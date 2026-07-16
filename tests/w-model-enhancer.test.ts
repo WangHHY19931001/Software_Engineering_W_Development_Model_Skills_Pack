@@ -218,3 +218,111 @@ describe('WModelVerifierEnhancer - 无 LLMClient 构造', () => {
     expect(result.qualityLevel).toBeDefined();
   });
 });
+
+class FixedJsonClient implements LLMClient {
+  constructor(private readonly json: string) {}
+  async generate(_prompt: string, _options?: LLMGenerateOptions): Promise<LLMResponse> {
+    return { text: this.json, supportsLogits: false };
+  }
+}
+
+const ADAPTIVE_RUBRIC_JSON = JSON.stringify({
+  dimensions: [
+    { id: 'adaptive-completeness', description: '完整性', scoringPrompt: '完整性(1-20)', weight: 0.5, minThreshold: 10 },
+    { id: 'adaptive-clarity', description: '清晰度', scoringPrompt: '清晰度(1-20)', weight: 0.5, minThreshold: 10 },
+  ],
+});
+
+describe('WModelVerifierEnhancer - adaptive rubric', () => {
+  it('uses hardcoded rubric when adaptive disabled (default)', async () => {
+    const config = {
+      llm: { model: 'mock' },
+      // no rubric.adaptive → defaults to off
+    };
+    const enhancer = new WModelVerifierEnhancer(config);
+    const req = {
+      id: 'r1', projectId: 'p1', title: '登录', description: 'desc',
+      type: '功能需求', priority: '高', acceptanceCriteria: ['ac1'],
+      testCases: [], status: '待开发',
+    };
+    const result = await enhancer.verifyRequirement(req);
+    // 硬编码 subCriteria 含 'completeness'（非 'adaptive-completeness'）
+    expect(result.subScores).toHaveProperty('completeness');
+    expect(result.subScores).not.toHaveProperty('adaptive-completeness');
+    expect(result.rubricFallback).toBeUndefined(); // adaptive off, no fallback flag
+  });
+
+  it('uses RubricGenerator when adaptive enabled', async () => {
+    const client = new FixedJsonClient(ADAPTIVE_RUBRIC_JSON);
+    const config = {
+      llm: { model: 'mock' },
+      rubric: {
+        adaptive: true, dimensions: 2, alphaThreshold: 0.8,
+        minThresholdDefault: 8, hardGate: false, cache: true,
+      },
+    };
+    const enhancer = new WModelVerifierEnhancer(config, client);
+    const req = {
+      id: 'r1', projectId: 'p1', title: '登录', description: 'desc',
+      type: '功能需求', priority: '高', acceptanceCriteria: ['ac1'],
+      testCases: [], status: '待开发',
+    };
+    const result = await enhancer.verifyRequirement(req, '用户登录功能');
+    expect(result.subScores).toHaveProperty('adaptive-completeness');
+    expect(result.rubricFallback).toBe(false);
+  });
+
+  it('falls back to hardcoded when RubricGenerator fails', async () => {
+    // rubric 生成调用（prompt 含"rubric 生成器"）抛错；评分调用正常返回默认文本
+    const client = new (class implements LLMClient {
+      async generate(prompt: string): Promise<LLMResponse> {
+        if (prompt.includes('rubric 生成器')) {
+          throw new Error('LLM down');
+        }
+        return { text: 'J', supportsLogits: false };
+      }
+    })();
+    const config = {
+      llm: { model: 'mock' },
+      rubric: {
+        adaptive: true, dimensions: 5, alphaThreshold: 0.8,
+        minThresholdDefault: 8, hardGate: false, cache: true,
+      },
+    };
+    const enhancer = new WModelVerifierEnhancer(config, client);
+    const req = {
+      id: 'r1', projectId: 'p1', title: '登录', description: 'desc',
+      type: '功能需求', priority: '高', acceptanceCriteria: ['ac1'],
+      testCases: [], status: '待开发',
+    };
+    const result = await enhancer.verifyRequirement(req, '用户登录功能');
+    expect(result.subScores).toHaveProperty('completeness');
+    expect(result.rubricFallback).toBe(true);
+  });
+
+  it('verifyDesign and verifyTestCase also support adaptive', async () => {
+    const client = new FixedJsonClient(ADAPTIVE_RUBRIC_JSON);
+    const config = {
+      llm: { model: 'mock' },
+      rubric: {
+        adaptive: true, dimensions: 2, alphaThreshold: 0.8,
+        minThresholdDefault: 8, hardGate: false, cache: true,
+      },
+    };
+    const enhancer = new WModelVerifierEnhancer(config, client);
+    const design = {
+      id: 'd1', projectId: 'p1', type: '系统设计' as const,
+      content: 'c', diagrams: [], testCases: [], createdAt: '2026-01-01',
+    };
+    const dResult = await enhancer.verifyDesign(design, '微服务架构');
+    expect(dResult.subScores).toHaveProperty('adaptive-completeness');
+
+    const tc = {
+      id: 't1', projectId: 'p1', type: '单元测试' as const, title: 't',
+      description: 'd', steps: ['s1'], expectedResult: 'e',
+      status: '待执行' as const, priority: '高' as const,
+    };
+    const tResult = await enhancer.verifyTestCaseQuality(tc, '边界测试');
+    expect(tResult.subScores).toHaveProperty('adaptive-completeness');
+  });
+});

@@ -13,6 +13,7 @@
 import type {
   Design,
   Requirement,
+  SubCriterion,
   TestCase,
   VerificationResult,
   VerifierConfig,
@@ -22,6 +23,7 @@ import { VerificationFramework, determineQualityLevel } from './verification-fra
 import { PPTRanker } from './ppt-ranker';
 import { MockLLMClient } from './llm-client';
 import type { LLMClient } from '../types';
+import { RubricGenerator, type RubricType } from './rubric-generator';
 
 /** 默认评分范围 */
 const DEFAULT_RANGE = { min: 1, max: 20 };
@@ -31,16 +33,36 @@ export class WModelVerifierEnhancer {
   private framework: VerificationFramework;
   private ranker: PPTRanker;
   private config: VerifierConfig;
+  private rubricGenerator: RubricGenerator | null = null;
+  private rubricConfig: NonNullable<VerifierConfig['rubric']>;
 
   constructor(config: VerifierConfig, llmClient?: LLMClient) {
     this.config = config;
     // 默认使用 MockLLMClient（开箱即用，便于 CI / 演示；生产环境请注入真实客户端）
-    this.engine = new LLMVerifierEngine(
-      config,
-      llmClient ?? new MockLLMClient(config.llm)
-    );
-    this.framework = new VerificationFramework(this.engine);
+    const client = llmClient ?? new MockLLMClient(config.llm);
+    this.engine = new LLMVerifierEngine(config, client);
+    this.framework = new VerificationFramework(this.engine, {
+      alphaThreshold: config.rubric?.alphaThreshold ?? 0.8,
+    });
     this.ranker = new PPTRanker(this.engine);
+
+    // rubric 配置（默认全关闭，向后兼容）
+    this.rubricConfig = config.rubric ?? {
+      adaptive: false,
+      dimensions: 5,
+      alphaThreshold: 0.8,
+      minThresholdDefault: 8,
+      hardGate: false,
+      cache: true,
+    };
+    if (this.rubricConfig.adaptive) {
+      this.rubricGenerator = new RubricGenerator({
+        llm: client,
+        dimensions: this.rubricConfig.dimensions,
+        minThresholdDefault: this.rubricConfig.minThresholdDefault,
+        cache: this.rubricConfig.cache,
+      });
+    }
   }
 
   /** 暴露底层引擎（测试 / 监控用） */
@@ -51,60 +73,75 @@ export class WModelVerifierEnhancer {
   // ==================== 需求验证 ====================
 
   /** 需求分析阶段验证：完整性 / 清晰度 / 一致性 / 可追溯性 / 可行性 */
-  async verifyRequirement(requirement: Requirement): Promise<VerificationResult> {
-    const subCriteria = [
-      { id: 'completeness', description: '需求描述完整性', scoringPrompt: '评估需求描述的完整性和详细程度(1-20分)', weight: 0.25 },
-      { id: 'clarity', description: '验收标准清晰度', scoringPrompt: '评估验收标准的清晰度和可操作性(1-20分)', weight: 0.20 },
-      { id: 'consistency', description: '需求内部一致性', scoringPrompt: '评估需求内部是否存在冲突或矛盾(1-20分)', weight: 0.20 },
-      { id: 'traceability', description: '需求可追溯性', scoringPrompt: '评估需求的可追溯性和可追踪性(1-20分)', weight: 0.20 },
-      { id: 'feasibility', description: '技术可行性', scoringPrompt: '评估需求的技术实现可行性(1-20分)', weight: 0.15 },
-    ];
-
-    return this.framework.verifyWithThreeDimensions(requirement, {
+  async verifyRequirement(
+    requirement: Requirement,
+    taskDescription?: string
+  ): Promise<VerificationResult> {
+    const subCriteria = await this.resolveSubCriteria('requirement', taskDescription);
+    const result = await this.framework.verifyWithThreeDimensions(requirement, {
       scoreGranularity: { range: DEFAULT_RANGE, labels: this.generateLabels(20), granularityLevel: 20 },
       repeatedEvaluation: { times: 5, varianceThreshold: 0.1, aggregationMethod: 'mean' },
       criteriaDecomposition: { originalCriteria: '需求质量', subCriteria, weights: subCriteria.map(s => s.weight) },
     });
+    if (this._lastRubricFallback !== undefined) result.rubricFallback = this._lastRubricFallback;
+    return result;
   }
 
   // ==================== 设计验证 ====================
 
   /** 设计阶段验证：架构清晰度 / 接口完整性 / 可扩展性 / 性能 / 安全 / 可测试性 */
-  async verifyDesign(design: Design): Promise<VerificationResult> {
-    const subCriteria = [
-      { id: 'arch-clarity', description: '架构设计清晰度', scoringPrompt: '评估架构设计的清晰度、模块划分合理性、技术选型依据充分性(1-20分)', weight: 0.20 },
-      { id: 'interface-completeness', description: '接口定义完整性', scoringPrompt: '评估接口定义的完整性、参数明确性、异常处理覆盖度(1-20分)', weight: 0.20 },
-      { id: 'scalability', description: '可扩展性设计', scoringPrompt: '评估设计的可扩展性、扩展点预留、耦合度合理性(1-20分)', weight: 0.15 },
-      { id: 'performance', description: '性能考虑', scoringPrompt: '评估性能瓶颈识别、优化方案、数据库设计、缓存策略(1-20分)', weight: 0.15 },
-      { id: 'security', description: '安全性设计', scoringPrompt: '评估安全风险识别、防护措施、数据加密、权限控制(1-20分)', weight: 0.15 },
-      { id: 'testability', description: '可测试性', scoringPrompt: '评估单元测试便利性、mock支持、数据隔离、测试环境设计(1-20分)', weight: 0.15 },
-    ];
-
-    return this.framework.verifyWithThreeDimensions(design, {
+  async verifyDesign(
+    design: Design,
+    taskDescription?: string
+  ): Promise<VerificationResult> {
+    const subCriteria = await this.resolveSubCriteria('design', taskDescription);
+    const result = await this.framework.verifyWithThreeDimensions(design, {
       scoreGranularity: { range: DEFAULT_RANGE, labels: this.generateLabels(20), granularityLevel: 20 },
       repeatedEvaluation: { times: 5, varianceThreshold: 0.1, aggregationMethod: 'mean' },
       criteriaDecomposition: { originalCriteria: '设计质量', subCriteria, weights: subCriteria.map(s => s.weight) },
     });
+    if (this._lastRubricFallback !== undefined) result.rubricFallback = this._lastRubricFallback;
+    return result;
   }
 
   // ==================== 测试用例验证 ====================
 
   /** 测试用例质量验证：覆盖完整性 / 边界 / 异常 / 步骤清晰度 / 可维护性 */
-  async verifyTestCaseQuality(testCase: TestCase): Promise<VerificationResult> {
-    const subCriteria = [
-      { id: 'coverage', description: '覆盖完整性', scoringPrompt: '评估测试场景覆盖的完整性和全面性(1-20分)', weight: 0.25 },
-      { id: 'boundary-handling', description: '边界条件处理', scoringPrompt: '评估边界条件和极端场景的测试覆盖(1-20分)', weight: 0.20 },
-      { id: 'exception-handling', description: '异常场景覆盖', scoringPrompt: '评估异常场景和错误处理的测试覆盖(1-20分)', weight: 0.20 },
-      { id: 'clarity', description: '测试步骤清晰度', scoringPrompt: '评估测试步骤描述的清晰度和可操作性(1-20分)', weight: 0.15 },
-      { id: 'maintainability', description: '可维护性', scoringPrompt: '评估测试用例的可维护性和易修改性(1-20分)', weight: 0.20 },
-    ];
-
-    return this.framework.verifyWithThreeDimensions(testCase, {
+  async verifyTestCaseQuality(
+    testCase: TestCase,
+    taskDescription?: string
+  ): Promise<VerificationResult> {
+    const subCriteria = await this.resolveSubCriteria('testcase', taskDescription);
+    const result = await this.framework.verifyWithThreeDimensions(testCase, {
       scoreGranularity: { range: DEFAULT_RANGE, labels: this.generateLabels(20), granularityLevel: 20 },
       repeatedEvaluation: { times: 5, varianceThreshold: 0.1, aggregationMethod: 'mean' },
       criteriaDecomposition: { originalCriteria: '测试用例质量', subCriteria, weights: subCriteria.map(s => s.weight) },
     });
+    if (this._lastRubricFallback !== undefined) result.rubricFallback = this._lastRubricFallback;
+    return result;
   }
+
+  /**
+   * 解析子标准：adaptive 开启时走 RubricGenerator，否则用硬编码。
+   * 把 rubricFallback 标记注入返回结果的 details（通过 wrapper）。
+   */
+  private async resolveSubCriteria(
+    type: RubricType,
+    taskDescription?: string
+  ): Promise<SubCriterion[]> {
+    if (this.rubricConfig.adaptive && this.rubricGenerator && taskDescription) {
+      const result = await this.rubricGenerator.generate(type, taskDescription);
+      // rubricFallback 通过闭包标记，verify* 调用方需读取；此处用全局标记
+      this._lastRubricFallback = result.fallback;
+      return result.subCriteria;
+    }
+    // adaptive 关闭或无 taskDescription → 硬编码（不标 fallback）
+    this._lastRubricFallback = undefined;
+    return hardcodedSubCriteria(type);
+  }
+
+  /** 上一次 resolveSubCriteria 的 fallback 标记（供 verify* 包装结果用） */
+  private _lastRubricFallback: boolean | undefined = undefined;
 
   /** 测试用例优先级排序（PPT 算法） */
   async rankTestCasesByPriority(testCases: TestCase[]): Promise<import('../types').RankingResult<TestCase>> {
@@ -133,5 +170,36 @@ export class WModelVerifierEnhancer {
       labels.push(String.fromCharCode(65 + i));
     }
     return labels;
+  }
+}
+
+/** 硬编码 subCriteria（adaptive 关闭或 fallback 时使用），与 RubricGenerator 的 fallback 一致 */
+function hardcodedSubCriteria(type: RubricType): SubCriterion[] {
+  switch (type) {
+    case 'requirement':
+      return [
+        { id: 'completeness', description: '需求描述完整性', scoringPrompt: '评估需求描述的完整性和详细程度(1-20分)', weight: 0.25 },
+        { id: 'clarity', description: '验收标准清晰度', scoringPrompt: '评估验收标准的清晰度和可操作性(1-20分)', weight: 0.20 },
+        { id: 'consistency', description: '需求内部一致性', scoringPrompt: '评估需求内部是否存在冲突或矛盾(1-20分)', weight: 0.20 },
+        { id: 'traceability', description: '需求可追溯性', scoringPrompt: '评估需求的可追溯性和可追踪性(1-20分)', weight: 0.20 },
+        { id: 'feasibility', description: '技术可行性', scoringPrompt: '评估需求的技术实现可行性(1-20分)', weight: 0.15 },
+      ];
+    case 'design':
+      return [
+        { id: 'arch-clarity', description: '架构设计清晰度', scoringPrompt: '评估架构设计的清晰度、模块划分合理性、技术选型依据充分性(1-20分)', weight: 0.20 },
+        { id: 'interface-completeness', description: '接口定义完整性', scoringPrompt: '评估接口定义的完整性、参数明确性、异常处理覆盖度(1-20分)', weight: 0.20 },
+        { id: 'scalability', description: '可扩展性设计', scoringPrompt: '评估设计的可扩展性、扩展点预留、耦合度合理性(1-20分)', weight: 0.15 },
+        { id: 'performance', description: '性能考虑', scoringPrompt: '评估性能瓶颈识别、优化方案、数据库设计、缓存策略(1-20分)', weight: 0.15 },
+        { id: 'security', description: '安全性设计', scoringPrompt: '评估安全风险识别、防护措施、数据加密、权限控制(1-20分)', weight: 0.15 },
+        { id: 'testability', description: '可测试性', scoringPrompt: '评估单元测试便利性、mock支持、数据隔离、测试环境设计(1-20分)', weight: 0.15 },
+      ];
+    case 'testcase':
+      return [
+        { id: 'coverage', description: '覆盖完整性', scoringPrompt: '评估测试场景覆盖的完整性和全面性(1-20分)', weight: 0.25 },
+        { id: 'boundary-handling', description: '边界条件处理', scoringPrompt: '评估边界条件和极端场景的测试覆盖(1-20分)', weight: 0.20 },
+        { id: 'exception-handling', description: '异常场景覆盖', scoringPrompt: '评估异常场景和错误处理的测试覆盖(1-20分)', weight: 0.20 },
+        { id: 'clarity', description: '测试步骤清晰度', scoringPrompt: '评估测试步骤描述的清晰度和可操作性(1-20分)', weight: 0.15 },
+        { id: 'maintainability', description: '可维护性', scoringPrompt: '评估测试用例的可维护性和易修改性(1-20分)', weight: 0.20 },
+      ];
   }
 }
