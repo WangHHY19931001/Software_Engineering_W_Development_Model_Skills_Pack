@@ -12,7 +12,8 @@
 import { describe, it, expect } from '@jest/globals';
 import { WModelVerifierEnhancer } from '../src/core/w-model-enhancer.js';
 import { MockLLMClient } from '../src/core/llm-client.js';
-import type { VerifierConfig, Requirement, Design, TestCase } from '../src/types/index.js';
+import { RubricGenerator } from '../src/core/rubric-generator.js';
+import type { VerifierConfig, Requirement, Design, TestCase, LLMClient, LLMResponse, LLMGenerateOptions } from '../src/types/index.js';
 
 function makeVerifier(overrides: Partial<VerifierConfig> = {}, clientOpts: { supportsLogits?: boolean; scoreLabel?: string; mockLogits?: number[][] } = {}): WModelVerifierEnhancer {
   const config: VerifierConfig = {
