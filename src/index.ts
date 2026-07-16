@@ -38,6 +38,15 @@ export {
   getCommandNames,
 } from './commands/router';
 
+// ==================== 自适应评分 (Adaptive Rubric) ====================
+export { RubricGenerator } from './core/rubric-generator';
+export type { RubricType, RubricGeneratorConfig, GenerateResult } from './core/rubric-generator';
+export {
+  computeKrippendorffAlpha,
+  applyDimensionAwareFilter,
+  toOrdinalLabels,
+} from './core/reliability-math';
+
 // ==================== 类型 ====================
 export type * from './types';
 
