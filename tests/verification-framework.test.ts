@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { VerificationFramework, determineQualityLevel } from '../src/core/verification-framework.js';
+import { VerificationFramework, determineQualityLevel, ReliabilityGateError } from '../src/core/verification-framework.js';
 import { applyDimensionAwareFilter, computeKrippendorffAlpha, toOrdinalLabels } from '../src/core/reliability-math.js';
 import type { ContinuousScoringEngine, VerificationDimension } from '../src/types/index.js';
 
@@ -257,5 +257,63 @@ describe('VerificationFramework - reliability post-processing', () => {
     expect(result.reliability!.alpha).toBeCloseTo(1.0, 3);
     expect(result.dimensionFlags).toEqual([{ id: 'a', violated: false }]);
     expect(result.deploymentGate).toBe('pass');
+  });
+});
+
+describe('VerificationFramework - hardGate', () => {
+  it('throws ReliabilityGateError when hardGate=true and gate=fail (dimension violation)', async () => {
+    // 2 dims: a passes (16), b fails (7 < minThreshold 10) → dimension violation → gate=fail under hardGate
+    const engine = new SequenceScoreEngine([16, 16, 16, 7, 7, 7]);
+    const fw = new VerificationFramework(engine, { alphaThreshold: 0.8, hardGate: true });
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 3, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [
+          { id: 'a', description: '', scoringPrompt: '', weight: 0.5, minThreshold: 10 },
+          { id: 'b', description: '', scoringPrompt: '', weight: 0.5, minThreshold: 10 },
+        ],
+        weights: [0.5, 0.5],
+      },
+    };
+    await expect(fw.verifyWithThreeDimensions({}, dim)).rejects.toBeInstanceOf(ReliabilityGateError);
+  });
+
+  it('does not throw when hardGate=true but gate=pass', async () => {
+    // 3 runs all 16 → alpha=1, no violation → gate=pass → no throw even under hardGate
+    const engine = new SequenceScoreEngine([16, 16, 16]);
+    const fw = new VerificationFramework(engine, { alphaThreshold: 0.8, hardGate: true });
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 3, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [{ id: 'a', description: '', scoringPrompt: '', weight: 1, minThreshold: 8 }],
+        weights: [1],
+      },
+    };
+    const result = await fw.verifyWithThreeDimensions({}, dim);
+    expect(result.deploymentGate).toBe('pass');
+  });
+
+  it('does not throw when hardGate=false (default soft gate)', async () => {
+    // dimension violation but hardGate=false → gate='review', no throw
+    const engine = new SequenceScoreEngine([16, 16, 16, 7, 7, 7]);
+    const fw = new VerificationFramework(engine, { alphaThreshold: 0.8, hardGate: false });
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 3, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [
+          { id: 'a', description: '', scoringPrompt: '', weight: 0.5, minThreshold: 10 },
+          { id: 'b', description: '', scoringPrompt: '', weight: 0.5, minThreshold: 10 },
+        ],
+        weights: [0.5, 0.5],
+      },
+    };
+    const result = await fw.verifyWithThreeDimensions({}, dim);
+    expect(result.deploymentGate).toBe('review');
   });
 });

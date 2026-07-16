@@ -41,10 +41,6 @@ export class WModelVerifierEnhancer {
     // 默认使用 MockLLMClient（开箱即用，便于 CI / 演示；生产环境请注入真实客户端）
     const client = llmClient ?? new MockLLMClient(config.llm);
     this.engine = new LLMVerifierEngine(config, client);
-    this.framework = new VerificationFramework(this.engine, {
-      alphaThreshold: config.rubric?.alphaThreshold ?? 0.8,
-    });
-    this.ranker = new PPTRanker(this.engine);
 
     // rubric 配置（默认全关闭，向后兼容）
     this.rubricConfig = config.rubric ?? {
@@ -55,6 +51,12 @@ export class WModelVerifierEnhancer {
       hardGate: false,
       cache: true,
     };
+    this.framework = new VerificationFramework(this.engine, {
+      alphaThreshold: config.rubric?.alphaThreshold ?? 0.8,
+      hardGate: this.rubricConfig.hardGate,
+    });
+    this.ranker = new PPTRanker(this.engine);
+
     if (this.rubricConfig.adaptive) {
       this.rubricGenerator = new RubricGenerator({
         llm: client,
@@ -137,7 +139,7 @@ export class WModelVerifierEnhancer {
     }
     // adaptive 关闭或无 taskDescription → 硬编码（不标 fallback）
     this._lastRubricFallback = undefined;
-    return hardcodedSubCriteria(type);
+    return hardcodedSubCriteria(type, this.rubricConfig.minThresholdDefault);
   }
 
   /** 上一次 resolveSubCriteria 的 fallback 标记（供 verify* 包装结果用） */
@@ -174,32 +176,32 @@ export class WModelVerifierEnhancer {
 }
 
 /** 硬编码 subCriteria（adaptive 关闭或 fallback 时使用），与 RubricGenerator 的 fallback 一致 */
-function hardcodedSubCriteria(type: RubricType): SubCriterion[] {
+function hardcodedSubCriteria(type: RubricType, minThresholdDefault: number): SubCriterion[] {
   switch (type) {
     case 'requirement':
       return [
-        { id: 'completeness', description: '需求描述完整性', scoringPrompt: '评估需求描述的完整性和详细程度(1-20分)', weight: 0.25 },
-        { id: 'clarity', description: '验收标准清晰度', scoringPrompt: '评估验收标准的清晰度和可操作性(1-20分)', weight: 0.20 },
-        { id: 'consistency', description: '需求内部一致性', scoringPrompt: '评估需求内部是否存在冲突或矛盾(1-20分)', weight: 0.20 },
-        { id: 'traceability', description: '需求可追溯性', scoringPrompt: '评估需求的可追溯性和可追踪性(1-20分)', weight: 0.20 },
-        { id: 'feasibility', description: '技术可行性', scoringPrompt: '评估需求的技术实现可行性(1-20分)', weight: 0.15 },
+        { id: 'completeness', description: '需求描述完整性', scoringPrompt: '评估需求描述的完整性和详细程度(1-20分)', weight: 0.25, minThreshold: minThresholdDefault },
+        { id: 'clarity', description: '验收标准清晰度', scoringPrompt: '评估验收标准的清晰度和可操作性(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'consistency', description: '需求内部一致性', scoringPrompt: '评估需求内部是否存在冲突或矛盾(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'traceability', description: '需求可追溯性', scoringPrompt: '评估需求的可追溯性和可追踪性(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'feasibility', description: '技术可行性', scoringPrompt: '评估需求的技术实现可行性(1-20分)', weight: 0.15, minThreshold: minThresholdDefault },
       ];
     case 'design':
       return [
-        { id: 'arch-clarity', description: '架构设计清晰度', scoringPrompt: '评估架构设计的清晰度、模块划分合理性、技术选型依据充分性(1-20分)', weight: 0.20 },
-        { id: 'interface-completeness', description: '接口定义完整性', scoringPrompt: '评估接口定义的完整性、参数明确性、异常处理覆盖度(1-20分)', weight: 0.20 },
-        { id: 'scalability', description: '可扩展性设计', scoringPrompt: '评估设计的可扩展性、扩展点预留、耦合度合理性(1-20分)', weight: 0.15 },
-        { id: 'performance', description: '性能考虑', scoringPrompt: '评估性能瓶颈识别、优化方案、数据库设计、缓存策略(1-20分)', weight: 0.15 },
-        { id: 'security', description: '安全性设计', scoringPrompt: '评估安全风险识别、防护措施、数据加密、权限控制(1-20分)', weight: 0.15 },
-        { id: 'testability', description: '可测试性', scoringPrompt: '评估单元测试便利性、mock支持、数据隔离、测试环境设计(1-20分)', weight: 0.15 },
+        { id: 'arch-clarity', description: '架构设计清晰度', scoringPrompt: '评估架构设计的清晰度、模块划分合理性、技术选型依据充分性(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'interface-completeness', description: '接口定义完整性', scoringPrompt: '评估接口定义的完整性、参数明确性、异常处理覆盖度(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'scalability', description: '可扩展性设计', scoringPrompt: '评估设计的可扩展性、扩展点预留、耦合度合理性(1-20分)', weight: 0.15, minThreshold: minThresholdDefault },
+        { id: 'performance', description: '性能考虑', scoringPrompt: '评估性能瓶颈识别、优化方案、数据库设计、缓存策略(1-20分)', weight: 0.15, minThreshold: minThresholdDefault },
+        { id: 'security', description: '安全性设计', scoringPrompt: '评估安全风险识别、防护措施、数据加密、权限控制(1-20分)', weight: 0.15, minThreshold: minThresholdDefault },
+        { id: 'testability', description: '可测试性', scoringPrompt: '评估单元测试便利性、mock支持、数据隔离、测试环境设计(1-20分)', weight: 0.15, minThreshold: minThresholdDefault },
       ];
     case 'testcase':
       return [
-        { id: 'coverage', description: '覆盖完整性', scoringPrompt: '评估测试场景覆盖的完整性和全面性(1-20分)', weight: 0.25 },
-        { id: 'boundary-handling', description: '边界条件处理', scoringPrompt: '评估边界条件和极端场景的测试覆盖(1-20分)', weight: 0.20 },
-        { id: 'exception-handling', description: '异常场景覆盖', scoringPrompt: '评估异常场景和错误处理的测试覆盖(1-20分)', weight: 0.20 },
-        { id: 'clarity', description: '测试步骤清晰度', scoringPrompt: '评估测试步骤描述的清晰度和可操作性(1-20分)', weight: 0.15 },
-        { id: 'maintainability', description: '可维护性', scoringPrompt: '评估测试用例的可维护性和易修改性(1-20分)', weight: 0.20 },
+        { id: 'coverage', description: '覆盖完整性', scoringPrompt: '评估测试场景覆盖的完整性和全面性(1-20分)', weight: 0.25, minThreshold: minThresholdDefault },
+        { id: 'boundary-handling', description: '边界条件处理', scoringPrompt: '评估边界条件和极端场景的测试覆盖(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'exception-handling', description: '异常场景覆盖', scoringPrompt: '评估异常场景和错误处理的测试覆盖(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
+        { id: 'clarity', description: '测试步骤清晰度', scoringPrompt: '评估测试步骤描述的清晰度和可操作性(1-20分)', weight: 0.15, minThreshold: minThresholdDefault },
+        { id: 'maintainability', description: '可维护性', scoringPrompt: '评估测试用例的可维护性和易修改性(1-20分)', weight: 0.20, minThreshold: minThresholdDefault },
       ];
   }
 }

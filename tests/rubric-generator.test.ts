@@ -92,6 +92,8 @@ describe('RubricGenerator', () => {
     expect(result.subCriteria.length).toBeGreaterThan(0);
     // 硬编码 subCriteria 不带 taskAdaptive
     expect(result.subCriteria.every(c => c.taskAdaptive !== true)).toBe(true);
+    // fallback subCriteria 应带 minThreshold（用 minThresholdDefault 填充）
+    expect(result.subCriteria.every(c => c.minThreshold === 8)).toBe(true);
   });
 
   it('falls back on invalid JSON', async () => {

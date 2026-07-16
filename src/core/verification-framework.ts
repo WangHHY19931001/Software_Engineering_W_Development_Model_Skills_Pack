@@ -14,13 +14,29 @@ import type {
 } from '../types';
 import { computeKrippendorffAlpha, applyDimensionAwareFilter, toOrdinalLabels } from './reliability-math';
 
+/** 硬门模式下 gate='fail' 时抛出，可被上层捕获 */
+export class ReliabilityGateError extends Error {
+  readonly gate: 'fail';
+  readonly alpha: number | null;
+  readonly dimensionViolations: string[];
+  constructor(result: VerificationResult) {
+    super(`Reliability gate failed: alpha=${result.reliability?.alpha ?? 'null'}, dimensionViolations=${(result.dimensionFlags ?? []).filter(f => f.violated).map(f => f.id).join(',')}`);
+    this.name = 'ReliabilityGateError';
+    this.gate = 'fail';
+    this.alpha = result.reliability?.alpha ?? null;
+    this.dimensionViolations = (result.dimensionFlags ?? []).filter(f => f.violated).map(f => f.id);
+  }
+}
+
 export class VerificationFramework {
   private scoringEngine: ContinuousScoringEngine;
   private readonly alphaThreshold: number;
+  private readonly hardGate: boolean;
 
-  constructor(scoringEngine: ContinuousScoringEngine, opts?: { alphaThreshold?: number }) {
+  constructor(scoringEngine: ContinuousScoringEngine, opts?: { alphaThreshold?: number; hardGate?: boolean }) {
     this.scoringEngine = scoringEngine;
     this.alphaThreshold = opts?.alphaThreshold ?? 0.8;
+    this.hardGate = opts?.hardGate ?? false;
   }
 
   /** 执行三维度验证 */
@@ -105,10 +121,10 @@ export class VerificationFramework {
     if (alphaOk && dimOk) {
       deploymentGate = 'pass';
     } else {
-      deploymentGate = 'review';
+      deploymentGate = this.hardGate ? 'fail' : 'review';
     }
 
-    return {
+    const result: VerificationResult = {
       finalScore,
       subScores,
       confidence,
@@ -118,6 +134,11 @@ export class VerificationFramework {
       deploymentGate,
       dimensionFlags: filterResult.dimensionFlags,
     };
+
+    if (this.hardGate && deploymentGate === 'fail') {
+      throw new ReliabilityGateError(result);
+    }
+    return result;
   }
 
   /** 聚合多次评分结果 */

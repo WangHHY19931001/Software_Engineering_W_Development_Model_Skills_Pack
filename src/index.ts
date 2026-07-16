@@ -15,6 +15,7 @@
 // ==================== 核心引擎 ====================
 export { LLMVerifierEngine } from './core/scoring-engine';
 export { VerificationFramework, determineQualityLevel } from './core/verification-framework';
+export { ReliabilityGateError } from './core/verification-framework';
 export { PPTRanker } from './core/ppt-ranker';
 export { WModelVerifierEnhancer } from './core/w-model-enhancer';
 export {
