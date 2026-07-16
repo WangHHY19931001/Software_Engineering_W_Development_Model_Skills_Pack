@@ -1,7 +1,7 @@
 /**
  * W-Model AI Assistant Skill - 共享类型定义
  *
- * 单一事实来源：skill-design-document_SSoT.md 第 7 章（数据模型）
+ * 单一事实来源：docs/skill-design-document_SSoT.md 第 7 章（数据模型）
  * 此文件为所有模块共用的类型入口，避免重复定义。
  */
 

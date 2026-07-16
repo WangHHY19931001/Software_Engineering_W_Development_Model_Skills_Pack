@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### 变更（项目结构整理）
+
+- 设计文档统一迁入 `docs/` 目录：`skill-design-document.md`、`skill-design-document_SSoT.md`、`llm-verifier-integration-design.md`、`llm-verifier-implementation-template.ts`、`IMPLEMENTATION-PLAN.md`
+- `w-model-dev/` 确立为标准 skill 结构目录（`SKILL.md` + `META-SKILL.md` + `references/` + `templates/` + `examples/`），自包含可独立拷贝安装
+- 新增 `docs/INSTALL.md`：AI Agent 安装指南（模式 A 零依赖拷贝 / 模式 B 程序化 TypeScript 引擎）
+- `README.md` 快速上手拆分为「AI Agent 安装」与「程序化安装」两条路径
+- 同步更新 `package.json` files 字段、`src/` 代码注释、`CONTRIBUTING.md`、`SKILL.md` 中所有受影响的文档引用路径
+
 ### 新增（基于设计→实现审查报告的全面修正）
 
 > 本次修正以 SSoT 设计文档为唯一事实来源审查起点，识别设计层与实现层问题后系统性修正。

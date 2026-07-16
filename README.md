@@ -17,17 +17,32 @@
 
 ## 快速上手
 
-### 环境要求
+本技能提供两种使用方式：**AI Agent 模式**（直接读取 Skill 资产，零依赖）与**程序化模式**（TypeScript 引擎）。
+
+### 方式一：AI Agent 安装（推荐，零依赖）
+
+将 [`w-model-dev/`](./w-model-dev) 目录拷贝到你的 AI Agent（Trae / Claude Code 等）的 skills 目录即可。Skill 资产自包含：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` 按需加载，无需 Node.js 或 npm。
+
+```bash
+# 拷贝 skill 目录到 agent 的 skills 位置（路径以你的 agent 为准）
+cp -r w-model-dev /path/to/agent/skills/w-model-dev
+```
+
+安装后，agent 在用户提及 W 模型或 `/wm` 命令时自动激活本技能。详细步骤与验证方法见 [docs/INSTALL.md](./docs/INSTALL.md)。
+
+### 方式二：程序化安装（TypeScript 引擎）
+
+#### 环境要求
 
 - Node.js ≥ 18.0.0
 
-### 安装依赖
+#### 安装依赖
 
 ```bash
 npm install
 ```
 
-### 运行全流程示例
+#### 运行全流程示例
 
 ```bash
 npm run example:run
@@ -35,7 +50,7 @@ npm run example:run
 
 该示例使用 Mock LLM（无需 API key），走完 W 模型 8 个阶段并导出 RTM。
 
-### 运行测试
+#### 运行测试
 
 ```bash
 npm test
@@ -62,7 +77,7 @@ npm test
 
 ```
 .
-├── src/                          # TypeScript 实现
+├── src/                          # TypeScript 实现（技能的可选运行时引擎）
 │   ├── core/                     # 核心引擎
 │   │   ├── llm-client.ts         # LLM 客户端抽象（Mock / Http）
 │   │   ├── scoring-engine.ts     # LLMVerifierEngine - 连续评分核心
@@ -80,17 +95,22 @@ npm test
 ├── tests/                        # 单元测试（119 个，覆盖率 ≥ 85%）
 ├── examples/
 │   └── run-wm-flow.ts            # W 模型全流程示例
-├── w-model-dev/                  # Skill 资产
-│   ├── SKILL.md                  # Skill 定义
-│   ├── references/               # 各阶段参考文档
+├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含）
+│   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排）
+│   ├── META-SKILL.md             # 元技能可演化配置
+│   ├── references/               # 各阶段参考文档（按需加载）
 │   ├── templates/                # 文档模板
 │   └── examples/                 # 交互示例
-├── skill-design-document_SSoT.md # 设计文档（单一事实来源）
-├── llm-verifier-integration-design.md  # LLM Verifier 集成设计
-├── llm-verifier-implementation-template.ts  # 原始模板（已被 src/ 替代）
+├── docs/                         # 设计文档（统一存放）
+│   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
+│   ├── skill-design-document.md                # 设计文档指针（已废弃独立维护）
+│   ├── llm-verifier-integration-design.md      # LLM Verifier 集成设计
+│   ├── llm-verifier-implementation-template.ts # 原始模板（已被 src/ 替代）
+│   ├── IMPLEMENTATION-PLAN.md                  # 实现路线图
+│   └── INSTALL.md                              # AI Agent 安装指南
 ├── CHANGELOG.md                  # 变更日志
 ├── CONTRIBUTING.md               # 贡献指南
-└── IMPLEMENTATION-PLAN.md        # 实现路线图
+└── README.md                     # 项目导航
 ```
 
 ## 编程式接入
@@ -131,10 +151,11 @@ if (result.success) {
 
 ## 相关文档
 
-- [设计文档（SSoT）](./skill-design-document_SSoT.md) - 单一事实来源
+- [设计文档（SSoT）](./docs/skill-design-document_SSoT.md) - 单一事实来源
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
-- [LLM Verifier 集成设计](./llm-verifier-integration-design.md)
-- [实现路线图](./IMPLEMENTATION-PLAN.md)
+- [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md)
+- [实现路线图](./docs/IMPLEMENTATION-PLAN.md)
+- [AI Agent 安装指南](./docs/INSTALL.md)
 - [变更日志](./CHANGELOG.md)
 - [贡献指南](./CONTRIBUTING.md)
 

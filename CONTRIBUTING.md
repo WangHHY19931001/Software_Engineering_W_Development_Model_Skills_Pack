@@ -95,8 +95,8 @@ docs(ssot): 同步 RTM 数据模型定义
 
 ### SSoT 原则
 
-- **设计决策**统一记录在 [`skill-design-document_SSoT.md`](./skill-design-document_SSoT.md)
-- `skill-design-document.md` 仅作为指针，不再独立维护内容
+- **设计决策**统一记录在 [`docs/skill-design-document_SSoT.md`](./docs/skill-design-document_SSoT.md)
+- `docs/skill-design-document.md` 仅作为指针，不再独立维护内容
 - 修改设计 → 先改 SSoT → 再改实现 → 最后改测试
 
 ### 变更日志
@@ -107,7 +107,7 @@ docs(ssot): 同步 RTM 数据模型定义
 ## 项目结构约定
 
 ```
-src/
+src/            # TypeScript 实现（技能的可选运行时引擎）
 ├── core/       # 核心引擎（LLM Verifier 相关）
 ├── state/      # 状态管理（项目状态 + RTM）
 ├── commands/   # /wm 命令路由
@@ -115,8 +115,9 @@ src/
 └── index.ts    # 公共 API 入口
 
 tests/          # 单元测试，文件名与 src/ 对应
-examples/       # 可运行示例
-w-model-dev/    # Skill 资产（SKILL.md、模板、参考文档）
+examples/       # 可运行示例（程序化调用）
+w-model-dev/    # Skill 资产（标准 skill 结构：SKILL.md、META-SKILL.md、references/、templates/、examples/）
+docs/           # 设计文档统一存放（SSoT、集成设计、实现路线图、安装指南等）
 ```
 
 ### 添加新命令

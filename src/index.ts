@@ -8,10 +8,10 @@
  *   4. 技能演化与评估（evolution/skill-optimizer + eval/skill-lift）—— 对应 SSoT 第 14/15 章
  *
  * 对应设计：
- *   - SSoT: skill-design-document_SSoT.md（第 7/10/14/15 章为数据模型/质量门/演化/评估的权威定义）
+ *   - SSoT: docs/skill-design-document_SSoT.md（第 7/10/14/15 章为数据模型/质量门/演化/评估的权威定义）
  *   - SKILL: w-model-dev/SKILL.md（编排逻辑）
  *   - MetaSkill: w-model-dev/META-SKILL.md（可训练外部状态）
- *   - 集成设计: llm-verifier-integration-design.md
+ *   - 集成设计: docs/llm-verifier-integration-design.md
  */
 
 // ==================== 核心引擎 ====================

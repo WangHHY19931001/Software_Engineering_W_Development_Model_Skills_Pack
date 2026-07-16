@@ -34,7 +34,7 @@ description: >-
 2. **阶段门评审（Stage Gate）**：每个阶段产出必须通过评审后才能进入下一阶段；评审不通过则回到当前阶段起点返工。
 3. **RTM 同步维护**：每次需求或设计变更，必须同步更新需求跟踪矩阵；定期核验需求覆盖率应为 100%。
 4. **质量门**：代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
-5. **以 SSoT 为准**：本技能以 `skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
+5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
 6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则按需从 `references/` 加载，模板从 `templates/` 取用。
 
 ## 阶段与测试并行对应表
@@ -170,7 +170,8 @@ description: >-
 
 ```
 w-model-dev/
-├── SKILL.md                       # 本文件：编排与命令
+├── SKILL.md                       # 本文件：编排与命令（YAML frontmatter + 阶段流）
+├── META-SKILL.md                  # 元技能可演化配置（可训练外部状态）
 ├── references/                    # 阶段细则（按需加载）
 │   ├── phase-1-requirements.md
 │   ├── phase-2-system-design.md
@@ -197,6 +198,9 @@ w-model-dev/
     ├── system-design.md
     └── coding.md
 ```
+
+> 本目录为标准 skill 结构，自包含。AI Agent 安装时只需拷贝整个 `w-model-dev/` 目录，
+> 详见 [../docs/INSTALL.md](../docs/INSTALL.md)。
 
 ## 实现位置
 
@@ -238,4 +242,4 @@ await dispatch('/wm design type=架构', ctx);
 // ... 完整 8 阶段流程
 ```
 
-详见 [README.md](../README.md) 与 [IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md)。
+详见 [README.md](../README.md) 与 [docs/IMPLEMENTATION-PLAN.md](../docs/IMPLEMENTATION-PLAN.md)。

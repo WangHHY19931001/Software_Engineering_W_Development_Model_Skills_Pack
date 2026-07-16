@@ -16,8 +16,7 @@
     "dist",
     "src",
     "w-model-dev",
-    "skill-design-document_SSoT.md",
-    "llm-verifier-integration-design.md"
+    "docs"
   ],
   "scripts": {
     "build": "tsc",
