@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from '@jest/globals';
 import { VerificationFramework, determineQualityLevel } from '../src/core/verification-framework.js';
+import { applyDimensionAwareFilter, computeKrippendorffAlpha, toOrdinalLabels } from '../src/core/reliability-math.js';
 import type { ContinuousScoringEngine, VerificationDimension } from '../src/types/index.js';
 
 /** 用于测试的固定评分引擎 */
@@ -156,5 +157,105 @@ describe('determineQualityLevel - 边界值', () => {
 
   it('使用默认范围 1-20', () => {
     expect(determineQualityLevel(20)).toBe('excellent');
+  });
+});
+
+/** 评分引擎：每次调用按序返回预设分数，用于构造可控的重复评估 */
+class SequenceScoreEngine implements ContinuousScoringEngine {
+  private callIdx = 0;
+  constructor(private readonly scoresByCall: number[]) {}
+  async computeContinuousScore(): Promise<number> {
+    const s = this.scoresByCall[this.callIdx % this.scoresByCall.length];
+    this.callIdx++;
+    return s;
+  }
+  async getScoreDistribution(): Promise<Map<number, number>> {
+    return new Map([[10, 1]]);
+  }
+  reset() { this.callIdx = 0; }
+}
+
+describe('VerificationFramework - reliability post-processing', () => {
+  it('computes reliability.alpha from repeated runs (N>=2)', async () => {
+    // 1 dimension, 3 runs, all score 16 → ordinal identical → alpha=1
+    const engine = new SequenceScoreEngine([16, 16, 16]);
+    const fw = new VerificationFramework(engine);
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 3, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [{ id: 'a', description: '', scoringPrompt: '', weight: 1, minThreshold: 10 }],
+        weights: [1],
+      },
+    };
+    const result = await fw.verifyWithThreeDimensions({}, dim);
+    expect(result.reliability).toBeDefined();
+    expect(result.reliability!.coders).toBe(3);
+    expect(result.reliability!.alpha).toBeCloseTo(1.0, 3);
+  });
+
+  it('sets reliability.alpha=null when N<2', async () => {
+    const engine = new SequenceScoreEngine([16]);
+    const fw = new VerificationFramework(engine);
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 1, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [{ id: 'a', description: '', scoringPrompt: '', weight: 1 }],
+        weights: [1],
+      },
+    };
+    const result = await fw.verifyWithThreeDimensions({}, dim);
+    expect(result.reliability).toEqual({ alpha: null, coders: 1 });
+    expect(result.deploymentGate).toBe('review');
+  });
+
+  it('applies DimensionAwareFilter to downgrade qualityLevel', async () => {
+    // 2 dimensions: a passes (16), b fails (7 < minThreshold 10)
+    // Sequence: 3 runs × 2 dims = [a,a,a,b,b,b]
+    const engine = new SequenceScoreEngine([16, 16, 16, 7, 7, 7]);
+    const fw = new VerificationFramework(engine);
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 3, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [
+          { id: 'a', description: '', scoringPrompt: '', weight: 0.5, minThreshold: 10 },
+          { id: 'b', description: '', scoringPrompt: '', weight: 0.5, minThreshold: 10 },
+        ],
+        weights: [0.5, 0.5],
+      },
+    };
+    const result = await fw.verifyWithThreeDimensions({}, dim);
+    // 加权总分 = 16*0.5 + 7*0.5 = 11.5 → equiv ≈ 12.4 → 'acceptable'
+    // 但 b 维度违规 → 钳制为 'poor'
+    expect(result.qualityLevel).toBe('poor');
+    expect(result.dimensionFlags).toEqual([
+      { id: 'a', violated: false },
+      { id: 'b', violated: true },
+    ]);
+    expect(result.deploymentGate).toBe('review'); // alpha 可能 pass 但 dimension 违规
+  });
+
+  it('sets deploymentGate=pass when alpha>=threshold and no dimension violated', async () => {
+    // 默认 alphaThreshold=0.80；3 runs 全一致 → alpha=1
+    const engine = new SequenceScoreEngine([16, 16, 16]);
+    const fw = new VerificationFramework(engine, { alphaThreshold: 0.8 });
+    const dim: VerificationDimension = {
+      scoreGranularity: { range: { min: 1, max: 20 }, labels: [], granularityLevel: 20 },
+      repeatedEvaluation: { times: 3, varianceThreshold: 0.1, aggregationMethod: 'mean' },
+      criteriaDecomposition: {
+        originalCriteria: 'test',
+        subCriteria: [{ id: 'a', description: '', scoringPrompt: '', weight: 1, minThreshold: 8 }],
+        weights: [1],
+      },
+    };
+    const result = await fw.verifyWithThreeDimensions({}, dim);
+    expect(result.reliability!.alpha).toBeCloseTo(1.0, 3);
+    expect(result.dimensionFlags).toEqual([{ id: 'a', violated: false }]);
+    expect(result.deploymentGate).toBe('pass');
   });
 });
