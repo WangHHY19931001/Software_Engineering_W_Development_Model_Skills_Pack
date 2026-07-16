@@ -93,8 +93,9 @@ W-Model AI Assistant Skill - 命令帮助
 核心命令：
   /wm analyze <需求描述>              需求分析，同步产出验收测试设计
   /wm design type=<架构|概要|详细>     设计阶段，同步产出对应测试设计
-  /wm code <功能描述>                  编码实现，同步执行单元测试
-  /wm test type=<单元|集成|系统|验收>  执行指定类型测试
+  /wm code <功能描述>                  编码实现，同步产出单元测试用例（不自动标记通过）
+  /wm test type=<单元|集成|系统|验收> [result=pass|fail]
+                                      查询测试状态或回填真实执行结果
   /wm review <目标ID或文件路径>        LLM-as-a-Verifier 验证（连续评分+置信度）
   /wm status                           查看当前阶段、进度、RTM 覆盖率
 
@@ -299,7 +300,9 @@ registerCommand('code', async (args, ctx) => {
   const designs = ctx.projectState.getDesigns('详细设计');
   const linkedDesignId = designs.length > 0 ? designs[0].id : undefined;
 
-  // 同步生成单元测试用例并标记为通过（实际场景由上游 AI 执行真实测试）
+  // 同步生成单元测试用例（W 模型并行原则：详细设计产出用例 → 编码阶段执行）
+  // 注意：不自动标记为通过——真实测试结果须由上游 AI 执行真实测试后通过
+  //       /wm test type=单元 result=pass|fail 回填，否则质量门保持未通过。
   const unitTest = await ctx.projectState.addTestCase({
     type: '单元测试',
     title: `${moduleName} 单元测试`,
@@ -310,19 +313,13 @@ registerCommand('code', async (args, ctx) => {
     requirementId: linkedReqId,
     designId: linkedDesignId,
   });
-  await ctx.projectState.updateTestCaseStatus(unitTest.id, '通过');
-
-  // 编码阶段同步执行所有单元测试（W 模型：详细设计产出用例 → 编码阶段执行）
-  let unitPassed = 1;
-  for (const tc of ctx.projectState.getTestCases('单元测试')) {
-    if (tc.status === '待执行') {
-      await ctx.projectState.updateTestCaseStatus(tc.id, '通过');
-      unitPassed++;
-    }
-  }
 
   await ctx.rtm.rebuild();
   await ctx.rtm.logChange(`新增代码模块: ${moduleName}`, linkedReqId ? [linkedReqId] : []);
+
+  const unitCases = ctx.projectState.getTestCases('单元测试');
+  const unitPassed = unitCases.filter(t => t.status === '通过').length;
+  const unitPending = unitCases.filter(t => t.status === '待执行').length;
 
   return {
     success: true,
@@ -330,18 +327,25 @@ registerCommand('code', async (args, ctx) => {
       `【编码实现】完成\n` +
       `  功能: ${feature}\n` +
       `  代码模块: ${moduleName}\n` +
-      `  单元测试: ${unitPassed}/${ctx.projectState.getTestCases('单元测试').length} 通过\n` +
+      `  单元测试: ${unitPassed}/${unitCases.length} 通过，${unitPending} 个待执行\n` +
+      `  ⚠️ 单元测试需上游 AI 真实执行后回填结果: /wm test type=单元 result=pass|fail\n` +
       `  RTM 已更新（覆盖率: ${ctx.rtm.getCoveragePercent()}%）\n` +
-      `  下一步: /wm test type=集成`,
+      `  下一步: /wm test type=单元 result=pass（回填后）/wm test type=集成`,
     data: { moduleName, unitTest },
   };
 });
 
 // ---- /wm test ----
+// 行为说明（修正占位实现）：
+//   - 不再批量将测试用例自动标记为「通过」。
+//   - 上游 AI / 测试运行器真实执行测试后，通过 result=pass|fail 回填结果。
+//   - 未提供 result 时，仅推进阶段并报告当前执行状态（待执行的用例将阻塞质量门）。
 registerCommand('test', async (args, ctx) => {
   await ensureProject(ctx);
   const typeArg = args.find(a => a.startsWith('type='));
   const typeRaw = typeArg ? typeArg.split('=')[1] : '';
+  const resultArg = args.find(a => a.startsWith('result='));
+  const resultRaw = resultArg ? resultArg.split('=')[1]?.toLowerCase() : undefined;
 
   const typeMap: Record<string, { phase: ProjectPhase; testType: TestCaseType }> = {
     '单元': { phase: '编码', testType: '单元测试' },
@@ -352,6 +356,11 @@ registerCommand('test', async (args, ctx) => {
   const m = typeMap[typeRaw];
   if (!m) {
     return { success: false, message: `无效 type: ${typeRaw}。可选: 单元 / 集成 / 系统 / 验收` };
+  }
+
+  // 校验 result 参数
+  if (resultRaw !== undefined && resultRaw !== 'pass' && resultRaw !== 'fail') {
+    return { success: false, message: `无效 result: ${resultRaw}。可选: pass / fail（省略则仅查询状态）` };
   }
 
   const phase = ctx.projectState.getProject().status;
@@ -370,7 +379,6 @@ registerCommand('test', async (args, ctx) => {
     }
   }
 
-  // 拉取该类型的所有测试用例并批量更新为通过（简化实现）
   const cases = ctx.projectState.getTestCases(m.testType);
   if (cases.length === 0) {
     return {
@@ -379,13 +387,18 @@ registerCommand('test', async (args, ctx) => {
     };
   }
 
-  let passed = 0;
-  for (const tc of cases) {
-    if (tc.status === '待执行') {
-      await ctx.projectState.updateTestCaseStatus(tc.id, '通过');
-      passed++;
-    } else if (tc.status === '通过') {
-      passed++;
+  // 仅在显式提供 result 时回填真实执行结果；否则保持「待执行」状态。
+  if (resultRaw === 'pass') {
+    for (const tc of cases) {
+      if (tc.status === '待执行') {
+        await ctx.projectState.updateTestCaseStatus(tc.id, '通过');
+      }
+    }
+  } else if (resultRaw === 'fail') {
+    for (const tc of cases) {
+      if (tc.status === '待执行') {
+        await ctx.projectState.updateTestCaseStatus(tc.id, '失败');
+      }
     }
   }
 
@@ -398,7 +411,11 @@ registerCommand('test', async (args, ctx) => {
     : 'acceptanceTest'
   ];
 
-  // 质量门检查
+  const pendingNote = summary.pending > 0
+    ? `\n  ⚠️ ${summary.pending} 个用例待执行，将阻塞质量门。回填结果: /wm test type=${typeRaw} result=pass|fail`
+    : '';
+
+  // 质量门检查（仅验收阶段）
   if (m.phase === '验收测试') {
     const gate = ctx.rtm.isQualityGatePassed();
     if (gate.passed) {
@@ -406,7 +423,7 @@ registerCommand('test', async (args, ctx) => {
         success: true,
         message:
           `【验收测试】执行完成\n` +
-          `  通过 ${passed}/${cases.length}\n` +
+          `  通过 ${summary.passed}/${cases.length}\n` +
           `  ✅ 质量门通过！项目可交付。\n` +
           `  RTM 覆盖率: ${ctx.rtm.getCoveragePercent()}%`,
         data: { summary, qualityGate: gate },
@@ -416,7 +433,7 @@ registerCommand('test', async (args, ctx) => {
         success: false,
         message:
           `【验收测试】执行完成但质量门未通过\n` +
-          `  通过 ${passed}/${cases.length}\n` +
+          `  通过 ${summary.passed}/${cases.length}\n` +
           `  ❌ 原因:\n    - ${gate.reasons.join('\n    - ')}\n` +
           `  请返工后重新执行。`,
         data: { summary, qualityGate: gate },
@@ -427,8 +444,8 @@ registerCommand('test', async (args, ctx) => {
   return {
     success: true,
     message:
-      `【${m.testType}】执行完成\n` +
-      `  通过 ${passed}/${cases.length}（覆盖率 ${summary.coverage}%）\n` +
+      `【${m.testType}】${resultRaw ? '结果已回填' : '状态查询'}\n` +
+      `  通过 ${summary.passed}/${cases.length}，失败 ${summary.failed}，待执行 ${summary.pending}（覆盖率 ${summary.coverage}%）${pendingNote}\n` +
       `  下一步: ${m.testType === '单元测试' ? '/wm test type=集成' : m.testType === '集成测试' ? '/wm test type=系统' : '/wm test type=验收'}`,
     data: { summary },
   };
