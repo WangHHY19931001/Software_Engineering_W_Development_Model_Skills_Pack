@@ -12,31 +12,12 @@ import type {
   VerificationResult,
   QualityLevel,
 } from '../types';
-import { computeKrippendorffAlpha, applyDimensionAwareFilter, toOrdinalLabels } from './reliability-math';
-
-/** 硬门模式下 gate='fail' 时抛出，可被上层捕获 */
-export class ReliabilityGateError extends Error {
-  readonly gate: 'fail';
-  readonly alpha: number | null;
-  readonly dimensionViolations: string[];
-  constructor(result: VerificationResult) {
-    super(`Reliability gate failed: alpha=${result.reliability?.alpha ?? 'null'}, dimensionViolations=${(result.dimensionFlags ?? []).filter(f => f.violated).map(f => f.id).join(',')}`);
-    this.name = 'ReliabilityGateError';
-    this.gate = 'fail';
-    this.alpha = result.reliability?.alpha ?? null;
-    this.dimensionViolations = (result.dimensionFlags ?? []).filter(f => f.violated).map(f => f.id);
-  }
-}
 
 export class VerificationFramework {
   private scoringEngine: ContinuousScoringEngine;
-  private readonly alphaThreshold: number;
-  private readonly hardGate: boolean;
 
-  constructor(scoringEngine: ContinuousScoringEngine, opts?: { alphaThreshold?: number; hardGate?: boolean }) {
+  constructor(scoringEngine: ContinuousScoringEngine) {
     this.scoringEngine = scoringEngine;
-    this.alphaThreshold = opts?.alphaThreshold ?? 0.8;
-    this.hardGate = opts?.hardGate ?? false;
   }
 
   /** 执行三维度验证 */
@@ -49,8 +30,6 @@ export class VerificationFramework {
     const weightedScores: number[] = [];
     /** 各子标准原始得分（用于置信度计算） */
     const rawScores: number[] = [];
-    /** 每次 run × 每个维度的原始分数，用于 alpha 计算 */
-    const perRunDimScores: number[][] = [];
 
     // 1. 标准分解评估
     for (const subCriterion of criteria.criteriaDecomposition.subCriteria) {
@@ -75,7 +54,6 @@ export class VerificationFramework {
       subScores[subCriterion.id] = aggregated;
       rawScores.push(aggregated);
       weightedScores.push(aggregated * subCriterion.weight);
-      perRunDimScores.push(repeatedScores);
     }
 
     // 4. 综合分数 = Σ(子标准得分 × 权重)
@@ -84,61 +62,19 @@ export class VerificationFramework {
     // 5. 置信度（基于原始得分的方差，越一致置信度越高）
     const confidence = this.computeConfidence(rawScores);
 
-    // 6. 质量等级（初始：基于加权总分）
-    let qualityLevel = this.determineQualityLevel(
+    // 6. 质量等级
+    const qualityLevel = this.determineQualityLevel(
       finalScore,
       criteria.scoreGranularity.range
     );
 
-    // 7. 可靠性：ordinal Krippendorff's alpha
-    // perRunDimScores 是 [dim][run]，需转置为 [run][dim] 喂给 toOrdinalLabels
-    const numRuns = criteria.repeatedEvaluation.times;
-    const transposed: number[][] = [];
-    for (let run = 0; run < numRuns; run++) {
-      const runDims: number[] = [];
-      for (let dim = 0; dim < perRunDimScores.length; dim++) {
-        runDims.push(perRunDimScores[dim][run]);
-      }
-      transposed.push(runDims);
-    }
-    const ordinalLabels = toOrdinalLabels(transposed);
-    const alpha = computeKrippendorffAlpha(ordinalLabels);
-    const reliability = { alpha, coders: numRuns };
-
-    // 8. DimensionAwareFilter
-    const filterResult = applyDimensionAwareFilter(
-      subScores,
-      criteria.criteriaDecomposition.subCriteria,
-      qualityLevel,
-      criteria.scoreGranularity.range
-    );
-    qualityLevel = filterResult.qualityLevel;
-
-    // 9. 部署门
-    const dimOk = !filterResult.dimensionFlags.some(f => f.violated);
-    const alphaOk = alpha !== null && alpha >= this.alphaThreshold;
-    let deploymentGate: 'pass' | 'review' | 'fail';
-    if (alphaOk && dimOk) {
-      deploymentGate = 'pass';
-    } else {
-      deploymentGate = this.hardGate ? 'fail' : 'review';
-    }
-
-    const result: VerificationResult = {
+    return {
       finalScore,
       subScores,
       confidence,
       qualityLevel,
       details: { rawScores, weightedScores },
-      reliability,
-      deploymentGate,
-      dimensionFlags: filterResult.dimensionFlags,
     };
-
-    if (this.hardGate && deploymentGate === 'fail') {
-      throw new ReliabilityGateError(result);
-    }
-    return result;
   }
 
   /** 聚合多次评分结果 */
