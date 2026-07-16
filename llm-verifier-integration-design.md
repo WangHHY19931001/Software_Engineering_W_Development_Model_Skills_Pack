@@ -893,3 +893,55 @@ ranking.ranking.forEach((item, index) => {
 4. **可信决策**: 置信度量化让每一个验证结果都有可靠性保障
 
 这将显著提升软件开发全流程的质量控制能力，使W-Model技能真正成为高质量软件交付的可靠保障。
+
+---
+
+## 🔧 实现位置
+
+本设计文档描述的方案已由 TypeScript 实现，对应关系如下：
+
+| 设计文档章节 | 实现文件 | 说明 |
+|---|---|---|
+| 连续评分核心算法（logits 期望值） | [`src/core/scoring-engine.ts`](./src/core/scoring-engine.ts) | `LLMVerifierEngine`，log-softmax 数值稳定 |
+| Fallback 机制（LLM 不支持 logits 时） | [`src/core/scoring-engine.ts`](./src/core/scoring-engine.ts) | `text-parse` / `discrete` / `throw` 三种策略 |
+| 三维度验证框架 | [`src/core/verification-framework.ts`](./src/core/verification-framework.ts) | `VerificationFramework` + `determineQualityLevel` |
+| PPT 排序算法 | [`src/core/ppt-ranker.ts`](./src/core/ppt-ranker.ts) | `PPTRanker`，分层抽样 pivot，O(N×k) |
+| W 模型集成（需求/设计/测试验证） | [`src/core/w-model-enhancer.ts`](./src/core/w-model-enhancer.ts) | `WModelVerifierEnhancer` |
+| LLM 客户端抽象 | [`src/core/llm-client.ts`](./src/core/llm-client.ts) | `BaseLLMClient` / `MockLLMClient` / `HttpLLMClient` |
+| 验证触发（`/wm review`） | [`src/commands/router.ts`](./src/commands/router.ts) | 命令路由自动调用 verifier |
+
+### 验证结果数据结构
+
+实现中的 `VerificationResult` 类型（见 [`src/types/index.ts`](./src/types/index.ts)）：
+
+```typescript
+interface VerificationResult {
+  finalScore: number;        // 连续分数 1-20
+  subScores: Record<string, number>;  // 各子标准分数
+  confidence: number;        // 置信度 0-1（基于评分方差）
+  qualityLevel: QualityLevel;  // excellent / good / acceptable / poor / unacceptable
+  fallbackUsed?: boolean;    // 是否使用了 fallback 路径
+  details?: { rawScores: number[]; weightedScores: number[] };
+}
+```
+
+### 质量等级阈值
+
+实现采用绝对阈值（归一化到 1-20 等价分数后判定）：
+
+| 等级 | 分数范围 | 含义 |
+|---|---|---|
+| `excellent` | ≥ 18 | 卓越，完全满足要求并有创新 |
+| `good` | ≥ 14 | 良好，满足大部分要求 |
+| `acceptable` | ≥ 10 | 可接受，满足基本要求 |
+| `poor` | ≥ 6 | 较差，存在明显不足 |
+| `unacceptable` | < 6 | 不可接受，需要重大改进 |
+
+### 测试覆盖
+
+- [`tests/scoring-engine.test.ts`](./tests/scoring-engine.test.ts)：logits 路径、三种 fallback、数值稳定性
+- [`tests/verification-framework.test.ts`](./tests/verification-framework.test.ts)：三维度验证、聚合方法、置信度、等级边界
+- [`tests/ppt-ranker.test.ts`](./tests/ppt-ranker.test.ts)：排序、pivot 抽样、复杂度
+- [`tests/w-model-enhancer.test.ts`](./tests/w-model-enhancer.test.ts)：需求/设计/测试用例验证、PPT 排序
+
+核心模块分支覆盖率 91.89%（目标 ≥ 85%）。

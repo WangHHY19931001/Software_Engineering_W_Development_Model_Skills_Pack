@@ -197,3 +197,45 @@ w-model-dev/
     ├── system-design.md
     └── coding.md
 ```
+
+## 实现位置
+
+本 SKILL.md 描述的 `/wm` 命令、状态管理与 RTM 维护已由 TypeScript 实现，开箱即用：
+
+| SKILL.md 章节 | 实现文件 | 说明 |
+|---|---|---|
+| 命令接口（`/wm analyze` 等） | [`src/commands/router.ts`](../src/commands/router.ts) | 10 个命令的路由与处理 |
+| 数据与状态管理 | [`src/state/project-state.ts`](../src/state/project-state.ts) | JSON 持久化，跨多轮交互保持上下文 |
+| RTM 同步维护 | [`src/state/rtm-manager.ts`](../src/state/rtm-manager.ts) | 自动重建、覆盖率统计、质量门检查 |
+| 阶段门评审（LLM-as-a-Verifier） | [`src/core/w-model-enhancer.ts`](../src/core/w-model-enhancer.ts) | 需求 / 设计 / 测试用例三阶段连续评分 |
+| LLM Verifier 引擎 | [`src/core/scoring-engine.ts`](../src/core/scoring-engine.ts) | logits 期望值 + fallback 机制 |
+| 三维度验证框架 | [`src/core/verification-framework.ts`](../src/core/verification-framework.ts) | 评分粒度 + 重复评估 + 标准分解 |
+| PPT 优先级排序 | [`src/core/ppt-ranker.ts`](../src/core/ppt-ranker.ts) | O(N×k) 概率枢轴锦标赛 |
+| 公共 API 入口 | [`src/index.ts`](../src/index.ts) | 导出 + `createCommandContext` 工厂 |
+
+### 快速验证
+
+```bash
+# 运行 W 模型 8 阶段全流程示例（使用 Mock LLM，无需 API key）
+npm run example:run
+
+# 运行测试套件（119 个测试，覆盖率达标）
+npm test
+```
+
+### 编程式接入
+
+```typescript
+import { createCommandContext, dispatch } from 'w-model-dev-skill';
+
+const ctx = await createCommandContext('./my-project', {
+  llm: { model: 'mock' },
+  fallbackStrategy: 'text-parse',
+});
+
+await dispatch('/wm analyze 用户登录功能', ctx);
+await dispatch('/wm design type=架构', ctx);
+// ... 完整 8 阶段流程
+```
+
+详见 [README.md](../README.md) 与 [IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md)。
