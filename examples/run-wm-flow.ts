@@ -55,17 +55,20 @@ async function main(): Promise<void> {
   // 阶段 4：详细设计（同步产出单元测试设计）
   await step('/wm design type=详细');
 
-  // 阶段 5：编码实现（同步执行单元测试）
+  // 阶段 5：编码实现（同步产出单元测试用例，但不自动标记通过）
   await step('/wm code 用户登录服务 userService.ts');
 
-  // 阶段 6：集成测试（执行集成测试用例）
-  await step('/wm test type=集成');
+  // 阶段 5.1：回填单元测试真实执行结果（上游 AI / 测试运行器执行后回填）
+  await step('/wm test type=单元 result=pass');
 
-  // 阶段 7：系统测试（执行系统测试用例）
-  await step('/wm test type=系统');
+  // 阶段 6：集成测试（回填真实执行结果）
+  await step('/wm test type=集成 result=pass');
 
-  // 阶段 8：验收测试（执行验收测试用例 + 质量门检查）
-  await step('/wm test type=验收');
+  // 阶段 7：系统测试（回填真实执行结果）
+  await step('/wm test type=系统 result=pass');
+
+  // 阶段 8：验收测试（回填真实执行结果 + 质量门检查）
+  await step('/wm test type=验收 result=pass');
 
   // ==================== 评审 / 状态 / 导出 ====================
 

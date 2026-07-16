@@ -632,6 +632,143 @@ erDiagram
     }
 ```
 
+### 7.6 LLM-as-a-Verifier 数据模型（补全）
+
+> 原第 7 章仅定义 Project / Requirement / Design / TestCase 四类业务实体，
+> 未涵盖项目核心能力「LLM-as-a-Verifier」相关的数据模型，导致设计↔实现追溯断裂。
+> 本节补全，对应 `src/types/index.ts` 第 87-211 行及新增的元技能 / 演化 / 评估类型。
+
+```typescript
+/** 验证结果：单次三维度验证的产出 */
+interface VerificationResult {
+  finalScore: number;          // 加权聚合的连续评分（1-20）
+  confidence: number;          // 置信度 0-1（受方差影响）
+  qualityLevel: QualityLevel;  // 离散质量等级
+  subScores: Record<string, number>;  // 子标准 → 分数
+  dimensions?: VerificationDimension; // 三维度明细
+}
+
+type QualityLevel = 'excellent' | 'good' | 'acceptable' | 'poor' | 'unacceptable';
+
+interface VerificationDimension {
+  granularity: { range: { min: number; max: number }; labels: string[]; granularityLevel: number };
+  repeatedEvaluation: { times: number; varianceThreshold: number; aggregationMethod: 'mean' | 'median' | 'weighted' };
+  criteriaDecomposition: { originalCriteria: string; subCriteria: SubCriterion[]; weights: number[] };
+}
+
+interface SubCriterion { id: string; description: string; scoringPrompt: string; weight: number; }
+
+/** 连续评分引擎契约 */
+interface ContinuousScoringEngine {
+  computeContinuousScore(prompt: string, target: unknown, range?: { min: number; max: number }): Promise<number>;
+}
+
+/** LLM 客户端抽象（解耦 verifier 与具体 SDK） */
+interface LLMClient {
+  generate(prompt: string, options?: LLMGenerateOptions): Promise<LLMResponse>;
+}
+interface LLMClientConfig {
+  model: string;
+  apiKey?: string;
+  baseURL?: string;
+  supportsLogits?: boolean;  // 决定是否触发上层 fallback
+}
+interface LLMResponse {
+  text: string;
+  logits?: number[][];       // 原生 logits（可选）
+  supportsLogits: boolean;
+}
+
+/** Verifier 配置 */
+interface VerifierConfig {
+  llm: LLMClientConfig;
+  temperature?: number;
+  continuousScoring?: { enabled: boolean; scoreRange: { min: number; max: number } };
+  threeDimensions?: { granularity: { level: number; adaptive: boolean }; repeatedEvaluation: { defaultTimes: number; varianceThreshold: number } };
+  pptRanking?: { enabled: boolean; defaultPivotCount: number };
+  fallbackStrategy: 'text-parse' | 'logits' | 'hybrid';
+}
+```
+
+### 7.7 元技能与演化数据模型（新增，对应第 14 章）
+
+```typescript
+/** 元技能配置：可被 SkillOptimizer 演化的可训练外部状态 */
+interface MetaSkillConfig {
+  version: string;
+  scoreRange: { min: number; max: number };
+  phases: {
+    requirement: MetaSkillPhaseConfig;
+    design: MetaSkillPhaseConfig;
+    testCase: MetaSkillPhaseConfig;
+  };
+}
+interface MetaSkillPhaseConfig {
+  phase: 'requirement' | 'design' | 'testCase';
+  subCriteria: MetaSubCriterion[];   // 原 w-model-enhancer 硬编码，现可演化
+  repeatedTimes: number;              // 原硬编码 5
+  varianceThreshold: number;          // 原硬编码 0.1
+  aggregationMethod: 'mean' | 'median' | 'weighted';
+}
+
+/** SkillOpt 训练循环数据模型 */
+interface RolloutEvidence {       // 一次 /wm 全流程的证据
+  taskId: string;
+  qualityGatePassed: boolean;
+  rtmCoverage: number;
+  phaseRollbacks: number;
+  verificationScores: Array<{ phase: string; entityId: string; finalScore: number; subScores: Record<string, number> }>;
+  failedSubCriteria: string[];    // reflect minibatch 输入
+}
+interface SkillEdit {             // 候选编辑（add/delete/replace）
+  op: 'add' | 'delete' | 'replace';
+  targetFile: string;
+  anchor: string;                 // 格式：<phase>.<subId>.<field>
+  content?: string;
+  rationale: string;
+  budgetCost: number;             // 文本学习率消耗
+}
+interface SkillEvolutionConfig {
+  epochs: number;
+  batchSize: number;
+  editBudget: number;             // 文本学习率
+  validationGateEnabled: boolean; // 强制 true（SkillsBench 实证）
+  protectedRegions: ProtectedRegion[];
+  heldOutTaskIds: string[];
+}
+```
+
+### 7.8 技能评估数据模型（新增，对应第 15 章）
+
+```typescript
+type EvalCondition = 'no-skill' | 'curated-skill' | 'self-generated-skill';
+
+interface SkillLiftResult {       // ACES 配对试验差值
+  taskId: string;
+  condition: EvalCondition;
+  withSkill: { qualityGatePassed: boolean; rtmCoverage: number; avgVerifierScore: number; phaseRollbacks: number };
+  baseline: { qualityGatePassed: boolean; rtmCoverage: number; avgVerifierScore: number; phaseRollbacks: number };
+  lift: { qualityGateDelta: number; rtmCoverageDelta: number; avgScoreDelta: number; rollbackDelta: number };
+}
+
+interface ThreeLevelEvalResult {  // SkillLearnBench 三级评估
+  taskId: string;
+  level1SpecQuality: { coverage: number; executability: number; safety: number };  // 规格质量
+  level2Trajectory: { skillUsageRate: number; trajectoryAlignment: number };        // 轨迹分析
+  level3Outcome: { passed: boolean; qualityGatePassed: boolean; rtmCoverage: number }; // 任务结果
+}
+
+interface SkillEvalReport {
+  skillHash: string;
+  condition: EvalCondition;
+  taskCount: number;
+  meanSkillLift: number;          // > 0 才接受候选
+  positiveLiftRate: number;
+  threeLevelSummary: { meanCoverage: number; meanSkillUsageRate: number; passRate: number };
+  perTask: SkillLiftResult[];
+}
+```
+
 ---
 
 ## 8. 技术实现方案
@@ -781,6 +918,43 @@ flowchart TD
     style G fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
 ```
 
+### 10.5 两类质量门（重要区分）
+
+本技能存在两类性质完全不同的「质量门」，不可混淆：
+
+| 维度 | 工件质量门（Artifact Gate） | 技能验证门（Skill Validation Gate） |
+|---|---|---|
+| 评估对象 | W 模型产出物（需求 / 设计 / 代码 / 测试用例） | 技能文档本身（SKILL.md / MetaSkillConfig） |
+| 触发时机 | 验收测试阶段（`/wm test type=验收`） | SkillOptimizer 演化候选评估时 |
+| 判定逻辑 | RTM 覆盖率 100% 且四级测试全部通过 | 留出集 `meanSkillLift > 0`（严格正提升） |
+| 实现位置 | `src/state/rtm-manager.ts` `isQualityGatePassed()` | `src/eval/skill-lift.ts` `SkillLiftEvaluator` |
+| 失败后果 | 返工回到编码阶段 | 拒绝候选技能，保留当前配置 |
+| 数据来源 | 真实测试执行结果（`/wm test result=pass\|fail` 回填） | with-skill vs without-skill 配对试验 |
+
+**关键约束**：工件质量门的有效性依赖真实测试结果回填。`/wm test` 命令不得自动将测试标记为通过——必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填，否则质量门形同虚设（这是 SkillOpt Rollout 收集失败 minibatch 的前提）。
+
+---
+
+## 10A. SSoT ↔ 实现追溯表
+
+> 本节是 W 模型 RTM 思想在文档层面的自我应用：每个设计章节标注其实现位置，建立双向追溯。
+> 与 `w-model-dev/SKILL.md` 的「实现位置」表互为参照。
+
+| SSoT 章节 | 设计内容 | 实现位置 | 一致性 |
+|---|---|---|---|
+| 3.2.1 需求分析模块 | 需求解析、验收测试生成 | `src/commands/router.ts` `analyze` 命令 | 部分实现（状态登记 + 占位测试，AI 解析由上游填充） |
+| 3.2.2 设计阶段模块 | 架构 / 概要 / 详细设计 + 对应测试设计 | `src/commands/router.ts` `design` 命令 | 部分实现（文档占位，AI 生成由上游填充） |
+| 3.2.3 编码与单元测试 | 代码生成、单元测试用例生成 | `src/commands/router.ts` `code` 命令 | 部分实现（不自动标记通过，需 `result` 回填） |
+| 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `src/commands/router.ts` `test` 命令 | 完整（支持 `result=pass\|fail` 回填） |
+| 6 命令接口 | 10 个 `/wm` 命令 | `src/commands/router.ts` | 完整 |
+| 7 数据模型 | Project / Requirement / Design / TestCase / **Verifier 类型** | `src/types/index.ts` | 完整（见 7.6） |
+| 8 技术实现方案 | LLM-as-a-Verifier 算法 | `src/core/scoring-engine.ts` + `verification-framework.ts` + `ppt-ranker.ts` | 完整 |
+| 9 RTM | 需求跟踪矩阵 | `src/state/rtm-manager.ts` | 完整 |
+| 10 质量保障 | 工件质量门 + 技能验证门 | `src/state/rtm-manager.ts` + `src/eval/skill-lift.ts` | 完整（见 10.5） |
+| 7.6 + 8 LLM Verifier | LLMClient 抽象与连续评分实现 | `src/core/llm-client.ts` + `src/core/scoring-engine.ts` | 完整（数据模型见 7.6，算法见 8） |
+| 14 技能演化机制 | SkillOpt ReflectTrainer | `src/evolution/skill-optimizer.ts` | 完整 |
+| 15 技能评估标准 | Skill Lift / 三级评估 | `src/eval/skill-lift.ts` | 完整 |
+
 ---
 
 ## 11. 部署与集成方案
@@ -849,7 +1023,16 @@ graph TD
 - 集成DevOps流程
 - 支持智能缺陷预测和预防
 
-### 12.4 路线图
+### 12.4 第四阶段（自演化版）
+
+> 对应第 14 章「技能演化机制」与第 15 章「技能评估标准」。本阶段把技能本身从「静态文档」升级为「可训练外部状态」。
+
+- **技能自演化**：落地 `SkillOptimizer` 的 SkillOpt ReflectTrainer 训练循环（Rollout → Reflect → Edit → Gate → Commit），使 `MetaSkillConfig` 的子标准权重 / 评估次数 / 方差阈值可基于实证演化
+- **技能评估基准建设**：构建 `DEFAULT_HELD_OUT_TASKS` 之外的真实留出 benchmark 集（≥30 个项目），覆盖登录/库存/支付/权限/报表等典型场景，支撑 Skill Lift 度量
+- **多 Agent 框架适配**：将 `RolloutExecutor` / `GateEvaluator` / `EvalRunExecutor` 三个接口适配到主流多 Agent 框架（如 LangGraph / AutoGen / CrewAI），使 W 模型技能可作为子图嵌入更大规模 Agent 编排
+- **MCP Server 化**：把 `/wm` 命令族暴露为 MCP（Model Context Protocol）Server，供 Claude / Cursor / Trae 等支持 MCP 的客户端直接调用，技能演化产物可通过 MCP 资源同步
+
+### 12.5 路线图
 
 ```mermaid
 timeline
@@ -866,11 +1049,272 @@ timeline
         多项目管理 : 2027 Q3
         团队协作 : 2027 Q3
         DevOps集成 : 2027 Q4
+    section 第四阶段（自演化版）
+        SkillOptimizer 训练循环 : 2028 Q1
+        技能评估基准集 : 2028 Q1
+        多 Agent 框架适配 : 2028 Q2
+        MCP Server 化 : 2028 Q3
 ```
 
 ---
 
-## 13. 参考文献
+## 14. 技能演化机制
+
+> 本章定义 W-Model AI Assistant Skill 的**自演化能力**：把技能文档（`SKILL.md` / `references/` / `MetaSkillConfig`）视为可训练外部状态，通过闭环优化持续提升技能本身的质量。
+>
+> 理论来源：微软 SkillOpt（Rollout → Reflect → Edit → Gate）、MetaSkill-Evolve（双时间尺度元技能）。
+> 数据模型见 §7.7；代码实现见 `src/evolution/skill-optimizer.ts`；可训练状态清单见 `w-model-dev/META-SKILL.md`。
+
+### 14.1 设计动机
+
+原 `WModelVerifierEnhancer` 的三个 `verify*` 方法将子标准集合、重复评估次数、方差阈值**硬编码在方法体内**，导致：
+
+1. 子标准权重无法根据实证调整（如发现「需求完整性」权重过低无法阻挡不充分需求）
+2. 评估次数与方差阈值无法跨项目复用经验
+3. 违背 MetaSkill-Evolve 核心思想——「改进流程本身」应成为第一类可优化对象
+
+本章将这些参数上提为 `MetaSkillConfig`（可训练外部状态），并由 `SkillOptimizer` 通过训练循环演化。
+
+### 14.2 可训练状态边界（Trainable vs Protected）
+
+参照 SkillOpt 的 protected region 机制，技能状态分为两类：
+
+| 类别 | 区域 | 可演化内容 | 演化频率 |
+|---|---|---|---|
+| 可训练 | `src/core/meta-skill-config.ts` | 子标准权重 / 评估次数 / 方差阈值 / scoringPrompt | 慢循环 |
+| 可训练 | `w-model-dev/references/phase-*.md` | 阶段指引（程序性知识） | 快循环 |
+| 可训练 | `w-model-dev/SKILL.md` 非保护章节 | 阶段流转说明 / 命令示例 | 快循环 |
+| **受保护** | `w-model-dev/SKILL.md` §2.1「核心约束」 | W 模型不可变骨架（并行/阶段门/RTM/质量门/SSoT/最小必要信息） | 不可编辑 |
+| **受保护** | `src/types/index.ts` | 类型契约（修改破坏编译） | 不可编辑 |
+| **受保护** | `src/commands/router.ts` 命令注册表 | 命令接口契约 | 不可编辑 |
+| **受保护** | `src/state/*` 持久化结构 | 数据兼容性 | 不可编辑 |
+
+`SkillEvolutionConfig.protectedRegions` 在运行时强制此约束：`SkillOptimizer.isProtected()` 会过滤任何指向受保护区域的 `SkillEdit`。
+
+### 14.3 SkillOpt ReflectTrainer 训练循环
+
+训练循环类比神经网络训练：
+
+| 神经网络训练 | SkillOpt 训练 |
+|---|---|
+| 模型权重 | 技能文档（可训练状态） |
+| forward | 跑一次 `/wm` 全流程（Rollout） |
+| loss | `VerificationResult` 分数 / 质量门失败原因 |
+| 梯度下降 | optimizer LLM 产出 `SkillEdit`（add/delete/replace） |
+| 学习率 | `editBudget`（每轮最大字符编辑预算） |
+| 验证集 | 留出 benchmark 项目集（`heldOutTaskIds`） |
+| 动量 | epoch 边界的纵向指导（写入 protected 区域之外） |
+
+#### 14.3.1 五阶段循环
+
+```
+for epoch in 1..N:
+  1. Rollout     —— 在训练集上跑 /wm 全流程，收集 RolloutEvidence
+  2. Reflect     —— 分离成功 / 失败 minibatch，optimizer LLM 诊断失败子标准
+  3. Edit        —— 产出 SkillEdit 列表（add/delete/replace），受 editBudget 约束
+  4. Gate        —— 在留出集上测 Skill Lift，严格提升才接受候选
+  5. Commit      —— 通过则 setMetaSkillConfig / 写回 references
+```
+
+各阶段契约（对应 `src/evolution/skill-optimizer.ts`）：
+
+| 阶段 | 入口方法 | 输入 | 产物 |
+|---|---|---|---|
+| Rollout | `RolloutExecutor.run(taskId, metaSkill)` | 训练任务 ID + 当前配置 | `RolloutEvidence[]`（含 `failedSubCriteria`） |
+| Reflect | `SkillOptimizer.reflectAndEdit()` | 失败 + 成功 minibatch | reflect prompt + optimizer LLM 响应 |
+| Edit | `SkillOptimizer.parseEdits()` + `applyEdit()` | LLM 响应 + 候选配置 | `SkillEdit[]` 已应用（受 budget 约束） |
+| Gate | `GateEvaluator.evaluate(candidate, heldOutTaskIds)` | 候选配置 + 留出集 | `GateResult`（`skillLift` + `accepted`） |
+| Commit | `train()` 主循环 | `GateResult.accepted=true` | `setMetaSkillConfig(candidate)` |
+
+#### 14.3.2 Reflect prompt 契约
+
+optimizer LLM 接收结构化输入，输出**纯 JSON 数组**：
+
+```json
+[
+  {
+    "op": "replace",
+    "targetFile": "src/core/meta-skill-config.ts",
+    "anchor": "requirement.completeness.weight",
+    "content": "0.30",
+    "rationale": "完整性权重过低导致需求描述不充分",
+    "budgetCost": 4
+  }
+]
+```
+
+`anchor` 格式：
+- `<phase>.<field>`：阶段级字段（`repeatedTimes` / `varianceThreshold`）
+- `<phase>.<subId>.<field>`：子标准级字段（`weight` / `scoringPrompt`）
+
+`SkillOptimizer.applyEdit()` 仅支持这四种可训练字段，其他字段编辑被静默忽略。
+
+### 14.4 文本学习率（editBudget）
+
+每轮最大字符编辑预算，对应 SkillOpt 的「学习率」。建议：
+
+| 循环类型 | editBudget | 可编辑范围 |
+|---|---|---|
+| 元技能慢循环 | 500 | 仅改权重 / 阈值 / prompt 措辞 |
+| 任务技能快循环 | 2000 | 可改 `references/phase-*.md` 整段 |
+
+`SkillOptimizer.reflectAndEdit()` 在应用编辑前检查 `remainingBudget`，超预算的编辑被跳过。
+
+### 14.5 验证门（Validation Gate）—— 强制启用
+
+**关键约束**：`SkillEvolutionConfig.validationGateEnabled` **必须为 `true`**。
+
+SkillsBench 实证发现：模型自生成技能平均 **-1.3pp**（负向），必须搭配验证门才能采纳候选。`SkillOptimizer.evaluateGate()` 在 `validationGateEnabled=false` 时虽提供「强制接受」分支（仅实验用），但生产环境必须启用。
+
+接受条件：候选在留出集上的 `meanSkillLift > 0`（严格正提升）。`<= 0` 的候选被拒绝并记录 `rejectionReason`，当前配置保留不变。
+
+### 14.6 双时间尺度（MetaSkill-Evolve）
+
+| 循环 | 频率 | 对象 | 产物 |
+|---|---|---|---|
+| 快循环 | 每次 `/wm` 命令后 | `references/phase-*.md` | 阶段指引精炼（任务技能） |
+| 慢循环 | 每完成 N 个项目 | `META-SKILL.md` + `meta-skill-config.ts` | 子标准权重 / 评估次数调整（元技能） |
+
+快循环由 SkillOpt-Sleep 模式触发（人工审阅日志后批量应用），慢循环由 `SkillOptimizer.train()` 自动执行。
+
+### 14.7 训练日志与可审计性
+
+`SkillOptimizer` 全程记录 `TrainingLogEntry[]`，每个 epoch 的每个阶段（rollout/reflect/edit/gate/commit）均落日志，含 `metrics`（rtmCoverage / phaseRollbacks / skillLift）。
+
+`persistLogs(dir)` 将日志写回 `skill-optimizer-logs.json`，供：
+- SkillOpt-Sleep 模式人工审阅
+- 训练回放与归因分析
+- 演化决策的可审计追溯
+
+### 14.8 与工件质量门的关系（重要）
+
+技能演化机制依赖工件质量门（§10.5）的真实失败信号：
+
+- `RolloutEvidence.failedSubCriteria` 来自 `VerificationResult.subScores`（低于 12 分视为失败，见 `extractFailedSubCriteria()`）
+- 若 `/wm test` 自动标记测试通过（占位实现），`qualityGatePassed` 恒为 `true`，失败 minibatch 为空，演化循环跳过（`failures.length === 0` 分支）
+
+因此 §10.5 中「`/wm test` 不得自动标记通过」的约束是技能演化的**前提条件**——这是占位实现必须移除的根本原因。
+
+---
+
+## 15. 技能评估标准
+
+> 本章定义如何评估**技能本身的有效性**（而非工件质量）。
+>
+> 理论来源：ACES Skill Lift、SkillsBench、SkillLearnBench。
+> 数据模型见 §7.8；代码实现见 `src/eval/skill-lift.ts`。
+
+### 15.1 设计动机
+
+现有基准只评估「模型本身」或「工件质量」，无法回答关键问题：
+
+> 引入 W-Model AI Assistant Skill 后，相比不使用技能，**质量门通过率 / RTM 覆盖率 / verifier 分数提升了多少**？
+
+本章通过配对试验量化技能带来的增量（Skill Lift），并辅以三条件对照与三级评估，构成完整的技能评估体系。
+
+### 15.2 三类评估标准
+
+| 标准 | 来源 | 评估问题 | 实现 |
+|---|---|---|---|
+| A. Skill Lift | ACES | with-skill vs without-skill 的指标差值 | `evaluateTaskLift()` |
+| B. 三条件对照 | SkillsBench | no-skill / curated-skill / self-generated-skill 的横向对比 | `evaluateBatch()` |
+| C. 三级评估 | SkillLearnBench | 规格质量 / 轨迹对齐 / 任务结果 | `evaluateThreeLevel()` |
+
+### 15.3 标准 A：Skill Lift（ACES 配对试验）
+
+#### 15.3.1 配对设计
+
+对每个评估任务 `EvalTask`，跑两次 `/wm` 全流程：
+
+| 运行 | 注入 | 度量 |
+|---|---|---|
+| baseline | 不注入 `WModelVerifierEnhancer`（without-skill） | `qualityGatePassed` / `rtmCoverage` / `avgVerifierScore=0` / `phaseRollbacks` |
+| with-skill | 注入 verifier（携带技能） | 同上，`avgVerifierScore` 取真实分数 |
+
+`SkillLiftResult.lift` 记录四个差值：`qualityGateDelta` / `rtmCoverageDelta` / `avgScoreDelta` / `rollbackDelta`（负值表示回退减少，是正向）。
+
+#### 15.3.2 综合指标聚合
+
+`evaluateBatch()` 把每个任务的 lift 折算为标量：
+
+```
+liftScalar = qualityGateDelta + rtmCoverageDelta/100 + avgScoreDelta/20 - rollbackDelta*0.1
+```
+
+`meanSkillLift` 为任务集均值，`positiveLiftRate` 为正向 lift 任务占比。
+
+### 15.4 标准 B：SkillsBench 三条件对照
+
+`EvalCondition` 三值对应三种实验条件：
+
+| 条件 | 含义 | 用途 |
+|---|---|---|
+| `no-skill` | 不使用任何技能 | 基线 |
+| `curated-skill` | 人工策展的技能（当前 `DEFAULT_META_SKILL_CONFIG`） | 验证策展技能有效性 |
+| `self-generated-skill` | `SkillOptimizer` 演化产出的技能 | 验证自演化是否带来增量 |
+
+`SkillEvalReport.condition` 记录评估条件，便于横向对比三者的 `meanSkillLift`。
+
+### 15.5 标准 C：SkillLearnBench 三级评估
+
+`evaluateThreeLevel()` 从三个层级评估技能质量：
+
+| 层级 | 指标 | 计算方式 |
+|---|---|---|
+| Level 1 规格质量 | `coverage` | 子标准覆盖度（默认 16 条，`min(count/16, 1)`） |
+| Level 1 规格质量 | `executability` | 有 `deterministicVerifier` 视为 1.0，否则 0.7 |
+| Level 1 规格质量 | `safety` | 默认配置不含危险操作，恒 1.0 |
+| Level 2 轨迹分析 | `skillUsageRate` | `/wm` 命令在轨迹中的占比 |
+| Level 2 轨迹分析 | `trajectoryAlignment` | 与 `expectedPhases` 对齐度 |
+| Level 3 任务结果 | `passed` | `withSkill.qualityGatePassed` |
+| Level 3 任务结果 | `qualityGatePassed` / `rtmCoverage` | 取自 with-skill 运行 |
+
+`SkillEvalReport.threeLevelSummary` 聚合为 `meanCoverage` / `meanSkillUsageRate` / `passRate`。
+
+### 15.6 确定性 verifier 优先原则
+
+**关键约束**：Skill Lift 决策应优先使用 `EvalTask.deterministicVerifier`，避免 LLM-as-judge 方差。
+
+SkillsBench 实证发现自生成技能平均 -1.3pp，若度量本身有方差，将无法区分真实提升与噪声。因此：
+- `EvalTask.deterministicVerifier` 字段优先于 `WModelVerifierEnhancer`
+- `evaluateThreeLevel()` 中 `executability` 对有确定性 verifier 的任务给满分 1.0
+
+### 15.7 留出任务集（heldOutTaskIds）
+
+`DEFAULT_HELD_OUT_TASKS` 定义三个留出 benchmark 任务（登录 / 库存 / 支付），覆盖典型业务场景。这些任务**不参与训练**，仅用于 Gate 评估，防止演化过拟合训练集。
+
+`SkillEvolutionConfig.heldOutTaskIds` 与 `DEFAULT_HELD_OUT_TASKS` 应保持一致，真实场景应从 fixtures 加载更大规模留出集。
+
+### 15.8 与技能演化（第 14 章）的对接
+
+第 14 章的 `GateEvaluator` 由本章的 `SkillLiftEvaluator` 实现：
+
+```
+SkillOptimizer.evaluateGate()
+  → GateEvaluator.evaluate(candidate, heldOutTaskIds)
+    → SkillLiftEvaluator.evaluateBatch()  （在留出集上）
+      → 返回 { skillLift, perTaskResults }
+  → accepted = (skillLift > 0)
+```
+
+`createMetaSkillGateEvaluator()` 工厂封装此对接：用候选配置构造新 enhancer，在留出集上跑 rollout，计算与基线（`DEFAULT_META_SKILL_CONFIG`）的 Skill Lift。
+
+### 15.9 评估报告消费方
+
+`SkillEvalReport` 的消费方：
+
+| 消费方 | 用途 | 关注字段 |
+|---|---|---|
+| `SkillOptimizer` | 决定候选采纳 | `meanSkillLift > 0` |
+| 人工审阅 | 评估技能质量 | `threeLevelSummary` / `positiveLiftRate` |
+| SkillsBench 对照 | 三条件横向对比 | `condition` / `meanSkillLift` |
+| 训练日志归因 | 解释演化决策 | `perTask` / `skillHash` |
+
+---
+
+## 16. 参考文献
+
+### 16.1 W 模型与软件工程基础
 
 1. 软件开发常见模型（瀑布模型、V模型、W模型、敏捷开发模型）. CSDN博客. https://blog.csdn.net/yao_zhuang/article/details/114273475
 2. W模型和瀑布模型与"V"模式开发模型有何异同？. 阿里云开发者社区. https://developer.aliyun.com/article/1566339
@@ -882,6 +1326,20 @@ timeline
 8. Requirements Traceability Matrix (RTM): The Complete Guide. https://getbestest.com/blog/requirements-traceability-matrix-guide/
 9. What is Requirements Traceability Matrix (RTM) in Testing?. https://www.guru99.com/traceability-matrix.html
 10. 需求跟踪深度解析：架构师视角下的全链路追溯体系. https://blog.csdn.net/ZxqSoftWare/article/details/149282779
+
+### 16.2 LLM-as-a-Verifier（第 8 章 / §7.6 数据模型）
+
+11. LLM-as-a-Verifier: A General-Purpose Verification Framework. arXiv:2607.05391. Stanford University + UC Berkeley + NVIDIA Research.
+12. LLM-as-a-Judge: 项目内集成设计见 `llm-verifier-integration-design.md`，权威定义以 SSoT §7.6 + §8 为准。
+
+### 16.3 技能演化与评估（第 14 章 / 第 15 章）
+
+13. SkillOpt: 把技能文档视为可训练外部状态，通过 Rollout → Reflect → Edit → Gate 闭环优化。Microsoft Research. （SkillsBench 实证：自生成技能平均 -1.3pp，必须搭配验证门）
+14. MetaSkill-Evolve: 5 组件元技能（ψ/σ/α/π/ε）+ 双时间尺度（快循环任务技能 + 慢循环元技能）。
+15. ACES (Agentic Capability Evaluation via Skill Lift): with-skill vs without-skill 配对试验差值。
+16. SkillsBench: 三条件对照（no-skill / curated-skill / self-generated-skill）。
+17. SkillLearnBench: 三级评估（规格质量 / 轨迹分析 / 任务结果）。
+18. PPT (Probabilistic Pivot Tournament): O(N×k) 复杂度排名算法，见 `src/core/ppt-ranker.ts`。
 
 ---
 

@@ -102,21 +102,26 @@ describe('命令路由 - 完整 W 模型流程', () => {
     expect(r4.success).toBe(true);
     expect(r4.message).toContain('详细设计');
 
-    // 5. 编码
+    // 5. 编码（产出单元测试用例，但不自动标记通过）
     const r5 = await dispatch('/wm code 用户注册服务', ctx);
     expect(r5.success).toBe(true);
     expect(r5.message).toContain('编码实现');
+    expect(r5.message).toContain('待执行'); // 单元测试保持待执行
 
-    // 6. 集成测试
-    const r6 = await dispatch('/wm test type=集成', ctx);
+    // 5.1 回填单元测试真实执行结果
+    const r5b = await dispatch('/wm test type=单元 result=pass', ctx);
+    expect(r5b.success).toBe(true);
+
+    // 6. 集成测试（回填真实执行结果）
+    const r6 = await dispatch('/wm test type=集成 result=pass', ctx);
     expect(r6.success).toBe(true);
 
-    // 7. 系统测试
-    const r7 = await dispatch('/wm test type=系统', ctx);
+    // 7. 系统测试（回填真实执行结果）
+    const r7 = await dispatch('/wm test type=系统 result=pass', ctx);
     expect(r7.success).toBe(true);
 
-    // 8. 验收测试
-    const r8 = await dispatch('/wm test type=验收', ctx);
+    // 8. 验收测试（回填真实执行结果 + 质量门检查）
+    const r8 = await dispatch('/wm test type=验收 result=pass', ctx);
     expect(r8.success).toBe(true);
 
     // status
@@ -382,5 +387,92 @@ describe('命令路由 - 边界与错误路径', () => {
     const r = await dispatch('/wm test type=单元', ctx);
     expect(r.success).toBe(true);
     expect(r.message).toContain('单元测试');
+  });
+});
+
+describe('命令路由 - result 参数（修正占位实现）', () => {
+  it('code 命令不自动标记单元测试通过', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    await dispatch('/wm design type=概要', ctx);
+    await dispatch('/wm design type=详细', ctx);
+    await dispatch('/wm code 功能', ctx);
+
+    // 编码后单元测试应保持「待执行」
+    const unitCases = ctx.projectState.getTestCases('单元测试');
+    expect(unitCases.length).toBeGreaterThan(0);
+    expect(unitCases.every(t => t.status === '待执行')).toBe(true);
+  });
+
+  it('test 不带 result 时保持待执行状态', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    await dispatch('/wm design type=概要', ctx);
+    await dispatch('/wm design type=详细', ctx);
+    await dispatch('/wm code 功能', ctx);
+
+    const r = await dispatch('/wm test type=单元', ctx);
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('待执行');
+
+    // 状态未变
+    const unitCases = ctx.projectState.getTestCases('单元测试');
+    expect(unitCases.every(t => t.status === '待执行')).toBe(true);
+  });
+
+  it('test result=pass 回填通过状态', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    await dispatch('/wm design type=概要', ctx);
+    await dispatch('/wm design type=详细', ctx);
+    await dispatch('/wm code 功能', ctx);
+
+    const r = await dispatch('/wm test type=单元 result=pass', ctx);
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('通过');
+
+    const unitCases = ctx.projectState.getTestCases('单元测试');
+    expect(unitCases.every(t => t.status === '通过')).toBe(true);
+  });
+
+  it('test result=fail 回填失败状态', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    await dispatch('/wm design type=概要', ctx);
+    await dispatch('/wm design type=详细', ctx);
+    await dispatch('/wm code 功能', ctx);
+
+    const r = await dispatch('/wm test type=单元 result=fail', ctx);
+    expect(r.success).toBe(true);
+
+    const unitCases = ctx.projectState.getTestCases('单元测试');
+    expect(unitCases.every(t => t.status === '失败')).toBe(true);
+  });
+
+  it('test result=无效值 失败', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    await dispatch('/wm design type=概要', ctx);
+    await dispatch('/wm design type=详细', ctx);
+    await dispatch('/wm code 功能', ctx);
+
+    const r = await dispatch('/wm test type=单元 result=invalid', ctx);
+    expect(r.success).toBe(false);
+    expect(r.message).toContain('无效 result');
+  });
+
+  it('验收测试无 result 时质量门未通过（待执行阻塞）', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    await dispatch('/wm design type=概要', ctx);
+    await dispatch('/wm design type=详细', ctx);
+    await dispatch('/wm code 功能', ctx);
+    await dispatch('/wm test type=集成 result=pass', ctx);
+    await dispatch('/wm test type=系统 result=pass', ctx);
+
+    // 验收测试不带 result：UAT 待执行 → 质量门失败
+    const r = await dispatch('/wm test type=验收', ctx);
+    expect(r.success).toBe(false);
+    expect(r.message).toContain('质量门未通过');
   });
 });

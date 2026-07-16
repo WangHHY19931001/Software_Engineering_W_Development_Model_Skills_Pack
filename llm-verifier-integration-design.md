@@ -1,5 +1,12 @@
 # LLM-as-a-Verifier 融入 W-Model 技能优化方案
 
+> **权威性说明**：本文档为 LLM-as-a-Verifier 的**详细集成方案**与论文映射，不作为单一事实来源。
+> 权威设计定义以 [`skill-design-document_SSoT.md`](./skill-design-document_SSoT.md) 为准：
+> - 数据模型（`VerificationResult` / `LLMClient` / `VerifierConfig` 等）→ SSoT §7.6
+> - 算法实现（连续评分 / 三维度验证 / PPT 排名）→ SSoT §8 技术实现方案
+> - 两类质量门区分（工件质量门 vs 技能验证门）→ SSoT §10.5
+> - 与本文档不一致处，以 SSoT 为准。
+
 ## 📋 文档概述
 
 本文档详细阐述如何将斯坦福、伯克利和NVIDIA联合发布的论文《LLM-as-a-Verifier: A General-Purpose Verification Framework》的核心创新理念，融入到现有的W-Model AI Assistant Skill中，构建更精准、更可靠的Agent任务验证框架。

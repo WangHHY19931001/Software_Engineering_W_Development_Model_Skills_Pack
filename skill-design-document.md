@@ -31,7 +31,8 @@
 `skill-design-document.md` 的旧版本（570 行）与 SSoT 的主要差异：
 
 - 旧版缺少第 7 章「数据模型」与第 9 章「RTM 需求跟踪矩阵」的完整定义
-- 旧版缺少第 11 章「LLM-as-a-Verifier 集成规范」
+- 旧版缺少 LLM-as-a-Verifier 集成规范（SSoT 现分布在 §7.6 数据模型 + §8 技术实现方案；项目内详细方案见 `llm-verifier-integration-design.md`）
 - 旧版缺少验收标准与质量门的具体阈值
+- 旧版缺少第 14 章「技能演化机制」与第 15 章「技能评估标准」（SkillOpt / ACES / SkillsBench / SkillLearnBench）
 
-这些差异已在 SSoT 中补齐，旧版本不再维护。
+这些差异已在 SSoT 中补齐，旧版本不再维护。SSoT 章节编号：§1-§12 主体 + §14 演化 + §15 评估 + §16 参考文献（§13 已合并入 §16）。

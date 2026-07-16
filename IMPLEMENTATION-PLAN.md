@@ -49,11 +49,32 @@
 | 2.3 创建 `CHANGELOG.md`、`CONTRIBUTING.md`、`IMPLEMENTATION-PLAN.md` | ✅ | 三份文档 |
 | 2.4 更新 `SKILL.md` 引用实现文件、`llm-verifier-integration-design.md` 引用新实现 | ✅ | 见各文档末尾的"实现位置"章节 |
 
+## Phase 2.5：设计→实现审查全面修正（✅ 已完成）
+
+> 以 SSoT 设计文档为唯一事实来源审查起点，识别设计层与实现层问题后系统性修正。
+> 对应 SSoT 新增 §7.6 / §7.7 / §7.8 / §10.5 / §10A / 第 14 章 / 第 15 章。
+
+| 任务 | 状态 | 产出 |
+|---|---|---|
+| 2.5.1 SSoT 数据模型补全 | ✅ | SSoT §7.6（Verifier 类型）/ §7.7（演化类型）/ §7.8（评估类型） |
+| 2.5.2 SSoT 两类质量门区分 | ✅ | SSoT §10.5（工件质量门 vs 技能验证门） |
+| 2.5.3 SSoT ↔ 实现追溯表 | ✅ | SSoT §10A（13 行双向追溯） |
+| 2.5.4 移除占位实现，恢复质量门有效性 | ✅ | `router.ts` `code` 不自动标记通过；`test` 新增 `result=pass\|fail` 回填 |
+| 2.5.5 真实 LLMClient 实现 | ✅ | `llm-client.ts` 新增 `OpenAICompatibleLLMClient` + `AnthropicLLMClient` + 工厂 |
+| 2.5.6 元技能配置外提（消除硬编码） | ✅ | `meta-skill-config.ts` + `w-model-enhancer.ts` 改读 `MetaSkillConfig` |
+| 2.5.7 SkillOptimizer 训练循环 | ✅ | `src/evolution/skill-optimizer.ts`（SkillOpt ReflectTrainer） |
+| 2.5.8 SkillLiftEvaluator 评估引擎 | ✅ | `src/eval/skill-lift.ts`（ACES + SkillsBench + SkillLearnBench） |
+| 2.5.9 SSoT 第 14 章「技能演化机制」 | ✅ | SSoT §14（8 节） |
+| 2.5.10 SSoT 第 15 章「技能评估标准」 | ✅ | SSoT §15（9 节） |
+| 2.5.11 SSoT 第 12 章发展规划更新 | ✅ | 新增「第四阶段（自演化版）」+ 路线图 |
+| 2.5.12 测试覆盖 | ✅ | 3 个新测试文件 + 2 个测试文件增强；163 测试全过 |
+| 2.5.13 文档一致性修正 | ✅ | 指针文档 + 集成设计文档 + 追溯表错误引用 |
+
 ## Phase 3：生产化（⏳ 计划中）
 
 | 任务 | 状态 | 说明 |
 |---|---|---|
-| 3.1 OpenAI / Anthropic SDK 适配器 | ⏳ | 实现真实的 `LLMClient`，支持 GPT-4 / Claude 的 logits 或 fallback |
+| 3.1 OpenAI / Anthropic SDK 适配器 | ✅ | 已在 Phase 2.5.5 完成：`OpenAICompatibleLLMClient`（fetch）+ `AnthropicLLMClient`（Messages API） |
 | 3.2 CLI 工具 | ⏳ | `npx w-model init` / `npx w-model analyze` 等命令行入口 |
 | 3.3 Web UI 可视化 RTM | ⏳ | 实时展示 RTM 矩阵、覆盖率、质量门状态 |
 | 3.4 多项目并行管理 | ⏳ | 支持 workspace 概念，同时跟踪多个项目 |
@@ -85,7 +106,9 @@
 
 | 项目 | 优先级 | 说明 |
 |---|---|---|
-| `HttpLLMClient.generate` 未实现 | 中 | 当前仅骨架，生产环境需注入具体 SDK 实现 |
+| `HttpLLMClient.generate` 未实现 | 低 | 骨架保留；生产环境已改用 `OpenAICompatibleLLMClient` / `AnthropicLLMClient`（Phase 2.5.5） |
+| `SkillOptimizer.getTrainTaskIds` 占位 | 中 | 真实场景应从 benchmark 集合加载训练任务，排除 `heldOutTaskIds` |
+| `createDefaultEvalExecutor.run` 未接入 dispatch | 中 | 当前仅框架，真实评估需调用 `dispatch('/wm analyze ...')` 走完整流程 |
 | `extractCodeModule` 简化实现 | 低 | 仅从单元测试描述中正则提取，真实场景应显式登记 |
 | `LLMVerifierEngine.getTokenIdForLabel` 硬编码 | 低 | 简化实现，实际需按 tokenizer 调整 |
 | `llm-verifier-implementation-template.ts` 保留 | 低 | 作为历史参考保留，已被 `src/` 替代 |

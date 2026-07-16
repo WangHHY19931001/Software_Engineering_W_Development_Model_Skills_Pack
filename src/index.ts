@@ -1,14 +1,16 @@
 /**
  * W-Model AI Assistant Skill - 实现入口
  *
- * 提供三类公共 API：
+ * 提供四类公共 API：
  *   1. LLM-as-a-Verifier 核心引擎（scoring-engine / verification-framework / ppt-ranker / w-model-enhancer）
  *   2. 项目状态与 RTM 管理（project-state / rtm-manager）
  *   3. /wm 命令路由（commands/router）
+ *   4. 技能演化与评估（evolution/skill-optimizer + eval/skill-lift）—— 对应 SSoT 第 14/15 章
  *
  * 对应设计：
- *   - SSoT: skill-design-document_SSoT.md
- *   - SKILL: w-model-dev/SKILL.md
+ *   - SSoT: skill-design-document_SSoT.md（第 7/10/14/15 章为数据模型/质量门/演化/评估的权威定义）
+ *   - SKILL: w-model-dev/SKILL.md（编排逻辑）
+ *   - MetaSkill: w-model-dev/META-SKILL.md（可训练外部状态）
  *   - 集成设计: llm-verifier-integration-design.md
  */
 
@@ -21,8 +23,19 @@ export {
   BaseLLMClient,
   MockLLMClient,
   HttpLLMClient,
+  OpenAICompatibleLLMClient,
+  AnthropicLLMClient,
   createLLMClient,
 } from './core/llm-client';
+export {
+  DEFAULT_META_SKILL_CONFIG,
+  DEFAULT_SCORE_RANGE,
+  DEFAULT_REQUIREMENT_SUBCRITERIA,
+  DEFAULT_DESIGN_SUBCRITERIA,
+  DEFAULT_TESTCASE_SUBCRITERIA,
+  cloneMetaSkillConfig,
+  validateMetaSkillConfig,
+} from './core/meta-skill-config';
 
 // ==================== 状态管理 ====================
 export {
@@ -38,6 +51,27 @@ export {
   getCommandNames,
 } from './commands/router';
 
+// ==================== 技能演化（对应 SSoT 第 14 章） ====================
+export {
+  SkillOptimizer,
+  createMetaSkillGateEvaluator,
+  extractFailedSubCriteria,
+  type RolloutExecutor,
+  type GateEvaluator,
+  type TrainingLogEntry,
+  type TrainingResult,
+} from './evolution/skill-optimizer';
+
+// ==================== 技能评估（对应 SSoT 第 15 章） ====================
+export {
+  SkillLiftEvaluator,
+  createDefaultEvalExecutor,
+  runSkillEvaluation,
+  DEFAULT_HELD_OUT_TASKS,
+  type EvalRunExecutor,
+  type EvalRunOutcome,
+} from './eval/skill-lift';
+
 // ==================== 类型 ====================
 export type * from './types';
 
@@ -46,18 +80,20 @@ export type * from './types';
 import { ProjectStateManager } from './state/project-state';
 import { RTMManager } from './state/rtm-manager';
 import { WModelVerifierEnhancer } from './core/w-model-enhancer';
-import { MockLLMClient } from './core/llm-client';
-import type { CommandContext, VerifierConfig } from './types';
+import { createLLMClient } from './core/llm-client';
+import type { CommandContext, MetaSkillConfig, VerifierConfig } from './types';
 
 /**
  * 创建默认命令上下文（用于即装即用的 CLI / Agent 接入）
  *
  * @param cwd 工作目录（项目根）
  * @param verifierConfig 可选的 Verifier 配置；不传则使用 Mock LLM（开箱即用，无需 API key）
+ * @param metaSkill 可选的元技能配置（用于 SkillOptimizer 演化）；不传则使用默认配置
  */
 export async function createCommandContext(
   cwd: string,
-  verifierConfig?: VerifierConfig
+  verifierConfig?: VerifierConfig,
+  metaSkill?: MetaSkillConfig
 ): Promise<CommandContext> {
   const projectState = new ProjectStateManager(cwd);
   await projectState.load();
@@ -65,7 +101,9 @@ export async function createCommandContext(
 
   let verifier: WModelVerifierEnhancer | undefined;
   if (verifierConfig) {
-    verifier = new WModelVerifierEnhancer(verifierConfig, new MockLLMClient(verifierConfig.llm));
+    // 根据 model 名自动选择真实 / Mock 客户端
+    const llmClient = createLLMClient(verifierConfig.llm);
+    verifier = new WModelVerifierEnhancer(verifierConfig, llmClient, metaSkill);
   }
 
   return { projectState, rtm, verifier, cwd };
