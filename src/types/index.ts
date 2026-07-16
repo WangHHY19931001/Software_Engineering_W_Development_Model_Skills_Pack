@@ -103,6 +103,14 @@ export interface VerificationResult {
   details?: unknown;
   /** 当 LLM 不支持 logits 时回退使用文本解析路径 */
   fallbackUsed?: boolean;
+  /** 可靠性指标：Krippendorff's alpha（单模型多 run 代理）；null 表示无法计算（N<2） */
+  reliability?: { alpha: number | null; coders: number };
+  /** 部署门：pass=可放行，review=需人工复核，fail=不达标（硬门模式抛错） */
+  deploymentGate?: 'pass' | 'review' | 'fail';
+  /** 各维度是否违规（低于 minThreshold） */
+  dimensionFlags?: { id: string; violated: boolean }[];
+  /** rubric 是否回退到硬编码（RubricGenerator 失败时为 true） */
+  rubricFallback?: boolean;
 }
 
 /** 子标准定义 */
@@ -111,6 +119,12 @@ export interface SubCriterion {
   description: string;
   scoringPrompt: string;
   weight: number;
+  /** 标记此子标准是否来自自适应生成（true=LLM 生成，false/undefined=硬编码） */
+  taskAdaptive?: boolean;
+  /** 维度级最低可接受阈值（归一化到 1-20 等价分数）。低于此值触发 DimensionAwareFilter 降级 */
+  minThreshold?: number;
+  /** 5 级评分描述（可选，用于 rubric 可读性） */
+  levelDescriptors?: string[];
 }
 
 /** 三维度验证框架配置 */
@@ -208,6 +222,24 @@ export interface VerifierConfig {
    * - 'throw'：直接抛错
    */
   fallbackStrategy?: 'text-parse' | 'discrete' | 'throw';
+  /**
+   * 自适应 rubric 与可靠性门控配置。
+   * 未提供时：adaptive=false，行为与原版完全一致。
+   */
+  rubric?: {
+    /** 是否启用自适应 rubric 生成（默认 false） */
+    adaptive: boolean;
+    /** 生成的维度数（默认 5） */
+    dimensions: number;
+    /** Krippendorff's alpha 部署门阈值（默认 0.80） */
+    alphaThreshold: number;
+    /** 维度级 minThreshold 默认值（归一化到 1-20 等价分数，默认 8） */
+    minThresholdDefault: number;
+    /** 硬门模式：gate=fail 时抛 ReliabilityGateError（默认 false=软标记） */
+    hardGate: boolean;
+    /** 是否缓存生成的 rubric（默认 true） */
+    cache: boolean;
+  };
 }
 
 // ==================== PPT 排名类型 ====================
