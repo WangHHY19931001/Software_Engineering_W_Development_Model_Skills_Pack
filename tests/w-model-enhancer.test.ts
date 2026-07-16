@@ -270,6 +270,9 @@ describe('WModelVerifierEnhancer - adaptive rubric', () => {
     const result = await enhancer.verifyRequirement(req, '用户登录功能');
     expect(result.subScores).toHaveProperty('adaptive-completeness');
     expect(result.rubricFallback).toBe(false);
+    expect(result.reliability).toBeDefined();
+    expect(result.dimensionFlags).toBeDefined();
+    expect(result.deploymentGate).toBeDefined();
   });
 
   it('falls back to hardcoded when RubricGenerator fails', async () => {
