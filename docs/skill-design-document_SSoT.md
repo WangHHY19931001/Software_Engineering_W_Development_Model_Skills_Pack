@@ -927,9 +927,17 @@ flowchart TD
 | 评估对象 | W 模型产出物（需求 / 设计 / 代码 / 测试用例） | 技能文档本身（SKILL.md / MetaSkillConfig） |
 | 触发时机 | 验收测试阶段（`/wm test type=验收`） | SkillOptimizer 演化候选评估时 |
 | 判定逻辑 | RTM 覆盖率 100% 且四级测试全部通过 | 留出集 `meanSkillLift > 0`（严格正提升） |
-| 实现位置 | `src/state/rtm-manager.ts` `isQualityGatePassed()` | `src/eval/skill-lift.ts` `SkillLiftEvaluator` |
+| 判定逻辑实现（单点事实源） | `w-model-dev/scripts/gate-logic.ts` `checkArtifactGate()` | `w-model-dev/scripts/gate-logic.ts` `checkSkillGate()` |
+| Agent CLI 入口 | `w-model-dev/scripts/check-artifact-gate.ts` | `w-model-dev/scripts/check-skill-gate.ts` |
+| SDK 委托方 | `src/state/rtm-manager.ts` `isQualityGatePassed()` → `checkArtifactGate` | `src/evolution/skill-optimizer.ts` `evaluateGate()` → `checkSkillGate`（Skill Lift 数值由 `src/eval/skill-lift.ts` 计算） |
 | 失败后果 | 返工回到编码阶段 | 拒绝候选技能，保留当前配置 |
 | 数据来源 | 真实测试执行结果（`/wm test result=pass\|fail` 回填） | with-skill vs without-skill 配对试验 |
+
+**门禁脚本与 Markdown 的配合**：门禁判定逻辑沉入技能包内 `w-model-dev/scripts/gate-logic.ts`（纯函数、自包含、不依赖 `src/`），保证技能包可独立分发给 TRAE / Claude 等 Agent。两类调用方共用同一份事实源：
+- **CLI 调用方（Agent）**：执行 `npx tsx w-model-dev/scripts/check-{artifact,skill}-gate.ts`，退出码 `0=通过 / 1=未通过 / 2=输入错误`，stdout 末尾输出 `GATE_JSON {...}` 供程序化解析。
+- **SDK 调用方（编程式）**：`src/state/rtm-manager.ts` 与 `src/evolution/skill-optimizer.ts` import 并委托至同一纯函数，确保 CLI 与 SDK 判定结果完全一致，避免逻辑漂移。
+
+`references/quality-standards.md` 以 Markdown 描述质量标准（人类可读），与脚本互为参照但不再承载判定逻辑。
 
 **关键约束**：工件质量门的有效性依赖真实测试结果回填。`/wm test` 命令不得自动将测试标记为通过——必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填，否则质量门形同虚设（这是 SkillOpt Rollout 收集失败 minibatch 的前提）。
 
@@ -950,9 +958,9 @@ flowchart TD
 | 7 数据模型 | Project / Requirement / Design / TestCase / **Verifier 类型** | `src/types/index.ts` | 完整（见 7.6） |
 | 8 技术实现方案 | LLM-as-a-Verifier 算法 | `src/core/scoring-engine.ts` + `verification-framework.ts` + `ppt-ranker.ts` | 完整 |
 | 9 RTM | 需求跟踪矩阵 | `src/state/rtm-manager.ts` | 完整 |
-| 10 质量保障 | 工件质量门 + 技能验证门 | `src/state/rtm-manager.ts` + `src/eval/skill-lift.ts` | 完整（见 10.5） |
+| 10 质量保障 | 工件质量门 + 技能验证门 | 判定逻辑：`w-model-dev/scripts/gate-logic.ts`（单点事实源）；SDK 委托方：`src/state/rtm-manager.ts` + `src/evolution/skill-optimizer.ts`；Skill Lift 计算：`src/eval/skill-lift.ts`；CLI：`w-model-dev/scripts/check-*-gate.ts` | 完整（见 10.5，门禁逻辑已沉入技能包） |
 | 7.6 + 8 LLM Verifier | LLMClient 抽象与连续评分实现 | `src/core/llm-client.ts` + `src/core/scoring-engine.ts` | 完整（数据模型见 7.6，算法见 8） |
-| 14 技能演化机制 | SkillOpt ReflectTrainer | `src/evolution/skill-optimizer.ts` | 完整 |
+| 14 技能演化机制 | SkillOpt ReflectTrainer | `src/evolution/skill-optimizer.ts`（Gate 阶段委托至 `w-model-dev/scripts/gate-logic.ts` `checkSkillGate`） | 完整 |
 | 15 技能评估标准 | Skill Lift / 三级评估 | `src/eval/skill-lift.ts` | 完整 |
 
 ---

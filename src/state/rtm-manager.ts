@@ -23,6 +23,8 @@ import type {
   TestCaseType,
 } from '../types';
 import type { ProjectStateManager, ProjectStore } from './project-state';
+// 门禁判定逻辑委托至技能包内脚本（单点事实源，与 CLI check-artifact-gate.ts 共用）
+import { checkArtifactGate } from '../../w-model-dev/scripts/gate-logic.js';
 
 const DEFAULT_RTM_DIR = '.w-model';
 
@@ -134,36 +136,17 @@ export class RTMManager {
     return result;
   }
 
-  /** 是否通过质量门：覆盖率 100% 且所有测试通过 */
+  /**
+   * 是否通过质量门：覆盖率 100% 且所有测试通过。
+   *
+   * 判定逻辑委托至技能包内脚本 `w-model-dev/scripts/gate-logic.ts` 的
+   * `checkArtifactGate()`，与 CLI `check-artifact-gate.ts` 共用同一份事实源，
+   * 避免逻辑漂移。返回值仅保留 { passed, reasons }，覆盖率字段由
+   * `getCoveragePercent()` 单独暴露。
+   */
   isQualityGatePassed(): { passed: boolean; reasons: string[] } {
-    const reasons: string[] = [];
-    if (!this.matrix) {
-      return { passed: false, reasons: ['RTM 未初始化'] };
-    }
-
-    if (this.getCoveragePercent() < 100) {
-      reasons.push(`RTM 覆盖率未达 100%（当前 ${this.getCoveragePercent()}%）`);
-    }
-
-    const summary = this.matrix.executionSummary;
-    const types: Array<{ name: string; s: typeof summary.unitTest }> = [
-      { name: '单元测试', s: summary.unitTest },
-      { name: '集成测试', s: summary.integrationTest },
-      { name: '系统测试', s: summary.systemTest },
-      { name: '验收测试', s: summary.acceptanceTest },
-    ];
-
-    for (const { name, s } of types) {
-      if (s.total === 0) {
-        reasons.push(`${name}: 无用例`);
-      } else if (s.failed > 0) {
-        reasons.push(`${name}: ${s.failed} 个失败`);
-      } else if (s.pending > 0) {
-        reasons.push(`${name}: ${s.pending} 个待执行`);
-      }
-    }
-
-    return { passed: reasons.length === 0, reasons };
+    const result = checkArtifactGate(this.matrix);
+    return { passed: result.passed, reasons: result.reasons };
   }
 
   // ==================== Markdown 导出 ====================

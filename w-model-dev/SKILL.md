@@ -129,6 +129,26 @@ description: >-
                                                                   回到编码       回到编码
 ```
 
+**门禁脚本调用（Agent 执行）**：到达质量门检查点时，Agent 直接执行技能包内的门禁脚本获取确定性判定，而非靠 LLM 自行估算：
+
+```bash
+# 工件质量门：读取 .w-model/rtm.json，校验 RTM 覆盖率 100% 且四级测试全部通过
+# 退出码 0=通过 / 1=未通过 / 2=输入错误；末尾输出 GATE_JSON {...} 供程序化解析
+npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+```
+
+技能演化场景另需校验候选技能的 Skill Lift（对应 SSoT §14.5 验证门）：
+
+```bash
+# 技能验证门：读取 SkillEvalReport JSON，校验留出集 meanSkillLift > 0（严格正提升）
+# 防止 SkillsBench 实证的「自生成技能平均 -1.3pp」退化候选被采纳
+npx tsx w-model-dev/scripts/check-skill-gate.ts <report.json>
+```
+
+> 两类门禁的判定逻辑均由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源）。
+> 编程式调用方（`src/state/rtm-manager.ts`、`src/evolution/skill-optimizer.ts`）也委托至该文件，
+> 确保 CLI 与 SDK 判定结果完全一致。
+
 ### 4. 数据与状态管理
 
 - 项目数据模型、需求 / 设计 / 测试用例数据结构见 [references/data-models.md](references/data-models.md)。
@@ -172,6 +192,10 @@ description: >-
 w-model-dev/
 ├── SKILL.md                       # 本文件：编排与命令（YAML frontmatter + 阶段流）
 ├── META-SKILL.md                  # 元技能可演化配置（可训练外部状态）
+├── scripts/                       # 门禁校验脚本（Agent 可直接执行，自包含）
+│   ├── gate-logic.ts              #   门禁纯逻辑（单点事实源，src/ 与 CLI 共用）
+│   ├── check-artifact-gate.ts     #   工件质量门 CLI（读 .w-model/rtm.json）
+│   └── check-skill-gate.ts        #   技能验证门 CLI（读 SkillEvalReport）
 ├── references/                    # 阶段细则（按需加载）
 │   ├── phase-1-requirements.md
 │   ├── phase-2-system-design.md
@@ -201,6 +225,12 @@ w-model-dev/
 
 > 本目录为标准 skill 结构，自包含。AI Agent 安装时只需拷贝整个 `w-model-dev/` 目录，
 > 详见 [../docs/INSTALL.md](../docs/INSTALL.md)。
+>
+> **门禁脚本与 Markdown 的配合**：`references/quality-standards.md` 以 Markdown 描述
+> 质量标准（人类可读、便于审阅），`scripts/check-*-gate.ts` 是同一套门禁的可执行实现
+> （Agent 可直接调用得到结构化结论）。两者指向同一份事实源 `scripts/gate-logic.ts`，
+> 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定，必要时回查
+> Markdown 了解判定依据。
 
 ## 实现位置
 
@@ -210,11 +240,13 @@ w-model-dev/
 |---|---|---|
 | 命令接口（`/wm analyze` 等） | [`src/commands/router.ts`](../src/commands/router.ts) | 10 个命令的路由与处理 |
 | 数据与状态管理 | [`src/state/project-state.ts`](../src/state/project-state.ts) | JSON 持久化，跨多轮交互保持上下文 |
-| RTM 同步维护 | [`src/state/rtm-manager.ts`](../src/state/rtm-manager.ts) | 自动重建、覆盖率统计、质量门检查 |
+| RTM 同步维护 | [`src/state/rtm-manager.ts`](../src/state/rtm-manager.ts) | 自动重建、覆盖率统计；质量门判定**委托至** `scripts/gate-logic.ts` |
 | 阶段门评审（LLM-as-a-Verifier） | [`src/core/w-model-enhancer.ts`](../src/core/w-model-enhancer.ts) | 需求 / 设计 / 测试用例三阶段连续评分 |
 | LLM Verifier 引擎 | [`src/core/scoring-engine.ts`](../src/core/scoring-engine.ts) | logits 期望值 + fallback 机制 |
 | 三维度验证框架 | [`src/core/verification-framework.ts`](../src/core/verification-framework.ts) | 评分粒度 + 重复评估 + 标准分解 |
 | PPT 优先级排序 | [`src/core/ppt-ranker.ts`](../src/core/ppt-ranker.ts) | O(N×k) 概率枢轴锦标赛 |
+| 技能演化（验证门） | [`src/evolution/skill-optimizer.ts`](../src/evolution/skill-optimizer.ts) | SkillOpt 训练循环；Gate 判定**委托至** `scripts/gate-logic.ts` |
+| **门禁校验（单点事实源）** | [`w-model-dev/scripts/gate-logic.ts`](scripts/gate-logic.ts) | `checkArtifactGate` + `checkSkillGate` 纯函数，CLI 与 SDK 共用 |
 | 公共 API 入口 | [`src/index.ts`](../src/index.ts) | 导出 + `createCommandContext` 工厂 |
 
 ### 快速验证
