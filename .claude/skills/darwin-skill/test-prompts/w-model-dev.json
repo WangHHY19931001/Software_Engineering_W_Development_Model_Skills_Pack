@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "scenario": "典型场景：自然语言触发 W 模型开发",
+    "prompt": "我想用 W 模型开发一个用户登录功能",
+    "expected": "skill 应识别为 W 模型意图 → 进入 Phase 1 需求分析 → 同步产出验收测试设计 → 套用 requirement-spec 模板 → 更新 RTM → 自检验收标准 → 触发阶段门评审（指向 verifier-spec.md + check-verifier-output.ts）→ 通过后才进入系统设计"
+  },
+  {
+    "id": 2,
+    "scenario": "典型场景：显式 /wm 命令",
+    "prompt": "/wm analyze 需求：实现一个 TODO 待办事项的增删改查 REST API，支持按用户隔离",
+    "expected": "skill 应执行 /wm analyze 命令 → 加载 references/phase-1-requirements.md → 产出需求规格说明书 + 验收测试用例（含用例ID/场景/输入/预期输出/优先级）→ 登记 RTM → 输出阶段完成摘要（产出清单、RTM 覆盖状态、下一步建议）"
+  },
+  {
+    "id": 3,
+    "scenario": "歧义/范围场景：完整流程但不指定起点",
+    "prompt": "帮我做一个博客系统，从需求开始走完整流程",
+    "expected": "skill 应识别为 W 模型全流程 → 确认技术栈并建立项目状态记录 → 按 8 阶段顺序推进（每阶段同步测试设计）→ 每个阶段门评审通过才前进 → 编码后强制走质量门（check-artifact-gate.ts，RTM 100% + 四级测试通过）→ 不跳阶段、不后置测试设计"
+  }
+]

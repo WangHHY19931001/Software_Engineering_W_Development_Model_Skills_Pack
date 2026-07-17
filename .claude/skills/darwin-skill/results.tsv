@@ -1,0 +1,5 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-07-17T07:34	70ec17c	w-model-dev	-	70.8	baseline	-	初始评估9维;dim4/9最低4分;runtime红灯0	dry_run
+2026-07-17T07:40	a3698f2	w-model-dev	70.8	85.4	keep	dim4检查点	HL-1加🔴CHECKPOINT标记;独立judge盲评;dim2/3/4簇同涨	dry_run
+2026-07-17T07:44	1d6ae60	w-model-dev	85.4	84.9	keep	dim9反例黑名单	目标dim9:6→10(+4);总分-0.5属judge间方差(dim5/7内容未改);judgment-keep;下轮修dim5/7预存问题	dry_run
+2026-07-17T07:47	54b6ac1	w-model-dev	84.9	86.8	keep	dim5可执行具体性	4处软化措辞收紧;独立judge盲评;dim5:8→9;HL-4触顶(连续2轮Δ<2)	dry_run

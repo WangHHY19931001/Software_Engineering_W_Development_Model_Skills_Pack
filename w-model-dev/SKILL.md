@@ -48,8 +48,24 @@ description: >-
 3. **RTM 同步维护**：每次需求或设计变更，必须同步更新需求跟踪矩阵；定期核验需求覆盖率应为 100%。
 4. **质量门**：代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
 5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
-6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则按需从 `references/` 加载，模板从 `templates/` 取用。
+6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则仅加载当前阶段对应的 `references/phase-N-*.md`，模板从 `templates/` 取用。
 7. **LLM 评审由外部执行**：阶段产物的 LLM-as-a-Verifier 评审不内置；外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 执行，并通过 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 防漂移。
+
+## 反例与黑名单（不要做什么）
+
+以下反模式均为 W 模型执行中真实高发陷阱，命中任一条即视为流程破坏，必须回退到对应阶段起点：
+
+| # | 反模式（不要做） | 危害 | 正确做法 |
+|---|---|---|---|
+| 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 §2 走完评审 + 🔴 CHECKPOINT 放行 |
+| 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
+| 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，覆盖率/测试通过状态会被编造 | 必须执行 `check-artifact-gate.ts`，以退出码 + GATE_JSON 为准 |
+| 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评 |
+| 5 | 一次性载入全部 `references/` | 上下文污染，阶段聚焦丢失 | 仅加载当前阶段所需 `references/phase-N-*.md` |
+| 6 | 用 LLM 估算 RTM 覆盖率 | 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，覆盖率必须 100% |
+| 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 一律回到编码实现，附 GATE_JSON 详情 |
+| 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
+| 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
 
 ## 阶段与测试并行对应表
 
@@ -109,11 +125,15 @@ description: >-
 
 ## 指令（执行规则）
 
+> **检查点机制**：本流程在关键决策点用 `🔴 CHECKPOINT` 显性标记暂停点。到达该标记时**必须暂停并向用户确认**后再继续——视觉标记是 Agent 解析的扫描锚点，不可用"必须/应当"等措辞替代。
+
 ### 0. 任务接入
 
 1. 识别用户意图对应的 W 模型阶段（对照"阶段与测试并行对应表"）。
 2. 若项目尚未初始化，先确认技术栈（前端 / 后端 / 数据库 / 其他）并建立项目状态记录。
 3. 仅加载当前阶段所需的 `references/` 文件，避免一次性载入全部细则。
+
+> 🔴 **CHECKPOINT · 项目初始化**：技术栈与 W 模型阶段确认后、正式产出前暂停，向用户复述「将进入 X 阶段 / 同步产出 Y 测试设计 / 预期产物清单」，得到确认再进入 §1。
 
 ### 1. 执行阶段任务（每个阶段统一遵循）
 
@@ -139,6 +159,8 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 4. 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
 5. 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，按 `reworkHints` 修复。
 
+> 🔴 **CHECKPOINT · 阶段门放行**：评审结果出炉后暂停，向用户展示「质量等级 / 各子标准分 / reworkHints（若有）」，由用户确认「放行进入下一阶段」或「返工」。未确认不得自动推进或自动返工。
+
 ### 3. 质量门（编码及之后阶段强制）
 
 执行顺序：代码提交 → 自动化代码审查 → 单元测试 → 集成测试 → 系统测试 → 质量门检查 → 发布。任一环节不通过回到编码实现。质量标准见 [references/quality-standards.md](references/quality-standards.md)。
@@ -160,6 +182,8 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 # 退出码 0=通过 / 1=未通过 / 2=输入错误；末尾输出 GATE_JSON {...} 供程序解析
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 ```
+
+> 🔴 **CHECKPOINT · 发布放行**：质量门脚本返回通过（退出码 0）后暂停，向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」，由用户确认「发布」或「回到编码」。退出码 1/2 一律不得放行，直接回到编码实现并附 GATE_JSON 详情。
 
 > 工件质量门的判定逻辑由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源），
 > 由 `scripts/check-artifact-gate.ts` CLI 包装，Agent 直接执行得到确定性判定。
@@ -189,7 +213,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 2. 产出文档使用 Markdown，文件命名遵循 `<类型>-<模块>-<时间或序号>.md`。
 3. 测试用例必须含：用例 ID、测试场景、输入、预期输出、优先级。
 4. 涉及缺陷或风险时给出等级与缓解措施。
-5. 每个阶段结束输出"阶段完成摘要"：产出清单、RTM 覆盖状态、下一步建议。
+5. 每个阶段结束输出"阶段完成摘要"：产出清单、RTM 覆盖状态、下一阶段动作。
 
 ## 验收检查清单（项目级）
 
@@ -216,7 +240,7 @@ w-model-dev/
 │   ├── check-artifact-gate.ts     #   工件质量门 CLI（读 .w-model/rtm.json）
 │   ├── verifier-logic.ts          #   Verifier 输出校验纯逻辑（单点事实源）
 │   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
-├── references/                    # 阶段细则与规范（按需加载）
+├── references/                    # 阶段细则与规范（仅当前阶段加载）
 │   ├── phase-1-requirements.md
 │   ├── phase-2-system-design.md
 │   ├── phase-3-outline-design.md
@@ -250,8 +274,7 @@ w-model-dev/
 > **门禁脚本与 Markdown 的配合**：`references/quality-standards.md` 以 Markdown 描述
 > 质量标准（人类可读、便于审阅），`scripts/check-*-gate.ts` 是同一套门禁的可执行实现
 > （Agent 可直接调用得到结构化结论）。两者指向同一份事实源 `scripts/gate-logic.ts`，
-> 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定，必要时回查
-> Markdown 了解判定依据。
+> 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定；若需了解判定依据，回查对应 Markdown（如 `references/quality-standards.md`）。
 >
 > **LLM 评审的配合**：`references/verifier-spec.md` 提供提示词与输出 Schema，
 > `scripts/check-verifier-output.ts` 是同一套 Schema 的可执行校验。两者指向同一份事实源
