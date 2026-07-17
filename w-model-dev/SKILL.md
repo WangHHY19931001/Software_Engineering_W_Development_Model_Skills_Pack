@@ -18,6 +18,19 @@ description: >-
 
 **核心原则**：开发与测试并行推进——每一个开发阶段都同步产出对应的测试设计，使测试前置、缺陷早发现，并通过需求跟踪矩阵（RTM）保证全链路可追溯。
 
+## 架构定位（重要）
+
+本技能遵循「技能包只包含提示词、参考、模板，里面的脚本只做门禁」的架构原则：
+
+- **技能本身不内置 LLM 调用**。阶段产物的 LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，详见 [references/verifier-spec.md](references/verifier-spec.md)；评审输出结构的防漂移校验由 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 完成。
+- **技能本身不包含演化机制与轨迹分析**。技能自演化（Rollout / Reflect / Edit / Skill Lift 评估等）由外部工具完成：
+  - SkillOpt（微软）：https://github.com/microsoft/SkillOpt
+  - darwin-skill：https://github.com/alchaincyf/darwin-skill
+- **技能包内的脚本只做门禁**：
+  - [scripts/check-artifact-gate.ts](scripts/check-artifact-gate.ts)：工件质量门（RTM 覆盖率 + 四级测试通过）
+  - [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts)：外部 Agent 评审输出的结构化校验
+  - [scripts/gate-logic.ts](scripts/gate-logic.ts) + [scripts/verifier-logic.ts](scripts/verifier-logic.ts)：纯逻辑单点事实源
+
 ## 使用场景
 
 触发本技能的条件：
@@ -36,6 +49,7 @@ description: >-
 4. **质量门**：代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
 5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
 6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则按需从 `references/` 加载，模板从 `templates/` 取用。
+7. **LLM 评审由外部执行**：阶段产物的 LLM-as-a-Verifier 评审不内置；外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 执行，并通过 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 防漂移。
 
 ## 阶段与测试并行对应表
 
@@ -81,7 +95,7 @@ description: >-
 | `/wm design` | 系统设计 | `type`: 架构 / 概要 / 详细 | 设计文档、对应测试用例 |
 | `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
 | `/wm test` | 测试执行 | `type`: 单元 / 集成 / 系统 / 验收 | 测试报告 |
-| `/wm review` | 代码审查 | `path`: 文件路径 | 审查报告、优化建议 |
+| `/wm review` | LLM 评审指引 | `target`: REQ-/SD-/AT-/文件路径 | 评审指引（指向 verifier-spec.md） |
 | `/wm status` | 项目状态 | 无 | 当前阶段、完成进度 |
 
 ### 辅助命令
@@ -109,11 +123,21 @@ description: >-
 4. **更新 RTM**：在 `templates/rtm.md`（或项目内 RTM 文件）登记本阶段产物与需求 / 设计的映射，确保覆盖状态可追踪。RTM 维护规则见 [references/rtm-guide.md](references/rtm-guide.md)。
 5. **自检验收标准**：对照阶段指引中的"验收标准"逐条核验，未达标不得提交评审。
 
-### 2. 阶段门评审
+### 2. 阶段门评审（LLM-as-a-Verifier，外部执行）
 
-1. 汇总本阶段产出与自检结果，向用户呈现评审材料。
-2. 评审通过 → 进入下一阶段，更新项目状态。
-3. 评审不通过 → 回到本阶段起点返工，记录返工原因。
+阶段门评审采用 LLM-as-a-Verifier 评审流程，**本技能不内置 LLM 调用**，由外部 Agent 按提示词执行：
+
+1. 读取 [references/verifier-spec.md](references/verifier-spec.md) 了解三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema。
+2. 按 §8 提示词模板构造评审请求，由外部 Agent 执行 LLM-as-a-Verifier 评审。
+3. 评审结果写入 JSON 文件，立即调用校验脚本防漂移：
+
+```bash
+# 退出码 0=通过 / 1=校验失败 / 2=输入错误
+npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
+```
+
+4. 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
+5. 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，按 `reworkHints` 修复。
 
 ### 3. 质量门（编码及之后阶段强制）
 
@@ -137,17 +161,13 @@ description: >-
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 ```
 
-技能演化场景另需校验候选技能的 Skill Lift（对应 SSoT §14.5 验证门）：
-
-```bash
-# 技能验证门：读取 SkillEvalReport JSON，校验留出集 meanSkillLift > 0（严格正提升）
-# 防止 SkillsBench 实证的「自生成技能平均 -1.3pp」退化候选被采纳
-npx tsx w-model-dev/scripts/check-skill-gate.ts <report.json>
-```
-
-> 两类门禁的判定逻辑均由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源）。
-> 编程式调用方（`src/state/rtm-manager.ts`、`src/evolution/skill-optimizer.ts`）也委托至该文件，
-> 确保 CLI 与 SDK 判定结果完全一致。
+> 工件质量门的判定逻辑由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源）。
+> 编程式调用方（`src/state/rtm-manager.ts`）也委托至该文件，确保 CLI 与 SDK 判定结果完全一致。
+>
+> **技能演化不在技能包内**：本技能不包含技能验证门、Skill Lift 评估、Rollout 记录等内容。
+> 技能自演化由外部工具完成（[SkillOpt](https://github.com/microsoft/SkillOpt) /
+> [darwin-skill](https://github.com/alchaincyf/darwin-skill)），它们可消费本技能产出的
+> `VerifierOutput` JSON 作为训练信号。
 
 ### 4. 数据与状态管理
 
@@ -191,12 +211,12 @@ npx tsx w-model-dev/scripts/check-skill-gate.ts <report.json>
 ```
 w-model-dev/
 ├── SKILL.md                       # 本文件：编排与命令（YAML frontmatter + 阶段流）
-├── META-SKILL.md                  # 元技能可演化配置（可训练外部状态）
 ├── scripts/                       # 门禁校验脚本（Agent 可直接执行，自包含）
-│   ├── gate-logic.ts              #   门禁纯逻辑（单点事实源，src/ 与 CLI 共用）
+│   ├── gate-logic.ts              #   工件质量门纯逻辑（单点事实源，src/ 与 CLI 共用）
 │   ├── check-artifact-gate.ts     #   工件质量门 CLI（读 .w-model/rtm.json）
-│   └── check-skill-gate.ts        #   技能验证门 CLI（读 SkillEvalReport）
-├── references/                    # 阶段细则（按需加载）
+│   ├── verifier-logic.ts          #   Verifier 输出校验纯逻辑（单点事实源）
+│   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
+├── references/                    # 阶段细则与规范（按需加载）
 │   ├── phase-1-requirements.md
 │   ├── phase-2-system-design.md
 │   ├── phase-3-outline-design.md
@@ -207,7 +227,8 @@ w-model-dev/
 │   ├── phase-8-acceptance-test.md
 │   ├── data-models.md
 │   ├── rtm-guide.md
-│   └── quality-standards.md
+│   ├── quality-standards.md
+│   └── verifier-spec.md           #   LLM-as-a-Verifier 评审规范（提示词+Schema+子标准）
 ├── templates/                     # 文档模板
 │   ├── requirement-spec.md
 │   ├── system-design.md
@@ -231,6 +252,10 @@ w-model-dev/
 > （Agent 可直接调用得到结构化结论）。两者指向同一份事实源 `scripts/gate-logic.ts`，
 > 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定，必要时回查
 > Markdown 了解判定依据。
+>
+> **LLM 评审的配合**：`references/verifier-spec.md` 提供提示词与输出 Schema，
+> `scripts/check-verifier-output.ts` 是同一套 Schema 的可执行校验。两者指向同一份事实源
+> `scripts/verifier-logic.ts`，避免提示词与校验漂移。
 
 ## 实现位置
 
@@ -238,25 +263,28 @@ w-model-dev/
 
 | SKILL.md 章节 | 实现文件 | 说明 |
 |---|---|---|
-| 命令接口（`/wm analyze` 等） | [`src/commands/router.ts`](../src/commands/router.ts) | 10 个命令的路由与处理 |
+| 命令接口（`/wm analyze` 等） | [`src/commands/router.ts`](../src/commands/router.ts) | 10 个命令的路由与处理；`/wm review` 返回评审指引（不内置 LLM） |
 | 数据与状态管理 | [`src/state/project-state.ts`](../src/state/project-state.ts) | JSON 持久化，跨多轮交互保持上下文 |
 | RTM 同步维护 | [`src/state/rtm-manager.ts`](../src/state/rtm-manager.ts) | 自动重建、覆盖率统计；质量门判定**委托至** `scripts/gate-logic.ts` |
-| 阶段门评审（LLM-as-a-Verifier） | [`src/core/w-model-enhancer.ts`](../src/core/w-model-enhancer.ts) | 需求 / 设计 / 测试用例三阶段连续评分 |
-| LLM Verifier 引擎 | [`src/core/scoring-engine.ts`](../src/core/scoring-engine.ts) | logits 期望值 + fallback 机制 |
-| 三维度验证框架 | [`src/core/verification-framework.ts`](../src/core/verification-framework.ts) | 评分粒度 + 重复评估 + 标准分解 |
-| PPT 优先级排序 | [`src/core/ppt-ranker.ts`](../src/core/ppt-ranker.ts) | O(N×k) 概率枢轴锦标赛 |
-| 技能演化（验证门） | [`src/evolution/skill-optimizer.ts`](../src/evolution/skill-optimizer.ts) | SkillOpt 训练循环；Gate 判定**委托至** `scripts/gate-logic.ts` |
-| **门禁校验（单点事实源）** | [`w-model-dev/scripts/gate-logic.ts`](scripts/gate-logic.ts) | `checkArtifactGate` + `checkSkillGate` 纯函数，CLI 与 SDK 共用 |
-| 公共 API 入口 | [`src/index.ts`](../src/index.ts) | 导出 + `createCommandContext` 工厂 |
+| 工件质量门（单点事实源） | [`w-model-dev/scripts/gate-logic.ts`](scripts/gate-logic.ts) | `checkArtifactGate` 纯函数，CLI 与 SDK 共用 |
+| Verifier 输出校验（单点事实源） | [`w-model-dev/scripts/verifier-logic.ts`](scripts/verifier-logic.ts) | `checkVerifierOutput` 纯函数，CLI 共用 |
+| 公共 API 入口 | [`src/index.ts`](../src/index.ts) | 导出 + `createCommandContext` 工厂（不再注入 verifier） |
+
+> **不在本技能内的能力**：
+> - LLM-as-a-Verifier 的实际 LLM 推理（由外部 Agent 按 `references/verifier-spec.md` 执行）
+> - 技能自演化 / Skill Lift 评估 / Rollout 轨迹分析（由外部 [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill) 完成）
 
 ### 快速验证
 
 ```bash
-# 运行 W 模型 8 阶段全流程示例（使用 Mock LLM，无需 API key）
+# 运行 W 模型 8 阶段全流程示例
 npm run example:run
 
-# 运行测试套件（119 个测试，覆盖率达标）
+# 运行测试套件
 npm test
+
+# 校验外部 Agent 产出的 Verifier JSON
+npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 ```
 
 ### 编程式接入
@@ -264,14 +292,16 @@ npm test
 ```typescript
 import { createCommandContext, dispatch } from 'w-model-dev-skill';
 
-const ctx = await createCommandContext('./my-project', {
-  llm: { model: 'mock' },
-  fallbackStrategy: 'text-parse',
-});
+// 本技能不再注入 verifier，createCommandContext 只接受 cwd
+const ctx = await createCommandContext('./my-project');
 
 await dispatch('/wm analyze 用户登录功能', ctx);
 await dispatch('/wm design type=架构', ctx);
 // ... 完整 8 阶段流程
+
+// 阶段门评审：/wm review 返回评审指引，由外部 Agent 按
+// w-model-dev/references/verifier-spec.md 执行 LLM-as-a-Verifier 评审，
+// 评审输出由 w-model-dev/scripts/check-verifier-output.ts 校验。
 ```
 
 详见 [README.md](../README.md) 与 [docs/IMPLEMENTATION-PLAN.md](../docs/IMPLEMENTATION-PLAN.md)。
