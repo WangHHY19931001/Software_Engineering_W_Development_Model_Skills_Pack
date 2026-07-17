@@ -109,11 +109,15 @@ description: >-
 
 ## 指令（执行规则）
 
+> **检查点机制**：本流程在关键决策点用 `🔴 CHECKPOINT` 显性标记暂停点。到达该标记时**必须暂停并向用户确认**后再继续——视觉标记是 Agent 解析的扫描锚点，不可用"必须/应当"等措辞替代。
+
 ### 0. 任务接入
 
 1. 识别用户意图对应的 W 模型阶段（对照"阶段与测试并行对应表"）。
 2. 若项目尚未初始化，先确认技术栈（前端 / 后端 / 数据库 / 其他）并建立项目状态记录。
 3. 仅加载当前阶段所需的 `references/` 文件，避免一次性载入全部细则。
+
+> 🔴 **CHECKPOINT · 项目初始化**：技术栈与 W 模型阶段确认后、正式产出前暂停，向用户复述「将进入 X 阶段 / 同步产出 Y 测试设计 / 预期产物清单」，得到确认再进入 §1。
 
 ### 1. 执行阶段任务（每个阶段统一遵循）
 
@@ -139,6 +143,8 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 4. 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
 5. 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，按 `reworkHints` 修复。
 
+> 🔴 **CHECKPOINT · 阶段门放行**：评审结果出炉后暂停，向用户展示「质量等级 / 各子标准分 / reworkHints（若有）」，由用户确认「放行进入下一阶段」或「返工」。未确认不得自动推进或自动返工。
+
 ### 3. 质量门（编码及之后阶段强制）
 
 执行顺序：代码提交 → 自动化代码审查 → 单元测试 → 集成测试 → 系统测试 → 质量门检查 → 发布。任一环节不通过回到编码实现。质量标准见 [references/quality-standards.md](references/quality-standards.md)。
@@ -160,6 +166,8 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 # 退出码 0=通过 / 1=未通过 / 2=输入错误；末尾输出 GATE_JSON {...} 供程序解析
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 ```
+
+> 🔴 **CHECKPOINT · 发布放行**：质量门脚本返回通过（退出码 0）后暂停，向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」，由用户确认「发布」或「回到编码」。退出码 1/2 一律不得放行，直接回到编码实现并附 GATE_JSON 详情。
 
 > 工件质量门的判定逻辑由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源），
 > 由 `scripts/check-artifact-gate.ts` CLI 包装，Agent 直接执行得到确定性判定。
