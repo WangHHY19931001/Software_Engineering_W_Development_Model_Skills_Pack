@@ -37,6 +37,8 @@ import {
   cloneMetaSkillConfig,
   validateMetaSkillConfig,
 } from '../core/meta-skill-config';
+// 技能验证门判定逻辑委托至技能包内脚本（单点事实源，与 CLI check-skill-gate.ts 共用）
+import { checkSkillGate } from '../../w-model-dev/scripts/gate-logic.js';
 
 /**
  * Rollout 执行器接口：跑一次 W 模型全流程并收集证据。
@@ -339,13 +341,18 @@ ${JSON.stringify(failures.slice(0, 3).map(f => ({
     }
 
     const evalResult = await this.gateEvaluator.evaluate(candidate.config, this.config.heldOutTaskIds);
-    const accepted = evalResult.skillLift > 0; // 严格正提升
+
+    // 技能验证门判定委托至技能包内脚本 `w-model-dev/scripts/gate-logic.ts`
+    // 的 `checkSkillGate()`，与 CLI `check-skill-gate.ts` 共用同一份事实源。
+    const gate = checkSkillGate({ meanSkillLift: evalResult.skillLift });
 
     return {
       candidateId: candidate.id,
-      skillLift: evalResult.skillLift,
-      accepted,
-      rejectionReason: accepted ? undefined : `skillLift=${evalResult.skillLift.toFixed(3)} 未严格大于 0`,
+      skillLift: gate.skillLift,
+      accepted: gate.accepted,
+      // checkSkillGate 返回的 reason 形如 "拒绝：meanSkillLift=... 未严格大于 0"
+      // 此处仅在被拒绝时透传原因，保持 GateResult.rejectionReason 的语义契约
+      rejectionReason: gate.accepted ? undefined : gate.reason,
       perTaskResults: evalResult.perTaskResults,
     };
   }

@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "description": "W-Model AI Assistant Skill - 基于 AI 辅助编码与 LLM-as-a-Verifier 的 W 开发模型闭环工作技能",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "module": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./scripts/gate-logic": {
+      "types": "./dist/w-model-dev/scripts/gate-logic.d.ts",
+      "import": "./dist/w-model-dev/scripts/gate-logic.js"
     }
   },
   "files": [
