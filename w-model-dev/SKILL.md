@@ -26,6 +26,7 @@ description: >-
 - **技能本身不包含演化机制与轨迹分析**。技能自演化（Rollout / Reflect / Edit / Skill Lift 评估等）由外部工具完成：
   - SkillOpt（微软）：https://github.com/microsoft/SkillOpt
   - darwin-skill：https://github.com/alchaincyf/darwin-skill
+- **需求形式化为可选外部委托**。Phase 1（需求分析）的部分语义工作（结构化提取 / BDD 生成 / 知识图谱 / NFR 标记 / TLA+ / Lean 4）可委托给 [SRS-Formalizer](https://github.com/WangHHY19931001/SRS-Formalizer)（外部技能，Agent 驱动 + 脚本门禁，架构与本技能同源）。委托为 **opt-in**，仅当存在正式 SRS 文档且用户显式启用时触发；TLA+/Lean 仅对并发/状态机/安全合规模块条件触发。权威性约定：RTM 以 `.w-model/rtm.json` 为唯一事实源，SRS-Formalizer 产出的追溯矩阵仅作输入；Phase 1 阶段门放行仍以本技能 `check-verifier-output.ts` 为准，SRS-Formalizer 的 `verify-gate` 仅作内部子门禁。详见 [references/phase-1-requirements.md](references/phase-1-requirements.md)「可选：需求形式化」节。
 - **技能包内的脚本只做门禁**：
   - [scripts/check-artifact-gate.ts](scripts/check-artifact-gate.ts)：工件质量门（RTM 覆盖率 + 四级测试通过）
   - [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts)：外部 Agent 评审输出的结构化校验
