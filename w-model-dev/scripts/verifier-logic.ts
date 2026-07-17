@@ -109,6 +109,8 @@ export interface VerifierCheckResult {
 // ==================== 工具函数 ====================
 
 const EPSILON = 1e-4;
+/** variance 字段与重算方差的允许误差（浮点比较） */
+const VARIANCE_EPSILON = 1e-4;
 const MIN_REPEAT_TIMES = 3;
 const DEFAULT_VARIANCE_THRESHOLD = 0.10;
 const SCHEMA_VERSION = '1.0';
@@ -119,6 +121,21 @@ function isNumber(x: unknown): x is number {
 
 function inRange(x: number, lo: number, hi: number, inclusive = true): boolean {
   return inclusive ? x >= lo && x <= hi : x > lo && x < hi;
+}
+
+/**
+ * 计算样本方差（总体方差，除以 n 而非 n-1）。
+ *
+ * 用途：校验外部 Agent 谎报 variance 的漂移行为。Agent 不能用低方差
+ * 掩盖「实际只评估 1 次、复制 N 次填入 rawScores」的作弊。
+ *
+ * 当 rawScores 长度 < 2 时方差无意义，返回 0。
+ */
+function computeVariance(scores: number[]): number {
+  if (scores.length < 2) return 0;
+  const mean = scores.reduce((s, x) => s + x, 0) / scores.length;
+  const sumSq = scores.reduce((s, x) => s + (x - mean) * (x - mean), 0);
+  return sumSq / scores.length;
 }
 
 /**
@@ -144,11 +161,13 @@ export function determineQualityLevel(score: number): QualityLevel {
  *      （名称与权重均不得改动）
  *   4. 每个子标准：score ∈ [0,1]；rawScores.length = repeatTimes；variance ≤ 阈值；
  *      evidence 非空字符串
- *   5. 综合分数 = Σ(score * weight)，与输出 compositeScore 误差 ≤ EPSILON
- *   6. qualityLevel 与综合分数映射一致（§6.1）
- *   7. passed = (qualityLevel === A || B)
- *   8. passed=false 时 reworkHints 必须非空数组
- *   9. ranking（可选）字段类型合法
+ *   5. 防漂移：根据 rawScores 重算方差，与 variance 字段误差 ≤ VARIANCE_EPSILON，
+ *      防止 Agent 谎报低方差掩盖「单次评估复制 N 次」的作弊
+ *   6. 综合分数 = Σ(score * weight)，与输出 compositeScore 误差 ≤ EPSILON
+ *   7. qualityLevel 与综合分数映射一致（§6.1）
+ *   8. passed = (qualityLevel === A || B)
+ *   9. passed=false 时 reworkHints 必须非空数组
+ *  10. ranking（可选）字段类型合法
  */
 export function checkVerifierOutput(
   raw: unknown,
@@ -279,6 +298,19 @@ export function checkVerifierOutput(
       reasons.push(`subCriteria[${idx}].variance 必须为非负数，实际为 ${JSON.stringify(sc.variance)}`);
     } else if (sc.variance > varianceThreshold) {
       reasons.push(`subCriteria[${idx}].variance ${sc.variance} > 阈值 ${varianceThreshold}（不可重复，需重评）`);
+    }
+
+    // 防漂移：重算 rawScores 方差并与 variance 字段对比。
+    // 防止 Agent 谎报低方差以掩盖「实际只评估 1 次、复制 N 次」的作弊。
+    if (Array.isArray(sc.rawScores) && sc.rawScores.length >= 2 && isNumber(sc.variance)) {
+      const recomputed = computeVariance(
+        sc.rawScores.filter(isNumber) as number[],
+      );
+      if (Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
+        reasons.push(
+          `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
+        );
+      }
     }
     if (typeof sc.evidence !== 'string' || sc.evidence.trim() === '') {
       reasons.push(`subCriteria[${idx}].evidence 必须为非空字符串（引用目标内具体片段）`);

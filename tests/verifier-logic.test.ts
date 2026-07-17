@@ -15,8 +15,22 @@ import {
 
 // ==================== 工具：构造合法 VerifierOutput ====================
 
+/**
+ * 计算样本方差（与 verifier-logic.ts 的 computeVariance 保持一致）。
+ * 测试 fixture 用此函数生成与 rawScores 自洽的 variance 字段。
+ */
+function computeVariance(scores: number[]): number {
+  if (scores.length < 2) return 0;
+  const mean = scores.reduce((s, x) => s + x, 0) / scores.length;
+  const sumSq = scores.reduce((s, x) => s + (x - mean) * (x - mean), 0);
+  return sumSq / scores.length;
+}
+
 function makeValidOutput(overrides: Partial<VerifierOutputShape> = {}): VerifierOutputShape {
   const expected = SUB_CRITERIA.requirement;
+  // 使用完全相同的 rawScores，使 variance=0（自洽，通过防漂移校验）
+  const rawScores = [0.80, 0.80, 0.80];
+  const variance = computeVariance(rawScores);
   return {
     schemaVersion: '1.0',
     meta: {
@@ -32,8 +46,8 @@ function makeValidOutput(overrides: Partial<VerifierOutputShape> = {}): Verifier
       name: sc.name,
       weight: sc.weight,
       score: 0.8,
-      rawScores: [0.79, 0.80, 0.81],
-      variance: 0.0001,
+      rawScores: [...rawScores],
+      variance,
       evidence: `行 ${i + 10}`,
     })),
     compositeScore: 0.8,
@@ -150,7 +164,7 @@ describe('verifier-logic - checkVerifierOutput 各类非法输出', () => {
       meta: { ...makeValidOutput().meta, repeatTimes: 2 },
       subCriteria: SUB_CRITERIA.requirement.map(sc => ({
         name: sc.name, weight: sc.weight, score: 0.8,
-        rawScores: [0.79, 0.80], variance: 0.0001, evidence: 'e',
+        rawScores: [0.80, 0.80], variance: 0, evidence: 'e',
       })),
     });
     const r = checkVerifierOutput(o);
@@ -310,20 +324,27 @@ describe('verifier-logic - 防漂移约束（核心目标）', () => {
     expect(r.reasons.some(x => x.includes('rawScores 长度'))).toBe(true);
   });
 
-  it('外部 Agent 试图伪造低方差以掩盖不可重复 → 失败', () => {
+  it('外部 Agent 试图伪造低方差以掩盖不可重复 → 失败（防漂移：重算方差）', () => {
     const o = makeValidOutput();
-    o.subCriteria[0].rawScores = [0.1, 0.9, 0.5]; // 实际方差大
-    o.subCriteria[0].variance = 0.001; // 但谎称方差小
+    // 实际 rawScores 方差大（0.1, 0.9, 0.5 → mean=0.5, var≈0.1155）
+    o.subCriteria[0].rawScores = [0.1, 0.9, 0.5];
+    // 但 Agent 谎称方差小（0.001），试图通过 ≤ 阈值 0.10 的校验
+    o.subCriteria[0].variance = 0.001;
     const r = checkVerifierOutput(o);
-    // 注：当前实现不重算方差，只校验 variance 字段是否超阈值。
-    // 此用例验证 variance 字段被严格校验：若谎报方差 ≤ 阈值会通过，
-    // 但 rawScores 与 variance 不一致也是漂移信号——本测试展示
-    // 当前校验仍能在 variance 字段超出阈值时拦截。
-    // 此处 variance=0.001 ≤ 阈值 0.10，故不触发该 reason。
-    // 改为 variance=0.5 应触发：
-    o.subCriteria[0].variance = 0.5;
-    const r2 = checkVerifierOutput(o);
-    expect(r2.passed).toBe(false);
-    expect(r2.reasons.some(x => x.includes('不可重复'))).toBe(true);
+    expect(r.passed).toBe(false);
+    // 防漂移校验应检测到 rawScores 重算方差与 variance 字段不一致
+    expect(r.reasons.some(x => x.includes('重算的方差') && x.includes('疑似谎报方差'))).toBe(true);
+  });
+
+  it('外部 Agent 试图通过复制相同分数冒充多次评估 → 通过（但 variance=0 是合法的）', () => {
+    // 注：复制相同分数 [0.8, 0.8, 0.8] 与 variance=0 是自洽的，校验通过。
+    // 这是已知限制：纯结构校验无法区分「真多次评估恰好相同」与「单次复制」。
+    // 防漂移的目的是阻止「方差字段与 rawScores 不一致」的谎报，
+    // 而非阻止「恰好一致的多次评估」（后者需靠评审提示词约束随机种子）。
+    const o = makeValidOutput();
+    o.subCriteria[0].rawScores = [0.8, 0.8, 0.8];
+    o.subCriteria[0].variance = 0;
+    const r = checkVerifierOutput(o);
+    expect(r.passed).toBe(true);
   });
 });

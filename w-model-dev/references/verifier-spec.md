@@ -45,6 +45,9 @@
 - 最终子标准分数 = `repeatTimes` 次评估的均值。
 - 子标准方差必须 ≤ `varianceThreshold`（默认 `0.10`），否则视为不可重复，
   `check-verifier-output.ts` 会判失败并要求重评。
+- **防漂移**：`check-verifier-output.ts` 会根据 `rawScores` **重算方差**并与输出
+  的 `variance` 字段对比，误差超过 `1e-4` 即判失败。Agent 不得谎报低方差以
+  掩盖「实际只评估 1 次、复制 N 次填入 rawScores」的作弊行为。
 
 ### 3.3 标准分解（Decomposition）
 
