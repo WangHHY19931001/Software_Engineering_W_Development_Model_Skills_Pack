@@ -2,17 +2,20 @@
  * W-Model 全流程示例
  *
  * 演示如何使用 /wm 命令走完 W 模型 8 个阶段（需求 → 系统/概要/详细设计 → 编码 → 集成/系统/验收测试），
- * 期间自动维护 RTM、运行 LLM-as-a-Verifier 评分、并在验收阶段触发质量门检查。
+ * 期间自动维护 RTM，并在验收阶段触发工件质量门检查。
  *
  * 运行方式：
  *   npm run example:run
  *
- * 本示例使用 MockLLMClient（无需 API key），开箱即用。
- * 生产环境可在 createCommandContext 时注入真实 LLM 客户端（如 HttpLLMClient）。
+ * 架构说明：
+ *   - 本技能不内置 LLM 调用。阶段产物的 LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，
+ *     详见 w-model-dev/references/verifier-spec.md；评审输出由
+ *     w-model-dev/scripts/check-verifier-output.ts 校验防漂移。
+ *   - 本示例因此不再调用 /wm review（该命令仅返回评审指引，实际评审需外部 Agent 完成）。
+ *   - 技能自演化由外部工具完成（SkillOpt / darwin-skill），不在本示例范围。
  */
 
 import { createCommandContext, dispatch } from '../src/index.js';
-import type { VerifierConfig } from '../src/types/index.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
@@ -22,14 +25,8 @@ async function main(): Promise<void> {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'w-model-demo-'));
   console.log(`\n工作目录: ${cwd}\n`);
 
-  // 2. 构造命令上下文（Mock LLM，开箱即用）
-  const verifierConfig: VerifierConfig = {
-    llm: { model: 'mock' },
-    fallbackStrategy: 'text-parse',
-    temperature: 0.3,
-    pptRanking: { enabled: true, defaultPivotCount: 3 },
-  };
-  const ctx = await createCommandContext(cwd, verifierConfig);
+  // 2. 构造命令上下文（本技能不再注入 verifier）
+  const ctx = await createCommandContext(cwd);
 
   const step = async (cmd: string): Promise<void> => {
     console.log(`\n$ ${cmd}`);
@@ -70,10 +67,7 @@ async function main(): Promise<void> {
   // 阶段 8：验收测试（回填真实执行结果 + 质量门检查）
   await step('/wm test type=验收 result=pass');
 
-  // ==================== 评审 / 状态 / 导出 ====================
-
-  // 对需求做 LLM-as-a-Verifier 评审
-  await step('/wm review REQ-001');
+  // ==================== 状态 / 导出 ====================
 
   // 查看最终状态
   await step('/wm status');
@@ -85,6 +79,17 @@ async function main(): Promise<void> {
   console.log('\n✅ W 模型全流程演示完成。');
   console.log(`   导出文件位于: ${exportDir}`);
   console.log(`   状态文件: ${path.join(cwd, '.w-model', 'project.json')}`);
+
+  // ==================== 阶段门评审（由外部 Agent 执行，不在本示例内） ====================
+  //
+  // 如需对阶段产物做 LLM-as-a-Verifier 评审：
+  //   1. 执行 /wm review <target>，技能返回评审指引（不内置 LLM）
+  //   2. 外部 Agent 按 w-model-dev/references/verifier-spec.md §8 提示词模板执行评审
+  //   3. 评审输出 JSON 后立即调用 w-model-dev/scripts/check-verifier-output.ts 校验防漂移
+  //
+  // 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具完成：
+  //   - SkillOpt（微软）  https://github.com/microsoft/SkillOpt
+  //   - darwin-skill       https://github.com/alchaincyf/darwin-skill
 
   // 清理（可选；保留以便检查产出）
   // await fs.rm(cwd, { recursive: true, force: true });

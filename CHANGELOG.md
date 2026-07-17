@@ -5,6 +5,53 @@
 
 ## [Unreleased]
 
+### 变更（架构重构：技能包纯化）
+
+> 把技能包纯化为「只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM」。
+> LLM-as-a-Verifier 评审改由外部 Agent 按提示词执行；技能演化移交外部 skillopt / darwin-skill。
+> 对应实现路线图 [Phase 2.6](./docs/IMPLEMENTATION-PLAN.md)。
+
+#### 删除（源码）
+
+- `src/core/{scoring-engine,verification-framework,ppt-ranker,w-model-enhancer,llm-client,meta-skill-config}.ts`：LLM 评分 / 验证 / 排序 / 增强器 / 客户端 / 元技能配置整块移除
+- `src/evolution/skill-optimizer.ts`：SkillOpt ReflectTrainer 训练循环移除，演化移交外部工具
+- `src/eval/skill-lift.ts`：ACES Skill Lift 评估移除，评估移交外部工具
+- `w-model-dev/scripts/check-skill-gate.ts`：技能验证门移除（仅保留工件质量门）
+- `w-model-dev/META-SKILL.md`：可演化元技能配置移除
+- `docs/llm-verifier-implementation-template.ts`：原始模板移除（已被 `src/` 替代后又随 `src/core/` 一并删除）
+- 对应测试文件 `tests/{scoring-engine,verification-framework,ppt-ranker,w-model-enhancer,llm-client,meta-skill-config,skill-optimizer,skill-lift}.test.ts` 全部移除
+
+#### 新增
+
+- `w-model-dev/references/verifier-spec.md`：LLM-as-a-Verifier 评审规范（设计原则 / 4 类目标 / 三维度验证 / 连续评分 [0,1] 4 位小数 / PPT / 输出 Schema / 子标准 / 提示词模板 / 与外部演化工具关系 / 校验脚本调用）
+- `w-model-dev/scripts/verifier-logic.ts`：Verifier 输出校验纯逻辑（自包含类型形状、`SUB_CRITERIA` 常量、`checkVerifierOutput`、`determineQualityLevel`，单点事实源）
+- `w-model-dev/scripts/check-verifier-output.ts`：Verifier 输出校验 CLI（防外部 Agent 输出漂移，退出码 0/1/2）
+- `tests/verifier-logic.test.ts`：33 个测试用例覆盖 Schema / 子标准 / 综合分数 / 质量等级 / passed / reworkHints / ranking
+
+#### 变更（核心文件重写）
+
+- `src/index.ts`：`createCommandContext(cwd)` 改为单参数，不再注入 verifier；移除演化 / 评估 / LLM 相关导出
+- `src/types/index.ts`：`CommandContext` 简化为 3 字段（`projectState` / `rtm` / `cwd`）；移除 `VerifierConfig` / `MetaSkillConfig` / `SkillEvolutionConfig` / `SkillLiftResult` / 轨迹相关类型
+- `src/commands/router.ts`：`/wm review` 改为返回结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`），不直接调用 LLM；`/wm code` 不自动标记单元测试通过；`/wm test` 支持 `result=pass|fail` 真实结果回填
+- `w-model-dev/scripts/gate-logic.ts`：移除 `checkSkillGate`，仅保留 `checkArtifactGate`（工件质量门）
+- `w-model-dev/SKILL.md`：新增「架构定位」节，引用 `verifier-spec.md` / `check-verifier-output.ts` / `verifier-logic.ts`，标注演化由外部工具完成
+- `examples/run-wm-flow.ts`：移除 `verifierConfig` 参数与 `/wm review` 步骤；新增 `result=pass` 真实结果回填
+
+#### 文档同步
+
+- `docs/skill-design-document_SSoT.md`：§1.4 新增架构重构说明；新增 §3.3「技能架构原则与外部工具边界」；§7.6 / §7.7 / §7.8 合并为单一 §7.6 指向 `verifier-spec.md`；§10.5 改为「工件质量门」单门；§10A 追溯表移除已删除文件行；§12.4 改为「外部演化工具协作」；§12.5 路线图移除自演化路线；第 14 章「技能演化机制」与第 15 章「技能评估标准」整章 tombstone；§16.2 / §16.3 同步
+- `docs/llm-verifier-integration-design.md`：简化为指针文档（约 103 行），权威来源指向 `verifier-spec.md`
+- `docs/IMPLEMENTATION-PLAN.md`：新增 Phase 2.6（9 子任务）；Phase 0 / 1 / 2.5 / 3 / 验收标准 / 技术债务全面标注取代关系
+- `README.md` / `CONTRIBUTING.md` / `docs/INSTALL.md`：同步架构原则、`createCommandContext(cwd)` 单参、移除 LLM 配置、新增外部演化工具边界
+
+#### 验证
+
+- `npx tsc --noEmit`：0 错误
+- `npx jest`：96 个测试通过（4 套件：`command-router.test.ts` 63 + `verifier-logic.test.ts` 33 + `project-state.test.ts` + `rtm-manager.test.ts`）
+- `npx eslint 'src/**/*.ts' --max-warnings=0`：0 warning
+- `w-model-dev/scripts/check-verifier-output.ts`：端到端验证通过
+- `npm run example:run`：通过
+
 ### 变更（项目结构整理）
 
 - 设计文档统一迁入 `docs/` 目录：`skill-design-document.md`、`skill-design-document_SSoT.md`、`llm-verifier-integration-design.md`、`llm-verifier-implementation-template.ts`、`IMPLEMENTATION-PLAN.md`
@@ -55,8 +102,8 @@
 ### 计划中
 - Web UI 可视化 RTM 矩阵
 - 多项目并行管理
-- SkillOptimizer 真实 RolloutExecutor 接入 dispatch 全流程
-- 留出 benchmark 集扩充（≥30 个项目）
+- 与外部演化工具（SkillOpt / darwin-skill）约定 `VerifierOutput` JSON 消费协议
+- 留出 benchmark 集扩充（≥30 个项目，供外部演化工具消费）
 
 ## [0.1.0] - 2026-07-16
 

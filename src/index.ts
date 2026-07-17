@@ -1,41 +1,23 @@
 /**
  * W-Model AI Assistant Skill - 实现入口
  *
- * 提供四类公共 API：
- *   1. LLM-as-a-Verifier 核心引擎（scoring-engine / verification-framework / ppt-ranker / w-model-enhancer）
- *   2. 项目状态与 RTM 管理（project-state / rtm-manager）
- *   3. /wm 命令路由（commands/router）
- *   4. 技能演化与评估（evolution/skill-optimizer + eval/skill-lift）—— 对应 SSoT 第 14/15 章
+ * 本技能遵循「技能包只包含提示词、参考、模板，脚本只做门禁」的架构原则：
+ *   - 不内置 LLM 调用。LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，
+ *     详见 w-model-dev/references/verifier-spec.md；
+ *     评审输出结构的防漂移校验由 w-model-dev/scripts/check-verifier-output.ts 完成。
+ *   - 不内置技能演化与轨迹分析。技能自演化由外部工具完成：
+ *       · SkillOpt（微软）  https://github.com/microsoft/SkillOpt
+ *       · darwin-skill       https://github.com/alchaincyf/darwin-skill
+ *
+ * 提供两类公共 API：
+ *   1. 项目状态与 RTM 管理（project-state / rtm-manager）—— 工件质量门数据来源
+ *   2. /wm 命令路由（commands/router）—— 阶段推进与工件质量门判定
  *
  * 对应设计：
- *   - SSoT: docs/skill-design-document_SSoT.md（第 7/10/14/15 章为数据模型/质量门/演化/评估的权威定义）
+ *   - SSoT: docs/skill-design-document_SSoT.md
  *   - SKILL: w-model-dev/SKILL.md（编排逻辑）
- *   - MetaSkill: w-model-dev/META-SKILL.md（可训练外部状态）
- *   - 集成设计: docs/llm-verifier-integration-design.md
+ *   - Verifier 规范: w-model-dev/references/verifier-spec.md
  */
-
-// ==================== 核心引擎 ====================
-export { LLMVerifierEngine } from './core/scoring-engine';
-export { VerificationFramework, determineQualityLevel } from './core/verification-framework';
-export { PPTRanker } from './core/ppt-ranker';
-export { WModelVerifierEnhancer } from './core/w-model-enhancer';
-export {
-  BaseLLMClient,
-  MockLLMClient,
-  HttpLLMClient,
-  OpenAICompatibleLLMClient,
-  AnthropicLLMClient,
-  createLLMClient,
-} from './core/llm-client';
-export {
-  DEFAULT_META_SKILL_CONFIG,
-  DEFAULT_SCORE_RANGE,
-  DEFAULT_REQUIREMENT_SUBCRITERIA,
-  DEFAULT_DESIGN_SUBCRITERIA,
-  DEFAULT_TESTCASE_SUBCRITERIA,
-  cloneMetaSkillConfig,
-  validateMetaSkillConfig,
-} from './core/meta-skill-config';
 
 // ==================== 状态管理 ====================
 export {
@@ -51,27 +33,6 @@ export {
   getCommandNames,
 } from './commands/router';
 
-// ==================== 技能演化（对应 SSoT 第 14 章） ====================
-export {
-  SkillOptimizer,
-  createMetaSkillGateEvaluator,
-  extractFailedSubCriteria,
-  type RolloutExecutor,
-  type GateEvaluator,
-  type TrainingLogEntry,
-  type TrainingResult,
-} from './evolution/skill-optimizer';
-
-// ==================== 技能评估（对应 SSoT 第 15 章） ====================
-export {
-  SkillLiftEvaluator,
-  createDefaultEvalExecutor,
-  runSkillEvaluation,
-  DEFAULT_HELD_OUT_TASKS,
-  type EvalRunExecutor,
-  type EvalRunOutcome,
-} from './eval/skill-lift';
-
 // ==================== 类型 ====================
 export type * from './types';
 
@@ -79,32 +40,25 @@ export type * from './types';
 
 import { ProjectStateManager } from './state/project-state';
 import { RTMManager } from './state/rtm-manager';
-import { WModelVerifierEnhancer } from './core/w-model-enhancer';
-import { createLLMClient } from './core/llm-client';
-import type { CommandContext, MetaSkillConfig, VerifierConfig } from './types';
+import type { CommandContext } from './types';
 
 /**
  * 创建默认命令上下文（用于即装即用的 CLI / Agent 接入）
  *
+ * 本技能不内置 LLM 调用：
+ *   - 阶段产物的 LLM-as-a-Verifier 评审由外部 Agent 按提示词执行
+ *     （见 w-model-dev/references/verifier-spec.md），评审输出可由
+ *     w-model-dev/scripts/check-verifier-output.ts 做结构化校验防漂移。
+ *   - 技能自演化与轨迹分析不在技能内，由外部 skillopt / darwin-skill 完成。
+ *
  * @param cwd 工作目录（项目根）
- * @param verifierConfig 可选的 Verifier 配置；不传则使用 Mock LLM（开箱即用，无需 API key）
- * @param metaSkill 可选的元技能配置（用于 SkillOptimizer 演化）；不传则使用默认配置
  */
 export async function createCommandContext(
-  cwd: string,
-  verifierConfig?: VerifierConfig,
-  metaSkill?: MetaSkillConfig
+  cwd: string
 ): Promise<CommandContext> {
   const projectState = new ProjectStateManager(cwd);
   await projectState.load();
   const rtm = new RTMManager(cwd, projectState);
 
-  let verifier: WModelVerifierEnhancer | undefined;
-  if (verifierConfig) {
-    // 根据 model 名自动选择真实 / Mock 客户端
-    const llmClient = createLLMClient(verifierConfig.llm);
-    verifier = new WModelVerifierEnhancer(verifierConfig, llmClient, metaSkill);
-  }
-
-  return { projectState, rtm, verifier, cwd };
+  return { projectState, rtm, cwd };
 }

@@ -1,15 +1,13 @@
 /**
  * /wm 命令处理器与路由
  *
- * 解决 issue Critical #2：`/wm` 命令路由未实现。
- *
  * 命令列表（对应 SKILL.md 命令接口）：
  *   核心命令：
  *     /wm analyze <需求描述>           需求分析（同步验收测试设计）
  *     /wm design type=<架构|概要|详细>  设计（同步对应测试设计）
  *     /wm code <功能描述>              编码（同步单元测试执行）
  *     /wm test type=<单元|集成|系统|验收> 测试执行
- *     /wm review <目标>                代码 / 文档审查（LLM-as-a-Verifier）
+ *     /wm review <目标>                触发 LLM-as-a-Verifier 评审（提示外部 Agent 执行）
  *     /wm status                       项目状态与进度
  *   辅助命令：
  *     /wm help                         帮助
@@ -17,9 +15,13 @@
  *     /wm export [文件路径]            导出项目 JSON + RTM Markdown
  *     /wm import <文件路径>            导入项目
  *
- * 注意：本处理器专注于「状态机驱动的命令编排」，
- * 实际的文档生成 / 代码生成由上游 AI 在调用此处理器前后完成。
- * 此处的命令处理器负责：状态校验、实体登记、RTM 同步、阶段推进、验证触发。
+ * 设计原则：
+ *   - 本处理器专注「状态机驱动的命令编排」与「实体登记 / RTM 同步 / 阶段推进」。
+ *   - 实际文档生成 / 代码生成 / LLM 评审由上游 AI 在调用此处理器前后完成。
+ *   - 技能本身不包含 LLM 调用代码：`/wm review` 仅返回「请按
+ *     references/verifier-spec.md 提示词执行 verifier，并通过
+ *     scripts/check-verifier-output.ts 校验输出」的指引，不直接调用 LLM。
+ *   - 技能演化与轨迹分析不在技能内，由外部 skillopt / darwin-skill 完成。
  */
 
 import { promises as fs } from 'node:fs';
@@ -31,7 +33,6 @@ import type {
   DesignType,
   ProjectPhase,
   TestCaseType,
-  VerificationResult,
 } from '../types';
 
 // ==================== 命令注册表 ====================
@@ -96,7 +97,7 @@ W-Model AI Assistant Skill - 命令帮助
   /wm code <功能描述>                  编码实现，同步产出单元测试用例（不自动标记通过）
   /wm test type=<单元|集成|系统|验收> [result=pass|fail]
                                       查询测试状态或回填真实执行结果
-  /wm review <目标ID或文件路径>        LLM-as-a-Verifier 验证（连续评分+置信度）
+  /wm review <目标ID或文件路径>        触发 LLM-as-a-Verifier 评审（由外部 Agent 按提示词执行）
   /wm status                           查看当前阶段、进度、RTM 覆盖率
 
 辅助命令：
@@ -114,6 +115,11 @@ W-Model AI Assistant Skill - 命令帮助
   集成测试 → 集成测试执行
   系统测试 → 系统测试执行
   验收测试 → 验收测试执行
+
+LLM-as-a-Verifier 评审流程：
+  /wm review 仅返回评审指引。实际评审由外部 Agent 按
+  w-model-dev/references/verifier-spec.md 提示词执行，
+  并通过 w-model-dev/scripts/check-verifier-output.ts 校验结构化输出。
 `.trim();
   return { success: true, message: text };
 };
@@ -166,16 +172,8 @@ registerCommand('analyze', async (args, ctx) => {
   await ctx.rtm.rebuild();
   await ctx.rtm.logChange(`新增需求 ${requirement.id}`, [requirement.id]);
 
-  // 可选：调用 verifier 验证需求质量
-  let verification: VerificationResult | undefined;
-  if (ctx.verifier) {
-    verification = await ctx.verifier.verifyRequirement(requirement);
-  }
-
-  const verifyMsg = verification
-    ? `\n需求质量验证: ${verification.finalScore.toFixed(1)}/20 (${verification.qualityLevel}, 置信度 ${(verification.confidence * 100).toFixed(0)}%)`
-    : '';
-
+  // LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，本处理器不直接调用 LLM。
+  // 评审指引见 /wm review 命令与 references/verifier-spec.md。
   return {
     success: true,
     message:
@@ -183,10 +181,11 @@ registerCommand('analyze', async (args, ctx) => {
       `  需求 ID: ${requirement.id}\n` +
       `  标题: ${title}\n` +
       `  同步产出验收测试: ${acceptanceTest.id}\n` +
-      `  RTM 已登记（覆盖率: ${ctx.rtm.getCoveragePercent()}%）${verifyMsg}\n` +
-      `  下一步: /wm design type=架构`,
+      `  RTM 已登记（覆盖率: ${ctx.rtm.getCoveragePercent()}%）\n` +
+      `  下一步: /wm design type=架构\n` +
+      `  评审建议: /wm review ${requirement.id}（由外部 Agent 按 verifier-spec.md 执行）`,
     artifacts: [],
-    data: { requirement, acceptanceTest, verification },
+    data: { requirement, acceptanceTest },
   };
 });
 
@@ -251,24 +250,16 @@ registerCommand('design', async (args, ctx) => {
   await ctx.rtm.rebuild();
   await ctx.rtm.logChange(`新增${m.designType}: ${design.id}`, linkedReqId ? [linkedReqId] : []);
 
-  let verification: VerificationResult | undefined;
-  if (ctx.verifier) {
-    verification = await ctx.verifier.verifyDesign(design);
-  }
-
-  const verifyMsg = verification
-    ? `\n设计质量验证: ${verification.finalScore.toFixed(1)}/20 (${verification.qualityLevel}, 置信度 ${(verification.confidence * 100).toFixed(0)}%)`
-    : '';
-
   return {
     success: true,
     message:
       `【${m.phase}】阶段完成\n` +
       `  设计 ID: ${design.id}\n` +
-      `  同步产出${m.testType}用例: ${testCase.id}${verifyMsg}\n` +
+      `  同步产出${m.testType}用例: ${testCase.id}\n` +
       `  RTM 已更新（覆盖率: ${ctx.rtm.getCoveragePercent()}%）\n` +
-      `  下一步: ${m.designType === '系统设计' ? '/wm design type=概要' : m.designType === '概要设计' ? '/wm design type=详细' : '/wm code <功能>'}`,
-    data: { design, testCase, verification },
+      `  下一步: ${m.designType === '系统设计' ? '/wm design type=概要' : m.designType === '概要设计' ? '/wm design type=详细' : '/wm code <功能>'}\n` +
+      `  评审建议: /wm review ${design.id}`,
+    data: { design, testCase },
   };
 });
 
@@ -452,6 +443,16 @@ registerCommand('test', async (args, ctx) => {
 });
 
 // ---- /wm review ----
+//
+// 设计变更说明：
+//   技能本身不包含 LLM 调用代码。`/wm review` 不再直接调用 verifier，
+//   而是返回结构化指引，让外部 Agent 按提示词执行评审：
+//     1. 读取 w-model-dev/references/verifier-spec.md（三维度验证 + 连续评分 + PPT + 子标准 + 输出 schema）
+//     2. 按提示词对目标执行 LLM-as-a-Verifier 评审，产出结构化 JSON
+//     3. 执行 w-model-dev/scripts/check-verifier-output.ts 校验输出（防漂移）
+//
+//   这样技能包可独立分发给任意 Agent（Trae / Claude / Cursor 等），
+//   Agent 自行选择 LLM 实现评审，技能只提供提示词与校验脚本。
 registerCommand('review', async (args, ctx) => {
   await ensureProject(ctx);
   const target = args.join(' ').trim();
@@ -459,45 +460,73 @@ registerCommand('review', async (args, ctx) => {
     return { success: false, message: '用法: /wm review <需求ID|设计ID|测试用例ID|文件路径>' };
   }
 
-  if (!ctx.verifier) {
-    return { success: false, message: '未配置 LLM Verifier，无法执行审查。' };
-  }
+  // 识别目标类型（用于在指引中提示对应的子标准集合）
+  let targetKind: '需求' | '设计' | '测试用例' | '文件' = '文件';
+  let targetFound = false;
 
-  // 尝试匹配实体
   const req = ctx.projectState.getRequirement(target);
   if (req) {
-    const result = await ctx.verifier.verifyRequirement(req);
-    return formatReviewResult('需求', target, result);
+    targetKind = '需求';
+    targetFound = true;
+  } else {
+    const designs = ctx.projectState.getDesigns();
+    const design = designs.find(d => d.id === target);
+    if (design) {
+      targetKind = '设计';
+      targetFound = true;
+    } else {
+      const testCases = ctx.projectState.getTestCases();
+      const tc = testCases.find(t => t.id === target);
+      if (tc) {
+        targetKind = '测试用例';
+        targetFound = true;
+      } else {
+        // 退化：当作文件路径
+        try {
+          await fs.access(target);
+          targetKind = '文件';
+          targetFound = true;
+        } catch {
+          targetFound = false;
+        }
+      }
+    }
   }
 
-  const designs = ctx.projectState.getDesigns();
-  const design = designs.find(d => d.id === target);
-  if (design) {
-    const result = await ctx.verifier.verifyDesign(design);
-    return formatReviewResult('设计', target, result);
-  }
-
-  const testCases = ctx.projectState.getTestCases();
-  const tc = testCases.find(t => t.id === target);
-  if (tc) {
-    const result = await ctx.verifier.verifyTestCaseQuality(tc);
-    return formatReviewResult('测试用例', target, result);
-  }
-
-  // 退化：当作文件路径，调用通用 score
-  try {
-    const content = await fs.readFile(target, 'utf-8');
-    const score = await ctx.verifier.score({ content, path: target }, '评估文件内容质量');
-    const { WModelVerifierEnhancer } = await import('../core/w-model-enhancer');
-    return formatReviewResult('文件', target, {
-      finalScore: score,
-      subScores: {},
-      confidence: 0,
-      qualityLevel: WModelVerifierEnhancer.determineQualityLevel(score),
-    });
-  } catch {
+  if (!targetFound) {
     return { success: false, message: `未找到目标: ${target}` };
   }
+
+  // 子标准集合提示（与 references/verifier-spec.md §7 同源，校验脚本以该集合为准）
+  const phaseHint: Record<typeof targetKind, string> = {
+    '需求': 'requirement（completeness / clarity / consistency / testability / traceability）',
+    '设计': 'design（architecture-soundness / requirement-coverage / interface-consistency / feasibility / testability）',
+    '测试用例': 'testcase（coverage / correctness / independence / clarity / priority-reasonableness）',
+    '文件': 'file（correctness / security / readability / maintainability / conformance）',
+  };
+
+  return {
+    success: true,
+    message:
+      `=== LLM-as-a-Verifier 评审指引: ${target} ===\n` +
+      `目标类型: ${targetKind}\n` +
+      `子标准集合: ${phaseHint[targetKind]}\n` +
+      `\n` +
+      `本技能不内置 LLM 调用。请外部 Agent 按以下流程执行评审：\n` +
+      `  1. 读取 w-model-dev/references/verifier-spec.md 获取三维度验证框架、\n` +
+      `     连续评分 [0,1]、PPT 排序、子标准定义与输出 Schema。\n` +
+      `  2. 按 verifier-spec.md §8 提示词模板对目标执行 LLM-as-a-Verifier 评审，\n` +
+      `     产出严格符合 §6 Schema 的结构化 JSON（含 subCriteria / compositeScore /\n` +
+      `     qualityLevel / passed 等字段）。\n` +
+      `  3. 执行校验脚本防输出漂移：\n` +
+      `       npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>\n` +
+      `     退出码 0=通过 / 1=校验失败 / 2=输入错误。\n` +
+      `\n` +
+      `技术演化与轨迹分析不在技能内，由外部工具完成：\n` +
+      `  - skillopt（微软 SkillOpt）\n` +
+      `  - https://github.com/alchaincyf/darwin-skill`,
+    data: { target, targetKind, phaseHint: phaseHint[targetKind] },
+  };
 });
 
 // ---- /wm status ----
@@ -621,22 +650,4 @@ async function ensureProject(ctx: CommandContext): Promise<void> {
       { frontend: [], backend: [], database: [], others: [] }
     );
   }
-}
-
-function formatReviewResult(kind: string, target: string, result: VerificationResult): CommandResult {
-  const lines: string[] = [];
-  lines.push(`=== ${kind}审查报告: ${target} ===`);
-  lines.push(`综合分数: ${result.finalScore.toFixed(2)} / 20`);
-  lines.push(`质量等级: ${result.qualityLevel}`);
-  lines.push(`置信度: ${(result.confidence * 100).toFixed(0)}%`);
-  if (result.fallbackUsed) {
-    lines.push(`⚠️ LLM 不支持 logits，已使用 fallback 路径评分`);
-  }
-  if (Object.keys(result.subScores).length > 0) {
-    lines.push(`子标准评分:`);
-    for (const [k, v] of Object.entries(result.subScores)) {
-      lines.push(`  ${k}: ${v.toFixed(2)}`);
-    }
-  }
-  return { success: true, message: lines.join('\n'), data: result };
 }

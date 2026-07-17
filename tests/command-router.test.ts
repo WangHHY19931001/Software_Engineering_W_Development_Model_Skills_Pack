@@ -6,7 +6,7 @@
  *   - analyze → design → code → test 完整 W 模型流程
  *   - 阶段校验（不允许跨阶段）
  *   - 未知命令处理
- *   - verifier 集成（review）
+ *   - /wm review 仅返回评审指引（不内置 LLM，由外部 Agent 按提示词执行）
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
@@ -16,9 +16,7 @@ import { promises as fs } from 'node:fs';
 import { ProjectStateManager } from '../src/state/project-state.js';
 import { RTMManager } from '../src/state/rtm-manager.js';
 import { dispatch } from '../src/commands/router.js';
-import { WModelVerifierEnhancer } from '../src/core/w-model-enhancer.js';
-import { MockLLMClient } from '../src/core/llm-client.js';
-import type { CommandContext, VerifierConfig } from '../src/types/index.js';
+import type { CommandContext } from '../src/types/index.js';
 
 let tmpDir: string;
 let ctx: CommandContext;
@@ -28,15 +26,8 @@ beforeEach(async () => {
   const state = new ProjectStateManager(tmpDir);
   await state.load();
   const rtm = new RTMManager(tmpDir, state);
-  const verifierCfg: VerifierConfig = {
-    llm: { model: 'mock' },
-    fallbackStrategy: 'text-parse',
-  };
-  const verifier = new WModelVerifierEnhancer(
-    verifierCfg,
-    new MockLLMClient({ model: 'mock', supportsLogits: false, scoreLabel: 'N' })
-  );
-  ctx = { projectState: state, rtm, verifier, cwd: tmpDir };
+  // 本技能不再注入 verifier；CommandContext 只有 projectState / rtm / cwd
+  ctx = { projectState: state, rtm, cwd: tmpDir };
 });
 
 afterEach(async () => {
@@ -152,19 +143,73 @@ describe('命令路由 - 完整 W 模型流程', () => {
   });
 });
 
-describe('命令路由 - review', () => {
-  it('review 需求返回验证结果', async () => {
+describe('命令路由 - review（仅返回评审指引，不内置 LLM）', () => {
+  it('review 需求返回评审指引（指向 verifier-spec.md + check-verifier-output.ts）', async () => {
     await dispatch('/wm analyze 登录功能', ctx);
     const r = await dispatch('/wm review REQ-001', ctx);
     expect(r.success).toBe(true);
-    expect(r.message).toContain('综合分数');
-    expect(r.message).toContain('质量等级');
+    expect(r.message).toContain('LLM-as-a-Verifier 评审指引');
+    expect(r.message).toContain('verifier-spec.md');
+    expect(r.message).toContain('check-verifier-output.ts');
+    expect(r.message).toContain('requirement');
+    // 不应包含 LLM 实际评分（本技能不内置 LLM）
+    expect(r.message).not.toContain('综合分数');
+  });
+
+  it('review 设计文档返回设计子标准集合', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    await dispatch('/wm design type=架构', ctx);
+    // 取实际生成的设计 ID（addDesign 自动分配）
+    const designs = ctx.projectState.getDesigns();
+    expect(designs.length).toBeGreaterThan(0);
+    const r = await dispatch(`/wm review ${designs[0].id}`, ctx);
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('目标类型: 设计');
+    expect(r.message).toContain('design');
+    expect(r.message).toContain('architecture-soundness');
+  });
+
+  it('review 测试用例返回测试用例子标准集合', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    const testCases = ctx.projectState.getTestCases();
+    expect(testCases.length).toBeGreaterThan(0);
+    const r = await dispatch(`/wm review ${testCases[0].id}`, ctx);
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('目标类型: 测试用例');
+    expect(r.message).toContain('testcase');
+    expect(r.message).toContain('coverage');
   });
 
   it('review 不存在的目标 → 失败', async () => {
     await dispatch('/wm analyze 登录功能', ctx);
     const r = await dispatch('/wm review REQ-999', ctx);
     expect(r.success).toBe(false);
+    expect(r.message).toContain('未找到目标');
+  });
+
+  it('review 缺少参数时失败', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    const r = await dispatch('/wm review', ctx);
+    expect(r.success).toBe(false);
+    expect(r.message).toContain('用法');
+  });
+
+  it('review 文件路径返回文件子标准集合', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    const filePath = path.join(tmpDir, 'sample.txt');
+    await fs.writeFile(filePath, '示例文件内容', 'utf-8');
+    const r = await dispatch(`/wm review ${filePath}`, ctx);
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('目标类型: 文件');
+    expect(r.message).toContain('file');
+  });
+
+  it('review 指引中标注外部演化工具', async () => {
+    await dispatch('/wm analyze 需求', ctx);
+    const r = await dispatch('/wm review REQ-001', ctx);
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('skillopt');
+    expect(r.message).toContain('darwin-skill');
   });
 });
 
@@ -317,53 +362,6 @@ describe('命令路由 - 边界与错误路径', () => {
     const r = await dispatch('/wm test type=验收', ctx);
     expect(r.success).toBe(false);
     expect(r.message).toContain('质量门未通过');
-  });
-
-  it('review 缺少参数时失败', async () => {
-    await dispatch('/wm analyze 需求', ctx);
-    const r = await dispatch('/wm review', ctx);
-    expect(r.success).toBe(false);
-    expect(r.message).toContain('用法');
-  });
-
-  it('review 设计文档', async () => {
-    await dispatch('/wm analyze 需求', ctx);
-    await dispatch('/wm design type=架构', ctx);
-    const r = await dispatch('/wm review DESIGN-001', ctx);
-    expect(r.success).toBe(true);
-    expect(r.message).toContain('设计审查报告');
-  });
-
-  it('review 测试用例', async () => {
-    await dispatch('/wm analyze 需求', ctx);
-    await dispatch('/wm design type=架构', ctx);
-    const r = await dispatch('/wm review ST-001', ctx);
-    expect(r.success).toBe(true);
-    expect(r.message).toContain('测试用例审查报告');
-  });
-
-  it('review 文件路径', async () => {
-    await dispatch('/wm analyze 需求', ctx);
-    const filePath = path.join(tmpDir, 'sample.txt');
-    await fs.writeFile(filePath, '示例文件内容', 'utf-8');
-    const r = await dispatch(`/wm review ${filePath}`, ctx);
-    expect(r.success).toBe(true);
-    expect(r.message).toContain('文件审查报告');
-  });
-
-  it('review 无 verifier 时失败', async () => {
-    await dispatch('/wm analyze 需求', ctx);
-    const noVerifierCtx = { ...ctx, verifier: undefined };
-    const r = await dispatch('/wm review REQ-001', noVerifierCtx);
-    expect(r.success).toBe(false);
-    expect(r.message).toContain('未配置 LLM Verifier');
-  });
-
-  it('review 不存在的目标返回失败', async () => {
-    await dispatch('/wm analyze 需求', ctx);
-    const r = await dispatch('/wm review /nonexistent/path/file.txt', ctx);
-    expect(r.success).toBe(false);
-    expect(r.message).toContain('未找到目标');
   });
 
   it('export 未初始化项目失败', async () => {
