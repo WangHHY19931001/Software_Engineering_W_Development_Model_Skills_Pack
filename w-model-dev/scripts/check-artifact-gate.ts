@@ -12,7 +12,7 @@
  *   project-dir  项目根目录（默认：当前工作目录）
  *
  * 读取：
- *   <project-dir>/.w-model/rtm.json   （由 RTMManager.persist 写出）
+ *   <project-dir>/.w-model/rtm.json   （由 Agent 在执行 /wm 命令时维护）
  *
  * 退出码：
  *   0  质量门通过（覆盖率 100% 且四级测试全部通过）
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // 末尾 JSON 摘要（供 Agent 程序化解析；行首标记便于正则截取）
+  // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   console.log('─'.repeat(60));
   console.log('GATE_JSON ' + JSON.stringify({
     type: 'artifact',

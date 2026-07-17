@@ -5,15 +5,13 @@
  *   - checkArtifactGate：工件质量门（RTM 覆盖率 100% 且四级测试全部通过）
  *
  * 设计原则：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import src/，
+ *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块，
  *      保证技能包（w-model-dev/）可独立分发给 TRAE / Claude 等 Agent。
- *   2. 纯函数：无 I/O、无副作用，便于 src/ 反向复用、便于测试。
- *   3. 单点事实：src/state/rtm-manager.ts 的工件质量门判定委托至此，
- *      避免逻辑重复漂移。
+ *   2. 纯函数：无 I/O、无副作用，便于测试与复用。
+ *   3. 单点事实：所有「工件质量门是否通过」的判定均委托至此，避免逻辑漂移。
  *
  * 调用方：
  *   - CLI 脚本 check-artifact-gate.ts（供 Agent 直接执行）
- *   - src/ 编程式 API（RTMManager.isQualityGatePassed）
  *
  * 注意：技能演化（SkillOpt / darwin-skill）相关的「技能验证门」已从技能包中移除。
  * 技能本身不再包含演化机制与轨迹分析，演化由外部工具完成：
@@ -23,8 +21,7 @@
 
 // ==================== 自包含类型形状 ====================
 //
-// 刻意只保留门禁判定所需字段；结构上与 src/types 的 RTMMatrix 兼容
-// （src/ 的完整类型可直接传入，多余字段被结构性类型忽略）。
+// 刻意只保留门禁判定所需字段。
 
 export interface RTMMatrixShape {
   rows: Array<{

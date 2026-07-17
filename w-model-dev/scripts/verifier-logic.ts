@@ -4,14 +4,13 @@
  * 对应 w-model-dev/references/verifier-spec.md §6 输出 Schema。
  *
  * 设计原则：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import src/，
+ *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块，
  *      保证技能包（w-model-dev/）可独立分发给 TRAE / Claude 等 Agent。
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用。
  *   3. 单点事实：所有「Verifier 输出是否符合规范」的判定均委托至此。
  *
  * 调用方：
  *   - CLI 脚本 check-verifier-output.ts（供 Agent 直接执行）
- *   - src/ 编程式 API（若需要）
  *
  * 注意：本文件只校验外部 Agent 产出的 VerifierOutput JSON 结构与数值合理性，
  * 不包含任何 LLM 调用、演化机制或轨迹分析。技能演化由外部工具完成：

@@ -17,12 +17,12 @@
 | 设计决策 / 数据模型 / RTM 结构 / 验收标准 / 工作流 | [skill-design-document_SSoT.md](./skill-design-document_SSoT.md) |
 | Skill 定义（AI 助理触发命令、阶段流） | [w-model-dev/SKILL.md](../w-model-dev/SKILL.md) |
 | LLM Verifier 集成设计 | [llm-verifier-integration-design.md](./llm-verifier-integration-design.md) |
-| 实现入口（TypeScript） | [src/index.ts](../src/index.ts) |
+| AI Agent 安装指南 | [INSTALL.md](./INSTALL.md) |
 
 ## 如何贡献设计变更
 
 1. 直接修改 `skill-design-document_SSoT.md`
-2. 同步更新受影响的实现代码（`src/`）与测试（`tests/`）
+2. 同步更新受影响的 `w-model-dev/` 资产（`SKILL.md` / `references/` / `scripts/` / `templates/`）
 3. 在 `CHANGELOG.md` 中记录变更
 4. 详见 [CONTRIBUTING.md](../CONTRIBUTING.md)
 
