@@ -23,8 +23,8 @@
 
 | 能力 | 归属 | 实现位置 |
 |---|---|---|
-| W 模型阶段编排、RTM 维护、状态管理 | 技能内 | `src/commands/router.ts` / `src/state/*` / `w-model-dev/SKILL.md` |
-| 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/gate-logic.ts` |
+| W 模型阶段编排、RTM 维护、状态管理 | 技能内 | `w-model-dev/SKILL.md`（编排逻辑，Agent 执行）+ `w-model-dev/references/*`（阶段细则） |
+| 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/gate-logic.ts` + `check-artifact-gate.ts` |
 | LLM-as-a-Verifier 评审（三维度 / 连续评分 / PPT / 子标准） | 技能内提供提示词与 Schema，外部 Agent 执行 | `w-model-dev/references/verifier-spec.md` + `scripts/check-verifier-output.ts` |
 | LLM 推理本身 | 外部 | 由外部 Agent（Trae / Claude / Cursor 等）自行调用其 LLM |
 | 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估） | 外部 | [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill) |
@@ -33,9 +33,7 @@
 
 ## 快速上手
 
-本技能提供两种使用方式：**AI Agent 模式**（直接读取 Skill 资产，零依赖）与**程序化模式**（TypeScript 引擎）。
-
-### 方式一：AI Agent 安装（推荐，零依赖）
+### AI Agent 安装（零依赖）
 
 将 [`w-model-dev/`](./w-model-dev) 目录拷贝到你的 AI Agent（Trae / Claude Code 等）的 skills 目录即可。Skill 资产自包含：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` 按需加载，无需 Node.js 或 npm。
 
@@ -46,33 +44,19 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 
 安装后，agent 在用户提及 W 模型或 `/wm` 命令时自动激活本技能。详细步骤与验证方法见 [docs/INSTALL.md](./docs/INSTALL.md)。
 
-### 方式二：程序化安装（TypeScript 引擎）
+### 运行门禁校验脚本
 
-#### 环境要求
-
-- Node.js ≥ 18.0.0
-
-#### 安装依赖
+技能包内的校验脚本（`w-model-dev/scripts/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本仅依赖 [tsx](https://tsx.is/) 运行 ESM，无任何业务依赖：
 
 ```bash
-npm install
+# 校验外部 Agent 产出的 Verifier JSON（退出码 0/1/2）
+npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
+
+# 工件质量门：校验 RTM 覆盖率 100% 且四级测试全部通过（退出码 0/1/2）
+npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 ```
 
-#### 运行全流程示例
-
-```bash
-npm run example:run
-```
-
-该示例走完 W 模型 8 个阶段并导出 RTM。示例不再调用 `/wm review`——LLM-as-a-Verifier 评审由外部 Agent 按 [`w-model-dev/references/verifier-spec.md`](./w-model-dev/references/verifier-spec.md) 执行。
-
-#### 运行测试
-
-```bash
-npm test
-```
-
-覆盖率目标：全局 ≥ 70%，状态与命令模块 ≥ 80%（Phase 2.6 后核心模块 `src/core/` 已删除）。
+> 脚本不调用任何 LLM，仅做结构化门禁判定。运行需本地具备 `tsx`（`npm i -g tsx` 或通过 `npx tsx`）。
 
 ## 命令一览
 
@@ -93,69 +77,34 @@ npm test
 
 ```
 .
-├── src/                          # TypeScript 实现（技能的可选运行时引擎）
-│   ├── state/                    # 状态管理
-│   │   ├── project-state.ts      # 项目状态持久化
-│   │   └── rtm-manager.ts        # RTM 自动更新
-│   ├── commands/
-│   │   └── router.ts             # /wm 命令路由
-│   ├── types/
-│   │   └── index.ts              # 共享类型定义（CommandContext 仅 projectState/rtm/cwd）
-│   └── index.ts                  # 公共 API 入口（createCommandContext(cwd) 单参）
-├── tests/                        # 单元测试（96 个，4 套件）
-├── examples/
-│   └── run-wm-flow.ts            # W 模型全流程示例（不含 /wm review）
-├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含）
+├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位）
-│   ├── references/
-│   │   └── verifier-spec.md      # LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准）
-│   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM
-│   │   ├── gate-logic.ts         # 工件质量门（仅 checkArtifactGate）
-│   │   ├── verifier-logic.ts     # VerifierOutput 校验纯逻辑（SUB_CRITERIA + checkVerifierOutput）
+│   ├── references/               # 阶段细则与规范（按需加载）
+│   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
+│   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准）
+│   │   ├── data-models.md        #   项目 / 需求 / 设计 / 测试用例数据模型
+│   │   ├── rtm-guide.md          #   RTM 维护规则
+│   │   └── quality-standards.md #   质量标准
+│   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
+│   │   ├── gate-logic.ts         #   工件质量门纯逻辑（单点事实源）
+│   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json）
+│   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源）
 │   │   └── check-verifier-output.ts  # Verifier 输出校验 CLI（防 Agent 输出漂移）
-│   ├── templates/                # 文档模板
-│   └── examples/                 # 交互示例
+│   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
+│   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码）
 ├── docs/                         # 设计文档（统一存放）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
 │   ├── skill-design-document.md                # 设计文档指针（已废弃独立维护）
 │   ├── llm-verifier-integration-design.md      # LLM Verifier 集成设计（指针文档）
-│   ├── IMPLEMENTATION-PLAN.md                  # 实现路线图
 │   └── INSTALL.md                              # AI Agent 安装指南
 ├── CHANGELOG.md                  # 变更日志
 ├── CONTRIBUTING.md               # 贡献指南
 └── README.md                     # 项目导航
 ```
 
-## 编程式接入
-
-```typescript
-import { createCommandContext, dispatch } from 'w-model-dev-skill';
-
-// 1. 创建命令上下文（单参数 cwd；本技能不注入 verifier，不内置 LLM）
-const ctx = await createCommandContext('./my-project');
-
-// 2. 走 W 模型流程
-await dispatch('/wm analyze 用户登录功能', ctx);
-await dispatch('/wm design type=架构', ctx);
-await dispatch('/wm design type=概要', ctx);
-await dispatch('/wm design type=详细', ctx);
-await dispatch('/wm code 登录服务 authService.ts', ctx);
-await dispatch('/wm test type=集成 result=pass', ctx);
-await dispatch('/wm test type=系统 result=pass', ctx);
-const result = await dispatch('/wm test type=验收 result=pass', ctx);
-
-if (result.success) {
-  console.log('✅ 工件质量门通过，项目可交付');
-}
-```
-
-> LLM-as-a-Verifier 评审不在 `dispatch` 内执行。如需对阶段产物做评审：
-> 1. 调用 `/wm review <target>` 获取结构化评审指引；
-> 2. 外部 Agent 按 [`w-model-dev/references/verifier-spec.md`](./w-model-dev/references/verifier-spec.md) §8 提示词模板执行评审；
-> 3. 评审输出 JSON 后立即运行 `w-model-dev/scripts/check-verifier-output.ts` 校验防漂移。
->
-> 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具完成：
-> [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)。
+> 编排逻辑由 `w-model-dev/SKILL.md` 承载，Agent 读取后用自身工具执行；不内置任何
+> TypeScript 引擎、npm 包或编程式 SDK。`/wm` 命令、状态持久化、RTM 维护均由 Agent
+> 按 `SKILL.md` 与 `references/` 在项目内（`.w-model/*.json`）完成。
 
 ## 相关文档
 
@@ -163,7 +112,6 @@ if (result.success) {
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
-- [实现路线图](./docs/IMPLEMENTATION-PLAN.md)
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [变更日志](./CHANGELOG.md)
 - [贡献指南](./CONTRIBUTING.md)

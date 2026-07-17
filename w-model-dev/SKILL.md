@@ -157,12 +157,12 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 
 ```bash
 # 工件质量门：读取 .w-model/rtm.json，校验 RTM 覆盖率 100% 且四级测试全部通过
-# 退出码 0=通过 / 1=未通过 / 2=输入错误；末尾输出 GATE_JSON {...} 供程序化解析
+# 退出码 0=通过 / 1=未通过 / 2=输入错误；末尾输出 GATE_JSON {...} 供程序解析
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 ```
 
-> 工件质量门的判定逻辑由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源）。
-> 编程式调用方（`src/state/rtm-manager.ts`）也委托至该文件，确保 CLI 与 SDK 判定结果完全一致。
+> 工件质量门的判定逻辑由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源），
+> 由 `scripts/check-artifact-gate.ts` CLI 包装，Agent 直接执行得到确定性判定。
 >
 > **技能演化不在技能包内**：本技能不包含技能验证门、Skill Lift 评估、Rollout 记录等内容。
 > 技能自演化由外部工具完成（[SkillOpt](https://github.com/microsoft/SkillOpt) /
@@ -212,7 +212,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 w-model-dev/
 ├── SKILL.md                       # 本文件：编排与命令（YAML frontmatter + 阶段流）
 ├── scripts/                       # 门禁校验脚本（Agent 可直接执行，自包含）
-│   ├── gate-logic.ts              #   工件质量门纯逻辑（单点事实源，src/ 与 CLI 共用）
+│   ├── gate-logic.ts              #   工件质量门纯逻辑（单点事实源，CLI 调用）
 │   ├── check-artifact-gate.ts     #   工件质量门 CLI（读 .w-model/rtm.json）
 │   ├── verifier-logic.ts          #   Verifier 输出校验纯逻辑（单点事实源）
 │   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
@@ -257,51 +257,4 @@ w-model-dev/
 > `scripts/check-verifier-output.ts` 是同一套 Schema 的可执行校验。两者指向同一份事实源
 > `scripts/verifier-logic.ts`，避免提示词与校验漂移。
 
-## 实现位置
 
-本 SKILL.md 描述的 `/wm` 命令、状态管理与 RTM 维护已由 TypeScript 实现，开箱即用：
-
-| SKILL.md 章节 | 实现文件 | 说明 |
-|---|---|---|
-| 命令接口（`/wm analyze` 等） | [`src/commands/router.ts`](../src/commands/router.ts) | 10 个命令的路由与处理；`/wm review` 返回评审指引（不内置 LLM） |
-| 数据与状态管理 | [`src/state/project-state.ts`](../src/state/project-state.ts) | JSON 持久化，跨多轮交互保持上下文 |
-| RTM 同步维护 | [`src/state/rtm-manager.ts`](../src/state/rtm-manager.ts) | 自动重建、覆盖率统计；质量门判定**委托至** `scripts/gate-logic.ts` |
-| 工件质量门（单点事实源） | [`w-model-dev/scripts/gate-logic.ts`](scripts/gate-logic.ts) | `checkArtifactGate` 纯函数，CLI 与 SDK 共用 |
-| Verifier 输出校验（单点事实源） | [`w-model-dev/scripts/verifier-logic.ts`](scripts/verifier-logic.ts) | `checkVerifierOutput` 纯函数，CLI 共用 |
-| 公共 API 入口 | [`src/index.ts`](../src/index.ts) | 导出 + `createCommandContext` 工厂（不再注入 verifier） |
-
-> **不在本技能内的能力**：
-> - LLM-as-a-Verifier 的实际 LLM 推理（由外部 Agent 按 `references/verifier-spec.md` 执行）
-> - 技能自演化 / Skill Lift 评估 / Rollout 轨迹分析（由外部 [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill) 完成）
-
-### 快速验证
-
-```bash
-# 运行 W 模型 8 阶段全流程示例
-npm run example:run
-
-# 运行测试套件
-npm test
-
-# 校验外部 Agent 产出的 Verifier JSON
-npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
-```
-
-### 编程式接入
-
-```typescript
-import { createCommandContext, dispatch } from 'w-model-dev-skill';
-
-// 本技能不再注入 verifier，createCommandContext 只接受 cwd
-const ctx = await createCommandContext('./my-project');
-
-await dispatch('/wm analyze 用户登录功能', ctx);
-await dispatch('/wm design type=架构', ctx);
-// ... 完整 8 阶段流程
-
-// 阶段门评审：/wm review 返回评审指引，由外部 Agent 按
-// w-model-dev/references/verifier-spec.md 执行 LLM-as-a-Verifier 评审，
-// 评审输出由 w-model-dev/scripts/check-verifier-output.ts 校验。
-```
-
-详见 [README.md](../README.md) 与 [docs/IMPLEMENTATION-PLAN.md](../docs/IMPLEMENTATION-PLAN.md)。

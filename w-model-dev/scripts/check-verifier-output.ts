@@ -94,7 +94,7 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/verifier-spec.md');
   }
 
-  // 末尾 JSON 摘要（供 Agent 程序化解析；行首标记便于正则截取）
+  // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   console.log('─'.repeat(60));
   console.log('VERIFIER_JSON ' + JSON.stringify({
     type: 'verifier-output',

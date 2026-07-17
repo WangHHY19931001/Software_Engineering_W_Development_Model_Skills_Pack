@@ -5,105 +5,57 @@
 
 ## [Unreleased]
 
-### 变更（架构重构：技能包纯化）
+### 架构纯化：移除全部编程式接入
 
-> 把技能包纯化为「只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM」。
-> LLM-as-a-Verifier 评审改由外部 Agent 按提示词执行；技能演化移交外部 skillopt / darwin-skill。
-> 对应实现路线图 [Phase 2.6](./docs/IMPLEMENTATION-PLAN.md)。
+> 把本仓库确定为「单纯的编排 + 校验脚本技能」，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）。
+> 技能包只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM 调用。
+> 此变更撤销了此前 [Unreleased] 阶段规划的「内置 `src/` TypeScript 引擎 + `tests/` 测试套件 + `package.json` 工具链」方向，回归纯技能包形态。
 
-#### 删除（源码）
+#### 删除（编程式引擎与 Node 工具链）
 
-- `src/core/{scoring-engine,verification-framework,ppt-ranker,w-model-enhancer,llm-client,meta-skill-config}.ts`：LLM 评分 / 验证 / 排序 / 增强器 / 客户端 / 元技能配置整块移除
-- `src/evolution/skill-optimizer.ts`：SkillOpt ReflectTrainer 训练循环移除，演化移交外部工具
-- `src/eval/skill-lift.ts`：ACES Skill Lift 评估移除，评估移交外部工具
-- `w-model-dev/scripts/check-skill-gate.ts`：技能验证门移除（仅保留工件质量门）
-- `w-model-dev/META-SKILL.md`：可演化元技能配置移除
-- `docs/llm-verifier-implementation-template.ts`：原始模板移除（已被 `src/` 替代后又随 `src/core/` 一并删除）
-- 对应测试文件 `tests/{scoring-engine,verification-framework,ppt-ranker,w-model-enhancer,llm-client,meta-skill-config,skill-optimizer,skill-lift}.test.ts` 全部移除
+- `src/` 整块移除：`index.ts`、`commands/router.ts`、`state/{project-state,rtm-manager}.ts`、`types/index.ts`（`/wm` 命令路由、状态持久化、RTM 维护改由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行，状态持久化到项目内 `.w-model/*.json`）
+- `tests/` 整块移除：`command-router.test.ts`、`project-state.test.ts`、`rtm-manager.test.ts`、`verifier-logic.test.ts`
+- `examples/run-wm-flow.ts` 移除（编程式示例，与新架构不符）
+- Node 工程化文件移除：`package.json`、`package-lock.json`、`tsconfig.json`、`jest.config.js`、`.eslintrc.cjs`
+- `docs/IMPLEMENTATION-PLAN.md` 移除（内置引擎路线图，已不适用）
 
-#### 新增
+#### 保留（自包含校验脚本）
 
-- `w-model-dev/references/verifier-spec.md`：LLM-as-a-Verifier 评审规范（设计原则 / 4 类目标 / 三维度验证 / 连续评分 [0,1] 4 位小数 / PPT / 输出 Schema / 子标准 / 提示词模板 / 与外部演化工具关系 / 校验脚本调用）
-- `w-model-dev/scripts/verifier-logic.ts`：Verifier 输出校验纯逻辑（自包含类型形状、`SUB_CRITERIA` 常量、`checkVerifierOutput`、`determineQualityLevel`，单点事实源）
-- `w-model-dev/scripts/check-verifier-output.ts`：Verifier 输出校验 CLI（防外部 Agent 输出漂移，退出码 0/1/2）
-- `tests/verifier-logic.test.ts`：33 个测试用例覆盖 Schema / 子标准 / 综合分数 / 质量等级 / passed / reworkHints / ranking
+- `w-model-dev/scripts/gate-logic.ts`：工件质量门纯逻辑（自包含，仅依赖本目录内文件）
+- `w-model-dev/scripts/verifier-logic.ts`：Verifier 输出校验纯逻辑（自包含）
+- `w-model-dev/scripts/check-artifact-gate.ts`：工件质量门 CLI（读 `.w-model/rtm.json`，退出码 0/1/2）
+- `w-model-dev/scripts/check-verifier-output.ts`：Verifier 输出校验 CLI（防外部 Agent 输出漂移）
+- 校验脚本运行依赖仅为 `tsx`（用户通过 `npx tsx` 或全局安装调用），无需 `npm install`
 
-#### 变更（核心文件重写）
+#### 变更（文档同步至纯技能架构）
 
-- `src/index.ts`：`createCommandContext(cwd)` 改为单参数，不再注入 verifier；移除演化 / 评估 / LLM 相关导出
-- `src/types/index.ts`：`CommandContext` 简化为 3 字段（`projectState` / `rtm` / `cwd`）；移除 `VerifierConfig` / `MetaSkillConfig` / `SkillEvolutionConfig` / `SkillLiftResult` / 轨迹相关类型
-- `src/commands/router.ts`：`/wm review` 改为返回结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`），不直接调用 LLM；`/wm code` 不自动标记单元测试通过；`/wm test` 支持 `result=pass|fail` 真实结果回填
-- `w-model-dev/scripts/gate-logic.ts`：移除 `checkSkillGate`，仅保留 `checkArtifactGate`（工件质量门）
-- `w-model-dev/SKILL.md`：新增「架构定位」节，引用 `verifier-spec.md` / `check-verifier-output.ts` / `verifier-logic.ts`，标注演化由外部工具完成
-- `examples/run-wm-flow.ts`：移除 `verifierConfig` 参数与 `/wm review` 步骤；新增 `result=pass` 真实结果回填
-
-#### 文档同步
-
-- `docs/skill-design-document_SSoT.md`：§1.4 新增架构重构说明；新增 §3.3「技能架构原则与外部工具边界」；§7.6 / §7.7 / §7.8 合并为单一 §7.6 指向 `verifier-spec.md`；§10.5 改为「工件质量门」单门；§10A 追溯表移除已删除文件行；§12.4 改为「外部演化工具协作」；§12.5 路线图移除自演化路线；第 14 章「技能演化机制」与第 15 章「技能评估标准」整章 tombstone；§16.2 / §16.3 同步
-- `docs/llm-verifier-integration-design.md`：简化为指针文档（约 103 行），权威来源指向 `verifier-spec.md`
-- `docs/IMPLEMENTATION-PLAN.md`：新增 Phase 2.6（9 子任务）；Phase 0 / 1 / 2.5 / 3 / 验收标准 / 技术债务全面标注取代关系
-- `README.md` / `CONTRIBUTING.md` / `docs/INSTALL.md`：同步架构原则、`createCommandContext(cwd)` 单参、移除 LLM 配置、新增外部演化工具边界
+- `w-model-dev/SKILL.md`：移除「实现位置 / 快速验证 / 编程式接入」尾部章节；文件清单注释中去除 `src/` 引用
+- `README.md`：架构边界表「W 模型阶段编排」实现位置改为 `w-model-dev/SKILL.md` + `references/*`；快速上手改为「AI Agent 安装（零依赖）」+「运行门禁校验脚本」；移除「编程式接入」章节与 `src/` / `tests/` / `examples/run-wm-flow.ts` 结构条目
+- `docs/INSTALL.md`：重写为单一安装路径（移除模式 B 程序化模式 / 模式 A+B 混合使用 / `npm install` / `createCommandContext` 示例）；新增「为什么没有 npm install / package.json」FAQ
+- `docs/skill-design-document_SSoT.md`：§1.4 架构重构说明、§3.3 边界表、§6.3 时序图、§8.1 技术栈表、§10.5 / §10A 追溯表、§11 部署集成方案全面改为纯技能架构描述
+- `docs/skill-design-document.md`：用途表「实现入口（TypeScript）| src/index.ts」改为「AI Agent 安装指南 | INSTALL.md」
+- `docs/llm-verifier-integration-design.md`：移除「命令路由实现 | ../src/commands/router.ts」引用
+- `CONTRIBUTING.md`：移除 `npm test` / `npm run lint` / `npm run typecheck` 工作流与覆盖率阈值；改为 `npx tsx` 端到端校验；新增「脚本不得 import `src/`」自包含规则
+- `.gitignore`：移除 `node_modules/` / `dist/` / `build/` / `*.tsbuildinfo` / `coverage/` 等不再相关的条目
 
 #### 验证
 
-- `npx tsc --noEmit`：0 错误
-- `npx jest`：96 个测试通过（4 套件：`command-router.test.ts` 63 + `verifier-logic.test.ts` 33 + `project-state.test.ts` + `rtm-manager.test.ts`）
-- `npx eslint 'src/**/*.ts' --max-warnings=0`：0 warning
-- `w-model-dev/scripts/check-verifier-output.ts`：端到端验证通过
-- `npm run example:run`：通过
+- `grep -rE "src/|createCommandContext|dispatch\(|程序化|编程式|模式 ?B|混合使用|npm (run|test|install)|npx (jest|tsc|eslint)"` 在保留文件中无残留编程式接入引用（仅保留明确否定句「不包含编程式接入」与历史 tombstone 说明）
+- `w-model-dev/scripts/*.ts` 校验脚本自包含性确认（仅 `import ./gate-logic.js` / `./verifier-logic.js` 与 Node 标准库）
 
-### 变更（项目结构整理）
+### 已撤销的方向（历史记录）
 
-- 设计文档统一迁入 `docs/` 目录：`skill-design-document.md`、`skill-design-document_SSoT.md`、`llm-verifier-integration-design.md`、`llm-verifier-implementation-template.ts`、`IMPLEMENTATION-PLAN.md`
-- `w-model-dev/` 确立为标准 skill 结构目录（`SKILL.md` + `META-SKILL.md` + `references/` + `templates/` + `examples/`），自包含可独立拷贝安装
-- 新增 `docs/INSTALL.md`：AI Agent 安装指南（模式 A 零依赖拷贝 / 模式 B 程序化 TypeScript 引擎）
-- `README.md` 快速上手拆分为「AI Agent 安装」与「程序化安装」两条路径
-- 同步更新 `package.json` files 字段、`src/` 代码注释、`CONTRIBUTING.md`、`SKILL.md` 中所有受影响的文档引用路径
+> 以下为此前 [Unreleased] 阶段规划的「内置 `src/` 引擎」方向，已被上方「架构纯化」整体撤销，所列文件均已删除，保留仅作历史记录。
 
-### 新增（基于设计→实现审查报告的全面修正）
-
-> 本次修正以 SSoT 设计文档为唯一事实来源审查起点，识别设计层与实现层问题后系统性修正。
-
-#### SSoT 设计层补全
-- SSoT 新增 §7.6「LLM-as-a-Verifier 数据模型」：补全 `VerificationResult` / `QualityLevel` / `VerificationDimension` / `SubCriterion` / `ContinuousScoringEngine` / `LLMClient` / `LLMClientConfig` / `LLMResponse` / `VerifierConfig` 完整 TypeScript 接口
-- SSoT 新增 §7.7「元技能与演化数据模型」：`MetaSkillConfig` / `MetaSkillPhaseConfig` / `RolloutEvidence` / `SkillEdit` / `SkillEvolutionConfig`
-- SSoT 新增 §7.8「技术评估数据模型」：`EvalCondition` / `SkillLiftResult` / `ThreeLevelEvalResult` / `SkillEvalReport`
-- SSoT 新增 §10.5「两类质量门（重要区分）」：区分工件质量门（RTM 覆盖率 + 测试通过）vs 技能验证门（SkillLift > 0）
-- SSoT 新增 §10A「SSoT ↔ 实现追溯表」：13 行追溯表建立设计↔实现双向追溯
-- SSoT 新增第 14 章「技能演化机制」（8 节）：SkillOpt ReflectTrainer 训练循环、可训练状态边界、protected region、验证门强制启用、双时间尺度、训练日志、与工件质量门关系
-- SSoT 新增第 15 章「技能评估标准」（9 节）：ACES Skill Lift 配对试验、SkillsBench 三条件对照、SkillLearnBench 三级评估、确定性 verifier 优先、留出任务集、与第 14 章对接
-- SSoT 第 12 章发展规划新增「第四阶段（自演化版）」：技能自演化 / 评估基准建设 / 多 Agent 框架适配 / MCP Server 化
-- SSoT 参考文献重编为 §16，新增 SkillOpt / MetaSkill-Evolve / ACES / SkillsBench / SkillLearnBench / PPT 引用
-
-#### 实现层修正
-- `src/commands/router.ts`：移除 `code` 命令「自动标记单元测试通过」的占位实现；`test` 命令新增 `result=pass|fail` 参数支持真实结果回填（恢复工件质量门有效性）
-- `src/core/llm-client.ts`：新增 `OpenAICompatibleLLMClient`（基于全局 fetch，覆盖 OpenAI / Azure / DeepSeek / Moonshot / 通义）与 `AnthropicLLMClient`（Messages API）；`createLLMClient` 工厂按 model 名自动选择
-- `src/core/meta-skill-config.ts`（新）：将原硬编码子标准 / 评估次数 / 方差阈值上提为 `DEFAULT_META_SKILL_CONFIG`，含 `cloneMetaSkillConfig` / `validateMetaSkillConfig`
-- `src/core/w-model-enhancer.ts`：构造函数新增 `metaSkill?` 参数；三个 `verify*` 方法收敛到 `verifyWithPhase`，从 `MetaSkillConfig` 读取参数（消除硬编码）
-- `src/evolution/skill-optimizer.ts`（新）：`SkillOptimizer` 实现 SkillOpt ReflectTrainer 训练循环（Rollout → Reflect → Edit → Gate → Commit），含 `RolloutExecutor` / `GateEvaluator` 接口、`createMetaSkillGateEvaluator` 工厂、`extractFailedSubCriteria` 工具
-- `src/eval/skill-lift.ts`（新）：`SkillLiftEvaluator` 实现 ACES Skill Lift 配对试验 + SkillsBench 三条件对照 + SkillLearnBench 三级评估，含 `createDefaultEvalExecutor` 工厂与 `DEFAULT_HELD_OUT_TASKS`
-- `w-model-dev/META-SKILL.md`（新）：定义可训练外部状态，与代码同源
-- `src/index.ts`：导出新增模块；`createCommandContext` 新增 `metaSkill?` 参数；改用 `createLLMClient` 替代 `new MockLLMClient`
-- `examples/run-wm-flow.ts`：适配新行为，新增 `result=pass` 回填步骤
-
-#### 测试
-- 新增 `tests/meta-skill-config.test.ts`（3 describe）：默认值完整性 / 深拷贝独立性 / 合法性校验
-- 新增 `tests/skill-optimizer.test.ts`（4 describe，8 用例）：无失败样本不演化 / 验证门拒绝接受 / 受保护区域过滤 / editBudget 约束 / 强制接受模式 / 训练日志 / extractFailedSubCriteria / 隔离性
-- 新增 `tests/skill-lift.test.ts`（3 describe）：正/负/零 lift 方向性 / 批量聚合 / DEFAULT_HELD_OUT_TASKS
-- `tests/llm-client.test.ts`：新增 OpenAICompatibleLLMClient / AnthropicLLMClient 构造校验 + createLLMClient 工厂选择测试
-- `tests/command-router.test.ts`：完整流程测试改用 `result=pass` 回填；新增「result 参数（修正占位实现）」describe 块（6 用例）
-- 验证：`npx tsc --noEmit` 0 错误；`npx jest` 11 个测试套件、163 个测试全部通过
-
-#### 文档一致性
-- `skill-design-document.md`（指针）：修正「SSoT 第 11 章为 LLM-as-a-Verifier 集成规范」的错误（实际分布在 §7.6 + §8）
-- `llm-verifier-integration-design.md`：顶部新增「权威性说明」，明确以 SSoT §7.6 + §8 + §10.5 为权威来源
-- SSoT §10A 追溯表修正「11 LLM Verifier 集成 见 11A」错误引用（§11A 不存在）
-
-### 计划中
-- Web UI 可视化 RTM 矩阵
-- 多项目并行管理
-- 与外部演化工具（SkillOpt / darwin-skill）约定 `VerifierOutput` JSON 消费协议
-- 留出 benchmark 集扩充（≥30 个项目，供外部演化工具消费）
+- 内置 `src/core/*` LLM 评分 / 验证 / 排序 / 增强器 / 客户端 / 元技能配置
+- 内置 `src/evolution/skill-optimizer.ts` SkillOpt ReflectTrainer 训练循环
+- 内置 `src/eval/skill-lift.ts` ACES Skill Lift 评估
+- `w-model-dev/scripts/check-skill-gate.ts` 技能验证门
+- `w-model-dev/META-SKILL.md` 可演化元技能配置
+- `tests/verifier-logic.test.ts` 等 11 个测试套件、163 个测试
+- `examples/run-wm-flow.ts` 编程式全流程示例
+- `npx tsc --noEmit` / `npx jest` / `npx eslint` / `npm run example:run` 验证链
+- `docs/INSTALL.md` 模式 A / 模式 B 双路径与混合使用说明
 
 ## [0.1.0] - 2026-07-16
 
