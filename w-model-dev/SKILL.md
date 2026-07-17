@@ -48,7 +48,7 @@ description: >-
 3. **RTM 同步维护**：每次需求或设计变更，必须同步更新需求跟踪矩阵；定期核验需求覆盖率应为 100%。
 4. **质量门**：代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
 5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
-6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则按需从 `references/` 加载，模板从 `templates/` 取用。
+6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则仅加载当前阶段对应的 `references/phase-N-*.md`，模板从 `templates/` 取用。
 7. **LLM 评审由外部执行**：阶段产物的 LLM-as-a-Verifier 评审不内置；外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 执行，并通过 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 防漂移。
 
 ## 反例与黑名单（不要做什么）
@@ -213,7 +213,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 2. 产出文档使用 Markdown，文件命名遵循 `<类型>-<模块>-<时间或序号>.md`。
 3. 测试用例必须含：用例 ID、测试场景、输入、预期输出、优先级。
 4. 涉及缺陷或风险时给出等级与缓解措施。
-5. 每个阶段结束输出"阶段完成摘要"：产出清单、RTM 覆盖状态、下一步建议。
+5. 每个阶段结束输出"阶段完成摘要"：产出清单、RTM 覆盖状态、下一阶段动作。
 
 ## 验收检查清单（项目级）
 
@@ -240,7 +240,7 @@ w-model-dev/
 │   ├── check-artifact-gate.ts     #   工件质量门 CLI（读 .w-model/rtm.json）
 │   ├── verifier-logic.ts          #   Verifier 输出校验纯逻辑（单点事实源）
 │   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
-├── references/                    # 阶段细则与规范（按需加载）
+├── references/                    # 阶段细则与规范（仅当前阶段加载）
 │   ├── phase-1-requirements.md
 │   ├── phase-2-system-design.md
 │   ├── phase-3-outline-design.md
@@ -274,8 +274,7 @@ w-model-dev/
 > **门禁脚本与 Markdown 的配合**：`references/quality-standards.md` 以 Markdown 描述
 > 质量标准（人类可读、便于审阅），`scripts/check-*-gate.ts` 是同一套门禁的可执行实现
 > （Agent 可直接调用得到结构化结论）。两者指向同一份事实源 `scripts/gate-logic.ts`，
-> 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定，必要时回查
-> Markdown 了解判定依据。
+> 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定；若需了解判定依据，回查对应 Markdown（如 `references/quality-standards.md`）。
 >
 > **LLM 评审的配合**：`references/verifier-spec.md` 提供提示词与输出 Schema，
 > `scripts/check-verifier-output.ts` 是同一套 Schema 的可执行校验。两者指向同一份事实源
