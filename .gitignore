@@ -1,6 +1,9 @@
 # W-Model 运行时状态（项目状态 / RTM 数据）
 .w-model/
 
+# 本地 Agent 工作目录（如 darwin-skill 评估产物，由外部工具维护，不纳入版本控制）
+.claude/
+
 # IDE
 .vscode/
 .idea/
@@ -18,3 +21,11 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Node 依赖（package.json 仅声明 tsx 作为开发依赖，依赖目录不入库）
+node_modules/
+
+# npm 安装产物
+package-lock.json
+npm-debug.log*
+yarn-error.log*
