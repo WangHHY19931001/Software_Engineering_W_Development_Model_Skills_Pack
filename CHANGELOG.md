@@ -5,6 +5,40 @@
 
 ## [Unreleased]
 
+### 一致性补全：命令执行规则与示例覆盖
+
+> 全面扫描后发现 SKILL.md（Agent 实际读取的入口）在若干命令执行规则上与 SSoT / README / verifier-spec.md 不一致或不完整，本次补全使 10 个 `/wm` 命令均有可执行规则，并消除文档间不一致。
+
+#### 新增
+
+- `w-model-dev/SKILL.md` §5「`/wm test` 结果回填机制」：明确 `result=pass|fail` 必填、真实回填约束、与工件质量门的有效性关联（之前只在 README / SSoT / 脚本注释中说明，SKILL.md 自身缺失）
+- `w-model-dev/SKILL.md` §6「辅助命令执行规则」：补全 `/wm review` / `/wm status` / `/wm help` / `/wm reset` / `/wm export` / `/wm import` 六个命令的详细执行步骤与 CHECKPOINT
+- `w-model-dev/SKILL.md` §4「数据与状态管理」：补充 `.w-model/` 持久化目录结构与文件用途
+- `w-model-dev/examples/test-execution.md`：新增测试执行阶段示例（phase 6 集成 / phase 7 系统 + 质量门 / phase 8 验收 + 项目交付），覆盖 `result=pass|fail` 回填、根因分析、CHECKPOINT 放行全流程
+
+#### 变更
+
+- `w-model-dev/SKILL.md` 命令接口表：
+  - `/wm test` 参数补充 `result: pass / fail（必填，真实回填）`，产出列补充「RTM 状态更新」
+  - `/wm review` 的 `target` 前缀由 `REQ-/SD-/AT-/文件路径` 修正为 `REQ- / DESIGN- / UAT- / ST- / IT- / UT- / 文件路径`，与 `references/verifier-spec.md` §2 权威定义一致
+  - `/wm status` 产出列补充「RTM 覆盖率」
+- `w-model-dev/SKILL.md` YAML frontmatter `description`：命令列表由 6 个（analyze/design/code/test/review/status）补全为 10 个（增加 help/reset/export/import），影响 Agent 自动激活触发判断
+- `docs/skill-design-document_SSoT.md` §6.1 核心命令表：
+  - `/wm design` 的 `type` 由 `(架构/详细)` 修正为 `(架构/概要/详细)`，与 SKILL.md / README 一致
+  - `/wm test` 的 `type` 由 `(单元/集成/系统)` 修正为 `(单元/集成/系统/验收)`，并补充 `result` 参数
+  - `/wm status` 返回值补充「RTM 覆盖率」
+- `docs/skill-design-document_SSoT.md` §10A 追溯表：`6 命令接口` 行的实现位置补充「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」
+- `docs/skill-design-document_SSoT.md` 附录 A 命令速查：补全遗漏的 3 个命令（`/wm reset` / `/wm export` / `/wm import`），并修正 `/wm design` / `/wm test` 的参数格式
+- `CONTRIBUTING.md`「添加新命令」节：删除旧架构残留的 `helpHandler` 引用，改为指向 SKILL.md「指令（执行规则）§1/§2/§3/§6」与 SSoT §6.1 / §6.2 / 附录 A 的同步更新流程
+
+#### 验证
+
+- `grep -E "helpHandler|REQ-/SD-/AT-|设计类型\(架构/详细\)|测试类型\(单元/集成/系统\)"` 在保留文件中无残留
+- `npx tsx w-model-dev/scripts/check-verifier-output.ts` 退出码 2（输入错误，符合预期，未传文件）
+- `npx tsx w-model-dev/scripts/check-artifact-gate.ts` 退出码 2（输入错误，符合预期，无 .w-model/rtm.json）
+- 校验脚本未受影响：`verifier-logic.ts` `SUB_CRITERIA` 与 `verifier-spec.md` §7 完全一致（20/20 子标准）；`determineQualityLevel` 与 §6.1 完全一致
+- 所有内部 Markdown 链接目标文件均存在，无断链
+
 ### 架构纯化：移除全部编程式接入
 
 > 把本仓库确定为「单纯的编排 + 校验脚本技能」，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）。

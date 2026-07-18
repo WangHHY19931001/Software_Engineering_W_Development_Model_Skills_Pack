@@ -5,9 +5,9 @@ description: >-
   and test design. Use when the user wants to run requirements analysis, system/outline/detailed
   design, coding with unit tests, integration testing, system testing, or acceptance
   testing as a closed-loop W-model workflow; when the user invokes /wm commands
-  (analyze, design, code, test, review, status); or when building software that
-  needs synchronized test design alongside each development stage with requirements
-  traceability.
+  (analyze, design, code, test, review, status, help, reset, export, import);
+  or when building software that needs synchronized test design alongside each
+  development stage with requirements traceability.
 ---
 
 # W-Model AI Assistant Skill
@@ -111,9 +111,9 @@ description: >-
 | `/wm analyze` | 需求分析 | `input`: 需求描述 | 需求规格说明书、验收测试用例 |
 | `/wm design` | 系统设计 | `type`: 架构 / 概要 / 详细 | 设计文档、对应测试用例 |
 | `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
-| `/wm test` | 测试执行 | `type`: 单元 / 集成 / 系统 / 验收 | 测试报告 |
-| `/wm review` | LLM 评审指引 | `target`: REQ-/SD-/AT-/文件路径 | 评审指引（指向 verifier-spec.md） |
-| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度 |
+| `/wm test` | 测试执行与回填 | `type`: 单元 / 集成 / 系统 / 验收；`result`: pass / fail（必填，真实回填） | 测试报告、RTM 状态更新 |
+| `/wm review` | LLM 评审指引 | `target`: `REQ-` / `DESIGN-` / `UAT-` / `ST-` / `IT-` / `UT-` / 文件路径 | 评审指引（指向 verifier-spec.md + check-verifier-output.ts） |
+| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度、RTM 覆盖率 |
 
 ### 辅助命令
 
@@ -199,6 +199,84 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 - 项目数据模型、需求 / 设计 / 测试用例数据结构见 [references/data-models.md](references/data-models.md)。
 - 项目状态字段取值：`需求分析 | 系统设计 | 概要设计 | 详细设计 | 编码 | 集成测试 | 系统测试 | 验收测试`。
 - 每次阶段切换更新 `status` 与 `updatedAt`。
+- 持久化位置：项目内 `.w-model/` 目录（已在 `.gitignore` 中默认排除）。
+  - `.w-model/project.json`：项目元信息（id / name / description / status / techStack / 时间戳）。
+  - `.w-model/rtm.json`：需求跟踪矩阵（行 + 四级测试执行汇总），由 [`scripts/check-artifact-gate.ts`](scripts/check-artifact-gate.ts) 读取。
+  - 其余实体（需求 / 设计 / 测试用例）按需写入 `.w-model/<entity>.json`，结构与 [references/data-models.md](references/data-models.md) 一致。
+
+### 5. `/wm test` 结果回填机制（重要）
+
+`/wm test` 是 W 模型右 V 的测试执行入口，必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填结果，**不得自动将测试标记为通过**——否则工件质量门形同虚设。
+
+执行步骤：
+
+1. Agent 调用真实的测试运行器执行对应类型的测试（单元 / 集成 / 系统 / 验收）。
+2. 收集真实结果（通过数 / 失败数 / 待执行数 / 覆盖率）。
+3. 通过 `/wm test type=<类型> result=<pass|fail>` 回填：
+   - `result=pass`：将该类型所有用例状态置为「通过」，更新 `executionSummary.<type>Test` 的 `passed` / `failed` / `pending`。
+   - `result=fail`：将失败用例状态置为「失败」，并要求 Agent 定位根因、关联到模块，回到编码实现返工。
+4. 同步更新 `.w-model/rtm.json` 的 `executionSummary` 与对应测试列状态。
+5. 产出《测试报告》（套用 [templates/test-report.md](templates/test-report.md)）。
+
+> **禁止行为**：跳过真实测试执行、由 LLM 估算测试结果、未执行即标通过、`result` 参数缺省。违反任一项即视为流程破坏（见「反例与黑名单」#3 / #6）。
+
+### 6. 辅助命令执行规则
+
+#### `/wm review <target>`
+
+返回结构化评审指引，**不调用 LLM**：
+
+1. 识别 `target` 类型（按 ID 前缀：`REQ-` → requirement / `DESIGN-` → design / `UAT-` / `ST-` / `IT-` / `UT-` → testcase / 其他按文件路径 → file）。
+2. 加载 [references/verifier-spec.md](references/verifier-spec.md)，定位 §7 对应 targetKind 的子标准集合。
+3. 输出评审指引：
+   - targetKind、target、对应子标准列表（名称 + 权重 + 描述）
+   - §8 提示词模板（系统提示词 + 用户提示词占位符待填）
+   - 校验脚本调用命令：`npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>`
+   - 通过判定：`passed=true (A/B) → 放行` / `passed=false (C/D) → 按 reworkHints 返工`
+4. 由外部 Agent 自行执行 LLM-as-a-Verifier 评审，产出 JSON 后立即调用校验脚本（见 §2）。
+
+#### `/wm status`
+
+读取 `.w-model/project.json` 与 `.w-model/rtm.json`，输出：
+
+1. 当前阶段（`status` 字段）与 `updatedAt`。
+2. 已完成阶段数 / 总阶段数（8）+ 阶段进度条。
+3. RTM 覆盖率（需求维度）：已覆盖需求数 / 总需求数。
+4. 四级测试执行汇总：单元 / 集成 / 系统 / 验收的 `total / passed / failed / pending`。
+5. 下一步建议（如「评审通过可进入 X 阶段」或「质量门未通过，回到编码」）。
+
+#### `/wm help`
+
+输出本技能的命令一览（与「命令接口」节一致）+ 阶段与测试并行对应表 + 关键约束（反例黑名单 #1/#2/#7/#8）摘要。不读项目状态。
+
+#### `/wm reset`
+
+重置当前项目状态：
+
+1. 保留元信息：`project.id` / `project.name` / `project.description` / `project.techStack` / `createdAt`。
+2. 清空实体：删除 `.w-model/` 下所有需求 / 设计 / 测试用例 / RTM 数据；`project.status` 重置为 `需求分析`；`updatedAt` 刷新为当前时间。
+3. 输出确认信息，提示用户可重新从 `/wm analyze` 开始。
+
+> 🔴 **CHECKPOINT · 重置确认**：执行前必须暂停向用户确认「将清空所有实体，保留项目元信息」，得到确认后执行。
+
+#### `/wm export [输出目录]`
+
+将项目导出为可迁移的 JSON + RTM Markdown：
+
+1. 默认输出目录：`./w-model-export/`，可由参数指定。
+2. 导出 `project.json`（项目元信息 + 全部实体）与 `rtm.md`（按 [templates/rtm.md](templates/rtm.md) 渲染）。
+3. 输出导出清单（文件路径 + 大小）。
+
+#### `/wm import <文件路径>`
+
+从 JSON 导入项目：
+
+1. 读取指定 `project.json`，按 [references/data-models.md](references/data-models.md) 校验结构。
+2. 校验失败 → 输出原因，不写入任何文件；退出码 2。
+3. 校验通过 → 写入 `.w-model/`，更新 `project.status` 与 `updatedAt`。
+4. 输出导入摘要（项目名 / 当前阶段 / 需求数 / 测试用例数）。
+
+> 🔴 **CHECKPOINT · 导入确认**：若 `.w-model/` 已存在项目数据，执行前必须暂停向用户确认「将覆盖现有项目」，得到确认后执行。
 
 ## 交互模式示例
 
@@ -207,6 +285,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 - 需求分析交互：[examples/requirement-analysis.md](examples/requirement-analysis.md)
 - 设计阶段交互：[examples/system-design.md](examples/system-design.md)
 - 编码阶段交互：[examples/coding.md](examples/coding.md)
+- 测试执行交互：[examples/test-execution.md](examples/test-execution.md)
 
 ## 通用输出规范
 
@@ -266,7 +345,8 @@ w-model-dev/
 └── examples/                      # 交互示例
     ├── requirement-analysis.md
     ├── system-design.md
-    └── coding.md
+    ├── coding.md
+    └── test-execution.md          #   集成 / 系统 / 验收测试执行示例（phase 6/7/8）
 ```
 
 > 本目录为标准 skill 结构，自包含。AI Agent 安装时只需拷贝整个 `w-model-dev/` 目录，

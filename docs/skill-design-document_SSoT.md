@@ -501,11 +501,11 @@ AI: 执行测试中...测试通过
 | 命令 | 功能描述 | 参数 | 返回值 |
 |------|----------|------|--------|
 | `/wm analyze` | 需求分析 | `input`: 需求描述 | 需求规格说明书、验收测试用例 |
-| `/wm design` | 系统设计 | `type`: 设计类型(架构/详细) | 设计文档、测试用例 |
+| `/wm design` | 系统设计 | `type`: 设计类型(架构/概要/详细) | 设计文档、测试用例 |
 | `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
-| `/wm test` | 测试执行 | `type`: 测试类型(单元/集成/系统) | 测试报告 |
+| `/wm test` | 测试执行与回填 | `type`: 测试类型(单元/集成/系统/验收)；`result`: pass/fail（必填，真实回填） | 测试报告 |
 | `/wm review` | LLM 评审指引 | `target`: 需求/设计/测试用例 ID 或文件路径 | 结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`，不内置 LLM） |
-| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度 |
+| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度、RTM 覆盖率 |
 
 ### 6.2 辅助命令
 
@@ -869,7 +869,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 | 3.2.3 编码与单元测试 | 代码生成、单元测试用例生成 | `w-model-dev/SKILL.md` `/wm code` 编排 + `references/phase-4/5-*.md` | 编排完整（不自动标记通过，需 `result` 回填） |
 | 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
 | 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
-| 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」（编排，Agent 执行） | 完整 |
+| 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 7 数据模型 | Project / Requirement / Design / TestCase / RTM | `w-model-dev/references/data-models.md`（Agent 维护 `.w-model/*.json` 的 schema） | 完整 |
 | 7.6 LLM-as-a-Verifier 评审规范 | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 | `w-model-dev/references/verifier-spec.md`（规范）+ `w-model-dev/scripts/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/check-verifier-output.ts`（CLI 校验） | 完整（LLM 推理由外部 Agent 执行） |
 | 8 技术实现方案 | 需求解析 / 测试用例生成 / 代码生成算法 | 上游 AI 按提示词执行（`w-model-dev/references/phase-*.md`） | 完整（算法由提示词承载，技能不内置 LLM） |
@@ -1052,12 +1052,15 @@ timeline
 | 命令 | 功能 |
 |------|------|
 | `/wm analyze <需求>` | 分析需求并生成规格说明 |
-| `/wm design [type]` | 生成系统/详细设计文档 |
+| `/wm design type=<架构\|概要\|详细>` | 生成对应类型设计文档 |
 | `/wm code <功能>` | 生成代码和单元测试 |
-| `/wm test [type]` | 执行指定类型测试 |
+| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 执行指定类型测试并真实回填结果 |
 | `/wm review <目标>` | 返回 LLM 评审指引（指向 verifier-spec.md，由外部 Agent 执行） |
-| `/wm status` | 查看项目状态 |
+| `/wm status` | 查看项目状态（当前阶段、RTM 覆盖率、四级测试汇总） |
 | `/wm help` | 显示帮助 |
+| `/wm reset` | 重置当前项目状态（保留元信息，清空实体） |
+| `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
+| `/wm import <文件路径>` | 从 JSON 导入项目 |
 
 ### B. 测试类型对应关系
 

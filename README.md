@@ -91,7 +91,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 │   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源）
 │   │   └── check-verifier-output.ts  # Verifier 输出校验 CLI（防 Agent 输出漂移）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
-│   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码）
+│   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
 ├── docs/                         # 设计文档（统一存放）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
 │   ├── skill-design-document.md                # 设计文档指针（已废弃独立维护）
