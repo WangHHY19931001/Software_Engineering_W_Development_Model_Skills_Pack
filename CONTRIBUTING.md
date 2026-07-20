@@ -19,6 +19,11 @@ cd Software_Engineering_W_Development_Model_Skills_Pack
 npm install
 # 之后即可用 npm run self-test / check:verifier / check:gate 快捷运行
 
+# 3. 启用本地推送前门禁（一次性，写入本地 .git/config）
+npm run setup:hooks
+# 等价于 git config core.hooksPath .githooks
+# 启用后每次 git push 会自动跑回归基线，详见下方「本地推送前门禁」一节
+
 # 或不安装依赖，按需用 npx tsx 拉取（适合一次性使用）
 npx tsx w-model-dev/scripts/self-test.ts
 ```
@@ -69,8 +74,46 @@ npm run check:gate -- <project-dir>
 > 本仓库不设单元测试框架。校验纯逻辑（`gate-logic.ts` / `verifier-logic.ts`）的正确性
 > 通过 `self-test.ts` + `samples/` 端到端样本验证，二者共同构成回归基线。
 >
-> CI（[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)）会在 push / PR 时
-> 自动跑 self-test 与 CLI 退出码冒烟检查，无需本地手动守护。
+> 本仓库**不使用远程 CI**：推送前门禁由本地 git hook 承载，详见下方「本地推送前门禁」。
+
+### 本地推送前门禁
+
+为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
+在 `git push` 时自动跑与原 CI 一致的 5 项检查；任一退出码不符预期即中止推送：
+
+| # | 检查 | 期望退出码 |
+|---|---|---|
+| 1 | `npm run self-test`（11 条样本回归基线） | 0 |
+| 2 | `npm run check:verifier`（无参数） | 2 |
+| 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
+| 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
+| 5 | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本） | 1 |
+
+**启用方式**（仓库克隆后执行一次即可，配置写入本地 `.git/config`，不影响仓库内容）：
+
+```bash
+npm run setup:hooks
+# 等价于 git config core.hooksPath .githooks
+```
+
+**手动触发**（不实际推送，仅跑门禁验证）：
+
+```bash
+npm run prepush
+```
+
+**触发条件**：hook 会先判断本次推送的提交里是否包含以下路径的变更，命中才跑门禁，
+纯文档 / 模板改动直接放行，避免无谓延迟：
+
+- `w-model-dev/scripts/**`
+- `package.json`
+- `.githooks/pre-push`
+
+**临时跳过**（仅紧急情况，勿用于常规开发）：
+
+```bash
+git push --no-verify
+```
 
 ### 4. 提交规范
 

@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# 本地推送前门禁（pre-push gate）
+#
+# 目的：替代远程 CI，在 `git push` 前自动跑校验脚本回归基线，防止
+#       w-model-dev/scripts/*.ts 与 samples/ 漂移。任何一项失败即中止 push。
+#
+# 启用方式（仓库克隆后执行一次）：
+#   npm run setup:hooks        # 等价于 git config core.hooksPath .githooks
+#
+# 临时跳过（仅紧急情况，勿用于常规开发）：
+#   git push --no-verify
+#
+# 触发条件：仅当本次推送的提交里包含以下路径的变更时才跑门禁，
+#           纯文档 / 模板改动直接放行，避免无谓延迟：
+#   - w-model-dev/scripts/**
+#   - package.json
+#   - .githooks/pre-push
+
+set -u
+
+# ---------- 工具函数 ----------
+
+log()  { printf '[pre-push] %s\n' "$*"; }
+ok()   { printf '[pre-push] \033[32m✓\033[0m %s\n' "$*"; }
+fail() { printf '[pre-push] \033[31m✗\033[0m %s\n' "$*"; }
+
+# ---------- 路径过滤：无相关变更直接放行 ----------
+#
+# PREPUSH_FORCE=1 时强制跑全部门禁，便于手动验证（npm run prepush 默认开启）。
+# 实际 git push 触发时不带此环境变量，仍按变更路径过滤。
+
+if [ "${PREPUSH_FORCE:-0}" != "1" ]; then
+  # pre-push hook stdin 格式：<local ref> <local sha> <remote ref> <remote sha>
+  # 读取所有待推送的 ref 行，聚合后判断变更范围。
+  changed_files="$(git diff --name-only HEAD@{push} HEAD 2>/dev/null || git diff --name-only origin/HEAD HEAD 2>/dev/null)"
+
+  # 兜底：上面的 diff 失败（首次推送、无 upstream 等），改为扫描本次待推送的提交列表
+  if [ -z "$changed_files" ]; then
+    while read -r local_ref local_sha remote_ref remote_sha; do
+      # 全新的远程分支（remote_sha 全 0）→ 取本地最近 20 条提交里的变更
+      if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        changed_files="${changed_files}$(git log --name-only --pretty=format: -n 20 "$local_sha" 2>/dev/null)"
+      else
+        changed_files="${changed_files}$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)"
+      fi
+    done
+  fi
+
+  # 命中任一前缀即需要跑门禁
+  needs_gate=0
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+      w-model-dev/scripts/*) needs_gate=1; break ;;
+      package.json)         needs_gate=1; break ;;
+      .githooks/pre-push)   needs_gate=1; break ;;
+    esac
+  done <<EOF
+$changed_files
+EOF
+
+  if [ "$needs_gate" -eq 0 ]; then
+    ok "本次推送未触及 scripts/ / package.json / .githooks，跳过门禁"
+    exit 0
+  fi
+fi
+
+log "检测到校验脚本相关变更，启动推送前门禁..."
+
+# ---------- 依赖检查 ----------
+
+if ! command -v npm >/dev/null 2>&1; then
+  fail "未找到 npm，请先安装 Node.js >= 20"
+  exit 1
+fi
+
+if [ ! -d node_modules ]; then
+  log "node_modules 缺失，先执行 npm install --no-audit --no-fund"
+  npm install --no-audit --no-fund >/dev/null 2>&1 || {
+    fail "npm install 失败"
+    exit 1
+  }
+fi
+
+# ---------- 门禁用例 ----------
+# 与原 CI 一致：5 项检查，退出码必须全部符合预期才放行。
+
+tmp_log="$(mktemp)"
+trap 'rm -f "$tmp_log"' EXIT
+
+# run_expect <描述> <期望退出码> <命令...>
+run_expect() {
+  local desc="$1"; shift
+  local expect="$1"; shift
+  set +e
+  "$@" >"$tmp_log" 2>&1
+  local code=$?
+  set -e
+  if [ "$code" -ne "$expect" ]; then
+    fail "$desc（期望 exit $expect，实际 $code）"
+    cat "$tmp_log"
+    return 1
+  fi
+  ok "$desc（exit $code）"
+  return 0
+}
+
+# 1. self-test：11 条样本回归基线，必须 exit 0
+run_expect "self-test 全部样本匹配期望" 0 npm run self-test || exit 1
+
+# 2. check:verifier 无参数应退出 2（输入错误）
+run_expect "check:verifier 无参数退出 2" 2 npm run check:verifier || exit 1
+
+# 3. check:gate 不存在的目录应退出 2（输入错误）
+run_expect "check:gate 不存在目录退出 2" 2 npm run check:gate -- /tmp/nonexistent || exit 1
+
+# 4. check:verifier 对有效样本应退出 0
+run_expect "check:verifier 有效样本退出 0" 0 \
+  npm run check:verifier -- w-model-dev/scripts/samples/verifier/valid.json || exit 1
+
+# 5. check:verifier 对无效样本应退出 1（校验失败）
+run_expect "check:verifier 无效样本退出 1" 1 \
+  npm run check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json || exit 1
+
+log "全部门禁通过，允许推送 ✓"
+exit 0
