@@ -321,6 +321,7 @@ export function checkVerifierOutput(
           `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
         );
       }
+      }
     }
     if (typeof sc.evidence !== 'string' || sc.evidence.trim() === '') {
       reasons.push(`subCriteria[${idx}].evidence 必须为非空字符串（引用目标内具体片段）`);

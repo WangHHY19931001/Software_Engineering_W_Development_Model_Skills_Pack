@@ -1,460 +1,164 @@
 ---
 name: w-model-dev
 description: >-
-  Use only when the user explicitly invokes a /wm command, mentions the W model
-  (W模型 / W开发模型 / W-model), or explicitly requests a closed-loop workflow
-  with development and testing in parallel, requirements traceability (RTM),
-  or stage/quality gates. Do not activate for ordinary standalone requirements,
-  coding, testing, or design requests unless the user also requests this W-model
-  workflow. Supports /wm analyze, design, code, test, review, status, help, reset,
-  export, and import.
+  Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
+  requests requirements traceability (RTM), stage gates, quality gates, or development
+  and testing in parallel. When the user only asks for an end-to-end or complete
+  development process without these signals, ask whether to use the W-model first.
 ---
 
-# W-Model AI Assistant Skill
+# W-Model Development
 
-## 描述
+## 核心原则
 
-本技能基于 AI 辅助编码技术，实现软件工程中 **W 开发模型**的全流程闭环管理。W 模型由 Evolutif 公司提出，由两个同步推进的"V"字结构组成：左 V 为开发侧（需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码），右 V 为测试侧（验收测试设计 → 系统测试设计 → 集成测试设计 → 单元测试设计 → 测试执行）。
+W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设计、系统设计 ↔ 系统测试设计、概要设计 ↔ 集成测试设计、详细设计 ↔ 单元测试设计。通过 RTM 追踪需求、设计、代码和四级测试，并以阶段门阻止未经验证的推进。
 
-**核心原则**：开发与测试并行推进——每一个开发阶段都同步产出对应的测试设计，使测试前置、缺陷早发现，并通过需求跟踪矩阵（RTM）保证全链路可追溯。
+技能只提供编排、参考、模板和确定性门禁脚本。LLM-as-a-Verifier 由外部 Agent 按提示词执行；技能脚本不调用 LLM。设计决策以 `docs/skill-design-document_SSoT.md` 为准。
 
-## 架构定位（重要）
+## 触发决策
 
-本技能遵循「技能包只包含提示词、参考、模板，里面的脚本只做门禁」的架构原则：
+按以下优先级判断，不要把普通软件任务升级为 W 模型流程：
 
-- **技能本身不内置 LLM 调用**。阶段产物的 LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，详见 [references/verifier-spec.md](references/verifier-spec.md)；评审输出结构的防漂移校验由 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 完成。
-- **技能本身不包含演化机制与轨迹分析**。技能自演化（Rollout / Reflect / Edit / Skill Lift 评估等）由外部工具完成：
-  - SkillOpt（微软）：https://github.com/microsoft/SkillOpt
-  - darwin-skill：https://github.com/alchaincyf/darwin-skill
-- **需求形式化为可选外部委托**。Phase 1（需求分析）的部分语义工作（结构化提取 / BDD 生成 / 知识图谱 / NFR 标记 / TLA+ / Lean 4）可委托给 [SRS-Formalizer](https://github.com/WangHHY19931001/SRS-Formalizer)（外部技能，Agent 驱动 + 脚本门禁，架构与本技能同源）。委托为 **opt-in**，仅当存在正式 SRS 文档且用户显式启用时触发；TLA+/Lean 仅对并发/状态机/安全合规模块条件触发。权威性约定：RTM 以 `.w-model/rtm.json` 为唯一事实源，SRS-Formalizer 产出的追溯矩阵仅作输入；Phase 1 阶段门放行仍以本技能 `check-verifier-output.ts` 为准，SRS-Formalizer 的 `verify-gate` 仅作内部子门禁。详见 [references/phase-1-requirements-formalization.md](references/phase-1-requirements-formalization.md)（[phase-1-requirements.md](references/phase-1-requirements.md)「可选：需求形式化」节有简短指针）。
-- **技能包内的脚本只做门禁**：
-  - [scripts/check-artifact-gate.ts](scripts/check-artifact-gate.ts)：工件质量门（RTM 覆盖率 + 四级测试通过）
-  - [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts)：外部 Agent 评审输出的结构化校验
-  - [scripts/gate-logic.ts](scripts/gate-logic.ts) + [scripts/verifier-logic.ts](scripts/verifier-logic.ts)：纯逻辑单点事实源
-
-## 使用场景
-
-触发本技能的条件：
-
-- 用户明确提及 W 模型、W 开发模型，或希望按"开发与测试并行"的方式推进项目
-- 用户使用 `/wm` 系列命令（analyze / design / code / test / review / status / help / reset / export / import）
-- 用户要从需求出发，逐步完成设计、编码、各级测试的完整软件交付
-- 用户需要对已有项目补齐测试设计、做需求追溯或质量门检查
-- 用户要求在文档/代码/测试之间建立可追踪的对应关系
-
-## 核心约束
-
-1. **并行原则不可破坏**：进入任一开发阶段时，必须同步启动对应测试类型的设计（见下表），不得将测试设计后置。
-2. **阶段门评审（Stage Gate）**：每个阶段产出必须通过评审后才能进入下一阶段；评审不通过则回到当前阶段起点返工。
-3. **RTM 同步维护**：每次需求或设计变更，必须同步更新需求跟踪矩阵；定期核验需求覆盖率应为 100%。
-4. **质量门**：单元测试代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
-5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
-6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则仅加载当前阶段对应的 `references/phase-N-*.md`，模板从 `templates/` 取用。
-7. **LLM 评审由外部执行**：阶段产物的 LLM-as-a-Verifier 评审不内置；外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 执行，并通过 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 防漂移。
-
-## 反例与黑名单（不要做什么）
-
-W 模型执行中真实高发陷阱共 9 条，命中任一条即视为流程破坏，必须回退到对应阶段起点。完整清单（含危害、正确做法、与门禁脚本的对应关系、命中后处理流程）见 [references/anti-patterns.md](references/anti-patterns.md)。
-
-简表（Agent 阶段门评审前扫描）：
-
-1. 跳过阶段门评审直接进入下一阶段
-2. 将测试设计后置到编码之后
-3. 用 LLM 自行"估算"质量门结果
-4. 评审未通过时悄悄小修后继续
-5. 一次性载入全部 `references/`
-6. 用 LLM 估算 RTM 覆盖率
-7. 质量门脚本退出码 1/2 时放行发布
-8. 越过 🔴 CHECKPOINT 自动推进
-9. 谎报阶段状态（未完成标为完成）
-
-## 阶段与测试并行对应表
-
-| # | 开发阶段（左 V） | 同步测试设计（右 V） | 对应执行测试 | 详细指引 |
-|---|---|---|---|---|
-| 1 | 需求分析 | 验收测试设计 | 验收测试执行 | [phase-1-requirements.md](references/phase-1-requirements.md) |
-| 2 | 系统设计 | 系统测试设计 | 系统测试执行 | [phase-2-system-design.md](references/phase-2-system-design.md) |
-| 3 | 概要设计 | 集成测试设计 | 集成测试执行 | [phase-3-outline-design.md](references/phase-3-outline-design.md) |
-| 4 | 详细设计 | 单元测试设计 | 单元测试执行 | [phase-4-detailed-design.md](references/phase-4-detailed-design.md) |
-| 5 | 编码实现 | 单元测试执行 | — | [phase-5-coding.md](references/phase-5-coding.md) |
-| 6 | 集成测试 | — | 集成测试执行 | [phase-6-integration-test.md](references/phase-6-integration-test.md) |
-| 7 | 系统测试 | — | 系统测试执行 | [phase-7-system-test.md](references/phase-7-system-test.md) |
-| 8 | 验收测试 | — | 验收测试执行 | [phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
-
-## 完整工作流程
-
-总体流程：8 阶段左 V 开发 + 同步右 V 测试设计，每阶段评审通过才进入下一阶段，编码后接入质量门。
-
-详细流程图（含阶段门评审 + 质量门 + 缺陷返工路径）与阶段并行对应表见 [references/workflow.md](references/workflow.md)。
-
-简图：
-
-```
-需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码 → 集成测试 → 系统测试 → 验收测试
-   │同步        │同步        │同步        │同步      │执行       │执行       │执行
-   ▼            ▼            ▼            ▼         ▼          ▼          ▼
-验收测试设计  系统测试设计  集成测试设计  单元测试设计  单元测试  集成测试  系统测试  验收测试
-```
-
-## 命令接口
-
-### 核心命令
-
-| 命令 | 功能 | 参数 | 产出 |
-|---|---|---|---|
-| `/wm analyze` | 需求分析 | `input`: 需求描述 | 需求规格说明书、验收测试用例 |
-| `/wm design` | 系统设计 | `type`: 架构 / 概要 / 详细 | 设计文档、对应测试用例 |
-| `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
-| `/wm test` | 测试执行与回填 | `type`: 单元 / 集成 / 系统 / 验收；`result`: pass / fail（必填，真实回填） | 测试报告、RTM 状态更新 |
-| `/wm review` | LLM 评审指引 | `target`: `REQ-` / `DESIGN-` / `UAT-` / `ST-` / `IT-` / `UT-` / 文件路径 | 评审指引（指向 verifier-spec.md + check-verifier-output.ts） |
-| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度、RTM 覆盖率 |
-
-### 辅助命令
-
-| 命令 | 功能 |
+| 用户信号 | 行为 |
 |---|---|
-| `/wm help` | 显示帮助信息 |
-| `/wm reset` | 重置当前项目状态 |
-| `/wm export` | 导出项目文档 |
-| `/wm import` | 导入现有项目 |
+| `/wm ...`、W-model、W 模型、W 开发模型 | 立即启用 |
+| 明确要求 RTM、阶段门/质量门、开发与测试并行 | 立即启用 |
+| 只说“完整流程”“从需求到交付”“全生命周期开发” | 先询问“是否采用 W 模型（含并行测试设计、RTM 和阶段门）？”；确认前不初始化 |
+| 普通需求、设计、编码、测试、修复或技术解释 | 不启用，按普通任务处理 |
 
-## 指令（执行规则）
+**边界示例：**
 
-> **检查点机制**：本流程在关键决策点用 `🔴 CHECKPOINT` 显性标记暂停点。到达该标记时**必须暂停并向用户确认**后再继续——视觉标记是 Agent 解析的扫描锚点，不可用"必须/应当"等措辞替代。
+- “用 W 模型开发登录功能” → 启用。
+- “从需求开始走完整流程” → 先询问是否采用 W 模型。
+- “修复 `src/auth.ts` 并运行测试” → 不启用。
 
-### 0. 任务接入
+## 不可违反的约束
 
-1. 识别用户意图对应的 W 模型阶段（对照"阶段与测试并行对应表"）。
-2. 若项目尚未初始化，先确认技术栈（前端 / 后端 / 数据库 / 其他）并建立项目状态记录。
-3. 仅加载当前阶段所需的 `references/` 文件（见下表），避免一次性载入全部细则。
+1. **测试设计前置**：阶段 1–4 的开发产物完成后，立即产出对应测试设计，不得推迟到编码后。
+2. **阶段门放行**：产物评审通过且用户在 🔴 CHECKPOINT 明确确认后，才能推进。
+3. **RTM 为事实源**：`.w-model/rtm.json` 是追溯与测试状态的唯一事实源；变更产物时同步更新。
+4. **真实执行**：不得估算覆盖率、测试结果或门禁结果；必须执行真实测试/脚本并记录输出。
+5. **失败即回退**：评审 C/D、测试失败或门禁退出码 1/2 均不得放行。
+6. **按需加载**：只读取当前命令和阶段需要的参考；禁止一次加载整个 `references/`。
+7. **如实状态**：未完成、未评审或未确认的阶段不得标为完成。
 
-**阶段→引用文件映射表**（§0 步骤 3 的执行依据）：
+完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
-| 阶段 | 必须加载 | 按需加载 |
-|---|---|---|
-| 0 任务接入 | — | `workflow.md`（向用户解释流程时） |
-| 1 需求分析 | `phase-1-requirements.md`, `rtm-guide.md` | `phase-1-requirements-formalization.md`（用户启用形式化时） |
-| 2 系统设计 | `phase-2-system-design.md`, `rtm-guide.md` | — |
-| 3 概要设计 | `phase-3-outline-design.md`, `rtm-guide.md` | — |
-| 4 详细设计 | `phase-4-detailed-design.md`, `rtm-guide.md` | — |
-| 5 编码 | `phase-5-coding.md`, `rtm-guide.md` | `anti-patterns.md`（编码规范校验时） |
-| 6 集成测试 | `phase-6-integration-test.md`, `rtm-guide.md` | — |
-| 7 系统测试 | `phase-7-system-test.md`, `quality-standards.md`, `rtm-guide.md` | — |
-| 8 验收测试 | `phase-8-acceptance-test.md`, `rtm-guide.md` | — |
-| 阶段门评审 | `verifier-spec.md` | — |
-| 质量门 | `quality-standards.md` | — |
+## 执行工作流
 
-跨阶段共享文件（仅在对应场景触发时加载，不随阶段自动加载）：`data-models.md`（数据结构定义）、`anti-patterns.md`（反模式核验）、`workflow.md`（流程图/并行表）。
+每次启用技能后按顺序执行：
 
-> 🔴 **CHECKPOINT · 项目初始化**：技术栈与 W 模型阶段确认后、正式产出前暂停，向用户复述「将进入 X 阶段 / 同步产出 Y 测试设计 / 预期产物清单」，得到确认再进入 §1。
+1. **路由任务**：识别命令、当前阶段和用户意图；歧义触发先确认。
+2. **读取状态**：若 `.w-model/` 存在，读取 `project.json` 与 `rtm.json`；状态损坏时先恢复，不得继续推进。
+3. **检查前置产物**：缺少上游阶段产物时拒绝跳阶段，并指出应返回的命令。
+4. **加载最小引用集**：按“按需导航”读取当前阶段、RTM 指南和所需模板。
+5. **初始化确认**：首次进入项目前确认技术栈、当前阶段、同步测试设计和产物清单。
+6. **执行阶段**：生成开发产物与对应测试设计，更新 RTM，自检当前阶段验收标准。
+7. **验证与暂停**：执行评审或确定性门禁，展示证据，并在对应 🔴 CHECKPOINT 等待用户决定。
+8. **持久化状态**：只有放行后才更新 `project.status`；取消时保留产物但不推进状态。
 
-### 1. 执行阶段任务（每个阶段统一遵循）
-
-1. **读取阶段指引**：用 Read 工具加载对应 `references/phase-N-*.md`，严格按其输入 / 输出 / AI 能力 / 测试用例设计 / 验收标准执行。
-2. **并行产出测试设计**：在本阶段开发产物产出后，立即同步产出对应测试类型的设计文档（不得推迟）。
-3. **套用模板**：从 `templates/` 取对应模板填充产出物，保证格式规范一致。
-4. **更新 RTM**：在 `templates/rtm.md`（或项目内 RTM 文件）登记本阶段产物与需求 / 设计的映射，确保覆盖状态可追踪。RTM 维护规则见 [references/rtm-guide.md](references/rtm-guide.md)。
-5. **自检验收标准**：对照阶段指引中的"验收标准"逐条核验，未达标不得提交评审。
-
-### 2. 阶段门评审（LLM-as-a-Verifier，外部执行）
-
-阶段门评审采用 LLM-as-a-Verifier 评审流程，**本技能不内置 LLM 调用**，由外部 Agent 按提示词执行：
-
-1. 读取 [references/verifier-spec.md](references/verifier-spec.md) 了解三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema。
-2. 按 §8 提示词模板构造评审请求，由外部 Agent 执行 LLM-as-a-Verifier 评审。
-3. 评审结果写入 JSON 文件，立即调用校验脚本防漂移：
-
-```bash
-# 退出码 0=通过 / 1=校验失败 / 2=输入错误
-npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
-```
-
-4. 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
-5. 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，按 `reworkHints` 修复。
-
-> 🔴 **CHECKPOINT · 阶段门放行**：评审结果出炉后暂停，向用户展示「质量等级 / 各子标准分 / reworkHints（若有）」，由用户确认「放行进入下一阶段」或「返工」。未确认不得自动推进或自动返工。
-
-### 3. 质量门（编码及之后阶段强制）
-
-执行顺序：代码提交 → 自动化代码审查 → 单元测试 → 集成测试 → 系统测试 → 质量门检查 → 发布。任一环节不通过回到编码实现。质量标准见 [references/quality-standards.md](references/quality-standards.md)。
-
-```
-代码提交 → 自动化代码审查 ──通过──► 单元测试 ──通过──► 集成测试
-                │不通过                 │不通过              │
-                ▼                        ▼                   ▼
-              回到编码                回到编码           系统测试 ──通过──► 质量门 ──通过──► 发布
-                                                                     │不通过         │不通过
-                                                                     ▼               ▼
-                                                                  回到编码       回到编码
-```
-
-**门禁脚本调用（Agent 执行）**：到达质量门检查点时，Agent 直接执行技能包内的门禁脚本获取确定性判定，而非靠 LLM 自行估算：
-
-```bash
-# 工件质量门：读取 .w-model/rtm.json，校验 RTM 覆盖率 100% 且四级测试全部通过
-# 退出码 0=通过 / 1=未通过 / 2=输入错误；末尾输出 GATE_JSON {...} 供程序解析
-npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
-```
-
-> 🔴 **CHECKPOINT · 发布放行**：质量门脚本返回通过（退出码 0）后暂停，向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」，由用户确认「发布」或「回到编码」。退出码 1/2 一律不得放行，直接回到编码实现并附 GATE_JSON 详情。
-
-> 工件质量门的判定逻辑由 [`scripts/gate-logic.ts`](scripts/gate-logic.ts) 提供（单点事实源），
-> 由 `scripts/check-artifact-gate.ts` CLI 包装，Agent 直接执行得到确定性判定。
+> 🔴 **CHECKPOINT · 项目初始化**：复述“进入阶段 / 同步测试设计 / 预期产物”，获得确认后才能正式产出。
 >
-> **技能演化不在技能包内**：本技能不包含技能验证门、Skill Lift 评估、Rollout 记录等内容。
-> 技能自演化由外部工具完成（[SkillOpt](https://github.com/microsoft/SkillOpt) /
-> [darwin-skill](https://github.com/alchaincyf/darwin-skill)），它们可消费本技能产出的
-> `VerifierOutput` JSON 作为训练信号。
+> 🔴 **CHECKPOINT · 阶段门放行**：展示质量等级、各子标准分与 `reworkHints`，等待用户选择放行或返工。
+>
+> 🔴 **CHECKPOINT · 发布放行**：质量门退出码 0 后展示 RTM 覆盖率、四级测试结果与 `GATE_JSON`，等待用户选择发布或回到编码。
 
-### 4. 数据与状态管理
+完整阶段切换、失败回退与质量门流程见 [references/workflow.md](references/workflow.md)。
 
-- 项目数据模型、需求 / 设计 / 测试用例数据结构见 [references/data-models.md](references/data-models.md)。
-- 项目状态字段取值：`需求分析 | 系统设计 | 概要设计 | 详细设计 | 编码 | 集成测试 | 系统测试 | 验收测试`。
-- 每次阶段切换更新 `status` 与 `updatedAt`。
-- 持久化位置：项目内 `.w-model/` 目录（已在 `.gitignore` 中默认排除）。
-  - `.w-model/project.json`：项目元信息（id / name / description / status / techStack / 时间戳）。
-  - `.w-model/rtm.json`：需求跟踪矩阵（行 + 四级测试执行汇总），由 [`scripts/check-artifact-gate.ts`](scripts/check-artifact-gate.ts) 读取。
-  - 其余实体（需求 / 设计 / 测试用例）按需写入 `.w-model/<entity>.json`，结构与 [references/data-models.md](references/data-models.md) 一致。
+## 阶段路由
 
-### 5. `/wm test` 结果回填机制（重要）
-
-`/wm test` 是 W 模型右 V 的测试执行入口，必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填结果，**不得自动将测试标记为通过**——否则工件质量门形同虚设。
-
-执行步骤：
-
-1. Agent 调用真实的测试运行器执行对应类型的测试（单元 / 集成 / 系统 / 验收）。
-2. 收集真实结果（通过数 / 失败数 / 待执行数 / 单元测试代码覆盖率，仅单元测试必填）。
-3. 通过 `/wm test type=<类型> result=<pass|fail>` 回填：
-   - `result=pass`：将该类型所有用例状态置为「通过」，更新 `executionSummary.<type>Test` 的 `passed` / `failed` / `pending`。
-   - `result=fail`：将失败用例状态置为「失败」，并要求 Agent 定位根因、关联到模块，回到编码实现返工。
-4. 同步更新 `.w-model/rtm.json` 的 `executionSummary` 与对应测试列状态。
-5. 产出《测试报告》（套用 [templates/test-report.md](templates/test-report.md)）。
-
-> **禁止行为**：跳过真实测试执行、由 LLM 估算测试结果、未执行即标通过、`result` 参数缺省。违反任一项即视为流程破坏（见「反例与黑名单」#3 / #6）。
-
-### 6. 辅助命令执行规则
-
-#### `/wm review <target>`
-
-返回结构化评审指引，**不调用 LLM**：
-
-1. 识别 `target` 类型（按 ID 前缀：`REQ-` → requirement / `DESIGN-` → design / `UAT-` / `ST-` / `IT-` / `UT-` → testcase / 其他按文件路径 → file）。
-2. 加载 [references/verifier-spec.md](references/verifier-spec.md)，定位 §7 对应 targetKind 的子标准集合。
-3. 输出评审指引：
-   - targetKind、target、对应子标准列表（名称 + 权重 + 描述）
-   - §8 提示词模板（系统提示词 + 用户提示词占位符待填）
-   - 校验脚本调用命令：`npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>`
-   - 通过判定：`passed=true (A/B) → 放行` / `passed=false (C/D) → 按 reworkHints 返工`
-4. 由外部 Agent 自行执行 LLM-as-a-Verifier 评审，产出 JSON 后立即调用校验脚本（见 §2）。
-
-#### `/wm status`
-
-读取 `.w-model/project.json` 与 `.w-model/rtm.json`，输出：
-
-1. 当前阶段（`status` 字段）与 `updatedAt`。
-2. 已完成阶段数 / 总阶段数（8）+ 阶段进度条。
-3. RTM 覆盖率（需求维度）：已覆盖需求数 / 总需求数。
-4. 四级测试执行汇总：单元 / 集成 / 系统 / 验收的 `total / passed / failed / pending`。
-5. 下一步建议（如「评审通过可进入 X 阶段」或「质量门未通过，回到编码」）。
-
-#### `/wm help`
-
-输出本技能的命令一览（与「命令接口」节一致）+ 阶段与测试并行对应表 + 关键约束（反例黑名单 #1/#2/#7/#8）摘要。不读项目状态。
-
-#### `/wm reset`
-
-重置当前项目状态：
-
-1. 保留元信息：`project.id` / `project.name` / `project.description` / `project.techStack` / `createdAt`。
-2. 清空实体：删除 `.w-model/` 下所有需求 / 设计 / 测试用例 / RTM 数据；`project.status` 重置为 `需求分析`；`updatedAt` 刷新为当前时间。
-3. 输出确认信息，提示用户可重新从 `/wm analyze` 开始。
-
-> 🔴 **CHECKPOINT · 重置确认**：执行前必须暂停向用户确认「将清空所有实体，保留项目元信息」，得到确认后执行。
-
-#### `/wm export [输出目录]`
-
-将项目导出为可迁移的 JSON + RTM Markdown：
-
-1. 默认输出目录：`./w-model-export/`，可由参数指定。
-2. 导出文件清单：
-   - `project.json`：项目元信息（`id` / `name` / `description` / `status` / `techStack` / 时间戳）+ 全部实体（需求数组 / 设计数组 / 测试用例数组）
-   - `rtm.md`：按 [templates/rtm.md](templates/rtm.md) 渲染的跟踪矩阵
-   - `requirements.json` / `designs.json` / `testcases.json`：各实体独立文件（便于部分导入）
-3. 校验导出完整性：`project.json` 中实体数与独立文件记录数一致，不一致时输出警告。
-4. 输出导出清单（文件路径 + 大小 + 实体数）。
-
-#### `/wm import <文件路径>`
-
-从 JSON 导入项目：
-
-1. 读取指定 `project.json`，按 [references/data-models.md](references/data-models.md) 校验结构：
-   - 必填字段：`id` / `name` / `status` / `techStack`（类型为 `Project` 接口定义的子集）
-   - 枚举校验：`status` ∈ {`需求分析` | `系统设计` | `概要设计` | `详细设计` | `编码` | `集成测试` | `系统测试` | `验收测试`}
-   - 实体校验：每个 `Requirement` / `Design` / `TestCase` 的 `type` / `status` / `priority` 均在合法枚举内
-2. 校验失败 → 输出具体失败字段与原因，不写入任何文件；退出码 2。
-3. 校验通过 → 写入 `.w-model/`（`project.json` + `rtm.json`），更新 `project.status` 与 `updatedAt`。
-4. 输出导入摘要（项目名 / 当前阶段 / 需求数 / 测试用例数 / RTM 需求覆盖率）。
-
-> 🔴 **CHECKPOINT · 导入确认**：若 `.w-model/` 已存在项目数据，执行前必须暂停向用户确认「将覆盖现有项目」，得到确认后执行。
-
-## 交互模式示例
-
-完整交互示例见 `examples/`：
-
-- 需求分析交互：[examples/requirement-analysis.md](examples/requirement-analysis.md)
-- 设计阶段交互：[examples/system-design.md](examples/system-design.md)
-- 编码阶段交互：[examples/coding.md](examples/coding.md)
-- 测试执行交互：[examples/test-execution.md](examples/test-execution.md)
-
-## 多场景适配指引
-
-W 模型适用于各类软件项目。不同技术栈与项目类型在阶段 5（编码）~阶段 7（系统测试）的执行方式有差异，Agent 应按项目 `techStack` 自适应：
-
-| 项目类型 | 阶段 5 编码 | 阶段 6 集成测试 | 阶段 7 系统测试 | 覆盖率工具 |
+| # | 开发阶段 | 同步/执行测试 | 必读参考 |
 |---|---|---|---|
-| Node.js / TypeScript 后端 | `npx tsc --noEmit` + `npx eslint` | `npx vitest run tests/integration/` 或 `supertest` | `k6` 负载 + `zap-cli` 安全 | `npx vitest --coverage` |
-| Python 后端 | `ruff check` + `mypy` | `pytest tests/integration/` | `locust` 负载 + `bandit` 安全 | `pytest --cov` |
-| Java / Spring 后端 | `mvn compile` + `checkstyle` | `mvn verify -P integration` | `jmeter` 负载 + `owasp-dependency-check` | `jacoco` |
-| 前端 SPA (React/Vue) | `npx tsc --noEmit` + `npx eslint` | `npx vitest run` + `msw` mock | `playwright` E2E + `lighthouse` 性能 | `npx vitest --coverage` |
-| 全栈 (前后端一体) | 合并上述对应栈 | 合并前后端集成测试 | 合并前后端系统测试 | 合并覆盖率报告 |
+| 1 | 需求分析 | 验收测试设计 | [references/phase-1-requirements.md](references/phase-1-requirements.md) |
+| 2 | 系统设计 | 系统测试设计 | [references/phase-2-system-design.md](references/phase-2-system-design.md) |
+| 3 | 概要设计 | 集成测试设计 | [references/phase-3-outline-design.md](references/phase-3-outline-design.md) |
+| 4 | 详细设计 | 单元测试设计 | [references/phase-4-detailed-design.md](references/phase-4-detailed-design.md) |
+| 5 | 编码实现 | 单元测试执行 | [references/phase-5-coding.md](references/phase-5-coding.md) |
+| 6 | 集成测试 | 集成测试执行 | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
+| 7 | 系统测试 | 系统测试执行 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
+| 8 | 验收测试 | 验收测试执行 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
 
-> Agent 在阶段 0 任务接入时根据用户声明的技术栈选择对应行的工具链；若用户未声明，按 `Node.js / TypeScript` 为默认。工具链变更影响阶段 5~7 的执行方法论，不影响阶段 1~4（需求/设计）与阶段 8（验收测试）的流程。
+所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。只有以下场景追加读取：
 
-## 失败恢复策略
+- 正式 SRS 且用户显式启用形式化 → [references/phase-1-requirements-formalization.md](references/phase-1-requirements-formalization.md)
+- 阶段门评审或 `/wm review` → [references/verifier-spec.md](references/verifier-spec.md)
+- 编码后质量检查 → [references/quality-standards.md](references/quality-standards.md)
+- 状态 Schema、导入、导出或恢复 → [references/data-models.md](references/data-models.md)
+- 异常、跨平台、技术栈切换或大项目 → [references/operational-recovery.md](references/operational-recovery.md)
 
-当任一阶段返工超过 **2 次** 仍不通过时，触发以下恢复策略（避免无限返工循环）：
+## 命令速查
 
-1. **根因深化**：暂停返工，向用户展示「已返工 N 次 / 仍不通过的子标准 / 当前 reworkHints」，请求用户提供额外上下文（如遗漏的业务规则 / 环境约束）。
-2. **范围缩减**：与用户协商是否可将不通过的子项降级为「已知限制」并在 RTM 标注，而非阻塞全部流程。
-3. **阶段回退**：若返工根因指向上游阶段（如集成测试失败根因在概要设计接口契约），经用户确认后回退到上游阶段修正，而非在本阶段反复修补。
-
-## 异常与边界条件
-
-W 模型在真实工程环境中可能遭遇的异常场景与确定性处理路径。Agent 命中任一场景时按表格执行，不得自行发挥或绕过。
-
-### 跨平台与路径
-
-| 场景 | 触发条件 | 处理动作 |
+| 命令 | 路由 | 关键前置/行为 |
 |---|---|---|
-| 路径分隔符不一致 | Windows 反斜杠 vs Unix 正斜杠 | scripts 调用统一用 forward slash（`/`）；Agent 在 `.w-model/` 路径拼接时用 `path.join()` 或等价工具，不得硬编码 `\` |
-| 路径含空格/中文 | 命令行参数路径含空格或非 ASCII 字符 | 所有命令路径必须用双引号包裹：`npx tsx "path with space/scripts/check-verifier-output.ts" <output.json>` |
+| `/wm analyze <需求>` | 阶段 1 | 首次初始化并同步验收测试设计 |
+| `/wm design type=<架构\|概要\|详细>` | 阶段 2/3/4 | 必须存在上一阶段已放行产物 |
+| `/wm code <功能>` | 阶段 5 | 必须存在已放行详细设计；生成并真实执行单元测试 |
+| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 阶段 5–8 | `result` 必填且必须来自真实测试输出 |
+| `/wm review <目标>` | 阶段门 | 返回评审指引；外部 Agent 执行评审 |
+| `/wm status` | 状态查询 | 读取状态与 RTM，不修改数据 |
+| `/wm help` | 帮助 | 不读项目状态 |
+| `/wm reset` | 重置 | 🔴 CHECKPOINT 后清空实体，保留项目元信息 |
+| `/wm export [目录]` | 导出 | 输出 JSON 与 RTM Markdown |
+| `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT |
 
-### `.w-model/` 目录异常
+每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| 目录不存在 | `/wm analyze` 执行时 `.w-model/` 缺失 | Agent 自动创建三件套：`.w-model/` + `project.json`（空模板，含 `techStack` 待用户填写）+ `rtm.json`（空 RTM）；不向用户报错，继续阶段流 |
-| 目录被锁（Windows 文件占用） | 写入 `.w-model/*.json` 时抛 EPERM/EBUSY | 提示用户关闭占用进程（常见：编辑器/IDE 锁定、OneDrive 同步占用），**不得绕过**；用户解除后重试当前命令 |
-| JSON 文件损坏 | 读取 `.w-model/*.json` 抛 JSON 解析异常 | 1) 将损坏文件备份为 `<name>.bak.YYYYMMDD-HHMM`；2) 从最近 git 提交恢复（`git checkout HEAD -- .w-model/<name>.json`）；3) 无 git 跟踪则提示用户重置（`/wm reset`） |
+## 阶段统一产出契约
 
-### 外部 Agent 与 LLM 不可用
+每个阶段必须：
 
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| LLM 服务超时/不可达 | 阶段门评审时外部 Agent LLM 调用超时或网络不可达 | 暂停评审，在 `.w-model/` 标注「等待 LLM 可用」，**不得降级为 LLM 自评**（违反反例 #3）；待 LLM 可用后由用户手动触发 `/wm review` |
-| 评审 Agent 与执行 Agent 不同实例 | 评审 Agent ≠ 产出 Agent | 评审结果 JSON 仍可流转；`check-verifier-output.ts` 只校验 JSON Schema，不依赖 Agent 身份 |
+1. 按阶段参考定义的输入和算法产出文档。
+2. 使用对应 [templates/](templates/) 模板；测试用例至少包含 ID、场景、输入、预期输出和优先级。
+3. 同步更新 `.w-model/rtm.json` 的需求、设计、代码与测试映射。
+4. 给出风险/缺陷等级和缓解措施。
+5. 输出阶段摘要：产物路径、RTM 覆盖状态、验证证据、阻塞项和下一步。
 
-### 门禁脚本执行异常
+模板按产物直接读取：
 
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| `npx tsx` 未安装 | 执行 `npx tsx scripts/*.ts` 报 command not found | 提示用户执行 `npm install -D tsx`（项目级）或 `npx --yes tsx@latest <script>`（临时）；不得跳过门禁 |
-| 脚本执行超时 | `check-artifact-gate.ts` / `check-verifier-output.ts` 执行 >30s | 视为失败，退出码 1，**不得放行**；提示用户检查 `.w-model/rtm.json` 体量或网络代理 |
-| 脚本抛出未捕获异常 | 脚本执行 stderr 非空且退出码非 0/1/2 | 输出 stderr 摘要（前 500 字符），引导用户检查 `.w-model/rtm.json` 结构是否符合 [references/data-models.md](references/data-models.md) |
+- 需求：[templates/requirement-spec.md](templates/requirement-spec.md)
+- 系统/详细/接口设计：[templates/system-design.md](templates/system-design.md)、[templates/detailed-design.md](templates/detailed-design.md)、[templates/interface-design.md](templates/interface-design.md)
+- 测试用例/报告：[templates/test-case.md](templates/test-case.md)、[templates/test-report.md](templates/test-report.md)
+- RTM/评审：[templates/rtm.md](templates/rtm.md)、[templates/review-report.md](templates/review-report.md)
 
-### 多技术栈切换
+## 阶段门与质量门
 
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| 项目执行中变更技术栈 | `project.techStack` 与当前编码阶段实际使用技术栈不符 | 必须执行 `/wm reset` 重置项目状态；已产出文档在文件名后追加「.技术栈变更前」归档（不删除）；重置后从 `/wm analyze` 重新开始 |
-| 多场景适配指引表外技术栈 | 项目技术栈不在「多场景适配指引」表内 | Agent 按「最接近的技术栈」映射（如 Rust → C/Java 系），并向用户确认映射选择；用户可手动指定工具链 |
+阶段产物由外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 评审。JSON 产出后立即执行：
 
-### 阶段状态漂移
-
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| `project.status` 与实际产出不一致 | `project.json` 标注「编码」但 `.w-model/` 无对应设计文档 | 以实际产出为准，Agent 修正 `status` 字段为最近一次有产出物对应的阶段，并在 `updatedAt` 标注修正时间 |
-| 跳过阶段执行 | 用户直接 `/wm code` 但 `.w-model/` 无详细设计文档 | **拒绝执行**，引导用户回到对应阶段（`/wm design type=详细`）；不得基于不完整上游产出强行编码 |
-
-### 大型项目性能
-
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| RTM 行数过多 | `.w-model/rtm.json` 行数 > 500 | 提示用户分段管理：按模块拆分子 RTM（`.w-model/rtm-<module>.json`），主 RTM 仅维护跨模块追溯 |
-| 测试用例数过多 | `.w-model/testcases.json` 用例数 > 1000 | 提示按 `priority` 分组执行：先 P0/P1，后 P2/P3；`/wm test type=单元` 支持按 `module` 或 `priority` 过滤 |
-
-### 用户中途取消
-
-| 场景 | 触发条件 | 处理动作 |
-|---|---|---|
-| 阶段执行中用户中断 | 用户在阶段执行过程中主动取消（中断信号） | 保留已产出物写入 `.w-model/`；`project.status` **不更新**（停留在上一阶段）；下次 `/wm <阶段>` 由 Agent 询问「从断点继续」或「重新执行」 |
-| CHECKPOINT 用户拒绝 | 🔴 CHECKPOINT 处用户选择「不放行/不返工/不重置」 | Agent **不得重试相同请求**，应询问用户具体调整方向（如「需要修改哪些设计要点」「需要补充哪些需求」），根据用户回复调整后再触发 CHECKPOINT |
-
-## 通用输出规范
-
-1. 阶段开始时简要说明"正在执行 X 阶段"，并列出将同步产出的测试设计类型。
-2. 产出文档使用 Markdown，文件命名遵循 `<类型>-<模块>-<时间或序号>.md`。
-3. 测试用例必须含：用例 ID、测试场景、输入、预期输出、优先级。
-4. 涉及缺陷或风险时给出等级与缓解措施。
-5. 每个阶段结束输出"阶段完成摘要"：产出清单、RTM 覆盖状态、下一阶段动作。
-
-## 验收检查清单（项目级）
-
-核心放行条件（详见 [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md)「项目级验收检查清单」）：
-
-- [ ] 四级测试（单元 / 集成 / 系统 / 验收）全部通过
-- [ ] 单元测试代码覆盖率 ≥ 80%
-- [ ] RTM 需求覆盖率 100%（`check-artifact-gate.ts` 退出码 0）
-- [ ] 用户确认签字 + 交付文档齐全
-
-## 文件清单
-
-```
-w-model-dev/
-├── SKILL.md                       # 本文件：编排与命令（YAML frontmatter + 阶段流）
-├── scripts/                       # 门禁校验脚本（Agent 可直接执行，自包含）
-│   ├── gate-logic.ts              #   工件质量门纯逻辑（单点事实源，CLI 调用）
-│   ├── check-artifact-gate.ts     #   工件质量门 CLI（读 .w-model/rtm.json）
-│   ├── verifier-logic.ts          #   Verifier 输出校验纯逻辑（单点事实源）
-│   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
-├── references/                    # 阶段细则与规范（仅当前阶段加载）
-│   ├── phase-1-requirements.md
-│   ├── phase-1-requirements-formalization.md  #   Phase 1 可选增强（SRS-Formalizer 委托）
-│   ├── phase-2-system-design.md
-│   ├── phase-3-outline-design.md
-│   ├── phase-4-detailed-design.md
-│   ├── phase-5-coding.md
-│   ├── phase-6-integration-test.md
-│   ├── phase-7-system-test.md
-│   ├── phase-8-acceptance-test.md
-│   ├── anti-patterns.md           #   反例与黑名单（9 条高发陷阱）
-│   ├── workflow.md                #   完整工作流程（流程图 + 阶段并行表）
-│   ├── data-models.md
-│   ├── rtm-guide.md
-│   ├── quality-standards.md
-│   └── verifier-spec.md           #   LLM-as-a-Verifier 评审规范（提示词+Schema+子标准）
-├── templates/                     # 文档模板
-│   ├── requirement-spec.md
-│   ├── system-design.md
-│   ├── detailed-design.md
-│   ├── interface-design.md
-│   ├── test-case.md
-│   ├── test-report.md
-│   ├── review-report.md
-│   └── rtm.md
-└── examples/                      # 交互示例
-    ├── requirement-analysis.md
-    ├── system-design.md
-    ├── coding.md
-    └── test-execution.md          #   集成 / 系统 / 验收测试执行示例（phase 6/7/8）
+```bash
+npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
 ```
 
-> 本目录为标准 skill 结构，自包含。AI Agent 安装时只需拷贝整个 `w-model-dev/` 目录，
-> 详见 [../docs/INSTALL.md](../docs/INSTALL.md)。
->
-> **门禁脚本与 Markdown 的配合关系**（架构原则详见本文「架构定位」节，此处不重复）：
-> `references/quality-standards.md`（人类可读标准）↔ `scripts/check-*-gate.ts`（可执行判定）；
-> `references/verifier-spec.md`（提示词+Schema）↔ `scripts/check-verifier-output.ts`（可执行校验）。
-> Agent 在阶段门评审时优先执行脚本获取确定性判定；若需了解判定依据，回查对应 Markdown。
+仅当脚本退出码 0、`passed=true` 且 `qualityLevel` 为 A/B，才可进入阶段门用户确认。C/D 或退出码 1/2 回到当前阶段起点。
 
+验收终检执行：
 
+```bash
+npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
+```
+
+只有退出码 0 且用户在发布检查点确认，项目才可完成。退出码 1/2 一律停止并按 `GATE_JSON` 回退。单元测试代码覆盖率还必须达到 80%，代码规范检查通过且无高危安全漏洞。
+
+## 测试结果真实性
+
+`/wm test` 的 `result` 只用于回填已执行结果，不是用户声明即可信的“通过开关”。回填前必须具有：
+
+- 测试运行器命令与退出码；
+- `passed / failed / pending` 数量；
+- 单元测试覆盖率（仅单元测试必填）；
+- 失败用例与根因（`result=fail` 时）。
+
+缺少证据时拒绝标记通过，保持状态为待执行，并给出应运行的测试命令。
+
+## 快速自检
+
+在任何推进或完成声明前确认：
+
+- [ ] 触发边界已正确判断，歧义请求已经确认
+- [ ] 上游产物与项目状态一致
+- [ ] 当前阶段开发产物和对应测试设计均已完成
+- [ ] RTM 已同步且没有估算值
+- [ ] 真实测试/门禁证据可复核
+- [ ] 当前 🔴 CHECKPOINT 已获得用户明确决定
+- [ ] 未一次性加载无关参考文件
+
+交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。

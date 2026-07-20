@@ -76,7 +76,7 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-variance-threshold.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/varianceThreshold 必须为数字/],
+    expectedReasonPatterns: [/varianceThreshold 必须在 \[0,0\.1\]/],
     description: 'meta.varianceThreshold 缺失，应判失败（spec §6 必填字段）',
   },
   {

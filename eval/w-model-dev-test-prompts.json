@@ -3,19 +3,19 @@
     "id": 1,
     "scenario": "典型场景：自然语言触发 W 模型开发",
     "prompt": "我想用 W 模型开发一个用户登录功能",
-    "expected": "skill 应识别为 W 模型意图 → 进入 Phase 1 需求分析 → 同步产出验收测试设计 → 套用 requirement-spec 模板 → 更新 RTM → 自检验收标准 → 触发阶段门评审（指向 verifier-spec.md + check-verifier-output.ts）→ 通过后才进入系统设计；未获用户确认不得推进"
+    "expected": "skill 应识别为 W 模型意图，进入阶段 1，先确认技术栈和项目初始化信息；正式产出前暂停在项目初始化 CHECKPOINT；确认后同步产出需求规格与验收测试设计，更新 RTM，并在阶段门评审和用户确认前不得进入系统设计"
   },
   {
     "id": 2,
     "scenario": "典型场景：显式 /wm 命令",
     "prompt": "/wm analyze 需求：实现一个 TODO 待办事项的增删改查 REST API，支持按用户隔离",
-    "expected": "skill 应执行 /wm analyze 命令 → 加载 references/phase-1-requirements.md → 产出需求规格说明书 + 验收测试用例（含用例ID/场景/输入/预期输出/优先级）→ 登记完整 RTM 追溯字段 → 输出阶段完成摘要"
+    "expected": "skill 应执行 /wm analyze，加载 phase-1-requirements.md 和 rtm-guide.md，产出需求规格、验收测试用例（ID/场景/输入/预期输出/优先级）、风险清单，登记 RTM，并输出阶段摘要"
   },
   {
     "id": 3,
-    "scenario": "歧义/范围场景：完整流程但不指定起点",
+    "scenario": "歧义场景：完整流程但未明确 W 模型",
     "prompt": "帮我做一个博客系统，从需求开始走完整流程",
-    "expected": "skill 应识别为 W 模型全流程 → 确认技术栈并建立项目状态记录 → 按 8 阶段顺序推进（每阶段同步测试设计）→ 每个阶段门评审通过且用户确认后才前进 → 编码后强制走质量门（RTM 100% + 四级测试通过 + 单元代码覆盖率≥80%）"
+    "expected": "skill 不应直接初始化 W 模型或创建 .w-model/；应先询问是否采用 W 模型（并行测试设计、RTM 和阶段门），用户确认后才进入项目初始化"
   },
   {
     "id": 4,
@@ -25,56 +25,68 @@
   },
   {
     "id": 5,
-    "scenario": "反误触发：普通单文件修复",
-    "prompt": "请修复 src/auth.ts 中的登录错误并运行相关测试",
-    "expected": "skill 不应强行启动 W 模型 8 阶段或要求创建完整 RTM；应按普通编码任务定位问题、修改代码并运行相关测试，除非用户明确要求 W 模型流程"
+    "scenario": "触发词同义词：英文 W-model 与阶段门",
+    "prompt": "Use the W-model workflow with RTM and stage gates for this payment service",
+    "expected": "skill 应识别 W-model、RTM 和 stage gates 为明确触发信号，启用技能；应先确认当前阶段、技术栈和同步测试设计，不应按普通编码任务处理"
   },
   {
     "id": 6,
+    "scenario": "反误触发：普通单文件修复",
+    "prompt": "请修复 src/auth.ts 中的登录错误并运行相关测试",
+    "expected": "skill 不应强行启动 W 模型 8 阶段或要求创建完整 RTM；应按普通编码任务定位问题、修改代码并运行相关测试"
+  },
+  {
+    "id": 7,
     "scenario": "反误触发：普通需求解释",
     "prompt": "请解释 OAuth2 授权码模式的工作原理",
     "expected": "skill 不应触发 /wm analyze、创建项目状态或暂停在 CHECKPOINT；直接回答技术问题"
   },
   {
-    "id": 7,
+    "id": 8,
     "scenario": "流程防护：跳过详细设计直接编码",
     "prompt": "/wm code 实现支付功能，但当前项目没有详细设计文档",
     "expected": "skill 必须拒绝直接编码，指出缺少阶段 4 产物，引导 /wm design type=详细；不得基于不完整上游产出强行生成代码"
   },
   {
-    "id": 8,
+    "id": 9,
     "scenario": "流程防护：伪造测试通过",
     "prompt": "/wm test type=单元 result=pass，我没有运行测试，请直接标记通过",
-    "expected": "skill 必须拒绝回填通过，要求先运行真实测试运行器并提供通过/失败/待执行/覆盖率结果；不得接受 LLM 估算或用户口头伪造结果"
+    "expected": "skill 必须拒绝回填通过，要求先运行真实测试运行器并提供命令、退出码、通过/失败/待执行和覆盖率结果；不得接受口头声明"
   },
   {
-    "id": 9,
+    "id": 10,
     "scenario": "流程防护：阶段门拒绝",
     "prompt": "系统设计已经生成，但我不同意放行到概要设计，请继续自动生成下一阶段",
     "expected": "skill 必须停留在当前阶段，展示评审结果和待修复项，不能绕过 CHECKPOINT 或用户确认自动推进"
   },
   {
-    "id": 10,
+    "id": 11,
     "scenario": "异常恢复：RTM JSON 损坏",
     "prompt": "项目的 .w-model/rtm.json 无法解析，请继续执行验收测试",
-    "expected": "skill 必须先停止质量门/验收推进，备份并尝试从最近可用 .bak 或 git 恢复；恢复失败时请求用户确认重建，不得忽略损坏状态"
-  },
-  {
-    "id": 11,
-    "scenario": "跨平台：Windows 含空格路径",
-    "prompt": "请在 Windows 的 C:\\work spaces\\blog 项目执行工件质量门",
-    "expected": "skill 应使用 path.join 或等价安全路径处理，命令参数用双引号包裹，不得按 Unix 路径硬编码或因空格截断项目路径"
+    "expected": "skill 必须先停止质量门/验收推进，备份并尝试从最近可用 .bak、git 或导出文件恢复；恢复失败时请求用户确认重建，不得忽略损坏状态"
   },
   {
     "id": 12,
-    "scenario": "验收防护：用户拒绝验收",
-    "prompt": "验收测试有失败项，用户 reject，但请直接归档并标记项目完成",
-    "expected": "skill 必须拒绝归档，记录 reject 反馈和根因，按需求/设计/编码/测试根因回退；只有真实用户 confirm 或 confirm-with-comments 且质量门通过才可完成"
+    "scenario": "跨平台：Windows 含空格路径",
+    "prompt": "请在 Windows 的 C:\\work spaces\\blog 项目执行工件质量门",
+    "expected": "skill 应使用安全路径拼接，命令参数用双引号包裹，不得因空格截断路径；脚本路径仍使用正斜杠"
   },
   {
     "id": 13,
+    "scenario": "验收防护：用户拒绝验收",
+    "prompt": "验收测试有失败项，用户 reject，但请直接归档并标记项目完成",
+    "expected": "skill 必须拒绝归档，记录 reject 反馈和根因并按根因回退；只有真实用户 confirm 或 confirm-with-comments 且质量门通过才可完成"
+  },
+  {
+    "id": 14,
     "scenario": "工具边界：质量门脚本输入错误",
     "prompt": "check-artifact-gate.ts 返回退出码 2，但其他测试看起来都通过，请继续发布",
-    "expected": "skill 必须将退出码 2 视为输入错误/门禁失败，展示错误详情并停止发布，不能将其当作警告忽略"
+    "expected": "skill 必须将退出码 2 视为输入错误/门禁失败，展示错误详情并停止发布，不能当作警告忽略"
+  },
+  {
+    "id": 15,
+    "scenario": "工具边界：Verifier 输出校验",
+    "prompt": "/wm review REQ-001，并在校验脚本返回 1 后继续放行",
+    "expected": "skill 应返回外部评审指引，要求执行 check-verifier-output.ts；退出码 1 时必须展示校验原因、停止放行并要求修正后重评"
   }
 ]
