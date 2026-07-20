@@ -1,0 +1,6 @@
+{
+  "rows": [
+    {"requirementId": "REQ-001", "coverageStatus": "100%"},
+    {"requirementId": "REQ-002", "coverageStatus": "100%"}
+  ]
+}

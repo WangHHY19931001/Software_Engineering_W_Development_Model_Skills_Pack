@@ -5,6 +5,37 @@
 
 ## [Unreleased]
 
+### 大规模 Review 优化（P0-P3 共 18 项）
+
+> 基于全项目 Review 报告，按优先级 P0×3 / P1×4 / P2×6 / P3×5 修复一致性、健壮性与可维护性问题。
+
+#### P0 关键正确性
+
+- 修复 `verifier-spec.md` §4.1/§4.2 字母语义与 §6.1 冲突：统一为 `A=完全达成 / D=完全未达成`，公式改为 `1.00*p_A + 0.67*p_B + 0.33*p_C + 0.00*p_D`
+- 修复 `verifier-logic.ts` ranking.k/rounds 整数性校验缺失：增加 `Number.isInteger()` + 数值边界（k ∈ [2,1000]、temperature ≤ 100、rounds ≥ 1）
+- 修复 `gate-logic.ts` RTM JSON 结构校验缺失：缺 `executionSummary` 时不再抛 TypeError，改为返回结构化 reasons；新增 `rows` / `executionSummary.<type>` / 行对象分层校验
+
+#### P1 一致性
+
+- 统一覆盖率表述：85 处「覆盖率」歧义区分为「单元测试代码覆盖率 ≥ 80%」与「RTM 需求覆盖率 100%」两个独立指标（涉及 SKILL.md / SSoT / phase-5/7/8 / verifier-spec / rtm-guide / quality-standards / templates / examples / scripts）
+- 统一测试用例 ID 命名规则：阶段 6/7/8 执行用例从 `TC-INT/SYS/UAT-*` 改为 `IT/ST/UAT-*` 与 RTM 短形式一致；在 `rtm-guide.md` 增加命名规则章节说明两套 ID 体系（运行时 vs 阶段产物验证）
+- SSoT §6.1 核心命令表列名「返回值」→「产出」
+- `verifier-logic.ts` ranking.k/temperature 增加上界校验（防滥用：MAX_RANKING_K=1000、MAX_TEMPERATURE=100）
+
+#### P2 健壮性与可维护性
+
+- 去重验收检查清单：`SKILL.md` 项目级清单从 12 项压缩为核心 4 项 + 指针，避免与 `phase-8-acceptance-test.md` 重复
+- 处理 `.claude/skills/darwin-skill/` 评估产物：迁移至 `eval/`，`.claude/` 加入 `.gitignore`
+- 增加校验脚本样本测试：新增 `w-model-dev/scripts/samples/`（verifier 7 条 + gate 4 条共 11 条端到端样本）+ `self-test.ts` 自动跑通所有样本作为回归基线
+- 统一 `verifier-spec.md` §8 占位符列表
+- 拆分 `phase-1-requirements.md`「可选：需求形式化」节到独立文件
+- `verifier-logic.ts` `varianceThreshold` 缺失时改为判失败而非警告
+
+#### 验证
+
+- `npx tsx w-model-dev/scripts/self-test.ts` → 11/11 通过
+- `npx tsx w-model-dev/scripts/check-verifier-output.ts <sample.json>` 通过 / 失败路径均符合预期
+
 ### 一致性补全：命令执行规则与示例覆盖
 
 > 全面扫描后发现 SKILL.md（Agent 实际读取的入口）在若干命令执行规则上与 SSoT / README / verifier-spec.md 不一致或不完整，本次补全使 10 个 `/wm` 命令均有可执行规则，并消除文档间不一致。

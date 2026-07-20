@@ -26,7 +26,7 @@ description: >-
 - **技能本身不包含演化机制与轨迹分析**。技能自演化（Rollout / Reflect / Edit / Skill Lift 评估等）由外部工具完成：
   - SkillOpt（微软）：https://github.com/microsoft/SkillOpt
   - darwin-skill：https://github.com/alchaincyf/darwin-skill
-- **需求形式化为可选外部委托**。Phase 1（需求分析）的部分语义工作（结构化提取 / BDD 生成 / 知识图谱 / NFR 标记 / TLA+ / Lean 4）可委托给 [SRS-Formalizer](https://github.com/WangHHY19931001/SRS-Formalizer)（外部技能，Agent 驱动 + 脚本门禁，架构与本技能同源）。委托为 **opt-in**，仅当存在正式 SRS 文档且用户显式启用时触发；TLA+/Lean 仅对并发/状态机/安全合规模块条件触发。权威性约定：RTM 以 `.w-model/rtm.json` 为唯一事实源，SRS-Formalizer 产出的追溯矩阵仅作输入；Phase 1 阶段门放行仍以本技能 `check-verifier-output.ts` 为准，SRS-Formalizer 的 `verify-gate` 仅作内部子门禁。详见 [references/phase-1-requirements.md](references/phase-1-requirements.md)「可选：需求形式化」节。
+- **需求形式化为可选外部委托**。Phase 1（需求分析）的部分语义工作（结构化提取 / BDD 生成 / 知识图谱 / NFR 标记 / TLA+ / Lean 4）可委托给 [SRS-Formalizer](https://github.com/WangHHY19931001/SRS-Formalizer)（外部技能，Agent 驱动 + 脚本门禁，架构与本技能同源）。委托为 **opt-in**，仅当存在正式 SRS 文档且用户显式启用时触发；TLA+/Lean 仅对并发/状态机/安全合规模块条件触发。权威性约定：RTM 以 `.w-model/rtm.json` 为唯一事实源，SRS-Formalizer 产出的追溯矩阵仅作输入；Phase 1 阶段门放行仍以本技能 `check-verifier-output.ts` 为准，SRS-Formalizer 的 `verify-gate` 仅作内部子门禁。详见 [references/phase-1-requirements-formalization.md](references/phase-1-requirements-formalization.md)（[phase-1-requirements.md](references/phase-1-requirements.md)「可选：需求形式化」节有简短指针）。
 - **技能包内的脚本只做门禁**：
   - [scripts/check-artifact-gate.ts](scripts/check-artifact-gate.ts)：工件质量门（RTM 覆盖率 + 四级测试通过）
   - [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts)：外部 Agent 评审输出的结构化校验
@@ -47,26 +47,26 @@ description: >-
 1. **并行原则不可破坏**：进入任一开发阶段时，必须同步启动对应测试类型的设计（见下表），不得将测试设计后置。
 2. **阶段门评审（Stage Gate）**：每个阶段产出必须通过评审后才能进入下一阶段；评审不通过则回到当前阶段起点返工。
 3. **RTM 同步维护**：每次需求或设计变更，必须同步更新需求跟踪矩阵；定期核验需求覆盖率应为 100%。
-4. **质量门**：代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
+4. **质量门**：单元测试代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
 5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
 6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则仅加载当前阶段对应的 `references/phase-N-*.md`，模板从 `templates/` 取用。
 7. **LLM 评审由外部执行**：阶段产物的 LLM-as-a-Verifier 评审不内置；外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 执行，并通过 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 防漂移。
 
 ## 反例与黑名单（不要做什么）
 
-以下反模式均为 W 模型执行中真实高发陷阱，命中任一条即视为流程破坏，必须回退到对应阶段起点：
+W 模型执行中真实高发陷阱共 9 条，命中任一条即视为流程破坏，必须回退到对应阶段起点。完整清单（含危害、正确做法、与门禁脚本的对应关系、命中后处理流程）见 [references/anti-patterns.md](references/anti-patterns.md)。
 
-| # | 反模式（不要做） | 危害 | 正确做法 |
-|---|---|---|---|
-| 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 §2 走完评审 + 🔴 CHECKPOINT 放行 |
-| 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
-| 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，覆盖率/测试通过状态会被编造 | 必须执行 `check-artifact-gate.ts`，以退出码 + GATE_JSON 为准 |
-| 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评 |
-| 5 | 一次性载入全部 `references/` | 上下文污染，阶段聚焦丢失 | 仅加载当前阶段所需 `references/phase-N-*.md` |
-| 6 | 用 LLM 估算 RTM 覆盖率 | 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，覆盖率必须 100% |
-| 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 一律回到编码实现，附 GATE_JSON 详情 |
-| 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
-| 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
+简表（Agent 阶段门评审前扫描）：
+
+1. 跳过阶段门评审直接进入下一阶段
+2. 将测试设计后置到编码之后
+3. 用 LLM 自行"估算"质量门结果
+4. 评审未通过时悄悄小修后继续
+5. 一次性载入全部 `references/`
+6. 用 LLM 估算 RTM 覆盖率
+7. 质量门脚本退出码 1/2 时放行发布
+8. 越过 🔴 CHECKPOINT 自动推进
+9. 谎报阶段状态（未完成标为完成）
 
 ## 阶段与测试并行对应表
 
@@ -83,23 +83,17 @@ description: >-
 
 ## 完整工作流程
 
+总体流程：8 阶段左 V 开发 + 同步右 V 测试设计，每阶段评审通过才进入下一阶段，编码后接入质量门。
+
+详细流程图（含阶段门评审 + 质量门 + 缺陷返工路径）与阶段并行对应表见 [references/workflow.md](references/workflow.md)。
+
+简图：
+
 ```
-需求分析 ──(同步验收测试设计)──► 评审 ──通过──► 系统设计
-                                              │不通过► 回到需求分析
-系统设计 ──(同步系统测试设计)──► 评审 ──通过──► 概要设计
-                                              │不通过► 回到系统设计
-概要设计 ──(同步集成测试设计)──► 评审 ──通过──► 详细设计
-                                              │不通过► 回到概要设计
-详细设计 ──(同步单元测试设计)──► 评审 ──通过──► 编码实现
-                                              │不通过► 回到详细设计
-编码实现 ──(执行单元测试)──────► 代码审查 ──通过──► 集成测试
-                                              │不通过► 回到编码实现
-集成测试 ──(接口验证)──────────► 通过──► 系统测试
-                              │不通过► 回到编码实现
-系统测试 ──(性能/安全测试)─────► 缺陷修复 ──完成──► 验收测试
-                              │需修复► 回到编码实现
-验收测试 ──(用户确认)──────────► 通过──► 项目完成
-                              │不通过► 回到需求分析
+需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码 → 集成测试 → 系统测试 → 验收测试
+   │同步        │同步        │同步        │同步      │执行       │执行       │执行
+   ▼            ▼            ▼            ▼         ▼          ▼          ▼
+验收测试设计  系统测试设计  集成测试设计  单元测试设计  单元测试  集成测试  系统测试  验收测试
 ```
 
 ## 命令接口
@@ -211,7 +205,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 执行步骤：
 
 1. Agent 调用真实的测试运行器执行对应类型的测试（单元 / 集成 / 系统 / 验收）。
-2. 收集真实结果（通过数 / 失败数 / 待执行数 / 覆盖率）。
+2. 收集真实结果（通过数 / 失败数 / 待执行数 / 单元测试代码覆盖率，仅单元测试必填）。
 3. 通过 `/wm test type=<类型> result=<pass|fail>` 回填：
    - `result=pass`：将该类型所有用例状态置为「通过」，更新 `executionSummary.<type>Test` 的 `passed` / `failed` / `pending`。
    - `result=fail`：将失败用例状态置为「失败」，并要求 Agent 定位根因、关联到模块，回到编码实现返工。
@@ -297,18 +291,12 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 
 ## 验收检查清单（项目级）
 
-- [ ] 需求规格说明书完整
-- [ ] 设计文档完整且符合规范
-- [ ] 代码实现完成且通过编译
-- [ ] 单元测试覆盖率 ≥ 80%
-- [ ] 集成测试全部通过
-- [ ] 系统测试全部通过
-- [ ] 安全测试无高危漏洞
-- [ ] 性能测试达标
-- [ ] 验收测试通过
-- [ ] 用户确认签字
-- [ ] 交付文档齐全
-- [ ] RTM 覆盖率 100%
+核心放行条件（详见 [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md)「项目级验收检查清单」）：
+
+- [ ] 四级测试（单元 / 集成 / 系统 / 验收）全部通过
+- [ ] 单元测试代码覆盖率 ≥ 80%
+- [ ] RTM 需求覆盖率 100%（`check-artifact-gate.ts` 退出码 0）
+- [ ] 用户确认签字 + 交付文档齐全
 
 ## 文件清单
 
@@ -322,6 +310,7 @@ w-model-dev/
 │   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
 ├── references/                    # 阶段细则与规范（仅当前阶段加载）
 │   ├── phase-1-requirements.md
+│   ├── phase-1-requirements-formalization.md  #   Phase 1 可选增强（SRS-Formalizer 委托）
 │   ├── phase-2-system-design.md
 │   ├── phase-3-outline-design.md
 │   ├── phase-4-detailed-design.md
@@ -329,6 +318,8 @@ w-model-dev/
 │   ├── phase-6-integration-test.md
 │   ├── phase-7-system-test.md
 │   ├── phase-8-acceptance-test.md
+│   ├── anti-patterns.md           #   反例与黑名单（9 条高发陷阱）
+│   ├── workflow.md                #   完整工作流程（流程图 + 阶段并行表）
 │   ├── data-models.md
 │   ├── rtm-guide.md
 │   ├── quality-standards.md

@@ -1,0 +1,106 @@
+# W-Model Skill CI
+#
+# 目的：在 PR / push 时自动跑校验脚本回归基线，防止 w-model-dev/scripts/*.ts 与
+# samples/ 漂移。本仓库不构建产物、不发布 npm 包，CI 仅做「校验脚本可用性」守护。
+#
+# 触发：push 到 main / pull_request 到 main；支持手动 workflow_dispatch。
+# 节省额度：只在 w-model-dev/scripts/、package.json、.github/workflows/ 变更时跑。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'w-model-dev/scripts/**'
+      - 'package.json'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'w-model-dev/scripts/**'
+      - 'package.json'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-test:
+    name: 校验脚本自检（self-test）
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 安装开发依赖（仅 tsx）
+        run: npm install --no-audit --no-fund
+
+      - name: 运行 self-test（samples/ 11 条样本回归基线）
+        run: npm run self-test
+
+  cli-smoke:
+    name: CLI 入口冒烟（exit code 守护）
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 安装开发依赖（仅 tsx）
+        run: npm install --no-audit --no-fund
+
+      - name: check-verifier-output 无参数应退出 2（输入错误）
+        run: |
+          set +e
+          npm run check:verifier > /tmp/out.log 2>&1
+          code=$?
+          cat /tmp/out.log
+          if [ "$code" -ne 2 ]; then
+            echo "✗ 期望 exit code 2（输入错误），实际 $code"
+            exit 1
+          fi
+          echo "✓ 退出码 2 符合预期"
+
+      - name: check-artifact-gate 在无 .w-model 目录时应退出 2
+        run: |
+          set +e
+          npm run check:gate -- /tmp/nonexistent > /tmp/out.log 2>&1
+          code=$?
+          cat /tmp/out.log
+          if [ "$code" -ne 2 ]; then
+            echo "✗ 期望 exit code 2（输入错误），实际 $code"
+            exit 1
+          fi
+          echo "✓ 退出码 2 符合预期"
+
+      - name: check-verifier-output 对有效样本应退出 0
+        run: npm run check:verifier -- w-model-dev/scripts/samples/verifier/valid.json
+
+      - name: check-verifier-output 对无效样本应退出 1
+        run: |
+          set +e
+          npm run check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json > /tmp/out.log 2>&1
+          code=$?
+          cat /tmp/out.log
+          if [ "$code" -ne 1 ]; then
+            echo "✗ 期望 exit code 1（校验失败），实际 $code"
+            exit 1
+          fi
+          echo "✓ 退出码 1 符合预期"

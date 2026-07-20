@@ -1,0 +1,19 @@
+{
+  "name": "w-model-dev-skill",
+  "version": "0.4.0",
+  "private": true,
+  "description": "W-Model AI Assistant Skill — 编排 + 校验脚本技能包（提示词 + 模板 + 自包含门禁脚本，不内置 LLM 调用）",
+  "type": "module",
+  "scripts": {
+    "self-test": "tsx w-model-dev/scripts/self-test.ts",
+    "check:verifier": "tsx w-model-dev/scripts/check-verifier-output.ts",
+    "check:gate": "tsx w-model-dev/scripts/check-artifact-gate.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
