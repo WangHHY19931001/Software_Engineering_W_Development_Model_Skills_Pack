@@ -1,0 +1,11 @@
+{
+  "rows": [
+    {"requirementId":"REQ-001","description":"用户注册","designDoc":"SD-001","codeModule":"src/user.ts","unitTest":"UT-001","integrationTest":"IT-001","systemTest":"ST-001","acceptanceTest":"UAT-001","coverageStatus":"100%"}
+  ],
+  "executionSummary": {
+    "unitTest":{"total":10,"passed":10,"failed":0,"pending":0,"coverage":79},
+    "integrationTest":{"total":8,"passed":8,"failed":0,"pending":0,"coverage":100},
+    "systemTest":{"total":12,"passed":12,"failed":0,"pending":0,"coverage":100},
+    "acceptanceTest":{"total":5,"passed":5,"failed":0,"pending":0,"coverage":100}
+  }
+}

@@ -1,6 +1,5 @@
 {
   "rows": [
-    {"requirementId": "REQ-001", "coverageStatus": "100%"},
-    {"requirementId": "REQ-002", "coverageStatus": "100%"}
+    {"requirementId":"REQ-001","description":"用户注册","designDoc":"SD-001","codeModule":"src/user.ts","unitTest":"UT-001","integrationTest":"IT-001","systemTest":"ST-001","acceptanceTest":"UAT-001","coverageStatus":"100%"}
   ]
 }

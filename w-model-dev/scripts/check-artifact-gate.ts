@@ -66,6 +66,7 @@ async function main(): Promise<void> {
   console.log(`项目目录      : ${projectDir}`);
   console.log(`RTM 文件      : ${rtmFile}`);
   console.log(`RTM 覆盖率    : ${result.coveragePercent}%`);
+  console.log(`单元覆盖率    : ${result.unitCoveragePercent}%`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -84,6 +85,8 @@ async function main(): Promise<void> {
     type: 'artifact',
     passed: result.passed,
     coveragePercent: result.coveragePercent,
+    unitCoveragePercent: result.unitCoveragePercent,
+    missingItems: result.missingItems,
     reasons: result.reasons,
   }));
 

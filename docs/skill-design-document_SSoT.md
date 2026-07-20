@@ -111,9 +111,9 @@ graph TD
 
 > **去重约定**：本节只描述各核心模块的**设计层面边界**（功能、输入输出、AI 能力应用）。
 > 各模块的详细阶段产物、测试用例设计表、验收标准清单、RTM 登记规则、阶段门评审等内容
-> 由 [`w-model-dev/references/phase-N-*.md`](../../w-model-dev/references/) 各阶段文档维护，
+> 由 [`w-model-dev/references/phase-N-*.md`](../w-model-dev/references/) 各阶段文档维护，
 > 本节不再重复，仅以指针引用。测试用例 ID 命名规则（`UT/IT/ST/UAT-NNN` 运行时用例 vs
-> `TC-<PHASE>-NNN` 阶段产物验证用例）见 [`rtm-guide.md`](../../w-model-dev/references/rtm-guide.md)。
+> `TC-<PHASE>-NNN` 阶段产物验证用例）见 [`rtm-guide.md`](../w-model-dev/references/rtm-guide.md)。
 
 #### 3.2.1 需求分析模块
 
@@ -135,8 +135,8 @@ graph TD
 - 验收测试用例自动生成
 
 > 详细阶段产物、测试用例设计表（TC-REQ-001~005）、验收标准、可选 SRS-Formalizer 委托：
-> 见 [`phase-1-requirements.md`](../../w-model-dev/references/phase-1-requirements.md) 与
-> [`phase-1-requirements-formalization.md`](../../w-model-dev/references/phase-1-requirements-formalization.md)。
+> 见 [`phase-1-requirements.md`](../w-model-dev/references/phase-1-requirements.md) 与
+> [`phase-1-requirements-formalization.md`](../w-model-dev/references/phase-1-requirements-formalization.md)。
 
 #### 3.2.2 设计阶段模块
 
@@ -154,9 +154,9 @@ graph TD
 - 测试用例设计
 
 > 详细阶段产物、测试用例设计表（TC-DES-001~006）、验收标准：
-> 见 [`phase-2-system-design.md`](../../w-model-dev/references/phase-2-system-design.md) /
-> [`phase-3-outline-design.md`](../../w-model-dev/references/phase-3-outline-design.md) /
-> [`phase-4-detailed-design.md`](../../w-model-dev/references/phase-4-detailed-design.md)。
+> 见 [`phase-2-system-design.md`](../w-model-dev/references/phase-2-system-design.md) /
+> [`phase-3-outline-design.md`](../w-model-dev/references/phase-3-outline-design.md) /
+> [`phase-4-detailed-design.md`](../w-model-dev/references/phase-4-detailed-design.md)。
 
 #### 3.2.3 编码与单元测试模块
 
@@ -178,7 +178,7 @@ graph TD
 - 测试执行与报告生成
 
 > 详细阶段产物、测试用例设计表（TC-COD-001~005）、验收标准（含单元测试代码覆盖率 ≥ 80%）：
-> 见 [`phase-5-coding.md`](../../w-model-dev/references/phase-5-coding.md)。
+> 见 [`phase-5-coding.md`](../w-model-dev/references/phase-5-coding.md)。
 
 #### 3.2.4 集成测试模块
 
@@ -198,7 +198,7 @@ graph TD
 - 测试结果分析
 
 > 详细阶段产物、运行时测试用例（IT-001~005）、验收标准：
-> 见 [`phase-6-integration-test.md`](../../w-model-dev/references/phase-6-integration-test.md)。
+> 见 [`phase-6-integration-test.md`](../w-model-dev/references/phase-6-integration-test.md)。
 
 #### 3.2.5 系统测试模块
 
@@ -219,7 +219,7 @@ graph TD
 - 安全漏洞检测
 
 > 详细阶段产物、运行时测试用例（ST-001~005）、验收标准：
-> 见 [`phase-7-system-test.md`](../../w-model-dev/references/phase-7-system-test.md)。
+> 见 [`phase-7-system-test.md`](../w-model-dev/references/phase-7-system-test.md)。
 
 #### 3.2.6 验收测试模块
 
@@ -238,7 +238,7 @@ graph TD
 - 用户需求匹配验证
 
 > 详细阶段产物、运行时测试用例（UAT-001~004）、验收标准、项目级验收检查清单：
-> 见 [`phase-8-acceptance-test.md`](../../w-model-dev/references/phase-8-acceptance-test.md)。
+> 见 [`phase-8-acceptance-test.md`](../w-model-dev/references/phase-8-acceptance-test.md)。
 
 ### 3.3 技能架构原则与外部工具边界（重要）
 

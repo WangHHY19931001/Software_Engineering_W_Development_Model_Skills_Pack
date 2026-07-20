@@ -15,7 +15,8 @@
 ## 输出
 
 - 验收测试报告（套用 [templates/test-report.md](../templates/test-report.md)，类型=验收测试）
-- 用户确认结果（载体：在 `.w-model/rtm.md` 的「用户签字」列填入 `confirm` / `confirm-with-comments` / `reject`，或通过 `/wm sign` 命令提交确认状态）
+- 用户确认结果：在验收测试报告的「用户确认」区记录 `confirm` / `confirm-with-comments` / `reject`；不得使用未定义的 `/wm sign` 命令。
+- `.w-model/rtm.json` 是 RTM 唯一事实源；Markdown RTM 仅用于导出或展示。
 
 ## AI 能力应用
 
@@ -90,7 +91,7 @@
 >
 > **🔴 CHECKPOINT-C · 执行后（项目级放行）**
 >
-> 验收测试全部执行完成后暂停。Agent 必须向用户逐条展示「项目级验收检查清单 12 项核验结果 / RTM 覆盖率 / 四级测试汇总 / 用户确认请求」，由用户在 RTM 签字列填入 `confirm` 或 `confirm-with-comments` 才能归档。RTM 覆盖率 < 100% 或四级测试任一未通过 → 一律不得请求用户确认，必须回对应阶段返工。
+> 验收测试全部执行完成后暂停。Agent 必须逐条展示项目级检查清单、RTM 覆盖率、四级测试汇总，并请求真实用户在验收测试报告的「用户确认」区记录 `confirm` 或 `confirm-with-comments`。RTM 覆盖率 < 100% 或四级测试任一未通过时不得请求确认，必须回对应阶段返工。`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown 仅用于导出或展示。Agent 不得代签，也不得通过未定义的 `/wm sign` 命令代替用户确认。
 
 ## 阶段门评审
 
@@ -141,4 +142,4 @@
 
 ## 退出状态
 
-项目完成，归档全部文档与 RTM。
+产物完成但尚未通过阶段门时，保持项目当前 `status` 不变。只有阶段门评审通过且用户确认放行后，才将 `status` 更新为「项目完成」。

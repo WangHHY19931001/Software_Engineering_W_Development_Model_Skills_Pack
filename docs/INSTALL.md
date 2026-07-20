@@ -22,23 +22,28 @@
 ## 2. 前置条件
 
 - 一个支持「Skill 目录 + YAML frontmatter」机制的 AI Agent（如 Trae）
-- Agent 具备基础文件操作工具（Read / Write / Edit / Glob / Grep）与 Bash 执行能力（运行校验脚本）
-- 运行校验脚本时本地具备 [tsx](https://tsx.is/)（`npm i -g tsx` 或通过 `npx tsx` 按需拉取）
+- Agent 具备基础文件操作工具与可执行 Node/tsx 的 shell（PowerShell、Bash 等）
+- **仅运行门禁脚本时**需要 Node.js ≥20，以及 [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
 
-技能资产本身是纯 Markdown + 自包含 TypeScript 校验脚本，无需 Node.js 项目、`npm install` 或任何运行时依赖。
+纯 Markdown 技能资产无需 Node.js 或 `npm install`；Node.js/tsx 只用于执行 `scripts/*.ts` 的确定性门禁。
 
 ---
 
 ## 3. 标准安装步骤
 
-```bash
-# 1. 定位你的 Agent 的 skills 目录（路径以具体 Agent 文档为准）
-#    Trae 示例：~/.trae/skills/
-#    通用示例：/path/to/agent/skills/
+### Bash / macOS / Linux
 
-# 2. 拷贝 skill 目录（注意：拷贝的是 w-model-dev 目录本身，保持其内部结构）
-cp -r w-model-dev /path/to/agent/skills/w-model-dev
+```bash
+cp -r "w-model-dev" "/path/to/agent/skills/w-model-dev"
 ```
+
+### PowerShell / Windows
+
+```powershell
+Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-dev"
+```
+
+目标 skills 路径以具体 Agent 文档为准；路径包含空格时始终使用引号。
 
 安装后的目录结构应为：
 
@@ -82,8 +87,15 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 确认 Agent 能运行门禁脚本（需本地 `tsx`）：
 
 ```bash
-npx tsx w-model-dev/scripts/check-verifier-output.ts --help 2>&1 | head -1
-# 预期：脚本可执行，提示用法（无依赖错误）
+npx tsx "w-model-dev/scripts/check-verifier-output.ts"
+# 预期退出码 2，并输出用法；这同时证明脚本可执行且无依赖错误
+```
+
+PowerShell：
+
+```powershell
+npx tsx "w-model-dev/scripts/check-verifier-output.ts"
+$LASTEXITCODE  # 预期为 2
 ```
 
 ---
@@ -117,8 +129,16 @@ description: >
 
 删除 skills 目录下的 `w-model-dev/` 即可：
 
+Bash：
+
 ```bash
-rm -rf /path/to/agent/skills/w-model-dev
+rm -rf "/path/to/agent/skills/w-model-dev"
+```
+
+PowerShell：
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 ```
 
 ---

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {"targetKind":"requirement","target":"REQ-001","reviewedAt":"2026-07-19T00:00:00Z","agent":"test-agent","scoringMethod":"logits","repeatTimes":3,"varianceThreshold":0.10},
+  "subCriteria": [
+    {"name":"completeness","weight":0.30,"score":0.90,"rawScores":[0.90,0.90,0.90],"variance":0,"evidence":"REQ-001"},
+    {"name":"clarity","weight":0.25,"score":0.85,"rawScores":[0.85,0.85,0.85],"variance":0,"evidence":"REQ-001"},
+    {"name":"consistency","weight":0.20,"score":0.88,"rawScores":[0.88,0.88,0.88],"variance":0,"evidence":"REQ-001"},
+    {"name":"testability","weight":0.15,"score":0.80,"rawScores":[0.80,0.80,0.80],"variance":0,"evidence":"REQ-001"},
+    {"name":"traceability","weight":0.10,"score":0.95,"rawScores":[0.95,0.95,0.95],"variance":0,"evidence":"REQ-001"}
+  ],
+  "compositeScore":0.8735,"qualityLevel":"A","summary":"valid","passed":true,
+  "ranking":{"algorithm":"PPT","k":2,"temperature":4,"rounds":1,"ordered":["A","A"]}
+}

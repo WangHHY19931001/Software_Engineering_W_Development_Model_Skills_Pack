@@ -111,7 +111,7 @@ const EPSILON = 1e-4;
 /** variance 字段与重算方差的允许误差（浮点比较） */
 const VARIANCE_EPSILON = 1e-4;
 const MIN_REPEAT_TIMES = 3;
-const DEFAULT_VARIANCE_THRESHOLD = 0.10;
+const MAX_VARIANCE_THRESHOLD = 0.10;
 const SCHEMA_VERSION = '1.0';
 
 /** ranking 字段边界（spec §5.1 默认 k=5 / temperature=4.0，此处给出合理性上界防滥用） */
@@ -126,7 +126,11 @@ function isNumber(x: unknown): x is number {
 }
 
 function inRange(x: number, lo: number, hi: number, inclusive = true): boolean {
-  return inclusive ? x >= lo && x <= hi : x > lo && x < hi;
+  return Number.isFinite(x) && (inclusive ? x >= lo && x <= hi : x > lo && x < hi);
+}
+
+function isIso8601(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Date.parse(value));
 }
 
 /**
@@ -225,8 +229,8 @@ export function checkVerifierOutput(
   if (typeof meta.target !== 'string' || meta.target.trim() === '') {
     reasons.push('meta.target 必须为非空字符串');
   }
-  if (typeof meta.reviewedAt !== 'string' || meta.reviewedAt.trim() === '') {
-    reasons.push('meta.reviewedAt 必须为非空 ISO 8601 字符串');
+  if (!isIso8601(meta.reviewedAt)) {
+    reasons.push('meta.reviewedAt 必须为有效 ISO 8601 时间');
   }
   if (typeof meta.agent !== 'string' || meta.agent.trim() === '') {
     reasons.push('meta.agent 必须为非空字符串');
@@ -244,9 +248,9 @@ export function checkVerifierOutput(
 
   const varianceThreshold = isNumber(meta.varianceThreshold)
     ? meta.varianceThreshold
-    : DEFAULT_VARIANCE_THRESHOLD;
-  if (!isNumber(meta.varianceThreshold)) {
-    reasons.push(`meta.varianceThreshold 必须为数字（spec §6 meta 必填字段），实际为 ${JSON.stringify(meta.varianceThreshold)}`);
+    : Number.NaN;
+  if (!inRange(varianceThreshold, 0, MAX_VARIANCE_THRESHOLD)) {
+    reasons.push(`meta.varianceThreshold 必须在 [0,${MAX_VARIANCE_THRESHOLD}] 范围内，实际为 ${JSON.stringify(meta.varianceThreshold)}`);
   }
 
   // 3. subCriteria
@@ -309,9 +313,9 @@ export function checkVerifierOutput(
     // 防漂移：重算 rawScores 方差并与 variance 字段对比。
     // 防止 Agent 谎报低方差以掩盖「实际只评估 1 次、复制 N 次」的作弊。
     if (Array.isArray(sc.rawScores) && sc.rawScores.length >= 2 && isNumber(sc.variance)) {
-      const recomputed = computeVariance(
-        sc.rawScores.filter(isNumber) as number[],
-      );
+      const numericScores = sc.rawScores.filter(isNumber) as number[];
+      if (numericScores.length === sc.rawScores.length && numericScores.length >= 2 && isNumber(sc.variance)) {
+        const recomputed = computeVariance(numericScores);
       if (Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
         reasons.push(
           `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
@@ -412,6 +416,18 @@ export function checkVerifierOutput(
       }
       if (!Array.isArray(r.ordered) || r.ordered.length < 2) {
         reasons.push('ranking.ordered 必须为长度 ≥2 的字符串数组');
+      } else {
+        const ordered = r.ordered as unknown[];
+        if (ordered.some(item => typeof item !== 'string' || item.trim() === '')) {
+          reasons.push('ranking.ordered 的每项必须为非空字符串');
+        }
+        const unique = new Set(ordered.filter((item): item is string => typeof item === 'string'));
+        if (unique.size !== ordered.length) {
+          reasons.push('ranking.ordered 不得包含重复候选项');
+        }
+        if (isNumber(r.k) && Number.isInteger(r.k) && r.k > ordered.length) {
+          reasons.push(`ranking.k ${r.k} 不得大于候选项数量 ${ordered.length}`);
+        }
       }
     }
   }

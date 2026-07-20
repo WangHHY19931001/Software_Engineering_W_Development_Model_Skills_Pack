@@ -62,7 +62,8 @@
 - [ ] 系统测试全部通过
 - [ ] 安全检测无高危漏洞（`npm audit --audit-level=high` 退出码 0）
 - [ ] 性能指标达标（P95 响应 < 2s，高负载无崩溃）
-- [ ] RTM 覆盖率 100%（`check-artifact-gate.ts` 退出码 0）
+- [ ] RTM 需求覆盖率 100%（按 `.w-model/rtm.json` 的 7 个追溯字段重算，`check-artifact-gate.ts` 退出码 0）
+- [ ] 单元测试汇总计数守恒（`passed + failed + pending = total`）且代码覆盖率 ≥ 80%
 - [ ] 交付文档齐全且一致（对照 templates/ 8 个模板）
 
 任一条件不满足，回到编码实现返工。

@@ -1,33 +1,17 @@
-/**
- * 门禁校验纯逻辑（Gate Logic）—— 技能包内门禁脚本的单点事实源
- *
- * 对应 SSoT §10.5「工件质量门」：
- *   - checkArtifactGate：工件质量门（RTM 覆盖率 100% 且四级测试全部通过）
- *
- * 设计原则：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块，
- *      保证技能包（w-model-dev/）可独立分发给 TRAE / Claude 等 Agent。
- *   2. 纯函数：无 I/O、无副作用，便于测试与复用。
- *   3. 单点事实：所有「工件质量门是否通过」的判定均委托至此，避免逻辑漂移。
- *
- * 调用方：
- *   - CLI 脚本 check-artifact-gate.ts（供 Agent 直接执行）
- *
- * 注意：技能演化（SkillOpt / darwin-skill）相关的「技能验证门」已从技能包中移除。
- * 技能本身不再包含演化机制与轨迹分析，演化由外部工具完成：
- *   - skillopt（微软 SkillOpt）
- *   - https://github.com/alchaincyf/darwin-skill
- */
-
-// ==================== 自包含类型形状 ====================
-//
-// 刻意只保留门禁判定所需字段。
+export interface RTMRowShape {
+  requirementId: string;
+  description: string;
+  designDoc: string;
+  codeModule: string;
+  unitTest: string;
+  integrationTest: string;
+  systemTest: string;
+  acceptanceTest: string;
+  coverageStatus?: '100%' | '部分' | '待覆盖';
+}
 
 export interface RTMMatrixShape {
-  rows: Array<{
-    requirementId: string;
-    coverageStatus: '100%' | '部分' | '待覆盖';
-  }>;
+  rows: RTMRowShape[];
   executionSummary: {
     unitTest: TestSummaryShape;
     integrationTest: TestSummaryShape;
@@ -44,109 +28,118 @@ export interface TestSummaryShape {
   coverage: number;
 }
 
-// ==================== 工件质量门（Artifact Gate） ====================
-
 export interface ArtifactGateResult {
   passed: boolean;
   reasons: string[];
-  /** 整体 RTM 覆盖率（需求维度，0-100） */
   coveragePercent: number;
+  missingItems: Array<{ requirementId: string; fields: string[] }>;
+  unitCoveragePercent: number;
 }
 
-/**
- * 工件质量门：RTM 覆盖率 100% 且四级测试（单元 / 集成 / 系统 / 验收）全部通过。
- *
- * 判定规则（与 SSoT §10.5 一致）：
- *   - 覆盖率 < 100% → 失败，reason 记录当前覆盖率
- *   - 任一测试类型 total=0 → 失败（无用例）
- *   - 任一测试类型 failed>0 → 失败
- *   - 任一测试类型 pending>0 → 失败（存在待执行用例）
- *   - 全部满足 → 通过
- *
- * 结构校验：若 RTM JSON 缺字段（如 executionSummary.unitTest 缺失），
- * 返回结构化 reasons 而非抛 TypeError，便于 Agent 解析。
- *
- * 关键约束（SSoT §10.5）：本门禁的有效性依赖 `/wm test` 真实回填结果，
- * 不得自动标记测试通过。
- */
+const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [
+  'description',
+  'designDoc',
+  'codeModule',
+  'unitTest',
+  'integrationTest',
+  'systemTest',
+  'acceptanceTest',
+];
+
+function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
+  return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
+}
+
+function isFiniteNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && Number.isFinite(value) && value >= 0;
+}
+
 export function checkArtifactGate(
   matrix: RTMMatrixShape | null | undefined,
 ): ArtifactGateResult {
-  if (!matrix) {
-    return { passed: false, reasons: ['RTM 未初始化'], coveragePercent: 0 };
-  }
+  if (!matrix) return failureResult(['RTM 未初始化']);
 
   const reasons: string[] = [];
-
-  // ===== 结构校验（防止 JSON.parse 合法但缺字段时抛 TypeError） =====
-  if (!Array.isArray(matrix.rows)) {
-    reasons.push('RTM 结构错误：rows 字段缺失或非数组');
-  }
+  if (!Array.isArray(matrix.rows)) reasons.push('RTM 结构错误：rows 字段缺失或非数组');
   if (!matrix.executionSummary || typeof matrix.executionSummary !== 'object') {
     reasons.push('RTM 结构错误：executionSummary 字段缺失或非对象');
   }
+  if (reasons.length > 0) return failureResult(reasons);
 
-  // 提前返回，避免后续访问 undefined 属性抛 TypeError
-  if (reasons.length > 0) {
-    return { passed: false, reasons, coveragePercent: 0 };
-  }
-
-  // 四级测试汇总字段结构校验
-  const requiredTestTypes: Array<{ key: keyof typeof matrix.executionSummary; name: string }> = [
+  const requiredTestTypes: Array<{ key: keyof RTMMatrixShape['executionSummary']; name: string }> = [
     { key: 'unitTest', name: '单元测试' },
     { key: 'integrationTest', name: '集成测试' },
     { key: 'systemTest', name: '系统测试' },
     { key: 'acceptanceTest', name: '验收测试' },
   ];
+  const summaries: Array<{ name: string; summary: TestSummaryShape | undefined }> = [];
 
   for (const { key, name } of requiredTestTypes) {
-    const s = matrix.executionSummary[key];
-    if (!s || typeof s !== 'object') {
+    const summary = matrix.executionSummary[key];
+    if (!summary || typeof summary !== 'object') {
       reasons.push(`RTM 结构错误：executionSummary.${key}（${name}汇总）缺失或非对象`);
     }
+    summaries.push({ name, summary });
   }
 
-  // 行结构校验
-  if (Array.isArray(matrix.rows)) {
-    for (let i = 0; i < matrix.rows.length; i++) {
-      const r = matrix.rows[i];
-      if (!r || typeof r !== 'object') {
-        reasons.push(`RTM 结构错误：rows[${i}] 非对象`);
-      }
+  const missingItems: Array<{ requirementId: string; fields: string[] }> = [];
+  const ids = new Set<string>();
+  for (let index = 0; index < matrix.rows.length; index++) {
+    const row = matrix.rows[index];
+    if (!row || typeof row !== 'object') {
+      reasons.push(`RTM 结构错误：rows[${index}] 非对象`);
+      continue;
+    }
+    if (typeof row.requirementId !== 'string' || row.requirementId.trim() === '') {
+      reasons.push(`RTM 结构错误：rows[${index}].requirementId 必须为非空字符串`);
+      continue;
+    }
+    if (ids.has(row.requirementId)) {
+      reasons.push(`RTM 结构错误：需求 ID 重复（${row.requirementId}）`);
+    }
+    ids.add(row.requirementId);
+    const missing = REQUIRED_TRACE_FIELDS.filter(field => typeof row[field] !== 'string' || row[field].trim() === '');
+    if (missing.length > 0) missingItems.push({ requirementId: row.requirementId, fields: missing });
+  }
+
+  for (const item of missingItems) {
+    reasons.push(`RTM 追溯不完整：${item.requirementId} 缺少 ${item.fields.join('、')}`);
+  }
+
+  const totalRows = matrix.rows.length;
+  const coveredRows = totalRows - missingItems.length;
+  const coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
+  if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
+  if (totalRows === 0) reasons.push('RTM 无需求行');
+
+  let unitCoveragePercent = 0;
+  for (const { name, summary } of summaries) {
+    if (!summary || typeof summary !== 'object') continue;
+    const values = [summary.total, summary.passed, summary.failed, summary.pending];
+    if (!values.every(isFiniteNonNegativeInteger)) {
+      reasons.push(`${name}: total/passed/failed/pending 必须为非负整数`);
+      continue;
+    }
+    if (summary.passed + summary.failed + summary.pending !== summary.total) {
+      reasons.push(`${name}: passed + failed + pending 必须等于 total`);
+    }
+    if (summary.total === 0) reasons.push(`${name}: 无用例`);
+    if (summary.failed > 0) reasons.push(`${name}: ${summary.failed} 个失败`);
+    if (summary.pending > 0) reasons.push(`${name}: ${summary.pending} 个待执行`);
+    if (typeof summary.coverage !== 'number' || !Number.isFinite(summary.coverage) || summary.coverage < 0 || summary.coverage > 100) {
+      reasons.push(`${name}: coverage 必须为 [0,100] 范围内的有限数字`);
+    }
+    if (name === '单元测试' && typeof summary.coverage === 'number' && Number.isFinite(summary.coverage)) {
+      unitCoveragePercent = summary.coverage;
+      if (summary.coverage < 80) reasons.push(`单元测试代码覆盖率未达 80%（当前 ${summary.coverage}%）`);
     }
   }
 
-  // 结构有问题则提前返回（后续访问 s.total / r.coverageStatus 可能出错）
-  if (reasons.length > 0) {
-    return { passed: false, reasons, coveragePercent: 0 };
-  }
-
-  // ===== 覆盖率（需求维度） =====
-  const total = matrix.rows.length;
-  const covered = matrix.rows.filter(r => r.coverageStatus === '100%').length;
-  const coveragePercent = total > 0 ? Math.round((covered / total) * 100) : 0;
-
-  if (coveragePercent < 100) {
-    reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
-  }
-
-  // ===== 四级测试执行状态 =====
-  const types: Array<{ name: string; s: TestSummaryShape }> = [
-    { name: '单元测试', s: matrix.executionSummary.unitTest },
-    { name: '集成测试', s: matrix.executionSummary.integrationTest },
-    { name: '系统测试', s: matrix.executionSummary.systemTest },
-    { name: '验收测试', s: matrix.executionSummary.acceptanceTest },
-  ];
-
-  for (const { name, s } of types) {
-    if (s.total === 0) {
-      reasons.push(`${name}: 无用例`);
-    } else if (s.failed > 0) {
-      reasons.push(`${name}: ${s.failed} 个失败`);
-    } else if (s.pending > 0) {
-      reasons.push(`${name}: ${s.pending} 个待执行`);
-    }
-  }
-
-  return { passed: reasons.length === 0, reasons, coveragePercent };
+  return {
+    passed: reasons.length === 0,
+    reasons,
+    coveragePercent,
+    missingItems,
+    unitCoveragePercent,
+  };
 }

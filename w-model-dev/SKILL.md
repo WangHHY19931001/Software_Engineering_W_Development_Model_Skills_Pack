@@ -1,15 +1,13 @@
 ---
 name: w-model-dev
 description: >-
-  Drive the full W-model (W开发模型) software development lifecycle with parallel
-  development and test design. Use when the user wants to run requirements analysis,
-  system/outline/detailed design, coding with unit tests, integration testing,
-  system testing, or acceptance testing as a closed-loop W-model workflow; when
-  the user invokes /wm commands (analyze, design, code, test, review, status,
-  help, reset, export, import); when building software that needs synchronized
-  test design alongside each development stage with requirements traceability;
-  or when user mentions "W模型", "W开发模型", "W-model", "开发与测试并行",
-  "需求跟踪", "RTM", "阶段门评审", "质量门", "LLM-as-a-Verifier".
+  Use only when the user explicitly invokes a /wm command, mentions the W model
+  (W模型 / W开发模型 / W-model), or explicitly requests a closed-loop workflow
+  with development and testing in parallel, requirements traceability (RTM),
+  or stage/quality gates. Do not activate for ordinary standalone requirements,
+  coding, testing, or design requests unless the user also requests this W-model
+  workflow. Supports /wm analyze, design, code, test, review, status, help, reset,
+  export, and import.
 ---
 
 # W-Model AI Assistant Skill

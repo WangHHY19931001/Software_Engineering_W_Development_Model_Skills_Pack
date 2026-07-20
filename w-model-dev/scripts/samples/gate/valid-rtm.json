@@ -1,13 +1,13 @@
 {
   "rows": [
-    {"requirementId": "REQ-001", "coverageStatus": "100%"},
-    {"requirementId": "REQ-002", "coverageStatus": "100%"},
-    {"requirementId": "REQ-003", "coverageStatus": "100%"}
+    {"requirementId":"REQ-001","description":"用户注册","designDoc":"SD-001","codeModule":"src/user.ts","unitTest":"UT-001","integrationTest":"IT-001","systemTest":"ST-001","acceptanceTest":"UAT-001","coverageStatus":"100%"},
+    {"requirementId":"REQ-002","description":"用户登录","designDoc":"SD-002","codeModule":"src/auth.ts","unitTest":"UT-002","integrationTest":"IT-002","systemTest":"ST-002","acceptanceTest":"UAT-002","coverageStatus":"100%"},
+    {"requirementId":"REQ-003","description":"文章浏览","designDoc":"SD-003","codeModule":"src/article.ts","unitTest":"UT-003","integrationTest":"IT-003","systemTest":"ST-003","acceptanceTest":"UAT-003","coverageStatus":"100%"}
   ],
   "executionSummary": {
-    "unitTest": {"total": 18, "passed": 18, "failed": 0, "pending": 0, "coverage": 92},
-    "integrationTest": {"total": 8, "passed": 8, "failed": 0, "pending": 0, "coverage": 100},
-    "systemTest": {"total": 12, "passed": 12, "failed": 0, "pending": 0, "coverage": 100},
-    "acceptanceTest": {"total": 5, "passed": 5, "failed": 0, "pending": 0, "coverage": 100}
+    "unitTest":{"total":18,"passed":18,"failed":0,"pending":0,"coverage":92},
+    "integrationTest":{"total":8,"passed":8,"failed":0,"pending":0,"coverage":100},
+    "systemTest":{"total":12,"passed":12,"failed":0,"pending":0,"coverage":100},
+    "acceptanceTest":{"total":5,"passed":5,"failed":0,"pending":0,"coverage":100}
   }
 }

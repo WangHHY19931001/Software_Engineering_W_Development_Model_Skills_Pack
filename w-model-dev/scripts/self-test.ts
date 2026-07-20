@@ -91,6 +91,24 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/passed.*与 qualityLevel.*不一致/],
     description: 'passed=true 与 qualityLevel=D 不一致',
   },
+  {
+    file: 'bad-reviewed-at.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/reviewedAt 必须为有效 ISO 8601/],
+    description: 'reviewedAt 不是有效时间，应被拒绝',
+  },
+  {
+    file: 'bad-variance-threshold-range.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/varianceThreshold 必须在 \[0,0\.1\]/],
+    description: '方差阈值被放宽到 0.50，应被拒绝',
+  },
+  {
+    file: 'bad-ranking-ordered.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ranking\.ordered 不得包含重复候选项/],
+    description: '排序结果包含重复候选项，应被拒绝',
+  },
 ];
 
 const GATE_CASES: GateCase[] = [
@@ -103,7 +121,25 @@ const GATE_CASES: GateCase[] = [
     file: 'bad-coverage.json',
     expectedPassed: false,
     expectedReasonPatterns: [/覆盖率未达 100%/],
-    description: 'RTM 存在「部分」覆盖行，应被覆盖率门禁拦截',
+    description: 'RTM 存在不完整追溯行，应被覆盖率门禁拦截',
+  },
+  {
+    file: 'bad-count-invariant.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/passed \+ failed \+ pending 必须等于 total/],
+    description: '测试汇总计数不守恒，应阻止假通过',
+  },
+  {
+    file: 'bad-unit-coverage.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/单元测试代码覆盖率未达 80%/],
+    description: '单元测试代码覆盖率低于 80%，应阻止放行',
+  },
+  {
+    file: 'bad-duplicate-id.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/需求 ID 重复/],
+    description: 'RTM 存在重复需求 ID，应被结构校验拦截',
   },
   {
     file: 'bad-test-failed.json',
