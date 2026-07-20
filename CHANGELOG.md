@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### CI 改为本地推送前门禁
+
+> 远程 GitHub Actions runner 始终无法分配（多次运行卡在 Queued，与代码无关），
+> 改为本地 git `pre-push` hook 承载门禁职责，等价覆盖原 CI 的 5 项检查。
+
+- 删除 `.github/workflows/ci.yml`，关闭远程 CI
+- 新增 `.githooks/pre-push`：在 `git push` 时自动跑 self-test + 4 项 CLI 退出码冒烟，任一不符预期即中止推送
+- 仅当本次推送触及 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` 时才跑门禁，纯文档改动直接放行
+- `package.json` 新增 `setup:hooks`（一次性启用 hook）与 `prepush`（手动跑全部门禁）快捷脚本
+- `CONTRIBUTING.md` 同步说明启用与临时跳过（`git push --no-verify`）方式
+
 ### 大规模 Review 优化（P0-P3 共 18 项）
 
 > 基于全项目 Review 报告，按优先级 P0×3 / P1×4 / P2×6 / P3×5 修复一致性、健壮性与可维护性问题。
