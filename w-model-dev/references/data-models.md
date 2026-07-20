@@ -78,6 +78,20 @@ REQUIREMENT 1──* TEST_CASE   (需求生成验收测试)
 DESIGN 1──* TEST_CASE        (设计生成系统/集成/单元测试)
 ```
 
+## 与 RTM 的映射
+
+RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm-guide.md)）：
+
+| RTM 列 | 数据模型 | ID 格式 | 登记阶段 |
+|---|---|---|---|
+| 需求 ID | `Requirement` | `REQ-NNN` | 阶段 1 |
+| 设计文档 | `Design` | `SD-N.N.N` | 阶段 2/3/4 |
+| 代码模块 | —（文件路径） | `<filename>.ts` | 阶段 5 |
+| 单元测试 | `TestCase` (type=单元测试) | `UT-NNN` | 阶段 4（设计）/ 阶段 5（执行） |
+| 集成测试 | `TestCase` (type=集成测试) | `IT-NNN` | 阶段 3（设计）/ 阶段 6（执行） |
+| 系统测试 | `TestCase` (type=系统测试) | `ST-NNN` | 阶段 2（设计）/ 阶段 7（执行） |
+| 验收测试 | `TestCase` (type=验收测试) | `UAT-NNN` | 阶段 1（设计）/ 阶段 8（执行） |
+
 ## 使用约定
 
 - `id` 使用 `REQ-<序号>` / `SD-<节号>` / `TC-<类型>-<序号>` 等可读编码。

@@ -1,13 +1,15 @@
 ---
 name: w-model-dev
 description: >-
-  Drive the full W-model software development lifecycle with parallel development
-  and test design. Use when the user wants to run requirements analysis, system/outline/detailed
-  design, coding with unit tests, integration testing, system testing, or acceptance
-  testing as a closed-loop W-model workflow; when the user invokes /wm commands
-  (analyze, design, code, test, review, status, help, reset, export, import);
-  or when building software that needs synchronized test design alongside each
-  development stage with requirements traceability.
+  Drive the full W-model (W开发模型) software development lifecycle with parallel
+  development and test design. Use when the user wants to run requirements analysis,
+  system/outline/detailed design, coding with unit tests, integration testing,
+  system testing, or acceptance testing as a closed-loop W-model workflow; when
+  the user invokes /wm commands (analyze, design, code, test, review, status,
+  help, reset, export, import); when building software that needs synchronized
+  test design alongside each development stage with requirements traceability;
+  or when user mentions "W模型", "W开发模型", "W-model", "开发与测试并行",
+  "需求跟踪", "RTM", "阶段门评审", "质量门", "LLM-as-a-Verifier".
 ---
 
 # W-Model AI Assistant Skill
@@ -126,7 +128,25 @@ W 模型执行中真实高发陷阱共 9 条，命中任一条即视为流程破
 
 1. 识别用户意图对应的 W 模型阶段（对照"阶段与测试并行对应表"）。
 2. 若项目尚未初始化，先确认技术栈（前端 / 后端 / 数据库 / 其他）并建立项目状态记录。
-3. 仅加载当前阶段所需的 `references/` 文件，避免一次性载入全部细则。
+3. 仅加载当前阶段所需的 `references/` 文件（见下表），避免一次性载入全部细则。
+
+**阶段→引用文件映射表**（§0 步骤 3 的执行依据）：
+
+| 阶段 | 必须加载 | 按需加载 |
+|---|---|---|
+| 0 任务接入 | — | `workflow.md`（向用户解释流程时） |
+| 1 需求分析 | `phase-1-requirements.md`, `rtm-guide.md` | `phase-1-requirements-formalization.md`（用户启用形式化时） |
+| 2 系统设计 | `phase-2-system-design.md`, `rtm-guide.md` | — |
+| 3 概要设计 | `phase-3-outline-design.md`, `rtm-guide.md` | — |
+| 4 详细设计 | `phase-4-detailed-design.md`, `rtm-guide.md` | — |
+| 5 编码 | `phase-5-coding.md`, `rtm-guide.md` | `anti-patterns.md`（编码规范校验时） |
+| 6 集成测试 | `phase-6-integration-test.md`, `rtm-guide.md` | — |
+| 7 系统测试 | `phase-7-system-test.md`, `quality-standards.md`, `rtm-guide.md` | — |
+| 8 验收测试 | `phase-8-acceptance-test.md`, `rtm-guide.md` | — |
+| 阶段门评审 | `verifier-spec.md` | — |
+| 质量门 | `quality-standards.md` | — |
+
+跨阶段共享文件（仅在对应场景触发时加载，不随阶段自动加载）：`data-models.md`（数据结构定义）、`anti-patterns.md`（反模式核验）、`workflow.md`（流程图/并行表）。
 
 > 🔴 **CHECKPOINT · 项目初始化**：技术栈与 W 模型阶段确认后、正式产出前暂停，向用户复述「将进入 X 阶段 / 同步产出 Y 测试设计 / 预期产物清单」，得到确认再进入 §1。
 
@@ -258,17 +278,24 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 将项目导出为可迁移的 JSON + RTM Markdown：
 
 1. 默认输出目录：`./w-model-export/`，可由参数指定。
-2. 导出 `project.json`（项目元信息 + 全部实体）与 `rtm.md`（按 [templates/rtm.md](templates/rtm.md) 渲染）。
-3. 输出导出清单（文件路径 + 大小）。
+2. 导出文件清单：
+   - `project.json`：项目元信息（`id` / `name` / `description` / `status` / `techStack` / 时间戳）+ 全部实体（需求数组 / 设计数组 / 测试用例数组）
+   - `rtm.md`：按 [templates/rtm.md](templates/rtm.md) 渲染的跟踪矩阵
+   - `requirements.json` / `designs.json` / `testcases.json`：各实体独立文件（便于部分导入）
+3. 校验导出完整性：`project.json` 中实体数与独立文件记录数一致，不一致时输出警告。
+4. 输出导出清单（文件路径 + 大小 + 实体数）。
 
 #### `/wm import <文件路径>`
 
 从 JSON 导入项目：
 
-1. 读取指定 `project.json`，按 [references/data-models.md](references/data-models.md) 校验结构。
-2. 校验失败 → 输出原因，不写入任何文件；退出码 2。
-3. 校验通过 → 写入 `.w-model/`，更新 `project.status` 与 `updatedAt`。
-4. 输出导入摘要（项目名 / 当前阶段 / 需求数 / 测试用例数）。
+1. 读取指定 `project.json`，按 [references/data-models.md](references/data-models.md) 校验结构：
+   - 必填字段：`id` / `name` / `status` / `techStack`（类型为 `Project` 接口定义的子集）
+   - 枚举校验：`status` ∈ {`需求分析` | `系统设计` | `概要设计` | `详细设计` | `编码` | `集成测试` | `系统测试` | `验收测试`}
+   - 实体校验：每个 `Requirement` / `Design` / `TestCase` 的 `type` / `status` / `priority` 均在合法枚举内
+2. 校验失败 → 输出具体失败字段与原因，不写入任何文件；退出码 2。
+3. 校验通过 → 写入 `.w-model/`（`project.json` + `rtm.json`），更新 `project.status` 与 `updatedAt`。
+4. 输出导入摘要（项目名 / 当前阶段 / 需求数 / 测试用例数 / RTM 需求覆盖率）。
 
 > 🔴 **CHECKPOINT · 导入确认**：若 `.w-model/` 已存在项目数据，执行前必须暂停向用户确认「将覆盖现有项目」，得到确认后执行。
 
@@ -280,6 +307,28 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 - 设计阶段交互：[examples/system-design.md](examples/system-design.md)
 - 编码阶段交互：[examples/coding.md](examples/coding.md)
 - 测试执行交互：[examples/test-execution.md](examples/test-execution.md)
+
+## 多场景适配指引
+
+W 模型适用于各类软件项目。不同技术栈与项目类型在阶段 5（编码）~阶段 7（系统测试）的执行方式有差异，Agent 应按项目 `techStack` 自适应：
+
+| 项目类型 | 阶段 5 编码 | 阶段 6 集成测试 | 阶段 7 系统测试 | 覆盖率工具 |
+|---|---|---|---|
+| Node.js / TypeScript 后端 | `npx tsc --noEmit` + `npx eslint` | `npx vitest run tests/integration/` 或 `supertest` | `k6` 负载 + `zap-cli` 安全 | `npx vitest --coverage` |
+| Python 后端 | `ruff check` + `mypy` | `pytest tests/integration/` | `locust` 负载 + `bandit` 安全 | `pytest --cov` |
+| Java / Spring 后端 | `mvn compile` + `checkstyle` | `mvn verify -P integration` | `jmeter` 负载 + `owasp-dependency-check` | `jacoco` |
+| 前端 SPA (React/Vue) | `npx tsc --noEmit` + `npx eslint` | `npx vitest run` + `msw` mock | `playwright` E2E + `lighthouse` 性能 | `npx vitest --coverage` |
+| 全栈 (前后端一体) | 合并上述对应栈 | 合并前后端集成测试 | 合并前后端系统测试 | 合并覆盖率报告 |
+
+> Agent 在阶段 0 任务接入时根据用户声明的技术栈选择对应行的工具链；若用户未声明，按 `Node.js / TypeScript` 为默认。工具链变更影响阶段 5~7 的执行方法论，不影响阶段 1~4（需求/设计）与阶段 8（验收测试）的流程。
+
+## 失败恢复策略
+
+当任一阶段返工超过 **2 次** 仍不通过时，触发以下恢复策略（避免无限返工循环）：
+
+1. **根因深化**：暂停返工，向用户展示「已返工 N 次 / 仍不通过的子标准 / 当前 reworkHints」，请求用户提供额外上下文（如遗漏的业务规则 / 环境约束）。
+2. **范围缩减**：与用户协商是否可将不通过的子项降级为「已知限制」并在 RTM 标注，而非阻塞全部流程。
+3. **阶段回退**：若返工根因指向上游阶段（如集成测试失败根因在概要设计接口契约），经用户确认后回退到上游阶段修正，而非在本阶段反复修补。
 
 ## 通用输出规范
 

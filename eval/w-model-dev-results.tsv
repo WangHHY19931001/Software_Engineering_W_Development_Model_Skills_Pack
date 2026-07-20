@@ -14,3 +14,9 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-07-20T07:15	8ac77b2	w-model-dev/references/phase-4-detailed-design.md	58.5	74.0	keep	dim3/5/8/9	测试用例生成算法增强(expect断言+边界清单:空/null/极值/越界/类型不符/竞态;分支≥80%);🔴CHECKPOINT;6行禁止行为	dry_run
 2026-07-20T07:25	6ccf6a7	w-model-dev/references/workflow.md	71.0	81.8	keep	dim4/9	🔴CHECKPOINT阶段门+质量门双暂停点;7行工作流反模式表交叉链接anti-patterns#1/#2/#3/#4/#5/#6/#7/#8/#9	dry_run
 2026-07-20T07:25	6ccf6a7	w-model-dev/SKILL.md	87.9	86.8	keep	dim7冗余消解	压缩3处重复blockquote为1段指针;架构原则仍在架构定位节单一事实源;Δ-1.1属judge间方差(dim7实际8→9);HL-3/4方差带内	dry_run
+2026-07-20T10:00	darwin-01	w-model-dev/SKILL.md	78.7	84.5	keep	dim1/3/5/8	Frontmatter补中英文触发词;阶段引用映射表;export/import细化;多场景适配指引(5技术栈);失败恢复策略(返工>2次触发)	dry_run
+2026-07-20T10:00	darwin-01	w-model-dev/references/phase-1-4	78.7	84.5	keep	dim2/3/5	4文件各加执行方法论(产出物+落地方式+文件命名)+返工路径(5-6条)	dry_run
+2026-07-20T10:00	darwin-01	w-model-dev/references/phase-5-8	78.7	84.5	keep	dim3/5	4文件各加返工路径(phase5:6条列表;phase6/7:4-5行表格含重跑命令;phase8:执行方法论+返工路径4行)	dry_run
+2026-07-20T10:00	darwin-01	w-model-dev/references/verifier-spec.md	78.7	84.5	keep	dim6	§2.1目标类型与产出阶段交叉引用(targetKind→产出阶段→产物示例)	dry_run
+2026-07-20T10:00	darwin-01	w-model-dev/references/data-models.md	78.7	84.5	keep	dim6	与RTM的映射节(RTM列→数据模型→ID格式→登记阶段)	dry_run
+2026-07-20T10:00	darwin-01	w-model-dev/references/anti-patterns.md	78.7	84.5	keep	dim6	命中高发阶段子节(9反模式→最易命中阶段→阶段指引链接)	dry_run

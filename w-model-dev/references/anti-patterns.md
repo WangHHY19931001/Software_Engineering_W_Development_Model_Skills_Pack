@@ -18,6 +18,20 @@
 | 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
 | 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
 
+### 命中高发阶段
+
+| 反模式 | 最易命中阶段 | 阶段指引 |
+|---|---|---|
+| #1（跳过评审） | 全阶段 | 各 phase-N「阶段门评审」节 |
+| #2（测试设计后置） | 阶段 1~4 | 各 phase-N「并行任务（强制）」节 |
+| #3（估算质量门） | 阶段 5~7 | [phase-5-coding.md](phase-5-coding.md) / [phase-7-system-test.md](phase-7-system-test.md) |
+| #4（评审未通过悄悄小修） | 全阶段 | 各 phase-N「返工路径」节 |
+| #5（一次性载入全部 references） | 阶段 0 | SKILL.md §0「任务接入」步骤 3 |
+| #6（估算 RTM 覆盖率） | 阶段 7~8 | [phase-7-system-test.md](phase-7-system-test.md) / [phase-8-acceptance-test.md](phase-8-acceptance-test.md) |
+| #7（退出码 1/2 放行） | 阶段 5~7 | [quality-standards.md](quality-standards.md)「质量门检查清单」 |
+| #8（越过 CHECKPOINT） | 全阶段 | 各 phase-N「🔴 CHECKPOINT」标记 |
+| #9（谎报状态） | 全阶段 | SKILL.md §4「数据与状态管理」 |
+
 ## 与门禁脚本的对应关系
 
 | 反模式 | 由哪个脚本 / 机制守护 |
