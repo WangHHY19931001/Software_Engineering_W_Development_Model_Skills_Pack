@@ -60,3 +60,30 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 - **运行时测试用例**（四级测试）一律采用短形式 `UT/IT/ST/UAT-NNN`，登记到 RTM 对应列；同一类型在项目内连续编号（如 `UT-001 ~ UT-018`）。
 - **阶段产物验证用例**采用 `TC-<PHASE>-NNN`，仅出现在阶段文档与 SSoT 中作为示例，用于校验阶段产出物（需求规格、设计文档、代码、覆盖率报告）是否合格，不进入 RTM。
 - **历史兼容**：早期版本阶段 6/7/8 文档曾使用 `TC-INT-*` / `TC-SYS-*` / `TC-UAT-*` 表示执行用例，已统一改为 `IT-*` / `ST-*` / `UAT-*`，与 RTM 短形式一致。
+
+## RTM 登记命令与覆盖率算法（指令具体性）
+
+> 每阶段 RTM 字段更新的具体命令清单 + 覆盖率计算公式 + 缺失项检测算法。Agent 须按此执行，禁止凭印象登记。
+
+### 1. 各阶段 RTM 字段更新清单
+
+| 阶段 | 更新的 RTM 字段 | 登记命令（伪代码） | 校验 |
+|---|---|---|---|
+| 1 需求分析 | 需求 ID、需求描述、验收测试列 | `rtm.addRequirement({id:'REQ-NNN', desc, uatId:'UAT-NNN'})` | 字段非空 + ID 唯一 |
+| 2 系统设计 | 设计文档列、系统测试列 | `rtm.updateDesign(reqId, {sd:'SD-N.N.N', stId:'ST-NNN'})` | `sd` 非空 + `stId` 关联 REQ |
+| 3 概要设计 | 接口设计列、集成测试列 | `rtm.updateDesign(reqId, {interfaceDoc:'SD-N.N.N', itId:'IT-NNN'})` | 同上 |
+| 4 详细设计 | 详细设计列、单元测试列 | `rtm.updateDesign(reqId, {detailedDoc:'SD-N.N.N', utId:'UT-NNN'})` | 同上 |
+| 5 编码 | 代码模块列 | `rtm.updateCode(reqId, '<filename>.ts')` | 文件路径存在 |
+| 6 集成测试 | 集成测试状态列 | `rtm.updateStatus(itId, '通过' \| '失败')` | 状态 ∈ 枚举 |
+| 7 系统测试 | 系统测试状态列 | `rtm.updateStatus(stId, '通过' \| '失败')` | 同上 |
+| 8 验收测试 | 验收测试状态列、覆盖率终检 | `rtm.updateStatus(uatId, '通过' \| '失败')` + 跑 `check-artifact-gate.ts` | 退出码 0 |
+
+### 2. 覆盖率计算公式
+
+**需求覆盖率 = （已登记全部 8 列的需求数 / 总需求数）× 100%**。每个 REQ-NNN 须登记 8 列：需求描述 / 设计文档 / 代码模块 / 单元测试 / 集成测试 / 系统测试 / 验收测试 / 覆盖状态；任一列空缺 → 该需求计为「未覆盖」。100% → `check-artifact-gate.ts` 退出码 0；< 100% → 退出码 1，补齐缺失列后重跑。
+
+### 3. 缺失项检测算法
+
+阶段 8 终检前必须执行（实际由 `check-artifact-gate.ts` 实现，此处仅作流程透明化）：遍历 `rtm.json` 的 `requirements[]`，对每个 REQ 检查 7 个必需字段（`desc` / `designDoc` / `codeModule` / `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`）是否非空；任一字段为空即记入 `missingItems`。`missingItems` 非空 → 退出码 1，Agent 须将缺失明细透传给用户并回阶段 5 补齐；为空 → 退出码 0 可发布。
+
+> 缺失项明细由 `check-artifact-gate.ts` 输出到 stdout，Agent 须将其透传给用户。

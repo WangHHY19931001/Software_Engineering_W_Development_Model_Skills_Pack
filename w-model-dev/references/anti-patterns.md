@@ -52,6 +52,35 @@
 3. **告知用户**：在交互中明示命中的反模式编号与正确做法，由用户确认回退动作。
 4. **记录教训**：在《测试报告》或《评审报告》的「备注」节记录命中的反模式，便于后续阶段避免重复。
 
+## 检测信号与回退命令（指令具体性）
+
+> Agent 自检「是否已命中反模式」的检测信号 + 命中后的具体回退命令。每条与门禁脚本退出码精确对应。
+
+| # | 检测信号（Agent 自查） | 命中后回退命令 | 对应退出码 |
+|---|---|---|---|
+| #1 | 阶段产物已产出但无 `VerifierOutput` JSON 文件 / 未调用 `check-verifier-output.ts` | `npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>`；JSON 不存在则重新执行评审 | `check-verifier-output.ts` 退出码 0 才算评审闭环 |
+| #2 | 阶段 1~4 产物存在但对应测试设计文档缺失（如阶段 3 无 `interface-test-design.md`） | 回到阶段 N 起点，按 `phase-N-*.md`「并行任务（强制）」节补产出测试设计 | 无脚本；Agent 比对 `templates/` 模板核验 |
+| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]`，退出码非 0 一律回阶段 5 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
+| #4 | `VerifierOutput.passed=false` 但 `Project.status` 已推进到下一阶段 | 回到本阶段起点，按 `reworkHints` 修复后重评，重置 `status` 字段 | `check-verifier-output.ts` 退出码 0 + `passed=true` |
+| #5 | Agent 上下文同时加载 ≥3 个 `references/phase-N-*.md` 文件 | 卸载无关 phase 文档，仅保留当前阶段 + `SKILL.md` + 必要 references | 无脚本；Agent 自检加载列表 |
+| #6 | RTM 覆盖率字段为 LLM 估算（无 `check-artifact-gate.ts` 输出佐证） | 执行 `check-artifact-gate.ts` 重新计算覆盖率；估算值不得写入 `rtm.json` | `check-artifact-gate.ts` 退出码 0 + `GATE_JSON.coverage=100%` |
+| #7 | `check-artifact-gate.ts` 退出码 1/2 但 `Project.status` 已标「验收通过」 | 重置 `status` 为「编码」，回阶段 5 返工；附 GATE_JSON 详情告知用户 | 退出码 1/2 → 一律回阶段 5 |
+| #8 | 到达 🔴 CHECKPOINT 节点后无「等待用户确认」记录直接推进 | 回到 CHECKPOINT 节点重新暂停，向用户展示放行判定并由用户确认 | 无脚本；Agent 自检对话流 |
+| #9 | `Project.status` / `Requirement.status` 字段值与实际产物不符（如标「已完成」但无代码） | 按实际进度修正 `status` 字段；未完成不得推进到下一阶段 | 无脚本；Agent 比对 `rtm.json` 与磁盘产物 |
+
+### 门禁脚本退出码精确对应表
+
+| 脚本 | 退出码 | 含义 | 触发的反模式 | 回退动作 |
+|---|---|---|---|---|
+| `check-verifier-output.ts` | 0 | 评审通过 | — | 可推进到下一阶段 |
+| `check-verifier-output.ts` | 1 | 评审未通过（schema / 方差 / 分数不达标） | #1 / #4 | 回到当前阶段起点返工 |
+| `check-verifier-output.ts` | 2 | 输入错误（JSON 缺失 / 路径错误） | #1 | 重新执行评审产出 JSON |
+| `check-artifact-gate.ts` | 0 | 质量门通过 | — | 可发布 |
+| `check-artifact-gate.ts` | 1 | 质量门未通过（覆盖率 / 测试状态不达标） | #3 / #6 / #7 | 回阶段 5 编码返工 |
+| `check-artifact-gate.ts` | 2 | 输入错误（`rtm.json` 缺失 / 字段错误） | #9 | 修复 `rtm.json` 后重跑 |
+
+> 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。

@@ -36,13 +36,35 @@
 - 纯 CRUD / 信息管理系统，无并发/状态机/安全合规需求 —— TLA+/Lean 收益低于引入成本
 - 运行环境无法安装 Java JRE ≥11（TLA+ TLC）或 Lean 4 —— 仅可用其 BDD+KG 子集，需与用户确认收益
 
-## 委托执行指引
+## 委托执行指引（分步命令）
 
-Agent 在触发本节后：
+按以下顺序执行，每步必须过门禁脚本才进入下一步：
 
-1. 加载 SRS-Formalizer 的 `SKILL.md`，按其工作流逐步执行 Frontend → Middle-end → Backend；
-2. 每步通过其门禁脚本（`validate-jsonl` / `validate-semantics` / `validate-bdd` 等）校验；
-3. 将其 BDD 场景并入本阶段的「验收测试用例设计文档」（套用 `templates/test-case.md`）；
-4. 将其 NFR 标记与风险评分并入「需求风险评估报告」；
-5. 将其知识图谱中的需求依赖关系登记到 RTM（仅需求列，其余列留待后续阶段）；
-6. TLA+/Lean 条件触发时，其验证反例与证明结论作为「需求风险评估报告」的附录。
+1. **初始化**：`npx srs-formalizer init --project <dir>`（生成 `.srs_formalizer/`）
+2. **Parse → Shard**：`npx srs-formalizer parse <srs.md> && npx srs-formalizer shard` → 门禁 `validate-jsonl`
+3. **Extract → 装配 SRS-IR**：`npx srs-formalizer extract && npx srs-formalizer assemble-ir` → 门禁 `validate-semantics`
+4. **BDD 场景生成**：`npx srs-formalizer bdd-gen` → 门禁 `validate-bdd`
+5. **知识图谱**：`npx srs-formalizer build-kg`
+6. **NFR 标记 + 风险评分**：`npx srs-formalizer nfr-tag --risk-score`
+7. **（条件触发）TLA+**：`npx srs-formalizer tla-gen --module <name>` → `java -jar tla2tools.jar TLC <model>.tla`
+8. **（条件触发）Lean 4**：`npx srs-formalizer lean-gen --nfr <id>` → `lake build`
+
+## 产出物并入清单
+
+| SRS-Formalizer 产物 | 并入目标 | 字段映射 |
+|---|---|---|
+| `srs-ir.json` | 《需求规格说明书》结构化提取段 | `requirements[].id` → RTM 需求列 |
+| `features/*.feature` | 验收测试用例设计文档 | 每个 Scenario → 1 条 UAT 用例 |
+| `kg.cypher` 依赖关系 | RTM 需求依赖列 | `DEPENDS_ON` 关系 → 依赖矩阵 |
+| `nfr-report.json` | 需求风险评估报告 | `risk_score ≥ 7` 标为高风险 |
+| TLA+ 反例 / Lean 证明 | 风险评估报告附录 | 反例路径 → 风险场景；`theorem + proof` → 合规验证 |
+
+## 边界条件与 Fallback
+
+| 异常场景 | 检测条件 | Fallback 路径 |
+|---|---|---|
+| SRS-Formalizer 调用失败（网络 / 依赖缺失） | `init` 退出码 ≠ 0 或超时 | 记录到 `.srs_formalizer/error.log`；降级为 Agent 手动提取（套 SRS-IR schema）；RTM 标「形式化降级」 |
+| 门禁脚本校验失败 | `validate-*` 退出码 ≠ 0 | 输出明细回上一步修复；3 次失败 → 降级仅做 BDD |
+| TLA+ 不可用（无 Java JRE） | `java -version` 退出码 ≠ 0 | 跳过 TLA+；风险报告标「未做并发形式化验证」；用户显式接受 |
+| Lean 4 不可用 | `lake --version` 退出码 ≠ 0 | 跳过 Lean；security/compliance NFR 改人工审查清单 |
+| 产出物冲突（SRS-IR 与 RTM 不一致） | 需求 ID 或字段在两处不同 | 以 `.w-model/rtm.json` 为准；冲突项记入 `decisions/conflicts.md` 等用户裁决 |

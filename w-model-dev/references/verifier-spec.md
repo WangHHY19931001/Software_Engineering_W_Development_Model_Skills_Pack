@@ -391,3 +391,68 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 ```
 
 校验未通过即视为评审无效，Agent 必须按脚本输出的 `reasons` 重新执行评审。
+
+## 11. 异常处理与降级策略（边界条件）
+
+> 评审执行中常见异常的检测与处理。Agent 须按以下策略处理，**禁止因异常而跳过评审或放行**。
+
+### 11.1 LLM 调用失败重试策略
+
+| 失败类型 | 检测信号 | 重试策略 | 重试上限 |
+|---|---|---|---|
+| 网络超时 / API 5xx | HTTP 状态码 ≠ 2xx / 请求超时 | 指数退避：1s → 2s → 4s → 8s → 16s | 5 次 |
+| 限流（429） | `Retry-After` 响应头 | 按 `Retry-After` 等待后重试 | 3 次 |
+| 响应非 JSON / 解析失败 | `JSON.parse` 抛异常 | 重新构造提示词，追加「必须输出严格 JSON」约束后重试 | 3 次 |
+| 响应截断（max_tokens） | `finish_reason='length'` | 提升 `max_tokens` 至 2 倍后重试；仍失败则拆分子标准分批评估 | 2 次 |
+| 子标准缺失 | `subCriteria` 数量 < §7 定义数 | 在提示词中显式列出缺失子标准 name 后重试 | 2 次 |
+
+重试失败处理：所有重试用尽后仍失败 → 该目标 `passed=false`，`reworkHints=['LLM 评审不可用，须人工评审或更换模型']`，回阶段起点返工。
+
+### 11.2 logits 不可用 → text-parse 降级
+
+| 检测信号 | 降级动作 | 输出标注 |
+|---|---|---|
+| LLM API 不返回 logits（仅返回 text） | 改用 §4.2 text-parse 实现：解析首个字母 A-D + `±0.05` 稳定扰动 | `meta.scoringMethod = 'text-parse'` |
+| logits 返回但 A/B/C/D token 缺失 | 同上降级 | 同上 |
+| text-parse 解析失败（输出无 A-D 字母） | 在提示词追加「仅输出一个字母」后重试 1 次；仍失败则该子标准 `score=0` | `meta.scoringMethod = 'text-parse'`，`evidence` 标注「解析失败」 |
+
+> 降级后必须更新 `meta.scoringMethod`，否则 `check-verifier-output.ts` 校验失败。
+
+### 11.3 方差超阈值处理
+
+当 `subCriteria[i].variance > meta.varianceThreshold`（默认 0.10）时：
+
+1. **检测**：`check-verifier-output.ts` 重算方差并对比，误差 > `1e-4` 或方差超阈值 → 退出码 1。
+2. **重评**：对该子标准增加 `repeatTimes` 至 5 次（默认 3 次基础上 +2），使用更强温度扰动（如 0.7 → 0.9）。
+3. **离群值剔除**：若 `rawScores` 中存在明显离群值（与中位数偏差 > 2×MAD），剔除后重算均值与方差。
+4. **仍超阈值**：判定该子标准不可重复 → `passed=false`，`reworkHints` 标注「子标准 `<name>` 不可重复，须人工评审」。
+5. **防作弊**：`check-verifier-output.ts` 检测 `rawScores` 全相同（方差=0）且 `repeatTimes≥3` → 视为复制填入，判失败。
+
+### 11.4 evidence 引用失效处理
+
+| 失效类型 | 检测信号 | 处理 |
+|---|---|---|
+| 引用行号超出目标范围 | `evidence` 含「L123」但目标仅 100 行 | 该子标准 `score=0`，`evidence` 标注「引用失效」 |
+| 引用段落 ID 不存在 | `evidence` 含 `§3.5` 但目标无该节 | 同上 |
+| 目标内容已变更（评审期间被修改） | `evidence` 引用片段与目标当前内容不匹配 | 重新读取目标最新版本后重评；若仍不匹配则 `passed=false` |
+| evidence 为空字符串 | `evidence === ''` | 子标准判 0 分（§3.3 已规定） |
+
+> evidence 失效一律不得放行；`check-verifier-output.ts` 校验 evidence 非空，但行号/段落有效性须由 Agent 自检。
+
+### 11.5 异常处理流程总览
+
+```
+LLM 调用 → 失败？─是─► §11.1 重试策略（≤5 次指数退避）
+              │否
+              ▼
+          返回 logits？─否─► §11.2 降级 text-parse
+              │是
+              ▼
+          重算方差超阈值？─是─► §11.3 重评 + 离群剔除
+              │否
+              ▼
+          evidence 失效？─是─► §11.4 子标准判 0 分或重评
+              │否
+              ▼
+          输出 VerifierOutput JSON → check-verifier-output.ts 校验
+```

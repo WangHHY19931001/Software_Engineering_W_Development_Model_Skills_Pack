@@ -67,6 +67,27 @@
 
 任一条件不满足，回到编码实现返工。
 
+## 工具缺失与降级处理（边界条件）
+
+> 当质量门检查清单中引用的工具未安装或运行失败时，按以下降级路径处理，**禁止因工具缺失而跳过检查或放行**。
+
+| 标准项 | 主工具缺失判定 | 降级工具 | 降级有效性约束 |
+|---|---|---|---|
+| 代码规范检查 | `npx eslint --version` 退出码 ≠ 0（未安装 / 无配置） | `npx tsc --noEmit`（TypeScript 项目）/ `node --check <file>`（JS 文件） | 仅校验语法与类型错误，不覆盖风格规则；降级时必须在《测试报告》备注「eslint 缺失，仅做 tsc 语法兜底」 |
+| 单元测试运行 | `npx vitest --version` 退出码 ≠ 0 | `npx jest --coverage`（须有 jest 配置） | 覆盖率阈值同主工具（≥80% 分支+行）；jest 也缺失则停止推进，提示用户安装测试运行器 |
+| 覆盖率统计失败 | 运行器退出码 0 但未生成 coverage 报告（JSON 解析失败 / 字段缺失） | 改用 `npx c8 --reporter=json <test-runner>` 包裹运行器；仍失败则统计「通过用例数 / 总用例数」作粗略覆盖率 | 粗略覆盖率仅作临时判定，**不得作为放行依据**；须在 24h 内修复运行器并重跑 |
+| 安全漏洞扫描 | `npm audit` stderr 含 `command not found` / npm 不可用 | `npx audit-ci --moderate` 或对 `package-lock.json` 调用 OSV API（`https://api.osv.dev/v1/query`）批量查询 | 降级结果须标注数据源；高危漏洞判定与主工具一致（高危数 = 0 才放行） |
+| ESLint security plugin 缺失 | `npx eslint --print-config .` 输出不含 `eslint-plugin-security` | `npx eslint . --rule '{"no-eval":"error","no-implied-eval":"error","no-new-func":"error"}'` 跑核心安全规则补位 | 仅覆盖基础安全规则，缺漏项必须在备注列出，不得视为等价于 security plugin |
+
+### 降级流程
+
+1. **检测**：质量门前执行一次 `--version` / `--print-config` 探测，识别主工具是否可用。
+2. **降级**：按上表选择降级工具；降级工具同样不可用时，**不得放行**，回编码并提示用户补装工具链。
+3. **标注**：在《测试报告》「备注」节注明「降级路径 + 降级原因 + 降级覆盖差距」。
+4. **重跑**：用户补装主工具后必须重跑主工具校验，覆盖降级口径的缺漏项。
+
+> 降级路径仅是兜底，**不改变**质量门通过判定标准（覆盖率 ≥ 80%、高危漏洞数 = 0、退出码 0）。
+
 ## 禁止行为（反例黑名单）
 
 > 与 [anti-patterns.md](anti-patterns.md) 互引：以下为质量门层面的高发陷阱，命中即回编码。
