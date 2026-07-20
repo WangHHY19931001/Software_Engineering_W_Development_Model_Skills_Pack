@@ -79,6 +79,24 @@ npx tsx w-model-dev/scripts/self-test.ts
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
 | `/wm import <文件路径>` | 从 JSON 导入项目 |
 
+## 参考实现：`w-model-dev-demo/`
+
+[`w-model-dev-demo/`](./w-model-dev-demo) 是 W 模型 8 阶段端到端调测的完整产物——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。
+
+**端到端调测结论**（2026-07-20）：
+
+| 指标 | 数值 |
+|---|---|
+| 单元测试 | 22/22 通过，代码覆盖率 98%（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 6/6 通过，覆盖 4 对模块交互 + 5 类错误路径 |
+| 系统测试 | 6/6 通过，覆盖 4 模块 + 4 类异常路径 + 4 项安全约束 |
+| 验收测试 | 15/15 通过，4/4 需求 RTM 覆盖率 100% |
+| 工件质量门 | 通过（RTM 100% + 四级测试全通过） |
+
+过程中发现并修正了 Express 4 不自动捕获 async handler rejected promise 的缺陷（引入 `src/utils/async-handler.ts` 包装器），详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
+
+> 该目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向此目录。
+
 ## 项目结构
 
 ```
@@ -88,7 +106,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   ├── references/               # 阶段细则与规范（按需加载）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
 │   │   ├── phase-1-requirements-formalization.md  #   Phase 1 可选增强（委托 SRS-Formalizer）
-│   │   ├── anti-patterns.md      #   反例与黑名单（9 条高发陷阱 + 与门禁脚本对应关系）
+│   │   ├── anti-patterns.md      #   反例与黑名单（9 条高发陷阱 + 与门禁脚本对应关系 + 实现层经验教训）
 │   │   ├── workflow.md           #   完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准）
 │   │   ├── data-models.md        #   项目 / 需求 / 设计 / 测试用例数据模型
@@ -103,6 +121,13 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   └── samples/              #   端到端样本（verifier/ + gate/）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
+├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物）
+│   ├── docs/                     #   8 阶段产出文档（需求 / 设计 / 四级测试用例与报告）
+│   ├── src/                      #   实现代码（Express + TS，控制器 / 服务 / 存储 / 中间件）
+│   ├── tests/                    #   四级测试（unit / integration / system / acceptance）
+│   ├── package.json              #   demo 自身的依赖与脚本（独立于根 package.json）
+│   ├── tsconfig.json
+│   └── vitest.config.ts
 ├── docs/                         # 设计文档（统一存放）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
 │   ├── skill-design-document.md                # 设计文档指针（已废弃独立维护）
@@ -111,6 +136,8 @@ npx tsx w-model-dev/scripts/self-test.ts
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 │   ├── w-model-dev-test-prompts.json           #   评估测试场景（3 个典型 / 歧义场景）
 │   └── w-model-dev-results.tsv                 #   评估历史记录（得分轨迹）
+├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI，仅触及脚本 / package.json 时触发）
+├── AGENTS.md                     # AI Agent 仓库导航（与 README 互补，聚焦 Agent 行动事实集）
 ├── package.json                  # 仅声明 tsx 开发依赖 + npm run 快捷脚本（private，不发布）
 ├── CHANGELOG.md                  # 变更日志
 ├── CONTRIBUTING.md               # 贡献指南
@@ -120,6 +147,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 > 编排逻辑由 `w-model-dev/SKILL.md` 承载，Agent 读取后用自身工具执行；不内置任何
 > TypeScript 引擎、npm 包或编程式 SDK。`/wm` 命令、状态持久化、RTM 维护均由 Agent
 > 按 `SKILL.md` 与 `references/` 在项目内（`.w-model/*.json`）完成。
+> `w-model-dev-demo/` 是参考实现，独立于技能资产，不参与 `/wm` 命令编排。
 
 ## 相关文档
 
@@ -128,6 +156,8 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
 - [AI Agent 安装指南](./docs/INSTALL.md)
+- [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集
+- [参考实现](./w-model-dev-demo) - W 模型 8 阶段端到端调测产物（博客系统后端）
 - [变更日志](./CHANGELOG.md)
 - [贡献指南](./CONTRIBUTING.md)
 

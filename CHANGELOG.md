@@ -5,6 +5,45 @@
 
 ## [Unreleased]
 
+### 端到端调测：交付博客系统参考实现 + 文档同步
+
+> 通过 [`w-model-dev-demo/`](./w-model-dev-demo) 完整跑通 W 模型 8 阶段端到端调测，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用，并把调测结论与缺陷修正经验同步到全仓库文档。
+
+#### 新增
+
+- `w-model-dev-demo/`：博客系统后端参考实现（Express 4 + TypeScript 5 + 内存存储）
+  - 8 阶段产出文档：`docs/`（需求规格 / 系统设计 / 概要设计 / 详细设计 + 四级测试用例与报告）
+  - 可运行代码：`src/`（控制器 / 服务 / 存储 / 中间件，含 `utils/async-handler.ts` 缺陷修正产物）
+  - 四级测试：`tests/`（unit 22 / integration 6 / system 6 / acceptance 15）
+  - 独立 `package.json` / `tsconfig.json` / `vitest.config.ts`，与仓库根工具链解耦
+- `AGENTS.md`：仓库根级 AI Agent 导航（与 README 互补，聚焦 Agent 行动所需最小事实集）
+- `docs/skill-design-document_SSoT.md` §10B「参考实现（端到端调测验证）」：6 个子节，含项目概况 / 8 阶段产出对应 / 调测结论摘要 / 缺陷与修正 / 与 SSoT 章节映射 / 边界声明
+- `w-model-dev/references/anti-patterns.md`「实现层经验教训」节：新增 L1（Express 4 async handler 不自动 catch）+ 扩展规则（与 SSoT §10B.4 双向追溯）
+
+#### 变更
+
+- `README.md`：新增「参考实现：`w-model-dev-demo/`」节（含调测结论表 + 缺陷修正指针）；项目结构补 `w-model-dev-demo/` / `.githooks/pre-push` / `AGENTS.md`；相关文档列表补 AGENTS.md 与参考实现两项
+- `docs/skill-design-document_SSoT.md` §1.4：增加参考实现指针
+- `docs/INSTALL.md` §7 目录速查：补「参考实现」与「Agent 仓库导航」两行；§8 FAQ 新增「哪里可以看到 W 模型 8 阶段的完整端到端产出样本？」
+- `CONTRIBUTING.md`「项目结构约定」：补 `w-model-dev-demo/` 条目与边界声明；「SSoT 原则」同步链路补 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `CHANGELOG.md` / `docs/INSTALL.md`
+
+#### 端到端调测结论（2026-07-20）
+
+| 指标 | 目标 | 实测 |
+|---|---|---|
+| 单元测试 | 100% 通过 + 覆盖率 ≥ 80% | 22/22 通过，覆盖率 98% |
+| 集成测试 | 100% 通过 | 6/6 通过（含 L1 缺陷修正） |
+| 系统测试 | 100% 通过 | 6/6 通过 |
+| 验收测试 | 100% 通过 | 15/15 通过 |
+| RTM 需求覆盖率 | 100% | 4/4 需求 100% |
+| 工件质量门 | 退出码 0 | 通过 |
+
+#### 验证
+
+- `w-model-dev-demo/` 内 `npm install && npm test` → 全部四级测试通过
+- 文档一致性：`grep -rE "w-model-dev-demo"` 在 `README.md` / `AGENTS.md` / `docs/skill-design-document_SSoT.md` / `docs/INSTALL.md` / `CONTRIBUTING.md` / `w-model-dev/references/anti-patterns.md` 均有正确指针；无断链
+- SSoT §10B 与 anti-patterns.md「实现层经验教训」节双向链接校验通过
+
 ### CI 改为本地推送前门禁
 
 > 远程 GitHub Actions runner 始终无法分配（多次运行卡在 Queued，与代码无关），

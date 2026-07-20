@@ -17,6 +17,8 @@
 ### 1.4 文档定位
 本文档为W-Model AI Assistant Skill的**单一事实来源（Single Source of Truth, SSoT）**，包含所有设计决策、需求定义、测试用例、集成规范和验收标准。所有相关团队和系统均应以本文档为准。
 
+> **参考实现**：本技能的设计已由 [`w-model-dev-demo/`](../w-model-dev-demo)（博客系统后端，Express + TypeScript）端到端调测验证，8 阶段全流程闭环、四级测试全通过、工件质量门放行。详见 §10B。
+
 > **架构重构说明（重要）**：本技能已完成架构纯化——**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）。技能包只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM 调用。
 > 据此，本文档已移除技能演化机制与轨迹分析相关章节（原第 14 章「技能演化机制」、原第 15 章「技能评估标准」、原 §7.7 / §7.8 数据模型、原 §12.4「第四阶段（自演化版）」等），并移除全部 `src/` 编程式引擎（`/wm` 命令、状态持久化、RTM 维护改由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行）。
 > LLM-as-a-Verifier 评审由外部 Agent 按提示词执行（规范见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md)）；
@@ -807,6 +809,79 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 | 8 技术实现方案 | 需求解析 / 测试用例生成 / 代码生成算法 | 上游 AI 按提示词执行（`w-model-dev/references/phase-*.md`） | 完整（算法由提示词承载，技能不内置 LLM） |
 | 9 RTM | 需求跟踪矩阵 | `w-model-dev/references/rtm-guide.md` + `templates/rtm.md`（Agent 维护） | 完整 |
 | 10 质量保障 | 工件质量门 | 判定逻辑：`w-model-dev/scripts/gate-logic.ts`（单点事实源）；CLI：`w-model-dev/scripts/check-artifact-gate.ts` | 完整（见 10.5，门禁逻辑已沉入技能包） |
+
+---
+
+## 10B. 参考实现（端到端调测验证）
+
+> 本节记录对 W 模型 8 阶段编排 + LLM-as-a-Verifier 阶段门 + 工件质量门的端到端调测验证结论。
+> 参考实现位于 [`w-model-dev-demo/`](../w-model-dev-demo)，是一个博客系统后端（blog-system-demo），用于具象验证本 SSoT 所述设计在真实项目中的可执行性。
+
+### 10B.1 项目概况
+
+| 项 | 内容 |
+|---|---|
+| 项目名 | 博客系统后端（blog-system-demo） |
+| 技术栈 | Node.js ≥20 / Express 4 / TypeScript 5（严格模式）/ zod 3 / jsonwebtoken 9 / bcrypt 5 / vitest 1 + supertest |
+| 存储方式 | 内存 Map（无外部 DB 依赖，便于端到端调测） |
+| 调测日期 | 2026-07-20 |
+| 调测模式 | self-as-verifier（Agent 按本技能编排自驱完成 8 阶段） |
+| 范围 | 用户认证（注册 / 登录 / JWT）+ 文章 CRUD（作者隔离）+ 公开浏览 + 评论 |
+
+### 10B.2 8 阶段产出对应
+
+| W 模型阶段 | 产出位置 | 同步测试设计 |
+|---|---|---|
+| 1 需求分析 | [`docs/requirement-spec.md`](../w-model-dev-demo/docs/requirement-spec.md) | 验收测试用例索引（UAT-001~015） |
+| 2 系统设计 | [`docs/system-design.md`](../w-model-dev-demo/docs/system-design.md) | 系统测试用例索引（ST-001~006） |
+| 3 概要设计 | [`docs/outline-design.md`](../w-model-dev-demo/docs/outline-design.md) | 集成测试用例索引（IT-001~006） |
+| 4 详细设计 | [`docs/detailed-design.md`](../w-model-dev-demo/docs/detailed-design.md) | 单元测试用例（UT-001~022） |
+| 5 编码 | [`src/`](../w-model-dev-demo/src) + [`docs/unit-test-cases.md`](../w-model-dev-demo/docs/unit-test-cases.md) | 单元测试执行（22/22 通过，覆盖率 98%） |
+| 6 集成测试 | [`docs/integration-test-report.md`](../w-model-dev-demo/docs/integration-test-report.md) | 6/6 通过（含缺陷修正，见 §10B.4） |
+| 7 系统测试 | [`docs/system-test-report.md`](../w-model-dev-demo/docs/system-test-report.md) | 6/6 通过 |
+| 8 验收测试 | [`docs/acceptance-test-report.md`](../w-model-dev-demo/docs/acceptance-test-report.md) | 15/15 通过，RTM 覆盖率 100% |
+
+### 10B.3 调测结论摘要
+
+| 指标 | 目标 | 实测 | 是否达标 |
+|---|---|---|---|
+| 单元测试通过率 | 100% | 22/22（100%） | ✅ |
+| 单元测试代码覆盖率 | ≥ 80%（NFR-004） | 98% | ✅ |
+| 集成测试通过率 | 100% | 6/6（100%） | ✅ |
+| 系统测试通过率 | 100% | 6/6（100%） | ✅ |
+| 验收测试通过率 | 100% | 15/15（100%） | ✅ |
+| RTM 需求覆盖率 | 100% | 4/4（100%） | ✅ |
+| 阶段门评审 | 8 阶段全部放行 | 8/8 | ✅ |
+| 工件质量门（`check-artifact-gate.ts`） | 退出码 0 | 通过 | ✅ |
+| 安全约束（JWT 过期 / 作者隔离 / 输入校验 / 孤儿数据） | 全部覆盖 | 4/4 | ✅ |
+
+### 10B.4 过程中发现的缺陷与修正
+
+| 缺陷 | 触发阶段 | 根因 | 修正 | 验证 |
+|---|---|---|---|---|
+| 首轮 4 个集成测试失败：NotFoundError / ForbiddenError 未被中间件捕获，表现为 Unhandled Rejection | 阶段 6（集成测试） | Express 4 不自动捕获 async handler 抛出的 rejected promise | 新建 [`src/utils/async-handler.ts`](../w-model-dev-demo/src/utils/async-handler.ts) 包装器，包裹 `auth-routes.ts` / `article-routes.ts` / `comment-routes.ts` 全部路由 | 重跑 6/6 通过 |
+
+> 此缺陷已纳入 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节，供后续项目在阶段 5（编码）规避。
+
+### 10B.5 与 SSoT 设计章节的映射
+
+参考实现验证了以下 SSoT 设计章节在真实项目中的可执行性：
+
+| SSoT 章节 | 验证点 | 验证结果 |
+|---|---|---|
+| §3.2 模块设计 | 4 模块划分（认证 / 文章 / 评论 / 公共层） | ✅ M-001~M-004 全部落地 |
+| §4 工作流程 | 8 阶段顺序 + 阶段门评审 | ✅ 全部走通 |
+| §6 命令接口 | `/wm analyze` / `design` / `code` / `test` / `review` / `status` | ✅ 编排可用 |
+| §9 RTM | 双向追溯 + 覆盖率 100% | ✅ 4/4 需求 100% 覆盖 |
+| §10 质量保障 | 工件质量门（§10.5） | ✅ 退出码 0 |
+| §7.6 LLM-as-a-Verifier | 阶段门评审流程 | ✅ 8 阶段全部放行 |
+
+### 10B.6 边界声明
+
+- `w-model-dev-demo/` 是**参考实现**，不是技能运行时依赖：不参与 `/wm` 命令编排，也不被 `check-*-gate.ts` 读取。
+- 调测结论仅验证本 SSoT 所述设计的可执行性，不构成对其他项目场景的承诺。
+- demo 自身的 `package.json` 独立于仓库根 `package.json`（demo 引入 express / bcrypt / jsonwebtoken / zod / vitest 等业务依赖，与根 `package.json` 仅声明 `tsx` 不同）。
+- 内存存储是已知限制（重启数据丢失），详见 [`w-model-dev-demo/docs/requirement-spec.md`](../w-model-dev-demo/docs/requirement-spec.md) RISK-001。
 
 ---
 

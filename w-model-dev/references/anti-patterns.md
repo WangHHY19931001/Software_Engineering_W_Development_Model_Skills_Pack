@@ -37,3 +37,19 @@
 2. **回退到对应阶段起点**：根据反模式定位回退点（评审 → 重新评审 / 编码 → 返工 / 测试 → 重新执行）。
 3. **告知用户**：在交互中明示命中的反模式编号与正确做法，由用户确认回退动作。
 4. **记录教训**：在《测试报告》或《评审报告》的「备注」节记录命中的反模式，便于后续阶段避免重复。
+
+## 实现层经验教训（来自端到端调测）
+
+> 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
+> Agent 在阶段 5（编码）与阶段 6（集成测试）应主动规避，避免重蹈覆辙。
+> 来源：[`w-model-dev-demo/`](../../w-model-dev-demo) 博客系统后端端到端调测（2026-07-20）。
+
+| # | 教训 | 触发场景 | 危害 | 规避做法 |
+|---|---|---|---|---|
+| L1 | Express 4 路由直接使用 `async (req, res, next) => {...}` 而不包装 | 阶段 5 编码：在 Express 4 路由中抛出 `AppError` 子类（如 `ForbiddenError` / `NotFoundError`） | rejected promise 不被错误中间件捕获，表现为 Unhandled Rejection，错误响应体不符合 `{error: string}` 契约，首轮集成测试集体失败 | 引入 `asyncHandler` 包装器包裹全部路由：`(fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)`；详见 [w-model-dev-demo/src/utils/async-handler.ts](../../w-model-dev-demo/src/utils/async-handler.ts) 与 [integration-test-report.md](../../w-model-dev-demo/docs/integration-test-report.md) §5 |
+
+### 适用范围与扩展规则
+
+- 本节仅记录**真实调测中发现并修正过**的代码层教训，每条须可指向具体的缺陷与修正证据（demo 内的代码 / 报告链接）。
+- 新增教训时，同步在 SSoT [§10B.4](../../docs/skill-design-document_SSoT.md) 「过程中发现的缺陷与修正」表登记对应缺陷行，保证双向可追溯。
+- 教训不命中阶段回退；若 Agent 在阶段 6 集成测试中再次触发已记录教训，应在《测试报告》「备注」节标注「重蹈 L#」并提示用户复核阶段 5 编码规范。
