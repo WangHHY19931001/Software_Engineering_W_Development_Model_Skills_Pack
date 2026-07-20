@@ -136,9 +136,11 @@ rm -rf /path/to/agent/skills/w-model-dev
 | 工件质量门 CLI | [../w-model-dev/scripts/check-artifact-gate.ts](../w-model-dev/scripts/check-artifact-gate.ts) |
 | 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
 | 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |
+| 参考实现（端到端调测样本） | [../w-model-dev-demo/](../w-model-dev-demo) |
 | 设计文档（SSoT） | [./skill-design-document_SSoT.md](./skill-design-document_SSoT.md) |
 | LLM Verifier 集成设计 | [./llm-verifier-integration-design.md](./llm-verifier-integration-design.md) |
 | 项目导航 | [../README.md](../README.md) |
+| Agent 仓库导航 | [../AGENTS.md](../AGENTS.md) |
 
 > 技能演化与评估相关能力不在本仓库：参见外部工具
 > [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)。
@@ -165,3 +167,8 @@ rm -rf /path/to/agent/skills/w-model-dev
 **Q：能否只安装部分阶段？**
 不建议。W 模型的核心是开发与测试并行，阶段之间存在阶段门依赖。`SKILL.md` 已按需
 加载 `references/`，无需为节省上下文而拆分安装。
+
+**Q：哪里可以看到 W 模型 8 阶段的完整端到端产出样本？**
+参见仓库内的参考实现 [`w-model-dev-demo/`](../w-model-dev-demo)（博客系统后端，Express + TypeScript）。
+该目录独立于技能资产，包含 8 阶段全部产出文档与可运行代码，2026-07-20 调测结论：单元 22/22（覆盖率 98%）、
+集成 6/6、系统 6/6、验收 15/15、RTM 100%、工件质量门通过。详见 SSoT [§10B](./skill-design-document_SSoT.md)。
