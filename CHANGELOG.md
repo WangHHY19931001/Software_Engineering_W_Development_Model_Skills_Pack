@@ -5,6 +5,121 @@
 
 ## [Unreleased]
 
+### 端到端调测：交付博客系统参考实现 + 文档同步
+
+> 通过 [`w-model-dev-demo/`](./w-model-dev-demo) 完整跑通 W 模型 8 阶段端到端调测，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用，并把调测结论与缺陷修正经验同步到全仓库文档。
+
+#### 新增
+
+- `w-model-dev-demo/`：博客系统后端参考实现（Express 4 + TypeScript 5 + 内存存储）
+  - 8 阶段产出文档：`docs/`（需求规格 / 系统设计 / 概要设计 / 详细设计 + 四级测试用例与报告）
+  - 可运行代码：`src/`（控制器 / 服务 / 存储 / 中间件，含 `utils/async-handler.ts` 缺陷修正产物）
+  - 四级测试：`tests/`（unit 22 / integration 6 / system 6 / acceptance 15）
+  - 独立 `package.json` / `tsconfig.json` / `vitest.config.ts`，与仓库根工具链解耦
+- `AGENTS.md`：仓库根级 AI Agent 导航（与 README 互补，聚焦 Agent 行动所需最小事实集）
+- `docs/skill-design-document_SSoT.md` §10B「参考实现（端到端调测验证）」：6 个子节，含项目概况 / 8 阶段产出对应 / 调测结论摘要 / 缺陷与修正 / 与 SSoT 章节映射 / 边界声明
+- `w-model-dev/references/anti-patterns.md`「实现层经验教训」节：新增 L1（Express 4 async handler 不自动 catch）+ 扩展规则（与 SSoT §10B.4 双向追溯）
+
+#### 变更
+
+- `README.md`：新增「参考实现：`w-model-dev-demo/`」节（含调测结论表 + 缺陷修正指针）；项目结构补 `w-model-dev-demo/` / `.githooks/pre-push` / `AGENTS.md`；相关文档列表补 AGENTS.md 与参考实现两项
+- `docs/skill-design-document_SSoT.md` §1.4：增加参考实现指针
+- `docs/INSTALL.md` §7 目录速查：补「参考实现」与「Agent 仓库导航」两行；§8 FAQ 新增「哪里可以看到 W 模型 8 阶段的完整端到端产出样本？」
+- `CONTRIBUTING.md`「项目结构约定」：补 `w-model-dev-demo/` 条目与边界声明；「SSoT 原则」同步链路补 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `CHANGELOG.md` / `docs/INSTALL.md`
+
+#### 端到端调测结论（2026-07-20）
+
+| 指标 | 目标 | 实测 |
+|---|---|---|
+| 单元测试 | 100% 通过 + 覆盖率 ≥ 80% | 22/22 通过，覆盖率 98% |
+| 集成测试 | 100% 通过 | 6/6 通过（含 L1 缺陷修正） |
+| 系统测试 | 100% 通过 | 6/6 通过 |
+| 验收测试 | 100% 通过 | 15/15 通过 |
+| RTM 需求覆盖率 | 100% | 4/4 需求 100% |
+| 工件质量门 | 退出码 0 | 通过 |
+
+#### 验证
+
+- `w-model-dev-demo/` 内 `npm install && npm test` → 全部四级测试通过
+- 文档一致性：`grep -rE "w-model-dev-demo"` 在 `README.md` / `AGENTS.md` / `docs/skill-design-document_SSoT.md` / `docs/INSTALL.md` / `CONTRIBUTING.md` / `w-model-dev/references/anti-patterns.md` 均有正确指针；无断链
+- SSoT §10B 与 anti-patterns.md「实现层经验教训」节双向链接校验通过
+
+### CI 改为本地推送前门禁
+
+> 远程 GitHub Actions runner 始终无法分配（多次运行卡在 Queued，与代码无关），
+> 改为本地 git `pre-push` hook 承载门禁职责，等价覆盖原 CI 的 5 项检查。
+
+- 删除 `.github/workflows/ci.yml`，关闭远程 CI
+- 新增 `.githooks/pre-push`：在 `git push` 时自动跑 self-test + 4 项 CLI 退出码冒烟，任一不符预期即中止推送
+- 仅当本次推送触及 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` 时才跑门禁，纯文档改动直接放行
+- `package.json` 新增 `setup:hooks`（一次性启用 hook）与 `prepush`（手动跑全部门禁）快捷脚本
+- `CONTRIBUTING.md` 同步说明启用与临时跳过（`git push --no-verify`）方式
+
+### 大规模 Review 优化（P0-P3 共 18 项）
+
+> 基于全项目 Review 报告，按优先级 P0×3 / P1×4 / P2×6 / P3×5 修复一致性、健壮性与可维护性问题。
+
+#### P0 关键正确性
+
+- 修复 `verifier-spec.md` §4.1/§4.2 字母语义与 §6.1 冲突：统一为 `A=完全达成 / D=完全未达成`，公式改为 `1.00*p_A + 0.67*p_B + 0.33*p_C + 0.00*p_D`
+- 修复 `verifier-logic.ts` ranking.k/rounds 整数性校验缺失：增加 `Number.isInteger()` + 数值边界（k ∈ [2,1000]、temperature ≤ 100、rounds ≥ 1）
+- 修复 `gate-logic.ts` RTM JSON 结构校验缺失：缺 `executionSummary` 时不再抛 TypeError，改为返回结构化 reasons；新增 `rows` / `executionSummary.<type>` / 行对象分层校验
+
+#### P1 一致性
+
+- 统一覆盖率表述：85 处「覆盖率」歧义区分为「单元测试代码覆盖率 ≥ 80%」与「RTM 需求覆盖率 100%」两个独立指标（涉及 SKILL.md / SSoT / phase-5/7/8 / verifier-spec / rtm-guide / quality-standards / templates / examples / scripts）
+- 统一测试用例 ID 命名规则：阶段 6/7/8 执行用例从 `TC-INT/SYS/UAT-*` 改为 `IT/ST/UAT-*` 与 RTM 短形式一致；在 `rtm-guide.md` 增加命名规则章节说明两套 ID 体系（运行时 vs 阶段产物验证）
+- SSoT §6.1 核心命令表列名「返回值」→「产出」
+- `verifier-logic.ts` ranking.k/temperature 增加上界校验（防滥用：MAX_RANKING_K=1000、MAX_TEMPERATURE=100）
+
+#### P2 健壮性与可维护性
+
+- 去重验收检查清单：`SKILL.md` 项目级清单从 12 项压缩为核心 4 项 + 指针，避免与 `phase-8-acceptance-test.md` 重复
+- 处理 `.claude/skills/darwin-skill/` 评估产物：迁移至 `eval/`，`.claude/` 加入 `.gitignore`
+- 增加校验脚本样本测试：新增 `w-model-dev/scripts/samples/`（verifier 7 条 + gate 4 条共 11 条端到端样本）+ `self-test.ts` 自动跑通所有样本作为回归基线
+- 统一 `verifier-spec.md` §8 占位符列表
+- 拆分 `phase-1-requirements.md`「可选：需求形式化」节到独立文件
+- `verifier-logic.ts` `varianceThreshold` 缺失时改为判失败而非警告
+
+#### 验证
+
+- `npx tsx w-model-dev/scripts/self-test.ts` → 11/11 通过
+- `npx tsx w-model-dev/scripts/check-verifier-output.ts <sample.json>` 通过 / 失败路径均符合预期
+
+### 一致性补全：命令执行规则与示例覆盖
+
+> 全面扫描后发现 SKILL.md（Agent 实际读取的入口）在若干命令执行规则上与 SSoT / README / verifier-spec.md 不一致或不完整，本次补全使 10 个 `/wm` 命令均有可执行规则，并消除文档间不一致。
+
+#### 新增
+
+- `w-model-dev/SKILL.md` §5「`/wm test` 结果回填机制」：明确 `result=pass|fail` 必填、真实回填约束、与工件质量门的有效性关联（之前只在 README / SSoT / 脚本注释中说明，SKILL.md 自身缺失）
+- `w-model-dev/SKILL.md` §6「辅助命令执行规则」：补全 `/wm review` / `/wm status` / `/wm help` / `/wm reset` / `/wm export` / `/wm import` 六个命令的详细执行步骤与 CHECKPOINT
+- `w-model-dev/SKILL.md` §4「数据与状态管理」：补充 `.w-model/` 持久化目录结构与文件用途
+- `w-model-dev/examples/test-execution.md`：新增测试执行阶段示例（phase 6 集成 / phase 7 系统 + 质量门 / phase 8 验收 + 项目交付），覆盖 `result=pass|fail` 回填、根因分析、CHECKPOINT 放行全流程
+
+#### 变更
+
+- `w-model-dev/SKILL.md` 命令接口表：
+  - `/wm test` 参数补充 `result: pass / fail（必填，真实回填）`，产出列补充「RTM 状态更新」
+  - `/wm review` 的 `target` 前缀由 `REQ-/SD-/AT-/文件路径` 修正为 `REQ- / DESIGN- / UAT- / ST- / IT- / UT- / 文件路径`，与 `references/verifier-spec.md` §2 权威定义一致
+  - `/wm status` 产出列补充「RTM 覆盖率」
+- `w-model-dev/SKILL.md` YAML frontmatter `description`：命令列表由 6 个（analyze/design/code/test/review/status）补全为 10 个（增加 help/reset/export/import），影响 Agent 自动激活触发判断
+- `docs/skill-design-document_SSoT.md` §6.1 核心命令表：
+  - `/wm design` 的 `type` 由 `(架构/详细)` 修正为 `(架构/概要/详细)`，与 SKILL.md / README 一致
+  - `/wm test` 的 `type` 由 `(单元/集成/系统)` 修正为 `(单元/集成/系统/验收)`，并补充 `result` 参数
+  - `/wm status` 返回值补充「RTM 覆盖率」
+- `docs/skill-design-document_SSoT.md` §10A 追溯表：`6 命令接口` 行的实现位置补充「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」
+- `docs/skill-design-document_SSoT.md` 附录 A 命令速查：补全遗漏的 3 个命令（`/wm reset` / `/wm export` / `/wm import`），并修正 `/wm design` / `/wm test` 的参数格式
+- `CONTRIBUTING.md`「添加新命令」节：删除旧架构残留的 `helpHandler` 引用，改为指向 SKILL.md「指令（执行规则）§1/§2/§3/§6」与 SSoT §6.1 / §6.2 / 附录 A 的同步更新流程
+
+#### 验证
+
+- `grep -E "helpHandler|REQ-/SD-/AT-|设计类型\(架构/详细\)|测试类型\(单元/集成/系统\)"` 在保留文件中无残留
+- `npx tsx w-model-dev/scripts/check-verifier-output.ts` 退出码 2（输入错误，符合预期，未传文件）
+- `npx tsx w-model-dev/scripts/check-artifact-gate.ts` 退出码 2（输入错误，符合预期，无 .w-model/rtm.json）
+- 校验脚本未受影响：`verifier-logic.ts` `SUB_CRITERIA` 与 `verifier-spec.md` §7 完全一致（20/20 子标准）；`determineQualityLevel` 与 §6.1 完全一致
+- 所有内部 Markdown 链接目标文件均存在，无断链
+
 ### 架构纯化：移除全部编程式接入
 
 > 把本仓库确定为「单纯的编排 + 校验脚本技能」，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）。

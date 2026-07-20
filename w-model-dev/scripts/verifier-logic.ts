@@ -114,6 +114,13 @@ const MIN_REPEAT_TIMES = 3;
 const DEFAULT_VARIANCE_THRESHOLD = 0.10;
 const SCHEMA_VERSION = '1.0';
 
+/** ranking 字段边界（spec §5.1 默认 k=5 / temperature=4.0，此处给出合理性上界防滥用） */
+const MIN_RANKING_K = 2;
+const MAX_RANKING_K = 1000;
+const MIN_TEMPERATURE = 1e-6;
+const MAX_TEMPERATURE = 100;
+const MIN_RANKING_ROUNDS = 1;
+
 function isNumber(x: unknown): x is number {
   return typeof x === 'number' && !Number.isNaN(x);
 }
@@ -239,7 +246,7 @@ export function checkVerifierOutput(
     ? meta.varianceThreshold
     : DEFAULT_VARIANCE_THRESHOLD;
   if (!isNumber(meta.varianceThreshold)) {
-    reasons.push(`meta.varianceThreshold 缺失或非数字，已按默认 ${DEFAULT_VARIANCE_THRESHOLD} 处理`);
+    reasons.push(`meta.varianceThreshold 必须为数字（spec §6 meta 必填字段），实际为 ${JSON.stringify(meta.varianceThreshold)}`);
   }
 
   // 3. subCriteria
@@ -394,14 +401,14 @@ export function checkVerifierOutput(
       if (r.algorithm !== 'PPT') {
         reasons.push(`ranking.algorithm 必须为 "PPT"，实际为 ${JSON.stringify(r.algorithm)}`);
       }
-      if (!isNumber(r.k) || r.k < 2) {
-        reasons.push(`ranking.k 必须为 ≥2 的整数，实际为 ${JSON.stringify(r.k)}`);
+      if (!isNumber(r.k) || !Number.isInteger(r.k) || r.k < MIN_RANKING_K || r.k > MAX_RANKING_K) {
+        reasons.push(`ranking.k 必须为整数且 ∈ [${MIN_RANKING_K}, ${MAX_RANKING_K}]，实际为 ${JSON.stringify(r.k)}`);
       }
-      if (!isNumber(r.temperature) || r.temperature <= 0) {
-        reasons.push(`ranking.temperature 必须为正数，实际为 ${JSON.stringify(r.temperature)}`);
+      if (!isNumber(r.temperature) || r.temperature <= MIN_TEMPERATURE || r.temperature > MAX_TEMPERATURE) {
+        reasons.push(`ranking.temperature 必须为正数且 ≤ ${MAX_TEMPERATURE}（过大 sigmoid 失去区分度），实际为 ${JSON.stringify(r.temperature)}`);
       }
-      if (!isNumber(r.rounds) || r.rounds < 1) {
-        reasons.push(`ranking.rounds 必须为 ≥1 的整数，实际为 ${JSON.stringify(r.rounds)}`);
+      if (!isNumber(r.rounds) || !Number.isInteger(r.rounds) || r.rounds < MIN_RANKING_ROUNDS) {
+        reasons.push(`ranking.rounds 必须为 ≥${MIN_RANKING_ROUNDS} 的整数，实际为 ${JSON.stringify(r.rounds)}`);
       }
       if (!Array.isArray(r.ordered) || r.ordered.length < 2) {
         reasons.push('ranking.ordered 必须为长度 ≥2 的字符串数组');

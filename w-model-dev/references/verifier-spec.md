@@ -62,10 +62,10 @@
 若底层 LLM 提供 logits 接口，按以下算法计算连续分数：
 
 1. 在提示词末尾追加单选题：「请用字母作答：本子标准的达成度属于哪一档？
-   A=完全未达成 / B=部分达成 / C=基本达成 / D=完全达成」。
+   A=完全达成 / B=基本达成 / C=部分达成 / D=完全未达成」。
 2. 取 A / B / C / D 四个 token 的 logits，做 log-softmax 归一化得概率 `p_A, p_B, p_C, p_D`。
-3. 连续分数 = `0.00 * p_A + 0.33 * p_B + 0.67 * p_C + 1.00 * p_D`。
-4. 该方法数值稳定，且与离散打分兼容（取 argmax 即恢复字母档）。
+3. 连续分数 = `1.00 * p_A + 0.67 * p_B + 0.33 * p_C + 0.00 * p_D`。
+4. 该方法数值稳定，且与离散打分兼容（取 argmax 即恢复字母档）；字母语义与 §6.1 质量等级一致（A 优 / D 差），避免同一字母在不同章节含义冲突。
 
 ### 4.2 文本回退实现（text-parse）
 
@@ -73,24 +73,73 @@
 
 1. 在提示词末尾追加：「请仅输出一个字母作答：A / B / C / D」。
 2. 解析模型输出首个出现的字母（A-D），忽略大小写。
-3. 连续分数 = 该字母对应的离散锚点（0.00 / 0.33 / 0.67 / 1.00）+ `±0.05` 的稳定扰动
+3. 连续分数 = 该字母对应的离散锚点（A=1.00 / B=0.67 / C=0.33 / D=0.00）+ `±0.05` 的稳定扰动
    （扰动种子由子标准 name + 目标 ID 哈希得到，保证可复现）。
 
 > 两种实现均输出 `[0.0, 1.0]` 连续分数，下游消费方不感知差异。
 > Agent 必须在输出 JSON 的 `scoringMethod` 字段标注实际使用的方法。
 
-## 5. PPT 优先级排序（Probability Pivot Tournament）
+## 5. PPT 优先级排序（Probabilistic Pivot Tournament）
 
 当一次评审涉及多个候选目标（如多份候选设计文档、多个测试用例）需要排出优先级时，使用 PPT：
 
 ### 5.1 算法描述
 
-- 输入：`N` 个候选目标，每个已有综合分数（连续值）。
-- 锦标赛规模 `k`（默认 `5`）：每轮随机抽取 `k` 个候选做「软比较」。
-- 软比较胜率 = `sigmoid((score_i - score_j) * temperature)`，`temperature` 默认 `4.0`。
-- 每轮胜者累计 1 分，败者累计 0 分；总分高者优先级高。
-- 总轮数 = `N * k`（保证每个候选平均被比较 `k` 次）。
-- 时间复杂度 `O(N×k)`，相比 `O(N²)` 全比较显著节省 token。
+> 算法源自 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 「LLM-as-a-Verifier: A General-Purpose Verification Framework」§4.3 Probabilistic Pivot Tournament (PPT)。
+> 本节为算法描述，**由外部 Agent 执行**；技能仅校验输出 JSON 的 `ranking` 字段合理性（见 §6 / [`scripts/verifier-logic.ts`](../scripts/verifier-logic.ts)），不实现算法本身。
+
+**核心思路**：将 N 个候选的两两全比较（O(N²)）替换为「每候选 vs k 个枢轴」比较（O(N·k)），在保留排序质量的前提下显著降低 token 预算。
+
+**关键参数**：
+
+| 参数 | 默认 | 取值约束（由校验脚本强制） | 含义 |
+|---|---|---|---|
+| `k` | `5` | 整数 ∈ [2, 1000] | 锦标赛规模；每候选与 `k` 个枢轴比较 |
+| `temperature` | `4.0` | 正数 ≤ 100 | 软比较温度；放大分数差以提升 sigmoid 区分度 |
+| `rounds` | `N * k` | 整数 ≥ 1 | 总比较轮数；由 Agent 根据预算与精度权衡确定 |
+
+**算法流程**（5 阶段流水线）：
+
+1. **候选池**：收集 N 个候选目标，每个已有综合分数 `score_i ∈ [0,1]`（来自 §4 连续评分）。
+2. **环状配对**（Ring Pairing，消除位置偏差）：将候选按环形配对，先用 Bradley-Terry 模型做初步两两比较，得到每个候选的 ring-pass 分数 `w(i)`。
+3. **枢轴选择**：按 `w(i)` 降序排序，取 top-`k` 作为枢轴集 `P`（保留最强候选作为锚点，避免随机枢轴浪费预算）。
+4. **枢轴锦标赛**：每个非枢轴候选 `i` 与 `P` 中所有 `k` 个枢轴 `p` 做软比较；累计 `k` 次胜率均值作为候选 `i` 的最终得分。
+5. **排序输出**：按累计胜率降序，输出 `ordered` 数组。
+
+**软比较胜率公式**：
+
+```
+p(i ≻ j) = sigmoid((score_i - score_j) × temperature)
+         = 1 / (1 + exp(-(score_i - score_j) × temperature))
+```
+
+- 当 `temperature → ∞` 时退化为 `argmax`（硬比较，区分度最大但对噪声敏感）；
+- 当 `temperature → 0` 时退化为 `0.5`（无区分度）；
+- 默认 `4.0` 在分数差 `0.10` 时给出胜率 ≈ `0.60`，区分度足够且不过度放大噪声。
+
+**时间复杂度**：每候选比较 `k` 次，`N` 个候选共 `N·k` 次软比较；每次软比较涉及一次 LLM 调用（logits 读取或文本解析），总开销 `O(N·k)`。相比 round-robin 全比较 `O(N²)`，当 `k ≪ N` 时显著节省 token。
+
+**伪代码**：
+
+```
+输入: candidates[1..N], scores[1..N], k, temperature
+输出: ordered[1..N]
+
+# 第 2-3 阶段：环状配对 + 选枢轴
+1. ring_scores = ring_pairing_tournament(candidates, scores)
+2. pivots = top_k(ring_scores, k)             # |pivots| = k
+
+# 第 4 阶段：枢轴锦标赛
+3. for i in 1..N:
+4.   win_rate[i] = mean( sigmoid((scores[i] - scores[p]) * temperature)
+                        for p in pivots )
+
+# 第 5 阶段：排序输出
+5. ordered = sort_by(win_rate, descending=True)
+6. return ordered
+```
+
+> **本技能的边界**：技能不实现 PPT 算法本身，只校验外部 Agent 输出的 `ranking` 字段（见 §6）。参数 `k` / `temperature` / `rounds` 的合理性边界由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 强制（`k ∈ [2,1000]`、`temperature ∈ (0,100]`、`rounds ≥ 1` 的整数）。
 
 ### 5.2 输出
 
@@ -247,6 +296,24 @@ interface VerifierOutput {
 ## 8. 评审提示词模板
 
 外部 Agent 执行评审时，按以下模板构造提示词（替换 `{{}}` 占位符）。
+
+### 8.0 占位符列表
+
+所有提示词模板共享以下占位符，Agent 在构造提示词前必须先准备好这些值：
+
+| 占位符 | 来源 / 取值约束 | 示例 |
+|---|---|---|
+| `{{repeatTimes}}` | 由 Agent 配置，整数 ≥3（spec §3.2 默认 `3`）；与输出 JSON `meta.repeatTimes` 一致 | `3` |
+| `{{scoringMethod}}` | Agent 选择，`logits` 或 `text-parse`（spec §4 / §6）；与输出 JSON `meta.scoringMethod` 一致 | `logits` |
+| `{{targetKind}}` | 评审目标类型，`requirement` / `design` / `testcase` / `file`（spec §2 / §7）；与输出 JSON `meta.targetKind` 一致 | `requirement` |
+| `{{target}}` | 目标 ID（前缀见 §2）或文件路径；与输出 JSON `meta.target` 一致 | `REQ-001` |
+| `{{targetContent}}` | 目标的完整文本内容（需求规格 / 设计文档 / 测试用例 / 代码片段），由 Agent 从项目工件中读取后整体填入 | （省略） |
+| `{{subSection}}` | §7 中对应 `targetKind` 的子节号（1-4）；用于让模型按正确子标准集合评估 | `1`（对应 §7.1 需求） |
+| `{{k}}` | PPT 锦标赛规模，整数 ∈ [2, 1000]（spec §5.1 默认 `5`）；与输出 JSON `ranking.k` 一致 | `5` |
+| `{{temperature}}` | PPT 软比较温度，正数 ≤ 100（spec §5.1 默认 `4.0`）；与输出 JSON `ranking.temperature` 一致 | `4.0` |
+| `{{candidates}}` | 候选目标列表，每行 `ID<TAB>综合分数`，由 Agent 收集所有候选的 `compositeScore` 后填充 | （省略） |
+
+> 占位符取值必须与输出 JSON 的对应字段保持一致，否则 [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) 会以「字段不一致」为由判失败。
 
 ### 8.1 系统提示词（System Prompt）
 

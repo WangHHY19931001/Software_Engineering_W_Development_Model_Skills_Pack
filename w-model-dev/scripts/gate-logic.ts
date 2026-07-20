@@ -63,6 +63,9 @@ export interface ArtifactGateResult {
  *   - 任一测试类型 pending>0 → 失败（存在待执行用例）
  *   - 全部满足 → 通过
  *
+ * 结构校验：若 RTM JSON 缺字段（如 executionSummary.unitTest 缺失），
+ * 返回结构化 reasons 而非抛 TypeError，便于 Agent 解析。
+ *
  * 关键约束（SSoT §10.5）：本门禁的有效性依赖 `/wm test` 真实回填结果，
  * 不得自动标记测试通过。
  */
@@ -75,7 +78,50 @@ export function checkArtifactGate(
 
   const reasons: string[] = [];
 
-  // 覆盖率（需求维度）
+  // ===== 结构校验（防止 JSON.parse 合法但缺字段时抛 TypeError） =====
+  if (!Array.isArray(matrix.rows)) {
+    reasons.push('RTM 结构错误：rows 字段缺失或非数组');
+  }
+  if (!matrix.executionSummary || typeof matrix.executionSummary !== 'object') {
+    reasons.push('RTM 结构错误：executionSummary 字段缺失或非对象');
+  }
+
+  // 提前返回，避免后续访问 undefined 属性抛 TypeError
+  if (reasons.length > 0) {
+    return { passed: false, reasons, coveragePercent: 0 };
+  }
+
+  // 四级测试汇总字段结构校验
+  const requiredTestTypes: Array<{ key: keyof typeof matrix.executionSummary; name: string }> = [
+    { key: 'unitTest', name: '单元测试' },
+    { key: 'integrationTest', name: '集成测试' },
+    { key: 'systemTest', name: '系统测试' },
+    { key: 'acceptanceTest', name: '验收测试' },
+  ];
+
+  for (const { key, name } of requiredTestTypes) {
+    const s = matrix.executionSummary[key];
+    if (!s || typeof s !== 'object') {
+      reasons.push(`RTM 结构错误：executionSummary.${key}（${name}汇总）缺失或非对象`);
+    }
+  }
+
+  // 行结构校验
+  if (Array.isArray(matrix.rows)) {
+    for (let i = 0; i < matrix.rows.length; i++) {
+      const r = matrix.rows[i];
+      if (!r || typeof r !== 'object') {
+        reasons.push(`RTM 结构错误：rows[${i}] 非对象`);
+      }
+    }
+  }
+
+  // 结构有问题则提前返回（后续访问 s.total / r.coverageStatus 可能出错）
+  if (reasons.length > 0) {
+    return { passed: false, reasons, coveragePercent: 0 };
+  }
+
+  // ===== 覆盖率（需求维度） =====
   const total = matrix.rows.length;
   const covered = matrix.rows.filter(r => r.coverageStatus === '100%').length;
   const coveragePercent = total > 0 ? Math.round((covered / total) * 100) : 0;
@@ -84,7 +130,7 @@ export function checkArtifactGate(
     reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
   }
 
-  // 四级测试执行状态
+  // ===== 四级测试执行状态 =====
   const types: Array<{ name: string; s: TestSummaryShape }> = [
     { name: '单元测试', s: matrix.executionSummary.unitTest },
     { name: '集成测试', s: matrix.executionSummary.integrationTest },

@@ -5,9 +5,9 @@ description: >-
   and test design. Use when the user wants to run requirements analysis, system/outline/detailed
   design, coding with unit tests, integration testing, system testing, or acceptance
   testing as a closed-loop W-model workflow; when the user invokes /wm commands
-  (analyze, design, code, test, review, status); or when building software that
-  needs synchronized test design alongside each development stage with requirements
-  traceability.
+  (analyze, design, code, test, review, status, help, reset, export, import);
+  or when building software that needs synchronized test design alongside each
+  development stage with requirements traceability.
 ---
 
 # W-Model AI Assistant Skill
@@ -26,6 +26,7 @@ description: >-
 - **技能本身不包含演化机制与轨迹分析**。技能自演化（Rollout / Reflect / Edit / Skill Lift 评估等）由外部工具完成：
   - SkillOpt（微软）：https://github.com/microsoft/SkillOpt
   - darwin-skill：https://github.com/alchaincyf/darwin-skill
+- **需求形式化为可选外部委托**。Phase 1（需求分析）的部分语义工作（结构化提取 / BDD 生成 / 知识图谱 / NFR 标记 / TLA+ / Lean 4）可委托给 [SRS-Formalizer](https://github.com/WangHHY19931001/SRS-Formalizer)（外部技能，Agent 驱动 + 脚本门禁，架构与本技能同源）。委托为 **opt-in**，仅当存在正式 SRS 文档且用户显式启用时触发；TLA+/Lean 仅对并发/状态机/安全合规模块条件触发。权威性约定：RTM 以 `.w-model/rtm.json` 为唯一事实源，SRS-Formalizer 产出的追溯矩阵仅作输入；Phase 1 阶段门放行仍以本技能 `check-verifier-output.ts` 为准，SRS-Formalizer 的 `verify-gate` 仅作内部子门禁。详见 [references/phase-1-requirements-formalization.md](references/phase-1-requirements-formalization.md)（[phase-1-requirements.md](references/phase-1-requirements.md)「可选：需求形式化」节有简短指针）。
 - **技能包内的脚本只做门禁**：
   - [scripts/check-artifact-gate.ts](scripts/check-artifact-gate.ts)：工件质量门（RTM 覆盖率 + 四级测试通过）
   - [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts)：外部 Agent 评审输出的结构化校验
@@ -46,26 +47,26 @@ description: >-
 1. **并行原则不可破坏**：进入任一开发阶段时，必须同步启动对应测试类型的设计（见下表），不得将测试设计后置。
 2. **阶段门评审（Stage Gate）**：每个阶段产出必须通过评审后才能进入下一阶段；评审不通过则回到当前阶段起点返工。
 3. **RTM 同步维护**：每次需求或设计变更，必须同步更新需求跟踪矩阵；定期核验需求覆盖率应为 100%。
-4. **质量门**：代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
+4. **质量门**：单元测试代码覆盖率 ≥ 80%；代码规范检查通过；安全检测无高危漏洞；各级测试全部通过方可放行。
 5. **以 SSoT 为准**：本技能以 `docs/skill-design-document_SSoT.md` 为单一事实来源，所有决策、用例、验收标准以其为准。
 6. **最小必要信息**：本文件仅保留编排逻辑，各阶段细则仅加载当前阶段对应的 `references/phase-N-*.md`，模板从 `templates/` 取用。
 7. **LLM 评审由外部执行**：阶段产物的 LLM-as-a-Verifier 评审不内置；外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 执行，并通过 [scripts/check-verifier-output.ts](scripts/check-verifier-output.ts) 防漂移。
 
 ## 反例与黑名单（不要做什么）
 
-以下反模式均为 W 模型执行中真实高发陷阱，命中任一条即视为流程破坏，必须回退到对应阶段起点：
+W 模型执行中真实高发陷阱共 9 条，命中任一条即视为流程破坏，必须回退到对应阶段起点。完整清单（含危害、正确做法、与门禁脚本的对应关系、命中后处理流程）见 [references/anti-patterns.md](references/anti-patterns.md)。
 
-| # | 反模式（不要做） | 危害 | 正确做法 |
-|---|---|---|---|
-| 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 §2 走完评审 + 🔴 CHECKPOINT 放行 |
-| 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
-| 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，覆盖率/测试通过状态会被编造 | 必须执行 `check-artifact-gate.ts`，以退出码 + GATE_JSON 为准 |
-| 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评 |
-| 5 | 一次性载入全部 `references/` | 上下文污染，阶段聚焦丢失 | 仅加载当前阶段所需 `references/phase-N-*.md` |
-| 6 | 用 LLM 估算 RTM 覆盖率 | 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，覆盖率必须 100% |
-| 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 一律回到编码实现，附 GATE_JSON 详情 |
-| 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
-| 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
+简表（Agent 阶段门评审前扫描）：
+
+1. 跳过阶段门评审直接进入下一阶段
+2. 将测试设计后置到编码之后
+3. 用 LLM 自行"估算"质量门结果
+4. 评审未通过时悄悄小修后继续
+5. 一次性载入全部 `references/`
+6. 用 LLM 估算 RTM 覆盖率
+7. 质量门脚本退出码 1/2 时放行发布
+8. 越过 🔴 CHECKPOINT 自动推进
+9. 谎报阶段状态（未完成标为完成）
 
 ## 阶段与测试并行对应表
 
@@ -82,23 +83,17 @@ description: >-
 
 ## 完整工作流程
 
+总体流程：8 阶段左 V 开发 + 同步右 V 测试设计，每阶段评审通过才进入下一阶段，编码后接入质量门。
+
+详细流程图（含阶段门评审 + 质量门 + 缺陷返工路径）与阶段并行对应表见 [references/workflow.md](references/workflow.md)。
+
+简图：
+
 ```
-需求分析 ──(同步验收测试设计)──► 评审 ──通过──► 系统设计
-                                              │不通过► 回到需求分析
-系统设计 ──(同步系统测试设计)──► 评审 ──通过──► 概要设计
-                                              │不通过► 回到系统设计
-概要设计 ──(同步集成测试设计)──► 评审 ──通过──► 详细设计
-                                              │不通过► 回到概要设计
-详细设计 ──(同步单元测试设计)──► 评审 ──通过──► 编码实现
-                                              │不通过► 回到详细设计
-编码实现 ──(执行单元测试)──────► 代码审查 ──通过──► 集成测试
-                                              │不通过► 回到编码实现
-集成测试 ──(接口验证)──────────► 通过──► 系统测试
-                              │不通过► 回到编码实现
-系统测试 ──(性能/安全测试)─────► 缺陷修复 ──完成──► 验收测试
-                              │需修复► 回到编码实现
-验收测试 ──(用户确认)──────────► 通过──► 项目完成
-                              │不通过► 回到需求分析
+需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码 → 集成测试 → 系统测试 → 验收测试
+   │同步        │同步        │同步        │同步      │执行       │执行       │执行
+   ▼            ▼            ▼            ▼         ▼          ▼          ▼
+验收测试设计  系统测试设计  集成测试设计  单元测试设计  单元测试  集成测试  系统测试  验收测试
 ```
 
 ## 命令接口
@@ -110,9 +105,9 @@ description: >-
 | `/wm analyze` | 需求分析 | `input`: 需求描述 | 需求规格说明书、验收测试用例 |
 | `/wm design` | 系统设计 | `type`: 架构 / 概要 / 详细 | 设计文档、对应测试用例 |
 | `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
-| `/wm test` | 测试执行 | `type`: 单元 / 集成 / 系统 / 验收 | 测试报告 |
-| `/wm review` | LLM 评审指引 | `target`: REQ-/SD-/AT-/文件路径 | 评审指引（指向 verifier-spec.md） |
-| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度 |
+| `/wm test` | 测试执行与回填 | `type`: 单元 / 集成 / 系统 / 验收；`result`: pass / fail（必填，真实回填） | 测试报告、RTM 状态更新 |
+| `/wm review` | LLM 评审指引 | `target`: `REQ-` / `DESIGN-` / `UAT-` / `ST-` / `IT-` / `UT-` / 文件路径 | 评审指引（指向 verifier-spec.md + check-verifier-output.ts） |
+| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度、RTM 覆盖率 |
 
 ### 辅助命令
 
@@ -198,6 +193,84 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 - 项目数据模型、需求 / 设计 / 测试用例数据结构见 [references/data-models.md](references/data-models.md)。
 - 项目状态字段取值：`需求分析 | 系统设计 | 概要设计 | 详细设计 | 编码 | 集成测试 | 系统测试 | 验收测试`。
 - 每次阶段切换更新 `status` 与 `updatedAt`。
+- 持久化位置：项目内 `.w-model/` 目录（已在 `.gitignore` 中默认排除）。
+  - `.w-model/project.json`：项目元信息（id / name / description / status / techStack / 时间戳）。
+  - `.w-model/rtm.json`：需求跟踪矩阵（行 + 四级测试执行汇总），由 [`scripts/check-artifact-gate.ts`](scripts/check-artifact-gate.ts) 读取。
+  - 其余实体（需求 / 设计 / 测试用例）按需写入 `.w-model/<entity>.json`，结构与 [references/data-models.md](references/data-models.md) 一致。
+
+### 5. `/wm test` 结果回填机制（重要）
+
+`/wm test` 是 W 模型右 V 的测试执行入口，必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填结果，**不得自动将测试标记为通过**——否则工件质量门形同虚设。
+
+执行步骤：
+
+1. Agent 调用真实的测试运行器执行对应类型的测试（单元 / 集成 / 系统 / 验收）。
+2. 收集真实结果（通过数 / 失败数 / 待执行数 / 单元测试代码覆盖率，仅单元测试必填）。
+3. 通过 `/wm test type=<类型> result=<pass|fail>` 回填：
+   - `result=pass`：将该类型所有用例状态置为「通过」，更新 `executionSummary.<type>Test` 的 `passed` / `failed` / `pending`。
+   - `result=fail`：将失败用例状态置为「失败」，并要求 Agent 定位根因、关联到模块，回到编码实现返工。
+4. 同步更新 `.w-model/rtm.json` 的 `executionSummary` 与对应测试列状态。
+5. 产出《测试报告》（套用 [templates/test-report.md](templates/test-report.md)）。
+
+> **禁止行为**：跳过真实测试执行、由 LLM 估算测试结果、未执行即标通过、`result` 参数缺省。违反任一项即视为流程破坏（见「反例与黑名单」#3 / #6）。
+
+### 6. 辅助命令执行规则
+
+#### `/wm review <target>`
+
+返回结构化评审指引，**不调用 LLM**：
+
+1. 识别 `target` 类型（按 ID 前缀：`REQ-` → requirement / `DESIGN-` → design / `UAT-` / `ST-` / `IT-` / `UT-` → testcase / 其他按文件路径 → file）。
+2. 加载 [references/verifier-spec.md](references/verifier-spec.md)，定位 §7 对应 targetKind 的子标准集合。
+3. 输出评审指引：
+   - targetKind、target、对应子标准列表（名称 + 权重 + 描述）
+   - §8 提示词模板（系统提示词 + 用户提示词占位符待填）
+   - 校验脚本调用命令：`npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>`
+   - 通过判定：`passed=true (A/B) → 放行` / `passed=false (C/D) → 按 reworkHints 返工`
+4. 由外部 Agent 自行执行 LLM-as-a-Verifier 评审，产出 JSON 后立即调用校验脚本（见 §2）。
+
+#### `/wm status`
+
+读取 `.w-model/project.json` 与 `.w-model/rtm.json`，输出：
+
+1. 当前阶段（`status` 字段）与 `updatedAt`。
+2. 已完成阶段数 / 总阶段数（8）+ 阶段进度条。
+3. RTM 覆盖率（需求维度）：已覆盖需求数 / 总需求数。
+4. 四级测试执行汇总：单元 / 集成 / 系统 / 验收的 `total / passed / failed / pending`。
+5. 下一步建议（如「评审通过可进入 X 阶段」或「质量门未通过，回到编码」）。
+
+#### `/wm help`
+
+输出本技能的命令一览（与「命令接口」节一致）+ 阶段与测试并行对应表 + 关键约束（反例黑名单 #1/#2/#7/#8）摘要。不读项目状态。
+
+#### `/wm reset`
+
+重置当前项目状态：
+
+1. 保留元信息：`project.id` / `project.name` / `project.description` / `project.techStack` / `createdAt`。
+2. 清空实体：删除 `.w-model/` 下所有需求 / 设计 / 测试用例 / RTM 数据；`project.status` 重置为 `需求分析`；`updatedAt` 刷新为当前时间。
+3. 输出确认信息，提示用户可重新从 `/wm analyze` 开始。
+
+> 🔴 **CHECKPOINT · 重置确认**：执行前必须暂停向用户确认「将清空所有实体，保留项目元信息」，得到确认后执行。
+
+#### `/wm export [输出目录]`
+
+将项目导出为可迁移的 JSON + RTM Markdown：
+
+1. 默认输出目录：`./w-model-export/`，可由参数指定。
+2. 导出 `project.json`（项目元信息 + 全部实体）与 `rtm.md`（按 [templates/rtm.md](templates/rtm.md) 渲染）。
+3. 输出导出清单（文件路径 + 大小）。
+
+#### `/wm import <文件路径>`
+
+从 JSON 导入项目：
+
+1. 读取指定 `project.json`，按 [references/data-models.md](references/data-models.md) 校验结构。
+2. 校验失败 → 输出原因，不写入任何文件；退出码 2。
+3. 校验通过 → 写入 `.w-model/`，更新 `project.status` 与 `updatedAt`。
+4. 输出导入摘要（项目名 / 当前阶段 / 需求数 / 测试用例数）。
+
+> 🔴 **CHECKPOINT · 导入确认**：若 `.w-model/` 已存在项目数据，执行前必须暂停向用户确认「将覆盖现有项目」，得到确认后执行。
 
 ## 交互模式示例
 
@@ -206,6 +279,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 - 需求分析交互：[examples/requirement-analysis.md](examples/requirement-analysis.md)
 - 设计阶段交互：[examples/system-design.md](examples/system-design.md)
 - 编码阶段交互：[examples/coding.md](examples/coding.md)
+- 测试执行交互：[examples/test-execution.md](examples/test-execution.md)
 
 ## 通用输出规范
 
@@ -217,18 +291,12 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 
 ## 验收检查清单（项目级）
 
-- [ ] 需求规格说明书完整
-- [ ] 设计文档完整且符合规范
-- [ ] 代码实现完成且通过编译
-- [ ] 单元测试覆盖率 ≥ 80%
-- [ ] 集成测试全部通过
-- [ ] 系统测试全部通过
-- [ ] 安全测试无高危漏洞
-- [ ] 性能测试达标
-- [ ] 验收测试通过
-- [ ] 用户确认签字
-- [ ] 交付文档齐全
-- [ ] RTM 覆盖率 100%
+核心放行条件（详见 [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md)「项目级验收检查清单」）：
+
+- [ ] 四级测试（单元 / 集成 / 系统 / 验收）全部通过
+- [ ] 单元测试代码覆盖率 ≥ 80%
+- [ ] RTM 需求覆盖率 100%（`check-artifact-gate.ts` 退出码 0）
+- [ ] 用户确认签字 + 交付文档齐全
 
 ## 文件清单
 
@@ -242,6 +310,7 @@ w-model-dev/
 │   └── check-verifier-output.ts   #   Verifier 输出校验 CLI（防外部 Agent 输出漂移）
 ├── references/                    # 阶段细则与规范（仅当前阶段加载）
 │   ├── phase-1-requirements.md
+│   ├── phase-1-requirements-formalization.md  #   Phase 1 可选增强（SRS-Formalizer 委托）
 │   ├── phase-2-system-design.md
 │   ├── phase-3-outline-design.md
 │   ├── phase-4-detailed-design.md
@@ -249,6 +318,8 @@ w-model-dev/
 │   ├── phase-6-integration-test.md
 │   ├── phase-7-system-test.md
 │   ├── phase-8-acceptance-test.md
+│   ├── anti-patterns.md           #   反例与黑名单（9 条高发陷阱）
+│   ├── workflow.md                #   完整工作流程（流程图 + 阶段并行表）
 │   ├── data-models.md
 │   ├── rtm-guide.md
 │   ├── quality-standards.md
@@ -265,7 +336,8 @@ w-model-dev/
 └── examples/                      # 交互示例
     ├── requirement-analysis.md
     ├── system-design.md
-    └── coding.md
+    ├── coding.md
+    └── test-execution.md          #   集成 / 系统 / 验收测试执行示例（phase 6/7/8）
 ```
 
 > 本目录为标准 skill 结构，自包含。AI Agent 安装时只需拷贝整个 `w-model-dev/` 目录，

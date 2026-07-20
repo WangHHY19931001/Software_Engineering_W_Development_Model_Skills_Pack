@@ -17,6 +17,8 @@
 ### 1.4 文档定位
 本文档为W-Model AI Assistant Skill的**单一事实来源（Single Source of Truth, SSoT）**，包含所有设计决策、需求定义、测试用例、集成规范和验收标准。所有相关团队和系统均应以本文档为准。
 
+> **参考实现**：本技能的设计已由 [`w-model-dev-demo/`](../w-model-dev-demo)（博客系统后端，Express + TypeScript）端到端调测验证，8 阶段全流程闭环、四级测试全通过、工件质量门放行。详见 §10B。
+
 > **架构重构说明（重要）**：本技能已完成架构纯化——**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）。技能包只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM 调用。
 > 据此，本文档已移除技能演化机制与轨迹分析相关章节（原第 14 章「技能演化机制」、原第 15 章「技能评估标准」、原 §7.7 / §7.8 数据模型、原 §12.4「第四阶段（自演化版）」等），并移除全部 `src/` 编程式引擎（`/wm` 命令、状态持久化、RTM 维护改由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行）。
 > LLM-as-a-Verifier 评审由外部 Agent 按提示词执行（规范见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md)）；
@@ -107,6 +109,12 @@ graph TD
 
 ### 3.2 核心模块设计
 
+> **去重约定**：本节只描述各核心模块的**设计层面边界**（功能、输入输出、AI 能力应用）。
+> 各模块的详细阶段产物、测试用例设计表、验收标准清单、RTM 登记规则、阶段门评审等内容
+> 由 [`w-model-dev/references/phase-N-*.md`](../../w-model-dev/references/) 各阶段文档维护，
+> 本节不再重复，仅以指针引用。测试用例 ID 命名规则（`UT/IT/ST/UAT-NNN` 运行时用例 vs
+> `TC-<PHASE>-NNN` 阶段产物验证用例）见 [`rtm-guide.md`](../../w-model-dev/references/rtm-guide.md)。
+
 #### 3.2.1 需求分析模块
 
 **功能描述**：将自然语言需求转化为结构化的需求规格说明书，并同步设计验收测试用例
@@ -126,20 +134,9 @@ graph TD
 - 需求冲突检测
 - 验收测试用例自动生成
 
-**测试用例设计**：
-
-| 用例ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|--------|----------|------|----------|--------|
-| TC-REQ-001 | 自然语言需求解析 | "我需要一个用户登录功能" | 结构化需求，包含功能描述、输入输出、验收标准 | 高 |
-| TC-REQ-002 | 复杂需求分解 | "在线商城系统，支持用户注册、商品浏览、购物车和订单功能" | 分解为4个独立模块需求 | 高 |
-| TC-REQ-003 | 需求完整性检查 | "用户登录功能"（缺少密码策略） | 提示缺少密码复杂度要求 | 高 |
-| TC-REQ-004 | 需求冲突检测 | "用户登录需要邮箱验证" AND "用户登录不需要验证" | 检测到冲突并提示 | 高 |
-| TC-REQ-005 | 验收测试用例生成 | 完整需求描述 | 生成对应的验收测试用例 | 高 |
-
-**验收标准**：
-- 需求规格说明书符合模板规范
-- 验收测试用例覆盖所有功能点
-- 需求风险评估报告包含风险等级和缓解措施
+> 详细阶段产物、测试用例设计表（TC-REQ-001~005）、验收标准、可选 SRS-Formalizer 委托：
+> 见 [`phase-1-requirements.md`](../../w-model-dev/references/phase-1-requirements.md) 与
+> [`phase-1-requirements-formalization.md`](../../w-model-dev/references/phase-1-requirements-formalization.md)。
 
 #### 3.2.2 设计阶段模块
 
@@ -156,22 +153,10 @@ graph TD
 - 接口定义文档生成
 - 测试用例设计
 
-**测试用例设计**：
-
-| 用例ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|--------|----------|------|----------|--------|
-| TC-DES-001 | 系统架构设计 | 需求规格说明书 | 完整架构图、技术选型、模块划分 | 高 |
-| TC-DES-002 | 类图生成 | 详细需求描述 | 符合UML规范的类图 | 高 |
-| TC-DES-003 | 数据库设计 | 数据需求 | ER图、表结构定义、索引设计 | 高 |
-| TC-DES-004 | 接口定义 | 模块交互需求 | 接口文档、参数定义、返回值 | 高 |
-| TC-DES-005 | 系统测试用例生成 | 系统设计文档 | 覆盖系统级功能的测试用例 | 高 |
-| TC-DES-006 | 集成测试用例生成 | 接口定义文档 | 覆盖模块间交互的测试用例 | 高 |
-
-**验收标准**：
-- 架构设计符合技术选型原则
-- UML图符合规范
-- 接口定义完整，包含输入输出和错误处理
-- 测试用例覆盖关键路径
+> 详细阶段产物、测试用例设计表（TC-DES-001~006）、验收标准：
+> 见 [`phase-2-system-design.md`](../../w-model-dev/references/phase-2-system-design.md) /
+> [`phase-3-outline-design.md`](../../w-model-dev/references/phase-3-outline-design.md) /
+> [`phase-4-detailed-design.md`](../../w-model-dev/references/phase-4-detailed-design.md)。
 
 #### 3.2.3 编码与单元测试模块
 
@@ -192,21 +177,8 @@ graph TD
 - 单元测试用例生成
 - 测试执行与报告生成
 
-**测试用例设计**：
-
-| 用例ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|--------|----------|------|----------|--------|
-| TC-COD-001 | 代码生成 | 详细设计文档 | 可编译运行的代码 | 高 |
-| TC-COD-002 | 代码质量检查 | 生成的代码 | 无语法错误、符合代码规范 | 高 |
-| TC-COD-003 | 单元测试生成 | 代码文件 | 覆盖核心逻辑的单元测试用例 | 高 |
-| TC-COD-004 | 测试覆盖率 | 执行单元测试 | 覆盖率 ≥ 80% | 高 |
-| TC-COD-005 | 边界条件处理 | 边界输入 | 正确处理并返回预期结果 | 中 |
-
-**验收标准**：
-- 代码可编译通过
-- 代码规范检查通过（ESLint/Prettier）
-- 单元测试覆盖率 ≥ 80%
-- 测试报告清晰，包含通过率和覆盖率
+> 详细阶段产物、测试用例设计表（TC-COD-001~005）、验收标准（含单元测试代码覆盖率 ≥ 80%）：
+> 见 [`phase-5-coding.md`](../../w-model-dev/references/phase-5-coding.md)。
 
 #### 3.2.4 集成测试模块
 
@@ -225,21 +197,8 @@ graph TD
 - 接口调用验证
 - 测试结果分析
 
-**测试用例设计**：
-
-| 用例ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|--------|----------|------|----------|--------|
-| TC-INT-001 | 接口调用验证 | 合法请求参数 | 返回预期结果，状态码200 | 高 |
-| TC-INT-002 | 接口参数校验 | 非法参数 | 返回错误信息，状态码400 | 高 |
-| TC-INT-003 | 模块间数据传递 | 跨模块调用 | 数据正确传递和处理 | 高 |
-| TC-INT-004 | 接口性能测试 | 高并发请求 | 响应时间 < 500ms | 中 |
-| TC-INT-005 | 接口兼容性 | 不同版本接口 | 向后兼容或提示版本升级 | 中 |
-
-**验收标准**：
-- 所有接口调用验证通过
-- 参数校验逻辑正确
-- 模块间数据传递无误
-- 接口性能满足要求
+> 详细阶段产物、运行时测试用例（IT-001~005）、验收标准：
+> 见 [`phase-6-integration-test.md`](../../w-model-dev/references/phase-6-integration-test.md)。
 
 #### 3.2.5 系统测试模块
 
@@ -259,21 +218,8 @@ graph TD
 - 性能测试脚本生成
 - 安全漏洞检测
 
-**测试用例设计**：
-
-| 用例ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|--------|----------|------|----------|--------|
-| TC-SYS-001 | 端到端功能测试 | 完整业务流程 | 流程顺利完成，数据正确 | 高 |
-| TC-SYS-002 | 性能测试 | 模拟高负载 | 系统响应时间 < 2s，无崩溃 | 高 |
-| TC-SYS-003 | 安全测试 | 常见攻击向量 | 无安全漏洞，防御有效 | 高 |
-| TC-SYS-004 | 兼容性测试 | 不同浏览器/设备 | 功能正常显示和使用 | 中 |
-| TC-SYS-005 | 可靠性测试 | 长时间运行 | 系统稳定，无内存泄漏 | 中 |
-
-**验收标准**：
-- 端到端测试全部通过
-- 性能指标达到预期
-- 安全检测无高危漏洞
-- 兼容性测试通过
+> 详细阶段产物、运行时测试用例（ST-001~005）、验收标准：
+> 见 [`phase-7-system-test.md`](../../w-model-dev/references/phase-7-system-test.md)。
 
 #### 3.2.6 验收测试模块
 
@@ -291,20 +237,8 @@ graph TD
 - 验收测试用例执行
 - 用户需求匹配验证
 
-**测试用例设计**：
-
-| 用例ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|--------|----------|------|----------|--------|
-| TC-UAT-001 | 需求匹配验证 | 原始需求描述 | 系统功能与需求一致 | 高 |
-| TC-UAT-002 | 用户场景测试 | 用户真实操作流程 | 流程顺畅，符合预期 | 高 |
-| TC-UAT-003 | 验收标准验证 | 验收标准列表 | 每项标准均满足 | 高 |
-| TC-UAT-004 | 文档完整性 | 交付文档列表 | 文档齐全，格式规范 | 中 |
-
-**验收标准**：
-- 所有验收测试用例通过
-- 用户确认系统满足需求
-- 交付文档完整
-- 系统可正常部署和运行
+> 详细阶段产物、运行时测试用例（UAT-001~004）、验收标准、项目级验收检查清单：
+> 见 [`phase-8-acceptance-test.md`](../../w-model-dev/references/phase-8-acceptance-test.md)。
 
 ### 3.3 技能架构原则与外部工具边界（重要）
 
@@ -464,7 +398,7 @@ AI: 已生成以下文件：
     - src/services/userService.ts
     - src/models/User.ts
     - src/routes/userRoutes.ts
-AI: 已生成单元测试用例，覆盖率95%
+AI: 已生成单元测试用例，单元测试代码覆盖率 95%
 AI: 执行测试中...测试通过
 ```
 
@@ -498,14 +432,14 @@ AI: 执行测试中...测试通过
 
 ### 6.1 核心命令
 
-| 命令 | 功能描述 | 参数 | 返回值 |
+| 命令 | 功能描述 | 参数 | 产出 |
 |------|----------|------|--------|
 | `/wm analyze` | 需求分析 | `input`: 需求描述 | 需求规格说明书、验收测试用例 |
-| `/wm design` | 系统设计 | `type`: 设计类型(架构/详细) | 设计文档、测试用例 |
+| `/wm design` | 系统设计 | `type`: 设计类型(架构/概要/详细) | 设计文档、测试用例 |
 | `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
-| `/wm test` | 测试执行 | `type`: 测试类型(单元/集成/系统) | 测试报告 |
+| `/wm test` | 测试执行与回填 | `type`: 测试类型(单元/集成/系统/验收)；`result`: pass/fail（必填，真实回填） | 测试报告 |
 | `/wm review` | LLM 评审指引 | `target`: 需求/设计/测试用例 ID 或文件路径 | 结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`，不内置 LLM） |
-| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度 |
+| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度、RTM 覆盖率 |
 
 ### 6.2 辅助命令
 
@@ -713,7 +647,7 @@ flowchart TD
     B --> C[识别输入输出边界条件]
     C --> D[生成正常场景用例]
     C --> E[生成异常场景用例]
-    D --> F[评估测试覆盖率]
+    D --> F[评估测试用例覆盖率]
     E --> F
     F --> G[输出: 测试用例集合]
     
@@ -789,7 +723,7 @@ graph LR
 ## 10. 质量保障体系
 
 ### 10.1 代码质量标准
-- 代码覆盖率 ≥ 80%
+- 单元测试代码覆盖率 ≥ 80%
 - 代码规范检查（ESLint/Prettier）
 - 安全漏洞扫描
 - 性能指标监控
@@ -869,12 +803,85 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 | 3.2.3 编码与单元测试 | 代码生成、单元测试用例生成 | `w-model-dev/SKILL.md` `/wm code` 编排 + `references/phase-4/5-*.md` | 编排完整（不自动标记通过，需 `result` 回填） |
 | 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
 | 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
-| 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」（编排，Agent 执行） | 完整 |
+| 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 7 数据模型 | Project / Requirement / Design / TestCase / RTM | `w-model-dev/references/data-models.md`（Agent 维护 `.w-model/*.json` 的 schema） | 完整 |
 | 7.6 LLM-as-a-Verifier 评审规范 | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 | `w-model-dev/references/verifier-spec.md`（规范）+ `w-model-dev/scripts/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/check-verifier-output.ts`（CLI 校验） | 完整（LLM 推理由外部 Agent 执行） |
 | 8 技术实现方案 | 需求解析 / 测试用例生成 / 代码生成算法 | 上游 AI 按提示词执行（`w-model-dev/references/phase-*.md`） | 完整（算法由提示词承载，技能不内置 LLM） |
 | 9 RTM | 需求跟踪矩阵 | `w-model-dev/references/rtm-guide.md` + `templates/rtm.md`（Agent 维护） | 完整 |
 | 10 质量保障 | 工件质量门 | 判定逻辑：`w-model-dev/scripts/gate-logic.ts`（单点事实源）；CLI：`w-model-dev/scripts/check-artifact-gate.ts` | 完整（见 10.5，门禁逻辑已沉入技能包） |
+
+---
+
+## 10B. 参考实现（端到端调测验证）
+
+> 本节记录对 W 模型 8 阶段编排 + LLM-as-a-Verifier 阶段门 + 工件质量门的端到端调测验证结论。
+> 参考实现位于 [`w-model-dev-demo/`](../w-model-dev-demo)，是一个博客系统后端（blog-system-demo），用于具象验证本 SSoT 所述设计在真实项目中的可执行性。
+
+### 10B.1 项目概况
+
+| 项 | 内容 |
+|---|---|
+| 项目名 | 博客系统后端（blog-system-demo） |
+| 技术栈 | Node.js ≥20 / Express 4 / TypeScript 5（严格模式）/ zod 3 / jsonwebtoken 9 / bcrypt 5 / vitest 1 + supertest |
+| 存储方式 | 内存 Map（无外部 DB 依赖，便于端到端调测） |
+| 调测日期 | 2026-07-20 |
+| 调测模式 | self-as-verifier（Agent 按本技能编排自驱完成 8 阶段） |
+| 范围 | 用户认证（注册 / 登录 / JWT）+ 文章 CRUD（作者隔离）+ 公开浏览 + 评论 |
+
+### 10B.2 8 阶段产出对应
+
+| W 模型阶段 | 产出位置 | 同步测试设计 |
+|---|---|---|
+| 1 需求分析 | [`docs/requirement-spec.md`](../w-model-dev-demo/docs/requirement-spec.md) | 验收测试用例索引（UAT-001~015） |
+| 2 系统设计 | [`docs/system-design.md`](../w-model-dev-demo/docs/system-design.md) | 系统测试用例索引（ST-001~006） |
+| 3 概要设计 | [`docs/outline-design.md`](../w-model-dev-demo/docs/outline-design.md) | 集成测试用例索引（IT-001~006） |
+| 4 详细设计 | [`docs/detailed-design.md`](../w-model-dev-demo/docs/detailed-design.md) | 单元测试用例（UT-001~022） |
+| 5 编码 | [`src/`](../w-model-dev-demo/src) + [`docs/unit-test-cases.md`](../w-model-dev-demo/docs/unit-test-cases.md) | 单元测试执行（22/22 通过，覆盖率 98%） |
+| 6 集成测试 | [`docs/integration-test-report.md`](../w-model-dev-demo/docs/integration-test-report.md) | 6/6 通过（含缺陷修正，见 §10B.4） |
+| 7 系统测试 | [`docs/system-test-report.md`](../w-model-dev-demo/docs/system-test-report.md) | 6/6 通过 |
+| 8 验收测试 | [`docs/acceptance-test-report.md`](../w-model-dev-demo/docs/acceptance-test-report.md) | 15/15 通过，RTM 覆盖率 100% |
+
+### 10B.3 调测结论摘要
+
+| 指标 | 目标 | 实测 | 是否达标 |
+|---|---|---|---|
+| 单元测试通过率 | 100% | 22/22（100%） | ✅ |
+| 单元测试代码覆盖率 | ≥ 80%（NFR-004） | 98% | ✅ |
+| 集成测试通过率 | 100% | 6/6（100%） | ✅ |
+| 系统测试通过率 | 100% | 6/6（100%） | ✅ |
+| 验收测试通过率 | 100% | 15/15（100%） | ✅ |
+| RTM 需求覆盖率 | 100% | 4/4（100%） | ✅ |
+| 阶段门评审 | 8 阶段全部放行 | 8/8 | ✅ |
+| 工件质量门（`check-artifact-gate.ts`） | 退出码 0 | 通过 | ✅ |
+| 安全约束（JWT 过期 / 作者隔离 / 输入校验 / 孤儿数据） | 全部覆盖 | 4/4 | ✅ |
+
+### 10B.4 过程中发现的缺陷与修正
+
+| 缺陷 | 触发阶段 | 根因 | 修正 | 验证 |
+|---|---|---|---|---|
+| 首轮 4 个集成测试失败：NotFoundError / ForbiddenError 未被中间件捕获，表现为 Unhandled Rejection | 阶段 6（集成测试） | Express 4 不自动捕获 async handler 抛出的 rejected promise | 新建 [`src/utils/async-handler.ts`](../w-model-dev-demo/src/utils/async-handler.ts) 包装器，包裹 `auth-routes.ts` / `article-routes.ts` / `comment-routes.ts` 全部路由 | 重跑 6/6 通过 |
+
+> 此缺陷已纳入 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节，供后续项目在阶段 5（编码）规避。
+
+### 10B.5 与 SSoT 设计章节的映射
+
+参考实现验证了以下 SSoT 设计章节在真实项目中的可执行性：
+
+| SSoT 章节 | 验证点 | 验证结果 |
+|---|---|---|
+| §3.2 模块设计 | 4 模块划分（认证 / 文章 / 评论 / 公共层） | ✅ M-001~M-004 全部落地 |
+| §4 工作流程 | 8 阶段顺序 + 阶段门评审 | ✅ 全部走通 |
+| §6 命令接口 | `/wm analyze` / `design` / `code` / `test` / `review` / `status` | ✅ 编排可用 |
+| §9 RTM | 双向追溯 + 覆盖率 100% | ✅ 4/4 需求 100% 覆盖 |
+| §10 质量保障 | 工件质量门（§10.5） | ✅ 退出码 0 |
+| §7.6 LLM-as-a-Verifier | 阶段门评审流程 | ✅ 8 阶段全部放行 |
+
+### 10B.6 边界声明
+
+- `w-model-dev-demo/` 是**参考实现**，不是技能运行时依赖：不参与 `/wm` 命令编排，也不被 `check-*-gate.ts` 读取。
+- 调测结论仅验证本 SSoT 所述设计的可执行性，不构成对其他项目场景的承诺。
+- demo 自身的 `package.json` 独立于仓库根 `package.json`（demo 引入 express / bcrypt / jsonwebtoken / zod / vitest 等业务依赖，与根 `package.json` 仅声明 `tsx` 不同）。
+- 内存存储是已知限制（重启数据丢失），详见 [`w-model-dev-demo/docs/requirement-spec.md`](../w-model-dev-demo/docs/requirement-spec.md) RISK-001。
 
 ---
 
@@ -1052,12 +1059,15 @@ timeline
 | 命令 | 功能 |
 |------|------|
 | `/wm analyze <需求>` | 分析需求并生成规格说明 |
-| `/wm design [type]` | 生成系统/详细设计文档 |
+| `/wm design type=<架构\|概要\|详细>` | 生成对应类型设计文档 |
 | `/wm code <功能>` | 生成代码和单元测试 |
-| `/wm test [type]` | 执行指定类型测试 |
+| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 执行指定类型测试并真实回填结果 |
 | `/wm review <目标>` | 返回 LLM 评审指引（指向 verifier-spec.md，由外部 Agent 执行） |
-| `/wm status` | 查看项目状态 |
+| `/wm status` | 查看项目状态（当前阶段、RTM 覆盖率、四级测试汇总） |
 | `/wm help` | 显示帮助 |
+| `/wm reset` | 重置当前项目状态（保留元信息，清空实体） |
+| `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
+| `/wm import <文件路径>` | 从 JSON 导入项目 |
 
 ### B. 测试类型对应关系
 
@@ -1077,7 +1087,7 @@ timeline
 - [ ] 需求规格说明书完整
 - [ ] 设计文档完整且符合规范
 - [ ] 代码实现完成且通过编译
-- [ ] 单元测试覆盖率 ≥ 80%
+- [ ] 单元测试代码覆盖率 ≥ 80%
 - [ ] 集成测试全部通过
 - [ ] 系统测试全部通过
 - [ ] 安全测试无高危漏洞

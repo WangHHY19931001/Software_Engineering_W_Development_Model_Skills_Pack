@@ -15,7 +15,7 @@
  *   <project-dir>/.w-model/rtm.json   （由 Agent 在执行 /wm 命令时维护）
  *
  * 退出码：
- *   0  质量门通过（覆盖率 100% 且四级测试全部通过）
+ *   0  质量门通过（RTM 需求覆盖率 100% 且四级测试全部通过）
  *   1  质量门未通过（reasons 列出具体原因）
  *   2  输入错误（RTM 文件不存在 / 格式非法）
  *
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
 
   if (result.passed) {
-    console.log('所有放行条件均满足：覆盖率 100% 且四级测试全部通过。');
+    console.log('所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过。');
   } else {
     console.log('未通过原因：');
     for (const r of result.reasons) {

@@ -50,6 +50,16 @@
 
 产出需求规格后，**立即**同步生成验收测试用例，覆盖所有功能点。验收测试用例将在阶段 8（验收测试）执行，本阶段只做设计。
 
+## 可选：需求形式化（委托 SRS-Formalizer）
+
+> 本节为 Phase 1 的**可选增强**，默认关闭。触发条件、委托范围、权威性约定与执行指引详见独立文件：
+> [phase-1-requirements-formalization.md](phase-1-requirements-formalization.md)。
+>
+> 简要触发条件（必须全部满足，详见独立文件「触发条件」节）：
+> 1. 用户提供正式 SRS 文档（Markdown / HTML / 多目录包），而非口头或卡片式需求；
+> 2. 用户显式 opt-in（如"启用形式化"/"生成 BDD"/"做 TLA+ 建模"）；
+> 3. 运行环境具备 SRS-Formalizer 前置依赖（Node.js ≥20；TLA+/Lean 仅在条件触发时需要）。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中登记：需求 ID、需求描述、验收测试列。其余列（设计文档 / 代码模块 / 单元 / 集成 / 系统测试）留待后续阶段填充。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
