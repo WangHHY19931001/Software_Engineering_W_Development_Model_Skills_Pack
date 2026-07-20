@@ -343,13 +343,9 @@ w-model-dev/
 > 本目录为标准 skill 结构，自包含。AI Agent 安装时只需拷贝整个 `w-model-dev/` 目录，
 > 详见 [../docs/INSTALL.md](../docs/INSTALL.md)。
 >
-> **门禁脚本与 Markdown 的配合**：`references/quality-standards.md` 以 Markdown 描述
-> 质量标准（人类可读、便于审阅），`scripts/check-*-gate.ts` 是同一套门禁的可执行实现
-> （Agent 可直接调用得到结构化结论）。两者指向同一份事实源 `scripts/gate-logic.ts`，
-> 避免文档与代码漂移。Agent 在阶段门评审时优先执行脚本获取确定性判定；若需了解判定依据，回查对应 Markdown（如 `references/quality-standards.md`）。
->
-> **LLM 评审的配合**：`references/verifier-spec.md` 提供提示词与输出 Schema，
-> `scripts/check-verifier-output.ts` 是同一套 Schema 的可执行校验。两者指向同一份事实源
-> `scripts/verifier-logic.ts`，避免提示词与校验漂移。
+> **门禁脚本与 Markdown 的配合关系**（架构原则详见本文「架构定位」节，此处不重复）：
+> `references/quality-standards.md`（人类可读标准）↔ `scripts/check-*-gate.ts`（可执行判定）；
+> `references/verifier-spec.md`（提示词+Schema）↔ `scripts/check-verifier-output.ts`（可执行校验）。
+> Agent 在阶段门评审时优先执行脚本获取确定性判定；若需了解判定依据，回查对应 Markdown。
 
 

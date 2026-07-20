@@ -3,3 +3,14 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-07-17T07:40	a3698f2	w-model-dev	70.8	85.4	keep	dim4检查点	HL-1加🔴CHECKPOINT标记;独立judge盲评;dim2/3/4簇同涨	dry_run
 2026-07-17T07:44	1d6ae60	w-model-dev	85.4	84.9	keep	dim9反例黑名单	目标dim9:6→10(+4);总分-0.5属judge间方差(dim5/7内容未改);judgment-keep;下轮修dim5/7预存问题	dry_run
 2026-07-17T07:47	54b6ac1	w-model-dev	84.9	86.8	keep	dim5可执行具体性	4处软化措辞收紧;独立judge盲评;dim5:8→9;HL-4触顶(连续2轮Δ<2)	dry_run
+2026-07-20T06:55	fd68d19	w-model-dev/references/quality-standards.md	40.5	79.5	keep	dim5/6/9/4	每条标准转工具+阈值+失败动作三元组表;加🔴CHECKPOINT质量门放行;7行禁止行为表交叉链接anti-patterns#3/#6/#7	dry_run
+2026-07-20T07:05	abea498	w-model-dev/references/phase-5-coding.md	55.7	86.0	keep	dim3/4/5/8/9	代码生成算法5步失败分支;执行方法论表(vitest/eslint/tsc);🔴CHECKPOINT;6行禁止行为	dry_run
+2026-07-20T07:05	abea498	w-model-dev/references/phase-6-integration-test.md	48.1	82.1	keep	dim3/4/5/8/9	IT-004具体化(100并发×30s,P95<500ms);IT-005版本对比;失败分支;🔴CHECKPOINT;5行禁止行为	dry_run
+2026-07-20T07:05	abea498	w-model-dev/references/phase-7-system-test.md	52.2	85.4	keep	dim3/4/5/8/9	ST-002 ramp-up/sustain/down;ST-003 OWASP Top10;ST-004浏览器矩阵;ST-005 24h可靠性;🔴CHECKPOINT(check-artifact-gate);6行禁止行为	dry_run
+2026-07-20T07:05	abea498	w-model-dev/references/phase-8-acceptance-test.md	54.5	71.6	keep	dim3/4/8/9	用户确认载体具体化(RTM sign列+confirm/confirm-with-comments/reject+/wm sign);🔴CHECKPOINT项目级;6行禁止行为	dry_run
+2026-07-20T07:15	8ac77b2	w-model-dev/references/phase-1-requirements.md	60.2	82.3	keep	dim3/4/5/9	需求解析算法4步+失败分支(低置信/模块归属/冲突/缺失/不可验证标准);🔴CHECKPOINT;6行禁止行为	dry_run
+2026-07-20T07:15	8ac77b2	w-model-dev/references/phase-2-system-design.md	56.2	66.4	keep	dim3/8/9	补3条系统测试用例TC-DES-007/008/009(端到端+性能基线+安全基线);🔴CHECKPOINT;5行禁止行为	dry_run
+2026-07-20T07:15	8ac77b2	w-model-dev/references/phase-3-outline-design.md	56.2	66.4	keep	dim3/8/9	加边界澄清(不深入类/方法内部);补3条集成测试TC-DES-010/011/012(参数校验+跨模块+异常路径);🔴CHECKPOINT;5行禁止行为	dry_run
+2026-07-20T07:15	8ac77b2	w-model-dev/references/phase-4-detailed-design.md	58.5	74.0	keep	dim3/5/8/9	测试用例生成算法增强(expect断言+边界清单:空/null/极值/越界/类型不符/竞态;分支≥80%);🔴CHECKPOINT;6行禁止行为	dry_run
+2026-07-20T07:25	6ccf6a7	w-model-dev/references/workflow.md	71.0	81.8	keep	dim4/9	🔴CHECKPOINT阶段门+质量门双暂停点;7行工作流反模式表交叉链接anti-patterns#1/#2/#3/#4/#5/#6/#7/#8/#9	dry_run
+2026-07-20T07:25	6ccf6a7	w-model-dev/SKILL.md	87.9	86.8	keep	dim7冗余消解	压缩3处重复blockquote为1段指针;架构原则仍在架构定位节单一事实源;Δ-1.1属judge间方差(dim7实际8→9);HL-3/4方差带内	dry_run
