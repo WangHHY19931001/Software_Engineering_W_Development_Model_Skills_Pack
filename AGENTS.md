@@ -33,7 +33,7 @@
 
 ```bash
 # 校验脚本（自包含，仅依赖 tsx）
-npm run self-test                           # 11 条样本回归基线，退出码 0/1
+npm run self-test                           # 17 条样本回归基线（10 Verifier + 7 Gate），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 

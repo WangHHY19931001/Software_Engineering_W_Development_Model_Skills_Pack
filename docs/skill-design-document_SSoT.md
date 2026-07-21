@@ -491,7 +491,7 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  status: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试';
+  status: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试' | '项目完成';
   techStack: {
     frontend: string[];
     backend: string[];

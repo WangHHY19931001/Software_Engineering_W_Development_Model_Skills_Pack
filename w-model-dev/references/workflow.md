@@ -86,7 +86,7 @@
 
 - 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
 - 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，按 `reworkHints` 修复。
-- 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与 SKILL.md §2「阶段门评审」。
+- 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与 SKILL.md「阶段门与质量门」节。
 
 ## 质量门（编码及之后阶段强制）
 

@@ -55,7 +55,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/*.ts` 后，必须先跑自检脚本，再用端到端方式验证：
 
 ```bash
-# 3.1 跑自检（samples/ 目录下 11 条样本：verifier 7 + gate 4）
+# 3.1 跑自检（samples/ 目录下 17 条样本：verifier 10 + gate 7）
 npm run self-test
 # 等价于：npx tsx w-model-dev/scripts/self-test.ts
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
@@ -83,7 +83,7 @@ npm run check:gate -- <project-dir>
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（11 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（17 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |

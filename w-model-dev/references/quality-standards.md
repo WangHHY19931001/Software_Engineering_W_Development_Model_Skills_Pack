@@ -52,7 +52,7 @@
 发布
 ```
 
-> 🔴 **CHECKPOINT · 质量门放行**：到达"质量门检查"节点时，Agent 必须执行 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]` 获取确定性判定（不得用 LLM 估算）。退出码 0 → 暂停向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布；退出码 1/2 → 一律回到编码，禁止放行。详见 [SKILL.md](../SKILL.md) §3 与 [anti-patterns.md](anti-patterns.md) #3/#6/#7。
+> 🔴 **CHECKPOINT · 质量门放行**：到达"质量门检查"节点时，Agent 必须执行 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]` 获取确定性判定（不得用 LLM 估算）。退出码 0 → 暂停向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布；退出码 1/2 → 一律回到编码，禁止放行。详见 [SKILL.md](../SKILL.md)「阶段门与质量门」节与 [anti-patterns.md](anti-patterns.md) #3/#6/#7。
 
 ## 质量门检查清单（放行条件）
 

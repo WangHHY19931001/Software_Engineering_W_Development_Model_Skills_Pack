@@ -15,7 +15,7 @@
 
 | # | 反模式（不要做） | 危害 | 正确做法 |
 |---|---|---|---|
-| 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 SKILL.md §2 走完评审 + 🔴 CHECKPOINT 放行 |
+| 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 SKILL.md「阶段门与质量门」节走完评审 + 🔴 CHECKPOINT 放行 |
 | 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
 | 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
 | 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评 |
@@ -33,24 +33,24 @@
 | #2（测试设计后置） | 阶段 1~4 | 各 phase-N「并行任务（强制）」节 |
 | #3（估算质量门） | 阶段 5~7 | [phase-5-coding.md](phase-5-coding.md) / [phase-7-system-test.md](phase-7-system-test.md) |
 | #4（评审未通过悄悄小修） | 全阶段 | 各 phase-N「返工路径」节 |
-| #5（一次性载入全部 references） | 阶段 0 | SKILL.md §0「任务接入」步骤 3 |
+| #5（一次性载入全部 references） | 全阶段 | SKILL.md「不可违反的约束」第 6 条「按需加载」 |
 | #6（估算 RTM 覆盖率） | 阶段 7~8 | [phase-7-system-test.md](phase-7-system-test.md) / [phase-8-acceptance-test.md](phase-8-acceptance-test.md) |
 | #7（退出码 1/2 放行） | 阶段 5~7 | [quality-standards.md](quality-standards.md)「质量门检查清单」 |
 | #8（越过 CHECKPOINT） | 全阶段 | 各 phase-N「🔴 CHECKPOINT」标记 |
-| #9（谎报状态） | 全阶段 | SKILL.md §4「数据与状态管理」 |
+| #9（谎报状态） | 全阶段 | [data-models.md](data-models.md)「项目数据模型」 |
 
 ## 与门禁脚本的对应关系
 
 | 反模式 | 由哪个脚本 / 机制守护 |
 |---|---|
-| #1（跳过评审） | SKILL.md §2「阶段门评审」+ 🔴 CHECKPOINT · 阶段门放行 |
-| #2（测试设计后置） | SKILL.md §1「执行阶段任务」步骤 2「并行产出测试设计」 |
+| #1（跳过评审） | SKILL.md「阶段门与质量门」节 + 🔴 CHECKPOINT · 阶段门放行 |
+| #2（测试设计后置） | SKILL.md「不可违反的约束」第 1 条「测试设计前置」 |
 | #3 / #6（估算质量门 / RTM 覆盖率） | [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts)（退出码 0 才算通过） |
 | #4（评审未通过悄悄小修） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts)（rework 闭环校验） |
-| #5（一次性载入全部 references） | SKILL.md §0「任务接入」步骤 3 |
+| #5（一次性载入全部 references） | SKILL.md「不可违反的约束」第 6 条「按需加载」 |
 | #7（退出码 1/2 放行） | 🔴 CHECKPOINT · 发布放行（明确「退出码 1/2 一律不得放行」） |
 | #8（越过 CHECKPOINT） | 🔴 CHECKPOINT 视觉标记（Agent 扫描锚点） |
-| #9（谎报状态） | SKILL.md §4「数据与状态管理」+ `status` 字段约束 |
+| #9（谎报状态） | [data-models.md](data-models.md)「项目数据模型」+ `status` 字段约束 |
 
 ## 命中后的处理流程
 

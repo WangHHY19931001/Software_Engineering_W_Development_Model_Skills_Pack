@@ -105,7 +105,7 @@ run_expect() {
   return 0
 }
 
-# 1. self-test：11 条样本回归基线，必须 exit 0
+# 1. self-test：17 条样本回归基线，必须 exit 0
 run_expect "self-test 全部样本匹配期望" 0 npm run self-test || exit 1
 
 # 2. check:verifier 无参数应退出 2（输入错误）
