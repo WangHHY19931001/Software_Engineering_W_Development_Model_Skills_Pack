@@ -1,18 +1,10 @@
 import type { Comment } from '../types.js';
 
-/**
- * 内存评论存储。
- *
- * 设计来源：`docs/detailed-design.md` §1.1 / §2.3 / §3.3 / CON-002。
- * - 主键 `id` 作为 Map key（O(1) 查找）。
- * - `findByArticleId` 按 `createdAt` 升序排列（与文章详情聚合一致）。
- */
-export class CommentStore {
-  private readonly comments: Map<string, Comment> = new Map();
+class CommentStoreImpl {
+  private comments = new Map<string, Comment>();
 
-  save(comment: Comment): Comment {
+  save(comment: Comment): void {
     this.comments.set(comment.id, comment);
-    return comment;
   }
 
   findById(id: string): Comment | undefined {
@@ -20,9 +12,9 @@ export class CommentStore {
   }
 
   findByArticleId(articleId: string): Comment[] {
-    const list = Array.from(this.comments.values()).filter(c => c.articleId === articleId);
-    list.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
-    return list;
+    return Array.from(this.comments.values())
+      .filter((c) => c.articleId === articleId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   delete(id: string): boolean {
@@ -32,4 +24,10 @@ export class CommentStore {
   clear(): void {
     this.comments.clear();
   }
+
+  size(): number {
+    return this.comments.size;
+  }
 }
+
+export const commentStore = new CommentStoreImpl();

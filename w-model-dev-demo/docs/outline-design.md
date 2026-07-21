@@ -1,8 +1,7 @@
-# 接口设计文档（概要设计）
+# 概要设计文档
 
 > 阶段 3（概要设计）产出。W 模型右 V 同步产出集成测试设计。
 > 本文件内嵌集成测试用例设计（IT-001~006），不再外挂独立测试用例文件。
-> 本阶段只定义模块边界与接口契约，**不深入类 / 方法内部**（类 / 方法级设计属阶段 4）。
 
 ## 文档信息
 
@@ -10,310 +9,409 @@
 - 文档版本：v1.0
 - 编制日期：2026-07-21
 - 编制者：W-Model Agent
-- 关联系统设计文档：`docs/system-design.md`
+- 关联需求文档：`docs/requirement-spec.md`
+- 关联系统设计：`docs/system-design.md`
 
-## 1. 模块调用关系
+## 1. 设计目标
 
-### 1.1 调用关系图（Mermaid graph）
+承接系统设计（§3 模块划分），细化模块间接口契约：
+- 定义 Service / Store / Controller / Middleware / Utils 间方法签名
+- 明确 DTO 与 Error 域模型
+- 设计集成测试（IT）以校验模块间契约
 
-```mermaid
-graph TD
-    Routes[routes/<br/>auth/article/comment]
-    MW[middleware/<br/>auth · validate · errorHandler]
-    Ctrl[controllers/<br/>Auth/Article/Comment]
-    Svc[services/<br/>UserService/ArticleService/CommentService]
-    Store[stores/<br/>UserStore/ArticleStore/CommentStore]
-    Sch[schemas/<br/>zod schemas]
-    Util[utils/<br/>jwt/password/asyncHandler]
+## 2. 接口设计原则
 
-    Routes -->|调用| MW
-    MW -->|next| Ctrl
-    Ctrl -->|调用| Svc
-    Ctrl -->|异常| MW
-    Svc -->|CRUD| Store
-    Svc -->|校验| Sch
-    Svc -->|工具| Util
-    MW -->|工具| Util
+1. **依赖方向**：`routes → middleware → controllers → services → stores / utils`，单向依赖，禁止反向调用
+2. **错误传播**：Service 抛出 `HttpError` 子类，Controller 不捕获，由 `errorHandler` 中间件统一序列化
+3. **DTO 边界**：`schemas/*` 用 zod 校验外部输入，校验后产出强类型 DTO；Service 入参为 DTO 而非 `unknown`
+4. **作者隔离**：`authorId` 必须来自 JWT（`req.user.userId`），Controller 不允许从 body 接收
+5. **存储抽象**：Store 仅提供 CRUD，业务规则（如作者隔离）由 Service 强制
 
-    classDef layer fill:#eef,stroke:#336
-    class Routes,MW,Ctrl,Svc,Store,Sch,Util layer
+## 3. 模块接口签名
+
+### 3.1 路由层（M-001）
+
+#### auth.routes.ts
+
+```typescript
+import { Router } from 'express';
+import { AuthController } from '../controllers/auth.controller';
+import { asyncHandler } from '../utils/async-handler';
+import { validate } from '../middleware/validate';
+import { AuthRegisterSchema, AuthLoginSchema } from '../schemas/auth.schema';
+
+const router: Router = Router();
+router.post('/register', validate(AuthRegisterSchema), asyncHandler(AuthController.register));
+router.post('/login', validate(AuthLoginSchema), asyncHandler(AuthController.login));
+// 契约：POST /api/v1/auth/register 期望 201 / 409；POST /api/v1/auth/login 期望 200 / 401
 ```
 
-### 1.2 依赖方向矩阵
+#### article.routes.ts
 
-| 调用方 ↓ \ 被调方 → | routes | middleware | controllers | services | stores | schemas | utils |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| routes | — | ✓ | ✓ | — | — | — | — |
-| middleware | — | — | — | — | — | ✓ | ✓ |
-| controllers | — | — | — | ✓ | — | — | ✓ |
-| services | — | — | — | — | ✓ | ✓ | ✓ |
-| stores | — | — | — | — | — | — | — |
-| schemas | — | — | — | — | — | — | — |
-| utils | — | — | — | — | — | — | — |
+```typescript
+import { Router } from 'express';
+import { ArticleController } from '../controllers/article.controller';
+import { authMiddleware } from '../middleware/auth';
+import { asyncHandler } from '../utils/async-handler';
+import { validate } from '../middleware/validate';
+import { ArticleCreateSchema, ArticleUpdateSchema } from '../schemas/article.schema';
 
-依赖方向严格自上而下；stores / schemas / utils 为底层无外部依赖。**禁止反向依赖**（如 stores import services）—— 通过 ESLint `no-restricted-imports` 在阶段 5 编码时强制。
-
-### 1.3 循环依赖检测说明（DFS 三色染色）
-
-检测算法：DFS 三色染色（白 = 未访问 / 灰 = 栈中 / 黑 = 已完成）；遇灰节点即环。
-
-对模块依赖图执行检测：
-
-```
-DFS(routes)         → routes → middleware → schemas ✓ exit
-                                       → utils ✓ exit
-                    → routes → controllers → services → stores ✓ exit
-                                                       → schemas ✓ exit
-                                                       → utils ✓ exit
-                                       → controllers → utils ✓ exit
-DFS 结果：无环（环路径 = []）
+const router: Router = Router();
+// 公开（无 authMiddleware）
+router.get('/', asyncHandler(ArticleController.list));
+router.get('/:id', asyncHandler(ArticleController.getById));
+// 受保护
+router.post('/', authMiddleware, validate(ArticleCreateSchema), asyncHandler(ArticleController.create));
+router.patch('/:id', authMiddleware, validate(ArticleUpdateSchema), asyncHandler(ArticleController.update));
+router.delete('/:id', authMiddleware, asyncHandler(ArticleController.remove));
+// 契约：公开接口无 Authorization 可访问；受保护接口缺 Authorization → 401.40103
 ```
 
-| 节点 | 入度 | 出度 | 颜色序列 |
-|---|:---:|:---:|---|
-| routes | 0 | 2 | 白→灰→黑 |
-| middleware | 1 | 2 | 白→灰→黑 |
-| controllers | 1 | 2 | 白→灰→黑 |
-| services | 1 | 3 | 白→灰→黑 |
-| stores | 1 | 0 | 白→灰→黑 |
-| schemas | 2 | 0 | 白→灰→黑 |
-| utils | 3 | 0 | 白→灰→黑 |
+#### comment.routes.ts
 
-**结论**：模块依赖图无环，可放行进入接口契约定义。若阶段 5 编码后通过 `npx -y madge --circular --extensions ts,js src` 检测到环，回阶段 3 重新划分模块边界（引入接口层或倒置依赖）。
+```typescript
+import { Router } from 'express';
+import { CommentController } from '../controllers/comment.controller';
+import { authMiddleware } from '../middleware/auth';
+import { asyncHandler } from '../utils/async-handler';
+import { validate } from '../middleware/validate';
+import { CommentCreateSchema } from '../schemas/comment.schema';
 
-## 2. 接口定义
+const router: Router = Router({ mergeParams: true });
+router.post('/', authMiddleware, validate(CommentCreateSchema), asyncHandler(CommentController.create));
+router.delete('/:commentId', authMiddleware, asyncHandler(CommentController.remove));
+// 契约：挂载在 /api/v1/articles/:articleId/comments 路径下，:articleId 由父路由提供
+```
 
-> 每个接口契约按 10 字段 Schema 模板填写：方法 / 路径 / 请求 schema / 响应 schema / 错误码 / 认证 / 版本 / 限流 / 缓存 / 示例。
+### 3.2 中间件层（M-002）
 
-### 2.1 用户认证接口
+#### auth.ts
 
-#### 接口 1：用户注册
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { verifyToken } from '../utils/jwt';
+import { UnauthorizedError } from '../utils/errors';
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `POST` |
-| 路径 | `/api/v1/auth/register` |
-| 请求 schema | `AuthRegisterSchema`：`{username: string(3..32, 字母数字下划线), password: string(min 8, 至少 1 字母 + 1 数字)}` |
-| 响应 schema | `{userId: string(uuid), username: string}` |
-| 错误码集合 | `40001 参数缺失/格式错误` / `40002 密码复杂度不足` / `40901 用户名已注册` |
-| 认证 | 无（公开接口） |
-| 版本 | `v1` |
-| 限流 | 5 req/min/IP（防用户枚举与暴力注册） |
-| 缓存 | 无 |
-| 示例请求 | `POST /api/v1/auth/register` body: `{"username":"alice","password":"Passw0rd!"}` |
-| 示例响应 | `201 Created` body: `{"userId":"550e8400-e29b-41d4-a716-446655440000","username":"alice"}` |
+export interface AuthenticatedRequest extends Request {
+  user?: { userId: string; username: string };
+}
 
-#### 接口 2：用户登录
+export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    throw new UnauthorizedError(40103, '未提供认证令牌');
+  }
+  const token = header.slice(7);
+  const payload = verifyToken(token); // 抛 UnauthorizedError(40102)
+  req.user = { userId: payload.userId, username: payload.username };
+  next();
+}
+// 契约：缺失/前缀错误 → 401.40103；签名错误或过期 → 401.40102
+```
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `POST` |
-| 路径 | `/api/v1/auth/login` |
-| 请求 schema | `AuthLoginSchema`：`{username: string, password: string}` |
-| 响应 schema | `{token: string(jwt), expiresIn: 3600}` |
-| 错误码集合 | `40001 参数缺失/格式错误` / `40101 用户名或密码错误` |
-| 认证 | 无（公开接口） |
-| 版本 | `v1` |
-| 限流 | 10 req/min/IP |
-| 缓存 | 无 |
-| 示例请求 | `POST /api/v1/auth/login` body: `{"username":"alice","password":"Passw0rd!"}` |
-| 示例响应 | `200 OK` body: `{"token":"eyJhbGciOiJIUzI1NiIs...","expiresIn":3600}` |
+#### validate.ts
 
-### 2.2 文章管理接口
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { ZodSchema } from 'zod';
+import { BadRequestError } from '../utils/errors';
 
-#### 接口 3：创建文章
+export function validate<T>(schema: ZodSchema<T>): (req: Request, _res: Response, next: NextFunction) => void {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      throw new BadRequestError(40001, '请求参数校验失败', result.error.issues);
+    }
+    req.body = result.data; // 替换为强类型 DTO
+    next();
+  };
+}
+// 契约：zod 校验失败 → 400.40001
+```
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `POST` |
-| 路径 | `/api/v1/articles` |
-| 请求 schema | `ArticleCreateSchema`：`{title: string(1..200), content: string(1..10000), tags?: string[](0..10)}` |
-| 响应 schema | `{articleId: string(uuid), authorId: string(uuid), title: string, content: string, tags: string[], createdAt: ISO8601}` |
-| 错误码集合 | `40001 参数缺失` / `40002 标题/内容长度越界` / `40103 未提供认证令牌` / `40102 JWT 已过期或无效` |
-| 认证 | `Authorization: Bearer <token>`（必需） |
-| 版本 | `v1` |
-| 限流 | 30 req/min/user |
-| 缓存 | 无 |
-| 示例请求 | `POST /api/v1/articles` body: `{"title":"Hello","content":"World","tags":["intro"]}` |
-| 示例响应 | `201 Created` body: `{"articleId":"...","authorId":"...","title":"Hello","content":"World","tags":["intro"],"createdAt":"2026-07-21T10:00:00Z"}` |
+#### error-handler.ts
 
-#### 接口 4：修改文章
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { HttpError } from '../utils/errors';
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `PATCH` |
-| 路径 | `/api/v1/articles/:id` |
-| 请求 schema | `ArticleUpdateSchema`：`{title?: string(1..200), content?: string(1..10000), tags?: string[](0..10)}` |
-| 响应 schema | `{articleId: string, authorId: string, title: string, content: string, tags: string[], createdAt: ISO8601, updatedAt: ISO8601}` |
-| 错误码集合 | `40001 参数缺失` / `40002 长度越界` / `40102 JWT 无效` / `40103 未提供令牌` / `40301 无权操作他人文章` / `40401 文章不存在` |
-| 认证 | `Authorization: Bearer <token>`（必需；且 authorId 须等于 JWT.userId） |
-| 版本 | `v1` |
-| 限流 | 30 req/min/user |
-| 缓存 | 无 |
-| 示例请求 | `PATCH /api/v1/articles/abc-123` body: `{"title":"Hello v2"}` |
-| 示例响应 | `200 OK` body: `{"articleId":"abc-123","authorId":"...","title":"Hello v2","content":"World","tags":["intro"],"createdAt":"...","updatedAt":"2026-07-21T10:05:00Z"}` |
+export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
+    return;
+  }
+  res.status(500).json({ code: 50001, message: '内部服务器错误' });
+}
+// 契约：HttpError → 对应 HTTP 状态 + 业务码；其他 → 500.50001
+```
 
-#### 接口 5：删除文章
+### 3.3 控制器层（M-003）
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `DELETE` |
-| 路径 | `/api/v1/articles/:id` |
-| 请求 schema | 无 body |
-| 响应 schema | 空（HTTP 204） |
-| 错误码集合 | `40102 JWT 无效` / `40103 未提供令牌` / `40301 无权操作他人文章` / `40401 文章不存在` |
-| 认证 | `Authorization: Bearer <token>`（必需；且 authorId 须等于 JWT.userId） |
-| 版本 | `v1` |
-| 限流 | 10 req/min/user |
-| 缓存 | 无 |
-| 示例请求 | `DELETE /api/v1/articles/abc-123` |
-| 示例响应 | `204 No Content` 空 body |
+#### AuthController
 
-#### 接口 6：获取文章详情（含评论聚合）
+```typescript
+export class AuthController {
+  static async register(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const dto = req.body as AuthRegisterDTO;
+    const result = await UserService.register(dto.username, dto.password);
+    res.status(201).json(result); // 期望 { userId, username }
+  }
+  static async login(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const dto = req.body as AuthLoginDTO;
+    const result = await UserService.login(dto.username, dto.password);
+    res.status(200).json(result); // 期望 { token, userId, username }
+  }
+}
+```
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `GET` |
-| 路径 | `/api/v1/articles/:id` |
-| 请求 schema | 路径参数 `id: string(uuid)` |
-| 响应 schema | `{id: string, authorId: string, title: string, content: string, tags: string[], createdAt: ISO8601, updatedAt: ISO8601, comments: Comment[]}` |
-| 错误码集合 | `40001 id 格式错误` / `40401 文章不存在` |
-| 认证 | 无（公开接口） |
-| 版本 | `v1` |
-| 限流 | 100 req/min/IP |
-| 缓存 | `Cache-Control: public, max-age=60`（1 分钟） |
-| 示例请求 | `GET /api/v1/articles/abc-123` |
-| 示例响应 | `200 OK` body: `{"id":"abc-123","authorId":"...","title":"Hello","content":"World","tags":["intro"],"createdAt":"...","updatedAt":"...","comments":[{"id":"c-1","authorId":"...","content":"Nice","createdAt":"..."}]}` |
+#### ArticleController
 
-#### 接口 7：分页浏览文章列表
+```typescript
+export class ArticleController {
+  static async create(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const dto = req.body as ArticleCreateDTO;
+    const authorId = req.user!.userId; // 作者隔离：来自 JWT
+    const article = await ArticleService.create(authorId, dto);
+    res.status(201).json(article);
+  }
+  static async list(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const { page = '1', pageSize = '10' } = req.query;
+    const result = await ArticleService.list(Number(page), Number(pageSize));
+    res.status(200).json(result);
+  }
+  static async getById(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const article = await ArticleService.getById(req.params.id);
+    const comments = await CommentService.listByArticle(req.params.id);
+    res.status(200).json({ ...article, comments });
+  }
+  static async update(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const dto = req.body as ArticleUpdateDTO;
+    const article = await ArticleService.update(req.user!.userId, req.params.id, dto);
+    res.status(200).json(article);
+  }
+  static async remove(req: AuthenticatedRequest, res: Response): Promise<void> {
+    await ArticleService.remove(req.user!.userId, req.params.id);
+    res.status(204).end();
+  }
+}
+```
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `GET` |
-| 路径 | `/api/v1/articles` |
-| 请求 schema | query: `{page?: int(≥1, default 1), pageSize?: int(1..100, default 10), tag?: string}` |
-| 响应 schema | `{items: Article[], total: int, page: int, pageSize: int}` |
-| 错误码集合 | `40001 page/pageSize 非整数或越界` |
-| 认证 | 无（公开接口） |
-| 版本 | `v1` |
-| 限流 | 100 req/min/IP |
-| 缓存 | `Cache-Control: public, max-age=60` |
-| 示例请求 | `GET /api/v1/articles?page=1&pageSize=10` |
-| 示例响应 | `200 OK` body: `{"items":[{...},{...}],"total":15,"page":1,"pageSize":10}` |
+#### CommentController
 
-### 2.3 评论接口
+```typescript
+export class CommentController {
+  static async create(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const dto = req.body as CommentCreateDTO;
+    const authorId = req.user!.userId;
+    const articleId = req.params.articleId; // 来自父路由
+    const comment = await CommentService.create(authorId, articleId, dto);
+    res.status(201).json(comment);
+  }
+  static async remove(req: AuthenticatedRequest, res: Response): Promise<void> {
+    await CommentService.remove(req.user!.userId, req.params.commentId);
+    res.status(204).end();
+  }
+}
+```
 
-#### 接口 8：发表评论
+### 3.4 服务层（M-004）
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `POST` |
-| 路径 | `/api/v1/articles/:id/comments` |
-| 请求 schema | `CommentCreateSchema`：`{content: string(1..1000)}`；路径参数 `id: string(uuid)` |
-| 响应 schema | `{commentId: string(uuid), articleId: string, authorId: string, content: string, createdAt: ISO8601}` |
-| 错误码集合 | `40001 参数缺失` / `40002 content 长度越界` / `40102 JWT 无效` / `40103 未提供令牌` / `40401 文章不存在` |
-| 认证 | `Authorization: Bearer <token>`（必需；authorId 取自 JWT.userId，不取自 body） |
-| 版本 | `v1` |
-| 限流 | 60 req/min/user |
-| 缓存 | 无 |
-| 示例请求 | `POST /api/v1/articles/abc-123/comments` body: `{"content":"Nice post!"}` |
-| 示例响应 | `201 Created` body: `{"commentId":"c-1","articleId":"abc-123","authorId":"...","content":"Nice post!","createdAt":"2026-07-21T10:10:00Z"}` |
+#### UserService
 
-#### 接口 9：获取文章评论列表
+```typescript
+export class UserService {
+  static async register(username: string, password: string): Promise<{ userId: string; username: string }>;
+  static async login(username: string, password: string): Promise<{ token: string; userId: string; username: string }>;
+}
+// 契约：register 用户名已存在 → 409.40901；login 凭证错误 → 401.40101
+```
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `GET` |
-| 路径 | `/api/v1/articles/:id/comments` |
-| 请求 schema | 路径参数 `id: string(uuid)` |
-| 响应 schema | `{items: Comment[], total: int}` |
-| 错误码集合 | `40001 id 格式错误` / `40401 文章不存在` |
-| 认证 | 无（公开接口） |
-| 版本 | `v1` |
-| 限流 | 100 req/min/IP |
-| 缓存 | `Cache-Control: public, max-age=60` |
-| 示例请求 | `GET /api/v1/articles/abc-123/comments` |
-| 示例响应 | `200 OK` body: `{"items":[{"commentId":"c-1",...}],"total":1}` |
+#### ArticleService
 
-#### 接口 10：删除评论
+```typescript
+export class ArticleService {
+  static async create(authorId: string, dto: ArticleCreateDTO): Promise<Article>;
+  static async list(page: number, pageSize: number): Promise<{ items: Article[]; total: number; page: number; pageSize: number }>;
+  static async getById(id: string): Promise<Article>;
+  static async update(authorId: string, id: string, dto: ArticleUpdateDTO): Promise<Article>;
+  static async remove(authorId: string, id: string): Promise<void>;
+}
+// 契约：getById 不存在 → 404.40401；update/remove 非作者 → 403.40301
+```
 
-| 字段 | 值 |
-|---|---|
-| 方法 | `DELETE` |
-| 路径 | `/api/v1/articles/:id/comments/:commentId` |
-| 请求 schema | 路径参数 `id: string(uuid)`、`commentId: string(uuid)` |
-| 响应 schema | 空（HTTP 204） |
-| 错误码集合 | `40102 JWT 无效` / `40103 未提供令牌` / `40301 无权删除他人评论` / `40401 文章或评论不存在` |
-| 认证 | `Authorization: Bearer <token>`（必需；且 comment.authorId 须等于 JWT.userId） |
-| 版本 | `v1` |
-| 限流 | 10 req/min/user |
-| 缓存 | 无 |
-| 示例请求 | `DELETE /api/v1/articles/abc-123/comments/c-1` |
-| 示例响应 | `204 No Content` 空 body |
+> **历史修复 #3**：`ArticleService` 必须 `export class`，否则单元测试无法引用其类型。
 
-## 3. 错误码分层约定
+#### CommentService
 
-| 段位 | 范围 | 含义 | 错误码清单 |
+```typescript
+export class CommentService {
+  static async create(authorId: string, articleId: string, dto: CommentCreateDTO): Promise<Comment>;
+  static async listByArticle(articleId: string): Promise<Comment[]>;
+  static async remove(authorId: string, commentId: string): Promise<void>;
+}
+// 契约：create 关联文章不存在 → 404.40401；remove 非作者 → 403.40301
+```
+
+### 3.5 存储层（M-005）
+
+```typescript
+// 通用接口契约：所有 Store 仅提供 CRUD，不抛业务错误（404/403 由 Service 判定）
+export interface UserStore {
+  findById(id: string): User | undefined;
+  findByUsername(username: string): User | undefined;
+  save(user: User): void;
+}
+export interface ArticleStore {
+  findById(id: string): Article | undefined;
+  findAll(page: number, pageSize: number): { items: Article[]; total: number };
+  save(article: Article): void;
+  delete(id: string): boolean;
+}
+export interface CommentStore {
+  findById(id: string): Comment | undefined;
+  findByArticleId(articleId: string): Comment[];
+  save(comment: Comment): void;
+  delete(id: string): boolean;
+}
+```
+
+### 3.6 Schema 层（M-006）
+
+```typescript
+import { z } from 'zod';
+
+export const AuthRegisterSchema = z.object({
+  username: z.string().min(3).max(32),
+  password: z.string().min(6).max(128),
+});
+export const AuthLoginSchema = AuthRegisterSchema;
+export const ArticleCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  content: z.string().min(1),
+});
+export const ArticleUpdateSchema = ArticleCreateSchema.partial();
+export const CommentCreateSchema = z.object({
+  content: z.string().min(1).max(1000),
+});
+```
+
+### 3.7 工具层（M-007）
+
+#### jwt.ts
+
+```typescript
+import jwt from 'jsonwebtoken';
+
+export interface JwtPayload {
+  userId: string;
+  username: string;
+}
+export function signToken(payload: JwtPayload, expiresIn: number = 3600): string;
+export function verifyToken(token: string): JwtPayload;
+// 契约：从 process.env.JWT_SECRET 读取密钥；缺失 → throw Error('JWT_SECRET 未配置')
+```
+
+> **历史修复 #2**：`signToken` 与 `verifyToken` 必须从 `process.env.JWT_SECRET` 读取密钥，禁止硬编码。
+
+#### password.ts
+
+```typescript
+import bcrypt from 'bcrypt';
+export function hashPassword(plain: string): Promise<string>; // bcrypt cost=10
+export function comparePassword(plain: string, hash: string): Promise<boolean>;
+```
+
+#### async-handler.ts
+
+```typescript
+import { Request, Response, NextFunction, RequestHandler } from 'express';
+export function asyncHandler(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+): RequestHandler;
+// 契约：捕获 Promise 内异常，next(err) 转交 errorHandler
+```
+
+#### errors.ts
+
+```typescript
+export abstract class HttpError extends Error {
+  abstract status: number;
+  constructor(public code: number, message: string, public details?: unknown) {
+    super(message);
+  }
+}
+export class BadRequestError extends HttpError { status = 400; }
+export class UnauthorizedError extends HttpError { status = 401; }
+export class ForbiddenError extends HttpError { status = 403; }
+export class NotFoundError extends HttpError { status = 404; }
+export class ConflictError extends HttpError { status = 409; }
+// 业务码枚举：40001/40002/40101/40102/40103/40301/40401/40901/50001/50002
+```
+
+### 3.8 应用入口（M-008）
+
+```typescript
+// app.ts
+export const app = express();
+app.use(express.json());
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/articles', articleRoutes);
+app.use('/api/v1/articles/:articleId/comments', commentRoutes);
+app.use(errorHandler); // 兜底
+```
+
+## 4. 错误码与状态码契约
+
+| 业务码 | HTTP 状态 | 触发条件 | 触发位置 |
 |---|---|---|---|
-| 4xx | 40000-49999 | 客户端错误（参数 / 认证 / 权限） | `40001 参数缺失或格式错误` / `40002 字段长度或类型越界` / `40101 用户名或密码错误` / `40102 JWT 已过期或无效` / `40103 未提供认证令牌` / `40301 无权操作他人资源` / `40401 资源不存在` / `40901 资源已存在（用户名已注册）` |
-| 5xx | 50000-59999 | 服务端错误（依赖 / 未知） | `50001 内部错误` / `50002 内存存储写入失败` |
-| 业务 | 60000-69999 | 业务规则错误（状态机 / 风控） | 本 demo 无业务错误码（无订单 / 库存场景）；保留段位供扩展 |
+| 40001 | 400 | zod 校验失败 | validate.ts |
+| 40002 | 400 | 路径参数非法（如 NaN） | controller |
+| 40101 | 401 | 登录凭证错误 | UserService.login |
+| 40102 | 401 | JWT 已过期或签名无效 | jwt.ts → authMiddleware |
+| 40103 | 401 | 未提供 Authorization 头 | authMiddleware |
+| 40301 | 403 | 无权操作他人资源 | ArticleService.update/remove、CommentService.remove |
+| 40401 | 404 | 资源不存在 | ArticleService.getById/update/remove、CommentService.create/remove |
+| 40901 | 409 | 用户名已存在 | UserService.register |
+| 50001 | 500 | 未捕获异常 | errorHandler |
+| 50002 | 500 | 第三方库错误 | Service（如 bcrypt/jwt 内部失败） |
 
-每条错误码配套 `code` + `message` + `httpStatus` + `retryable` 四元组：
-
-| code | message | httpStatus | retryable |
-|---|---|:---:|:---:|
-| 40001 | 参数缺失或格式错误 | 400 | false |
-| 40002 | 字段长度或类型越界 | 400 | false |
-| 40101 | 用户名或密码错误 | 401 | false |
-| 40102 | JWT 已过期或无效 | 401 | false |
-| 40103 | 未提供认证令牌 | 401 | false |
-| 40301 | 无权操作他人资源 | 403 | false |
-| 40401 | 资源不存在 | 404 | false |
-| 40901 | 资源已存在 | 409 | false |
-| 50001 | 内部错误 | 500 | true |
-| 50002 | 内存存储写入失败 | 500 | true |
-
-## 4. 集成测试用例设计
+## 5. 集成测试用例设计
 
 > 阶段 3 同步产出集成测试设计。本阶段只设计，不执行；执行在阶段 6（集成测试）。
-> 覆盖原则：必须覆盖 TC-DES-010（参数校验）/ TC-DES-011（跨模块调用）/ TC-DES-012（异常路径）三类强制场景。
-> 集成测试使用 supertest + 真实 Express app 实例；不 mock 内部 Service / Store；每个测试用例 beforeEach 重置 Store 单例。
+> 覆盖原则：必须覆盖模块间契约 + 错误传播 + 跨层边界条件。
 
-### 4.1 集成测试用例清单
+### 5.1 集成测试用例清单
 
-| 用例 ID | 关联接口 | 场景 | 输入 | 预期输出 | 优先级 |
-|---|---|---|---|---|---|
-| IT-001 | 接口 1 | 合法参数注册成功 | `POST /api/v1/auth/register` body: `{"username":"alice","password":"Passw0rd!"}`；随后重复注册同用户名 | 第 1 次：HTTP 201；`res.body.userId` 匹配 UUID v4；`res.body.username === "alice"`；第 2 次：HTTP 409 + `code === 40901`；存储中 `passwordHash` 以 `$2b$10$` 开头 | 高 |
-| IT-002 | 接口 1 | 非法参数（邮箱格式错误 / 密码弱 / 缺失字段） | 5 类非法输入：1) `{"username":"ab","password":"Passw0rd!"}`（用户名过短）；2) `{"username":"bob","password":"Ab1"}`（密码 < 8）；3) `{"username":"bob","password":"Password"}`（无数字）；4) `{"username":"bob","password":"12345678"}`（无字母）；5) `{"username":"bob"}`（缺 password） | 1) HTTP 400 + 40001；2-4) HTTP 400 + 40002；5) HTTP 400 + 40001；非法参数不写入存储（`userStore.findByUsername("bob")` 为 undefined） | 高 |
-| IT-003 | 接口 2 + 3 | 登录后跨模块创建文章（认证传递） | `POST /api/v1/auth/login` 获取 token → `jwt.decode(token)` 校验 payload → `POST /api/v1/articles` Header: `Authorization: Bearer <token>` body: `{"title":"T1","content":"C1"}` | 登录返回 200 + token；payload.userId 与注册返回一致；创建文章返回 201；`res.body.authorId === payload.userId`（authorId 来自 JWT 而非 body）；`articleStore.findById` 返回文章且 authorId 一致 | 高 |
-| IT-004 | 接口 3 + 8 + 6 | 文章服务 → 评论服务 → 详情聚合数据传递 | alice 登录后：1) `POST /api/v1/articles` 创建文章；2) `POST /api/v1/articles/:id/comments` body `{"content":"First!"}`；3) 同接口 body `{"content":"Second!"}`；4) `GET /api/v1/articles/:id` | 步骤 1-3 返回 201；步骤 4 返回 200；`res.body.comments.length === 2`；评论按 createdAt 升序：First → Second；`comments[0].authorId === alice.userId` | 高 |
-| IT-005 | 接口 8 | 文章不存在异常路径 - 发表评论 | `POST /api/v1/articles/non-existent-uuid/comments` Bearer + `{"content":"Hi"}` | HTTP 404 + `code === 40401`；`commentStore.findByArticleId("non-existent-uuid")` 为 `[]`；stderr 无 Unhandled Rejection；进程未崩溃（异常经 asyncHandler → errorHandler 链路捕获） | 高 |
-| IT-006 | 接口 5 + 6 + 9 | 删除文章后查询返回 404 异常路径 | 文章 X 存在且下有 2 条评论；`DELETE /api/v1/articles/:X`（作者 token）→ `GET /api/v1/articles/:X` → `GET /api/v1/articles/:X/comments` | DELETE 返回 204；后续 GET 详情返回 404 + 40401；GET 评论列表返回 404 + 40401；`articleStore.findById(":X")` 为 undefined；`commentStore.findByArticleId(":X")` 为 `[]`（评论随文章级联删除或不暴露） | 高 |
+| 用例 ID | 关联需求 | 测试目标 | 接口/模块组合 | 输入 | 预期输出 | 优先级 |
+|---|---|---|---|---|---|---|
+| IT-001 | REQ-001 | 注册 + 登录模块间契约 | routes/auth → AuthController → UserService → UserStore + passwordUtils + jwtUtils | 1) POST /register {alice/Pass1234}；2) POST /login {alice/Pass1234} | 步骤 1：201 + {userId, username='alice'}；步骤 2：200 + {token, userId, username='alice'}；token 可被 verifyToken 解码；userStore 内部 passwordHash 以 $2b$10$ 开头 | 高 |
+| IT-002 | REQ-001 | 重复注册触发 ConflictError 经 errorHandler 序列化 | routes/auth + UserService + errorHandler | POST /register {alice/Pass1234} 两次 | 第二次：409 + {code:40901, message:'用户名已存在'} | 高 |
+| IT-003 | REQ-002 | 创建文章 + 作者隔离（update/remove 跨用户） | routes/article + authMiddleware + ArticleController + ArticleService | 1) A 注册登录；2) A 创建文章 X；3) B 注册登录；4) B PATCH /articles/X；5) B DELETE /articles/X；6) A PATCH /articles/X | 步骤 4：403 + 40301；步骤 5：403 + 40301；步骤 6：200 + 更新后内容；X 仍存在 | 高 |
+| IT-004 | REQ-003 | 公开浏览（未认证）+ 评论聚合 | routes/article + ArticleController.getById + CommentService.listByArticle | 1) A 创建文章 X；2) A 创建评论 C1；3) 公开 GET /articles/X | 200 + {id, title, content, authorId, comments:[{id:C1, content, authorId:A}]}；无需 Authorization | 高 |
+| IT-005 | REQ-004 | 评论删除作者隔离 + 文章不存在拦截 | routes/comment + authMiddleware + CommentService | 1) A 创建文章 X + 评论 C1；2) B 登录；3) B DELETE /articles/X/comments/C1；4) A DELETE /articles/X/comments/C1；5) A POST /articles/不存在/comments | 步骤 3：403 + 40301；步骤 4：204；步骤 5：404 + 40401 | 高 |
+| IT-006 | NFR-001 | 鉴权中间件全链路：缺 token / 伪造 / 过期 | authMiddleware + jwtUtils | 1) POST /articles 无 Authorization；2) POST /articles Authorization: Bearer 伪造；3) POST /articles Authorization: Bearer 过期 token；4) POST /articles Authorization: Bearer 合法 token | 步骤 1：401 + 40103；步骤 2：401 + 40102；步骤 3：401 + 40102；步骤 4：201 | 高 |
 
-### 4.2 集成测试覆盖说明
+### 5.2 集成测试覆盖说明
 
-- 参数校验覆盖（TC-DES-010）：IT-001 合法 + IT-002 非法 5 类（格式 / 长度 / 复杂度 / 缺失 / 类型）
-- 跨模块调用覆盖（TC-DES-011）：IT-003（auth→article 认证传递）+ IT-004（article→comment→article 详情聚合）
-- 异常路径覆盖（TC-DES-012）：IT-005（文章不存在发表评论 → 40401）+ IT-006（删除后查询 → 40401）
-- 数据传递正确性：IT-003 authorId 注入 + IT-004 评论聚合 + 评论顺序
-- 总计：6 条 IT，覆盖参数校验 + 跨模块 2 + 异常路径 2 + 数据传递 1
+- 模块间契约：IT-001（auth 全链路）、IT-003（article 跨用户作者隔离）、IT-005（comment 跨用户 + 跨资源）
+- 错误传播：IT-002（ConflictError → errorHandler）、IT-006（UnauthorizedError 三态）
+- 跨层边界：IT-004（routes → controller → service → store + 跨 service 聚合 comments）
+- 总计：6 条 IT，覆盖 4 个 REQ + 1 个 NFR；剩余 NFR（性能/可维护性/可测试性）由 ST/UAT 覆盖
 
-## 5. 阶段 3 自检清单
+## 6. 阶段 3 自检清单
 
-- [x] 接口定义完整，10 个接口契约全部按「10 字段 Schema 模板」填写
-- [x] 错误码按「错误码分层约定」覆盖 4xx / 5xx / 业务三段位（业务段位本 demo 无用例但已声明保留段位）
-- [x] 模块间调用关系清晰，无循环依赖（DFS 三色染色验证）
-- [x] 集成测试用例覆盖关键模块交互路径（参数校验 + 跨模块 + 异常路径），共 6 条
+- [x] 模块间接口签名已定义（route → middleware → controller → service → store / utils）
+- [x] 错误码与 HTTP 状态码契约已固化（10 个业务码枚举）
+- [x] 集成测试用例覆盖关键模块间路径（CRUD + 作者隔离 + 鉴权 + 评论聚合），共 6 条
+- [x] 4 项历史修复中的接口约束已声明：async-handler（routes）、JWT_SECRET（jwt.ts）、ArticleService export class、HttpError 子类
 - [x] RTM 已补登 outline-design 文档（见 `.w-model/rtm.json`）
-- [x] 未越界深入类 / 方法内部（方法签名将在阶段 4 详细设计产出）
 
-## 6. 阶段完成摘要
+## 7. 阶段完成摘要
 
 - 产物路径：
   - `docs/outline-design.md`（本文件，内嵌 IT-001~006）
-  - `.w-model/rtm.json`（已补登 outline-design）
-- RTM 覆盖状态：部分（designDoc 已填充；codeModule / UT / IT / ST / UAT 待后续阶段填充）
-- 验证证据：10 个接口契约完整 + 10 个错误码 + DFS 三色染色无环 + 6 条 IT 覆盖参数校验 / 跨模块 / 异常路径
+  - `.w-model/rtm.json`（已补登 integrationTest 字段）
+- RTM 覆盖状态：部分（designDoc + systemTest + integrationTest + acceptanceTest 已填充；codeModule + unitTest 待阶段 4/5）
+- 验证证据：8 模块接口签名 + 10 业务码契约表 + 6 条 IT 覆盖模块间路径
 - 阻塞项：无
-- 下一步：进入阶段 4（详细设计），同步产出单元测试设计
+- 下一步：进入阶段 4（详细设计），同步产出单元测试设计（UT-001~030）

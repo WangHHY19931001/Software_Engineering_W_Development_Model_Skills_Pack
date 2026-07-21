@@ -31,3 +31,4 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-07-20T11:00	darwin-02-09	w-model-dev/references/rtm-guide.md	84.5	86.0	keep	dim5	8阶段RTM字段更新清单+伪代码;覆盖率计算公式8列定义;缺失项检测算法7字段非空遍历	dry_run
 2026-07-20T11:00	darwin-02-10	w-model-dev/references/verifier-spec.md	84.5	87.0	keep	dim3	§11异常处理章节(LLM调用失败重试5类失败×指数退避;logits→text-parse降级3检测信号;方差超阈值5步含离群剔除+防作弊;evidence引用失效4类型)	dry_run
 2026-07-20T11:00	darwin-02-11	w-model-dev/SKILL.md	86.8	90.5	keep	dim3	新增「异常与边界条件」章节8类场景17条动作(跨平台路径/.w-model异常/LLM不可用/门禁脚本异常/多技术栈切换/阶段状态漂移/大型项目性能/用户中途取消)	dry_run
+2026-07-21T22:30	f79d72d	w-model-dev-demo	-	-	keep	e2e_rebuild	8阶段从零重建第2轮;107/107通过(UT71+IT13+ST8+UAT15);cov 100%×4维;gate exit0;self-test 17/17;4历史修复回归通过(async-handler sync throw/JWT_SECRET/ArticleService导出/vitest mock类型);新修4问题(Promise.resolve sync throw/密码长度zod/User双重断言/npx.cmd shell);项目归档confirm	e2e

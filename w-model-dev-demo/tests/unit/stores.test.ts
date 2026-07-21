@@ -1,97 +1,159 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { UserStore } from '../../src/stores/user.store.js';
-import { ArticleStore } from '../../src/stores/article.store.js';
-import { CommentStore } from '../../src/stores/comment.store.js';
+import { userStore } from '../../src/stores/user.store.js';
+import { articleStore } from '../../src/stores/article.store.js';
+import { commentStore } from '../../src/stores/comment.store.js';
+import type { User, Article, Comment } from '../../src/types.js';
 
-/**
- * UT-030：UserStore / ArticleStore / CommentStore.clear 单元测试。
- * 设计来源：docs/detailed-design.md §4.1
- */
-describe('Stores.clear()', () => {
-  let userStore: UserStore;
-  let articleStore: ArticleStore;
-  let commentStore: CommentStore;
-
+describe('stores', () => {
   beforeEach(() => {
-    userStore = new UserStore();
-    articleStore = new ArticleStore();
-    commentStore = new CommentStore();
-  });
-
-  it('UT-030: UserStore.clear 后 findById/findByUsername 返回 undefined', () => {
-    const now = new Date().toISOString();
-    userStore.save({ id: 'u-1', username: 'alice', passwordHash: '$2b$10$xxx', createdAt: now });
-    userStore.save({ id: 'u-2', username: 'bob', passwordHash: '$2b$10$yyy', createdAt: now });
-
     userStore.clear();
-
-    expect(userStore.findById('u-1')).toBeUndefined();
-    expect(userStore.findById('u-2')).toBeUndefined();
-    expect(userStore.findByUsername('alice')).toBeUndefined();
-  });
-
-  it('UT-030: ArticleStore.clear 后 findById 返回 undefined，count()=0', () => {
-    const now = new Date().toISOString();
-    articleStore.save({
-      id: 'a-1',
-      authorId: 'u-1',
-      title: 'T',
-      content: 'C',
-      tags: [],
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    expect(articleStore.count()).toBe(1);
     articleStore.clear();
-
-    expect(articleStore.findById('a-1')).toBeUndefined();
-    expect(articleStore.count()).toBe(0);
-    expect(articleStore.findAll(1, 10)).toHaveLength(0);
+    commentStore.clear();
   });
 
-  it('UT-030: CommentStore.clear 后 findById/findByArticleId 返回空', () => {
-    const now = new Date().toISOString();
-    commentStore.save({
-      id: 'c-1',
-      articleId: 'a-1',
-      authorId: 'u-1',
-      content: 'Nice',
-      createdAt: now,
+  describe('userStore', () => {
+    it('save → findById / findByUsername 查询', () => {
+      const user: User = {
+        id: 'u1',
+        username: 'alice',
+        passwordHash: '$2b$10$abc',
+        createdAt: new Date().toISOString(),
+      };
+      userStore.save(user);
+      expect(userStore.findById('u1')).toEqual(user);
+      expect(userStore.findByUsername('alice')).toEqual(user);
     });
 
-    commentStore.clear();
+    it('findById 不存在 → undefined', () => {
+      expect(userStore.findById('non-existent')).toBeUndefined();
+    });
 
-    expect(commentStore.findById('c-1')).toBeUndefined();
-    expect(commentStore.findByArticleId('a-1')).toHaveLength(0);
+    it('findByUsername 不存在 → undefined', () => {
+      expect(userStore.findByUsername('non-existent')).toBeUndefined();
+    });
+
+    it('clear → size 归零', () => {
+      const user: User = {
+        id: 'u1',
+        username: 'alice',
+        passwordHash: '$2b$10$abc',
+        createdAt: new Date().toISOString(),
+      };
+      userStore.save(user);
+      expect(userStore.size()).toBe(1);
+      userStore.clear();
+      expect(userStore.size()).toBe(0);
+    });
   });
 
-  it('UT-030-extra: ArticleStore.findAll 分页 + createdAt 降序', () => {
-    const base = new Date('2026-01-01T00:00:00.000Z').getTime();
-    for (let i = 0; i < 5; i++) {
-      const ts = new Date(base + i * 1000).toISOString();
-      articleStore.save({
-        id: `a-${i}`,
-        authorId: 'u-1',
-        title: `T-${i}`,
+  describe('articleStore', () => {
+    function makeArticle(id: string, title: string, createdAt: string): Article {
+      return {
+        id,
+        title,
         content: 'C',
-        tags: [],
-        createdAt: ts,
-        updatedAt: ts,
-      });
+        authorId: 'u1',
+        createdAt,
+        updatedAt: createdAt,
+      };
     }
 
-    const page1 = articleStore.findAll(1, 2);
-    expect(page1).toHaveLength(2);
-    // 降序：最新优先（a-4 createdAt 最大）
-    expect(page1[0].id).toBe('a-4');
-    expect(page1[1].id).toBe('a-3');
+    it('save → findById 查询', () => {
+      const a = makeArticle('a1', 'T1', '2026-01-01T00:00:00Z');
+      articleStore.save(a);
+      expect(articleStore.findById('a1')).toEqual(a);
+    });
 
-    const page2 = articleStore.findAll(2, 2);
-    expect(page2[0].id).toBe('a-2');
-    expect(page2[1].id).toBe('a-1');
+    it('findById 不存在 → undefined', () => {
+      expect(articleStore.findById('non-existent')).toBeUndefined();
+    });
 
-    const page3 = articleStore.findAll(3, 2);
-    expect(page3).toHaveLength(1);
+    it('findAll 按 createdAt 降序排列', () => {
+      articleStore.save(makeArticle('a1', 'T1', '2026-01-01T00:00:00Z'));
+      articleStore.save(makeArticle('a2', 'T2', '2026-02-01T00:00:00Z'));
+      articleStore.save(makeArticle('a3', 'T3', '2026-01-15T00:00:00Z'));
+      const result = articleStore.findAll(1, 10);
+      expect(result.total).toBe(3);
+      expect(result.items.map((a) => a.id)).toEqual(['a2', 'a3', 'a1']);
+    });
+
+    it('findAll 分页：page=1,pageSize=2', () => {
+      articleStore.save(makeArticle('a1', 'T1', '2026-01-01T00:00:00Z'));
+      articleStore.save(makeArticle('a2', 'T2', '2026-02-01T00:00:00Z'));
+      articleStore.save(makeArticle('a3', 'T3', '2026-01-15T00:00:00Z'));
+      const r1 = articleStore.findAll(1, 2);
+      expect(r1.items.length).toBe(2);
+      expect(r1.total).toBe(3);
+      const r2 = articleStore.findAll(2, 2);
+      expect(r2.items.length).toBe(1);
+    });
+
+    it('findAll 空存储 → {items:[], total:0}', () => {
+      const r = articleStore.findAll(1, 10);
+      expect(r.items).toEqual([]);
+      expect(r.total).toBe(0);
+    });
+
+    it('delete → boolean', () => {
+      articleStore.save(makeArticle('a1', 'T1', '2026-01-01T00:00:00Z'));
+      expect(articleStore.delete('a1')).toBe(true);
+      expect(articleStore.delete('a1')).toBe(false);
+    });
+
+    it('clear → size 归零', () => {
+      articleStore.save(makeArticle('a1', 'T1', '2026-01-01T00:00:00Z'));
+      expect(articleStore.size()).toBe(1);
+      articleStore.clear();
+      expect(articleStore.size()).toBe(0);
+    });
+  });
+
+  describe('commentStore', () => {
+    function makeComment(id: string, articleId: string, createdAt: string): Comment {
+      return {
+        id,
+        articleId,
+        authorId: 'u1',
+        content: 'C',
+        createdAt,
+      };
+    }
+
+    it('save → findById 查询', () => {
+      const c = makeComment('c1', 'a1', '2026-01-01T00:00:00Z');
+      commentStore.save(c);
+      expect(commentStore.findById('c1')).toEqual(c);
+    });
+
+    it('findById 不存在 → undefined', () => {
+      expect(commentStore.findById('non-existent')).toBeUndefined();
+    });
+
+    it('findByArticleId 过滤 + createdAt 升序', () => {
+      commentStore.save(makeComment('c1', 'a1', '2026-02-01T00:00:00Z'));
+      commentStore.save(makeComment('c2', 'a2', '2026-01-01T00:00:00Z'));
+      commentStore.save(makeComment('c3', 'a1', '2026-01-15T00:00:00Z'));
+      const list = commentStore.findByArticleId('a1');
+      expect(list.map((c) => c.id)).toEqual(['c3', 'c1']);
+    });
+
+    it('findByArticleId 无匹配 → 空数组', () => {
+      commentStore.save(makeComment('c1', 'a1', '2026-01-01T00:00:00Z'));
+      const list = commentStore.findByArticleId('a2');
+      expect(list).toEqual([]);
+    });
+
+    it('delete → boolean', () => {
+      commentStore.save(makeComment('c1', 'a1', '2026-01-01T00:00:00Z'));
+      expect(commentStore.delete('c1')).toBe(true);
+      expect(commentStore.delete('c1')).toBe(false);
+    });
+
+    it('clear → size 归零', () => {
+      commentStore.save(makeComment('c1', 'a1', '2026-01-01T00:00:00Z'));
+      expect(commentStore.size()).toBe(1);
+      commentStore.clear();
+      expect(commentStore.size()).toBe(0);
+    });
   });
 });

@@ -1,18 +1,12 @@
 import type { User } from '../types.js';
 
-/**
- * 内存用户存储。
- *
- * 设计来源：`docs/detailed-design.md` §1.1 / §2.3 / CON-002。
- * - 主键 `id` 作为 Map key（O(1) 查找）。
- * - `username` 通过遍历查找（数据规模 ≤ 1000，性能可接受）。
- */
-export class UserStore {
-  private readonly users: Map<string, User> = new Map();
+class UserStoreImpl {
+  private users = new Map<string, User>();
+  private usernameIndex = new Map<string, string>();
 
-  save(user: User): User {
+  save(user: User): void {
     this.users.set(user.id, user);
-    return user;
+    this.usernameIndex.set(user.username, user.id);
   }
 
   findById(id: string): User | undefined {
@@ -20,13 +14,18 @@ export class UserStore {
   }
 
   findByUsername(username: string): User | undefined {
-    for (const user of this.users.values()) {
-      if (user.username === username) return user;
-    }
-    return undefined;
+    const id = this.usernameIndex.get(username);
+    return id ? this.users.get(id) : undefined;
   }
 
   clear(): void {
     this.users.clear();
+    this.usernameIndex.clear();
+  }
+
+  size(): number {
+    return this.users.size;
   }
 }
+
+export const userStore = new UserStoreImpl();

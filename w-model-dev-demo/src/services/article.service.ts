@@ -1,90 +1,64 @@
 import { randomUUID } from 'node:crypto';
-import type { ArticleStore } from '../stores/article.store.js';
-import type { CommentStore } from '../stores/comment.store.js';
-import type {
-  Article,
-  ArticleCreateDTO,
-  ArticleDetail,
-  ArticleUpdateDTO,
-  PageQuery,
-  PageResult,
-} from '../types.js';
+import { articleStore } from '../stores/article.store.js';
 import { ForbiddenError, NotFoundError } from '../utils/errors.js';
+import type { ArticleCreateDTO, ArticleUpdateDTO } from '../schemas/article.schema.js';
+import type { Article } from '../types.js';
 
-/**
- * 文章业务服务。
- *
- * 设计来源：`docs/detailed-design.md` §3.2 / REQ-002 / REQ-003。
- * - 创建 / 更新 / 删除均强制作者隔离（authorId 来自 JWT，不取自 body）。
- * - `delete` 级联清理该文章下的全部评论。
- * - `getById` 聚合评论列表（按 createdAt 升序）。
- * - `list` 按 createdAt 降序分页；可选 tag 过滤。
- */
 export class ArticleService {
-  constructor(
-    private readonly articleStore: ArticleStore,
-    private readonly commentStore: CommentStore,
-  ) {}
-
-  create(authorId: string, dto: ArticleCreateDTO): Article {
+  static async create(
+    authorId: string,
+    dto: ArticleCreateDTO,
+  ): Promise<Article> {
     const now = new Date().toISOString();
     const article: Article = {
       id: randomUUID(),
-      authorId,
       title: dto.title,
       content: dto.content,
-      tags: dto.tags ?? [],
+      authorId,
       createdAt: now,
       updatedAt: now,
     };
-    this.articleStore.save(article);
+    articleStore.save(article);
     return article;
   }
 
-  update(authorId: string, articleId: string, dto: ArticleUpdateDTO): Article {
-    const article = this.articleStore.findById(articleId);
-    if (!article) {
-      throw new NotFoundError('文章不存在');
-    }
-    if (article.authorId !== authorId) {
-      throw new ForbiddenError('无权操作他人文章');
-    }
-    if (dto.title !== undefined) article.title = dto.title;
-    if (dto.content !== undefined) article.content = dto.content;
-    if (dto.tags !== undefined) article.tags = dto.tags;
-    article.updatedAt = new Date().toISOString();
-    this.articleStore.save(article);
+  static async list(
+    page: number,
+    pageSize: number,
+  ): Promise<{ items: Article[]; total: number; page: number; pageSize: number }> {
+    if (page < 1) page = 1;
+    if (pageSize < 1) pageSize = 10;
+    const result = articleStore.findAll(page, pageSize);
+    return { ...result, page, pageSize };
+  }
+
+  static async getById(id: string): Promise<Article> {
+    const article = articleStore.findById(id);
+    if (!article) throw new NotFoundError(40401, '文章不存在');
     return article;
   }
 
-  delete(authorId: string, articleId: string): void {
-    const article = this.articleStore.findById(articleId);
-    if (!article) {
-      throw new NotFoundError('文章不存在');
-    }
-    if (article.authorId !== authorId) {
-      throw new ForbiddenError('无权操作他人文章');
-    }
-    // 级联清理评论
-    const comments = this.commentStore.findByArticleId(articleId);
-    for (const c of comments) {
-      this.commentStore.delete(c.id);
-    }
-    this.articleStore.delete(articleId);
+  static async update(
+    authorId: string,
+    id: string,
+    dto: ArticleUpdateDTO,
+  ): Promise<Article> {
+    const article = articleStore.findById(id);
+    if (!article) throw new NotFoundError(40401, '文章不存在');
+    if (article.authorId !== authorId) throw new ForbiddenError(40301, '无权操作他人文章');
+    const updated: Article = {
+      ...article,
+      ...dto,
+      updatedAt: new Date().toISOString(),
+    };
+    articleStore.save(updated);
+    return updated;
   }
 
-  getById(articleId: string): ArticleDetail {
-    const article = this.articleStore.findById(articleId);
-    if (!article) {
-      throw new NotFoundError('文章不存在');
-    }
-    const comments = this.commentStore.findByArticleId(articleId);
-    return { ...article, comments };
-  }
-
-  list(query: PageQuery): PageResult<Article> {
-    const items = this.articleStore.findAll(query.page, query.pageSize, query.tag);
-    const total = this.articleStore.count(query.tag);
-    return { items, total, page: query.page, pageSize: query.pageSize };
+  static async remove(authorId: string, id: string): Promise<void> {
+    const article = articleStore.findById(id);
+    if (!article) throw new NotFoundError(40401, '文章不存在');
+    if (article.authorId !== authorId) throw new ForbiddenError(40301, '无权操作他人文章');
+    articleStore.delete(id);
   }
 }

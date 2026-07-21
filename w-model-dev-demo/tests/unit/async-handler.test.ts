@@ -1,44 +1,42 @@
 import { describe, it, expect, vi } from 'vitest';
+import { asyncHandler } from '../../src/utils/async-handler.js';
 import type { Request, Response, NextFunction } from 'express';
-import { AsyncHandler } from '../../src/utils/async-handler.js';
 
-/**
- * UT-027：asyncHandler 单元测试。
- * 设计来源：docs/detailed-design.md §4.1 / RISK-002
- */
-describe('AsyncHandler', () => {
-  // UT-027: 捕获 rejected promise → next(err)
-  it('UT-027: async handler 抛出 rejected promise 时通过 next(err) 捕获', async () => {
-    const asyncHandler = new AsyncHandler();
-    const throwingFn = async (_req: Request, _res: Response, _next: NextFunction) => {
-      throw new Error('boom');
-    };
-    const wrapped = asyncHandler.wrap(throwingFn);
-
-    const next = vi.fn();
-    wrapped({} as Request, {} as Response, next);
-
-    // 等待微任务队列刷新（Promise.catch 在微任务中执行）
-    await vi.waitFor(() => expect(next).toHaveBeenCalledWith(expect.any(Error)));
-
-    expect(next.mock.calls[0][0]).toBeInstanceOf(Error);
-    expect((next.mock.calls[0][0] as Error).message).toBe('boom');
+describe('async-handler', () => {
+  it('成功路径：调用 fn 并返回 Promise resolved', async () => {
+    const req = {} as Request;
+    const res = {} as Response;
+    const next = vi.fn() as unknown as NextFunction;
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const handler = asyncHandler(fn);
+    await handler(req, res, next);
+    expect(fn).toHaveBeenCalledWith(req, res, next);
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it('UT-027-extra: 正常 async handler 不触发 next(err)', async () => {
-    const asyncHandler = new AsyncHandler();
-    const okFn = async (_req: Request, _res: Response, _next: NextFunction) => {
-      return 'ok';
-    };
-    const wrapped = asyncHandler.wrap(okFn);
+  it('异常路径：fn reject → next(err) 被调用', async () => {
+    const req = {} as Request;
+    const res = {} as Response;
+    const next = vi.fn() as unknown as NextFunction;
+    const err = new Error('boom');
+    const fn = vi.fn().mockRejectedValue(err);
+    const handler = asyncHandler(fn);
+    handler(req, res, next);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(next).toHaveBeenCalledWith(err);
+  });
 
-    const next = vi.fn();
-    wrapped({} as Request, {} as Response, next);
-
-    // 等待微任务队列刷新，确保 Promise.resolve(...).catch(next) 链已 settle
-    await new Promise(resolve => setImmediate(resolve));
-
-    // wrap 实现只在 reject 时调用 next(err)，成功时不会自动调用 next()
-    expect(next).not.toHaveBeenCalled();
+  it('同步抛出异常：fn 同步 throw → next(err) 被调用', async () => {
+    const req = {} as Request;
+    const res = {} as Response;
+    const next = vi.fn() as unknown as NextFunction;
+    const err = new Error('sync boom');
+    const fn = vi.fn().mockImplementation(() => {
+      throw err;
+    });
+    const handler = asyncHandler(fn);
+    handler(req, res, next);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(next).toHaveBeenCalledWith(err);
   });
 });

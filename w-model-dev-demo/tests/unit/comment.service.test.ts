@@ -1,89 +1,74 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CommentStore } from '../../src/stores/comment.store.js';
-import { ArticleStore } from '../../src/stores/article.store.js';
-import { ArticleService } from '../../src/services/article.service.js';
 import { CommentService } from '../../src/services/comment.service.js';
+import { ArticleService } from '../../src/services/article.service.js';
+import { commentStore } from '../../src/stores/comment.store.js';
 import { ForbiddenError, NotFoundError } from '../../src/utils/errors.js';
+import type { Article } from '../../src/types.js';
 
-/**
- * UT-018 ~ UT-021：CommentService 单元测试。
- * 设计来源：docs/detailed-design.md §4.1
- */
-describe('CommentService', () => {
-  let commentStore: CommentStore;
-  let articleStore: ArticleStore;
-  let articleService: ArticleService;
-  let commentService: CommentService;
+describe('UT-026 ~ UT-029: CommentService', () => {
+  let article: Article;
 
-  beforeEach(() => {
-    commentStore = new CommentStore();
-    articleStore = new ArticleStore();
-    articleService = new ArticleService(articleStore, commentStore);
-    commentService = new CommentService(commentStore, articleService);
+  beforeEach(async () => {
+    commentStore.clear();
+    article = await ArticleService.create('u1', {
+      title: 'T1',
+      content: 'C1',
+    });
   });
 
-  // UT-018: 成功创建评论
-  it('UT-018: 对已存在文章发表评论返回 UUID + authorId 来自参数', () => {
-    const article = articleService.create('u-1', { title: 'T', content: 'C' });
-    const result = commentService.create('u-1', article.id, 'Nice');
-
-    expect(result.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(result.authorId).toBe('u-1');
-    expect(result.content).toBe('Nice');
-    expect(result.articleId).toBe(article.id);
+  it('UT-026: create 文章存在 → 返回 Comment', async () => {
+    const comment = await CommentService.create('u1', article.id, { content: 'Hello' });
+    expect(comment.id).toBeTruthy();
+    expect(comment.articleId).toBe(article.id);
+    expect(comment.authorId).toBe('u1');
+    expect(comment.content).toBe('Hello');
+    expect(comment.createdAt).toBeTruthy();
   });
 
-  // UT-019: 文章不存在 → 40401
-  it('UT-019: 对不存在文章发表评论抛 NotFoundError(40401)', () => {
+  it('UT-027: create 文章不存在 → NotFoundError(40401)', async () => {
+    await expect(
+      CommentService.create('u1', 'non-existent', { content: 'Hello' }),
+    ).rejects.toThrow(NotFoundError);
     try {
-      commentService.create('u-1', 'non-existent', 'Hi');
-      throw new Error('should not reach');
-    } catch (err) {
-      expect(err).toBeInstanceOf(NotFoundError);
-      expect((err as NotFoundError).code).toBe(40401);
+      await CommentService.create('u1', 'non-existent', { content: 'Hello' });
+    } catch (e) {
+      expect((e as NotFoundError).code).toBe(40401);
     }
   });
 
-  // UT-020: 成功删除自己的评论
-  it('UT-020: 作者删除自己的评论，存储中已删除', () => {
-    const article = articleService.create('u-1', { title: 'T', content: 'C' });
-    const comment = commentService.create('u-1', article.id, 'Nice');
-
-    commentService.delete('u-1', comment.id);
-
-    expect(commentStore.findById(comment.id)).toBeUndefined();
+  it('UT-028: remove 作者本人 → 无返回；commentStore.size 减 1', async () => {
+    const comment = await CommentService.create('u1', article.id, { content: 'Hello' });
+    expect(commentStore.size()).toBe(1);
+    await CommentService.remove('u1', comment.id);
+    expect(commentStore.size()).toBe(0);
   });
 
-  // UT-021: 非作者删除 → 40301
-  it('UT-021: 非作者删除评论抛 ForbiddenError(40301)', () => {
-    const article = articleService.create('u-1', { title: 'T', content: 'C' });
-    const comment = commentService.create('u-1', article.id, 'Nice');
-
+  it('UT-029: remove 非作者 → ForbiddenError(40301)', async () => {
+    const comment = await CommentService.create('u1', article.id, { content: 'Hello' });
+    await expect(CommentService.remove('u2', comment.id)).rejects.toThrow(ForbiddenError);
     try {
-      commentService.delete('u-2', comment.id);
-      throw new Error('should not reach');
-    } catch (err) {
-      expect(err).toBeInstanceOf(ForbiddenError);
-      expect((err as ForbiddenError).code).toBe(40301);
+      await CommentService.remove('u2', comment.id);
+    } catch (e) {
+      expect((e as ForbiddenError).code).toBe(40301);
     }
   });
 
-  it('UT-021-extra: 删除不存在的评论抛 NotFoundError(40401)', () => {
-    try {
-      commentService.delete('u-1', 'non-existent');
-      throw new Error('should not reach');
-    } catch (err) {
-      expect(err).toBeInstanceOf(NotFoundError);
-      expect((err as NotFoundError).code).toBe(40401);
-    }
+  it('补充: remove 评论不存在 → NotFoundError(40401)', async () => {
+    await expect(CommentService.remove('u1', 'non-existent')).rejects.toThrow(NotFoundError);
   });
 
-  it('UT-021-extra2: listByArticle 文章不存在抛 NotFoundError', () => {
-    try {
-      commentService.listByArticle('non-existent');
-      throw new Error('should not reach');
-    } catch (err) {
-      expect(err).toBeInstanceOf(NotFoundError);
-    }
+  it('补充: listByArticle 返回评论按 createdAt 升序', async () => {
+    await CommentService.create('u1', article.id, { content: 'C1' });
+    await new Promise((r) => setTimeout(r, 5));
+    await CommentService.create('u1', article.id, { content: 'C2' });
+    const list = await CommentService.listByArticle(article.id);
+    expect(list.length).toBe(2);
+    expect(list[0].content).toBe('C1');
+    expect(list[1].content).toBe('C2');
+  });
+
+  it('补充: listByArticle 不存在的文章 → 空数组', async () => {
+    const list = await CommentService.listByArticle('non-existent');
+    expect(list).toEqual([]);
   });
 });
