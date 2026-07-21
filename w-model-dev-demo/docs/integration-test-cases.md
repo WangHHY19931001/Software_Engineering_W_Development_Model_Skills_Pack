@@ -1,190 +1,133 @@
-# 测试用例文档
+# 集成测试用例文档
 
-> 阶段 3 设计、阶段 6 执行。集成测试用例。
+> 阶段 6（集成测试执行）产出。
+> 设计来源：`docs/outline-design.md` §4 集成测试用例设计（IT-001 ~ IT-006）。
+> 执行入口：`npm run test:integration` → `tests/integration/integration.test.ts`。
 
 ## 文档信息
 
-- 项目名称：博客系统（blog-system-demo）
-- 测试类型：集成测试
-- 设计来源阶段：阶段 3（概要设计）
-- 执行阶段：阶段 6（集成测试）
+- 项目名称：blog-system-demo
 - 文档版本：v1.0
+- 编制日期：2026-07-21
+- 编制者：W-Model Agent（阶段 6）
+- 关联设计文档：`docs/outline-design.md` §4
+- 测试运行器：vitest 1.6 + supertest 7.2
+- 被测入口：`src/app.ts` 单例 `app`（真实 Express 实例，不 mock 控制器 / 服务 / 存储）
 
-## 用例列表
+## 1. 用例总览
 
-### IT-001
-
-- 标题：JWT 在 M-001 与 M-002 之间正确传递
-- 优先级：高
-- 关联模块交互：M-001 ↔ M-002
-- 测试场景：注册→登录获取 JWT→用 JWT 创建文章，验证 token 在跨模块调用中传递 userId
-
-**前置条件**
-- 服务已启动，存储已清空
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/auth/register | `{username, password}` | 201 + userId |
-| 2 | POST /api/auth/login | 同上 | 200 + token |
-| 3 | 解码 JWT | base64 decode payload | payload.userId === 步骤 1 返回的 userId |
-| 4 | POST /api/articles | Bearer token + body | 201 + articleId |
-| 5 | GET /api/articles/:id | — | 200 + article.authorId === userId |
-
-**预期结果**
-JWT payload 中的 userId 与创建出的文章 authorId 完全一致。
-
-**执行状态**
-- [x] 待执行
-
----
-
-### IT-002
-
-- 标题：文章 CRUD 全流程
-- 优先级：高
-- 关联模块交互：M-002 内部
-- 测试场景：在一个测试用例内串联 create→findById→list→update→remove→findById(404)
-
-**前置条件**
-- 用户已注册并持有 JWT
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/articles | Bearer + `{title:"T1",content:"C1"}` | 201 + articleId |
-| 2 | GET /api/articles/:id | — | 200 + 完整文章 |
-| 3 | GET /api/articles | — | 200 + 数组长度 ≥ 1 |
-| 4 | PUT /api/articles/:id | Bearer + `{title:"T1-updated"}` | 200 + title 更新 |
-| 5 | DELETE /api/articles/:id | Bearer | 204 |
-| 6 | GET /api/articles/:id | — | 404 |
-
-**预期结果**
-CRUD 串联无断层，删除后查询返回 404。
-
-**执行状态**
-- [x] 待执行
-
----
-
-### IT-003
-
-- 标题：评论创建依赖文章存在校验
-- 优先级：高
-- 关联模块交互：M-002 ↔ M-003
-- 测试场景：CommentService.create 内部调用 ArticleService.findById 验证跨服务依赖
-
-**前置条件**
-- 用户 alice 持 JWT
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/articles/non-existent/comments | Bearer + `{content:"Hi"}` | 404 |
-| 2 | POST /api/articles (alice) | Bearer + body | 201 + articleId=A1 |
-| 3 | POST /api/articles/A1/comments (alice) | Bearer + `{content:"Nice"}` | 201 + commentId |
-
-**预期结果**
-对不存在文章评论返回 404；对存在文章评论返回 201。
-
-**执行状态**
-- [x] 待执行
-
----
-
-### IT-004
-
-- 标题：作者隔离跨用户验证
-- 优先级：高
-- 关联模块交互：M-001 ↔ M-002
-- 测试场景：alice 创建文章，bob 用自己的 JWT 尝试 PUT/DELETE 该文章
-
-**前置条件**
-- alice、bob 均注册并各自登录
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/articles (alice) | Bearer alice | 201 + A1 |
-| 2 | PUT /api/articles/A1 (bob) | Bearer bob + `{title:"Hacked"}` | 403 |
-| 3 | DELETE /api/articles/A1 (bob) | Bearer bob | 403 |
-| 4 | GET /api/articles/A1 | — | 200 + 标题仍为原值 |
-
-**预期结果**
-bob 的所有写操作被 403 拒绝，文章未被篡改。
-
-**执行状态**
-- [x] 待执行
-
----
-
-### IT-005
-
-- 标题：错误处理中间件统一捕获 AppError
-- 优先级：中
-- 关联模块交互：M-004 ↔ 全部
-- 测试场景：触发各类 AppError，验证响应格式与状态码一致
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/articles（无 token） | 无 Authorization | 401 + `{error}` |
-| 2 | PUT /api/articles/A1 (bob) | Bearer bob | 403 + `{error}` |
-| 3 | GET /api/articles/non-existent | — | 404 + `{error}` |
-| 4 | POST /api/auth/register (重复) | 已存在 username | 409 + `{error}` |
-| 5 | POST /api/articles (title 缺失) | Bearer + `{content:"x"}` | 400 + `{error}` |
-
-**预期结果**
-所有错误响应体格式一致（`{error: string}`），状态码正确。
-
-**执行状态**
-- [x] 待执行
-
----
-
-### IT-006
-
-- 标题：删除文章后评论不可再创建
-- 优先级：中
-- 关联模块交互：M-002 ↔ M-003
-- 测试场景：验证删除文章后 CommentService 仍能正确判定文章不存在
-
-**前置条件**
-- 文章 A1 存在；用户 alice 持 JWT
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | DELETE /api/articles/A1 (alice) | Bearer alice | 204 |
-| 2 | POST /api/articles/A1/comments (alice) | Bearer + `{content:"Hi"}` | 404 |
-
-**预期结果**
-评论创建被拒，不存在孤儿评论。
-
-**执行状态**
-- [x] 待执行
-
----
-
-## 用例汇总
-
-| 用例 ID | 标题 | 优先级 | 关联 | 状态 |
+| 用例 ID | 关联接口 | 场景 | 优先级 | 模块覆盖 |
 |---|---|---|---|---|
-| IT-001 | JWT 跨模块传递 | 高 | M-001↔M-002 | 待执行 |
-| IT-002 | 文章 CRUD 全流程 | 高 | M-002 | 待执行 |
-| IT-003 | 评论依赖文章存在校验 | 高 | M-002↔M-003 | 待执行 |
-| IT-004 | 作者隔离跨用户 | 高 | M-001↔M-002 | 待执行 |
-| IT-005 | 错误中间件统一捕获 | 中 | M-004↔全部 | 待执行 |
-| IT-006 | 删除后评论不可创建 | 中 | M-002↔M-003 | 待执行 |
+| IT-001 | 接口 1（POST /api/v1/auth/register） | 合法参数注册成功 + 重复注册 40901 | 高 | routes/auth + AuthController + UserService + PasswordUtils + UserStore |
+| IT-002 | 接口 1 | 5 类非法参数（用户名过短 / 密码 < 8 / 无数字 / 无字母 / 缺字段）全部 400 | 高 | middleware/validate + schemas/auth + ErrorHandler |
+| IT-003 | 接口 2 + 3（/auth/login + /articles） | 登录后跨模块创建文章，JWT 认证传递 + authorId 注入 | 高 | routes/auth + routes/article + AuthMiddleware + ArticleService + ArticleStore |
+| IT-004 | 接口 3 + 8 + 6（/articles + /comments + GET 详情） | 文章 → 评论 → 详情聚合数据传递 + 评论顺序 | 高 | ArticleService + CommentService + ArticleStore + CommentStore |
+| IT-005 | 接口 8 | 文章不存在异常路径发表评论 → 404 + 进程未崩溃 | 高 | CommentService + ArticleService + ErrorHandler（异常链路） |
+| IT-006 | 接口 5 + 6 + 9 | 删除文章后查询返回 404 + 评论级联删除 | 高 | ArticleService.delete + CommentStore（级联清理） |
 
-## 测试用例覆盖说明
+## 2. 用例详细规格
 
-- 模块交互覆盖：所有 6 对模块交互（M-001↔M-002 / M-002↔M-003 / M-002 内部 / M-004↔全部）均有用例
-- 跨服务依赖覆盖：IT-003 / IT-006 验证 CommentService→ArticleService 跨模块调用
-- 错误路径覆盖：401 / 403 / 404 / 409 / 400 全部覆盖
+### IT-001：合法参数注册成功 + 重复注册 40901
+
+| 项 | 内容 |
+|---|---|
+| 关联接口 | 接口 1 POST /api/v1/auth/register |
+| 场景 | 合法参数注册成功 + 重复注册返回 40901 |
+| 输入 | 1) `POST /api/v1/auth/register` body `{"username":"alice","password":"Passw0rd!"}`<br>2) 重复同 body |
+| 预期输出 | 第 1 次：HTTP 201；`res.body.userId` 匹配 UUID v4；`res.body.username === "alice"`；响应不含 password / passwordHash<br>第 2 次：HTTP 409 + `code === 40901`<br>存储校验：`userStore.findByUsername("alice").passwordHash` 以 `$2b$10$` 开头 |
+| 优先级 | 高 |
+| 模块覆盖 | routes/auth + AuthController + UserService + PasswordUtils + UserStore |
+| 实现位置 | tests/integration/integration.test.ts → describe('IT-001') |
+
+### IT-002：5 类非法参数全部 400 + 不写入存储
+
+| 项 | 内容 |
+|---|---|
+| 关联接口 | 接口 1 POST /api/v1/auth/register |
+| 场景 | 5 类非法参数（用户名过短 / 密码 < 8 / 无数字 / 无字母 / 缺字段） |
+| 输入 | 1) `{"username":"ab","password":"Passw0rd!"}`（用户名过短）<br>2) `{"username":"bob","password":"Ab1"}`（密码 < 8）<br>3) `{"username":"bob","password":"Password"}`（无数字）<br>4) `{"username":"bob","password":"12345678"}`（无字母）<br>5) `{"username":"bob"}`（缺 password） |
+| 预期输出 | 全部返回 HTTP 400 + `code === 40001`<br>5 类非法输入全部跑完后 `userStore.findByUsername("bob")` 为 undefined（不写入存储） |
+| 优先级 | 高 |
+| 模块覆盖 | middleware/validate + schemas/auth + ErrorHandler |
+| 实现位置 | tests/integration/integration.test.ts → describe('IT-002') |
+| 设计-实现偏差说明 | outline-design §4.1 原设计 2-4 项密码复杂度失败预期 40002，但 `src/middleware/validate.ts` 注释已声明「本 demo 统一使用 40001 简化错误码映射」，故实际断言为 40001。该偏差在阶段 5 编码时已固化并记录于源码注释，不影响四级测试覆盖完整性。 |
+
+### IT-003：登录后跨模块创建文章（认证传递）
+
+| 项 | 内容 |
+|---|---|
+| 关联接口 | 接口 2 POST /api/v1/auth/login + 接口 3 POST /api/v1/articles |
+| 场景 | 登录获取 token → 解码 payload → 创建文章，authorId 来自 JWT 而非 body |
+| 输入 | 1) 注册 alice<br>2) `POST /api/v1/auth/login` body `{"username":"alice","password":"Passw0rd!"}`<br>3) `jwt.decode(token)` 校验 payload<br>4) `POST /api/v1/articles` Header `Authorization: Bearer <token>` body `{"title":"T1","content":"C1"}` |
+| 预期输出 | 登录返回 200 + token；payload.userId 与注册返回一致；创建文章返回 201；`res.body.authorId === payload.userId`；`articleStore.findById(articleId).authorId` 一致 |
+| 优先级 | 高 |
+| 模块覆盖 | routes/auth + routes/article + AuthMiddleware + ArticleService + ArticleStore |
+| 实现位置 | tests/integration/integration.test.ts → describe('IT-003') |
+
+### IT-004：文章 → 评论 → 详情聚合数据传递
+
+| 项 | 内容 |
+|---|---|
+| 关联接口 | 接口 3 + 接口 8 + 接口 6 |
+| 场景 | alice 创建文章 → 发表 2 条评论 → GET 详情聚合 comments 数组 |
+| 输入 | 1) alice 注册 + 登录<br>2) `POST /api/v1/articles` 创建文章<br>3) `POST /api/v1/articles/:id/comments` body `{"content":"First!"}`<br>4) `POST /api/v1/articles/:id/comments` body `{"content":"Second!"}`<br>5) `GET /api/v1/articles/:id` |
+| 预期输出 | 步骤 2-4 返回 201；步骤 5 返回 200；`res.body.comments.length === 2`；评论按 createdAt 升序：First → Second；`comments[0].authorId === alice.userId` |
+| 优先级 | 高 |
+| 模块覆盖 | ArticleService + CommentService + ArticleStore + CommentStore |
+| 实现位置 | tests/integration/integration.test.ts → describe('IT-004') |
+
+### IT-005：文章不存在异常路径 - 发表评论
+
+| 项 | 内容 |
+|---|---|
+| 关联接口 | 接口 8 POST /api/v1/articles/:id/comments |
+| 场景 | 对不存在文章 UUID 发表评论 → 404 + 进程未崩溃 |
+| 输入 | alice 登录后 `POST /api/v1/articles/00000000-0000-4000-8000-000000000000/comments` Bearer + `{"content":"Hi"}` |
+| 预期输出 | HTTP 404 + `code === 40401`；`commentStore.findByArticleId(...)` 为 `[]`；`unhandledRejection` / `uncaughtException` 计数 = 0（异常经 errorHandler 链路捕获） |
+| 优先级 | 高 |
+| 模块覆盖 | CommentService + ArticleService + ErrorHandler（异常链路） |
+| 实现位置 | tests/integration/integration.test.ts → describe('IT-005') |
+
+### IT-006：删除文章后查询返回 404 + 评论级联删除
+
+| 项 | 内容 |
+|---|---|
+| 关联接口 | 接口 5 DELETE /api/v1/articles/:id + 接口 6 GET 详情 + 接口 9 GET 评论列表 |
+| 场景 | 文章存在且下有 2 条评论 → 删除文章 → 后续 GET 详情 / GET 评论列表均返回 404 |
+| 输入 | 1) alice 注册 + 登录 + 创建文章 X<br>2) 加 2 条评论<br>3) `DELETE /api/v1/articles/:X`<br>4) `GET /api/v1/articles/:X`<br>5) `GET /api/v1/articles/:X/comments` |
+| 预期输出 | DELETE 返回 204；GET 详情返回 404 + 40401；GET 评论列表返回 404 + 40401；`articleStore.findById(X)` 为 undefined；`commentStore.findByArticleId(X)` 为 `[]`（评论随文章级联删除） |
+| 优先级 | 高 |
+| 模块覆盖 | ArticleService.delete + CommentStore（级联清理） |
+| 实现位置 | tests/integration/integration.test.ts → describe('IT-006') |
+
+## 3. 覆盖说明
+
+### 3.1 强制场景覆盖（TC-DES-010 / 011 / 012）
+
+| 场景类型 | 覆盖用例 | 说明 |
+|---|---|---|
+| TC-DES-010 参数校验 | IT-001 合法 + IT-002 非法 5 类 | 格式 / 长度 / 复杂度 / 缺失全命中 |
+| TC-DES-011 跨模块调用 | IT-003（auth→article 认证传递）+ IT-004（article→comment→article 详情聚合） | 真实模块链路，不 mock |
+| TC-DES-012 异常路径 | IT-005（文章不存在发表评论 → 40401）+ IT-006（删除后查询 → 40401） | 含进程未崩溃断言 |
+
+### 3.2 数据传递正确性
+
+- IT-003 authorId 注入（JWT → article.authorId，非 body）
+- IT-004 评论聚合 + 评论顺序（升序）+ authorId 注入
+- IT-006 级联删除（文章删除后评论同步清理）
+
+### 3.3 总计
+
+- 设计 IT 用例数：6 条（IT-001 ~ IT-006）
+- 实际 it() 测试数：12 条（IT-001 拆 2 + IT-002 拆 6 + IT-003/004/005/006 各 1）
+- 全部为高优先级用例
+
+## 4. 测试环境与隔离
+
+| 项 | 内容 |
+|---|---|
+| 被测 app | `import { app, deps } from '../../src/app.js'`（单例） |
+| 状态重置 | `beforeEach` 调 `POST /__test/reset` 清空 3 个内存 Store |
+| 存储断言 | 通过 `deps.userStore` / `deps.articleStore` / `deps.commentStore` 直接读取，验证 passwordHash 前缀 / 级联删除 / 不写入存储 |
+| JWT 密钥 | `cross-env JWT_SECRET=test-secret-blog-demo`（package.json 脚本注入，RISK-008） |
+| 异常监听 | IT-005 通过 `process.on('unhandledRejection' / 'uncaughtException')` 计数器验证进程未崩溃 |

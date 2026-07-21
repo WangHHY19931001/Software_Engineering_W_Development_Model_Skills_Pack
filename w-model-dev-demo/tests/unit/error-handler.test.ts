@@ -1,65 +1,71 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { Request, Response } from 'express';
-import { ZodError, z } from 'zod';
-import { errorHandler } from '../../src/middleware/error-handler.js';
+import type { Request, Response, NextFunction } from 'express';
+import { ErrorHandler } from '../../src/middleware/error-handler.js';
 import {
   AppError,
-  ForbiddenError,
-  UnauthorizedError,
   NotFoundError,
-  ConflictError,
   ValidationError,
+  AuthError,
+  ForbiddenError,
+  ConflictError,
 } from '../../src/utils/errors.js';
 
-function runErrorHandler(err: unknown): { status: number; body: unknown } {
-  const res = {
-    status: vi.fn().mockReturnThis(),
-    json: vi.fn().mockReturnThis(),
-    send: vi.fn().mockReturnThis(),
-  } as unknown as Response;
-  errorHandler(err, {} as Request, res, vi.fn());
-  expect(res.status).toHaveBeenCalledTimes(1);
-  const status = (res.status as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as number;
-  const jsonBody = (res.json as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-  const sendBody = (res.send as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-  return { status, body: jsonBody ?? sendBody };
-}
+/**
+ * UT-028 / UT-029：ErrorHandler 单元测试。
+ * 设计来源：docs/detailed-design.md §4.1
+ */
+describe('ErrorHandler', () => {
+  const errorHandler = new ErrorHandler();
 
-describe('errorHandler', () => {
-  it('UT-020: AppError 转换为对应状态码', () => {
-    const cases: Array<{ err: AppError; expectedStatus: number; expectedMessage: string }> = [
-      { err: new ValidationError('bad input'), expectedStatus: 400, expectedMessage: 'bad input' },
-      { err: new UnauthorizedError(), expectedStatus: 401, expectedMessage: 'Unauthorized' },
-      { err: new ForbiddenError(), expectedStatus: 403, expectedMessage: 'Forbidden' },
-      { err: new NotFoundError(), expectedStatus: 404, expectedMessage: 'Not Found' },
-      { err: new ConflictError('dup'), expectedStatus: 409, expectedMessage: 'dup' },
+  function buildRes() {
+    const status = vi.fn().mockReturnThis();
+    const json = vi.fn().mockReturnThis();
+    return { res: { status, json } as unknown as Response, status, json };
+  }
+
+  // UT-028: AppError → 正确 HTTP status + code
+  it('UT-028: NotFoundError 映射为 404 + {code:40401, message:"文章不存在"}', () => {
+    const { res, status, json } = buildRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    errorHandler.handle(new NotFoundError('文章不存在'), {} as Request, res, next);
+
+    expect(status).toHaveBeenCalledWith(404);
+    expect(json).toHaveBeenCalledWith({ code: 40401, message: '文章不存在' });
+  });
+
+  it('UT-028-extra: 各 AppError 子类 HTTP status 映射正确', () => {
+    const cases: Array<{ err: AppError; httpStatus: number; code: number }> = [
+      { err: new ValidationError('参数错误'), httpStatus: 400, code: 40001 },
+      { err: new AuthError(40101, '认证失败'), httpStatus: 401, code: 40101 },
+      { err: new AuthError(40102, 'JWT 无效'), httpStatus: 401, code: 40102 },
+      { err: new AuthError(40103, '无令牌'), httpStatus: 401, code: 40103 },
+      { err: new ForbiddenError('无权'), httpStatus: 403, code: 40301 },
+      { err: new ConflictError('已存在'), httpStatus: 409, code: 40901 },
     ];
     for (const c of cases) {
-      const { status, body } = runErrorHandler(c.err);
-      expect(status).toBe(c.expectedStatus);
-      expect((body as { error: string }).error).toBe(c.expectedMessage);
+      const { res, status, json } = buildRes();
+      errorHandler.handle(c.err, {} as Request, res, vi.fn() as unknown as NextFunction);
+      expect(status).toHaveBeenCalledWith(c.httpStatus);
+      expect(json).toHaveBeenCalledWith({ code: c.code, message: c.err.message });
     }
   });
 
-  it('UT-021: ZodError 转换为 400', () => {
-    const schema = z.object({ name: z.string().min(3) });
-    let zodErr: ZodError | null = null;
-    try {
-      schema.parse({ name: 'a' });
-    } catch (e) {
-      zodErr = e as ZodError;
-    }
-    expect(zodErr).not.toBeNull();
-    const { status, body } = runErrorHandler(zodErr!);
-    expect(status).toBe(400);
-    expect((body as { error: string }).error).toContain('name');
+  // UT-029: 未知错误 → 50001
+  it('UT-029: 未知错误映射为 500 + {code:50001, message:"内部错误"}', () => {
+    const { res, status, json } = buildRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    errorHandler.handle(new Error('unknown'), {} as Request, res, next);
+
+    expect(status).toHaveBeenCalledWith(500);
+    expect(json).toHaveBeenCalledWith({ code: 50001, message: '内部错误' });
   });
 
-  it('UT-022: 未知错误转换为 500', () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { status, body } = runErrorHandler(new Error('boom'));
-    expect(status).toBe(500);
-    expect((body as { error: string }).error).toBe('Internal Server Error');
-    errSpy.mockRestore();
+  it('UT-029-extra: 字符串错误也映射为 50001', () => {
+    const { res, status, json } = buildRes();
+    errorHandler.handle('string error', {} as Request, res, vi.fn() as unknown as NextFunction);
+    expect(status).toHaveBeenCalledWith(500);
+    expect(json).toHaveBeenCalledWith({ code: 50001, message: '内部错误' });
   });
 });

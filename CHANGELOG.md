@@ -5,6 +5,61 @@
 
 ## [Unreleased]
 
+### 端到端调测第二轮：从零重建 + k6 性能基线 + 文档全面同步
+
+> 通过完全清空 [`w-model-dev-demo/`](./w-model-dev-demo) 后按 W 模型 8 阶段从零重建，
+> 验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可重复执行；
+> 并通过回归测试发现 3 项工程配置缺陷（JWT_SECRET 缺失 / ArticleService 类型导出 / vitest mock 类型），
+> 修复后纳入 [`w-model-dev/references/anti-patterns.md`](./w-model-dev/references/anti-patterns.md)「实现层经验教训」L2~L4。
+
+#### 新增
+
+- `w-model-dev-demo/tests/perf/k6-load-test.js`：k6 性能基线脚本（100 VUs × 30s，P95 < 200ms，覆盖文章列表 / 详情 / 登录）
+- `w-model-dev-demo/tests/perf/README.md`：k6 安装 / 运行 / 解读说明（k6 是独立二进制，不纳入 npm 自动化链路）
+- `w-model-dev-demo/tests/unit/validate.test.ts`：validate 中间件单元测试 13 用例（UT-031~043），行覆盖率 0% → 100%
+- `w-model-dev-demo/tests/unit/jwt.utils.test.ts`：补充 5 边界用例（UT-031B~035B），branches 覆盖率 57.14% → 100%
+- `w-model-dev-demo/tests/unit/password.utils.test.ts`：补充 3 边界用例（UT-024B~026B），branches 覆盖率 60% → 100%
+- `w-model-dev/references/anti-patterns.md`「实现层经验教训」节：新增 L2（模块加载阶段抛错）+ L3（service 类导出方式反复）+ L4（vitest mock 与 express 类型不兼容）三条教训，与 SSoT §10B.4 双向追溯
+
+#### 变更
+
+- `w-model-dev-demo/` 完全清空后从零重建：4 份设计文档（1021 行）+ 工程配置 + src/ 全部源码 + 9 单元测试文件
+- `w-model-dev-demo/package.json`：所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入，修复 L2 缺陷
+- `w-model-dev-demo/src/services/article-service.ts`：恢复 `export class ArticleService`，与 `export const articleService` 共存，修复 L3 缺陷
+- `w-model-dev-demo/tests/unit/auth-middleware.test.ts` + `tests/unit/error-handler.test.ts`：用 `ReturnType<typeof vi.fn>` / `Mock` 类型断言访问 mock.calls，修复 L4 缺陷
+- `w-model-dev-demo/.w-model/rtm.json`：RTM 终检状态更新，8 行需求 × 7 字段全部非空，coverage.rtmCoverage=100 / unitTestCoverage=99
+- `w-model-dev-demo/.w-model/project.json`：`status` 改为「已完成」，新增 `completedAt` 与 `acceptance` 字段（用户 `confirm` 归档）
+- `w-model-dev-demo/docs/acceptance-test-report.md` §9：用户确认区填入 `confirm`（2026-07-21）
+- `w-model-dev-demo/docs/system-test-report.md` §5 + §9.3：k6 脚本引用更新为 `tests/perf/k6-load-test.js`
+- `w-model-dev-demo/docs/system-test-cases.md` ST-003：增加「工具」字段，注明 k6 设计原意 + vitest CI 近似验证
+- `README.md`：参考实现节调测数据从 2026-07-20 baseline 更新到 2026-07-21 第二轮（65 单元 + 12 集成 + 6 系统 + 15 验收 = 98 测试，覆盖率 98.96%）；项目结构树补 `tests/perf/` 与 `.w-model/`
+- `AGENTS.md` §4：参考实现调测数据同步更新；新增 4 项缺陷修正记录
+- `docs/skill-design-document_SSoT.md` §1.4 + §10B 1-6 小节：全面重写，新增调测轮次 / 用户确认 / 4 项缺陷 / k6 边界声明
+- `docs/INSTALL.md` §8 FAQ：调测数据同步更新，补 4 项缺陷与 L1~L4 指针
+
+#### 端到端调测结论（2026-07-21 第二轮）
+
+| 指标 | 目标 | 实测 | 与 baseline（2026-07-20）对比 |
+|---|---|---|---|
+| 单元测试 | 100% 通过 + 覆盖率 ≥ 80% | 65/65 通过，98.96% lines / 93.23% branches / 100% functions | 用例数 +43，覆盖率 lines -0.04pp（仍远超阈值） |
+| 集成测试 | 100% 通过 | 12/12 通过 | 用例数 +6 |
+| 系统测试 | 100% 通过 | 6/6 通过 + k6 脚本就绪 | 持平 + 新增 k6 |
+| 验收测试 | 100% 通过 | 15/15 通过 + 用户 `confirm` 归档 | 持平 + 归档 |
+| RTM 需求覆盖率 | 100% | 4/4（100%） | 持平 |
+| 工件质量门 | 退出码 0 | 通过（退出码 0） | 持平 |
+| TypeScript 严格编译 | 0 错误 | 退出码 0 | 持平 |
+| 性能基线 | P95 ≤ 200ms | k6 脚本就绪，vitest 近似采样 P95=3ms | 新增 |
+
+#### 验证
+
+- `w-model-dev-demo/` 内 `npm install && npm test` → 98 用例全过（65 unit + 12 integration + 6 system + 15 acceptance）
+- `w-model-dev-demo/` 内 `npm run coverage` → 总覆盖率 98.96% lines / 93.23% branches / 100% functions
+- `w-model-dev-demo/` 内 `npx tsc --noEmit` → 退出码 0
+- `w-model-dev-demo/` 内 `npx tsx ../w-model-dev/scripts/check-artifact-gate.ts .` → 退出码 0
+- `tests/perf/k6-load-test.js` 通过 `node --check` 语法校验
+- 文档一致性：`README.md` / `AGENTS.md` / `docs/skill-design-document_SSoT.md` / `docs/INSTALL.md` / `w-model-dev/references/anti-patterns.md` 均已同步至 2026-07-21 第二轮数据
+- SSoT §10B.4 与 anti-patterns.md「实现层经验教训」节 L1~L4 双向链接校验通过
+
 ### 端到端调测：交付博客系统参考实现 + 文档同步
 
 > 通过 [`w-model-dev-demo/`](./w-model-dev-demo) 完整跑通 W 模型 8 阶段端到端调测，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用，并把调测结论与缺陷修正经验同步到全仓库文档。

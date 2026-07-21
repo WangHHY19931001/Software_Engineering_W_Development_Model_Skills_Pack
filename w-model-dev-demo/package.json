@@ -7,11 +7,12 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",
-    "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:system": "vitest run tests/system",
-    "coverage": "vitest run --coverage"
+    "test": "cross-env JWT_SECRET=test-secret-blog-demo vitest run",
+    "test:unit": "cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/unit",
+    "test:integration": "cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/integration",
+    "test:system": "cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/system",
+    "test:acceptance": "cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/acceptance",
+    "coverage": "cross-env JWT_SECRET=test-secret-blog-demo vitest run --coverage"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -26,6 +27,7 @@
     "@types/node": "^20.14.10",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^1.6.0",
+    "cross-env": "^7.0.3",
     "supertest": "^7.2.2",
     "tsx": "^4.15.7",
     "typescript": "^5.5.3",

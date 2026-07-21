@@ -190,5 +190,9 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 
 **Q：哪里可以看到 W 模型 8 阶段的完整端到端产出样本？**
 参见仓库内的参考实现 [`w-model-dev-demo/`](../w-model-dev-demo)（博客系统后端，Express + TypeScript）。
-该目录独立于技能资产，包含 8 阶段全部产出文档与可运行代码，2026-07-20 调测结论：单元 22/22（覆盖率 98%）、
-集成 6/6、系统 6/6、验收 15/15、RTM 100%、工件质量门通过。详见 SSoT [§10B](./skill-design-document_SSoT.md)。
+该目录独立于技能资产，包含 8 阶段全部产出文档与可运行代码，2026-07-21 第二轮调测结论（已归档）：
+单元 65/65（覆盖率 98.96% lines / 93.23% branches / 100% functions）、集成 12/12、系统 6/6、验收 15/15、
+RTM 100%、工件质量门退出码 0、用户 `confirm` 归档；含 k6 性能基线脚本（`tests/perf/k6-load-test.js`）。
+过程中累计发现并修正 4 项缺陷（Express 4 async handler / JWT_SECRET 缺失 / ArticleService 类型导出 / vitest mock 类型），
+均已沉淀到 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节 L1~L4。
+详见 SSoT [§10B](./skill-design-document_SSoT.md)。

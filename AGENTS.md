@@ -51,19 +51,29 @@ npm run prepush
 `w-model-dev-demo/` 是 W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用：
 
 - **项目**：博客系统后端（blog-system-demo），Express 4 + TypeScript 5 + 内存存储
-- **8 阶段产出**：`docs/`（需求 / 系统 / 概要 / 详细设计 + 四级测试用例与报告）+ `src/`（控制器 / 服务 / 存储 / 中间件）+ `tests/`（单元 / 集成 / 系统 / 验收）
-- **端到端调测结论**（2026-07-20）：
+- **8 阶段产出**：`docs/`（需求 / 系统 / 概要 / 详细设计 + 四级测试用例与报告）+ `src/`（控制器 / 服务 / 存储 / 中间件）+ `tests/`（单元 / 集成 / 系统 / 验收 / 性能）+ `tests/perf/`（k6 性能基线脚本）
+- **端到端调测结论**（2026-07-21，从零重建第二轮）：
 
 | 指标 | 数值 |
 |---|---|
-| 单元测试 | 22/22 通过，代码覆盖率 98%（NFR-004 要求 ≥ 80%） |
-| 集成测试 | 6/6 通过，覆盖 4 对模块交互 + 5 类错误路径 |
+| 单元测试 | 65/65 通过，代码覆盖率 98.96% lines / 93.23% branches / 100% functions（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 12/12 通过，覆盖 4 对模块交互 + 5 类错误路径 |
 | 系统测试 | 6/6 通过，覆盖 4 模块 + 4 类异常路径 + 4 项安全约束 |
 | 验收测试 | 15/15 通过，4/4 需求 RTM 覆盖率 100% |
+| 性能基线 | k6 脚本就绪（`tests/perf/k6-load-test.js`，100 VUs × 30s，P95 < 200ms），vitest 内近似采样 P95=3ms |
 | 阶段门评审 | 8 阶段全部放行 |
-| 工件质量门 | 通过（RTM 100% + 四级测试全通过） |
+| 工件质量门 | 通过（RTM 100% + 四级测试全通过，退出码 0） |
+| 用户确认 | `confirm`（2026-07-21，项目已归档） |
 
-- **过程中发现并修正的缺陷**：Express 4 不自动捕获 async handler 抛出的 rejected promise，首轮 4 个集成测试表现为 Unhandled Rejection。修正方案：新建 `src/utils/async-handler.ts` 包装器，包裹全部路由后重跑 6/6 通过。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
+- **过程中发现并修正的缺陷**：
+  1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：新建 `src/utils/async-handler.ts` 包装器，包裹全部路由后重跑 6/6 通过。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
+  2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段即抛错，连锁导致 4 个测试套件挂掉。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。
+  3. **ArticleService 类型导出消失**（2026-07-21 回归发现）：`src/services/article-service.ts` 改为内部 `class ArticleService` + `export const articleService` 实例，导致 `comment-service.ts` 的 `import type { ArticleService }` 类型丢失。修正方案：恢复 `export class ArticleService`。
+  4. **vitest mock 与 express NextFunction 类型不兼容**（2026-07-21 回归发现）：`vi.fn() as unknown as NextFunction` 丢失 mock 类型，`next.mock.calls[0][0]` 报 TS2339。修正方案：用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问。
+
+  详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5 与 [acceptance-test-report.md](./w-model-dev-demo/docs/acceptance-test-report.md) §9。
+
+- **调测模式**：self-as-verifier（Agent 按本技能编排自驱完成 8 阶段，每阶段跑质量门，不暂停 CHECKPOINT）。
 
 > Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时，可指向此目录作为具象参考。**不要**把 `w-model-dev-demo/` 视为技能运行时依赖——它不参与 `/wm` 命令编排，也不会被 `check-*-gate.ts` 读取。
 

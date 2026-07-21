@@ -83,17 +83,24 @@ npx tsx w-model-dev/scripts/self-test.ts
 
 [`w-model-dev-demo/`](./w-model-dev-demo) 是 W 模型 8 阶段端到端调测的完整产物——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。
 
-**端到端调测结论**（2026-07-20）：
+**端到端调测结论**（2026-07-21，从零重建第二轮，已归档）：
 
 | 指标 | 数值 |
 |---|---|
-| 单元测试 | 22/22 通过，代码覆盖率 98%（NFR-004 要求 ≥ 80%） |
-| 集成测试 | 6/6 通过，覆盖 4 对模块交互 + 5 类错误路径 |
+| 单元测试 | 65/65 通过，代码覆盖率 98.96% lines / 93.23% branches / 100% functions（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 12/12 通过，覆盖 4 对模块交互 + 5 类错误路径 |
 | 系统测试 | 6/6 通过，覆盖 4 模块 + 4 类异常路径 + 4 项安全约束 |
 | 验收测试 | 15/15 通过，4/4 需求 RTM 覆盖率 100% |
-| 工件质量门 | 通过（RTM 100% + 四级测试全通过） |
+| 性能基线 | k6 脚本就绪（`tests/perf/k6-load-test.js`，100 VUs × 30s，P95 < 200ms），vitest 内近似采样 P95=3ms |
+| 工件质量门 | 通过（RTM 100% + 四级测试全通过，退出码 0） |
+| 用户确认 | `confirm`（2026-07-21，项目已归档） |
 
-过程中发现并修正了 Express 4 不自动捕获 async handler rejected promise 的缺陷（引入 `src/utils/async-handler.ts` 包装器），详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
+过程中发现并修正的缺陷（累计 4 项）：
+
+1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
+2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段抛错连锁挂掉 4 个测试套件。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。
+3. **ArticleService 类型导出消失**（2026-07-21 回归发现）：`comment-service.ts` 的 `import type { ArticleService }` 类型丢失。修正方案：恢复 `export class ArticleService`。
+4. **vitest mock 与 express NextFunction 类型不兼容**（2026-07-21 回归发现）：`next.mock.calls[0][0]` 报 TS2339。修正方案：用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问。
 
 > 该目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向此目录。
 
@@ -121,11 +128,12 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   └── samples/              #   端到端样本（verifier/ + gate/）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
-├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物）
+├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物，已归档）
 │   ├── docs/                     #   8 阶段产出文档（需求 / 设计 / 四级测试用例与报告）
 │   ├── src/                      #   实现代码（Express + TS，控制器 / 服务 / 存储 / 中间件）
-│   ├── tests/                    #   四级测试（unit / integration / system / acceptance）
-│   ├── package.json              #   demo 自身的依赖与脚本（独立于根 package.json）
+│   ├── tests/                    #   四级测试（unit / integration / system / acceptance）+ perf/（k6 性能基线）
+│   ├── .w-model/                 #   项目状态（project.json + rtm.json，用户 confirm 归档）
+│   ├── package.json              #   demo 自身的依赖与脚本（独立于根 package.json，test 脚本用 cross-env 注入 JWT_SECRET）
 │   ├── tsconfig.json
 │   └── vitest.config.ts
 ├── docs/                         # 设计文档（统一存放）
