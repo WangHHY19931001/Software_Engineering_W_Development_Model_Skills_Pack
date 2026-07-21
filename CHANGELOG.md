@@ -5,6 +5,50 @@
 
 ## [Unreleased]
 
+### 吸收 addyosmani/agent-skills 设计模式（P1 + P2）
+
+> 将 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) 中的 `using-agent-skills` 元技能（6 条核心操作行为 + 10 条失败模式）、`code-review-and-quality`（五轴评审 + Severity 标签 + Structural Remedies）、`references/definition-of-done.md`（项目级 DoD）、`agents/`（Agent Personas）、`docs/adoption-guide.md`（Greenfield vs Brownfield 采用路径）等设计模式吸收到本技能包。
+>
+> 吸收遵循「SSoT 优先 + 不内置 LLM 调用 + CHECKPOINT 不可绕过」三项硬约束：Persona 定义为「供外部 Agent 在执行 `/wm review` 时采用的角色提示词」，文件本身是 Markdown，不调用任何 LLM；失败模式与 9 条流程反模式二分（反模式=流程破坏回退，失败模式=行为退化登记）。
+
+#### 新增
+
+- `docs/skill-design-document_SSoT.md` §4A「核心操作行为与失败模式」：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10
+- `docs/skill-design-document_SSoT.md` §6.4「Agent Personas（评审角色提示词）」：三层架构（Skill / Persona / Command）+ 4 个 W 模型适配 Persona + 与 §7.6 LLM-as-a-Verifier 的路由关系
+- `docs/skill-design-document_SSoT.md` §7.6「五轴评审」：Correctness / Readability / Architecture / Security / Performance 五轴 + Severity 标签（Critical / Required / Optional / Nit / FYI）+ Structural Remedies
+- `docs/skill-design-document_SSoT.md` §10.6「项目级 Definition of Done」：5 维度 DoD（功能 / 质量 / 测试 / 文档 / 部署）
+- `docs/skill-design-document_SSoT.md` §11A「采用路径（Greenfield vs Brownfield）」：路径选择信号表 + Day 0 全流程 + 增量验证优先 + 收敛表
+- `w-model-dev/references/agent-personas.md`：4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor），含 JSON 输出格式、评审规则、组合节、与 addyosmani 差异表；performance-auditor 直接吸收 Metric-Honesty Rule
+- `w-model-dev/references/definition-of-done.md`：项目级 DoD（5 维度），SSoT §10.6 为权威定义
+- `w-model-dev/references/verifier-spec.md` §7.4A：五轴评审 + Severity 标签 + Structural Remedies（与 SSoT §7.6 双向追溯）
+- `docs/adoption-guide.md`：人类可读采用指南（Greenfield Day 0 全流程 + Brownfield 增量验证优先 + 收敛表 + 与 addyosmani 差异表），SSoT §11A 为权威定义
+
+#### 变更
+
+- `w-model-dev/SKILL.md`：新增「核心操作行为」节（6 条）+ 「失败模式 F1~F10」节；YAML frontmatter `description` 同步
+- `w-model-dev/references/anti-patterns.md`：新增「失败模式清单 F1~F10」节（10 条行为退化 + 与反模式对照表 + 标注约定 + 与 addyosmani 差异表）；目录同步更新；F# 重复命中 ≥2 次升级为 L# 教训
+- `README.md`：项目结构树补 `agent-personas.md` / `definition-of-done.md` / `docs/adoption-guide.md`；`anti-patterns.md` 描述更新为「9 条流程反模式 + L1~L4 教训 + 失败模式 F1~F10」；`verifier-spec.md` 描述补「五轴评审 §7.4A」
+- `AGENTS.md`：§1 仓库定位补 Agent Personas 行；§2 关键目录速查表 `w-model-dev/references/` 行补 agent-personas / definition-of-done / 失败模式 F1~F10 / command-reference / operational-recovery；§5 必读文档列表补 `docs/adoption-guide.md`
+
+#### 与 addyosmani/agent-skills 的差异
+
+- **不内置 LLM 调用**：addyosmani 的 Persona 可直接调用 LLM；本技能包 Persona 是「供外部 Agent 在执行 `/wm review` 时采用的角色提示词」，文件本身是 Markdown
+- **Persona 不互相调用**：吸收 addyosmani 规则——组合由命令或用户完成；`code-reviewer` 发现安全问题时在 `reworkHints` 中以「[建议 security-auditor 深审] xxx」前缀呈现，不自动调用
+- **失败模式与反模式二分**：反模式=流程破坏（命中即回退），失败模式=行为退化（命中不回退但登记）；F# 重复命中 ≥2 次升级为 L# 教训，并在 SSoT §10B.4 同步登记
+- **performance-auditor 适配 W 模型后端场景**：借鉴 addyosmani `web-performance-auditor` 但扩展为前端+后端双场景；Quick 模式（无工具工件）退化为源代码结构反模式扫描；直接吸收 Metric-Honesty Rule（永不编造指标，无工具数据时标 `not measured`）
+- **Persona 产出与 §7.6 Schema 对齐**：Persona 产出的 JSON 必须满足 `verifier-spec.md` §7 Schema，Severity 标签作为 `reworkHints` 字符串前缀，不新增 Schema 字段
+- **采用路径适配 W 模型 8 阶段**：Greenfield 路径按 8 阶段顺序执行；Brownfield 路径分 4 Phase（上下文与只读 / 先测试后改动 / 新工作跑全流程 / 偿还债务废弃观测）
+
+#### 验证
+
+- `npm run self-test` → 17/17 用例通过，退出码 0（10 Verifier + 7 Gate 样本回归基线未受影响）
+- 文档一致性：`README.md` / `AGENTS.md` / `docs/skill-design-document_SSoT.md` / `w-model-dev/SKILL.md` / `w-model-dev/references/agent-personas.md` / `definition-of-done.md` / `anti-patterns.md` / `verifier-spec.md` / `docs/adoption-guide.md` 均已同步至 addyosmani/agent-skills 吸收后状态
+- SSoT §6.4 ↔ `agent-personas.md` 双向链接校验通过
+- SSoT §11A ↔ `docs/adoption-guide.md` 双向链接校验通过
+- SSoT §4A ↔ `anti-patterns.md`「失败模式清单 F1~F10」双向链接校验通过
+- SSoT §7.6 ↔ `verifier-spec.md` §7.4A 双向链接校验通过
+- SSoT §10.6 ↔ `definition-of-done.md` 双向链接校验通过
+
 ### 端到端调测第二轮：从零重建 + k6 性能基线 + 文档全面同步
 
 > 通过完全清空 [`w-model-dev-demo/`](./w-model-dev-demo) 后按 W 模型 8 阶段从零重建，

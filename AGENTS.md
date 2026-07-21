@@ -10,6 +10,7 @@
 - **技能资产**（`w-model-dev/`）：纯 Markdown + 自包含 TypeScript 门禁脚本，**不内置 LLM 调用、不包含编程式引擎（无 `src/`、无 npm 包、无 SDK）**。
 - **`/wm` 命令、状态持久化、RTM 维护** 由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行，状态写入项目内 `.w-model/*.json`。
 - **LLM-as-a-Verifier 评审** 由外部 Agent 按 `w-model-dev/references/verifier-spec.md` 提示词执行，技能用校验脚本防输出漂移。
+- **Agent Personas（评审角色提示词）** 由外部 Agent 在执行 `/wm review` 时按 `w-model-dev/references/agent-personas.md` 选用对应 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema。
 - **技能自演化** 不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
@@ -20,7 +21,7 @@
 |---|---|---|
 | `w-model-dev/` | **技能资产主体**（标准 skill 结构，可整体拷贝分发） | 安装时整体拷贝此目录；运行时按阶段加载 `references/phase-N-*.md` |
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
-| `w-model-dev/references/` | 阶段细则 / verifier-spec / 数据模型 / RTM 指南 / 质量标准 / 反例 | **按需加载**，禁止一次性载入全部（反例 #5） |
+| `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A）/ agent-personas（4 个评审角色提示词）/ definition-of-done（项目级 DoD）/ anti-patterns（9 条流程反模式 + L1~L4 教训 + 失败模式 F1~F10）/ command-reference / operational-recovery / 数据模型 / RTM 指南 / 质量标准 | **按需加载**，禁止一次性载入全部（反例 #5） |
 | `w-model-dev/scripts/` | 自包含门禁脚本（仅依赖 `tsx`） | Agent 在阶段门 / 质量门检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
@@ -85,8 +86,9 @@ npm run prepush
 2. [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) — 单一事实来源
 3. [w-model-dev/SKILL.md](./w-model-dev/SKILL.md) — 编排逻辑与命令执行规则
 4. [docs/INSTALL.md](./docs/INSTALL.md) — AI Agent 安装指南
-5. [CONTRIBUTING.md](./CONTRIBUTING.md) — 贡献与文档维护规则
-6. [CHANGELOG.md](./CHANGELOG.md) — 变更历史
+5. [docs/adoption-guide.md](./docs/adoption-guide.md) — 采用路径（Greenfield vs Brownfield，人类可读；SSoT §11A 为权威定义）
+6. [CONTRIBUTING.md](./CONTRIBUTING.md) — 贡献与文档维护规则
+7. [CHANGELOG.md](./CHANGELOG.md) — 变更历史
 
 ## 6. 行动约束
 

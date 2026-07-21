@@ -311,6 +311,86 @@ interface VerifierOutput {
 
 权重和 = 1.00。
 
+### 7.4A 五轴评审维度与 Severity 标签（吸收自 addyosmani/agent-skills）
+
+> 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能的五轴评审与 Severity 标签模式。
+> 本节**不改变** §7.4 的子标准 name 与 weight（避免破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 的校验），只规定：
+> 1. 评审 `targetKind=file` 时，发现项按五轴组织；
+> 2. `reworkHints` 每条建议前缀 Severity 标签；
+> 3. 结构性问题必须配 Structural Remedy。
+
+#### 7.4A.1 五轴与子标准映射
+
+`targetKind=file` 的 5 个子标准（§7.4）与 addyosmani 五轴的映射：
+
+| 五轴 | 对应子标准 (§7.4) | 评审重点 |
+|---|---|---|
+| Correctness（正确性） | `correctness` (0.30) | 逻辑是否符合需求 / 设计；边界条件；错误路径；off-by-one；竞态 |
+| Readability（可读性） | `readability` (0.15) | 命名；控制流；组织；「clever」技巧；注释必要性；dead code |
+| Architecture（架构） | `maintainability` (0.15) | 模块边界；依赖方向；抽象层次；特性逻辑泄漏；类型边界显式性 |
+| Security（安全） | `security` (0.20) | 输入校验；密钥管理；鉴权；SQL 参数化；XSS；依赖来源 |
+| Performance（性能） | `conformance` (0.20) | N+1 查询；无界循环；同步阻塞；UI 重渲染；分页缺失；热路径大对象 |
+
+> 注：Performance 轴映射到 `conformance` 是 W 模型适配——`conformance` 原指「符合代码规范」，扩展为「符合性能与规范双约束」。若项目有独立性能子标准，可在 [phase-7-system-test.md](phase-7-system-test.md) 单独评审（k6 性能基线）。
+
+#### 7.4A.2 Severity 标签
+
+`reworkHints` 数组每条建议**必须**以下列前缀之一开头，便于返工优先级排序：
+
+| 前缀 | 含义 | 作者动作 |
+|---|---|---|
+| `Critical:` | 阻断合并 | 安全漏洞 / 数据丢失 / 功能破坏；必须修复才能放行 |
+| `Required:` | 必修变更 | 合并前必须处理 |
+| `Optional:` / `Consider:` | 建议 | 值得考虑但非必须 |
+| `Nit:` | 小事可选 | 作者可忽略——格式 / 风格偏好 |
+| `FYI:` | 仅供参考 | 无需动作——未来参考上下文 |
+| （无前缀） | 默认 Required | 按 Required 处理 |
+
+示例：
+
+```json
+"reworkHints": [
+  "Critical: SQL 拼接导致注入风险（src/store/user.ts:42），改用参数化查询",
+  "Required: 缺少 JWT 过期分支测试（src/utils/jwt.ts:18-25），补 UT-031B",
+  "Nit: 命名 `data` 过于宽泛（src/services/article.ts:67），建议改为 `articleInput`",
+  "FYI: 此模式与 w-model-dev-demo 的 async-handler 包装一致，可作为参考"
+]
+```
+
+> Severity 标签是字符串前缀约定，**不改变** §6 Schema 的 `reworkHints: string[]` 类型；[`check-verifier-output.ts`](../scripts/check-verifier-output.ts) 不强制校验前缀（避免误判历史 JSON），由 Agent 自检与 LLM-as-a-Verifier 在 `summary` 中标注「Severity 标签缺失」。
+
+#### 7.4A.3 Structural Remedies
+
+对结构性问题，`reworkHints` **必须**提出命名修复方案，而非只指出问题。可用的命名修复（吸收自 addyosmani）：
+
+| 命名修复 | 适用场景 |
+|---|---|
+| Replace a chain of conditionals with a typed model or dispatcher | 条件链重复判断同一 shape |
+| Collapse duplicate branches into a single clearer flow | 重复分支 |
+| Separate orchestration from business logic | 编排与业务逻辑纠缠 |
+| Move feature-specific logic out of shared module | 特性逻辑泄漏到共享模块 |
+| Reuse the canonical helper instead of a near-duplicate | 重复实现近似 helper |
+| Make a type boundary explicit so downstream branching disappears | `any` / `unknown` / silent fallback 掩盖不变量 |
+| Delete a pass-through wrapper that adds indirection | 透传包装增加间接层无收益 |
+| Extract a helper, or split a large file into focused modules | 单文件过大（>1000 行） |
+
+示例：
+
+```json
+"reworkHints": [
+  "Required: auth-routes.ts 内 4 处 if (role === 'admin') 条件链重复判断同一 shape，Structural Remedy: Replace a chain of conditionals with a typed model——提取 RolePermission 表，按 role 查表分发"
+]
+```
+
+> 仅指出「这里复杂」而不给修复方向，会让作者猜测；命名修复让作者直接看到重构路径。
+
+#### 7.4A.4 与 addyosmani/agent-skills 的差异
+
+- addyosmani 的五轴是**完整评审维度**，每轴独立打分。
+- 本规范的五轴是**发现项组织方式**——子标准仍是 §7.4 的 5 个（`correctness` / `security` / `readability` / `maintainability` / `conformance`），五轴用于在 `reworkHints` 中归类发现项。
+- 这样既吸收了五轴评审的结构化思维，又不破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 对子标准 name/weight 的校验。
+- Performance 轴在 W 模型中通常由阶段 7 系统测试（含 k6 性能基线）独立验证，`file` 评审中只标注明显性能反模式（N+1 / 无界循环），不做完整性能评审。
+
 ## 8. 评审提示词模板
 
 外部 Agent 执行评审时，按以下模板构造提示词（替换 `{{}}` 占位符）。

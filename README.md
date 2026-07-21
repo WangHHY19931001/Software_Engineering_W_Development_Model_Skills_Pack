@@ -12,10 +12,15 @@
 
 - **W 模型 8 阶段编排**：需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码 → 集成测试 → 系统测试 → 验收测试
 - **LLM-as-a-Verifier（外部 Agent 执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，外部 Agent 执行 LLM 调用，技能用校验脚本防漂移
+- **Agent Personas（评审角色提示词，外部 Agent 执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由外部 Agent 在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
+- **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 9 条流程反模式（流程破坏，命中即回退）二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
 - **工件质量门**：RTM 需求覆盖率 100% + 四级测试全部通过才允许交付（技能验证门已移除，演化评估移交外部工具；单元测试代码覆盖率阈值 ≥ 80% 属于质量标准，与 RTM 覆盖率是两个独立指标）
 - **PPT 排序算法**：O(N×k) 复杂度的概率枢轴锦标赛，用于测试用例优先级排序
+- **采用路径（Greenfield vs Brownfield）**：新项目 Day 0 跑全流程 vs 存量项目增量验证优先，见 [采用路径指南](./docs/adoption-guide.md)；吸收自 addyosmani/agent-skills `docs/adoption-guide.md` 并适配 W 模型 8 阶段
 
 ## 架构原则与外部工具边界
 
@@ -109,13 +114,15 @@ npx tsx w-model-dev/scripts/self-test.ts
 ```
 .
 ├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
-│   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位）
+│   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
 │   │   ├── phase-1-requirements-formalization.md  #   Phase 1 可选增强（委托 SRS-Formalizer）
-│   │   ├── anti-patterns.md      #   反例与黑名单（9 条高发陷阱 + 与门禁脚本对应关系 + 实现层经验教训）
+│   │   ├── anti-patterns.md      #   反例与黑名单（9 条流程反模式 + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
 │   │   ├── workflow.md           #   完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
-│   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准）
+│   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审 §7.4A）
+│   │   ├── agent-personas.md     #   Agent Personas（4 个评审角色提示词：code-reviewer / test-engineer / security-auditor / performance-auditor）
+│   │   ├── definition-of-done.md #   项目级 Definition of Done（每次变更的日常标准，5 维度）
 │   │   ├── data-models.md        #   项目 / 需求 / 设计 / 测试用例数据模型
 │   │   ├── rtm-guide.md          #   RTM 维护规则
 │   │   └── quality-standards.md #   质量标准
@@ -161,7 +168,11 @@ npx tsx w-model-dev/scripts/self-test.ts
 
 - [设计文档（SSoT）](./docs/skill-design-document_SSoT.md) - 单一事实来源
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
-- [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准
+- [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审 §7.4A
+- [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 9 条流程反模式 + L1~L4 实现层教训 + F1~F10 失败模式
+- [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（5 维度）
+- [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集
