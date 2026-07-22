@@ -23,7 +23,6 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-07-20T11:00	darwin-02-01	w-model-dev/references/phase-2-system-design.md	66.4	74.5	keep	dim5/3	技术选型决策矩阵5维评分;边界条件表(Mermaid降级ASCII/选型冲突处理/循环依赖检测命令madge+dependency-cruiser)	dry_run
 2026-07-20T11:00	darwin-02-02	w-model-dev/references/phase-3-outline-design.md	66.4	74.5	keep	dim5/3	接口契约Schema模板10字段;错误码分层4xx/5xx/业务三段位;DFS三色染色循环依赖检测;模块职责重叠30%阈值检测	dry_run
 2026-07-20T11:00	darwin-02-03	w-model-dev/references/phase-8-acceptance-test.md	71.6	76.9	keep	dim4/3	CHECKPOINT拆三段(A执行前/B执行中30%暂停/C执行后);reject反馈模板+部分通过归档+用户无法参会异步确认;回退决策树	dry_run
-2026-07-20T11:00	darwin-02-04	w-model-dev/references/phase-1-requirements-formalization.md	66.0	76.3	keep	dim5/3	委托执行指引8步分步命令;产出物并入清单6字段映射;边界Fallback 5类异常(SRS-Formalizer失败/门禁3次失败/TLA+不可用/Lean4不可用/SRS-IR与RTM冲突仲裁)	dry_run
 2026-07-20T11:00	darwin-02-05	w-model-dev/references/quality-standards.md	79.5	86.0	keep	dim3	工具缺失降级矩阵(eslint→tsc/vitest→jest/覆盖率失败/安全扫描器未安装5类);降级流程4步骤	dry_run
 2026-07-20T11:00	darwin-02-06	w-model-dev/references/workflow.md	81.8	87.0	keep	dim5	每阶段节点补输入/产物/切换判定/回退编号四元组;阶段切换精确到退出码与JSON字段(passed/qualityLevel/executionSummary.failed)	dry_run
 2026-07-20T11:00	darwin-02-07	w-model-dev/references/anti-patterns.md	84.5	86.0	keep	dim5	9反模式逐条加检测信号+回退命令;门禁脚本退出码精确对应表	dry_run

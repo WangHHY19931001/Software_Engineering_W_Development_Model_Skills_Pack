@@ -134,9 +134,8 @@ graph TD
 - 需求冲突检测
 - 验收测试用例自动生成
 
-> 详细阶段产物、测试用例设计表（TC-REQ-001~005）、验收标准、可选 SRS-Formalizer 委托：
-> 见 [`phase-1-requirements.md`](../w-model-dev/references/phase-1-requirements.md) 与
-> [`phase-1-requirements-formalization.md`](../w-model-dev/references/phase-1-requirements-formalization.md)。
+> 详细阶段产物、测试用例设计表（TC-REQ-001~005）、验收标准：
+> 见 [`phase-1-requirements.md`](../w-model-dev/references/phase-1-requirements.md)。
 
 #### 3.2.2 设计阶段模块
 
