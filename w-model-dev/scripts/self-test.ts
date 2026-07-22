@@ -28,6 +28,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkVerifierOutput } from './verifier-logic.js';
 import { checkArtifactGate } from './gate-logic.js';
+import { checkRequirementGraph } from './graph-logic.js';
 
 // ==================== 测试用例定义 ====================
 
@@ -155,6 +156,72 @@ const GATE_CASES: GateCase[] = [
   },
 ];
 
+interface GraphCase {
+  file: string;
+  phase: number;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const GRAPH_CASES: GraphCase[] = [
+  {
+    file: 'valid-graph.json',
+    phase: 4,
+    expectedPassed: true,
+    description: 'phase=4 完整图谱：连通 + 单根 + 父唯一 + 全追溯',
+  },
+  {
+    file: 'bad-isolated.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/连通性校验失败/],
+    description: '存在孤立节点 REQ-002，应被连通性校验拦截',
+  },
+  {
+    file: 'bad-multi-root.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/单根校验失败.*2 个根节点/],
+    description: '两个根节点（depends-on 不构成 parent），应被单根校验拦截',
+  },
+  {
+    file: 'bad-orphan.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/单根校验失败/],
+    description: 'REQ-002 无 parent 入边且非唯一根，应被单根/orphan 校验拦截',
+  },
+  {
+    file: 'bad-multi-parent.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/父唯一性校验失败.*REQ-C/],
+    description: 'REQ-C 有两条 parent 入边，应被父唯一性校验拦截',
+  },
+  {
+    file: 'bad-sd-no-implements.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/SD 节点 SD-001 缺少 implements 出边/],
+    description: 'phase=2 时 SD 缺 implements，应被追溯校验拦截',
+  },
+  {
+    file: 'bad-intf-no-defines.json',
+    phase: 3,
+    expectedPassed: false,
+    expectedReasonPatterns: [/INTF 节点 INTF-001 缺少 defines 入边/],
+    description: 'phase=3 时 INTF 缺 defines，应被追溯校验拦截',
+  },
+  {
+    file: 'bad-dd-no-realizes.json',
+    phase: 4,
+    expectedPassed: false,
+    expectedReasonPatterns: [/DD 节点 DD-001 缺少 realizes 出边/],
+    description: 'phase=4 时 DD 缺 realizes，应被追溯校验拦截',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -236,6 +303,34 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of GRAPH_CASES) {
+    const abs = path.join(samplesDir, 'graph', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkRequirementGraph(parsed, c.phase);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `graph/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // ==================== 入口 ====================
 
 async function main(): Promise<void> {
@@ -248,13 +343,15 @@ async function main(): Promise<void> {
   console.log(`样本目录      : ${samplesDir}`);
   console.log(`Verifier 用例 : ${VERIFIER_CASES.length}`);
   console.log(`Gate 用例     : ${GATE_CASES.length}`);
+  console.log(`Graph 用例    : ${GRAPH_CASES.length}`);
   console.log('─'.repeat(60));
 
-  const [verifierResults, gateResults] = await Promise.all([
+  const [verifierResults, gateResults, graphResults] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
+    runGraphCases(samplesDir),
   ]);
-  const all = [...verifierResults, ...gateResults];
+  const all = [...verifierResults, ...gateResults, ...graphResults];
 
   const passedCount = all.filter(r => r.passed).length;
   const failedCount = all.length - passedCount;

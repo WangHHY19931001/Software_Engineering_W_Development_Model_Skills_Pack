@@ -43,3 +43,34 @@ AI: RTM 已登记：REQ-001~005 → UAT-001~050（覆盖状态：部分，待后
 - 验收测试用例在本阶段**设计**，在阶段 8 **执行**。
 - RTM 在本阶段登记需求与验收测试列，其余列留待后续。
 - 评审通过后方可进入系统设计。
+
+## 示例：超大/多目录文档 ingestion
+
+```
+用户: /wm analyze docs/legacy-specs/（含 20+ 历史需求文档的多目录）
+
+AI: 正在执行【需求分析】阶段，输入为多目录结构，启用 ingestion 子流程...
+
+AI: 分块规划（plan-chunks.ts）：
+    - 策略: dir-tree
+    - 总块数: 23
+    - 总 token 估算: 45000
+    🔴 CHECKPOINT · ingestion 规划确认：是否放行此分块计划？
+
+用户: 放行
+
+AI: 并行分派 23 个 A-chunk 提取 REQ 节点...
+    （收敛循环 round 1）
+    A-cross 合并: 87 个 REQ 节点, 102 条边, 3 个孤立节点, 2 个连通分量
+    G 跑 check-requirement-graph.ts --phase=1: exit 1（连通分量=2, 孤立=[REQ-041,REQ-058,REQ-073]）
+    reworkHints: chunk-007 补 REQ-041 关系, chunk-015 补 REQ-058/073 关系
+    
+    （针对性补漏后 round 2）
+    G: exit 0, passed=true, 连通分量=1, 单根=REQ-ROOT
+    
+    🔴 CHECKPOINT · ingestion 收敛确认：图谱 87 节点/115 边，单根 REQ-ROOT，是否放行进入需求产出？
+
+用户: 放行
+
+AI: S 子代理读 graph.json 产出需求规格说明书 + 98 个验收测试用例 + RTM 登记...
+```

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "currentPhase": 3,
+  "rootId": "REQ-ROOT",
+  "nodes": [
+    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
+    {"id":"SD-001","type":"SD","phase":2,"title":"模块","summary":"s"},
+    {"id":"INTF-001","type":"INTF","phase":3,"title":"接口","summary":"缺defines"}
+  ],
+  "edges": [
+    {"from":"REQ-ROOT","to":"SD-001","type":"parent"},
+    {"from":"SD-001","to":"INTF-001","type":"parent"},
+    {"from":"SD-001","to":"REQ-ROOT","type":"implements"}
+  ]
+}

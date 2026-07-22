@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "rootId": null,
+  "nodes": [
+    {"id":"REQ-001","type":"REQ","phase":1,"title":"根A","summary":"s"},
+    {"id":"REQ-002","type":"REQ","phase":1,"title":"根B","summary":"s"}
+  ],
+  "edges": [
+    {"from":"REQ-001","to":"REQ-002","type":"depends-on"}
+  ]
+}

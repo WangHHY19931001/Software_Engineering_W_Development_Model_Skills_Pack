@@ -22,8 +22,8 @@
 |---|---|---|
 | `w-model-dev/` | **技能资产主体**（标准 skill 结构，可整体拷贝分发） | 安装时整体拷贝此目录；运行时按阶段加载 `references/phase-N-*.md` |
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
-| `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A）/ agent-personas（4 个评审角色提示词）/ subagent-delegation（O/S/V/G 编排者-子代理边界）/ definition-of-done（项目级 DoD）/ anti-patterns（10 条流程反模式含 #10 编排者越权实施 + L1~L4 教训 + 失败模式 F1~F10）/ command-reference / operational-recovery / 数据模型 / RTM 指南 / 质量标准 | **按需加载**，禁止一次性载入全部（反例 #5） |
-| `w-model-dev/scripts/` | 自包含门禁脚本（仅依赖 `tsx`） | Agent 在阶段门 / 质量门检查点直接 `npx tsx` 执行 |
+| `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A）/ agent-personas（4 个评审角色提示词）/ subagent-delegation（O/A/S/V/G 编排者-子代理边界，A 为阶段 1–4 分析子代理）/ definition-of-done（项目级 DoD）/ anti-patterns（12 条流程反模式含 #10 编排者越权实施 + #11 ingestion 跳过图谱校验 + #12 A 自评收敛 + L1~L4 教训 + 失败模式 F1~F10）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则）/ command-reference / operational-recovery / 数据模型 / RTM 指南 / 质量标准 | **按需加载**，禁止一次性载入全部（反例 #5） |
+| `w-model-dev/scripts/` | 自包含门禁脚本（仅依赖 `tsx`）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线） | Agent 在阶段门 / 质量门 / 图谱门禁检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
 | `w-model-dev-demo/` | **参考实现**：博客系统后端（Express + TypeScript），W 模型 8 阶段端到端调测产物 | 学习 W 模型实际产出形态时参考；不是技能运行时依赖 |
@@ -35,9 +35,10 @@
 
 ```bash
 # 校验脚本（自包含，仅依赖 tsx）
-npm run self-test                           # 17 条样本回归基线（10 Verifier + 7 Gate），退出码 0/1
+npm run self-test                           # 25 条样本回归基线（10 Verifier + 7 Gate + 8 Graph），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
+npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2
 
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
@@ -46,7 +47,7 @@ npm run setup:hooks
 npm run prepush
 ```
 
-退出码约定：`0 = 通过 / 1 = 校验失败 / 2 = 输入错误`。Agent 在 🔴 CHECKPOINT 处必须以脚本退出码为准，**不得用 LLM 估算**（反例 #3 / #6 / #7）。
+退出码约定：`0 = 通过 / 1 = 校验失败 / 2 = 输入错误`。Agent 在 🔴 CHECKPOINT 处必须以脚本退出码为准，**不得用 LLM 估算**（反例 #3 / #6 / #7 / #12）。
 
 ## 4. 参考实现：`w-model-dev-demo/`
 

@@ -70,6 +70,14 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（详细设计）、单元测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+## ingestion 子流程（S→A 路径，阶段 4）
+
+阶段 4 的 S 子代理先产出 detailed-design.md，再由 A-evolve 提取 DD 节点追加到 `graph.json`，G 跑 `check-requirement-graph.ts --phase=4` 校验全部追溯项。
+
+> **阶段 4 硬约束**：`check-requirement-graph.ts --phase=4` 退出码必须为 0（连通 + 单根 + 父唯一 + SD_without_implements=0 + INTF_without_defines=0 + DD_without_realizes=0），否则不放行进阶段 5 编码。阶段 1-3 允许带未解决项强制接受（标注后留后续阶段补），阶段 4 不允许。
+
+详见 [ingestion-cross.md](ingestion-cross.md) 与 [graph-guide.md](graph-guide.md)。
+
 ## 验收标准
 
 - [ ] UML 图符合规范

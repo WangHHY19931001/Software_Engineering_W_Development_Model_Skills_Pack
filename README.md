@@ -15,7 +15,7 @@
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评
 - **Agent Personas（评审角色提示词，V 子代理执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由 V 子代理在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
-- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 10 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施）二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 12 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛）二分；F# 重复命中 ≥2 次升级为 L# 教训
 - **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
@@ -59,16 +59,18 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 npm install
 npm run check:verifier -- <output.json>     # 退出码 0/1/2
 npm run check:gate -- [project-dir]         # 退出码 0/1/2
+npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，退出码 0/1/2
 npm run self-test                           # 退出码 0/1
 
 # 方式二：用 npx tsx 按需拉取（无需 npm install，适合一次性使用）
 npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
 npx tsx w-model-dev/scripts/self-test.ts
 ```
 
 > 脚本不调用任何 LLM，仅做结构化门禁判定。
-> `self-test.ts` 是校验逻辑的回归基线：每次修改 `gate-logic.ts` / `verifier-logic.ts` 后必须跑通，新增校验项需同步增加样本。
+> `self-test.ts` 是校验逻辑的回归基线：每次修改 `gate-logic.ts` / `verifier-logic.ts` / `graph-logic.ts` 后必须跑通，新增校验项需同步增加样本。
 
 ## 命令一览
 
@@ -118,11 +120,14 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
-│   │   ├── anti-patterns.md      #   反例与黑名单（10 条流程反模式含 #10 编排者越权实施 + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
+│   │   ├── anti-patterns.md      #   反例与黑名单（12 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
 │   │   ├── workflow.md           #   完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审 §7.4A）
 │   │   ├── agent-personas.md     #   Agent Personas（4 个评审角色提示词：code-reviewer / test-engineer / security-auditor / performance-auditor）
-│   │   ├── subagent-delegation.md#   编排者-子代理边界（O/S/V/G 四角色 + 分派模板 + 回填契约 + 反模式 #10）
+│   │   ├── subagent-delegation.md#   编排者-子代理边界（O/A/S/V/G 五角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12）
+│   │   ├── ingestion-chunk.md    #   A 子代理分块分析细则（阶段 1–4）
+│   │   ├── ingestion-cross.md    #   A 子代理交叉合并与图谱演进细则（阶段 1–4）
+│   │   ├── graph-guide.md        #   图谱门禁与收敛准则（check-requirement-graph.ts）
 │   │   ├── definition-of-done.md #   项目级 Definition of Done（每次变更的日常标准，5 维度）
 │   │   ├── data-models.md        #   项目 / 需求 / 设计 / 测试用例数据模型
 │   │   ├── rtm-guide.md          #   RTM 维护规则
@@ -132,8 +137,11 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json）
 │   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源）
 │   │   ├── check-verifier-output.ts  # Verifier 输出校验 CLI（防 Agent 输出漂移）
+│   │   ├── graph-logic.ts        #   图谱结构门禁纯逻辑（单点事实源，阶段 1–4）
+│   │   ├── check-requirement-graph.ts  # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯，退出码 0/1/2）
+│   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线）
-│   │   └── samples/              #   端到端样本（verifier/ + gate/）
+│   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
 ├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物，已归档）
@@ -171,10 +179,14 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审 §7.4A
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 10 条流程反模式（含 #10 编排者越权实施）+ L1~L4 实现层教训 + F1~F10 失败模式
-- [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/S/V/G 四角色 + 分派模板 + 回填契约 + 反模式 #10
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 12 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛）+ L1~L4 实现层教训 + F1~F10 失败模式
+- [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G 五角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12
+- [ingestion 子流程：分块分析](./w-model-dev/references/ingestion-chunk.md) - A 子代理分块分析细则（阶段 1–4）
+- [ingestion 子流程：交叉合并与图谱演进](./w-model-dev/references/ingestion-cross.md) - A 子代理合并建图 + 收敛循环（阶段 1–4）
+- [图谱门禁与收敛准则](./w-model-dev/references/graph-guide.md) - check-requirement-graph.ts 用法 + 收敛判定
 - [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（5 维度）
 - [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
+- [ingestion 与图谱收敛设计](./docs/ingestion-graph-convergence-design.md) - A 角色 / graph.json / check-requirement-graph.ts 权威设计文档
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集

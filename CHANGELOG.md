@@ -5,6 +5,42 @@
 
 ## [Unreleased]
 
+### ingestion 子流程与图谱门禁（A 角色 + graph.json + check-requirement-graph.ts）
+
+> 为阶段 1–4（需求分析 → 系统设计 → 概要设计 → 详细设计）新增 ingestion 子流程与分析子代理（A 角色），引入 graph.json 结构层图谱与 check-requirement-graph.ts 图谱门禁，实现「超大/多目录文档分块分析 → 交叉合并 → 图谱演进 → 结构连通性门禁」闭环。
+>
+> 五角色架构 O/A/S/V/G：A 为阶段 1–4 分析子代理（分块分析 / 交叉合并 / 图谱演进），与 S（产出）/ V（评审）/ G（门禁）协同；编排者 O 不得越权。阶段 1 走 A→S 路径（A 先提取 REQ 节点，S 再产出需求规格），阶段 2/3/4 走 S→A 路径（S 先产出正式设计文档，A 再分块提取 SD/INTF/DD 节点）。
+>
+> 收敛判定由 G 跑 check-requirement-graph.ts 退出码决定，不由 A 的 LLM 输出决定（约束 4，反模式 #12）。阶段 4 零违反（DD realizes 全覆盖）才放行进阶段 5 编码。
+
+#### 新增
+
+- **A 角色（分析子代理）**：SSoT §3.4.2 角色划分表加 A 行（与 subagent-delegation.md 一致）；subagent-delegation.md 加 A-chunk / A-cross/A-evolve 分派模板与回填契约；SKILL.md「编排者-子代理边界」节同步
+- **graph-logic.ts + check-requirement-graph.ts**：图谱结构门禁纯逻辑 + CLI（连通性 / 单根 / 父唯一性 / 阶段递进追溯 implements/defines/realizes），退出码 0/1/2；package.json 加 `check:graph` 快捷脚本
+- **plan-chunks.ts**：ingestion 分块策略（混合：文件/目录 + 超限拆分），供编排者分派 A-chunk 前调用
+- **ingestion-chunk.md + ingestion-cross.md + graph-guide.md**：A 子代理参考文档（分块分析细则 / 交叉合并与图谱演进细则 / 图谱门禁与收敛准则）
+- **graph.json schema**：结构层图谱（nodes/edges/analysisRounds），与 rtm.json 追溯层并存；SSoT §7.7 摘要，权威定义在设计文档 §2.4
+- **阶段 4 零违反硬约束**：`--phase=4` 零违反（DD realizes 全覆盖）才放行进阶段 5 编码；SSoT §4.4 + §10.7
+- **self-test 用例 17→25（+8）**：新增 8 条 Graph 样本（samples/graph/），覆盖连通/单根/父唯一/阶段追溯各校验路径
+- **设计文档**：`docs/ingestion-graph-convergence-design.md`（A 角色 / graph.json schema / 校验算法 / 收敛准则 / 文件清单 / 失败模式）
+
+#### 变更
+
+- `w-model-dev/references/anti-patterns.md`：反模式清单从 10 条扩到 12 条（#11 ingestion 跳过图谱校验 / #12 A 自评收敛）；命中高发阶段表 / 门禁脚本对应关系表 / 检测信号与回退命令表 / 门禁脚本退出码精确对应表 / F1-F10 失败模式表均同步登记 #11/#12 + check-requirement-graph.ts
+- `w-model-dev/references/workflow.md`：流程图阶段 1–4 加 ingestion 标注（A 图谱: REQ/SD/INTF/DD 节点 + 校验）；阶段产物清单表加 graph.json；反模式表加 #11/#12 行
+- `w-model-dev/references/command-reference.md`：`/wm analyze` 加 `ingestion` 字段（A→S 路径，plan-chunks → A-chunk → A-cross → G 图谱校验 → 收敛循环）；`/wm design` 加 `ingestion` 字段（S→A 路径，按 type 追加 SD/INTF/DD 节点，详细阶段零违反硬约束）
+- `w-model-dev/references/subagent-delegation.md`：角色划分表加 A 行；目录加 A-chunk / A-cross/A-evolve 分派模板
+- `w-model-dev/examples/requirement-analysis.md`：追加「示例：超大/多目录文档 ingestion」节（完整交互样例：分块规划 CHECKPOINT → 并行 A-chunk → 收敛循环 → 收敛确认 CHECKPOINT → S 产出）
+- `docs/skill-design-document_SSoT.md`：§3.4.2 标题改为「四层子代理 + 编排者：O / A / S / V / G」+ 角色表加 A 行；§4.4 新增 ingestion 子流程节；§7.7 新增 graph.json schema；§10.7 新增图谱门禁；§10A 追溯表加 §7.7 / §10.7 行 + §3.4 行更新为五角色 + #10/#11/#12
+- `AGENTS.md`：§2 关键目录速查表 scripts/ 行加 graph-logic.ts / check-requirement-graph.ts / plan-chunks.ts；references/ 行加 ingestion-*.md / graph-guide.md + anti-patterns 计数 10→12 + O/A/S/V/G；§3 常用命令加 check:graph + self-test 计数 17→25
+- `README.md`：运行门禁校验脚本节加 check:graph（npm run + npx tsx 两种方式）；项目结构树加 graph-logic.ts / check-requirement-graph.ts / plan-chunks.ts / ingestion-*.md / graph-guide.md；anti-patterns 计数 10→12；subagent-delegation O/S/V/G→O/A/S/V/G；相关文档列表加 ingestion-*.md / graph-guide.md / 设计文档
+
+#### 验证
+
+- `npm run self-test` → 25/25 用例通过，退出码 0（10 Verifier + 7 Gate + 8 Graph 样本回归基线）
+- 文档一致性：SSoT §3.4.2 / §4.4 / §7.7 / §10.7 ↔ subagent-delegation.md ↔ anti-patterns.md #11/#12 ↔ graph-guide.md ↔ ingestion-chunk.md / ingestion-cross.md ↔ command-reference.md ↔ workflow.md ↔ AGENTS.md ↔ README.md 均已同步至 ingestion + 图谱门禁设计
+- SSoT §10A 追溯表 §7.7 / §10.7 行与设计文档 §2.4 / §3 双向链接校验通过
+
 ### 编排者最小化（Orchestrator Minimization）
 
 > 将「任何修改、编码、调测、分析、修正、验证都只允许子代理执行，编排者只进行编排，编排者工作最小化」作为强制约束纳入技能设计。

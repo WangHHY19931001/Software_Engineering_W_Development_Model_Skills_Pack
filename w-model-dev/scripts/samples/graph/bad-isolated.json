@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "rootId": null,
+  "nodes": [
+    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
+    {"id":"REQ-001","type":"REQ","phase":1,"title":"登录","summary":"s"},
+    {"id":"REQ-002","type":"REQ","phase":1,"title":"孤立","summary":"无连接"}
+  ],
+  "edges": [
+    {"from":"REQ-ROOT","to":"REQ-001","type":"parent"}
+  ]
+}

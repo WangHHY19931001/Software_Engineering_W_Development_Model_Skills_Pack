@@ -94,6 +94,12 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（概要设计 / 接口）、集成测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+## ingestion 子流程（S→A 路径，阶段 3）
+
+阶段 3 的 S 子代理先产出接口设计文档，再由 A-evolve 提取 INTF 节点追加到 `graph.json`，G 跑 `check-requirement-graph.ts --phase=3` 校验连通 + 单根 + SD_without_implements=0 + INTF_without_defines=0。
+
+详见 [ingestion-cross.md](ingestion-cross.md) 与 [graph-guide.md](graph-guide.md)。
+
 ## 验收标准
 
 - [ ] 接口定义完整，每条契约按「接口契约 Schema 模板」10 字段填写

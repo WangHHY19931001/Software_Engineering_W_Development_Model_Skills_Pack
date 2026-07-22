@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "rootId": null,
+  "nodes": [
+    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
+    {"id":"REQ-001","type":"REQ","phase":1,"title":"登录","summary":"s"},
+    {"id":"REQ-002","type":"REQ","phase":1,"title":"孤立orphan","summary":"有 depends-on 但无 parent"}
+  ],
+  "edges": [
+    {"from":"REQ-ROOT","to":"REQ-001","type":"parent"},
+    {"from":"REQ-002","to":"REQ-001","type":"depends-on"}
+  ]
+}

@@ -82,6 +82,12 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（系统设计）、系统测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+## ingestion 子流程（S→A 路径，阶段 2）
+
+阶段 2 的 S 子代理先产出 system-design.md，再由 A-evolve 从中提取 SD 节点追加到 `graph.json`，G 跑 `check-requirement-graph.ts --phase=2` 校验连通 + 单根 + SD_without_implements=0。
+
+详见 [ingestion-cross.md](ingestion-cross.md) 与 [graph-guide.md](graph-guide.md)。
+
 ## 验收标准
 
 - [ ] 架构设计已按「技术选型决策矩阵」5 维度评分（含候选清单 + 总分 + 选型理由）
