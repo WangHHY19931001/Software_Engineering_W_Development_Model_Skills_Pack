@@ -27,6 +27,16 @@
 
 A-chunk 独立产出时只能初判跨块关系，最终跨块边由 A-cross 在合并时确认。
 
+### 信息流边与边界节点提取
+
+A-chunk 提取每个实体时，同步识别信息流（与结构边正交）：
+
+- **consumes**：该实体消费了哪些上游信息 → 写 `{from:上游, to:本实体, type:"consumes"}`
+- **produces**：该实体产出了哪些下游信息 → 写 `{from:本实体, to:下游, type:"produces"}`
+- **边界节点**：识别外部信息源写 `EXT-IN` 节点、外部信息汇写 `EXT-OUT` 节点（DFD terminator）
+
+方向约定：produces/consumes 的 `{from,to}` 一律表信息流方向。目标：让 G 跑 check-requirement-graph.ts 时每个业务节点入流出流均 ≥1、边界各 ≥1（无黑洞/奇迹/死模块）。
+
 ## blocked 返回条件
 
 遇到以下情况返回 `{blocked: reason}` 而非强行产出：

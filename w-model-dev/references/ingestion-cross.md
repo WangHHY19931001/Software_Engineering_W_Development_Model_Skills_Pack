@@ -29,6 +29,14 @@
 [{"chunkId":"chunk-003","reason":"REQ-007 孤立，未发现与任何节点的 parent/depends-on 关系"}]
 ```
 
+### 信息流边跨块确认与 reworkHints
+
+A-cross/A-evolve 合并时：
+
+- 去重跨块重复信息流边（同一条流可能被生产方/消费方各记一次 produces/consumes，合并为一条）。
+- 对疑似信息流违反写入 `reworkHints`，格式：`{chunkId, reason:"SD-003 疑似黑洞：消费 REQ-002 但无 produces 出边"}`。
+- **收敛判定仍由 G 跑 check-requirement-graph.ts 退出码决定**（守护反模式 #12/#13），A 的 reworkHints 仅作指引，不替代脚本判定。
+
 ## 关键约束
 
 - **收敛判定不由本子代理决定**：reworkHints 仅作指引，最终收敛由 G 跑 check-requirement-graph.ts 退出码决定
