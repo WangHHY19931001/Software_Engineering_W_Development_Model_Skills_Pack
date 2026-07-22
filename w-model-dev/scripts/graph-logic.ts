@@ -89,6 +89,11 @@ export interface GraphCheckResult {
   violations: string[];
 }
 
+// ==================== 模块级常量 ====================
+
+/** 业务节点类型集合（信息流校验关注的生产/消费节点） */
+const BUSINESS_TYPES = new Set<NodeType>(['REQ', 'SD', 'INTF', 'DD']);
+
 // ==================== 校验入口 ====================
 
 export function checkRequirementGraph(
@@ -185,7 +190,7 @@ export function checkRequirementGraph(
 
   // 单根检查：统计 parent 入边为 0 的节点
   const nodeTypeById = new Map<string, string>();
-  for (const n of g.nodes) nodeTypeById.set(n.id, n.type as string);
+  for (const n of g.nodes) nodeTypeById.set(n.id, n.type);
   const isBoundary = (id: string): boolean => {
     const t = nodeTypeById.get(id);
     return t === 'EXT-IN' || t === 'EXT-OUT';
@@ -287,9 +292,8 @@ export function checkRequirementGraph(
     }
   }
 
-  const businessTypes = new Set(['REQ', 'SD', 'INTF', 'DD']);
   for (const n of g.nodes) {
-    if (!businessTypes.has(n.type as string)) continue;
+    if (!BUSINESS_TYPES.has(n.type)) continue;
     if ((n.phase ?? 1) > phase) continue;
     const inFlow = flowInCount.get(n.id) ?? 0;
     const outFlow = flowOutCount.get(n.id) ?? 0;
@@ -306,8 +310,8 @@ export function checkRequirementGraph(
   }
 
   // 边界完整性（阶段 1 起：至少 1 个 EXT-IN 和 1 个 EXT-OUT）
-  result.boundary.extIn = g.nodes.filter(n => n.type as string === 'EXT-IN').length;
-  result.boundary.extOut = g.nodes.filter(n => n.type as string === 'EXT-OUT').length;
+  result.boundary.extIn = g.nodes.filter(n => n.type === 'EXT-IN').length;
+  result.boundary.extOut = g.nodes.filter(n => n.type === 'EXT-OUT').length;
   result.boundary.complete = result.boundary.extIn >= 1 && result.boundary.extOut >= 1;
   if (result.boundary.extIn < 1) {
     result.violations.push('信息流校验失败：缺少 EXT-IN 边界源（系统不能凭空产生信息）');
