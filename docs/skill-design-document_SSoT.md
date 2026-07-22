@@ -258,6 +258,78 @@ graph TD
 
 ---
 
+### 3.4 编排者-子代理边界（Orchestrator-Subagent Boundary）
+
+> 本节为「编排者最小化」原则的权威定义。与 §3.3「外部工具边界」互补：§3.3 划定**技能包与外部 LLM/演化工具**的边界，本节划定**编排者与实施动作**的边界。
+> 实现位置：[`w-model-dev/references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md) 为可执行细则；[`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)「编排者-子代理边界」节为编排摘要。
+> 强制等级：违反本节命中反模式 #10「编排者越权实施」（见 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)），**命中即回退到当前阶段起点**。
+
+#### 3.4.1 设计目标
+
+编排者工作最小化：编排者只负责**编排**（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本），任何**实施动作**（修改、编码、调测、分析、修正、验证产出）必须由子代理执行。这样做的理由：
+
+1. **上下文隔离**：编排者上下文不被产物内容污染，保留用于全局协调。
+2. **评审独立性**：评审子代理不接触产出子代理的内部推理，避免自产自评漂移。
+3. **可追溯**：每个产物/评审/门禁结果可归属到具体子代理调用，便于回退与审计。
+4. **与现有架构一致**：`verifier-spec.md` §7.6「LLM-as-a-Verifier 由外部 Agent 执行」与 `agent-personas.md` Persona 体系天然映射为 V 子代理；门禁脚本由 G 子代理跑，保留「技能不内置 LLM」原则。
+
+#### 3.4.2 角色划分（三层子代理 + 编排者）
+
+| 角色 | 简称 | 职责 | 允许动作 | 禁止动作 |
+|---|---|---|---|---|
+| **编排者** | O | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化 | 读 `.w-model/*.json`、跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看退出码（只读）、`git status`、`ls`、向用户展示证据 | 写代码、改文档、产出 `VerifierOutput` JSON、生成测试用例、改 RTM 实体（产出 / 评审 / 门禁结果内容） |
+| **产出子代理** | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体 | 写文件、跑测试运行器（仅产出阶段）、改 `.w-model/rtm.json` 实体 | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts`、越阶段产出 |
+| **评审子代理** | V | 按 [`agent-personas.md`](../w-model-dev/references/agent-personas.md) + [`verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 产出 `VerifierOutput` JSON | 读产物文件、产出 JSON 评审 | 跑门禁脚本、改产物文件、改 RTM |
+| **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | 跑门禁脚本、读 GATE_JSON / Verifier JSON、产出证据摘要字符串 | 改产物文件、产出 `VerifierOutput` JSON、改 RTM 实体 |
+
+> **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。
+
+#### 3.4.3 每阶段分派时序（统一）
+
+```
+O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（SKILL.md + 当前阶段 phase-N）
+O: 🔴 CHECKPOINT · 项目初始化（首次）或阶段进入确认
+  ↓ 分派 S
+S: 产出开发文档 + 同步测试设计 + 更新 RTM 实体 → 返回 {产物路径, RTM diff}
+  ↓ 分派 V
+V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
+  ↓ 分派 G
+G: npx tsx w-model-dev/scripts/check-verifier-output.ts "<json>" → 返回 {exitCode, qualityLevel, passed, reworkHints}
+O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D} → 分派 S 返工（带 reworkHints），重走 V → G
+O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（编排者展示 G 子代理返回的证据给用户）
+O: 用户放行 → 编排者更新 project.status → 进入下一阶段
+```
+
+阶段 8 终检额外分派 G 跑 `check-artifact-gate.ts`，退出码 0 + 用户确认 → 发布。
+
+#### 3.4.4 与现有约束的兼容性
+
+- **约束 4「真实执行」**：G 子代理跑脚本 + 回填退出码 = 真实执行，不冲突。
+- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载 `SKILL.md` + 状态文件，加载面更窄。
+- **约束 2「阶段门放行」**：G 子代理返回证据 → 编排者展示给用户 → CHECKPOINT 等待，不冲突。
+- **`verifier-spec.md` §7.6「外部 Agent 执行」**：V 子代理即「外部 Agent」，边界一致。
+- **`agent-personas.md` 4 个 Persona**：V 子代理按 `targetKind` 选用，无改动。
+- **技能不内置 LLM**：V 子代理由编排者通过宿主 Agent 的子代理机制（如 Task 工具）启动，技能包自身仍只含提示词 + 脚本，不引入 LLM 调用。
+
+#### 3.4.5 强制约束
+
+编排者不得直接执行以下任何动作（命中即触发反模式 #10，回到当前阶段起点重做）：
+
+1. 用 `Write` / `Edit` 写或修改任何阶段产物文件（需求规格 / 设计文档 / 代码 / 测试用例 / 测试报告 / 评审报告）。
+2. 直接产出 `VerifierOutput` JSON 内容（评审必须分派 V 子代理）。
+3. 修改 `.w-model/rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果；编排者只可更新 `project.status` 与 `updatedAt`）。
+4. 生成测试用例代码或业务代码。
+5. 跳过 S → V → G 顺序（如编排者自评自审）。
+
+编排者**允许**的动作：
+- 读 `.w-model/project.json` / `.w-model/rtm.json`；
+- 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看**退出码**（用于向用户展示或路由判定，不替代 G 子代理的回填职责）；
+- `git status` / `ls` / `Read` 等只读核验；
+- 在 CHECKPOINT 暂停等待用户决定；
+- 用户放行后更新 `project.status` 与 `updatedAt`。
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -937,6 +1009,7 @@ DoD 与工件质量门的关系：
 | 3.2.3 编码与单元测试 | 代码生成、单元测试用例生成 | `w-model-dev/SKILL.md` `/wm code` 编排 + `references/phase-4/5-*.md` | 编排完整（不自动标记通过，需 `result` 回填） |
 | 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
 | 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
+| 3.4 编排者-子代理边界 | 编排者最小化（O/S/V/G 四角色）+ 反模式 #10 守护 | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10 | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式 + 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节 | 完整（吸收自 addyosmani/agent-skills `using-agent-skills`，适配 W 模型语境） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由） |

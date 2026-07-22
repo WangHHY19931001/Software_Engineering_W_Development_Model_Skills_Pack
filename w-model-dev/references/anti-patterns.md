@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（9 条流程反模式 #1~#9）
+- 反模式清单（10 条流程反模式 #1~#10）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -26,6 +26,7 @@
 | 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 一律回到编码实现，附 GATE_JSON 详情 |
 | 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
 | 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
+| 10 | 编排者越权实施（写代码 / 改文档 / 产出评审 JSON / 改 RTM 实体 / 生成测试用例） | 编排者上下文污染、评审独立性丧失、状态机失真、违反「技能不内置 LLM」架构原则 | 编排者仅分派 S / V / G 子代理执行实施动作；自身只做路由 + 状态 + CHECKPOINT + 只读脚本（见 [subagent-delegation.md](subagent-delegation.md)） |
 
 ### 命中高发阶段
 
@@ -40,6 +41,7 @@
 | #7（退出码 1/2 放行） | 阶段 5~7 | [quality-standards.md](quality-standards.md)「质量门检查清单」 |
 | #8（越过 CHECKPOINT） | 全阶段 | 各 phase-N「🔴 CHECKPOINT」标记 |
 | #9（谎报状态） | 全阶段 | [data-models.md](data-models.md)「项目数据模型」 |
+| #10（编排者越权实施） | 全阶段 | [subagent-delegation.md](subagent-delegation.md)「强制约束」节 + SKILL.md「不可违反的约束」第 8 条 |
 
 ## 与门禁脚本的对应关系
 
@@ -53,6 +55,7 @@
 | #7（退出码 1/2 放行） | 🔴 CHECKPOINT · 发布放行（明确「退出码 1/2 一律不得放行」） |
 | #8（越过 CHECKPOINT） | 🔴 CHECKPOINT 视觉标记（Agent 扫描锚点） |
 | #9（谎报状态） | [data-models.md](data-models.md)「项目数据模型」+ `status` 字段约束 |
+| #10（编排者越权实施） | [subagent-delegation.md](subagent-delegation.md)「强制约束」节 + 编排者自身动作清单（O/S/V/G 角色表） |
 
 ## 命中后的处理流程
 
@@ -76,6 +79,7 @@
 | #7 | `check-artifact-gate.ts` 退出码 1/2 但 `Project.status` 已标「验收通过」 | 重置 `status` 为「编码」，回阶段 5 返工；附 GATE_JSON 详情告知用户 | 退出码 1/2 → 一律回阶段 5 |
 | #8 | 到达 🔴 CHECKPOINT 节点后无「等待用户确认」记录直接推进 | 回到 CHECKPOINT 节点重新暂停，向用户展示放行判定并由用户确认 | 无脚本；Agent 自检对话流 |
 | #9 | `Project.status` / `Requirement.status` 字段值与实际产物不符（如标「已完成」但无代码） | 按实际进度修正 `status` 字段；未完成不得推进到下一阶段 | 无脚本；Agent 比对 `rtm.json` 与磁盘产物 |
+| #10 | 编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者 `git diff` 含非 `.w-model/*.json` 状态文件改动；或编排者会话出现代码 / 测试用例 / 评审 JSON 的生成内容 | 回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ 编排者会话内仅保留路由 / 状态 / CHECKPOINT / 只读脚本记录 | 无脚本；编排者自检动作清单 + 宿主 Agent 工具调用日志（`Write`/`Edit` 不得出现在编排者会话） |
 
 ### 门禁脚本退出码精确对应表
 
