@@ -25,6 +25,12 @@
 - **需求冲突检测**：识别相互矛盾的描述
 - **验收测试用例自动生成**：为每个功能点生成验收场景
 
+## ingestion 子流程（A→S 路径，阶段 1 专用）
+
+阶段 1 进入时，编排者先跑 `plan-chunks.ts` 对输入分块（一句话输入产 1 chunk，仍走完整流程），并行分派 A-chunk 提取 REQ 节点，再分派 A-cross 合并建图、G 跑 `check-requirement-graph.ts` 校验连通性与单根。收敛后 S 子代理读 `graph.json` 产出正式需求规格。
+
+详见 [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md) 与设计文档 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §1.3。
+
 ## 需求解析算法
 
 ```
@@ -54,6 +60,7 @@
 | 需求规格说明书 | 套用 `templates/requirement-spec.md` 模板，按"功能 / 非功能 / 约束"三类填充 | `<模块>-requirement-spec.md` |
 | 验收测试用例 | 套用 `templates/test-case.md` 模板，`type=验收测试`，每个功能点 ≥ 1 条用例 | `<模块>-acceptance-test.md` |
 | 风险评估报告 | 产出风险等级（高 / 中 / 低）+ 缓解措施表格；冲突对与缺失项单独列出 | `<模块>-risk-assessment.md` |
+| graph.json | A 子代理产出，记录 REQ 节点与 parent/depends-on 边 | `.w-model/ingestion/graph.json`（跨阶段演进） |
 
 **执行顺序**：需求解析算法（步骤 1-4）→ 套用模板产出需求规格 → 同步产出验收测试用例（覆盖正常 + 异常 + 边界）→ 产出风险评估报告 → RTM 登记。
 
@@ -82,6 +89,7 @@
 - [ ] 需求风险评估报告包含风险等级和缓解措施
 - [ ] 需求冲突 / 缺失项均已处理或标注
 - [ ] RTM 已登记需求与验收测试映射
+- [ ] 图谱校验通过：`check-requirement-graph.ts --phase=1` 退出码 0（连通 + 单根 + 父唯一）
 
 > 🔴 **CHECKPOINT · 阶段门放行**：需求规格 + 验收测试用例产出后暂停。Agent 必须向用户展示「需求清单 / 冲突与缺失项 / 验收标准可验证性 / 风险评估 / RTM 需求登记」，由用户确认「放行进入阶段 2」或「返工」。存在未解决的冲突或不可验证的验收标准 → 一律返工，不得放行。
 
