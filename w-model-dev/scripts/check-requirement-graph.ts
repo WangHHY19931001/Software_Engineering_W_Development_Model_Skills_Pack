@@ -89,6 +89,8 @@ async function main(): Promise<void> {
   console.log(`orphan        : ${result.orphans.length === 0 ? '无' : result.orphans.join(', ')}`);
   console.log(`multiParent   : ${result.multiParent.length === 0 ? '无' : result.multiParent.join(', ')}`);
   console.log(`追溯违反      : SD_without_implements=${result.traceabilityViolations.SD_without_implements}, INTF_without_defines=${result.traceabilityViolations.INTF_without_defines}, DD_without_realizes=${result.traceabilityViolations.DD_without_realizes}`);
+  console.log(`信息流违反    : blackHoles=[${result.dataflowViolations.blackHoles.join(', ')}], miracles=[${result.dataflowViolations.miracles.join(', ')}], deadModules=[${result.dataflowViolations.deadModules.join(', ')}]`);
+  console.log(`边界完整性    : EXT-IN=${result.boundary.extIn}, EXT-OUT=${result.boundary.extOut}, complete=${result.boundary.complete}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -118,6 +120,8 @@ async function main(): Promise<void> {
     orphans: result.orphans,
     multiParent: result.multiParent,
     traceabilityViolations: result.traceabilityViolations,
+    dataflowViolations: result.dataflowViolations,
+    boundary: result.boundary,
     violations: result.violations,
     converged: result.passed,
   }));
