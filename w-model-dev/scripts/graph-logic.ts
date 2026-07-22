@@ -12,8 +12,15 @@
 
 // ==================== 自包含类型形状 ====================
 
-export type NodeType = 'REQ' | 'SD' | 'INTF' | 'DD';
-export type EdgeType = 'parent' | 'depends-on' | 'implements' | 'defines' | 'realizes';
+export type NodeType = 'REQ' | 'SD' | 'INTF' | 'DD' | 'EXT-IN' | 'EXT-OUT';
+export type EdgeType =
+  | 'parent'
+  | 'depends-on'
+  | 'implements'
+  | 'defines'
+  | 'realizes'
+  | 'produces'
+  | 'consumes';
 
 export interface GraphNode {
   id: string;
@@ -54,6 +61,18 @@ export interface TraceabilityViolations {
   DD_without_realizes: number;
 }
 
+export interface DataflowViolations {
+  blackHoles: string[];
+  miracles: string[];
+  deadModules: string[];
+}
+
+export interface BoundaryInfo {
+  extIn: number;
+  extOut: number;
+  complete: boolean;
+}
+
 export interface GraphCheckResult {
   passed: boolean;
   phase: number;
@@ -65,6 +84,8 @@ export interface GraphCheckResult {
   orphans: string[];
   multiParent: string[];
   traceabilityViolations: TraceabilityViolations;
+  dataflowViolations: DataflowViolations;
+  boundary: BoundaryInfo;
   violations: string[];
 }
 
@@ -89,6 +110,12 @@ export function checkRequirementGraph(
       INTF_without_defines: 0,
       DD_without_realizes: 0,
     },
+    dataflowViolations: {
+      blackHoles: [],
+      miracles: [],
+      deadModules: [],
+    },
+    boundary: { extIn: 0, extOut: 0, complete: false },
     violations: [],
   };
 
@@ -157,6 +184,12 @@ export function checkRequirementGraph(
   }
 
   // 单根检查：统计 parent 入边为 0 的节点
+  const nodeTypeById = new Map<string, string>();
+  for (const n of g.nodes) nodeTypeById.set(n.id, n.type as string);
+  const isBoundary = (id: string): boolean => {
+    const t = nodeTypeById.get(id);
+    return t === 'EXT-IN' || t === 'EXT-OUT';
+  };
   const parentInCount = new Map<string, number>();
   for (const id of nodeIds) parentInCount.set(id, 0);
   for (const e of g.edges) {
@@ -165,7 +198,7 @@ export function checkRequirementGraph(
     }
   }
   for (const [id, cnt] of parentInCount) {
-    if (cnt === 0) result.roots.push(id);
+    if (cnt === 0 && !isBoundary(id)) result.roots.push(id);
   }
 
   // 父唯一性：非根节点的 parent 入边数
@@ -239,12 +272,62 @@ export function checkRequirementGraph(
     }
   }
 
+  // ============ 信息流校验（黑洞 / 奇迹 / 死模块 + 边界完整性）============
+  // 方向统一：produces/consumes 的 {from,to} 均表信息流方向，to=n 即流入 n，from=n 即流出 n
+  const flowInCount = new Map<string, number>();
+  const flowOutCount = new Map<string, number>();
+  for (const id of nodeIds) {
+    flowInCount.set(id, 0);
+    flowOutCount.set(id, 0);
+  }
+  for (const e of g.edges) {
+    if (e.type === 'produces' || e.type === 'consumes') {
+      if (nodeIds.has(e.to)) flowInCount.set(e.to, (flowInCount.get(e.to) ?? 0) + 1);
+      if (nodeIds.has(e.from)) flowOutCount.set(e.from, (flowOutCount.get(e.from) ?? 0) + 1);
+    }
+  }
+
+  const businessTypes = new Set(['REQ', 'SD', 'INTF', 'DD']);
+  for (const n of g.nodes) {
+    if (!businessTypes.has(n.type as string)) continue;
+    if ((n.phase ?? 1) > phase) continue;
+    const inFlow = flowInCount.get(n.id) ?? 0;
+    const outFlow = flowOutCount.get(n.id) ?? 0;
+    if (inFlow === 0 && outFlow === 0) {
+      result.dataflowViolations.deadModules.push(n.id);
+      result.violations.push(`信息流校验失败：死模块 ${n.id}（无信息流经，in=0 out=0）`);
+    } else if (inFlow === 0 && outFlow > 0) {
+      result.dataflowViolations.miracles.push(n.id);
+      result.violations.push(`信息流校验失败：奇迹 ${n.id}（只出不进，in=0 out=${outFlow}）`);
+    } else if (inFlow > 0 && outFlow === 0) {
+      result.dataflowViolations.blackHoles.push(n.id);
+      result.violations.push(`信息流校验失败：黑洞 ${n.id}（只进不出，in=${inFlow} out=0）`);
+    }
+  }
+
+  // 边界完整性（阶段 1 起：至少 1 个 EXT-IN 和 1 个 EXT-OUT）
+  result.boundary.extIn = g.nodes.filter(n => n.type as string === 'EXT-IN').length;
+  result.boundary.extOut = g.nodes.filter(n => n.type as string === 'EXT-OUT').length;
+  result.boundary.complete = result.boundary.extIn >= 1 && result.boundary.extOut >= 1;
+  if (result.boundary.extIn < 1) {
+    result.violations.push('信息流校验失败：缺少 EXT-IN 边界源（系统不能凭空产生信息）');
+  }
+  if (result.boundary.extOut < 1) {
+    result.violations.push('信息流校验失败：缺少 EXT-OUT 边界汇（信息不能进入黑洞消失）');
+  }
+
   // 汇总 passed
   const tv = result.traceabilityViolations;
   const traceabilityOk =
     tv.SD_without_implements === 0 &&
     tv.INTF_without_defines === 0 &&
     tv.DD_without_realizes === 0;
+  const dv = result.dataflowViolations;
+  const dataflowOk =
+    dv.blackHoles.length === 0 &&
+    dv.miracles.length === 0 &&
+    dv.deadModules.length === 0 &&
+    result.boundary.complete;
   result.passed =
     result.connectedComponents === 1 &&
     result.isolatedNodes.length === 0 &&
@@ -252,6 +335,7 @@ export function checkRequirementGraph(
     result.orphans.length === 0 &&
     result.multiParent.length === 0 &&
     traceabilityOk &&
+    dataflowOk &&
     result.violations.length === 0;
   return result;
 }
