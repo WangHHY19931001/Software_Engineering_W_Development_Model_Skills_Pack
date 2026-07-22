@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "project": "sample",
+  "currentPhase": 4,
+  "rootId": "REQ-ROOT",
+  "nodes": [
+    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根需求","summary":"系统根"},
+    {"id":"REQ-001","type":"REQ","phase":1,"title":"用户登录","summary":"登录功能"},
+    {"id":"SD-001","type":"SD","phase":2,"title":"认证模块","summary":"认证服务"},
+    {"id":"INTF-001","type":"INTF","phase":3,"title":"登录接口","summary":"POST /login"},
+    {"id":"DD-001","type":"DD","phase":4,"title":"登录处理","summary":"密码校验逻辑"}
+  ],
+  "edges": [
+    {"from":"REQ-ROOT","to":"REQ-001","type":"parent"},
+    {"from":"REQ-001","to":"SD-001","type":"parent"},
+    {"from":"SD-001","to":"INTF-001","type":"parent"},
+    {"from":"INTF-001","to":"DD-001","type":"parent"},
+    {"from":"SD-001","to":"REQ-001","type":"implements"},
+    {"from":"SD-001","to":"INTF-001","type":"defines"},
+    {"from":"DD-001","to":"INTF-001","type":"realizes"}
+  ]
+}

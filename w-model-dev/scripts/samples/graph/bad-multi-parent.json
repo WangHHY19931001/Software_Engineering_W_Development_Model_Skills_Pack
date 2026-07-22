@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "rootId": "REQ-ROOT",
+  "nodes": [
+    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
+    {"id":"REQ-A","type":"REQ","phase":1,"title":"A","summary":"s"},
+    {"id":"REQ-B","type":"REQ","phase":1,"title":"B","summary":"s"},
+    {"id":"REQ-C","type":"REQ","phase":1,"title":"C有两个parent","summary":"s"}
+  ],
+  "edges": [
+    {"from":"REQ-ROOT","to":"REQ-A","type":"parent"},
+    {"from":"REQ-ROOT","to":"REQ-B","type":"parent"},
+    {"from":"REQ-A","to":"REQ-C","type":"parent"},
+    {"from":"REQ-B","to":"REQ-C","type":"parent"}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "currentPhase": 2,
+  "rootId": "REQ-ROOT",
+  "nodes": [
+    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
+    {"id":"SD-001","type":"SD","phase":2,"title":"模块","summary":"缺implements"}
+  ],
+  "edges": [
+    {"from":"REQ-ROOT","to":"SD-001","type":"parent"}
+  ]
+}
