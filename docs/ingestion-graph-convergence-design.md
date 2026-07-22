@@ -130,6 +130,10 @@
 | 2 系统设计 | `SD` | A-evolve 从 S 的 system-design.md 提取 | 系统模块/组件 |
 | 3 概要设计 | `INTF` | A-evolve 从 S 的 outline-design.md（接口设计文档）提取 | 接口实体 |
 | 4 详细设计 | `DD` | A-evolve 从 S 的 detailed-design.md 提取 | 详细设计单元 |
+| 跨阶段（边界） | `EXT-IN` | A-chunk 从输入/文档边界识别 | 合法外部信息源（DFD terminator，如用户输入、外部 API）；豁免奇迹判定；不参与 `parent` 单根树；阶段 1 起 ≥ 1 |
+| 跨阶段（边界） | `EXT-OUT` | A-chunk 从输入/文档边界识别 | 合法外部信息汇（如界面展示、持久化、外部调用、验收输出）；豁免黑洞判定；不参与 `parent` 单根树；阶段 1 起 ≥ 1 |
+
+> 边界节点详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §1.2。
 
 ### 2.2 节点 schema（统一）
 
@@ -164,8 +168,12 @@
 | `implements` | SD→REQ | 设计实现需求（追溯边） | 每 SD ≥1 |
 | `defines` | SD→INTF | 系统设计定义接口 | 每 INTF ≥1（阶段3起校验） |
 | `realizes` | DD→INTF | 详细设计实现接口 | 每 DD ≥1（阶段4起校验） |
+| `produces` | 生产者 → 消费者 \| 生产者 → `EXT-OUT` | 信息流边（强调「产出」视角）：`from` 节点把信息推给 `to` | 业务节点 ≥ 0；方向=信息流方向 |
+| `consumes` | `EXT-IN` → 消费者 \| 生产者 → 消费者 | 信息流边（强调「消费」视角）：`to` 节点从 `from` 拉取信息 | 业务节点 ≥ 0；方向=信息流方向 |
 
 **单根树**由 `parent` 边构成：`REQ-ROOT → REQ-module → SD → INTF → DD`，多级汇聚为一个根。`implements/defines/realizes` 是追溯边，不参与树的父唯一性约束但参与连通性。
+
+**信息流边**（`produces`/`consumes`）方向语义统一：`{from, to}` 一律表示信息流方向，`from`=来源 `to`=去向；对任意节点 `n`，`to=n` 即"流入 n"，`from=n` 即"流出 n"。两类边方向语义相同，区别仅在语义强调与 A 子代理提取来源（`produces` 由生产方文档提取，`consumes` 由消费方文档提取，合并后可能表征同一条流）。信息流边不参与 `parent` 单根树约束（与结构边正交），但参与整体连通性 BFS；用于黑洞/奇迹/死模块校验，详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §1.1。
 
 ### 2.4 graph.json schema
 
@@ -247,7 +255,7 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolida
 2. 连通性检查: 从任一节点 BFS
    - visited < totalNodes → fail, 记录 isolatedNodes = 未访问节点
    - connectedComponents = 1 才通过
-3. 单根检查: 统计入边 type=parent 为 0 的节点
+3. 单根检查: 统计入边 type=parent 为 0 的节点（边界节点 EXT-IN/EXT-OUT 豁免，不计入 roots）
    - roots.length ≠ 1 → fail, 记录 roots[]
 4. 父唯一性: 每个非根节点的 parent 入边数
    - 0 → orphan（fail）；>1 → multiParent（fail）
@@ -255,9 +263,26 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolida
    - phase ≥ 2: 每个 SD 节点出边 implements ≥ 1 → 否则 SD_without_implements++
    - phase ≥ 3: 每个 INTF 节点入边 defines ≥ 1 → 否则 INTF_without_defines++
    - phase ≥ 4: 每个 DD 节点出边 realizes ≥ 1 → 否则 DD_without_realizes++
-6. 汇总:
+6. 信息流校验（与结构校验正交，详见 information-flow-validation-design.md §2.1）:
+   构建 produces/consumes 有向子图（方向=信息流方向，to=n 即流入 n，from=n 即流出 n）
+   businessNodes = nodes 中 type ∈ {REQ|SD|INTF|DD} 且 phase ≤ currentPhase 的节点
+   for n in businessNodes:
+     inFlow  = count(edges where (type=produces ∨ type=consumes) ∧ to=n)
+     outFlow = count(edges where (type=produces ∨ type=consumes) ∧ from=n)
+     - inFlow=0 ∧ outFlow=0 → deadModules.push(n)（死模块：无信息流经）
+     - inFlow=0 ∧ outFlow>0 → miracles.push(n)（奇迹：只出不进，信息凭空产生）
+     - inFlow>0 ∧ outFlow=0 → blackHoles.push(n)（黑洞：只进不出，信息消失）
+   边界节点 EXT-IN/EXT-OUT 豁免上述判定（它们本就是合法的源/汇）
+7. 边界完整性（阶段 1 起）:
+   extIn  = count(nodes where type=EXT-IN)
+   extOut = count(nodes where type=EXT-OUT)
+   boundary.complete = (extIn ≥ 1) ∧ (extOut ≥ 1)
+   - extIn < 1  → boundary 违反："缺少 EXT-IN 边界源"
+   - extOut < 1 → boundary 违反："缺少 EXT-OUT 边界汇"
+8. 汇总:
+   dataflowOk = (blackHoles=[]) ∧ (miracles=[]) ∧ (deadModules=[]) ∧ boundary.complete
    passed = (connectedComponents=1) ∧ (isolatedNodes=[]) ∧ (roots.length=1)
-            ∧ (orphans=[]) ∧ (multiParent=[]) ∧ (所有追溯违反=0)
+            ∧ (orphans=[]) ∧ (multiParent=[]) ∧ (所有追溯违反=0) ∧ dataflowOk
 ```
 
 ### 3.3 输出 JSON（G 子代理回填）
@@ -279,10 +304,18 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolida
     "INTF_without_defines": 0,
     "DD_without_realizes": 0
   },
+  "dataflowViolations": {
+    "blackHoles": [],
+    "miracles": [],
+    "deadModules": []
+  },
+  "boundary": { "extIn": 1, "extOut": 1, "complete": true },
   "violations": [],
   "converged": true
 }
 ```
+
+> `dataflowViolations` 与 `boundary` 为信息流校验层新增字段（详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §2.3），与 `traceabilityViolations` 并列。
 
 ### 3.4 收敛准则（阈值驱动）
 
@@ -295,22 +328,32 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolida
 - `round = MAX_ROUNDS(5)` 未收敛 → 🔴 CHECKPOINT 介入（展示 violations + reworkHints，用户决定补漏/强制接受标注/取消）
 
 **跨阶段收敛**（"门禁同步收敛"的语义）：
+
+结构层（追溯项递增）：
 - 阶段1：仅校验 REQ 子图连通 + 单根（追溯检查项 0 个）
 - 阶段2：+ `SD_without_implements=0`（追溯项 1 个）
 - 阶段3：+ `INTF_without_defines=0`（追溯项 2 个）
 - 阶段4：+ `DD_without_realizes=0`（追溯项 3 个）—— **硬约束零违反才放行进阶段5**
-- 门禁项**单调递增**，违反数应**单调递减至 0**：这是"信息不断精细化、门禁同步收敛"的形式化表达
 
-### 3.5 "孤立需求/不连通域"与"单根树"的具体落地
+信息流层（与结构层同节奏，详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §2.2）：
+- 阶段1：REQ 信息流闭合（**严格**，与结构连通同级）—— REQ 子图 `produces`/`consumes` 连通 + `EXT-IN`/`EXT-OUT` 边界完整 + 无 REQ 黑洞/奇迹/死模块
+- 阶段2：+ SD 节点无黑洞/奇迹/死模块（硬约束）
+- 阶段3：+ INTF 节点无黑洞/奇迹/死模块（硬约束）
+- 阶段4：+ DD 节点无黑洞/奇迹/死模块；`--phase=4` **信息流零违反 ∧ 结构零违反**才放行进编码（硬约束）
 
-对应"图谱连通性分析 + 单根树分析"两个算法分析方法：
+门禁项（结构 + 信息流）**单调递增**，违反数应**单调递减至 0**：这是"信息不断精细化、门禁同步收敛"在结构与信息流两个维度的形式化表达。
+
+### 3.5 "孤立需求/不连通域"与"单根树"与"信息流闭合"的具体落地
+
+对应"图谱连通性分析 + 单根树分析 + 信息流闭合"三个算法分析方法：
 
 | 用户要求 | 脚本实现 |
 |---|---|
 | 图谱连通性分析（无孤立需求/不连通域） | 步骤2 BFS，`connectedComponents=1` 且 `isolatedNodes=[]` |
-| 单根树分析（所有需求汇聚为单根多级系统联通域） | 步骤3 + 步骤4，`roots.length=1` 且无 orphan/multiParent；`parent` 边构成 REQ→SD→INTF→DD 多级树 |
+| 单根树分析（所有需求汇聚为单根多级系统联通域） | 步骤3 + 步骤4，`roots.length=1` 且无 orphan/multiParent；`parent` 边构成 REQ→SD→INTF→DD 多级树（边界节点 `EXT-IN`/`EXT-OUT` 豁免单根判定） |
+| 信息流闭合（无黑洞/奇迹/死模块 + 边界完整） | 步骤6 + 步骤7，业务节点（`REQ`/`SD`/`INTF`/`DD`，`phase≤当前`）`inFlow`/`outFlow` 均不为 0 且不同时为 0；`EXT-IN ≥ 1 ∧ EXT-OUT ≥ 1` |
 
-两者均为纯图论确定性算法，无 LLM 参与，满足约束4「真实执行」。
+三者均为纯图论确定性算法，无 LLM 参与，满足约束4「真实执行」。信息流闭合维度详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md)。
 
 ## 4. 与现有阶段衔接、文件清单与脚本接口
 
