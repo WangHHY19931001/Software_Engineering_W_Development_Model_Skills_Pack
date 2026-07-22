@@ -220,6 +220,33 @@ const GRAPH_CASES: GraphCase[] = [
     expectedReasonPatterns: [/DD 节点 DD-001 缺少 realizes 出边/],
     description: 'phase=4 时 DD 缺 realizes，应被追溯校验拦截',
   },
+  {
+    file: 'bad-blackhole.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/黑洞 REQ-001/],
+    description: 'REQ-001 只进不出，应被信息流黑洞校验拦截',
+  },
+  {
+    file: 'bad-miracle.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/奇迹 REQ-001/],
+    description: 'REQ-001 只出不进，应被信息流奇迹校验拦截',
+  },
+  {
+    file: 'bad-dead-module.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/死模块 REQ-001/],
+    description: 'REQ-001 无信息流经，应被死模块校验拦截',
+  },
+  {
+    file: 'valid-dataflow.json',
+    phase: 4,
+    expectedPassed: true,
+    description: 'phase=4 完整图谱含信息流：无黑洞/奇迹/死模块 + 边界完整',
+  },
 ];
 
 // ==================== 测试执行器 ====================
