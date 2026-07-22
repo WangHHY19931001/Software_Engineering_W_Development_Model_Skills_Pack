@@ -29,6 +29,7 @@
 - **产出**（S 子代理）：需求规格、验收测试设计、风险清单、RTM 初始映射。
 - **评审**（V 子代理）：按 `targetKind=requirement` 路由 Persona，产出 `VerifierOutput` JSON。
 - **门禁**（G 子代理）：跑 `check-verifier-output.ts`，回填 `{exitCode, qualityLevel, passed, reworkHints}`。
+- **ingestion**：触发 A 角色 ingestion 子流程（`plan-chunks` → A-chunk → A-cross → G 图谱校验 → 收敛循环），产出 `graph.json`（REQ 节点）；A→S 路径——先由 A 收敛图谱（连通 + 单根），再分派 S 读 `graph.json` 产出需求规格。详见 [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)。
 - **失败**：信息不足时列出缺失项并暂停；不得猜测关键业务规则。评审未通过由 O 分派 S 返工。
 - **状态**（O）：初始化为“需求分析”；阶段门与用户均放行后才更新为“系统设计”。
 
@@ -44,6 +45,7 @@
 - **产出**（S 子代理）：对应设计文档 + 同步测试设计 + RTM 设计/接口/详细列。
 - **评审**（V 子代理）：按 `targetKind=design` 路由 Persona（系统设计可选 security-auditor 架构评审）。
 - **门禁**（G 子代理）：跑 `check-verifier-output.ts` 回填证据。
+- **ingestion**：触发 A 角色 ingestion 子流程（S→A 路径——S 先产出正式设计文档，再 A-chunk 分块 → A-evolve 图谱演进 → G 跑 `check-requirement-graph.ts` → 收敛循环）；按 `type` 追加对应节点到 `graph.json`：`架构`→SD 节点（implements 校验）、`概要`→INTF 节点（defines 校验）、`详细`→DD 节点（realizes 校验，零违反硬约束才放行进编码）。详见 [graph-guide.md](graph-guide.md)。
 - **失败**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段。评审未通过由 O 分派 S 返工。
 - **状态**（O）：对应阶段门与用户放行后才切换到下一阶段。
 
