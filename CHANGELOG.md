@@ -5,6 +5,40 @@
 
 ## [Unreleased]
 
+### 信息流校验增强（黑洞 / 奇迹 / 死模块门禁）
+
+> 为图谱门禁新增与结构门禁正交的信息流校验层：任何软件系统都不是黑洞或奇迹，也不存在无信息流经的模块。
+> 新增 `produces`/`consumes` 信息流边 + `EXT-IN`/`EXT-OUT` 显式边界节点（DFD terminator），检测黑洞（只进不出）/ 奇迹（只出不进）/ 死模块（无流经）三类信息流反常。
+> 阶段 1 REQ 信息流闭合（严格），阶段 4 信息流零违反 + 结构零违反才放行进编码。全程确定性算法，无 LLM；收敛判定仍由 G 跑 `check-requirement-graph.ts` 退出码决定。
+
+#### 新增
+
+- **graph-logic.ts 信息流校验**：`NodeType` 加 `EXT-IN`/`EXT-OUT`；`EdgeType` 加 `produces`/`consumes`；新增 `DataflowViolations`（blackHoles/miracles/deadModules）+ `BoundaryInfo`（extIn/extOut/complete）接口；单根计算豁免边界节点；信息流校验仅对业务节点（REQ/SD/INTF/DD，phase≤当前）判定黑洞/奇迹/死模块 + 边界完整性（EXT-IN≥1 ∧ EXT-OUT≥1）；`passed` 汇总加 `dataflowOk`
+- **check-requirement-graph.ts CLI 输出**：人类可读段加信息流违反行 + 边界完整性行；`GRAPH_JSON` 摘要加 `dataflowViolations`/`boundary` 字段
+- **4 个信息流样本**：`bad-blackhole.json`（黑洞）/ `bad-miracle.json`（奇迹）/ `bad-dead-module.json`（死模块）/ `valid-dataflow.json`（phase=4 完整图谱）；`valid-graph.json` 按方案 A 补信息流边与边界节点
+- **self-test 用例 25→29（+4）**：新增 4 条 Graph 样本用例，覆盖三类信息流违反 + 正常态
+- **反模式 #13**：anti-patterns.md 新增「信息流黑洞/奇迹/死模块放行」（反模式清单 / 命中高发阶段表 / 门禁脚本对应表 / 检测信号表 / 详解小节）
+- **graph-guide.md「信息流模型」节**：三不变量（黑洞/奇迹/死模块）+ 边界节点 + 方向约定 + 跨阶段收敛 + 与结构门禁的正交性
+- **A 子代理信息流边提取规则**：ingestion-chunk.md 加 produces/consumes/EXT-IN/EXT-OUT 提取规则；ingestion-cross.md 加跨块去重与 reworkHints 规则
+- **设计文档**：`docs/information-flow-validation-design.md`（信息流校验层设计 spec）
+
+#### 变更
+
+- `w-model-dev/SKILL.md`：快速自检加「信息流无黑洞/奇迹/死模块 + 边界完整」项
+- `docs/skill-design-document_SSoT.md`：§7.7 graph.json schema 加信息流边与边界节点；§10.7 图谱门禁加信息流校验算法 + 跨阶段收敛；§10A 追溯表更新；守护反模式引用补 #13
+- `docs/ingestion-graph-convergence-design.md`：§2.1 节点类型表加 EXT-IN/EXT-OUT；§2.3 边类型表加 produces/consumes；§3.2 算法加信息流校验步骤 6-8；§3.4 收敛准则加信息流层；§3.5 对照表加信息流闭合行
+- `AGENTS.md`：§2 scripts/ 行加信息流校验描述；anti-patterns 计数 12→13；self-test 计数 25→29
+- `README.md`：anti-patterns 计数 12→13；graph-logic.ts 描述加信息流校验；相关文档列表加信息流设计文档
+- `docs/INSTALL.md`：§3 目录结构补 graph-logic.ts / check-requirement-graph.ts；§7 目录速查补图谱门禁条目
+
+#### 验证
+
+- `npm run self-test` → 29/29 用例通过，退出码 0（10 Verifier + 7 Gate + 12 Graph）
+- 三条 bad 样本（bad-blackhole/bad-miracle/bad-dead-module）退出码 1，各自 `dataflowViolations` 对应数组含 REQ-001
+- `valid-dataflow.json` + `valid-graph.json`（补边后）phase=4 退出码 0，信息流零违反 + 边界完整
+- 旧 7 条 bad 样本仍按原期望失败（信息流校验只增不减违反项，结构违反文案不变）
+- 文档一致性：SSoT §7.7/§10.7 ↔ ingestion 设计 §2.1/§2.3/§3.2/§3.4 ↔ graph-guide.md ↔ anti-patterns.md #13 ↔ ingestion-chunk/cross.md ↔ SKILL.md ↔ AGENTS.md ↔ README.md ↔ INSTALL.md 均已同步
+
 ### ingestion 子流程与图谱门禁（A 角色 + graph.json + check-requirement-graph.ts）
 
 > 为阶段 1–4（需求分析 → 系统设计 → 概要设计 → 详细设计）新增 ingestion 子流程与分析子代理（A 角色），引入 graph.json 结构层图谱与 check-requirement-graph.ts 图谱门禁，实现「超大/多目录文档分块分析 → 交叉合并 → 图谱演进 → 结构连通性门禁」闭环。

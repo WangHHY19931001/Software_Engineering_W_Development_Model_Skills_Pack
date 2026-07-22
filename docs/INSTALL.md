@@ -56,7 +56,9 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── gate-logic.ts            # 工件质量门纯逻辑（单点事实源）
 │   ├── check-artifact-gate.ts   # 工件质量门 CLI（读 .w-model/rtm.json）
 │   ├── verifier-logic.ts        # VerifierOutput 校验纯逻辑（单点事实源）
-│   └── check-verifier-output.ts # Verifier 输出校验 CLI（防 Agent 输出漂移）
+│   ├── check-verifier-output.ts # Verifier 输出校验 CLI（防 Agent 输出漂移）
+│   ├── graph-logic.ts           # 图谱结构门禁纯逻辑（阶段 1–4，含信息流校验：黑洞/奇迹/死模块/边界完整性）
+│   └── check-requirement-graph.ts # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯 + 信息流校验，退出码 0/1/2）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -155,6 +157,9 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | Verifier 输出校验 CLI | [../w-model-dev/scripts/check-verifier-output.ts](../w-model-dev/scripts/check-verifier-output.ts) |
 | 工件质量门逻辑 | [../w-model-dev/scripts/gate-logic.ts](../w-model-dev/scripts/gate-logic.ts) |
 | 工件质量门 CLI | [../w-model-dev/scripts/check-artifact-gate.ts](../w-model-dev/scripts/check-artifact-gate.ts) |
+| 图谱结构门禁逻辑 | [../w-model-dev/scripts/graph-logic.ts](../w-model-dev/scripts/graph-logic.ts) |
+| 图谱结构门禁 CLI | [../w-model-dev/scripts/check-requirement-graph.ts](../w-model-dev/scripts/check-requirement-graph.ts) |
+| 图谱门禁与收敛准则 | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md) |
 | 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
 | 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |
 | 参考实现（端到端调测样本） | [../w-model-dev-demo/](../w-model-dev-demo) |
