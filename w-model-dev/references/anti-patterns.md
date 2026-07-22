@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（12 条流程反模式 #1~#12）
+- 反模式清单（13 条流程反模式 #1~#13）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -29,6 +29,7 @@
 | 10 | 编排者越权实施（写代码 / 改文档 / 产出评审 JSON / 改 RTM 实体 / 生成测试用例） | 编排者上下文污染、评审独立性丧失、状态机失真、违反「技能不内置 LLM」架构原则 | 编排者仅分派 S / V / G 子代理执行实施动作；自身只做路由 + 状态 + CHECKPOINT + 只读脚本（见 [subagent-delegation.md](subagent-delegation.md)） |
 | 11 | ingestion 跳过图谱校验 | 阶段 1-4 结构连通性失守，孤立 / 多根 / 追溯断裂带入编码，graph.json 形同虚设 | 阶段 1-4 必须跑 [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)，不得跳过 A→G 收敛循环（见 [graph-guide.md](graph-guide.md)） |
 | 12 | A 子代理自评收敛（用 LLM 输出判定收敛） | "LLM 估算质量门"在 ingestion 场景的变体，收敛判定漂移 | 收敛判定由 G 跑 `check-requirement-graph.ts` 退出码决定，A 的 `reworkHints` 仅作指引 |
+| 13 | ingestion 图谱信息流黑洞/奇迹/死模块放行 | 存在只进不出/只出不进/无流经的模块，信息闭合失守，结构追溯通过却仍有信息断点带入编码 | 阶段 1-4 必须通过 [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts) 信息流校验（无黑洞/奇迹/死模块 + 边界完整），退出码 0 才放行（见 [graph-guide.md](graph-guide.md)「信息流模型」节） |
 
 ### 命中高发阶段
 
@@ -46,6 +47,7 @@
 | #10（编排者越权实施） | 全阶段 | [subagent-delegation.md](subagent-delegation.md)「强制约束」节 + SKILL.md「不可违反的约束」第 8 条 |
 | #11（ingestion 跳过图谱校验） | 阶段 1~4 | [graph-guide.md](graph-guide.md) + [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) |
 | #12（A 自评收敛） | 阶段 1~4 | [graph-guide.md](graph-guide.md)「收敛准则」节 |
+| #13（信息流黑洞/奇迹放行） | 阶段 1~4 | [graph-guide.md](graph-guide.md)「信息流模型」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -62,6 +64,7 @@
 | #10（编排者越权实施） | [subagent-delegation.md](subagent-delegation.md)「强制约束」节 + 编排者自身动作清单（O/S/V/G 角色表） |
 | #11（ingestion 跳过图谱校验） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)（退出码 0 才算通过）+ 🔴 CHECKPOINT · ingestion 收敛确认 |
 | #12（A 自评收敛） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts) 退出码（A 的 `reworkHints` 不替代 G 判定） |
+| #13（信息流黑洞/奇迹放行） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)（`dataflowViolations` 全空 + `boundary.complete=true` 才退出码 0） |
 
 ## 命中后的处理流程
 
@@ -88,6 +91,7 @@
 | #10 | 编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者 `git diff` 含非 `.w-model/*.json` 状态文件改动；或编排者会话出现代码 / 测试用例 / 评审 JSON 的生成内容 | 回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ 编排者会话内仅保留路由 / 状态 / CHECKPOINT / 只读脚本记录 | 无脚本；编排者自检动作清单 + 宿主 Agent 工具调用日志（`Write`/`Edit` 不得出现在编排者会话） |
 | #11 | 阶段 1-4 未跑 `check-requirement-graph.ts` 直接进 S 产出 / V 评审；或编排者跳过 A→G 收敛循环 | 回到当前阶段起点，补跑 ingestion 子流程（A-chunk → A-cross/A-evolve → G 图谱校验） | `check-requirement-graph.ts` 退出码 0 才算收敛闭环 |
 | #12 | A-cross/A-evolve 的 LLM 输出被直接用作收敛判定，未经 G 跑 `check-requirement-graph.ts` | 作废 A 的收敛声明，分派 G 跑脚本，按退出码重新判定 | `check-requirement-graph.ts` 退出码 0=通过 / 1=校验失败 / 2=输入错误 |
+| #13 | `GRAPH_JSON.dataflowViolations` 存在非空数组（blackHoles/miracles/deadModules）或 `boundary.complete=false` | 回到当前阶段起点，分派 A-chunk 补信息流边（produces/consumes）与边界节点（EXT-IN/EXT-OUT），重跑 A→G 收敛循环 | `check-requirement-graph.ts` 退出码 0 才算信息流闭合 |
 
 ### 门禁脚本退出码精确对应表
 
@@ -100,7 +104,7 @@
 | `check-artifact-gate.ts` | 1 | 质量门未通过（覆盖率 / 测试状态不达标） | #3 / #6 / #7 | 回阶段 5 编码返工 |
 | `check-artifact-gate.ts` | 2 | 输入错误（`rtm.json` 缺失 / 字段错误） | #9 | 修复 `rtm.json` 后重跑 |
 | `check-requirement-graph.ts` | 0 | 图谱结构门禁通过（连通 / 单根 / 父唯一 / 阶段追溯零违反） | — | 可推进（阶段 4 通过即可进阶段 5 编码） |
-| `check-requirement-graph.ts` | 1 | 图谱校验失败（孤立 / 多根 / orphan / multiParent / 追溯违反） | #11 / #12 | 回到当前阶段起点，补跑 A→G 收敛循环 |
+| `check-requirement-graph.ts` | 1 | 图谱校验失败（孤立 / 多根 / orphan / multiParent / 追溯违反 / blackHoles / miracles / deadModules / boundary 不完整） | #11 / #12 / #13 | 回到当前阶段起点，补跑 A→G 收敛循环 |
 | `check-requirement-graph.ts` | 2 | 输入错误（`graph.json` / `consolidated.json` 缺失或损坏） | #11 | 从 `graph.phase-N.bak.json` 恢复或重跑 ingestion |
 
 > 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
@@ -120,6 +124,14 @@
 **回退动作**：作废 A 的收敛声明，分派 G 跑脚本，按退出码重新判定。
 
 **与反模式 #3/#6 的关系**：这是"LLM 估算质量门"在 ingestion 场景的变体——A 的 reworkHints 是指引不是判定。
+
+## #13 ingestion 图谱信息流黑洞/奇迹/死模块放行
+
+**检测信号**：`GRAPH_JSON.dataflowViolations` 出现非空数组（blackHoles/miracles/deadModules），或 `boundary.complete=false`。
+
+**回退动作**：回到当前阶段起点，分派 A-chunk 补 produces/consumes 信息流边与 EXT-IN/EXT-OUT 边界节点，重跑 A→G 收敛循环。
+
+**与 #11 的关系**：#11 是「结构连通」失守（孤立/多根/追溯断裂），#13 是「信息闭合」失守（黑洞/奇迹/死模块）——两者正交，一个节点可结构追溯完整却仍是信息流黑洞。二者均由 `check-requirement-graph.ts` 退出码守护。
 
 ## 实现层经验教训（来自端到端调测）
 
@@ -146,7 +158,7 @@
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills` 元技能的 Failure Modes。
 > SSoT [§4A.2](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
 >
-> **与 12 条流程反模式（#1~#12）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
+> **与 13 条流程反模式（#1~#13）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
 >
 > **与 4 条实现层经验教训（L1~L4）的关系**：L1~L4 是代码层教训（特定技术栈的具体坑），F1~F10 是行为层模式（跨技术栈的通用陷阱）。
 >
@@ -169,7 +181,7 @@
 
 ### 失败模式与反模式的对照
 
-| 维度 | 反模式 #1~#12 | 失败模式 F1~F10 |
+| 维度 | 反模式 #1~#13 | 失败模式 F1~F10 |
 |---|---|---|
 | 性质 | 流程破坏 | 行为退化 |
 | 命中后果 | 立即回退到对应阶段起点 | 不回退，但降低产物质量 |
