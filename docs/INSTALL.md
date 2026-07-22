@@ -12,9 +12,10 @@
 
 本技能是**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）：
 
-- **编排**：由 `w-model-dev/SKILL.md` 承载，Agent 读取后用自身工具执行 `/wm` 命令、维护状态与 RTM。
-- **校验脚本**：`w-model-dev/scripts/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/)。
-- **LLM-as-a-Verifier 评审**：由外部 Agent 按 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) 提示词执行，技能用校验脚本防输出漂移。
+- **编排**：由 `w-model-dev/SKILL.md` 承载，Agent 读取后承担「编排者」角色，用自身工具执行 `/wm` 命令路由、状态维护与 CHECKPOINT 等待。
+- **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（S 产出 / V 评审 / G 门禁）执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+- **校验脚本**：`w-model-dev/scripts/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/)；由 G 子代理在门禁节点执行 + 回填证据摘要（编排者可同步跑一次只读脚本看退出码，但不替代 G 的回填）。
+- **LLM-as-a-Verifier 评审**：由 V 子代理（即「外部 Agent」）按 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) 提示词执行，技能用校验脚本防输出漂移；编排者不得自评。
 - **技能自演化**：不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 
 ---
@@ -49,8 +50,8 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 ```
 /path/to/agent/skills/w-model-dev/
-├── SKILL.md            # 入口：YAML frontmatter（name + description）+ 编排逻辑 + 架构定位
-├── references/         # 8 阶段细则 + verifier-spec.md（LLM-as-a-Verifier 评审规范）+ 数据模型 + RTM 指南 + 质量标准（按需加载）
+├── SKILL.md            # 入口：YAML frontmatter（name + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界
+├── references/         # 8 阶段细则 + verifier-spec.md（LLM-as-a-Verifier 评审规范）+ subagent-delegation.md（O/S/V/G 编排者-子代理边界）+ 数据模型 + RTM 指南 + 质量标准（按需加载）
 ├── scripts/            # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
 │   ├── gate-logic.ts            # 工件质量门纯逻辑（单点事实源）
 │   ├── check-artifact-gate.ts   # 工件质量门 CLI（读 .w-model/rtm.json）
@@ -60,8 +61,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
 
-> Agent 在阶段产物评审时按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 的提示词模板执行 LLM 调用，
-> 产出 `VerifierOutput` JSON 后立即调用 `scripts/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）。
+> Agent 读取 `SKILL.md` 后承担「编排者」（O）角色：每阶段分派 **S 产出子代理**生成开发产物 + 测试设计 + RTM，分派 **V 评审子代理**按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，分派 **G 门禁子代理**跑 `scripts/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。编排者只做路由 + 状态 + CHECKPOINT + 持久化，**不得越权实施**（反模式 #10）。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
 
 ---
 
@@ -149,6 +149,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 |---|---|
 | Skill 入口与触发条件 | [../w-model-dev/SKILL.md](../w-model-dev/SKILL.md) |
 | 各阶段执行细则 | [../w-model-dev/references/](../w-model-dev/references) |
+| 编排者-子代理边界（O/S/V/G） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
 | LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/verifier-logic.ts](../w-model-dev/scripts/verifier-logic.ts) |
 | Verifier 输出校验 CLI | [../w-model-dev/scripts/check-verifier-output.ts](../w-model-dev/scripts/check-verifier-output.ts) |
@@ -187,6 +188,17 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 **Q：能否只安装部分阶段？**
 不建议。W 模型的核心是开发与测试并行，阶段之间存在阶段门依赖。`SKILL.md` 已按需
 加载 `references/`，无需为节省上下文而拆分安装。
+
+**Q：编排者-子代理边界如何工作？Agent 自身就是编排者吗？**
+是的。Agent 读取 `w-model-dev/SKILL.md` 后承担「编排者」（O）角色，只做路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本。任何实施动作由三类子代理执行：
+- **S 产出子代理**：生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体；
+- **V 评审子代理**：按 `verifier-spec.md` 提示词产出 `VerifierOutput` JSON（即「外部 Agent 执行 LLM-as-a-Verifier」）；
+- **G 门禁子代理**：跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要。
+
+子代理通过宿主 Agent 的子代理机制（如 Trae 的 Task 工具 / Claude Code 的 Task 工具 / Cursor 的子代理）启动。编排者越权实施（直接写产物 / 自评 / 替代 G 回填）命中反模式 #10，回到当前阶段起点。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+
+**Q：编排者能跑门禁脚本吗？**
+可以跑只读脚本（`npx tsx check-*.ts`、`git status`、`ls`）看退出码用于展示或路由判定，但**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。
 
 **Q：哪里可以看到 W 模型 8 阶段的完整端到端产出样本？**
 参见仓库内的参考实现 [`w-model-dev-demo/`](../w-model-dev-demo)（博客系统后端，Express + TypeScript）。

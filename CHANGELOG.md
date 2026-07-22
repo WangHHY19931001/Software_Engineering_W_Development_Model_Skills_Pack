@@ -5,6 +5,45 @@
 
 ## [Unreleased]
 
+### 编排者最小化（Orchestrator Minimization）
+
+> 将「任何修改、编码、调测、分析、修正、验证都只允许子代理执行，编排者只进行编排，编排者工作最小化」作为强制约束纳入技能设计。
+>
+> 新增 O / S / V / G 四角色划分（编排者 / 产出子代理 / 评审子代理 / 门禁子代理），每阶段分派时序统一为 O 路由 → 🔴 CHECKPOINT → S 产出 → V 评审 → G 门禁 → O 展示证据 → 🔴 CHECKPOINT 放行 → O 持久化。违反约束命中反模式 #10「编排者越权实施」，回到当前阶段起点。
+>
+> 设计遵循「SSoT 优先 + 不内置 LLM 调用 + CHECKPOINT 不可绕过」三项硬约束：V 子代理即「外部 Agent 执行 LLM-as-a-Verifier」，技能包自身仍只含提示词 + 脚本，不引入 LLM 调用；G 子代理跑确定性门禁脚本回填证据，与「真实执行」约束一致。
+
+#### 新增
+
+- `docs/skill-design-document_SSoT.md` §3.4「编排者-子代理边界」：设计目标 / O-S-V-G 角色表 / 每阶段分派时序 / 与现有约束兼容性 / 强制约束；§10A 追溯表登记 §3.4 行
+- `w-model-dev/references/subagent-delegation.md`：编排者-子代理边界可执行细则（角色划分 / 每阶段分派时序 / S-V-G 三类子代理分派模板 / 回填契约 JSON / 强制约束 / 失败模式与回退 / 与 addyosmani 差异表）
+- `w-model-dev/references/anti-patterns.md` #10「编排者越权实施」：反模式清单从 9 条扩到 10 条；新增检测信号（编排者会话出现 `Write`/`Edit` 写产物 / 直接产出 VerifierOutput JSON / `git diff` 含非状态文件改动）+ 回退动作（回到当前阶段起点，已越权产出的实体作废重做）；命中高发阶段表 / 与门禁脚本对应表 / 检测信号与回退命令表均同步登记 #10
+- `w-model-dev/SKILL.md` 不可违反的约束新增第 8 条「编排者最小化」；新增「编排者-子代理边界」节（O/S/V/G 角色表 + 每阶段分派时序摘要 + 只读脚本例外 + 违反处置）；快速自检加编排者越权检查项
+
+#### 变更
+
+- `w-model-dev/SKILL.md` 执行工作流：从 8 步重写为 10 步（O/S/V/G 角色标注）；原步骤 6「执行阶段」（编排者直接产出）拆为步骤 6「分派 S 子代理产出」+ 步骤 7「分派 V 子代理评审」+ 步骤 8「分派 G 子代理门禁」；原步骤 7「验证与暂停」改为步骤 9「验证与暂停」（基于 G 返回值路由判定 + CHECKPOINT 等待）；命令速查表加「子代理分派」列；按需加载追加 subagent-delegation.md 入口
+- `w-model-dev/references/workflow.md` 总体流程图加 O/S/V/G 角色标注；阶段产物清单表加「子代理分派」列（标注每阶段由哪些角色执行）；工作流常见反模式表加第 8 行（对应 #10）
+- `w-model-dev/references/command-reference.md` 通用命令规则明确 O 边界（编排者只可读取/更新状态文件，不得修改 RTM 实体字段）；每个 `/wm` 命令加「执行方」字段，标注 S/V/G 分派与 O 持久化职责；`/wm review` 明确「编排者不得自评」；`/wm test` 禁止栏加「编排者越权回填 RTM 实体（反模式 #10）」
+- `AGENTS.md` §1 仓库定位新增「编排者最小化」行 + LLM-as-a-Verifier / Agent Personas 描述改为「V 子代理执行」；§2 关键目录速查表 `w-model-dev/references/` 行补 subagent-delegation / anti-patterns 描述从 9 条改为 10 条；§6 行动约束新增「编排者最小化」条目
+- `README.md` 核心能力新增「编排者最小化」一项 + LLM-as-a-Verifier / Agent Personas 描述改为「V 子代理执行」+ 反模式计数从 9 条改为 10 条；项目结构树补 `subagent-delegation.md` 条目；相关文档列表补 subagent-delegation.md 链接 + anti-patterns 描述更新到 10 条
+- `docs/INSTALL.md` §1 架构定位补「编排者最小化」+ 校验脚本 / LLM-as-a-Verifier 描述改为「G 子代理 / V 子代理执行」；§3 安装后目录结构补 subagent-delegation.md + 编排者-子代理边界说明；§7 目录速查表补 subagent-delegation.md 行；§8 FAQ 新增「编排者-子代理边界如何工作」与「编排者能跑门禁脚本吗」两个问答
+
+#### 设计要点
+
+- **三层子代理 + 编排者（O/S/V/G）**：O 路由 + 状态 + CHECKPOINT + 持久化 + 只读脚本；S 产出（含跑测试运行器）；V 评审（按 Persona 路由）；G 门禁（跑脚本 + 回填证据）。
+- **每阶段时序**：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → V 评审 → G 门禁 → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 持久化。阶段 8 终检额外分派 G 跑 `check-artifact-gate.ts`。
+- **只读脚本例外**：O 可跑 `check-*.ts` 看退出码用于展示/路由判定，但**不替代 G 的回填**——G 子代理必须独立跑一次并产出证据摘要。
+- **强制等级**：违反即命中反模式 #10，回到当前阶段起点，已越权产出的实体作废重做。
+- **兼容性**：与现有约束 2/4/6/8、`verifier-spec.md` §7.6「外部 Agent 执行」、`agent-personas.md` 4 个 Persona 均不冲突；V 子代理即「外部 Agent」，G 子代理跑脚本回填证据 = 真实执行。
+
+#### 验证
+
+- `npm run self-test` → 17/17 用例通过，退出码 0（10 Verifier + 7 Gate 样本回归基线未受影响）
+- 文档一致性：`docs/skill-design-document_SSoT.md` / `w-model-dev/SKILL.md` / `w-model-dev/references/subagent-delegation.md`（新建）/ `anti-patterns.md` / `workflow.md` / `command-reference.md` / `AGENTS.md` / `README.md` / `docs/INSTALL.md` / `CHANGELOG.md` 均已同步至编排者最小化设计
+- SSoT §3.4 ↔ `subagent-delegation.md` ↔ `SKILL.md`「编排者-子代理边界」节 ↔ `anti-patterns.md` #10 四向链接校验通过
+- `command-reference.md` 各命令「执行方」字段与 `workflow.md` 阶段产物表「子代理分派」列一致
+
 ### 吸收 addyosmani/agent-skills 设计模式（P1 + P2）
 
 > 将 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) 中的 `using-agent-skills` 元技能（6 条核心操作行为 + 10 条失败模式）、`code-review-and-quality`（五轴评审 + Severity 标签 + Structural Remedies）、`references/definition-of-done.md`（项目级 DoD）、`agents/`（Agent Personas）、`docs/adoption-guide.md`（Greenfield vs Brownfield 采用路径）等设计模式吸收到本技能包。
