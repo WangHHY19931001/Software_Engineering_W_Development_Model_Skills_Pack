@@ -35,6 +35,10 @@ import { checkVerifierOutput } from './verifier-logic.js';
 import { checkArtifactGate } from './gate-logic.js';
 import { checkRequirementGraph } from './graph-logic.js';
 import { checkTlaModel } from './tla-logic.js';
+import { checkBudget } from './budget-logic.js';
+import { checkRunLog } from './run-log-logic.js';
+import { checkMaturity } from './maturity-logic.js';
+import { checkCheckpoint } from './checkpoint-logic.js';
 
 // ==================== 测试用例定义 ====================
 
@@ -115,6 +119,24 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/ranking\.ordered 不得包含重复候选项/],
     description: '排序结果包含重复候选项，应被拒绝',
+  },
+  {
+    file: 'bad-rawscores-all-same.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/rawScores 全同/],
+    description: 'completeness 维度 rawScores 全同 [0.95,0.95,0.95]，应被防漂移规则 1 拦截',
+  },
+  {
+    file: 'bad-variance-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/variance.*≠.*重算的方差/],
+    description: 'completeness variance=0.001 与重算方差 0.000267 不一致，应被防谎报校验拦截',
+  },
+  {
+    file: 'bad-perturbation-out-of-range.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/扰动.*> 0\.10/],
+    description: 'text-parse 扰动范围 0.45 > 0.10，应被防漂移规则 3 拦截',
   },
 ];
 
@@ -253,6 +275,40 @@ const GRAPH_CASES: GraphCase[] = [
     expectedPassed: true,
     description: 'phase=4 完整图谱含信息流：无黑洞/奇迹/死模块 + 边界完整',
   },
+  {
+    file: 'bad-subsystem-orphan.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/orphan/],
+    description: 'SD-5.2.2 无 parent 依附，应被 orphan BFS 校验拦截',
+  },
+  {
+    file: 'bad-parent-cycle.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/环/],
+    description: 'parent 边构成 REQ-A→REQ-B→REQ-C→REQ-A 环，应被环检测拦截',
+  },
+  {
+    file: 'bad-governance-out-of-scope.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/governs.*源非治理类/],
+    description: 'governs 边源 SD-5.2.1 非治理类子系统（governance 标记缺失），应被横切边校验拦截',
+  },
+  {
+    file: 'bad-collaboration-asymmetric.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/collaborates-with.*目标节点不存在/],
+    description: 'collaborates-with 目标 SD-5.2.9 不存在，应被横切边校验拦截',
+  },
+  {
+    file: 'valid-multilayer.json',
+    phase: 4,
+    expectedPassed: true,
+    description: 'phase=4 7 层图谱：parent 树 + implements/defines/realizes + governs/collaborates-with/derives 横切边 + 信息流',
+  },
 ];
 
 interface TlaCase {
@@ -323,6 +379,172 @@ const TLA_CASES: TlaCase[] = [
       /L1-system 状态爆炸.*stateExplosion=true/,
     ],
     description: '声明标志全反（syntax/deadlock/invariant/explosion），应同时触发四类违反',
+  },
+  {
+    file: 'bad-coverage-missing-sd.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/未被任何 TLA\+ spec 覆盖/],
+    description: 'manifest.graphSdNodes 含 11 个 SD，但仅 2 个被 spec 覆盖，应被覆盖率校验拦截',
+  },
+  {
+    file: 'bad-cfg-missing-invariant.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/\.cfg 缺失不变式/],
+    description: '.cfg 仅含 NoExitTerminal，缺 ArtifactGateConsistency，应被 cfg-tla 一致性校验拦截',
+  },
+  {
+    file: 'bad-cfg-module-declaration.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/\.cfg 含 MODULE 声明/],
+    description: '.cfg 含 ---- MODULE L3_xxx ----，应被 cfg 结构校验拦截',
+  },
+  {
+    file: 'bad-invariant-count-mismatch.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/\.cfg 多余不变式/],
+    description: '.cfg 含 INV1 INV2 INV3，比 .tla BusinessInvariant 多 INV3，应被 cfg-tla 一致性校验拦截',
+  },
+  {
+    file: 'valid-cfg-consistency.json',
+    phase: 2,
+    expectedPassed: true,
+    description: '.cfg 与 .tla 不变式集合完全一致，应通过 cfg-tla 一致性 + cfg 结构校验',
+  },
+];
+
+// -------------------- Budget --------------------
+
+interface BudgetCase {
+  /** 样本文件名（相对 samples/budget/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 透传给 checkBudget 的 options（如 projectUpdatedAt / budgetCreatedAt） */
+  options?: Record<string, unknown>;
+  /** 用例说明 */
+  description: string;
+}
+
+const BUDGET_CASES: BudgetCase[] = [
+  {
+    file: 'valid.json',
+    expectedPassed: true,
+    description: '完整、合规的 BudgetConfig，应通过所有校验',
+  },
+  {
+    file: 'bad-stale.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/updatedAt == createdAt/],
+    options: {
+      projectUpdatedAt: '2026-07-23T18:00:00Z',
+      budgetCreatedAt: '2026-07-01T00:00:00Z',
+    },
+    description: 'updatedAt==createdAt 且项目已推进，应被 R1 时效性校验拦截',
+  },
+  {
+    file: 'bad-killswitch-triggered.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/budgetBurnRate 超范围/],
+    description: 'killSwitch.budgetBurnRate=1.5 超出 [0,1]，应被 R4 范围校验拦截',
+  },
+];
+
+// -------------------- RunLog --------------------
+
+interface RunLogCase {
+  /** 样本文件名（相对 samples/run-log/，JSONL 格式） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const RUN_LOG_CASES: RunLogCase[] = [
+  {
+    file: 'valid.jsonl',
+    expectedPassed: true,
+    description: '3 阶段各含 chunk/cross/gate/checkpoint，append-only 且 checkpoint tokens>0',
+  },
+  {
+    file: 'bad-incomplete.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R1.*缺 chunk/],
+    description: '阶段 1 缺 chunk 动作，应被 R1 阶段动作完整性校验拦截',
+  },
+  {
+    file: 'bad-o-overreach.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R2.*tokens=0/],
+    description: 'checkpoint success 但 tokens=0，应被 R2 tokens 非负校验拦截',
+  },
+  {
+    file: 'bad-exitcode-mismatch.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R7.*非 append-only/],
+    description: 'r1 时间戳 02:00 早于 r2 时间戳 01:00（时间戳倒序），应被 R7 append-only 校验拦截',
+  },
+];
+
+// -------------------- Maturity --------------------
+
+interface MaturityCase {
+  /** 样本文件名（相对 samples/maturity/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const MATURITY_CASES: MaturityCase[] = [
+  {
+    file: 'valid.json',
+    expectedPassed: true,
+    description: '完整、合规的 MaturityConfig（L1），应通过所有校验',
+  },
+  {
+    file: 'bad-stale.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/level 非法值.*L5/],
+    description: 'level=L5 超出 L0/L1/L2/L3，应被 R2 level 合法性校验拦截',
+  },
+];
+
+// -------------------- Checkpoint --------------------
+
+interface CheckpointCase {
+  /** 样本文件名（相对 samples/checkpoint/，JSONL 格式） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const CHECKPOINT_CASES: CheckpointCase[] = [
+  {
+    file: 'valid.jsonl',
+    expectedPassed: true,
+    description: '2 阶段 checkpoint 决策含具体名词（REQ-1.1 / SD-5.2.1）+ 长度合规',
+  },
+  {
+    file: 'bad-empty-decisions.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R1.*acknowledgedDecisions 为空/],
+    description: 'cp1 acknowledgedDecisions=[] 空决策放行，应被 R1 校验拦截',
   },
 ];
 
@@ -463,6 +685,129 @@ async function runTlaCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+/**
+ * JSONL 解析：按行分割，跳过空行，逐行 JSON.parse。
+ * 非法 JSON 行会向上抛错（保持样本错误可见性，不静默吞掉）。
+ */
+function parseJsonl(raw: string): unknown[] {
+  return raw
+    .split('\n')
+    .filter(l => l.trim() !== '')
+    .map(l => JSON.parse(l));
+}
+
+async function runBudgetCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of BUDGET_CASES) {
+    const abs = path.join(samplesDir, 'budget', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkBudget(parsed, c.options);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `budget/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runRunLogCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of RUN_LOG_CASES) {
+    const abs = path.join(samplesDir, 'run-log', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = parseJsonl(raw);
+    const r = checkRunLog(parsed);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `run-log/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of MATURITY_CASES) {
+    const abs = path.join(samplesDir, 'maturity', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkMaturity(parsed);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `maturity/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CHECKPOINT_CASES) {
+    const abs = path.join(samplesDir, 'checkpoint', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = parseJsonl(raw);
+    const r = checkCheckpoint(parsed);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `checkpoint/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // ==================== 入口 ====================
 
 async function main(): Promise<void> {
@@ -477,15 +822,29 @@ async function main(): Promise<void> {
   console.log(`Gate 用例     : ${GATE_CASES.length}`);
   console.log(`Graph 用例    : ${GRAPH_CASES.length}`);
   console.log(`TLA 用例      : ${TLA_CASES.length}`);
+  console.log(`Budget 用例   : ${BUDGET_CASES.length}`);
+  console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
+  console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
+  console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
   console.log('─'.repeat(60));
 
-  const [verifierResults, gateResults, graphResults, tlaResults] = await Promise.all([
+  const [
+    verifierResults, gateResults, graphResults, tlaResults,
+    budgetResults, runLogResults, maturityResults, checkpointResults,
+  ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
     runGraphCases(samplesDir),
     runTlaCases(samplesDir),
+    runBudgetCases(samplesDir),
+    runRunLogCases(samplesDir),
+    runMaturityCases(samplesDir),
+    runCheckpointCases(samplesDir),
   ]);
-  const all = [...verifierResults, ...gateResults, ...graphResults, ...tlaResults];
+  const all = [
+    ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
+    ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
+  ];
 
   const passedCount = all.filter(r => r.passed).length;
   const failedCount = all.length - passedCount;
