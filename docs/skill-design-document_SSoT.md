@@ -1455,7 +1455,7 @@ interface RunLogEntry {
 - **根 = 系统级 REQ 节点**（如 `REQ-001`），`type=REQ`，为系统层级树唯一根（系统根）。
 - **子系统根 = SD 节点**，通过 `parent` 边依附系统根（`SD.parent → REQ` 系统根）。
 - **接口根 = INTF 节点**，通过 `parent` 边依附子系统根（`INTF.parent → SD` 子系统根）。
-- **层级单调**：`parent` 边只能从 Level N → Level N-1（`REQ=L0` / `SD=L1` / `INTF=L2` / `DD=L3`），禁止跨层或逆向依附；违反 → `hierarchyTreeViolation`，`check-requirement-graph.ts` 退出码 1。
+- **层级单调**：`parent` 边（父→子）只能连接相邻层级，且 **子节点 Level = 父节点 Level + 1**（`REQ=L0` / `SD=L1` / `INTF=L2` / `DD=L3`，即边方向 L0→L1→L2→L3 单调递增），禁止跨层或逆向依附；违反 → `hierarchyTreeViolation`，`check-requirement-graph.ts` 退出码 1。
 
 ### 10.10.2 多层图谱（7 层）
 
