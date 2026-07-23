@@ -307,7 +307,7 @@ S 子代理核查：规格是否忠实于需求/设计？
 
 ### 5.3 SD 覆盖要求（与 graph 系统层级树同构）
 
-TLA+ 层次树须与 graph 系统层级树（SSoT §10.10.1）同构覆盖——每个 SD（子系统设计）节点须有对应的 TLA+ 行为规格，不得出现「结构层有 SD、行为层无规格」的覆盖缺口（缺陷 D10：11 个子系统但仅 3 个 spec 即本规则要治的覆盖不足）。
+TLA+ 层次树须与 graph 系统层级树（SSoT §10.10.1）同构覆盖——每个 SD（子系统根）节点须有对应的 TLA+ 行为规格，不得出现「结构层有 SD、行为层无规格」的覆盖缺口（缺陷 D10：11 个子系统但仅 3 个 spec 即本规则要治的覆盖不足）。
 
 | graph 系统层级树节点 | TLA+ 层次 | 规格职责 |
 |---|---|---|
@@ -318,7 +318,7 @@ TLA+ 层次树须与 graph 系统层级树（SSoT §10.10.1）同构覆盖——
 **覆盖要求**：
 - 每个 SD 须有 TLA+ 覆盖——L2 子系统规格或 L3 接口行为规格（任一即可）。
 - 覆盖判定：`tla-manifest.json.specs[]` 中存在某 spec 的 `requirementIds` 含该 SD 关联的 REQ，或 `designRef` 引用该 SD 对应设计文档。
-- 强制校验：`check-tla-model.ts --graph=<graph.json>` 提取 SD 节点做覆盖率校验，未覆盖 SD 列表 → `sdCoverageViolation`，exitCode=1。可执行细则见 [tla-plus-guide.md](../w-model-dev/references/tla-plus-guide.md) §13。
+- 强制校验：`check-tla-model.ts --graph=<graph.json>` 提取 SD 节点做覆盖率校验，未覆盖 SD 列表 → `sdCoverageViolation`，exitCode=1。可执行细则见 [tla-plus-guide.md](../w-model-dev/references/tla-plus-guide.md) §10。
 
 **横切设计承载**：
 - 横切设计（如 S08 治理子系统）可建独立 L2 规格，其 `@sibling` 指向被治理的子系统规格（而非通过 `@parent`/`@child` 依附）。

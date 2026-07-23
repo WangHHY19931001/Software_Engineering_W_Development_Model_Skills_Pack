@@ -123,7 +123,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
 | `--phase=N` | 只校验 `phase ≤ N` 的规格 |
 | `--spec=<id>` | 只校验单个规格（调试用） |
 | `--skip-tlc` | 只跑文件头 + 层次 + SANY 语法检查，跳过 TLC（阶段门放行前不可跳过） |
-| `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §13）；未提供时跳过覆盖率校验 |
+| `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §10）；未提供时跳过覆盖率校验 |
 
 ### 校验步骤（G 子代理执行）
 
@@ -232,7 +232,7 @@ TLA+ 建模必须符合需求和设计。TLC 发现违反时：
 
 图谱门禁管静态结构（节点/边/连通/信息流），TLA+ 门禁管动态行为（状态机/不变式/死锁）。两者正交，一个规格可结构完整却仍有死锁。
 
-## 13. SD 覆盖率规则
+## 10. SD 覆盖率规则
 
 > 每个 SD（子系统设计）节点须被至少一个 TLA+ spec 覆盖；存在未覆盖 SD → violation，exitCode=1。本规则由 SSoT §10.8「追加行为门禁校验项」定义，`check-tla-model.ts` 强制执行。
 
@@ -242,6 +242,8 @@ TLA+ 建模必须符合需求和设计。TLC 发现违反时：
 |---|---|
 | `spec.requirementIds` 命中 | spec 的 `requirementIds` 含该 SD 关联的 REQ ID |
 | `spec.designRef` 命中 | spec 的 `designRef` 引用该 SD 对应的设计文档（路径/锚点匹配） |
+
+> 该 SD 关联的 REQ = graph 系统层级树中 SD 的 parent REQ 节点（SSoT §10.10.1）。本表为操作化口径，SSoT §10.8 为权威定义。
 
 **算法**：
 1. 从 `--graph=<graph.json>` 提供的 `graph.json` 中提取所有 `type=SD` 节点，得到 SD 集合。
@@ -259,7 +261,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<grap
 
 > 覆盖率校验与结构层图谱门禁（`check-requirement-graph.ts`）正交：图谱门禁管 SD 是否在层级树中正确依附，本规则管 SD 是否有行为规格。两者均须通过。缺陷对照：D10（11 个子系统但仅 3 个 spec）即本规则检出。
 
-## 14. cfg-tla 一致性规则
+## 11. cfg-tla 一致性规则
 
 > 每个 `.cfg` 的 `INVARIANTS` 列表须与对应 `.tla` 中 `BusinessInvariant` 展开的子不变式集合一致；缺失或多余 → violation，exitCode=1。本规则由 SSoT §10.8 定义，`check-tla-model.ts` 强制执行。
 
@@ -280,7 +282,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<grap
 
 > 示例：`.tla` 定义 `BusinessInvariant == /\ NoExitTerminal /\ ArtifactGateConsistency`，则 `.cfg` 须列全 `NoExitTerminal` 与 `ArtifactGateConsistency`，缺任一即违反。
 
-## 15. cfg 结构规则
+## 12. cfg 结构规则
 
 > `.cfg` 文件须符合 TLC 配置语法；结构违反 → violation，exitCode=1。本规则由 SSoT §10.8 定义，`check-tla-model.ts` 强制执行。
 
@@ -294,14 +296,16 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<grap
 
 **合法 `.cfg` 片段示例**（`INVARIANTS` 关键字后跟列表）：
 
-```
+```cfg
 SPECIFICATION Spec
-INVARIANTS NoExitTerminal ArtifactGateConsistency
+INVARIANTS
+  NoExitTerminal
+  ArtifactGateConsistency
 ```
 
 等价的逐行形式：
 
-```
+```cfg
 SPECIFICATION Spec
 INVARIANT NoExitTerminal
 INVARIANT ArtifactGateConsistency
