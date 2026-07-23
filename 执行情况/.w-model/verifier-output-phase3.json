@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "design",
+    "target": "shell-agent-phase-3",
+    "reviewedAt": "2026-07-23T12:00:00+08:00",
+    "agent": "V-subagent (design-reviewer)",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.05
+  },
+  "subCriteria": [
+    {
+      "name": "architecture-soundness",
+      "weight": 0.25,
+      "score": 0.91,
+      "rawScores": [0.90, 0.92, 0.91],
+      "variance": 0.000067,
+      "evidence": "docs/shell-agent-interface-design.md:L14 (§1 模块调用关系) 以 Mermaid graph LR 呈现 S01-S11 单向调用链；DFS 三色染色循环依赖检查通过；11 组接口按子系统边界组织（docs/shell-agent-interface-design.md:L51-L757 §2 接口定义 INTF-5.2.1~5.2.11），未出现阶段 4 级别的类/方法内部细节"
+    },
+    {
+      "name": "requirement-coverage",
+      "weight": 0.25,
+      "score": 0.90,
+      "rawScores": [0.89, 0.91, 0.90],
+      "variance": 0.000067,
+      "evidence": ".w-model/rtm.json:L4 (requirements) 包含 50 条需求，每条关联 designDoc 字段；.w-model/rtm.json:L1002 (designs) 11 个 SD 节点各含 integrationTestIds 数组，与 docs/shell-agent-interface-design.md:L762 (§3 集成测试用例索引) 20 条用例一一对应；REQ-047/048 约束需求未直接关联集成测试属可接受边界"
+    },
+    {
+      "name": "interface-consistency",
+      "weight": 0.20,
+      "score": 0.92,
+      "rawScores": [0.91, 0.93, 0.92],
+      "variance": 0.000067,
+      "evidence": "docs/shell-agent-interface-design.md:L51-L757 (§2 接口定义) 11 组接口均按 10 字段模板填写；错误码覆盖三段位（4xx/5xx/6xx）共 26 个错误码；每个错误码含 message/httpStatus/retryable 四字段；返回值统一 code+data 结构"
+    },
+    {
+      "name": "feasibility",
+      "weight": 0.15,
+      "score": 0.88,
+      "rawScores": [0.87, 0.89, 0.88],
+      "variance": 0.000067,
+      "evidence": "接口设计所有能力调用均为终端环境已验证可行操作；tla/L3_artifact_gate.tla 建模两级门禁流程，L256-L269 (4 个不变式 HookFailBlocksVerifier/ValidDecision/ReworkBudgetBounded/HookBeforeVerifier) 约束 Hook/Verifier 行为，L272-L276 (ArtifactGateInvariant) 聚合；tla/L3_artifact_gate.tla:L69 (MAX_REWORK_ATTEMPTS=3) 与接口 60006 返工预算耗尽错误码对应"
+    },
+    {
+      "name": "testability",
+      "weight": 0.15,
+      "score": 0.90,
+      "rawScores": [0.89, 0.91, 0.90],
+      "variance": 0.000067,
+      "evidence": "docs/shell-agent-integration-test.md:L17 (§ 用例列表) 集成测试 20 用例按三大场景覆盖：参数校验(8)+跨模块(5)+异常路径(7)；11 个接口均有对应集成测试用例，索引见 docs/shell-agent-interface-design.md:L762 (§3 集成测试用例索引)"
+    }
+  ],
+  "compositeScore": 0.9035,
+  "qualityLevel": "A",
+  "passed": true,
+  "summary": "阶段 3 概要设计质量评级 A。11 接口组按 10 字段模板完整填写，错误码覆盖 4xx/5xx/6xx 三段位。集成测试 20 用例覆盖参数校验+跨模块+异常路径。RTM 追溯链完整无违规。TLA+ L3 以两级门禁状态机建模 artifact gate 行为。",
+  "reworkHints": [
+    "FYI: REQ-047/REQ-048 约束需求未直接关联集成测试，由系统测试 ST 覆盖",
+    "FYI: TLA+ L3 聚焦 artifact gate 单一子系统，主循环完整状态机由 L2 覆盖"
+  ]
+}

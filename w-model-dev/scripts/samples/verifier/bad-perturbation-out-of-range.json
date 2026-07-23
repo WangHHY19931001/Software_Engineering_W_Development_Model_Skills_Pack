@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "REQ-001",
+    "reviewedAt": "2026-07-19T00:00:00Z",
+    "agent": "test-agent",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.10
+  },
+  "subCriteria": [
+    {"name": "completeness", "weight": 0.30, "score": 0.80, "rawScores": [0.50, 0.95, 0.95], "variance": 0.045, "evidence": "REQ-001 §3.2"},
+    {"name": "clarity", "weight": 0.25, "score": 0.85, "rawScores": [0.83, 0.85, 0.87], "variance": 0.00026667, "evidence": "REQ-001 §3.2"},
+    {"name": "consistency", "weight": 0.20, "score": 0.88, "rawScores": [0.86, 0.88, 0.90], "variance": 0.00026667, "evidence": "REQ-001 §3.2"},
+    {"name": "testability", "weight": 0.15, "score": 0.80, "rawScores": [0.78, 0.80, 0.82], "variance": 0.00026667, "evidence": "REQ-001 §3.4"},
+    {"name": "traceability", "weight": 0.10, "score": 0.95, "rawScores": [0.93, 0.95, 0.97], "variance": 0.00026667, "evidence": "RTM REQ-001"}
+  ],
+  "compositeScore": 0.8435,
+  "qualityLevel": "B",
+  "summary": "需求覆盖完整、可测试、可追溯。",
+  "passed": true
+}

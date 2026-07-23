@@ -33,7 +33,7 @@
 
 A-cross/A-evolve 合并时：
 
-- 去重跨块重复信息流边（同一条流可能被生产方/消费方各记一次 produces/consumes，合并为一条）。
+- 去重跨块重复信息流边（同一条流可能被生产方/消费方各记一次 produces，合并为一条）。
 - 对疑似信息流违反写入 `reworkHints`，格式：`{chunkId, reason:"SD-003 疑似黑洞：消费 REQ-002 但无 produces 出边"}`。
 - **收敛判定仍由 G 跑 check-requirement-graph.ts 退出码决定**（守护反模式 #12/#13），A 的 reworkHints 仅作指引，不替代脚本判定。
 
@@ -46,6 +46,19 @@ A-cross/A-evolve 合并时：
 ## consolidated.json schema
 
 见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §2.6。
+
+## 阶段快照保留（consolidated-phaseN.json）
+
+> consolidated.json 在阶段演进时须保留各阶段快照，供跨阶段对比与回溯。对应缺陷 D5（历史快照丢失）。
+
+**保留规则**：
+
+- 每个阶段的合并图谱产物保留为独立快照 `consolidated-phaseN.json`（N = 阶段号 1~4）；当前阶段的活态合并图谱仍写入 `consolidated.json`。
+- **阶段演进根树保持**：A-evolve 仅追加当前阶段节点（SD/INTF/DD）与跨阶段边，不删除前阶段节点，系统根（REQ-001）不变（只增不减，根不变）。
+- `cross-analysis-report.md` 可对比相邻阶段快照 `consolidated-phaseN-1.json` → `consolidated-phaseN.json`，呈现本阶段新增节点 / 新增边 / 信息流闭合变化。
+- 快照一旦写入不得修改（append-only 语义）；损坏时从 `consolidated.json` 当前态重建并标注，不得回改历史快照。
+
+**与 graph.json 的关系**：`graph.json` 是 G 子代理校验用的当前态结构图谱；`consolidated-phaseN.json` 是 A 子代理合并产物的阶段历史快照。两者各自独立，`check-requirement-graph.ts` 接受任一作为输入（见 [graph-guide.md](graph-guide.md) 校验脚本节）。
 
 ## 禁止
 

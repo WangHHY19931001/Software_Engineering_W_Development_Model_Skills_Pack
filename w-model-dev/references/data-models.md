@@ -88,6 +88,58 @@ REQUIREMENT 1──* TEST_CASE   (需求生成验收测试)
 DESIGN 1──* TEST_CASE        (设计生成系统/集成/单元测试)
 ```
 
+## 图谱节点与边类型（GraphNode / EdgeType）
+
+> ingestion 子流程图谱模型的节点与边类型。完整节点语义、系统层级树与多层图谱（7 层）校验规则见 [graph-guide.md](graph-guide.md)；本节仅定义数据模型层 schema 与横切边源节点标识 marker。
+> 权威实现（待同步）：[`scripts/graph-logic.ts`](../scripts/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。**注意**：当前 graph-logic.ts 尚未包含本节新增的 `governs` / `derives` 边类型与 `governance` / `derivationProduct` marker（且仍兼容 `consumes`），Task B3 将同步移除 `consumes` 并落地新边类型与 marker；B3 落地前以本节 schema 为准。
+
+### 横切边源节点 marker（GraphNode 扩展）
+
+`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/graph-logic.ts)（B3 同步前不含下方 marker 字段）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 新增两个可选布尔 marker 字段（B3 前以本节定义为 schema 权威）：
+
+```typescript
+// GraphNode 扩展字段（叠加于 graph-logic.ts 现有 GraphNode 之上）
+interface GraphNodeMarkers {
+  /** true = 治理类子系统（横切治理多个子系统，如安全治理节点 S08），允许作为 governs 边的 from */
+  governance?: boolean;
+  /** true = 派生规格节点（由设计事实派生行为规格/接口契约/测试设计的产物，如 S11），允许作为 derives 边的 from */
+  derivationProduct?: boolean;
+}
+```
+
+> 注：上述两个 marker 字段为 **flat 可选字段直接叠加于 `GraphNode`**（非嵌套 `markers` 对象）。B3 实现时写 `node.governance === true` / `node.derivationProduct === true`，而非 `node.markers.governance`。`GraphNodeMarkers` 仅为本文档描述 marker 集合，不引入运行时嵌套层级。
+
+**marker 约定**（供 `graph-logic.ts` 实现 `isGovernanceSubsystem(node)` / `isDerivationProduct(node)` 校验；B3 待实现）：
+
+- `governance === true`：该节点为治理类子系统。仅此类节点允许作为 `governs` 边的 `from`。
+- `derivationProduct === true`：该节点为派生规格节点。仅此类节点允许作为 `derives` 边的 `from`。
+- 两字段均为可选布尔；缺省（`undefined` / `false`）即非该类源节点。
+- 治理类子系统与派生规格节点在系统层级树中仍是普通 `SD` 节点（`type='SD'`），marker 仅用于横切边源校验，**不改变结构层 `parent` 依附**（被治理子系统的 `parent` 仍是系统根；见 [graph-guide.md](graph-guide.md) §7 跨层一致性）。
+- marker 不得用节点 `id` 硬编码识别（如不得写 `node.id === 'SD-5.2.8'`）：`S08` / `S11` 仅作示例，实际项目治理/派生节点由设计文档显式声明，A-evolve 提取时写入对应 marker 字段。
+
+### EdgeType
+
+```typescript
+export type EdgeType =
+  | 'parent' | 'depends-on' | 'implements' | 'defines' | 'realizes'
+  | 'produces'
+  // 已移除：'consumes'（D21：信息流层统一用 produces，双向语义由 from/to 表达）
+  // 新增（多层图谱横切层，见 graph-guide.md §7）
+  | 'governs'           // 治理层：治理类子系统 → 被治理子系统
+  | 'collaborates-with' // 协作层：节点 ↔ 节点 对等协作
+  | 'derives';          // 派生层：派生规格节点 → 派生产物
+```
+
+**边类型与源节点 marker 对应**：
+
+| 边类型 | 源节点（from）要求 | 目标节点（to）要求 | 依附层级树 |
+|---|---|---|---|
+| `governs` | `governance === true`（治理类子系统） | 被治理子系统且存在 | 不依附 |
+| `collaborates-with` | 任意已登记节点（须存在） | 任意已登记节点（须存在） | 不依附 |
+| `derives` | `derivationProduct === true`（派生规格节点） | 派生产物且存在 | 不依附 |
+
+> `consumes` 边类型已废弃（D21）：信息流层统一用 `produces`，双向语义由 `{from, to}` 表达。**当前 `graph-logic.ts` 仍兼容 `consumes`**（视为合法信息流边，B3 待同步移除）；B3 移除 `consumes` 兼容后，历史 `graph.json` 中残留的 `consumes` 边将由 `check-requirement-graph.ts` 报为非法边类型。
+
 ## 与 RTM 的映射
 
 RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm-guide.md)）：
@@ -108,6 +160,31 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 - `status` 随阶段推进更新；阶段切换时同步 `Project.updatedAt`。
 - 测试用例 `type` 与设计来源阶段一一对应（见 SKILL.md 阶段对应表）。
 - 数据可持久化为 JSON 文件或 SQLite，本技能不强制存储介质。
+
+## RTM 字段阶段演进规则
+
+> RTM 各列按阶段递进补加，禁止在早期阶段填写晚期字段（防止「提前填晚期字段」缺陷）。本节是对 [rtm-guide.md](rtm-guide.md)「各阶段登记职责」与「各阶段 RTM 字段更新清单」的阶段演进约束补充；RTM 行字段 schema 见 [`scripts/gate-logic.ts`](../scripts/gate-logic.ts) `RTMRowShape`。
+
+**RTM 行字段阶段演进**（`RTMRowShape`）：
+
+| 字段 | 首次填写阶段 | 说明 |
+|---|---|---|
+| `requirementId` / `description` | 阶段 1 | 需求登记 |
+| `acceptanceTest` | 阶段 1（设计）/ 阶段 8（执行） | 验收测试用例 ID 在阶段 1 设计登记，执行状态在阶段 8 填 |
+| `designDoc`（系统设计） | 阶段 2 | 系统设计文档 SD-N.N.N |
+| `systemTest` | 阶段 2（设计）/ 阶段 7（执行） | 系统测试用例 ID 在阶段 2 设计登记，执行状态在阶段 7 填 |
+| `designDoc`（接口设计，即 interfaceDesign） | 阶段 3 | 接口设计文档在阶段 3 补加到 `designDoc` 列（[rtm-guide.md](rtm-guide.md)「接口设计列」） |
+| `integrationTest` | 阶段 3（设计）/ 阶段 6（执行） | 集成测试用例 ID 在阶段 3 设计登记，执行状态在阶段 6 填 |
+| `designDoc`（详细设计） | 阶段 4 | 详细设计文档在阶段 4 补加到 `designDoc` 列 |
+| `unitTest` | 阶段 4（设计）/ 阶段 5（执行） | 单元测试用例 ID 在阶段 4 设计登记，执行状态在阶段 5 填 |
+| `codeModule` | 阶段 5 | 代码模块文件路径 |
+
+**演进约束**：
+
+- `interfaceDesign`（接口设计，对应 `designDoc` 列的阶段 3 子条目）在阶段 3 才补加——阶段 1/2 不得预先填写接口设计文档。
+- `integrationTest` 字段在阶段 3 设计登记（用例 ID `IT-NNN`），执行状态在阶段 6 填写——阶段 3 不得预先填「通过 / 失败」执行状态。
+- **不得在早期阶段填写晚期字段**：如阶段 1/2 不得填 `codeModule`（阶段 5）、不得填 `integrationTest` 执行状态（阶段 6）、不得填 `unitTest` 执行状态（阶段 5）；早期阶段仅登记该阶段「设计」职责对应的用例 ID，不预填「执行」状态。
+- `coverageStatus` 仅用于展示，门禁脚本从原始字段重算（见 [rtm-guide.md](rtm-guide.md) 覆盖率算法）；手工预填 `100%` 不被信任。
 
 ## 数据迁移与异常处理（边界条件）
 
@@ -240,6 +317,7 @@ interface BudgetConfig {
 - `budget.json` 由编排者 O 维护，属"状态读写+持久化"允许动作（非实施，不触发反模式 #10）。
 - 编排者在每个阶段门放行前执行预算检查（汇总 `run-log.jsonl` 中本阶段/全项目 tokens），超限按 `onExceed` 处置。
 - `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4）。
+- `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐：当 `project.updatedAt > budget.createdAt` 时须满足 `budget.updatedAt > budget.createdAt`，否则报「阶段推进但 budget 未更新」。
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
 
 ## 运行日志模型（run-log.jsonl）
@@ -270,6 +348,8 @@ interface RunLogEntry {
   subagentSpawns: number;
   /** 门禁脚本退出码（仅 gate/tla-gate/graph-gate/checkpoint 类动作填写；其他为 null） */
   gateExitCode: number | null;
+  /** 门禁脚本 stdout 存档路径（gate/tla-gate/graph-gate 类动作必填；G 子代理将脚本 stdout 归档到 gate-logs/，本字段记录路径供 check-run-log.ts 交叉校验退出码防伪造，见 SSoT §10E） */
+  gateLogPath?: string;
   /** 结果 */
   outcome: 'success' | 'fail' | 'rework' | 'escalate' | 'blocked' | 'cancelled';
   /** 阶段门放行时（action=checkpoint & outcome=success），用户填写的理解证据（见 §10.6 第六维度） */

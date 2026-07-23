@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "shell-agent-wm-001",
+  "level": "L5",
+  "leveledUpAt": "2026-07-23T18:00:00Z",
+  "unlockConditions": {
+    "stableDays": 0,
+    "completedCycles": 0,
+    "attemptCapRate": 0,
+    "misjudgeRate": 0,
+    "operationalFailures": 0
+  },
+  "history": [
+    {
+      "at": "2026-07-23T18:00:00Z",
+      "from": "L0",
+      "to": "L5",
+      "reason": "测试非法级别"
+    }
+  ],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 3,
+    "userRequested": false
+  }
+}

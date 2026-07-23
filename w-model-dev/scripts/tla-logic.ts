@@ -49,6 +49,10 @@ export interface TlaSpec {
   invariantsHold: boolean;
   stateExplosion: boolean;
   lastCheckTimestamp?: string;
+  /** .tla 文件文本内容（可选；CLI 读取后注入，供 cfg-tla 一致性等纯逻辑校验使用） */
+  tlaContent?: string;
+  /** .cfg 文件文本内容（可选；CLI 读取后注入，供 cfg 结构/一致性纯逻辑校验使用） */
+  cfgContent?: string;
 }
 
 export interface TlaManifest {
@@ -57,6 +61,11 @@ export interface TlaManifest {
   currentPhase: number;
   tools: { jarPath: string; javaMinVersion: number };
   specs: TlaSpec[];
+  /**
+   * graph.json 中所有 type=SD 节点的 ID 列表（可选；CLI 通过 --graph 提取后注入，
+   * 供 SD 覆盖率纯逻辑校验使用）。未提供时跳过覆盖率校验。
+   */
+  graphSdNodes?: string[];
   checkRounds?: Array<{
     phase: number;
     round: number;
@@ -86,6 +95,12 @@ export interface TlaCheckResult {
   deadlockViolations: string[];
   invariantViolations: string[];
   stateExplosionSpecs: string[];
+  /** SD 覆盖率违反（graphSdNodes 中未被任何 spec 覆盖的 SD 列表，见 §10） */
+  coverageViolations: string[];
+  /** .cfg 与 .tla BusinessInvariant 不变式集合不一致违反（见 §11） */
+  cfgConsistencyViolations: string[];
+  /** .cfg 结构违反（如混入 MODULE 声明、INVARIANT 行格式错误，见 §12） */
+  cfgStructureViolations: string[];
   environmentOk: boolean;
   environmentErrors: string[];
   violations: string[];
@@ -133,6 +148,72 @@ function levelNum(level: string): number {
   const m = /^L(\d+)$/.exec(level);
   if (!m) return -1;
   return Number.parseInt(m[1], 10);
+}
+
+/**
+ * 剥离 TLA+/cfg 注释（§11 要求容忍注释与空白差异）：
+ *   - 块注释 `(* ... *)`（可跨行，非贪婪）
+ *   - 行注释 `\* ...`（至行尾）
+ * 注释内容替换为单个空格，避免注释剥离后相邻 token 粘连。
+ */
+function stripComments(s: string): string {
+  if (typeof s !== 'string' || s.length === 0) return '';
+  return s
+    .replace(/\(\*[\s\S]*?\*\)/g, ' ')
+    .replace(/\\\*[^\n]*/g, ' ');
+}
+
+/**
+ * 解析 .cfg 中的不变式名集合（§11 两种合法形式）：
+ *   - 形式1：`INVARIANTS` 关键字后跟列表（同行或后续缩进行）
+ *   - 形式2：逐行 `INVARIANT <Name>`（单行单不变式）
+ * 列表块在遇到已知 cfg 段落关键字（SPECIFICATION/INIT/NEXT/...）或空行时结束。
+ */
+function parseCfgInvariantNames(cfgContent: string): string[] {
+  const names: string[] = [];
+  const lines = (cfgContent ?? '').split('\n');
+  let inList = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line === '') {
+      inList = false;
+      continue;
+    }
+    // 形式2：逐行 INVARIANT <Name>（排除 INVARIANTS 关键字行）
+    const single = line.match(/^INVARIANT\s+(\S+)/i);
+    if (single && !/^INVARIANTS\b/i.test(line)) {
+      inList = false;
+      names.push(single[1]);
+      continue;
+    }
+    // 形式1：INVARIANTS 关键字（同行带名 或 后续行带名）
+    const listHead = line.match(/^INVARIANTS\s*(.*)$/i);
+    if (listHead) {
+      inList = true;
+      const rest = listHead[1];
+      if (rest.trim() !== '') {
+        for (const n of rest.split(/[\s,]+/).filter(s => s.trim() !== '')) {
+          names.push(n.trim());
+        }
+      }
+      continue;
+    }
+    // 列表块内的后续行：已知 cfg 关键字结束列表，否则视为不变式名
+    if (inList) {
+      if (
+        /^(SPECIFICATION|INIT|NEXT|CONSTRAINT|CONSTRAINTS|ACTION_CONSTRAINT|SYMMETRY|VIEW|POSTCONDITION|CHECK_DEADLOCK|CHECK_FINAL|ALIAS)\b/i.test(
+          line,
+        )
+      ) {
+        inList = false;
+        continue;
+      }
+      for (const n of line.split(/[\s,]+/).filter(s => s.trim() !== '')) {
+        names.push(n.trim());
+      }
+    }
+  }
+  return names;
 }
 
 // ==================== 文件头解析与校验 ====================
@@ -435,6 +516,131 @@ export function checkDecomposition(
   return { violations, warnings };
 }
 
+// ==================== SD 覆盖率 / cfg 一致性 / cfg 结构校验 ====================
+
+/**
+ * SD 覆盖率校验（tla-plus-guide.md §10）：
+ *   - 每个 SD 节点须被至少一个 TLA+ spec 覆盖；未覆盖 → violation
+ *   - 覆盖判定（满足任一）：
+ *       1. spec.requirementIds 含该 SD 关联的 REQ ID（操作化口径：rid 与 sd 互为子串）
+ *       2. spec.designRef 引用该 SD 对应设计文档（designRef 字符串含 sd）
+ *
+ * 边界：graphSdNodes 为空数组或 undefined 时由调用方跳过（不进入本函数）。
+ *
+ * @param specs        待校验的规格数组（通常为 phase 过滤后的子集）
+ * @param graphSdNodes graph.json 中所有 type=SD 节点的 ID 列表
+ * @returns { passed, violations }
+ */
+export function checkCoverage(
+  specs: TlaSpec[],
+  graphSdNodes: string[],
+): { passed: boolean; violations: string[] } {
+  const violations: string[] = [];
+  if (!Array.isArray(specs) || !Array.isArray(graphSdNodes)) {
+    violations.push('checkCoverage: specs 与 graphSdNodes 必须为数组');
+    return { passed: false, violations };
+  }
+  const coveredSds = new Set<string>();
+  for (const spec of specs) {
+    for (const sd of graphSdNodes) {
+      if (
+        (spec.requirementIds ?? []).some(rid => sd.includes(rid) || rid.includes(sd)) ||
+        (typeof spec.designRef === 'string' && spec.designRef.includes(sd))
+      ) {
+        coveredSds.add(sd);
+      }
+    }
+  }
+  const uncovered = graphSdNodes.filter(sd => !coveredSds.has(sd));
+  if (uncovered.length > 0) {
+    violations.push(`以下 SD 节点未被任何 TLA+ spec 覆盖: ${uncovered.join(', ')}`);
+  }
+  return { passed: violations.length === 0, violations };
+}
+
+/**
+ * cfg-tla 不变式一致性校验（tla-plus-guide.md §11）：
+ *   - .cfg 的 INVARIANTS 列表须与 .tla 中 BusinessInvariant 展开的子不变式集合**完全相等**
+ *   - .tla 中 `BusinessInvariant == /\ Inv1 /\ Inv2` → 展开集合 {Inv1, Inv2}
+ *   - 解析前剥离 `\*` 行注释与 `(* *)` 块注释及多余空白，再做集合比较
+ *   - .cfg 缺失或多余不变式 → violation
+ *
+ * @param tlaContent .tla 文件文本内容
+ * @param cfgContent .cfg 文件文本内容
+ * @returns { passed, violations }
+ */
+export function checkCfgInvariantsConsistency(
+  tlaContent: string,
+  cfgContent: string,
+): { passed: boolean; violations: string[] } {
+  const violations: string[] = [];
+  const tla = stripComments(tlaContent ?? '');
+  const cfg = stripComments(cfgContent ?? '');
+
+  // 1. 展开 .tla 中 BusinessInvariant 的子不变式集合
+  const tlaInvariants = new Set<string>();
+  const bizMatch = tla.match(
+    /BusinessInvariant\s*==\s*([\s\S]*?)(?=\n\s*====|\n\s*[A-Z][\w]*\s*==)/,
+  );
+  if (bizMatch) {
+    const invRegex = /\/\\\s*([A-Za-z_]\w*)/g;
+    let m: RegExpExecArray | null;
+    while ((m = invRegex.exec(bizMatch[1])) !== null) {
+      tlaInvariants.add(m[1]);
+    }
+  }
+
+  // 2. 解析 .cfg 的不变式集合（支持 INVARIANTS 关键字后跟列表 与 逐行 INVARIANT <Name> 两种形式）
+  const cfgInvariants = new Set<string>();
+  for (const n of parseCfgInvariantNames(cfg)) cfgInvariants.add(n);
+
+  // 3. 集合比较（双向差集）
+  const missing = [...tlaInvariants].filter(i => !cfgInvariants.has(i));
+  const extra = [...cfgInvariants].filter(i => !tlaInvariants.has(i));
+  if (missing.length > 0) violations.push(`.cfg 缺失不变式: ${missing.join(', ')}`);
+  if (extra.length > 0) violations.push(`.cfg 多余不变式: ${extra.join(', ')}`);
+  return { passed: violations.length === 0, violations };
+}
+
+/**
+ * cfg 结构校验（tla-plus-guide.md §12）：
+ *   - .cfg 禁止含 `---- MODULE <Name> ----`（.tla 头部语法，混入 .cfg 触发 TLC 解析错误）
+ *   - INVARIANT 行格式：`INVARIANT <Name>`（单行单不变式）或 `INVARIANTS` 关键字后跟列表
+ *   - 返回不变式数量计数供跨产物交叉校验
+ *
+ * @param cfgContent .cfg 文件文本内容
+ * @returns { passed, violations, invariantCount }
+ */
+export function checkCfgStructure(
+  cfgContent: string,
+): { passed: boolean; violations: string[]; invariantCount: number } {
+  const violations: string[] = [];
+  const content = typeof cfgContent === 'string' ? cfgContent : '';
+
+  // 1. 禁止 MODULE 声明
+  if (/----\s*MODULE\s/m.test(content)) {
+    violations.push('.cfg 含 MODULE 声明（这是 .tla 语法，.cfg 不应包含）');
+  }
+
+  // 2. INVARIANT 行格式校验（非 `INVARIANT <Name>` 形式、但以 INVARIANT(S) 开头且无名称 → 错误）
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (
+      /^INVARIANT\s+\S+/i.test(line) === false &&
+      /^INVARIANTS?\s+/i.test(line) &&
+      line.split(/\s+/).length < 2
+    ) {
+      violations.push(`.cfg 第 ${i + 1} 行 INVARIANT 格式错误: "${line}"`);
+    }
+  }
+
+  // 3. 不变式数量计数（供跨产物交叉校验，§12）
+  const invariantCount = parseCfgInvariantNames(content).length;
+
+  return { passed: violations.length === 0, violations, invariantCount };
+}
+
 // ==================== 规格字段结构校验 ====================
 
 /** 校验单个 spec 的字段类型与取值合法性，返回违反消息数组。 */
@@ -515,7 +721,8 @@ function validateSpec(raw: unknown, index: number): string[] {
 /**
  * TLA+ 模型校验主入口（纯逻辑，单点事实源）。
  *
- * 校验 manifest 结构 + 规格字段 + 层次一致性 + 拆解决策 + 声明的 SANY/TLC 结果标志。
+ * 校验 manifest 结构 + 规格字段 + 层次一致性 + 拆解决策 + 声明的 SANY/TLC 结果标志
+ *   + SD 覆盖率 + cfg-tla 一致性 + cfg 结构。
  * 不执行 I/O（读文件、跑 SANY/TLC 由 CLI 完成）。
  *
  * 校验项：
@@ -527,11 +734,14 @@ function validateSpec(raw: unknown, index: number): string[] {
  *        invariantsHold=false ⇒ invariantViolations；stateExplosion=true ⇒ stateExplosionSpecs
  *   4. 层次一致性（checkHierarchy）
  *   5. 拆解决策（checkDecomposition，警告不导致失败）
+ *   6. SD 覆盖率（checkCoverage，§10）：manifest.graphSdNodes 非空时执行，未覆盖 SD → coverageViolations
+ *   7. cfg-tla 一致性 + cfg 结构（§11/§12）：spec 含 tlaContent/cfgContent 时执行，
+ *      不变式集合不一致 → cfgConsistencyViolations；MODULE 声明/格式错误 → cfgStructureViolations
  *
  * 注意：headerViolations / environmentOk / environmentErrors 在纯逻辑中分别留空 / 置真 / 置空，
  *   由 CLI 在执行文件头解析与环境检查后回填，并重算 passed。
  *
- * @param manifest tla-manifest.json 解析后的对象
+ * @param manifest tla-manifest.json 解析后的对象（可选内嵌 graphSdNodes / spec.tlaContent / spec.cfgContent）
  * @param phase    校验阶段，仅校验 spec.phase ≤ phase 的规格
  * @param options  { skipTlc?: boolean } —— 跳过 TLC 相关标志校验（快速反馈用）
  * @returns TlaCheckResult
@@ -554,6 +764,9 @@ export function checkTlaModel(
     deadlockViolations: [],
     invariantViolations: [],
     stateExplosionSpecs: [],
+    coverageViolations: [],
+    cfgConsistencyViolations: [],
+    cfgStructureViolations: [],
     environmentOk: true,
     environmentErrors: [],
     violations: [],
@@ -635,7 +848,27 @@ export function checkTlaModel(
   const decomp = checkDecomposition(checkedSpecs);
   result.decompositionViolations = decomp.violations;
 
-  // 6. 汇总 violations（headerViolations 与环境错误由 CLI 回填后追加）
+  // 6. SD 覆盖率校验（§10）：manifest 提供 graphSdNodes 且非空时执行
+  if (Array.isArray(m.graphSdNodes) && m.graphSdNodes.length > 0) {
+    const coverage = checkCoverage(checkedSpecs, m.graphSdNodes);
+    result.coverageViolations = coverage.violations;
+  }
+
+  // 7. cfg-tla 一致性 + cfg 结构校验（§11/§12）：每个含 tlaContent/cfgContent 的 spec 单独校验
+  for (const s of checkedSpecs) {
+    if (typeof s.tlaContent === 'string' && typeof s.cfgContent === 'string') {
+      const cons = checkCfgInvariantsConsistency(s.tlaContent, s.cfgContent);
+      for (const v of cons.violations) {
+        result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
+      }
+      const struct = checkCfgStructure(s.cfgContent);
+      for (const v of struct.violations) {
+        result.cfgStructureViolations.push(`规格 ${s.id}: ${v}`);
+      }
+    }
+  }
+
+  // 8. 汇总 violations（headerViolations 与环境错误由 CLI 回填后追加）
   result.violations.push(...result.hierarchyViolations);
   result.violations.push(...result.decompositionViolations);
   result.violations.push(...result.syntaxErrors);
@@ -644,8 +877,11 @@ export function checkTlaModel(
   for (const id of result.stateExplosionSpecs) {
     result.violations.push(`规格 ${id} 状态爆炸（stateExplosion=true），须拆解后重跑`);
   }
+  result.violations.push(...result.coverageViolations);
+  result.violations.push(...result.cfgConsistencyViolations);
+  result.violations.push(...result.cfgStructureViolations);
 
-  // 7. passed 判定（headerViolations 此时为空，environmentOk 为真；CLI 回填后须重算）
+  // 9. passed 判定（headerViolations 此时为空，environmentOk 为真；CLI 回填后须重算）
   result.passed =
     result.environmentOk &&
     result.headerViolations.length === 0 &&
@@ -655,6 +891,9 @@ export function checkTlaModel(
     result.deadlockViolations.length === 0 &&
     result.invariantViolations.length === 0 &&
     result.stateExplosionSpecs.length === 0 &&
+    result.coverageViolations.length === 0 &&
+    result.cfgConsistencyViolations.length === 0 &&
+    result.cfgStructureViolations.length === 0 &&
     result.violations.length === 0;
 
   return result;

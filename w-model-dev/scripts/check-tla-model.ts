@@ -8,13 +8,14 @@
  *   （死锁 / 不变式违反 / 状态爆炸）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--skip-tlc]
+ *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>]
  *
  * 参数：
  *   tla-manifest.json   manifest 文件路径
  *   --phase=N            只校验 spec.phase ≤ N 的规格（1-8），默认从 manifest.currentPhase 读取
  *   --spec=<id>          仅对该规格执行 SANY/TLC（调试用；结构/层次校验仍覆盖全部 phase 内规格）
  *   --skip-tlc           只跑文件头 + 层次一致性 + SANY 语法检查，跳过 TLC（阶段门放行前不可跳过）
+ *   --graph=<graph.json> 提供图谱文件，提取 type=SD 节点 ID 供 SD 覆盖率校验（§10）
  *
  * 退出码：
  *   0  校验通过（环境就绪 + 头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反）
@@ -45,6 +46,7 @@ interface ParsedArgs {
   phase: number | undefined;
   specId: string | undefined;
   skipTlc: boolean;
+  graphFile: string | undefined;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -53,6 +55,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const phaseArg = args.find(a => a.startsWith('--phase='));
   const specArg = args.find(a => a.startsWith('--spec='));
   const skipTlc = args.includes('--skip-tlc');
+  const graphArg = args.find(a => a.startsWith('--graph='));
 
   let phase: number | undefined;
   if (phaseArg) {
@@ -64,7 +67,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     specId = specArg.split('=')[1];
   }
 
-  return { manifestFile, phase, specId, skipTlc };
+  const graphFile = graphArg ? graphArg.split('=')[1] : undefined;
+
+  return { manifestFile, phase, specId, skipTlc, graphFile };
 }
 
 // ==================== 环境检查 ====================
@@ -289,11 +294,11 @@ function runTools(
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  const { manifestFile, phase: phaseArg, specId, skipTlc } = parseArgs(process.argv);
+  const { manifestFile, phase: phaseArg, specId, skipTlc, graphFile } = parseArgs(process.argv);
 
   if (!manifestFile) {
     console.error(
-      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc]',
+      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>]',
     );
     process.exit(2);
   }
@@ -348,6 +353,34 @@ async function main(): Promise<void> {
   const env = await checkEnvironment(tools.jarPath, tools.javaMinVersion);
   const jarAbs = path.resolve(tools.jarPath);
 
+  // 提取 graph SD 节点（供 checkCoverage 校验 TLA+ 子系统覆盖率，§10）
+  let graphSdNodes: string[] | undefined;
+  if (graphFile) {
+    const graphAbs = path.resolve(graphFile);
+    let graphRaw: string;
+    try {
+      graphRaw = await fs.readFile(graphAbs, 'utf-8');
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'ENOENT') {
+        console.error(`✗ --graph 文件不存在: ${graphAbs}`);
+        process.exit(2);
+      }
+      throw err;
+    }
+    let graphParsed: unknown;
+    try {
+      graphParsed = JSON.parse(graphRaw);
+    } catch {
+      console.error(`✗ --graph 文件解析失败（非合法 JSON）: ${graphAbs}`);
+      process.exit(2);
+    }
+    const g = graphParsed as { nodes?: Array<{ id: string; type: string }> };
+    if (Array.isArray(g.nodes)) {
+      graphSdNodes = g.nodes.filter(n => n.type === 'SD').map(n => n.id);
+    }
+  }
+
   // 收集 headerViolations（需读 .tla 文件 + parseTlaHeader + validateHeader）
   const headerViolations: string[] = [];
   const specs: TlaSpec[] = Array.isArray(manifest.specs) ? (manifest.specs as TlaSpec[]) : [];
@@ -377,17 +410,24 @@ async function main(): Promise<void> {
         spec.syntaxChecked = false; // 标记未通过，供纯逻辑捕获
         continue;
       }
+      spec.tlaContent = content; // 供 checkCfgInvariantsConsistency 使用（§11）
       const header = parseTlaHeader(content);
       headerViolations.push(...validateHeader(header, spec));
 
       // 清理轨迹文件（每轮 TLC 运行前硬约束）
       await cleanTraceFiles(tlaDir);
 
-      // 读 .cfg 存在性（TLC 需要）
+      // 读 .cfg 内容（TLC 需要 + 新增供 checkCfgInvariantsConsistency/checkCfgStructure 使用，§11/§12）
       try {
-        await fs.access(cfgAbs);
-      } catch {
-        headerViolations.push(`规格 ${spec.id} 的 .cfg 文件不存在: ${cfgAbs}`);
+        const cfgContent = await fs.readFile(cfgAbs, 'utf-8');
+        spec.cfgContent = cfgContent;
+      } catch (err) {
+        const e = err as NodeJS.ErrnoException;
+        if (e.code === 'ENOENT') {
+          headerViolations.push(`规格 ${spec.id} 的 .cfg 文件不存在: ${cfgAbs}`);
+        } else {
+          headerViolations.push(`规格 ${spec.id} 的 .cfg 文件读取失败: ${e.message}`);
+        }
       }
 
       // SANY + TLC
@@ -408,7 +448,12 @@ async function main(): Promise<void> {
     }
   }
 
-  // 调用纯逻辑校验（manifest 已被本脚本按实际工具结果回填标志）
+  // 填入 graphSdNodes 供 checkCoverage 使用（§10）
+  if (graphSdNodes !== undefined) {
+    (parsed as Partial<TlaManifest>).graphSdNodes = graphSdNodes;
+  }
+
+  // 调用纯逻辑校验（manifest 已被本脚本按实际工具结果回填标志 + tlaContent/cfgContent/graphSdNodes）
   const result = checkTlaModel(parsed, phase, { skipTlc });
 
   // 回填纯逻辑无法判定的部分：headerViolations + 环境
@@ -439,6 +484,9 @@ async function main(): Promise<void> {
   console.log(`死锁违反      : ${result.deadlockViolations.length === 0 ? '无' : `${result.deadlockViolations.length} 条`}`);
   console.log(`不变式违反    : ${result.invariantViolations.length === 0 ? '无' : `${result.invariantViolations.length} 条`}`);
   console.log(`状态爆炸规格  : ${result.stateExplosionSpecs.length === 0 ? '无' : result.stateExplosionSpecs.join(', ')}`);
+  console.log(`覆盖率违反    : ${result.coverageViolations.length === 0 ? '无' : `${result.coverageViolations.length} 条`}`);
+  console.log(`CFG 一致性    : ${result.cfgConsistencyViolations.length === 0 ? '无' : `${result.cfgConsistencyViolations.length} 条`}`);
+  console.log(`CFG 结构      : ${result.cfgStructureViolations.length === 0 ? '无' : `${result.cfgStructureViolations.length} 条`}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -455,12 +503,15 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
+  // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
+  const exitCode = result.passed ? 0 : 1;
   console.log('─'.repeat(60));
   console.log(
     'TLA_JSON ' +
       JSON.stringify({
         type: 'tla-model',
         passed: result.passed,
+        exitCode,
         phase: result.phase,
         totalSpecs: result.totalSpecs,
         checkedSpecs: result.checkedSpecs,
@@ -471,6 +522,9 @@ async function main(): Promise<void> {
         deadlockViolations: result.deadlockViolations,
         invariantViolations: result.invariantViolations,
         stateExplosionSpecs: result.stateExplosionSpecs,
+        coverageViolations: result.coverageViolations,
+        cfgConsistencyViolations: result.cfgConsistencyViolations,
+        cfgStructureViolations: result.cfgStructureViolations,
         environmentOk: result.environmentOk,
         environmentErrors: result.environmentErrors,
         violations: result.violations,
@@ -478,7 +532,7 @@ async function main(): Promise<void> {
       }),
   );
 
-  process.exit(result.passed ? 0 : 1);
+  process.exit(exitCode);
 }
 
 main().catch(err => {

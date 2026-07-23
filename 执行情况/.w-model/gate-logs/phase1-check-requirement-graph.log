@@ -1,0 +1,21 @@
+============================================================
+图谱校验（Requirement Graph Checker）— 阶段 1 需求分析
+============================================================
+执行时间: 2026-07-23T01:00:00Z
+输入文件: d:/w_skill_opt/执行情况/.w-model/graph.json
+校验阶段: 1
+------------------------------------------------------------
+节点总数      : 63
+边总数        : 157
+连通分量      : 1
+孤立节点      : 无
+根节点        : REQ-001
+orphan        : 无
+multiParent   : 无
+追溯违反      : (阶段1不检查 SD/INTF/DD 追溯)
+信息流违反    : blackHoles=[], miracles=[], deadModules=[]
+边界完整性    : EXT-IN=7, EXT-OUT=6, complete=true
+校验结果      : ✓ 通过
+------------------------------------------------------------
+图谱结构符合 graph-guide.md：连通 + 单根 + 父唯一 + 阶段追溯完整。
+SCRIPT_JSON {"type":"requirement-graph","passed":true,"exitCode":0,"phase":1,"totalNodes":63,"totalEdges":157,"connectedComponents":1,"roots":["REQ-001"],"isolatedNodes":[],"orphans":[],"multiParent":[],"dataflowViolations":{"blackHoles":[],"miracles":[],"deadModules":[]},"boundary":{"extIn":7,"extOut":6,"complete":true}}

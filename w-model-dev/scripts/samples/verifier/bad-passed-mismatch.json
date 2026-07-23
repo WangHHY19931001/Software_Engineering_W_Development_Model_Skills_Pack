@@ -10,11 +10,11 @@
     "varianceThreshold": 0.10
   },
   "subCriteria": [
-    {"name": "completeness", "weight": 0.30, "score": 0.30, "rawScores": [0.30, 0.30, 0.30], "variance": 0, "evidence": "L1"},
-    {"name": "clarity", "weight": 0.25, "score": 0.30, "rawScores": [0.30, 0.30, 0.30], "variance": 0, "evidence": "L2"},
-    {"name": "consistency", "weight": 0.20, "score": 0.30, "rawScores": [0.30, 0.30, 0.30], "variance": 0, "evidence": "L3"},
-    {"name": "testability", "weight": 0.15, "score": 0.30, "rawScores": [0.30, 0.30, 0.30], "variance": 0, "evidence": "L4"},
-    {"name": "traceability", "weight": 0.10, "score": 0.30, "rawScores": [0.30, 0.30, 0.30], "variance": 0, "evidence": "L5"}
+    {"name": "completeness", "weight": 0.30, "score": 0.30, "rawScores": [0.29, 0.30, 0.31], "variance": 0.0000667, "evidence": "L1"},
+    {"name": "clarity", "weight": 0.25, "score": 0.30, "rawScores": [0.29, 0.30, 0.31], "variance": 0.0000667, "evidence": "L2"},
+    {"name": "consistency", "weight": 0.20, "score": 0.30, "rawScores": [0.29, 0.30, 0.31], "variance": 0.0000667, "evidence": "L3"},
+    {"name": "testability", "weight": 0.15, "score": 0.30, "rawScores": [0.29, 0.30, 0.31], "variance": 0.0000667, "evidence": "L4"},
+    {"name": "traceability", "weight": 0.10, "score": 0.30, "rawScores": [0.29, 0.30, 0.31], "variance": 0.0000667, "evidence": "L5"}
   ],
   "compositeScore": 0.3,
   "qualityLevel": "D",

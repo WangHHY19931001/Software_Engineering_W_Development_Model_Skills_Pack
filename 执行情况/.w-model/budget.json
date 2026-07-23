@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "shell-agent-wm-001",
+  "createdAt": "2026-07-23T00:00:00Z",
+  "updatedAt": "2026-07-23T18:00:00Z",
+  "perPhase": {
+    "maxTokens": 500000,
+    "maxSubagentSpawns": 30,
+    "maxReworkRounds": 3
+  },
+  "project": {
+    "maxTokensTotal": 4000000,
+    "maxTokensPerSession": 1000000
+  },
+  "onExceed": "pause",
+  "killSwitch": {
+    "consecutiveReworks": 3,
+    "budgetBurnRate": 0.9,
+    "tlaReworks": 3
+  }
+}

@@ -1,14 +1,18 @@
 {
   "version": 1,
   "currentPhase": 1,
-  "rootId": null,
+  "rootId": "REQ-001",
   "nodes": [
-    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
-    {"id":"REQ-001","type":"REQ","phase":1,"title":"登录","summary":"s"},
-    {"id":"REQ-002","type":"REQ","phase":1,"title":"孤立orphan","summary":"有 depends-on 但无 parent"}
+    {"id":"REQ-001","type":"REQ","phase":1,"title":"系统根","summary":"单 REQ 根"},
+    {"id":"SD-001","type":"SD","phase":2,"title":"子系统A","summary":"有 parent 依附系统根"},
+    {"id":"SD-002","type":"SD","phase":2,"title":"孤立子系统","summary":"无 parent 边，orphan 子系统"},
+    {"id":"EXT-IN-001","type":"EXT-IN","phase":1,"title":"外部输入","summary":"外部信息源"},
+    {"id":"EXT-OUT-001","type":"EXT-OUT","phase":1,"title":"外部输出","summary":"外部信息汇"}
   ],
   "edges": [
-    {"from":"REQ-ROOT","to":"REQ-001","type":"parent"},
-    {"from":"REQ-002","to":"REQ-001","type":"depends-on"}
+    {"from":"REQ-001","to":"SD-001","type":"parent"},
+    {"from":"SD-002","to":"SD-001","type":"depends-on"},
+    {"from":"EXT-IN-001","to":"REQ-001","type":"produces"},
+    {"from":"REQ-001","to":"EXT-OUT-001","type":"produces"}
   ]
 }
