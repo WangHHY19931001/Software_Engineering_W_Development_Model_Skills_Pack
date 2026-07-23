@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "shell-agent-wm-001",
+  "level": "L1",
+  "leveledUpAt": "2026-07-23T18:00:00Z",
+  "unlockConditions": {
+    "stableDays": 0,
+    "completedCycles": 3,
+    "attemptCapRate": 0,
+    "misjudgeRate": 0,
+    "operationalFailures": 0
+  },
+  "history": [
+    {
+      "from": "L0",
+      "to": "L1",
+      "at": "2026-07-23T18:00:00Z",
+      "reason": "3 阶段（需求分析/系统设计/概要设计）稳定完成，图谱/TLA+/Verifier 三门禁全部 exitCode=0 通过"
+    }
+  ],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 2,
+    "userRequested": false
+  }
+}
