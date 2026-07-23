@@ -95,17 +95,20 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
+  // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
+  const exitCode = result.passed ? 0 : 1;
   console.log('─'.repeat(60));
   console.log('VERIFIER_JSON ' + JSON.stringify({
     type: 'verifier-output',
     passed: result.passed,
+    exitCode,
     compositeScore: result.compositeScore,
     expectedCompositeScore: result.expectedCompositeScore,
     qualityLevel: result.qualityLevel,
     reasons: result.reasons,
   }));
 
-  process.exit(result.passed ? 0 : 1);
+  process.exit(exitCode);
 }
 
 main().catch((err) => {
