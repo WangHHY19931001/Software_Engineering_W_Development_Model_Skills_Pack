@@ -55,7 +55,8 @@ export function checkBudget(
   const violations: string[] = [];
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
-  if (!budget || typeof budget !== 'object') {
+  // 注意：typeof [] === 'object' 且 ![] 为 false，数组须显式排除，否则落到 R2 报"schema 不完整"有误导
+  if (!budget || typeof budget !== 'object' || Array.isArray(budget)) {
     return { passed: false, violations: ['budget 必须为对象'] };
   }
   // narrow 为 Partial<BudgetConfig> 用于后续字段访问

@@ -99,6 +99,13 @@ function countReworks(
 async function main(): Promise<void> {
   const { budgetFile, projectFile, runLogFile, phase } = parseArgs(process.argv);
 
+  // --phase 合法性校验：NaN / 越界均 exit(2)，避免 countReworks 中
+  // `NaN !== NaN` 恒为 true 导致所有 run-log 记录被过滤、reworkCount 静默归零
+  if (phase !== undefined && (Number.isNaN(phase) || phase < 1 || phase > 8)) {
+    console.error(`✗ --phase 须为 1-8，实际: ${phase}`);
+    process.exit(2);
+  }
+
   if (!budgetFile) {
     console.error(
       '用法: npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
