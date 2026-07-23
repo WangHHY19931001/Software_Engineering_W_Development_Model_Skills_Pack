@@ -3,10 +3,16 @@
   "currentPhase": 1,
   "rootId": null,
   "nodes": [
-    {"id":"REQ-001","type":"REQ","phase":1,"title":"根A","summary":"s"},
-    {"id":"REQ-002","type":"REQ","phase":1,"title":"根B","summary":"s"}
+    {"id":"REQ-001","type":"REQ","phase":1,"title":"根A","summary":"多根违反"},
+    {"id":"REQ-002","type":"REQ","phase":1,"title":"根B","summary":"多根违反"},
+    {"id":"EXT-IN-001","type":"EXT-IN","phase":1,"title":"外部输入","summary":"外部信息源"},
+    {"id":"EXT-OUT-001","type":"EXT-OUT","phase":1,"title":"外部输出","summary":"外部信息汇"}
   ],
   "edges": [
-    {"from":"REQ-001","to":"REQ-002","type":"depends-on"}
+    {"from":"REQ-001","to":"REQ-002","type":"depends-on"},
+    {"from":"EXT-IN-001","to":"REQ-001","type":"produces"},
+    {"from":"REQ-001","to":"EXT-OUT-001","type":"produces"},
+    {"from":"EXT-IN-001","to":"REQ-002","type":"produces"},
+    {"from":"REQ-002","to":"EXT-OUT-001","type":"produces"}
   ]
 }

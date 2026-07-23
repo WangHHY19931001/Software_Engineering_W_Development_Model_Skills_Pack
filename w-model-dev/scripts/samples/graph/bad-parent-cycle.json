@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "project": "sample-parent-cycle",
+  "currentPhase": 1,
+  "rootId": null,
+  "nodes": [
+    {"id":"REQ-A","type":"REQ","phase":1,"title":"环节点A","summary":"parent 边成环"},
+    {"id":"REQ-B","type":"REQ","phase":1,"title":"环节点B","summary":"parent 边成环"},
+    {"id":"REQ-C","type":"REQ","phase":1,"title":"环节点C","summary":"parent 边成环"}
+  ],
+  "edges": [
+    {"from":"REQ-A","to":"REQ-B","type":"parent"},
+    {"from":"REQ-B","to":"REQ-C","type":"parent"},
+    {"from":"REQ-C","to":"REQ-A","type":"parent"}
+  ]
+}

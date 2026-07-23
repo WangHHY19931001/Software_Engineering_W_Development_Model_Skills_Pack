@@ -11,7 +11,7 @@
   ],
   "edges": [
     {"from":"REQ-ROOT","to":"REQ-001","type":"parent"},
-    {"from":"EXT-IN-001","to":"REQ-ROOT","type":"consumes"},
+    {"from":"EXT-IN-001","to":"REQ-ROOT","type":"produces"},
     {"from":"REQ-ROOT","to":"EXT-OUT-001","type":"produces"}
   ]
 }

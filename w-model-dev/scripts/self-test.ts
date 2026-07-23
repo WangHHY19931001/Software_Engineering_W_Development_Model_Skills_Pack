@@ -188,15 +188,15 @@ const GRAPH_CASES: GraphCase[] = [
     file: 'bad-multi-root.json',
     phase: 1,
     expectedPassed: false,
-    expectedReasonPatterns: [/单根校验失败.*2 个根节点/],
-    description: '两个根节点（depends-on 不构成 parent），应被单根校验拦截',
+    expectedReasonPatterns: [/多根违反/],
+    description: '两个 REQ 根节点（depends-on 不构成 parent），应被单根校验拦截',
   },
   {
     file: 'bad-orphan.json',
     phase: 1,
     expectedPassed: false,
     expectedReasonPatterns: [/单根校验失败/],
-    description: 'REQ-002 无 parent 入边且非唯一根，应被单根/orphan 校验拦截',
+    description: 'SD-002 无 parent 边且为非 REQ 根候选，应被单根/orphan 校验拦截',
   },
   {
     file: 'bad-multi-parent.json',
