@@ -1,0 +1,2 @@
+{"runId":"r1","timestamp":"2026-07-10T02:00:00Z","phase":1,"phaseName":"需求与范围","action":"chunk","role":"A","duration_s":120,"tokens":5000,"estimated":false,"subagentSpawns":0,"gateExitCode":null,"outcome":"success"}
+{"runId":"r2","timestamp":"2026-07-10T01:00:00Z","phase":1,"phaseName":"需求与范围","action":"cross","role":"S","duration_s":60,"tokens":3000,"estimated":false,"subagentSpawns":0,"gateExitCode":null,"outcome":"success"}

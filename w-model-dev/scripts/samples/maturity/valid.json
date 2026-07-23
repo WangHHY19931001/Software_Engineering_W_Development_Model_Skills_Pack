@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "shell-agent-wm-001",
+  "level": "L1",
+  "leveledUpAt": "2026-07-23T18:00:00Z",
+  "unlockConditions": {
+    "stableDays": 30,
+    "completedCycles": 3,
+    "attemptCapRate": 0.85,
+    "misjudgeRate": 0.05,
+    "operationalFailures": 0
+  },
+  "history": [
+    {
+      "at": "2026-07-23T18:00:00Z",
+      "from": "L0",
+      "to": "L1",
+      "reason": "3 阶段稳定完成"
+    }
+  ],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 3,
+    "budgetBurnRateExceeded": 3,
+    "checkpointRejectionStreak": 2,
+    "userRequested": false
+  }
+}
