@@ -195,7 +195,7 @@ const GRAPH_CASES: GraphCase[] = [
     file: 'bad-orphan.json',
     phase: 1,
     expectedPassed: false,
-    expectedReasonPatterns: [/单根校验失败/],
+    expectedReasonPatterns: [/单根校验失败/, /orphan/],
     description: 'SD-002 无 parent 边且为非 REQ 根候选，应被单根/orphan 校验拦截',
   },
   {

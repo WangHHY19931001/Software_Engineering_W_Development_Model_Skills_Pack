@@ -452,13 +452,15 @@ export function checkRequirementGraph(
   for (const n of g.nodes) {
     if (!BUSINESS_TYPES.has(n.type)) continue;
     if ((n.phase ?? 1) > phase) continue;
-    // §3 规则 6：根节点豁免死模块（系统根是系统对外代理，in=0 ∧ out=0 不判死模块）
-    if (singleRoot && n.id === singleRoot.id) continue;
+    // §4.6：根节点豁免死模块（系统根是系统对外代理，in=0 ∧ out=0 不判死模块；不豁免黑洞/奇迹）
+    const isRoot = singleRoot !== null && n.id === singleRoot.id;
     const inFlow = flowInCount.get(n.id) ?? 0;
     const outFlow = flowOutCount.get(n.id) ?? 0;
     if (inFlow === 0 && outFlow === 0) {
-      result.dataflowViolations.deadModules.push(n.id);
-      result.violations.push(`信息流校验失败：死模块 ${n.id}（无信息流经，in=0 out=0）`);
+      if (!isRoot) {
+        result.dataflowViolations.deadModules.push(n.id);
+        result.violations.push(`信息流校验失败：死模块 ${n.id}（无信息流经，in=0 out=0）`);
+      }
     } else if (inFlow === 0 && outFlow > 0) {
       result.dataflowViolations.miracles.push(n.id);
       result.violations.push(`信息流校验失败：奇迹 ${n.id}（只出不进，in=0 out=${outFlow}）`);
