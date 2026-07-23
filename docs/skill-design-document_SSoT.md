@@ -1100,6 +1100,12 @@ DoD 不替代阶段产物的验收标准（见各 [`phase-N-*.md`](../w-model-de
 
 > 第六维度「理解证据」吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念，对抗用户对阶段产物 rubber-stamp。放行 ≠ 理解；acknowledgedDecisions 非空才算放行。
 
+第六维度「理解证据」细化子项（6.1~6.3，由 `check-checkpoint.ts` 强制校验）：
+
+- **6.1 acknowledgedDecisions 非空且含具体技术决策**：`acknowledgedDecisions` 数组须非空，且每条须为具体技术决策摘要（如「选用 JWT 而非 session」「数据模型增加 `deletedAt` 软删字段」），不得为「继续」「确认」「同意」「无意见」等泛化词——泛化词命中 `check-checkpoint.ts` R2 黑名单 → 视为 O4 命中，拒绝放行。
+- **6.2 evidence 可追溯**：评审 `VerifierOutput` 的 `subCriteria[].evidence` 字段引用产物时须标注「路径+行号」（如 `docs/system-design.md#L42-L58`），不得仅引用文件名或泛指「见设计文档」；无行号定位 → `check-checkpoint.ts` 视为证据不可追溯，拒绝放行。
+- **6.3 跨阶段证据一致性**：后阶段 `evidence` 不得否定前阶段已放行项——若阶段 N 评审 evidence 与阶段 N-1 已放行决策矛盾（如阶段 2 设计否定了阶段 1 已确认的 REQ 优先级），须显式回退修正前阶段产物并重跑，不得在后阶段静默推翻；`check-checkpoint.ts` 交叉比对历史 checkpoint 记录，发现矛盾未回退 → 拒绝放行。
+
 DoD 与工件质量门的关系：
 
 - DoD 是「日常标准」：每次 `/wm code` 或 `/wm test` 后自检，不通过则当场修复。
@@ -1205,6 +1211,12 @@ npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|
 - **门禁确认 CHECKPOINT 不可绕过**（约束 2，反模式 #11 同源）。
 - 守护反模式 #14（跳过 SANY 直接 TLC）/ #15（死锁/不变式违反放行）/ #16（占位/简化/错误实现）/ #17（建模不符需求/设计不回退），见 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)。
 
+**追加行为门禁校验项**（在上述校验算法 1~10 之外，`check-tla-model.ts` 须额外强制；任一违反 → exitCode=1）：
+
+- **SD 覆盖率**：每个 SD 节点（graph.json 中 `type=SD`）须被至少一个 TLA+ spec 覆盖——即 `tla-manifest.json.specs[]` 中存在某 spec 的 `requirementIds` 或 `designRef` 引用该 SD 节点（或其所属 REQ/INTF）；存在未被任何 spec 覆盖的 SD 节点 → `sdCoverageViolation`，exitCode=1。
+- **cfg-tla 一致性**：每个 `.cfg` 文件的 `INVARIANTS`（`INVARIANT` 行声明的不变式名集合）须与对应 `.tla` 文件中 `BusinessInvariant` 集合（`THEOREM`/`ASSUME`/显式不变式定义）一致——`INVARIANTS` 多于 `.tla` 定义（引用了不存在的不变式）或少于 `.tla` 定义（遗漏校验）均 → `cfgTlaMismatch`，exitCode=1。
+- **cfg 结构**：`.cfg` 文件禁止含 `MODULE` 声明（`MODULE` 属 `.tla` 头部，混入 `.cfg` 会触发 TLC 解析错误）；`INVARIANT` 行格式须合法（`INVARIANT <Name>`，`<Name>` 为合法 TLA+ 标识符，禁止空值/表达式/注释尾随）——违反 → `cfgStructureViolation`，exitCode=1。
+
 ---
 
 ## 10C. 自主成熟度阶梯（L0~L3）
@@ -1292,6 +1304,15 @@ interface MaturityConfig {
 - **决策型 CHECKPOINT 在所有级别均等用户**：设计方向不可自动决定。
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
 - **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0。
+
+### 10C.7 阶段完成计数与强制校验（check-maturity.ts）
+
+> 历史缺陷：Shell Agent 项目实跑暴露成熟度阶梯的 `unlockConditions.completedCycles` 此前无强制递增机制——编排者可漏更导致成熟度判定失真，成熟度升降级失去客观依据。本节确立阶段完成计数的强制校验。
+> 实现位置：[`w-model-dev/scripts/check-maturity.ts`](../w-model-dev/scripts/check-maturity.ts)（CLI 校验，确定性无 LLM）。
+
+- **阶段完成计数强制递增**：项目每完成一阶段（run-log.jsonl 追加 `action=checkpoint` 且 `outcome=success` 记录后），编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1；漏更 → 计数滞后。
+- **check-maturity.ts 强制校验**：`check-maturity.ts` 须交叉校验 `maturity.json.unlockConditions.completedCycles` 与 run-log.jsonl 中 `action=checkpoint ∧ outcome=success` 记录数——`completedCycles < 实际 checkpoint success 数` 即滞后 → 退出码 1。
+- **滞后即不放行**：校验发现计数滞后时，编排者 O 不得放行当前阶段门（反模式 #9 谎报状态守护）；须先补更 `completedCycles` 再重跑校验至退出码 0。
 
 ---
 
@@ -1394,6 +1415,69 @@ interface RunLogEntry {
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
 - **run-log 是 append-only**：不得修改历史记录；损坏行跳过并记录 note，不停止流程。
+
+### 10D.7 预算与运行日志强制校验项（check-budget.ts / check-run-log.ts）
+
+> 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露预算与运行日志为「纸面机制」——`budget.updatedAt` 不更新、killSwitch 触发无告警、run-log 缺类、返工无记录，且无脚本强制校验，闭环机制失效。本节确立强制校验项。
+> 实现位置：[`w-model-dev/scripts/check-budget.ts`](../w-model-dev/scripts/check-budget.ts) + [`w-model-dev/scripts/check-run-log.ts`](../w-model-dev/scripts/check-run-log.ts)（CLI 校验，确定性无 LLM）。
+
+- **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
+- **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
+- **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
+- **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
+- **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。
+
+---
+
+## 10E. 门禁退出码不可伪（gate-logs 存档与交叉校验）
+
+> 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「门禁脚本退出码可被伪造/丢失」——G 子代理只回填退出码摘要却不存档 stdout，编排者无法交叉核验 `run-log.gateExitCode` 与脚本真实输出是否一致，导致门禁形同虚设。本节确立退出码不可伪的三层防线。
+> 实现位置：各 `w-model-dev/scripts/check-*.ts`（exitCode 字段）+ G 子代理存档职责 + [`w-model-dev/scripts/check-run-log.ts`](../w-model-dev/scripts/check-run-log.ts)（交叉校验 CLI，确定性无 LLM）。
+
+**强制校验项**（E.1~E.4，任一层失败 → exitCode=1，O 不得放行）：
+
+- **E.1 各 check-*.ts 的 JSON 摘要须含 exitCode 字段，与 process.exit() 强一致**：每个门禁脚本 stdout 末尾的证据摘要（`GATE_JSON` / `TLA_JSON` / `GRAPH_JSON` 等）须显式含 `exitCode` 字段，且与脚本最终 `process.exit(code)` 调用的码值完全一致；字段缺失或二者不一致 → 视为校验失败（exitCode=1）。
+- **E.2 G 子代理须将脚本 stdout 完整存档到 `.w-model/gate-logs/phaseN-<script>.log`**：G 子代理跑完每个 `check-*.ts` 后，须把脚本 stdout 原样（含证据摘要 JSON 行）落盘到 `.w-model/gate-logs/phaseN-<script>.log`（如 `phase1-check-tla-model.log`），作为不可篡改的执行凭证；编排者 O 不得放行无对应 gate-log 的阶段门。
+- **E.3 check-run-log.ts 交叉校验 run-log.gateExitCode 与 gate-logs 存档一致**：`check-run-log.ts` 须读取本阶段所有 `gate-logs/phaseN-*.log`，解析其中的 `exitCode`，与 run-log.jsonl 中对应 `action ∈ {gate, tla-gate, graph-gate}` 记录的 `gateExitCode` 逐一比对；任一不一致 → exitCode=1。
+- **E.4 任一层校验失败 → exitCode=1，O 不得放行**：E.1（脚本自身 exitCode 字段缺失/不一致）、E.2（gate-log 缺失）、E.3（run-log 与 gate-log 不一致）三层中任一失败，`check-run-log.ts` 须返回退出码 1，编排者 O 不得放行该阶段门（反模式 #9 谎报状态守护）。
+
+---
+
+## 10.10 系统层级树与多层图谱
+
+> 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
+> 实现位置：[`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md)（结构层扩展）+ [`w-model-dev/scripts/graph-logic.ts`](../w-model-dev/scripts/graph-logic.ts)（校验纯逻辑，单点事实源）+ [`w-model-dev/scripts/check-requirement-graph.ts`](../w-model-dev/scripts/check-requirement-graph.ts)（CLI）。
+
+### 10.10.1 系统层级树
+
+跨阶段的结构主干，由 `parent` 边构成（与同阶段 parent 树正交但兼容）：
+
+- **根 = 系统级 REQ 节点**（如 `REQ-001`），`type=REQ`，为系统层级树唯一根（系统根）。
+- **子系统根 = SD 节点**，通过 `parent` 边依附系统根（`SD.parent → REQ` 系统根）。
+- **接口根 = INTF 节点**，通过 `parent` 边依附子系统根（`INTF.parent → SD` 子系统根）。
+- **层级单调**：`parent` 边只能从 Level N → Level N-1（`REQ=L0` / `SD=L1` / `INTF=L2` / `DD=L3`），禁止跨层或逆向依附；违反 → `hierarchyTreeViolation`，`check-requirement-graph.ts` 退出码 1。
+
+### 10.10.2 多层图谱（7 层）
+
+在系统层级树之上叠加 7 层正交图谱，各层边类型独立校验：
+
+| # | 层 | 边类型 | 语义 | 校验要点 |
+|---|---|---|---|---|
+| 1 | 结构层 | `parent` | 系统层级树依附（见 §10.10.1） | 单根、父唯一、层级单调 |
+| 2 | 依赖层 | `depends-on` | 节点间依赖（SD→SD / INTF→INTF） | 禁止环依赖；依赖目标须存在 |
+| 3 | 追溯层 | `implements` / `defines` / `realizes` | 跨阶段追溯（SD→REQ / SD→INTF / DD→INTF or DD→SD） | 阶段递进追溯（见 §10.7 校验算法 4） |
+| 4 | 信息流层 | `produces`（`consumes` 同义） | 信息流向 | 黑洞/奇迹/死模块校验；**根节点豁免死模块**（系统根无入流合法） |
+| 5 | 治理层 | `governs` | 横切治理（如安全治理节点 governs 多个子系统） | 横切边不依附层级树（见 §10.10.3） |
+| 6 | 协作层 | `collaborates-with` | 对等协作（子系统间对等交互） | 无向语义；两端须对等层级 |
+| 7 | 派生层 | `derives` | 派生规格（如 TLA+ spec derives 自设计节点） | 派生源须存在；派生不替代追溯 |
+
+### 10.10.3 横切设计承载
+
+横切边（`governs` / `collaborates-with` / `derives`，即第 5/6/7 层）的承载规则：
+
+- **横切边不依附系统层级树**：横切边两端节点不通过 `parent` 依附，独立于结构层。
+- **横切边两端节点须存在于层级树**：两端节点须已在系统层级树中登记（REQ/SD/INTF/DD 之一），但不构成 `parent` 关系。
+- **横切边不替代追溯**：被治理子系统的 `parent` 仍是系统根（治理是横切叠加，不改变结构依附）；追溯层（`implements`/`defines`/`realizes`）与横切层并存，互不替代。
 
 ---
 
