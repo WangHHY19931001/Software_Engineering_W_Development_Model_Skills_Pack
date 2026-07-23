@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "design",
+    "target": "docs/shell-agent-system-design.md + docs/shell-agent-system-test.md + .w-model/rtm.json + tla/L1_shell_agent.tla + tla/L2_task_loop.tla",
+    "reviewedAt": "2026-07-23T14:30:00+08:00",
+    "agent": "trae-wm-verifier",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.05
+  },
+  "subCriteria": [
+    {
+      "name": "architecture-soundness",
+      "description": "架构是否合理；分层/模块边界是否清晰",
+      "weight": 0.25,
+      "score": 0.9233,
+      "rawScores": [0.93, 0.92, 0.92],
+      "variance": 0.000022,
+      "evidence": "系统设计 §1.1 C4 组件图采用 Mermaid 分层表达，6 层（交互层/运行时层/治理层/能力层/协调层/状态层）映射 DESIGN.md §5.1 顶层组件图的 6 个逻辑域。§1.2 明确声明「分层+横切治理」混合架构风格，理由充分（DESIGN.md §19 治理模型、事件驱动主循环）。§3 列出 11 个规范性子系统（S01-S11），每个子系统含职责/关键能力/关联需求，与 DESIGN.md §5.2 规范性子系统清单完全对齐。治理系统（S08）作为横切关注点独立层，不依附某一层，符合 DESIGN.md §5.2 第 8 项「Artifact Quality Pipeline 归 S08 Governance」。§3.1 子系统间交互关系图（Mermaid）表达 11 个子系统间的依赖关系。部署架构 §4.1 明确单节点部署模型。分层边界清晰，模块职责无重叠。"
+    },
+    {
+      "name": "requirement-coverage",
+      "description": "是否覆盖所有相关需求；RTM 设计列是否可登记",
+      "weight": 0.25,
+      "score": 0.95,
+      "rawScores": [0.94, 0.95, 0.96],
+      "variance": 0.000067,
+      "evidence": "RTM (.w-model/rtm.json) 包含 50 个 REQ 节点、11 个 SD 设计节点、60 个 UAT + 30 个 ST 测试用例节点。REQ-001 至 REQ-050 每个均有 designDoc（SD-5.2.x）和 systemTest（ST-xxx 数组）字段。11 个 SD 节点（SD-5.2.1 至 SD-5.2.11）每个对应一个子系统，且 SD 节点的 requirementIds 和 systemTestIds 与 REQ 节点的 designDoc/systemTest 字段双向一致。系统测试文档含 30 个用例（ST-001 ~ ST-030），覆盖 6 类：端到端（ST-001~006）、跨模块集成（ST-007~009）、功能子系统（ST-010~013, ST-018~025）、性能基线（ST-014）、安全基线（ST-015~017, ST-026）、边界条件（ST-027~030）。30 个 ST 用例关联 39 个不同 REQ，覆盖率达 78%（39/50），但非核心需求（REQ-032~034, REQ-038, REQ-044, REQ-045, REQ-047~049）由 UAT 覆盖，ST 层聚焦端到端/集成/安全/性能/边界场景，符合系统设计阶段测试策略。RTM 追溯完整，REQ→SD→ST 链路可登记。"
+    },
+    {
+      "name": "interface-consistency",
+      "description": "接口定义是否一致；上下游是否对齐",
+      "weight": 0.20,
+      "score": 0.88,
+      "rawScores": [0.88, 0.89, 0.87],
+      "variance": 0.000067,
+      "evidence": "§3.1 子系统间交互关系图定义了 S01→S02（观测/反思）、S01→S03（规划）、S01→S05（执行）、S05→S08（治理）、S07→S08（治理）等 11 条跨子系统交互边。§1.1 C4 组件图中 TaskLoop→ContextSys/PlanningSys/CapSys/Hook 的数据流方向与 §3.1 交互图一致。TLA+ L1 状态集 {Idle, Observing, Oriented, Planned, Acting, Verifying, Reflecting, Completed, Failed, WaitingApproval, WaitingClarification} 与系统设计 §5 主循环状态机（Idle→Observing→Oriented→Planned→Acting→Verifying→Reflecting→Completed/Failed）一致。TLA+ L2 状态名采用动词形式（Observe, Orient, Plan, Act）而非 L1 的分词形式（Observing, Oriented），但映射关系明确（L1 State → L2 loopPhase 一对一）。L1 的 BusinessInvariant（10 条）在 L2 中扩展为 10 条 L2 专用不变式，核心不变式（NoActWithoutObservation、NoHighRiskActWithoutApproval、NoCompleteWithoutVerification、NoExitTerminal、BudgetNonNegative）保持一致。技术选型 §2 明确接口契约采用 OpenAPI 3.x（DESIGN.md §24 规定），行为规格采用 Gherkin/Cucumber（DESIGN.md §7 规定），MCP 协议接入外部工具（DESIGN.md §17 规定），与上游设计事实一致。"
+    },
+    {
+      "name": "feasibility",
+      "description": "技术选型是否可行；是否存在不可实现项",
+      "weight": 0.15,
+      "score": 0.9,
+      "rawScores": [0.90, 0.91, 0.89],
+      "variance": 0.000067,
+      "evidence": "§2 技术选型决策矩阵覆盖 5 个技术层次（运行时语言、持久化、行为规格/验证、接口契约、MCP 协调），每层提供 ≥2 候选技术，按 5 维度（适用性/成熟度/可维护性/引入成本/风险敞口）评分，满分 25。TypeScript/Node.js（22 分）vs Python（21 分）决策合理——终端环境首选，生态完善，符合 DESIGN.md 无强制约束。JSON+文件系统（22 分）vs SQLite（19 分）选择轻量方案，适合快照/恢复幂等性需求。Gherkin/Cucumber（21 分）与 DESIGN.md §7 强制要求一致。OpenAPI 3.x（22 分）与 DESIGN.md §24 强制要求一致。MCP 协议（19 分）与 DESIGN.md §17 强制要求一致。单节点部署模型（§4.2）降低了部署复杂度。所有技术选型均有明确备选方案对比，决策矩阵 5 维度评分完整。无不可实现项。"
+    },
+    {
+      "name": "testability",
+      "description": "是否可设计对应测试用例（系统/集成/单元）",
+      "weight": 0.15,
+      "score": 0.9333,
+      "rawScores": [0.93, 0.94, 0.93],
+      "variance": 0.000022,
+      "evidence": "系统测试文档（docs/shell-agent-system-test.md）含 30 个用例，结构完整：每个用例含前置条件、测试步骤表（操作/输入/预期输出）、预期结果、执行状态跟踪。端到端场景覆盖完整主循环（ST-001）、执行失败重规划（ST-002）、高风险审批（ST-003）、歧义澄清（ST-004）、预算熔断（ST-005）、中断恢复（ST-006）。跨模块集成测试覆盖 S02+S03（ST-007）、S05+S08（ST-008）、S07+S08（ST-009）。性能基线（ST-014）覆盖主循环单轮延迟 P95 和预算消耗追踪，含 10 次重复测量。安全基线覆盖路径穿越/越权（ST-015）、高风险审批（ST-016）、模型信任边界（ST-017）、Skill 注入治理（ST-026）。边界条件测试覆盖空目标（ST-027）、无观察高副作用（ST-028）、S4 BLOCKER 升级（ST-029）、子 Agent 故障隔离（ST-030）。TLA+ L1（36 行不变式+21 个状态转移）和 L2（47 行不变式+34 个状态转移）为测试提供形式化规格基线，可作为属性测试约束。RTM 中 30 个 ST 用例的 ID 与测试文档一致。测试设计可执行——步骤表结构清晰，预期输出明确，支持自动化实现。"
+    }
+  ],
+  "compositeScore": 0.9193,
+  "qualityLevel": "A",
+  "summary": "本阶段系统设计采用 TypeScript/Node.js + JSON+文件系统持久化 + 单节点部署，11 个规范性子系统（S01-S11），6 层架构（交互/运行时/治理/能力/协调/状态），治理系统横切作用于每层。C4 组件图和部署图完整覆盖系统全貌。30 个系统测试用例覆盖端到端/跨模块/性能基线/安全基线/边界条件 5 大场景。RTM 追溯完整（50 REQ → 11 SD → 30 ST + 60 UAT）。TLA+ L1（主循环状态机，10 条业务不变式）与 L2（细化产物质量门禁，10 条 L2 专用不变式）层次一致，核心不变式 L1→L2 继承。技术选型决策矩阵按 5 维度评分完整。\n\n关键决策：TypeScript 而非 Python（终端工具链优势）、JSON+文件系统而非 SQLite（快照幂等性）、治理系统独立横切层（非子系统集成到运行时）。\n\n遗留风险：性能基线阈值未在需求层冻结（REQ-043 声明「具体数值属于部署配置」），ST-014 中 P95 延迟阈值待阶段 7 k6 实测；TLA+ L2 未建模 S09 快照恢复幂等性（REQ-029）和 S10 观测数据导出（REQ-030），属 L3 细化范围；REQ-038（MCP 生命周期）和 REQ-045（外部服务降级）无 ST 用例直接覆盖，由 UAT-038/UAT-045 覆盖。",
+  "passed": true,
+  "reworkHints": [
+    "FYI: TLA+ L2 可考虑增加 artifactQueue 在 ReflectGateFailRework 中预算扣减与 L1 BudgetExhausted 的一致性不变式，以增强形式化验证深度",
+    "FYI: 系统设计 §3.1 子系统交互关系图为单向箭头，未标注双向交互（如 ContextSys ↔ PlanningSys 在 §1.1 C4 组件图中为双向），建议在 §3.1 中补全双向标注",
+    "FYI: ST-014 性能基线测试步骤中「可接受范围内」未量化具体阈值。建议在阶段 7 执行前由运营方在配置层声明 P95 延迟目标值"
+  ]
+}

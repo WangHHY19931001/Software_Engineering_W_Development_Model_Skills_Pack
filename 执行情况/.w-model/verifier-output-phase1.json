@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "shell-agent-phase-1",
+    "reviewedAt": "2026-07-23T12:00:00+08:00",
+    "agent": "V-subagent (requirements-analyst)",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.05
+  },
+  "subCriteria": [
+    {
+      "name": "completeness",
+      "description": "需求是否完整覆盖 DESIGN.md 设计事实",
+      "weight": 0.30,
+      "score": 0.92,
+      "rawScores": [0.92, 0.91, 0.93],
+      "variance": 0.000067,
+      "evidence": "50 个 REQ 节点全覆盖（39功能/7非功能/4约束），对应 graph.json:L3 (nodes 数组) 50 REQ 节点；docs/shell-agent-requirement-spec.md:L34 (§2.1 功能)、L89 (§2.2 非功能)、L101 (§2.3 约束) 三类需求分类登记。11个规范性子系统（SD-5.2.1~SD-5.2.11）全部覆盖，见 .w-model/rtm.json:L1002 (designs 数组)。风险评估见 docs/shell-agent-risk-assessment.md。缺失项见 docs/shell-agent-requirement-spec.md:L118（缺失项检测 ⚠️，属部署配置/设计层细化范畴）。"
+    },
+    {
+      "name": "clarity",
+      "description": "需求描述是否清晰、验收标准是否可验证",
+      "weight": 0.25,
+      "score": 0.91,
+      "rawScores": [0.90, 0.92, 0.91],
+      "variance": 0.000067,
+      "evidence": "需求分类正确（功能/非功能/约束，见 docs/shell-agent-requirement-spec.md:L34/L89/L101），验收标准格式统一且可验证。非功能需求 REQ-043/044 的量化阈值缺失属设计层细化，已在 docs/shell-agent-requirement-spec.md:L118 (§3 需求完整性检查) 中标注。核心术语（Intent Frame/Task Graph/Artifact Quality Gate/Governed Execution）前后一致。"
+    },
+    {
+      "name": "consistency",
+      "description": "需求间是否一致、无矛盾",
+      "weight": 0.20,
+      "score": 0.95,
+      "rawScores": [0.95, 0.94, 0.96],
+      "variance": 0.000067,
+      "evidence": "未发现需求间矛盾。5 对关键一致性检查（REQ-042 vs REQ-008、REQ-050 vs REQ-010、REQ-024 vs REQ-025、REQ-041 vs REQ-048、REQ-047 vs REQ-048）通过，见 docs/shell-agent-requirement-spec.md:L117 (§3 冲突检测行)。REQ ID 唯一，无孤立/孤儿节点，见 .w-model/graph.json:L3 (nodes) 与 .w-model/rtm.json:L4 (requirements)。"
+    },
+    {
+      "name": "testability",
+      "description": "验收测试是否充分、可执行",
+      "weight": 0.15,
+      "score": 0.88,
+      "rawScores": [0.87, 0.89, 0.88],
+      "variance": 0.000067,
+      "evidence": "60 条 UAT（UAT-001~UAT-060）覆盖所有 50 REQ，见 docs/shell-agent-requirement-spec.md:L132 (§5 验收测试用例索引)、L138 (UAT-001)、L197 (UAT-060)，包含正常+异常+边界路径。部分复杂需求（REQ-027 严重度处置、REQ-036 多 Agent 门禁）的验收标准偏抽象，缺乏具体量化验证条件（见 docs/shell-agent-requirement-spec.md:L64 REQ-027、L73 REQ-036）。"
+    },
+    {
+      "name": "traceability",
+      "description": "需求↔测试↔设计追溯链是否完整",
+      "weight": 0.10,
+      "score": 0.89,
+      "rawScores": [0.88, 0.90, 0.89],
+      "variance": 0.000067,
+      "evidence": "需求规格↔RTM: 50/50 需求 ID 完全匹配，见 docs/shell-agent-requirement-spec.md:L34 (§2.1 REQ 表) ↔ .w-model/rtm.json:L4 (requirements 数组)。需求规格↔验收测试: UAT-001~UAT-060 映射准确，见 docs/shell-agent-requirement-spec.md:L132 (§5 索引)、L138/L197 (UAT-001/UAT-060)。需求规格↔TLA+: tla/L1_shell_agent.tla:L40-42 (StateSet 11 状态) 与 docs/shell-agent-requirement-spec.md:L47 (REQ-010 主循环) 一致；tla/L1_shell_agent.tla:L356-366 (BusinessInvariant 10 条不变式) 对应 docs/shell-agent-requirement-spec.md:L87 (REQ-050 主循环约束)。需求规格↔graph.json: 63 节点/157 边一致，见 .w-model/graph.json:L3 (nodes)/L90 (edges)。"
+    }
+  ],
+  "compositeScore": 0.9145,
+  "qualityLevel": "A",
+  "summary": "阶段 1 需求分析产物质量良好。需求规格忠实反映 DESIGN.md 的 11 个规范性子系统、主循环状态机和治理模型。50 个 REQ 全覆盖，60 条 UAT 覆盖正常+异常+边界。跨产物追溯链完整（需求↔RTM↔TLA+↔graph.json）。遗留量化阈值缺失（MISSING-001~010）不阻塞阶段 1 放行，应在阶段 2 解决。",
+  "passed": true,
+  "reworkHints": [
+    "Optional: REQ-027 验收标准可细化严重度处置值映射",
+    "Optional: REQ-036 建议在 UAT 中补充具体门禁检查步骤",
+    "FYI: 量化阈值缺失属设计层细化，应在阶段 2 解决",
+    "FYI: TLA+ L1 可扩展至子系统级不变式"
+  ]
+}
