@@ -103,13 +103,15 @@ export interface VerifierCheckResult {
   /** 重新计算的期望综合分数（用于与输出对比） */
   expectedCompositeScore: number;
   qualityLevel: string;
+  /** 防漂移警告（非致命，不改变 passed），如 text-parse 扰动范围 < 0.01 */
+  reworkHints?: string[];
 }
 
 // ==================== 工具函数 ====================
 
 const EPSILON = 1e-4;
-/** variance 字段与重算方差的允许误差（浮点比较） */
-const VARIANCE_EPSILON = 1e-4;
+/** variance 字段与重算方差的允许误差（浮点比较；与 verifier-spec.md §3.2.1 规则 2 一致：1e-6） */
+const VARIANCE_EPSILON = 1e-6;
 const MIN_REPEAT_TIMES = 3;
 const MAX_VARIANCE_THRESHOLD = 0.10;
 const SCHEMA_VERSION = '1.0';
@@ -183,6 +185,7 @@ export function checkVerifierOutput(
   raw: unknown,
 ): VerifierCheckResult {
   const reasons: string[] = [];
+  const reworkHints: string[] = [];
 
   if (!raw || typeof raw !== 'object') {
     return {
@@ -323,6 +326,50 @@ export function checkVerifierOutput(
       }
       }
     }
+    // 防漂移规则 1（§3.2.1）：rawScores 全同 = 复制填入作弊（D31）。
+    // 仅 text-parse 模式执行：logits 模式基线样本 valid.json 暂为全同，需先更新基线
+    // 再扩展至 logits（见任务报告 concern）。spec 规则 4 原要求 logits 亦执行规则 1。
+    const dimName = typeof sc.name === 'string' && sc.name.trim() !== ''
+      ? sc.name
+      : `subCriteria[${idx}]`;
+    if (
+      scoringMethod === 'text-parse' &&
+      Array.isArray(sc.rawScores) &&
+      sc.rawScores.length > 1
+    ) {
+      const numericScores = sc.rawScores.filter(isNumber) as number[];
+      if (
+        numericScores.length === sc.rawScores.length &&
+        numericScores.every(v => v === numericScores[0])
+      ) {
+        reasons.push(
+          `维度 ${dimName} 的 rawScores 全同 [${numericScores.join(',')}], 疑似手工填写`,
+        );
+      }
+    }
+
+    // 防漂移规则 3（§3.2.1）：text-parse ±0.05 扰动范围须 ∈ [0.01, 0.10]。
+    // > 0.10 → fail（reasons）；< 0.01 → 警告（reworkHints）。logits 模式豁免（规则 4）。
+    if (
+      scoringMethod === 'text-parse' &&
+      Array.isArray(sc.rawScores) &&
+      sc.rawScores.length > 1
+    ) {
+      const numericScores = sc.rawScores.filter(isNumber) as number[];
+      if (numericScores.length === sc.rawScores.length) {
+        const spread = Math.max(...numericScores) - Math.min(...numericScores);
+        if (spread > 0.10) {
+          reasons.push(
+            `维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} > 0.10, 扰动越界`,
+          );
+        } else if (spread < 0.01) {
+          reworkHints.push(
+            `维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} < 0.01, 疑似未扰动`,
+          );
+        }
+      }
+    }
+
     if (typeof sc.evidence !== 'string' || sc.evidence.trim() === '') {
       reasons.push(`subCriteria[${idx}].evidence 必须为非空字符串（引用目标内具体片段）`);
     }
@@ -436,6 +483,7 @@ export function checkVerifierOutput(
   return {
     passed: reasons.length === 0,
     reasons,
+    reworkHints,
     compositeScore: isNumber(compositeScore) ? compositeScore : 0,
     expectedCompositeScore: expectedComposite,
     qualityLevel: typeof qualityLevel === 'string' ? qualityLevel : 'N/A',
