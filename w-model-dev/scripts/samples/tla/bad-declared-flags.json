@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "project": "tla-sample-bad-declared-flags",
+  "currentPhase": 1,
+  "tools": {
+    "jarPath": "w-model-dev/tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [
+    {
+      "id": "L1-system",
+      "level": "L1",
+      "phase": 1,
+      "system": "sample-system",
+      "requirementIds": ["REQ-001"],
+      "designRef": "docs/requirement-spec.md#§3",
+      "tlaPath": "tla/L1-system.tla",
+      "cfgPath": "tla/L1-system.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 240,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": true,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": true
+    }
+  ],
+  "checkRounds": []
+}

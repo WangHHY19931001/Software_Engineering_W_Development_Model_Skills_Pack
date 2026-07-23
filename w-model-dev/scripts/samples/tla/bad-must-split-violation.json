@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "project": "tla-sample-bad-must-split-violation",
+  "currentPhase": 1,
+  "tools": {
+    "jarPath": "w-model-dev/tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [
+    {
+      "id": "L1-mega-system",
+      "level": "L1",
+      "phase": 1,
+      "system": "mega-system",
+      "requirementIds": ["REQ-001"],
+      "designRef": "docs/requirement-spec.md#§3",
+      "tlaPath": "tla/L1-mega-system.tla",
+      "cfgPath": "tla/L1-mega-system.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 50000,
+      "decompositionDecision": "consider-split",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    }
+  ],
+  "checkRounds": []
+}

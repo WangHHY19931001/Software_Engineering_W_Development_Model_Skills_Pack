@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "project": "tla-e2e-syntax-error-fail",
+  "currentPhase": 1,
+  "tools": {
+    "jarPath": "../../../tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [
+    {
+      "id": "L1-syntax-error",
+      "level": "L1",
+      "phase": 1,
+      "system": "smoketest",
+      "requirementIds": [],
+      "designRef": "",
+      "tlaPath": "SyntaxError.tla",
+      "cfgPath": "SyntaxError.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 2,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    }
+  ],
+  "checkRounds": []
+}

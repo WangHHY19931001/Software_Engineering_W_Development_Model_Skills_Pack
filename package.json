@@ -9,6 +9,7 @@
     "check:verifier": "tsx w-model-dev/scripts/check-verifier-output.ts",
     "check:gate": "tsx w-model-dev/scripts/check-artifact-gate.ts",
     "check:graph": "tsx w-model-dev/scripts/check-requirement-graph.ts",
+    "check:tla": "tsx w-model-dev/scripts/check-tla-model.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
     "prepush": "PREPUSH_FORCE=1 bash .githooks/pre-push"
   },

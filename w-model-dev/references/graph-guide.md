@@ -80,3 +80,16 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json|consolidated
 ```
 
 退出码 0=通过 / 1=失败 / 2=输入错误。算法详见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §3.2。
+
+## 与 TLA+ 行为门禁的关系
+
+图谱门禁（本文件）管**静态结构拓扑**（连通/单根/父唯一/追溯 + 信息流闭合），TLA+ 行为门禁管**动态行为正确性**（状态机/不变式/死锁）。两者**正交**，是阶段 1–4 的两个独立门禁维度：
+
+| 维度 | 校验什么 | 产物 | 门禁脚本 |
+|---|---|---|---|
+| 结构 + 信息流（本文件） | 节点归属单根树 + 追溯完整 + 无黑洞/奇迹/死模块 | `graph.json` | `check-requirement-graph.ts` |
+| 行为正确性（TLA+） | 层次化状态机无死锁/不变式违反/状态爆炸 | `tla-manifest.json` + `.tla` + `.cfg` | `check-tla-model.ts` |
+
+**阶段 4 硬约束**：`--phase=4` 图谱零违反 ∧ TLA+ 零违反才放行进阶段 5 编码。两个门禁均由 G 子代理跑、退出码为准（约束 4，反模式 #12）。
+
+TLA+ 层次化建模（L1–L6）、文件头规范、SANY/TLC 校验顺序、拆解阈值（>1k 考虑拆 / >1w 必须拆）详见 [tla-plus-guide.md](./tla-plus-guide.md) 与 [tla-plus-modeling-design.md](../../docs/tla-plus-modeling-design.md)。

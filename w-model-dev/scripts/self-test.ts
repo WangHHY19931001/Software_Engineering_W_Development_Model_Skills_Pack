@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * 校验逻辑自检脚本（Self-Test）—— 端到端验证 gate-logic.ts / verifier-logic.ts 的正确性
+ * 校验逻辑自检脚本（Self-Test）—— 端到端验证 gate-logic.ts / verifier-logic.ts / graph-logic.ts / tla-logic.ts 的正确性
  *
  * 设计目标：
  *   - 不依赖任何测试框架（无 jest / vitest），仅用 Node 标准库
@@ -17,6 +17,11 @@
  * 样本目录约定：
  *   w-model-dev/scripts/samples/verifier/*.json   Verifier 输出样本
  *   w-model-dev/scripts/samples/gate/*.json       RTM 矩阵样本
+ *   w-model-dev/scripts/samples/graph/*.json      图谱样本
+ *   w-model-dev/scripts/samples/tla/*.json        TLA+ manifest 样本（纯逻辑校验，不跑 SANY/TLC）
+ *
+ * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
+ *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
  *
  * 新增校验项后，请同时：
  *   1. 增加能触发该校验项的样本（通过 / 失败各一条）
@@ -29,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { checkVerifierOutput } from './verifier-logic.js';
 import { checkArtifactGate } from './gate-logic.js';
 import { checkRequirementGraph } from './graph-logic.js';
+import { checkTlaModel } from './tla-logic.js';
 
 // ==================== 测试用例定义 ====================
 
@@ -249,6 +255,77 @@ const GRAPH_CASES: GraphCase[] = [
   },
 ];
 
+interface TlaCase {
+  file: string;
+  phase: number;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const TLA_CASES: TlaCase[] = [
+  {
+    file: 'valid.json',
+    phase: 2,
+    expectedPassed: true,
+    description: 'L1+L2 完整 manifest：单 L1 根 + 双向一致 + 拆解合规 + 声明标志全 true',
+  },
+  {
+    file: 'bad-no-l1-root.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/不存在 L1 根规格/],
+    description: '无 L1 根规格（仅 L2 且 parent=null），应被层次校验拦截',
+  },
+  {
+    file: 'bad-multi-l1-root.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/存在 2 个 L1 根规格/],
+    description: '两个 L1 根规格（L1-system-a/L1-system-b），应被单根校验拦截',
+  },
+  {
+    file: 'bad-parent-child-mismatch.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/声明 parent="tla\/L1-system\.tla".*parent\.children 未包含 tla\/L2-auth\.tla/],
+    description: 'L2-auth 声明 parent=L1-system，但 L1-system.children 为空，应被 parent→child 双向校验拦截',
+  },
+  {
+    file: 'bad-sibling-asymmetric.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/声明 sibling="tla\/L2-article\.tla".*tla\/L2-article\.tla\.siblings 未包含 tla\/L2-auth\.tla/],
+    description: 'L2-auth 声明 sibling=L2-article，但 L2-article.siblings 为空，应被 sibling 双向校验拦截',
+  },
+  {
+    file: 'bad-level-not-monotonic.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/level=L3 ≠ parent\(L1-system\) level L1 \+ 1/],
+    description: 'L3-auth parent=L1-system 但层级跨级（L1→L3），应被层级单调校验拦截',
+  },
+  {
+    file: 'bad-must-split-violation.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/variableCombination=50000 > 10000.*须 decompositionDecision='split-done'/],
+    description: 'variableCombination=50000 > 1w 但 decision=consider-split，应被拆解决策校验拦截',
+  },
+  {
+    file: 'bad-declared-flags.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [
+      /syntaxChecked=false/,
+      /存在死锁.*deadlockFree=false/,
+      /不变式违反.*invariantsHold=false/,
+      /L1-system 状态爆炸.*stateExplosion=true/,
+    ],
+    description: '声明标志全反（syntax/deadlock/invariant/explosion），应同时触发四类违反',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -358,6 +435,34 @@ async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runTlaCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of TLA_CASES) {
+    const abs = path.join(samplesDir, 'tla', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkTlaModel(parsed, c.phase);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `tla/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // ==================== 入口 ====================
 
 async function main(): Promise<void> {
@@ -371,14 +476,16 @@ async function main(): Promise<void> {
   console.log(`Verifier 用例 : ${VERIFIER_CASES.length}`);
   console.log(`Gate 用例     : ${GATE_CASES.length}`);
   console.log(`Graph 用例    : ${GRAPH_CASES.length}`);
+  console.log(`TLA 用例      : ${TLA_CASES.length}`);
   console.log('─'.repeat(60));
 
-  const [verifierResults, gateResults, graphResults] = await Promise.all([
+  const [verifierResults, gateResults, graphResults, tlaResults] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
     runGraphCases(samplesDir),
+    runTlaCases(samplesDir),
   ]);
-  const all = [...verifierResults, ...gateResults, ...graphResults];
+  const all = [...verifierResults, ...gateResults, ...graphResults, ...tlaResults];
 
   const passedCount = all.filter(r => r.passed).length;
   const failedCount = all.length - passedCount;

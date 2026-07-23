@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "project": "tla-e2e-deadlock-fail",
+  "currentPhase": 1,
+  "tools": {
+    "jarPath": "../../../tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [
+    {
+      "id": "L1-deadlock",
+      "level": "L1",
+      "phase": 1,
+      "system": "smoketest",
+      "requirementIds": [],
+      "designRef": "",
+      "tlaPath": "DeadlockDemo.tla",
+      "cfgPath": "DeadlockDemo.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 4,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    }
+  ],
+  "checkRounds": []
+}

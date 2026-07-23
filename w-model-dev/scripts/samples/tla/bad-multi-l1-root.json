@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "project": "tla-sample-bad-multi-l1-root",
+  "currentPhase": 1,
+  "tools": {
+    "jarPath": "w-model-dev/tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [
+    {
+      "id": "L1-system-a",
+      "level": "L1",
+      "phase": 1,
+      "system": "sample-system-a",
+      "requirementIds": ["REQ-001"],
+      "designRef": "docs/requirement-spec.md#§3",
+      "tlaPath": "tla/L1-system-a.tla",
+      "cfgPath": "tla/L1-system-a.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 240,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L1-system-b",
+      "level": "L1",
+      "phase": 1,
+      "system": "sample-system-b",
+      "requirementIds": ["REQ-002"],
+      "designRef": "docs/requirement-spec.md#§4",
+      "tlaPath": "tla/L1-system-b.tla",
+      "cfgPath": "tla/L1-system-b.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 100,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    }
+  ],
+  "checkRounds": []
+}

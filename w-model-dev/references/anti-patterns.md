@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（13 条流程反模式 #1~#13）
+- 反模式清单（17 条流程反模式 #1~#17）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -30,6 +30,10 @@
 | 11 | ingestion 跳过图谱校验 | 阶段 1-4 结构连通性失守，孤立 / 多根 / 追溯断裂带入编码，graph.json 形同虚设 | 阶段 1-4 必须跑 [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)，不得跳过 A→G 收敛循环（见 [graph-guide.md](graph-guide.md)） |
 | 12 | A 子代理自评收敛（用 LLM 输出判定收敛） | "LLM 估算质量门"在 ingestion 场景的变体，收敛判定漂移 | 收敛判定由 G 跑 `check-requirement-graph.ts` 退出码决定，A 的 `reworkHints` 仅作指引 |
 | 13 | ingestion 图谱信息流黑洞/奇迹/死模块放行 | 存在只进不出/只出不进/无流经的模块，信息闭合失守，结构追溯通过却仍有信息断点带入编码 | 阶段 1-4 必须通过 [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts) 信息流校验（无黑洞/奇迹/死模块 + 边界完整），退出码 0 才放行（见 [graph-guide.md](graph-guide.md)「信息流模型」节） |
+| 14 | TLA+ 语法检查未通过即跑 TLC / 跳过语法检查 | TLC 报错信息混乱，无法定位是语法还是语义问题，调试效率崩溃 | `check-tla-model.ts` 步骤 6→7 顺序强制：SANY 语法通过后才允许跑 TLC（见 [tla-plus-guide.md](tla-plus-guide.md)「编码调试顺序」节） |
+| 15 | TLA+ 死锁/状态爆炸/不变式违反放行 | 行为正确性失守，并发/时序缺陷带入编码，后期修复成本指数级上升 | 阶段 1-4 必须通过 [`check-tla-model.ts`](../scripts/check-tla-model.ts) 行为门禁（无死锁/不变式违反/状态爆炸），退出码 0 才放行 |
+| 16 | TLA+ 占位实现/简化实现/错误实现 | 规格形同虚设，无法作为正确性基准，TLA+ 门禁沦为橡皮图章 | V 评审标注 + G 门禁：不接受 `Next=[]` 空下一步 / 遗漏需求关键状态 / 不变式与设计矛盾（见 [tla-plus-guide.md](tla-plus-guide.md)「合规性约束」节） |
+| 17 | TLA+ 建模与需求/设计不符未回退 | 规格通过但与需求/设计脱节，或需求/设计本身缺陷被掩盖，问题后移到编码 | 规格忠实于需求/设计但 TLC 仍发现违反 → 修正需求/设计并回退重跑；规格偏离 → 修正规格重跑（见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节） |
 
 ### 命中高发阶段
 
@@ -48,6 +52,10 @@
 | #11（ingestion 跳过图谱校验） | 阶段 1~4 | [graph-guide.md](graph-guide.md) + [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) |
 | #12（A 自评收敛） | 阶段 1~4 | [graph-guide.md](graph-guide.md)「收敛准则」节 |
 | #13（信息流黑洞/奇迹放行） | 阶段 1~4 | [graph-guide.md](graph-guide.md)「信息流模型」节 |
+| #14（TLA+ 跳过语法检查） | 阶段 1~4 | [tla-plus-guide.md](tla-plus-guide.md)「编码调试顺序」节 |
+| #15（TLA+ 死锁/违反放行） | 阶段 1~4 | [tla-plus-guide.md](tla-plus-guide.md)「校验脚本」节 |
+| #16（TLA+ 占位/简化/错误实现） | 阶段 1~4 | [tla-plus-guide.md](tla-plus-guide.md)「合规性约束」节 |
+| #17（TLA+ 与需求/设计不符未回退） | 阶段 1~4 | [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -65,6 +73,10 @@
 | #11（ingestion 跳过图谱校验） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)（退出码 0 才算通过）+ 🔴 CHECKPOINT · ingestion 收敛确认 |
 | #12（A 自评收敛） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts) 退出码（A 的 `reworkHints` 不替代 G 判定） |
 | #13（信息流黑洞/奇迹放行） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)（`dataflowViolations` 全空 + `boundary.complete=true` 才退出码 0） |
+| #14（TLA+ 跳过语法检查） | [`check-tla-model.ts`](../scripts/check-tla-model.ts) 步骤 6→7 顺序强制（SANY 通过后才跑 TLC） |
+| #15（TLA+ 死锁/违反放行） | [`check-tla-model.ts`](../scripts/check-tla-model.ts)（`TLA_JSON.passed=true` 才退出码 0） |
+| #16（TLA+ 占位/简化/错误实现） | V 评审（`reworkHints` 标注）+ [`check-tla-model.ts`](../scripts/check-tla-model.ts)（拆解决策校验） |
+| #17（TLA+ 与需求/设计不符未回退） | S 子代理核查 + 回退机制（无脚本；Agent 比对 `@requirement`/`@design` 与规格一致性） |
 
 ## 命中后的处理流程
 
@@ -92,6 +104,10 @@
 | #11 | 阶段 1-4 未跑 `check-requirement-graph.ts` 直接进 S 产出 / V 评审；或编排者跳过 A→G 收敛循环 | 回到当前阶段起点，补跑 ingestion 子流程（A-chunk → A-cross/A-evolve → G 图谱校验） | `check-requirement-graph.ts` 退出码 0 才算收敛闭环 |
 | #12 | A-cross/A-evolve 的 LLM 输出被直接用作收敛判定，未经 G 跑 `check-requirement-graph.ts` | 作废 A 的收敛声明，分派 G 跑脚本，按退出码重新判定 | `check-requirement-graph.ts` 退出码 0=通过 / 1=校验失败 / 2=输入错误 |
 | #13 | `GRAPH_JSON.dataflowViolations` 存在非空数组（blackHoles/miracles/deadModules）或 `boundary.complete=false` | 回到当前阶段起点，分派 A-chunk 补信息流边（produces/consumes）与边界节点（EXT-IN/EXT-OUT），重跑 A→G 收敛循环 | `check-requirement-graph.ts` 退出码 0 才算信息流闭合 |
+| #14 | TLA+ 规格未经 SANY 语法检查直接跑 TLC；或 `check-tla-model.ts` 步骤 6（SANY）未通过即执行步骤 7（TLC） | 回到当前规格，先修语法错误使 SANY 退出码 0，再重跑 TLC | `check-tla-model.ts` 退出码 0（SANY + TLC 均通过） |
+| #15 | `TLA_JSON.passed=false`（deadlockViolations/invariantViolations/stateExplosionSpecs 非空）但阶段已推进 | 回到当前阶段起点，分派 S 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），重跑 `check-tla-model.ts` | `check-tla-model.ts` 退出码 0 才算行为门禁通过 |
+| #16 | TLA+ 规格含 `Next = []` 空下一步 / `\* TODO` 未实现分支 / 刻意遗漏需求关键状态 / 不变式与设计文档矛盾 | 回到当前阶段起点，分派 S 重写 TLA+ 规格（补全状态分支、对齐需求/设计），重跑 V→G | V 评审 `passed=false` + `check-tla-model.ts` 退出码 0 |
+| #17 | TLC 发现违反，S 核查后确认规格忠实于需求/设计，但未回退修正需求/设计 | 回退到对应阶段：修正需求规格或设计文档 → 重写 TLA+ 规格 → 重跑 TLC | `check-tla-model.ts` 退出码 0（修正后重跑通过） |
 
 ### 门禁脚本退出码精确对应表
 
@@ -106,6 +122,9 @@
 | `check-requirement-graph.ts` | 0 | 图谱结构门禁通过（连通 / 单根 / 父唯一 / 阶段追溯零违反） | — | 可推进（阶段 4 通过即可进阶段 5 编码） |
 | `check-requirement-graph.ts` | 1 | 图谱校验失败（孤立 / 多根 / orphan / multiParent / 追溯违反 / blackHoles / miracles / deadModules / boundary 不完整） | #11 / #12 / #13 | 回到当前阶段起点，补跑 A→G 收敛循环 |
 | `check-requirement-graph.ts` | 2 | 输入错误（`graph.json` / `consolidated.json` 缺失或损坏） | #11 | 从 `graph.phase-N.bak.json` 恢复或重跑 ingestion |
+| `check-tla-model.ts` | 0 | TLA+ 行为门禁通过（文件头 + 层次 + 拆解 + SANY + TLC 全通过） | — | 可推进（阶段 4 通过即可进阶段 5 编码） |
+| `check-tla-model.ts` | 1 | TLA+ 校验失败（文件头缺失 / 层次不一致 / 拆解未完成 / SANY 语法错 / TLC 死锁 / 不变式违反 / 状态爆炸） | #14 / #15 / #16 | 回到当前阶段起点，分派 S 修正规格或拆解，重跑 `check-tla-model.ts` |
+| `check-tla-model.ts` | 2 | 输入错误（`tla-manifest.json` 缺失 / Java 未找到 / jar 缺失） | #14 | 修复环境或 manifest 后重跑 |
 
 > 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
 
@@ -133,6 +152,38 @@
 
 **与 #11 的关系**：#11 是「结构连通」失守（孤立/多根/追溯断裂），#13 是「信息闭合」失守（黑洞/奇迹/死模块）——两者正交，一个节点可结构追溯完整却仍是信息流黑洞。二者均由 `check-requirement-graph.ts` 退出码守护。
 
+## #14 TLA+ 语法检查未通过即跑 TLC
+
+**检测信号**：TLA+ 规格未经 SANY 语法检查直接跑 TLC；或 `check-tla-model.ts` 步骤 6（SANY）未通过即执行步骤 7（TLC）。
+
+**回退动作**：回到当前规格，先修语法错误使 SANY 退出码 0，再重跑 TLC。
+
+**与约束 9 的关系**：TLA+ 编码调试须按「先清轨迹 → SANY 语法通过 → TLC 模型检查」顺序，语法未通过即跑 TLC 会导致报错信息混乱。
+
+## #15 TLA+ 死锁/状态爆炸/不变式违反放行
+
+**检测信号**：`TLA_JSON.passed=false`（`deadlockViolations`/`invariantViolations`/`stateExplosionSpecs` 非空）但阶段已推进。
+
+**回退动作**：回到当前阶段起点，分派 S 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），重跑 `check-tla-model.ts`。
+
+**与公理的关系**：正常软件系统不允许死锁。死锁或矛盾分支须定位根因修正，而非绕过。
+
+## #16 TLA+ 占位实现/简化实现/错误实现
+
+**检测信号**：TLA+ 规格含 `Next = []` 空下一步 / `\* TODO` 未实现分支 / 刻意遗漏需求关键状态 / 不变式与设计文档矛盾。
+
+**回退动作**：回到当前阶段起点，分派 S 重写 TLA+ 规格（补全状态分支、对齐需求/设计），重跑 V→G。
+
+**与约束 9 的关系**：TLA+ 不接受占位实现、简化实现、错误实现——规格须如实建模系统行为，否则无法作为正确性基准。
+
+## #17 TLA+ 建模与需求/设计不符未回退
+
+**检测信号**：TLC 发现违反，S 核查后确认规格忠实于需求/设计，但未回退修正需求/设计。
+
+**回退动作**：回退到对应阶段：修正需求规格或设计文档 → 重写 TLA+ 规格 → 重跑 TLC。
+
+**与 #16 的关系**：#16 是规格本身有缺陷（偏离需求/设计），#17 是规格忠实但需求/设计本身有缺陷——前者修规格，后者修需求/设计并回退。判定流程见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节。
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
@@ -158,7 +209,7 @@
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills` 元技能的 Failure Modes。
 > SSoT [§4A.2](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
 >
-> **与 13 条流程反模式（#1~#13）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
+> **与 17 条流程反模式（#1~#17）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
 >
 > **与 4 条实现层经验教训（L1~L4）的关系**：L1~L4 是代码层教训（特定技术栈的具体坑），F1~F10 是行为层模式（跨技术栈的通用陷阱）。
 >
@@ -181,7 +232,7 @@
 
 ### 失败模式与反模式的对照
 
-| 维度 | 反模式 #1~#13 | 失败模式 F1~F10 |
+| 维度 | 反模式 #1~#17 | 失败模式 F1~F10 |
 |---|---|---|
 | 性质 | 流程破坏 | 行为退化 |
 | 命中后果 | 立即回退到对应阶段起点 | 不回退，但降低产物质量 |
