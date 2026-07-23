@@ -327,13 +327,12 @@ export function checkVerifierOutput(
       }
     }
     // 防漂移规则 1（§3.2.1）：rawScores 全同 = 复制填入作弊（D31）。
-    // 仅 text-parse 模式执行：logits 模式基线样本 valid.json 暂为全同，需先更新基线
-    // 再扩展至 logits（见任务报告 concern）。spec 规则 4 原要求 logits 亦执行规则 1。
+    // 两种模式均执行：spec §3.2.1 规则 4 明确 logits 模式仅豁免规则 3（扰动范围），
+    // 规则 1 / 2 仍对 logits 模式生效。
     const dimName = typeof sc.name === 'string' && sc.name.trim() !== ''
       ? sc.name
       : `subCriteria[${idx}]`;
     if (
-      scoringMethod === 'text-parse' &&
       Array.isArray(sc.rawScores) &&
       sc.rawScores.length > 1
     ) {
