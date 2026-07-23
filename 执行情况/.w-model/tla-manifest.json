@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "project": "shell-agent-wm-001",
+  "currentPhase": 3,
+  "tools": { "jarPath": "w-model-dev/tools/tla2tools.jar", "javaMinVersion": 11 },
+  "specs": [
+    {
+      "id": "L1-shell-agent",
+      "level": "L1",
+      "phase": 1,
+      "system": "Shell Agent",
+      "requirementIds": ["REQ-001", "REQ-010"],
+      "designRef": "docs/shell-agent-requirement-spec.md",
+      "tlaPath": "../tla/L1_shell_agent.tla",
+      "cfgPath": "../tla/L1_shell_agent.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": ["../tla/L2_task_loop.tla"],
+      "variableCombination": 1056,
+      "decompositionDecision": "kept-below-threshold",
+      "decompositionReason": "L1_shell_agent 的 1056 变量组合对应 Shell Agent 单系统 11 状态×12 变量的核心状态机建模，作为 L1 根规格不可进一步拆分",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2-task-loop",
+      "level": "L2",
+      "phase": 2,
+      "system": "Shell Agent",
+      "requirementIds": ["REQ-010"],
+      "designRef": "docs/shell-agent-system-design.md",
+      "tlaPath": "../tla/L2_task_loop.tla",
+      "cfgPath": "../tla/L2_task_loop.cfg",
+      "parent": "../tla/L1_shell_agent.tla",
+      "siblings": [],
+      "children": ["../tla/L3_artifact_gate.tla"],
+      "variableCombination": 8192,
+      "decompositionDecision": "kept-below-threshold",
+      "decompositionReason": "L2_task_loop 的 8192 变量组合对应 11 子系统交互建模，无法进一步拆分",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3-artifact-gate",
+      "level": "L3",
+      "phase": 3,
+      "system": "Shell Agent",
+      "requirementIds": ["REQ-023", "REQ-024", "REQ-025"],
+      "designRef": "docs/shell-agent-interface-design.md",
+      "tlaPath": "../tla/L3_artifact_gate.tla",
+      "cfgPath": "../tla/L3_artifact_gate.cfg",
+      "parent": "../tla/L2_task_loop.tla",
+      "siblings": [],
+      "children": [],
+      "variableCombination": 1536,
+      "decompositionDecision": "kept-below-threshold",
+      "decompositionReason": "L3_artifact_gate 的 1536 变量组合对应产物门禁 8 状态×多检查钩子的细粒度建模，为叶子规格无可拆分子节点",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    }
+  ],
+  "checkRounds": [
+    {
+      "phase": 1,
+      "round": 1,
+      "specId": "L1-shell-agent",
+      "syntaxCheck": "pass",
+      "tlcCheck": "fail",
+      "violations": [
+        "INV1 NoActWithoutObservation 违反：state=Acting 时 hasObservation=FALSE",
+        "INV3 NoCompleteWithoutVerification 违反：state=Completed 时 hasVerification=FALSE",
+        "INV4 NoExitTerminal 违反：终态 Completed/Failed 被后续动作离开",
+        "INV5 BudgetNonNegative 违反：budgetRemaining 跌至负值",
+        "INV7 ArtifactGateConsistency 违反：artifactGateState=ReworkRequired 时 state 未处于 Reflecting/Planned"
+      ],
+      "converged": false
+    },
+    {
+      "phase": 1,
+      "round": 2,
+      "specId": "L1-shell-agent",
+      "syntaxCheck": "pass",
+      "tlcCheck": "pass",
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "specId": "L2-task-loop",
+      "syntaxCheck": "pass",
+      "tlcCheck": "fail",
+      "violations": [
+        "任务循环死锁：ActiveSubAgents>0 且 extInputQueue 持续非空时无法收敛",
+        "委派深度无界：maxDepthReached 超过 5 上限",
+        "输出未验证：extOutputQueue 含 REPORT 但 hasVerification=FALSE",
+        "预算耗尽未触发 Failed 终态"
+      ],
+      "converged": false
+    },
+    {
+      "phase": 2,
+      "round": 2,
+      "specId": "L2-task-loop",
+      "syntaxCheck": "pass",
+      "tlcCheck": "pass",
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 3,
+      "round": 1,
+      "specId": "L3-artifact-gate",
+      "syntaxCheck": "pass",
+      "tlcCheck": "fail",
+      "violations": [
+        "cfg 结构违反：.cfg 含 MODULE 声明（D26），TLC 解析失败"
+      ],
+      "converged": false
+    },
+    {
+      "phase": 3,
+      "round": 2,
+      "specId": "L3-artifact-gate",
+      "syntaxCheck": "pass",
+      "tlcCheck": "pass",
+      "violations": [],
+      "converged": true
+    }
+  ]
+}
