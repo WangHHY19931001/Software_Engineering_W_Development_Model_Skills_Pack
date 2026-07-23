@@ -91,11 +91,11 @@ DESIGN 1──* TEST_CASE        (设计生成系统/集成/单元测试)
 ## 图谱节点与边类型（GraphNode / EdgeType）
 
 > ingestion 子流程图谱模型的节点与边类型。完整节点语义、系统层级树与多层图谱（7 层）校验规则见 [graph-guide.md](graph-guide.md)；本节仅定义数据模型层 schema 与横切边源节点标识 marker。
-> 权威实现：[`scripts/graph-logic.ts`](../scripts/graph-logic.ts)（`GraphNode` / `GraphEdge` / `EdgeType` 单点事实源，Task B3 同步）。
+> 权威实现（待同步）：[`scripts/graph-logic.ts`](../scripts/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。**注意**：当前 graph-logic.ts 尚未包含本节新增的 `governs` / `derives` 边类型与 `governance` / `derivationProduct` marker（且仍兼容 `consumes`），Task B3 将同步移除 `consumes` 并落地新边类型与 marker；B3 落地前以本节 schema 为准。
 
 ### 横切边源节点 marker（GraphNode 扩展）
 
-`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/graph-logic.ts)。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 新增两个可选布尔 marker 字段：
+`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/graph-logic.ts)（B3 同步前不含下方 marker 字段）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 新增两个可选布尔 marker 字段（B3 前以本节定义为 schema 权威）：
 
 ```typescript
 // GraphNode 扩展字段（叠加于 graph-logic.ts 现有 GraphNode 之上）
@@ -107,7 +107,9 @@ interface GraphNodeMarkers {
 }
 ```
 
-**marker 约定**（供 `graph-logic.ts` 实现 `isGovernanceSubsystem(node)` / `isDerivationProduct(node)` 校验）：
+> 注：上述两个 marker 字段为 **flat 可选字段直接叠加于 `GraphNode`**（非嵌套 `markers` 对象）。B3 实现时写 `node.governance === true` / `node.derivationProduct === true`，而非 `node.markers.governance`。`GraphNodeMarkers` 仅为本文档描述 marker 集合，不引入运行时嵌套层级。
+
+**marker 约定**（供 `graph-logic.ts` 实现 `isGovernanceSubsystem(node)` / `isDerivationProduct(node)` 校验；B3 待实现）：
 
 - `governance === true`：该节点为治理类子系统。仅此类节点允许作为 `governs` 边的 `from`。
 - `derivationProduct === true`：该节点为派生规格节点。仅此类节点允许作为 `derives` 边的 `from`。
@@ -136,7 +138,7 @@ export type EdgeType =
 | `collaborates-with` | 任意已登记节点（须存在） | 任意已登记节点（须存在） | 不依附 |
 | `derives` | `derivationProduct === true`（派生规格节点） | 派生产物且存在 | 不依附 |
 
-> `consumes` 边类型已移除（D21）：信息流层统一用 `produces`，双向语义由 `{from, to}` 表达。历史 `graph.json` 中残留的 `consumes` 边由 `check-requirement-graph.ts` 报为非法边类型。
+> `consumes` 边类型已废弃（D21）：信息流层统一用 `produces`，双向语义由 `{from, to}` 表达。**当前 `graph-logic.ts` 仍兼容 `consumes`**（视为合法信息流边，B3 待同步移除）；B3 移除 `consumes` 兼容后，历史 `graph.json` 中残留的 `consumes` 边将由 `check-requirement-graph.ts` 报为非法边类型。
 
 ## 与 RTM 的映射
 

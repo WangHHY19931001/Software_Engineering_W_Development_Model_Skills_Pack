@@ -1466,7 +1466,7 @@ interface RunLogEntry {
 | 1 | 结构层 | `parent` | 系统层级树依附（见 §10.10.1） | 单根、父唯一、层级单调 |
 | 2 | 依赖层 | `depends-on` | 节点间依赖（SD→SD / INTF→INTF） | 禁止环依赖；依赖目标须存在 |
 | 3 | 追溯层 | `implements` / `defines` / `realizes` | 跨阶段追溯（SD→REQ / SD→INTF / DD→INTF or DD→SD） | 阶段递进追溯（见 §10.7 校验算法 4） |
-| 4 | 信息流层 | `produces`（`consumes` 同义） | 信息流向 | 黑洞/奇迹/死模块校验；**根节点豁免死模块**（系统根无入流合法） |
+| 4 | 信息流层 | `produces` | 信息流向 | 黑洞/奇迹/死模块校验；**根节点豁免死模块**（系统根无入流合法） |
 | 5 | 治理层 | `governs` | 横切治理（如安全治理节点 governs 多个子系统） | 横切边不依附层级树（见 §10.10.3） |
 | 6 | 协作层 | `collaborates-with` | 对等协作（子系统间对等交互） | 无向语义；两端须对等层级 |
 | 7 | 派生层 | `derives` | 派生规格（如 TLA+ spec derives 自设计节点） | 派生源须存在；派生不替代追溯 |

@@ -104,7 +104,7 @@
 | #10 | 编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者 `git diff` 含非 `.w-model/*.json` 状态文件改动；或编排者会话出现代码 / 测试用例 / 评审 JSON 的生成内容；或编排者使用 `node -e` 操作 `.w-model/*.json`（含 graph.json 边 / consolidated.json / chunk-*.json / tla-manifest.json / rtm.json 实体字段 / verifier-output-*.json 等产物 JSON）；或编排者直接 `Write` `.w-model/*.json` 产物文件（不通过 A/S 子代理）；或编排者自行填写 `acknowledgedDecisions`（用户未明确说出技术决策，O 代填视为越权实施 + O4 Comprehension Debt） | 回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ 编排者会话内仅保留路由 / 状态 / CHECKPOINT / 只读脚本记录；⑤ `acknowledgedDecisions` 清空并要求用户重新陈述决策 | 无脚本；编排者自检动作清单 + 宿主 Agent 工具调用日志（`Write`/`Edit`/`node -e` 不得出现在编排者会话对产物 JSON 的操作上，详见 [operational-recovery.md](operational-recovery.md)「O 越权检测」节） |
 | #11 | 阶段 1-4 未跑 `check-requirement-graph.ts` 直接进 S 产出 / V 评审；或编排者跳过 A→G 收敛循环 | 回到当前阶段起点，补跑 ingestion 子流程（A-chunk → A-cross/A-evolve → G 图谱校验） | `check-requirement-graph.ts` 退出码 0 才算收敛闭环 |
 | #12 | A-cross/A-evolve 的 LLM 输出被直接用作收敛判定，未经 G 跑 `check-requirement-graph.ts` | 作废 A 的收敛声明，分派 G 跑脚本，按退出码重新判定 | `check-requirement-graph.ts` 退出码 0=通过 / 1=校验失败 / 2=输入错误 |
-| #13 | `GRAPH_JSON.dataflowViolations` 存在非空数组（blackHoles/miracles/deadModules）或 `boundary.complete=false` | 回到当前阶段起点，分派 A-chunk 补信息流边（produces/consumes）与边界节点（EXT-IN/EXT-OUT），重跑 A→G 收敛循环 | `check-requirement-graph.ts` 退出码 0 才算信息流闭合 |
+| #13 | `GRAPH_JSON.dataflowViolations` 存在非空数组（blackHoles/miracles/deadModules）或 `boundary.complete=false` | 回到当前阶段起点，分派 A-chunk 补信息流边（produces）与边界节点（EXT-IN/EXT-OUT），重跑 A→G 收敛循环 | `check-requirement-graph.ts` 退出码 0 才算信息流闭合 |
 | #14 | TLA+ 规格未经 SANY 语法检查直接跑 TLC；或 `check-tla-model.ts` 步骤 6（SANY）未通过即执行步骤 7（TLC） | 回到当前规格，先修语法错误使 SANY 退出码 0，再重跑 TLC | `check-tla-model.ts` 退出码 0（SANY + TLC 均通过） |
 | #15 | `TLA_JSON.passed=false`（deadlockViolations/invariantViolations/stateExplosionSpecs 非空）但阶段已推进 | 回到当前阶段起点，分派 S 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），重跑 `check-tla-model.ts` | `check-tla-model.ts` 退出码 0 才算行为门禁通过 |
 | #16 | TLA+ 规格含 `Next = []` 空下一步 / `\* TODO` 未实现分支 / 刻意遗漏需求关键状态 / 不变式与设计文档矛盾 | 回到当前阶段起点，分派 S 重写 TLA+ 规格（补全状态分支、对齐需求/设计），重跑 V→G | V 评审 `passed=false` + `check-tla-model.ts` 退出码 0 |
@@ -149,7 +149,7 @@
 
 **检测信号**：`GRAPH_JSON.dataflowViolations` 出现非空数组（blackHoles/miracles/deadModules），或 `boundary.complete=false`。
 
-**回退动作**：回到当前阶段起点，分派 A-chunk 补 produces/consumes 信息流边与 EXT-IN/EXT-OUT 边界节点，重跑 A→G 收敛循环。
+**回退动作**：回到当前阶段起点，分派 A-chunk 补 produces 信息流边与 EXT-IN/EXT-OUT 边界节点，重跑 A→G 收敛循环。
 
 **与 #11 的关系**：#11 是「结构连通」失守（孤立/多根/追溯断裂），#13 是「信息闭合」失守（黑洞/奇迹/死模块）——两者正交，一个节点可结构追溯完整却仍是信息流黑洞。二者均由 `check-requirement-graph.ts` 退出码守护。
 
