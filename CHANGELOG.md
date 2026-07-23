@@ -5,6 +5,67 @@
 
 ## [Unreleased]
 
+### 吸收 cobusgreyling/loop-engineering 运维层与成熟度设计（4 项优化）
+
+> 对 [`cobusgreyling/loop-engineering`](https://github.com/cobusgreyling/loop-engineering) 的运维层与自主成熟度概念进行联网调研后，提出并落地 4 项优化设计，扩展 w-model-dev 技能包的「运行时治理层」。
+>
+> 设计遵循现有架构硬约束：不内置 LLM 调用（约束 4）、CHECKPOINT 不可绕过（约束 2 + #8）、编排者最小化（#10）、SSoT 优先。4 项优化均为声明式 JSON / 字段填写 / append-only 日志，不引入 LLM 估算，不改变门禁脚本退出码语义。
+>
+> 设计文档：[`docs/loop-engineering-adoption-design.md`](docs/loop-engineering-adoption-design.md)
+
+#### 新增
+
+- **优化 1：成本预算与运行日志**（SSoT §10D + operational-recovery.md）
+  - `budget.json`：声明式 perPhase / project 预算；`onExceed` ∈ `warn | pause | abort`；`killSwitch` 全局停摆开关
+  - `run-log.jsonl`：append-only 运行日志，每条记录含 `phase` / `action` / `agent` / `tokensEstimate`（宿主 Agent 报实际消耗，`estimated=false`）/ `acknowledgedDecisions`
+  - 预算超限 / kill switch 触发 / 运行日志维护三个子表（operational-recovery.md）
+  - `data-models.md` 新增 `interface BudgetConfig` / `interface RunLogEntry` 两个 schema
+- **优化 2：自主成熟度阶梯 L0~L3**（SSoT §10C + operational-recovery.md）
+  - L0（默认）→ L3 四级阶梯；决策型 CHECKPOINT 在所有级别均等用户（不可绕过）；L1+ 操作型 CHECKPOINT 可选择性自动放行（不是绕过，仍在 run-log 留痕）；L3 高风险路径强制人工 gate
+  - 放行矩阵覆盖：阶段门放行 / 质量门通过自动放行 / 返工路径 / 工件归档四个维度
+  - `maturity.json`：`level` / `unlockConditions` / `history` / `downgradeTriggers`；升级与降级流程
+  - `data-models.md` 新增 `interface MaturityConfig` schema
+- **优化 3：运维失败模式 O1~O6**（SSoT §4A.2a + anti-patterns.md）
+  - 6 条运行健康失败模式：O1 Token Burn / O2 State Rot / O3 Verifier Theater / O4 Comprehension Debt / O5 Cognitive Surrender / O6 Escalation Failure
+  - 三层失败模式架构：流程反模式 #1~#17（命中即回退）→ 行为退化 F1~F10（标注不回退）→ 运维失败模式 O1~O6（标注 + 协同检测，部分触发 kill switch）
+  - 检测信号 + 处理流程 + 与 loop-engineering 差异表（anti-patterns.md 完整登记）
+- **优化 4：理解债务显式化**（SSoT §10.6 第六维度 + verifier-spec.md §6.2 + definition-of-done.md）
+  - DoD 从五维度扩展为六维度：新增「理解证据」维度（标准：`acknowledgedDecisions` 已填入；验证方式：run-log.jsonl 比对；不通过动作：要求 Agent 复述关键决策并填 acknowledgedDecisions 后重放行）
+  - `verifier-spec.md` §6.2：`summary` 字段要求阶段 digest 三要素（① 关键决策摘要 ② 产物核心结构 ③ 遗留风险/已知限制）；`summary` 为空或仅"通过"视为 O3 命中，V 评审降级重做
+  - `definition-of-done.md` 自检清单新增「acknowledgedDecisions 已填入」项；反例引用更新为「17 条流程反模式、F1~F10 失败模式与 O1~O6 运维失败模式」
+
+#### 变更
+
+- `docs/skill-design-document_SSoT.md`：
+  - §3.4.5「编排者允许的动作」新增 budget / run-log / maturity 维护项
+  - §4A.2 后插入 §4A.2a「运维失败模式清单（O1~O6）」；§4A.3 扩展为三层失败模式架构描述
+  - §10.6 DoD 五维度 → 六维度（新增「理解证据」维度）
+  - §10A 追溯表新增 §10C / §10D 行，更新 §4A 与 §10.6 行
+  - 在 §10.8 与 §10A 之间插入 §10C「自主成熟度阶梯（L0~L3）」与 §10D「成本预算与运行日志」
+- `w-model-dev/SKILL.md`：
+  - 约束 2「阶段门放行」补充「L1+ 操作型 CHECKPOINT 自动放行是选择性激活，非绕过；决策型 CHECKPOINT 在所有级别均等用户；阶段门放行须填 acknowledgedDecisions 理解证据」
+  - 快速自检清单新增「阶段门放行已填理解证据」+「预算与成熟度已检查」两项
+- `w-model-dev/references/operational-recovery.md`：新增「成本预算与运行日志」节（预算超限 / kill switch / 运行日志维护 3 子表）+「成熟度与 CHECKPOINT 放行」节（CHECKPOINT 分类与放行 / L3 高风险路径 / 升级与降级 / maturity.json 维护 4 子表）
+- `w-model-dev/references/data-models.md`：目录新增 3 行；文件末尾追加 `BudgetConfig` / `RunLogEntry` / `MaturityConfig` 三个 schema 节
+- `w-model-dev/references/anti-patterns.md`：目录新增「运维失败模式清单（6 条运行健康 O1~O6）」行；文件末尾追加 O1~O6 完整定义表 + 检测信号与处理流程表 + 标注约定 + 与 loop-engineering 差异表
+- `w-model-dev/references/definition-of-done.md`：五维度 → 六维度；自检清单新增「acknowledgedDecisions 已填入」项；反例引用更新
+- `w-model-dev/references/verifier-spec.md`：§6.2「通过判定」改为 §6.3；在 §6.1 与 §6.3 之间插入 §6.2「summary 字段内容要求（阶段 digest 三要素）」
+- `w-model-dev/references/subagent-delegation.md`：O 角色允许动作新增第 ⑦ 项「维护 budget.json / run-log.jsonl / maturity.json」；扩展读取列表包含 budget / run-log / maturity
+- `AGENTS.md`：关键目录速查表 `w-model-dev/references/` 行扩展，新增 verifier-spec summary 阶段 digest 三要素 §6.2 / subagent-delegation O 维护 budget/run-log/maturity / definition-of-done 六维度含理解证据 / anti-patterns O1~O6 / operational-recovery 两节 / 数据模型 schema 说明
+
+#### 设计原则兼容性
+
+- **不内置 LLM 调用（约束 4）**：4 项优化均为声明式 JSON / 字段填写 / append-only 日志，无 LLM 调用；`budget.json` 的 `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`），不引入 LLM 估算
+- **CHECKPOINT 不可绕过（约束 2 + #8）**：L0~L3 阶梯是「选择性激活」而非「绕过」——决策型 CHECKPOINT 始终 attended，L3 高风险路径强制人工 gate，L1+ 自动放行仍在 run-log 记录保留可追溯性
+- **编排者最小化（#10）**：budget / run-log / maturity 维护是编排者允许的状态文件读写动作，不涉及阶段产物（代码 / 文档 / 评审 JSON / RTM 实体）的越权产出
+- **SSoT 优先**：严格按 AGENTS.md「SSoT 优先」约束，先改 SSoT，再同步 w-model-dev/references/，最后同步 SKILL.md 与 AGENTS.md
+
+#### 验证
+
+- `npm run self-test` → 37/37 用例通过，退出码 0（10 Verifier + 7 Gate + 12 Graph + 8 TLA 样本回归基线未受影响）
+- 4 项优化均为增量、声明式扩展，未触及任何 `check-*.ts` 脚本逻辑
+- 文档一致性：SSoT §3.4.5 / §4A.2a / §4A.3 / §10.6 / §10A ↔ operational-recovery.md 两节 ↔ data-models.md 3 schema ↔ anti-patterns.md O1~O6 ↔ definition-of-done.md 六维度 ↔ verifier-spec.md §6.2 ↔ subagent-delegation.md O 角色扩展 ↔ SKILL.md 约束 2 + 快速自检 ↔ AGENTS.md 关键目录速查 均已双向同步
+
 ### W 模型 8 阶段端到端全量重跑（第四轮，删除全部产物后从零再实现）
 
 > 2026-07-23 删除 `w-model-dev-demo/` 的 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物（保留 `package.json`/`tsconfig.json`/`vitest.config.ts`/`node_modules`），按 W 模型 8 阶段 self-as-verifier 模式从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。所有门禁退出码 0，图谱零违反收敛。

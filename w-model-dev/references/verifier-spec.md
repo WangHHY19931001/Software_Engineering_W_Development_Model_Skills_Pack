@@ -227,7 +227,7 @@ interface VerifierOutput {
   /** 质量等级（由综合分数映射） */
   qualityLevel: 'A' | 'B' | 'C' | 'D';
 
-  /** 主结论与改进建议（人类可读） */
+  /** 主结论与改进建议（人类可读）；须为阶段 digest 三要素（见 §6.1） */
   summary: string;
 
   /** 是否通过阶段门评审 */
@@ -256,7 +256,25 @@ interface VerifierOutput {
 | `[0.50, 0.70)` | C | 部分达成，需返工 |
 | `[0.00, 0.50)` | D | 未达成，必须返工 |
 
-### 6.2 通过判定
+### 6.2 summary 字段内容要求（阶段 digest 三要素）
+
+> 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念。`summary` 不仅是主结论，更是**阶段 digest**——供用户在 CHECKPOINT 放行时对照理解，填写 `acknowledgedDecisions`（见 [definition-of-done.md](definition-of-done.md) 第六维度）。
+
+V 子代理须在 `summary` 中包含：
+
+1. **本阶段关键决策摘要**（≥1 条）：设计选型/架构决策/范围取舍/风险接受。
+2. **本阶段产物核心结构**（1-2 句）：如"系统设计含 4 模块、3 接口、2 数据模型"。
+3. **遗留风险/已知限制**（如有）：如"TLA+ L2 未覆盖文章删除级联"、"性能基线待阶段 7 k6 实测"。
+
+**示例**：
+
+```
+本阶段系统设计采用 Express+TypeScript+内存存储，4 模块（auth/article/comment/common），REST API 3 接口。关键决策：评论模块独立存储降低耦合。遗留风险：内存存储重启数据丢失（RISK-001），性能基线待阶段 7 k6 实测。
+```
+
+> `summary` 为空或仅"通过"/"符合要求"等无信息字符串 → 视为 O3（Verifier Theater）命中，V 评审降级重做。
+
+### 6.3 通过判定
 
 `passed = (qualityLevel === 'A' || qualityLevel === 'B')`。
 （即综合分数 ≥ 0.70 视为通过阶段门。）
