@@ -1,7 +1,12 @@
+/**
+ * zod 校验 schema：评论入参与路径参数（realizes INTF-007 部分 / SD-006）。
+ */
 import { z } from 'zod';
 
-export const CommentCreateSchema = z.object({
-  content: z.string().min(1, '评论内容不能为空').max(1000, '评论至多 1000 字符'),
+export const commentCreateSchema = z.object({
+  content: z.string().min(1).max(1000),
 });
 
-export type CommentCreateDTO = z.infer<typeof CommentCreateSchema>;
+export const commentIdParamSchema = z.object({
+  commentId: z.string().min(1),
+});

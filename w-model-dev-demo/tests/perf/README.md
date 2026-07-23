@@ -1,78 +1,75 @@
-# 性能基线测试说明
+# 性能压测脚本（k6）
 
-## 1. 目的
+> 阶段 7 系统测试性能基线参考脚本。对应 NFR-002 / ST-004 / UAT-013。
 
-验证 NFR-002：读接口 P95 ≤ 200ms（关联 ST-003 系统测试用例）。
+## 说明
 
-## 2. 工具选型
+本目录提供 k6 外部压测脚本 `k6-load-test.js`，用于对 blog-system-demo 读接口做
+100 VUs × 30s 负载压测，验证 NFR-002 性能基线（P95 ≤ 200ms，错误率 0，无 5xx）。
 
-- **主工具**：k6（Go 实现的高性能负载测试工具，与 vitest 测试解耦）
-- **次工具**：vitest + supertest 内置的 ST-003 系统测试（200 次采样）
+**重要**：阶段 7 系统测试已用 **vitest 内近似采样**验证 P95（见
+`tests/system/system.test.ts` 的 ST-004：10000 条数据规模下 N=200 次采样，P95 实测
+远低于 200ms）。本 k6 脚本为「外部压测参考脚本」，供需要更高保真度负载测试时使用，
+**不要求在 CI 中真实执行**（k6 可能未安装）。
 
-选择 k6 而非 autocannon 的理由：
-1. k6 原生支持 ramping-arrival-rate 模型，可精准复刻 ST-003 设计的 ramp-up 30s → sustain 9min → ramp-down 30s 负载模型
-2. k6 内置 thresholds + checks + metrics，无需额外断言库
-3. k6 输出 JSON / CSV / Prometheus 多格式，便于后续接入 CI
+## 前置条件
 
-## 3. 前置条件
+1. 安装 k6：https://k6.io/docs/getting-started/installation/
+2. Node.js >= 18，已执行 `npm install`
+3. 服务可启动（`npm run dev`，默认监听 3000 端口）
 
-1. Node.js >= 20，已执行 `npm install`
-2. 服务端已启动：`npm run dev`，监听 `http://localhost:3000`
-3. 预置文章数据（避免冷启动空查询）：
-   ```bash
-   # 通过 supertest 启动脚本或手动 curl 预置 ≥ 10000 篇文章
-   ```
-4. 安装 k6：
-   - Windows: `choco install k6`
-   - macOS: `brew install k6`
-   - Linux: 参考 https://k6.io/docs/getting-started/installation/
+## 数据预置
 
-## 4. 执行命令
+NFR-002 要求在 10000 条数据规模下验证 P95。压测前需预置 ≥10000 篇文章：
+
+- 方式 A：通过测试钩子直接向 `ArticleStore` 灌入种子数据（参考
+  `tests/system/system.test.ts` 的 `seedArticles(10000)` 辅助函数）。
+- 方式 B：编写一次性种子脚本调用 `POST /api/v1/articles`（需鉴权）批量创建。
+
+> 公开读接口 `GET /api/v1/articles` 无需鉴权，可直接压测。
+
+## 运行方式
 
 ```bash
-# 1. 启动服务（另开终端）
+# 1. 启动服务（独立终端）
 npm run dev
 
-# 2. 执行 k6 性能测试（缩短为 3min 便于本地执行）
+# 2. 预置 10000 篇文章（参考 system.test.ts 的 seedArticles 实现）
+
+# 3. 执行 k6 压测（默认 BASE_URL=http://localhost:3000）
 k6 run tests/perf/k6-load-test.js
 
-# 3. 也可指定 BASE_URL
-BASE_URL=http://localhost:3000 k6 run tests/perf/k6-load-test.js
+# 可选：指定目标地址
+k6 run -e BASE_URL=http://localhost:3000 tests/perf/k6-load-test.js
 ```
 
-## 5. 验收阈值（与 ST-003 设计一致）
+## 负载模型
 
-| 指标 | 阈值 | 来源 |
+| 阶段 | 时长 | 目标 VUs |
 |---|---|---|
-| `http_req_duration p(95)` | ≤ 200ms | NFR-002 |
-| `http_req_failed rate` | < 1% | 通用稳定性的要求 |
-| `errors rate` | < 1% | 业务正确性 |
-| `http_reqs rate` | ≥ 95 RPS | 接近 100 QPS 目标 |
+| ramp-up | 10s | 0 → 100 |
+| sustain | 10s | 100 |
+| ramp-down | 10s | 100 → 0 |
 
-## 6. 输出示例
+总时长 30s，峰值 100 VUs。
 
-```
-========== k6 性能基线报告 ==========
-P95 延迟       : 4.32 ms  (阈值: ≤ 200ms)
-HTTP 失败率    : 0.00%  (阈值: < 1%)
-业务错误率     : 0.00%  (阈值: < 1%)
-实际 RPS       : 99.87  (目标: ≥ 95)
-总请求数       : 18000
-总迭代         : 18000
-======================================
+## 阈值（NFR-002）
 
-结论: ✓ 通过
-```
+| 指标 | 阈值 | 说明 |
+|---|---|---|
+| `http_req_duration` p(95) | < 200ms | 读接口 P95 响应时间 |
+| `http_req_failed` rate | === 0 | HTTP 失败率 |
+| `errors` rate | === 0 | 自定义业务错误率（非 200 / 5xx） |
 
-## 7. 与 ST-003 vitest 测试的关系
+## 阶段 7 已验证结果（vitest 内近似采样）
 
-- **ST-003 (vitest)**：200 次轻量采样，纳入 CI 流水线，P95 ≤ 200ms 即过
-- **k6-load-test.js**：完整 3min 负载测试，本地或夜间运行，输出更全面的性能数据
+| 指标 | 实测 | 阈值 | 是否达标 |
+|---|---|---|---|
+| P95 | 4.66ms | ≤ 200ms | ✅ |
+| max | 5.84ms | - | - |
+| 采样次数 N | 200 | - | - |
+| 5xx 数 | 0 | 0 | ✅ |
+| 数据规模 | 10000 篇 | 10000 篇 | ✅ |
 
-两者互为补充：vitest 版快速反馈，k6 版深度验证。
-
-## 8. 已知限制
-
-- 内存 Map 存储无磁盘 IO，P95 远低于 200ms（典型 1-5ms），不代表真实生产环境
-- 单进程无并发瓶颈，k6 加压到 100 QPS 也无法触发服务端饱和
-- 真实生产场景需替换为 PostgreSQL + 连接池，重新基线
+> 上述结果来自 `npm run test:system` 真实执行，非估算。内存存储 + 单进程事件循环下
+> 读接口响应时间稳定在个位数毫秒级，远低于 200ms 阈值。

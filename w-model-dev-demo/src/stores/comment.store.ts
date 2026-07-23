@@ -1,24 +1,28 @@
-import type { Comment } from '../types.js';
+/**
+ * CommentStore：评论内存存储（realizes INTF-012 / DD-003）。
+ * findByArticleId 按 createdAt 升序。
+ */
+import type { Comment } from '../types';
 
-class CommentStoreImpl {
-  private comments = new Map<string, Comment>();
+export class CommentStore {
+  private readonly comments = new Map<string, Comment>();
 
-  save(comment: Comment): void {
+  insert(comment: Comment): void {
     this.comments.set(comment.id, comment);
   }
 
-  findById(id: string): Comment | undefined {
-    return this.comments.get(id);
+  findById(id: string): Comment | null {
+    return this.comments.get(id) ?? null;
+  }
+
+  delete(id: string): boolean {
+    return this.comments.delete(id);
   }
 
   findByArticleId(articleId: string): Comment[] {
     return Array.from(this.comments.values())
       .filter((c) => c.articleId === articleId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
-
-  delete(id: string): boolean {
-    return this.comments.delete(id);
   }
 
   clear(): void {
@@ -29,5 +33,3 @@ class CommentStoreImpl {
     return this.comments.size;
   }
 }
-
-export const commentStore = new CommentStoreImpl();

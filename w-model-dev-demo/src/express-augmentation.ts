@@ -1,8 +1,14 @@
-// 让 TypeScript 识别 Express 的 req.user（来自 authMiddleware）
+/**
+ * Express 类型增强：将 JWT 解码后的用户身份挂载到 req.user（对应 INTF-006）。
+ */
+import type { JwtPayload } from './types';
+
 declare module 'express-serve-static-core' {
   interface Request {
-    user?: { userId: string; username: string };
+    user?: JwtPayload;
   }
 }
 
-export {};
+export interface AuthRequest {
+  user: JwtPayload;
+}

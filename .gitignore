@@ -25,6 +25,9 @@ Thumbs.db
 # Node 依赖（package.json 仅声明 tsx 作为开发依赖，依赖目录不入库）
 node_modules/
 
+# TypeScript 编译产物
+dist/
+
 # npm 安装产物
 package-lock.json
 npm-debug.log*

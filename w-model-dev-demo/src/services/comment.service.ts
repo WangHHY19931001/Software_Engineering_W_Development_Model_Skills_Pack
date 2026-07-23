@@ -1,38 +1,48 @@
+/**
+ * CommentService：评论增删查 + 文章存在性校验（realizes INTF-003 / DD-006）。
+ * 依赖 CommentStore + ArticleService（校验文章存在）。
+ */
 import { randomUUID } from 'node:crypto';
-import { commentStore } from '../stores/comment.store.js';
-import { articleStore } from '../stores/article.store.js';
-import { ForbiddenError, NotFoundError } from '../utils/errors.js';
-import type { CommentCreateDTO } from '../schemas/comment.schema.js';
-import type { Comment } from '../types.js';
+import type { CommentStore } from '../stores/comment.store';
+import type { ArticleService } from './article.service';
+import { NotFoundError, ForbiddenError, ErrorCode } from '../utils/errors';
+import type { Comment, CommentCreateInput } from '../types';
 
 export class CommentService {
-  static async create(
-    authorId: string,
+  constructor(
+    private readonly commentStore: CommentStore,
+    private readonly articleService: ArticleService,
+  ) {}
+
+  async create(
     articleId: string,
-    dto: CommentCreateDTO,
+    input: CommentCreateInput,
+    authorId: string,
   ): Promise<Comment> {
-    if (!articleStore.findById(articleId)) {
-      throw new NotFoundError(40401, '文章不存在');
-    }
+    await this.articleService.getById(articleId);
     const comment: Comment = {
       id: randomUUID(),
       articleId,
       authorId,
-      content: dto.content,
+      content: input.content,
       createdAt: new Date().toISOString(),
     };
-    commentStore.save(comment);
+    this.commentStore.insert(comment);
     return comment;
   }
 
-  static async listByArticle(articleId: string): Promise<Comment[]> {
-    return commentStore.findByArticleId(articleId);
+  async delete(commentId: string, authorId: string): Promise<void> {
+    const existing = this.commentStore.findById(commentId);
+    if (!existing) {
+      throw new NotFoundError(ErrorCode.NOT_FOUND, '评论不存在');
+    }
+    if (existing.authorId !== authorId) {
+      throw new ForbiddenError(ErrorCode.FORBIDDEN, '无权操作他人评论');
+    }
+    this.commentStore.delete(commentId);
   }
 
-  static async remove(authorId: string, commentId: string): Promise<void> {
-    const comment = commentStore.findById(commentId);
-    if (!comment) throw new NotFoundError(40401, '评论不存在');
-    if (comment.authorId !== authorId) throw new ForbiddenError(40301, '无权操作他人评论');
-    commentStore.delete(commentId);
+  async listByArticle(articleId: string): Promise<Comment[]> {
+    return this.commentStore.findByArticleId(articleId);
   }
 }

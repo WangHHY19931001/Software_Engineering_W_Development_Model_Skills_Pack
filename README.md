@@ -91,19 +91,24 @@ npx tsx w-model-dev/scripts/self-test.ts
 
 [`w-model-dev-demo/`](./w-model-dev-demo) 是 W 模型 8 阶段端到端调测的完整产物——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。
 
-**端到端调测结论**（2026-07-21，从零重建第二轮，已归档）：
+**端到端调测结论**（2026-07-23，全量删除后从零重跑第四轮，含信息流校验特性）：
 
 | 指标 | 数值 |
 |---|---|
-| 单元测试 | 65/65 通过，代码覆盖率 98.96% lines / 93.23% branches / 100% functions（NFR-004 要求 ≥ 80%） |
-| 集成测试 | 12/12 通过，覆盖 4 对模块交互 + 5 类错误路径 |
-| 系统测试 | 6/6 通过，覆盖 4 模块 + 4 类异常路径 + 4 项安全约束 |
+| 单元测试 | 53/53 通过，代码覆盖率 96.37% lines / 93.57% branches / 92.30% functions / 96.37% statements（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 13/13 通过，覆盖 4 对模块交互 + 5 类错误路径，零 mock |
+| 系统测试 | 8/8 通过，覆盖端到端业务链路 + 安全约束 + 性能基线 + 异常路径，P95=4.66ms（≤ 200ms） |
 | 验收测试 | 15/15 通过，4/4 需求 RTM 覆盖率 100% |
-| 性能基线 | k6 脚本就绪（`tests/perf/k6-load-test.js`，100 VUs × 30s，P95 < 200ms），vitest 内近似采样 P95=3ms |
-| 工件质量门 | 通过（RTM 100% + 四级测试全通过，退出码 0） |
-| 用户确认 | `confirm`（2026-07-21，项目已归档） |
+| 性能基线 | k6 脚本就绪（`tests/perf/k6-load-test.js`，100 VUs × 30s，P95 < 200ms），vitest 内近似采样 P95=4.66ms |
+| 阶段门评审 | 8 阶段全部放行（qualityLevel 均为 A，compositeScore 0.897~0.9405） |
+| 图谱校验 | 阶段 1-4 退出码 0，最终图谱 43 节点 182 边，信息流零违反（无黑洞/奇迹/死模块），EXT-IN/EXT-OUT 边界完整，1 轮收敛 |
+| 工件质量门 | 通过（RTM 100% + 单元覆盖率 96.37% + 四级测试全通过，退出码 0） |
+| 全量测试 | `npm test` → 18 test files / 89 tests 全通过（53 unit + 13 integration + 8 system + 15 acceptance） |
+| 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-23 全量重跑通过） |
 
-过程中发现并修正的缺陷（累计 4 项）：
+> 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
+
+过程中发现并修正的缺陷（累计 4 项，均为前轮历史记录）：
 
 1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
 2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段抛错连锁挂掉 4 个测试套件。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。

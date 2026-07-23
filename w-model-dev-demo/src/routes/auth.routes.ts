@@ -1,20 +1,24 @@
+/**
+ * auth 路由：POST /register + POST /login（realizes INTF-001 HTTP 绑定）。
+ * 挂载于 /api/v1/auth 前缀。
+ */
 import { Router } from 'express';
-import { AuthController } from '../controllers/auth.controller.js';
-import { asyncHandler } from '../utils/async-handler.js';
-import { validate } from '../middleware/validate.js';
-import { AuthRegisterSchema, AuthLoginSchema } from '../schemas/auth.schema.js';
+import { asyncHandler } from '../utils/async-handler';
+import { validateRequest } from '../middleware/validate';
+import { registerSchema, loginSchema } from '../schemas/auth.schema';
+import type { AuthController } from '../controllers/auth.controller';
 
-const router: Router = Router();
-
-router.post(
-  '/register',
-  validate(AuthRegisterSchema),
-  asyncHandler(AuthController.register),
-);
-router.post(
-  '/login',
-  validate(AuthLoginSchema),
-  asyncHandler(AuthController.login),
-);
-
-export { router as authRoutes };
+export function buildAuthRoutes(authController: AuthController): Router {
+  const router = Router();
+  router.post(
+    '/register',
+    validateRequest({ body: registerSchema }),
+    asyncHandler(authController.register),
+  );
+  router.post(
+    '/login',
+    validateRequest({ body: loginSchema }),
+    asyncHandler(authController.login),
+  );
+  return router;
+}

@@ -1,20 +1,18 @@
-import { type Request, type Response, type NextFunction } from 'express';
-import { HttpError } from '../utils/errors.js';
+/**
+ * ErrorHandler：Express 四参数错误中间件（realizes INTF-008 / DD-011）。
+ * AppError 按 httpStatus+code 序列化；非 AppError 兜底 50001；不泄露堆栈。
+ */
+import type { ErrorRequestHandler } from 'express';
+import { AppError, ErrorCode } from '../utils/errors';
 
-export function errorHandler(
-  err: unknown,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
-  if (err instanceof HttpError) {
-    res.status(err.status).json({
-      code: err.code,
-      message: err.message,
-      details: err.details,
-    });
+export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  if (err instanceof AppError) {
+    const body: Record<string, unknown> = { code: err.code, message: err.message };
+    if (err.details !== undefined) {
+      body.details = err.details;
+    }
+    res.status(err.httpStatus).json(body);
     return;
   }
-  console.error('未捕获异常:', err);
-  res.status(500).json({ code: 50001, message: '内部服务器错误' });
-}
+  res.status(500).json({ code: ErrorCode.INTERNAL, message: '服务器内部错误' });
+};

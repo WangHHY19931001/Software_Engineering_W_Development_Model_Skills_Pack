@@ -1,55 +1,76 @@
+/**
+ * article + comment 路由（realizes INTF-002 / INTF-003 HTTP 绑定）。
+ * 挂载于 /api/v1 前缀，含：
+ *   GET    /articles          公开，分页
+ *   GET    /articles/:id      公开，详情+评论聚合
+ *   POST   /articles          需鉴权
+ *   PUT    /articles/:id      需鉴权（作者隔离由 service 校验）
+ *   DELETE /articles/:id      需鉴权
+ *   POST   /articles/:id/comments  需鉴权
+ *   DELETE /comments/:commentId    需鉴权
+ */
 import { Router } from 'express';
-import { ArticleController } from '../controllers/article.controller.js';
-import { CommentController } from '../controllers/comment.controller.js';
-import { authMiddleware } from '../middleware/auth.js';
-import { asyncHandler } from '../utils/async-handler.js';
-import { validate } from '../middleware/validate.js';
+import { asyncHandler } from '../utils/async-handler';
+import { authMiddleware } from '../middleware/auth';
+import { validateRequest } from '../middleware/validate';
+import type { JwtService } from '../utils/jwt';
+import type { ArticleController } from '../controllers/article.controller';
+import type { CommentController } from '../controllers/comment.controller';
 import {
-  ArticleCreateSchema,
-  ArticleUpdateSchema,
-} from '../schemas/article.schema.js';
-import { CommentCreateSchema } from '../schemas/comment.schema.js';
+  articleCreateSchema,
+  articleUpdateSchema,
+  paginationSchema,
+  articleIdParamSchema,
+} from '../schemas/article.schema';
+import { commentCreateSchema, commentIdParamSchema } from '../schemas/comment.schema';
 
-const router: Router = Router();
+export function buildArticleRoutes(
+  articleController: ArticleController,
+  commentController: CommentController,
+  jwtService: JwtService,
+): Router {
+  const router = Router();
+  const auth = authMiddleware(jwtService);
 
-// 公开
-router.get('/', asyncHandler(ArticleController.list));
-router.get('/:id', asyncHandler(ArticleController.getById));
-
-// 受保护
-router.post(
-  '/',
-  authMiddleware,
-  validate(ArticleCreateSchema),
-  asyncHandler(ArticleController.create),
-);
-router.patch(
-  '/:id',
-  authMiddleware,
-  validate(ArticleUpdateSchema),
-  asyncHandler(ArticleController.update),
-);
-router.delete(
-  '/:id',
-  authMiddleware,
-  asyncHandler(ArticleController.remove),
-);
-
-// 嵌套评论路由
-router.get(
-  '/:articleId/comments',
-  asyncHandler(CommentController.list),
-);
-router.post(
-  '/:articleId/comments',
-  authMiddleware,
-  validate(CommentCreateSchema),
-  asyncHandler(CommentController.create),
-);
-router.delete(
-  '/:articleId/comments/:commentId',
-  authMiddleware,
-  asyncHandler(CommentController.remove),
-);
-
-export { router as articleRoutes };
+  router.get(
+    '/articles',
+    validateRequest({ query: paginationSchema }),
+    asyncHandler(articleController.list),
+  );
+  router.get(
+    '/articles/:id',
+    validateRequest({ params: articleIdParamSchema }),
+    asyncHandler(articleController.getById),
+  );
+  router.post(
+    '/articles',
+    auth,
+    validateRequest({ body: articleCreateSchema }),
+    asyncHandler(articleController.create),
+  );
+  router.put(
+    '/articles/:id',
+    auth,
+    validateRequest({ params: articleIdParamSchema, body: articleUpdateSchema }),
+    asyncHandler(articleController.update),
+  );
+  router.delete(
+    '/articles/:id',
+    auth,
+    validateRequest({ params: articleIdParamSchema }),
+    asyncHandler(articleController.remove),
+  );
+  router.post(
+    '/articles/:id/comments',
+    auth,
+    validateRequest({ params: articleIdParamSchema, body: commentCreateSchema }),
+    asyncHandler(commentController.create),
+  );
+  router.delete(
+    '/comments/:commentId',
+    auth,
+    validateRequest({ params: commentIdParamSchema }),
+    asyncHandler(commentController.remove),
+  );
+  return router;
+}

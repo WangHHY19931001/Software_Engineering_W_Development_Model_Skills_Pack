@@ -1,25 +1,35 @@
-import jwt, { type SignOptions } from 'jsonwebtoken';
-import { UnauthorizedError } from './errors.js';
+/**
+ * JwtService：JWT 签发 / 校验（realizes INTF-005 / DD-008）。
+ * HS256，exp=iat+3600，密钥来自 process.env.JWT_SECRET，缺失抛 50001。
+ */
+import jwt from 'jsonwebtoken';
+import type { JwtPayload } from '../types';
+import { UnauthorizedError, InternalError, ErrorCode } from './errors';
 
-export interface JwtPayload {
-  userId: string;
-  username: string;
-}
+const DEFAULT_EXPIRES_IN = 3600;
+const ALGORITHM = 'HS256';
 
-function getSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET 未配置');
-  return secret;
-}
+export class JwtService {
+  private getSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new InternalError(ErrorCode.INTERNAL, 'JWT_SECRET 未配置');
+    }
+    return secret;
+  }
 
-export function signToken(payload: JwtPayload, expiresIn: number = 3600): string {
-  return jwt.sign(payload, getSecret(), { expiresIn } as SignOptions);
-}
+  sign(payload: JwtPayload, expiresIn: number = DEFAULT_EXPIRES_IN): string {
+    const secret = this.getSecret();
+    return jwt.sign(payload, secret, { algorithm: ALGORITHM, expiresIn });
+  }
 
-export function verifyToken(token: string): JwtPayload {
-  try {
-    return jwt.verify(token, getSecret()) as JwtPayload;
-  } catch {
-    throw new UnauthorizedError(40102, 'JWT 已过期或无效');
+  verify(token: string): JwtPayload {
+    const secret = this.getSecret();
+    try {
+      const payload = jwt.verify(token, secret, { algorithms: [ALGORITHM] }) as JwtPayload;
+      return payload;
+    } catch {
+      throw new UnauthorizedError(ErrorCode.UNAUTHORIZED_TOKEN, 'JWT 已过期或无效');
+    }
   }
 }

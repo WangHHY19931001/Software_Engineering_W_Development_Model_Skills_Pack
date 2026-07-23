@@ -7,8 +7,8 @@
 
 - 项目名称：blog-system-demo
 - 文档版本：v1.0
-- 编制日期：2026-07-21
-- 编制者：W-Model Agent
+- 编制日期：2026-07-23
+- 编制者：W-Model Agent（self-as-verifier 回归调测）
 - 关联 W 模型阶段：阶段 1（需求分析 → 同步验收测试设计）
 
 ## 1. 项目概述
@@ -115,12 +115,12 @@
 | UAT-002 | REQ-001 | 用户登录成功并返回 JWT | `POST /api/v1/auth/login` body: `{"username":"alice","password":"Passw0rd!"}` | HTTP 200；响应体含 `token`（JWT 三段式）与 `expiresIn: 3600`；`jwt.decode(token).exp - iat === 3600` | 高 |
 | UAT-003 | REQ-001 | 用户登录 - 错误密码 | `POST /api/v1/auth/login` body: `{"username":"alice","password":"WrongPass"}` | HTTP 401；`{code: 40101, message: "用户名或密码错误"}`；不返回 token；不区分用户名不存在与密码错误 | 高 |
 | UAT-004 | REQ-002 | 创建文章（已认证作者） | `POST /api/v1/articles` Header: `Authorization: Bearer <token>` body: `{"title":"Hello World","content":"My first post.","tags":["intro"]}` | HTTP 201；响应体含 `articleId`（UUID v4）、`authorId`（=JWT.userId）、`title`、`content`、`tags`、`createdAt` | 高 |
-| UAT-005 | REQ-002 | 修改自己的文章 | `PATCH /api/v1/articles/:id` body: `{"title":"Hello World (v2)"}` | HTTP 200；`title` 已更新；`updatedAt > createdAt`；其他字段保持不变 | 高 |
-| UAT-006 | REQ-002 | 删除自己的文章 | `DELETE /api/v1/articles/:id` | HTTP 204 空响应；随后 `GET /api/v1/articles/:id` 返回 404 + 40401 | 高 |
+| UAT-005 | REQ-002 | 修改自己的文章 + 非作者修改被拒 | 作者 A `PATCH /api/v1/articles/:id` body: `{"title":"Hello World (v2)"}`；作者 B `PATCH /api/v1/articles/:id` 同 body | 作者 A：HTTP 200，`title` 已更新，`updatedAt > createdAt`；作者 B：HTTP 403，`{code: 40301}` | 高 |
+| UAT-006 | REQ-002 | 删除自己的文章 + 非作者删除被拒 | 作者 A `DELETE /api/v1/articles/:id`；作者 B `DELETE /api/v1/articles/:id` | 作者 A：HTTP 204 空响应，随后 `GET` 返回 404 + 40401；作者 B（对 A 的文章）：HTTP 403，`{code: 40301}` | 高 |
 | UAT-007 | REQ-003 | 公开列表分页浏览（未认证） | `GET /api/v1/articles?page=1&pageSize=10`（无 Authorization 头）；存在 ≥ 15 篇文章 | HTTP 200；`{items: Article[10], total, page: 1, pageSize: 10}`；`page=2` 时 items 长度 = 5 | 高 |
 | UAT-008 | REQ-003 + REQ-004 | 查看文章详情 + 评论聚合 | `GET /api/v1/articles/:id`；文章下有 ≥ 2 条评论 | HTTP 200；响应体含 `comments: Comment[]`；`comments.length >= 2`；评论按 `createdAt` 升序 | 高 |
-| UAT-009 | REQ-004 | 已登录用户对存在文章发表评论 | `POST /api/v1/articles/:id/comments` body: `{"content":"Nice post!"}` | HTTP 201；响应体含 `commentId`、`articleId`、`authorId`（=JWT.userId，不取自 body）、`content`、`createdAt` | 高 |
-| UAT-010 | REQ-004 | 查看文章评论列表（未认证） | `GET /api/v1/articles/:id/comments`（无 Authorization 头） | HTTP 200；`{items: Comment[], total}`；按 createdAt 升序 | 中 |
+| UAT-009 | REQ-004 | 已登录用户对存在文章发表评论 | `POST /api/v1/articles/:id/comments` Header: `Authorization: Bearer <token>` body: `{"content":"Nice post!"}` | HTTP 201；响应体含 `commentId`、`articleId`、`authorId`（=JWT.userId，不取自 body）、`content`、`createdAt` | 高 |
+| UAT-010 | REQ-004 | 删除自己评论 + 删除他人评论被拒 | 作者 A `DELETE /api/v1/comments/:commentId`；作者 B `DELETE /api/v1/comments/:commentId` | 作者 A：HTTP 204；作者 B（对 A 的评论）：HTTP 403，`{code: 40301}` | 高 |
 | UAT-011 | NFR-001 | 密码以 bcrypt 哈希存储（无明文） | 注册 `{"username":"bob","password":"Secret123"}` 后读取 `userStore` | `user.passwordHash` 以 `$2b$10$` 开头；`user.passwordHash !== "Secret123"`；存储中无 `password` 字段；`bcrypt.getRounds(hash) === 10` | 高 |
 | UAT-012 | NFR-001 | JWT 过期后访问受保护资源被拒 | `POST /api/v1/articles` 使用过期 JWT（exp = now - 1s） + 合法 body | HTTP 401；`{code: 40102, message: "JWT 已过期或无效"}`；不返回 201 / articleId | 高 |
 | UAT-013 | NFR-002 | 列表接口 P95 响应时间 ≤ 200ms | k6 / autocannon 100 QPS 持续 10min 压测 `GET /api/v1/articles?page=1&pageSize=10`；预置 10000 篇文章 | `expect(p95).toBeLessThanOrEqual(200)`；`expect(errorRate).toBe(0)`；无 5xx；进程未崩溃 | 高 |
@@ -131,7 +131,7 @@
 
 - 功能点覆盖：REQ-001~004 全部覆盖（每 REQ ≥ 2 条）
 - 非功能点覆盖：NFR-001~004 全部覆盖（每 NFR ≥ 1 条）
-- 边界条件覆盖：JWT 过期 / 错误密码 / 不存在文章 / 公开接口未认证 / 删除后查询
+- 边界条件覆盖：JWT 过期 / 错误密码 / 不存在文章 / 公开接口未认证 / 删除后查询 / 作者隔离
 - 异常路径覆盖：40101 / 40102 / 40301 / 40401 / 40001 全覆盖
 - 总计：15 条 UAT，正常路径 8 条 + 异常路径 5 条 + 性能 / 静态检查 2 条
 
@@ -148,8 +148,9 @@
 
 - 产物路径：
   - `docs/requirement-spec.md`（本文件，内嵌 UAT-001~015）
-  - `.w-model/rtm.json`（已登记 REQ-001~004 + NFR-001~004）
-- RTM 覆盖状态：部分（designDoc 已填充；codeModule / UT / IT / ST / UAT 待后续阶段填充）
-- 验证证据：需求完整性检查 0 冲突，验收标准全量化，15 条 UAT 覆盖全部 REQ + NFR
+  - `.w-model/rtm.json`（已登记 REQ-001~004 + NFR-001~004 + UAT-001~015）
+  - `.w-model/ingestion/consolidated.json`（阶段 1 图谱，check-requirement-graph.ts 退出码 0）
+- RTM 覆盖状态：部分（designDoc / codeModule / UT / IT / ST 待后续阶段填充；acceptanceTest 已填 UAT-001~015）
+- 验证证据：需求完整性检查 0 冲突，验收标准全量化，15 条 UAT 覆盖全部 REQ + NFR；图谱信息流零违反（无黑洞 / 奇迹 / 死模块，EXT-IN / EXT-OUT 边界完整）
 - 阻塞项：无
 - 下一步：进入阶段 2（系统设计），同步产出系统测试设计

@@ -1,17 +1,20 @@
-import { type Request, type Response } from 'express';
-import { UserService } from '../services/user.service.js';
-import type { AuthRegisterDTO, AuthLoginDTO } from '../schemas/auth.schema.js';
+/**
+ * AuthController：认证 HTTP 适配层（调用 INTF-001）。
+ * register 201 / login 200，异常透传 errorHandler。
+ */
+import type { RequestHandler } from 'express';
+import type { AuthService } from '../services/user.service';
 
 export class AuthController {
-  static async register(req: Request, res: Response): Promise<void> {
-    const dto = req.body as AuthRegisterDTO;
-    const result = await UserService.register(dto.username, dto.password);
-    res.status(201).json(result);
-  }
+  constructor(private readonly authService: AuthService) {}
 
-  static async login(req: Request, res: Response): Promise<void> {
-    const dto = req.body as AuthLoginDTO;
-    const result = await UserService.login(dto.username, dto.password);
+  register: RequestHandler = async (req, res) => {
+    const result = await this.authService.register(req.body);
+    res.status(201).json(result);
+  };
+
+  login: RequestHandler = async (req, res) => {
+    const result = await this.authService.login(req.body);
     res.status(200).json(result);
-  }
+  };
 }

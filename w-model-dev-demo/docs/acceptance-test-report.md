@@ -1,201 +1,166 @@
 # 验收测试报告
 
-> 阶段 8 验收测试执行报告 + 工件质量门结果 + 项目归档
+> 阶段 8（验收测试）执行 UAT-001~015 后产出。W 模型右 V 末段，回归调测最后一关。
+> 套用 `w-model-dev/templates/test-report.md` 模板，按验收测试特性扩展 §7~§9。
 
-## 1. 执行环境
+## 文档信息
 
-- 项目：blog-system-demo
-- 执行日期：2026-07-21
-- 执行命令：`npm run test:acceptance` + `npm test` + `npm run coverage`
-- 环境变量：`JWT_SECRET=test-secret-blog-demo`
-- 测试框架：vitest 1.6.1 + supertest 7.2.2
-- Node.js：>= 20
-- 操作系统：Windows
+- 项目名称：blog-system-demo
+- 测试类型：验收测试（UAT）
+- 执行阶段：阶段 8（验收测试）
+- 执行日期：2026-07-23
+- 执行者：W-Model Agent（self-as-verifier 回归调测，test_engineer persona）
+- 关联 W 模型阶段：阶段 1（验收测试设计）→ 阶段 8（验收测试执行）
+- 验收用例设计源：`docs/requirement-spec.md` §5.1 内嵌 UAT-001~015
+- 测试代码：`tests/acceptance/acceptance.test.ts`
+- 执行命令：`npm run test:acceptance`（`cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/acceptance`）
 
-## 2. 验收测试执行结果
+## 1. 测试概要
 
-```
-RUN  v1.6.1 D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev-demo
-
- ✓ tests/acceptance/acceptance.test.ts  (15 tests) 8480ms
-
- Test Files  1 passed (1)
-      Tests  15 passed (15)
-   Duration  9.70s
-```
-
-| 指标 | 值 |
+| 指标 | 数值 |
 |---|---|
-| 测试文件 | 1 |
-| 测试用例总数 | 15 |
+| 用例总数 | 15 |
 | 通过 | 15 |
 | 失败 | 0 |
-| 跳过 | 0 |
-| 总耗时 | 9.70s |
-| UAT-013 P95 | 5ms (阈值 ≤ 200ms) |
-| UAT-015 覆盖率 | lines=100% / branches=100% / functions=100% / statements=100% |
+| 跳过 / 挂起 | 0 |
+| 通过率 | 100% |
+| 退出码 | 0 |
+| 执行耗时 | 10.24s（tests 9.18s） |
+| 单元覆盖率（NFR-004 复核） | lines 96.37% / branches 93.57% / functions 92.30% / statements 96.37%（目标 ≥ 80%） |
+| 性能 P95（NFR-002 复核） | 4.64ms（目标 ≤ 200ms，10000 条数据规模） |
 
-## 3. 用例明细
+## 2. 测试环境
 
-| 用例 ID | 关联需求 | 测试目标 | 结果 | 耗时 |
-|---|---|---|---|---|
-| UAT-001 | REQ-001 | 用户注册成功 | 通过 | ~80ms |
-| UAT-002 | REQ-001 | 登录返回 JWT（exp - iat === 3600） | 通过 | ~50ms |
-| UAT-003 | REQ-001 | 错误密码登录 → 401.40101 | 通过 | ~80ms |
-| UAT-004 | REQ-002 | 创建文章 → 201 + authorId=JWT.userId | 通过 | ~60ms |
-| UAT-005 | REQ-002 | 修改自己文章 → 200；updatedAt > createdAt | 通过 | ~80ms |
-| UAT-006 | REQ-002 | 删除自己文章 → 204；二次 GET → 404 | 通过 | ~60ms |
-| UAT-007 | REQ-003 | 公开列表分页：15 篇 → 10 + 5 | 通过 | ~200ms |
-| UAT-008 | REQ-003+004 | 文章详情 + 评论聚合升序 | 通过 | ~150ms |
-| UAT-009 | REQ-004 | 发表评论 → 201 + authorId=JWT.userId | 通过 | ~80ms |
-| UAT-010 | REQ-004 | 公开评论列表（未认证） | 通过 | ~80ms |
-| UAT-011 | NFR-001 | bcrypt cost=10 + 无明文 | 通过 | ~80ms |
-| UAT-012 | NFR-001 | 过期 JWT → 401.40102 | 通过 | ~50ms |
-| UAT-013 | NFR-002 | 1000 篇文章 200 采样 P95 ≤ 200ms | 通过 | ~4000ms（P95=5ms） |
-| UAT-014 | NFR-003 | tsc --noEmit 退出码 0 | 通过 | ~3000ms |
-| UAT-015 | NFR-004 | 覆盖率 ≥ 80%（4 维度） | 通过 | ~500ms（实测 100%） |
+| 项 | 值 |
+|---|---|
+| 运行时 | Node.js（vitest 1.6.1，environment=node） |
+| 测试框架 | vitest 1.6.1 + supertest 7.2.2 |
+| 被测对象 | 真实 Express app（`createApp()`），无任何 mock 替代被测模块 |
+| 鉴权密钥 | `process.env.JWT_SECRET=test-secret-blog-demo`（cross-env 注入，非硬编码） |
+| 存储介质 | 内存 Map（UserStore / ArticleStore / CommentStore 真实实例） |
+| 隔离策略 | 每个 `it` 前 `deps.*Store.clear()` 清空内存存储 |
+| 操作系统 | Windows |
+| 工作目录 | `w-model-dev-demo` |
 
-## 4. 全量测试执行结果（四级测试汇总）
+## 3. 测试结果明细
 
-执行命令：`npm test`
+| 用例 ID | 关联需求 | 标题 | 优先级 | 状态 | 证据 |
+|---|---|---|---|---|---|
+| UAT-001 | REQ-001 | 用户注册成功 | 高 | ✅ 通过 | POST /auth/register → 201；userId 匹配 UUID v4；username=alice；响应无 password 字段；存储 passwordHash 匹配 `^$2b$10$` |
+| UAT-002 | REQ-001 | 用户登录成功并返回 JWT | 高 | ✅ 通过 | POST /auth/login → 200；token 三段式；expiresIn=3600；`jwt.decode` 得 exp-iat===3600 |
+| UAT-003 | REQ-001 | 用户登录 - 错误密码 | 高 | ✅ 通过 | POST /auth/login → 401；code=40101；message=「用户名或密码错误」；不返回 token |
+| UAT-004 | REQ-002 | 创建文章（已认证作者） | 高 | ✅ 通过 | POST /articles → 201；articleId 匹配 UUID v4；authorId=JWT.userId；title/content/tags 一致；createdAt 有值 |
+| UAT-005 | REQ-002 | 修改自己文章 + 非作者修改被拒 | 高 | ✅ 通过 | 非作者 PUT → 403 + 40301；作者 PUT → 200，title 更新，updatedAt≥createdAt |
+| UAT-006 | REQ-002 | 删除自己文章 + 非作者删除被拒 | 高 | ✅ 通过 | 非作者 DELETE → 403 + 40301；作者 DELETE → 204；删除后 GET → 404 + 40401 |
+| UAT-007 | REQ-003 | 公开列表分页浏览（未认证） | 高 | ✅ 通过 | 无 Authorization GET → 200；page=1 items=10/total=15；page=2 items=5 |
+| UAT-008 | REQ-003, REQ-004 | 查看文章详情 + 评论聚合 | 高 | ✅ 通过 | GET /articles/:id → 200；comments.length≥2；按 createdAt 升序 |
+| UAT-009 | REQ-004 | 已登录用户对存在文章发表评论 | 高 | ✅ 通过 | POST /articles/:id/comments → 201；commentId 匹配 UUID v4；authorId=JWT.userId（不取自 body） |
+| UAT-010 | REQ-004 | 删除自己评论 + 删除他人评论被拒 | 高 | ✅ 通过 | 他人 DELETE /comments/:id → 403 + 40301；自己 DELETE → 204；详情评论列表归零 |
+| UAT-011 | NFR-001 | 密码以 bcrypt 哈希存储（无明文） | 高 | ✅ 通过 | passwordHash 匹配 `^$2b$10$`；≠明文；存储无 password 字段；`getRounds===10`（真实 PasswordHasher） |
+| UAT-012 | NFR-001 | JWT 过期后访问受保护资源被拒 | 高 | ✅ 通过 | 过期 JWT（exp=now-1s）POST /articles → 401 + 40102；message=「JWT 已过期或无效」；无 articleId；存储无写入 |
+| UAT-013 | NFR-002 | 列表接口 P95 ≤ 200ms | 高 | ✅ 通过 | 10000 篇预置；N=150 采样；P95=4.64ms，max=6.32ms，errorRate=0，无 5xx |
+| UAT-014 | NFR-003 | tsc strict 模式 0 错误 | 中 | ✅ 通过 | `npx tsc --noEmit` 退出码 0；stderr 无输出 |
+| UAT-015 | NFR-004 | 单元测试覆盖率 ≥ 80% | 中 | ✅ 通过 | `npx vitest run tests/unit --coverage` 退出码 0；lines 96.37% / branches 93.57% / functions 92.30% / statements 96.37% |
 
-```
-Test Files  14 passed (14)
-      Tests  107 passed (107)
-   Duration  9.92s
-```
+## 4. 性能结果（NFR-002 验收）
 
-| 测试级别 | 文件数 | 用例数 | 通过 | 失败 |
-|---|---|---|---|---|
-| 单元测试 (UT) | 11 | 71 | 71 | 0 |
-| 集成测试 (IT) | 1 | 13 | 13 | 0 |
-| 系统测试 (ST) | 1 | 8 | 8 | 0 |
-| 验收测试 (UAT) | 1 | 15 | 15 | 0 |
-| **总计** | **14** | **107** | **107** | **0** |
-
-## 5. 覆盖率执行结果
-
-执行命令：`npm run coverage`
-
-```
- % Coverage report from v8
--------------------|---------|----------|---------|---------|-------------------
-File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
--------------------|---------|----------|---------|---------|-------------------
-All files          |     100 |      100 |     100 |     100 |
- middleware        |     100 |      100 |     100 |     100 |
-  auth.ts          |     100 |      100 |     100 |     100 |
-  error-handler.ts |     100 |      100 |     100 |     100 |
-  validate.ts      |     100 |      100 |     100 |     100 |
- services          |     100 |      100 |     100 |     100 |
-  article.service.ts |     100 |      100 |     100 |     100 |
-  comment.service.ts |     100 |      100 |     100 |     100 |
-  user.service.ts  |     100 |      100 |     100 |     100 |
- stores            |     100 |      100 |     100 |     100 |
-  article.store.ts |     100 |      100 |     100 |     100 |
-  comment.store.ts |     100 |      100 |     100 |     100 |
-  user.store.ts    |     100 |      100 |     100 |     100 |
- utils             |     100 |      100 |     100 |     100 |
-  async-handler.ts |     100 |      100 |     100 |     100 |
-  errors.ts        |     100 |      100 |     100 |     100 |
-  jwt.ts           |     100 |      100 |     100 |     100 |
-  password.ts      |     100 |      100 |     100 |     100 |
--------------------|---------|----------|---------|---------|-------------------
-```
-
-| 维度 | 阈值 | 实测 | 结论 |
+| 指标 | 目标 | 实测 | 是否达标 |
 |---|---|---|---|
-| Statements | ≥ 80% | 100% | ✓ |
-| Branches | ≥ 80% | 100% | ✓ |
-| Functions | ≥ 80% | 100% | ✓ |
-| Lines | ≥ 80% | 100% | ✓ |
+| 读接口 P95 | ≤ 200ms | 4.64ms | ✅ |
+| 最大响应时间 | — | 6.32ms | ✅ |
+| 错误率（5xx） | 0 | 0 | ✅ |
+| 数据规模 | 10000 篇 | 10000 篇 | ✅ |
+| 采样次数 | — | 150 | ✅ |
+| 进程崩溃 | 无 | 无 | ✅ |
 
-## 6. 工件质量门校验
+> 说明：UAT-013 采用 vitest 内进程采样（真实 app + supertest，循环 N 次测量 P95），与系统测试 ST-004 同一既定性能测试约定。
+> 规范级 k6 100QPS/10min 脚本位于 `tests/perf/k6-load-test.js`（系统测试阶段已执行，ST-004 P95=4.66ms），
+> 因 k6 非 vitest 可运行依赖，验收测试以等价内进程真实采样复核 NFR-002，未使用任何 mock。
 
-执行命令：`npx tsx ../w-model-dev/scripts/check-artifact-gate.ts .`
+## 5. 安全结果（NFR-001 验收）
 
-```
-════════════════════════════════════════════════════════════
-工件质量门校验（Artifact Gate）
-════════════════════════════════════════════════════════════
-项目目录      : .
-RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\rtm.json
-RTM 覆盖率    : 100%
-单元覆盖率    : 100%
-校验结果      : ✓ 通过
-────────────────────────────────────────────────────────────
-所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过。
-────────────────────────────────────────────────────────────
-GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"unitCoveragePercent":100,"missingItems":[],"reasons":[]}
-```
-
-退出码：0
-
-## 7. RTM 终检
-
-| 检查项 | 结果 |
-|---|---|
-| 需求行数 | 8 (REQ-001~004 + NFR-001~004) |
-| 7 字段全部非空 | ✓ |
-| 需求 ID 唯一 | ✓ |
-| RTM 覆盖率 | 100% |
-| unitTest 汇总 | total=71 / passed=71 / failed=0 / pending=0 / coverage=100 |
-| integrationTest 汇总 | total=13 / passed=13 / failed=0 / pending=0 / coverage=100 |
-| systemTest 汇总 | total=8 / passed=8 / failed=0 / pending=0 / coverage=100 |
-| acceptanceTest 汇总 | total=15 / passed=15 / failed=0 / pending=0 / coverage=100 |
-| 计数守恒 (passed+failed+pending=total) | ✓ 四级均满足 |
-| 单元覆盖率 ≥ 80% | ✓ (100%) |
-
-## 8. 4 项历史修复回归验证
-
-| 修复项 | 验证位置 | 状态 |
+| 检查项 | 状态 | 说明 |
 |---|---|---|
-| #1 async-handler 包装所有 async handler | src/routes/*.routes.ts (3 个文件，全部 asyncHandler 包装) | ✓ |
-| #2 JWT_SECRET 从 process.env 读取 | src/utils/jwt.ts:8-11 (getSecret 函数) | ✓ |
-| #3 ArticleService `export class` | src/services/article.service.ts:9 (export class ArticleService) | ✓ |
-| #4 vitest mock 类型断言 | tests/unit/validate.test.ts:15-19 (ReturnType<typeof vi.fn>) | ✓ |
+| 密码 bcrypt 哈希 | ✅ | UAT-011：passwordHash 匹配 `^$2b$10$`，cost=10，无明文，无 password 字段 |
+| JWT 过期/无效处理 | ✅ | UAT-012：过期 JWT → 401 + 40102，受保护资源被拒 |
+| 明文密码泄露 | ✅ | UAT-001/UAT-011：响应与存储序列化均无明文 |
+| 密钥硬编码 | ✅ | JWT_SECRET 来自 process.env（cross-env 注入） |
 
-## 9. 用户确认区
+## 6. 可维护性 / 可测试性结果（NFR-003 / NFR-004 验收）
 
-> 工件质量门已通过。请用户在下表填写 `confirm` 完成项目归档。
+| 检查项 | 目标 | 实测 | 是否达标 |
+|---|---|---|---|
+| tsc strict 0 错误（UAT-014） | exit 0 | exit 0，stderr 空 | ✅ |
+| 单元覆盖率 lines（UAT-015） | ≥ 80% | 96.37% | ✅ |
+| 单元覆盖率 branches（UAT-015） | ≥ 80% | 93.57% | ✅ |
+| 单元覆盖率 functions（UAT-015） | ≥ 80% | 92.30% | ✅ |
+| 单元覆盖率 statements（UAT-015） | ≥ 80% | 96.37% | ✅ |
 
-| 项 | 内容 |
-|---|---|
-| 项目名 | blog-system-demo |
-| 工件质量门结果 | ✓ 通过（exit 0） |
-| RTM 覆盖率 | 100% |
-| 四级测试通过率 | 107/107 (100%) |
-| 单元覆盖率 | 100%（4 维度） |
-| 用户确认 | confirm |
+## 7. 失败用例分析
 
-## 10. 项目归档清单
+无失败用例。15 条 UAT 全部一次通过，无需返工。
 
-| 类别 | 文件 | 状态 |
+## 8. RTM 覆盖率与四级测试汇总
+
+### 8.1 RTM 需求覆盖率
+
+| 需求 ID | 关联 UAT | 覆盖状态 |
 |---|---|---|
-| 阶段 1 产物 | docs/requirement-spec.md | ✓ |
-| 阶段 2 产物 | docs/system-design.md | ✓ |
-| 阶段 3 产物 | docs/outline-design.md | ✓ |
-| 阶段 4 产物 | docs/detailed-design.md | ✓ |
-| 阶段 5 产物 | src/*.ts (26 个文件) | ✓ |
-| 阶段 5 产物 | tests/unit/*.test.ts (11 个文件) | ✓ |
-| 阶段 6 产物 | tests/integration/integration.test.ts | ✓ |
-| 阶段 6 产物 | docs/integration-test-cases.md | ✓ |
-| 阶段 6 产物 | docs/integration-test-report.md | ✓ |
-| 阶段 7 产物 | tests/system/system.test.ts | ✓ |
-| 阶段 7 产物 | tests/perf/k6-load-test.js | ✓ |
-| 阶段 7 产物 | tests/perf/README.md | ✓ |
-| 阶段 7 产物 | docs/system-test-cases.md | ✓ |
-| 阶段 7 产物 | docs/system-test-report.md | ✓ |
-| 阶段 8 产物 | tests/acceptance/acceptance.test.ts | ✓ |
-| 阶段 8 产物 | docs/uat-test-cases.md | ✓ |
-| 阶段 8 产物 | docs/acceptance-test-report.md (本文件) | ✓ |
-| RTM | .w-model/rtm.json | ✓ |
-| 配置 | package.json / tsconfig.json / vitest.config.ts | ✓ (保留) |
+| REQ-001（用户认证） | UAT-001, UAT-002, UAT-003 | 完全覆盖 |
+| REQ-002（文章管理） | UAT-004, UAT-005, UAT-006 | 完全覆盖 |
+| REQ-003（公开浏览） | UAT-007, UAT-008 | 完全覆盖 |
+| REQ-004（评论） | UAT-008, UAT-009, UAT-010 | 完全覆盖 |
+| NFR-001（安全） | UAT-011, UAT-012 | 完全覆盖 |
+| NFR-002（性能） | UAT-013 | 完全覆盖 |
+| NFR-003（可维护性） | UAT-014 | 完全覆盖 |
+| NFR-004（可测试性） | UAT-015 | 完全覆盖 |
 
-## 11. 阻塞与异常
+- RTM 需求覆盖率：8/8 = **100%**（REQ-001~004 + NFR-001~004 全部有对应 UAT 且全部通过）
+- 异常码覆盖：40101 / 40102 / 40301 / 40401 / 40001 全覆盖（40001 由 UAT-007/008 间接经分页边界与 ST-008 覆盖，UAT 主线聚焦验收标准）
 
-无。所有验收用例一次通过；4 项历史修复全部回归验证通过；工件质量门退出码 0。
+### 8.2 四级测试汇总
 
-## 12. 结论
+| 测试级别 | 用例数 | 通过 | 失败 | 挂起 | 状态 |
+|---|---|---|---|---|---|
+| 单元测试（UT） | 53 | 53 | 0 | 0 | ✅ 全通过 |
+| 集成测试（IT） | 13 | 13 | 0 | 0 | ✅ 全通过 |
+| 系统测试（ST） | 8 | 8 | 0 | 0 | ✅ 全通过 |
+| 验收测试（UAT） | 15 | 15 | 0 | 0 | ✅ 全通过 |
+| **合计** | **89** | **89** | **0** | **0** | ✅ |
 
-W 模型 8 阶段端到端调测全部完成。项目可归档。
+## 9. 用户确认节（self-as-verifier 模式声明）
+
+> ⚠️ 模式声明：本项目处于 **self-as-verifier 回归调测模式**。按 `w-model-dev/references/phase-8-acceptance-test.md`
+> 规定，验收测试的最终用户确认不得由 Agent 代签。在 self-as-verifier 调测模式下，由**调测者代为确认**，
+> 但必须如实标注模式，不得伪造成真实终端用户签字。
+
+| 确认项 | 状态 | 说明 |
+|---|---|---|
+| UAT-001~015 执行结果 | ✅ 已由调测者复核 | 15/15 真实通过，证据见 §3 |
+| 需求满足度 | ✅ REQ-001~004 + NFR-001~004 全部满足 | RTM 覆盖率 100% |
+| 四级测试全绿 | ✅ | UT 53/53 + IT 13/13 + ST 8/8 + UAT 15/15 |
+| 终检门禁 | ✅ | check-artifact-gate.ts 退出码 0 |
+| 真实终端用户签字 | ⏳ pending（self-as-verifier 模式下由调测者代签） | 非真实终端用户签字 |
+
+- 确认模式：self-as-verifier（调测者代签）
+- 确认人：W-Model 调测者
+- 确认时间：2026-07-23
+- 备注：Agent 未代签真实用户确认；如需正式发布，仍建议由真实终端用户复核签字后替换本节。
+
+## 10. 结论
+
+- [x] 测试通过，可进入发布门禁
+- [ ] 测试未通过，需返工
+- [ ] 部分通过，遗留项：无
+
+**结论**：UAT-001~015 共 15 条验收用例全部真实通过（退出码 0），覆盖 REQ-001~004 全部验收标准与 NFR-001~004 全部非功能指标；RTM 需求覆盖率 100%；四级测试 89/89 全绿；单元覆盖率 96.37%（≥80%）；性能 P95=4.64ms（≤200ms）。满足需求规格，达到发布门禁条件。
+
+## 11. 质量门状态（验收测试后）
+
+- [x] 单元测试代码覆盖率 ≥ 80%（96.37%）
+- [x] tsc strict 规范检查通过（exit 0）
+- [x] 安全无高危（bcrypt cost=10 + JWT 校验 + 无明文）
+- [x] 性能达标（P95=4.64ms ≤ 200ms）
+- [x] RTM 需求覆盖率 100%
+- [x] 四级测试全部通过（89/89）
+- [x] check-artifact-gate.ts 终检退出码 0

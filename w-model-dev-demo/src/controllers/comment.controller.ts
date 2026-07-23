@@ -1,24 +1,36 @@
-import { type Response, type Request } from 'express';
-import { CommentService } from '../services/comment.service.js';
-import type { CommentCreateDTO } from '../schemas/comment.schema.js';
+/**
+ * CommentController：评论 HTTP 适配层（调用 INTF-003）。
+ * create 201 / remove 204，异常透传 errorHandler。
+ * DTO 映射 comment.id→commentId 以符合 UAT-009 契约。
+ */
+import type { RequestHandler } from 'express';
+import type { CommentService } from '../services/comment.service';
+import type { Comment } from '../types';
+
+function toCommentDto(c: Comment) {
+  return {
+    commentId: c.id,
+    articleId: c.articleId,
+    authorId: c.authorId,
+    content: c.content,
+    createdAt: c.createdAt,
+  };
+}
 
 export class CommentController {
-  static async create(req: Request, res: Response): Promise<void> {
-    const comment = await CommentService.create(
+  constructor(private readonly commentService: CommentService) {}
+
+  create: RequestHandler = async (req, res) => {
+    const comment = await this.commentService.create(
+      req.params.id,
+      req.body,
       req.user!.userId,
-      req.params.articleId,
-      req.body as CommentCreateDTO,
     );
-    res.status(201).json(comment);
-  }
+    res.status(201).json(toCommentDto(comment));
+  };
 
-  static async list(req: Request, res: Response): Promise<void> {
-    const items = await CommentService.listByArticle(req.params.articleId);
-    res.status(200).json({ items, total: items.length });
-  }
-
-  static async remove(req: Request, res: Response): Promise<void> {
-    await CommentService.remove(req.user!.userId, req.params.commentId);
+  remove: RequestHandler = async (req, res) => {
+    await this.commentService.delete(req.params.commentId, req.user!.userId);
     res.status(204).end();
-  }
+  };
 }
