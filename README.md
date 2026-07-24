@@ -24,6 +24,8 @@
 - **TLA+ 层次化状态机建模 + 代码-TLA+ 一致性回归**：阶段 1-4 用 TLA+ 建模系统/子系统/原子行为（L1-L3+ 层次化），G 子代理跑 `check-tla-model.ts` 校验 SANY 语法 + TLC 模型检查；阶段 5 G 子代理跑 `check-code-tla-consistency.ts` 四维度校验（SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式），将 TLA+ 资产作为状态机验证器回归编码产物
 - **PPT 排序算法**：O(N×k) 复杂度的概率枢轴锦标赛，用于测试用例优先级排序
 - **采用路径（Greenfield vs Brownfield）**：新项目 Day 0 跑全流程 vs 存量项目增量验证优先，见 [采用路径指南](./docs/adoption-guide.md)；吸收自 addyosmani/agent-skills `docs/adoption-guide.md` 并适配 W 模型 8 阶段
+- **Loop 3 事件驱动循环**（L2+ 激活）：棕地维护场景的事件接驳——消费方自行实现 webhook/cron 触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（bug 修复/需求变更/验收重跑/回归测试/安全事件）。不内置调度基础设施。详见 [event-ingress-guide.md](w-model-dev/references/event-ingress-guide.md)。
+- **Loop 4 爬坡循环**：分析 run-log 产出 HarnessImprovementReport 改进信号（prompt/工具/验证规则/反模式/成熟度/预算 6 类），人审后手动应用。保持"技能自演化不在本仓库"原则——外部 SkillOpt/darwin-skill 消费信号做演化。详见 [hill-climbing-guide.md](w-model-dev/references/hill-climbing-guide.md)。
 
 ## 架构原则与外部工具边界
 
