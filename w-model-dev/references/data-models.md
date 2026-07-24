@@ -12,6 +12,7 @@
 - 成本预算模型（budget.json）
 - 运行日志模型（run-log.jsonl）
 - 自主成熟度模型（maturity.json）
+- TLA+ manifest 模型（tla-manifest.json）
 
 ## 项目数据模型
 
@@ -449,3 +450,113 @@ interface MaturityConfig {
 - 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后 unlockConditions 全部达标时询问）。
 - 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0。
 - `maturity.json` 与 `budget.json` 协同：L2+ 自主度可设 `onExceed=notify`（仅在 run-log 记录告警）；L0 默认 `onExceed=pause`（最保守）。
+
+## TLA+ manifest 模型（tla-manifest.json）
+
+> TLA+ 行为层事实源。S 子代理产出 .tla/.cfg 后同步更新此文件；G 子代理跑 `check-tla-model.ts` 校验。
+> 权威语义与操作细则见 [tla-plus-guide.md](tla-plus-guide.md)（manifest schema 节 + §2.0 命名规范 + §2.1 路径解析基准 + checkRounds 字段语义节）。
+
+### tla-manifest.json
+
+```typescript
+interface TlaManifest {
+  /** Schema 版本，当前固定为 1 */
+  version: 1;
+  /** 项目 ID（与 project.json 一致） */
+  project: string;
+  /** 当前所处阶段（1-8） */
+  currentPhase: number;
+  /** TLA+ 工具链配置 */
+  tools: {
+    /** tla2tools.jar 路径，相对 cwd 解析（见 tla-plus-guide.md §2.1） */
+    jarPath: string;
+    /** Java 最低版本（默认 11） */
+    javaMinVersion: number;
+  };
+  /** TLA+ 规格列表 */
+  specs: TlaSpec[];
+  /** TLA+ 校验轮次记录数组，语义见 tla-plus-guide.md「checkRounds 字段语义」节 */
+  checkRounds: TlaCheckRound[];
+}
+
+interface TlaSpec {
+  /** 规格 ID，须符合命名规范（MODULE 名格式 L<level>_<system>[_<subsystem>]，见 tla-plus-guide.md §2.0） */
+  id: string;
+  /** 层级（L1 / L2 / L3 / L4 ...） */
+  level: 'L1' | 'L2' | 'L3' | 'L4';
+  /** 产出阶段（1-8） */
+  phase: number;
+  /** 所属系统名称（层次路径用 :: 分隔，如 blog-system::auth-subsystem） */
+  system: string;
+  /** 关联需求 ID 列表（与 rtm.json 需求 ID 一致） */
+  requirementIds: string[];
+  /** 关联设计文档相对路径（可带锚点 #§） */
+  designRef: string;
+  /** .tla 文件路径，相对 manifest 文件所在目录解析（见 tla-plus-guide.md §2.1） */
+  tlaPath: string;
+  /** .cfg 文件路径，相对 manifest 文件所在目录解析 */
+  cfgPath: string;
+  /** 上级 TLA 文件相对路径（L1 填 null）；相对该 .tla 文件所在目录解析 */
+  parent: string | null;
+  /** 同级 TLA 文件相对路径列表；无填 [] */
+  siblings: string[];
+  /** 下级 TLA 文件相对路径列表；叶子填 [] */
+  children: string[];
+  /** 变量组合数（各变量取值域笛卡尔积） */
+  variableCombination: number;
+  /** 拆解决策：kept-below-threshold / consider-split / must-split / split-done */
+  decompositionDecision: 'kept-below-threshold' | 'consider-split' | 'must-split' | 'split-done';
+  /** SANY 语法检查是否通过 */
+  syntaxChecked: boolean;
+  /** TLC 模型检查是否通过 */
+  tlcChecked: boolean;
+  /** 是否无死锁 */
+  deadlockFree: boolean;
+  /** 不变式是否成立 */
+  invariantsHold: boolean;
+  /** 是否发生状态爆炸 */
+  stateExplosion: boolean;
+}
+
+interface TlaCheckRound {
+  /** 校验时所处阶段（1-8） */
+  phase: number;
+  /** 本阶段内校验轮次序号（从 1 起） */
+  round: number;
+  /** ISO 8601 时间戳 */
+  timestamp: string;
+  /** 校验的 spec id */
+  specId: string;
+  /** SANY 语法检查是否通过 */
+  syntaxCheck: boolean;
+  /** TLC 模型检查是否通过（--skip-tlc 时填 false 并备注） */
+  tlcCheck: boolean;
+  /** 本轮违反数（死锁 + 不变式违反 + 状态爆炸等合计） */
+  violations: number;
+  /** 本轮是否零违反收敛（violations === 0） */
+  converged: boolean;
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `version` | `1` | 是 | Schema 版本 |
+| `project` | string | 是 | 项目 ID |
+| `currentPhase` | number | 是 | 当前阶段（1-8） |
+| `tools.jarPath` | string | 是 | jar 路径，相对 **cwd** 解析（见 [tla-plus-guide.md §2.1](tla-plus-guide.md#§21-路径解析基准)） |
+| `tools.javaMinVersion` | number | 是 | Java 最低版本 |
+| `specs[]` | TlaSpec[] | 是 | TLA+ 规格列表 |
+| `specs[].id` | string | 是 | 规格 ID，须符合 [§2.0 命名规范](tla-plus-guide.md#§20-命名规范)（禁止连字符） |
+| `specs[].tlaPath` / `cfgPath` | string | 是 | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus-guide.md#§21-路径解析基准)） |
+| `specs[].parent` / `siblings` / `children` | string / string[] | 是 | 相对 **该 .tla 文件所在目录**解析；L1 `parent=null`，叶子 `children=[]` |
+| `specs[].decompositionDecision` | enum | 是 | 拆解决策（组合数 >1w 必须 `split-done`） |
+| `checkRounds[]` | TlaCheckRound[] | 是 | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定） |
+
+**使用约定**：
+
+- `tla-manifest.json` 由 S 子代理维护（产出 .tla 后同步更新），属"状态读写+持久化"允许动作。
+- 阶段 5-8 冻结只读：编排者不应分派 S-tla 修改 TLA+ 资产（见 SKILL.md 自检清单）。
+- `tla-manifest.json`（行为层）与 `graph.json`（结构层）、`rtm.json`（追溯层）并存，各自独立校验，互不替代。
+- `checkRounds` 在项目首次产出 TLA+ 规格前填 `[]`；每轮校验后由 G 子代理追加一条记录。

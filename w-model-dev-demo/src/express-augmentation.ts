@@ -1,14 +1,13 @@
-/**
- * Express 类型增强：将 JWT 解码后的用户身份挂载到 req.user（对应 INTF-006）。
- */
+// Express 类型扩展：为 Request 注入 user 字段（JWT 鉴权中间件填充）
+// 对应 detailed-design.md DD-AUTH-MW：authenticate 注入 req.user={userId,role}
 import type { JwtPayload } from './types';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    user?: JwtPayload;
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JwtPayload;
+    }
   }
 }
 
-export interface AuthRequest {
-  user: JwtPayload;
-}
+export {};

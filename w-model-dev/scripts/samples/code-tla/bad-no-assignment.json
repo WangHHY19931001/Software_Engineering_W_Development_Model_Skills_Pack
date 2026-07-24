@@ -1,0 +1,38 @@
+{
+  "manifest": {
+    "specs": [
+      {
+        "id": "L2-auth",
+        "level": "L2",
+        "phase": 2,
+        "system": "demo::auth",
+        "requirementIds": ["REQ-001"],
+        "tlaPath": "tla/L2-auth.tla",
+        "cfgPath": "tla/L2-auth.cfg",
+        "parent": null,
+        "children": [],
+        "tlaContent": "---- MODULE L2_auth ----\nVARIABLES state\nInit == state = \"init\"\nNext == state' = state\n====\n"
+      }
+    ]
+  },
+  "graph": {
+    "nodes": [
+      { "id": "REQ-001", "type": "REQ" },
+      { "id": "SD-AUTH", "type": "SD" }
+    ],
+    "edges": [
+      { "from": "SD-AUTH", "to": "REQ-001", "type": "parent" }
+    ]
+  },
+  "rtm": {
+    "rows": [
+      { "requirementId": "REQ-001", "codeModule": "src/auth.ts" }
+    ]
+  },
+  "codeSources": [
+    {
+      "path": "src/auth.ts",
+      "content": "const greeting: string = 'hello';\nfunction foo(): number {\n  return 42;\n}\n"
+    }
+  ]
+}

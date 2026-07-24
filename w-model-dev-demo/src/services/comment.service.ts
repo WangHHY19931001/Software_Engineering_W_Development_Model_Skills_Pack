@@ -1,48 +1,66 @@
-/**
- * CommentService：评论增删查 + 文章存在性校验（realizes INTF-003 / DD-006）。
- * 依赖 CommentStore + ArticleService（校验文章存在）。
- */
-import { randomUUID } from 'node:crypto';
+// 评论服务：评论添加（含文章存在性校验）、评论列表查询
+// 对应 detailed-design.md DD-COMMENT-SVC：依赖 ArticleService / CommentStore
+import type { Comment, Result } from '../types';
+import { commentStore } from '../stores/comment.store';
 import type { CommentStore } from '../stores/comment.store';
+import { articleService } from './article.service';
 import type { ArticleService } from './article.service';
-import { NotFoundError, ForbiddenError, ErrorCode } from '../utils/errors';
-import type { Comment, CommentCreateInput } from '../types';
+import { AppError } from '../utils/errors';
 
 export class CommentService {
   constructor(
-    private readonly commentStore: CommentStore,
-    private readonly articleService: ArticleService,
+    private articleService: ArticleService,
+    private commentStore: CommentStore,
   ) {}
 
-  async create(
+  add(
     articleId: string,
-    input: CommentCreateInput,
     authorId: string,
-  ): Promise<Comment> {
-    await this.articleService.getById(articleId);
+    content: string,
+  ): Result<{ commentId: string; articleId: string; createdAt: string }> {
+    if (!content) {
+      return { ok: false, code: 40001, message: '评论内容不能为空' };
+    }
+    // 校验文章存在且非 rejected（对普通用户不可见的文章不允许评论）
+    try {
+      this.articleService.getById(articleId, 'user');
+    } catch (err) {
+      const e = err as AppError;
+      if (e.code === 40301) {
+        // rejected 文章对普通用户不可见 → 转换为 60002 状态不允许评论
+        return { ok: false, code: 60002, message: '文章状态不允许评论' };
+      }
+      // 40401 文章不存在直接透传
+      return { ok: false, code: e.code, message: e.message };
+    }
     const comment: Comment = {
-      id: randomUUID(),
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       articleId,
       authorId,
-      content: input.content,
+      content,
       createdAt: new Date().toISOString(),
     };
-    this.commentStore.insert(comment);
-    return comment;
+    this.commentStore.save(comment);
+    return {
+      ok: true,
+      data: {
+        commentId: comment.id,
+        articleId: comment.articleId,
+        createdAt: comment.createdAt,
+      },
+    };
   }
 
-  async delete(commentId: string, authorId: string): Promise<void> {
-    const existing = this.commentStore.findById(commentId);
-    if (!existing) {
-      throw new NotFoundError(ErrorCode.NOT_FOUND, '评论不存在');
+  listByArticle(articleId: string): Result<Comment[]> {
+    // 校验文章存在性（admin 视角，可见所有状态）
+    try {
+      this.articleService.getById(articleId, 'admin');
+    } catch (err) {
+      const e = err as AppError;
+      return { ok: false, code: e.code, message: e.message };
     }
-    if (existing.authorId !== authorId) {
-      throw new ForbiddenError(ErrorCode.FORBIDDEN, '无权操作他人评论');
-    }
-    this.commentStore.delete(commentId);
-  }
-
-  async listByArticle(articleId: string): Promise<Comment[]> {
-    return this.commentStore.findByArticleId(articleId);
+    return { ok: true, data: this.commentStore.findByArticle(articleId) };
   }
 }
+
+export const commentService = new CommentService(articleService, commentStore);

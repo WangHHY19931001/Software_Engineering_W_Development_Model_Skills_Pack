@@ -1,38 +1,27 @@
-/**
- * UserStore：用户内存存储（realizes INTF-010 / DD-001）。
- * 维护 users 主存储 + usernameIndex 唯一索引，冲突抛 40901。
- */
+// 用户内存存储封装：Map 读写 + username 索引
+// 对应 detailed-design.md DD-USER-STORE：store Map<userId,User> + usernameIndex Map<username,userId>
 import type { User } from '../types';
-import { ConflictError, ErrorCode } from '../utils/errors';
 
 export class UserStore {
-  private readonly users = new Map<string, User>();
-  private readonly usernameIndex = new Map<string, string>();
+  private store = new Map<string, User>();
+  private usernameIndex = new Map<string, string>();
 
-  insert(user: User): void {
-    if (this.usernameIndex.has(user.username)) {
-      throw new ConflictError(ErrorCode.CONFLICT, '用户名已存在');
-    }
-    this.users.set(user.id, user);
+  save(user: User): void {
+    this.store.set(user.id, user);
     this.usernameIndex.set(user.username, user.id);
   }
 
-  findByUsername(username: string): User | undefined {
+  findById(userId: string | null): User | null {
+    if (userId == null) return null;
+    return this.store.get(userId) ?? null;
+  }
+
+  findByUsername(username: string | null): User | null {
+    if (username == null) return null;
     const id = this.usernameIndex.get(username);
-    if (!id) return undefined;
-    return this.users.get(id);
-  }
-
-  findById(id: string): User | undefined {
-    return this.users.get(id);
-  }
-
-  clear(): void {
-    this.users.clear();
-    this.usernameIndex.clear();
-  }
-
-  size(): number {
-    return this.users.size;
+    if (!id) return null;
+    return this.store.get(id) ?? null;
   }
 }
+
+export const userStore = new UserStore();

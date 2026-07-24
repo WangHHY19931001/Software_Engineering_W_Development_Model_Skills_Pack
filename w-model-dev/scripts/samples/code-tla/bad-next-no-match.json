@@ -1,0 +1,38 @@
+{
+  "manifest": {
+    "specs": [
+      {
+        "id": "L2-auth",
+        "level": "L2",
+        "phase": 2,
+        "system": "demo::auth",
+        "requirementIds": ["REQ-001"],
+        "tlaPath": "tla/L2-auth.tla",
+        "cfgPath": "tla/L2-auth.cfg",
+        "parent": null,
+        "children": [],
+        "tlaContent": "---- MODULE L2_auth ----\nVARIABLES state, token\nInit ==\n    /\\ state = \"init\"\n    /\\ token = FALSE\n\nRegister ==\n    /\\ state = \"init\"\n    /\\ state' = \"registered\"\n    /\\ token' = FALSE\n\nLogin ==\n    /\\ state = \"registered\"\n    /\\ state' = \"authenticated\"\n    /\\ token' = TRUE\n\nNext ==\n    \\/ Register\n    \\/ Login\n\nBusinessInvariant ==\n    /\\ TypeInvariant\n\nTypeInvariant ==\n    state \\in {\"init\", \"registered\", \"authenticated\"}\n====\n"
+      }
+    ]
+  },
+  "graph": {
+    "nodes": [
+      { "id": "REQ-001", "type": "REQ" },
+      { "id": "SD-AUTH", "type": "SD" }
+    ],
+    "edges": [
+      { "from": "SD-AUTH", "to": "REQ-001", "type": "parent" }
+    ]
+  },
+  "rtm": {
+    "rows": [
+      { "requirementId": "REQ-001", "codeModule": "src/auth.ts" }
+    ]
+  },
+  "codeSources": [
+    {
+      "path": "src/auth.ts",
+      "content": "let state: string = 'init';\nfunction doSomething(): void {\n  state = 'unknown';\n  assert(state !== undefined, 'state defined');\n}\n"
+    }
+  ]
+}

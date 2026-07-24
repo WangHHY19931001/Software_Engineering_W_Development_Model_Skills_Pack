@@ -56,21 +56,23 @@ npm run prepush
 
 - **项目**：博客系统后端（blog-system-demo），Express 4 + TypeScript 5 + 内存存储
 - **8 阶段产出**：`docs/`（需求 / 系统 / 概要 / 详细设计 + 四级测试用例与报告）+ `src/`（控制器 / 服务 / 存储 / 中间件）+ `tests/`（单元 / 集成 / 系统 / 验收 / 性能）+ `tests/perf/`（k6 性能基线脚本）
-- **端到端调测结论**（2026-07-23，第四轮，全量删除后从零重跑，含信息流校验特性）：
+- **端到端调测结论**（2026-07-24，第五轮，全量删除后从零重跑，编排者-子代理分派模式）：
 
 | 指标 | 数值 |
 |---|---|
-| 单元测试 | 53/53 通过，代码覆盖率 96.37% lines / 93.57% branches / 92.30% functions / 96.37% statements（NFR-004 要求 ≥ 80%） |
-| 集成测试 | 13/13 通过，覆盖 4 对模块交互 + 5 类错误路径，零 mock |
-| 系统测试 | 8/8 通过，覆盖端到端业务链路 + 安全约束 + 性能基线 + 异常路径，P95=4.66ms（≤ 200ms） |
-| 验收测试 | 15/15 通过，4/4 需求 RTM 覆盖率 100% |
-| 性能基线 | k6 脚本就绪（`tests/perf/k6-load-test.js`，100 VUs × 30s，P95 < 200ms），vitest 内近似采样 P95=4.66ms |
-| 阶段门评审 | 8 阶段全部放行（qualityLevel 均为 A，compositeScore 0.897~0.9405） |
-| 图谱校验 | 阶段 1-4 退出码 0，最终图谱 43 节点 182 边，信息流零违反（无黑洞/奇迹/死模块），EXT-IN/EXT-OUT 边界完整，1 轮收敛 |
-| 工件质量门 | 通过（RTM 100% + 单元覆盖率 96.37% + 四级测试全通过，退出码 0） |
-| 自检基线 | 61/61 通过（13 Verifier + 7 Gate + 17 Graph + 13 TLA + 3 Budget + 4 RunLog + 2 Maturity + 2 Checkpoint，含信息流校验用例） |
-| 全量测试 | `npm test` → 18 test files / 89 tests 全通过（53 unit + 13 integration + 8 system + 15 acceptance） |
-| 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-23 全量重跑通过） |
+| 单元测试 | 77/77 通过，代码覆盖率 99.37% lines / 92.66% branches / 100% functions / 99.37% statements（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 21/21 通过，覆盖 4 对模块交互 + 5 类错误路径，零 mock |
+| 系统测试 | 22/22 通过，覆盖端到端业务链路 + 安全约束 + 性能基线 + 异常路径，P95=60.76ms（≤ 200ms） |
+| 验收测试 | 15/15 通过，5/5 需求 RTM 覆盖率 100% |
+| 阶段门评审 | 8 阶段全部放行（qualityLevel 均为 A，compositeScore 0.9015~0.922） |
+| 图谱校验 | 阶段 1-4 退出码 0，最终图谱 35 节点 141 边，信息流零违反（无黑洞/奇迹/死模块），EXT-IN/EXT-OUT 边界完整 |
+| TLA+ 行为门禁 | 阶段 1-4 退出码 0，8 个规格（1 L1 + 4 L2 + 3 L3），SANY 语法 + TLC 模型检查全通过，零死锁/不变式违反/状态爆炸 |
+| 工件质量门 | 通过（RTM 100% + 单元覆盖率 99.37% + 四级测试全通过，退出码 0） |
+| 自检基线 | 61/61 通过（13 Verifier + 7 Gate + 17 Graph + 13 TLA + 3 Budget + 4 RunLog + 2 Maturity + 2 Checkpoint） |
+| 全量测试 | `npm test` → 8 test files / 135 tests 全通过（77 unit + 21 integration + 22 system + 15 acceptance） |
+| 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-24 全量重跑通过） |
+
+> 第五轮（2026-07-24）相比第四轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/`/`dist/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，采用编排者-子代理分派模式（每阶段 S→V→G 子代理执行）。重跑产物为独立再实现，单元测试 53→77、覆盖率由 96.37% 提升至 99.37%（lines），集成测试 13→21、系统测试 8→22，验收测试 15 不变，全量测试 89→135。图谱节点 43→35（更精炼的 DD 拆分），边 182→141，零违反保持。TLA+ 规格 8 个（1 L1 + 4 L2 + 3 L3），层次化建模完整。过程中修正了 check-artifact-gate.ts 缺 exitCode 字段的脚本缺陷。所有门禁退出码 0，未引入新缺陷。
 
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
@@ -79,6 +81,7 @@ npm run prepush
   2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段即抛错，连锁导致 4 个测试套件挂掉。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。
   3. **ArticleService 类型导出消失**（2026-07-21 回归发现）：`src/services/article-service.ts` 改为内部 `class ArticleService` + `export const articleService` 实例，导致 `comment-service.ts` 的 `import type { ArticleService }` 类型丢失。修正方案：恢复 `export class ArticleService`。
   4. **vitest mock 与 express NextFunction 类型不兼容**（2026-07-21 回归发现）：`vi.fn() as unknown as NextFunction` 丢失 mock 类型，`next.mock.calls[0][0]` 报 TS2339。修正方案：用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问。
+  5. **check-artifact-gate.ts 缺 exitCode 字段**（2026-07-24 第五轮发现）：`check-artifact-gate.ts` 是唯一未在 `GATE_JSON` 输出中包含 `exitCode` 字段的门禁脚本，导致 `check-run-log.ts` R6 交叉校验无法提取退出码。修正方案：与其它 7 个 `check-*.ts` 脚本对齐，计算 `const exitCode = result.passed ? 0 : 1`，写入 `GATE_JSON` 并 `process.exit(exitCode)`；同时在 `check-run-log.ts` 的 `extractExitCode` 模式数组中增加 `GATE_JSON` 标记识别。
 
   详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5 与 [acceptance-test-report.md](./w-model-dev-demo/docs/acceptance-test-report.md) §9。
 
@@ -106,3 +109,16 @@ npm run prepush
 - **CHECKPOINT 不可绕过**：`w-model-dev/SKILL.md` 中 `🔴 CHECKPOINT` 标记的暂停点必须等用户确认，不得自动推进。
 - **真实测试结果回填**：`/wm test` 不得自动将测试标记为通过，必须由真实测试运行器执行后通过 `result=pass|fail` 回填（由 S 子代理执行回填，编排者不得越权）。
 - **编排者最小化**：编排者只做编排（路由 / 状态读写 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本），任何实施动作由 S / V / G 子代理执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](./w-model-dev/references/subagent-delegation.md)。
+
+## 7. 修复记录
+
+- **TLA+ 指南修复 + 编排纪律强化 + 代码-TLA+ 一致性回归**（2026-07-24）：
+  - 问题1：tla-plus-guide.md 新增命名规范/路径基准/前置清单三节；tla-spec-template.md 修正.cfg写法+补聚合示例+反例
+  - 问题2：subagent-delegation.md 强化信号5（TLA+产物）+ S-doc/S-tla拆分模板；SKILL.md 角色表/自检清单强化
+  - 问题3：新建 code-tla-logic.ts/check-code-tla-consistency.ts（四维度校验）；gate-logic.ts 终检新增 TLA+ 资产+SD→codeModule 校验；SSoT §10.8 追加校验项
+
+## 8. 脚本导航表
+
+| 脚本名 | 用途 | 阶段 | 退出码 |
+|---|---|---|---|
+| check-code-tla-consistency.ts | 代码-TLA+ 一致性回归校验（四维度） | 5 | 0=通过，1=失败 |

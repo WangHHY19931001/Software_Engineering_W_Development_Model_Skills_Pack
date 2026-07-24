@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * 校验逻辑自检脚本（Self-Test）—— 端到端验证 gate-logic.ts / verifier-logic.ts / graph-logic.ts / tla-logic.ts 的正确性
+ * 校验逻辑自检脚本（Self-Test）—— 端到端验证 gate-logic.ts / verifier-logic.ts / graph-logic.ts / tla-logic.ts / code-tla-logic.ts 的正确性
  *
  * 设计目标：
  *   - 不依赖任何测试框架（无 jest / vitest），仅用 Node 标准库
@@ -19,6 +19,7 @@
  *   w-model-dev/scripts/samples/gate/*.json       RTM 矩阵样本
  *   w-model-dev/scripts/samples/graph/*.json      图谱样本
  *   w-model-dev/scripts/samples/tla/*.json        TLA+ manifest 样本（纯逻辑校验，不跑 SANY/TLC）
+ *   w-model-dev/scripts/samples/code-tla/*.json   代码-TLA+ 一致性样本（含 manifest+graph+rtm+codeSources）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -39,6 +40,13 @@ import { checkBudget } from './budget-logic.js';
 import { checkRunLog } from './run-log-logic.js';
 import { checkMaturity } from './maturity-logic.js';
 import { checkCheckpoint } from './checkpoint-logic.js';
+import * as ts from 'typescript';
+import {
+  checkCodeTlaConsistency,
+  extractCodeStateTransfers,
+  type CodeTlaConsistencyInput,
+  type CodeFile,
+} from './code-tla-logic.js';
 
 // ==================== 测试用例定义 ====================
 
@@ -548,6 +556,51 @@ const CHECKPOINT_CASES: CheckpointCase[] = [
   },
 ];
 
+// -------------------- Code-TLA Consistency --------------------
+
+interface CodeTlaCase {
+  /** 样本文件名（相对 samples/code-tla/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const CODE_TLA_CASES: CodeTlaCase[] = [
+  {
+    file: 'valid.json',
+    expectedPassed: true,
+    description: '四维度全通过：SD→codeModule 映射 + 代码赋值 + Next 分支对应 + 断言覆盖',
+  },
+  {
+    file: 'bad-sd-no-code-module.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/SD-REVIEW 无对应 codeModule/],
+    description: 'SD-REVIEW 无对应 codeModule，应被维度1映射校验拦截',
+  },
+  {
+    file: 'bad-no-assignment.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/未抽取到任何赋值语句/],
+    description: '代码无赋值语句（仅 const + return），应被维度2状态转移校验拦截',
+  },
+  {
+    file: 'bad-next-no-match.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/Next 分支.*Register.*无对应函数/],
+    description: 'TLA+ Next 含 Register/Login 但代码无对应函数，应被维度3分支对应校验拦截',
+  },
+  {
+    file: 'bad-no-assertion.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/未抽取到任何断言/],
+    description: 'TLA+ 有 BusinessInvariant 但代码无 assert/invariant/require，应被维度4断言覆盖校验拦截',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -808,6 +861,53 @@ async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runCodeTlaCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_TLA_CASES) {
+    const abs = path.join(samplesDir, 'code-tla', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed = JSON.parse(raw) as {
+      manifest: CodeTlaConsistencyInput['manifest'];
+      graph: CodeTlaConsistencyInput['graph'];
+      rtm: CodeTlaConsistencyInput['rtm'];
+      codeSources: Array<{ path: string; content: string }>;
+    };
+
+    // 将代码源文本解析为 CodeFile（含 AST + 抽取的 assignments/conditionals/assertions）
+    const codeFiles: CodeFile[] = (parsed.codeSources ?? []).map(cs => {
+      const ast = ts.createSourceFile(cs.path, cs.content, ts.ScriptTarget.ES2022, true);
+      return extractCodeStateTransfers(ast, cs.path);
+    });
+
+    const input: CodeTlaConsistencyInput = {
+      manifest: parsed.manifest,
+      graph: parsed.graph,
+      rtm: parsed.rtm,
+      codeFiles,
+    };
+    const r = checkCodeTlaConsistency(input);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(
+        `  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`,
+      );
+    }
+    if (!c.expectedPassed) {
+      const violationMessages = r.violations.map(v => v.message);
+      details.push(...matchReasonPatterns(violationMessages, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `code-tla/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // ==================== 入口 ====================
 
 async function main(): Promise<void> {
@@ -826,11 +926,13 @@ async function main(): Promise<void> {
   console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
   console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
+  console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
+    codeTlaResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -840,10 +942,12 @@ async function main(): Promise<void> {
     runRunLogCases(samplesDir),
     runMaturityCases(samplesDir),
     runCheckpointCases(samplesDir),
+    runCodeTlaCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
+    ...codeTlaResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

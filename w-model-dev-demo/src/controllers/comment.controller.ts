@@ -1,36 +1,47 @@
-/**
- * CommentController：评论 HTTP 适配层（调用 INTF-003）。
- * create 201 / remove 204，异常透传 errorHandler。
- * DTO 映射 comment.id→commentId 以符合 UAT-009 契约。
- */
-import type { RequestHandler } from 'express';
+// 评论控制器：处理添加/查询评论 HTTP 请求，编排 CommentService
+// 对应 detailed-design.md DD-COMMENT-CTRL
+import type { Request, Response } from 'express';
+import { commentService } from '../services/comment.service';
 import type { CommentService } from '../services/comment.service';
-import type { Comment } from '../types';
-
-function toCommentDto(c: Comment) {
-  return {
-    commentId: c.id,
-    articleId: c.articleId,
-    authorId: c.authorId,
-    content: c.content,
-    createdAt: c.createdAt,
-  };
-}
+import { AppError } from '../utils/errors';
 
 export class CommentController {
-  constructor(private readonly commentService: CommentService) {}
+  constructor(private commentService: CommentService) {}
 
-  create: RequestHandler = async (req, res) => {
-    const comment = await this.commentService.create(
-      req.params.id,
-      req.body,
-      req.user!.userId,
-    );
-    res.status(201).json(toCommentDto(comment));
-  };
+  async addComment(req: Request, res: Response): Promise<void> {
+    const articleId = req.params.id;
+    const { content } = req.body as { content: string };
+    const authorId = req.user?.userId;
+    if (!authorId) {
+      throw new AppError(40101, '未授权');
+    }
+    const result = this.commentService.add(articleId, authorId, content);
+    if (!result.ok) {
+      throw new AppError(result.code, result.message);
+    }
+    res.status(201).json({
+      code: 0,
+      message: '评论成功',
+      data: {
+        commentId: result.data.commentId,
+        articleId: result.data.articleId,
+        createdAt: result.data.createdAt,
+      },
+    });
+  }
 
-  remove: RequestHandler = async (req, res) => {
-    await this.commentService.delete(req.params.commentId, req.user!.userId);
-    res.status(204).end();
-  };
+  async listComments(req: Request, res: Response): Promise<void> {
+    const articleId = req.params.id;
+    const result = this.commentService.listByArticle(articleId);
+    if (!result.ok) {
+      throw new AppError(result.code, result.message);
+    }
+    res.status(200).json({
+      code: 0,
+      message: '查询成功',
+      data: { comments: result.data },
+    });
+  }
 }
+
+export const commentController = new CommentController(commentService);

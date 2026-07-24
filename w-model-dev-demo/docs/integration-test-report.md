@@ -1,115 +1,212 @@
 # 集成测试报告
 
-> 阶段 6（集成测试）执行报告。套用 [templates/test-report.md](../../w-model-dev/templates/test-report.md)，类型=集成测试。
-> 设计来源：[docs/integration-test-cases.md](integration-test-cases.md) IT-001 ~ IT-013。
-> 执行方式：supertest 对真实 Express app（`createApp()`）端到端 HTTP 集成测试，**未使用 mock 替代任何被测真实模块**。
+> 阶段 6（集成测试）执行产物。套用 `templates/test-report.md` 模板，类型=集成测试。
+> 设计来源：阶段 3 产出的 `docs/integration-test-cases.md`（IT-001 ~ IT-014）。
+> 执行阶段：阶段 6。零 mock，真实模块间调用。
 
 ## 文档信息
 
 - 项目名称：blog-system-demo
 - 测试类型：集成测试
-- 执行阶段：阶段 6
-- 执行日期：2026-07-23
-- 执行者：self-as-verifier-glm-5（test-engineer persona）
-- 测试文件：`tests/integration/integration.test.ts`
-- 关联设计：`docs/integration-test-cases.md`（IT-001~013）
+- 设计来源阶段：阶段 3（概要设计）
+- 执行阶段：阶段 6（集成测试）
+- 文档版本：v1.0
+- 关联接口设计：docs/outline-design.md
+- 关联需求：REQ-001 ~ REQ-005
+- 执行时间：2026-07-24T12:21:00Z
 
-## 1. 测试概要
+## 1. 执行摘要
 
-| 指标 | 数值 |
+| 项目 | 结果 |
 |---|---|
-| 用例总数 | 13 |
-| 通过 | 13 |
+| 测试运行器 | vitest 1.6.1 |
+| 测试文件 | tests/integration/integration.test.ts |
+| 测试用例数（IT 设计） | 14（IT-001 ~ IT-014） |
+| vitest `it` 块数 | 21 |
+| 通过 | 21 |
 | 失败 | 0 |
 | 跳过 | 0 |
 | 通过率 | 100% |
-| 测试套件数 | 1（tests/integration/integration.test.ts） |
-| 执行时长 | ~2.86s |
-| 覆盖率（集成测试不单独计量） | —（单元测试覆盖率已 ≥80%，见阶段 5 报告） |
-
-## 2. 测试环境
-
-| 项 | 值 |
-|---|---|
-| Node.js 版本 | v22.16.0 |
-| vitest 版本 | 1.6.1 |
-| supertest 版本 | 7.2.2 |
-| 运行平台 | win32-x64 |
-| TypeScript | 5.x（strict） |
-| JWT_SECRET 注入方式 | `cross-env JWT_SECRET=test-secret-blog-demo`（经 `npm run test:integration` 脚本注入，不硬编码于测试） |
-| 执行命令 | `npm run test:integration` |
 | 退出码 | 0 |
-| tsc strict 检查 | `npm run build` 退出码 0（0 error，测试文件类型干净） |
+| 执行耗时 | 633ms（tests） / 1.86s（total） |
+| TypeScript 编译 | `npx tsc --noEmit` 退出码 0，0 错误 |
+| Mock 使用 | 零 mock（符合阶段6硬约束） |
+| 环境变量 | JWT_SECRET=test-secret-blog-demo |
 
-## 3. 测试结果明细
+### 1.1 真实执行命令与输出
 
-| 用例 ID | 标题 | 优先级 | 状态 | 覆盖模块交互 | 证据（关键断言） |
-|---|---|---|---|---|---|
-| IT-001 | 注册→登录全链路 | 高 | ✅ 通过 | authService×userStore×passwordHasher×jwtService | register 201 + userId 匹配 UUID v4；userStore.passwordHash 匹配 `^\$2b\$10\$`；login 200 + token 三段式 + expiresIn=3600；jwtService.verify payload.userId 一致 + exp-iat=3600 |
-| IT-002 | 重复注册→40901 | 高 | ✅ 通过 | authService×userStore×errorHandler | 重复注册 409 + code=40901 + message="用户名已存在"；userStore.size()=1（无重复写入） |
-| IT-003 | 登录密码错误→40101 | 高 | ✅ 通过 | authService×passwordHasher×errorHandler | 错误密码 401 + code=40101；不存在用户名同 code/同文案（不泄露存在性）；无 token 返回 |
-| IT-004 | 创建文章全链路 | 高 | ✅ 通过 | authMiddleware×articleService×articleStore | POST 201 + articleId UUID v4 + authorId=JWT.userId；articleStore.findById 命中；公开 GET 200 读回 title/content/tags |
-| IT-005 | 作者隔离-非作者修改/删除→40301 | 高 | ✅ 通过 | authMiddleware×articleService×errorHandler | bob PUT/DELETE 均 403 + code=40301；GET 200 文章 title 未被篡改 |
-| IT-006 | 公开浏览列表+分页 | 高 | ✅ 通过 | articleService×articleStore | page1=10 条 + total≥15 + 降序；page2=total-10；pageSize=100 返回全部；无 Authorization 可访问（公开） |
-| IT-007 | 文章详情+评论聚合 | 高 | ✅ 通过 | articleService×commentService×stores | GET 200 + comments[]≥2；每条含 commentId/articleId/authorId/content/createdAt；评论按 createdAt 升序 |
-| IT-008 | 发表评论+文章存在性校验 | 高 | ✅ 通过 | authMiddleware×commentService×articleService | POST 201 + commentId UUID v4 + articleId=A + authorId=JWT.userId；commentStore.findById 命中；详情聚合含该评论 |
-| IT-009 | 删除评论-作者隔离→40301 | 高 | ✅ 通过 | authMiddleware×commentService×errorHandler | bob 删 403+40301；评论仍在；alice 删 204；评论不再含 |
-| IT-010 | 评论对不存在文章→40401 | 中 | ✅ 通过 | commentService×articleService×errorHandler | POST 404 + code=40401 + message="文章不存在"；commentStore.size()=0（无脏数据） |
-| IT-011 | 鉴权中间件-缺token/伪造/过期→40103/40102 | 高 | ✅ 通过 | authMiddleware×jwtService×errorHandler | 缺 token→40103；伪造/过期/错误签名→40102；前 4 步 articleStore.size()=0；合法 token 对照 201 |
-| IT-012 | zod参数校验-非法入参→40001 | 高 | ✅ 通过 | validateRequest×errorHandler | 短用户名/短密码→40001+details 数组；空 title→40001；page=0&pageSize=200→40001；缺 password→40001 |
-| IT-013 | bcrypt哈希存储-cost=10+无明文 | 高 | ✅ 通过 | passwordHasher×userStore | passwordHash 匹配 `^\$2b\$10\$`；无 password 字段；getRounds=10；compare 正确 true/错误 false；序列化不含明文 "Secret123" |
+集成测试执行命令：
+```bash
+npx cross-env JWT_SECRET=test-secret-blog-demo npx vitest run tests/integration
+```
 
-## 4. 覆盖的模块交互对
+执行输出（关键行）：
+```
+ ✓ tests/integration/integration.test.ts  (21 tests) 633ms
 
-| 交互对 | 覆盖用例 | 验证内容 |
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  10:21:25
+   Duration  1.86s
+```
+
+退出码：`0`
+
+TypeScript 编译检查命令：
+```bash
+npx tsc --noEmit
+```
+退出码：`0`（零编译错误，符合 NFR-004 strict 模式 0 错误约束）
+
+## 2. 用例执行结果
+
+### 2.1 用例结果汇总
+
+| 用例 ID | 标题 | 优先级 | 关联需求/设计 | 模块交互对 | 结果 | vitest it 数 |
+|---|---|---|---|---|---|---|
+| IT-001 | 注册正向链路（控制器→服务→存储贯通） | 高 | REQ-002 / INTF-AUTH-* | 控制器↔服务↔存储 | ✓ 通过 | 1 |
+| IT-002 | 注册异常——用户名已存在 | 高 | REQ-002 / INTF-AUTH-API→SERVICE | 控制器↔服务 | ✓ 通过 | 1 |
+| IT-003 | 登录正向链路（bcrypt 比对 + JWT 签发） | 高 | REQ-002 / INTF-AUTH-* | 控制器↔服务↔工具 | ✓ 通过 | 1 |
+| IT-004 | 登录异常——密码错误 | 高 | REQ-002 / INTF-AUTH-SERVICE | 控制器↔服务 | ✓ 通过 | 1 |
+| IT-005 | 发布文章正向链路（auth→控制器→服务→存储） | 高 | REQ-003 / INTF-ARTICLE-* | 中间件↔控制器↔服务↔存储 | ✓ 通过 | 1 |
+| IT-006 | 发布文章异常——无 JWT 鉴权失败 | 高 | REQ-003 / INTF-AUTH-MW | 中间件链 | ✓ 通过 | 1 |
+| IT-007 | 文章列表查询——普通用户过滤 rejected | 高 | REQ-003/005 / INTF-ARTICLE-SERVICE | 服务↔存储 | ✓ 通过 | 1 |
+| IT-008 | 评论正向链路（跨模块 comment→article→store） | 高 | REQ-004 / INTF-COMMENT-* | 跨模块调用 | ✓ 通过 | 1 |
+| IT-009 | 评论异常——文章不存在（跨模块调用异常路径） | 高 | REQ-004 / INTF-COMMENT→ARTICLE | 跨模块调用 | ✓ 通过 | 1 |
+| IT-010 | 审核正向链路（admin→review.service→article.store） | 高 | REQ-005 / INTF-REVIEW-SERVICE | 跨模块调用↔存储 | ✓ 通过 | 1 |
+| IT-011 | 审核异常——非 admin 角色被拒 | 高 | REQ-005 / INTF-AUTH-MW | 中间件链 | ✓ 通过 | 1 |
+| IT-012 | 审核异常——文章状态非 pending（状态机约束） | 高 | REQ-005 / INTF-REVIEW-SERVICE | 服务↔存储 | ✓ 通过 | 1 |
+| IT-013 | 参数校验——zod 非法输入返回 400 | 高 | REQ-002/003 / INTF-VALIDATE-MW | 中间件链 | ✓ 通过 | 3 |
+| IT-014 | 错误处理 fallback——error.middleware 捕获非 AppError | 中 | REQ-001 / DD-ERROR-MW | 中间件链 | ✓ 通过 | 2 |
+| 汇总 | — | — | — | — | 14/14 通过 | 21 |
+
+### 2.2 模块交互对覆盖（4 对）
+
+| 交互对 | 验证用例 | 验证方式 |
 |---|---|---|
-| auth × article | IT-001, IT-002, IT-003, IT-004, IT-005 | 注册/登录颁发 JWT → 鉴权后创建文章 → 作者隔离 |
-| article × comment | IT-007, IT-008, IT-009, IT-010 | 文章详情聚合评论 → 发评论校验文章存在 → 删评论作者隔离 → 不存在文章 404 |
-| controller × service × store | IT-001, IT-004, IT-006, IT-007 | HTTP→controller→service→store→response 完整链路 |
-| middleware × controller | IT-005, IT-008, IT-011, IT-012 | authMiddleware 拦截 + validateRequest(zod) 拦截 |
-| 错误路径 | IT-002, IT-003, IT-005, IT-009, IT-010, IT-011, IT-012 | 40901/40101/40301/40401/40103/40102/40001（7/7 客户端错误码全覆盖） |
+| 控制器↔服务 | IT-001/003/005/008/010 | HTTP 请求经路由→控制器→服务，断言响应状态码与 body |
+| 服务↔存储 | IT-001/005/007/008/010 | 直接调用 `userStore.findById` / `articleStore.findById` / `articleStore.findAll` / `commentStore.findByArticle` 验证存储层状态 |
+| 中间件链（auth/validate/admin-guard/error.handler） | IT-005/006/011/013/014 | 无 JWT→401、非 admin→403、非法参数→400、malformed JSON→500 |
+| 跨模块调用（comment.service→article.service；review.service→article.store） | IT-008/009/010/012 | 评论依赖文章存在性校验；审核依赖文章状态机流转 |
 
-## 5. 性能结果（集成测试适用）
+### 2.3 错误路径覆盖（5 类）
 
-| 指标 | 目标 | 实测 | 是否达标 |
+| 错误类型 | 用例 | 状态码 | 业务码 |
 |---|---|---|---|
-| 单用例响应时间 | < 500ms | 13 用例总耗时 ~1.8s（含 bcrypt 哈希） | ✅ |
-| 套件执行时长 | — | ~2.86s | ✅ |
+| 鉴权失败（无 JWT） | IT-006 | 401 | 40101 |
+| 权限不足（非 admin） | IT-011 | 403 | 40301 |
+| 资源不存在 | IT-009 | 404 | 40401 |
+| 参数校验失败（zod） | IT-013 | 400 | 40001 |
+| 业务规则冲突（重复注册/状态机/重复审核） | IT-002/012 | 409 | 60001/60002 |
+| 登录凭证错误 | IT-004 | 401 | 40101 |
+| 通用 fallback（非 AppError） | IT-014 | 500 | 50001 |
 
-> 注：性能基线（100 QPS × 10min，P95 ≤ 200ms）属阶段 7 系统测试（ST-004），不在集成测试范围。
+## 3. 用例执行详情
 
-## 6. 失败用例分析
+### IT-001：注册正向链路（控制器→服务→存储贯通）
+- **状态**：✓ 通过
+- **验证点**：POST /api/auth/register 返回 201 + userId；`userStore.findById(userId)` 返回 User，passwordHash 为 bcrypt `$2b$` 前缀且非明文。
+- **存储层验证**：`expect(user!.passwordHash).toMatch(/^\$2[ab]\$/)`
 
-无失败用例。首次执行曾出现 2 例失败（IT-006、IT-012），根因与修正见第 7 节。
+### IT-002：注册异常——用户名已存在
+- **状态**：✓ 通过
+- **验证点**：重复用户名注册返回 409 + code 60001。
 
-## 7. 过程中发现的缺陷与修正
+### IT-003：登录正向链路（bcrypt 比对 + JWT 签发）
+- **状态**：✓ 通过
+- **验证点**：登录返回 200 + token；`jwt.verify` 解析 payload 含 userId/role；`exp - iat <= 3600`（JWT 有效期 ≤ 1 小时）。
 
-| 序号 | 现象 | 根因 | 修正 | 重跑结果 |
-|---|---|---|---|---|
-| 1 | IT-006、IT-012 报 `Cannot read properties of undefined (reading 'status')`，`page1`/`r3` 为 undefined | supertest 链式调用顺序错误：`request(app).query(obj).get(path)` —— `.query()` 在 `.get()` 之前时返回的对象被 await 后为 undefined | 改为标准模式 `request(app).get(path).query(obj)`（共 4 处） | 13/13 通过 |
-| 2 | tsc strict 报 `Property 'username' does not exist on type '{ userId: string; token: string }'`（IT-011 解构 username） | `registerAndLogin` 辅助函数返回类型未声明 username 字段，但 IT-011 需用 username 构造伪造/过期 JWT | 扩展返回类型为 `{ userId, username, token }` 并在返回值中带上 username | tsc 退出码 0 |
+### IT-004：登录异常——密码错误
+- **状态**：✓ 通过
+- **验证点**：错误密码返回 401 + code 40101，data 为 undefined。
 
-> 上述 2 项均为**测试代码**问题，非被测源码缺陷。被测源码（src/）在阶段 5 已通过门禁，集成测试未发现任何源码回归。
+### IT-005：发布文章正向链路（auth.middleware→控制器→服务→存储）
+- **状态**：✓ 通过
+- **验证点**：携带 JWT 发布文章返回 201 + pending；`articleStore.findById(articleId)` 返回 Article，status=pending，authorId=alice 的 userId。
 
-## 8. 安全结果（集成测试相关项）
+### IT-006：发布文章异常——无 JWT 鉴权失败
+- **状态**：✓ 通过
+- **验证点**：无 Authorization 头返回 401 + code 40101；`articleStore.findAll()` 不含标题"无鉴权文章"。
 
-| 检查项 | 状态 | 说明 |
-|---|---|---|
-| 明文密码不入存储/响应 | ✅ | IT-013 验证 userStore 仅存 passwordHash，序列化不含明文 |
-| JWT 密钥来自环境变量 | ✅ | IT-011 通过 JWT_SECRET 注入签名/校验；过期/伪造/错误签名一律 40102 |
-| 错误响应不泄露堆栈 | ✅ | errorHandler 序列化仅含 {code,message,details}（IT-002/003/010/012 验证） |
-| 登录不泄露用户名存在性 | ✅ | IT-003 不存在用户名与错误密码返回相同文案/相同 code |
+### IT-007：文章列表查询——普通用户过滤 rejected，admin 返回全部
+- **状态**：✓ 通过
+- **验证点**：普通用户 HTTP 列表不含 rejected 文章标题；`articleService.list('admin')` 含全部（含 rejected）。
+- **实现说明**：GET /api/articles 路由无 auth 中间件，HTTP 端 role 默认 user；admin 列表通过直接调用 `articleService.list('admin')` 验证。
 
-## 9. 结论
+### IT-008：评论正向链路（跨模块 comment.service→article.service→comment.store）
+- **状态**：✓ 通过
+- **验证点**：对 approved 文章评论返回 201 + commentId；`commentStore.findByArticle(articleId)` 含该评论。
 
-- [x] 测试通过，可进入下一阶段
-- [ ] 测试未通过，需回到编码实现返工
-- [ ] 部分通过，遗留项：—
+### IT-009：评论异常——文章不存在（跨模块 comment.service→article.service）
+- **状态**：✓ 通过
+- **验证点**：对不存在文章评论返回 404 + code 40401；`commentStore.findByArticle('a-nonexistent-id-999')` 长度为 0。
 
-**结论**：13/13 集成测试用例真实通过（exit 0，非 mock 制造），覆盖全部 8 项需求（REQ-001~004、NFR-001、NFR-003）与 7 个客户端错误码（40001/40101/40102/40103/40301/40401/40901）。跨模块交互对（auth×article、article×comment、controller×service×store、middleware×controller）均验证正确。TypeScript strict 模式 0 错误。过程中发现 2 项测试代码缺陷（supertest 调用顺序、helper 返回类型）已修正，未发现被测源码缺陷。**放行进入阶段 7（系统测试）**。
+### IT-010：审核正向链路（admin→review.service→article.store 状态流转）
+- **状态**：✓ 通过
+- **验证点**：admin approve pending 文章返回 200 + approved；审核前后 `articleStore.findById()` 状态从 pending 流转为 approved。
 
-## 10. RTM 同步状态
+### IT-011：审核异常——非 admin 角色被拒（admin-guard 中间件）
+- **状态**：✓ 通过
+- **验证点**：普通用户调用审核接口返回 403 + code 40301；文章状态仍为 pending（未被修改）。
 
-- `.w-model/rtm.json` tests.integration[] IT-001~013 状态已全部更新为「通过」
-- executionSummary.integration：passed=13, failed=0, pending=0
-- requirements[].integrationTest 追溯链已补全：REQ-001→IT-001,IT-002,IT-003 / REQ-002→IT-004,IT-005 / REQ-003→IT-006,IT-007 / REQ-004→IT-007,IT-008,IT-009,IT-010 / NFR-001→IT-011,IT-013 / NFR-003→IT-012（NFR-002/NFR-004 无对应 IT 用例保持空，集成测试不覆盖性能压测与可测试性）
+### IT-012：审核异常——文章状态非 pending（状态机约束）
+- **状态**：✓ 通过
+- **验证点**：对已 approved 文章重复审核（reject）返回 409 + code 60002；文章状态仍为 approved（不变）。
+
+### IT-013：参数校验——zod 非法输入返回 400
+- **状态**：✓ 通过（3 个 it 块）
+- **验证点**：注册 username 过短 → 400 + 40001；注册 password 过短 → 400 + 40001；发布文章 title 为空 → 400 + 40001。
+
+### IT-014：错误处理 fallback——error.middleware 捕获非 AppError
+- **状态**：✓ 通过（2 个 it 块）
+- **适配说明**：测试用例设计文档 IT-014 原设计 mock `INTF-ARTICLE-STORE.findById` 抛异常，但阶段6硬约束"零 mock（不得 mock 被测真实模块）"，存储为内部模块不可 mock。改用真实非 AppError 错误（malformed JSON 触发 `express.json()` SyntaxError）验证 `error.middleware` 通用 fallback（500 + 50001）+ 进程存活可继续处理后续请求。
+- **验证点**：malformed JSON → 500 + 50001；错误后 `/health` 仍返回 200 + code 0（fallback 不崩溃）。
+
+## 4. 已知偏离
+
+### 4.1 状态码偏离（非阻断）
+
+| 用例 | 文档预期 | 实际实现 | 处理 |
+|---|---|---|---|
+| IT-001 注册成功 | 200 | 201 | 以实际契约行为为准（RESTful 资源创建应返回 201），符合 `src/controllers/auth.controller.ts` 实现 |
+| IT-003 登录成功 | 200 | 200 | 一致 |
+| IT-005 发布文章 | 200 | 201 | 以实际契约行为为准（RESTful 资源创建应返回 201），符合 `src/controllers/article.controller.ts` 实现 |
+| IT-008 添加评论 | 200 | 201 | 以实际契约行为为准（RESTful 资源创建应返回 201），符合 `src/controllers/comment.controller.ts` 实现 |
+
+> 偏离原因：集成测试用例设计文档（阶段3产出）将成功状态码统一写为 200，而实际控制器实现遵循 RESTful 规范，资源创建类操作返回 201。以实际代码契约为准，测试通过。此偏离为设计文档与实现的轻微不一致，非阻断，不影响集成测试结论。
+
+### 4.2 IT-014 实现方式调整
+
+见 §3 IT-014 适配说明。原设计需 mock 存储层，因阶段6零 mock 硬约束改用真实非 AppError 错误路径验证 error.middleware fallback。覆盖目标不变（验证通用错误处理 fallback + 进程不崩溃）。
+
+## 5. RTM 更新
+
+`.w-model/rtm.json` 的 `executionSummary.integrationTest` 已更新：
+
+```json
+"integrationTest": {
+  "total": 14,
+  "passed": 14,
+  "failed": 0,
+  "pending": 0,
+  "coverage": 100,
+  "executedAt": "2026-07-24T12:21:00Z",
+  "exitCode": 0,
+  "testFile": "tests/integration/integration.test.ts",
+  "vitestCases": 21,
+  "note": "零 mock，supertest 端到端 + 直接调用真实 store/service 验证状态"
+}
+```
+
+## 6. 验收标准核对
+
+依据 `phase-6-integration-test.md` §验收标准：
+
+- [x] 所有接口调用验证通过（IT-001/003/005/008/010 正向链路全通过）
+- [x] 参数校验逻辑正确（IT-013 zod 校验 3 场景通过；IT-002/004/006/011/012 业务规则校验通过）
+- [x] 模块间数据传递无误（IT-001/005/008/010 直接验证存储层状态）
+- [x] 失败用例已定位根因并回归（无失败用例，0 failures）
+
+## 7. 结论
+
+集成测试 14 个用例（21 个 vitest `it` 块）全部通过，退出码 0，零 mock。覆盖 4 对模块交互（控制器↔服务、服务↔存储、中间件链、跨模块调用）与 5 类错误路径（鉴权失败/权限不足/资源不存在/参数校验/业务规则冲突 + 通用 fallback）。TypeScript strict 模式编译 0 错误。集成测试阶段产物符合 `phase-6-integration-test.md` 验收标准，可进入阶段门评审。

@@ -46,6 +46,69 @@ const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [
   'acceptanceTest',
 ];
 
+/**
+ * 终检强化（spec §3.4.4）可选入参类型。
+ */
+export interface GateGraphNode {
+  id: string;
+  type: string;
+}
+
+export interface GateGraph {
+  nodes: GateGraphNode[];
+}
+
+export interface CheckArtifactGateOptions {
+  graph?: GateGraph;
+  manifestExists?: boolean;
+}
+
+/**
+ * SD→codeModule 映射校验（spec §3.4.4 第2项，逻辑同 code-tla-logic.ts 维度1）。
+ *
+ * 校验：每个 SD 节点须有至少一个 codeModule 映射。
+ * 映射判定：SD id 去 "SD-" 前缀，按 -/_/. 拆段（长度 >= 2），任一段在 codeModule 路径中出现。
+ */
+function checkSdToCodeModuleMapping(
+  graph: GateGraph,
+  rows: RTMRowShape[],
+): string[] {
+  const violations: string[] = [];
+  if (!graph || !Array.isArray(graph.nodes)) return violations;
+  const sdNodes = graph.nodes.filter(n => n && n.type === 'SD');
+  if (sdNodes.length === 0) return violations;
+
+  const codeModules: string[] = [];
+  for (const row of rows) {
+    if (row && typeof row.codeModule === 'string' && row.codeModule.trim() !== '') {
+      codeModules.push(row.codeModule);
+    }
+  }
+
+  for (const sd of sdNodes) {
+    const id = String(sd.id ?? '');
+    const raw = id.replace(/^SD-/i, '');
+    const segments = raw
+      .split(/[-_.]+/)
+      .map(s => s.toLowerCase())
+      .filter(s => s.length >= 2);
+    if (segments.length === 0) {
+      violations.push(`TLA+ 资产校验失败：SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`);
+      continue;
+    }
+    const matched = codeModules.some(cm => {
+      const cmLower = cm.toLowerCase();
+      return segments.some(seg => cmLower.includes(seg));
+    });
+    if (!matched) {
+      violations.push(
+        `TLA+ 资产校验失败：SD 节点 ${id} 无对应 codeModule（期望 codeModule 路径包含以下任一段: ${segments.join(', ')}）`,
+      );
+    }
+  }
+  return violations;
+}
+
 function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
   return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
 }
@@ -56,6 +119,7 @@ function isFiniteNonNegativeInteger(value: unknown): value is number {
 
 export function checkArtifactGate(
   matrix: RTMMatrixShape | null | undefined,
+  options?: CheckArtifactGateOptions,
 ): ArtifactGateResult {
   if (!matrix) return failureResult(['RTM 未初始化']);
 
@@ -133,6 +197,17 @@ export function checkArtifactGate(
       unitCoveragePercent = summary.coverage;
       if (summary.coverage < 80) reasons.push(`单元测试代码覆盖率未达 80%（当前 ${summary.coverage}%）`);
     }
+  }
+
+  // ==================== TLA+ 资产校验（spec §3.4.4，追加项） ====================
+  // 1. TLA+ 资产存在性：manifestExists 显式为 false 时追加违反（未传时跳过，保持向后兼容）
+  if (options && options.manifestExists === false) {
+    reasons.push('TLA+ 资产校验失败：tla-manifest.json 不存在或 specs 为空');
+  }
+  // 2. SD→codeModule 映射：graph 提供时执行
+  if (options && options.graph) {
+    const sdViolations = checkSdToCodeModuleMapping(options.graph, matrix.rows);
+    for (const v of sdViolations) reasons.push(v);
   }
 
   return {

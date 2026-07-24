@@ -1,69 +1,88 @@
-/**
- * ArticleController：文章 HTTP 适配层（调用 INTF-002）。
- * 将领域模型映射为 HTTP DTO（articleId / commentId）以符合 UAT-004/008/009 契约。
- */
-import type { RequestHandler } from 'express';
+// 文章控制器：处理发布/列表/详情/审核 HTTP 请求，编排 ArticleService 与 ReviewService
+// 对应 detailed-design.md DD-ARTICLE-CTRL
+import type { Request, Response } from 'express';
+import { articleService } from '../services/article.service';
 import type { ArticleService } from '../services/article.service';
-import type { Article, ArticleDetail, Comment } from '../types';
-
-function toArticleDto(a: Article) {
-  return {
-    articleId: a.id,
-    authorId: a.authorId,
-    title: a.title,
-    content: a.content,
-    tags: a.tags,
-    createdAt: a.createdAt,
-    updatedAt: a.updatedAt,
-  };
-}
-
-function toCommentDto(c: Comment) {
-  return {
-    commentId: c.id,
-    articleId: c.articleId,
-    authorId: c.authorId,
-    content: c.content,
-    createdAt: c.createdAt,
-  };
-}
-
-function toArticleDetailDto(a: ArticleDetail) {
-  return { ...toArticleDto(a), comments: a.comments.map(toCommentDto) };
-}
+import { reviewService } from '../services/review.service';
+import type { ReviewService } from '../services/review.service';
+import { AppError } from '../utils/errors';
 
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) {}
+  constructor(
+    private articleService: ArticleService,
+    private reviewService: ReviewService,
+  ) {}
 
-  create: RequestHandler = async (req, res) => {
-    const article = await this.articleService.create(req.body, req.user!.userId);
-    res.status(201).json(toArticleDto(article));
-  };
-
-  update: RequestHandler = async (req, res) => {
-    const article = await this.articleService.update(req.params.id, req.body, req.user!.userId);
-    res.status(200).json(toArticleDto(article));
-  };
-
-  remove: RequestHandler = async (req, res) => {
-    await this.articleService.delete(req.params.id, req.user!.userId);
-    res.status(204).end();
-  };
-
-  getById: RequestHandler = async (req, res) => {
-    const detail = await this.articleService.getById(req.params.id);
-    res.status(200).json(toArticleDetailDto(detail));
-  };
-
-  list: RequestHandler = async (req, res) => {
-    const page = Number(req.query.page ?? 1);
-    const pageSize = Number(req.query.pageSize ?? 10);
-    const result = await this.articleService.list(page, pageSize);
-    res.status(200).json({
-      items: result.items.map(toArticleDto),
-      total: result.total,
-      page: result.page,
-      pageSize: result.pageSize,
+  async publishArticle(req: Request, res: Response): Promise<void> {
+    const { title, content } = req.body as { title: string; content: string };
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new AppError(40101, '未授权');
+    }
+    const result = this.articleService.publish(userId, title, content);
+    if (!result.ok) {
+      throw new AppError(result.code, result.message);
+    }
+    res.status(201).json({
+      code: 0,
+      message: '发布成功',
+      data: {
+        articleId: result.data.articleId,
+        status: result.data.status,
+        createdAt: result.data.createdAt,
+      },
     });
-  };
+  }
+
+  async listArticles(req: Request, res: Response): Promise<void> {
+    const role = req.user?.role ?? 'user';
+    const result = this.articleService.list(role);
+    if (!result.ok) {
+      throw new AppError(result.code, result.message);
+    }
+    res.status(200).json({
+      code: 0,
+      message: '查询成功',
+      data: { articles: result.data },
+    });
+  }
+
+  async getArticle(req: Request, res: Response): Promise<void> {
+    const id = req.params.id;
+    const role = req.user?.role ?? 'user';
+    // getById 成功返回 Article，失败抛 AppError（UT-007 场景）
+    const article = this.articleService.getById(id, role);
+    res.status(200).json({
+      code: 0,
+      message: '查询成功',
+      data: {
+        articleId: article.id,
+        title: article.title,
+        content: article.content,
+        status: article.status,
+        authorId: article.authorId,
+        createdAt: article.createdAt,
+      },
+    });
+  }
+
+  async reviewArticle(req: Request, res: Response): Promise<void> {
+    const id = req.params.id;
+    const { action } = req.body as { action: 'approve' | 'reject' };
+    const reviewerId = req.user?.userId;
+    if (!reviewerId) {
+      throw new AppError(40101, '未授权');
+    }
+    const result = this.reviewService.review(id, action, reviewerId);
+    if (!result.ok) {
+      throw new AppError(result.code, result.message);
+    }
+    res.status(200).json({
+      code: 0,
+      message: '审核成功',
+      data: { articleId: id, status: result.data.status },
+    });
+  }
 }
+
+export const articleController = new ArticleController(articleService, reviewService);

@@ -1,0 +1,38 @@
+{
+  "manifest": {
+    "specs": [
+      {
+        "id": "L2-auth",
+        "level": "L2",
+        "phase": 2,
+        "system": "demo::auth",
+        "requirementIds": ["REQ-001"],
+        "tlaPath": "tla/L2-auth.tla",
+        "cfgPath": "tla/L2-auth.cfg",
+        "parent": null,
+        "children": [],
+        "tlaContent": "---- MODULE L2_auth ----\nEXTENDS Naturals, Sequences\nVARIABLES state, token\n\nInit ==\n    /\\ state = \"init\"\n    /\\ token = FALSE\n\nRegister ==\n    /\\ state = \"init\"\n    /\\ state' = \"registered\"\n    /\\ token' = FALSE\n\nLogin ==\n    /\\ state = \"registered\"\n    /\\ state' = \"authenticated\"\n    /\\ token' = TRUE\n\nNext ==\n    \\/ Register\n    \\/ Login\n\nBusinessInvariant ==\n    /\\ TypeInvariant\n    /\\ TokenIssuedRequiresAuthenticated\n\nTypeInvariant ==\n    /\\ state \\in {\"init\", \"registered\", \"authenticated\"}\n    /\\ token \\in BOOLEAN\n\nTokenIssuedRequiresAuthenticated ==\n    token => state = \"authenticated\"\n\n====\n"
+      }
+    ]
+  },
+  "graph": {
+    "nodes": [
+      { "id": "REQ-001", "type": "REQ" },
+      { "id": "SD-AUTH", "type": "SD" }
+    ],
+    "edges": [
+      { "from": "SD-AUTH", "to": "REQ-001", "type": "parent" }
+    ]
+  },
+  "rtm": {
+    "rows": [
+      { "requirementId": "REQ-001", "codeModule": "src/auth.ts" }
+    ]
+  },
+  "codeSources": [
+    {
+      "path": "src/auth.ts",
+      "content": "let state: string = 'init';\nlet token: boolean = false;\n\nfunction register(): void {\n  state = 'registered';\n  token = false;\n  assert(state !== undefined, 'state must be defined');\n}\n\nfunction login(): void {\n  if (state === 'registered') {\n    state = 'authenticated';\n    token = true;\n  }\n}\n"
+    }
+  ]
+}

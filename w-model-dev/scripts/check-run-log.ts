@@ -86,6 +86,7 @@ function extractExitCode(content: string): number | undefined {
     /RUN_LOG_JSON\s+(\{.*\})/,
     /MATURITY_JSON\s+(\{.*\})/,
     /CHECKPOINT_JSON\s+(\{.*\})/,
+    /GATE_JSON\s+(\{.*\})/,
   ];
   for (const pattern of patterns) {
     const match = content.match(pattern);

@@ -1,76 +1,47 @@
-/**
- * article + comment 路由（realizes INTF-002 / INTF-003 HTTP 绑定）。
- * 挂载于 /api/v1 前缀，含：
- *   GET    /articles          公开，分页
- *   GET    /articles/:id      公开，详情+评论聚合
- *   POST   /articles          需鉴权
- *   PUT    /articles/:id      需鉴权（作者隔离由 service 校验）
- *   DELETE /articles/:id      需鉴权
- *   POST   /articles/:id/comments  需鉴权
- *   DELETE /comments/:commentId    需鉴权
- */
+// 文章路由：/api/articles（发布/列表/详情/审核/评论）
+// 对应 outline-design.md INTF-ARTICLE-API + INTF-COMMENT-API
 import { Router } from 'express';
-import { asyncHandler } from '../utils/async-handler';
-import { authMiddleware } from '../middleware/auth';
-import { validateRequest } from '../middleware/validate';
-import type { JwtService } from '../utils/jwt';
-import type { ArticleController } from '../controllers/article.controller';
-import type { CommentController } from '../controllers/comment.controller';
-import {
-  articleCreateSchema,
-  articleUpdateSchema,
-  paginationSchema,
-  articleIdParamSchema,
-} from '../schemas/article.schema';
-import { commentCreateSchema, commentIdParamSchema } from '../schemas/comment.schema';
+import { articleController } from '../controllers/article.controller';
+import { commentController } from '../controllers/comment.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { publishArticleSchema, addCommentSchema, reviewArticleSchema } from '../schemas';
+import { wrap } from '../utils/async-handler';
 
-export function buildArticleRoutes(
-  articleController: ArticleController,
-  commentController: CommentController,
-  jwtService: JwtService,
-): Router {
-  const router = Router();
-  const auth = authMiddleware(jwtService);
+const router = Router();
 
-  router.get(
-    '/articles',
-    validateRequest({ query: paginationSchema }),
-    asyncHandler(articleController.list),
-  );
-  router.get(
-    '/articles/:id',
-    validateRequest({ params: articleIdParamSchema }),
-    asyncHandler(articleController.getById),
-  );
-  router.post(
-    '/articles',
-    auth,
-    validateRequest({ body: articleCreateSchema }),
-    asyncHandler(articleController.create),
-  );
-  router.put(
-    '/articles/:id',
-    auth,
-    validateRequest({ params: articleIdParamSchema, body: articleUpdateSchema }),
-    asyncHandler(articleController.update),
-  );
-  router.delete(
-    '/articles/:id',
-    auth,
-    validateRequest({ params: articleIdParamSchema }),
-    asyncHandler(articleController.remove),
-  );
-  router.post(
-    '/articles/:id/comments',
-    auth,
-    validateRequest({ params: articleIdParamSchema, body: commentCreateSchema }),
-    asyncHandler(commentController.create),
-  );
-  router.delete(
-    '/comments/:commentId',
-    auth,
-    validateRequest({ params: commentIdParamSchema }),
-    asyncHandler(commentController.remove),
-  );
-  return router;
-}
+// POST /api/articles —— 发布文章（须登录 + zod 校验）
+router.post(
+  '/',
+  authMiddleware.authenticate.bind(authMiddleware),
+  validate(publishArticleSchema),
+  wrap(articleController.publishArticle.bind(articleController)),
+);
+
+// GET /api/articles —— 文章列表（无须登录，role 默认 user）
+router.get('/', wrap(articleController.listArticles.bind(articleController)));
+
+// GET /api/articles/:id —— 文章详情（无须登录，role 默认 user）
+router.get('/:id', wrap(articleController.getArticle.bind(articleController)));
+
+// PATCH /api/articles/:id/review —— 管理员审核（须登录 + admin + zod 校验）
+router.patch(
+  '/:id/review',
+  authMiddleware.authenticate.bind(authMiddleware),
+  authMiddleware.requireAdmin.bind(authMiddleware),
+  validate(reviewArticleSchema),
+  wrap(articleController.reviewArticle.bind(articleController)),
+);
+
+// POST /api/articles/:id/comments —— 添加评论（须登录 + zod 校验）
+router.post(
+  '/:id/comments',
+  authMiddleware.authenticate.bind(authMiddleware),
+  validate(addCommentSchema),
+  wrap(commentController.addComment.bind(commentController)),
+);
+
+// GET /api/articles/:id/comments —— 评论列表（无须登录）
+router.get('/:id/comments', wrap(commentController.listComments.bind(commentController)));
+
+export const articleRoutes = router;

@@ -1,53 +1,27 @@
-/**
- * AuthService：注册 / 登录 / token 校验（realizes INTF-001 / DD-004）。
- * 依赖 UserStore + PasswordHasher + JwtService。
- */
-import { randomUUID } from 'node:crypto';
+// 用户服务：用户存储、用户名唯一性校验、用户查找
+// 对应 detailed-design.md DD-USER-SVC：依赖 UserStore
+import type { User, Result } from '../types';
+import { userStore } from '../stores/user.store';
 import type { UserStore } from '../stores/user.store';
-import type { PasswordHasher } from '../utils/password';
-import type { JwtService } from '../utils/jwt';
-import { ConflictError, UnauthorizedError, ErrorCode } from '../utils/errors';
-import type { RegisterInput, LoginInput, JwtPayload } from '../types';
 
-const TOKEN_EXPIRES_IN = 3600;
-const INVALID_CREDENTIALS_MSG = '用户名或密码错误';
+export class UserService {
+  constructor(private userStore: UserStore) {}
 
-export class AuthService {
-  constructor(
-    private readonly userStore: UserStore,
-    private readonly passwordHasher: PasswordHasher,
-    private readonly jwtService: JwtService,
-  ) {}
-
-  async register(input: RegisterInput): Promise<{ userId: string; username: string }> {
-    if (this.userStore.findByUsername(input.username)) {
-      throw new ConflictError(ErrorCode.CONFLICT, '用户名已存在');
+  saveUser(user: User): Result<void> {
+    if (this.userStore.findByUsername(user.username)) {
+      return { ok: false, code: 60001, message: '用户名已存在' };
     }
-    const passwordHash = await this.passwordHasher.hash(input.password);
-    const user = {
-      id: randomUUID(),
-      username: input.username,
-      passwordHash,
-      createdAt: new Date().toISOString(),
-    };
-    this.userStore.insert(user);
-    return { userId: user.id, username: user.username };
+    this.userStore.save(user);
+    return { ok: true, data: undefined };
   }
 
-  async login(input: LoginInput): Promise<{ token: string; expiresIn: number }> {
-    const user = this.userStore.findByUsername(input.username);
-    if (!user) {
-      throw new UnauthorizedError(ErrorCode.UNAUTHORIZED_CREDENTIALS, INVALID_CREDENTIALS_MSG);
-    }
-    const ok = await this.passwordHasher.compare(input.password, user.passwordHash);
-    if (!ok) {
-      throw new UnauthorizedError(ErrorCode.UNAUTHORIZED_CREDENTIALS, INVALID_CREDENTIALS_MSG);
-    }
-    const token = this.jwtService.sign({ userId: user.id, username: user.username }, TOKEN_EXPIRES_IN);
-    return { token, expiresIn: TOKEN_EXPIRES_IN };
+  findById(userId: string): Result<User | null> {
+    return { ok: true, data: this.userStore.findById(userId) };
   }
 
-  async verifyToken(token: string): Promise<JwtPayload> {
-    return this.jwtService.verify(token);
+  findByUsername(username: string): Result<User | null> {
+    return { ok: true, data: this.userStore.findByUsername(username) };
   }
 }
+
+export const userService = new UserService(userStore);

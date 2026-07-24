@@ -1,35 +1,18 @@
-/**
- * CommentStore：评论内存存储（realizes INTF-012 / DD-003）。
- * findByArticleId 按 createdAt 升序。
- */
+// 评论内存存储封装：Map 读写
+// 对应 detailed-design.md DD-COMMENT-STORE：store Map<commentId,Comment>；findByArticle 遍历过滤
 import type { Comment } from '../types';
 
 export class CommentStore {
-  private readonly comments = new Map<string, Comment>();
+  private store = new Map<string, Comment>();
 
-  insert(comment: Comment): void {
-    this.comments.set(comment.id, comment);
+  save(comment: Comment): void {
+    this.store.set(comment.id, comment);
   }
 
-  findById(id: string): Comment | null {
-    return this.comments.get(id) ?? null;
-  }
-
-  delete(id: string): boolean {
-    return this.comments.delete(id);
-  }
-
-  findByArticleId(articleId: string): Comment[] {
-    return Array.from(this.comments.values())
-      .filter((c) => c.articleId === articleId)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
-
-  clear(): void {
-    this.comments.clear();
-  }
-
-  size(): number {
-    return this.comments.size;
+  findByArticle(articleId: string | null | undefined): Comment[] {
+    if (articleId == null) return [];
+    return Array.from(this.store.values()).filter(c => c.articleId === articleId);
   }
 }
+
+export const commentStore = new CommentStore();

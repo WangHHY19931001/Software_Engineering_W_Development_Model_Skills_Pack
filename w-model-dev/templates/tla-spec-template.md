@@ -5,8 +5,8 @@
 
 ## .tla 文件模板
 
-> 文件名：`<L级别>-<系统名>.tla`（如 `L1-blog-system.tla`、`L2-auth-subsystem.tla`）。
-> MODULE 名须与文件名一致（不含 `.tla` 后缀）。
+> 文件名：`<L级别>_<系统名>.tla`（如 `L1_blog_system.tla`、`L2_auth_subsystem.tla`）。
+> MODULE 名须与文件名一致（不含 `.tla` 后缀）；命名规范见 [tla-plus-guide.md §2.0](../references/tla-plus-guide.md#§20-命名规范)（禁止连字符/中文/特殊符号）。
 
 ```tla
 (*
@@ -39,6 +39,16 @@ TypeInvariant ==
 <InvariantName> ==
     /\ <不变式谓词>
 
+(* ==================== 业务不变式聚合（BusinessInvariant） ==================== *)
+(* 须聚合所有子不变式（含 TypeInvariant）；.cfg 的 INVARIANTS 列表须与此展开集合一致 *)
+(* 见 tla-plus-guide.md §11 cfg-tla 一致性规则；check-tla-model.ts 强制校验集合相等 *)
+(* 示例：*)
+BusinessInvariant ==
+    /\ TypeInvariant
+    /\ SessionUserRegistered
+    /\ ArticlePublishedRequiresRegisteredUser
+    /\ <其他子不变式>
+
 (* ==================== 初始状态 ==================== *)
 Init ==
     /\ <变量初始值约束>
@@ -64,11 +74,11 @@ Spec == Init /\ [][Next]_<<vars>>
 
 ## .cfg 文件模板
 
-> 文件名须与对应 `.tla` 文件一致（如 `L1-blog-system.cfg`）。
+> 文件名须与对应 `.tla` 文件一致（如 `L1_blog_system.cfg`）。
 
 ```cfg
 SPECIFICATION Spec
-INVARIANT
+INVARIANTS
     TypeInvariant
     <InvariantName1>
     <InvariantName2>
@@ -81,6 +91,9 @@ CONSTANTS
 (* 可选：状态空间限制（缓解状态爆炸） *)
 (* VIEW viewFunc *)
 ```
+
+> `INVARIANTS` 关键字后跟不变式名列表（每行一个，缩进可选）；列表须与 `.tla` 中 `BusinessInvariant` 展开的子不变式集合**完全相等**（见 [tla-plus-guide.md §11](../references/tla-plus-guide.md#11-cfg-tla-一致性规则)）。
+> 等价写法：`INVARIANT <单名>` 重复多行（每行一个不变式）。**禁止** `INVARIANT` 单数关键字后跟多名（非法 TLC 语法，见下方反例5）。
 
 ### `.cfg` 模式选择（实测 2026-07-23）
 
@@ -115,11 +128,11 @@ CONSTANTS
   @design        docs/requirement-spec.md#§3
   @parent        null
   @sibling       null
-  @child         tla/L2-auth-subsystem.tla, tla/L2-article-subsystem.tla
+  @child         tla/L2_auth_subsystem.tla, tla/L2_article_subsystem.tla
   @level         L1
   @phase         1
 *)
----- MODULE L1-blog-system ----
+---- MODULE L1_blog_system ----
 ```
 
 ### L2 子规格（@child 非空）
@@ -129,13 +142,13 @@ CONSTANTS
   @system        blog-system::auth-subsystem
   @requirement   REQ-001
   @design        docs/system-design.md#§3.2
-  @parent        tla/L1-blog-system.tla
-  @sibling       tla/L2-article-subsystem.tla
-  @child         tla/L3-token-store.tla
+  @parent        tla/L1_blog_system.tla
+  @sibling       tla/L2_article_subsystem.tla
+  @child         tla/L3_token_store.tla
   @level         L2
   @phase         2
 *)
----- MODULE L2-auth-subsystem ----
+---- MODULE L2_auth_subsystem ----
 ```
 
 ### L3 叶子规格（@child=null）
@@ -145,13 +158,13 @@ CONSTANTS
   @system        blog-system::auth-subsystem::token-store
   @requirement   REQ-001
   @design        docs/detailed-design.md#§4.1.2
-  @parent        tla/L2-auth-subsystem.tla
+  @parent        tla/L2_auth_subsystem.tla
   @sibling       null
   @child         null
   @level         L3
   @phase         4
 *)
----- MODULE L3-token-store ----
+---- MODULE L3_token_store ----
 ```
 
 ## 双向一致性校验
@@ -175,3 +188,114 @@ CONSTANTS
 
 > 不接受占位实现 / 简化实现 / 错误实现（反模式 #16）。
 > 建模须符合需求和设计；符合后仍有问题须修正需求/设计并回退重跑（反模式 #17）。
+
+## 反例（常见违规写法）
+
+> 以下写法均会被 `check-tla-model.ts` 拦截（退出码 1）或 SANY/TLC 拒绝解析。S 子代理产出前须逐项自检。
+
+### 反例1：.cfg 混入 MODULE 声明
+
+`.cfg` 是 TLC 配置文件，不得含 `---- MODULE ----` 声明（这是 `.tla` 头部语法）。
+
+**错误**（命中 `cfgStructureViolation`，见 [tla-plus-guide.md §12](../references/tla-plus-guide.md#12-cfg-结构规则)）：
+
+```cfg
+---- MODULE L3_token_store ----
+SPECIFICATION Spec
+INVARIANTS
+    TypeInvariant
+```
+
+**正确**：.cfg 仅含 `SPECIFICATION` / `INVARIANTS` / `CONSTANTS` 等配置指令，不含 MODULE 声明。
+
+### 反例2：INVARIANTS 漏列 TypeInvariant
+
+`.tla` 中 `BusinessInvariant` 聚合了 `TypeInvariant`，但 `.cfg` 的 `INVARIANTS` 列表漏列 `TypeInvariant` → 集合不一致（命中 `cfgTlaMismatch`，见 [tla-plus-guide.md §11](../references/tla-plus-guide.md#11-cfg-tla-一致性规则)）。
+
+**错误**：
+
+```tla
+(* .tla *)
+BusinessInvariant ==
+    /\ TypeInvariant
+    /\ SessionUserRegistered
+```
+```cfg
+INVARIANTS
+    SessionUserRegistered
+```
+
+**正确**：.cfg 须列全 BusinessInvariant 展开集合 `{TypeInvariant, SessionUserRegistered}`：
+
+```cfg
+INVARIANTS
+    TypeInvariant
+    SessionUserRegistered
+```
+
+### 反例3：BusinessInvariant 缺少 TypeInvariant 子项
+
+`.tla` 中 `BusinessInvariant` 聚合时遗漏 `TypeInvariant` → 类型约束未被纳入业务不变式集合，.cfg 也随之漏列（命中 `cfgTlaMismatch`）。
+
+**错误**：
+
+```tla
+BusinessInvariant ==
+    /\ SessionUserRegistered
+    /\ ArticlePublishedRequiresRegisteredUser
+```
+
+**正确**：`BusinessInvariant` 须显式聚合 `TypeInvariant`：
+
+```tla
+BusinessInvariant ==
+    /\ TypeInvariant
+    /\ SessionUserRegistered
+    /\ ArticlePublishedRequiresRegisteredUser
+```
+
+### 反例4：MODULE 名含连字符
+
+MODULE 名含连字符 `-` 违反命名规范（见 [tla-plus-guide.md §2.0](../references/tla-plus-guide.md#§20-命名规范)），SANY 报 `Fatal errors while parsing`（退出码 11）。
+
+**错误**：
+
+```tla
+---- MODULE L1-blog-system ----
+```
+
+**正确**：层级与系统名以下划线分隔：
+
+```tla
+---- MODULE L1_blog_system ----
+```
+
+### 反例5：INVARIANT 单数后跟多名
+
+`INVARIANT` 是单数关键字，后只能跟**一个**不变式名。多名须用 `INVARIANTS` 关键字 + 列表，或 `INVARIANT <单名>` 重复多行（命中 `cfgStructureViolation`，见 [tla-plus-guide.md §12](../references/tla-plus-guide.md#12-cfg-结构规则)）。
+
+**错误**（`INVARIANT` 后跟三名，TLC 解析报错）：
+
+```cfg
+INVARIANT
+    TypeInvariant
+    SessionUserRegistered
+    ArticlePublishedRequiresRegisteredUser
+```
+
+**正确A**（`INVARIANTS` 关键字 + 列表）：
+
+```cfg
+INVARIANTS
+    TypeInvariant
+    SessionUserRegistered
+    ArticlePublishedRequiresRegisteredUser
+```
+
+**正确B**（`INVARIANT <单名>` 重复多行）：
+
+```cfg
+INVARIANT TypeInvariant
+INVARIANT SessionUserRegistered
+INVARIANT ArticlePublishedRequiresRegisteredUser
+```

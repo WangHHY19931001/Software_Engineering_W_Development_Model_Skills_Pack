@@ -1,24 +1,20 @@
-/**
- * auth 路由：POST /register + POST /login（realizes INTF-001 HTTP 绑定）。
- * 挂载于 /api/v1/auth 前缀。
- */
+// 认证路由：/api/auth/register + /api/auth/login + /api/auth/logout
+// 对应 outline-design.md INTF-AUTH-API
 import { Router } from 'express';
-import { asyncHandler } from '../utils/async-handler';
-import { validateRequest } from '../middleware/validate';
-import { registerSchema, loginSchema } from '../schemas/auth.schema';
-import type { AuthController } from '../controllers/auth.controller';
+import { authController } from '../controllers/auth.controller';
+import { validate } from '../middleware/validate.middleware';
+import { registerSchema, loginSchema } from '../schemas';
+import { wrap } from '../utils/async-handler';
 
-export function buildAuthRoutes(authController: AuthController): Router {
-  const router = Router();
-  router.post(
-    '/register',
-    validateRequest({ body: registerSchema }),
-    asyncHandler(authController.register),
-  );
-  router.post(
-    '/login',
-    validateRequest({ body: loginSchema }),
-    asyncHandler(authController.login),
-  );
-  return router;
-}
+const router = Router();
+
+// POST /api/auth/register —— zod 校验 → 控制器
+router.post('/register', validate(registerSchema), wrap(authController.register.bind(authController)));
+
+// POST /api/auth/login —— zod 校验 → 控制器
+router.post('/login', validate(loginSchema), wrap(authController.login.bind(authController)));
+
+// POST /api/auth/logout —— 注销当前会话 JWT（TLA+ Logout）
+router.post('/logout', wrap(authController.logout.bind(authController)));
+
+export const authRoutes = router;

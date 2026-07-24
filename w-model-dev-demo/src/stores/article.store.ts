@@ -1,51 +1,31 @@
-/**
- * ArticleStore：文章内存存储（realizes INTF-011 / DD-002）。
- * findAll 按 createdAt 降序分页。
- */
-import type { Article } from '../types';
+// 文章内存存储封装：Map 读写 + 状态更新
+// 对应 detailed-design.md DD-ARTICLE-STORE：store Map<articleId,Article>
+import type { Article, ArticleStatus } from '../types';
+import { AppError } from '../utils/errors';
 
 export class ArticleStore {
-  private readonly articles = new Map<string, Article>();
+  private store = new Map<string, Article>();
 
-  insert(article: Article): void {
-    this.articles.set(article.id, article);
+  save(article: Article): void {
+    this.store.set(article.id, article);
   }
 
-  findById(id: string): Article | null {
-    return this.articles.get(id) ?? null;
+  findById(id: string | null): Article | null {
+    if (id == null) return null;
+    return this.store.get(id) ?? null;
   }
 
-  update(id: string, patch: Partial<Article>): Article | null {
-    const existing = this.articles.get(id);
-    if (!existing) return null;
-    const updated: Article = {
-      ...existing,
-      ...patch,
-      id: existing.id,
-      updatedAt: new Date().toISOString(),
-    };
-    this.articles.set(id, updated);
-    return updated;
+  findAll(): Article[] {
+    return Array.from(this.store.values());
   }
 
-  delete(id: string): boolean {
-    return this.articles.delete(id);
-  }
-
-  findAll(page: number, pageSize: number): { items: Article[]; total: number } {
-    const all = Array.from(this.articles.values()).sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    );
-    const start = (page - 1) * pageSize;
-    const items = start < 0 || start >= all.length ? [] : all.slice(start, start + pageSize);
-    return { items, total: all.length };
-  }
-
-  clear(): void {
-    this.articles.clear();
-  }
-
-  size(): number {
-    return this.articles.size;
+  updateStatus(id: string, status: ArticleStatus): void {
+    const article = this.store.get(id);
+    if (!article) {
+      throw new AppError(40401, '文章不存在');
+    }
+    article.status = status;
   }
 }
+
+export const articleStore = new ArticleStore();

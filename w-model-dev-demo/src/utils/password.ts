@@ -1,30 +1,21 @@
-/**
- * PasswordHasher：bcrypt 密码哈希封装（realizes INTF-004 / DD-007）。
- * cost=10，明文不入日志。
- */
+// bcrypt 密码哈希与比对工具
+// 对应 detailed-design.md DD-PASSWORD-UTIL：hash cost factor=10；compare 比对明文与哈希
 import bcrypt from 'bcrypt';
-import { InternalError, ErrorCode } from './errors';
 
-const COST = 10;
+export class PasswordUtil {
+  private costFactor: number;
 
-export class PasswordHasher {
-  async hash(plain: string): Promise<string> {
-    try {
-      return await bcrypt.hash(plain, COST);
-    } catch {
-      throw new InternalError(ErrorCode.INTERNAL, '密码哈希失败');
-    }
+  constructor(costFactor = 10) {
+    this.costFactor = costFactor;
   }
 
-  async compare(plain: string, hash: string): Promise<boolean> {
-    try {
-      return await bcrypt.compare(plain, hash);
-    } catch {
-      throw new InternalError(ErrorCode.INTERNAL, '密码校验失败');
-    }
+  hash(password: string): string {
+    return bcrypt.hashSync(password, this.costFactor);
   }
 
-  getRounds(hash: string): number {
-    return bcrypt.getRounds(hash);
+  compare(password: string, hash: string): boolean {
+    return bcrypt.compareSync(password, hash);
   }
 }
+
+export const passwordUtil = new PasswordUtil();
