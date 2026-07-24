@@ -11,15 +11,16 @@
 ## 核心能力
 
 - **W 模型 8 阶段编排**：需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码 → 集成测试 → 系统测试 → 验收测试
-- **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（S 产出 / V 评审 / G 门禁）执行。违反命中反模式 #10，回到当前阶段起点。详见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)
+- **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位）执行。违反命中反模式 #10，回到当前阶段起点。详见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评
 - **Agent Personas（评审角色提示词，V 子代理执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由 V 子代理在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
-- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 17 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退）二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 19 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复）二分；F# 重复命中 ≥2 次升级为 L# 教训
 - **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
 - **工件质量门**：RTM 需求覆盖率 100% + 四级测试全部通过才允许交付（技能验证门已移除，演化评估移交外部工具；单元测试代码覆盖率阈值 ≥ 80% 属于质量标准，与 RTM 覆盖率是两个独立指标）
+- **返工循环：R 根因定位者 + S 兼 F 修复者**：V/G 不通过后，必先分派 R（根因定位者，第 6 角色）接收 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位缺陷根因，产出 `RootCauseReport`（含根因链 / 上游缺陷标记 / 修复建议 / 防御措施）；经 V 复审（`targetKind=rootcause`）+ G 门禁（`check-rootcause-report.ts`）通过后，S 兼 F 携 R 报告执行修复（按 `fixRecommendation`）；新增反模式 #18（跳过 R 直接 S 返工）/ #19（R 报告未 V 复审直接 S 修复）；正常路径 `S → V → G → 下一阶段`，返工路径 `V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → V → G → 下一阶段`；详见 [root-cause-locator.md](./w-model-dev/references/root-cause-locator.md)
 - **TLA+ 层次化状态机建模 + 代码-TLA+ 一致性回归**：阶段 1-4 用 TLA+ 建模系统/子系统/原子行为（L1-L3+ 层次化），G 子代理跑 `check-tla-model.ts` 校验 SANY 语法 + TLC 模型检查；阶段 5 G 子代理跑 `check-code-tla-consistency.ts` 四维度校验（SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式），将 TLA+ 资产作为状态机验证器回归编码产物
 - **PPT 排序算法**：O(N×k) 复杂度的概率枢轴锦标赛，用于测试用例优先级排序
 - **采用路径（Greenfield vs Brownfield）**：新项目 Day 0 跑全流程 vs 存量项目增量验证优先，见 [采用路径指南](./docs/adoption-guide.md)；吸收自 addyosmani/agent-skills `docs/adoption-guide.md` 并适配 W 模型 8 阶段
@@ -132,11 +133,12 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
-│   │   ├── anti-patterns.md      #   反例与黑名单（17 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
+│   │   ├── anti-patterns.md      #   反例与黑名单（19 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
 │   │   ├── workflow.md           #   完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审 §7.4A）
 │   │   ├── agent-personas.md     #   Agent Personas（4 个评审角色提示词：code-reviewer / test-engineer / security-auditor / performance-auditor）
-│   │   ├── subagent-delegation.md#   编排者-子代理边界（O/A/S/V/G 五角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12/#13/#14/#15/#16/#17）
+│   │   ├── subagent-delegation.md#   编排者-子代理边界（O/A/S/V/G/R 六角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12/#13/#14/#15/#16/#17/#18/#19）
+│   │   ├── root-cause-locator.md  #   R 根因定位者方法论（4 种方法 + 质量标准 + 多人格多角度分析）
 │   │   ├── ingestion-chunk.md    #   A 子代理分块分析细则（阶段 1–4）
 │   │   ├── ingestion-cross.md    #   A 子代理交叉合并与图谱演进细则（阶段 1–4）
 │   │   ├── graph-guide.md        #   图谱门禁与收敛准则（check-requirement-graph.ts）
@@ -196,8 +198,9 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审 §7.4A
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 17 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退）+ L1~L4 实现层教训 + F1~F10 失败模式
-- [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G 五角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12/#13/#14/#15/#16/#17
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 19 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复）+ L1~L4 实现层教训 + F1~F10 失败模式
+- [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12/#13/#14/#15/#16/#17/#18/#19
+- [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）+ 质量标准 + 多人格多角度分析
 - [ingestion 子流程：分块分析](./w-model-dev/references/ingestion-chunk.md) - A 子代理分块分析细则（阶段 1–4）
 - [ingestion 子流程：交叉合并与图谱演进](./w-model-dev/references/ingestion-cross.md) - A 子代理合并建图 + 收敛循环（阶段 1–4）
 - [图谱门禁与收敛准则](./w-model-dev/references/graph-guide.md) - check-requirement-graph.ts 用法 + 收敛判定
