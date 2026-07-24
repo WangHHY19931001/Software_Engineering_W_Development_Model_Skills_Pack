@@ -58,6 +58,13 @@ export interface TlaSpec {
 export interface TlaManifest {
   version: number;
   project?: string;
+  /**
+   * 强制必填字段（P1.1）：jarPath/tlaPath/cfgPath 路径解析的统一基准。
+   * 值为相对 manifest 文件所在目录的路径（如 "." 或 ".."）。
+   * CLI（check-tla-model.ts）按 `path.resolve(manifestDir, basePath)` 解析为绝对基准目录，
+   * 再据此解析 jarPath/tlaPath/cfgPath，避免按 cwd 解析导致跨项目试错。
+   */
+  basePath: string;
   currentPhase: number;
   tools: { jarPath: string; javaMinVersion: number };
   specs: TlaSpec[];
@@ -799,6 +806,12 @@ export function checkTlaModel(
   if (!Array.isArray(m.specs)) {
     result.violations.push('manifest.specs 必须为数组');
     return result;
+  }
+
+  // basePath 强制字段校验（P1.1）：缺失 / 非字符串 / 空字符串均判失败。
+  // 不 return 早退 —— 仅记录违反，其余结构校验继续执行，保持向后兼容（脚本不崩溃）。
+  if (typeof m.basePath !== 'string' || m.basePath === '') {
+    result.violations.push('manifest.basePath 缺失（强制字段，相对 manifest 文件所在目录）');
   }
 
   result.totalSpecs = m.specs.length;

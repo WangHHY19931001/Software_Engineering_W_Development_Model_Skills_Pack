@@ -2,6 +2,7 @@
   "version": 1,
   "project": "tla-e2e-syntax-error-fail",
   "currentPhase": 1,
+  "basePath": ".",
   "tools": {
     "jarPath": "../../../tools/tla2tools.jar",
     "javaMinVersion": 11

@@ -56,12 +56,19 @@ TLA+ 门禁是 W 模型第三维度门禁——与结构连通门禁（graph）�
 
 > manifest 与 .tla 头部中所有相对路径的解析基准。路径解析错误 → `check-tla-model.ts` 报「文件不存在」或层次校验失败。
 
+**强制字段 `basePath`**（P1.1）：
+
+- `tla-manifest.json` 顶层 **必须** 含 `basePath: string` 字段；缺失 / 非字符串 / 空字符串 → `checkTlaModel` 返回 `passed=false`，violations 含 `"manifest.basePath 缺失（强制字段，相对 manifest 文件所在目录）"`。
+- `basePath` 的值是相对 **manifest 文件所在目录** 的路径（如 `"."` 或 `".."`），由 CLI 解析为绝对基准目录 `baseAbs = path.resolve(manifestDir, basePath)`，再据此解析 `jarPath` / `tlaPath` / `cfgPath`，避免按 cwd 解析导致跨项目试错。
+- 向后兼容：旧 manifest 无 `basePath` 时校验会报缺失（脚本不崩溃），CLI 缺省回退 `basePath = '.'`。
+
 **三类路径基准**：
 
 | 字段来源 | 字段 | 解析基准 |
 |---|---|---|
-| `tla-manifest.json` | `tools.jarPath` | 相对 **cwd**（脚本执行目录） |
-| `tla-manifest.json` | `specs[].tlaPath` / `specs[].cfgPath` | 相对 **manifest 文件所在目录** |
+| `tla-manifest.json` | `basePath` | 相对 **manifest 文件所在目录**（强制必填，P1.1） |
+| `tla-manifest.json` | `tools.jarPath` | 相对 **basePath**（P1.1 起统一基准，不再按 cwd 解析） |
+| `tla-manifest.json` | `specs[].tlaPath` / `specs[].cfgPath` | 相对 **basePath** |
 | `.tla` 文件头 | `@parent` / `@sibling` / `@child` | 相对 **该 .tla 文件所在目录** |
 
 **示例**（demo 项目布局）：
@@ -76,11 +83,12 @@ w-model-dev-demo/
     └── L2_auth_subsystem.tla
 ```
 
-对应 manifest 字段填写：
+对应 manifest 字段填写（`basePath="."` 表示以 manifest 所在目录 `.w-model/` 为基准，需上跳一级到 `tla/`）：
 
 ```json
 {
-  "tools": { "jarPath": "w-model-dev/tools/tla2tools.jar" },
+  "basePath": ".",
+  "tools": { "jarPath": "../../w-model-dev/tools/tla2tools.jar" },
   "specs": [{
     "id": "L1_blog_system",
     "tlaPath": "../tla/L1_blog_system.tla",
@@ -89,11 +97,12 @@ w-model-dev-demo/
 }
 ```
 
-- `jarPath` 相对 cwd（脚本从仓库根执行，故填 `w-model-dev/tools/...`）。
-- `tlaPath`/`cfgPath` 相对 manifest 目录（`.w-model/`），故用 `../tla/...` 上跳一级。
+- `basePath` 相对 manifest 目录（`.w-model/`），此处填 `"."` 表示基准即 `.w-model/`。
+- `jarPath` 相对 basePath 基准（即 `.w-model/`），故填 `../../w-model-dev/tools/...` 上跳到仓库根再进入 `w-model-dev/tools/`。
+- `tlaPath`/`cfgPath` 相对 basePath 基准（即 `.w-model/`），故用 `../tla/...` 上跳一级到 `tla/`。
 - `L1_blog_system.tla` 头部 `@child tla/L2_auth_subsystem.tla` 相对该 .tla 所在 `tla/` 目录。
 
-> 路径基准混淆是高频返工点（jarPath 误按 manifest 目录解析、tlaPath 误按 cwd 解析）。填路径前先确认所属基准列。
+> 路径基准混淆是高频返工点（jarPath 误按 cwd 解析、tlaPath 误按 cwd 解析）。P1.1 起所有 manifest 路径统一以 `basePath` 为基准，填路径前先确认 `basePath` 已声明。
 
 ## §2.2 前置清单
 
