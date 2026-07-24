@@ -109,7 +109,7 @@ const VERIFIER_CASES: VerifierCase[] = [
     file: 'bad-passed-mismatch.json',
     expectedPassed: false,
     expectedReasonPatterns: [/passed.*与 qualityLevel.*不一致/],
-    description: 'passed=true 与 qualityLevel=D 不一致',
+    description: 'passed=false 与 qualityLevel=B 不一致（B 级应 passed=true）',
   },
   {
     file: 'bad-reviewed-at.json',
