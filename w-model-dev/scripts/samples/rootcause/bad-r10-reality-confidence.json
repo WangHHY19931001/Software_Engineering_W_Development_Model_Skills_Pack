@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "reportId": "RC-phase5-1-01",
+    "targetKind": "rootcause",
+    "targetArtifact": "w-model-dev-demo/src/services/auth.service.ts",
+    "targetPhase": "阶段 5 - 编码",
+    "reworkRound": 1,
+    "reworkSource": "verifier",
+    "persona": "root-cause-locator",
+    "method": "combined",
+    "analysisTimestamp": "2026-07-24T10:00:00Z"
+  },
+  "input": {
+    "reworkHints": ["[Critical] auth.service.ts login() 未校验密码为空的场景"],
+    "verifierOutputPath": ".w-model/verifier/auth-review.json"
+  },
+  "phenomenon": {
+    "summary": "login() 在 password 为空字符串时直接签发 JWT",
+    "severity": "Critical",
+    "affectedArtifacts": ["w-model-dev-demo/src/services/auth.service.ts"]
+  },
+  "rootCauseChain": [
+    {
+      "step": 1,
+      "why": "为什么 login() 未校验空密码？",
+      "answer": "login() 函数体中无 password 非空检查",
+      "evidence": "auth.service.ts:24-30 login() 函数体"
+    },
+    {
+      "step": 2,
+      "why": "为什么没有非空检查？",
+      "answer": "需求规格 REQ-AUTH-002 未规定 password 为空时的行为",
+      "evidence": "requirement-spec.md REQ-AUTH-002 节"
+    }
+  ],
+  "rootCause": {
+    "category": "requirement-gap",
+    "description": "需求规格 REQ-AUTH-002 未规定空密码的处理，编码默认不检查",
+    "evidence": "requirement-spec.md REQ-AUTH-002 缺少空值处理条款",
+    "falsifiabilityCheck": "若在 REQ-AUTH-002 中增加空密码拒绝条款并在 login() 增加 password.trim() 非空校验，则空密码登录现象消失"
+  },
+  "upstreamDefect": {
+    "present": true,
+    "upstreamPhase": "阶段 1",
+    "upstreamArtifactId": "REQ-AUTH-002",
+    "defectDescription": "需求规格未规定空密码处理",
+    "rollbackRecommended": false
+  },
+  "fixRecommendation": [
+    {
+      "target": "w-model-dev-demo/src/services/auth.service.ts",
+      "location": "auth.service.ts:26 login() 入口",
+      "action": "增加 if (!password || password.trim() === '') throw new ValidationError('密码不能为空')",
+      "rationale": "消除根因（空密码未校验），与 REQ-AUTH-002 补充条款一致"
+    }
+  ],
+  "prevention": [
+    {
+      "scope": "phase-1-requirements",
+      "measure": "需求模板增加「输入边界值处理」检查项，强制规定空值/边界值行为",
+      "owner": "S-doc"
+    }
+  ],
+  "partialReports": [
+    {
+      "personaSlice": "testing-reality-checker",
+      "path": ".w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json",
+      "confidence": 0.3
+    }
+  ],
+  "qualityLevel": "A",
+  "passed": true,
+  "summary": "空密码登录根因为需求规格 REQ-AUTH-002 未规定空值处理，须补需求 + 补编码校验",
+  "reviewNotes": ""
+}
