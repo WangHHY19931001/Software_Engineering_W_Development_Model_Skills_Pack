@@ -335,6 +335,51 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 - 用户放行后更新 `project.status` 与 `updatedAt`；
 - **维护 budget.json / run-log.jsonl / maturity.json**（状态读写+持久化，非实施；见 §10C / §10D）：项目初始化创建三文件、每次子代理返回/门禁执行/CHECKPOINT 放行后 append run-log、预算检查、成熟度判定与升降级。
 
+#### 3.4.6 门禁增强约束（2026-07-25）
+
+> 第6轮 W 模型调测后识别的 8 个技能问题，经门禁增强设计修正后的硬约束条款。
+
+##### P1.1 TLA+ manifest basePath 强制
+- `tla-manifest.json` 须包含 `basePath` 字段（强制必填，非可选）
+- `tools.jarPath` / `specs[].tlaPath` / `specs[].cfgPath` 全部相对 `basePath` 解析
+- 缺失/非字符串/空字符串 → `check-tla-model.ts` 退出码 1
+
+##### P1.2 TLA+ SD 覆盖率全规格强制（无例外）
+- 所有 spec（L1/L2/L3/L4 无例外）须含 `requirementIds` 且至少一个 SD-xxx 标识
+- 每个 SD-xxx 须被至少一个 spec 的 requirementIds 包含
+- 违反 → `check-tla-model.ts` 退出码 1
+
+##### P1.3 Verifier passed↔qualityLevel 严格一致（无例外）
+- `passed` 必须严格等于 `(qualityLevel === 'A' || qualityLevel === 'B')`
+- 禁止通过 summary 或任何字段降级
+- P0 未解决时 `qualityLevel` 须实际降为 C/D，不得保持 B 级同时 `passed=false`
+- 不一致 → `check-verifier-output.ts` 退出码 1
+
+##### P1.4 RTM codeModule 回填时机
+- 阶段5编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列
+- 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）
+- 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1
+
+##### P2.5 UAT 路径映射表
+- 阶段1设计 UAT 时须产出 `docs/uat-path-mapping.md`
+- 阶段5编码后回填实际路径列
+- 阶段8验收测试编写时按映射表对应，禁止凭主观判断
+
+##### P2.6 TLA+ 不变式业务语义对齐
+- 每个 TLA+ 不变式须在 .tla 文件注释中标注 `@designRef <doc>#<section>`
+- V 评审须校验业务语义对齐（非仅语法/模型检查通过）
+- 评审者须为每个不变式提供设计文档引用 + 业务语义解释
+
+##### P2.7 phase-8 三段暂停点语义
+- A 段（用例执行）：自驱模式下连续执行不暂停
+- B 段（每 30% 暂停）：自驱模式下合并为单次中点检查（50% 时）
+- C 段（最终用户确认）：任何模式下强制暂停，须用户在 §9 确认
+
+##### P2.8 TLA+ Next 分支命名约定
+- TLA+ Action 名：PascalCase（如 `PublishAnnouncement`）
+- 代码方法名：camelCase（如 `publishAnnouncement`）
+- `check-code-tla-consistency.ts` 维度3 支持 PascalCase→camelCase 自动映射
+
 ---
 
 ## 4. 技能工作流程
