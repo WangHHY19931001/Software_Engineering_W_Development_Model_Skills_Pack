@@ -32,8 +32,10 @@ export interface RunLogEntry {
     | 'test'
     | 'checkpoint'
     | 'rework'
-    | 'rollback';
-  role: 'O' | 'A' | 'S' | 'V' | 'G';
+    | 'rollback'
+    | 'rootcause'
+    | 'fix';
+  role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number;
   estimated: boolean;
@@ -44,6 +46,33 @@ export interface RunLogEntry {
   acknowledgedDecisions?: string[];
   note?: string;
   artifacts?: string[];
+  // ---- rootcause/fix 扩展字段（spec §5.5）----
+  /** rootcause: R 报告 ID；fix: 所基于的 R 报告 ID */
+  reportId?: string;
+  /** rootcause: 根因分类 */
+  rootCauseCategory?: string;
+  /** rootcause: 是否存在上游缺陷 */
+  upstreamDefect?: boolean;
+  /** rootcause: 是否建议回退 */
+  rollbackRecommended?: boolean;
+  /** fix: 所基于的 R 报告 ID（语义同 reportId，但字段名与 spec 对齐） */
+  basedOnReport?: string;
+  /** fix: RTM diff */
+  rtmDiff?: Record<string, unknown>;
+  /** review: 审查目标类型（'rootcause' 表示复审 R 报告） */
+  targetKind?: string;
+  /** review: 审查目标产物 */
+  target?: string;
+  /** review: 质量等级 */
+  qualityLevel?: string;
+  /** review: 是否通过 */
+  passed?: boolean;
+  /** review: 返工提示 */
+  reworkHints?: string[];
+  /** rootcause/fix: 返工轮次 */
+  round?: number;
+  /** gate: 门禁脚本名 */
+  script?: string;
 }
 
 export interface RunLogCheckOptions {
@@ -56,6 +85,12 @@ export interface RunLogCheckOptions {
 export interface RunLogCheckResult {
   passed: boolean;
   violations: string[];
+}
+
+// ==================== 工具函数 ====================
+
+function isNonEmptyString(x: unknown): x is string {
+  return typeof x === 'string' && x.trim() !== '';
 }
 
 // ==================== 校验入口 ====================
@@ -117,6 +152,20 @@ export function checkRunLog(
     if (!hasCheckpoint) violations.push(`R1: 阶段 ${phase} 缺 checkpoint 动作`);
   }
 
+  // R1 扩展：rootcause/fix 动作字段完整性（spec §7.5）
+  for (const e of valid) {
+    if (e.action === 'rootcause') {
+      if (!isNonEmptyString(e.reportId)) violations.push(`R1: rootcause 动作 ${e.runId} 须含 reportId`);
+      if (!isNonEmptyString(e.rootCauseCategory)) violations.push(`R1: rootcause 动作 ${e.runId} 须含 rootCauseCategory`);
+      if (typeof e.upstreamDefect !== 'boolean') violations.push(`R1: rootcause 动作 ${e.runId} 须含 upstreamDefect(boolean)`);
+      if (typeof e.rollbackRecommended !== 'boolean') violations.push(`R1: rootcause 动作 ${e.runId} 须含 rollbackRecommended(boolean)`);
+    }
+    if (e.action === 'fix') {
+      if (!isNonEmptyString(e.basedOnReport)) violations.push(`R1: fix 动作 ${e.runId} 须含 basedOnReport`);
+      if (!Array.isArray(e.artifacts) || e.artifacts.length === 0) violations.push(`R1: fix 动作 ${e.runId} 须含 artifacts(非空数组)`);
+    }
+  }
+
   // R2 tokens 非负
   for (const e of valid) {
     if (typeof e.tokens === 'number' && e.tokens < 0) {
@@ -144,6 +193,29 @@ export function checkRunLog(
         `R3: run-log rework 记录数 ${reworkCount} 与 tla-manifest.checkRounds ${options.tlaCheckRounds} 不一致`,
       );
     }
+  }
+
+  // R3 扩展：rootcause ↔ fix 一一对应 + V 复审 rootcause 记录数 = R 记录数（spec §7.6）
+  const rootcauseActions = valid.filter(e => e.action === 'rootcause');
+  const fixActions = valid.filter(e => e.action === 'fix');
+  const rootcauseReviews = valid.filter(e => e.action === 'review' && e.targetKind === 'rootcause');
+
+  if (rootcauseActions.length !== fixActions.length) {
+    violations.push(
+      `R3: rootcause 记录数(${rootcauseActions.length}) ≠ fix 记录数(${fixActions.length})，须一一对应`,
+    );
+  }
+  for (const r of rootcauseActions) {
+    if (!fixActions.some(f => f.basedOnReport === r.reportId)) {
+      violations.push(
+        `R3: rootcause 报告 ${r.reportId ?? '?'} 无对应 fix 记录（basedOnReport 缺失）`,
+      );
+    }
+  }
+  if (rootcauseReviews.length !== rootcauseActions.length) {
+    violations.push(
+      `R3: V 复审 rootcause 记录数(${rootcauseReviews.length}) ≠ R 记录数(${rootcauseActions.length})，每份 R 报告须有 V 复审`,
+    );
   }
 
   // R4 acknowledgedDecisions 非空
@@ -203,6 +275,18 @@ export function checkRunLog(
     }
   }
 
+  // R6 扩展：check-rootcause-report.ts gate 须有 exitCode（spec §7.6）
+  const rootcauseGateActions = valid.filter(
+    e => e.action === 'gate' && e.script === 'check-rootcause-report.ts',
+  );
+  for (const g of rootcauseGateActions) {
+    if (typeof g.gateExitCode !== 'number' || g.gateExitCode === null) {
+      violations.push(
+        `R6: check-rootcause-report.ts gate 记录 ${g.runId} 缺 gateExitCode`,
+      );
+    }
+  }
+
   // R7 append-only（时间戳单调递增）
   let prevTimestamp: string | undefined;
   for (const e of valid) {
@@ -214,6 +298,27 @@ export function checkRunLog(
       }
     }
     prevTimestamp = e.timestamp;
+  }
+
+  // R7 扩展：返工路径时序 rootcause → review(targetKind=rootcause) → fix（spec §7.6）
+  for (let i = 0; i < valid.length; i++) {
+    if (valid[i].action === 'rootcause') {
+      // 后续须先有 review(targetKind=rootcause) 再有 fix
+      let j = i + 1;
+      while (j < valid.length && valid[j].action !== 'review') j++;
+      if (j >= valid.length || valid[j].targetKind !== 'rootcause') {
+        violations.push(
+          `R7: rootcause 记录 ${valid[i].runId} 后须紧跟 review(targetKind=rootcause)`,
+        );
+      }
+      // fix 须在 review(rootcause) 之后
+      while (j < valid.length && valid[j].action !== 'fix') j++;
+      if (j >= valid.length) {
+        violations.push(
+          `R7: rootcause 记录 ${valid[i].runId} 后须有 fix 记录`,
+        );
+      }
+    }
   }
 
   return { passed: violations.length === 0, violations };

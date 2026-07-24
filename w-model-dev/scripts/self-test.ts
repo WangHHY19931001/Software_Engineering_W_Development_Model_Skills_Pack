@@ -501,6 +501,23 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedReasonPatterns: [/R7.*非 append-only/],
     description: 'r1 时间戳 02:00 早于 r2 时间戳 01:00（时间戳倒序），应被 R7 append-only 校验拦截',
   },
+  {
+    file: 'rootcause-valid.jsonl',
+    expectedPassed: true,
+    description: '完整 rootcause→review→fix→review→gate 返工闭环，应通过 R1/R3/R6/R7 扩展校验',
+  },
+  {
+    file: 'rootcause-missing-fix.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R3.*rootcause.*fix.*一一对应|basedOnReport.*缺失/, /R7.*rootcause.*fix/],
+    description: '有 R 但缺 S-fix 记录，应被 R3 一一对应 + R7 时序校验拦截',
+  },
+  {
+    file: 'rootcause-missing-review.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R3.*V 复审 rootcause.*≠.*R 记录数/, /R7.*rootcause.*review.*targetKind=rootcause/],
+    description: '有 R 但缺 V 复审 rootcause 记录，应被 R3 复审数 + R7 时序校验拦截',
+  },
 ];
 
 // -------------------- Maturity --------------------
