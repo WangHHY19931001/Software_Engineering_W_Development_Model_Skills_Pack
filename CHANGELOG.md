@@ -5,6 +5,34 @@
 
 ## [Unreleased]
 
+### R/F 角色新增：返工循环根因定位者（R）与修复者（F，由 S 兼任）
+
+> 2026-07-24 为返工循环新增根因定位者（R）角色与修复者（F，由 S 兼任）角色，建立 V/G→R→V→G→S-fix→V→G 返工路径，强制返工必经根因定位。
+
+#### 新增
+
+- 新增根因定位者（R）角色与修复者（F，由 S 兼任）角色
+- 新增返工循环 V/G→R→V→G→S-fix→V→G
+- 新增 RootCauseReport Schema 与 check-rootcause-report.ts 校验脚本（R1-R10 规则）
+- 新增 root-cause-locator.md（R 方法论指南）与 subagent-persona-matrix.md（人格选择矩阵）
+- 新增多人格多角度分析机制（并行/串行均可）
+- 新增反模式 #18（跳过 R 直接 S 返工）/ #19（R 报告未 V 复审）
+- 新增 SKILL.md 约束第 13 条（返工必经根因定位）
+- run-log 新增 rootcause / fix 动作类型
+- budget 新增 rootcauseParallelBudget 字段与 R4-A 校验规则
+
+#### 变更
+
+- anti-patterns.md #4/#10/#12 扩展（纳入 R 相关检测信号）
+- workflow.md 返工路径更新为 R 循环
+- data-models.md run-log schema 扩展
+- verifier-spec.md targetKind 新增 rootcause
+- self-test.ts 基线从 66 增至 77
+- SSoT §3.4/§6.4/§10.9/§4A.2b 新增 R 角色定义与 #18/#19 反模式
+- SKILL.md 角色表新增 R + 约束第 13 条 + 返工路径更新
+- AGENTS.md 角色新增 R + 行动约束 + 脚本导航
+- README.md 角色概览新增 R + 返工流程图更新
+
 ### TLA+ 指南修复 + 编排纪律强化 + 代码-TLA+ 一致性回归（完整版）
 
 > 修复工作过程中发现的三个问题：① TLA+ 存在多次返工（疑似指南和编写规范问题）；② 编排者出现多次上下文压缩（疑似任务越权或任务设计过于复杂）；③ TLA+ 资产未能作为状态机验证器门禁来回归编码产物。
