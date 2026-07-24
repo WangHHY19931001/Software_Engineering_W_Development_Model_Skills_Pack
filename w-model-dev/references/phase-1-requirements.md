@@ -17,6 +17,7 @@
 - 《需求规格说明书》（套用 [templates/requirement-spec.md](../templates/requirement-spec.md)）
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
+- `docs/uat-path-mapping.md`：UAT 路径映射表初始版（设计路径列，实际路径待阶段5回填）
 
 ## AI 能力应用
 

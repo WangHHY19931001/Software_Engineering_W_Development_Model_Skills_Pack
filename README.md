@@ -77,6 +77,22 @@ npx tsx w-model-dev/scripts/self-test.ts
 > 脚本不调用任何 LLM，仅做结构化门禁判定。
 > `self-test.ts` 是校验逻辑的回归基线：每次修改 `gate-logic.ts` / `verifier-logic.ts` / `graph-logic.ts` 后必须跑通，新增校验项需同步增加样本。
 
+### 门禁脚本增强（v2，2026-07-25）
+
+| 校验项 | 脚本 | 说明 |
+|---|---|---|
+| basePath 强制 | check-tla-model.ts | manifest.basePath 必填，缺失 → exit 1 |
+| SD 覆盖率全规格 | check-tla-model.ts | 所有 spec 须含 SD-xxx，无例外 |
+| passed↔qualityLevel | check-verifier-output.ts | 严格一致，无例外 |
+| codeModule 时机 | check-code-tla-consistency.ts | 阶段5编码后强制回填 |
+| Next 命名映射 | check-code-tla-consistency.ts | PascalCase↔camelCase 自动映射 |
+
+**Fixture 化回归测试**：
+```bash
+cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
+```
+覆盖 basePath/SD 覆盖/passed↔qualityLevel 三个维度的正常+失败路径。
+
 ## 命令一览
 
 | 命令 | 说明 |
@@ -124,6 +140,17 @@ npx tsx w-model-dev/scripts/self-test.ts
 5. **check-artifact-gate.ts 缺 exitCode 字段**（2026-07-24 第五轮发现）：唯一未在 `GATE_JSON` 输出中包含 `exitCode` 的门禁脚本，导致 `check-run-log.ts` R6 交叉校验无法提取退出码。修正方案：与其它 7 个 `check-*.ts` 脚本对齐，计算并输出 `exitCode`。
 
 > 该目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向此目录。
+
+### 新门禁满足情况（2026-07-25）
+
+第6轮 demo 产物已通过新门禁校验：
+- `tla-manifest.json` 含 `basePath` 字段
+- 所有 spec `requirementIds` 含 SD-xxx 标识
+- Verifier 输出 passed↔qualityLevel 一致
+- RTM.codeModule 列已回填
+- code-TLA 一致性四维度全通过
+
+> 完整 DDD 重构版 demo 待 Part B 完成后作为参考实现模板。
 
 ## 项目结构
 

@@ -2,6 +2,7 @@
   "version": 1,
   "project": "tla-sample-valid",
   "currentPhase": 2,
+  "basePath": ".",
   "tools": {
     "jarPath": "w-model-dev/tools/tla2tools.jar",
     "javaMinVersion": 11

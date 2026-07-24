@@ -100,10 +100,10 @@ interface EnvironmentStatus {
 /**
  * 环境检查（设计文档 §3.1 步骤 1）：
  *   - java -version 可执行且主版本 ≥ javaMinVersion
- *   - tla2tools.jar 文件存在（jarPath 相对 cwd 解析）
+ *   - tla2tools.jar 文件存在（jarAbs 为按 basePath 基准解析后的绝对路径）
  */
 async function checkEnvironment(
-  jarPath: string,
+  jarAbs: string,
   javaMinVersion: number,
 ): Promise<EnvironmentStatus> {
   const errors: string[] = [];
@@ -135,8 +135,7 @@ async function checkEnvironment(
     }
   }
 
-  // jar 文件存在（相对 cwd 解析）
-  const jarAbs = path.resolve(jarPath);
+  // jar 文件存在（jarAbs 已由调用方按 basePath 基准解析为绝对路径）
   try {
     const stat = await fs.stat(jarAbs);
     if (!stat.isFile()) {
@@ -145,7 +144,7 @@ async function checkEnvironment(
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      errors.push(`tla2tools.jar 不存在: ${jarAbs}（按 cwd 相对路径解析）`);
+      errors.push(`tla2tools.jar 不存在: ${jarAbs}`);
     } else {
       errors.push(`tla2tools.jar 访问失败: ${e.message}`);
     }
@@ -349,9 +348,15 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  // P1.1: 路径解析统一基准 —— basePath（相对 manifest 文件所在目录）。
+  // 缺省回退 '.'（与 manifest 目录同级），但纯逻辑已对缺失 basePath 报违反。
+  const basePath = manifest.basePath || '.';
+  const manifestDir = path.dirname(abs);
+  const baseAbs = path.resolve(manifestDir, basePath);
+
   // 环境检查
-  const env = await checkEnvironment(tools.jarPath, tools.javaMinVersion);
-  const jarAbs = path.resolve(tools.jarPath);
+  const jarAbs = path.resolve(baseAbs, tools.jarPath);
+  const env = await checkEnvironment(jarAbs, tools.javaMinVersion);
 
   // 提取 graph SD 节点（供 checkCoverage 校验 TLA+ 子系统覆盖率，§10）
   let graphSdNodes: string[] | undefined;
@@ -392,8 +397,8 @@ async function main(): Promise<void> {
       if (typeof spec.phase === 'number' && spec.phase > phase) continue;
       if (specId !== undefined && spec.id !== specId) continue;
 
-      const tlaAbs = path.resolve(path.dirname(abs), spec.tlaPath);
-      const cfgAbs = path.resolve(path.dirname(abs), spec.cfgPath);
+      const tlaAbs = path.resolve(baseAbs, spec.tlaPath);
+      const cfgAbs = path.resolve(baseAbs, spec.cfgPath);
       const tlaDir = path.dirname(tlaAbs);
 
       // 读 .tla 文件 + 解析头部 + 校验头部
@@ -473,7 +478,7 @@ async function main(): Promise<void> {
   console.log(`规格总数      : ${result.totalSpecs}`);
   console.log(`受检规格数    : ${result.checkedSpecs}`);
   console.log(
-    `环境状态      : ${result.environmentOk ? '✓ 就绪' : '✗ 未就绪'}（Java ${env.javaVersion ?? 'N/A'}，jar ${path.resolve(tools.jarPath)}）`,
+    `环境状态      : ${result.environmentOk ? '✓ 就绪' : '✗ 未就绪'}（Java ${env.javaVersion ?? 'N/A'}，jar ${jarAbs}）`,
   );
   if (specId !== undefined) console.log(`--spec 过滤   : ${specId}`);
   if (skipTlc) console.log(`--skip-tlc    : 是（跳过 TLC）`);

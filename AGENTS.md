@@ -33,6 +33,11 @@
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
 | `.githooks/pre-push` | 本地推送前门禁（替代远程 CI） | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` 后会触发 |
 
+门禁脚本测试：
+- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest）
+- `w-model-dev/scripts/samples/`：fixture 样本（含 gate-enhancement 场景）
+- 运行：`cd w-model-dev && npx vitest run scripts/__tests__/`
+
 ## 3. 常用命令
 
 ```bash
@@ -77,6 +82,36 @@ npm run prepush
 | 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-24 全量重跑通过） |
 
 > 第五轮（2026-07-24）相比第四轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/`/`dist/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，采用编排者-子代理分派模式（每阶段 S→V→G 子代理执行）。重跑产物为独立再实现，单元测试 53→77、覆盖率由 96.37% 提升至 99.37%（lines），集成测试 13→21、系统测试 8→22，验收测试 15 不变，全量测试 89→135。图谱节点 43→35（更精炼的 DD 拆分），边 182→141，零违反保持。TLA+ 规格 8 个（1 L1 + 4 L2 + 3 L3），层次化建模完整。过程中修正了 check-artifact-gate.ts 缺 exitCode 字段的脚本缺陷。所有门禁退出码 0，未引入新缺陷。
+
+- **端到端调测结论**（2026-07-25，第六轮，扩展博客系统，编排者-子代理分派 + self-as-verifier 自驱模式）：
+
+| 指标 | 数值 |
+|---|---|
+| 项目范围 | 扩展博客系统后端：站点管理/多博主/多用户/推荐/广告/统计/搜索/标签/分类/评论/通知/多博文/交叉引用（21 需求 = 13 REQ + 5 NFR + 3 CON） |
+| 单元测试 | 209/209 通过，代码覆盖率 87.69% lines（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 43/43 通过，覆盖 5 类 TC-DES 用例（参数校验/跨模块/异常路径） |
+| 系统测试 | 53/53 通过，P95 ≤ 200ms，1000 请求错误率 0%，内存 37.98MB |
+| 验收测试 | 49/49 通过（56 vitest 用例），覆盖 21 需求 × 正常+异常+边界场景 |
+| 全量测试 | 单元 209 + 集成 43 + 系统 53 + 验收 49 = 354 全通过 |
+| 阶段门评审 | 8 阶段全部放行（阶段1-4 qualityLevel A~B，阶段5-8 G门禁 exit 0） |
+| 图谱校验 | 阶段 1-4 退出码 0，最终图谱 76 节点 396 边，信息流零违反，EXT-IN/EXT-OUT 边界完整 |
+| TLA+ 行为门禁 | 阶段 1-4 退出码 0，13 规格（1 L1 + 6 L2 + 4 L3 + 2 L4），SANY + TLC 全通过 |
+| 代码-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule / 状态转移 / Next 分支 / 不变式断言） |
+| 工件质量门 | 通过（RTM 100% + 单元覆盖率 87.69% + 四级测试全通过 + TLA+ 资产✓，退出码 0） |
+| 用户确认 | `pending`（验收门禁通过，§9 待用户确认；按 phase-8-acceptance-test.md 规定项目级放行须用户签字） |
+
+> 第六轮（2026-07-25）相比第五轮：项目范围从基础博客扩展为 13 功能领域（新增站点管理/多博主/推荐/广告/统计/搜索/标签/分类/评论/通知/交叉引用），需求 5→21、DD 5→29、TLA+ 规格 8→13（新增 L4 层级）、图谱节点 35→76、边 141→396。采用 self-as-verifier 自驱模式 + 编排者-子代理分派（S-doc/S-tla/V/G/R 串行）。全量测试 135→354（单元 77→209、集成 21→43、系统 22→53、验收 15→49）。过程中修复 TLA+ 不变式违反（分类树 2-循环/广告插槽语义）+ Verifier passed 字段 + SD 覆盖率 + codeModule 映射。所有门禁退出码 0。验收门禁通过，项目级放行待用户在 acceptance-test-report.md §9 确认。
+
+- **门禁增强与文档更新**（2026-07-25，第七轮）：
+
+| 指标 | 数值 |
+|---|---|
+| 范围 | 8 个技能问题修正（P1.1/P1.2/P1.3/P1.4/P2.5/P2.6/P2.7/P2.8） |
+| 已实现 | P1.3（passed↔qualityLevel）、P2.8（Next 命名映射）—— 无需改脚本 |
+| 新实现 | P1.1（basePath 强制）、P1.2（SD 覆盖率 spec 方向）、P1.4（codeModule 时机）、P2.5（UAT 映射表）、P2.6（不变式业务语义）、P2.7（phase-8 三段语义） |
+| 测试 | vitest 63/63 + self-test 82/82 全通过 |
+| fixture | 6 个集成测试覆盖门禁脚本增强（gate-enhancement.test.ts） |
+| 文档 | tla-plus-guide.md §2.1/§3/§4、verifier-spec.md、phase-5-coding.md、phase-8-acceptance-test.md、phase-1-requirements.md、SKILL.md |
 
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
@@ -142,3 +177,4 @@ npm run prepush
 | check-checkpoint.ts | Checkpoint 门禁（R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-rootcause-report.ts | RootCauseReport 校验（R1-R10：Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>`） | 全阶段（返工） | 0=通过，1=校验失败，2=输入错误 |
 | self-test.ts | 回归基线（66 条样本：13 Verifier + 7 Gate + 17 Graph + 13 TLA + 3 Budget + 4 RunLog + 2 Maturity + 2 Checkpoint + 5 Code-TLA+） | - | 0=通过，1=失败 |
+| gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel） | - | 0=通过，1=失败 |

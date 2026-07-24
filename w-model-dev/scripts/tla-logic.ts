@@ -58,6 +58,13 @@ export interface TlaSpec {
 export interface TlaManifest {
   version: number;
   project?: string;
+  /**
+   * 强制必填字段（P1.1）：jarPath/tlaPath/cfgPath 路径解析的统一基准。
+   * 值为相对 manifest 文件所在目录的路径（如 "." 或 ".."）。
+   * CLI（check-tla-model.ts）按 `path.resolve(manifestDir, basePath)` 解析为绝对基准目录，
+   * 再据此解析 jarPath/tlaPath/cfgPath，避免按 cwd 解析导致跨项目试错。
+   */
+  basePath: string;
   currentPhase: number;
   tools: { jarPath: string; javaMinVersion: number };
   specs: TlaSpec[];
@@ -519,8 +526,12 @@ export function checkDecomposition(
 // ==================== SD 覆盖率 / cfg 一致性 / cfg 结构校验 ====================
 
 /**
- * SD 覆盖率校验（tla-plus-guide.md §10）：
- *   - 每个 SD 节点须被至少一个 TLA+ spec 覆盖；未覆盖 → violation
+ * SD 覆盖率校验（tla-plus-guide.md §3 / §10）：
+ *   - P1.2 spec 方向校验（全规格强制，无例外）：每个 spec 须满足
+ *       1. requirementIds 非空数组
+ *       2. requirementIds 含至少一个 SD-xxx 标识（正则 `/^SD-/`）
+ *     违反 → violation，明确指出问题 spec
+ *   - SD 被覆盖方向校验（§10）：每个 SD 节点须被至少一个 TLA+ spec 覆盖；未覆盖 → violation
  *   - 覆盖判定（满足任一）：
  *       1. spec.requirementIds 含该 SD 关联的 REQ ID（操作化口径：rid 与 sd 互为子串）
  *       2. spec.designRef 引用该 SD 对应设计文档（designRef 字符串含 sd）
@@ -540,6 +551,20 @@ export function checkCoverage(
     violations.push('checkCoverage: specs 与 graphSdNodes 必须为数组');
     return { passed: false, violations };
   }
+
+  // P1.2 新增：spec 方向校验（每个 spec 须含 SD 标识，全规格无例外）
+  for (const spec of specs) {
+    if (!Array.isArray(spec.requirementIds) || spec.requirementIds.length === 0) {
+      violations.push(`规格 ${spec.id} 缺 requirementIds（SD 覆盖强制，全规格无例外）`);
+      continue;
+    }
+    const hasSdId = spec.requirementIds.some(rid => /^SD-/.test(rid));
+    if (!hasSdId) {
+      violations.push(`规格 ${spec.id} requirementIds 无 SD 标识（须含至少一个 SD-xxx，全规格无例外）`);
+    }
+  }
+
+  // 保留：SD 被覆盖方向校验（现有逻辑不动）
   const coveredSds = new Set<string>();
   for (const spec of specs) {
     for (const sd of graphSdNodes) {
@@ -799,6 +824,12 @@ export function checkTlaModel(
   if (!Array.isArray(m.specs)) {
     result.violations.push('manifest.specs 必须为数组');
     return result;
+  }
+
+  // basePath 强制字段校验（P1.1）：缺失 / 非字符串 / 空字符串均判失败。
+  // 不 return 早退 —— 仅记录违反，其余结构校验继续执行，保持向后兼容（脚本不崩溃）。
+  if (typeof m.basePath !== 'string' || m.basePath === '') {
+    result.violations.push('manifest.basePath 缺失（强制字段，相对 manifest 文件所在目录）');
   }
 
   result.totalSpecs = m.specs.length;

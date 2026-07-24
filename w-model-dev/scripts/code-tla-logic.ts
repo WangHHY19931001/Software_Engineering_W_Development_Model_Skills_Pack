@@ -169,8 +169,9 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
       return segments.some(seg => cmLower.includes(seg));
     });
     if (!matched) {
+      // P1.4：错误信息须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）与格式
       violations.push(
-        `SD 节点 ${id} 无对应 codeModule（期望 codeModule 路径包含以下任一段: ${segments.join(', ')}）`,
+        `SD 节点 ${id} 无对应 codeModule（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts；期望路径包含以下任一段: ${segments.join(', ')}）`,
       );
     }
   }
