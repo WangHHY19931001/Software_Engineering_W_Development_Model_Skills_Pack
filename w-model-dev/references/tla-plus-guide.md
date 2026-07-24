@@ -120,6 +120,18 @@ w-model-dev-demo/
 2. **确认路径基准**：按 §2.1 核对 manifest 中 `jarPath`/`tlaPath`/`cfgPath` 的解析基准正确。
 3. **先 SANY 后 TLC**：先跑 `tla2sany.SANY` 语法检查，退出码 0 后才跑 `tlc2.TLC`；语法未过即跑 TLC 命中反模式 #14。
 
+## §3 SD 覆盖率校验（全规格强制，无例外）
+
+> 每个 spec（L1/L2/L3/L4 无例外）须满足：
+> 1. `requirementIds` 非空数组
+> 2. `requirementIds` 含至少一个 SD-xxx 标识（正则 `/^SD-/`）
+>
+> 每个 SD-xxx 须被至少一个 spec 的 requirementIds 包含（现有校验，不变）。
+>
+> L1 须标注其对应的顶层 SD（如 SD-000 系统根）。
+>
+> 违反 → `check-tla-model.ts` 退出码 1，violation 明确指出问题 spec。
+
 ## 层级模型
 
 | 层级 | 抽象内容 | 产出阶段 |
