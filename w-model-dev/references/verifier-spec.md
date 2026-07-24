@@ -35,6 +35,7 @@
 | 设计文档 | `design` | `DESIGN-` | §7.2 |
 | 测试用例 | `testcase` | `UAT-` / `ST-` / `IT-` / `UT-` | §7.3 |
 | 代码 / 文件 | `file` | （文件路径） | §7.4 |
+| 根因报告 | `rootcause` | `RC-` | §7.5 |
 
 > `/wm review <target>` 命令会识别目标类型并指引外部 Agent 加载本规范相应章节。
 
@@ -46,6 +47,7 @@
 | `design` | 阶段 2 系统设计 / 阶段 3 概要设计 / 阶段 4 详细设计 | 系统设计/接口设计/详细设计文档 |
 | `testcase` | 阶段 1~4（设计）/ 阶段 5~8（执行） | 验收/系统/集成/单元测试用例 |
 | `file` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
+| `rootcause` | 全阶段（返工循环 V/G→R→V→G→S-fix→V→G） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
 
 ## 3. 三维度验证（Three-Dimension Verification）
 
@@ -211,7 +213,7 @@ interface VerifierOutput {
   /** 评审元信息 */
   meta: {
     /** 评审目标类型 */
-    targetKind: 'requirement' | 'design' | 'testcase' | 'file';
+    targetKind: 'requirement' | 'design' | 'testcase' | 'file' | 'rootcause';
     /** 目标 ID 或文件路径 */
     target: string;
     /** 评审时间 ISO 8601 */
@@ -442,6 +444,41 @@ V 子代理须在 `summary` 中包含：
 - 本规范的五轴是**发现项组织方式**——子标准仍是 §7.4 的 5 个（`correctness` / `security` / `readability` / `maintainability` / `conformance`），五轴用于在 `reworkHints` 中归类发现项。
 - 这样既吸收了五轴评审的结构化思维，又不破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 对子标准 name/weight 的校验。
 - Performance 轴在 W 模型中通常由阶段 7 系统测试（含 k6 性能基线）独立验证，`file` 评审中只标注明显性能反模式（N+1 / 无界循环），不做完整性能评审。
+
+### 7.5 根因报告（targetKind = `rootcause`）
+
+> V 复审 R 子代理产出的 RootCauseReport 时使用。对应 spec [§5.2](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) V 复审根因报告分派模板。
+> V 复审仍输出 VerifierOutput JSON（§6 Schema），`meta.targetKind='rootcause'`，`meta.target` 为 R 报告 `reportId`（如 `RC-phase5-1-01`）。
+
+| 子标准 name | weight | 描述 |
+|---|---|---|
+| `correctness` | 0.25 | 根因链是否逻辑自洽？每步 `evidence` 是否支持该步 `answer`？根因分类（`rootCause.category`）是否准确？ |
+| `completeness` | 0.25 | 是否触及根本原因而非停在现象？`rootCauseChain` 是否充分追溯（2-5 步）？`upstreamDefect` 是否被正确检测或排除？ |
+| `falsifiability` | 0.20 | `rootCause.falsifiabilityCheck` 是否含「若...则」可验证假设？假设是否真的可证伪（非泛化描述）？ |
+| `actionability` | 0.15 | `fixRecommendation` 是否针对根因且可执行？每条是否含 `target`/`location`/`action`/`rationale` 四字段？`rationale` 是否说明「为何这样修复能消除根因」？ |
+| `prevention` | 0.15 | `prevention` 是否可落实？每条是否含 `scope`/`measure`/`owner` 三字段？措施是否具体（非「加强评审」泛化建议）？ |
+
+权重和 = 1.00。
+
+**rootcause 子标准与五轴评审的关系**：
+
+rootcause 复审不使用 §7.4A 的五轴（Correctness / Readability / Architecture / Security / Performance），而是使用上述 5 个根因诊断专用维度。两者映射关系：
+
+| rootcause 子标准 | 对应 §7.4A 五轴（参考） | 说明 |
+|---|---|---|
+| `correctness` | Correctness | 根因链逻辑正确性（类比代码逻辑正确性） |
+| `completeness` | —（无直接对应） | 根因追溯完整性（根因诊断专属维度） |
+| `falsifiability` | —（无直接对应） | 可证伪假设（根因诊断专属维度，防幻想根因） |
+| `actionability` | Architecture | 修复建议的结构性（类比架构修复方向） |
+| `prevention` | Conformance | 预防措施落实（类比规范符合性） |
+
+**Severity 标签适配**：
+
+rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀（`Critical:` / `Required:` / `Optional:` / `Nit:` / `FYI:`）。`reworkHints` 含 `[Critical]`/`[Required]` 时表示根因报告不准确，须重派 R（见 spec §6.3 场景 2）。
+
+**多角度复审**：
+
+根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（`testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）从多角度复审，并行或串行分派均可。V-lead 聚合规则见 spec §9.7。
 
 ## 8. 评审提示词模板
 

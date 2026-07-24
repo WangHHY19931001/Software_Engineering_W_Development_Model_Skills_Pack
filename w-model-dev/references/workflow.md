@@ -84,6 +84,20 @@
 | 阶段 7 | 系统测试退出码 ≠ 0 / 性能不达标 / 高危漏洞 > 0 | 阶段 5 编码实现 |
 | 阶段 8 | `check-artifact-gate.ts` 退出码 1/2 | 阶段 5（一般缺陷）/ 阶段 1（需求级缺陷，罕见） |
 
+### 回退路径阶段编号映射（R 根因分类扩展）
+
+> 当 R 定位根因标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true`，并经 V 复审通过后，按以下映射决定回退目标阶段（见 root-cause-locator.md 场景 5 阶段回退）。
+
+| 当前阶段 | R 根因分类 | upstreamDefect.upstreamPhase | 回退到 |
+|---|---|---|---|
+| 阶段 2-4 | `requirement-gap` | 阶段 1 | 阶段 1 |
+| 阶段 3-4 | `design-flaw` | 阶段 2 | 阶段 2 |
+| 阶段 4 | `design-flaw` | 阶段 3 | 阶段 3 |
+| 阶段 5-8 | `requirement-gap` | 阶段 1 | 阶段 1（罕见，重大需求缺陷） |
+| 阶段 5-8 | `design-flaw` | 阶段 2/3/4 | 阶段 2/3/4 |
+| 阶段 5-8 | `coding-error` | — | 阶段 5（当前阶段返工，不回退） |
+| 阶段 6-8 | `coding-error` | 阶段 5 | 阶段 5 |
+
 ## 阶段门评审（每个阶段统一）
 
 > 🔴 **CHECKPOINT · 每个阶段门**：流程图中每个「评审」节点都是暂停点。Agent 必须按 [verifier-spec.md](verifier-spec.md) §8 提示词执行 LLM-as-a-Verifier 评审，调用 `npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>` 防漂移，向用户展示「质量等级 / 各子标准分 / reworkHints」由用户确认放行或返工。**禁止越过评审节点自动推进**（见 [anti-patterns.md](anti-patterns.md) #1/#8）。
@@ -91,8 +105,58 @@
 每个开发阶段产出后必须经过 LLM-as-a-Verifier 评审：
 
 - 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
-- 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，按 `reworkHints` 修复。
+- 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，**必须经 R 根因定位 → V 复审 → G 门禁 → S-fix 修复 → V → G 循环**（见下方返工循环流程图），禁止直接分派 S 返工（命中反模式 #18）。
 - 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与 SKILL.md「阶段门与质量门」节。
+
+### 返工循环（V/G→R→V→G→S-fix→V→G）
+
+```
+S 产出 → V 评审 → G 门禁 ──通过──► 阶段门放行
+                       │不通过（exitCode≠0 或 qualityLevel∈{C,D}）
+                       ▼
+                  O 分派 R 定位（输入：reworkHints + 失败产物 + 上游产物）
+                       │
+                       ▼
+                  R 产出 RootCauseReport（含根因链 + fixRecommendation + upstreamDefect?）
+                       │
+                       ▼
+                  O 分派 V 复审根因报告（targetKind=rootcause）
+                       │
+            ┌──────────┴──────────┐
+            ▼                     ▼
+       V 复审不通过            V 复审通过
+            │                     │
+            ▼                     ▼
+       O 重派 R（带 V 的        O 分派 G 门禁（check-rootcause-report.ts）
+       rootcause reworkHints）       │
+       → R 重定位 ──循环──    ┌──────┴──────┐
+                              ▼             ▼
+                          G 门禁不通过   G 门禁通过
+                              │             │
+                              ▼             ▼
+                          O 重派 R     O 分派 S 兼 F 修复
+                                      （输入：R 报告 + fixRecommendation）
+                                           │
+                                           ▼
+                                      S 修复产物 + 更新 RTM
+                                           │
+                                           ▼
+                                      O 分派 V 评审修复产物
+                                           │
+                                           ▼
+                                      O 分派 G 门禁
+                                           │
+                                 ┌─────────┴─────────┐
+                                 ▼                   ▼
+                            G 通过               G 不通过
+                                 │                   ▼
+                                 ▼            新一轮 R 定位
+                            阶段门放行           （round++）
+```
+
+### R 介入说明
+
+V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分派 R 子代理定位根因，禁止直接分派 S 返工（命中反模式 #18）。R 产出后须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix 修复。详见 [root-cause-locator.md](root-cause-locator.md)。
 
 ## 质量门（编码及之后阶段强制）
 

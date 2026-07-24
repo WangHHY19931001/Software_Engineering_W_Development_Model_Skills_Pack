@@ -539,3 +539,53 @@
 | 性能 Persona | 专注前端 Core Web Vitals（Lighthouse / CrUX） | 前端 + 后端双场景；后端 P95 / 吞吐量 / DB 查询；Metric-Honesty Rule 直接吸收 |
 | 测试 Persona | 通用 QA | 适配 W 模型阶段 4/6/7 的测试设计与执行 |
 | 安全 Persona | 通用 OWASP + STRIDE | 适配 W 模型阶段 7 安全子项 + 阶段 2 安全架构评审 |
+
+## 与 root-cause-locator.md 的关系
+
+> 对应 spec [§8.2](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) agent-personas.md 修改 + [§9.10](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 兼容性。
+
+- `agent-personas.md` 定义 **V 子代理**的评审角色视角（product-manager / code-reviewer / security-auditor / performance-auditor / test-engineer 等），用于评审 W 模型各阶段产物。
+- [root-cause-locator.md](root-cause-locator.md) 定义 **R 子代理**的诊断方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯），用于返工循环中根因定位。
+- **两者互补，不互相调用**：
+  - R 不调用 Persona：R 子代理加载 root-cause-locator.md 方法论，不加载本文件的 Persona 提示词。
+  - Persona 不调用 R：V 子代理加载本文件 Persona 提示词评审产物，不执行根因分析。
+- **V 复审根因报告（`targetKind=rootcause`）时的协作**：V 子代理加载 persona（如 `testing-reality-checker` / `engineering-incident-response-commander` / `testing-evidence-collector`）从多角度复审 R 产出的 RootCauseReport。此时 V 评审的是 R 的产出，而非 R 调用 V——分派由编排者 O 完成（见 [subagent-delegation.md](subagent-delegation.md) V-rootcause 分派模板）。
+
+## 与 subagent/ 人格库的关系
+
+> 对应 spec [§9.1](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 现有人格库盘点。
+
+[`w-model-dev/subagent/`](../subagent/) 含 28 个人格文件，分 5 类（engineering 13 / testing 7 / design 3 / product 3 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
+
+| 本文件 Persona | subagent/ 对应人格 | 关系 |
+|---|---|---|
+| code-reviewer | engineering-code-reviewer | 同源：本文件为 V 评审视角；subagent/ 为 R-persona / V-persona 多角度加载的视角文件 |
+| test-engineer | testing-api-tester + testing-performance-benchmarker | 拆分：本文件为综合 QA 视角；subagent/ 拆为 api-tester / performance-benchmarker 等专项 |
+| security-auditor | engineering-threat-detection-engineer | 同源 |
+| performance-auditor | testing-performance-benchmarker + engineering-database-optimizer | 拆分 |
+
+人格选择矩阵（R-persona / V-persona 按缺陷类型与阶段选择哪些人格）详见 [subagent-persona-matrix.md](subagent-persona-matrix.md)。
+
+## 多角度分派说明（并行/串行均可）
+
+> 对应 spec [§9.2](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 核心原则：多角度 > 并行 + [§9.10](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 兼容性。
+
+**多角度分析的本质是「多角度」，不是「并行」。** 并行只是性能优化，串行同样合法。
+
+现有 Persona 规则 2「Persona 不调用其他 Persona，组合由命令或用户完成」与本机制兼容：
+
+| 分派方式 | 是否违反规则 2 | 说明 |
+|---|---|---|
+| O 分派 persona 子代理（并行） | 否 | 「命令/用户完成组合」，N 个 persona 并行执行 |
+| O 分派 persona 子代理（串行） | 否 | 同上——每次分派是独立的命令-子代理调用 |
+| R-lead 依次串行分派 persona 子代理 | 否 | 仍是「命令完成组合」，R-lead 是 lead 角色而非 persona |
+| R-lead / V-lead 聚合 persona 产出 | 否 | lead 角色聚合，不是 persona 互相调用 |
+| persona 子代理之间互相调用 | **是（违反）** | 禁止——每个 persona 独立产出 PartialReport，不互相调用 |
+
+**关键约束（三种分派方式均强制）**：
+1. N 份 PartialReport 必须独立产出（串行分派时，后一个 persona 也不读取前一个 persona 的产出）。
+2. 聚合规则不变（R-lead 聚合见 [root-cause-locator.md](root-cause-locator.md) §4.4；V-lead 聚合见 spec §9.7）。
+3. PartialReport 归档不变（`.w-model/rootcause/partial/<reportId>/<personaSlice>.json`）。
+4. run-log 记录不变（每份 PartialReport 各记一条 `rootcause` 动作）。
+
+详见 [root-cause-locator.md](root-cause-locator.md) §4.2 与 spec §9.2。

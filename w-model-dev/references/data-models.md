@@ -284,6 +284,16 @@ interface BudgetConfig {
     /** 同一 TLA+ 规格返工次数 ≥ 此值（默认 3） */
     tlaReworks: number;
   };
+
+  /** 多角度 R 的 token 预算配置（不论并行/串行均累计；对应 spec §9.9） */
+  rootcauseParallelBudget?: {
+    /** 每轮 R-persona 数量上限（默认 5） */
+    maxPersonasPerRound: number;
+    /** 单个 R-persona token 上限（默认 50000） */
+    maxTokensPerPersona: number;
+    /** 每轮所有 R-persona token 总和上限（默认 200000；串行分派时累计校验） */
+    maxTotalTokensPerRound: number;
+  };
 }
 ```
 
@@ -309,6 +319,11 @@ interface BudgetConfig {
     "consecutiveReworks": 3,
     "budgetBurnRate": 0.9,
     "tlaReworks": 3
+  },
+  "rootcauseParallelBudget": {
+    "maxPersonasPerRound": 5,
+    "maxTokensPerPersona": 50000,
+    "maxTotalTokensPerRound": 200000
   }
 }
 ```
@@ -320,6 +335,7 @@ interface BudgetConfig {
 - `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4）。
 - `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐：当 `project.updatedAt > budget.createdAt` 时须满足 `budget.updatedAt > budget.createdAt`，否则报「阶段推进但 budget 未更新」。
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
+- `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
 
 ## 运行日志模型（run-log.jsonl）
 
@@ -336,9 +352,9 @@ interface RunLogEntry {
   /** 阶段名称 */
   phaseName: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试';
   /** 动作类型 */
-  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback';
+  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix';
   /** 子代理角色 */
-  role: 'O' | 'A' | 'S' | 'V' | 'G';
+  role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   /** 本次动作持续时间（秒） */
   duration_s: number;
   /** 本次动作 token 消耗（由宿主 Agent 报告实际消耗；无值时填 0 并标注 estimated:false） */
@@ -374,6 +390,32 @@ interface RunLogEntry {
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
+
+### 动作类型字段约束（rootcause / fix / escalate 扩展）
+
+> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/run-log-logic.ts`](../scripts/run-log-logic.ts) R1 校验。
+
+`action` 枚举新增 `rootcause` / `fix` 两个动作（返工循环 V/G→R→V→G→S-fix→V→G 专用）。各动作的额外必填字段约束：
+
+| action | 额外必填字段 | 说明 |
+|---|---|---|
+| `rootcause` | `reportId` / `rootCauseCategory` / `upstreamDefect` / `rollbackRecommended` | R 子代理产出根因报告时记录；`reportId` 格式 `RC-<phase>-<round>-<seq>`；`rootCauseCategory` 见 RootCauseReport Schema；`upstreamDefect`(boolean) 标记是否检测到上游缺陷；`rollbackRecommended`(boolean) 标记是否建议阶段回退 |
+| `fix` | `basedOnReport` / `artifacts` | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组 |
+| `escalate` | 新增可选字段 `reportId`（仅 `upstreamDefect` 触发的升级） | 当 R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true` 触发场景 5 阶段回退升级时，`escalate` 动作记录 `reportId` 关联根因报告 |
+
+**rootcause 动作示例**（spec §5.5）：
+
+```json
+{"action":"rootcause","phase":"<阶段N>","round":<int>,"role":"R","reportId":"RC-phase5-1-01","rootCauseCategory":"requirement-gap","upstreamDefect":false,"rollbackRecommended":false,"tokens":<int>,"timestamp":"<ISO>","note":"<可选>"}
+```
+
+**fix 动作示例**（spec §5.5）：
+
+```json
+{"action":"fix","phase":"<阶段N>","round":<int>,"role":"S","basedOnReport":"RC-phase5-1-01","artifacts":["src/auth.ts"],"tokens":<int>,"timestamp":"<ISO>","note":"<可选>"}
+```
+
+> 多角度场景（R-lead 分派 N 个 R-persona，并行/串行均可）时，每份 PartialReport 各记一条 `rootcause` 动作（`role:"R"`，`note` 标注 personaSlice），聚合记一条 `rootcause` 动作（`note:"R-lead aggregation"`）。
 
 ## 自主成熟度模型（maturity.json）
 
