@@ -5,6 +5,94 @@
 
 ## [Unreleased]
 
+### TLA+ 指南修复 + 编排纪律强化 + 代码-TLA+ 一致性回归（完整版）
+
+> 修复工作过程中发现的三个问题：① TLA+ 存在多次返工（疑似指南和编写规范问题）；② 编排者出现多次上下文压缩（疑似任务越权或任务设计过于复杂）；③ TLA+ 资产未能作为状态机验证器门禁来回归编码产物。
+>
+> 走 superpowers-zh 工作流（头脑风暴 → 设计 spec → 编写计划 → 执行 → 修正 SSoT）完整修复。设计文档：[`docs/superpowers/specs/2026-07-24-tla-plus-and-orchestration-fix-design.md`](docs/superpowers/specs/2026-07-24-tla-plus-and-orchestration-fix-design.md)；实现计划：[`docs/superpowers/plans/2026-07-24-tla-plus-and-orchestration-fix.md`](docs/superpowers/plans/2026-07-24-tla-plus-and-orchestration-fix.md)。
+
+#### 问题1：TLA+ 指南缺陷修复
+
+#### 新增
+
+- `w-model-dev/references/tla-plus-guide.md` 新增三节：
+  - §2.0 命名规范（强制）：MODULE 名 `[A-Za-z][A-Za-z0-9_]*` 禁止连字符；`L<level>_<system>` 格式；反例 `L1-blog-system`（连字符）/ `1blog`（数字开头）/ `博客系统`（中文）
+  - §2.1 路径解析基准（强制）：`jarPath` 相对 cwd、`tlaPath`/`cfgPath` 相对 manifest 目录、`@parent`/`@sibling`/`@child` 相对 `.tla` 目录
+  - §2.2 前置清单：S 产出前 3 项检查（MODULE 名合法 / 路径基准 / cfg-tla 一致性）、G 校验前 3 项检查（含删除 `states/` 目录）
+- `w-model-dev/references/tla-plus-guide.md` manifest schema 节补 `checkRounds` 语义：记录每轮 `check-tla-model.ts` 校验结果（含 violations 摘要与 round 编号）；violations 跨轮须单调递减；与 `run-log.jsonl` R3 交叉校验；无返工填 `[]`
+- `w-model-dev/templates/tla-spec-template.md` 修正 `.cfg` 写法：L65-83 非法 `INVARIANT` 多行多名 → `INVARIANTS` 关键字 + 列表；补 `BusinessInvariant` 聚合示例；末尾追加 5 个反例节
+- `w-model-dev/references/data-models.md` 末尾追加 `### tla-manifest.json` 节，含完整字段表 + `checkRounds` 语义指针
+
+#### 变更
+
+- 全局统一 MODULE 名示例去连字符（`L1-blog-system` → `L1_blog_system`）：`tla-plus-guide.md` / `tla-spec-template.md` / `data-models.md` / `docs/tla-plus-modeling-design.md`
+
+#### 问题2：编排纪律强化
+
+#### 新增
+
+- `w-model-dev/references/subagent-delegation.md` 新增 S-doc/S-tla 拆分机制：
+  - **S-doc**：产出开发文档 + 同步测试设计 + 更新 RTM 实体
+  - **S-tla**：产出 `.tla` + `.cfg` + `tla-manifest.json` 实体（依赖 S-doc 的设计文档）
+  - 分派时序：S-doc → S-tla → V → G
+  - S-doc / S-tla 分派模板（含任务边界声明）
+- `w-model-dev/references/subagent-delegation.md` 检测信号 5：编排者 `Write`/`Edit` 写 TLA+ 产物实体（`.tla`/`.cfg`/`tla-manifest.json`）
+
+#### 变更
+
+- `w-model-dev/references/subagent-delegation.md` L282 强制约束「写产物」项追加 `.tla`/`.cfg`/`tla-manifest.json` 实体
+- `w-model-dev/SKILL.md`：
+  - L62 角色表「关键禁止」补 `.tla`/`.cfg`/`tla-manifest.json` 实体
+  - L118 阶段 1-4 分派补「可拆 S-doc/S-tla」指引
+  - L239 自检清单补「无 `.tla`/`.cfg`/`tla-manifest.json` 实体改动」
+  - 阶段 5 门禁节补「额外分派 G 跑 `check-code-tla-consistency.ts`」
+
+#### 问题3：代码-TLA+ 一致性回归（完整版）
+
+#### 新增
+
+- **`w-model-dev/scripts/code-tla-logic.ts`**：代码-TLA+ 一致性校验纯逻辑（单点事实源），四维度校验：
+  - 维度1 `checkSdToCodeModule`：SD→codeModule 映射完整性（读 `graph.json` SD 节点，核验 `rtm.json` codeModule 覆盖，多段匹配）
+  - 维度2 `extractCodeStateTransfers` + `checkCodeStateTransfer`：代码状态转移抽取（TypeScript Compiler API 解析 AST，抽取 `BinaryExpression(=)` / `IfStatement` / `SwitchStatement`）
+  - 维度3 `checkNextBranchCoverage`：Next 分支对应（正则抽取 TLA+ Next 动作名，驼峰匹配代码方法名）
+  - 维度4 `checkInvariantCoverage`：断言覆盖不变式（抽取 `BusinessInvariant` 子不变式名，匹配代码 `assert`/`invariant`/`require` 调用）
+- **`w-model-dev/scripts/check-code-tla-consistency.ts`**：CLI 入口（参数 `--manifest`/`--graph`/`--rtm`/`--src`；输出 `CODE_TLA_JSON`；退出码 0/1）
+- **`w-model-dev/scripts/__tests__/code-tla-logic.test.ts`**：5 条测试样本（3 合规 + 2 违规）
+- `w-model-dev/scripts/self-test.ts`：新增 5 条 code-TLA+ 样本用例（回归基线 61→66）
+
+#### 变更
+
+- `w-model-dev/scripts/gate-logic.ts`：`checkArtifactGate` 入参追加 `graph?`/`manifestExists?`；新增 TLA+ 资产存在性校验（manifestExists）+ SD→codeModule 映射校验（读 graph SD 节点）
+- `w-model-dev/scripts/check-artifact-gate.ts`：读取 `.w-model/ingestion/graph.json` + 检查 `.w-model/tla-manifest.json` 存在性 + specs 非空；传入 `checkArtifactGate`；修复 `exitCode` 字段缺失缺陷（缺陷5）
+- `w-model-dev/scripts/check-run-log.ts`：`extractExitCode` 模式数组增加 `GATE_JSON` 标记识别（配合缺陷5修复）
+
+#### SSoT 修正
+
+- `docs/skill-design-document_SSoT.md`：
+  - §10.8 L1203 阶段 5-8 行：从「只读」升级为「冻结只读 + 须通过 `check-code-tla-consistency.ts` 一致性回归」
+  - §10.8 L1220-1222 追加校验项：代码状态转移与 Next 对应 / 断言覆盖不变式 / SD 有 codeModule
+  - §10.8 新增 §10.8.1「代码-TLA+ 一致性回归（check-code-tla-consistency.ts）」节：CLI 接口 + 四维度校验算法 + 触发时机 + 与其它门禁协同
+  - §10.8 L1169 统一 `--phase` 取值口径（1-8，与脚本一致）
+  - §7.8 补 `checkRounds` 语义（与 `tla-plus-guide.md` 双向追溯）
+  - §10A 追溯表新增 §10.8.1 行
+  - §10B 参考实现更新至第五轮（2026-07-24）：调测轮次/缺陷数/测试计数/覆盖率/图谱/TLA+/code-TLA+ 一致性全维度同步
+
+#### demo 项目代码补齐 TLA+ 对齐
+
+- `w-model-dev-demo/src/services/auth.service.ts`：新增 `logout()` / `resetCycle()` 方法 + `assert` 断言覆盖 TLA+ 不变式（TokenIssuedRequiresAuthenticated / LoggedOutImpliesNoToken / InitStateImpliesNoTokenAndNoHash）
+- `w-model-dev-demo/src/controllers/auth.controller.ts`：新增 `logout()` 控制器方法
+- `w-model-dev-demo/src/routes/auth.routes.ts`：新增 `POST /api/auth/logout` 路由
+- `w-model-dev-demo/src/services/article.service.ts`：新增 `startNewArticle()` 方法 + `assert` 断言覆盖 TLA+ 不变式（TypeInvariant / PublishedCountBounded）
+
+#### 验证
+
+- `npx tsc --noEmit` → 0 错误（demo 项目 + skill 脚本）
+- `npm run self-test` → 66/66 通过（含 5 条 code-TLA+ 用例），退出码 0
+- demo 项目 `check-code-tla-consistency.ts` → 退出码 0（四维度全通过）
+- demo 项目 `check-artifact-gate.ts` → 退出码 0（RTM 100% + TLA+ 资产✓ + graph✓）
+- demo 项目 `npm test` → 135/135 通过（77 unit + 21 integration + 22 system + 15 acceptance）
+- Grep 确认无 MODULE 名连字符残留（仅反例4故意保留）
+
 ### 吸收 cobusgreyling/loop-engineering 运维层与成熟度设计（4 项优化）
 
 > 对 [`cobusgreyling/loop-engineering`](https://github.com/cobusgreyling/loop-engineering) 的运维层与自主成熟度概念进行联网调研后，提出并落地 4 项优化设计，扩展 w-model-dev 技能包的「运行时治理层」。

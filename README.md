@@ -20,6 +20,7 @@
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
 - **工件质量门**：RTM 需求覆盖率 100% + 四级测试全部通过才允许交付（技能验证门已移除，演化评估移交外部工具；单元测试代码覆盖率阈值 ≥ 80% 属于质量标准，与 RTM 覆盖率是两个独立指标）
+- **TLA+ 层次化状态机建模 + 代码-TLA+ 一致性回归**：阶段 1-4 用 TLA+ 建模系统/子系统/原子行为（L1-L3+ 层次化），G 子代理跑 `check-tla-model.ts` 校验 SANY 语法 + TLC 模型检查；阶段 5 G 子代理跑 `check-code-tla-consistency.ts` 四维度校验（SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式），将 TLA+ 资产作为状态机验证器回归编码产物
 - **PPT 排序算法**：O(N×k) 复杂度的概率枢轴锦标赛，用于测试用例优先级排序
 - **采用路径（Greenfield vs Brownfield）**：新项目 Day 0 跑全流程 vs 存量项目增量验证优先，见 [采用路径指南](./docs/adoption-guide.md)；吸收自 addyosmani/agent-skills `docs/adoption-guide.md` 并适配 W 模型 8 阶段
 
@@ -60,12 +61,15 @@ npm install
 npm run check:verifier -- <output.json>     # 退出码 0/1/2
 npm run check:gate -- [project-dir]         # 退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，退出码 0/1/2
+npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>] [--skip-tlc]  # TLA+ 行为门禁，退出码 0/1/2
 npm run self-test                           # 退出码 0/1
 
 # 方式二：用 npx tsx 按需拉取（无需 npm install，适合一次性使用）
 npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4] [--skip-tlc]
+npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 代码-TLA+ 一致性回归，退出码 0/1
 npx tsx w-model-dev/scripts/self-test.ts
 ```
 
@@ -91,29 +95,32 @@ npx tsx w-model-dev/scripts/self-test.ts
 
 [`w-model-dev-demo/`](./w-model-dev-demo) 是 W 模型 8 阶段端到端调测的完整产物——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。
 
-**端到端调测结论**（2026-07-23，全量删除后从零重跑第四轮，含信息流校验特性）：
+**端到端调测结论**（2026-07-24，全量删除后从零重跑第五轮，编排者-子代理分派模式，含代码-TLA+ 一致性回归）：
 
 | 指标 | 数值 |
 |---|---|
-| 单元测试 | 53/53 通过，代码覆盖率 96.37% lines / 93.57% branches / 92.30% functions / 96.37% statements（NFR-004 要求 ≥ 80%） |
-| 集成测试 | 13/13 通过，覆盖 4 对模块交互 + 5 类错误路径，零 mock |
-| 系统测试 | 8/8 通过，覆盖端到端业务链路 + 安全约束 + 性能基线 + 异常路径，P95=4.66ms（≤ 200ms） |
-| 验收测试 | 15/15 通过，4/4 需求 RTM 覆盖率 100% |
-| 性能基线 | k6 脚本就绪（`tests/perf/k6-load-test.js`，100 VUs × 30s，P95 < 200ms），vitest 内近似采样 P95=4.66ms |
-| 阶段门评审 | 8 阶段全部放行（qualityLevel 均为 A，compositeScore 0.897~0.9405） |
-| 图谱校验 | 阶段 1-4 退出码 0，最终图谱 43 节点 182 边，信息流零违反（无黑洞/奇迹/死模块），EXT-IN/EXT-OUT 边界完整，1 轮收敛 |
-| 工件质量门 | 通过（RTM 100% + 单元覆盖率 96.37% + 四级测试全通过，退出码 0） |
-| 全量测试 | `npm test` → 18 test files / 89 tests 全通过（53 unit + 13 integration + 8 system + 15 acceptance） |
-| 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-23 全量重跑通过） |
+| 单元测试 | 77/77 通过，代码覆盖率 99.37% lines / 92.66% branches / 100% functions / 99.37% statements（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 21/21 通过，覆盖 4 对模块交互 + 5 类错误路径，零 mock |
+| 系统测试 | 22/22 通过，覆盖端到端业务链路 + 安全约束 + 性能基线 + 异常路径，P95=60.76ms（≤ 200ms） |
+| 验收测试 | 15/15 通过，5/5 需求 RTM 覆盖率 100% |
+| 阶段门评审 | 8 阶段全部放行（qualityLevel 均为 A，compositeScore 0.9015~0.922） |
+| 图谱校验 | 阶段 1-4 退出码 0，最终图谱 35 节点 141 边，信息流零违反（无黑洞/奇迹/死模块），EXT-IN/EXT-OUT 边界完整 |
+| TLA+ 行为门禁 | 阶段 1-4 退出码 0，8 个规格（1 L1 + 4 L2 + 3 L3），SANY 语法 + TLC 模型检查全通过，零死锁/不变式违反/状态爆炸 |
+| 代码-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式） |
+| 工件质量门 | 通过（RTM 100% + 单元覆盖率 99.37% + 四级测试全通过 + TLA+ 资产✓，退出码 0） |
+| 全量测试 | `npm test` → 8 test files / 135 tests 全通过（77 unit + 21 integration + 22 system + 15 acceptance） |
+| 自检基线 | `npm run self-test` → 66/66 通过（13 Verifier + 7 Gate + 17 Graph + 13 TLA + 3 Budget + 4 RunLog + 2 Maturity + 2 Checkpoint + 5 Code-TLA+） |
+| 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-24 全量重跑通过） |
 
-> 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
+> 第五轮（2026-07-24）相比第四轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/`/`dist/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，采用编排者-子代理分派模式（每阶段 S→V→G 子代理执行）。重跑产物为独立再实现，单元测试 53→77、覆盖率由 96.37% 提升至 99.37%（lines），集成测试 13→21、系统测试 8→22，验收测试 15 不变，全量测试 89→135。图谱节点 43→35（更精炼的 DD 拆分），边 182→141，零违反保持。TLA+ 规格 8 个（1 L1 + 4 L2 + 3 L3），层次化建模完整。阶段 5 新增代码-TLA+ 一致性回归门禁（`check-code-tla-consistency.ts` 四维度校验）。过程中修正了 check-artifact-gate.ts 缺 exitCode 字段的脚本缺陷。所有门禁退出码 0，未引入新缺陷。
 
-过程中发现并修正的缺陷（累计 4 项，均为前轮历史记录）：
+过程中发现并修正的缺陷（累计 5 项）：
 
 1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
 2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段抛错连锁挂掉 4 个测试套件。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。
 3. **ArticleService 类型导出消失**（2026-07-21 回归发现）：`comment-service.ts` 的 `import type { ArticleService }` 类型丢失。修正方案：恢复 `export class ArticleService`。
 4. **vitest mock 与 express NextFunction 类型不兼容**（2026-07-21 回归发现）：`next.mock.calls[0][0]` 报 TS2339。修正方案：用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问。
+5. **check-artifact-gate.ts 缺 exitCode 字段**（2026-07-24 第五轮发现）：唯一未在 `GATE_JSON` 输出中包含 `exitCode` 的门禁脚本，导致 `check-run-log.ts` R6 交叉校验无法提取退出码。修正方案：与其它 7 个 `check-*.ts` 脚本对齐，计算并输出 `exitCode`。
 
 > 该目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向此目录。
 
@@ -139,17 +146,19 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── rtm-guide.md          #   RTM 维护规则
 │   │   └── quality-standards.md #   质量标准
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
-│   │   ├── gate-logic.ts         #   工件质量门纯逻辑（单点事实源）
-│   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json）
+│   │   ├── gate-logic.ts         #   工件质量门纯逻辑（单点事实源，含 TLA+ 资产 + SD→codeModule 终检）
+│   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json + graph.json + tla-manifest.json）
 │   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源）
 │   │   ├── check-verifier-output.ts  # Verifier 输出校验 CLI（防 Agent 输出漂移）
 │   │   ├── graph-logic.ts        #   图谱结构门禁纯逻辑（单点事实源，阶段 1–4，含信息流校验：黑洞/奇迹/死模块/边界完整性）
 │   │   ├── check-requirement-graph.ts  # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯 + 信息流校验，退出码 0/1/2）
 │   │   ├── tla-logic.ts          #   TLA+ 行为门禁纯逻辑（单点事实源，阶段 1–4，文件头/层次/拆解一致性校验）
 │   │   ├── check-tla-model.ts    #   TLA+ 行为门禁 CLI（SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性，退出码 0/1/2）
+│   │   ├── code-tla-logic.ts     #   代码-TLA+ 一致性校验纯逻辑（单点事实源，阶段 5，四维度：SD→codeModule/状态转移/Next分支/不变式覆盖）
+│   │   ├── check-code-tla-consistency.ts  # 代码-TLA+ 一致性回归 CLI（TypeScript Compiler API 解析 AST，退出码 0/1）
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线）
-│   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + tla/ + tla-e2e/）
+│   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + tla/ + tla-e2e/ + code-tla/）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
 ├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物，已归档）
@@ -192,7 +201,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [ingestion 子流程：分块分析](./w-model-dev/references/ingestion-chunk.md) - A 子代理分块分析细则（阶段 1–4）
 - [ingestion 子流程：交叉合并与图谱演进](./w-model-dev/references/ingestion-cross.md) - A 子代理合并建图 + 收敛循环（阶段 1–4）
 - [图谱门禁与收敛准则](./w-model-dev/references/graph-guide.md) - check-requirement-graph.ts 用法 + 收敛判定
-- [TLA+ 层次化状态机建模](./w-model-dev/references/tla-plus-guide.md) - check-tla-model.ts 用法 + 层级模型 + 文件头规范 + SANY/TLC 门禁
+- [TLA+ 层次化状态机建模](./w-model-dev/references/tla-plus-guide.md) - check-tla-model.ts 用法 + 层级模型 + 文件头规范 + SANY/TLC 门禁 + 命名规范 + 路径基准 + 前置清单
 - [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（5 维度）
 - [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
 - [ingestion 与图谱收敛设计](./docs/ingestion-graph-convergence-design.md) - A 角色 / graph.json / check-requirement-graph.ts 权威设计文档
