@@ -12,6 +12,7 @@
 - 大项目与用户中断
 - 成本预算与运行日志
 - 成熟度与 CHECKPOINT 放行
+- 事件驱动与棕地维护
 - O 越权检测（编排者越权实施守护）
 - 闭环校验脚本调用约定
 
@@ -234,6 +235,28 @@ Agent 应依据项目已有脚本和声明选择真实工具链，不默认伪�
 | `maturity.json` 不存在 | 项目未初始化；`/wm analyze` 初始化时创建默认 L0 配置 |
 | `maturity.json` 字段缺失或类型错误 | 按 [data-models.md](data-models.md) schema 校验；修复后重跑成熟度判定 |
 | `maturity.json` 被误删 | 从 git 恢复；无备份时按默认 L0 重建（丢失升级历史） |
+
+## 事件驱动与棕地维护
+
+> 来源：SSoT [§10F](../../docs/skill-design-document_SSoT.md)。事件驱动循环（Loop 3）仅在 L2+ 成熟度激活，详见 [event-ingress-guide.md](event-ingress-guide.md)。
+
+### 事件路由失败
+
+| 场景 | 必须动作 |
+|---|---|
+| event-ingress.jsonl 不存在 | 项目未初始化或 L0/L1 未激活；引导 /wm analyze 初始化或升级到 L2+ |
+| event-ingress.jsonl 解析失败（某行非合法 JSON） | 跳过损坏行，记录到 run-log 末尾一条 note=「事件日志损坏行已跳过」；不停止流程 |
+| 事件路由到阶段 N 但前序阶段产物缺失 | 标记事件为 blocked；run-log append action=event-route outcome=blocked note="前序产物缺失"；询问用户是否回退到更早阶段 |
+| 事件触发的高风险路径 CHECKPOINT 被拒绝 | 事件标记为 cancelled；run-log append action=event-route outcome=cancelled |
+| L2+ 但 maturity.json 降级触发回 L0 | 暂停所有未路由事件处理；询问用户是否继续（L0 下事件驱动不激活） |
+
+### event-ingress.jsonl 维护
+
+| 场景 | 动作 |
+|---|---|
+| 事件累积过多未路由 | CHECKPOINT 展示待路由事件数；建议用户批量处理或归档 |
+| 事件指向已删除的产物 | 标记事件为 invalid；run-log append note="事件指向已删除产物" |
+| 需要导出事件历史 | /wm export 包含 event-ingress.jsonl |
 
 ## O 越权检测（编排者越权实施守护）
 
