@@ -12,6 +12,7 @@
 - 成本预算模型（budget.json）
 - 运行日志模型（run-log.jsonl）
 - 自主成熟度模型（maturity.json）
+- 事件接驳模型（EventIngress / event-ingress.jsonl）
 - TLA+ manifest 模型（tla-manifest.json）
 
 ## 项目数据模型
@@ -492,6 +493,46 @@ interface MaturityConfig {
 - 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后 unlockConditions 全部达标时询问）。
 - 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0。
 - `maturity.json` 与 `budget.json` 协同：L2+ 自主度可设 `onExceed=notify`（仅在 run-log 记录告警）；L0 默认 `onExceed=pause`（最保守）。
+
+## 事件接驳模型（EventIngress / event-ingress.jsonl）
+
+> 来源：SSoT [§10F](../../docs/skill-design-document_SSoT.md)。Append-only JSON Lines 格式，每行一条事件记录。编排者 O 维护，消费方自行实现触发器写入。
+
+```typescript
+interface EventIngress {
+  /** 事件 ID（UUID 或时间戳） */
+  eventId: string;
+  /** 时间戳 ISO 8601 */
+  timestamp: string;
+  /** 事件来源（消费方自填，技能不内置触发器） */
+  source: 'webhook' | 'cron' | 'manual' | 'external-ci' | 'user-report';
+  /** 事件类型，决定路由到哪个阶段 */
+  eventType: 'bug-report' | 'requirement-change' | 'acceptance-failure'
+           | 'regression-detected' | 'scheduled-review' | 'security-incident';
+  /** 事件摘要 */
+  summary: string;
+  /** 受影响的产物路径（如有） */
+  affectedArtifacts?: string[];
+  /** 受影响的需求 ID（如有，对应 rtm.json） */
+  affectedRequirements?: string[];
+  /** 证据（链接/日志/截图路径） */
+  evidence?: string[];
+  /** 路由决策（编排者 O 填写） */
+  routedTo?: {
+    phase: number;
+    phaseName: string;
+    routedAt: string;
+    /** 是否触发高风险路径强制 CHECKPOINT */
+    highRiskGate: boolean;
+  };
+}
+```
+
+**示例记录**（webhook 触发的 bug 报告）：
+
+```json
+{"eventId":"evt-2026-07-25-001","timestamp":"2026-07-25T10:15:00Z","source":"webhook","eventType":"bug-report","summary":"登录接口返回 500","affectedArtifacts":["src/services/identity/user-service.ts"],"affectedRequirements":["REQ-002"],"evidence":["https://ci.example.com/run/12345/log"]}
+```
 
 ## TLA+ manifest 模型（tla-manifest.json）
 
