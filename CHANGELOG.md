@@ -3,6 +3,50 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2026-07-25] 门禁增强与文档更新
+
+> 2026-07-25 第6轮 W 模型调测后识别 8 个技能问题，本次完成 6 项门禁增强（P1.1/P1.2/P1.4/P2.5/P2.6/P2.7）+ 2 项已实现确认（P1.3/P2.8）+ 顶层文档更新。
+
+### 新增
+
+- P1.1 TLA+ manifest `basePath` 强制校验（`tla-logic.ts` + `check-tla-model.ts`）
+- P1.2 TLA+ SD 覆盖率全规格强制 spec 方向校验（`tla-logic.ts` checkCoverage 函数）
+- P2.5 UAT 路径映射表规范（`phase-8-acceptance-test.md` + `phase-1-requirements.md`）
+- P2.6 TLA+ 不变式业务语义校验项（`verifier-spec.md` subCriteria 第 8 项 + `tla-plus-guide.md` §4）
+- P2.7 phase-8 三段暂停点语义明确（`phase-8-acceptance.md` 自驱 vs 交互模式对比）
+- Fixture 化回归测试（`scripts/__tests__/gate-enhancement.test.ts`，6 个集成测试用例）
+
+### 变更
+
+- `tla-plus-guide.md` §2.1 路径基准表更新（jarPath/tlaPath/cfgPath 改为相对 basePath）+ §3 SD 覆盖率校验 + §4 不变式业务语义对齐
+- `verifier-spec.md` §4.2.1 V 评审 subCriteria 新增第 8 项
+- `phase-5-coding.md` §"RTM 登记"增加 codeModule 回填强制条款
+- `phase-8-acceptance-test.md` 增加 UAT 路径映射表 + 自驱模式 vs 交互模式章节
+- `SKILL.md` 阶段5门禁清单增加 codeModule 回填检查项
+- `code-tla-logic.ts` 维度1 错误信息优化（明确指出"阶段5编码后必须回填"）
+- `self-test.ts` 基线从 77 增至 82
+- `samples/verifier/bad-passed-mismatch.json` 修正为 B 级 passed=false（与 P1.3 校验一致）
+
+### 修复
+
+- P1.4 codeModule 回填时机错误信息不明确（现为"阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts"）
+- P1.3 passed↔qualityLevel 一致性校验已在 v1 实现，本次明确"无例外"条款
+- P2.8 Next 分支命名映射已在 v1 实现，本次明确 PascalCase↔camelCase 约定
+
+### 文档
+
+- SSoT `docs/skill-design-document_SSoT.md` §3.4.6 新增门禁增强约束条款（8 项）
+- AGENTS.md §4 新增第7轮门禁增强调测结论 + §2 门禁脚本测试说明 + §8 gate-enhancement.test.ts 条目
+- README.md 新增门禁脚本增强表格 + 参考实现新门禁满足情况
+- 设计 spec `docs/superpowers/specs/2026-07-25-gate-enhancement-and-ddd-rebuild-design.md`
+- 实现计划 `docs/superpowers/plans/2026-07-25-gate-enhancement-and-ddd-rebuild.md`
+
+### 测试
+
+- vitest 63/63 全通过（含 6 个新增 gate-enhancement 用例）
+- self-test 82/82 全通过（基线从 77 增至 82）
+- TypeScript strict 模式 0 错误
+
 ## [Unreleased]
 
 ### R/F 角色新增：返工循环根因定位者（R）与修复者（F，由 S 兼任）
