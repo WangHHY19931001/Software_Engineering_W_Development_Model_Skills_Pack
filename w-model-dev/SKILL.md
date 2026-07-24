@@ -50,6 +50,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
+- **Loop 4 不自动改 harness**：爬坡循环（Loop 4，详见 [hill-climbing-guide.md](references/hill-climbing-guide.md)）只产出 HarnessImprovementReport 改进信号，不自动改 prompt/工具/验证规则。人审后手动应用；外部 SkillOpt/darwin-skill 消费信号做演化。违反命中反模式 #10（编排者越权）。
+
 ## 编排者-子代理边界
 
 > SSoT §3.4 为权威定义；[references/subagent-delegation.md](references/subagent-delegation.md) 为可执行细则。本节为编排摘要。
@@ -170,6 +172,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm reset` | 重置 | 🔴 CHECKPOINT 后清空实体，保留项目元信息 | O 执行（仅状态文件操作，非阶段产物） |
 | `/wm export [目录]` | 导出 | 输出 JSON 与 RTM Markdown | O 只读导出，不分派子代理 |
 | `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
+| `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进 | O 分析（状态读写+分析，非实施） |
 
 每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 

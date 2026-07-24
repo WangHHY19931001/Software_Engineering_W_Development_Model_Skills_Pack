@@ -1421,6 +1421,8 @@ npx tsx w-model-dev/scripts/check-rootcause-report.ts "<rootcause-report.json>"
 | **L2（返工自主化）** | ✅ 等用户 | ⚡ 自动放行 | ⚡ 阶段 5-7 返工可自主（带 attempt cap=maxReworkRounds，超限升级） | ✅ 等用户 | L1 稳定运行 ≥2 周，attempt cap 达标率 ≥80%，无 Token Burn/O3 Verifier Theater |
 | **L3（高风险路径外的全自主）** | ✅ 等用户（仅高风险路径：auth/加密/发布/架构变更） | ⚡ 自动放行 | ⚡ 全阶段返工可自主（带 attempt cap） | ✅ 等用户（发布门始终 attended） | L2 稳定运行 ≥2 周，误判率 ≤10%，用户显式申请升级 |
 
+> **L2+ 事件驱动激活**：成熟度达 L2 后，事件驱动循环（Loop 3，详见 §10F）激活。消费方自行实现触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段）。L0/L1 不支持事件驱动。
+
 ### 10C.4 L3 高风险路径定义（强制人工 gate，不可自动放行）
 
 | 高风险路径 | 触发条件 | 强制动作 |
@@ -1612,6 +1614,92 @@ interface RunLogEntry {
 
 ---
 
+## 10F. 事件驱动循环（Loop 3）
+
+> 权威定义：[docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md](./superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md) §2。
+> 实现位置：`w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节。
+>
+> **与 §10C 成熟度阶梯的关系**：L2+ 是事件驱动激活的前置条件；L0/L1 不支持事件驱动。
+> **与 §11.2 的关系**：技能不内置 cron/webhook/GitHub Actions/Slack bot；只定义 EventIngress schema + 路由表 + 编排者路由逻辑，消费方自行实现触发器。
+
+### 激活条件
+
+| 条件 | 要求 |
+|---|---|
+| 成熟度级别 | maturity.json.level ≥ L2（L0/L1 attended 不激活） |
+| 项目模式 | 棕地维护（greenfield 首次跑不激活） |
+| 高风险路径 | 即使 L3，涉及 auth/加密/发布/架构变更的事件强制决策型 CHECKPOINT |
+
+### EventIngress Schema
+
+见 [data-models.md](../w-model-dev/references/data-models.md)「事件接驳模型」节。编排者 O 维护 `.w-model/event-ingress.jsonl`（append-only）。
+
+### 事件 → 阶段路由表
+
+| eventType | 目标阶段 | 触发条件 | 高风险路径 |
+|---|---|---|---|
+| `bug-report` | 阶段 5（编码修复） | L2+，bug 涉及已存在代码 | 涉及 auth/加密代码 → 强制 CHECKPOINT |
+| `requirement-change` | 阶段 1（需求重跑） | L2+，需求变更须回退到阶段 1 | 架构变更 → 强制 CHECKPOINT |
+| `acceptance-failure` | 阶段 8（验收重跑） | L2+，验收失败重跑验收 | 发布放行 → 始终 attended |
+| `regression-detected` | 阶段 6/7（集成/系统测试） | L2+，回归测试失败 | - |
+| `scheduled-review` | 阶段 8（验收回顾） | L3，定期回顾 | 发布放行 → 始终 attended |
+| `security-incident` | 阶段 4（详细设计重审） | L2+，安全事件须回退设计 | 强制 CHECKPOINT |
+
+### 编排者路由逻辑
+
+编排者 O 确定性执行（无 LLM），详见 [event-ingress-guide.md](../w-model-dev/references/event-ingress-guide.md)「编排者路由逻辑」节。路由动作 append 到 run-log（action=event-route）。
+
+### 不引入的调度基础设施
+
+技能不内置 cron 调度器、webhook 服务器、GitHub Actions 集成、Slack bot（遵循 §11.2）。消费方自行实现触发器写入 `event-ingress.jsonl`。
+
+---
+
+## 10G. 爬坡循环（Loop 4）
+
+> 权威定义：[docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md](./superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md) §3。
+> 实现位置：`w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节。
+>
+> **与 §11 的关系**：技能只产出改进信号，不自动改 harness；外部 SkillOpt/darwin-skill 消费信号做演化；人审后手动应用。
+> **与 §10D run-log 的关系**：run-log 是 Loop 4 的主要分析输入。
+> **与 §4A.2 失败模式的关系**：Loop 4 信号检测关联 O1~O6 运维失败模式。
+
+### 设计原则
+
+| 原则 | 遵守方式 |
+|---|---|
+| 技能不内置 LLM 调用（§3.3） | HarnessImprovementReport 由编排者 O 确定性分析 run-log 产出，无 LLM |
+| 技能自演化不在本仓库（§11） | 技能只产出改进信号，不自动改 harness |
+| 编排者最小化（§3.4） | O 分析 run-log 产出报告属"状态读写+分析"允许动作，非实施 |
+| 真实执行（约束4） | 分析基于 run-log 实际记录，不 LLM 估算 |
+
+### HarnessImprovementReport Schema
+
+见 [data-models.md](../w-model-dev/references/data-models.md)「爬坡循环改进报告模型」节。编排者 O 产出存 `.w-model/hill-climbing/<timestamp>-report.json`。
+
+### 信号检测逻辑
+
+详见 [hill-climbing-guide.md](../w-model-dev/references/hill-climbing-guide.md)「信号检测逻辑」节。8 类信号（prompt/tool/verification-rule/anti-pattern/maturity/budget）均确定性检测。
+
+### 触发时机
+
+| 触发方式 | 条件 | 动作 |
+|---|---|---|
+| 用户请求 | `/wm hill-climbing` 命令 | O 分析全量 run-log 产出报告 |
+| 阶段门后自动 | 每个阶段门放行后 | O 增量分析本阶段 run-log |
+| 定期触发（L3） | maturity.level=L3 且距上次报告 ≥ 7 天 | O 自动产出全量报告 |
+| 失败模式命中 | O 系列失败模式命中 ≥ 2 次 | O 强制产出专项报告 |
+
+### 与外部 SkillOpt/darwin-skill 的边界
+
+| 角色 | 职责 | 边界 |
+|---|---|---|
+| w-model-dev Loop 4 | 产出 HarnessImprovementReport（信号） | 不自动改 harness；不调用 LLM |
+| 外部 SkillOpt/darwin-skill | 消费信号做技能自演化 | 重写 prompt/工具/验证规则；可能用 LLM |
+| 人 | 审查报告 + 决定应用哪些信号 | 低风险人审后手动改；高风险人审+回归测试 |
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
@@ -1681,6 +1769,8 @@ interface RunLogEntry {
 | 10.9 根因报告门禁 | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R10：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / reality-checker confidence） | `w-model-dev/scripts/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源） | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4） |
 | 10C 自主成熟度阶梯 | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型始终 attended，操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑 | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过；L3 高风险路径强制人工 gate） |
 | 10D 成本预算与运行日志 | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑 | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4） |
+| 10F 事件驱动循环（Loop 3） | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2） |
+| 10G 爬坡循环（Loop 4） | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用） |
 | 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
 
 ---
