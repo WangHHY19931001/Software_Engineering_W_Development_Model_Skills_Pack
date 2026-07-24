@@ -13,6 +13,7 @@
 - 运行日志模型（run-log.jsonl）
 - 自主成熟度模型（maturity.json）
 - 事件接驳模型（EventIngress / event-ingress.jsonl）
+- 爬坡循环改进报告模型（HarnessImprovementReport / hill-climbing/<timestamp>-report.json）
 - TLA+ manifest 模型（tla-manifest.json）
 
 ## 项目数据模型
@@ -532,6 +533,72 @@ interface EventIngress {
 
 ```json
 {"eventId":"evt-2026-07-25-001","timestamp":"2026-07-25T10:15:00Z","source":"webhook","eventType":"bug-report","summary":"登录接口返回 500","affectedArtifacts":["src/services/identity/user-service.ts"],"affectedRequirements":["REQ-002"],"evidence":["https://ci.example.com/run/12345/log"]}
+```
+
+## 爬坡循环改进报告模型（HarnessImprovementReport / hill-climbing/<timestamp>-report.json）
+
+> 来源：SSoT [§10G](../../docs/skill-design-document_SSoT.md)。编排者 O 确定性分析 run-log 产出，存 `.w-model/hill-climbing/<timestamp>-report.json`。详见 [hill-climbing-guide.md](hill-climbing-guide.md)。
+
+```typescript
+interface HarnessImprovementReport {
+  /** 报告 ID */
+  reportId: string;
+  /** 生成时间 ISO 8601 */
+  generatedAt: string;
+  /** 分析窗口 */
+  analysisWindow: {
+    from: string;
+    to: string;
+    runLogEntries: number;
+    phasesCovered: number[];
+  };
+  /** 检测到的改进信号 */
+  signals: Array<{
+    signalId: string;
+    category: 'prompt' | 'tool' | 'verification-rule' | 'anti-pattern' | 'maturity' | 'budget';
+    severity: 'S1' | 'S2' | 'S3';
+    evidence: {
+      runLogRefs: string[];
+      patterns: string[];
+      metrics: {
+        occurrences: number;
+        trend: 'increasing' | 'stable' | 'decreasing';
+      };
+    };
+    suggestion: string;
+    affectedAssets: string[];
+    priority: 1 | 2 | 3;
+  }>;
+  /** 元分析（跨信号聚合） */
+  metaAnalysis: {
+    topFailurePatterns: string[];
+    reworkHotspots: string[];
+    verifierDisagreements: number;
+    budgetBurnTrend: 'increasing' | 'stable' | 'decreasing';
+    operationalFailureHits: Record<string, number>;
+    comprehensionQuality: {
+      emptyOrTrivialRate: number;
+      uniqueDecisionRate: number;
+    };
+  };
+  /** 改进建议聚合 */
+  recommendations: {
+    promptTweaks: string[];
+    toolImprovements: string[];
+    verificationRuleTightening: string[];
+    candidateAntiPatterns: string[];
+    maturityAdjustments: string[];
+  };
+  /** 应用状态（人审后填写） */
+  applicationStatus?: {
+    reviewedBy: string;
+    reviewedAt: string;
+    appliedSignals: string[];
+    deferredSignals: string[];
+    rejectedSignals: string[];
+    notes?: string;
+  };
+}
 ```
 
 ## TLA+ manifest 模型（tla-manifest.json）
