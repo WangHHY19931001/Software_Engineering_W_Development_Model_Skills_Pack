@@ -1,0 +1,3 @@
+{"eventId":"evt-001","timestamp":"2026-07-25T10:15:00Z","source":"webhook","eventType":"bug-report","summary":"登录接口返回 500","affectedArtifacts":["src/services/identity/user-service.ts"],"affectedRequirements":["REQ-002"],"evidence":["https://ci.example.com/run/12345/log"]}
+{"eventId":"evt-002","timestamp":"2026-07-25T11:00:00Z","source":"cron","eventType":"scheduled-review","summary":"每周定期验收回顾","routedTo":{"phase":8,"phaseName":"验收测试","routedAt":"2026-07-25T11:05:00Z","highRiskGate":true}}
+{"eventId":"evt-003","timestamp":"2026-07-25T14:30:00Z","source":"user-report","eventType":"requirement-change","summary":"新增搜索功能需求","affectedRequirements":["REQ-007"],"evidence":["docs/requirement-change-request.md"]}
