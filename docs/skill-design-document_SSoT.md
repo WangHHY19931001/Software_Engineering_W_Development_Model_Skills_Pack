@@ -1612,6 +1612,47 @@ interface RunLogEntry {
 
 ---
 
+## 10F. 事件驱动循环（Loop 3）
+
+> 权威定义：[docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md](./superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md) §2。
+> 实现位置：`w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节。
+>
+> **与 §10C 成熟度阶梯的关系**：L2+ 是事件驱动激活的前置条件；L0/L1 不支持事件驱动。
+> **与 §11.2 的关系**：技能不内置 cron/webhook/GitHub Actions/Slack bot；只定义 EventIngress schema + 路由表 + 编排者路由逻辑，消费方自行实现触发器。
+
+### 激活条件
+
+| 条件 | 要求 |
+|---|---|
+| 成熟度级别 | maturity.json.level ≥ L2（L0/L1 attended 不激活） |
+| 项目模式 | 棕地维护（greenfield 首次跑不激活） |
+| 高风险路径 | 即使 L3，涉及 auth/加密/发布/架构变更的事件强制决策型 CHECKPOINT |
+
+### EventIngress Schema
+
+见 [data-models.md](../w-model-dev/references/data-models.md)「事件接驳模型」节。编排者 O 维护 `.w-model/event-ingress.jsonl`（append-only）。
+
+### 事件 → 阶段路由表
+
+| eventType | 目标阶段 | 触发条件 | 高风险路径 |
+|---|---|---|---|
+| `bug-report` | 阶段 5（编码修复） | L2+，bug 涉及已存在代码 | 涉及 auth/加密代码 → 强制 CHECKPOINT |
+| `requirement-change` | 阶段 1（需求重跑） | L2+，需求变更须回退到阶段 1 | 架构变更 → 强制 CHECKPOINT |
+| `acceptance-failure` | 阶段 8（验收重跑） | L2+，验收失败重跑验收 | 发布放行 → 始终 attended |
+| `regression-detected` | 阶段 6/7（集成/系统测试） | L2+，回归测试失败 | - |
+| `scheduled-review` | 阶段 8（验收回顾） | L3，定期回顾 | 发布放行 → 始终 attended |
+| `security-incident` | 阶段 4（详细设计重审） | L2+，安全事件须回退设计 | 强制 CHECKPOINT |
+
+### 编排者路由逻辑
+
+编排者 O 确定性执行（无 LLM），详见 [event-ingress-guide.md](../w-model-dev/references/event-ingress-guide.md)「编排者路由逻辑」节。路由动作 append 到 run-log（action=event-route）。
+
+### 不引入的调度基础设施
+
+技能不内置 cron 调度器、webhook 服务器、GitHub Actions 集成、Slack bot（遵循 §11.2）。消费方自行实现触发器写入 `event-ingress.jsonl`。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
