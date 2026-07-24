@@ -1,0 +1,71 @@
+{
+  "reportId": "hc-2026-07-25-001",
+  "generatedAt": "2026-07-25T18:00:00Z",
+  "analysisWindow": {
+    "from": "2026-07-20T00:00:00Z",
+    "to": "2026-07-25T18:00:00Z",
+    "runLogEntries": 47,
+    "phasesCovered": [1, 2, 3, 4, 5]
+  },
+  "signals": [
+    {
+      "signalId": "sig-001",
+      "category": "prompt",
+      "severity": "S2",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-23T10-15-00Z", "run-2026-07-24T14-20-00Z"],
+        "patterns": ["V 评审 summary 跨 3 个阶段 Jaccard 相似度 0.87"],
+        "metrics": {
+          "occurrences": 3,
+          "trend": "stable"
+        }
+      },
+      "suggestion": "强化 verifier-spec.md §6 summary 字段内容要求，明确禁止模板化措辞",
+      "affectedAssets": ["w-model-dev/references/verifier-spec.md"],
+      "priority": 2
+    },
+    {
+      "signalId": "sig-002",
+      "category": "verification-rule",
+      "severity": "S1",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-24T16-00-00Z"],
+        "patterns": ["V passed=true 但 G check-artifact-gate.ts exit=1，频次 4 次"],
+        "metrics": {
+          "occurrences": 4,
+          "trend": "increasing"
+        }
+      },
+      "suggestion": "收紧 V 评审规则：要求 V 引用具体 evidence 行号，G 校验 evidence 非空",
+      "affectedAssets": ["w-model-dev/references/verifier-spec.md", "w-model-dev/scripts/verifier-logic.ts"],
+      "priority": 1
+    }
+  ],
+  "metaAnalysis": {
+    "topFailurePatterns": ["V-G 矛盾", "summary 模板化", "返工阶段 4 TLA+"],
+    "reworkHotspots": ["阶段 4"],
+    "verifierDisagreements": 4,
+    "budgetBurnTrend": "stable",
+    "operationalFailureHits": { "O3": 4, "O1": 0, "O2": 0, "O4": 1, "O5": 0, "O6": 0 },
+    "comprehensionQuality": {
+      "emptyOrTrivialRate": 0.125,
+      "uniqueDecisionRate": 0.75
+    }
+  },
+  "recommendations": {
+    "promptTweaks": [
+      "verifier-spec.md §6 summary 字段：明确要求含 ≥1 关键决策摘要 + 1-2 句产物核心结构 + 遗留风险",
+      "禁止 summary 使用「评审通过」「质量良好」等空泛措辞"
+    ],
+    "toolImprovements": [
+      "verifier-logic.ts 新增 summary 长度校验（≥50 字符）"
+    ],
+    "verificationRuleTightening": [
+      "V 评审 evidence 字段须引用具体行号/文件路径，禁止空泛描述"
+    ],
+    "candidateAntiPatterns": [
+      "#20（候选）V 评审 summary 模板化：跨阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符"
+    ],
+    "maturityAdjustments": []
+  }
+}

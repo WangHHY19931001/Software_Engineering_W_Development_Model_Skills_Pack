@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-07-25T18:00:00Z",
+  "analysisWindow": {
+    "from": "2026-07-20T00:00:00Z",
+    "to": "2026-07-25T18:00:00Z",
+    "runLogEntries": 47,
+    "phasesCovered": [1, 2, 3, 4, 5]
+  },
+  "signals": [],
+  "metaAnalysis": {
+    "topFailurePatterns": [],
+    "reworkHotspots": [],
+    "verifierDisagreements": 0,
+    "budgetBurnTrend": "stable",
+    "operationalFailureHits": {},
+    "comprehensionQuality": { "emptyOrTrivialRate": 0, "uniqueDecisionRate": 1 }
+  },
+  "recommendations": {
+    "promptTweaks": [],
+    "toolImprovements": [],
+    "verificationRuleTightening": [],
+    "candidateAntiPatterns": [],
+    "maturityAdjustments": []
+  }
+}
