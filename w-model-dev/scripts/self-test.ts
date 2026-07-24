@@ -47,6 +47,7 @@ import {
   type CodeTlaConsistencyInput,
   type CodeFile,
 } from './code-tla-logic.js';
+import { checkRootCauseReport } from './root-cause-logic.js';
 
 // ==================== 测试用例定义 ====================
 
@@ -601,6 +602,31 @@ const CODE_TLA_CASES: CodeTlaCase[] = [
   },
 ];
 
+interface RootCauseCase {
+  /** 样本文件名（相对 samples/rootcause/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 reasons 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const ROOTCAUSE_CASES: RootCauseCase[] = [
+  { file: 'valid.json', expectedPassed: true, description: '完整、合规的 RootCauseReport，应通过所有校验' },
+  { file: 'bad-r1-missing-fields.json', expectedPassed: false, expectedReasonPatterns: [/rootCause/], description: 'R1 缺 rootCause 字段' },
+  { file: 'bad-r2-chain-length.json', expectedPassed: false, expectedReasonPatterns: [/rootCauseChain.*长度/], description: 'R2 chain 仅 1 步' },
+  { file: 'bad-r3-falsifiability.json', expectedPassed: false, expectedReasonPatterns: [/falsifiabilityCheck.*若.*则/], description: 'R3 无若...则句式' },
+  { file: 'bad-r4-fix-recommendation.json', expectedPassed: false, expectedReasonPatterns: [/fixRecommendation.*rationale/], description: 'R4 缺 rationale' },
+  { file: 'bad-r5-prevention.json', expectedPassed: false, expectedReasonPatterns: [/prevention.*owner/], description: 'R5 缺 owner' },
+  { file: 'bad-r6-upstream-defect.json', expectedPassed: false, expectedReasonPatterns: [/upstreamDefect.*upstreamPhase/], description: 'R6 present=true 缺 upstreamPhase' },
+  { file: 'bad-r7-quality-level.json', expectedPassed: false, expectedReasonPatterns: [/qualityLevel.*passed.*一致/], description: 'R7 qualityLevel=C 但 passed=true' },
+  { file: 'bad-r8-report-id.json', expectedPassed: false, expectedReasonPatterns: [/reportId.*格式/], description: 'R8 reportId 含下划线' },
+  { file: 'bad-r9-partial-missing.json', expectedPassed: false, expectedReasonPatterns: [/partialReports.*非空/], description: 'R9 多角度缺 partialReports' },
+  { file: 'bad-r10-reality-confidence.json', expectedPassed: false, expectedReasonPatterns: [/reality-checker.*confidence/], description: 'R10 reality-checker confidence=0.3' },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -908,6 +934,32 @@ async function runCodeTlaCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runRootCauseCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of ROOTCAUSE_CASES) {
+    const abs = path.join(samplesDir, 'rootcause', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkRootCauseReport(parsed);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `rootcause/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // ==================== 入口 ====================
 
 async function main(): Promise<void> {
@@ -927,12 +979,13 @@ async function main(): Promise<void> {
   console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
+  console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
-    codeTlaResults,
+    codeTlaResults, rootcauseResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -943,11 +996,12 @@ async function main(): Promise<void> {
     runMaturityCases(samplesDir),
     runCheckpointCases(samplesDir),
     runCodeTlaCases(samplesDir),
+    runRootCauseCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
-    ...codeTlaResults,
+    ...codeTlaResults, ...rootcauseResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
