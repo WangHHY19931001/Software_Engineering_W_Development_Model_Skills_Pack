@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "shell-agent-wm-001",
+  "createdAt": "2026-07-01T00:00:00Z",
+  "updatedAt": "2026-07-24T18:00:00Z",
+  "perPhase": {
+    "maxTokens": 200000,
+    "maxSubagentSpawns": 10,
+    "maxReworkRounds": 3
+  },
+  "project": {
+    "maxTokensTotal": 2000000,
+    "maxTokensPerSession": 500000
+  },
+  "onExceed": "pause",
+  "killSwitch": {
+    "consecutiveReworks": 3,
+    "budgetBurnRate": 0.9,
+    "tlaReworks": 3
+  },
+  "rootcauseParallelBudget": {
+    "maxPersonasPerRound": 5,
+    "maxTokensPerPersona": 50000,
+    "maxTotalTokensPerRound": 200000
+  },
+  "rootcauseRounds": [
+    {
+      "round": 1,
+      "personas": [
+        { "personaSlice": "engineering-incident-response-commander", "tokens": 48000 },
+        { "personaSlice": "engineering-code-reviewer", "tokens": 45000 },
+        { "personaSlice": "testing-evidence-collector", "tokens": 50000 }
+      ],
+      "totalTokens": 143000
+    }
+  ]
+}

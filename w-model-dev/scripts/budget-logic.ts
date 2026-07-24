@@ -34,6 +34,17 @@ export interface BudgetConfig {
     budgetBurnRate: number;
     tlaReworks: number;
   };
+  // ---- R4-A 扩展：多角度 R 的 token 预算（spec §9.9）----
+  rootcauseParallelBudget?: {
+    maxPersonasPerRound: number;
+    maxTokensPerPersona: number;
+    maxTotalTokensPerRound: number;
+  };
+  rootcauseRounds?: Array<{
+    round: number;
+    personas: Array<{ personaSlice: string; tokens: number }>;
+    totalTokens: number;
+  }>;
 }
 
 export interface BudgetCheckResult {
@@ -111,6 +122,48 @@ export function checkBudget(
     options.tlaReworkCount >= ks.tlaReworks
   ) {
     violations.push(`killSwitch 应触发（TLA+ 返工 ${options.tlaReworkCount} >= ${ks.tlaReworks}）但未告警`);
+  }
+
+  // R4-A：多角度 R 的 token 预算校验（不论并行/串行均累计，spec §9.9）
+  const r4a = checkRootcauseBudget(b);
+  violations.push(...r4a.violations);
+
+  return { passed: violations.length === 0, violations };
+}
+
+/**
+ * R4-A：多角度 R 的 token 预算校验（不论并行/串行均累计）
+ *
+ * 校验规则：
+ *   - 每轮 persona 数 ≤ maxPersonasPerRound
+ *   - 每个 persona tokens ≤ maxTokensPerPersona
+ *   - 每轮总 tokens ≤ maxTotalTokensPerRound（串行分派时累计）
+ *
+ * 对应 spec §9.9。
+ */
+export function checkRootcauseBudget(b: Partial<BudgetConfig>): BudgetCheckResult {
+  const violations: string[] = [];
+  const cfg = b.rootcauseParallelBudget;
+  if (!cfg) {
+    // 未配置多角度预算时不校验（向后兼容）
+    return { passed: true, violations: [] };
+  }
+  if (!Array.isArray(b.rootcauseRounds) || b.rootcauseRounds.length === 0) {
+    return { passed: true, violations: [] };
+  }
+
+  for (const round of b.rootcauseRounds) {
+    if (round.personas.length > cfg.maxPersonasPerRound) {
+      violations.push(`R4-A：round ${round.round} persona 数 ${round.personas.length} > maxPersonasPerRound ${cfg.maxPersonasPerRound}`);
+    }
+    for (const p of round.personas) {
+      if (p.tokens > cfg.maxTokensPerPersona) {
+        violations.push(`R4-A：round ${round.round} persona ${p.personaSlice} tokens ${p.tokens} > maxTokensPerPersona ${cfg.maxTokensPerPersona}`);
+      }
+    }
+    if (round.totalTokens > cfg.maxTotalTokensPerRound) {
+      violations.push(`R4-A：round ${round.round} 总 tokens ${round.totalTokens} > maxTotalTokensPerRound ${cfg.maxTotalTokensPerRound}（串行分派时累计，触发 killSwitch）`);
+    }
   }
 
   return { passed: violations.length === 0, violations };

@@ -462,6 +462,17 @@ const BUDGET_CASES: BudgetCase[] = [
     expectedReasonPatterns: [/budgetBurnRate 超范围/],
     description: 'killSwitch.budgetBurnRate=1.5 超出 [0,1]，应被 R4 范围校验拦截',
   },
+  {
+    file: 'rootcause-valid.json',
+    expectedPassed: true,
+    description: '含 rootcauseParallelBudget 且所有轮次均在限额内，应通过 R4-A 校验',
+  },
+  {
+    file: 'rootcause-over-budget.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R4-A.*maxTokensPerPersona/, /R4-A.*总 tokens.*maxTotalTokensPerRound/],
+    description: 'R4-A：persona tokens 超 maxTokensPerPersona + 总 tokens 超 maxTotalTokensPerRound',
+  },
 ];
 
 // -------------------- RunLog --------------------
