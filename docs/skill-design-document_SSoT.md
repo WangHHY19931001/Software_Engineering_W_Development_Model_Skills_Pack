@@ -1653,6 +1653,51 @@ interface RunLogEntry {
 
 ---
 
+## 10G. 爬坡循环（Loop 4）
+
+> 权威定义：[docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md](./superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md) §3。
+> 实现位置：`w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节。
+>
+> **与 §11 的关系**：技能只产出改进信号，不自动改 harness；外部 SkillOpt/darwin-skill 消费信号做演化；人审后手动应用。
+> **与 §10D run-log 的关系**：run-log 是 Loop 4 的主要分析输入。
+> **与 §4A.2 失败模式的关系**：Loop 4 信号检测关联 O1~O6 运维失败模式。
+
+### 设计原则
+
+| 原则 | 遵守方式 |
+|---|---|
+| 技能不内置 LLM 调用（§3.3） | HarnessImprovementReport 由编排者 O 确定性分析 run-log 产出，无 LLM |
+| 技能自演化不在本仓库（§11） | 技能只产出改进信号，不自动改 harness |
+| 编排者最小化（§3.4） | O 分析 run-log 产出报告属"状态读写+分析"允许动作，非实施 |
+| 真实执行（约束4） | 分析基于 run-log 实际记录，不 LLM 估算 |
+
+### HarnessImprovementReport Schema
+
+见 [data-models.md](../w-model-dev/references/data-models.md)「爬坡循环改进报告模型」节。编排者 O 产出存 `.w-model/hill-climbing/<timestamp>-report.json`。
+
+### 信号检测逻辑
+
+详见 [hill-climbing-guide.md](../w-model-dev/references/hill-climbing-guide.md)「信号检测逻辑」节。8 类信号（prompt/tool/verification-rule/anti-pattern/maturity/budget）均确定性检测。
+
+### 触发时机
+
+| 触发方式 | 条件 | 动作 |
+|---|---|---|
+| 用户请求 | `/wm hill-climbing` 命令 | O 分析全量 run-log 产出报告 |
+| 阶段门后自动 | 每个阶段门放行后 | O 增量分析本阶段 run-log |
+| 定期触发（L3） | maturity.level=L3 且距上次报告 ≥ 7 天 | O 自动产出全量报告 |
+| 失败模式命中 | O 系列失败模式命中 ≥ 2 次 | O 强制产出专项报告 |
+
+### 与外部 SkillOpt/darwin-skill 的边界
+
+| 角色 | 职责 | 边界 |
+|---|---|---|
+| w-model-dev Loop 4 | 产出 HarnessImprovementReport（信号） | 不自动改 harness；不调用 LLM |
+| 外部 SkillOpt/darwin-skill | 消费信号做技能自演化 | 重写 prompt/工具/验证规则；可能用 LLM |
+| 人 | 审查报告 + 决定应用哪些信号 | 低风险人审后手动改；高风险人审+回归测试 |
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
