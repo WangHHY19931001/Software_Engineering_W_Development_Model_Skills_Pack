@@ -1,0 +1,18 @@
+════════════════════════════════════════════════════════════
+代码-TLA+ 一致性校验（Code-TLA Consistency Checker）
+════════════════════════════════════════════════════════════
+manifest      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\tla-manifest.json
+graph         : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\ingestion\graph.json
+rtm           : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\rtm.json
+src           : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\src
+代码文件数    : 36
+────────────────────────────────────────────────────────────
+维度校验结果：
+  维度1 SD→codeModule   : ✓ 通过（6 项）
+  维度2 代码状态转移    : ✓ 通过（93 项）
+  维度3 Next 分支对应   : ✓ 通过（11 项）
+  维度4 断言覆盖不变式  : ✓ 通过（45 项）
+────────────────────────────────────────────────────────────
+校验结果      : ✓ 通过
+────────────────────────────────────────────────────────────
+CODE_TLA_JSON {"type":"code-tla-consistency","passed":true,"exitCode":0,"dimensions":{"sdToCodeModule":{"passed":true,"checked":6,"violations":[]},"codeStateTransfer":{"passed":true,"checked":93,"violations":[]},"nextBranchCoverage":{"passed":true,"checked":11,"violations":[]},"invariantCoverage":{"passed":true,"checked":45,"violations":[]}},"violations":[],"codeFileCount":36,"converged":true}

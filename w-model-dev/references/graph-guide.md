@@ -52,7 +52,7 @@
    - 根候选中存在非 REQ 节点 → 违反「根必须是系统」；
    - 多个 REQ 节点 → 多根违反；
    - 零个 REQ 节点 → 报「缺少系统根，可能存在 parent 边环」，转入环检测（规则 5）。
-3. **层级单调**：parent 边（父→子，见 §2）只能连接相邻层级，且 **子节点 Level = 父节点 Level + 1**（REQ=L0 / SD=L1 / INTF=L2 / DD=L3，即边方向 L0→L1→L2→L3 单调递增），禁止跨层或逆向依附；违反 → `hierarchyTreeViolation`，check-requirement-graph.ts 退出码 1。
+3. **层级单调**（跨类型）：**跨类型** parent 边（父→子，见 §2）只能连接相邻层级，且 **子节点 Level = 父节点 Level + 1**（REQ=L0 / SD=L1 / INTF=L2 / DD=L3，即边方向 L0→L1→L2→L3 单调递增），禁止跨层或逆向依附；违反 → `hierarchyTreeViolation`，check-requirement-graph.ts 退出码 1。**同类型** parent 边（REQ→REQ 需求分解 / SD→SD 子系统分解 / INTF→INTF / DD→DD）属内部分解层级，豁免跨类型层级单调校验（如系统根 REQ-000 → 需求模块 REQ-001~REQ-013 不违反层级单调）。
 4. **orphan 检测**：`reachableFromRoot = BFS(parent 边反向，从唯一系统根出发能到达的节点集合)`；orphans = 所有非边界节点 − reachableFromRoot；存在 orphan → 违反。
 5. **环检测**：零根场景时对 parent 边做 DFS 三色染色，发现灰边（回边）则报「parent 边存在环」。
 6. **根节点豁免死模块**：REQ-001 作为系统根，是系统对外交互的代理，in=0 ∧ out=0 不判死模块（历史缺陷 D11：旧 graph-logic.ts 曾误报根为死模块）。EXT-IN/EXT-OUT 边界节点同样豁免。死模块完整定义见 §7 第 4 层。

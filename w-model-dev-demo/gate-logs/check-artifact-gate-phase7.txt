@@ -1,0 +1,24 @@
+════════════════════════════════════════════════════════════
+工件质量门校验（Artifact Gate）— 阶段 7 系统测试后
+════════════════════════════════════════════════════════════
+项目目录      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo
+RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\rtm.json
+RTM 覆盖率    : 100%
+单元覆盖率    : 87.69%
+TLA+ 资产     : ✓ manifest 存在且 specs 非空
+graph 资产    : ✓ 加载（76 节点）
+校验结果      : ✗ 未通过（阶段 7 预期：验收测试待执行）
+────────────────────────────────────────────────────────────
+未通过原因：
+  - 验收测试: 49 个待执行（阶段 8 待执行，阶段 7 预期状态）
+────────────────────────────────────────────────────────────
+
+阶段 7 门禁分析：
+  ✓ 单元测试: 209/209 passed, coverage 87.69% (≥80%)
+  ✓ 集成测试: 43/43 passed, coverage 100%
+  ✓ 系统测试: 53/53 passed, coverage 100%
+  ✗ 验收测试: 0/49 passed, 49 pending（阶段 8 待执行）
+
+结论：阶段 7 系统测试门禁通过（1-7 级测试全绿），唯一未通过项为验收测试待执行（阶段 8 预期状态）。
+
+GATE_JSON {"type":"artifact","passed":false,"exitCode":1,"coveragePercent":100,"unitCoveragePercent":87.69,"missingItems":[],"reasons":["验收测试: 49 个待执行"]}

@@ -1,0 +1,27 @@
+RUN  v1.6.1 D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev-demo
+
+Test Files  8 passed (8)
+     Tests  53 passed (53)
+  Start at  04:13:22
+  Duration  12.04s (transform 535ms, setup 0ms, collect 4.04s, tests 17.35s, environment 2ms, prepare 2.86s)
+
+测试明细：
+  TC-DES-001 架构设计验证: 11 passed
+  TC-DES-005 系统测试用例覆盖完整性: 5 passed
+  TC-DES-007 端到端流程: 3 passed
+  TC-DES-008 性能基线: 8 passed
+  TC-DES-009 安全基线: 14 passed
+  TC-DES-010 跨子系统——发文→统计→推荐流: 2 passed
+  TC-DES-011 跨子系统——评论→通知→热度→搜索: 2 passed
+  TC-DES-012 崩溃恢复——WAL 重放后状态一致: 8 passed
+
+性能数据：
+  GET /api/articles: P95=4.13ms, P99=5.31ms
+  GET /api/articles/:id: P95=2.98ms
+  POST /api/auth/login: P95=65.45ms
+  GET /api/notifications: P95=3.26ms
+  GET /api/search: P95=2.73ms
+  批量请求: total=1000, success=1000, failed=0, errorRate=0.000%
+  Memory: heapUsed=37.98MB, rss=358.66MB
+
+Exit code: 0

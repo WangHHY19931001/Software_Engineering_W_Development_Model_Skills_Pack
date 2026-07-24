@@ -334,7 +334,9 @@ export function checkRequirementGraph(
     );
   }
 
-  // --- §3 规则 3：层级单调校验（parent 边 子 Level = 父 Level + 1）---
+  // --- §3 规则 3：层级单调校验（parent 边 跨类型 子 Level = 父 Level + 1；同类型内部分解豁免）---
+  // 同类型 parent 边（REQ→REQ 需求分解 / SD→SD 子系统分解 / INTF→INTF / DD→DD）属内部分解层级，
+  // 不触发跨类型层级单调校验；仅跨类型 parent 边（REQ→SD / SD→INTF / INTF→DD）须满足 子 Level = 父 Level + 1。
   for (const e of g.edges) {
     if (e.type !== 'parent') continue;
     const fromNode = nodeMap.get(e.from);
@@ -343,6 +345,7 @@ export function checkRequirementGraph(
     const fromLevel = LEVEL_MAP[fromNode.type];
     const toLevel = LEVEL_MAP[toNode.type];
     if (fromLevel === undefined || toLevel === undefined) continue; // 边界节点不在层级树
+    if (fromNode.type === toNode.type) continue; // 同类型内部分解豁免（如 REQ→REQ 系统根→需求模块）
     if (toLevel !== fromLevel + 1) {
       result.violations.push(
         `层级单调校验失败：parent 边 ${e.from}(${fromNode.type})→${e.to}(${toNode.type}) 非相邻层级（应为 L${fromLevel}→L${fromLevel + 1}）`,

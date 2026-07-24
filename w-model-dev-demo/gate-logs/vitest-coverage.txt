@@ -1,0 +1,66 @@
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mD:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev-demo[39m
+[2m      Coverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m ../w-model-dev/scripts/__tests__/budget-logic.test.ts [2m ([22m[2m4 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m ../w-model-dev/scripts/__tests__/run-log-logic.test.ts [2m ([22m[2m8 tests[22m[2m)[22m[90m 13[2mms[22m[39m
+ [32m✓[39m ../w-model-dev/scripts/__tests__/root-cause-logic.test.ts [2m ([22m[2m11 tests[22m[2m)[22m[90m 17[2mms[22m[39m
+ [32m✓[39m tests/unit/infrastructure/infra.test.ts [2m ([22m[2m5 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/services/discovery.test.ts [2m ([22m[2m16 tests[22m[2m)[22m[90m 26[2mms[22m[39m
+ [32m✓[39m tests/unit/services/interaction.test.ts [2m ([22m[2m20 tests[22m[2m)[22m[90m 25[2mms[22m[39m
+ [32m✓[39m tests/unit/services/content.test.ts [2m ([22m[2m54 tests[22m[2m)[22m[90m 42[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/jwt-rbac.test.ts [2m ([22m[2m30 tests[22m[2m)[22m[90m 31[2mms[22m[39m
+ [32m✓[39m tests/unit/middleware/middleware.test.ts [2m ([22m[2m19 tests[22m[2m)[22m[90m 30[2mms[22m[39m
+ [32m✓[39m tests/unit/services/identity.test.ts [2m ([22m[2m24 tests[22m[2m)[22m[33m 1283[2mms[22m[39m
+ [32m✓[39m tests/unit/services/operation.test.ts [2m ([22m[2m41 tests[22m[2m)[22m[33m 1534[2mms[22m[39m
+ [32m✓[39m ../w-model-dev/scripts/__tests__/code-tla-logic.test.ts [2m ([22m[2m26 tests[22m[2m)[22m[90m 26[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m12 passed[39m[22m[90m (12)[39m
+[2m      Tests [22m [1m[32m258 passed[39m[22m[90m (258)[39m
+[2m   Start at [22m 03:27:46
+[2m   Duration [22m 3.22s[2m (transform 3.18s, setup 2ms, collect 5.98s, tests 3.04s, environment 4ms, prepare 6.43s)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   87.69 |    81.12 |   82.99 |   87.69 |                   
+ middleware        |   94.86 |    90.74 |   72.72 |   94.86 |                   
+  auth.ts          |     100 |      100 |     100 |     100 |                   
+  error-handler.ts |   77.58 |       75 |     100 |   77.58 | 25-37             
+  rate-limiter.ts  |   94.73 |       80 |      40 |   94.73 | 56-57,61-62       
+  rbac.ts          |     100 |     92.3 |     100 |     100 | 65,100            
+ services/content  |   85.02 |     77.9 |    82.5 |   85.02 |                   
+  ...le-service.ts |    96.2 |    80.95 |     100 |    96.2 | ...05-206,224-225 
+  ...ry-service.ts |   66.95 |    66.66 |      75 |   66.95 | ...11-218,222-223 
+  ...ef-service.ts |   95.26 |    86.88 |    87.5 |   95.26 | ...93-194,208-210 
+  tag-service.ts   |   78.68 |     62.5 |      70 |   78.68 | ...81-182,186-189 
+ ...ices/discovery |    90.4 |    83.11 |   80.95 |    90.4 |                   
+  ...ion-engine.ts |   98.27 |    92.68 |    90.9 |   98.27 | 171-173           
+  ...ch-indexer.ts |   82.35 |    72.22 |      70 |   82.35 | ...55-156,166-169 
+ services/identity |   80.38 |    68.42 |   70.37 |   80.38 |                   
+  ...er-service.ts |   93.71 |    46.66 |     100 |   93.71 | ...37-138,141-142 
+  ...ow-service.ts |   72.59 |       70 |   55.55 |   72.59 | ...27-128,132-134 
+  user-service.ts  |   75.75 |    81.81 |   63.63 |   75.75 | ...04-221,226-227 
+ ...es/interaction |   86.61 |    77.77 |   89.47 |   86.61 |                   
+  ...nt-service.ts |   76.26 |     64.7 |      80 |   76.26 | ...52-171,175-187 
+  ...on-service.ts |    98.8 |    89.47 |     100 |    98.8 | 98-99             
+ ...ices/operation |   94.64 |    85.82 |   95.12 |   94.64 |                   
+  ad-service.ts    |   98.14 |    82.45 |     100 |   98.14 | 131-132,157-158   
+  ...-scheduler.ts |   86.77 |    77.27 |      90 |   86.77 | ...4,80-81,95-111 
+  site-service.ts  |   95.53 |      100 |      90 |   95.53 | 107-111           
+  ...aggregator.ts |    98.7 |    90.47 |     100 |    98.7 | 108-109           
+ stores            |   82.42 |     70.7 |   89.18 |   82.42 |                   
+  article-store.ts |   83.33 |    66.07 |     100 |   83.33 | ...35-136,149-151 
+  generic-store.ts |   77.33 |    73.33 |   72.72 |   77.33 | ...56,65-66,73-74 
+  user-store.ts    |   84.21 |    78.57 |    90.9 |   84.21 | ...48,74-80,88-94 
+ utils             |   89.06 |    92.72 |    77.5 |   89.06 |                   
+  ...te-machine.ts |     100 |      100 |     100 |     100 |                   
+  bcrypt.ts        |   85.18 |       80 |     100 |   85.18 | 17-18,25-26       
+  ...calculator.ts |   78.18 |     87.5 |   66.66 |   78.18 | 40-48,52-54       
+  email.ts         |   79.09 |    77.77 |    62.5 |   79.09 | ...,70-86,108-109 
+  errors.ts        |     100 |      100 |     100 |     100 |                   
+  jwt.ts           |   90.78 |      100 |      80 |   90.78 | 58-64             
+  ...ive-filter.ts |   82.41 |    81.25 |    62.5 |   82.41 | ...70,79-80,84-90 
+  validate.ts      |     100 |      100 |     100 |     100 |                   
+-------------------|---------|----------|---------|---------|-------------------
