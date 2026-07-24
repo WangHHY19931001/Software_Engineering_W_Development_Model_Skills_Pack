@@ -87,6 +87,8 @@ describe('维度1 checkSdToCodeModule', () => {
     expect(result.checked).toBe(2);
     expect(result.violations.length).toBeGreaterThanOrEqual(1);
     expect(result.violations.some(v => v.includes('SD-REVIEW'))).toBe(true);
+    // P1.4：violation 须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）
+    expect(result.violations.some(v => v.includes('阶段5编码后必须回填'))).toBe(true);
   });
 
   it('SD id 去 "SD-" 前缀转小写后做包含匹配', () => {
@@ -112,6 +114,8 @@ describe('维度1 checkSdToCodeModule', () => {
     const rtm = makeRtm([]);
     const result = checkSdToCodeModule(graph, rtm);
     expect(result.passed).toBe(false);
+    // P1.4：violation 须明确指出回填时机
+    expect(result.violations.some(v => v.includes('阶段5编码后必须回填'))).toBe(true);
   });
 });
 

@@ -79,6 +79,10 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：代码模块列（实现文件路径）。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+> **强制条款（P1.4）**：编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列。
+> 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）。
+> 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1，violation 明确指出回填时机。
+
 ## 验收标准
 
 - [ ] 代码可编译通过
