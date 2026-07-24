@@ -132,6 +132,22 @@ w-model-dev-demo/
 >
 > 违反 → `check-tla-model.ts` 退出码 1，violation 明确指出问题 spec。
 
+## §4 不变式业务语义对齐（P2.6）
+
+> 每个 TLA+ 不变式须有对应的设计文档章节引用与业务语义解释。
+
+**要求**：
+- 每个 `Invariant` 须在 .tla 文件注释中标注 `@designRef <doc>#<section>`
+- V 评审须校验业务语义对齐（非仅语法/模型检查通过）
+
+**示例**：
+
+```tla
+\* @designRef docs/system-design.md#§3.3 分类树无环约束
+CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\ 
+                        \A p \in Categories : categoryParent[p] # c \/ p = None
+```
+
 ## 层级模型
 
 | 层级 | 抽象内容 | 产出阶段 |

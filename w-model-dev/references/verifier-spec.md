@@ -121,6 +121,13 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 2. **禁止手工编造 rawScores**：必须实际执行 `repeatTimes ≥ 3` 次扰动评分（不同随机种子 / 温度 / 上下文扰动），将每次真实评分填入 `rawScores`；禁止复制同一个分数填满数组（详见 §3.2.1 规则 1）。
 3. **rawScores 须有实际差异**：`rawScores` 各元素不得全同；text-parse 模式下 `max - min` 须 ∈ `[0.01, 0.10]`（详见 §3.2.1 规则 3）。
 4. **variance 须由 rawScores 自动计算**：禁止手工填写 `variance` 字段；必须用总体方差公式 `Var = Σ(xᵢ - μ)² / N` 从 `rawScores` 计算（与 `check-verifier-output.ts` 重算公式一致，避免因 `N` vs `N-1` 差异导致 `1e-6` 误差判失败；详见 §3.2.1 规则 2）。
+8. **不变式业务语义对齐**（P2.6）
+   - 校验：TLA+ 每个不变式是否真实反映设计文档的业务约束
+   - 评审者须为每个不变式提供：
+     - 设计文档引用（如 `design.md §X.X`）
+     - 业务语义解释（一句话说明不变式约束的业务含义）
+   - 评分权重：纳入 compositeScore 计算
+   - 不变式仅语法/模型检查通过但业务语义无法对应设计文档 → 该项 0 分
 
 ## 5. PPT 优先级排序（Probabilistic Pivot Tournament）
 
