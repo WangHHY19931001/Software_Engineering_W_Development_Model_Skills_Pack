@@ -13,6 +13,7 @@
 - 实现层经验教训（代码层 L1~L4）
 - 失败模式清单（10 条行为退化 F1~F10）
 - 运维失败模式清单（6 条运行健康 O1~O6）
+- 候选反模式检测信号（来自 Loop 4 爬坡循环）
 
 ## 反模式清单
 
@@ -331,3 +332,40 @@ LLM-as-a-Verifier 在评审中识别到运维失败模式时，应在 `reworkHin
 | 标注位置 | loop-run-log.md | run-log.jsonl 的 `note` 字段 + 阶段产物「备注」节 + 评审报告 `reworkHints`（`[O#]` 前缀） |
 | 检测机制 | loop 系统自动检测 | 预算检查（O1/O6）/ 路径存活校验（O2）/ V-G 矛盾检测（O3）/ 理解证据机制（O4/O5）协同检测 |
 | 与成熟度关系 | 无 | O 系列命中影响成熟度升级判定（L0→L1 需无 O 系列命中）与降级（连续命中触发自动降级回 L0） |
+
+## 候选反模式检测信号（来自 Loop 4 爬坡循环）
+
+> 来源：SSoT [§10G](../../docs/skill-design-document_SSoT.md)。Loop 4 的 HarnessImprovementReport（详见 [hill-climbing-guide.md](hill-climbing-guide.md)）产出候选反模式信号，人审后手动加入本清单。
+>
+> **与已收录反模式的关系**：已收录的 #1~#19 + F1~F10 + O1~O6 是技能包内置清单；候选反模式是 Loop 4 从 run-log 模式聚合产出的**待审**信号，须经人审 + 至少 2 个项目的回归验证后才正式加入清单。
+
+### 候选反模式信号来源
+
+Loop 4 的信号检测逻辑（确定性，无 LLM）会从 run-log 聚合以下模式作为候选反模式：
+
+| 检测信号 | 来源 | 转正条件 |
+|---|---|---|
+| run-log note 字段反复出现同类问题（≥3 次跨 ≥2 阶段） | Loop 4 `anti-pattern` 信号类别 | 人审 + 2 项目回归验证 |
+| V 评审 summary 跨阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符 | Loop 4 `prompt` 信号 + 信息熵检测 | 人审 + 2 项目回归验证 |
+| V passed=true 但 G exit=1 频次 > 阈值（≥3 次/阶段） | Loop 4 `verification-rule` 信号 | 人审 + 2 项目回归验证 |
+| L1+ 自动放行后误判率 > 10% | Loop 4 `maturity` 信号 | 人审 + 2 项目回归验证 |
+
+### 候选反模式生命周期
+
+```
+Loop 4 产出候选信号（HarnessImprovementReport.recommendations.candidateAntiPatterns）
+  ↓ 人审
+人决定 adopt / defer / reject
+  ↓ adopt 后
+加入本节「待回归验证」清单
+  ↓ 2 项目回归验证通过
+正式加入 #1~#19 或 F1~F10 或 O1~O6 清单
+```
+
+### 待回归验证清单（初始为空）
+
+> 本节随 Loop 4 报告累积。每条记录格式：`候选 ID | 描述 | 来源报告 ID | 首次发现时间 | 验证项目数`
+
+| 候选 ID | 描述 | 来源报告 | 首次发现 | 验证项目数 |
+|---|---|---|---|---|
+| （初始为空） | | | | |
