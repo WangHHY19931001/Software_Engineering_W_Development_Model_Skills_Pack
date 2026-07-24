@@ -128,7 +128,7 @@ w-model-dev-demo/
 >
 > 每个 SD-xxx 须被至少一个 spec 的 requirementIds 包含（现有校验，不变）。
 >
-> L1 须标注其对应的顶层 SD（如 SD-000 系统根）。
+> 说明：L1 通常标注其对应的顶层 SD（如 SD-000 系统根），便于追溯；但非强制校验项。
 >
 > 违反 → `check-tla-model.ts` 退出码 1，violation 明确指出问题 spec。
 
