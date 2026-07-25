@@ -83,6 +83,26 @@
 > 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）。
 > 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1，violation 明确指出回填时机。
 
+### NFR/CON codeModule 回填（第 9 轮 P1.2）
+
+> NFR（非功能需求）与 CON（技术约束）行的 `codeModule` 字段在阶段 5 须回填。与 [phase-1-requirements.md](phase-1-requirements.md)「NFR/CON 横切治理字段登记」节配套：阶段 1 已登记 `designDoc`（横切关系），阶段 5 闭环到代码层。
+
+**字段回填要求**：
+
+| 行类型 | `codeModule` 回填要求 | 示例值 |
+|---|---|---|
+| `NFR-001~005` | 填写涉及的源码文件清单（多文件用逗号分隔）或填 `"横切"`（多文件横切时） | NFR-001 性能 → `"src/utils/cache.ts,src/services/recommend.service.ts"`；NFR-003 可观测性 → `"横切"` |
+| `CON-001~003` | 填写技术栈配置文件或填 `"横切"` | CON-001 TypeScript strict → `"tsconfig.json"`；CON-002 npm 包管理 → `"package.json"`；CON-003 全局约束 → `"横切"` |
+
+**与 REQ 行的差别**：
+
+- REQ 行 `codeModule` 格式严格为 `SD-xxx:src/path/to/file.ts`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
+- NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，直接填文件路径或 `"横切"` 标识。
+
+**阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，回到阶段 5 补回填。
+
+> 与阶段 1 的衔接：阶段 1 已登记 `NFR/CON.designDoc`（横切 SD 清单或 `"横切"`），阶段 5 须保证 `codeModule` 与 `designDoc` 横切关系一致——若 `designDoc="横切"` 而 `codeModule` 只指向单个文件，V 子代理评审时应提示「横切范围与代码实现不匹配」（可选 reworkHint，非阻断）。
+
 ## 验收标准
 
 - [ ] 代码可编译通过
