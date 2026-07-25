@@ -49,7 +49,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   const runLogFile = runLogArg ? runLogArg.split('=')[1] : undefined;
   let phase: number | undefined;
   if (phaseArg) {
-    phase = Number.parseInt(phaseArg.split('=')[1], 10);
+    const phaseStr = phaseArg.split('=')[1];
+    if (phaseStr !== undefined) phase = Number.parseInt(phaseStr, 10);
   }
 
   return { budgetFile, projectFile, runLogFile, phase };

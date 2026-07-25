@@ -105,7 +105,7 @@ async function loadCheckpointLog(
     const fileAbs = path.join(dirAbs, file);
     try {
       const content = await fs.readFile(fileAbs, 'utf-8');
-      map.set(phase, content);
+      if (phase) map.set(phase, content);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       console.error(

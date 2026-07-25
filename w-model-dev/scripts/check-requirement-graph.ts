@@ -40,8 +40,9 @@ async function main(): Promise<void> {
   let phase: number | undefined;
   const phaseArg = process.argv.slice(3).find(a => a.startsWith('--phase='));
   if (phaseArg) {
-    phase = Number.parseInt(phaseArg.split('=')[1], 10);
-    if (![1, 2, 3, 4].includes(phase)) {
+    const phaseStr = phaseArg.split('=')[1];
+    if (phaseStr !== undefined) phase = Number.parseInt(phaseStr, 10);
+    if (phase === undefined || ![1, 2, 3, 4].includes(phase)) {
       console.error(`✗ --phase 必须为 1-4，实际: ${phase}`);
       process.exit(2);
     }

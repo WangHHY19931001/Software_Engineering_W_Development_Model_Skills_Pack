@@ -90,7 +90,7 @@ function extractExitCode(content: string): number | undefined {
   ];
   for (const pattern of patterns) {
     const match = content.match(pattern);
-    if (match) {
+    if (match && match[1]) {
       try {
         const json = JSON.parse(match[1]) as { exitCode?: unknown };
         if (typeof json.exitCode === 'number') return json.exitCode;

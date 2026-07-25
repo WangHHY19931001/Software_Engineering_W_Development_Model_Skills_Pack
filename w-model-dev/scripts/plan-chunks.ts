@@ -56,9 +56,16 @@ function parseArgs(argv: string[]): {
   let nodeType: string | undefined;
   let maxTokens = MAX_TOKENS_DEFAULT;
   for (const a of argv.slice(3)) {
-    if (a.startsWith('--phase=')) phase = Number.parseInt(a.split('=')[1], 10);
-    else if (a.startsWith('--node-type=')) nodeType = a.split('=')[1];
-    else if (a.startsWith('--max-tokens=')) maxTokens = Number.parseInt(a.split('=')[1], 10);
+    if (a.startsWith('--phase=')) {
+      const phaseStr = a.split('=')[1];
+      if (phaseStr !== undefined) phase = Number.parseInt(phaseStr, 10);
+    } else if (a.startsWith('--node-type=')) {
+      const typeStr = a.split('=')[1];
+      if (typeStr !== undefined) nodeType = typeStr;
+    } else if (a.startsWith('--max-tokens=')) {
+      const tokStr = a.split('=')[1];
+      if (tokStr !== undefined) maxTokens = Number.parseInt(tokStr, 10);
+    }
   }
   if (![1, 2, 3, 4].includes(phase ?? 0)) {
     console.error(`✗ --phase 必须为 1-4，实际: ${phase}`);
@@ -99,7 +106,7 @@ async function splitMarkdownByHeaders(
         tokens: estimateTokens(current),
       });
       idx++;
-      current = piece;
+      current = piece ?? '';
     } else {
       current = candidate;
     }
