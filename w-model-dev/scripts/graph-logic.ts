@@ -290,7 +290,7 @@ export function checkRequirementGraph(
       `单根校验失败：存在 ${reqRoots.length} 个 REQ 根，多根违反：${reqRoots.map(n => n.id).join(', ')}`,
     );
   } else {
-    singleRoot = reqRoots[0];
+    singleRoot = reqRoots[0] ?? null;
   }
 
   // --- §3 规则 4：orphan BFS（从唯一根出发，经 parent 边可达性）---

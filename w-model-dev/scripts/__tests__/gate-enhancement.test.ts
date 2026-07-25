@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../tla-logic.js';
 import { checkVerifierOutput, type VerifierOutputShape } from '../verifier-logic.js';
+import { checkArtifactGate, type RTMMatrixShape, type PhaseOption } from '../gate-logic.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,14 @@ const SAMPLES_DIR = path.resolve(here, '..', 'samples');
 function loadJson<T>(rel: string): T {
   const abs = path.resolve(SAMPLES_DIR, rel);
   return JSON.parse(fs.readFileSync(abs, 'utf-8')) as T;
+}
+
+function loadGateSample(name: string): RTMMatrixShape {
+  return loadJson<RTMMatrixShape>(path.join('gate', name));
+}
+
+function loadVerifierSample(name: string): VerifierOutputShape {
+  return loadJson<VerifierOutputShape>(path.join('verifier', name));
 }
 
 /**
@@ -133,6 +142,77 @@ describe('Part A 门禁增强回归测试', () => {
       const verifier = loadJson<VerifierOutputShape>('verifier/valid.json');
       const result = checkVerifierOutput(verifier);
       expect(result.passed).toBe(true);
+    });
+  });
+
+  // ==================== 第 9 轮 P1.1 阶段级校验 ====================
+  describe('P1.1 阶段级校验（phaseOption）', () => {
+    it('phase=6 合法场景：unit+integration 通过，system+acceptance pending 应通过', () => {
+      const matrix = loadGateSample('valid-phase6.json');
+      const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+      expect(result.passed).toBe(true);
+      expect(result.reasons).toEqual([]);
+    });
+
+    it('phase=6 REQ 缺 integrationTest 字段应失败', () => {
+      const matrix = loadGateSample('bad-phase6-pending-system.json');
+      const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+      expect(result.passed).toBe(false);
+      expect(
+        result.reasons.some(r => r.includes('REQ-001') && r.includes('integrationTest')),
+      ).toBe(true);
+    });
+
+    it('phase=5 REQ 缺 codeModule 应失败', () => {
+      const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
+      const result = checkArtifactGate(matrix, { phaseOption: 5 as PhaseOption });
+      expect(result.passed).toBe(false);
+      expect(
+        result.reasons.some(r => r.includes('REQ-001') && r.includes('codeModule')),
+      ).toBe(true);
+    });
+
+    it('phase=5 bad 样本在 phase=8 终检也应失败', () => {
+      const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
+      const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+      expect(result.passed).toBe(false);
+    });
+
+    it('phase=6 合法场景在 phase=8 终检应失败（system/acceptance pending）', () => {
+      const matrix = loadGateSample('valid-phase6.json');
+      const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+      expect(result.passed).toBe(false);
+      expect(result.reasons.some(r => r.includes('待执行'))).toBe(true);
+    });
+
+    it('未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）', () => {
+      const matrix = loadGateSample('valid-phase6.json');
+      const result = checkArtifactGate(matrix);
+      expect(result.passed).toBe(false);
+    });
+  });
+
+  // ==================== 第 9 轮 P2.4/P2.5/P3.10 verifier 标准化校验 ====================
+  describe('P2.4/P2.5/P3.10 verifier 标准化校验', () => {
+    it('P2.5 targetKind=testcase 应失败（已废弃，须用 test）', () => {
+      const v = loadVerifierSample('bad-targetkind.json');
+      const result = checkVerifierOutput(v);
+      expect(result.passed).toBe(false);
+      expect(result.reasons.some(r => r.includes('targetKind') && r.includes('testcase'))).toBe(true);
+    });
+
+    it('P2.4 subCriteria 名称非标准应失败', () => {
+      const v = loadVerifierSample('bad-subcriteria-name.json');
+      const result = checkVerifierOutput(v);
+      expect(result.passed).toBe(false);
+      expect(result.reasons.some(r => r.includes('应为') && r.includes('fake-criterion'))).toBe(true);
+    });
+
+    it('P3.10 rawScores 全相同应失败', () => {
+      const v = loadVerifierSample('bad-rawscores-constant.json');
+      const result = checkVerifierOutput(v);
+      expect(result.passed).toBe(false);
+      expect(result.reasons.some(r => r.includes('全同'))).toBe(true);
     });
   });
 });

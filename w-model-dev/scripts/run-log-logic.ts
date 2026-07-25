@@ -302,22 +302,22 @@ export function checkRunLog(
 
   // R7 扩展：返工路径时序 rootcause → review(targetKind=rootcause) → fix（spec §7.6）
   for (let i = 0; i < valid.length; i++) {
-    if (valid[i].action === 'rootcause') {
-      // 后续须先有 review(targetKind=rootcause) 再有 fix
-      let j = i + 1;
-      while (j < valid.length && valid[j].action !== 'review') j++;
-      if (j >= valid.length || valid[j].targetKind !== 'rootcause') {
-        violations.push(
-          `R7: rootcause 记录 ${valid[i].runId} 后须紧跟 review(targetKind=rootcause)`,
-        );
-      }
-      // fix 须在 review(rootcause) 之后
-      while (j < valid.length && valid[j].action !== 'fix') j++;
-      if (j >= valid.length) {
-        violations.push(
-          `R7: rootcause 记录 ${valid[i].runId} 后须有 fix 记录`,
-        );
-      }
+    const curEntry = valid[i];
+    if (!curEntry || curEntry.action !== 'rootcause') continue;
+    // 后续须先有 review(targetKind=rootcause) 再有 fix
+    let j = i + 1;
+    while (j < valid.length && valid[j]?.action !== 'review') j++;
+    if (j >= valid.length || valid[j]?.targetKind !== 'rootcause') {
+      violations.push(
+        `R7: rootcause 记录 ${curEntry.runId} 后须紧跟 review(targetKind=rootcause)`,
+      );
+    }
+    // fix 须在 review(rootcause) 之后
+    while (j < valid.length && valid[j]?.action !== 'fix') j++;
+    if (j >= valid.length || !valid[j]) {
+      violations.push(
+        `R7: rootcause 记录 ${curEntry.runId} 后须有 fix 记录`,
+      );
     }
   }
 

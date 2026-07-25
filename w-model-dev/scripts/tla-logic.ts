@@ -153,7 +153,7 @@ function sameSet(a: string[], b: string[]): boolean {
 /** 由层级字符串（如 "L3"）解析出层级数字；非法返回 -1。 */
 function levelNum(level: string): number {
   const m = /^L(\d+)$/.exec(level);
-  if (!m) return -1;
+  if (!m || !m[1]) return -1;
   return Number.parseInt(m[1], 10);
 }
 
@@ -188,7 +188,7 @@ function parseCfgInvariantNames(cfgContent: string): string[] {
     }
     // 形式2：逐行 INVARIANT <Name>（排除 INVARIANTS 关键字行）
     const single = line.match(/^INVARIANT\s+(\S+)/i);
-    if (single && !/^INVARIANTS\b/i.test(line)) {
+    if (single && single[1] && !/^INVARIANTS\b/i.test(line)) {
       inList = false;
       names.push(single[1]);
       continue;
@@ -197,7 +197,7 @@ function parseCfgInvariantNames(cfgContent: string): string[] {
     const listHead = line.match(/^INVARIANTS\s*(.*)$/i);
     if (listHead) {
       inList = true;
-      const rest = listHead[1];
+      const rest = listHead[1] ?? '';
       if (rest.trim() !== '') {
         for (const n of rest.split(/[\s,]+/).filter(s => s.trim() !== '')) {
           names.push(n.trim());
@@ -257,8 +257,8 @@ export function parseTlaHeader(content: string): Record<string, string | null> {
   for (const line of lines) {
     const m = line.match(re);
     if (!m) continue;
-    const name = m[1].toLowerCase();
-    const raw = m[2].trim();
+    const name = (m[1] ?? '').toLowerCase();
+    const raw = (m[2] ?? '').trim();
     if (raw === '' || raw.toLowerCase() === 'null') {
       result[name] = null;
     } else {
@@ -607,11 +607,12 @@ export function checkCfgInvariantsConsistency(
   const bizMatch = tla.match(
     /BusinessInvariant\s*==\s*([\s\S]*?)(?=\n\s*====|\n\s*[A-Z][\w]*\s*==)/,
   );
-  if (bizMatch) {
+  if (bizMatch && bizMatch[1]) {
     const invRegex = /\/\\\s*([A-Za-z_]\w*)/g;
     let m: RegExpExecArray | null;
-    while ((m = invRegex.exec(bizMatch[1])) !== null) {
-      tlaInvariants.add(m[1]);
+    const bizContent = bizMatch[1];
+    while ((m = invRegex.exec(bizContent)) !== null) {
+      if (m[1]) tlaInvariants.add(m[1]);
     }
   }
 
@@ -650,7 +651,7 @@ export function checkCfgStructure(
   // 2. INVARIANT 行格式校验（非 `INVARIANT <Name>` 形式、但以 INVARIANT(S) 开头且无名称 → 错误）
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const line = (lines[i] ?? '').trim();
     if (
       /^INVARIANT\s+\S+/i.test(line) === false &&
       /^INVARIANTS?\s+/i.test(line) &&

@@ -20,7 +20,14 @@
 
 // ==================== 自包含类型形状 ====================
 
-export type TargetKind = 'requirement' | 'design' | 'testcase' | 'file';
+/**
+ * P2.5（第 9 轮）targetKind 枚举标准化：
+ *   - 'requirement' : phase 1 需求规格
+ *   - 'design'      : phase 2/3/4 系统/接口/详细设计
+ *   - 'code'        : phase 5 源代码（原 'file' 已废弃）
+ *   - 'test'        : phase 6/7/8 集成/系统/验收测试（原 'testcase' 已废弃）
+ */
+export type TargetKind = 'requirement' | 'design' | 'code' | 'test';
 export type ScoringMethod = 'logits' | 'text-parse';
 export type QualityLevel = 'A' | 'B' | 'C' | 'D';
 
@@ -77,14 +84,14 @@ export const SUB_CRITERIA: Record<TargetKind, Array<{ name: string; weight: numb
     { name: 'feasibility', weight: 0.15 },
     { name: 'testability', weight: 0.15 },
   ],
-  testcase: [
+  test: [
     { name: 'coverage', weight: 0.30 },
     { name: 'correctness', weight: 0.25 },
     { name: 'independence', weight: 0.20 },
     { name: 'clarity', weight: 0.15 },
     { name: 'priority-reasonableness', weight: 0.10 },
   ],
-  file: [
+  code: [
     { name: 'correctness', weight: 0.30 },
     { name: 'security', weight: 0.20 },
     { name: 'readability', weight: 0.15 },
@@ -217,9 +224,10 @@ export function checkVerifierOutput(
   }
 
   const targetKind = meta.targetKind as string;
-  const allowedKinds: TargetKind[] = ['requirement', 'design', 'testcase', 'file'];
+  // P2.5（第 9 轮）targetKind 枚举标准化：'testcase'/'file' 已废弃
+  const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test'];
   if (!allowedKinds.includes(targetKind as TargetKind)) {
-    reasons.push(`meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}`);
+    reasons.push(`meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`);
     return {
       passed: false,
       reasons,
@@ -347,6 +355,34 @@ export function checkVerifierOutput(
       }
     }
 
+    // P3.10（第 9 轮）rawScores 完美等差数列（公差 0.01）检测。
+    // 仅 text-parse 模式执行：text-parse 来源于文本解析，不应形成完美等差数列；
+    // logits 模式天然可能产生等差分布（如 [0.89,0.90,0.91]），故豁免。
+    if (
+      scoringMethod === 'text-parse' &&
+      Array.isArray(sc.rawScores) &&
+      sc.rawScores.length >= 3
+    ) {
+      const numericScores = sc.rawScores.filter(isNumber) as number[];
+      if (numericScores.length === sc.rawScores.length) {
+        const sorted = [...numericScores].sort((a, b) => a - b);
+        const diff = sorted[1]! - sorted[0]!;
+        let isArithmetic = diff > 0;
+        for (let k = 2; k < sorted.length; k++) {
+          const curDiff = sorted[k]! - sorted[k - 1]!;
+          if (Math.abs(curDiff - diff) > 1e-9) {
+            isArithmetic = false;
+            break;
+          }
+        }
+        if (isArithmetic && Math.abs(diff - 0.01) < 1e-9) {
+          reasons.push(
+            `维度 ${dimName} 的 rawScores 为完美等差数列 [${numericScores.join(',')}]（公差 0.01），疑似构造数据`,
+          );
+        }
+      }
+    }
+
     // 防漂移规则 3（§3.2.1）：text-parse ±0.05 扰动范围须 ∈ [0.01, 0.10]。
     // > 0.10 → fail（reasons）；< 0.01 → 警告（reworkHints）。logits 模式豁免（规则 4）。
     if (
@@ -377,6 +413,7 @@ export function checkVerifierOutput(
   // 子标准集合必须与 §7 定义完全匹配（名称 + 权重）
   for (let i = 0; i < expected.length; i++) {
     const exp = expected[i];
+    if (!exp) continue;
     const act = subCriteria[i] as Record<string, unknown> | undefined;
     if (!act) continue;
     if (act.name !== exp.name) {

@@ -258,7 +258,7 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 ## 校验脚本
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>]
+npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>] [--keep-states]
 ```
 
 退出码 `0=通过 / 1=失败 / 2=输入错误`。stdout 末尾输出 `TLA_JSON {...}` 供 Agent 解析。
@@ -271,6 +271,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
 | `--spec=<id>` | 只校验单个规格（调试用） |
 | `--skip-tlc` | 只跑文件头 + 层次 + SANY 语法检查，跳过 TLC（阶段门放行前不可跳过） |
 | `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §10）；未提供时跳过覆盖率校验 |
+| `--keep-states` / `-k` | **第 9 轮 P3.8**：保留 TLC `states/` 目录用于调试（默认校验后自动清理） |
 
 ### 校验步骤（G 子代理执行）
 
@@ -300,9 +301,51 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
      | 不变式违反 | `Error: Invariant <Inv> is violated.` |
      | 状态爆炸 | `out of memory` / `states ... exceeds ... exceeded` / `too many` |
 8. **汇总**：零违反才 `passed=true`。
+9. **states 自动清理**（第 9 轮 P3.8，校验后）：见下方「TLA+ states 目录自动清理」节。
 
 > **编码调试顺序（硬约束）**：先清轨迹 → SANY 语法通过 → 才允许跑 TLC。违反命中反模式 #14。
 > **.cfg 模式选择**：`SPECIFICATION Spec` 使用 `[Next]_vars` 带 stuttering，可避免终态被误报为死锁；`INIT Init` + `NEXT Next` 不带 stuttering，终态会触发死锁。建模时通常用 `SPECIFICATION Spec`，仅在刻意要检测终态死锁时才用 `INIT/NEXT`。
+
+### TLA+ states 目录自动清理（第 9 轮 P3.8）
+
+> TLA+ 校验完成后必须清理 `<tla-dir>/states/` 目录，避免状态文件残留污染仓库。第 8 轮调测发现 demo 项目 `w-model-dev-demo/tla/states/` 累积 229 个残留文件（多轮 TLC 校验产物未清理），第 9 轮将其硬约束化为脚本默认行为。
+
+**`check-tla-model.ts` 行为**（第 9 轮 P3.8 已实施）：
+
+- **默认清理**：TLC 校验完成后自动清理所有已校验 spec 的 `states/` 子目录（每个 spec 独立清理）
+  - 实现细节：脚本遍历 `manifest.specs[]`，对每个 spec 解析 `tlaPath` 所在目录，删除其下 `states/` 目录（含全部 `<YY-MM-DD-HH-MM-SS>/` 时间戳子目录及 `.st` / `.fp` 文件）
+  - 日志输出：`✓ P3.8 已清理 TLA+ states 目录（<N> 个 spec 目录）`
+- **`--keep-states` / `-k` 参数**：调试场景下保留 `states/` 用于排查
+  - 日志输出：`⚠ --keep-states 已启用，未清理 states 目录（调试模式）`
+  - 适用场景：TLC 报死锁 / 不变式违反时，开发者需要检查 `states/` 中的反例轨迹文件定位具体状态转移
+- **与步骤 5 的关系**：步骤 5 是「校验前清理」（避免旧轨迹干扰本轮 TLC），P3.8 是「校验后清理」（避免本轮产物残留）。两者互补，共同保证仓库洁净。
+
+**手动清理脚本**（适用于历史残留清理或 CI 流水线）：
+
+```bash
+# 项目根目录运行，清理 w-model-dev-demo/tla/states/ 残留
+npm run clean:tla-states
+```
+
+对应 `package.json` scripts：
+
+```json
+{
+  "scripts": {
+    "clean:tla-states": "node -e \"require('fs').rmSync('w-model-dev-demo/tla/states', {recursive: true, force: true})\""
+  }
+}
+```
+
+> 项目可将上述 script 加入 `package.json`，或直接使用 `Remove-Item -Recurse -Force w-model-dev-demo/tla/states`（PowerShell）/ `rm -rf w-model-dev-demo/tla/states`（bash）等价命令。
+
+**校验**（第 9 轮 Part C 验收）：
+
+- `check-tla-model.ts` 默认运行（无 `--keep-states`）后，`<tla-dir>/states/` 目录应不存在或为空
+- `--keep-states` 运行后，`<tla-dir>/states/` 目录应保留，含 TLC 产物
+- 第八轮 demo 残留 229 个文件由 Part C Task C2 集中清理，第 9 轮后不再产生新残留
+
+> 与 `.gitignore` 的配合：项目应在 `.gitignore` 中排除 `tla/states/` 目录，避免 TLC 产物误提交。第 9 轮 Part A Task A7 已增加 `coverage/.tmp/` 排除规则，`tla/states/` 排除规则由项目自行维护（不同项目 `<tla-dir>` 路径不同，技能包不强制约定）。
 
 ## 阶段产出契约
 

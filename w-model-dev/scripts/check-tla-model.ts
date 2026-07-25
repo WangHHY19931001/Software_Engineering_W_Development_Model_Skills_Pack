@@ -8,7 +8,7 @@
  *   （死锁 / 不变式违反 / 状态爆炸）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>]
+ *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>] [--keep-states]
  *
  * 参数：
  *   tla-manifest.json   manifest 文件路径
@@ -16,6 +16,7 @@
  *   --spec=<id>          仅对该规格执行 SANY/TLC（调试用；结构/层次校验仍覆盖全部 phase 内规格）
  *   --skip-tlc           只跑文件头 + 层次一致性 + SANY 语法检查，跳过 TLC（阶段门放行前不可跳过）
  *   --graph=<graph.json> 提供图谱文件，提取 type=SD 节点 ID 供 SD 覆盖率校验（§10）
+ *   --keep-states / -k   P3.8：保留 TLC states 目录用于调试（默认校验后自动清理）
  *
  * 退出码：
  *   0  校验通过（环境就绪 + 头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反）
@@ -47,6 +48,8 @@ interface ParsedArgs {
   specId: string | undefined;
   skipTlc: boolean;
   graphFile: string | undefined;
+  /** P3.8（第 9 轮）--keep-states：保留 states 目录用于调试 */
+  keepStates: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -55,11 +58,14 @@ function parseArgs(argv: string[]): ParsedArgs {
   const phaseArg = args.find(a => a.startsWith('--phase='));
   const specArg = args.find(a => a.startsWith('--spec='));
   const skipTlc = args.includes('--skip-tlc');
+  // P3.8（第 9 轮）--keep-states / -k：调试模式下保留 TLC 产物
+  const keepStates = args.includes('--keep-states') || args.includes('-k');
   const graphArg = args.find(a => a.startsWith('--graph='));
 
   let phase: number | undefined;
   if (phaseArg) {
-    phase = Number.parseInt(phaseArg.split('=')[1], 10);
+    const phaseStr = phaseArg.split('=')[1];
+    phase = phaseStr !== undefined ? Number.parseInt(phaseStr, 10) : undefined;
   }
 
   let specId: string | undefined;
@@ -69,7 +75,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   const graphFile = graphArg ? graphArg.split('=')[1] : undefined;
 
-  return { manifestFile, phase, specId, skipTlc, graphFile };
+  return { manifestFile, phase, specId, skipTlc, graphFile, keepStates };
 }
 
 // ==================== 环境检查 ====================
@@ -80,12 +86,16 @@ function parseArgs(argv: string[]): ParsedArgs {
  */
 function parseJavaMajorVersion(stderr: string): number | null {
   const m = stderr.match(/version\s+"([0-9._]+)"/i);
-  if (!m) return null;
+  if (!m || m[1] === undefined) return null;
   const parts = m[1].split(/[._]/);
-  const first = Number.parseInt(parts[0], 10);
+  const firstStr = parts[0];
+  if (firstStr === undefined) return null;
+  const first = Number.parseInt(firstStr, 10);
   if (Number.isNaN(first)) return null;
   if (first === 1 && parts.length > 1) {
-    const second = Number.parseInt(parts[1], 10);
+    const secondStr = parts[1];
+    if (secondStr === undefined) return null;
+    const second = Number.parseInt(secondStr, 10);
     return Number.isNaN(second) ? null : second;
   }
   return first;
@@ -293,11 +303,11 @@ function runTools(
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  const { manifestFile, phase: phaseArg, specId, skipTlc, graphFile } = parseArgs(process.argv);
+  const { manifestFile, phase: phaseArg, specId, skipTlc, graphFile, keepStates } = parseArgs(process.argv);
 
   if (!manifestFile) {
     console.error(
-      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>]',
+      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>] [--keep-states]',
     );
     process.exit(2);
   }
@@ -468,6 +478,27 @@ async function main(): Promise<void> {
   for (const hv of headerViolations) result.violations.push(hv);
   for (const ee of env.errors) result.violations.push(`环境错误：${ee}`);
   result.passed = result.environmentOk && result.violations.length === 0;
+
+  // ==================== P3.8（第 9 轮）states 自动清理（校验后） ====================
+  // 默认在 TLC 校验完成后自动清理 states/ 目录，避免状态文件残留污染仓库。
+  // --keep-states / -k：调试模式下保留 states 用于排查。
+  if (!keepStates) {
+    let cleanedCount = 0;
+    for (const spec of specs) {
+      if (!spec || typeof spec !== 'object' || typeof spec.id !== 'string') continue;
+      if (typeof spec.phase === 'number' && spec.phase > phase) continue;
+      if (specId !== undefined && spec.id !== specId) continue;
+      const tlaAbs = path.resolve(baseAbs, spec.tlaPath);
+      const tlaDir = path.dirname(tlaAbs);
+      const deleted = await cleanTraceFiles(tlaDir);
+      if (deleted.length > 0) cleanedCount++;
+    }
+    if (cleanedCount > 0) {
+      console.log(`✓ P3.8 已清理 TLA+ states 目录（${cleanedCount} 个 spec 目录）`);
+    }
+  } else {
+    console.log('⚠ --keep-states 已启用，未清理 states 目录（调试模式）');
+  }
 
   // ==================== 报告输出 ====================
   console.log('═'.repeat(60));

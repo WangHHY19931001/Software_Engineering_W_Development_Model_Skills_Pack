@@ -67,6 +67,8 @@ interface GateCase {
   expectedPassed: boolean;
   expectedReasonPatterns?: RegExp[];
   description: string;
+  /** P1.1 阶段级校验选项：传入时按对应 phase 校验，未传时默认 phase=8（终检） */
+  phaseOption?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -147,6 +149,25 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/扰动.*> 0\.10/],
     description: 'text-parse 扰动范围 0.45 > 0.10，应被防漂移规则 3 拦截',
   },
+  // -------------------- P2.4/P2.5/P3.10 verifier 标准化校验（第 9 轮） --------------------
+  {
+    file: 'bad-targetkind.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/targetKind.*testcase/],
+    description: 'P2.5 targetKind=testcase 已废弃，应被枚举校验拦截',
+  },
+  {
+    file: 'bad-subcriteria-name.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/应为.*fake-criterion/],
+    description: 'P2.4 subCriteria 名称 fake-criterion 不在 test 标准集合内，应被命名校验拦截',
+  },
+  {
+    file: 'bad-rawscores-constant.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/rawScores 全同/],
+    description: 'P3.10 coverage 维度 rawScores 全同 [0.90,0.90,0.90]，应被防漂移规则 1 拦截',
+  },
 ];
 
 const GATE_CASES: GateCase[] = [
@@ -190,6 +211,46 @@ const GATE_CASES: GateCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/executionSummary 字段缺失/],
     description: 'RTM 缺 executionSummary，应被结构校验拦截而非抛 TypeError',
+  },
+  // -------------------- P1.1 阶段级校验（第 9 轮） --------------------
+  {
+    file: 'valid-phase6.json',
+    expectedPassed: true,
+    phaseOption: 6,
+    description: 'P1.1 phase=6 合法：unit+integration 通过，system/acceptance pending 合理跳过',
+  },
+  {
+    file: 'bad-phase6-pending-system.json',
+    expectedPassed: false,
+    phaseOption: 6,
+    expectedReasonPatterns: [/REQ-001.*integrationTest/],
+    description: 'P1.1 phase=6 REQ 缺 integrationTest 字段应失败',
+  },
+  {
+    file: 'bad-phase5-missing-codemodule.json',
+    expectedPassed: false,
+    phaseOption: 5,
+    expectedReasonPatterns: [/REQ-001.*codeModule/],
+    description: 'P1.1 phase=5 REQ 缺 codeModule 应失败',
+  },
+  {
+    file: 'bad-phase5-missing-codemodule.json',
+    expectedPassed: false,
+    phaseOption: 8,
+    expectedReasonPatterns: [/REQ-001.*codeModule/],
+    description: 'P1.1 phase=5 bad 样本在 phase=8 终检也应失败',
+  },
+  {
+    file: 'valid-phase6.json',
+    expectedPassed: false,
+    phaseOption: 8,
+    expectedReasonPatterns: [/待执行/],
+    description: 'P1.1 phase=6 合法场景在 phase=8 终检应失败（system/acceptance pending）',
+  },
+  {
+    file: 'valid-phase6.json',
+    expectedPassed: false,
+    description: 'P1.1 未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）',
   },
 ];
 
@@ -714,7 +775,10 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
-    const r = checkArtifactGate(parsed as never);
+    // P1.1 阶段级校验：传入 phaseOption 时按对应 phase 校验
+    const r = c.phaseOption
+      ? checkArtifactGate(parsed as never, { phaseOption: c.phaseOption })
+      : checkArtifactGate(parsed as never);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
@@ -726,8 +790,9 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
       details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
     }
 
+    const phaseTag = c.phaseOption ? `[p${c.phaseOption}]` : '';
     results.push({
-      name: `gate/${c.file}`,
+      name: `gate/${c.file}${phaseTag}`,
       passed: details.length === 0,
       description: c.description,
       details: details.length > 0 ? details : undefined,

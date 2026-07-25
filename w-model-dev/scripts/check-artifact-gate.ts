@@ -28,15 +28,65 @@ import * as path from 'node:path';
 import {
   checkArtifactGate,
   type GateGraph,
+  type PhaseOption,
   type RTMMatrixShape,
 } from './gate-logic.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
-const GRAPH_RELATIVE_PATH = path.join('.w-model', 'ingestion', 'graph.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
 
+// ==================== --phase 参数解析（P1.1） ====================
+/**
+ * 解析 --phase=N 或 --phase N 参数。
+ * 返回 undefined 表示未传（默认终检 phase=8，向后兼容）。
+ * 非法值（非 1-8）退出码 2。
+ */
+function parsePhaseArg(argv: string[]): PhaseOption | undefined {
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === undefined) continue;
+    if (arg === '--phase' || arg === '-p') {
+      const next = argv[i + 1] ?? '';
+      const val = parseInt(next, 10);
+      if (val >= 1 && val <= 8) return val as PhaseOption;
+      console.error(`✗ --phase 参数非法: ${next}（须 1-8）`);
+      process.exit(2);
+    }
+    const eqMatch = arg.match(/^--phase=(\d+)$/);
+    if (eqMatch) {
+      const digits = eqMatch[1] ?? '';
+      const val = parseInt(digits, 10);
+      if (val >= 1 && val <= 8) return val as PhaseOption;
+      console.error(`✗ --phase 参数非法: ${digits}（须 1-8）`);
+      process.exit(2);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 解析位置参数：第一个不以 -- 开头的参数为 project-dir。
+ * 兼容 --phase=N 出现在任意位置的场景。
+ */
+function parseProjectDir(argv: string[]): string {
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === undefined) continue;
+    if (arg.startsWith('--')) {
+      // 跳过 --phase N 形式的值
+      if ((arg === '--phase' || arg === '-p') && i + 1 < argv.length) {
+        i++;
+      }
+      continue;
+    }
+    return arg;
+  }
+  return process.cwd();
+}
+
 async function main(): Promise<void> {
-  const projectDir = process.argv[2] ?? process.cwd();
+  const phaseOption = parsePhaseArg(process.argv);
+  const projectDir = parseProjectDir(process.argv);
   const rtmFile = path.resolve(projectDir, RTM_RELATIVE_PATH);
 
   let raw: string;
@@ -61,21 +111,32 @@ async function main(): Promise<void> {
   }
 
   // ==================== TLA+ 资产读取（spec §3.4.4） ====================
-  // 1. 读取 graph.json（若存在），用于 SD→codeModule 映射校验
-  const graphFile = path.resolve(projectDir, GRAPH_RELATIVE_PATH);
+  // P2.6 graph 资产自动发现：按优先级查找 .w-model/ingestion/ 下的 graph 资产
+  const ingestionDir = path.resolve(projectDir, '.w-model', 'ingestion');
+  const graphCandidates = [
+    path.join(ingestionDir, 'graph.json'),
+    path.join(ingestionDir, 'consolidated-phase4.json'),
+    path.join(ingestionDir, 'consolidated-phase3.json'),
+    path.join(ingestionDir, 'consolidated-phase2.json'),
+    path.join(ingestionDir, 'consolidated-phase1.json'),
+  ];
   let graph: GateGraph | undefined;
-  try {
-    const graphRaw = await fs.readFile(graphFile, 'utf-8');
-    const graphParsed = JSON.parse(graphRaw) as GateGraph;
-    if (graphParsed && Array.isArray(graphParsed.nodes)) {
-      graph = graphParsed;
+  let graphSource = '';
+  for (const candidate of graphCandidates) {
+    try {
+      const graphRaw = await fs.readFile(candidate, 'utf-8');
+      const graphParsed = JSON.parse(graphRaw) as GateGraph;
+      if (graphParsed && Array.isArray(graphParsed.nodes)) {
+        graph = graphParsed;
+        graphSource = path.basename(candidate);
+        break;
+      }
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code !== 'ENOENT') {
+        console.error(`⚠ ${path.basename(candidate)} 读取失败（忽略）: ${e.message}`);
+      }
     }
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') {
-      console.error(`⚠ graph.json 读取失败（忽略，跳过 SD→codeModule 校验）: ${e.message}`);
-    }
-    // ENOENT 时静默跳过（graph 为可选输入）
   }
 
   // 2. 检查 tla-manifest.json 存在性 + specs 非空
@@ -95,8 +156,8 @@ async function main(): Promise<void> {
     // ENOENT 或解析失败 → manifestExists 保持 false
   }
 
-  // 调用纯逻辑校验（传入 graph + manifestExists，启用 TLA+ 资产校验）
-  const result = checkArtifactGate(matrix, { graph, manifestExists });
+  // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption，启用 TLA+ 资产校验与阶段分层）
+  const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption });
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -104,10 +165,11 @@ async function main(): Promise<void> {
   console.log('═'.repeat(60));
   console.log(`项目目录      : ${projectDir}`);
   console.log(`RTM 文件      : ${rtmFile}`);
+  console.log(`校验阶段      : phase=${phaseOption ?? 8}${phaseOption ? '（阶段级）' : '（终检，默认）'}`);
   console.log(`RTM 覆盖率    : ${result.coveragePercent}%`);
   console.log(`单元覆盖率    : ${result.unitCoveragePercent}%`);
   console.log(`TLA+ 资产     : ${manifestExists ? '✓ manifest 存在且 specs 非空' : '✗ manifest 缺失或 specs 为空'}`);
-  console.log(`graph 资产    : ${graph ? `✓ 加载（${graph.nodes.length} 节点）` : '⚠ 未提供（跳过 SD→codeModule 校验）'}`);
+  console.log(`graph 资产    : ${graph ? `✓ ${graphSource}（${graph.nodes.length} 节点）` : '⚠ 未发现任何 graph 资产'}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 

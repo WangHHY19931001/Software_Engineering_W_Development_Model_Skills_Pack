@@ -137,6 +137,24 @@ npm run hill-climbing                           # （编排者 O 执行）L2+ �
 
 > 第八轮（2026-07-25）相比第七轮（门禁增强）：本轮验证增强后门禁在 25 需求全量重跑下的端到端可用性。需求 21→25、DD 29→51、TLA+ 13→17（新增 L4 层级 3 个）、图谱节点 76→216、边 396→902。全量测试 354→386（单元 209→226、集成 43→40、系统 53→64、验收 49→56）。过程中修复 4 个源码 bug（push.service retry break→continue、article.store getById 副本、blogger.service follow 幂等、auth.service 预哈希校验）。所有门禁退出码 0。**用户已于 2026-07-25 在 acceptance-test-report.md §9 勾选 `confirm` 归档，project.json status 更新为「项目完成」，rtm.json currentPhase=9，run-log.jsonl 追加 wm8-r012 归档 checkpoint 条目。**
 
+- **第九轮：门禁与流程细化修正结论**（2026-07-25）：
+
+| 指标 | 数值 |
+|---|---|
+| 触发 | 第 8 轮 25 需求端到端调测归档后识别 11 个问题（P1×3 + P2×4 + P3×4） |
+| 修正方案 | 方案 A 全量修正 11 个问题 |
+| 脚本改动 | 5 个（gate-logic.ts / check-artifact-gate.ts / verifier-logic.ts / check-tla-model.ts / code-tla-logic.ts） |
+| 新增 fixture | 6 个（gate/valid-phase6 + bad-phase6-pending-system + bad-phase5-missing-codemodule；verifier/bad-targetkind + bad-subcriteria-name + bad-rawscores-constant） |
+| reference 文档 | 7 个（phase-1 / phase-5 / subagent-delegation / subagent-persona-matrix / verifier-spec / tla-plus-guide / SKILL） |
+| 顶层文档 | 3 个（SSoT §3.4.7 + AGENTS.md §4 + CHANGELOG.md） |
+| demo 修正 | phase6/7 verifier-output 标准化（targetKind testcase→test + rawScores 自然波动） |
+| 工程清理 | tla/states/ 229 文件 + coverage/.tmp/ 排除规则 |
+| self-test | 基线 82→91（+9 新测试）全通过 |
+| TypeScript strict | 0 错误 |
+| 门禁验证 | check-verifier-output phase6/7 exitCode=0；check-artifact-gate --phase=6/7/8 exitCode=0 |
+
+> 第九轮（2026-07-25）相比第八轮（端到端调测）：门禁从「终检一次性否决」进化为「阶段级渐进式校验」（P1.1 phaseOption）；verifier 从「自由命名」进化为「4 targetKind × 5 项标准颗粒度」（P2.4/P2.5，保留 §7.1-§7.5 既有结构，不按 8 阶段细分）；子代理从「边界模糊」进化为「立即执行 + S/R 职责分明」（P1.3 反模式 #20 + P2.7 修改边界）。TLA+ 工程化增强：states 自动清理（P3.8）+ Next 分支覆盖扩展至全部 specs（P3.9）。verifier 防漂移增强：rawScores 全同检测 + 完美等差数列检测 + 扰动范围校验（P3.10）。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：

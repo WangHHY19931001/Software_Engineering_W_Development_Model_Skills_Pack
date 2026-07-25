@@ -3,6 +3,59 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [9.0.0] - 2026-07-25
+
+### 第 9 轮门禁与流程细化修正
+
+基于第 8 轮 25 需求端到端调测归档后识别的 11 个问题（P1×3 + P2×4 + P3×4）全量修正。
+
+#### 新增
+
+- **P1.1 阶段级工件校验**：check-artifact-gate.ts `--phase=N` 参数，按阶段分层校验测试汇总和 RTM 字段（phase 5/6/7/8 渐进式，默认 8 终检向后兼容）
+- **P2.6 graph 自动发现**：check-artifact-gate.ts 自动查找 `.w-model/ingestion/` 下 graph 资产（graph.json → consolidated-phase4.json → … → consolidated-phase1.json）
+- **P2.4 subCriteria 标准模板**：4 targetKind × 5 项标准颗粒度（保留 §7.1-§7.5 既有结构，不按 8 阶段细分；阶段推断通过 targetKind 实现）
+- **P2.5 targetKind 枚举**：`requirement` | `design` | `code` | `test`，`testcase`/`file` 已废弃
+- **P3.8 TLA+ states 自动清理**：check-tla-model.ts `--keep-states`（`-k`）参数，默认校验后自动清理 states/ 目录
+- **P3.9 Next 分支覆盖扩展**：code-tla-logic.ts 维度 3 遍历 tla-manifest 全部 specs（旧实现仅 L4）
+- **P3.10 rawScores 合理性校验**：不得全相同（防复制填入）；text-parse 模式不得为完美等差数列（公差 0.01）；扰动范围 ∈ [0.01, 0.10]
+- **P3.11 coverage/.tmp 清理**：w-model-dev-demo/.gitignore 排除 + vitest coverage.clean=true
+- 6 新 fixture：gate/valid-phase6 + bad-phase6-pending-system + bad-phase5-missing-codemodule；verifier/bad-targetkind + bad-subcriteria-name + bad-rawscores-constant
+- 9 新 self-test（基线 82→91）：P1.1 阶段级校验 ×6 + P2.4/P2.5/P3.10 verifier 标准化 ×3
+
+#### 变更
+
+- gate-logic.ts: checkArtifactGate 增加 phaseOption 参数 + PHASE_TEST_LAYERS / PHASE_TRACE_FIELDS 阶段分层 + NFR/CON 横切行阶段递进校验
+- check-artifact-gate.ts: 增加 --phase 参数解析 + graph 资产自动发现 + 日志增强
+- verifier-logic.ts: 增加 targetKind 枚举校验 + subCriteria 名称/数量/权重严格匹配 + rawScores 全同/等差数列/扰动范围校验
+- check-tla-model.ts: 增加 --keep-states 参数 + states 目录自动清理
+- code-tla-logic.ts: 维度 3 从仅遍历 L4 specs 扩展为遍历 manifest 全部 specs
+- subagent-delegation.md: 反模式 #20（只规划不执行）+ S 子代理修改既有产物边界（S 新增 / R 修复 / 紧急修复 run-log 记录）
+- subagent-persona-matrix.md: S 子代理"立即执行"约束 + R 子代理"修复既有产物"职责强化
+- phase-1-requirements.md: NFR/CON 横切 designDoc 字段登记要求
+- phase-5-coding.md: NFR/CON codeModule 回填要求
+- verifier-spec.md: §2.2 targetKind 枚举规范 + §2.3 4 targetKind × 5 项 subCriteria 标准模板
+- tla-plus-guide.md: states 自动清理约定 + --keep-states 调试模式
+- SKILL.md: 阶段 5/6/7 门禁 --phase 参数说明 + 阶段级 G 门禁推荐命令
+- SSoT §3.4.7: 第 9 轮 11 项约束条款
+- AGENTS.md §4: 第 9 轮修正结论（含指标表 + 与第八轮对比）
+- w-model-dev-demo/.gitignore: 增加 coverage/.tmp/ 排除规则
+
+#### 修复
+
+- 第八轮 demo phase6 verifier-output targetKind "testcase" → "test"
+- 第八轮 demo phase7 verifier-output targetKind "testcase" → "test"
+- 第八轮 demo phase6 verifier-output rawScores 改为自然波动（3 distinct 值，方差重算）
+- 清理 w-model-dev-demo/tla/states/ 229 个残留文件（Part A P3.8 自动清理 + Part C 验证）
+
+#### 验证
+
+- TypeScript strict 0 错误
+- self-test 91/91 全通过
+- vitest 全通过
+- check-verifier-output phase6/7 exitCode=0
+- check-artifact-gate --phase=6/7/8 在第八轮 demo 上 exitCode=0
+- tla/states/ 已清理
+
 ## [2026-07-25] 第八轮 W 模型 25 需求端到端调测
 
 > 2026-07-25 第八轮 W 模型调测：扩展博客系统后端 25 需求（17 REQ + 5 NFR + 3 CON），全量删除 w-model-dev-demo 产物后从零重跑完整 8 阶段，验证第七轮门禁增强在 25 需求全量场景下的端到端可用性。

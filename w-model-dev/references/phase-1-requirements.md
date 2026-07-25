@@ -83,6 +83,27 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中登记：需求 ID、需求描述、验收测试列。其余列（设计文档 / 代码模块 / 单元 / 集成 / 系统测试）留待后续阶段填充。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+### NFR/CON 横切治理字段登记（第 9 轮 P1.2）
+
+> NFR（非功能需求）与 CON（技术约束）的 RTM 字段登记要求。横切治理类需求在阶段 1 完成 `designDoc` 字段登记，避免阶段 5 编码后才发现"未挂载到任何 SD 子系统"。
+
+**字段登记要求**：
+
+| 行类型 | `designDoc` 登记要求 | 示例值 |
+|---|---|---|
+| `NFR-001~005` | 须登记横切 SD 清单（多 SD 用逗号分隔），表示该 NFR 横切治理哪些 SD 子系统 | `"SD-001,SD-004,SD-007"` |
+| `CON-001~003` | 须登记 `designDoc="横切"`（无具体 SD 映射时填"横切"标识，表示为全局技术约束） | `"横切"` |
+
+**其他字段约定**：
+
+- `detailedDesign`：NFR/CON 行可填 `"横切"`（无具体 DD 映射），待阶段 2–4 设计细化后再补充具体 DD-xxx。
+- `codeModule`：阶段 1 留空，由阶段 5 回填（详见 [phase-5-coding.md](phase-5-coding.md)「NFR/CON codeModule 回填」节）。
+- `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`：NFR/CON 行可填对应测试用例 ID 或 `null`（横切测试在阶段 5–8 补充）。
+
+**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，回到阶段 1 补登记。
+
+> 与 REQ 行的差别：REQ 行在阶段 1 登记时 `designDoc` 可暂留空（待阶段 2 系统设计后映射到 SD-xxx）；NFR/CON 行**必须在阶段 1 完成横切登记**，因为 NFR/CON 是横切治理类需求，不挂在具体 SD 上会丢失治理关系。
+
 ## 验收标准
 
 - [ ] 需求规格说明书符合模板规范
