@@ -478,6 +478,29 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 - 阶段 5：票据拆解优先 prefactor；Wide refactor 必走 expand-contract
 - 不全量补建历史 RTM/TLA+，不重构无关历史代码（约束 5 协同）
 
+#### 3.4.9 第 11 轮外部技能吸收（2026-07-26）
+
+> 吸收 `claude-tla-plus-plugin` 的 4 份 skill 资料与 review 命令语义，以"阶段内强化 + 纯文档"方式融入 TLA+ 子流程。不新增脚本、不新增子流程、不新增约束。
+
+**吸收内容**：
+- 新建 4 份 TLA+ 参考文件：`tla-plus-syntax-reference.md` / `tla-plus-patterns-examples.md` / `tla-plus-tlc-configuration.md` / `tla-plus-review-checklist.md`
+- 修订 `tla-plus-guide.md` 新增 §13 索引节 + S-tla/V-tla 加载矩阵
+- 修订 `verifier-spec.md` §7.2 补「TLA+ 审查参考清单」引用（不新增 targetKind 枚举值）
+- 修订 `SKILL.md` 阶段路由表 TLA+ 行补参考文件引用
+
+**加载矩阵**（遵循约束 #6「按需加载」）：
+
+| 角色/阶段 | 必读 | 按场景 |
+|---|---|---|
+| S-tla 阶段 1（L1） | syntax-reference | patterns §KV |
+| S-tla 阶段 2-3（L2/L3） | syntax-reference | patterns §Bakery/Producer-Consumer + tlc-configuration |
+| S-tla 阶段 4（L3/L4） | syntax-reference | patterns §Consensus/Two-Phase Commit + tlc-configuration |
+| V-tla 全阶段 | review-checklist | syntax-reference |
+
+**不新增约束的依据**：现有反模式 #15-17（TLA+ 占位/简化/错误实现、建模不符合需求设计）已覆盖吸收内容的合规边界。4 份参考文件是参考资料，不是新约束。
+
+详见 `w-model-dev/references/tla-plus-guide.md` §13。
+
 ---
 
 ## 4. 技能工作流程
