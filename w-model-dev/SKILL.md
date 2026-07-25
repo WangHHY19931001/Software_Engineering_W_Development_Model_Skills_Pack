@@ -79,7 +79,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills`，适配 W 模型语境。与「不可违反的约束」互补：约束是硬红线（命中即回退），操作行为是日常准则（违反不回退但降低质量）。SSoT §4A 为权威定义。
 
-### 六条操作行为
+### 七条操作行为
 
 | # | 行为 | 在 W 模型中的具体表现 |
 |---|---|---|
@@ -89,6 +89,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 4 | **Enforce Simplicity** | 编码前自问「能否更少行？抽象是否物有所值？」；1000 行能 100 行完成即失败 |
 | 5 | **Maintain Scope Discipline** | 只动该动的；不删看不懂的注释 / 不顺手清理无关代码 / 不重构相邻系统 / 不加规格外功能 |
 | 6 | **Verify, Don't Assume** | 每阶段须有验证证据（测试退出码 / 脚本输出 / 运行时数据）；「看起来对」永远不够 |
+| 7 | **Choose Highest Seam** | 阶段 2-4 测试设计前置时优先选现有最高 seam；理想零新 seam；私有状态机转移由 TLA+ 不变式覆盖 |
 
 ### 失败模式清单（F1~F10）
 
@@ -135,16 +136,16 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ## 阶段路由
 
-| # | 开发阶段 | 同步/执行测试 | 必读参考 |
-|---|---|---|---|
-| 1 | 需求分析 | 验收测试设计 | [references/phase-1-requirements.md](references/phase-1-requirements.md) |
-| 2 | 系统设计 | 系统测试设计 | [references/phase-2-system-design.md](references/phase-2-system-design.md) |
-| 3 | 概要设计 | 集成测试设计 | [references/phase-3-outline-design.md](references/phase-3-outline-design.md) |
-| 4 | 详细设计 | 单元测试设计 | [references/phase-4-detailed-design.md](references/phase-4-detailed-design.md) |
-| 5 | 编码实现 | 单元测试执行 | [references/phase-5-coding.md](references/phase-5-coding.md) |
-| 6 | 集成测试 | 集成测试执行 | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
-| 7 | 系统测试 | 系统测试执行 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
-| 8 | 验收测试 | 验收测试执行 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
+| # | 开发阶段 | 同步/执行测试 | 第 10 轮外部技能吸收标记 | 必读参考 |
+|---|---|---|---|---|
+| 1 | 需求分析 | 验收测试设计 | User Stories + Out of Scope + Implementation/Testing Decisions | [references/phase-1-requirements.md](references/phase-1-requirements.md) |
+| 2 | 系统设计 | 系统测试设计 | seam 决策 | [references/phase-2-system-design.md](references/phase-2-system-design.md) |
+| 3 | 概要设计 | 集成测试设计 | seam 决策 | [references/phase-3-outline-design.md](references/phase-3-outline-design.md) |
+| 4 | 详细设计 | 单元测试设计 | seam 决策 | [references/phase-4-detailed-design.md](references/phase-4-detailed-design.md) |
+| 5 | 编码实现 | 单元测试执行 | Tracer-bullet 票据拆解 | [references/phase-5-coding.md](references/phase-5-coding.md) |
+| 6 | 集成测试 | 集成测试执行 | — | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
+| 7 | 系统测试 | 系统测试执行 | — | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
+| 8 | 验收测试 | 验收测试执行 | archive 机制 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
 
 所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。只有以下场景追加读取：
 
@@ -185,6 +186,12 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 3. 同步更新 `.w-model/rtm.json` 的需求、设计、代码与测试映射。
 4. 给出风险/缺陷等级和缓解措施。
 5. 输出阶段摘要：产物路径、RTM 覆盖状态、验证证据、阻塞项和下一步。
+6. **第 10 轮外部技能吸收三要素**（适用阶段）：
+   - 阶段 1：User Stories + Out of Scope + Implementation/Testing Decisions
+   - 阶段 2-4：测试 seam 决策（三层一致性）
+   - 阶段 5：Tracer-bullet 票据拆解（tickets.md）
+   - 阶段 8：archive 机制（changes/archive/YYYY-MM-DD-<feature>/）
+   - 详见 [references/external-skills-absorption.md](references/external-skills-absorption.md)
 
 模板按产物直接读取：
 
@@ -308,5 +315,6 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
 - [ ] `check-run-log.ts` 是否 exitCode=0
 - [ ] `check-maturity.ts` 是否 exitCode=0
 - [ ] `check-checkpoint.ts` 是否 exitCode=0
+- [ ] **上下文窗口已清理**（第 10 轮外部技能吸收）：阶段切换时 S 子代理是新会话，不继承前阶段上下文（OpenSpec context hygiene）
 
 交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。
