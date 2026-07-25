@@ -1,520 +1,343 @@
-/**
- * Express 应用入口（组装中间件 + 路由）
- *
- * 路由分组：
- * - /api/auth 注册/登录/刷新
- * - /api/users 用户资料
- * - /api/bloggers 博主
- * - /api/follow 关注
- * - /api/articles 文章
- * - /api/tags 标签
- * - /api/categories 分类
- * - /api/comments 评论
- * - /api/notifications 通知
- * - /api/site 站点
- * - /api/announcements 公告
- * - /api/stats 统计
- * - /api/ads 广告
- * - /api/recommend 推荐
- * - /api/search 搜索
- */
-import express from 'express';
-import type { Request, Response, NextFunction } from 'express';
-import { getContainer } from './container.js';
-import { authenticate, requireAuth } from './middleware/auth.js';
-import { RbacMiddleware } from './middleware/rbac.js';
-import { RateLimiter } from './middleware/rate-limiter.js';
-import { ErrorHandler } from './middleware/error-handler.js';
-import { validate } from './utils/validate.js';
-import { AppError } from './utils/errors.js';
-import { z } from 'zod';
+// Express app — wires all stores, services, controllers; registers routes.
 
-export function createApp() {
+import express, { type Express, type Request, type Response, type NextFunction } from 'express';
+import { errorHandler } from './utils/errors.js';
+
+// Stores
+import { SiteStore } from './stores/site.store.js';
+import { BloggerStore } from './stores/blogger.store.js';
+import { UserStore } from './stores/user.store.js';
+import { ArticleStore } from './stores/article.store.js';
+import { CommentStore } from './stores/comment.store.js';
+import { NotificationStore } from './stores/notification.store.js';
+import { FileStore } from './stores/file.store.js';
+import { SubscriptionStore } from './stores/subscription.store.js';
+import { WsStore } from './stores/ws.store.js';
+import { BackupStore } from './stores/backup.store.js';
+import { SearchStore } from './stores/search.store.js';
+import { TagStore } from './stores/tag.store.js';
+import { CategoryStore } from './stores/category.store.js';
+import { AdStore } from './stores/ad.store.js';
+import { RecommendStore } from './stores/recommend.store.js';
+import { StatsStore } from './stores/stats.store.js';
+import { CrossReferenceStore } from './stores/crossref.store.js';
+
+// Services
+import { AuthService, UserService } from './services/auth.service.js';
+import { SiteService } from './services/site.service.js';
+import { BloggerService } from './services/blogger.service.js';
+import { ArticleService } from './services/article.service.js';
+import { CommentService } from './services/comment.service.js';
+import { NotificationService } from './services/notification.service.js';
+import { FileService } from './services/file.service.js';
+import { SubscriptionService } from './services/subscription.service.js';
+import { PushService } from './services/push.service.js';
+import { BackupService } from './services/backup.service.js';
+import { SearchService } from './services/search.service.js';
+import { TagService } from './services/tag.service.js';
+import { CategoryService } from './services/category.service.js';
+import { AdService } from './services/ad.service.js';
+import { RecommendService } from './services/recommend.service.js';
+import { StatsService } from './services/stats.service.js';
+import { CrossReferenceService } from './services/crossref.service.js';
+
+// Controllers
+import { SiteController } from './controllers/site.controller.js';
+import { BloggerController } from './controllers/blogger.controller.js';
+import { UserController } from './controllers/user.controller.js';
+import { RecommendController } from './controllers/recommend.controller.js';
+import { AdController } from './controllers/ad.controller.js';
+import { StatsController } from './controllers/stats.controller.js';
+import { SearchController } from './controllers/search.controller.js';
+import { TagController } from './controllers/tag.controller.js';
+import { CategoryController } from './controllers/category.controller.js';
+import { CommentController } from './controllers/comment.controller.js';
+import { NotificationController } from './controllers/notification.controller.js';
+import { ArticleController } from './controllers/article.controller.js';
+import { CrossReferenceController } from './controllers/crossref.controller.js';
+import { PushController } from './controllers/push.controller.js';
+import { FileController } from './controllers/file.controller.js';
+import { SubscriptionController } from './controllers/subscription.controller.js';
+import { BackupController } from './controllers/backup.controller.js';
+
+export interface AppDeps {
+  // Stores
+  siteStore: SiteStore;
+  bloggerStore: BloggerStore;
+  userStore: UserStore;
+  articleStore: ArticleStore;
+  commentStore: CommentStore;
+  notificationStore: NotificationStore;
+  fileStore: FileStore;
+  subscriptionStore: SubscriptionStore;
+  wsStore: WsStore;
+  backupStore: BackupStore;
+  searchStore: SearchStore;
+  tagStore: TagStore;
+  categoryStore: CategoryStore;
+  adStore: AdStore;
+  recommendStore: RecommendStore;
+  statsStore: StatsStore;
+  crossRefStore: CrossReferenceStore;
+  // Services
+  authService: AuthService;
+  userService: UserService;
+  siteService: SiteService;
+  bloggerService: BloggerService;
+  articleService: ArticleService;
+  commentService: CommentService;
+  notificationService: NotificationService;
+  fileService: FileService;
+  subscriptionService: SubscriptionService;
+  pushService: PushService;
+  backupService: BackupService;
+  searchService: SearchService;
+  tagService: TagService;
+  categoryService: CategoryService;
+  adService: AdService;
+  recommendService: RecommendService;
+  statsService: StatsService;
+  crossRefService: CrossReferenceService;
+}
+
+export function createDeps(): AppDeps {
+  // Stores
+  const siteStore = new SiteStore();
+  const bloggerStore = new BloggerStore();
+  const userStore = new UserStore();
+  const articleStore = new ArticleStore();
+  const commentStore = new CommentStore();
+  const notificationStore = new NotificationStore();
+  const fileStore = new FileStore();
+  const subscriptionStore = new SubscriptionStore();
+  const wsStore = new WsStore();
+  const backupStore = new BackupStore();
+  const searchStore = new SearchStore();
+  const tagStore = new TagStore();
+  const categoryStore = new CategoryStore();
+  const adStore = new AdStore();
+  const recommendStore = new RecommendStore();
+  const statsStore = new StatsStore();
+  const crossRefStore = new CrossReferenceStore();
+
+  // Wire store dependencies (SiteStore aggregates stats from other stores).
+  siteStore.setStores({
+    userStore,
+    bloggerStore,
+    articleStore,
+    commentStore,
+    fileStore,
+  });
+
+  // Services (order matters for dependency injection)
+  const authService = new AuthService(userStore);
+  const userService = new UserService(userStore, authService);
+  const siteService = new SiteService(siteStore);
+  const bloggerService = new BloggerService(bloggerStore, userStore, subscriptionStore);
+  const articleService = new ArticleService(articleStore, searchStore, userStore);
+  const commentService = new CommentService(commentStore, articleStore, siteStore);
+  const notificationService = new NotificationService(notificationStore);
+  const fileService = new FileService(fileStore, userStore);
+  const pushService = new PushService(wsStore);
+  const subscriptionService = new SubscriptionService(
+    subscriptionStore,
+    userStore,
+    bloggerStore,
+    tagStore,
+    categoryStore,
+    pushService,
+  );
+  const backupService = new BackupService(
+    backupStore,
+    userStore,
+    bloggerStore,
+    articleStore,
+    commentStore,
+    notificationStore,
+    fileStore,
+  );
+  const searchService = new SearchService(searchStore);
+  const tagService = new TagService(tagStore);
+  const categoryService = new CategoryService(categoryStore);
+  const adService = new AdService(adStore);
+  const recommendService = new RecommendService(recommendStore, articleStore, subscriptionStore);
+  const statsService = new StatsService(statsStore);
+  const crossRefService = new CrossReferenceService(crossRefStore, articleStore, tagStore);
+
+  return {
+    siteStore, bloggerStore, userStore, articleStore, commentStore,
+    notificationStore, fileStore, subscriptionStore, wsStore, backupStore,
+    searchStore, tagStore, categoryStore, adStore, recommendStore, statsStore,
+    crossRefStore,
+    authService, userService, siteService, bloggerService, articleService,
+    commentService, notificationService, fileService, subscriptionService,
+    pushService, backupService, searchService, tagService, categoryService,
+    adService, recommendService, statsService, crossRefService,
+  };
+}
+
+export function createApp(deps?: AppDeps): { app: Express; deps: AppDeps } {
+  const d = deps ?? createDeps();
+
+  // Controllers
+  const siteController = new SiteController(d.siteService, d.authService);
+  const bloggerController = new BloggerController(d.bloggerService, d.authService);
+  const userController = new UserController(d.authService, d.userService);
+  const recommendController = new RecommendController(d.recommendService, d.authService);
+  const adController = new AdController(d.adService, d.authService);
+  const statsController = new StatsController(d.statsService, d.authService);
+  const searchController = new SearchController(d.searchService, d.authService);
+  const tagController = new TagController(d.tagService, d.authService);
+  const categoryController = new CategoryController(d.categoryService, d.authService);
+  const commentController = new CommentController(d.commentService, d.authService);
+  const notificationController = new NotificationController(d.notificationService, d.authService);
+  const articleController = new ArticleController(d.articleService, d.authService);
+  const crossRefController = new CrossReferenceController(d.crossRefService);
+  const pushController = new PushController(d.pushService, d.authService);
+  const fileController = new FileController(d.fileService, d.authService);
+  const subscriptionController = new SubscriptionController(d.subscriptionService, d.authService);
+  const backupController = new BackupController(d.backupService, d.authService);
+
   const app = express();
-  const c = getContainer();
+  app.use(express.json({ limit: '15mb' }));
 
-  app.use(express.json({ limit: '1mb' }));
-  app.use(authenticate);
-
-  // 限流：每 IP 每分钟 60 次
-  app.use(RateLimiter.rateLimit({ windowMs: 60_000, max: 60 }));
-
-  // ============ /api/auth ============
-  const RegisterSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(8).max(128),
-    nickname: z.string().min(1).max(50),
-    role: z.enum(['user', 'blogger', 'admin', 'super_admin']).optional(),
-  });
-  app.post('/api/auth/register', validate(RegisterSchema), async (req, res, next) => {
-    try {
-      const result = await c.userService.register(req.body);
-      res.status(201).json(result);
-    } catch (e) { next(e); }
+  // Health check
+  app.get('/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok', ts: new Date().toISOString() });
   });
 
-  const LoginSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(1),
-  });
-  app.post('/api/auth/login', validate(LoginSchema), async (req, res, next) => {
-    try {
-      const result = await c.userService.login(req.body.email, req.body.password);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-001 Site
+  app.get('/api/site/config', siteController.getConfig);
+  app.put('/api/site/config', siteController.updateConfig);
+  app.post('/api/site/maintenance', siteController.setMaintenanceMode);
+  app.post('/api/site/announcement', siteController.scheduleAnnouncement);
+  app.get('/api/site/stats', siteController.getStatsOverview);
 
-  app.post('/api/auth/refresh', async (req, res, next) => {
-    try {
-      const { refreshToken } = req.body as { refreshToken?: string };
-      if (!refreshToken) throw new Error('refreshToken 缺失');
-      const { sign, verify, ACCESS_EXPIRES } = await import('./utils/jwt.js');
-      const payload = verify(refreshToken);
-      const accessToken = sign({ userId: payload.userId, role: payload.role }, ACCESS_EXPIRES);
-      res.json({ accessToken, expiresIn: ACCESS_EXPIRES });
-    } catch (e) { next(e); }
-  });
+  // SD-002 Blogger
+  app.post('/api/bloggers', bloggerController.register);
+  app.get('/api/bloggers/:slug', bloggerController.getBySlug);
+  app.post('/api/bloggers/:bloggerId/follow', bloggerController.follow);
+  app.delete('/api/bloggers/:bloggerId/follow', bloggerController.unfollow);
+  app.get('/api/bloggers', bloggerController.listByFollower);
 
-  // ============ /api/users ============
-  app.get('/api/users/:id', requireAuth, (req, res, next) => {
-    try {
-      const user = c.userService.getProfile(req.params.id);
-      res.json(user);
-    } catch (e) { next(e); }
-  });
+  // SD-003 User + Auth
+  app.post('/api/auth/register', userController.register);
+  app.post('/api/auth/login', userController.login);
+  app.post('/api/auth/logout', userController.logout);
+  app.get('/api/users/me', userController.me);
+  app.post('/api/users/:userId/ban', userController.ban);
+  app.post('/api/users/:userId/unban', userController.unban);
 
-  const UpdateProfileSchema = z.object({
-    nickname: z.string().min(1).max(50).optional(),
-    avatar: z.string().url().optional(),
-    bio: z.string().max(500).optional(),
-  });
-  app.patch('/api/users/:id', requireAuth, validate(UpdateProfileSchema), async (req, res, next) => {
-    try {
-      if (!req.user?.userId || req.user.userId !== req.params.id) {
-        if (req.user?.role !== 'admin' && req.user?.role !== 'super_admin') {
-          throw new AppError(40302, '所有权校验失败', { id: req.params.id, actorId: req.user?.userId });
-        }
-      }
-      const result = await c.userService.updateProfile(req.params.id, req.body);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-004 Recommend
+  app.get('/api/recommend/hot', recommendController.hot);
+  app.get('/api/recommend/personalized', recommendController.personalized);
+  app.get('/api/recommend/latest', recommendController.latest);
+  app.post('/api/recommend/slots', recommendController.setSlot);
 
-  app.post('/api/users/:id/ban', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const { reason } = req.body as { reason?: string };
-      if (!reason) throw new Error('reason 缺失');
-      const result = await c.userService.banUser(req.params.id, reason, req.user!.userId!);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-005 Ad
+  app.post('/api/ads', adController.create);
+  app.post('/api/ads/:adId/audit', adController.audit);
+  app.post('/api/ads/:adId/click', adController.recordClick);
+  app.get('/api/ads/slot/:slotId', adController.listBySlot);
 
-  app.post('/api/users/:id/unban', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const result = await c.userService.unbanUser(req.params.id, req.user!.userId!);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-006 Stats
+  app.get('/api/stats/articles', statsController.articleStats);
+  app.get('/api/stats/users', statsController.userStats);
+  app.get('/api/stats/bloggers', statsController.bloggerStats);
+  app.get('/api/stats/trend', statsController.siteTrend);
 
-  // ============ /api/bloggers ============
-  app.post('/api/bloggers', async (req, res, next) => {
-    try {
-      const result = await c.bloggerService.registerBlogger(req.body);
-      res.status(201).json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-007 Search
+  app.get('/api/search', searchController.search);
+  app.get('/api/search/suggest', searchController.suggest);
+  app.get('/api/search/history', searchController.history);
+  app.delete('/api/search/history', searchController.clearHistory);
 
-  app.get('/api/bloggers/:id', (req, res, next) => {
-    try {
-      res.json(c.bloggerService.getBloggerProfile(req.params.id));
-    } catch (e) { next(e); }
-  });
+  // SD-008 Tag
+  app.post('/api/tags', tagController.create);
+  app.post('/api/tags/:tagId/approve', tagController.approve);
+  app.post('/api/tags/:tagId/reject', tagController.reject);
+  app.post('/api/articles/:articleId/tags', tagController.bind);
+  app.delete('/api/articles/:articleId/tags', tagController.unbind);
+  app.get('/api/tags/cloud', tagController.cloud);
+  app.post('/api/tags/merge', tagController.merge);
 
-  app.get('/api/bloggers/:id/home', (req, res, next) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      res.json(c.bloggerService.getBloggerHome(req.params.id, page, size));
-    } catch (e) { next(e); }
-  });
+  // SD-009 Category
+  app.post('/api/categories', categoryController.create);
+  app.get('/api/categories/tree', categoryController.tree);
+  app.get('/api/categories/:categoryId/breadcrumb', categoryController.breadcrumb);
+  app.delete('/api/categories/:categoryId', categoryController.cascadeDelete);
+  app.post('/api/articles/:articleId/category', categoryController.bindCategory);
 
-  app.post('/api/bloggers/:id/upgrade', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const { level } = req.body as { level?: 'normal' | 'verified' | 'featured' };
-      if (!level) throw new Error('level 缺失');
-      const result = await c.bloggerService.upgradeBloggerLevel(req.params.id, level, req.user!.userId!);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-010 Comment
+  app.post('/api/articles/:articleId/comments', commentController.create);
+  app.post('/api/comments/:commentId/audit', commentController.audit);
+  app.post('/api/comments/:commentId/like', commentController.like);
+  app.post('/api/comments/:commentId/report', commentController.report);
+  app.get('/api/articles/:articleId/comments', commentController.listByArticle);
 
-  // ============ /api/follow ============
-  app.post('/api/follow/:bloggerId', requireAuth, async (req, res, next) => {
-    try {
-      const result = await c.followService.follow(req.user!.userId!, req.params.bloggerId);
-      res.status(201).json(result);
-    } catch (e) { next(e); }
-  });
+  // SD-011 Notification
+  app.get('/api/notifications', notificationController.list);
+  app.post('/api/notifications/:notificationId/read', notificationController.markRead);
+  app.post('/api/notifications/read-all', notificationController.markAllRead);
+  app.put('/api/notifications/settings', notificationController.updateSettings);
+  app.get('/api/notifications/unread/count', notificationController.unreadSize);
 
-  app.delete('/api/follow/:bloggerId', requireAuth, (req, res, next) => {
-    try {
-      c.followService.unfollow(req.user!.userId!, req.params.bloggerId);
-      res.status(204).end();
-    } catch (e) { next(e); }
-  });
+  // SD-012 Article
+  app.post('/api/articles', articleController.create);
+  app.get('/api/articles/:articleId', articleController.getById);
+  app.post('/api/articles/:articleId/submit', articleController.submitForReview);
+  app.post('/api/articles/:articleId/publish', articleController.publish);
+  app.post('/api/articles/:articleId/approve', articleController.approve);
+  app.post('/api/articles/:articleId/offline', articleController.offline);
+  app.post('/api/articles/:articleId/archive', articleController.archive);
+  app.post('/api/articles/:articleId/republish', articleController.republish);
+  app.post('/api/articles/:articleId/schedule', articleController.schedule);
+  app.post('/api/articles/:articleId/fire', articleController.fireScheduledPublish);
+  app.post('/api/articles/batch-offline', articleController.batchOffline);
+  app.get('/api/authors/:authorId/articles', articleController.listByAuthor);
+  app.post('/api/articles/:articleId/transition', articleController.transition);
 
-  app.get('/api/follow/:bloggerId/followers', (req, res, next) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      res.json(c.followService.getFollowers(req.params.bloggerId, page, size));
-    } catch (e) { next(e); }
-  });
+  // SD-013 CrossReference
+  app.post('/api/articles/:articleId/citations', crossRefController.addCitation);
+  app.delete('/api/articles/:articleId/citations', crossRefController.removeCitation);
+  app.get('/api/articles/:articleId/backlinks', crossRefController.backlinks);
+  app.get('/api/articles/:articleId/related', crossRefController.related);
+  app.get('/api/articles/:articleId/graph', crossRefController.graph);
 
-  app.get('/api/follow/me/following', requireAuth, (req, res, next) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      res.json(c.followService.getFollowing(req.user!.userId!, page, size));
-    } catch (e) { next(e); }
-  });
+  // SD-014 Push
+  app.post('/api/push/:userId', pushController.push);
+  app.post('/api/push/broadcast', pushController.broadcast);
+  app.post('/api/push/flush', pushController.flushOffline);
 
-  // ============ /api/articles ============
-  const CreateArticleSchema = z.object({
-    title: z.string().min(1).max(200),
-    content: z.string().min(1).max(100000),
-    summary: z.string().max(500).optional(),
-    tagIds: z.array(z.string()).max(10).optional(),
-    categoryId: z.string().optional(),
-    seriesId: z.string().optional(),
-    citeArticleIds: z.array(z.string()).max(20).optional(),
-  });
-  app.post('/api/articles', requireAuth, RbacMiddleware.requireRole(['blogger', 'admin', 'super_admin']), validate(CreateArticleSchema), async (req, res, next) => {
-    try {
-      const article = await c.articleService.createArticle({
-        ...req.body,
-        authorId: req.user!.userId!,
-      });
-      res.status(201).json(article);
-    } catch (e) { next(e); }
-  });
+  // SD-015 File
+  app.post('/api/files', fileController.upload);
+  app.get('/api/files/quota', fileController.getQuota);
+  app.get('/api/files/:fileId', fileController.getById);
+  app.get('/api/files', fileController.listByUser);
+  app.delete('/api/files/:fileId', fileController.delete);
 
-  app.get('/api/articles', (req, res, next) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      const filter: Record<string, string> = {};
-      if (req.query.authorId) filter.authorId = req.query.authorId as string;
-      if (req.query.status) filter.status = req.query.status as string;
-      if (req.query.tagId) filter.tagId = req.query.tagId as string;
-      if (req.query.categoryId) filter.categoryId = req.query.categoryId as string;
-      res.json(c.articleService.listArticles(filter, page, size));
-    } catch (e) { next(e); }
-  });
+  // SD-016 Subscription
+  app.post('/api/subscriptions', subscriptionController.subscribe);
+  app.delete('/api/subscriptions', subscriptionController.unsubscribe);
+  app.get('/api/subscriptions', subscriptionController.list);
+  app.get('/api/subscriptions/permission', subscriptionController.permission);
 
-  app.get('/api/articles/:id', (req, res, next) => {
-    try {
-      const viewerId = req.user?.userId;
-      res.json(c.articleService.getArticle(req.params.id, viewerId));
-    } catch (e) { next(e); }
-  });
+  // SD-017 Backup
+  app.post('/api/backups', backupController.create);
+  app.get('/api/backups/export/:userId', backupController.exportUserData);
+  app.post('/api/backups/:backupId/restore', backupController.restore);
+  app.get('/api/backups/incremental', backupController.incremental);
+  app.get('/api/backups/:backupId/verify', backupController.verifyIntegrity);
 
-  app.patch('/api/articles/:id', requireAuth, async (req, res, next) => {
-    try {
-      const result = await c.articleService.updateArticle(req.params.id, req.body, req.user!.userId!);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
-
-  app.delete('/api/articles/:id', requireAuth, async (req, res, next) => {
-    try {
-      await c.articleService.deleteArticle(req.params.id, req.user!.userId!);
-      res.status(204).end();
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/articles/:id/transition', requireAuth, async (req, res, next) => {
-    try {
-      const { toState } = req.body as { toState?: string };
-      if (!toState) throw new Error('toState 缺失');
-      const result = await c.articleService.transitionState(req.params.id, toState as never, {
-        id: req.user!.userId!,
-        role: req.user!.role ?? 'user',
-      });
-      res.json(result);
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/articles/batch', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const { ids, action } = req.body as { ids?: string[]; action?: 'archive' | 'delete' };
-      if (!ids || !action) throw new Error('ids/action 缺失');
-      const result = await c.articleService.batchManage(ids, action, {
-        id: req.user!.userId!,
-        role: req.user!.role ?? 'user',
-      });
-      res.json(result);
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/tags ============
-  app.post('/api/tags', requireAuth, RbacMiddleware.requireRole(['blogger', 'admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const { name } = req.body as { name?: string };
-      if (!name) throw new Error('name 缺失');
-      const tag = await c.tagService.createTag(name, req.user!.userId!);
-      res.status(201).json(tag);
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/tags/cloud', (req, res, next) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 20;
-      res.json(c.tagService.getTagCloud(limit));
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/articles/:id/tags/:tagId', requireAuth, async (req, res, next) => {
-    try {
-      await c.tagService.bindTag(req.params.id, req.params.tagId, req.user!.userId!);
-      res.status(204).end();
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/categories ============
-  app.get('/api/categories/tree', (_req, res) => {
-    res.json(c.categoryService.getCategoryTree());
-  });
-
-  app.post('/api/categories', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const cat = await c.categoryService.createCategory(req.body, req.user!.userId!);
-      res.status(201).json(cat);
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/comments ============
-  const CreateCommentSchema = z.object({
-    articleId: z.string().min(1),
-    content: z.string().min(1).max(1000),
-    parentId: z.string().optional(),
-  });
-  app.post('/api/comments', requireAuth, validate(CreateCommentSchema), async (req, res, next) => {
-    try {
-      const comment = await c.commentService.createComment({
-        ...req.body,
-        authorId: req.user!.userId!,
-      });
-      res.status(201).json(comment);
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/articles/:id/comments', (req, res, next) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      const sort = (req.query.sort as 'latest' | 'hottest') || 'latest';
-      res.json(c.commentService.listComments(req.params.id, page, size, sort));
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/comments/:id/like', requireAuth, (req, res, next) => {
-    try {
-      c.commentService.like(req.params.id, req.user!.userId!);
-      res.status(204).end();
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/comments/:id/moderate', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const { action } = req.body as { action?: 'approve' | 'reject' };
-      if (!action) throw new Error('action 缺失');
-      const result = await c.commentService.moderate(req.params.id, action, req.user!.userId!);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/notifications ============
-  app.get('/api/notifications', requireAuth, (req, res, next) => {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      res.json(c.notificationService.listByUser(req.user!.userId!, page, size));
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/notifications/unread-count', requireAuth, (req, res) => {
-    res.json({ count: c.notificationService.getUnreadCount(req.user!.userId!) });
-  });
-
-  app.post('/api/notifications/:id/read', requireAuth, (req, res, next) => {
-    try {
-      c.notificationService.markRead(req.params.id, req.user!.userId!);
-      res.status(204).end();
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/notifications/read-all', requireAuth, (req, res) => {
-    c.notificationService.markAllRead(req.user!.userId!);
-    res.status(204).end();
-  });
-
-  // ============ /api/site ============
-  app.get('/api/site/config', (_req, res) => {
-    res.json(c.siteService.getConfig());
-  });
-
-  app.patch('/api/site/config', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const result = await c.siteService.updateConfig(req.body, req.user!.userId!);
-      res.json(result);
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/site/switches', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const { name, value } = req.body as { name?: string; value?: boolean };
-      if (!name || typeof value !== 'boolean') throw new Error('name/value 缺失');
-      await c.siteService.setSwitch(name as never, value, req.user!.userId!);
-      res.json({ ok: true });
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/site/overview', (_req, res) => {
-    res.json(c.siteService.getOverview());
-  });
-
-  // ============ /api/announcements ============
-  app.get('/api/announcements', (_req, res) => {
-    // 简化：返回全部
-    res.json({ list: [] });
-  });
-
-  app.post('/api/announcements', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const ann = await c.announcementScheduler.createAnnouncement(req.body, req.user!.userId!);
-      res.status(201).json(ann);
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/stats ============
-  app.get('/api/stats/articles', (_req, res) => {
-    res.json(c.statsAggregator.getArticleStats());
-  });
-
-  app.get('/api/stats/users', (_req, res) => {
-    res.json(c.statsAggregator.getUserStats());
-  });
-
-  app.get('/api/stats/site', (_req, res) => {
-    res.json(c.statsAggregator.getSiteStats());
-  });
-
-  app.get('/api/stats/export', (req, res, next) => {
-    try {
-      const format = (req.query.format as 'csv' | 'json') || 'json';
-      const type = (req.query.type as 'article' | 'user' | 'blogger' | 'site') || 'site';
-      const buffer = c.statsAggregator.exportReport(format, type);
-      res.setHeader('Content-Type', format === 'csv' ? 'text/csv' : 'application/json');
-      res.send(buffer);
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/ads ============
-  app.post('/api/ads', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      const ad = await c.adService.createAd(req.body, req.user!.userId!);
-      res.status(201).json(ad);
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/ads/:id', (req, res, next) => {
-    try {
-      res.json(c.adService.getAd(req.params.id));
-    } catch (e) { next(e); }
-  });
-
-  app.post('/api/ads/:id/approve', requireAuth, RbacMiddleware.requireRole(['admin', 'super_admin']), async (req, res, next) => {
-    try {
-      res.json(await c.adService.approve(req.params.id, req.user!.userId!));
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/ads/serve/:slot', requireAuth, async (req, res, next) => {
-    try {
-      const ad = await c.adService.serveAd(req.user!.userId!, req.params.slot);
-      if (!ad) {
-        res.status(404).json({ message: '无可用广告' });
-        return;
-      }
-      res.json(ad);
-    } catch (e) { next(e); }
-  });
-
-  // ============ /api/recommend ============
-  app.get('/api/recommend/hot', (req, res) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const size = parseInt(req.query.size as string) || 10;
-    res.json(c.recommendationEngine.getHotFeed(page, size));
-  });
-
-  app.get('/api/recommend/latest', (req, res) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const size = parseInt(req.query.size as string) || 10;
-    res.json(c.recommendationEngine.getLatestFeed(page, size));
-  });
-
-  app.get('/api/recommend/personalized', requireAuth, (req, res) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const size = parseInt(req.query.size as string) || 10;
-    res.json(c.recommendationEngine.getPersonalizedFeed(req.user!.userId!, page, size));
-  });
-
-  app.get('/api/recommend/bloggers', (_req, res) => {
-    res.json(c.recommendationEngine.getBloggerRecommend(''));
-  });
-
-  // ============ /api/search ============
-  app.get('/api/search', (req, res, next) => {
-    try {
-      const q = req.query.q as string;
-      const sort = (req.query.sort as 'relevance' | 'latest' | 'hottest') || 'relevance';
-      const page = parseInt(req.query.page as string) || 1;
-      const size = parseInt(req.query.size as string) || 10;
-      const userId = req.user?.userId;
-      res.json(c.searchIndexer.search(q, sort, page, size, userId));
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/search/suggest', (req, res, next) => {
-    try {
-      const prefix = req.query.prefix as string;
-      res.json(c.searchIndexer.searchSuggest(prefix));
-    } catch (e) { next(e); }
-  });
-
-  app.get('/api/search/history', requireAuth, (req, res) => {
-    res.json({ history: c.searchIndexer.getSearchHistory(req.user!.userId!) });
-  });
-
-  app.delete('/api/search/history', requireAuth, (req, res) => {
-    c.searchIndexer.clearHistory(req.user!.userId!);
-    res.status(204).end();
-  });
-
-  // ============ 健康检查 ============
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: Math.floor(Date.now() / 1000) });
-  });
-
-  // ============ 404 ============
+  // 404 handler
   app.use((_req: Request, res: Response) => {
-    res.status(404).json({ code: 40400, message: '路由不存在', requestId: 'req-404' });
+    res.status(404).json({ code: 404, message: 'Not Found', httpStatus: 404 });
   });
 
-  // ============ 错误处理（必须最后注册） ============
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    ErrorHandler.handle(err, _req, res, _next);
+  // Error handler (must be last)
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    errorHandler(err, req, res, next);
   });
 
-  return app;
+  return { app, deps: d };
 }

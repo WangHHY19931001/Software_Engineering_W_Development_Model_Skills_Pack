@@ -3,6 +3,39 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2026-07-25] 第八轮 W 模型 25 需求端到端调测
+
+> 2026-07-25 第八轮 W 模型调测：扩展博客系统后端 25 需求（17 REQ + 5 NFR + 3 CON），全量删除 w-model-dev-demo 产物后从零重跑完整 8 阶段，验证第七轮门禁增强在 25 需求全量场景下的端到端可用性。
+
+### 新增
+
+- w-model-dev-demo 25 需求完整实现（17 SD × 3 DD = 51 详细设计 + 17 INTF 接口契约）
+- 17 个 TLA+ 规格（1 L1 + 7 L2 + 5 L3 + 3 L4 + 1 L4 原子行为扩展），层级化建模 parent→child 一致
+- 58 个 TypeScript 源文件（17 controllers + 17 services + 18 stores + 4 utils + app/server/types）
+- 四级测试套件：单元 226 + 集成 40 + 系统 64 + 验收 56 = 386 用例全通过
+- code-TLA+ 一致性四维度校验全通过（SD→codeModule 17/17 + 状态转移 90 + Next 分支 + 不变式断言 69）
+- 8 个验收测试文件覆盖 56 UAT 用例（含 NFR 性能/安全/覆盖率/TS strict 真实测量）
+
+### 变更
+
+- w-model-dev-demo 项目范围扩展：需求 21→25、DD 29→51、TLA+ 13→17、图谱节点 76→216、边 396→902
+- RTM 回填 NFR-001~005 和 CON-001~003 横切治理字段（designDoc/codeModule/unitTest/integrationTest）
+- project.json status 流转：需求分析→系统设计→概要设计→详细设计→编码→集成测试→系统测试→验收门禁通过待用户确认→**项目完成**（用户 confirm 归档）
+- rtm.json currentPhase: 8→9（项目归档），run-log.jsonl 追加 wm8-r012 归档 checkpoint 条目（acknowledgedDecisions=["user-confirm-archive"]）
+- acceptance-test-report.md §9 用户确认区勾选 `[x] confirm` + 确认意见（含四级测试 386/386、RTM 100%、门禁 exitCode=0 等关键数据）
+
+### 修复
+
+- push.service.ts retry 循环 break→continue（TC-INT-031 推送重试 3 次而非 1 次）
+- article.store.ts getById 返回副本防止状态污染
+- blogger.service.ts bloggerFollow 幂等性
+- auth.service.ts 预哈希校验顺序
+
+### 文档
+
+- AGENTS.md §4 新增第八轮调测结论
+- w-model-dev-demo/docs/acceptance-test-report.md 9 章验收报告（含 §9 用户确认区）
+
 ## [2026-07-25] 门禁增强与文档更新
 
 > 2026-07-25 第6轮 W 模型调测后识别 8 个技能问题，本次完成 6 项门禁增强（P1.1/P1.2/P1.4/P2.5/P2.6/P2.7）+ 2 项已实现确认（P1.3/P2.8）+ 顶层文档更新。

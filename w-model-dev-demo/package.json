@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "博客系统后端 - W 模型端到端调测产物",
+  "description": "扩展博客系统后端 - 第8轮W模型端到端调测产物（25 需求 = 17 REQ + 5 NFR + 3 CON）",
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",

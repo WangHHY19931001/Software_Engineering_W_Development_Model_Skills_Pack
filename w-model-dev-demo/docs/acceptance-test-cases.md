@@ -1,986 +1,923 @@
-# 测试用例文档
+# 验收测试用例文档
 
-> 阶段 1 设计、阶段 8 执行。W 模型第 6 轮端到端调测。
-> 用例 ID 格式：UAT-NNN（运行时验收测试用例，登记到 RTM 验收测试列）。
-> 覆盖原则：每个功能点 ≥ 1 用例，关键功能 ≥ 3 用例，覆盖正常 + 异常 + 边界。
+> 阶段 1（需求分析）同步产出验收测试设计。共 56 个 UAT 用例（17 REQ × 3 + 5 NFR × 1）。
+> 执行阶段：阶段 8（验收测试执行）。本阶段仅设计，不执行。
 
 ## 文档信息
 
-- 项目名称：blog-system-demo（扩展博客系统后端）
+- 项目名称：blog-system-demo
 - 测试类型：验收测试
-- 设计来源阶段：阶段 1 需求分析
-- 执行阶段：阶段 8 验收测试
+- 设计来源阶段：阶段 1（需求分析）
+- 执行阶段：阶段 8（验收测试）
 - 文档版本：v1.0
-- 用例总数：49（UAT-001 ~ UAT-049）
-- 关联需求：21（REQ-001~013 + NFR-001~005 + CON-001~003）
 
-## 用例列表
+---
+
+## REQ-001 站点管理
 
 ### UAT-001
 
-- 标题：站点配置项持久化与读取
+- 标题：站点配置正常更新
 - 优先级：高
 - 关联需求：REQ-001
-- 测试场景：正常场景——管理员设置站点配置后通过 GET 接口读取，验证持久化
+- 测试场景：管理员创建/更新站点配置，字段合法
 
 **前置条件**
-- 已存在管理员账号并持有有效 JWT
-- 站点配置存储初始化完成
+- 管理员已登录，持有有效 JWT
+- 站点配置为初始状态
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/site/config（管理员 JWT） | `{"name":"MyBlog","description":"desc","logo":"https://x.png","icp":"京ICP备XXXX号"}` | 200，返回完整配置对象 |
-| 2 | GET /api/site/config | 无 | 200，返回对象与步骤 1 输入一致 |
-| 3 | 重启服务后再次 GET /api/site/config | 无 | 200，配置仍与步骤 1 一致（操作日志重放后恢复） |
+| 1 | PUT /api/site/config | {siteName:"我的博客", description:"技术博客", logoUrl:"/logo.png", icpRecord:"京ICP备12345"} | 200, 返回更新后的配置 |
+| 2 | GET /api/site/config | 无 | 200, 返回 siteName="我的博客" |
 
 **预期结果**
-配置项持久化，重启后通过操作日志重放恢复，GET 接口返回值与 PUT 输入字段全等。
+站点配置更新成功，后续读取返回最新配置
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-002
 
-- 标题：维护模式开关阻断非管理员请求
+- 标题：维护模式开关验证
 - 优先级：高
 - 关联需求：REQ-001
-- 测试场景：边界场景——维护模式启用后，非管理员请求被阻断，管理员请求正常
+- 测试场景：管理员开启维护模式后，普通用户请求被拒绝
 
 **前置条件**
-- 存在管理员账号与普通用户账号
-- 维护模式默认关闭
+- 管理员已登录
+- 普通用户持有有效 JWT
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/site/switches（管理员） | `{"maintenanceMode":true}` | 200 |
-| 2 | GET /api/articles（普通用户 JWT） | 无 | 503，错误码 `SITE_IN_MAINTENANCE` |
-| 3 | GET /api/articles（管理员 JWT） | 无 | 200，正常返回文章列表 |
-| 4 | PUT /api/site/switches（管理员） | `{"maintenanceMode":false}` | 200 |
-| 5 | GET /api/articles（普通用户 JWT） | 无 | 200，恢复正常 |
+| 1 | PUT /api/site/maintenance | {enabled:true, message:"系统维护中"} | 200 |
+| 2 | GET /api/articles（普通用户 token） | 无 | 503, 响应体含 maintenanceMessage |
 
 **预期结果**
-维护模式开关生效，非管理员请求返回 503，管理员请求不受影响，关闭后恢复。
+维护模式开启后，非管理员请求返回 503
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-003
 
-- 标题：公告定时发布在指定时间戳后可见
+- 标题：公告定时发布边界
 - 优先级：中
 - 关联需求：REQ-001
-- 测试场景：边界场景——公告设定未来时间发布，到达时间前不可见，到达后可见
+- 测试场景：公告 publishedAt 设为未来时间时 status=pending，到达后转 published
 
 **前置条件**
-- 管理员账号有效
-- 系统时间可注入（测试用 mock clock）
+- 管理员已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/site/announcements（管理员） | `{"title":"a","content":"b","publishAt":<now+60s>}` | 201，状态 `scheduled` |
-| 2 | GET /api/site/announcements（普通用户，clock=now） | 无 | 200，列表不含该公告 |
-| 3 | 推进 mock clock 至 `now+61s` 并触发定时器 | 无 | 公告状态变为 `published` |
-| 4 | GET /api/site/announcements（普通用户） | 无 | 200，列表含该公告 |
+| 1 | POST /api/announcements | {title:"公告", content:"内容", publishedAt:"2026-07-26T00:00:00Z"} | 201, status=pending |
+| 2 | 等待到 publishedAt 后查询 | 无 | status=published |
 
 **预期结果**
-定时发布精度为秒级，未到时间用户不可见，到达后自动发布并可见。
+定时公告在到达时间后自动发布
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-002 多博主
+
 ### UAT-004
 
-- 标题：站点统计概览 4 项计数一致
-- 优先级：中
-- 关联需求：REQ-001
-- 测试场景：正常场景——统计概览返回用户数、文章数、评论数、访问量，与底层实体数一致
+- 标题：博主注册正常流程
+- 优先级：高
+- 关联需求：REQ-002
+- 测试场景：新博主通过邮箱+密码注册，密码 bcrypt 哈希存储
 
 **前置条件**
-- 已创建 5 用户、3 文章、10 评论、累计 100 访问量
+- 邮箱未被注册
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/site/stats/overview（管理员） | 无 | 200，返回 `{userCount:5, articleCount:3, commentCount:10, visitCount:100}` |
-| 2 | POST /api/articles（博主） | 1 篇新文章 | 201 |
-| 3 | GET /api/site/stats/overview | 无 | 200，`articleCount` 变为 4 |
+| 1 | POST /api/bloggers/register | {email:"blogger@test.com", password:"Pass1234", nickname:"博主A"} | 201, 返回 JWT token |
+| 2 | GET /api/bloggers/me | Authorization: Bearer <token> | 200, email="blogger@test.com" |
 
 **预期结果**
-4 项计数与底层实体数一致，实体变化后计数同步更新。
+博主注册成功，密码以 bcrypt 哈希存储，返回有效 JWT
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-005
 
-- 标题：博主注册返回 201 并签发 JWT
+- 标题：重复邮箱注册异常
 - 优先级：高
 - 关联需求：REQ-002
-- 测试场景：正常场景——博主注册成功，返回 201 与 JWT；异常场景——重复邮箱注册返回 409
+- 测试场景：使用已注册邮箱再次注册
 
 **前置条件**
-- 注册开关开启
-- 邮箱 `blogger@test.com` 未注册
+- 邮箱 "blogger@test.com" 已注册
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/bloggers/register | `{"email":"blogger@test.com","password":"Pass1234","name":"B1"}` | 201，返回 `{bloggerId, jwt}`，jwt 不为空 |
-| 2 | 解析返回的 JWT | 无 | payload 含 `bloggerId` 且 `exp - iat ≤ 86400` |
-| 3 | POST /api/bloggers/register（重复邮箱） | 同上 | 409，错误码 `EMAIL_EXISTS` |
-| 4 | GET /api/bloggers/me（携带步骤 1 JWT） | 无 | 200，返回博主信息 |
+| 1 | POST /api/bloggers/register | {email:"blogger@test.com", password:"Pass1234", nickname:"博主B"} | 409, 提示邮箱已存在 |
 
 **预期结果**
-注册返回 201 + JWT，JWT 有效期 ≤ 24h，重复邮箱被拒。
+重复邮箱注册返回 409
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-006
 
-- 标题：博主角色分级 3 类区分
-- 优先级：中
+- 标题：权限隔离边界（跨博主编辑）
+- 优先级：高
 - 关联需求：REQ-002
-- 测试场景：边界场景——3 类博主角色（普通博主、认证博主、特邀博主）通过 role 字段区分
+- 测试场景：博主 A 尝试编辑博主 B 的文章
 
 **前置条件**
-- 已存在 3 类角色的博主各 1 名（由超级管理员预设）
+- 博主 A 和博主 B 已注册，博主 B 有一篇文章 articleId=X
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/bloggers/:id（普通博主） | 无 | 200，`role=normal` |
-| 2 | GET /api/bloggers/:id（认证博主） | 无 | 200，`role=verified` |
-| 3 | GET /api/bloggers/:id（特邀博主） | 无 | 200，`role=invited` |
-| 4 | PUT /api/bloggers/:id/role（非超级管理员调用） | `{"role":"verified"}` | 403 |
+| 1 | PUT /api/articles/X（博主 A token） | {title:"修改标题"} | 403, 提示无权操作 |
 
 **预期结果**
-3 类角色字段值正确，仅超级管理员可变更角色。
+博主 A 编辑博主 B 的文章返回 403
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-003 多用户
+
 ### UAT-007
 
-- 标题：博主权限隔离（跨博主编辑返回 403）
+- 标题：用户登录 JWT 正常
 - 优先级：高
-- 关联需求：REQ-002
-- 测试场景：异常场景——博主 A 尝试编辑博主 B 的文章，返回 403
+- 关联需求：REQ-003
+- 测试场景：用户用邮箱密码登录，获取 JWT，后续请求携带 token 鉴权
 
 **前置条件**
-- 博主 A 与博主 B 各自创建 1 篇文章
+- 用户已注册，email="user@test.com", password="Pass1234"
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/articles/:B-article-id（博主 A 的 JWT） | `{"title":"hacked"}` | 403，错误码 `PERMISSION_DENIED` |
-| 2 | PUT /api/articles/:B-article-id（博主 B 的 JWT） | `{"title":"updated"}` | 200，更新成功 |
-| 3 | DELETE /api/articles/:B-article-id（博主 A 的 JWT） | 无 | 403 |
+| 1 | POST /api/auth/login | {email:"user@test.com", password:"Pass1234"} | 200, 返回 JWT token（有效期 24h） |
+| 2 | GET /api/users/me | Authorization: Bearer <token> | 200, 返回用户信息 |
 
 **预期结果**
-博主仅可编辑自己的文章，跨博主写操作返回 403。
+登录成功返回 JWT，后续请求可正常鉴权
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-008
 
-- 标题：关注/取关双向列表一致
-- 优先级：中
-- 关联需求：REQ-002
-- 测试场景：正常场景——博主 A 关注博主 B 后，A 的关注列表与 B 的粉丝列表均含对方；取关后均不含
+- 标题：封禁用户 token 失效
+- 优先级：高
+- 关联需求：REQ-003
+- 测试场景：管理员封禁用户后，该用户 token 立即失效
 
 **前置条件**
-- 博主 A 与博主 B 存在
+- 用户已登录持有 token，管理员已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/bloggers/:B-id/follow（A 的 JWT） | 无 | 200 |
-| 2 | GET /api/bloggers/:A-id/followings | 无 | 200，列表含 B |
-| 3 | GET /api/bloggers/:B-id/followers | 无 | 200，列表含 A |
-| 4 | DELETE /api/bloggers/:B-id/follow（A 的 JWT） | 无 | 200 |
-| 5 | GET /api/bloggers/:A-id/followings | 无 | 200，列表不含 B |
-| 6 | GET /api/bloggers/:B-id/followers | 无 | 200，列表不含 A |
+| 1 | POST /api/admin/users/X/ban（管理员 token） | {reason:"违规操作"} | 200 |
+| 2 | GET /api/users/me（被封用户 token） | 无 | 403, 提示已被封禁，附封禁原因 |
 
 **预期结果**
-关注关系双向一致，取关后双向同步移除。
+封禁后用户 token 失效，请求返回 403
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-009
 
-- 标题：用户注册+登录返回 JWT 且 bcrypt 哈希
+- 标题：角色权限越权异常
 - 优先级：高
 - 关联需求：REQ-003
-- 测试场景：正常场景——注册后登录返回 JWT；异常场景——错误密码登录返回 401；边界场景——密码以 bcrypt 哈希存储（非明文）
+- 测试场景：普通用户尝试访问管理员接口
 
 **前置条件**
-- 注册开关开启
+- 普通用户（role=user）已登录持有 token
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/users/register | `{"email":"u@test.com","password":"Pass1234","name":"U1"}` | 201，返回 userId |
-| 2 | POST /api/users/login | `{"email":"u@test.com","password":"Pass1234"}` | 200，返回 JWT |
-| 3 | POST /api/users/login（错误密码） | `{"email":"u@test.com","password":"wrong"}` | 401，错误码 `INVALID_CREDENTIALS` |
-| 4 | 检查内存存储中用户记录的 password 字段 | 无 | 字段以 `$2b$` 开头（bcrypt 哈希），非明文 |
-| 5 | 验证 bcrypt cost | 无 | cost ≥ 10 |
+| 1 | GET /api/admin/users（普通用户 token） | 无 | 403, 提示权限不足 |
 
 **预期结果**
-注册+登录返回 JWT，错误密码被拒，密码以 bcrypt 哈希存储且 cost ≥ 10。
+普通用户访问管理员接口返回 403
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-004 推荐
+
 ### UAT-010
 
-- 标题：4 类角色 RBAC 权限边界
-- 优先级：高
-- 关联需求：REQ-003
-- 测试场景：边界场景——4 类角色（普通用户、博主、管理员、超级管理员）访问 admin 接口的权限边界
+- 标题：热门推荐正常返回
+- 优先级：中
+- 关联需求：REQ-004
+- 测试场景：未登录用户请求热门推荐流，返回 ≤20 篇文章
 
 **前置条件**
-- 4 类角色账号各 1 个
+- 系统中存在已发布文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/admin/users（普通用户 JWT） | 无 | 403，错误码 `ROLE_FORBIDDEN` |
-| 2 | GET /api/admin/users（博主 JWT） | 无 | 403 |
-| 3 | GET /api/admin/users（管理员 JWT） | 无 | 200，返回用户列表 |
-| 4 | GET /api/admin/users（超级管理员 JWT） | 无 | 200 |
-| 5 | DELETE /api/admin/users/:id（管理员 JWT，删除其他管理员） | 无 | 403（仅超级管理员可删管理员） |
-| 6 | DELETE /api/admin/users/:id（超级管理员 JWT） | 无 | 200 |
+| 1 | GET /api/recommendations?type=hot | 无 | 200, 返回文章数组，长度 ≤20，按热度降序 |
 
 **预期结果**
-普通用户/博主无法访问 admin 接口；管理员可读但不可删管理员；超级管理员全权。
+热门推荐返回 ≤20 篇文章，不含已下架/已归档
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-011
 
-- 标题：用户资料修改一致性
+- 标题：个性化推荐需登录
 - 优先级：中
-- 关联需求：REQ-003
-- 测试场景：正常场景——用户修改昵称/头像/简介后 GET 返回最新值；异常场景——非法字段被拒
+- 关联需求：REQ-004
+- 测试场景：未登录用户请求个性化推荐
 
 **前置条件**
-- 用户已登录
+- 无
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/users/me | `{"nickname":"new","avatar":"https://x.png","bio":"hi"}` | 200 |
-| 2 | GET /api/users/me | 无 | 200，字段与步骤 1 一致 |
-| 3 | PUT /api/users/me（昵称超长 200 字符） | `{"nickname":"<200 chars>"}` | 400，错误码 `VALIDATION_FAILED` |
+| 1 | GET /api/recommendations?type=personalized | 无 Authorization | 401, 提示需登录 |
 
 **预期结果**
-资料修改后 GET 返回最新值，非法字段（超长）被 zod 校验拦截返回 400。
+个性化推荐需登录，未登录返回 401
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-012
 
-- 标题：封禁用户登录返回 403 且记录原因
-- 优先级：高
-- 关联需求：REQ-003
-- 测试场景：异常场景——被封禁用户登录返回 403，封禁原因可查
+- 标题：推荐位管理异常（非管理员）
+- 优先级：中
+- 关联需求：REQ-004
+- 测试场景：普通用户尝试创建推荐位
 
 **前置条件**
-- 用户 U1 已注册
-- 管理员账号有效
+- 普通用户已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/admin/users/:U1-id/ban（管理员） | `{"reason":"spam"}` | 200 |
-| 2 | POST /api/users/login（U1） | `{"email":"...","password":"..."}` | 403，错误码 `USER_BANNED`，返回封禁原因 `spam` |
-| 3 | GET /api/admin/users/:U1-id/ban-log（管理员） | 无 | 200，含封禁记录与原因 |
-| 4 | POST /api/admin/users/:U1-id/unban（管理员） | 无 | 200 |
-| 5 | POST /api/users/login（U1） | 同上 | 200，登录成功 |
+| 1 | POST /api/recommendations/slots | {name:"首页推荐", type:"article", position:"homepage"} | 403 |
 
 **预期结果**
-封禁后登录返回 403 并附原因，解禁后恢复登录。
+非管理员创建推荐位返回 403
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-005 广告
+
 ### UAT-013
 
-- 标题：个性化推荐流返回 ≥ 1 篇文章且按算法排序
+- 标题：广告投放正常流程
 - 优先级：中
-- 关联需求：REQ-004
-- 测试场景：正常场景——已登录用户获取个性化推荐流，返回 ≥ 1 篇文章且按算法得分降序
+- 关联需求：REQ-005
+- 测试场景：管理员创建广告并审核通过后，广告在有效期内展示
 
 **前置条件**
-- 用户已登录并有浏览历史（影响偏好）
-- 已发布文章 ≥ 5 篇
+- 管理员已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/recommendations/personalized | 无 | 200，返回文章数组长度 ≥ 1 |
-| 2 | 验证返回文章按算法得分降序 | 无 | `score[i] >= score[i+1]` 对所有 i 成立 |
+| 1 | POST /api/ads | {title:"广告", imageUrl:"/ad.png", targetUrl:"/link", startTime:"now", endTime:"+7d", maxImpressions:1000} | 201, status=pending |
+| 2 | PUT /api/ads/X/review | {status:"approved"} | 200, status=approved |
+| 3 | GET /api/ads/active | 无 | 200, 返回含该广告 |
 
 **预期结果**
-个性化推荐流非空且按算法得分降序排列。
+广告审核通过后在有效期内展示
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-014
 
-- 标题：热门/最新推荐流排序正确
+- 标题：广告时间范围边界
 - 优先级：中
-- 关联需求：REQ-004
-- 测试场景：正常场景——热门流按热度降序、最新流按发布时间降序
+- 关联需求：REQ-005
+- 测试场景：广告 endTime 已过，不再展示
 
 **前置条件**
-- 已发布文章 ≥ 5 篇，热度与发布时间不一致
+- 存在 approved 广告，endTime 为过去时间
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/recommendations/hot | 无 | 200，文章按热度（点赞×2+评论×3+阅读×1）降序 |
-| 2 | GET /api/recommendations/latest | 无 | 200，文章按 `publishedAt` 降序 |
+| 1 | GET /api/ads/active | 无 | 200, 不包含已过期广告 |
 
 **预期结果**
-热门流按热度公式降序，最新流按发布时间降序。
+超过 endTime 的广告不展示
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-015
 
-- 标题：推荐位配置变更生效
-- 优先级：低
-- 关联需求：REQ-004
-- 测试场景：正常场景——管理员变更推荐位配置后接口返回最新配置
+- 标题：广告审核状态异常
+- 优先级：中
+- 关联需求：REQ-005
+- 测试场景：pending 状态广告不应展示
 
 **前置条件**
-- 管理员账号有效
+- 存在 pending 状态广告
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/admin/recommendation-slots（管理员） | `{"slots":[{"id":"home-banner","articleId":"a1"}]}` | 200 |
-| 2 | GET /api/recommendations/slots | 无 | 200，返回配置含 `home-banner` 与 `articleId=a1` |
+| 1 | GET /api/ads/active | 无 | 200, 不含 pending 广告 |
 
 **预期结果**
-推荐位配置变更后 GET 返回最新值。
+未审核通过的广告不展示
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-006 统计
+
 ### UAT-016
 
-- 标题：广告位 CRUD + 投放时间范围生效
+- 标题：文章统计正常返回
 - 优先级：中
-- 关联需求：REQ-005
-- 测试场景：正常场景——广告位 CRUD 返回 200；边界场景——投放时间范围外不返回广告
+- 关联需求：REQ-006
+- 测试场景：管理员查看文章统计数据
 
 **前置条件**
-- 管理员账号有效
+- 管理员已登录，存在已发布文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/admin/ad-slots（管理员） | `{"name":"banner","placement":"home","startAt":<now-60s>,"endAt":<now+3600s>}` | 201 |
-| 2 | GET /api/ads?placement=home（当前时间） | 无 | 200，列表含该广告 |
-| 3 | 推进 mock clock 至 `now+3601s` | 无 | 无 |
-| 4 | GET /api/ads?placement=home | 无 | 200，列表不含该广告（超出 endAt） |
+| 1 | GET /api/stats/articles/X | 管理员 token | 200, {viewCount, likeCount, commentCount, shareCount} |
 
 **预期结果**
-广告位 CRUD 正常，投放时间范围生效，超出 endAt 后广告不展示。
+返回文章统计四项指标
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-017
 
-- 标题：点击统计 CTR 计算正确
+- 标题：用户统计趋势聚合
 - 优先级：中
-- 关联需求：REQ-005
-- 测试场景：正常场景——广告展示与点击后 CTR = 点击数 / 展示数
+- 关联需求：REQ-006
+- 测试场景：按日聚合用户注册趋势
 
 **前置条件**
-- 广告 A 已发布
+- 管理员已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/ads/:A-id/impression × 100 次 | 无 | 每次返回 200，展示数累计 100 |
-| 2 | POST /api/ads/:A-id/click × 10 次 | 无 | 每次返回 200，点击数累计 10 |
-| 3 | GET /api/admin/ads/:A-id/stats（管理员） | 无 | 200，`{impressions:100, clicks:10, ctr:0.1}` |
+| 1 | GET /api/stats/users?granularity=daily&days=7 | 管理员 token | 200, 返回 [{date, count}]×7 |
 
 **预期结果**
-CTR = 10/100 = 0.1，统计精确无误差。
+返回 7 天注册趋势数组
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-018
 
-- 标题：未审核广告不向前台返回
-- 优先级：中
-- 关联需求：REQ-005
-- 测试场景：异常场景——广告处于 `pending` 审核状态时，前台 GET /api/ads 不返回
+- 标题：非管理员访问统计异常
+- 优先级：高
+- 关联需求：REQ-006
+- 测试场景：普通用户访问统计接口
 
 **前置条件**
-- 管理员与普通用户账号有效
+- 普通用户已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/admin/ads（管理员） | `{"slotId":"s1","content":"...","status":"pending"}` | 201，状态 `pending` |
-| 2 | GET /api/ads（普通用户） | 无 | 200，列表不含该广告 |
-| 3 | PUT /api/admin/ads/:id/audit（管理员） | `{"status":"approved"}` | 200 |
-| 4 | GET /api/ads（普通用户） | 无 | 200，列表含该广告 |
+| 1 | GET /api/stats/articles/X | 普通用户 token | 403 |
 
 **预期结果**
-未审核广告不向前台返回，审核通过后可见。
+非管理员访问统计返回 403
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-007 搜索
+
 ### UAT-019
 
-- 标题：4 类统计接口字段齐全且数值一致
-- 优先级：中
-- 关联需求：REQ-006
-- 测试场景：正常场景——文章/用户/博主/站点 4 类统计接口返回字段齐全且与底层一致
+- 标题：全文搜索正常
+- 优先级：高
+- 关联需求：REQ-007
+- 测试场景：输入关键词搜索文章标题/内容/摘要
 
 **前置条件**
-- 已有 5 用户、3 博主、10 文章、20 评论、100 访问量
+- 存在已发布文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/stats/articles | 无 | 200，含 `{views, likes, comments, shares}` 字段且数值与底层一致 |
-| 2 | GET /api/stats/users | 无 | 200，含 `{registrationTrend, activity, retention}` |
-| 3 | GET /api/stats/bloggers | 无 | 200，含 `{output, interaction, followerGrowth}` |
-| 4 | GET /api/stats/site | 无 | 200，含 `{visits, pv, uv, sources}` |
+| 1 | GET /api/search?q=TypeScript&type=article | 无 | 200, 返回匹配文章分页列表 |
 
 **预期结果**
-4 类统计接口返回字段齐全，数值与底层实体数一致。
+返回匹配关键词的文章
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-020
 
-- 标题：CSV/JSON 导出文件可解析
+- 标题：搜索排序模式切换
 - 优先级：中
-- 关联需求：REQ-006
-- 测试场景：正常场景——统计报表导出 CSV 与 JSON 格式均可被标准库解析
+- 关联需求：REQ-007
+- 测试场景：切换 relevance/time/hotness 排序
 
 **前置条件**
-- 已有统计数据
+- 存在多篇文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/stats/export?format=csv | 无 | 200，`Content-Type: text/csv`，body 可被标准 CSV 解析器解析为 ≥ 1 行 |
-| 2 | GET /api/stats/export?format=json | 无 | 200，`Content-Type: application/json`，body 可被 `JSON.parse` 解析 |
-| 3 | 验证 CSV 与 JSON 含全部统计字段 | 无 | 字段集一致 |
+| 1 | GET /api/search?q=blog&sort=relevance | 无 | 200, 按相关度降序 |
+| 2 | GET /api/search?q=blog&sort=time | 无 | 200, 按时间降序 |
+| 3 | GET /api/search?q=blog&sort=hotness | 无 | 200, 按热度降序 |
 
 **预期结果**
-CSV 与 JSON 导出文件含全部统计字段，可被标准库解析。
+三种排序模式返回不同顺序结果
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-021
 
-- 标题：全文搜索 P95 ≤ 500ms 且命中
-- 优先级：高
+- 标题：搜索历史 FIFO 淘汰边界
+- 优先级：中
 - 关联需求：REQ-007
-- 测试场景：边界场景——1000 文章数据集下全文搜索 P95 ≤ 500ms；正常场景——返回结果命中查询词
+- 测试场景：用户搜索超过 100 次后，最旧记录被淘汰
 
 **前置条件**
-- 已发布 1000 篇文章（含关键词「TypeScript」的 ≥ 10 篇）
+- 用户已登录，已有 100 条搜索历史
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/search?q=TypeScript（连续 100 次，计时） | 无 | 100 次响应时间的 P95 ≤ 500ms |
-| 2 | 验证返回结果 | 无 | 每条结果的 title/content/summary 含「TypeScript」（不区分大小写） |
+| 1 | GET /api/search/history | 用户 token | 200, 返回 100 条 |
+| 2 | GET /api/search?q=newkeyword | 用户 token | 200 |
+| 3 | GET /api/search/history | 用户 token | 200, 返回 100 条，最旧一条被淘汰，含 newkeyword |
 
 **预期结果**
-P95 ≤ 500ms，返回结果命中查询词。
+搜索历史超 100 条时 FIFO 淘汰最旧记录
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-008 标签
+
 ### UAT-022
 
-- 标题：排序参数（相关度/时间/热度）生效
+- 标题：标签创建与绑定
 - 优先级：中
-- 关联需求：REQ-007
-- 测试场景：正常场景——不同 sort 参数返回结果顺序不同
+- 关联需求：REQ-008
+- 测试场景：管理员创建标签并审核通过后，文章可绑定标签
 
 **前置条件**
-- 已发布 ≥ 10 篇文章含关键词「test」
+- 管理员和博主已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/search?q=test&sort=relevance | 无 | 200，按相关度降序 |
-| 2 | GET /api/search?q=test&sort=time | 无 | 200，按 `publishedAt` 降序 |
-| 3 | GET /api/search?q=test&sort=hot | 无 | 200，按热度降序 |
-| 4 | 验证 3 次结果顺序不完全相同 | 无 | 至少 2 次顺序不同 |
+| 1 | POST /api/tags | {name:"TypeScript"}（管理员） | 201, status=pending |
+| 2 | PUT /api/tags/X/review | {status:"approved"}（管理员） | 200 |
+| 3 | PUT /api/articles/Y/tags | {tagIds:[X]}（博主） | 200 |
 
 **预期结果**
-3 种排序参数生效，结果顺序有差异。
+标签审核通过后可绑定到文章
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-023
 
-- 标题：搜索建议前缀匹配返回 ≤ 10 条
-- 优先级：低
-- 关联需求：REQ-007
-- 测试场景：边界场景——前缀匹配返回 ≤ 10 条；异常场景——空前缀返回 400
+- 标题：标签合并管理员操作
+- 优先级：中
+- 关联需求：REQ-008
+- 测试场景：管理员合并相似标签
 
 **前置条件**
-- 已有 ≥ 15 个含「type」前缀的搜索词历史
+- 存在标签 A 和标签 B，文章已绑定标签 A
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/search/suggest?prefix=type | 无 | 200，返回数组长度 ≤ 10，每条以「type」开头 |
-| 2 | GET /api/search/suggest?prefix= | 无 | 400，错误码 `VALIDATION_FAILED` |
+| 1 | POST /api/tags/merge | {sourceId:A, targetId:B}（管理员） | 200 |
+| 2 | GET /api/tags/A | 无 | 404, 标签 A 已删除 |
+| 3 | GET /api/articles/Y | 无 | 文章 Y 的标签包含 B |
 
 **预期结果**
-前缀建议 ≤ 10 条且均以前缀开头，空前缀被拒。
+合并后源标签删除，文章标签迁移到目标标签
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-024
 
-- 标题：文章多标签绑定 + 标签云频次降序
+- 标题：标签名特殊字符异常
 - 优先级：中
 - 关联需求：REQ-008
-- 测试场景：正常场景——文章可绑定 ≥ 1 标签，标签云按使用频次降序
+- 测试场景：标签名包含非法特殊字符
 
 **前置条件**
-- 博主已登录
+- 管理员已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/articles（博主） | `{"title":"a","content":"b","tags":["ts","js"]}` | 201 |
-| 2 | GET /api/articles/:id | 无 | 200，`tags` 含 `ts` 与 `js` |
-| 3 | GET /api/tags/cloud | 无 | 200，按 `count` 降序，`ts.count >= js.count` 或反之但有序 |
-| 4 | POST /api/articles（绑定 0 标签） | `{"title":"a","content":"b","tags":[]}` | 400，错误码 `VALIDATION_FAILED`（边界：至少 1 标签） |
+| 1 | POST /api/tags | {name:"<script>"}（管理员） | 400, 提示标签名仅允许中文/字母/数字/连字符 |
 
 **预期结果**
-文章可多标签绑定，标签云按频次降序，0 标签被拒。
+特殊字符标签名返回 400
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-009 分类
+
 ### UAT-025
 
-- 标题：标签合并后旧标签不可用
+- 标题：分类树多级创建
 - 优先级：中
-- 关联需求：REQ-008
-- 测试场景：正常场景——管理员合并标签后，旧标签下的文章迁移到新标签，旧标签不可用
+- 关联需求：REQ-009
+- 测试场景：创建多级分类树（≤5 层）
 
 **前置条件**
-- 标签 `js` 与 `javascript` 各绑定 ≥ 2 篇文章
-- 管理员账号有效
+- 管理员已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/admin/tags/merge（管理员） | `{"from":"js","to":"javascript"}` | 200，返回受影响文章数 |
-| 2 | GET /api/tags/js | 无 | 404，旧标签不可用 |
-| 3 | GET /api/articles?tag=javascript | 无 | 200，含原 `js` 标签下的文章 |
+| 1 | POST /api/categories | {name:"技术", parentId:null} | 201, id=C1 |
+| 2 | POST /api/categories | {name:"前端", parentId:C1} | 201, id=C2 |
+| 3 | GET /api/categories/tree | 无 | 200, 返回树结构含 C1→C2 |
 
 **预期结果**
-合并后旧标签不可用，文章迁移到新标签。
+多级分类树创建成功
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-026
 
-- 标题：分类树多级父子 + 拒绝循环引用
+- 标题：分类级联删除边界
 - 优先级：中
 - 关联需求：REQ-009
-- 测试场景：正常场景——分类树支持多级父子；异常场景——循环引用被拒
+- 测试场景：删除有子分类的分类时级联删除
 
 **前置条件**
-- 管理员账号有效
+- 存在分类 C1→C2（C2 是 C1 的子分类），C2 下有文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/admin/categories | `{"name":"root"}` | 201，返回 `id=root` |
-| 2 | POST /api/admin/categories | `{"name":"child","parentId":"root"}` | 201 |
-| 3 | POST /api/admin/categories | `{"name":"grandchild","parentId":"child"}` | 201 |
-| 4 | GET /api/categories/tree | 无 | 200，树深度 ≥ 3 |
-| 5 | PUT /api/admin/categories/root（尝试设 parentId=grandchild 形成环） | `{"parentId":"grandchild"}` | 400，错误码 `CYCLIC_REFERENCE` |
+| 1 | DELETE /api/categories/C1 | 管理员 token | 200 |
+| 2 | GET /api/categories/C2 | 无 | 404, C2 已级联删除 |
+| 3 | GET /api/articles?categoryId=C2 | 无 | 文章归类到未分类 |
 
 **预期结果**
-分类树支持多级父子，循环引用被拒。
+删除分类时子分类级联删除，文章归入未分类
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-027
 
-- 标题：分类下文章列表分页参数生效
-- 优先级：中
+- 标题：分类排序正常
+- 优先级：低
 - 关联需求：REQ-009
-- 测试场景：边界场景——分页参数 page/size 生效，总数准确
+- 测试场景：管理员设置分类 sortOrder 后按序返回
 
 **前置条件**
-- 分类 `c1` 下有 25 篇文章
+- 存在同級分类 C1(sortOrder=2)、C2(sortOrder=1)
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/categories/c1/articles?page=1&size=10 | 无 | 200，返回 10 篇，`total=25` |
-| 2 | GET /api/categories/c1/articles?page=3&size=10 | 无 | 200，返回 5 篇，`total=25` |
-| 3 | GET /api/categories/c1/articles?page=4&size=10 | 无 | 200，返回 0 篇，`total=25` |
-| 4 | GET /api/categories/c1/articles?page=1&size=0 | 无 | 400，错误码 `VALIDATION_FAILED`（边界：size ≥ 1） |
+| 1 | GET /api/categories?parentId=null | 无 | 200, C2 在 C1 前（sortOrder 升序） |
 
 **预期结果**
-分页参数生效，total 准确，size=0 被拒。
+分类按 sortOrder 升序排列
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-010 评论
+
 ### UAT-028
 
-- 标题：评论 ≥ 2 级回复 + 楼中楼结构
+- 标题：评论多级回复正常
 - 优先级：高
 - 关联需求：REQ-010
-- 测试场景：正常场景——评论支持 ≥ 2 级回复，楼中楼结构正确
+- 测试场景：在文章下发表评论并多级回复（≤5 层）
 
 **前置条件**
-- 文章 A 已发布，用户 U1、U2 已登录
+- 用户已登录，存在已发布文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/articles/A/comments（U1） | `{"content":"L1"}` | 201，返回 `id=c1, parentId=null, level=1` |
-| 2 | POST /api/articles/A/comments（U2） | `{"content":"L2","parentId":"c1"}` | 201，返回 `id=c2, parentId=c1, level=2` |
-| 3 | POST /api/articles/A/comments（U1） | `{"content":"L3","parentId":"c2"}` | 201，返回 `id=c3, parentId=c2, level=3` |
-| 4 | GET /api/articles/A/comments | 无 | 200，楼中楼结构含 c1 → c2 → c3 链 |
+| 1 | POST /api/articles/X/comments | {content:"一级评论", parentId:null} | 201, id=C1 |
+| 2 | POST /api/articles/X/comments | {content:"二级回复", parentId:C1} | 201, id=C2 |
+| 3 | GET /api/articles/X/comments | 无 | 200, 返回嵌套评论树 |
 
 **预期结果**
-评论支持 ≥ 2 级回复，楼中楼结构正确。
+多级回复创建成功，返回嵌套结构
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-029
 
-- 标题：敏感词评论拦截 + 待审核
+- 标题：敏感词评论审核
 - 优先级：高
 - 关联需求：REQ-010
-- 测试场景：异常场景——含敏感词的评论被拦截，状态为待审核
+- 测试场景：评论含敏感词时自动标记 pending
 
 **前置条件**
-- 敏感词词库含「spam_word」
-- 用户已登录
+- 敏感词列表已配置，用户已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/articles/A/comments | `{"content":"this is spam_word"}` | 201，状态 `pending` |
-| 2 | GET /api/articles/A/comments（普通用户） | 无 | 200，列表不含该评论（待审核不可见） |
-| 3 | GET /api/admin/comments?status=pending（管理员） | 无 | 200，含该评论 |
-| 4 | PUT /api/admin/comments/:id/audit（管理员） | `{"status":"approved"}` | 200 |
-| 5 | GET /api/articles/A/comments（普通用户） | 无 | 200，列表含该评论 |
+| 1 | POST /api/articles/X/comments | {content:"含敏感词的评论"} | 201, status=pending |
+| 2 | GET /api/articles/X/comments | 无 | 不含 pending 评论（公开列表） |
 
 **预期结果**
-敏感词评论被拦截进入待审核，管理员审核通过后可见。
+含敏感词评论自动 pending，不在公开列表显示
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-030
 
-- 标题：点赞计数与取消点赞递减一致
+- 标题：评论点赞幂等性
 - 优先级：中
 - 关联需求：REQ-010
-- 测试场景：正常场景——点赞后计数 +1，取消后 -1；异常场景——重复点赞返回 409
+- 测试场景：同一用户对同一评论点赞两次，第二次取消
 
 **前置条件**
-- 评论 c1 存在，用户 U1 已登录
+- 用户已登录，存在已审核评论
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/comments/c1/like（U1） | 无 | 200，`likeCount=1` |
-| 2 | POST /api/comments/c1/like（U1，重复） | 无 | 409，错误码 `ALREADY_LIKED` |
-| 3 | DELETE /api/comments/c1/like（U1） | 无 | 200，`likeCount=0` |
-| 4 | DELETE /api/comments/c1/like（U1，重复） | 无 | 409，错误码 `NOT_LIKED` |
+| 1 | POST /api/comments/X/like | 用户 token | 200, likeCount=1 |
+| 2 | POST /api/comments/X/like | 同一用户 token | 200, likeCount=0（取消） |
 
 **预期结果**
-点赞计数与取消递减一致，重复操作返回 409。
+点赞操作幂等，再次点击取消
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-011 通知
+
 ### UAT-031
 
-- 标题：举报提交 + 管理员处理状态流转
-- 优先级：中
-- 关联需求：REQ-010
-- 测试场景：正常场景——举报提交后状态为「待处理」，管理员可标记处理结果
+- 标题：通知触发正常
+- 优先级：高
+- 关联需求：REQ-011
+- 测试场景：用户 A 关注博主 B，B 收到关注通知
 
 **前置条件**
-- 评论 c1 存在，用户 U1 与管理员已登录
+- 用户 A 和博主 B 已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/comments/c1/report（U1） | `{"reason":"abuse"}` | 201，状态 `pending` |
-| 2 | GET /api/admin/reports?status=pending（管理员） | 无 | 200，含该举报 |
-| 3 | PUT /api/admin/reports/:id（管理员） | `{"status":"resolved","action":"deleted"}` | 200，状态 `resolved` |
-| 4 | GET /api/articles/A/comments | 无 | 200，评论 c1 已被删除（action=deleted） |
+| 1 | POST /api/bloggers/B/follow | 用户 A token | 200 |
+| 2 | GET /api/notifications | 博主 B token | 200, 含 type=follow 的通知 |
 
 **预期结果**
-举报提交后状态为待处理，管理员处理并执行动作后状态流转。
+关注操作触发被关注者的通知
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-032
 
-- 标题：评论回复触发站内通知 + 未读数 +1
+- 标题：通知全部已读
 - 优先级：中
 - 关联需求：REQ-011
-- 测试场景：正常场景——U2 回复 U1 的评论后，U1 收到站内通知且未读数 +1
+- 测试场景：用户有未读通知，标记全部已读后未读数为 0
 
 **前置条件**
-- U1 与 U2 已登录，U1 的评论 c1 存在
-- U1 未读通知数为 0
+- 用户有 ≥3 条未读通知
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | GET /api/notifications/unread-count（U1） | 无 | 200，`count=0` |
-| 2 | POST /api/articles/A/comments（U2） | `{"content":"reply","parentId":"c1"}` | 201 |
-| 3 | GET /api/notifications（U1） | 无 | 200，含 1 条 `type=comment_reply` 通知 |
-| 4 | GET /api/notifications/unread-count（U1） | 无 | 200，`count=1` |
+| 1 | GET /api/notifications/unread-count | 用户 token | 200, count≥3 |
+| 2 | PUT /api/notifications/read-all | 用户 token | 200 |
+| 3 | GET /api/notifications/unread-count | 用户 token | 200, count=0 |
 
 **预期结果**
-评论回复触发站内通知，未读数 +1。
+全部已读后未读数为 0
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-033
 
-- 标题：全部已读归零 + 通知设置关闭某类生效
+- 标题：通知设置关闭某类
 - 优先级：中
 - 关联需求：REQ-011
-- 测试场景：正常场景——标记全部已读后未读数归零；边界场景——关闭某类通知后该类不再投递
+- 测试场景：用户关闭 follow 类型通知后，关注事件不产生通知
 
 **前置条件**
-- U1 有 3 条未读通知（2 条 comment_reply，1 条 system）
+- 用户 B 已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/notifications/read-all（U1） | 无 | 200 |
-| 2 | GET /api/notifications/unread-count（U1） | 无 | 200，`count=0` |
-| 3 | PUT /api/users/me/notification-settings（U1） | `{"commentReply":false}` | 200 |
-| 4 | 触发 1 条 comment_reply 通知事件 | 无 | U1 不收到该通知 |
-| 5 | GET /api/notifications（U1） | 无 | 200，不含新增 comment_reply 通知 |
+| 1 | PUT /api/notifications/settings | {follow:false}（用户 B） | 200 |
+| 2 | POST /api/bloggers/B/follow | 用户 A token | 200 |
+| 3 | GET /api/notifications | 用户 B token | 200, 不含 follow 通知 |
 
 **预期结果**
-全部已读归零，关闭某类通知后该类不再投递。
+关闭某类通知后该类事件不产生通知
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-012 多博文
+
 ### UAT-034
 
-- 标题：文章 CRUD 状态码 + 非法状态转换拒绝
+- 标题：文章状态机正常流转
 - 优先级：高
 - 关联需求：REQ-012
-- 测试场景：正常场景——CRUD 返回正确状态码；异常场景——非法状态转换被拒
+- 测试场景：文章从 draft → pending_review → published → offline → archived 正常流转
+
+**前置条件**
+- 博主和管理员已登录
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/articles | {title:"文章", content:"内容", status:"draft"}（博主） | 201, status=draft |
+| 2 | PUT /api/articles/X/status | {status:"pending_review"}（博主） | 200 |
+| 3 | PUT /api/articles/X/status | {status:"published"}（管理员） | 200 |
+| 4 | PUT /api/articles/X/status | {status:"offline"}（管理员） | 200 |
+| 5 | PUT /api/articles/X/status | {status:"archived"}（管理员） | 200 |
+
+**预期结果**
+文章状态按正常顺序流转
+
+**执行状态**
+- [x] 待执行
+
+---
+
+### UAT-035
+
+- 标题：状态机逆向跳转异常
+- 优先级：高
+- 关联需求：REQ-012
+- 测试场景：尝试从 archived 回到 published
+
+**前置条件**
+- 存在 archived 状态文章
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | PUT /api/articles/X/status | {status:"published"} | 400, 提示禁止逆向跳转 |
+
+**预期结果**
+archived 不可回到 published
+
+**执行状态**
+- [x] 待执行
+
+---
+
+### UAT-036
+
+- 标题：定时发布到达触发
+- 优先级：中
+- 关联需求：REQ-012
+- 测试场景：文章设置 scheduledAt 为未来时间，到达后自动转为 pending_review
 
 **前置条件**
 - 博主已登录
@@ -989,267 +926,206 @@ P95 ≤ 500ms，返回结果命中查询词。
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/articles | `{"title":"a","content":"b","status":"draft"}` | 201 |
-| 2 | GET /api/articles/:id | 无 | 200 |
-| 3 | PUT /api/articles/:id | `{"title":"a2"}` | 200 |
-| 4 | DELETE /api/articles/:id | 无 | 200 |
-| 5 | POST /api/articles | `{"title":"a","content":"b","status":"published"}` | 409，错误码 `INVALID_STATUS_TRANSITION`（draft 不能直接 published） |
+| 1 | POST /api/articles | {title:"定时", content:"内容", status:"draft", scheduledAt:"未来时间"}（博主） | 201, status=draft |
+| 2 | 等待到 scheduledAt 后查询 | 无 | status=pending_review |
 
 **预期结果**
-CRUD 状态码正确，非法状态转换返回 409。
+定时到达后文章自动转为 pending_review
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
-### UAT-035
-
-- 标题：状态机 6 状态合法 + 非法转换 409
-- 优先级：高
-- 关联需求：REQ-012
-- 测试场景：边界场景——6 状态间合法转换全部通过，非法转换返回 409
-
-**前置条件**
-- 文章 A 处于 `draft` 状态
-- mock clock 可注入
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | PUT /api/articles/A/status | `{"status":"pending_review"}` | 200（draft → pending_review） |
-| 2 | PUT /api/articles/A/status | `{"status":"scheduled_publish","publishAt":<now+60s>}` | 200（pending_review → scheduled_publish） |
-| 3 | 推进 mock clock 至 `now+61s` 并触发定时器 | 无 | 状态变为 `published`（scheduled_publish → published） |
-| 4 | PUT /api/articles/A/status | `{"status":"archived"}` | 409（published 不能直接 archived） |
-| 5 | PUT /api/articles/A/status | `{"status":"taken_down"}` | 200（published → taken_down） |
-| 6 | PUT /api/articles/A/status | `{"status":"archived"}` | 200（taken_down → archived） |
-| 7 | PUT /api/articles/A/status | `{"status":"draft"}` | 409（archived 不能转 draft） |
-
-**预期结果**
-6 状态（draft→pending_review→scheduled_publish→published→taken_down→archived）间合法转换全部通过，非法转换返回 409。
-
-**执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
-
----
-
-### UAT-036
-
-- 标题：文章系列顺序字段 + 可重排
-- 优先级：中
-- 关联需求：REQ-012
-- 测试场景：正常场景——文章归属系列并有顺序字段，可重排
-
-**前置条件**
-- 博主已登录，3 篇文章 a1/a2/a3 均为已发布
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/article-series | `{"name":"s1","articleIds":["a1","a2","a3"]}` | 201 |
-| 2 | GET /api/article-series/s1 | 无 | 200，文章顺序为 `[a1,a2,a3]` |
-| 3 | PUT /api/article-series/s1/order | `{"articleIds":["a3","a1","a2"]}` | 200 |
-| 4 | GET /api/article-series/s1 | 无 | 200，顺序为 `[a3,a1,a2]` |
-
-**预期结果**
-文章系列顺序字段正确，可重排。
-
-**执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
-
----
+## REQ-013 交叉引用
 
 ### UAT-037
 
-- 标题：定时发布在指定时间戳后状态变为已发布
+- 标题：交叉引用正常建立
 - 优先级：中
-- 关联需求：REQ-012
-- 测试场景：边界场景——定时发布在指定时间戳后状态自动变为已发布
+- 关联需求：REQ-013
+- 测试场景：文章 A 引用文章 B，系统自动创建反向链接
 
 **前置条件**
-- 博主已登录，文章 A 处于 `pending_review`
-- mock clock 可注入
+- 存在两篇 published 文章 A 和 B
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/articles/A/status | `{"status":"published","publishAt":<now+60s>}` | 200，状态 `scheduled_publish` |
-| 2 | GET /api/articles/A | 无 | 200，状态 `scheduled_publish`（未到时间） |
-| 3 | 推进 mock clock 至 `now+61s` 并触发定时器 | 无 | 状态变为 `published` |
-| 4 | GET /api/articles/A | 无 | 200，状态 `published` |
+| 1 | POST /api/articles/A/references | {targetArticleId:B}（博主） | 200 |
+| 2 | GET /api/articles/B/cited-by | 无 | 200, 包含 A |
 
 **预期结果**
-定时发布在指定时间戳后自动变为已发布。
+引用建立后 B 的被引用列表包含 A
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-038
 
-- 标题：管理员批量下架返回受影响文章数
+- 标题：自引用异常
 - 优先级：中
-- 关联需求：REQ-012
-- 测试场景：正常场景——管理员批量下架多篇文章，返回受影响文章数
+- 关联需求：REQ-013
+- 测试场景：文章尝试引用自己
 
 **前置条件**
-- 5 篇文章处于 `published` 状态
-- 管理员账号有效
+- 存在文章 A
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | POST /api/admin/articles/batch-takedown（管理员） | `{"articleIds":["a1","a2","a3","a4","a5"]}` | 200，`affectedCount=5` |
-| 2 | GET /api/articles/a1 | 无 | 200，状态 `taken_down` |
-| 3 | POST /api/admin/articles/batch-takedown（重复下架） | 同上 | 200，`affectedCount=0`（已是 taken_down） |
+| 1 | POST /api/articles/A/references | {targetArticleId:A}（博主） | 400, 提示禁止自引用 |
 
 **预期结果**
-批量下架返回受影响文章数，重复下架返回 0。
+自引用返回 400
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-039
 
-- 标题：显式引用自动生成反向链接 + 图谱计数
+- 标题：相关文章推荐计算
 - 优先级：中
 - 关联需求：REQ-013
-- 测试场景：正常场景——文章 A 显式引用文章 B 后，B 自动生成反向链接，图谱计数正确
+- 测试场景：基于共同标签/分类/引用关系推荐相关文章
 
 **前置条件**
-- 文章 A 与 B 均已发布
+- 文章 A 和 B 有共同标签，文章 A 和 C 有引用关系
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/articles/A（博主） | `{"content":"...","references":["B"]}` | 200 |
-| 2 | GET /api/articles/B/backlinks | 无 | 200，含 A |
-| 3 | GET /api/articles/A/reference-graph | 无 | 200，`outgoingCount=1, incomingCount=0` |
-| 4 | GET /api/articles/B/reference-graph | 无 | 200，`outgoingCount=0, incomingCount=1` |
+| 1 | GET /api/articles/A/related | 无 | 200, 返回 ≤10 篇相关文章，含 B 和 C |
 
 **预期结果**
-显式引用后自动生成反向链接，图谱计数正确。
+相关文章推荐返回基于多维度计算的文章
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-014 消息推送 ★ 第 8 轮新增
+
 ### UAT-040
 
-- 标题：被引用文章原作者收到通知
-- 优先级：中
-- 关联需求：REQ-013
-- 测试场景：正常场景——文章 A 引用 B 后，B 的原作者收到引用通知
+- 标题：WebSocket 连接与推送
+- 优先级：高
+- 关联需求：REQ-014
+- 测试场景：用户建立 WebSocket 连接后，新评论事件实时推送到文章作者
 
 **前置条件**
-- 博主 X 是文章 A 作者，博主 Y 是文章 B 作者
-- X 与 Y 已登录
+- 文章作者已建立 WebSocket 连接
+- 另一用户已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/articles/A（X） | `{"references":["B"]}` | 200 |
-| 2 | GET /api/notifications（Y） | 无 | 200，含 1 条 `type=article_referenced` 通知，引用方为 A |
-| 3 | GET /api/articles/B/related | 无 | 200，含 A（基于引用关系推荐） |
+| 1 | WebSocket 连接 ws://localhost:3000/ws | token=作者 JWT | 连接建立成功 |
+| 2 | POST /api/articles/X/comments | 另一用户发表评论 | 201 |
+| 3 | 等待推送（≤100ms） | 无 | 作者 WebSocket 收到 {type:"comment", data:{...}} |
 
 **预期结果**
-被引用文章原作者收到通知，相关文章推荐含引用关系文章。
+新评论实时推送到已连接的文章作者，延迟 ≤100ms
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-041
 
-- 标题：100 QPS 负载下 P95 ≤ 200ms
+- 标题：推送失败重试与离线合并
 - 优先级：高
-- 关联需求：NFR-001
-- 测试场景：边界场景——100 QPS 负载下连续 60s，接口 P95 ≤ 200ms
+- 关联需求：REQ-014
+- 测试场景：用户离线时产生通知，合并后在线时推送；推送失败重试 3 次后转离线消息
 
 **前置条件**
-- 已发布 ≥ 100 篇文章
-- 压测工具可发起 100 QPS
+- 用户 A 离线，有人评论 A 的文章
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 启动压测工具，目标接口 GET /api/articles，100 QPS，持续 60s | 无 | 共发起 6000 请求 |
-| 2 | 收集响应时间 | 无 | P95 ≤ 200ms |
-| 3 | 收集错误率 | 无 | 错误率 ≤ 0.1% |
+| 1 | POST /api/articles/X/comments（A 的文章） | 另一用户 | 201 |
+| 2 | POST /api/articles/X/comments（A 的文章） | 第三方用户 | 201 |
+| 3 | WebSocket 连接（A 上线） | token=A JWT | 收到 1 条合并消息（2 条评论合并） |
+| 4 | 模拟推送失败 | 断开连接后重连 | 重试 3 次（1s/2s/4s）后转离线 |
 
 **预期结果**
-100 QPS 负载下 P95 ≤ 200ms，错误率 ≤ 0.1%。
+离线消息合并为 1 条，重试 3 次失败后保留为离线消息（24h）
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-042
 
-- 标题：操作日志重放后状态一致
-- 优先级：高
-- 关联需求：NFR-002
-- 测试场景：边界场景——服务崩溃后从操作日志重放，状态与崩溃前一致
+- 标题：在线状态广播
+- 优先级：中
+- 关联需求：REQ-014
+- 测试场景：用户上线/下线时广播给其关注者
 
 **前置条件**
-- 已执行 100 次写操作（创建用户/文章/评论等）
-- 操作日志已持久化
+- 用户 B 关注用户 A，A 已建立 WebSocket 连接
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 记录当前内存存储快照 S1 | 无 | 快照 S1 |
-| 2 | 模拟崩溃：清空内存存储，保留操作日志 | 无 | 内存存储为空 |
-| 3 | 重启服务并触发操作日志重放 | 无 | 重放完成 |
-| 4 | 记录重放后内存存储快照 S2 | 无 | 快照 S2 |
-| 5 | 对比 S1 与 S2 | 无 | S1 === S2（实体集合一致） |
+| 1 | WebSocket 连接（B 上线） | token=B JWT | A 收到 {type:"online", userId:B} |
+| 2 | WebSocket 断开（B 下线） | 无 | A 收到 {type:"offline", userId:B} |
 
 **预期结果**
-操作日志重放后状态与崩溃前一致。
+用户上下线事件广播给关注者
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-015 文件上传 ★ 第 8 轮新增
+
 ### UAT-043
 
-- 标题：原型链污染测试不污染对象
+- 标题：图片上传正常
 - 优先级：高
-- 关联需求：NFR-003
-- 测试场景：异常场景——通过 `__proto__` 注入尝试污染对象，验证不生效
+- 关联需求：REQ-015
+- 测试场景：用户上传 JPG 图片，返回文件元数据和 SHA-256
+
+**前置条件**
+- 用户已登录，日配额未用尽
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/files/upload（multipart/form-data） | file=cover.jpg, type=image | 201, 返回 {id, originalName, mimeType:"image/jpeg", size, sha256, uploadedAt} |
+| 2 | GET /api/files/X | 用户 token | 200, 返回文件内容 |
+
+**预期结果**
+图片上传成功，元数据含 SHA-256 摘要
+
+**执行状态**
+- [x] 待执行
+
+---
+
+### UAT-044
+
+- 标题：文件超 10MB 异常
+- 优先级：高
+- 关联需求：REQ-015
+- 测试场景：上传超过 10MB 的文件
 
 **前置条件**
 - 用户已登录
@@ -1258,190 +1134,333 @@ CRUD 状态码正确，非法状态转换返回 409。
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | PUT /api/users/me | `{"nickname":"x","__proto__":{"isAdmin":true}}` | 200 或 400（zod 拦截或字段过滤） |
-| 2 | 验证全局对象原型 | 无 | `({}).isAdmin !== true`（原型未被污染） |
-| 3 | GET /api/admin/users（普通用户 JWT） | 无 | 403（仍无管理员权限） |
+| 1 | POST /api/files/upload | file=large.pdf（11MB）, type=attachment | 413, 提示文件超过 10MB 限制 |
 
 **预期结果**
-原型链污染尝试不生效，普通用户未获得管理员权限。
+超 10MB 文件返回 413
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
-
----
-
-### UAT-044
-
-- 标题：bcrypt 哈希 + JWT 过期 ≤ 24h
-- 优先级：高
-- 关联需求：NFR-003
-- 测试场景：正常场景——密码以 bcrypt 哈希存储；边界场景——JWT 过期时间 ≤ 24h
-
-**前置条件**
-- 用户已注册
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 检查内存存储中用户密码字段 | 无 | 以 `$2b$` 开头（bcrypt 哈希） |
-| 2 | 验证 bcrypt cost | 无 | cost ≥ 10 |
-| 3 | 解析注册返回的 JWT | 无 | `exp - iat ≤ 86400`（≤ 24h） |
-| 4 | 等待 JWT 过期后调用受保护接口 | 无 | 401，错误码 `TOKEN_EXPIRED` |
-
-**预期结果**
-密码以 bcrypt 哈希存储且 cost ≥ 10，JWT 过期时间 ≤ 24h。
-
-**执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-045
 
-- 标题：vitest 覆盖率报告 lines ≥ 80%
+- 标题：魔数校验不匹配异常
 - 优先级：高
-- 关联需求：NFR-004
-- 测试场景：正常场景——运行 vitest 覆盖率报告，lines ≥ 80%
+- 关联需求：REQ-015
+- 测试场景：文件扩展名为 .jpg 但实际内容为可执行文件
 
 **前置条件**
-- 单元测试已编写完成
+- 用户已登录
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 运行 `vitest run --coverage` | 无 | 退出码 0 |
-| 2 | 检查覆盖率报告 | 无 | `lines ≥ 80%` |
-| 3 | 检查覆盖率报告 | 无 | `statements ≥ 80%` |
-| 4 | 检查覆盖率报告 | 无 | `functions ≥ 80%` |
+| 1 | POST /api/files/upload | file=malicious.jpg（实际为 EXE，魔数为 MZ）, type=image | 400, 提示魔数与 MIME 不匹配 |
 
 **预期结果**
-vitest 覆盖率报告 lines / statements / functions 均 ≥ 80%。
+魔数校验不匹配返回 400
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-016 订阅 ★ 第 8 轮新增
+
 ### UAT-046
 
-- 标题：tsc --noEmit strict 模式 0 错误
+- 标题：博主订阅与推送
 - 优先级：高
-- 关联需求：NFR-005
-- 测试场景：正常场景——TypeScript strict 模式编译 0 错误
+- 关联需求：REQ-016
+- 测试场景：用户订阅博主后，博主发布新文章时触发推送
 
 **前置条件**
-- 代码已实现
+- 用户 A 已订阅博主 B，A 已建立 WebSocket 连接
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 运行 `tsc --noEmit` | 无 | 退出码 0，无错误输出 |
-| 2 | 检查 tsconfig.json | 无 | `"strict": true` |
-| 3 | 验证目录结构 | 无 | `controller/`、`service/`、`store/` 分层目录存在 |
-| 4 | 验证公共工具 | 无 | `auth.ts`、`validate.ts`、`error-handler.ts` 存在且被引用 |
+| 1 | POST /api/subscriptions | {type:"blogger", targetId:B}（用户 A） | 201 |
+| 2 | POST /api/articles（博主 B 发布新文章） | {title:"新文", content:"内容", status:"published"} | 201 |
+| 3 | 等待推送 | 无 | A 收到 {type:"article", data:{articleId, title}} |
 
 **预期结果**
-tsc strict 模式 0 错误，模块分层与公共工具复用结构存在。
+订阅博主后新文章发布触发推送
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-047
 
-- 标题：package.json 依赖符合技术栈约束
+- 标题：标签订阅聚合推送
 - 优先级：中
-- 关联需求：CON-001
-- 测试场景：正常场景——package.json 依赖清单符合 CON-001 技术栈约束
+- 关联需求：REQ-016
+- 测试场景：标签订阅后，同小时内多篇新文章合并为 1 条推送
 
 **前置条件**
-- package.json 存在
+- 用户 A 已订阅标签 T，A 离线
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 读取 package.json dependencies | 无 | 含 `express` v4.x、`typescript` v5.x |
-| 2 | 读取 dependencies | 无 | 含 `zod`、`bcrypt`、`jsonwebtoken` |
-| 3 | 读取 devDependencies | 无 | 含 `vitest` |
-| 4 | 验证无数据库依赖 | 无 | 不含 `mongoose`、`sequelize`、`typeorm`、`pg`、`mysql2` 等 |
+| 1 | 发布 3 篇带标签 T 的文章 | 3 位博主 | 3 篇文章创建 |
+| 2 | 等待聚合窗口（1h） | 无 | 生成 1 条聚合通知 |
+| 3 | A 上线（WebSocket 连接） | token=A JWT | A 收到 1 条合并推送 |
 
 **预期结果**
-依赖清单符合技术栈约束，无数据库依赖。
+同小时多篇新文章聚合为 1 条推送
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
 ### UAT-048
 
-- 标题：启动脚本与 Node 20+ 版本要求
+- 标题：订阅权限分级
 - 优先级：中
-- 关联需求：CON-002
-- 测试场景：正常场景——启动脚本与 Node 20+ 版本要求生效
+- 关联需求：REQ-016
+- 测试场景：invitation 类型订阅需邀请码
 
 **前置条件**
-- Node.js 20+ 已安装
+- 存在邀请制订阅配置
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 检查 package.json `engines.node` | 无 | `>=20.0.0` |
-| 2 | 运行 `npm start` | 无 | 服务启动，监听端口，输出就绪日志 |
-| 3 | 验证单实例 | 无 | 仅 1 个进程，无集群/多实例配置 |
+| 1 | POST /api/subscriptions | {type:"blogger", targetId:B, permission:"invitation", inviteCode:"INVALID"} | 403, 邀请码无效 |
+| 2 | POST /api/subscriptions | {type:"blogger", targetId:B, permission:"invitation", inviteCode:"VALID123"} | 201 |
 
 **预期结果**
-启动脚本正常，Node 版本要求 ≥ 20，单实例部署。
+邀请制订阅需有效邀请码
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
 
 ---
 
+## REQ-017 数据导出与备份 ★ 第 8 轮新增
+
 ### UAT-049
 
-- 标题：测试数据规模不超限（单元/集成）
-- 优先级：中
-- 关联需求：CON-003
-- 测试场景：边界场景——单元测试与集成测试数据规模不超 CON-003 上限
+- 标题：用户数据导出 JSON
+- 优先级：高
+- 关联需求：REQ-017
+- 测试场景：用户请求导出个人数据（JSON 格式），异步任务完成后下载
 
 **前置条件**
-- 单元测试与集成测试已编写
+- 用户已登录，有个人资料/文章/评论/订阅数据
 
 **测试步骤**
 
 | 步骤 | 操作 | 输入 | 预期输出 |
 |---|---|---|---|
-| 1 | 运行单元测试套件 | 无 | 全部通过 |
-| 2 | 检查单元测试数据规模 | 无 | 文章 ≤ 100，用户 ≤ 50 |
-| 3 | 运行集成测试套件 | 无 | 全部通过 |
-| 4 | 检查集成测试数据规模 | 无 | 文章 ≤ 1000，用户 ≤ 200 |
+| 1 | POST /api/export/user | {format:"json"}（用户 token） | 202, 返回 {taskId} |
+| 2 | GET /api/export/tasks/X/progress | 用户 token | 200, {status:"running", progress:50} |
+| 3 | GET /api/export/tasks/X/download | 用户 token（等待 completed） | 200, 下载 JSON 文件含 profile/articles/comments/subscriptions |
 
 **预期结果**
-单元测试与集成测试数据规模不超 CON-003 上限。
+用户数据导出为 JSON，异步任务完成后可下载
 
 **执行状态**
-- [ ] 待执行
-- [ ] 通过
-- [ ] 失败 —— 失败原因：{{}}
+- [x] 待执行
+
+---
+
+### UAT-050
+
+- 标题：管理员备份与恢复
+- 优先级：高
+- 关联需求：REQ-017
+- 测试场景：管理员创建全量备份，从备份恢复到内存存储
+
+**前置条件**
+- 管理员已登录，系统有数据
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/admin/backup | 管理员 token | 202, 返回 {backupId, version} |
+| 2 | GET /api/admin/backups/X | 管理员 token | 200, 下载 JSON 备份文件 |
+| 3 | POST /api/admin/restore | {backupId:X}（管理员） | 200, 含完整性校验结果 |
+| 4 | GET /api/articles（恢复后） | 无 | 数据与备份一致 |
+
+**预期结果**
+备份和恢复成功，完整性校验通过
+
+**执行状态**
+- [x] 待执行
+
+---
+
+### UAT-051
+
+- 标题：增量导出时间范围
+- 优先级：中
+- 关联需求：REQ-017
+- 测试场景：按时间范围导出增量数据
+
+**前置条件**
+- 管理员已登录，存在时间范围内的变更数据
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/export/incremental | {startTime:"2026-07-01T00:00:00Z", endTime:"2026-07-25T00:00:00Z", format:"json"}（管理员） | 202, 返回 {taskId} |
+| 2 | GET /api/export/tasks/X/download | 管理员 token | 200, 仅含时间范围内的变更数据 |
+
+**预期结果**
+增量导出仅包含时间范围内的数据
+
+**执行状态**
+- [x] 待执行
+
+---
+
+## NFR-001 性能
+
+### UAT-052
+
+- 标题：接口响应 P95 性能验证
+- 优先级：高
+- 关联需求：NFR-001
+- 测试场景：在 100 QPS 并发下验证接口响应 P95 ≤ 200ms，搜索 P95 ≤ 500ms，上传 P95 ≤ 1s，推送 ≤ 100ms
+
+**前置条件**
+- 系统已部署，有测试数据（100 篇文章、50 用户）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | k6 压测 /api/articles GET | 100 QPS × 60s | P95 ≤ 200ms |
+| 2 | k6 压测 /api/search?q=blog | 100 QPS × 60s | P95 ≤ 500ms |
+| 3 | k6 压测 /api/files/upload（5MB） | 10 QPS × 60s | P95 ≤ 1s |
+| 4 | WebSocket 推送延迟测量 | 100 次推送 | P95 ≤ 100ms |
+
+**预期结果**
+所有性能指标达标
+
+**执行状态**
+- [x] 待执行
+
+---
+
+## NFR-002 可用性
+
+### UAT-053
+
+- 标题：备份恢复成功率验证
+- 优先级：高
+- 关联需求：NFR-002
+- 测试场景：连续执行 100 次备份恢复，成功率 ≥ 99%
+
+**前置条件**
+- 管理员已登录
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 循环 100 次：POST /api/admin/backup → POST /api/admin/restore | 100 次备份+恢复 | 成功次数 ≥ 99 |
+| 2 | 计算成功率 | successCount / 100 | ≥ 99% |
+
+**预期结果**
+备份恢复成功率 ≥ 99%
+
+**执行状态**
+- [x] 待执行
+
+---
+
+## NFR-003 安全
+
+### UAT-054
+
+- 标题：安全校验综合验证（JWT/bcrypt/魔数/原型链污染）
+- 优先级：高
+- 关联需求：NFR-003
+- 测试场景：验证 JWT 认证、bcrypt 哈希、魔数校验、原型链污染防护
+
+**前置条件**
+- 系统已部署
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 验证密码 bcrypt 哈希 | 查看用户存储 | password 字段为 bcrypt 哈希（$2b$开头） |
+| 2 | JWT 无效 token | Authorization: Bearer invalid | 401 |
+| 3 | 原型链污染尝试 | {__proto__:{isAdmin:true}} | 不影响权限 |
+| 4 | 文件魔数校验 | .jpg 实际为 EXE | 400 |
+
+**预期结果**
+所有安全校验通过
+
+**执行状态**
+- [x] 待执行
+
+---
+
+## NFR-004 可测试性
+
+### UAT-055
+
+- 标题：单元测试覆盖率 ≥ 80%
+- 优先级：高
+- 关联需求：NFR-004
+- 测试场景：运行全部单元测试，检查 lines 覆盖率
+
+**前置条件**
+- 单元测试代码已编写
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | npx vitest run --coverage | 无 | 所有测试通过，lines 覆盖率 ≥ 80% |
+
+**预期结果**
+单元测试 lines 覆盖率 ≥ 80%
+
+**执行状态**
+- [x] 待执行
+
+---
+
+## NFR-005 可维护性
+
+### UAT-056
+
+- 标题：TypeScript strict 0 错误
+- 优先级：高
+- 关联需求：NFR-005
+- 测试场景：TypeScript strict 模式编译无错误
+
+**前置条件**
+- tsconfig.json 配置 strict: true
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | npx tsc --noEmit | 无 | 0 错误，0 警告 |
+
+**预期结果**
+TypeScript strict 模式编译 0 错误
+
+**执行状态**
+- [x] 待执行
 
 ---
 
@@ -1449,82 +1468,67 @@ tsc strict 模式 0 错误，模块分层与公共工具复用结构存在。
 
 | 用例 ID | 标题 | 优先级 | 关联 | 状态 |
 |---|---|---|---|---|
-| UAT-001 | 站点配置项持久化与读取 | 高 | REQ-001 | 待执行 |
-| UAT-002 | 维护模式开关阻断非管理员请求 | 高 | REQ-001 | 待执行 |
-| UAT-003 | 公告定时发布在指定时间戳后可见 | 中 | REQ-001 | 待执行 |
-| UAT-004 | 站点统计概览 4 项计数一致 | 中 | REQ-001 | 待执行 |
-| UAT-005 | 博主注册返回 201 并签发 JWT | 高 | REQ-002 | 待执行 |
-| UAT-006 | 博主角色分级 3 类区分 | 中 | REQ-002 | 待执行 |
-| UAT-007 | 博主权限隔离（跨博主编辑返回 403） | 高 | REQ-002 | 待执行 |
-| UAT-008 | 关注/取关双向列表一致 | 中 | REQ-002 | 待执行 |
-| UAT-009 | 用户注册+登录返回 JWT 且 bcrypt 哈希 | 高 | REQ-003 | 待执行 |
-| UAT-010 | 4 类角色 RBAC 权限边界 | 高 | REQ-003 | 待执行 |
-| UAT-011 | 用户资料修改一致性 | 中 | REQ-003 | 待执行 |
-| UAT-012 | 封禁用户登录返回 403 且记录原因 | 高 | REQ-003 | 待执行 |
-| UAT-013 | 个性化推荐流返回 ≥ 1 篇文章且排序 | 中 | REQ-004 | 待执行 |
-| UAT-014 | 热门/最新推荐流排序正确 | 中 | REQ-004 | 待执行 |
-| UAT-015 | 推荐位配置变更生效 | 低 | REQ-004 | 待执行 |
-| UAT-016 | 广告位 CRUD + 投放时间范围生效 | 中 | REQ-005 | 待执行 |
-| UAT-017 | 点击统计 CTR 计算正确 | 中 | REQ-005 | 待执行 |
-| UAT-018 | 未审核广告不向前台返回 | 中 | REQ-005 | 待执行 |
-| UAT-019 | 4 类统计接口字段齐全且数值一致 | 中 | REQ-006 | 待执行 |
-| UAT-020 | CSV/JSON 导出文件可解析 | 中 | REQ-006 | 待执行 |
-| UAT-021 | 全文搜索 P95 ≤ 500ms 且命中 | 高 | REQ-007 | 待执行 |
-| UAT-022 | 排序参数（相关度/时间/热度）生效 | 中 | REQ-007 | 待执行 |
-| UAT-023 | 搜索建议前缀匹配返回 ≤ 10 条 | 低 | REQ-007 | 待执行 |
-| UAT-024 | 文章多标签绑定 + 标签云频次降序 | 中 | REQ-008 | 待执行 |
-| UAT-025 | 标签合并后旧标签不可用 | 中 | REQ-008 | 待执行 |
-| UAT-026 | 分类树多级父子 + 拒绝循环引用 | 中 | REQ-009 | 待执行 |
-| UAT-027 | 分类下文章列表分页参数生效 | 中 | REQ-009 | 待执行 |
-| UAT-028 | 评论 ≥ 2 级回复 + 楼中楼结构 | 高 | REQ-010 | 待执行 |
-| UAT-029 | 敏感词评论拦截 + 待审核 | 高 | REQ-010 | 待执行 |
-| UAT-030 | 点赞计数与取消点赞递减一致 | 中 | REQ-010 | 待执行 |
-| UAT-031 | 举报提交 + 管理员处理状态流转 | 中 | REQ-010 | 待执行 |
-| UAT-032 | 评论回复触发站内通知 + 未读数 +1 | 中 | REQ-011 | 待执行 |
-| UAT-033 | 全部已读归零 + 通知设置关闭某类生效 | 中 | REQ-011 | 待执行 |
-| UAT-034 | 文章 CRUD 状态码 + 非法状态转换拒绝 | 高 | REQ-012 | 待执行 |
-| UAT-035 | 状态机 6 状态合法 + 非法转换 409 | 高 | REQ-012 | 待执行 |
-| UAT-036 | 文章系列顺序字段 + 可重排 | 中 | REQ-012 | 待执行 |
-| UAT-037 | 定时发布在指定时间戳后状态变为已发布 | 中 | REQ-012 | 待执行 |
-| UAT-038 | 管理员批量下架返回受影响文章数 | 中 | REQ-012 | 待执行 |
-| UAT-039 | 显式引用自动生成反向链接 + 图谱计数 | 中 | REQ-013 | 待执行 |
-| UAT-040 | 被引用文章原作者收到通知 | 中 | REQ-013 | 待执行 |
-| UAT-041 | 100 QPS 负载下 P95 ≤ 200ms | 高 | NFR-001 | 待执行 |
-| UAT-042 | 操作日志重放后状态一致 | 高 | NFR-002 | 待执行 |
-| UAT-043 | 原型链污染测试不污染对象 | 高 | NFR-003 | 待执行 |
-| UAT-044 | bcrypt 哈希 + JWT 过期 ≤ 24h | 高 | NFR-003 | 待执行 |
-| UAT-045 | vitest 覆盖率报告 lines ≥ 80% | 高 | NFR-004 | 待执行 |
-| UAT-046 | tsc --noEmit strict 模式 0 错误 | 高 | NFR-005 | 待执行 |
-| UAT-047 | package.json 依赖符合技术栈约束 | 中 | CON-001 | 待执行 |
-| UAT-048 | 启动脚本与 Node 20+ 版本要求 | 中 | CON-002 | 待执行 |
-| UAT-049 | 测试数据规模不超限（单元/集成） | 中 | CON-003 | 待执行 |
+| UAT-001 | 站点配置正常更新 | 高 | REQ-001 | 待执行 |
+| UAT-002 | 维护模式开关验证 | 高 | REQ-001 | 待执行 |
+| UAT-003 | 公告定时发布边界 | 中 | REQ-001 | 待执行 |
+| UAT-004 | 博主注册正常流程 | 高 | REQ-002 | 待执行 |
+| UAT-005 | 重复邮箱注册异常 | 高 | REQ-002 | 待执行 |
+| UAT-006 | 权限隔离边界 | 高 | REQ-002 | 待执行 |
+| UAT-007 | 用户登录 JWT 正常 | 高 | REQ-003 | 待执行 |
+| UAT-008 | 封禁用户 token 失效 | 高 | REQ-003 | 待执行 |
+| UAT-009 | 角色权限越权异常 | 高 | REQ-003 | 待执行 |
+| UAT-010 | 热门推荐正常返回 | 中 | REQ-004 | 待执行 |
+| UAT-011 | 个性化推荐需登录 | 中 | REQ-004 | 待执行 |
+| UAT-012 | 推荐位管理异常 | 中 | REQ-004 | 待执行 |
+| UAT-013 | 广告投放正常流程 | 中 | REQ-005 | 待执行 |
+| UAT-014 | 广告时间范围边界 | 中 | REQ-005 | 待执行 |
+| UAT-015 | 广告审核状态异常 | 中 | REQ-005 | 待执行 |
+| UAT-016 | 文章统计正常返回 | 中 | REQ-006 | 待执行 |
+| UAT-017 | 用户统计趋势聚合 | 中 | REQ-006 | 待执行 |
+| UAT-018 | 非管理员访问统计异常 | 高 | REQ-006 | 待执行 |
+| UAT-019 | 全文搜索正常 | 高 | REQ-007 | 待执行 |
+| UAT-020 | 搜索排序模式切换 | 中 | REQ-007 | 待执行 |
+| UAT-021 | 搜索历史 FIFO 淘汰 | 中 | REQ-007 | 待执行 |
+| UAT-022 | 标签创建与绑定 | 中 | REQ-008 | 待执行 |
+| UAT-023 | 标签合并管理员操作 | 中 | REQ-008 | 待执行 |
+| UAT-024 | 标签名特殊字符异常 | 中 | REQ-008 | 待执行 |
+| UAT-025 | 分类树多级创建 | 中 | REQ-009 | 待执行 |
+| UAT-026 | 分类级联删除边界 | 中 | REQ-009 | 待执行 |
+| UAT-027 | 分类排序正常 | 低 | REQ-009 | 待执行 |
+| UAT-028 | 评论多级回复正常 | 高 | REQ-010 | 待执行 |
+| UAT-029 | 敏感词评论审核 | 高 | REQ-010 | 待执行 |
+| UAT-030 | 评论点赞幂等性 | 中 | REQ-010 | 待执行 |
+| UAT-031 | 通知触发正常 | 高 | REQ-011 | 待执行 |
+| UAT-032 | 通知全部已读 | 中 | REQ-011 | 待执行 |
+| UAT-033 | 通知设置关闭某类 | 中 | REQ-011 | 待执行 |
+| UAT-034 | 文章状态机正常流转 | 高 | REQ-012 | 待执行 |
+| UAT-035 | 状态机逆向跳转异常 | 高 | REQ-012 | 待执行 |
+| UAT-036 | 定时发布到达触发 | 中 | REQ-012 | 待执行 |
+| UAT-037 | 交叉引用正常建立 | 中 | REQ-013 | 待执行 |
+| UAT-038 | 自引用异常 | 中 | REQ-013 | 待执行 |
+| UAT-039 | 相关文章推荐计算 | 中 | REQ-013 | 待执行 |
+| UAT-040 | WebSocket 连接与推送 | 高 | REQ-014 | 待执行 |
+| UAT-041 | 推送失败重试与离线合并 | 高 | REQ-014 | 待执行 |
+| UAT-042 | 在线状态广播 | 中 | REQ-014 | 待执行 |
+| UAT-043 | 图片上传正常 | 高 | REQ-015 | 待执行 |
+| UAT-044 | 文件超 10MB 异常 | 高 | REQ-015 | 待执行 |
+| UAT-045 | 魔数校验不匹配异常 | 高 | REQ-015 | 待执行 |
+| UAT-046 | 博主订阅与推送 | 高 | REQ-016 | 待执行 |
+| UAT-047 | 标签订阅聚合推送 | 中 | REQ-016 | 待执行 |
+| UAT-048 | 订阅权限分级 | 中 | REQ-016 | 待执行 |
+| UAT-049 | 用户数据导出 JSON | 高 | REQ-017 | 待执行 |
+| UAT-050 | 管理员备份与恢复 | 高 | REQ-017 | 待执行 |
+| UAT-051 | 增量导出时间范围 | 中 | REQ-017 | 待执行 |
+| UAT-052 | 接口响应 P95 性能 | 高 | NFR-001 | 待执行 |
+| UAT-053 | 备份恢复成功率 | 高 | NFR-002 | 待执行 |
+| UAT-054 | 安全校验综合 | 高 | NFR-003 | 待执行 |
+| UAT-055 | 单元测试覆盖率 ≥80% | 高 | NFR-004 | 待执行 |
+| UAT-056 | TypeScript strict 0 错误 | 高 | NFR-005 | 待执行 |
 
 ## 测试用例覆盖说明
 
-- 功能点覆盖：21/21（13 功能需求 + 5 NFR + 3 CON，100%）
-- 关键功能用例数（≥ 3 用例）：
-  - REQ-001 站点管理：4 用例（UAT-001 ~ UAT-004）
-  - REQ-002 多博主：4 用例（UAT-005 ~ UAT-008）
-  - REQ-003 多用户：4 用例（UAT-009 ~ UAT-012）
-  - REQ-007 搜索：3 用例（UAT-021 ~ UAT-023）
-  - REQ-010 评论：4 用例（UAT-028 ~ UAT-031）
-  - REQ-012 多博文：5 用例（UAT-034 ~ UAT-038）
-- 边界条件覆盖：
-  - 维护模式开关（UAT-002）
-  - 定时发布时间边界（UAT-003 / UAT-037）
-  - 4 类角色权限边界（UAT-010）
-  - 标签 0 标签被拒（UAT-024）
-  - 分页 size=0 被拒（UAT-027）
-  - 评论 3 级嵌套（UAT-028）
-  - 状态机 6 状态转换（UAT-035）
-  - 100 QPS 性能边界（UAT-041）
-  - 数据规模上限（UAT-049）
-- 异常场景覆盖：
-  - 重复邮箱注册（UAT-005）
-  - 跨博主编辑（UAT-007）
-  - 错误密码登录（UAT-009）
-  - 敏感词评论（UAT-029）
-  - 重复点赞（UAT-030）
-  - 非法状态转换（UAT-034 / UAT-035）
-  - 原型链污染（UAT-043）
-- 主观词检查：本用例集无「快速」「友好」「易用」等主观词，全部改写为可量化标准（状态码 / P95 / QPS / 计数一致性 / 字段存在性）。
+- 功能点覆盖：17/17 REQ 全覆盖（每个 REQ ≥3 个用例：正常+异常+边界）
+- 非功能覆盖：5/5 NFR 全覆盖（每个 NFR 1 个用例）
+- 总用例数：56（51 功能 + 5 非功能）
+- 优先级分布：高 30 / 中 23 / 低 3
+- 场景覆盖：正常场景 25 + 异常场景 20 + 边界场景 11

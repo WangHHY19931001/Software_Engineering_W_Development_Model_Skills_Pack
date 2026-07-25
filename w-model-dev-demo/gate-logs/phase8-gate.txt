@@ -1,0 +1,15 @@
+════════════════════════════════════════════════════════════
+工件质量门校验（Artifact Gate）
+════════════════════════════════════════════════════════════
+项目目录      : .
+RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\rtm.json
+RTM 覆盖率    : 100%
+单元覆盖率    : 83.48%
+TLA+ 资产     : ✓ manifest 存在且 specs 非空
+graph 资产    : ⚠ 未提供（跳过 SD→codeModule 校验）
+校验结果      : ✓ 通过
+────────────────────────────────────────────────────────────
+所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过。
+────────────────────────────────────────────────────────────
+GATE_JSON {"type":"artifact","passed":true,"exitCode":0,"coveragePercent":100,"unitCoveragePercent":83.48,"missingItems":[],"reasons":[]}
+exitCode=0

@@ -116,6 +116,27 @@ npm run hill-climbing                           # （编排者 O 执行）L2+ �
 | fixture | 6 个集成测试覆盖门禁脚本增强（gate-enhancement.test.ts） |
 | 文档 | tla-plus-guide.md §2.1/§3/§4、verifier-spec.md、phase-5-coding.md、phase-8-acceptance-test.md、phase-1-requirements.md、SKILL.md |
 
+- **端到端调测结论**（2026-07-25，第八轮，扩展博客系统 25 需求，编排者-子代理分派 + self-as-verifier 自驱模式）：
+
+| 指标 | 数值 |
+|---|---|
+| 范围 | 扩展博客系统后端（w-model-dev-demo） |
+| 需求 | 25 项（17 REQ + 5 NFR + 3 CON） |
+| 设计 | 17 SD + 51 DD + 17 INTF |
+| TLA+ 规格 | 17 个（1 L1 + 7 L2 + 5 L3 + 3 L4）+ 3 L4 原子行为 |
+| 图谱 | 216 节点 902 边，信息流零违反，EXT-IN/EXT-OUT 边界完整 |
+| 源码 | 58 TS 文件（17 controllers + 17 services + 18 stores + 4 utils + app/server/types） |
+| 单元测试 | 226/226 通过，代码覆盖率 83.48% lines（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 40/40 通过（TC-INT-001~040） |
+| 系统测试 | 64/64 通过（TC-SYS-001~064） |
+| 验收测试 | 56/56 通过（UAT-001~056） |
+| 阶段门评审 | phase4=0.9125/A、phase5=0.923/A、phase6=0.9325/A、phase7=0.9275/A、phase8=0.9375/A |
+| code-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule 17/17 + 状态转移 90 + Next 分支 + 不变式断言 69） |
+| 工件质量门 | check-artifact-gate 终检 exitCode=0，RTM 100%，missingItems=[] |
+| 用户确认 | `confirm`（2026-07-25 用户在 acceptance-test-report.md §9 勾选 confirm，项目归档完成；currentPhase=9，project.json status=项目完成） |
+
+> 第八轮（2026-07-25）相比第七轮（门禁增强）：本轮验证增强后门禁在 25 需求全量重跑下的端到端可用性。需求 21→25、DD 29→51、TLA+ 13→17（新增 L4 层级 3 个）、图谱节点 76→216、边 396→902。全量测试 354→386（单元 209→226、集成 43→40、系统 53→64、验收 49→56）。过程中修复 4 个源码 bug（push.service retry break→continue、article.store getById 副本、blogger.service follow 幂等、auth.service 预哈希校验）。所有门禁退出码 0。**用户已于 2026-07-25 在 acceptance-test-report.md §9 勾选 `confirm` 归档，project.json status 更新为「项目完成」，rtm.json currentPhase=9，run-log.jsonl 追加 wm8-r012 归档 checkpoint 条目。**
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：

@@ -133,6 +133,26 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 > 第五轮（2026-07-24）相比第四轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/`/`dist/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，采用编排者-子代理分派模式（每阶段 S→V→G 子代理执行）。重跑产物为独立再实现，单元测试 53→77、覆盖率由 96.37% 提升至 99.37%（lines），集成测试 13→21、系统测试 8→22，验收测试 15 不变，全量测试 89→135。图谱节点 43→35（更精炼的 DD 拆分），边 182→141，零违反保持。TLA+ 规格 8 个（1 L1 + 4 L2 + 3 L3），层次化建模完整。阶段 5 新增代码-TLA+ 一致性回归门禁（`check-code-tla-consistency.ts` 四维度校验）。过程中修正了 check-artifact-gate.ts 缺 exitCode 字段的脚本缺陷。所有门禁退出码 0，未引入新缺陷。
 
+**端到端调测结论**（2026-07-25，第八轮，扩展博客系统 25 需求，编排者-子代理分派 + self-as-verifier 自驱模式，**用户 confirm 归档**）：
+
+| 指标 | 数值 |
+|---|---|
+| 范围 | 扩展博客系统后端（25 需求：17 REQ + 5 NFR + 3 CON） |
+| 设计 | 17 SD + 51 DD + 17 INTF |
+| TLA+ 规格 | 17 个（1 L1 + 7 L2 + 5 L3 + 3 L4）+ 3 L4 原子行为 |
+| 图谱 | 216 节点 902 边，信息流零违反，EXT-IN/EXT-OUT 边界完整 |
+| 源码 | 58 TS 文件（17 controllers + 17 services + 18 stores + 4 utils + app/server/types） |
+| 单元测试 | 226/226 通过，代码覆盖率 83.48% lines（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 40/40 通过（TC-INT-001~040） |
+| 系统测试 | 64/64 通过（TC-SYS-001~064） |
+| 验收测试 | 56/56 通过（UAT-001~056） |
+| 阶段门评审 | phase4=0.9125/A、phase5=0.923/A、phase6=0.9325/A、phase7=0.9275/A、phase8=0.9375/A |
+| code-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule 17/17 + 状态转移 90 + Next 分支 + 不变式断言 69） |
+| 工件质量门 | check-artifact-gate 终检 exitCode=0，RTM 100%，missingItems=[] |
+| 用户确认 | `confirm`（2026-07-25 用户在 acceptance-test-report.md §9 勾选 confirm，项目归档完成；currentPhase=9，project.json status=项目完成） |
+
+> 第八轮（2026-07-25）相比第五轮（已归档基线）：项目范围从基础博客扩展为 25 需求（新增站点管理/多博主/推荐/广告/统计/搜索/标签/分类/评论/通知/交叉引用/订阅/备份恢复 + 5 NFR + 3 CON），需求 5→25、DD 5→51、TLA+ 规格 8→17（新增 L4 层级 3 个）、图谱节点 35→216、边 141→902。全量测试 135→386（单元 77→226、集成 21→40、系统 22→64、验收 15→56）。采用 self-as-verifier 自驱模式 + 编排者-子代理分派。过程中修复 4 个源码 bug（push.service retry、article.store 副本、blogger.service 幂等、auth.service 预哈希）。所有门禁退出码 0。**用户已于 2026-07-25 在 acceptance-test-report.md §9 勾选 `confirm` 归档，project.json status=「项目完成」，rtm.json currentPhase=9，run-log.jsonl 追加 wm8-r012 归档 checkpoint 条目。**
+
 过程中发现并修正的缺陷（累计 5 项）：
 
 1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
