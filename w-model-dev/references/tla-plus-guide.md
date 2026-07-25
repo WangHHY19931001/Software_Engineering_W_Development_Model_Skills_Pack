@@ -502,3 +502,34 @@ INVARIANT ArtifactGateConsistency
 ```
 
 > 不变式数量计数是跨产物交叉校验的枢纽：`.cfg` 声明数 = `.tla` `BusinessInvariant` 展开数 = verifier-output 不变式描述数，三者一致才放行（治 D27 三处不一致）。
+
+## 13. 第 11 轮吸收的参考资料
+
+> 第 11 轮外部技能吸收（2026-07-26）：吸收 `claude-tla-plus-plugin` 的 4 份 skill 资料与 review 命令语义。详见 SSoT §3.4.9。
+
+### 13.1 参考资料索引
+
+| # | 文件 | 用途 | 加载时机 |
+|---|---|---|---|
+| 1 | [tla-plus-syntax-reference.md](./tla-plus-syntax-reference.md) | TLA+ 完整语法 | S-tla 必读 |
+| 2 | [tla-plus-patterns-examples.md](./tla-plus-patterns-examples.md) | 8 个典型示例 | S-tla 按场景 |
+| 3 | [tla-plus-tlc-configuration.md](./tla-plus-tlc-configuration.md) | TLC .cfg 配置指南 | S-tla 产 .cfg 时必读 |
+| 4 | [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) | V-tla 审查 7 项清单 | V-tla 必读 |
+
+### 13.2 S-tla/V-tla 加载矩阵
+
+遵循约束 #6「按需加载」——只加载当前阶段所需文件，禁止一次加载全部。
+
+| 角色/阶段 | 必读 | 按场景 |
+|---|---|---|
+| S-tla 阶段 1（L1） | syntax-reference | patterns §KV |
+| S-tla 阶段 2-3（L2/L3） | syntax-reference | patterns §Bakery/Producer-Consumer + tlc-configuration |
+| S-tla 阶段 4（L3/L4） | syntax-reference | patterns §Consensus/Two-Phase Commit + tlc-configuration |
+| V-tla 全阶段 | review-checklist | syntax-reference |
+
+### 13.3 与现有约束的关系
+
+- 4 份参考文件是**参考资料**，不是新约束
+- S-tla 子代理参考示例时仍须遵循 §2.0 命名规范、§文件头规范、§3 SD 覆盖率规则
+- V-tla 子代理审查时仍用 `targetKind=design`（不新增 targetKind 枚举值）
+- 现有反模式 #15-17（TLA+ 占位/简化/错误实现、建模不符合需求设计）仍为合规边界
