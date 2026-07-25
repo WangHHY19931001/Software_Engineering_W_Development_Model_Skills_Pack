@@ -52,6 +52,66 @@
 输出: 结构化需求规格 + 验收测试用例 + 风险评估报告
 ```
 
+## User Stories 长列表（第 10 轮外部技能吸收）
+
+> 吸收 to-spec PRD 结构。S-doc 产出需求规格时，在「需求清单」前必须包含 User Stories 节，覆盖正常/异常/边界/NFR/CON 全场景。
+
+**模板**：
+
+```markdown
+## User Stories
+
+1. As a <actor>, I want <feature>, so that <benefit>
+2. As a <actor>, I want <feature>, so that <benefit>
+...
+```
+
+**规则**：
+- 每条 user story 对应 ≥1 个 REQ 行（RTM `requirementId` 可追溯）
+- 列表「extensive」——覆盖正常/异常/边界/NFR/CON 全场景
+- 与「需求清单」互补：user stories 是用户视角，需求清单是系统视角
+- A 子代理 ingestion 时把 user stories 作为 chunk 之一（不破坏现有分块策略）
+
+## Out of Scope 显式声明（第 10 轮外部技能吸收）
+
+> 吸收 to-spec PRD 结构。S-doc 在「需求清单」后必须包含 Out of Scope 节，明确排除的功能/场景。
+
+**模板**：
+
+```markdown
+## Out of Scope
+
+- <明确排除的功能/场景>
+- <原因：依赖未就绪/范围过大/下轮迭代>
+```
+
+**规则**：
+- 至少 1 条（即使是「无」也要显式声明）
+- 与 NFR/CON 横切治理互补：NFR/CON 是「要做什么」，Out of Scope 是「不做什么」
+- V 子代理评审时检查「Out of Scope 是否覆盖了用户提到的边界场景」
+- Brownfield 项目须明确声明不动哪些历史模块（见 SSoT §11A.5）
+
+## Implementation/Testing Decisions 分离（第 10 轮外部技能吸收）
+
+> 吸收 to-spec PRD 结构。S-doc 在「风险与缓解」前必须包含 Implementation Decisions + Testing Decisions 两节，分离架构决策与测试决策。
+
+**模板**：
+
+```markdown
+## Implementation Decisions
+- <架构/模块/接口/Schema/API 契约决策>
+- <避免具体文件路径与代码片段（除非 prototype 产出的决策密集片段）>
+
+## Testing Decisions
+- <测试 seam 选择及理由>
+- <哪些模块测试、参考哪些既有测试>
+```
+
+**规则**：
+- Implementation Decisions 与现有「设计假设」互补：假设是「未确认的前提」，决策是「已选定的方向」
+- Testing Decisions 与阶段 1 同步验收测试设计互补：本节是「为什么这样测」，验收测试设计是「测什么」
+- 禁止具体文件路径（OpenSpec 与 to-spec 共识：路径易过期）
+
 ## 执行方法论
 
 > 本节规定产出物的工具级落地方式，确保产出可复现、可追溯、可审计。

@@ -173,6 +173,37 @@
 - 实现缺陷 → 回阶段 5（编码）
 - 测试覆盖不足 → 回对应测试阶段（6/7）
 
+## Archive 机制（第 10 轮外部技能吸收）
+
+> 吸收 OpenSpec archive 机制。项目级放行后，S 子代理执行 archive，沉淀产物到只读目录。
+
+### 触发时机
+项目级放行（acceptance-test-report.md §9 用户勾选 confirm）后，S 子代理执行 archive。
+
+### Archive 路径
+`changes/archive/<YYYY-MM-DD>-<feature-slug>/`
+
+### Archive 产物清单
+- `proposal.md` ← 阶段 1 需求规格的「问题陈述 + 解决方案 + User Stories + Out of Scope」节抽取
+- `specs.md` ← RTM 需求行 + 验收测试用例（UAT-xxx）合并
+- `design.md` ← 阶段 2-4 设计产物的技术决策摘要（不含具体文件路径）
+- `tasks.md` ← 阶段 5 tickets.md 的票据清单 + 完成状态
+- `tla-summary.md` ← TLA+ 规格清单（L1/L2/L3/L4 ID + 不变式列表）
+- `rtm-snapshot.json` ← RTM 最终快照（requirementId → {designDoc, codeModule, tests}）
+- `verifier-summary.md` ← 8 阶段 V 评审 qualityLevel + compositeScore 摘要
+
+### Archive 规则
+- 由 S 子代理执行（编排者不越权，反模式 #10 不变）
+- archive 后 `.w-model/` 原始产物保留（不删除，作为可追溯证据）
+- archive 产物只读，后续项目引用时只读取不修改
+- archive 产物禁止具体文件路径（OpenSpec 与 to-spec 共识）
+- **tickets.md 源路径无关性**：阶段 5 票据产出位置（`.w-model/tickets.md` 或 `docs/tickets.md`）不影响 archive——archive 时 S 子代理从源路径读取内容，写入 archive 的 `tasks.md`，源文件保留不动
+
+### 与 project.json 的关系
+- archive 完成后 S 子代理回填 `project.json.status = "项目完成 + 已归档"`
+- archive 路径写入 `project.json.archivePath` 字段（可选字段，默认空字符串，向后兼容）
+- check-artifact-gate.ts 不校验 archivePath（保持纯文档吸收，不新增脚本校验）
+
 ## 退出状态
 
 产物完成但尚未通过阶段门时，保持项目当前 `status` 不变。只有阶段门评审通过且用户确认放行后，才将 `status` 更新为「项目完成」。

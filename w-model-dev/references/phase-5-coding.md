@@ -48,6 +48,85 @@
 输出: 可运行代码 + 单元测试 + 覆盖率报告
 ```
 
+## Tracer-bullet 票据拆解（第 10 轮外部技能吸收）
+
+> 吸收 to-tickets tracer-bullet 垂直切片 + blocking edges + wide refactor expand-contract 方法论。S 子代理编码前兼任 S-tickets 角色，产出 `tickets.md` 作为 S-coding 执行单元。
+
+### 时序
+
+```
+原时序: O 路由 → CHECKPOINT → S-coding（直接编码）→ V → G
+新时序: O 路由 → CHECKPOINT → S-tickets（票据拆解）→ S-coding（按票据执行）→ V → G
+```
+
+- S-tickets 由 S 子代理兼任（不新增角色）
+- S-tickets 产出 `tickets.md`（位于 `.w-model/tickets.md` 或 `docs/tickets.md`，由用户选择）
+- S-tickets 必须在 S-coding 前完成，V/G 不单独评审 tickets.md（合并到阶段 5 V/G 评审）
+
+### 票据清单模板
+
+```markdown
+## Tracer-bullet 票据拆解
+
+### 票据清单
+| # | 标题 | Blocked by | What it delivers | Status |
+|---|---|---|---|---|
+| 01 | <标题> | None | <端到端行为，用户视角> | ready-for-agent |
+| 02 | <标题> | 01 | <端到端行为> | blocked |
+| ... | | | | |
+
+### Wide refactor（如有）
+- <refactor-1>: <机械改动描述> — blast radius <范围>
+  - Expand: <ticket-id>（添加新形式，旧形式不破坏）
+  - Migrate batch 1: <ticket-id>（blocked by Expand）
+  - Migrate batch 2: <ticket-id>（blocked by batch 1）
+  - Contract: <ticket-id>（删除旧形式，blocked by 所有 batch）
+```
+
+### vertical-slice 规则
+- 每片贯穿全层（schema + service + store + 单元测试），不是单层切片
+- 每片可独立 demo 或验证（独立跑测试通过）
+- 每片大小适配单个新鲜上下文窗口（与"子代理任务 ≤1000 词"约束协同）
+- 优先 prefactor：先做让实现更容易的预备改动（to-tickets 原则）
+
+### Wide refactor 例外
+- 单一机械改动（重命名/重类型）blast radius 跨全代码库时，不强制 tracer-bullet
+- 用 expand-contract 序列：expand（新旧并存）→ migrate batches（每批 CI 绿）→ contract（删旧）
+- 每批大小按 blast radius（按目录/按包）
+
+### 票据内容契约
+
+```markdown
+# <NN> — <标题>
+
+**What to build:** 端到端行为，用户视角（非层-by-layer 实现列表）
+**Blocked by:** <票据号/标题列表，或 "None — can start immediately">
+**Status:** ready-for-agent | blocked | in-progress | done
+
+- [ ] 验收标准 1
+- [ ] 验收标准 2
+```
+
+- 禁止具体文件路径与代码片段（to-tickets 与 to-spec 共识：路径易过期）
+- 例外：prototype 产出的决策密集片段（状态机/reducer/schema/type shape）可内联，标注来源
+- 验收标准与 RTM `unitTest` 字段对应（每张票据 ≥1 单元测试）
+
+### Blocking edges 依赖图
+- blocking edges 形成有向无环图（DAG）
+- frontier = blockers 全完成的票据（可立即开始）
+- 纯线性链：top to bottom
+- 编排者按 frontier 一次性分派全部可启动票据（串行执行时按票据号顺序处理，与"主机不支持并行则串行"约束协同）
+- 每张票据对应 RTM `codeModule` 字段的 ≥1 条目（SD-xxx:src/path 格式不变）
+- 票据 ID（NN）不写入 RTM（RTM 保持现有 schema，不污染数据模型）
+- 票据的 Next 分支实现必须与 TLA+ Action 名对应（与约束"TLA+ Next 分支 PascalCase ↔ code camelCase"协同）
+
+### Out of 票据化的例外
+- 单一 bug 修复（直接走 R→S-fix 返工循环）
+- 单一 TLA+ 不变式违反修复（同上）
+- 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时（直接编码，不拆票据）
+- 不需要票据化时产出 `tickets.md` 仅含一行声明「本阶段改动范围小，不票据化，直接编码」
+- V 子代理评审时检查该声明是否合理（避免漏拆）
+
 ## 执行方法论
 
 | 步骤 | 工具 / 命令 | 阈值 |
