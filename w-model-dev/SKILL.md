@@ -316,5 +316,6 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
 - [ ] `check-maturity.ts` 是否 exitCode=0
 - [ ] `check-checkpoint.ts` 是否 exitCode=0
 - [ ] **上下文窗口已清理**（第 10 轮外部技能吸收）：阶段切换时 S 子代理是新会话，不继承前阶段上下文（OpenSpec context hygiene）
+- [ ] **TLA+ 资料按需加载**（第 11 轮外部技能吸收）：S-tla/V-tla 子代理按 [tla-plus-guide.md §13 加载矩阵](references/tla-plus-guide.md) 加载 4 份参考文件，禁止一次加载全部
 
 交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。
