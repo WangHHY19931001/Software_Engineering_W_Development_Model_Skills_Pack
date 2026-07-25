@@ -3,6 +3,46 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [11.0.0] - 2026-07-26
+
+### 第 11 轮外部技能吸收（claude-tla-plus-plugin）
+
+以"阶段内强化 + 纯文档"方式吸收 `claude-tla-plus-plugin` 的 4 份 skill 资料与 review 命令语义，不新增脚本、不新增子流程、不新增约束。
+
+#### 新增
+
+- **tla-plus-syntax-reference.md**：TLA+ 完整语法参考（模块/算子/时序逻辑/PlusCal），适配 §2.0 命名规范
+- **tla-plus-patterns-examples.md**：8 个典型示例（KV/Bakery/Producer-Consumer/Echo/Elevator/Cigarette Smokers/Consensus/Two-Phase Commit），每个补 W 模型文件头
+- **tla-plus-tlc-configuration.md**：TLC .cfg 配置指南，适配 §11 cfg-tla 一致性规则 + §12 cfg 结构规则
+- **tla-plus-review-checklist.md**：V-tla 审查 7 项清单（吸收 review 命令），映射到 verifier-spec.md 5 维度
+- **SSoT §3.4.9**：第 11 轮外部技能吸收小节（纯描述性，含加载矩阵）
+- **tla-plus-guide.md §13**：参考资料索引 + S-tla/V-tla 加载矩阵
+
+#### 变更
+
+- verifier-spec.md §7.2「设计（targetKind = `design`）」补「TLA+ 审查参考清单」引用（不新增 targetKind 枚举值）
+- SKILL.md 快速自检补「TLA+ 资料按需加载」条目
+
+#### 不变（明确边界）
+
+- 11 个 `scripts/check-*.ts` 脚本不变
+- self-test 基线 91 条不变
+- vitest 测试套件不变
+- `tla-plus-guide.md` §1-§12 不变（仅新增 §13）
+- TLA+ 层级模型 L1/L2/L3/L4 不变
+- 反模式 #15-17 不变
+- 失败模式 F1-F10 不变
+- verifier-spec.md 4 targetKind 枚举不变（requirement/design/test/file）+ rootcause 独立校验
+- data-models.md 不变
+- subagent-delegation.md O-S-V-G-R 边界不变
+
+#### 验证
+
+- TypeScript strict 0 错误
+- self-test 91/91 全通过
+- vitest 全通过
+- 文档一致性人工检查：SSoT §3.4.9 / tla-plus-guide.md §13 / 4 份新参考文件 / verifier-spec.md §7.2 / SKILL.md 自检 / CHANGELOG [11.0.0] 互引一致
+
 ## [10.0.0] - 2026-07-26
 
 ### 第 10 轮外部技能吸收（to-tickets / to-spec / OpenSpec）
