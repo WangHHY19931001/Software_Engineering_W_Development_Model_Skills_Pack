@@ -121,6 +121,42 @@
 
 ---
 
+## Brownfield 阶段级适配（第 10 轮外部技能吸收）
+
+> 吸收 OpenSpec brownfield 优先理念，对路径 B 补充阶段级适配细则。权威定义见 SSoT [§11A.5](./skill-design-document_SSoT.md)。
+
+### 适用场景
+- 已有代码库引入 W 模型管理后续迭代
+- 历史代码无 RTM/无 TLA+ 规格，需要补建追溯
+- OpenSpec 风格的 brownfield 项目迁移到 W 模型
+
+### 阶段 1 Brownfield 入口
+S 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
+
+1. **现状调查**：扫描 `src/` 产出模块清单（controller/service/store/utils）
+2. **逆向 RTM**：从代码反推需求清单（每个公共 API → 候选 REQ 行）
+3. **缺口分析**：标注哪些需求有测试覆盖、哪些无覆盖
+4. **User Stories 回填**：从代码行为反推 user stories
+5. **Out of Scope 声明**：明确本轮 brownfield 迭代不动哪些历史模块
+
+### 阶段 2-4 Brownfield 适配
+- 阶段 2 系统设计：优先复用现有架构，seam 决策优先选现有模块边界
+- 阶段 3 概要设计：模块交互 seam 优先选现有公共导出
+- 阶段 4 详细设计：新增 DD 仅针对本轮改动模块，历史模块不补 DD（避免范围蔓延）
+- TLA+ 规格：仅对本轮改动的 SD 子系统建模（历史模块不补 TLA+）
+
+### 阶段 5 Brownfield 编码
+- 票据拆解时优先 prefactor：让本轮改动更容易
+- Wide refactor 场景（重命名共享符号/重类型）必走 expand-contract
+- 历史代码清理不在本轮范围（Out of Scope 声明）
+
+### Brownfield 不做的事
+- 不全量补建历史 RTM（除非用户明确要求，作为独立项目）
+- 不全量补建历史 TLA+ 规格（同上）
+- 不重构无关历史代码（与 SSoT §4A.1 行为 5「Maintain Scope Discipline」协同）
+
+---
+
 ## 两条路径的收敛
 
 两条路径终态相同：新工作跑全 8 阶段、常开 RTM 维护与真实执行、阶段门评审在合并前、`references/` 按阶段加载而非批量。Greenfield 在数天内到达；Brownfield 在约一个季度内到达，差异正是老代码库从未有的安全网（上下文 / 特征化测试 / 边界）。
