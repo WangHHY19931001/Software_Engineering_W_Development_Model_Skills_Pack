@@ -380,6 +380,70 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 - 代码方法名：camelCase（如 `publishAnnouncement`）
 - `check-code-tla-consistency.ts` 维度3 支持 PascalCase→camelCase 自动映射
 
+#### 3.4.7 第 9 轮门禁与流程细化约束（2026-07-25）
+
+> 第 8 轮 25 需求端到端调测归档后识别的 11 个问题（P1×3 + P2×4 + P3×4），经第 9 轮全量修正后的硬约束条款。
+
+##### P1.1 阶段级工件校验（phaseOption）
+- `check-artifact-gate.ts` 支持 `--phase=N`（简写 `-p N`，N ∈ 1..8）参数，按阶段分层校验测试汇总与 RTM 字段
+- 阶段 5/6/7 G 门禁须使用对应 `--phase=5/6/7` 校验，不得用终检（phase=8）提前否决 pending 的后续测试层
+- `phaseOption` 默认 8（终检，向后兼容）；NFR/CON 横切行按阶段递进（phase<5 仅校验 designDoc，phase≥5 加校 codeModule）
+
+##### P1.2 NFR/CON 早发现
+- NFR/CON 行须在阶段 1 登记 `designDoc`（横切 SD 清单或"横切"标识）
+- 阶段 5 须回填 `codeModule`（源码文件清单或"横切"标识）
+- 配合 `--phase` 阶段校验早发现横切治理缺失
+
+##### P1.3 禁止只规划不执行（反模式 #20）
+- 子代理响应必须含至少一次执行工具调用（Write/Edit/RunCommand/Read）
+- 编排者检测到纯文本规划（含"正在准备"/"将创建"/"步骤"等关键词且无 tool_use）须重派
+- 子代理 prompt 模板必须包含"立即执行，禁止只规划"约束语句
+
+##### P2.4 subCriteria 标准化（4 targetKind × 5 项标准颗粒度）
+- `verifier-output.subCriteria` 名称必须取自 `verifier-spec.md` §2.3 标准模板
+- 实际实施颗粒度：**4 targetKind × 5 项标准**（保留 §7.1-§7.5 既有结构，不按 8 阶段细分）
+  - `requirement`：completeness / clarity / consistency / testability / traceability
+  - `design`：architecture-soundness / requirement-coverage / interface-consistency / feasibility / testability
+  - `code`：correctness / security / readability / maintainability / conformance
+  - `test`：coverage / correctness / independence / clarity / priority-reasonableness
+- 阶段推断通过 targetKind 实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）
+- `verifier-logic.ts` 校验 subCriteria 名称、数量（必须 ==5）、权重均不得改动
+
+##### P2.5 targetKind 枚举标准化
+- `meta.targetKind` ∈ {"requirement","design","code","test"}
+- "testcase" 已废弃（统一用 "test"）；"file" 已废弃（统一用 "code"）
+- 非法值 → `check-verifier-output.ts` 退出码 1
+
+##### P2.6 graph 资产自动发现
+- `check-artifact-gate.ts` 自动查找 `.w-model/ingestion/` 下 graph 资产
+- 候选顺序：graph.json → consolidated-phase4.json → consolidated-phase3.json → consolidated-phase2.json → consolidated-phase1.json
+- 未发现 graph 资产时输出警告但不 fail
+
+##### P2.7 S 子代理修改既有产物边界
+- S 子代理负责**新增**产物；R 子代理负责**修复**既有产物的 bug
+- S 发现既有产物 bug 时须记录 `rootcause-report.jsonl` 并转交 R
+- 紧急修复（阻塞当前阶段）须在 `run-log.jsonl` 追加 fix 条目标注"紧急修复"，阶段后由 R 复核
+
+##### P3.8 TLA+ states 自动清理
+- `check-tla-model.ts` 默认在 TLC 校验完成后自动 `rm -rf <tla-dir>/states/`
+- `--keep-states`（简写 `-k`）参数用于调试场景保留 states
+- 未传 `--keep-states` 时日志输出 `✓ 已清理 TLA+ states 目录`
+
+##### P3.9 Next 分支覆盖扩展
+- `code-tla-logic.ts` 维度 3 遍历 `tla-manifest.json` 全部 specs 的 Next actions
+- 旧实现仅遍历 L4 specs；新实现覆盖 L1/L2/L3/L4 全部 specs
+- PascalCase（TLA+ Action）→ camelCase（代码方法）自动映射校验
+
+##### P3.10 rawScores 合理性校验
+- `rawScores` 不得全相同（防"复制填入"作弊）
+- text-parse 模式下 `rawScores` 不得为完美等差数列（公差 0.01）
+- text-parse 模式扰动范围须 ∈ [0.01, 0.10]；>0.10 fail，<0.01 警告
+- logits 模式豁免等差与扰动范围校验（天然可能产生等差分布）
+
+##### P3.11 coverage/.tmp 清理
+- `w-model-dev-demo/.gitignore` 排除 `coverage/.tmp/`
+- vitest `coverage.clean=true`（或 vitest.config.ts 中 `coverage.clean: true`）
+
 ---
 
 ## 4. 技能工作流程
