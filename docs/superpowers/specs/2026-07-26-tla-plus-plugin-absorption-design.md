@@ -53,7 +53,7 @@ W 模型 `tla-plus-guide.md` 已有 17 节流程约束（命名/路径/前置/�
 | 4 | `w-model-dev/references/tla-plus-patterns-examples.md` | 新建 | 吸收 8 个示例，每个补 W 模型文件头 |
 | 5 | `w-model-dev/references/tla-plus-tlc-configuration.md` | 新建 | 吸收 tlc-configuration.md，适配 §11/§12 |
 | 6 | `w-model-dev/references/tla-plus-review-checklist.md` | 新建 | 吸收 review.md 7 项清单，转化为 V-tla 产出契约 |
-| 7 | `w-model-dev/references/verifier-spec.md` | 修订 | §8 VerifierOutput 补 `targetKind=tla` 审查维度映射 |
+| 7 | `w-model-dev/references/verifier-spec.md` | 修订 | §7.2 设计（targetKind = `design`）补「TLA+ 审查参考清单」引用（不新增 targetKind 枚举值） |
 | 8 | `w-model-dev/SKILL.md` | 修订 | 阶段路由表 TLA+ 行补参考文件引用 + 快速自检补「按需加载 TLA+ 资料」 |
 | 9 | `CHANGELOG.md` | 修订 | 新增 [11.0.0] 条目 |
 
@@ -90,9 +90,13 @@ EXTENDS Naturals, Sequences, FiniteSets, TLC
 
 示例原 .tla 内容保持不变（仅补文件头）。
 
-### 4.4 审查清单转化（review.md 7 项 → verifier-spec.md 5 维度）
+### 4.4 审查清单转化（review.md 7 项 → V-tla 参考清单）
 
-| review.md 清单项 | verifier-spec.md 维度 |
+不新增 `targetKind=tla`（会违反第 9 轮 P2.5 的 4 值枚举约束）。V-tla 子代理评审 TLA+ 时仍用 `targetKind=design`，仅在 §7.2「设计」节补「TLA+ 审查参考清单」引用，指向 `tla-plus-review-checklist.md`。
+
+review.md 7 项清单与现有 5 维度的对应关系（作为 V-tla 评审时的参考映射，不修改 5 维度定义）：
+
+| review.md 清单项 | verifier-spec.md 5 维度 |
 |---|---|
 | Structure / Correctness / Type Safety | correctness |
 | Properties | coverage（不变式/活性覆盖） |
@@ -126,7 +130,7 @@ SSoT §3.4.9 纯描述性，不新增硬约束。现有反模式 #15-17（TLA+ �
   - SSoT §3.4.9 引用 tla-plus-guide.md §13
   - tla-plus-guide.md §13 引用 4 份新参考文件
   - 4 份新参考文件引用 tla-plus-guide.md §2.0/§11/§12/§文件头规范
-  - verifier-spec.md targetKind=tla 引用 tla-plus-review-checklist.md
+  - verifier-spec.md §7.2 引用 tla-plus-review-checklist.md（不新增 targetKind 枚举值）
   - SKILL.md 阶段路由表 TLA+ 行引用 4 份新参考文件
   - CHANGELOG [11.0.0] 引用 SSoT §3.4.9
 
