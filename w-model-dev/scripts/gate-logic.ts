@@ -46,6 +46,44 @@ const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [
   'acceptanceTest',
 ];
 
+// ==================== 阶段级校验（P1.1，第 9 轮） ====================
+/**
+ * 阶段级校验选项。
+ * - phase 1-4：跳过测试汇总校验（设计阶段，pending 合理）
+ * - phase 5：校验 unitTest；跳过 integration/system/acceptance
+ * - phase 6：phase 5 + integrationTest
+ * - phase 7：phase 6 + systemTest
+ * - phase 8：全部 + acceptanceTest（默认，向后兼容）
+ */
+export type PhaseOption = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+/** 各阶段须校验的测试汇总层（未到的层跳过 pending/failed 校验）。 */
+const PHASE_TEST_LAYERS: Record<number, readonly string[]> = {
+  1: [],
+  2: [],
+  3: [],
+  4: [],
+  5: ['unitTest'],
+  6: ['unitTest', 'integrationTest'],
+  7: ['unitTest', 'integrationTest', 'systemTest'],
+  8: ['unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
+};
+
+/**
+ * 各阶段须校验的 RTM 追溯字段（含 description，保持与终检一致）。
+ * phase=8 与 REQUIRED_TRACE_FIELDS 完全一致（向后兼容）。
+ */
+const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
+  1: ['description', 'designDoc'],
+  2: ['description', 'designDoc'],
+  3: ['description', 'designDoc'],
+  4: ['description', 'designDoc'],
+  5: ['description', 'designDoc', 'codeModule', 'unitTest'],
+  6: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest'],
+  7: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest'],
+  8: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
+};
+
 /**
  * 终检强化（spec §3.4.4）可选入参类型。
  */
@@ -61,6 +99,8 @@ export interface GateGraph {
 export interface CheckArtifactGateOptions {
   graph?: GateGraph;
   manifestExists?: boolean;
+  /** 阶段级校验选项（P1.1）：1-8，默认 8（终检，向后兼容）。 */
+  phaseOption?: PhaseOption;
 }
 
 /**
@@ -123,6 +163,11 @@ export function checkArtifactGate(
 ): ArtifactGateResult {
   if (!matrix) return failureResult(['RTM 未初始化']);
 
+  // P1.1 阶段级校验：默认 phase=8（终检，向后兼容）
+  const phase: PhaseOption = options?.phaseOption ?? 8;
+  const phaseFields = PHASE_TRACE_FIELDS[phase] ?? REQUIRED_TRACE_FIELDS;
+  const phaseLayers = PHASE_TEST_LAYERS[phase] ?? [];
+
   const reasons: string[] = [];
   if (!Array.isArray(matrix.rows)) reasons.push('RTM 结构错误：rows 字段缺失或非数组');
   if (!matrix.executionSummary || typeof matrix.executionSummary !== 'object') {
@@ -130,20 +175,23 @@ export function checkArtifactGate(
   }
   if (reasons.length > 0) return failureResult(reasons);
 
-  const requiredTestTypes: Array<{ key: keyof RTMMatrixShape['executionSummary']; name: string }> = [
-    { key: 'unitTest', name: '单元测试' },
-    { key: 'integrationTest', name: '集成测试' },
-    { key: 'systemTest', name: '系统测试' },
-    { key: 'acceptanceTest', name: '验收测试' },
+  const requiredTestTypes: Array<{ key: keyof RTMMatrixShape['executionSummary']; name: string; layer: string }> = [
+    { key: 'unitTest', name: '单元测试', layer: 'unitTest' },
+    { key: 'integrationTest', name: '集成测试', layer: 'integrationTest' },
+    { key: 'systemTest', name: '系统测试', layer: 'systemTest' },
+    { key: 'acceptanceTest', name: '验收测试', layer: 'acceptanceTest' },
   ];
-  const summaries: Array<{ name: string; summary: TestSummaryShape | undefined }> = [];
+  const summaries: Array<{ name: string; layer: string; summary: TestSummaryShape | undefined }> = [];
 
-  for (const { key, name } of requiredTestTypes) {
+  for (const { key, name, layer } of requiredTestTypes) {
     const summary = matrix.executionSummary[key];
     if (!summary || typeof summary !== 'object') {
-      reasons.push(`RTM 结构错误：executionSummary.${key}（${name}汇总）缺失或非对象`);
+      // 仅当该层属于当前阶段校验范围时才报结构错误（未到的层允许缺失）
+      if (phaseLayers.includes(layer)) {
+        reasons.push(`RTM 结构错误：executionSummary.${key}（${name}汇总）缺失或非对象`);
+      }
     }
-    summaries.push({ name, summary });
+    summaries.push({ name, layer, summary });
   }
 
   const missingItems: Array<{ requirementId: string; fields: string[] }> = [];
@@ -162,7 +210,18 @@ export function checkArtifactGate(
       reasons.push(`RTM 结构错误：需求 ID 重复（${row.requirementId}）`);
     }
     ids.add(row.requirementId);
-    const missing = REQUIRED_TRACE_FIELDS.filter(field => typeof row[field] !== 'string' || row[field].trim() === '');
+    // P1.2 横切治理：NFR/CON 行只校验 designDoc（phase<5）或 designDoc+codeModule（phase>=5），
+    // 不强制要求 test 字段（横切测试通过 REQ 行的测试用例覆盖）
+    const isCrossCutting =
+      row.requirementId.startsWith('NFR') || row.requirementId.startsWith('CON');
+    const fieldsToCheck = isCrossCutting
+      ? phase >= 5
+        ? (['description', 'designDoc', 'codeModule'] as const)
+        : (['description', 'designDoc'] as const)
+      : phaseFields;
+    const missing = fieldsToCheck.filter(
+      field => typeof row[field] !== 'string' || (row[field] as string).trim() === '',
+    );
     if (missing.length > 0) missingItems.push({ requirementId: row.requirementId, fields: missing });
   }
 
@@ -177,7 +236,9 @@ export function checkArtifactGate(
   if (totalRows === 0) reasons.push('RTM 无需求行');
 
   let unitCoveragePercent = 0;
-  for (const { name, summary } of summaries) {
+  for (const { name, layer, summary } of summaries) {
+    // P1.1 阶段分层：未到的测试层跳过 pending/failed 校验（pending 合理）
+    if (!phaseLayers.includes(layer)) continue;
     if (!summary || typeof summary !== 'object') continue;
     const values = [summary.total, summary.passed, summary.failed, summary.pending];
     if (!values.every(isFiniteNonNegativeInteger)) {
