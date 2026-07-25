@@ -3,6 +3,51 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [10.0.0] - 2026-07-26
+
+### 第 10 轮外部技能吸收（to-tickets / to-spec / OpenSpec）
+
+以"阶段内强化 + 纯文档"方式吸收三源精华，不新增脚本、不新增子流程、不新增约束。
+
+#### 新增
+
+- **阶段 1 新增三节**：User Stories 长列表 + Out of Scope 显式声明 + Implementation/Testing Decisions 分离（to-spec PRD 结构）
+- **阶段 2-4 新增「测试 seam 决策」节**：seam-first testing（用最高 seam、理想零新 seam、三层一致性约束）
+- **阶段 5 新增「Tracer-bullet 票据拆解」节**：垂直切片 + blocking edges DAG + wide refactor expand-contract + Out of 票据化例外
+- **阶段 8 新增「archive 机制」节**：`changes/archive/YYYY-MM-DD-<feature>/`，7 类产物，tickets.md 源路径无关性
+- **adoption-guide 新增 Brownfield 阶段级适配**：阶段 1 codebase survey 5 步 + 阶段 2-4/5 适配 + 不做的事
+- **新增 references/external-skills-absorption.md**：三源吸收映射 + 决策记录 + 与约束/反模式关系
+- **SSoT §3.4.8**：第 10 轮外部技能吸收约束小节（阶段 1/2-4/5/8 + §11A.5 brownfield）
+- **SSoT §4A.1 第 7 行**：Choose Highest Seam 操作行为（标题改"七条核心操作行为"）
+- **SSoT §11A.5**：Brownfield 阶段级适配子节
+- **project.json 新增可选字段 archivePath**（默认空字符串，向后兼容）
+
+#### 变更
+
+- SKILL.md 阶段路由表补「第 10 轮外部技能吸收标记」列（阶段 1/2/3/4/5/8 标记，6/7 为 —）
+- SKILL.md 阶段统一产出契约补「第 10 轮外部技能吸收三要素」第 6 项
+- SKILL.md §核心操作行为标题改"七条操作行为" + 补第 7 行 Choose Highest Seam
+- SKILL.md 快速自检补「上下文窗口已清理」条目（OpenSpec context hygiene）
+- SSoT §3.4 补「S-doc 内含票据拆解」说明
+
+#### 不变（明确边界）
+
+- 11 个 `scripts/check-*.ts` 脚本不变（纯文档吸收，不新增校验维度）
+- self-test 基线 91 条不变
+- vitest 测试套件不变
+- verifier-spec.md 5 轴 + 5 targetKind 不变
+- subagent-delegation.md O-S-V-G-R 边界不变（S-tickets 由 S 兼任）
+- anti-patterns.md 19 条反模式不变
+- data-models.md 强制字段不变（archivePath 可选）
+- w-model-dev-demo/ 不补建新节产物（demo 已归档）
+
+#### 验证
+
+- TypeScript strict 0 错误
+- self-test 91/91 全通过
+- vitest 全通过
+- 文档一致性人工检查：SSoT §3.4.8 / §4A.1 / §11A.5 与 phase-N-*.md 新增节标题与 SKILL.md 路由表标记一致
+
 ## [9.0.0] - 2026-07-25
 
 ### 第 9 轮门禁与流程细化修正
