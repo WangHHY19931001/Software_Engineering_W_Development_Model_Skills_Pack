@@ -49,6 +49,88 @@
 | `file` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
 | `rootcause` | 全阶段（返工循环 V/G→R→V→G→S-fix→V→G） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
 
+### 2.2 targetKind 枚举规范（第 9 轮 P2.5）
+
+> 第 9 轮标准化：`meta.targetKind` 必须取自以下 4 值枚举。原 `testcase` / `file` 已废弃，分别用 `test` / `code` 替代。`rootcause` 不由 `check-verifier-output.ts` 校验（由 `check-rootcause-report.ts` 独立校验），故不在本枚举内。
+
+**合法枚举**：
+
+| 枚举值 | 适用阶段 | 含义 | 与原值的关系 |
+|---|---|---|---|
+| `requirement` | phase 1 | 需求规格说明 | 不变 |
+| `design` | phase 2 / 3 / 4 | 系统 / 接口 / 详细设计 | 不变 |
+| `code` | phase 5 | 源代码 | **取代原 `file`** |
+| `test` | phase 6 / 7 / 8 | 集成 / 系统 / 验收测试 | **取代原 `testcase`** |
+
+**废弃值映射**：
+
+| 废弃值 | 新值 | 迁移说明 |
+|---|---|---|
+| `testcase` | `test` | 阶段 1~4 测试用例设计文档 + 阶段 6~8 测试执行报告统一用 `test` |
+| `file` | `code` | 阶段 5 源代码评审用 `code`，与 `code-tla-consistency` 维度命名对齐 |
+
+> `rootcause` 仍作为 V 复审根因报告的 `targetKind`（详见 §7.5），但 `check-verifier-output.ts` 不校验该值（脚本只校验上述 4 值枚举）；rootcause 类 VerifierOutput 由 `check-rootcause-report.ts` 独立校验。
+
+**校验**（由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 强制执行）：
+
+```typescript
+const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test'];
+if (!allowedKinds.includes(targetKind as TargetKind)) {
+  reasons.push(`meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`);
+  return { passed: false, ... };
+}
+```
+
+非法值（含 `testcase` / `file` / `rootcause` / 其他任意值）→ 退出码 1，VerifierOutput 判定不通过。
+
+> 迁移策略：第八轮及更早的 demo / fixture 中含 `targetKind="testcase"` 的 VerifierOutput 须在第 9 轮 Part C 修正为 `targetKind="test"`（详见 CHANGELOG 第 9 轮条目）。
+
+### 2.3 各阶段 subCriteria 标准模板（第 9 轮 P2.4）
+
+> 各阶段的 `verifier-output.subCriteria` 名称必须取自下表标准集合（允许子集，但不允许新增名称）。本表与 §7 子标准定义一致，按 `targetKind` 推断阶段后校验。
+
+**4 targetKind × subCriteria 标准模板**：
+
+| targetKind | 适用阶段 | subCriteria 标准名称（权重） | 权重和 |
+|---|---|---|---|
+| `requirement` | phase 1 | `completeness`(0.30) / `clarity`(0.25) / `consistency`(0.20) / `testability`(0.15) / `traceability`(0.10) | 1.00 |
+| `design` | phase 2 / 3 / 4 | `architecture-soundness`(0.25) / `requirement-coverage`(0.25) / `interface-consistency`(0.20) / `feasibility`(0.15) / `testability`(0.15) | 1.00 |
+| `code` | phase 5 | `correctness`(0.30) / `security`(0.20) / `readability`(0.15) / `maintainability`(0.15) / `conformance`(0.20) | 1.00 |
+| `test` | phase 6 / 7 / 8 | `coverage`(0.30) / `correctness`(0.25) / `independence`(0.20) / `clarity`(0.15) / `priority-reasonableness`(0.10) | 1.00 |
+
+**8 阶段对照表**（按 `targetKind` 推断阶段）：
+
+| 阶段 | targetKind | subCriteria 来源 | 备注 |
+|---|---|---|---|
+| phase 1 需求分析 | `requirement` | §7.1 | 5 项标准 |
+| phase 2 系统设计 | `design` | §7.2 | 5 项标准 |
+| phase 3 概要设计 | `design` | §7.2 | 同 phase 2（系统/接口/详细设计共用 design 集合） |
+| phase 4 详细设计 | `design` | §7.2 | 同 phase 2 |
+| phase 5 编码实现 | `code` | §7.4 | 5 项标准；五轴评审维度（§7.4A）映射到 `conformance`/`security` 等 |
+| phase 6 集成测试 | `test` | §7.3 | 5 项标准 |
+| phase 7 系统测试 | `test` | §7.3 | 同 phase 6（集成/系统/验收测试共用 test 集合） |
+| phase 8 验收测试 | `test` | §7.3 | 同 phase 6 |
+
+**权重说明**：
+
+- 表中所列权重为标准值，所有 subCriteria 权重之和必须为 `1.0`（由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 校验）。
+- subCriteria 数量必须等于标准集合大小（5 项），不允许子集或超集（与 §3.1「≥3 个」最小约束叠加：脚本强制 == 5 项）。
+- 名称必须精确匹配（大小写敏感、连字符敏感），不允许新增名称或重命名。
+
+**校验逻辑**（由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 强制执行）：
+
+```typescript
+const expected = SUB_CRITERIA[targetKind as TargetKind];
+if (subCriteria.length !== expected.length) {
+  reasons.push(`targetKind=${targetKind} 应有 ${expected.length} 个子标准，实际 ${subCriteria.length} 个`);
+}
+// 逐项校验 name 与 weight
+```
+
+> 与原计划的差异：第 9 轮设计曾提议按 8 阶段细分（如 phase 1 用 `requirement-completeness` / `stakeholder-coverage` 等），但实际实施时为避免破坏既有 VerifierOutput 历史数据与 §7 子标准定义，保留原 4 targetKind × 5 项标准的颗粒度。8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）。
+
+> 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
+
 ## 3. 三维度验证（Three-Dimension Verification）
 
 每个目标必须按以下三个维度独立评估，最终综合分数由三维度融合得出。
