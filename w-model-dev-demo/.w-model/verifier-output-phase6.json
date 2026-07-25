@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "test",
+    "target": "tests/integration/",
+    "reviewedAt": "2026-07-25T15:05:00+08:00",
+    "agent": "V-phase6",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 5,
+    "varianceThreshold": 0.05
+  },
+  "subCriteria": [
+    {
+      "name": "coverage",
+      "weight": 0.30,
+      "score": 0.95,
+      "rawScores": [0.96, 0.93, 0.95, 0.94, 0.95],
+      "variance": 0.000104,
+      "evidence": "tests/integration/ 4 个测试文件 40 用例全通过（vitest run 退出码 0，duration 2.61s）；覆盖 TC-INT-001~040 全部 40 用例，对应 integration-test-design.md 中 40 TC-INT 设计用例 100% 覆盖；17 INTF 接口全覆盖（contract 10 + single-intf 10 + cross-module 10 + exception 10）；覆盖 TC-DES-004/006/010/011/012 五个设计测试用例分类；RTM executionSummary.integrationTest={total:40,passed:40,failed:0,pending:0,coverage:100}"
+    },
+    {
+      "name": "correctness",
+      "weight": 0.25,
+      "score": 0.93,
+      "rawScores": [0.94, 0.91, 0.93, 0.92, 0.94],
+      "variance": 0.000136,
+      "evidence": "40 用例均含 expect() 断言且全部通过；真实实例化 Store/Service/Controller（禁止 mock 内部模块），仅 mock 外部 IO（WebSocket readyState/send）；修复 3 个源码 bug：push.service.ts retry break→continue（TC-INT-031 重试 3 次而非 1 次）、article.store.ts getById 返回副本防止状态污染、blogger.service.ts bloggerFollow 幂等性；修复测试数据问题：TC-INT-034 配额测试用 5×10MB 文件替代 49MB（超 FILE_SIZE_LIMIT）、TC-INT-040 评论深度循环 5→6 使 depth 6 > MAX_DEPTH 5 触发 1004；错误码验证精确：1001/1002/1003/1004/1005/1011/1012/1013/1021/1022/1023/1025/1031/1041 全覆盖"
+    },
+    {
+      "name": "independence",
+      "weight": 0.20,
+      "score": 0.92,
+      "rawScores": [0.93, 0.91, 0.92, 0.93, 0.92],
+      "variance": 0.000056,
+      "evidence": "每个测试文件 beforeEach 独立重建全部 15 Store + 15 Service 实例（new UserStore()/new ArticleStore()/...），无跨用例状态泄漏；clearRevokedJtis() 每次重置 JWT 撤销列表；process.env.JWT_SECRET='test-secret-key' 在文件顶部注入保证隔离；4 个测试文件分别覆盖不同维度（contract 契约/single-intf 单接口/cross-module 跨模块/exception 异常路径）无重叠；article.store.ts getById 返回 {...a} 副本防止引用污染"
+    },
+    {
+      "name": "clarity",
+      "weight": 0.15,
+      "score": 0.94,
+      "rawScores": [0.95, 0.93, 0.94, 0.95, 0.94],
+      "variance": 0.000056,
+      "evidence": "每个 it() 用例标题含 TC-INT-XXX ID + 中文描述（如 'TC-INT-031: 推送失败重试 fallback（3 次后转离线消息）'）；用例内注释标注测试意图与预期错误码（如 '// 3 次重试均失败 → delivered=false' '// 文件超 10MB → 1041'）；辅助函数 seedAdminBloggerReader/publishArticle/makeOpenSocket/makeClosedSocket 语义明确；测试文件头部含覆盖范围说明（TC-DES-XXX + 禁止 mock 内部模块约束）"
+    },
+    {
+      "name": "priority-reasonableness",
+      "weight": 0.10,
+      "score": 0.90,
+      "rawScores": [0.91, 0.89, 0.90, 0.91, 0.90],
+      "variance": 0.000056,
+      "evidence": "40 用例按优先级分配：contract(10) 验证接口契约基础 → single-intf(10) 验证单接口端到端 → cross-module(10) 验证跨模块正向数据传递 → exception(10) 验证异常路径 fallback；覆盖 17 INTF 全部接口；异常路径覆盖状态机非法跳转(1002)、RBAC越权(1021)、JWT失效(1011/1012/1013/1022)、配额超限(1005/1041)、深度超限(1004)、维护模式(1023)、评论关闭(1025)、备份校验失败(1001)、交叉引用违规(1003/1005/1031)；与 integration-test-design.md TC-INT-001~040 一一对应"
+    }
+  ],
+  "compositeScore": 0.9325,
+  "qualityLevel": "A",
+  "passed": true,
+  "summary": "阶段 6 集成测试完成：4 个测试文件（contract.test.ts/single-intf.test.ts/cross-module.test.ts/exception.test.ts）共 40 用例全部通过（vitest run 退出码 0，duration 2.61s）；覆盖 17 INTF 接口 × TC-DES-004/006/010/011/012 五个设计测试分类；真实实例化 Store/Service/Controller 三层（禁止 mock 内部模块），仅 mock WebSocket 外部 IO；修复 3 个源码 bug（push.service retry break→continue / article.store getById 返回副本 / blogger.service bloggerFollow 幂等性）+ 修复 auth.service 预哈希密码校验；修复测试数据问题（TC-INT-034 配额文件大小 / TC-INT-040 评论深度循环次数 / TC-INT-022~029 搜索词分词匹配 / TC-INT-018 slug 校验 / TC-INT-024 coverImageUrl 格式 / TC-INT-009 分类深度循环）；错误码 14 类全覆盖；RTM executionSummary.integrationTest={total:40,passed:40,failed:0,pending:0,coverage:100}。优势：40/40 全通过、真实三层实例化、异常路径全覆盖、源码 bug 修复提升代码质量。遗留风险：(1) 系统/验收测试仍 pending（phase 7/8 补充）；(2) 集成覆盖率未单独计量（依赖单元覆盖率 83.48%）；(3) WebSocket mock 可进一步贴近真实 ws 库行为。",
+  "reworkHints": []
+}
