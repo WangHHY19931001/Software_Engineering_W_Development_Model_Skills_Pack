@@ -211,6 +211,62 @@ npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|
 
 退出码 0（`TLA_JSON.passed=true`）才可进入阶段门确认。退出码 1（死锁/不变式违反/状态爆炸/占位实现/拆解未完成）回到当前阶段起点。**阶段 4 TLA+ 零违反 + 图谱零违反才放行进编码**（约束 9）。TLC 发现违反且规格忠实于需求/设计时，须修正需求/设计并回退重跑（反模式 #17）。
 
+### 阶段 5/6/7 阶段级工件校验（第 9 轮 P1.1）
+
+> 阶段 5/6/7 G 门禁推荐使用 `--phase=N` 参数做阶段级校验，避免用终检（`--phase=8`，默认）提前否决 pending 的后续测试层。第 8 轮调测发现：阶段 6 G 门禁若用终检，会因为 `systemTest` / `acceptanceTest` 字段 pending 而误判为不通过，导致阶段无法推进。
+
+[`check-artifact-gate.ts`](scripts/check-artifact-gate.ts) 支持 `--phase=N`（简写 `-p N`）参数，按阶段分层校验：
+
+| 参数 | 校验范围 | RTM 字段校验（REQ 行） | 测试汇总校验 |
+|---|---|---|---|
+| `--phase=5` | 阶段 5 编码完成 | `designDoc` / `codeModule` / `unitTest` | `unitTest` 汇总（`integrationTest` / `systemTest` / `acceptanceTest` pending 合理跳过） |
+| `--phase=6` | 阶段 6 集成测试完成 | `--phase=5` 全部 + `integrationTest` | `--phase=5` 全部 + `integrationTest` 汇总 |
+| `--phase=7` | 阶段 7 系统测试完成 | `--phase=6` 全部 + `systemTest` | `--phase=6` 全部 + `systemTest` 汇总 |
+| `--phase=8`（默认） | 阶段 8 终检 | `--phase=7` 全部 + `acceptanceTest` | `--phase=7` 全部 + `acceptanceTest` 汇总（终检，向后兼容） |
+
+**NFR/CON 横切行特殊规则**：NFR/CON 行的 RTM 字段校验与 REQ 行不同——
+
+- 阶段 1~4：仅校验 `designDoc` 字段非空（横切登记，详见 [references/phase-1-requirements.md](references/phase-1-requirements.md)「NFR/CON 横切治理字段登记」节）
+- 阶段 5~8：校验 `designDoc` + `codeModule` 字段非空（横切回填，详见 [references/phase-5-coding.md](references/phase-5-coding.md)「NFR/CON codeModule 回填」节）
+- 不校验 NFR/CON 行的 `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest` 字段（横切测试在阶段 5-8 按需补充）
+
+**用法**：
+
+```bash
+# 阶段 6 G 门禁：校验 unit + integration 测试通过，system/acceptance pending 合理跳过
+npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=6 [project-dir]
+
+# 阶段 7 G 门禁：校验 unit + integration + system 测试通过，acceptance pending 合理跳过
+npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=7 [project-dir]
+
+# 阶段 8 终检（默认，向后兼容）：全部测试通过才放行
+npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+```
+
+**阶段 6 G 门禁推荐命令组合**：
+
+```bash
+# 1. V 评审产出 VerifierOutput JSON 后，G 跑 check-verifier-output.ts
+npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output-phase6.json>"
+# 2. G 跑 check-artifact-gate.ts --phase=6（阶段级校验，不否决 pending 的 system/acceptance）
+npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=6 [project-dir]
+```
+
+**阶段 7 G 门禁推荐命令组合**：
+
+```bash
+# 1. V 评审产出 VerifierOutput JSON 后，G 跑 check-verifier-output.ts
+npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output-phase7.json>"
+# 2. G 跑 check-artifact-gate.ts --phase=7（阶段级校验，不否决 pending 的 acceptance）
+npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=7 [project-dir]
+```
+
+> **阶段 5 G 门禁**：阶段 5 仍以 `check-verifier-output.ts` + `check-code-tla-consistency.ts` 为主（code-TLA+ 一致性回归，四维度校验），`check-artifact-gate.ts --phase=5` 可作为补充校验确认 REQ 行 `codeModule` 字段已回填。
+>
+> **向后兼容**：未传 `--phase` 参数时默认 `phase=8`（终检），行为与第八轮及更早版本一致。历史 demo / fixture 不需修改即可继续通过终检。
+>
+> **graph 自动发现**（第 9 轮 P2.6）：`check-artifact-gate.ts` 自动按以下优先级查找 `.w-model/ingestion/` 下 graph 资产：`graph.json` → `consolidated-phase4.json` → `consolidated-phase3.json` → `consolidated-phase2.json` → `consolidated-phase1.json`。无需手动指定 `--graph` 参数。
+
 验收终检执行：
 
 ```bash
