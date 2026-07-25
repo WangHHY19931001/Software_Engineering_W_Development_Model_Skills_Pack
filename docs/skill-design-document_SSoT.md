@@ -335,6 +335,8 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 - 用户放行后更新 `project.status` 与 `updatedAt`；
 - **维护 budget.json / run-log.jsonl / maturity.json**（状态读写+持久化，非实施；见 §10C / §10D）：项目初始化创建三文件、每次子代理返回/门禁执行/CHECKPOINT 放行后 append run-log、预算检查、成熟度判定与升降级。
 
+> **S-doc 内含票据拆解（第 10 轮外部技能吸收）**：阶段 5 进入时，S 子代理在编码前兼任 S-tickets 角色，产出 `tickets.md`（tracer-bullet 垂直切片 + blocking edges DAG）。编排者只按 frontier 分派 S-coding，不参与拆解决策。详见 [phase-5-coding.md](../w-model-dev/references/phase-5-coding.md)「Tracer-bullet 票据拆解」节与 [external-skills-absorption.md](../w-model-dev/references/external-skills-absorption.md)。
+
 #### 3.4.6 门禁增强约束（2026-07-25）
 
 > 第6轮 W 模型调测后识别的 8 个技能问题，经门禁增强设计修正后的硬约束条款。
@@ -443,6 +445,38 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 ##### P3.11 coverage/.tmp 清理
 - `w-model-dev-demo/.gitignore` 排除 `coverage/.tmp/`
 - vitest `coverage.clean=true`（或 vitest.config.ts 中 `coverage.clean: true`）
+
+#### 3.4.8 第 10 轮外部技能吸收约束（2026-07-26）
+
+> 吸收 to-tickets / to-spec / OpenSpec 三源精华，以"阶段内强化 + 纯文档"方式融入 8 阶段流程。不新增脚本、不新增子流程、不新增约束。详细映射与决策记录见 [external-skills-absorption.md](../w-model-dev/references/external-skills-absorption.md)。
+
+##### 阶段 1 强制产出节
+- S-doc 产出需求规格时必须包含三节：**User Stories 长列表**（覆盖正常/异常/边界/NFR/CON）、**Out of Scope 显式声明**（至少 1 条）、**Implementation/Testing Decisions 分离**（架构/接口决策与测试 seam 决策分离）
+- 禁止具体文件路径与代码片段（除非 prototype 产出的决策密集片段）
+
+##### 阶段 2-4 测试 seam 决策
+- S-doc 在系统/概要/详细设计文档中必须包含「测试 seam 决策」节
+- 三层一致性：阶段 3 必须引用阶段 2 seam，阶段 4 必须引用阶段 3 seam
+- 阶段 2/3 不允许"为覆盖率新建 seam"（违反 to-spec「fewer seams better」原则）
+- 阶段 4 私有状态机转移由 TLA+ 不变式断言覆盖，不在代码层引入测试 seam
+
+##### 阶段 5 Tracer-bullet 票据拆解
+- S 子代理编码前兼任 S-tickets，产出 `tickets.md`（位于 `.w-model/tickets.md` 或 `docs/tickets.md`，由用户选择）
+- 票据为垂直切片（贯穿 schema + service + store + 单元测试），形成 blocking edges DAG
+- Wide refactor（重命名/重类型跨全代码库）走 expand-contract 序列
+- 例外：单一 bug 修复 / 单一 TLA+ 不变式违反修复 / 单 SD 子系统且 ≤1 文件改动 → 不票据化，直接编码
+
+##### 阶段 8 archive 机制
+- 项目级放行（acceptance-test-report.md §9 用户 confirm）后，S 子代理执行 archive
+- 路径：`changes/archive/<YYYY-MM-DD>-<feature-slug>/`
+- 产物：proposal.md + specs.md + design.md + tasks.md + tla-summary.md + rtm-snapshot.json + verifier-summary.md
+- `project.json` 新增可选字段 `archivePath: string`（默认空字符串，向后兼容）
+
+##### §11A Brownfield 阶段级适配
+- 阶段 1 Brownfield 入口：codebase survey 5 步（现状调查 → 逆向 RTM → 缺口分析 → User Stories 回填 → Out of Scope 声明）
+- 阶段 2-4：seam 决策优先选现有模块边界；DD 仅针对本轮改动模块
+- 阶段 5：票据拆解优先 prefactor；Wide refactor 必走 expand-contract
+- 不全量补建历史 RTM/TLA+，不重构无关历史代码（约束 5 协同）
 
 ---
 
@@ -609,7 +643,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 > 适配 W 模型语境：保留「不可违反的约束」（§4 与 [`SKILL.md`](../w-model-dev/SKILL.md)「不可违反的约束」节）作为硬性规则，本节为跨阶段的「日常操作准则」。
 > 详细反模式与门禁脚本对应关系见 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)。
 
-### 4A.1 六条核心操作行为
+### 4A.1 七条核心操作行为
 
 以下行为在 W 模型 8 阶段全程适用，与「不可违反的约束」互补：约束是「不可越界」的红线，操作行为是「主动遵守」的准则。
 
@@ -621,6 +655,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | 4 | **Enforce Simplicity（强制简洁）** | 编码前自问「能否更少行？抽象是否物有所值？资深工程师是否会问『为何不直接……』」；1000 行能 100 行完成即失败 |
 | 5 | **Maintain Scope Discipline（保持范围纪律）** | 只动该动的；不删除看不懂的注释、不顺手清理无关代码、不重构相邻系统、不删除「看似无用」的代码除非显式批准、不加规格外「看似有用」的功能 |
 | 6 | **Verify, Don't Assume（验证而非假设）** | 每个阶段都必须有验证证据（测试通过 / 脚本退出码 / 运行时数据）；「看起来对了」永远不够；§10.5 工件质量门是验证的最后一道闸 |
+| 7 | **Choose Highest Seam（选择最高 seam）** | 阶段 2-4 测试设计前置时，优先选现有最高 seam（系统层 HTTP/CLI/进程边界，模块层公共导出，单元层公共 API）；理想零新 seam；禁止为"覆盖率"新建 seam；私有状态机转移由 TLA+ 不变式断言覆盖（与约束 9 协同） |
 
 ### 4A.2 失败模式清单
 
@@ -2101,6 +2136,40 @@ graph TD
 | 重构规则 | 罕见（无东西可重构） | 特征化测试先行，永远 |
 | 最高风险反模式 | 跳过 `/wm analyze` | 重构未测试代码 |
 | 到达全流程时间 | Day 0 | 约一个季度，中间双速 |
+
+### 11A.5 Brownfield 阶段级适配（第 10 轮外部技能吸收）
+
+> 吸收 OpenSpec brownfield 优先理念，对 §11A.3 路径 B 补充阶段级适配细则。权威定义见 [external-skills-absorption.md](../w-model-dev/references/external-skills-absorption.md) §4.5。
+
+#### 适用场景
+- 已有代码库引入 W 模型管理后续迭代
+- 历史代码无 RTM/无 TLA+ 规格，需要补建追溯
+- OpenSpec 风格的 brownfield 项目迁移到 W 模型
+
+#### 阶段 1 Brownfield 入口
+S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
+
+1. **现状调查**：扫描 src/ 产出模块清单（controller/service/store/utils）
+2. **逆向 RTM**：从代码反推需求清单（每个公共 API → 候选 REQ 行）
+3. **缺口分析**：标注哪些需求有测试覆盖、哪些无覆盖
+4. **User Stories 回填**：从代码行为反推 user stories（与 §3.4.8 阶段 1 强制产出节互补）
+5. **Out of Scope 声明**：明确本轮 brownfield 迭代不动哪些历史模块
+
+#### 阶段 2-4 Brownfield 适配
+- 阶段 2 系统设计：优先复用现有架构，seam 决策优先选现有模块边界
+- 阶段 3 概要设计：模块交互 seam 优先选现有公共导出
+- 阶段 4 详细设计：新增 DD 仅针对本轮改动模块，历史模块不补 DD（避免范围蔓延）
+- TLA+ 规格：仅对本轮改动的 SD 子系统建模（历史模块不补 TLA+）
+
+#### 阶段 5 Brownfield 编码
+- 票据拆解时优先 prefactor（to-tickets 原则）：让本轮改动更容易
+- Wide refactor 场景（重命名共享符号/重类型）必走 expand-contract
+- 历史代码清理不在本轮范围（Out of Scope 声明）
+
+#### Brownfield 不做的事
+- 不全量补建历史 RTM（除非用户明确要求，作为独立项目）
+- 不全量补建历史 TLA+ 规格（同上）
+- 不重构无关历史代码（与 §4A.1 行为 5「Maintain Scope Discipline」协同）
 
 ---
 
