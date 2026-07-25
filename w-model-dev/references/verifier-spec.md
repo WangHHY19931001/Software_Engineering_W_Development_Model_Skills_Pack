@@ -430,6 +430,8 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
+**TLA+ 审查参考清单**（第 11 轮外部技能吸收）：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
+
 ### 7.3 测试用例（targetKind = `testcase`）
 
 | 子标准 name | weight | 描述 |
