@@ -303,7 +303,9 @@ export function toCamelCase(name: string): string {
   const parts = name.split(/[_-]+/).filter(p => p.length > 0);
   if (parts.length === 0) return '';
   // 第一段首字母小写，后续段首字母大写
-  const first = parts[0].charAt(0).toLowerCase() + parts[0].slice(1);
+  const firstPart = parts[0];
+  if (firstPart === undefined) return '';
+  const first = firstPart.charAt(0).toLowerCase() + firstPart.slice(1);
   const rest = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1));
   return first + rest.join('');
 }
@@ -324,7 +326,7 @@ export function extractNextActions(tlaContent: string): string[] {
   if (typeof tlaContent !== 'string' || tlaContent.length === 0) return [];
   // 匹配 `Next ==` 后到下一个顶层定义（行首大写标识符 + `==`）或文件末尾
   const nextMatch = tlaContent.match(/Next\s*==\s*([\s\S]*?)(?=\n\s*[A-Z][A-Za-z0-9_]*\s*==|\n\s*====|$)/);
-  if (!nextMatch) return [];
+  if (!nextMatch || nextMatch[1] === undefined) return [];
   const body = nextMatch[1];
   // 抽取 \/ 后的动作名（可能带括号，如 \/ (A \/ B)，这里只取顶层 \/ 分隔的标识符）
   // 正则中用字符类 [\\][/] 匹配字面量 "\/"（反斜杠+斜杠），避免 \/ 被解析为 Unicode 转义
@@ -332,7 +334,8 @@ export function extractNextActions(tlaContent: string): string[] {
   const re = new RegExp('[\\\\][/]\\s*([A-Za-z_][A-Za-z0-9_]*)', 'g');
   let m: RegExpExecArray | null;
   while ((m = re.exec(body)) !== null) {
-    actions.push(m[1]);
+    const actionName = m[1];
+    if (actionName !== undefined) actions.push(actionName);
   }
   return actions;
 }
@@ -448,14 +451,15 @@ export function extractBusinessInvariants(tlaContent: string): string[] {
   const invMatch = tlaContent.match(
     /BusinessInvariant\s*==\s*([\s\S]*?)(?=\n\s*[A-Z][A-Za-z0-9_]*\s*==|\n\s*====|$)/,
   );
-  if (!invMatch) return [];
+  if (!invMatch || invMatch[1] === undefined) return [];
   const body = invMatch[1];
   const invariants: string[] = [];
   // 正则中用字符类 [/][\\] 匹配字面量 "/\"（斜杠+反斜杠，TLA+ 合取符号）
   const re = new RegExp('[/][\\\\]\\s*([A-Za-z_][A-Za-z0-9_]*)', 'g');
   let m: RegExpExecArray | null;
   while ((m = re.exec(body)) !== null) {
-    invariants.push(m[1]);
+    const invName = m[1];
+    if (invName !== undefined) invariants.push(invName);
   }
   return invariants;
 }
@@ -563,9 +567,10 @@ export function checkCodeTlaConsistency(
   // 维度3/4：从 manifest.specs[].tlaContent 读取 .tla 文件内容
   // 多个 spec 的 tlaContent 拼接校验：任一 spec 的 Next 分支无对应 → 失败
   const specs = Array.isArray(input.manifest?.specs) ? input.manifest.specs : [];
-  // 仅校验 L2/L3 spec（Next 分支通常在 L2/L3）
+  // P3.9（第 9 轮）扩展：遍历全部 specs（L1/L2/L3/L4）的 tlaContent，
+  // 不再仅限 L2/L3。Next 分支与 BusinessInvariant 可定义于任意层级。
   const tlaSpecs = specs.filter(
-    s => s && (s.level === 'L2' || s.level === 'L3') && typeof s.tlaContent === 'string',
+    s => s && typeof s.tlaContent === 'string',
   );
 
   // 维度3：Next 分支对应
@@ -573,7 +578,7 @@ export function checkCodeTlaConsistency(
   const nextViolations: string[] = [];
   let nextChecked = 0;
   if (tlaSpecs.length === 0) {
-    // 无 L2/L3 spec 的 tlaContent → 跳过（视为通过）
+    // 无 spec 的 tlaContent → 跳过（视为通过）
   } else {
     for (const spec of tlaSpecs) {
       const r = checkNextBranchCoverage(spec.tlaContent ?? '', codeFilesWithExtract);
@@ -600,7 +605,7 @@ export function checkCodeTlaConsistency(
   const invViolations: string[] = [];
   let invChecked = 0;
   if (tlaSpecs.length === 0) {
-    // 无 L2/L3 spec 的 tlaContent → 跳过
+    // 无 spec 的 tlaContent → 跳过
   } else {
     for (const spec of tlaSpecs) {
       const r = checkInvariantCoverage(spec.tlaContent ?? '', codeFilesWithExtract);
