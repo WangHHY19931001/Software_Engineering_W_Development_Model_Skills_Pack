@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "test-phase5-bad",
+  "currentPhase": 5,
+  "lastUpdated": "2026-07-25T00:00:00+08:00",
+  "rows": [
+    {
+      "requirementId": "REQ-001",
+      "description": "测试需求",
+      "designDoc": "SD-001",
+      "codeModule": null,
+      "unitTest": "TC-UNIT-001",
+      "integrationTest": null,
+      "systemTest": null,
+      "acceptanceTest": null,
+      "coverageStatus": "完整"
+    }
+  ],
+  "executionSummary": {
+    "unitTest": { "total": 10, "passed": 10, "failed": 0, "pending": 0, "coverage": 85 },
+    "integrationTest": { "total": 5, "passed": 0, "failed": 0, "pending": 5, "coverage": 0 },
+    "systemTest": { "total": 8, "passed": 0, "failed": 0, "pending": 8, "coverage": 0 },
+    "acceptanceTest": { "total": 6, "passed": 0, "failed": 0, "pending": 6, "coverage": 0 }
+  }
+}
