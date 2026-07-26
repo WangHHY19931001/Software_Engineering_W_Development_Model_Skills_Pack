@@ -177,6 +177,14 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 
+**参数示例**：
+```
+/wm hill-climbing                              # 全量分析当前 run-log
+/wm hill-climbing --from=2026-07-20 --to=2026-07-26  # 指定时间窗口
+/wm hill-climbing --phase=5                    # 仅分析阶段 5 的 run-log
+```
+产出存 `.w-model/hill-climbing/<timestamp>-report.json`。
+
 ## 阶段统一产出契约
 
 每个阶段必须：
@@ -319,5 +327,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
 - [ ] `check-checkpoint.ts` 是否 exitCode=0
 - [ ] **上下文窗口已清理**（第 10 轮外部技能吸收）：阶段切换时 S 子代理是新会话，不继承前阶段上下文（OpenSpec context hygiene）
 - [ ] **TLA+ 资料按需加载**（第 11 轮外部技能吸收）：S-tla/V-tla 子代理按 [tla-plus-guide.md §13 加载矩阵](references/tla-plus-guide.md) 加载 4 份参考文件，禁止一次加载全部
+- [ ] 反模式 #20（只规划不执行）：确认所有规划都有对应执行动作，未停留在规划阶段
+- [ ] 反模式 #21（阶段级门禁跳过）：确认阶段 6/7/8 都跑了 `--phase=N` 门禁，未跳过阶段级校验
 
 交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。
