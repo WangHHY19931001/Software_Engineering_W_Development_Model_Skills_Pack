@@ -1,89 +1,68 @@
-// SD-014 WsStore: WebSocket connection registry + offline message queue.
-
-import type { IWsLike } from '../types.js';
-
-export interface OfflineMessage {
-  channel: string;
-  payload: unknown;
-  at: Date;
-  attempts: number;
+/**
+ * WsStore — WebSocket 连接存储（推送用）。
+ */
+export interface WsConnection {
+  id: string;
+  userId: string;
+  send: (data: string) => void;
+  createdAt: string;
 }
 
 export class WsStore {
-  private wsConnections = new Map<string, IWsLike>();
-  private channelToUsers = new Map<string, Set<string>>();
-  private offlineMessages = new Map<string, OfflineMessage[]>();
+  private connections: Map<string, WsConnection> = new Map();
+  private userIndex: Map<string, Set<string>> = new Map();
 
-  register(userId: string, ws: IWsLike): void {
-    const existing = this.wsConnections.get(userId);
-    if (existing && existing !== ws) {
-      try {
-        existing.close(1000, 'replaced');
-      } catch {
-        // ignore
-      }
-    }
-    this.wsConnections.set(userId, ws);
-  }
-
-  unregister(userId: string): void {
-    this.wsConnections.delete(userId);
-  }
-
-  isOnline(userId: string): boolean {
-    return this.wsConnections.has(userId);
-  }
-
-  getSocket(userId: string): IWsLike | null {
-    return this.wsConnections.get(userId) ?? null;
-  }
-
-  joinChannel(channel: string, userId: string): void {
-    let set = this.channelToUsers.get(channel);
+  add(conn: WsConnection): void {
+    this.connections.set(conn.id, conn);
+    let set = this.userIndex.get(conn.userId);
     if (!set) {
       set = new Set();
-      this.channelToUsers.set(channel, set);
+      this.userIndex.set(conn.userId, set);
     }
-    set.add(userId);
+    set.add(conn.id);
   }
 
-  leaveChannel(channel: string, userId: string): void {
-    const set = this.channelToUsers.get(channel);
-    if (!set) return;
-    set.delete(userId);
-    if (set.size === 0) this.channelToUsers.delete(channel);
-  }
-
-  channelUsers(channel: string): string[] {
-    const set = this.channelToUsers.get(channel);
-    return set ? Array.from(set) : [];
-  }
-
-  enqueueOffline(userId: string, msg: OfflineMessage): void {
-    let arr = this.offlineMessages.get(userId);
-    if (!arr) {
-      arr = [];
-      this.offlineMessages.set(userId, arr);
+  remove(id: string): boolean {
+    const conn = this.connections.get(id);
+    if (!conn) return false;
+    this.connections.delete(id);
+    const set = this.userIndex.get(conn.userId);
+    if (set) {
+      set.delete(id);
+      if (set.size === 0) this.userIndex.delete(conn.userId);
     }
-    arr.push(msg);
+    return true;
   }
 
-  getOffline(userId: string): OfflineMessage[] {
-    const arr = this.offlineMessages.get(userId);
-    return arr ? [...arr] : [];
+  sendToUser(userId: string, data: string): number {
+    const set = this.userIndex.get(userId);
+    if (!set) return 0;
+    let sent = 0;
+    for (const id of set) {
+      const conn = this.connections.get(id);
+      if (conn) {
+        conn.send(data);
+        sent += 1;
+      }
+    }
+    return sent;
   }
 
-  clearOffline(userId: string): void {
-    this.offlineMessages.delete(userId);
+  broadcast(data: string): number {
+    let sent = 0;
+    for (const conn of this.connections.values()) {
+      conn.send(data);
+      sent += 1;
+    }
+    return sent;
   }
 
-  setOffline(userId: string, msgs: OfflineMessage[]): void {
-    this.offlineMessages.set(userId, [...msgs]);
+  size(): number {
+    return this.connections.size;
   }
 
   clear(): void {
-    this.wsConnections.clear();
-    this.channelToUsers.clear();
-    this.offlineMessages.clear();
+    this.connections.clear();
+    this.userIndex.clear();
   }
 }

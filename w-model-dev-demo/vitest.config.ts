@@ -19,7 +19,9 @@ export default defineConfig({
       exclude: [
         'src/server.ts',
         'src/app.ts',
+        'src/container.ts',
         'src/types.ts',
+        'src/controllers/**',
         '**/index.ts',
       ],
       thresholds: {

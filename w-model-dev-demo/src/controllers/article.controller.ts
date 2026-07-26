@@ -1,146 +1,85 @@
-// SD-012 ArticleController — thin HTTP wrapper around ArticleService.
-
+/**
+ * ArticleController（DD-005-001 ~ DD-009-001 + DD-017-001 workflow + DD-018-001 like）。
+ */
 import type { Request, Response, NextFunction } from 'express';
 import type { ArticleService } from '../services/article.service.js';
-import type { AuthService } from '../services/auth.service.js';
-import { ArticleStatus } from '../types.js';
+import type { ArticleWorkflowService } from '../services/article-workflow.service.js';
+import type { LikeService } from '../services/article-workflow.service.js';
+import { articleCreateSchema, articleUpdateSchema, articleListQuerySchema, articleWorkflowSchema } from '../utils/schemas.js';
+import { ValidationError } from '../utils/errors.js';
+import type { AuthenticatedUser } from '../utils/auth-middleware.js';
+
+function getUser(req: Request): AuthenticatedUser {
+  const user = (req as unknown as { user?: AuthenticatedUser }).user;
+  if (!user) throw new ValidationError('未认证');
+  return user;
+}
 
 export class ArticleController {
   constructor(
     private articleService: ArticleService,
-    private authService: AuthService,
+    private workflowService: ArticleWorkflowService,
+    private likeService: LikeService,
   ) {}
 
-  create = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      res.status(201).json(this.articleService.createArticle(ctx.userId, req.body));
-    } catch (err) {
-      next(err);
-    }
-  };
+  async create(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const user = getUser(req);
+    const input = articleCreateSchema.parse(req.body);
+    const article = this.articleService.create({
+      title: input.title,
+      content: input.content,
+      authorId: user.id,
+      tagIds: input.tagIds,
+      categoryId: input.categoryId,
+      status: input.status,
+    });
+    res.status(201).json(article);
+  }
 
-  getById = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      res.json(this.articleService.getById(req.params.articleId!));
-    } catch (err) {
-      next(err);
-    }
-  };
+  async list(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const query = articleListQuerySchema.parse(req.query);
+    const result = this.articleService.list(query);
+    res.json(result);
+  }
 
-  submitForReview = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.submitForReview(ctx.userId, req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
+  async getById(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const id = req.params['id'];
+    if (!id) throw new ValidationError('缺少 id');
+    const article = this.articleService.getById(id, true);
+    res.json(article);
+  }
 
-  publish = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.publishArticle(ctx.userId, req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
+  async update(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const user = getUser(req);
+    const id = req.params['id'];
+    if (!id) throw new ValidationError('缺少 id');
+    const input = articleUpdateSchema.parse(req.body);
+    const article = this.articleService.update(id, input, user.id, user.role);
+    res.json(article);
+  }
 
-  approve = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.approveArticle(ctx.userId, ctx.role, req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
+  async remove(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const user = getUser(req);
+    const id = req.params['id'];
+    if (!id) throw new ValidationError('缺少 id');
+    this.articleService.remove(id, user.id, user.role);
+    res.status(204).end();
+  }
 
-  offline = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.offlineArticle(ctx.userId, ctx.role, req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
+  async workflow(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const user = getUser(req);
+    const id = req.params['id'];
+    if (!id) throw new ValidationError('缺少 id');
+    const input = articleWorkflowSchema.parse(req.body);
+    const article = this.workflowService.transition(id, input.action, user.id, user.role);
+    res.json(article);
+  }
 
-  archive = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.archiveArticle(ctx.userId, ctx.role, req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  republish = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.republishArticle(ctx.userId, ctx.role, req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  schedule = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.schedule(ctx.userId, req.params.articleId!, new Date(req.body.scheduledAt));
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  fireScheduledPublish = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      this.articleService.fireScheduledPublish(req.params.articleId!);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  batchOffline = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      this.articleService.batchOffline(ctx.userId, ctx.role, req.body.articleIds);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  listByAuthor = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const page = Number(req.query.page ?? 1);
-      const pageSize = Number(req.query.pageSize ?? 10);
-      res.json(this.articleService.listByAuthor(req.params.authorId!, page, pageSize));
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  transition = (req: Request, res: Response, next: NextFunction): void => {
-    try {
-      const ctx = this.authContext(req);
-      const to = req.body.to as ArticleStatus;
-      this.articleService.transition(ctx.userId, req.params.articleId!, to);
-      res.json({ ok: true });
-    } catch (err) {
-      next(err);
-    }
-  };
-
-  private authContext(req: Request): { userId: string; role: string } {
-    const header = req.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-    return this.authService.verifyToken(token);
+  async like(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    const user = getUser(req);
+    const id = req.params['id'];
+    if (!id) throw new ValidationError('缺少 id');
+    const result = this.likeService.toggle(user.id, id);
+    res.json(result);
   }
 }

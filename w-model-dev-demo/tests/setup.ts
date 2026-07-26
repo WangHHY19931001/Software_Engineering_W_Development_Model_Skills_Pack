@@ -1,4 +1,14 @@
-// Vitest global setup — ensures JWT_SECRET is available for all test files.
-// Tests run via `npx vitest run` (without cross-env) still get the secret.
+/**
+ * 单元测试全局 setup。
+ * - 注入 JWT_SECRET 环境变量（CON-002 / NFR-002 安全约束）。
+ * - 重置 ID 计数器，保证测试隔离。
+ */
+import { resetCounter } from '../src/utils/id.js';
 
-process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-blog-demo';
+if (!process.env['JWT_SECRET']) {
+  process.env['JWT_SECRET'] = 'test-secret-blog-demo-32chars-min!!';
+}
+
+beforeEach(() => {
+  resetCounter();
+});

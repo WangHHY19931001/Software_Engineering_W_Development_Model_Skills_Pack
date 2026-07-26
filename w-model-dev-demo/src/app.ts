@@ -1,343 +1,110 @@
-// Express app — wires all stores, services, controllers; registers routes.
+/**
+ * ExpressApp（DD-001-002）— Express 应用装配 + 路由挂载 + 中间件链。
+ */
+import express, { type Express, Router } from 'express';
+import { errorHandler, notFoundHandler } from './utils/errors.js';
+import { asyncHandler } from './utils/async-handler.js';
+import type { AuthMiddleware } from './utils/auth-middleware.js';
+import type { RateLimitMiddleware } from './utils/rate-limit.js';
+import type { AuditMiddleware } from './utils/audit-middleware.js';
+import type { SiteController } from './controllers/site.controller.js';
+import type { UserController } from './controllers/user.controller.js';
+import type { ArticleController } from './controllers/article.controller.js';
+import type { CommentController } from './controllers/comment.controller.js';
+import type { TagController, CategoryController } from './controllers/taxonomy.controller.js';
+import type { SearchController, ArchiveController } from './controllers/search.controller.js';
+import type { AuditLogController } from './controllers/audit-log.controller.js';
+import type { RssController } from './controllers/rss.controller.js';
+import type { WebhookController } from './controllers/webhook.controller.js';
 
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
-import { errorHandler } from './utils/errors.js';
-
-// Stores
-import { SiteStore } from './stores/site.store.js';
-import { BloggerStore } from './stores/blogger.store.js';
-import { UserStore } from './stores/user.store.js';
-import { ArticleStore } from './stores/article.store.js';
-import { CommentStore } from './stores/comment.store.js';
-import { NotificationStore } from './stores/notification.store.js';
-import { FileStore } from './stores/file.store.js';
-import { SubscriptionStore } from './stores/subscription.store.js';
-import { WsStore } from './stores/ws.store.js';
-import { BackupStore } from './stores/backup.store.js';
-import { SearchStore } from './stores/search.store.js';
-import { TagStore } from './stores/tag.store.js';
-import { CategoryStore } from './stores/category.store.js';
-import { AdStore } from './stores/ad.store.js';
-import { RecommendStore } from './stores/recommend.store.js';
-import { StatsStore } from './stores/stats.store.js';
-import { CrossReferenceStore } from './stores/crossref.store.js';
-
-// Services
-import { AuthService, UserService } from './services/auth.service.js';
-import { SiteService } from './services/site.service.js';
-import { BloggerService } from './services/blogger.service.js';
-import { ArticleService } from './services/article.service.js';
-import { CommentService } from './services/comment.service.js';
-import { NotificationService } from './services/notification.service.js';
-import { FileService } from './services/file.service.js';
-import { SubscriptionService } from './services/subscription.service.js';
-import { PushService } from './services/push.service.js';
-import { BackupService } from './services/backup.service.js';
-import { SearchService } from './services/search.service.js';
-import { TagService } from './services/tag.service.js';
-import { CategoryService } from './services/category.service.js';
-import { AdService } from './services/ad.service.js';
-import { RecommendService } from './services/recommend.service.js';
-import { StatsService } from './services/stats.service.js';
-import { CrossReferenceService } from './services/crossref.service.js';
-
-// Controllers
-import { SiteController } from './controllers/site.controller.js';
-import { BloggerController } from './controllers/blogger.controller.js';
-import { UserController } from './controllers/user.controller.js';
-import { RecommendController } from './controllers/recommend.controller.js';
-import { AdController } from './controllers/ad.controller.js';
-import { StatsController } from './controllers/stats.controller.js';
-import { SearchController } from './controllers/search.controller.js';
-import { TagController } from './controllers/tag.controller.js';
-import { CategoryController } from './controllers/category.controller.js';
-import { CommentController } from './controllers/comment.controller.js';
-import { NotificationController } from './controllers/notification.controller.js';
-import { ArticleController } from './controllers/article.controller.js';
-import { CrossReferenceController } from './controllers/crossref.controller.js';
-import { PushController } from './controllers/push.controller.js';
-import { FileController } from './controllers/file.controller.js';
-import { SubscriptionController } from './controllers/subscription.controller.js';
-import { BackupController } from './controllers/backup.controller.js';
-
-export interface AppDeps {
-  // Stores
-  siteStore: SiteStore;
-  bloggerStore: BloggerStore;
-  userStore: UserStore;
-  articleStore: ArticleStore;
-  commentStore: CommentStore;
-  notificationStore: NotificationStore;
-  fileStore: FileStore;
-  subscriptionStore: SubscriptionStore;
-  wsStore: WsStore;
-  backupStore: BackupStore;
-  searchStore: SearchStore;
-  tagStore: TagStore;
-  categoryStore: CategoryStore;
-  adStore: AdStore;
-  recommendStore: RecommendStore;
-  statsStore: StatsStore;
-  crossRefStore: CrossReferenceStore;
-  // Services
-  authService: AuthService;
-  userService: UserService;
-  siteService: SiteService;
-  bloggerService: BloggerService;
-  articleService: ArticleService;
-  commentService: CommentService;
-  notificationService: NotificationService;
-  fileService: FileService;
-  subscriptionService: SubscriptionService;
-  pushService: PushService;
-  backupService: BackupService;
-  searchService: SearchService;
-  tagService: TagService;
-  categoryService: CategoryService;
-  adService: AdService;
-  recommendService: RecommendService;
-  statsService: StatsService;
-  crossRefService: CrossReferenceService;
+export interface AppControllers {
+  site: SiteController;
+  user: UserController;
+  article: ArticleController;
+  comment: CommentController;
+  tag: TagController;
+  category: CategoryController;
+  search: SearchController;
+  archive: ArchiveController;
+  auditLog: AuditLogController;
+  rss: RssController;
+  webhook: WebhookController;
 }
 
-export function createDeps(): AppDeps {
-  // Stores
-  const siteStore = new SiteStore();
-  const bloggerStore = new BloggerStore();
-  const userStore = new UserStore();
-  const articleStore = new ArticleStore();
-  const commentStore = new CommentStore();
-  const notificationStore = new NotificationStore();
-  const fileStore = new FileStore();
-  const subscriptionStore = new SubscriptionStore();
-  const wsStore = new WsStore();
-  const backupStore = new BackupStore();
-  const searchStore = new SearchStore();
-  const tagStore = new TagStore();
-  const categoryStore = new CategoryStore();
-  const adStore = new AdStore();
-  const recommendStore = new RecommendStore();
-  const statsStore = new StatsStore();
-  const crossRefStore = new CrossReferenceStore();
-
-  // Wire store dependencies (SiteStore aggregates stats from other stores).
-  siteStore.setStores({
-    userStore,
-    bloggerStore,
-    articleStore,
-    commentStore,
-    fileStore,
-  });
-
-  // Services (order matters for dependency injection)
-  const authService = new AuthService(userStore);
-  const userService = new UserService(userStore, authService);
-  const siteService = new SiteService(siteStore);
-  const bloggerService = new BloggerService(bloggerStore, userStore, subscriptionStore);
-  const articleService = new ArticleService(articleStore, searchStore, userStore);
-  const commentService = new CommentService(commentStore, articleStore, siteStore);
-  const notificationService = new NotificationService(notificationStore);
-  const fileService = new FileService(fileStore, userStore);
-  const pushService = new PushService(wsStore);
-  const subscriptionService = new SubscriptionService(
-    subscriptionStore,
-    userStore,
-    bloggerStore,
-    tagStore,
-    categoryStore,
-    pushService,
-  );
-  const backupService = new BackupService(
-    backupStore,
-    userStore,
-    bloggerStore,
-    articleStore,
-    commentStore,
-    notificationStore,
-    fileStore,
-  );
-  const searchService = new SearchService(searchStore);
-  const tagService = new TagService(tagStore);
-  const categoryService = new CategoryService(categoryStore);
-  const adService = new AdService(adStore);
-  const recommendService = new RecommendService(recommendStore, articleStore, subscriptionStore);
-  const statsService = new StatsService(statsStore);
-  const crossRefService = new CrossReferenceService(crossRefStore, articleStore, tagStore);
-
-  return {
-    siteStore, bloggerStore, userStore, articleStore, commentStore,
-    notificationStore, fileStore, subscriptionStore, wsStore, backupStore,
-    searchStore, tagStore, categoryStore, adStore, recommendStore, statsStore,
-    crossRefStore,
-    authService, userService, siteService, bloggerService, articleService,
-    commentService, notificationService, fileService, subscriptionService,
-    pushService, backupService, searchService, tagService, categoryService,
-    adService, recommendService, statsService, crossRefService,
-  };
+export interface AppMiddleware {
+  auth: AuthMiddleware;
+  rateLimit: RateLimitMiddleware;
+  audit: AuditMiddleware;
 }
 
-export function createApp(deps?: AppDeps): { app: Express; deps: AppDeps } {
-  const d = deps ?? createDeps();
-
-  // Controllers
-  const siteController = new SiteController(d.siteService, d.authService);
-  const bloggerController = new BloggerController(d.bloggerService, d.authService);
-  const userController = new UserController(d.authService, d.userService);
-  const recommendController = new RecommendController(d.recommendService, d.authService);
-  const adController = new AdController(d.adService, d.authService);
-  const statsController = new StatsController(d.statsService, d.authService);
-  const searchController = new SearchController(d.searchService, d.authService);
-  const tagController = new TagController(d.tagService, d.authService);
-  const categoryController = new CategoryController(d.categoryService, d.authService);
-  const commentController = new CommentController(d.commentService, d.authService);
-  const notificationController = new NotificationController(d.notificationService, d.authService);
-  const articleController = new ArticleController(d.articleService, d.authService);
-  const crossRefController = new CrossReferenceController(d.crossRefService);
-  const pushController = new PushController(d.pushService, d.authService);
-  const fileController = new FileController(d.fileService, d.authService);
-  const subscriptionController = new SubscriptionController(d.subscriptionService, d.authService);
-  const backupController = new BackupController(d.backupService, d.authService);
-
+export function createApp(controllers: AppControllers, middleware: AppMiddleware): Express {
   const app = express();
-  app.use(express.json({ limit: '15mb' }));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(middleware.rateLimit.middleware());
+  app.use(middleware.audit.record());
 
-  // Health check
-  app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', ts: new Date().toISOString() });
-  });
+  const api = Router();
 
-  // SD-001 Site
-  app.get('/api/site/config', siteController.getConfig);
-  app.put('/api/site/config', siteController.updateConfig);
-  app.post('/api/site/maintenance', siteController.setMaintenanceMode);
-  app.post('/api/site/announcement', siteController.scheduleAnnouncement);
-  app.get('/api/site/stats', siteController.getStatsOverview);
+  // 站点
+  api.get('/health', (req, res) => controllers.site.health(req, res, () => {}));
+  api.get('/stats', (req, res) => controllers.site.stats(req, res, () => {}));
 
-  // SD-002 Blogger
-  app.post('/api/bloggers', bloggerController.register);
-  app.get('/api/bloggers/:slug', bloggerController.getBySlug);
-  app.post('/api/bloggers/:bloggerId/follow', bloggerController.follow);
-  app.delete('/api/bloggers/:bloggerId/follow', bloggerController.unfollow);
-  app.get('/api/bloggers', bloggerController.listByFollower);
+  // 用户
+  api.post('/users/register', asyncHandler((req, res, next) => controllers.user.register(req, res, next)));
+  api.post('/users/login', asyncHandler((req, res, next) => controllers.user.login(req, res, next)));
+  api.post('/users/password-reset/request', asyncHandler((req, res, next) => controllers.user.passwordResetRequest(req, res, next)));
+  api.post('/users/password-reset', asyncHandler((req, res, next) => controllers.user.passwordReset(req, res, next)));
+  api.get('/users', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.user.list(req, res, next)));
+  api.get('/users/profile', middleware.auth.authenticate(), asyncHandler((req, res, next) => controllers.user.getProfile(req, res, next)));
+  api.put('/users/profile', middleware.auth.authenticate(), asyncHandler((req, res, next) => controllers.user.updateProfile(req, res, next)));
 
-  // SD-003 User + Auth
-  app.post('/api/auth/register', userController.register);
-  app.post('/api/auth/login', userController.login);
-  app.post('/api/auth/logout', userController.logout);
-  app.get('/api/users/me', userController.me);
-  app.post('/api/users/:userId/ban', userController.ban);
-  app.post('/api/users/:userId/unban', userController.unban);
+  // 文章
+  api.post('/articles', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.article.create(req, res, next)));
+  api.get('/articles', asyncHandler((req, res, next) => controllers.article.list(req, res, next)));
+  api.get('/articles/:id', asyncHandler((req, res, next) => controllers.article.getById(req, res, next)));
+  api.put('/articles/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.article.update(req, res, next)));
+  api.delete('/articles/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.article.remove(req, res, next)));
+  api.post('/articles/:id/workflow', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.article.workflow(req, res, next)));
+  api.post('/articles/:id/like', middleware.auth.authenticate(), asyncHandler((req, res, next) => controllers.article.like(req, res, next)));
 
-  // SD-004 Recommend
-  app.get('/api/recommend/hot', recommendController.hot);
-  app.get('/api/recommend/personalized', recommendController.personalized);
-  app.get('/api/recommend/latest', recommendController.latest);
-  app.post('/api/recommend/slots', recommendController.setSlot);
+  // 评论
+  api.post('/articles/:id/comments', middleware.auth.authenticate(), asyncHandler((req, res, next) => controllers.comment.create(req, res, next)));
+  api.get('/articles/:id/comments', asyncHandler((req, res, next) => controllers.comment.listByArticle(req, res, next)));
+  api.delete('/comments/:id', middleware.auth.authenticate(), asyncHandler((req, res, next) => controllers.comment.remove(req, res, next)));
 
-  // SD-005 Ad
-  app.post('/api/ads', adController.create);
-  app.post('/api/ads/:adId/audit', adController.audit);
-  app.post('/api/ads/:adId/click', adController.recordClick);
-  app.get('/api/ads/slot/:slotId', adController.listBySlot);
+  // 标签（仅 admin 可写）
+  api.get('/tags', asyncHandler((req, res, next) => controllers.tag.list(req, res, next)));
+  api.post('/tags', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.tag.create(req, res, next)));
+  api.put('/tags/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.tag.update(req, res, next)));
+  api.delete('/tags/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.tag.remove(req, res, next)));
 
-  // SD-006 Stats
-  app.get('/api/stats/articles', statsController.articleStats);
-  app.get('/api/stats/users', statsController.userStats);
-  app.get('/api/stats/bloggers', statsController.bloggerStats);
-  app.get('/api/stats/trend', statsController.siteTrend);
+  // 分类
+  api.get('/categories', asyncHandler((req, res, next) => controllers.category.list(req, res, next)));
+  api.post('/categories', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.category.create(req, res, next)));
+  api.put('/categories/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.category.update(req, res, next)));
+  api.delete('/categories/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin', 'author']), asyncHandler((req, res, next) => controllers.category.remove(req, res, next)));
 
-  // SD-007 Search
-  app.get('/api/search', searchController.search);
-  app.get('/api/search/suggest', searchController.suggest);
-  app.get('/api/search/history', searchController.history);
-  app.delete('/api/search/history', searchController.clearHistory);
+  // 搜索 + 归档
+  api.get('/search', asyncHandler((req, res, next) => controllers.search.search(req, res, next)));
+  api.get('/archive', asyncHandler((req, res, next) => controllers.archive.list(req, res, next)));
 
-  // SD-008 Tag
-  app.post('/api/tags', tagController.create);
-  app.post('/api/tags/:tagId/approve', tagController.approve);
-  app.post('/api/tags/:tagId/reject', tagController.reject);
-  app.post('/api/articles/:articleId/tags', tagController.bind);
-  app.delete('/api/articles/:articleId/tags', tagController.unbind);
-  app.get('/api/tags/cloud', tagController.cloud);
-  app.post('/api/tags/merge', tagController.merge);
+  // 审计日志
+  api.get('/audit-logs', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.auditLog.list(req, res, next)));
 
-  // SD-009 Category
-  app.post('/api/categories', categoryController.create);
-  app.get('/api/categories/tree', categoryController.tree);
-  app.get('/api/categories/:categoryId/breadcrumb', categoryController.breadcrumb);
-  app.delete('/api/categories/:categoryId', categoryController.cascadeDelete);
-  app.post('/api/articles/:articleId/category', categoryController.bindCategory);
+  // RSS
+  api.get('/rss', asyncHandler((req, res, next) => controllers.rss.feed(req, res, next)));
 
-  // SD-010 Comment
-  app.post('/api/articles/:articleId/comments', commentController.create);
-  app.post('/api/comments/:commentId/audit', commentController.audit);
-  app.post('/api/comments/:commentId/like', commentController.like);
-  app.post('/api/comments/:commentId/report', commentController.report);
-  app.get('/api/articles/:articleId/comments', commentController.listByArticle);
+  // Webhook
+  api.get('/webhooks', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.webhook.list(req, res, next)));
+  api.post('/webhooks', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.webhook.create(req, res, next)));
+  api.delete('/webhooks/:id', middleware.auth.authenticate(), middleware.auth.requireRole(['admin']), asyncHandler((req, res, next) => controllers.webhook.remove(req, res, next)));
+  api.post('/webhooks/trigger', asyncHandler((req, res, next) => controllers.webhook.trigger(req, res, next)));
 
-  // SD-011 Notification
-  app.get('/api/notifications', notificationController.list);
-  app.post('/api/notifications/:notificationId/read', notificationController.markRead);
-  app.post('/api/notifications/read-all', notificationController.markAllRead);
-  app.put('/api/notifications/settings', notificationController.updateSettings);
-  app.get('/api/notifications/unread/count', notificationController.unreadSize);
+  app.use('/api', api);
 
-  // SD-012 Article
-  app.post('/api/articles', articleController.create);
-  app.get('/api/articles/:articleId', articleController.getById);
-  app.post('/api/articles/:articleId/submit', articleController.submitForReview);
-  app.post('/api/articles/:articleId/publish', articleController.publish);
-  app.post('/api/articles/:articleId/approve', articleController.approve);
-  app.post('/api/articles/:articleId/offline', articleController.offline);
-  app.post('/api/articles/:articleId/archive', articleController.archive);
-  app.post('/api/articles/:articleId/republish', articleController.republish);
-  app.post('/api/articles/:articleId/schedule', articleController.schedule);
-  app.post('/api/articles/:articleId/fire', articleController.fireScheduledPublish);
-  app.post('/api/articles/batch-offline', articleController.batchOffline);
-  app.get('/api/authors/:authorId/articles', articleController.listByAuthor);
-  app.post('/api/articles/:articleId/transition', articleController.transition);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
-  // SD-013 CrossReference
-  app.post('/api/articles/:articleId/citations', crossRefController.addCitation);
-  app.delete('/api/articles/:articleId/citations', crossRefController.removeCitation);
-  app.get('/api/articles/:articleId/backlinks', crossRefController.backlinks);
-  app.get('/api/articles/:articleId/related', crossRefController.related);
-  app.get('/api/articles/:articleId/graph', crossRefController.graph);
-
-  // SD-014 Push
-  app.post('/api/push/:userId', pushController.push);
-  app.post('/api/push/broadcast', pushController.broadcast);
-  app.post('/api/push/flush', pushController.flushOffline);
-
-  // SD-015 File
-  app.post('/api/files', fileController.upload);
-  app.get('/api/files/quota', fileController.getQuota);
-  app.get('/api/files/:fileId', fileController.getById);
-  app.get('/api/files', fileController.listByUser);
-  app.delete('/api/files/:fileId', fileController.delete);
-
-  // SD-016 Subscription
-  app.post('/api/subscriptions', subscriptionController.subscribe);
-  app.delete('/api/subscriptions', subscriptionController.unsubscribe);
-  app.get('/api/subscriptions', subscriptionController.list);
-  app.get('/api/subscriptions/permission', subscriptionController.permission);
-
-  // SD-017 Backup
-  app.post('/api/backups', backupController.create);
-  app.get('/api/backups/export/:userId', backupController.exportUserData);
-  app.post('/api/backups/:backupId/restore', backupController.restore);
-  app.get('/api/backups/incremental', backupController.incremental);
-  app.get('/api/backups/:backupId/verify', backupController.verifyIntegrity);
-
-  // 404 handler
-  app.use((_req: Request, res: Response) => {
-    res.status(404).json({ code: 404, message: 'Not Found', httpStatus: 404 });
-  });
-
-  // Error handler (must be last)
-  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
-    errorHandler(err, req, res, next);
-  });
-
-  return { app, deps: d };
+  return app;
 }

@@ -1,74 +1,66 @@
-// SD-007 SearchService.
-
-import { AppError, ErrorCode } from '../utils/errors.js';
-import {
-  pageSchema,
-  searchQuerySchema,
-  suggestPrefixSchema,
-} from '../utils/schemas.js';
-import type { SearchStore, SearchHit } from '../stores/search.store.js';
-import type { Page } from '../types.js';
-
-export type SearchMode = 'relevance' | 'newest' | 'popular';
+/**
+ * SearchService（DD-015-002）+ ArchiveService（DD-022-002）。
+ */
+import type { Article, PaginatedResult, ArchiveItem, SearchQuery } from '../types.js';
+import type { ArticleStore } from '../stores/article.store.js';
+import { PaginationUtil } from '../utils/pagination.js';
+import { SearchQueryParser } from '../utils/search-query-parser.js';
 
 export class SearchService {
-  constructor(private searchStore: SearchStore) {}
+  private parser = new SearchQueryParser();
 
-  /** search — TLA+ L2_discovery.search */
-  search(
-    userId: string | null,
-    query: string,
-    mode: SearchMode,
-    page: number,
-    pageSize: number,
-  ): Page<SearchHit> {
-    if (!searchQuerySchema.safeParse(query).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
+  constructor(private articleStore: ArticleStore) {}
+
+  search(query: SearchQuery): PaginatedResult<Article> {
+    let items = this.articleStore.listPublished();
+    const keyword = query.keyword.toLowerCase();
+    if (keyword.length > 0) {
+      items = items.filter(
+        (a) =>
+          a.title.toLowerCase().includes(keyword) ||
+          a.content.toLowerCase().includes(keyword),
+      );
     }
-    const parsed = pageSchema.safeParse({ page, pageSize });
-    if (!parsed.success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
+    if (query.tagIds !== undefined && query.tagIds.length > 0) {
+      items = items.filter((a) => query.tagIds!.some((t) => a.tagIds.includes(t)));
     }
-    const hits = this.searchStore.search(query);
-    // Sort by mode.
-    if (mode === 'relevance') {
-      hits.sort((a, b) => b.score - a.score);
-    } else if (mode === 'newest') {
-      // SearchStore doesn't track timestamps; treat as insertion order which is stable.
-      // For determinism, fall back to score.
-      hits.sort((a, b) => b.score - a.score);
-    } else {
-      // popular — fall back to score.
-      hits.sort((a, b) => b.score - a.score);
+    if (query.categoryIds !== undefined && query.categoryIds.length > 0) {
+      items = items.filter(
+        (a) => a.categoryId !== null && query.categoryIds!.includes(a.categoryId),
+      );
     }
-    // Append to history (per-user).
-    if (userId) {
-      this.searchStore.appendHistory(userId, query);
-    }
-    const start = (parsed.data.page - 1) * parsed.data.pageSize;
-    return {
-      items: hits.slice(start, start + parsed.data.pageSize),
-      total: hits.length,
-      page: parsed.data.page,
-      pageSize: parsed.data.pageSize,
-    };
+    items = PaginationUtil.sort(items, 'createdAt', 'desc');
+    return PaginationUtil.paginate(items, query.page, query.limit);
   }
 
-  suggest(prefix: string): string[] {
-    if (!suggestPrefixSchema.safeParse(prefix).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
+  searchRaw(raw: Parameters<SearchQueryParser['parse']>[0]): PaginatedResult<Article> {
+    const parsed = this.parser.parse(raw);
+    return this.search(parsed);
+  }
+}
+
+export class ArchiveService {
+  constructor(private articleStore: ArticleStore) {}
+
+  listArchive(): ArchiveItem[] {
+    const articles = this.articleStore.listPublished();
+    const buckets = new Map<string, ArchiveItem>();
+    for (const a of articles) {
+      const date = new Date(a.publishedAt ?? a.createdAt);
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth() + 1;
+      const key = `${year}-${month.toString().padStart(2, '0')}`;
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { year, month, count: 0, articleIds: [] };
+        buckets.set(key, bucket);
+      }
+      bucket.count += 1;
+      bucket.articleIds.push(a.id);
     }
-    return this.searchStore.suggest(prefix, 10);
-  }
-
-  history(userId: string): string[] {
-    if (!userId) throw new AppError(ErrorCode.NoUser, '1011');
-    return this.searchStore.getHistory(userId);
-  }
-
-  /** clearSearchHistory — TLA+ L2_discovery.clearSearchHistory */
-  clearSearchHistory(userId: string): void {
-    if (!userId) throw new AppError(ErrorCode.NoUser, '1011');
-    this.searchStore.clearHistory(userId);
+    return [...buckets.values()].sort((a, b) => {
+      if (b.year !== a.year) return b.year - a.year;
+      return b.month - a.month;
+    });
   }
 }

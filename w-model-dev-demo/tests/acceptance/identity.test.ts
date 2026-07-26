@@ -1,250 +1,253 @@
-// 验收测试 - 身份认证 (UAT-004 ~ UAT-009).
-// 覆盖 REQ-002/REQ-003：博主注册/重复邮箱/权限隔离/用户登录/JWT/封禁/角色越权.
-// 真实实例化 Store/Service 三层，从用户场景出发；禁止 mock 内部模块.
-
-process.env.JWT_SECRET = 'test-secret-key';
-
+/**
+ * 验收测试 - 身份与认证模块（15 用例）
+ * 覆盖 UAT: 001, 002, 003, 004, 016, 021, 023, 024, 025, 026, 027, 039, 040, 049, 050
+ * 关联需求: REQ-001~004, REQ-016, REQ-021
+ *
+ * 测试方法：supertest → Express app（seam-http），beforeEach 创建独立 container 数据隔离。
+ * 实际 API 路径以 docs/uat-path-mapping.md 回填为准（设计路径与实际路径存在等价映射）。
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { UserStore } from '../../src/stores/user.store.js';
-import { ArticleStore } from '../../src/stores/article.store.js';
-import { SearchStore } from '../../src/stores/search.store.js';
-import { BloggerStore } from '../../src/stores/blogger.store.js';
-import { SubscriptionStore } from '../../src/stores/subscription.store.js';
-import { SiteStore } from '../../src/stores/site.store.js';
-import { CommentStore } from '../../src/stores/comment.store.js';
-import { FileStore } from '../../src/stores/file.store.js';
-import { AuthService, UserService } from '../../src/services/auth.service.js';
-import { ArticleService } from '../../src/services/article.service.js';
-import { BloggerService } from '../../src/services/blogger.service.js';
-import { AppError, ErrorCode } from '../../src/utils/errors.js';
+import request from 'supertest';
+import type { Express } from 'express';
 import {
-  ArticleStatus,
-  UserRole,
-  UserStatus,
-} from '../../src/types.js';
-import { clearRevokedJtis, signToken, verifyToken } from '../../src/utils/auth.js';
+  createTestContext,
+  registerAndLogin,
+  requestPasswordResetToken,
+  type AcceptanceTestContext,
+} from './helpers.js';
 
-describe('UAT-004~009 身份认证验收', () => {
-  let userStore: UserStore;
-  let articleStore: ArticleStore;
-  let searchStore: SearchStore;
-  let bloggerStore: BloggerStore;
-  let subscriptionStore: SubscriptionStore;
-  let siteStore: SiteStore;
-  let authService: AuthService;
-  let userService: UserService;
-  let articleService: ArticleService;
-  let bloggerService: BloggerService;
+describe('验收测试 - 身份与认证模块（15 用例）', () => {
+  let ctx: AcceptanceTestContext;
+  let app: Express;
 
   beforeEach(() => {
-    userStore = new UserStore();
-    articleStore = new ArticleStore();
-    searchStore = new SearchStore();
-    bloggerStore = new BloggerStore();
-    subscriptionStore = new SubscriptionStore();
-    siteStore = new SiteStore();
-    const commentStore = new CommentStore();
-    const fileStore = new FileStore();
-    siteStore.setStores({ userStore, bloggerStore, articleStore, commentStore, fileStore });
-    authService = new AuthService(userStore);
-    userService = new UserService(userStore, authService);
-    articleService = new ArticleService(articleStore, searchStore, userStore);
-    bloggerService = new BloggerService(bloggerStore, userStore, subscriptionStore);
-    clearRevokedJtis();
+    ctx = createTestContext();
+    app = ctx.app;
   });
 
-  it('UAT-004: 博主注册正常流程', async () => {
-    // 博主通过邮箱+密码注册，密码 bcrypt 哈希存储.
-    const blogger = await authService.userRegister({
-      email: 'blogger@test.com',
-      password: 'passwordpassword',
-      displayName: '博主A',
-      role: UserRole.Blogger,
-    });
-    expect(blogger.id).toBeTruthy();
-    expect(blogger.email).toBe('blogger@test.com');
-    // 密码以 bcrypt 哈希存储（$2b$ 开头）.
-    expect(blogger.passwordHash.startsWith('$2b$')).toBe(true);
-    expect(blogger.passwordHash).not.toBe('passwordpassword');
-    // 注册博主档案.
-    const bloggerEntity = bloggerService.bloggerRegister(blogger.id, 'blogger-a', 'bio');
-    expect(bloggerEntity.userId).toBe(blogger.id);
-    // 登录获取 JWT.
-    const { token, user } = await authService.userLogin('blogger@test.com', 'passwordpassword');
+  // ==================== UAT-001 系统健康检查（REQ-001） ====================
+  it('UAT-001: 系统健康检查 → GET /api/health 返回 200 {status:"ok"}', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+  });
+
+  // ==================== UAT-023 未知路由 404（REQ-001 边界） ====================
+  it('UAT-023: 未知路由 → 404 NOT_FOUND_ERROR', async () => {
+    const res = await request(app).get('/api/non-existent-route');
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('NOT_FOUND_ERROR');
+  });
+
+  // ==================== UAT-002 用户注册正常流程（REQ-002） ====================
+  it('UAT-002: 用户注册 → 201 含 userId', async () => {
+    const res = await request(app)
+      .post('/api/users/register')
+      .send({ email: 'test@example.com', password: 'Pass1234', role: 'reader' });
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBeTruthy();
+    expect(res.body.email).toBe('test@example.com');
+    expect(res.body.role).toBe('reader');
+  });
+
+  // ==================== UAT-024 注册邮箱已存在（REQ-002 异常） ====================
+  it('UAT-024: 重复注册同一邮箱 → 409 CONFLICT_ERROR', async () => {
+    await request(app)
+      .post('/api/users/register')
+      .send({ email: 'test@example.com', password: 'Pass1234', role: 'reader' });
+    const res = await request(app)
+      .post('/api/users/register')
+      .send({ email: 'test@example.com', password: 'Pass1234', role: 'reader' });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CONFLICT_ERROR');
+  });
+
+  // ==================== UAT-025 注册密码边界值（REQ-002 边界） ====================
+  it('UAT-025: 密码长度边界（7 位拒绝 / 8 位通过）', async () => {
+    const shortRes = await request(app)
+      .post('/api/users/register')
+      .send({ email: 'a@b.com', password: '1234567', role: 'reader' });
+    expect(shortRes.status).toBe(400);
+    expect(shortRes.body.error.code).toBe('VALIDATION_ERROR');
+
+    const okRes = await request(app)
+      .post('/api/users/register')
+      .send({ email: 'b@b.com', password: '12345678', role: 'reader' });
+    expect(okRes.status).toBe(201);
+    expect(okRes.body.id).toBeTruthy();
+  });
+
+  // ==================== UAT-003 用户登录正常流程（REQ-003） ====================
+  it('UAT-003: 用户登录 → 200 含 JWT token（三段式）', async () => {
+    await request(app)
+      .post('/api/users/register')
+      .send({ email: 'test@example.com', password: 'Pass1234', role: 'reader' });
+    const res = await request(app)
+      .post('/api/users/login')
+      .send({ email: 'test@example.com', password: 'Pass1234' });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeTruthy();
+    const parts = (res.body.token as string).split('.');
+    expect(parts.length).toBe(3);
+    expect(res.body.user.email).toBe('test@example.com');
+  });
+
+  // ==================== UAT-026 登录密码错误（REQ-003 异常） ====================
+  it('UAT-026: 密码错误登录 → 401 AUTHENTICATION_ERROR', async () => {
+    await request(app)
+      .post('/api/users/register')
+      .send({ email: 'test@example.com', password: 'Pass1234', role: 'reader' });
+    const res = await request(app)
+      .post('/api/users/login')
+      .send({ email: 'test@example.com', password: 'WrongPass' });
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('AUTHENTICATION_ERROR');
+  });
+
+  // ==================== UAT-004 角色权限校验（REQ-004） ====================
+  it('UAT-004: 角色权限校验（reader 403 / author 201 / admin 可删除他人文章）', async () => {
+    const reader = await registerAndLogin(app, 'reader@b.com', 'reader');
+    const author = await registerAndLogin(app, 'author@b.com', 'author');
+    const admin = await registerAndLogin(app, 'admin@b.com', 'admin');
+
+    // reader 创建文章 → 403
+    const readerRes = await request(app)
+      .post('/api/articles')
+      .set('Authorization', `Bearer ${reader.token}`)
+      .send({ title: 't', content: 'c', tagIds: [], categoryId: null });
+    expect(readerRes.status).toBe(403);
+    expect(readerRes.body.error.code).toBe('AUTHORIZATION_ERROR');
+
+    // author 创建文章 → 201
+    const authorRes = await request(app)
+      .post('/api/articles')
+      .set('Authorization', `Bearer ${author.token}`)
+      .send({ title: 't', content: 'c', tagIds: [], categoryId: null });
+    expect(authorRes.status).toBe(201);
+    const articleId = authorRes.body.id;
+
+    // admin 删除他人文章 → 204
+    const adminDelRes = await request(app)
+      .delete(`/api/articles/${articleId}`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(adminDelRes.status).toBe(204);
+  });
+
+  // ==================== UAT-027 无 Token 访问受保护资源（REQ-004 异常） ====================
+  it('UAT-027: 无 Authorization 头 → 401 AUTHENTICATION_ERROR', async () => {
+    const res = await request(app)
+      .post('/api/articles')
+      .send({ title: 't', content: 'c', tagIds: [], categoryId: null });
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('AUTHENTICATION_ERROR');
+  });
+
+  // ==================== UAT-016 密码重置流程（REQ-016） ====================
+  it('UAT-016: 密码重置全流程（请求→重置→新密码登录）', async () => {
+    const email = 'reset@example.com';
+    const oldPassword = 'OldPass1234';
+    const newPassword = 'NewPass1234';
+
+    // 1. 注册
+    await request(app)
+      .post('/api/users/register')
+      .send({ email, password: oldPassword, role: 'reader' });
+
+    // 2. 请求重置（HTTP 端点返回 message + expiresAt，token 通过 service 获取模拟邮件投递）
+    const reqRes = await request(app)
+      .post('/api/users/password-reset/request')
+      .send({ email });
+    expect(reqRes.status).toBe(200);
+    expect(reqRes.body.message).toContain('重置');
+    expect(reqRes.body.expiresAt).toBeTruthy();
+
+    // 通过 service 获取 token（模拟邮件投递）
+    const { token } = requestPasswordResetToken(ctx.services, email);
     expect(token).toBeTruthy();
-    expect(user.id).toBe(blogger.id);
-    // JWT 有效可验证.
-    const verified = authService.verifyToken(token);
-    expect(verified.userId).toBe(blogger.id);
-    expect(verified.role).toBe(UserRole.Blogger);
+
+    // 3. 使用 token 重置密码
+    const resetRes = await request(app)
+      .post('/api/users/password-reset')
+      .send({ token, newPassword });
+    expect(resetRes.status).toBe(200);
+    expect(resetRes.body.userId).toBeTruthy();
+
+    // 4. 新密码登录 → 200
+    const newLoginRes = await request(app)
+      .post('/api/users/login')
+      .send({ email, password: newPassword });
+    expect(newLoginRes.status).toBe(200);
+    expect(newLoginRes.body.token).toBeTruthy();
   });
 
-  it('UAT-005: 重复邮箱注册异常', async () => {
-    await authService.userRegister({
-      email: 'blogger@test.com',
-      password: 'passwordpassword',
-      displayName: '博主A',
-      role: UserRole.Blogger,
-    });
-    // 使用已注册邮箱再次注册 → 409 BusinessConflict (1005).
-    expect(() => authService.userRegister({
-      email: 'blogger@test.com',
-      password: 'passwordpassword',
-      displayName: '博主B',
-      role: UserRole.Blogger,
-    })).rejects.toThrow(AppError);
-    await expect(authService.userRegister({
-      email: 'blogger@test.com',
-      password: 'passwordpassword',
-      displayName: '博主B',
-      role: UserRole.Blogger,
-    })).rejects.toMatchObject({ code: ErrorCode.BusinessConflict, httpStatus: 409 });
+  // ==================== UAT-039 密码重置令牌无效（REQ-016 异常） ====================
+  it('UAT-039: 无效令牌重置 → 404 NOT_FOUND_ERROR', async () => {
+    const res = await request(app)
+      .post('/api/users/password-reset')
+      .send({ token: 'invalid-token', newPassword: 'NewPass1234' });
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('NOT_FOUND_ERROR');
   });
 
-  it('UAT-006: 权限隔离边界（跨博主编辑）', async () => {
-    const admin = await authService.userRegister({
-      email: 'admin@x.com',
-      password: 'passwordpassword',
-      displayName: 'admin',
-      role: UserRole.Admin,
-    });
-    const bloggerA = await authService.userRegister({
-      email: 'a@x.com',
-      password: 'passwordpassword',
-      displayName: 'bloggerA',
-      role: UserRole.Blogger,
-    });
-    const bloggerB = await authService.userRegister({
-      email: 'b@x.com',
-      password: 'passwordpassword',
-      displayName: 'bloggerB',
-      role: UserRole.Blogger,
-    });
-    // 博主 B 创建文章.
-    const article = articleService.createArticle(bloggerB.id, { title: 'B 的文章', content: '内容' });
-    expect(article.authorId).toBe(bloggerB.id);
-    // 博主 A 尝试操作博主 B 的文章 → 1021 Rbac.
-    expect(() => articleService.transition(bloggerA.id, article.id, ArticleStatus.PendingReview))
-      .toThrow(AppError);
-    try {
-      articleService.transition(bloggerA.id, article.id, ArticleStatus.PendingReview);
-    } catch (e) {
-      expect((e as AppError).code).toBe(ErrorCode.Rbac);
-      expect((e as AppError).httpStatus).toBe(403);
-    }
-    // 文章作者本人可流转.
-    articleService.submitForReview(bloggerB.id, article.id);
-    expect(articleStore.getById(article.id)?.status).toBe(ArticleStatus.PendingReview);
-    // 管理员可审核.
-    articleService.approveArticle(admin.id, UserRole.Admin, article.id);
-    expect(articleStore.getById(article.id)?.status).toBe(ArticleStatus.Published);
+  // ==================== UAT-040 密码重置新密码不足 8 位（REQ-016 边界） ====================
+  it('UAT-040: 新密码 < 8 位 → 400 VALIDATION_ERROR', async () => {
+    const email = 'boundary@example.com';
+    await request(app)
+      .post('/api/users/register')
+      .send({ email, password: 'OldPass1234', role: 'reader' });
+    const { token } = requestPasswordResetToken(ctx.services, email);
+
+    const res = await request(app)
+      .post('/api/users/password-reset')
+      .send({ token, newPassword: '123' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('UAT-007: 用户登录 JWT 正常', async () => {
-    await authService.userRegister({
-      email: 'user@test.com',
-      password: 'passwordpassword',
-      displayName: 'user',
-    });
-    // 登录获取 JWT.
-    const { token, user } = await authService.userLogin('user@test.com', 'passwordpassword');
-    expect(token).toBeTruthy();
-    expect(user.email).toBe('user@test.com');
-    // JWT 可被 verifyToken 验证.
-    const { payload } = verifyToken(token);
-    expect(payload.userId).toBe(user.id);
-    expect(payload.role).toBe(UserRole.Reader);
-    // 后续请求携带 token 鉴权 — verifyToken 返回 userId/role.
-    const verified = authService.verifyToken(token);
-    expect(verified.userId).toBe(user.id);
-    expect(verified.role).toBe(UserRole.Reader);
-    // 错误密码登录失败 → 1012 WrongPassword.
-    await expect(authService.userLogin('user@test.com', 'wrong-password'))
-      .rejects.toMatchObject({ code: ErrorCode.WrongPassword });
+  // ==================== UAT-021 用户资料管理（REQ-021） ====================
+  it('UAT-021: 更新与查询用户资料', async () => {
+    const user = await registerAndLogin(app, 'profile@b.com', 'author');
+
+    // PUT /api/users/profile 更新资料
+    const updateRes = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ nickname: '张三', avatar: 'https://example.com/a.png', bio: '博主' });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.nickname).toBe('张三');
+    expect(updateRes.body.avatar).toBe('https://example.com/a.png');
+    expect(updateRes.body.bio).toBe('博主');
+
+    // GET /api/users/profile 查询资料
+    const getRes = await request(app)
+      .get('/api/users/profile')
+      .set('Authorization', `Bearer ${user.token}`);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.nickname).toBe('张三');
   });
 
-  it('UAT-008: 封禁用户 token 失效', async () => {
-    const admin = await authService.userRegister({
-      email: 'admin@x.com',
-      password: 'passwordpassword',
-      displayName: 'admin',
-      role: UserRole.Admin,
-    });
-    const reader = await authService.userRegister({
-      email: 'r@x.com',
-      password: 'passwordpassword',
-      displayName: 'reader',
-    });
-    // reader 登录获取 token.
-    const { token } = await authService.userLogin('r@x.com', 'passwordpassword');
-    expect(token).toBeTruthy();
-    // admin 封禁 reader.
-    userService.banUser(admin.id, 'admin', reader.id, '违规操作');
-    expect(userStore.getById(reader.id)?.status).toBe(UserStatus.Banned);
-    // 封禁后旧 token 失效（jti 已撤销 → 1022 Banned）.
-    expect(() => authService.verifyToken(token)).toThrow(AppError);
-    try {
-      authService.verifyToken(token);
-    } catch (e) {
-      expect((e as AppError).code).toBe(ErrorCode.Banned);
-      expect((e as AppError).httpStatus).toBe(403);
-    }
-    // 被封禁用户登录被拒.
-    await expect(authService.userLogin('r@x.com', 'passwordpassword'))
-      .rejects.toMatchObject({ code: ErrorCode.Banned });
-    // 解禁后可重新登录.
-    userService.unbanUser(admin.id, 'admin', reader.id);
-    expect(userStore.getById(reader.id)?.status).toBe(UserStatus.Active);
-    const relogin = await authService.userLogin('r@x.com', 'passwordpassword');
-    expect(relogin.token).toBeTruthy();
+  // ==================== UAT-049 用户资料 nickname 超长（REQ-021 异常） ====================
+  it('UAT-049: nickname > 50 字符 → 400 VALIDATION_ERROR', async () => {
+    const user = await registerAndLogin(app, 'longnick@b.com', 'author');
+    const longNickname = 'x'.repeat(51);
+    const res = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ nickname: longNickname });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('UAT-009: 角色权限越权异常', async () => {
-    const admin = await authService.userRegister({
-      email: 'admin@x.com',
-      password: 'passwordpassword',
-      displayName: 'admin',
-      role: UserRole.Admin,
-    });
-    const reader = await authService.userRegister({
-      email: 'r@x.com',
-      password: 'passwordpassword',
-      displayName: 'reader',
-    });
-    // reader 登录获取 token.
-    const { token } = await authService.userLogin('r@x.com', 'passwordpassword');
-    // JWT 角色为 reader，访问管理员接口需被 service 层 Rbac 拒绝.
-    const verified = authService.verifyToken(token);
-    expect(verified.role).toBe(UserRole.Reader);
-    // reader 尝试审核文章 → 1021.
-    const blogger = await authService.userRegister({
-      email: 'b@x.com',
-      password: 'passwordpassword',
-      displayName: 'blogger',
-      role: UserRole.Blogger,
-    });
-    const article = articleService.createArticle(blogger.id, { title: '审核测试', content: '内容' });
-    articleService.submitForReview(blogger.id, article.id);
-    // reader 真实角色调用 → 1021.
-    expect(() => articleService.approveArticle(reader.id, UserRole.Reader, article.id))
-      .toThrow(AppError);
-    try {
-      articleService.approveArticle(reader.id, UserRole.Reader, article.id);
-    } catch (e) {
-      expect((e as AppError).code).toBe(ErrorCode.Rbac);
-      expect((e as AppError).httpStatus).toBe(403);
-    }
-    // reader 尝试封禁他人 → 1021.
-    expect(() => userService.banUser(reader.id, UserRole.Reader, blogger.id, '越权'))
-      .toThrow(AppError);
-    // reader 用 signToken 伪造 admin token — 但 verifyToken 仍按 token 中的 role 返回，
-    // 真正鉴权在 service 层：即使 token role=admin，approveArticle 也会按 role=admin 通过。
-    // 这反映 RBAC 信任 JWT payload；伪造 JWT 需要密钥（UAT-054 覆盖）.
-    const forgedToken = signToken(reader.id, UserRole.Admin);
-    const forgedVerified = authService.verifyToken(forgedToken);
-    expect(forgedVerified.role).toBe(UserRole.Admin);
-    // admin 正常审核通过.
-    articleService.approveArticle(admin.id, UserRole.Admin, article.id);
-    expect(articleStore.getById(article.id)?.status).toBe(ArticleStatus.Published);
+  // ==================== UAT-050 查询未设置资料的用户（REQ-021 边界） ====================
+  it('UAT-050: 未设置资料时查询 → 200 空资料（注册即初始化空 profile）', async () => {
+    const user = await registerAndLogin(app, 'noprofile@b.com', 'author');
+    const res = await request(app)
+      .get('/api/users/profile')
+      .set('Authorization', `Bearer ${user.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.userId).toBe(user.id);
+    expect(res.body.nickname).toBe('');
+    expect(res.body.avatar).toBe('');
+    expect(res.body.bio).toBe('');
   });
 });

@@ -1,160 +1,171 @@
-// SD-012 ArticleStore.
-
-import {
-  ArticleStatus,
-  ScheduleStatus,
-  type Article,
-  type ArticleInput,
-} from '../types.js';
-import { AppError, ErrorCode } from '../utils/errors.js';
-import { articleInputSchema } from '../utils/schemas.js';
-
-let counter = 0;
-function nextId(): string {
-  counter += 1;
-  return `a-${counter}`;
-}
+/**
+ * ArticleStore（DD-005-003）— 文章存储 + authorId/status 索引。
+ */
+import type { Article, ArticleQuery, ArticleStatus } from '../types.js';
+import { NotFoundError } from '../utils/errors.js';
+import { generateId } from '../utils/id.js';
+import { PaginationUtil } from '../utils/pagination.js';
 
 export class ArticleStore {
-  private articles = new Map<string, Article>();
-  private authorIdToArticles = new Map<string, Set<string>>();
-  private statusToArticles = new Map<ArticleStatus, Set<string>>();
-  private seriesIdToArticles = new Map<string, Set<string>>();
+  private articles: Map<string, Article> = new Map();
+  private authorIndex: Map<string, Set<string>> = new Map();
+  private statusIndex: Map<string, Set<string>> = new Map();
+
+  insert(article: Omit<Article, 'id' | 'createdAt' | 'updatedAt' | 'likeCount' | 'viewCount'> & {
+    id?: string; likeCount?: number; viewCount?: number;
+  }): Article {
+    const now = new Date().toISOString();
+    const record: Article = {
+      id: article.id ?? generateId('article'),
+      title: article.title,
+      content: article.content,
+      authorId: article.authorId,
+      categoryId: article.categoryId,
+      tagIds: article.tagIds,
+      status: article.status,
+      likeCount: article.likeCount ?? 0,
+      viewCount: article.viewCount ?? 0,
+      publishedAt: article.publishedAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.articles.set(record.id, record);
+    this.addToIndex(this.authorIndex, record.authorId, record.id);
+    this.addToIndex(this.statusIndex, record.status, record.id);
+    return record;
+  }
+
+  private addToIndex(idx: Map<string, Set<string>>, key: string, value: string): void {
+    let set = idx.get(key);
+    if (!set) {
+      set = new Set();
+      idx.set(key, set);
+    }
+    set.add(value);
+  }
+
+  private removeFromIndex(idx: Map<string, Set<string>>, key: string, value: string): void {
+    const set = idx.get(key);
+    if (set) {
+      set.delete(value);
+      if (set.size === 0) idx.delete(key);
+    }
+  }
+
+  findById(id: string): Article | undefined {
+    return this.articles.get(id);
+  }
+
+  update(id: string, patch: Partial<Article>): Article {
+    const article = this.articles.get(id);
+    if (!article) throw new NotFoundError('文章');
+    const oldStatus = article.status;
+    const oldAuthor = article.authorId;
+    const updated: Article = {
+      ...article,
+      ...patch,
+      id: article.id,
+      createdAt: article.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    this.articles.set(id, updated);
+    if (patch.status !== undefined && patch.status !== oldStatus) {
+      this.removeFromIndex(this.statusIndex, oldStatus, id);
+      this.addToIndex(this.statusIndex, updated.status, id);
+    }
+    if (patch.authorId !== undefined && patch.authorId !== oldAuthor) {
+      this.removeFromIndex(this.authorIndex, oldAuthor, id);
+      this.addToIndex(this.authorIndex, updated.authorId, id);
+    }
+    return updated;
+  }
+
+  delete(id: string): boolean {
+    const article = this.articles.get(id);
+    if (!article) return false;
+    this.removeFromIndex(this.authorIndex, article.authorId, id);
+    this.removeFromIndex(this.statusIndex, article.status, id);
+    return this.articles.delete(id);
+  }
+
+  listAll(): Article[] {
+    return [...this.articles.values()];
+  }
+
+  listPublished(): Article[] {
+    return this.listByStatus('published');
+  }
+
+  listByStatus(status: ArticleStatus): Article[] {
+    const ids = this.statusIndex.get(status);
+    if (!ids) return [];
+    const result: Article[] = [];
+    for (const id of ids) {
+      const a = this.articles.get(id);
+      if (a) result.push(a);
+    }
+    return result;
+  }
+
+  listByAuthor(authorId: string): Article[] {
+    const ids = this.authorIndex.get(authorId);
+    if (!ids) return [];
+    const result: Article[] = [];
+    for (const id of ids) {
+      const a = this.articles.get(id);
+      if (a) result.push(a);
+    }
+    return result;
+  }
+
+  query(q: ArticleQuery): { items: Article[]; total: number; page: number; limit: number } {
+    let items = this.listAll();
+    if (q.status !== undefined) {
+      items = items.filter((a) => a.status === q.status);
+    }
+    if (q.authorId !== undefined) {
+      items = items.filter((a) => a.authorId === q.authorId);
+    }
+    if (q.tagId !== undefined) {
+      items = items.filter((a) => a.tagIds.includes(q.tagId!));
+    }
+    if (q.categoryId !== undefined) {
+      items = items.filter((a) => a.categoryId === q.categoryId);
+    }
+    const sortKey = q.sort ?? 'createdAt';
+    const order = q.order ?? 'desc';
+    items = PaginationUtil.sort(items, sortKey, order);
+    return PaginationUtil.paginate(items, q.page, q.limit);
+  }
+
+  incrementView(id: string): void {
+    const article = this.articles.get(id);
+    if (article) {
+      article.viewCount += 1;
+    }
+  }
+
+  incrementLike(id: string): void {
+    const article = this.articles.get(id);
+    if (article) {
+      article.likeCount += 1;
+    }
+  }
+
+  decrementLike(id: string): void {
+    const article = this.articles.get(id);
+    if (article && article.likeCount > 0) {
+      article.likeCount -= 1;
+    }
+  }
 
   size(): number {
     return this.articles.size;
   }
 
-  statusSize(status: ArticleStatus): number {
-    const set = this.statusToArticles.get(status);
-    return set ? set.size : 0;
-  }
-
-  getById(id: string): Article | null {
-    const a = this.articles.get(id);
-    return a ? { ...a } : null;
-  }
-
-  listByStatus(status: ArticleStatus): Article[] {
-    const set = this.statusToArticles.get(status);
-    if (!set) return [];
-    const out: Article[] = [];
-    for (const id of set) {
-      const a = this.articles.get(id);
-      if (a) out.push({ ...a });
-    }
-    return out;
-  }
-
-  listByAuthor(authorId: string): Article[] {
-    const set = this.authorIdToArticles.get(authorId);
-    if (!set) return [];
-    const out: Article[] = [];
-    for (const id of set) {
-      const a = this.articles.get(id);
-      if (a) out.push({ ...a });
-    }
-    return out;
-  }
-
-  create(authorId: string, input: ArticleInput): Article {
-    const parsed = articleInputSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    const now = new Date();
-    const article: Article = {
-      id: nextId(),
-      authorId,
-      title: parsed.data.title,
-      content: parsed.data.content,
-      summary: parsed.data.summary ?? '',
-      coverImageUrl: parsed.data.coverImageUrl ?? null,
-      status: ArticleStatus.Draft,
-      seriesId: parsed.data.seriesId ?? null,
-      seriesOrder: parsed.data.seriesOrder ?? 0,
-      scheduledAt: parsed.data.scheduledAt ?? null,
-      publishedAt: null,
-      archivedAt: null,
-      scheduleStatus: ScheduleStatus.None,
-      viewCount: 0,
-      likeCount: 0,
-      commentCount: 0,
-      categoryId: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.articles.set(article.id, article);
-    this.indexAdd(this.authorIdToArticles, authorId, article.id);
-    this.indexAdd(this.statusToArticles, ArticleStatus.Draft, article.id);
-    if (article.seriesId) {
-      this.indexAdd(this.seriesIdToArticles, article.seriesId, article.id);
-    }
-    return { ...article };
-  }
-
-  update(article: Article): Article {
-    const existing = this.articles.get(article.id);
-    if (!existing) {
-      throw new AppError(ErrorCode.NotFound, '1031');
-    }
-    const oldStatus = existing.status;
-    const newStatus = article.status;
-    const updated: Article = { ...article, updatedAt: new Date() };
-    this.articles.set(article.id, updated);
-    if (oldStatus !== newStatus) {
-      this.indexRemove(this.statusToArticles, oldStatus, article.id);
-      this.indexAdd(this.statusToArticles, newStatus, article.id);
-    }
-    return { ...updated };
-  }
-
-  incrementView(articleId: string): void {
-    const a = this.articles.get(articleId);
-    if (!a) throw new AppError(ErrorCode.NotFound, '1031');
-    a.viewCount += 1;
-  }
-
-  incrementLike(articleId: string): void {
-    const a = this.articles.get(articleId);
-    if (!a) throw new AppError(ErrorCode.NotFound, '1031');
-    a.likeCount += 1;
-  }
-
-  incrementComment(articleId: string): void {
-    const a = this.articles.get(articleId);
-    if (!a) throw new AppError(ErrorCode.NotFound, '1031');
-    a.commentCount += 1;
-  }
-
-  listByAuthorPaged(authorId: string, page: number, pageSize: number): { items: Article[]; total: number } {
-    const all = this.listByAuthor(authorId).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-    );
-    const start = (page - 1) * pageSize;
-    return { items: all.slice(start, start + pageSize), total: all.length };
-  }
-
-  private indexAdd<K>(map: Map<K, Set<string>>, key: K, value: string): void {
-    let set = map.get(key);
-    if (!set) {
-      set = new Set();
-      map.set(key, set);
-    }
-    set.add(value);
-  }
-
-  private indexRemove<K>(map: Map<K, Set<string>>, key: K, value: string): void {
-    const set = map.get(key);
-    if (!set) return;
-    set.delete(value);
-    if (set.size === 0) map.delete(key);
-  }
-
   clear(): void {
     this.articles.clear();
-    this.authorIdToArticles.clear();
-    this.statusToArticles.clear();
-    this.seriesIdToArticles.clear();
+    this.authorIndex.clear();
+    this.statusIndex.clear();
   }
 }

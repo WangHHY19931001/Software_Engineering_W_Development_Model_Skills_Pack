@@ -1,87 +1,83 @@
-// bcrypt + JWT helpers (with revocation registry for AuthService).
-
+/**
+ * JWT 签发/验证 + bcrypt 哈希（DD-003-002 AuthService / DD-004-003 JwtUtil / CON-002）。
+ * 与 L4_auth_token_lifecycle.tla 一致：TokenNotRevoked / TokenNotExpired 不变式。
+ */
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import type { JwtPayload, UserRole } from '../types.js';
-import { AppError, ErrorCode } from './errors.js';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
+import { AuthenticationError } from './errors.js';
 
-const JWT_TTL_SECONDS = 24 * 60 * 60; // 24h
+const BCRYPT_ROUNDS = 10;
+const TOKEN_ALGORITHM = 'HS256';
+const TOKEN_EXPIRES_IN = '1h';
 
-function getSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new AppError(ErrorCode.ZodValidation, 'JWT_SECRET is not configured');
-  }
-  return secret;
+export interface JwtUtilPayload {
+  sub: string;
+  email: string;
+  role: string;
 }
 
-export async function hashPassword(plain: string): Promise<string> {
-  return bcrypt.hash(plain, 10);
-}
+export class JwtUtil {
+  private readonly secret: string;
+  private readonly expiresIn: string;
+  private revoked: Set<string> = new Set();
 
-export async function comparePassword(plain: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(plain, hash);
-}
-
-// In-memory revoked JTIs set. AuthService.revokeToken adds; verifyToken checks.
-export const revokedJtis: Set<string> = new Set();
-
-export function revokeJti(jti: string): void {
-  revokedJtis.add(jti);
-}
-
-export function isJtiRevoked(jti: string): boolean {
-  return revokedJtis.has(jti);
-}
-
-export function clearRevokedJtis(): void {
-  revokedJtis.clear();
-}
-
-let jtiCounter = 0;
-function nextJti(): string {
-  jtiCounter += 1;
-  return `jti-${jtiCounter}-${Date.now()}`;
-}
-
-export function signToken(userId: string, role: UserRole): string {
-  const secret = getSecret();
-  const payload: JwtPayload = {
-    userId,
-    role,
-    jti: nextJti(),
-  };
-  return jwt.sign(payload, secret, { expiresIn: JWT_TTL_SECONDS });
-}
-
-export interface VerifyResult {
-  payload: JwtPayload;
-}
-
-export function verifyToken(token: string): VerifyResult {
-  if (!token) {
-    throw new AppError(ErrorCode.NoUser, '1011');
-  }
-  const secret = getSecret();
-  let payload: JwtPayload;
-  try {
-    payload = jwt.verify(token, secret) as JwtPayload;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.toLowerCase().includes('expired')) {
-      throw new AppError(ErrorCode.ExpiredToken, '1013');
+  constructor(secret: string, expiresIn: string = TOKEN_EXPIRES_IN) {
+    // NFR-002: HS256 密钥长度 ≥ 256 位（32 字节）。TC-SEC-001 验证 31/32/64 字节边界。
+    if (!secret || secret.length < 32) {
+      throw new Error('JWT_SECRET 长度须 ≥ 32 字节（256 位，NFR-002 / CON-002 安全约束）');
     }
-    throw new AppError(ErrorCode.WrongPassword, '1012');
+    this.secret = secret;
+    this.expiresIn = expiresIn;
   }
-  if (payload.jti && isJtiRevoked(payload.jti)) {
-    throw new AppError(ErrorCode.Banned, '1022');
+
+  sign(payload: JwtUtilPayload): string {
+    return jwt.sign(payload, this.secret, {
+      algorithm: TOKEN_ALGORITHM,
+      expiresIn: this.expiresIn as unknown as number,
+    });
   }
-  return { payload };
+
+  verify(token: string): JwtPayload & JwtUtilPayload {
+    if (this.revoked.has(token)) {
+      throw new AuthenticationError('令牌已撤销');
+    }
+    try {
+      const decoded = jwt.verify(token, this.secret, {
+        algorithms: [TOKEN_ALGORITHM],
+      }) as JwtPayload & JwtUtilPayload;
+      return decoded;
+    } catch {
+      throw new AuthenticationError('令牌无效或已过期');
+    }
+  }
+
+  revoke(token: string): void {
+    this.revoked.add(token);
+  }
+
+  isRevoked(token: string): boolean {
+    return this.revoked.has(token);
+  }
+
+  clearRevoked(): void {
+    this.revoked.clear();
+  }
 }
 
-/** Convenience: revoke all issued JTIs for a user. AuthService uses this. */
-export function revokeAllJtisForUser(jtis: string[]): void {
-  for (const j of jtis) {
-    revokedJtis.add(j);
+export class PasswordHasher {
+  static async hash(password: string): Promise<string> {
+    return bcrypt.hash(password, BCRYPT_ROUNDS);
   }
+
+  static async compare(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+}
+
+export function generateRandomToken(bytes: number = 32): string {
+  const arr = new Uint8Array(bytes);
+  for (let i = 0; i < bytes; i++) {
+    arr[i] = Math.floor(Math.random() * 256);
+  }
+  return Buffer.from(arr).toString('hex');
 }

@@ -1,60 +1,73 @@
-// Logger + audit log + invariant helper (covers invariant-coverage gate requirement).
-
-import type { AuditLog, ID } from '../types.js';
-
-type LogFn = (msg: string, meta?: unknown) => void;
-
-const noop: LogFn = () => {};
-
-export const logger = {
-  info: (msg: string, meta?: unknown) => console.log(`[INFO] ${msg}`, meta ?? ''),
-  warn: (msg: string, meta?: unknown) => console.warn(`[WARN] ${msg}`, meta ?? ''),
-  error: (msg: string, meta?: unknown) => console.error(`[ERROR] ${msg}`, meta ?? ''),
-  debug: noop,
-};
-
-// In-memory audit log buffer shared with SiteStore/UserService/etc.
-// Stores append AuditLog records; controllers/services may inspect.
-export const auditLogBuffer: AuditLog[] = [];
-
-export function appendAuditLog(userId: ID, action: string, target: string): AuditLog {
-  const entry: AuditLog = {
-    id: `log-${auditLogBuffer.length + 1}-${Date.now()}`,
-    userId,
-    action,
-    target,
-    at: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  auditLogBuffer.push(entry);
-  return entry;
-}
-
-export function appendOperationLog(userId: ID, action: string, target: string): AuditLog {
-  // Operation log mirrors audit log shape but conceptually covers user-facing operations.
-  return appendAuditLog(userId, action, target);
-}
-
-export function clearAuditLogs(): void {
-  auditLogBuffer.length = 0;
-}
-
 /**
- * Runtime invariant check. Throws when `condition` is falsy.
- * Satisfies the TLA+ invariant coverage gate.
+ * 结构化 JSON 日志工具（DD-COMMON-002 / CON-004）。
+ * 格式：{ level, timestamp, message, meta }
  */
-export function invariant(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`Invariant violated: ${message}`);
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  level: LogLevel;
+  timestamp: string;
+  message: string;
+  meta?: Record<string, unknown>;
+}
+
+export class Logger {
+  private entries: LogEntry[] = [];
+  private readonly minLevel: LogLevel;
+
+  constructor(minLevel: LogLevel = 'debug') {
+    this.minLevel = minLevel;
   }
-}
 
-/**
- * Assert helper using console.assert (alternative invariant form).
- * Returns true when ok, false otherwise (does not throw).
- */
-export function debugAssert(condition: boolean, message: string): boolean {
-  console.assert(condition, `Assertion failed: ${message}`);
-  return condition;
+  private readonly order: Record<LogLevel, number> = {
+    debug: 0,
+    info: 1,
+    warn: 2,
+    error: 3,
+  };
+
+  private shouldLog(level: LogLevel): boolean {
+    return this.order[level] >= this.order[this.minLevel];
+  }
+
+  log(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
+    if (!this.shouldLog(level)) return;
+    const entry: LogEntry = {
+      level,
+      timestamp: new Date().toISOString(),
+      message,
+    };
+    if (meta !== undefined) {
+      entry.meta = meta;
+    }
+    this.entries.push(entry);
+  }
+
+  debug(message: string, meta?: Record<string, unknown>): void {
+    this.log('debug', message, meta);
+  }
+
+  info(message: string, meta?: Record<string, unknown>): void {
+    this.log('info', message, meta);
+  }
+
+  warn(message: string, meta?: Record<string, unknown>): void {
+    this.log('warn', message, meta);
+  }
+
+  error(message: string, meta?: Record<string, unknown>): void {
+    this.log('error', message, meta);
+  }
+
+  getEntries(): LogEntry[] {
+    return [...this.entries];
+  }
+
+  clear(): void {
+    this.entries = [];
+  }
+
+  toJSON(): LogEntry[] {
+    return this.getEntries();
+  }
 }

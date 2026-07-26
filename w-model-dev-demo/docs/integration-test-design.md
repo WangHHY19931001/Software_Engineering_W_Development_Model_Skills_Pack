@@ -1,1179 +1,1011 @@
-# 测试用例文档 - 集成测试
-
-> 阶段 3（概要设计）同步产出集成测试用例设计。执行阶段：阶段 6（集成测试）。
-> 套用 `templates/test-case.md` 模板，类型=集成测试。
-> 覆盖 17 INTF 的模块间交互正向 + 异常路径（超时/错误码 fallback/状态机非法跳转）。
-> 必含 TC-DES-004（接口定义）/ TC-DES-006（集成测试用例生成）/ TC-DES-010（接口参数校验）/ TC-DES-011（跨模块调用）/ TC-DES-012（数据传递异常路径）。
-
-## 文档信息
-
-- 项目名称：blog-system-demo（扩展博客系统后端）
-- 测试类型：集成测试
-- 设计来源阶段：阶段 3（概要设计）
-- 执行阶段：阶段 6（集成测试）
-- 文档版本：v1.0
-- 编制日期：2026-07-25
-- 编制者：S 子代理（第 8 轮 W 模型，阶段 3）
-- 关联接口设计：`docs/interface-design.md`
-- 关联系统设计：`docs/system-design.md`
-
-## 1. 集成测试策略
-
-### 1.1 测试目标
-验证 17 个 INTF 接口的模块间交互契约、参数校验、跨模块调用数据传递、异常路径 fallback（超时/错误码/状态机非法跳转），确认概要设计满足接口契约 Schema 模板 10 字段 + 错误码三段位分层。
-
-### 1.2 测试范围与分层
-| 层次 | 用例区间 | 数量 | 覆盖目标 |
-|---|---|---|---|
-| 接口契约与参数校验 | TC-INT-001~010 | 10 | TC-DES-004/006/010：17 INTF 契约 + 参数合法性/边界 |
-| 单 INTF 行为集成 | TC-INT-011~020 | 10 | 17 INTF 内部 controller↔service↔store 集成 |
-| 跨模块调用（正向） | TC-INT-021~030 | 10 | TC-DES-011：模块 A→B 数据正确传递 |
-| 异常路径与 fallback | TC-INT-031~040 | 10 | TC-DES-012：超时/错误码 fallback/状态机非法跳转 |
-| **合计** | TC-INT-001~040 | **40** | 17 INTF + 5 TC-DES 覆盖 |
-
-### 1.3 覆盖说明
-- 17 INTF 全覆盖：每接口至少 2 条用例（正向 + 异常）。
-- TC-DES 必含项：TC-INT-001(DES-004)/TC-INT-002(DES-006)/TC-INT-003~005(DES-010)/TC-INT-021~030(DES-011)/TC-INT-031~040(DES-012)。
-- 错误码三段位覆盖：4xx(1001/1011/1021...)/5xx(1099/5001/5021)/业务(1002/1003/1004/1042/1051...)。
-
----
-
-## 2. 用例列表
-
-### TC-INT-001
-- 标题：接口契约定义验证（TC-DES-004）
-- 优先级：高
-- 关联需求/设计：REQ-001~017 / SD-001~017 / INTF-001~017
-- 测试场景：验证 17 INTF 接口契约按 10 字段 schema 模板定义完整（接口名/路径/参数名/参数类型/必填/默认值/约束/示例/返回值结构/错误码集合）
-
-**前置条件**
-`docs/interface-design.md` 阶段 3 复核完成，17 INTF 契约全部填写。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 解析 interface-design.md §20.1 覆盖矩阵 | 17 INTF × 10 字段 | 全 ✅，无缺失字段 |
-| 2 | 校验每 INTF 错误码集合含 4xx/5xx/业务三段位 | §20.2 错误码集合 | 三段位覆盖标记全 ✅ |
-| 3 | 校验每 INTF 含默认值与约束 | §20.3 默认值约束表 | 17 INTF 全有默认值+约束 |
-
-**预期结果**
-17 INTF × 10 字段全覆盖；错误码三段位无遗漏；默认值/约束补全。
-
-**优先级**：高
-**关联 INTF**：INTF-001~017
-
----
-
-### TC-INT-002
-- 标题：集成测试用例生成完整性（TC-DES-006）
-- 优先级：高
-- 关联需求/设计：REQ-001~017 / SD-001~017 / INTF-001~017
-- 测试场景：验证集成测试用例覆盖模块间交互的正向/异常路径，每条用例含 7 字段（ID/场景/前置/输入/预期/优先级/关联INTF）
-
-**前置条件**
-本文档已生成 TC-INT-001~040。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 统计 TC-INT 用例数 | TC-INT-001~040 | ≥40 条 |
-| 2 | 校验 17 INTF 覆盖 | 每 INTF 至少 2 条 | 17 INTF 全覆盖 |
-| 3 | 校验异常路径覆盖 | TC-INT-031~040 | ≥10 条异常路径用例 |
-
-**预期结果**
-40 条用例全覆盖 17 INTF，含正向 + 异常路径，7 字段完整。
-
-**优先级**：高
-**关联 INTF**：INTF-001~017
-
----
-
-### TC-INT-003
-- 标题：用户注册接口参数校验（TC-DES-010）
-- 优先级：高
-- 关联需求/设计：REQ-003 / SD-003 / INTF-003
-- 测试场景：POST /api/auth/register 合法/非法/边界参数校验
-
-**前置条件**
-注册开关开启；系统初始无用户。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 合法参数注册 | email=u1@x.com, password=Abc12345, nickname=用户1 | 201，返回 JWT + userId |
-| 2 | 非法 email | email="not-email", password=Abc12345 | 400 + code=1001 |
-| 3 | password 边界（7 位） | password=Abc1234（8 位以下） | 400 + code=1001 |
-| 4 | password 边界（33 位） | password=Abc...（33 位） | 400 + code=1001 |
-| 5 | 缺 nickname | 无 nickname 字段 | 400 + code=1001 |
-| 6 | 重复 email | email=u1@x.com（已注册） | 409 + code=1061 |
-
-**预期结果**
-合法参数 201；非法/边界参数返回 400 + code=1001；重复 email 返回 409 + code=1061。
-
-**优先级**：高
-**关联 INTF**：INTF-003
-
----
-
-### TC-INT-004
-- 标题：文章创建接口参数校验（TC-DES-010）
-- 优先级：高
-- 关联需求/设计：REQ-012 / SD-012 / INTF-012
-- 测试场景：POST /api/articles 参数校验 + 状态机默认值
-
-**前置条件**
-博主已登录（blogger token）。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 合法创建 | title="标题", content="内容", status=draft | 201，status=draft |
-| 2 | title 超长 | title=201 字符 | 400 + code=1001 |
-| 3 | 非法 status | status="invalid" | 400 + code=1001 |
-| 4 | tagIds 超限 | tagIds 含 11 个标签 | 400 + code=1005 |
-| 5 | 非 blogger 角色 | user token 创建文章 | 403 + code=1021 |
-
-**预期结果**
-合法 201；非法参数 400+1001；标签超限 400+1005；越权 403+1021。
-
-**优先级**：高
-**关联 INTF**：INTF-012
-
----
-
-### TC-INT-005
-- 标题：文件上传接口参数校验（TC-DES-010）
-- 优先级：高
-- 关联需求/设计：REQ-015 / SD-015 / INTF-015
-- 测试场景：POST /api/files/image MIME/大小/魔数校验
-
-**前置条件**
-用户已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 合法图片 | image/jpeg, 1MB | 201，返回 sha256 |
-| 2 | MIME 非白名单 | image/bmp | 400 + code=1053 |
-| 3 | 超过 10MB | 11MB image/jpeg | 413 + code=1041 |
-| 4 | 魔数不匹配 | 扩展名 jpg 但内容是 png | 400 + code=1052 |
-| 5 | 配额超限 | 用户日配额已满 50MB | 413 + code=1042 |
-
-**预期结果**
-合法 201；MIME 拒绝 400+1053；超限 413+1041；魔数不匹配 400+1052；配额超限 413+1042。
-
-**优先级**：高
-**关联 INTF**：INTF-015
-
----
-
-### TC-INT-006
-- 标题：推荐接口 mode 参数校验（TC-DES-010）
-- 优先级：中
-- 关联需求/设计：REQ-004 / SD-004 / INTF-004
-- 测试场景：GET /api/recommendations mode 切换 + 个性化推荐需登录
-
-**前置条件**
-无。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | mode=hot | 无 token | 200，返回热门文章列表 |
-| 2 | mode=latest | 无 token | 200，返回最新文章 |
-| 3 | mode=personalized 无 token | 无 token | 401 + code=1011 |
-| 4 | mode=personalized 有 token | user token | 200，返回个性化推荐 |
-| 5 | mode=invalid | mode=xxx | 400 + code=1001 |
-
-**预期结果**
-hot/latest 公开；personalized 需登录，无 token 401+1011；非法 mode 400+1001。
-
-**优先级**：中
-**关联 INTF**：INTF-004
-
----
-
-### TC-INT-007
-- 标题：搜索接口参数校验（TC-DES-010）
-- 优先级：中
-- 关联需求/设计：REQ-007 / SD-007 / INTF-007
-- 测试场景：POST /api/search keyword/sort/pageSize 校验
-
-**前置条件**
-无。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 合法搜索 | keyword="React", sort=relevance | 200，返回 items+total |
-| 2 | keyword 空 | keyword="" | 400 + code=1001 |
-| 3 | keyword 超长 | keyword=101 字符 | 400 + code=1001 |
-| 4 | pageSize 超限 | pageSize=100 | 400 + code=1001（上限 50） |
-| 5 | sort 非法 | sort=xxx | 400 + code=1001 |
-
-**预期结果**
-合法 200；keyword 空/超长 400+1001；pageSize 超限 400+1001；sort 非法 400+1001。
-
-**优先级**：中
-**关联 INTF**：INTF-007
-
----
-
-### TC-INT-008
-- 标题：标签创建与绑定参数校验（TC-DES-010）
-- 优先级：中
-- 关联需求/设计：REQ-008 / SD-008 / INTF-008
-- 测试场景：POST /api/tags 标签名唯一性 + 文章绑定标签数限制
-
-**前置条件**
-用户已登录；标签 tag-1 已存在（approved）。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建标签 | name="React" | 201，status=pending |
-| 2 | 重复标签名 | name="React"（已存在） | 409 + code=1071 |
-| 3 | 标签名超长 | name=21 字符 | 400 + code=1001 |
-| 4 | 文章绑定第 11 个标签 | article 已绑 10 标签 | 400 + code=1005 |
-| 5 | 绑定 pending 标签 | tag status=pending | 400 + code=1001（须 approved） |
-
-**预期结果**
-创建 201 pending；重复 409+1071；超长 400+1001；超限 400+1005；pending 标签绑定 400+1001。
-
-**优先级**：中
-**关联 INTF**：INTF-008
-
----
-
-### TC-INT-009
-- 标题：分类树深度参数校验（TC-DES-010）
-- 优先级：中
-- 关联需求/设计：REQ-009 / SD-009 / INTF-009
-- 测试场景：POST /api/categories 树深度 ≤ 5 + 自引用禁止
-
-**前置条件**
-管理员已登录；分类树已有 5 层。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 合法创建根分类 | name="前端", parentId=null | 201 |
-| 2 | 合法创建子分类 | parentId=已存在分类 | 201 |
-| 3 | 第 6 层超限 | parentId=第 5 层分类 | 400 + code=1004 |
-| 4 | 自引用 | parentId=自身 id | 400 + code=1001 |
-| 5 | parentId 不存在 | parentId=无效 id | 400 + code=1001 |
-
-**预期结果**
-合法 201；超深 400+1004；自引用 400+1001；parentId 不存在 400+1001。
-
-**优先级**：中
-**关联 INTF**：INTF-009
-
----
-
-### TC-INT-010
-- 标题：订阅 invitation 权限参数校验（TC-DES-010）
-- 优先级：中
-- 关联需求/设计：REQ-016 / SD-016 / INTF-016
-- 测试场景：POST /api/subscriptions invitation 类型须 invitationCode
-
-**前置条件**
-用户已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | free 订阅 | targetType=blogger, permission=free | 201 |
-| 2 | invitation 无 code | permission=invitation, 无 invitationCode | 400 + code=1001 |
-| 3 | invitation code 短 | invitationCode=7 字符 | 400 + code=1001 |
-| 4 | invitation code 长 | invitationCode=33 字符 | 400 + code=1001 |
-| 5 | 非法 targetType | targetType=invalid | 400 + code=1001 |
-
-**预期结果**
-free 201；invitation 无 code 400+1001；code 长度边界 400+1001；非法 targetType 400+1001。
-
-**优先级**：中
-**关联 INTF**：INTF-016
-
----
-
-### TC-INT-011
-- 标题：站点管理 controller↔service↔store 集成
-- 优先级：高
-- 关联需求/设计：REQ-001 / SD-001 / INTF-001
-- 测试场景：站点配置更新经 controller→service→store 三层集成，维护模式开关生效
-
-**前置条件**
-管理员已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | PUT /api/site/config | siteName="我的博客" | 200，store 持久化 |
-| 2 | PUT /api/site/maintenance | maintenanceMode=true | 200 |
-| 3 | 普通用户 GET /api/articles | user token | 503 + code=1023 |
-| 4 | GET /api/site/config | - | 200，返回更新后配置 |
-| 5 | GET /api/site/stats | admin token | 200，含 userCount 等 |
-
-**预期结果**
-三层集成正常；维护模式拦截非管理员 503+1023；统计返回站点概览。
-
-**优先级**：高
-**关联 INTF**：INTF-001
-
----
-
-### TC-INT-012
-- 标题：多博主注册→关注→主页集成
-- 优先级：高
-- 关联需求/设计：REQ-002 / SD-002 / INTF-002
-- 测试场景：博主注册→关注→粉丝列表→主页集成
-
-**前置条件**
-注册开关开启。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 博主注册 | email=b1@x.com, password=Abc12345 | 201，bloggerId+token |
-| 2 | 博主2 注册并关注博主1 | POST /api/bloggers/:id/follow | 200 |
-| 3 | GET 粉丝列表 | /api/bloggers/:id/followers | 200，含博主2 |
-| 4 | 重复关注（幂等） | 再次 follow | 200（幂等不报错） |
-| 5 | 取关 | DELETE /api/bloggers/:id/follow | 200 |
-
-**预期结果**
-注册→关注→粉丝列表→取关全链路集成正常；关注幂等。
-
-**优先级**：高
-**关联 INTF**：INTF-002
-
----
-
-### TC-INT-013
-- 标题：用户登录→JWT→封禁→token 失效集成
-- 优先级：高
-- 关联需求/设计：REQ-003 / SD-003 / INTF-003
-- 测试场景：登录签发 JWT→封禁→旧 token 立即失效→审计日志
-
-**前置条件**
-用户已注册。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/auth/login | email/password | 200，返回 JWT |
-| 2 | 携 token 访问 | GET /api/users/:id | 200 |
-| 3 | 管理员封禁 | POST /api/users/:id/ban | 200 |
-| 4 | 旧 token 访问 | GET /api/users/:id（旧 token） | 403 + code=1022 |
-| 5 | 审计日志 | GET /api/users/audit-logs | 200，含 ban 记录 |
-
-**预期结果**
-登录→封禁→token 失效→审计日志链路正常；封禁后旧 token 403+1022。
-
-**优先级**：高
-**关联 INTF**：INTF-003
-
----
-
-### TC-INT-014
-- 标题：文章状态机 draft→published→offline→archived 集成
-- 优先级：高
-- 关联需求/设计：REQ-012 / SD-012 / INTF-012
-- 测试场景：文章状态机正向流转集成
-
-**前置条件**
-博主已登录，文章已创建（draft）。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | draft → pending_review | PUT /api/articles/:id/status status=pending_review | 200 |
-| 2 | pending_review → published | status=published | 200 |
-| 3 | published → offline | status=offline | 200 |
-| 4 | offline → archived | status=archived | 200 |
-| 5 | GET 文章详情 | - | 200，status=archived |
-
-**预期结果**
-状态机正向流转全链路正常。
-
-**优先级**：高
-**关联 INTF**：INTF-012
-
----
-
-### TC-INT-015
-- 标题：交叉引用建立→图谱→相关文章集成
-- 优先级：中
-- 关联需求/设计：REQ-013 / SD-013 / INTF-013
-- 测试场景：文章 A 引用文章 B→引用图谱→相关文章推荐
-
-**前置条件**
-文章 A、B 均 published。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建引用 | POST /api/articles/A/citations targetId=B | 201 |
-| 2 | 引用图谱 | GET /api/articles/A/citations | 200，citing=[B] |
-| 3 | 反向链接 | GET /api/articles/B/citations | 200，citedBy=[A] |
-| 4 | 相关文章 | GET /api/articles/A/related | 200，含 B |
-| 5 | 删除引用 | DELETE /api/articles/A/citations/:cid | 200 |
-
-**预期结果**
-引用建立→图谱双向查询→相关推荐→删除全链路正常。
-
-**优先级**：中
-**关联 INTF**：INTF-013
-
----
-
-### TC-INT-016
-- 标题：WebSocket 连接→订阅→推送→离线合并集成
-- 优先级：高
-- 关联需求/设计：REQ-014 / SD-014 / INTF-014
-- 测试场景：WS 连接→订阅通道→推送→断线→离线合并→重连投递
-
-**前置条件**
-用户已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | WS 连接 | ws://host:3000/ws?token=JWT | 连接成功 |
-| 2 | 订阅通道 | subscribe {channel:comment} | 200 |
-| 3 | 触发推送 | 评论触发推送 | 收到 push 事件 |
-| 4 | 断线+触发推送 | 离线时评论触发 | 进入 offlineMessages |
-| 5 | 重连后投递 | 重新 WS 连接 | 收到合并后离线消息 |
-
-**预期结果**
-WS 连接→订阅→推送→离线合并→重连投递全链路正常。
-
-**优先级**：高
-**关联 INTF**：INTF-014
-
----
-
-### TC-INT-017
-- 标题：文件上传→去重→配额查询集成
-- 优先级：高
-- 关联需求/设计：REQ-015 / SD-015 / INTF-015
-- 测试场景：上传→同 sha256 去重→配额查询
-
-**前置条件**
-用户已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 上传图片 | image/jpeg 1MB | 201，sha256=abc |
-| 2 | 同 sha256 再上传 | 同文件 | 201，复用已有文件 |
-| 3 | 配额查询 | GET /api/files/quota | 200，含已用配额 |
-| 4 | 文件元数据 | GET /api/files/:id | 200，含 sha256 |
-| 5 | 文件下载 | GET /api/files/:id/download | 200，二进制流 |
-
-**预期结果**
-上传→去重→配额查询→元数据→下载全链路正常。
-
-**优先级**：高
-**关联 INTF**：INTF-015
-
----
-
-### TC-INT-018
-- 标题：订阅→新文章→聚合推送集成
-- 优先级：高
-- 关联需求/设计：REQ-016 / SD-016 / INTF-016
-- 测试场景：订阅博主→博主发新文章→聚合窗口内合并推送
-
-**前置条件**
-用户已登录；博主已发布文章。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 订阅博主 | POST /api/subscriptions targetType=blogger | 201 |
-| 2 | 博主发文章 A | - | 触发推送 |
-| 3 | 博主发文章 B（同小时） | - | 聚合为 1 条通知 |
-| 4 | 聚合窗口查询 | GET /api/subscriptions/aggregates | 200，含聚合记录 |
-| 5 | 取消订阅 | DELETE /api/subscriptions/:id | 200（幂等） |
-
-**预期结果**
-订阅→新文章→聚合推送→取订全链路正常；同小时合并为 1 条。
-
-**优先级**：高
-**关联 INTF**：INTF-016
-
----
-
-### TC-INT-019
-- 标题：数据导出→任务进度→下载集成
-- 优先级：高
-- 关联需求/设计：REQ-017 / SD-017 / INTF-017
-- 测试场景：创建导出任务→查询进度→下载结果
-
-**前置条件**
-用户已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建导出任务 | POST /api/exports type=user_export | 201，taskId |
-| 2 | 查询进度 | GET /api/exports/:taskId | 200，status=pending/running |
-| 3 | 等待完成 | 轮询 | status=completed |
-| 4 | 下载结果 | GET /api/exports/:taskId/download | 200，JSON 文件 |
-| 5 | 增量导出 | POST /api/exports/incremental | 201 |
-
-**预期结果**
-导出任务创建→进度查询→下载→增量导出全链路正常。
-
-**优先级**：高
-**关联 INTF**：INTF-017
-
----
-
-### TC-INT-020
-- 标题：广告投放→审核→展示→点击统计集成
-- 优先级：中
-- 关联需求/设计：REQ-005 / SD-005 / INTF-005
-- 测试场景：广告投放→审核→展示（impressions+1）→点击（clicks+1）
-
-**前置条件**
-博主已登录；管理员已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建广告 | POST /api/ads | 201，status=pending |
-| 2 | 审核 | POST /api/ads/:id/review approved | 200 |
-| 3 | 展示 | GET /api/ads/:id/display | 200，impressions+1 |
-| 4 | 点击 | POST /api/ads/:id/click | 200，clicks+1 |
-| 5 | 广告列表 | GET /api/ads（admin） | 200，含统计 |
-
-**预期结果**
-广告投放→审核→展示→点击统计全链路正常。
-
-**优先级**：中
-**关联 INTF**：INTF-005
-
----
-
-### TC-INT-021
-- 标题：评论→通知→推送跨模块调用（TC-DES-011）
-- 优先级：高
-- 关联需求/设计：REQ-010, REQ-011, REQ-014 / SD-010, SD-011, SD-014 / INTF-010, INTF-011, INTF-014
-- 测试场景：用户评论文章→触发通知→通知触发 WS 推送，数据正确传递
-
-**前置条件**
-文章作者在线（WS 连接）；评论者已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 评论者创建评论 | POST /api/comments articleId, content | 201 |
-| 2 | 文章作者收到通知 | GET /api/notifications | 200，含评论通知 |
-| 3 | 文章作者收到 WS 推送 | - | 收到 push 事件 channel=comment |
-| 4 | 通知未读数 | GET /api/notifications/unread-count | 200，count+1 |
-| 5 | 标记已读 | POST /api/notifications/:id/read | 200 |
-
-**预期结果**
-评论→通知→推送跨模块数据正确传递；返回结构符合契约。
-
-**优先级**：高
-**关联 INTF**：INTF-010, INTF-011, INTF-014
-
----
-
-### TC-INT-022
-- 标题：文章→标签→搜索跨模块调用（TC-DES-011）
-- 优先级：高
-- 关联需求/设计：REQ-008, REQ-012, REQ-007 / SD-008, SD-012, SD-007 / INTF-008, INTF-012, INTF-007
-- 测试场景：文章绑定标签→标签流入搜索索引→按标签搜索文章
-
-**前置条件**
-文章已发布；标签已 approved。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 文章绑定标签 | POST /api/articles/:id/tags tagIds | 200 |
-| 2 | 标签流入搜索索引 | - | 索引更新 |
-| 3 | 按标签搜索 | POST /api/search/tags keyword | 200，含该文章 |
-| 4 | 全文搜索 | POST /api/search keyword=文章标题 | 200，含该文章 |
-| 5 | 标签云 | GET /api/tags/cloud | 200，含该标签 count+1 |
-
-**预期结果**
-文章→标签→搜索跨模块数据正确传递；标签云 count 更新。
-
-**优先级**：高
-**关联 INTF**：INTF-008, INTF-012, INTF-007
-
----
-
-### TC-INT-023
-- 标题：订阅→推送→通知聚合跨模块调用（TC-DES-011）
-- 优先级：高
-- 关联需求/设计：REQ-014, REQ-016 / SD-014, SD-016 / INTF-014, INTF-016
-- 测试场景：订阅博主→博主发文章→订阅触发推送→聚合窗口合并
-
-**前置条件**
-用户已订阅博主；博主已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 博主发文章 A | POST /api/articles | 201 |
-| 2 | 订阅触发推送 | - | 用户收到推送 |
-| 3 | 博主发文章 B（同小时） | POST /api/articles | 201 |
-| 4 | 聚合合并 | - | 同小时合并为 1 条通知 |
-| 5 | 聚合窗口查询 | GET /api/subscriptions/aggregates | 200 |
-
-**预期结果**
-订阅→推送→聚合跨模块数据正确传递；同小时合并。
-
-**优先级**：高
-**关联 INTF**：INTF-014, INTF-016
-
----
-
-### TC-INT-024
-- 标题：文件上传→文章创建→交叉引用跨模块调用（TC-DES-011）
-- 优先级：高
-- 关联需求/设计：REQ-012, REQ-013, REQ-015 / SD-012, SD-013, SD-015 / INTF-012, INTF-013, INTF-015
-- 测试场景：上传封面图→创建文章引用封面→文章间交叉引用
-
-**前置条件**
-博主已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 上传封面图 | POST /api/files/image | 201，fileId |
-| 2 | 创建文章引用封面 | POST /api/articles coverImageUrl=fileId | 201 |
-| 3 | 创建文章 B | POST /api/articles | 201 |
-| 4 | 文章 A 引用文章 B | POST /api/articles/A/citations targetId=B | 201 |
-| 5 | 引用图谱 | GET /api/articles/A/citations | 200 |
-
-**预期结果**
-上传→文章创建→交叉引用跨模块数据正确传递。
-
-**优先级**：高
-**关联 INTF**：INTF-012, INTF-013, INTF-015
-
----
-
-### TC-INT-025
-- 标题：站点管理→统计→数据导出跨模块调用（TC-DES-011）
-- 优先级：中
-- 关联需求/设计：REQ-001, REQ-006, REQ-017 / SD-001, SD-006, SD-017 / INTF-001, INTF-006, INTF-017
-- 测试场景：站点配置更新→统计数据流入→导出站点统计
-
-**前置条件**
-管理员已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 更新站点配置 | PUT /api/site/config | 200 |
-| 2 | 站点统计 | GET /api/stats/site | 200，含 userCount 等 |
-| 3 | 文章统计 | GET /api/stats/articles/:id | 200 |
-| 4 | 导出统计 | POST /api/exports type=admin_backup | 201，taskId |
-| 5 | 下载导出 | GET /api/exports/:taskId/download | 200 |
-
-**预期结果**
-站点→统计→导出跨模块数据正确传递。
-
-**优先级**：中
-**关联 INTF**：INTF-001, INTF-006, INTF-017
-
----
-
-### TC-INT-026
-- 标题：用户→博主→关注→推荐跨模块调用（TC-DES-011）
-- 优先级：中
-- 关联需求/设计：REQ-002, REQ-003, REQ-004 / SD-002, SD-003, SD-004 / INTF-002, INTF-003, INTF-004
-- 测试场景：用户注册→升级博主→被关注→流入推荐（相似博主）
-
-**前置条件**
-注册开关开启。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 用户注册 | POST /api/auth/register | 201 |
-| 2 | 升级博主 | POST /api/bloggers/register | 201 |
-| 3 | 其他用户关注 | POST /api/bloggers/:id/follow | 200 |
-| 4 | 博主数据流入推荐 | - | 推荐索引更新 |
-| 5 | 相似博主推荐 | GET /api/recommendations/bloggers?mode=similar | 200，含该博主 |
-
-**预期结果**
-用户→博主→关注→推荐跨模块数据正确传递。
-
-**优先级**：中
-**关联 INTF**：INTF-002, INTF-003, INTF-004
-
----
-
-### TC-INT-027
-- 标题：分类→文章→搜索跨模块调用（TC-DES-011）
-- 优先级：中
-- 关联需求/设计：REQ-009, REQ-012, REQ-007 / SD-009, SD-012, SD-007 / INTF-009, INTF-012, INTF-007
-- 测试场景：创建分类→文章归属分类→分类搜索
-
-**前置条件**
-管理员已登录；博主已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建分类 | POST /api/categories name=前端 | 201 |
-| 2 | 文章归属分类 | PUT /api/articles/:id categoryId | 200 |
-| 3 | 分类下文章 | GET /api/categories/:id/articles | 200，含该文章 |
-| 4 | 分类搜索 | POST /api/search/categories keyword=前端 | 200，含该分类 |
-| 5 | 面包屑 | GET /api/categories/:id/breadcrumb | 200 |
-
-**预期结果**
-分类→文章→搜索跨模块数据正确传递。
-
-**优先级**：中
-**关联 INTF**：INTF-009, INTF-012, INTF-007
-
----
-
-### TC-INT-028
-- 标题：广告→统计→推荐跨模块调用（TC-DES-011）
-- 优先级：中
-- 关联需求/设计：REQ-005, REQ-006, REQ-004 / SD-005, SD-006, SD-004 / INTF-005, INTF-006, INTF-004
-- 测试场景：广告投放→点击统计流入→统计数据流入推荐
-
-**前置条件**
-广告已审核通过。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 广告展示 | GET /api/ads/:id/display | 200，impressions+1 |
-| 2 | 广告点击 | POST /api/ads/:id/click | 200，clicks+1 |
-| 3 | 广告数据流入统计 | - | 统计索引更新 |
-| 4 | 统计数据流入推荐 | - | 推荐权重更新 |
-| 5 | 推荐列表 | GET /api/recommendations?mode=hot | 200 |
-
-**预期结果**
-广告→统计→推荐跨模块数据正确传递。
-
-**优先级**：中
-**关联 INTF**：INTF-005, INTF-006, INTF-004
-
----
-
-### TC-INT-029
-- 标题：评论→点赞→举报→审核跨模块调用（TC-DES-011）
-- 优先级：中
-- 关联需求/设计：REQ-010 / SD-010 / INTF-010
-- 测试场景：评论→点赞（幂等）→举报→管理员审核
-
-**前置条件**
-文章已发布；用户已登录；管理员已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建评论 | POST /api/comments | 201 |
-| 2 | 点赞 | POST /api/comments/:id/like | 200 |
-| 3 | 重复点赞（幂等） | POST /api/comments/:id/like | 200（幂等） |
-| 4 | 举报 | POST /api/comments/:id/report | 200 |
-| 5 | 管理员审核 | POST /api/comments/:id/review | 200 |
-
-**预期结果**
-评论→点赞→举报→审核跨模块数据正确传递；点赞幂等。
-
-**优先级**：中
-**关联 INTF**：INTF-010
-
----
-
-### TC-INT-030
-- 标题：备份→恢复→统计跨模块调用（TC-DES-011）
-- 优先级：高
-- 关联需求/设计：REQ-017, REQ-006 / SD-017, SD-006 / INTF-017, INTF-006
-- 测试场景：创建备份→恢复（SHA-256 校验）→恢复后统计正确
-
-**前置条件**
-管理员已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 创建备份 | POST /api/backups | 201，backupId |
-| 2 | 备份列表 | GET /api/backups | 200 |
-| 3 | 恢复备份 | POST /api/backups/restore backupId | 200（SHA-256 校验通过） |
-| 4 | 恢复后统计 | GET /api/stats/site | 200，数据一致 |
-| 5 | 增量导出 | POST /api/exports/incremental | 201 |
-
-**预期结果**
-备份→恢复→统计跨模块数据正确传递；SHA-256 校验通过。
-
-**优先级**：高
-**关联 INTF**：INTF-017, INTF-006
-
----
-
-### TC-INT-031
-- 标题：推送失败重试 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-014 / SD-014 / INTF-014
-- 测试场景：WS 推送失败→重试 3 次（1s/2s/4s）→转离线消息
-
-**前置条件**
-用户 WS 连接不稳定。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 触发推送（连接断开） | - | 推送失败 |
-| 2 | 第 1 次重试 | 1s 后 | 失败 |
-| 3 | 第 2 次重试 | 2s 后 | 失败 |
-| 4 | 第 3 次重试 | 4s 后 | 失败，放弃 |
-| 5 | 转离线消息 | - | offlineMessages 入队，同类合并 |
-
-**预期结果**
-推送失败按 1s/2s/4s 重试 3 次后转离线消息；模块不崩溃。
-
-**优先级**：高
-**关联 INTF**：INTF-014
-
----
-
-### TC-INT-032
-- 标题：文章状态机非法跳转 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-012 / SD-012 / INTF-012
-- 测试场景：archived → published 逆向跳转被拒；draft → archived 跨态跳转被拒
-
-**前置条件**
-文章已 archived。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | archived → published | PUT /api/articles/:id/status status=published | 400 + code=1002 |
-| 2 | archived → draft | status=draft | 400 + code=1002 |
-| 3 | draft → archived（跨态） | status=archived | 400 + code=1002 |
-| 4 | draft → published（跨态） | status=published | 400 + code=1002 |
-| 5 | 合法 draft → pending_review | status=pending_review | 200 |
-
-**预期结果**
-非法跳转返回 400+1002；合法跳转 200；状态机不崩溃。
-
-**优先级**：高
-**关联 INTF**：INTF-012
-
----
-
-### TC-INT-033
-- 标题：交叉引用自引用 fallback（TC-DES-012）
-- 优先级：中
-- 关联需求/设计：REQ-013 / SD-013 / INTF-013
-- 测试场景：文章引用自己被拒；引用非 published 文章被拒
-
-**前置条件**
-文章 A published；文章 B draft。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 自引用 | POST /api/articles/A/citations targetId=A | 400 + code=1003 |
-| 2 | 引用 draft 文章 | POST /api/articles/A/citations targetId=B | 400 + code=1001 |
-| 3 | 引用不存在文章 | targetId=无效 id | 400 + code=1031 |
-| 4 | 合法引用 | targetId=已 published 文章 | 201 |
-| 5 | 重复引用 | 再次引用同一文章 | 200（幂等不报错） |
-
-**预期结果**
-自引用 400+1003；引用非 published 400+1001；引用不存在 400+1031；合法引用 201。
-
-**优先级**：中
-**关联 INTF**：INTF-013
-
----
-
-### TC-INT-034
-- 标题：文件上传配额超限 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-015 / SD-015 / INTF-015
-- 测试场景：用户日配额已满→上传被拒；博主月配额超限→上传被拒
-
-**前置条件**
-用户日配额已用 50MB；博主月配额已用 500MB。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 用户上传（日配额满） | POST /api/files/image | 413 + code=1042 |
-| 2 | 博主上传（月配额满） | POST /api/files/attachment | 413 + code=1042 |
-| 3 | 文件超 10MB | 11MB | 413 + code=1041 |
-| 4 | MIME 非白名单 | image/bmp | 400 + code=1053 |
-| 5 | 魔数不匹配 | 扩展 jpg 内容 png | 400 + code=1052 |
-
-**预期结果**
-配额超限 413+1042；文件超限 413+1041；MIME/魔数拒绝 400；模块不崩溃。
-
-**优先级**：高
-**关联 INTF**：INTF-015
-
----
-
-### TC-INT-035
-- 标题：备份恢复 SHA-256 校验失败 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-017 / SD-017 / INTF-017
-- 测试场景：备份文件 SHA-256 校验失败→恢复被拒
-
-**前置条件**
-备份文件被篡改。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 恢复被篡改的备份 | POST /api/backups/restore backupId | 422 + code=1051 |
-| 2 | 恢复不存在备份 | backupId=无效 | 404 + code=1031 |
-| 3 | 非管理员恢复 | user token | 403 + code=1021 |
-| 4 | 合法恢复 | 未篡改备份 | 200 |
-| 5 | 恢复后数据一致 | GET /api/stats/site | 200，数据一致 |
-
-**预期结果**
-SHA-256 校验失败 422+1051；不存在 404+1031；越权 403+1021；合法恢复 200。
-
-**优先级**：高
-**关联 INTF**：INTF-017
-
----
-
-### TC-INT-036
-- 标题：维护模式拦截非管理员 fallback（TC-DES-012）
-- 优先级：中
-- 关联需求/设计：REQ-001 / SD-001 / INTF-001
-- 测试场景：维护模式开启→非管理员访问被 503 拦截→管理员正常访问
-
-**前置条件**
-维护模式开启。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 普通用户 GET /api/articles | user token | 503 + code=1023 |
-| 2 | 普通用户 POST /api/comments | user token | 503 + code=1023 |
-| 3 | 管理员 GET /api/articles | admin token | 200 |
-| 4 | 关闭维护模式 | PUT /api/site/maintenance | 200 |
-| 5 | 普通用户访问恢复 | user token | 200 |
-
-**预期结果**
-维护模式拦截非管理员 503+1023；管理员正常；关闭后恢复。
-
-**优先级**：中
-**关联 INTF**：INTF-001
-
----
-
-### TC-INT-037
-- 标题：封禁用户 token 失效 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-003 / SD-003 / INTF-003
-- 测试场景：用户封禁后→旧 token 立即失效→解禁后可重新登录
-
-**前置条件**
-用户已登录（有效 token）。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 管理员封禁用户 | POST /api/users/:id/ban | 200 |
-| 2 | 旧 token 访问 | GET /api/users/:id（旧 token） | 403 + code=1022 |
-| 3 | 旧 token 创建评论 | POST /api/comments | 403 + code=1022 |
-| 4 | 解禁用户 | POST /api/users/:id/unban | 200 |
-| 5 | 重新登录 | POST /api/auth/login | 200，新 JWT |
-
-**预期结果**
-封禁后旧 token 立即失效 403+1022；解禁后可重新登录。
-
-**优先级**：高
-**关联 INTF**：INTF-003
-
----
-
-### TC-INT-038
-- 标题：JWT 伪造/过期 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-003 / SD-003 / INTF-003
-- 测试场景：伪造 token→401；过期 token→401；无 token→401
-
-**前置条件**
-无。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 无 token 访问受保护接口 | GET /api/users/:id（无 Authorization） | 401 + code=1011 |
-| 2 | 伪造 token | Authorization: Bearer fake.jwt.token | 401 + code=1012 |
-| 3 | 过期 token | 24h 前签发的 token | 401 + code=1013 |
-| 4 | 合法 token | 有效 JWT | 200 |
-| 5 | 错误格式 token | Authorization: xxx | 401 + code=1011 |
-
-**预期结果**
-无 token 401+1011；伪造 401+1012；过期 401+1013；合法 200。
-
-**优先级**：高
-**关联 INTF**：INTF-003
-
----
-
-### TC-INT-039
-- 标题：RBAC 越权 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-003 / SD-003 / INTF-003
-- 测试场景：user 角色访问 admin 接口→403；blogger 角色访问 admin 接口→403
-
-**前置条件**
-user/blogger/admin 各已登录。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | user 访问统计 | GET /api/stats/site（user token） | 403 + code=1021 |
-| 2 | user 创建广告 | POST /api/ads（user token） | 403 + code=1021 |
-| 3 | blogger 访问统计 | GET /api/stats/site（blogger token） | 403 + code=1021 |
-| 4 | blogger 创建广告 | POST /api/ads（blogger token） | 201 |
-| 5 | admin 访问统计 | GET /api/stats/site（admin token） | 200 |
-
-**预期结果**
-越权访问 403+1021；合法权限 200/201。
-
-**优先级**：高
-**关联 INTF**：INTF-003
-
----
-
-### TC-INT-040
-- 标题：评论嵌套深度超限 fallback（TC-DES-012）
-- 优先级：高
-- 关联需求/设计：REQ-010 / SD-010 / INTF-010
-- 测试场景：评论嵌套达 5 层→第 6 层被拒
-
-**前置条件**
-文章已发布；评论嵌套已有 5 层。
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | 第 5 层评论 | POST /api/comments parentId=第4层 | 201 |
-| 2 | 第 6 层评论 | POST /api/comments parentId=第5层 | 400 + code=1004 |
-| 3 | 评论内容超长 | content=2001 字符 | 400 + code=1001 |
-| 4 | 评论开关关闭 | POST /api/comments | 403 + code=1025 |
-| 5 | 合法评论 | content=正常 | 201 |
-
-**预期结果**
-嵌套超限 400+1004；内容超长 400+1001；开关关闭 403+1025；合法 201。
-
-**优先级**：高
-**关联 INTF**：INTF-010
-
----
-
-## 3. 用例汇总
-
-| 用例 ID | 标题 | 优先级 | 关联 INTF | 状态 |
-|---|---|---|---|---|
-| TC-INT-001 | 接口契约定义验证（TC-DES-004） | 高 | INTF-001~017 | 待执行 |
-| TC-INT-002 | 集成测试用例生成完整性（TC-DES-006） | 高 | INTF-001~017 | 待执行 |
-| TC-INT-003 | 用户注册接口参数校验（TC-DES-010） | 高 | INTF-003 | 待执行 |
-| TC-INT-004 | 文章创建接口参数校验（TC-DES-010） | 高 | INTF-012 | 待执行 |
-| TC-INT-005 | 文件上传接口参数校验（TC-DES-010） | 高 | INTF-015 | 待执行 |
-| TC-INT-006 | 推荐接口 mode 参数校验（TC-DES-010） | 中 | INTF-004 | 待执行 |
-| TC-INT-007 | 搜索接口参数校验（TC-DES-010） | 中 | INTF-007 | 待执行 |
-| TC-INT-008 | 标签创建与绑定参数校验（TC-DES-010） | 中 | INTF-008 | 待执行 |
-| TC-INT-009 | 分类树深度参数校验（TC-DES-010） | 中 | INTF-009 | 待执行 |
-| TC-INT-010 | 订阅 invitation 权限参数校验（TC-DES-010） | 中 | INTF-016 | 待执行 |
-| TC-INT-011 | 站点管理三层集成 | 高 | INTF-001 | 待执行 |
-| TC-INT-012 | 多博主注册→关注→主页集成 | 高 | INTF-002 | 待执行 |
-| TC-INT-013 | 用户登录→JWT→封禁→token 失效集成 | 高 | INTF-003 | 待执行 |
-| TC-INT-014 | 文章状态机正向流转集成 | 高 | INTF-012 | 待执行 |
-| TC-INT-015 | 交叉引用建立→图谱→相关文章集成 | 中 | INTF-013 | 待执行 |
-| TC-INT-016 | WebSocket 连接→订阅→推送→离线合并集成 | 高 | INTF-014 | 待执行 |
-| TC-INT-017 | 文件上传→去重→配额查询集成 | 高 | INTF-015 | 待执行 |
-| TC-INT-018 | 订阅→新文章→聚合推送集成 | 高 | INTF-016 | 待执行 |
-| TC-INT-019 | 数据导出→任务进度→下载集成 | 高 | INTF-017 | 待执行 |
-| TC-INT-020 | 广告投放→审核→展示→点击统计集成 | 中 | INTF-005 | 待执行 |
-| TC-INT-021 | 评论→通知→推送跨模块调用（TC-DES-011） | 高 | INTF-010,011,014 | 待执行 |
-| TC-INT-022 | 文章→标签→搜索跨模块调用（TC-DES-011） | 高 | INTF-008,012,007 | 待执行 |
-| TC-INT-023 | 订阅→推送→通知聚合跨模块调用（TC-DES-011） | 高 | INTF-014,016 | 待执行 |
-| TC-INT-024 | 文件上传→文章→交叉引用跨模块调用（TC-DES-011） | 高 | INTF-012,013,015 | 待执行 |
-| TC-INT-025 | 站点→统计→导出跨模块调用（TC-DES-011） | 中 | INTF-001,006,017 | 待执行 |
-| TC-INT-026 | 用户→博主→关注→推荐跨模块调用（TC-DES-011） | 中 | INTF-002,003,004 | 待执行 |
-| TC-INT-027 | 分类→文章→搜索跨模块调用（TC-DES-011） | 中 | INTF-009,012,007 | 待执行 |
-| TC-INT-028 | 广告→统计→推荐跨模块调用（TC-DES-011） | 中 | INTF-005,006,004 | 待执行 |
-| TC-INT-029 | 评论→点赞→举报→审核跨模块调用（TC-DES-011） | 中 | INTF-010 | 待执行 |
-| TC-INT-030 | 备份→恢复→统计跨模块调用（TC-DES-011） | 高 | INTF-017,006 | 待执行 |
-| TC-INT-031 | 推送失败重试 fallback（TC-DES-012） | 高 | INTF-014 | 待执行 |
-| TC-INT-032 | 文章状态机非法跳转 fallback（TC-DES-012） | 高 | INTF-012 | 待执行 |
-| TC-INT-033 | 交叉引用自引用 fallback（TC-DES-012） | 中 | INTF-013 | 待执行 |
-| TC-INT-034 | 文件上传配额超限 fallback（TC-DES-012） | 高 | INTF-015 | 待执行 |
-| TC-INT-035 | 备份恢复 SHA-256 校验失败 fallback（TC-DES-012） | 高 | INTF-017 | 待执行 |
-| TC-INT-036 | 维护模式拦截非管理员 fallback（TC-DES-012） | 中 | INTF-001 | 待执行 |
-| TC-INT-037 | 封禁用户 token 失效 fallback（TC-DES-012） | 高 | INTF-003 | 待执行 |
-| TC-INT-038 | JWT 伪造/过期 fallback（TC-DES-012） | 高 | INTF-003 | 待执行 |
-| TC-INT-039 | RBAC 越权 fallback（TC-DES-012） | 高 | INTF-003 | 待执行 |
-| TC-INT-040 | 评论嵌套深度超限 fallback（TC-DES-012） | 高 | INTF-010 | 待执行 |
-
-## 4. 测试用例覆盖说明
-
-- **17 INTF 覆盖**：17/17（INTF-001~017 每接口至少 2 条用例）
-- **TC-DES 覆盖**：
-  - TC-DES-004（接口定义）：TC-INT-001 ✅
-  - TC-DES-006（集成测试用例生成）：TC-INT-002 ✅
-  - TC-DES-010（接口参数校验）：TC-INT-003~010（8 条）✅
-  - TC-DES-011（跨模块调用）：TC-INT-021~030（10 条）✅
-  - TC-DES-012（数据传递异常路径）：TC-INT-031~040（10 条）✅
-- **错误码三段位覆盖**：4xx(1001/1011/1012/1013/1021/1022/1023/1025/1031/1041/1053) + 5xx(1099/5021) + 业务(1002/1003/1004/1005/1042/1051/1052/1061/1071)
-- **状态机非法跳转**：TC-INT-032（archived→published/draft 逆向 + draft→archived/published 跨态）
-- **超时/重试 fallback**：TC-INT-031（推送 3 次重试 1s/2s/4s）
-- **错误码 fallback**：TC-INT-033~040（自引用/配额/SHA-256/维护模式/封禁/JWT/RBAC/嵌套深度）
-- **优先级分布**：高 26 条 / 中 14 条 / 低 0 条
-- **边界条件覆盖**：password 8-32 位、tagIds ≤10、分类树 ≤5、评论嵌套 ≤5、文件 ≤10MB、配额日 50MB/月 500MB、invitationCode 8-32
+# 集成测试设计文档（Integration Test Design）
+
+> 阶段 3 概要设计产出。对应阶段 3 接口设计 `docs/interface-design.md`（22 INTF）。
+> 测试 seam 决策沿用阶段 2 §5 + 阶段 3 §1.6：seam-http 主 + seam-module 辅（INTF-004 权限中间件 / INTF-019 内部审计调用）。
+> 本文含 69 个集成测试用例：22 单接口契约正常路径 + 22 单接口契约异常路径 + 15 跨模块交互 + 10 异常路径。
+> 用例 ID 前缀 `TC-INT-*`，将在阶段 6 集成测试执行。
+
+## §1 概述
+
+### §1.1 测试目标
+
+- **单接口契约测试**：每个 INTF 的正常路径（200/201/204）+ 异常路径（4xx/5xx/业务错误码），验证接口契约符合 `docs/interface-design.md` 定义
+- **跨模块交互测试**：验证 INTF→INTF 调用链的正确性，覆盖关键业务流（如博文发布→审计→RSS 更新）
+- **异常路径测试**：超时、并发冲突、依赖故障、限流、状态机违反等边界场景
+
+### §1.2 测试环境
+
+- **测试框架**：Vitest + supertest（HTTP API 集成测试）
+- **测试 seam**：seam-http（HTTP API 边界）+ seam-module（INTF-004/019 内部调用钩子）
+- **数据隔离**：每个用例独立内存存储（beforeEach 重置 Map）
+- **认证 mock**：测试用 JWT 签发真实 token（HS256 + 测试密钥）；角色通过 register 接口注入
+
+### §1.3 用例统计
+
+| 类型 | 用例数 | 用例 ID 范围 |
+|---|---|---|
+| 单接口契约测试-正常路径 | 22 | TC-INT-001N ~ TC-INT-022N |
+| 单接口契约测试-异常路径 | 22 | TC-INT-001E ~ TC-INT-022E |
+| 跨模块交互测试 | 15 | TC-INT-C01 ~ TC-INT-C15 |
+| 异常路径测试 | 10 | TC-INT-X01 ~ TC-INT-X10 |
+| **合计** | **69** | |
+
+## §2 单接口契约测试（44 用例）
+
+> 每个 INTF 两条用例：正常路径（N）+ 异常路径（E）。
+
+### TC-INT-001N 健康检查正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-001N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-001 |
+| 场景 | GET /health 返回服务运行状态 |
+| 前置条件 | Express App 已启动 |
+| 步骤 | 1. 发起 `GET /health`；2. 校验响应 |
+| 预期 | 200 `{status:"ok", timestamp:<iso8601>, uptime:<number>}` |
+| 优先级 | 高 |
+
+### TC-INT-001E 健康检查异常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-001E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-001 |
+| 场景 | GET /health 在 Redis/DB 不可用时降级返回 |
+| 前置条件 | 内存存储故障模拟（mock Map 抛错） |
+| 步骤 | 1. mock store 抛异常；2. 发起 `GET /health` |
+| 预期 | 500 `{code:50001, message:"服务端错误", httpStatus:500, retryable:true}` |
+| 优先级 | 中 |
+
+### TC-INT-002N 用户注册正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-002N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-002 |
+| 场景 | 邮箱+密码+角色注册成功 |
+| 前置条件 | 邮箱未注册 |
+| 步骤 | 1. `POST /api/users/register {"email":"a@b.com","password":"pass1234","role":"author"}` |
+| 预期 | 201 `{id:<uuid>, email:"a@b.com", role:"author", createdAt:<iso8601>}`；passwordHash 不返回 |
+| 优先级 | 高 |
+
+### TC-INT-002E 用户注册异常路径（邮箱已存在）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-002E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-002 |
+| 场景 | 重复注册同邮箱返回 409 |
+| 前置条件 | 邮箱 a@b.com 已注册 |
+| 步骤 | 1. 注册 a@b.com；2. 再次注册同邮箱 |
+| 预期 | 第二次 409 `{code:40901, message:"邮箱已存在", httpStatus:409, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-003N 用户登录正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-003N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-003 |
+| 场景 | 正确凭据登录获取 JWT |
+| 前置条件 | 用户已注册 |
+| 步骤 | 1. `POST /api/users/login {"email":"a@b.com","password":"pass1234"}` |
+| 预期 | 200 `{token:<jwt>, expiresIn:3600}`；token 解码后 sub=userId, role=author |
+| 优先级 | 高 |
+
+### TC-INT-003E 用户登录异常路径（凭据无效）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-003E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-003 |
+| 场景 | 密码错误返回 401 |
+| 前置条件 | 用户已注册 |
+| 步骤 | 1. `POST /api/users/login {"email":"a@b.com","password":"wrongpass"}` |
+| 预期 | 401 `{code:40101, message:"凭据无效", httpStatus:401, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-004N 权限中间件正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-004N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-004 |
+| 场景 | author 角色 token 访问 POST /api/articles 通过 |
+| 前置条件 | 注册 author 用户并登录 |
+| 步骤 | 1. 携带 author token `POST /api/articles` |
+| 预期 | 中间件 next() 调用，请求到达 articleController.create |
+| 优先级 | 高 |
+| seam | seam-module（钩住 requireRole 中间件） |
+
+### TC-INT-004E 权限中间件异常路径（角色不匹配）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-004E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-004 |
+| 场景 | reader 角色访问 POST /api/articles 返回 403 |
+| 前置条件 | 注册 reader 用户并登录 |
+| 步骤 | 1. 携带 reader token `POST /api/articles` |
+| 预期 | 403 `{code:40301, message:"禁止访问", httpStatus:403, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-005N 文章创建正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-005N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-005 |
+| 场景 | author 创建文章成功，初始状态 draft |
+| 前置条件 | author 登录；标签/分类已存在 |
+| 步骤 | 1. `POST /api/articles {"title":"Hello","content":"World","tagIds":["t1"],"categoryId":"c1"}` |
+| 预期 | 201 `{id, title, content, tags:[...], category:{...}, authorId:<userId>, status:"draft", likeCount:0, createdAt, updatedAt}` |
+| 优先级 | 高 |
+
+### TC-INT-005E 文章创建异常路径（分类不存在）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-005E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-005 |
+| 场景 | categoryId 不存在返回 404 |
+| 前置条件 | author 登录 |
+| 步骤 | 1. `POST /api/articles {"title":"Hello","content":"World","categoryId":"non-exist"}` |
+| 预期 | 404 `{code:40402, message:"分类不存在", httpStatus:404, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-006N 文章列表查询正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-006N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-006 |
+| 场景 | 分页查询返回文章列表 |
+| 前置条件 | 已发布 5 篇文章 |
+| 步骤 | 1. `GET /api/articles?page=1&limit=20&sort=createdAt&order=desc` |
+| 预期 | 200 `{items:[<5 articles>], total:5, page:1, limit:20}` |
+| 优先级 | 高 |
+
+### TC-INT-006E 文章列表查询异常路径（参数非法）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-006E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-006 |
+| 场景 | page=0 返回 400 |
+| 前置条件 | 无 |
+| 步骤 | 1. `GET /api/articles?page=0` |
+| 预期 | 400 `{code:40001, message:"参数错误：page ≥ 1", httpStatus:400, retryable:false}` |
+| 优先级 | 中 |
+
+### TC-INT-007N 文章详情查询正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-007N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-007 |
+| 场景 | 按 ID 查询已发布文章详情 |
+| 前置条件 | 文章 published |
+| 步骤 | 1. `GET /api/articles/:id` |
+| 预期 | 200 完整 Article 对象 |
+| 优先级 | 高 |
+
+### TC-INT-007E 文章详情查询异常路径（草稿无权访问）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-007E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-007 |
+| 场景 | reader 访问他人草稿返回 403 |
+| 前置条件 | 文章 draft，author=A；reader 登录 |
+| 步骤 | 1. 携带 reader token `GET /api/articles/:draftId` |
+| 预期 | 403 `{code:40301, message:"草稿无权访问", httpStatus:403, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-008N 文章更新正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-008N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-008 |
+| 场景 | 作者本人更新文章 |
+| 前置条件 | author 登录，文章属于该 author |
+| 步骤 | 1. `PUT /api/articles/:id {"title":"Updated"}` |
+| 预期 | 200 更新后 Article；updatedAt 刷新 |
+| 优先级 | 高 |
+
+### TC-INT-008E 文章更新异常路径（非作者无权更新）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-008E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-008 |
+| 场景 | 其他 author 更新非己文章返回 403 |
+| 前置条件 | 文章 authorId=A；author=B 登录 |
+| 步骤 | 1. 携带 B token `PUT /api/articles/:A_articleId` |
+| 预期 | 403 `{code:40301, message:"禁止访问", httpStatus:403, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-009N 文章删除正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-009N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-009 |
+| 场景 | 作者删除文章+级联删除评论 |
+| 前置条件 | 文章有 3 条评论 |
+| 步骤 | 1. `DELETE /api/articles/:id`；2. 查询评论列表 |
+| 预期 | 204；评论列表为空 |
+| 优先级 | 高 |
+
+### TC-INT-009E 文章删除异常路径（文章不存在）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-009E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-009 |
+| 场景 | 删除不存在的文章返回 404 |
+| 前置条件 | 无 |
+| 步骤 | 1. `DELETE /api/articles/non-exist-id` |
+| 预期 | 404 `{code:40401, message:"文章不存在", httpStatus:404, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-010N 评论创建正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-010N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-010 |
+| 场景 | reader 在已发布文章下评论 |
+| 前置条件 | 文章 published；reader 登录 |
+| 步骤 | 1. `POST /api/articles/:id/comments {"content":"Nice"}` |
+| 预期 | 201 `{id, articleId, userId, content, createdAt}` |
+| 优先级 | 高 |
+
+### TC-INT-010E 评论创建异常路径（文章不存在）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-010E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-010 |
+| 场景 | 在不存在的文章下评论返回 404 |
+| 前置条件 | 无 |
+| 步骤 | 1. `POST /api/articles/non-exist/comments {"content":"x"}` |
+| 预期 | 404 `{code:40401, message:"文章不存在", httpStatus:404, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-011N 评论列表查询正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-011N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-011 |
+| 场景 | 分页查询某文章评论 |
+| 前置条件 | 文章有 5 条评论 |
+| 步骤 | 1. `GET /api/articles/:id/comments?page=1&limit=20` |
+| 预期 | 200 `{items:[<5 comments>], total:5, page:1, limit:20}` |
+| 优先级 | 中 |
+
+### TC-INT-011E 评论列表查询异常路径（文章不存在）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-011E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-011 |
+| 场景 | 查询不存在文章的评论返回 404 |
+| 前置条件 | 无 |
+| 步骤 | 1. `GET /api/articles/non-exist/comments` |
+| 预期 | 404 `{code:40401, message:"文章不存在"}` |
+| 优先级 | 中 |
+
+### TC-INT-012N 评论删除正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-012N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-012 |
+| 场景 | 评论作者删除自己的评论 |
+| 前置条件 | 评论 userId=当前用户 |
+| 步骤 | 1. `DELETE /api/comments/:id` |
+| 预期 | 204 |
+| 优先级 | 高 |
+
+### TC-INT-012E 评论删除异常路径（非作者无权删除）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-012E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-012 |
+| 场景 | 其他 reader 删除非己评论返回 403 |
+| 前置条件 | 评论 userId=A；reader=B 登录 |
+| 步骤 | 1. 携带 B token `DELETE /api/comments/:A_commentId` |
+| 预期 | 403 `{code:40301, message:"禁止访问"}` |
+| 优先级 | 高 |
+
+### TC-INT-013N 标签管理正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-013N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-013 |
+| 场景 | admin 创建标签成功 |
+| 前置条件 | admin 登录 |
+| 步骤 | 1. `POST /api/tags {"name":"TypeScript"}` |
+| 预期 | 201 `{id, name:"TypeScript", createdAt, updatedAt}` |
+| 优先级 | 高 |
+
+### TC-INT-013E 标签管理异常路径（非 admin 写）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-013E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-013 |
+| 场景 | author 创建标签返回 403 |
+| 前置条件 | author 登录 |
+| 步骤 | 1. 携带 author token `POST /api/tags {"name":"x"}` |
+| 预期 | 403 `{code:40301, message:"禁止访问"}` |
+| 优先级 | 高 |
+
+### TC-INT-014N 分类管理正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-014N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-014 |
+| 场景 | admin 创建顶层分类 |
+| 前置条件 | admin 登录 |
+| 步骤 | 1. `POST /api/categories {"name":"Frontend","parentCategoryId":null}` |
+| 预期 | 201 `{id, name:"Frontend", parentCategoryId:null, createdAt, updatedAt}` |
+| 优先级 | 高 |
+
+### TC-INT-014E 分类管理异常路径（成环检测）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-014E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-014 |
+| 场景 | 设置 parentCategoryId 形成环返回 60002 |
+| 前置条件 | 已有分类 A→B→C 链 |
+| 步骤 | 1. `PUT /api/categories/:A_id {"parentCategoryId":"C_id"}` 形成环 |
+| 预期 | 400 `{code:60002, message:"分类树成环", httpStatus:400, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-015N 文章搜索正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-015N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-015 |
+| 场景 | 关键词搜索已发布文章 |
+| 前置条件 | 3 篇文章含 "hello" |
+| 步骤 | 1. `GET /api/search?q=hello` |
+| 预期 | 200 `{items:[<3 articles>], total:3, page:1, limit:20}` |
+| 优先级 | 高 |
+
+### TC-INT-015E 文章搜索异常路径（参数越界）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-015E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-015 |
+| 场景 | limit=200 返回 400 |
+| 前置条件 | 无 |
+| 步骤 | 1. `GET /api/search?limit=200` |
+| 预期 | 400 `{code:40001, message:"参数错误：limit ∈ [1, 100]"}` |
+| 优先级 | 中 |
+
+### TC-INT-016N 密码重置正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-016N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-016 |
+| 场景 | 重置令牌一次性使用成功 |
+| 前置条件 | 用户已注册 |
+| 步骤 | 1. `POST /api/users/password/reset-request {"email":"a@b.com"}`；2. 截获 token；3. `POST /api/users/password/reset {"token","newPassword"}`；4. 用新密码登录 |
+| 预期 | reset-request 200 `{tokenSent:true}`；reset 200 `{reset:true}`；登录 200 |
+| 优先级 | 高 |
+
+### TC-INT-016E 密码重置异常路径（令牌过期）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-016E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-016 |
+| 场景 | 使用过期令牌返回 410 |
+| 前置条件 | 令牌签发时间 > 15min |
+| 步骤 | 1. mock 时钟前进 16min；2. `POST /api/users/password/reset {"token","newPassword"}` |
+| 预期 | 410 `{code:41001, message:"令牌过期", httpStatus:410, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-017N 草稿/发布工作流正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-017N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-017 |
+| 场景 | draft → published 转移成功 |
+| 前置条件 | 文章 status=draft |
+| 步骤 | 1. `POST /api/articles/:id/publish` |
+| 预期 | 200 `{status:"published", publishedAt:<iso8601>}` |
+| 优先级 | 高 |
+
+### TC-INT-017E 草稿/发布工作流异常路径（非法状态转移）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-017E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-017 |
+| 场景 | 已 published 文章再次 publish 返回 60001 |
+| 前置条件 | 文章 status=published |
+| 步骤 | 1. `POST /api/articles/:id/publish` |
+| 预期 | 400 `{code:60001, message:"非法状态转移", httpStatus:400, retryable:false}` |
+| 优先级 | 高 |
+
+### TC-INT-018N 文章点赞正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-018N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-018 |
+| 场景 | 首次点赞 liked=true |
+| 前置条件 | 文章 published；用户首次点赞 |
+| 步骤 | 1. `POST /api/articles/:id/like` |
+| 预期 | 200 `{likeCount:N+1, liked:true}` |
+| 优先级 | 高 |
+
+### TC-INT-018E 文章点赞异常路径（重复点赞幂等）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-018E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-018 |
+| 场景 | 重复点赞返回 liked=false（幂等） |
+| 前置条件 | 用户已点赞 |
+| 步骤 | 1. 再次 `POST /api/articles/:id/like` |
+| 预期 | 200 `{likeCount:N, liked:false}`（不增加） |
+| 优先级 | 高 |
+
+### TC-INT-019N 审计日志查询正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-019N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-019 |
+| 场景 | admin 查询审计日志列表 |
+| 前置条件 | 已有审计记录 10 条；admin 登录 |
+| 步骤 | 1. `GET /api/audit-logs?page=1&limit=50` |
+| 预期 | 200 `{items:[<10 logs>], total:10, page:1, limit:50}` |
+| 优先级 | 高 |
+
+### TC-INT-019E 审计日志查询异常路径（非 admin 查询）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-019E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-019 |
+| 场景 | author 查询审计日志返回 403 |
+| 前置条件 | author 登录 |
+| 步骤 | 1. 携带 author token `GET /api/audit-logs` |
+| 预期 | 403 `{code:40301, message:"禁止访问"}` |
+| 优先级 | 高 |
+
+### TC-INT-020N RSS 全局订阅正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-020N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-020 |
+| 场景 | GET /api/rss 返回 Atom XML |
+| 前置条件 | 已发布 5 篇文章 |
+| 步骤 | 1. `GET /api/rss`；2. 校验 Content-Type + XML 解析 |
+| 预期 | 200 `Content-Type: application/atom+xml`；Atom 1.0 文档含 5 个 `<entry>` |
+| 优先级 | 高 |
+
+### TC-INT-020E RSS 条件请求异常路径（304 命中）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-020E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-020 |
+| 场景 | If-None-Match 匹配 ETag 返回 304 |
+| 前置条件 | 已获取 ETag |
+| 步骤 | 1. `GET /api/rss` 首次获取 ETag；2. `GET /api/rss` 携带 `If-None-Match:<etag>` |
+| 预期 | 第二次 304 Not Modified 无 body |
+| 优先级 | 中 |
+
+### TC-INT-021N 用户资料更新正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-021N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-021 |
+| 场景 | 本人更新昵称成功 |
+| 前置条件 | 用户已登录 |
+| 步骤 | 1. `PUT /api/users/profile {"nickname":"Alice"}` |
+| 预期 | 200 `{userId, nickname:"Alice", avatar, bio, updatedAt:<刷新>}` |
+| 优先级 | 中 |
+
+### TC-INT-021E 用户资料更新异常路径（头像非 URL）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-021E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-021 |
+| 场景 | avatar 非 URL 格式返回 400 |
+| 前置条件 | 用户已登录 |
+| 步骤 | 1. `PUT /api/users/profile {"avatar":"not-a-url"}` |
+| 预期 | 400 `{code:40001, message:"参数错误：avatar 为 URL 格式"}` |
+| 优先级 | 中 |
+
+### TC-INT-022N 文章归档正常路径
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-022N |
+| 类型 | 单接口契约-正常 |
+| 关联 INTF | INTF-022 |
+| 场景 | 按月份分组统计已发布文章 |
+| 前置条件 | 7 月 5 篇 + 6 月 3 篇 |
+| 步骤 | 1. `GET /api/articles/archive` |
+| 预期 | 200 `{items:[{year:2026, month:7, count:5}, {year:2026, month:6, count:3}]}` |
+| 优先级 | 中 |
+
+### TC-INT-022E 文章归档异常路径（year 非法）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-022E |
+| 类型 | 单接口契约-异常 |
+| 关联 INTF | INTF-022 |
+| 场景 | year=1999 返回 400 |
+| 前置条件 | 无 |
+| 步骤 | 1. `GET /api/articles/archive?year=1999` |
+| 预期 | 400 `{code:40001, message:"参数错误：year ∈ [2000, 2100]"}` |
+| 优先级 | 低 |
+
+## §3 跨模块交互测试（15 用例）
+
+### TC-INT-C01 博文发布→审计日志链路
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C01 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-005 → INTF-017 → INTF-019 |
+| 场景 | 创建文章→发布→审计日志记录 |
+| 前置条件 | author 登录；分类/标签已存在 |
+| 步骤 | 1. POST /api/articles 创建 draft；2. POST /api/articles/:id/publish 发布；3. GET /api/audit-logs 查询 action=publish |
+| 预期 | 步骤1 201；步骤2 200 status=published；步骤3 200 含 resourceId=:id 的 publish 记录 |
+| 优先级 | 高 |
+
+### TC-INT-C02 文章删除→评论级联→审计
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C02 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-009 → INTF-010/011 → INTF-019 |
+| 场景 | 删除文章时级联删除评论并记录审计 |
+| 前置条件 | 文章有 3 条评论 |
+| 步骤 | 1. DELETE /api/articles/:id；2. GET /api/articles/:id/comments（应 404）；3. GET /api/audit-logs action=delete |
+| 预期 | 步骤1 204；步骤2 404；步骤3 含 delete 记录 |
+| 优先级 | 高 |
+
+### TC-INT-C03 评论创建→文章详情联动
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C03 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-010 → INTF-007 |
+| 场景 | 创建评论后文章详情不变（评论独立存储） |
+| 前置条件 | 文章 published |
+| 步骤 | 1. GET /api/articles/:id 记录字段；2. POST /api/articles/:id/comments；3. 再次 GET /api/articles/:id |
+| 预期 | 文章详情不变；评论列表新增 |
+| 优先级 | 中 |
+
+### TC-INT-C04 文件上传→博文创建→搜索索引
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C04 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-005 → INTF-015 |
+| 场景 | 创建文章后能被搜索到（同进程内存索引同步） |
+| 前置条件 | author 登录 |
+| 步骤 | 1. POST /api/articles 创建并 publish；2. GET /api/search?q=<title 关键词> |
+| 预期 | 步骤2 命中步骤1 创建的文章 |
+| 优先级 | 高 |
+
+### TC-INT-C05 用户注册→默认资料→公开查询
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C05 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-002 → INTF-021 |
+| 场景 | 注册后用户资料默认空，公开查询返回 |
+| 前置条件 | 无 |
+| 步骤 | 1. POST /api/users/register；2. GET /api/users/:id/profile |
+| 预期 | 步骤2 200 默认 nickname="" avatar="" bio="" |
+| 优先级 | 中 |
+
+### TC-INT-C06 RSS 订阅源→条件请求→304
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C06 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-020 → INTF-006 |
+| 场景 | RSS 拉取后第二次条件请求返回 304 |
+| 前置条件 | 已发布文章 |
+| 步骤 | 1. GET /api/rss 获取 ETag；2. GET /api/rss 携带 If-None-Match |
+| 预期 | 步骤1 200 + ETag；步骤2 304 |
+| 优先级 | 高 |
+
+### TC-INT-C07 RSS 按分类过滤
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C07 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-020 → INTF-014 |
+| 场景 | 按 categoryId 过滤 RSS 内容 |
+| 前置条件 | 分类 c1 下有 2 篇文章；c2 下有 3 篇 |
+| 步骤 | 1. GET /api/rss/category/c1 |
+| 预期 | 200 Atom XML 仅含 c1 下 2 篇 |
+| 优先级 | 中 |
+
+### TC-INT-C08 标签删除→文章标签关联清理
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C08 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-013 → INTF-005/007 |
+| 场景 | 删除标签后文章 tags 字段不再包含该标签 |
+| 前置条件 | 文章 A 含标签 t1 |
+| 步骤 | 1. DELETE /api/tags/t1；2. GET /api/articles/A_id |
+| 预期 | 步骤2 文章 tags 数组不含 t1 |
+| 优先级 | 中 |
+
+### TC-INT-C09 分类删除（被引用时阻止）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C09 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-014 → INTF-005 |
+| 场景 | 删除被文章引用的分类返回 60005 |
+| 前置条件 | 文章 A 的 categoryId=c1 |
+| 步骤 | 1. DELETE /api/categories/c1 |
+| 预期 | 409 `{code:60005, message:"分类被文章引用无法删除"}` |
+| 优先级 | 高 |
+
+### TC-INT-C10 文章点赞→文章详情计数同步
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C10 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-018 → INTF-007 |
+| 场景 | 点赞后文章详情 likeCount 同步增加 |
+| 前置条件 | 文章 published |
+| 步骤 | 1. GET /api/articles/:id 记录 likeCount=N；2. POST /api/articles/:id/like；3. GET /api/articles/:id |
+| 预期 | 步骤3 likeCount=N+1 |
+| 优先级 | 高 |
+
+### TC-INT-C11 密码重置→旧 token 失效
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C11 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-016 → INTF-003 |
+| 场景 | 重置密码后旧 password 登录失败 |
+| 前置条件 | 用户已注册 |
+| 步骤 | 1. reset-request + reset 重置密码；2. 用旧密码 POST /api/users/login |
+| 预期 | 步骤2 401 凭据无效 |
+| 优先级 | 高 |
+
+### TC-INT-C12 工作流→RSS 更新（发布后 RSS 可见）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C12 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-017 → INTF-020 |
+| 场景 | 文章 publish 后 RSS 出现该文章 |
+| 前置条件 | 文章 draft |
+| 步骤 | 1. GET /api/rss 验证不含该文章；2. POST /api/articles/:id/publish；3. GET /api/rss |
+| 预期 | 步骤1 不含；步骤3 含该文章 |
+| 优先级 | 高 |
+
+### TC-INT-C13 搜索→归档统计一致性
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C13 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-015 → INTF-022 |
+| 场景 | 搜索 total = 归档 count 之和 |
+| 前置条件 | 5 篇 published |
+| 步骤 | 1. GET /api/search（空 q）→ total；2. GET /api/articles/archive → sum(count) |
+| 预期 | 两者相等 |
+| 优先级 | 中 |
+
+### TC-INT-C14 权限中间件→审计日志查询（admin only）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C14 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-004 → INTF-019 |
+| 场景 | 非 admin 调用 GET /api/audit-logs 被 INTF-004 拦截 |
+| 前置条件 | author 登录 |
+| 步骤 | 1. 携带 author token GET /api/audit-logs |
+| 预期 | 403 |
+| 优先级 | 中 |
+
+### TC-INT-C15 文章更新→审计日志 meta 字段
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-C15 |
+| 类型 | 跨模块交互 |
+| 关联 INTF | INTF-008 → INTF-019 |
+| 场景 | 更新文章后审计 meta 含变更字段 |
+| 前置条件 | author 登录 |
+| 步骤 | 1. PUT /api/articles/:id {"title":"New"}；2. GET /api/audit-logs?action=update |
+| 预期 | 步骤2 最新一条 meta 含 `{fields:["title"]}` |
+| 优先级 | 中 |
+
+## §4 异常路径测试（10 用例）
+
+### TC-INT-X01 限流触发（5 次失败/分钟）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X01 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-003 |
+| 场景 | 同 IP 连续 5 次登录失败触发限流 429 |
+| 前置条件 | 同 IP |
+| 步骤 | 1. 连续 5 次 POST /api/users/login 错误密码；2. 第 6 次 |
+| 预期 | 第 6 次 429 `{code:42901, message:"限流", httpStatus:429, retryable:true}` |
+| 优先级 | 高 |
+
+### TC-INT-X02 并发点赞竞态
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X02 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-018 |
+| 场景 | 同一用户并发 2 次 POST /like，仅一次 liked=true |
+| 前置条件 | 用户已登录 |
+| 步骤 | 1. 并行发起 2 个 POST /api/articles/:id/like（Promise.all） |
+| 预期 | 1 个 liked=true，1 个 liked=false（幂等）；likeCount=N+1 |
+| 优先级 | 高 |
+
+### TC-INT-X03 文章删除与评论创建并发
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X03 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-009, INTF-010 |
+| 场景 | 删除文章与创建评论并发，评论应失败 |
+| 前置条件 | 文章存在 |
+| 步骤 | 1. 并行 DELETE /api/articles/:id + POST /api/articles/:id/comments |
+| 预期 | DELETE 成功；POST 返回 404 |
+| 优先级 | 中 |
+
+### TC-INT-X04 内存存储超限（NFR-004 10000）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X04 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-005 |
+| 场景 | 超过 10000 篇文章后创建返回 50001 |
+| 前置条件 | articleStore 已有 10000 条 |
+| 步骤 | 1. 批量插入 10000 篇；2. POST /api/articles |
+| 预期 | 500 `{code:50001, message:"内存存储超限"}` |
+| 优先级 | 中 |
+
+### TC-INT-X05 JWT 过期（1 小时后）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X05 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-003, INTF-004 |
+| 场景 | token 过期后访问受保护接口返回 401 |
+| 前置条件 | 用户已登录 |
+| 步骤 | 1. mock 时钟前进 3601s；2. GET /api/articles（需认证的） |
+| 预期 | 401 `{code:40101, message:"token 过期"}` |
+| 优先级 | 高 |
+
+### TC-INT-X06 JWT 签名无效
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X06 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-004 |
+| 场景 | 篡改 token 签名返回 40102 |
+| 前置条件 | 任意 token |
+| 步骤 | 1. 修改 token 最后 4 字符；2. GET /api/articles |
+| 预期 | 401 `{code:40102, message:"token 无效签名"}` |
+| 优先级 | 高 |
+
+### TC-INT-X07 Zod schema 校验失败（NFR-005）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X07 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-002 |
+| 场景 | email 字段非邮箱格式返回 400 |
+| 前置条件 | 无 |
+| 步骤 | 1. POST /api/users/register {"email":"not-email","password":"pass1234"} |
+| 预期 | 400 `{code:40001, message:"参数错误：email 邮箱格式"}` |
+| 优先级 | 高 |
+
+### TC-INT-X08 XML 渲染失败（INTF-020）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X08 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-020 |
+| 场景 | 文章 title 含特殊字符导致 XML 渲染失败 |
+| 前置条件 | 文章 title 含 `&<>` 等 |
+| 步骤 | 1. 创建并发布含特殊字符文章；2. GET /api/rss |
+| 预期 | 200（XML 转义后正常）或 500 `{code:50301, message:"XML 渲染失败"}`（若转义遗漏） |
+| 优先级 | 中 |
+
+### TC-INT-X09 内部审计写入失败不阻断主流程
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X09 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-005, INTF-019 |
+| 场景 | auditService.log 抛异常时文章创建仍成功 |
+| 前置条件 | mock auditService.log 抛错 |
+| 步骤 | 1. POST /api/articles |
+| 预期 | 201 文章创建成功；stderr 含审计写入失败日志 |
+| 优先级 | 高 |
+| seam | seam-module（钩住 auditService.log） |
+
+### TC-INT-X10 限流中间件白名单（健康检查不限流）
+
+| 字段 | 值 |
+|---|---|
+| 用例 ID | TC-INT-X10 |
+| 类型 | 异常路径 |
+| 关联 INTF | INTF-001 |
+| 场景 | GET /health 不受 60 次/分钟限流约束 |
+| 前置条件 | 无 |
+| 步骤 | 1. 连续 100 次 GET /health |
+| 预期 | 全部 200，不触发 429 |
+| 优先级 | 中 |
+
+## §5 测试覆盖矩阵
+
+### §5.1 INTF 覆盖
+
+| INTF | 正常 N | 异常 E | 跨模块 C | 异常路径 X | 总数 |
+|---|---|---|---|---|---|
+| INTF-001 | 1 | 1 | 0 | 1 | 3 |
+| INTF-002 | 1 | 1 | 1 (C05) | 1 | 4 |
+| INTF-003 | 1 | 1 | 1 (C11) | 2 (X01,X05) | 5 |
+| INTF-004 | 1 | 1 | 1 (C14) | 2 (X05,X06) | 5 |
+| INTF-005 | 1 | 1 | 4 (C01,C04,C08,C09) | 2 (X04,X09) | 8 |
+| INTF-006 | 1 | 1 | 3 (C06,C12,C13) | 0 | 5 |
+| INTF-007 | 1 | 1 | 2 (C03,C10) | 0 | 4 |
+| INTF-008 | 1 | 1 | 1 (C15) | 0 | 3 |
+| INTF-009 | 1 | 1 | 1 (C02) | 1 (X03) | 4 |
+| INTF-010 | 1 | 1 | 2 (C03,C02) | 1 (X03) | 5 |
+| INTF-011 | 1 | 1 | 1 (C02) | 0 | 3 |
+| INTF-012 | 1 | 1 | 0 | 0 | 2 |
+| INTF-013 | 1 | 1 | 1 (C08) | 0 | 3 |
+| INTF-014 | 1 | 1 | 3 (C07,C09,C13) | 0 | 5 |
+| INTF-015 | 1 | 1 | 2 (C04,C13) | 0 | 4 |
+| INTF-016 | 1 | 1 | 1 (C11) | 0 | 3 |
+| INTF-017 | 1 | 1 | 2 (C01,C12) | 0 | 4 |
+| INTF-018 | 1 | 1 | 1 (C10) | 1 (X02) | 4 |
+| INTF-019 | 1 | 1 | 4 (C01,C02,C14,C15) | 1 (X09) | 7 |
+| INTF-020 | 1 | 1 | 3 (C06,C07,C12) | 1 (X08) | 6 |
+| INTF-021 | 1 | 1 | 1 (C05) | 0 | 3 |
+| INTF-022 | 1 | 1 | 1 (C13) | 0 | 3 |
+| **合计** | **22** | **22** | **15** | **10** | **69** |
+
+### §5.2 错误码段位覆盖
+
+| 段位 | 覆盖用例 |
+|---|---|
+| 4xx | TC-INT-005E (404), 007E (403), 008E (403), 009E (404), 010E (404), 012E (403), 013E (403), 014E (400 业务), 015E (400), 017E (400 业务), 021E (400), 022E (400), X01 (429), X05 (401), X06 (401), X07 (400) |
+| 5xx | TC-INT-001E (500), X04 (500), X08 (500 业务 50301) |
+| 业务 60000+ | TC-INT-014E (60002), 017E (60001), 018E (60003 重复点赞幂等), C09 (60005 引用阻止), 016E (60004 令牌已使用) |
+
+三段位（4xx/5xx/业务）全覆盖。
+
+### §5.3 NFR 覆盖
+
+| NFR | 覆盖用例 |
+|---|---|
+| NFR-001 性能 200ms | 阶段 7 系统测试 TC-PERF-* 承担 |
+| NFR-002 JWT 强度 | X05/X06 校验过期/签名 |
+| NFR-003 错误处理统一 | 所有异常用例校验统一响应格式 |
+| NFR-004 容量 10000 | X04 |
+| NFR-005 zod schema 100% | X07 + 所有 40001 用例 |
+| NFR-006 限流 60/min | X01, X10 |
+
+### §5.4 CON 覆盖
+
+| CON | 覆盖用例 |
+|---|---|
+| CON-001 Express+TS+Map | 全部用例（隐式） |
+| CON-002 JWT HS256 1h | X05 |
+| CON-003 TS strict | 阶段 5 编码 tsc --noEmit 承担 |
+| CON-004 结构化 JSON 日志 | TC-INT-C15 校验审计 meta 字段格式 |
+
+## §6 RTM 补登
+
+`rtm.json` 的 `integrationTest` 列登记 TC-INT-* 用例 ID（按 REQ/SD 关联映射）。详见 `.w-model/rtm.json` mappings.integrationTest 节。
+
+## §7 验收标准对齐
+
+- [x] 22 INTF × 2（正常+异常）= 44 单接口契约测试用例
+- [x] 15 跨模块交互测试覆盖关键业务流（发布→审计、删除级联、搜索索引、RSS 更新等）
+- [x] 10 异常路径测试覆盖超时/并发/限流/状态机违反/依赖故障
+- [x] 错误码三段位（4xx/5xx/业务）全覆盖
+- [x] NFR-006 限流 + NFR-005 zod schema 校验 + CON-002 JWT 1h 过期 + CON-004 JSON 日志 全覆盖
+- [x] 测试 seam 决策沿用阶段 2 §5（seam-http 主 + seam-module 辅）

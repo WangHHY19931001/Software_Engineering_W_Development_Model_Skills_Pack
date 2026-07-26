@@ -1,161 +1,72 @@
-// SD-003 UserStore.
-
-import { UserRole, UserStatus, type User } from '../types.js';
-import { AppError, ErrorCode } from '../utils/errors.js';
-import { displayNameSchema, emailSchema, passwordSchema } from '../utils/schemas.js';
-
-let counter = 0;
-function nextId(): string {
-  counter += 1;
-  return `u-${counter}`;
-}
-
-export interface UserCreateInput {
-  email: string;
-  password: string;
-  displayName: string;
-  role?: UserRole;
-}
+/**
+ * UserStore（DD-002-003 / DD-003-003）— 用户存储 + email 唯一索引。
+ */
+import type { User } from '../types.js';
+import { ConflictError, NotFoundError } from '../utils/errors.js';
+import { generateId } from '../utils/id.js';
 
 export class UserStore {
-  private users = new Map<string, User>();
-  private emailToId = new Map<string, string>();
-  private roleToIds = new Map<UserRole, Set<string>>();
-  private bannedUserIds = new Set<string>();
-  // Tracks JTIs issued per user (for revocation).
-  private userJtis = new Map<string, Set<string>>();
+  private users: Map<string, User> = new Map();
+  private emailIndex: Map<string, string> = new Map();
+
+  insert(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): User {
+    const email = user.email.toLowerCase();
+    if (this.emailIndex.has(email)) {
+      throw new ConflictError('邮箱已注册');
+    }
+    const now = new Date().toISOString();
+    const record: User = {
+      id: user.id ?? generateId('user'),
+      email: user.email,
+      passwordHash: user.passwordHash,
+      role: user.role,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.users.set(record.id, record);
+    this.emailIndex.set(email, record.id);
+    return record;
+  }
+
+  findById(id: string): User | undefined {
+    return this.users.get(id);
+  }
+
+  findByEmail(email: string): User | undefined {
+    const id = this.emailIndex.get(email.toLowerCase());
+    if (!id) return undefined;
+    return this.users.get(id);
+  }
+
+  update(id: string, patch: Partial<Pick<User, 'passwordHash' | 'role'>>): User {
+    const user = this.users.get(id);
+    if (!user) throw new NotFoundError('用户');
+    const updated: User = {
+      ...user,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  delete(id: string): boolean {
+    const user = this.users.get(id);
+    if (!user) return false;
+    this.emailIndex.delete(user.email.toLowerCase());
+    return this.users.delete(id);
+  }
+
+  list(): User[] {
+    return [...this.users.values()];
+  }
 
   size(): number {
     return this.users.size;
   }
 
-  bannedSize(): number {
-    return this.bannedUserIds.size;
-  }
-
-  roleSize(role: UserRole): number {
-    const set = this.roleToIds.get(role);
-    return set ? set.size : 0;
-  }
-
-  hasEmail(email: string): boolean {
-    return this.emailToId.has(email);
-  }
-
-  getById(id: string): User | null {
-    return this.users.get(id) ?? null;
-  }
-
-  getByEmail(email: string): User | null {
-    const id = this.emailToId.get(email);
-    if (!id) return null;
-    return this.users.get(id) ?? null;
-  }
-
-  create(input: UserCreateInput): User {
-    if (!emailSchema.safeParse(input.email).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    if (!passwordSchema.safeParse(input.password).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    if (!displayNameSchema.safeParse(input.displayName).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    if (this.emailToId.has(input.email)) {
-      throw new AppError(ErrorCode.BusinessConflict, '1005');
-    }
-    const role = input.role ?? UserRole.Reader;
-    const now = new Date();
-    const user: User = {
-      id: nextId(),
-      email: input.email,
-      passwordHash: input.password, // caller hashes before passing in
-      role,
-      status: UserStatus.Active,
-      displayName: input.displayName,
-      bannedAt: null,
-      banReason: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.users.set(user.id, user);
-    this.emailToId.set(input.email, user.id);
-    let roleSet = this.roleToIds.get(role);
-    if (!roleSet) {
-      roleSet = new Set();
-      this.roleToIds.set(role, roleSet);
-    }
-    roleSet.add(user.id);
-    return { ...user };
-  }
-
-  update(user: User): User {
-    const existing = this.users.get(user.id);
-    if (!existing) {
-      throw new AppError(ErrorCode.NotFound, '1031');
-    }
-    const updated: User = { ...user, updatedAt: new Date() };
-    this.users.set(user.id, updated);
-    return { ...updated };
-  }
-
-  ban(userId: string, reason: string): User {
-    const user = this.users.get(userId);
-    if (!user) throw new AppError(ErrorCode.NotFound, '1031');
-    user.status = UserStatus.Banned;
-    user.bannedAt = new Date();
-    user.banReason = reason;
-    user.updatedAt = new Date();
-    this.bannedUserIds.add(userId);
-    return { ...user };
-  }
-
-  unban(userId: string): User {
-    const user = this.users.get(userId);
-    if (!user) throw new AppError(ErrorCode.NotFound, '1031');
-    user.status = UserStatus.Active;
-    user.bannedAt = null;
-    user.banReason = null;
-    user.updatedAt = new Date();
-    this.bannedUserIds.delete(userId);
-    return { ...user };
-  }
-
-  isBanned(userId: string): boolean {
-    return this.bannedUserIds.has(userId);
-  }
-
-  listByRole(role: UserRole): User[] {
-    const set = this.roleToIds.get(role);
-    if (!set) return [];
-    const out: User[] = [];
-    for (const id of set) {
-      const u = this.users.get(id);
-      if (u) out.push({ ...u });
-    }
-    return out;
-  }
-
-  addJti(userId: string, jti: string): void {
-    let set = this.userJtis.get(userId);
-    if (!set) {
-      set = new Set();
-      this.userJtis.set(userId, set);
-    }
-    set.add(jti);
-  }
-
-  getJtis(userId: string): string[] {
-    const set = this.userJtis.get(userId);
-    return set ? Array.from(set) : [];
-  }
-
   clear(): void {
     this.users.clear();
-    this.emailToId.clear();
-    this.roleToIds.clear();
-    this.bannedUserIds.clear();
-    this.userJtis.clear();
+    this.emailIndex.clear();
   }
 }

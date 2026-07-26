@@ -1,37 +1,32 @@
-// SD-009 CategoryService.
-
-import { UserRole, type Category, type CategoryNode } from '../types.js';
-import { AppError, ErrorCode } from '../utils/errors.js';
+/**
+ * CategoryService（DD-014-002）。
+ */
+import type { Category } from '../types.js';
 import type { CategoryStore } from '../stores/category.store.js';
+import { NotFoundError } from '../utils/errors.js';
 
 export class CategoryService {
   constructor(private categoryStore: CategoryStore) {}
 
-  /** createCategory — TLA+ L2_content_management.createCategory */
-  createCategory(name: string, parentId: string | null): Category {
-    return this.categoryStore.create(name, parentId);
+  create(name: string, parentCategoryId: string | null = null): Category {
+    return this.categoryStore.insert({ name, parentCategoryId });
   }
 
-  /** bindCategory — TLA+ L2_content_management.bindCategory */
-  bindCategory(articleId: string, categoryId: string): void {
-    const cat = this.categoryStore.getById(categoryId);
-    if (!cat) throw new AppError(ErrorCode.NotFound, '1031');
-    this.categoryStore.bindArticle(categoryId, articleId);
+  list(): Category[] {
+    return this.categoryStore.list();
   }
 
-  tree(): CategoryNode[] {
-    return this.categoryStore.tree();
+  findById(id: string): Category | undefined {
+    return this.categoryStore.findById(id);
   }
 
-  breadcrumb(categoryId: string): Category[] {
-    return this.categoryStore.breadcrumb(categoryId);
+  update(id: string, patch: { name?: string; parentCategoryId?: string | null }): Category {
+    if (!this.categoryStore.findById(id)) throw new NotFoundError('分类');
+    return this.categoryStore.update(id, patch);
   }
 
-  /** cascadeDelete — admin only. */
-  cascadeDelete(_operatorId: string, operatorRole: string, categoryId: string): void {
-    if (operatorRole !== UserRole.Admin) {
-      throw new AppError(ErrorCode.Rbac, '1021');
-    }
-    this.categoryStore.cascadeDelete(operatorRole, categoryId);
+  remove(id: string): void {
+    if (!this.categoryStore.findById(id)) throw new NotFoundError('分类');
+    this.categoryStore.delete(id);
   }
 }

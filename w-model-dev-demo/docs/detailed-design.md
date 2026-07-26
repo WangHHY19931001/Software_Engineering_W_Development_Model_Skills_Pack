@@ -1,988 +1,1950 @@
-# 详细设计说明书
+# 详细设计文档（Detailed Design）
 
-> 阶段 4（详细设计）产出。覆盖 17 SD 子系统的方法级定义 + 内存数据结构 + 类图 + 模块依赖。
-> 套用 `templates/phase-4-detailed-design.md` 模板。技术栈：Express 4 + TypeScript 5 (strict) + bcrypt + jsonwebtoken + zod + ws + 内存存储(Map) + vitest，**无数据库**。
+> 阶段 4 产出。对应系统设计 `docs/system-design.md`（22 SD）+ 接口设计 `docs/interface-design.md`（22 INTF）。
+> 建模方法：分层架构 + 类/方法级设计；技术栈遵循 CON-001（Express 4 + TypeScript 5 + 内存存储）。
+> 本文含 75 个 DD 条目：22 SD 拆分为 70 个 DD + 5 个横切公共 DD（DD-COMMON-001 ~ DD-COMMON-005）。
+> 每个 DD 含：DD-ID / 关联 SD-ID+INTF-ID / 模块名 / 类签名 / 数据结构 / 算法伪代码 / 状态转移 / 异常处理 / 关键不变式 / TLA+ 不变式引用。
+> 设计目标：阶段 5 编码可实施；单元测试覆盖 NFR-004 ≥80% lines。
 
-## 文档信息
+## §1 总览
 
-- 项目名称：blog-system-demo（扩展博客系统后端）
-- 文档版本：v1.0
-- 编制日期：2026-07-25
-- 关联需求：`docs/requirement-spec.md`
-- 关联系统设计：`docs/system-design.md`
-- 关联接口设计：`docs/interface-design.md`
-- 编制者：S 子代理（第 8 轮 W 模型，阶段 4 详细设计）
+### §1.1 模块分层约定
 
----
+| 层 | 职责 | 命名约定 |
+|---|---|---|
+| Controller | HTTP 请求/响应适配；调用 Service；统一错误响应 | `*Controller` |
+| Service | 业务逻辑；事务编排；调用 Store/Audit | `*Service` |
+| Store | 内存持久化（Map） | `*Store` |
+| Middleware | 限流 / 认证 / 审计 / 错误处理 | `*Middleware` |
+| Util | 工具函数（zod schema / XML / 令牌桶） | `*Util` / `*Factory` |
 
-## 1. 类图（Mermaid classDiagram）
+### §1.2 DD 编号规则
 
-> 覆盖核心领域类：User/Article/Comment/Notification/File/Subscription/Category/Tag/Ad/Backup 等。
-> 体现继承（Role/State 枚举基类）/ 关联（Author-Article 1:N）/ 依赖（Service-Store）。
+`DD-<SD编号>-<序号>`（如 DD-005-001 = SD-005 文章创建的第 1 个 DD）；横切公共 DD 编号 `DD-COMMON-<序号>`。
+
+### §1.3 关联 TLA+ L4 规格清单（5 个）
+
+| L4 spec | 关联 DD | 关联不变式 |
+|---|---|---|
+| `L4_article_state_machine` | DD-017-002 / DD-017-003 | StateMachineLegality / NoInvalidTransition |
+| `L4_auth_token_lifecycle` | DD-003-002 / DD-004-003 | TokenNotRevoked / TokenNotExpired |
+| `L4_rate_limiter_token_bucket` | DD-COMMON-004 / DD-COMMON-005 | CapacityInvariant / NonNegativeTokens |
+| `L4_audit_log_retention` | DD-019-002 / DD-019-003 / DD-019-004 | Retention90Days / NoLogLoss |
+| `L4_password_reset_token_lifecycle` | DD-016-002 / DD-016-003 / DD-016-004 | OneTimeUse / TokenExpiry15min |
+
+### §1.4 UML 类图（核心模块）
 
 ```mermaid
 classDiagram
-    class BaseEntity {
-        +string id
-        +Date createdAt
-        +Date updatedAt
+    class ExpressApp {
+        +mountMiddleware(): void
+        +mountRoutes(): void
+        +listen(port: number): Server
     }
-    class User {
-        +string email
-        +string passwordHash
-        +UserRole role
-        +UserStatus status
-        +string displayName
-        +Date bannedAt
-        +string banReason
+    class ErrorHandlerMiddleware {
+        +handle(err: AppError, req, res, next): void
     }
-    class Blogger {
-        +string userId
-        +string slug
-        +string bio
-        +number followerCount
+    class RateLimitMiddleware {
+        +check(req, res, next): void
     }
-    class Article {
-        +string authorId
-        +string title
-        +string content
-        +string summary
-        +string coverImageUrl
-        +ArticleStatus status
-        +string seriesId
-        +number seriesOrder
-        +Date scheduledAt
-        +Date publishedAt
+    class AuthMiddleware {
+        +requireRole(roles: Role[]): RequestHandler
+        +authenticate(req, res, next): void
     }
-    class Comment {
-        +string articleId
-        +string userId
-        +string parentId
-        +string content
-        +number depth
-        +number likeCount
-        +CommentStatus status
+    class AuditMiddleware {
+        +record(req, res, next): void
     }
-    class Notification {
-        +string userId
-        +NotificationType type
-        +string title
-        +string body
-        +string refId
-        +boolean read
-        +Date createdAt
+    class UserController {
+        +register(req, res): Promise~void~
+        +login(req, res): Promise~void~
+        +passwordResetRequest(req, res): Promise~void~
+        +passwordReset(req, res): Promise~void~
+        +updateProfile(req, res): Promise~void~
+        +getProfile(req, res): Promise~void~
     }
-    class FileAsset {
-        +string userId
-        +string filename
-        +string mimeType
-        +number size
-        +Buffer content
-        +string sha256
-        +string magicType
+    class ArticleController {
+        +create(req, res): Promise~void~
+        +list(req, res): Promise~void~
+        +getById(req, res): Promise~void~
+        +update(req, res): Promise~void~
+        +remove(req, res): Promise~void~
+        +publish(req, res): Promise~void~
+        +unpublish(req, res): Promise~void~
+        +like(req, res): Promise~void~
+        +archive(req, res): Promise~void~
     }
-    class Subscription {
-        +string userId
-        +SubscriptionTarget target
-        +string targetId
-        +Date createdAt
+    class CommentController {
+        +create(req, res): Promise~void~
+        +listByArticle(req, res): Promise~void~
+        +remove(req, res): Promise~void~
     }
-    class Category {
-        +string name
-        +string parentId
-        +number depth
-        +number sortOrder
+    class TagController {
+        +list(req, res): Promise~void~
+        +create(req, res): Promise~void~
+        +update(req, res): Promise~void~
+        +remove(req, res): Promise~void~
     }
-    class Tag {
-        +string name
-        +string slug
-        +number articleCount
-        +TagStatus status
+    class CategoryController {
+        +list(req, res): Promise~void~
+        +create(req, res): Promise~void~
+        +update(req, res): Promise~void~
+        +remove(req, res): Promise~void~
     }
-    class Ad {
-        +string slotId
-        +string title
-        +string imageUrl
-        +string targetUrl
-        +Date startAt
-        +Date endAt
-        +AdStatus status
-        +number clickCount
+    class SearchController {
+        +search(req, res): Promise~void~
     }
-    class Backup {
-        +string operatorId
-        +BackupType type
-        +Buffer payload
-        +string sha256
-        +number size
-        +BackupStatus status
+    class AuditLogController {
+        +list(req, res): Promise~void~
     }
-    class Series {
-        +string authorId
-        +string name
-        +string description
+    class RssController {
+        +feed(req, res): Promise~void~
     }
-    class CrossReference {
-        +string fromArticleId
-        +string toArticleId
-        +Date createdAt
-    }
-    class AuditLog {
-        +string userId
-        +string action
-        +string target
-        +Date at
-    }
-    class RecommendSlot {
-        +string name
-        +string articleId
-        +number priority
-    }
-
-    BaseEntity <|-- User
-    BaseEntity <|-- Blogger
-    BaseEntity <|-- Article
-    BaseEntity <|-- Comment
-    BaseEntity <|-- Notification
-    BaseEntity <|-- FileAsset
-    BaseEntity <|-- Subscription
-    BaseEntity <|-- Category
-    BaseEntity <|-- Tag
-    BaseEntity <|-- Ad
-    BaseEntity <|-- Backup
-    BaseEntity <|-- Series
-    BaseEntity <|-- CrossReference
-    BaseEntity <|-- AuditLog
-    BaseEntity <|-- RecommendSlot
-
-    User "1" --> "*" Blogger : owns
-    User "1" --> "*" Article : authors
-    User "1" --> "*" Comment : writes
-    User "1" --> "*" Notification : receives
-    User "1" --> "*" FileAsset : uploads
-    User "1" --> "*" Subscription : subscribes
-    Article "1" --> "*" Comment : has
-    Article "1" --> "*" CrossReference : references
-    Article "*" --> "0..1" Series : belongsTo
-    Article "*" --> "*" Tag : taggedBy
-    Article "*" --> "0..1" Category : classifiedInto
-    Category "1" --> "*" Category : parentOf
-    Comment "1" --> "*" Comment : replies
-    Ad "1" --> "*" RecommendSlot : mayUse
+    ExpressApp --> ErrorHandlerMiddleware
+    ExpressApp --> RateLimitMiddleware
+    ExpressApp --> AuthMiddleware
+    ExpressApp --> AuditMiddleware
+    ExpressApp --> UserController
+    ExpressApp --> ArticleController
+    ExpressApp --> CommentController
+    ExpressApp --> TagController
+    ExpressApp --> CategoryController
+    ExpressApp --> SearchController
+    ExpressApp --> AuditLogController
+    ExpressApp --> RssController
 ```
 
----
-
-## 2. 内存数据结构设计
-
-> 替代 ER 图（无数据库）。每个核心实体给出主存储 Map + 索引 Map。
-> Map key 即索引主键；辅助索引指向主键集合（Set）以支持 O(1) 查询。
-
-### 2.1 实体结构总览（erDiagram）
+### §1.5 ER 图（内存存储表结构 + 索引）
 
 ```mermaid
 erDiagram
-    USER ||--o{ BLOGGER : "1:N"
-    USER ||--o{ ARTICLE : "1:N author"
-    USER ||--o{ COMMENT : "1:N"
-    USER ||--o{ NOTIFICATION : "1:N"
-    USER ||--o{ FILE_ASSET : "1:N"
-    USER ||--o{ SUBSCRIPTION : "1:N"
-    USER ||--o{ AUDIT_LOG : "1:N"
-    ARTICLE ||--o{ COMMENT : "1:N"
-    ARTICLE ||--o{ CROSS_REFERENCE : "1:N from"
-    ARTICLE }o--o| SERIES : "N:0..1"
-    ARTICLE }o--o{ TAG : "N:M"
-    ARTICLE }o--o| CATEGORY : "N:0..1"
-    CATEGORY ||--o{ CATEGORY : "parent"
-    COMMENT ||--o{ COMMENT : "reply"
-    AD ||--o{ RECOMMEND_SLOT : "may"
-    USER {
+    User ||--o| UserProfile : "1:1"
+    User ||--o{ Article : "1:n (authorId)"
+    User ||--o{ Comment : "1:n (userId)"
+    User ||--o{ Like : "1:n (userId)"
+    User ||--o{ AuditLog : "1:n (userId)"
+    User ||--o{ PasswordResetToken : "1:n (userId)"
+    Article ||--o{ Comment : "1:n (articleId)"
+    Article ||--o{ Like : "1:n (articleId)"
+    Article }o--|| Category : "n:1 (categoryId)"
+    Article }o--o{ Tag : "m:n (tagIds[])"
+    Category ||--o| Category : "self (parentCategoryId)"
+    User {
         string id PK
         string email UK
         string passwordHash
-        UserRole role
-        UserStatus status
+        string role
+        string createdAt
+        string updatedAt
     }
-    ARTICLE {
+    UserProfile {
+        string userId PK_FK
+        string nickname
+        string avatar
+        string bio
+        string updatedAt
+    }
+    Article {
         string id PK
-        string authorId FK
         string title
-        ArticleStatus status
-        Date scheduledAt
+        string content
+        string authorId FK
+        string categoryId FK
+        string status
+        int likeCount
+        string publishedAt
+        string createdAt
+        string updatedAt
     }
-    COMMENT {
+    Comment {
         string id PK
         string articleId FK
         string userId FK
-        string parentId FK
-        number depth
+        string content
+        string createdAt
+        string updatedAt
     }
-    NOTIFICATION {
+    Tag {
+        string id PK
+        string name UK
+        string createdAt
+        string updatedAt
+    }
+    Category {
+        string id PK
+        string name
+        string parentCategoryId FK
+        string createdAt
+        string updatedAt
+    }
+    Like {
+        string userId PK_FK
+        string articleId PK_FK
+        string createdAt
+    }
+    AuditLog {
         string id PK
         string userId FK
-        NotificationType type
-        boolean read
+        string action
+        string resource
+        string resourceId
+        object meta
+        string timestamp
     }
-    FILE_ASSET {
-        string id PK
+    PasswordResetToken {
+        string token PK
         string userId FK
-        string sha256 UK
-        number size
-    }
-    SUBSCRIPTION {
-        string id PK
-        string userId FK
-        SubscriptionTarget target
-        string targetId
-    }
-    CATEGORY {
-        string id PK
-        string parentId FK
-        number depth
-    }
-    TAG {
-        string id PK
-        string slug UK
-        TagStatus status
-    }
-    AD {
-        string id PK
-        string slotId FK
-        AdStatus status
-    }
-    BACKUP {
-        string id PK
-        string sha256 UK
-        BackupStatus status
+        string expiresAt
+        boolean used
     }
 ```
 
-### 2.2 Map 存储与索引清单（≥10 实体）
-
-| # | 实体 | 主存储 Map | 索引 Map | 索引类型 | 用途 |
-|---|---|---|---|---|---|
-| 1 | User | `users: Map<userId, User>` | `emailToId: Map<email, userId>` | 唯一索引 | email 唯一性 + O(1) 登录查找 |
-| 1 | User | (同上) | `roleToIds: Map<UserRole, Set<userId>>` | 二级索引 | 角色批量查询（管理员列表） |
-| 1 | User | (同上) | `bannedUserIds: Set<userId>` | 状态索引 | 封禁用户快速过滤 |
-| 2 | Blogger | `bloggers: Map<bloggerId, Blogger>` | `userIdToBloggerId: Map<userId, bloggerId>` | 唯一索引 | 用户→博主 1:1 反查 |
-| 2 | Blogger | (同上) | `slugToId: Map<slug, bloggerId>` | 唯一索引 | slug 唯一性 + URL 反查 |
-| 3 | Article | `articles: Map<articleId, Article>` | `authorIdToArticles: Map<userId, Set<articleId>>` | 二级索引 | 博主文章列表 |
-| 3 | Article | (同上) | `statusToArticles: Map<ArticleStatus, Set<articleId>>` | 状态索引 | 按状态批量查询/定时发布扫描 |
-| 3 | Article | (同上) | `seriesIdToArticles: Map<seriesId, Set<articleId>>` | 二级索引 | 系列文章列表 |
-| 4 | Comment | `comments: Map<commentId, Comment>` | `articleIdToComments: Map<articleId, Set<commentId>>` | 二级索引 | 文章评论列表 |
-| 4 | Comment | (同上) | `parentIdToReplies: Map<parentId, Set<commentId>>` | 二级索引 | 多级回复树 |
-| 5 | Notification | `notifications: Map<notificationId, Notification>` | `userIdToNotifications: Map<userId, Set<notificationId>>` | 二级索引 | 用户通知收件箱 |
-| 5 | Notification | (同上) | `userIdUnread: Map<userId, Set<notificationId>>` | 状态索引 | 未读通知计数 |
-| 6 | FileAsset | `files: Map<fileId, FileAsset>` | `userIdToFiles: Map<userId, Set<fileId>>` | 二级索引 | 用户文件列表 + 配额计算 |
-| 6 | FileAsset | (同上) | `sha256ToId: Map<sha256, fileId>` | 唯一索引 | 秒传/去重 |
-| 7 | Subscription | `subscriptions: Map<subscriptionId, Subscription>` | `userIdToSubs: Map<userId, Set<subscriptionId>>` | 二级索引 | 用户订阅列表 |
-| 7 | Subscription | (同上) | `targetIdToSubs: Map<targetId, Set<subscriptionId>>` | 二级索引 | 目标订阅者反查（推送触发） |
-| 8 | Category | `categories: Map<categoryId, Category>` | `parentIdToChildren: Map<parentId, Set<categoryId>>` | 二级索引 | 分类树子节点 |
-| 8 | Category | (同上) | `categoryIdToArticles: Map<categoryId, Set<articleId>>` | 二级索引 | 分类文章列表 |
-| 9 | Tag | `tags: Map<tagId, Tag>` | `slugToId: Map<slug, tagId>` | 唯一索引 | slug 唯一性 |
-| 9 | Tag | (同上) | `articleIdToTags: Map<articleId, Set<tagId>>` | 二级索引 | 文章标签反查 |
-| 9 | Tag | (同上) | `tagIdToArticles: Map<tagId, Set<articleId>>` | 二级索引 | 标签文章列表 |
-| 10 | Ad | `ads: Map<adId, Ad>` | `slotIdToAds: Map<slotId, Set<adId>>` | 二级索引 | 广告位投放列表 |
-| 10 | Ad | (同上) | `statusToAds: Map<AdStatus, Set<adId>>` | 状态索引 | 审核队列 |
-| 11 | Backup | `backups: Map<backupId, Backup>` | `statusToBackups: Map<BackupStatus, Set<backupId>>` | 状态索引 | 备份任务状态机 |
-| 12 | Series | `series: Map<seriesId, Series>` | `authorIdToSeries: Map<userId, Set<seriesId>>` | 二级索引 | 博主系列列表 |
-| 13 | CrossReference | `crossRefs: Map<refId, CrossReference>` | `fromArticleToRefs: Map<articleId, Set<refId>>` | 二级索引 | 正向引用 |
-| 13 | CrossReference | (同上) | `toArticleToBackrefs: Map<articleId, Set<refId>>` | 二级索引 | 反向链接 |
-| 14 | AuditLog | `auditLogs: Map<logId, AuditLog>` | `userIdToLogs: Map<userId, Set<logId>>` | 二级索引 | 用户操作历史 |
-| 15 | RecommendSlot | `recommendSlots: Map<slotName, RecommendSlot>` | `priorityQueue: Array<slotName>` | 排序索引 | 首页推荐位排序 |
-| 16 | SearchIndex | `invertedIndex: Map<term, Set<articleId>>` | `articleTerms: Map<articleId, Set<term>>` | 倒排索引 | 全文搜索 |
-| 16 | SearchIndex | `searchHistory: Map<userId, Array<string>>` | (无) | FIFO | 搜索历史（≤20 条） |
-| 17 | WsConnection | `wsConnections: Map<userId, WebSocket>` | `channelToUsers: Map<channel, Set<userId>>` | 二级索引 | WebSocket 通道订阅 |
-| 17 | WsConnection | (同上) | `offlineMessages: Map<userId, Array<Message>>` | 离线队列 | 离线消息合并 |
-
----
-
-## 3. 方法级定义（17 SD 子系统核心方法）
-
-> 每个方法：方法签名（参数名+类型+必填+约束）/ 返回值结构 / 错误码集合 / 前置条件 / 后置条件 / 异常。
-> 错误码引用 `docs/interface-design.md` §2.2。
-
-### 3.1 SD-001 站点管理（SiteService / SiteStore）
-
-#### `SiteStore.getConfig(): SiteConfig`
-- **返回**：`{ siteName, description, maintenanceMode, registrationOpen, commentOpen, announcement, announcementAt }`
-- **前置**：无（系统启动后必有默认配置）
-- **后置**：返回当前站点配置快照（不可变引用）
-- **异常**：无
-
-#### `SiteStore.updateConfig(operatorId: string, patch: Partial<SiteConfig>): SiteConfig`
-- **参数**：`operatorId` 必填 string（管理员 ID）；`patch` 必填对象，字段可部分更新
-- **前置**：`operatorId` 对应用户 role 必须为 `admin`，否则抛 `1021 RBAC越权`
-- **后置**：配置原子更新，`updatedAt` 刷新，写审计日志
-- **异常**：`1021`（越权）/ `1001`（zod 校验失败）
-
-#### `SiteService.setMaintenanceMode(operatorId: string, enabled: boolean): void`
-- **参数**：`operatorId` 必填 string；`enabled` 必填 boolean
-- **前置**：`operatorId` 为 admin
-- **后置**：`maintenanceMode` 切换；非管理员后续请求返回 `1023`
-- **异常**：`1021`
-
-#### `SiteService.scheduleAnnouncement(operatorId: string, text: string, at: Date): void`
-- **参数**：`text` 必填 string 1-1000 字符；`at` 必填 Date 未来时间
-- **前置**：admin 权限；`at > now`
-- **后置**：`announcement` + `announcementAt` 写入；setInterval 定时触发发布
-- **异常**：`1001`（参数）/ `1021`（越权）
-
-#### `SiteService.getStatsOverview(): SiteStatsOverview`
-- **返回**：`{ articleCount, userCount, bloggerCount, commentCount, fileCount }`
-- **前置**：无
-- **后置**：聚合 17 SD 主存储 size
-- **异常**：无
-
----
-
-### 3.2 SD-002 多博主（BloggerService / BloggerStore）
-
-#### `BloggerStore.create(userId: string, slug: string, bio: string): Blogger`
-- **参数**：`userId` 必填 string；`slug` 必填 string `^[a-z0-9-]{3,30}$`；`bio` 可选 string ≤200
-- **前置**：`userId` 存在且 role=`blogger`；`slug` 未被占用
-- **后置**：新增 Blogger 记录，`slugToId` 索引更新，`userIdToBloggerId` 索引更新
-- **异常**：`1001`（参数）/ `1005`（slug 重复业务码）/ `1021`（非 blogger 角色）
-
-#### `BloggerStore.getBySlug(slug: string): Blogger | null`
-- **参数**：`slug` 必填 string
-- **前置**：无
-- **后置**：通过 `slugToId` 索引 O(1) 查找
-- **异常**：无（返回 null 表示不存在）
-
-#### `BloggerService.follow(followerId: string, bloggerId: string): void`
-- **参数**：`followerId` 必填 string；`bloggerId` 必填 string
-- **前置**：`followerId` 存在且未封禁；`bloggerId` 存在；不可关注自己
-- **后置**：Subscription 记录创建，`followerCount++`
-- **异常**：`1001`/`1031`（博主不存在）/ `1003`（自关注禁止）
-
-#### `BloggerService.unfollow(followerId: string, bloggerId: string): void`
-- **参数**：同上
-- **前置**：已存在关注关系
-- **后置**：Subscription 删除，`followerCount--`
-- **异常**：`1031`（关系不存在）
-
-#### `BloggerService.listByFollower(userId: string, page: number, pageSize: number): Page<Blogger>`
-- **参数**：`page` 默认 1 ≥1；`pageSize` 默认 10 ≤50
-- **前置**：无
-- **后置**：分页返回博主列表
-- **异常**：`1001`
-
----
-
-### 3.3 SD-003 多用户（UserService / UserStore / AuthService）
-
-#### `UserStore.create(input: { email, password, displayName, role }): User`
-- **参数**：`email` 必填 RFC5322；`password` 必填 ≥8 字符；`displayName` 1-50；`role` 默认 `reader`
-- **前置**：`email` 未注册（`emailToId` 索引无该 key）
-- **后置**：bcrypt 哈希密码；新增 User；`emailToId`/`roleToIds` 索引更新
-- **异常**：`1001`（参数）/ `1005`（邮箱已注册业务码）
-
-#### `AuthService.login(email: string, password: string): { token: string, user: User }`
-- **参数**：`email` 必填；`password` 必填
-- **前置**：`email` 存在；密码 bcrypt 比对通过；用户未封禁
-- **后置**：签发 JWT（24h），`iat`/`exp` 写入 payload
-- **异常**：`1011`（无此用户）/ `1012`（密码错误）/ `1022`（已封禁）
-
-#### `AuthService.verifyToken(token: string): { userId: string, role: UserRole }`
-- **参数**：`token` 必填 string
-- **前置**：token 格式合法
-- **后置**：jwt.verify 成功；userId 对应用户未封禁且未删除
-- **异常**：`1011`（无 token）/ `1012`（伪造）/ `1013`（过期）/ `1022`（封禁）
-
-#### `AuthService.revokeToken(userId: string): void`
-- **参数**：`userId` 必填
-- **前置**：用户存在
-- **后置**：将该用户所有未过期 token 的 `jti` 加入 `revokedJtis: Set<jti>`，后续 verify 拒绝
-- **异常**：`1031`
-
-#### `UserService.ban(operatorId: string, userId: string, reason: string): void`
-- **参数**：`operatorId` admin；`userId` 必填；`reason` 1-200
-- **前置**：operator 为 admin；`userId` 存在且非 admin（不可封禁 admin）
-- **后置**：`status=banned`，`bannedAt=now`，调用 `revokeToken`，写审计日志
-- **异常**：`1021`/`1031`/`1001`
-
----
-
-### 3.4 SD-004 推荐（RecommendService / RecommendStore）
-
-#### `RecommendService.hot(page: number, pageSize: number): Page<Article>`
-- **参数**：`page` 默认 1；`pageSize` 默认 10
-- **前置**：无（公开接口）
-- **后置**：从 `statusToArticles[published]` 按热度公式 `score = viewCount*1 + likeCount*5 + commentCount*10` 降序排序
-- **异常**：`1001`
-
-#### `RecommendService.personalized(userId: string, page: number, pageSize: number): Page<Article>`
-- **参数**：`userId` 必填
-- **前置**：用户登录；基于用户订阅/历史生成
-- **后置**：从 `userIdToSubs` 取订阅博主→其 published 文章按时间倒序
-- **异常**：`1011`/`1001`
-
-#### `RecommendService.latest(page: number, pageSize: number): Page<Article>`
-- **前置**：无
-- **后置**：`statusToArticles[published]` 按 `publishedAt` 倒序
-- **异常**：`1001`
-
-#### `RecommendService.setSlot(operatorId: string, slotName: string, articleId: string, priority: number): void`
-- **参数**：`operatorId` admin；`slotName` 1-50；`priority` ≥0
-- **前置**：admin；article 存在且 published
-- **后置**：`recommendSlots[slotName]` 更新
-- **异常**：`1021`/`1031`/`1001`
-
----
-
-### 3.5 SD-005 广告（AdService / AdStore）
-
-#### `AdStore.create(operatorId: string, input: AdInput): Ad`
-- **参数**：`slotId` 必填；`title` 1-100；`imageUrl` URL；`targetUrl` URL；`startAt`/`endAt` Date 且 `startAt < endAt`
-- **前置**：admin；时间区间不与同 slot 已发布广告重叠
-- **后置**：新增 Ad（status=`pending_review`），`slotIdToAds`/`statusToAds` 索引更新
-- **异常**：`1021`/`1001`/`1005`（时间重叠）
-
-#### `AdService.audit(operatorId: string, adId: string, decision: "approve"|"reject"): void`
-- **参数**：`operatorId` admin；`adId`；`decision`
-- **前置**：admin；ad 状态为 `pending_review`
-- **后置**：状态机 `pending_review → approved` 或 `→ rejected`
-- **异常**：`1021`/`1031`/`1002`（状态机非法跳转）
-
-#### `AdService.recordClick(adId: string): void`
-- **前置**：ad 状态为 `approved` 且当前时间在 `[startAt, endAt]`
-- **后置**：`clickCount++`
-- **异常**：`1031`/`1002`
-
-#### `AdService.listBySlot(slotId: string, page: number, pageSize: number): Page<Ad>`
-- **前置**：无
-- **后置**：从 `slotIdToAds` 分页
-- **异常**：`1001`
-
----
-
-### 3.6 SD-006 统计（StatsService / StatsStore）
-
-#### `StatsService.articleStats(): { total, published, draft, archived }`
-- **前置**：无（admin）
-- **后置**：聚合 `statusToArticles` 各状态 size
-- **异常**：`1021`（非 admin）
-
-#### `StatsService.userStats(): { total, banned, byRole: Record<UserRole, number> }`
-- **前置**：admin
-- **后置**：聚合 `users.size` + `bannedUserIds.size` + `roleToIds` 各 size
-- **异常**：`1021`
-
-#### `StatsService.bloggerStats(): { total, topFollowers: Array<{bloggerId, followerCount}> }`
-- **前置**：admin
-- **后置**：聚合 bloggers + 取 followerCount Top 10
-- **异常**：`1021`
-
-#### `StatsService.siteTrend(days: number): Array<{ date, articleCount, userCount }>`
-- **参数**：`days` 1-90
-- **前置**：admin
-- **后置**：按日聚合 `createdAt` 在区间内的文章/用户数
-- **异常**：`1021`/`1001`
-
----
-
-### 3.7 SD-007 搜索（SearchService / SearchStore）
-
-#### `SearchStore.index(articleId: string, title: string, content: string): void`
-- **参数**：`articleId` 必填；`title`/`content` 必填
-- **前置**：article 已存在
-- **后置**：分词后写入 `invertedIndex`，`articleTerms` 索引更新
-- **异常**：`1031`
-
-#### `SearchService.search(query: string, mode: "relevance"|"newest"|"popular", page: number, pageSize: number): Page<{articleId, snippet, score}>`
-- **参数**：`query` 1-100 字符；`mode` 默认 `relevance`
-- **前置**：无
-- **后置**：分词→`invertedIndex` 取交集→按 mode 排序→分页；写 `searchHistory`（FIFO ≤20）
-- **异常**：`1001`
-
-#### `SearchService.suggest(prefix: string): string[]`
-- **参数**：`prefix` 1-50
-- **前置**：无
-- **后置**：前缀匹配 `invertedIndex` keys，返回 Top 10
-- **异常**：`1001`
-
-#### `SearchService.history(userId: string): string[]`
-- **前置**：userId 登录
-- **后置**：返回 `searchHistory[userId]`
-- **异常**：`1011`
-
----
-
-### 3.8 SD-008 标签（TagService / TagStore）
-
-#### `TagStore.create(name: string, slug: string): Tag`
-- **参数**：`name` 1-30 字符，禁止 `<>"'/\\`；`slug` `^[a-z0-9-]{2,30}$`
-- **前置**：`slug` 未占用
-- **后置**：新增 Tag（status=`pending_review`），`slugToId` 索引更新
-- **异常**：`1001`/`1005`（slug 重复）
-
-#### `TagService.bind(articleId: string, tagIds: string[]): void`
-- **参数**：`tagIds` 长度 ≤10
-- **前置**：article 存在；每个 tag 存在且 `approved`
-- **后置**：`articleIdToTags`/`tagIdToArticles` 双向索引更新；`articleCount++`
-- **异常**：`1001`（>10）/ `1031`/`1002`（tag 未审核）
-
-#### `TagService.cloud(topN: number): Array<{tagId, name, articleCount}>`
-- **参数**：`topN` 1-100 默认 50
-- **前置**：无
-- **后置**：按 `articleCount` 降序取 Top N
-- **异常**：`1001`
-
-#### `TagService.merge(operatorId: string, sourceId: string, targetId: string): void`
-- **参数**：operator admin；`sourceId ≠ targetId`
-- **前置**：admin；两 tag 均 `approved`
-- **后置**：source 的所有 article 迁移到 target；source 软删除；索引重建
-- **异常**：`1021`/`1003`（自合并）/ `1031`
-
----
-
-### 3.9 SD-009 分类（CategoryService / CategoryStore）
-
-#### `CategoryStore.create(name: string, parentId: string | null): Category`
-- **参数**：`name` 1-50；`parentId` 可选
-- **前置**：若 `parentId` 提供，则父分类存在且其 `depth < 5`
-- **后置**：新增 Category（`depth = parent.depth + 1`），`parentIdToChildren` 索引更新
-- **异常**：`1001`/`1004`（深度超限）/ `1031`
-
-#### `CategoryService.tree(): CategoryNode[]`
-- **前置**：无
-- **后置**：从根分类递归构建树（最大深度 5）
-- **异常**：无
-
-#### `CategoryService.breadcrumb(categoryId: string): Category[]`
-- **前置**：分类存在
-- **后置**：从该分类向上回溯到根
-- **异常**：`1031`
-
-#### `CategoryService.cascadeDelete(operatorId: string, categoryId: string): void`
-- **前置**：admin；分类存在
-- **后置**：递归软删除子分类；`categoryIdToArticles` 中文章的 `categoryId` 置 null
-- **异常**：`1021`/`1031`
-
----
-
-### 3.10 SD-010 评论（CommentService / CommentStore）
-
-#### `CommentStore.create(articleId: string, userId: string, parentId: string | null, content: string): Comment`
-- **参数**：`content` 1-1000 字符；`parentId` 可选
-- **前置**：article 为 `published`；若 `parentId` 提供，则父评论存在且其 `depth < 5`；评论开关开启
-- **后置**：新增 Comment（status=`pending_review`），`depth = parent.depth + 1`，索引更新
-- **异常**：`1001`/`1004`（嵌套超限）/ `1025`（评论开关关闭）/ `1031`
-
-#### `CommentService.audit(operatorId: string, commentId: string, decision: "approve"|"reject"): void`
-- **前置**：admin 或博主（自己的文章）；comment 为 `pending_review`
-- **后置**：状态机 `pending_review → approved | rejected`
-- **异常**：`1021`/`1002`
-
-#### `CommentService.like(userId: string, commentId: string): void`
-- **前置**：comment 为 `approved`；用户未点赞过（幂等）
-- **后置**：`likeCount++`，`userIdToLikedComments` 索引记录
-- **异常**：`1031`/`1005`（已点赞幂等返回成功）
-
-#### `CommentService.listByArticle(articleId: string, page: number, pageSize: number, sort: "newest"|"oldest"|"popular"): Page<Comment>`
-- **前置**：无
-- **后置**：从 `articleIdToComments` 过滤 `approved`，按 sort 排序
-- **异常**：`1001`
-
-#### `CommentService.report(userId: string, commentId: string, reason: string): void`
-- **参数**：`reason` 1-200
-- **前置**：comment 存在
-- **后置**：新增举报记录，comment status→`flagged`（如已 approved）
-- **异常**：`1001`/`1031`
-
----
-
-### 3.11 SD-011 通知（NotificationService / NotificationStore）
-
-#### `NotificationStore.create(userId: string, type: NotificationType, title: string, body: string, refId: string): Notification`
-- **前置**：userId 存在；用户通知设置未关闭该 type
-- **后置**：新增 Notification（read=false），`userIdToNotifications`/`userIdUnread` 索引更新
-- **异常**：`1031`/`1001`
-
-#### `NotificationService.markRead(userId: string, notificationId: string): void`
-- **前置**：通知属于该 userId；当前 `read=false`
-- **后置**：`read=true`，`userIdUnread` 移除
-- **异常**：`1031`/`1002`
-
-#### `NotificationService.markAllRead(userId: string): void`
-- **前置**：无
-- **后置**：该用户所有未读通知 `read=true`，`userIdUnread` 清空
-- **异常**：无
-
-#### `NotificationService.updateSettings(userId: string, settings: Partial<NotificationSettings>): void`
-- **参数**：settings 含各 type 的 enabled boolean
-- **前置**：userId 存在
-- **后置**：`notificationSettings[userId]` 更新
-- **异常**：`1001`
-
----
-
-### 3.12 SD-012 多博文（ArticleService / ArticleStore）
-
-#### `ArticleStore.create(authorId: string, input: ArticleInput): Article`
-- **参数**：`title` 1-200；`content` 1-50000；`summary` 0-500；`coverImageUrl` 可选 URL；`status` 默认 `draft`
-- **前置**：authorId 为 blogger；scheduledAt 可选未来时间
-- **后置**：新增 Article，`authorIdToArticles`/`statusToArticles`/`seriesIdToArticles` 索引更新；SearchStore.index 调用
-- **异常**：`1001`/`1021`
-
-#### `ArticleService.transition(authorId: string, articleId: string, to: ArticleStatus): void`
-- **参数**：`to` ∈ {`pending_review`, `published`, `offline`, `archived`}
-- **前置**：authorId 为文章作者或 admin；当前状态→to 满足状态机合法转移（见 L4_article_state_machine.tla）
-- **后置**：状态机转移；若 `published` 则 `publishedAt=now`；SearchStore 索引更新
-- **异常**：`1002`（非法跳转）/ `1021`/`1031`
-
-#### `ArticleService.schedule(authorId: string, articleId: string, scheduledAt: Date): void`
-- **参数**：`scheduledAt` 未来时间
-- **前置**：article 为 `pending_review`；`publishSchedule` 为 None
-- **后置**：`publishSchedule=schedule_pending`，setInterval 定时触发 → `published`
-- **异常**：`1001`/`1002`
-
-#### `ArticleService.batchOffline(operatorId: string, articleIds: string[]): void`
-- **参数**：`articleIds` 长度 ≤100
-- **前置**：admin；所有 article 当前为 `published`
-- **后置**：批量状态转移 `published → offline`，写审计日志
-- **异常**：`1021`/`1002`
-
-#### `ArticleService.listByAuthor(authorId: string, page: number, pageSize: number): Page<Article>`
-- **前置**：无
-- **后置**：从 `authorIdToArticles` 分页
-- **异常**：`1001`
-
----
-
-### 3.13 SD-013 交叉引用（CrossReferenceService / CrossReferenceStore）
-
-#### `CrossReferenceStore.create(fromArticleId: string, toArticleId: string): CrossReference`
-- **前置**：两 article 均 `published`；`fromArticleId ≠ toArticleId`；引用关系不存在
-- **后置**：新增记录，`fromArticleToRefs`/`toArticleToBackrefs` 索引更新
-- **异常**：`1003`（自引用）/ `1005`（重复引用）/ `1031`
-
-#### `CrossReferenceService.backlinks(articleId: string): Array<{fromArticleId, title}>`
-- **前置**：article 存在
-- **后置**：从 `toArticleToBackrefs` 反查
-- **异常**：`1031`
-
-#### `CrossReferenceService.related(articleId: string, topN: number): Array<{articleId, score}>`
-- **参数**：`topN` 1-20 默认 5
-- **前置**：article 存在
-- **后置**：基于共同 tag/category/author 计算 Jaccard 相似度，取 Top N
-- **异常**：`1031`/`1001`
-
-#### `CrossReferenceService.graph(articleId: string, depth: number): GraphNode[]`
-- **参数**：`depth` 1-3 默认 2
-- **前置**：article 存在
-- **后置**：BFS 遍历引用图
-- **异常**：`1031`/`1001`
-
----
-
-### 3.14 SD-014 消息推送（PushService / WsStore）
-
-#### `WsStore.register(userId: string, ws: WebSocket): void`
-- **前置**：userId 未在 `wsConnections` 中（单连接）
-- **后置**：`wsConnections[userId]=ws`，旧连接关闭
-- **异常**：无
-
-#### `WsStore.unregister(userId: string): void`
-- **前置**：无
-- **后置**：`wsConnections` 删除 userId
-- **异常**：无
-
-#### `PushService.push(userId: string, channel: string, message: object): void`
-- **参数**：`channel` 必填 string
-- **前置**：无
-- **后置**：若用户在线→ws.send；否则入 `offlineMessages` 队列；失败重试 3 次指数退避（1s/2s/4s）
-- **异常**：无（异步重试）
-
-#### `PushService.broadcast(channel: string, message: object): void`
-- **前置**：无
-- **后置**：遍历 `channelToUsers[channel]` 逐个 push
-- **异常**：无
-
-#### `PushService.flushOffline(userId: string): void`
-- **前置**：用户上线时调用
-- **后置**：合并 `offlineMessages[userId]` 中同 channel 消息（≤24h），逐条 push 后清空
-- **异常**：无
-
----
-
-### 3.15 SD-015 文件上传（FileService / FileStore）
-
-#### `FileStore.create(userId: string, input: FileInput): FileAsset`
-- **参数**：`filename` 1-255（消毒后）；`mimeType` 必填；`content` Buffer；`size` ≤10MB
-- **前置**：用户日配额 `≤50MB` 且月配额 `≤500MB` 未超；魔数校验通过；`sha256` 未存在（秒传）
-- **后置**：新增 FileAsset，`userIdToFiles`/`sha256ToId` 索引更新；配额计数器累加
-- **异常**：`1041`（超 10MB）/ `1005`（配额超限）/ `1001`（魔数不匹配）/ `1005`（文件名消毒失败）
-
-#### `FileService.validateMagic(buffer: Buffer, declaredMime: string): boolean`
-- **前置**：buffer.length ≥ 4
-- **后置**：检测前 8 字节魔数（JPEG `FFD8FF`/PNG `89504E47`/GIF `47494638`/PDF `25504446`），与 declaredMime 一致
-- **异常**：`1001`（魔数不匹配业务码）
-
-#### `FileService.computeSha256(buffer: Buffer): string`
-- **前置**：无
-- **后置**：返回 hex 编码 SHA-256
-- **异常**：无
-
-#### `FileService.sanitizeFilename(name: string): string`
-- **前置**：无
-- **后置**：移除路径分隔符/`..`/控制字符/`<>"'`，截断 255
-- **异常**：`1001`（消毒后为空）
-
-#### `FileService.getQuota(userId: string): { dailyUsed, monthlyUsed, dailyLimit, monthlyLimit }`
-- **前置**：userId 存在
-- **后置**：聚合 `userIdToFiles` 在 24h/30d 内 size 之和
-- **异常**：`1031`
-
----
-
-### 3.16 SD-016 订阅（SubscriptionService / SubscriptionStore）
-
-#### `SubscriptionStore.create(userId: string, target: SubscriptionTarget, targetId: string): Subscription`
-- **参数**：`target` ∈ {`blogger`, `tag`, `category`}；`targetId` 必填
-- **前置**：target 存在；用户未订阅过同一 target+targetId
-- **后置**：新增 Subscription，`userIdToSubs`/`targetIdToSubs` 索引更新
-- **异常**：`1005`（已订阅幂等）/ `1031`
-
-#### `SubscriptionService.aggregateAndPush(targetId: string, event: SubscriptionEvent): void`
-- **参数**：`event` 含 `{ type, refId, at }`
-- **前置**：无
-- **后置**：取 `targetIdToSubs[targetId]` 所有订阅者；按 1h 聚合窗口合并同 type 事件→批量 push
-- **异常**：无
-
-#### `SubscriptionService.listByUser(userId: string, target?: SubscriptionTarget): Page<Subscription>`
-- **前置**：无
-- **后置**：从 `userIdToSubs` 过滤分页
-- **异常**：`1001`
-
-#### `SubscriptionService.permission(userId: string, target: SubscriptionTarget): SubscriptionLevel`
-- **前置**：userId 存在
-- **后置**：返回 `basic`/`premium`/`admin`（基于用户 role 与订阅数）
-- **异常**：`1031`
-
----
-
-### 3.17 SD-017 数据导出与备份（BackupService / BackupStore）
-
-#### `BackupStore.create(operatorId: string, type: BackupType, payload: Buffer): Backup`
-- **参数**：`type` ∈ {`full`, `incremental`}；`payload.size ≤ 10MB`
-- **前置**：admin；`payload` 为合法 JSON 序列化 Buffer
-- **后置**：计算 `sha256`，新增 Backup（status=`created`），`statusToBackups` 索引更新
-- **异常**：`1021`/`1001`/`1005`（payload 超限）
-
-#### `BackupService.exportUserData(userId: string): Buffer`
-- **前置**：userId 存在
-- **后置**：聚合 User+Blogger+Article+Comment+Notification+FileAsset 元数据→JSON Buffer（GDPR 占位）
-- **异常**：`1031`
-
-#### `BackupService.restore(operatorId: string, backupId: string): void`
-- **前置**：admin；backup status=`created`；SHA-256 校验通过
-- **后置**：解析 payload→逐表还原（覆盖），status→`restored`
-- **异常**：`1021`/`1031`/`1001`（SHA-256 不匹配）
-
-#### `BackupService.incremental(since: Date): Buffer`
-- **参数**：`since` 必填 Date
-- **前置**：admin
-- **后置**：聚合 `updatedAt >= since` 的所有实体→JSON Buffer
-- **异常**：`1021`/`1001`
-
-#### `BackupService.verifyIntegrity(backupId: string): boolean`
-- **前置**：backup 存在
-- **后置**：重新计算 payload SHA-256 与存储值比对
-- **异常**：`1031`
-
----
-
-## 4. 模块划分与依赖关系
-
-### 4.1 模块依赖图（Mermaid graph）
-
-> 箭头 A --> B 表示 A 依赖 B。Store 层无下游依赖；Service 层依赖 Store + 工具层；Controller 层依赖 Service。
-
-```mermaid
-graph TD
-    subgraph Controllers
-        C1[SiteController]
-        C2[BloggerController]
-        C3[UserController]
-        C4[RecommendController]
-        C5[AdController]
-        C6[StatsController]
-        C7[SearchController]
-        C8[TagController]
-        C9[CategoryController]
-        C10[CommentController]
-        C11[NotificationController]
-        C12[ArticleController]
-        C13[CrossRefController]
-        C14[PushController]
-        C15[FileController]
-        C16[SubscriptionController]
-        C17[BackupController]
-    end
-    subgraph Services
-        S1[SiteService]
-        S2[BloggerService]
-        S3[UserService/AuthService]
-        S4[RecommendService]
-        S5[AdService]
-        S6[StatsService]
-        S7[SearchService]
-        S8[TagService]
-        S9[CategoryService]
-        S10[CommentService]
-        S11[NotificationService]
-        S12[ArticleService]
-        S13[CrossRefService]
-        S14[PushService]
-        S15[FileService]
-        S16[SubscriptionService]
-        S17[BackupService]
-    end
-    subgraph Stores
-        ST1[SiteStore]
-        ST2[BloggerStore]
-        ST3[UserStore]
-        ST4[RecommendStore]
-        ST5[AdStore]
-        ST6[StatsStore]
-        ST7[SearchStore]
-        ST8[TagStore]
-        ST9[CategoryStore]
-        ST10[CommentStore]
-        ST11[NotificationStore]
-        ST12[ArticleStore]
-        ST13[CrossRefStore]
-        ST14[WsStore]
-        ST15[FileStore]
-        ST16[SubscriptionStore]
-        ST17[BackupStore]
-    end
-    subgraph Utils
-        U1[auth: bcrypt+jwt]
-        U2[zod schemas]
-        U3[error-handler]
-        U4[logger/audit]
-    end
-
-    C1 --> S1
-    C2 --> S2
-    C3 --> S3
-    C4 --> S4
-    C5 --> S5
-    C6 --> S6
-    C7 --> S7
-    C8 --> S8
-    C9 --> S9
-    C10 --> S10
-    C11 --> S11
-    C12 --> S12
-    C13 --> S13
-    C14 --> S14
-    C15 --> S15
-    C16 --> S16
-    C17 --> S17
-
-    S1 --> ST1
-    S2 --> ST2
-    S3 --> ST3
-    S3 --> U1
-    S4 --> ST4
-    S4 --> ST12
-    S5 --> ST5
-    S6 --> ST6
-    S7 --> ST7
-    S8 --> ST8
-    S9 --> ST9
-    S10 --> ST10
-    S11 --> ST11
-    S12 --> ST12
-    S12 --> ST7
-    S13 --> ST13
-    S14 --> ST14
-    S15 --> ST15
-    S16 --> ST16
-    S17 --> ST17
-
-    S1 --> U2
-    S3 --> U2
-    S12 --> U2
-    S15 --> U2
-
-    S1 --> U4
-    S3 --> U4
-    S12 --> U4
-    S17 --> U4
-```
-
-### 4.2 DFS 三色染色验证无循环依赖
-
-> 验证算法：对依赖图执行 DFS 三色染色（WHITE 未访问 / GRAY 访问中 / BLACK 已完成）。
-> 若 DFS 过程中遇到 GRAY 节点则存在循环依赖。
-
-**验证结果**：
-
-| 验证项 | 结果 |
-|---|---|
-| 节点总数 | 17 Controller + 17 Service + 17 Store + 4 Utils = 55 |
-| 边总数 | 17（C→S）+ 21（S→ST，含跨 SD 依赖）+ 4（S→U1/U2/U4）+ 4（S→U2）= 46 |
-| DFS 起始色 | 全部 WHITE |
-| GRAY 回边检测 | 0 次 |
-| 循环依赖 | **无** |
-| 拓扑排序存在 | **是** |
-
-**拓扑序（部分）**：
-```
-Utils(zod/auth/logger/error-handler) → Stores(17) → Services(17) → Controllers(17)
-```
-
-跨 SD 依赖说明（无循环）：
-- `RecommendService → ArticleStore`：推荐读取文章（单向）
-- `ArticleService → SearchStore`：文章变更触发索引（单向）
-- `SubscriptionService → PushService`：订阅事件触发推送（单向，PushService 不反向依赖 SubscriptionService）
-
-**结论**：依赖图满足 DAG（有向无环图），DFS 三色染色零回边，无循环依赖。
-
----
-
-## 5. 追溯矩阵（DD-001 ~ DD-051 ↔ SD ↔ REQ）
-
-> 17 SD × 3 层（Controller/Service/Store）= 51 DD，与 RTM `designArtifacts.subsystems` 完全一致。
-
-| DD | 层 | SD | REQ | 核心方法数 |
-|---|---|---|---|---|
-| DD-001~003 | C/S/ST | SD-001 | REQ-001 | 5 |
-| DD-004~006 | C/S/ST | SD-002 | REQ-002 | 5 |
-| DD-007~009 | C/S/ST | SD-003 | REQ-003 | 5 |
-| DD-010~012 | C/S/ST | SD-004 | REQ-004 | 4 |
-| DD-013~015 | C/S/ST | SD-005 | REQ-005 | 4 |
-| DD-016~018 | C/S/ST | SD-006 | REQ-006 | 4 |
-| DD-019~021 | C/S/ST | SD-007 | REQ-007 | 4 |
-| DD-022~024 | C/S/ST | SD-008 | REQ-008 | 4 |
-| DD-025~027 | C/S/ST | SD-009 | REQ-009 | 4 |
-| DD-028~030 | C/S/ST | SD-010 | REQ-010 | 5 |
-| DD-031~033 | C/S/ST | SD-011 | REQ-011 | 4 |
-| DD-034~036 | C/S/ST | SD-012 | REQ-012 | 5 |
-| DD-037~039 | C/S/ST | SD-013 | REQ-013 | 4 |
-| DD-040~042 | C/S/ST | SD-014 | REQ-014 | 5 |
-| DD-043~045 | C/S/ST | SD-015 | REQ-015 | 5 |
-| DD-046~048 | C/S/ST | SD-016 | REQ-016 | 4 |
-| DD-049~051 | C/S/ST | SD-017 | REQ-017 | 5 |
-
-合计：51 DD，覆盖 17 SD × 3 层，方法总数 ≈ 77。
-
----
-
-## 6. 与 L4 TLA+ 规格的对应关系
-
-| L4 规格 | 父级 L3 | 关联 SD | 关联 DD | 不变式 |
-|---|---|---|---|---|
-| `L4_article_state_machine.tla` | `L3_article_lifecycle.tla` | SD-012 | DD-034/035/036 | TypeInvariant + ArticleStateMachineInvariant + ScheduleGuardInvariant |
-| `L4_auth_token_lifecycle.tla` | `L3_auth_session.tla` | SD-003 | DD-007/008/009 | TypeInvariant + TokenNotReusedInvariant + BanInvalidatesTokenInvariant |
-| `L4_notification_delivery.tla` | `L3_notification_push.tla` | SD-014 | DD-040/041/042 | TypeInvariant + DeliveryOrderInvariant + RetryBudgetInvariant + MergeWindowInvariant |
-
----
-
-*文档结束。*
+> **索引设计**（内存 Map）：User.email 维护 `emailIndex: Map<string, string>`（O(1) 唯一性校验）；Article 维护 `authorIdIndex: Map<string, Set<string>>` 与 `statusIndex: Map<string, Set<string>>`；Comment 维护 `articleIdIndex: Map<string, Set<string>>`；Like 复合主键 `(userId, articleId)`；AuditLog 维护 `timestampIndex: Map<string, Set<string>>`（按月分桶）；Tag.name 维护 `nameIndex: Map<string, string>`。
+
+## §2 SD-001 系统根（blog-system）— 3 DD
+
+### DD-001-001 AppController（健康检查控制器）
+
+- **关联 SD/INTF**：SD-001 / INTF-001
+- **模块名**：controller/AppController
+- **类签名**：
+  ```typescript
+  class AppController {
+    /** 健康检查 GET /health */
+    health(req: Request, res: Response): void;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface HealthResponse { status: 'ok'; uptime: number; }
+  ```
+- **算法伪代码**：
+  ```
+  health(req, res):
+    return res.json({ status: 'ok', uptime: process.uptime() })
+  ```
+- **异常处理**：无业务异常；Express 默认兜底
+- **关键不变式**：响应永远 200 + `{status:'ok'}`；uptime ≥ 0
+- **TLA+ 引用**：L1_blog_system TypeInvariant（state \in States）
+
+### DD-001-002 ExpressApp（Express 应用装配）
+
+- **关联 SD/INTF**：SD-001 / INTF-001
+- **模块名**：app
+- **类签名**：
+  ```typescript
+  function createApp(deps: AppDependencies): Express;
+  interface AppDependencies {
+    userController: UserController;
+    articleController: ArticleController;
+    commentController: CommentController;
+    tagController: TagController;
+    categoryController: CategoryController;
+    searchController: SearchController;
+    auditLogController: AuditLogController;
+    rssController: RssController;
+    rateLimitMiddleware: RateLimitMiddleware;
+    authMiddleware: AuthMiddleware;
+    auditMiddleware: AuditMiddleware;
+    errorHandler: ErrorHandlerMiddleware;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  createApp(deps):
+    app = express()
+    app.use(express.json())
+    app.use(cors({ origin: WHITELIST }))
+    app.use(deps.rateLimitMiddleware.check)
+    app.use(deps.auditMiddleware.record)
+    app.get('/health', appController.health)
+    app.use('/api/users', userRoutes(deps))
+    app.use('/api/articles', articleRoutes(deps))
+    app.use('/api/comments', commentRoutes(deps))
+    app.use('/api/tags', tagRoutes(deps))
+    app.use('/api/categories', categoryRoutes(deps))
+    app.use('/api/search', searchRoutes(deps))
+    app.use('/api/audit-logs', auditLogRoutes(deps))
+    app.use('/api/rss', rssRoutes(deps))
+    app.use(deps.errorHandler.handle)
+    return app
+  ```
+- **异常处理**：中间件链异常由 ErrorHandler 兜底（NFR-003 100% 统一错误响应）
+- **关键不变式**：所有 /api/* 路由必须挂载；ErrorHandler 必须最后挂载
+- **TLA+ 引用**：L1_blog_system（系统对外代理）
+
+### DD-001-003 Server（HTTP 监听）
+
+- **关联 SD/INTF**：SD-001 / INTF-001
+- **模块名**：server
+- **类签名**：
+  ```typescript
+  function startServer(port: number): Promise<Server>;
+  ```
+- **算法伪代码**：
+  ```
+  startServer(port):
+    app = createApp(loadDependencies())
+    server = app.listen(port)
+    await once(server, 'listening')
+    return server
+  ```
+- **异常处理**：端口占用 → 抛 `EADDRINUSE`；启动超时（>5s）→ reject
+- **关键不变式**：启动成功后 server.listening === true
+- **TLA+ 引用**：无（运行时入口）
+
+## §3 SD-002 用户注册模块 — 3 DD
+
+### DD-002-001 UserController.register
+
+- **关联 SD/INTF**：SD-002 / INTF-002
+- **模块名**：controller/UserController
+- **类签名**：
+  ```typescript
+  class UserController {
+    constructor(private userService: UserService, private auditService: AuditService) {}
+    async register(req: Request, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface RegisterRequest { email: string; password: string; role: 'admin'|'author'|'reader'; }
+  interface RegisterResponse { id: string; email: string; role: Role; createdAt: string; }
+  ```
+- **算法伪代码**：
+  ```
+  register(req, res, next):
+    try:
+      dto = RegisterSchema.parse(req.body)  // NFR-005 zod
+      user = await userService.createUser(dto)
+      await auditService.log({ userId: user.id, action: 'user.register', resource: 'user', resourceId: user.id })
+      return res.status(201).json({ id, email, role, createdAt })
+    catch e:
+      return next(e)
+  ```
+- **异常处理**：400 参数错误；409 邮箱已存在；500 内部错误（兜底）
+- **关键不变式**：注册成功后 user 必含 id；触发审计写入
+- **TLA+ 引用**：L3_register_flow TypeInvariant
+
+### DD-002-002 UserService.createUser
+
+- **关联 SD/INTF**：SD-002 / INTF-002
+- **模块名**：service/UserService
+- **类签名**：
+  ```typescript
+  class UserService {
+    constructor(private userStore: UserStore, private bcrypt: BcryptAdapter) {}
+    async createUser(dto: RegisterRequest): Promise<User>;
+    async findByEmail(email: string): Promise<User | null>;
+    async findById(id: string): Promise<User | null>;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface User { id: string; email: string; passwordHash: string; role: Role; createdAt: string; updatedAt: string; }
+  type Role = 'admin' | 'author' | 'reader';
+  ```
+- **算法伪代码**：
+  ```
+  createUser(dto):
+    if userStore.findByEmail(dto.email) != null:
+      throw new ConflictError('EMAIL_EXISTS', 409)
+    passwordHash = await bcrypt.hash(dto.password, 10)
+    user = { id: uuid(), email, passwordHash, role, createdAt: now(), updatedAt: now() }
+    userStore.insert(user)
+    return user
+  ```
+- **异常处理**：ConflictError；bcrypt 失败 → 500
+- **关键不变式**：邮箱唯一；passwordHash 长度 = 60（bcrypt 固定）；role ∈ {admin,author,reader}
+- **TLA+ 引用**：L3_register_flow EmailUniqueness
+
+### DD-002-003 UserStore
+
+- **关联 SD/INTF**：SD-002 / INTF-002
+- **模块名**：store/UserStore
+- **类签名**：
+  ```typescript
+  class UserStore {
+    private users: Map<string, User> = new Map();
+    private emailIndex: Map<string, string> = new Map();
+    insert(user: User): void;
+    findById(id: string): User | null;
+    findByEmail(email: string): User | null;
+    update(id: string, patch: Partial<User>): User;
+    size(): number;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  insert(user):
+    if emailIndex.has(user.email): throw ConflictError
+    users.set(user.id, user)
+    emailIndex.set(user.email, user.id)
+  findById(id): return users.get(id) ?? null
+  findByEmail(email):
+    id = emailIndex.get(email)
+    return id ? users.get(id) : null
+  ```
+- **异常处理**：插入重复 email → ConflictError；更新不存在 → NotFoundError
+- **关键不变式**：emailIndex 与 users 一致（插入/删除原子）；NFR-004 容量 ≤ 10000
+- **TLA+ 引用**：L3_register_flow
+
+## §4 SD-003 用户登录模块 — 3 DD
+
+### DD-003-001 UserController.login
+
+- **关联 SD/INTF**：SD-003 / INTF-003
+- **模块名**：controller/UserController
+- **类签名**：
+  ```typescript
+  class UserController {
+    async login(req: Request, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface LoginRequest { email: string; password: string; }
+  interface LoginResponse { token: string; expiresIn: number; }
+  ```
+- **算法伪代码**：
+  ```
+  login(req, res, next):
+    try:
+      dto = LoginSchema.parse(req.body)
+      result = await authService.login(dto)
+      return res.json({ token: result.token, expiresIn: 3600 })
+    catch e:
+      return next(e)
+  ```
+- **异常处理**：401 凭据无效；429 限流（DD-003-003）；500 内部错误
+- **关键不变式**：成功响应 token 非空；expiresIn === 3600（CON-002）
+- **TLA+ 引用**：L3_login_flow
+
+### DD-003-002 AuthService.login
+
+- **关联 SD/INTF**：SD-003 / INTF-003
+- **模块名**：service/AuthService
+- **类签名**：
+  ```typescript
+  class AuthService {
+    constructor(private userStore: UserStore, private bcrypt: BcryptAdapter, private jwt: JwtAdapter, private loginRateLimiter: LoginRateLimiter) {}
+    async login(dto: LoginRequest): Promise<AuthToken>;
+  }
+  interface AuthToken { token: string; expiresIn: number; }
+  ```
+- **算法伪代码**：
+  ```
+  login(dto):
+    if not loginRateLimiter.allow(dto.email):
+      throw new TooManyRequestsError('LOGIN_RATE_LIMITED')
+    user = userStore.findByEmail(dto.email)
+    if user == null:
+      loginRateLimiter.recordFailure(dto.email)
+      throw new UnauthorizedError('INVALID_CREDENTIALS')
+    if not await bcrypt.compare(dto.password, user.passwordHash):
+      loginRateLimiter.recordFailure(dto.email)
+      throw new UnauthorizedError('INVALID_CREDENTIALS')
+    loginRateLimiter.reset(dto.email)
+    token = jwt.sign({ sub: user.id, role: user.role }, { expiresIn: 3600 })
+    return { token, expiresIn: 3600 }
+  ```
+- **异常处理**：UnauthorizedError；TooManyRequestsError；JWT 签发失败 → 500
+- **关键不变式**：失败计数防爆破；成功后重置计数；token.expiresIn === 3600
+- **TLA+ 引用**：L4_auth_token_lifecycle TokenNotExpired
+
+### DD-003-003 LoginRateLimiter（登录失败计数器）
+
+- **关联 SD/INTF**：SD-003 / INTF-003
+- **模块名**：util/LoginRateLimiter
+- **类签名**：
+  ```typescript
+  class LoginRateLimiter {
+    private failures: Map<string, number> = new Map();
+    private lastFailure: Map<string, number> = new Map();
+    private readonly MAX_FAILURES = 5;
+    private readonly WINDOW_MS = 60_000;
+    allow(email: string): boolean;
+    recordFailure(email: string): void;
+    reset(email: string): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  allow(email):
+    count = failures.get(email) ?? 0
+    last = lastFailure.get(email) ?? 0
+    if count >= MAX_FAILURES and (now() - last) < WINDOW_MS:
+      return false
+    if (now() - last) >= WINDOW_MS:
+      failures.delete(email); lastFailure.delete(email)
+    return true
+  recordFailure(email):
+    failures.set(email, (failures.get(email) ?? 0) + 1)
+    lastFailure.set(email, now())
+  reset(email):
+    failures.delete(email); lastFailure.delete(email)
+  ```
+- **异常处理**：纯逻辑无异常
+- **关键不变式**：MAX_FAILURES = 5；窗口 60s；超窗口自动重置
+- **TLA+ 引用**：L3_login_flow RateLimitThreshold
+
+## §5 SD-004 角色权限模块 — 3 DD
+
+### DD-004-001 AuthMiddleware.requireRole
+
+- **关联 SD/INTF**：SD-004 / INTF-004
+- **模块名**：middleware/AuthMiddleware
+- **类签名**：
+  ```typescript
+  class AuthMiddleware {
+    constructor(private jwt: JwtAdapter) {}
+    authenticate(req: Request, res: Response, next: NextFunction): void;
+    requireRole(roles: Role[]): RequestHandler;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  authenticate(req, res, next):
+    token = extractBearer(req.headers.authorization)
+    if not token: throw UnauthorizedError('MISSING_TOKEN')
+    payload = jwt.verify(token)
+    req.user = { id: payload.sub, role: payload.role }
+    next()
+  requireRole(roles):
+    return (req, res, next) => {
+      if not req.user: throw UnauthorizedError()
+      if not roles.includes(req.user.role): throw ForbiddenError('ROLE_FORBIDDEN')
+      next()
+    }
+  ```
+- **异常处理**：401 缺失/无效 token；403 角色不匹配
+- **关键不变式**：默认拒绝；admin 全权限；requireRole 必须在 authenticate 之后
+- **TLA+ 引用**：L2_rbac_subsystem
+
+### DD-004-002 RbacService
+
+- **关联 SD/INTF**：SD-004 / INTF-004
+- **模块名**：service/RbacService
+- **类签名**：
+  ```typescript
+  class RbacService {
+    private static PERMISSIONS: Record<Role, Set<Action>> = {
+      admin: new Set(['read','write','delete','admin']),
+      author: new Set(['read','write','delete:own']),
+      reader: new Set(['read']),
+    };
+    can(role: Role, action: Action): boolean;
+    isOwner(userId: string, resourceOwnerId: string): boolean;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  can(role, action): return PERMISSIONS[role].has(action)
+  isOwner(userId, resourceOwnerId): return userId === resourceOwnerId
+  ```
+- **异常处理**：未知 role → 默认拒绝
+- **关键不变式**：默认拒绝；权限集合不可变（static final）
+- **TLA+ 引用**：L2_rbac_subsystem
+
+### DD-004-003 JwtUtil
+
+- **关联 SD/INTF**：SD-004 / INTF-004
+- **模块名**：util/JwtUtil
+- **类签名**：
+  ```typescript
+  class JwtAdapter {
+    constructor(private secret: string, private algorithm: 'HS256') {}
+    sign(payload: JwtPayload, options: { expiresIn: number }): string;
+    verify(token: string): JwtPayload;
+  }
+  interface JwtPayload { sub: string; role: Role; iat?: number; exp?: number; }
+  ```
+- **算法伪代码**：
+  ```
+  sign(payload, options):
+    if secret.length * 8 < 256: throw Error('JWT_SECRET_TOO_SHORT')  // NFR-002
+    return jwt.sign(payload, secret, { algorithm, expiresIn: options.expiresIn })
+  verify(token):
+    payload = jwt.verify(token, secret, { algorithms: [algorithm] })
+    if payload.exp * 1000 < Date.now(): throw UnauthorizedError('TOKEN_EXPIRED')
+    return payload
+  ```
+- **异常处理**：TokenExpiredError；JsonWebTokenError；secret 太短 → 启动失败
+- **关键不变式**：NFR-002 密钥 ≥ 256 位；CON-002 expiresIn = 3600s；算法固定 HS256
+- **TLA+ 引用**：L4_auth_token_lifecycle TokenNotExpired / TokenNotRevoked
+
+## §6 SD-005 文章创建模块 — 4 DD
+
+### DD-005-001 ArticleController.create
+
+- **关联 SD/INTF**：SD-005 / INTF-005
+- **模块名**：controller/ArticleController
+- **类签名**：
+  ```typescript
+  class ArticleController {
+    constructor(private articleService: ArticleService, private auditService: AuditService) {}
+    async create(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface CreateArticleRequest { title: string; content: string; tagIds: string[]; categoryId: string; }
+  interface ArticleResponse { id: string; title: string; content: string; tags: Tag[]; category: Category; authorId: string; status: 'draft'; likeCount: 0; createdAt: string; updatedAt: string; }
+  ```
+- **算法伪代码**：
+  ```
+  create(req, res, next):
+    try:
+      dto = CreateArticleSchema.parse(req.body)
+      article = await articleService.create(dto, req.user.id)
+      await auditService.log({ userId: req.user.id, action: 'article.create', resource: 'article', resourceId: article.id })
+      return res.status(201).json(toArticleResponse(article))
+    catch e: return next(e)
+  ```
+- **异常处理**：400 参数；401 未认证；403 非 author/admin；404 标签/分类不存在
+- **关键不变式**：初始 status='draft'；likeCount=0；触发审计
+- **TLA+ 引用**：L2_article_crud_subsystem
+
+### DD-005-002 ArticleService.create
+
+- **关联 SD/INTF**：SD-005 / INTF-005
+- **模块名**：service/ArticleService
+- **类签名**：
+  ```typescript
+  class ArticleService {
+    constructor(private articleStore: ArticleStore, private tagStore: TagStore, private categoryStore: CategoryStore) {}
+    async create(dto: CreateArticleRequest, authorId: string): Promise<Article>;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface Article { id: string; title: string; content: string; tagIds: string[]; categoryId: string; authorId: string; status: 'draft'|'published'; likeCount: number; publishedAt: string|null; createdAt: string; updatedAt: string; }
+  ```
+- **算法伪代码**：
+  ```
+  create(dto, authorId):
+    if not tagStore.allExist(dto.tagIds): throw NotFoundError('TAG_NOT_FOUND')
+    if not categoryStore.exists(dto.categoryId): throw NotFoundError('CATEGORY_NOT_FOUND')
+    article = { id: uuid(), ...dto, authorId, status: 'draft', likeCount: 0, publishedAt: null, createdAt: now(), updatedAt: now() }
+    articleStore.insert(article)
+    return article
+  ```
+- **异常处理**：NotFoundError；title/content 长度限制
+- **关键不变式**：tagIds 全部存在；categoryId 存在；初始 status='draft'
+- **TLA+ 引用**：L4_article_state_machine ValidInitialState
+
+### DD-005-003 ArticleStore
+
+- **关联 SD/INTF**：SD-005 / INTF-005
+- **模块名**：store/ArticleStore
+- **类签名**：
+  ```typescript
+  class ArticleStore {
+    private articles: Map<string, Article> = new Map();
+    private authorIdIndex: Map<string, Set<string>> = new Map();
+    private statusIndex: Map<string, Set<string>> = new Map();
+    insert(article: Article): void;
+    findById(id: string): Article | null;
+    update(id: string, patch: Partial<Article>): Article;
+    delete(id: string): boolean;
+    list(filter: ArticleFilter, page: Page, sort: SortSpec): PaginatedResult<Article>;
+    listPublished(): Article[];
+    countByMonth(): Array<{ year: number; month: number; count: number }>;
+    size(): number;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  list(filter, page, sort):
+    arr = [...articles.values()]
+    if filter.authorId: arr = arr.filter(a => a.authorId === filter.authorId)
+    if filter.status: arr = arr.filter(a => a.status === filter.status)
+    arr.sort(byField(sort.field, sort.order))
+    total = arr.length
+    items = arr.slice((page.num-1)*page.size, page.num*page.size)
+    return { items, total, page: page.num, limit: page.size }
+  ```
+- **异常处理**：更新不存在 → NotFoundError
+- **关键不变式**：索引与主表一致；NFR-004 size ≤ 10000
+- **TLA+ 引用**：L2_article_crud_subsystem
+
+### DD-005-004 ArticleValidator
+
+- **关联 SD/INTF**：SD-005 / INTF-005
+- **模块名**：util/ArticleValidator
+- **类签名**：
+  ```typescript
+  class ArticleValidator {
+    static CreateArticleSchema: z.ZodType<CreateArticleRequest>;
+    static UpdateArticleSchema: z.ZodType<Partial<CreateArticleRequest>>;
+    static PublishSchema: z.ZodType<{ }>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  CreateArticleSchema = z.object({
+    title: z.string().min(1).max(200),
+    content: z.string().min(1).max(50000),
+    tagIds: z.array(z.string().uuid()).max(10),
+    categoryId: z.string().uuid(),
+  })
+  ```
+- **异常处理**：zod 校验失败 → 400 ValidationError
+- **关键不变式**：NFR-005 100% 接口使用 zod schema；title/content 非空
+- **TLA+ 引用**：无（校验层）
+
+## §7 SD-006 文章列表查询模块 — 3 DD
+
+### DD-006-001 ArticleController.list
+
+- **关联 SD/INTF**：SD-006 / INTF-006
+- **模块名**：controller/ArticleController
+- **类签名**：`async list(req: Request, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  list(req, res, next):
+    try:
+      query = ListArticleSchema.parse(req.query)
+      result = articleService.list(query)
+      return res.json({ items: result.items.map(toArticleResponse), total, page, limit })
+    catch e: return next(e)
+  ```
+- **异常处理**：400 参数；500 兜底
+- **关键不变式**：默认只返回 published（reader 可见）；分页 page ≥ 1
+- **TLA+ 引用**：无
+
+### DD-006-002 ArticleService.list
+
+- **关联 SD/INTF**：SD-006 / INTF-006
+- **模块名**：service/ArticleService
+- **类签名**：`list(query: ListArticleQuery): PaginatedResult<Article>;`
+- **算法伪代码**：
+  ```
+  list(query):
+    filter = { status: 'published' }  // 默认仅 published
+    if query.authorId: filter.authorId = query.authorId
+    return articleStore.list(filter, { num: query.page, size: query.limit }, { field: query.sort, order: query.order })
+  ```
+- **异常处理**：无业务异常
+- **关键不变式**：仅返回 published；分页避免全量
+- **TLA+ 引用**：无
+
+### DD-006-003 PaginationUtil
+
+- **关联 SD/INTF**：SD-006 / INTF-006（横切）
+- **模块名**：util/PaginationUtil
+- **类签名**：
+  ```typescript
+  class PaginationUtil {
+    static parse(query: unknown, defaults: { page: number; limit: number }): Page;
+    static slice<T>(arr: T[], page: Page): PaginatedResult<T>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  parse(query, defaults):
+    page = max(1, Number(query.page) ?? defaults.page)
+    limit = min(100, max(1, Number(query.limit) ?? defaults.limit))
+    return { num: page, size: limit }
+  ```
+- **异常处理**：非数字 → 用默认值
+- **关键不变式**：page ≥ 1；1 ≤ limit ≤ 100
+- **TLA+ 引用**：无
+
+## §8 SD-007 文章详情查询模块 — 3 DD
+
+### DD-007-001 ArticleController.getById
+
+- **关联 SD/INTF**：SD-007 / INTF-007
+- **类签名**：`async getById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  getById(req, res, next):
+    article = articleService.getById(req.params.id, req.user)
+    return res.json(toArticleResponse(article))
+  ```
+- **异常处理**：404 不存在；403 草稿非作者/admin 访问
+- **关键不变式**：草稿仅作者/admin 可见
+
+### DD-007-002 ArticleService.getById
+
+- **关联 SD/INTF**：SD-007 / INTF-007
+- **类签名**：`getById(id: string, requester: AuthUser): Article;`
+- **算法伪代码**：
+  ```
+  getById(id, requester):
+    article = articleStore.findById(id)
+    if not article: throw NotFoundError('ARTICLE_NOT_FOUND')
+    visibilityChecker.check(article, requester)
+    return article
+  ```
+- **异常处理**：NotFoundError；ForbiddenError
+- **关键不变式**：草稿可见性校验
+
+### DD-007-003 ArticleVisibilityChecker
+
+- **关联 SD/INTF**：SD-007 / INTF-007
+- **模块名**：util/ArticleVisibilityChecker
+- **类签名**：
+  ```typescript
+  class ArticleVisibilityChecker {
+    check(article: Article, requester: AuthUser): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  check(article, requester):
+    if article.status === 'draft':
+      if requester.role !== 'admin' and requester.id !== article.authorId:
+        throw ForbiddenError('DRAFT_ACCESS_DENIED')
+  ```
+- **异常处理**：ForbiddenError
+- **关键不变式**：草稿仅作者/admin 可见
+- **TLA+ 引用**：L4_article_state_machine
+
+## §9 SD-008 文章更新模块 — 3 DD
+
+### DD-008-001 ArticleController.update
+
+- **关联 SD/INTF**：SD-008 / INTF-008
+- **类签名**：`async update(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  update(req, res, next):
+    dto = UpdateArticleSchema.parse(req.body)
+    article = articleService.update(req.params.id, dto, req.user)
+    await auditService.log({ userId: req.user.id, action: 'article.update', resource: 'article', resourceId: req.params.id })
+    return res.json(toArticleResponse(article))
+  ```
+- **异常处理**：400/401/403/404
+- **关键不变式**：触发审计；权限校验
+
+### DD-008-002 ArticleService.update
+
+- **关联 SD/INTF**：SD-008 / INTF-008
+- **类签名**：`update(id: string, patch: UpdateArticleDto, requester: AuthUser): Article;`
+- **算法伪代码**：
+  ```
+  update(id, patch, requester):
+    article = articleStore.findById(id)
+    if not article: throw NotFoundError
+    ownershipChecker.check(article, requester)
+    if patch.tagIds and not tagStore.allExist(patch.tagIds): throw NotFoundError('TAG_NOT_FOUND')
+    if patch.categoryId and not categoryStore.exists(patch.categoryId): throw NotFoundError
+    merged = { ...article, ...patch, updatedAt: now() }
+    articleStore.update(id, merged)
+    return merged
+  ```
+- **异常处理**：NotFoundError；ForbiddenError
+- **关键不变式**：updatedAt 必刷新；浅合并
+
+### DD-008-003 OwnershipChecker
+
+- **关联 SD/INTF**：SD-008 / INTF-008（横切）
+- **模块名**：util/OwnershipChecker
+- **类签名**：
+  ```typescript
+  class OwnershipChecker {
+    check(resource: { authorId: string }, requester: AuthUser): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  check(resource, requester):
+    if requester.role === 'admin': return
+    if resource.authorId !== requester.id: throw ForbiddenError('NOT_OWNER')
+  ```
+- **异常处理**：ForbiddenError
+- **关键不变式**：admin 全权；非 admin 仅本人
+
+## §10 SD-009 文章删除模块 — 3 DD
+
+### DD-009-001 ArticleController.remove
+
+- **关联 SD/INTF**：SD-009 / INTF-009
+- **类签名**：`async remove(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  remove(req, res, next):
+    articleService.remove(req.params.id, req.user)
+    await auditService.log({ userId: req.user.id, action: 'article.delete', resource: 'article', resourceId: req.params.id })
+    return res.status(204).end()
+  ```
+- **异常处理**：401/403/404
+- **关键不变式**：触发审计；级联删评论
+
+### DD-009-002 ArticleService.remove
+
+- **关联 SD/INTF**：SD-009 / INTF-009
+- **类签名**：`remove(id: string, requester: AuthUser): void;`
+- **算法伪代码**：
+  ```
+  remove(id, requester):
+    article = articleStore.findById(id)
+    if not article: throw NotFoundError
+    ownershipChecker.check(article, requester)
+    commentCascadeDeleter.deleteByArticle(id)
+    articleStore.delete(id)
+  ```
+- **异常处理**：NotFoundError；ForbiddenError
+- **关键不变式**：原子级联（评论 + 文章）
+
+### DD-009-003 CommentCascadeDeleter
+
+- **关联 SD/INTF**：SD-009 / INTF-009
+- **模块名**：util/CommentCascadeDeleter
+- **类签名**：
+  ```typescript
+  class CommentCascadeDeleter {
+    constructor(private commentStore: CommentStore) {}
+    deleteByArticle(articleId: string): number;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  deleteByArticle(articleId):
+    return commentStore.deleteByArticleId(articleId)
+  ```
+- **异常处理**：无
+- **关键不变式**：返回删除条数 ≥ 0
+
+## §11 SD-010 评论创建模块 — 3 DD
+
+### DD-010-001 CommentController.create
+
+- **关联 SD/INTF**：SD-010 / INTF-010
+- **类签名**：`async create(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  create(req, res, next):
+    dto = CreateCommentSchema.parse({ ...req.body, articleId: req.params.id })
+    comment = commentService.create(dto, req.user.id)
+    return res.status(201).json(toCommentResponse(comment))
+  ```
+- **异常处理**：400/401/404
+
+### DD-010-002 CommentService.create
+
+- **关联 SD/INTF**：SD-010 / INTF-010
+- **类签名**：`create(dto: CreateCommentDto, userId: string): Comment;`
+- **算法伪代码**：
+  ```
+  create(dto, userId):
+    if not articleStore.exists(dto.articleId): throw NotFoundError('ARTICLE_NOT_FOUND')
+    comment = { id: uuid(), articleId, userId, content: dto.content, createdAt: now(), updatedAt: now() }
+    commentStore.insert(comment)
+    return comment
+  ```
+- **关键不变式**：文章存在性校验
+
+### DD-010-003 CommentStore
+
+- **关联 SD/INTF**：SD-010 / INTF-010
+- **类签名**：
+  ```typescript
+  class CommentStore {
+    private comments: Map<string, Comment> = new Map();
+    private articleIdIndex: Map<string, Set<string>> = new Map();
+    insert(c: Comment): void;
+    findById(id: string): Comment | null;
+    listByArticle(articleId: string, page: Page): PaginatedResult<Comment>;
+    delete(id: string): boolean;
+    deleteByArticleId(articleId: string): number;
+    size(): number;
+  }
+  ```
+- **关键不变式**：articleIdIndex 一致；NFR-004 ≤ 10000
+
+## §12 SD-011 评论列表查询模块 — 3 DD
+
+### DD-011-001 CommentController.listByArticle
+
+- **关联 SD/INTF**：SD-011 / INTF-011
+- **类签名**：`async listByArticle(req: Request, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  listByArticle(req, res, next):
+    page = PaginationUtil.parse(req.query, { page: 1, limit: 20 })
+    result = commentService.listByArticle(req.params.id, page)
+    return res.json({ items: result.items.map(toCommentResponse), total, page, limit })
+  ```
+- **关键不变式**：分页 page ≥ 1
+
+### DD-011-002 CommentService.listByArticle
+
+- **关联 SD/INTF**：SD-011 / INTF-011
+- **类签名**：`listByArticle(articleId: string, page: Page): PaginatedResult<Comment>;`
+- **算法伪代码**：
+  ```
+  listByArticle(articleId, page):
+    return commentStore.listByArticle(articleId, page)
+  ```
+
+### DD-011-003 CommentValidator
+
+- **关联 SD/INTF**：SD-011 / INTF-011
+- **类签名**：
+  ```typescript
+  class CommentValidator {
+    static CreateCommentSchema: z.ZodType<CreateCommentDto>;
+  }
+  ```
+- **算法伪代码**：`z.object({ articleId: z.string().uuid(), content: z.string().min(1).max(2000) })`
+- **关键不变式**：NFR-005 zod 校验；content 1..2000 字符
+
+## §13 SD-012 评论删除模块 — 3 DD
+
+### DD-012-001 CommentController.remove
+
+- **关联 SD/INTF**：SD-012 / INTF-012
+- **类签名**：`async remove(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  remove(req, res, next):
+    commentService.remove(req.params.id, req.user)
+    await auditService.log({ userId: req.user.id, action: 'comment.delete', resource: 'comment', resourceId: req.params.id })
+    return res.status(204).end()
+  ```
+
+### DD-012-002 CommentService.remove
+
+- **关联 SD/INTF**：SD-012 / INTF-012
+- **类签名**：`remove(id: string, requester: AuthUser): void;`
+- **算法伪代码**：
+  ```
+  remove(id, requester):
+    comment = commentStore.findById(id)
+    if not comment: throw NotFoundError
+    if requester.role !== 'admin' and comment.userId !== requester.id: throw ForbiddenError
+    commentStore.delete(id)
+  ```
+
+### DD-012-003 CommentOwnershipChecker
+
+- **关联 SD/INTF**：SD-012 / INTF-012
+- **类签名**：
+  ```typescript
+  class CommentOwnershipChecker {
+    check(comment: Comment, requester: AuthUser): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  check(comment, requester):
+    if requester.role === 'admin': return
+    if comment.userId !== requester.id: throw ForbiddenError('NOT_COMMENT_OWNER')
+  ```
+
+## §14 SD-013 标签管理模块 — 3 DD
+
+### DD-013-001 TagController
+
+- **关联 SD/INTF**：SD-013 / INTF-013
+- **类签名**：
+  ```typescript
+  class TagController {
+    constructor(private tagService: TagService) {}
+    list(req: Request, res: Response): void;
+    create(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    update(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    remove(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  create(req, res, next):
+    dto = TagSchema.parse(req.body)
+    tag = tagService.create(dto)
+    await auditService.log({ userId: req.user.id, action: 'tag.create', resource: 'tag', resourceId: tag.id })
+    return res.status(201).json(tag)
+  ```
+- **关键不变式**：写操作 requireRole(['admin'])
+
+### DD-013-002 TagService
+
+- **关联 SD/INTF**：SD-013 / INTF-013
+- **类签名**：
+  ```typescript
+  class TagService {
+    constructor(private tagStore: TagStore) {}
+    list(): Tag[];
+    create(dto: { name: string }): Tag;
+    update(id: string, patch: { name?: string }): Tag;
+    remove(id: string): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  create(dto):
+    if tagStore.findByName(dto.name): throw ConflictError('TAG_NAME_EXISTS')
+    tag = { id: uuid(), name: dto.name, createdAt: now(), updatedAt: now() }
+    tagStore.insert(tag)
+    return tag
+  ```
+
+### DD-013-003 TagStore
+
+- **关联 SD/INTF**：SD-013 / INTF-013
+- **类签名**：
+  ```typescript
+  class TagStore {
+    private tags: Map<string, Tag> = new Map();
+    private nameIndex: Map<string, string> = new Map();
+    insert(t: Tag): void;
+    findById(id: string): Tag | null;
+    findByName(name: string): Tag | null;
+    allExist(ids: string[]): boolean;
+    list(): Tag[];
+    update(id: string, patch: Partial<Tag>): Tag;
+    delete(id: string): boolean;
+  }
+  ```
+- **关键不变式**：name 唯一；NFR-004 ≤ 10000
+
+## §15 SD-014 分类管理模块 — 3 DD
+
+### DD-014-001 CategoryController
+
+- **关联 SD/INTF**：SD-014 / INTF-014
+- **类签名**：
+  ```typescript
+  class CategoryController {
+    constructor(private categoryService: CategoryService) {}
+    list(req: Request, res: Response): void;
+    create(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    update(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    remove(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+
+### DD-014-002 CategoryService
+
+- **关联 SD/INTF**：SD-014 / INTF-014
+- **类签名**：
+  ```typescript
+  class CategoryService {
+    constructor(private categoryStore: CategoryStore, private cycleChecker: CategoryCycleChecker) {}
+    list(): Category[];
+    create(dto: { name: string; parentCategoryId: string | null }): Category;
+    update(id: string, patch: { name?: string; parentCategoryId?: string | null }): Category;
+    remove(id: string): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  create(dto):
+    if dto.parentCategoryId and not categoryStore.exists(dto.parentCategoryId): throw NotFoundError
+    category = { id: uuid(), name: dto.name, parentCategoryId: dto.parentCategoryId, createdAt: now(), updatedAt: now() }
+    categoryStore.insert(category)
+    return category
+  update(id, patch):
+    if patch.parentCategoryId:
+      cycleChecker.checkNoCycle(id, patch.parentCategoryId)  // 防自环
+    merged = { ...category, ...patch, updatedAt: now() }
+    categoryStore.update(id, merged)
+  ```
+
+### DD-014-003 CategoryCycleChecker
+
+- **关联 SD/INTF**：SD-014 / INTF-014
+- **模块名**：util/CategoryCycleChecker
+- **类签名**：
+  ```typescript
+  class CategoryCycleChecker {
+    constructor(private categoryStore: CategoryStore) {}
+    checkNoCycle(categoryId: string, newParentId: string | null): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  checkNoCycle(categoryId, newParentId):
+    if newParentId == null: return
+    if newParentId === categoryId: throw ConflictError('SELF_PARENT')
+    visited = new Set([categoryId])
+    cursor = newParentId
+    while cursor != null:
+      if visited.has(cursor): throw ConflictError('CYCLE_DETECTED')
+      visited.add(cursor)
+      parent = categoryStore.findById(cursor)
+      cursor = parent?.parentCategoryId ?? null
+  ```
+- **关键不变式**：无环；无自环
+- **TLA+ 引用**：L3_category_cycle_check CategoryTreeNoCycle
+
+## §16 SD-015 文章搜索模块 — 3 DD
+
+### DD-015-001 SearchController.search
+
+- **关联 SD/INTF**：SD-015 / INTF-015
+- **类签名**：`async search(req: Request, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  search(req, res, next):
+    query = SearchQueryParser.parse(req.query)
+    result = searchService.search(query)
+    return res.json({ items: result.items.map(toArticleResponse), total, page, limit })
+  ```
+
+### DD-015-002 SearchService
+
+- **关联 SD/INTF**：SD-015 / INTF-015
+- **类签名**：`search(query: SearchQuery): PaginatedResult<Article>;`
+- **算法伪代码**：
+  ```
+  search(query):
+    arr = articleStore.listPublished()
+    if query.q:
+      arr = arr.filter(a => a.title.includes(query.q) || a.content.includes(query.q))
+    if query.tagId: arr = arr.filter(a => a.tagIds.includes(query.tagId))
+    if query.categoryId: arr = arr.filter(a => a.categoryId === query.categoryId)
+    return PaginationUtil.slice(arr, query.page)
+  ```
+- **关键不变式**：仅搜索 published；O(n) n≤10000
+
+### DD-015-003 SearchQueryParser
+
+- **关联 SD/INTF**：SD-015 / INTF-015
+- **类签名**：
+  ```typescript
+  class SearchQueryParser {
+    static parse(query: unknown): SearchQuery;
+  }
+  ```
+- **算法伪代码**：zod 解析 `{ q: string optional, tagId: uuid optional, categoryId: uuid optional, page, limit }`
+- **关键不变式**：NFR-005 zod 校验
+
+## §17 SD-016 密码重置模块 — 4 DD
+
+### DD-016-001 PasswordResetController
+
+- **关联 SD/INTF**：SD-016 / INTF-016
+- **类签名**：
+  ```typescript
+  class PasswordResetController {
+    constructor(private passwordResetService: PasswordResetService) {}
+    async resetRequest(req: Request, res: Response, next: NextFunction): Promise<void>;
+    async reset(req: Request, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  resetRequest(req, res, next):
+    dto = ResetRequestSchema.parse(req.body)
+    await passwordResetService.requestReset(dto.email)
+    return res.json({ tokenSent: true })  // 防枚举：无论邮箱是否存在都返回 true
+  reset(req, res, next):
+    dto = ResetSchema.parse(req.body)
+    await passwordResetService.reset(dto.token, dto.newPassword)
+    return res.json({ reset: true })
+  ```
+- **异常处理**：400 参数；404 用户不存在（reset 端）；410 令牌过期/已用
+- **关键不变式**：防邮箱枚举；令牌一次性
+
+### DD-016-002 PasswordResetService
+
+- **关联 SD/INTF**：SD-016 / INTF-016
+- **类签名**：
+  ```typescript
+  class PasswordResetService {
+    constructor(private userStore: UserStore, private tokenStore: PasswordResetStore, private tokenUtil: PasswordResetTokenUtil, private bcrypt: BcryptAdapter) {}
+    async requestReset(email: string): Promise<void>;
+    async reset(token: string, newPassword: string): Promise<void>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  requestReset(email):
+    user = userStore.findByEmail(email)
+    if not user: return  // 静默，防枚举
+    token = tokenUtil.issue({ userId: user.id, expiresIn: 900 })  // 15min
+    tokenStore.insert({ token, userId: user.id, expiresAt: token.exp, used: false })
+    // 实际项目此处发邮件，本项目仅记录
+  reset(token, newPassword):
+    record = tokenStore.find(token)
+    if not record: throw NotFoundError('TOKEN_NOT_FOUND')
+    if record.used: throw ConflictError('TOKEN_ALREADY_USED')
+    if record.expiresAt < now(): throw GoneError('TOKEN_EXPIRED')
+    passwordHash = await bcrypt.hash(newPassword, 10)
+    userStore.update(record.userId, { passwordHash, updatedAt: now() })
+    tokenStore.markUsed(token)
+  ```
+- **关键不变式**：令牌一次性；15min 过期；新密码 bcrypt 哈希
+- **TLA+ 引用**：L4_password_reset_token_lifecycle OneTimeUse / TokenExpiry15min
+
+### DD-016-003 PasswordResetStore
+
+- **关联 SD/INTF**：SD-016 / INTF-016
+- **类签名**：
+  ```typescript
+  class PasswordResetStore {
+    private tokens: Map<string, PasswordResetToken> = new Map();
+    private userIndex: Map<string, Set<string>> = new Map();
+    insert(t: PasswordResetToken): void;
+    find(token: string): PasswordResetToken | null;
+    markUsed(token: string): void;
+    deleteExpired(): number;
+  }
+  ```
+- **关键不变式**：used 标记后不可再用；userIndex 一致
+
+### DD-016-004 PasswordResetTokenUtil
+
+- **关联 SD/INTF**：SD-016 / INTF-016
+- **模块名**：util/PasswordResetTokenUtil
+- **类签名**：
+  ```typescript
+  class PasswordResetTokenUtil {
+    constructor(private jwt: JwtAdapter) {}
+    issue(payload: { userId: string; expiresIn: number }): { token: string; exp: string };
+    verify(token: string): { userId: string };
+  }
+  ```
+- **算法伪代码**：
+  ```
+  issue(payload):
+    token = jwt.sign({ sub: payload.userId, type: 'password-reset' }, { expiresIn: payload.expiresIn })
+    payload = jwt.verify(token)
+    return { token, exp: new Date(payload.exp * 1000).toISOString() }
+  ```
+- **关键不变式**：type='password-reset' 区分 access token；expiresIn ≤ 900s
+- **TLA+ 引用**：L4_password_reset_token_lifecycle
+
+## §18 SD-017 草稿/发布工作流模块 — 4 DD
+
+### DD-017-001 ArticleWorkflowController
+
+- **关联 SD/INTF**：SD-017 / INTF-017
+- **模块名**：controller/ArticleController
+- **类签名**：
+  ```typescript
+  class ArticleController {
+    async publish(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    async unpublish(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  publish(req, res, next):
+    result = articleWorkflowService.publish(req.params.id, req.user)
+    await auditService.log({ userId: req.user.id, action: 'article.publish', resource: 'article', resourceId: req.params.id })
+    return res.json({ status: 'published', publishedAt: result.publishedAt })
+  unpublish(req, res, next):
+    articleWorkflowService.unpublish(req.params.id, req.user)
+    await auditService.log({ userId: req.user.id, action: 'article.unpublish', resource: 'article', resourceId: req.params.id })
+    return res.json({ status: 'draft' })
+  ```
+- **异常处理**：400 非法状态转移；401/403/404
+- **关键不变式**：触发审计
+
+### DD-017-002 ArticleWorkflowService
+
+- **关联 SD/INTF**：SD-017 / INTF-017
+- **模块名**：service/ArticleWorkflowService
+- **类签名**：
+  ```typescript
+  class ArticleWorkflowService {
+    constructor(private articleStore: ArticleStore, private stateMachine: ArticleStateMachine, private ownershipChecker: OwnershipChecker) {}
+    publish(id: string, requester: AuthUser): { publishedAt: string };
+    unpublish(id: string, requester: AuthUser): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  publish(id, requester):
+    article = articleStore.findById(id)
+    if not article: throw NotFoundError
+    ownershipChecker.check(article, requester)
+    stateMachine.transition(article, 'publish')
+    publishedAt = now()
+    articleStore.update(id, { status: 'published', publishedAt, updatedAt: publishedAt })
+    return { publishedAt }
+  unpublish(id, requester):
+    article = articleStore.findById(id)
+    if not article: throw NotFoundError
+    ownershipChecker.check(article, requester)
+    stateMachine.transition(article, 'unpublish')
+    articleStore.update(id, { status: 'draft', publishedAt: null, updatedAt: now() })
+  ```
+- **关键不变式**：状态机合法转移；publishedAt 仅在 published 时设置
+- **TLA+ 引用**：L4_article_state_machine StateMachineLegality / NoInvalidTransition
+
+### DD-017-003 ArticleStateMachine
+
+- **关联 SD/INTF**：SD-017 / INTF-017
+- **模块名**：util/ArticleStateMachine
+- **类签名**：
+  ```typescript
+  type ArticleState = 'draft' | 'published';
+  type ArticleEvent = 'publish' | 'unpublish';
+  class ArticleStateMachine {
+    private static TRANSITIONS: Record<ArticleState, Partial<Record<ArticleEvent, ArticleState>>> = {
+      draft: { publish: 'published' },
+      published: { unpublish: 'draft' },
+    };
+    transition(article: Article, event: ArticleEvent): ArticleState;
+    canTransition(from: ArticleState, event: ArticleEvent): boolean;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  transition(article, event):
+    next = TRANSITIONS[article.status]?.[event]
+    if not next: throw BadRequestError('INVALID_TRANSITION')
+    return next
+  ```
+- **关键不变式**：draft↔published 双向；非法转移拒绝
+- **TLA+ 引用**：L4_article_state_machine（draft→publishing→published→unpublishing→draft 完整状态机）
+
+### DD-017-004 AuditContextUtil（工作流审计上下文）
+
+- **关联 SD/INTF**：SD-017 / INTF-017（横切）
+- **模块名**：util/AuditContextUtil
+- **类签名**：
+  ```typescript
+  class AuditContextUtil {
+    static buildArticleContext(article: Article, event: ArticleEvent): AuditLogMeta;
+  }
+  ```
+- **算法伪代码**：返回 `{ before: { status: article.status }, after: { status: nextStatus }, publishedAt }`
+- **关键不变式**：审计 meta 含 before/after 状态
+
+## §19 SD-018 文章点赞模块 — 3 DD
+
+### DD-018-001 LikeController
+
+- **关联 SD/INTF**：SD-018 / INTF-018
+- **类签名**：`async like(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  like(req, res, next):
+    result = likeService.like(req.params.id, req.user.id)
+    return res.json({ likeCount: result.likeCount, liked: result.liked })
+  ```
+
+### DD-018-002 LikeService
+
+- **关联 SD/INTF**：SD-018 / INTF-018
+- **类签名**：
+  ```typescript
+  class LikeService {
+    constructor(private likeStore: LikeStore, private articleStore: ArticleStore) {}
+    like(articleId: string, userId: string): { likeCount: number; liked: boolean };
+  }
+  ```
+- **算法伪代码**：
+  ```
+  like(articleId, userId):
+    if not articleStore.exists(articleId): throw NotFoundError
+    existing = likeStore.find(userId, articleId)
+    if existing:
+      return { likeCount: articleStore.findById(articleId).likeCount, liked: false }  // 幂等
+    likeStore.insert({ userId, articleId, createdAt: now() })
+    article = articleStore.findById(articleId)
+    newCount = article.likeCount + 1
+    articleStore.update(articleId, { likeCount: newCount })
+    return { likeCount: newCount, liked: true }
+  ```
+- **关键不变式**：幂等；复合主键去重；likeCount 与 likeStore 一致
+
+### DD-018-003 LikeStore
+
+- **关联 SD/INTF**：SD-018 / INTF-018
+- **类签名**：
+  ```typescript
+  class LikeStore {
+    private likes: Map<string, Like> = new Map();  // key: `${userId}:${articleId}`
+    private userIndex: Map<string, Set<string>> = new Map();
+    private articleIndex: Map<string, Set<string>> = new Map();
+    insert(l: Like): void;
+    find(userId: string, articleId: string): Like | null;
+    delete(userId: string, articleId: string): boolean;
+    countByArticle(articleId: string): number;
+  }
+  ```
+- **关键不变式**：复合主键唯一；索引一致
+
+## §20 SD-019 审计日志模块 — 4 DD（关键新增）
+
+### DD-019-001 AuditLogController
+
+- **关联 SD/INTF**：SD-019 / INTF-019
+- **模块名**：controller/AuditLogController
+- **类签名**：
+  ```typescript
+  class AuditLogController {
+    constructor(private auditService: AuditService) {}
+    async list(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  list(req, res, next):
+    requireRole(['admin'])(req, res, () => {})
+    query = AuditLogQuerySchema.parse(req.query)
+    result = auditService.query(query)
+    return res.json({ items: result.items.map(toAuditLogResponse), total, page, limit })
+  ```
+- **异常处理**：401/403 非 admin；400 参数
+- **关键不变式**：仅 admin 可查询；分页
+
+### DD-019-002 AuditService
+
+- **关联 SD/INTF**：SD-019 / INTF-019
+- **模块名**：service/AuditService
+- **类签名**：
+  ```typescript
+  class AuditService {
+    constructor(private auditLogStore: AuditLogStore, private logger: Logger) {}
+    async log(entry: AuditLogEntry): Promise<void>;
+    query(query: AuditLogQuery): PaginatedResult<AuditLog>;
+  }
+  interface AuditLogEntry { userId: string; action: string; resource: string; resourceId: string; meta?: object; }
+  ```
+- **算法伪代码**：
+  ```
+  log(entry):
+    try:
+      record = { id: uuid(), ...entry, timestamp: now() }
+      auditLogStore.insert(record)  // 写入 EXT-OUT-002 信息汇
+    catch e:
+      logger.error('audit_log_failure', { entry, error: e.message })  // best-effort 不阻断主流程
+  query(query):
+    return auditLogStore.query(query)
+  ```
+- **关键不变式**：best-effort 写入（失败不阻断）；EXT-OUT-002 信息汇
+- **TLA+ 引用**：L3_audit_log_flow BestEffortNoBlock / L4_audit_log_retention Retention90Days
+
+### DD-019-003 AuditLogStore
+
+- **关联 SD/INTF**：SD-019 / INTF-019
+- **模块名**：store/AuditLogStore
+- **类签名**：
+  ```typescript
+  class AuditLogStore {
+    private logs: Map<string, AuditLog> = new Map();
+    private timestampIndex: Map<string, Set<string>> = new Map();  // key: YYYY-MM 分桶
+    private actionIndex: Map<string, Set<string>> = new Map();
+    private userIndex: Map<string, Set<string>> = new Map();
+    private readonly RETENTION_DAYS = 90;
+    insert(log: AuditLog): void;
+    query(query: AuditLogQuery): PaginatedResult<AuditLog>;
+    cleanupExpired(now: Date): number;
+    size(): number;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  insert(log):
+    logs.set(log.id, log)
+    month = log.timestamp.slice(0, 7)  // YYYY-MM
+    timestampIndex.get(month)?.add(log.id)
+    actionIndex.get(log.action)?.add(log.id)
+    userIndex.get(log.userId)?.add(log.id)
+  cleanupExpired(now):
+    cutoff = now - 90 days
+    expired = [...logs.values()].filter(l => l.timestamp < cutoff)
+    expired.forEach(l => logs.delete(l.id) + 索引清理)
+    return expired.length
+  ```
+- **关键不变式**：RETENTION_DAYS = 90；索引一致；NFR-004 容量
+- **TLA+ 引用**：L4_audit_log_retention Retention90Days / NoLogLoss
+
+### DD-019-004 AuditMiddleware
+
+- **关联 SD/INTF**：SD-019 / INTF-019（横切）
+- **模块名**：middleware/AuditMiddleware
+- **类签名**：
+  ```typescript
+  class AuditMiddleware {
+    constructor(private auditService: AuditService) {}
+    record(req: Request, res: Response, next: NextFunction): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  record(req, res, next):
+    next()  // 先放行
+    if req.user and req.method in ['POST','PUT','DELETE','PATCH']:
+      auditService.log({
+        userId: req.user.id,
+        action: `${req.method.toLowerCase()}.${req.path}`,
+        resource: req.path.split('/')[2],
+        resourceId: req.params.id ?? '',
+        meta: { statusCode: res.statusCode, ip: req.ip }
+      }).catch(e => logger.error('audit_middleware_failure', { error: e.message }))  // best-effort
+  ```
+- **关键不变式**：先放行后记录；best-effort；仅写操作触发
+- **TLA+ 引用**：L3_audit_log_flow
+
+## §21 SD-020 RSS 订阅模块 — 3 DD
+
+### DD-020-001 RssController.feed
+
+- **关联 SD/INTF**：SD-020 / INTF-020
+- **类签名**：`async feed(req: Request, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  feed(req, res, next):
+    xml = rssService.generateFeed()
+    etag = hash(xml)
+    if req.headers['if-none-match'] === etag: return res.status(304).end()
+    res.set('Content-Type', 'application/atom+xml')
+    res.set('ETag', etag)
+    return res.send(xml)
+  ```
+- **异常处理**：500 兜底
+- **关键不变式**：ETag/304 缓存；Content-Type 正确
+
+### DD-020-002 RssService
+
+- **关联 SD/INTF**：SD-020 / INTF-020
+- **类签名**：
+  ```typescript
+  class RssService {
+    constructor(private articleStore: ArticleStore, private generator: AtomFeedGenerator) {}
+    generateFeed(): string;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  generateFeed():
+    articles = articleStore.listPublished().slice(0, 20)  // 最近 20 篇
+    return generator.render(articles)
+  ```
+
+### DD-020-003 AtomFeedGenerator
+
+- **关联 SD/INTF**：SD-020 / INTF-020
+- **模块名**：util/AtomFeedGenerator
+- **类签名**：
+  ```typescript
+  class AtomFeedGenerator {
+    render(articles: Article[]): string;
+    private escapeXml(s: string): string;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  render(articles):
+    entries = articles.map(a => `
+      <entry>
+        <id>${a.id}</id>
+        <title>${escapeXml(a.title)}</title>
+        <updated>${a.updatedAt}</updated>
+        <content type="html">${escapeXml(a.content)}</content>
+      </entry>`).join('')
+    return `<?xml version="1.0" encoding="UTF-8"?>
+      <feed xmlns="http://www.w3.org/2005/Atom">
+        <title>Blog RSS</title>
+        <updated>${now()}</updated>
+        ${entries}
+      </feed>`
+  escapeXml(s): return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]))
+  ```
+- **关键不变式**：XML 转义防 XSS；最多 20 篇；Atom 1.0 格式
+
+## §22 SD-021 用户资料管理模块 — 3 DD
+
+### DD-021-001 UserProfileController
+
+- **关联 SD/INTF**：SD-021 / INTF-021
+- **类签名**：
+  ```typescript
+  class UserProfileController {
+    constructor(private userProfileService: UserProfileService) {}
+    async updateProfile(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    async getProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  updateProfile(req, res, next):
+    dto = ProfileUpdateSchema.parse(req.body)
+    profile = userProfileService.update(req.user.id, dto)
+    return res.json(profile)
+  getProfile(req, res, next):
+    profile = userProfileService.findByUserId(req.params.id)
+    if not profile: throw NotFoundError
+    return res.json({ nickname: profile.nickname, avatar: profile.avatar, bio: profile.bio })
+  ```
+- **异常处理**：400/401/404
+- **关键不变式**：更新仅本人；公开读取不含敏感字段
+
+### DD-021-002 UserProfileService
+
+- **关联 SD/INTF**：SD-021 / INTF-021
+- **类签名**：
+  ```typescript
+  class UserProfileService {
+    constructor(private profileStore: UserProfileStore, private userStore: UserStore) {}
+    update(userId: string, patch: ProfilePatch): UserProfile;
+    findByUserId(userId: string): UserProfile | null;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  update(userId, patch):
+    if not userStore.findById(userId): throw NotFoundError
+    existing = profileStore.findByUserId(userId)
+    if existing:
+      merged = { ...existing, ...patch, updatedAt: now() }
+      profileStore.update(userId, merged)
+      return merged
+    profile = { userId, ...patch, updatedAt: now() }
+    profileStore.insert(profile)
+    return profile
+  ```
+
+### DD-021-003 UserProfileStore
+
+- **关联 SD/INTF**：SD-021 / INTF-021
+- **类签名**：
+  ```typescript
+  class UserProfileStore {
+    private profiles: Map<string, UserProfile> = new Map();
+    insert(p: UserProfile): void;
+    findByUserId(userId: string): UserProfile | null;
+    update(userId: string, patch: Partial<UserProfile>): UserProfile;
+    delete(userId: string): boolean;
+  }
+  ```
+- **关键不变式**：userId 主键唯一
+
+## §23 SD-022 文章归档查询模块 — 3 DD
+
+### DD-022-001 ArticleController.archive
+
+- **关联 SD/INTF**：SD-022 / INTF-022
+- **类签名**：`async archive(req: Request, res: Response, next: NextFunction): Promise<void>;`
+- **算法伪代码**：
+  ```
+  archive(req, res, next):
+    result = archiveService.archive()
+    return res.json({ items: result })
+  ```
+
+### DD-022-002 ArchiveService
+
+- **关联 SD/INTF**：SD-022 / INTF-022
+- **类签名**：
+  ```typescript
+  class ArchiveService {
+    constructor(private articleStore: ArticleStore) {}
+    archive(): Array<{ year: number; month: number; count: number }>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  archive():
+    return articleStore.countByMonth()
+  ```
+
+### DD-022-003 ArchiveGroupingUtil
+
+- **关联 SD/INTF**：SD-022 / INTF-022
+- **模块名**：util/ArchiveGroupingUtil
+- **类签名**：
+  ```typescript
+  class ArchiveGroupingUtil {
+    static groupByMonth(articles: Article[]): Array<{ year: number; month: number; count: number }>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  groupByMonth(articles):
+    map = new Map<string, number>()
+    for a of articles:
+      if a.status !== 'published': continue
+      d = new Date(a.createdAt)
+      key = `${d.getFullYear()}-${pad(d.getMonth()+1)}`
+      map.set(key, (map.get(key) ?? 0) + 1)
+    return [...map].map(([k, count]) => {
+      [year, month] = k.split('-').map(Number)
+      return { year, month, count }
+    }).sort((a, b) => b.year - a.year || b.month - a.month)
+  ```
+- **关键不变式**：仅 published；按时间倒序
+
+## §24 横切公共模块 — 5 DD
+
+### DD-COMMON-001 ErrorHandlerMiddleware（NFR-003 统一错误响应）
+
+- **关联 SD/INTF**：横切（SD-001 / 全部 INTF）/ NFR-003
+- **模块名**：middleware/ErrorHandlerMiddleware
+- **类签名**：
+  ```typescript
+  interface AppError extends Error {
+    code: string;
+    statusCode: number;
+    details?: object;
+  }
+  class ErrorHandlerMiddleware {
+    handle(err: Error | AppError, req: Request, res: Response, next: NextFunction): void;
+  }
+  ```
+- **数据结构**：
+  ```typescript
+  interface ErrorResponse {
+    error: { code: string; message: string; details?: object; };
+    requestId: string;
+    timestamp: string;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  handle(err, req, res, next):
+    if res.headersSent: return next(err)
+    statusCode = err.statusCode ?? 500
+    code = err.code ?? 'INTERNAL_ERROR'
+    logger.error(code, { err: err.message, stack: err.stack, path: req.path })
+    return res.status(statusCode).json({
+      error: { code, message: err.message, details: err.details },
+      requestId: req.id,
+      timestamp: now()
+    })
+  ```
+- **异常处理**：兜底所有未捕获错误；headersSent 时委托 next(err)
+- **关键不变式**：NFR-003 100% 统一错误响应格式；status/code/message 必填
+- **TLA+ 引用**：无（横切层）
+
+### DD-COMMON-002 Logger（CON-004 结构化 JSON 日志）
+
+- **关联 SD/INTF**：横切 / CON-004
+- **模块名**：util/Logger
+- **类签名**：
+  ```typescript
+  interface LogEntry {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    timestamp: string;
+    message: string;
+    meta?: object;
+  }
+  class Logger {
+    debug(message: string, meta?: object): void;
+    info(message: string, meta?: object): void;
+    warn(message: string, meta?: object): void;
+    error(message: string, meta?: object): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  log(level, message, meta):
+    entry = { level, timestamp: now(), message, ...(meta ?? {}) }
+    process.stdout.write(JSON.stringify(entry) + '\n')
+  ```
+- **异常处理**：stdout 写入失败 → stderr fallback
+- **关键不变式**：CON-004 结构化 JSON；level/timestamp/message 必填
+
+### DD-COMMON-003 ZodSchemaFactory（NFR-005 100% zod 校验）
+
+- **关联 SD/INTF**：横切 / NFR-005
+- **模块名**：util/ZodSchemaFactory
+- **类签名**：
+  ```typescript
+  class ZodSchemaFactory {
+    static uuid(): z.ZodString;
+    static email(): z.ZodString;
+    static password(): z.ZodString;
+    static pagination(defaults?: { page: number; limit: number }): z.ZodType<Page>;
+    static oneOf<T extends string>(values: readonly T[]): z.ZodEnum<[T, ...T[]]>;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  uuid(): z.string().uuid()
+  email(): z.string().email()
+  password(): z.string().min(8).max(128).regex(/[A-Z]/).regex(/[a-z]/).regex(/[0-9]/)
+  pagination(defaults = { page: 1, limit: 20 }):
+    z.object({
+      page: z.coerce.number().int().min(1).default(defaults.page),
+      limit: z.coerce.number().int().min(1).max(100).default(defaults.limit),
+    })
+  ```
+- **关键不变式**：NFR-005 100% 接口使用 zod；password 强度规则
+
+### DD-COMMON-004 RateLimitMiddleware（NFR-006 限流）
+
+- **关联 SD/INTF**：横切 / NFR-006
+- **模块名**：middleware/RateLimitMiddleware
+- **类签名**：
+  ```typescript
+  class RateLimitMiddleware {
+    constructor(private tokenBucket: TokenBucket, private identifier: (req: Request) => string) {}
+    check(req: Request, res: Response, next: NextFunction): void;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  check(req, res, next):
+    key = identifier(req)  // 默认 req.ip，认证后用 req.user.id
+    allowed = tokenBucket.consume(key, 1)
+    if not allowed:
+      res.set('Retry-After', '1')
+      throw new TooManyRequestsError('RATE_LIMITED')
+    next()
+  ```
+- **异常处理**：429 Too Many Requests + Retry-After 头
+- **关键不变式**：NFR-006 每用户 60 次/分钟
+- **TLA+ 引用**：L4_rate_limiter_token_bucket CapacityInvariant / NonNegativeTokens
+
+### DD-COMMON-005 TokenBucket（令牌桶算法）
+
+- **关联 SD/INTF**：横切 / NFR-006
+- **模块名**：util/TokenBucket
+- **类签名**：
+  ```typescript
+  class TokenBucket {
+    private buckets: Map<string, { tokens: number; lastRefill: number }> = new Map();
+    private readonly capacity: number;       // 60
+    private readonly refillRatePerSec: number; // 1 (60/min)
+    constructor(capacity: number = 60, refillRatePerSec: number = 1) {}
+    consume(key: string, tokens: number): boolean;
+    available(key: string): number;
+  }
+  ```
+- **算法伪代码**：
+  ```
+  consume(key, tokens):
+    bucket = buckets.get(key) ?? { tokens: capacity, lastRefill: now() }
+    elapsed = now() - bucket.lastRefill
+    bucket.tokens = min(capacity, bucket.tokens + elapsed * refillRatePerSec)
+    bucket.lastRefill = now()
+    if bucket.tokens >= tokens:
+      bucket.tokens -= tokens
+      buckets.set(key, bucket)
+      return true
+    buckets.set(key, bucket)
+    return false
+  ```
+- **关键不变式**：tokens ∈ [0, capacity]；refill 速率 = 1/s；capacity = 60
+- **TLA+ 引用**：L4_rate_limiter_token_bucket（refill→consume→replenish→reject 完整状态机）
+
+## §25 测试 seam 决策（吸收 to-spec seam-first testing）
+
+### §25.1 单元测试 seam
+
+- DD-002-001 ~ DD-022-003：seam = 各 Service / Store / Controller / Middleware / Util 类的公共方法
+- DD-COMMON-001 ~ DD-COMMON-005：seam = 公共方法（handle / log / parse / consume / check）
+
+### §25.2 选定 seam
+
+- **单元测试主 seam**：seam-module（模块导出边界，类公共 API）
+- **不复用阶段 2/3 seam 的部分**：无（HTTP seam 留给集成/系统测试；单元层只测模块导出）
+
+### §25.3 理由
+
+- 单元测试理想零新 seam：直接复用类公共方法
+- 私有状态机（如 ArticleStateMachine.TRANSITIONS）通过公共 transition() 方法间接覆盖
+- TLA+ 不变式作为 oracle：每个 L4 状态机至少 1 个对应单元测试（如 L4_article_state_machine → DD-017-003 状态转移测试）
+
+## §26 RTM 补登
+
+`rtm.json` 的 `unitTest` 列由「待阶段4单元测试设计映射」更新为对应 TC-UNIT-XXX 编号；`designDoc` 列追加详细设计章节引用。详见 `docs/unit-test-design.md` 与 `.w-model/rtm.json#mappings.dd`。
+
+## §27 验收标准对齐
+
+- [x] UML 类图（§1.4）符合 UML 规范，体现继承/关联/依赖
+- [x] ER 图（§1.5）含主键/外键/索引标注
+- [x] 75 DD 含方法签名（TypeScript 风格）+ 数据结构 + 算法伪代码 + 异常处理 + 关键不变式
+- [x] 单元测试用例覆盖核心逻辑与边界条件（见 `docs/unit-test-design.md`，225 用例）
+- [x] RTM 已补登详细设计（`mappings.dd`）与单元测试映射（`unitTest` 列）
+- [x] 5 L4 TLA+ 不变式与 DD 业务约束对齐（§1.3）

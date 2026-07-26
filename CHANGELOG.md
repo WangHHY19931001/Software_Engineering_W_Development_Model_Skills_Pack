@@ -3,6 +3,68 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [12.0.0] - 2026-07-26
+
+### 第 12 轮 W 模型 32 需求端到端调测
+
+> 2026-07-26 第十二轮 W 模型调测：扩展博客系统后端 32 需求（22 REQ + 6 NFR + 4 CON），全量删除 w-model-dev-demo 产物后从零重跑完整 8 阶段，新增审计日志/RSS/Webhook/API 限流领域，验证 self-as-verifier 自驱模式 + 编排者-子代理分派在 32 需求全量场景下的端到端可用性。
+
+#### 新增
+
+- w-model-dev-demo 32 需求完整实现（22 SD + 22 INTF + 75 DD）
+- 22 个 TLA+ 规格（1 L1 + 9 L2 + 7 L3 + 5 L4），层级化建模 parent→child 一致
+- 56 个 TypeScript 源文件（9 controllers + 15 services + 14 stores + 14 utils + app/server/types）
+- 四级测试套件：单元 250 + 集成 69 + 系统 25 + 验收 63 = 407 用例全通过
+- code-TLA+ 一致性四维度校验全通过（SD→codeModule 22/22 + 状态转移 67 + Next 分支 + 不变式断言）
+- 新增领域：审计日志（REQ-018/019 + CON-004 90 天保留）、RSS（REQ-020）、Webhook（REQ-021/022 指数退避重试 1s/2s/4s）、API 限流（NFR-006 令牌桶 1000 req/min per IP）
+
+#### 变更
+
+- w-model-dev-demo 项目范围扩展：需求 25→32、SD 17→22、INTF 17→22、DD 51→75、TLA+ 17→22（L4 层级 3→5）、图谱节点 216→155（更精炼）、边 902→638
+- 全量测试 386→407（单元 226→250、集成 40→69、系统 64→25、验收 56→63）
+- 代码覆盖率 83.48%→93.63% lines（NFR-004 ≥ 80% 要求）
+- project.json status 流转：需求分析→系统设计→概要设计→详细设计→编码→集成测试→系统测试→验收门禁通过→**项目完成**（self-as-verifier 模式调测者代签 confirm 归档）
+- rtm.json currentPhase: 8→9（项目归档），run-log.jsonl 追加归档 checkpoint 条目
+- acceptance-test-report.md §9 用户确认区勾选 `[x] confirm` + 确认意见（含四级测试 407/407、RTM 100%、门禁 exitCode=0 等关键数据）
+
+#### 阶段门评审
+
+| 阶段 | compositeScore | qualityLevel |
+|---|---|---|
+| phase1 | 0.887 | A |
+| phase2 | 0.8915 | A |
+| phase3 | 0.9075 | A |
+| phase4 | 0.914 | A |
+| phase5 | 0.9115 | A |
+| phase6 | 0.9195 | A |
+| phase7 | 0.9095 | A |
+| phase8 | 0.9095 | A |
+
+#### 修复
+
+- TLA+ `L4_audit_log_retention` 不变式违反：`AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1`）→ 添加 `logCount > 0` 前置条件 + 触发条件改为 `oldestAge >= RETENTION_DAYS`
+- Verifier compositeScore 漂移：phase6 初始 0.921 与重算 0.9195 误差 >1e-4 触发防漂移检测 → 校正为 0.9195
+- RTM 映射遗漏：REQ-019（审计日志）/REQ-021（用户资料管理）`systemTest` 字段缺失 → 补 `TC-E2E-001,TC-SEC-002` / `TC-REL-001,TC-EXC-004`，同步更新系统测试设计映射矩阵
+- Maturity R3 违反：`completedCycles=6` < 已完成 phases=7 → 更新为 7
+- `check-code-tla-consistency.ts` / `check-requirement-graph.ts` 参数错误：传入目录路径导致 `EISDIR` → 改为文件路径 `.w-model/graph.json`
+
+#### 验证
+
+- TypeScript strict 0 错误
+- self-test 91/91 全通过
+- 全量测试 407/407 全通过（250 单元 + 69 集成 + 25 系统 + 63 验收）
+- 代码覆盖率 93.63% lines（NFR-004 ≥ 80%）
+- 图谱校验：155 节点 638 边，信息流零违反（无黑洞/奇迹/死模块），EXT-IN/EXT-OUT 边界完整
+- TLA+ 行为门禁：22 规格 SANY + TLC 全通过，零死锁/不变式违反/状态爆炸
+- code-TLA+ 一致性回归：阶段 5 退出码 0，四维度全通过
+- 工件质量门：check-artifact-gate 终检 exitCode=0，RTM 100%，missingItems=[]
+- 用户确认：`confirm`（2026-07-26 self-as-verifier 模式调测者代签；currentPhase=9，project.json status=项目完成）
+
+#### 文档
+
+- AGENTS.md §4 新增第十二轮调测结论（含指标表 + 与第八轮对比）
+- w-model-dev-demo/docs/acceptance-test-report.md 完整验收报告（含 §9 用户确认区）
+
 ## [11.0.0] - 2026-07-26
 
 ### 第 11 轮外部技能吸收（claude-tla-plus-plugin）

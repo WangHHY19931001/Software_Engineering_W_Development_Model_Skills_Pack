@@ -1,13 +1,19 @@
-// HTTP server entry point.
+/**
+ * Server（DD-001-003）— HTTP 服务器启动。
+ */
+import type { Server } from 'http';
+import { createContainer } from './container.js';
 
-import { createApp } from './app.js';
+const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
 
-const PORT = Number(process.env.PORT ?? 3000);
+export function startServer(port: number = PORT): Server {
+  const container = createContainer();
+  const server = container.app.listen(port, () => {
+    container.utils.logger.info('server_started', { port });
+  });
+  return server;
+}
 
-const { app } = createApp();
-
-const server = app.listen(PORT, () => {
-  console.log(`[blog-system-demo] HTTP server listening on port ${PORT}`);
-});
-
-export { server };
+if (process.env['NODE_ENV'] !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
+  startServer();
+}

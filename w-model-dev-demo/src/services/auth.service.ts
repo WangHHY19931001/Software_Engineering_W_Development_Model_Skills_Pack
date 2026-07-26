@@ -1,168 +1,108 @@
-// SD-003 AuthService + UserService.
-
-import { UserRole, UserStatus, type User } from '../types.js';
-import { AppError, ErrorCode } from '../utils/errors.js';
+/**
+ * AuthService（DD-003-002）— 登录认证 + JWT 签发。
+ * 与 L3_login_flow.tla / L4_auth_token_lifecycle.tla 一致。
+ */
+import type { User, Role } from '../types.js';
 import type { UserStore } from '../stores/user.store.js';
-import {
-  clearRevokedJtis,
-  comparePassword,
-  hashPassword,
-  revokeAllJtisForUser,
-  revokedJtis,
-  signToken,
-  verifyToken,
-} from '../utils/auth.js';
-import { appendAuditLog, invariant } from '../utils/logger.js';
-import { banReasonSchema, displayNameSchema, emailSchema, passwordSchema } from '../utils/schemas.js';
+import type { JwtUtil } from '../utils/auth.js';
+import { PasswordHasher } from '../utils/auth.js';
+import { AuthenticationError, NotFoundError, ValidationError } from '../utils/errors.js';
 
-export interface RegisterInput {
-  email: string;
-  password: string;
-  displayName: string;
-  role?: UserRole;
+export interface LoginResult {
+  token: string;
+  user: Omit<User, 'passwordHash'>;
+}
+
+export class LoginRateLimiter {
+  private failures: Map<string, { count: number; lockedUntil: number }> = new Map();
+  private readonly maxFailures: number;
+  private readonly lockMs: number;
+
+  constructor(maxFailures: number = 5, lockMs: number = 5 * 60 * 1000) {
+    this.maxFailures = maxFailures;
+    this.lockMs = lockMs;
+  }
+
+  isLocked(key: string, now: number = Date.now()): boolean {
+    const entry = this.failures.get(key);
+    if (!entry) return false;
+    if (entry.lockedUntil > now) return true;
+    if (entry.lockedUntil > 0 && entry.lockedUntil <= now) {
+      this.failures.delete(key);
+    }
+    return false;
+  }
+
+  recordFailure(key: string, now: number = Date.now()): void {
+    const entry = this.failures.get(key) ?? { count: 0, lockedUntil: 0 };
+    entry.count += 1;
+    if (entry.count >= this.maxFailures) {
+      entry.lockedUntil = now + this.lockMs;
+    }
+    this.failures.set(key, entry);
+  }
+
+  recordSuccess(key: string): void {
+    this.failures.delete(key);
+  }
+
+  remainingAttempts(key: string): number {
+    const entry = this.failures.get(key);
+    if (!entry) return this.maxFailures;
+    return Math.max(0, this.maxFailures - entry.count);
+  }
+
+  clear(): void {
+    this.failures.clear();
+  }
 }
 
 export class AuthService {
-  constructor(private userStore: UserStore) {}
+  constructor(
+    private userStore: UserStore,
+    private jwtUtil: JwtUtil,
+    private rateLimiter: LoginRateLimiter = new LoginRateLimiter(),
+  ) {}
 
-  /** userRegister — register a new user. TLA+ L2_identity_access.userRegister / L3_auth_session.userRegister */
-  async userRegister(input: RegisterInput): Promise<User> {
-    // Validate raw inputs before hashing (store validates hash, not original password).
-    if (!emailSchema.safeParse(input.email).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
+  async login(email: string, password: string): Promise<LoginResult> {
+    if (!email || !password) {
+      throw new ValidationError('邮箱和密码必填');
     }
-    if (!passwordSchema.safeParse(input.password).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
+    const key = email.toLowerCase();
+    if (this.rateLimiter.isLocked(key)) {
+      throw new AuthenticationError('登录失败次数过多，请稍后重试');
     }
-    if (!displayNameSchema.safeParse(input.displayName).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    const hash = await hashPassword(input.password);
-    const user = this.userStore.create({
-      email: input.email,
-      password: hash,
-      displayName: input.displayName,
-      role: input.role,
-    });
-    appendAuditLog(user.id, 'userRegister', user.id);
-    return user;
-  }
-
-  /** Alias matching SD-003 design. */
-  async register(input: RegisterInput): Promise<User> {
-    return this.userRegister(input);
-  }
-
-  /** userLogin — login with email + password. TLA+ L2_identity_access.userLogin / L3_auth_session.userLogin */
-  async userLogin(email: string, password: string): Promise<{ token: string; user: User }> {
-    invariant(!!email && !!password, 'email/password required');
-    const user = this.userStore.getByEmail(email);
+    const user = this.userStore.findByEmail(email);
     if (!user) {
-      throw new AppError(ErrorCode.NoUser, '1011');
+      this.rateLimiter.recordFailure(key);
+      throw new AuthenticationError('邮箱或密码错误');
     }
-    if (this.userStore.isBanned(user.id)) {
-      throw new AppError(ErrorCode.Banned, '1022');
-    }
-    const ok = await comparePassword(password, user.passwordHash);
+    const ok = await PasswordHasher.compare(password, user.passwordHash);
     if (!ok) {
-      throw new AppError(ErrorCode.WrongPassword, '1012');
+      this.rateLimiter.recordFailure(key);
+      throw new AuthenticationError('邮箱或密码错误');
     }
-    const token = signToken(user.id, user.role);
-    // Decode jti from token (we know payload shape).
-    const { payload } = verifyToken(token);
-    this.userStore.addJti(user.id, payload.jti);
-    return { token, user };
+    this.rateLimiter.recordSuccess(key);
+    const token = this.jwtUtil.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    });
+    const { passwordHash: _ph, ...safeUser } = user;
+    void _ph;
+    return { token, user: safeUser };
   }
 
-  /** Alias matching SD-003 design. */
-  async login(email: string, password: string): Promise<{ token: string; user: User }> {
-    return this.userLogin(email, password);
+  verifyToken(token: string): { id: string; email: string; role: Role } {
+    const payload = this.jwtUtil.verify(token);
+    return { id: payload.sub, email: payload.email, role: payload.role as Role };
   }
 
-  /** userLogout — invalidate the current token's jti. */
-  userLogout(token: string): void {
-    const { payload } = verifyToken(token);
-    revokeAllJtisForUser([payload.jti]);
-    appendAuditLog(payload.userId, 'userLogout', payload.userId);
-  }
-
-  /** verifyToken wrapper. */
-  verifyToken(token: string): { userId: string; role: UserRole } {
-    const { payload } = verifyToken(token);
-    const user = this.userStore.getById(payload.userId);
-    if (!user) {
-      throw new AppError(ErrorCode.NoUser, '1011');
-    }
-    if (user.status === UserStatus.Banned) {
-      throw new AppError(ErrorCode.Banned, '1022');
-    }
-    return { userId: payload.userId, role: payload.role };
-  }
-
-  /** revokeToken — revoke all tokens for a user. TLA+ L2_identity_access.revokeToken / L3_auth_session.revokeToken */
-  revokeToken(userId: string): void {
-    const user = this.userStore.getById(userId);
-    if (!user) throw new AppError(ErrorCode.NotFound, '1031');
-    const jtis = this.userStore.getJtis(userId);
-    revokeAllJtisForUser(jtis);
-    appendAuditLog(userId, 'revokeToken', userId);
-  }
-
-  /** expireToken — mark a token expired (TLA+ L3_auth_session.expireToken). */
-  expireToken(jti: string): void {
-    revokeAllJtisForUser([jti]);
-  }
-
-  /** Test helper: exposes revoked JTIs set. */
-  revokedCount(): number {
-    return revokedJtis.size;
-  }
-
-  /** Test helper: clear all revoked JTIs. */
-  clearRevoked(): void {
-    clearRevokedJtis();
+  getRateLimiter(): LoginRateLimiter {
+    return this.rateLimiter;
   }
 }
 
-export class UserService {
-  constructor(private userStore: UserStore, private authService: AuthService) {}
-
-  /** banUser — ban a user. TLA+ L2_identity_access.banUser / L3_auth_session.banUser */
-  banUser(operatorId: string, operatorRole: string, userId: string, reason: string): void {
-    invariant(!!operatorId && !!userId, 'ids required');
-    if (operatorRole !== UserRole.Admin) {
-      throw new AppError(ErrorCode.Rbac, '1021');
-    }
-    if (!banReasonSchema.safeParse(reason).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    const target = this.userStore.getById(userId);
-    if (!target) throw new AppError(ErrorCode.NotFound, '1031');
-    if (target.role === UserRole.Admin) {
-      throw new AppError(ErrorCode.Rbac, '1021');
-    }
-    this.userStore.ban(userId, reason);
-    this.authService.revokeToken(userId);
-    appendAuditLog(operatorId, 'banUser', userId);
-  }
-
-  /** Alias. */
-  ban(operatorId: string, operatorRole: string, userId: string, reason: string): void {
-    this.banUser(operatorId, operatorRole, userId, reason);
-  }
-
-  /** unbanUser — unban a user. TLA+ L2_identity_access.unbanUser / L3_auth_session.unbanUser */
-  unbanUser(operatorId: string, operatorRole: string, userId: string): void {
-    if (operatorRole !== UserRole.Admin) {
-      throw new AppError(ErrorCode.Rbac, '1021');
-    }
-    const target = this.userStore.getById(userId);
-    if (!target) throw new AppError(ErrorCode.NotFound, '1031');
-    this.userStore.unban(userId);
-    appendAuditLog(operatorId, 'unbanUser', userId);
-  }
-
-  getById(id: string): User | null {
-    return this.userStore.getById(id);
-  }
+export function assertUserExists(user: User | undefined, message: string = '用户'): asserts user is User {
+  if (!user) throw new NotFoundError(message);
 }

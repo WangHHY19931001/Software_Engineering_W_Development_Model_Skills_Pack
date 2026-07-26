@@ -1,61 +1,35 @@
-// SD-011 NotificationService.
-
-import { NotificationType, type Notification, type NotificationSettings } from '../types.js';
+/**
+ * NotificationService + PushService — 通知与推送。
+ */
+import type { Notification } from '../types.js';
 import type { NotificationStore } from '../stores/notification.store.js';
-import { AppError, ErrorCode } from '../utils/errors.js';
-import { notificationSettingsSchema } from '../utils/schemas.js';
+import type { WsStore } from '../stores/ws.store.js';
+import { generateId } from '../utils/id.js';
 
 export class NotificationService {
   constructor(private notificationStore: NotificationStore) {}
 
-  /** enqueueNotification — TLA+ L2_interaction.enqueueNotification */
-  enqueueNotification(
-    userId: string,
-    type: NotificationType,
-    title: string,
-    body: string,
-    refId: string,
-  ): Notification | null {
-    return this.notificationStore.create(userId, type, title, body, refId);
+  notify(userId: string, type: string, content: string): Notification {
+    return this.notificationStore.insert({ userId, type, content });
   }
 
-  /** create — alias matching SD-011 design. */
-  create(
-    userId: string,
-    type: NotificationType,
-    title: string,
-    body: string,
-    refId: string,
-  ): Notification | null {
-    return this.enqueueNotification(userId, type, title, body, refId);
+  listByUser(userId: string, page: number = 1, limit: number = 10) {
+    return this.notificationStore.listByUser(userId, page, limit);
   }
 
-  /** markNotificationRead — TLA+ L2_interaction.markNotificationRead */
-  markNotificationRead(userId: string, notificationId: string): void {
-    this.notificationStore.markRead(userId, notificationId);
+  markRead(id: string): boolean {
+    return this.notificationStore.markRead(id);
+  }
+}
+
+export class PushService {
+  constructor(private wsStore: WsStore) {}
+
+  pushToUser(userId: string, message: string): number {
+    return this.wsStore.sendToUser(userId, JSON.stringify({ id: generateId('push'), message, timestamp: new Date().toISOString() }));
   }
 
-  markRead(userId: string, notificationId: string): void {
-    this.markNotificationRead(userId, notificationId);
-  }
-
-  markAllRead(userId: string): void {
-    this.notificationStore.markAllRead(userId);
-  }
-
-  /** updateNotificationSetting — TLA+ L2_interaction.updateNotificationSetting */
-  updateNotificationSetting(userId: string, settings: Partial<NotificationSettings>): NotificationSettings {
-    if (!notificationSettingsSchema.safeParse(settings).success) {
-      throw new AppError(ErrorCode.ZodValidation, '1001');
-    }
-    return this.notificationStore.updateSettings(userId, settings);
-  }
-
-  listByUser(userId: string): Notification[] {
-    return this.notificationStore.listByUser(userId);
-  }
-
-  unreadSize(userId: string): number {
-    return this.notificationStore.unreadSize(userId);
+  broadcast(message: string): number {
+    return this.wsStore.broadcast(JSON.stringify({ id: generateId('push'), message, timestamp: new Date().toISOString() }));
   }
 }
