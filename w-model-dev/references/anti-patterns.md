@@ -196,6 +196,12 @@
 
 **与 #16 的关系**：#16 是规格本身有缺陷（偏离需求/设计），#17 是规格忠实但需求/设计本身有缺陷——前者修规格，后者修需求/设计并回退。判定流程见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节。
 
+## #20 只规划不执行（第 9 轮 P1.3）
+
+> 详细描述见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节。子代理返回规划性内容而未调用任何执行工具，浪费 token + 轮次，任务无实际进展。
+
+**检测信号**（sig-008）：run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify` 条目；规划产物（spec/plan）存在但无对应执行产物。
+
 ## #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
 
 > 第 13 轮 P3.1 新增。self-as-verifier 模式下编排者为加速调测，跳过阶段 6/7 的 `--phase=N` 门禁直接跑 `--phase=8` 终检，导致阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则。
@@ -212,6 +218,20 @@
 **与反模式 #1 的关系**：#1 是"跳过阶段门评审直接进入下一阶段"（完全不跑门禁），#21 是"跑了门禁但跳过阶段级校验直接跑终检"（跑了但参数错误）。前者完全不校验，后者校验粒度错误。
 
 **与 SKILL.md 阶段路由表的对应**：SKILL.md「阶段 5-8 工件质量门」节已指引阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，本反模式是 self-as-verifier 模式下的强制约束。
+
+**检测信号**（sig-008）：run-log 中阶段 6/7/8 的 GATE 条目缺 `--phase=N` 参数；或 gate JSON 输出中 phaseOption 字段缺失。
+
+## #22（候选，pending V 复审）V 评审 summary 模板化
+
+**症状**：V 评审 summary 字段跨多个阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符，使用「评审通过」「质量良好」等空泛措辞。
+
+**违反原则**：真实执行（约束4）—— summary 信息熵低，无法体现阶段产出的具体决策与结构。
+
+**检测信号**：Loop 4 HarnessImprovementReport category=prompt severity=S2，evidence.patterns 含「Jaccard 相似度 > 0.8」。
+
+**修正**：强化 verifier-spec.md §6 summary 三要素要求（sig-001 已应用）；V 子代理重写 summary 含具体决策+结构+风险。
+
+**状态**：候选（pending V 复审）。本候选由 Loop 4 信号驱动提出，需 V 子代理复审转正后正式编号入清单。复审前不作为强制反模式执行。
 
 ## 实现层经验教训（来自端到端调测）
 
