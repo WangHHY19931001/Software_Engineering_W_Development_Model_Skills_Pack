@@ -26,6 +26,7 @@
 - **采用路径（Greenfield vs Brownfield）**：新项目 Day 0 跑全流程 vs 存量项目增量验证优先，见 [采用路径指南](./docs/adoption-guide.md)；吸收自 addyosmani/agent-skills `docs/adoption-guide.md` 并适配 W 模型 8 阶段
 - **Loop 3 事件驱动循环**（L2+ 激活）：棕地维护场景的事件接驳——消费方自行实现 webhook/cron 触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（bug 修复/需求变更/验收重跑/回归测试/安全事件）。不内置调度基础设施。详见 [event-ingress-guide.md](w-model-dev/references/event-ingress-guide.md)。
 - **Loop 4 爬坡循环**：分析 run-log 产出 HarnessImprovementReport 改进信号（prompt/工具/验证规则/反模式/成熟度/预算 6 类），人审后手动应用。保持"技能自演化不在本仓库"原则——外部 SkillOpt/darwin-skill 消费信号做演化。详见 [hill-climbing-guide.md](w-model-dev/references/hill-climbing-guide.md)。
+- **SkillOpt 方法论吸收**：吸收 [microsoft/SkillOpt](https://github.com/microsoft/SkillOpt)「bounded edit + validation gate」方法论，消费 Loop 4 产出的 HarnessImprovementReport 信号，对技能/模板/参考/脚本 4 类资产做离线进化。不引入 Python 依赖、不调用 LLM（方法论吸收非工具运行，与 §11 协调）。详见 [skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md)。
 
 ## 架构原则与外部工具边界
 
@@ -37,7 +38,7 @@
 | 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/gate-logic.ts` + `check-artifact-gate.ts` |
 | LLM-as-a-Verifier 评审（三维度 / 连续评分 / PPT / 子标准） | 技能内提供提示词与 Schema，外部 Agent 执行 | `w-model-dev/references/verifier-spec.md` + `scripts/check-verifier-output.ts` |
 | LLM 推理本身 | 外部 | 由外部 Agent（Trae / Claude / Cursor 等）自行调用其 LLM |
-| 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估） | 外部 | [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill) |
+| 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估） | 外部（工具运行）+ 技能内（方法论吸收） | 工具运行：[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)；方法论吸收：[skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md)（§10H） |
 
 详见 SSoT [§3.3 技能架构原则与外部工具边界](./docs/skill-design-document_SSoT.md)。
 
