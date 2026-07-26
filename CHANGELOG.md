@@ -3,6 +3,51 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [14.0.0] - 2026-07-26
+
+### 第 14 轮 SkillOpt 方法论吸收
+
+吸收 microsoft/SkillOpt「bounded edit + validation gate」方法论（非工具运行），消费 Loop 4 产出的 HarnessImprovementReport 信号对 4 类资产做全谱离线进化。不引入 Python 依赖、不调用 LLM、不变更 Loop 4 信号产出逻辑。
+
+#### 新增
+
+- **SSoT §10H「SkillOpt 方法论吸收」**：六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 与 §11 协调
+- **SSoT §10A 追溯表**新增 §10H 行
+- **SSoT §10G** 补充信号消费流程引用 §10H
+- **SSoT §3.4.2 角色表扩展**：离线进化场景主代理执行 reflect→bounded edit→validation gate
+- `w-model-dev/references/skillopt-adoption.md`：SkillOpt 方法论采用指南
+- `w-model-dev/scripts/samples/hill-climbing/expanded-2026-07-26.json`：扩展 HarnessImprovementReport（10 信号覆盖 4 类资产）
+- `w-model-dev/scripts/samples/verifier/bad-summary-too-short.json`：R11 触发 fixture
+- `w-model-dev/scripts/samples/verifier/bad-evidence-empty.json`：R12 触发 fixture
+- verifier-logic.ts R11（summary 长度≥50）+ R12（evidence 具体引用）校验规则
+- anti-patterns.md 候选 #22（pending V 复审）：V 评审 summary 模板化
+
+#### 变更
+
+- verifier-spec.md §6 summary 三要素要求（sig-001）
+- SKILL.md hill-climbing 命令参数示例（sig-003）+ 自检清单引反模式 #20/#21（sig-004）
+- review-report.md 模板 summary 三要素结构提示（sig-005）
+- test-report.md 模板测试结论节量化指标占位符（sig-006）
+- requirement-spec.md 模板 NFR 可测量性提示（sig-007）
+- anti-patterns.md #20/#21 检测信号字段（sig-008）
+- verifier-logic.ts computeVariance 注释 + NaN/Infinity 边界保护（sig-009）
+- verifier/valid.json summary 扩展至 ≥50 字符（R11 兼容）
+- self-test 基线 92→94（+2 R11/R12 用例）
+- vitest 72→76（+4 R11/R12 单元测试）
+
+#### 方法论
+
+- 吸收 microsoft/SkillOpt「bounded edit + validation gate」方法论（非工具运行）
+- 消费 Loop 4 HarnessImprovementReport 信号，对 4 类资产做全谱离线进化
+- 不引入 Python 依赖、不调用 LLM、不变更 Loop 4 信号产出逻辑
+
+#### 验证
+
+- TypeScript strict 0 错误
+- self-test 94/94 全通过（基线 92→94）
+- vitest 76/76 全通过（72→76）
+- 文档一致性：SSoT §10H ↔ skillopt-adoption.md ↔ AGENTS.md §4 第十四轮 ↔ CHANGELOG [14.0.0] 互引一致
+
 ## [13.0.0] - 2026-07-26
 
 ### 第 13 轮门禁鲁棒性与 maturity 语义修正
