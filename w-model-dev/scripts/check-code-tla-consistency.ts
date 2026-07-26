@@ -81,6 +81,10 @@ async function readJson<T>(file: string, label: string): Promise<T> {
       console.error(`✗ ${label} 文件不存在: ${abs}`);
       process.exit(2);
     }
+    if (e.code === 'EISDIR') {
+      console.error(`✗ ${label} 参数应为文件路径，实际为目录: ${abs}`);
+      process.exit(2);
+    }
     throw err;
   }
   try {

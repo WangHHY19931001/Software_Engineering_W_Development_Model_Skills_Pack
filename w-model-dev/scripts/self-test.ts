@@ -601,6 +601,8 @@ interface MaturityCase {
   expectedPassed: boolean;
   /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
   expectedReasonPatterns?: RegExp[];
+  /** 传给 checkMaturity 的 options（可选，默认不传） */
+  options?: { completedPhases?: number };
   /** 用例说明 */
   description: string;
 }
@@ -616,6 +618,13 @@ const MATURITY_CASES: MaturityCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/level 非法值.*L5/],
     description: 'level=L5 超出 L0/L1/L2/L3，应被 R2 level 合法性校验拦截',
+  },
+  {
+    file: 'bad-r3-cycle-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R3.*8 阶段.*1 完整周期.*completedCycles=0/],
+    options: { completedPhases: 8 },
+    description: 'P2.1 R3 单位修正：completedPhases=8（1 完整周期）但 completedCycles=0，应触发 R3 违规',
   },
 ];
 
@@ -930,7 +939,7 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'maturity', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
-    const r = checkMaturity(parsed);
+    const r = checkMaturity(parsed, c.options);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {

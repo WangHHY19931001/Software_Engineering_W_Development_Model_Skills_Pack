@@ -96,16 +96,17 @@ export function checkMaturity(
     violations.push(`R2: level 非法值: ${m.level}（须为 L0/L1/L2/L3）`);
   }
 
-  // R3 成功阶段更新：project 已完成 N 阶段但 unlockConditions.completedCycles 未更新
-  // 注：completedPhases 为阶段数，completedCycles 为完整 8 阶段周期数；
-  //     简化语义——completedCycles < completedPhases 即报违规（后续可改为 floor(completedPhases/8)）
+  // R3 成功阶段更新：completedCycles 为完整 8 阶段周期数（与 schema 语义对齐）
+  // 语义：1 完整周期 = 8 阶段，completedCycles 应 ≥ floor(completedPhases / 8)
+  // 第 13 轮 P2.1 修正：原逻辑 completedCycles < completedPhases 单位不匹配（阶段数 vs 周期数）
   if (
     options?.completedPhases !== undefined &&
     uc &&
     typeof uc.completedCycles === 'number' &&
-    uc.completedCycles < options.completedPhases
+    uc.completedCycles < Math.floor(options.completedPhases / 8)
   ) {
-    violations.push(`R3: project 已完成 ${options.completedPhases} 阶段，但 unlockConditions.completedCycles=${uc.completedCycles} 未更新`);
+    const expectedCycles = Math.floor(options.completedPhases / 8);
+    violations.push(`R3: project 已完成 ${options.completedPhases} 阶段（${expectedCycles} 完整周期），但 unlockConditions.completedCycles=${uc.completedCycles} 未更新`);
   }
 
   // R4 history 时序一致：history.at 与 leveledUpAt 不得早于 project.createdAt

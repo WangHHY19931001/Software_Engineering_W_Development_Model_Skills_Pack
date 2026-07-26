@@ -15,7 +15,7 @@
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评
 - **Agent Personas（评审角色提示词，V 子代理执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由 V 子代理在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
-- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 19 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复）二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 21 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过）二分；F# 重复命中 ≥2 次升级为 L# 教训
 - **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
@@ -95,6 +95,28 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 ```
 覆盖 basePath/SD 覆盖/passed↔qualityLevel 三个维度的正常+失败路径。
 
+### 门禁脚本增强（v3，2026-07-25 第 9 轮）
+
+| 校验项 | 脚本 | 说明 |
+|---|---|---|
+| 阶段级渐进式校验 | check-artifact-gate.ts | 新增 `--phase=N`，N<8 时只校验该阶段及之前字段；N=8/缺省为终检 |
+| targetKind 标准化 | verifier-logic.ts | 4 枚举值 `requirement/design/code/test`，`testcase` 弃用 |
+| NFR/CON 字段注册 | check-artifact-gate.ts | 阶段 1 强制 NFR/CON 字段在 RTM 注册 |
+| codeModule 阶段 5 回填 | check-artifact-gate.ts | 阶段 5 强制 codeModule 列非空 |
+| rawScores 防漂移 | verifier-logic.ts | 全同检测 + 完美等差数列检测 + 扰动范围校验 |
+| TLA+ states 自动清理 | check-tla-model.ts | 默认清理 `states/`，`--keep-states` 调试保留 |
+| Next 分支覆盖扩展 | check-code-tla-consistency.ts | 全部 specs 覆盖，不再仅 L2+ |
+| 反模式 #20 | subagent-delegation.md | 只规划不执行 → 编排者重派并强调「立即执行」 |
+
+### 门禁脚本增强（v4，2026-07-26 第 13 轮）
+
+| 校验项 | 脚本 | 说明 |
+|---|---|---|
+| EISDIR 友好提示 | check-code-tla-consistency.ts / check-requirement-graph.ts | 传目录路径输出「参数应为文件路径，实际为目录」，退出码 2 |
+| Maturity R3 单位对齐 | maturity-logic.ts | `completedCycles < Math.floor(completedPhases / 8)`，与"完整 8 阶段周期"语义对齐 |
+| 反模式 #21 | anti-patterns.md | self-as-verifier 模式下不得跳过阶段 6/7 直接跑 `--phase=8` 终检 |
+| TLA+ §14 时间推进建模 | tla-plus-guide.md | L4 时间推进/保留期建模模式（反例 + 正例 + 通用规则） |
+
 ## 命令一览
 
 | 命令 | 说明 |
@@ -153,6 +175,27 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 > 第八轮（2026-07-25）相比第五轮（已归档基线）：项目范围从基础博客扩展为 25 需求（新增站点管理/多博主/推荐/广告/统计/搜索/标签/分类/评论/通知/交叉引用/订阅/备份恢复 + 5 NFR + 3 CON），需求 5→25、DD 5→51、TLA+ 规格 8→17（新增 L4 层级 3 个）、图谱节点 35→216、边 141→902。全量测试 135→386（单元 77→226、集成 21→40、系统 22→64、验收 15→56）。采用 self-as-verifier 自驱模式 + 编排者-子代理分派。过程中修复 4 个源码 bug（push.service retry、article.store 副本、blogger.service 幂等、auth.service 预哈希）。所有门禁退出码 0。**用户已于 2026-07-25 在 acceptance-test-report.md §9 勾选 `confirm` 归档，project.json status=「项目完成」，rtm.json currentPhase=9，run-log.jsonl 追加 wm8-r012 归档 checkpoint 条目。**
 
+**端到端调测结论**（2026-07-26，第十二轮，扩展博客系统 32 需求，编排者-子代理分派 + self-as-verifier 自驱模式，**调测者代签 confirm 归档**）：
+
+| 指标 | 数值 |
+|---|---|
+| 范围 | 扩展博客系统后端，新增审计日志/RSS/Webhook/API 限流领域（32 需求 = 22 REQ + 6 NFR + 4 CON） |
+| 设计 | 22 SD + 22 INTF + 75 DD |
+| TLA+ 规格 | 22 个（1 L1 + 9 L2 + 7 L3 + 5 L4），SANY + TLC 零违反 |
+| 图谱 | 155 节点 638 边，信息流零违反，EXT-IN/EXT-OUT 边界完整 |
+| 源码 | 56 TS 文件（9 controllers + 15 services + 14 stores + 14 utils + app/server/types） |
+| 单元测试 | 250/250 通过，代码覆盖率 93.63% lines（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 69/69 通过（44 契约 + 15 跨模块 + 10 异常） |
+| 系统测试 | 25/25 通过（4 性能 + 3 可靠性 + 2 内存 + 5 安全 + 2 限流 + 3 E2E + 6 异常） |
+| 验收测试 | 63/63 通过（覆盖 32 需求 × 正常+异常+边界） |
+| 全量测试 | 407/407 通过（250 单元 + 69 集成 + 25 系统 + 63 验收） |
+| 阶段门评审 | phase1=0.887/A、phase2=0.8915/A、phase3=0.9075/A、phase4=0.914/A、phase5=0.9115/A、phase6=0.9195/A、phase7=0.9095/A、phase8=0.9095/A |
+| code-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule 22/22 + 状态转移 67 + Next 分支 + 不变式断言） |
+| 工件质量门 | check-artifact-gate 终检 exitCode=0，RTM 100%，missingItems=[] |
+| 用户确认 | `confirm`（2026-07-26 self-as-verifier 模式调测者代签；currentPhase=9，project.json status=项目完成） |
+
+> 第十二轮（2026-07-26）相比第八轮（25 需求）：项目范围从 25 需求扩展至 32 需求（新增审计日志 REQ-018/019 + RSS REQ-020 + Webhook REQ-021/022 + API 限流 NFR-006 + 审计日志保留 CON-004）。需求 25→32、SD 17→22、INTF 17→22、DD 51→75、TLA+ 17→22（L4 层级 3→5）、图谱节点 216→155（更精炼）、边 902→638。全量测试 386→407（单元 226→250、集成 40→69、系统 64→25、验收 56→63）。覆盖率 83.48%→93.63% lines。采用 self-as-verifier 自驱模式 + 编排者-子代理分派（每阶段独立 Task 子代理执行 S/V/G）。过程中修复 TLA+ L4 不变式违反（audit_log_retention AdvanceTime 越界）+ Verifier compositeScore 漂移（phase6 0.921→0.9195）+ RTM 映射遗漏（REQ-019/021 systemTest 缺失）+ Maturity R3 违反（completedCycles 6→7）。所有门禁退出码 0，调测者代签 confirm 归档，currentPhase=9，project.json status=项目完成。
+
 过程中发现并修正的缺陷（累计 5 项）：
 
 1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
@@ -163,16 +206,19 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 > 该目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向此目录。
 
-### 新门禁满足情况（2026-07-25）
+### 新门禁满足情况（2026-07-26 第十二轮）
 
-第6轮 demo 产物已通过新门禁校验：
-- `tla-manifest.json` 含 `basePath` 字段
-- 所有 spec `requirementIds` 含 SD-xxx 标识
-- Verifier 输出 passed↔qualityLevel 一致
-- RTM.codeModule 列已回填
-- code-TLA 一致性四维度全通过
-
-> 完整 DDD 重构版 demo 待 Part B 完成后作为参考实现模板。
+第 12 轮 32 需求 demo 产物已通过 v2+v3+v4 全部门禁校验：
+- `tla-manifest.json` 含 `basePath` 字段（v2）
+- 所有 spec `requirementIds` 含 SD-xxx 标识（v2）
+- Verifier 输出 passed↔qualityLevel 一致（v2）+ rawScores 自然波动（v3 防漂移）
+- RTM.codeModule 列已回填（v2）+ 阶段 5 强制回填（v3）
+- code-TLA 一致性四维度全通过（v2）+ Next 分支覆盖全部 specs（v3）
+- 阶段 1 NFR/CON 字段在 RTM 注册（v3）
+- check-artifact-gate 阶段级 `--phase=N` 全 8 阶段退出码 0（v3）
+- TLA+ states 目录自动清理，无残留（v3）
+- Maturity R3 单位对齐：completedCycles=7 ≥ floor(8/8)=1，不触发违反（v4）
+- EISDIR 友好提示：参数错误时输出明确文案（v4）
 
 ## 项目结构
 
@@ -182,7 +228,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
-│   │   ├── anti-patterns.md      #   反例与黑名单（19 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
+│   │   ├── anti-patterns.md      #   反例与黑名单（21 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #21 阶段级门禁跳过；#20 见 subagent-delegation.md + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
 │   │   ├── workflow.md           #   完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审 §7.4A）
 │   │   ├── agent-personas.md     #   Agent Personas（4 个评审角色提示词：code-reviewer / test-engineer / security-auditor / performance-auditor）
@@ -197,19 +243,29 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── rtm-guide.md          #   RTM 维护规则
 │   │   └── quality-standards.md #   质量标准
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
-│   │   ├── gate-logic.ts         #   工件质量门纯逻辑（单点事实源，含 TLA+ 资产 + SD→codeModule 终检）
-│   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json + graph.json + tla-manifest.json）
-│   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源）
+│   │   ├── gate-logic.ts         #   工件质量门纯逻辑（单点事实源，含 TLA+ 资产 + SD→codeModule 终检 + 阶段级 `--phase=N`）
+│   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json + graph.json + tla-manifest.json，支持 `--phase=N`）
+│   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源，4 targetKind × 5 子标准 + rawScores 防漂移）
 │   │   ├── check-verifier-output.ts  # Verifier 输出校验 CLI（防 Agent 输出漂移）
 │   │   ├── graph-logic.ts        #   图谱结构门禁纯逻辑（单点事实源，阶段 1–4，含信息流校验：黑洞/奇迹/死模块/边界完整性）
-│   │   ├── check-requirement-graph.ts  # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯 + 信息流校验，退出码 0/1/2）
-│   │   ├── tla-logic.ts          #   TLA+ 行为门禁纯逻辑（单点事实源，阶段 1–4，文件头/层次/拆解一致性校验）
-│   │   ├── check-tla-model.ts    #   TLA+ 行为门禁 CLI（SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性，退出码 0/1/2）
-│   │   ├── code-tla-logic.ts     #   代码-TLA+ 一致性校验纯逻辑（单点事实源，阶段 5，四维度：SD→codeModule/状态转移/Next分支/不变式覆盖）
+│   │   ├── check-requirement-graph.ts  # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯 + 信息流校验 + EISDIR 友好提示，退出码 0/1/2）
+│   │   ├── tla-logic.ts          #   TLA+ 行为门禁纯逻辑（单点事实源，阶段 1–4，文件头/层次/拆解一致性校验 + states 自动清理）
+│   │   ├── check-tla-model.ts    #   TLA+ 行为门禁 CLI（SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性 + `--keep-states`，退出码 0/1/2）
+│   │   ├── code-tla-logic.ts     #   代码-TLA+ 一致性校验纯逻辑（单点事实源，阶段 5，四维度：SD→codeModule/状态转移/Next分支/不变式覆盖 + EISDIR 友好提示）
 │   │   ├── check-code-tla-consistency.ts  # 代码-TLA+ 一致性回归 CLI（TypeScript Compiler API 解析 AST，退出码 0/1）
+│   │   ├── budget-logic.ts       #   Budget 门禁纯逻辑（R1-R5 时效性/schema/onExceed/killSwitch/触发检测）
+│   │   ├── check-budget.ts       #   Budget 门禁 CLI（`<budget.json> [--project=] [--run-log=] [--phase=N]`，退出码 0/1/2）
+│   │   ├── run-log-logic.ts      #   Run-log 门禁纯逻辑（R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序）
+│   │   ├── check-run-log.ts      #   Run-log 门禁 CLI（`<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`，退出码 0/1/2）
+│   │   ├── maturity-logic.ts     #   Maturity 门禁纯逻辑（R1-R5 schema/level/周期/history/降级；R3 单位对齐 `floor(completedPhases/8)`）
+│   │   ├── check-maturity.ts     #   Maturity 门禁 CLI（`<maturity.json> [--project=] [--run-log=]`，退出码 0/1/2）
+│   │   ├── checkpoint-logic.ts   #   Checkpoint 门禁纯逻辑（R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致）
+│   │   ├── check-checkpoint.ts   #   Checkpoint 门禁 CLI（`<run-log.jsonl> [--checkpoint-log=]`，退出码 0/1/2）
+│   │   ├── root-cause-logic.ts   #   RootCauseReport 校验纯逻辑（R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度）
+│   │   ├── check-rootcause-report.ts  # RootCauseReport 校验 CLI（`<report.json>`，退出码 0/1/2）
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
-│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线）
-│   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + tla/ + tla-e2e/ + code-tla/）
+│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 92 条）
+│   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
 ├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物，已归档）
@@ -247,7 +303,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审 §7.4A
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 19 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复）+ L1~L4 实现层教训 + F1~F10 失败模式
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 21 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #21 阶段级门禁跳过；#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）+ L1~L4 实现层教训 + F1~F10 失败模式
 - [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12/#13/#14/#15/#16/#17/#18/#19
 - [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）+ 质量标准 + 多人格多角度分析
 - [ingestion 子流程：分块分析](./w-model-dev/references/ingestion-chunk.md) - A 子代理分块分析细则（阶段 1–4）

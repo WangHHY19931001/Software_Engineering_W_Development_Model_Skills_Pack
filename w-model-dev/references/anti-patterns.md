@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（17 条流程反模式 #1~#17）
+- 反模式清单（18 条流程反模式 #1~#17 + #21；#20 见 subagent-delegation.md）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -38,6 +38,7 @@
 | 17 | TLA+ 建模与需求/设计不符未回退 | 规格通过但与需求/设计脱节，或需求/设计本身缺陷被掩盖，问题后移到编码 | 规格忠实于需求/设计但 TLC 仍发现违反 → 修正需求/设计并回退重跑；规格偏离 → 修正规格重跑（见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节） |
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复（见 [root-cause-locator.md](root-cause-locator.md)） |
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
+| 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节） |
 
 ### 命中高发阶段
 
@@ -62,6 +63,7 @@
 | #17（TLA+ 与需求/设计不符未回退） | 阶段 1~4 | [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节 |
 | #18（跳过 R 直接 S 返工） | 全阶段 | [root-cause-locator.md](root-cause-locator.md) + 各 phase-N「返工路径」节 |
 | #19（R 报告未 V 复审） | 全阶段 | [root-cause-locator.md](root-cause-locator.md)「R 产出质量标准」节 |
+| #21（阶段级门禁跳过） | 阶段 6/7/8 | [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -83,6 +85,7 @@
 | #15（TLA+ 死锁/违反放行） | [`check-tla-model.ts`](../scripts/check-tla-model.ts)（`TLA_JSON.passed=true` 才退出码 0） |
 | #16（TLA+ 占位/简化/错误实现） | V 评审（`reworkHints` 标注）+ [`check-tla-model.ts`](../scripts/check-tla-model.ts)（拆解决策校验） |
 | #17（TLA+ 与需求/设计不符未回退） | S 子代理核查 + 回退机制（无脚本；Agent 比对 `@requirement`/`@design` 与规格一致性） |
+| #21（阶段级门禁跳过） | [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts) `--phase=N` 参数 + run-log R5 O 越权检测（编排者自检阶段 N 是否跑 `--phase=N`） |
 
 ## 命中后的处理流程
 
@@ -116,6 +119,7 @@
 | #17 | TLC 发现违反，S 核查后确认规格忠实于需求/设计，但未回退修正需求/设计 | 回退到对应阶段：修正需求规格或设计文档 → 重写 TLA+ 规格 → 重跑 TLC | `check-tla-model.ts` 退出码 0（修正后重跑通过） |
 | #18 | V/G 不通过后编排者直接分派 S 返工（无 R 报告作为 S-fix 输入） | 回到 V/G 不通过节点，分派 R 定位 → V 复审 → G 门禁 → S-fix | `check-rootcause-report.ts` 退出码 0 + run-log R3 扩展（R+S-fix 一一对应） |
 | #19 | R 报告产出后无 V 复审记录（targetKind=rootcause）直接分派 S-fix | 回到 R 产出节点，分派 V 复审 → G 门禁后才可 S-fix | `check-verifier-output.ts`（targetKind=rootcause）退出码 0 + run-log R3 扩展（V 复审数=R 数） |
+| #21 | run-log.jsonl 中阶段 N（6/7）的 gate 动作参数为 `--phase=8`（或无 `--phase` 参数）且 N < 8；或阶段 N 完成但未跑对应 `--phase=N` 门禁 | 回到阶段 N 起点，强制跑 `npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=N [project-dir]` | `check-artifact-gate.ts --phase=N` 退出码 0 才算阶段 N 门禁闭环 |
 
 ### 门禁脚本退出码精确对应表
 
@@ -191,6 +195,23 @@
 **回退动作**：回退到对应阶段：修正需求规格或设计文档 → 重写 TLA+ 规格 → 重跑 TLC。
 
 **与 #16 的关系**：#16 是规格本身有缺陷（偏离需求/设计），#17 是规格忠实但需求/设计本身有缺陷——前者修规格，后者修需求/设计并回退。判定流程见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节。
+
+## #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
+
+> 第 13 轮 P3.1 新增。self-as-verifier 模式下编排者为加速调测，跳过阶段 6/7 的 `--phase=N` 门禁直接跑 `--phase=8` 终检，导致阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则。
+> 第 12 轮阶段 7 跳过 `--phase=7` 直接跑 `--phase=8`，导致 REQ-019/021 的 `systemTest` 字段缺失到终检才发现（详见 [AGENTS.md](../../AGENTS.md) §4 第十二轮"修复"节）。
+
+**检测信号**：run-log.jsonl 中阶段 N（6/7）的 gate 动作类型为 `check-artifact-gate` 但参数为 `--phase=8`（或无 `--phase` 参数，默认终检），且 N < 8；或阶段 N 完成但未跑对应 `--phase=N` 门禁。
+
+**回退动作**：回到阶段 N 起点，强制跑 `--phase=N`。
+
+**例外**：
+- 阶段 1-4 不强制跑 `check-artifact-gate`（设计阶段，无测试汇总校验）
+- 阶段 5 以 `check-code-tla-consistency` 为主，`--phase=5` 为辅
+
+**与反模式 #1 的关系**：#1 是"跳过阶段门评审直接进入下一阶段"（完全不跑门禁），#21 是"跑了门禁但跳过阶段级校验直接跑终检"（跑了但参数错误）。前者完全不校验，后者校验粒度错误。
+
+**与 SKILL.md 阶段路由表的对应**：SKILL.md「阶段 5-8 工件质量门」节已指引阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，本反模式是 self-as-verifier 模式下的强制约束。
 
 ## 实现层经验教训（来自端到端调测）
 

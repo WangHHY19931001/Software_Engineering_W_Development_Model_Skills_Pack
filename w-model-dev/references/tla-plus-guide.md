@@ -533,3 +533,90 @@ INVARIANT ArtifactGateConsistency
 - S-tla 子代理参考示例时仍须遵循 §2.0 命名规范、§文件头规范、§3 SD 覆盖率规则
 - V-tla 子代理审查时仍用 `targetKind=design`（不新增 targetKind 枚举值）
 - 现有反模式 #15-17（TLA+ 占位/简化/错误实现、建模不符合需求设计）仍为合规边界
+
+## 14. L4 时间推进/保留期建模模式（第 13 轮 P4.1）
+
+> S-tla 子代理在 L4 层级建模涉及"时间推进/保留期/过期清理"场景时的模式指引。第 12 轮 `L4_audit_log_retention` 靠 TLC 拦截才发现 `AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1` 违反 `Retention90Days` 不变式），本节提供正反例与通用规则，降低 S-tla 子代理对 TLC 试错的依赖。
+
+### 14.1 模式概述
+
+时间推进动作（`AdvanceTime`/`Tick`）+ 保留期不变式（`Retention`/`Expiry`）是 L4 状态机常见模式：系统按时间推进，过期数据按保留期清理。
+
+典型场景：
+- 审计日志保留 N 天后清理（第 12 轮 `L4_audit_log_retention`，CON-004 要求 90 天）
+- Token 过期清理（`L4_auth_token_lifecycle`）
+- 密码重置 Token 生命周期（`L4_password_reset_token_lifecycle`）
+- 限流器令牌桶补充（`L4_rate_limiter_token_bucket`）
+
+### 14.2 反例（第 12 轮 L4_audit_log_retention 错误实现）
+
+**错误实现**：
+
+```tla
+AdvanceTime ==
+  oldestAge' = oldestAge + 1
+
+Retention90Days == oldestAge <= RETENTION_DAYS
+```
+
+**TLC 报错**：`Invariant Retention90Days is violated.`
+
+**问题分析**：
+- `AdvanceTime` 无前置条件，`oldestAge` 可无限推进至 `RETENTION_DAYS+1`、`RETENTION_DAYS+2`...
+- 不变式 `Retention90Days` 要求 `oldestAge <= RETENTION_DAYS`，但 `AdvanceTime` 无上限守卫
+- 即使有 `PurgeExpiredLogs` 动作，若 `Next` 分支允许连续 `AdvanceTime` 不触发清理，不变式必然违反
+
+### 14.3 正例（第 12 轮修正后实现）
+
+```tla
+AdvanceTime ==
+  /\ logCount > 0                    \* 前置条件 1：无日志时不推进（避免无意义推进）
+  /\ oldestAge < RETENTION_DAYS      \* 前置条件 2：上限守卫（不超过保留期）
+  /\ oldestAge' = oldestAge + 1
+  /\ logCount' = logCount
+  /\ unchanged otherVars
+
+PurgeExpiredLogs ==
+  /\ oldestAge >= RETENTION_DAYS     \* 触发阈值：达到保留期才清理
+  /\ logCount' = logCount - expiredCount
+  /\ oldestAge' = oldestAge
+  /\ unchanged otherVars
+
+Next == \/ AdvanceTime
+        \/ PurgeExpiredLogs
+        \/ OtherActions
+
+Retention90Days == oldestAge <= RETENTION_DAYS
+```
+
+**关键设计**：
+1. `AdvanceTime` 前置条件 `logCount > 0`：无日志时不需要推进时间（避免空集合上的无意义动作）
+2. `AdvanceTime` 上限守卫 `oldestAge < RETENTION_DAYS`：确保推进后 `oldestAge' <= RETENTION_DAYS`，不变式保持
+3. `PurgeExpiredLogs` 触发阈值 `oldestAge >= RETENTION_DAYS`：与不变式边界对齐（`>=` 触发清理，`<=` 不变式守卫）
+4. `Next` 分支覆盖：`AdvanceTime` 与 `PurgeExpiredLogs` 均可达，清理动作不会被饿死
+
+### 14.4 通用规则
+
+1. **时间推进动作必须有前置条件**：
+   - 非空集合守卫（如 `logCount > 0`）：避免空集合上的无意义推进
+   - 上限约束（如 `oldestAge < RETENTION_DAYS`）：防止越界违反不变式
+
+2. **保留期不变式与清理动作触发阈值一致**：
+   - 不变式：`oldestAge <= RETENTION_DAYS`（`<=` 守卫）
+   - 触发阈值：`oldestAge >= RETENTION_DAYS`（`>=` 触发清理）
+   - 两者边界对齐：`RETENTION_DAYS` 是不变式上界，也是清理触发点
+
+3. **清理动作与时间推进动作分离**：
+   - 不要在 `AdvanceTime` 中同时清理（违反单一职责）
+   - `PurgeExpiredLogs` 独立动作，由 `Next` 分支调度
+
+4. **Next 分支覆盖**：
+   - `Next == \/ AdvanceTime \/ PurgeExpiredLogs \/ ...`
+   - 确保清理动作可达（不被 `AdvanceTime` 饿死）
+   - `check-tla-model.ts` 维度 3（Next 分支对应）会校验覆盖
+
+5. **与 §4 不变式业务语义对齐的关系**：
+   - §4 是 V-tla 评审项（不变式业务语义校验）
+   - §14 是 S-tla 产出参考（建模模式指引）
+   - 两者互补：S-tla 按 §14 建模，V-tla 按 §4 评审
+

@@ -503,6 +503,22 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+#### 3.4.10 第 13 轮：门禁鲁棒性与 maturity 语义约束（2026-07-26）
+
+> 第 12 轮 32 需求端到端调测归档后识别的 4 个问题修正约束。设计 spec：[`docs/superpowers/specs/2026-07-26-round13-gate-robustness-and-maturity-semantics-design.md`](./superpowers/specs/2026-07-26-round13-gate-robustness-and-maturity-semantics-design.md)。
+
+1. **P1.1 脚本 EISDIR 友好处理**：`check-code-tla-consistency.ts` / `check-requirement-graph.ts` 的 `readJson`/`readFile` 错误处理增加 EISDIR 分支，输出"参数应为文件路径，实际为目录"明确提示（退出码 2）。不引入 `.w-model/` 自动发现（保持脚本职责单一，自动发现是 `check-artifact-gate.ts` 的特化能力）。
+
+2. **P2.1 maturity R3 单位修正**：`maturity-logic.ts` R3 逻辑从 `completedCycles < completedPhases` 改为 `completedCycles < Math.floor(completedPhases / 8)`，与 schema 语义"完整 8 阶段周期数"对齐。1 完整周期 = 8 阶段，`completedCycles` 应 ≥ `floor(completedPhases / 8)`。第 12 轮调测时 `completedCycles=6` 触发 R3 违反被迫人工改为 7，但语义上 7 阶段只对应 0 个完整周期——原逻辑单位矛盾。
+
+3. **P3.1 反模式 #21**：self-as-verifier 模式下不得跳过阶段 6/7 门禁直接跑 `--phase=8` 终检，违反则回到阶段起点。第 12 轮阶段 7 跳过 `--phase=7` 直接跑 `--phase=8`，导致 REQ-019/021 的 `systemTest` 字段缺失到终检才发现。例外：阶段 1-4 不强制跑 `check-artifact-gate`；阶段 5 以 `check-code-tla-consistency` 为主，`--phase=5` 为辅。详见 `w-model-dev/references/anti-patterns.md` #21。
+
+4. **P4.1 tla-plus-guide.md §14**：新增 L4 时间推进/保留期建模模式指引（反例 + 正例 + 通用规则），降低 S-tla 子代理对 TLC 试错的依赖。第 12 轮 `L4_audit_log_retention` 的 `AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1`）触发 `Retention90Days` 不变式违反，靠 TLC 拦截后人工修复。详见 `w-model-dev/references/tla-plus-guide.md` §14。
+
+**不涉及范围**：不修改 `check-artifact-gate.ts`（P1.1 仅对齐 EISDIR）；不修改 `data-models.md` schema 定义（P2 仅修正 R3 逻辑）；不修改 `verifier-spec.md`（P3 反模式靠流程约束）；不修改 `w-model-dev-demo/`（第 12 轮已归档）。
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程

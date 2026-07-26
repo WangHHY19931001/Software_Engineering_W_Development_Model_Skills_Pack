@@ -177,6 +177,25 @@ npm run hill-climbing                           # （编排者 O 执行）L2+ �
 
 > 第十二轮（2026-07-26）相比第八轮（25 需求端到端调测）：项目范围从 25 需求扩展至 32 需求（新增审计日志 REQ-018/019 + RSS REQ-020 + Webhook REQ-021/022 + API 限流 NFR-006 + 审计日志保留 CON-004）。需求 25→32、SD 17→22、INTF 17→22、DD 51→75、TLA+ 17→22（L4 层级 3→5）、图谱节点 216→155（更精炼）、边 902→638。全量测试 386→407（单元 226→250、集成 40→69、系统 64→25、验收 56→63）。覆盖率 83.48%→93.63% lines。采用 self-as-verifier 自驱模式 + 编排者-子代理分派（每阶段独立 Task 子代理执行 S/V/G）。过程中修复 TLA+ L4 不变式违反（audit_log_retention AdvanceTime 越界）、Verifier compositeScore 漂移、RTM 映射遗漏（REQ-019/021 systemTest）、Express 4 路由权限缺失、ZodError 未捕获、限流中间件、Webhook 重试机制等问题。所有门禁退出码 0，self-as-verifier 模式调测者代签 `confirm` 归档。
 
+- **第十三轮：门禁鲁棒性与 maturity 语义修正结论**（2026-07-26）：
+
+| 指标 | 数值 |
+|---|---|
+| 触发 | 第 12 轮 32 需求端到端调测归档后识别 4 个问题（P1×1 + P2×1 + P3×1 + P4×1） |
+| 修正方案 | 方案 A 全量修正 4 个问题 |
+| 脚本改动 | 3 个（check-code-tla-consistency.ts / check-requirement-graph.ts / maturity-logic.ts） |
+| 新增 fixture | 1 个（maturity/bad-r3-cycle-mismatch.json） |
+| reference 文档 | 2 个（anti-patterns.md #21 + tla-plus-guide.md §14） |
+| 顶层文档 | 3 个（SSoT §3.4.10 + AGENTS.md §4 + CHANGELOG.md） |
+| self-test | 基线 91→92（+1 新测试）全通过 |
+| vitest | 72/72 不变 |
+| TypeScript strict | 0 错误 |
+| 反模式 | #20 → #21（新增"阶段级门禁跳过"） |
+| EISDIR 手动验证 | check-requirement-graph.ts 传目录路径输出"参数应为文件路径"提示，退出码 2 |
+| maturity R3 回归 | 第 12 轮 demo maturity.json（completedCycles=7, completedPhases=8）不触发 R3 |
+
+> 第十三轮（2026-07-26）相比第十二轮（端到端调测）：门禁脚本从"裸 Node 报错"进化为"EISDIR 友好提示"（P1.1）；maturity R3 从"单位矛盾的简化语义"进化为"floor(completedPhases/8) 正式语义"（P2.1）；self-as-verifier 模式从"无阶段级门禁约束"进化为"反模式 #21 强制阶段 6/7/8 跑 --phase=N"（P3.1）；TLA+ 指南从"无时间推进建模指引"进化为"§14 正反例 + 通用规则"（P4.1）。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：

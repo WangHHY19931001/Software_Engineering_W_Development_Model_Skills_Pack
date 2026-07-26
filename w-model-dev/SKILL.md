@@ -221,6 +221,8 @@ npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|
 ### 阶段 5/6/7 阶段级工件校验（第 9 轮 P1.1）
 
 > 阶段 5/6/7 G 门禁推荐使用 `--phase=N` 参数做阶段级校验，避免用终检（`--phase=8`，默认）提前否决 pending 的后续测试层。第 8 轮调测发现：阶段 6 G 门禁若用终检，会因为 `systemTest` / `acceptanceTest` 字段 pending 而误判为不通过，导致阶段无法推进。
+>
+> **反模式 #21（第 13 轮 P3.1）**：self-as-verifier 模式下不得跳过阶段 6/7 门禁直接跑 `--phase=8` 终检。每阶段完成必须跑对应 `--phase=N`，违反则回到阶段起点。阶段 6/7 跳过 `--phase=N` 直接跑终检会导致阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则。详见 [references/anti-patterns.md](references/anti-patterns.md) #21。
 
 [`check-artifact-gate.ts`](scripts/check-artifact-gate.ts) 支持 `--phase=N`（简写 `-p N`）参数，按阶段分层校验：
 

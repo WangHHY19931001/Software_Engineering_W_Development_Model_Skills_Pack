@@ -3,6 +3,40 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [13.0.0] - 2026-07-26
+
+### 第 13 轮门禁鲁棒性与 maturity 语义修正
+
+基于第 12 轮 32 需求端到端调测归档后识别的 4 个问题（P1×1 + P2×1 + P3×1 + P4×1）全量修正。
+
+#### 新增
+
+- **P2.1 R3 单位修正**：maturity-logic.ts R3 逻辑从 `completedCycles < completedPhases` 改为 `completedCycles < Math.floor(completedPhases / 8)`，与 schema 语义"完整 8 阶段周期数"对齐
+- **P3.1 反模式 #21**：self-as-verifier 模式下不得跳过阶段 6/7 门禁直接跑 `--phase=8` 终检，违反则回到阶段起点
+- **P4.1 tla-plus-guide.md §14**：L4 时间推进/保留期建模模式指引（反例 + 正例 + 通用规则）
+- 1 新 fixture：maturity/bad-r3-cycle-mismatch.json（completedPhases=8, completedCycles=0 应触发 R3）
+- 1 新 self-test（基线 91→92）：P2.1 R3 单位不匹配样本
+
+#### 变更
+
+- check-code-tla-consistency.ts: readJson 增加 EISDIR 友好提示（P1.1）
+- check-requirement-graph.ts: readFile 增加 EISDIR 友好提示（P1.1）
+- maturity-logic.ts: R3 逻辑修正（`floor(completedPhases/8)`）+ 删除"简化语义"注释（P2.1）
+- anti-patterns.md: 新增 #21 阶段级门禁跳过 + 目录/清单/对应关系/检测信号表同步更新（P3.1）
+- SKILL.md: 阶段 5/6/7 阶段级工件校验节增加反模式 #21 强制约束（P3.1）
+- tla-plus-guide.md: 新增 §14 时间推进/保留期建模模式（P4.1）
+- SSoT §3.4.10: 第 13 轮 4 项约束条款
+- AGENTS.md §4: 第 13 轮修正结论（含指标表 + 与第十二轮对比）
+
+#### 验证
+
+- TypeScript strict 0 错误
+- self-test 92/92 全通过（基线 91→92）
+- vitest 72/72 全通过（不修改 vitest 套件）
+- EISDIR 手动验证：check-requirement-graph.ts 传目录路径输出"参数应为文件路径，实际为目录"提示，退出码 2
+- maturity R3 回归：第 12 轮 demo maturity.json（completedCycles=7, completedPhases=8）不触发 R3（`floor(8/8)=1 ≤ 7`）
+- 文档一致性：anti-patterns.md #21 ↔ SKILL.md 阶段路由表 ↔ SSoT §3.4.10 P3.1 ↔ AGENTS.md §4 第十三轮 ↔ CHANGELOG [13.0.0] 互引一致
+
 ## [12.0.0] - 2026-07-26
 
 ### 第 12 轮 W 模型 32 需求端到端调测
