@@ -173,18 +173,24 @@ export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): str
 }
 
 /**
- * 计算样本方差（总体方差，除以 n 而非 n-1）。
+ * 计算样本方差（总体方差，除以 N 而非 N-1）。
+ * 用于防漂移校验：根据 rawScores 重算方差，与 variance 字段对比，
+ * 防止 Agent 谎报低方差掩盖「单次评估复制 N 次」的作弊（§3.2.1 规则 5）。
  *
- * 用途：校验外部 Agent 谎报 variance 的漂移行为。Agent 不能用低方差
- * 掩盖「实际只评估 1 次、复制 N 次填入 rawScores」的作弊。
- *
- * 当 rawScores 长度 < 2 时方差无意义，返回 0。
+ * 边界保护（sig-009）：
+ * - 输入空数组或单元素数组 → 返回 0（无方差可言）
+ * - 输入含 NaN/Infinity → 返回 NaN（让上游 isNumber 校验拦截）
+ * - 计算结果 NaN/Infinity → 返回 NaN（让上游 VARIANCE_EPSILON 比较拦截）
  */
 function computeVariance(scores: number[]): number {
   if (scores.length < 2) return 0;
-  const mean = scores.reduce((s, x) => s + x, 0) / scores.length;
-  const sumSq = scores.reduce((s, x) => s + (x - mean) * (x - mean), 0);
-  return sumSq / scores.length;
+  // 边界保护：含 NaN/Infinity 的输入返回 NaN
+  if (scores.some(v => !Number.isFinite(v))) return Number.NaN;
+  const mean = scores.reduce((sum, v) => sum + v, 0) / scores.length;
+  const sumSqDiff = scores.reduce((sum, v) => sum + (v - mean) ** 2, 0);
+  const variance = sumSqDiff / scores.length;
+  // 边界保护：计算结果 NaN/Infinity 返回 NaN
+  return Number.isFinite(variance) ? variance : Number.NaN;
 }
 
 /**
@@ -351,13 +357,16 @@ export function checkVerifierOutput(
       reasons.push(`subCriteria[${idx}].variance ${sc.variance} > 阈值 ${varianceThreshold}（不可重复，需重评）`);
     }
 
-    // 防漂移：重算 rawScores 方差并与 variance 字段对比。
+    // 防漂移规则 5（§3.2.1）：重算 rawScores 方差并与 variance 字段对比。
     // 防止 Agent 谎报低方差以掩盖「实际只评估 1 次、复制 N 次」的作弊。
+    // 边界保护（sig-009）：computeVariance 对 NaN/Infinity 返回 NaN，
+    //   Math.abs(NaN - x) = NaN > VARIANCE_EPSILON 为 false，不会误报；
+    //   上游 isNumber(sc.variance) 已过滤非数字 variance 字段。
     if (Array.isArray(sc.rawScores) && sc.rawScores.length >= 2 && isNumber(sc.variance)) {
       const numericScores = sc.rawScores.filter(isNumber) as number[];
       if (numericScores.length === sc.rawScores.length && numericScores.length >= 2 && isNumber(sc.variance)) {
         const recomputed = computeVariance(numericScores);
-      if (Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
+      if (Number.isFinite(recomputed) && Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
         reasons.push(
           `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
         );
