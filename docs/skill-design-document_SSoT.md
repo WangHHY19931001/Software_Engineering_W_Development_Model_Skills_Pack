@@ -1838,6 +1838,64 @@ interface RunLogEntry {
 
 ---
 
+## 10H. SkillOpt 方法论吸收（Loop 4 信号消费路径）
+
+### 10H.1 目的
+
+消费 §10G（Loop 4）产出的 `HarnessImprovementReport` 信号，应用 SkillOpt「bounded edit + validation gate」方法论对技能包 4 类资产（技能/模板/参考/脚本）做离线进化。**吸收方法论而非工具运行**——不引入 Python 依赖、不调用 LLM、不做 rollout 训练。
+
+### 10H.2 与 §11「技能自演化不在本仓库」的协调
+
+- §11 原意：技能**自动演化**（LLM 驱动 rollout/reflect）不在本仓库
+- 本节吸收：**方法论**（bounded edit + validation gate 流程范式），不是工具运行
+- 类比：§10E TLA+ 方法论吸收（tla-plus-guide.md）是方法论吸收而非 TLA+ 工具内置——本节同构
+
+### 10H.3 六段式循环类比映射
+
+| SkillOpt 训练循环 | w-model-dev 离线进化 | 说明 |
+|---|---|---|
+| rollout | （已完成）Loop 4 产出 HarnessImprovementReport | 信号源已就绪 |
+| reflect | 主代理审查信号 + 产出 edit proposal | 确定性，无 LLM |
+| aggregate | 多信号合并为 edit 批次（低风险/高风险） | 按风险分批 |
+| select | 按 bounded edit 边界裁剪 edit 数量 | 单文件≤3、单信号≤2 文件、全轮≤15 |
+| update | 应用 edit 到 4 类资产 | 技能/模板/参考/脚本 |
+| gate | self-test + vitest + tsc + fixture validation | 真实退出码 |
+
+### 10H.4 bounded edit 边界规则
+
+- 单文件单次 edit 最多 3 处（防过度编辑）
+- 单信号最多影响 2 个文件（防爆炸半径）
+- 全轮总 edit 数 ≤ 15 处
+
+### 10H.5 validation gate 标准
+
+| 阶段 | 命令 | 退出码 |
+|---|---|---|
+| V1 | `npx tsc --noEmit` | 0 |
+| V2 | `npm run self-test` | 0 |
+| V3 | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 |
+| V4 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <fixture>` | 1（触发 R11/R12） |
+
+### 10H.6 与 Loop 4 的边界
+
+| 角色 | 职责 | 边界 |
+|---|---|---|
+| w-model-dev Loop 4 | 产出 HarnessImprovementReport 信号 | 不自动改 harness |
+| SkillOpt 方法论吸收（本节） | 消费信号 → reflect → bounded edit → validation gate | 不引入 SkillOpt 工具；不调用 LLM |
+| 外部 SkillOpt/darwin-skill | 真实 SkillOpt 工具运行 | 仍由外部完成（§11） |
+
+### 10H.7 人审流程
+
+1. spec 阶段：用户审查设计文档
+2. 实施阶段：每个 Phase E 批次完成后 CHECKPOINT 确认
+3. V 复审：候选反模式需 V 子代理复审转正
+
+### 10H.8 实现位置
+
+权威采用指南：`w-model-dev/references/skillopt-adoption.md`（本节为可执行细则）
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
