@@ -216,3 +216,33 @@ describe('Part A 门禁增强回归测试', () => {
     });
   });
 });
+
+describe('R11/R12 Verifier 改进（sig-002）', () => {
+  it('R11: summary 长度 < 50 字符应失败', () => {
+    const sample = loadVerifierSample('bad-summary-too-short.json');
+    const result = checkVerifierOutput(sample);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some(r => /summary 长度.*< 50.*R11/.test(r))).toBe(true);
+  });
+
+  it('R11: summary 长度 ≥ 50 字符应通过（valid.json）', () => {
+    const sample = loadVerifierSample('valid.json');
+    const result = checkVerifierOutput(sample);
+    // valid.json summary 已扩展至 ≥50 字符，R11 应通过
+    expect(result.reasons.some(r => /R11/.test(r))).toBe(false);
+  });
+
+  it('R12: evidence 缺具体引用应失败', () => {
+    const sample = loadVerifierSample('bad-evidence-empty.json');
+    const result = checkVerifierOutput(sample);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some(r => /evidence.*缺具体引用.*R12/.test(r))).toBe(true);
+  });
+
+  it('R12: evidence 含具体引用应通过（valid.json）', () => {
+    const sample = loadVerifierSample('valid.json');
+    const result = checkVerifierOutput(sample);
+    // valid.json evidence 含 "REQ-001 §3.2" 等具体引用，R12 应通过
+    expect(result.reasons.some(r => /R12/.test(r))).toBe(false);
+  });
+});
