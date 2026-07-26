@@ -168,6 +168,18 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/rawScores 全同/],
     description: 'P3.10 coverage 维度 rawScores 全同 [0.90,0.90,0.90]，应被防漂移规则 1 拦截',
   },
+  {
+    file: 'bad-summary-too-short.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/summary 长度.*< 50.*R11/],
+    description: 'summary 长度 < 50 字符，应被 R11 校验拦截（sig-002）',
+  },
+  {
+    file: 'bad-evidence-empty.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/evidence.*缺具体引用.*R12/],
+    description: 'evidence 缺具体引用，应被 R12 校验拦截（sig-002）',
+  },
 ];
 
 const GATE_CASES: GateCase[] = [
