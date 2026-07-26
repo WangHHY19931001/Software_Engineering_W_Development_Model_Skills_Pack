@@ -143,6 +143,36 @@ function isIso8601(value: unknown): value is string {
 }
 
 /**
+ * R11（sig-002）：summary 长度校验。
+ * 防止 V 评审 summary 模板化（空泛措辞）。summary 须 ≥ 50 字符。
+ * 检测信号：Loop 4 category=prompt severity=S2，Jaccard 相似度 > 0.8 且长度 < 50。
+ */
+export function checkR11SummaryLength(summary: unknown): string | null {
+  if (typeof summary !== 'string') return null; // 类型校验由 R1 负责
+  if (summary.trim().length < 50) {
+    return `summary 长度 ${summary.trim().length} < 50 字符（R11：防止模板化空泛措辞，须含关键决策+产物结构+遗留风险三要素）`;
+  }
+  return null;
+}
+
+/**
+ * R12（sig-002）：subCriteria evidence 非空校验。
+ * 防止 V 评审 evidence 字段空泛描述。每个子标准 evidence 须引用具体行号/文件路径。
+ * 注：evidence 字段非空校验已在主循环 R4 实现，R12 增强为「引用具体片段」校验。
+ */
+export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): string | null {
+  if (typeof evidence !== 'string') return null; // 类型校验由 R4 负责
+  const e = evidence.trim();
+  if (e === '') return null; // 空校验由 R4 负责
+  // R12：evidence 须含具体引用（行号/文件路径/章节号），禁止纯描述
+  const hasSpecificRef = /(\.md|\.ts|\.json|§|L\d+|line|行|节|章|REQ-|SD-|DD-|INTF-|TC-|UAT-)/.test(e);
+  if (!hasSpecificRef && e.length < 20) {
+    return `subCriteria[${idx}].evidence "${e}" 缺具体引用（R12：须含行号/文件路径/章节号/ID，如「REQ-001 §3.2」「article.service.ts:L45」）`;
+  }
+  return null;
+}
+
+/**
  * 计算样本方差（总体方差，除以 n 而非 n-1）。
  *
  * 用途：校验外部 Agent 谎报 variance 的漂移行为。Agent 不能用低方差
@@ -407,6 +437,10 @@ export function checkVerifierOutput(
 
     if (typeof sc.evidence !== 'string' || sc.evidence.trim() === '') {
       reasons.push(`subCriteria[${idx}].evidence 必须为非空字符串（引用目标内具体片段）`);
+    } else {
+      // R12（sig-002）：evidence 须含具体引用，禁止纯描述
+      const r12 = checkR12EvidenceSpecificity(sc.evidence, idx);
+      if (r12) reasons.push(r12);
     }
   }
 
@@ -461,9 +495,12 @@ export function checkVerifierOutput(
     reasons.push(`passed ${passed} 与 qualityLevel ${qualityLevel} 不一致（应 = ${expectedPassed}）`);
   }
 
-  // 7. summary
+  // 7. summary（R1 非空 + R11 长度≥50，sig-002 改进）
   if (typeof o.summary !== 'string' || o.summary.trim() === '') {
     reasons.push('summary 必须为非空字符串');
+  } else {
+    const r11 = checkR11SummaryLength(o.summary);
+    if (r11) reasons.push(r11);
   }
 
   // 8. reworkHints
