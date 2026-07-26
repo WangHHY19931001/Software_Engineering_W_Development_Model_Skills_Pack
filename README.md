@@ -133,7 +133,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
 | `/wm import <文件路径>` | 从 JSON 导入项目 |
 
-## 参考实现：`w-model-dev-demo/`
+## 参考实现：`w-model-dev-demo/`（已于 2026-07-26 清理，结论见 AGENTS.md §4 第十二轮）
 
 [`w-model-dev-demo/`](./w-model-dev-demo) 是 W 模型 8 阶段端到端调测的完整产物——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。
 
@@ -199,7 +199,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 过程中发现并修正的缺陷（累计 5 项）：
 
-1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md) §5。
+1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md)（已清理） §5。
 2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段抛错连锁挂掉 4 个测试套件。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。
 3. **ArticleService 类型导出消失**（2026-07-21 回归发现）：`comment-service.ts` 的 `import type { ArticleService }` 类型丢失。修正方案：恢复 `export class ArticleService`。
 4. **vitest mock 与 express NextFunction 类型不兼容**（2026-07-21 回归发现）：`next.mock.calls[0][0]` 报 TS2339。修正方案：用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问。
@@ -269,7 +269,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
-├── w-model-dev-demo/             # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物，已归档）
+├── w-model-dev-demo/             # 已清理（2026-07-26），结论见 AGENTS.md §4
 │   ├── docs/                     #   8 阶段产出文档（需求 / 设计 / 四级测试用例与报告）
 │   ├── src/                      #   实现代码（Express + TS，控制器 / 服务 / 存储 / 中间件）
 │   ├── tests/                    #   四级测试（unit / integration / system / acceptance）+ perf/（k6 性能基线）
@@ -319,7 +319,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集
-- [参考实现](./w-model-dev-demo) - W 模型 8 阶段端到端调测产物（博客系统后端）
+- [参考实现](./w-model-dev-demo) - W 模型 8 阶段端到端调测产物（博客系统后端）（已清理）
 - [变更日志](./CHANGELOG.md)
 - [贡献指南](./CONTRIBUTING.md)
 

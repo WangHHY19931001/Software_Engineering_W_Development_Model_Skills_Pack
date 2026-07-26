@@ -3,6 +3,21 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [14.1.0] - 2026-07-26
+
+### 第 14.1 轮 参考实现 artifacts 清理
+
+#### 变更
+- 删除 `w-model-dev-demo/` 目录（src/40+ 文件 + tests/40+ 文件 + tla/22 规格 + docs/9 文档 + coverage/）
+- 参考实现已通过第12轮 8 阶段验证并归档，结论已写入 AGENTS.md §4 第十二轮
+- README.md 同步标注「已清理」（§参考实现 + 目录树 + 底部链接）
+- AGENTS.md 同步标注「已清理」（§1 表 + §4 参考实现节 + 各轮结论链接）
+
+#### 验证
+- TypeScript strict: 0 错误（未改脚本）
+- self-test: 94/94 通过（未改测试）
+- vitest: 76/76 通过（未改测试）
+
 ## [14.0.0] - 2026-07-26
 
 ### 第 14 轮 SkillOpt 方法论吸收
