@@ -277,7 +277,7 @@ graph TD
 
 | 角色 | 简称 | 职责 | 允许动作 | 禁止动作 |
 |---|---|---|---|---|
-| **编排者** | O | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化 | 读 `.w-model/*.json`、跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看退出码（只读）、`git status`、`ls`、向用户展示证据 | 写代码、改文档、产出 `VerifierOutput` JSON、生成测试用例、改 RTM 实体（产出 / 评审 / 门禁结果内容） |
+| **编排者** | O | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化 | 读 `.w-model/*.json`、跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看退出码（只读）、`git status`、`ls`、向用户展示证据、离线进化场景下执行 reflect→bounded edit→validation gate（状态读写+分析，非实施；区别于运行时阶段产物生成，反模式 #10 约束运行时编排） | 写代码、改文档、产出 `VerifierOutput` JSON、生成测试用例、改 RTM 实体（产出 / 评审 / 门禁结果内容） |
 | **产出子代理** | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体 +（阶段 1–4）产出 TLA+ 层次化状态机规格（`.tla` + `.cfg` + `tla-manifest.json` 实体） | 写文件、跑测试运行器（仅产出阶段）、改 `.w-model/rtm.json` 实体、写 `tla/*.tla` / `tla/*.cfg` / `.w-model/tla-manifest.json` | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-tla-model.ts`、越阶段产出、产出占位/简化/错误 TLA+ 实现（反模式 #16） |
 | **评审子代理** | V | 按 [`agent-personas.md`](../w-model-dev/references/agent-personas.md) + [`verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 产出 `VerifierOutput` JSON；含 TLA+ 规格与需求/设计的语义一致性评审 | 读产物文件（含 `.tla`）、产出 JSON 评审 | 跑门禁脚本、改产物文件、改 RTM |
 | **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-tla-model.ts`（阶段 1–4） + 回填证据摘要 | 跑门禁脚本、读 GATE_JSON / Verifier JSON / TLA_JSON、产出证据摘要字符串 | 改产物文件、产出 `VerifierOutput` JSON、改 RTM 实体、改 `.tla` / `tla-manifest.json` 实体 |
@@ -1836,6 +1836,8 @@ interface RunLogEntry {
 | 外部 SkillOpt/darwin-skill | 消费信号做技能自演化 | 重写 prompt/工具/验证规则；可能用 LLM |
 | 人 | 审查报告 + 决定应用哪些信号 | 低风险人审后手动改；高风险人审+回归测试 |
 
+> Loop 4 产出的 HarnessImprovementReport 信号消费流程详见 §10H（SkillOpt 方法论吸收）。
+
 ---
 
 ## 10H. SkillOpt 方法论吸收（Loop 4 信号消费路径）
@@ -1967,6 +1969,7 @@ interface RunLogEntry {
 | 10D 成本预算与运行日志 | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑 | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4） |
 | 10F 事件驱动循环（Loop 3） | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2） |
 | 10G 爬坡循环（Loop 4） | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用） |
+| §10H SkillOpt 方法论吸收 | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调 | `w-model-dev/references/skillopt-adoption.md`（可执行细则） | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10E TLA+） |
 | 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
 
 ---
