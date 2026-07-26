@@ -1,0 +1,176 @@
+{
+  "reportId": "hc-2026-07-26-expanded-001",
+  "generatedAt": "2026-07-26T20:00:00Z",
+  "analysisWindow": {
+    "from": "2026-07-20T00:00:00Z",
+    "to": "2026-07-26T20:00:00Z",
+    "runLogEntries": 52,
+    "phasesCovered": [1, 2, 3, 4, 5]
+  },
+  "signals": [
+    {
+      "signalId": "sig-001",
+      "category": "prompt",
+      "severity": "S2",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-23T10-15-00Z", "run-2026-07-24T14-20-00Z"],
+        "patterns": ["V 评审 summary 跨 3 个阶段 Jaccard 相似度 0.87"],
+        "metrics": {"occurrences": 3, "trend": "stable"}
+      },
+      "suggestion": "强化 verifier-spec.md §6 summary 字段内容要求，明确禁止模板化措辞，要求含≥1关键决策摘要+1-2句产物核心结构+遗留风险三要素",
+      "affectedAssets": ["w-model-dev/references/verifier-spec.md"],
+      "priority": 2
+    },
+    {
+      "signalId": "sig-002",
+      "category": "verification-rule",
+      "severity": "S1",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-24T16-00-00Z"],
+        "patterns": ["V passed=true 但 G check-artifact-gate.ts exit=1，频次 4 次"],
+        "metrics": {"occurrences": 4, "trend": "increasing"}
+      },
+      "suggestion": "收紧 V 评审规则：新增 R11 summary 长度≥50字符 + R12 evidence 非空校验",
+      "affectedAssets": ["w-model-dev/references/verifier-spec.md", "w-model-dev/scripts/verifier-logic.ts"],
+      "priority": 1
+    },
+    {
+      "signalId": "sig-003",
+      "category": "prompt",
+      "severity": "S2",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-25T09-00-00Z"],
+        "patterns": ["SKILL.md hill-climbing 命令缺参数示例，用户多次询问用法"],
+        "metrics": {"occurrences": 2, "trend": "stable"}
+      },
+      "suggestion": "SKILL.md hill-climbing 命令增参数示例（--from --to --phase）",
+      "affectedAssets": ["w-model-dev/SKILL.md"],
+      "priority": 2
+    },
+    {
+      "signalId": "sig-004",
+      "category": "prompt",
+      "severity": "S3",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-25T11-00-00Z"],
+        "patterns": ["SKILL.md 自检清单未引用反模式 #20/#21，用户漏检"],
+        "metrics": {"occurrences": 1, "trend": "stable"}
+      },
+      "suggestion": "SKILL.md 自检清单补引反模式 #20（只规划不执行）/#21（阶段级门禁跳过）",
+      "affectedAssets": ["w-model-dev/SKILL.md"],
+      "priority": 3
+    },
+    {
+      "signalId": "sig-005",
+      "category": "prompt",
+      "severity": "S2",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-24T10-00-00Z"],
+        "patterns": ["review-report.md 模板 summary 字段缺三要素结构提示，产出 summary 空泛"],
+        "metrics": {"occurrences": 3, "trend": "stable"}
+      },
+      "suggestion": "review-report.md 模板 summary 字段增三要素结构提示（关键决策+产物结构+遗留风险）",
+      "affectedAssets": ["w-model-dev/templates/review-report.md"],
+      "priority": 2
+    },
+    {
+      "signalId": "sig-006",
+      "category": "prompt",
+      "severity": "S3",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-24T15-00-00Z"],
+        "patterns": ["test-report.md 模板测试结论节缺量化指标占位符，产出结论模糊"],
+        "metrics": {"occurrences": 2, "trend": "stable"}
+      },
+      "suggestion": "test-report.md 模板测试结论节增量覆盖率/通过率/性能指标占位符",
+      "affectedAssets": ["w-model-dev/templates/test-report.md"],
+      "priority": 3
+    },
+    {
+      "signalId": "sig-007",
+      "category": "prompt",
+      "severity": "S3",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-23T16-00-00Z"],
+        "patterns": ["requirement-spec.md 模板 NFR 字段缺可测量性提示，产出 NFR 不可验证"],
+        "metrics": {"occurrences": 2, "trend": "stable"}
+      },
+      "suggestion": "requirement-spec.md 模板 NFR 字段增可测量性提示（量化指标+验收阈值）",
+      "affectedAssets": ["w-model-dev/templates/requirement-spec.md"],
+      "priority": 3
+    },
+    {
+      "signalId": "sig-008",
+      "category": "verification-rule",
+      "severity": "S2",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-25T14-00-00Z"],
+        "patterns": ["anti-patterns.md #20/#21 缺检测信号字段，无法被 Loop 4 自动检测"],
+        "metrics": {"occurrences": 1, "trend": "stable"}
+      },
+      "suggestion": "anti-patterns.md #20/#21 增检测信号字段（detectionSignal）",
+      "affectedAssets": ["w-model-dev/references/anti-patterns.md"],
+      "priority": 2
+    },
+    {
+      "signalId": "sig-009",
+      "category": "tool",
+      "severity": "S2",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-25T17-00-00Z"],
+        "patterns": ["verifier-logic.ts rawScores 方差重算逻辑缺注释+边界保护（NaN/Infinity）"],
+        "metrics": {"occurrences": 1, "trend": "stable"}
+      },
+      "suggestion": "verifier-logic.ts 方差重算逻辑加注释 + NaN/Infinity 边界保护",
+      "affectedAssets": ["w-model-dev/scripts/verifier-logic.ts"],
+      "priority": 2
+    },
+    {
+      "signalId": "sig-010",
+      "category": "anti-pattern",
+      "severity": "S3",
+      "evidence": {
+        "runLogRefs": ["run-2026-07-25T18-00-00Z"],
+        "patterns": ["valid.json candidateAntiPatterns 提取候选 #22 V 评审 summary 模板化"],
+        "metrics": {"occurrences": 1, "trend": "stable"}
+      },
+      "suggestion": "anti-patterns.md 新增候选反模式 #22（标 pending V 复审）：V 评审 summary 模板化——跨阶段 Jaccard 相似度>0.8 且长度<50字符",
+      "affectedAssets": ["w-model-dev/references/anti-patterns.md"],
+      "priority": 3
+    }
+  ],
+  "metaAnalysis": {
+    "topFailurePatterns": ["V-G 矛盾", "summary 模板化", "返工阶段 4 TLA+"],
+    "reworkHotspots": ["阶段 4"],
+    "verifierDisagreements": 4,
+    "budgetBurnTrend": "stable",
+    "operationalFailureHits": {"O3": 4, "O1": 0, "O2": 0, "O4": 1, "O5": 0, "O6": 0},
+    "comprehensionQuality": {"emptyOrTrivialRate": 0.125, "uniqueDecisionRate": 0.75},
+    "appliedAssetClasses": ["skill", "template", "reference", "script"],
+    "riskProfile": {"lowRisk": 7, "highRisk": 3}
+  },
+  "recommendations": {
+    "promptTweaks": [
+      "verifier-spec.md §6 summary 字段：明确要求含 ≥1 关键决策摘要 + 1-2 句产物核心结构 + 遗留风险",
+      "禁止 summary 使用「评审通过」「质量良好」等空泛措辞",
+      "SKILL.md hill-climbing 命令增参数示例",
+      "SKILL.md 自检清单补引反模式 #20/#21",
+      "review-report.md 模板 summary 增三要素结构提示",
+      "test-report.md 模板测试结论节增量指标占位符",
+      "requirement-spec.md 模板 NFR 字段增可测量性提示"
+    ],
+    "toolImprovements": [
+      "verifier-logic.ts 新增 R11 summary 长度校验（≥50 字符）",
+      "verifier-logic.ts 新增 R12 evidence 非空校验",
+      "verifier-logic.ts 方差重算逻辑加注释 + NaN/Infinity 边界保护"
+    ],
+    "verificationRuleTightening": [
+      "V 评审 evidence 字段须引用具体行号/文件路径，禁止空泛描述",
+      "anti-patterns.md #20/#21 增检测信号字段"
+    ],
+    "candidateAntiPatterns": [
+      "#22（候选，pending V 复审）V 评审 summary 模板化：跨阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符"
+    ],
+    "maturityAdjustments": []
+  }
+}
