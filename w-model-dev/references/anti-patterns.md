@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（28 条流程反模式 #1~#19 + #20 + #21~#28；#20 在 subagent-delegation.md）
+- 反模式清单（29 条流程反模式 #1~#19 + #20 + #21~#29；#20 在 subagent-delegation.md）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -46,6 +46,7 @@
 | 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败（第 15 轮共性问题 B） | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 13 份） |
+| 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 
 ### 命中高发阶段
 
@@ -298,6 +299,48 @@
 - 10 个 `*-logic.ts`（verifier / gate / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause）已集成 `validateBySchema` 前置校验。
 - self-test 基线 99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
 - vitest 90 测试全通过（9 个 .test.ts 文件）。
+
+### 反模式 #29：BDD 建模与需求/设计/TLA+ 不符未回退
+
+**危害**：BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段。
+
+**触发场景**：
+- BDD features 写完后未跑 `check-bdd-model.ts` D4 等价性校验即放行。
+- BDD 状态机七要素与同层 TLA+ spec 的 State/Init/Next/Invariants 不一致。
+- BDD scenario 路径在 TLA+ 转移表中无对应分支，但未回退修正 BDD 或 TLA+。
+- BDD features 与需求 (REQ) / 设计 (SD/INTF/DD) 脱节，仅作为「写完就过」的形式产物。
+
+**正确做法**：
+- BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）。
+- BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行。
+- 接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）。
+- 实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项。
+
+**检测信号**：
+- `check-bdd-model.ts` 退出码 1，violations 含 `[D4:...]` 前缀的等价性违反。
+- BDD features 文件头 `@tla-spec` 与 manifest.tlaSpecId 不一致。
+- BDD 状态机状态集与 TLA+ spec 状态集差异 > 0。
+- BDD scenario 路径校验失败（`[D6:...]` 前缀违反）但未触发 R 循环。
+
+**回退动作**：
+1. 若 BDD↔TLA+ 等价性违反：先分派 R 子代理判定是「措辞差异」还是「实质不一致」。
+2. 措辞差异：R 报告经 V 复审后标注「等价」，G 门禁放行。
+3. 实质不一致：上报人类决策，三选一（修正 BDD / 修正 TLA+ / 修正需求设计），修正后回退到对应阶段起点重跑。
+4. BDD 与需求/设计脱节：必须修正需求/设计并回退重跑（仿反模式 #17 流程）。
+
+**与反模式 #17 的关系**：#17 是 "TLA+ 建模与需求/设计不符未回退"，#29 是 "BDD 建模与需求/设计/TLA+ 不符未回退"。前者关注 TLA+ 单一规格，后者关注 BDD 与 TLA+ 的等价性以及 BDD 与需求/设计的一致性。两者复用同一回退流程（R→V→G→S-fix）。
+
+**与反模式 #16 的关系**：#16 是 "TLA+ 占位实现/简化实现/错误实现"，#29 不直接覆盖占位实现，但若 BDD 状态机七要素缺失（如 `@accepting-states: ()`）则可能同时命中 #16（TLA+ 端）和 #29（BDD 端等价性失败）。
+
+**关联**：
+- spec §10.1 / bdd-guide.md §8 / check-bdd-model.ts D4 等价性校验。
+- bdd-review-checklist.md 第 3 项「TLA+ 等价性」。
+- 反模式 #17（TLA+ 建模与需求/设计不符未回退）。
+
+**实现证据**（BDD 建模任务）：
+- `check-bdd-model.ts` D4 维度已实现 `validateTlaEquivalence()` 等价性校验（状态集 / 初始状态 / 转移集 / 不变式归一化匹配）。
+- `bdd-logic.ts` 的 `validateStateMachineCompleteness()` 校验七要素完整性，与 TLA+ 端 `tla-logic.ts` 状态机校验对称。
+- self-test BDD 样本中 `bad-tla-mismatch.manifest.json` 专测 D4 等价性违反拦截。
 
 ## 实现层经验教训（来自端到端调测）
 
