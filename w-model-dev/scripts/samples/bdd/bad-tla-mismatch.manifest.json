@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "blog-system",
+  "basePath": ".",
+  "currentPhase": 1,
+  "features": [
+    {
+      "id": "L1_blog_system-001",
+      "level": 1,
+      "filePath": "samples/bdd/valid-l1.feature",
+      "scenarioCount": 1,
+      "stateMachineId": "SM-L1-blog_system",
+      "tlaSpecId": "L1_blog_system",
+      "reqIds": ["REQ-001"],
+      "designIds": ["SD-3.2.1"],
+      "parentFeatureIds": [],
+      "siblingFeatureIds": [],
+      "childFeatureIds": []
+    }
+  ],
+  "stateMachines": [
+    {
+      "id": "SM-L1-blog_system",
+      "level": 1,
+      "states": ["Unauthenticated", "Authenticated"],
+      "initialState": "Unauthenticated",
+      "terminalStates": ["Authenticated"],
+      "acceptingStates": ["Authenticated"],
+      "rejectingStates": ["Unauthenticated"],
+      "transitions": [
+        { "from": "Unauthenticated", "event": "login", "to": "Authenticated" }
+      ],
+      "invariants": ["Authenticated => sessionValid"]
+    }
+  ]
+}

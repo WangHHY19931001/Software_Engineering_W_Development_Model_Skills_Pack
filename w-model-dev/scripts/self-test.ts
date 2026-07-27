@@ -20,6 +20,7 @@
  *   w-model-dev/scripts/samples/graph/*.json      图谱样本
  *   w-model-dev/scripts/samples/tla/*.json        TLA+ manifest 样本（纯逻辑校验，不跑 SANY/TLC）
  *   w-model-dev/scripts/samples/code-tla/*.json   代码-TLA+ 一致性样本（含 manifest+graph+rtm+codeSources）
+ *   w-model-dev/scripts/samples/bdd/*.json+*.feature  BDD manifest + features 样本（含 5 valid + 5 bad）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -50,6 +51,15 @@ import {
   type CodeFile,
 } from './code-tla-logic.js';
 import { checkRootCauseReport } from './root-cause-logic.js';
+import {
+  checkBddModel,
+  parseFeatureHeader,
+  parseBackgroundStateMachine,
+  type BddManifest,
+  type BddCheckInput,
+  type ScenarioPathCheck,
+  type TlaSpecSnapshot,
+} from './bdd-logic.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -748,6 +758,137 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
   { file: 'bad-r10-reality-confidence.json', expectedPassed: false, expectedReasonPatterns: [/reality-checker.*confidence/], description: 'R10 reality-checker confidence=0.3' },
 ];
 
+// -------------------- BDD（Task 5：10 样本，2 valid + 8 bad） --------------------
+
+interface BddCase {
+  /** manifest 文件名（相对 samples/bdd/） */
+  manifestFile: string;
+  /** feature 文件名列表（相对 samples/bdd/） */
+  featureFiles: string[];
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 exitCode（0=通过, 1=校验失败, 2=schema/输入错误） */
+  expectedExitCode: 0 | 1 | 2;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+  /** 校验阶段 */
+  phase: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  /** 注入的 TLA+ 快照（用于 D4 等价性校验） */
+  tlaSnapshots?: TlaSpecSnapshot[];
+  /** 注入的 RTM 行（用于 D7 RTM 映射校验） */
+  rtmRows?: Array<{ reqId: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }>;
+  /** 注入的 cucumber 报告（用于 D5 step 绑定校验，phase >= 5） */
+  cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+}
+
+const BDD_CASES: BddCase[] = [
+  // -------------------- 2 valid 样本（L1 + L2） --------------------
+  {
+    manifestFile: 'valid-manifest.json',
+    featureFiles: ['valid-l1.feature'],
+    expectedPassed: true,
+    expectedExitCode: 0,
+    phase: 1,
+    description: '完整合法的 L1 features + manifest：头标注完整 + 状态机七要素齐全 + scenario 路径合法',
+  },
+  {
+    manifestFile: 'valid-l2-manifest.json',
+    featureFiles: ['valid-l2.feature'],
+    expectedPassed: true,
+    expectedExitCode: 0,
+    phase: 2,
+    description: '完整合法的 L2 features + manifest：parent 指向 L1 + 状态机七要素齐全',
+  },
+  // -------------------- 8 bad 样本（覆盖 D1/D3/D4/D5/D6/D7 + schema） --------------------
+  {
+    manifestFile: 'bad-schema.manifest.json',
+    featureFiles: ['valid-l1.feature'],
+    expectedPassed: false,
+    expectedExitCode: 2,
+    expectedReasonPatterns: [/\[schema\].*basePath/],
+    phase: 1,
+    description: 'manifest 缺 basePath 字段，应被 schema required 前置校验拦截（exitCode=2）',
+  },
+  {
+    manifestFile: 'valid-manifest.json',
+    featureFiles: ['bad-missing-header.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/missing required field @tla-spec/],
+    phase: 1,
+    description: 'feature 头标注缺 @tla-spec，应被 parseFeatureHeader 头标注完整性校验拦截',
+  },
+  {
+    manifestFile: 'valid-manifest.json',
+    featureFiles: ['bad-incomplete-state-machine.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/@rejecting-states missing/],
+    phase: 1,
+    description: 'Background 缺 @rejecting-states，应被 D3 状态机七要素完整性校验拦截',
+  },
+  {
+    manifestFile: 'valid-manifest.json',
+    featureFiles: ['bad-invalid-transition.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/transition from "Unknown" not in @states/],
+    phase: 1,
+    description: '转移表 From=Unknown 不在 @states 中，应被 D3 转移表校验拦截',
+  },
+  {
+    manifestFile: 'valid-manifest.json',
+    featureFiles: ['bad-scenario-path.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/no transition from "Unauthenticated" on event "logout"/],
+    phase: 1,
+    description: 'scenario When=logout 但转移表无此 From+Event，应被 D6 路径合法性校验拦截',
+  },
+  {
+    manifestFile: 'bad-tla-mismatch.manifest.json',
+    featureFiles: ['valid-l1.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/state set mismatch/],
+    phase: 1,
+    description: 'BDD 状态集与 TLA+ 快照不一致，应被 D4 等价性校验拦截',
+    tlaSnapshots: [
+      {
+        specId: 'L1-blog_system',
+        states: ['LoggedOut', 'LoggedIn'],
+        initialState: 'LoggedOut',
+        transitions: [{ from: 'LoggedOut', event: 'login', to: 'LoggedIn' }],
+        invariants: ['LoggedIn => sessionValid'],
+      },
+    ],
+  },
+  {
+    manifestFile: 'bad-no-rtm-mapping.manifest.json',
+    featureFiles: ['valid-l1.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/feature id not in RTM row/],
+    phase: 1,
+    description: 'feature id 未登记在 RTM test 字段中，应被 D7 RTM 映射校验拦截',
+    rtmRows: [
+      { reqId: 'REQ-001', acceptanceTest: null, systemTest: null, integrationTest: null, unitTest: null },
+    ],
+  },
+  {
+    manifestFile: 'valid-manifest.json',
+    featureFiles: ['bad-step-unbound.feature'],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/undefined steps/],
+    phase: 5,
+    description: 'feature 含未绑定 step（注入 cucumberReport.undefinedCount=1），应被 D5 step 绑定校验拦截',
+    cucumberReport: { undefinedCount: 1, pendingCount: 0, failedCount: 0 },
+  },
+];
+
 // -------------------- Schema 前置校验（借鉴 drawio-skill/styles/schema.json） --------------------
 
 interface SchemaCase {
@@ -1210,6 +1351,132 @@ async function runRootCauseCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
+
+function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
+  const m = body.match(pattern);
+  return m ? m[1]! : null;
+}
+
+function extractBddEventsFromWhen(body: string): string[] {
+  const events: string[] = [];
+  const lines = body.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^\s*(?:When|And)\s+.+?\b(\w+)\s*$/);
+    if (m) events.push(m[1]!);
+  }
+  return events;
+}
+
+function extractBddInvariantsFromThen(body: string): string[] {
+  const invs: string[] = [];
+  const lines = body.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^\s*(?:Then|And)\s+不变式\s+"(.+?)"\s+应成立/);
+    if (m) invs.push(m[1]!);
+  }
+  return invs;
+}
+
+async function runBddCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const bddSamplesDir = path.join(samplesDir, 'bdd');
+
+  for (const c of BDD_CASES) {
+    const manifestPath = path.join(bddSamplesDir, c.manifestFile);
+    const name = `bdd/${c.manifestFile}`;
+    const details: string[] = [];
+
+    let manifest: BddManifest;
+    try {
+      const manifestRaw = await fs.readFile(manifestPath, 'utf-8');
+      manifest = JSON.parse(manifestRaw) as BddManifest;
+    } catch (e) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 无法读取 manifest: ${(e as Error).message}`],
+      });
+      continue;
+    }
+
+    // 解析 features 文件（头标注 + Background 状态机 + scenarios）
+    const parsedFeatures: BddCheckInput['parsedFeatures'] = [];
+    const headerViolations: string[] = [];
+    for (const ff of c.featureFiles) {
+      try {
+        const featurePath = path.join(bddSamplesDir, ff);
+        const content = await fs.readFile(featurePath, 'utf-8');
+        const { header, violations: hdrViolations } = parseFeatureHeader(content);
+        headerViolations.push(...hdrViolations);
+
+        const bgMatch = content.match(/Background:\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/);
+        const bgContent = bgMatch ? bgMatch[1]! : '';
+        const { sm } = parseBackgroundStateMachine(bgContent);
+
+        // 提取 scenarios（与 check-bdd-model.ts 同构）
+        const scenarios: ScenarioPathCheck[] = [];
+        const scenarioRegex = /Scenario:\s*(.+?)\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/g;
+        let m: RegExpExecArray | null;
+        while ((m = scenarioRegex.exec(content)) !== null) {
+          const sName = m[1]!.trim();
+          const body = m[2]!;
+          const startState = extractBddStateFromStep(body, /Given.*?"(\w+)"/);
+          const events = extractBddEventsFromWhen(body);
+          const expectedEndState = extractBddStateFromStep(body, /Then.*?"(\w+)"/);
+          const invariantAssertions = extractBddInvariantsFromThen(body);
+          scenarios.push({ scenarioName: sName, startState, events, expectedEndState, invariantAssertions });
+        }
+
+        // 找到 manifest 中对应 feature 的 id
+        const featureId = manifest.features.find(f => f.filePath.endsWith(ff))?.id ?? manifest.features[0]?.id ?? '';
+        parsedFeatures.push({
+          featureId,
+          header,
+          stateMachine: sm,
+          scenarios,
+        });
+      } catch (e) {
+        details.push(`  - 无法读取 feature ${ff}: ${(e as Error).message}`);
+      }
+    }
+
+    const result = checkBddModel({
+      manifest,
+      phase: c.phase,
+      parsedFeatures,
+      tlaSnapshots: c.tlaSnapshots,
+      rtmRows: c.rtmRows,
+      cucumberReport: c.cucumberReport,
+    });
+
+    // 合并 header 解析违反 + checkBddModel 违反（CLI 也应如此聚合）
+    const allViolations = [...headerViolations, ...result.violations];
+    const actualPassed = allViolations.length === 0;
+    // exitCode：schema 失败为 2；有违反为 1；无违反为 0
+    const actualExitCode: 0 | 1 | 2 = result.exitCode === 2 ? 2 : (allViolations.length > 0 ? 1 : 0);
+
+    if (actualPassed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${actualPassed}`);
+    }
+    if (actualExitCode !== c.expectedExitCode) {
+      details.push(`  - 期望 exitCode=${c.expectedExitCode}，实际 exitCode=${actualExitCode}`);
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(allViolations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of SCHEMA_CASES) {
@@ -1284,13 +1551,14 @@ async function main(): Promise<void> {
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
+  console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Metadata 用例  : 1`);
   console.log('─'.repeat(60));
 
   const [
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
-    codeTlaResults, rootcauseResults, schemaResults, metadataResults,
+    codeTlaResults, rootcauseResults, schemaResults, bddResults, metadataResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -1303,12 +1571,13 @@ async function main(): Promise<void> {
     runCodeTlaCases(samplesDir),
     runRootCauseCases(samplesDir),
     runSchemaCases(samplesDir),
+    runBddCases(samplesDir),
     runMetadataCheck(skillRoot),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
-    ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...metadataResults,
+    ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults, ...metadataResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

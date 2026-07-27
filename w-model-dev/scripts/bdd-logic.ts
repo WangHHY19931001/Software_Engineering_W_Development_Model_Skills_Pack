@@ -171,9 +171,11 @@ export function parseBackgroundStateMachine(
   const sm: Partial<BddStateMachine> = {
     states: [],
     initialState: '',
-    terminalStates: [],
+    // terminalStates / rejectingStates 初始化为 undefined（而非 []），
+    // 以区分「字段缺失」与「声明为空集 ()」—— validateStateMachineCompleteness 依赖 === undefined 判定缺失。
+    terminalStates: undefined,
     acceptingStates: [],
-    rejectingStates: [],
+    rejectingStates: undefined,
     transitions: [],
     invariants: [],
   };
