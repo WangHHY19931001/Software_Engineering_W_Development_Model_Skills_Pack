@@ -168,11 +168,12 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  const phase = (args.phase ?? manifest.currentPhase) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-  if (phase < 1 || phase > 8) {
-    console.error(`[input] --phase=${phase} 非法（须 1-8）`);
+  const phaseRaw = args.phase ?? manifest.currentPhase;
+  if (typeof phaseRaw !== 'number' || !Number.isInteger(phaseRaw) || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phaseRaw)) {
+    console.error(`[input] --phase=${args.phase ?? manifest.currentPhase} 非法（须 1-8 整数）`);
     return 2;
   }
+  const phase = phaseRaw as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
   const manifestDir = path.dirname(args.manifestFile);
   const basePath = path.resolve(manifestDir, manifest.basePath);
@@ -289,11 +290,15 @@ async function main(): Promise<number> {
   console.log(`\n=== JSON Summary ===`);
   console.log(JSON.stringify(result, null, 2));
 
-  // 写入 gate-logs
+  // 写入 gate-logs（失败不污染退出码）
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const logDir = path.resolve(manifestDir, '..', '.w-model', 'gate-logs');
-  await fs.mkdir(logDir, { recursive: true });
-  await fs.writeFile(path.join(logDir, `${timestamp}-bdd.json`), JSON.stringify(result, null, 2));
+  try {
+    await fs.mkdir(logDir, { recursive: true });
+    await fs.writeFile(path.join(logDir, `${timestamp}-bdd.json`), JSON.stringify(result, null, 2));
+  } catch (e) {
+    console.error(`[gate-logs] 写入失败（不影响校验结果）: ${(e as Error).message}`);
+  }
 
   return result.exitCode;
 }
