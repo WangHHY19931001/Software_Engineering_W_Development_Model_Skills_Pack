@@ -270,6 +270,25 @@ npm run hill-climbing                           # （编排者 O 执行）L2+ �
 
 > 第十六轮（2026-07-26）相比第十五轮（端到端调测）：从「demo 层调测发现 32 问题」进化为「技能包侧预防条款补强」，不重建 demo 仅在 reference 补强约束。`tla-logic.ts` 从「类型定义不校验」进化为「R13 schema 校验强制拦截 phase 级摘要」。`data-models.md` 从「RunLogEntry/EventIngress 分散定义」进化为「显式 Schema 边界对照表禁止混用」。`anti-patterns.md` 从「21 条」扩展为「26 条」，覆盖角色越权 / 跨模块 store 误用 / 副作用时序 / PowerShell 写入 / 字段混用 5 类高发陷阱。第 15 轮遗留 #14（checkRounds 语义不一致）+ 共性问题 A（PowerShell 写入）/ B（字段混用）/ C（acknowledgedDecisions 关键词）/ D（checkRounds phase 级摘要）全部闭环。
 
+- **第十七轮：D5 文档不一致修正与简化行为预防**（2026-07-27）：
+
+| 指标 | 数值 |
+|---|---|
+| 触发 | 第 16 轮 D5 文档一致性检查发现 4 项互引不一致 + 1 项简化行为预防缺失 + 2 项状态问题（demo 未清理 + 第 16 轮变更未提交） |
+| 修正方案 | Part A 修 4 项 D5 不一致 / Part B 新增反模式 #27 + 简化预防节 / Part C 清理 w-model-dev-demo + 提交 16+17 轮 / Part D 全量回归验证 |
+| reference 文档 | 3 个（data-models.md violations 类型 / anti-patterns.md #25 工具补全 + #26 字段名修正 + #27 新增 / operational-recovery.md 简化预防节） |
+| SKILL.md | 2 处（acknowledgedDecisions 标注修正 + 简化行为自检条） |
+| 反模式新增 | 1 条（#27 调测者简化行为，含 3 类倾向 S1/S2/S3 + 5 项自检清单） |
+| 顶层文档 | 4 个（SSoT §3.4.12 + AGENTS.md §4 + CHANGELOG.md [17.0.0] + README.md 反模式总数 21→24） |
+| 删除产物 | w-model-dev-demo/（归档已迁移至 docs/changes/archive/2026-07-26-round15-end-to-end-test/） |
+| git commit | acc80ce（第 16+17 轮合并提交，因变更文件级交错无法拆分） |
+| self-test | 95/95 全通过（无变化） |
+| vitest | 76/76 全通过（无变化） |
+| TypeScript strict | 0 错误 |
+| D5 文档一致性复检 | 6 项互引全一致 |
+
+> 第十七轮（2026-07-27）相比第十六轮：从「设计层缺口闭环」进化为「D5 文档互引一致性闭环 + 简化行为预防」。`data-models.md` violations 类型从 `number` 修正为 `string[]` 与 `tla-plus-guide.md` + `tla-logic.ts` 三处一致。`anti-patterns.md` #25 工具清单补全 4 种 PowerShell 工具 + #26 字段名修正 `decisions` → `acknowledgedDecisions`。`anti-patterns.md` 从「26 条」扩展为「27 条」，新增 #27 调测者简化行为反模式（self-as-verifier 模式下无外部评审拦截简化行为，须靠自检条款预防）。`operational-recovery.md` 新增「调测者简化行为预防」节（3 类简化倾向 + 5 项自检清单）。第 15 轮调测产物 `w-model-dev-demo/` 清理（归档已迁移至仓库级 `docs/changes/archive/`）。第 16 轮 D5 互引不一致（violations 类型 / #25 工具 / #26 字段名 / acknowledgedDecisions 标注）+ 简化行为预防缺失（#27）+ 状态问题（demo 清理 / 变更提交）全部闭环。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：

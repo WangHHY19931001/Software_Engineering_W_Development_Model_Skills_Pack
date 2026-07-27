@@ -3,6 +3,46 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [17.0.0] - 2026-07-27
+
+### 第十七轮 D5 文档不一致修正与简化行为预防
+
+第 16 轮 D5 文档一致性检查发现 4 项互引不一致 + 1 项简化行为预防缺失 + 2 项状态问题（demo 未清理 + 第 16 轮变更未提交）。本轮全量修正并新增反模式 #27 预防调测者简化行为。实施计划：[`docs/superpowers/plans/2026-07-27-round17-d5-inconsistency-and-simplification-prevention.md`](./docs/superpowers/plans/2026-07-27-round17-d5-inconsistency-and-simplification-prevention.md)。
+
+#### 新增
+
+- **operational-recovery.md「调测者简化行为预防」节**：3 类简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）+ 5 项自检清单（硬约束复述 / reworkHints 非空 / 7 脚本全 exitCode=0 / §9 确认 / 长会话重读硬约束）
+- **anti-patterns.md #27 调测者简化行为**：self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档；目录 / 主表 / 命中高发阶段表 / 与门禁脚本对应关系表 / 检测信号表 5 处同步
+- **SKILL.md 快速自检补「调测者简化行为自检」条**：每阶段须按 operational-recovery.md 自检清单逐条核验
+- **docs/changes/archive/2026-07-26-round15-end-to-end-test/**：第 15 轮调测归档（9 文件，从 w-model-dev-demo/ 迁移至仓库级归档目录）
+
+#### 变更
+
+- `data-models.md` TlaCheckRound.violations 类型 `number` → `string[]`（P1，与 tla-plus-guide.md + tla-logic.ts 一致）+ 注释 `violations === 0` → `violations.length === 0`
+- `anti-patterns.md` #25 主表描述补全 4 种 PowerShell 工具（ConvertTo-Json/Add-Content/Out-File/Set-Content）+ 检测信号补 `Set-Content` 关键词（P2，与 operational-recovery.md 一致）
+- `anti-patterns.md` #26 主表描述 `decisions` → `acknowledgedDecisions`（RunLogEntry 字段，非 EventIngress）+ 修正字段归类（P3，与同文件检测信号 + data-models.md Schema 边界对照表一致）
+- `anti-patterns.md` 「与门禁脚本对应关系」表 #25 检测信号补 `Set-Content` 关键词
+- `SKILL.md` acknowledgedDecisions 条目标注「反模式 #26 关联」→「R2 校验维度区分：#26 管字段归属 R1，本条管字段内容 R2」（P4）
+- `data-models.md` 历史叙述第 395 行加注 `decisions` 非合法字段名（正确为 `acknowledgedDecisions`）
+- `CHANGELOG.md` [16.0.0] 节 SKILL.md 自检条目描述同步修正（反模式 #26 关联 → R2 校验维度区分）
+
+#### 删除
+
+- `w-model-dev-demo/` 整个目录（第 15 轮调测产物，归档已迁移至 `docs/changes/archive/2026-07-26-round15-end-to-end-test/`）
+
+#### 验证
+
+- TypeScript strict: 0 错误
+- self-test: 95/95 全通过
+- vitest: 76/76 全通过
+- D5 文档一致性复检 6 项全一致：
+  1. `tla-plus-guide.md` §checkRounds ↔ `data-models.md` tla-manifest.json 节 ↔ `tla-logic.ts` 类型定义（violations: string[]）→ 一致 ✓
+  2. `anti-patterns.md` #22~#27 ↔ phase-3/4/5/7/8 禁止行为节 ↔ `SKILL.md` 快速自检 → 一致 ✓
+  3. `operational-recovery.md`「JSON 文件写入工具选择」（4 种工具）↔ `anti-patterns.md` #25 主表（4 种）+ 检测信号（4 种关键词）→ 一致 ✓
+  4. `data-models.md` Schema 边界对照表 ↔ `anti-patterns.md` #26 主表（字段名已修）+ 检测信号 → 一致 ✓
+  5. SSoT §3.4.11 ↔ AGENTS.md §4 第十六轮 ↔ CHANGELOG [16.0.0] → 一致 ✓
+  6. `operational-recovery.md`「调测者简化行为预防」↔ `anti-patterns.md` #27 ↔ `SKILL.md` 快速自检 → 三向互引闭合 ✓
+
 ## [16.0.0] - 2026-07-26
 
 ### 第十六轮 遗留问题与设计层缺口闭环

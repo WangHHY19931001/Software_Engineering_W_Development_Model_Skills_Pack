@@ -543,6 +543,26 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不重建 `w-model-dev-demo/`（第 15 轮调测后归档不入库，本轮仅在 reference 补强预防条款）；不修改 `verifier-spec.md`（V 评审 schema 不变，靠 reworkHints 标注新反模式）；不修改 `check-artifact-gate.ts` / `check-requirement-graph.ts` / `check-verifier-output.ts`（脚本层仅 `tla-logic.ts` + `check-tla-model.ts` + `checkpoint-logic.ts` 改动）；不引入新门禁脚本（#22~#24 靠 V 评审 + 系统测试用例守护，#25 靠 run-log note 字段检测 + 编排者自检，#26 靠现有 `check-run-log.ts` R1 校验）。
 
+#### 3.4.12 第 17 轮：D5 文档不一致修正与简化行为预防（2026-07-27）
+
+> 第 16 轮 D5 文档一致性检查发现 4 项互引不一致 + 1 项简化行为预防缺失 + 2 项状态问题（demo 未清理 + 第 16 轮变更未提交）。实施计划：[`docs/superpowers/plans/2026-07-27-round17-d5-inconsistency-and-simplification-prevention.md`](./superpowers/plans/2026-07-27-round17-d5-inconsistency-and-simplification-prevention.md)。修正策略：Part A 修 4 项 D5 不一致 / Part B 新增反模式 #27 + 简化预防节 / Part C 清理 w-model-dev-demo + 提交 16+17 轮 / Part D 全量回归验证。
+
+1. **P1 data-models.md violations 类型修正**：`TlaCheckRound.violations` 类型从 `number` 改为 `string[]`（与 `tla-plus-guide.md` §checkRounds + `tla-logic.ts` 类型定义一致），注释 `violations === 0` 改为 `violations.length === 0`。第 16 轮 D5 互引不一致 P1 闭环。
+
+2. **P2 anti-patterns.md #25 工具清单补全**：#25 主表描述补全 4 种 PowerShell 工具（`ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`），检测信号补 `Set-Content` 关键词。同步 `operational-recovery.md` 描述 + 检测信号（4 种工具一致）。第 16 轮 D5 互引不一致 P2 闭环。
+
+3. **P3 anti-patterns.md #26 字段名修正**：#26 主表描述 `decisions` 改为 `acknowledgedDecisions`（正确字段名为 RunLogEntry 的 `acknowledgedDecisions`，非 EventIngress 字段）。`data-models.md` 第 395 行历史叙述加注 `decisions` 非合法字段名。第 16 轮 D5 互引不一致 P3 闭环。
+
+4. **P4 SKILL.md acknowledgedDecisions 标注修正**：acknowledgedDecisions 条目标注「反模式 #26 关联」改为「R2 校验维度区分：#26 管字段归属 R1，本条管字段内容 R2」。同步 `CHANGELOG.md` [16.0.0] 节描述。第 16 轮 D5 互引不一致 P4 闭环。
+
+5. **P5 新增反模式 #27 调测者简化行为**：self-as-verifier 模式下调测者兼具 S/V/G 角色，简化行为无外部评审拦截。`anti-patterns.md` 新增 #27（3 类简化倾向：S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验），目录 / 主表 / 命中高发阶段表 / 与门禁脚本对应关系表 / 检测信号表 5 处同步。`operational-recovery.md` 新增「调测者简化行为预防」节（3 类倾向表 + 5 项自检清单）。`SKILL.md` 快速自检补「调测者简化行为自检」条。三向互引闭合（operational-recovery.md ↔ anti-patterns.md #27 ↔ SKILL.md）。
+
+6. **P6 删除 w-model-dev-demo/**：第 15 轮调测产物清理。归档（9 文件）已迁移至仓库级 `docs/changes/archive/2026-07-26-round15-end-to-end-test/`。
+
+7. **P7 第 16+17 轮合并提交**：commit `acc80ce`。因第 16/17 轮变更在 `anti-patterns.md` / `SKILL.md` / `data-models.md` / `CHANGELOG.md` 文件级交错，无法用非交互方式拆分为 2 个 commit。
+
+**不涉及范围**：不修改脚本（仅文档与 SKILL.md 自检）；不修改 `verifier-spec.md`（V 评审 schema 不变）；不修改 `check-*.ts` 脚本（#27 靠现有 R1 + R2 + R6 交叉检测 + 编排者自检）；不引入新门禁脚本。
+
 ---
 
 ## 4. 技能工作流程
