@@ -19,17 +19,17 @@
 - 新增 w-model-dev/skill-metadata.json 版本号镜像
 - 新增 w-model-dev/references/toolbox.md 决策表
 - 新增 w-model-dev/scripts/__tests__/README.md coverage 矩阵
-- 新增反模式 #28：JSON 文件未通过 schema 校验放行
+- 新增反模式 #28：schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验）
 
 #### Changed
 
 - SKILL.md frontmatter 加 version 字段 + 新增 Bundled Resources 章节
-- 9 个 *-logic.ts 顶部增加 schema 前置校验
+- 10 个 *-logic.ts 顶部增加 schema 前置校验
 - .githooks/pre-push 增加 security-scan 步骤（6 项门禁）
 
 #### Tests
 
-- vitest +4 文件（schema-validation / security-scan / skill-metadata + pure/IO 审计）
+- vitest +3 文件（schema-validation / security-scan / skill-metadata），+14 tests（76→90 全通过）
 - tsc strict 0 错误
 
 ## [17.0.0] - 2026-07-27

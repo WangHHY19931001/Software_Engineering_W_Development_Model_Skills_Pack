@@ -18,7 +18,7 @@
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评
 - **Agent Personas（评审角色提示词，V 子代理执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由 V 子代理在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
-- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 24 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为）二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 28 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失）二分；F# 重复命中 ≥2 次升级为 L# 教训
 - **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
@@ -62,7 +62,7 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 
 技能包内的校验脚本（`w-model-dev/scripts/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本依赖 [tsx](https://tsx.is/) + 少量 devDependencies（在仓库根目录 `npm install` 一次）：
 
-- **runtime devDep**：`ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `schema-loader.ts` 在 9 个 `*-logic.ts` 顶部自动 import
+- **runtime devDep**：`ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import
 - **devDep（仅安全扫描用）**：`eslint-plugin-security` + `@typescript-eslint/*` — 由 `security-scan.ts` 调用
 - **runtime**：`tsx`（运行 ESM TypeScript）
 
@@ -144,9 +144,9 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
 | `/wm import <文件路径>` | 从 JSON 导入项目 |
 
-## 参考实现：`w-model-dev-demo/`（已于 2026-07-26 清理，结论见 AGENTS.md §4 第十二轮）
+## 参考实现（已归档）
 
-[`w-model-dev-demo/`](./w-model-dev-demo) 是 W 模型 8 阶段端到端调测的完整产物——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。
+[`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) 是 W 模型 8 阶段端到端调测的归档摘要——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。原 `w-model-dev-demo/` 目录已于第 17 轮 P6 删除。
 
 **端到端调测结论**（2026-07-24，全量删除后从零重跑第五轮，编排者-子代理分派模式，含代码-TLA+ 一致性回归）：
 
@@ -162,7 +162,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 | 代码-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式） |
 | 工件质量门 | 通过（RTM 100% + 单元覆盖率 99.37% + 四级测试全通过 + TLA+ 资产✓，退出码 0） |
 | 全量测试 | `npm test` → 8 test files / 135 tests 全通过（77 unit + 21 integration + 22 system + 15 acceptance） |
-| 自检基线 | `npm run self-test` → 66/66 通过（13 Verifier + 7 Gate + 17 Graph + 13 TLA + 3 Budget + 4 RunLog + 2 Maturity + 2 Checkpoint + 5 Code-TLA+） |
+| 自检基线 | `npm run self-test` → 111/111 通过（18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata） |
 | 用户确认 | `confirm`（self-as-verifier 模式，调测者代签；2026-07-24 全量重跑通过） |
 
 > 第五轮（2026-07-24）相比第四轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/`/`dist/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，采用编排者-子代理分派模式（每阶段 S→V→G 子代理执行）。重跑产物为独立再实现，单元测试 53→77、覆盖率由 96.37% 提升至 99.37%（lines），集成测试 13→21、系统测试 8→22，验收测试 15 不变，全量测试 89→135。图谱节点 43→35（更精炼的 DD 拆分），边 182→141，零违反保持。TLA+ 规格 8 个（1 L1 + 4 L2 + 3 L3），层次化建模完整。阶段 5 新增代码-TLA+ 一致性回归门禁（`check-code-tla-consistency.ts` 四维度校验）。过程中修正了 check-artifact-gate.ts 缺 exitCode 字段的脚本缺陷。所有门禁退出码 0，未引入新缺陷。
@@ -210,13 +210,13 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 过程中发现并修正的缺陷（累计 5 项）：
 
-1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见 [w-model-dev-demo/docs/integration-test-report.md](./w-model-dev-demo/docs/integration-test-report.md)（已清理） §5。
+1. **Express 4 async handler 不自动捕获 rejected promise**（2026-07-20 首轮）：引入 `src/utils/async-handler.ts` 包装器。详见归档 [`test-report-snapshot.json`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/test-report-snapshot.json)。
 2. **JWT_SECRET 缺失导致测试套件加载失败**（2026-07-21 回归发现）：`src/utils/env.ts` 在 import 阶段抛错连锁挂掉 4 个测试套件。修正方案：`package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入。
 3. **ArticleService 类型导出消失**（2026-07-21 回归发现）：`comment-service.ts` 的 `import type { ArticleService }` 类型丢失。修正方案：恢复 `export class ArticleService`。
 4. **vitest mock 与 express NextFunction 类型不兼容**（2026-07-21 回归发现）：`next.mock.calls[0][0]` 报 TS2339。修正方案：用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问。
 5. **check-artifact-gate.ts 缺 exitCode 字段**（2026-07-24 第五轮发现）：唯一未在 `GATE_JSON` 输出中包含 `exitCode` 的门禁脚本，导致 `check-run-log.ts` R6 交叉校验无法提取退出码。修正方案：与其它 7 个 `check-*.ts` 脚本对齐，计算并输出 `exitCode`。
 
-> 该目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向此目录。
+> 归档目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/)。
 
 ### 新门禁满足情况（2026-07-26 第十二轮）
 
@@ -240,7 +240,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md
-│   │   ├── anti-patterns.md      #   反例与黑名单（24 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为；#20 见 subagent-delegation.md + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
+│   │   ├── anti-patterns.md      #   反例与黑名单（28 条流程反模式含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失；#20 见 subagent-delegation.md + 实现层经验教训 L1~L4 + 失败模式清单 F1~F10）
 │   │   ├── workflow.md           #   完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      #   LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审 §7.4A）
 │   │   ├── agent-personas.md     #   Agent Personas（4 个评审角色提示词：code-reviewer / test-engineer / security-auditor / performance-auditor）
@@ -251,10 +251,19 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── graph-guide.md        #   图谱门禁与收敛准则（check-requirement-graph.ts）
 │   │   ├── tla-plus-guide.md     #   TLA+ 层次化状态机建模与行为门禁（check-tla-model.ts）
 │   │   ├── definition-of-done.md #   项目级 Definition of Done（每次变更的日常标准，5 维度）
-│   │   ├── data-models.md        #   项目 / 需求 / 设计 / 测试用例数据模型
+│   │   ├── data-models.md        #   项目 / 需求 / 设计 / 测试用例数据模型 + JSON Schema 强约束（13 份 draft-07）+ RunLogEntry vs EventIngress 边界对照表
 │   │   ├── rtm-guide.md          #   RTM 维护规则
+│   │   ├── operational-recovery.md  # 运维失败模式 O1~O6 + 调测者简化行为预防（反模式 #27 关联）+ JSON 文件写入工具选择（反模式 #25 关联）
+│   │   ├── event-ingress-guide.md  # Loop 3 事件接驳（EventIngress schema + 路由表，L2+ 激活）
+│   │   ├── hill-climbing-guide.md  # Loop 4 爬坡循环（HarnessImprovementReport schema + 信号检测）
+│   │   ├── skillopt-adoption.md  #   SkillOpt 方法论吸收（bounded edit + validation gate）
+│   │   ├── subagent-persona-matrix.md  # R-lead / V-lead 多角度 persona 选择矩阵（关联 subagent/ 28 个人格文件）
+│   │   ├── command-reference.md  #   /wm 命令参考
+│   │   ├── toolbox.md            #   工具箱决策表（I have X → use Z）
 │   │   └── quality-standards.md #   质量标准
-│   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
+│   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
+│   ├── schemas/                  # 13 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest）
+│   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）
 │   │   ├── gate-logic.ts         #   工件质量门纯逻辑（单点事实源，含 TLA+ 资产 + SD→codeModule 终检 + 阶段级 `--phase=N`）
 │   │   ├── check-artifact-gate.ts#   工件质量门 CLI（读 .w-model/rtm.json + graph.json + tla-manifest.json，支持 `--phase=N`）
 │   │   ├── verifier-logic.ts     #   Verifier 输出校验纯逻辑（单点事实源，4 targetKind × 5 子标准 + rawScores 防漂移）
@@ -275,19 +284,16 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── check-checkpoint.ts   #   Checkpoint 门禁 CLI（`<run-log.jsonl> [--checkpoint-log=]`，退出码 0/1/2）
 │   │   ├── root-cause-logic.ts   #   RootCauseReport 校验纯逻辑（R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度）
 │   │   ├── check-rootcause-report.ts  # RootCauseReport 校验 CLI（`<report.json>`，退出码 0/1/2）
+│   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 10 个 *-logic.ts 顶部自动 import）
+│   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
-│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 92 条）
+│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 111 条）
+│   │   ├── __tests__/            #   vitest 单元测试（9 个 .test.ts + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/）
+│   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
-├── w-model-dev-demo/             # 已清理（2026-07-26），结论见 AGENTS.md §4
-│   ├── docs/                     #   8 阶段产出文档（需求 / 设计 / 四级测试用例与报告）
-│   ├── src/                      #   实现代码（Express + TS，控制器 / 服务 / 存储 / 中间件）
-│   ├── tests/                    #   四级测试（unit / integration / system / acceptance）+ perf/（k6 性能基线）
-│   ├── .w-model/                 #   项目状态（project.json + rtm.json，用户 confirm 归档）
-│   ├── package.json              #   demo 自身的依赖与脚本（独立于根 package.json，test 脚本用 cross-env 注入 JWT_SECRET）
-│   ├── tsconfig.json
-│   └── vitest.config.ts
+├── docs/changes/archive/2026-07-26-round15-end-to-end-test/  # 第 15 轮端到端调测归档摘要（9 文件）
 ├── docs/                         # 设计文档（统一存放）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
 │   ├── skill-design-document.md                # 设计文档指针（已废弃独立维护）
@@ -298,7 +304,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   └── w-model-dev-results.tsv                 #   评估历史记录（得分轨迹）
 ├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI，仅触及脚本 / package.json 时触发）
 ├── AGENTS.md                     # AI Agent 仓库导航（与 README 互补，聚焦 Agent 行动事实集）
-├── package.json                  # 仅声明 tsx 开发依赖 + npm run 快捷脚本（private，不发布）
+├── package.json                  # 声明 tsx + devDeps（ajv / eslint-plugin-security 等）+ npm run 快捷脚本（private，不发布）
 ├── CHANGELOG.md                  # 变更日志
 ├── CONTRIBUTING.md               # 贡献指南
 └── README.md                     # 项目导航
@@ -307,7 +313,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 > 编排逻辑由 `w-model-dev/SKILL.md` 承载，Agent 读取后用自身工具执行；不内置任何
 > TypeScript 引擎、npm 包或编程式 SDK。`/wm` 命令、状态持久化、RTM 维护均由 Agent
 > 按 `SKILL.md` 与 `references/` 在项目内（`.w-model/*.json`）完成。
-> `w-model-dev-demo/` 是参考实现，独立于技能资产，不参与 `/wm` 命令编排。
+> 历史参考实现（`w-model-dev-demo/`）已于第 17 轮删除，归档摘要见 `docs/changes/archive/2026-07-26-round15-end-to-end-test/`，不参与 `/wm` 命令编排。
 
 ## 相关文档
 
@@ -315,7 +321,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审 §7.4A
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 24 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为；#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）+ L1~L4 实现层教训 + F1~F10 失败模式
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 28 条流程反模式（含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失；#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）+ L1~L4 实现层教训 + F1~F10 失败模式
 - [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六角色 + 分派模板 + 回填契约 + 反模式 #10/#11/#12/#13/#14/#15/#16/#17/#18/#19
 - [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）+ 质量标准 + 多人格多角度分析
 - [ingestion 子流程：分块分析](./w-model-dev/references/ingestion-chunk.md) - A 子代理分块分析细则（阶段 1–4）
@@ -330,7 +336,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集
-- [参考实现](./w-model-dev-demo) - W 模型 8 阶段端到端调测产物（博客系统后端）（已清理）
+- [参考实现归档](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) - W 模型 8 阶段端到端调测归档摘要（9 文件）
 - [变更日志](./CHANGELOG.md)
 - [贡献指南](./CONTRIBUTING.md)
 

@@ -17,7 +17,7 @@
 ### 1.4 文档定位
 本文档为W-Model AI Assistant Skill的**单一事实来源（Single Source of Truth, SSoT）**，包含所有设计决策、需求定义、测试用例、集成规范和验收标准。所有相关团队和系统均应以本文档为准。
 
-> **参考实现**：本技能的设计已由 [`w-model-dev-demo/`](../w-model-dev-demo)（扩展博客系统后端 25 需求，Express + TypeScript + 内存存储）端到端调测验证（第 8 轮，2026-07-25 归档），8 阶段全流程闭环、四级测试 386/386 全通过（单元 226 + 集成 40 + 系统 64 + 验收 56）、RTM 覆盖率 100%、check-artifact-gate 终检 exitCode=0、工件质量门放行、用户 `confirm` 归档（currentPhase=9，project.json status=项目完成）。详见 §10B。
+> **参考实现**：本技能的设计已由博客系统后端端到端调测验证（第十五轮，2026-07-27 归档至 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)），8 阶段全流程闭环、四级测试 889/889 全通过（单元 708 + 集成 74 + 系统 35 + 验收 72），32 需求全覆盖、22 个 TLA+ 规格、tsc 0 错误、工件质量门退出码 0、用户 `confirm` 归档。
 
 > **架构重构说明（重要）**：本技能已完成架构纯化——**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）。技能包只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM 调用。
 > 据此，本文档已移除技能演化机制与轨迹分析相关章节（原第 14 章「技能演化机制」、原第 15 章「技能评估标准」、原 §7.7 / §7.8 数据模型、原 §12.4「第四阶段（自演化版）」等），并移除全部 `src/` 编程式引擎（`/wm` 命令、状态持久化、RTM 维护改由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行）。
@@ -443,7 +443,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 - logits 模式豁免等差与扰动范围校验（天然可能产生等差分布）
 
 ##### P3.11 coverage/.tmp 清理
-- `w-model-dev-demo/.gitignore` 排除 `coverage/.tmp/`
+- 历史 `w-model-dev-demo/.gitignore` 排除 `coverage/.tmp/`（已归档删除）
 - vitest `coverage.clean=true`（或 vitest.config.ts 中 `coverage.clean: true`）
 
 #### 3.4.8 第 10 轮外部技能吸收约束（2026-07-26）
@@ -515,7 +515,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 4. **P4.1 tla-plus-guide.md §14**：新增 L4 时间推进/保留期建模模式指引（反例 + 正例 + 通用规则），降低 S-tla 子代理对 TLC 试错的依赖。第 12 轮 `L4_audit_log_retention` 的 `AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1`）触发 `Retention90Days` 不变式违反，靠 TLC 拦截后人工修复。详见 `w-model-dev/references/tla-plus-guide.md` §14。
 
-**不涉及范围**：不修改 `check-artifact-gate.ts`（P1.1 仅对齐 EISDIR）；不修改 `data-models.md` schema 定义（P2 仅修正 R3 逻辑）；不修改 `verifier-spec.md`（P3 反模式靠流程约束）；不修改 `w-model-dev-demo/`（第 12 轮已归档）。
+**不涉及范围**：不修改 `check-artifact-gate.ts`（P1.1 仅对齐 EISDIR）；不修改 `data-models.md` schema 定义（P2 仅修正 R3 逻辑）；不修改 `verifier-spec.md`（P3 反模式靠流程约束）；不修改已归档的 `w-model-dev-demo/`（已于第 17 轮 P6 删除）。
 
 #### 3.4.11 第 16 轮：遗留问题与设计层缺口闭环（2026-07-26）
 
@@ -572,8 +572,8 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 3. **skillspector-baseline 安全扫描**：引入 eslint-plugin-security + .eslintsecurity-baseline.json sha256 指纹豁免，pre-push 强制
 4. **版本号双写**：SKILL.md frontmatter `version` + skill-metadata.json 镜像，__tests__/skill-metadata.test.ts 回归
 5. **pure/IO 函数分离**：*-logic.ts 纯函数审计，IO 抽到 check-*.ts
-7. **测试 coverage 矩阵**：__tests__/README.md 用 Area | What's locked in 表
-9. **toolbox 决策表**：references/toolbox.md「I have X, I want Y → use Z」
+6. **测试 coverage 矩阵**：__tests__/README.md 用 Area | What's locked in 表
+7. **toolbox 决策表**：references/toolbox.md「I have X, I want Y → use Z」
 
 **不涉及范围**：不修改 `*.ts` 代码（仅文档同步 SSoT / AGENTS / CHANGELOG / README）；不引入新门禁脚本（schema 校验由 logic 层自动调用，security-scan 由 pre-push 承载）。
 
@@ -758,7 +758,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 4A.2 失败模式清单
 
-以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 的 19 条流程反模式互补：反模式是「流程破坏」，失败模式是「行为退化」。
+以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 的 28 条流程反模式（#1-#19 + #20 + #21-#28；#20 在 subagent-delegation.md）互补：反模式是「流程破坏」，失败模式是「行为退化」。
 
 | # | 失败模式 | 与 W 模型反例的关系 |
 |---|---|---|
@@ -778,7 +778,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 ### 4A.2a 运维失败模式清单（O1~O6）
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
-> 与 19 条流程反模式（#1~#19）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
+> 与 28 条流程反模式（#1-#19 + #20 + #21-#28；#20 在 subagent-delegation.md）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
 > O 系列命中**不触发脚本回退**（与 F1~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
 
 | # | 失败模式 | 症状 | 与现有反模式/失败模式的关系 | 缓解措施 |
@@ -808,7 +808,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 - **「不可违反的约束」（[`SKILL.md`](../w-model-dev/SKILL.md)）** 是硬红线，命中即触发阶段回退；由门禁脚本或 CHECKPOINT 强制。
 - **「核心操作行为」（本节 §4A.1）** 是日常准则，违反不立即触发回退但会降低产物质量；由 Agent 自检或 LLM-as-a-Verifier 在评审中标注。
-- **「流程反模式」（[`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 19 条，含返工循环 #18/#19）** 是流程破坏，命中即回退；与门禁脚本退出码精确对应。
+- **「流程反模式」（[`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 28 条，#1-#19 + #20 + #21-#28；#20 在 subagent-delegation.md，含返工循环 #18/#19）** 是流程破坏，命中即回退；与门禁脚本退出码精确对应。
 - **「失败模式」（本节 §4A.2 F1~F10）** 是行为退化，命中不回退但应记录；与反模式互补。
 - **「运维失败模式」（本节 §4A.2a O1~O6）** 是运行健康问题，命中不回退但应标注；由预算检查（O1/O6）/路径存活校验（O2）/V-G 矛盾检测（O3）/理解证据机制（O4/O5）协同检测。
 
@@ -2010,6 +2010,7 @@ interface RunLogEntry {
 | 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
 | 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
 | 3.4 编排者-子代理边界 | 编排者最小化（O/A/S/V/G/R 六角色，A 为阶段 1–4 分析子代理，R 为返工循环根因定位，F 由 S 兼任）+ 反模式 #10/#11/#12/#18/#19 守护 | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10/#11/#12/#18/#19 + `ingestion-chunk.md` / `ingestion-cross.md` / `graph-guide.md` | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施 + A 子代理图谱演进 + G 跑 `check-requirement-graph.ts` 守护 #11/#12 + R 返工根因定位守护 #18/#19） |
+| §3.4.13 第 18 轮 drawio-skill 设计吸收 | Bundled Resources 触发条件总表 + JSON Schema 强约束（反模式 #28）+ 安全扫描基线 + 版本号双写 + pure/IO 函数分离 + 测试 coverage 矩阵 + toolbox 决策表 | `w-model-dev/SKILL.md`「Bundled Resources」节 + `w-model-dev/schemas/*.schema.json`（13 份 draft-07）+ `w-model-dev/scripts/schema-loader.ts`（ajv 单例）+ `w-model-dev/scripts/security-scan.ts` + `.eslintsecurity-baseline.json`（sha256 指纹豁免）+ `w-model-dev/skill-metadata.json`（版本号镜像）+ `w-model-dev/scripts/__tests__/skill-metadata.test.ts`（双写回归）+ `w-model-dev/references/toolbox.md`（I have X → use Z）+ `w-model-dev/scripts/__tests__/README.md`（coverage 矩阵）+ `w-model-dev/references/anti-patterns.md` #28 | 完整（吸收 drawio-skill 7 项设计实践；纯文档同步不涉及 .ts 代码变更；schema 校验由 logic 层自动调用、security-scan 由 pre-push 承载） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |
@@ -2055,16 +2056,18 @@ interface RunLogEntry {
 
 ### 10B.2 8 阶段产出对应
 
-| W 模型阶段 | 产出位置 | 同步测试设计 |
+> 下表产出位置为**历史记录**（`w-model-dev-demo/` 已于第 17 轮删除，源码不再可访问；最终数字见归档 [`README.md`](./changes/archive/2026-07-26-round15-end-to-end-test/README.md)）。
+
+| W 模型阶段 | 产出位置（历史，源码已删除） | 同步测试设计 |
 |---|---|---|
-| 1 需求分析 | [`docs/requirement-spec.md`](../w-model-dev-demo/docs/requirement-spec.md) | 验收测试用例索引（UAT-001~015） |
-| 2 系统设计 | [`docs/system-design.md`](../w-model-dev-demo/docs/system-design.md) | 系统测试用例索引（ST-001~022） |
-| 3 概要设计 | [`docs/outline-design.md`](../w-model-dev-demo/docs/outline-design.md) | 集成测试用例索引（IT-001~021） |
-| 4 详细设计 | [`docs/detailed-design.md`](../w-model-dev-demo/docs/detailed-design.md) | 单元测试用例（UT-001~077） |
-| 5 编码 | [`src/`](../w-model-dev-demo/src) | 单元测试执行（77/77 通过，覆盖率 99.37% lines / 92.66% branches / 100% functions） |
-| 6 集成测试 | [`docs/integration-test-report.md`](../w-model-dev-demo/docs/integration-test-report.md) | 21/21 通过（含缺陷修正，见 §10B.4） |
-| 7 系统测试 | [`docs/system-test-report.md`](../w-model-dev-demo/docs/system-test-report.md) + [`tests/perf/k6-load-test.js`](../w-model-dev-demo/tests/perf/k6-load-test.js) | 22/22 通过 + k6 性能基线脚本就绪 |
-| 8 验收测试 | [`docs/acceptance-test-report.md`](../w-model-dev-demo/docs/acceptance-test-report.md) | 15/15 通过，RTM 覆盖率 100%，用户 `confirm` 归档 |
+| 1 需求分析 | `docs/requirement-spec.md` | 验收测试用例索引（UAT-001~015） |
+| 2 系统设计 | `docs/system-design.md` | 系统测试用例索引（ST-001~022） |
+| 3 概要设计 | `docs/outline-design.md` | 集成测试用例索引（IT-001~021） |
+| 4 详细设计 | `docs/detailed-design.md` | 单元测试用例（UT-001~077） |
+| 5 编码 | `src/` | 单元测试执行（77/77 通过，覆盖率 99.37% lines / 92.66% branches / 100% functions） |
+| 6 集成测试 | `docs/integration-test-report.md` | 21/21 通过（含缺陷修正，见 §10B.4） |
+| 7 系统测试 | `docs/system-test-report.md` + `tests/perf/k6-load-test.js` | 22/22 通过 + k6 性能基线脚本就绪 |
+| 8 验收测试 | `docs/acceptance-test-report.md` | 15/15 通过，RTM 覆盖率 100%，用户 `confirm` 归档 |
 
 ### 10B.3 调测结论摘要
 
@@ -2086,16 +2089,16 @@ interface RunLogEntry {
 | 性能基线 | P95 ≤ 200ms（NFR-002） | vitest 内近似采样 P95=60.76ms | ✅ |
 | 安全约束（JWT 过期 / 作者隔离 / 输入校验 / 孤儿数据） | 全部覆盖 | 4/4 | ✅ |
 | TypeScript 严格编译（`tsc --noEmit`） | 0 错误（NFR-003） | 退出码 0 | ✅ |
-| 自检基线（`npm run self-test`） | 退出码 0 | 66/66 通过（含 5 条 code-TLA+ 用例） | ✅ |
+| 自检基线（`npm run self-test`） | 退出码 0 | 111/111 通过（18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata） | ✅ |
 | 用户确认 | 真实用户在验收报告 §9 填入 | `confirm`（2026-07-24） | ✅ |
 
 ### 10B.4 过程中发现的缺陷与修正（累计 5 项）
 
 | # | 缺陷 | 触发阶段 | 根因 | 修正 | 验证 |
 |---|---|---|---|---|---|
-| 1 | 首轮 4 个集成测试失败：NotFoundError / ForbiddenError 未被中间件捕获，表现为 Unhandled Rejection | 阶段 6（集成测试），2026-07-20 首轮 | Express 4 不自动捕获 async handler 抛出的 rejected promise | 新建 [`src/utils/async-handler.ts`](../w-model-dev-demo/src/utils/async-handler.ts) 包装器，包裹 `auth-routes.ts` / `article-routes.ts` / `comment-routes.ts` 全部路由 | 重跑 6/6 通过 |
-| 2 | JWT_SECRET 缺失导致 4 个测试套件加载失败（user-service / auth-middleware / integration / system / acceptance 全挂） | 2026-07-21 回归发现 | [`src/utils/env.ts`](../w-model-dev-demo/src/utils/env.ts) 在 import 阶段即抛错，连锁导致所有间接依赖 user-service 的测试套件在 `collect` 阶段失败 | `package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入 | 全部测试套件正常加载 |
-| 3 | ArticleService 类型导出消失：`src/services/comment-service.ts` 报 TS2724 | 2026-07-21 回归发现 | [`src/services/article-service.ts`](../w-model-dev-demo/src/services/article-service.ts) 改为内部 `class ArticleService`（无 `export`）+ `export const articleService` 实例，导致 `import type { ArticleService }` 类型丢失 | 恢复 `export class ArticleService`，与 `export const articleService` 共存 | `tsc --noEmit` 退出码 0 |
+| 1 | 首轮 4 个集成测试失败：NotFoundError / ForbiddenError 未被中间件捕获，表现为 Unhandled Rejection | 阶段 6（集成测试），2026-07-20 首轮 | Express 4 不自动捕获 async handler 抛出的 rejected promise | 新建历史 `src/utils/async-handler.ts`（已归档）包装器，包裹 `auth-routes.ts` / `article-routes.ts` / `comment-routes.ts` 全部路由 | 重跑 6/6 通过 |
+| 2 | JWT_SECRET 缺失导致 4 个测试套件加载失败（user-service / auth-middleware / integration / system / acceptance 全挂） | 2026-07-21 回归发现 | 历史 `src/utils/env.ts`（已归档）在 import 阶段即抛错，连锁导致所有间接依赖 user-service 的测试套件在 `collect` 阶段失败 | `package.json` 所有 test 脚本统一用 `cross-env JWT_SECRET=test-secret-blog-demo` 注入 | 全部测试套件正常加载 |
+| 3 | ArticleService 类型导出消失：`src/services/comment-service.ts` 报 TS2724 | 2026-07-21 回归发现 | 历史 `src/services/article-service.ts`（已归档）改为内部 `class ArticleService`（无 `export`）+ `export const articleService` 实例，导致 `import type { ArticleService }` 类型丢失 | 恢复 `export class ArticleService`，与 `export const articleService` 共存 | `tsc --noEmit` 退出码 0 |
 | 4 | vitest mock 与 express NextFunction 类型不兼容：`next.mock.calls[0][0]` 报 TS2339 | 2026-07-21 回归发现 | `vi.fn() as unknown as NextFunction` 断言丢失 vitest mock 类型；vitest 1.6 类型定义与 express 4 类型定义存在兼容性问题 | 用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问 | `tsc --noEmit` 退出码 0 |
 | 5 | check-artifact-gate.ts 缺 exitCode 字段，导致 check-run-log.ts R6 交叉校验无法提取退出码 | 阶段 8（验收测试），2026-07-24 第五轮发现 | `check-artifact-gate.ts` 是唯一未在 `GATE_JSON` 输出中包含 `exitCode` 字段的门禁脚本 | 与其它 7 个 `check-*.ts` 脚本对齐：计算 `const exitCode = result.passed ? 0 : 1`，写入 `GATE_JSON` 并 `process.exit(exitCode)`；`check-run-log.ts` 的 `extractExitCode` 模式数组增加 `GATE_JSON` 标记识别 | `npm run self-test` 全通过 |
 
@@ -2121,11 +2124,11 @@ interface RunLogEntry {
 
 ### 10B.6 边界声明
 
-- `w-model-dev-demo/` 是**参考实现**，不是技能运行时依赖：不参与 `/wm` 命令编排，也不被 `check-*-gate.ts` 读取。
+- 历史 `w-model-dev-demo/` 是**参考实现**（已于第 17 轮 P6 删除，归档摘要见 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)），不是技能运行时依赖：不参与 `/wm` 命令编排，也不被 `check-*-gate.ts` 读取。
 - 调测结论仅验证本 SSoT 所述设计的可执行性，不构成对其他项目场景的承诺。
-- demo 自身的 `package.json` 独立于仓库根 `package.json`（demo 引入 express / bcrypt / jsonwebtoken / zod / vitest / cross-env 等业务依赖，与根 `package.json` 仅声明 `tsx` 不同）。
-- 内存存储是已知限制（重启数据丢失），详见 [`w-model-dev-demo/docs/requirement-spec.md`](../w-model-dev-demo/docs/requirement-spec.md) RISK-001。
-- k6 是独立二进制工具，不能通过 npm 安装；`tests/perf/k6-load-test.js` 需用户先按 [`tests/perf/README.md`](../w-model-dev-demo/tests/perf/README.md) 安装 k6 后独立运行，不纳入 `npm test` 自动化链路。
+- 历史 demo 自身的 `package.json` 独立于仓库根 `package.json`（demo 引入 express / bcrypt / jsonwebtoken / zod / vitest / cross-env 等业务依赖，与根 `package.json` 声明 tsx + ajv + ajv-formats + eslint-plugin-security + @typescript-eslint/* + typescript + @types/node 不同）。
+- 内存存储是已知限制（重启数据丢失），详见归档 [`specs.md`](./changes/archive/2026-07-26-round15-end-to-end-test/specs.md) RISK-001。
+- k6 是独立二进制工具，不能通过 npm 安装；历史 `tests/perf/k6-load-test.js` 需用户先安装 k6 后独立运行，不纳入 `npm test` 自动化链路（源码已归档删除）。
 
 ---
 

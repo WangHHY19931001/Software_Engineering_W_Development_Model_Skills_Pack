@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（25 条流程反模式 #1~#17 + #21~#28；#20 见 subagent-delegation.md）
+- 反模式清单（28 条流程反模式 #1~#19 + #20 + #21~#28；#20 在 subagent-delegation.md）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -256,7 +256,7 @@
 
 **检测信号**（sig-008）：run-log 中阶段 6/7/8 的 GATE 条目缺 `--phase=N` 参数；或 gate JSON 输出中 phaseOption 字段缺失。
 
-## #22（候选，pending V 复审）V 评审 summary 模板化
+## #29（候选，pending V 复审）V 评审 summary 模板化
 
 **症状**：V 评审 summary 字段跨多个阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符，使用「评审通过」「质量良好」等空泛措辞。
 
@@ -295,9 +295,9 @@
 
 **实现证据**（Task 3，借鉴点 2）：
 - 13 份 schema 已落地于 `w-model-dev/schemas/*.schema.json`（详见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单）。
-- 8 个 `*-logic.ts`（verifier / gate / graph / tla / code-tla / budget / run-log / checkpoint / maturity / root-cause）已集成 `validateBySchema` 前置校验。
+- 10 个 `*-logic.ts`（verifier / gate / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause）已集成 `validateBySchema` 前置校验。
 - self-test 基线 99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
-- vitest 88 测试全通过（含 schema-validation.test.ts 9 条单元 + 集成测试）。
+- vitest 90 测试全通过（9 个 .test.ts 文件）。
 
 ## 实现层经验教训（来自端到端调测）
 

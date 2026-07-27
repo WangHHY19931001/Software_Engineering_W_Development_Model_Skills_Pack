@@ -6,7 +6,6 @@
 
 | File | Area | What's locked in |
 |---|---|---|
-| verifier-logic.test.ts | Verifier | subCriteria 权重 / rawScores 方差 / compositeScore 重算 / targetKind 枚举 |
 | budget-logic.test.ts | Budget | R1 时效性 / R2 schema / R3 onExceed / R4 killSwitch / R5 触发检测 |
 | code-tla-logic.test.ts | Code-TLA+ | SD→codeModule 映射 / 状态转移 / Next 分支 / 不变式覆盖 |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |

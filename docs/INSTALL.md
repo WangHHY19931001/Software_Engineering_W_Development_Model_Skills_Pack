@@ -13,7 +13,7 @@
 本技能是**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 SDK）：
 
 - **编排**：由 `w-model-dev/SKILL.md` 承载，Agent 读取后承担「编排者」角色，用自身工具执行 `/wm` 命令路由、状态维护与 CHECKPOINT 等待。
-- **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（S 产出 / V 评审 / G 门禁）执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+- **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（A 分析 / S 产出 / V 评审 / G 门禁 / R 根因定位）执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
 - **校验脚本**：`w-model-dev/scripts/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/) + 少量 devDependency（见 §2）；由 G 子代理在门禁节点执行 + 回填证据摘要（编排者可同步跑一次只读脚本看退出码，但不替代 G 的回填）。
 - **LLM-as-a-Verifier 评审**：由 V 子代理（即「外部 Agent」）按 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) 提示词执行，技能用校验脚本防输出漂移；编排者不得自评。
 - **技能自演化**：不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
@@ -28,7 +28,7 @@
   - Node.js ≥20
   - [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
-    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 9 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
+    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
     - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` — 安全扫描基线（`npm run lint:security` 时使用，devDep）
 
 > 纯 Markdown 技能资产（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零 Node.js、零 `npm install`，可整目录拷贝分发；Node.js/npm/tsx/devDeps 仅用于执行 `scripts/*.ts` 的确定性门禁与回归基线。
@@ -127,14 +127,12 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-description: >
-  Drive the full W-model software development lifecycle with parallel development
-  and test design. Use when the user wants to run requirements analysis, system/outline/detailed
-  design, coding with unit tests, integration testing, system testing, or acceptance
-  testing as a closed-loop W-model workflow; when the user invokes /wm commands
-  (analyze, design, code, test, review, status); or when building software that
-  needs synchronized test design alongside each development stage with requirements
-  traceability.
+version: 18.0.0
+description: >-
+  Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
+  requests requirements traceability (RTM), stage gates, quality gates, or development
+  and testing in parallel. When the user only asks for an end-to-end or complete
+  development process without these signals, ask whether to use the W-model first.
 ```
 
 触发条件摘要：
@@ -143,6 +141,8 @@ description: >
 - 用户使用 `/wm` 系列命令
 - 用户要从需求出发完成设计 → 编码 → 各级测试的完整交付
 - 用户需要需求追溯 / 质量门检查 / 补齐测试设计
+
+> `version` 字段与 [`w-model-dev/skill-metadata.json`](../w-model-dev/skill-metadata.json) 镜像双写，由 [`__tests__/skill-metadata.test.ts`](../w-model-dev/scripts/__tests__/skill-metadata.test.ts) 回归校验一致。
 
 ---
 
@@ -170,7 +170,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 |---|---|
 | Skill 入口与触发条件 | [../w-model-dev/SKILL.md](../w-model-dev/SKILL.md) |
 | 各阶段执行细则 | [../w-model-dev/references/](../w-model-dev/references) |
-| 编排者-子代理边界（O/S/V/G） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
+| 编排者-子代理边界（O/A/S/V/G/R） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
 | LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
 | 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
 | JSON Schema 文件（draft-07，13 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
@@ -210,7 +210,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 
 **Q：为什么有 `package.json` + `npm install`？**
 Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/*.ts` 校验脚本：
-- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 9 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
+- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` 指纹豁免）
 - **runtime**：`tsx`（运行 ESM TypeScript）
 
