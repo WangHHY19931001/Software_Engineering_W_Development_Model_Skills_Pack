@@ -33,7 +33,8 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as ts from 'typescript';
+import { createRequire } from 'node:module';
+import type * as TsType from 'typescript';
 import {
   checkCodeTlaConsistency,
   extractCodeStateTransfers,
@@ -44,6 +45,8 @@ import {
   type TlaManifest,
   type TlaSpec,
 } from './code-tla-logic.js';
+
+const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
 // ==================== 参数解析 ====================
 

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "targetKind": "requirement", "target": "REQ-001", "reviewedAt": "2026-07-19T00:00:00Z", "agent": "x", "scoringMethod": "logits", "repeatTimes": 3, "varianceThreshold": 0.10 },
+  "subCriteria": [],
+  "compositeScore": 0.9,
+  "qualityLevel": "A",
+  "summary": "test test test test test test test test test test test test test test",
+  "passed": true,
+  "unknownExtraField": "should-be-rejected"
+}

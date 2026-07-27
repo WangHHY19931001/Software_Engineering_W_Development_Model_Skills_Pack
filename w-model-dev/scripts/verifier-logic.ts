@@ -18,6 +18,8 @@
  *   - https://github.com/alchaincyf/darwin-skill
  */
 
+import { validateBySchema } from './schema-loader.js';
+
 // ==================== 自包含类型形状 ====================
 
 /**
@@ -227,6 +229,20 @@ export function determineQualityLevel(score: number): QualityLevel {
 export function checkVerifierOutput(
   raw: unknown,
 ): VerifierCheckResult {
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+  // 通过后才进入下方业务规则校验（数值合理性 / 防漂移 / 权重匹配等）。
+  const schemaResult = validateBySchema('verifier-output', raw);
+  if (!schemaResult.valid) {
+    return {
+      passed: false,
+      reasons: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+      compositeScore: 0,
+      expectedCompositeScore: 0,
+      qualityLevel: 'N/A',
+    };
+  }
+
   const reasons: string[] = [];
   const reworkHints: string[] = [];
 

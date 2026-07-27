@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0",
+  "meta": { "targetKind": "requirement" },
+  "subCriteria": [],
+  "compositeScore": 0.9,
+  "qualityLevel": "A",
+  "summary": "missing passed field test test test test test test test test test test"
+}

@@ -33,6 +33,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkVerifierOutput } from './verifier-logic.js';
+import { validateBySchema } from './schema-loader.js';
 import { checkArtifactGate } from './gate-logic.js';
 import { checkRequirementGraph } from './graph-logic.js';
 import { checkTlaModel } from './tla-logic.js';
@@ -40,7 +41,8 @@ import { checkBudget } from './budget-logic.js';
 import { checkRunLog } from './run-log-logic.js';
 import { checkMaturity } from './maturity-logic.js';
 import { checkCheckpoint } from './checkpoint-logic.js';
-import * as ts from 'typescript';
+import { createRequire } from 'node:module';
+import type * as TsType from 'typescript';
 import {
   checkCodeTlaConsistency,
   extractCodeStateTransfers,
@@ -48,6 +50,8 @@ import {
   type CodeFile,
 } from './code-tla-logic.js';
 import { checkRootCauseReport } from './root-cause-logic.js';
+
+const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
 // ==================== 测试用例定义 ====================
 
@@ -80,8 +84,8 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-ranking-k.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/ranking\.k 必须为整数/],
-    description: 'ranking.k=2.5 非整数，应被整数性校验拦截',
+    expectedReasonPatterns: [/\[schema\].*ranking/],
+    description: 'ranking.k=2.5 非整数，应被 schema type:integer 前置校验拦截',
   },
   {
     file: 'bad-composite-score.json',
@@ -98,8 +102,8 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-variance-threshold.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/varianceThreshold 必须在 \[0,0\.1\]/],
-    description: 'meta.varianceThreshold 缺失，应判失败（spec §6 必填字段）',
+    expectedReasonPatterns: [/\[schema\].*varianceThreshold/],
+    description: 'meta.varianceThreshold 缺失，应被 schema required 前置校验拦截',
   },
   {
     file: 'bad-variance-drift.json',
@@ -116,8 +120,8 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-reviewed-at.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/reviewedAt 必须为有效 ISO 8601/],
-    description: 'reviewedAt 不是有效时间，应被拒绝',
+    expectedReasonPatterns: [/\[schema\].*reviewedAt/],
+    description: 'reviewedAt 不是有效时间，应被 schema format:date-time 前置校验拦截',
   },
   {
     file: 'bad-variance-threshold-range.json',
@@ -153,8 +157,8 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-targetkind.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/targetKind.*testcase/],
-    description: 'P2.5 targetKind=testcase 已废弃，应被枚举校验拦截',
+    expectedReasonPatterns: [/\[schema\].*targetKind/],
+    description: 'P2.5 targetKind=testcase 已废弃，应被 schema enum 前置校验拦截',
   },
   {
     file: 'bad-subcriteria-name.json',
@@ -171,8 +175,8 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-summary-too-short.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/summary 长度.*< 50.*R11/],
-    description: 'summary 长度 < 50 字符，应被 R11 校验拦截（sig-002）',
+    expectedReasonPatterns: [/\[schema\].*summary/],
+    description: 'summary 长度 < 50 字符，应被 schema minLength:50 前置校验拦截',
   },
   {
     file: 'bad-evidence-empty.json',
@@ -744,6 +748,40 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
   { file: 'bad-r10-reality-confidence.json', expectedPassed: false, expectedReasonPatterns: [/reality-checker.*confidence/], description: 'R10 reality-checker confidence=0.3' },
 ];
 
+// -------------------- Schema 前置校验（借鉴 drawio-skill/styles/schema.json） --------------------
+
+interface SchemaCase {
+  /** 样本文件名（相对 samples/schema/） */
+  file: string;
+  /** 期望 schema 校验是否通过 */
+  expectedValid: boolean;
+  /** 期望 errorMessages 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedErrorPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const SCHEMA_CASES: SchemaCase[] = [
+  {
+    file: 'bad-additional-props.json',
+    expectedValid: false,
+    expectedErrorPatterns: [/additionalProperties/],
+    description: '未知字段 unknownExtraField 应被 additionalProperties:false 拦截',
+  },
+  {
+    file: 'bad-missing-required.json',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: '缺失 passed / meta 必填字段应被 required 拦截',
+  },
+  {
+    file: 'bad-wrong-type.json',
+    expectedValid: false,
+    expectedErrorPatterns: [/type/],
+    description: 'compositeScore 为字符串应被 type:number 拦截',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -1081,6 +1119,37 @@ async function runRootCauseCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of SCHEMA_CASES) {
+    const abs = path.join(samplesDir, 'schema', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = validateBySchema('verifier-output', parsed);
+
+    const details: string[] = [];
+    if (r.valid !== c.expectedValid) {
+      details.push(`  - 期望 valid=${c.expectedValid}，实际 valid=${r.valid}`);
+    }
+    if (!c.expectedValid && c.expectedErrorPatterns) {
+      for (const p of c.expectedErrorPatterns) {
+        const matched = r.errorMessages.some(m => p.test(m));
+        if (!matched) {
+          details.push(`  - 未匹配期望错误模式 ${p}（实际 errorMessages=${JSON.stringify(r.errorMessages)}）`);
+        }
+      }
+    }
+
+    results.push({
+      name: `schema/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（借鉴点 4：版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -1123,13 +1192,14 @@ async function main(): Promise<void> {
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
+  console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
   console.log(`Metadata 用例  : 1`);
   console.log('─'.repeat(60));
 
   const [
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
-    codeTlaResults, rootcauseResults, metadataResults,
+    codeTlaResults, rootcauseResults, schemaResults, metadataResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -1141,12 +1211,13 @@ async function main(): Promise<void> {
     runCheckpointCases(samplesDir),
     runCodeTlaCases(samplesDir),
     runRootCauseCases(samplesDir),
+    runSchemaCases(samplesDir),
     runMetadataCheck(skillRoot),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
-    ...codeTlaResults, ...rootcauseResults, ...metadataResults,
+    ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...metadataResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

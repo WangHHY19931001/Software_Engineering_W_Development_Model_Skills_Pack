@@ -198,7 +198,8 @@ describe('Part A 门禁增强回归测试', () => {
       const v = loadVerifierSample('bad-targetkind.json');
       const result = checkVerifierOutput(v);
       expect(result.passed).toBe(false);
-      expect(result.reasons.some(r => r.includes('targetKind') && r.includes('testcase'))).toBe(true);
+      // schema enum 前置校验拦截，错误消息含 [schema] 和 targetKind 路径
+      expect(result.reasons.some(r => r.includes('[schema]') && r.includes('targetKind'))).toBe(true);
     });
 
     it('P2.4 subCriteria 名称非标准应失败', () => {
@@ -222,7 +223,8 @@ describe('R11/R12 Verifier 改进（sig-002）', () => {
     const sample = loadVerifierSample('bad-summary-too-short.json');
     const result = checkVerifierOutput(sample);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /summary 长度.*< 50.*R11/.test(r))).toBe(true);
+    // schema minLength:50 前置校验拦截，错误消息含 [schema] 和 summary 路径
+    expect(result.reasons.some(r => r.includes('[schema]') && r.includes('summary'))).toBe(true);
   });
 
   it('R11: summary 长度 ≥ 50 字符应通过（valid.json）', () => {

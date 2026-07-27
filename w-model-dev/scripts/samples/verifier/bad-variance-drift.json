@@ -18,6 +18,6 @@
   ],
   "compositeScore": 0.8735,
   "qualityLevel": "A",
-  "summary": "ok",
+  "summary": "REQ-001 需求覆盖完整（5 子标准），采用 RBAC 权限模型，可测试可追溯，遗留风险：无，待运行时验证。",
   "passed": true
 }

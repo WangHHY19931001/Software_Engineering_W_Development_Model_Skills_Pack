@@ -14,7 +14,11 @@
     "prepush": "PREPUSH_FORCE=1 bash .githooks/pre-push"
   },
   "devDependencies": {
-    "tsx": "^4.19.2"
+    "@types/node": "^20.19.43",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=20"

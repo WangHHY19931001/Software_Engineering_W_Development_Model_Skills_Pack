@@ -18,7 +18,10 @@
  *   - gate-logic.ts 终检（仅复用维度1逻辑，校验 SD→codeModule 映射）
  */
 
-import * as ts from 'typescript';
+import { createRequire } from 'node:module';
+import type * as TsType from 'typescript';
+
+const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
 // ==================== 自包含类型形状 ====================
 
@@ -67,7 +70,7 @@ export interface Rtm {
 
 export interface CodeFile {
   path: string;
-  ast: ts.SourceFile;
+  ast: TsType.SourceFile;
   assignments: Assignment[];
   conditionals: Conditional[];
   assertions: Assertion[];
@@ -198,14 +201,14 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
  * @returns CodeFile（含 assignments/conditionals/assertions）
  */
 export function extractCodeStateTransfers(
-  ast: ts.SourceFile,
+  ast: TsType.SourceFile,
   filePath: string,
 ): CodeFile {
   const assignments: Assignment[] = [];
   const conditionals: Conditional[] = [];
   const assertions: Assertion[] = [];
 
-  function getLine(node: ts.Node): number {
+  function getLine(node: TsType.Node): number {
     const fullText = ast.getFullText();
     const pos = node.getStart(ast, false);
     if (pos < 0) return 0;
@@ -216,11 +219,11 @@ export function extractCodeStateTransfers(
     return line;
   }
 
-  function getText(node: ts.Node): string {
+  function getText(node: TsType.Node): string {
     return node.getText(ast).replace(/\s+/g, ' ').trim();
   }
 
-  function visit(node: ts.Node): void {
+  function visit(node: TsType.Node): void {
     // 赋值语句：BinaryExpression 且 operator = =
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
       const line = getLine(node);
@@ -349,7 +352,7 @@ export function extractNextActions(tlaContent: string): string[] {
 export function extractCodeFunctionNames(files: CodeFile[]): string[] {
   const names: string[] = [];
   for (const f of files) {
-    function visit(node: ts.Node): void {
+    function visit(node: TsType.Node): void {
       if (ts.isFunctionDeclaration(node) && node.name) {
         names.push(node.name.text);
       } else if (ts.isMethodDeclaration(node) && node.name) {

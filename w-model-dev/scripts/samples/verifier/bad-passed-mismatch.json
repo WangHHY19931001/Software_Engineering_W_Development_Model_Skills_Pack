@@ -18,7 +18,7 @@
   ],
   "compositeScore": 0.7735,
   "qualityLevel": "B",
-  "summary": "需求基本覆盖但仍有改进空间。",
+  "summary": "REQ-001 需求基本覆盖但仍有改进空间，需补充边界场景与异常路径的测试用例设计以提升整体完整度。",
   "passed": false,
   "reworkHints": ["重写需求以提升完整度"]
 }
