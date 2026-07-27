@@ -755,10 +755,10 @@ interface TlaCheckRound {
 | `budget` | `budget.schema.json` | BudgetConfig | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1] | budget-logic.ts |
 | `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（15 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
 | `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | checkpoint-logic.ts |
-| `event-ingress` | `event-ingress.schema.json` | EventIngressEntry | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （schema-loader 直接校验） |
+| `event-ingress` | `event-ingress.schema.json` | `EventIngressEntry` | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （暂未集成到 logic.ts，仅 self-test 覆盖） |
 | `maturity` | `maturity.schema.json` | MaturityConfig | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格 | maturity-logic.ts |
-| `project` | `project.schema.json` | Project | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格 | （schema-loader 直接校验） |
-| `hill-climbing-report` | `hill-climbing-report.schema.json` | HarnessImprovementReport | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required | （schema-loader 直接校验） |
+| `project` | `project.schema.json` | `Project` | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格 | （暂未集成到 logic.ts，仅 self-test 覆盖） |
+| `hill-climbing-report` | `hill-climbing-report.schema.json` | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required | （暂未集成到 logic.ts，仅 self-test 覆盖） |
 | `rootcause-report` | `rootcause-report.schema.json` | RootCauseReport | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5 | root-cause-logic.ts |
 
 ### 设计原则
