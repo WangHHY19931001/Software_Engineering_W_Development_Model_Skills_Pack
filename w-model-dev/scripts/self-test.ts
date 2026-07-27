@@ -1081,11 +1081,33 @@ async function runRootCauseCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- Metadata（借鉴点 4：版本号双写一致性） --------------------
+
+async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
+  const skill = await fs.readFile(path.join(skillRoot, 'SKILL.md'), 'utf-8');
+  const meta = JSON.parse(await fs.readFile(path.join(skillRoot, 'skill-metadata.json'), 'utf-8')) as { version: string };
+  const versionMatch = skill.match(/^version:\s*(.+)$/m);
+  const skillVersion = versionMatch?.[1]?.trim();
+  const details: string[] = [];
+  if (skillVersion === undefined) {
+    details.push('  - SKILL.md frontmatter 缺 version 字段');
+  } else if (skillVersion !== meta.version) {
+    details.push(`  - 版本不一致: SKILL.md=${skillVersion}, metadata=${meta.version}`);
+  }
+  return [{
+    name: 'metadata/version-consistency',
+    passed: details.length === 0,
+    description: 'SKILL.md frontmatter version 与 skill-metadata.json 一致',
+    details: details.length > 0 ? details : undefined,
+  }];
+}
+
 // ==================== 入口 ====================
 
 async function main(): Promise<void> {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const samplesDir = path.join(here, 'samples');
+  const skillRoot = path.join(here, '..');
 
   console.log('═'.repeat(60));
   console.log('校验逻辑自检（Self-Test）');
@@ -1101,12 +1123,13 @@ async function main(): Promise<void> {
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
+  console.log(`Metadata 用例  : 1`);
   console.log('─'.repeat(60));
 
   const [
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
-    codeTlaResults, rootcauseResults,
+    codeTlaResults, rootcauseResults, metadataResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -1118,11 +1141,12 @@ async function main(): Promise<void> {
     runCheckpointCases(samplesDir),
     runCodeTlaCases(samplesDir),
     runRootCauseCases(samplesDir),
+    runMetadataCheck(skillRoot),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
-    ...codeTlaResults, ...rootcauseResults,
+    ...codeTlaResults, ...rootcauseResults, ...metadataResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
