@@ -84,13 +84,13 @@ export interface FeatureHeader {
   system: string;
   tlaSpec: string;
   stateMachine: string;
-  parentFeatures: string[] | null;  // null 表示 '(none)'
-  siblingFeatures: string[] | null;
-  childFeatures: string[] | null;
+  parentFeatures: string[] | null | undefined;  // undefined=未声明, null='(none)', string[]=显式列表
+  siblingFeatures: string[] | null | undefined;
+  childFeatures: string[] | null | undefined;
   scenarioIdPrefix: string;
 }
 
-const HEADER_KEY_PATTERN = /^#\s*@(\w+):\s*(.+?)\s*$/;
+const HEADER_KEY_PATTERN = /^#\s*@([\w-]+):\s*(.+?)\s*$/;
 
 /**
  * 解析 .feature 文件头注释块（在 `Feature:` 行之前的所有 `# @key: value` 行）。
@@ -117,8 +117,8 @@ export function parseFeatureHeader(content: string): { header: FeatureHeader; vi
     violations.push('[header] missing Feature: line');
   }
 
-  const parseList = (val: string | undefined): string[] | null => {
-    if (val === undefined) return undefined as never as null;  // 未声明
+  const parseList = (val: string | undefined): string[] | null | undefined => {
+    if (val === undefined) return undefined;  // 未声明
     if (val === '(none)') return null;
     return val.split(',').map(s => s.trim()).filter(s => s.length > 0);
   };
@@ -456,6 +456,8 @@ export interface BddCheckInput {
   rtmRows?: Array<{ reqId: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }>;
   /** 阶段 5-8 注入：cucumber 运行报告 */
   cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+  /** 校验时间戳：纯函数测试可注入固定值以确保可重放；CLI 不传时回退到当前时间 */
+  checkedAt?: string;
 }
 
 export interface BddCheckResult {
@@ -480,7 +482,7 @@ export interface BddCheckResult {
  * 纯函数：输入 BddCheckInput，输出 BddCheckResult。
  */
 export function checkBddModel(input: BddCheckInput): BddCheckResult {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = input.checkedAt ?? new Date().toISOString();
   const phase = input.phase;
 
   // 入口 schema 校验（防反模式 #28）
