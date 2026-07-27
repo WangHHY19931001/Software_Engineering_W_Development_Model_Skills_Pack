@@ -155,6 +155,7 @@ refactor(skill): /wm review 编排指引精简
 - **设计决策**统一记录在 [`docs/skill-design-document_SSoT.md`](./docs/skill-design-document_SSoT.md)
 - `docs/skill-design-document.md` 仅作为指针，不再独立维护内容
 - 修改设计 → 先改 SSoT → 再改 `w-model-dev/` 资产（`SKILL.md` / `references/` / `scripts/` / `templates/`）→ 最后同步 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `CHANGELOG.md` / `docs/INSTALL.md`
+- **BDD 文档维护**：修改 BDD features 结构 / 状态机七要素 / `bdd-manifest.json` schema / `check-bdd-model.ts` 校验维度时，必须同步更新 SSoT §3.4.14 + `bdd-guide.md` + `bdd-review-checklist.md` + `data-models.md` BDD 数据模型节 + `anti-patterns.md` #29 关联节
 
 ### 变更日志
 

@@ -3,6 +3,32 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [19.0.0] - 2026-07-27
+
+### 第 19 轮 BDD 建模与验收夹具
+
+引入 BDD（Behavior-Driven Development）建模（Cucumber.js + Gherkin）与验收夹具，与既有 TLA+ 行为规格正交协作，覆盖 W 模型 8 阶段的测试设计/执行/TDD 夹具需求。详见 SSoT §3.4.14。
+
+#### Added
+- BDD 建模与验收夹具（Cucumber.js v11 + @cucumber/messages）：分层 L1/L2/L3/L4 features + 状态机七要素（states / initialState / terminalStates / acceptingStates / rejectingStates / transitions / invariants）
+- `check-bdd-model.ts` 独立门禁脚本（7 维度校验：D1 头标注 / D3 状态机 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）
+- `bdd-manifest.schema.json` + `bdd-logic.ts` + 10 个 BDD samples（5 valid + 5 bad）
+- `bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md`
+- `feature.template` + `bdd-manifest.template.json`
+- 反模式 #29（BDD 建模与需求/设计/TLA+ 不符未回退）
+- SSoT §3.4.14 + SKILL.md 约束 #14
+
+#### Changed
+- 阶段 1-4 产出对应层级 BDD features（L1/L2/L3/L4）；阶段 5 以 L4 features 作为 TDD 夹具；阶段 6/7/8 执行 L3/L2/L1 cucumber scenarios
+- self-test 基线 111 → 121（+10 BDD）
+- RTM 测试列字段值格式扩展：`<Type>-NNN | BDD-L<level>-<system>-<num>.feature`（字段类型保持 `string | null` 不变）
+- `check-artifact-gate.ts` 终检新增 BDD 资产校验
+- verifier-spec 不新增 targetKind，BDD 评审用 `test` + `bdd-review-checklist.md`（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）
+- 8 个 phase-*.md 追加 BDD 节；workflow.md 阶段产物表追加 BDD 产物；operational-recovery.md 追加 4 条 BDD 自检项；data-models.md 追加 BDD 数据模型节；rtm-guide.md 追加 BDD 引用格式
+
+#### Dependencies
+- 新增 devDeps: `@cucumber/cucumber@^11.0.0`, `@cucumber/messages@^27.0.0`
+
 ## [18.0.0] - 2026-07-27
 
 ### 第 18 轮 drawio-skill 设计吸收

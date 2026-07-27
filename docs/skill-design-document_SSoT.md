@@ -577,6 +577,23 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改 `*.ts` 代码（仅文档同步 SSoT / AGENTS / CHANGELOG / README）；不引入新门禁脚本（schema 校验由 logic 层自动调用，security-scan 由 pre-push 承载）。
 
+#### 3.4.14 第 19 轮：BDD 建模与验收夹具（2026-07-27）
+
+> 引入 BDD（Behavior-Driven Development）建模（Cucumber.js + Gherkin）与验收夹具，与既有 TLA+ 行为规格正交协作，覆盖 W 模型 8 阶段的测试设计/执行/TDD 夹具需求。BDD features 作为可执行规格，TLA+ 作为行为正确性基准，二者通过等价性校验互锁。
+
+1. **分层 BDD 架构**：L1（系统级 acceptance）/ L2（子系统级 system）/ L3（集成级 integration）/ L4（原子级 unit），与 TLA+ L1-L4 层次化建模对齐
+2. **features 文件结构**：独立 .feature 文件（Gherkin 语法），文件头标注 `@req` / `@design` / `@system` / `@tla-spec` / `@state-machine` / `@parent-features` / `@sibling-features` / `@child-features` / `@scenario-id-prefix`，Background 节声明状态机七要素
+3. **状态机七要素约束**：states / initialState / terminalStates / acceptingStates / rejectingStates / transitions / invariants 全部必填（acceptingStates 不可为空，其余可为 `()`）
+4. **BDD↔TLA+ 等价性校验**：状态集等价 + 初始状态一致 + 转移集等价 + 不变式归一化匹配；不等价时走 R→V→G→S-fix 循环（反模式 #29）
+5. **门禁脚本**：`check-bdd-model.ts` 7 维度校验（D1 头标注 / D3 状态机 / D4 TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）+ `bdd-logic.ts` 纯逻辑 + `bdd-manifest.schema.json` 强约束
+6. **8 阶段产出时序**：阶段 1-4 产出对应层级 L1/L2/L3/L4 features + bdd-manifest.json；阶段 5 以 L4 features 作为 TDD 夹具；阶段 6/7/8 执行 L3/L2/L1 cucumber scenarios
+7. **BDD↔RTM 映射**：RTM 测试列字段值扩展为 `<Type>-NNN | BDD-L<level>-<system>-<num>.feature`，字段类型保持 `string | null` 不变
+8. **BDD↔verifier-spec 关系**：不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + `bdd-review-checklist.md` 7 项清单（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）
+9. **验收夹具四类**：状态转移夹具 / 不变式断言夹具 / RTM 追溯夹具 / 端到端 scenario 夹具
+10. **反模式 #29**：BDD 建模与需求/设计/TLA+ 不符未回退——BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑
+
+**不涉及范围**：不引入 LLM 调用（cucumber 是确定性运行器，features/step 是文本+代码）；不替换 TLA+（BDD 与 TLA+ 正交协作，互为补充）；不修改既有 `*-logic.ts` 校验逻辑（新增独立的 `bdd-logic.ts`）。
+
 ---
 
 ## 4. 技能工作流程
@@ -2011,6 +2028,7 @@ interface RunLogEntry {
 | 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
 | 3.4 编排者-子代理边界 | 编排者最小化（O/A/S/V/G/R 六角色，A 为阶段 1–4 分析子代理，R 为返工循环根因定位，F 由 S 兼任）+ 反模式 #10/#11/#12/#18/#19 守护 | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10/#11/#12/#18/#19 + `ingestion-chunk.md` / `ingestion-cross.md` / `graph-guide.md` | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施 + A 子代理图谱演进 + G 跑 `check-requirement-graph.ts` 守护 #11/#12 + R 返工根因定位守护 #18/#19） |
 | §3.4.13 第 18 轮 drawio-skill 设计吸收 | Bundled Resources 触发条件总表 + JSON Schema 强约束（反模式 #28）+ 安全扫描基线 + 版本号双写 + pure/IO 函数分离 + 测试 coverage 矩阵 + toolbox 决策表 | `w-model-dev/SKILL.md`「Bundled Resources」节 + `w-model-dev/schemas/*.schema.json`（13 份 draft-07）+ `w-model-dev/scripts/schema-loader.ts`（ajv 单例）+ `w-model-dev/scripts/security-scan.ts` + `.eslintsecurity-baseline.json`（sha256 指纹豁免）+ `w-model-dev/skill-metadata.json`（版本号镜像）+ `w-model-dev/scripts/__tests__/skill-metadata.test.ts`（双写回归）+ `w-model-dev/references/toolbox.md`（I have X → use Z）+ `w-model-dev/scripts/__tests__/README.md`（coverage 矩阵）+ `w-model-dev/references/anti-patterns.md` #28 | 完整（吸收 drawio-skill 7 项设计实践；纯文档同步不涉及 .ts 代码变更；schema 校验由 logic 层自动调用、security-scan 由 pre-push 承载） |
+| §3.4.14 第 19 轮 BDD 建模与验收夹具 | 分层 BDD features（L1-L4）+ 状态机七要素 + BDD↔TLA+ 等价性 + 7 维度门禁 + RTM 映射扩展 + 验收夹具四类 + 反模式 #29 | `w-model-dev/schemas/bdd-manifest.schema.json` + `w-model-dev/scripts/bdd-logic.ts`（纯逻辑）+ `w-model-dev/scripts/check-bdd-model.ts`（CLI）+ `w-model-dev/scripts/samples/bdd/`（10 样本）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（vitest）+ `w-model-dev/references/bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md` + `w-model-dev/templates/feature.template` / `bdd-manifest.template.json` + `w-model-dev/references/anti-patterns.md` #29 + `w-model-dev/SKILL.md` 约束 #14 | 完整（BDD 与 TLA+ 正交协作；Cucumber.js v11 + @cucumber/messages devDeps；self-test 基线 111→121） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |
