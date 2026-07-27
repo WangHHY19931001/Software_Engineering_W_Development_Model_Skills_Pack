@@ -12,6 +12,7 @@
 | RTM | 阶段 5/6/7 阶段级校验 | `check-artifact-gate.ts --phase=5\|6\|7 <project-dir>` |
 | graph.json（阶段 1–4 ingestion） | 图谱结构 + 信息流门禁 | `npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=N]` |
 | tla-manifest.json | TLA+ 行为门禁（SANY + TLC） | `npx tsx w-model-dev/scripts/check-tla-model.ts <manifest.json> [--phase=N]` |
+| bdd-manifest.json | BDD 模型门禁（D1-D7 七维度：头标注/状态机/TLA+ 等价/step 绑定/scenario 路径/RTM 映射） | `npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> [--phase=N]` |
 | tla-manifest + graph + rtm + src/ | 阶段 5 代码-TLA+ 一致性回归 | `npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=... --graph=... --rtm=... --src=...` |
 | budget.json | 预算超限检查 | `npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=] [--run-log=] [--phase=N]` |
 | run-log.jsonl | 运行日志完整性检查 | `npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=] [--tla-manifest=]` |

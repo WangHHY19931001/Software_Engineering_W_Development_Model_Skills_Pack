@@ -6,6 +6,7 @@
 
 | File | Area | What's locked in |
 |---|---|---|
+| bdd-logic.test.ts | BDD | parseFeatureHeader 头标注解析 / parseBackgroundStateMachine 七要素解析 / validateStateMachineCompleteness 状态机完整性 / validateScenarioPath 路径合法性 / validateTlaEquivalence BDD↔TLA+ 等价性 / checkBddModel schema 失败 exitCode=2 |
 | budget-logic.test.ts | Budget | R1 时效性 / R2 schema / R3 onExceed / R4 killSwitch / R5 触发检测 |
 | code-tla-logic.test.ts | Code-TLA+ | SD→codeModule 映射 / 状态转移 / Next 分支 / 不变式覆盖 |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |

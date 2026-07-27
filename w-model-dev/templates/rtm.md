@@ -12,7 +12,7 @@
 
 | 需求 ID | 需求描述 | 设计文档 | 代码模块 | 单元测试 | 集成测试 | 系统测试 | 验收测试 | 覆盖状态 |
 |---|---|---|---|---|---|---|---|---|
-| REQ-001 | {{描述}} | {{SD-3.2.1}} | {{userController.ts}} | {{UT-001}} | {{IT-001}} | {{ST-001}} | {{UAT-001}} | {{100%}} |
+| REQ-001 | {{描述}} | {{SD-3.2.1}} | {{userController.ts}} | {{UT-001 \| BDD-L4-blog_system_user_controller-001.feature}} | {{IT-001 \| BDD-L3-blog_system_auth-001.feature}} | {{ST-001 \| BDD-L2-blog_system_auth-001.feature}} | {{UAT-001 \| BDD-L1-blog_system-001.feature}} | {{100%}} |
 | REQ-002 | {{描述}} | — | — | — | — | — | {{UAT-002}} | {{部分}} |
 | REQ-003 | {{描述}} | — | — | — | — | — | — | {{待覆盖}} |
 
@@ -20,6 +20,7 @@
 
 - `—`：尚未到达该阶段，待填充。
 - 单元 / 集成 / 系统 / 验收测试列填用例 ID，并在测试报告产出后追加状态（如 `UT-001 ✅`）。
+- BDD features 引用附加在短 ID 之后，用 ` | ` 分隔（如 `UAT-001 | BDD-L1-<system>-<num>.feature`），格式详见 [references/rtm-guide.md](../references/rtm-guide.md)「BDD features 引用格式」节。
 - 覆盖状态：由门禁脚本从 7 个追溯字段重算；`100%`（全部字段已填充且测试通过）/ `部分` / `待覆盖` 仅作为展示值，不能替代 `.w-model/rtm.json` 的确定性校验。
 
 ## 测试执行状态汇总

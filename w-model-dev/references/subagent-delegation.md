@@ -194,19 +194,20 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 ### S 拆分机制（阶段 1–4 任务过重时）
 
-> 阶段 1–4 单个 S 子代理任务过重（文档 + 测试设计 + RTM + TLA+ 四类产出）时，编排者可将 S 拆为两次分派，避免单次上下文超载或产出质量稀释。**拆分为可选项，非强制**；任务粒度可承载时不拆，按标准 S 模板一次产出。
+> 阶段 1–4 单个 S 子代理任务过重（文档 + 测试设计 + RTM + TLA+ + BDD features 五类产出）时，编排者可将 S 拆为最多三次分派，避免单次上下文超载或产出质量稀释。**拆分为可选项，非强制**；任务粒度可承载时不拆，按标准 S 模板一次产出。
 
-- **S-doc**：产出开发文档 + 同步测试设计 + 更新 RTM 实体；**不产出** `.tla` / `.cfg` / `tla-manifest.json`。
+- **S-doc**：产出开发文档 + 同步测试设计 + 更新 RTM 实体；**不产出** `.tla` / `.cfg` / `tla-manifest.json` / `.feature` / `bdd-manifest.json`。
 - **S-tla**：产出对应层级 TLA+ 规格（`.tla` + `.cfg`）+ 更新 `tla-manifest.json`；**依赖 S-doc 已产出的设计文档**作为建模输入。
-- **分派时序**：S-doc → S-tla → V → G（V 评审两批产物的合集；G 跑 `check-verifier-output.ts` + `check-tla-model.ts`）。
-- **返工边界**：V/G 命中 TLA+ 问题 → 仅返工 S-tla；命中文档 / 测试设计 / RTM 问题 → 仅返工 S-doc，若设计变更影响 TLA+ 模型则同步触发 S-tla 重评。
+- **S-bdd**：产出对应层级 BDD features（`.feature`）+ 更新 `bdd-manifest.json`；**依赖 S-doc 已产出的设计文档 + S-tla 已产出的 TLA+ 规格**作为等价性对齐输入（BDD 状态机七要素须与同层 TLA+ spec 的 State/Init/Next/Invariants 等价）。
+- **分派时序**：S-doc → S-tla → S-bdd → V → G（V 评审三批产物的合集；G 跑 `check-verifier-output.ts` + `check-tla-model.ts` + `check-bdd-model.ts`）。
+- **返工边界**：V/G 命中 TLA+ 问题 → 仅返工 S-tla；命中 BDD 问题 → 仅返工 S-bdd（若 TLA+ 规格变更影响 BDD 等价性则同步触发 S-bdd 重评）；命中文档 / 测试设计 / RTM 问题 → 仅返工 S-doc，若设计变更影响 TLA+ 模型或 BDD features 则同步触发 S-tla / S-bdd 重评。
 
 #### S-doc 子代理分派模板
 
 ```
 角色：产出子代理-文档变体（S-doc）
 当前 W 模型阶段：<阶段 N - 名称>
-任务：产出开发文档 + 同步测试设计 + 更新 RTM 实体（不产出 TLA+ 实体）
+任务：产出开发文档 + 同步测试设计 + 更新 RTM 实体（不产出 TLA+ / BDD 实体）
 依据：references/phase-<N>-*.md + templates/<对应模板>.md + references/rtm-guide.md
 产出：
   1. 开发文档（按 phase-N 定义）
@@ -215,6 +216,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   4. 返回：{产物路径, RTM diff, selfCheck}
 不产出：
   - .tla / .cfg / tla-manifest.json（由 S-tla 负责）
+  - .feature / bdd-manifest.json（由 S-bdd 负责）
   - 跑门禁脚本 / 越阶段产出 / 改 project.status
 ```
 
@@ -232,7 +234,30 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   4. 返回：{.tla 路径, .cfg 路径, manifest diff, selfCheck}
 不产出：
   - 开发文档 / 测试设计 / RTM 实体（由 S-doc 负责）
+  - .feature / bdd-manifest.json（由 S-bdd 负责）
   - 跑门禁脚本 / 越阶段产出 / 改 project.status
+```
+
+#### S-bdd 子代理分派模板
+
+```
+角色：产出子代理-BDD 变体（S-bdd）
+当前 W 模型阶段：<阶段 N - 名称>
+任务：产出对应层级 BDD features + 更新 bdd-manifest.json
+依据：references/bdd-guide.md + templates/feature.template + templates/bdd-manifest.template.json + S-doc 已产出的设计文档 + S-tla 已产出的 TLA+ 规格（用于 BDD↔TLA+ 等价性对齐）
+产出：
+  1. .feature（按 phase-N 层级：L1/L2/L3/L4，每个 REQ/SD/INTF/DD ≥1 个 .feature 文件）
+  2. bdd-manifest.json 实体更新（features + stateMachines + tlaSpecId 关联）
+  3. RTM 测试列追加 BDD 引用（`<Type>-NNN | BDD-L<level>-<system>-<num>.feature`）
+  4. 返回：{.feature 路径, manifest diff, RTM diff, selfCheck}
+不产出：
+  - 开发文档 / 测试设计 / RTM 实体（由 S-doc 负责）
+  - .tla / .cfg / tla-manifest.json（由 S-tla 负责）
+  - 跑门禁脚本 / 越阶段产出 / 改 project.status
+约束：
+  - BDD 状态机七要素须与同层 TLA+ spec 等价（states↔State / initialState↔Init / transitions↔Next / invariants↔Invariants）
+  - 文件头 9 个 @ 字段全部必填（@req / @design / @system / @tla-spec / @state-machine / @parent-features / @sibling-features / @child-features / @scenario-id-prefix）
+  - Background 节七要素全部必填（acceptingStates 不可为空，其余可为 ()）
 ```
 
 ### R 子代理分派模板

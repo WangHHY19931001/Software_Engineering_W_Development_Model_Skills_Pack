@@ -79,3 +79,4 @@ V-tla 子代理产出 VerifierOutput JSON 时，本清单 7 项按以下映射�
 - [语法参考](./tla-plus-syntax-reference.md)：TLA+ 完整语法
 - [模式示例](./tla-plus-patterns-examples.md)：8 个典型示例
 - [TLC 配置](./tla-plus-tlc-configuration.md)：.cfg 文件指南
+- [bdd-review-checklist.md](./bdd-review-checklist.md)：BDD features 审查参考清单（与 TLA+ 审查清单对称：TLA+ 用 `targetKind=design` + 本清单，BDD 用 `targetKind=test` + bdd-review-checklist.md；BDD↔TLA+ 等价性由 `check-bdd-model.ts` D4 维度守护）

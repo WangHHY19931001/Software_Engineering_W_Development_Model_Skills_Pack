@@ -25,6 +25,7 @@
 - `check-artifact-gate.ts` 终检新增 BDD 资产校验
 - verifier-spec 不新增 targetKind，BDD 评审用 `test` + `bdd-review-checklist.md`（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）
 - 8 个 phase-*.md 追加 BDD 节；workflow.md 阶段产物表追加 BDD 产物；operational-recovery.md 追加 4 条 BDD 自检项；data-models.md 追加 BDD 数据模型节；rtm-guide.md 追加 BDD 引用格式
+- 文档一致性补全（D5 复检）：`toolbox.md` scripts 决策表补 `check-bdd-model.ts` 条目；`__tests__/README.md` coverage 矩阵补 `bdd-logic.test.ts` 行；`subagent-delegation.md` S 拆分机制补 S-bdd 子代理模板（与 S-tla 对称）；`tla-plus-guide.md`「与其他门禁的关系」节补 BDD 门禁正交说明；`tla-plus-review-checklist.md` 交叉引用节补 `bdd-review-checklist.md`；`definition-of-done.md` 行为维度补 BDD features 证据 + 自检清单补 BDD 条目 + 反模式计数 17→29；`templates/rtm.md` 测试列补 BDD 引用示例；`templates/test-case.md` 补 BDD feature 关联字段
 
 #### Dependencies
 - 新增 devDeps: `@cucumber/cucumber@^11.0.0`, `@cucumber/messages@^27.0.0`
