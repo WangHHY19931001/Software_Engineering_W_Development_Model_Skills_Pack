@@ -563,6 +563,20 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改脚本（仅文档与 SKILL.md 自检）；不修改 `verifier-spec.md`（V 评审 schema 不变）；不修改 `check-*.ts` 脚本（#27 靠现有 R1 + R2 + R6 交叉检测 + 编排者自检）；不引入新门禁脚本。
 
+#### 3.4.13 第 18 轮：drawio-skill 设计吸收（2026-07-27）
+
+> 吸收 drawio-skill (https://github.com/Agents365-ai/drawio-skill) 7 项设计实践，强化 JSON Schema 强约束 + 安全扫描基线 + 版本号双写 + pure/IO 分离 + 测试 coverage 矩阵 + toolbox 决策表 + Bundled Resources 触发条件总表。本轮为纯文档同步，不涉及 .ts 代码变更。
+
+1. **Bundled Resources 触发条件总表**：SKILL.md 新增章节，明示 references/scripts/subagent/templates 每文件的触发条件（约束 #6 可执行化）
+2. **JSON Schema 强约束**：引入 ajv (draft-07) + 13 份 schemas/*.schema.json，所有 .w-model/*.json 在 logic 层前置 schema 校验，反模式 #28
+3. **skillspector-baseline 安全扫描**：引入 eslint-plugin-security + .eslintsecurity-baseline.json sha256 指纹豁免，pre-push 强制
+4. **版本号双写**：SKILL.md frontmatter `version` + skill-metadata.json 镜像，__tests__/skill-metadata.test.ts 回归
+5. **pure/IO 函数分离**：*-logic.ts 纯函数审计，IO 抽到 check-*.ts
+7. **测试 coverage 矩阵**：__tests__/README.md 用 Area | What's locked in 表
+9. **toolbox 决策表**：references/toolbox.md「I have X, I want Y → use Z」
+
+**不涉及范围**：不修改 `*.ts` 代码（仅文档同步 SSoT / AGENTS / CHANGELOG / README）；不引入新门禁脚本（schema 校验由 logic 层自动调用，security-scan 由 pre-push 承载）。
+
 ---
 
 ## 4. 技能工作流程

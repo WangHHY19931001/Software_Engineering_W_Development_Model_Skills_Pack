@@ -28,6 +28,7 @@
 | `w-model-dev/scripts/` | 自包含门禁脚本（仅依赖 `tsx`）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `<report.json>`）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
+| `w-model-dev/schemas/` | JSON Schema (draft-07) 文件（13 份） | logic 层 schema 校验时自动加载；新增 .w-model/*.json 字段必先改 schema |
 | `w-model-dev-demo/` | **参考实现**：博客系统后端（Express + TypeScript），W 模型 8 阶段端到端调测产物 | 学习 W 模型实际产出形态时参考；不是技能运行时依赖（目录已于 2026-07-26 清理，结论见 §4 第十二轮） |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南） | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
@@ -57,6 +58,9 @@ npm run prepush
 
 # Loop 4 改进信号分析（非门禁脚本，编排者 O 执行）
 npm run hill-climbing                           # （编排者 O 执行）L2+ 项目：分析 run-log 产出 HarnessImprovementReport；非门禁脚本，O 确定性分析
+
+npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1
+# schema 校验由 logic 层自动调用，无需独立命令
 ```
 
 退出码约定：`0 = 通过 / 1 = 校验失败 / 2 = 输入错误`。Agent 在 🔴 CHECKPOINT 处必须以脚本退出码为准，**不得用 LLM 估算**（反例 #3 / #6 / #7 / #12）。

@@ -3,6 +3,35 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [18.0.0] - 2026-07-27
+
+### 第 18 轮 drawio-skill 设计吸收
+
+吸收 drawio-skill (https://github.com/Agents365-ai/drawio-skill) 7 项设计实践，强化 JSON Schema 强约束 + 安全扫描基线 + 版本号双写 + pure/IO 分离 + 测试 coverage 矩阵 + toolbox 决策表 + Bundled Resources 触发条件总表。详见 SSoT §3.4.13。本轮为纯文档同步，不涉及 .ts 代码变更。
+
+#### Added
+
+- 借鉴 drawio-skill 7 项设计实践（详见 SSoT §3.4.13）
+- 引入 ajv (draft-07) + 13 份 JSON Schema 强约束 .w-model/*.json
+- 引入 eslint-plugin-security + .eslintsecurity-baseline.json 安全扫描基线
+- 新增 w-model-dev/schemas/ 目录
+- 新增 w-model-dev/scripts/schema-loader.ts / security-scan.ts
+- 新增 w-model-dev/skill-metadata.json 版本号镜像
+- 新增 w-model-dev/references/toolbox.md 决策表
+- 新增 w-model-dev/scripts/__tests__/README.md coverage 矩阵
+- 新增反模式 #28：JSON 文件未通过 schema 校验放行
+
+#### Changed
+
+- SKILL.md frontmatter 加 version 字段 + 新增 Bundled Resources 章节
+- 9 个 *-logic.ts 顶部增加 schema 前置校验
+- .githooks/pre-push 增加 security-scan 步骤（6 项门禁）
+
+#### Tests
+
+- vitest +4 文件（schema-validation / security-scan / skill-metadata + pure/IO 审计）
+- tsc strict 0 错误
+
 ## [17.0.0] - 2026-07-27
 
 ### 第十七轮 D5 文档不一致修正与简化行为预防

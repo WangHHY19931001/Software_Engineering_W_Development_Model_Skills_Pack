@@ -1,5 +1,8 @@
 # W-Model AI Assistant Skill
 
+[![JSON Schema](https://img.shields.io/badge/JSON%20Schema-draft--07-blue)](w-model-dev/schemas/)
+[![Security Scan](https://img.shields.io/badge/Security-eslint--plugin--security-green)](.eslintrc.cjs)
+
 > 基于 AI 辅助编码与 LLM-as-a-Verifier 的 W 开发模型闭环工作技能。
 >
 > 将软件工程 W 模型（需求 → 设计 → 编码 → 测试）的 8 个阶段编排为可执行的 `/wm` 命令，
