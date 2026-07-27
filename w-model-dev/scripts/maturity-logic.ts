@@ -12,6 +12,8 @@
  *   3. 单点事实：所有「成熟度模型是否符合规范」的判定均委托至此
  */
 
+import { validateBySchema } from './schema-loader.js';
+
 // ==================== 自包含类型形状 ====================
 
 export interface MaturityConfig {
@@ -72,6 +74,15 @@ export function checkMaturity(
   maturity: unknown,
   options?: MaturityCheckOptions,
 ): MaturityCheckResult {
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  const schemaResult = validateBySchema('maturity', maturity);
+  if (!schemaResult.valid) {
+    return {
+      passed: false,
+      violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+    };
+  }
+
   const violations: string[] = [];
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError

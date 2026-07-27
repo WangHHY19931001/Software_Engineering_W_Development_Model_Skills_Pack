@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "reportId": "RC-test-001",
+    "targetKind": "rootcause",
+    "targetArtifact": "src/auth.ts",
+    "targetPhase": "阶段 5",
+    "reworkRound": 1,
+    "reworkSource": "verifier",
+    "persona": "root-cause-locator",
+    "method": "5-why",
+    "analysisTimestamp": "2026-07-24T10:00:00Z"
+  },
+  "input": {
+    "reworkHints": ["空密码未校验"]
+  },
+  "phenomenon": {
+    "summary": "login() 空密码签发 JWT",
+    "severity": "Critical",
+    "affectedArtifacts": ["src/auth.ts"]
+  },
+  "rootCauseChain": [
+    { "step": 1, "why": "为什么未校验？", "answer": "无密码检查", "evidence": "auth.ts:24" },
+    { "step": 2, "why": "为什么无检查？", "answer": "需求未规定", "evidence": "REQ-AUTH-002" }
+  ],
+  "rootCause": {
+    "category": "requirement-gap",
+    "description": "需求未规定空密码处理",
+    "evidence": "REQ-AUTH-002 缺空值条款",
+    "falsifiabilityCheck": "若增加空密码拒绝条款并实现，现象消失"
+  },
+  "upstreamDefect": {
+    "present": true,
+    "rollbackRecommended": false
+  },
+  "fixRecommendation": [
+    { "target": "src/auth.ts", "location": "login()", "action": "增加空密码校验", "rationale": "消除根因" }
+  ],
+  "prevention": [
+    { "scope": "phase-1", "measure": "增加空值处理检查清单", "owner": "O 子代理" }
+  ],
+  "qualityLevel": "A",
+  "passed": true,
+  "summary": "根因明确并已给出修复建议",
+  "unknownReportField": "should-be-rejected-by-additionalProperties"
+}

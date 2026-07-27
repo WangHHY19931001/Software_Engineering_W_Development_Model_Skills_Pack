@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/checkpoint-log.schema.json",
+  "title": "CheckpointLogEntry",
+  "description": "checkpoint-log.jsonl 单行记录形状（checkpoint-logic.ts RunLogEntry 子集：无 rootcause/fix/escalate 动作、无 R 角色）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runId", "timestamp", "phase", "phaseName", "action", "role", "duration_s", "tokens", "estimated", "subagentSpawns", "gateExitCode", "outcome"],
+  "properties": {
+    "runId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "phaseName": { "type": "string", "minLength": 1 },
+    "action": { "enum": ["chunk", "cross", "evolve", "produce", "review", "gate", "tla-gate", "graph-gate", "test", "checkpoint", "rework", "rollback"] },
+    "role": { "enum": ["O", "A", "S", "V", "G"] },
+    "duration_s": { "type": "number", "minimum": 0 },
+    "tokens": { "type": "number", "minimum": 0 },
+    "estimated": { "type": "boolean" },
+    "subagentSpawns": { "type": "integer", "minimum": 0 },
+    "gateExitCode": { "type": ["integer", "null"] },
+    "gateLogPath": { "type": "string" },
+    "outcome": { "enum": ["success", "fail", "rework", "escalate", "blocked", "cancelled"] },
+    "acknowledgedDecisions": { "type": "array", "items": { "type": "string" } },
+    "note": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "type": "string" } }
+  }
+}

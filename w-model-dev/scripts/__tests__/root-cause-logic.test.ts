@@ -42,7 +42,8 @@ describe('R2 rootCauseChain 长度', () => {
     const report = await loadSample('bad-r2-chain-length.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /rootCauseChain.*长度/.test(r))).toBe(true);
+    // schema minItems:2 前置拦截 1 步链（[schema] 前缀），业务规则长度校验不再触达
+    expect(result.reasons.some(r => /\[schema\].*rootCauseChain/.test(r))).toBe(true);
   });
 });
 

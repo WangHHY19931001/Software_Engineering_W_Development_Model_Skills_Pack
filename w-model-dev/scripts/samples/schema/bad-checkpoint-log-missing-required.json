@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-07-10T04:00:00Z",
+  "phase": 1,
+  "phaseName": "需求与范围",
+  "action": "checkpoint",
+  "role": "O",
+  "duration_s": 10,
+  "tokens": 2000,
+  "estimated": false,
+  "subagentSpawns": 0,
+  "gateExitCode": null,
+  "outcome": "success",
+  "acknowledgedDecisions": ["决策 A"]
+}

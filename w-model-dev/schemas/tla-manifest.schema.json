@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/tla-manifest.schema.json",
+  "title": "TlaManifest",
+  "description": "TLA+ manifest 结构 schema，对应 tla-logic.ts TlaManifest（层次化状态机建模规格清单）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "currentPhase", "tools", "specs"],
+  "properties": {
+    "version": { "type": "number" },
+    "project": { "type": "string" },
+    "currentPhase": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "basePath": { "type": "string", "minLength": 1 },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jarPath", "javaMinVersion"],
+      "properties": {
+        "jarPath": { "type": "string", "minLength": 1 },
+        "javaMinVersion": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "specs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "level",
+          "phase",
+          "system",
+          "requirementIds",
+          "designRef",
+          "tlaPath",
+          "cfgPath",
+          "parent",
+          "siblings",
+          "children",
+          "variableCombination",
+          "decompositionDecision",
+          "syntaxChecked",
+          "tlcChecked",
+          "deadlockFree",
+          "invariantsHold",
+          "stateExplosion"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "level": { "enum": ["L1", "L2", "L3", "L4", "L5", "L6"] },
+          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "system": { "type": "string", "minLength": 1 },
+          "requirementIds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "designRef": { "type": "string" },
+          "tlaPath": { "type": "string", "minLength": 1 },
+          "cfgPath": { "type": "string", "minLength": 1 },
+          "parent": { "type": ["string", "null"] },
+          "siblings": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "children": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "variableCombination": { "type": "number", "minimum": 0 },
+          "decompositionDecision": {
+            "enum": ["must-split", "consider-split", "kept-below-threshold", "split-done"]
+          },
+          "syntaxChecked": { "type": "boolean" },
+          "tlcChecked": { "type": "boolean" },
+          "deadlockFree": { "type": "boolean" },
+          "invariantsHold": { "type": "boolean" },
+          "stateExplosion": { "type": "boolean" },
+          "lastCheckTimestamp": { "type": "string" },
+          "tlaContent": { "type": "string" },
+          "cfgContent": { "type": "string" }
+        }
+      }
+    },
+    "graphSdNodes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "checkRounds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["phase", "round", "specId", "syntaxCheck", "tlcCheck", "violations", "converged"],
+        "properties": {
+          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "round": { "type": "integer", "minimum": 1 },
+          "timestamp": { "type": "string" },
+          "specId": { "type": "string", "minLength": 1 },
+          "syntaxCheck": { "type": "boolean" },
+          "tlcCheck": { "type": "boolean" },
+          "violations": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "converged": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

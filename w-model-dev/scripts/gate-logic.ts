@@ -1,3 +1,5 @@
+import { validateBySchema } from './schema-loader.js';
+
 export interface RTMRowShape {
   requirementId: string;
   description: string;
@@ -162,6 +164,20 @@ export function checkArtifactGate(
   options?: CheckArtifactGateOptions,
 ): ArtifactGateResult {
   if (!matrix) return failureResult(['RTM 未初始化']);
+
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+  // 通过后才进入下方业务规则校验（覆盖率 / 阶段级字段 / TLA+ 资产等）。
+  const schemaResult = validateBySchema('rtm', matrix);
+  if (!schemaResult.valid) {
+    return {
+      passed: false,
+      reasons: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+      coveragePercent: 0,
+      missingItems: [],
+      unitCoveragePercent: 0,
+    };
+  }
 
   // P1.1 阶段级校验：默认 phase=8（终检，向后兼容）
   const phase: PhaseOption = options?.phaseOption ?? 8;

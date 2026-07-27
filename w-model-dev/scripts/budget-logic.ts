@@ -12,6 +12,8 @@
  *   3. 单点事实：所有「预算是否符合规范」的判定均委托至此
  */
 
+import { validateBySchema } from './schema-loader.js';
+
 // ==================== 自包含类型形状 ====================
 
 export interface BudgetConfig {
@@ -63,6 +65,15 @@ export function checkBudget(
     tlaReworkCount?: number;
   },
 ): BudgetCheckResult {
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  const schemaResult = validateBySchema('budget', budget);
+  if (!schemaResult.valid) {
+    return {
+      passed: false,
+      violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+    };
+  }
+
   const violations: string[] = [];
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError

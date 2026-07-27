@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "project": "tla-sample-bad",
+  "currentPhase": 2,
+  "basePath": ".",
+  "tools": {
+    "jarPath": "w-model-dev/tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [],
+  "unknownManifestField": "should-be-rejected-by-additionalProperties"
+}

@@ -5,9 +5,12 @@
  *
  * 设计原则（与 verifier-logic.ts / graph-logic.ts / tla-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
+ *      （schema-loader.ts 为同目录内部工具，不计为外部依赖）
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「R 报告是否符合规范」的判定均委托至此
  */
+
+import { validateBySchema } from './schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -138,6 +141,18 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return { passed: false, reasons: ['RootCauseReport 必须为对象'] };
   }
+
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+  // 通过后才进入下方 R1-R10 业务规则校验。
+  const schemaResult = validateBySchema('rootcause-report', input);
+  if (!schemaResult.valid) {
+    return {
+      passed: false,
+      reasons: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+    };
+  }
+
   const r = input as Partial<RootCauseReportShape>;
 
   // schemaVersion

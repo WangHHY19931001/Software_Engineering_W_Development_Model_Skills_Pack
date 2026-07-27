@@ -735,3 +735,66 @@ interface TlaCheckRound {
 - 阶段 5-8 冻结只读：编排者不应分派 S-tla 修改 TLA+ 资产（见 SKILL.md 自检清单）。
 - `tla-manifest.json`（行为层）与 `graph.json`（结构层）、`rtm.json`（追溯层）并存，各自独立校验，互不替代。
 - `checkRounds` 在项目首次产出 TLA+ 规格前填 `[]`；每轮校验后由 G 子代理追加一条记录。
+
+## JSON Schema 强约束（借鉴 drawio-skill/styles/schema.json）
+
+> 借鉴点 2（Task 3）：所有 .w-model/*.json 在进入业务规则校验前，必须先过 JSON Schema 前置校验。
+> schema 用 draft-07 + `additionalProperties:false` 防字段漂移、`required` 防字段缺失、`type`/`enum`/`format` 防类型/枚举/格式错误。
+> schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
+> 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
+
+### Schema 清单（13 份）
+
+| Schema 名（注册键） | 文件 | 目标类型 | 关键约束 | 对应 logic.ts |
+| --- | --- | --- | --- | --- |
+| `verifier-output` | `verifier-output.schema.json` | VerifierOutput | additionalProperties:false；meta/subCriteria 嵌套严格；summary minLength:50 | verifier-logic.ts |
+| `rtm` | `rtm.schema.json` | RTMMatrixShape | additionalProperties:false；executionSummary 嵌套严格；coverage [0,100] | gate-logic.ts |
+| `graph` | `graph.schema.json` | GraphShape | additionalProperties:false；node.type enum（REQ/SD/INTF/DD/EXT-IN/EXT-OUT）；edge.type enum（9 类） | graph-logic.ts |
+| `tla-manifest` | `tla-manifest.schema.json` | TlaManifest | additionalProperties:false；spec.level enum（L1-L6）；decompositionDecision enum（4 类） | tla-logic.ts |
+| `code-tla-manifest` | `code-tla-manifest.schema.json` | CodeTlaConsistencyInput | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description） | code-tla-logic.ts |
+| `budget` | `budget.schema.json` | BudgetConfig | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1] | budget-logic.ts |
+| `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（15 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
+| `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | checkpoint-logic.ts |
+| `event-ingress` | `event-ingress.schema.json` | EventIngressEntry | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （schema-loader 直接校验） |
+| `maturity` | `maturity.schema.json` | MaturityConfig | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格 | maturity-logic.ts |
+| `project` | `project.schema.json` | Project | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格 | （schema-loader 直接校验） |
+| `hill-climbing-report` | `hill-climbing-report.schema.json` | HarnessImprovementReport | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required | （schema-loader 直接校验） |
+| `rootcause-report` | `rootcause-report.schema.json` | RootCauseReport | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5 | root-cause-logic.ts |
+
+### 设计原则
+
+1. **structural-first**：结构性约束（字段缺失 / 类型错误 / 未知字段 / 枚举越界）一律由 schema 拦截，业务规则仅校验语义一致性（如 RTM 覆盖率、parent/child 双向一致、compositeScore 与 Σ 重算一致）。
+2. **`additionalProperties:false` 全层级**：顶层 + 嵌套对象均禁止未知字段，防字段漂移（如 VerifierOutput 顶层多 `unknownField` → schema 拒绝）。
+3. **`[schema]` 前缀**：所有 schema 错误统一以 `[schema]` 前缀返回，便于 Agent 与日志区分"结构错误"vs"业务规则违反"。
+4. **样本兼容**：schema 设计须让 `samples/*/valid*.json` 通过；如样本与 schema 冲突，优先调整 schema（放宽）或修复样本，不得破坏现有测试。
+5. **运行时形态兼容**：含 AST/函数等不可 JSON 序列化字段的输入（如 `code-tla-logic.ts` 的 `codeFiles`），schema 校验时仅传入 JSON 兼容子集（`manifest + graph + rtm`），不传 `codeFiles`。
+
+### 集成模式（`*-logic.ts`）
+
+```typescript
+import { validateBySchema } from './schema-loader.js';
+
+export function checkXxx(input: unknown): XxxResult {
+  // 1. 类型守卫（null / 非对象）
+  if (!input || typeof input !== 'object') return { passed: false, ... };
+
+  // 2. Schema 前置校验（结构性约束）
+  const schemaResult = validateBySchema('xxx-schema', input);
+  if (!schemaResult.valid) {
+    return {
+      passed: false,
+      reasons: schemaResult.errorMessages.map(m => `[schema] ${m}`),
+    };
+  }
+
+  // 3. 业务规则校验（语义一致性）
+  // ... 仅在 schema 通过后触达 ...
+}
+```
+
+### 测试基线
+
+- `self-test.ts` SCHEMA_CASES：13 份 schema 各 1 条用例（3 verifier-output 基线 + 12 Task 3 新增），共 15 条。
+- `__tests__/schema-validation.test.ts`：5 条 validateBySchema 单元测试 + 4 条 checkVerifierOutput 集成测试。
+- self-test 基线：99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
+

@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-tla-manifest.schema.json",
+  "title": "CodeTlaConsistencyInput",
+  "description": "代码-TLA+ 一致性校验输入结构 schema，对应 code-tla-logic.ts CodeTlaConsistencyInput（manifest + graph + rtm + codeSources）。\n注意：函数运行时接收 codeFiles（含 AST），CLI/test 由 codeSources 转换而来；本 schema 同时兼容两种形态：codeSources 可选（样本文件提供，函数运行时由 codeFiles 派生）。manifest/graph/rtm 允许额外字段以兼容完整 TlaManifest/Graph/Rtm 类型。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest", "graph", "rtm"],
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["specs"],
+      "properties": {
+        "specs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "level",
+              "phase",
+              "system",
+              "requirementIds",
+              "tlaPath",
+              "cfgPath",
+              "parent",
+              "children"
+            ],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "level": { "type": "string", "minLength": 1 },
+              "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+              "system": { "type": "string", "minLength": 1 },
+              "requirementIds": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "tlaPath": { "type": "string", "minLength": 1 },
+              "cfgPath": { "type": "string", "minLength": 1 },
+              "parent": { "type": ["string", "null"] },
+              "children": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "siblings": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "tlaContent": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["id", "type"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "type": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "type": "string", "minLength": 1 },
+              "to": { "type": "string", "minLength": 1 },
+              "type": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "rtm": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["rows"],
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["requirementId"],
+            "properties": {
+              "requirementId": { "type": "string", "minLength": 1 },
+              "codeModule": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "codeSources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "content"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "content": { "type": "string" }
+        }
+      }
+    }
+  }
+}

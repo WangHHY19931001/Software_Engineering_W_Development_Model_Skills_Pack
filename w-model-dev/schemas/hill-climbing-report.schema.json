@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/hill-climbing-report.schema.json",
+  "title": "HarnessImprovementReport",
+  "description": "爬坡循环改进报告结构 schema，对应 data-models.md HarnessImprovementReport（hill-climbing/<timestamp>-report.json）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reportId", "generatedAt", "analysisWindow", "signals", "metaAnalysis", "recommendations"],
+  "properties": {
+    "reportId": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "analysisWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "runLogEntries", "phasesCovered"],
+      "properties": {
+        "from": { "type": "string", "format": "date-time" },
+        "to": { "type": "string", "format": "date-time" },
+        "runLogEntries": { "type": "integer", "minimum": 0 },
+        "phasesCovered": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1, "maximum": 8 }
+        }
+      }
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signalId",
+          "category",
+          "severity",
+          "evidence",
+          "suggestion",
+          "affectedAssets",
+          "priority"
+        ],
+        "properties": {
+          "signalId": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "minLength": 1 },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["runLogRefs", "patterns", "metrics"],
+            "properties": {
+              "runLogRefs": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "patterns": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "metrics": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["occurrences", "trend"],
+                "properties": {
+                  "occurrences": { "type": "integer", "minimum": 0 },
+                  "trend": { "enum": ["stable", "increasing", "decreasing"] }
+                }
+              }
+            }
+          },
+          "suggestion": { "type": "string", "minLength": 1 },
+          "affectedAssets": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "priority": { "type": "integer", "minimum": 1, "maximum": 5 }
+        }
+      }
+    },
+    "metaAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topFailurePatterns",
+        "reworkHotspots",
+        "verifierDisagreements",
+        "budgetBurnTrend",
+        "operationalFailureHits",
+        "comprehensionQuality"
+      ],
+      "properties": {
+        "topFailurePatterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reworkHotspots": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "verifierDisagreements": { "type": "integer", "minimum": 0 },
+        "budgetBurnTrend": { "enum": ["stable", "increasing", "decreasing"] },
+        "operationalFailureHits": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "comprehensionQuality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["emptyOrTrivialRate", "uniqueDecisionRate"],
+          "properties": {
+            "emptyOrTrivialRate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "uniqueDecisionRate": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "promptTweaks",
+        "toolImprovements",
+        "verificationRuleTightening",
+        "candidateAntiPatterns",
+        "maturityAdjustments"
+      ],
+      "properties": {
+        "promptTweaks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "toolImprovements": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "verificationRuleTightening": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "candidateAntiPatterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "maturityAdjustments": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

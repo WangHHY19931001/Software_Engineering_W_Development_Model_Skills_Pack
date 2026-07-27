@@ -8,6 +8,7 @@
  *
  * 设计原则（与 graph-logic.ts / verifier-logic.ts / gate-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
+ *      （schema-loader.ts 为同目录内部工具，不计为外部依赖）
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「TLA+ 规格是否符合规范」的判定均委托至此
  *
@@ -19,6 +20,8 @@
  *   将违反合并入最终结果。headerViolations / environmentOk / environmentErrors 字段
  *   在纯逻辑中分别留空 / 置真 / 置空，由 CLI 在执行 I/O 后回填并重算 passed。
  */
+
+import { validateBySchema } from './schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -889,6 +892,18 @@ export function checkTlaModel(
     result.violations.push('manifest 必须为对象');
     return result;
   }
+
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+  // 通过后才进入下方业务规则校验（层次 / 拆解 / 声明标志 / cfg 一致性等）。
+  const schemaResult = validateBySchema('tla-manifest', manifest);
+  if (!schemaResult.valid) {
+    for (const m of schemaResult.errorMessages) {
+      result.violations.push(`[schema] ${m}`);
+    }
+    return result;
+  }
+
   const m = manifest as Partial<TlaManifest>;
 
   if (typeof m.version !== 'number') {

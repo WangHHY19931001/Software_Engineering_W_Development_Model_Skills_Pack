@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "shell-agent-wm-001",
+  "level": "L5-INVALID-ENUM",
+  "leveledUpAt": "2026-07-23T18:00:00Z",
+  "unlockConditions": {
+    "stableDays": 30,
+    "completedCycles": 3,
+    "attemptCapRate": 0.85,
+    "misjudgeRate": 0.05,
+    "operationalFailures": 0
+  },
+  "history": [],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 3,
+    "userRequested": false
+  }
+}

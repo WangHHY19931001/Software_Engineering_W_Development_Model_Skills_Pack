@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-07-25T10:15:00Z",
+  "source": "webhook",
+  "eventType": "bug-report",
+  "summary": "登录接口返回 500",
+  "affectedArtifacts": ["src/services/identity/user-service.ts"]
+}

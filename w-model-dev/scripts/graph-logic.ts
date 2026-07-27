@@ -12,6 +12,8 @@
  *   3. 单点事实：所有「图谱是否符合规范」的判定均委托至此
  */
 
+import { validateBySchema } from './schema-loader.js';
+
 // ==================== 自包含类型形状 ====================
 
 export type NodeType = 'REQ' | 'SD' | 'INTF' | 'DD' | 'EXT-IN' | 'EXT-OUT';
@@ -198,6 +200,18 @@ export function checkRequirementGraph(
     result.violations.push('graph 必须为对象');
     return result;
   }
+
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+  // 通过后才进入下方业务规则校验（连通性 / 层级树 / 信息流等）。
+  const schemaResult = validateBySchema('graph', graph);
+  if (!schemaResult.valid) {
+    for (const m of schemaResult.errorMessages) {
+      result.violations.push(`[schema] ${m}`);
+    }
+    return result;
+  }
+
   const g = graph as Partial<GraphShape>;
   if (!Array.isArray(g.nodes) || !Array.isArray(g.edges)) {
     result.violations.push('graph.nodes 与 graph.edges 必须为数组');

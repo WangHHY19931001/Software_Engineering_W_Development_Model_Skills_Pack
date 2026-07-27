@@ -1,0 +1,13 @@
+{
+  "runId": "run-001",
+  "phase": 1,
+  "phaseName": "需求与范围",
+  "action": "produce",
+  "role": "S",
+  "duration_s": 12,
+  "tokens": 3000,
+  "estimated": false,
+  "subagentSpawns": 0,
+  "gateExitCode": null,
+  "outcome": "success"
+}

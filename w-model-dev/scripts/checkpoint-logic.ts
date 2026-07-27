@@ -8,9 +8,12 @@
  *
  * 设计原则（与 budget-logic.ts / run-log-logic.ts / maturity-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
+ *      （schema-loader.ts 为同目录内部工具，不计为外部依赖）
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「checkpoint 是否符合规范」的判定均委托至此
  */
+
+import { validateBySchema } from './schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -143,6 +146,16 @@ export function checkCheckpoint(
   const valid: RunLogEntry[] = [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
+    // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+    // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+    // 拒绝时记录 [schema] 前缀违规并跳过该条（与 run-log-logic.ts 一致）。
+    const schemaResult = validateBySchema('checkpoint-log', raw);
+    if (!schemaResult.valid) {
+      for (const m of schemaResult.errorMessages) {
+        violations.push(`条目 ${i + 1} [schema] ${m}`);
+      }
+      continue;
+    }
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       violations.push(`条目 ${i + 1} 非对象，已跳过`);
       continue;

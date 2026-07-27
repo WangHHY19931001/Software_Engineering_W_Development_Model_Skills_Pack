@@ -1,0 +1,13 @@
+{
+  "name": "demo-project",
+  "description": "示例项目",
+  "status": "编码",
+  "techStack": {
+    "frontend": ["React"],
+    "backend": ["Node.js"],
+    "database": ["PostgreSQL"],
+    "others": []
+  },
+  "createdAt": "2026-07-01T00:00:00Z",
+  "updatedAt": "2026-07-23T18:00:00Z"
+}

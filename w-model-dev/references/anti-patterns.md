@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（24 条流程反模式 #1~#17 + #21~#27；#20 见 subagent-delegation.md）
+- 反模式清单（25 条流程反模式 #1~#17 + #21~#28；#20 见 subagent-delegation.md）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -45,6 +45,7 @@
 | 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工（第 15 轮共性问题 A） | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
 | 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败（第 15 轮共性问题 B） | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
+| 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 13 份） |
 
 ### 命中高发阶段
 
@@ -76,6 +77,7 @@
 | #25（JSON 文件 PowerShell 写入） | 阶段 5/6/7/8 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26（RunLogEntry 与 EventIngress 字段混用） | 阶段 1/6/7/8 | [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | 阶段 1-8（self-as-verifier 模式全阶段） | [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
+| #28（schema 前置校验缺失） | 阶段 1-8（所有 `*-logic.ts` 校验入口） | [data-models.md](data-models.md)「JSON Schema 强约束」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -104,6 +106,7 @@
 | #25（JSON 文件 PowerShell 写入） | run-log.jsonl `note` 字段检测（"PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词）+ [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
+| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（13 份） |
 
 ## 命中后的处理流程
 
@@ -256,6 +259,37 @@
 **修正**：强化 verifier-spec.md §6 summary 三要素要求（sig-001 已应用）；V 子代理重写 summary 含具体决策+结构+风险。
 
 **状态**：候选（pending V 复审）。本候选由 Loop 4 信号驱动提出，需 V 子代理复审转正后正式编号入清单。复审前不作为强制反模式执行。
+
+## #28 schema 前置校验缺失（借鉴点 2 — Task 3）
+
+**症状**：`*-logic.ts` 校验函数直接进入业务规则校验，未先调用 `validateBySchema`；当输入结构异常（字段缺失 / 类型错误 / 未知字段 / 枚举越界）时，业务规则校验抛 TypeError（如 `Cannot read property 'specs' of undefined`）或返回模糊错误信息，Agent 无法定位是结构错误还是语义错误。
+
+**违反原则**：真实执行（约束4）+ 单点事实—— 结构性约束与业务规则校验未分层，错误信息混杂，Agent 修正时无法区分"结构错误"（应改 schema 或输入数据结构）vs"业务规则违反"（应改数据语义）。
+
+**检测信号**：
+- `*-logic.ts` 校验函数未 `import { validateBySchema } from './schema-loader.js'`，或函数入口未调用 `validateBySchema(name, input)`。
+- 校验错误信息缺 `[schema]` 前缀（结构性错误未与业务规则违反区分）。
+- TypeError 堆栈含 `undefined` 属性访问（如 `input.manifest.specs` 当 `manifest` 缺失时 crash）。
+- `schemas/` 目录缺少对应 schema 文件（schema-loader 报 `schema 未注册`）。
+
+**回退动作**：
+1. 在 `w-model-dev/schemas/` 目录增加对应 schema 文件（draft-07 + `additionalProperties:false` + `required` + `type`/`enum`/`format`）。
+2. 在 `*-logic.ts` 校验函数入口（类型守卫之后、业务规则之前）增加 `validateBySchema(name, input)` 前置校验，失败时以 `[schema]` 前缀返回错误。
+3. 在 `self-test.ts` SCHEMA_CASES 增加对应 schema 的 bad 样本用例（additionalProperties / required / type / enum 至少各 1 条）。
+
+**例外**：
+- 含 AST / 函数等不可 JSON 序列化字段的输入（如 `code-tla-logic.ts` 的 `codeFiles`），schema 校验时仅传入 JSON 兼容子集，不传不可序列化字段。
+- 顶层 `additionalProperties:false` 须与运行时形态兼容（如 `code-tla-manifest.schema.json` 允许 `codeSources` 可选，兼容 CLI/test 与运行时两种形态）。
+
+**与反模式 #11 的关系**：#11 是"跳过图谱校验"（完全不跑校验），#28 是"跑了校验但缺 schema 前置层"（校验了但结构错误未拦截）。前者完全不校验，后者校验层级不完整。
+
+**与约束 4 的关系**：schema 前置校验是"真实执行"在结构层的延伸—— 结构错误必须由 schema 拦截并明确标注 `[schema]` 前缀，不得让业务规则校验 crash 或返回模糊错误。借鉴 drawio-skill/styles/schema.json 设计实践。
+
+**实现证据**（Task 3，借鉴点 2）：
+- 13 份 schema 已落地于 `w-model-dev/schemas/*.schema.json`（详见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单）。
+- 8 个 `*-logic.ts`（verifier / gate / graph / tla / code-tla / budget / run-log / checkpoint / maturity / root-cause）已集成 `validateBySchema` 前置校验。
+- self-test 基线 99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
+- vitest 88 测试全通过（含 schema-validation.test.ts 9 条单元 + 集成测试）。
 
 ## 实现层经验教训（来自端到端调测）
 

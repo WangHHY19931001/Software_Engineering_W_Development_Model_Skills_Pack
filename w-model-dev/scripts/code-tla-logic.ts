@@ -20,6 +20,7 @@
 
 import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
+import { validateBySchema } from './schema-loader.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -544,6 +545,35 @@ export function checkCodeTlaConsistency(
         invariantCoverage: { passed: false, checked: 0, violations: [] },
       },
       violations: [{ dimension: 'input', message: 'input 必须为对象' }],
+    };
+  }
+
+  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
+  // 通过后才进入下方四维度业务规则校验（SD→codeModule / 状态转移 / Next 分支 / 不变式覆盖）。
+  // 注意：schema 兼容两种形态 —— codeSources（CLI/test）与 codeFiles（运行时含 AST）；
+  // 校验对象为 manifest + graph + rtm 的结构形状，不要求 codeSources 字段。
+  // codeFiles 含 TypeScript AST（不可 JSON 序列化），从 schema 校验中剔除。
+  const schemaInput = {
+    manifest: input.manifest,
+    graph: input.graph,
+    rtm: input.rtm,
+  };
+  const schemaResult = validateBySchema('code-tla-manifest', schemaInput);
+  if (!schemaResult.valid) {
+    const schemaViolations: Violation[] = schemaResult.errorMessages.map(m => ({
+      dimension: 'schema',
+      message: `[schema] ${m}`,
+    }));
+    return {
+      passed: false,
+      dimensions: {
+        sdToCodeModule: { passed: false, checked: 0, violations: [] },
+        codeStateTransfer: { passed: false, checked: 0, violations: [] },
+        nextBranchCoverage: { passed: false, checked: 0, violations: [] },
+        invariantCoverage: { passed: false, checked: 0, violations: [] },
+      },
+      violations: schemaViolations,
     };
   }
 

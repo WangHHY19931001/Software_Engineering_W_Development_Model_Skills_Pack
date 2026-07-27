@@ -225,8 +225,8 @@ const GATE_CASES: GateCase[] = [
   {
     file: 'bad-structure.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/executionSummary 字段缺失/],
-    description: 'RTM 缺 executionSummary，应被结构校验拦截而非抛 TypeError',
+    expectedReasonPatterns: [/\[schema\].*executionSummary/],
+    description: 'RTM 缺 executionSummary，应被 schema required 前置校验拦截（[schema] 前缀）',
   },
   // -------------------- P1.1 阶段级校验（第 9 轮） --------------------
   {
@@ -543,8 +543,8 @@ const BUDGET_CASES: BudgetCase[] = [
   {
     file: 'bad-killswitch-triggered.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/budgetBurnRate 超范围/],
-    description: 'killSwitch.budgetBurnRate=1.5 超出 [0,1]，应被 R4 范围校验拦截',
+    expectedReasonPatterns: [/\[schema\].*budgetBurnRate/],
+    description: 'killSwitch.budgetBurnRate=1.5 超出 [0,1]，应被 schema maximum:1 前置校验拦截',
   },
   {
     file: 'rootcause-valid.json',
@@ -639,8 +639,8 @@ const MATURITY_CASES: MaturityCase[] = [
   {
     file: 'bad-stale.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/level 非法值.*L5/],
-    description: 'level=L5 超出 L0/L1/L2/L3，应被 R2 level 合法性校验拦截',
+    expectedReasonPatterns: [/\[schema\].*level/],
+    description: 'level=L5 超出 L0/L1/L2/L3，应被 schema enum 前置校验拦截',
   },
   {
     file: 'bad-r3-cycle-mismatch.json',
@@ -737,7 +737,7 @@ interface RootCauseCase {
 const ROOTCAUSE_CASES: RootCauseCase[] = [
   { file: 'valid.json', expectedPassed: true, description: '完整、合规的 RootCauseReport，应通过所有校验' },
   { file: 'bad-r1-missing-fields.json', expectedPassed: false, expectedReasonPatterns: [/rootCause/], description: 'R1 缺 rootCause 字段' },
-  { file: 'bad-r2-chain-length.json', expectedPassed: false, expectedReasonPatterns: [/rootCauseChain.*长度/], description: 'R2 chain 仅 1 步' },
+  { file: 'bad-r2-chain-length.json', expectedPassed: false, expectedReasonPatterns: [/\[schema\].*rootCauseChain/], description: 'R2 chain 仅 1 步（schema minItems:2 前置拦截）' },
   { file: 'bad-r3-falsifiability.json', expectedPassed: false, expectedReasonPatterns: [/falsifiabilityCheck.*若.*则/], description: 'R3 无若...则句式' },
   { file: 'bad-r4-fix-recommendation.json', expectedPassed: false, expectedReasonPatterns: [/fixRecommendation.*rationale/], description: 'R4 缺 rationale' },
   { file: 'bad-r5-prevention.json', expectedPassed: false, expectedReasonPatterns: [/prevention.*owner/], description: 'R5 缺 owner' },
@@ -753,6 +753,8 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
 interface SchemaCase {
   /** 样本文件名（相对 samples/schema/） */
   file: string;
+  /** schema 名（schema-loader 自动注册的 basename，无 .schema.json 后缀） */
+  schema: string;
   /** 期望 schema 校验是否通过 */
   expectedValid: boolean;
   /** 期望 errorMessages 中至少一条匹配以下每个正则（全部匹配才算通过） */
@@ -762,23 +764,112 @@ interface SchemaCase {
 }
 
 const SCHEMA_CASES: SchemaCase[] = [
+  // -------------------- verifier-output schema（基线 3 条） --------------------
   {
     file: 'bad-additional-props.json',
+    schema: 'verifier-output',
     expectedValid: false,
     expectedErrorPatterns: [/additionalProperties/],
     description: '未知字段 unknownExtraField 应被 additionalProperties:false 拦截',
   },
   {
     file: 'bad-missing-required.json',
+    schema: 'verifier-output',
     expectedValid: false,
     expectedErrorPatterns: [/required/],
     description: '缺失 passed / meta 必填字段应被 required 拦截',
   },
   {
     file: 'bad-wrong-type.json',
+    schema: 'verifier-output',
     expectedValid: false,
     expectedErrorPatterns: [/type/],
     description: 'compositeScore 为字符串应被 type:number 拦截',
+  },
+  // -------------------- 借鉴点 2：12 份 schema 各加一条用例（Task 3） --------------------
+  {
+    file: 'bad-budget-additional-props.json',
+    schema: 'budget',
+    expectedValid: false,
+    expectedErrorPatterns: [/additionalProperties/],
+    description: 'budget 顶层未知字段 unknownBudgetField 应被 additionalProperties:false 拦截',
+  },
+  {
+    file: 'bad-checkpoint-log-missing-required.json',
+    schema: 'checkpoint-log',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'checkpoint-log 缺 runId 必填字段应被 required 拦截',
+  },
+  {
+    file: 'bad-code-tla-manifest-wrong-type.json',
+    schema: 'code-tla-manifest',
+    expectedValid: false,
+    expectedErrorPatterns: [/type/],
+    description: 'code-tla-manifest manifest.specs 为字符串应被 type:array 拦截',
+  },
+  {
+    file: 'bad-event-ingress-missing-required.json',
+    schema: 'event-ingress',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'event-ingress 缺 eventId 必填字段应被 required 拦截',
+  },
+  {
+    file: 'bad-graph-additional-props.json',
+    schema: 'graph',
+    expectedValid: false,
+    expectedErrorPatterns: [/additionalProperties/],
+    description: 'graph node 未知字段 unknownNodeField 应被 additionalProperties:false 拦截',
+  },
+  {
+    file: 'bad-hill-climbing-report-missing-required.json',
+    schema: 'hill-climbing-report',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'hill-climbing-report 缺 reportId 必填字段应被 required 拦截',
+  },
+  {
+    file: 'bad-maturity-wrong-type.json',
+    schema: 'maturity',
+    expectedValid: false,
+    expectedErrorPatterns: [/enum/],
+    description: 'maturity level=L5-INVALID-ENUM 应被 enum 拦截',
+  },
+  {
+    file: 'bad-project-missing-required.json',
+    schema: 'project',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'project 缺 id 必填字段应被 required 拦截',
+  },
+  {
+    file: 'bad-rootcause-report-additional-props.json',
+    schema: 'rootcause-report',
+    expectedValid: false,
+    expectedErrorPatterns: [/additionalProperties/],
+    description: 'rootcause-report 顶层未知字段 unknownReportField 应被 additionalProperties:false 拦截',
+  },
+  {
+    file: 'bad-rtm-wrong-type.json',
+    schema: 'rtm',
+    expectedValid: false,
+    expectedErrorPatterns: [/type/],
+    description: 'rtm currentPhase 为字符串应被 type:integer 拦截',
+  },
+  {
+    file: 'bad-run-log-missing-required.json',
+    schema: 'run-log',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'run-log 缺 timestamp 必填字段应被 required 拦截',
+  },
+  {
+    file: 'bad-tla-manifest-additional-props.json',
+    schema: 'tla-manifest',
+    expectedValid: false,
+    expectedErrorPatterns: [/additionalProperties/],
+    description: 'tla-manifest 顶层未知字段 unknownManifestField 应被 additionalProperties:false 拦截',
   },
 ];
 
@@ -1125,7 +1216,7 @@ async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'schema', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
-    const r = validateBySchema('verifier-output', parsed);
+    const r = validateBySchema(c.schema, parsed);
 
     const details: string[] = [];
     if (r.valid !== c.expectedValid) {
@@ -1141,7 +1232,7 @@ async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
     }
 
     results.push({
-      name: `schema/${c.file}`,
+      name: `schema/${c.schema}/${c.file}`,
       passed: details.length === 0,
       description: c.description,
       details: details.length > 0 ? details : undefined,

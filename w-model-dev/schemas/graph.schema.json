@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/graph.schema.json",
+  "title": "GraphShape",
+  "description": "ingestion 图谱结构 schema，对应 graph-logic.ts GraphShape（GraphNode + GraphEdge）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "currentPhase", "nodes", "edges"],
+  "properties": {
+    "version": { "type": "number" },
+    "project": { "type": "string" },
+    "currentPhase": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "rootId": { "type": ["string", "null"] },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "phase", "title", "summary"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["REQ", "SD", "INTF", "DD", "EXT-IN", "EXT-OUT"] },
+          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "title": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string" },
+          "sourceChunk": { "type": "string" },
+          "sourceArtifact": { "type": "string" },
+          "attributes": { "type": "object" },
+          "governance": { "type": "boolean" },
+          "derivationProduct": { "type": "boolean" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "type"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "type": {
+            "enum": ["parent", "depends-on", "implements", "defines", "realizes", "produces", "governs", "collaborates-with", "derives"]
+          }
+        }
+      }
+    },
+    "analysisRounds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "round", "violations", "converged"],
+        "properties": {
+          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "round": { "type": "integer", "minimum": 1 },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "violations": { "type": "array", "items": { "type": "string" } },
+          "converged": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

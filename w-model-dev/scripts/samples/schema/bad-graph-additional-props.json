@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "project": "sample",
+  "currentPhase": 4,
+  "rootId": "REQ-ROOT",
+  "nodes": [
+    {
+      "id": "REQ-ROOT",
+      "type": "REQ",
+      "phase": 1,
+      "title": "根需求",
+      "summary": "系统根",
+      "unknownNodeField": "should-be-rejected-by-additionalProperties"
+    }
+  ],
+  "edges": []
+}

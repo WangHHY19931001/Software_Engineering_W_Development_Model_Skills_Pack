@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/event-ingress.schema.json",
+  "title": "EventIngressEntry",
+  "description": "事件接驳单行记录 schema，对应 data-models.md EventIngress（event-ingress.jsonl 每行一条 JSON 对象）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "timestamp", "source", "eventType", "summary"],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "source": {
+      "enum": ["webhook", "cron", "user-report", "ci", "external-agent", "manual"]
+    },
+    "eventType": {
+      "enum": [
+        "bug-report",
+        "feature-request",
+        "requirement-change",
+        "scheduled-review",
+        "test-failure",
+        "gate-failure",
+        "rework-request",
+        "escalation",
+        "user-checkpoint"
+      ]
+    },
+    "summary": { "type": "string", "minLength": 1 },
+    "affectedArtifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "affectedRequirements": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "routedTo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "phaseName", "routedAt", "highRiskGate"],
+      "properties": {
+        "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "phaseName": { "type": "string", "minLength": 1 },
+        "routedAt": { "type": "string", "format": "date-time" },
+        "highRiskGate": { "type": "boolean" }
+      }
+    }
+  }
+}

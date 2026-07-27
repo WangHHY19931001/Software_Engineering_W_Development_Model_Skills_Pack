@@ -13,6 +13,8 @@
  *   3. 单点事实：所有「运行日志是否符合规范」的判定均委托至此
  */
 
+import { validateBySchema } from './schema-loader.js';
+
 // ==================== 自包含类型形状 ====================
 
 export interface RunLogEntry {
@@ -111,6 +113,15 @@ export function checkRunLog(
   const valid: RunLogEntry[] = [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
+    // === Schema 前置校验（借鉴点 2） ===
+    const schemaResult = validateBySchema('run-log', raw);
+    if (!schemaResult.valid) {
+      // schema 拒绝：记录 [schema] 前缀违规并跳过该条
+      for (const m of schemaResult.errorMessages) {
+        violations.push(`条目 ${i + 1} [schema] ${m}`);
+      }
+      continue;
+    }
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       violations.push(`条目 ${i + 1} 非对象，已跳过`);
       continue;

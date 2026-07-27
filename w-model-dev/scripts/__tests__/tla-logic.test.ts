@@ -98,14 +98,16 @@ describe('P1.1 manifest.basePath 强制字段校验', () => {
     const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
     m.basePath = '';
     const result = checkTlaModel(m, 2);
-    expect(result.violations.some(v => v.includes('basePath 缺失'))).toBe(true);
+    // schema minLength:1 前置拦截空字符串（[schema] 前缀），业务规则 basePath 缺失不再触达
+    expect(result.violations.some(v => /\[schema\].*basePath/.test(v))).toBe(true);
   });
 
   it('basePath 为非字符串 → 报缺失', () => {
     const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
     m.basePath = 123;
     const result = checkTlaModel(m, 2);
-    expect(result.violations.some(v => v.includes('basePath 缺失'))).toBe(true);
+    // schema type:string 前置拦截非字符串（[schema] 前缀），业务规则 basePath 缺失不再触达
+    expect(result.violations.some(v => /\[schema\].*basePath/.test(v))).toBe(true);
   });
 });
 

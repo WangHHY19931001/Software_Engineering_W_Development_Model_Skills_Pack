@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/rootcause-report.schema.json",
+  "title": "RootCauseReport",
+  "description": "根因分析报告结构 schema，对应 root-cause-logic.ts RootCauseReportShape（R 子代理产出）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "meta",
+    "input",
+    "phenomenon",
+    "rootCauseChain",
+    "rootCause",
+    "upstreamDefect",
+    "fixRecommendation",
+    "prevention",
+    "qualityLevel",
+    "passed",
+    "summary"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "pattern": "^1\\.0$" },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reportId",
+        "targetKind",
+        "targetArtifact",
+        "targetPhase",
+        "reworkRound",
+        "reworkSource",
+        "persona",
+        "method",
+        "analysisTimestamp"
+      ],
+      "properties": {
+        "reportId": { "type": "string", "minLength": 1 },
+        "targetKind": { "const": "rootcause" },
+        "targetArtifact": { "type": "string", "minLength": 1 },
+        "targetPhase": { "type": "string", "minLength": 1 },
+        "reworkRound": { "type": "integer", "minimum": 1 },
+        "reworkSource": { "enum": ["verifier", "gate"] },
+        "persona": { "type": "string", "minLength": 1 },
+        "method": {
+          "enum": ["5-why", "fishbone", "defect-chain", "upstream-trace", "combined"]
+        },
+        "analysisTimestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reworkHints"],
+      "properties": {
+        "reworkHints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "verifierOutputPath": { "type": "string" },
+        "gateJsonPath": { "type": "string" }
+      }
+    },
+    "phenomenon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "severity", "affectedArtifacts"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "severity": {
+          "enum": ["Critical", "Required", "Optional", "Nit", "FYI"]
+        },
+        "affectedArtifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "rootCauseChain": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "why", "answer", "evidence"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 1 },
+          "why": { "type": "string", "minLength": 1 },
+          "answer": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "rootCause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "description", "evidence", "falsifiabilityCheck"],
+      "properties": {
+        "category": {
+          "enum": [
+            "requirement-gap",
+            "design-flaw",
+            "coding-error",
+            "test-gap",
+            "process-missing",
+            "tool-gap",
+            "upstream-defect"
+          ]
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 },
+        "falsifiabilityCheck": { "type": "string", "minLength": 1 }
+      }
+    },
+    "upstreamDefect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "rollbackRecommended"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "upstreamPhase": { "type": "string" },
+        "upstreamArtifactId": { "type": "string" },
+        "defectDescription": { "type": "string" },
+        "rollbackRecommended": { "type": "boolean" }
+      }
+    },
+    "fixRecommendation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "location", "action", "rationale"],
+        "properties": {
+          "target": { "type": "string", "minLength": 1 },
+          "location": { "type": "string", "minLength": 1 },
+          "action": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "prevention": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scope", "measure", "owner"],
+        "properties": {
+          "scope": { "type": "string", "minLength": 1 },
+          "measure": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "qualityLevel": { "enum": ["A", "B", "C", "D"] },
+    "passed": { "type": "boolean" },
+    "summary": { "type": "string", "minLength": 1 },
+    "reviewNotes": { "type": "string" },
+    "partialReports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["personaSlice", "path", "confidence"],
+        "properties": {
+          "personaSlice": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/project.schema.json",
+  "title": "Project",
+  "description": "项目数据模型 schema，对应 data-models.md Project interface",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "status", "techStack", "createdAt", "updatedAt"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "status": {
+      "enum": ["需求分析", "系统设计", "概要设计", "详细设计", "编码", "集成测试", "系统测试", "验收测试", "项目完成"]
+    },
+    "techStack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frontend", "backend", "database", "others"],
+      "properties": {
+        "frontend": { "type": "array", "items": { "type": "string" } },
+        "backend": { "type": "array", "items": { "type": "string" } },
+        "database": { "type": "array", "items": { "type": "string" } },
+        "others": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

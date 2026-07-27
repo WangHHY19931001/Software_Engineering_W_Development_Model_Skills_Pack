@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/maturity.schema.json",
+  "title": "MaturityConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectId", "level", "leveledUpAt", "unlockConditions", "history", "downgradeTriggers"],
+  "properties": {
+    "schemaVersion": { "type": "string", "pattern": "^1\\.0$" },
+    "projectId": { "type": "string", "minLength": 1 },
+    "level": { "enum": ["L0", "L1", "L2", "L3"] },
+    "leveledUpAt": { "type": "string", "format": "date-time" },
+    "unlockConditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableDays", "completedCycles", "attemptCapRate", "misjudgeRate", "operationalFailures"],
+      "properties": {
+        "stableDays": { "type": "integer", "minimum": 0 },
+        "completedCycles": { "type": "integer", "minimum": 0 },
+        "attemptCapRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "misjudgeRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "operationalFailures": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "at", "reason"],
+        "properties": {
+          "from": { "enum": ["L0", "L1", "L2", "L3"] },
+          "to": { "enum": ["L0", "L1", "L2", "L3"] },
+          "at": { "type": "string", "format": "date-time" },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "downgradeTriggers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationalFailureStreak", "userRequested"],
+      "properties": {
+        "operationalFailureStreak": { "type": "integer", "minimum": 0 },
+        "budgetBurnRateExceeded": { "type": "integer", "minimum": 0 },
+        "checkpointRejectionStreak": { "type": "integer", "minimum": 0 },
+        "userRequested": { "type": "boolean" }
+      }
+    }
+  }
+}
