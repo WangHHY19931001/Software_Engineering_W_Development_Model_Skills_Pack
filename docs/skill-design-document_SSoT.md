@@ -2037,7 +2037,9 @@ interface RunLogEntry {
 ## 10B. 参考实现（端到端调测验证）
 
 > 本节记录对 W 模型 8 阶段编排 + LLM-as-a-Verifier 阶段门 + 工件质量门的端到端调测验证结论。
-> 参考实现位于 [`w-model-dev-demo/`](../w-model-dev-demo)，是一个博客系统后端（blog-system-demo），用于具象验证本 SSoT 所述设计在真实项目中的可执行性。
+> 参考实现是一个博客系统后端（blog-system-demo），用于具象验证本 SSoT 所述设计在真实项目中的可执行性。
+
+> **归档说明（2026-07-27 第 17 轮 P6）**：`w-model-dev-demo/` 目录已从仓库删除，归档摘要迁移至 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)（9 文件：README / proposal / specs / design / tasks / tla-summary / rtm-snapshot / verifier-summary / test-report-snapshot）。下文所有 `../w-model-dev-demo/` 链接为**历史记录**，目录已不存在；最终调测数字（第十五轮：708 UT / 74 IT / 35 ST / 72 UAT / 889 测试用例全通过）见归档 [`README.md`](./changes/archive/2026-07-26-round15-end-to-end-test/README.md)。本节数字为**第五轮**（2026-07-24）快照，保留作历史对照。
 
 ### 10B.1 项目概况
 

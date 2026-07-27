@@ -220,28 +220,41 @@ Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `
 **Q：技能自演化在哪里？**
 不在本仓库。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具完成：
 [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)。
-本技能产出的 `VerifierOutput` JSON 可作为这些工具的训练信号。
+本技能产出的 `VerifierOutput` JSON 可作为这些工具的训练信号。详见 SSoT [§12.4 与外部 SkillOpt/darwin-skill 的边界](./skill-design-document_SSoT.md) 与 [§14 技能演化机制（已移除）](./skill-design-document_SSoT.md)。
 
 **Q：能否只安装部分阶段？**
 不建议。W 模型的核心是开发与测试并行，阶段之间存在阶段门依赖。`SKILL.md` 已按需
 加载 `references/`，无需为节省上下文而拆分安装。
 
 **Q：编排者-子代理边界如何工作？Agent 自身就是编排者吗？**
-是的。Agent 读取 `w-model-dev/SKILL.md` 后承担「编排者」（O）角色，只做路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本。任何实施动作由三类子代理执行：
-- **S 产出子代理**：生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体；
-- **V 评审子代理**：按 `verifier-spec.md` 提示词产出 `VerifierOutput` JSON（即「外部 Agent 执行 LLM-as-a-Verifier」）；
-- **G 门禁子代理**：跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要。
+是的。Agent 读取 `w-model-dev/SKILL.md` 后承担「编排者」（O）角色，只做路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本。任何实施动作由五类子代理执行（详见 SSoT [§3.4.2 角色划分](./skill-design-document_SSoT.md)）：
+- **A 分析子代理**：L2+ 项目事件接驳 / ingestion 分块分析（阶段 1–4）
+- **S 产出子代理**：生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体
+- **V 评审子代理**：按 `verifier-spec.md` 提示词产出 `VerifierOutput` JSON（即「外部 Agent 执行 LLM-as-a-Verifier」）；V-lead 可调用多 persona 多角度评审
+- **G 门禁子代理**：跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要
+- **R 根因子代理**：V/G 不通过后，R-lead 按 persona 矩阵选用多角度做根因定位（详见 [`references/root-cause-locator.md`](../w-model-dev/references/root-cause-locator.md)）
 
-子代理通过宿主 Agent 的子代理机制（如 Trae 的 Task 工具 / Claude Code 的 Task 工具 / Cursor 的子代理）启动。编排者越权实施（直接写产物 / 自评 / 替代 G 回填）命中反模式 #10，回到当前阶段起点。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+子代理通过宿主 Agent 的子代理机制（如 Trae 的 Task 工具 / Claude Code 的 Task 工具 / Cursor 的子代理）启动。编排者越权实施（直接写产物 / 自评 / 替代 G 回填）命中反模式 #10，回到当前阶段起点。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md) 与 SSoT [§3.4.5 强制约束](./skill-design-document_SSoT.md)。
 
 **Q：编排者能跑门禁脚本吗？**
-可以跑只读脚本（`npx tsx check-*.ts`、`git status`、`ls`）看退出码用于展示或路由判定，但**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。
+可以跑只读脚本（`npx tsx check-*.ts`、`git status`、`ls`）看退出码用于展示或路由判定，但**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。详见 SSoT [§3.4.5 强制约束](./skill-design-document_SSoT.md)。
 
 **Q：哪里可以看到 W 模型 8 阶段的完整端到端产出样本？**
-参见仓库内的参考实现 [`w-model-dev-demo/`](../w-model-dev-demo)（博客系统后端，Express + TypeScript）。
-该目录独立于技能资产，包含 8 阶段全部产出文档与可运行代码，2026-07-21 第二轮调测结论（已归档）：
-单元 65/65（覆盖率 98.96% lines / 93.23% branches / 100% functions）、集成 12/12、系统 6/6、验收 15/15、
-RTM 100%、工件质量门退出码 0、用户 `confirm` 归档；含 k6 性能基线脚本（`tests/perf/k6-load-test.js`）。
-过程中累计发现并修正 4 项缺陷（Express 4 async handler / JWT_SECRET 缺失 / ArticleService 类型导出 / vitest mock 类型），
-均已沉淀到 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节 L1~L4。
-详见 SSoT [§10B](./skill-design-document_SSoT.md)。
+参考实现是博客系统后端（Express + TypeScript）的端到端调测，**已归档**。
+- **归档摘要**：[`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)（9 文件：README / proposal / specs / design / tasks / tla-summary / rtm-snapshot / verifier-summary / test-report-snapshot）
+- **原 `w-model-dev-demo/` 目录已于 2026-07-27 第 17 轮 P6 从仓库删除**，仅保留归档摘要
+
+**第十五轮最终调测数字**（详见归档 [`README.md`](./changes/archive/2026-07-26-round15-end-to-end-test/README.md)）：
+- 需求 32（22 REQ + 6 NFR + 4 CON）/ 设计文档 4 / 接口契约 22 INTF / 详细设计节点 75 DD / TLA+ 规格 22（1 L1 + 9 L2 + 7 L3 + 5 L4）/ 源文件 60 TS
+- 单元测试 708 UT（覆盖率 98.66% lines）/ 集成测试 74 IT（100%）/ 系统测试 35 ST（100%）/ 验收测试 72 UAT（100%）
+- **四级测试总计 889 测试用例全通过**，8 阶段全完成，V 评审 8 阶段全 A 级，用户 `confirm` 归档
+
+**过程中累计发现并修正 5 项缺陷**（详见 SSoT [§10B.4](./skill-design-document_SSoT.md)）：
+1. Express 4 async handler 未包装（rejected promise 未捕获）→ 沉淀为 L1
+2. JWT_SECRET 缺失致测试套件 collect 阶段崩溃 → 沉淀为 L2
+3. ArticleService 类型导出丢失（TS2724）→ 沉淀为 L3
+4. vitest mock 与 express NextFunction 类型不兼容（TS2339）→ 沉淀为 L4
+5. check-artifact-gate.ts 缺 exitCode 字段（门禁脚本一致性缺陷，已纳入 self-test 回归基线）
+
+缺陷 1~4 已沉淀到 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节 L1~L4。
+SSoT §10B 保留**第五轮**（2026-07-24）快照作历史对照（77/77 UT / 21/21 IT / 22/22 ST / 15/15 UAT）。
