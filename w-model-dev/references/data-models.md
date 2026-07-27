@@ -736,6 +736,66 @@ interface TlaCheckRound {
 - `tla-manifest.json`（行为层）与 `graph.json`（结构层）、`rtm.json`（追溯层）并存，各自独立校验，互不替代。
 - `checkRounds` 在项目首次产出 TLA+ 规格前填 `[]`；每轮校验后由 G 子代理追加一条记录。
 
+## BDD 数据模型
+
+### BddManifest
+
+```typescript
+interface BddManifest {
+  schemaVersion: '1.0';
+  projectId: string;
+  basePath: string;
+  currentPhase: number;
+  features: BddFeature[];
+  stateMachines: BddStateMachine[];
+  checkRounds?: Array<{
+    phase: 1 | 2 | 3 | 4;
+    round: number;
+    timestamp: string;
+    violations: string[];
+    converged: boolean;
+  }>;
+}
+```
+
+### BddStateMachine
+
+```typescript
+interface BddStateMachine {
+  id: string;
+  level: 1 | 2 | 3 | 4;
+  states: string[];
+  initialState: string;
+  terminalStates: string[];
+  acceptingStates: string[];
+  rejectingStates: string[];
+  transitions: BddTransition[];
+  invariants: string[];
+}
+```
+
+### BddFeature
+
+```typescript
+interface BddFeature {
+  id: string;
+  level: 1 | 2 | 3 | 4;
+  filePath: string;
+  scenarioCount: number;
+  stateMachineId: string;
+  tlaSpecId: string;
+  reqIds: string[];
+  designIds: string[];
+  parentFeatureIds: string[];
+  siblingFeatureIds: string[];
+  childFeatureIds: string[];
+}
+```
+
+### 与 TLA+ 数据模型的关系
+
+BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同层 TLA+ spec 的 `State` / `Init` / `Next` / `Invariants` 一一对应，由 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 校验等价性（见 [bdd-guide.md](bdd-guide.md)「BDD↔TLA+ 协作」节）。
+
 ## JSON Schema 强约束（借鉴 drawio-skill/styles/schema.json）
 
 > 借鉴点 2（Task 3）：所有 .w-model/*.json 在进入业务规则校验前，必须先过 JSON Schema 前置校验。

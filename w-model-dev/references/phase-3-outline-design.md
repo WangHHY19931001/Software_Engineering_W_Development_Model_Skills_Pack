@@ -129,6 +129,17 @@
 
 接口定义产出后，**立即**同步生成集成测试用例，覆盖模块间数据传递、接口参数校验、跨模块调用。集成测试用例将在阶段 6（集成测试）执行，本阶段只做设计。
 
+### L3 BDD features 设计（与 TLA+ L3 spec 并行）
+
+S-bdd 子代理在 S-doc 产出接口设计后：
+1. 套用 [`templates/feature.template`](../templates/feature.template) 产出 L3 features（每个 INTF ≥1 个 .feature 文件，parent 指向 L2）
+2. 在 Background 节声明 L3 状态机七要素
+3. 更新 `.w-model/bdd-manifest.json`（追加 features + stateMachines）
+4. 在 RTM `integrationTest` 列登记 `IT-NNN | BDD-L3-<system>_<subsystem>-<num>.feature`
+
+V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=3` 校验 D1-D7。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（概要设计 / 接口）、集成测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。

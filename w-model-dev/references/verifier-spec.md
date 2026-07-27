@@ -451,6 +451,9 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
+> BDD features 评审额外参考 [bdd-review-checklist.md](bdd-review-checklist.md)（7 项清单）。
+> 不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + 附加清单（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）。
+
 ### 7.4 代码 / 文件（targetKind = `file`）
 
 | 子标准 name | weight | 描述 |

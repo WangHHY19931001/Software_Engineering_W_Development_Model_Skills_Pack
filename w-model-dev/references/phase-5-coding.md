@@ -234,6 +234,16 @@
 
 违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](anti-patterns.md)。
 
+## L4 features 作为 TDD 夹具
+
+S-code 子代理在编码时遵循 TDD 红-绿-重构循环，以 L4 BDD features 作为夹具：
+1. 先跑 `npx cucumber-js features/L4/` 观察 all scenarios fail（红）
+2. 实现 step definitions（`features/step_definitions/L4_*.steps.ts`）+ 业务代码
+3. 重跑 cucumber 直到 all scenarios pass（绿）
+4. 重构代码（保持 scenarios 绿）
+
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=5 --cucumber-report=<report.json>` 校验 D5（step 绑定）+ D6（scenario 路径）+ cucumber 报告无失败。
+
 ## 返工路径
 
 阶段门评审不通过时，按以下路径返工：

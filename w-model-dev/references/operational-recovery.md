@@ -148,6 +148,10 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - [ ] 每阶段 G 门禁后，确认 7 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint；阶段 1-4 额外 check-tla-model / check-requirement-graph）
 - [ ] 归档前确认 acceptance-test-report.md §9 用户确认区已勾选（self-as-verifier 模式须留代签痕迹）
 - [ ] 长会话（>20 轮）后重读 project_memory.md 硬约束 + 当前阶段 phase-N-*.md 摘要
+- [ ] BDD features 是否完整产出（每个 REQ/SD/INTF/DD 至少 1 个对应层级 .feature 文件）？
+- [ ] BDD 状态机七要素是否齐全（不接受「占位状态机」）？
+- [ ] BDD↔TLA+ 等价性是否校验通过（不接受「BDD 写完就跳过等价性校验」）？
+- [ ] cucumber 报告是否有 undefined/pending step（不接受「step 没写也放行」）？
 
 命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [anti-patterns.md #27](anti-patterns.md#27-调测者简化行为)。
 

@@ -78,6 +78,17 @@
 
 类 / 方法级设计产出后，**立即**同步生成单元测试用例，覆盖核心逻辑与边界条件。单元测试用例将在阶段 5（编码）中实现为可执行测试代码。
 
+### L4 BDD features 设计（与 TLA+ L4 spec 并行）
+
+S-bdd 子代理在 S-doc 产出详细设计后：
+1. 套用 [`templates/feature.template`](../templates/feature.template) 产出 L4 features（每个 DD ≥1 个 .feature 文件，parent 指向 L3）
+2. 在 Background 节声明 L4 状态机七要素
+3. 更新 `.w-model/bdd-manifest.json`（追加 features + stateMachines）
+4. 在 RTM `unitTest` 列登记 `UT-NNN | BDD-L4-<system>_<subsystem>_<atom>-<num>.feature`
+
+V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4` 校验 D1-D7。
+
 ## 测试用例生成算法
 
 ```

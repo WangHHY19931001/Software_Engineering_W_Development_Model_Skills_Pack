@@ -131,6 +131,13 @@
 验收测试通过 + 用户确认（`confirm` / `confirm-with-comments`） → **项目完成**，归档全部文档与 RTM。
 不通过（`reject` 或 RTM 未达 100%） → 回到需求分析，重新走 W 模型流程（缺陷溯源到对应阶段）。
 
+## L1 BDD features 执行
+
+S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
+- 失败走 R→V→G→S-fix 循环（反模式 #29）
+- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=8 --cucumber-report=<report.json>` 门禁
+- cucumber 报告不得有 undefined/pending/failed step（D5 校验）
+
 ## 禁止行为
 
 | # | 禁止行为 | 正确做法 |

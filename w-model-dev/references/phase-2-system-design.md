@@ -106,6 +106,17 @@
 
 架构设计产出后，**立即**同步生成系统测试用例，覆盖各模块集成场景与系统级功能（端到端流程、性能基线、安全基线）。系统测试用例将在阶段 7（系统测试）执行，本阶段只做设计。
 
+### L2 BDD features 设计（与 TLA+ L2 spec 并行）
+
+S-bdd 子代理在 S-doc 产出系统设计后：
+1. 套用 [`templates/feature.template`](../templates/feature.template) 产出 L2 features（每个 SD ≥1 个 .feature 文件，parent 指向 L1）
+2. 在 Background 节声明 L2 状态机七要素
+3. 更新 `.w-model/bdd-manifest.json`（追加 features + stateMachines）
+4. 在 RTM `systemTest` 列登记 `ST-NNN | BDD-L2-<system>_<subsystem>-<num>.feature`
+
+V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=2` 校验 D1-D7。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（系统设计）、系统测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。

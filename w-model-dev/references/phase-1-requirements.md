@@ -139,6 +139,17 @@
 
 产出需求规格后，**立即**同步生成验收测试用例，覆盖所有功能点。验收测试用例将在阶段 8（验收测试）执行，本阶段只做设计。
 
+### L1 BDD features 设计（与 TLA+ L1 spec 并行）
+
+S-bdd 子代理在 S-doc 产出需求规格后：
+1. 套用 [`templates/feature.template`](../templates/feature.template) 产出 L1 features（每个 REQ ≥1 个 .feature 文件）
+2. 在 Background 节声明 L1 状态机七要素（states / initialState / terminalStates / acceptingStates / rejectingStates / transitions / invariants）
+3. 更新 `.w-model/bdd-manifest.json`（features + stateMachines）
+4. 在 RTM `acceptanceTest` 列登记 `UAT-NNN | BDD-L1-<system>-<num>.feature`
+
+V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md) 7 项清单）。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1` 校验 D1-D7（D5 step 绑定阶段 1-4 跳过）。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中登记：需求 ID、需求描述、验收测试列。其余列（设计文档 / 代码模块 / 单元 / 集成 / 系统测试）留待后续阶段填充。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。

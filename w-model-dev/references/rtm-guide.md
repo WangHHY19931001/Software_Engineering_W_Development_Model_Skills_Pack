@@ -87,3 +87,13 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 阶段 8 终检前必须执行（实际由 `check-artifact-gate.ts` 实现，此处仅作流程透明化）：遍历 `rtm.json` 的 `requirements[]`，对每个 REQ 检查 7 个必需字段（`desc` / `designDoc` / `codeModule` / `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`）是否非空；任一字段为空即记入 `missingItems`。`missingItems` 非空 → 退出码 1，Agent 须将缺失明细透传给用户并回阶段 5 补齐；为空 → 退出码 0 可发布。
 
 > 缺失项明细由 `check-artifact-gate.ts` 输出到 stdout，Agent 须将其透传给用户。
+
+### BDD features 引用格式
+
+BDD features 文件引用附加在短 ID 之后，用 ` | ` 分隔：
+- `UAT-NNN | BDD-L1-<system>-<num>.feature`
+- `ST-NNN | BDD-L2-<system>_<subsystem>-<num>.feature`
+- `IT-NNN | BDD-L3-<system>_<subsystem>-<num>.feature`
+- `UT-NNN | BDD-L4-<system>_<subsystem>_<atom>-<num>.feature`
+
+RTM 行 schema 字段类型保持 `string | null` 不变（BDD 引用作为字符串值的一部分，不新增字段）。

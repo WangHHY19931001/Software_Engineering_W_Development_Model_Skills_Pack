@@ -48,6 +48,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 11. **系统层级树 + 多层图谱**：层级树根 = REQ 系统节点，子系统根 = SD（parent 依附），接口根 = INTF；图谱须覆盖 7 层（结构 / 依赖 / 追溯 / 信息流 / 治理 / 协作 / 派生）；横切边（`governs` / `collaborates-with` / `derives`）不依附层级树，但**不替代追溯**——追溯仍以 RTM 为事实源（SSoT §10.10）。
 12. **闭环机制强制校验**：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` 4 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。
 13. **返工必经根因定位**：V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V 复审 + G 门禁通过，才可分派 S-fix 修复。跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。详见 [references/root-cause-locator.md](references/root-cause-locator.md)。
+14. **BDD 行为门禁**：阶段 1-4 必须产出对应层级 L1/L2/L3/L4 BDD features + `bdd-manifest.json`；阶段 5-8 必须执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](scripts/check-bdd-model.ts) exitCode=0；BDD↔TLA+ 不等价必须走 R→V→G→S-fix 循环（反模式 #29）。详见 [references/bdd-guide.md](references/bdd-guide.md)。
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
@@ -152,6 +153,9 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 - TLA+ 状态机建模（阶段 1–4 产出 `.tla`/`.cfg`，G 跑 `check-tla-model.ts`） → [references/tla-plus-guide.md](references/tla-plus-guide.md)
 - TLA+ 规格模板 → [templates/tla-spec-template.md](templates/tla-spec-template.md)
+- BDD features 建模（阶段 1–4 产出 `.feature` + `bdd-manifest.json`，G 跑 `check-bdd-model.ts`） → [references/bdd-guide.md](references/bdd-guide.md)
+- BDD features 模板 → [templates/feature.template](templates/feature.template)
+- BDD manifest 模板 → [templates/bdd-manifest.template.json](templates/bdd-manifest.template.json)
 - 阶段门评审或 `/wm review` → [references/verifier-spec.md](references/verifier-spec.md)
 - 编码后质量检查 → [references/quality-standards.md](references/quality-standards.md)
 - 状态 Schema、导入、导出或恢复 → [references/data-models.md](references/data-models.md)
@@ -199,6 +203,10 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | hill-climbing-guide.md | L2+ 项目爬坡循环 |
 | skillopt-adoption.md | SkillOpt 方法论吸收 |
 | external-skills-absorption.md | 第 10 轮外部技能吸收 |
+| bdd-guide.md | 阶段 1-8 涉及 BDD features 设计时加载 |
+| bdd-review-checklist.md | V 子代理评审 BDD features 时加载 |
+| bdd-syntax-reference.md | 撰写 features 时加载 |
+| bdd-patterns-examples.md | 撰写 features 时按需加载 |
 | toolbox.md | 「I have X, I want Y → use Z」决策表 |
 
 ### scripts/（按需读取，仅供 G 子代理执行）
@@ -209,6 +217,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | check-artifact-gate.ts | 阶段 8 终检 / 阶段 5/6/7 阶段级校验 |
 | check-requirement-graph.ts | 阶段 1–4 图谱门禁 |
 | check-tla-model.ts | 阶段 1–4 TLA+ 行为门禁 |
+| check-bdd-model.ts | 阶段 1-8 BDD 模型门禁 |
 | check-code-tla-consistency.ts | 阶段 5 代码-TLA+ 一致性回归 |
 | check-budget.ts | 阶段门放行前 |
 | check-run-log.ts | 阶段门放行前 |

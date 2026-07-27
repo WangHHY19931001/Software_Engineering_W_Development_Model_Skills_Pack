@@ -57,14 +57,14 @@
 
 | 阶段 | 输入 | 产物（artifact） | 子代理分派 | 切换到下一阶段判定 | 回退阶段编号 |
 |---|---|---|---|---|---|
-| 1 需求分析 | 用户需求陈述 / 业务背景 | 需求规格说明书（`*-requirement-spec.md`）、RTM 需求列 + 验收测试列、graph.json（REQ 节点） | O 路由 → S 产出 → V 评审 → G 门禁 | `check-verifier-output.ts` 退出码 0 且 `VerifierOutput.passed=true` 且 `qualityLevel ∈ {A,B}` | — |
-| 2 系统设计 | 阶段 1 全部产物 | 系统设计文档（`SD-N.N.N`）、RTM 设计文档列 + 系统测试列、graph.json（SD 节点） | O 路由 → S 产出 → V 评审 → G 门禁 | 同上 | 阶段 1 |
-| 3 概要设计 | 阶段 2 全部产物 | 接口设计文档（`SD-N.N.N`）、RTM 接口列 + 集成测试列、graph.json（INTF 节点） | O 路由 → S 产出 → V 评审 → G 门禁 | 同上 | 阶段 2 |
-| 4 详细设计 | 阶段 3 全部产物 | 详细设计文档（`SD-N.N.N`）、RTM 详细列 + 单元测试列、graph.json（DD 节点） | O 路由 → S 产出 → V 评审 → G 门禁 | 同上 | 阶段 3 |
-| 5 编码实现 | 阶段 4 全部产物 | 源代码文件、RTM 代码模块列 | O 路由 → S 产出代码+单测 → V 代码审查 → G 门禁 | `check-verifier-output.ts` 退出码 0 + 单元测试退出码 0 + 覆盖率 ≥ 80% | 阶段 4 |
-| 6 集成测试 | 阶段 5 全部产物 + 集成测试设计 | 集成测试报告、RTM 集成测试状态列 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 集成测试退出码 0，`rtm.json.executionSummary.failed=0` | 阶段 5 |
-| 7 系统测试 | 阶段 6 全部产物 + 系统测试设计 | 系统测试报告、RTM 系统测试状态列 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 系统测试退出码 0，性能 P95 < 2s，高危漏洞数 = 0 | 阶段 5 |
-| 8 验收测试 | 阶段 7 全部产物 + 验收测试设计 | 验收测试报告、RTM 验收测试状态列 + 终检 | O 路由 → S 执行测试+回填 → V 评审报告 → G 终检门禁 | `check-artifact-gate.ts` 退出码 0 + 用户确认放行 | 阶段 1（需求级缺陷）/ 阶段 5（一般缺陷） |
+| 1 需求分析 | 用户需求陈述 / 业务背景 | 需求规格说明书（`*-requirement-spec.md`）、RTM 需求列 + 验收测试列、graph.json（REQ 节点）、L1 BDD features + bdd-manifest.json | O 路由 → S 产出 → V 评审 → G 门禁 | `check-verifier-output.ts` 退出码 0 且 `VerifierOutput.passed=true` 且 `qualityLevel ∈ {A,B}` | — |
+| 2 系统设计 | 阶段 1 全部产物 | 系统设计文档（`SD-N.N.N`）、RTM 设计文档列 + 系统测试列、graph.json（SD 节点）、L2 BDD features | O 路由 → S 产出 → V 评审 → G 门禁 | 同上 | 阶段 1 |
+| 3 概要设计 | 阶段 2 全部产物 | 接口设计文档（`SD-N.N.N`）、RTM 接口列 + 集成测试列、graph.json（INTF 节点）、L3 BDD features | O 路由 → S 产出 → V 评审 → G 门禁 | 同上 | 阶段 2 |
+| 4 详细设计 | 阶段 3 全部产物 | 详细设计文档（`SD-N.N.N`）、RTM 详细列 + 单元测试列、graph.json（DD 节点）、L4 BDD features | O 路由 → S 产出 → V 评审 → G 门禁 | 同上 | 阶段 3 |
+| 5 编码实现 | 阶段 4 全部产物 | 源代码文件、RTM 代码模块列、step_definitions + cucumber L4 报告 | O 路由 → S 产出代码+单测 → V 代码审查 → G 门禁 | `check-verifier-output.ts` 退出码 0 + 单元测试退出码 0 + 覆盖率 ≥ 80% | 阶段 4 |
+| 6 集成测试 | 阶段 5 全部产物 + 集成测试设计 | 集成测试报告、RTM 集成测试状态列、cucumber L3 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 集成测试退出码 0，`rtm.json.executionSummary.failed=0` | 阶段 5 |
+| 7 系统测试 | 阶段 6 全部产物 + 系统测试设计 | 系统测试报告、RTM 系统测试状态列、cucumber L2 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 系统测试退出码 0，性能 P95 < 2s，高危漏洞数 = 0 | 阶段 5 |
+| 8 验收测试 | 阶段 7 全部产物 + 验收测试设计 | 验收测试报告、RTM 验收测试状态列 + 终检、cucumber L1 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 终检门禁 | `check-artifact-gate.ts` 退出码 0 + 用户确认放行 | 阶段 1（需求级缺陷）/ 阶段 5（一般缺陷） |
 
 ### 阶段切换判定字段（精确对应）
 

@@ -76,6 +76,13 @@
 系统测试 + 质量门通过 → 进入阶段 8（验收测试）。
 需修复 → 回到编码实现返工，按失败分支定位根因，修复后重跑系统测试与质量门检查。
 
+## L2 BDD features 执行
+
+S-test 子代理执行 `npx cucumber-js features/L2/` 运行所有 scenarios：
+- 失败走 R→V→G→S-fix 循环（反模式 #29）
+- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=7 --cucumber-report=<report.json>` 门禁
+- cucumber 报告不得有 undefined/pending/failed step（D5 校验）
+
 ## 禁止行为
 
 | # | 禁止行为 | 正确做法 |
