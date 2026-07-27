@@ -108,6 +108,8 @@ export interface TlaCheckResult {
   cfgConsistencyViolations: string[];
   /** .cfg 结构违反（如混入 MODULE 声明、INVARIANT 行格式错误，见 §12） */
   cfgStructureViolations: string[];
+  /** checkRounds schema 违反（如元素缺字段、字段类型错、含 phase 级摘要字段，见 §checkRounds 字段语义，R13 第 16 轮新增） */
+  checkRoundsViolations: string[];
   environmentOk: boolean;
   environmentErrors: string[];
   violations: string[];
@@ -772,6 +774,89 @@ function validateSpec(raw: unknown, index: number): string[] {
  * @param options  { skipTlc?: boolean } —— 跳过 TLC 相关标志校验（快速反馈用）
  * @returns TlaCheckResult
  */
+
+/**
+ * R13 checkRounds schema 校验（第 16 轮 P1.1）。
+ *
+ * 语义权威定义见 tla-plus-guide.md §checkRounds 字段语义：
+ * checkRounds 数组记录每次 TLA+ 校验轮次的结果（spec 级返工记录），
+ * 用于追踪返工收敛趋势。每条元素对应一次 spec 的 TLA+ 校验轮次（specId 标识），
+ * 不是 phase 级摘要（phase 级摘要应写在 run-log.jsonl 的 note 字段）。
+ *
+ * 校验规则：
+ *   - checkRounds 可选，缺省视为 []（合法）
+ *   - 必须是数组（非数组 → R13 违反）
+ *   - 每个元素须含全部必填字段：phase / round / specId / syntaxCheck / tlcCheck / violations / converged
+ *     （timestamp 可选）
+ *   - 字段类型校验：
+ *     - phase: number ∈ [1, 8]
+ *     - round: number ≥ 1
+ *     - specId: 非空字符串
+ *     - syntaxCheck / tlcCheck / converged: boolean
+ *     - violations: string[]（与 tla-logic.ts TlaManifest.checkRounds 类型定义一致）
+ *   - 禁止字段：元素不得含 phaseSummary / summary / phaseDecisions / phaseLevelSummary 等
+ *     phase 级摘要字段（命中 → R13 违反，第 15 轮遗留 #14 闭环）
+ *
+ * 关联：
+ *   - tla-plus-guide.md §checkRounds（语义权威）
+ *   - data-models.md tla-manifest.json 节字段表（指向 tla-plus-guide.md）
+ *   - CHANGELOG [15.0.0] 问题 #14（第 15 轮遗留）
+ *   - CHANGELOG [16.0.0] P1.1（第 16 轮闭环）
+ */
+export function checkRoundsSchema(manifest: Partial<TlaManifest>): string[] {
+  const violations: string[] = [];
+  const cr = manifest.checkRounds;
+  if (cr === undefined) return violations; // 可选缺省合法
+  if (!Array.isArray(cr)) {
+    violations.push(`R13: checkRounds 必须是数组，实际为 ${typeof cr}`);
+    return violations;
+  }
+  const REQUIRED_FIELDS = ['phase', 'round', 'specId', 'syntaxCheck', 'tlcCheck', 'violations', 'converged'] as const;
+  const FORBIDDEN_FIELDS = ['phaseSummary', 'summary', 'phaseDecisions', 'phaseLevelSummary'] as const;
+  cr.forEach((entry: unknown, i: number) => {
+    if (typeof entry !== 'object' || entry === null) {
+      violations.push(`R13: checkRounds[${i}] 必须是对象，实际为 ${typeof entry}`);
+      return;
+    }
+    const e = entry as Record<string, unknown>;
+    // 必填字段检查
+    for (const f of REQUIRED_FIELDS) {
+      if (!(f in e)) {
+        violations.push(`R13: checkRounds[${i}] 缺必填字段 ${f}`);
+      }
+    }
+    // 字段类型检查
+    if (typeof e.phase !== 'number' || e.phase < 1 || e.phase > 8) {
+      violations.push(`R13: checkRounds[${i}].phase 须为 number ∈ [1,8]，实际为 ${JSON.stringify(e.phase)}`);
+    }
+    if (typeof e.round !== 'number' || e.round < 1) {
+      violations.push(`R13: checkRounds[${i}].round 须为 number ≥ 1，实际为 ${JSON.stringify(e.round)}`);
+    }
+    if (typeof e.specId !== 'string' || e.specId.trim() === '') {
+      violations.push(`R13: checkRounds[${i}].specId 须为非空字符串，实际为 ${JSON.stringify(e.specId)}`);
+    }
+    if (typeof e.syntaxCheck !== 'boolean') {
+      violations.push(`R13: checkRounds[${i}].syntaxCheck 须为 boolean，实际为 ${typeof e.syntaxCheck}`);
+    }
+    if (typeof e.tlcCheck !== 'boolean') {
+      violations.push(`R13: checkRounds[${i}].tlcCheck 须为 boolean，实际为 ${typeof e.tlcCheck}`);
+    }
+    if (typeof e.converged !== 'boolean') {
+      violations.push(`R13: checkRounds[${i}].converged 须为 boolean，实际为 ${typeof e.converged}`);
+    }
+    if (!Array.isArray(e.violations) || e.violations.some((v: unknown) => typeof v !== 'string')) {
+      violations.push(`R13: checkRounds[${i}].violations 须为 string[]，实际为 ${Array.isArray(e.violations) ? '含非字符串元素' : typeof e.violations}`);
+    }
+    // 禁止字段检查（phase 级摘要字段）
+    for (const f of FORBIDDEN_FIELDS) {
+      if (f in e) {
+        violations.push(`R13: checkRounds[${i}] 含禁止字段 ${f}（phase 级摘要字段，checkRounds 为 spec 级返工记录）`);
+      }
+    }
+  });
+  return violations;
+}
+
 export function checkTlaModel(
   manifest: unknown,
   phase: number,
@@ -793,6 +878,7 @@ export function checkTlaModel(
     coverageViolations: [],
     cfgConsistencyViolations: [],
     cfgStructureViolations: [],
+    checkRoundsViolations: [],
     environmentOk: true,
     environmentErrors: [],
     violations: [],
@@ -913,6 +999,10 @@ export function checkTlaModel(
   result.violations.push(...result.cfgConsistencyViolations);
   result.violations.push(...result.cfgStructureViolations);
 
+  // 8.1 R13 checkRounds schema 校验（第 16 轮 P1.1，第 15 轮遗留 #14 闭环）
+  result.checkRoundsViolations.push(...checkRoundsSchema(m));
+  result.violations.push(...result.checkRoundsViolations);
+
   // 9. passed 判定（headerViolations 此时为空，environmentOk 为真；CLI 回填后须重算）
   result.passed =
     result.environmentOk &&
@@ -926,6 +1016,7 @@ export function checkTlaModel(
     result.coverageViolations.length === 0 &&
     result.cfgConsistencyViolations.length === 0 &&
     result.cfgStructureViolations.length === 0 &&
+    result.checkRoundsViolations.length === 0 &&
     result.violations.length === 0;
 
   return result;

@@ -496,6 +496,13 @@ const TLA_CASES: TlaCase[] = [
     expectedPassed: true,
     description: '.cfg 与 .tla 不变式集合完全一致，应通过 cfg-tla 一致性 + cfg 结构校验',
   },
+  {
+    file: 'bad-checkrounds-phase-summary.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R13.*checkRounds\[0\] 含禁止字段 phaseSummary.*phase 级摘要字段/],
+    description: 'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 R13 schema 校验拦截（第 16 轮 P1.1）',
+  },
 ];
 
 // -------------------- Budget --------------------

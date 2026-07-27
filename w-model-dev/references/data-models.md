@@ -392,6 +392,7 @@ interface RunLogEntry {
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
+- **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`。第 15 轮共性问题 B 子代理误用 `eventId` / `eventType` / `decisions` 触发 R1 失败（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`；第 17 轮 P3 修正历史叙述加注）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
 
 ### 动作类型字段约束（rootcause / fix / escalate 扩展）
 
@@ -494,6 +495,30 @@ interface MaturityConfig {
 - 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后 unlockConditions 全部达标时询问）。
 - 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0。
 - `maturity.json` 与 `budget.json` 协同：L2+ 自主度可设 `onExceed=notify`（仅在 run-log 记录告警）；L0 默认 `onExceed=pause`（最保守）。
+
+### RunLogEntry vs EventIngress Schema 边界对照表
+
+> 第 15 轮调测发现子代理频繁混用 RunLogEntry（`run-log.jsonl`）与 EventIngress（`event-ingress.jsonl`）字段（共性问题 B），第 16 轮 P2.1 新增此对照表显式区分边界。命中混用 → [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验失败（run-log.jsonl）或 EventIngress schema 校验失败（event-ingress.jsonl）。
+
+| 用途 | RunLogEntry 字段 | EventIngress 字段 | 区别 |
+|---|---|---|---|
+| 标识 | `runId`（UUID 或时间戳） | `eventId`（UUID 或时间戳） | 不同 ID 命名空间，不可混用 |
+| 时间戳 | `timestamp` | `timestamp` | 相同（ISO 8601） |
+| 阶段 | `phase` + `phaseName` | 无（路由后才有阶段） | RunLogEntry 强制阶段，EventIngress 路由前无 |
+| 动作 | `action`（chunk/cross/produce/review/gate/tla-gate/graph-gate/test/checkpoint/rework/rollback/rootcause/fix/escalate） | `eventType`（bug-report/requirement-change/...） | 不同枚举集，不可混用 |
+| 角色 | `role`（O/A/S/V/G/R） | `source`（webhook/cron/manual/external-ci/user-report） | 不同维度，不可混用 |
+| 结果 | `outcome`（success/fail/rework/escalate/blocked/cancelled） | `routedTo`（路由决策对象） | 不同语义，不可混用 |
+| 决策 | `acknowledgedDecisions`（数组） | 无 | 仅 RunLogEntry |
+| 耗时 | `duration_s` / `tokens` / `estimated` / `subagentSpawns` | 无 | 仅 RunLogEntry |
+| 影响范围 | `artifacts`（产物路径数组） | `affectedArtifacts` + `affectedRequirements` + `evidence` | EventIngress 更具体 |
+| 备注 | `note` | `summary` | 不同字段名，不可混用 |
+| 门禁归档 | `gateExitCode` / `gateLogPath` | 无 | 仅 RunLogEntry |
+
+**禁止混用规则**：
+- `run-log.jsonl` 不得含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）
+- `event-ingress.jsonl` 不得含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`）
+
+详见 [anti-patterns.md #26](anti-patterns.md) 「RunLogEntry 与 EventIngress 字段混用」。
 
 ## 事件接驳模型（EventIngress / event-ingress.jsonl）
 
@@ -681,9 +706,9 @@ interface TlaCheckRound {
   syntaxCheck: boolean;
   /** TLC 模型检查是否通过（--skip-tlc 时填 false 并备注） */
   tlcCheck: boolean;
-  /** 本轮违反数（死锁 + 不变式违反 + 状态爆炸等合计） */
-  violations: number;
-  /** 本轮是否零违反收敛（violations === 0） */
+  /** 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述） */
+  violations: string[];
+  /** 本轮是否零违反收敛（violations.length === 0） */
   converged: boolean;
 }
 ```
@@ -702,7 +727,7 @@ interface TlaCheckRound {
 | `specs[].tlaPath` / `cfgPath` | string | 是 | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus-guide.md#§21-路径解析基准)） |
 | `specs[].parent` / `siblings` / `children` | string / string[] | 是 | 相对 **该 .tla 文件所在目录**解析；L1 `parent=null`，叶子 `children=[]` |
 | `specs[].decompositionDecision` | enum | 是 | 拆解决策（组合数 >1w 必须 `split-done`） |
-| `checkRounds[]` | TlaCheckRound[] | 是 | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定） |
+| `checkRounds[]` | TlaCheckRound[] | 是 | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus-guide.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致，第 16 轮 P4.3 修正）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
 
 **使用约定**：
 

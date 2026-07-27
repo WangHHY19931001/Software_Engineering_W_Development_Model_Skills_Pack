@@ -208,6 +208,31 @@
 | 4 | 用 `// eslint-disable` 绕过规范检查 | 修复违规源，禁止整文件 disable |
 | 5 | 覆盖率不达标时调低阈值放行 | 阈值固定 ≥ 80%，不达标必须补测试 |
 | 6 | 伪造实现（TODO/stub）当完成 | 缺失依赖必须暂停标注，不得伪造业务逻辑 |
+| 7 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色） | 路由层或控制器入口必须显式校验 `requiredRole`，与需求/设计中的角色枚举一致；token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden。详见下方「角色校验清单」节（第 16 轮 P3.1，预防 P7-001 类缺陷） |
+| 8 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值） | 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成；响应体字段须反映已生效的状态。详见下方「副作用时序一致性清单」节（第 16 轮 P3.3，预防 P7-004 类缺陷） |
+
+## 角色校验清单
+
+> 第 15 轮 P7-001 reader 可发博文（`authRequired` 未校验角色）缺陷的预防清单。每个受保护端点须通过以下检查：
+
+- [ ] 每个受保护端点须有 `requiredRole` 显式声明（在路由配置或控制器入口）
+- [ ] `requiredRole` 须与需求/设计文档中的角色枚举一致（如 `user` / `reader` / `blogger` / `admin`）
+- [ ] token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden
+- [ ] 单元测试须覆盖「跨角色越权」场景（如 `reader` 调用 `blogger-only` 端点应返回 403）
+- [ ] 系统测试须覆盖「越权用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
+
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#22 角色越权](anti-patterns.md)。
+
+## 副作用时序一致性清单
+
+> 第 15 轮 P7-004 `PostController.get` 响应体返回 `recordView` 自增前旧 `viewCount` 缺陷的预防清单。每个含副作用端点须通过以下检查：
+
+- [ ] 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成
+- [ ] 响应体字段须反映已生效的状态（如自增后的 `viewCount`，不是自增前的旧值）
+- [ ] 单元测试须覆盖「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态）
+- [ ] 系统测试须覆盖「时序用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
+
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](anti-patterns.md)。
 
 ## 返工路径
 

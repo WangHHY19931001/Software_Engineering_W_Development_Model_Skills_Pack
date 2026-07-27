@@ -55,6 +55,18 @@
 | 返回值结构 | ✅ | `{code, message, data: {orderId, status}}` |
 | 错误码集合 | ✅ | `40001, 40002, 50001` |
 
+## 跨模块数据源选择约束
+
+> 第 15 轮 P7-002 `BloggerService.follow` 校验 `follower` 在 blogger store（设计标注 user+）、P7-003 `CommentService.create` 仅校验 user store（blogger token sub 是 bloggerId）缺陷的预防约束。第 16 轮 P3.2 新增。
+
+跨模块调用时，数据源（store）选择须满足：
+
+- **显式声明**：每个跨模块调用须在接口设计文档显式声明所用的 store（如 `user store` / `blogger store` / `article store`），写入接口契约 Schema 模板的「约束」字段或「备注」字段。
+- **schema 一致**：store 选择须与 schema 中的实体定义一致。如 `follower` 是 `user` 实体的子集 → 须在 `user store` 校验，不应在 `blogger store`；如 `comment.bloggerId` 引用 `blogger` 实体主键 → 须在 `blogger store` 校验，不应在 `user store`。
+- **token sub 对齐**：如调用方携带 token，`token.sub` 须与所选 store 的主键一致。如 `blogger token sub=bloggerId` → 不应在 `user store` 校验 `follower`；如 `user token sub=userId` → 不应在 `blogger store` 校验 `blogger` 实体。
+
+**违反后果**：集成测试阶段发现跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 返工接口设计。关联反模式 [#23 跨模块 store 误用](anti-patterns.md)。phase-4 详细设计同步此约束（见 [phase-4-detailed-design.md「跨模块数据源选择约束（同步 phase-3）」](phase-4-detailed-design.md)）。
+
 ## 错误码分层约定
 
 | 段位 | 范围 | 含义 | 示例 |

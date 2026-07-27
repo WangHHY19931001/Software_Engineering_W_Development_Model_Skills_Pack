@@ -88,7 +88,68 @@ Agent 应依据项目已有脚本和声明选择真实工具链，不默认伪�
 - 测试用例超过 1000：按模块和优先级分批执行，但最终不得用部分通过代替全量门禁。
 - 用户中断：保留已写产物，`status` 停留在上一已放行阶段；下次询问继续断点或重做。
 - CHECKPOINT 拒绝：不重试同一请求；询问调整方向，修改后再进入检查点。
-- 同一阶段返工超过 2 次：展示失败子标准与证据，询问缺失上下文；必要时经用户确认回退到上游阶段。不得把硬门槛降级为“已知限制”后放行。
+- 同一阶段返工超过 2 次：展示失败子标准与证据，询问缺失上下文；必要时经用户确认回退到上游阶段。不得把硬门槛降级为"已知限制"后放行。
+
+## JSON 文件写入工具选择
+
+> 第 15 轮共性问题 A：PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` 在阶段 5/6/7/8 多次返工（BOM + 深度 + 中文乱码）。第 16 轮 P4.2 强制工具选择，关联反模式 [#25 JSON 文件 PowerShell 写入](anti-patterns.md)。
+
+### 强制工具
+
+```javascript
+import { writeFileSync } from 'node:fs';
+writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
+```
+
+- **Node.js `fs.writeFileSync`**：跨平台、UTF-8 无 BOM、深度无限制、中文不乱码
+- 适用于所有 JSON 文件写入：
+  - `.w-model/run-log.jsonl`（每行 JSON append，使用 `appendFileSync` 等价 API）
+  - `.w-model/maturity.json` / `budget.json` / `graph.json` / `project.json`
+  - `.w-model/tla-manifest.json` / `rtm.json`
+  - 各阶段产物中所有 JSON 文件
+
+### 禁止工具
+
+| 工具 | 问题 | 表现 |
+|---|---|---|
+| PowerShell `ConvertTo-Json` | BOM + 深度问题 | 深度 > 2 时字段丢失，文件仅剩 BOM |
+| PowerShell `Add-Content -Encoding UTF8` | 中文乱码 | UTF-8 BOM 导致中文被 GBK 误解析 |
+| PowerShell `Out-File -Encoding UTF8` | 中文乱码 | 同上 |
+| PowerShell `Set-Content -Encoding UTF8` | 中文乱码 | 同上 |
+
+**命中禁止工具**：回阶段起点，改用 Node.js `fs.writeFileSync` 重写。检测信号：`run-log.jsonl` 中 `note` 字段含 `"PowerShell"` / `"ConvertTo-Json"` / `"Add-Content"` / `"Out-File"` / `"Set-Content"`（软检测，V 评审 + G 门禁 note 检查）。
+
+### JSONL 文件追加（run-log.jsonl / event-ingress.jsonl）
+
+```javascript
+import { appendFileSync } from 'node:fs';
+appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
+```
+
+- 每行一条 JSON 记录，末尾换行 `\n`（Unix 风格，跨平台一致）
+- 不得用 PowerShell `Add-Content` 追加（同上 BOM + 乱码问题）
+
+## 调测者简化行为预防
+
+> 第 15 轮归档反思识别的调测者简化倾向。self-as-verifier 模式下调测者兼具 S/V/G 角色，简化行为无外部评审拦截，须靠自检条款预防。第 17 轮 P5 新增。
+
+### 三类简化倾向
+
+| # | 简化倾向 | 表现 | 检测信号 | 回退动作 |
+|---|---|---|---|---|
+| S1 | 上下文压缩丢失细节 | 长会话后遗漏硬约束（如 RTM 须 100%、TLA+ 须零违反、checkRounds 须 spec 级）；复述阶段产物时省略字段 | run-log.jsonl note 字段缺关键约束名 / checkpoint acknowledgedDecisions 缺硬约束 ID | 回当前阶段起点，重读硬约束 + 重走 S→V→G |
+| S2 | 追求效率省略步骤 | 跳过 ingestion 子流程 / 跳过 R 根因定位直接 S 返工 / 跳过阶段级 G 直接终检 / V 评审省略 reworkHints | run-log.jsonl 缺 chunk/cross/review/gate 动作 / 缺 reworkHints 字段 / 阶段级 --phase=N 缺失 | 回当前阶段起点，补全 S→V→G 全流程 |
+| S3 | 未对照硬约束核验 | V 评审不核验信息流零违反 / G 门禁不核验 exitCode 与 JSON passed 一致 / 归档不核验 acceptance-test-report §9 用户确认 | verifier-output 缺硬约束核验项 / gate JSON exitCode ≠ passed / 归档缺 §9 确认 | 回当前阶段起点，逐条核验硬约束清单 |
+
+### 自检清单
+
+- [ ] 每阶段 S 产出后，复述硬约束清单（RTM 100% / TLA+ 零违反 / 信息流零违反 / exitCode 与 passed 一致 / acknowledgedDecisions 含关键词）
+- [ ] 每阶段 V 评审后，确认 reworkHints 非空（即使 passed=true 也有 FYI 提示）
+- [ ] 每阶段 G 门禁后，确认 7 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint；阶段 1-4 额外 check-tla-model / check-requirement-graph）
+- [ ] 归档前确认 acceptance-test-report.md §9 用户确认区已勾选（self-as-verifier 模式须留代签痕迹）
+- [ ] 长会话（>20 轮）后重读 project_memory.md 硬约束 + 当前阶段 phase-N-*.md 摘要
+
+命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [anti-patterns.md #27](anti-patterns.md#27-调测者简化行为)。
 
 ## 成本预算与运行日志
 

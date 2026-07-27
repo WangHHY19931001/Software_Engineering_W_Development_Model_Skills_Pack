@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（18 条流程反模式 #1~#17 + #21；#20 见 subagent-delegation.md）
+- 反模式清单（24 条流程反模式 #1~#17 + #21~#27；#20 见 subagent-delegation.md）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -39,6 +39,12 @@
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复（见 [root-cause-locator.md](root-cause-locator.md)） |
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
 | 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节） |
+| 22 | 角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依，第 15 轮 P7-001 reader 可发博文 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
+| 23 | 跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高，第 15 轮 P7-002/P7-003 类 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
+| 24 | 副作用时序不一致（响应体字段返回副作用自增前的旧值） | 响应体字段与已生效状态不一致，集成测试难发现，第 15 轮 P7-004 类 | 副作用须在响应体构造前完成，响应体字段反映已生效状态（见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节） |
+| 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工（第 15 轮共性问题 A） | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
+| 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败（第 15 轮共性问题 B） | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
+| 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
 
 ### 命中高发阶段
 
@@ -64,6 +70,12 @@
 | #18（跳过 R 直接 S 返工） | 全阶段 | [root-cause-locator.md](root-cause-locator.md) + 各 phase-N「返工路径」节 |
 | #19（R 报告未 V 复审） | 全阶段 | [root-cause-locator.md](root-cause-locator.md)「R 产出质量标准」节 |
 | #21（阶段级门禁跳过） | 阶段 6/7/8 | [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节 |
+| #22（角色越权） | 阶段 5 | [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
+| #23（跨模块 store 误用） | 阶段 3/4 | [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
+| #24（副作用时序不一致） | 阶段 5 | [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |
+| #25（JSON 文件 PowerShell 写入） | 阶段 5/6/7/8 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
+| #26（RunLogEntry 与 EventIngress 字段混用） | 阶段 1/6/7/8 | [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
+| #27（调测者简化行为） | 阶段 1-8（self-as-verifier 模式全阶段） | [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -86,6 +98,12 @@
 | #16（TLA+ 占位/简化/错误实现） | V 评审（`reworkHints` 标注）+ [`check-tla-model.ts`](../scripts/check-tla-model.ts)（拆解决策校验） |
 | #17（TLA+ 与需求/设计不符未回退） | S 子代理核查 + 回退机制（无脚本；Agent 比对 `@requirement`/`@design` 与规格一致性） |
 | #21（阶段级门禁跳过） | [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts) `--phase=N` 参数 + run-log R5 O 越权检测（编排者自检阶段 N 是否跑 `--phase=N`） |
+| #22（角色越权） | V-code 评审（`reworkHints` 标注）+ 系统测试用例（越权场景应返回 403）+ [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
+| #23（跨模块 store 误用） | V-design 评审（`reworkHints` 标注）+ 集成测试用例（跨模块数据流）+ [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
+| #24（副作用时序不一致） | V-code 评审（`reworkHints` 标注）+ 系统测试用例（副作用与响应体一致性）+ [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |
+| #25（JSON 文件 PowerShell 写入） | run-log.jsonl `note` 字段检测（"PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词）+ [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
+| #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
+| #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
 
 ## 命中后的处理流程
 
@@ -120,6 +138,12 @@
 | #18 | V/G 不通过后编排者直接分派 S 返工（无 R 报告作为 S-fix 输入） | 回到 V/G 不通过节点，分派 R 定位 → V 复审 → G 门禁 → S-fix | `check-rootcause-report.ts` 退出码 0 + run-log R3 扩展（R+S-fix 一一对应） |
 | #19 | R 报告产出后无 V 复审记录（targetKind=rootcause）直接分派 S-fix | 回到 R 产出节点，分派 V 复审 → G 门禁后才可 S-fix | `check-verifier-output.ts`（targetKind=rootcause）退出码 0 + run-log R3 扩展（V 复审数=R 数） |
 | #21 | run-log.jsonl 中阶段 N（6/7）的 gate 动作参数为 `--phase=8`（或无 `--phase` 参数）且 N < 8；或阶段 N 完成但未跑对应 `--phase=N` 门禁 | 回到阶段 N 起点，强制跑 `npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=N [project-dir]` | `check-artifact-gate.ts --phase=N` 退出码 0 才算阶段 N 门禁闭环 |
+| #22 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色）；或受保护端点无 `requiredRole` 声明 | 回到阶段 5 起点，分派 S 在路由层或控制器入口显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403；重跑 V-code 评审 + 单元测试「跨角色越权」场景 | 无脚本（V 评审 `reworkHints` 标注 + 系统测试用例越权场景应返回 403）；详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
+| #23 | 跨模块调用时 store 选择与 schema 不一致（如 `follower` 是 `user` 子集却在 `blogger store` 校验；`comment.bloggerId` 引用 `blogger` 主键却在 `user store` 校验）；或 `token.sub` 与所选 store 主键不对齐 | 回到阶段 3/4 起点，分派 S 在接口设计/详细设计显式声明所用 store，与 schema 一致；重跑 V-design 评审 + 集成测试「跨模块数据流」用例 | 无脚本（V 评审 `reworkHints` 标注 + 集成测试用例跨模块数据流）；详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
+| #24 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值；状态变更后响应体仍返回旧状态） | 回到阶段 5 起点，分派 S 调整副作用与响应体构造顺序（副作用在前，响应体构造在后）；重跑 V-code 评审 + 单元测试「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态） | 无脚本（V 评审 `reworkHints` 标注 + 系统测试用例副作用时序）；详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |
+| #25 | run-log.jsonl `note` 字段含 "PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词；或产物 JSON 文件首字节为 BOM（0xEF 0xBB 0xBF）；或 JSON 深度 > 2 时字段丢失 | 回到当前阶段起点，分派 S 改用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 重写损坏的 JSON 文件；重跑相关门禁 | 无脚本（编排者自检 run-log `note` 字段 + 文件 BOM 检测）；详见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
+| #26 | `run-log.jsonl` 含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）；或 `event-ingress.jsonl` 含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`） | 回到当前阶段起点，分派 S 按正确 schema 重写 run-log.jsonl 或 event-ingress.jsonl；重跑 `check-run-log.ts` R1 动作完整性校验 | `check-run-log.ts` 退出码 0 才算 RunLogEntry schema 闭合；详见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
+| #27 | run-log.jsonl 缺 chunk/cross/review/gate 动作（S2 省步骤）；或 checkpoint acknowledgedDecisions 缺硬约束 ID（S1 丢细节）；或 gate JSON exitCode ≠ passed（S3 未核验）；或归档缺 acceptance-test-report §9 用户确认（S3 未核验）；或 V 评审 reworkHints 为空（S2 省步骤） | 回到当前阶段起点，按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验：重读硬约束 + 补全 S→V→G 全流程 + 逐条核验硬约束清单 | 无脚本（编排者自检 run-log 动作完整性 + checkpoint R2 + gate exitCode 一致性交叉检测）；详见 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
 
 ### 门禁脚本退出码精确对应表
 

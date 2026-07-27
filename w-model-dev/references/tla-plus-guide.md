@@ -233,6 +233,8 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 ### checkRounds 字段语义
 
 > `checkRounds` 数组记录每次 TLA+ 校验轮次的结果，用于追踪返工收敛趋势。语义权威定义见本节，[data-models.md](data-models.md) `tla-manifest.json` 节字段表指向本节。
+>
+> **spec 级返工记录**：每条 checkRounds 元素对应一次 spec 的 TLA+ 校验轮次（`specId` 标识），**不是 phase 级摘要**。phase 级摘要应写在 `run-log.jsonl` 的 `note` 字段，phase 级决策列表应写在 `acknowledgedDecisions` 字段。第 15 轮调测发现子代理误把 phase 级摘要（含 `phaseSummary` / `summary` / `phaseDecisions` 字段）写入 checkRounds（共性问题 D），第 16 轮 R13 校验强制拦截。
 
 **记录时机**：每轮 TLA+ 校验（SANY + TLC）完成后，由 G 子代理向 `checkRounds` 数组追加一条记录。
 
@@ -246,14 +248,27 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 | `specId` | string | 校验的 spec id（如 `L1_blog_system`） |
 | `syntaxCheck` | boolean | SANY 语法检查是否通过 |
 | `tlcCheck` | boolean | TLC 模型检查是否通过（`--skip-tlc` 时填 `false` 并备注） |
-| `violations` | number | 本轮违反数（死锁 + 不变式违反 + 状态爆炸等合计） |
-| `converged` | boolean | 本轮是否零违反收敛（`violations === 0`） |
+| `violations` | string[] | 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述，与 [tla-logic.ts](../scripts/tla-logic.ts) 类型定义一致；第 16 轮 P4.3 修正：原 `number` 类型与脚本不一致） |
+| `converged` | boolean | 本轮是否零违反收敛（`violations.length === 0`） |
 
-**单调递减规则**：同一 `specId` 跨轮 `violations` 数应单调递减（每轮返工修复一部分违反）。若某轮 `violations` 不降反升 → 视为返工失败，编排者分派 S 子代理返工时须在 prompt 中明确「违反数上升」信号。
+**单调递减规则**：同一 `specId` 跨轮 `violations.length` 应单调递减（每轮返工修复一部分违反）。若某轮 `violations.length` 不降反升 → 视为返工失败，编排者分派 S 子代理返工时须在 prompt 中明确「违反数上升」信号。
 
 **与 run-log R3 交叉校验**：`checkRounds` 数组长度须与 `run-log.jsonl` 中该 spec 对应的 `action=tla-gate` 且 `outcome=rework` 记录数一致（`check-run-log.ts` R3 规则强制校验）。不一致 → `check-run-log.ts` 报 R3 违反。
 
 **空值约定**：项目首次产出 TLA+ 规格前（未跑过任何校验轮次），`checkRounds` 填 `[]`。零返工一次性通过的项目，`checkRounds` 仅含一条 `converged=true` 记录。
+
+### 禁止字段（phase 级摘要）
+
+> checkRounds 元素为 **spec 级返工记录**，不得含 phase 级摘要字段。第 15 轮调测发现子代理误把 phase 级摘要写入 checkRounds（共性问题 D），第 16 轮 R13 校验强制拦截。违反 → `check-tla-model.ts` 退出码 1。
+
+| 禁止字段 | 说明 | 应写入位置 |
+|---|---|---|
+| `phaseSummary` | phase 级摘要（如"本阶段所有 spec 一次性通过"） | `run-log.jsonl` 的 `note` 字段 |
+| `summary` | phase 级摘要（同上，无前缀简写） | `run-log.jsonl` 的 `note` 字段 |
+| `phaseDecisions` | phase 级决策列表 | `run-log.jsonl` 的 `acknowledgedDecisions` 字段 |
+| `phaseLevelSummary` | phase 级总结 | `run-log.jsonl` 的 `note` 字段 |
+
+R13 校验由 [`tla-logic.ts`](../scripts/tla-logic.ts) `checkRoundsSchema` 函数执行，命中禁止字段 → 报 `R13: checkRounds[i] 含禁止字段 <字段名>（phase 级摘要字段，checkRounds 为 spec 级返工记录）`。
 
 ## 校验脚本
 

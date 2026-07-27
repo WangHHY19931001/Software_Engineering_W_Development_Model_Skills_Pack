@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "blog-system-demo",
+  "phase": 8,
+  "phaseName": "验收测试执行 + 终检 + 归档",
+  "reportType": "acceptance-test-result-snapshot",
+  "archivedAt": "2026-07-27T04:30:00.000+08:00",
+  "summary": {
+    "verdict": "passed",
+    "oneLine": "阶段 8 验收测试执行全部通过：72 UAT 用例全通过（0 失败），覆盖 32 需求（22 REQ + 6 NFR + 4 CON）× 正常/异常/边界场景，真实 HTTP server 零 mock，RTM 22 REQ 行每行 ≥2 UAT，NFR/CON 横切行回填完成，check-artifact-gate --phase=8 exitCode=0，可归档。"
+  },
+  "vitest": {
+    "command": "JWT_SECRET=test-secret-blog-demo npx vitest run tests/acceptance",
+    "exitCode": 0,
+    "testFiles": 8,
+    "tests": { "total": 72, "passed": 72, "failed": 0, "pending": 0, "skipped": 0 },
+    "duration": "5.11s",
+    "passed": true
+  },
+  "fourLevelTestSummary": {
+    "unitTest": { "total": 708, "passed": 708, "failed": 0, "coverage": 98.66 },
+    "integrationTest": { "total": 74, "passed": 74, "failed": 0, "coverage": 100 },
+    "systemTest": { "total": 35, "passed": 35, "failed": 0, "coverage": 100 },
+    "acceptanceTest": { "total": 72, "passed": 72, "failed": 0, "coverage": 100 }
+  },
+  "gateScript": {
+    "check-artifact-gate": {
+      "command": "npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=8 w-model-dev-demo",
+      "exitCode": 0,
+      "passed": true
+    }
+  },
+  "userConfirmation": {
+    "status": "confirm",
+    "confirmedAt": "2026-07-27T04:20:00.000+08:00",
+    "mode": "self-as-verifier",
+    "reportPath": "docs/acceptance-test-report.md"
+  },
+  "archive": {
+    "archivePath": "docs/changes/archive/2026-07-26-round15-end-to-end-test/",
+    "projectStatus": "项目完成 + 已归档",
+    "currentPhase": 9
+  }
+}

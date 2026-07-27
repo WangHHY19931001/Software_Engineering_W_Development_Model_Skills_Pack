@@ -517,6 +517,32 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改 `check-artifact-gate.ts`（P1.1 仅对齐 EISDIR）；不修改 `data-models.md` schema 定义（P2 仅修正 R3 逻辑）；不修改 `verifier-spec.md`（P3 反模式靠流程约束）；不修改 `w-model-dev-demo/`（第 12 轮已归档）。
 
+#### 3.4.11 第 16 轮：遗留问题与设计层缺口闭环（2026-07-26）
+
+> 第 15 轮端到端调测归档后识别的 9 项问题（1 遗留 #14 + 4 demo 层设计缺口 P7-001~P7-004 + 4 技能包侧设计缺口）全量修正约束。设计 spec：[`docs/superpowers/specs/2026-07-26-round16-residual-and-design-gap-closure-design.md`](./superpowers/specs/2026-07-26-round16-residual-and-design-gap-closure-design.md)。修正策略：方案 A 全量修正——技能包侧预防 demo 缺陷（不重建 demo 仅在 reference 补强约束）+ 脚本文档双改闭环 #14 + 反模式补强。
+
+1. **P1.1 tla-logic.ts R13 checkRounds schema 校验**：`tla-logic.ts` 新增 R13 校验，`checkRounds` 元素须含 `phase` / `round` / `specId` / `syntaxCheck` / `tlcCheck` / `violations` / `converged` 七个必填字段，禁止 `phaseSummary` / `summary` / `phaseDecisions` / `phaseLevelSummary` 等 phase 级摘要字段（checkRounds 为 spec 级返工记录，phase 级摘要应写在 `run-log.jsonl` 的 `note` 字段）。`check-tla-model.ts` JSON 摘要新增 `checkRoundsViolations` 字段。新增 fixture `samples/tla/bad-checkrounds-phase-summary.json` + self-test 样本（基线 94→95）。第 15 轮遗留 #14 闭环。
+
+2. **P2.1 RunLogEntry vs EventIngress Schema 边界对照表**：`data-models.md` 新增 Schema 边界对照表，显式区分两 schema 字段（标识 / 时间戳 / 阶段 / 动作 / 角色 / 结果 / 决策 / 耗时 / 影响范围 / 备注 / 门禁归档），禁止混用规则：`run-log.jsonl` 不得含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`），`event-ingress.jsonl` 不得含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`）。第 15 轮共性问题 B 闭环。
+
+3. **P3.1 phase-5-coding.md 角色越权预防**：`phase-5-coding.md` 禁止行为节新增 #7（角色越权：`authRequired` 仅校验 token 存在未校验角色），新增「角色校验清单」节（5 项检查：`requiredRole` 显式声明 / 与需求设计角色枚举一致 / token 解码后断言 `token.role ∈ requiredRoles` / 单元测试覆盖跨角色越权 / 系统测试覆盖越权用例）。预防 P7-001 类缺陷。
+
+4. **P3.2 phase-3-outline-design.md 跨模块数据源选择约束**：`phase-3-outline-design.md` 新增「跨模块数据源选择约束」节（显式声明 / schema 一致 / token sub 对齐三项要求），`phase-4-detailed-design.md` 同步约束节（不得在详细设计阶段变更 store 选择）。预防 P7-002 / P7-003 类缺陷。
+
+5. **P3.3 phase-5-coding.md 副作用时序一致性**：`phase-5-coding.md` 禁止行为节新增 #8（副作用时序不一致：响应体字段返回副作用自增前的旧值），新增「副作用时序一致性清单」节（4 项检查：副作用在响应体构造前完成 / 响应体字段反映已生效状态 / 单元测试覆盖一致性 / 系统测试覆盖时序用例）。预防 P7-004 类缺陷。
+
+6. **P3.4 phase-7-system-test.md 检测条款**：`phase-7-system-test.md` 禁止行为节新增 #7（系统测试未覆盖跨模块数据流 / 角色越权 / 副作用时序一致性检测），强制系统测试用例包含三类场景。
+
+7. **P4.1 checkpoint-logic.ts 关键词集合注释 + phase-8-acceptance-test.md 决策关键词约束**：`checkpoint-logic.ts` 在 `ID_PATTERNS` / `TECH_KEYWORDS` 定义前新增注释块（用途 / 扩展规则 / 与 R2 关系），明确当前集合为 5 个 ID 模式 + 37 个技术关键词（16 英文 + 21 中文）。`phase-8-acceptance-test.md` 新增「acknowledgedDecisions 决策条目须含关键词」节。第 15 轮共性问题 C 闭环。
+
+8. **P4.2 operational-recovery.md JSON 文件写入工具选择**：`operational-recovery.md` 新增「JSON 文件写入工具选择」节，强制 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`（BOM + 深度 + 中文乱码）。第 15 轮共性问题 A 闭环。
+
+9. **P4.3 tla-plus-guide.md §checkRounds 字段类型修正 + 禁止字段节**：`tla-plus-guide.md` §checkRounds 字段表 `violations` 类型从 `number` 改为 `string[]`（与 `tla-logic.ts` 类型定义一致），新增「禁止字段（phase 级摘要）」节 + spec 级语义明确。
+
+10. **反模式 #22~#26 新增**：`anti-patterns.md` 新增 5 条反模式——#22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用。目录 / 命中高发阶段表 / 与门禁脚本对应关系表 / 检测信号与回退命令表同步 #22~#26。`SKILL.md` 快速自检补「JSON 文件写入工具」+「acknowledgedDecisions 关键词」两条。
+
+**不涉及范围**：不重建 `w-model-dev-demo/`（第 15 轮调测后归档不入库，本轮仅在 reference 补强预防条款）；不修改 `verifier-spec.md`（V 评审 schema 不变，靠 reworkHints 标注新反模式）；不修改 `check-artifact-gate.ts` / `check-requirement-graph.ts` / `check-verifier-output.ts`（脚本层仅 `tla-logic.ts` + `check-tla-model.ts` + `checkpoint-logic.ts` 改动）；不引入新门禁脚本（#22~#24 靠 V 评审 + 系统测试用例守护，#25 靠 run-log note 字段检测 + 编排者自检，#26 靠现有 `check-run-log.ts` R1 校验）。
+
 ---
 
 ## 4. 技能工作流程

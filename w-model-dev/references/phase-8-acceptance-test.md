@@ -142,6 +142,25 @@
 | 5 | 验收用例只覆盖 happy path | UAT 必须覆盖正常流程 + 异常流程 + 边界场景 |
 | 6 | 文档完整性只检查文件存在 | 必须对照 [templates/](../templates/) 8 个模板逐一核验内容完整性 |
 
+### acknowledgedDecisions 决策条目须含关键词
+
+> 第 15 轮共性问题 C：`acknowledgedDecisions` 多次因未含 ID 模式或 `TECH_KEYWORDS` 返工。第 16 轮 P4.1 补充约束。
+
+每条 `acknowledgedDecisions`（[run-log.jsonl](data-models.md) 的 `RunLogEntry.acknowledgedDecisions` 字段）须命中以下任一，否则触发 [`check-checkpoint.ts`](../scripts/check-checkpoint.ts) R2 名词违规：
+
+- **ID 模式**（正则匹配，5 个）：
+  - `REQ-\d+`（需求 ID，如 `REQ-001`）
+  - `SD-[\d.]+`（系统设计 ID，如 `SD-5.2.1`）
+  - `INTF-[\d.]+`（接口设计 ID，如 `INTF-3.1.2`）
+  - `DD-[\d.]+`（详细设计 ID，如 `DD-4.2.3`）
+  - `TC-\w+-\d+`（测试用例 ID，如 `TC-UNIT-001`、`TC-INT-012`）
+
+- **技术关键词**（中英，37 个）：
+  - **英文（16 个）**：`REST` / `GraphQL` / `JWT` / `OAuth` / `SQLite` / `PostgreSQL` / `Redis` / `Koa` / `Express` / `React` / `Vue` / `TypeScript` / `WebSocket` / `HTTP` / `API` / `CRUD`
+  - **中文（21 个）**：`认证` / `鉴权` / `缓存` / `存储` / `模块` / `接口` / `表` / `字段` / `状态机` / `不变式` / `需求` / `设计` / `架构` / `数据库` / `前端` / `后端` / `网关` / `队列` / `事务` / `锁` / `索引`
+
+泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释，第 16 轮 P4.1 补充）。
+
 ## 返工路径
 
 | 失败场景 | 根因定位 | 返工目标 |

@@ -215,6 +215,61 @@ npm run hill-climbing                           # （编排者 O 执行）L2+ �
 
 > 第十四轮（2026-07-26）相比第十三轮：吸收 SkillOpt「bounded edit + validation gate」方法论（非工具运行），建立 Loop 4 信号标准消费路径。新增 skillopt-adoption.md 采用指南 + SSoT §10H。10 信号覆盖 4 类资产（技能/模板/参考/脚本），低风险 8 信号（prompt 措辞）+ 高风险 2 信号（R11 summary 长度≥50 + R12 evidence 具体引用 + 方差重算边界保护）。valid.json summary 同步扩展至 ≥50 字符。候选反模式 #22 标 pending V 复审。
 
+- **端到端调测结论**（2026-07-26，第十五轮，扩展博客系统 32 需求，self-as-verifier 自驱模式）：
+
+| 指标 | 数值 |
+|---|---|
+| 触发 | 用户要求「移除 w-model-dev-demo 所有产物，进行完整 8 阶段调测」，按正常流程不遗漏地跑全部流程，发现其中问题 |
+| 范围 | 扩展博客系统后端（w-model-dev-demo，临时重建，本轮调测后归档不入库） |
+| 需求 | 32 项（22 REQ + 6 NFR + 4 CON） |
+| 设计 | 22 SD + 22 INTF + 75 DD |
+| TLA+ 规格 | 22 个（1 L1 + 9 L2 + 7 L3 + 5 L4），SANY+TLC 零违反 |
+| 图谱 | 156 节点 576 边，信息流零违反，EXT-IN/EXT-OUT 边界完整 |
+| 源码 | 60 TS 文件（13 controllers + 19 services + 12 stores + 4 middlewares + 7 utils + 5 根模块） |
+| 单元测试 | 708/708 通过，代码覆盖率 98.66% lines（NFR-004 要求 ≥ 80%） |
+| 集成测试 | 74/74 通过（含 4 横切：IT-perf/IT-sec/IT-rate/IT-audit） |
+| 系统测试 | 35/35 通过（含 P95≤200ms / 内存≤100MB / 1000 请求错误率 0% / 限流 100req/min） |
+| 验收测试 | 72/72 通过（覆盖 32 需求 × 正常+异常+边界） |
+| 全量测试 | 889/889 通过（708 单元 + 74 集成 + 35 系统 + 72 验收） |
+| 阶段门评审 | phase1=0.878/A、phase2=0.881/A、phase3=0.890/A、phase4=0.900/A、phase5=0.922/A、phase6=0.89/A、phase7=0.902/A、phase8=0.91/A |
+| code-TLA+ 一致性回归 | 阶段 5 退出码 0，四维度全通过（SD→codeModule 22/22 + 状态转移 142 项 + Next 分支 + 不变式断言） |
+| 工件质量门 | check-artifact-gate 终检 exitCode=0，RTM 100%，missingItems=[] |
+| 用户确认 | `confirm`（2026-07-26 self-as-verifier 模式调测者代签；currentPhase=9，project.json status=项目完成） |
+
+> 第十五轮（2026-07-26）相比第十二轮（32 需求端到端调测）：按用户「按正常流程不遗漏地跑全部流程，发现其中问题」的指令重新跑端到端调测。规模对齐第十二轮（32 需求/22 SD/22 INTF/75 DD/22 TLA+）。全量测试 407→889（单元 250→708、集成 69→74、系统 25→35、验收 63→72），覆盖率 93.63%→98.66% lines。本轮调测共发现 **32 个流程问题**（31 个已修复 + 1 个遗留：阶段 3 `tla-manifest.json checkRounds 语义不一致`，影响小非阻塞），其中跨阶段共性问题 7 类：
+> 1. **PowerShell ConvertTo-Json 不稳定**：BOM 编码 + 深度问题导致 graph.json 损坏，统一改用 Node.js `fs.writeFileSync` 写 JSON
+> 2. **RunLogEntry 与 EventIngress schema 混淆**：阶段 1 初始化误用 `eventId`/`eventType` 字段，应为 `runId`/`action`/`role`/`outcome` 等字段
+> 3. **acknowledgedDecisions 需含 ID 模式或 TECH_KEYWORDS**：check-checkpoint R2 强制要求「REQ-NNN / INTF-NNN / 接口 / 状态机 / 不变式」等关键词，"同意"/"确认" 视为空
+> 4. **tla-manifest.json checkRounds schema 混淆**：阶段 3 子代理误把 phase 级摘要写入 checkRounds，应为 spec 级返工记录或空数组
+> 5. **TLA+ 头注解 @child/@sibling 与 manifest 双向同步缺失**：阶段 2/3/4 多次因头注解为 null 但 manifest 非空触发 headerViolations
+> 6. **budget.updatedAt 不能等于 createdAt**：隐含约束，更新时须同步推进 updatedAt
+> 7. **check-run-log.ts / check-checkpoint.ts cwd 敏感性**：R6 gateLogPath 索引相对路径，须在 `w-model-dev-demo/` 目录下运行
+
+> 第十五轮发现的设计层缺口（非阻塞，遗留待后续迭代修复，源自 stage 7 system test）：
+> - **P7-001** reader 可发博文（authRequired 未校验角色）—— `tests/system/st-007-009-user.test.ts`
+> - **P7-002** BloggerService.follow 校验 follower 在 blogger store（设计标注为 user+）—— `tests/system/st-026-e2e.test.ts`
+> - **P7-003** CommentService.create 仅校验 user store（blogger token sub 是 bloggerId）—— `tests/system/st-027-030-memory-exception.test.ts`
+> - **P7-004** PostController.get 响应体返回 recordView 自增前旧 viewCount —— `tests/system/st-026-e2e.test.ts`
+>
+> 这些是参考实现 demo 层的设计缺口，非技能包脚本缺陷。它们揭示了 self-as-verifier 模式下"调测者代签"无独立 V 校验设计一致性的局限——建议后续在反模式 #22（V 评审 summary 模板化）解决时一并处理。
+
+- **第十六轮：遗留问题与设计层缺口闭环**（2026-07-26）：
+
+| 指标 | 数值 |
+|---|---|
+| 触发 | 第 15 轮端到端调测归档后识别 9 项问题（1 遗留 #14 + 4 demo 层设计缺口 P7-001~P7-004 + 4 技能包侧设计缺口） |
+| 修正方案 | 方案 A 全量修正：技能包侧预防 demo 缺陷（不重建 demo）+ 脚本文档双改闭环 #14 + 反模式补强 |
+| 脚本改动 | 3 个（`tla-logic.ts` 新增 R13 checkRounds schema 校验 + `check-tla-model.ts` JSON 摘要新增 checkRoundsViolations + `checkpoint-logic.ts` ID_PATTERNS/TECH_KEYWORDS 注释补充） |
+| 新增 fixture | 1 个（`samples/tla/bad-checkrounds-phase-summary.json`，R13 触发） |
+| reference 文档 | 8 个（tla-plus-guide / data-models / phase-3-outline-design / phase-4-detailed-design / phase-5-coding / phase-7-system-test / phase-8-acceptance-test / operational-recovery） |
+| 反模式新增 | 5 条（#22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用） |
+| 顶层文档 | 3 个（SSoT §3.4.11 + AGENTS.md §4 + CHANGELOG.md [16.0.0]） |
+| self-test | 基线 94→95（+1 R13 样本）全通过 |
+| vitest | 76/76 或 77+/77+ 全通过 |
+| TypeScript strict | 0 错误 |
+
+> 第十六轮（2026-07-26）相比第十五轮（端到端调测）：从「demo 层调测发现 32 问题」进化为「技能包侧预防条款补强」，不重建 demo 仅在 reference 补强约束。`tla-logic.ts` 从「类型定义不校验」进化为「R13 schema 校验强制拦截 phase 级摘要」。`data-models.md` 从「RunLogEntry/EventIngress 分散定义」进化为「显式 Schema 边界对照表禁止混用」。`anti-patterns.md` 从「21 条」扩展为「26 条」，覆盖角色越权 / 跨模块 store 误用 / 副作用时序 / PowerShell 写入 / 字段混用 5 类高发陷阱。第 15 轮遗留 #14（checkRounds 语义不一致）+ 共性问题 A（PowerShell 写入）/ B（字段混用）/ C（acknowledgedDecisions 关键词）/ D（checkRounds phase 级摘要）全部闭环。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：

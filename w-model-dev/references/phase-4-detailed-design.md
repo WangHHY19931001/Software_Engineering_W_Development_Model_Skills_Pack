@@ -97,6 +97,16 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（详细设计）、单元测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+## 跨模块数据源选择约束（同步 phase-3）
+
+> 详细设计文档须列出每个跨模块调用的数据源选择，与 phase-3 接口设计一致。第 16 轮 P3.2 新增。详见 [phase-3-outline-design.md「跨模块数据源选择约束」](phase-3-outline-design.md#跨模块数据源选择约束)。
+
+- 每个跨模块调用须在详细设计中显式声明所用 store（写入类图/方法定义的「依赖」或「数据源」字段）
+- store 选择须与 phase-3 接口设计一致（**不得在详细设计阶段变更 store 选择**）
+- 如需变更 → 回 phase-3 返工接口设计，再回 phase-4 同步详细设计
+
+**违反后果**：编码阶段按错误 store 实现触发跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 + phase-4 双返工。关联反模式 [#23 跨模块 store 误用](anti-patterns.md)。
+
 ## ingestion 子流程（S→A 路径，阶段 4）
 
 阶段 4 的 S 子代理先产出 detailed-design.md，再由 A-evolve 提取 DD 节点追加到 `graph.json`，G 跑 `check-requirement-graph.ts --phase=4` 校验全部追溯项。

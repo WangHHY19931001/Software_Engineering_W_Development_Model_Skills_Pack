@@ -68,6 +68,28 @@ const BLACKLIST = new Set<string>([
   '同意',
 ]);
 
+/**
+ * R2 决策内容具体性校验的关键词集合（ID_PATTERNS + TECH_KEYWORDS）。
+ *
+ * 用途：每条 acknowledgedDecision 须命中 ID_PATTERNS 任一正则 OR TECH_KEYWORDS 任一关键词，
+ *      否则 R2 报"名词违规"（决策内容无具体名词）。详见 R2 校验逻辑（checkpoint-logic.ts §R2）。
+ *
+ * 扩展规则（重要）：
+ *   - ID_PATTERNS 新增需求/设计/测试 ID 模式时，须同步更新：
+ *     - w-model-dev/references/tla-plus-guide.md（如 TLA+ 相关 ID 模式）
+ *     - w-model-dev/references/data-models.md（如数据模型相关 ID 模式）
+ *     - w-model-dev/references/rtm-guide.md（如 RTM 相关 ID 模式）
+ *   - TECH_KEYWORDS 新增技术关键词时，须与 project.json techStack 字段对齐；
+ *     新增前在 w-model-dev/references/phase-8-acceptance-test.md「acknowledgedDecisions 决策条目须含关键词」节登记。
+ *
+ * 与 R2 关系（评估顺序）：
+ *   - 命中黑名单（BLACKLIST）→ 报黑名单违规（同条决策不再重复报长度/名词）
+ *   - 长度 < 10 → 报长度违规（同条决策不再重复报名词）
+ *   - 无 ID_PATTERN 命中 且 无 TECH_KEYWORD 命中 → 报名词违规
+ *
+ * 当前集合（共 5 个 ID 模式 + 37 个技术关键词：16 个英文 + 21 个中文）由第 16 轮 P4.1 补充注释。
+ * 来源：第 15 轮调测共性问题 C（acknowledgedDecisions 多次因未含 ID/关键词返工）。
+ */
 // 具体名词识别：ID 模式（满足任一即通过）
 const ID_PATTERNS: RegExp[] = [
   /REQ-\d+/,

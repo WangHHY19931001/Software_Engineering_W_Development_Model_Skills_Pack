@@ -3,6 +3,155 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [16.0.0] - 2026-07-26
+
+### 第十六轮 遗留问题与设计层缺口闭环
+
+全量修正第 15 轮端到端调测归档后识别的 9 项问题（1 遗留 #14 + 4 demo 层设计缺口 P7-001~P7-004 + 4 技能包侧设计缺口），新增 5 条反模式 #22~#26，闭环第 15 轮共性问题 A/B/C/D。设计 spec：[`docs/superpowers/specs/2026-07-26-round16-residual-and-design-gap-closure-design.md`](./docs/superpowers/specs/2026-07-26-round16-residual-and-design-gap-closure-design.md)。
+
+#### 新增
+
+- **tla-logic.ts R13 checkRounds schema 校验**：元素须含 `phase`/`round`/`specId`/`syntaxCheck`/`tlcCheck`/`violations`/`converged`，禁止 `phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary` 等 phase 级摘要字段（第 15 轮遗留 #14 闭环）
+- **data-models.md RunLogEntry vs EventIngress Schema 边界对照表**：显式区分两 schema 字段（标识/时间戳/阶段/动作/角色/结果/决策/耗时/影响范围/备注/门禁归档），禁止混用（第 15 轮共性问题 B 闭环）
+- **phase-5-coding.md 禁止行为 #7（角色越权）+ 角色校验清单节**：预防 P7-001 类缺陷（reader 可发博文）
+- **phase-5-coding.md 禁止行为 #8（副作用时序一致）+ 副作用时序一致性清单节**：预防 P7-004 类缺陷（响应体返回旧 viewCount）
+- **phase-3-outline-design.md 跨模块数据源选择约束节 + phase-4-detailed-design.md 同步约束**：预防 P7-002/P7-003 类缺陷（跨模块 store 误用）
+- **phase-7-system-test.md 禁止行为 #7（跨模块/角色/时序检测）**：系统测试阶段强制覆盖三类场景
+- **operational-recovery.md JSON 文件写入工具选择节**：强制 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json`/`Add-Content`/`Out-File`/`Set-Content`（第 15 轮共性问题 A 闭环）
+- **anti-patterns.md #22~#26**：5 条新反模式覆盖角色越权 / 跨模块 store 误用 / 副作用时序 / PowerShell 写入 / 字段混用；目录 / 命中高发阶段表 / 与门禁脚本对应关系表 / 检测信号与回退命令表同步
+- **checkpoint-logic.ts ID_PATTERNS / TECH_KEYWORDS 注释补充**：集合用途 / 扩展规则 / 与 R2 关系（5 个 ID 模式 + 37 个技术关键词：16 英文 + 21 中文）（第 15 轮共性问题 C 闭环）
+- **phase-8-acceptance-test.md acknowledgedDecisions 关键词约束节**：显式列出 ID 模式 + 技术关键词集合
+- **SKILL.md 快速自检补两条**：JSON 文件写入工具（反模式 #25）+ acknowledgedDecisions 关键词（R2 校验；与反模式 #26 字段混用同属 schema 边界约束但维度不同：#26 管字段归属 R1，本条管字段内容 R2）
+- **1 新 fixture**：`samples/tla/bad-checkrounds-phase-summary.json`（R13 触发，含 `phaseSummary` 禁止字段）
+- **1 新 self-test 样本**（基线 94→95）：R13 checkRounds schema 校验
+
+#### 变更
+
+- `tla-plus-guide.md` §checkRounds 字段表 `violations` 类型从 `number` 改为 `string[]`（与 `tla-logic.ts` 类型定义一致，P4.3）
+- `tla-plus-guide.md` §checkRounds 新增「禁止字段（phase 级摘要）」节 + spec 级语义明确
+- `check-tla-model.ts` JSON 摘要输出新增 `checkRoundsViolations` 字段 + 控制台输出新增 checkRounds 行
+- `data-models.md` tla-manifest.json 节 checkRounds 字段说明对齐 tla-plus-guide.md
+- SSoT §3.4 新增 §3.4.11「第 16 轮：遗留问题与设计层缺口闭环」
+- AGENTS.md §4 追加第十六轮结论
+
+#### 验证
+
+- TypeScript strict: 0 错误
+- self-test: 95/95 全通过（基线 94→95）
+- vitest: 76/76 或 77+/77+ 全通过
+- R13 手动验证：`bad-checkrounds-phase-summary.json` 触发 R13 退出码 1，输出 `R13: checkRounds[0] 含禁止字段 phaseSummary`
+- 文档一致性：`tla-plus-guide.md` §checkRounds ↔ `data-models.md` ↔ `tla-logic.ts` / `anti-patterns.md` #22~#26 ↔ phase-3/4/5/7/8 ↔ `SKILL.md` / SSoT §3.4.11 ↔ AGENTS.md §4 ↔ CHANGELOG [16.0.0]
+
+## [15.0.0] - 2026-07-26
+
+### 第十五轮 端到端调测（self-as-verifier 自驱）
+
+按用户「移除 w-model-dev-demo 所有产物，进行完整 8 阶段调测」「按正常流程不遗漏地跑全部流程，发现其中问题」指令，临时重建 w-model-dev-demo 跑完整 8 阶段。规模对齐第十二轮（32 需求 / 22 SD / 22 INTF / 75 DD / 22 TLA+ / 60 TS 源文件）。本轮调测共发现并修复 32 个流程问题，归档不入库。
+
+#### 调测产出（不入库，临时参考）
+
+- 32 需求 + 72 UAT + 22 INTF + 75 DD + 22 TLA+ 规格（1 L1 + 9 L2 + 7 L3 + 5 L4）
+- 60 TS 源文件 + 708 单元测试（98.66% lines）+ 74 集成测试 + 35 系统测试 + 72 验收测试 = 889 测试全通过
+- 8 阶段门禁全 exitCode=0（V 评分 phase1=0.878/A ~ phase8=0.91/A）
+- 终检 check-artifact-gate.ts exitCode=0，RTM 100%，code-TLA+ 一致性四维度全通过
+
+#### 阶段1发现并修复（5 问题）
+
+1. **TLA+ 文件首行注释语法** `(\*` → `(*`（SANY 标准块注释语法）
+2. **L1 模型死锁**：当 `served=MAX_SERVED` 时 Next 不使能，新增 `ResetCounter` 动作对齐 NFR-006 限流窗口重置
+3. **maturity.json schema 不符**：`level` 应为 `"L2"` 字符串（非数字 2），缺 `unlockConditions` / `downgradeTriggers` 字段，`history` 条目结构不符
+4. **run-log.jsonl 不符 RunLogEntry schema**：误用 `eventId` / `eventType` / `decisions` 字段（event-ingress schema），应为 `runId` / `action` / `role` / `outcome` 等字段
+5. **缺 checkpoint-log 用户确认文件**：check-checkpoint.ts R3 校验需 `.w-model/checkpoint-log/phase-N.txt`，初始化时未创建
+
+#### 阶段2发现并修复（4 问题）
+
+6. **budget.json updatedAt == createdAt** 触发 check-budget.ts 失败，更新时须同步推进 updatedAt
+7. **L2_comment.tla 不变式含 primed 变量**：TLC 只能检查状态不变式，移除伪不变式，终态不可逆性由守卫保证
+8. **L1 头注解 @child / @requirement 需同步更新**：phase 2 追加 9 个 L2 子规格后须补头注解 @child 与 @requirement
+9. **L2 头注解 @sibling 需显式列出同级**：manifest.siblings 含 8 个同级 spec 时，头注解 @sibling=null 触发 headerViolations
+
+#### 阶段3发现并修复（4 问题 + 1 遗留）
+
+10. graph-guide 语义不一致
+11. IT 模板 seam 字段缺失
+12. L3 parent 双向一致（manifest + 头注解）
+13. **acknowledgedDecisions 不含阶段关键词**：check-checkpoint R2 要求 ID 模式（REQ-/INTF-/DD-/TC-）或 TECH_KEYWORDS（JWT/HTTP/状态机/不变式/接口），"同意"/"确认" 视为空
+14. **tla-manifest.json checkRounds 语义不一致**（遗留）：子代理误把 phase 级摘要写入 checkRounds，应为 spec 级返工记录或空数组
+
+#### 阶段4发现并修复（3 问题）
+
+15. **TLA+ 死锁**（4 个 L4 规格）：blog_state_machine / comment_workflow / token_bucket / audit_log_rotation TLC 报 Deadlock reached → 添加 `QueryState` 只读查询操作（无守卫，始终 enabled）
+16. **L3 头注解 @child=null 但 manifest.children 非空**：4 个 L3 规格需补头注解 @child 为对应 L4 路径
+17. **SANY 类路径问题**：`java tla2sany.SANY` 报找不到类 → 用绝对路径 `java -cp "...\tla2tools.jar" tla2sany.SANY`
+
+#### 阶段4 V+G 评审发现并修复（2 问题）
+
+18. **tla-manifest.json checkRounds schema 不符**：清空为 `[]`（匹配 valid.json 规范样例 + 零返工语义）
+19. **R6 gateLogPath 不匹配**：缺 phase4-budget.log / phase4-maturity.log，真实运行脚本重定向 stdout 到对应 .log 文件
+
+#### 阶段5发现并修复（2 问题）
+
+20. **graph.json 被 PowerShell ConvertTo-Json 损坏**：PowerShell ConvertTo-Json 深度/编码问题导致文件仅剩 BOM → 新建 `generate-graph.mjs`（Node.js ESM）依据 detailed-design.md / requirement-spec.md / tickets.md 重建 156 节点 512 边
+21. **check-artifact-gate.ts 路径问题**：查找 `.w-model/tla-manifest.json`，但项目 manifest 在 `tla/tla-manifest.json` → 复制 manifest 到 `.w-model/`
+
+#### 阶段6发现并修复（3 问题）
+
+22. **subcriteria 名字与脚本固定集合不一致**：任务给出 `coverage / contract-validation / cross-module-validation / isolation / realism`，但 `verifier-logic.ts` `SUB_CRITERIA.test` 强制固定为 `coverage / correctness / independence / clarity / priority-reasonableness` → 在 description 字段说明五轴维度到 §7.4 标准名的映射关系
+23. **acknowledgedDecisions 不含 ID 模式或 TECH_KEYWORDS**：第 2/3 条决策未含关键词 → 修正为「REQ-001~REQ-022 与 INTF-001~INTF-022 接口契约」「JWT 鉴权 + 状态机 + 不变式校验」
+24. **PowerShell 5 UTF-8 中文乱码**：Add-Content 追加 run-log 时中文被 GBK 误解析 → 改用 Node.js `fs.writeFileSync` 直接写 UTF-8
+
+#### 阶段7发现并修复（3 问题）
+
+25. **maturity.json completedCycles 需同步更新**：project.json status 改为「验收测试」后 STATUS_TO_PHASES 映射 completedPhases=8，触发 R3 检查 `completedCycles < Math.floor(8/8)=1`，原 completedCycles=0 导致失败 → 更新为 1
+26. **acknowledgedDecision R2 合规修复**：第 2 条决策「RTM 22 REQ 行...」原未含 TECH_KEYWORD 或 ID_PATTERN → 改为「需求 REQ-001~REQ-022 行」
+27. **check-run-log.ts cwd 敏感性**：R6 gateLogPath 索引相对路径，须从 `w-model-dev-demo/` 目录运行
+
+#### 阶段8发现并修复（4 问题）
+
+28. **PowerShell 编码问题**：Add-Content -Encoding UTF8 导致中文乱码，改用 Node.js `fs.writeFileSync`
+29. **R1 动作完整性**：phase 8 初次只添加了 gate+checkpoint，缺少 chunk/cross/produce/review 动作，已补全
+30. **R2 决策具体性**：checkpoint 第三条决策未含具体技术名词，已添加 REQ-001/需求/接口/设计 关键词
+31. **脚本参数格式**：check-budget / check-checkpoint 需要文件路径而非目录路径作为首参
+
+#### 最终回归发现并修复（1 问题）
+
+32. **根目录 vitest 默认扫描会误扫 w-model-dev-demo/tests/**：根目录 `npx vitest run` 默认扫描全仓库 `*.test.ts`，会扫到 w-model-dev-demo/tests/ 下的 889 个测试，缺 JWT_SECRET 注入时 465 failed → 新增根目录 `vitest.config.ts` 限定 include 为 `w-model-dev/scripts/__tests__/**/*.test.ts`，exclude `w-model-dev-demo/**`
+
+#### 新增/变更文件
+
+- 新增 `vitest.config.ts`（根目录）：限定 vitest 扫描范围，避免误扫 w-model-dev-demo/tests/
+- 修改 `AGENTS.md` §4：追加第十五轮端到端调测结论表 + 32 问题归纳 + 7 共性问题 + 4 设计层缺口
+- 修改 `CHANGELOG.md`：追加 [15.0.0] 节
+
+#### 设计层缺口（非阻塞，遗留待后续迭代修复）
+
+源参考实现 demo 层（非技能包脚本缺陷），源自 stage 7 system test：
+
+- **P7-001** reader 可发博文（authRequired 未校验角色）
+- **P7-002** BloggerService.follow 校验 follower 在 blogger store（设计标注为 user+）
+- **P7-003** CommentService.create 仅校验 user store（blogger token sub 是 bloggerId）
+- **P7-004** PostController.get 响应体返回 recordView 自增前旧 viewCount
+
+#### 共性问题归纳（跨阶段）
+
+| # | 共性问题 | 影响阶段 | 修复方案 |
+|---|---|---|---|
+| A | PowerShell ConvertTo-Json 不稳定（BOM + 深度） | 5/6/7/8 | 统一改用 Node.js `fs.writeFileSync` 写 JSON |
+| B | RunLogEntry 与 EventIngress schema 混淆 | 1 | 用 `runId/action/role/outcome` 等字段，非 `eventId/eventType/decisions` |
+| C | acknowledgedDecisions 需含 ID 模式或 TECH_KEYWORDS | 6/7/8 | 「REQ-NNN / INTF-NNN / 接口 / 状态机 / 不变式」等关键词，「同意」视为空 |
+| D | tla-manifest.json checkRounds schema 混淆 | 3/4 | spec 级返工记录或空数组，非 phase 级摘要 |
+| E | TLA+ 头注解 @child/@sibling 与 manifest 双向同步缺失 | 2/3/4 | 头注解字段须与 manifest.children / siblings 集合一致 |
+| F | budget.updatedAt 不能等于 createdAt | 2 | 更新时同步推进 updatedAt |
+| G | check-run-log.ts / check-checkpoint.ts cwd 敏感性 | 6/7 | 在 `w-model-dev-demo/` 目录下运行（R6 gateLogPath 索引相对路径） |
+
+#### 验证
+
+- TypeScript strict: 0 错误
+- self-test: 94/94 通过（未改脚本）
+- vitest: 76/76 通过（未改脚本）
+- w-model-dev-demo: 889/889 通过（708 unit + 74 integration + 35 system + 72 acceptance）
+- 8 阶段门禁全 exitCode=0
+
 ## [14.1.0] - 2026-07-26
 
 ### 第 14.1 轮 参考实现 artifacts 清理

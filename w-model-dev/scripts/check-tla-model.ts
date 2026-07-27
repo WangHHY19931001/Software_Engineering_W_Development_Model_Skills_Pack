@@ -523,6 +523,7 @@ async function main(): Promise<void> {
   console.log(`覆盖率违反    : ${result.coverageViolations.length === 0 ? '无' : `${result.coverageViolations.length} 条`}`);
   console.log(`CFG 一致性    : ${result.cfgConsistencyViolations.length === 0 ? '无' : `${result.cfgConsistencyViolations.length} 条`}`);
   console.log(`CFG 结构      : ${result.cfgStructureViolations.length === 0 ? '无' : `${result.cfgStructureViolations.length} 条`}`);
+  console.log(`checkRounds   : ${result.checkRoundsViolations.length === 0 ? '无' : `${result.checkRoundsViolations.length} 条`}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -561,6 +562,7 @@ async function main(): Promise<void> {
         coverageViolations: result.coverageViolations,
         cfgConsistencyViolations: result.cfgConsistencyViolations,
         cfgStructureViolations: result.cfgStructureViolations,
+        checkRoundsViolations: result.checkRoundsViolations,
         environmentOk: result.environmentOk,
         environmentErrors: result.environmentErrors,
         violations: result.violations,
