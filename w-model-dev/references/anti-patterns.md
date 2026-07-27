@@ -79,6 +79,7 @@
 | #26（RunLogEntry 与 EventIngress 字段混用） | 阶段 1/6/7/8 | [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | 阶段 1-8（self-as-verifier 模式全阶段） | [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
 | #28（schema 前置校验缺失） | 阶段 1-8（所有 `*-logic.ts` 校验入口） | [data-models.md](data-models.md)「JSON Schema 强约束」节 |
+| #29（BDD 建模不符未回退） | 阶段 1-4 | [bdd-guide.md](bdd-guide.md)「不符处理流程」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -108,6 +109,7 @@
 | #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
 | #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（13 份） |
+| #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
 
 ## 命中后的处理流程
 
@@ -257,7 +259,7 @@
 
 **检测信号**（sig-008）：run-log 中阶段 6/7/8 的 GATE 条目缺 `--phase=N` 参数；或 gate JSON 输出中 phaseOption 字段缺失。
 
-## #29（候选，pending V 复审）V 评审 summary 模板化
+## C1（候选，pending V 复审）V 评审 summary 模板化
 
 **症状**：V 评审 summary 字段跨多个阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符，使用「评审通过」「质量良好」等空泛措辞。
 
@@ -300,7 +302,7 @@
 - self-test 基线 99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
 - vitest 90 测试全通过（9 个 .test.ts 文件）。
 
-### 反模式 #29：BDD 建模与需求/设计/TLA+ 不符未回退
+## #29 BDD 建模与需求/设计/TLA+ 不符未回退
 
 **危害**：BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段。
 
