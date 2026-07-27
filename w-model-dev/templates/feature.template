@@ -1,0 +1,49 @@
+# BDD features 文件模板（feature.template）
+# S-bdd 子代理产出 .feature 文件时套用本模板：复制本文件到 features/L<level>/L<level>_<system>-<num>.feature
+# 将所有 <...> 占位符替换为真实值；删除说明性注释（以 `# ` 开头且非 `# @` 头标注的行）
+# 权威设计：docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md
+# 可执行细则：references/bdd-guide.md §2-§3
+#
+# 文件命名规则：L<level>_<system>[_<subsystem>][_<atom>]-<feature-num>.feature
+#   L1 示例：L1_blog_system-001.feature
+#   L2 示例：L2_blog_system_auth-001.feature
+#   L3 示例：L3_blog_system_article_store-001.feature
+#   L4 示例：L4_blog_system_token_store_issue-001.feature
+#
+# 头标注 9 个字段全部必填（见 bdd-guide.md §2.2）；L1 @parent-features 填 (none)；L4 @child-features 填 (none)
+# Background 节七要素全部必填（见 bdd-guide.md §3.2）；值可空集时填 ()
+# scenario TAG 含 @REQ-NNN / @<UAT|ST|IT|UT>-NNN / @BDD-L<level>-<num> / @high|medium|low
+# BDD L4 ↔ TLA+ L3 最细粒度（原子方法级），@tla-spec 填同层 TLA+ L3 spec ID
+
+# @req: <REQ-NNN>
+# @design: <SD-X.Y.Z>
+# @system: <L>_<system_name>
+# @tla-spec: <L>_<system_name>
+# @state-machine: SM-<L>_<system_name>
+# @parent-features: <parent-feature-id> | (none)
+# @sibling-features: <sibling-feature-id> | (none)
+# @child-features: <child-feature-id> | (none)
+# @scenario-id-prefix: BDD-<L>
+Feature: <feature name>
+  <作为...>
+  <我希望...>
+  <以便...>
+
+Background:
+  # @states: <State1>, <State2>
+  # @initial-state: <State1>
+  # @terminal-states: <State2> | ()
+  # @accepting-states: <State2>
+  # @rejecting-states: <State1> | ()
+  # @transitions:
+  #   <State1> + <event1> -> <State2> [guard: <condition>] [action: <sideEffect>]
+  # @invariants:
+  #   <State2> => <condition>
+  Given 系统处于初始状态
+
+@REQ-NNN @UAT-NNN @BDD-L-001 @high
+Scenario: <scenario name>
+  Given 系统处于 "<State1>" 状态
+  When 用户执行 <event1>
+  Then 系统应转移到 "<State2>" 状态
+  And 不变式 "<State2> => <condition>" 应成立

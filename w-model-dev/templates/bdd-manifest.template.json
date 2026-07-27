@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "<project-id>",
+  "basePath": ".",
+  "currentPhase": 1,
+  "features": [
+    {
+      "id": "<L>_<system>-001",
+      "level": 1,
+      "filePath": "features/<L>/<L>_<system>-001.feature",
+      "scenarioCount": 1,
+      "stateMachineId": "SM-<L>_<system>",
+      "tlaSpecId": "<L>_<system>",
+      "reqIds": ["REQ-NNN"],
+      "designIds": ["SD-X.Y.Z"],
+      "parentFeatureIds": [],
+      "siblingFeatureIds": [],
+      "childFeatureIds": []
+    }
+  ],
+  "stateMachines": [
+    {
+      "id": "SM-<L>_<system>",
+      "level": 1,
+      "states": ["State1", "State2"],
+      "initialState": "State1",
+      "terminalStates": ["State2"],
+      "acceptingStates": ["State2"],
+      "rejectingStates": [],
+      "transitions": [
+        { "from": "State1", "event": "event1", "to": "State2" }
+      ],
+      "invariants": ["State2 => condition"]
+    }
+  ],
+  "checkRounds": [
+    {
+      "phase": 1,
+      "round": 1,
+      "timestamp": "2026-07-27T00:00:00Z",
+      "violations": [],
+      "converged": true
+    }
+  ]
+}
