@@ -10,11 +10,11 @@
 
 ## 1. 架构定位
 
-本技能是**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 npm 包、无 SDK）：
+本技能是**单纯的编排 + 校验脚本技能**，不包含任何编程式接入（无 TypeScript 引擎、无 SDK）：
 
 - **编排**：由 `w-model-dev/SKILL.md` 承载，Agent 读取后承担「编排者」角色，用自身工具执行 `/wm` 命令路由、状态维护与 CHECKPOINT 等待。
 - **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（S 产出 / V 评审 / G 门禁）执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
-- **校验脚本**：`w-model-dev/scripts/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/)；由 G 子代理在门禁节点执行 + 回填证据摘要（编排者可同步跑一次只读脚本看退出码，但不替代 G 的回填）。
+- **校验脚本**：`w-model-dev/scripts/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/) + 少量 devDependency（见 §2）；由 G 子代理在门禁节点执行 + 回填证据摘要（编排者可同步跑一次只读脚本看退出码，但不替代 G 的回填）。
 - **LLM-as-a-Verifier 评审**：由 V 子代理（即「外部 Agent」）按 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) 提示词执行，技能用校验脚本防输出漂移；编排者不得自评。
 - **技能自演化**：不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 
@@ -24,9 +24,14 @@
 
 - 一个支持「Skill 目录 + YAML frontmatter」机制的 AI Agent（如 Trae）
 - Agent 具备基础文件操作工具与可执行 Node/tsx 的 shell（PowerShell、Bash 等）
-- **仅运行门禁脚本时**需要 Node.js ≥20，以及 [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
+- **仅运行门禁脚本时**需要：
+  - Node.js ≥20
+  - [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
+  - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
+    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 9 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
+    - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` — 安全扫描基线（`npm run lint:security` 时使用，devDep）
 
-纯 Markdown 技能资产无需 Node.js 或 `npm install`；Node.js/tsx 只用于执行 `scripts/*.ts` 的确定性门禁。
+> 纯 Markdown 技能资产（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零 Node.js、零 `npm install`，可整目录拷贝分发；Node.js/npm/tsx/devDeps 仅用于执行 `scripts/*.ts` 的确定性门禁与回归基线。
 
 ---
 
@@ -50,18 +55,22 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 ```
 /path/to/agent/skills/w-model-dev/
-├── SKILL.md            # 入口：YAML frontmatter（name + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界
-├── references/         # 8 阶段细则 + verifier-spec.md（LLM-as-a-Verifier 评审规范）+ subagent-delegation.md（O/S/V/G 编排者-子代理边界）+ 数据模型 + RTM 指南 + 质量标准（按需加载）
-├── scripts/            # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
-│   ├── gate-logic.ts            # 工件质量门纯逻辑（单点事实源）
-│   ├── check-artifact-gate.ts   # 工件质量门 CLI（读 .w-model/rtm.json）
-│   ├── verifier-logic.ts        # VerifierOutput 校验纯逻辑（单点事实源）
-│   ├── check-verifier-output.ts # Verifier 输出校验 CLI（防 Agent 输出漂移）
-│   ├── graph-logic.ts           # 图谱结构门禁纯逻辑（阶段 1–4，含信息流校验：黑洞/奇迹/死模块/边界完整性）
-│   └── check-requirement-graph.ts # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯 + 信息流校验，退出码 0/1/2）
+├── SKILL.md            # 入口：YAML frontmatter（name + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界 + Bundled Resources 按需加载契约
+├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + anti-patterns.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南（按需加载，详见 SKILL.md Bundled Resources 表）
+├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
+├── schemas/            # 13 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest），由 schema-loader.ts 在 logic 层前置加载
+├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
+│   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause）
+│   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
+│   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
+│   ├── security-scan.ts         # eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
+│   ├── self-test.ts             # 回归基线（111 条样本）
+│   └── __tests__/               # vitest 单元测试（9 个 .test.ts + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
+
+> Skill 资产（除 `scripts/` 外）零依赖、零 Node.js，可整目录拷贝。`scripts/` 需在仓库根目录 `npm install` 一次以拉取 devDeps（ajv / eslint-plugin-security 等），详见 §2。
 
 > Agent 读取 `SKILL.md` 后承担「编排者」（O）角色：每阶段分派 **S 产出子代理**生成开发产物 + 测试设计 + RTM，分派 **V 评审子代理**按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，分派 **G 门禁子代理**跑 `scripts/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。编排者只做路由 + 状态 + CHECKPOINT + 持久化，**不得越权实施**（反模式 #10）。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
 
@@ -86,18 +95,28 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 ### 校验脚本可用性
 
-确认 Agent 能运行门禁脚本（需本地 `tsx`）：
+确认 Agent 能运行门禁脚本（需先在仓库根目录 `npm install` 拉取 devDeps，详见 §2）：
 
 ```bash
+# 首次：在仓库根目录安装 devDependencies（ajv / eslint-plugin-security / tsx 等）
+npm install
+
+# 验证脚本可执行 + schema 校验链路通：
 npx tsx "w-model-dev/scripts/check-verifier-output.ts"
-# 预期退出码 2，并输出用法；这同时证明脚本可执行且无依赖错误
+# 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
+
+# 验证安全扫描基线（exit 0 = 无新增风险）：
+npm run lint:security
 ```
 
 PowerShell：
 
 ```powershell
+npm install
 npx tsx "w-model-dev/scripts/check-verifier-output.ts"
 $LASTEXITCODE  # 预期为 2
+npm run lint:security
+$LASTEXITCODE  # 预期为 0
 ```
 
 ---
@@ -153,16 +172,25 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | 各阶段执行细则 | [../w-model-dev/references/](../w-model-dev/references) |
 | 编排者-子代理边界（O/S/V/G） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
 | LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
+| 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
+| JSON Schema 文件（draft-07，13 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
+| Schema 加载与校验工具 | [../w-model-dev/scripts/schema-loader.ts](../w-model-dev/scripts/schema-loader.ts) |
+| 安全扫描脚本（baseline 指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
+| 回归基线脚本（111 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
+| 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
+| 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/verifier-logic.ts](../w-model-dev/scripts/verifier-logic.ts) |
 | Verifier 输出校验 CLI | [../w-model-dev/scripts/check-verifier-output.ts](../w-model-dev/scripts/check-verifier-output.ts) |
 | 工件质量门逻辑 | [../w-model-dev/scripts/gate-logic.ts](../w-model-dev/scripts/gate-logic.ts) |
 | 工件质量门 CLI | [../w-model-dev/scripts/check-artifact-gate.ts](../w-model-dev/scripts/check-artifact-gate.ts) |
 | 图谱结构门禁逻辑 | [../w-model-dev/scripts/graph-logic.ts](../w-model-dev/scripts/graph-logic.ts) |
 | 图谱结构门禁 CLI | [../w-model-dev/scripts/check-requirement-graph.ts](../w-model-dev/scripts/check-requirement-graph.ts) |
+| TLA+ 行为门禁 CLI | [../w-model-dev/scripts/check-tla-model.ts](../w-model-dev/scripts/check-tla-model.ts) |
+| 代码-TLA+ 一致性回归 CLI | [../w-model-dev/scripts/check-code-tla-consistency.ts](../w-model-dev/scripts/check-code-tla-consistency.ts) |
+| Budget / RunLog / Maturity / Checkpoint / RootCause 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts) |
 | 图谱门禁与收敛准则 | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md) |
 | 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
 | 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |
-| 参考实现（端到端调测样本） | [../w-model-dev-demo/](../w-model-dev-demo) |
 | 设计文档（SSoT） | [./skill-design-document_SSoT.md](./skill-design-document_SSoT.md) |
 | LLM Verifier 集成设计 | [./llm-verifier-integration-design.md](./llm-verifier-integration-design.md) |
 | 项目导航 | [../README.md](../README.md) |
@@ -176,14 +204,18 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 ## 8. 常见问题
 
 **Q：安装需要联网或 API key 吗？**
-技能资产本身不需要——是纯 Markdown + 自包含 TypeScript 校验脚本，无内置 LLM 调用。
-但 Agent 在执行 LLM-as-a-Verifier 评审时需要调用其自身的 LLM，此时按 Agent 框架自身的鉴权方式处理（与技能无关）。
-运行校验脚本时需本地具备 `tsx`（首次 `npx tsx` 会按需拉取）。
+- **纯 Skill 资产**（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零联网，拷贝即可用。
+- **运行门禁脚本** 需联网一次 `npm install` 拉取 devDeps（`ajv` / `ajv-formats` / `eslint-plugin-security` 等，首次安装约 30MB）。之后离线可用。
+- Agent 在执行 LLM-as-a-Verifier 评审时需要调用其自身的 LLM，按 Agent 框架自身的鉴权方式处理（与技能无关）。
 
-**Q：为什么没有 `npm install` / `package.json`？**
-本技能是单纯的编排 + 校验脚本技能，不包含编程式 SDK。`/wm` 命令、状态持久化、RTM 维护
-均由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无需 Node 项目工程化。
-校验脚本仅依赖 `tsx` 运行 ESM，无任何业务依赖。
+**Q：为什么有 `package.json` + `npm install`？**
+Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/*.ts` 校验脚本：
+- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 9 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
+- **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` 指纹豁免）
+- **runtime**：`tsx`（运行 ESM TypeScript）
+
+`/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
+若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
 
 **Q：技能自演化在哪里？**
 不在本仓库。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具完成：

@@ -47,9 +47,9 @@
 
 ## 快速上手
 
-### AI Agent 安装（零依赖）
+### AI Agent 安装
 
-将 [`w-model-dev/`](./w-model-dev) 目录拷贝到你的 AI Agent（Trae / Claude Code 等）的 skills 目录即可。Skill 资产自包含：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` 按需加载，无需 Node.js 或 npm。
+将 [`w-model-dev/`](./w-model-dev) 目录拷贝到你的 AI Agent（Trae / Claude Code 等）的 skills 目录即可。**Skill 资产零依赖**：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` / `subagent/` / `schemas/` 按需加载，纯 Markdown 无需 Node.js 或 npm。
 
 ```bash
 # 拷贝 skill 目录到 agent 的 skills 位置（路径以你的 agent 为准）
@@ -60,18 +60,25 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 
 ### 运行门禁校验脚本
 
-技能包内的校验脚本（`w-model-dev/scripts/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本仅依赖 [tsx](https://tsx.is/) 运行 ESM，无任何业务依赖：
+技能包内的校验脚本（`w-model-dev/scripts/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本依赖 [tsx](https://tsx.is/) + 少量 devDependencies（在仓库根目录 `npm install` 一次）：
+
+- **runtime devDep**：`ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `schema-loader.ts` 在 9 个 `*-logic.ts` 顶部自动 import
+- **devDep（仅安全扫描用）**：`eslint-plugin-security` + `@typescript-eslint/*` — 由 `security-scan.ts` 调用
+- **runtime**：`tsx`（运行 ESM TypeScript）
 
 ```bash
-# 方式一：用 npm run 快捷脚本（需先在仓库根目录 npm install，安装 tsx 一次）
+# 首次：在仓库根目录安装 devDependencies（ajv / eslint-plugin-security / tsx 等）
 npm install
+
+# 用 npm run 快捷脚本：
 npm run check:verifier -- <output.json>     # 退出码 0/1/2
 npm run check:gate -- [project-dir]         # 退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，退出码 0/1/2
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>] [--skip-tlc]  # TLA+ 行为门禁，退出码 0/1/2
-npm run self-test                           # 退出码 0/1
+npm run self-test                           # 退出码 0/1（111 条样本回归基线）
+npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 
-# 方式二：用 npx tsx 按需拉取（无需 npm install，适合一次性使用）
+# 或用 npx tsx 直接调用：
 npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
 npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
 npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
@@ -81,7 +88,8 @@ npx tsx w-model-dev/scripts/self-test.ts
 ```
 
 > 脚本不调用任何 LLM，仅做结构化门禁判定。
-> `self-test.ts` 是校验逻辑的回归基线：每次修改 `gate-logic.ts` / `verifier-logic.ts` / `graph-logic.ts` 后必须跑通，新增校验项需同步增加样本。
+> `self-test.ts` 是校验逻辑的回归基线：每次修改 `*-logic.ts` 后必须跑通，新增校验项需同步增加样本（详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
+> 「I have X, I want Y → use Z」工具路由见 [`references/toolbox.md`](./w-model-dev/references/toolbox.md)。
 
 ### 门禁脚本增强（v2，2026-07-25）
 

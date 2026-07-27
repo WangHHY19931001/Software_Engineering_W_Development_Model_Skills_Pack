@@ -7,7 +7,7 @@
 
 **W-Model AI Assistant Skill** — 单纯的编排 + 校验脚本技能包：
 
-- **技能资产**（`w-model-dev/`）：纯 Markdown + 自包含 TypeScript 门禁脚本，**不内置 LLM 调用、不包含编程式引擎（无 `src/`、无 npm 包、无 SDK）**。
+- **技能资产**（`w-model-dev/`）：纯 Markdown + 自包含 TypeScript 门禁脚本，**不内置 LLM 调用、不包含编程式引擎（无 `src/`、无 SDK）**。门禁脚本依赖 `tsx` runtime + 少量 devDeps（ajv / eslint-plugin-security，详见 §2 / §3）。
 - **`/wm` 命令、状态持久化、RTM 维护** 由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行，状态写入项目内 `.w-model/*.json`。
 - **编排者最小化（Orchestrator Minimization）**：Agent 读取 `w-model-dev/SKILL.md` 后承担「编排者」角色，只做路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位）执行。详见 `w-model-dev/references/subagent-delegation.md`；违反命中反模式 #10，回到当前阶段起点。
 - **根因定位者（R）与修复者（F）**：V/G 不通过后，编排者分派 R 子代理接收 reworkHints + 失败产物 + 上游产物，运用根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位缺陷根因，产出 RootCauseReport；R 报告经 V 复审 + G 门禁（`check-rootcause-report.ts` 退出码 0）后，分派 S 兼任 F（修复者）携带 R 报告执行返工修复。详见 `w-model-dev/references/root-cause-locator.md`；跳过 R 直接 S 返工命中反模式 #18，R 报告未 V 复审直接 S-fix 命中反模式 #19。
@@ -25,7 +25,7 @@
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
 | `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A + summary 阶段 digest 三要素 §6.2）/ agent-personas（4 个评审角色提示词）/ subagent-delegation（O/A/S/V/G/R 编排者-子代理边界，A 为阶段 1–4 分析子代理，R 为返工根因定位子代理，F 由 S 兼任；O 维护 budget/run-log/maturity）/ root-cause-locator（R 子代理根因分析方法论：5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）/ subagent-persona-matrix（R-lead / V-lead 多角度 persona 选择矩阵，关联 `w-model-dev/subagent/` 28 个人格文件）/ definition-of-done（项目级 DoD 六维度含理解证据）/ event-ingress-guide（Loop 3 事件接驳：EventIngress schema + 路由表 + 消费方指引，L2+ 激活）/ hill-climbing-guide（Loop 4 爬坡循环：HarnessImprovementReport schema + 信号检测 + 报告消费流程）/ skillopt-adoption（SkillOpt 方法论吸收：bounded edit + validation gate 流程，消费 Loop 4 信号）/ anti-patterns（19 条流程反模式含 #10 编排者越权实施 + #11 ingestion 跳过图谱校验 + #12 A 自评收敛 + #13 信息流黑洞/奇迹/死模块放行 + #14 跳过 SANY 直接 TLC + #15 死锁/不变式违反放行 + #16 TLA+ 占位/简化/错误实现 + #17 TLA+ 建模不符需求/设计不回退 + #18 跳过 R 直接 S 返工 + #19 R 报告未 V 复审 + L1~L4 教训 + 失败模式 F1~F10 + 运维失败模式 O1~O6）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则，含信息流模型）/ tla-plus-guide（TLA+ 层次化状态机建模与行为门禁）/ command-reference / operational-recovery（含成本预算与运行日志节 + 成熟度与 CHECKPOINT 放行节）/ 数据模型（含 budget/run-log/maturity schema）/ RTM 指南 / 质量标准 | **按需加载**，禁止一次性载入全部（反例 #5） |
 | `w-model-dev/subagent/` | **人格库**（28 个 Markdown 文件，分 engineering / testing / design / product / project 5 类） | R-lead / V-lead 多角度分析时按 `references/subagent-persona-matrix.md` 选用 persona；Persona 文件本身是 Markdown，不调用 LLM |
-| `w-model-dev/scripts/` | 自包含门禁脚本（仅依赖 `tsx`）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `<report.json>`）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归检查点直接 `npx tsx` 执行 |
+| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `<report.json>`）/ `schema-loader.ts`（ajv 单例 + schemas/ 自动加载 + validateBySchema 工具，被 9 个 `*-logic.ts` 顶部自动 import）/ `security-scan.ts`（eslint-plugin-security 扫描 + baseline 指纹豁免）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线，111 条样本）/ `__tests__/`（vitest 单元测试 + README.md coverage 矩阵） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
 | `w-model-dev/schemas/` | JSON Schema (draft-07) 文件（13 份） | logic 层 schema 校验时自动加载；新增 .w-model/*.json 字段必先改 schema |
@@ -42,8 +42,11 @@
 ## 3. 常用命令
 
 ```bash
-# 校验脚本（自包含，仅依赖 tsx）
-npm run self-test                           # 66 条样本回归基线（13 Verifier + 7 Gate + 17 Graph + 13 TLA + 3 Budget + 4 RunLog + 2 Maturity + 2 Checkpoint + 5 Code-TLA+），退出码 0/1
+# 首次：在仓库根目录安装 devDependencies（ajv / ajv-formats / eslint-plugin-security / tsx / typescript / vitest 等，约 30MB）
+npm install
+
+# 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
+npm run self-test                           # 111 条样本回归基线（18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2
@@ -53,14 +56,14 @@ npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --gr
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
 
-# 手动跑推送前门禁（不实际推送）
+# 手动跑推送前门禁（不实际推送，6 项门禁检查）
 npm run prepush
 
 # Loop 4 改进信号分析（非门禁脚本，编排者 O 执行）
 npm run hill-climbing                           # （编排者 O 执行）L2+ 项目：分析 run-log 产出 HarnessImprovementReport；非门禁脚本，O 确定性分析
 
-npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1
-# schema 校验由 logic 层自动调用，无需独立命令
+npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1（devDep：eslint + @typescript-eslint/* + eslint-plugin-security）
+# schema 校验由 logic 层自动调用，无需独立命令（devDep：ajv + ajv-formats）
 ```
 
 退出码约定：`0 = 通过 / 1 = 校验失败 / 2 = 输入错误`。Agent 在 🔴 CHECKPOINT 处必须以脚本退出码为准，**不得用 LLM 估算**（反例 #3 / #6 / #7 / #12）。
@@ -323,7 +326,7 @@ npm run lint:security              # 跑 eslint-plugin-security + baseline 比�
 ## 6. 行动约束
 
 - **SSoT 优先**：修改设计决策先改 `docs/skill-design-document_SSoT.md`，再同步 `w-model-dev/` 资产（`SKILL.md` / `references/` / `scripts/` / `templates/`），最后同步 `README.md` / `CONTRIBUTING.md` / `AGENTS.md` / `CHANGELOG.md`。
-- **脚本自包含**：`w-model-dev/scripts/*.ts` 不得 `import` 任何 `src/` 或外部业务模块，仅依赖本目录内文件与 Node 标准库。
+- **脚本自包含**：`w-model-dev/scripts/*.ts` 不得 `import` 任何 `src/` 或外部业务模块，仅依赖本目录内文件 + Node 标准库 + 已声明 devDeps（`ajv` / `ajv-formats` 由 schema-loader.ts runtime import；`eslint-plugin-security` 等仅 security-scan.ts 调用）。devDep 增减必须在 `package.json` + INSTALL.md §2 同步。
 - **不引入 LLM 调用**：技能包内任何文件都不得直接调用 LLM；LLM-as-a-Verifier 评审通过提示词委托 V 子代理执行。
 - **CHECKPOINT 不可绕过**：`w-model-dev/SKILL.md` 中 `🔴 CHECKPOINT` 标记的暂停点必须等用户确认，不得自动推进。
 - **真实测试结果回填**：`/wm test` 不得自动将测试标记为通过，必须由真实测试运行器执行后通过 `result=pass|fail` 回填（由 S 子代理执行回填，编排者不得越权）。
