@@ -83,7 +83,7 @@ if [ ! -d node_modules ]; then
 fi
 
 # ---------- 门禁用例 ----------
-# 与原 CI 一致：5 项检查，退出码必须全部符合预期才放行。
+# 与原 CI 一致：6 项检查，退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 trap 'rm -f "$tmp_log"' EXIT
@@ -121,6 +121,10 @@ run_expect "check:verifier 有效样本退出 0" 0 \
 # 5. check:verifier 对无效样本应退出 1（校验失败）
 run_expect "check:verifier 无效样本退出 1" 1 \
   npm run check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json || exit 1
+
+# 6. security-scan：跑 eslint-plugin-security + baseline 比对，必须 exit 0
+run_expect "security-scan 无新增风险" 0 \
+  npx tsx w-model-dev/scripts/security-scan.ts || exit 1
 
 log "全部门禁通过，允许推送 ✓"
 exit 0

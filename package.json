@@ -11,12 +11,17 @@
     "check:graph": "tsx w-model-dev/scripts/check-requirement-graph.ts",
     "check:tla": "tsx w-model-dev/scripts/check-tla-model.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
+    "lint:security": "tsx w-model-dev/scripts/security-scan.ts",
     "prepush": "PREPUSH_FORCE=1 bash .githooks/pre-push"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
+    "eslint": "^8.57.1",
+    "eslint-plugin-security": "^1.7.1",
     "tsx": "^4.19.2",
     "typescript": "^5.3.3"
   },
