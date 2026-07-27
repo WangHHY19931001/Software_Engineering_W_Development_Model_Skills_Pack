@@ -31,9 +31,11 @@ import {
   type PhaseOption,
   type RTMMatrixShape,
 } from './gate-logic.js';
+import { validateBySchema } from './schema-loader.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
+const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
@@ -156,8 +158,69 @@ async function main(): Promise<void> {
     // ENOENT 或解析失败 → manifestExists 保持 false
   }
 
+  // ==================== BDD 资产读取（spec §13.2 #18） ====================
+  // 与 TLA+ manifest 校验对称：检查 bdd-manifest.json 存在性 + schema + features 文件存在性
+  // + stateMachines 七要素非空（states/acceptingStates/transitions/invariants）。
+  // 阶段 4 后才要求 bdd-manifest.json 存在（阶段 1-3 可能还未创建）。
+  const bddManifestFile = path.resolve(projectDir, BDD_MANIFEST_RELATIVE_PATH);
+  const bddViolations: string[] = [];
+  let bddManifestExists = false;
+  const effectivePhase: PhaseOption = phaseOption ?? 8;
+  try {
+    const bddRaw = await fs.readFile(bddManifestFile, 'utf-8');
+    const bddManifestParsed = JSON.parse(bddRaw) as unknown;
+    bddManifestExists = true;
+    const bddSchemaResult = validateBySchema('bdd-manifest', bddManifestParsed);
+    if (!bddSchemaResult.valid) {
+      bddViolations.push(`[artifact:bdd] manifest schema failed: ${bddSchemaResult.errorMessages.join('; ')}`);
+    } else {
+      const bddManifest = bddManifestParsed as {
+        basePath: string;
+        features: Array<{ filePath: string }>;
+        stateMachines: Array<{
+          id: string;
+          states: string[];
+          acceptingStates: string[];
+          transitions: unknown[];
+          invariants: string[];
+        }>;
+      };
+      // 检查 features 文件存在
+      const bddBasePath = path.resolve(projectDir, bddManifest.basePath);
+      for (const f of bddManifest.features ?? []) {
+        const fp = path.resolve(bddBasePath, f.filePath);
+        try {
+          await fs.access(fp);
+        } catch {
+          bddViolations.push(`[artifact:bdd] feature file missing: ${f.filePath}`);
+        }
+      }
+      // 检查 stateMachines 七要素非空
+      for (const sm of bddManifest.stateMachines ?? []) {
+        if (!sm.states?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no states`);
+        if (!sm.acceptingStates?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no accepting states`);
+        if (!sm.transitions?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no transitions`);
+        if (!sm.invariants?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no invariants`);
+      }
+    }
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code !== 'ENOENT') {
+      console.error(`⚠ bdd-manifest.json 读取失败（忽略，按不存在处理）: ${e.message}`);
+    }
+    // ENOENT 或解析失败 → bddManifestExists 保持 false
+  }
+  if (!bddManifestExists && effectivePhase >= 4) {
+    // 阶段 4 后必须有 BDD manifest
+    bddViolations.push('[artifact:bdd] .w-model/bdd-manifest.json missing (required after phase 4)');
+  }
+
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption，启用 TLA+ 资产校验与阶段分层）
   const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption });
+
+  // 合并 BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
+  const allReasons = [...result.reasons, ...bddViolations];
+  const overallPassed = result.passed && bddViolations.length === 0;
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -169,31 +232,33 @@ async function main(): Promise<void> {
   console.log(`RTM 覆盖率    : ${result.coveragePercent}%`);
   console.log(`单元覆盖率    : ${result.unitCoveragePercent}%`);
   console.log(`TLA+ 资产     : ${manifestExists ? '✓ manifest 存在且 specs 非空' : '✗ manifest 缺失或 specs 为空'}`);
+  console.log(`BDD 资产      : ${bddManifestExists ? '✓ bdd-manifest.json 存在且 schema 通过' : '✗ bdd-manifest.json 缺失或 schema 失败'}`);
   console.log(`graph 资产    : ${graph ? `✓ ${graphSource}（${graph.nodes.length} 节点）` : '⚠ 未发现任何 graph 资产'}`);
-  console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
+  console.log(`校验结果      : ${overallPassed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
-  if (result.passed) {
-    console.log('所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过。');
+  if (overallPassed) {
+    console.log('所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过（含 BDD 资产校验）。');
   } else {
     console.log('未通过原因：');
-    for (const r of result.reasons) {
+    for (const r of allReasons) {
       console.log(`  - ${r}`);
     }
   }
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = result.passed ? 0 : 1;
+  const exitCode = overallPassed ? 0 : 1;
   console.log('─'.repeat(60));
   console.log('GATE_JSON ' + JSON.stringify({
     type: 'artifact',
-    passed: result.passed,
+    passed: overallPassed,
     exitCode,
     coveragePercent: result.coveragePercent,
     unitCoveragePercent: result.unitCoveragePercent,
     missingItems: result.missingItems,
-    reasons: result.reasons,
+    reasons: allReasons,
+    bddManifestExists,
   }));
 
   process.exit(exitCode);
