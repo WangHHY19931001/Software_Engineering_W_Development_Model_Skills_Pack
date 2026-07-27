@@ -354,7 +354,7 @@ interface RunLogEntry {
   /** 阶段名称 */
   phaseName: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试';
   /** 动作类型 */
-  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix';
+  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';
   /** 子代理角色 */
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   /** 本次动作持续时间（秒） */
@@ -641,9 +641,11 @@ interface TlaManifest {
   project: string;
   /** 当前所处阶段（1-8） */
   currentPhase: number;
+  /** 路径解析基准（强制必填，P1.1）：相对 manifest 文件所在目录，jarPath/tlaPath/cfgPath 都基于此解析（见 tla-plus-guide.md §2.1） */
+  basePath: string;
   /** TLA+ 工具链配置 */
   tools: {
-    /** tla2tools.jar 路径，相对 cwd 解析（见 tla-plus-guide.md §2.1） */
+    /** tla2tools.jar 路径，相对 basePath 解析（P1.1 起统一基准，不再按 cwd 解析；见 tla-plus-guide.md §2.1） */
     jarPath: string;
     /** Java 最低版本（默认 11） */
     javaMinVersion: number;
@@ -720,7 +722,8 @@ interface TlaCheckRound {
 | `version` | `1` | 是 | Schema 版本 |
 | `project` | string | 是 | 项目 ID |
 | `currentPhase` | number | 是 | 当前阶段（1-8） |
-| `tools.jarPath` | string | 是 | jar 路径，相对 **cwd** 解析（见 [tla-plus-guide.md §2.1](tla-plus-guide.md#§21-路径解析基准)） |
+| `tools.jarPath` | string | 是 | jar 路径，相对 **basePath** 解析（P1.1 起统一基准，不再按 cwd 解析；见 [tla-plus-guide.md §2.1](tla-plus-guide.md#§21-路径解析基准)） |
+| `basePath` | string | 是 | 路径解析基准（强制必填，P1.1），相对 manifest 文件所在目录 |
 | `tools.javaMinVersion` | number | 是 | Java 最低版本 |
 | `specs[]` | TlaSpec[] | 是 | TLA+ 规格列表 |
 | `specs[].id` | string | 是 | 规格 ID，须符合 [§2.0 命名规范](tla-plus-guide.md#§20-命名规范)（禁止连字符） |

@@ -13,7 +13,7 @@
 - 命名约定是否一致（W 模型：PascalCase 模块名）
 - 是否有充分注释说明意图
 
-**W 模型增强**：文件头须含 @level/@sd/@parent/@sibling/@child 注解（见 [tla-plus-guide.md §文件头规范](./tla-plus-guide.md)）。
+**W 模型增强**：文件头须含 8 字段结构化注释头 @system/@requirement/@design/@parent/@sibling/@child/@level/@phase（见 [tla-plus-guide.md §文件头规范](./tla-plus-guide.md)）。
 
 ### 2. 正确性（Correctness）
 

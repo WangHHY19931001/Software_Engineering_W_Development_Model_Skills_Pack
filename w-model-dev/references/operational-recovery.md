@@ -145,7 +145,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 - [ ] 每阶段 S 产出后，复述硬约束清单（RTM 100% / TLA+ 零违反 / 信息流零违反 / exitCode 与 passed 一致 / acknowledgedDecisions 含关键词）
 - [ ] 每阶段 V 评审后，确认 reworkHints 非空（即使 passed=true 也有 FYI 提示）
-- [ ] 每阶段 G 门禁后，确认 7 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint；阶段 1-4 额外 check-tla-model / check-requirement-graph）
+- [ ] 每阶段 G 门禁后，确认 9 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint；阶段 1-4 额外 check-tla-model / check-requirement-graph / check-bdd-model）
 - [ ] 归档前确认 acceptance-test-report.md §9 用户确认区已勾选（self-as-verifier 模式须留代签痕迹）
 - [ ] 长会话（>20 轮）后重读 project_memory.md 硬约束 + 当前阶段 phase-N-*.md 摘要
 - [ ] BDD features 是否完整产出（每个 REQ/SD/INTF/DD 至少 1 个对应层级 .feature 文件）？

@@ -585,7 +585,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 2. **features 文件结构**：独立 .feature 文件（Gherkin 语法），文件头标注 `@req` / `@design` / `@system` / `@tla-spec` / `@state-machine` / `@parent-features` / `@sibling-features` / `@child-features` / `@scenario-id-prefix`，Background 节声明状态机七要素
 3. **状态机七要素约束**：states / initialState / terminalStates / acceptingStates / rejectingStates / transitions / invariants 全部必填（acceptingStates 不可为空，其余可为 `()`）
 4. **BDD↔TLA+ 等价性校验**：状态集等价 + 初始状态一致 + 转移集等价 + 不变式归一化匹配；不等价时走 R→V→G→S-fix 循环（反模式 #29）
-5. **门禁脚本**：`check-bdd-model.ts` 7 维度校验（D1 头标注 / D3 状态机 / D4 TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）+ `bdd-logic.ts` 纯逻辑 + `bdd-manifest.schema.json` 强约束
+5. **门禁脚本**：`check-bdd-model.ts` 7 维度校验（D1 头标注 / D2 Gherkin 语法 / D3 状态机 / D4 TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）+ `bdd-logic.ts` 纯逻辑 + `bdd-manifest.schema.json` 强约束
 6. **8 阶段产出时序**：阶段 1-4 产出对应层级 L1/L2/L3/L4 features + bdd-manifest.json；阶段 5 以 L4 features 作为 TDD 夹具；阶段 6/7/8 执行 L3/L2/L1 cucumber scenarios
 7. **BDD↔RTM 映射**：RTM 测试列字段值扩展为 `<Type>-NNN | BDD-L<level>-<system>-<num>.feature`，字段类型保持 `string | null` 不变
 8. **BDD↔verifier-spec 关系**：不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + `bdd-review-checklist.md` 7 项清单（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）

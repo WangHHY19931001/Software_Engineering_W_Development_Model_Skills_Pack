@@ -311,6 +311,24 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 
 > 第十八轮（2026-07-27）相比第十七轮：从「D5 文档互引一致性闭环」进化为「外部技能设计实践吸收」。吸收 drawio-skill (https://github.com/Agents365-ai/drawio-skill) 7 项设计实践，强化 JSON Schema 强约束 + 安全扫描基线 + 版本号双写 + pure/IO 分离 + 测试 coverage 矩阵 + toolbox 决策表 + Bundled Resources 触发条件总表。`anti-patterns.md` 从「27 条」扩展为「28 条」（合计 28 条，#20 在 subagent-delegation.md），新增 #28 schema 前置校验缺失。`SKILL.md` frontmatter 新增 `version: 18.0.0` 字段 + 新增「Bundled Resources」章节明示按需加载契约。引入 ajv (draft-07) + 13 份 schemas/*.schema.json 在 logic 层前置校验，eslint-plugin-security + .eslintsecurity-baseline.json sha256 指纹豁免。版本号三处一致（package.json + SKILL.md frontmatter + skill-metadata.json）。详见 SSoT §3.4.13 与 §10A 追溯表新增 §3.4.13 行。
 
+#### 第十九轮（2026-07-27）：BDD 建模与验收夹具（SSoT §3.4.14）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 用户要求增强设计：加入 BDD 建模和基于 BDD 的测试、验收夹具 |
+| 修正方案 | 引入 Cucumber.js v11 + @cucumber/messages，与既有 TLA+ 行为规格正交协作 |
+| 新增 | BDD 建模与验收夹具（L1/L2/L3/L4 features + 状态机七要素）+ `check-bdd-model.ts` 7 维度校验（D1 头标注 / D2 Gherkin 语法 / D3 状态机 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）+ `bdd-manifest.schema.json` + `bdd-logic.ts` + 10 个 BDD samples + 4 份 BDD reference（bdd-guide.md / bdd-review-checklist.md / bdd-syntax-reference.md / bdd-patterns-examples.md）+ 2 个模板（feature.template + bdd-manifest.template.json） |
+| 反模式新增 | 1 条（#29 BDD 建模与需求/设计/TLA+ 不符未回退） |
+| reference 文档 | 4 个新增（bdd-guide.md / bdd-review-checklist.md / bdd-syntax-reference.md / bdd-patterns-examples.md） |
+| 顶层文档 | 4 个（SSoT §3.4.14 + AGENTS.md §4 + CHANGELOG.md [19.0.0] + README.md 反模式总数 28→29） |
+| package.json | version `18.0.0` → `19.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| self-test | 基线 111→121（+10 BDD）全通过 |
+| vitest | 90→100+（+1 文件：bdd-logic.test.ts）全通过 |
+| TypeScript strict | 0 错误 |
+| pre-push | 7 项门禁（新增 check-bdd-model.ts） |
+
+> 第十九轮（2026-07-27）相比第十八轮：从「外部技能设计实践吸收」进化为「BDD 行为建模与验收夹具」。引入 Cucumber.js + Gherkin BDD 建模，与既有 TLA+ 行为规格正交协作，覆盖 W 模型 8 阶段的测试设计/执行/TDD 夹具需求。BDD features 作为可执行规格，TLA+ 作为行为正确性基准，二者通过等价性校验互锁（状态集等价 + 初始状态一致 + 转移集等价 + 不变式归一化匹配）。`anti-patterns.md` 从「28 条」扩展为「29 条」（合计 29 条，#20 在 subagent-delegation.md），新增 #29 BDD 建模与需求/设计/TLA+ 不符未回退。`SKILL.md` frontmatter `version: 18.0.0` → `19.0.0` + 新增约束 #14（BDD 行为门禁）+ S 拆分机制补 S-bdd 子代理变体（与 S-tla 对称）。新增 `check-bdd-model.ts` 7 维度独立门禁脚本 + `bdd-logic.ts` 纯逻辑 + `bdd-manifest.schema.json` 强约束 + 10 个 BDD samples（5 valid + 5 bad）。版本号三处一致（package.json + SKILL.md frontmatter + skill-metadata.json）。详见 SSoT §3.4.14 与 §10A 追溯表新增 §3.4.14 行。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：
@@ -369,7 +387,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-artifact-gate.ts | 工件质量门（RTM 覆盖率 + 四级测试 + TLA+ 资产 + SD→codeModule 终检） | 8 | 0=通过，1=校验失败，2=输入错误 |
 | check-requirement-graph.ts | 图谱结构门禁 + 信息流校验（黑洞/奇迹/死模块/边界完整性） | 1-4 | 0=通过，1=校验失败，2=输入错误 |
 | check-tla-model.ts | TLA+ 行为门禁（SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性） | 1-4 | 0=通过，1=校验失败，2=输入错误 |
-| check-bdd-model.ts | BDD 模型门禁（D1 头标注+D3 状态机七要素+D4 TLA+ 等价+D5 step 绑定+D6 scenario 路径+D7 RTM 映射） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
+| check-bdd-model.ts | BDD 模型门禁（D1 头标注+D2 Gherkin 语法+D3 状态机七要素+D4 TLA+ 等价+D5 step 绑定+D6 scenario 路径+D7 RTM 映射） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-code-tla-consistency.ts | 代码-TLA+ 一致性回归（四维度：SD→codeModule / 代码状态转移 / Next 分支 / 不变式覆盖） | 5 | 0=通过，1=失败 |
 | check-budget.ts | Budget 门禁（R1-R5 时效性/schema/onExceed/killSwitch/触发检测） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-run-log.ts | Run-log 门禁（R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序） | 1-8 | 0=通过，1=校验失败，2=输入错误 |

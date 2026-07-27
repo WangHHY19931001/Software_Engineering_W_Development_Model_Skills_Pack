@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 18.0.0
+version: 19.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -95,7 +95,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ### 失败模式清单（F1~F10）
 
-「看似高效实则埋坑」的 10 条行为退化，与 9 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。详细检测信号与处理流程见 [references/anti-patterns.md](references/anti-patterns.md)「失败模式清单」节。
+「看似高效实则埋坑」的 10 条行为退化，与 29 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。详细检测信号与处理流程见 [references/anti-patterns.md](references/anti-patterns.md)「失败模式清单」节。
 
 | # | 失败模式 | 与反例的关系 |
 |---|---|---|
@@ -122,9 +122,9 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 4. **加载最小引用集**（O）：编排者只加载 `SKILL.md` + 当前阶段 `phase-N-*.md` 摘要 + 所需状态文件；阶段细则由 S 子代理按需加载。
 5. **初始化确认**（O）：首次进入项目前确认技术栈、当前阶段、同步测试设计和产物清单。
 5.5. **ingestion 子流程**（O → A → G，阶段 1–4）：每个设计阶段进入时，O 跑 `plan-chunks.ts`（只读 stdout）产出分块计划 → 🔴 CHECKPOINT · ingestion 规划确认 → 并行分派 A-chunk 产出 `<chunk-id>.{md,json}` → 分派 A-cross（阶段1）/A-evolve（阶段2-4）合并建图产出 `consolidated.json` → 分派 G 跑 `check-requirement-graph.ts` → 收敛循环（MAX_ROUNDS=5，阈值=零违反）→ 🔴 CHECKPOINT · ingestion 收敛确认。详见 [references/ingestion-chunk.md](references/ingestion-chunk.md) 与 [references/ingestion-cross.md](references/ingestion-cross.md)。
-6. **分派 S 子代理产出**（O → S）：分派产出子代理生成开发产物 + 同步测试设计 + 更新 RTM 实体；**阶段 1–4 额外产出对应层级 TLA+ 规格（`.tla` + `.cfg`）并更新 `tla-manifest.json`**；S 返回 `{产物路径, RTM diff, selfCheck}`。**编排者不得直接产出**。TLA+ 层级：阶段1=L1、阶段2=L1细化+L2、阶段3=L2细化+L3、阶段4=L3+按需L4。**S 任务过重时可拆为 S-doc（文档+测试+RTM）/ S-tla（TLA+ 规格）两次分派，时序：S-doc → S-tla → V → G**（详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 拆分机制」节）。
+6. **分派 S 子代理产出**（O → S）：分派产出子代理生成开发产物 + 同步测试设计 + 更新 RTM 实体；**阶段 1–4 额外产出对应层级 TLA+ 规格（`.tla` + `.cfg`）并更新 `tla-manifest.json`，同时产出对应层级 BDD features（`.feature`）并更新 `bdd-manifest.json`**；S 返回 `{产物路径, RTM diff, selfCheck}`。**编排者不得直接产出**。TLA+ 层级：阶段1=L1、阶段2=L1细化+L2、阶段3=L2细化+L3、阶段4=L3+按需L4；BDD 层级同 TLA+（L1/L2/L3/L4 features）。**S 任务过重时可拆为 S-doc（文档+测试+RTM）/ S-tla（TLA+ 规格）/ S-bdd（BDD features）三次分派，时序：S-doc → S-tla → S-bdd → V → G**（详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 拆分机制」节）。
 7. **分派 V 子代理评审**（O → V）：分派评审子代理按 `targetKind` 路由 Persona，产出 `VerifierOutput` JSON。**编排者不得自评**。
-8. **分派 G 子代理门禁**（O → G）：分派门禁子代理跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts`**（TLA+ 行为门禁：文件头 + 层次一致性 + SANY 语法 + TLC 模型检查，无死锁/不变式违反/状态爆炸），返回 TLA+ 证据摘要。**阶段 5 额外分派 G 跑 `check-code-tla-consistency.ts`（代码-TLA+ 一致性回归，四维度校验）**。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
+8. **分派 G 子代理门禁**（O → G）：分派门禁子代理跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts`**（TLA+ 行为门禁：文件头 + 层次一致性 + SANY 语法 + TLC 模型检查，无死锁/不变式违反/状态爆炸）+ `check-bdd-model.ts`（BDD 行为门禁：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射），返回 TLA+ / BDD 证据摘要。**阶段 5 额外分派 G 跑 `check-code-tla-consistency.ts`（代码-TLA+ 一致性回归，四维度校验）**。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告**（targetKind=rootcause）→ **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
 10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。
 
@@ -415,6 +415,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
 - [ ] **图谱校验通过**：阶段 1–4 的 `check-requirement-graph.ts` 退出码 0；阶段 4 零违反硬约束达成才放行进编码
 - [ ] 图谱信息流无黑洞/奇迹/死模块，且边界（EXT-IN/EXT-OUT）完整（`check-requirement-graph.ts` 退出码 0，`GRAPH_JSON.dataflowViolations` 全空）
 - [ ] **TLA+ 行为门禁通过**：阶段 1–4 的 `check-tla-model.ts` 退出码 0（`TLA_JSON.passed=true`）；阶段 4 TLA+ 零违反（无死锁/不变式违反/状态爆炸/拆解决策合规）+ 图谱零违反才放行进编码；TLA+ 规格无占位/简化/错误实现（反模式 #16）；建模与需求/设计一致（反模式 #17）
+- [ ] **BDD 行为门禁通过**（第 19 轮）：阶段 1–4 的 `check-bdd-model.ts --phase=N` 退出码 0（7 维度 D1-D7 全通过：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）；BDD features 无占位/简化/错误实现；建模与需求/设计/TLA+ 一致（反模式 #29）
 - [ ] **阶段5 codeModule 回填**：RTM.codeModule 列已回填（格式 SD-xxx:src/path，编码后强制）；缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1
 - [ ] **阶段门放行已填理解证据**：run-log `acknowledgedDecisions` 非空且含 ≥1 关键决策摘要（非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行（见 [references/definition-of-done.md](references/definition-of-done.md) 第六维度）
 - [ ] **预算与成熟度已检查**：阶段门放行前跑预算检查（超 `budget.json` 限制按 `onExceed` 处置）；CHECKPOINT 类型由 `maturity.json.level` 决定（L1+ 操作型自动放行仍记录 run-log）；见 [references/operational-recovery.md](references/operational-recovery.md)
@@ -428,7 +429,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
 - [ ] 反模式 #21（阶段级门禁跳过）：确认阶段 6/7/8 都跑了 `--phase=N` 门禁，未跳过阶段级校验
 - [ ] **JSON 文件写入工具**（反模式 #25，第 16 轮 P4.2）：所有 JSON 文件写入用 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`（BOM + 深度 + 中文乱码）。详见 [references/operational-recovery.md](references/operational-recovery.md)「JSON 文件写入工具选择」节
 - [ ] **acknowledgedDecisions 关键词**（第 16 轮 P4.1，R2 校验；与反模式 #26 字段混用同属 schema 边界约束但维度不同：#26 管字段归属 R1，本条管字段内容 R2）：每条 `acknowledgedDecisions` 决策条目须命中 ID 模式（`REQ-\d+` / `SD-[\d.]+` / `INTF-[\d.]+` / `DD-[\d.]+` / `TC-\w+-\d+`）或 TECH_KEYWORDS（`REST` / `JWT` / `HTTP` / `状态机` / `不变式` / `接口` / `存储` 等 37 个中英关键词）；「同意」/「确认」/「OK」/「好的」视为空，触发 `check-checkpoint.ts` R2 名词违规。完整集合见 [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md)「acknowledgedDecisions 决策条目须含关键词」节
-- [ ] **调测者简化行为自检**（反模式 #27，第 17 轮 P5）：self-as-verifier 模式下每阶段须按 [references/operational-recovery.md](references/operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（硬约束复述 / reworkHints 非空 / 7 脚本全 exitCode=0 / §9 确认 / 长会话重读硬约束）。命中任一简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）回阶段起点。
+- [ ] **调测者简化行为自检**（反模式 #27，第 17 轮 P5）：self-as-verifier 模式下每阶段须按 [references/operational-recovery.md](references/operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（硬约束复述 / reworkHints 非空 / 9 脚本全 exitCode=0 / §9 确认 / 长会话重读硬约束）。命中任一简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）回阶段起点。
 - [ ] **Bundled Resources 按需加载**（第 18 轮 P1，借鉴 drawio-skill）：会话内已加载的文件清单与「Bundled Resources」表对照，未加载无关文件（约束 #6 可执行化）
 
 交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。

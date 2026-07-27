@@ -11,7 +11,7 @@
 
 #### Added
 - BDD 建模与验收夹具（Cucumber.js v11 + @cucumber/messages）：分层 L1/L2/L3/L4 features + 状态机七要素（states / initialState / terminalStates / acceptingStates / rejectingStates / transitions / invariants）
-- `check-bdd-model.ts` 独立门禁脚本（7 维度校验：D1 头标注 / D3 状态机 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）
+- `check-bdd-model.ts` 独立门禁脚本（7 维度校验：D1 头标注 / D2 Gherkin 语法 / D3 状态机 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射）
 - `bdd-manifest.schema.json` + `bdd-logic.ts` + 10 个 BDD samples（5 valid + 5 bad）
 - `bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md`
 - `feature.template` + `bdd-manifest.template.json`
@@ -1014,7 +1014,7 @@
 
 ### 端到端调测第二轮：从零重建 + k6 性能基线 + 文档全面同步
 
-> 通过完全清空 [`w-model-dev-demo/`](./w-model-dev-demo) 后按 W 模型 8 阶段从零重建，
+> 通过完全清空 `w-model-dev-demo/`（已于第 17 轮 P6 删除，详见 [17.0.0] 节）后按 W 模型 8 阶段从零重建，
 > 验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可重复执行；
 > 并通过回归测试发现 3 项工程配置缺陷（JWT_SECRET 缺失 / ArticleService 类型导出 / vitest mock 类型），
 > 修复后纳入 [`w-model-dev/references/anti-patterns.md`](./w-model-dev/references/anti-patterns.md)「实现层经验教训」L2~L4。
@@ -1069,7 +1069,7 @@
 
 ### 端到端调测：交付博客系统参考实现 + 文档同步
 
-> 通过 [`w-model-dev-demo/`](./w-model-dev-demo) 完整跑通 W 模型 8 阶段端到端调测，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用，并把调测结论与缺陷修正经验同步到全仓库文档。
+> 通过 `w-model-dev-demo/`（已于第 17 轮 P6 删除，详见 [17.0.0] 节）完整跑通 W 模型 8 阶段端到端调测，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用，并把调测结论与缺陷修正经验同步到全仓库文档。
 
 #### 新增
 
