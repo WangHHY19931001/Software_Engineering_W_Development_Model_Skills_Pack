@@ -23,7 +23,7 @@
 | 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
 | 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
 | 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评。V/G 不通过后，未经 R 定位直接小修也命中 #4。修复路径必须经 R→V→G→S-fix |
-| 5 | 一次性载入全部 `references/` | 上下文污染，阶段聚焦丢失 | 仅加载当前阶段所需 `references/phase-N-*.md` |
+| 5 | 一次性载入全部 `references/` 或违反 Bundled Resources 表 | 上下文污染，阶段聚焦丢失 | 按 [SKILL.md](../SKILL.md)「Bundled Resources」表按需加载 |
 | 6 | 用 LLM 估算 RTM 覆盖率 | RTM 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，RTM 覆盖率必须 100% |
 | 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 一律回到编码实现，附 GATE_JSON 详情 |
 | 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
@@ -166,6 +166,14 @@
 | `check-tla-model.ts` | 2 | 输入错误（`tla-manifest.json` 缺失 / Java 未找到 / jar 缺失） | #14 | 修复环境或 manifest 后重跑 |
 
 > 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
+
+## #5 一次性载入全部 references（强化）
+
+**反模式 #5（强化）**：违反 Bundled Resources 表 — 一次性加载整个 references/ 或无关阶段的 phase 文件。Bundled Resources 表（见 [SKILL.md](../SKILL.md)「Bundled Resources」节）是按需加载的可执行清单，违反即回退。
+
+> 检测信号与回退动作见上方「检测信号与回退命令」表 #5 行（Agent 上下文同时加载 ≥3 个 `references/phase-N-*.md` 文件 → 卸载无关 phase 文档，仅保留当前阶段 + `SKILL.md` + 必要 references）。
+>
+> 约束 #6「按需加载」的可执行化清单见 [SKILL.md](../SKILL.md)「Bundled Resources（按需加载契约）」节，明示每个 reference/script/subagent/template 的触发条件，**none of them need to be in context up front**。
 
 ## #11 ingestion 跳过图谱校验
 

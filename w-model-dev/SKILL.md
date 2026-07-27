@@ -158,6 +158,93 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 - 异常、跨平台、技术栈切换或大项目 → [references/operational-recovery.md](references/operational-recovery.md)
 - 子代理分派 / O-S-V-G 角色边界 / 编排者越权判定 → [references/subagent-delegation.md](references/subagent-delegation.md)
 
+## Bundled Resources（按需加载契约）
+
+> 借鉴 drawio-skill/skills/drawio-skill/SKILL.md 的 Bundled Resources 设计：明示每个 reference/script/subagent/template 的触发条件，**none of them need to be in context up front**。约束 #6「按需加载」的可执行清单。
+
+### references/（按需读取）
+
+| File | Read it when |
+|---|---|
+| phase-1-requirements.md | 用户进入阶段 1（需求分析） |
+| phase-2-system-design.md | 阶段 2 系统设计 |
+| phase-3-outline-design.md | 阶段 3 概要设计 |
+| phase-4-detailed-design.md | 阶段 4 详细设计 |
+| phase-5-coding.md | 阶段 5 编码 |
+| phase-6-integration-test.md | 阶段 6 集成测试 |
+| phase-7-system-test.md | 阶段 7 系统测试 |
+| phase-8-acceptance-test.md | 阶段 8 验收测试 |
+| rtm-guide.md | 任何阶段更新 RTM 时 |
+| verifier-spec.md | V 子代理产出 VerifierOutput 前 |
+| agent-personas.md | V 子代理选用 Persona 时 |
+| subagent-delegation.md | O 分派 S/V/G/R 子代理前 |
+| subagent-persona-matrix.md | R-lead / V-lead 多角度分析时 |
+| root-cause-locator.md | V/G 不通过后分派 R 子代理时 |
+| definition-of-done.md | 阶段门放行判定时 |
+| data-models.md | 读写 .w-model/*.json 或 schema 校验失败时 |
+| anti-patterns.md | 怀疑命中反模式或新增反模式登记时 |
+| command-reference.md | /wm 命令参数细节 |
+| workflow.md | 阶段切换 / 失败回退 / 质量门流程 |
+| quality-standards.md | 编码后质量检查 |
+| operational-recovery.md | 异常 / 跨平台 / 技术栈切换 / 大项目 / 简化行为自检 |
+| tla-plus-guide.md | 阶段 1–4 产出 TLA+ 规格时 |
+| tla-plus-patterns-examples.md | TLA+ 模式参考 |
+| tla-plus-review-checklist.md | TLA+ 规格自审 |
+| tla-plus-syntax-reference.md | TLA+ 语法查询 |
+| tla-plus-tlc-configuration.md | TLC 配置 |
+| graph-guide.md | 图谱门禁与收敛 |
+| ingestion-chunk.md | A 子代理分块分析 |
+| ingestion-cross.md | A 子代理交叉合并 |
+| event-ingress-guide.md | L2+ 项目事件接驳 |
+| hill-climbing-guide.md | L2+ 项目爬坡循环 |
+| skillopt-adoption.md | SkillOpt 方法论吸收 |
+| external-skills-absorption.md | 第 10 轮外部技能吸收 |
+| toolbox.md | 「I have X, I want Y → use Z」决策表 |
+
+### scripts/（按需读取，仅供 G 子代理执行）
+
+| File | Read it when |
+|---|---|
+| check-verifier-output.ts | V 产出 JSON 后 G 校验 |
+| check-artifact-gate.ts | 阶段 8 终检 / 阶段 5/6/7 阶段级校验 |
+| check-requirement-graph.ts | 阶段 1–4 图谱门禁 |
+| check-tla-model.ts | 阶段 1–4 TLA+ 行为门禁 |
+| check-code-tla-consistency.ts | 阶段 5 代码-TLA+ 一致性回归 |
+| check-budget.ts | 阶段门放行前 |
+| check-run-log.ts | 阶段门放行前 |
+| check-maturity.ts | 阶段门放行前 |
+| check-checkpoint.ts | 阶段门放行前 |
+| check-rootcause-report.ts | R 子代理产出后 |
+| schema-loader.ts | logic 层 schema 校验（被自动 import） |
+| security-scan.ts | pre-push / 手动安全扫描 |
+| self-test.ts | 回归基线（非阶段流程） |
+| plan-chunks.ts | ingestion 子流程分块（O 只读） |
+
+### subagent/（按需读取，仅供 V-lead / R-lead 多角度分析）
+
+| File | Read it when |
+|---|---|
+| engineering-code-reviewer.md | V 评审 code 阶段 |
+| engineering-backend-architect.md | V 评审 design 阶段（后端） |
+| engineering-software-architect.md | V 评审 system design |
+| testing-api-tester.md | V 评审 test 阶段（API） |
+| testing-reality-checker.md | V reality check |
+| ... | 完整清单见 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) |
+
+### templates/（产出时按需读取）
+
+| File | Read it when |
+|---|---|
+| requirement-spec.md | 阶段 1 产出需求规格 |
+| system-design.md | 阶段 2 产出系统设计 |
+| detailed-design.md | 阶段 4 产出详细设计 |
+| interface-design.md | 阶段 4 产出接口设计 |
+| test-case.md | 任何阶段产出测试用例 |
+| test-report.md | 阶段 6/7/8 产出测试报告 |
+| rtm.md | RTM 维护 |
+| review-report.md | V 产出评审报告 |
+| tla-spec-template.md | 阶段 1–4 产出 TLA+ 规格 |
+
 ## 命令速查
 
 > 编排者（O）只路由 + CHECKPOINT + 状态持久化；产出（S）、评审（V）、门禁（G）均由子代理执行。详见 [references/subagent-delegation.md](references/subagent-delegation.md)。
@@ -333,5 +420,6 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
 - [ ] **JSON 文件写入工具**（反模式 #25，第 16 轮 P4.2）：所有 JSON 文件写入用 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`（BOM + 深度 + 中文乱码）。详见 [references/operational-recovery.md](references/operational-recovery.md)「JSON 文件写入工具选择」节
 - [ ] **acknowledgedDecisions 关键词**（第 16 轮 P4.1，R2 校验；与反模式 #26 字段混用同属 schema 边界约束但维度不同：#26 管字段归属 R1，本条管字段内容 R2）：每条 `acknowledgedDecisions` 决策条目须命中 ID 模式（`REQ-\d+` / `SD-[\d.]+` / `INTF-[\d.]+` / `DD-[\d.]+` / `TC-\w+-\d+`）或 TECH_KEYWORDS（`REST` / `JWT` / `HTTP` / `状态机` / `不变式` / `接口` / `存储` 等 37 个中英关键词）；「同意」/「确认」/「OK」/「好的」视为空，触发 `check-checkpoint.ts` R2 名词违规。完整集合见 [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md)「acknowledgedDecisions 决策条目须含关键词」节
 - [ ] **调测者简化行为自检**（反模式 #27，第 17 轮 P5）：self-as-verifier 模式下每阶段须按 [references/operational-recovery.md](references/operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（硬约束复述 / reworkHints 非空 / 7 脚本全 exitCode=0 / §9 确认 / 长会话重读硬约束）。命中任一简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）回阶段起点。
+- [ ] **Bundled Resources 按需加载**（第 18 轮 P1，借鉴 drawio-skill）：会话内已加载的文件清单与「Bundled Resources」表对照，未加载无关文件（约束 #6 可执行化）
 
 交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。
