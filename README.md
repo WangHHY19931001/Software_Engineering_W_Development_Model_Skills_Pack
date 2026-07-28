@@ -76,7 +76,7 @@ npm run check:verifier -- <output.json>     # 退出码 0/1/2
 npm run check:gate -- [project-dir]         # 退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，退出码 0/1/2
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>] [--skip-tlc]  # TLA+ 行为门禁，退出码 0/1/2
-npm run self-test                           # 退出码 0/1（111 条样本回归基线）
+npm run self-test                           # 退出码 0/1（121 条样本回归基线）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 
 # 或用 npx tsx 直接调用：
@@ -147,7 +147,12 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 ## 参考实现（已归档）
 
-[`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) 是 W 模型 8 阶段端到端调测的归档摘要——一个博客系统后端（Express 4 + TypeScript 5 + 内存存储），用于验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。原 `w-model-dev-demo/` 目录已于第 17 轮 P6 删除。
+历史端到端调测归档（按时间倒序）：
+
+- [`docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/) — 第十九轮 W 模型 8 阶段端到端调测归档（7 文件），32 需求 / 231 测试全通过 / 1 完整 W 模型周期闭环 / 发现 check-bdd-model.ts D7 RTM schema bug
+- [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) — 第十五轮端到端调测归档（9 文件），32 需求 / 889 测试全通过 / 32 个流程问题修复
+
+原 `w-model-dev-demo/` 目录已于第 17 轮 P6 删除，第十九轮调测重建后再次清理，归档已迁移至上述目录。
 
 **端到端调测结论**（2026-07-24，全量删除后从零重跑第五轮，编排者-子代理分派模式，含代码-TLA+ 一致性回归）：
 
@@ -294,6 +299,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
+├── docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/  # 第 19.0.1 轮 8 阶段调测归档（7 文件）
 ├── docs/changes/archive/2026-07-26-round15-end-to-end-test/  # 第 15 轮端到端调测归档摘要（9 文件）
 ├── docs/                         # 设计文档（统一存放）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
@@ -337,7 +343,8 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集
-- [参考实现归档](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) - W 模型 8 阶段端到端调测归档摘要（9 文件）
+- [参考实现归档（第 19.0.1 轮）](./docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/) - W 模型 8 阶段端到端调测归档（7 文件，32 需求 / 231 测试 / 1 完整周期）
+- [参考实现归档（第 15 轮）](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) - W 模型 8 阶段端到端调测归档摘要（9 文件）
 - [变更日志](./CHANGELOG.md)
 - [贡献指南](./CONTRIBUTING.md)
 

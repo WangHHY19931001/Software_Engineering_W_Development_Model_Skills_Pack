@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "blog-system-demo",
+  "archivedAt": "2026-07-27T23:10:00+08:00",
+  "description": "8 阶段测试执行汇总快照（UT/IT/ST/UAT）",
+  "phases": [
+    { "phase": 5, "phaseName": "编码实现", "testType": "unitTest", "total": 150, "passed": 150, "failed": 0, "pending": 0, "coverage": 100, "runner": "vitest", "duration_s": null, "note": "tsc strict 0 错误；vitest 150/150 通过；code-TLA 一致性 4 维度全通过" },
+    { "phase": 6, "phaseName": "集成测试", "testType": "integrationTest", "total": 24, "passed": 24, "failed": 0, "pending": 0, "coverage": 100, "runner": "vitest + supertest", "duration_s": 3.512, "note": "24 IT 全通过（3512ms）；supertest 真实 HTTP 调用无 mock 替代；覆盖 22 INTF 100%" },
+    { "phase": 7, "phaseName": "系统测试", "testType": "systemTest", "total": 32, "passed": 32, "failed": 0, "pending": 0, "coverage": 100, "runner": "vitest 全量回归", "duration_s": 4.71, "note": "vitest 全量回归 174/174 通过（150 UT + 24 IT，4.71s）；25 ST 用例 + TC-DES-007 端到端 + TC-DES-008 性能 + TC-DES-009 安全" },
+    { "phase": 8, "phaseName": "验收测试", "testType": "acceptanceTest", "total": 25, "passed": 25, "failed": 0, "pending": 0, "coverage": 100, "runner": "vitest 全量回归 + UAT 手工执行", "duration_s": 4.71, "note": "25 UAT 全通过；场景分布：正常 14 + 异常 8 + 边界 3；覆盖 22 REQ + 6 NFR + 4 CON 横切需求" }
+  ],
+  "executionSummary": {
+    "unitTest": { "total": 150, "passed": 150, "failed": 0, "pending": 0, "coverage": 100 },
+    "integrationTest": { "total": 24, "passed": 24, "failed": 0, "pending": 0, "coverage": 100 },
+    "systemTest": { "total": 32, "passed": 32, "failed": 0, "pending": 0, "coverage": 100 },
+    "acceptanceTest": { "total": 25, "passed": 25, "failed": 0, "pending": 0, "coverage": 100 }
+  },
+  "totalTests": 231,
+  "totalPassed": 231,
+  "totalFailed": 0,
+  "overallCoverage": 100,
+  "gateResult": {
+    "gate": "check-artifact-gate --phase=8",
+    "exitCode": 0,
+    "passed": true,
+    "note": "RTM 覆盖率 100% + UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 全部通过 + TLA 状态机不变式 + BDD feature 接口契约 + graph 节点拓扑资产校验通过"
+  },
+  "uatScenarioDistribution": {
+    "normal": 14,
+    "abnormal": 8,
+    "boundary": 3,
+    "total": 25
+  },
+  "nfrCoverage": {
+    "NFR-001": "性能（UAT-002 步骤2 JWT 24h 过期）",
+    "NFR-002": "安全（UAT-001 步骤2 bcrypt 哈希、UAT-004/010/014 Zod 校验）",
+    "NFR-003": "JWT 24h 过期（UAT-002）",
+    "NFR-004": "TypeScript strict 0 错误（tsc 编译）",
+    "NFR-005": "UT 覆盖率 100%",
+    "NFR-006": "内存存储（demo 可接受）"
+  },
+  "conCoverage": {
+    "CON-001": "Express 4",
+    "CON-002": "TypeScript 5 strict",
+    "CON-003": "Node.js 20",
+    "CON-004": "内存存储（Map）"
+  }
+}

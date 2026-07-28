@@ -55,7 +55,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/*.ts` 后，必须先跑自检脚本，再用端到端方式验证：
 
 ```bash
-# 3.1 跑自检（samples/ 目录下 17 条样本：verifier 10 + gate 7）
+# 3.1 跑自检（samples/ 目录下 121 条样本：18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata + 10 BDD）
 npm run self-test
 # 等价于：npx tsx w-model-dev/scripts/self-test.ts
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
@@ -83,7 +83,7 @@ npm run check:gate -- <project-dir>
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（17 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（121 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
@@ -169,25 +169,28 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 ├── SKILL.md            # 编排逻辑 + 命令接口 + 架构定位
 ├── references/         # 阶段细则 + verifier-spec.md + 数据模型 + RTM 指南 + 质量标准
 ├── scripts/            # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
-│   ├── gate-logic.ts
-│   ├── check-artifact-gate.ts
-│   ├── verifier-logic.ts
-│   ├── check-verifier-output.ts
-│   ├── self-test.ts                # 校验逻辑自检（samples/ 驱动）
-│   └── samples/                    # 端到端样本（verifier/ + gate/）
+│   ├── gate-logic.ts / check-artifact-gate.ts       # 工件质量门
+│   ├── verifier-logic.ts / check-verifier-output.ts # Verifier 输出校验
+│   ├── graph-logic.ts / check-requirement-graph.ts  # 阶段 1-4 图谱结构门禁
+│   ├── tla-logic.ts / check-tla-model.ts            # 阶段 1-4 TLA+ 行为门禁
+│   ├── code-tla-logic.ts / check-code-tla-consistency.ts  # 阶段 5 代码-TLA+ 一致性回归
+│   ├── bdd-logic.ts / check-bdd-model.ts            # BDD 模型 7 维度校验
+│   ├── budget-logic / run-log-logic / maturity-logic / checkpoint-logic / root-cause-logic  # 闭环校验
+│   ├── schema-loader.ts                              # ajv 单例 + schemas/ 自动加载
+│   ├── self-test.ts                                  # 校验逻辑自检（121 条样本，samples/ 驱动）
+│   ├── __tests__/                                    # vitest 单元测试
+│   └── samples/                                      # 端到端样本（verifier/ + gate/ + graph/ + tla/ + bdd/ 等）
 ├── templates/          # 文档模板
-└── examples/           # 交互示例
-w-model-dev-demo/       # 参考实现：博客系统后端（W 模型 8 阶段端到端调测产物，独立于技能资产）
-├── docs/               #   8 阶段产出文档（需求 / 设计 / 四级测试用例与报告）
-├── src/                #   实现代码（Express + TS）
-├── tests/              #   四级测试（unit / integration / system / acceptance）
-└── package.json        #   demo 自身的依赖与脚本（独立于根 package.json）
+├── examples/           # 交互示例
+├── subagent/           # 人格库（28 个 Markdown 文件，分 5 类）
+└── schemas/            # JSON Schema (draft-07) 文件（13 份）
 docs/                   # 设计文档统一存放（SSoT、集成设计、安装指南等）
+└── changes/archive/    # 历史端到端调测归档（按时间倒序，最新：2026-07-27-round19-w-model-8-phase-validation/）
 ```
 
 > 本仓库不包含 `src/` TypeScript 引擎或 `tests/` 测试套件；根目录的 `package.json` 仅声明 `tsx` 作为开发依赖，不引入构建工具链。
 > `/wm` 命令、状态持久化、RTM 维护均由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成。
-> `w-model-dev-demo/` 是参考实现，独立于技能资产，**不参与 `/wm` 命令编排**，也不被 `check-*-gate.ts` 读取。修改技能资产时无需同步改动 demo。
+> 原 `w-model-dev-demo/` 参考实现已于第 17 轮 P6 删除，第十九轮调测重建后再次清理；端到端调测产物归档于 `docs/changes/archive/`，独立于技能资产，**不参与 `/wm` 命令编排**，也不被 `check-*-gate.ts` 读取。修改技能资产时无需同步改动归档。
 
 ### 添加新命令
 

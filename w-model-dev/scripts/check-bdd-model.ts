@@ -223,12 +223,13 @@ async function main(): Promise<number> {
   }
 
   // 读取 RTM（用于 D7）
+  // RTM 标准结构见 gate-logic.ts 的 RTMMatrixShape：{ rows: [{ requirementId, ... }] }
   let rtmRows: BddCheckInput['rtmRows'] | undefined;
   if (args.rtmFile) {
     try {
-      const rtm = await readJson<{ requirements: Array<{ id: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }> }>(args.rtmFile);
-      rtmRows = rtm.requirements.map(r => ({
-        reqId: r.id,
+      const rtm = await readJson<{ rows: Array<{ requirementId: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }> }>(args.rtmFile);
+      rtmRows = rtm.rows.map(r => ({
+        reqId: r.requirementId,
         acceptanceTest: r.acceptanceTest,
         systemTest: r.systemTest,
         integrationTest: r.integrationTest,

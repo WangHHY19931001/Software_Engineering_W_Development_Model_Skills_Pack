@@ -236,4 +236,135 @@ describe('checkBddModel', () => {
     expect(result.exitCode).toBe(2);
     expect(result.passed).toBe(false);
   });
+
+  it('D7: passes when rtmRows uses correct schema (rows + requirementId) and feature id is registered', () => {
+    // 回归测试：check-bdd-model.ts D7 曾误用 rtm.requirements（不存在字段），
+    // 修正为 rtm.rows + requirementId（与 gate-logic.ts RTMMatrixShape 对齐）。
+    // 本测试确保 rtmRows 注入正确字段名时 D7 能通过。
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'bdd',
+      currentPhase: 4,
+      features: [{
+        id: 'BDD-L1-test',
+        level: 1,
+        filePath: 'test.feature',
+        scenarioCount: 1,
+        stateMachineId: 'SM-L1-test',
+        tlaSpecId: 'L1-test',
+        reqIds: ['REQ-001'],
+        designIds: [],
+        parentFeatureIds: [],
+        siblingFeatureIds: [],
+        childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test',
+        level: 1,
+        states: ['A'],
+        initialState: 'A',
+        terminalStates: [],
+        acceptingStates: ['A'],
+        rejectingStates: [],
+        transitions: [{ from: 'A', event: 'e', to: 'A' }],
+        invariants: ['A => true'],
+      }],
+    };
+    const result = checkBddModel({
+      manifest: manifest as any,
+      phase: 8,
+      rtmRows: [
+        // 正确 schema：requirementId（非 id），acceptanceTest 含 feature id
+        { reqId: 'REQ-001', acceptanceTest: 'UAT-001 | BDD-L1-test', systemTest: null, integrationTest: null, unitTest: null },
+      ],
+    });
+    expect(result.dimensions.rtmMapping).toEqual([]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('D7: fails when feature id not registered in RTM test field', () => {
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'bdd',
+      currentPhase: 4,
+      features: [{
+        id: 'BDD-L1-test',
+        level: 1,
+        filePath: 'test.feature',
+        scenarioCount: 1,
+        stateMachineId: 'SM-L1-test',
+        tlaSpecId: 'L1-test',
+        reqIds: ['REQ-001'],
+        designIds: [],
+        parentFeatureIds: [],
+        siblingFeatureIds: [],
+        childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test',
+        level: 1,
+        states: ['A'],
+        initialState: 'A',
+        terminalStates: [],
+        acceptingStates: ['A'],
+        rejectingStates: [],
+        transitions: [{ from: 'A', event: 'e', to: 'A' }],
+        invariants: ['A => true'],
+      }],
+    };
+    const result = checkBddModel({
+      manifest: manifest as any,
+      phase: 8,
+      rtmRows: [
+        // feature id 未登记在 acceptanceTest 字段
+        { reqId: 'REQ-001', acceptanceTest: 'UAT-001', systemTest: null, integrationTest: null, unitTest: null },
+      ],
+    });
+    expect(result.dimensions.rtmMapping.some(v => v.includes('feature id not in RTM'))).toBe(true);
+    expect(result.exitCode).toBe(1);
+  });
+
+  it('D7: fails when reqId not in RTM at all', () => {
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'bdd',
+      currentPhase: 4,
+      features: [{
+        id: 'BDD-L1-test',
+        level: 1,
+        filePath: 'test.feature',
+        scenarioCount: 1,
+        stateMachineId: 'SM-L1-test',
+        tlaSpecId: 'L1-test',
+        reqIds: ['REQ-999'],
+        designIds: [],
+        parentFeatureIds: [],
+        siblingFeatureIds: [],
+        childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test',
+        level: 1,
+        states: ['A'],
+        initialState: 'A',
+        terminalStates: [],
+        acceptingStates: ['A'],
+        rejectingStates: [],
+        transitions: [{ from: 'A', event: 'e', to: 'A' }],
+        invariants: ['A => true'],
+      }],
+    };
+    const result = checkBddModel({
+      manifest: manifest as any,
+      phase: 8,
+      rtmRows: [
+        { reqId: 'REQ-001', acceptanceTest: 'UAT-001 | BDD-L1-test', systemTest: null, integrationTest: null, unitTest: null },
+      ],
+    });
+    expect(result.dimensions.rtmMapping.some(v => v.includes('not in RTM'))).toBe(true);
+    expect(result.exitCode).toBe(1);
+  });
 });

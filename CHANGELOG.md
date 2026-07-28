@@ -3,6 +3,48 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [19.0.1] - 2026-07-27
+
+### 第十九轮 W 模型 8 阶段端到端调测验证与归档
+
+使用博客系统后端 demo（22 REQ + 6 NFR + 4 CON = 32 需求）完整执行 W 模型 8 阶段端到端调测，验证 BDD 建模（[19.0.0]）与既有 TLA+/RTM/graph 门禁的端到端协作。1 完整 W 模型周期闭环（阶段 1-8 全通过），V 评审 7A+1B，231 测试用例全通过。归档产物迁移至 `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`，demo 产物清理。
+
+#### Fixed
+- `check-bdd-model.ts` D7 RTM 映射校验修正：原读取 `rtm.requirements`（不存在字段），修正为 `rtm.rows` + `requirementId`，与 `gate-logic.ts` 的 `RTMMatrixShape` 对齐
+
+#### Added
+- `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`：8 阶段调测归档（7 文件：README.md / verifier-summary.md / rtm-snapshot.json / test-report-snapshot.json / tla-summary.md / bdd-summary.md / checkpoint-summary.md）
+
+#### Removed
+- `w-model-dev-demo/` 整个目录（8 阶段调测产物，归档已迁移至 `docs/changes/archive/`）
+- `update-rtm.cjs`（demo 专用 RTM 批量更新脚本）
+- `package.json` demo 专用依赖：bcrypt / express / jsonwebtoken / uuid / zod / supertest / @types/bcrypt / @types/express / @types/jsonwebtoken / @types/supertest / @types/uuid + `dependencies` 节
+
+#### Validation
+- W 模型 8 阶段端到端调测：阶段 1 需求分析（0.8245 B）→ 阶段 2 系统设计（0.8645 A）→ 阶段 3 概要设计（0.881 A）→ 阶段 4 详细设计（0.8885 A）→ 阶段 5 编码实现（0.8805 A）→ 阶段 6 集成测试（0.912 A）→ 阶段 7 系统测试（0.909 A）→ 阶段 8 验收测试（0.922 A）
+- 测试执行：UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过
+- TLA+ L4 TLC 模型检验：零死锁、零不变式违反、状态空间 125 可控
+- BDD 4 features（L1/L2/L3/L4）34 scenarios，check-bdd-model 7 维度全通过
+- code-TLA+ 一致性 4 维度 78 项全通过
+- check-artifact-gate 终检（phase=8）退出码 0
+- maturity.json：unlockConditions.completedCycles=1（1 完整 W 模型周期闭环）
+
+### [19.0.1] 后续一致性修复
+
+#### Fixed
+- 版本号三处同步为 19.0.1：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter（[18.0.0] 版本号双写规范）
+- `bdd-logic.test.ts` 补充 D7 RTM schema 测试样本 3 个：正确 schema 通过 + feature id 未登记失败 + reqId 不存在失败（防止 `rtm.rows` → `rtm.requirements` 回退）
+
+#### Docs
+- SSoT §3.4.15 新增「第 19.0.1 轮：W 模型 8 阶段端到端调测验证与归档」节；§10A 追溯矩阵追加 19.0.1 行
+- README.md「参考实现（已归档）」节追加 19.0.1 归档条目（7 文件 / 32 需求 / 231 测试 / 1 完整 W 模型周期闭环 / D7 bug 修复记录）；「快速上手」self-test 基线 111 → 121
+- AGENTS.md §4 新增「第 19.0.1 轮」节（触发 / 真实 bug / 修正 / 验证 / 归档）；§2 关键目录速查追加 19.0.1 归档目录；§3 self-test 基线 111 → 121
+- CONTRIBUTING.md self-test 基线 17 → 121；项目结构约定移除 `w-model-dev-demo/` 条目，追加 `docs/changes/archive/` 说明
+- INSTALL.md self-test 基线 111 → 121（2 处：项目结构树 + 资产索引表）
+
+#### Removed
+- `执行情况/` 目录（调测临时 TLA 配置文件，已随归档固化）
+
 ## [19.0.0] - 2026-07-27
 
 ### 第 19 轮 BDD 建模与验收夹具

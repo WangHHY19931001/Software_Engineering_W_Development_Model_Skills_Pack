@@ -65,7 +65,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
 │   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
 │   ├── security-scan.ts         # eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
-│   ├── self-test.ts             # 回归基线（111 条样本）
+│   ├── self-test.ts             # 回归基线（121 条样本）
 │   └── __tests__/               # vitest 单元测试（9 个 .test.ts + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
@@ -177,7 +177,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | JSON Schema 文件（draft-07，13 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/schema-loader.ts](../w-model-dev/scripts/schema-loader.ts) |
 | 安全扫描脚本（baseline 指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
-| 回归基线脚本（111 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
+| 回归基线脚本（121 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/verifier-logic.ts](../w-model-dev/scripts/verifier-logic.ts) |

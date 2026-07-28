@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 19.0.0
+version: 19.0.1
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development

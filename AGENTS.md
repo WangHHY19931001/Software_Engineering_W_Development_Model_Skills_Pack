@@ -25,10 +25,11 @@
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
 | `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A + summary 阶段 digest 三要素 §6.2）/ agent-personas（4 个评审角色提示词）/ subagent-delegation（O/A/S/V/G/R 编排者-子代理边界，A 为阶段 1–4 分析子代理，R 为返工根因定位子代理，F 由 S 兼任；O 维护 budget/run-log/maturity）/ root-cause-locator（R 子代理根因分析方法论：5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）/ subagent-persona-matrix（R-lead / V-lead 多角度 persona 选择矩阵，关联 `w-model-dev/subagent/` 28 个人格文件）/ definition-of-done（项目级 DoD 六维度含理解证据）/ event-ingress-guide（Loop 3 事件接驳：EventIngress schema + 路由表 + 消费方指引，L2+ 激活）/ hill-climbing-guide（Loop 4 爬坡循环：HarnessImprovementReport schema + 信号检测 + 报告消费流程）/ skillopt-adoption（SkillOpt 方法论吸收：bounded edit + validation gate 流程，消费 Loop 4 信号）/ anti-patterns（28 条流程反模式 #1-#19 + #20 + #21-#28；#20 见 subagent-delegation.md，含 #10 编排者越权实施 + #11 ingestion 跳过图谱校验 + #12 A 自评收敛 + #13 信息流黑洞/奇迹/死模块放行 + #14 跳过 SANY 直接 TLC + #15 死锁/不变式违反放行 + #16 TLA+ 占位/简化/错误实现 + #17 TLA+ 建模不符需求/设计不回退 + #18 跳过 R 直接 S 返工 + #19 R 报告未 V 复审 + L1~L4 教训 + 失败模式 F1~F10 + 运维失败模式 O1~O6）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则，含信息流模型）/ tla-plus-guide（TLA+ 层次化状态机建模与行为门禁）/ command-reference / operational-recovery（含成本预算与运行日志节 + 成熟度与 CHECKPOINT 放行节）/ 数据模型（含 budget/run-log/maturity schema）/ RTM 指南 / 质量标准 | **按需加载**，禁止一次性载入全部（反例 #5） |
 | `w-model-dev/subagent/` | **人格库**（28 个 Markdown 文件，分 engineering / testing / design / product / project 5 类） | R-lead / V-lead 多角度分析时按 `references/subagent-persona-matrix.md` 选用 persona；Persona 文件本身是 Markdown，不调用 LLM |
-| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `<report.json>`）/ `schema-loader.ts`（ajv 单例 + schemas/ 自动加载 + validateBySchema 工具，被 10 个 `*-logic.ts` 顶部自动 import）/ `security-scan.ts`（eslint-plugin-security 扫描 + baseline 指纹豁免）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线，111 条样本）/ `__tests__/`（vitest 单元测试 + README.md coverage 矩阵） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归检查点直接 `npx tsx` 执行 |
+| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `<report.json>`）/ `schema-loader.ts`（ajv 单例 + schemas/ 自动加载 + validateBySchema 工具，被 10 个 `*-logic.ts` 顶部自动 import）/ `security-scan.ts`（eslint-plugin-security 扫描 + baseline 指纹豁免）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线，121 条样本）/ `__tests__/`（vitest 单元测试 + README.md coverage 矩阵） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
 | `w-model-dev/schemas/` | JSON Schema (draft-07) 文件（13 份） | logic 层 schema 校验时自动加载；新增 .w-model/*.json 字段必先改 schema |
+| `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/` | 第 19.0.1 轮 8 阶段调测归档（7 文件，含 D7 bug 修复记录） | 查阅最新调测结论时 |
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南） | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
@@ -46,7 +47,7 @@
 npm install
 
 # 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
-npm run self-test                           # 111 条样本回归基线（18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata），退出码 0/1
+npm run self-test                           # 121 条样本回归基线（18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata + 10 BDD），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2
@@ -329,6 +330,25 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 
 > 第十九轮（2026-07-27）相比第十八轮：从「外部技能设计实践吸收」进化为「BDD 行为建模与验收夹具」。引入 Cucumber.js + Gherkin BDD 建模，与既有 TLA+ 行为规格正交协作，覆盖 W 模型 8 阶段的测试设计/执行/TDD 夹具需求。BDD features 作为可执行规格，TLA+ 作为行为正确性基准，二者通过等价性校验互锁（状态集等价 + 初始状态一致 + 转移集等价 + 不变式归一化匹配）。`anti-patterns.md` 从「28 条」扩展为「29 条」（合计 29 条，#20 在 subagent-delegation.md），新增 #29 BDD 建模与需求/设计/TLA+ 不符未回退。`SKILL.md` frontmatter `version: 18.0.0` → `19.0.0` + 新增约束 #14（BDD 行为门禁）+ S 拆分机制补 S-bdd 子代理变体（与 S-tla 对称）。新增 `check-bdd-model.ts` 7 维度独立门禁脚本 + `bdd-logic.ts` 纯逻辑 + `bdd-manifest.schema.json` 强约束 + 10 个 BDD samples（5 valid + 5 bad）。版本号三处一致（package.json + SKILL.md frontmatter + skill-metadata.json）。详见 SSoT §3.4.14 与 §10A 追溯表新增 §3.4.14 行。
 
+#### 第 19.0.1 轮（2026-07-27）：W 模型 8 阶段端到端调测验证与归档（SSoT §3.4.15）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 用户要求移除 w-model-dev-demo 所有产物，进行完整 8 阶段调测 |
+| 范围 | 博客系统后端 demo（32 需求 = 22 REQ + 6 NFR + 4 CON），调测后归档不入库 |
+| 真实 bug | `check-bdd-model.ts` D7 RTM 映射校验误用 `rtm.requirements`（不存在字段），修正为 `rtm.rows` + `requirementId`（与 `gate-logic.ts` `RTMMatrixShape` 对齐）—— 单元测试无法发现，仅端到端调测暴露 |
+| 调测过程修正 | 4 项：checkpoint 决策缺技术名词 / maturity R3 误报 completedCycles=0 / verifier compositeScore 0.9235 漂移 / run-log action="execute" 枚举违反 |
+| 归档 | 7 文件迁移至 `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/` |
+| 产物清理 | `w-model-dev-demo/` + `update-rtm.cjs` + `执行情况/` 删除；`package.json` demo 专用依赖还原 |
+| 测试补强 | `bdd-logic.test.ts` 新增 3 个 D7 RTM schema 测试（正确 schema 通过 + feature id 未登记失败 + reqId 不存在失败），防止 schema 回退 |
+| 版本号 | 三处同步为 `19.0.1`（package.json + skill-metadata.json + SKILL.md frontmatter） |
+| self-test | 基线 121 不变（BDD 用例 10 不变）全通过 |
+| vitest | 105→108（bdd-logic.test.ts +3 D7 测试）全通过 |
+| TypeScript strict | 0 错误 |
+| 调测统计 | UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过；V 评审 7A+1B；TLA+ L4 TLC 零违反；BDD 4 features 34 scenarios；code-TLA+ 4 维度 78 项；check-artifact-gate exitCode=0；maturity.completedCycles=1 |
+
+> 第 19.0.1 轮（2026-07-27）相比第十九轮（BDD 建模）：从「BDD 建模引入」进化为「BDD 建模端到端验证 + 真实 bug 发现」。本次调测的核心价值在于 `check-bdd-model.ts` D7 bug 的暴露——这个 bug 在单元测试中无法发现（sample 数据结构恰好与错误字段名匹配），只有在真实 8 阶段端到端调测中用真实 RTM（`rtm.rows` + `requirementId`）喂给脚本时才会暴露。这印证了 W 模型 8 阶段端到端调测对技能包本身的验证价值。归档产物迁移至 `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`（7 文件），demo 产物清理。版本号三处同步 19.0.1。详见 SSoT §3.4.15 与 §10A 追溯表新增 §3.4.15 行。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：
@@ -394,5 +414,5 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-maturity.ts | Maturity 门禁（R1-R5 schema/level/周期/history/降级） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-checkpoint.ts | Checkpoint 门禁（R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-rootcause-report.ts | RootCauseReport 校验（R1-R10：Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度；CLI `npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>`） | 全阶段（返工） | 0=通过，1=校验失败，2=输入错误 |
-| self-test.ts | 回归基线（121 条样本：18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata + 10 BDD） | - | 0=通过，1=失败 |
+| self-test.ts | 回归基线（121 条样本：18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata + 10 BDD）；第 19.0.1 轮调测后 vitest 108 条（bdd-logic.test.ts 含 3 个 D7 RTM schema 测试） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel） | - | 0=通过，1=失败 |

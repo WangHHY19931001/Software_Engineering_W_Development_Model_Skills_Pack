@@ -1,6 +1,6 @@
 {
   "name": "w-model-dev",
-  "version": "19.0.0",
+  "version": "19.0.1",
   "schemaVersion": "1.0",
   "source": "w-model-dev/SKILL.md",
   "description": "W 模型开发技能版本号镜像，由 __tests__/skill-metadata.test.ts 校验与 SKILL.md frontmatter 一致",

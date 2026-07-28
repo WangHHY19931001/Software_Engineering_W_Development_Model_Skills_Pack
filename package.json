@@ -1,6 +1,6 @@
 {
   "name": "w-model-dev-skill",
-  "version": "19.0.0",
+  "version": "19.0.1",
   "private": true,
   "description": "W-Model AI Assistant Skill — 编排 + 校验脚本技能包（提示词 + 模板 + 自包含门禁脚本，不内置 LLM 调用）",
   "type": "module",
@@ -25,7 +25,8 @@
     "eslint": "^8.57.1",
     "eslint-plugin-security": "^1.7.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=20"
