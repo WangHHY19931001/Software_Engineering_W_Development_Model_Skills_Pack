@@ -382,3 +382,24 @@ describe('R1-R6 四维识别校验', () => {
     });
   });
 });
+
+describe('[21.0.0] R11 level 正整数校验', () => {
+  it('R11: REQ 节点 level 为非正整数应 fail', () => {
+    const graph: GraphShape = {
+      version: 1,
+      currentPhase: 1,
+      nodes: [
+        { id: 'REQ-001', type: 'REQ', phase: 1, title: '域A', summary: 'level=1', level: 1 },
+        { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块A', summary: 'level=0', level: 0, reqGroup: 'REQ-001' },
+        { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块B', summary: 'level=-1', level: -1, reqGroup: 'REQ-001' },
+      ],
+      edges: [
+        { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+        { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
+      ],
+    };
+    const result = checkRequirementGraph(graph, 1);
+    expect(result.passed).toBe(false);
+    expect(result.violations.length).toBeGreaterThan(0);
+  });
+});

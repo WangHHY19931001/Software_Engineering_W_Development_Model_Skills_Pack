@@ -51,7 +51,7 @@ export interface GraphNode {
   level?: number;
   /** 需求优先级：P0=必须 P1=应该 P2=可以 P3=不会（可选） */
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
-  /** 所属 REQ-group ID（level=1 REQ 自身为 group 无此字段；level=2-4 须指向 level=1 祖先） */
+  /** 所属 REQ-group ID（level=1 REQ 自身为 group 无此字段；level≥2 须指向 level=1 祖先） */
   reqGroup?: string;
 }
 
@@ -586,6 +586,14 @@ export function checkRequirementGraph(
     const missingLevelReqs = reqNodes.filter(n => n.level === undefined).map(n => n.id);
     if (missingLevelReqs.length > 0) {
       result.violations.push(`R1-R4 层级校验失败：REQ 节点缺 level 字段（强制必填，无降级）：${missingLevelReqs.join(', ')}`);
+    }
+
+    // R11: level 正整数校验（[21.0.0] 新增）
+    const nonPositiveLevelReqs = reqNodes
+      .filter(n => n.level !== undefined && (!Number.isInteger(n.level) || n.level < 1))
+      .map(n => n.id);
+    if (nonPositiveLevelReqs.length > 0) {
+      result.violations.push(`R11 level 正整数校验失败：REQ 节点 level 非正整数：${nonPositiveLevelReqs.join(', ')}`);
     }
 
     const level1Reqs = reqNodes.filter(n => n.level === 1).map(n => n.id);
