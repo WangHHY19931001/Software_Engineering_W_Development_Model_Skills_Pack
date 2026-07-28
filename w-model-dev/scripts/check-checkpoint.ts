@@ -8,11 +8,11 @@
  * 内容具体、用户确认存在、决策与阶段匹配、跨阶段证据一致。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=<dir>]
+ *   npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
  *
  * 参数：
  *   run-log.jsonl          run-log.jsonl 文件路径
- *   --checkpoint-log=<dir> checkpoint-log 目录路径（可选，R3 用户确认存在校验）
+ *   --checkpoint-log=<dir> checkpoint-log 目录路径（强制，R3 用户确认存在校验）
  *                         目录下按 phase 命名的文件（如 phase-1.txt / 1.txt / checkpoint-1.md）
  *                         内容即用户确认原文，key=phase
  *
@@ -129,8 +129,13 @@ async function main(): Promise<void> {
 
   if (!runLogFile) {
     console.error(
-      '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=<dir>]',
+      '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
     );
+    process.exit(2);
+  }
+
+  if (!checkpointLogDir) {
+    console.error('✗ --checkpoint-log=<dir> 参数为强制（[21.0.0] R3 强化），未提供');
     process.exit(2);
   }
 
@@ -149,7 +154,7 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  // 可选输入：--checkpoint-log（读失败只警告不 exit）
+  // 强制输入：--checkpoint-log（读失败只警告不 exit，但 R3 逻辑会报违规）
   let checkpointLog: Map<string, string> | undefined;
   let checkpointLogFileCount = 0;
   if (checkpointLogDir) {

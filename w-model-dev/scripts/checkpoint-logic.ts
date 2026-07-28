@@ -223,10 +223,15 @@ export function checkCheckpoint(
     }
   }
 
-  // R3 用户确认存在（可选校验：仅当 checkpointLog 提供时执行）
-  // 对每个 checkpoint success，查 checkpointLog.get(String(phase))；
-  // 不存在或为空 → 疑似 O 自问自答（D19）。options 未提供 → 跳过 R3（不报违规）
-  if (options?.checkpointLog) {
+  // R3 用户确认存在（[21.0.0] 强化：强制校验，拒绝代签）
+  if (!options?.checkpointLog) {
+    // [21.0.0] 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规
+    for (const e of checkpoints) {
+      violations.push(
+        `R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（未提供 --checkpoint-log，[21.0.0] 强制）`,
+      );
+    }
+  } else {
     for (const e of checkpoints) {
       const userConfirm = options.checkpointLog.get(String(e.phase));
       if (!userConfirm || userConfirm.trim() === '') {
