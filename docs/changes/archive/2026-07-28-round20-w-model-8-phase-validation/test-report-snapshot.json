@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "blog-system-demo",
+  "archivedAt": "2026-07-28T22:38:00.000Z",
+  "currentPhase": 8,
+  "totalTests": 126,
+  "totalPassed": 126,
+  "totalFailed": 0,
+  "totalPending": 0,
+  "phases": [
+    {
+      "phase": 5,
+      "phaseName": "编码实现",
+      "testType": "unitTest",
+      "framework": "vitest",
+      "total": 55,
+      "passed": 55,
+      "failed": 0,
+      "pending": 0,
+      "coverage": {
+        "stmts": 99.28,
+        "branch": 93.75,
+        "funcs": 100,
+        "lines": 99.26
+      },
+      "testCases": [
+        "TC-UT-001~004 用户注册（REQ-001）",
+        "TC-UT-005~006 用户登录（REQ-002）",
+        "TC-UT-003,TC-UT-015e~g 角色管理（REQ-003）",
+        "TC-UT-007~009 文章发布（REQ-004）",
+        "TC-UT-010~011 文章编辑（REQ-005）",
+        "TC-UT-006-001~002 文章列表（REQ-006）",
+        "TC-UT-012 文章分页（REQ-007）",
+        "TC-UT-013~014 评论发布（REQ-008）",
+        "TC-UT-015a~d JWT 认证（CON-001）"
+      ]
+    },
+    {
+      "phase": 6,
+      "phaseName": "集成测试",
+      "testType": "integrationTest",
+      "framework": "vitest",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "pending": 0,
+      "coverage": 100,
+      "testCases": [
+        "TC-INT-001 用户注册→Store 持久化",
+        "TC-INT-002 用户登录→JWT 签发→Middleware 验证",
+        "TC-INT-003 文章发布→角色权限 Middleware",
+        "TC-INT-004 文章发布→Store 持久化",
+        "TC-INT-005 文章编辑→权限校验",
+        "TC-INT-006 文章查询→分页逻辑",
+        "TC-INT-007 评论发布→Store 持久化",
+        "TC-INT-008 跨模块协作（User↔Article↔Comment）"
+      ]
+    },
+    {
+      "phase": 7,
+      "phaseName": "系统测试",
+      "testType": "systemTest",
+      "framework": "vitest+supertest",
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "pending": 0,
+      "coverage": 100,
+      "testCases": [
+        "TC-SYS-001 注册+登录 HTTP 端到端",
+        "TC-SYS-002 文章 CRUD HTTP 端到端",
+        "TC-SYS-003 文章编辑权限 HTTP 端到端",
+        "TC-SYS-004 分页查询 HTTP 端到端",
+        "TC-SYS-005 评论发布 HTTP 端到端",
+        "TC-SYS-006 角色权限 HTTP 端到端",
+        "TC-SYS-007 跨用户协作 HTTP 端到端",
+        "TC-SYS-008 P95 响应时间性能基线",
+        "TC-SYS-009 JWT 认证安全",
+        "TC-SYS-010 内存使用基线"
+      ]
+    },
+    {
+      "phase": 8,
+      "phaseName": "验收测试",
+      "testType": "acceptanceTest",
+      "framework": "vitest+supertest",
+      "total": 46,
+      "passed": 46,
+      "failed": 0,
+      "pending": 0,
+      "coverage": 100,
+      "testCases": [
+        "UAT-001 用户注册场景（REQ-001）",
+        "UAT-002 用户登录场景（REQ-002 + CON-001 JWT）",
+        "UAT-003 角色管理场景（REQ-003）",
+        "UAT-004 文章发布场景（REQ-004）",
+        "UAT-005 文章编辑场景（REQ-005，含 B1 部分更新）",
+        "UAT-006 文章列表场景（REQ-006 + CON-002 内存存储）",
+        "UAT-007 分页查询场景（REQ-007）",
+        "UAT-008 评论发布场景（REQ-008）",
+        "UAT-009 NFR-001/NFR-003 性能+内存",
+        "UAT-010 NFR-002 代码覆盖率"
+      ]
+    }
+  ],
+  "regressionCheck": {
+    "tscStrict": "0 errors",
+    "selfTest": "152/152 passed",
+    "vitest": "165/165 passed"
+  }
+}

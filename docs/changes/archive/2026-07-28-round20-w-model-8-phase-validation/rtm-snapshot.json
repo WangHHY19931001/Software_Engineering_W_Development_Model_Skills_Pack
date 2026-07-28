@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "blog-system-demo",
+  "currentPhase": 8,
+  "lastUpdated": "2026-07-28T22:36:00.000Z",
+  "rows": [
+    { "requirementId": "REQ-001", "description": "用户注册（邮箱+密码+角色）", "designDoc": "docs/system-design.md", "codeModule": "SD-001:src/services/userService.ts", "unitTest": "TC-UT-001~004", "integrationTest": "TC-INT-001,TC-INT-008,L3_blog_system_auth_interface-001", "systemTest": "TC-SYS-001,TC-SYS-007,L2_blog_system_user_management-001", "acceptanceTest": "UAT-001,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-002", "description": "用户登录（JWT 签发）", "designDoc": "docs/system-design.md", "codeModule": "SD-001:src/services/userService.ts", "unitTest": "TC-UT-005~006", "integrationTest": "TC-INT-002,TC-INT-008,L3_blog_system_auth_interface-001", "systemTest": "TC-SYS-001,TC-SYS-009,L2_blog_system_user_management-001", "acceptanceTest": "UAT-002,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-003", "description": "用户角色管理（reader/blogger/admin）", "designDoc": "docs/system-design.md", "codeModule": "SD-001:src/services/userService.ts, SD-001:src/middleware/auth.ts", "unitTest": "TC-UT-003,TC-UT-015e~g", "integrationTest": "TC-INT-003,TC-INT-004,L3_blog_system_auth_interface-001", "systemTest": "TC-SYS-006,L2_blog_system_user_management-001", "acceptanceTest": "UAT-003,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-004", "description": "文章发布（blogger 角色）", "designDoc": "docs/system-design.md", "codeModule": "SD-002:src/services/articleService.ts", "unitTest": "TC-UT-007~009", "integrationTest": "TC-INT-003,TC-INT-004,TC-INT-008,L3_blog_system_content_interface-001", "systemTest": "TC-SYS-002,TC-SYS-006,TC-SYS-007,L2_blog_system_content_management-001", "acceptanceTest": "UAT-004,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-005", "description": "文章编辑（作者本人）", "designDoc": "docs/system-design.md", "codeModule": "SD-002:src/services/articleService.ts", "unitTest": "TC-UT-010~011", "integrationTest": "TC-INT-005,L3_blog_system_content_interface-001", "systemTest": "TC-SYS-003,L2_blog_system_content_management-001", "acceptanceTest": "UAT-005,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-006", "description": "文章列表查询（全量）", "designDoc": "docs/system-design.md", "codeModule": "SD-002:src/services/articleService.ts", "unitTest": "TC-UT-006-001~002", "integrationTest": "TC-INT-006,L3_blog_system_content_interface-001", "systemTest": "TC-SYS-002,TC-SYS-010,L2_blog_system_content_management-001", "acceptanceTest": "UAT-006,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-007", "description": "文章分页查询（page+size）", "designDoc": "docs/system-design.md", "codeModule": "SD-002:src/services/articleService.ts", "unitTest": "TC-UT-012", "integrationTest": "TC-INT-006,L3_blog_system_content_interface-001", "systemTest": "TC-SYS-004,TC-SYS-008,L2_blog_system_content_management-001", "acceptanceTest": "UAT-007,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "REQ-008", "description": "评论发布（登录用户）", "designDoc": "docs/system-design.md", "codeModule": "SD-003:src/services/commentService.ts", "unitTest": "TC-UT-013~014", "integrationTest": "TC-INT-007,TC-INT-008,L3_blog_system_content_interface-001", "systemTest": "TC-SYS-005,TC-SYS-007,TC-SYS-010,L2_blog_system_comment_management-001", "acceptanceTest": "UAT-008,L1_blog_system-001", "coverageStatus": "100%" },
+    { "requirementId": "NFR-001", "description": "响应时间 P95 ≤ 200ms", "designDoc": "docs/system-design.md", "codeModule": "SD-000:src/app.ts", "unitTest": null, "integrationTest": null, "systemTest": "TC-SYS-008", "acceptanceTest": "UAT-009", "coverageStatus": "100%" },
+    { "requirementId": "NFR-002", "description": "代码覆盖率 ≥ 80%", "designDoc": "docs/system-design.md", "codeModule": "SD-000:vitest.config.ts", "unitTest": null, "integrationTest": null, "systemTest": null, "acceptanceTest": "UAT-010", "coverageStatus": "100%" },
+    { "requirementId": "NFR-003", "description": "内存使用 ≤ 100MB", "designDoc": "docs/system-design.md", "codeModule": "SD-001:src/stores/userStore.ts, SD-002:src/stores/articleStore.ts, SD-003:src/stores/commentStore.ts", "unitTest": null, "integrationTest": null, "systemTest": "TC-SYS-010", "acceptanceTest": "UAT-009", "coverageStatus": "100%" },
+    { "requirementId": "CON-001", "description": "使用 JWT 认证", "designDoc": "docs/system-design.md", "codeModule": "SD-001:src/utils/jwt.ts, SD-001:src/middleware/auth.ts", "unitTest": "TC-UT-015a~d", "integrationTest": null, "systemTest": null, "acceptanceTest": "UAT-002", "coverageStatus": "100%" },
+    { "requirementId": "CON-002", "description": "使用内存存储（Map）", "designDoc": "docs/system-design.md", "codeModule": "SD-001:src/stores/userStore.ts, SD-002:src/stores/articleStore.ts, SD-003:src/stores/commentStore.ts", "unitTest": null, "integrationTest": null, "systemTest": null, "acceptanceTest": "UAT-006", "coverageStatus": "100%" }
+  ],
+  "executionSummary": {
+    "unitTest": { "total": 55, "passed": 55, "failed": 0, "pending": 0, "coverage": 99 },
+    "integrationTest": { "total": 8, "passed": 8, "failed": 0, "pending": 0, "coverage": 100 },
+    "systemTest": { "total": 17, "passed": 17, "failed": 0, "pending": 0, "coverage": 100 },
+    "acceptanceTest": { "total": 46, "passed": 46, "failed": 0, "pending": 0, "coverage": 100 }
+  }
+}
