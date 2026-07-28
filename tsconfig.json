@@ -21,6 +21,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
@@ -29,5 +30,5 @@
     "noEmit": true
   },
   "include": ["w-model-dev/scripts/**/*"],
-  "exclude": ["node_modules", "dist", "w-model-dev-demo", "coverage", "w-model-dev/scripts/__tests__"]
+  "exclude": ["node_modules", "dist", "coverage", "w-model-dev/scripts/__tests__"]
 }

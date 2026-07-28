@@ -1518,11 +1518,16 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
 
 async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
+  // [21.0.0] R3 强化：valid 样本须提供 checkpointLog（含用户确认记录）
+  const validCheckpointLog = new Map<string, string>([
+    ['1', '用户确认：放行进入阶段 2（user-id: alice）'],
+    ['2', '用户确认：放行进入阶段 3（user-id: alice）'],
+  ]);
   for (const c of CHECKPOINT_CASES) {
     const abs = path.join(samplesDir, 'checkpoint', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonl(raw);
-    const r = checkCheckpoint(parsed);
+    const r = checkCheckpoint(parsed, { checkpointLog: c.expectedPassed ? validCheckpointLog : undefined });
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
@@ -1801,8 +1806,9 @@ async function runSignatureChainCases(samplesDir: string): Promise<CaseResult[]>
     const abs = path.join(samplesDir, 'signature-chain', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const entries = raw.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
-    // R8 需 existingPaths；样本中所有路径均不存在于 self-test 环境，传空集即可触发 R8
-    const r = checkSignatureChain(entries, { phase: 1, existingPaths: new Set<string>() });
+    // R8 需 existingPaths；仅 bad-missing-artifact 样本传空集触发 R8，其余样本跳过 R8
+    const existingPaths = c.file === 'bad-missing-artifact.jsonl' ? new Set<string>() : undefined;
+    const r = checkSignatureChain(entries, { phase: 1, existingPaths });
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {

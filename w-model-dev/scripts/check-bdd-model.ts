@@ -101,7 +101,7 @@ async function parseFeatureFile(
     const body = m[2]!;
     const startState = extractStateFromStep(body, /Given.*?"(\w+)"/);
     const events = extractEventsFromWhen(body);
-    const expectedEndState = extractStateFromStep(body, /Then.*?"(\w+)"/);
+    const expectedEndState = extractLastStateFromThen(body);
     const invariantAssertions = extractInvariantsFromThen(body);
     scenarios.push({ scenarioName: name, startState, events, expectedEndState, invariantAssertions });
   }
@@ -117,6 +117,16 @@ async function parseFeatureFile(
 function extractStateFromStep(body: string, pattern: RegExp): string | null {
   const m = body.match(pattern);
   return m ? m[1]! : null;
+}
+
+/**
+ * 从 scenario body 中提取最后一个 Then 步骤声明的状态。
+ * 多 When-Then 场景中，期望终态应为最后一个 Then 声明的状态，而非第一个。
+ */
+function extractLastStateFromThen(body: string): string | null {
+  const matches = [...body.matchAll(/Then.*?"(\w+)"/g)];
+  if (matches.length === 0) return null;
+  return matches[matches.length - 1]![1]!;
 }
 
 function extractEventsFromWhen(body: string): string[] {
@@ -304,25 +314,149 @@ async function main(): Promise<number> {
   return result.exitCode;
 }
 
-// 简化的 TLA+ 解析辅助（生产实现应调 tla-logic.ts）
-function extractTlaStates(content: string): string[] {
-  const m = content.match(/VARIABLES\s+(.+?)\s/s);
-  if (!m) return [];
-  return m[1]!.split(',').map(s => s.trim());
+// ==================== TLA+ 快照解析辅助 ====================
+//
+// 从 .tla 文件内容中提取状态机快照（states / initialState / transitions / invariants），
+// 供 D4 BDD↔TLA+ 等价性校验使用。
+//
+// 解析约定（与本项目所有 .tla 文件一致）：
+//   - 状态变量：在 TypeInvariant 中以 `var \in {"s1", "s2", ...}` 声明（区别于计数器 `var \in Nat`）
+//   - 初始状态：在 Init 中以 `var = "Value"` 赋值
+//   - 转移：每个 Action 定义中 `var = "From"` (或 `var \in {...}`) + `var' = "To"`
+//   - 不变式：`var = "State" => condition` 格式，归一化为 `State => condition`
+
+/**
+ * 提取 TLA+ 规格中的状态变量名（第一个在 TypeInvariant 中以 \in {"..."} 声明的变量）。
+ */
+function extractStateVarName(content: string): string | null {
+  const typeInvStart = content.indexOf('TypeInvariant ==');
+  if (typeInvStart === -1) return null;
+  const afterTypeInv = content.slice(typeInvStart);
+  const m = afterTypeInv.match(/(\w+)\s*\\in\s*\{"/);
+  return m ? m[1]! : null;
 }
+
+/**
+ * 提取 TLA+ 规格中的所有状态值（从 TypeInvariant 的 \in {"s1", "s2", ...} 中解析）。
+ */
+function extractTlaStates(content: string): string[] {
+  const states: string[] = [];
+  const typeInvStart = content.indexOf('TypeInvariant ==');
+  if (typeInvStart === -1) return states;
+  const afterTypeInv = content.slice(typeInvStart);
+  // 截取到下一个顶层定义（缩进为0的 \w+ ==）或 ====
+  const endMatch = afterTypeInv.slice(16).match(/\n\w+\s*==|\n====/);
+  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + 16) : afterTypeInv;
+
+  // 匹配 \in {"val1", "val2", ...}（不匹配 \in Nat）
+  const setPattern = /\\in\s*\{((?:"[^"]+"\s*,?\s*)+)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = setPattern.exec(typeInvBody)) !== null) {
+    const valMatches = m[1]!.match(/"([^"]+)"/g);
+    if (valMatches) {
+      for (const v of valMatches) {
+        const val = v.slice(1, -1);
+        if (!states.includes(val)) states.push(val);
+      }
+    }
+  }
+  return states;
+}
+
+/**
+ * 提取 TLA+ 规格的初始状态值（从 Init 中解析状态变量的赋值）。
+ */
 function extractTlaInit(content: string): string {
-  const m = content.match(/Init\s*==\s*(\w+)/s);
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return '';
+
+  const initStart = content.indexOf('Init ==');
+  if (initStart === -1) return '';
+  const afterInit = content.slice(initStart);
+  const endMatch = afterInit.slice(8).match(/\n\w+\s*==|\n====/);
+  const initBody = endMatch ? afterInit.slice(0, endMatch.index! + 8) : afterInit;
+
+  // 匹配 stateVar = "Value"（不匹配 stateVar' = ...）
+  const m = initBody.match(new RegExp(stateVar + '\\s*=\\s*"([^"]+)"'));
   return m ? m[1]! : '';
 }
+
+/**
+ * 提取 TLA+ 规格的转移列表（从各 Action 定义中解析 from→to，事件名转 camelCase）。
+ * 处理 `var \in {"s1", "s2"}` 形式的多 from-state 展开。
+ */
 function extractTlaTransitions(content: string): Array<{ from: string; event: string; to: string }> {
-  // 简化：TLA+ Next 分支解析复杂，这里返回空数组；实际由 tla-logic.ts 提供
-  void content;
-  return [];
+  const transitions: Array<{ from: string; event: string; to: string }> = [];
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return transitions;
+
+  // 从 Next == 中提取 action 名称列表
+  const nextStart = content.indexOf('Next ==');
+  if (nextStart === -1) return transitions;
+  const afterNext = content.slice(nextStart);
+  const specStart = afterNext.indexOf('Spec ==');
+  const nextBody = specStart > 0 ? afterNext.slice(0, specStart) : afterNext;
+  const actionNames = [...nextBody.matchAll(/\\\/\s*(\w+)/g)].map(m => m[1]!);
+
+  for (const actionName of actionNames) {
+    // 定位 action 定义体
+    const defStart = content.indexOf(actionName + ' ==');
+    if (defStart === -1) continue;
+    const afterDef = content.slice(defStart + actionName.length + 4);
+    const endMatch = afterDef.match(/\n\w+\s*==|\n====/);
+    const actionBody = endMatch ? afterDef.slice(0, endMatch.index) : afterDef;
+
+    // 提取 to-state: stateVar' = "Value"
+    const toRegex = new RegExp(stateVar + "'\\s*=\\s*\"([^\"]+)\"");
+    const toMatch = actionBody.match(toRegex);
+    if (!toMatch) continue;
+
+    const toState = toMatch[1]!;
+    // 事件名：PascalCase → camelCase
+    const event = actionName.charAt(0).toLowerCase() + actionName.slice(1);
+
+    // 提取 from-state: stateVar = "Value" 或 stateVar \in {"s1", "s2", ...}
+    const fromSingleRegex = new RegExp(stateVar + '\\s*=\\s*"([^"]+)"');
+    const fromSingleMatch = actionBody.match(fromSingleRegex);
+    if (fromSingleMatch) {
+      transitions.push({ from: fromSingleMatch[1]!, event, to: toState });
+    } else {
+      const fromSetRegex = new RegExp(stateVar + '\\s*\\\\in\\s*\\{((?:"[^"]+"\\s*,?\\s*)+)\\}');
+      const fromSetMatch = actionBody.match(fromSetRegex);
+      if (fromSetMatch) {
+        const fromStates = fromSetMatch[1]!.match(/"([^"]+)"/g)!;
+        for (const fs of fromStates) {
+          transitions.push({ from: fs.slice(1, -1), event, to: toState });
+        }
+      }
+    }
+  }
+
+  return transitions;
 }
+
+/**
+ * 提取 TLA+ 规格的不变式列表（归一化 `var = "State" => cond` 为 `State => cond`）。
+ */
 function extractTlaInvariants(content: string): string[] {
-  // 简化：实际由 tla-logic.ts 提供完整解析
-  void content;
-  return [];
+  const invariants: string[] = [];
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return invariants;
+
+  // 匹配 stateVar = "State" => condition（不匹配 stateVar' = ...）
+  const invRegex = new RegExp(
+    stateVar + '\\s*=\\s*"([^"]+)"\\s*=>\\s*([^\\n]+)',
+    'g'
+  );
+
+  const matches = [...content.matchAll(invRegex)];
+  for (const m of matches) {
+    const stateValue = m[1]!;
+    const condition = m[2]!.trim();
+    invariants.push(`${stateValue} => ${condition}`);
+  }
+
+  return invariants;
 }
 
 main().then(exitCode => process.exit(exitCode)).catch(e => {
