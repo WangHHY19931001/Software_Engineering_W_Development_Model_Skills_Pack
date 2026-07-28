@@ -205,6 +205,31 @@ export function determineQualityLevel(score: number): QualityLevel {
   return 'D';
 }
 
+// ==================== [21.0.0] evidence 格式校验 ====================
+
+const EVIDENCE_PATTERN = /^[\w/.-]+\.[\w-]+(?:\.[\w-\[\]]+)*=.+$/;
+const VAGUE_EVIDENCE_PATTERNS = [
+  /^(C\d+-C\d+\s*全通过)/,
+  /^(质量良好|评审通过|校验通过|全部通过)/,
+  /^(全\s*通过|已\s*通过|满\s*足)/,
+];
+export function validateEvidenceFormat(evidence: string[]): { valid: boolean; vagueItems: string[] } {
+  const vagueItems: string[] = [];
+  for (const item of evidence) {
+    if (!EVIDENCE_PATTERN.test(item)) {
+      vagueItems.push(item);
+      continue;
+    }
+    for (const vaguePattern of VAGUE_EVIDENCE_PATTERNS) {
+      if (vaguePattern.test(item)) {
+        vagueItems.push(item);
+        break;
+      }
+    }
+  }
+  return { valid: vagueItems.length === 0, vagueItems };
+}
+
 // ==================== 主校验函数 ====================
 
 /**
@@ -484,7 +509,7 @@ export function checkVerifierOutput(
   }
 
   // 4. 综合分数
-  const compositeScore = o.compositeScore;
+  let compositeScore = o.compositeScore;
   let expectedComposite = 0;
   for (const sc of subCriteria as Array<Record<string, unknown>>) {
     if (isNumber(sc.score) && isNumber(sc.weight)) {
@@ -500,7 +525,7 @@ export function checkVerifierOutput(
   }
 
   // 5. qualityLevel
-  const qualityLevel = o.qualityLevel;
+  let qualityLevel = o.qualityLevel;
   const allowedLevels: QualityLevel[] = ['A', 'B', 'C', 'D'];
   if (!allowedLevels.includes(qualityLevel as QualityLevel)) {
     reasons.push(`qualityLevel 必须为 A/B/C/D，实际为 ${JSON.stringify(qualityLevel)}`);
@@ -526,6 +551,29 @@ export function checkVerifierOutput(
   } else {
     const r11 = checkR11SummaryLength(o.summary);
     if (r11) reasons.push(r11);
+  }
+
+  // [21.0.0] evidence 格式校验
+  const evidenceList = (subCriteria as Array<Record<string, unknown>>)
+    .map(sc => sc.evidence)
+    .filter((e): e is string => typeof e === 'string');
+  if (evidenceList.length > 0) {
+    const evidenceResult = validateEvidenceFormat(evidenceList);
+    if (!evidenceResult.valid) {
+      if (typeof qualityLevel === 'string') {
+        const levels: string[] = ['A', 'B', 'C', 'D'];
+        const idx = levels.indexOf(qualityLevel);
+        if (idx >= 0 && idx < levels.length - 1) {
+          qualityLevel = levels[idx + 1] as QualityLevel;
+          if (isNumber(compositeScore)) {
+            compositeScore = Math.max(0, compositeScore - 0.1);
+          }
+        }
+      }
+      reasons.push(
+        `evidence 格式校验失败（空泛声明，O3 命中）：${evidenceResult.vagueItems.join('; ')}`,
+      );
+    }
   }
 
   // 8. reworkHints
