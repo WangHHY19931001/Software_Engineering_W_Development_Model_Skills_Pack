@@ -761,7 +761,7 @@ function validateSpec(raw: unknown, index: number): string[] {
  *   2. 每个 spec（phase ≤ 入参 phase）的字段类型与取值合法性
  *   3. 声明的结果标志：
  *      - syntaxChecked=false ⇒ syntaxErrors（SANY 必须通过）
- *      - 非 --skip-tlc 时：tlcChecked=false ⇒ 违反；deadlockFree=false ⇒ deadlockViolations；
+ *      - tlcChecked=false ⇒ 违反；deadlockFree=false ⇒ deadlockViolations；
  *        invariantsHold=false ⇒ invariantViolations；stateExplosion=true ⇒ stateExplosionSpecs
  *   4. 层次一致性（checkHierarchy）
  *   5. 拆解决策（checkDecomposition，警告不导致失败）
@@ -774,7 +774,6 @@ function validateSpec(raw: unknown, index: number): string[] {
  *
  * @param manifest tla-manifest.json 解析后的对象（可选内嵌 graphSdNodes / spec.tlaContent / spec.cfgContent）
  * @param phase    校验阶段，仅校验 spec.phase ≤ phase 的规格
- * @param options  { skipTlc?: boolean } —— 跳过 TLC 相关标志校验（快速反馈用）
  * @returns TlaCheckResult
  */
 
@@ -863,9 +862,7 @@ export function checkRoundsSchema(manifest: Partial<TlaManifest>): string[] {
 export function checkTlaModel(
   manifest: unknown,
   phase: number,
-  options?: { skipTlc?: boolean },
 ): TlaCheckResult {
-  const skipTlc = options?.skipTlc === true;
   const result: TlaCheckResult = {
     passed: false,
     phase,
@@ -958,19 +955,17 @@ export function checkTlaModel(
         `规格 ${s.id} syntaxChecked=false（SANY 语法检查未通过或未执行）`,
       );
     }
-    if (!skipTlc) {
-      if (!s.tlcChecked) {
-        result.violations.push(`规格 ${s.id} tlcChecked=false（TLC 模型检查未完成）`);
-      }
-      if (!s.deadlockFree) {
-        result.deadlockViolations.push(`规格 ${s.id} 存在死锁（deadlockFree=false）`);
-      }
-      if (!s.invariantsHold) {
-        result.invariantViolations.push(`规格 ${s.id} 不变式违反（invariantsHold=false）`);
-      }
-      if (s.stateExplosion) {
-        result.stateExplosionSpecs.push(s.id);
-      }
+    if (!s.tlcChecked) {
+      result.violations.push(`规格 ${s.id} tlcChecked=false（TLC 模型检查未完成）`);
+    }
+    if (!s.deadlockFree) {
+      result.deadlockViolations.push(`规格 ${s.id} 存在死锁（deadlockFree=false）`);
+    }
+    if (!s.invariantsHold) {
+      result.invariantViolations.push(`规格 ${s.id} 不变式违反（invariantsHold=false）`);
+    }
+    if (s.stateExplosion) {
+      result.stateExplosionSpecs.push(s.id);
     }
   }
 

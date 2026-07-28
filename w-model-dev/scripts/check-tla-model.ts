@@ -8,13 +8,12 @@
  *   （死锁 / 不变式违反 / 状态爆炸）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>] [--keep-states]
+ *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
  *
  * 参数：
  *   tla-manifest.json   manifest 文件路径
  *   --phase=N            只校验 spec.phase ≤ N 的规格（1-8），默认从 manifest.currentPhase 读取
  *   --spec=<id>          仅对该规格执行 SANY/TLC（调试用；结构/层次校验仍覆盖全部 phase 内规格）
- *   --skip-tlc           只跑文件头 + 层次一致性 + SANY 语法检查，跳过 TLC（阶段门放行前不可跳过）
  *   --graph=<graph.json> 提供图谱文件，提取 type=SD 节点 ID 供 SD 覆盖率校验（§10）
  *   --keep-states / -k   P3.8：保留 TLC states 目录用于调试（默认校验后自动清理）
  *
@@ -46,7 +45,6 @@ interface ParsedArgs {
   manifestFile: string | undefined;
   phase: number | undefined;
   specId: string | undefined;
-  skipTlc: boolean;
   graphFile: string | undefined;
   /** P3.8（第 9 轮）--keep-states：保留 states 目录用于调试 */
   keepStates: boolean;
@@ -57,7 +55,6 @@ function parseArgs(argv: string[]): ParsedArgs {
   const manifestFile = args.find(a => !a.startsWith('--'));
   const phaseArg = args.find(a => a.startsWith('--phase='));
   const specArg = args.find(a => a.startsWith('--spec='));
-  const skipTlc = args.includes('--skip-tlc');
   // P3.8（第 9 轮）--keep-states / -k：调试模式下保留 TLC 产物
   const keepStates = args.includes('--keep-states') || args.includes('-k');
   const graphArg = args.find(a => a.startsWith('--graph='));
@@ -75,7 +72,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   const graphFile = graphArg ? graphArg.split('=')[1] : undefined;
 
-  return { manifestFile, phase, specId, skipTlc, graphFile, keepStates };
+  return { manifestFile, phase, specId, graphFile, keepStates };
 }
 
 // ==================== 环境检查 ====================
@@ -218,7 +215,7 @@ interface ToolRunResult {
 }
 
 /**
- * 对单个规格执行 SANY 语法检查与（可选）TLC 模型检查。
+ * 对单个规格执行 SANY 语法检查与 TLC 模型检查。
  *
  * 顺序硬约束（反模式 #14）：先 SANY，通过后才允许跑 TLC。
  */
@@ -226,7 +223,6 @@ function runTools(
   jarAbs: string,
   tlaAbs: string,
   cfgAbs: string,
-  skipTlc: boolean,
 ): ToolRunResult {
   const tlaDir = path.dirname(tlaAbs);
   const moduleName = path.basename(tlaAbs, '.tla');
@@ -259,8 +255,6 @@ function runTools(
     out.syntaxOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}`.trim() || (e.message ?? 'SANY 执行失败');
     return out; // 语法未通过 → 不跑 TLC（反模式 #14 守护）
   }
-
-  if (skipTlc) return out;
 
   // TLC 模型检查（cwd 置为 .tla 所在目录，TLC 据此查找模块文件）
   // 实测退出码：0=成功 / 11=死锁 / 12=不变式违反 / 其他=内存或配置错误
@@ -303,11 +297,11 @@ function runTools(
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  const { manifestFile, phase: phaseArg, specId, skipTlc, graphFile, keepStates } = parseArgs(process.argv);
+  const { manifestFile, phase: phaseArg, specId, graphFile, keepStates } = parseArgs(process.argv);
 
   if (!manifestFile) {
     console.error(
-      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>] [--keep-states]',
+      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]',
     );
     process.exit(2);
   }
@@ -446,7 +440,7 @@ async function main(): Promise<void> {
       }
 
       // SANY + TLC
-      const run = runTools(jarAbs, tlaAbs, cfgAbs, skipTlc);
+      const run = runTools(jarAbs, tlaAbs, cfgAbs);
       spec.syntaxChecked = run.syntaxOk;
       if (!run.syntaxOk) {
         headerViolations.push(
@@ -469,7 +463,7 @@ async function main(): Promise<void> {
   }
 
   // 调用纯逻辑校验（manifest 已被本脚本按实际工具结果回填标志 + tlaContent/cfgContent/graphSdNodes）
-  const result = checkTlaModel(parsed, phase, { skipTlc });
+  const result = checkTlaModel(parsed, phase);
 
   // 回填纯逻辑无法判定的部分：headerViolations + 环境
   result.headerViolations = headerViolations;
@@ -512,7 +506,6 @@ async function main(): Promise<void> {
     `环境状态      : ${result.environmentOk ? '✓ 就绪' : '✗ 未就绪'}（Java ${env.javaVersion ?? 'N/A'}，jar ${jarAbs}）`,
   );
   if (specId !== undefined) console.log(`--spec 过滤   : ${specId}`);
-  if (skipTlc) console.log(`--skip-tlc    : 是（跳过 TLC）`);
   console.log(`头部违反      : ${result.headerViolations.length === 0 ? '无' : `${result.headerViolations.length} 条`}`);
   console.log(`层次违反      : ${result.hierarchyViolations.length === 0 ? '无' : `${result.hierarchyViolations.length} 条`}`);
   console.log(`拆解违反      : ${result.decompositionViolations.length === 0 ? '无' : `${result.decompositionViolations.length} 条`}`);
