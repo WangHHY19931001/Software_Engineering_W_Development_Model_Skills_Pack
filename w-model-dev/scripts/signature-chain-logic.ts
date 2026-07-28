@@ -165,12 +165,16 @@ export function checkSignatureChain(
     rulesPassed.push('R2');
   }
 
-  // ==================== R3: 时序单调 ====================
-  for (let i = 1; i < phaseEntries.length; i++) {
-    const prev = phaseEntries[i - 1]!;
-    const curr = phaseEntries[i]!;
-    if (new Date(curr.signedAt).getTime() < new Date(prev.signedAt).getTime()) {
-      violations.push(`R3: 时间戳非单调递增：${curr.sigId}(${curr.signedAt}) 早于 ${prev.sigId}(${prev.signedAt})`);
+  // ==================== R3: 时序单调（按链顺序校验 signedAt 不得早于前环） ====================
+  // 注：phaseEntries 已按 signedAt 排序，相邻比较无法检出回填；须按 prevSigId 链序校验。
+  const entryBySigId = new Map<string, SignatureChainEntry>(
+    phaseEntries.map((e): [string, SignatureChainEntry] => [e.sigId, e]),
+  );
+  for (const entry of phaseEntries) {
+    if (entry.prevSigId === 'genesis') continue;
+    const prev = entryBySigId.get(entry.prevSigId);
+    if (prev && new Date(entry.signedAt).getTime() < new Date(prev.signedAt).getTime()) {
+      violations.push(`R3: 时间戳非单调递增：${entry.sigId}(${entry.signedAt}) 早于 ${entry.prevSigId}(${prev.signedAt})`);
       rulesFailed.push('R3');
       break;
     }
