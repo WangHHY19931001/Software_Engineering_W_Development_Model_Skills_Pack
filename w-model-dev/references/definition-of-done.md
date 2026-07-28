@@ -14,7 +14,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 - 每次阶段门评审通过前
 - 每次发布检查点（🔴 CHECKPOINT · 发布放行）前
 
-## 六维度标准
+## 七维度标准
 
 | 维度 | 标准 | 验证方式 | 不通过 → 动作 |
 |---|---|---|---|
@@ -26,6 +26,12 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 | **理解证据** | 阶段门放行须有用户理解证据 | run-log `acknowledgedDecisions` 非空且含 ≥1 关键决策摘要（非"确认"/"同意"） | 拒绝放行；要求用户填入理解证据（O4 命中） |
 
 > 第六维度「理解证据」吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念，对抗用户对阶段产物 rubber-stamp。放行 ≠ 理解；`acknowledgedDecisions` 非空才算放行。SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 为权威定义。
+
+**[21.0.0] 强化**：self-as-verifier 代签视为 O4 命中（`signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID 即代签）。
+
+### 第七维度：签名链完整性（[21.0.0] 新增）
+
+每阶段每角色动作完成后须写入 `signature-chain.jsonl`；G 角色跑门禁脚本前须校验签名链完整性（R1-R10 全通过）；签名链断裂视为 #32 命中，拒绝放行。
 
 ## 自检清单
 

@@ -247,7 +247,7 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 | `timestamp` | string | ISO 8601 时间戳 |
 | `specId` | string | 校验的 spec id（如 `L1_blog_system`） |
 | `syntaxCheck` | boolean | SANY 语法检查是否通过 |
-| `tlcCheck` | boolean | TLC 模型检查是否通过（`--skip-tlc` 时填 `false` 并备注） |
+| `tlcCheck` | boolean | TLC 模型检查是否通过 |
 | `violations` | string[] | 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述，与 [tla-logic.ts](../scripts/tla-logic.ts) 类型定义一致；第 16 轮 P4.3 修正：原 `number` 类型与脚本不一致） |
 | `converged` | boolean | 本轮是否零违反收敛（`violations.length === 0`） |
 
@@ -273,10 +273,15 @@ R13 校验由 [`tla-logic.ts`](../scripts/tla-logic.ts) `checkRoundsSchema` 函�
 ## 校验脚本
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc] [--graph=<graph.json>] [--keep-states]
+npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
 ```
 
 退出码 `0=通过 / 1=失败 / 2=输入错误`。stdout 末尾输出 `TLA_JSON {...}` 供 Agent 解析。
+
+所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查
+- 不得使用 `--skip-tlc` 跳过 TLC（参数已移除，[21.0.0]）
+- 若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip）
+- 拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段
 
 ### 参数
 
@@ -284,7 +289,6 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
 |---|---|
 | `--phase=N` | 只校验 `phase ≤ N` 的规格 |
 | `--spec=<id>` | 只校验单个规格（调试用） |
-| `--skip-tlc` | 只跑文件头 + 层次 + SANY 语法检查，跳过 TLC（阶段门放行前不可跳过） |
 | `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §10）；未提供时跳过覆盖率校验 |
 | `--keep-states` / `-k` | **第 9 轮 P3.8**：保留 TLC `states/` 目录用于调试（默认校验后自动清理） |
 
@@ -301,7 +305,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
    java -cp <jarPath> tla2sany.SANY <module>.tla
    ```
    实测退出码：**0=成功 / 11=语法错误**；输出走 stdout（含 `Fatal errors while parsing` 等错误消息）。
-7. **TLC 模型检查**（仅 SANY 通过且未 `--skip-tlc` 时；cwd 置为 `.tla` 所在目录）：
+7. **TLC 模型检查**（仅 SANY 通过时；cwd 置为 `.tla` 所在目录）：
    ```
    java -cp <jarPath> tlc2.TLC -nowarning -cleanup -config <spec>.cfg <moduleName>
    ```
@@ -459,7 +463,7 @@ TLA+ 建模必须符合需求和设计。TLC 发现违反时：
 **CLI 入参**：
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<graph.json> [--phase=N] [--spec=<id>] [--skip-tlc]
+npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<graph.json> [--phase=N] [--spec=<id>]
 ```
 
 - `--graph=<graph.json>`：提供结构层图谱，提取 SD 节点供覆盖率校验。未提供时跳过覆盖率校验。

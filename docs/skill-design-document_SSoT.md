@@ -628,6 +628,16 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不引入新节点类型；不引入新 V 子标准；不引入新 CHECKPOINT 暂停点；不引入端到端调测。
 
+#### 3.4.17 第 21 轮：产出来源正确性（inputProvenance）（2026-07-29）
+
+各角色产出须含 `inputProvenance` 来源证明（签名链记录的字段，详见 §7.9 / §10.11）：
+
+- `sourceSigIds`：本角色动作所依赖的上游签名 ID 列表（必须存在于签名链中）
+- `sourceArtifacts`：本角色产出所消费的上游产物 + 来源签名 ID + 来源角色
+- `transformDescription`：本角色对上游产物做了什么变换（人类可读描述）
+
+后续阶段消费者须校验前一阶段产出来源正确性；来源缺失或来源错误即拒绝消费，回退前一阶段。各角色强制来源/禁止来源矩阵见 [`w-model-dev/references/signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) §3。
+
 ---
 
 ## 4. 技能工作流程
@@ -1168,6 +1178,11 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **五轴评审与严重等级标签**（吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能）：代码评审（`targetKind=file`）的子标准按五轴（Correctness / Readability / Security / Architecture / Performance）组织发现项；每条发现项标注 Severity（Critical / Required / Nit / Optional / FYI），使作者区分必修与可选。详细子标准映射与 Structural Remedies 见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §7.4A。
 - **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/verifier-logic.ts`。
 - **与外部演化工具的关系**：本规范只覆盖「阶段产物校验流程」，是技能内部的产物质量保障；技能演化（Rollout / Reflect / Edit / Skill Lift）由外部 SkillOpt / darwin-skill 完成，可消费本规范产出的 `VerifierOutput` JSON 作为训练信号。
+- **evidence 格式规范**（[21.0.0] 新增）：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
+  - 合法示例：`coverage.json.matrices.stakeholder.coverage=100%` / `tla-manifest.json.specs[0].tlcChecked=true`
+  - 非法示例：`C1-C10 全通过` / `质量良好` / `评审通过`（空泛声明）
+  - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
+  - evidence 字段为空 → 评审失败
 
 `/wm review <target>` 命令（见 §6）仅返回结构化评审指引——根据目标 ID 识别 `targetKind`，提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板执行评审、再调用校验脚本。命令本身不调用 LLM。
 
@@ -1193,6 +1208,11 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
 要点：
 - **节点类型**（每阶段一种，设计文档 §2.1）：阶段 1 `REQ` / 阶段 2 `SD` / 阶段 3 `INTF` / 阶段 4 `DD`；另含边界节点 `EXT-IN`（合法外部信息源，DFD terminator）/ `EXT-OUT`（合法外部信息汇），二者豁免黑洞/奇迹判定且不参与 `parent` 单根树。节点 schema 统一含 `id` / `type` / `phase` / `sourcePath` / `summary` 等字段（设计文档 §2.2）。
+- **REQ level 自适应层级深度**（[21.0.0] 修正）：每个 REQ 节点须标注 level（正整数，从 1 开始单调递增，无上限）
+  - 最小层级深度 = 2（domain → acceptance，适用极小项目）
+  - 推荐层级深度 = 4（domain → module → feature → acceptance）
+  - 最大层级深度 = 不限（复杂项目可扩展至 5+ 层）
+  - 校验规则：level 单调性（子节点 level > 父节点 level）+ 根节点 level=1 + 叶节点须可追溯到验收级
 - **边类型**（设计文档 §2.3）：结构边 `parent`（同阶段树形）/ `implements`（SD→REQ）/ `defines`（SD→INTF）/ `realizes`（DD→INTF or DD→SD）；信息流边 `produces` / `consumes`（方向=信息流方向，`from`=来源 `to`=去向，两类方向语义相同仅强调视角不同）。
 - **信息流边与边界节点**用于黑洞/奇迹/死模块校验，与结构边正交（不参与 `parent` 单根树但参与整体连通性 BFS），详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md)。
 - **收敛循环**：A-cross/A-evolve 把 `consolidated.json` 作为 `graph.json` 候选态写入，G 跑 `check-requirement-graph.ts` 校验；`passed=true` 才晋升为正式 `graph.json`（设计文档 §2.6）。
@@ -1244,6 +1264,44 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **维护边界**：S 子代理产出（.tla + .cfg + manifest 实体）；G 子代理跑 `check-tla-model.ts` 校验；编排者不写。TLA+ 不接受占位/简化/错误实现（反模式 #16）；建模须符合需求和设计，符合后仍有问题须修正需求/设计并回退重跑（反模式 #17）。
 - **工具链**：Java ≥ 11（外部）+ `tla2tools.jar`（技能内置 `w-model-dev/tools/tla2tools.jar`，含 SANY + TLC + PlusCal）。
 - **checkRounds 语义**（与 [`w-model-dev/references/tla-plus-guide.md`](../w-model-dev/references/tla-plus-guide.md) 双向追溯）：记录每轮 `check-tla-model.ts` 校验结果（含 violations 摘要与 round 编号）；`violations` 跨轮须单调递减（设计文档 §3.4）；与 `run-log.jsonl` R3（返工动作完整性）交叉校验——每轮 checkRound 须对应 run-log 中一条返工记录；无返工（首次即收敛）填 `[]`。
+
+### 7.9 signature-chain.jsonl schema（角色链式签名产物）
+
+> 阶段 1–8 每角色动作完成后产出的**签名链**记录 schema。权威定义见 [`w-model-dev/references/signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md)；schema 文件见 [`w-model-dev/schemas/signature-chain.schema.json`](../w-model-dev/schemas/signature-chain.schema.json)。
+
+```json
+{
+  "sigId": "wm1-r002-S",
+  "phase": 1,
+  "phaseName": "需求分析",
+  "role": "S",
+  "action": "produce",
+  "runId": "wm1-r002",
+  "artifacts": ["docs/requirements.md", ".w-model/graph.json"],
+  "prevSigId": "wm1-r002a-A",
+  "prevSigHash": "sha256:...",
+  "sigHash": "sha256:...",
+  "signedAt": "2026-07-28T10:00:01.000Z",
+  "signer": "user-or-agent-id",
+  "gateExitCode": null,
+  "gateLogPath": null,
+  "inputProvenance": {
+    "sourceSigIds": ["wm1-r001-O", "wm1-r002a-A"],
+    "sourceArtifacts": [
+      {"path": ".w-model/graph.json", "sourceSigId": "wm1-r002a-A", "sourceRole": "A"},
+      {"path": ".w-model/project.json", "sourceSigId": "wm1-r001-O", "sourceRole": "O"}
+    ],
+    "transformDescription": "A 子代理合并 REQ 节点建图 → S 子代理产出需求规格"
+  }
+}
+```
+
+要点：
+- **链式约束**：`prevSigId` 指向同阶段前一环签名；`sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)`；首环 `prevSigId = "genesis"`，`prevSigHash = "0"`。
+- **角色签名顺序**（强制链）：`genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(gate) → O(checkpoint-用户确认)`；阶段 5 无 A，阶段 6-8 视具体阶段调整。
+- **产出来源正确性**（`inputProvenance`）：各角色产出须声明上游签名 + 上游产物 + 变换描述；强制来源/禁止来源矩阵见 [`signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) §3。
+- **G 角色校验职责**：G 跑门禁脚本前先跑 `check-signature-chain.ts`（R1-R10）；O checkpoint 前须跑签名链校验 + 用户确认签名。
+- **归档**：`signature-chain.jsonl` 须纳入归档完整性强制快照清单（见 §10B.2）。
 
 ---
 
@@ -1510,8 +1568,10 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolida
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 TLA_JSON 证据摘要（与 check-requirement-graph.ts 同构）
-npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc]
+npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
 ```
+
+> [21.0.0] 移除 `--skip-tlc` 参数：所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查，任何场景不得跳过 TLC。若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip），拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段。
 
 **校验算法**（确定性，无 LLM；设计文档 §3.1）：
 
@@ -1523,7 +1583,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|
 6. **拆解决策校验**（设计文档 §3.1 步骤 4 / §1.1）：`checkDecomposition()` 校验 `variableCombination > MUST_SPLIT_THRESHOLD(10000)` 必须 `decompositionDecision='split-done'`，否则违反；`> CONSIDER_SPLIT_THRESHOLD(1000)` 且 `kept-below-threshold` 为警告（不导致失败）。违反 → `decompositionViolations++`。
 7. **轨迹/状态文件清理**（设计文档 §3.4）：每个 spec 校验前删除 `*.dump` / `*.out` / `states/` 目录，避免旧轨迹污染本轮 TLC。实测 TLC 2.19 产物落在 `states/<YY-MM-DD-HH-MM-SS>/` 下（含 `<Module>.st` / `<Module>-0.st` 状态文件与 `<Module>_0.fp` / `<Module>_1.fp` 指纹文件），默认不产生 `.dump` / `.out`。
 8. **SANY 语法检查**（设计文档 §3.1 步骤 6，硬约束顺序；cwd 置为 `.tla` 所在目录）：`java -cp <jarPath> tla2sany.SANY <spec>.tla`，捕获 stdout。实测退出码 **0=成功 / 11=语法错误**（输出走 stdout，含 `Fatal errors while parsing` 等错误消息）。语法失败 → `syntaxErrors++`，**跳过该 spec 的 TLC**（反模式 #14 守护），该 spec 标 `syntaxChecked=false`。
-9. **TLC 模型检查**（仅 SANY 通过且未 `--skip-tlc` 时；cwd 置为 `.tla` 所在目录）：`java -cp <jarPath> tlc2.TLC -nowarning -cleanup -config <spec>.cfg <moduleName>`，捕获 stdout。
+9. **TLC 模型检查**（仅 SANY 通过时；[21.0.0] 移除 skip-tlc 选项；cwd 置为 `.tla` 所在目录）：`java -cp <jarPath> tlc2.TLC -nowarning -cleanup -config <spec>.cfg <moduleName>`，捕获 stdout。
    - `-nowarning`：抑制 GC 建议警告（输出更干净）。
    - `-cleanup`：TLC 自身在运行前清理 `states/` 目录（与步骤 7 互补，双保险）。
    - `<moduleName>` 为 `.tla` 文件名去后缀（如 `L1_blog_system.tla` → `L1_blog_system`），**非** `.tla` 路径。
@@ -1671,6 +1731,8 @@ npx tsx w-model-dev/scripts/check-rootcause-report.ts "<rootcause-report.json>"
 | **L3（高风险路径外的全自主）** | ✅ 等用户（仅高风险路径：auth/加密/发布/架构变更） | ⚡ 自动放行 | ⚡ 全阶段返工可自主（带 attempt cap） | ✅ 等用户（发布门始终 attended） | L2 稳定运行 ≥2 周，误判率 ≤10%，用户显式申请升级 |
 
 > **L2+ 事件驱动激活**：成熟度达 L2 后，事件驱动循环（Loop 3，详见 §10F）激活。消费方自行实现触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段）。L0/L1 不支持事件驱动。
+
+> **[21.0.0] 全面禁止代签**：任何场景（含技能包内部 dogfooding）均须真实用户确认。历史轮次（第 5-20 轮）代签记录标注为 'known violation'。编排者 O 不得代替用户在 🔴 CHECKPOINT 处签字放行。`acknowledgedDecisions` 须由用户陈述，O 不得代填（违反反模式 #10）。即使 L3 自动放行路径，CHECKPOINT 节点仍须真实用户确认（仅降低其他门禁的强制程度，不降低用户确认）。签名链 R5 校验 O checkpoint 签名 signer 须为用户 ID（非 O 角色）。
 
 ### 10C.4 L3 高风险路径定义（强制人工 gate，不可自动放行）
 
@@ -2045,6 +2107,42 @@ interface RunLogEntry {
 - **横切边两端节点须存在于层级树**：两端节点须已在系统层级树中登记（REQ/SD/INTF/DD 之一），但不构成 `parent` 关系。
 - **横切边不替代追溯**：被治理子系统的 `parent` 仍是系统根（治理是横切叠加，不改变结构依附）；追溯层（`implements`/`defines`/`realizes`）与横切层并存，互不替代。
 
+## 10.11 签名链门禁（check-signature-chain.ts）
+
+> 阶段 1–8 每角色动作完成后产出的**签名链完整性 + 产出来源正确性**门禁。权威定义见 [`w-model-dev/references/signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md)；schema 见 §7.9。
+>
+> 实现位置：[`w-model-dev/scripts/check-signature-chain.ts`](../w-model-dev/scripts/check-signature-chain.ts)（CLI）+ [`w-model-dev/scripts/signature-chain-logic.ts`](../w-model-dev/scripts/signature-chain-logic.ts)（校验纯逻辑，单点事实源）。
+> 触发方：G 子代理跑每个 gate 脚本前 + O 子代理 checkpoint 前 + 归档时。
+
+**CLI 接口**：
+
+```bash
+# 退出码 0=通过 / 1=校验失败 / 2=输入错误
+npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+```
+
+**校验规则**（R1-R10）：
+
+| 规则 | 校验内容 | 失败后果 |
+|---|---|---|
+| R1 | 当前阶段所有强制角色签名齐全 | exitCode=1，标注缺失角色 |
+| R2 | 签名链连续（prevSigHash 匹配） | exitCode=1，标注断裂点 |
+| R3 | 时间戳单调递增 | exitCode=1，标注时序异常 |
+| R4 | 签名角色与阶段角色清单匹配 | exitCode=1，标注越权角色 |
+| R5 | O checkpoint 签名 signer 为用户 ID（非 O 角色） | exitCode=1，标注代签（O4 命中） |
+| R6 | sigHash 重算一致（防篡改） | exitCode=1，标注篡改签名 |
+| R7 | 各角色 sourceSigIds 均存在于签名链中 | exitCode=1，标注悬空来源 |
+| R8 | 各角色 sourceArtifacts 路径存在于磁盘 | exitCode=1，标注缺失产物 |
+| R9 | 各角色来源符合"强制来源/禁止来源"矩阵 | exitCode=1，标注越权消费 |
+| R10 | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录 | exitCode=1，标注绕过门禁 |
+
+**跨阶段消费者校验**（`--stage=archive` 时）：
+- 阶段 N+1 的 O chunk 签名 sourceSigIds 含阶段 N 的 O checkpoint 签名
+- 阶段 5 的 S produce 签名 sourceSigIds 含阶段 1-4 全部 G gate 签名
+- 阶段 8 的 G gate 签名 sourceSigIds 含阶段 1-7 全部签名链根 hash
+
+违反任一规则即命中反模式 #32（签名链断裂），拒绝放行。
+
 ---
 
 ## 10A. SSoT ↔ 实现追溯表
@@ -2123,6 +2221,24 @@ interface RunLogEntry {
 | 7 系统测试 | `docs/system-test-report.md` + `tests/perf/k6-load-test.js` | 22/22 通过 + k6 性能基线脚本就绪 |
 | 8 验收测试 | `docs/acceptance-test-report.md` | 15/15 通过，RTM 覆盖率 100%，用户 `confirm` 归档 |
 
+#### 10B.2.1 归档完整性清单（[21.0.0] 新增）
+
+归档时必须快照各阶段所有强制产出文档，由 `check-archive-integrity.ts` 校验：
+
+| 阶段 | 强制快照文件 |
+|---|---|
+| 1 | requirements.md / risk-assessment.md / uat-path-mapping.md / coverage.json / graph.json / tla-manifest.json / bdd-manifest.json |
+| 2 | system-design.md / system-test-design.md / graph.json / tla-manifest.json / bdd-manifest.json |
+| 3 | outline-design.md / integration-test-design.md / graph.json / tla-manifest.json / bdd-manifest.json |
+| 4 | detailed-design.md / unit-test-design.md / graph.json / tla-manifest.json / bdd-manifest.json |
+| 5 | src/ / unit-test-report.json / rtm.json / run-log.jsonl / checkpoint-log.jsonl / signature-chain.jsonl |
+| 6 | integration-test-report.json / rtm.json / run-log.jsonl / checkpoint-log.jsonl / signature-chain.jsonl |
+| 7 | system-test-report.json / rtm.json / run-log.jsonl / checkpoint-log.jsonl / signature-chain.jsonl |
+| 8 | acceptance-test-report.json / rtm.json / run-log.jsonl / checkpoint-log.jsonl / signature-chain.jsonl |
+| 全阶段 | signature-chain.jsonl / verifier-output-*.json / gate-logs/ |
+
+缺失即归档失败（exitCode=1），违反反模式 #31。
+
 ### 10B.3 调测结论摘要
 
 | 指标 | 目标 | 实测（2026-07-24 第五轮） | 是否达标 |
@@ -2155,6 +2271,11 @@ interface RunLogEntry {
 | 3 | ArticleService 类型导出消失：`src/services/comment-service.ts` 报 TS2724 | 2026-07-21 回归发现 | 历史 `src/services/article-service.ts`（已归档）改为内部 `class ArticleService`（无 `export`）+ `export const articleService` 实例，导致 `import type { ArticleService }` 类型丢失 | 恢复 `export class ArticleService`，与 `export const articleService` 共存 | `tsc --noEmit` 退出码 0 |
 | 4 | vitest mock 与 express NextFunction 类型不兼容：`next.mock.calls[0][0]` 报 TS2339 | 2026-07-21 回归发现 | `vi.fn() as unknown as NextFunction` 断言丢失 vitest mock 类型；vitest 1.6 类型定义与 express 4 类型定义存在兼容性问题 | 用 `(next as ReturnType<typeof vi.fn>).mock.calls[0][0]` 等带类型断言访问 | `tsc --noEmit` 退出码 0 |
 | 5 | check-artifact-gate.ts 缺 exitCode 字段，导致 check-run-log.ts R6 交叉校验无法提取退出码 | 阶段 8（验收测试），2026-07-24 第五轮发现 | `check-artifact-gate.ts` 是唯一未在 `GATE_JSON` 输出中包含 `exitCode` 字段的门禁脚本 | 与其它 7 个 `check-*.ts` 脚本对齐：计算 `const exitCode = result.passed ? 0 : 1`，写入 `GATE_JSON` 并 `process.exit(exitCode)`；`check-run-log.ts` 的 `extractExitCode` 模式数组增加 `GATE_JSON` 标记识别 | `npm run self-test` 全通过 |
+| 6 | 阶段 1-4 全部 CHECKPOINT 使用 self-as-verifier 代签，无真实用户确认 | 阶段 8 code review，2026-07-28 第 20 轮 | self-as-verifier 模式合法性歧义 + 历史轮次常态化 | §10C 全面禁止代签 + check-checkpoint.ts R3 强化 + 签名链 R5 代签检测（D20-1） |
+| 7 | TLA+ L1 使用 --skip-tlc 跳过 TLC 检查，违反硬约束 | 阶段 8 code review，2026-07-28 第 20 轮 | --skip-tlc 参数与反模式 #15 矛盾 | §10.8 移除 --skip-tlc + check-tla-model.ts 移除参数（D20-2） |
+| 8 | REQ 层级树仅 3 层，"4 层强制"条款不合理 | 阶段 8 code review，2026-07-28 第 20 轮 | 硬约束设计缺陷（应自适应层级深度） | §7.7 改为自适应层级深度 + graph.schema.json 移除 maximum: 4（D20-3） |
+| 9 | 6 项强制文档未在归档留证 | 阶段 8 code review，2026-07-28 第 20 轮 | 归档完整性缺口 | §10B.2 归档完整性清单 + check-archive-integrity.ts（D20-4） |
+| 10 | 覆盖矩阵/冲突检测无证据，V 评审 evidence 空泛 | 阶段 8 code review，2026-07-28 第 20 轮 | V 评审 evidence 无格式约束 | §7.6 evidence 强制引用 + check-verifier-output.ts 格式校验（D20-5） |
 
 > 缺陷 1 已纳入 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节。
 > 缺陷 2/3/4 是 2026-07-21 从零重建过程中通过回归测试发现的工程配置问题，已通过工程配置修复固化到 demo 的 `package.json` / `tsconfig.json` 与源码中，供后续项目在阶段 5（编码）参考。

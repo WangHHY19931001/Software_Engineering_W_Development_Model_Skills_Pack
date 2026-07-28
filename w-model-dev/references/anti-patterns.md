@@ -181,6 +181,26 @@
 >
 > 约束 #6「按需加载」的可执行化清单见 [SKILL.md](../SKILL.md)「Bundled Resources（按需加载契约）」节，明示每个 reference/script/subagent/template 的触发条件，**none of them need to be in context up front**。
 
+## #8 越过 🔴 CHECKPOINT 自动推进
+
+**检测信号**：到达 🔴 CHECKPOINT 节点后无「等待用户确认」记录直接推进。
+
+- `signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID（代签检测，[21.0.0] 新增）
+
+**回退动作**：回到 CHECKPOINT 节点重新暂停，向用户展示放行判定并由用户确认。
+
+- 清空 O 代签的 `acknowledgedDecisions`，要求用户重新陈述决策（[21.0.0] 新增）
+
+## #10 编排者越权实施
+
+**检测信号**：编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者直接判定根因并分派 S-fix（无 R 报告路径作为 S-fix 输入）；或编排者自行填写 `acknowledgedDecisions`。
+
+- `signature-chain.jsonl` 中 O 角色 `action=produce/review/gate`（O 越权承担 S/V/G 职责，[21.0.0] 新增）
+
+**回退动作**：回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ `acknowledgedDecisions` 清空并要求用户重新陈述决策。
+
+- 作废 O 越权签名，重新分派对应角色子代理（[21.0.0] 新增）
+
 ## #11 ingestion 跳过图谱校验
 
 **检测信号**：阶段 1-4 未跑 `check-requirement-graph.ts` 直接进 S 产出 / V 评审；或编排者跳过 A→G 收敛循环。
@@ -217,7 +237,11 @@
 
 **检测信号**：`TLA_JSON.passed=false`（`deadlockViolations`/`invariantViolations`/`stateExplosionSpecs` 非空）但阶段已推进。
 
+- `signature-chain.jsonl` 中 G 签名 `action=gate` 但 `gateExitCode` 字段缺失（skip-tlc 无 GATE_JSON，[21.0.0] 新增）
+
 **回退动作**：回到当前阶段起点，分派 S 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），重跑 `check-tla-model.ts`。
+
+- 回到当前阶段起点，跑完整 TLC 检查（[21.0.0] 新增，--skip-tlc 已移除）
 
 **与公理的关系**：正常软件系统不允许死锁。死锁或矛盾分支须定位根因修正，而非绕过。
 
@@ -392,6 +416,30 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05。
 - [subagent-delegation.md](subagent-delegation.md) S/R/V 角色边界扩展（豁免审批职责）。
 - [verifier-spec.md](verifier-spec.md) §7.1 completeness 四维核验（豁免审批缺失 → completeness 判 0 分）。
+
+## #31 归档完整性缺失
+
+**危害**：归档未包含强制产出文档，事后无法审计 V 评审声明真实性，审计链断裂。
+
+**检测信号**：
+- `check-archive-integrity.ts` 退出码 1（缺失任一阶段强制快照清单文件）
+
+**回退动作**：
+- 回到归档前状态，补齐缺失文件后重跑 `check-archive-integrity.ts`
+
+**关联**：SSoT §10B.2.1 归档完整性清单（[21.0.0] 新增）
+
+## #32 签名链断裂
+
+**危害**：跳过角色 / 签名链不连续 / 篡改签名 / 代签 checkpoint / 来源缺失 / 来源越权，流程完整性失守。
+
+**检测信号**：
+- `check-signature-chain.ts` R1-R10 任一失败
+
+**回退动作**：
+- 回到当前阶段起点，补齐缺失角色签名 / 来源证明，重跑签名链校验
+
+**关联**：SSoT §10.11 签名链门禁 + §7.9 SignatureChainEntry schema（[21.0.0] 新增）
 
 ## 实现层经验教训（来自端到端调测）
 

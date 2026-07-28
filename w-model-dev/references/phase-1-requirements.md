@@ -39,13 +39,13 @@
   1. LLM 意图识别和实体提取
      ├─ 失败: 意图置信度低 / 需求歧义 → 暂停，要求用户重述或拆解，禁止 LLM 自行补全默认值
      └─ 成功: 产出功能/非功能/约束需求实体清单
-  2. 构建需求层级树【维度1】（4 层：domain → module → feature → acceptance）
-     ├─ 每个 REQ 节点须标注 level（1-4，强制必填，无降级）
+  2. 构建需求层级树【维度1】（自适应层级深度）
+     ├─ 每个 REQ 节点须标注 level（正整数，从 1 开始单调递增，无上限）
      ├─ level≥2 REQ 须有 parent 指向 level-1 祖先；level=1 REQ 即 REQ-group 候选
      ├─ priority 字段可选（P0-P3）；reqGroup 字段：level≥2 节点指向 level=1 祖先
-     ├─ 失败: level 无法判定 → blocked 返回（见 [ingestion-chunk.md](ingestion-chunk.md) level 识别规则）
+     ├─ 失败: level 非正整数或非单调 → blocked 返回（见 [ingestion-chunk.md](ingestion-chunk.md) level 识别规则）
      ├─ 失败: 模块归属不明 → 标注待澄清项，向用户确认归属
-     └─ 成功: 产出 4 层层级树（含 level/priority/reqGroup 字段）
+     └─ 成功: 产出 自适应层级树（含 level/priority/reqGroup 字段）
   3. 检测需求冲突和缺失【维度3】（含四类交叉逻辑边识别）
      ├─ 同步在 graph.json 写入 conflicts-with 边（A 与 B 矛盾）
      ├─ 同步识别 depends-on / precedes / cross-cuts 边并写入 graph.json
@@ -71,6 +71,13 @@
      └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
 输出: 结构化需求规格（§1-§12）+ 验收测试用例 + 风险评估报告 + 豁免审批记录
 ```
+
+**自适应层级深度规则**（[21.0.0] 新增）：
+
+- 最小层级深度 = 2（domain → acceptance，适用极小项目）
+- 推荐层级深度 = 4（domain → module → feature → acceptance）
+- 最大层级深度 = 不限（复杂项目可扩展至 5+ 层）
+- 校验规则：level 单调性（子节点 level > 父节点 level）+ 根节点 level=1 + 叶节点须可追溯到验收级
 
 ## User Stories 长列表（第 10 轮外部技能吸收）
 
@@ -291,7 +298,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 4 | 跳过冲突检测直接生成用例 | 步骤 3 冲突检测必须执行，冲突未解决不得进入步骤 4 |
 | 5 | 验收测试用例只覆盖 happy path | 必须覆盖正常 + 异常 + 边界场景 |
 | 6 | 需求规格未套用模板 | 必须套用 [templates/requirement-spec.md](../templates/requirement-spec.md) |
-| 7 | REQ 节点不标注 level（1-4） | 每个 REQ 节点必须标注 level（强制必填，无降级）；level 无法判定 → blocked 返回，禁止降级为缺省值 |
+| 7 | REQ 节点不标注 level（正整数） | 每个 REQ 节点必须标注 level（强制必填，无降级）；level 非正整数或非单调 → blocked 返回，禁止降级为缺省值 |
 | 8 | LLM 自行决定 REQ-group 归属 | level=1 REQ 即 REQ-group 候选（确定性规则）；group 边界模糊（FM-3D-04）须向用户确认，禁止 LLM 自行裁定 |
 | 9 | 省略 §4-§7 任一节（层级树/REQ-group/交叉逻辑/覆盖分析） | 四维识别强制节必须全部产出；无内容时填「无」并加说明，禁止省略 |
 | 10 | 覆盖缺失项隐式遗漏 | 覆盖缺失项须经豁免审批（FM-4D-01/02/03/05）并在 §8 Out of Scope 显式声明，禁止隐式遗漏 |

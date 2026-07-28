@@ -395,6 +395,11 @@ V 子代理须在 `summary` 中包含：
 
 **禁止措辞**：「评审通过」「质量良好」「符合要求」等空泛表述。summary 长度须 ≥ 50 字符（R11 校验）。
 
+**evidence 格式规范**（[21.0.0] 新增）：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
+- 合法示例：`coverage.json.matrices.stakeholder.coverage=100%`
+- 非法示例：`C1-C10 全通过` / `质量良好` / `评审通过`
+- 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
+
 ### 6.2.1 evidence 字段可追溯约束
 
 > 针对 D14 缺陷：V 子代理曾伪造 TLA+ evidence（声称 5 个不变量，实际产物有 10 个）。evidence 必须可追溯至目标产物内的具体位置，禁止编造。
@@ -426,6 +431,9 @@ V 子代理须在 `summary` 中包含：
 权重和 = 1.00。
 
 > **completeness 四维核验对照**（第 20 轮，权重不变 0.30）：V 子代理评审 `targetKind=requirement` 时，须在 `evidence` 中引用需求规格 §4-§7 的具体位置作为四维覆盖证据。任一维度缺失（如 §6 某矩阵只写「无」未加说明，或 §7.5 覆盖率 < 100% 且无豁免审批）→ `completeness` 判 0 分。四维核验命中 FM-3D-01~06 / FM-4D-01~05 / FM-EXEMPT-01~05 任一失败模式 → `passed=false`。
+>
+> - 归档完整性缺失 → completeness 判 0 分（[21.0.0] 新增）
+> - 签名链断裂 → completeness 判 0 分（[21.0.0] 新增）
 
 ### 7.2 设计（targetKind = `design`）
 
