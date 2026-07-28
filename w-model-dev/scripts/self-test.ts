@@ -46,6 +46,8 @@ import { checkMaturity } from './maturity-logic.js';
 import { checkCheckpoint } from './checkpoint-logic.js';
 import { checkRequirementCoverage, type CoverageCheckOptions } from './coverage-logic.js';
 import { checkExemption } from './exemption-logic.js';
+import { checkSignatureChain } from './signature-chain-logic.js';
+import { checkArchiveIntegrity } from './archive-integrity-logic.js';
 import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 import {
@@ -1097,6 +1099,54 @@ const EXEMPTION_CASES: ExemptionCase[] = [
   },
 ];
 
+// -------------------- SignatureChain（[21.0.0] 签名链：12 样本，1 valid + 11 bad） --------------------
+
+interface SignatureChainCase {
+  /** 样本文件名（相对 samples/signature-chain/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 rulesFailed 中至少包含以下每个值（全部包含才算通过） */
+  expectedRulesFailed?: string[];
+  /** 用例说明 */
+  description: string;
+}
+
+const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
+  { file: 'valid-all-roles.jsonl', expectedPassed: true, description: '签名链：阶段 1 完整 9 角色 + 用户确认 checkpoint（R1-R10 全通过）' },
+  { file: 'bad-missing-V.jsonl', expectedPassed: false, expectedRulesFailed: ['R1'], description: '签名链：缺 V 角色，R1 失败' },
+  { file: 'bad-broken-chain.jsonl', expectedPassed: false, expectedRulesFailed: ['R2'], description: '签名链：prevSigHash 不匹配，R2 失败' },
+  { file: 'bad-backdated.jsonl', expectedPassed: false, expectedRulesFailed: ['R3'], description: '签名链：时间戳非单调，R3 失败' },
+  { file: 'bad-O-produce.jsonl', expectedPassed: false, expectedRulesFailed: ['R4'], description: '签名链：非法角色 X，R4 失败' },
+  { file: 'bad-O-self-sign.jsonl', expectedPassed: false, expectedRulesFailed: ['R5'], description: '签名链：O 代签 checkpoint，R5 失败' },
+  { file: 'bad-tampered-hash.jsonl', expectedPassed: false, expectedRulesFailed: ['R6'], description: '签名链：sigHash 篡改，R6 失败' },
+  { file: 'bad-dangling-source.jsonl', expectedPassed: false, expectedRulesFailed: ['R7'], description: '签名链：悬空来源，R7 失败' },
+  { file: 'bad-missing-artifact.jsonl', expectedPassed: false, expectedRulesFailed: ['R8'], description: '签名链：缺失产物，R8 失败' },
+  { file: 'bad-S-consumes-G.jsonl', expectedPassed: false, expectedRulesFailed: ['R9'], description: '签名链：S 越权消费 G，R9 失败' },
+  { file: 'bad-R-consumes-S.jsonl', expectedPassed: false, expectedRulesFailed: ['R9'], description: '签名链：R 越权消费 S，R9 失败' },
+  { file: 'bad-O-bypass-G.jsonl', expectedPassed: false, expectedRulesFailed: ['R10'], description: '签名链：O checkpoint 绕过 G，R10 失败' },
+];
+
+// -------------------- ArchiveIntegrity（[21.0.0] 归档完整性：4 样本，1 valid + 3 bad） --------------------
+
+interface ArchiveIntegrityCase {
+  /** 样本文件名（相对 samples/archive-integrity/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 missingFiles 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const ARCHIVE_INTEGRITY_CASES: ArchiveIntegrityCase[] = [
+  { file: 'valid-full.json', expectedPassed: true, description: '归档完整性：全阶段强制文件齐全' },
+  { file: 'bad-missing-phase1-docs.json', expectedPassed: false, expectedReasonPatterns: [/requirements\.md/], description: '归档完整性：缺 phase-1 文档' },
+  { file: 'bad-missing-signature-chain.json', expectedPassed: false, expectedReasonPatterns: [/signature-chain\.jsonl/], description: '归档完整性：缺 signature-chain.jsonl' },
+  { file: 'bad-missing-gate-logs.json', expectedPassed: false, expectedReasonPatterns: [/gate-logs\//], description: '归档完整性：缺 gate-logs/ 目录' },
+];
+
 // -------------------- Schema 前置校验（借鉴 drawio-skill/styles/schema.json） --------------------
 
 interface SchemaCase {
@@ -1745,6 +1795,68 @@ async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runSignatureChainCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of SIGNATURE_CHAIN_CASES) {
+    const abs = path.join(samplesDir, 'signature-chain', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const entries = raw.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
+    // R8 需 existingPaths；样本中所有路径均不存在于 self-test 环境，传空集即可触发 R8
+    const r = checkSignatureChain(entries, { phase: 1, existingPaths: new Set<string>() });
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (!c.expectedPassed && c.expectedRulesFailed) {
+      for (const rf of c.expectedRulesFailed) {
+        if (!r.rulesFailed.includes(rf)) {
+          details.push(`  - 未匹配期望 rulesFailed=${rf}（实际 rulesFailed=${JSON.stringify(r.rulesFailed)}，violations=${JSON.stringify(r.violations)}）`);
+        }
+      }
+    }
+
+    results.push({
+      name: `signature-chain/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runArchiveIntegrityCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of ARCHIVE_INTEGRITY_CASES) {
+    const abs = path.join(samplesDir, 'archive-integrity', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const contents = new Set<string>(JSON.parse(raw));
+    const r = checkArchiveIntegrity(contents);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (!c.expectedPassed && c.expectedReasonPatterns) {
+      for (const p of c.expectedReasonPatterns) {
+        const matched = r.missingFiles.some(m => p.test(m));
+        if (!matched) {
+          details.push(`  - 未匹配期望缺失模式 ${p}（实际 missingFiles=${JSON.stringify(r.missingFiles)}）`);
+        }
+      }
+    }
+
+    results.push({
+      name: `archive-integrity/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of SCHEMA_CASES) {
@@ -1822,6 +1934,8 @@ async function main(): Promise<void> {
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
+  console.log(`SignatureChain 用例 : ${SIGNATURE_CHAIN_CASES.length}`);
+  console.log(`ArchiveIntegrity 用例: ${ARCHIVE_INTEGRITY_CASES.length}`);
   console.log(`Metadata 用例  : 1`);
   console.log('─'.repeat(60));
 
@@ -1829,7 +1943,7 @@ async function main(): Promise<void> {
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
     codeTlaResults, rootcauseResults, schemaResults, bddResults,
-    coverageResults, exemptionResults, metadataResults,
+    coverageResults, exemptionResults, signatureChainResults, archiveIntegrityResults, metadataResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -1845,13 +1959,15 @@ async function main(): Promise<void> {
     runBddCases(samplesDir),
     runCoverageCases(samplesDir),
     runExemptionCases(samplesDir),
+    runSignatureChainCases(samplesDir),
+    runArchiveIntegrityCases(samplesDir),
     runMetadataCheck(skillRoot),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
     ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults,
-    ...coverageResults, ...exemptionResults, ...metadataResults,
+    ...coverageResults, ...exemptionResults, ...signatureChainResults, ...archiveIntegrityResults, ...metadataResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
