@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/signature-chain.schema.json",
+  "title": "SignatureChainEntry",
+  "description": "角色链式签名记录 schema，对应 SSoT §7.9",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sigId", "phase", "role", "action", "runId", "artifacts", "prevSigId", "prevSigHash", "sigHash", "signedAt", "signer", "inputProvenance"],
+  "properties": {
+    "sigId": { "type": "string", "pattern": "^wm\\d+-r\\d+-[OSAVGR]$|^genesis$" },
+    "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "phaseName": { "type": "string" },
+    "role": { "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] },
+    "action": { "type": "string" },
+    "runId": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "prevSigId": { "type": "string" },
+    "prevSigHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$|^0$" },
+    "sigHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "signedAt": { "type": "string", "format": "date-time" },
+    "signer": { "type": "string" },
+    "gateExitCode": { "type": ["integer", "null"] },
+    "gateLogPath": { "type": ["string", "null"] },
+    "inputProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSigIds", "sourceArtifacts", "transformDescription"],
+      "properties": {
+        "sourceSigIds": { "type": "array", "items": { "type": "string" } },
+        "sourceArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sourceSigId", "sourceRole"],
+            "properties": {
+              "path": { "type": "string" },
+              "sourceSigId": { "type": "string" },
+              "sourceRole": { "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] }
+            }
+          }
+        },
+        "transformDescription": { "type": "string" }
+      }
+    }
+  }
+}
