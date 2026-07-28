@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 19.0.1
+version: 20.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -49,6 +49,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 12. **闭环机制强制校验**：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` 4 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。
 13. **返工必经根因定位**：V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V 复审 + G 门禁通过，才可分派 S-fix 修复。跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。详见 [references/root-cause-locator.md](references/root-cause-locator.md)。
 14. **BDD 行为门禁**：阶段 1-4 必须产出对应层级 L1/L2/L3/L4 BDD features + `bdd-manifest.json`；阶段 5-8 必须执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](scripts/check-bdd-model.ts) exitCode=0；BDD↔TLA+ 不等价必须走 R→V→G→S-fix 循环（反模式 #29）。详见 [references/bdd-guide.md](references/bdd-guide.md)。
+15. **REQ 层级强制标注**：REQ 节点须标注 `level`（1-4）强制必填，无降级；无法判断时 blocked 返回要求用户重述（禁止默认填 level=3）。`level=1` REQ 即 REQ-group 候选；`level≥2` REQ 须有 `reqGroup` 指向 `level=1` 祖先。不向后兼容老图谱（历史抛弃，重新生成）。
+16. **豁免审批强制四阶段**：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](scripts/check-exemption.ts) E1-E8 全通过。跳过任一阶段命中反模式 #30。
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 

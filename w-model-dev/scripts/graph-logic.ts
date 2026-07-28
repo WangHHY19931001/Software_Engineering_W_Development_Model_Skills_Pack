@@ -28,7 +28,11 @@ export type EdgeType =
   // 多层图谱（横切层）：
   | 'governs' // 治理层：治理类子系统→被治理子系统
   | 'collaborates-with' // 协作层：对等协作（单条边语义双向）
-  | 'derives'; // 派生层：派生规格节点→派生产物
+  | 'derives' // 派生层：派生规格节点→派生产物
+  // 四维识别·维度1/3 扩展边（phase=1 时启用校验）：
+  | 'precedes' // 时序层：REQ→REQ 时序先于
+  | 'conflicts-with' // 冲突层：REQ→REQ 冲突/互斥（单向写入，语义双向）
+  | 'cross-cuts'; // 横切层：NFR/CON→REQ 横切治理
 
 export interface GraphNode {
   id: string;
@@ -43,6 +47,12 @@ export interface GraphNode {
   governance?: boolean;
   /** 派生规格节点标记（如 S11），derives 边源须此标记为 true（flat 可选，非嵌套） */
   derivationProduct?: boolean;
+  /** REQ 内部层级：1=domain 2=module 3=feature 4=acceptance（REQ 强制必填，无降级） */
+  level?: number;
+  /** 需求优先级：P0=必须 P1=应该 P2=可以 P3=不会（可选） */
+  priority?: 'P0' | 'P1' | 'P2' | 'P3';
+  /** 所属 REQ-group ID（level=1 REQ 自身为 group 无此字段；level=2-4 须指向 level=1 祖先） */
+  reqGroup?: string;
 }
 
 export interface GraphEdge {
@@ -85,6 +95,24 @@ export interface BoundaryInfo {
   complete: boolean;
 }
 
+export interface ReqHierarchy {
+  groups: string[];
+  maxDepth: number;
+  levelDistribution: Record<number, number>;
+  orphanReqs: string[];
+  multiParentReqs: string[];
+  levelMonotonicViolations: Array<{ from: string; to: string; fromLevel: number; toLevel: number }>;
+  missingLevelReqs: string[];
+}
+
+export interface CrossLogic {
+  dependsOnCycles: string[][];
+  precedesCycles: string[][];
+  conflictsAsymmetric: string[];
+  crossCutsSourceTypeViolations: string[];
+  crossCutsTargetTypeViolations: string[];
+}
+
 export interface GraphCheckResult {
   passed: boolean;
   phase: number;
@@ -99,6 +127,10 @@ export interface GraphCheckResult {
   dataflowViolations: DataflowViolations;
   boundary: BoundaryInfo;
   violations: string[];
+  /** REQ 层级树信息（四维·维度1，phase=1 时填充） */
+  reqHierarchy?: ReqHierarchy;
+  /** 交叉逻辑信息（四维·维度3，phase=1 时填充） */
+  crossLogic?: CrossLogic;
 }
 
 // ==================== 模块级常量 ====================
@@ -108,6 +140,15 @@ const BUSINESS_TYPES = new Set<NodeType>(['REQ', 'SD', 'INTF', 'DD']);
 
 /** 边界节点类型集合（豁免系统层级树根候选 / 死模块判定） */
 const BOUNDARY_TYPES = new Set<NodeType>(['EXT-IN', 'EXT-OUT']);
+
+/**
+ * 判断节点是否为 NFR/CON 横切关注点（通过 ID 前缀识别）。
+ * NFR/CON 节点在 graph.json 中 type 仍为 REQ（schema 不支持 NFR/CON 类型），
+ * 但不参与 REQ 层级树（R1-R4）校验，也不作为系统根候选。
+ */
+function isNfrConNode(node: GraphNode): boolean {
+  return node.id.startsWith('NFR-') || node.id.startsWith('CON-');
+}
 
 /**
  * 系统层级树层级映射（graph-guide §3）：
@@ -277,13 +318,18 @@ export function checkRequirementGraph(
   for (const n of g.nodes) nodeMap.set(n.id, n);
 
   // --- §3 规则 1-2：单根校验（根候选 = parent 入边为 0 的节点，排除边界节点）---
+  // 四维识别：phase=1 纯 REQ 图（无 SD/INTF/DD/EXT-IN/EXT-OUT）启用多 group 模式，
+  // 多个 level=1 REQ 视为 group 候选，允许多根（R1 规则）；NFR/CON 节点排除根候选。
+  const isPureReqGraph = g.nodes.length > 0 && g.nodes.every(n => n.type === 'REQ');
+  const isPhase1PureReq = phase === 1 && isPureReqGraph;
+
   const rootCandidates: GraphNode[] = [];
   for (const n of g.nodes) {
     if (BOUNDARY_TYPES.has(n.type)) continue;
     const hasParentIn = g.edges.some(e => e.type === 'parent' && e.to === n.id);
     if (!hasParentIn) rootCandidates.push(n);
   }
-  const reqRoots = rootCandidates.filter(n => n.type === 'REQ');
+  const reqRoots = rootCandidates.filter(n => n.type === 'REQ' && !isNfrConNode(n));
   const nonReqRoots = rootCandidates.filter(n => n.type !== 'REQ');
 
   result.roots = reqRoots.map(n => n.id);
@@ -295,22 +341,45 @@ export function checkRequirementGraph(
   }
 
   let singleRoot: GraphNode | null = null;
-  if (reqRoots.length === 0) {
-    // §3 规则 5：零根场景，报缺根并转入环检测
-    result.violations.push('单根校验失败：缺少 REQ 系统根，可能存在 parent 边环');
-    detectParentCycle(g.edges, nodeIds, result.violations);
-  } else if (reqRoots.length > 1) {
-    result.violations.push(
-      `单根校验失败：存在 ${reqRoots.length} 个 REQ 根，多根违反：${reqRoots.map(n => n.id).join(', ')}`,
-    );
+  /** 多 group 模式下的 level=1 根列表（phase=1 纯 REQ 图允许多 group） */
+  let multiGroupRoots: GraphNode[] = [];
+
+  if (isPhase1PureReq) {
+    // 四维识别：phase=1 纯 REQ 图——多 group 模式
+    if (reqRoots.length === 0) {
+      // 零根：可能是 parent 边环，检测环但不报"缺根"（R4 处理）
+      detectParentCycle(g.edges, nodeIds, result.violations);
+    } else {
+      // 多个 level=1 REQ 视为 group 候选，不报多根违反
+      multiGroupRoots = reqRoots.filter(n => n.level === 1);
+      if (multiGroupRoots.length >= 1) {
+        singleRoot = multiGroupRoots[0] ?? null;
+      }
+    }
   } else {
-    singleRoot = reqRoots[0] ?? null;
+    // 非 phase=1 纯 REQ 图：保持现有单根校验
+    if (reqRoots.length === 0) {
+      // §3 规则 5：零根场景，报缺根并转入环检测
+      result.violations.push('单根校验失败：缺少 REQ 系统根，可能存在 parent 边环');
+      detectParentCycle(g.edges, nodeIds, result.violations);
+    } else if (reqRoots.length > 1) {
+      result.violations.push(
+        `单根校验失败：存在 ${reqRoots.length} 个 REQ 根，多根违反：${reqRoots.map(n => n.id).join(', ')}`,
+      );
+    } else {
+      singleRoot = reqRoots[0] ?? null;
+    }
   }
 
-  // --- §3 规则 4：orphan BFS（从唯一根出发，经 parent 边可达性）---
-  if (singleRoot) {
-    const reachable = new Set<string>([singleRoot.id]);
-    const queue = [singleRoot.id];
+  // --- §3 规则 4：orphan BFS（从根出发，经 parent 边可达性）---
+  // 多 group 模式：从所有 level=1 根出发 BFS；单根模式：从 singleRoot 出发
+  const bfsStartNodes = (isPhase1PureReq && multiGroupRoots.length > 0)
+    ? multiGroupRoots.map(n => n.id)
+    : (singleRoot ? [singleRoot.id] : []);
+
+  if (bfsStartNodes.length > 0) {
+    const reachable = new Set<string>(bfsStartNodes);
+    const queue = [...bfsStartNodes];
     while (queue.length > 0) {
       const cur = queue.shift()!;
       for (const e of g.edges) {
@@ -322,11 +391,13 @@ export function checkRequirementGraph(
     }
     for (const n of g.nodes) {
       if (BOUNDARY_TYPES.has(n.type)) continue;
+      if (isNfrConNode(n)) continue; // NFR/CON 横切节点不参与 orphan 校验
       if (!reachable.has(n.id)) result.orphans.push(n.id);
     }
     if (result.orphans.length > 0) {
+      const rootLabel = bfsStartNodes.length === 1 ? bfsStartNodes[0]! : bfsStartNodes.join(', ');
       result.violations.push(
-        `orphan 校验失败：以下节点无法从根 ${singleRoot.id} 经 parent 边追溯: ${result.orphans.join(', ')}`,
+        `orphan 校验失败：以下节点无法从根 ${rootLabel} 经 parent 边追溯: ${result.orphans.join(', ')}`,
       );
     }
   }
@@ -452,50 +523,199 @@ export function checkRequirementGraph(
   }
 
   // ============ 信息流校验（graph-guide §7 第 4 层：黑洞 / 奇迹 / 死模块 + 边界完整性）============
-  // produces 的 {from,to} 表信息流方向：to=n 即流入 n，from=n 即流出 n（consumes 已移除 D21）
-  const flowInCount = new Map<string, number>();
-  const flowOutCount = new Map<string, number>();
-  for (const id of nodeIds) {
-    flowInCount.set(id, 0);
-    flowOutCount.set(id, 0);
-  }
-  for (const e of g.edges) {
-    if (e.type === 'produces') {
-      if (nodeIds.has(e.to)) flowInCount.set(e.to, (flowInCount.get(e.to) ?? 0) + 1);
-      if (nodeIds.has(e.from)) flowOutCount.set(e.from, (flowOutCount.get(e.from) ?? 0) + 1);
+  // 四维识别：phase=1 纯 REQ 图（需求层级树）无 produces 边也无 EXT-IN/EXT-OUT 边界节点，
+  // 信息流校验不适用，整体跳过（dataflowOk 视为 true，boundary 视为 complete）。
+  if (!isPhase1PureReq) {
+    // produces 的 {from,to} 表信息流方向：to=n 即流入 n，from=n 即流出 n（consumes 已移除 D21）
+    const flowInCount = new Map<string, number>();
+    const flowOutCount = new Map<string, number>();
+    for (const id of nodeIds) {
+      flowInCount.set(id, 0);
+      flowOutCount.set(id, 0);
     }
-  }
-
-  for (const n of g.nodes) {
-    if (!BUSINESS_TYPES.has(n.type)) continue;
-    if ((n.phase ?? 1) > phase) continue;
-    // §4.6：根节点豁免死模块（系统根是系统对外代理，in=0 ∧ out=0 不判死模块；不豁免黑洞/奇迹）
-    const isRoot = singleRoot !== null && n.id === singleRoot.id;
-    const inFlow = flowInCount.get(n.id) ?? 0;
-    const outFlow = flowOutCount.get(n.id) ?? 0;
-    if (inFlow === 0 && outFlow === 0) {
-      if (!isRoot) {
-        result.dataflowViolations.deadModules.push(n.id);
-        result.violations.push(`信息流校验失败：死模块 ${n.id}（无信息流经，in=0 out=0）`);
+    for (const e of g.edges) {
+      if (e.type === 'produces') {
+        if (nodeIds.has(e.to)) flowInCount.set(e.to, (flowInCount.get(e.to) ?? 0) + 1);
+        if (nodeIds.has(e.from)) flowOutCount.set(e.from, (flowOutCount.get(e.from) ?? 0) + 1);
       }
-    } else if (inFlow === 0 && outFlow > 0) {
-      result.dataflowViolations.miracles.push(n.id);
-      result.violations.push(`信息流校验失败：奇迹 ${n.id}（只出不进，in=0 out=${outFlow}）`);
-    } else if (inFlow > 0 && outFlow === 0) {
-      result.dataflowViolations.blackHoles.push(n.id);
-      result.violations.push(`信息流校验失败：黑洞 ${n.id}（只进不出，in=${inFlow} out=0）`);
     }
+
+    for (const n of g.nodes) {
+      if (!BUSINESS_TYPES.has(n.type)) continue;
+      if ((n.phase ?? 1) > phase) continue;
+      // §4.6：根节点豁免死模块（系统根是系统对外代理，in=0 ∧ out=0 不判死模块；不豁免黑洞/奇迹）
+      const isRoot = singleRoot !== null && n.id === singleRoot.id;
+      const inFlow = flowInCount.get(n.id) ?? 0;
+      const outFlow = flowOutCount.get(n.id) ?? 0;
+      if (inFlow === 0 && outFlow === 0) {
+        if (!isRoot) {
+          result.dataflowViolations.deadModules.push(n.id);
+          result.violations.push(`信息流校验失败：死模块 ${n.id}（无信息流经，in=0 out=0）`);
+        }
+      } else if (inFlow === 0 && outFlow > 0) {
+        result.dataflowViolations.miracles.push(n.id);
+        result.violations.push(`信息流校验失败：奇迹 ${n.id}（只出不进，in=0 out=${outFlow}）`);
+      } else if (inFlow > 0 && outFlow === 0) {
+        result.dataflowViolations.blackHoles.push(n.id);
+        result.violations.push(`信息流校验失败：黑洞 ${n.id}（只进不出，in=${inFlow} out=0）`);
+      }
+    }
+
+    // 边界完整性（阶段 1 起：至少 1 个 EXT-IN 和 1 个 EXT-OUT）
+    result.boundary.extIn = g.nodes.filter(n => n.type === 'EXT-IN').length;
+    result.boundary.extOut = g.nodes.filter(n => n.type === 'EXT-OUT').length;
+    result.boundary.complete = result.boundary.extIn >= 1 && result.boundary.extOut >= 1;
+    if (result.boundary.extIn < 1) {
+      result.violations.push('信息流校验失败：缺少 EXT-IN 边界源（系统不能凭空产生信息）');
+    }
+    if (result.boundary.extOut < 1) {
+      result.violations.push('信息流校验失败：缺少 EXT-OUT 边界汇（信息不能进入黑洞消失）');
+    }
+  } else {
+    // 纯 REQ 图：boundary 标记为 complete（不适用而非不完整）
+    result.boundary.complete = true;
   }
 
-  // 边界完整性（阶段 1 起：至少 1 个 EXT-IN 和 1 个 EXT-OUT）
-  result.boundary.extIn = g.nodes.filter(n => n.type === 'EXT-IN').length;
-  result.boundary.extOut = g.nodes.filter(n => n.type === 'EXT-OUT').length;
-  result.boundary.complete = result.boundary.extIn >= 1 && result.boundary.extOut >= 1;
-  if (result.boundary.extIn < 1) {
-    result.violations.push('信息流校验失败：缺少 EXT-IN 边界源（系统不能凭空产生信息）');
-  }
-  if (result.boundary.extOut < 1) {
-    result.violations.push('信息流校验失败：缺少 EXT-OUT 边界汇（信息不能进入黑洞消失）');
+  // ==================== 四维识别校验（phase=1 时启用）====================
+  if (phase === 1) {
+    // 四维识别：NFR/CON 节点（通过 ID 前缀识别，type 仍为 REQ）不参与 R1-R4 层级树校验
+    const reqNodes = g.nodes.filter(n => n.type === 'REQ' && !isNfrConNode(n));
+    const reqIds = new Set(reqNodes.map(n => n.id));
+
+    // R1-R4: REQ 层级树校验
+    const missingLevelReqs = reqNodes.filter(n => n.level === undefined).map(n => n.id);
+    if (missingLevelReqs.length > 0) {
+      result.violations.push(`R1-R4 层级校验失败：REQ 节点缺 level 字段（强制必填，无降级）：${missingLevelReqs.join(', ')}`);
+    }
+
+    const level1Reqs = reqNodes.filter(n => n.level === 1).map(n => n.id);
+    const reqParentEdges = g.edges.filter(e => e.type === 'parent' && reqIds.has(e.from) && reqIds.has(e.to));
+
+    // R2: parent 唯一
+    const parentInCount: Record<string, number> = {};
+    for (const e of reqParentEdges) {
+      parentInCount[e.to] = (parentInCount[e.to] ?? 0) + 1;
+    }
+    const orphanReqs = reqNodes.filter(n => (n.level ?? 0) >= 2 && (parentInCount[n.id] ?? 0) === 0).map(n => n.id);
+    const multiParentReqs = reqNodes.filter(n => (parentInCount[n.id] ?? 0) > 1).map(n => n.id);
+    if (orphanReqs.length > 0) {
+      result.violations.push(`R2 父唯一性校验失败：level≥2 REQ 缺 REQ→REQ parent 入边（orphan）：${orphanReqs.join(', ')}`);
+    }
+    if (multiParentReqs.length > 0) {
+      result.violations.push(`R2 父唯一性校验失败：REQ 有多条 REQ→REQ parent 入边（multiParent）：${multiParentReqs.join(', ')}`);
+    }
+
+    // R3: level 单调
+    const levelMonotonicViolations: Array<{ from: string; to: string; fromLevel: number; toLevel: number }> = [];
+    const nodeLevelMap = new Map(reqNodes.map(n => [n.id, n.level ?? 0]));
+    for (const e of reqParentEdges) {
+      const fromLevel = nodeLevelMap.get(e.from) ?? 0;
+      const toLevel = nodeLevelMap.get(e.to) ?? 0;
+      if (toLevel !== fromLevel + 1) {
+        levelMonotonicViolations.push({ from: e.from, to: e.to, fromLevel, toLevel });
+      }
+    }
+    if (levelMonotonicViolations.length > 0) {
+      result.violations.push(`R3 level 单调校验失败：REQ→REQ parent 边须满足 子level=父level+1，违反：${levelMonotonicViolations.map(v => `${v.from}(${v.fromLevel})→${v.to}(${v.toLevel})`).join(', ')}`);
+    }
+
+    // R4: REQ-group 非空
+    if (level1Reqs.length === 0 && reqNodes.length >= 5) {
+      result.violations.push(`R4 REQ-group 非空校验失败：REQ 总数≥5 但无 level=1 REQ（无候选子系统）`);
+    }
+
+    // R5: depends-on 与 precedes 无环
+    const detectCycle = (edgeType: 'depends-on' | 'precedes'): string[][] => {
+      const adj: Record<string, string[]> = {};
+      for (const e of g.edges ?? []) {
+        if (e.type === edgeType) {
+          (adj[e.from] ??= []).push(e.to);
+        }
+      }
+      const cycles: string[][] = [];
+      const visited = new Set<string>();
+      const stack = new Set<string>();
+      const path: string[] = [];
+      const dfs = (node: string): void => {
+        if (stack.has(node)) {
+          const cycleStart = path.indexOf(node);
+          cycles.push([...path.slice(cycleStart), node]);
+          return;
+        }
+        if (visited.has(node)) return;
+        visited.add(node);
+        stack.add(node);
+        path.push(node);
+        for (const next of adj[node] ?? []) dfs(next);
+        path.pop();
+        stack.delete(node);
+      };
+      for (const node of Object.keys(adj)) dfs(node);
+      return cycles;
+    };
+
+    const dependsOnCycles = detectCycle('depends-on');
+    const precedesCycles = detectCycle('precedes');
+    if (dependsOnCycles.length > 0) {
+      result.violations.push(`R5 依赖无环校验失败：depends-on 子图有环：${dependsOnCycles.map(c => c.join('→')).join('；')}`);
+    }
+    if (precedesCycles.length > 0) {
+      result.violations.push(`R5 时序无环校验失败：precedes 子图有环：${precedesCycles.map(c => c.join('→')).join('；')}`);
+    }
+
+    // R6: 交叉边对称性与源类型
+    const conflictsAsymmetric: string[] = [];
+    const crossCutsSourceTypeViolations: string[] = [];
+    const crossCutsTargetTypeViolations: string[] = [];
+    for (const e of g.edges) {
+      if (e.type === 'conflicts-with') {
+        const hasReverse = g.edges.some(re => re.type === 'conflicts-with' && re.from === e.to && re.to === e.from);
+        if (!hasReverse) conflictsAsymmetric.push(`${e.from}→${e.to}`);
+      }
+      if (e.type === 'cross-cuts') {
+        const targetNode = g.nodes.find(n => n.id === e.to);
+        if (targetNode && targetNode.type !== 'REQ') {
+          crossCutsTargetTypeViolations.push(`${e.from}→${e.to}（目标 ${targetNode.type} 非 REQ）`);
+        }
+      }
+      if (e.type === 'precedes') {
+        const sourceNode = g.nodes.find(n => n.id === e.from);
+        const targetNode = g.nodes.find(n => n.id === e.to);
+        if (sourceNode && sourceNode.type !== 'REQ') {
+          result.violations.push(`R6 precedes 源类型校验失败：${e.from}（${sourceNode.type}）非 REQ`);
+        }
+        if (targetNode && targetNode.type !== 'REQ') {
+          result.violations.push(`R6 precedes 目标类型校验失败：${e.to}（${targetNode.type}）非 REQ`);
+        }
+      }
+    }
+    // conflicts-with 非对称仅记录到 crossLogic 字段（warning，不 fail）—— 设计文档 §3.3 R6
+    if (crossCutsTargetTypeViolations.length > 0) {
+      result.violations.push(`R6 cross-cuts 目标类型校验失败：${crossCutsTargetTypeViolations.join('；')}`);
+    }
+
+    // 填充 reqHierarchy 与 crossLogic
+    const levelDistribution: Record<number, number> = {};
+    for (const n of reqNodes) {
+      const lv = n.level ?? 0;
+      levelDistribution[lv] = (levelDistribution[lv] ?? 0) + 1;
+    }
+    result.reqHierarchy = {
+      groups: level1Reqs,
+      maxDepth: Math.max(...reqNodes.map(n => n.level ?? 0), 0),
+      levelDistribution,
+      orphanReqs,
+      multiParentReqs,
+      levelMonotonicViolations,
+      missingLevelReqs,
+    };
+    result.crossLogic = {
+      dependsOnCycles,
+      precedesCycles,
+      conflictsAsymmetric,
+      crossCutsSourceTypeViolations,
+      crossCutsTargetTypeViolations,
+    };
   }
 
   // 汇总 passed
@@ -505,15 +725,19 @@ export function checkRequirementGraph(
     tv.INTF_without_defines === 0 &&
     tv.DD_without_realizes === 0;
   const dv = result.dataflowViolations;
-  const dataflowOk =
+  // 四维识别：phase=1 纯 REQ 图跳过信息流校验，dataflowOk 直接为 true
+  const dataflowOk = isPhase1PureReq ? true : (
     dv.blackHoles.length === 0 &&
     dv.miracles.length === 0 &&
     dv.deadModules.length === 0 &&
-    result.boundary.complete;
+    result.boundary.complete
+  );
+  // 四维识别：phase=1 纯 REQ 图允许多个 level=1 REQ 根（多 group 模式）
+  const rootsOk = isPhase1PureReq ? result.roots.length >= 1 : result.roots.length === 1;
   result.passed =
     result.connectedComponents === 1 &&
     result.isolatedNodes.length === 0 &&
-    result.roots.length === 1 &&
+    rootsOk &&
     result.orphans.length === 0 &&
     result.multiParent.length === 0 &&
     traceabilityOk &&

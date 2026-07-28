@@ -614,6 +614,22 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+#### 3.4.16 第 20 轮：阶段 1 需求提取四维识别与豁免审批（2026-07-28）
+
+> 阶段 1 需求分析从「扁平 REQ 列表 + 简单层次」升级为「四维识别模型 + 豁免审批治理」。
+> 四维：层级关系 + 子系统划分 + 交叉逻辑 + 覆盖分析。豁免审批强制 S→R→V→人类四阶段流程。
+
+1. **四维识别模型**：层级关系（level/priority/reqGroup + R1-R4）+ 子系统划分（REQ-group）+ 交叉逻辑（precedes/conflicts-with/cross-cuts + R5/R6）+ 覆盖分析（4 张矩阵 + 100% 覆盖率 + C1-C10）
+2. **豁免审批治理**（强制 S→R→V→人类）：check-exemption.ts E1-E8 + 反模式 #30 + 禁止行为 #11
+3. **图谱 schema 扩展**：节点新增 level/priority/reqGroup；边新增 3 类；不向后兼容（历史抛弃，重新生成）
+4. **规格书模板扩展**：5 节 → 13 节（§4-§7 四维识别）
+5. **失败模式扩展**：FM-3D-01~06 + FM-4D-01~05 + FM-EXEMPT-01~05，共 16 类
+6. **测试基线扩展**：self-test 121→152；vitest 108→~165
+
+**不涉及范围**：不引入新节点类型；不引入新 V 子标准；不引入新 CHECKPOINT 暂停点；不引入端到端调测。
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -2048,6 +2064,7 @@ interface RunLogEntry {
 | §3.4.13 第 18 轮 drawio-skill 设计吸收 | Bundled Resources 触发条件总表 + JSON Schema 强约束（反模式 #28）+ 安全扫描基线 + 版本号双写 + pure/IO 函数分离 + 测试 coverage 矩阵 + toolbox 决策表 | `w-model-dev/SKILL.md`「Bundled Resources」节 + `w-model-dev/schemas/*.schema.json`（13 份 draft-07）+ `w-model-dev/scripts/schema-loader.ts`（ajv 单例）+ `w-model-dev/scripts/security-scan.ts` + `.eslintsecurity-baseline.json`（sha256 指纹豁免）+ `w-model-dev/skill-metadata.json`（版本号镜像）+ `w-model-dev/scripts/__tests__/skill-metadata.test.ts`（双写回归）+ `w-model-dev/references/toolbox.md`（I have X → use Z）+ `w-model-dev/scripts/__tests__/README.md`（coverage 矩阵）+ `w-model-dev/references/anti-patterns.md` #28 | 完整（吸收 drawio-skill 7 项设计实践；纯文档同步不涉及 .ts 代码变更；schema 校验由 logic 层自动调用、security-scan 由 pre-push 承载） |
 | §3.4.14 第 19 轮 BDD 建模与验收夹具 | 分层 BDD features（L1-L4）+ 状态机七要素 + BDD↔TLA+ 等价性 + 7 维度门禁 + RTM 映射扩展 + 验收夹具四类 + 反模式 #29 | `w-model-dev/schemas/bdd-manifest.schema.json` + `w-model-dev/scripts/bdd-logic.ts`（纯逻辑）+ `w-model-dev/scripts/check-bdd-model.ts`（CLI）+ `w-model-dev/scripts/samples/bdd/`（10 样本）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（vitest）+ `w-model-dev/references/bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md` + `w-model-dev/templates/feature.template` / `bdd-manifest.template.json` + `w-model-dev/references/anti-patterns.md` #29 + `w-model-dev/SKILL.md` 约束 #14 | 完整（BDD 与 TLA+ 正交协作；Cucumber.js v11 + @cucumber/messages devDeps；self-test 基线 111→121） |
 | §3.4.15 第 19.0.1 轮 W 模型 8 阶段端到端调测验证与归档 | check-bdd-model.ts D7 RTM schema 修正（`rtm.requirements` → `rtm.rows` + `requirementId`）+ D7 测试样本补强（3 个）+ 8 阶段调测归档（7 文件）+ demo 产物清理 + 版本号三处同步 19.0.1 | `w-model-dev/scripts/check-bdd-model.ts`（D7 修正）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（+3 D7 测试）+ `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`（7 归档文件）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 19.0.1）+ `CHANGELOG.md` [19.0.1] | 完整（8 阶段端到端调测发现 D7 schema bug；UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过；self-test 基线 121 不变；vitest 105→108） |
+| §3.4.16 第 20 轮 阶段 1 需求提取四维识别与豁免审批 | 四维识别模型（层级关系 R1-R4 + 子系统划分 REQ-group + 交叉逻辑 R5/R6 + 覆盖分析 C1-C10）+ 豁免审批治理（S→R→V→人类 E1-E8）+ 图谱 schema 扩展（level/priority/reqGroup + 3 类边）+ 规格书模板 5→13 节 + 反模式 #30 + 禁止行为 #7-#11 | `w-model-dev/schemas/coverage.schema.json` + `exemption.schema.json` + `w-model-dev/scripts/coverage-logic.ts` / `check-requirement-coverage.ts` + `exemption-logic.ts` / `check-exemption.ts` + `graph-logic.ts`（R1-R6 + reqHierarchy/crossLogic）+ `check-requirement-graph.ts`（--rtm / --exemptions）+ `samples/graph/`（+13）+ `samples/coverage/`（10）+ `samples/exemption/`（7）+ `__tests__/graph-logic.test.ts`（R1-R6）+ `coverage-logic.test.ts`（C1-C10）+ `exemption-logic.test.ts`（E1-E8）+ `templates/requirement-spec.md`（5→13 节）+ `references/anti-patterns.md` #30 + `w-model-dev/SKILL.md` 约束 #15/#16 | 完整（不向后兼容老图谱，历史抛弃重新生成；self-test 基线 121→152；vitest 108→~165） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |

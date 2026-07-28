@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域", "summary": "level=1", "level": 1},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "注册模块", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"},
+    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "登录模块", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"},
+    {"id": "REQ-004", "type": "REQ", "phase": 1, "title": "邮箱注册", "summary": "level=3", "level": 3, "reqGroup": "REQ-001"},
+    {"id": "REQ-005", "type": "REQ", "phase": 1, "title": "邮箱登录", "summary": "level=3", "level": 3, "reqGroup": "REQ-001"},
+    {"id": "REQ-006", "type": "REQ", "phase": 1, "title": "密码重置", "summary": "level=3", "level": 3, "reqGroup": "REQ-001"},
+    {"id": "NFR-001", "type": "REQ", "phase": 1, "title": "安全横切", "summary": "NFR 横切关注点"}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-002", "type": "parent"},
+    {"from": "REQ-001", "to": "REQ-003", "type": "parent"},
+    {"from": "REQ-002", "to": "REQ-004", "type": "parent"},
+    {"from": "REQ-003", "to": "REQ-005", "type": "parent"},
+    {"from": "REQ-003", "to": "REQ-006", "type": "parent"},
+    {"from": "REQ-004", "to": "REQ-005", "type": "depends-on"},
+    {"from": "REQ-004", "to": "REQ-005", "type": "precedes"},
+    {"from": "REQ-004", "to": "REQ-006", "type": "conflicts-with"},
+    {"from": "REQ-006", "to": "REQ-004", "type": "conflicts-with"},
+    {"from": "NFR-001", "to": "REQ-004", "type": "cross-cuts"}
+  ]
+}

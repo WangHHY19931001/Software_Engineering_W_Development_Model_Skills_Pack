@@ -652,7 +652,95 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 - 非紧急修复的 `fix` 条目视为越权，需回滚并由 R + S-fix 重做
 - 检测脚本：`check-run-log.ts` 校验 `role=S` 的 `action=fix` 条目必须含 `variant` 字段，且 `variant=emergency-fix` 时必须含 `blocker` 字段
 
-> 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是唯一例外，且必须 `needsReview=true` 由 R 复核。
+> 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是唯一例外，且必须 needsReview=true 由 R 复核。
+
+## 豁免审批角色边界（第 20 轮四维识别与豁免审批扩展）
+
+> 第 20 轮新增。覆盖缺失、conflicts-with 冲突、覆盖率不达标等事项须经强制 S→R→V→人类四阶段审批流程。本节扩展 S/R/V 角色边界，明确各角色在豁免审批中的职责与禁止动作。违反即命中反模式 #30（豁免审批跳步），见 [anti-patterns.md](anti-patterns.md)。
+
+### 角色职责划分
+
+| 角色 | 豁免审批职责 | 产出物 | 禁止动作 |
+|---|---|---|---|
+| **S** | 识别需豁免项（覆盖缺失 / conflicts-with / 覆盖率不达标），产出豁免请求 | `exemption-request.json`（含豁免理由、影响范围、替代方案） | **禁止 S 自行决定豁免生效**（FM-EXEMPT-01） |
+| **R** | 按 [root-cause-locator.md](root-cause-locator.md) 方法论审查豁免请求（5-Why / 上游回溯 / 可证伪性） | `exemption-review.json`（含 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions） | **不得直接批准豁免生效**（FM-EXEMPT-02）；R 仅产出审查意见，批准权在人类 |
+| **V** | 校验 R 的审查质量：`reviewDecision` / `rootCauseAnalysis` / `falsifiabilityCheck` / `conditions` 是否齐全且可证伪 | `exemption-verification.json`（含 passed / reworkHints） | 禁止跳过校验直接放行（FM-EXEMPT-03） |
+| **人类** | CHECKPOINT 确认豁免是否生效 | `granted.json`（approve 写入）/ reject 回到原规则 | —（编排者不得代签，FM-EXEMPT-04） |
+| **O（编排者）** | 路由豁免审批流程各阶段，分派 S/R/V，在 CHECKPOINT 暂停等人类确认 | run-log 记录豁免审批各阶段 | 禁止代签人类确认（命中反模式 #10 + #30） |
+
+### 流程时序
+
+```
+O: 分派 S 产出需求规格 → V 评审发现覆盖缺失/conflicts-with/覆盖率<100%
+  ↓
+O: 分派 S 识别需豁免项
+S: 产出 exemption-request.json → 返回 {豁免请求路径}
+  ↓ （禁止 S 自行声明豁免生效）
+O: 分派 R 审查豁免请求
+R: 按 root-cause-locator.md 方法论审查 → 产出 exemption-review.json → 返回 {审查路径, reviewDecision}
+  ↓ （R 不得直接批准豁免生效）
+O: 分派 V 校验审查质量
+V: 校验 reviewDecision/rootCauseAnalysis/falsifiabilityCheck/conditions → 产出 exemption-verification.json → 返回 {校验路径, passed}
+  ↓
+O: 🔴 CHECKPOINT · 豁免审批确认（展示豁免请求 + R 审查 + V 校验给用户）
+  ↓
+人类: approve → O 写入 granted.json / reject → 回到原规则（补需求或补覆盖）
+  ↓
+O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
+```
+
+### 分派模板
+
+#### S 豁免请求分派模板
+
+```
+角色：产出子代理（S）- 豁免请求变体
+任务：识别需豁免项，产出 exemption-request.json
+上下文：
+  - 豁免来源：<V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项>
+  - 需求规格路径：<路径>
+产出契约：
+  1. exemption-request.json：含 exemptionId / 豁免理由 / 影响范围 / 替代方案 / 关联 FM ID
+  2. 返回编排者：{role:"S", variant:"exemption-request", requestPath, exemptionId}
+禁止：
+  - 自行决定豁免生效（FM-EXEMPT-01）
+  - 用豁免掩盖需求遗漏（FM-EXEMPT-05）
+```
+
+#### R 豁免审查分派模板
+
+```
+角色：根因定位子代理（R）- 豁免审查变体
+任务：按 root-cause-locator.md 方法论审查豁免请求
+上下文：
+  - exemption-request.json 路径：<路径>
+  - 需求规格路径：<路径>
+必读：
+  - references/root-cause-locator.md
+产出契约：
+  1. exemption-review.json：含 reviewDecision / rootCauseAnalysis（5-Why）/ upstreamTrace（上游回溯）/ falsifiabilityCheck（可证伪性）/ conditions
+  2. 返回编排者：{role:"R", variant:"exemption-review", reviewPath, reviewDecision}
+禁止：
+  - 直接批准豁免生效（FM-EXEMPT-02）
+  - 模板化审查（缺 5-Why/上游回溯/可证伪性）
+```
+
+#### V 豁免校验分派模板
+
+```
+角色：评审子代理（V）- 豁免校验变体
+任务：校验 R 的豁免审查质量
+上下文：
+  - exemption-request.json 路径：<路径>
+  - exemption-review.json 路径：<路径>
+产出契约：
+  1. exemption-verification.json：含 passed / reworkHints（校验 reviewDecision/rootCauseAnalysis/falsifiabilityCheck/conditions）
+  2. 返回编排者：{role:"V", variant:"exemption-verification", verificationPath, passed}
+禁止：
+  - 跳过校验直接放行（FM-EXEMPT-03）
+```
+
+> 豁免审批流程的收敛判定由 G 跑 `check-exemption` E1-E8 退出码决定（仿 ingestion 收敛由 G 跑 `check-requirement-graph.ts` 决定）。S/R/V 的产出仅作流程输入，不替代脚本判定。
 
 ## 与现有约束的兼容性
 

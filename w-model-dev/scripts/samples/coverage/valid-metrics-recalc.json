@@ -1,0 +1,25 @@
+{
+  "stakeholders": [
+    {"id": "SH-001", "role": "终端用户", "relatedReqs": ["REQ-001"], "status": "covered"},
+    {"id": "SH-002", "role": "管理员", "relatedReqs": ["REQ-002"], "status": "covered"}
+  ],
+  "scenarios": [
+    {"id": "SC-001", "description": "用户注册成功", "steps": ["输入邮箱", "提交"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "happy"},
+    {"id": "SC-002", "description": "邮箱格式错误", "steps": ["输入错误邮箱", "提交"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "error"},
+    {"id": "SC-003", "description": "邮箱长度边界", "steps": ["输入 254 字符邮箱"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "boundary"}
+  ],
+  "requirementTypes": [
+    {"type": "REQ", "reqIds": ["REQ-001", "REQ-002"], "status": "covered"},
+    {"type": "NFR", "reqIds": ["NFR-001"], "status": "covered"},
+    {"type": "CON", "reqIds": ["CON-001"], "status": "covered"}
+  ],
+  "crossCuts": [
+    {"nfrConId": "NFR-001", "governedReqs": ["REQ-001"], "status": "covered"}
+  ],
+  "metrics": {
+    "stakeholder": 100,
+    "scenario": 100,
+    "requirementType": 100,
+    "crossCut": 100
+  }
+}

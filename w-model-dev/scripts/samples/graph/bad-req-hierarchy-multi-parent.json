@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域A", "summary": "level=1", "level": 1},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "用户域B", "summary": "level=1", "level": 1},
+    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "多父模块", "summary": "level=2 有两个 parent", "level": 2, "reqGroup": "REQ-001"}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-003", "type": "parent"},
+    {"from": "REQ-002", "to": "REQ-003", "type": "parent"}
+  ]
+}

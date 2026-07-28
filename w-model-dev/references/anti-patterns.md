@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（29 条流程反模式 #1~#19 + #20 + #21~#29；#20 在 subagent-delegation.md）
+- 反模式清单（30 条流程反模式 #1~#19 + #20 + #21~#30；#20 在 subagent-delegation.md；#30 第 20 轮新增）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -47,6 +47,7 @@
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 13 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
+| 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
 
 ### 命中高发阶段
 
@@ -80,6 +81,7 @@
 | #27（调测者简化行为） | 阶段 1-8（self-as-verifier 模式全阶段） | [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
 | #28（schema 前置校验缺失） | 阶段 1-8（所有 `*-logic.ts` 校验入口） | [data-models.md](data-models.md)「JSON Schema 强约束」节 |
 | #29（BDD 建模不符未回退） | 阶段 1-4 | [bdd-guide.md](bdd-guide.md)「不符处理流程」节 |
+| #30（豁免审批跳步） | 阶段 1（需求分析，四维识别豁免） | [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05 |
 
 ## 与门禁脚本的对应关系
 
@@ -110,6 +112,7 @@
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
 | #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（13 份） |
 | #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
+| #30（豁免审批跳步） | `check-exemption` E1-E8 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
 
 ## 命中后的处理流程
 
@@ -343,6 +346,52 @@
 - `check-bdd-model.ts` D4 维度已实现 `validateTlaEquivalence()` 等价性校验（状态集 / 初始状态 / 转移集 / 不变式归一化匹配）。
 - `bdd-logic.ts` 的 `validateStateMachineCompleteness()` 校验七要素完整性，与 TLA+ 端 `tla-logic.ts` 状态机校验对称。
 - self-test BDD 样本中 `bad-tla-mismatch.manifest.json` 专测 D4 等价性违反拦截。
+
+## #30 豁免审批跳步（第 20 轮新增）
+
+> 第 20 轮四维识别与豁免审批增强（v20.0.0）。任何豁免未按 S→R→V→人类四阶段流程执行即命中本反模式。
+
+**危害**：覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经四阶段流程即生效，需求遗漏被豁免掩盖，治理失守，缺陷后移到设计/编码阶段。
+
+**典型表现**（命中任一即判 #30）：
+- **S 自行声明豁免**：S 产出 `exemption-request.json` 后直接声明豁免生效（FM-EXEMPT-01），未走 R 审查。
+- **R 直接批准**：R 的 `exemption-review.json` 直接批准豁免生效，未交 V 校验与人类确认（FM-EXEMPT-02）。
+- **V 跳过**：豁免流程中无 `exemption-verification.json`，或 V 校验 `passed=false` 但豁免已生效（FM-EXEMPT-03）。
+- **编排者代签**：编排者代替人类完成 CHECKPOINT 确认，无真实人类确认记录（FM-EXEMPT-04）。
+- **掩盖需求遗漏**：用豁免审批掩盖本应补充的需求，而非真实豁免（FM-EXEMPT-05）。
+
+**正确做法**：
+```
+S 提出 exemption-request.json（含豁免理由、影响范围、替代方案）
+  → R 按 root-cause-locator.md 方法论审查（5-Why / 上游回溯 / 可证伪性）产出 exemption-review.json
+    （R 不得直接批准豁免生效）
+  → V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions 产出 exemption-verification.json
+  → 人类 CHECKPOINT 确认 → approve 写入 granted.json / reject 回到原规则
+  → check-exemption E1-E8 全通过
+```
+
+**检测信号**：
+- 豁免已生效（`granted.json` 存在或需求规格 §8 引用 EXEMPT-NNN）但缺少 `exemption-request.json` / `exemption-review.json` / `exemption-verification.json` 任一文件。
+- `exemption-review.json` 缺 5-Why / 上游回溯 / 可证伪性字段（FM-EXEMPT-02）。
+- `exemption-verification.json` `passed=false` 但 `granted.json` 已写入（FM-EXEMPT-03）。
+- 无 CHECKPOINT 人类确认记录（run-log 无 `action=checkpoint` + 人类确认），但豁免已生效（FM-EXEMPT-04）。
+- 豁免理由为「需求遗漏」类但未补需求（FM-EXEMPT-05）。
+- `check-exemption` E1-E8 任一未通过。
+
+**回退动作**：
+1. 作废已生效的豁免（删除 `granted.json` 对应条目，回退需求规格 §8 Out of Scope 中的豁免声明）。
+2. 回到豁免审批流程的缺失阶段补齐（S/R/V/人类对应阶段）。
+3. 若为 FM-EXEMPT-05（掩盖需求遗漏）→ 作废豁免，回 [phase-1-requirements.md](phase-1-requirements.md) 步骤 1 补充需求。
+4. 重跑 V 评审（`targetKind=requirement`）+ G 门禁。
+
+**与反模式 #10（编排者越权实施）的关系**：编排者代签人类 CHECKPOINT 确认同时命中 #10（编排者越权）与 #30（豁免跳步），按两者叠加处置。
+
+**与反模式 #18（跳过 R 直接 S 返工）的关系**：#18 是返工流程跳过 R，#30 是豁免流程跳过 R/V/人类；两者均为「跳过治理阶段」，但适用场景不同（#18 返工修复，#30 豁免审批）。
+
+**关联**：
+- [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05。
+- [subagent-delegation.md](subagent-delegation.md) S/R/V 角色边界扩展（豁免审批职责）。
+- [verifier-spec.md](verifier-spec.md) §7.1 completeness 四维核验（豁免审批缺失 → completeness 判 0 分）。
 
 ## 实现层经验教训（来自端到端调测）
 

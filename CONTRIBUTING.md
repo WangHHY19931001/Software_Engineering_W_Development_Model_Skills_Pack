@@ -55,7 +55,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/*.ts` 后，必须先跑自检脚本，再用端到端方式验证：
 
 ```bash
-# 3.1 跑自检（samples/ 目录下 121 条样本：18 Verifier + 13 Gate + 17 Graph + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 15 Schema + 1 Metadata + 10 BDD）
+# 3.1 跑自检（samples/ 目录下 149 条样本：18 Verifier + 13 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD）
 npm run self-test
 # 等价于：npx tsx w-model-dev/scripts/self-test.ts
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
@@ -79,15 +79,20 @@ npm run check:gate -- <project-dir>
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑与原 CI 一致的 5 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑与原 CI 一致的 10 项检查；任一退出码不符预期即中止推送：
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（121 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（149 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
 | 5 | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本） | 1 |
+| 6 | `npx tsx w-model-dev/scripts/security-scan.ts`（安全扫描 + baseline 比对） | 0 |
+| 7 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本） | 0 |
+| 8 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本） | 2 |
+| 9 | `npm run check:coverage -- w-model-dev/scripts/samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
+| 10 | `npm run check:exemption -- w-model-dev/scripts/samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 
 **启用方式**（仓库克隆后执行一次即可，配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -177,9 +182,9 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── bdd-logic.ts / check-bdd-model.ts            # BDD 模型 7 维度校验
 │   ├── budget-logic / run-log-logic / maturity-logic / checkpoint-logic / root-cause-logic  # 闭环校验
 │   ├── schema-loader.ts                              # ajv 单例 + schemas/ 自动加载
-│   ├── self-test.ts                                  # 校验逻辑自检（121 条样本，samples/ 驱动）
+│   ├── self-test.ts                                  # 校验逻辑自检（149 条样本，samples/ 驱动）
 │   ├── __tests__/                                    # vitest 单元测试
-│   └── samples/                                      # 端到端样本（verifier/ + gate/ + graph/ + tla/ + bdd/ 等）
+│   └── samples/                                      # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ 等）
 ├── templates/          # 文档模板
 ├── examples/           # 交互示例
 ├── subagent/           # 人格库（28 个 Markdown 文件，分 5 类）

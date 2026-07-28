@@ -1,0 +1,12 @@
+{
+  "stakeholders": [
+    {"id": "SH-001", "role": "用户", "relatedReqs": ["REQ-001"], "status": "covered"}
+  ],
+  "scenarios": [
+    {"id": "SC-001", "description": "happy", "steps": ["s1"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "happy"}
+  ],
+  "requirementTypes": [
+    {"type": "REQ", "reqIds": ["REQ-001"], "status": "covered"}
+  ],
+  "crossCuts": []
+}

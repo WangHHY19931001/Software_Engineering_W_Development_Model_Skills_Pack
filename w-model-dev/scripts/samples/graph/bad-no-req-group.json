@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "功能A", "summary": "level=2 无根", "level": 2},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "功能B", "summary": "level=2 无根", "level": 2},
+    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "功能C", "summary": "level=3 无根", "level": 3},
+    {"id": "REQ-004", "type": "REQ", "phase": 1, "title": "功能D", "summary": "level=3 无根", "level": 3},
+    {"id": "REQ-005", "type": "REQ", "phase": 1, "title": "功能E", "summary": "level=3 无根", "level": 3}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-003", "type": "parent"},
+    {"from": "REQ-001", "to": "REQ-004", "type": "parent"},
+    {"from": "REQ-002", "to": "REQ-005", "type": "parent"}
+  ]
+}

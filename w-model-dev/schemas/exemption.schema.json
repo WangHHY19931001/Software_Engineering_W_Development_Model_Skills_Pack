@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/exemption.schema.json",
+  "title": "ExemptionShape",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "target", "ruleId", "justification", "evidence", "proposedAlternative", "submittedAt"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^EXEMPT-\\d{3}$" },
+    "type": {
+      "enum": [
+        "small-project-hierarchy",
+        "stakeholder-not-applicable",
+        "scenario-type-not-applicable",
+        "coverage-missing-declared",
+        "nfr-subtype-not-applicable"
+      ]
+    },
+    "target": { "type": "string", "minLength": 1 },
+    "ruleId": { "type": "string", "pattern": "^[RC]\\d+$|^C\\d+$" },
+    "justification": { "type": "string", "minLength": 20 },
+    "evidence": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "proposedAlternative": { "type": "string", "minLength": 10 },
+    "submittedAt": { "type": "string", "format": "date-time" },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reviewDecision": { "enum": ["approve", "reject", "need-more-info"] },
+        "rootCauseAnalysis": { "type": "string", "minLength": 30 },
+        "falsifiabilityCheck": { "type": "string", "minLength": 10 },
+        "riskAssessment": { "type": "string", "minLength": 10 },
+        "conditions": { "type": "array", "items": { "type": "string" } },
+        "reviewedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reviewDecision", "rootCauseAnalysis", "falsifiabilityCheck", "riskAssessment", "reviewedAt"]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verified": { "type": "boolean" },
+        "reworkHints": { "type": "array", "items": { "type": "string" } },
+        "verifiedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["verified", "verifiedAt"]
+    },
+    "humanDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": { "enum": ["approve", "reject"] },
+        "decidedAt": { "type": "string", "format": "date-time" },
+        "decidedBy": { "type": "string" }
+      },
+      "required": ["decision", "decidedAt"]
+    }
+  }
+}

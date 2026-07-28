@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域", "summary": "level=1", "level": 1},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "注册模块", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"},
+    {"id": "NFR-001", "type": "REQ", "phase": 1, "title": "安全NFR", "summary": "安全横切关注点"},
+    {"id": "CON-001", "type": "REQ", "phase": 1, "title": "合规CON", "summary": "合规约束"}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-002", "type": "parent"},
+    {"from": "NFR-001", "to": "REQ-002", "type": "cross-cuts"},
+    {"from": "CON-001", "to": "REQ-001", "type": "cross-cuts"}
+  ]
+}

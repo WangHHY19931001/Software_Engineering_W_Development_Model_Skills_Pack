@@ -48,6 +48,40 @@ async function main(): Promise<void> {
     }
   }
 
+  // 解析 --rtm（可选，用于 R6 cross-cuts 源类型校验）
+  const rtmArg = process.argv.slice(3).find(a => a.startsWith('--rtm='));
+  let rtmRows: Array<{ requirementId: string; type: string }> | undefined;
+  if (rtmArg) {
+    const rtmPath = rtmArg.split('=')[1];
+    if (rtmPath) {
+      try {
+        const rtmRaw = await fs.readFile(path.resolve(rtmPath), 'utf-8');
+        const rtmParsed = JSON.parse(rtmRaw) as { rows?: Array<{ requirementId: string; type: string }> };
+        rtmRows = rtmParsed.rows;
+      } catch {
+        console.error(`✗ --rtm 文件读取失败: ${rtmPath}`);
+        process.exit(2);
+      }
+    }
+  }
+
+  // 解析 --exemptions（可选，用于跳过已批准豁免的规则）
+  const exemptArg = process.argv.slice(3).find(a => a.startsWith('--exemptions='));
+  let exemptedRules: string[] | undefined;
+  if (exemptArg) {
+    const exemptPath = exemptArg.split('=')[1];
+    if (exemptPath) {
+      try {
+        const exemptRaw = await fs.readFile(path.resolve(exemptPath), 'utf-8');
+        const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
+        exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
+      } catch {
+        console.error(`✗ --exemptions 文件读取失败: ${exemptPath}`);
+        process.exit(2);
+      }
+    }
+  }
+
   const abs = path.resolve(file);
   let raw: string;
   try {
@@ -80,6 +114,51 @@ async function main(): Promise<void> {
   }
 
   const result = checkRequirementGraph(parsed, effectivePhase);
+
+  // R6 扩展：cross-cuts 源类型 RTM 关联校验（若提供 --rtm）
+  if (rtmRows && result.crossLogic) {
+    const nfrConIds = new Set(rtmRows.filter(r => r.type === 'NFR' || r.type === 'CON').map(r => r.requirementId));
+    for (const edge of (parsed as GraphShape).edges) {
+      if (edge.type === 'cross-cuts' && !nfrConIds.has(edge.from)) {
+        result.crossLogic.crossCutsSourceTypeViolations.push(`${edge.from}→${edge.to}（源 ${edge.from} 非 NFR/CON 行）`);
+        result.violations.push(`R6 cross-cuts 源类型校验失败：${edge.from} 非 NFR/CON 行`);
+      }
+    }
+  }
+
+  // 应用豁免：跳过已批准豁免的规则
+  if (exemptedRules) {
+    const beforeLen = result.violations.length;
+    result.violations = result.violations.filter(v => {
+      for (const rule of exemptedRules!) {
+        if (v.startsWith(`${rule} `) || v.startsWith(`[${rule}]`)) return false;
+      }
+      return true;
+    });
+    if (result.violations.length < beforeLen) {
+      // 重新评估 passed（与 graph-logic.ts 的汇总逻辑保持一致，含 traceabilityOk / dataflowOk / boundary）
+      const tv = result.traceabilityViolations;
+      const traceabilityOk =
+        tv.SD_without_implements === 0 &&
+        tv.INTF_without_defines === 0 &&
+        tv.DD_without_realizes === 0;
+      const dv = result.dataflowViolations;
+      const dataflowOk =
+        dv.blackHoles.length === 0 &&
+        dv.miracles.length === 0 &&
+        dv.deadModules.length === 0 &&
+        result.boundary.complete;
+      result.passed =
+        result.connectedComponents === 1 &&
+        result.isolatedNodes.length === 0 &&
+        result.roots.length === 1 &&
+        result.orphans.length === 0 &&
+        result.multiParent.length === 0 &&
+        traceabilityOk &&
+        dataflowOk &&
+        result.violations.length === 0;
+    }
+  }
 
   console.log('═'.repeat(60));
   console.log('图谱校验（Requirement Graph Checker）');
@@ -130,6 +209,9 @@ async function main(): Promise<void> {
     traceabilityViolations: result.traceabilityViolations,
     dataflowViolations: result.dataflowViolations,
     boundary: result.boundary,
+    reqHierarchy: result.reqHierarchy,
+    crossLogic: result.crossLogic,
+    exemptionsApplied: exemptedRules ?? [],
     violations: result.violations,
     converged: result.passed,
   }));

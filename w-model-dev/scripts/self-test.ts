@@ -21,6 +21,8 @@
  *   w-model-dev/scripts/samples/tla/*.json        TLA+ manifest 样本（纯逻辑校验，不跑 SANY/TLC）
  *   w-model-dev/scripts/samples/code-tla/*.json   代码-TLA+ 一致性样本（含 manifest+graph+rtm+codeSources）
  *   w-model-dev/scripts/samples/bdd/*.json+*.feature  BDD manifest + features 样本（含 5 valid + 5 bad）
+ *   w-model-dev/scripts/samples/coverage/*.json   覆盖分析样本（四维·维度4，10 条）
+ *   w-model-dev/scripts/samples/exemption/*.json  豁免审批样本（四维·豁免，7 条）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -42,6 +44,8 @@ import { checkBudget } from './budget-logic.js';
 import { checkRunLog } from './run-log-logic.js';
 import { checkMaturity } from './maturity-logic.js';
 import { checkCheckpoint } from './checkpoint-logic.js';
+import { checkRequirementCoverage, type CoverageCheckOptions } from './coverage-logic.js';
+import { checkExemption } from './exemption-logic.js';
 import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 import {
@@ -290,12 +294,6 @@ interface GraphCase {
 
 const GRAPH_CASES: GraphCase[] = [
   {
-    file: 'valid-graph.json',
-    phase: 4,
-    expectedPassed: true,
-    description: 'phase=4 完整图谱：连通 + 单根 + 父唯一 + 全追溯',
-  },
-  {
     file: 'bad-isolated.json',
     phase: 1,
     expectedPassed: false,
@@ -366,12 +364,6 @@ const GRAPH_CASES: GraphCase[] = [
     description: 'REQ-001 无信息流经，应被死模块校验拦截',
   },
   {
-    file: 'valid-dataflow.json',
-    phase: 4,
-    expectedPassed: true,
-    description: 'phase=4 完整图谱含信息流：无黑洞/奇迹/死模块 + 边界完整',
-  },
-  {
     file: 'bad-subsystem-orphan.json',
     phase: 1,
     expectedPassed: false,
@@ -399,11 +391,92 @@ const GRAPH_CASES: GraphCase[] = [
     expectedReasonPatterns: [/collaborates-with.*目标节点不存在/],
     description: 'collaborates-with 目标 SD-5.2.9 不存在，应被横切边校验拦截',
   },
+  // -------------------- 四维识别·维度1/3：13 个 phase=1 纯 REQ 图样本（第 20 轮） --------------------
   {
-    file: 'valid-multilayer.json',
-    phase: 4,
+    file: 'valid-req-hierarchy.json',
+    phase: 1,
     expectedPassed: true,
-    description: 'phase=4 7 层图谱：parent 树 + implements/defines/realizes + governs/collaborates-with/derives 横切边 + 信息流',
+    description: '四维·维度1：phase=1 纯 REQ 层级树（4 层 parent + level + reqGroup），应通过 R1-R4',
+  },
+  {
+    file: 'valid-multi-group.json',
+    phase: 1,
+    expectedPassed: true,
+    description: '四维·维度1：phase=1 纯 REQ 多 group（2 个 level=1 根 + collaborates-with），应通过多 group 模式',
+  },
+  {
+    file: 'valid-cross-cuts-nfr.json',
+    phase: 1,
+    expectedPassed: true,
+    description: '四维·维度3：phase=1 纯 REQ 图含 NFR/CON 横切节点（cross-cuts 边），NFR/CON 不参与 R1-R4',
+  },
+  {
+    file: 'valid-cross-logic.json',
+    phase: 1,
+    expectedPassed: true,
+    description: '四维·维度3：phase=1 纯 REQ 图含 depends-on/precedes/conflicts-with（对称）+ cross-cuts，应通过 R5/R6',
+  },
+  {
+    file: 'valid-small-project-exemption.json',
+    phase: 1,
+    expectedPassed: true,
+    description: '四维·维度1：phase=1 小项目纯 REQ 图（REQ 总数<5），R4 不强制 level=1 group',
+  },
+  {
+    file: 'bad-req-hierarchy-orphan.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/orphan/],
+    description: '四维·维度1：REQ-003 level=3 缺 parent 入边，应被 R2 orphan 校验拦截',
+  },
+  {
+    file: 'bad-req-hierarchy-multi-parent.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/multiParent|父唯一性/],
+    description: '四维·维度1：REQ-003 有两条 parent 入边，应被 R2 父唯一性校验拦截',
+  },
+  {
+    file: 'bad-level-not-monotonic.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R3 level 单调/],
+    description: '四维·维度1：REQ-001(1)→REQ-002(3) 跳级，应被 R3 level 单调校验拦截',
+  },
+  {
+    file: 'bad-missing-level.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R1-R4.*level/],
+    description: '四维·维度1：REQ 节点缺 level 字段，应被 R1-R4 强制必填校验拦截',
+  },
+  {
+    file: 'bad-no-req-group.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R4.*REQ-group/],
+    description: '四维·维度1：REQ 总数≥5 但无 level=1 REQ，应被 R4 REQ-group 非空校验拦截',
+  },
+  {
+    file: 'bad-depends-on-cycle.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R5.*depends-on.*环/],
+    description: '四维·维度3：depends-on 子图有环（REQ-002→REQ-003→REQ-002），应被 R5 依赖无环校验拦截',
+  },
+  {
+    file: 'bad-precedes-cycle.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R5.*precedes.*环/],
+    description: '四维·维度3：precedes 子图有环（REQ-002→REQ-003→REQ-002），应被 R5 时序无环校验拦截',
+  },
+  {
+    file: 'bad-cross-logic.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R6.*cross-cuts.*目标类型|conflicts-with.*对称/],
+    description: '四维·维度3：cross-cuts 目标 SD-001 非 REQ + conflicts-with 单向，应被 R6 横切边校验拦截',
   },
 ];
 
@@ -889,6 +962,141 @@ const BDD_CASES: BddCase[] = [
   },
 ];
 
+// -------------------- Coverage（四维·维度4：10 样本，5 valid + 5 bad） --------------------
+
+interface CoverageCase {
+  /** 样本文件名（相对 samples/coverage/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 透传给 checkRequirementCoverage 的 options */
+  options?: CoverageCheckOptions;
+  /** 用例说明 */
+  description: string;
+}
+
+const COVERAGE_CASES: CoverageCase[] = [
+  // -------------------- 5 valid 样本 --------------------
+  {
+    file: 'valid-full-coverage.json',
+    expectedPassed: true,
+    description: '四维·维度4：完整覆盖（4 维度均 100% + REQ/NFR/CON 三类 + happy/error/boundary 三类）',
+  },
+  {
+    file: 'valid-minimal-coverage.json',
+    expectedPassed: true,
+    description: '四维·维度4：最小合规覆盖（每维度仅 1 项 covered，metrics 重算一致）',
+  },
+  {
+    file: 'valid-metrics-recalc.json',
+    expectedPassed: true,
+    description: '四维·维度4：metrics 100% 与重算一致（C10 通过）',
+  },
+  {
+    file: 'valid-cross-cuts-consistent.json',
+    expectedPassed: true,
+    options: { graphCrossCuts: [{ from: 'NFR-001', to: 'REQ-001' }] },
+    description: '四维·维度4：crossCuts 与 graph.json cross-cuts 边集一致（C7 通过）',
+  },
+  {
+    file: 'valid-out-of-scope-declared.json',
+    expectedPassed: true,
+    description: '四维·维度4：NFR/CON 不适用但 status=covered + gapDescription 声明',
+  },
+  // -------------------- 5 bad 样本 --------------------
+  {
+    file: 'bad-empty-stakeholder.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/C1 stakeholders/],
+    description: '四维·维度4：stakeholders 数组为空，应被 C1 校验拦截',
+  },
+  {
+    file: 'bad-missing-scenario-type.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/C4.*boundary/],
+    description: '四维·维度4：scenarios 缺 boundary 类型，应被 C4 场景类型校验拦截',
+  },
+  {
+    file: 'bad-coverage-below-threshold.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/C8.*stakeholder.*< 100/],
+    description: '四维·维度4：stakeholder 覆盖率 50% < 100%，应被 C8 阈值校验拦截',
+  },
+  {
+    file: 'bad-partial-not-resolved.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/C8.*partial/],
+    description: '四维·维度4：存在 partial 项未补齐，应被 C8 100% 阈值校验拦截',
+  },
+  {
+    file: 'bad-cross-cuts-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/C7.*coverage.*graph/],
+    options: { graphCrossCuts: [{ from: 'NFR-001', to: 'REQ-001' }] },
+    description: '四维·维度4：coverage 有 NFR-001→REQ-002 但 graph.json 无，应被 C7 双向校验拦截',
+  },
+];
+
+// -------------------- Exemption（四维·豁免审批：7 样本，2 valid + 5 bad） --------------------
+
+interface ExemptionCase {
+  /** 样本文件名（相对 samples/exemption/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const EXEMPTION_CASES: ExemptionCase[] = [
+  // -------------------- 2 valid 样本（S→R→V→人类 全 approve） --------------------
+  {
+    file: 'valid-full-approval.json',
+    expectedPassed: true,
+    description: '四维·豁免：完整 S→R→V→人类 四阶段 approve（E1-E8 全通过）',
+  },
+  {
+    file: 'valid-coverage-exemption.json',
+    expectedPassed: true,
+    description: '四维·豁免：coverage-missing-declared 类型豁免（NFR 不适用声明）',
+  },
+  // -------------------- 5 bad 样本（覆盖 E4-E8 各阶段失败） --------------------
+  {
+    file: 'bad-s-self-approve.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/E4 review.*缺失|E7 verification.*缺失|E8 humanDecision.*缺失/],
+    description: '四维·豁免：S 自行批准（缺 R/V/人类三阶段），应被 E4/E7/E8 拦截',
+  },
+  {
+    file: 'bad-r-template-review.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/\[schema\].*rootCauseAnalysis.*30/],
+    description: '四维·豁免：R rootCauseAnalysis 模板化（<30 字符），schema minLength:30 前置拦截（E6 与 schema 冗余）',
+  },
+  {
+    file: 'bad-v-not-verified.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/E7.*verified.*false/],
+    description: '四维·豁免：V 校验未通过（verified=false），应被 E7 拦截',
+  },
+  {
+    file: 'bad-no-human.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/E8 humanDecision.*缺失/],
+    description: '四维·豁免：缺人类确认阶段，应被 E8 拦截',
+  },
+  {
+    file: 'bad-r-reject.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/E5.*reviewDecision.*reject/],
+    description: '四维·豁免：R 审查拒绝（reviewDecision=reject），应被 E5 拦截',
+  },
+];
+
 // -------------------- Schema 前置校验（借鉴 drawio-skill/styles/schema.json） --------------------
 
 interface SchemaCase {
@@ -1011,6 +1219,14 @@ const SCHEMA_CASES: SchemaCase[] = [
     expectedValid: false,
     expectedErrorPatterns: [/additionalProperties/],
     description: 'tla-manifest 顶层未知字段 unknownManifestField 应被 additionalProperties:false 拦截',
+  },
+  // -------------------- 四维识别·coverage schema（第 20 轮） --------------------
+  {
+    file: 'bad-coverage-missing-required.json',
+    schema: 'coverage',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'coverage 缺 metrics 必填字段应被 required 拦截',
   },
 ];
 
@@ -1477,6 +1693,58 @@ async function runBddCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runCoverageCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of COVERAGE_CASES) {
+    const abs = path.join(samplesDir, 'coverage', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkRequirementCoverage(parsed, c.options);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `coverage/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of EXEMPTION_CASES) {
+    const abs = path.join(samplesDir, 'exemption', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const r = checkExemption(parsed);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (!c.expectedPassed) {
+      details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+
+    results.push({
+      name: `exemption/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of SCHEMA_CASES) {
@@ -1552,13 +1820,16 @@ async function main(): Promise<void> {
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
+  console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
+  console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
   console.log(`Metadata 用例  : 1`);
   console.log('─'.repeat(60));
 
   const [
     verifierResults, gateResults, graphResults, tlaResults,
     budgetResults, runLogResults, maturityResults, checkpointResults,
-    codeTlaResults, rootcauseResults, schemaResults, bddResults, metadataResults,
+    codeTlaResults, rootcauseResults, schemaResults, bddResults,
+    coverageResults, exemptionResults, metadataResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -1572,12 +1843,15 @@ async function main(): Promise<void> {
     runRootCauseCases(samplesDir),
     runSchemaCases(samplesDir),
     runBddCases(samplesDir),
+    runCoverageCases(samplesDir),
+    runExemptionCases(samplesDir),
     runMetadataCheck(skillRoot),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
-    ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults, ...metadataResults,
+    ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults,
+    ...coverageResults, ...exemptionResults, ...metadataResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

@@ -1,0 +1,26 @@
+{
+  "id": "EXEMPT-002",
+  "type": "coverage-missing-declared",
+  "target": "NFR",
+  "ruleId": "C8",
+  "justification": "本项目无性能/可用性 NFR 需求，声明不适用",
+  "evidence": ["requirement-spec.md:§7.3 NFR 行空", "用户确认无 NFR 需求"],
+  "proposedAlternative": "在 §8 Out of Scope 显式声明 NFR 不适用",
+  "submittedAt": "2026-07-28T10:00:00Z",
+  "review": {
+    "reviewDecision": "approve",
+    "rootCauseAnalysis": "项目为内部工具，无外部用户性能要求。5-Why 分析确认是业务特性而非需求遗漏。",
+    "falsifiabilityCheck": "若未来开放外部用户须重新评估 NFR",
+    "riskAssessment": "低风险：内部工具性能要求宽松",
+    "reviewedAt": "2026-07-28T11:00:00Z"
+  },
+  "verification": {
+    "verified": true,
+    "verifiedAt": "2026-07-28T12:00:00Z"
+  },
+  "humanDecision": {
+    "decision": "approve",
+    "decidedAt": "2026-07-28T13:00:00Z",
+    "decidedBy": "user"
+  }
+}

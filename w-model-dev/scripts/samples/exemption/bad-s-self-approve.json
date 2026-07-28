@@ -1,0 +1,10 @@
+{
+  "id": "EXEMPT-003",
+  "type": "small-project-hierarchy",
+  "target": "REQ-group",
+  "ruleId": "R4",
+  "justification": "项目规模小，REQ 总数<5 无需拆分 group",
+  "evidence": ["graph.json:REQ总数=4"],
+  "proposedAlternative": "声明单 group，阶段2直接派生1个SD",
+  "submittedAt": "2026-07-28T10:00:00Z"
+}

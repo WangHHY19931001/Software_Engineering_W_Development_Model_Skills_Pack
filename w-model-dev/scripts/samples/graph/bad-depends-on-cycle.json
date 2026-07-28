@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域", "summary": "level=1", "level": 1},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "模块A", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"},
+    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "模块B", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-002", "type": "parent"},
+    {"from": "REQ-001", "to": "REQ-003", "type": "parent"},
+    {"from": "REQ-002", "to": "REQ-003", "type": "depends-on"},
+    {"from": "REQ-003", "to": "REQ-002", "type": "depends-on"}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "小项目域", "summary": "level=1 小项目根", "level": 1},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "功能A", "summary": "level=2 小项目模块", "level": 2, "reqGroup": "REQ-001"},
+    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "功能B", "summary": "level=2 小项目模块", "level": 2, "reqGroup": "REQ-001"}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-002", "type": "parent"},
+    {"from": "REQ-001", "to": "REQ-003", "type": "parent"}
+  ]
+}

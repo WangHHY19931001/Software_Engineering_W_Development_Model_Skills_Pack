@@ -1,0 +1,26 @@
+{
+  "id": "EXEMPT-007",
+  "type": "small-project-hierarchy",
+  "target": "REQ-group",
+  "ruleId": "R4",
+  "justification": "项目规模小，REQ 总数<5 无需拆分 group",
+  "evidence": ["graph.json:REQ总数=4"],
+  "proposedAlternative": "声明单 group，阶段2直接派生1个SD",
+  "submittedAt": "2026-07-28T10:00:00Z",
+  "review": {
+    "reviewDecision": "reject",
+    "rootCauseAnalysis": "审查发现该项目实际有多个业务域，S 提出的豁免理由不成立。5-Why 分析显示是需求识别不充分。",
+    "falsifiabilityCheck": "须补充多业务域 REQ 识别",
+    "riskAssessment": "高风险：掩盖需求遗漏",
+    "reviewedAt": "2026-07-28T11:00:00Z"
+  },
+  "verification": {
+    "verified": true,
+    "verifiedAt": "2026-07-28T12:00:00Z"
+  },
+  "humanDecision": {
+    "decision": "approve",
+    "decidedAt": "2026-07-28T13:00:00Z",
+    "decidedBy": "user"
+  }
+}

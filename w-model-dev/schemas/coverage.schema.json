@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/coverage.schema.json",
+  "title": "CoverageShape",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stakeholders", "scenarios", "requirementTypes", "crossCuts", "metrics"],
+  "properties": {
+    "stakeholders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "role", "relatedReqs", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "role": { "type": "string" },
+          "relatedReqs": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["covered", "partial", "missing"] },
+          "gapDescription": { "type": "string" }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "steps", "relatedReqs", "status", "scenarioType"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "steps": { "type": "array", "items": { "type": "string" } },
+          "relatedReqs": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["covered", "partial", "missing"] },
+          "scenarioType": { "enum": ["happy", "error", "boundary"] },
+          "gapDescription": { "type": "string" }
+        }
+      }
+    },
+    "requirementTypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "reqIds", "status"],
+        "properties": {
+          "type": { "enum": ["REQ", "NFR", "CON"] },
+          "reqIds": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["covered", "partial", "missing"] },
+          "gapDescription": { "type": "string" }
+        }
+      }
+    },
+    "crossCuts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nfrConId", "governedReqs", "status"],
+        "properties": {
+          "nfrConId": { "type": "string" },
+          "governedReqs": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["covered", "partial", "missing"] },
+          "gapDescription": { "type": "string" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stakeholder", "scenario", "requirementType", "crossCut"],
+      "properties": {
+        "stakeholder": { "type": "number" },
+        "scenario": { "type": "number" },
+        "requirementType": { "type": "number" },
+        "crossCut": { "type": "number" }
+      }
+    }
+  }
+}

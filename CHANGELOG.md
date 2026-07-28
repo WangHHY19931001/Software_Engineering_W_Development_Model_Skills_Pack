@@ -3,6 +3,45 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [20.0.0] - 2026-07-28
+
+### 第二十轮 阶段 1 需求提取四维识别与豁免审批
+
+阶段 1 需求分析从「扁平 REQ 列表 + 简单层次」升级为「四维识别模型 + 豁免审批治理」。四维 = 层级关系 + 子系统划分 + 交叉逻辑 + 覆盖分析；豁免审批强制 S→R→V→人类四阶段流程。图谱 schema 不向后兼容老图谱（历史抛弃，重新生成）。详见 SSoT §3.4.16。
+
+#### Added
+- 阶段 1 需求提取四维识别模型：层级关系（节点新增 `level`/`priority`/`reqGroup` + R1-R4）+ 子系统划分（REQ-group）+ 交叉逻辑（边新增 `precedes`/`conflicts-with`/`cross-cuts` + R5/R6）+ 覆盖分析（4 张矩阵 + 100% 覆盖率 + C1-C10）
+- 豁免审批治理：强制 S→R→V→人类四阶段流程，`check-exemption.ts` E1-E8 校验（schema 完整性 / justification / evidence / review 阶段 / reviewDecision=approve / rootCauseAnalysis / verification.verified / humanDecision=approve）
+- 新增 schema：`coverage.schema.json` / `exemption.schema.json`
+- 新增纯逻辑层：`coverage-logic.ts`（C1-C10）/ `exemption-logic.ts`（E1-E8）
+- 新增 CLI 入口：`check-requirement-coverage.ts` / `check-exemption.ts`
+- 新增样本：13 graph + 10 coverage + 7 exemption
+- 新增单元测试：`graph-logic.test.ts`（R1-R6）/ `coverage-logic.test.ts`（C1-C10）/ `exemption-logic.test.ts`（E1-E8）
+- 新增反模式 #30（豁免审批跳步：任何豁免未按 S→R→V→人类四阶段流程执行）
+- 新增禁止行为 #7-#11（#7 REQ 不标注 level / #8 LLM 自行决定 REQ-group / #9 省略规格书 §4-§7 / #10 覆盖缺失隐式遗漏 / #11 跳过豁免审批流程）
+- 规格书模板扩展：5 节 → 13 节（§4-§7 四维识别）
+- `package.json` 新增 scripts：`check:coverage` / `check:exemption`
+- `.githooks/pre-push` 门禁扩展：8 → 10 项（新增 `check:coverage` 有效样本 exit 0 + `check:exemption` 有效样本 exit 0）
+- SSoT §3.4.16 + §10A 追溯表 + SKILL.md 约束 #15/#16
+
+#### Changed
+- `graph.schema.json`：节点新增 `level`/`priority`/`reqGroup`；边新增 `precedes`/`conflicts-with`/`cross-cuts`
+- `graph-logic.ts`：新增 R1-R6 校验 + `reqHierarchy`/`crossLogic` 扩展字段
+- `check-requirement-graph.ts`：新增 `--rtm` / `--exemptions` 参数
+- self-test 基线：121 → 152（+13 Graph + 10 Coverage + 7 Exemption + 1 Schema + 1 Metadata 调整）
+- vitest 基线：108 → ~165（+graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + gate-enhancement 集成）
+- 版本号三处同步为 20.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+- 顶层文档同步：README.md 反模式总数 29→30 + self-test 基线 121→152 + 新增 `check:coverage`/`check:exemption` 命令；AGENTS.md §4 第二十轮记录 + 脚本导航表新增 `check-requirement-coverage.ts`/`check-exemption.ts` + self-test 基线 121→152；CONTRIBUTING.md self-test 基线 121→152 + samples 目录新增 `coverage/`/`exemption/` + 本地推送前门禁表新增第 9/10 项；INSTALL.md self-test 基线 121→152 + YAML 示例 version 18.0.0→20.0.0
+
+#### Removed
+- 老图谱向后兼容机制（历史抛弃，重新生成；不向后兼容老图谱）
+
+#### Validation
+- TypeScript strict: 0 错误
+- self-test: 152/152 全通过（18 Verifier + 13 Gate + 30 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD）
+- vitest: ~165 全通过
+- pre-push: 10 项门禁全通过
+
 ## [19.0.1] - 2026-07-27
 
 ### 第十九轮 W 模型 8 阶段端到端调测验证与归档

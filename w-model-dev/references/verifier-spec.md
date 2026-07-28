@@ -417,13 +417,15 @@ V 子代理须在 `summary` 中包含：
 
 | 子标准 name | weight | 描述 |
 |---|---|---|
-| `completeness` | 0.30 | 功能 / 非功能 / 约束需求是否齐全；缺失项是否标注 |
+| `completeness` | 0.30 | 功能 / 非功能 / 约束需求是否齐全；缺失项是否标注。**第 20 轮四维识别增强**：须额外核验①§4 层级树覆盖所有 REQ（每个 REQ 出现且 level 必填）；②§5 REQ-group 覆盖所有 level=1 REQ（至少 1 个 group）；③§6 四类交叉逻辑矩阵（depends-on/precedes/conflicts-with/cross-cuts）无遗漏，无内容时填「无」并加说明；④§7 四张覆盖矩阵（stakeholder/业务场景/需求类型/NFR-CON 横切）完整且每维度覆盖率 100%。覆盖缺失项须经豁免审批（FM-4D-01~05），不得隐式遗漏。 |
 | `clarity` | 0.25 | 表述是否无歧义；输入输出边界是否明确 |
-| `consistency` | 0.20 | 需求之间是否冲突；术语是否前后一致 |
+| `consistency` | 0.20 | 需求之间是否冲突；术语是否前后一致；conflicts-with 边是否均有处置 |
 | `testability` | 0.15 | 验收标准是否可测试；是否可观测可量化 |
 | `traceability` | 0.10 | 是否能映射到业务目标；RTM 是否可登记 |
 
 权重和 = 1.00。
+
+> **completeness 四维核验对照**（第 20 轮，权重不变 0.30）：V 子代理评审 `targetKind=requirement` 时，须在 `evidence` 中引用需求规格 §4-§7 的具体位置作为四维覆盖证据。任一维度缺失（如 §6 某矩阵只写「无」未加说明，或 §7.5 覆盖率 < 100% 且无豁免审批）→ `completeness` 判 0 分。四维核验命中 FM-3D-01~06 / FM-4D-01~05 / FM-EXEMPT-01~05 任一失败模式 → `passed=false`。
 
 ### 7.2 设计（targetKind = `design`）
 

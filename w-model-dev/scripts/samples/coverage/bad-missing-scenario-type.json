@@ -1,0 +1,21 @@
+{
+  "stakeholders": [
+    {"id": "SH-001", "role": "用户", "relatedReqs": ["REQ-001"], "status": "covered"}
+  ],
+  "scenarios": [
+    {"id": "SC-001", "description": "happy", "steps": ["s1"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "happy"},
+    {"id": "SC-002", "description": "error", "steps": ["s1"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "error"}
+  ],
+  "requirementTypes": [
+    {"type": "REQ", "reqIds": ["REQ-001"], "status": "covered"},
+    {"type": "NFR", "reqIds": ["NFR-001"], "status": "covered"},
+    {"type": "CON", "reqIds": ["CON-001"], "status": "covered"}
+  ],
+  "crossCuts": [],
+  "metrics": {
+    "stakeholder": 100,
+    "scenario": 100,
+    "requirementType": 100,
+    "crossCut": 100
+  }
+}

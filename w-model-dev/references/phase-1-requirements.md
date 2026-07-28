@@ -39,17 +39,37 @@
   1. LLM 意图识别和实体提取
      ├─ 失败: 意图置信度低 / 需求歧义 → 暂停，要求用户重述或拆解，禁止 LLM 自行补全默认值
      └─ 成功: 产出功能/非功能/约束需求实体清单
-  2. 构建需求层次结构（模块 → 功能点 → 验收标准）
+  2. 构建需求层级树【维度1】（4 层：domain → module → feature → acceptance）
+     ├─ 每个 REQ 节点须标注 level（1-4，强制必填，无降级）
+     ├─ level≥2 REQ 须有 parent 指向 level-1 祖先；level=1 REQ 即 REQ-group 候选
+     ├─ priority 字段可选（P0-P3）；reqGroup 字段：level≥2 节点指向 level=1 祖先
+     ├─ 失败: level 无法判定 → blocked 返回（见 [ingestion-chunk.md](ingestion-chunk.md) level 识别规则）
      ├─ 失败: 模块归属不明 → 标注待澄清项，向用户确认归属
-     └─ 成功: 产出层次化需求树
-  3. 检测需求冲突和缺失
-     ├─ 失败: 检测到冲突（如 A 与 B 矛盾）→ 在风险评估报告标注冲突对，暂停等用户决策
+     └─ 成功: 产出 4 层层级树（含 level/priority/reqGroup 字段）
+  3. 检测需求冲突和缺失【维度3】（含四类交叉逻辑边识别）
+     ├─ 同步在 graph.json 写入 conflicts-with 边（A 与 B 矛盾）
+     ├─ 同步识别 depends-on / precedes / cross-cuts 边并写入 graph.json
+     ├─ 失败: 检测到 conflicts-with 冲突 → 风险评估报告标注冲突对，同步写入 graph.json，启动豁免审批流程（S→R→V→人类）
      ├─ 失败: 检测到缺失项（如登录无密码策略）→ 提示用户补充，禁止自动填默认策略
-     └─ 成功: 0 冲突、缺失项已标注
+     └─ 成功: 0 冲突、缺失项已标注、四类交叉边已登记
   4. 生成验收标准（每个功能点 ≥ 1 条可验证标准）
      ├─ 失败: 验收标准不可验证（含"快速"/"友好"等主观词）→ 改写为可量化标准（如"响应 < 2s"）
      └─ 成功: 产出可验证的验收标准 + 验收测试用例
-输出: 结构化需求规格 + 验收测试用例 + 风险评估报告
+  5. REQ-group 识别与候选子系统划分【维度2】
+     ├─ level=1 REQ 即 REQ-group 候选（每个 domain 对应一个候选子系统）
+     ├─ 验证 reqGroup 字段：level≥2 节点须指向 level=1 祖先
+     ├─ 产出 REQ-group 清单（§5.1）+ group 划分依据（§5.2）+ 待阶段2决策事项（§5.3）
+     ├─ 失败: REQ-group 边界模糊（FM-3D-04）→ 标注待澄清，向用户确认 group 归属
+     └─ 成功: 产出 REQ-group 候选清单，正式子系统划分待阶段 2
+  6. 需求覆盖分析【维度4】（四张覆盖矩阵 + 100% 覆盖率）
+     ├─ stakeholder 识别后未关联 REQ → FM-4D-01，须经豁免审批
+     ├─ 场景类型缺失（正常/异常/边界/NFR/CON）→ FM-4D-02，须经豁免审批
+     ├─ 覆盖率 < 100%（stakeholder/场景/需求类型）→ FM-4D-03，须经豁免审批
+     ├─ cross-cuts 横切不一致 → FM-4D-04
+     ├─ partial 覆盖未补齐 → FM-4D-05，须经豁免审批
+     ├─ 失败: 覆盖率不达标且未走豁免审批 → 回步骤 6，补覆盖或申请豁免
+     └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
+输出: 结构化需求规格（§1-§12）+ 验收测试用例 + 风险评估报告 + 豁免审批记录
 ```
 
 ## User Stories 长列表（第 10 轮外部技能吸收）
@@ -191,6 +211,76 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1`
 评审通过 → 进入阶段 2（系统设计）。
 评审不通过 → 回到需求分析起点返工（如需求不明确、验收标准缺失、冲突未解决）。
 
+## 失败模式矩阵（FM）
+
+> 第 20 轮四维识别与豁免审批增强（v20.0.0）。FM 矩阵定义四维识别与豁免审批流程的失败模式，由 V 子代理在评审时对照核验，命中即触发返工或豁免审批。
+
+### FM-3D（三维结构失败模式）
+
+> 对应维度1（层级树）/ 维度2（REQ-group）/ 维度3（交叉逻辑）。
+
+| FM ID | 失败模式 | 检测信号 | 处置 |
+|---|---|---|---|
+| FM-3D-01 | 层级缺根 | 无 level=1 REQ；graph.json 无 REQ-group 根 | 回步骤 2 补 level=1 domain REQ |
+| FM-3D-02 | orphan 节点 | level≥2 REQ 无 parent 指向 level-1 祖先 | 回步骤 2 补 parent 边 |
+| FM-3D-03 | multiParent | 一个 REQ 有多个 parent | 回步骤 2 拆分或确认唯一 parent |
+| FM-3D-04 | REQ-group 边界模糊 | level=1 REQ 对应的 group 范围不清；reqGroup 指向非 level=1 节点 | 回步骤 5 向用户确认 group 归属 |
+| FM-3D-05 | 依赖时序环 | depends-on / precedes 边形成环 | 回步骤 3 拆解环或申请豁免 |
+| FM-3D-06 | conflicts-with 未解决 | conflicts-with 边存在但无处置记录 | 启动豁免审批（S→R→V→人类） |
+
+### FM-4D（四维覆盖失败模式）
+
+> 对应维度4（覆盖分析）。
+
+| FM ID | 失败模式 | 检测信号 | 处置 |
+|---|---|---|---|
+| FM-4D-01 | stakeholder 未关联 REQ | stakeholder 识别后无关联 REQ | 补 REQ 或申请豁免审批 |
+| FM-4D-02 | 场景类型缺失 | 正常/异常/边界/NFR/CON 场景未全覆盖 | 补场景或申请豁免审批 |
+| FM-4D-03 | 覆盖率不达标 | stakeholder/场景/需求类型覆盖率 < 100% | 补覆盖或申请豁免审批 |
+| FM-4D-04 | cross-cuts 不一致 | 横切边在 graph.json 与覆盖矩阵不一致 | 回步骤 3 对齐 cross-cuts 边 |
+| FM-4D-05 | partial 未补齐 | 覆盖矩阵标 partial 但未补齐 | 补齐或申请豁免审批 |
+
+### FM-EXEMPT（豁免审批失败模式）
+
+> 对应豁免审批治理（S→R→V→人类四阶段）。
+
+| FM ID | 失败模式 | 检测信号 | 处置 |
+|---|---|---|---|
+| FM-EXEMPT-01 | S 自行决定豁免 | S 产出 exemption-request.json 后直接声明豁免生效 | 作废豁免，回 R 审查 |
+| FM-EXEMPT-02 | R 模板化审查 | R 的 exemption-review.json 缺 5-Why/上游回溯/可证伪性 | 重派 R 补审查 |
+| FM-EXEMPT-03 | V 未通过即放行 | exemption-verification.json passed=false 但豁免已生效 | 作废豁免，回 V 复审 |
+| FM-EXEMPT-04 | 人类未确认 | 无 CHECKPOINT 人类确认记录，豁免已生效 | 暂停，回 CHECKPOINT 等人类确认 |
+| FM-EXEMPT-05 | 掩盖需求遗漏 | 用豁免审批掩盖本应补充的需求 | 作废豁免，回步骤 1 补需求 |
+
+## 豁免审批治理（S→R→V→人类四阶段）
+
+> 第 20 轮新增。覆盖缺失、conflicts-with 冲突、覆盖率不达标等事项须经强制四阶段审批流程，禁止任何角色自行决定豁免生效。
+
+### 流程
+
+```
+S 识别需豁免项 → 产出 exemption-request.json（含豁免理由、影响范围、替代方案）
+  ↓
+R 按 root-cause-locator.md 方法论审查 → 产出 exemption-review.json（5-Why/上游回溯/可证伪性）
+  ↓ 不得直接批准豁免生效
+V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions → 产出 exemption-verification.json
+  ↓
+人类 CHECKPOINT 确认 → approve 写入 granted.json / reject 回到原规则
+```
+
+### 角色边界
+
+- **S 角色**：识别需豁免项，产出 `exemption-request.json`；**禁止 S 自行决定豁免生效**。
+- **R 角色**：按 [root-cause-locator.md](root-cause-locator.md) 方法论审查（5-Why / 上游回溯 / 可证伪性），产出 `exemption-review.json`；**不得直接批准豁免生效**。
+- **V 角色**：校验 `reviewDecision` / `rootCauseAnalysis` / `falsifiabilityCheck` / `conditions`，产出 `exemption-verification.json`。
+- **人类**：CHECKPOINT 确认，approve 写入 `granted.json`，reject 回到原规则。
+
+### check-exemption 校验（E1-E8）
+
+豁免生效前须通过 `check-exemption` E1-E8 全部校验（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）。
+
+> 与反模式 #30（豁免审批跳步）的关系：任何豁免未按四阶段流程执行即命中 #30，见 [anti-patterns.md](anti-patterns.md)。
+
 ## 禁止行为
 
 | # | 禁止行为 | 正确做法 |
@@ -201,15 +291,26 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1`
 | 4 | 跳过冲突检测直接生成用例 | 步骤 3 冲突检测必须执行，冲突未解决不得进入步骤 4 |
 | 5 | 验收测试用例只覆盖 happy path | 必须覆盖正常 + 异常 + 边界场景 |
 | 6 | 需求规格未套用模板 | 必须套用 [templates/requirement-spec.md](../templates/requirement-spec.md) |
+| 7 | REQ 节点不标注 level（1-4） | 每个 REQ 节点必须标注 level（强制必填，无降级）；level 无法判定 → blocked 返回，禁止降级为缺省值 |
+| 8 | LLM 自行决定 REQ-group 归属 | level=1 REQ 即 REQ-group 候选（确定性规则）；group 边界模糊（FM-3D-04）须向用户确认，禁止 LLM 自行裁定 |
+| 9 | 省略 §4-§7 任一节（层级树/REQ-group/交叉逻辑/覆盖分析） | 四维识别强制节必须全部产出；无内容时填「无」并加说明，禁止省略 |
+| 10 | 覆盖缺失项隐式遗漏 | 覆盖缺失项须经豁免审批（FM-4D-01/02/03/05）并在 §8 Out of Scope 显式声明，禁止隐式遗漏 |
+| 11 | 跳过豁免审批流程 | 豁免须经 S→R→V→人类四阶段流程 + check-exemption E1-E8 全通过；跳步即命中反模式 #30 |
 
 ## 返工路径
 
 阶段门评审不通过时，按以下路径返工：
 
 - 需求歧义 / 置信度低 → 回到步骤 1，要求用户重述或拆解
-- 需求冲突未解决 → 回到步骤 3，向用户决策冲突对
+- 需求冲突未解决 → 回到步骤 3，向用户决策冲突对（conflicts-with 启动豁免审批）
 - 缺失项未补充 → 回到步骤 3，向用户提示补充
 - 验收标准不可验证 → 回到步骤 4，改写为可量化标准
+- 层级缺根 / orphan / multiParent（FM-3D-01/02/03）→ 回到步骤 2，补 level=1 根或 parent 边
+- REQ-group 边界模糊（FM-3D-04）→ 回到步骤 5，向用户确认 group 归属
+- 依赖时序环 / conflicts-with 未解决（FM-3D-05/06）→ 回到步骤 3，拆解环或启动豁免审批
+- 覆盖缺失（FM-4D-01/02/03/05）→ 回到步骤 6，补覆盖或申请豁免审批
+- cross-cuts 不一致（FM-4D-04）→ 回到步骤 3，对齐横切边
+- 豁免审批跳步（FM-EXEMPT-01/02/03/04/05）→ 回到豁免审批对应阶段（S/R/V/人类）
 - 验收测试未覆盖全部功能点 → 回到并行任务，补充用例
 
 ## 退出状态

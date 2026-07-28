@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域", "summary": "level=1 group A", "level": 1},
+    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "订单域", "summary": "level=1 group B", "level": 1},
+    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "用户注册", "summary": "level=2 module A", "level": 2, "reqGroup": "REQ-001"},
+    {"id": "REQ-004", "type": "REQ", "phase": 1, "title": "订单创建", "summary": "level=2 module B", "level": 2, "reqGroup": "REQ-002"},
+    {"id": "REQ-005", "type": "REQ", "phase": 1, "title": "邮箱校验", "summary": "level=3 feature A", "level": 3, "reqGroup": "REQ-001"},
+    {"id": "REQ-006", "type": "REQ", "phase": 1, "title": "金额校验", "summary": "level=3 feature B", "level": 3, "reqGroup": "REQ-002"}
+  ],
+  "edges": [
+    {"from": "REQ-001", "to": "REQ-003", "type": "parent"},
+    {"from": "REQ-002", "to": "REQ-004", "type": "parent"},
+    {"from": "REQ-003", "to": "REQ-005", "type": "parent"},
+    {"from": "REQ-004", "to": "REQ-006", "type": "parent"},
+    {"from": "REQ-001", "to": "REQ-002", "type": "collaborates-with"}
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "EXEMPT-001",
+  "type": "small-project-hierarchy",
+  "target": "REQ-group",
+  "ruleId": "R4",
+  "justification": "项目规模小，REQ 总数<5 无需拆分 group",
+  "evidence": ["graph.json:REQ总数=4", "cross-analysis-report:单 group 声明"],
+  "proposedAlternative": "声明单 group，阶段2直接派生1个SD",
+  "submittedAt": "2026-07-28T10:00:00Z",
+  "review": {
+    "reviewDecision": "approve",
+    "rootCauseAnalysis": "项目为 MVP 试点，业务范围天然聚焦单一领域，无多 group 必要。5-Why 分析显示根因为业务边界清晰而非需求遗漏。",
+    "falsifiabilityCheck": "若 REQ 总数增长至≥5 须重新评估",
+    "riskAssessment": "低风险：单一 group 不影响阶段2 SD 派生",
+    "conditions": ["后续若新增 REQ 须重新评估"],
+    "reviewedAt": "2026-07-28T11:00:00Z"
+  },
+  "verification": {
+    "verified": true,
+    "reworkHints": [],
+    "verifiedAt": "2026-07-28T12:00:00Z"
+  },
+  "humanDecision": {
+    "decision": "approve",
+    "decidedAt": "2026-07-28T13:00:00Z",
+    "decidedBy": "user"
+  }
+}

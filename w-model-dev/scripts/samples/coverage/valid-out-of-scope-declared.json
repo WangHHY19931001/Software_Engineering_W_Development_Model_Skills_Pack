@@ -1,0 +1,23 @@
+{
+  "stakeholders": [
+    {"id": "SH-001", "role": "终端用户", "relatedReqs": ["REQ-001"], "status": "covered"},
+    {"id": "SH-002", "role": "审计员", "relatedReqs": [], "status": "covered", "gapDescription": "审计需求不适用，已在 §8 声明"}
+  ],
+  "scenarios": [
+    {"id": "SC-001", "description": "正常流程", "steps": ["步骤"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "happy"},
+    {"id": "SC-002", "description": "错误流程", "steps": ["步骤"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "error"},
+    {"id": "SC-003", "description": "边界流程", "steps": ["步骤"], "relatedReqs": ["REQ-001"], "status": "covered", "scenarioType": "boundary"}
+  ],
+  "requirementTypes": [
+    {"type": "REQ", "reqIds": ["REQ-001"], "status": "covered"},
+    {"type": "NFR", "reqIds": [], "status": "covered", "gapDescription": "NFR 不适用，已在 §8 声明"},
+    {"type": "CON", "reqIds": [], "status": "covered", "gapDescription": "CON 不适用，已在 §8 声明"}
+  ],
+  "crossCuts": [],
+  "metrics": {
+    "stakeholder": 100,
+    "scenario": 100,
+    "requirementType": 100,
+    "crossCut": 100
+  }
+}
