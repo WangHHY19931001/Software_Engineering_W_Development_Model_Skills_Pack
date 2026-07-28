@@ -3,6 +3,74 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [21.0.0] - 2026-07-29
+
+### 第二十一轮 流程完整性硬化（链式签名 + 产出来源正确性 + 归档完整性）
+
+修复第 20 轮调测发现的 5 类流程完整性违规（C1 代签 / C2 skip-tlc / I1 level=4 强制 / I2 归档缺失 / I3 evidence 空泛），引入角色链式签名 + 产出来源正确性 + 消费者校验机制，从结构上根治跳环问题。
+
+#### Added
+- 角色链式签名机制：`signature-chain.jsonl` + SignatureChainEntry schema（含 inputProvenance 来源证明）
+- 签名链门禁脚本：`check-signature-chain.ts`（R1-R10 校验 + 跨阶段消费者校验）
+- 归档完整性校验脚本：`check-archive-integrity.ts` + `archive-integrity-logic.ts`
+- 新增参考指南：`w-model-dev/references/signature-chain-guide.md`
+- 新增 schema：`signature-chain.schema.json`
+- 新增反模式 #31（归档完整性缺失）/ #32（签名链断裂）
+- 新增 DoD 第七维度（签名链完整性）
+- 新增 SSoT §3.4.1（产出来源正确性）/ §7.9（SignatureChainEntry schema）/ §10.11（签名链门禁）/ §10B.2.1（归档完整性清单）
+- 新增样本：12 签名链 + 4 归档完整性
+- 新增单测：signature-chain-logic.test.ts（R1-R10）+ archive-integrity-logic.test.ts
+
+#### Changed
+- §7.7 graph.json schema：REQ level 从"4 层强制"改为自适应层级深度（minimum=1，无上限）
+- §7.6 V 评审规范：evidence 字段强制引用具体产物字段（`<文件路径>.<字段路径>=<值>` 格式）
+- §10.8 TLA+ 行为门禁：移除 `--skip-tlc` 参数（所有 specs 强制 TLC）
+- §10C 成熟度阶梯：全面禁止代签（含 dogfooding，历史轮次标注 'known violation'）
+- `check-tla-model.ts`：移除 `--skip-tlc` 参数
+- `check-checkpoint.ts`：R3 强化（`--checkpoint-log` 强制 + 拒绝代签）
+- `check-verifier-output.ts`：evidence 格式校验（空泛声明 → O3 命中 + qualityLevel 降级）
+- `graph.schema.json`：level 字段移除 `maximum: 4`
+- `graph-logic.ts`：新增 R11（level 正整数校验）
+- 反模式 #8/#10/#15 强化（代签检测 / 越权检测 / skip-tlc 检测信号）
+- 版本号三处同步为 21.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+
+#### Removed
+- `check-tla-model.ts` 的 `--skip-tlc` 参数（硬约束：所有 specs 强制 TLC）
+- `tla-logic.ts` 的 `skipTlc` 选项
+- `tla-plus-guide.md` 的 skip-tlc 相关条款
+
+#### Validation
+- tsc strict：0 错误
+- self-test：通过（基线 +新增签名链 12 + 归档完整性 4 样本）
+- vitest：通过（新增签名链 + 归档完整性测试 18 项）
+
+## [20.0.1] - 2026-07-28
+
+### 第二十轮 W 模型 8 阶段端到端调测验证与归档（四维识别模型验证）
+
+使用博客系统后端 demo（8 REQ + 3 NFR + 2 CON = 13 需求）完整执行 W 模型 8 阶段端到端调测，验证 [20.0.0] 四维识别模型与豁免审批治理在真实项目中的端到端协作。1 完整 W 模型周期闭环（阶段 1-8 全通过），V 评审 8 阶段全 A 级，126 测试用例全通过。归档产物迁移至 `docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/`，demo 产物清理。
+
+#### Added
+- `docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/`：8 阶段调测归档（7 文件：README.md / verifier-summary.md / rtm-snapshot.json / test-report-snapshot.json / tla-summary.md / bdd-summary.md / checkpoint-summary.md）
+
+#### Removed
+- `w-model-dev-demo/` 整个目录（8 阶段调测产物，归档已迁移至 `docs/changes/archive/`）
+- `coverage/` 顶层目录（vitest 调测临时产物）
+- `package.json` demo 专用依赖：express / jsonwebtoken / supertest / @types/express / @types/jsonwebtoken / @types/superagent / @types/supertest
+
+#### Validation
+- W 模型 8 阶段端到端调测：阶段 1 需求分析（0.865 A）→ 阶段 2 系统设计（0.872 A）→ 阶段 3 概要设计（0.881 A）→ 阶段 4 详细设计（0.889 A）→ 阶段 5 编码实现（0.885 A）→ 阶段 6 集成测试（0.915 A）→ 阶段 7 系统测试（0.918 A）→ 阶段 8 验收测试（0.928 A）
+- 测试执行：UT 55/55 + IT 8/8 + ST 17/17 + UAT 46/46 = 126 全通过
+- 单元覆盖率：Stmts=99.28% / Branch=93.75% / Funcs=100% / Lines=99.26%（超 NFR-002 80% 阈值）
+- TLA+ 8 specs（L1/L2/L3/L4 四层分层建模）SANY 全通过 + TLC 7/7 通过（L1 skip-tlc）
+- BDD 8 features（L1/L2/L3/L4）31 scenarios，check-bdd-model D1-D7 全通过
+- 代码-TLA+ 一致性 4 维度全通过（SD-codeModule 映射 + 状态转移 + Next 分支 + 不变式断言）
+- check-artifact-gate 终检（phase=8）退出码 0
+- maturity.json：unlockConditions.completedCycles=2（第 2 完整 W 模型周期闭环）
+
+#### Changed
+- 版本号三处同步为 20.0.1：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter（[18.0.0] 版本号双写规范）
+
 ## [20.0.0] - 2026-07-28
 
 ### 第二十轮 阶段 1 需求提取四维识别与豁免审批
