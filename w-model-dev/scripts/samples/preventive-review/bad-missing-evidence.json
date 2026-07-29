@@ -1,0 +1,14 @@
+{
+  "reviewedAt": "2026-07-30T10:00:00Z",
+  "reviewer": "R3-reliability-bot",
+  "phase": 2,
+  "dimension": "reliability",
+  "findings": [
+    {
+      "severity": "Critical",
+      "description": "TLA+ 转移缺失",
+      "evidence": ""
+    }
+  ],
+  "passed": false
+}

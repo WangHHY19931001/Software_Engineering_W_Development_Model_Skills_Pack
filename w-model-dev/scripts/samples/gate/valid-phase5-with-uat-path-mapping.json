@@ -1,0 +1,20 @@
+{
+  "rows": [
+    {
+      "requirementId": "REQ-001",
+      "description": "用户登录",
+      "designDoc": "SD-1",
+      "codeModule": "SD-1.1:src/auth/login.ts",
+      "unitTest": "UT-001",
+      "integrationTest": "",
+      "systemTest": "",
+      "acceptanceTest": "UAT-001"
+    }
+  ],
+  "executionSummary": {
+    "unitTest": { "total": 10, "passed": 10, "failed": 0, "pending": 0, "coverage": 90 },
+    "integrationTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "systemTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "acceptanceTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 }
+  }
+}
