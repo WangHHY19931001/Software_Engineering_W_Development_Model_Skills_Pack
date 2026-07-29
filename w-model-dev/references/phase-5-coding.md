@@ -162,6 +162,22 @@
 > 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）。
 > 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1，violation 明确指出回填时机。
 
+### codeModule 格式规范（第22轮 P0-2 修正）
+
+`codeModule` 字段须按以下格式填写，由 `check-artifact-gate.ts --phase=5` 强制校验：
+
+| 行类型 | 格式 | 正则 | 示例 |
+|---|---|---|---|
+| REQ 行 | `SD-xxx:src/path/to/file.ts` | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$` | `SD-5.2.1:src/auth/login.ts` |
+| NFR 行 | `src/path/to/file.ts` 或 `横切` | `^src/.+\.(ts\|js\|py\|java)$` 或 `^横切$` | `src/middleware/rateLimit.ts` |
+| CON 行 | 同 NFR | 同 NFR | `横切` |
+
+**校验逻辑**：
+- REQ 行（`requirementId` 以 `REQ-` 开头）：校验 `codeModule` 匹配 `^SD-[\d.]+:src/.+`
+- NFR 行（`requirementId` 以 `NFR-` 开头）：校验 `codeModule` 匹配 `^src/.+` 或 `=== "横切"`
+- CON 行（`requirementId` 以 `CON-` 开头）：同 NFR
+- 格式不匹配 → check-artifact-gate.ts 退出码 1，reasons 列出具体 requirementId
+
 ### NFR/CON codeModule 回填（第 9 轮 P1.2）
 
 > NFR（非功能需求）与 CON（技术约束）行的 `codeModule` 字段在阶段 5 须回填。与 [phase-1-requirements.md](phase-1-requirements.md)「NFR/CON 横切治理字段登记」节配套：阶段 1 已登记 `designDoc`（横切关系），阶段 5 闭环到代码层。
@@ -181,6 +197,47 @@
 **阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，回到阶段 5 补回填。
 
 > 与阶段 1 的衔接：阶段 1 已登记 `NFR/CON.designDoc`（横切 SD 清单或 `"横切"`），阶段 5 须保证 `codeModule` 与 `designDoc` 横切关系一致——若 `designDoc="横切"` 而 `codeModule` 只指向单个文件，V 子代理评审时应提示「横切范围与代码实现不匹配」（可选 reworkHint，非阻断）。
+
+## 跨平台环境变量设置（第22轮 P3-9 修正）
+
+Windows PowerShell 下 `cross-env` 可能失效。推荐方案：
+
+### 推荐方案：dotenv
+
+在项目根创建 `.env` 文件，`import 'dotenv/config'` 自动加载：
+
+```bash
+# .env
+JWT_SECRET=test-secret-blog-demo
+PORT=3000
+```
+
+```typescript
+// src/app.ts 首行
+import 'dotenv/config';
+// process.env.JWT_SECRET 自动可用
+```
+
+### 备选方案：cross-env
+
+`package.json` scripts 使用 `cross-env`（需安装为 devDependency）：
+
+```json
+{
+  "devDependencies": {
+    "cross-env": "^7.0.3"
+  },
+  "scripts": {
+    "test": "cross-env JWT_SECRET=test-secret-blog-demo npx vitest run"
+  }
+}
+```
+
+### Windows PowerShell 适配
+
+`cross-env` 在 PowerShell 下可能失效，建议用以下方式之一：
+- `$env:JWT_SECRET="test-secret-blog-demo"` 临时设置
+- 使用 `dotenv` 包（推荐）
 
 ### 验收设计反向对照（强制）
 
