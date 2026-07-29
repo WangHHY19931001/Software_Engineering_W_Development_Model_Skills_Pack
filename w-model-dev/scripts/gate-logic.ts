@@ -151,6 +151,70 @@ function checkSdToCodeModuleMapping(
   return violations;
 }
 
+// ==================== codeModule 格式校验（第22轮 P0-2） ====================
+/**
+ * codeModule 格式校验（按行类型分支）。
+ * - REQ 行：^SD-[\d.]+:src/.+
+ * - NFR/CON 行：^src/.+ 或 === "横切"
+ */
+export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
+  const violations: string[] = [];
+  const reqPattern = /^SD-[\d.]+:src\/.+/;
+  const nfrPattern = /^src\/.+/;
+
+  for (const row of rows) {
+    if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
+
+    const id = row.requirementId;
+    const cm = row.codeModule.trim();
+
+    if (id.startsWith('REQ-')) {
+      if (!reqPattern.test(cm)) {
+        violations.push(
+          `codeModule 格式错误：REQ 行 ${id} 的 codeModule "${cm}" 须匹配 ^SD-[\\d.]+:src/.+（示例：SD-5.2.1:src/auth/login.ts）`,
+        );
+      }
+    } else if (id.startsWith('NFR-') || id.startsWith('CON-')) {
+      if (cm !== '横切' && !nfrPattern.test(cm)) {
+        violations.push(
+          `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的 codeModule "${cm}" 须匹配 ^src/.+ 或 === "横切"`,
+        );
+      }
+    }
+  }
+  return violations;
+}
+
+// ==================== uat-path-mapping 回填校验（第22轮 P0-1） ====================
+export interface UatPathMappingRow {
+  uatId: string;
+  actualPath: string;
+  mappingType: string;
+}
+
+/**
+ * uat-path-mapping 回填校验。
+ * - 每条 UAT-NNN 的 actualPath 非 "_待阶段5回填_"
+ * - mappingType ∈ ["直接", "等价", "替代"]
+ */
+export function checkUatPathMappingBackfill(mappings: UatPathMappingRow[]): string[] {
+  const violations: string[] = [];
+  const validMappingTypes = ['直接', '等价', '替代'];
+
+  for (const m of mappings) {
+    if (!m || typeof m.uatId !== 'string') continue;
+    if (m.actualPath.includes('_待阶段5回填_') || m.actualPath.trim() === '') {
+      violations.push(`uat-path-mapping 未回填：${m.uatId} 的实际路径仍为 "_待阶段5回填_" 或为空`);
+    }
+    if (!validMappingTypes.includes(m.mappingType)) {
+      violations.push(
+        `uat-path-mapping mappingType 非法：${m.uatId} 的 mappingType "${m.mappingType}" 须 ∈ ["直接", "等价", "替代"]`,
+      );
+    }
+  }
+  return violations;
+}
+
 function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
   return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
 }
@@ -285,6 +349,12 @@ export function checkArtifactGate(
   if (options && options.graph && phase >= 5) {
     const sdViolations = checkSdToCodeModuleMapping(options.graph, matrix.rows);
     for (const v of sdViolations) reasons.push(v);
+  }
+
+  // ==================== codeModule 格式校验（第22轮 P0-2，仅 phase >= 5） ====================
+  if (phase >= 5) {
+    const formatViolations = checkCodeModuleFormat(matrix.rows);
+    for (const v of formatViolations) reasons.push(v);
   }
 
   return {
