@@ -30,7 +30,7 @@
  * 注意：本脚本不调用任何 LLM。cucumber 是确定性运行器，features/step 是文本+代码。
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import * as path from 'node:path';
 import {
   checkBddModel,
@@ -76,6 +76,26 @@ function parseArgs(argv: string[]): ParsedArgs {
 async function readJson<T>(file: string): Promise<T> {
   const text = await fs.readFile(file, 'utf-8');
   return JSON.parse(text) as T;
+}
+
+/**
+ * 多路径查找 feature 文件（第22轮 P2-6 修正）。
+ * 依次尝试：basePath + filePath → .w-model/ + filePath → .w-model/bdd/ + filePath → projectDir + filePath
+ * 返回第一个存在的路径，都不存在返回 null
+ */
+function resolveFeatureFile(basePath: string, filePath: string, projectDir: string): string | null {
+  const candidates = [
+    path.resolve(basePath, filePath),
+    path.resolve(projectDir, '.w-model', filePath),
+    path.resolve(projectDir, '.w-model', 'bdd', filePath),
+    path.resolve(projectDir, filePath),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 /**
@@ -193,14 +213,20 @@ async function main(): Promise<number> {
   const manifestDir = path.resolve(path.dirname(args.manifestFile));
   // 项目根目录 = manifest 所在目录的父目录（约定：manifest 在 .w-model/ 下）
   const projectDir = path.resolve(manifestDir, '..');
-  const basePath = path.resolve(projectDir, manifest.basePath);
+  const basePath = manifest.basePath
+    ? path.resolve(projectDir, manifest.basePath)
+    : manifestDir; // basePath 缺失时回退到 manifest 所在目录
 
   // 解析所有 features 文件
   const parsedFeatures: BddCheckInput['parsedFeatures'] = [];
   for (const f of manifest.features) {
-    const filePath = path.resolve(basePath, f.filePath);
+    const resolved = resolveFeatureFile(basePath, f.filePath, projectDir);
+    if (!resolved) {
+      console.error(`[D2] feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`);
+      continue;
+    }
     try {
-      const parsed = await parseFeatureFile(filePath);
+      const parsed = await parseFeatureFile(resolved);
       parsedFeatures.push({
         featureId: f.id,
         header: parsed.header,
@@ -208,7 +234,7 @@ async function main(): Promise<number> {
         scenarios: parsed.scenarios,
       });
     } catch (e) {
-      console.error(`[D2] 无法读取 feature 文件 ${filePath}: ${(e as Error).message}`);
+      console.error(`[D2] 无法读取 feature 文件 ${resolved}: ${(e as Error).message}`);
     }
   }
 
