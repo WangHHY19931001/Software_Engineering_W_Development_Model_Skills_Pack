@@ -48,6 +48,7 @@
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 13 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
+| #33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3 |
 
 ### 命中高发阶段
 
@@ -440,6 +441,18 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - 回到当前阶段起点，补齐缺失角色签名 / 来源证明，重跑签名链校验
 
 **关联**：SSoT §10.11 签名链门禁 + §7.9 SignatureChainEntry schema（[21.0.0] 新增）
+
+## #33 跳过 R3 预防性审查（第22轮新增）
+
+**检测信号**：
+- S 产出后未触发 R3 三阶段审查，直接进入 V 评审
+- run-log 中 S→V 之间缺少 3 条 R3 记录（completeness/reliability/security）
+- `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 文件缺失
+- V 评审未读取 R3 报告（reworkHints 未纳入 R3 发现）
+
+**回退动作**：回到 S 产出后起点，补跑 R3 三阶段审查，产出三份 PreventiveReview JSON，再进入 V 评审。
+
+**门禁脚本**：`check-preventive-review.ts` 校验三份报告完整性；`check-run-log.ts` 校验 S→V 间 R3 记录数。
 
 ## 实现层经验教训（来自端到端调测）
 
