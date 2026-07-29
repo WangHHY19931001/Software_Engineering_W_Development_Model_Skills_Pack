@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/preventive-review.schema.json",
+  "title": "PreventiveReview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewedAt", "reviewer", "phase", "dimension", "findings", "passed"],
+  "properties": {
+    "reviewedAt": { "type": "string", "format": "date-time" },
+    "reviewer": { "type": "string", "minLength": 1 },
+    "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "dimension": { "enum": ["completeness", "reliability", "security"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "description", "evidence"],
+        "properties": {
+          "severity": { "enum": ["Critical", "Required", "Optional", "Nit", "FYI"] },
+          "description": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "passed": { "type": "boolean" }
+  }
+}
