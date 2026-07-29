@@ -177,6 +177,25 @@ S-bdd 子代理在 S-doc 产出需求规格后：
 V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md) 7 项清单）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1` 校验 D1-D7（D5 step 绑定阶段 1-4 跳过）。
 
+### 验收测试前置条件分析（强制）
+
+> 第 22 轮新增。第 21 轮调测发现 5 个验收用例因前置条件缺失而失败（如用公开接口测 token 失效、管理员场景未预创建管理员用户）。
+
+每条验收测试用例须包含以下前置条件分析：
+
+| 前置条件类型 | 要求 | 示例 |
+|---|---|---|
+| 认证状态 | 明确标注是否需认证 + 角色 | 需 admin token / 需普通用户 token / 无需认证 |
+| 数据依赖 | 明确标注依赖的测试数据 | 需预创建文章/用户/标签 |
+| 接口路径 | 明确标注 API 路径 + HTTP 方法 | POST /api/posts |
+
+**禁止行为（新增）**：
+
+| # | 禁止行为 | 正确做法 |
+|---|---|---|
+| 12 | 用公开接口测试认证失效 | 须选需要认证的接口验证 token 失效 |
+| 13 | 验收用例未声明前置条件 | 每条用例须含前置条件分析节 |
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中登记：需求 ID、需求描述、验收测试列。其余列（设计文档 / 代码模块 / 单元 / 集成 / 系统测试）留待后续阶段填充。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。

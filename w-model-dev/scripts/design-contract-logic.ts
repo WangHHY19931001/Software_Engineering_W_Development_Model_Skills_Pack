@@ -89,6 +89,17 @@ export function checkDesignContractConsistency(
   const violations: DesignContractViolation[] = [];
 
   // D1 路径一致性：映射表中「实际路径」须在路由定义中存在
+  // actualPath 可能是纯路径 "/api/posts" 或含方法前缀 "POST /api/posts"
+  const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+  function stripMethodPrefix(p: string): string {
+    const parts = p.trim().split(/\s+/);
+    const first = parts[0];
+    if (parts.length >= 2 && first !== undefined && HTTP_METHODS.includes(first.toUpperCase())) {
+      return parts.slice(1).join(' ');
+    }
+    return p.trim();
+  }
+
   for (const mapping of input.uatPathMappings) {
     if (!mapping.actualPath || mapping.actualPath.trim() === '') {
       continue; // 未回填的跳过（阶段 5 前允许空）
@@ -96,8 +107,9 @@ export function checkDesignContractConsistency(
     if (mapping.actualPath === '横切') {
       continue; // NFR/CON 横切豁免
     }
+    const normalizedPath = stripMethodPrefix(mapping.actualPath);
     const found = input.routeDefinitions.some(
-      (route) => route.path === mapping.actualPath,
+      (route) => route.path === normalizedPath,
     );
     if (!found) {
       violations.push({

@@ -1,0 +1,29 @@
+{
+  "uatPathMappings": [
+    {
+      "uatId": "UAT-017",
+      "designPath": "GET /api/posts/search",
+      "actualPath": "GET /api/search",
+      "mappingType": "替代"
+    }
+  ],
+  "routeDefinitions": [
+    {
+      "method": "GET",
+      "path": "/api/posts",
+      "params": ["page", "pageSize"],
+      "successStatus": 200,
+      "responseFields": ["data", "total"]
+    }
+  ],
+  "acceptanceAssertions": [
+    {
+      "uatId": "UAT-017",
+      "method": "GET",
+      "path": "/api/search",
+      "params": ["q"],
+      "expectedStatus": 200,
+      "assertedFields": ["data"]
+    }
+  ]
+}

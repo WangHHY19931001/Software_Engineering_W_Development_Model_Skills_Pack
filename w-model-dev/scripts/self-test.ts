@@ -48,6 +48,7 @@ import { checkRequirementCoverage, type CoverageCheckOptions } from './coverage-
 import { checkExemption } from './exemption-logic.js';
 import { checkSignatureChain } from './signature-chain-logic.js';
 import { checkArchiveIntegrity } from './archive-integrity-logic.js';
+import { checkDesignContractConsistency } from './design-contract-logic.js';
 import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 import {
@@ -1113,6 +1114,45 @@ const EXEMPTION_CASES: ExemptionCase[] = [
   },
 ];
 
+// -------------------- DesignContract --------------------
+
+interface DesignContractCase {
+  /** 样本文件名（相对 samples/design-contract/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 reasons 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const DESIGN_CONTRACT_CASES: DesignContractCase[] = [
+  {
+    file: 'valid-consistent.json',
+    expectedPassed: true,
+    description: '路径/参数/状态码/字段全部一致，应通过',
+  },
+  {
+    file: 'bad-path-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/\[D1\]/],
+    description: 'UAT 路径映射实际路径在路由定义中不存在，应被 D1 拦截',
+  },
+  {
+    file: 'bad-param-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/\[D2\]/],
+    description: '验收测试使用 limit 但路由定义使用 pageSize，应被 D2 拦截',
+  },
+  {
+    file: 'bad-status-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/\[D3\]/],
+    description: '验收测试预期 204 但路由实际返回 200，应被 D3 拦截',
+  },
+];
+
 // -------------------- SignatureChain（[21.0.0] 签名链：12 样本，1 valid + 11 bad） --------------------
 
 interface SignatureChainCase {
@@ -1814,6 +1854,40 @@ async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runDesignContractCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const tc of DESIGN_CONTRACT_CASES) {
+    const filePath = path.join(samplesDir, 'design-contract', tc.file);
+    const name = `design-contract/${tc.file}`;
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const input = JSON.parse(content);
+      const result = checkDesignContractConsistency(input);
+      const passed = result.passed === tc.expectedPassed &&
+        (!tc.expectedReasonPatterns || tc.expectedReasonPatterns.every(
+          (pat) => result.reasons.some((r) => pat.test(r)),
+        ));
+      results.push({
+        name,
+        passed,
+        description: tc.description,
+        details: passed ? [] : [
+          `  expectedPassed=${tc.expectedPassed}, actual passed=${result.passed}`,
+          `  reasons: ${result.reasons.join('; ')}`,
+        ],
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: tc.description,
+        details: [`  异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 async function runSignatureChainCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of SIGNATURE_CHAIN_CASES) {
@@ -1964,6 +2038,7 @@ async function main(): Promise<void> {
     budgetResults, runLogResults, maturityResults, checkpointResults,
     codeTlaResults, rootcauseResults, schemaResults, bddResults,
     coverageResults, exemptionResults, signatureChainResults, archiveIntegrityResults, metadataResults,
+    designContractResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -1982,12 +2057,14 @@ async function main(): Promise<void> {
     runSignatureChainCases(samplesDir),
     runArchiveIntegrityCases(samplesDir),
     runMetadataCheck(skillRoot),
+    runDesignContractCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
     ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults,
     ...coverageResults, ...exemptionResults, ...signatureChainResults, ...archiveIntegrityResults, ...metadataResults,
+    ...designContractResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

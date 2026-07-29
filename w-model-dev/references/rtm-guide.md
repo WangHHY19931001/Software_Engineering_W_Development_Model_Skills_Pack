@@ -46,6 +46,23 @@
 | 7 系统测试 | 系统测试状态 |
 | 8 验收测试 | 验收测试状态、RTM 需求覆盖率终检 |
 
+### 阶段级增量校验（强制）
+
+> 第 22 轮新增。第 21 轮调测发现 35 个节点 acceptanceTest 为 null 直到阶段 8 才发现。
+
+`check-artifact-gate.ts --phase=N` 在每阶段门执行，校验当前阶段应完成的 RTM 字段：
+
+| Phase | 校验的 RTM 字段 | 新增校验项 |
+|---|---|---|
+| 1 | description, designDoc, **acceptanceTest** | REQ 行 acceptanceTest 须非空 |
+| 2 | description, designDoc, **acceptanceTest** | SD 行 acceptanceTest 须非空 |
+| 3 | description, designDoc, **acceptanceTest** | INTF 行 acceptanceTest 须非空 |
+| 4 | description, designDoc, **acceptanceTest** | DD 行 acceptanceTest 须非空 |
+| 5 | + codeModule, unitTest, **acceptanceTest** | 跑 check-design-contract-consistency.ts |
+| 8 | 全字段终检 | + check-design-contract-consistency.ts 终检 |
+
+NFR/CON 行的 acceptanceTest 允许为 null（横切治理类豁免，由 `isCrossCutting` 逻辑覆盖）。
+
 ## 测试用例 ID 命名规则
 
 RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：

@@ -1,0 +1,29 @@
+{
+  "uatPathMappings": [
+    {
+      "uatId": "UAT-013",
+      "designPath": "DELETE /api/posts/:id",
+      "actualPath": "DELETE /api/posts/:id",
+      "mappingType": "直接"
+    }
+  ],
+  "routeDefinitions": [
+    {
+      "method": "DELETE",
+      "path": "/api/posts/:id",
+      "params": [],
+      "successStatus": 200,
+      "responseFields": ["code"]
+    }
+  ],
+  "acceptanceAssertions": [
+    {
+      "uatId": "UAT-013",
+      "method": "DELETE",
+      "path": "/api/posts/:id",
+      "params": [],
+      "expectedStatus": 204,
+      "assertedFields": ["code"]
+    }
+  ]
+}

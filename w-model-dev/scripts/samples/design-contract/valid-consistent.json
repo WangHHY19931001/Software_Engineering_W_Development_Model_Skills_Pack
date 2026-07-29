@@ -1,0 +1,29 @@
+{
+  "uatPathMappings": [
+    {
+      "uatId": "UAT-001",
+      "designPath": "POST /api/posts",
+      "actualPath": "POST /api/posts",
+      "mappingType": "直接"
+    }
+  ],
+  "routeDefinitions": [
+    {
+      "method": "POST",
+      "path": "/api/posts",
+      "params": ["title", "content"],
+      "successStatus": 201,
+      "responseFields": ["id", "title", "content", "authorId"]
+    }
+  ],
+  "acceptanceAssertions": [
+    {
+      "uatId": "UAT-001",
+      "method": "POST",
+      "path": "/api/posts",
+      "params": ["title", "content"],
+      "expectedStatus": 201,
+      "assertedFields": ["id", "title"]
+    }
+  ]
+}
