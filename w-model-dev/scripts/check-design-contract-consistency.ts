@@ -31,6 +31,7 @@ import * as path from 'node:path';
 import {
   checkDesignContractConsistency,
   type DesignContractCheckInput,
+  type DesignContractCheckResult,
   type UatPathMapping,
   type RouteDefinition,
   type AcceptanceTestAssertion,
@@ -202,11 +203,29 @@ async function main(): Promise<void> {
   const routesDir = path.join(projectDirAbs, 'src', 'routes');
   const testDir = path.join(projectDirAbs, 'tests', 'acceptance');
 
-  // 检查 uat-path-mapping.md 存在性
+  // P2-8: uat-path-mapping.md 缺失时输出明确提示
   try {
     await fs.access(mappingPath);
   } catch {
-    console.error(`✗ 输入错误：${mappingPath} 不存在`);
+    console.error('✗ uat-path-mapping.md 不存在，请在阶段1产出该文件（见 phase-1-requirements.md §输出）');
+    console.error(`  期望路径：${mappingPath}`);
+    const result: DesignContractCheckResult = {
+      passed: false,
+      reasons: ['uat-path-mapping.md 不存在'],
+      violations: [{
+        dimension: 'D1',
+        severity: 'error',
+        message: 'uat-path-mapping.md 不存在',
+        expected: `期望路径：${mappingPath}`,
+        actual: '文件不存在',
+      }],
+    };
+    console.log(`CONTRACT_JSON: ${JSON.stringify({
+      passed: false,
+      exitCode: 2,
+      violationCount: result.violations.length,
+      violations: result.violations,
+    }, null, 2)}`);
     process.exit(2);
   }
 
