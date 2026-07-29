@@ -55,6 +55,19 @@
 | 返回值结构 | ✅ | `{code, message, data: {orderId, status}}` |
 | 错误码集合 | ✅ | `40001, 40002, 50001` |
 
+## 字段命名业务语义对齐（第22轮 P1-4 修正）
+
+设计文档字段命名须与业务语义对齐。若因技术约束无法对齐，须在设计文档「Implementation Decisions」节说明字段映射。
+
+**检查规则**（R3 可靠性审查项，非硬性门禁）：
+- 字段命名须反映业务语义（如「关注关系」用 `followerId/followeeId` 而非 `userId/bloggerId`）
+- 若因技术约束无法对齐，须在 Implementation Decisions 节说明字段映射关系
+- 不一致且无 Implementation Decisions 说明 → R3 可靠性审查标注 finding（severity=Required），V 评审纳入 reworkHints
+
+**示例**：
+- ✅ `followerId/followeeId`（业务语义清晰）
+- ❌ `userId/bloggerId`（业务语义模糊，需 Implementation Decisions 说明映射）
+
 ## 跨模块数据源选择约束
 
 > 第 15 轮 P7-002 `BloggerService.follow` 校验 `follower` 在 blogger store（设计标注 user+）、P7-003 `CommentService.create` 仅校验 user store（blogger token sub 是 bloggerId）缺陷的预防约束。第 16 轮 P3.2 新增。
