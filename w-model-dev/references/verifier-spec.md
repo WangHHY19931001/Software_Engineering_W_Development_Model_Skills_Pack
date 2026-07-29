@@ -131,6 +131,51 @@ if (subCriteria.length !== expected.length) {
 
 > 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
 
+### 2.4 常见违规示例（第22轮 P2-7 修正）
+
+> 针对 D12/D31 缺陷：V 子代理曾手工编造 subCriteria 名称、使用非法 mappingType、添加额外字段。以下为常见违规示例及正确写法。
+
+**违规示例 1：mappingType 使用非法值**
+
+```json
+// ❌ 违规：mappingType 使用 "NFR" / "CON" 不在枚举内
+{ "mappingType": "NFR" }
+{ "mappingType": "CON" }
+
+// ✅ 正确：mappingType 须 ∈ ["直接", "等价", "替代"]
+{ "mappingType": "直接" }
+```
+
+**违规示例 2：subCriteria.name 不匹配标准名称**
+
+```json
+// ❌ 违规：使用中文或不匹配 ^[a-z][a-z-]*$ 模式
+{ "name": "性能" }
+{ "name": "安全" }
+{ "name": "Correctness" }
+
+// ✅ 正确：使用 §2.3 表格中的标准名称（小写+连字符）
+{ "name": "correctness" }
+{ "name": "security" }
+{ "name": "architecture-soundness" }
+```
+
+**违规示例 3：额外字段违反 additionalProperties: false**
+
+```json
+// ❌ 违规：添加 schema 未定义的字段
+{ "name": "correctness", "weight": 0.3, "customField": "xxx" }
+
+// ✅ 正确：仅使用 schema 定义字段（name/description/weight/score/rawScores/variance/evidence）
+{ "name": "correctness", "weight": 0.3, "score": 0.85, "rawScores": [0.83, 0.85, 0.87], "variance": 0.000267, "evidence": "L45-52" }
+```
+
+**推荐 subCriteria 名称清单**（直接引用 §2.3 表格）：
+- requirement: `completeness` / `clarity` / `consistency` / `testability` / `traceability`
+- design: `architecture-soundness` / `requirement-coverage` / `interface-consistency` / `feasibility` / `testability`
+- code: `correctness` / `security` / `readability` / `maintainability` / `conformance`
+- test: `coverage` / `correctness` / `independence` / `clarity` / `priority-reasonableness`
+
 ## 3. 三维度验证（Three-Dimension Verification）
 
 每个目标必须按以下三个维度独立评估，最终综合分数由三维度融合得出。
