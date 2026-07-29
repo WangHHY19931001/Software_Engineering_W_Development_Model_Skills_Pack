@@ -555,3 +555,76 @@ describe('阶段 E 集成测试：graph + coverage + exemption 联动', () => {
     expect(result.overallPassed).toBe(true);
   });
 });
+
+describe('P0-2 codeModule 格式校验（第22轮）', () => {
+  it('REQ 行 codeModule 缺 SD 前缀 → 失败', () => {
+    const matrix: RTMMatrixShape = {
+      rows: [{
+        requirementId: 'REQ-001',
+        description: '登录',
+        designDoc: 'SD-1',
+        codeModule: 'src/auth/login.ts',
+        unitTest: 'UT-001',
+        integrationTest: '',
+        systemTest: '',
+        acceptanceTest: 'UAT-001',
+      }],
+      executionSummary: {
+        unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+        integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      },
+    };
+    const result = checkArtifactGate(matrix, { phaseOption: 5 });
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some(r => r.includes('codeModule 格式错误'))).toBe(true);
+  });
+
+  it('NFR 行 codeModule 带非法 SD 前缀 → 失败', () => {
+    const matrix: RTMMatrixShape = {
+      rows: [{
+        requirementId: 'NFR-001',
+        description: '限流',
+        designDoc: 'SD-2',
+        codeModule: 'SD-2.1:src/middleware/rateLimit.ts',
+        unitTest: '',
+        integrationTest: '',
+        systemTest: '',
+        acceptanceTest: '',
+      }],
+      executionSummary: {
+        unitTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      },
+    };
+    const result = checkArtifactGate(matrix, { phaseOption: 5 });
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some(r => r.includes('codeModule 格式错误'))).toBe(true);
+  });
+
+  it('REQ 行 codeModule 格式正确 → 通过', () => {
+    const matrix: RTMMatrixShape = {
+      rows: [{
+        requirementId: 'REQ-001',
+        description: '登录',
+        designDoc: 'SD-1',
+        codeModule: 'SD-1.1:src/auth/login.ts',
+        unitTest: 'UT-001',
+        integrationTest: '',
+        systemTest: '',
+        acceptanceTest: 'UAT-001',
+      }],
+      executionSummary: {
+        unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+        integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      },
+    };
+    const result = checkArtifactGate(matrix, { phaseOption: 5 });
+    expect(result.reasons.some(r => r.includes('codeModule 格式错误'))).toBe(false);
+  });
+});
