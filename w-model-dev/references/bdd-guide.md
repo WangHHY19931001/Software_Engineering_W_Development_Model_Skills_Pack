@@ -547,6 +547,30 @@ V 子代理复审 R 报告
 
 ---
 
+## §9 TLA+/BDD 自动化同步校验（第22轮 P3-10 修正）
+
+> BDD features 与 TLA+ 规格的等价性维护成本高，手动比对易遗漏。新增 `check-tla-bdd-sync.ts` 脚本自动化 diff 比对。
+
+### 校验内容
+
+| 维度 | TLA+ 来源 | BDD 来源 | 比对规则 |
+|---|---|---|---|
+| 转移名 | `Next == \/ Act1 \/ Act2` | Background 节 `When` 步骤 | 名称完全一致 |
+| 状态名 | `vars` 声明 | Background 节 `Given` 步骤 | 名称完全一致 |
+| 不变式名 | `Inv == ...` | Background 节 `Then` 步骤 | 名称完全一致 |
+
+### 脚本调用
+
+```bash
+npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
+```
+
+退出码：0=一致 / 1=有差异 / 2=输入错误
+
+### 与 check-bdd-model.ts D4 的关系
+
+`check-bdd-model.ts` D4 等价性校验在阶段门禁时执行；`check-tla-bdd-sync.ts` 作为独立开发工具，便于在编写 TLA+/BDD 时快速验证一致性。两者可互补使用。
+
 ## W 模型交叉引用
 
 - [反模式 #29](./anti-patterns.md)：BDD 建模与需求/设计/TLA+ 不符未回退
