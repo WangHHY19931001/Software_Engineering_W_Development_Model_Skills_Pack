@@ -89,6 +89,20 @@ S-bdd 子代理在 S-doc 产出详细设计后：
 V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4` 校验 D1-D7。
 
+## 设计项→装配点→测试 seam 三者一致性（第22轮 P1-5 修正）
+
+每个设计项（如 DD-026 RateLimitMiddleware）须声明：
+- **装配点**：中间件链位置（如 `app.use('/api/', rateLimitMiddleware)`）
+- **测试 seam**：HTTP 层 / 独立实例 / 白盒
+
+**校验规则**（R3 可靠性审查项）：
+- 若装配点为空但测试 seam 为 HTTP 层 → R3 可靠性审查标注 finding
+- 设计项须在详细设计文档中显式声明装配点和测试 seam
+
+## 字段命名业务语义对齐（第22轮 P1-4 修正，同步 phase-3）
+
+详细设计文档中的字段命名须与 phase-3 概要设计保持一致。若因技术约束无法对齐，须在「Implementation Decisions」节说明字段映射。
+
 ## 测试用例生成算法
 
 ```
