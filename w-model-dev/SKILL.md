@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 21.0.0
+version: 22.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -51,6 +51,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 14. **BDD 行为门禁**：阶段 1-4 必须产出对应层级 L1/L2/L3/L4 BDD features + `bdd-manifest.json`；阶段 5-8 必须执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](scripts/check-bdd-model.ts) exitCode=0；BDD↔TLA+ 不等价必须走 R→V→G→S-fix 循环（反模式 #29）。详见 [references/bdd-guide.md](references/bdd-guide.md)。
 15. **REQ 层级强制标注**：REQ 节点须标注 `level`（1-4）强制必填，无降级；无法判断时 blocked 返回要求用户重述（禁止默认填 level=3）。`level=1` REQ 即 REQ-group 候选；`level≥2` REQ 须有 `reqGroup` 指向 `level=1` 祖先。不向后兼容老图谱（历史抛弃，重新生成）。
 16. **豁免审批强制四阶段**：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](scripts/check-exemption.ts) E1-E8 全通过。跳过任一阶段命中反模式 #30。
+17. **R3 预防性审查强制**：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](scripts/check-preventive-review.ts) 校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「R3 预防性审查分派模板」。
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
@@ -125,6 +126,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 5. **初始化确认**（O）：首次进入项目前确认技术栈、当前阶段、同步测试设计和产物清单。
 5.5. **ingestion 子流程**（O → A → G，阶段 1–4）：每个设计阶段进入时，O 跑 `plan-chunks.ts`（只读 stdout）产出分块计划 → 🔴 CHECKPOINT · ingestion 规划确认 → 并行分派 A-chunk 产出 `<chunk-id>.{md,json}` → 分派 A-cross（阶段1）/A-evolve（阶段2-4）合并建图产出 `consolidated.json` → 分派 G 跑 `check-requirement-graph.ts` → 收敛循环（MAX_ROUNDS=5，阈值=零违反）→ 🔴 CHECKPOINT · ingestion 收敛确认。详见 [references/ingestion-chunk.md](references/ingestion-chunk.md) 与 [references/ingestion-cross.md](references/ingestion-cross.md)。
 6. **分派 S 子代理产出**（O → S）：分派产出子代理生成开发产物 + 同步测试设计 + 更新 RTM 实体；**阶段 1–4 额外产出对应层级 TLA+ 规格（`.tla` + `.cfg`）并更新 `tla-manifest.json`，同时产出对应层级 BDD features（`.feature`）并更新 `bdd-manifest.json`**；S 返回 `{产物路径, RTM diff, selfCheck}`。**编排者不得直接产出**。TLA+ 层级：阶段1=L1、阶段2=L1细化+L2、阶段3=L2细化+L3、阶段4=L3+按需L4；BDD 层级同 TLA+（L1/L2/L3/L4 features）。**S 任务过重时可拆为 S-doc（文档+测试+RTM）/ S-tla（TLA+ 规格）/ S-bdd（BDD features）三次分派，时序：S-doc → S-tla → S-bdd → V → G**（详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 拆分机制」节）。
+6.5. **分派 R3 预防性审查**（O → R3）：S 产出后、V 评审前，分派 R 子代理执行三阶段预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`。R3 三阶段可并行分派。G 子代理跑 `check-preventive-review.ts` 校验报告完整性。
 7. **分派 V 子代理评审**（O → V）：分派评审子代理按 `targetKind` 路由 Persona，产出 `VerifierOutput` JSON。**编排者不得自评**。
 8. **分派 G 子代理门禁**（O → G）：分派门禁子代理跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts`**（TLA+ 行为门禁：文件头 + 层次一致性 + SANY 语法 + TLC 模型检查，无死锁/不变式违反/状态爆炸）+ `check-bdd-model.ts`（BDD 行为门禁：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射），返回 TLA+ / BDD 证据摘要。**阶段 5 额外分派 G 跑 `check-code-tla-consistency.ts`（代码-TLA+ 一致性回归，四维度校验）**。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告**（targetKind=rootcause）→ **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
