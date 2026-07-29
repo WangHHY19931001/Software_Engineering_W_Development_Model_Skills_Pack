@@ -640,3 +640,28 @@ Retention90Days == oldestAge <= RETENTION_DAYS
    - §14 是 S-tla 产出参考（建模模式指引）
    - 两者互补：S-tla 按 §14 建模，V-tla 按 §4 评审
 
+## 15. TLA+/BDD 自动化同步校验（第22轮 P3-10 修正）
+
+> TLA+ 与 BDD 等价性维护成本高，手动比对易遗漏。新增 `check-tla-bdd-sync.ts` 脚本自动化 diff 比对。
+
+### 校验内容
+
+从 TLA+ 文件抽取：
+- 转移名（`Next == \/ Act1 \/ Act2`）
+- 状态名（`vars` 声明）
+- 不变式名（`Inv == ...`）
+
+从 BDD feature 文件 Background 节抽取状态机七要素，diff 比对两者差异。
+
+### 脚本调用
+
+```bash
+npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
+```
+
+退出码：0=一致 / 1=有差异 / 2=输入错误
+
+### 与 check-bdd-model.ts 的关系
+
+`check-bdd-model.ts` D4 等价性校验可调用本脚本（可选，不强制）。本脚本作为独立工具，便于开发阶段快速验证 TLA+/BDD 一致性。
+
