@@ -2071,6 +2071,51 @@ interface RunLogEntry {
 
 ---
 
+## 10I. 设计契约一致性校验（check-design-contract-consistency.ts）
+
+> 历史缺陷：第 21 轮 8 阶段调测暴露「阶段 1 验收测试设计与阶段 5 编码实现脱节」——
+> 6 处接口路径/参数名/状态码/响应字段不一致，`uat-path-mapping.md` 形同虚设。
+> 本节确立编码后自动校验设计契约一致性的机制。
+> 实现位置：`w-model-dev/scripts/check-design-contract-consistency.ts` + `w-model-dev/references/phase-5-coding.md` 反向对照清单。
+
+**强制校验维度**（D1~D4，任一失败 → exitCode=1，O 不得放行）：
+
+- **D1 路径一致性**：`uat-path-mapping.md` 中「实际路径」须在路由定义中存在
+- **D2 参数一致性**：验收测试使用的分页/筛选参数名须与路由定义一致
+- **D3 状态码一致性**：验收测试预期状态码须与路由实际返回一致
+- **D4 响应字段一致性**：验收测试断言字段须在实际响应体中存在
+
+**校验时机**：
+- 阶段 5 编码完成后（G 子代理执行，exitCode=0 才放行进阶段 6）
+- 阶段 8 终检时（与 `check-artifact-gate.ts` 并行执行）
+
+**NFR/CON 行例外**：横切治理类需求不强制 D1~D4 校验（允许路径为「横切」）。
+
+---
+
+## 10J. RTM 增量校验修正（phase 1-4 acceptanceTest 补漏）
+
+> 历史缺陷：第 21 轮 8 阶段调测暴露「35 个 INTF/SD 节点 acceptanceTest 字段为 null
+> 直到阶段 8 终检才发现」——根因是 `gate-logic.ts` 的 `PHASE_TRACE_FIELDS` 中
+> phase 1-4 不含 `acceptanceTest` 字段，导致阶段 1-4 门禁不校验该字段。
+> 本节修正 `PHASE_TRACE_FIELDS`，确保阶段 1-4 就校验 acceptanceTest。
+
+**修正内容**：
+- phase 1-4 `PHASE_TRACE_FIELDS` 增加 `acceptanceTest`（REQ/SD/INTF/DD 行强制非空）
+- NFR/CON 行允许 `acceptanceTest` 为 null（横切治理类豁免，已有 `isCrossCutting` 逻辑覆盖）
+- 判定规则：rowId 前缀 `REQ-`/`SD-`/`INTF-`/`DD-` 强制校验；`NFR-`/`CON-` 允许 null
+
+**校验阶段映射**：
+
+| Phase | 新增行类型 | acceptanceTest 校验要求 |
+|---|---|---|
+| 1 | REQ 行 | 须非空（UAT 用例在阶段 1 设计） |
+| 2 | SD 行 | 须非空（映射到已有 UAT 用例） |
+| 3 | INTF 行 | 须非空（映射到已有 UAT 用例） |
+| 4 | DD 行 | 须非空（映射到已有 UAT 用例） |
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
