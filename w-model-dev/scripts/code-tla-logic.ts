@@ -157,15 +157,21 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
   for (const sd of sdNodes) {
     checked++;
     const id = String(sd.id ?? '');
-    // SD id 去 "SD-" 前缀，转小写，按 -/_/. 拆分成多段（取主关键词，避免多单词组合无法匹配）
-    // 任一段（长度 >= 2）在 codeModule 路径中出现即视为映射
+
+    // 主匹配：SD ID 前缀精确匹配（codeModule 格式 SD-xxx:src/path per phase-5-coding.md）
+    // 处理数字 ID（如 SD-5.2.1）和命名 ID（如 SD-AUTH），最可靠的反向追溯方式
+    const prefixMatch = codeModules.some(cm => cm.includes(`${id}:`));
+    if (prefixMatch) continue;
+
+    // 回退匹配：SD id 去 "SD-" 前缀，转小写，按 -/_/. 拆分成多段
+    // 任一段（长度 >= 2）在 codeModule 路径中出现即视为映射（适用于命名 SD ID 如 SD-AUTH）
     const raw = id.replace(/^SD-/i, '');
     const segments = raw
       .split(/[-_.]+/)
       .map(s => s.toLowerCase())
       .filter(s => s.length >= 2);
     if (segments.length === 0) {
-      violations.push(`SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`);
+      violations.push(`SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts）`);
       continue;
     }
     const matched = codeModules.some(cm => {
