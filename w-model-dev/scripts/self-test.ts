@@ -284,6 +284,20 @@ const GATE_CASES: GateCase[] = [
     expectedPassed: false,
     description: 'P1.1 未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）',
   },
+  // -------------------- §10J RTM 增量校验修正（第 22 轮） --------------------
+  {
+    file: 'valid-phase1.json',
+    expectedPassed: true,
+    phaseOption: 1,
+    description: '§10J phase=1 REQ 行 acceptanceTest 非空 + NFR 行豁免，应通过',
+  },
+  {
+    file: 'bad-phase1-missing-acceptance-test.json',
+    expectedPassed: false,
+    phaseOption: 1,
+    expectedReasonPatterns: [/REQ-001.*acceptanceTest/],
+    description: '§10J phase=1 REQ 行 acceptanceTest 为空，应被增量校验拦截',
+  },
 ];
 
 interface GraphCase {

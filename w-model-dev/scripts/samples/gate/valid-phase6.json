@@ -12,7 +12,7 @@
       "unitTest": "TC-UNIT-001",
       "integrationTest": "TC-INT-001",
       "systemTest": null,
-      "acceptanceTest": null,
+      "acceptanceTest": "TC-UAT-001",
       "coverageStatus": "完整"
     },
     {

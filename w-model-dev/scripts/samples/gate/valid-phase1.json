@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "test-project",
+  "currentPhase": 1,
+  "lastUpdated": "2026-07-29T00:00:00.000Z",
+  "rows": [
+    {
+      "requirementId": "REQ-001",
+      "description": "用户注册功能",
+      "designDoc": "docs/requirement-spec.md#REQ-001",
+      "codeModule": "",
+      "unitTest": "",
+      "integrationTest": "",
+      "systemTest": "",
+      "acceptanceTest": "docs/acceptance-test-cases.md#UAT-001",
+      "coverageStatus": "待覆盖"
+    },
+    {
+      "requirementId": "NFR-001",
+      "description": "响应时间 P95 ≤ 200ms",
+      "designDoc": "SD-001,SD-004",
+      "codeModule": "",
+      "unitTest": "",
+      "integrationTest": "",
+      "systemTest": "",
+      "acceptanceTest": "",
+      "coverageStatus": "待覆盖"
+    }
+  ],
+  "executionSummary": {
+    "unitTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "integrationTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "systemTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "acceptanceTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 }
+  }
+}

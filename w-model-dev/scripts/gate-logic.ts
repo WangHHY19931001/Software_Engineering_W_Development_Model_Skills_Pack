@@ -76,13 +76,13 @@ const PHASE_TEST_LAYERS: Record<number, readonly string[]> = {
  * phase=8 与 REQUIRED_TRACE_FIELDS 完全一致（向后兼容）。
  */
 const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
-  1: ['description', 'designDoc'],
-  2: ['description', 'designDoc'],
-  3: ['description', 'designDoc'],
-  4: ['description', 'designDoc'],
-  5: ['description', 'designDoc', 'codeModule', 'unitTest'],
-  6: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest'],
-  7: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest'],
+  1: ['description', 'designDoc', 'acceptanceTest'],
+  2: ['description', 'designDoc', 'acceptanceTest'],
+  3: ['description', 'designDoc', 'acceptanceTest'],
+  4: ['description', 'designDoc', 'acceptanceTest'],
+  5: ['description', 'designDoc', 'codeModule', 'unitTest', 'acceptanceTest'],
+  6: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'acceptanceTest'],
+  7: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
   8: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
 };
 
