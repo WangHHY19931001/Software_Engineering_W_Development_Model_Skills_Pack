@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Design Contract Consistency Check Input",
+  "type": "object",
+  "required": ["uatPathMappings", "routeDefinitions", "acceptanceAssertions"],
+  "additionalProperties": false,
+  "properties": {
+    "uatPathMappings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["uatId", "designPath", "actualPath"],
+        "additionalProperties": false,
+        "properties": {
+          "uatId": { "type": "string", "minLength": 1 },
+          "designPath": { "type": "string" },
+          "actualPath": { "type": "string" },
+          "mappingType": { "enum": ["直接", "等价", "替代"] }
+        }
+      }
+    },
+    "routeDefinitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["method", "path", "params", "successStatus", "responseFields"],
+        "additionalProperties": false,
+        "properties": {
+          "method": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "params": { "type": "array", "items": { "type": "string" } },
+          "successStatus": { "type": "integer", "minimum": 100, "maximum": 599 },
+          "responseFields": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "acceptanceAssertions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["uatId", "method", "path", "params", "expectedStatus", "assertedFields"],
+        "additionalProperties": false,
+        "properties": {
+          "uatId": { "type": "string", "minLength": 1 },
+          "method": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "params": { "type": "array", "items": { "type": "string" } },
+          "expectedStatus": { "type": "integer", "minimum": 100, "maximum": 599 },
+          "assertedFields": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
