@@ -305,6 +305,41 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 跨阶段定位（仅当前阶段产物 + 上游回溯标记）
 ```
 
+### R3 预防性审查分派模板（第22轮新增）
+
+> S 产出后、V 评审前触发。R3 复用 R 子代理机制，但目的为预防性审查而非根因定位。
+
+**分派时序**：S 产出 → R3-completeness / R3-reliability / R3-security（可并行）→ V 评审
+
+**R3 子代理输入**：
+- 当前阶段产物路径
+- 上游产物（需求/设计文档、RTM、TLA+ 规格、BDD features）
+- 审查维度（completeness / reliability / security）
+
+**R3 子代理产出**：`.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`
+
+**PreventiveReview schema**：见 `schemas/preventive-review.schema.json`
+
+**R3 审查清单（按维度）**：
+
+| 维度 | 检查项 |
+|---|---|
+| completeness | 字段齐全 / 模板套用 / RTM 登记 / demo 范围边界 / N-A 标记 / uat-path-mapping 回填 |
+| reliability | TLA+/BDD 等价性 / 状态机一致性 / 接口契约 / 字段命名业务语义对齐 / 设计项装配点与测试 seam 一致性 |
+| security | 输入校验 / 鉴权 / 越权 / 敏感信息 / 限流装配 / 密码哈希 |
+
+**R3 与返工R的区别**：
+
+| 属性 | 返工R（现有） | 预防R3（新增） |
+|---|---|---|
+| 触发时机 | V/G 不通过后触发 | S 产出后主动触发 |
+| 目的 | 定位根因 | 预防性审查 |
+| 产出 | RootCauseReport | PreventiveReview 三份报告 |
+| 方法论 | root-cause-locator.md（5-Why / 鱼骨图 / 上游回溯）定位根因 | 借鉴 root-cause-locator.md 分析工具，但目的不同：预防性审查用「完整性清单 + 可靠性核验 + 安全基线」三维度检查产物，不定位根因 |
+| schema | rootcause-report.schema.json | preventive-review.schema.json |
+
+**V 评审参考方式**：V 子代理在评审时须读取 R3 三份报告，将 R3 发现的问题纳入 `reworkHints`。V 不得跳过 R3 报告直接评审（命中反模式 #33）。
+
 ### V 复审根因报告分派模板（targetKind=rootcause）
 
 ```
