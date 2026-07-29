@@ -27,15 +27,37 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import {
   checkArtifactGate,
+  checkUatPathMappingBackfill,
   type GateGraph,
   type PhaseOption,
   type RTMMatrixShape,
+  type UatPathMappingRow,
 } from './gate-logic.js';
 import { validateBySchema } from './schema-loader.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
 const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
+
+/**
+ * 从 uat-path-mapping.md 内容解析映射行。
+ * 格式：| UAT-001 | POST /api/posts | POST /api/posts | 直接 | ... |
+ */
+function parseUatPathMappingFromContent(content: string): UatPathMappingRow[] {
+  const rows: UatPathMappingRow[] = [];
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const match = line.match(/^\|\s*(UAT-\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/);
+    if (match) {
+      rows.push({
+        uatId: match[1]!.trim(),
+        actualPath: match[3]!.trim(),
+        mappingType: match[4]!.trim(),
+      });
+    }
+  }
+  return rows;
+}
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
@@ -217,6 +239,29 @@ async function main(): Promise<void> {
 
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption，启用 TLA+ 资产校验与阶段分层）
   const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption });
+
+  // P0-1: phase=1 校验 docs/uat-path-mapping.md 存在性
+  if (phaseOption === 1) {
+    const uatMappingPath = path.resolve(projectDir, 'docs', 'uat-path-mapping.md');
+    try {
+      await fs.access(uatMappingPath);
+    } catch {
+      result.reasons.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在，阶段1须产出该文件（见 phase-1-requirements.md §输出）');
+    }
+  }
+
+  // P0-1: phase=5 校验 uat-path-mapping 回填
+  if (phaseOption === 5) {
+    const uatMappingPath = path.resolve(projectDir, 'docs', 'uat-path-mapping.md');
+    try {
+      const content = await fs.readFile(uatMappingPath, 'utf-8');
+      const mappings = parseUatPathMappingFromContent(content);
+      const backfillViolations = checkUatPathMappingBackfill(mappings);
+      for (const v of backfillViolations) result.reasons.push(v);
+    } catch {
+      result.reasons.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在或无法读取');
+    }
+  }
 
   // 合并 BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
   const allReasons = [...result.reasons, ...bddViolations];
