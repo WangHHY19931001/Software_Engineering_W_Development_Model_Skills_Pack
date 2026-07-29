@@ -17,7 +17,7 @@
 - 《需求规格说明书》（套用 [templates/requirement-spec.md](../templates/requirement-spec.md)）
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
-- `docs/uat-path-mapping.md`：UAT 路径映射表初始版（设计路径列，实际路径待阶段5回填）
+- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**，第22轮 P0-1 修正）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
 
 ## AI 能力应用
 
@@ -195,6 +195,15 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1`
 |---|---|---|
 | 12 | 用公开接口测试认证失效 | 须选需要认证的接口验证 token 失效 |
 | 13 | 验收用例未声明前置条件 | 每条用例须含前置条件分析节 |
+
+### demo 范围声明（第22轮 P1-3 修正）
+
+S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围外子系统。验收测试设计须对照 Out of Scope 标记 N/A 用例（附注释说明缺失端点名和原因）。
+
+**R3 完整性维度校验**：
+- 验收测试设计的 N/A 用例是否与 Out of Scope 声明一致
+- N/A 用例是否附注释说明缺失端点名和原因
+- 不一致或注释缺失 → R3 报告标注 finding，V 评审纳入 reworkHints
 
 ## RTM 登记
 
