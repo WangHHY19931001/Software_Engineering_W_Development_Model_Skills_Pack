@@ -229,6 +229,39 @@ export function checkRunLog(
     );
   }
 
+  // ==================== R3 预防性审查记录校验（第22轮新增） ====================
+  // 校验：每个阶段的 S→V 之间须有 3 条 R3 记录（completeness/reliability/security）
+  const r3Dimensions = ['completeness', 'reliability', 'security'];
+  const phaseEntries = new Map<number, Array<{ role: string; action: string }>>();
+
+  for (const entry of valid) {
+    if (!entry || typeof entry.phase !== 'number') continue;
+    if (!phaseEntries.has(entry.phase)) phaseEntries.set(entry.phase, []);
+    phaseEntries.get(entry.phase)!.push({ role: entry.role, action: entry.action });
+  }
+
+  for (const [phase, entryList] of phaseEntries) {
+    // 查找 S 产出和 V 评审的位置
+    let sIndex = -1, vIndex = -1;
+    for (let i = 0; i < entryList.length; i++) {
+      const item = entryList[i];
+      if (!item) continue;
+      if (item.role === 'S' && item.action === 'produce') sIndex = i;
+      if (item.role === 'V' && item.action === 'review' && sIndex >= 0 && vIndex === -1) vIndex = i;
+    }
+    if (sIndex >= 0 && vIndex > sIndex) {
+      // 检查 S→V 之间是否有 3 条 R3 记录
+      const r3Records = entryList.slice(sIndex + 1, vIndex).filter(
+        e => e.role === 'R' && r3Dimensions.some(d => e.action.includes(d)),
+      );
+      if (r3Records.length < 3) {
+        violations.push(
+          `R3 记录校验失败：阶段 ${phase} 的 S→V 之间仅有 ${r3Records.length} 条 R3 记录，须有 3 条（completeness/reliability/security）`,
+        );
+      }
+    }
+  }
+
   // R4 acknowledgedDecisions 非空
   for (const e of valid) {
     if (e.action === 'checkpoint' && e.outcome === 'success') {
