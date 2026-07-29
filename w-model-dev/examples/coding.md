@@ -41,3 +41,34 @@ AI: RTM 已补登：代码模块列 userController.ts/userService.ts/User.ts。
 - 代码审查通过后方可进入集成测试。
 - 体现质量门：自动化审查 → 单元测试 → （后续）集成 → 系统 → 质量门 → 发布。
 - RTM 补登代码模块列，形成需求 → 设计 → 代码的追溯链。
+
+## 跨平台环境变量示例（第22轮 P3-9 修正）
+
+### Windows PowerShell 适配
+
+`cross-env` 在 PowerShell 下可能失效，推荐使用 `dotenv`：
+
+```bash
+# 安装 dotenv
+npm install dotenv
+
+# 创建 .env 文件
+echo JWT_SECRET=test-secret-blog-demo > .env
+echo PORT=3000 >> .env
+```
+
+```typescript
+// src/app.ts 首行
+import 'dotenv/config';
+
+// process.env.JWT_SECRET 自动可用
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) throw new Error('JWT_SECRET is required');
+```
+
+### 备选：PowerShell 临时设置
+
+```powershell
+$env:JWT_SECRET="test-secret-blog-demo"
+npx vitest run
+```
