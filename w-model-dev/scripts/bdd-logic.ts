@@ -397,26 +397,28 @@ export function validateTlaEquivalence(
 ): string[] {
   const violations: string[] = [];
 
-  const bddStates = new Set(sm.states);
-  const tlaStates = new Set(tla.states);
+  // 大小写不敏感比较：将 BDD 和 TLA+ 的状态集统一转小写后比较
+  const normalizeState = (s: string) => s.trim().toLowerCase();
+  const bddStates = new Set(sm.states.map(normalizeState));
+  const tlaStates = new Set(tla.states.map(normalizeState));
   if (bddStates.size !== tlaStates.size || ![...bddStates].every(s => tlaStates.has(s))) {
     violations.push(
-      `[tla-equiv] state set mismatch: BDD=${[...bddStates].sort().join(',')} vs TLA+=${[...tlaStates].sort().join(',')}`
+      `[tla-equiv] state set mismatch: BDD=${[...new Set(sm.states)].sort().join(',')} vs TLA+=${[...new Set(tla.states)].sort().join(',')}`
     );
   }
 
-  if (sm.initialState !== tla.initialState) {
+  if (normalizeState(sm.initialState) !== normalizeState(tla.initialState)) {
     violations.push(
       `[tla-equiv] initial state mismatch: BDD="${sm.initialState}" vs TLA+="${tla.initialState}"`
     );
   }
 
-  const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  const normalizeTransition = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
   const bddTrans = new Set(
-    sm.transitions.map(t => `${t.from}+${t.event}->${t.to}`)
+    sm.transitions.map(t => normalizeTransition(`${t.from}+${t.event}->${t.to}`))
   );
   const tlaTrans = new Set(
-    tla.transitions.map(t => `${t.from}+${t.event}->${t.to}`)
+    tla.transitions.map(t => normalizeTransition(`${t.from}+${t.event}->${t.to}`))
   );
   const bddMissing = [...tlaTrans].filter(t => !bddTrans.has(t));
   const tlaMissing = [...bddTrans].filter(t => !tlaTrans.has(t));
@@ -427,6 +429,7 @@ export function validateTlaEquivalence(
     violations.push(`[tla-equiv] transitions in BDD but not in TLA+: ${tlaMissing.join('; ')}`);
   }
 
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
   const bddInv = new Set(sm.invariants.map(normalize));
   const tlaInv = new Set(tla.invariants.map(normalize));
   const invOnlyBdd = [...bddInv].filter(i => !tlaInv.has(i));

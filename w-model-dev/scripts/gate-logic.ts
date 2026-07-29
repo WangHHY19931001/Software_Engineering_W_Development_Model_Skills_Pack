@@ -281,8 +281,8 @@ export function checkArtifactGate(
   if (options && options.manifestExists === false) {
     reasons.push('TLA+ 资产校验失败：tla-manifest.json 不存在或 specs 为空');
   }
-  // 2. SD→codeModule 映射：graph 提供时执行
-  if (options && options.graph) {
+  // 2. SD→codeModule 映射：graph 提供时执行（仅 phase >= 5 时校验，因为 codeModule 在 phase 5 才进入 RTM 追溯字段）
+  if (options && options.graph && phase >= 5) {
     const sdViolations = checkSdToCodeModuleMapping(options.graph, matrix.rows);
     for (const v of sdViolations) reasons.push(v);
   }

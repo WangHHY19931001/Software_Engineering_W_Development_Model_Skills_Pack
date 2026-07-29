@@ -133,7 +133,12 @@ function extractEventsFromWhen(body: string): string[] {
   const events: string[] = [];
   const lines = body.split('\n');
   for (const line of lines) {
-    const m = line.match(/^\s*(?:When|And)\s+.+?\b(\w+)\s*$/);
+    // 只从 When 步骤提取事件名（不在 And 步骤中提取，因为 And 可能用于 Then 的延续）
+    // 事件名是行末括号中的英文单词，如 (CreateComment)，或行末最后一个英文单词
+    // 支持两种格式：
+    //   1. When 已认证用户对文章发表评论 (CreateComment) → CreateComment
+    //   2. When 用户提交有效的注册信息 (Register) → Register
+    const m = line.match(/^\s*When\s+.+?\b(\w+)\s*\)?\s*$/);
     if (m) events.push(m[1]!);
   }
   return events;
@@ -185,8 +190,10 @@ async function main(): Promise<number> {
   }
   const phase = phaseRaw as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-  const manifestDir = path.dirname(args.manifestFile);
-  const basePath = path.resolve(manifestDir, manifest.basePath);
+  const manifestDir = path.resolve(path.dirname(args.manifestFile));
+  // 项目根目录 = manifest 所在目录的父目录（约定：manifest 在 .w-model/ 下）
+  const projectDir = path.resolve(manifestDir, '..');
+  const basePath = path.resolve(projectDir, manifest.basePath);
 
   // 解析所有 features 文件
   const parsedFeatures: BddCheckInput['parsedFeatures'] = [];
@@ -328,12 +335,32 @@ async function main(): Promise<number> {
 /**
  * 提取 TLA+ 规格中的状态变量名（第一个在 TypeInvariant 中以 \in {"..."} 声明的变量）。
  */
+/**
+ * 提取 TLA+ 规格中枚举状态数最多的状态变量名。
+ * 当规格有多个带枚举值的状态变量时（如 L1 的 systemState 和 userState），
+ * 选择状态数最多的那个（通常是 BDD 对应的用户行为状态变量）。
+ */
 function extractStateVarName(content: string): string | null {
   const typeInvStart = content.indexOf('TypeInvariant ==');
   if (typeInvStart === -1) return null;
   const afterTypeInv = content.slice(typeInvStart);
-  const m = afterTypeInv.match(/(\w+)\s*\\in\s*\{"/);
-  return m ? m[1]! : null;
+  const endMatch = afterTypeInv.slice(16).match(/\n\w+\s*==|\n====/);
+  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + 16) : afterTypeInv;
+
+  // 找到所有 stateVar \in {"v1", "v2", ...} 模式
+  const varPattern = /(\w+)\s*\\in\s*\{((?:"[^"]+"\s*,?\s*)+)\}/g;
+  let bestVar: string | null = null;
+  let maxCount = 0;
+  let match: RegExpExecArray | null;
+  while ((match = varPattern.exec(typeInvBody)) !== null) {
+    const valMatches = match[2]!.match(/"([^"]+)"/g);
+    const count = valMatches ? valMatches.length : 0;
+    if (count > maxCount) {
+      maxCount = count;
+      bestVar = match[1]!;
+    }
+  }
+  return bestVar;
 }
 
 /**
@@ -341,6 +368,8 @@ function extractStateVarName(content: string): string | null {
  */
 function extractTlaStates(content: string): string[] {
   const states: string[] = [];
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return states;
   const typeInvStart = content.indexOf('TypeInvariant ==');
   if (typeInvStart === -1) return states;
   const afterTypeInv = content.slice(typeInvStart);
@@ -348,10 +377,11 @@ function extractTlaStates(content: string): string[] {
   const endMatch = afterTypeInv.slice(16).match(/\n\w+\s*==|\n====/);
   const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + 16) : afterTypeInv;
 
-  // 匹配 \in {"val1", "val2", ...}（不匹配 \in Nat）
-  const setPattern = /\\in\s*\{((?:"[^"]+"\s*,?\s*)+)\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = setPattern.exec(typeInvBody)) !== null) {
+  // 仅匹配第一个状态变量的 \in {"val1", "val2", ...}（不匹配 \in Nat）
+  // 通过 stateVar 名称定位：stateVar \in { ... }
+  const stateVarPattern = new RegExp('\\b' + stateVar + '\\s*\\\\in\\s*\\{((?:"[^"]+"\\s*,?\\s*)+)\\}');
+  const m = stateVarPattern.exec(typeInvBody);
+  if (m) {
     const valMatches = m[1]!.match(/"([^"]+)"/g);
     if (valMatches) {
       for (const v of valMatches) {
@@ -396,13 +426,16 @@ function extractTlaTransitions(content: string): Array<{ from: string; event: st
   const afterNext = content.slice(nextStart);
   const specStart = afterNext.indexOf('Spec ==');
   const nextBody = specStart > 0 ? afterNext.slice(0, specStart) : afterNext;
-  const actionNames = [...nextBody.matchAll(/\\\/\s*(\w+)/g)].map(m => m[1]!);
+  // 匹配 \/ ActionName 或 \/ \E var \in set : ActionName(args)
+  // 注意：JS 正则中 \E 不是转义序列，需用 \\E 匹配字面反斜杠+E
+  const actionNames = [...nextBody.matchAll(/\\\/\s*(?:\\E[^:]+:\s*)?(\w+)/g)].map(m => m[1]!);
 
   for (const actionName of actionNames) {
-    // 定位 action 定义体
-    const defStart = content.indexOf(actionName + ' ==');
-    if (defStart === -1) continue;
-    const afterDef = content.slice(defStart + actionName.length + 4);
+    // 定位 action 定义体（支持 ActionName == 和 ActionName(params) == 两种形式）
+    const defRegex = new RegExp('\\b' + actionName + '\\s*(?:\\([^)]*\\))?\\s*==');
+    const defMatch = defRegex.exec(content);
+    if (!defMatch) continue;
+    const afterDef = content.slice(defMatch.index + defMatch[0].length);
     const endMatch = afterDef.match(/\n\w+\s*==|\n====/);
     const actionBody = endMatch ? afterDef.slice(0, endMatch.index) : afterDef;
 
