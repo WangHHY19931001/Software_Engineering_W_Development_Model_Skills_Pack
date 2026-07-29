@@ -95,6 +95,19 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 | 7 系统测试 | 系统测试状态列 | `rtm.updateStatus(stId, '通过' \| '失败')` | 同上 |
 | 8 验收测试 | 验收测试状态列、覆盖率终检 | `rtm.updateStatus(uatId, '通过' \| '失败')` + 跑 `check-artifact-gate.ts` | 退出码 0 |
 
+### codeModule 格式规范（第22轮 P0-2 修正）
+
+`codeModule` 字段须按行类型填写不同格式：
+
+| 行类型 | 格式 | 正则 | 示例 |
+|---|---|---|---|
+| REQ 行 | `SD-xxx:src/path/to/file.ts` | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$` | `SD-5.2.1:src/auth/login.ts` |
+| NFR 行 | `src/path/to/file.ts` 或 `横切` | `^src/.+\.(ts\|js\|py\|java)$` 或 `^横切$` | `src/middleware/rateLimit.ts` |
+| CON 行 | 同 NFR | 同 NFR | `横切` |
+
+**校验时机**：`check-artifact-gate.ts --phase=5` 强制校验。
+**校验逻辑**：按 `requirementId` 前缀（`REQ-` / `NFR-` / `CON-`）分支匹配正则。
+
 ### 2. 覆盖率计算公式
 
 **需求覆盖率 =（7 个追溯字段均非空的需求数 / 总需求数）× 100%**。每个 `REQ-NNN` 须具备 `description` / `designDoc` / `codeModule` / `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`；任一字段为空，该需求即未覆盖。`coverageStatus` 仅用于展示，门禁脚本会从原始字段重算，不信任手工填写的状态。
