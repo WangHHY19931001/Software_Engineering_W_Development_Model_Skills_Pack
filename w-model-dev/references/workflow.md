@@ -34,6 +34,22 @@
                               │不通过► 回到需求分析 / 编码
 ```
 
+### R3 预防性审查流程（第22轮新增）
+
+```
+O 路由 → CHECKPOINT → S 产出 → R3 预防性审查 → V 评审 → G 门禁 → CHECKPOINT 放行
+```
+
+S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
+
+| 阶段 | 审查维度 | 检查项 | 产出文件 |
+|---|---|---|---|
+| R-完整性 | 产物完整性 | 字段齐全/模板套用/RTM登记/demo范围边界/N-A标记/uat-path-mapping回填 | `.w-model/preventive-reviews/<phase>-completeness.json` |
+| R-可靠性 | 逻辑可靠性 | TLA+/BDD等价性/状态机一致性/接口契约/字段命名业务语义对齐/设计项装配点与测试seam一致性 | `.w-model/preventive-reviews/<phase>-reliability.json` |
+| R-安全性 | 安全风险 | 输入校验/鉴权/越权/敏感信息/限流装配/密码哈希 | `.w-model/preventive-reviews/<phase>-security.json` |
+
+**与返工R的区别**：返工R在V/G不通过后触发，定位根因；R3在S产出后主动触发，预防性审查。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
+
 > **编排者越权实施**（如 O 直接产出 / 评审 / 跑门禁并替代 G 回填）命中反模式 #10，回到当前阶段起点（见 [anti-patterns.md](anti-patterns.md) #10）。
 
 ## 阶段与测试并行对应表
@@ -107,6 +123,8 @@
 - 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
 - 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，**必须经 R 根因定位 → V 复审 → G 门禁 → S-fix 修复 → V → G 循环**（见下方返工循环流程图），禁止直接分派 S 返工（命中反模式 #18）。
 - 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与 SKILL.md「阶段门与质量门」节。
+
+**R3 预防性审查强制**：V 评审前须先完成 R3 三阶段审查（completeness/reliability/security），产出三份 PreventiveReport JSON。V 子代理须读取 R3 报告并将发现纳入 reworkHints。跳过 R3 直接进入 V 评审命中反模式 #33。G 子代理须跑 `check-preventive-review.ts` 校验三份报告完整性。
 
 ### 阶段 1–4 额外行为门禁
 
