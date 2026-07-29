@@ -11,7 +11,7 @@
     "timestamp": { "type": "string", "format": "date-time" },
     "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
     "phaseName": { "type": "string", "minLength": 1 },
-    "action": { "enum": ["chunk", "cross", "evolve", "produce", "review", "gate", "tla-gate", "graph-gate", "test", "checkpoint", "rework", "rollback", "rootcause", "fix", "escalate"] },
+    "action": { "enum": ["chunk", "cross", "evolve", "produce", "review", "gate", "tla-gate", "graph-gate", "test", "checkpoint", "rework", "rollback", "rootcause", "fix", "escalate", "r3-completeness", "r3-reliability", "r3-security"] },
     "role": { "enum": ["O", "A", "S", "V", "G", "R"] },
     "duration_s": { "type": "number", "minimum": 0 },
     "tokens": { "type": "number", "minimum": 0 },

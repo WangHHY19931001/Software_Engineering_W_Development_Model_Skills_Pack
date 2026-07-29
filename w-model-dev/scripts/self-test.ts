@@ -67,6 +67,8 @@ import {
   type ScenarioPathCheck,
   type TlaSpecSnapshot,
 } from './bdd-logic.js';
+import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
+import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -846,6 +848,49 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
   { file: 'bad-r8-report-id.json', expectedPassed: false, expectedReasonPatterns: [/reportId.*格式/], description: 'R8 reportId 含下划线' },
   { file: 'bad-r9-partial-missing.json', expectedPassed: false, expectedReasonPatterns: [/partialReports.*非空/], description: 'R9 多角度缺 partialReports' },
   { file: 'bad-r10-reality-confidence.json', expectedPassed: false, expectedReasonPatterns: [/reality-checker.*confidence/], description: 'R10 reality-checker confidence=0.3' },
+];
+
+// -------------------- Preventive Review（第22轮新增） --------------------
+
+interface PreventiveReviewCase {
+  /** 样本文件名（相对 samples/preventive-review/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 reasons 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const PREVENTIVE_REVIEW_CASES: PreventiveReviewCase[] = [
+  {
+    file: 'valid-completeness.json',
+    expectedPassed: false, // 单份报告不齐 → checkPreventiveReview 返回 false
+    description: 'R3 完整性报告合规（但其他维度缺失，整体 passed=false）',
+  },
+  {
+    file: 'bad-missing-evidence.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/evidence/],
+    description: 'R3 报告缺失 evidence 字段（schema 校验失败 + 其他维度缺失）',
+  },
+];
+
+// -------------------- TLA+/BDD Sync（第22轮新增） --------------------
+
+interface TlaBddSyncCase {
+  /** 样本文件名（相对 samples/tla-bdd-sync/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 用例说明 */
+  description: string;
+}
+
+const TLA_BDD_SYNC_CASES: TlaBddSyncCase[] = [
+  { file: 'valid.json', expectedPassed: true, description: 'TLA+/BDD 一致' },
+  { file: 'bad-transition-mismatch.json', expectedPassed: false, description: 'TLA+/BDD 转移不一致' },
 ];
 
 // -------------------- BDD（Task 5：10 样本，2 valid + 8 bad） --------------------
@@ -1676,6 +1721,76 @@ async function runRootCauseCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runPreventiveReviewCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of PREVENTIVE_REVIEW_CASES) {
+    const abs = path.join(samplesDir, 'preventive-review', c.file);
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const review = JSON.parse(raw) as PreventiveReview;
+      // 单份样本 → 注入到 reviews 字典，其他维度为 null
+      const reviews: Record<string, PreventiveReview | null> = {
+        completeness: null,
+        reliability: null,
+        security: null,
+        [review.dimension]: review,
+      };
+      const r = checkPreventiveReview(reviews, review.phase);
+      const details: string[] = [];
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed && c.expectedReasonPatterns) {
+        details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
+      }
+      results.push({
+        name: `preventive-review/${c.file}`,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name: `preventive-review/${c.file}`,
+        passed: false,
+        description: c.description,
+        details: [`  - ${(err as Error).message}`],
+      });
+    }
+  }
+  return results;
+}
+
+async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of TLA_BDD_SYNC_CASES) {
+    const abs = path.join(samplesDir, 'tla-bdd-sync', c.file);
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const data = JSON.parse(raw) as { tlaContent: string; featureContent: string };
+      const r = checkTlaBddSync(data.tlaContent, data.featureContent);
+      const details: string[] = [];
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      results.push({
+        name: `tla-bdd-sync/${c.file}`,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name: `tla-bdd-sync/${c.file}`,
+        passed: false,
+        description: c.description,
+        details: [`  - ${(err as Error).message}`],
+      });
+    }
+  }
+  return results;
+}
+
 // -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
 
 function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
@@ -2031,6 +2146,8 @@ async function main(): Promise<void> {
   console.log(`SignatureChain 用例 : ${SIGNATURE_CHAIN_CASES.length}`);
   console.log(`ArchiveIntegrity 用例: ${ARCHIVE_INTEGRITY_CASES.length}`);
   console.log(`Metadata 用例  : 1`);
+  console.log(`PreventiveReview 用例: ${PREVENTIVE_REVIEW_CASES.length}`);
+  console.log(`TlaBddSync 用例: ${TLA_BDD_SYNC_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
@@ -2038,7 +2155,7 @@ async function main(): Promise<void> {
     budgetResults, runLogResults, maturityResults, checkpointResults,
     codeTlaResults, rootcauseResults, schemaResults, bddResults,
     coverageResults, exemptionResults, signatureChainResults, archiveIntegrityResults, metadataResults,
-    designContractResults,
+    designContractResults, preventiveReviewResults, tlaBddSyncResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2058,13 +2175,15 @@ async function main(): Promise<void> {
     runArchiveIntegrityCases(samplesDir),
     runMetadataCheck(skillRoot),
     runDesignContractCases(samplesDir),
+    runPreventiveReviewCases(samplesDir),
+    runTlaBddSyncCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
     ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults,
     ...coverageResults, ...exemptionResults, ...signatureChainResults, ...archiveIntegrityResults, ...metadataResults,
-    ...designContractResults,
+    ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

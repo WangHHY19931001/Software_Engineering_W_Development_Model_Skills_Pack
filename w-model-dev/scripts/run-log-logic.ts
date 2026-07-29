@@ -36,7 +36,10 @@ export interface RunLogEntry {
     | 'rework'
     | 'rollback'
     | 'rootcause'
-    | 'fix';
+    | 'fix'
+    | 'r3-completeness'
+    | 'r3-reliability'
+    | 'r3-security';
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number;
