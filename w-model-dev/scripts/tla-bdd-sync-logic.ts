@@ -56,12 +56,12 @@ const TLA_DEF_BLACKLIST = [
  * 从 TLA+ 内容抽取转移名。
  * 匹配 Next == \/ Act1 \/ Act2 格式（TLA+ 析取运算符 \/）。
  *
- * 正则中 `\\\/` 用于匹配字面 `\/`：`\\` 匹配反斜杠，`\/` 匹配斜杠
- * （斜杠在正则字面量中需转义以免被当作分隔符）。
+ * 注意：prefix 正则不消费首个 `\/`，使其保留在 body 中，
+ * 这样 matchAll 能统一抽取所有 `\/` 后的转移名（含第一个）。
  */
 export function extractTlaTransitions(tlaContent: string): string[] {
   const transitions: string[] = [];
-  const nextMatch = tlaContent.match(/Next\s*==\s*\\\/\s*([\s\S]+?)(?:\n\n|\n\(\*|$)/);
+  const nextMatch = tlaContent.match(/Next\s*==\s*([\s\S]+?)(?:\n\n|\n\(\*|$)/);
   if (nextMatch && nextMatch[1]) {
     const nextBody = nextMatch[1];
     const matches = nextBody.matchAll(/\\\/\s*([A-Za-z_][A-Za-z0-9_]*)/g);
@@ -78,7 +78,7 @@ export function extractTlaTransitions(tlaContent: string): string[] {
  */
 export function extractTlaStates(tlaContent: string): string[] {
   const states: string[] = [];
-  const varsMatch = tlaContent.match(/VARIABLES?\s+([\s\S]+?)(?:\n\n|\n\(\*|$)/);
+  const varsMatch = tlaContent.match(/VARIABLES?\s+([\s\S]+?)(?:\n|$)/);
   if (varsMatch && varsMatch[1]) {
     const varsBody = varsMatch[1];
     const matches = varsBody.matchAll(/([A-Za-z_][A-Za-z0-9_]*)/g);

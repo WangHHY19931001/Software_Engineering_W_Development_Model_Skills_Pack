@@ -1,4 +1,4 @@
 {
   "tlaContent": "EXTENDS Naturals\nVARIABLES state\nInit == state = \"idle\"\nNext == \\/ Login \\/ Logout \\/ Register\nLogin == state = \"idle\" /\\ state' = \"active\"\nLogout == state = \"active\" /\\ state' = \"idle\"\nRegister == state = \"idle\" /\\ state' = \"registered\"\nTypeInvariant == state \\in {\"idle\", \"active\", \"registered\"}",
-  "featureContent": "Feature: Test\nBackground:\n  Given state idle\n  When Login\n  Then TypeInvariant"
+  "featureContent": "Feature: Test\nBackground:\n  Given initial state\n  When Login\n  When Logout\n  Then TypeInvariant"
 }
