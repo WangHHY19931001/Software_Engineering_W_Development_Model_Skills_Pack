@@ -167,7 +167,18 @@ async function main(): Promise<void> {
   process.exit(exitCode);
 }
 
-main().catch((err) => {
-  console.error('State Machine Consistency 校验脚本异常:', err);
-  process.exit(2);
-});
+// isMain 守卫：仅在直接执行时运行 main，被 import 时不触发
+const isMain = (() => {
+  try {
+    return process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.url.replace('file:///', ''));
+  } catch {
+    return false;
+  }
+})();
+
+if (isMain) {
+  main().catch((err) => {
+    console.error('State Machine Consistency 校验脚本异常:', err);
+    process.exit(2);
+  });
+}

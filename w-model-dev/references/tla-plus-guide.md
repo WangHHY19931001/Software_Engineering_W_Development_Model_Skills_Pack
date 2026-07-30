@@ -695,12 +695,12 @@ npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
 
 ### 豁免条件
 
-- **无状态机的项目跳过**：若项目 `detailed-design.md` 无 `| 状态 | 事件 | 转移 |` 表格格式的章节，则跳过本校验。
-- **TLA+ 已覆盖的项目**：若项目已有 TLA+ 状态机规格且 `check-tla-model.ts` 通过，则本校验作为补充（不替代 TLA+）。
+- **无状态机的项目跳过**：若项目 `detailed-design.md` 无 `| 状态 | 事件 | 转移 |` 表格格式的章节，则跳过本校验（不视为违反）。
+- **TLA+ 已覆盖的项目**：若项目已有 TLA+ 状态机规格且 `check-tla-model.ts` 通过，则 `check-state-machine-consistency.ts` 作为补充校验（不替代 TLA+）。
 
 ### 误报处理
 
-- 若设计文档使用非标准表格格式，解析器可能漏识别 → 须人工确认表格格式后重跑。
+- 若设计文档使用非标准表格格式（如 `| from | to | event |` 而非 `| 状态 | 事件 | 转移 |`），解析器可能漏识别 → 须人工确认表格格式后重跑。
 - 若代码 `TRANSITIONS` 定义分散在多个文件，须在 input.json 中合并所有文件的转移定义。
 - 误报时在 `reworkHints` 中标注"state-machine 误报"，由 V 评审确认后豁免。
 
