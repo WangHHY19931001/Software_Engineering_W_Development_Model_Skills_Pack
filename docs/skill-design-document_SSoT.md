@@ -717,6 +717,24 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改约束 #1-#17 既有语义（#10/#12 仅扩展文案不改变语义）；不引入新 CHECKPOINT 暂停点；不修改 TLA+/BDD 建模架构（§3.4.14 已定义）；图谱边数下限校验为警告级不 fail（保留豁免机制）。
 
+#### 3.4.21 第 25 轮：codegraph + OpenSpec 集成（2026-07-30）
+
+> 触发：用户要求阶段 5 起引入 codegraph（修改前影响分析）与 OpenSpec opsx（任务规划层），增强代码修改安全性与任务拆解规范性。设计 spec：[`docs/superpowers/specs/2026-07-30-round25-codegraph-opsx-integration-design.md`](./superpowers/specs/2026-07-30-round25-codegraph-opsx-integration-design.md)。经联网调研确认两工具能力定位：codegraph 提供 100% 本地符号级 callers/callees/blast radius 查询（auto-sync）；OpenSpec 提供 opsx:explore/propose/apply/archive 规格驱动变更工作流。集成方案 A（三段式 S 分派，每段 R3×3+V 审查）。版本号目标 24.0.0。
+
+1. **外部工具边界扩展**：SSoT §3.3 外部工具边界新增 codegraph（宿主 Agent MCP 工具 `codegraph_explore`，修改前预防）+ OpenSpec（宿主 Agent CLI `/opsx:*`，规格级规划层）。技能包不内置调用，通过 CHECKPOINT/子代理指令触发。
+
+2. **codegraph 修改前强制查询**：新增约束 #20「阶段 5-8 任何代码/测试文件修改前，S-coding 须先调用 `codegraph_explore` 查询目标符号影响半径（callers/callees/blast radius），结果落盘 `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`」。新增反模式 #38「修改前未查询 codegraph」。与 code-TLA+ 一致性校验（修改后回归）互补。
+
+3. **OpenSpec opsx 与 S-tickets 共存**：opsx:propose 产 tasks.md（what/why），S-tickets 产 tickets.md（how，端到端切片），opsx:apply 按 tickets.md frontier 执行。新增反模式 #39「跳过 opsx 产物审查」+ #40「opsx/S-tickets 职责混淆」。
+
+4. **三段式 S 分派**：S-explore（opsx:explore + codegraph 影响初判）→ S-propose（opsx:propose + S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码，每片 codegraph_explore）。每段产物跑 R3×3（completeness/reliability/security）+ V 评审，不合格打回重做。
+
+5. **依赖自动检查与安装初始化**：新增 `ensure-codegraph-opsx.ts`，三层检测（L1 CLI / L2 MCP 注册 / L3 项目目录）+ 自动处置（npm i -g / codegraph install --yes / codegraph init / openspec init），仅自动失败时 CHECKPOINT。三模式：full（阶段 5 首次）/ quick（阶段 6-8）/ light（启动健康检查）。
+
+6. **门禁扩展**：新增 `check-codegraph-queries.ts`（反模式 #38）/ `check-opsx-artifacts.ts`（反模式 #39/#40）/ `check-openspec-archive.ts`（归档完整性）。`gate-logic.ts` 阶段 5-8 增加 codegraphQueriesValid / opsxArtifactsValid / openspecArchived 三布尔校验。`run-log.schema.json` action 枚举 +6 值（codegraph_query / opsx_explore / opsx_propose / opsx_apply / opsx_archive / ensure_deps）。
+
+**不涉及范围**：不修改约束 #1-#19 既有语义；不修改阶段 1-4 流程（仍是 A/S-doc/S-tla/S-bdd）；不内置 codegraph/opsx 调用（依赖宿主 Agent）；codegraph auto-sync 保持开启不手动管理图谱新鲜度。
+
 ---
 
 ## 4. 技能工作流程
