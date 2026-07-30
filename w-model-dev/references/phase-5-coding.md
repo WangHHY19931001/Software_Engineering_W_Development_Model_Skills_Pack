@@ -48,6 +48,37 @@
 输出: 可运行代码 + 单元测试 + 覆盖率报告
 ```
 
+## codegraph 修改前影响分析（第 25 轮新增）
+
+> 对应约束 #20 + 反模式 #38。阶段 5 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
+
+**修改前流程**：
+1. `codegraph_explore(目标符号)` → 查询 callers / callees / blast radius
+2. 落盘结果到 `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）
+3. 评估：修改是否波及 callers？是否需同步改 callees？
+4. 安全确认后 `Edit`/`Write` 代码
+5. （可选）修改后再查一次确认影响未意外扩大
+
+**与 code-TLA+ 一致性校验的关系**：codegraph = 修改前预防，code-TLA+ = 修改后回归，互补不冲突。
+
+## OpenSpec opsx 三段式 S 分派（第 25 轮新增）
+
+> 对应 SSoT §3.4.21。阶段 5-8 引入 opsx 工作流做规格级规划，与 S-tickets（代码级切片）共存。
+
+**三段式分派**：
+```
+S-explore  → opsx:explore + codegraph 影响初判 → 产物 exploration-analysis.md → R3×3 + V
+S-propose  → opsx:propose（产 proposal/specs/design/tasks）+ S-tickets 拆解（产 tickets）→ R3×3 + V
+S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore → R3×3 + V
+```
+
+**opsx 与 S-tickets 共存边界**（统一由 S-propose 产出）：
+- `opsx:propose` 的 **tasks.md** = 高层任务清单（what/why）
+- `S-tickets` 的 **tickets.md** = 代码垂直切片（how，端到端可 demo）
+- **S-coding 不做拆解**，只按 tickets.md frontier 执行
+
+**每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，不合格打回重做（反模式 #39）。
+
 ## Tracer-bullet 票据拆解（第 10 轮外部技能吸收）
 
 > 吸收 to-tickets tracer-bullet 垂直切片 + blocking edges + wide refactor expand-contract 方法论。S 子代理编码前兼任 S-tickets 角色，产出 `tickets.md` 作为 S-coding 执行单元。
