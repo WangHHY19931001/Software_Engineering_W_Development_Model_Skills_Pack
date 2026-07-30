@@ -1,0 +1,252 @@
+#!/usr/bin/env tsx
+/**
+ * codegraph + OpenSpec 依赖检测与自动安装初始化脚本
+ *
+ * 对应 SSoT §3.4.21：阶段 5-8 引入 codegraph（修改前影响分析）+ OpenSpec opsx（任务规划层）。
+ * 三层检测（L1 CLI / L2 MCP 注册 / L3 项目目录）+ 自动处置，仅自动失败时 CHECKPOINT。
+ *
+ * 用法：
+ *   npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>
+ *
+ * 模式：
+ *   full   = L1→L2→L3 全量检测+自动处置（阶段 5 首次进入）
+ *   quick  = L1+L3 快速复检（阶段 6-8 进入）
+ *   light  = 仅 L1 轻检（技能启动健康检查）
+ *
+ * 退出码：
+ *   0  全部 ready 或 installed
+ *   1  有 CHECKPOINT 项（需人工介入）
+ *   2  输入错误（参数缺失/非法）
+ */
+
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+type Mode = 'full' | 'quick' | 'light';
+
+interface CheckResult {
+  layer: string;
+  item: string;
+  status: 'ready' | 'installed' | 'checkpoint';
+  detail: string;
+}
+
+/**
+ * 检测 CLI 是否可用（L1）
+ */
+function checkCli(name: string): boolean {
+  try {
+    execFileSync(name, ['--version'], { stdio: 'pipe', timeout: 10000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * npm 全局安装 CLI
+ */
+function installCli(packageName: string): boolean {
+  try {
+    execFileSync('npm', ['i', '-g', packageName], { stdio: 'pipe', timeout: 120000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 检测 codegraph_explore MCP 工具可调用性（L2）
+ * 通过尝试执行 codegraph 查询探针符号判断 MCP 是否注册
+ */
+function checkMcpCodegraph(projectRoot: string): boolean {
+  try {
+    // codegraph CLI 可查询图谱验证 MCP 链路；探针符号取项目入口
+    execFileSync('codegraph', ['query', '--symbol', 'main'], {
+      cwd: projectRoot,
+      stdio: 'pipe',
+      timeout: 15000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 注册 codegraph MCP 到 Agent（L2 自动处置）
+ */
+function registerMcpCodegraph(): boolean {
+  try {
+    execFileSync('codegraph', ['install', '--yes'], { stdio: 'pipe', timeout: 60000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * codegraph 项目初始化（L3）
+ */
+function initCodegraph(projectRoot: string): boolean {
+  try {
+    execFileSync('codegraph', ['init'], { cwd: projectRoot, stdio: 'pipe', timeout: 300000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * openspec 项目初始化（L3）
+ */
+function initOpenspec(projectRoot: string): boolean {
+  try {
+    execFileSync('openspec', ['init'], { cwd: projectRoot, stdio: 'pipe', timeout: 60000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 依赖检测纯逻辑（可被 self-test import）
+ */
+export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): CheckResult[] {
+  const results: CheckResult[] = [];
+  const isFull = mode === 'full';
+
+  // L1: codegraph CLI
+  if (checkCli('codegraph')) {
+    results.push({ layer: 'L1', item: 'codegraph CLI', status: 'ready', detail: 'codegraph --version OK' });
+  } else {
+    if (installCli('@colbymchenry/codegraph') && checkCli('codegraph')) {
+      results.push({ layer: 'L1', item: 'codegraph CLI', status: 'installed', detail: 'npm i -g @colbymchenry/codegraph 成功' });
+    } else {
+      results.push({ layer: 'L1', item: 'codegraph CLI', status: 'checkpoint', detail: '自动安装失败，需用户手动 npm i -g @colbymchenry/codegraph 或检查权限' });
+    }
+  }
+
+  // L1: openspec CLI
+  if (checkCli('openspec')) {
+    results.push({ layer: 'L1', item: 'openspec CLI', status: 'ready', detail: 'openspec --version OK' });
+  } else {
+    if (installCli('@fission-ai/openspec@latest') && checkCli('openspec')) {
+      results.push({ layer: 'L1', item: 'openspec CLI', status: 'installed', detail: 'npm i -g @fission-ai/openspec@latest 成功' });
+    } else {
+      results.push({ layer: 'L1', item: 'openspec CLI', status: 'checkpoint', detail: '自动安装失败，需用户手动 npm i -g @fission-ai/openspec@latest' });
+    }
+  }
+
+  // light 模式到此为止
+  if (mode === 'light') return results;
+
+  // L2: codegraph MCP 注册（仅 full 模式）
+  if (isFull) {
+    if (checkMcpCodegraph(projectRoot)) {
+      results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'ready', detail: '探针查询成功，MCP 已注册' });
+    } else {
+      if (registerMcpCodegraph() && checkMcpCodegraph(projectRoot)) {
+        results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'installed', detail: 'codegraph install --yes 成功' });
+      } else {
+        results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'checkpoint', detail: '需用户手动运行交互式 codegraph install' });
+      }
+    }
+  }
+
+  // L3: codegraph 图谱目录
+  const codegraphDir = path.join(projectRoot, '.codegraph');
+  if (existsSync(codegraphDir)) {
+    results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'ready', detail: '目录已存在' });
+  } else {
+    if (initCodegraph(projectRoot) && existsSync(codegraphDir)) {
+      results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'installed', detail: 'codegraph init 成功' });
+    } else {
+      results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'checkpoint', detail: 'codegraph init 失败，需用户手动执行' });
+    }
+  }
+
+  // L3: openspec 工作区目录
+  const openspecDir = path.join(projectRoot, 'openspec');
+  if (existsSync(openspecDir)) {
+    results.push({ layer: 'L3', item: 'openspec/ 工作区', status: 'ready', detail: '目录已存在' });
+  } else {
+    if (initOpenspec(projectRoot) && existsSync(openspecDir)) {
+      results.push({ layer: 'L3', item: 'openspec/ 工作区', status: 'installed', detail: 'openspec init 成功' });
+    } else {
+      results.push({ layer: 'L3', item: 'openspec/ 工作区', status: 'checkpoint', detail: 'openspec init 失败，需用户手动执行' });
+    }
+  }
+
+  return results;
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const getArg = (name: string): string | undefined => {
+    const i = args.indexOf(`--${name}`);
+    return i >= 0 ? args[i + 1] : undefined;
+  };
+
+  const phaseStr = getArg('phase');
+  const projectRoot = getArg('project-root');
+  const modeStr = getArg('mode') as Mode | undefined;
+
+  if (!phaseStr || !projectRoot || !modeStr) {
+    console.error('用法: npx tsx ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>');
+    process.exit(2);
+  }
+
+  const phase = parseInt(phaseStr, 10);
+  if (phase < 5 || phase > 8) {
+    console.error(`✗ phase 须为 5-8，收到 ${phase}`);
+    process.exit(2);
+  }
+
+  if (!['full', 'quick', 'light'].includes(modeStr)) {
+    console.error(`✗ mode 须为 full/quick/light，收到 ${modeStr}`);
+    process.exit(2);
+  }
+
+  const absRoot = path.resolve(projectRoot);
+  const results = ensureDeps(phase, absRoot, modeStr);
+  const hasCheckpoint = results.some(r => r.status === 'checkpoint');
+
+  console.log('═'.repeat(60));
+  console.log('codegraph + OpenSpec 依赖检测');
+  console.log('═'.repeat(60));
+  console.log(`阶段          : ${phase}`);
+  console.log(`项目根        : ${absRoot}`);
+  console.log(`模式          : ${modeStr}`);
+  console.log(`校验结果      : ${hasCheckpoint ? '✗ 有 CHECKPOINT' : '✓ 就绪'}`);
+  console.log('─'.repeat(60));
+
+  for (const r of results) {
+    const icon = r.status === 'ready' ? '✓' : r.status === 'installed' ? '+' : '✗';
+    console.log(`  ${icon} [${r.layer}] ${r.item}: ${r.status} — ${r.detail}`);
+  }
+
+  const exitCode = hasCheckpoint ? 1 : 0;
+  console.log('─'.repeat(60));
+  console.log('ENSURE_DEPS_JSON ' + JSON.stringify({
+    type: 'ensure-deps',
+    phase,
+    mode: modeStr,
+    passed: !hasCheckpoint,
+    exitCode,
+    results,
+  }));
+
+  process.exit(exitCode);
+}
+
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
+if (isMain) {
+  main().catch((err) => {
+    console.error('ensure-codegraph-opsx 异常:', err);
+    process.exit(2);
+  });
+}
