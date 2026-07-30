@@ -471,6 +471,23 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增）
 
+## #35 self-as-verifier 模式下 V/G/R 产物混合（第24轮新增）
+
+**危害**：self-as-verifier 模式下 V/G/R 产物与 S 产出混合在同一文件中，导致评审独立性失守，评审结论可能被 S 产出污染或覆盖。
+
+**检测信号**：
+- 评审报告（VerifierOutput JSON）与产出文档（S 产出）在同一文件中
+- VerifierOutput JSON 文件路径与 S 产出文件路径相同
+- gate-logs JSON 文件路径与 S 产出文件路径相同
+- RootCauseReport JSON 文件路径与 S 产出文件路径相同
+- run-log 条目的 `artifacts` 字段未列出各角色独立产物路径
+
+**回退动作**：回到当前阶段起点，拆分为独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON 路径不同），重审 V/G/R 环节。
+
+**门禁脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同；`check-role-dispatch.ts` 校验 run-log artifacts 字段含各角色独立产物路径。
+
+**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增）
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。

@@ -84,6 +84,32 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **违反处置**：命中反模式 #10「编排者越权实施」一律回到当前阶段起点，已越权产出的实体作废重做。检测信号与回退动作详见 [references/anti-patterns.md](references/anti-patterns.md) #10 与 [references/subagent-delegation.md](references/subagent-delegation.md)「强制约束」节。
 
+## self-as-verifier 模式
+
+> 对应 Round 24 P1 问题 10。单 Agent 兼任 S/V/G/R 多角色的正式定义与独立性保证。
+
+**定义**：self-as-verifier 模式指单 Agent 在同一阶段内兼任 S（产出）/ V（评审）/ G（门禁）/ R（根因/R3）多角色的执行模式。
+
+**启用条件**：
+- 仅限 demo 项目 / 非生产项目 / 教学演示场景
+- 生产项目禁止启用（须严格按 O→S→V→G→R 角色分派）
+- 启用时须在 `project.status` 中标记 `selfAsVerifier: true`
+
+**独立性保证**（关键约束）：
+- 兼任时须产出各角色独立产物文件，路径不得相同：
+  - S 产出：阶段开发产物（如 `requirements-spec.md` / `detailed-design.md`）
+  - V 产出：`VerifierOutput` JSON（独立文件，如 `.w-model/verifier-outputs/<phase>-<target>.json`）
+  - G 产出：`gate-logs` JSON（独立文件，如 `.w-model/gate-logs/<timestamp>-<script>.json`）
+  - R 产出：`RootCauseReport` / `PreventiveReview` JSON（独立文件）
+- run-log 条目的 `artifacts` 字段须列出各角色独立产物路径
+- 违反独立性（V/G/R 产物与 S 产出同路径或同文件）命中反模式 #35
+
+**与约束 #19 的关系**：
+- self-as-verifier 模式下，run-log 中 S/V/G 可同一 `runId` 条目标记多角色（如 `role="S/V"`），但 check-role-dispatch.ts 仍须校验每阶段含 S/V/G 各 ≥1 条记录（可同一行满足）。
+- R3 启用时 R 角色 ≥3 条记录不可由同一行满足（completeness/reliability/security 须为独立 R3 报告）。
+
+**校验脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同。
+
 ## 核心操作行为
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills`，适配 W 模型语境。与「不可违反的约束」互补：约束是硬红线（命中即回退），操作行为是日常准则（违反不回退但降低质量）。SSoT §4A 为权威定义。

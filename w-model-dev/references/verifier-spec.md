@@ -809,3 +809,21 @@ LLM 调用 → 失败？─是─► §11.1 重试策略（≤5 次指数退避�
 1. 将阶段 1 ~ N-1 所有已放行项的 `evidence` 汇总为「前阶段 evidence 清单」，注入 V 子代理上下文。
 2. 要求 V 子代理在 `summary` 中声明「已对照前阶段 evidence，无矛盾」或「发现矛盾 N 处，已标注 reworkHint」。
 3. 若 V 子代理声明存在矛盾，编排者须回溯触发对应前阶段的返工流程，不得直接放行阶段 N。
+
+## 13. self-as-verifier 模式
+
+> 对应 Round 24 P1 问题 10。V 评审产出独立性要求。
+
+### V 评审产出独立性
+
+self-as-verifier 模式下（单 Agent 兼任 S/V/G/R），V 评审产出须满足独立性要求：
+
+1. **VerifierOutput JSON 须独立产出**：文件路径不得与 S 产出文件路径相同
+   - 合规：`S 产出 = docs/phase1-requirements/requirements-spec.md`，`V 产出 = .w-model/verifier-outputs/1-requirements.json`
+   - 违规：`S 产出 = docs/phase1-requirements/requirements-spec.md`，`V 产出 = docs/phase1-requirements/requirements-spec.md`（同路径）
+2. **VerifierOutput 内容须独立**：不得在 S 产出文档中直接嵌入评审结论；评审结论须以独立 JSON 结构产出（按 §6 Schema）
+3. **run-log 记录独立**：V 评审须有独立 run-log 条目（即使 `runId` 与 S 相同，`role` 字段须明确标记 V）
+
+### 校验
+
+`check-verifier-output.ts --self-as-verifier --s-output=<path>` 校验 VerifierOutput JSON 路径与 S 产出路径不同。违反命中反模式 #35。

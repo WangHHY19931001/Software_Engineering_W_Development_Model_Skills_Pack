@@ -589,3 +589,24 @@
 4. run-log 记录不变（每份 PartialReport 各记一条 `rootcause` 动作）。
 
 详见 [root-cause-locator.md](root-cause-locator.md) §4.2 与 spec §9.2。
+
+## self-as-verifier 兼任规则
+
+> 对应 Round 24 P1 问题 10。S/V/G/R 任两角色由同一 Agent 兼任时的产物独立性要求。
+
+### 兼任规则
+
+self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须满足：
+
+| 兼任组合 | 独立产物要求 | 校验脚本 |
+|---|---|---|
+| S + V | S 产出文档与 V 产出 VerifierOutput JSON 路径不同 | check-verifier-output.ts --self-as-verifier |
+| S + G | S 产出文档与 G 产出 gate-logs JSON 路径不同 | check-role-dispatch.ts |
+| V + G | V 产出 VerifierOutput JSON 与 G 产出 gate-logs JSON 路径不同 | check-role-dispatch.ts |
+| S + R | S 产出文档与 R 产出 RootCauseReport/PreventiveReview JSON 路径不同 | check-role-dispatch.ts |
+| V + R | V 产出 VerifierOutput JSON 与 R 产出 RootCauseReport JSON 路径不同 | check-role-dispatch.ts |
+| G + R | G 产出 gate-logs JSON 与 R 产出 RootCauseReport JSON 路径不同 | check-role-dispatch.ts |
+
+### 违反处置
+
+任两角色产物路径相同 → 命中反模式 #35，回退到当前阶段起点，拆分为独立产物文件后重审。
