@@ -59,14 +59,14 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 ├── SKILL.md            # 入口：YAML frontmatter（name + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界 + Bundled Resources 按需加载契约
 ├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + anti-patterns.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南（按需加载，详见 SKILL.md Bundled Resources 表）
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
-├── schemas/            # 13 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest），由 schema-loader.ts 在 logic 层前置加载
+├── schemas/            # 19 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract），由 schema-loader.ts 在 logic 层前置加载
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause）
+│   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / tla-bdd-sync / role-dispatch / state-machine）
 │   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
 │   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
 │   ├── security-scan.ts         # eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
-│   ├── self-test.ts             # 回归基线（149 条样本）
-│   └── __tests__/               # vitest 单元测试（9 个 .test.ts + README.md coverage 矩阵）
+│   ├── self-test.ts             # 回归基线（184 条样本）
+│   └── __tests__/               # vitest 单元测试（19 个 .test.ts + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -128,7 +128,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 20.0.0
+version: 23.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -174,10 +174,10 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | 编排者-子代理边界（O/A/S/V/G/R） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
 | LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
 | 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
-| JSON Schema 文件（draft-07，13 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
+| JSON Schema 文件（draft-07，19 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/schema-loader.ts](../w-model-dev/scripts/schema-loader.ts) |
 | 安全扫描脚本（baseline 指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
-| 回归基线脚本（149 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
+| 回归基线脚本（184 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/verifier-logic.ts](../w-model-dev/scripts/verifier-logic.ts) |

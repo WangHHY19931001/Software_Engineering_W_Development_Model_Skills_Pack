@@ -3,6 +3,73 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [23.0.0] - 2026-07-30
+
+### 第二十四轮 P0-P3 技能包十项修正（RTM 回填 + 角色分派 + R3 实执行 + 状态机一致性 + self-as-verifier + NFR 双字段 + 路由顺序 + 图谱边数 + 门禁 stdout + 信息密度）
+
+修复第 23 轮 8 阶段端到端调测发现的 10 项技能包问题（P0×2 + P1×3 + P2×3 + P3×2），按 P0→P1→P2→P3 分 4 批 19 个任务执行，新增约束 #18/#19 + 反模式 #34-#37 + 2 个新校验脚本（check-role-dispatch.ts / check-state-machine-consistency.ts）。详见 SSoT §3.4.20。
+
+#### Added
+- 新增约束 #18（RTM 实体每阶段必须回填）：S 子代理产出后须更新 `.w-model/rtm.json`；coverageStatus 字段与 coveragePercent 须一致
+- 新增约束 #19（编排者角色分派完整性）：每阶段须至少分派 S/V/G 三角色各 1 次；R3 启用时须分派 R 角色 ≥3 次；self-as-verifier 模式下兼任时须产出各角色独立产物文件
+- 新增反模式 #34（编排者漏派角色）/ #35（self-as-verifier 模式下 V/G/R 产物混合）/ #36（路由顺序错误）/ #37（产物膨胀但核心决策稀疏）
+- 新增脚本：`check-role-dispatch.ts`（角色分派完整性校验，校验 run-log 每阶段含 S/V/G 各 ≥1 条；`--r3-enabled` 时 R ≥3 条）
+- 新增脚本：`check-state-machine-consistency.ts`（设计文档↔代码状态机一致性校验，校验状态集 + 转移集一致）
+- 新增 schema 字段：`rtm.schema.json` NFR 行增加 `targetValue` + `testThreshold` 双字段；`run-log.schema.json` role 字段增加 description（约束 #19 说明）
+- 新增样本：gate/bad-rtm-coverage-below-100.json + bad-rtm-status-mismatch.json（RTM coverageStatus 校验）；run-log/bad-missing-V-role.jsonl + bad-missing-G-role.jsonl + bad-missing-R-role.jsonl（角色分派校验）；state-machine/bad-missing-transition.json + bad-extra-transition.json + valid-consistent.json（状态机一致性校验）
+- 新增 self-test 用例：8 条（2 GATE coverageStatus + 3 RoleDispatch + 3 StateMachine）
+- 新增参考指南节：SKILL.md「self-as-verifier 模式」节；verifier-spec.md「self-as-verifier 模式」节；agent-personas.md「self-as-verifier 兼任规则」节；tla-plus-guide.md「设计文档 ↔ 代码状态机一致性」节；graph-guide.md「边数下限与语义来源占比」节；quality-standards.md「信息密度指标」+「生产目标值 vs 测试环境基线」节；definition-of-done.md「信息密度度量」节；phase-8-acceptance-test.md「门禁 stdout 贴出要求」节；templates/interface-design.md「路由注册顺序约束」节；phase-3-outline-design.md「路由顺序约束」节；templates/requirement-spec.md「NFR 性能基线双字段」节；templates/system-test.md「性能度量环境声明」节
+- 新增模板节：subagent-delegation.md「角色分派完整性校验」节 + S 子代理 RTM 回填强制职责
+
+#### Changed
+- `SKILL.md` 约束 #10 扩展：编排者展示证据时须贴出门禁脚本 stdout 末尾 5 行（不得仅引用 JSON 摘要）
+- `SKILL.md` 约束 #12 扩展：4 脚本 → 5 脚本（增加 `check-preventive-review.ts`，R3 启用时）
+- `check-preventive-review.ts`：新增 `--auto-trigger --run-log=<path>` 模式，从 run-log 读取当前阶段自动校验
+- `check-verifier-output.ts`：新增 `--self-as-verifier --s-output=<path>` 参数，校验 VerifierOutput JSON 路径与 S 产出路径不同（反模式 #35）
+- `gate-logic.ts`：新增 RTM coverageStatus 字段一致性硬校验 + NFR 双字段缺失校验（双字段都缺失才 fail）
+- `graph-logic.ts`：新增边数下限校验（边 < 节点×3 → 警告）+ 语义来源占比校验（< 80% → 警告），保留 small-project exemption
+- `anti-patterns.md` 反模式 #27 S2 扩展：新增「门禁脚本未实跑」作为独立可命中信号
+- self-test 基线：175 → 184（+2 GATE coverageStatus + 3 RoleDispatch + 3 StateMachine + 1 既有调整）
+- 版本号三处同步为 23.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+
+#### Validation
+- TypeScript strict: 0 错误
+- self-test: 184/184 全通过
+- 约束 #18/#19 + 反模式 #34-#37 编号连续无冲突
+
+## [22.0.0] - 2026-07-29
+
+### 第二十二轮 P0-P3 技能包修正（R3 强制 + TLA+/BDD 同步 + 设计契约 + uat-path-mapping + codeModule 格式）
+
+修复第 21 轮调测发现的 35 项技能包问题（SSoT 14 任务 + schemas 1 任务 + scripts 7 任务 + samples 8 任务 + testing 4 任务），29 次提交。新增约束 #17 + 反模式 #33 + 2 个新校验脚本（check-preventive-review.ts / check-tla-bdd-sync.ts）+ preventive-review.schema.json。详见 SSoT §3.4.19。
+
+#### Added
+- 新增约束 #17（R3 预防性审查强制）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告
+- 新增反模式 #33（跳过 R3 预防性审查）：V 评审前 G 子代理须跑 `check-preventive-review.ts` 校验报告完整性，跳过 R3 直接进入 V 评审命中反模式 #33
+- 新增 schema：`preventive-review.schema.json`（R3 预防性审查报告 schema）
+- 新增脚本：`check-preventive-review.ts`（校验 R3 三份报告完整性，`<project-dir> --phase=<1-8>`，退出码 0/1/2）
+- 新增脚本：`check-tla-bdd-sync.ts`（TLA+/BDD 自动化同步校验，校验转移集 + 状态集 + 不变式等价）
+- 新增样本：8 项 P0-P3 修正样本（preventive-review + tla-bdd-sync + codeModule 格式 + uat-path-mapping 等）
+- 新增单测：preventive-review-logic.test.ts + tla-bdd-sync-logic.test.ts + gate-enhancement codeModule 格式覆盖
+- 新增参考指南节：bdd-guide.md「TLA+/BDD 自动化同步校验」节；tla-plus-guide.md「TLA+/BDD 自动化同步校验」节；verifier-spec.md「常见违规示例」节
+- 新增示例：examples/coding 跨平台 .env 示例
+- run-log-logic.ts：新增 R3 预防性审查记录校验
+
+#### Changed
+- `gate-logic.ts`：新增 codeModule 格式校验（`SD-xxx:src/path.ts` 格式）+ uat-path-mapping 回填校验
+- `check-artifact-gate.ts`：新增 phase=1/5 uat-path-mapping 校验
+- `check-bdd-model.ts`：多路径查找支持根目录/子目录回退
+- `check-design-contract.ts`：uat-path-mapping 缺失明确提示
+- self-test：注册 preventive-review 和 tla-bdd-sync 校验器
+- self-test 基线：152 → 175（+preventive-review + tla-bdd-sync + codeModule 格式 + uat-path-mapping 样本）
+- vitest 基线：~165 → ~201（+preventive-review-logic + tla-bdd-sync-logic + gate-enhancement 扩展）
+- 版本号三处同步为 22.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+
+#### Validation
+- TypeScript strict: 0 错误
+- self-test: 175/175 全通过
+- vitest: 201/201 全通过
+
 ## [21.0.0] - 2026-07-29
 
 ### 第二十一轮 流程完整性硬化（链式签名 + 产出来源正确性 + 归档完整性）
