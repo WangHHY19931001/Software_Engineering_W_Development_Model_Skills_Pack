@@ -153,7 +153,7 @@
 | #24 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值；状态变更后响应体仍返回旧状态） | 回到阶段 5 起点，分派 S 调整副作用与响应体构造顺序（副作用在前，响应体构造在后）；重跑 V-code 评审 + 单元测试「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态） | 无脚本（V 评审 `reworkHints` 标注 + 系统测试用例副作用时序）；详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |
 | #25 | run-log.jsonl `note` 字段含 "PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词；或产物 JSON 文件首字节为 BOM（0xEF 0xBB 0xBF）；或 JSON 深度 > 2 时字段丢失 | 回到当前阶段起点，分派 S 改用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 重写损坏的 JSON 文件；重跑相关门禁 | 无脚本（编排者自检 run-log `note` 字段 + 文件 BOM 检测）；详见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26 | `run-log.jsonl` 含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）；或 `event-ingress.jsonl` 含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`） | 回到当前阶段起点，分派 S 按正确 schema 重写 run-log.jsonl 或 event-ingress.jsonl；重跑 `check-run-log.ts` R1 动作完整性校验 | `check-run-log.ts` 退出码 0 才算 RunLogEntry schema 闭合；详见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
-| #27 | run-log.jsonl 缺 chunk/cross/review/gate 动作（S2 省步骤）；或 checkpoint acknowledgedDecisions 缺硬约束 ID（S1 丢细节）；或 gate JSON exitCode ≠ passed（S3 未核验）；或归档缺 acceptance-test-report §9 用户确认（S3 未核验）；或 V 评审 reworkHints 为空（S2 省步骤） | 回到当前阶段起点，按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验：重读硬约束 + 补全 S→V→G 全流程 + 逐条核验硬约束清单 | 无脚本（编排者自检 run-log 动作完整性 + checkpoint R2 + gate exitCode 一致性交叉检测）；详见 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
+| #27 | run-log.jsonl 缺 chunk/cross/review/gate 动作（S2 省步骤）；或 checkpoint acknowledgedDecisions 缺硬约束 ID（S1 丢细节）；或 gate JSON exitCode ≠ passed（S3 未核验）；或归档缺 acceptance-test-report §9 用户确认（S3 未核验）；或 V 评审 reworkHints 为空（S2 省步骤）；或门禁脚本未实跑——仅记录 JSON 摘要未真实执行命令（编排者仅引用 JSON 摘要中的 `passed: true`，但未展示 check-*.ts 的 stdout 输出）（S2 省步骤） | 回到当前阶段起点，按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验：重读硬约束 + 补全 S→V→G 全流程 + 逐条核验硬约束清单 | 无脚本（编排者自检 run-log 动作完整性 + checkpoint R2 + gate exitCode 一致性交叉检测）；详见 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
 
 ### 门禁脚本退出码精确对应表
 
@@ -501,6 +501,22 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **回退动作**：修正路由注册顺序后重跑集成测试，确认静态路径优先匹配、鉴权中间件生效。
 
 **门禁脚本**：无自动脚本（由 V 评审 + G 门禁人工校验路由注册顺序表）。
+
+**关联**：SSoT §3.4.20（[23.0.0] 新增）
+
+## #37 产物膨胀但核心决策稀疏（第24轮新增）
+
+**危害**：产物文件大小达标（1-2MB）但核心决策稀疏，大量内容为扩展点/附录/重复说明，稀释了产物的语义价值。
+
+**检测信号**：
+- 文件大小达标但实体引用密度 < 1/章节
+- 大量内容为"扩展点详细补充"而非核心设计决策
+- 章节数多但每章引用的 SD-xxx / DD-xxx / REQ-xxx 等实体 ID 少
+- V 评审发现核心设计决策被大量非核心内容淹没
+
+**回退动作**：精简非核心内容（扩展点/附录），补充核心实体引用，使信息密度 ≥ 2/章节后重审。
+
+**门禁脚本**：无自动脚本（由 V 评审人工校验信息密度）。
 
 **关联**：SSoT §3.4.20（[23.0.0] 新增）
 
