@@ -70,6 +70,7 @@ import {
 import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from './check-role-dispatch.js';
+import { checkStateMachineConsistency } from './check-state-machine-consistency.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -938,6 +939,35 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=R/],
     description: 'R3 启用但阶段 1 仅有 1 条 R3 记录（缺 reliability/security），应被拦截',
+  },
+];
+
+// -------------------- 第24轮 P1 状态机一致性校验 --------------------
+
+interface StateMachineCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const STATE_MACHINE_CASES: StateMachineCase[] = [
+  {
+    file: 'bad-missing-transition.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/代码状态机缺转移/],
+    description: '设计文档有 draft→published 但代码缺，应被一致性校验拦截',
+  },
+  {
+    file: 'bad-extra-transition.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/代码状态机多转移|代码状态机多状态/],
+    description: '代码有 archived→deleted 但设计文档缺，应被一致性校验拦截',
+  },
+  {
+    file: 'valid-consistent.json',
+    expectedPassed: true,
+    description: '设计文档与代码状态机完全一致，应通过',
   },
 ];
 
@@ -1876,6 +1906,40 @@ async function runRoleDispatchCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runStateMachineCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of STATE_MACHINE_CASES) {
+    const abs = path.join(samplesDir, 'state-machine', c.file);
+    const name = `state-machine/${c.file}`;
+    const details: string[] = [];
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const parsed = JSON.parse(raw) as Parameters<typeof checkStateMachineConsistency>[0];
+      const r = checkStateMachineConsistency(parsed);
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 // -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
 
 function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
@@ -2234,6 +2298,7 @@ async function main(): Promise<void> {
   console.log(`PreventiveReview 用例: ${PREVENTIVE_REVIEW_CASES.length}`);
   console.log(`TlaBddSync 用例: ${TLA_BDD_SYNC_CASES.length}`);
   console.log(`RoleDispatch 用例 : ${ROLE_DISPATCH_CASES.length}`);
+  console.log(`StateMachine 用例 : ${STATE_MACHINE_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
@@ -2242,6 +2307,7 @@ async function main(): Promise<void> {
     codeTlaResults, rootcauseResults, schemaResults, bddResults,
     coverageResults, exemptionResults, signatureChainResults, archiveIntegrityResults, metadataResults,
     designContractResults, preventiveReviewResults, tlaBddSyncResults, roleDispatchResults,
+    stateMachineResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2264,6 +2330,7 @@ async function main(): Promise<void> {
     runPreventiveReviewCases(samplesDir),
     runTlaBddSyncCases(samplesDir),
     runRoleDispatchCases(samplesDir),
+    runStateMachineCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
@@ -2271,6 +2338,7 @@ async function main(): Promise<void> {
     ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults,
     ...coverageResults, ...exemptionResults, ...signatureChainResults, ...archiveIntegrityResults, ...metadataResults,
     ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults, ...roleDispatchResults,
+    ...stateMachineResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
