@@ -205,6 +205,12 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - N/A 用例是否附注释说明缺失端点名和原因
 - 不一致或注释缺失 → R3 报告标注 finding，V 评审纳入 reworkHints
 
+**check-preventive-review.ts 触发时机**（第24轮新增）：
+- `check-preventive-review.ts` 须在 V 评审前由 G 子代理执行，`exitCode=0` 方可进入 V 评审。
+- 支持 `--auto-trigger --run-log=<path>` 模式：从 run-log 读取最后一条 checkpoint success 记录的 phase 作为当前阶段，自动校验对应阶段的 3 份 R3 报告。
+- 跳过 check-preventive-review.ts 直接进入 V 评审命中反模式 #33。
+- 约束 #12 闭环机制强制校验已扩展为 5 脚本（增加 check-preventive-review.ts，R3 启用时）。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中登记：需求 ID、需求描述、验收测试列。其余列（设计文档 / 代码模块 / 单元 / 集成 / 系统测试）留待后续阶段填充。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。

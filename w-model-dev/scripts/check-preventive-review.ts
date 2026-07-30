@@ -15,10 +15,56 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const projectDir = args.find(a => !a.startsWith('--')) ?? '.';
   const phaseArg = args.find(a => a.startsWith('--phase='));
-  const phase = phaseArg ? parseInt(phaseArg.split('=')[1]!, 10) : undefined;
+  const autoTrigger = args.includes('--auto-trigger');
+  const runLogArg = args.find(a => a.startsWith('--run-log='));
+
+  let phase: number | undefined = phaseArg ? parseInt(phaseArg.split('=')[1]!, 10) : undefined;
+
+  // --auto-trigger 模式：从 run-log 读取当前阶段
+  if (autoTrigger) {
+    if (!runLogArg) {
+      console.error('用法: check-preventive-review.ts <project-dir> --auto-trigger --run-log=<run-log.jsonl>');
+      process.exit(2);
+    }
+    const runLogPath = runLogArg.split('=')[1]!;
+    const abs = path.resolve(runLogPath);
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length === 0) {
+        console.error('✗ run-log 为空');
+        process.exit(2);
+      }
+      // 取最后一条 checkpoint success 记录的 phase 作为当前阶段
+      let lastPhase = 0;
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as { phase?: number; action?: string; outcome?: string };
+          if (typeof entry.phase === 'number' && entry.action === 'checkpoint' && entry.outcome === 'success') {
+            lastPhase = entry.phase;
+          }
+        } catch {
+          // 跳过非法行
+        }
+      }
+      if (lastPhase < 1 || lastPhase > 8) {
+        console.error(`✗ 无法从 run-log 推断当前阶段（最后 checkpoint phase=${lastPhase}）`);
+        process.exit(2);
+      }
+      phase = lastPhase;
+      console.error(`[auto-trigger] 从 run-log 推断当前阶段: phase=${phase}`);
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'ENOENT') {
+        console.error(`✗ run-log 文件不存在: ${abs}`);
+        process.exit(2);
+      }
+      throw err;
+    }
+  }
 
   if (!phase || phase < 1 || phase > 8) {
-    console.error('用法: check-preventive-review.ts <project-dir> --phase=<1-8>');
+    console.error('用法: check-preventive-review.ts <project-dir> --phase=<1-8> | --auto-trigger --run-log=<run-log.jsonl>');
     process.exit(2);
   }
 
@@ -43,6 +89,8 @@ async function main(): Promise<void> {
     passed: result.passed,
     reasons: result.reasons,
     reviews: result.reviews,
+    autoTrigger,
+    phase,
   };
 
   console.log(JSON.stringify(output, null, 2));
