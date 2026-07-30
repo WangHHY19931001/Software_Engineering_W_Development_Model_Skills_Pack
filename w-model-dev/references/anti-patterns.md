@@ -520,6 +520,52 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：SSoT §3.4.20（[23.0.0] 新增）
 
+## #38 修改前未查询 codegraph（第25轮新增）
+
+**危害**：S-coding 子代理在阶段 5-8 直接修改代码/测试文件，未先查询 codegraph 影响半径，可能误改被广泛依赖的符号，引入隐蔽回归。
+
+**检测信号**：
+- `.w-model/codegraph-queries/` 目录不存在或为空（阶段 5-8 有代码修改但无查询记录）
+- 代码修改的 ticket 在 codegraph-queries/ 下无对应 `<phase>-<ticket>-<symbol>.json` 落盘文件
+- run-log 中阶段 5-8 有 action=produce（代码产出）但无 action=codegraph_query 记录
+
+**回退动作**：撤销未查询的修改，补跑 codegraph_explore 查询并落盘，重新评估影响半径后重做修改。
+
+**门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）。
+
+**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #20
+
+## #39 跳过 opsx 产物审查（第25轮新增）
+
+**危害**：opsx:explore/propose/apply 工作流步骤产物未经 R3×3（completeness/reliability/security）+ V 评审即进入下一步，导致规划缺陷或实现偏差未被发现。
+
+**检测信号**：
+- `.w-model/r3-reviews/` 下缺少 `<phase>-explore-*.md` / `<phase>-propose-*.md` / `<phase>-coding-*.md` 任一段的 3 份 R3 报告
+- `.w-model/v-reviews/` 下缺少对应段的 V 评审文件
+- run-log 中 opsx 步骤（action=opsx_explore/opsx_propose/opsx_apply）之间无 action=r3-completeness/r3-reliability/r3-security + role=V 记录
+
+**回退动作**：回退到缺失审查的 opsx 步骤，补跑 R3×3 + V 评审后重做后续步骤。
+
+**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
+
+**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #17（R3 预防性审查强制）
+
+## #40 opsx/S-tickets 职责混淆（第25轮新增）
+
+**危害**：用 opsx:propose 的 tasks.md 替代 S-tickets 的 tickets.md（或反之），破坏规格级规划（what/why）与代码级切片（how）的职责边界，导致切片缺失端到端可 demo 性或规划缺失设计依据。
+
+**检测信号**：
+- `openspec/changes/<change>/` 目录下有 tasks.md 但无 tickets.md（S-tickets 拆解被跳过）
+- tickets.md 存在但 tasks.md 缺失（opsx:propose 被跳过）
+- tickets.md 内容是高层任务清单而非 vertical-slice 切片（职责错位）
+- tasks.md 内容含 tracer-bullet/blocking-edges 代码切片细节（职责错位）
+
+**回退动作**：补齐缺失的制品，修正职责错位的内容，重审 R3×3 + V。
+
+**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
+
+**关联**：SSoT §3.4.21（[24.0.0] 新增）
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
