@@ -1,0 +1,7 @@
+{
+  "querySymbol": "ArticleService.create",
+  "callers": ["ArticleController.handleCreate"],
+  "callees": ["ArticleRepository.save", "EventBus.publish"],
+  "blastRadius": 3,
+  "queryTimestamp": "2026-07-30T10:00:00Z"
+}
