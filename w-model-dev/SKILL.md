@@ -179,10 +179,10 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 2 | 系统设计 | 系统测试设计 | seam 决策 | [references/phase-2-system-design.md](references/phase-2-system-design.md) |
 | 3 | 概要设计 | 集成测试设计 | seam 决策 | [references/phase-3-outline-design.md](references/phase-3-outline-design.md) |
 | 4 | 详细设计 | 单元测试设计 | seam 决策 | [references/phase-4-detailed-design.md](references/phase-4-detailed-design.md) |
-| 5 | 编码实现 | 单元测试执行 | Tracer-bullet 票据拆解 | [references/phase-5-coding.md](references/phase-5-coding.md) |
-| 6 | 集成测试 | 集成测试执行 | — | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
-| 7 | 系统测试 | 系统测试执行 | — | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
-| 8 | 验收测试 | 验收测试执行 | archive 机制 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
+| 5 | 编码实现 | 单元测试执行 | Tracer-bullet 票据拆解 + opsx 三段式 + codegraph 修改前查询 | [references/phase-5-coding.md](references/phase-5-coding.md) |
+| 6 | 集成测试 | 集成测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
+| 7 | 系统测试 | 系统测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
+| 8 | 验收测试 | 验收测试执行 | archive 机制 + opsx 三段式 + codegraph 修改前查询 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
 
 所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。只有以下场景追加读取：
 
@@ -263,6 +263,10 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | security-scan.ts | pre-push / 手动安全扫描 |
 | self-test.ts | 回归基线（非阶段流程） |
 | plan-chunks.ts | ingestion 子流程分块（O 只读） |
+| ensure-codegraph-opsx.ts | 阶段 5 进入时（full）/ 6-8 进入时（quick）/ 启动时（light）—— 检测并自动安装 codegraph + OpenSpec 依赖 |
+| check-codegraph-queries.ts | 阶段 5-8 gate —— 校验 codegraph 查询落盘（反模式 #38） |
+| check-opsx-artifacts.ts | 阶段 5-8 gate —— 校验 opsx 制品 + R3/V 审查产物（反模式 #39/#40） |
+| check-openspec-archive.ts | 阶段 5-8 gate 通过后 —— 校验 opsx:archive 归档完整性 |
 
 ### subagent/（按需读取，仅供 V-lead / R-lead 多角度分析）
 
