@@ -69,6 +69,7 @@ import {
 } from './bdd-logic.js';
 import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
+import { checkRoleDispatch } from './check-role-dispatch.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -300,6 +301,19 @@ const GATE_CASES: GateCase[] = [
     phaseOption: 1,
     expectedReasonPatterns: [/REQ-001.*acceptanceTest/],
     description: '§10J phase=1 REQ 行 acceptanceTest 为空，应被增量校验拦截',
+  },
+  // -------------------- 第24轮 P0 RTM coverageStatus 校验 --------------------
+  {
+    file: 'bad-rtm-coverage-below-100.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/覆盖率未达 100/],
+    description: 'RTM coveragePercent=66% < 100%，应被覆盖率门禁拦截（约束 #18）',
+  },
+  {
+    file: 'bad-rtm-status-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/coverageStatus.*不一致/],
+    description: 'RTM coverageStatus="100%" 但 coveragePercent=66%，应被 coverageStatus 一致性校验拦截',
   },
 ];
 
@@ -891,6 +905,40 @@ interface TlaBddSyncCase {
 const TLA_BDD_SYNC_CASES: TlaBddSyncCase[] = [
   { file: 'valid.json', expectedPassed: true, description: 'TLA+/BDD 一致' },
   { file: 'bad-transition-mismatch.json', expectedPassed: false, description: 'TLA+/BDD 转移不一致' },
+];
+
+// -------------------- 第24轮 P0 角色分派完整性校验 --------------------
+
+interface RoleDispatchCase {
+  file: string;
+  r3Enabled: boolean;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
+  {
+    file: 'bad-missing-V-role.jsonl',
+    r3Enabled: false,
+    expectedPassed: false,
+    expectedReasonPatterns: [/缺失 role=V/],
+    description: '阶段 1 缺 role=V 评审记录，应被角色分派校验拦截（约束 #19）',
+  },
+  {
+    file: 'bad-missing-G-role.jsonl',
+    r3Enabled: false,
+    expectedPassed: false,
+    expectedReasonPatterns: [/缺失 role=G/],
+    description: '阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #19）',
+  },
+  {
+    file: 'bad-missing-R-role.jsonl',
+    r3Enabled: true,
+    expectedPassed: false,
+    expectedReasonPatterns: [/缺失 role=R/],
+    description: 'R3 启用但阶段 1 仅有 1 条 R3 记录（缺 reliability/security），应被拦截',
+  },
 ];
 
 // -------------------- BDD（Task 5：10 样本，2 valid + 8 bad） --------------------
@@ -1791,6 +1839,43 @@ async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runRoleDispatchCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of ROLE_DISPATCH_CASES) {
+    const abs = path.join(samplesDir, 'run-log', c.file);
+    const name = `run-log/${c.file}`;
+    const details: string[] = [];
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const entries = raw.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .map(l => JSON.parse(l) as Record<string, unknown>);
+      const r = checkRoleDispatch(entries as Parameters<typeof checkRoleDispatch>[0], c.r3Enabled);
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 // -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
 
 function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
@@ -2148,6 +2233,7 @@ async function main(): Promise<void> {
   console.log(`Metadata 用例  : 1`);
   console.log(`PreventiveReview 用例: ${PREVENTIVE_REVIEW_CASES.length}`);
   console.log(`TlaBddSync 用例: ${TLA_BDD_SYNC_CASES.length}`);
+  console.log(`RoleDispatch 用例 : ${ROLE_DISPATCH_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
@@ -2155,7 +2241,7 @@ async function main(): Promise<void> {
     budgetResults, runLogResults, maturityResults, checkpointResults,
     codeTlaResults, rootcauseResults, schemaResults, bddResults,
     coverageResults, exemptionResults, signatureChainResults, archiveIntegrityResults, metadataResults,
-    designContractResults, preventiveReviewResults, tlaBddSyncResults,
+    designContractResults, preventiveReviewResults, tlaBddSyncResults, roleDispatchResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2177,13 +2263,14 @@ async function main(): Promise<void> {
     runDesignContractCases(samplesDir),
     runPreventiveReviewCases(samplesDir),
     runTlaBddSyncCases(samplesDir),
+    runRoleDispatchCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
     ...budgetResults, ...runLogResults, ...maturityResults, ...checkpointResults,
     ...codeTlaResults, ...rootcauseResults, ...schemaResults, ...bddResults,
     ...coverageResults, ...exemptionResults, ...signatureChainResults, ...archiveIntegrityResults, ...metadataResults,
-    ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults,
+    ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults, ...roleDispatchResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

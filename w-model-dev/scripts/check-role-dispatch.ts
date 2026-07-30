@@ -23,6 +23,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 interface RunLogEntry {
   runId?: string;
@@ -178,7 +179,15 @@ async function main(): Promise<void> {
   process.exit(exitCode);
 }
 
-main().catch((err) => {
-  console.error('Role Dispatch 校验脚本异常:', err);
-  process.exit(2);
-});
+// Windows 兼容的 main 模块判断：
+//   - import.meta.url 是 file:///D:/... URL 格式
+//   - process.argv[1] 是 Windows 路径 D:\... 或 POSIX 路径
+//   用 fileURLToPath + path.resolve 归一化两端再比较，避免斜杠方向 / 盘符大小写差异。
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
+if (isMain) {
+  main().catch((err) => {
+    console.error('Role Dispatch 校验脚本异常:', err);
+    process.exit(2);
+  });
+}
