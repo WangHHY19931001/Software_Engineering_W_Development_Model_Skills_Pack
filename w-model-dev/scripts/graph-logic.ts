@@ -59,6 +59,8 @@ export interface GraphEdge {
   from: string;
   to: string;
   type: EdgeType;
+  /** 语义来源标记：从设计文档实体派生的边此字段非空（语义来源占比校验用，第24轮 P2 新增） */
+  sourceArtifact?: string;
 }
 
 export interface GraphShape {
@@ -127,6 +129,8 @@ export interface GraphCheckResult {
   dataflowViolations: DataflowViolations;
   boundary: BoundaryInfo;
   violations: string[];
+  /** 警告列表（不影响 passed 判定，第24轮 P2 新增：边数下限 + 语义来源占比） */
+  warnings?: string[];
   /** REQ 层级树信息（四维·维度1，phase=1 时填充） */
   reqHierarchy?: ReqHierarchy;
   /** 交叉逻辑信息（四维·维度3，phase=1 时填充） */
@@ -235,6 +239,9 @@ export function checkRequirementGraph(
     boundary: { extIn: 0, extOut: 0, complete: false },
     violations: [],
   };
+
+  // 警告列表（不影响 passed 判定，第24轮 P2 新增：边数下限 + 语义来源占比）
+  const warnings: string[] = [];
 
   // 输入校验
   if (!graph || typeof graph !== 'object') {
@@ -726,6 +733,26 @@ export function checkRequirementGraph(
     };
   }
 
+  // ==================== 边数下限 + 语义来源占比校验（第24轮 P2 新增） ====================
+  const nodeCount = g.nodes.length;
+  const edgeCount = g.edges.length;
+  const minEdgeCount = nodeCount * 3;
+
+  // 检查 small-project exemption
+  const hasSmallProjectExemption = g.nodes.some(n => n?.attributes && typeof n.attributes === 'object' && 'smallProjectExemption' in n.attributes && n.attributes.smallProjectExemption === true);
+
+  if (!hasSmallProjectExemption && edgeCount < minEdgeCount) {
+    warnings.push(`边数下限警告：当前边数 ${edgeCount} < 节点数 × 3 = ${minEdgeCount}（可能存在孤立节点或边缺失）`);
+  }
+
+  if (!hasSmallProjectExemption && edgeCount > 0) {
+    const semanticEdges = g.edges.filter(e => e && typeof (e as GraphEdge).sourceArtifact === 'string' && (e as GraphEdge).sourceArtifact!.trim() !== '').length;
+    const semanticRatio = semanticEdges / edgeCount;
+    if (semanticRatio < 0.8) {
+      warnings.push(`语义来源占比警告：语义来源边占比 ${(semanticRatio * 100).toFixed(1)}% < 80%（可能存在过多人工补丁边）`);
+    }
+  }
+
   // 汇总 passed
   const tv = result.traceabilityViolations;
   const traceabilityOk =
@@ -751,5 +778,6 @@ export function checkRequirementGraph(
     traceabilityOk &&
     dataflowOk &&
     result.violations.length === 0;
+  result.warnings = warnings;
   return result;
 }

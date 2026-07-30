@@ -137,3 +137,31 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json|consolidated
 **阶段 4 硬约束**：`--phase=4` 图谱零违反 ∧ TLA+ 零违反才放行进阶段 5 编码。两个门禁均由 G 子代理跑、退出码为准（约束 4，反模式 #12）。
 
 TLA+ 层次化建模（L1–L6）、文件头规范、SANY/TLC 校验顺序、拆解阈值（>1k 考虑拆 / >1w 必须拆）详见 [tla-plus-guide.md](./tla-plus-guide.md) 与 [tla-plus-modeling-design.md](../../docs/tla-plus-modeling-design.md)。
+
+## 边数下限与语义来源占比
+
+> 对应 Round 24 P2 问题 7。图谱规模阈值须有边数下限与语义来源占比指导，避免靠补丁达成规模。
+
+### 边数下限
+
+**规则**：边数 ≥ 节点数 × 3
+
+**说明**：
+- 每个节点平均须有 ≥3 条边
+- 边数 < 节点 × 3 → 警告（可能存在孤立节点或边缺失）
+- 警告级不 fail，保留 small-project exemption 机制
+
+### 语义来源占比
+
+**规则**：语义来源边占比 ≥ 80%
+
+**定义**：语义来源边指从设计文档实体派生的边（即 `sourceArtifact` 字段非空的边）。
+
+**说明**：
+- 语义来源边占比 = 语义来源边数 / 总边数
+- 占比 < 80% → 警告（可能存在过多人工补丁边）
+- 警告级不 fail，保留 small-project exemption 机制
+
+### Small-project exemption
+
+节点数 < 20 的小项目可豁免边数下限与语义来源占比校验。
