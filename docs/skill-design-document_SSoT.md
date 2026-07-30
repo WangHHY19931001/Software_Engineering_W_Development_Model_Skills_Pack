@@ -256,6 +256,15 @@ graph TD
 - **LLM-as-a-Verifier 属于技能内部各阶段产物校验流程的一部分**，是 W 模型阶段门评审的实现方式，并非独立的「LLM 引擎」模块。
 - **技能本身不包含演化机制与轨迹分析**。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具（SkillOpt / darwin-skill）完成，它们可消费本技能产出的 `VerifierOutput` JSON 作为训练信号。
 
+### 3.3.x 外部工具集成（第 25 轮新增）
+
+| 工具 | 定位 | 集成方式 | 应用阶段 | 触发条件 |
+|---|---|---|---|---|
+| codegraph | 修改前影响分析（callers/callees/blast radius） | 宿主 Agent MCP（`codegraph_explore`）+ auto-sync | 5-8 | S-coding 任何 Edit/Write 前（约束 #20） |
+| OpenSpec | 规格级任务规划（opsx:explore/propose/apply/archive） | 宿主 Agent CLI/技能（`/opsx:*`） | 5-8 | S-explore/S-propose/S-coding 分派时 |
+
+技能包不内置调用上述工具，通过 CHECKPOINT 指令 + 子代理分派模板触发。依赖检测与自动安装由 `ensure-codegraph-opsx.ts` 承载。
+
 ---
 
 ### 3.4 编排者-子代理边界（Orchestrator-Subagent Boundary）
