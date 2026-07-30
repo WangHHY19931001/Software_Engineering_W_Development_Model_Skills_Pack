@@ -260,6 +260,33 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - Background 节七要素全部必填（acceptingStates 不可为空，其余可为 ()）
 ```
 
+### 阶段 5-8 S 三段式变体（第 25 轮新增）
+
+> 对应 SSoT §3.4.21。阶段 5-8 引入 codegraph + OpenSpec opsx 后，S 角色拆分为三段式变体。每段产物须跑 R3×3 + V 审查。
+
+#### S-explore 子代理分派模板
+
+- **输入**：当前阶段 spec + 上游产物 + codegraph 图谱（已 init）
+- **调用**：`/opsx:explore` + `codegraph_explore`（影响初判）
+- **产出**：`exploration-analysis.md`（方案对比 / 推荐方案 / codegraph 影响初判）
+- **审查**：R3×3（completeness/reliability/security）→ V 评审 → 不合格打回
+
+#### S-propose 子代理分派模板
+
+- **输入**：S-explore 产物（exploration-analysis.md）+ R3/V 审查通过
+- **调用**：`/opsx:propose <change>` → 产 proposal.md / specs/ / design.md / tasks.md；随后 S-tickets 拆解 → tickets.md（tracer-bullet + blocking edges DAG）
+- **产出**：`openspec/changes/<change>/{proposal,specs,design,tasks}.md` + `tickets.md`
+- **审查**：R3×3 → V 评审 → 不合格打回
+- **职责边界**：opsx:propose 产 tasks.md（what/why），S-tickets 产 tickets.md（how）。反模式 #40 禁止混淆。
+
+#### S-coding 子代理分派模板
+
+- **输入**：S-propose 产物（tickets.md）+ R3/V 审查通过
+- **调用**：按 tickets.md frontier 逐片执行；每片 `codegraph_explore(目标符号)` → 落盘 `.w-model/codegraph-queries/` → `opsx:apply` 推进 → `Edit`/`Write` 代码 + 单元测试 →该片 code-TLA+ 一致性校验
+- **产出**：代码 + 测试 + `.w-model/codegraph-queries/` + TLA 校验报告
+- **审查**：R3×3 → V 评审 → 不合格打回（指定返工票据）
+- **约束 #20**：任何 Edit/Write 前须 codegraph_explore，否则命中反模式 #38
+
 ### R 子代理分派模板
 
 ```
