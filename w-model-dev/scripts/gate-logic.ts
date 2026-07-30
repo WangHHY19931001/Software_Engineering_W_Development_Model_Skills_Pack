@@ -38,6 +38,9 @@ export interface ArtifactGateResult {
   coveragePercent: number;
   missingItems: Array<{ requirementId: string; fields: string[] }>;
   unitCoveragePercent: number;
+  codegraphQueriesValid?: boolean;   // check-codegraph-queries.ts exitCode=0（phase 5-8）
+  opsxArtifactsValid?: boolean;      // check-opsx-artifacts.ts exitCode=0（phase 5-8）
+  openspecArchived?: boolean;        // check-openspec-archive.ts exitCode=0（phase 5-8 门通过后）
 }
 
 const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [
@@ -105,6 +108,12 @@ export interface CheckArtifactGateOptions {
   manifestExists?: boolean;
   /** 阶段级校验选项（P1.1）：1-8，默认 8（终检，向后兼容）。 */
   phaseOption?: PhaseOption;
+  /** 阶段 5-8 外部校验脚本结果（G 子代理先跑 check 脚本获取 exitCode，再传入保持纯逻辑可测试性）。 */
+  externalChecks?: {
+    codegraphQueriesValid?: boolean;
+    opsxArtifactsValid?: boolean;
+    openspecArchived?: boolean;
+  };
 }
 
 /**
@@ -398,5 +407,8 @@ export function checkArtifactGate(
     coveragePercent,
     missingItems,
     unitCoveragePercent,
+    codegraphQueriesValid: phase >= 5 ? options?.externalChecks?.codegraphQueriesValid : undefined,
+    opsxArtifactsValid: phase >= 5 ? options?.externalChecks?.opsxArtifactsValid : undefined,
+    openspecArchived: phase >= 5 ? options?.externalChecks?.openspecArchived : undefined,
   };
 }
