@@ -816,3 +816,43 @@ O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
 | 评审独立性 | 由 Agent 自评 | V 子代理物理隔离，不接触 S 子代理内部推理 |
 | 门禁执行 | 由 Agent 直接跑 | G 子代理独立跑 + 回填证据摘要 |
 | 编排者越权处置 | 无强制机制 | 反模式 #10，命中即回退 |
+
+## 角色分派完整性校验
+
+> 对应约束 #19 + 反模式 #34。`check-role-dispatch.ts` 自动校验。
+
+### 必分派条件
+
+每阶段 run-log 须至少含以下角色记录各 1 条：
+
+| 角色 | 必分派条件 | 校验脚本 |
+|---|---|---|
+| S（产出） | 每阶段必须（产出开发产物 + 测试设计 + RTM 更新） | check-role-dispatch.ts |
+| V（评审） | 每阶段必须（按 verifier-spec.md §8 产出 VerifierOutput JSON） | check-role-dispatch.ts |
+| G（门禁） | 每阶段必须（跑 check-*.ts + 回填证据摘要） | check-role-dispatch.ts |
+| R（根因/R3） | R3 预防性审查启用时必须（completeness/reliability/security 三阶段各 1 次，共 ≥3 条） | check-role-dispatch.ts --r3-enabled |
+
+### 可选条件
+
+- A（分析）子代理仅在阶段 1–4 的分块分析与图谱演进时分派；阶段 5–8 可不分派。
+- O（编排者）每阶段固定分派（CHECKPOINT），不在 check-role-dispatch.ts 校验范围（O 由约束 #2 阶段门放行覆盖）。
+
+### 豁免条件
+
+**self-as-verifier 模式豁免**（仅 demo 项目 / 非生产项目）：
+- S/V/G/R 任两角色由同一 Agent 兼任时，run-log 中可同一 `runId` 条目标记多角色（如 `role="S/V"`），但须满足：
+  1. 产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON 路径不同）
+  2. run-log 条目的 `artifacts` 字段列出各角色独立产物路径
+- 详见 SKILL.md「self-as-verifier 模式」节与反模式 #35。
+
+### 校验命令
+
+```bash
+# 非 R3 模式
+npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl
+
+# R3 启用模式
+npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
+```
+
+退出码：0=通过，1=缺角色（违反约束 #19），2=输入错误。
