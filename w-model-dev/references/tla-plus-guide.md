@@ -665,3 +665,50 @@ npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
 
 `check-bdd-model.ts` D4 等价性校验可调用本脚本（可选，不强制）。本脚本作为独立工具，便于开发阶段快速验证 TLA+/BDD 一致性。
 
+## 16. 设计文档 ↔ 代码状态机一致性
+
+> 对应 Round 24 P1 问题 6。现有脚本校验"代码↔TLA+"，本节补充"设计文档↔代码"维度。
+
+### 校验范围
+
+`check-state-machine-consistency.ts` 校验 `docs/phase4-design/detailed-design.md` 中的状态转移表（Markdown 表格格式 `| 状态 | 事件 | 转移 |`）与 `src/state-machines/*.ts` 中的 `TRANSITIONS` 定义的一致性：
+
+1. **状态集一致**：设计文档声明的状态集须与代码 `TRANSITIONS` 派生的状态集一致
+2. **转移集一致**：设计文档声明的转移（from→to+event）须与代码 `TRANSITIONS` 完全匹配
+
+### 校验输入格式
+
+`check-state-machine-consistency.ts` 接受 JSON 输入（由编排者或 G 子代理从设计文档与代码中解析后构造）：
+
+```json
+{
+  "designStates": ["draft", "published", "archived"],
+  "codeStates": ["draft", "published", "archived"],
+  "designTransitions": [
+    {"from": "draft", "to": "published", "event": "publish"}
+  ],
+  "codeTransitions": [
+    {"from": "draft", "to": "published", "event": "publish"}
+  ]
+}
+```
+
+### 豁免条件
+
+- **无状态机的项目跳过**：若项目 `detailed-design.md` 无 `| 状态 | 事件 | 转移 |` 表格格式的章节，则跳过本校验。
+- **TLA+ 已覆盖的项目**：若项目已有 TLA+ 状态机规格且 `check-tla-model.ts` 通过，则本校验作为补充（不替代 TLA+）。
+
+### 误报处理
+
+- 若设计文档使用非标准表格格式，解析器可能漏识别 → 须人工确认表格格式后重跑。
+- 若代码 `TRANSITIONS` 定义分散在多个文件，须在 input.json 中合并所有文件的转移定义。
+- 误报时在 `reworkHints` 中标注"state-machine 误报"，由 V 评审确认后豁免。
+
+### 校验命令
+
+```bash
+npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
+```
+
+退出码：0=一致，1=不一致，2=输入错误。
+

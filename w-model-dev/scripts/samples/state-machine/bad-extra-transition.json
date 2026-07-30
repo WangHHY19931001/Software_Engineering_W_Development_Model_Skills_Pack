@@ -1,0 +1,13 @@
+{
+  "designStates": ["draft", "published", "archived"],
+  "codeStates": ["draft", "published", "archived", "deleted"],
+  "designTransitions": [
+    {"from": "draft", "to": "published", "event": "publish"},
+    {"from": "published", "to": "archived", "event": "archive"}
+  ],
+  "codeTransitions": [
+    {"from": "draft", "to": "published", "event": "publish"},
+    {"from": "published", "to": "archived", "event": "archive"},
+    {"from": "archived", "to": "deleted", "event": "delete"}
+  ]
+}
