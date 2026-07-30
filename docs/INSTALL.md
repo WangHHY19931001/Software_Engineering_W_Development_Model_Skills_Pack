@@ -128,7 +128,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 23.0.0
+version: 24.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -265,6 +265,8 @@ SSoT §10B 保留**第五轮**（2026-07-24）快照作历史对照（77/77 UT /
 > 阶段 5-8 依赖两个外部工具。技能包通过 `ensure-codegraph-opsx.ts` 自动检测并安装，仅自动失败时需用户手动介入。
 
 ### 自动安装
+
+> **状态**：`ensure-codegraph-opsx.ts` 脚本为第25轮计划新增，尚未实现（Task 6-11）。实现后本节命令即可使用。当前用户需手动安装 codegraph 和 OpenSpec（见上方手动安装步骤）。
 
 技能包在阶段 5 进入 CHECKPOINT 时自动运行：
 ```bash

@@ -263,6 +263,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | security-scan.ts | pre-push / 手动安全扫描 |
 | self-test.ts | 回归基线（非阶段流程） |
 | plan-chunks.ts | ingestion 子流程分块（O 只读） |
+| **（以下脚本计划中，第25轮 Task 6-11 实现）** | |
 | ensure-codegraph-opsx.ts | 阶段 5 进入时（full）/ 6-8 进入时（quick）/ 启动时（light）—— 检测并自动安装 codegraph + OpenSpec 依赖 |
 | check-codegraph-queries.ts | 阶段 5-8 gate —— 校验 codegraph 查询落盘（反模式 #38） |
 | check-opsx-artifacts.ts | 阶段 5-8 gate —— 校验 opsx 制品 + R3/V 审查产物（反模式 #39/#40） |

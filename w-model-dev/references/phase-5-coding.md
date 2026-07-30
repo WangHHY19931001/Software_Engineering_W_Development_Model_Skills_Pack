@@ -92,7 +92,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 - S-tickets 由 S 子代理兼任（不新增角色）
 - S-tickets 产出 `tickets.md`（位于 `.w-model/tickets.md` 或 `docs/tickets.md`，由用户选择）
-- S-tickets 必须在 S-coding 前完成，V/G 不单独评审 tickets.md（合并到阶段 5 V/G 评审）
+- S-tickets 必须在 S-coding 前完成，V/G 不单独评审 tickets.md（合并到阶段 5 V/G 评审）（第25轮更新：启用 opsx 三段式分派时，S-propose 段的 tickets.md 须按三段式 R3×3 + V 审查执行，见上方「OpenSpec opsx 三段式 S 分派」节；未启用 opsx 时本规则仍适用。）
 
 ### 票据清单模板
 

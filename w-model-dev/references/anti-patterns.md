@@ -531,7 +531,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：撤销未查询的修改，补跑 codegraph_explore 查询并落盘，重新评估影响半径后重做修改。
 
-**门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）。
+**门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）（计划中，第25轮 Task 9-10 实现）。
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #20
 
@@ -546,7 +546,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：回退到缺失审查的 opsx 步骤，补跑 R3×3 + V 评审后重做后续步骤。
 
-**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
+**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）（计划中，第25轮 Task 9-10 实现）。
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #17（R3 预防性审查强制）
 
@@ -562,7 +562,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：补齐缺失的制品，修正职责错位的内容，重审 R3×3 + V。
 
-**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
+**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）（计划中，第25轮 Task 9-10 实现）。
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）
 
