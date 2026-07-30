@@ -33,9 +33,13 @@ import {
 } from './verifier-logic.js';
 
 async function main(): Promise<void> {
-  const file = process.argv[2];
+  const args = process.argv.slice(2);
+  const file = args.find(a => !a.startsWith('--'));
+  const selfAsVerifier = args.includes('--self-as-verifier');
+  const sOutputArg = args.find(a => a.startsWith('--s-output='));
+
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>');
+    console.error('用法: npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]');
     process.exit(2);
   }
 
@@ -63,6 +67,24 @@ async function main(): Promise<void> {
   const result = checkVerifierOutput(parsed);
   const meta = (parsed as VerifierOutputShape)?.meta;
 
+  // self-as-verifier 模式：校验 VerifierOutput JSON 路径与 S 产出路径不同（反模式 #35）
+  const selfAsVerifierViolations: string[] = [];
+  if (selfAsVerifier) {
+    if (!sOutputArg) {
+      selfAsVerifierViolations.push('--self-as-verifier 模式须同时提供 --s-output=<S产出路径>');
+    } else {
+      const sOutputPath = path.resolve(sOutputArg.split('=')[1]!);
+      if (abs === sOutputPath) {
+        selfAsVerifierViolations.push(
+          `反模式 #35：self-as-verifier 模式下 VerifierOutput JSON 路径(${abs})与 S 产出路径(${sOutputPath})相同，须拆分为独立产物文件`,
+        );
+      }
+    }
+  }
+
+  const allReasons = [...result.reasons, ...selfAsVerifierViolations];
+  const passed = result.passed && selfAsVerifierViolations.length === 0;
+
   // 人类可读报告
   console.log('═'.repeat(60));
   console.log('Verifier 输出校验（LLM-as-a-Verifier Output Checker）');
@@ -76,17 +98,18 @@ async function main(): Promise<void> {
     console.log(`重复次数      : ${meta.repeatTimes}`);
     console.log(`方差阈值      : ${meta.varianceThreshold}`);
   }
+  console.log(`self-as-verifier: ${selfAsVerifier ? '是' : '否'}`);
   console.log(`综合分数      : ${result.compositeScore}`);
   console.log(`期望综合分数  : ${result.expectedCompositeScore}`);
   console.log(`质量等级      : ${result.qualityLevel}`);
-  console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
+  console.log(`校验结果      : ${passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
-  if (result.passed) {
+  if (passed) {
     console.log('输出结构符合 verifier-spec.md §6 Schema 与各数值约束。');
   } else {
     console.log('未通过原因：');
-    for (const r of result.reasons) {
+    for (const r of allReasons) {
       console.log(`  - ${r}`);
     }
     console.log('');
@@ -96,16 +119,17 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = result.passed ? 0 : 1;
+  const exitCode = passed ? 0 : 1;
   console.log('─'.repeat(60));
   console.log('VERIFIER_JSON ' + JSON.stringify({
     type: 'verifier-output',
-    passed: result.passed,
+    passed,
     exitCode,
+    selfAsVerifier,
     compositeScore: result.compositeScore,
     expectedCompositeScore: result.expectedCompositeScore,
     qualityLevel: result.qualityLevel,
-    reasons: result.reasons,
+    reasons: allReasons,
   }));
 
   process.exit(exitCode);
