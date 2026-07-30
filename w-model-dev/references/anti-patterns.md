@@ -454,6 +454,23 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-preventive-review.ts` 校验三份报告完整性；`check-run-log.ts` 校验 S→V 间 R3 记录数。
 
+## #34 编排者漏派角色（第24轮新增）
+
+**危害**：编排者未按约束 #19 分派 S/V/G/R 角色，导致评审、门禁或根因定位环节缺失，流程完整性失守。
+
+**检测信号**：
+- run-log 中某阶段缺 role=V 记录（V 评审被跳过）
+- run-log 中某阶段缺 role=G 记录（门禁被跳过）
+- run-log 中某阶段缺 role=S 记录（产出环节被跳过或由 O 越权产出）
+- R3 启用时缺 role=R 记录（completeness/reliability/security 三阶段任一缺失）
+- self-as-verifier 模式下兼任时未产出独立产物文件（VerifierOutput JSON 与 S 产出同路径）
+
+**回退动作**：回到当前阶段起点，补派缺失角色（S/V/G/R），重跑对应环节并补记 run-log，再进入 CHECKPOINT。
+
+**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；R3 启用时含 R ≥3 条记录。
+
+**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增）
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。

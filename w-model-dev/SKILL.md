@@ -53,6 +53,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 16. **豁免审批强制四阶段**：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](scripts/check-exemption.ts) E1-E8 全通过。跳过任一阶段命中反模式 #30。
 17. **R3 预防性审查强制**：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](scripts/check-preventive-review.ts) 校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「R3 预防性审查分派模板」。
 18. **RTM 实体每阶段必须回填**：RTM 实体每阶段必须回填；S 子代理产出后须更新 `.w-model/rtm.json`；阶段门 CHECKPOINT 须展示 RTM 文件路径与 coverage 字段。S 子代理返回时须列出 `rtm.json` 文件路径与 coverage 百分比；coverageStatus 字段为"100%"时 coveragePercent 须 = 100，为"部分"时 coveragePercent 须 < 100，为"待覆盖" → 违反约束（回退）。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 子代理职责」。
+19. **编排者角色分派完整性**：编排者每阶段须至少分派 S/V/G 三角色各 1 次；R3 启用时须分派 R 角色（completeness/reliability/security 三阶段各 1 次）；self-as-verifier 模式下兼任时须产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON）。O 须在 CHECKPOINT 前确认 run-log 中含 role=S/V/G 各 ≥1 条记录。命中反模式 #34 一律回退到当前阶段起点补派缺失角色。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「角色分派完整性校验」。
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
@@ -76,6 +77,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 根因定位子代理 | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`（含根因链 + 修复建议 + 防御措施 + `upstreamDefect` 标记）；可作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 改任何产物文件（由 S 修复）/ 跑门禁脚本（由 G 负责）/ 改 RTM 实体 / 改 `project.status` / 跨阶段定位（仅当前阶段产物 + 上游回溯标记）/ 评审其他角色产出 |
 
 **每阶段分派时序**：O 路由 → 🔴 CHECKPOINT 进入确认 → **分派 S 产出** → **分派 V 评审** → **分派 G 门禁** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新 `project.status`。阶段 8 终检额外分派 G 跑 `check-artifact-gate.ts`。
+
+**角色分派完整性确认**（约束 #19）：O 须在 🔴 CHECKPOINT 阶段门放行前确认 run-log 中含 role=S/V/G 各 ≥1 条记录；R3 启用时须含 role=R ≥3 条记录（completeness/reliability/security）。缺失任一角色记录命中反模式 #34，回退到当前阶段起点补派。`check-role-dispatch.ts` 自动校验此约束。
 
 **只读脚本例外**：编排者可跑 `check-*.ts` 看退出码（用于展示/路由判定），但**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
