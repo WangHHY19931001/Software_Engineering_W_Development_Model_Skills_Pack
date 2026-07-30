@@ -52,6 +52,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 15. **REQ 层级强制标注**：REQ 节点须标注 `level`（1-4）强制必填，无降级；无法判断时 blocked 返回要求用户重述（禁止默认填 level=3）。`level=1` REQ 即 REQ-group 候选；`level≥2` REQ 须有 `reqGroup` 指向 `level=1` 祖先。不向后兼容老图谱（历史抛弃，重新生成）。
 16. **豁免审批强制四阶段**：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](scripts/check-exemption.ts) E1-E8 全通过。跳过任一阶段命中反模式 #30。
 17. **R3 预防性审查强制**：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](scripts/check-preventive-review.ts) 校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「R3 预防性审查分派模板」。
+18. **RTM 实体每阶段必须回填**：RTM 实体每阶段必须回填；S 子代理产出后须更新 `.w-model/rtm.json`；阶段门 CHECKPOINT 须展示 RTM 文件路径与 coverage 字段。S 子代理返回时须列出 `rtm.json` 文件路径与 coverage 百分比；coverageStatus 字段为"100%"时 coveragePercent 须 = 100，为"部分"时 coveragePercent 须 < 100，为"待覆盖" → 违反约束（回退）。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 子代理职责」。
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 

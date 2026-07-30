@@ -474,6 +474,12 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 }
 ```
 
+**RTM 实体回填强制职责**：
+- RTM 实体回填是 S 子代理的强制职责，不得委托给其他角色；S 子代理产出后须立即更新 `.w-model/rtm.json`。
+- S 子代理返回时须列出 `rtm.json` 文件路径与 coverage 百分比（如 `coveragePercent=100%`）。
+- `coverageStatus` 字段值须与实际 coveragePercent 一致："100%" 对应 100%，"部分" 对应 < 100%，"待覆盖" 不允许（须回退重做）。
+- 阶段门 CHECKPOINT 须展示 RTM 文件路径（`.w-model/rtm.json`）与 coverage 字段值，未展示视为约束 #18 违反。
+
 ### V 子代理返回
 
 ```json
