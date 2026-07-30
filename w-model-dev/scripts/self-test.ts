@@ -71,6 +71,9 @@ import { checkPreventiveReview, type PreventiveReview } from './preventive-revie
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from './check-role-dispatch.js';
 import { checkStateMachineConsistency } from './check-state-machine-consistency.js';
+import { checkCodegraphQueries } from './check-codegraph-queries.js';
+import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
+import { checkOpenspecArchive } from './check-openspec-archive.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -975,6 +978,87 @@ const STATE_MACHINE_CASES: StateMachineCase[] = [
     file: 'valid-consistent.json',
     expectedPassed: true,
     description: '设计文档与代码状态机完全一致，应通过',
+  },
+];
+
+// -------------------- 第25轮 codegraph/opsx 校验 --------------------
+
+interface CodegraphQueryCase {
+  sampleDir: string;  // samples/ 下的子目录路径（作为 projectRoot）
+  phase: number;
+  expectedPassed: boolean;
+  expectedViolationPatterns?: RegExp[];
+  description: string;
+}
+
+const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
+  {
+    sampleDir: 'codegraph-queries/valid-phase5',
+    phase: 5,
+    expectedPassed: true,
+    description: '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/timestamp），应通过',
+  },
+  {
+    sampleDir: 'codegraph-queries/bad-empty',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/无 phase5-\*\.json 查询文件/],
+    description: 'codegraph-queries 目录存在但无 phase5-*.json 文件，应未通过',
+  },
+  {
+    sampleDir: 'codegraph-queries/bad-missing-field',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/缺 callers\[\] 字段|缺 callees\[\] 字段/],
+    description: '查询文件缺 callers/callees 字段，应未通过',
+  },
+];
+
+interface OpsxArtifactCase {
+  sampleDir: string;
+  phase: number;
+  expectedPassed: boolean;
+  expectedViolationPatterns?: RegExp[];
+  description: string;
+}
+
+const OPSX_ARTIFACT_CASES: OpsxArtifactCase[] = [
+  {
+    sampleDir: 'opsx-artifacts/valid-phase5',
+    phase: 5,
+    expectedPassed: true,
+    description: 'opsx 制品齐全（proposal/design/tasks/tickets/specs）+ R3×9 + V×3，应通过',
+  },
+  {
+    sampleDir: 'opsx-artifacts/bad-missing-tickets',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/tickets\.md 缺失/],
+    description: 'opsx 变更目录缺 tickets.md（反模式 #40），应未通过',
+  },
+];
+
+interface OpenspecArchiveCase {
+  sampleDir: string;
+  phase: number;
+  expectedPassed: boolean;
+  expectedViolationPatterns?: RegExp[];
+  description: string;
+}
+
+const OPENSPEC_ARCHIVE_CASES: OpenspecArchiveCase[] = [
+  {
+    sampleDir: 'openspec-archive/valid',
+    phase: 5,
+    expectedPassed: true,
+    description: 'openspec 归档目录含完整制品（proposal/design/tasks/specs），应通过',
+  },
+  {
+    sampleDir: 'openspec-archive/bad-no-archive',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/archive\/ 目录不存在/],
+    description: 'openspec/changes/archive/ 不存在（opsx:archive 未执行），应未通过',
   },
 ];
 
@@ -1947,6 +2031,102 @@ async function runStateMachineCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runCodegraphQueryCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODEGRAPH_QUERY_CASES) {
+    const projectRoot = path.join(samplesDir, c.sampleDir);
+    const name = `${c.sampleDir}`;
+    const details: string[] = [];
+    try {
+      const r = checkCodegraphQueries(projectRoot, c.phase);
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
+async function runOpsxArtifactCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of OPSX_ARTIFACT_CASES) {
+    const projectRoot = path.join(samplesDir, c.sampleDir);
+    const name = `${c.sampleDir}`;
+    const details: string[] = [];
+    try {
+      const r = checkOpsxArtifacts(projectRoot, c.phase);
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
+async function runOpenspecArchiveCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of OPENSPEC_ARCHIVE_CASES) {
+    const projectRoot = path.join(samplesDir, c.sampleDir);
+    const name = `${c.sampleDir}`;
+    const details: string[] = [];
+    try {
+      const r = checkOpenspecArchive(projectRoot, c.phase);
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 // -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
 
 function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
@@ -2306,6 +2486,9 @@ async function main(): Promise<void> {
   console.log(`TlaBddSync 用例: ${TLA_BDD_SYNC_CASES.length}`);
   console.log(`RoleDispatch 用例 : ${ROLE_DISPATCH_CASES.length}`);
   console.log(`StateMachine 用例 : ${STATE_MACHINE_CASES.length}`);
+  console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
+  console.log(`OpsxArtifact 用例 : ${OPSX_ARTIFACT_CASES.length}`);
+  console.log(`OpenspecArchive 用例 : ${OPENSPEC_ARCHIVE_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
@@ -2315,6 +2498,7 @@ async function main(): Promise<void> {
     coverageResults, exemptionResults, signatureChainResults, archiveIntegrityResults, metadataResults,
     designContractResults, preventiveReviewResults, tlaBddSyncResults, roleDispatchResults,
     stateMachineResults,
+    codegraphQueryResults, opsxArtifactResults, openspecArchiveResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2338,6 +2522,9 @@ async function main(): Promise<void> {
     runTlaBddSyncCases(samplesDir),
     runRoleDispatchCases(samplesDir),
     runStateMachineCases(samplesDir),
+    runCodegraphQueryCases(samplesDir),
+    runOpsxArtifactCases(samplesDir),
+    runOpenspecArchiveCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
@@ -2346,6 +2533,7 @@ async function main(): Promise<void> {
     ...coverageResults, ...exemptionResults, ...signatureChainResults, ...archiveIntegrityResults, ...metadataResults,
     ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults, ...roleDispatchResults,
     ...stateMachineResults,
+    ...codegraphQueryResults, ...opsxArtifactResults, ...openspecArchiveResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
