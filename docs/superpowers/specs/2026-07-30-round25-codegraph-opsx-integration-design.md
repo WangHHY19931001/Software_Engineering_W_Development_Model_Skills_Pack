@@ -313,7 +313,9 @@ S 子代理据此重做后重审。
 
 > 阶段 5-8 任何代码/测试文件修改前，S-coding 子代理必须先调用 `codegraph_explore` 查询目标符号影响半径（callers/callees/blast radius），并将查询结果落盘到 `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`。未查询直接修改视为违反约束 #20。
 
-写入位置：SSoT §3.2 约束表 + `constraints.schema.json`。
+写入位置：`w-model-dev/SKILL.md` 约束块（第 36-58 行编号列表，追加第 20 条）。
+
+> **注**：经上下文核实，`constraints.schema.json` 不存在——约束以纯 Markdown 编号列表存于 SKILL.md，SSoT §3.4.x 轮次记录中仅以"新增约束 #N"文本引用。
 
 ### 5.2 新增反模式
 
@@ -323,7 +325,9 @@ S 子代理据此重做后重审。
 | **#39** | 跳过 opsx 产物审查 | opsx 工作流步骤产物（exploration/proposal/apply）未经 R3×3 + V 审查即进入下一步 |
 | **#40** | opsx/S-tickets 职责混淆 | 用 opsx:propose 的 tasks.md 替代 S-tickets 的 tickets.md，或反之 |
 
-写入位置：SSoT §3.3 反模式表 + `anti-patterns.schema.json`。
+写入位置：`w-model-dev/references/anti-patterns.md`（二级标题分节格式 `## #N 标题（第25轮新增）`，含危害/检测信号/回退动作/门禁脚本/关联 6 段）。
+
+> **注**：经上下文核实，`anti-patterns.schema.json` 不存在——反模式以纯 Markdown 二级标题分节存于 references/anti-patterns.md。
 
 ### 5.3 新增脚本
 
@@ -334,14 +338,14 @@ S 子代理据此重做后重审。
 | `scripts/check-opsx-artifacts.ts` | 校验每阶段 opsx 变更目录制品齐全（proposal/specs/design/tasks + tickets）+ R3×3+V 审查产物齐全；命中 #39/#40 则失败 | 0=通过 / 1=失败 |
 | `scripts/check-openspec-archive.ts` | 校验阶段门通过后 opsx:archive 已执行，archive/ 下制品完整 | 0=通过 / 1=失败 |
 
-### 5.4 schema 扩展
+### 5.4 schema 与逻辑扩展
 
-| schema | 变更 |
+> **经上下文核实**：`constraints.schema.json` / `anti-patterns.schema.json` / `phase-gate.schema.json` 三个文件均不存在。约束存于 SKILL.md 编号列表，反模式存于 references/anti-patterns.md 二级标题分节，阶段门校验逻辑存于 `scripts/gate-logic.ts` + `check-artifact-gate.ts`。因此本节改为扩展真实存在的文件。
+
+| 文件 | 变更 |
 |---|---|
-| `constraints.schema.json` | + #20 |
-| `anti-patterns.schema.json` | + #38 / #39 / #40 |
-| `phase-gate.schema.json` | 阶段 5-8 gate 增加 `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔字段 |
-| `run-log.schema.json` | action 枚举增加 `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` |
+| `w-model-dev/schemas/run-log.schema.json` | action 枚举（第 14 行，现有 19 个值）增加 `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` |
+| `w-model-dev/scripts/gate-logic.ts` | 阶段 5-8 gate 校验增加 `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔校验逻辑（调用 check-codegraph-queries.ts / check-opsx-artifacts.ts / check-openspec-archive.ts） |
 
 ---
 
@@ -358,30 +362,32 @@ S 子代理据此重做后重审。
 
 ### 6.2 资产同步清单（22 项）
 
+> **经上下文核实修正**：SSoT 无 §3.2 约束表/§3.3 反模式表（约束/反模式散落在 §3.4.x 轮次记录中引用）；三个 schema 文件不存在。清单已据此修正。
+
 | # | 资产 | 变更内容 |
 |---|---|---|
-| 1 | SSoT §3.2 约束表 | + #20 |
-| 2 | SSoT §3.3 反模式表 | + #38 / #39 / #40 |
-| 3 | SSoT §3.3 外部工具边界 | + codegraph / OpenSpec |
-| 4 | SSoT §3.4.21 | 第 25 轮记录 |
-| 5 | SSoT 版本号 | 当前版本 24.0.0 |
-| 6 | SKILL.md frontmatter | version → 24.0.0 |
-| 7 | SKILL.md「Bundled Resources」 | + codegraph/opsx 触发条件 |
-| 8 | SKILL.md 阶段 5-8 流程 | + 三段式 S 分派 + codegraph 修改前查询 |
-| 9 | skill-metadata.json | version → 24.0.0 |
-| 10 | package.json | version → 24.0.0 |
-| 11 | references/phase-5-coding.md | + opsx 三段式 + codegraph + S-tickets 共存 |
-| 12 | references/phase-{6,7,8}-*.md | + opsx 三段式 + codegraph |
-| 13 | references/subagent-delegation.md | + S-explore / S-propose / S-coding 变体 |
-| 14 | constraints.schema.json | + #20 |
-| 15 | anti-patterns.schema.json | + #38 / #39 / #40 |
-| 16 | phase-gate.schema.json | + 3 个新布尔字段 |
-| 17 | run-log.schema.json | + 6 个新 action 枚举 |
-| 18 | INSTALL.md | + codegraph/OpenSpec 自动安装说明 |
-| 19 | scripts/ensure-codegraph-opsx.ts | 新增 |
-| 20 | scripts/check-codegraph-queries.ts | 新增 |
-| 21 | scripts/check-opsx-artifacts.ts | 新增 |
-| 22 | scripts/check-openspec-archive.ts | 新增 |
+| 1 | `w-model-dev/SKILL.md` 约束块（第 36-58 行） | 追加第 20 条：codegraph 修改前强制查询 |
+| 2 | `w-model-dev/references/anti-patterns.md` | 追加 #38 / #39 / #40 三条（二级标题分节格式） |
+| 3 | SSoT §3.3 外部工具边界（第 242 行起） | + codegraph / OpenSpec 边界声明 |
+| 4 | SSoT §3.4.21（第 720 行 `---` 前插入） | 第 25 轮记录（仿 §3.4.20 格式） |
+| 5 | SSoT §3.4.21 触发说明 | 声明版本号目标 24.0.0（SSoT 无独立版本字段） |
+| 6 | `w-model-dev/SKILL.md` frontmatter（第 3 行） | version → 24.0.0 |
+| 7 | `w-model-dev/SKILL.md`「Bundled Resources」（第 199-290 行） | + codegraph/opsx 触发条件 |
+| 8 | `w-model-dev/SKILL.md` 阶段 5-8 流程（第 148-184 行） | + 三段式 S 分派 + codegraph 修改前查询 |
+| 9 | `w-model-dev/skill-metadata.json`（第 3 行） | version → 24.0.0，updatedAt → 2026-07-30 |
+| 10 | `package.json`（第 3 行） | version → 24.0.0 |
+| 11 | `w-model-dev/references/phase-5-coding.md` | + opsx 三段式 + codegraph + S-tickets 共存（第 51-119 行 S-tickets 节扩展） |
+| 12 | `w-model-dev/references/phase-{6,7,8}-*.md` | + opsx 三段式 + codegraph |
+| 13 | `w-model-dev/references/subagent-delegation.md`（第 195-261 行 S 拆分机制） | + S-explore / S-propose / S-coding 变体分派模板 |
+| 14 | `w-model-dev/schemas/run-log.schema.json`（第 14 行 action 枚举） | + `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` |
+| 15 | `w-model-dev/scripts/gate-logic.ts` | + `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔校验逻辑 |
+| 16 | `docs/INSTALL.md` | + codegraph/OpenSpec 自动安装说明节 |
+| 17 | `w-model-dev/scripts/ensure-codegraph-opsx.ts` | 新增（三层依赖检测+自动安装初始化） |
+| 18 | `w-model-dev/scripts/check-codegraph-queries.ts` | 新增（校验 codegraph 查询落盘，命中 #38） |
+| 19 | `w-model-dev/scripts/check-opsx-artifacts.ts` | 新增（校验 opsx 制品+审查产物，命中 #39/#40） |
+| 20 | `w-model-dev/scripts/check-openspec-archive.ts` | 新增（校验 opsx:archive 归档完整性） |
+| 21 | `w-model-dev/scripts/self-test.ts` | + codegraph/opsx 相关 self-test 用例（4 组 CASES + runner + main 注册） |
+| 22 | `w-model-dev/scripts/samples/` | + codegraph-queries / opsx-artifacts / openspec-archive 样本文件 |
 
 ---
 
