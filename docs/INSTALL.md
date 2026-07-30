@@ -259,3 +259,29 @@ Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `
 
 缺陷 1~4 已沉淀到 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md)「实现层经验教训」节 L1~L4。
 SSoT §10B 保留**第五轮**（2026-07-24）快照作历史对照（77/77 UT / 21/21 IT / 22/22 ST / 15/15 UAT）。
+
+## codegraph + OpenSpec 自动安装（第 25 轮新增）
+
+> 阶段 5-8 依赖两个外部工具。技能包通过 `ensure-codegraph-opsx.ts` 自动检测并安装，仅自动失败时需用户手动介入。
+
+### 自动安装
+
+技能包在阶段 5 进入 CHECKPOINT 时自动运行：
+```bash
+npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase 5 --project-root . --mode full
+```
+
+脚本执行三层检测+自动处置：
+1. **L1 CLI**：`codegraph --version` / `openspec --version` → 缺失则 `npm i -g`
+2. **L2 MCP 注册**：codegraph 探针查询 → 失败则 `codegraph install --yes`
+3. **L3 项目**：`.codegraph/` / `openspec/` 目录 → 缺失则 `codegraph init` / `openspec init`
+
+### 手动安装（自动失败时）
+
+```bash
+npm i -g @colbymchenry/codegraph
+npm i -g @fission-ai/openspec@latest
+codegraph install          # 交互式注册 MCP（自动失败时手动跑）
+codegraph init             # 项目图谱初始化
+openspec init              # OpenSpec 工作区初始化
+```
