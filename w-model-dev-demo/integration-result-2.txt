@@ -1,0 +1,60 @@
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> blog-system-demo@1.0.0 test:integration
+> cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/integration
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mD:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev-demo[39m
+
+ [32m✓[39m tests/integration/tc-int-041-050-data-consistency.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 286[2mms[22m[39m
+ [32m✓[39m tests/integration/tc-int-001-005-param-validation.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 369[2mms[22m[39m
+ [32m✓[39m tests/integration/tc-int-006-015-cross-module.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 417[2mms[22m[39m
+ [32m✓[39m tests/integration/tc-int-016-030-exception-path.test.ts [2m([22m[2m29 tests[22m[2m)[22m[33m 792[2mms[22m[39m
+       [33m[2m✓[22m[39m TC-INT-020-C1: 超过限流阈值 → 429 RATE_LIMITED（裸 supertest 无 bypass） [33m 366[2mms[22m[39m
+ [32m✓[39m tests/integration/tc-int-031-040-cross-cutting.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 1080[2mms[22m[39m
+       [33m[2m✓[22m[39m TC-INT-020-D1: 限流 bypass 头（true）→ 不计入限流 [33m 826[2mms[22m[39m
+ [31m❯[39m tests/integration/tc-int-051-074-cuts-rate-audit.test.ts [2m([22m[2m23 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 20761[2mms[22m[39m
+[31m     [31m×[31m IT-perf-01: 200 并发 GET /tags P95 ≤ 800ms（本地内存基线）[39m[33m 18777[2mms[22m[39m
+     [33m[2m✓[22m[39m IT-perf-02: 50 并发 GET /articles/:id P95 ≤ 500ms [33m 353[2mms[22m[39m
+     [32m✓[39m IT-sec-01: 缺 JWT 受保护端点 → 401 UNAUTHENTICATED[32m 16[2mms[22m[39m
+     [32m✓[39m IT-sec-02: 错 JWT → 401 TOKEN_INVALID[32m 9[2mms[22m[39m
+     [32m✓[39m IT-sec-03: 不同 secret 签的 token → 401[32m 9[2mms[22m[39m
+     [32m✓[39m IT-sec-04: 过期 token → 401 TOKEN_EXPIRED[32m 10[2mms[22m[39m
+     [32m✓[39m IT-sec-05: 密码 bcrypt 哈希存储（明文不出现）[32m 6[2mms[22m[39m
+     [32m✓[39m IT-sec-06: bcrypt 验证正确密码 → 200 + token[32m 22[2mms[22m[39m
+     [32m✓[39m IT-sec-07: bcrypt 验证错误密码 → 401[32m 11[2mms[22m[39m
+     [32m✓[39m IT-sec-08: bcrypt 验证 hash 格式正确（cost 4 环境）[32m 6[2mms[22m[39m
+     [32m✓[39m IT-sec-09: 注册响应不暴露 passwordHash[32m 8[2mms[22m[39m
+     [32m✓[39m IT-sec-10: 登录响应不暴露 passwordHash[32m 10[2mms[22m[39m
+     [33m[2m✓[22m[39m IT-rate-01: 限流 100 req/min/IP 第 101 次 → 429 [33m 324[2mms[22m[39m
+     [33m[2m✓[22m[39m IT-rate-02: 不同 IP 互不影响 [33m 336[2mms[22m[39m
+     [33m[2m✓[22m[39m IT-rate-03: bypass 头（大小写不敏感）生效 [33m 468[2mms[22m[39m
+     [33m[2m✓[22m[39m IT-rate-04: 限流触发后未重置期间持续 429 [33m 375[2mms[22m[39m
+     [32m✓[39m IT-audit-01: 注册用户 → auditLog 含记录[32m 5[2mms[22m[39m
+     [32m✓[39m IT-audit-02: 审计日志可按 action 过滤[32m 2[2mms[22m[39m
+     [32m✓[39m IT-audit-03: 审计日志可按 actor 过滤[32m 4[2mms[22m[39m
+     [32m✓[39m IT-audit-04: 审计日志 list 分页[32m 2[2mms[22m[39m
+     [32m✓[39m IT-audit-05: 审计日志 CON-004 90 天保留语义（purgeOlderThan）[32m 2[2mms[22m[39m
+     [32m✓[39m IT-audit-06: 审计日志永久保留（< 90 天不被 purge）[32m 1[2mms[22m[39m
+     [32m✓[39m IT-audit-07: 审计日志 count 正确[32m 1[2mms[22m[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/tc-int-051-074-cuts-rate-audit.test.ts > IT-perf 性能基线 > IT-perf-01: 200 并发 GET /tags P95 ≤ 800ms（本地内存基线）
+AssertionError: expected 18469 to be less than or equal to 800
+ ❯ tests/integration/tc-int-051-074-cuts-rate-audit.test.ts:43:17
+     41|     const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 0;
+     42|     expect(results.every((r) => r.status === 200)).toBe(true);
+     43|     expect(p95).toBeLessThanOrEqual(800);
+       |                 ^
+     44|     expect(totalMs).toBeLessThan(15000);
+     45|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m129 passed[39m[22m[90m (130)[39m
+[2m   Start at [22m 12:28:11
+[2m   Duration [22m 22.11s[2m (transform 2.33s, setup 146ms, import 5.86s, tests 23.70s, environment 1ms)[22m
+

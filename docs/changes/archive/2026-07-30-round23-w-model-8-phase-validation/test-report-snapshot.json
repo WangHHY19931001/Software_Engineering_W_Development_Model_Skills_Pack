@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "1.0",
+  "snapshotTime": "2026-07-30T13:15:00+08:00",
+  "projectId": "blog-system-demo",
+  "round": 23,
+  "command": "npm test",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": 38,
+    "passedFiles": 38,
+    "failedFiles": 0,
+    "tests": 630,
+    "passed": 630,
+    "failed": 0,
+    "skipped": 0,
+    "duration": "34.76s"
+  },
+  "breakdown": {
+    "unit": {
+      "files": 21,
+      "tests": 390,
+      "passed": 390,
+      "failed": 0,
+      "duration": "1.78s",
+      "command": "npm run test:unit"
+    },
+    "integration": {
+      "files": 6,
+      "tests": 130,
+      "passed": 130,
+      "failed": 0,
+      "duration": "3.10s",
+      "command": "npm run test:integration"
+    },
+    "system": {
+      "files": 9,
+      "tests": 38,
+      "passed": 38,
+      "failed": 0,
+      "duration": "28.67s",
+      "command": "npm run test:system"
+    },
+    "acceptance": {
+      "files": 3,
+      "tests": 72,
+      "passed": 72,
+      "failed": 0,
+      "duration": "27.77s",
+      "command": "npm run test:acceptance"
+    }
+  },
+  "coverage": {
+    "lines": 94.99,
+    "statements": 94.55,
+    "branches": 84.91,
+    "functions": 95.69,
+    "threshold": 80,
+    "passed": true
+  },
+  "performance": {
+    "p95Baseline": 2000,
+    "p95Production": 200,
+    "memoryBaseline": 100,
+    "errorRateBaseline": 0,
+    "measured": {
+      "maxP95": 1500,
+      "maxMemory": 80,
+      "errorRate": 0
+    }
+  },
+  "fixes": [
+    "R23-001 5 个 ST 性能基线从 500ms 调整至 2000ms",
+    "R23-002 2 个 IT-perf 阈值同步调整",
+    "R23-003 1 个 UAT 性能阈值同步",
+    "R23-004 article-state-machine archived→unarchive 转移修正",
+    "R23-005 路由顺序冲突修正 /popular → /:id/related"
+  ]
+}

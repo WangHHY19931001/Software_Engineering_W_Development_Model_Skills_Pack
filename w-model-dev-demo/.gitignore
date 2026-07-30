@@ -1,0 +1,6 @@
+node_modules/
+dist/
+coverage/
+.w-model/tla/states/
+.w-model/gate-logs/*.log
+*.log

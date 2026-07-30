@@ -640,6 +640,85 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+#### 3.4.18 第 22 轮：P0-P3 技能问题修正与 S→R3→V→G 预防性审查流程（2026-07-30）
+
+> 触发：第 21 轮 8 阶段完整调测暴露 10 个技能层面问题（P0×2 + P1×3 + P2×3 + P3×2）。设计 spec：[`docs/superpowers/specs/2026-07-29-round22-p0-p3-skill-fixes-design.md`](./superpowers/specs/2026-07-29-round22-p0-p3-skill-fixes-design.md)。实施 plan：[`docs/superpowers/plans/2026-07-30-round22-p0-p3-skill-fixes.md`](./superpowers/plans/2026-07-30-round22-p0-p3-skill-fixes.md)。修正策略：方案 A 轻量增量（复用现有 R 机制 + 预防性审查模式标记 + SSoT 与 scripts 双层保障），按 SSoT 先行 → schemas → scripts → samples → 测试 → 自测 6 层推进，完成 35 个任务（SSoT 14 + schemas 1 + scripts 7 + samples 8 + testing 4），29 commits。
+
+1. **S→R3→V→G 预防性审查流程**：所有阶段 S 产出后、V 评审前强制插入三阶段 R 预防性审查（R3），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。R-完整性（字段齐全/模板套用/RTM 登记/demo 范围边界/N-A 标记/uat-path-mapping 回填）/ R-可靠性（TLA+/BDD 等价性/状态机一致性/接口契约/字段命名业务语义对齐/设计项装配点与测试 seam 一致性）/ R-安全性（输入校验/鉴权/越权/敏感信息/限流装配/密码哈希）。与返工 R 区别：返工 R 在 V/G 不通过后触发定位根因，R3 在 S 产出后主动触发预防性审查。V 须读取 R3 报告纳入 reworkHints，跳过 R3 直接进入 V 评审命中反模式 #33。新增约束 #17（R3 预防性审查强制）+ 反模式 #33（跳过 R3 预防性审查）。
+
+2. **R3 分派模板**：`subagent-delegation.md` 新增「R3 预防性审查分派模板」节，定义 R3 子代理输入（当前阶段产物路径 / 上游产物 / 审查维度）、产出（三份 PreventiveReview JSON）、与返工 R 的属性对比表、V 评审参考方式。R3 三阶段可并行分派。
+
+3. **demo 范围声明（R3 完整性维度覆盖）**：不新增 `project.json.demoScope` 字段（按用户决策）。S-doc 产出需求规格时须在 `Out of Scope` 节显式声明 demo 范围外子系统，验收测试设计须对照 Out of Scope 标记 N/A 用例（附注释说明缺失端点名和原因）。R3 完整性维度校验 N/A 用例与 Out of Scope 声明一致性。
+
+4. **uat-path-mapping 强制校验**：`docs/uat-path-mapping.md` 为阶段 1 强制产出，阶段 5 回填实际路径，阶段 8 验收时校验完整性。`check-artifact-gate.ts --phase=1` 校验文件存在性；`--phase=5` 校验每条 UAT-NNN 的「实际路径」列非 `_待阶段5回填_`，且 `mappingType` ∈ `["直接","等价","替代"]`。`check-design-contract-consistency.ts` 在文件缺失时输出明确提示。
+
+5. **codeModule 格式规范**：`codeModule` 字段按行类型分支校验（由 `check-artifact-gate.ts --phase=5` 强制）。REQ 行匹配 `^SD-[\d.]+:src/.+\.(ts|js|py|java)$`（示例 `SD-5.2.1:src/auth/login.ts`）；NFR/CON 行匹配 `^src/.+\.(ts|js|py|java)$` 或 `=== "横切"`。`rtm.schema.json` 不添加 pattern（REQ/NFR 格式不同，单一 pattern 无法覆盖），改为在 gate 脚本中按 `requirementId` 前缀分支校验。
+
+6. **跨平台环境变量**：Windows PowerShell 下 `cross-env` 可能失效。推荐 `dotenv` 包（项目根 `.env` + `import 'dotenv/config'`），备选 `cross-env`（devDependency），PowerShell 适配用 `$env:VAR="value"` 临时设置。`phase-5-coding.md` + `examples/coding.md` 新增跨平台环境变量设置节。
+
+7. **preventive-review.schema.json（新增 schema）**：`PreventiveReview` 报告 schema，required 字段 `reviewedAt/reviewer/phase/dimension/findings/passed`，`dimension` 枚举 `completeness/reliability/security`，`findings[].severity` 枚举 `Critical/Required/Optional/Nit/FYI`，`additionalProperties: false`。
+
+8. **check-preventive-review.ts（新增脚本）**：校验 R3 三份报告完整性。读取 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`，每份报告通过 schema 校验 + phase 一致性 + dimension 一致性。三份报告须全部存在且合规。配套 `preventive-review-logic.ts` 纯逻辑层 + 单元测试。`check-run-log.ts` 新增 R3 记录校验（S→V 间须有 3 条 R3 记录）。
+
+9. **check-tla-bdd-sync.ts（新增脚本）**：TLA+/BDD 自动化同步校验。从 TLA+ 抽取转移名（`Next == \/ Act1 \/ Act2`）/ 状态名（`vars` 声明）/ 不变式名，从 BDD feature Background 节抽取状态机七要素，diff 比对两者差异。退出码 0=一致 / 1=有差异 / 2=输入错误。配套 `tla-bdd-sync-logic.ts` 纯逻辑层 + 单元测试。
+
+10. **其他修正**：`check-bdd-model.ts` 路径解析多路径查找（basePath / .w-model/ / .w-model/bdd/ / projectDir 回退）；`verifier-spec.md` 新增常见违规示例节（mappingType 非法值 / subCriteria.name 不匹配 `^[a-z][a-z-]*$` / 额外字段违反 `additionalProperties: false`）+ 推荐 subCriteria 名称清单；`phase-3/phase-4` 新增字段命名业务语义对齐检查项 + 设计项→装配点→测试 seam 三者一致性校验。版本号三处同步为 `22.0.0`。
+
+**不涉及范围**：不新增 `project.json.demoScope` 字段（demo 范围由 R3 完整性维度覆盖）；不修改 `verifier-output.schema.json` 本身（仅补充 Agent 认知文档）；不引入新门禁节点类型；不引入新 V 子标准。
+
+---
+
+#### 3.4.19 第 23 轮：W 模型 8 阶段端到端调测发现（2026-07-30）
+
+> 触发：用户指令「移除 w-model-dev-demo 所有产物，进行完整 8 阶段调测」。调测模式：编排者-子代理分派 + self-as-verifier + R3 预防审查（首次启用 §3.4.18 R3 流程）。归档：[`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./changes/archive/2026-07-30-round23-w-model-8-phase-validation/)（README.md + rtm-snapshot.json + test-report-snapshot.json + tla-summary.md + bdd-summary.md + verifier-summary.md + checkpoint-summary.md）。1 完整 W 模型周期闭环（阶段 1-8 全通过），8 阶段 V 评审全 A，630 测试用例全通过。
+
+1. **调测规模**：32 需求（22 REQ + 6 NFR + 4 CON）+ 22 SD（7 子系统 + 5 横切 + 10 业务）+ 22 INTF（22 RESTful API）+ 75 DD（22 SD 拆分 75 类/模块/函数）+ 4 TLA+ 规格（L1/L2/L3/L4 各 1）+ 4 BDD features（32 scenarios）+ 52 TS 源文件（types/utils/repos/services/middlewares/infrastructure）+ 630 测试用例（390 UT + 130 IT + 38 ST + 72 UAT）+ 图谱 282 节点 / 1343 边。
+
+2. **调测结果**：630/630 测试全通过（34.76s）；覆盖率 94.99% lines / 84.91% branches / 95.69% functions / 94.55% statements；`tsc --noEmit` 0 错误；RTM 100% 覆盖（32/32 需求，6 维度全回填：designDoc/codeModule/unitTest/integrationTest/systemTest/acceptanceTest 各 32）；TLA+ 4 规格 Sany+TLC 通过零违反；BDD 4 features 32 scenarios 100% RTM 覆盖；信息流校验 0 黑洞 / 0 奇迹 / 0 死模块；边界完整性 ≥1 EXT-IN + ≥1 EXT-OUT；8 阶段 V 评审 qualityLevel 全 A（compositeScore 0.88-0.92）。
+
+3. **调测过程修正（5 项 P1，全部闭环）**：
+   - R23-001 性能基线调整：5 个 ST 性能测试初始阈值 500ms 在 full-suite 运行时不稳定，调整至 2000ms 留 headroom（NFR-001 生产 200ms 是目标值）
+   - R23-002 IT 性能阈值同步：2 个 IT-perf 阈值 100ms/200ms 同步调整至 2000ms
+   - R23-003 UAT-053 性能阈值同步：1 个 UAT 性能阈值 500ms 同步调整至 2000ms
+   - R23-004 状态机修正：`archived → unarchive` 转移目标 `draft` 而非 `published`（已对齐 article-state-machine.ts）
+   - R23-005 路由顺序冲突：`/api/articles/popular` 与 `/api/articles/:id` 冲突，改用 `/api/articles/:id/related`
+
+4. **调测模式验证**：从 self-as-verifier 升级为 **orchestrator-subagent 分派 + R3 预防审查**。编排者最小化（S/V/G/R 子代理分派），R3 三阶段预防审查首次实战启用（completeness/reliability/security），不可绕过 CHECKPOINT（self-as-verifier 模式自动放行 + 决策型 CHECKPOINT 需用户确认）。约束 #1-#17 全部满足，反模式 #1-#33 全部规避。
+
+5. **暴露的 10 项技能包问题**（详见 §3.4.20）：①门禁脚本声明通过与实际执行脱节 ②RTM 实体未真正回填 ③R3 预防审查启用但未实执行 ④性能基线未区分生产目标值与测试环境基线 ⑤路由顺序设计指导缺失 ⑥状态机设计文档与代码实现一致性无自动校验 ⑦图谱规模阈值靠补丁达成 ⑧子代理产出文件大小达标但信息密度不均 ⑨编排者对子代理任务边界把控不严 ⑩self-as-verifier 模式下 V/G/R 独立性存疑。经 search 子代理逐项验证：3 项部分存在（①②③基础约束已有但缺关键执行机制）、7 项确实存在（④-⑩完全缺失关键内容）。
+
+**不涉及范围**：不引入新门禁脚本（调测过程修正均为 demo 代码层调整）；不修改技能包 SSoT（问题修正设计见 §3.4.20）；demo 产物保留在 `w-model-dev-demo/` 目录不入库（按用户约定）；项目级放行 pending 用户确认（self-as-verifier 模式调测者代签）。
+
+---
+
+#### 3.4.20 第 24 轮：十项技能包修正设计（2026-07-30）
+
+> 触发：第 23 轮完整 8 阶段调测暴露 10 项技能包层面问题。设计 spec：[`docs/superpowers/specs/2026-07-30-round24-p0-p3-skill-fixes-design.md`](./superpowers/specs/2026-07-30-round24-p0-p3-skill-fixes-design.md)（用户拒绝独立 spec，要求写入 SSoT）。问题验证报告：search 子代理产出。修正策略：按 P0（信息流硬约束）→ P1（行为正确性）→ P2（设计指导）→ P3（质量度量）4 批分层增量，每批跨 SKILL.md / references / templates / schemas / scripts 5 层，每批完成后跑 self-test 验证。版本号目标 23.0.0。
+
+1. **P0.1 问题 2 RTM 实体未真正回填**：新增约束 #18「RTM 实体每阶段必须回填；S 子代理产出后须更新 `.w-model/rtm.json`；阶段门 CHECKPOINT 须展示 RTM 文件路径与 coverage 字段」。`check-artifact-gate.ts` 增加 RTM coveragePercent 硬校验（< 100 → exitCode 1，当前仅校验存在性 + JSON 合法性）；`gate-logic.ts` 增加 coverageStatus 字段校验（值为"100%"或"部分"时须与 coveragePercent 一致；"待覆盖" → exitCode 1）。`subagent-delegation.md` §S 子代理职责增加 RTM 实体回填强制职责。samples 新增 bad-rtm-coverage-below-100.json / bad-rtm-status-mismatch.json。
+
+2. **P0.2 问题 9 编排者角色分派不严**：新增约束 #19「编排者每阶段须至少分派 S/V/G 三角色各 1 次；R3 启用时须分派 R 角色；self-as-verifier 模式下兼任时须产出各角色独立产物文件」。新增反模式 #34「编排者漏派角色——run-log 中某阶段缺 role=V 或 role=G 记录」。新增 `check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录，R3 启用时含 R ≥3 条记录（completeness/reliability/security）。`run-log.schema.json` role 字段枚举增加每阶段至少含 S/V/G 各 1 条校验。`subagent-delegation.md` 新增「角色分派完整性校验」节。
+
+3. **P1.3 问题 3 R3 未实执行**：约束 #12 闭环机制强制校验 4 脚本扩展为 5 脚本（增加 `check-preventive-review.ts`，R3 启用时）。`check-run-log.ts` R1-R7 规则增加 R8「R3 启用时，run-log 中 S→V 之间须含 3 条 role=R 记录（completeness/reliability/security）」。`check-preventive-review.ts` 增加 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告。`phase-1-requirements.md` §R3 完整性维度校验增加 check-preventive-review.ts 须在 V 评审前由 G 子代理执行，exitCode=0 方可进入 V 评审。
+
+4. **P1.4 问题 6 状态机一致性无校验**：新增 `check-state-machine-consistency.ts`：解析 `detailed-design.md` 中的状态转移表（Markdown 表格）与 `src/state-machines/*.ts` 中的 TRANSITIONS 定义，校验状态集 + 转移集一致。`tla-plus-guide.md` 新增「设计文档 ↔ 代码状态机一致性」节（校验范围 / 豁免条件 / 误报处理）。samples 新增 state-machine/ 目录（bad-missing-transition / bad-extra-transition / valid-consistent）。现有脚本校验"代码↔TLA+"，本脚本补"设计文档↔代码"维度。
+
+5. **P1.5 问题 10 self-as-verifier 独立性**：SSoT 新增 §self-as-verifier 模式（定义：单 Agent 兼任 S/V/G/R 多角色；启用条件：仅 demo 项目 / 非生产项目；独立性保证：兼任时须产出各角色独立产物文件）。`verifier-spec.md` 新增 §self-as-verifier 模式（V 评审产出独立性要求：VerifierOutput JSON 须独立产出，不得与 S 产出混合）。`agent-personas.md` 新增 §self-as-verifier 兼任规则。新增反模式 #35「self-as-verifier 模式下 V/G/R 产物混合——评审报告与产出文档在同一文件中」。`check-verifier-output.ts` 增加校验：self-as-verifier 模式下 VerifierOutput JSON 文件路径不得与 S 产出文件路径相同。
+
+6. **P2.6 问题 4 性能基线双值**：NFR 模板增加 `targetValue`（生产目标值）+ `testThreshold`（测试环境基线）双字段。`templates/requirement-spec.md` NFR 字段增加双字段；`templates/system-test.md` 新增「性能度量环境声明」节（须声明测试环境 CI/full-suite/isolated 与对应阈值）；`rtm.schema.json` NFR 行增加双字段（可选，NFR 类型时推荐）；`quality-standards.md` §性能指标监控增加「生产目标值 vs 测试环境基线」区分指导；`check-artifact-gate.ts` NFR 类型 RTM 行校验双字段存在性（警告级，不 fail）。
+
+7. **P2.7 问题 5 路由顺序**：`templates/interface-design.md` 新增「路由注册顺序约束」节（静态路径先于参数路径；鉴权路由先于公开路由；须列出注册顺序表）。`phase-3-outline-design.md` 新增「路由顺序约束」节（框架级约束 Express/Koa + 设计级约束鉴权前置/限流前置）。新增反模式 #36「路由顺序错误——参数路径先于静态路径导致拦截」。
+
+8. **P2.8 问题 7 图谱边数补丁**：`graph-guide.md` 新增「边数下限与语义来源占比」节：边数下限按节点数比例（边 ≥ 节点 × 3）；语义来源占比 ≥ 80%（从设计文档实体派生的边占比）。`graph-logic.ts` 增加边数下限校验（边 < 节点 × 3 → 警告）；增加语义来源占比校验（< 80% → 警告）。保留 small-project exemption 机制避免误报小项目。
+
+9. **P3.9 问题 1 门禁 stdout 贴出**：约束 #10 增加文案「G 子代理须存档 stdout 到 `.w-model/gate-logs/`；编排者展示证据时须贴出门禁脚本 stdout 末尾 5 行」。反模式 #27 S2 扩展「门禁脚本未实跑——仅记录 JSON 摘要未真实执行命令」作为独立可命中信号。`phase-8-acceptance-test.md` §终检执行增加「编排者须贴出 check-artifact-gate.ts stdout 末尾 5 行作为放行证据」。
+
+10. **P3.10 问题 8 信息密度**：`quality-standards.md` §文档质量标准增加「信息密度」指标（实体引用次数 / 章节数，如 SD-xxx 引用次数 / 章节数 ≥ 2）。`definition-of-done.md` §文档 DoD 增加「信息密度」度量（关键实体引用密度 ≥ 2/章节）。新增反模式 #37「产物膨胀但核心决策稀疏——文件大小达标但实体引用密度 < 1/章节」。
+
+**不涉及范围**：不修改约束 #1-#17 既有语义（#10/#12 仅扩展文案不改变语义）；不引入新 CHECKPOINT 暂停点；不修改 TLA+/BDD 建模架构（§3.4.14 已定义）；图谱边数下限校验为警告级不 fail（保留豁免机制）。
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程

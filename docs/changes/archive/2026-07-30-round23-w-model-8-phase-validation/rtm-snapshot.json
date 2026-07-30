@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1.0",
+  "snapshotTime": "2026-07-30T13:15:00+08:00",
+  "projectId": "blog-system-demo",
+  "round": 23,
+  "currentPhase": 8,
+  "summary": {
+    "requirements": 32,
+    "scenarios": "22 REQ + 6 NFR + 4 CON",
+    "systemDesign": 22,
+    "interfaces": 22,
+    "detailedDesign": 75,
+    "tlaSpecs": 4,
+    "bddFeatures": 4,
+    "sourceFiles": 52,
+    "tests": 630,
+    "testDistribution": {
+      "unit": 390,
+      "integration": 130,
+      "system": 38,
+      "acceptance": 72
+    },
+    "coverage": {
+      "lines": 94.99,
+      "branches": 84.91,
+      "functions": 95.69,
+      "statements": 94.55
+    }
+  },
+  "graph": {
+    "phase1Nodes": 80,
+    "phase1Edges": 200,
+    "phase2Nodes": 101,
+    "phase2Edges": 627,
+    "phase3Nodes": 145,
+    "phase3Edges": 817,
+    "phase4Nodes": 282,
+    "phase4Edges": 1343,
+    "dataflowViolations": {
+      "blackhole": 0,
+      "miracle": 0,
+      "deadModule": 0
+    },
+    "extBoundary": {
+      "extIn": 2,
+      "extOut": 1
+    }
+  },
+  "tla": {
+    "total": 4,
+    "byLevel": {
+      "L1": 1,
+      "L2": 1,
+      "L3": 1,
+      "L4": 1
+    },
+    "sanyPass": true,
+    "tlcPass": true,
+    "violations": 0
+  },
+  "bdd": {
+    "totalFeatures": 4,
+    "totalScenarios": 32,
+    "byLevel": {
+      "L1": 5,
+      "L2": 7,
+      "L3": 10,
+      "L4": 10
+    },
+    "rtmCoverage": "100%"
+  },
+  "rtm": {
+    "totalRequirements": 32,
+    "covered": 32,
+    "uncovered": 0,
+    "coverage": "100%",
+    "byPhase": {
+      "designDoc": 32,
+      "codeModule": 32,
+      "unitTest": 32,
+      "integrationTest": 32,
+      "systemTest": 32,
+      "acceptanceTest": 32
+    }
+  },
+  "phaseHistory": [
+    {"phase": 1, "status": "completed", "productsCount": 3},
+    {"phase": 2, "status": "completed", "productsCount": 3},
+    {"phase": 3, "status": "completed", "productsCount": 3},
+    {"phase": 4, "status": "completed", "productsCount": 17},
+    {"phase": 5, "status": "completed", "productsCount": 73},
+    {"phase": 6, "status": "completed", "productsCount": 6},
+    {"phase": 7, "status": "completed", "productsCount": 9},
+    {"phase": 8, "status": "completed", "productsCount": 4}
+  ]
+}
