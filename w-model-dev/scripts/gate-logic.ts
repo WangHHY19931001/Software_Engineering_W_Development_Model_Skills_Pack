@@ -315,6 +315,25 @@ export function checkArtifactGate(
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
   if (totalRows === 0) reasons.push('RTM 无需求行');
 
+  // ==================== coverageStatus 字段一致性校验（第24轮 P0 新增） ====================
+  // 约束 #18：coverageStatus 须与 coveragePercent 一致
+  // "100%" → coveragePercent 须 = 100；"部分" → coveragePercent 须 < 100；"待覆盖" → 违反
+  for (const row of matrix.rows) {
+    if (!row || typeof row.coverageStatus !== 'string') continue;
+    const status = row.coverageStatus.trim();
+    if (status === '100%') {
+      if (coveragePercent !== 100) {
+        reasons.push(`RTM coverageStatus="100%" 但 coveragePercent=${coveragePercent}%，coverageStatus 与 coveragePercent 不一致`);
+      }
+    } else if (status === '部分') {
+      if (coveragePercent >= 100) {
+        reasons.push(`RTM coverageStatus="部分" 但 coveragePercent=${coveragePercent}%，coverageStatus 与 coveragePercent 不一致`);
+      }
+    } else if (status === '待覆盖') {
+      reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #18）`);
+    }
+  }
+
   let unitCoveragePercent = 0;
   for (const { name, layer, summary } of summaries) {
     // P1.1 阶段分层：未到的测试层跳过 pending/failed 校验（pending 合理）
