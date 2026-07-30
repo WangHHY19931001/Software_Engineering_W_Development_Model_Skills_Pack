@@ -26,7 +26,9 @@
           "integrationTest": { "type": ["string", "null"] },
           "systemTest": { "type": ["string", "null"] },
           "acceptanceTest": { "type": ["string", "null"] },
-          "coverageStatus": { "type": "string" }
+          "coverageStatus": { "type": "string" },
+          "targetValue": { "type": "string", "description": "NFR 生产目标值（NFR 类型时推荐填写）" },
+          "testThreshold": { "type": "string", "description": "NFR 测试环境基线（NFR 类型时推荐填写）" }
         }
       }
     },

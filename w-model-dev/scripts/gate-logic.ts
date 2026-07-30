@@ -10,6 +10,8 @@ export interface RTMRowShape {
   systemTest: string;
   acceptanceTest: string;
   coverageStatus?: '100%' | '部分' | '待覆盖';
+  targetValue?: string;
+  testThreshold?: string;
 }
 
 export interface RTMMatrixShape {
@@ -331,6 +333,20 @@ export function checkArtifactGate(
       }
     } else if (status === '待覆盖') {
       reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #18）`);
+    }
+  }
+
+  // ==================== NFR 双值字段校验（第24轮 P2 新增） ====================
+  // 问题 4：性能基线须区分生产目标值与测试环境基线
+  // 仅对 NFR 类型行校验（requirementId 以 NFR 开头）；非 NFR 行跳过
+  // 双字段都缺失才 fail，单字段缺失不 fail
+  for (const row of matrix.rows) {
+    if (!row || typeof row.requirementId !== 'string') continue;
+    if (!row.requirementId.startsWith('NFR')) continue;
+    const hasTarget = 'targetValue' in row && typeof row.targetValue === 'string' && row.targetValue.trim() !== '';
+    const hasThreshold = 'testThreshold' in row && typeof row.testThreshold === 'string' && row.testThreshold.trim() !== '';
+    if (!hasTarget && !hasThreshold) {
+      reasons.push(`NFR 行 ${row.requirementId} 缺 targetValue 与 testThreshold 双字段（性能基线须区分生产目标值与测试环境基线）`);
     }
   }
 

@@ -269,3 +269,26 @@ graph TD
 | `CON-001~003` | 须登记 `designDoc="横切"` | `"横切"` |
 
 > 阶段 1 门禁校验：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空。
+
+### NFR 性能基线双字段（第24轮新增）
+
+> 对应 Round 24 P2 问题 4。性能基线须区分生产目标值与测试环境基线。
+
+每个性能类 NFR 须包含以下双字段：
+
+| 字段 | 含义 | 示例 |
+|---|---|---|
+| `targetValue` | 生产目标值（生产环境须达成的指标） | `p95 响应时间 ≤ 200ms` |
+| `testThreshold` | 测试环境基线（CI/full-suite/isolated 环境的放宽阈值） | `CI 环境 p95 ≤ 400ms（生产 2 倍放宽）` |
+
+**示例 NFR 条目**：
+
+| NFR-ID | 类型 | 描述 | targetValue | testThreshold |
+|---|---|---|---|---|
+| NFR-001 | 性能 | 用户登录 API p95 响应时间 | ≤ 200ms（生产） | ≤ 400ms（CI）/ ≤ 300ms（full-suite）/ ≤ 250ms（isolated） |
+| NFR-002 | 性能 | 文章列表查询 p99 响应时间 | ≤ 500ms（生产） | ≤ 1000ms（CI）/ ≤ 800ms（full-suite）/ ≤ 600ms（isolated） |
+
+**说明**：
+- `targetValue` 是生产环境的硬性目标，未达成视为性能不达标
+- `testThreshold` 是测试环境的放宽阈值（因 CI 资源受限等），须明确声明放宽倍数与原因
+- 测试环境类型须在 `system-test.md` 的「性能度量环境声明」节中定义
