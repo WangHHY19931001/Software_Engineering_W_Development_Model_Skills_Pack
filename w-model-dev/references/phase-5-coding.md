@@ -54,7 +54,7 @@
 
 **修改前流程**：
 1. `codegraph_explore(目标符号)` → 查询 callers / callees / blast radius
-2. 落盘结果到 `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）
+2. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）
 3. 评估：修改是否波及 callers？是否需同步改 callees？
 4. 安全确认后 `Edit`/`Write` 代码
 5. （可选）修改后再查一次确认影响未意外扩大

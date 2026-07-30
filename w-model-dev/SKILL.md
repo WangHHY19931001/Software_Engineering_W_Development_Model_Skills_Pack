@@ -54,7 +54,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 17. **R3 预防性审查强制**：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](scripts/check-preventive-review.ts) 校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「R3 预防性审查分派模板」。
 18. **RTM 实体每阶段必须回填**：RTM 实体每阶段必须回填；S 子代理产出后须更新 `.w-model/rtm.json`；阶段门 CHECKPOINT 须展示 RTM 文件路径与 coverage 字段。S 子代理返回时须列出 `rtm.json` 文件路径与 coverage 百分比；coverageStatus 字段为"100%"时 coveragePercent 须 = 100，为"部分"时 coveragePercent 须 < 100，为"待覆盖" → 违反约束（回退）。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 子代理职责」。
 19. **编排者角色分派完整性**：编排者每阶段须至少分派 S/V/G 三角色各 1 次；R3 启用时须分派 R 角色（completeness/reliability/security 三阶段各 1 次）；self-as-verifier 模式下兼任时须产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON）。O 须在 CHECKPOINT 前确认 run-log 中含 role=S/V/G 各 ≥1 条记录。命中反模式 #34 一律回退到当前阶段起点补派缺失角色。详见 [references/subagent-delegation.md](references/subagent-delegation.md)「角色分派完整性校验」。
-20. **codegraph 修改前强制查询**：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 子代理须先调用宿主 Agent 的 `codegraph_explore` MCP 工具查询目标符号影响半径（callers/callees/blast radius），并将查询结果落盘到 `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）。未查询直接修改视为违反约束 #20，命中反模式 #38。codegraph 与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。详见 [references/phase-5-coding.md](references/phase-5-coding.md)「codegraph 修改前影响分析」节。
+20. **codegraph 修改前强制查询**：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 子代理须先调用宿主 Agent 的 `codegraph_explore` MCP 工具查询目标符号影响半径（callers/callees/blast radius），并将查询结果落盘到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）。未查询直接修改视为违反约束 #20，命中反模式 #38。codegraph 与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。详见 [references/phase-5-coding.md](references/phase-5-coding.md)「codegraph 修改前影响分析」节。
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
@@ -263,7 +263,6 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | security-scan.ts | pre-push / 手动安全扫描 |
 | self-test.ts | 回归基线（非阶段流程） |
 | plan-chunks.ts | ingestion 子流程分块（O 只读） |
-| **（以下脚本计划中，第25轮 Task 6-11 实现）** | |
 | ensure-codegraph-opsx.ts | 阶段 5 进入时（full）/ 6-8 进入时（quick）/ 启动时（light）—— 检测并自动安装 codegraph + OpenSpec 依赖 |
 | check-codegraph-queries.ts | 阶段 5-8 gate —— 校验 codegraph 查询落盘（反模式 #38） |
 | check-opsx-artifacts.ts | 阶段 5-8 gate —— 校验 opsx 制品 + R3/V 审查产物（反模式 #39/#40） |

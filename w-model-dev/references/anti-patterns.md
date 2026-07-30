@@ -526,12 +526,12 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **检测信号**：
 - `.w-model/codegraph-queries/` 目录不存在或为空（阶段 5-8 有代码修改但无查询记录）
-- 代码修改的 ticket 在 codegraph-queries/ 下无对应 `<phase>-<ticket>-<symbol>.json` 落盘文件
+- 代码修改的 ticket 在 codegraph-queries/ 下无对应 `phase<N>-<ticket>-<symbol>.json` 落盘文件
 - run-log 中阶段 5-8 有 action=produce（代码产出）但无 action=codegraph_query 记录
 
 **回退动作**：撤销未查询的修改，补跑 codegraph_explore 查询并落盘，重新评估影响半径后重做修改。
 
-**门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）（计划中，第25轮 Task 9-10 实现）。
+**门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）。
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #20
 
@@ -540,13 +540,13 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **危害**：opsx:explore/propose/apply 工作流步骤产物未经 R3×3（completeness/reliability/security）+ V 评审即进入下一步，导致规划缺陷或实现偏差未被发现。
 
 **检测信号**：
-- `.w-model/r3-reviews/` 下缺少 `<phase>-explore-*.md` / `<phase>-propose-*.md` / `<phase>-coding-*.md` 任一段的 3 份 R3 报告
+- `.w-model/r3-reviews/` 下缺少 `phase<N>-explore-*.md` / `phase<N>-propose-*.md` / `phase<N>-coding-*.md` 任一段的 3 份 R3 报告
 - `.w-model/v-reviews/` 下缺少对应段的 V 评审文件
 - run-log 中 opsx 步骤（action=opsx_explore/opsx_propose/opsx_apply）之间无 action=r3-completeness/r3-reliability/r3-security + role=V 记录
 
 **回退动作**：回退到缺失审查的 opsx 步骤，补跑 R3×3 + V 评审后重做后续步骤。
 
-**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）（计划中，第25轮 Task 9-10 实现）。
+**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #17（R3 预防性审查强制）
 
@@ -562,7 +562,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：补齐缺失的制品，修正职责错位的内容，重审 R3×3 + V。
 
-**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）（计划中，第25轮 Task 9-10 实现）。
+**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）
 

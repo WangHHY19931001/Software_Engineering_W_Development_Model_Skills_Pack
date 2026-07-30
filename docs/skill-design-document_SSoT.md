@@ -742,11 +742,12 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 6. **门禁扩展**：新增 `check-codegraph-queries.ts`（反模式 #38）/ `check-opsx-artifacts.ts`（反模式 #39/#40）/ `check-openspec-archive.ts`（归档完整性）。`gate-logic.ts` 阶段 5-8 增加 codegraphQueriesValid / opsxArtifactsValid / openspecArchived 三布尔校验。`run-log.schema.json` action 枚举 +6 值（codegraph_query / opsx_explore / opsx_propose / opsx_apply / opsx_archive / ensure_deps）。
 
-**实现状态（2026-07-30）**：本轮文档层（SSoT/SKILL.md/anti-patterns/references/INSTALL.md）已落地。以下为计划中、待实现单元2/3 落地：
-- 脚本：`ensure-codegraph-opsx.ts` / `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts`（Task 6-11）
-- schema：`run-log.schema.json` action 枚举扩展 +6 值（Task 8）
-- `gate-logic.ts` 阶段 5-8 三布尔校验扩展（Task 11）
-- 测试与样本（Task 17-18）
+**实现状态（2026-07-30）**：本轮全部落地并通过验证（tsc 0 错误 / self-test 191 通过 / vitest 201 通过）：
+- 文档层：SSoT §3.4.21 + §3.3、SKILL.md 约束#20 + Bundled Resources + 阶段路由、anti-patterns #38/#39/#40、phase-5/6/7/8 + subagent-delegation、INSTALL.md
+- 脚本层：`ensure-codegraph-opsx.ts` / `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts`（4 个新脚本）
+- schema 层：`run-log.schema.json` action 枚举 +6 值
+- 逻辑层：`gate-logic.ts` +codegraphQueriesValid / opsxArtifactsValid / openspecArchived（externalChecks 参数）
+- 测试层：41 样本文件 + self-test 7 新用例（3 组 CASES + 3 runner）
 
 **不涉及范围**：不修改约束 #1-#19 既有语义；不修改阶段 1-4 流程（仍是 A/S-doc/S-tla/S-bdd）；不内置 codegraph/opsx 调用（依赖宿主 Agent）；codegraph auto-sync 保持开启不手动管理图谱新鲜度。
 
