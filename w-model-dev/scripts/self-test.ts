@@ -316,6 +316,13 @@ const GATE_CASES: GateCase[] = [
     expectedReasonPatterns: [/coverageStatus.*不一致/],
     description: 'RTM coverageStatus="100%" 但 coveragePercent=66%，应被 coverageStatus 一致性校验拦截',
   },
+  // -------------------- 第24轮 P2 NFR 双值校验 --------------------
+  {
+    file: 'bad-nfr-missing-dual-fields.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/NFR 行 NFR-001 缺 targetValue 与 testThreshold/],
+    description: 'NFR-001 行缺 targetValue + testThreshold 双字段，应被 NFR 双值校验拦截',
+  },
 ];
 
 interface GraphCase {

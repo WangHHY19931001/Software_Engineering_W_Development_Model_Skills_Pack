@@ -24,7 +24,9 @@
       "integrationTest": null,
       "systemTest": null,
       "acceptanceTest": null,
-      "coverageStatus": "完整"
+      "coverageStatus": "完整",
+      "targetValue": "P95 ≤ 200ms（生产环境）",
+      "testThreshold": "P95 ≤ 250ms（测试环境基线）"
     }
   ],
   "executionSummary": {
