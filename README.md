@@ -18,7 +18,7 @@
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评
 - **Agent Personas（评审角色提示词，V 子代理执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由 V 子代理在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
-- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 37 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失 / #30 豁免审批跳步 / #31 归档完整性缺失 / #32 签名链断裂 / #33 跳过 R3 预防性审查 / #34 编排者漏派角色 / #35 self-as-verifier 模式下 V/G/R 产物混合 / #36 路由顺序错误 / #37 产物膨胀但核心决策稀疏）二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 40 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失 / #30 豁免审批跳步 / #31 归档完整性缺失 / #32 签名链断裂 / #33 跳过 R3 预防性审查 / #34 编排者漏派角色 / #35 self-as-verifier 模式下 V/G/R 产物混合 / #36 路由顺序错误 / #37 产物膨胀但核心决策稀疏） / #38 修改前未查询 codegraph / #39 跳过 opsx 产物审查 / #40 opsx/S-tickets 职责混淆二分；F# 重复命中 ≥2 次升级为 L# 教训
 - **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
@@ -31,6 +31,8 @@
 - **Loop 3 事件驱动循环**（L2+ 激活）：棕地维护场景的事件接驳——消费方自行实现 webhook/cron 触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（bug 修复/需求变更/验收重跑/回归测试/安全事件）。不内置调度基础设施。详见 [event-ingress-guide.md](w-model-dev/references/event-ingress-guide.md)。
 - **Loop 4 爬坡循环**：分析 run-log 产出 HarnessImprovementReport 改进信号（prompt/工具/验证规则/反模式/成熟度/预算 6 类），人审后手动应用。保持"技能自演化不在本仓库"原则——外部 SkillOpt/darwin-skill 消费信号做演化。详见 [hill-climbing-guide.md](w-model-dev/references/hill-climbing-guide.md)。
 - **SkillOpt 方法论吸收**：吸收 [microsoft/SkillOpt](https://github.com/microsoft/SkillOpt)「bounded edit + validation gate」方法论，消费 Loop 4 产出的 HarnessImprovementReport 信号，对技能/模板/参考/脚本 4 类资产做离线进化。不引入 Python 依赖、不调用 LLM（方法论吸收非工具运行，与 §11 协调）。详见 [skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md)。
+- **codegraph 修改前影响分析**（阶段 5-8，第 25 轮新增）：S-coding 子代理在 Edit/Write 任何代码/测试文件前，须先调用 codegraph_explore MCP 工具查询目标符号的 callers/callees/blast radius，结果落盘 `.w-model/codegraph-queries/`。与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。详见 [phase-5-coding.md](./w-model-dev/references/phase-5-coding.md)「codegraph 修改前影响分析」节
+- **OpenSpec opsx 三段式 S 分派**（阶段 5-8，第 25 轮新增）：引入 opsx:explore/propose/apply/archive 规格驱动变更工作流，S-explore（思路探索+codegraph 影响初判）→ S-propose（规格级变更规划+S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码）。每段产物跑 R3×3（completeness/reliability/security）+ V 评审，不合格打回重做。详见 [phase-5-coding.md](./w-model-dev/references/phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节
 
 ## 架构原则与外部工具边界
 
@@ -43,6 +45,8 @@
 | LLM-as-a-Verifier 评审（三维度 / 连续评分 / PPT / 子标准） | 技能内提供提示词与 Schema，外部 Agent 执行 | `w-model-dev/references/verifier-spec.md` + `scripts/check-verifier-output.ts` |
 | LLM 推理本身 | 外部 | 由外部 Agent（Trae / Claude / Cursor 等）自行调用其 LLM |
 | 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估） | 外部（工具运行）+ 技能内（方法论吸收） | 工具运行：[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)；方法论吸收：[skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md)（§10H） |
+| codegraph（符号级影响分析）| 外部（MCP 工具）| 宿主 Agent MCP 工具 `codegraph_explore`，阶段 5-8 修改前预防查询 |
+| OpenSpec opsx（规格驱动变更管理）| 外部（CLI 工具）| 宿主 Agent CLI `/opsx:explore` `/opsx:propose` `/opsx:apply` `/opsx:archive`，阶段 5-8 规划层 |
 
 详见 SSoT [§3.3 技能架构原则与外部工具边界](./docs/skill-design-document_SSoT.md)。
 

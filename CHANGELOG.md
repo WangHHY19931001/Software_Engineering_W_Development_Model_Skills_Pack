@@ -3,6 +3,38 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [24.0.0] - 2026-07-30
+
+### 第二十五轮 codegraph + OpenSpec 集成（修改前影响分析 + 规格驱动变更管理 + 三段式 S 分派）
+
+阶段 5 起引入 codegraph（100% 本地符号级 callers/callees/blast radius 查询，修改前预防）与 OpenSpec opsx（opsx:explore/propose/apply/archive 规格驱动变更工作流，任务规划层）。新增约束 #20 + 反模式 #38/#39/#40 + 4 个新脚本 + gate-logic 三布尔扩展 + run-log action 枚举 +6 值。详见 SSoT §3.4.21。
+
+#### Added
+- 新增约束 #20（codegraph 修改前强制查询）：阶段 5-8 任何代码/测试文件 Edit/Write 前，S-coding 须先调用 codegraph_explore MCP 工具查询目标符号影响半径，结果落盘 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`
+- 新增反模式 #38（修改前未查询 codegraph）/ #39（跳过 opsx 产物审查）/ #40（opsx/S-tickets 职责混淆）
+- 新增脚本：`ensure-codegraph-opsx.ts`（三层依赖检测 L1 CLI / L2 MCP / L3 项目目录 + 自动安装，full/quick/light 三模式）
+- 新增脚本：`check-codegraph-queries.ts`（反模式 #38 校验：codegraph 查询落盘完整性）
+- 新增脚本：`check-opsx-artifacts.ts`（反模式 #39/#40 校验：opsx 制品 + R3×3 + V 审查产物齐全）
+- 新增脚本：`check-openspec-archive.ts`（opsx:archive 归档完整性校验）
+- 新增 schema：`run-log.schema.json` action 枚举 +6 值（codegraph_query / opsx_explore / opsx_propose / opsx_apply / opsx_archive / ensure_deps）
+- 新增样本：41 个（codegraph-queries 3 组 + opsx-artifacts 2 组 + openspec-archive 2 组）
+- 新增 self-test 用例：7 条（3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive）
+- 新增参考指南节：phase-5-coding.md「codegraph 修改前影响分析」+「OpenSpec opsx 三段式 S 分派」节；phase-6/7/8 各新增「第 25 轮新增：opsx 三段式 + codegraph」节；subagent-delegation.md「阶段 5-8 S 三段式变体」节
+- 新增 INSTALL.md「codegraph + OpenSpec 自动安装」节
+- SSoT §3.3 外部工具边界新增 codegraph + OpenSpec 登记
+
+#### Changed
+- `gate-logic.ts`：ArtifactGateResult 新增 3 可选布尔字段（codegraphQueriesValid / opsxArtifactsValid / openspecArchived）+ CheckArtifactGateOptions 新增 externalChecks 参数（phase ≥ 5 时读取，保持纯逻辑可测试性）
+- `SKILL.md` Bundled Resources scripts 表新增 4 个脚本；阶段路由表阶段 5-8 追加 opsx+codegraph 标记
+- self-test 基线：184 → 191（+3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive）
+- 版本号三处同步为 24.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+
+#### Validation
+- TypeScript strict: 0 错误
+- self-test: 191/191 全通过
+- vitest: 201/201 全通过
+- 约束 #20 + 反模式 #38/#39/#40 编号连续无冲突
+
 ## [23.0.0] - 2026-07-30
 
 ### 第二十四轮 P0-P3 技能包十项修正（RTM 回填 + 角色分派 + R3 实执行 + 状态机一致性 + self-as-verifier + NFR 双字段 + 路由顺序 + 图谱边数 + 门禁 stdout + 信息密度）
