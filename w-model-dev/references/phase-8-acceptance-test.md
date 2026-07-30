@@ -105,6 +105,12 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中核验：所有需求 → 设计 → 代码 → 单元 / 集成 / 系统 / 验收测试均建立映射，RTM 需求覆盖率 100%。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
+**门禁脚本 stdout 贴出要求**（第24轮新增）：
+- 编排者须贴出 `check-artifact-gate.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` / `check-bdd-model.ts` / `check-role-dispatch.ts` 等门禁脚本 stdout 末尾 5 行作为放行证据
+- 不得仅引用 JSON 摘要中的 `passed: true` 作为放行依据
+- 违反命中反模式 #27 S2（门禁脚本未实跑）
+- 约束 #10 已扩展：编排者展示证据时须贴出门禁脚本 stdout 末尾 5 行
+
 ## 验收标准
 
 - [ ] 所有验收测试用例通过
