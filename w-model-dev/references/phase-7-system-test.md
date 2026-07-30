@@ -24,6 +24,17 @@
 - **性能测试脚本生成**：负载 / 压力 / 稳定性
 - **安全漏洞检测**：常见攻击向量扫描
 
+## 第 25 轮新增：opsx 三段式 S 分派 + codegraph 影响分析
+
+> 对应 SSoT §3.4.21。本阶段（系统测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
+
+**三段式分派**（与阶段 5 一致）：
+- S-explore：opsx:explore 探索测试策略 + codegraph 查被测模块影响
+- S-propose：opsx:propose 规划测试用例 + S-tickets 拆解测试代码切片
+- S-coding：按 tickets.md frontier 逐片编写测试，每片 codegraph_explore 查被测模块影响半径
+
+**约束 #20 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
+
 ## 测试用例设计（执行）
 
 | 用例 ID | 测试场景 | 输入 | 预期输出 | 优先级 |
