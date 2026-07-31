@@ -37,6 +37,7 @@ export interface RunLogEntry {
     | 'rollback'
     | 'rootcause'
     | 'fix'
+    | 'emergency-fix'
     | 'r3-completeness'
     | 'r3-reliability'
     | 'r3-security';
@@ -261,9 +262,12 @@ export function checkRunLog(
     );
   }
 
-  // ==================== R3 预防性审查记录校验（第22轮新增） ====================
-  // 校验：每个阶段的 S→V 之间须有 3 条 R3 记录（completeness/reliability/security）
+  // ==================== R3 预防性审查记录校验（第22轮新增，第29轮升级） ====================
+  // 第29轮升级：R3 无条件强制，覆盖所有 S 变体（含 S-fix / S-emergency-fix）。
+  // 校验：每个阶段的 S(任意变体)→V 之间须有 3 条 R3 记录（completeness/reliability/security）。
+  // S 变体识别：produce（标准）/ fix（返工）/ emergency-fix（紧急修复）。
   const r3Dimensions = ['completeness', 'reliability', 'security'];
+  const S_VARIANTS = ['produce', 'fix', 'emergency-fix'];
   const phaseEntries = new Map<number, Array<{ role: string; action: string }>>();
 
   for (const entry of valid) {
@@ -273,23 +277,33 @@ export function checkRunLog(
   }
 
   for (const [phase, entryList] of phaseEntries) {
-    // 查找 S 产出和 V 评审的位置
-    let sIndex = -1, vIndex = -1;
+    // 查找每条 S 变体产出后紧跟的下一条 V 评审，校验其间是否有 3 条 R3 记录。
+    // 一个阶段可能有多个 S 变体（如 produce 后返工 fix），每个 S→V 段都须独立有 3 条 R3。
     for (let i = 0; i < entryList.length; i++) {
       const item = entryList[i];
       if (!item) continue;
-      if (item.role === 'S' && item.action === 'produce') sIndex = i;
-      if (item.role === 'V' && item.action === 'review' && sIndex >= 0 && vIndex === -1) vIndex = i;
-    }
-    if (sIndex >= 0 && vIndex > sIndex) {
-      // 检查 S→V 之间是否有 3 条 R3 记录
-      const r3Records = entryList.slice(sIndex + 1, vIndex).filter(
-        e => e.role === 'R' && r3Dimensions.some(d => e.action.includes(d)),
-      );
-      if (r3Records.length < 3) {
-        violations.push(
-          `R3 记录校验失败：阶段 ${phase} 的 S→V 之间仅有 ${r3Records.length} 条 R3 记录，须有 3 条（completeness/reliability/security）`,
-        );
+      if (item.role === 'S' && S_VARIANTS.includes(item.action)) {
+        const sVariant = item.action;
+        // 找该 S 之后第一条 V review
+        let vIndex = -1;
+        for (let j = i + 1; j < entryList.length; j++) {
+          const candidate = entryList[j];
+          if (!candidate) continue;
+          if (candidate.role === 'V' && candidate.action === 'review') {
+            vIndex = j;
+            break;
+          }
+        }
+        if (vIndex > i) {
+          const r3Records = entryList.slice(i + 1, vIndex).filter(
+            e => e.role === 'R' && r3Dimensions.some(d => e.action.includes(d)),
+          );
+          if (r3Records.length < 3) {
+            violations.push(
+              `R3 记录校验失败：阶段 ${phase} 的 S(${sVariant})→V 之间仅有 ${r3Records.length} 条 R3 记录，须有 3 条（completeness/reliability/security）`,
+            );
+          }
+        }
       }
     }
   }

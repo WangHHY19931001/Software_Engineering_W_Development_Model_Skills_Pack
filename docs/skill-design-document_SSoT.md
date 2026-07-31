@@ -655,6 +655,8 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 1. **S→R3→V→G 预防性审查流程**：所有阶段 S 产出后、V 评审前强制插入三阶段 R 预防性审查（R3），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。R-完整性（字段齐全/模板套用/RTM 登记/demo 范围边界/N-A 标记/uat-path-mapping 回填）/ R-可靠性（TLA+/BDD 等价性/状态机一致性/接口契约/字段命名业务语义对齐/设计项装配点与测试 seam 一致性）/ R-安全性（输入校验/鉴权/越权/敏感信息/限流装配/密码哈希）。与返工 R 区别：返工 R 在 V/G 不通过后触发定位根因，R3 在 S 产出后主动触发预防性审查。V 须读取 R3 报告纳入 reworkHints，跳过 R3 直接进入 V 评审命中反模式 #33。新增约束 #17（R3 预防性审查强制）+ 反模式 #33（跳过 R3 预防性审查）。
 
+   **第29轮升级（§3.4.25）**：R3 从「条件强制」升级为「**无条件强制**」，覆盖**所有 S 变体**（S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**）。移除 `--r3-enabled` flag 语义（CLI 保留向后兼容视为 no-op）。紧急修复通道从「事后 R 复核」改为「前置 R3×3 + V + G」。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json`。新增反模式 #42（S-fix / emergency-fix 后跳过 R3+V）；强化 #33/#34（移除「启用时」措辞）；扩展 #35（含 R3 产物混合）。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。
+
 2. **R3 分派模板**：`subagent-delegation.md` 新增「R3 预防性审查分派模板」节，定义 R3 子代理输入（当前阶段产物路径 / 上游产物 / 审查维度）、产出（三份 PreventiveReview JSON）、与返工 R 的属性对比表、V 评审参考方式。R3 三阶段可并行分派。
 
 3. **demo 范围声明（R3 完整性维度覆盖）**：不新增 `project.json.demoScope` 字段（按用户决策）。S-doc 产出需求规格时须在 `Out of Scope` 节显式声明 demo 范围外子系统，验收测试设计须对照 Out of Scope 标记 N/A 用例（附注释说明缺失端点名和原因）。R3 完整性维度校验 N/A 用例与 Out of Scope 声明一致性。
@@ -708,7 +710,11 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 2. **P0.2 问题 9 编排者角色分派不严**：新增约束 #19「编排者每阶段须至少分派 S/V/G 三角色各 1 次；R3 启用时须分派 R 角色；self-as-verifier 模式下兼任时须产出各角色独立产物文件」。新增反模式 #34「编排者漏派角色——run-log 中某阶段缺 role=V 或 role=G 记录」。新增 `check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录，R3 启用时含 R ≥3 条记录（completeness/reliability/security）。`run-log.schema.json` role 字段枚举增加每阶段至少含 S/V/G 各 1 条校验。`subagent-delegation.md` 新增「角色分派完整性校验」节。
 
+   **第29轮升级（§3.4.25）**：约束 #19 中「R3 启用时须分派 R 角色」升级为「**无条件须分派 R 角色 ≥3 次**」。`check-role-dispatch.ts` 移除 `--r3-enabled` 参数语义（R≥3 无条件校验，CLI 保留 flag 向后兼容视为 no-op），纯逻辑抽离至 `role-dispatch-logic.ts`。反模式 #34 强化（移除「启用时」措辞）。
+
 3. **P1.3 问题 3 R3 未实执行**：约束 #12 闭环机制强制校验 4 脚本扩展为 5 脚本（增加 `check-preventive-review.ts`，R3 启用时）。`check-run-log.ts` R1-R7 规则增加 R8「R3 启用时，run-log 中 S→V 之间须含 3 条 role=R 记录（completeness/reliability/security）」。`check-preventive-review.ts` 增加 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告。`phase-1-requirements.md` §R3 完整性维度校验增加 check-preventive-review.ts 须在 V 评审前由 G 子代理执行，exitCode=0 方可进入 V 评审。
+
+   **第29轮升级（§3.4.25）**：约束 #12 删除「（R3 启用时）」字样，5 脚本无条件强制。R8 规则从「R3 启用时」改为「**无条件**」，并扩展覆盖 `action=fix` / `action=emergency-fix`（S-fix / S-emergency-fix → V 之间也须有 3 条 R3 记录）。`check-preventive-review.ts` 新增 `--variant=standard|fix|emergency` 参数，支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json` 路径校验。
 
 4. **P1.4 问题 6 状态机一致性无校验**：新增 `check-state-machine-consistency.ts`：解析 `detailed-design.md` 中的状态转移表（Markdown 表格）与 `src/state-machines/*.ts` 中的 TRANSITIONS 定义，校验状态集 + 转移集一致。`tla-plus-guide.md` 新增「设计文档 ↔ 代码状态机一致性」节（校验范围 / 豁免条件 / 误报处理）。samples 新增 state-machine/ 目录（bad-missing-transition / bad-extra-transition / valid-consistent）。现有脚本校验"代码↔TLA+"，本脚本补"设计文档↔代码"维度。
 
@@ -853,6 +859,36 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 **版本号**：三处同步 27.0.0（package.json + skill-metadata.json + SKILL.md frontmatter），与 CHANGELOG [27.0.0] / SSoT §3.4.24 / AGENTS.md §4 一致。
 
 **不涉及范围**：不新增反模式（41 条不变）；不新增 schema 文件；不新增 check 脚本（现有脚本行为修复）。
+
+---
+
+#### 3.4.25 第 29 轮：S→R3+V 无条件强制（覆盖所有 S 变体，含 S-fix / emergency-fix）（2026-07-31）
+
+> 触发：用户指令「强化技能设计，任意方式派遣 S 子代理后必须派遣 R+V 子代理进行分析，不允许任何意外」。设计 spec：[`docs/superpowers/specs/2026-07-31-round29-s-r3-v-unconditional-design.md`](./superpowers/specs/2026-07-31-round29-s-r3-v-unconditional-design.md)。实施 plan：[`docs/superpowers/plans/2026-07-31-round29-s-r3-v-unconditional.md`](./superpowers/plans/2026-07-31-round29-s-r3-v-unconditional.md)。核心目标：将 R3 预防性审查从「条件强制（--r3-enabled flag）」升级为「无条件强制」，覆盖所有 S 变体，堵死 S-fix / emergency-fix 跳过 R3+V 的漏洞。版本号目标 28.0.0。
+
+1. **R3 无条件强制（升级 §3.4.18 约束 #17）**：R3 预防性审查从「条件强制」升级为「**无条件强制**」。每个 S 派遣（任意变体）后必须派遣 R3×3（completeness/reliability/security）+ V，顺序 `S → R3×3 → V → G`，无例外，无 flag，无「启用时」措辞。覆盖**全部 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。
+
+2. **紧急修复通道调整**：emergency-fix 通道从「修复时记 needsReview=true，阶段完成后由 R 复核」（事后复核）改为「前置 R3×3 + V + G」。移除 `emergencyFixReview` 字段 + 「阶段完成后由 R 复核」条款。emergency-fix 仍保留 `variant=emergency-fix` + `blocker` 字段用于 run-log 审计，仅作为「为何走紧急通道」的说明，不再意味跳过审查。
+
+3. **check-role-dispatch.ts 升级**：移除 `--r3-enabled` 参数语义（R≥3 无条件校验，CLI 保留 flag 向后兼容视为 no-op）。纯逻辑抽离至新建 `role-dispatch-logic.ts`（与 run-log-logic.ts / preventive-review-logic.ts 一致的自包含纯函数模式）。JSON 输出 `r3Enabled` 字段恒为 `true`（向后兼容历史消费者）。缺失 R<3 即 violations，exitCode=1。
+
+4. **check-preventive-review.ts 升级**：always-on 无 flag。新增 `--variant=standard|fix|emergency` 参数（默认 standard）。报告路径校验扩展：standard `<phase>-{dim}.json` / fix `<phase>-fix-{dim}.json` / emergency `<phase>-emergency-{dim}.json`。`--auto-trigger` 模式从 run-log 推断 variant（扫描最近一条 `action=fix` → fix；`action=emergency-fix` → emergency；否则 standard）。纯逻辑层 `preventive-review-logic.ts` 新增 `PreventiveReviewOptions.variant` 参数。
+
+5. **check-run-log.ts R8 升级**：R8 规则从「R3 启用时，S→V 间须有 3 条 R3 记录」改为「**无条件**，S→V 间须有 3 条 R3 记录」。S 识别条件从 `action=produce` 扩展为 `['produce', 'fix', 'emergency-fix']`（覆盖 S-fix / S-emergency-fix）。RunLogEntry.action 联合类型新增 `'emergency-fix'`。违规信息含 S 变体标识：`S(${sVariant})→V`。
+
+6. **反模式强化与新增**：
+   - **#33 强化**（跳过 R3 预防性审查）：移除「启用时」措辞，覆盖所有 S 变体（含 S-fix / S-emergency-fix）。
+   - **#34 强化**（编排者漏派角色）：「R3 启用时须分派 R 角色 ≥3 次」改为「无条件须分派 R 角色 ≥3 次」。
+   - **#35 扩展**（self-as-verifier 模式下产物混合）：产物混合清单新增「PreventiveReview JSON 须独立产出，不得与 S 产出混合」。
+   - **#42 新增**（S-fix / emergency-fix 后跳过 R3+V）：症状为 S-fix/emergency-fix 产出后未派 R3×3 + V 直接 G/放行；检测信号为 run-log `action=fix`/`emergency-fix` 后无 R3 直接 V/G；回退为补跑 R3×3 + V。
+
+7. **文档层同步**：SKILL.md 约束 #12（删除「（R3 启用时）」）/ #17（删除「启用时」+ 新增含 S-fix / emergency-fix）/ #19（删除「R3 启用时须分派 R 角色」改为「无条件」）；subagent-delegation.md「R3 预防性审查分派模板」节删除「启用时」、「角色分派完整性校验」表 R 行必分派条件改为「无条件必须」、「S 兼 F 修复分派模板（返工变体）」节新增 R3+V 前置、「S 子代理修改既有产物的边界」节紧急修复通道改前置；anti-patterns.md #33/#34/#35 强化 + #42 新增；phase-1~8-*.md 统一删除「启用时」措辞。
+
+**不涉及范围**：不修改 R3 三维度本身（completeness/reliability/security 保持）；不修改 V 评审 Schema（`verifier-output.schema.json` 不变）；不引入新 R3 维度；不取消 self-as-verifier 兼任豁免（各角色产物文件独立即可，R3 不可省略）；不修改返工 R（root cause locator）机制——R3 与返工 R 仍是两个角色变体，本轮只升级 R3。
+
+**实现状态（2026-07-31）**：[待实施完成后回填 self-test/vitest/prepush 数值]。
+
+**版本号**：三处同步 28.0.0（package.json + skill-metadata.json + SKILL.md frontmatter），与 CHANGELOG [28.0.0] / SSoT §3.4.25 / AGENTS.md §4 一致。
 
 ---
 

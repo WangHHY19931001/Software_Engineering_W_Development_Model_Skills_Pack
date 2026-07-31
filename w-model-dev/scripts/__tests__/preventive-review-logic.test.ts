@@ -35,3 +35,46 @@ describe('checkPreventiveReview', () => {
     expect(result.reasons.some(r => r.includes('phase 不一致'))).toBe(true);
   });
 });
+
+describe('checkPreventiveReview: variant 选项（第29轮 S-fix/emergency）', () => {
+  it('variant=fix 时三份齐备应通过（逻辑层不依赖 variant）', () => {
+    const reviews: Record<string, PreventiveReview> = {
+      completeness: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'completeness', findings: [], passed: true },
+      reliability: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'reliability', findings: [], passed: true },
+      security: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'security', findings: [], passed: true },
+    };
+    const r = checkPreventiveReview(reviews, 5, { variant: 'fix' });
+    expect(r.passed).toBe(true);
+  });
+
+  it('variant=emergency 时三份齐备应通过', () => {
+    const reviews: Record<string, PreventiveReview> = {
+      completeness: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'completeness', findings: [], passed: true },
+      reliability: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'reliability', findings: [], passed: true },
+      security: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'security', findings: [], passed: true },
+    };
+    const r = checkPreventiveReview(reviews, 5, { variant: 'emergency' });
+    expect(r.passed).toBe(true);
+  });
+
+  it('variant=standard（默认）三份齐备应通过', () => {
+    const reviews: Record<string, PreventiveReview> = {
+      completeness: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'completeness', findings: [], passed: true },
+      reliability: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'reliability', findings: [], passed: true },
+      security: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'security', findings: [], passed: true },
+    };
+    const r = checkPreventiveReview(reviews, 5);
+    expect(r.passed).toBe(true);
+  });
+
+  it('variant=fix 时缺 security 仍应失败（逻辑层校验不变）', () => {
+    const reviews: Record<string, PreventiveReview | null> = {
+      completeness: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'completeness', findings: [], passed: true },
+      reliability: { reviewedAt: '2026-07-31T00:00:00Z', reviewer: 'R', phase: 5, dimension: 'reliability', findings: [], passed: true },
+      security: null,
+    };
+    const r = checkPreventiveReview(reviews, 5, { variant: 'fix' });
+    expect(r.passed).toBe(false);
+    expect(r.reasons.some(msg => /security.*未找到/.test(msg))).toBe(true);
+  });
+});

@@ -69,7 +69,7 @@ import {
 } from './bdd-logic.js';
 import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
-import { checkRoleDispatch } from './check-role-dispatch.js';
+import { checkRoleDispatch } from './role-dispatch-logic.js';
 import { checkStateMachineConsistency } from './check-state-machine-consistency.js';
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
 import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
@@ -985,7 +985,6 @@ const TLA_BDD_SYNC_CASES: TlaBddSyncCase[] = [
 
 interface RoleDispatchCase {
   file: string;
-  r3Enabled: boolean;
   expectedPassed: boolean;
   expectedReasonPatterns?: RegExp[];
   description: string;
@@ -994,24 +993,21 @@ interface RoleDispatchCase {
 const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
   {
     file: 'bad-missing-V-role.jsonl',
-    r3Enabled: false,
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=V/],
     description: '阶段 1 缺 role=V 评审记录，应被角色分派校验拦截（约束 #19）',
   },
   {
     file: 'bad-missing-G-role.jsonl',
-    r3Enabled: false,
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=G/],
     description: '阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #19）',
   },
   {
     file: 'bad-missing-R-role.jsonl',
-    r3Enabled: true,
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=R/],
-    description: 'R3 启用但阶段 1 仅有 1 条 R3 记录（缺 reliability/security），应被拦截',
+    description: '阶段 1 仅有 1 条 R3 记录（缺 reliability/security），第29轮 R3 无条件强制应被拦截',
   },
 ];
 
@@ -2111,7 +2107,7 @@ async function runRoleDispatchCases(samplesDir: string): Promise<CaseResult[]> {
         .map(l => l.trim())
         .filter(l => l.length > 0)
         .map(l => JSON.parse(l) as Record<string, unknown>);
-      const r = checkRoleDispatch(entries as Parameters<typeof checkRoleDispatch>[0], c.r3Enabled);
+      const r = checkRoleDispatch(entries as Parameters<typeof checkRoleDispatch>[0]);
       if (r.passed !== c.expectedPassed) {
         details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
       }
