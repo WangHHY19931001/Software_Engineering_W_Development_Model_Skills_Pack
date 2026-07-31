@@ -781,3 +781,32 @@ export function checkRequirementGraph(
   result.warnings = warnings;
   return result;
 }
+
+/**
+ * 重新计算 passed（供 CLI 层在 violations 变更后调用，保持与 checkRequirementGraph 一致）。
+ * @param result 已填充的 GraphCheckResult（violations 可能已变更）
+ * @param isPhase1PureReq 是否为 phase=1 纯 REQ 图（多 group 模式允许 roots.length >= 1）
+ */
+export function recalculatePassed(result: GraphCheckResult, isPhase1PureReq: boolean): void {
+  const tv = result.traceabilityViolations;
+  const traceabilityOk =
+    tv.SD_without_implements === 0 &&
+    tv.INTF_without_defines === 0 &&
+    tv.DD_without_realizes === 0;
+  const dv = result.dataflowViolations;
+  const dataflowOk =
+    dv.blackHoles.length === 0 &&
+    dv.miracles.length === 0 &&
+    dv.deadModules.length === 0 &&
+    result.boundary.complete;
+  const rootsOk = isPhase1PureReq ? result.roots.length >= 1 : result.roots.length === 1;
+  result.passed =
+    result.connectedComponents === 1 &&
+    result.isolatedNodes.length === 0 &&
+    rootsOk &&
+    result.orphans.length === 0 &&
+    result.multiParent.length === 0 &&
+    traceabilityOk &&
+    dataflowOk &&
+    result.violations.length === 0;
+}

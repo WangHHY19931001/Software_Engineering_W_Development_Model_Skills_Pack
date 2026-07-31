@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { checkRequirementGraph, type GraphShape } from '../graph-logic.js';
+import { checkRequirementGraph, recalculatePassed, type GraphShape, type GraphCheckResult } from '../graph-logic.js';
 
 describe('R1-R6 四维识别校验', () => {
   // ==================== R1-R4: REQ 层级树 ====================
@@ -401,5 +401,77 @@ describe('[21.0.0] R11 level 正整数校验', () => {
     const result = checkRequirementGraph(graph, 1);
     expect(result.passed).toBe(false);
     expect(result.violations.length).toBeGreaterThan(0);
+  });
+});
+
+// ==================== recalculatePassed（round28 C1/C2） ====================
+describe('recalculatePassed（round28 G-C）', () => {
+  it('C1: 新增 violation 后 passed 应变为 false', () => {
+    const graph: GraphShape = {
+      version: 1,
+      currentPhase: 1,
+      nodes: [
+        { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
+        { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+        { id: 'NFR-001', type: 'REQ', phase: 1, title: '横切NFR', summary: '' },
+      ],
+      edges: [
+        { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+        { from: 'NFR-001', to: 'REQ-002', type: 'cross-cuts' },
+      ],
+    };
+    const result = checkRequirementGraph(graph, 1);
+    // 初始应通过（R6 cross-cuts target type OK，NFR→REQ）
+    expect(result.passed).toBe(true);
+    // 模拟 CLI --rtm R6 检查发现 cross-cuts 源非 NFR/CON 行
+    result.violations.push('R6 cross-cuts 源类型校验失败：NFR-001 非 NFR/CON 行');
+    result.crossLogic!.crossCutsSourceTypeViolations.push('NFR-001→REQ-002（源 NFR-001 非 NFR/CON 行）');
+    recalculatePassed(result, false);
+    expect(result.passed).toBe(false);
+  });
+
+  it('C2: 多 group 纯 REQ 图重算 passed 应接受 roots.length >= 1', () => {
+    const graph: GraphShape = {
+      version: 1,
+      currentPhase: 1,
+      nodes: [
+        { id: 'REQ-001', type: 'REQ', phase: 1, title: '域A', summary: 'level=1', level: 1 },
+        { id: 'REQ-002', type: 'REQ', phase: 1, title: '域B', summary: 'level=1', level: 1 },
+        { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+        { id: 'REQ-004', type: 'REQ', phase: 1, title: '模块B', summary: 'level=2', level: 2, reqGroup: 'REQ-002' },
+      ],
+      edges: [
+        { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
+        { from: 'REQ-002', to: 'REQ-004', type: 'parent' },
+        { from: 'REQ-001', to: 'REQ-002', type: 'collaborates-with' },
+      ],
+    };
+    const result = checkRequirementGraph(graph, 1);
+    // 多 group 纯 REQ 图应通过
+    expect(result.passed).toBe(true);
+    expect(result.roots.length).toBe(2);
+    // 模拟豁免对 R3 违规的过滤（实际无 R3 违规，但重算应保持通过）
+    recalculatePassed(result, true);
+    expect(result.passed).toBe(true);
+  });
+
+  it('C2: 非纯 REQ 图重算 passed 仍要求 roots.length === 1', () => {
+    const result: GraphCheckResult = {
+      passed: false,
+      phase: 2,
+      totalNodes: 4,
+      totalEdges: 3,
+      connectedComponents: 1,
+      isolatedNodes: [],
+      roots: ['REQ-001', 'REQ-002'],
+      orphans: [],
+      multiParent: [],
+      traceabilityViolations: { SD_without_implements: 0, INTF_without_defines: 0, DD_without_realizes: 0 },
+      dataflowViolations: { blackHoles: [], miracles: [], deadModules: [] },
+      boundary: { extIn: 1, extOut: 1, complete: true },
+      violations: [],
+    };
+    recalculatePassed(result, false);
+    expect(result.passed).toBe(false);
   });
 });
