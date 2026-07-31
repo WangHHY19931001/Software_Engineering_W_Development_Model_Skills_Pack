@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 24.0.0
+version: 25.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -68,14 +68,14 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **角色划分（O / S / V / G / A / R）**：
 
-| 角色 | 简称 | 职责 | 关键禁止 |
+| 角色 | 简称 | 职责 | 关键职责 + 脚本不变式（第 26 轮 Negation 审计：正向动作替代纯否定） |
 |---|---|---|---|
-| 编排者 | O | 路由 / 状态读写 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本 | 写产物 / .tla/.cfg/tla-manifest.json 实体 / 产出评审 JSON / 改 RTM 实体 / 生成代码 / 跳过 S→V→G |
-| 产出子代理 | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体；**F（修复者）由 S 兼任**——返工时携带 R 报告执行修复 | 跑门禁脚本 / 越阶段产出 / 改 project.status |
-| 评审子代理 | V | 按 [references/agent-personas.md](references/agent-personas.md) + [references/verifier-spec.md](references/verifier-spec.md) §8 产出 `VerifierOutput` JSON | 跑门禁脚本 / 改产物 / 改 RTM |
-| 门禁子代理 | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | 改产物 / 产出评审 JSON / 改 RTM / 跑测试运行器 |
-| 分析子代理 | A | 分块分析、交叉合并、图谱演进（阶段 1–4）；产出 `.w-model/ingestion/*` 与 `consolidated.json` | 跑 `check-requirement-graph.ts` / 写正式阶段产物 / 改 `project.status` / 越阶段产出 / 删除前阶段图谱节点 |
-| 根因定位子代理 | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`（含根因链 + 修复建议 + 防御措施 + `upstreamDefect` 标记）；可作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 改任何产物文件（由 S 修复）/ 跑门禁脚本（由 G 负责）/ 改 RTM 实体 / 改 `project.status` / 跨阶段定位（仅当前阶段产物 + 上游回溯标记）/ 评审其他角色产出 |
+| 编排者 | O | 路由 / 状态读写 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本 | 职责：只做编排，不实施任何产物动作。不变式：`check-role-dispatch.ts` 强制每阶段 S/V/G 各 ≥1 条（约束 #19）；越权实施命中反模式 #10（回退当前阶段起点） |
+| 产出子代理 | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体；**F（修复者）由 S 兼任**——返工时携带 R 报告执行修复 | 职责：产出阶段产物 + 回填 RTM（约束 #18）+ 签名链 `inputProvenance` 来源证明。不变式：`check-signature-chain.ts` R3 校验来源（反模式 #32）；`check-run-log.ts` R7 校验时序；越界跑门禁/改 status 命中反模式 #22 |
+| 评审子代理 | V | 按 [references/agent-personas.md](references/agent-personas.md) + [references/verifier-spec.md](references/verifier-spec.md) §8 产出 `VerifierOutput` JSON | 职责：独立评审 + 产出 VerifierOutput（evidence 须具体引用）。不变式：`check-verifier-output.ts` R1-R13（含 R13 单轴下限 <0.70 判失败，反模式 #41）；越界跑门禁/改产物命中反模式 #22 |
+| 门禁子代理 | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | 职责：独立跑门禁 + 回填 exitCode 证据。不变式：`check-run-log.ts` R6 用 gate-logs 交叉校验 exitCode；越界改产物/产出评审 JSON 命中反模式 #22 |
+| 分析子代理 | A | 分块分析、交叉合并、图谱演进（阶段 1–4）；产出 `.w-model/ingestion/*` 与 `consolidated.json` | 职责：只产出 ingestion 分析中间产物。不变式：`check-requirement-graph.ts` 由 G 独立跑（A 跑命中反模式 #22）；越界写正式阶段产物/改 status 命中反模式 #22 |
+| 根因定位子代理 | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`（含根因链 + 修复建议 + 防御措施 + `upstreamDefect` 标记）；可作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 职责：只产出根因定位报告，不实施修复。不变式：`check-rootcause-report.ts` R1-R10 由 G 校验 + V 复审后才可派 S-fix（反模式 #18/#19）；越界改产物/跑门禁/跨阶段定位命中反模式 #22 |
 
 **每阶段分派时序**：O 路由 → 🔴 CHECKPOINT 进入确认 → **分派 S 产出** → **分派 V 评审** → **分派 G 门禁** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新 `project.status`。阶段 8 终检额外分派 G 跑 `check-artifact-gate.ts`。
 
@@ -221,6 +221,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | root-cause-locator.md | V/G 不通过后分派 R 子代理时 |
 | definition-of-done.md | 阶段门放行判定时 |
 | data-models.md | 读写 .w-model/*.json 或 schema 校验失败时 |
+| glossary.md | 术语定义权威入口（字段名 / 枚举 / `_Avoid_` 别名治理）——新增/修改字段、schema、脚本 violation 消息前先查本表 |
 | anti-patterns.md | 怀疑命中反模式或新增反模式登记时 |
 | command-reference.md | /wm 命令参数细节 |
 | workflow.md | 阶段切换 / 失败回退 / 质量门流程 |

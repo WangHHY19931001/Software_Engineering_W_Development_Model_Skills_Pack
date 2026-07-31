@@ -213,6 +213,10 @@ if (subCriteria.length !== expected.length) {
 - 每个子标准必须给出：`name` / `description` / `weight` / `score` / `evidence`。
 - `evidence` 必须引用目标内部的具体片段（行号 / 段落 ID / 字段名），不得空泛描述。
 - `evidence` 缺失或与目标内容无关 → 子标准判 0 分。
+- **单轴下限（R13，第 26 轮）**：每个子标准 `score` 必须 ≥ `0.70`（B 级分界，§6.1）。
+  任一子标准低于该值即视为该维度不达标，`passed=false`——即使其余子标准高分将
+  `compositeScore` 加权平均拉至 ≥ 0.70 也不放行（防止加权平均掩盖单轴失败，
+  对应外部 code-review 双轴报告永不合并原则；详见 §6.3 与反模式 #41）。
 
 ## 4. 连续评分（Continuous Scoring）
 
@@ -458,8 +462,16 @@ V 子代理须在 `summary` 中包含：
 
 ### 6.3 通过判定
 
-`passed = (qualityLevel === 'A' || qualityLevel === 'B')`。
-（即综合分数 ≥ 0.70 视为通过阶段门。）
+`passed = (qualityLevel === 'A' || qualityLevel === 'B') && 所有 subCriterion.score >= 0.70`。
+
+（即综合分数 ≥ 0.70 视为通过阶段门，**且**每个子标准得分 ≥ 0.70——单轴下限 R13，第 26 轮。）
+
+> **单轴下限（R13）说明**：`qualityLevel` 仍由 `compositeScore` 加权平均按 §6.1 映射，
+> 但 `passed` 判定额外要求每个子标准 ≥ 0.70（B 级分界）。理由：
+> 5 子标准加权平均下，某子标准失败（如 completeness=0.65）可被其余高分拉过 0.70 线；
+> 该维度根本性不达标时不得用其它维度补偿（对应外部 code-review 双轴报告永不合并原则）。
+> 违反判定 → 命中反模式 #41「加权平均掩盖单轴失败」，`check-verifier-output.ts` 判失败。
+> 任一子标准低于 0.70 时 `passed=false`，`reworkHints` 必须非空（§7.8 强制）。
 
 ## 7. 子标准定义
 

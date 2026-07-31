@@ -566,6 +566,21 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：SSoT §3.4.21（[24.0.0] 新增）
 
+## #41 加权平均掩盖单轴失败（第26轮新增）
+
+**危害**：V 评审产物通过加权平均 `compositeScore` 掩盖某一子标准的显著失败——如 completeness=0.65 但其余四项 0.95，加权后仍达 A 级被放行，需求遗漏/分析缺失的单轴缺陷被「平均」抹平。这与外部 code-review 技能「单轴（completeness / correctness）永不合并计分」原则一致：评审各轴独立成环，加权平均只用于汇报，不用于放行判据。
+
+**检测信号**：
+- `VerifierOutput` 存在任一 `subCriterion.score < 0.70`（0.70 = qualityLevel B 级分界，即「每个子标准自身须达 B 级」）
+- `passed` 为 true 但存在 `subCriterion.score < 0.70` 的子标准（旧的加权平均误判）
+- 评审时用「总体不错 / 平均分达标」措辞回避具体子标准失败
+
+**回退动作**：V 按 R13 将对应子标准标记为 violation，`passed=false`，产出 `reworkHints` 交 S 返工（须走 R→V→G 循环）；qualityLevel 不变（仍由 compositeScore 映射），仅 passed 增加单轴条件。
+
+**门禁脚本**：`check-verifier-output.ts` R13 单轴下限（exitCode=1 命中本反模式）。
+
+**关联**：SSoT §3.4.22（[25.0.0] 新增）；[verifier-spec.md](verifier-spec.md) §3.3 / §6.3；[glossary.md](glossary.md)「单轴下限（R13）」；外部原则「评审各轴独立成环，永不合并计分」
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
@@ -592,7 +607,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills` 元技能的 Failure Modes。
 > SSoT [§4A.2](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
 >
-> **与 29 条流程反模式（#1~#29）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
+> **与 41 条流程反模式（#1~#41）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
 >
 > **与 4 条实现层经验教训（L1~L4）的关系**：L1~L4 是代码层教训（特定技术栈的具体坑），F1~F10 是行为层模式（跨技术栈的通用陷阱）。
 >

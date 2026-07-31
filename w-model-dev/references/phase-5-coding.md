@@ -142,6 +142,15 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - 例外：prototype 产出的决策密集片段（状态机/reducer/schema/type shape）可内联，标注来源
 - 验收标准与 RTM `unitTest` 字段对应（每张票据 ≥1 单元测试）
 
+### 票据内容 durability（第 26 轮外部技能吸收）
+
+> 对应外部 implement-* 系列 SKILL.md 的 Agent Brief durability 原则：票据主体是**符号级契约**（接口 / 类型 / 行为），不是**文件路径 / 行号**（fragile reference，重构即失效）。
+
+- **票据主体 = 符号级契约**：目标行为的接口签名 / 类型约束 / 状态转移（与 TLA+ 状态机 Action 对齐），如「实现 `ArticleService.create` 契约：入参 `{title, content}`，返回 `Article`，触发状态 `draft → published`」——而非「改 `src/services/article-service.ts:42`」
+- **位置信息交给 codegraph**（约束 #20）：文件路径由 `codegraph_explore` 查询获得，票据不预设路径。票据只写「实现 `XX` 符号契约」，位置由查询结果落盘的 `.w-model/codegraph-queries/` 决定
+- **与评审 evidence 的边界**：评审 evidence 须路径 + 行号（[verifier-spec.md](verifier-spec.md) §6.2.1，可追溯性）；实施票据**不**须——二者定位不同：evidence 是「评审时证明我看过哪」，票据是「实现时做什么契约」
+- 票据引用术语统一用 [glossary.md](glossary.md) 规范名（如 `codeModule` / `mappingType`），不得自造别名
+
 ### Blocking edges 依赖图
 - blocking edges 形成有向无环图（DAG）
 - frontier = blockers 全完成的票据（可立即开始）
