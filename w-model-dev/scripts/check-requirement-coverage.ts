@@ -81,8 +81,12 @@ async function main(): Promise<void> {
   if (outOfScopePath) {
     try {
       const oosRaw = await fs.readFile(path.resolve(outOfScopePath), 'utf-8');
-      const oosParsed = JSON.parse(oosRaw) as { items?: string[] };
-      outOfScope = oosParsed.items;
+      const oosParsed = JSON.parse(oosRaw);
+      if (!oosParsed || !Array.isArray((oosParsed as { items?: unknown }).items)) {
+        console.error(`✗ --out-of-scope 文件无 items 数组（结构不符）: ${outOfScopePath}`);
+        process.exit(2);
+      }
+      outOfScope = (oosParsed as { items: string[] }).items;
     } catch {
       console.error(`✗ --out-of-scope 文件读取失败: ${outOfScopePath}`);
       process.exit(2);

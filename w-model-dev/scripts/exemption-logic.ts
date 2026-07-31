@@ -121,6 +121,27 @@ export function checkExemption(exemption: unknown): ExemptionCheckResult {
     }
   }
 
+  // E9: 时间戳时序校验 submittedAt < reviewedAt < verifiedAt < decidedAt
+  if (e.review && e.verification && e.humanDecision) {
+    const submitted = new Date(e.submittedAt).getTime();
+    const reviewed = new Date(e.review.reviewedAt).getTime();
+    const verified = new Date(e.verification.verifiedAt).getTime();
+    const decided = new Date(e.humanDecision.decidedAt).getTime();
+    if (isNaN(submitted) || isNaN(reviewed) || isNaN(verified) || isNaN(decided)) {
+      result.violations.push('E9 时间戳解析失败（非 ISO 8601 格式）');
+    } else {
+      if (submitted >= reviewed) {
+        result.violations.push(`E9 时间戳时序违反：submittedAt(${e.submittedAt}) >= reviewedAt(${e.review.reviewedAt})`);
+      }
+      if (reviewed >= verified) {
+        result.violations.push(`E9 时间戳时序违反：reviewedAt(${e.review.reviewedAt}) >= verifiedAt(${e.verification.verifiedAt})`);
+      }
+      if (verified >= decided) {
+        result.violations.push(`E9 时间戳时序违反：verifiedAt(${e.verification.verifiedAt}) >= decidedAt(${e.humanDecision.decidedAt})`);
+      }
+    }
+  }
+
   if (result.violations.length === 0) {
     result.stage = 'complete';
   }

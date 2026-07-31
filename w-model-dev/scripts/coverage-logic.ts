@@ -194,15 +194,25 @@ export function checkRequirementCoverage(
   }
 
   // C9: status=missing 须在 Out of Scope 显式声明
-  const allEntries = [
+  const allEntries2 = [
     ...c.stakeholders,
     ...c.scenarios,
     ...c.requirementTypes,
     ...c.crossCuts,
   ];
-  const missingEntries = allEntries.filter(e => e.status === 'missing');
+  const missingEntries = allEntries2.filter(e => e.status === 'missing');
   if (missingEntries.length > 0) {
-    const missingIds = missingEntries.map(e => (e as { id?: string; nfrConId?: string }).id ?? (e as CrossCutEntry).nfrConId ?? '');
+    const missingIds: string[] = [];
+    for (const e of missingEntries) {
+      const entry = e as StakeholderEntry | ScenarioEntry | RequirementTypeEntry | CrossCutEntry;
+      if ('id' in entry && typeof entry.id === 'string' && entry.id) {
+        missingIds.push(entry.id);
+      } else if ('nfrConId' in entry && typeof entry.nfrConId === 'string' && entry.nfrConId) {
+        missingIds.push(entry.nfrConId);
+      } else if ('reqIds' in entry && Array.isArray(entry.reqIds) && entry.reqIds.length > 0) {
+        missingIds.push(...entry.reqIds);
+      }
+    }
     if (options.outOfScope) {
       const declared = new Set(options.outOfScope);
       const undeclared = missingIds.filter(id => !declared.has(id));

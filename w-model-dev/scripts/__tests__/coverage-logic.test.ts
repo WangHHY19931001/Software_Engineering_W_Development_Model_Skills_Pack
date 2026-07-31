@@ -206,6 +206,22 @@ describe('C1-C10 覆盖分析校验', () => {
       });
       expect(result.violations.some(v => v.includes('C9'))).toBe(false);
     });
+
+    it('C8/C9: requirementType status=missing 的 missingIds 取 reqIds 具体 ID（NFR-001）非类别名', () => {
+      const coverage = makeValidCoverage();
+      coverage.requirementTypes = [
+        { type: 'REQ', reqIds: ['REQ-001'], status: 'covered' },
+        { type: 'NFR', reqIds: ['NFR-001'], status: 'missing' },
+        { type: 'CON', reqIds: ['CON-001'], status: 'covered' },
+      ];
+      coverage.metrics.requirementType = 50; // (1 + 0) / 2 * 100 = 50
+      const result = checkRequirementCoverage(coverage, {
+        outOfScope: ['SH-OTHER'],
+      });
+      expect(result.passed).toBe(false);
+      const c9Violations = result.violations.filter(v => v.includes('C9')).join(' ');
+      expect(c9Violations).toContain('NFR-001');
+    });
   });
 
   // ==================== C10: metrics 重算一致性 ====================

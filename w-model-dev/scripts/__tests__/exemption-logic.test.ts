@@ -187,6 +187,39 @@ describe('E1-E8 豁免审批校验', () => {
     });
   });
 
+  // ==================== E9: 时间戳时序 ====================
+  describe('E9: 时间戳时序 submittedAt < reviewedAt < verifiedAt < decidedAt', () => {
+    it('E9: submittedAt >= reviewedAt（时序乱序）→ fail', () => {
+      const e = makeValidExemption();
+      e.submittedAt = '2026-07-28T12:00:00Z'; // 晚于 reviewedAt
+      const result = checkExemption(e);
+      expect(result.passed).toBe(false);
+      expect(result.violations.some(v => v.includes('E9') && v.includes('submittedAt'))).toBe(true);
+    });
+
+    it('E9: reviewedAt >= verifiedAt（时序乱序）→ fail', () => {
+      const e = makeValidExemption();
+      e.review!.reviewedAt = '2026-07-28T13:00:00Z'; // 晚于 verifiedAt
+      const result = checkExemption(e);
+      expect(result.passed).toBe(false);
+      expect(result.violations.some(v => v.includes('E9') && v.includes('reviewedAt'))).toBe(true);
+    });
+
+    it('E9: verifiedAt >= decidedAt（时序乱序）→ fail', () => {
+      const e = makeValidExemption();
+      e.verification!.verifiedAt = '2026-07-28T14:00:00Z'; // 晚于 decidedAt
+      const result = checkExemption(e);
+      expect(result.passed).toBe(false);
+      expect(result.violations.some(v => v.includes('E9') && v.includes('verifiedAt'))).toBe(true);
+    });
+
+    it('E9: 时间戳时序合规 → 无 E9 违规', () => {
+      const e = makeValidExemption();
+      const result = checkExemption(e);
+      expect(result.violations.some(v => v.includes('E9'))).toBe(false);
+    });
+  });
+
   // ==================== 完整流程：四阶段全通过 ====================
   describe('完整流程: 四阶段全通过', () => {
     it('S→R→V→人类四阶段全通过 → passed=true, stage=complete', () => {
