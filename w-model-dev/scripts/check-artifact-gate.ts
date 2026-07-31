@@ -25,6 +25,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   checkArtifactGate,
   checkUatPathMappingBackfill,
@@ -40,23 +41,62 @@ const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
 const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
 
 /**
- * 从 uat-path-mapping.md 内容解析映射行。
+ * 从 uat-path-mapping.md 内容解析映射行（round28 G-B B4：严格解析）。
  * 格式：| UAT-001 | POST /api/posts | POST /api/posts | 直接 | ... |
+ *
+ * 严格化规则：
+ * - 表头校验：数据行首列必须为 `UAT-` 前缀（`UAT-\d+`）；表头行 / 分隔行 / 其它表格行一律忽略。
+ * - 数据行格式不符（单元格数 < 4 或前 4 列含空单元格）→ 记录 violation，不静默跳行。
+ * - 文件非空但解析不出任何映射行 → violation「uat-path-mapping 无有效映射行」。
  */
-function parseUatPathMappingFromContent(content: string): UatPathMappingRow[] {
+export interface UatPathMappingParseResult {
+  rows: UatPathMappingRow[];
+  violations: string[];
+}
+
+export function parseUatPathMappingFromContent(content: string): UatPathMappingParseResult {
   const rows: UatPathMappingRow[] = [];
+  const violations: string[] = [];
   const lines = content.split('\n');
-  for (const line of lines) {
-    const match = line.match(/^\|\s*(UAT-\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/);
-    if (match) {
-      rows.push({
-        uatId: match[1]!.trim(),
-        actualPath: match[3]!.trim(),
-        mappingType: match[4]!.trim(),
-      });
+  for (let i = 0; i < lines.length; i++) {
+    const line = (lines[i] ?? '').trim();
+    if (line === '' || !line.startsWith('|')) continue; // 非表格行（标题 / 说明段落）
+    let cells = line.split('|').map((c) => c.trim());
+    cells = cells.slice(1); // 去掉行首 '|' 前的空串
+    if (cells.length > 0 && cells[cells.length - 1] === '') {
+      cells = cells.slice(0, -1); // 去掉行尾 '|' 产生的空串
     }
+    const firstCol = cells[0] ?? '';
+    // 表头校验：首列必须为 UAT- 前缀（表头 / 分隔行 / 其它表格一律忽略）
+    if (!/^UAT-\d+$/.test(firstCol)) continue;
+    const lineNo = i + 1;
+    // 数据行格式校验：单元格数须 ≥4
+    if (cells.length < 4) {
+      violations.push(`uat-path-mapping 第${lineNo}行畸形（单元格数 ${cells.length}，须 ≥4）`);
+      continue;
+    }
+    const actualPath = cells[2] ?? '';
+    const mappingType = cells[3] ?? '';
+    // 前 4 列（uatId/设计路径/实际路径/映射类型）任一为空 → 畸形
+    if (cells[1] === '' || actualPath === '' || mappingType === '') {
+      violations.push(`uat-path-mapping 第${lineNo}行畸形（含空单元格）`);
+      continue;
+    }
+    rows.push({ uatId: firstCol, actualPath, mappingType });
   }
-  return rows;
+  if (rows.length === 0 && content.trim() !== '') {
+    violations.push('uat-path-mapping 无有效映射行');
+  }
+  return { rows, violations };
+}
+
+/**
+ * uat-path-mapping 内容综合校验（B4 严格解析 + 回填校验）。
+ * 供 check-artifact-gate CLI 阶段 5 / 终检与 self-test 共用。
+ */
+export function checkUatPathMappingContent(content: string): string[] {
+  const { rows, violations } = parseUatPathMappingFromContent(content);
+  return [...violations, ...checkUatPathMappingBackfill(rows)];
 }
 
 // ==================== --phase 参数解析（P1.1） ====================
@@ -66,23 +106,34 @@ function parseUatPathMappingFromContent(content: string): UatPathMappingRow[] {
  * 非法值（非 1-8）退出码 2。
  */
 function parsePhaseArg(argv: string[]): PhaseOption | undefined {
+  // B6（round28 G-B）：严格整数校验——字符串全数字 + Number.isInteger，
+  // 拒绝 "5abc" / "3.7" 这类 parseInt 会部分解析的非法输入
+  const strictPhase = (s: string): PhaseOption | undefined => {
+    if (!/^\d+$/.test(s)) return undefined;
+    const val = Number(s);
+    if (!Number.isInteger(val) || val < 1 || val > 8) return undefined;
+    return val as PhaseOption;
+  };
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === undefined) continue;
     if (arg === '--phase' || arg === '-p') {
       const next = argv[i + 1] ?? '';
-      const val = parseInt(next, 10);
-      if (val >= 1 && val <= 8) return val as PhaseOption;
-      console.error(`✗ --phase 参数非法: ${next}（须 1-8）`);
-      process.exit(2);
+      const val = strictPhase(next);
+      if (val === undefined) {
+        console.error(`✗ --phase 参数非法: ${next}（须 1-8 的整数）`);
+        process.exit(2);
+      }
+      return val;
     }
-    const eqMatch = arg.match(/^--phase=(\d+)$/);
+    const eqMatch = arg.match(/^--phase=(.+)$/);
     if (eqMatch) {
-      const digits = eqMatch[1] ?? '';
-      const val = parseInt(digits, 10);
-      if (val >= 1 && val <= 8) return val as PhaseOption;
-      console.error(`✗ --phase 参数非法: ${digits}（须 1-8）`);
-      process.exit(2);
+      const val = strictPhase(eqMatch[1] ?? '');
+      if (val === undefined) {
+        console.error(`✗ --phase 参数非法: ${eqMatch[1] ?? ''}（须 1-8 的整数）`);
+        process.exit(2);
+      }
+      return val;
     }
   }
   return undefined;
@@ -240,32 +291,34 @@ async function main(): Promise<void> {
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption，启用 TLA+ 资产校验与阶段分层）
   const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption });
 
+  // uat-path-mapping 校验违反（计入终检结果，B4/B5：解析严格化 + 阶段5/终检均校验）
+  const uatMappingViolations: string[] = [];
+
   // P0-1: phase=1 校验 docs/uat-path-mapping.md 存在性
   if (phaseOption === 1) {
     const uatMappingPath = path.resolve(projectDir, 'docs', 'uat-path-mapping.md');
     try {
       await fs.access(uatMappingPath);
     } catch {
-      result.reasons.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在，阶段1须产出该文件（见 phase-1-requirements.md §输出）');
+      uatMappingViolations.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在，阶段1须产出该文件（见 phase-1-requirements.md §输出）');
     }
   }
 
-  // P0-1: phase=5 校验 uat-path-mapping 回填
-  if (phaseOption === 5) {
+  // P0-1: phase=5 / 终检（B5：无 --phase 终检默认 phase 8 也校验）校验 uat-path-mapping 回填
+  if (phaseOption === 5 || phaseOption === undefined) {
     const uatMappingPath = path.resolve(projectDir, 'docs', 'uat-path-mapping.md');
     try {
       const content = await fs.readFile(uatMappingPath, 'utf-8');
-      const mappings = parseUatPathMappingFromContent(content);
-      const backfillViolations = checkUatPathMappingBackfill(mappings);
-      for (const v of backfillViolations) result.reasons.push(v);
+      uatMappingViolations.push(...checkUatPathMappingContent(content));
     } catch {
-      result.reasons.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在或无法读取');
+      uatMappingViolations.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在或无法读取');
     }
   }
 
-  // 合并 BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
-  const allReasons = [...result.reasons, ...bddViolations];
-  const overallPassed = result.passed && bddViolations.length === 0;
+  // 合并 uat-path-mapping + BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
+  const allReasons = [...result.reasons, ...uatMappingViolations, ...bddViolations];
+  const overallPassed =
+    result.passed && uatMappingViolations.length === 0 && bddViolations.length === 0;
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -309,7 +362,12 @@ async function main(): Promise<void> {
   process.exit(exitCode);
 }
 
-main().catch((err) => {
-  console.error('门禁校验脚本异常:', err);
-  process.exit(2);
-});
+// isMain 守卫：仅直接执行时运行 main，被 self-test 等 import 时不触发
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
+if (isMain) {
+  main().catch((err) => {
+    console.error('门禁校验脚本异常:', err);
+    process.exit(2);
+  });
+}

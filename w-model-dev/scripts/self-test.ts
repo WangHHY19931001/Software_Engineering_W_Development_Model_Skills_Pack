@@ -74,6 +74,7 @@ import { checkStateMachineConsistency } from './check-state-machine-consistency.
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
 import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
 import { checkOpenspecArchive } from './check-openspec-archive.js';
+import { checkUatPathMappingContent } from './check-artifact-gate.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -1065,6 +1066,45 @@ const OPENSPEC_ARCHIVE_CASES: OpenspecArchiveCase[] = [
     expectedPassed: false,
     expectedViolationPatterns: [/archive\/ 目录不存在/],
     description: 'openspec/changes/archive/ 不存在（opsx:archive 未执行），应未通过',
+  },
+];
+
+interface UatPathMappingCase {
+  sampleDir: string; // samples/uat-path-mapping/<dir>/docs/uat-path-mapping.md
+  expectedPassed: boolean;
+  expectedViolationPatterns?: RegExp[];
+  description: string;
+}
+
+const UAT_PATH_MAPPING_CASES: UatPathMappingCase[] = [
+  {
+    sampleDir: 'uat-path-mapping/valid-phase5',
+    expectedPassed: true,
+    description: 'B4 阶段5回填完整（实际路径非占位符 + mappingType 合法），应通过',
+  },
+  {
+    sampleDir: 'uat-path-mapping/bad-empty-table',
+    expectedPassed: false,
+    expectedViolationPatterns: [/无有效映射行/],
+    description: 'B4 空表（仅表头无数据行）应报"无有效映射行"，不静默通过',
+  },
+  {
+    sampleDir: 'uat-path-mapping/bad-malformed-row',
+    expectedPassed: false,
+    expectedViolationPatterns: [/行畸形/],
+    description: 'B4 畸形行（单元格数 < 4）应记录 violation，不静默跳行',
+  },
+  {
+    sampleDir: 'uat-path-mapping/bad-empty-cell',
+    expectedPassed: false,
+    expectedViolationPatterns: [/含空单元格/],
+    description: 'B4 畸形行（空单元格）应记录 violation，不静默跳行',
+  },
+  {
+    sampleDir: 'uat-path-mapping/bad-unbackfilled',
+    expectedPassed: false,
+    expectedViolationPatterns: [/未回填/],
+    description: 'B5 终检语义（checkUatPathMappingContent 供阶段5/终检共用）下含未回填行应失败',
   },
 ];
 
@@ -2133,6 +2173,40 @@ async function runOpenspecArchiveCases(samplesDir: string): Promise<CaseResult[]
   return results;
 }
 
+async function runUatPathMappingCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of UAT_PATH_MAPPING_CASES) {
+    const mdPath = path.join(samplesDir, c.sampleDir, 'docs', 'uat-path-mapping.md');
+    const name = `${c.sampleDir}`;
+    const details: string[] = [];
+    try {
+      const content = await fs.readFile(mdPath, 'utf-8');
+      const violations = checkUatPathMappingContent(content);
+      const passed = violations.length === 0;
+      if (passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(violations, c.expectedViolationPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 // -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
 
 function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
@@ -2495,6 +2569,7 @@ async function main(): Promise<void> {
   console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
   console.log(`OpsxArtifact 用例 : ${OPSX_ARTIFACT_CASES.length}`);
   console.log(`OpenspecArchive 用例 : ${OPENSPEC_ARCHIVE_CASES.length}`);
+  console.log(`UatPathMapping 用例 : ${UAT_PATH_MAPPING_CASES.length}`);
   console.log('─'.repeat(60));
 
   const [
@@ -2505,6 +2580,7 @@ async function main(): Promise<void> {
     designContractResults, preventiveReviewResults, tlaBddSyncResults, roleDispatchResults,
     stateMachineResults,
     codegraphQueryResults, opsxArtifactResults, openspecArchiveResults,
+    uatPathMappingResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2531,6 +2607,7 @@ async function main(): Promise<void> {
     runCodegraphQueryCases(samplesDir),
     runOpsxArtifactCases(samplesDir),
     runOpenspecArchiveCases(samplesDir),
+    runUatPathMappingCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
@@ -2540,6 +2617,7 @@ async function main(): Promise<void> {
     ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults, ...roleDispatchResults,
     ...stateMachineResults,
     ...codegraphQueryResults, ...opsxArtifactResults, ...openspecArchiveResults,
+    ...uatPathMappingResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
