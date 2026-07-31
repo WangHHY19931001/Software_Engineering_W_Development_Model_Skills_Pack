@@ -14,7 +14,11 @@
  *   全通过 4 张矩阵完整 + 100% → passed=true
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { execSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { checkRequirementCoverage, type CoverageShape } from '../coverage-logic.js';
 
 /** 构造一份全通过的合法 CoverageShape（4 张矩阵完整 + 100% 覆盖率） */
@@ -279,5 +283,94 @@ describe('C1-C10 覆盖分析校验', () => {
       expect(result.violations).toEqual([]);
       expect(result.metrics).toEqual({ stakeholder: 100, scenario: 100, requirementType: 100, crossCut: 100 });
     });
+  });
+});
+
+// ==================== C7 OOS 形状校验（CLI 层 exit 2） ====================
+describe('C7: OOS 形状校验 (CLI exit 2)', () => {
+  const scriptPath = 'w-model-dev/scripts/check-requirement-coverage.ts';
+  let tmpDirs: string[] = [];
+
+  afterEach(() => {
+    for (const d of tmpDirs) {
+      if (existsSync(d)) rmSync(d, { recursive: true, force: true });
+    }
+    tmpDirs = [];
+  });
+
+  function makeTmpDir(): string {
+    const d = mkdtempSync(join(tmpdir(), 'coverage-c7-test-'));
+    tmpDirs.push(d);
+    return d;
+  }
+
+  function writeValidCoverage(dir: string): string {
+    const p = join(dir, 'coverage.json');
+    writeFileSync(p, JSON.stringify({
+      stakeholders: [{ id: 'SH-001', role: '终端用户', relatedReqs: ['REQ-001'], status: 'covered' }],
+      scenarios: [
+        { id: 'SC-001', description: '正常', steps: ['x'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'happy' },
+        { id: 'SC-002', description: '错误', steps: ['x'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'error' },
+        { id: 'SC-003', description: '边界', steps: ['x'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'boundary' },
+      ],
+      requirementTypes: [
+        { type: 'REQ', reqIds: ['REQ-001'], status: 'covered' },
+        { type: 'NFR', reqIds: ['NFR-001'], status: 'covered' },
+        { type: 'CON', reqIds: ['CON-001'], status: 'covered' },
+      ],
+      crossCuts: [{ nfrConId: 'NFR-001', governedReqs: ['REQ-001'], status: 'covered' }],
+      metrics: { stakeholder: 100, scenario: 100, requirementType: 100, crossCut: 100 },
+    }));
+    return p;
+  }
+
+  it('C7: OOS 文件无 items 字段 → exit 2', () => {
+    const dir = makeTmpDir();
+    const coveragePath = writeValidCoverage(dir);
+    const oosPath = join(dir, 'outOfScope.json');
+    writeFileSync(oosPath, JSON.stringify({ something: 'else' }));
+
+    try {
+      execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {
+        stdio: 'pipe',
+        timeout: 15000,
+      });
+      expect.fail('should have exited with code 2');
+    } catch (e: unknown) {
+      const err = e as { status?: number; stderr?: Buffer };
+      expect(err.status).toBe(2);
+    }
+  });
+
+  it('C7: OOS 文件 items 非数组 → exit 2', () => {
+    const dir = makeTmpDir();
+    const coveragePath = writeValidCoverage(dir);
+    const oosPath = join(dir, 'outOfScope.json');
+    writeFileSync(oosPath, JSON.stringify({ items: 'not-an-array' }));
+
+    try {
+      execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {
+        stdio: 'pipe',
+        timeout: 15000,
+      });
+      expect.fail('should have exited with code 2');
+    } catch (e: unknown) {
+      const err = e as { status?: number; stderr?: Buffer };
+      expect(err.status).toBe(2);
+    }
+  });
+
+  it('C7: OOS 文件合法（items 是数组）→ exit 0（不抛异常）', () => {
+    const dir = makeTmpDir();
+    const coveragePath = writeValidCoverage(dir);
+    const oosPath = join(dir, 'outOfScope.json');
+    writeFileSync(oosPath, JSON.stringify({ items: ['SH-OTHER'] }));
+
+    expect(() => {
+      execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {
+        stdio: 'pipe',
+        timeout: 15000,
+      });
+    }).not.toThrow();
   });
 });
