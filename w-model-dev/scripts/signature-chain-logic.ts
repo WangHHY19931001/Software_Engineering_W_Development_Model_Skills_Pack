@@ -164,19 +164,16 @@ export function checkSignatureChain(
         if (!allSigIds.has(entry.prevSigId)) {
           violations.push(`R2: 签名链断裂：${entry.sigId} 首条 prevSigId="${entry.prevSigId}" 不存在于全链中`);
           rulesFailed.push('R2');
-          break;
         }
         if (entry.prevSigId !== 'genesis') {
           const ref = allSorted.find(e => e.sigId === entry.prevSigId);
           if (ref && entry.prevSigHash !== ref.sigHash) {
             violations.push(`R2: 签名链断裂：${entry.sigId} 首条 prevSigHash 与 ${entry.prevSigId} 的 sigHash 不一致`);
             rulesFailed.push('R2');
-            break;
           }
         } else if (entry.prevSigHash !== '0') {
           violations.push(`R2: 签名链断裂：${entry.sigId} genesis 条 prevSigHash 应为 "0"`);
           rulesFailed.push('R2');
-          break;
         }
       } else {
         // Phase 内前条用列表索引
@@ -184,7 +181,6 @@ export function checkSignatureChain(
         if (entry.prevSigId !== prev.sigId || entry.prevSigHash !== prev.sigHash) {
           violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与 phase 内前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`);
           rulesFailed.push('R2');
-          break;
         }
       }
     }
@@ -203,7 +199,6 @@ export function checkSignatureChain(
           if (entry.prevSigId !== prev.sigId || entry.prevSigHash !== prev.sigHash) {
             violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`);
             rulesFailed.push('R2');
-            break;
           }
         }
       }
