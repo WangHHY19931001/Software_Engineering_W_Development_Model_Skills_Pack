@@ -11,6 +11,7 @@
 ## 目录
 
 - 角色划分（O / S / V / G）
+- 文件落地交接协议与编排者状态日志
 - 每阶段分派时序
 - 子代理分派模板
 - 回填契约
@@ -30,6 +31,129 @@
 | **根因定位子代理** | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施） | ① 读失败产物文件 + 上游产物（需求/设计/代码/测试/TLA+/graph.json）；② 读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON；③ 运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）；④ 产出 `RootCauseReport` JSON + `.md` 报告文件；⑤ 标记 `upstreamDefect`（若根因为上游需求/设计缺陷）；⑥ 作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出（见 root-cause-locator.md §4） | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出 |
 
 > **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
+
+## 文件落地交接协议与编排者状态日志（File-Landing Handoff & Orchestrator Journal）
+
+> **目的**：编排者 token 最小化 + 子代理间信息不经编排者转发 + 编排者工作全程落地可追溯。本节是 [回填契约](#回填契约) 的前置约束：子代理返回 O 的内容须降至最小信标，完整产出以文件为媒介在子代理间直传。
+>
+> **强制等级**：违反本节「禁止转发」「状态日志强制」命中反模式 #10 变体（编排者越权承担信息搬运），回退到当前分派起点。
+>
+> **与既有机制的关系**：本节**不替代** `run-log.jsonl`（事件流水 / append-only 审计）、`progress.md`（SDD 完成账本）、[task-brief / review-package 脚本模式](../../.cursor/skills/subagent-driven-development/scripts/)（brief / report 文件雏形）；在它们之上增加「状态日志当前快照」+「status.json 信标」+「O 不读 output」硬约束。
+
+### 1. 编排者状态日志（current / done / next）
+
+编排者在 `.w-model/orchestrator-state.md` 维护一份**当前快照**（非流水），结构固定三段，O 的"我在哪 / 干完了什么 / 下一步干什么"地图：
+
+```markdown
+# Orchestrator State
+updated: <ISO8601>
+phase: <N - 名称>
+
+## CURRENT
+- 分派 <role>（<dispatch-id>），等待 <产物 beacon | CHECKPOINT 放行 | 用户澄清>
+- started: <ISO8601>
+
+## DONE
+- [<dispatch-id>] <role> → <one-line outcome> | beacon: handoff/<dispatch-id>/status.json
+- ...
+
+## NEXT
+- [<dispatch-id>] <role> 读 handoff/<prev-dispatch-id>/output.md → 产 handoff/<dispatch-id>/output.md
+- ...
+```
+
+**更新规则**：
+- 每次**分派前**与**收到 beacon 后**，O 用 `Write` 整文件覆盖（原子更新，非 append）。
+- compaction / 会话恢复后，O 先 `Read` 本文件 + `run-log.jsonl` 尾部重建位置；**不得凭记忆分派**。
+- 阶段门 CHECKPOINT 须展示本文件 `DONE` 段作为分派完整性证据（与约束 #19 互补）。
+
+**与既有三文件互补、不替代**：
+
+| 文件 | 性质 | 内容 |
+|---|---|---|
+| `orchestrator-state.md` | 当前快照（覆盖式） | current / done / next |
+| `run-log.jsonl` | 事件流水（append-only） | 审计每条分派 / 门禁 / CHECKPOINT |
+| `progress.md` / 阶段门记录 | 完成账本（append-only） | 已完成任务 + 提交区间 |
+
+### 2. 交接目录协议（handoff directory）
+
+根目录：`.w-model/handoff/`。每次分派一个子目录 `handoff/<dispatch-id>/`，`<dispatch-id> = phase<N>-<role>-<seq>`（如 `phase1-S-01`、`phase1-V-01`、`phase1-G-01`、`phase1-R-01`、`phase1-S-fix-01`）。
+
+每个分派目录固定三文件：
+
+| 文件 | 写入者 | 内容 | O 是否可读 |
+|---|---|---|---|
+| `brief.md` | O（指针型，非内容） | 任务一句话定位 + 输入产物**路径列表** + 产出契约 + 禁止项 | 否（O 已知路径，无需读） |
+| `output.md` | 子代理 | 完整产出（报告 / VerifierOutput JSON 内容 / diff 摘要 / 根因报告 / 证据） | **否** |
+| `status.json` | 子代理 | 信标（< 200 字节） | **是（唯一可读）** |
+
+`status.json` Schema：
+
+```json
+{
+  "role": "S|V|G|A|R|S-fix",
+  "dispatchId": "phase1-S-01",
+  "state": "DONE|BLOCKED|NEEDS_CONTEXT",
+  "output_path": "handoff/phase1-S-01/output.md",
+  "exit_code": 0,
+  "quality_level": "A|B|C|D",
+  "one_line_summary": "产出需求规格 + RTM REQ 列 + L1 TLA+，coverage 100%",
+  "next_hint": "派 V 评审 handoff/phase1-S-01/output.md"
+}
+```
+
+**禁止转发规则（核心）**：
+- O **只** `Read` 各 `status.json`；**禁止** `Read` 任何 `brief.md` / `output.md` 内容。命中即反模式 #10 变体。
+- 下游子代理**直接** `Read` 上游 `output.md`，不经 O 搬运：
+  - V 读 S 的 `output.md`（+ R3 三份报告路径）
+  - G 读 V 的 `output.md`（VerifierOutput JSON）
+  - R 读 V/G 的 `output.md`（reworkHints + 失败产物路径）
+  - S-fix 读 R 的 `output.md`（RootCauseReport + fixRecommendation）
+- O 在下游 `brief.md` 里只写"读 `handoff/<prev-dispatch-id>/output.md`"指针，不粘贴内容。
+- 子代理返回 O 的文本 ≤ 5 行：仅 `{state, dispatchId, status.json 路径, one-line}`。完整产出在 `output.md`。
+
+> 与 [task-brief / review-package 脚本模式](../../.cursor/skills/subagent-driven-development/scripts/) 的关系：SDD 技能的 brief / report 文件即本协议 `brief.md` / `output.md` 的雏形；本协议增加 `status.json` 信标与"O 不读 output"硬约束，把"O 读路径"进一步降为"O 只读信标"。
+
+### 3. 任务拆分预算（simplicity budget）
+
+每个子代理任务须满足**全部**，否则 O 必须先拆分再分派：
+
+- **单一产出类型**：doc / tla / bdd / code / review / gate / rootcause 之一；混合产出 → 用既有变体拆分（S-doc / S-tla / S-bdd、S-explore / S-propose / S-coding、R-lead / R-persona）。
+- **单一阶段**：越阶段 → 拆分。
+- **输入文件 ≤ 5 个**：超出 → 用 `brief.md` 聚合路径列表，子代理按需 `Read`，禁止全量塞入 brief。
+- **产出文件 ≤ 3 个**：超出 → 拆分为多次分派。
+- **预期单次往返**：复杂任务须先拆；子代理 `BLOCKED` / 轮次膨胀 / 产出质量稀释 → O 拆分后重派（**不计入返工 round**，属编排拆分而非质量返工）。
+
+**过重信号**（命中即拆分重派）：
+- 子代理返回 `NEEDS_CONTEXT` ≥ 2 次（上下文过大信号）
+- 单次 `output.md` 超过该角色预算（doc ≤ 1 文件、review ≤ 1 JSON、gate ≤ 1 摘要、rootcause ≤ 1 报告）
+- 子代理主动报告"任务过大 / 需要拆分"
+
+### 4. 编排者 token 最小化检查清单
+
+O 会话**禁止**出现：阶段产物正文、VerifierOutput JSON 内容、diff 内容、业务/测试代码正文、根因报告正文。
+
+O **只读**：`project.json` / `rtm.json`（仅状态字段）/ `orchestrator-state.md` / `handoff/*/status.json` / `run-log.jsonl`（尾部）/ `check-*.ts` 退出码与 stdout 末尾 5 行（约束 #10 放行证据）。
+
+O **只写**：`orchestrator-state.md` / `project.status` / `run-log.jsonl`（append）/ `handoff/<id>/brief.md`（指针型）/ `handoff/<id>/` 目录创建。
+
+旁白 ≤ 1 句/工具调用（与 SDD 技能"旁白"约束一致）。
+
+### 5. 分派时序示例（文件落地版）
+
+```
+O: Read orchestrator-state.md → 重建位置
+O: Write handoff/phase1-S-01/brief.md（指针：输入产物路径 + 契约）
+O: Write orchestrator-state.md（CURRENT=派 S-01，NEXT=派 V-01 读 S-01/output.md）
+O: 分派 S-01（Task 工具，prompt 只含 brief 路径 + status.json 契约 + ≤5 行返回约束）
+S-01: Read brief.md → 产出 → Write output.md + Write status.json → 返回 O ≤5 行
+O: Read handoff/phase1-S-01/status.json（唯一可读）
+O: Write handoff/phase1-V-01/brief.md（指针：读 handoff/phase1-S-01/output.md + R3 报告路径）
+O: Write orchestrator-state.md（DONE+=S-01，CURRENT=派 V-01）
+O: 分派 V-01
+V-01: Read handoff/phase1-S-01/output.md → 产出 → Write output.md + status.json → 返回 ≤5 行
+...（G 读 V/output.md，R 读 V+G/output.md，S-fix 读 R/output.md，全程不经 O 转发内容）
+```
 
 ## 每阶段分派时序
 
@@ -490,6 +614,8 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 ## 回填契约
 
 子代理返回编排者的数据格式（结构化，便于编排者路由判定与 CHECKPOINT 展示）：
+
+> **前置约束（[文件落地交接协议](#文件落地交接协议与编排者状态日志)）**：启用文件落地模式时，下列结构化数据须写入 `handoff/<dispatch-id>/status.json` + `output.md`，子代理返回 O 的文本进一步降至 ≤ 5 行信标（`state` + `dispatchId` + `status.json` 路径 + 一句话）。O 只 `Read` `status.json`，不读 `output.md`。下文 JSON 结构即 `status.json` / `output.md` 的内容契约。
 
 ### S 子代理返回
 
