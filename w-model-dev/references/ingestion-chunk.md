@@ -38,6 +38,40 @@
 
 > level 识别是确定性规则匹配，不是 LLM 估算。匹配失败即 blocked，由 S 子代理或用户澄清后重跑 A-chunk。
 
+### REQ 入学锐利性测试（第 27 轮，吸收 wayfinder「Fog or ticket?」）
+
+提取候选需求时，先执行锐利性测试——判断标准是**现在能否精确陈述该需求的问题**（不是能否回答它）：
+
+- **能精确陈述** → 按上述规则提取 REQ 节点（level/priority/reqGroup 判定照常；level 无法判定 → blocked 澄清，见「blocked 返回条件」）。
+- **不能精确陈述**（需求方向已见、但连问题都还说不清）→ **入迷雾登记册**，**不建图节点**。
+
+迷雾项写入本 chunk 的 `.md` 叙事文件，固定表格格式：
+
+```markdown
+## 迷雾项（Fog of War，第 27 轮）
+
+| fogId | fogDesc | fogBlocker | fogGroupHint |
+|---|---|---|---|
+| FOG-<chunk>-NN | {{模糊描述}} | {{疑点：哪部分无法精确陈述}} | {{level=1 REQ id 或空}} |
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `fogId` | ✅ | 迷雾项 ID（`FOG-<chunk>-NN`，本块内编号） |
+| `fogDesc` | ✅ | 模糊描述（能说多少说多少） |
+| `fogBlocker` | ✅ | 疑点：哪部分无法精确陈述（缺信息 / 待上游决策 / 范围未定） |
+| `fogGroupHint` | ❌ | 疑似范围归属（level=1 REQ id 候选，可空） |
+
+> 迷雾项不计入覆盖矩阵分母（非正式 REQ）；阶段末须全部毕业 / 判出范围 / 豁免（见 [phase-1-requirements.md](phase-1-requirements.md)「迷雾登记册（Fog of War）」节）。禁止把本应精确陈述的需求塞入迷雾册（FM-3D-07）。
+
+**blocked 条件微调**：可精确陈述但 level 无法判定 → 维持 blocked（由 S 或用户澄清后重跑）；整项无法精确陈述 → 入迷雾册（**不再 blocked**）。
+
+**crossChunkHints 迷雾提示**：疑似跨块迷雾关联可写入 crossChunkHints，`edgeType: "fog"`（`direction` 省略），由 A-cross 在 §7 汇总时确认：
+
+```json
+{"target":"<疑似关联的chunk-id>","reason":"<为什么认为存在跨块迷雾关联>","edgeType":"fog"}
+```
+
 ## 边提取规则
 
 1. 仅提取本块内部的边（parent/depends-on/implements/defines/realizes）
