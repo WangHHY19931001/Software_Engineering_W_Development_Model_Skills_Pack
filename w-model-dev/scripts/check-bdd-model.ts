@@ -240,28 +240,32 @@ async function main(): Promise<number> {
 
   // 读取 TLA+ manifest 并构造快照（阶段 1-4 用于 D4）
   let tlaSnapshots: TlaSpecSnapshot[] | undefined;
-  if (phase <= 4 && args.tlaManifestFile) {
-    const tlaManifestPath = args.tlaManifestFile;
-    try {
-      const tlaManifest = await readJson<{ specs: Array<{ id: string; tlaPath: string }> }>(tlaManifestPath);
-      tlaSnapshots = [];
-      // 这里简化：实际 tla-logic.ts 应提供 parseTlaSpecSnapshot 函数
-      // 完整实现由后续 R 子代理按需补全 tla-logic.ts 的导出
-      for (const spec of tlaManifest.specs) {
-        const tlaPath = path.resolve(path.dirname(tlaManifestPath), spec.tlaPath);
-        const tlaContent = await fs.readFile(tlaPath, 'utf-8');
-        // 简化的 TLA+ 解析：提取 VARIABLES / Init / Next / Invariants
-        // 生产实现请调 tla-logic.ts 的 parseTlaHeader + 解析 State/Next
-        tlaSnapshots.push({
-          specId: spec.id,
-          states: extractTlaStates(tlaContent),
-          initialState: extractTlaInit(tlaContent),
-          transitions: extractTlaTransitions(tlaContent),
-          invariants: extractTlaInvariants(tlaContent),
-        });
+  if (phase <= 4) {
+    if (args.tlaManifestFile) {
+      const tlaManifestPath = args.tlaManifestFile;
+      try {
+        const tlaManifest = await readJson<{ specs: Array<{ id: string; tlaPath: string }> }>(tlaManifestPath);
+        tlaSnapshots = [];
+        // 这里简化：实际 tla-logic.ts 应提供 parseTlaSpecSnapshot 函数
+        // 完整实现由后续 R 子代理按需补全 tla-logic.ts 的导出
+        for (const spec of tlaManifest.specs) {
+          const tlaPath = path.resolve(path.dirname(tlaManifestPath), spec.tlaPath);
+          const tlaContent = await fs.readFile(tlaPath, 'utf-8');
+          // 简化的 TLA+ 解析：提取 VARIABLES / Init / Next / Invariants
+          // 生产实现请调 tla-logic.ts 的 parseTlaHeader + 解析 State/Next
+          tlaSnapshots.push({
+            specId: spec.id,
+            states: extractTlaStates(tlaContent),
+            initialState: extractTlaInit(tlaContent),
+            transitions: extractTlaTransitions(tlaContent),
+            invariants: extractTlaInvariants(tlaContent),
+          });
+        }
+      } catch (e) {
+        console.error(`[D4] 无法读取 TLA+ manifest: ${(e as Error).message}`);
       }
-    } catch (e) {
-      console.error(`[D4] 无法读取 TLA+ manifest: ${(e as Error).message}`);
+    } else {
+      console.error('提示：未提供 --tla-manifest，跳过 D4 TLA+ 等价校验');
     }
   }
 
@@ -367,13 +371,14 @@ async function main(): Promise<number> {
  * 选择状态数最多的那个（通常是 BDD 对应的用户行为状态变量）。
  */
 function extractStateVarName(content: string): string | null {
-  const typeInvStart = content.indexOf('TypeInvariant ==');
-  if (typeInvStart === -1) return null;
+  const typeDefMatch = content.match(/\b(?:TypeOK|TypeInvariant|Invariants)\s*==/);
+  if (!typeDefMatch) return null;
+  const typeInvStart = typeDefMatch.index!;
   const afterTypeInv = content.slice(typeInvStart);
-  const endMatch = afterTypeInv.slice(16).match(/\n\w+\s*==|\n====/);
-  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + 16) : afterTypeInv;
+  const bodyOffset = typeDefMatch[0].length;
+  const endMatch = afterTypeInv.slice(bodyOffset).match(/\n\w+\s*==|\n====/);
+  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + bodyOffset) : afterTypeInv;
 
-  // 找到所有 stateVar \in {"v1", "v2", ...} 模式
   const varPattern = /(\w+)\s*\\in\s*\{((?:"[^"]+"\s*,?\s*)+)\}/g;
   let bestVar: string | null = null;
   let maxCount = 0;
@@ -396,12 +401,13 @@ function extractTlaStates(content: string): string[] {
   const states: string[] = [];
   const stateVar = extractStateVarName(content);
   if (!stateVar) return states;
-  const typeInvStart = content.indexOf('TypeInvariant ==');
-  if (typeInvStart === -1) return states;
+  const typeDefMatch = content.match(/\b(?:TypeOK|TypeInvariant|Invariants)\s*==/);
+  if (!typeDefMatch) return states;
+  const typeInvStart = typeDefMatch.index!;
   const afterTypeInv = content.slice(typeInvStart);
-  // 截取到下一个顶层定义（缩进为0的 \w+ ==）或 ====
-  const endMatch = afterTypeInv.slice(16).match(/\n\w+\s*==|\n====/);
-  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + 16) : afterTypeInv;
+  const bodyOffset = typeDefMatch[0].length;
+  const endMatch = afterTypeInv.slice(bodyOffset).match(/\n\w+\s*==|\n====/);
+  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + bodyOffset) : afterTypeInv;
 
   // 仅匹配第一个状态变量的 \in {"val1", "val2", ...}（不匹配 \in Nat）
   // 通过 stateVar 名称定位：stateVar \in { ... }

@@ -56,15 +56,18 @@ const TLA_DEF_BLACKLIST = [
  * 从 TLA+ 内容抽取转移名。
  * 匹配 Next == \/ Act1 \/ Act2 格式（TLA+ 析取运算符 \/）。
  *
+ * 支持 \E 量化形式：`\/ \E var \in set : ActionName` 提取 ActionName。
+ * Next 体边界：以 \n\n / \n\(\* / Spec == / ==== / EOF 终结（不吞入无关定义）。
+ *
  * 注意：prefix 正则不消费首个 `\/`，使其保留在 body 中，
  * 这样 matchAll 能统一抽取所有 `\/` 后的转移名（含第一个）。
  */
 export function extractTlaTransitions(tlaContent: string): string[] {
   const transitions: string[] = [];
-  const nextMatch = tlaContent.match(/Next\s*==\s*([\s\S]+?)(?:\n\n|\n\(\*|$)/);
+  const nextMatch = tlaContent.match(/Next\s*==\s*([\s\S]+?)(?:\n\n|\n\(\*|\n\w+\s*==|\n====|$)/);
   if (nextMatch && nextMatch[1]) {
     const nextBody = nextMatch[1];
-    const matches = nextBody.matchAll(/\\\/\s*([A-Za-z_][A-Za-z0-9_]*)/g);
+    const matches = nextBody.matchAll(/\\\/\s*(?:\\E\s*[^:]+:\s*)?([A-Za-z_][A-Za-z0-9_]*)/g);
     for (const m of matches) {
       if (m[1]) transitions.push(m[1]);
     }
@@ -75,18 +78,20 @@ export function extractTlaTransitions(tlaContent: string): string[] {
 /**
  * 从 TLA+ 内容抽取状态变量名。
  * 匹配 VARIABLES var1 var2 ... 格式（或 VARIABLE 单数形式）。
+ * 支持多行 VARIABLES 声明（变量跨多行以逗号分隔）。
  */
 export function extractTlaStates(tlaContent: string): string[] {
   const states: string[] = [];
-  const varsMatch = tlaContent.match(/VARIABLES?\s+([\s\S]+?)(?:\n|$)/);
-  if (varsMatch && varsMatch[1]) {
-    const varsBody = varsMatch[1];
-    const matches = varsBody.matchAll(/([A-Za-z_][A-Za-z0-9_]*)/g);
-    for (const m of matches) {
-      const name = m[1];
-      if (name && !TLA_KEYWORD_BLACKLIST.includes(name as typeof TLA_KEYWORD_BLACKLIST[number])) {
-        states.push(name);
-      }
+  const varsStartMatch = tlaContent.match(/VARIABLES?\s+/);
+  if (!varsStartMatch) return states;
+  const afterVars = tlaContent.slice(varsStartMatch.index! + varsStartMatch[0].length);
+  const endMatch = afterVars.match(/\n\w+\s*==|\n====|^$/m);
+  const varsBody = endMatch ? afterVars.slice(0, endMatch.index) : afterVars;
+  const matches = varsBody.matchAll(/([A-Za-z_][A-Za-z0-9_]*)/g);
+  for (const m of matches) {
+    const name = m[1];
+    if (name && !TLA_KEYWORD_BLACKLIST.includes(name as typeof TLA_KEYWORD_BLACKLIST[number])) {
+      states.push(name);
     }
   }
   return states;
@@ -115,7 +120,12 @@ export function extractTlaInvariants(tlaContent: string): string[] {
 }
 
 /**
- * 从 BDD feature 内容抽取 Background 节的状态机七要素。
+ * 从 BDD feature 内容抽取状态机七要素。
+ * 提取来源：
+ *   - `# @states: value1, value2, ...` 注释声明（状态名）
+ *   - `# @transitions:` 块注释声明（事件名：A + event -> B 的 event 部分）
+ *   - Background 节 Given/When/Then 步骤
+ *   - Scenario 体 Given/When/Then 步骤
  * - Given → 状态（取末尾 token）
  * - When  → 转移（取首 token）
  * - Then  → 不变式（取首 token）
@@ -129,11 +139,45 @@ export function extractBddStateMachine(featureContent: string): {
   const transitions: string[] = [];
   const invariants: string[] = [];
 
-  const bgMatch = featureContent.match(/Background:\s*([\s\S]+?)(?:\nScenario|\n@|$)/);
-  const bgContent = bgMatch && bgMatch[1] ? bgMatch[1] : featureContent;
+  // 1. 从 # @states: 注释提取状态名
+  const statesMatch = featureContent.match(/^\s*#\s*@states:\s*(.+?)\s*$/m);
+  if (statesMatch && statesMatch[1]) {
+    for (const s of statesMatch[1].split(',').map(x => x.trim())) {
+      if (s) states.push(s);
+    }
+  }
 
-  // Given → 状态
-  const givenMatches = bgContent.matchAll(/Given\s+(.+)/g);
+  // 2. 从 # @transitions: 块提取事件名（A + event -> B 的 event 部分）
+  const transBlockMatch = featureContent.match(/#\s*@transitions:\s*\n([\s\S]*?)(?:\n\s*#\s*@\w+:|$)/);
+  if (transBlockMatch && transBlockMatch[1]) {
+    const transPattern = /^[^+\n]*\+\s*(\w+)\s*->/gm;
+    let m: RegExpExecArray | null;
+    while ((m = transPattern.exec(transBlockMatch[1])) !== null) {
+      const evt = m[1];
+      if (evt) transitions.push(evt);
+    }
+  }
+
+  // 3. 从 # @invariants: 块提取不变式名（首 token）
+  const invBlockMatch = featureContent.match(/#\s*@invariants:\s*\n([\s\S]*?)(?:\n\s*#\s*@\w+:|$)/);
+  if (invBlockMatch && invBlockMatch[1]) {
+    const invPattern = /^\s*#\s+(\w+)/gm;
+    let m: RegExpExecArray | null;
+    while ((m = invPattern.exec(invBlockMatch[1])) !== null) {
+      const name = m[1];
+      if (name) invariants.push(name);
+    }
+  }
+
+  // 4. 提取 Background 节和 Scenario 体的 Given/When/Then 步骤
+  const bgMatch = featureContent.match(/Background:\s*([\s\S]+?)(?:\n\s*Scenario|\n@|$)/);
+  const bgContent = bgMatch && bgMatch[1] ? bgMatch[1] : '';
+  const scenarioMatches = [...featureContent.matchAll(/Scenario(?: Outline)?:\s*[^\n]*\n([\s\S]*?)(?=\n\s*Scenario|\n@|$)/g)];
+  const scenarioContent = scenarioMatches.map(m => m[1]).join('\n');
+  const allStepsContent = bgContent + '\n' + scenarioContent;
+
+  // Given → 状态（末尾 token）
+  const givenMatches = allStepsContent.matchAll(/Given\s+(.+)/g);
   for (const m of givenMatches) {
     const grp = m[1];
     if (!grp) continue;
@@ -144,8 +188,8 @@ export function extractBddStateMachine(featureContent: string): {
     }
   }
 
-  // When → 转移
-  const whenMatches = bgContent.matchAll(/When\s+(.+)/g);
+  // When → 转移（首 token）
+  const whenMatches = allStepsContent.matchAll(/When\s+(.+)/g);
   for (const m of whenMatches) {
     const grp = m[1];
     if (!grp) continue;
@@ -156,8 +200,8 @@ export function extractBddStateMachine(featureContent: string): {
     }
   }
 
-  // Then → 不变式
-  const thenMatches = bgContent.matchAll(/Then\s+(.+)/g);
+  // Then → 不变式（首 token）
+  const thenMatches = allStepsContent.matchAll(/Then\s+(.+)/g);
   for (const m of thenMatches) {
     const grp = m[1];
     if (!grp) continue;
