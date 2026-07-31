@@ -163,6 +163,69 @@ digraph process {
 - **审查者输入：** 任务审查者拿到三个路径——同一份简报文件、报告文件、以及审查包——外加约束该任务的全局约束。
 - 修复分派把它们的修复报告（连同测试结果）追加到同一个报告文件，并返回一句简短小结；重新审查读取更新后的文件。
 
+## 文件落地交接 + 编排者状态日志（强化）
+
+> 对上面「文件交接」与下面「持久化进度」的强化：把"O 读路径"降为"O 只读信标"，把"完成账本"补成"current / done / next 当前快照"，并禁止子代理产物经 O 转发。控制者越权搬运内容命中反模式 #10 变体。
+
+### 交接目录 + 信标（status.json）
+
+每次分派在 `.superpowers/sdd/handoff/<task-N>-<role>/` 下落三文件：
+
+| 文件 | 写入者 | 内容 | O 可读 |
+|---|---|---|---|
+| `brief.md` | O（指针型） | 任务一句话 + 输入路径列表 + 报告契约 + 禁止项 | 否 |
+| `output.md` | 子代理 | 完整报告 / diff 摘要 / 评审结论 | **否** |
+| `status.json` | 子代理 | 信标（< 200 字节） | **是（唯一可读）** |
+
+`status.json`：
+
+```json
+{
+  "role": "implementer|reviewer|fixer",
+  "task": "task-N",
+  "state": "DONE|BLOCKED|NEEDS_CONTEXT|DONE_WITH_CONCERNS",
+  "output_path": "handoff/task-N-implementer/output.md",
+  "one_line_summary": "实现了 X，5/5 测试通过，自审发现 1 处已补",
+  "next_hint": "派审查者读 output.md"
+}
+```
+
+**O 只 `Read` `status.json`；禁止 `Read` `output.md` / `brief.md` 内容。** 下游子代理（审查者 / 修复者）直接 `Read` 上游 `output.md`，O 在下游 brief 里只写"读 `handoff/<prev>/output.md`"指针，不粘贴内容。子代理返回 O 的文本 ≤ 5 行（state + `status.json` 路径 + 一句话）。
+
+`task-brief` 产出的简报即 `brief.md`；`review-package` 产出的 diff 包即审查者的输入（由 S 的 `output.md` 引用其路径）。两脚本无需改动，本协议在其产出之上加 `status.json` 信标与"O 不读 output"硬约束。
+
+### 编排者状态日志（current / done / next）
+
+`.superpowers/sdd/orchestrator-state.md`，三段固定，O 的"我在哪 / 干完了什么 / 下一步干什么"地图：
+
+```markdown
+# Orchestrator State
+updated: <ISO>
+## CURRENT
+- 任务 <N> / 分派 <role>（<dispatch-id>）/ 等待 <beacon | 审查 | 修复>
+## DONE
+- [<dispatch-id>] <role> → <one-line> | beacon: handoff/<id>/status.json
+## NEXT
+- [<dispatch-id>] <role> 读 handoff/<prev>/output.md
+```
+
+每次分派前与收到 beacon 后 `Write` 整文件覆盖（原子，非 append）。compaction 后先 `Read` 本文件 + `progress.md` 重建位置，**不得凭记忆分派**。
+
+**与 `progress.md` 互补、不替代**：本文件是当前快照（current/done/next，覆盖式），`progress.md` 是完成账本（append-only，`Task N: complete (commits ...)`）。两者并存。
+
+### 任务拆分预算（simplicity budget）
+
+每个子代理任务须满足**全部**，否则先拆分再分派：
+
+- 单一产出类型（实现 / 审查 / 修复之一）；混合 → 拆
+- 输入文件 ≤ 5 个；超出 → 用 `brief.md` 聚合路径，子代理按需 Read
+- 产出文件 ≤ 3 个；超出 → 拆
+- 预期单次往返；`BLOCKED` / `NEEDS_CONTEXT` ≥ 2 次 / 轮次膨胀 → O 拆分后重派（不计返工轮次，属编排拆分）
+
+### O token 最小化清单
+
+O 会话禁止出现：产物正文、diff 内容、代码正文、审查 JSON 内容。O 只读 `orchestrator-state.md` / `handoff/*/status.json` / `progress.md` / git 退出码与 `review-package` 打印的路径。O 只写 `orchestrator-state.md` / `progress.md`（append）/ `handoff/<id>/brief.md`（指针型）。旁白 ≤ 1 句/工具调用。
+
 ## 持久化进度
 
 会话记忆无法在上下文压缩（compaction）中存活。在真实会话里，丢失了位置的控制者曾重新分派整段已经完成的任务序列——这是观察到的最昂贵的失败。把进度记在一个账本文件里，而不只是记在待办里。
