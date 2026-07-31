@@ -94,8 +94,8 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
         violations.push(`${f}：缺 callees[] 字段`);
         continue;
       }
-      if (q.blastRadius === undefined || q.blastRadius === null) {
-        violations.push(`${f}：缺 blastRadius 字段（查询结果影响半径）`);
+      if (q.blastRadius === undefined || q.blastRadius === null || typeof q.blastRadius !== 'number') {
+        violations.push(`${f}：缺 blastRadius 字段（查询结果影响半径，须为 number）`);
         continue;
       }
       validCount++;
