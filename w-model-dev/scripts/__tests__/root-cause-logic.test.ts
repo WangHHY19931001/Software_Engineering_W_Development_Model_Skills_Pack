@@ -117,6 +117,13 @@ describe('R10 reality-checker confidence', () => {
     expect(result.passed).toBe(false);
     expect(result.reasons.some(r => /reality-checker.*confidence/.test(r))).toBe(true);
   });
+
+  it('combined 方法 partialReports 缺失 reality-checker 时失败', async () => {
+    const report = await loadSample('bad-r10-no-reality-checker.json');
+    const result = checkRootCauseReport(report);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some(r => /R10.*缺失 reality-checker/.test(r))).toBe(true);
+  });
 });
 
 describe('valid 样本', () => {

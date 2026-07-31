@@ -93,7 +93,7 @@ async function main(): Promise<void> {
     phase,
   };
 
-  console.log(JSON.stringify(output, null, 2));
+  console.log('PREVENTIVE_REVIEW_JSON ' + JSON.stringify({ type: 'preventive-review', passed: output.passed, exitCode: output.exitCode, reasons: output.reasons }));
 
   // 写入 gate-logs
   const gateLogsDir = path.resolve(projectDir, '.w-model', 'gate-logs');

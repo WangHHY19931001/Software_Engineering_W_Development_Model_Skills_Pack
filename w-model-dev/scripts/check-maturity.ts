@@ -63,8 +63,8 @@ const STATUS_TO_PHASES: Record<string, number> = {
 
 // ==================== run-log O 系列失败模式统计 ====================
 
-// 匹配 note 字段中的 O1~O6 失败模式标注（如 "O1 Token Burn"、"O3 Verifier Theater"）
-const O_PATTERN = /O[1-6]/;
+// 匹配 note 字段中的 O1~O6 失败模式标注（如 "O1 Token Burn"、"O3 Verifier Theater"），词边界防止 O100 误命中
+const O_PATTERN = /\bO[1-6]\b/g;
 
 /**
  * 统计 run-log.jsonl 中 O 系列失败模式命中次数。
@@ -88,8 +88,9 @@ function countOperationalFailures(
       continue;
     }
     const e = entry as { note?: string };
-    if (typeof e.note === 'string' && O_PATTERN.test(e.note)) {
-      count++;
+    if (typeof e.note === 'string') {
+      const matches = e.note.match(O_PATTERN);
+      if (matches) count += matches.length;
     }
   }
   return count;

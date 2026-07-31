@@ -69,8 +69,11 @@ export function checkArchiveIntegrity(
           presentFiles.push(`[phase=${phase}] ${requiredFile}`);
         }
       } else if (requiredFile.endsWith('-')) {
-        // 前缀匹配（如 verifier-output-）
-        const found = Array.from(archiveDirContents).some(p => p.includes(requiredFile));
+        // 前缀匹配（如 verifier-output-），按归档根下 basename 精确前缀匹配
+        const found = Array.from(archiveDirContents).some(p => {
+          const base = p.split('/').pop() ?? '';
+          return base.startsWith(requiredFile);
+        });
         if (!found) {
           missingFiles.push(`[phase=${phase}] ${requiredFile}*（前缀匹配失败）`);
         } else {

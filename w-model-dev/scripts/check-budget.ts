@@ -66,7 +66,7 @@ interface ReworkStats {
 /**
  * 统计 run-log.jsonl 中的返工记录数。
  * - reworkCount     = action === 'rework' 且（若提供 phase）phase === N 的记录数
- * - tlaReworkCount  = action === 'tla-rework' 且（若提供 phase）phase === N 的记录数
+ * - tlaReworkCount  = action === 'rework' 且（note 或 target 含 'TLA/tla'）且（若提供 phase）phase === N 的记录数
  *
  * 容错：空行跳过，单行解析失败跳过该行并 console.error 警告。
  */
@@ -87,10 +87,17 @@ function countReworks(
       console.error(`⚠ run-log 第 ${i + 1} 行非合法 JSON，已跳过: ${runLogAbs}`);
       continue;
     }
-    const e = entry as { action?: string; phase?: number };
+    const e = entry as { action?: string; phase?: number; note?: string; target?: string };
     if (phase !== undefined && e.phase !== phase) continue;
-    if (e.action === 'rework') reworkCount++;
-    else if (e.action === 'tla-rework') tlaReworkCount++;
+    if (e.action === 'rework') {
+      reworkCount++;
+      if (
+        (typeof e.note === 'string' && /TLA/i.test(e.note)) ||
+        (typeof e.target === 'string' && /TLA/i.test(e.target))
+      ) {
+        tlaReworkCount++;
+      }
+    }
   }
   return { reworkCount, tlaReworkCount };
 }

@@ -74,9 +74,10 @@ async function main(): Promise<void> {
     }
   }
   console.log('═'.repeat(60));
-  console.log(JSON.stringify({ passed: result.passed, reasonCount: result.reasons.length }));
+  const exitCode1 = result.passed ? 0 : 1;
+  console.log('ROOTCAUSE_JSON ' + JSON.stringify({ type: 'rootcause', passed: result.passed, exitCode: exitCode1, reasonCount: result.reasons.length }));
 
-  process.exit(result.passed ? 0 : 1);
+  process.exit(exitCode1);
 }
 
 main().catch((err) => {

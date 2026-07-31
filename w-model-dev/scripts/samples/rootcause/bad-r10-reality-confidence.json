@@ -64,7 +64,7 @@
   ],
   "partialReports": [
     {
-      "personaSlice": "testing-reality-checker",
+      "personaSlice": "reality-checker",
       "path": ".w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json",
       "confidence": 0.3
     }

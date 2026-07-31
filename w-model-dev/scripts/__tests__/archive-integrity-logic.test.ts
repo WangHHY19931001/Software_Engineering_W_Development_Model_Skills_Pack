@@ -44,4 +44,14 @@ describe('[21.0.0] archive-integrity-logic', () => {
     expect(ARCHIVE_INTEGRITY_CHECKLIST['8']).toContain('acceptance-test-report.json');
     expect(ARCHIVE_INTEGRITY_CHECKLIST.global).toContain('signature-chain.jsonl');
   });
+
+  it('非归档根下同名文件不满足 verifier-output- 前缀匹配', () => {
+    // 文件在非归档根子目录下，basename 不以 verifier-output- 开头
+    const contents = new Set([
+      'some/deep/path/other-verifier-output-1.json',
+    ]);
+    const result = checkArchiveIntegrity(contents, ['global']);
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some(f => f.includes('verifier-output-'))).toBe(true);
+  });
 });

@@ -935,6 +935,7 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
   { file: 'bad-r8-report-id.json', expectedPassed: false, expectedReasonPatterns: [/reportId.*格式/], description: 'R8 reportId 含下划线' },
   { file: 'bad-r9-partial-missing.json', expectedPassed: false, expectedReasonPatterns: [/partialReports.*非空/], description: 'R9 多角度缺 partialReports' },
   { file: 'bad-r10-reality-confidence.json', expectedPassed: false, expectedReasonPatterns: [/reality-checker.*confidence/], description: 'R10 reality-checker confidence=0.3' },
+  { file: 'bad-r10-no-reality-checker.json', expectedPassed: false, expectedReasonPatterns: [/R10.*缺失 reality-checker/], description: 'R10 combined 方法 partialReports 缺失 reality-checker personaSlice（E16）' },
 ];
 
 // -------------------- Preventive Review（第22轮新增） --------------------

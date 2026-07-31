@@ -65,7 +65,7 @@ async function main(): Promise<void> {
       },
     };
 
-    console.log(JSON.stringify(output, null, 2));
+    console.log('TLA_BDD_SYNC_JSON ' + JSON.stringify({ type: 'tla-bdd-sync', passed: output.passed, exitCode: output.exitCode, violations: output.violations }));
     process.exit(output.exitCode);
   } catch (err) {
     console.error('输入错误：', err);

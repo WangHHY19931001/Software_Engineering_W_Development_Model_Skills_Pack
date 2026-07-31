@@ -87,6 +87,20 @@ function extractExitCode(content: string): number | undefined {
     /MATURITY_JSON\s+(\{.*\})/,
     /CHECKPOINT_JSON\s+(\{.*\})/,
     /GATE_JSON\s+(\{.*\})/,
+    /SIGNATURE_CHAIN_JSON\s+(\{.*\})/,
+    /ARCHIVE_INTEGRITY_JSON\s+(\{.*\})/,
+    /ROLE_DISPATCH_JSON\s+(\{.*\})/,
+    /CODE_TLA_JSON\s+(\{.*\})/,
+    /COVERAGE_JSON\s+(\{.*\})/,
+    /EXEMPTION_JSON\s+(\{.*\})/,
+    /CONTRACT_JSON[:\s]+(\{.*\})/,
+    /OPSX_ARTIFACTS_JSON\s+(\{.*\})/,
+    /OPENSPEC_ARCHIVE_JSON\s+(\{.*\})/,
+    /CODEGRAPH_QUERIES_JSON\s+(\{.*\})/,
+    /BDD_JSON\s+(\{.*\})/,
+    /PREVENTIVE_REVIEW_JSON\s+(\{.*\})/,
+    /ROOTCAUSE_JSON\s+(\{.*\})/,
+    /TLA_BDD_SYNC_JSON\s+(\{.*\})/,
   ];
   for (const pattern of patterns) {
     const match = content.match(pattern);
@@ -103,7 +117,7 @@ function extractExitCode(content: string): number | undefined {
 }
 
 /**
- * 加载 gate-logs 目录下所有 .log 文件，构建 Map。
+ * 加载 gate-logs 目录下全部文件，构建 Map。
  *
  * gateLogPath 匹配策略：run-log 条目的 gateLogPath 可能是相对路径或文件名。
  * 构建 Map 时同时存 basename、绝对路径、相对 cwd 路径作为 key（三索引），
@@ -132,7 +146,6 @@ async function loadGateLogs(
   const map = new Map<string, { exitCode?: number; content: string }>();
   let fileCount = 0;
   for (const file of files) {
-    if (!file.endsWith('.log')) continue;
     fileCount++;
     const fileAbs = path.join(dirAbs, file);
     try {
@@ -239,7 +252,7 @@ async function main(): Promise<void> {
   console.log('═'.repeat(60));
   console.log(`输入文件        : ${runLogAbs}`);
   console.log(`条目数          : ${entries.length}`);
-  console.log(`--gate-logs     : ${gateLogsDir ?? '未提供'}${gateLogs ? `（已加载 ${gateLogFileCount} 个 .log 文件）` : ''}`);
+  console.log(`--gate-logs     : ${gateLogsDir ?? '未提供'}${gateLogs ? `（已加载 ${gateLogFileCount} 个文件）` : ''}`);
   console.log(`--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`);
   console.log(`校验结果        : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));

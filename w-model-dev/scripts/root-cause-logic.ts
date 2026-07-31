@@ -289,16 +289,21 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   }
 
   // R9 多角度场景 partialReports 非空
-  // R10 多角度场景 reality-checker confidence ≥ 0.5
-  const isMultiPersona = r.meta?.method === 'combined';
-  if (isMultiPersona) {
-    if (!Array.isArray(r.partialReports) || r.partialReports.length === 0) {
+  // R10 多角度场景 reality-checker personaSlice 强制（不限 method）：任一有效 partialReport 含 personaSlice==='reality-checker' 且 confidence ≥ 0.5
+  const hasPartialReports = Array.isArray(r.partialReports) && r.partialReports.length > 0;
+  if (hasPartialReports) {
+    const realityChecker = r.partialReports!.find(p => p.personaSlice === 'reality-checker');
+    if (!realityChecker) {
+      reasons.push('R10: 多角度场景缺失 reality-checker personaSlice（防幻想根因）');
+    } else if (typeof realityChecker.confidence === 'number' && realityChecker.confidence < MIN_REALITY_CONFIDENCE) {
+      reasons.push(`R10: 多角度场景 reality-checker persona confidence=${realityChecker.confidence} < ${MIN_REALITY_CONFIDENCE}（防幻想根因）`);
+    }
+  } else {
+    // 无 partialReports 时 R9 不强制（非 combined 方法可能无 partialReports）
+    // 如 method=combined 则 R9 要求 partialReports 非空
+    const isCombined = r.meta?.method === 'combined';
+    if (isCombined) {
       reasons.push('多角度场景（method=combined）partialReports 必须为非空数组');
-    } else {
-      const realityChecker = r.partialReports.find(p => p.personaSlice?.includes('reality-checker'));
-      if (realityChecker && typeof realityChecker.confidence === 'number' && realityChecker.confidence < MIN_REALITY_CONFIDENCE) {
-        reasons.push(`多角度场景 reality-checker persona confidence=${realityChecker.confidence} < ${MIN_REALITY_CONFIDENCE}（防幻想根因）`);
-      }
     }
   }
 

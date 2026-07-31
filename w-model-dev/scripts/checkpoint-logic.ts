@@ -207,8 +207,8 @@ export function checkCheckpoint(
         );
         continue;
       }
-      // 2. 长度检查（字符数，中英文都算 1）
-      if (decision.length < 10) {
+      // 2. 长度检查（Unicode 码点数，中英文都算 1）
+      if ([...decision].length < 10) {
         violations.push(`R2: 条目 ${e.runId} 决策 "${decision}" 长度 < 10`);
         continue;
       }

@@ -336,7 +336,8 @@ async function main(): Promise<number> {
 
   // JSON 摘要
   console.log(`\n=== JSON Summary ===`);
-  console.log(JSON.stringify(result, null, 2));
+  const summary = { type: 'bdd', passed: result.passed, exitCode: result.exitCode, summary: result.summary };
+  console.log('BDD_JSON ' + JSON.stringify(summary));
 
   // 写入 gate-logs（失败不污染退出码）
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

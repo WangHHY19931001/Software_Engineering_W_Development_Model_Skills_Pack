@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "reportId": "RC-phase5-1-02",
+    "targetKind": "rootcause",
+    "targetArtifact": "w-model-dev-demo/src/services/comment.service.ts",
+    "targetPhase": "阶段 5 - 编码",
+    "reworkRound": 1,
+    "reworkSource": "verifier",
+    "persona": "root-cause-locator",
+    "method": "combined",
+    "analysisTimestamp": "2026-07-24T10:00:00Z"
+  },
+  "input": {
+    "reworkHints": ["[Critical] comment.service.ts 未校验 articleId 是否存在"]
+  },
+  "phenomenon": {
+    "summary": "comment.service.ts create() 未校验 articleId 是否存在就直接创建评论",
+    "severity": "Critical",
+    "affectedArtifacts": ["w-model-dev-demo/src/services/comment.service.ts"]
+  },
+  "rootCauseChain": [
+    {
+      "step": 1,
+      "why": "为什么 create() 未校验 articleId？",
+      "answer": "create() 函数体中无 articleId 存在性检查",
+      "evidence": "comment.service.ts:78-95 create() 函数体"
+    },
+    {
+      "step": 2,
+      "why": "为什么没有存在性检查？",
+      "answer": "接口设计 INTF-COMMENT-001 未规定 articleId 不存在时的行为",
+      "evidence": "interface-design.md INTF-COMMENT-001 节"
+    }
+  ],
+  "rootCause": {
+    "category": "design-flaw",
+    "description": "接口设计 INTF-COMMENT-001 未规定 articleId 不存在时的处理",
+    "evidence": "interface-design.md INTF-COMMENT-001 缺少异常路径处理条款",
+    "falsifiabilityCheck": "若在 INTF-COMMENT-001 中增加 articleId 不存在时返回 404 的条款，则不存在性校验缺失现象消失"
+  },
+  "upstreamDefect": {
+    "present": true,
+    "upstreamPhase": "阶段 3",
+    "upstreamArtifactId": "INTF-COMMENT-001",
+    "defectDescription": "接口设计未规定 articleId 不存在的异常路径",
+    "rollbackRecommended": false
+  },
+  "fixRecommendation": [
+    {
+      "target": "w-model-dev-demo/src/services/comment.service.ts",
+      "location": "comment.service.ts:78 create() 入口",
+      "action": "增加 articleId 存在性校验，不存在时 throw new NotFoundError('文章不存在')",
+      "rationale": "消除根因（articleId 未校验），与 INTF-COMMENT-001 补充条款一致"
+    }
+  ],
+  "prevention": [
+    {
+      "scope": "phase-3-outline-design",
+      "measure": "接口设计模板增加「异常路径检查」项，强制规定所有参数不存在的返回状态码",
+      "owner": "S-intf"
+    }
+  ],
+  "partialReports": [
+    {
+      "personaSlice": "engineering-testability",
+      "path": ".w-model/rootcause/partial/RC-phase5-1-02/engineering-testability.json",
+      "confidence": 0.9
+    },
+    {
+      "personaSlice": "design-architect",
+      "path": ".w-model/rootcause/partial/RC-phase5-1-02/design-architect.json",
+      "confidence": 0.85
+    }
+  ],
+  "qualityLevel": "B",
+  "passed": true,
+  "summary": "评论创建未校验文章存在的根因为接口设计 INTF-COMMENT-001 未规定异常路径，须补接口设计 + 补编码校验",
+  "reviewNotes": ""
+}

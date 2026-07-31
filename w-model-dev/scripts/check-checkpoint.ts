@@ -101,7 +101,9 @@ async function loadCheckpointLog(
   for (const file of files) {
     const match = file.match(phasePattern);
     if (!match) continue;
-    const phase = match[1];
+    const phaseNum = parseInt(match[1]!, 10);
+    if (isNaN(phaseNum)) continue;
+    const phase = String(phaseNum);
     const fileAbs = path.join(dirAbs, file);
     try {
       const content = await fs.readFile(fileAbs, 'utf-8');
