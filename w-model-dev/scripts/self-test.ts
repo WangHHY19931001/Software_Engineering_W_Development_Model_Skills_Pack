@@ -37,7 +37,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkVerifierOutput } from './verifier-logic.js';
 import { validateBySchema } from './schema-loader.js';
-import { checkArtifactGate } from './gate-logic.js';
+import { checkArtifactGate, type GateGraph } from './gate-logic.js';
 import { checkRequirementGraph } from './graph-logic.js';
 import { checkTlaModel } from './tla-logic.js';
 import { checkBudget } from './budget-logic.js';
@@ -98,6 +98,8 @@ interface GateCase {
   description: string;
   /** P1.1 阶段级校验选项：传入时按对应 phase 校验，未传时默认 phase=8（终检） */
   phaseOption?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  /** SD→codeModule 映射校验（phase >= 5 + graph 存在时触发 checkSdToCodeModuleMapping） */
+  graph?: GateGraph;
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -332,6 +334,14 @@ const GATE_CASES: GateCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/NFR 行 NFR-001 缺 targetValue 与 testThreshold/],
     description: 'NFR-001 行缺 targetValue + testThreshold 双字段，应被 NFR 双值校验拦截',
+  },
+  // -------------------- round28 G-B SD 数字层级映射 --------------------
+  {
+    file: 'valid-sd-numeric-levels.json',
+    expectedPassed: true,
+    phaseOption: 5,
+    graph: { nodes: [{ id: 'SD-5.2.1', type: 'SD' }] },
+    description: 'SD 数字层级 id（SD-5.2.1）经 checkSdToCodeModuleMapping 识别为数字层级，命中 codeModule 前缀映射应通过',
   },
 ];
 
@@ -1653,10 +1663,10 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
-    // P1.1 阶段级校验：传入 phaseOption 时按对应 phase 校验
-    const r = c.phaseOption
-      ? checkArtifactGate(parsed as never, { phaseOption: c.phaseOption })
-      : checkArtifactGate(parsed as never);
+    const options: Record<string, unknown> = {};
+    if (c.phaseOption) options.phaseOption = c.phaseOption;
+    if (c.graph) options.graph = c.graph;
+    const r = checkArtifactGate(parsed as never, Object.keys(options).length > 0 ? options as never : undefined);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
