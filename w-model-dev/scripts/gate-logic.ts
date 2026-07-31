@@ -140,11 +140,14 @@ function checkSdToCodeModuleMapping(
 
   for (const sd of sdNodes) {
     const id = String(sd.id ?? '');
-    const raw = id.replace(/^SD-/i, '');
-    const segments = raw
+    const stripped = id.replace(/^SD-/, '');
+    const segments = stripped
       .split(/[-_.]+/)
       .map(s => s.toLowerCase())
       .filter(s => s.length >= 2);
+    if (segments.length === 0 && codeModules.some((m: string) => m.includes(`${id}:`))) {
+      continue; // 数字层级 id（如 SD-5.2.1）命中 codeModule 前缀映射
+    }
     if (segments.length === 0) {
       violations.push(`TLA+ 资产校验失败：SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`);
       continue;
@@ -214,6 +217,10 @@ export function checkUatPathMappingBackfill(mappings: UatPathMappingRow[]): stri
 
   for (const m of mappings) {
     if (!m || typeof m.uatId !== 'string') continue;
+    if (typeof m.actualPath !== 'string' || typeof m.mappingType !== 'string') {
+      violations.push(`uat-path-mapping 字段类型非法：${m.uatId} 的 actualPath/mappingType 必须为字符串`);
+      continue;
+    }
     if (m.actualPath.includes('_待阶段5回填_') || m.actualPath.trim() === '') {
       violations.push(`uat-path-mapping 未回填：${m.uatId} 的实际路径仍为 "_待阶段5回填_" 或为空`);
     }
@@ -322,26 +329,36 @@ export function checkArtifactGate(
 
   const totalRows = matrix.rows.length;
   const coveredRows = totalRows - missingItems.length;
-  const coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
+  let coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
+  // coveragePercent 与 missingItems 联动（约束 #18）：存在追溯缺失项时覆盖率强制 < 100，
+  // 防止 (total-1)/total 舍入边界（如 199/200=99.5→100）掩盖缺失
+  if (missingItems.length > 0 && coveragePercent >= 100) coveragePercent = 99;
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
   if (totalRows === 0) reasons.push('RTM 无需求行');
 
-  // ==================== coverageStatus 字段一致性校验（第24轮 P0 新增） ====================
-  // 约束 #18：coverageStatus 须与 coveragePercent 一致
-  // "100%" → coveragePercent 须 = 100；"部分" → coveragePercent 须 < 100；"待覆盖" → 违反
+  // ==================== coverageStatus 字段一致性校验（第24轮 P0，round28 改行级） ====================
+  // 约束 #18：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
+  //   "100%" → 该行所需 RTM 字段齐全；"部分" → 该行存在追溯缺失；"待覆盖" → 违反
+  //   （"完整" 等历史兼容值与非标准值不参与一致性判定，由 missingItems 覆盖检查兜底）
+  const missingReqIds = new Set(missingItems.map(item => item.requirementId));
+  const missingFieldsByReqId = new Map<string, string[]>(
+    missingItems.map(item => [item.requirementId, item.fields]),
+  );
   for (const row of matrix.rows) {
     if (!row || typeof row.coverageStatus !== 'string') continue;
     const status = row.coverageStatus.trim();
-    if (status === '100%') {
-      if (coveragePercent !== 100) {
-        reasons.push(`RTM coverageStatus="100%" 但 coveragePercent=${coveragePercent}%，coverageStatus 与 coveragePercent 不一致`);
-      }
-    } else if (status === '部分') {
-      if (coveragePercent >= 100) {
-        reasons.push(`RTM coverageStatus="部分" 但 coveragePercent=${coveragePercent}%，coverageStatus 与 coveragePercent 不一致`);
-      }
-    } else if (status === '待覆盖') {
+    if (status === '待覆盖') {
       reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #18）`);
+      continue;
+    }
+    const rowComplete = !missingReqIds.has(row.requirementId);
+    if (status === '100%' && !rowComplete) {
+      const fields = missingFieldsByReqId.get(row.requirementId) ?? [];
+      reasons.push(
+        `RTM coverageStatus="100%" 但该行追溯不完整（缺少 ${fields.join('、')}），coverageStatus 与行级完整性不一致`,
+      );
+    } else if (status === '部分' && rowComplete) {
+      reasons.push(`RTM coverageStatus="部分" 但该行追溯完整，coverageStatus 与行级完整性不一致`);
     }
   }
 

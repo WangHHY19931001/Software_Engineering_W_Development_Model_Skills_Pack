@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../tla-logic.js';
 import { checkVerifierOutput, type VerifierOutputShape } from '../verifier-logic.js';
-import { checkArtifactGate, type RTMMatrixShape, type PhaseOption } from '../gate-logic.js';
+import { checkArtifactGate, checkUatPathMappingBackfill, type GateGraph, type RTMMatrixShape, type PhaseOption } from '../gate-logic.js';
 import { checkRequirementGraph, type GraphShape } from '../graph-logic.js';
 import { checkRequirementCoverage, type CoverageShape, type CoverageCheckOptions } from '../coverage-logic.js';
 import { checkExemption, type ExemptionShape } from '../exemption-logic.js';
@@ -626,5 +626,89 @@ describe('P0-2 codeModule 格式校验（第22轮）', () => {
     };
     const result = checkArtifactGate(matrix, { phaseOption: 5 });
     expect(result.reasons.some(r => r.includes('codeModule 格式错误'))).toBe(false);
+  });
+});
+
+// ==================== 第 28 轮 G-B gate-logic 修正（B1-B3） ====================
+describe('G-B gate-logic 修正（round28）', () => {
+  describe('B1: SD 数字层级 id codeModule 前缀映射兜底', () => {
+    it('SD-5.2.1 命中 codeModule "SD-5.2.1:src/..." 前缀 → 应通过，不误报"无可识别段"', () => {
+      const matrix: RTMMatrixShape = {
+        rows: [{
+          requirementId: 'REQ-001',
+          description: '登录',
+          designDoc: 'SD-5.2.1',
+          codeModule: 'SD-5.2.1:src/auth/login.ts',
+          unitTest: 'UT-001',
+          integrationTest: 'IT-001',
+          systemTest: 'ST-001',
+          acceptanceTest: 'UAT-001',
+          coverageStatus: '100%',
+        }],
+        executionSummary: {
+          unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+          integrationTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+          systemTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+          acceptanceTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+        },
+      };
+      const graph: GateGraph = { nodes: [{ id: 'SD-5.2.1', type: 'SD' }] };
+      const result = checkArtifactGate(matrix, { graph, phaseOption: 8 });
+      expect(result.passed).toBe(true);
+      expect(result.reasons.some(r => r.includes('TLA+ 资产校验失败'))).toBe(false);
+    });
+  });
+
+  describe('B2: coverageStatus 行级一致性比较', () => {
+    it('行 A 完整+"100%" 不应被 flag；行 B 缺 acceptanceTest 应被 flag（不误报行 A）', () => {
+      const matrix: RTMMatrixShape = {
+        rows: [
+          {
+            requirementId: 'REQ-A',
+            description: '完整行',
+            designDoc: 'SD-1.1',
+            codeModule: 'SD-1.1:src/a.ts',
+            unitTest: 'UT-A',
+            integrationTest: 'IT-A',
+            systemTest: 'ST-A',
+            acceptanceTest: 'UAT-A',
+            coverageStatus: '100%',
+          },
+          {
+            requirementId: 'REQ-B',
+            description: '缺验收',
+            designDoc: 'SD-2.1',
+            codeModule: 'SD-2.1:src/b.ts',
+            unitTest: 'UT-B',
+            integrationTest: 'IT-B',
+            systemTest: 'ST-B',
+            acceptanceTest: '',
+            coverageStatus: '0%',
+          },
+        ],
+        executionSummary: {
+          unitTest: { total: 2, passed: 2, failed: 0, pending: 0, coverage: 90 },
+          integrationTest: { total: 2, passed: 2, failed: 0, pending: 0, coverage: 90 },
+          systemTest: { total: 2, passed: 2, failed: 0, pending: 0, coverage: 90 },
+          acceptanceTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+        },
+      };
+      const result = checkArtifactGate(matrix, { phaseOption: 8 });
+      // 整体仍失败（行 B 追溯不完整）
+      expect(result.passed).toBe(false);
+      // 行 B 被 flag（缺失 acceptanceTest）
+      expect(result.reasons.some(r => r.includes('REQ-B'))).toBe(true);
+      // 行 A 不应因 coverageStatus 被 flag：不得再有矩阵全局比较产生的 "coverageStatus...不一致"
+      expect(result.reasons.some(r => r.includes('coverageStatus') && r.includes('不一致'))).toBe(false);
+    });
+  });
+
+  describe('B3: uat-path-mapping 回填校验类型 guard', () => {
+    it('actualPath/mappingType 非字符串 → 不抛 TypeError，push violation 后继续', () => {
+      const violations = checkUatPathMappingBackfill([
+        { uatId: 'UAT-001', actualPath: 123 as unknown as string, mappingType: '直接' },
+      ]);
+      expect(violations.some(v => v.includes('UAT-001') && v.includes('类型'))).toBe(true);
+    });
   });
 });
