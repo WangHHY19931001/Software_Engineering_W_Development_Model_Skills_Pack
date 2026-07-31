@@ -83,6 +83,8 @@ export interface RunLogEntry {
 export interface RunLogCheckOptions {
   /** R3: tla-manifest 的 checkRounds（TLA+ 返工轮数），用于与 run-log rework 记录数比对 */
   tlaCheckRounds?: number;
+  /** R3: 当前阶段编号，用于按阶段过滤 rework 条目 */
+  phase?: number;
   /** R5/R6: gate-logs 数据，key = gateLogPath，value = { exitCode?, content } */
   gateLogs?: Map<string, { exitCode?: number; content: string }>;
 }
@@ -145,7 +147,9 @@ export function checkRunLog(
 
   // R1 阶段动作完整性
   // "已完成阶段"定义：该阶段有 action=checkpoint 且 outcome=success 的记录。
-  // 对每个已完成阶段，检查是否含至少 chunk / cross / gate(类) / checkpoint 四类动作。
+  // 对每个已完成阶段，按阶段分档检查动作完整性：
+  //   阶段 1-4：chunk / cross / gate(类) / checkpoint
+  //   阶段 5-8：produce / review / gate(类) / checkpoint
   const completedPhases = new Set<number>();
   for (const e of valid) {
     if (e.action === 'checkpoint' && e.outcome === 'success') {
@@ -155,13 +159,16 @@ export function checkRunLog(
   for (const phase of completedPhases) {
     const phaseEntries = valid.filter(e => e.phase === phase);
     const actions = new Set(phaseEntries.map(e => e.action));
-    const hasChunk = actions.has('chunk');
-    const hasCross = actions.has('cross');
     const hasGate =
       actions.has('gate') || actions.has('tla-gate') || actions.has('graph-gate');
     const hasCheckpoint = actions.has('checkpoint');
-    if (!hasChunk) violations.push(`R1: 阶段 ${phase} 缺 chunk 动作`);
-    if (!hasCross) violations.push(`R1: 阶段 ${phase} 缺 cross 动作`);
+    if (phase >= 1 && phase <= 4) {
+      if (!actions.has('chunk')) violations.push(`R1: 阶段 ${phase} 缺 chunk 动作`);
+      if (!actions.has('cross')) violations.push(`R1: 阶段 ${phase} 缺 cross 动作`);
+    } else {
+      if (!actions.has('produce')) violations.push(`R1: 阶段 ${phase} 缺 produce 动作`);
+      if (!actions.has('review')) violations.push(`R1: 阶段 ${phase} 缺 review 动作`);
+    }
     if (!hasGate) violations.push(`R1: 阶段 ${phase} 缺 gate 类动作`);
     if (!hasCheckpoint) violations.push(`R1: 阶段 ${phase} 缺 checkpoint 动作`);
   }
@@ -200,35 +207,57 @@ export function checkRunLog(
   }
 
   // R3 返工记录一致性（可选校验：仅当 tlaCheckRounds 提供时执行）
+  // 按 phase 过滤 + 仅统计 target/note 含 TLA 的返工，与 tla-manifest checkRounds 语义对齐
   if (options?.tlaCheckRounds !== undefined) {
-    const reworkCount = valid.filter(e => e.action === 'rework').length;
-    if (reworkCount !== options.tlaCheckRounds) {
+    let reworkEntries = valid.filter(e => e.action === 'rework');
+    if (options.phase !== undefined) {
+      reworkEntries = reworkEntries.filter(e => e.phase === options.phase);
+    }
+    const tlaReworkCount = reworkEntries.filter(
+      e => (e.note && /TLA/i.test(e.note)) || (e.target && /TLA/i.test(e.target)),
+    ).length;
+    if (tlaReworkCount !== options.tlaCheckRounds) {
       violations.push(
-        `R3: run-log rework 记录数 ${reworkCount} 与 tla-manifest.checkRounds ${options.tlaCheckRounds} 不一致`,
+        `R3: run-log TLA rework 记录数 ${tlaReworkCount} 与 tla-manifest.checkRounds ${options.tlaCheckRounds} 不一致`,
       );
     }
   }
 
-  // R3 扩展：rootcause ↔ fix 一一对应 + V 复审 rootcause 记录数 = R 记录数（spec §7.6）
+  // R3 扩展：rootcause ↔ fix 通过 reportId 映射（去重后比较，一个 fix 可覆盖多份 R 报告）
   const rootcauseActions = valid.filter(e => e.action === 'rootcause');
   const fixActions = valid.filter(e => e.action === 'fix');
   const rootcauseReviews = valid.filter(e => e.action === 'review' && e.targetKind === 'rootcause');
 
-  if (rootcauseActions.length !== fixActions.length) {
-    violations.push(
-      `R3: rootcause 记录数(${rootcauseActions.length}) ≠ fix 记录数(${fixActions.length})，须一一对应`,
-    );
+  // 收集所有唯一的 reportId
+  const uniqueReportIds = new Set(
+    rootcauseActions.map(r => r.reportId).filter((id): id is string => typeof id === 'string' && id.trim() !== ''),
+  );
+  const coveredReportIds = new Set<string>();
+  for (const f of fixActions) {
+    if (typeof f.basedOnReport === 'string' && f.basedOnReport.trim() !== '') {
+      for (const rid of f.basedOnReport.split(/[;,]\s*/)) {
+        const trimmed = rid.trim();
+        if (trimmed) coveredReportIds.add(trimmed);
+      }
+    }
   }
-  for (const r of rootcauseActions) {
-    if (!fixActions.some(f => f.basedOnReport === r.reportId)) {
+
+  // 每个唯一 reportId 须有至少一个 fix
+  for (const rid of uniqueReportIds) {
+    if (!coveredReportIds.has(rid)) {
       violations.push(
-        `R3: rootcause 报告 ${r.reportId ?? '?'} 无对应 fix 记录（basedOnReport 缺失）`,
+        `R3: rootcause 报告 ${rid} 无对应 fix 记录（basedOnReport 缺失）`,
       );
     }
   }
-  if (rootcauseReviews.length !== rootcauseActions.length) {
+
+  // V 复审 rootcause 记录按 reportId（target 字段）去重计数
+  const reviewedReportIds = new Set(
+    rootcauseReviews.map(r => r.target).filter((t): t is string => typeof t === 'string' && t.trim() !== ''),
+  );
+  if (reviewedReportIds.size !== uniqueReportIds.size) {
     violations.push(
-      `R3: V 复审 rootcause 记录数(${rootcauseReviews.length}) ≠ R 记录数(${rootcauseActions.length})，每份 R 报告须有 V 复审`,
+      `R3: V 复审 rootcause 记录数(${reviewedReportIds.size}) ≠ R 记录数(${uniqueReportIds.size})，每份 R 报告须有 V 复审`,
     );
   }
 
@@ -301,6 +330,15 @@ export function checkRunLog(
     }
   }
 
+  // R6 gateExitCode 回填检查：gateLogPath 存在但 gateExitCode 非 number → 始终报
+  for (const e of valid) {
+    if (e.gateLogPath && typeof e.gateExitCode !== 'number') {
+      violations.push(
+        `R6: 条目 ${e.runId ?? '?'} gateLogPath 已设但 gateExitCode 未回填`,
+      );
+    }
+  }
+
   // R6 exitCode 一致（可选校验：仅当 gateLogs 提供时执行）
   // 交叉校验 run-log 条目 gateExitCode 与 gate-log 存档 exitCode 一致（SSoT §10E 防伪造）
   if (options?.gateLogs) {
@@ -353,15 +391,17 @@ export function checkRunLog(
     if (!curEntry || curEntry.action !== 'rootcause') continue;
     // 后续须先有 review(targetKind=rootcause) 再有 fix
     let j = i + 1;
-    while (j < valid.length && valid[j]?.action !== 'review') j++;
-    if (j >= valid.length || valid[j]?.targetKind !== 'rootcause') {
+    while (j < valid.length && !(valid[j]?.action === 'review' && valid[j]?.targetKind === 'rootcause')) j++;
+    if (j >= valid.length || !valid[j]) {
       violations.push(
-        `R7: rootcause 记录 ${curEntry.runId} 后须紧跟 review(targetKind=rootcause)`,
+        `R7: rootcause 记录 ${curEntry.runId} 后须有 review(targetKind=rootcause)`,
       );
+      continue;
     }
     // fix 须在 review(rootcause) 之后
-    while (j < valid.length && valid[j]?.action !== 'fix') j++;
-    if (j >= valid.length || !valid[j]) {
+    let k = j + 1;
+    while (k < valid.length && valid[k]?.action !== 'fix') k++;
+    if (k >= valid.length || !valid[k]) {
       violations.push(
         `R7: rootcause 记录 ${curEntry.runId} 后须有 fix 记录`,
       );

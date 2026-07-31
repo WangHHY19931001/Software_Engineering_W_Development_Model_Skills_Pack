@@ -394,6 +394,19 @@ interface RunLogEntry {
 - `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
 - **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`。第 15 轮共性问题 B 子代理误用 `eventId` / `eventType` / `decisions` 触发 R1 失败（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`；第 17 轮 P3 修正历史叙述加注）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
 
+### R1 阶段动作完整性：按阶段分档
+
+> 由 [`scripts/run-log-logic.ts`](../scripts/run-log-logic.ts) R1 校验。对每个已完成阶段（含 checkpoint success），按阶段编号分档检查必需动作：
+
+| 阶段范围 | 必需动作 | 说明 |
+|---|---|---|
+| 1-4（分析/设计阶段） | `chunk` / `cross` / gate 类（gate/tla-gate/graph-gate） / `checkpoint` | A 子代理的 ingestion chunk/cross 拆解 + G 门禁 + O CHECKPOINT |
+| 5-8（编码/测试/验证阶段） | `produce` / `review` / gate 类 / `checkpoint` | S 子代理的产出 + V 评审 + G 门禁 + O CHECKPOINT |
+
+- gate 类动作包括 `gate`、`tla-gate`、`graph-gate`，任一存在即满足。
+- 阶段 1-4 不要求 `produce`/`review`；阶段 5-8 不要求 `chunk`/`cross`。
+- 所有阶段均要求 gate 类动作和 checkpoint。missing 任一必需动作 → R1 违规。
+
 ### 动作类型字段约束（rootcause / fix / escalate 扩展）
 
 > 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/run-log-logic.ts`](../scripts/run-log-logic.ts) R1 校验。

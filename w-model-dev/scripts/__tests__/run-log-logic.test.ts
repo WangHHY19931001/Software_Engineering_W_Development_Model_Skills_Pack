@@ -101,3 +101,50 @@ describe('run-log R7 扩展：返工路径时序', () => {
     ).toBe(true);
   });
 });
+
+describe('run-log E5: R1 阶段 5-8 分档', () => {
+  it('阶段 5 含 produce/review/gate/checkpoint 应通过（不要求 chunk/cross）', async () => {
+    const lines = await loadJsonl('phase5-valid.jsonl');
+    const result = checkRunLog(lines);
+    expect(result.passed).toBe(true);
+  });
+
+  it('阶段 5 缺 produce 动作应失败', async () => {
+    const lines = await loadJsonl('phase5-missing-produce.jsonl');
+    const result = checkRunLog(lines);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(r => /R1.*缺 produce/.test(r))).toBe(true);
+  });
+});
+
+describe('run-log E7: gateExitCode 未回填', () => {
+  it('gateLogPath 已设但 gateExitCode 为 null 应被 R6 拦截', async () => {
+    const lines = await loadJsonl('bad-gateExitCode-null.jsonl');
+    const result = checkRunLog(lines);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(r => /R6.*gateLogPath.*gateExitCode/.test(r))).toBe(true);
+  });
+});
+
+describe('run-log E8: rootcause 之后中间夹普通 review 不误报', () => {
+  it('rootcause→普通review→review(targetKind=rootcause)→fix 应通过 R7', async () => {
+    const lines = await loadJsonl('rootcause-intermediate-review.jsonl');
+    const result = checkRunLog(lines);
+    expect(result.passed).toBe(true);
+  });
+});
+
+describe('run-log E9: 1 fix 可覆盖多份 R 报告（去重映射）', () => {
+  it('1 fix（basedOnReport 分号分隔）覆盖 2 份 R 报告应通过', async () => {
+    const lines = await loadJsonl('rootcause-multi-fix.jsonl');
+    const result = checkRunLog(lines);
+    expect(result.passed).toBe(true);
+  });
+
+  it('2 份 R 报告但仅 1 份有 fix 应被 R3 拦截', async () => {
+    const lines = await loadJsonl('rootcause-multi-uncovered.jsonl');
+    const result = checkRunLog(lines);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(r => /R3.*rootcause.*RC-phase5-1-02.*无对应 fix/.test(r))).toBe(true);
+  });
+});
