@@ -18,7 +18,7 @@
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评
 - **Agent Personas（评审角色提示词，V 子代理执行）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），由 V 子代理在执行 `/wm review` 时按 `targetKind` 路由选用；Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI），作为 `reworkHints` 字符串前缀；吸收自 addyosmani/agent-skills `code-review-and-quality`
-- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 40 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失 / #30 豁免审批跳步 / #31 归档完整性缺失 / #32 签名链断裂 / #33 跳过 R3 预防性审查 / #34 编排者漏派角色 / #35 self-as-verifier 模式下 V/G/R 产物混合 / #36 路由顺序错误 / #37 产物膨胀但核心决策稀疏） / #38 修改前未查询 codegraph / #39 跳过 opsx 产物审查 / #40 opsx/S-tickets 职责混淆二分；F# 重复命中 ≥2 次升级为 L# 教训
+- **核心操作行为 + 失败模式清单**：6 条核心操作行为（Surface Assumptions / Manage Confusion Actively / Push Back When Warranted / 等）+ 10 条失败模式 F1~F10（行为退化，命中不回退但登记）；与 41 条流程反模式（流程破坏，命中即回退，含 #10 编排者越权实施 / #11 ingestion 跳过图谱校验 / #12 A 自评收敛 / #13 信息流黑洞/奇迹/死模块放行 / #14 跳过 SANY 直接 TLC / #15 死锁/不变式违反放行 / #16 TLA+ 占位/简化/错误实现 / #17 TLA+ 建模不符需求/设计不回退 / #18 跳过 R 直接 S 返工 / #19 R 报告未 V 复审直接 S 修复 / #20 只规划不执行（见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）/ #21 阶段级门禁跳过 / #22 角色越权 / #23 跨模块 store 误用 / #24 副作用时序不一致 / #25 JSON 文件 PowerShell 写入 / #26 RunLogEntry 与 EventIngress 字段混用 / #27 调测者简化行为 / #28 schema 前置校验缺失 / #30 豁免审批跳步 / #31 归档完整性缺失 / #32 签名链断裂 / #33 跳过 R3 预防性审查 / #34 编排者漏派角色 / #35 self-as-verifier 模式下 V/G/R 产物混合 / #36 路由顺序错误 / #37 产物膨胀但核心决策稀疏） / #38 修改前未查询 codegraph / #39 跳过 opsx 产物审查 / #40 opsx/S-tickets 职责混淆 / #41 加权平均掩盖单轴失败二分；F# 重复命中 ≥2 次升级为 L# 教训
 - **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储，跨多轮交互保持上下文
@@ -33,6 +33,8 @@
 - **SkillOpt 方法论吸收**：吸收 [microsoft/SkillOpt](https://github.com/microsoft/SkillOpt)「bounded edit + validation gate」方法论，消费 Loop 4 产出的 HarnessImprovementReport 信号，对技能/模板/参考/脚本 4 类资产做离线进化。不引入 Python 依赖、不调用 LLM（方法论吸收非工具运行，与 §11 协调）。详见 [skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md)。
 - **codegraph 修改前影响分析**（阶段 5-8，第 25 轮新增）：S-coding 子代理在 Edit/Write 任何代码/测试文件前，须先调用 codegraph_explore MCP 工具查询目标符号的 callers/callees/blast radius，结果落盘 `.w-model/codegraph-queries/`。与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。详见 [phase-5-coding.md](./w-model-dev/references/phase-5-coding.md)「codegraph 修改前影响分析」节
 - **OpenSpec opsx 三段式 S 分派**（阶段 5-8，第 25 轮新增）：引入 opsx:explore/propose/apply/archive 规格驱动变更工作流，S-explore（思路探索+codegraph 影响初判）→ S-propose（规格级变更规划+S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码）。每段产物跑 R3×3（completeness/reliability/security）+ V 评审，不合格打回重做。详见 [phase-5-coding.md](./w-model-dev/references/phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节
+- **单轴下限 R13**（第 26 轮新增）：Verifier 评审 passed 判据收紧为 `qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70`（0.70 = B 级分界），杜绝「加权平均掩盖单轴失败」（反模式 #41）——completeness=0.65 但其余 0.95 加权后达 A 级的历史放行路径被拦截。外部原则「评审各轴独立成环，永不合并计分」为设计依据。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md) §3.3 / §6.3
+- **Fowler 12 坏味道基线 + 票据 durability + 术语治理**（第 26 轮新增）：`engineering-code-reviewer.md` 固定 12 条坏味道基线（重复代码 / 过长方法 / 过大类 / 特征依恋 / 数据泥团 / Switch 语句 / 临时字段 / 消息链等，评审命中须引用条目名）；`phase-5-coding.md` 票据主体 = 符号级契约（接口/类型/状态转移），位置信息交给 codegraph，杜绝 fragile reference；新建 [glossary.md](./w-model-dev/references/glossary.md) 术语权威表（15+ 术语 + `_Avoid_` 别名治理）
 
 ## 架构原则与外部工具边界
 
@@ -82,7 +84,7 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # TLA+ 行为门禁，退出码 0/1/2
 npm run check:coverage -- <coverage.json> [--graph=] [--out-of-scope=] [--exemptions=]  # 阶段 1 需求覆盖分析门禁，退出码 0/1/2
 npm run check:exemption -- <exemption.json>  # 豁免审批门禁（S→R→V→人类四阶段），退出码 0/1/2
-npm run self-test                           # 退出码 0/1（184 条样本回归基线）
+npm run self-test                           # 退出码 0/1（192 条样本回归基线）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 
 # 或用 npx tsx 直接调用：
@@ -135,6 +137,16 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 | Maturity R3 单位对齐 | maturity-logic.ts | `completedCycles < Math.floor(completedPhases / 8)`，与"完整 8 阶段周期"语义对齐 |
 | 反模式 #21 | anti-patterns.md | self-as-verifier 模式下不得跳过阶段 6/7 直接跑 `--phase=8` 终检 |
 | TLA+ §14 时间推进建模 | tla-plus-guide.md | L4 时间推进/保留期建模模式（反例 + 正例 + 通用规则） |
+
+### 门禁脚本增强（v5，2026-07-30 第 26 轮）
+
+| 校验项 | 脚本 | 说明 |
+|---|---|---|
+| R13 单轴下限 | verifier-logic.ts / check-verifier-output.ts | `passed = (A\|\|B) && 所有 subCriterion.score ≥ 0.70`；违规格式「子标准 <name> 得分 <score> < 0.7（单轴下限，反模式 #41）」 |
+| 反模式 #41 | anti-patterns.md | 加权平均掩盖单轴失败 → V 标记 violation + passed=false + reworkHints 交 S 返工（R→V→G 循环） |
+| Fowler 12 基线 | engineering-code-reviewer.md | 12 条坏味道固定基线，评审命中须引用条目名（如「命中 F-01 重复代码」） |
+| 票据 durability | phase-5-coding.md | 票据主体 = 符号级契约（接口/类型/状态转移），禁止文件路径+行号作为票据主体（位置交 codegraph 约束 #20） |
+| glossary 术语表 | references/glossary.md | 15+ 术语权威入口（字段名 / 枚举 / `_Avoid_` 别名治理），新增字段前先查本表 |
 
 ## 命令一览
 
@@ -299,7 +311,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 10 个 *-logic.ts 顶部自动 import）
 │   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
-│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 184 条）
+│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 192 条）
 │   │   ├── __tests__/            #   vitest 单元测试（13 个 .test.ts + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）

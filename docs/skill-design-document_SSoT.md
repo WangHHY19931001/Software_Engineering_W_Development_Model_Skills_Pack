@@ -751,6 +751,27 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改约束 #1-#19 既有语义；不修改阶段 1-4 流程（仍是 A/S-doc/S-tla/S-bdd）；不内置 codegraph/opsx 调用（依赖宿主 Agent）；codegraph auto-sync 保持开启不手动管理图谱新鲜度。
 
+#### 3.4.22 第 26 轮：外部技能深度对比吸收 + 单轴下限 + Fowler 12 + 术语治理（2026-07-30）
+
+> 触发：用户要求深度对比外部参考仓库（`/mnt/skill_work_dir/skills`，Matt Pocock "Skills For Real Engineers"）与本仓库技能包，找出可借鉴增强点。设计 spec：[`docs/superpowers/specs/2026-07-30-round26-external-skills-absorption-design.md`](./superpowers/specs/2026-07-30-round26-external-skills-absorption-design.md)。经逐文件对比 5 类外部仓库（async/implement/refactor/general/incidental+orchestrator），提取 5 项借鉴点。版本号目标 25.0.0。
+
+1. **加权平均掩盖单轴失败 → R13 单轴下限**：V 评审 passed 判据从「qualityLevel∈{A,B}」收紧为「qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70」。0.70 = qualityLevel B 级分界（§6.1），语义自洽：原判据「加权平均 ≥ B」→「每个子标准自身 ≥ B」。外部原则「评审各轴独立成环，永不合并计分」引用为设计依据。`verifier-logic.ts` 新增 `SINGLE_AXIS_MIN_SCORE` 常量 + `checkR13SingleAxisFloor()` + violation 格式「子标准 <name> 得分 <score> < 0.70（单轴下限）」。新增反模式 #41「加权平均掩盖单轴失败」。
+
+2. **Fowler 12 坏味道基线**：`engineering-code-reviewer.md` 新增 12 条坏味道固定基线（F-01 重复代码 / F-02 过长方法 / F-03 过大类 / F-04 过长参数表 / F-05 特征依恋 / F-06 数据泥团 / F-07 基本类型偏执 / F-08 Switch 语句 / F-09 懒惰类 / F-10 臆测式泛化 / F-11 临时字段 / F-12 消息链），每条含定义/检测信号/AI 生成代码高频场景/默认分级（🟡💭🔴），🔴 关联反模式 #23（跨模块 store 误用）。评审命中须引用条目名，不得自造术语。
+
+3. **票据内容 durability（符号级契约）**：`phase-5-coding.md` 新增「票据内容 durability」节——票据主体是符号级契约（接口/类型/状态转移，与 TLA+ Action 对齐），位置信息交给 codegraph（约束 #20），与评审 evidence「路径+行号」边界区分。术语引用统一用 glossary 规范名。
+
+4. **术语治理 glossary**：新建 `references/glossary.md`，15+ 术语分 3 区（评审相关/数据模型/工程资产），每条含「规范定义 + `_Avoid_` 别名治理」，并作为 SKILL.md Bundled Resources 索引条目。角色表 Negation 审计：SKILL.md 角色表「关键禁止」列改写为「关键职责 + 脚本不变式（正向动作替代纯否定）」。
+
+**实现状态（2026-07-30）**：全部落地并通过验证（tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / V4 fixture exit=1 / V6 全样本 valid=0 bad=1）：
+- 逻辑层：`verifier-logic.ts` +R13 单轴下限（SINGLE_AXIS_MIN_SCORE=0.70 / checkR13SingleAxisFloor / expectedPassed 单轴条件）
+- 文档层：verifier-spec.md §3.3+§6.3、engineering-code-reviewer.md Fowler 12 基线、references/glossary.md（新建）、phase-5-coding.md durability 节、SKILL.md 角色表 Negation 审计 + references 索引、anti-patterns #41（#41 直接转正，用户决策不经 pending 复审）
+- 测试层：`bad-single-axis-low.json` fixture（completeness=0.65 / 其余 0.95 / compositeScore=0.86 / qualityLevel=A / passed=false）+ verifier-logic.test.ts 4 用例（全 ≥0.70 通过 / 单轴 0.65 命中 / 边界 0.70 通过 / 非数组空返回）+ self-test VERIFIER_CASES +1 案例（基线 191→192）
+- 验证过程修正 2 项（V2/V3 门禁捕获）：JS 数字渲染 `0.70`→`0.7`，self-test 正则与单测断言同步改为 `0\.7(?!\d)` / `'0.7'`
+- 兼容性：既有 verifier 样本全部子标准 score ≥0.70（最低 0.80），R13 非破坏性；V6 全样本 valid=0 / bad=1
+
+**不涉及范围**：不修改 qualityLevel 映射（仍由 compositeScore 决定）；不修改门禁脚本 CLI/退出码约定；不新增脚本文件（R13 并入既有 check-verifier-output.ts）；不改 schema（R13 复用既有 VerifierOutput 结构）。
+
 ---
 
 ## 4. 技能工作流程
@@ -1287,7 +1308,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **连续评分实现**：logits 期望值（A/B/C/D 四档 token 概率加权）或文本回退（解析字母 + ±0.05 稳定扰动），Agent 在 `meta.scoringMethod` 标注实际方法。
 - **PPT 排序**：多候选场景按 PPT 算法（默认 `k=5` / `temperature=4.0`）输出 `ranking` 字段。
 - **输出 Schema**：`schemaVersion="1.0"` + `meta` + `subCriteria[]` + `compositeScore[0,1]` + `qualityLevel(A/B/C/D)` + `summary` + `passed` + 可选 `reworkHints` / `ranking`。
-- **质量等级映射**：`[0.85,1.0]=A` / `[0.70,0.85)=B` / `[0.50,0.70)=C` / `[0,0.50)=D`；`passed = (A or B)`。
+- **质量等级映射**：`[0.85,1.0]=A` / `[0.70,0.85)=B` / `[0.50,0.70)=C` / `[0,0.50)=D`；`passed = (A or B) && 所有 subCriterion.score ≥ 0.70`（[25.0.0] 第 26 轮新增 R13 单轴下限：加权重平均只用于汇报，放行判据须逐子标准 ≥ B 级分界；反模式 #41 守护）。
 - **五轴评审与严重等级标签**（吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能）：代码评审（`targetKind=file`）的子标准按五轴（Correctness / Readability / Security / Architecture / Performance）组织发现项；每条发现项标注 Severity（Critical / Required / Nit / Optional / FYI），使作者区分必修与可选。详细子标准映射与 Structural Remedies 见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §7.4A。
 - **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/verifier-logic.ts`。
 - **与外部演化工具的关系**：本规范只覆盖「阶段产物校验流程」，是技能内部的产物质量保障；技能演化（Rollout / Reflect / Edit / Skill Lift）由外部 SkillOpt / darwin-skill 完成，可消费本规范产出的 `VerifierOutput` JSON 作为训练信号。
@@ -2162,7 +2183,7 @@ interface RunLogEntry {
 | V1 | `npx tsc --noEmit` | 0 |
 | V2 | `npm run self-test` | 0 |
 | V3 | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 |
-| V4 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <fixture>` | 1（触发 R11/R12） |
+| V4 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <fixture>` | 1（触发 R11/R12/R13） |
 
 ### 10H.6 与 Loop 4 的边界
 
@@ -2321,6 +2342,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.14 第 19 轮 BDD 建模与验收夹具 | 分层 BDD features（L1-L4）+ 状态机七要素 + BDD↔TLA+ 等价性 + 7 维度门禁 + RTM 映射扩展 + 验收夹具四类 + 反模式 #29 | `w-model-dev/schemas/bdd-manifest.schema.json` + `w-model-dev/scripts/bdd-logic.ts`（纯逻辑）+ `w-model-dev/scripts/check-bdd-model.ts`（CLI）+ `w-model-dev/scripts/samples/bdd/`（10 样本）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（vitest）+ `w-model-dev/references/bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md` + `w-model-dev/templates/feature.template` / `bdd-manifest.template.json` + `w-model-dev/references/anti-patterns.md` #29 + `w-model-dev/SKILL.md` 约束 #14 | 完整（BDD 与 TLA+ 正交协作；Cucumber.js v11 + @cucumber/messages devDeps；self-test 基线 111→121） |
 | §3.4.15 第 19.0.1 轮 W 模型 8 阶段端到端调测验证与归档 | check-bdd-model.ts D7 RTM schema 修正（`rtm.requirements` → `rtm.rows` + `requirementId`）+ D7 测试样本补强（3 个）+ 8 阶段调测归档（7 文件）+ demo 产物清理 + 版本号三处同步 19.0.1 | `w-model-dev/scripts/check-bdd-model.ts`（D7 修正）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（+3 D7 测试）+ `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`（7 归档文件）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 19.0.1）+ `CHANGELOG.md` [19.0.1] | 完整（8 阶段端到端调测发现 D7 schema bug；UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过；self-test 基线 121 不变；vitest 105→108） |
 | §3.4.16 第 20 轮 阶段 1 需求提取四维识别与豁免审批 | 四维识别模型（层级关系 R1-R4 + 子系统划分 REQ-group + 交叉逻辑 R5/R6 + 覆盖分析 C1-C10）+ 豁免审批治理（S→R→V→人类 E1-E8）+ 图谱 schema 扩展（level/priority/reqGroup + 3 类边）+ 规格书模板 5→13 节 + 反模式 #30 + 禁止行为 #7-#11 | `w-model-dev/schemas/coverage.schema.json` + `exemption.schema.json` + `w-model-dev/scripts/coverage-logic.ts` / `check-requirement-coverage.ts` + `exemption-logic.ts` / `check-exemption.ts` + `graph-logic.ts`（R1-R6 + reqHierarchy/crossLogic）+ `check-requirement-graph.ts`（--rtm / --exemptions）+ `samples/graph/`（+13）+ `samples/coverage/`（10）+ `samples/exemption/`（7）+ `__tests__/graph-logic.test.ts`（R1-R6）+ `coverage-logic.test.ts`（C1-C10）+ `exemption-logic.test.ts`（E1-E8）+ `templates/requirement-spec.md`（5→13 节）+ `references/anti-patterns.md` #30 + `w-model-dev/SKILL.md` 约束 #15/#16 | 完整（不向后兼容老图谱，历史抛弃重新生成；self-test 基线 121→152；vitest 108→~165） |
+| §3.4.22 第 26 轮 外部技能深度对比吸收 + 单轴下限 + Fowler 12 + 术语治理 | 加权平均掩盖单轴失败 → R13 单轴下限（passed 收紧为 qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70，0.70=B 级分界）+ Fowler 12 坏味道基线 + 票据内容 durability（符号级契约）+ 术语治理 glossary + 角色表 Negation 审计 + 反模式 #41 | `w-model-dev/scripts/verifier-logic.ts`（R13：SINGLE_AXIS_MIN_SCORE + checkR13SingleAxisFloor + expectedPassed 单轴条件）+ `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json`（completeness=0.65 fixture）+ `w-model-dev/scripts/__tests__/verifier-logic.test.ts`（+4 R13 用例）+ `w-model-dev/scripts/self-test.ts`（VERIFIER_CASES +1，基线 191→192）+ `w-model-dev/references/verifier-spec.md`（§3.3/§6.3）+ `w-model-dev/subagent/engineering-code-reviewer.md`（Fowler 12 基线节）+ `w-model-dev/references/glossary.md`（新建，15+ 术语 + `_Avoid_`）+ `w-model-dev/references/phase-5-coding.md`（票据 durability 节）+ `w-model-dev/references/anti-patterns.md` #41 + `w-model-dev/SKILL.md`（角色表 Negation 审计 + references 索引 glossary 条目） | 完整（R13 非破坏性：既有样本全部 score ≥0.70；#41 用户决策直接转正不经 pending 复审；qualityLevel 映射不变，仅 passed 增加单轴条件；验证门 V1-V6 全通过：tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / fixture exit=1 / 全样本 valid=0 bad=1） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |

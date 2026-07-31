@@ -55,7 +55,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/*.ts` 后，必须先跑自检脚本，再用端到端方式验证：
 
 ```bash
-# 3.1 跑自检（samples/ 目录下 149 条样本：18 Verifier + 13 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD）
+# 3.1 跑自检（samples/ 目录下 192 条样本：19 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive）
 npm run self-test
 # 等价于：npx tsx w-model-dev/scripts/self-test.ts
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
@@ -83,7 +83,7 @@ npm run check:gate -- <project-dir>
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（149 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（192 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
@@ -182,7 +182,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── bdd-logic.ts / check-bdd-model.ts            # BDD 模型 7 维度校验
 │   ├── budget-logic / run-log-logic / maturity-logic / checkpoint-logic / root-cause-logic  # 闭环校验
 │   ├── schema-loader.ts                              # ajv 单例 + schemas/ 自动加载
-│   ├── self-test.ts                                  # 校验逻辑自检（149 条样本，samples/ 驱动）
+│   ├── self-test.ts                                  # 校验逻辑自检（192 条样本，samples/ 驱动）
 │   ├── __tests__/                                    # vitest 单元测试
 │   └── samples/                                      # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ 等）
 ├── templates/          # 文档模板

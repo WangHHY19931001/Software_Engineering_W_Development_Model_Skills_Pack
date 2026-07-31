@@ -3,6 +3,37 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [25.0.0] - 2026-07-30
+
+### 第二十六轮 外部技能深度对比吸收（单轴下限 R13 + Fowler 12 基线 + 票据 durability + 术语治理）
+
+深度对比外部参考仓库（Matt Pocock "Skills For Real Engineers"，`/mnt/skill_work_dir/skills`）逐文件提取 5 项借鉴点。核心：Verifier passed 判据从「加权平均 ≥ B」收紧为「每个子标准自身 ≥ B」（单轴下限 R13，反模式 #41）。详见 SSoT §3.4.22。
+
+#### Added
+- 新增反模式 #41（加权平均掩盖单轴失败）：V 评审通过加权平均 compositeScore 掩盖单一子标准显著失败 → 命中后 passed=false + reworkHints 交 S 返工（R→V→G 循环）；用户决策直接转正（不经 pending V 复审流程）
+- 新增 R13 单轴下限校验：`verifier-logic.ts` 新增 `SINGLE_AXIS_MIN_SCORE` 常量（0.70 = qualityLevel B 级分界）+ `checkR13SingleAxisFloor()`；violation 格式「子标准 <name> 得分 <score> < 0.70（单轴下限，反模式 #41）」
+- 新增 `references/glossary.md`：术语权威表（15+ 术语分 3 区：评审相关 / 数据模型 / 工程资产），每条含「规范定义 + `_Avoid_` 别名治理」+ 维护规则（新增字段前先登记术语）
+- 新增样本：`samples/verifier/bad-single-axis-low.json`（completeness=0.65 / 其余 0.95 / compositeScore=0.86 / qualityLevel=A / passed=false，加权平均达 A 级但单轴失败）
+- 新增 verifier-logic.test.ts R13 单测 4 用例（全 ≥0.70 通过 / 单轴 0.65 命中含子标准名 / 边界 0.70 通过 / 非数组返回空）
+- 新增 self-test 用例 1 条（VERIFIER_CASES +1，基线 191 → 192）
+
+#### Changed
+- `verifier-spec.md`：§3.3 新增单轴下限说明（引用外部原则「评审各轴独立成环，永不合并计分」）；§6.3 通过判定改写为 `passed = (A||B) && 所有 subCriterion.score >= 0.70`
+- `subagent/engineering-code-reviewer.md`：新增「Fowler 12 坏味道固定基线」节（F-01~F-12，取自《Refactoring》22 种坏味道最相关 12 种），每条含定义/检测信号/AI 生成代码高频场景/默认分级；🔴 级关联反模式 #23；评审命中须引用条目名不得自造术语
+- `phase-5-coding.md`：新增「票据内容 durability」节——票据主体 = 符号级契约（接口/类型/状态转移，与 TLA+ Action 对齐），禁止文件路径+行号作为票据主体；位置信息交给 codegraph（约束 #20）；与评审 evidence「路径+行号」边界区分；术语引用统一用 glossary 规范名
+- `SKILL.md`：角色表「关键禁止」列改写为「关键职责 + 脚本不变式（正向动作替代纯否定，Negation 审计）」；references 索引补 glossary 条目
+- `anti-patterns.md`：#41 转正 + F1~F10 节「与 29 条流程反模式」陈旧计数修正为 41 条
+- 版本号三处同步为 25.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+
+#### Validation
+- TypeScript strict: 0 错误
+- self-test: 192/192 全通过（基线 191 → 192）
+- vitest: 205/205 全通过（+4 R13 单测）
+- fixture 门禁：bad-single-axis-low.json exit=1（触发 R13）、valid.json exit=0
+- 既有样本兼容：V6 全样本 valid=0 / 18 bad=1（R13 无误伤，最低既有 score 0.80）
+- 验证过程修正 2 项（V2/V3 门禁捕获）：JS 数字渲染 `0.70`→`0.7`，self-test 正则与单测断言同步修正
+- 反模式 #41 编号连续无冲突（#40 → #41）
+
 ## [24.0.0] - 2026-07-30
 
 ### 第二十五轮 codegraph + OpenSpec 集成（修改前影响分析 + 规格驱动变更管理 + 三段式 S 分派）

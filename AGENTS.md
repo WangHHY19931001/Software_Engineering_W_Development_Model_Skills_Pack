@@ -15,6 +15,7 @@
 - **Agent Personas（评审角色提示词）** 由 V 子代理在执行 `/wm review` 时按 `w-model-dev/references/agent-personas.md` 选用对应 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema。多角度分析时，R-lead / V-lead 按 `w-model-dev/references/subagent-persona-matrix.md` 从 `w-model-dev/subagent/`（28 个人格文件，分 engineering / testing / design / product / project 5 类）选用 persona 并行/串行分派。
 - **技能自演化** 不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 - **codegraph + OpenSpec 集成**（阶段 5-8，第 25 轮）：codegraph 提供修改前符号级影响分析（callers/callees/blast radius），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。技能包通过 `ensure-codegraph-opsx.ts` 自动检测安装，通过 3 个 check 脚本做门禁校验。详见 SSoT §3.4.21。
+- **第 26 轮深度对比吸收**（外部仓库逐文件对比产物）：单轴下限 R13（`check-verifier-output.ts` passed 收紧为 `(A||B) && 所有 subCriterion.score ≥ 0.70`，反模式 #41「加权平均掩盖单轴失败」）/ Fowler 12 坏味道基线（`subagent/engineering-code-reviewer.md`）/ 票据 durability（`phase-5-coding.md` 票据主体 = 符号级契约，位置交 codegraph）/ 术语治理（`references/glossary.md` 权威表 + `_Avoid_`）。详见 SSoT §3.4.22。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 
@@ -24,15 +25,16 @@
 |---|---|---|
 | `w-model-dev/` | **技能资产主体**（标准 skill 结构，可整体拷贝分发） | 安装时整体拷贝此目录；运行时按阶段加载 `references/phase-N-*.md` |
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
-| `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A + summary 阶段 digest 三要素 §6.2 + self-as-verifier 模式节）/ agent-personas（4 个评审角色提示词 + self-as-verifier 兼任规则节）/ subagent-delegation（O/A/S/V/G/R 编排者-子代理边界，A 为阶段 1–4 分析子代理，R 为返工根因定位子代理，F 由 S 兼任；O 维护 budget/run-log/maturity；含角色分派完整性校验节 + S 子代理 RTM 回填强制职责）/ root-cause-locator（R 子代理根因分析方法论：5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）/ subagent-persona-matrix（R-lead / V-lead 多角度 persona 选择矩阵，关联 `w-model-dev/subagent/` 28 个人格文件）/ definition-of-done（项目级 DoD 七维度含理解证据 + 信息密度度量）/ signature-chain-guide（角色链式签名 + 产出来源正确性）/ event-ingress-guide（Loop 3 事件接驳：EventIngress schema + 路由表 + 消费方指引，L2+ 激活）/ hill-climbing-guide（Loop 4 爬坡循环：HarnessImprovementReport schema + 信号检测 + 报告消费流程）/ skillopt-adoption（SkillOpt 方法论吸收：bounded edit + validation gate 流程，消费 Loop 4 信号）/ anti-patterns（40 条流程反模式 #1-#19 + #20 + #21-#40；#20 见 subagent-delegation.md，含 #10 编排者越权实施 + #11 ingestion 跳过图谱校验 + #12 A 自评收敛 + #13 信息流黑洞/奇迹/死模块放行 + #14 跳过 SANY 直接 TLC + #15 死锁/不变式违反放行 + #16 TLA+ 占位/简化/错误实现 + #17 TLA+ 建模不符需求/设计不回退 + #18 跳过 R 直接 S 返工 + #19 R 报告未 V 复审 + #21 阶段级门禁跳过 + #22 角色越权 + #23 跨模块 store 误用 + #24 副作用时序不一致 + #25 JSON 文件 PowerShell 写入 + #26 RunLogEntry 与 EventIngress 字段混用 + #27 调测者简化行为 + #28 schema 前置校验缺失 + #29 BDD 建模与需求/设计/TLA+ 不符未回退 + #30 豁免审批跳步 + #31 归档完整性缺失 + #32 签名链断裂 + #33 跳过 R3 预防性审查 + #34 编排者漏派角色 + #35 self-as-verifier 产物混合 + #36 路由顺序错误 + #37 产物膨胀核心决策稀疏 + #38 修改前未查询 codegraph + #39 跳过 opsx 产物审查 + #40 opsx/S-tickets 职责混淆 + L1~L4 教训 + 失败模式 F1~F10 + 运维失败模式 O1~O6）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则，含信息流模型 + 边数下限与语义来源占比节）/ tla-plus-guide（TLA+ 层次化状态机建模与行为门禁 + 设计文档↔代码状态机一致性节）/ bdd-guide（BDD 建模 + TLA+/BDD 自动化同步校验节）/ command-reference / operational-recovery（含成本预算与运行日志节 + 成熟度与 CHECKPOINT 放行节）/ 数据模型（含 budget/run-log/maturity schema）/ RTM 指南 / 质量标准（含信息密度指标 + 生产目标值 vs 测试环境基线节） | **按需加载**，禁止一次性载入全部（反例 #5） |
-| `w-model-dev/subagent/` | **人格库**（28 个 Markdown 文件，分 engineering / testing / design / product / project 5 类） | R-lead / V-lead 多角度分析时按 `references/subagent-persona-matrix.md` 选用 persona；Persona 文件本身是 Markdown，不调用 LLM |
-| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检 + RTM coverageStatus 一致性 + NFR 双字段校验）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验，支持 `--self-as-verifier --s-output=<path>` 校验 V 产物与 S 产物路径不同）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性 + 边数下限 + 语义来源占比）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性，**已移除 `--skip-tlc`**）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序 + R3 预防性审查记录校验；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致 + 拒绝代签；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10；CLI `<report.json>`）/ `signature-chain-logic.ts` + `check-signature-chain.ts`（角色链式签名门禁：R1-R10 + 跨阶段消费者校验；CLI `<signature-chain.jsonl>`）/ `archive-integrity-logic.ts` + `check-archive-integrity.ts`（归档完整性校验）/ `preventive-review-logic.ts` + `check-preventive-review.ts`（R3 预防性审查三份报告完整性校验；CLI `<project-dir> --phase=<1-8>`，支持 `--auto-trigger --run-log=<path>`）/ `tla-bdd-sync-logic.ts` + `check-tla-bdd-sync.ts`（TLA+/BDD 自动化同步校验：转移集 + 状态集 + 不变式等价）/ `role-dispatch-logic.ts` + `check-role-dispatch.ts`（角色分派完整性校验：每阶段 S/V/G 各 ≥1 条，`--r3-enabled` 时 R ≥3 条）/ `state-machine-logic.ts` + `check-state-machine-consistency.ts`（设计文档↔代码状态机一致性校验：状态集 + 转移集一致）/ `ensure-codegraph-opsx.ts`（codegraph + OpenSpec 依赖三层检测+自动安装，full/quick/light 三模式）/ `check-codegraph-queries.ts`（反模式 #38 校验：codegraph 查询落盘完整性）/ `check-opsx-artifacts.ts`（反模式 #39/#40 校验：opsx 制品 + R3×3 + V 审查产物齐全）/ `check-openspec-archive.ts`（opsx:archive 归档完整性校验）/ `schema-loader.ts`（ajv 单例 + schemas/ 自动加载 + validateBySchema 工具，被 `*-logic.ts` 顶部自动 import）/ `security-scan.ts`（eslint-plugin-security 扫描 + baseline 指纹豁免）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线，191 条样本）/ `__tests__/`（vitest 单元测试 + README.md coverage 矩阵） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 预防性审查 / TLA+/BDD 同步 / 角色分派 / 状态机一致性检查点直接 `npx tsx` 执行 |
+| `w-model-dev/references/` | 阶段细则 / verifier-spec（含五轴评审 §7.4A + summary 阶段 digest 三要素 §6.2 + self-as-verifier 模式节）/ agent-personas（4 个评审角色提示词 + self-as-verifier 兼任规则节）/ subagent-delegation（O/A/S/V/G/R 编排者-子代理边界，A 为阶段 1–4 分析子代理，R 为返工根因定位子代理，F 由 S 兼任；O 维护 budget/run-log/maturity；含角色分派完整性校验节 + S 子代理 RTM 回填强制职责）/ root-cause-locator（R 子代理根因分析方法论：5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）/ subagent-persona-matrix（R-lead / V-lead 多角度 persona 选择矩阵，关联 `w-model-dev/subagent/` 28 个人格文件）/ definition-of-done（项目级 DoD 七维度含理解证据 + 信息密度度量）/ signature-chain-guide（角色链式签名 + 产出来源正确性）/ event-ingress-guide（Loop 3 事件接驳：EventIngress schema + 路由表 + 消费方指引，L2+ 激活）/ hill-climbing-guide（Loop 4 爬坡循环：HarnessImprovementReport schema + 信号检测 + 报告消费流程）/ skillopt-adoption（SkillOpt 方法论吸收：bounded edit + validation gate 流程，消费 Loop 4 信号）/ anti-patterns（41 条流程反模式 #1-#19 + #20 + #21-#41；#20 见 subagent-delegation.md，含 #10 编排者越权实施 + #11 ingestion 跳过图谱校验 + #12 A 自评收敛 + #13 信息流黑洞/奇迹/死模块放行 + #14 跳过 SANY 直接 TLC + #15 死锁/不变式违反放行 + #16 TLA+ 占位/简化/错误实现 + #17 TLA+ 建模不符需求/设计不回退 + #18 跳过 R 直接 S 返工 + #19 R 报告未 V 复审 + #21 阶段级门禁跳过 + #22 角色越权 + #23 跨模块 store 误用 + #24 副作用时序不一致 + #25 JSON 文件 PowerShell 写入 + #26 RunLogEntry 与 EventIngress 字段混用 + #27 调测者简化行为 + #28 schema 前置校验缺失 + #29 BDD 建模与需求/设计/TLA+ 不符未回退 + #30 豁免审批跳步 + #31 归档完整性缺失 + #32 签名链断裂 + #33 跳过 R3 预防性审查 + #34 编排者漏派角色 + #35 self-as-verifier 产物混合 + #36 路由顺序错误 + #37 产物膨胀核心决策稀疏 + #38 修改前未查询 codegraph + #39 跳过 opsx 产物审查 + #40 opsx/S-tickets 职责混淆 + #41 加权平均掩盖单轴失败 + L1~L4 教训 + 失败模式 F1~F10 + 运维失败模式 O1~O6）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则，含信息流模型 + 边数下限与语义来源占比节）/ tla-plus-guide（TLA+ 层次化状态机建模与行为门禁 + 设计文档↔代码状态机一致性节）/ bdd-guide（BDD 建模 + TLA+/BDD 自动化同步校验节）/ command-reference / operational-recovery（含成本预算与运行日志节 + 成熟度与 CHECKPOINT 放行节）/ 数据模型（含 budget/run-log/maturity schema）/ RTM 指南 / 质量标准（含信息密度指标 + 生产目标值 vs 测试环境基线节） | **按需加载**，禁止一次性载入全部（反例 #5） |
+| `w-model-dev/subagent/` | **人格库**（28 个 Markdown 人格文件，分 engineering / testing / design / product / project 5 类） | R-lead / V-lead 多角度分析时按 `references/subagent-persona-matrix.md` 选用 persona；Persona 文件本身是 Markdown，不调用 LLM。注意目录内含一个 macOS 重复下载残留 `engineering-technical-writer (1).md`（与正式版重复），分派时勿误用 |
+| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`gate-logic.ts` + `check-artifact-gate.ts`（工件质量门，含 TLA+ 资产 + SD→codeModule 终检 + RTM coverageStatus 一致性 + NFR 双字段校验）/ `verifier-logic.ts` + `check-verifier-output.ts`（Verifier 校验，支持 `--self-as-verifier --s-output=<path>` 校验 V 产物与 S 产物路径不同）/ `graph-logic.ts` + `check-requirement-graph.ts`（阶段 1–4 图谱结构门禁 + 信息流校验：黑洞/奇迹/死模块/边界完整性 + 边数下限 + 语义来源占比）/ `tla-logic.ts` + `check-tla-model.ts`（阶段 1–4 TLA+ 行为门禁：SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性，**已移除 `--skip-tlc`**）/ `code-tla-logic.ts` + `check-code-tla-consistency.ts`（阶段 5 代码-TLA+ 一致性回归：四维度校验 SD→codeModule 映射 / 代码状态转移 / Next 分支对应 / 断言覆盖不变式；CLI `--manifest=<path> --graph=<path> --rtm=<path> --src=<dir>`）/ `budget-logic.ts` + `check-budget.ts`（Budget 门禁：R1-R5 时效性/schema/onExceed/killSwitch/触发检测；CLI `<budget.json> [--project=] [--run-log=] [--phase=N]`）/ `run-log-logic.ts` + `check-run-log.ts`（Run-log 门禁：R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序 + R3 预防性审查记录校验；CLI `<run-log.jsonl> [--gate-logs=] [--tla-manifest=]`）/ `maturity-logic.ts` + `check-maturity.ts`（Maturity 门禁：R1-R5 schema/level/周期/history/降级；CLI `<maturity.json> [--project=] [--run-log=]`）/ `checkpoint-logic.ts` + `check-checkpoint.ts`（Checkpoint 门禁：R1-R5 决策非空/内容具体/用户确认/阶段匹配/跨阶段一致 + 拒绝代签；CLI `<run-log.jsonl> [--checkpoint-log=]`）/ `root-cause-logic.ts` + `check-rootcause-report.ts`（RootCauseReport 校验：R1-R10；CLI `<report.json>`）/ `signature-chain-logic.ts` + `check-signature-chain.ts`（角色链式签名门禁：R1-R10 + 跨阶段消费者校验；CLI `<signature-chain.jsonl>`）/ `archive-integrity-logic.ts` + `check-archive-integrity.ts`（归档完整性校验）/ `preventive-review-logic.ts` + `check-preventive-review.ts`（R3 预防性审查三份报告完整性校验；CLI `<project-dir> --phase=<1-8>`，支持 `--auto-trigger --run-log=<path>`）/ `tla-bdd-sync-logic.ts` + `check-tla-bdd-sync.ts`（TLA+/BDD 自动化同步校验：转移集 + 状态集 + 不变式等价）/ `role-dispatch-logic.ts` + `check-role-dispatch.ts`（角色分派完整性校验：每阶段 S/V/G 各 ≥1 条，`--r3-enabled` 时 R ≥3 条）/ `state-machine-logic.ts` + `check-state-machine-consistency.ts`（设计文档↔代码状态机一致性校验：状态集 + 转移集一致）/ `ensure-codegraph-opsx.ts`（codegraph + OpenSpec 依赖三层检测+自动安装，full/quick/light 三模式）/ `check-codegraph-queries.ts`（反模式 #38 校验：codegraph 查询落盘完整性）/ `check-opsx-artifacts.ts`（反模式 #39/#40 校验：opsx 制品 + R3×3 + V 审查产物齐全）/ `check-openspec-archive.ts`（opsx:archive 归档完整性校验）/ `schema-loader.ts`（ajv 单例 + schemas/ 自动加载 + validateBySchema 工具，被 `*-logic.ts` 顶部自动 import）/ `security-scan.ts`（eslint-plugin-security 扫描 + baseline 指纹豁免）/ `plan-chunks.ts`（ingestion 分块策略）/ `self-test.ts`（回归基线，192 条样本）/ `__tests__/`（vitest 单元测试 + README.md coverage 矩阵） | Agent 在阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 预防性审查 / TLA+/BDD 同步 / 角色分派 / 状态机一致性检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
 | `w-model-dev/schemas/` | JSON Schema (draft-07) 文件（19 份） | logic 层 schema 校验时自动加载；新增 .w-model/*.json 字段必先改 schema |
 | `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/` | 第 19.0.1 轮 8 阶段调测归档（7 文件，含 D7 bug 修复记录） | 查阅最新调测结论时 |
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南） | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
+| `w-model-dev-demo/` | 第 23 轮端到端调测 demo（blog-system-demo，Express 4 + TS + vitest），2026-07-30 随仓库提交，含 build-*.cjs 生成脚本 + docs/src/tests/tla/features 阶段产物 | 只读测试夹具；不参与 `/wm` 编排；有独立 package.json 依赖（cross-env 等），勿与根 devDeps 混用 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
 | `.githooks/pre-push` | 本地推送前门禁（替代远程 CI） | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` 后会触发 |
 
@@ -48,7 +50,7 @@
 npm install
 
 # 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
-npm run self-test                           # 191 条样本回归基线（18 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive），退出码 0/1
+npm run self-test                           # 192 条样本回归基线（19 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2
@@ -58,7 +60,7 @@ npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --gr
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
 
-# 手动跑推送前门禁（不实际推送，6 项门禁检查）
+# 手动跑推送前门禁（不实际推送，11 项门禁检查）
 npm run prepush
 
 npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1（devDep：eslint + @typescript-eslint/* + eslint-plugin-security）
@@ -69,7 +71,7 @@ npm run lint:security              # 跑 eslint-plugin-security + baseline 比�
 
 ## 4. 参考实现（已归档）
 
-W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。原 `w-model-dev-demo/` 目录已于第 17 轮 P6 删除，归档摘要位于 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/)（9 文件）。下文数字为历史记录，源码不再可访问。
+W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as-a-Verifier 阶段门 + 工件质量门」端到端可用。第十五轮调测源码原位于 `w-model-dev-demo/`，第 17 轮 P6 已删除，归档摘要位于 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/)（9 文件）。下文数字为历史记录，第十五轮源码已不可访问；如需可运行产物可参考当前仓库内重建的 `w-model-dev-demo/`（第 23 轮端到端调测 demo）。
 
 > **最终调测数字**（第十五轮，详见归档 [`README.md`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/README.md)）：32 需求 / 22 TLA+ / 708 UT / 74 IT / 35 ST / 72 UAT / 889 测试用例全通过。
 
@@ -440,6 +442,25 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 
 > 第二十四轮（2026-07-30）相比第二十二轮：从「R3 强制 + TLA+/BDD 同步」进化为「RTM 回填 + 角色分派 + R3 实执行 + 状态机一致性 + self-as-verifier + NFR 双字段 + 路由顺序 + 图谱边数 + 门禁 stdout + 信息密度」十项修正。修复第 23 轮 8 阶段端到端调测发现的 10 项技能包问题（P0×2 + P1×3 + P2×3 + P3×2），按 P0→P1→P2→P3 分 4 批 19 个任务执行，采用 Subagent-Driven Development 模式（2 个 implementation 子代理 + orchestrator spec compliance review）。新增约束 #18（RTM 回填）+ #19（角色分派完整性）+ 反模式 #34-#37 + 2 个新校验脚本（check-role-dispatch.ts / check-state-machine-consistency.ts）。`anti-patterns.md` 从「33 条」扩展为「37 条」。首次正式定义 self-as-verifier 模式（单 Agent 兼任 S/V/G/R 多角色的执行模式，仅限 demo/非生产/教学场景，须产出各角色独立产物文件）。版本号三处一致 23.0.0。详见 SSoT §3.4.20 与 §10A 追溯表新增 §3.4.20 行。
 
+#### 第二十五轮（2026-07-30）：codegraph + OpenSpec 集成（修改前影响分析 + 规格驱动变更管理）（SSoT §3.4.21，[24.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 用户要求阶段 5 起引入 codegraph（修改前符号级影响分析）与 OpenSpec opsx（规格驱动变更工作流） |
+| 外部工具边界 | SSoT §3.3 登记 codegraph（宿主 Agent MCP 工具 `codegraph_explore`，修改前预防）+ OpenSpec（宿主 Agent CLI `/opsx:*`，规格级规划层）；技能包**不内置调用**，通过 CHECKPOINT/子代理指令触发 |
+| 新增约束 | #20（codegraph 修改前强制查询）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先 `codegraph_explore` 查询目标符号影响半径（callers/callees/blast radius），结果落盘 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json` |
+| 反模式新增 | 3 条（#38 修改前未查询 codegraph / #39 跳过 opsx 产物审查 / #40 opsx/S-tickets 职责混淆） |
+| S 分派变体 | 阶段 5-8 三段式 S 分派：S-explore（opsx:explore + codegraph 影响初判）→ S-propose（opsx:propose + S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码，每片 codegraph_explore）；每段产物 R3×3 + V 评审 |
+| 新增脚本 | `ensure-codegraph-opsx.ts`（三层依赖检测 L1 CLI / L2 MCP 注册 / L3 项目目录 + 自动安装，full/quick/light 三模式）+ `check-codegraph-queries.ts`（#38 校验）+ `check-opsx-artifacts.ts`（#39/#40 校验）+ `check-openspec-archive.ts`（opsx:archive 归档完整性校验） |
+| 门禁扩展 | `gate-logic.ts` ArtifactGateResult +3 可选布尔字段（codegraphQueriesValid / opsxArtifactsValid / openspecArchived）+ externalChecks 参数（phase ≥ 5）；`run-log.schema.json` action 枚举 +6 值（codegraph_query / opsx_explore / opsx_propose / opsx_apply / opsx_archive / ensure_deps） |
+| 顶层文档 | 5 个（SSoT §3.4.21 + §3.3 + README.md 反模式 37→40 + AGENTS.md + CHANGELOG.md [24.0.0] + INSTALL.md） |
+| self-test | 基线 184→191（+3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive）全通过 |
+| vitest | 201/201 全通过 |
+| package.json | version `23.0.0` → `24.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| TypeScript strict | 0 错误 |
+
+> 第二十五轮（2026-07-30）相比第二十四轮：从「流程校验增强」进化为「外部工具集成」。codegraph 提供修改前符号级影响分析（与 code-TLA+ 修改后回归互补：前者预防、后者回归），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。skill 通过 `ensure-codegraph-opsx.ts` 自动检测安装（仅自动失败时 CHECKPOINT），通过 3 个 check 脚本 + gate-logic 三布尔做门禁校验。版本号三处一致 24.0.0。详见 SSoT §3.4.21 与 §10A 追溯表新增 §3.4.21 行。
+
 > 第四轮（2026-07-23）相比第三轮：删除 `.w-model/`/`docs/`/`src/`/`tests/`/`coverage/` 全部阶段产物后，按 W 模型 8 阶段从零端到端重跑，验证信息流校验特性合入后技能编排端到端可用。重跑产物为独立再实现，单元测试 71→53、覆盖率由 100% 全维度回落至 96.37%/93.57%/92.30%（仍 ≥ 80% 阈值），集成/系统/验收测试计数不变，所有门禁退出码仍为 0，图谱零违反收敛 1 轮达成。本轮未引入新缺陷。
 
 - **过程中发现并修正的缺陷**：
@@ -453,7 +474,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 
 - **调测模式**：self-as-verifier（Agent 按本技能编排自驱完成 8 阶段，每阶段跑质量门，不暂停 CHECKPOINT）。
 
-> Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时，可指向归档目录 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) 作为具象参考（原 `w-model-dev-demo/` 已于第 17 轮 P6 删除，源码不再可访问）。归档不参与 `/wm` 命令编排，也不会被 `check-*-gate.ts` 读取。
+> Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时，可指向归档目录 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) 作为具象参考（第 15 轮源码已清理，归档不可执行）。如需可运行产物，可参考当前仓库内 `w-model-dev-demo/`（第 23 轮端到端调测 demo，随仓库提交）。归档不参与 `/wm` 命令编排，也不会被 `check-*-gate.ts` 读取。
 
 ## 5. 必读文档
 
@@ -478,6 +499,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 - **编排者最小化**：编排者只做编排（路由 / 状态读写 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本），任何实施动作由 A / S / V / G / R 子代理执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](./w-model-dev/references/subagent-delegation.md)。
 - **返工必先根因定位**：V/G 不通过后必须分派 R 子代理定位根因，禁止直接分派 S 返工（命中反模式 #18）。R 子代理按 [`w-model-dev/references/root-cause-locator.md`](./w-model-dev/references/root-cause-locator.md) 方法论产出 RootCauseReport。
 - **R 报告须 V 复审 + G 门禁**：R 报告必须经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）才可分派 S-fix（命中反模式 #19）。返工循环：V/G→R→V→G→S-fix→V→G。
+- **修改前 codegraph 查询**（约束 #20）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用 `codegraph_explore` 查询目标符号影响半径（callers/callees/blast radius）并落盘 `.w-model/codegraph-queries/`；未查询直接修改命中反模式 #38，回到当前阶段起点。OpenSpec opsx 用于规格驱动变更（explore/propose/apply/archive），S-tickets 只做任务拆解（反模式 #40）。
 
 ## 7. 修复记录
 
@@ -494,7 +516,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 
 | 脚本名 | 用途 | 阶段 | 退出码 |
 |---|---|---|---|
-| check-verifier-output.ts | Verifier 输出校验（防 LLM 漂移；支持 `--self-as-verifier --s-output=<path>` 校验 V 产物与 S 产物路径不同，反模式 #35） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
+| check-verifier-output.ts | Verifier 输出校验（防 LLM 漂移；R13 单轴下限：passed 收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`，反模式 #41；支持 `--self-as-verifier --s-output=<path>` 校验 V 产物与 S 产物路径不同，反模式 #35） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-artifact-gate.ts | 工件质量门（RTM 覆盖率 + 四级测试 + TLA+ 资产 + SD→codeModule 终检 + RTM coverageStatus 一致性 + NFR 双字段校验） | 8 | 0=通过，1=校验失败，2=输入错误 |
 | check-requirement-graph.ts | 图谱结构门禁 + 信息流校验（黑洞/奇迹/死模块/边界完整性）+ 边数下限校验 + 语义来源占比校验 | 1-4 | 0=通过，1=校验失败，2=输入错误 |
 | check-tla-model.ts | TLA+ 行为门禁（SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性；**已移除 `--skip-tlc`**，所有 specs 强制 TLC） | 1-4 | 0=通过，1=校验失败，2=输入错误 |
@@ -513,5 +535,10 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-tla-bdd-sync.ts | TLA+/BDD 自动化同步校验（转移集 + 状态集 + 不变式等价） | 1-4 | 0=通过，1=校验失败，2=输入错误 |
 | check-role-dispatch.ts | 角色分派完整性校验（每阶段 S/V/G 各 ≥1 条；`--r3-enabled` 时 R ≥3 条；约束 #19） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-state-machine-consistency.ts | 设计文档↔代码状态机一致性校验（状态集 + 转移集一致） | 5 | 0=通过，1=校验失败，2=输入错误 |
-| self-test.ts | 回归基线（184 条样本：18 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine）；vitest ~219 条（含 graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + signature-chain R1-R10 + archive-integrity + preventive-review + tla-bdd-sync） | - | 0=通过，1=失败 |
+| check-design-contract-consistency.ts | 设计契约一致性校验（SSoT §10I：D1 路径 / D2 参数 / D3 状态码 / D4 响应字段，读 docs/uat-path-mapping.md + src/routes + 验收测试断言；CLI `<project-dir>`） | 5、8 | 0=通过，1=校验失败，2=输入错误 |
+| check-codegraph-queries.ts | codegraph 查询落盘完整性校验（反模式 #38；CLI `<project-root> --phase <5\|6\|7\|8>`） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
+| check-opsx-artifacts.ts | opsx 制品 + R3×3 + V 审查产物齐全性校验（反模式 #39/#40；CLI `<project-root> --phase <5\|6\|7\|8>`） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
+| check-openspec-archive.ts | opsx:archive 归档完整性校验（CLI `<project-root> --phase <5\|6\|7\|8>`） | 8（归档） | 0=通过，1=校验失败，2=输入错误 |
+| ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式；CLI `--phase <5-8> --project-root <path> --mode <full\|quick\|light>` | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
+| self-test.ts | 回归基线（191 条样本：18 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive）；vitest 201 条（含 graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + signature-chain R1-R10 + archive-integrity + preventive-review + tla-bdd-sync） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel + codeModule 格式 + uat-path-mapping） | - | 0=通过，1=失败 |
