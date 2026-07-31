@@ -148,3 +148,49 @@ describe('run-log E9: 1 fix 可覆盖多份 R 报告（去重映射）', () => {
     expect(result.violations.some(r => /R3.*rootcause.*RC-phase5-1-02.*无对应 fix/.test(r))).toBe(true);
   });
 });
+
+describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3（第29轮）', () => {
+  it('S-fix 后无 R3 直接 V 应失败', () => {
+    const entries: RunLogEntry[] = [
+      { runId: '1', timestamp: '2026-07-31T00:00:00Z', phase: 5, phaseName: 'Coding', action: 'fix', role: 'S', duration_s: 10, tokens: 100, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '2', timestamp: '2026-07-31T00:01:00Z', phase: 5, phaseName: 'Coding', action: 'review', role: 'V', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+    ];
+    const result = checkRunLog(entries, { gateLogs: new Map() });
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(v => /R3 记录校验失败.*S\(fix\)/.test(v))).toBe(true);
+  });
+
+  it('S-emergency-fix 后无 R3 直接 V 应失败', () => {
+    const entries: RunLogEntry[] = [
+      { runId: '1', timestamp: '2026-07-31T00:00:00Z', phase: 5, phaseName: 'Coding', action: 'emergency-fix', role: 'S', duration_s: 10, tokens: 100, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '2', timestamp: '2026-07-31T00:01:00Z', phase: 5, phaseName: 'Coding', action: 'review', role: 'V', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+    ];
+    const result = checkRunLog(entries, { gateLogs: new Map() });
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(v => /R3 记录校验失败.*S\(emergency-fix\)/.test(v))).toBe(true);
+  });
+
+  it('S-fix 后有 3 条 R3 再 V 应通过 R8（不因 fix 段报违规）', () => {
+    const entries: RunLogEntry[] = [
+      { runId: '1', timestamp: '2026-07-31T00:00:00Z', phase: 5, phaseName: 'Coding', action: 'fix', role: 'S', duration_s: 10, tokens: 100, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '2', timestamp: '2026-07-31T00:01:00Z', phase: 5, phaseName: 'Coding', action: 'r3-completeness', role: 'R', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '3', timestamp: '2026-07-31T00:02:00Z', phase: 5, phaseName: 'Coding', action: 'r3-reliability', role: 'R', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '4', timestamp: '2026-07-31T00:03:00Z', phase: 5, phaseName: 'Coding', action: 'r3-security', role: 'R', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '5', timestamp: '2026-07-31T00:04:00Z', phase: 5, phaseName: 'Coding', action: 'review', role: 'V', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+    ];
+    const result = checkRunLog(entries, { gateLogs: new Map() });
+    expect(result.violations.some(v => /R3 记录校验失败/.test(v))).toBe(false);
+  });
+
+  it('S-emergency-fix 后有 3 条 R3 再 V 应通过 R8', () => {
+    const entries: RunLogEntry[] = [
+      { runId: '1', timestamp: '2026-07-31T00:00:00Z', phase: 5, phaseName: 'Coding', action: 'emergency-fix', role: 'S', duration_s: 10, tokens: 100, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '2', timestamp: '2026-07-31T00:01:00Z', phase: 5, phaseName: 'Coding', action: 'r3-completeness', role: 'R', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '3', timestamp: '2026-07-31T00:02:00Z', phase: 5, phaseName: 'Coding', action: 'r3-reliability', role: 'R', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '4', timestamp: '2026-07-31T00:03:00Z', phase: 5, phaseName: 'Coding', action: 'r3-security', role: 'R', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+      { runId: '5', timestamp: '2026-07-31T00:04:00Z', phase: 5, phaseName: 'Coding', action: 'review', role: 'V', duration_s: 5, tokens: 50, estimated: false, subagentSpawns: 0, gateExitCode: null, outcome: 'success' },
+    ];
+    const result = checkRunLog(entries, { gateLogs: new Map() });
+    expect(result.violations.some(v => /R3 记录校验失败/.test(v))).toBe(false);
+  });
+});

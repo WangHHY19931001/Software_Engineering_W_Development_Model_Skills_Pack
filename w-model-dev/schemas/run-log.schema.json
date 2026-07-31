@@ -11,9 +11,9 @@
     "timestamp": { "type": "string", "format": "date-time" },
     "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
     "phaseName": { "type": "string", "minLength": 1 },
-    "action": { "enum": ["chunk", "cross", "evolve", "produce", "review", "gate", "tla-gate", "graph-gate", "test", "checkpoint", "rework", "rollback", "rootcause", "fix", "escalate", "r3-completeness", "r3-reliability", "r3-security", "codegraph_query", "opsx_explore", "opsx_propose", "opsx_apply", "opsx_archive", "ensure_deps"] },
+    "action": { "enum": ["chunk", "cross", "evolve", "produce", "review", "gate", "tla-gate", "graph-gate", "test", "checkpoint", "rework", "rollback", "rootcause", "fix", "emergency-fix", "escalate", "r3-completeness", "r3-reliability", "r3-security", "codegraph_query", "opsx_explore", "opsx_propose", "opsx_apply", "opsx_archive", "ensure_deps"] },
     "role": {
-      "description": "执行角色：O=编排者 A=分析 S=产出 V=评审 G=门禁 R=根因定位/R3预防性审查。约束 #19：每阶段 run-log 须至少含 role=S/V/G 各 1 条记录；R3 启用时须含 role=R ≥3 条（completeness/reliability/security）",
+      "description": "执行角色：O=编排者 A=分析 S=产出 V=评审 G=门禁 R=根因定位/R3预防性审查。约束 #19：每阶段 run-log 须至少含 role=S/V/G 各 1 条记录；R3 无条件强制须含 role=R ≥3 条（completeness/reliability/security，第29轮升级）",
       "enum": ["O", "A", "S", "V", "G", "R"]
     },
     "duration_s": { "type": "number", "minimum": 0 },
