@@ -58,7 +58,7 @@ function parseArgs(argv: string[]): {
   for (const a of argv.slice(3)) {
     if (a.startsWith('--phase=')) {
       const phaseStr = a.split('=')[1];
-      if (phaseStr !== undefined) phase = Number.parseInt(phaseStr, 10);
+      if (phaseStr !== undefined) phase = Number(phaseStr);
     } else if (a.startsWith('--node-type=')) {
       const typeStr = a.split('=')[1];
       if (typeStr !== undefined) nodeType = typeStr;
@@ -67,7 +67,7 @@ function parseArgs(argv: string[]): {
       if (tokStr !== undefined) maxTokens = Number.parseInt(tokStr, 10);
     }
   }
-  if (![1, 2, 3, 4].includes(phase ?? 0)) {
+  if (!Number.isInteger(phase) || ![1, 2, 3, 4].includes(phase!)) {
     console.error(`✗ --phase 必须为 1-4，实际: ${phase}`);
     process.exit(2);
   }
@@ -75,12 +75,59 @@ function parseArgs(argv: string[]): {
     console.error(`✗ --node-type 必须为 REQ|SD|INTF|DD，实际: ${nodeType}`);
     process.exit(2);
   }
+  if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+    console.error(`✗ --max-tokens 必须为正整数，实际: ${maxTokens}`);
+    process.exit(2);
+  }
   return { inputPath, phase: phase!, nodeType: nodeType!, maxTokens };
 }
 
 function estimateTokens(text: string): number {
-  // 字符数 / 4 近似（实现阶段可调，见设计文档 §6 开放问题1）
-  return Math.ceil(text.length / 4);
+  return Math.ceil(Buffer.byteLength(text, 'utf8') / 4);
+}
+
+function splitMarkdownSections(content: string): string[] {
+  const lines = content.split('\n');
+  const sections: string[] = [];
+  let current: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    const fence = line.match(/^\s*(```|~~~)/);
+    if (fence) inFence = !inFence;
+    if (!inFence && /^#{1,6}\s/.test(line) && current.length > 0) {
+      sections.push(current.join('\n'));
+      current = [];
+    }
+    current.push(line);
+  }
+  if (current.length > 0) sections.push(current.join('\n'));
+  return sections;
+}
+
+function splitByLines(text: string, maxTokens: number, filePath: string, chunkIdPrefix: string): Chunk[] {
+  const lines = text.split('\n');
+  const chunks: Chunk[] = [];
+  const OVERLAP = 5;
+  let buf: string[] = [];
+  let bufBytes = 0;
+  let idx = 1;
+  const flush = () => {
+    if (buf.length === 0) return;
+    const slice = buf.join('\n');
+    chunks.push({ id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`, path: filePath, kind: 'section', tokens: estimateTokens(slice) });
+    idx++;
+    const keep = buf.slice(-OVERLAP);
+    buf = [...keep];
+    bufBytes = keep.reduce((a, l) => a + Buffer.byteLength(l, 'utf8') + 1, 0);
+  };
+  for (const line of lines) {
+    const lineBytes = Buffer.byteLength(line, 'utf8') + 1;
+    if (bufBytes + lineBytes > maxTokens * 4 && buf.length > 0) flush();
+    buf.push(line);
+    bufBytes += lineBytes;
+  }
+  if (buf.length > 0) flush();
+  return chunks;
 }
 
 async function splitMarkdownByHeaders(
@@ -89,35 +136,27 @@ async function splitMarkdownByHeaders(
   filePath: string,
   chunkIdPrefix: string,
 ): Promise<Chunk[]> {
-  // 按 # 标题切分；若单节仍超限，按行数二次切分
-  const sections = content.split(/^(#{1,6}\s)/m);
+  const sections = splitMarkdownSections(content);
   const chunks: Chunk[] = [];
   let current = '';
   let idx = 1;
-  for (let i = 0; i < sections.length; i++) {
-    const piece = i === 0 ? sections[i] : sections[i] + (sections[i + 1] ?? '');
-    if (i !== 0) i++; // 跳过已消费的标题部分
-    const candidate = current + piece;
-    if (estimateTokens(candidate) > maxTokens && current.length > 0) {
-      chunks.push({
-        id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
-        path: filePath,
-        kind: 'section',
-        tokens: estimateTokens(current),
-      });
+  for (const sec of sections) {
+    if (estimateTokens(current + sec) > maxTokens && current.length > 0) {
+      chunks.push({ id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`, path: filePath, kind: 'section', tokens: estimateTokens(current) });
       idx++;
-      current = piece ?? '';
+      current = '';
+    }
+    if (estimateTokens(sec) > maxTokens) {
+      const sub = splitByLines(sec, maxTokens, filePath, `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`);
+      chunks.push(...sub);
+      idx += sub.length;
+      current = '';
     } else {
-      current = candidate;
+      current += sec;
     }
   }
   if (current.length > 0) {
-    chunks.push({
-      id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
-      path: filePath,
-      kind: 'section',
-      tokens: estimateTokens(current),
-    });
+    chunks.push({ id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`, path: filePath, kind: 'section', tokens: estimateTokens(current) });
   }
   return chunks;
 }
@@ -129,18 +168,17 @@ async function planFile(
 ): Promise<Chunk[]> {
   const stat = await fs.stat(filePath);
   if (stat.isDirectory()) {
-    // 目录：按叶子文件分块
     const entries = await fs.readdir(filePath, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
     const chunks: Chunk[] = [];
     let idx = 1;
     for (const e of entries) {
       const childPath = path.join(filePath, e.name);
-      if (e.isFile()) {
+      if (e.isFile() || e.isDirectory()) {
         const sub = await planFile(childPath, maxTokens, `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`);
         chunks.push(...sub);
         idx++;
       }
-      // 子目录递归（叶子子目录=一候选块由递归自然处理）
     }
     return chunks;
   }
@@ -159,23 +197,7 @@ async function planFile(
   if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
     return splitMarkdownByHeaders(content, maxTokens, filePath, chunkIdPrefix);
   }
-  // 按行切（overlap 50 行）
-  const lines = content.split('\n');
-  const linesPerChunk = Math.ceil((maxTokens * 4) / 1); // 近似：maxTokens*4 字符 ≈ 行数
-  const chunks: Chunk[] = [];
-  let idx = 1;
-  for (let i = 0; i < lines.length; i += linesPerChunk - 50) {
-    const slice = lines.slice(i, i + linesPerChunk).join('\n');
-    chunks.push({
-      id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
-      path: filePath,
-      kind: 'section',
-      tokens: estimateTokens(slice),
-    });
-    idx++;
-    if (i + linesPerChunk >= lines.length) break;
-  }
-  return chunks;
+  return splitByLines(content, maxTokens, filePath, chunkIdPrefix);
 }
 
 async function main(): Promise<void> {
