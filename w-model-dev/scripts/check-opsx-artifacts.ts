@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 interface CheckResult {
   passed: boolean;
   violations: string[];
-  changeName: string | null;
+  changesNames: string[];
   artifactsFound: string[];
   reviewsFound: string[];
 }
@@ -42,41 +42,47 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
   const changesDir = path.join(projectRoot, 'openspec', 'changes');
   if (!existsSync(changesDir)) {
     violations.push(`openspec/changes/ 目录不存在（阶段 ${phase} 须有 opsx 变更）`);
-    return { passed: false, violations, changeName: null, artifactsFound, reviewsFound };
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
   }
 
-  // 找该阶段的变更目录 phase<N>-*
-  const prefix = `phase${phase}-`;
+  // 找该阶段所有变更目录 phase<N>-*（精确前缀匹配，排除 archive）
+  const prefixRegex = new RegExp(`^phase${phase}-`);
   const entries = readdirSync(changesDir, { withFileTypes: true })
-    .filter(e => e.isDirectory() && e.name.startsWith(prefix) && e.name !== 'archive');
+    .filter(e => e.isDirectory() && prefixRegex.test(e.name) && e.name !== 'archive');
 
   if (entries.length === 0) {
-    violations.push(`阶段 ${phase}：openspec/changes/ 下无 ${prefix}* 变更目录`);
-    return { passed: false, violations, changeName: null, artifactsFound, reviewsFound };
+    violations.push(`阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`);
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
   }
 
-  const changeDir = path.join(changesDir, entries[0]!.name);
-  const changeName = entries[0]!.name;
+  // 按名称排序后逐个校验所有变更目录
+  const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
+  const changesNames = sorted.map(e => e.name);
 
-  // 校验 opsx 制品 + tickets（反模式 #40）
-  for (const art of REQUIRED_OPSX_ARTIFACTS) {
-    const artPath = path.join(changeDir, art);
-    if (existsSync(artPath)) {
-      artifactsFound.push(art);
+  for (const entry of sorted) {
+    const changeDir = path.join(changesDir, entry.name);
+    const changeName = entry.name;
+
+    // 校验 opsx 制品 + tickets（反模式 #40）
+    for (const art of REQUIRED_OPSX_ARTIFACTS) {
+      const artPath = path.join(changeDir, art);
+      if (existsSync(artPath)) {
+        artifactsFound.push(`${changeName}/${art}`);
+      } else {
+        violations.push(`${changeName}/${art} 缺失（反模式 #40：opsx/S-tickets 职责混淆）`);
+      }
+    }
+
+    // 校验 specs/ 目录存在
+    const specsDir = path.join(changeDir, 'specs');
+    if (!existsSync(specsDir)) {
+      violations.push(`${changeName}/specs/ 目录缺失`);
     } else {
-      violations.push(`${changeName}/${art} 缺失（反模式 #40：opsx/S-tickets 职责混淆）`);
+      artifactsFound.push(`${changeName}/specs/`);
     }
   }
 
-  // 校验 specs/ 目录存在
-  const specsDir = path.join(changeDir, 'specs');
-  if (!existsSync(specsDir)) {
-    violations.push(`${changeName}/specs/ 目录缺失`);
-  } else {
-    artifactsFound.push('specs/');
-  }
-
-  // 校验 R3×3 + V 审查产物（反模式 #39）
+  // 校验 R3×3 + V 审查产物（反模式 #39）—— 项目级 stage 审查
   const r3Dir = path.join(projectRoot, '.w-model', 'r3-reviews');
   const vDir = path.join(projectRoot, '.w-model', 'v-reviews');
 
@@ -100,7 +106,7 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
   return {
     passed: violations.length === 0,
     violations,
-    changeName,
+    changesNames,
     artifactsFound,
     reviewsFound,
   };
@@ -129,7 +135,7 @@ async function main(): Promise<void> {
   console.log('═'.repeat(60));
   console.log(`项目根        : ${abs}`);
   console.log(`阶段          : ${phase}`);
-  console.log(`变更名        : ${result.changeName ?? '（未找到）'}`);
+  console.log(`变更目录      : ${result.changesNames.join(', ') || '（未找到）'}`);
   console.log(`制品          : ${result.artifactsFound.join(', ') || '（无）'}`);
   console.log(`审查产物      : ${result.reviewsFound.join(', ') || '（无）'}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
@@ -149,7 +155,7 @@ async function main(): Promise<void> {
     passed: result.passed,
     exitCode,
     phase,
-    changeName: result.changeName,
+    changesNames: result.changesNames,
     artifactsFound: result.artifactsFound,
     reviewsFound: result.reviewsFound,
     violations: result.violations,

@@ -345,6 +345,15 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 **R3 子代理产出**：`.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`
 
+**阶段 5-8 opsx 三段式 stage 级 R3+V 产物**（第28轮 D4 明确）：
+
+opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 stage 级审查产物：
+
+- **R3（9 份）**：`.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md`
+- **V 评审（3 份）**：`.w-model/v-reviews/phase<N>-{explore,propose,coding}.md`
+
+这些 stage 级产物与 `check-opsx-artifacts.ts` 校验口径一致；缺失任一文件命中反模式 #39（跳过 opsx 产物审查）。
+
 **PreventiveReview schema**：见 `schemas/preventive-review.schema.json`
 
 **R3 审查清单（按维度）**：

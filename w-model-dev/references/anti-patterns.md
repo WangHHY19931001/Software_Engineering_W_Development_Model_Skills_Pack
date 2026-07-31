@@ -540,9 +540,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **危害**：opsx:explore/propose/apply 工作流步骤产物未经 R3×3（completeness/reliability/security）+ V 评审即进入下一步，导致规划缺陷或实现偏差未被发现。
 
 **检测信号**：
-- `.w-model/r3-reviews/` 下缺少 `phase<N>-explore-*.md` / `phase<N>-propose-*.md` / `phase<N>-coding-*.md` 任一段的 3 份 R3 报告
-- `.w-model/v-reviews/` 下缺少对应段的 V 评审文件
-- run-log 中 opsx 步骤（action=opsx_explore/opsx_propose/opsx_apply）之间无 action=r3-completeness/r3-reliability/r3-security + role=V 记录
+- `.w-model/r3-reviews/` 下缺少 opsx 三段式中任一 stage 的 3 份 R3 报告：`phase<N>-explore-{completeness,reliability,security}.md` / `phase<N>-propose-{completeness,reliability,security}.md` / `phase<N>-coding-{completeness,reliability,security}.md`（共 9 份）
+- `.w-model/v-reviews/` 下缺少对应段 V 评审文件：`phase<N>-explore.md` / `phase<N>-propose.md` / `phase<N>-coding.md`（共 3 份）
+- `openspec/changes/` 下任一 `phase<N>-*` 变更目录制品不齐（proposal/design/tasks/tickets/specs）
 
 **回退动作**：回退到缺失审查的 opsx 步骤，补跑 R3×3 + V 评审后重做后续步骤。
 

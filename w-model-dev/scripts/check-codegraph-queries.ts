@@ -15,7 +15,7 @@
  *   2  输入错误
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -94,6 +94,10 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
         violations.push(`${f}：缺 callees[] 字段`);
         continue;
       }
+      if (q.blastRadius === undefined || q.blastRadius === null) {
+        violations.push(`${f}：缺 blastRadius 字段（查询结果影响半径）`);
+        continue;
+      }
       validCount++;
     } catch {
       violations.push(`${f}：非合法 JSON`);
@@ -114,6 +118,11 @@ async function main(): Promise<void> {
   const phase = phaseIdx >= 0 ? parseInt(args[phaseIdx + 1]!, 10) : NaN;
 
   if (!file || Number.isNaN(phase)) {
+    console.error('用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>');
+    process.exit(2);
+  }
+  if (!existsSync(file) || !statSync(file).isDirectory()) {
+    console.error(`✗ 项目根路径不存在或不是目录: ${file}`);
     console.error('用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>');
     process.exit(2);
   }

@@ -24,7 +24,7 @@ interface CheckResult {
   artifactsFound: string[];
 }
 
-const REQUIRED_ARCHIVED_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md'] as const;
+const REQUIRED_ARCHIVED_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md', 'tickets.md'] as const;
 
 /**
  * 校验 opsx 归档完整性纯逻辑（可被 self-test import）
@@ -39,13 +39,13 @@ export function checkOpenspecArchive(projectRoot: string, phase: number): CheckR
     return { passed: false, violations, archivedChange: null, artifactsFound };
   }
 
-  // 找该阶段的归档目录 *-phase<N>-*
-  const suffix = `phase${phase}-`;
+  // 找该阶段的归档目录（名称精确前缀匹配 phase<N>-）
+  const prefixRegex = new RegExp(`phase${phase}-`);
   const entries = readdirSync(archiveDir, { withFileTypes: true })
-    .filter(e => e.isDirectory() && e.name.includes(suffix));
+    .filter(e => e.isDirectory() && prefixRegex.test(e.name));
 
   if (entries.length === 0) {
-    violations.push(`阶段 ${phase}：archive/ 下无含 ${suffix} 的归档目录（opsx:archive 未执行）`);
+    violations.push(`阶段 ${phase}：archive/ 下无含 phase${phase}- 前缀的归档目录（opsx:archive 未执行）`);
     return { passed: false, violations, archivedChange: null, artifactsFound };
   }
 
