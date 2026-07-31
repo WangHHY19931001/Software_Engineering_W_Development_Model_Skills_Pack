@@ -118,6 +118,30 @@
 - V 子代理评审时检查「Out of Scope 是否覆盖了用户提到的边界场景」
 - Brownfield 项目须明确声明不动哪些历史模块（见 SSoT §11A.5）
 
+## 迷雾登记册（Fog of War）（第 27 轮新增）
+
+> 吸收 wayfinder「Fog of war」理念。W 阶段 1 强制 100% 覆盖（C1-C10）下，为「in-scope 但尚无法精确陈述」的需求提供显式落脚点，防止 A 子代理提前捏造浅层 REQ（违背禁止行为 #2 精神）或静默丢弃（违反禁止行为 #10）。设计 spec：[`docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md`](../../docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md)。
+
+### 定义与区分
+
+- **迷雾项**：in-scope、但当前无法精确陈述的需求（方向已见、连问题都还说不清）。
+- **与 §8 Out of Scope 的区分**：迷雾 = 要做什么但还说不清（in-scope 未成形）；Out of Scope = 不做什么（范围外，不属雾，永不毕业除非目的地重画）。
+- **锐利性测试**（吸收 wayfinder「Fog or ticket?」）：判断标准是**现在能否精确陈述该需求的问题**，不是能否回答它。能精确陈述 → 正式 REQ；不能 → 入迷雾册。
+
+### 流程与责任
+
+- **准入（A 子代理）**：A-chunk 提取时执行锐利性测试，不能精确陈述者记入 `<chunk-id>.md` 迷雾节（fogDesc / fogBlocker / fogGroupHint，见 [ingestion-chunk.md](ingestion-chunk.md)「REQ 入学锐利性测试」节）；A-cross 汇总去重写入 `cross-analysis-report.md` §7。
+- **毕业（S 子代理）**：S 产出需求规格时，对每项迷雾给出毕业处置（三选一），填入规格书 §8.5：
+  1. **毕业成 REQ**：进入 graph.json + 覆盖矩阵，走正常维度 1-4 校验
+  2. **判 Out of Scope**：写入规格书 §8，永不毕业（除非目的地重画）
+  3. **豁免审批暂缓**：走 S→R→V→人类四阶段（见「豁免审批治理」节），写入 exemption.json
+- **核验（R / V）**：R 预防性审查核验迷雾项真实性（是否本可精确陈述却借雾逃避覆盖）；V 评审检查毕业处置完整性（FM-3D-07）。
+- **CHECKPOINT 前强制清空**：阶段门放行前迷雾册每项必须有毕业处置结果，禁止静默遗留（禁止行为 #12）。
+
+### 覆盖矩阵语义
+
+迷雾项**不计入**覆盖矩阵分母（非正式 REQ、非图节点）；毕业 / 判范围 / 豁免的处置结果在规格书 §8.5、§8 与 exemption.json 中可见，禁止隐式消失。
+
 ## Implementation/Testing Decisions 分离（第 10 轮外部技能吸收）
 
 > 吸收 to-spec PRD 结构。S-doc 在「风险与缓解」前必须包含 Implementation Decisions + Testing Decisions 两节，分离架构决策与测试决策。
@@ -268,6 +292,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 | FM-3D-04 | REQ-group 边界模糊 | level=1 REQ 对应的 group 范围不清；reqGroup 指向非 level=1 节点 | 回步骤 5 向用户确认 group 归属 |
 | FM-3D-05 | 依赖时序环 | depends-on / precedes 边形成环 | 回步骤 3 拆解环或申请豁免 |
 | FM-3D-06 | conflicts-with 未解决 | conflicts-with 边存在但无处置记录 | 启动豁免审批（S→R→V→人类） |
+| FM-3D-07 | 迷雾滥用 | 检测信号 A：把本应正式的 REQ 塞入迷雾册逃避覆盖（R/V 发现迷雾项实为可精确陈述需求）；检测信号 B：CHECKPOINT 前迷雾册存在未终结项 | 处置 A：作废迷雾项，回步骤 2-4 补正式 REQ；处置 B：回 CHECKPOINT 前补毕业处置（毕业 / 判范围 / 豁免） |
 
 ### FM-4D（四维覆盖失败模式）
 
@@ -337,6 +362,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 9 | 省略 §4-§7 任一节（层级树/REQ-group/交叉逻辑/覆盖分析） | 四维识别强制节必须全部产出；无内容时填「无」并加说明，禁止省略 |
 | 10 | 覆盖缺失项隐式遗漏 | 覆盖缺失项须经豁免审批（FM-4D-01/02/03/05）并在 §8 Out of Scope 显式声明，禁止隐式遗漏 |
 | 11 | 跳过豁免审批流程 | 豁免须经 S→R→V→人类四阶段流程 + check-exemption E1-E8 全通过；跳步即命中反模式 #30 |
+| 12 | 迷雾项静默遗留 | CHECKPOINT 前迷雾册每项须有毕业处置结果（毕业成 REQ / 判 Out of Scope / 豁免审批），禁止未终结即放行（FM-3D-07） |
 
 ## 返工路径
 
@@ -352,6 +378,8 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 - 覆盖缺失（FM-4D-01/02/03/05）→ 回到步骤 6，补覆盖或申请豁免审批
 - cross-cuts 不一致（FM-4D-04）→ 回到步骤 3，对齐横切边
 - 豁免审批跳步（FM-EXEMPT-01/02/03/04/05）→ 回到豁免审批对应阶段（S/R/V/人类）
+- 迷雾项未终结（FM-3D-07）→ 回 CHECKPOINT 前补毕业处置：毕业成 REQ → 回步骤 2-4；判 Out of Scope → 补 §8；豁免 → 回豁免审批流程
+- 迷雾滥用逃避覆盖（FM-3D-07）→ 作废迷雾项，回步骤 2-4 补正式 REQ
 - 验收测试未覆盖全部功能点 → 回到并行任务，补充用例
 
 ## 退出状态
