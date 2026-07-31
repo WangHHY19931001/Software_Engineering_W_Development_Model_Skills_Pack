@@ -145,7 +145,7 @@ function checkSdToCodeModuleMapping(
       .split(/[-_.]+/)
       .map(s => s.toLowerCase())
       .filter(s => s.length >= 2);
-    if (segments.length === 0 && codeModules.some((m: string) => m.includes(`${id}:`))) {
+    if (id !== '' && segments.length === 0 && codeModules.some((m: string) => m.includes(`${id}:`))) {
       continue; // 数字层级 id（如 SD-5.2.1）命中 codeModule 前缀映射
     }
     if (segments.length === 0) {
