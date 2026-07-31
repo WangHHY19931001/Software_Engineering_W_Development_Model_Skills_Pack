@@ -456,18 +456,30 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 跨阶段定位（仅当前阶段产物 + 上游回溯标记）
 ```
 
-### R3 预防性审查分派模板（第22轮新增）
+### R3 预防性审查分派模板（第22轮新增，第29轮升级为无条件，覆盖所有 S 变体）
 
 > S 产出后、V 评审前触发。R3 复用 R 子代理机制，但目的为预防性审查而非根因定位。
+>
+> **第29轮升级**：R3 从「条件强制（--r3-enabled flag）」升级为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神。
 
-**分派时序**：S 产出 → R3-completeness / R3-reliability / R3-security（可并行）→ V 评审
+**分派时序**：S 产出（任意变体）→ R3-completeness / R3-reliability / R3-security（可并行）→ V 评审
+
+**S 变体与 R3 报告路径对应**（第29轮新增）：
+
+| S 变体 | action | R3 报告路径前缀 |
+|---|---|---|
+| 标准 S / S-doc / S-tla / S-bdd | `produce` | `<phase>-{dim}.json` |
+| S-fix（返工变体） | `fix` | `<phase>-fix-{dim}.json` |
+| S-emergency-fix（紧急修复变体） | `emergency-fix` | `<phase>-emergency-{dim}.json` |
+
+`check-preventive-review.ts` 支持 `--variant=standard|fix|emergency` 参数校验对应路径；`--auto-trigger` 模式从 run-log 推断 S 变体。
 
 **R3 子代理输入**：
 - 当前阶段产物路径
 - 上游产物（需求/设计文档、RTM、TLA+ 规格、BDD features）
 - 审查维度（completeness / reliability / security）
 
-**R3 子代理产出**：`.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`
+**R3 子代理产出**：`.w-model/preventive-reviews/<phase>[-fix|-emergency]-{completeness,reliability,security}.json`
 
 **阶段 5-8 opsx 三段式 stage 级 R3+V 产物**（第28轮 D4 明确）：
 
@@ -538,6 +550,8 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 ```
 
 ### S 兼 F 修复分派模板（返工变体）
+
+> **第29轮新增条款**：S-fix 与标准 S 一视同仁，产出后须 **R3×3 → V → G**（无条件强制，不得跳过 R3+V）。命中反模式 #42（S-fix / emergency-fix 后跳过 R3+V）一律回到 S-fix 产出后起点补跑 R3×3 + V。R3 报告路径走 `<phase>-fix-{completeness,reliability,security}.json`。
 
 ```
 角色：产出子代理-修复变体（S-fix）
@@ -841,11 +855,12 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 1. **记录 rootcause**：S 子代理必须在 `.w-model/rootcause/rootcause-report.jsonl` 追加条目（`action=rootcause`），描述 bug 现象、影响范围、定位过程、初步根因猜测
    - 字段：`{action:"rootcause", phase, foundBy:"S", bugLocation, symptom, impact, guess}`
 2. **转交 R 子代理**：非紧急修复一律转 R 子代理正式定位，S 子代理不得越权修改既有产物。R 子代理产出 `RootCauseReport` → V 复审 → G 门禁 → S-fix 修复（标准返工流程）
-3. **紧急修复通道**（仅当 bug 阻塞当前阶段推进时启用）：
+3. **紧急修复通道**（仅当 bug 阻塞当前阶段推进时启用，第29轮升级为前置 R3+V+G）：
    - S 子代理可执行**最小修复**（仅修复阻塞点，不扩展功能、不重构）
    - 必须在 `.w-model/run-log.jsonl` 追加 `fix` 条目，标注 `"紧急修复": true` 和阻塞原因
-   - 紧急修复条目格式：`{role:"S", action:"fix", variant:"emergency-fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment", needsReview:true}`
-   - 阶段完成后由 R 子代理复核紧急修复的完整性（R 复核产出追加到 `RootCauseReport` 的 `emergencyFixReview` 字段）；R 复核认为修复不完整 → 转 S-fix 重做
+   - 紧急修复条目格式：`{role:"S", action:"emergency-fix", variant:"emergency-fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment"}`（第29轮：移除 `needsReview:true` 字段，紧急修复不再走事后 R 复核）
+   - **第29轮升级（前置 R3+V+G）**：emergency-fix 与其他 S 变体一视同仁，产出后须前置 **R3×3（completeness/reliability/security）→ V → G**，不得跳过。R3 报告路径走 `<phase>-emergency-{completeness,reliability,security}.json`（与 `check-preventive-review.ts --variant=emergency` 一致）。跳过 R3+V 命中反模式 #42。`variant=emergency-fix` + `blocker` 字段保留用于 run-log 审计，仅作为「为何走紧急通道」的说明，不再意味跳过审查。
+   - **移除机制**：原「阶段完成后由 R 子代理复核紧急修复的完整性（R 复核产出追加到 `RootCauseReport` 的 `emergencyFixReview` 字段）」事后复核机制已移除（第29轮）。紧急修复的完整性由前置 R3×3 + V 兜底。
 
 **违规检测**：
 
@@ -855,7 +870,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 - 非紧急修复的 `fix` 条目视为越权，需回滚并由 R + S-fix 重做
 - 检测脚本：`check-run-log.ts` 校验 `role=S` 的 `action=fix` 条目必须含 `variant` 字段，且 `variant=emergency-fix` 时必须含 `blocker` 字段
 
-> 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是唯一例外，且必须 needsReview=true 由 R 复核。
+> 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。第29轮升级后，紧急修复通道不再是「跳过 R3+V 的事后复核例外」，而是「与其他 S 变体一视同仁的前置 R3+V+G 通道」——emergency-fix 产出后仍须 R3×3 + V + G，命中反模式 #42 一律回退。
 
 ## 豁免审批角色边界（第 20 轮四维识别与豁免审批扩展）
 
@@ -992,7 +1007,7 @@ O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
 | S（产出） | 每阶段必须（产出开发产物 + 测试设计 + RTM 更新） | check-role-dispatch.ts |
 | V（评审） | 每阶段必须（按 verifier-spec.md §8 产出 VerifierOutput JSON） | check-role-dispatch.ts |
 | G（门禁） | 每阶段必须（跑 check-*.ts + 回填证据摘要） | check-role-dispatch.ts |
-| R（根因/R3） | R3 预防性审查启用时必须（completeness/reliability/security 三阶段各 1 次，共 ≥3 条） | check-role-dispatch.ts --r3-enabled |
+| R（根因/R3） | **无条件必须**（completeness/reliability/security 三阶段各 1 次，共 ≥3 条，第29轮升级为无条件强制，覆盖所有 S 变体含 S-fix / S-emergency-fix） | check-role-dispatch.ts（`--r3-enabled` flag 保留为 no-op 向后兼容） |
 
 ### 可选条件
 
@@ -1003,18 +1018,18 @@ O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
 
 **self-as-verifier 模式豁免**（仅 demo 项目 / 非生产项目）：
 - S/V/G/R 任两角色由同一 Agent 兼任时，run-log 中可同一 `runId` 条目标记多角色（如 `role="S/V"`），但须满足：
-  1. 产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON 路径不同）
+  1. 产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON / PreventiveReview JSON 三份路径不同，第29轮扩展含 R3 产物）
   2. run-log 条目的 `artifacts` 字段列出各角色独立产物路径
 - 详见 SKILL.md「self-as-verifier 模式」节与反模式 #35。
 
 ### 校验命令
 
 ```bash
-# 非 R3 模式
+# 第29轮升级：R3 无条件强制，--r3-enabled flag 保留为 no-op 向后兼容
 npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl
 
-# R3 启用模式
+# 旧调用（flag 视为 no-op，行为一致）
 npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
 ```
 
-退出码：0=通过，1=缺角色（违反约束 #19），2=输入错误。
+退出码：0=通过，1=缺角色（违反约束 #19，R≥3 无条件校验），2=输入错误。
