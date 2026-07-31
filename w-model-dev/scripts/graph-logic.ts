@@ -794,11 +794,11 @@ export function recalculatePassed(result: GraphCheckResult, isPhase1PureReq: boo
     tv.INTF_without_defines === 0 &&
     tv.DD_without_realizes === 0;
   const dv = result.dataflowViolations;
-  const dataflowOk =
+  const dataflowOk = isPhase1PureReq ? true : (
     dv.blackHoles.length === 0 &&
     dv.miracles.length === 0 &&
     dv.deadModules.length === 0 &&
-    result.boundary.complete;
+    result.boundary.complete);
   const rootsOk = isPhase1PureReq ? result.roots.length >= 1 : result.roots.length === 1;
   result.passed =
     result.connectedComponents === 1 &&
