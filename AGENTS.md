@@ -16,6 +16,7 @@
 - **技能自演化** 不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 - **codegraph + OpenSpec 集成**（阶段 5-8，第 25 轮）：codegraph 提供修改前符号级影响分析（callers/callees/blast radius），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。技能包通过 `ensure-codegraph-opsx.ts` 自动检测安装，通过 3 个 check 脚本做门禁校验。详见 SSoT §3.4.21。
 - **第 26 轮深度对比吸收**（外部仓库逐文件对比产物）：单轴下限 R13（`check-verifier-output.ts` passed 收紧为 `(A||B) && 所有 subCriterion.score ≥ 0.70`，反模式 #41「加权平均掩盖单轴失败」）/ Fowler 12 坏味道基线（`subagent/engineering-code-reviewer.md`）/ 票据 durability（`phase-5-coding.md` 票据主体 = 符号级契约，位置交 codegraph）/ 术语治理（`references/glossary.md` 权威表 + `_Avoid_`）。详见 SSoT §3.4.22。
+- **第 27 轮 Wayfinder「Fog of War」吸收**：阶段 1 需求分析引入迷雾登记册——REQ 入学锐利性测试（`references/ingestion-chunk.md`，判据 = 能否精确陈述需求的问题，非能否回答）/ A-cross 报告 §7 迷雾汇总（`references/ingestion-cross.md`，不代 S 决定毕业）/ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空，`references/phase-1-requirements.md`「迷雾登记册（Fog of War）」节）/ 规格书 §8.5 Not yet specified（`templates/requirement-spec.md`）。迷雾册为文本节不建图节点、无脚本/schema 变更，治理走 FM-3D-07 + 禁止行为 #12（不新增反模式）。详见 SSoT §3.4.23。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 

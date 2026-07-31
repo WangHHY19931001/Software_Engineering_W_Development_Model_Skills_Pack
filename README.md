@@ -35,6 +35,7 @@
 - **OpenSpec opsx 三段式 S 分派**（阶段 5-8，第 25 轮新增）：引入 opsx:explore/propose/apply/archive 规格驱动变更工作流，S-explore（思路探索+codegraph 影响初判）→ S-propose（规格级变更规划+S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码）。每段产物跑 R3×3（completeness/reliability/security）+ V 评审，不合格打回重做。详见 [phase-5-coding.md](./w-model-dev/references/phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节
 - **单轴下限 R13**（第 26 轮新增）：Verifier 评审 passed 判据收紧为 `qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70`（0.70 = B 级分界），杜绝「加权平均掩盖单轴失败」（反模式 #41）——completeness=0.65 但其余 0.95 加权后达 A 级的历史放行路径被拦截。外部原则「评审各轴独立成环，永不合并计分」为设计依据。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md) §3.3 / §6.3
 - **Fowler 12 坏味道基线 + 票据 durability + 术语治理**（第 26 轮新增）：`engineering-code-reviewer.md` 固定 12 条坏味道基线（重复代码 / 过长方法 / 过大类 / 特征依恋 / 数据泥团 / Switch 语句 / 临时字段 / 消息链等，评审命中须引用条目名）；`phase-5-coding.md` 票据主体 = 符号级契约（接口/类型/状态转移），位置信息交给 codegraph，杜绝 fragile reference；新建 [glossary.md](./w-model-dev/references/glossary.md) 术语权威表（15+ 术语 + `_Avoid_` 别名治理）
+- **阶段 1 迷雾登记册（Fog of War）**（第 27 轮新增）：需求分析引入「REQ 入学锐利性测试」（吸收 wayfinder「Fog or ticket?」判据——能否精确陈述，不是能否回答）+ 迷雾登记册文本节（Not yet specified，不建图节点）+ 毕业机制（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空）。为「in-scope 尚无法精确陈述」的需求提供落脚点，杜绝 A 子代理捏造浅层 REQ 或静默丢弃。治理走 FM-3D-07 + 禁止行为 #12（不新增反模式）。详见 [phase-1-requirements.md](./w-model-dev/references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节
 
 ## 架构原则与外部工具边界
 
