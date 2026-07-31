@@ -445,7 +445,7 @@ export function checkNextBranchCoverage(
 // ==================== 维度4：断言覆盖不变式 ====================
 
 /**
- * 从 TLA+ 文本中抽取 BusinessInvariant == 定义后的所有子不变式名（/\ 分隔）。
+ * 从 TLA+ 文本中抽取 BusinessInvariant/Invariants == 定义后的所有子不变式名（/\ 分隔）。
  *
  * 形如：
  *   BusinessInvariant ==
@@ -453,13 +453,17 @@ export function checkNextBranchCoverage(
  *       /\ TokenIssuedRequiresAuthenticated
  *       /\ LoggedOutImpliesNoToken
  *
+ *   Invariants ==
+ *       /\ TypeOK
+ *       /\ InitInvariant
+ *
  * @param tlaContent .tla 文件文本内容
  * @returns 子不变式名数组
  */
 export function extractBusinessInvariants(tlaContent: string): string[] {
   if (typeof tlaContent !== 'string' || tlaContent.length === 0) return [];
   const invMatch = tlaContent.match(
-    /BusinessInvariant\s*==\s*([\s\S]*?)(?=\n\s*[A-Z][A-Za-z0-9_]*\s*==|\n\s*====|$)/,
+    /(?:BusinessInvariant|Invariants)\s*==\s*([\s\S]*?)(?=\n\s*[A-Z][A-Za-z0-9_]*\s*==|\n\s*====|$)/,
   );
   if (!invMatch || invMatch[1] === undefined) return [];
   const body = invMatch[1];
@@ -478,7 +482,7 @@ export function extractBusinessInvariants(tlaContent: string): string[] {
  * 维度4：断言覆盖不变式校验（spec §3.4.2 维度4）
  *
  * 校验逻辑：
- *   - 正则抽取 `BusinessInvariant ==` 后的 `/\` 分隔子不变式名
+ *   - 正则抽取 `BusinessInvariant/Invariants ==` 后的 `/\` 分隔子不变式名
  *   - 抽取代码中含 assert/invariant/require 的 ExpressionStatement
  *   - 宽松策略：有断言即认为覆盖（不要求 1:1 对应）
  *   - 无覆盖则失败
@@ -493,7 +497,7 @@ export function checkInvariantCoverage(
 ): DimensionResult {
   const invariants = extractBusinessInvariants(tlaContent);
   if (invariants.length === 0) {
-    // 无 BusinessInvariant 定义时跳过
+    // 无 BusinessInvariant/Invariants 定义时跳过
     return { passed: true, checked: 0, violations: [] };
   }
 

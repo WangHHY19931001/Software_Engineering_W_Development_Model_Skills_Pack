@@ -392,10 +392,10 @@ export function validateHeader(
     );
   }
 
-  // 9. @phase
+  // 9. @phase（使用 Number+Number.isInteger 拒绝 4x/3.9 等非整数）
   if (header.phase != null) {
-    const phaseNum = Number.parseInt(header.phase, 10);
-    if (!Number.isFinite(phaseNum) || phaseNum !== spec.phase) {
+    const phaseNum = Number(header.phase);
+    if (!Number.isFinite(phaseNum) || !Number.isInteger(phaseNum) || phaseNum !== spec.phase) {
       violations.push(
         `规格 ${id} 文件头 @phase="${header.phase}" ≠ manifest.phase=${spec.phase}`,
       );
@@ -607,10 +607,10 @@ export function checkCfgInvariantsConsistency(
   const tla = stripComments(tlaContent ?? '');
   const cfg = stripComments(cfgContent ?? '');
 
-  // 1. 展开 .tla 中 BusinessInvariant 的子不变式集合
+  // 1. 展开 .tla 中 BusinessInvariant/Invariants 的子不变式集合
   const tlaInvariants = new Set<string>();
   const bizMatch = tla.match(
-    /BusinessInvariant\s*==\s*([\s\S]*?)(?=\n\s*====|\n\s*[A-Z][\w]*\s*==)/,
+    /(?:BusinessInvariant|Invariants)\s*==\s*([\s\S]*?)(?=\n\s*====|\n\s*[A-Z][\w]*\s*==|$)/,
   );
   if (bizMatch && bizMatch[1]) {
     const invRegex = /\/\\\s*([A-Za-z_]\w*)/g;
@@ -653,16 +653,12 @@ export function checkCfgStructure(
     violations.push('.cfg 含 MODULE 声明（这是 .tla 语法，.cfg 不应包含）');
   }
 
-  // 2. INVARIANT 行格式校验（非 `INVARIANT <Name>` 形式、但以 INVARIANT(S) 开头且无名称 → 错误）
+  // 2. INVARIANT 行格式校验（单行 INVARIANT 无不变式名 → 缺少不变式名）
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = (lines[i] ?? '').trim();
-    if (
-      /^INVARIANT\s+\S+/i.test(line) === false &&
-      /^INVARIANTS?\s+/i.test(line) &&
-      line.split(/\s+/).length < 2
-    ) {
-      violations.push(`.cfg 第 ${i + 1} 行 INVARIANT 格式错误: "${line}"`);
+    if (/^INVARIANT\s*$/i.test(line)) {
+      violations.push(`.cfg 第 ${i + 1} 行 INVARIANT 缺少不变式名: "${line}"`);
     }
   }
 

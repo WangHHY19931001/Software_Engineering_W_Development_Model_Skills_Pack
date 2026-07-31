@@ -15,7 +15,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { checkTlaModel, checkCoverage, type TlaSpec } from '../tla-logic.js';
+import {
+  checkTlaModel,
+  checkCoverage,
+  checkCfgInvariantsConsistency,
+  checkCfgStructure,
+  validateHeader,
+  type TlaSpec,
+} from '../tla-logic.js';
 
 // ==================== 辅助构造函数 ====================
 
@@ -162,5 +169,102 @@ describe('P1.2 SD 覆盖率 spec 方向校验', () => {
       const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
       expect(result.violations.some(v => v.includes(`${level}_test 缺 requirementIds`))).toBe(true);
     }
+  });
+});
+
+// ==================== G-D D1：Invariants == 命名兼容 ====================
+
+describe('G-D D1 cfg-tla 不变式命名兼容 Invariants ==', () => {
+  const tlaInvariants = `
+Invariants ==
+    /\\ TypeOK
+    /\\ AuthInvariant
+`;
+
+  it('tla 用 Invariants == 定义，cfg 用 INVARIANT 逐行声明 → passed=true', () => {
+    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT AuthInvariant';
+    const result = checkCfgInvariantsConsistency(tlaInvariants, cfg);
+    expect(result.passed).toBe(true);
+    expect(result.violations).toHaveLength(0);
+  });
+
+  it('tla 用 Invariants == 定义，cfg 缺一项 → 报缺失不变式', () => {
+    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK';
+    const result = checkCfgInvariantsConsistency(tlaInvariants, cfg);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(v => v.includes('缺失不变式'))).toBe(true);
+  });
+
+  it('tla 用 BusinessInvariant == 定义（向后兼容）→ passed=true', () => {
+    const tla = `
+BusinessInvariant ==
+    /\\ TypeOK
+    /\\ AuthInvariant
+`;
+    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT AuthInvariant';
+    const result = checkCfgInvariantsConsistency(tla, cfg);
+    expect(result.passed).toBe(true);
+    expect(result.violations).toHaveLength(0);
+  });
+});
+
+// ==================== G-D D2：INVARIANT 格式死分支 ====================
+
+describe('G-D D2 cfg INVARIANT 格式死分支', () => {
+  it('cfg 含裸 INVARIANT（无不变式名）→ 报缺少不变式名', () => {
+    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT\nINIT Init');
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(v => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
+  });
+
+  it('cfg 含裸 INVARIANT 带尾随空格 → 报缺少不变式名', () => {
+    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT   \nINIT Init');
+    expect(result.passed).toBe(false);
+    expect(result.violations.some(v => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
+  });
+
+  it('cfg INVARIANT 后跟不变式名 → passed=true', () => {
+    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT TypeOK\nINIT Init');
+    expect(result.passed).toBe(true);
+  });
+
+  it('cfg INVARIANTS 关键字跟列表 → passed=true（不变式行本身不报错）', () => {
+    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANTS TypeOK AuthInvariant\nINIT Init');
+    expect(result.passed).toBe(true);
+  });
+});
+
+// ==================== G-D D3：@phase 严格 ====================
+
+describe('G-D D3 @phase 解析拒绝非整数', () => {
+
+  it('@phase="4x" 通过 validateHeader 应触发 violation', () => {
+    const header: Record<string, string | null> = {
+      system: 'test',
+      phase: '4x',
+    };
+    const spec = { id: 'L1-test', level: 'L1' as const, phase: 4 };
+    const violations = validateHeader(header, spec as never);
+    expect(violations.some(v => v.includes('@phase="4x"'))).toBe(true);
+  });
+
+  it('@phase="3.9" 通过 validateHeader 应触发 violation', () => {
+    const header: Record<string, string | null> = {
+      system: 'test',
+      phase: '3.9',
+    };
+    const spec = { id: 'L1-test', level: 'L1' as const, phase: 3 };
+    const violations = validateHeader(header, spec as never);
+    expect(violations.some(v => v.includes('@phase="3.9"'))).toBe(true);
+  });
+
+  it('@phase="4" 正常整数 → 不触发 violation', () => {
+    const header: Record<string, string | null> = {
+      system: 'test',
+      phase: '4',
+    };
+    const spec = { id: 'L1-test', level: 'L1' as const, phase: 4 };
+    const violations = validateHeader(header, spec as never);
+    expect(violations.some(v => v.includes('@phase'))).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ import {
   checkCodeStateTransfer,
   checkNextBranchCoverage,
   checkInvariantCoverage,
+  extractBusinessInvariants,
   checkCodeTlaConsistency,
   toCamelCase,
   type CodeTlaConsistencyInput,
@@ -282,6 +283,29 @@ BusinessInvariant ==
     const result = checkInvariantCoverage(tla, [file]);
     expect(result.passed).toBe(true);
     expect(result.checked).toBe(0);
+  });
+
+  it('G-D D1: Invariants == 命名提取子不变式', () => {
+    const tla = `
+Invariants ==
+    /\\ TypeOK
+    /\\ AuthInvariant
+`;
+    const invariants = extractBusinessInvariants(tla);
+    expect(invariants).toContain('TypeOK');
+    expect(invariants).toContain('AuthInvariant');
+    expect(invariants.length).toBe(2);
+  });
+
+  it('G-D D1: Invariants == 下 checkInvariantCoverage 正确检测断言', () => {
+    const tla = `
+Invariants ==
+    /\\ TypeOK
+`;
+    const source = `function foo() { invariant(x > 0); }`;
+    const file = makeCodeFile(source);
+    const result = checkInvariantCoverage(tla, [file]);
+    expect(result.passed).toBe(true);
   });
 });
 
