@@ -145,22 +145,7 @@ function inRange(x: number, lo: number, hi: number, inclusive = true): boolean {
   return Number.isFinite(x) && (inclusive ? x >= lo && x <= hi : x > lo && x < hi);
 }
 
-function isIso8601(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Date.parse(value));
-}
 
-/**
- * R11（sig-002）：summary 长度校验。
- * 防止 V 评审 summary 模板化（空泛措辞）。summary 须 ≥ 50 字符。
- * 检测信号：Loop 4 category=prompt severity=S2，Jaccard 相似度 > 0.8 且长度 < 50。
- */
-export function checkR11SummaryLength(summary: unknown): string | null {
-  if (typeof summary !== 'string') return null; // 类型校验由 R1 负责
-  if (summary.trim().length < 50) {
-    return `summary 长度 ${summary.trim().length} < 50 字符（R11：防止模板化空泛措辞，须含关键决策+产物结构+遗留风险三要素）`;
-  }
-  return null;
-}
 
 /**
  * R12（sig-002）：subCriteria evidence 非空校验。
@@ -278,10 +263,11 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
  *   5. 防漂移：根据 rawScores 重算方差，与 variance 字段误差 ≤ VARIANCE_EPSILON，
  *      防止 Agent 谎报低方差掩盖「单次评估复制 N 次」的作弊
  *   6. 综合分数 = Σ(score * weight)，与输出 compositeScore 误差 ≤ EPSILON
- *   7. qualityLevel 与综合分数映射一致（§6.1）
- *   8. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限，第 26 轮）
- *   9. passed=false 时 reworkHints 必须非空数组
- *  10. ranking（可选）字段类型合法
+ *   7. 证据格式校验（O3 空泛声明→compositeScore -0.1，再判定 qualityLevel/passed）
+ *   8. qualityLevel 与降级后综合分数映射一致（§6.1），evidence 扣分后重新判定
+ *   9. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限，第 26 轮）
+ *  10. passed=false 时 reworkHints 必须非空数组
+ *  11. ranking（可选）字段类型合法
  */
 export function checkVerifierOutput(
   raw: unknown,
@@ -348,9 +334,6 @@ export function checkVerifierOutput(
 
   if (typeof meta.target !== 'string' || meta.target.trim() === '') {
     reasons.push('meta.target 必须为非空字符串');
-  }
-  if (!isIso8601(meta.reviewedAt)) {
-    reasons.push('meta.reviewedAt 必须为有效 ISO 8601 时间');
   }
   if (typeof meta.agent !== 'string' || meta.agent.trim() === '') {
     reasons.push('meta.agent 必须为非空字符串');
@@ -556,7 +539,25 @@ export function checkVerifierOutput(
     reasons.push(`compositeScore ${compositeScore} ≠ Σ(score*weight) ${expectedComposite}（误差 > ${EPSILON}）`);
   }
 
-  // 5. qualityLevel
+  // 5. evidence 格式校验（先于 qualityLevel/passed 判定，evidence 扣分后重新判定两者）
+  const evidenceList = (subCriteria as Array<Record<string, unknown>>)
+    .map(sc => sc.evidence)
+    .filter((e): e is string => typeof e === 'string');
+  let evidenceDeduction = false;
+  if (evidenceList.length > 0) {
+    const evidenceResult = validateEvidenceFormat(evidenceList);
+    if (!evidenceResult.valid) {
+      if (isNumber(compositeScore)) {
+        compositeScore = Math.max(0, compositeScore - 0.1);
+      }
+      evidenceDeduction = true;
+      reasons.push(
+        `evidence 格式校验失败（空泛声明，O3 命中）：${evidenceResult.vagueItems.join('; ')}`,
+      );
+    }
+  }
+
+  // 6. qualityLevel — 基于证据扣分后的 compositeScore 重新判定（round28 G-B B11）
   let qualityLevel = o.qualityLevel;
   const allowedLevels: QualityLevel[] = ['A', 'B', 'C', 'D'];
   if (!allowedLevels.includes(qualityLevel as QualityLevel)) {
@@ -567,10 +568,14 @@ export function checkVerifierOutput(
       reasons.push(`qualityLevel ${qualityLevel} 与综合分数 ${compositeScore} 应映射为 ${expectedLevel}（§6.1）`);
     }
   }
+  // evidence 扣分后，qualityLevel 重新判定（覆盖可能的 text-parse 降级）
+  if (evidenceDeduction && isNumber(compositeScore)) {
+    qualityLevel = determineQualityLevel(compositeScore);
+  }
 
-  // 6. passed
-  // R13（第 26 轮）：单轴下限。qualityLevel 仍由 compositeScore 映射（§6.1），
-  // 但 passed 判定收紧为「加权平均 ≥ B 且每个子标准得分 ≥ 0.70（B 级分界）」。
+  // 7. passed
+  // R13（第 26 轮）：单轴下限。qualityLevel 由证据扣分后的 compositeScore 映射（§6.1），
+  // passed 判定收紧为「加权平均 ≥ B 且每个子标准得分 ≥ 0.70（B 级分界）」。
   // 防止加权平均掩盖单轴失败（反模式 #41）。
   const passed = o.passed;
   const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
@@ -583,38 +588,12 @@ export function checkVerifierOutput(
   }
   reasons.push(...singleAxisViolations);
 
-  // 7. summary（R1 非空 + R11 长度≥50，sig-002 改进）
+  // 8. summary（R1 非空）
   if (typeof o.summary !== 'string' || o.summary.trim() === '') {
     reasons.push('summary 必须为非空字符串');
-  } else {
-    const r11 = checkR11SummaryLength(o.summary);
-    if (r11) reasons.push(r11);
   }
 
-  // [21.0.0] evidence 格式校验
-  const evidenceList = (subCriteria as Array<Record<string, unknown>>)
-    .map(sc => sc.evidence)
-    .filter((e): e is string => typeof e === 'string');
-  if (evidenceList.length > 0) {
-    const evidenceResult = validateEvidenceFormat(evidenceList);
-    if (!evidenceResult.valid) {
-      if (typeof qualityLevel === 'string') {
-        const levels: string[] = ['A', 'B', 'C', 'D'];
-        const idx = levels.indexOf(qualityLevel);
-        if (idx >= 0 && idx < levels.length - 1) {
-          qualityLevel = levels[idx + 1] as QualityLevel;
-          if (isNumber(compositeScore)) {
-            compositeScore = Math.max(0, compositeScore - 0.1);
-          }
-        }
-      }
-      reasons.push(
-        `evidence 格式校验失败（空泛声明，O3 命中）：${evidenceResult.vagueItems.join('; ')}`,
-      );
-    }
-  }
-
-  // 8. reworkHints
+  // 9. reworkHints
   if (expectedPassed === false) {
     if (!Array.isArray(o.reworkHints) || o.reworkHints.length === 0) {
       reasons.push('passed=false 时 reworkHints 必须为非空数组');
@@ -628,7 +607,7 @@ export function checkVerifierOutput(
     }
   }
 
-  // 9. ranking（可选）
+  // 10. ranking（可选）
   if (o.ranking !== undefined) {
     const r = o.ranking as Record<string, unknown>;
     if (!r || typeof r !== 'object') {

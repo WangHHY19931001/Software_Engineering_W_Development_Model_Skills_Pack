@@ -73,7 +73,12 @@ async function main(): Promise<void> {
     if (!sOutputArg) {
       selfAsVerifierViolations.push('--self-as-verifier 模式须同时提供 --s-output=<S产出路径>');
     } else {
-      const sOutputPath = path.resolve(sOutputArg.split('=')[1]!);
+      const sOutputValue = sOutputArg.slice(sOutputArg.indexOf('=') + 1);
+      if (sOutputValue === '') {
+        console.error('✗ --s-output= 值不能为空');
+        process.exit(2);
+      }
+      const sOutputPath = path.resolve(sOutputValue);
       if (abs === sOutputPath) {
         selfAsVerifierViolations.push(
           `反模式 #35：self-as-verifier 模式下 VerifierOutput JSON 路径(${abs})与 S 产出路径(${sOutputPath})相同，须拆分为独立产物文件`,

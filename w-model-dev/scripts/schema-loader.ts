@@ -15,7 +15,7 @@
 
 import Ajv, { type ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,14 +25,22 @@ let ajv: Ajv | null = null;
 
 function getAjv(): Ajv {
   if (ajv) return ajv;
-  ajv = new Ajv({ allErrors: true, strict: true });
-  addFormats(ajv);
-  for (const f of readdirSync(SCHEMAS_DIR)) {
-    if (!f.endsWith('.schema.json')) continue;
-    const name = basename(f, '.schema.json');
-    const schema = JSON.parse(readFileSync(join(SCHEMAS_DIR, f), 'utf-8'));
-    ajv.addSchema(schema, name);
+  if (!existsSync(SCHEMAS_DIR)) {
+    throw new Error(`schemas 目录不存在: ${SCHEMAS_DIR}`);
   }
+  const newAjv = new Ajv({ allErrors: true, strict: true });
+  addFormats(newAjv);
+  try {
+    for (const f of readdirSync(SCHEMAS_DIR)) {
+      if (!f.endsWith('.schema.json')) continue;
+      const name = basename(f, '.schema.json');
+      const schema = JSON.parse(readFileSync(join(SCHEMAS_DIR, f), 'utf-8'));
+      newAjv.addSchema(schema, name);
+    }
+  } catch (err) {
+    throw new Error(`schema 加载失败（${SCHEMAS_DIR}）：${err instanceof Error ? err.message : String(err)}`);
+  }
+  ajv = newAjv;
   return ajv;
 }
 
