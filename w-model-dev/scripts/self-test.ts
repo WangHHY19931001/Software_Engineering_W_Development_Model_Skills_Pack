@@ -350,6 +350,7 @@ interface GraphCase {
   phase: number;
   expectedPassed: boolean;
   expectedReasonPatterns?: RegExp[];
+  expectedWarningPatterns?: RegExp[];
   description: string;
 }
 
@@ -538,6 +539,13 @@ const GRAPH_CASES: GraphCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R6.*cross-cuts.*目标类型|conflicts-with.*对称/],
     description: '四维·维度3：cross-cuts 目标 SD-001 非 REQ + conflicts-with 单向，应被 R6 横切边校验拦截',
+  },
+  {
+    file: 'valid-warnings.json',
+    phase: 1,
+    expectedPassed: true,
+    expectedWarningPatterns: [/边数下限警告/],
+    description: '4 REQ 节点 3 parent 边（边数 < 节点×3），应通过但触发边数下限警告',
   },
 ];
 
@@ -1705,6 +1713,10 @@ async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
     }
     if (!c.expectedPassed) {
       details.push(...matchReasonPatterns(r.violations, c.expectedReasonPatterns));
+    }
+    if (c.expectedWarningPatterns && c.expectedWarningPatterns.length > 0) {
+      const warnings = (r as { warnings?: string[] }).warnings ?? [];
+      details.push(...matchReasonPatterns(warnings, c.expectedWarningPatterns));
     }
 
     results.push({

@@ -185,6 +185,14 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/ingestion-cross.md');
   }
 
+  if (result.warnings && result.warnings.length > 0) {
+    console.log('─'.repeat(60));
+    console.log('警告：');
+    for (const w of result.warnings) {
+      console.log(`  - ${w}`);
+    }
+  }
+
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
   const exitCode = result.passed ? 0 : 1;
@@ -208,6 +216,7 @@ async function main(): Promise<void> {
     crossLogic: result.crossLogic,
     exemptionsApplied: exemptedRules ?? [],
     violations: result.violations,
+    warnings: result.warnings ?? [],
     converged: result.passed,
   }));
 

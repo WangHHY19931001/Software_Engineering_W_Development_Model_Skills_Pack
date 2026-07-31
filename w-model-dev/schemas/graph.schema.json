@@ -45,7 +45,8 @@
           "to": { "type": "string", "minLength": 1 },
           "type": {
             "enum": ["parent", "depends-on", "implements", "defines", "realizes", "produces", "governs", "collaborates-with", "derives", "precedes", "conflicts-with", "cross-cuts"]
-          }
+          },
+          "sourceArtifact": { "type": "string" }
         }
       }
     },
