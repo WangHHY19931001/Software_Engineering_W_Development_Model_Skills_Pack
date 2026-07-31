@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（30 条流程反模式 #1~#19 + #20 + #21~#30；#20 在 subagent-delegation.md；#30 第 20 轮新增）
+- 反模式清单（#1~#19 + #20 + #21~#30 + #33~#42；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -48,7 +48,8 @@
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 13 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
-| #33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3 |
+| #33 | 跳过 R3 预防性审查（第29轮强化为无条件，覆盖所有 S 变体含 S-fix / S-emergency-fix） | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
+| #42 | S-fix / emergency-fix 后跳过 R3+V（第29轮新增） | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
 
 ### 命中高发阶段
 
@@ -442,7 +443,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：SSoT §10.11 签名链门禁 + §7.9 SignatureChainEntry schema（[21.0.0] 新增）
 
-## #33 跳过 R3 预防性审查（第22轮新增）
+## #33 跳过 R3 预防性审查（第22轮新增，第29轮强化为无条件）
 
 **检测信号**：
 - S 产出后未触发 R3 三阶段审查，直接进入 V 评审
@@ -450,9 +451,11 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 文件缺失
 - V 评审未读取 R3 报告（reworkHints 未纳入 R3 发现）
 
+**第29轮强化（无条件强制）**：R3 从「条件强制（--r3-enabled flag）」升级为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json`。
+
 **回退动作**：回到 S 产出后起点，补跑 R3 三阶段审查，产出三份 PreventiveReview JSON，再进入 V 评审。
 
-**门禁脚本**：`check-preventive-review.ts` 校验三份报告完整性；`check-run-log.ts` 校验 S→V 间 R3 记录数。
+**门禁脚本**：`check-preventive-review.ts`（always-on，无 flag，支持 `--variant=standard|fix|emergency`）校验三份报告完整性；`check-run-log.ts` R8 无条件校验 S(任意变体)→V 间 R3 记录数。
 
 ## #34 编排者漏派角色（第24轮新增）
 
@@ -462,31 +465,32 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - run-log 中某阶段缺 role=V 记录（V 评审被跳过）
 - run-log 中某阶段缺 role=G 记录（门禁被跳过）
 - run-log 中某阶段缺 role=S 记录（产出环节被跳过或由 O 越权产出）
-- R3 启用时缺 role=R 记录（completeness/reliability/security 三阶段任一缺失）
+- 缺 role=R 记录（completeness/reliability/security 三阶段任一缺失）—— 第29轮升级为**无条件**强制，不再需要 R3 启用 flag
 - self-as-verifier 模式下兼任时未产出独立产物文件（VerifierOutput JSON 与 S 产出同路径）
 
 **回退动作**：回到当前阶段起点，补派缺失角色（S/V/G/R），重跑对应环节并补记 run-log，再进入 CHECKPOINT。
 
-**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；R3 启用时含 R ≥3 条记录。
+**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；**无条件**含 R ≥3 条记录（第29轮升级，`--r3-enabled` flag 保留为 no-op 向后兼容）。
 
-**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增）
+**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮强化为无条件）
 
-## #35 self-as-verifier 模式下 V/G/R 产物混合（第24轮新增）
+## #35 self-as-verifier 模式下 V/G/R 产物混合（第24轮新增，第29轮扩展含 R3 产物）
 
-**危害**：self-as-verifier 模式下 V/G/R 产物与 S 产出混合在同一文件中，导致评审独立性失守，评审结论可能被 S 产出污染或覆盖。
+**危害**：self-as-verifier 模式下 V/G/R 产物与 S 产出混合在同一文件中，导致评审独立性失守，评审结论可能被 S 产出污染或覆盖。第29轮扩展：R3 预防性审查三份报告（PreventiveReview JSON）若与 S 产出混合，会令 R3 审查沦为 S 自评，破坏 R3 无条件强制的精神。
 
 **检测信号**：
 - 评审报告（VerifierOutput JSON）与产出文档（S 产出）在同一文件中
 - VerifierOutput JSON 文件路径与 S 产出文件路径相同
 - gate-logs JSON 文件路径与 S 产出文件路径相同
 - RootCauseReport JSON 文件路径与 S 产出文件路径相同
-- run-log 条目的 `artifacts` 字段未列出各角色独立产物路径
+- PreventiveReview JSON（`<phase>[-fix|-emergency]-{completeness,reliability,security}.json`）文件路径与 S 产出文件路径相同（第29轮扩展）
+- run-log 条目的 `artifacts` 字段未列出各角色独立产物路径（含 R3 三份报告独立路径）
 
-**回退动作**：回到当前阶段起点，拆分为独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON 路径不同），重审 V/G/R 环节。
+**回退动作**：回到当前阶段起点，拆分为独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON / PreventiveReview JSON 三份路径均不同），重审 V/G/R 环节并补跑 R3×3。
 
-**门禁脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同；`check-role-dispatch.ts` 校验 run-log artifacts 字段含各角色独立产物路径。
+**门禁脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同；`check-role-dispatch.ts` 校验 run-log artifacts 字段含各角色独立产物路径；`check-preventive-review.ts` 校验三份 PreventiveReview JSON 独立存在（第29轮扩展）。
 
-**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增）
+**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮扩展含 R3 产物）
 
 ## #36 路由顺序错误（第24轮新增）
 
@@ -580,6 +584,26 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **门禁脚本**：`check-verifier-output.ts` R13 单轴下限（exitCode=1 命中本反模式）。
 
 **关联**：SSoT §3.4.22（[25.0.0] 新增）；[verifier-spec.md](verifier-spec.md) §3.3 / §6.3；[glossary.md](glossary.md)「单轴下限（R13）」；外部原则「评审各轴独立成环，永不合并计分」
+
+## #42 S-fix / emergency-fix 后跳过 R3+V（第29轮新增）
+
+**症状**：S-fix（返工变体）或 S-emergency-fix（紧急修复变体）产出后，未派遣 R3×3（completeness/reliability/security）+ V 评审，直接进入 G 门禁或放行。
+
+**为何是反模式**：第29轮升级后，R3 预防性审查对所有 S 变体无条件强制。「修复就是小改不用审」「紧急救援优先跳过审查」属合理化借口——修复恰好是引入回归风险最高的环节，紧急修复往往跳过完整设计审查，更需要 R3 三维度（完整性/可靠性/安全性）兜底。跳过 R3+V 的修复等于未经验证直接合入。
+
+**检测信号**：
+- run-log 中 `action=fix` 或 `action=emergency-fix` 后无 3 条 R3 记录直接出现 `action=review` role=V
+- run-log 中 `action=fix` 或 `action=emergency-fix` 后无 R3 记录直接进入 `action=gate` role=G
+- `check-run-log.ts` R8 报「S(fix)→V 之间 R3 记录不足」或「S(emergency-fix)→V 之间 R3 记录不足」
+- `check-role-dispatch.ts` 报「阶段 N 缺失 role=R」
+- `check-preventive-review.ts --variant=fix/emergency` 报告路径缺失（`<phase>-fix-{dim}.json` 或 `<phase>-emergency-{dim}.json` 三份不齐）
+- `.w-model/preventive-reviews/` 下无对应 fix/emergency 前缀的三份 PreventiveReview JSON
+
+**回退动作**：回到 S-fix / emergency-fix 产出后起点，补跑 R3×3（completeness/reliability/security）+ V 评审，V 通过后才可 G 门禁。若 emergency-fix 误用事后 R 复核机制（`emergencyFixReview` 字段），须移除该字段并改走前置 R3+V+G。
+
+**门禁脚本**：`check-run-log.ts` R8 无条件校验 S(任意变体，含 fix/emergency-fix)→V 间 R3 记录数；`check-role-dispatch.ts` 校验 R≥3 无条件；`check-preventive-review.ts --variant=fix|emergency` 校验对应路径三份报告完整性。
+
+**关联**：约束 #17 + #19 + SSoT §3.4.25（[28.0.0] 新增）；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
 ## 实现层经验教训（来自端到端调测）
 
