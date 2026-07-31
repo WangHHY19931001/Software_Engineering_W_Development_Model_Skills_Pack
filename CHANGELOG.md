@@ -3,6 +3,29 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [26.0.0] - 2026-07-30
+
+### 第二十七轮 Wayfinder「Fog of War」吸收（阶段 1 迷雾登记册）
+
+吸收外部仓库 wayfinder 技能（Matt Pocock "Skills For Real Engineers"，`skills/skills/engineering/wayfinder/`）「Fog of war」理念：阶段 1 需求分析为「in-scope 但尚无法精确陈述」的需求引入显式治理路径——REQ 入学锐利性测试 + Not-yet-specified 文本节 + 毕业机制。纯文档吸收，无脚本/schema 变更。详见 SSoT §3.4.23。
+
+#### Added
+- `ingestion-chunk.md`：新增「REQ 入学锐利性测试」节（判据 = 能否精确陈述需求的问题，非能否回答）；迷雾项字段 fogDesc / fogBlocker / fogGroupHint 写入 chunk `.md`；crossChunkHints 支持 `edgeType: "fog"`
+- `ingestion-cross.md`：A-cross 算法新增步骤 9（迷雾册跨块去重汇总）+ 报告模板新增 §7 迷雾登记册（疑似 REQ-group 归属 + 疑似毕业方向）；A-cross 不代 S 决定毕业
+- `phase-1-requirements.md`：新增「迷雾登记册（Fog of War）」节（定义与 §8 Out of Scope 区分 + 锐利性测试 + 毕业机制三选一 + CHECKPOINT 前强制清空 + 覆盖矩阵语义）；FM-3D 新增 FM-3D-07 迷雾滥用；禁止行为新增 #12 迷雾项静默遗留；返工路径补充对应条目
+- `templates/requirement-spec.md`：§8 后新增「8.5 Not yet specified（迷雾登记册）」节（登记表 + 毕业处置结果列）
+
+#### Changed
+- 版本号三处同步为 26.0.0：`package.json` + `w-model-dev/skill-metadata.json` + `w-model-dev/SKILL.md` frontmatter
+- SSoT §3.4.23 第 27 轮记录 + §10A 追溯表补行
+
+#### Validation
+- TypeScript strict: 0 错误（无代码变更，基线确认）
+- self-test: 192/192 全通过（基线不变）
+- vitest: 205/205 全通过（基线不变）
+- D5 文档互引一致性：新增节与既有 §8 Out of Scope / 覆盖矩阵 / FM 矩阵 / 禁止行为表无矛盾
+- 反模式计数保持 41 条（迷雾滥用走 FM-3D-07 + 禁止行为 #12，不新增反模式）
+
 ## [25.0.0] - 2026-07-30
 
 ### 第二十六轮 外部技能深度对比吸收（单轴下限 R13 + Fowler 12 基线 + 票据 durability + 术语治理）
