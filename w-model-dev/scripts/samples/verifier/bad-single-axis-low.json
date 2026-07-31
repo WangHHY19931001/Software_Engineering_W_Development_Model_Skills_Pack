@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "REQ-002",
+    "reviewedAt": "2026-07-30T00:00:00Z",
+    "agent": "test-agent",
+    "scoringMethod": "logits",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.10
+  },
+  "subCriteria": [
+    {"name": "completeness", "weight": 0.30, "score": 0.65, "rawScores": [0.64, 0.65, 0.66], "variance": 0.0000667, "evidence": "requirements.md.REQ-002.section=3.2"},
+    {"name": "clarity", "weight": 0.25, "score": 0.95, "rawScores": [0.94, 0.95, 0.96], "variance": 0.0000667, "evidence": "requirements.md.REQ-002.section=3.2"},
+    {"name": "consistency", "weight": 0.20, "score": 0.95, "rawScores": [0.94, 0.95, 0.96], "variance": 0.0000667, "evidence": "requirements.md.REQ-002.section=3.2"},
+    {"name": "testability", "weight": 0.15, "score": 0.95, "rawScores": [0.94, 0.95, 0.96], "variance": 0.0000667, "evidence": "requirements.md.REQ-002.section=3.4"},
+    {"name": "traceability", "weight": 0.10, "score": 0.95, "rawScores": [0.94, 0.95, 0.96], "variance": 0.0000667, "evidence": "rtm.json.REQ-002.coverage=full"}
+  ],
+  "compositeScore": 0.86,
+  "qualityLevel": "A",
+  "summary": "REQ-002 四维度完整但 completeness 偏低（0.65 低于单轴下限 0.70），加权平均达 A 级但存在单轴失败，须判定 passed=false 触发返工。",
+  "passed": false,
+  "reworkHints": ["completeness 维度得分 0.65 < 0.70 单轴下限，须补全需求覆盖后重评"]
+}

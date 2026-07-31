@@ -208,6 +208,12 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/evidence.*缺具体引用.*R12/],
     description: 'evidence 缺具体引用，应被 R12 校验拦截（sig-002）',
   },
+  {
+    file: 'bad-single-axis-low.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/completeness.*0\.65.*0\.7(?!\d).*单轴下限/],
+    description: 'R13 单轴下限：completeness=0.65<0.70 加权平均达 A 级（0.86）但单轴失败，应 passed=false（反模式 #41）',
+  },
 ];
 
 const GATE_CASES: GateCase[] = [

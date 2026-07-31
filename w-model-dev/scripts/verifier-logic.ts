@@ -132,6 +132,11 @@ const MIN_TEMPERATURE = 1e-6;
 const MAX_TEMPERATURE = 100;
 const MIN_RANKING_ROUNDS = 1;
 
+/** R13（第 26 轮）单轴下限：任一子标准得分低于此值 → passed=false。
+ *  阈值 = qualityLevel B 级分界（§6.1），语义自洽：passed 原判据为「加权平均 ≥ B」，
+ *  收紧为「每个子标准自身 ≥ B」。防止加权平均掩盖单轴失败（反模式 #41）。 */
+const SINGLE_AXIS_MIN_SCORE = 0.70;
+
 function isNumber(x: unknown): x is number {
   return typeof x === 'number' && !Number.isNaN(x);
 }
@@ -172,6 +177,33 @@ export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): str
     return `subCriteria[${idx}].evidence "${e}" 缺具体引用（R12：须含行号/文件路径/章节号/ID，如「REQ-001 §3.2」「article.service.ts:L45」）`;
   }
   return null;
+}
+
+/**
+ * R13（第 26 轮）单轴下限校验（反模式 #41 加权平均掩盖单轴失败）。
+ * 防止 compositeScore 加权平均 ≥0.70 放行时，存在子标准低于 B 级（<0.70）被其余高分掩盖。
+ * 返回低于下限的子标准违规列表；空数组 = 全部子标准 ≥ 下限。
+ */
+export function checkR13SingleAxisFloor(
+  subCriteria: Array<Record<string, unknown>> | unknown[],
+): string[] {
+  if (!Array.isArray(subCriteria)) return [];
+  const violations: string[] = [];
+  for (let i = 0; i < subCriteria.length; i++) {
+    const sc = subCriteria[i] as Record<string, unknown>;
+    if (!sc || typeof sc !== 'object') continue;
+    const name = typeof sc.name === 'string' && sc.name.trim() !== ''
+      ? sc.name
+      : `subCriteria[${i + 1}]`;
+    if (typeof sc.score === 'number' && !Number.isNaN(sc.score)) {
+      if (sc.score < SINGLE_AXIS_MIN_SCORE) {
+        violations.push(
+          `子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`,
+        );
+      }
+    }
+  }
+  return violations;
 }
 
 /**
@@ -247,7 +279,7 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
  *      防止 Agent 谎报低方差掩盖「单次评估复制 N 次」的作弊
  *   6. 综合分数 = Σ(score * weight)，与输出 compositeScore 误差 ≤ EPSILON
  *   7. qualityLevel 与综合分数映射一致（§6.1）
- *   8. passed = (qualityLevel === A || B)
+ *   8. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限，第 26 轮）
  *   9. passed=false 时 reworkHints 必须非空数组
  *  10. ranking（可选）字段类型合法
  */
@@ -537,13 +569,19 @@ export function checkVerifierOutput(
   }
 
   // 6. passed
+  // R13（第 26 轮）：单轴下限。qualityLevel 仍由 compositeScore 映射（§6.1），
+  // 但 passed 判定收紧为「加权平均 ≥ B 且每个子标准得分 ≥ 0.70（B 级分界）」。
+  // 防止加权平均掩盖单轴失败（反模式 #41）。
   const passed = o.passed;
-  const expectedPassed = qualityLevel === 'A' || qualityLevel === 'B';
+  const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
+  const expectedPassed =
+    (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
   if (typeof passed !== 'boolean') {
     reasons.push(`passed 必须为布尔值，实际为 ${JSON.stringify(passed)}`);
   } else if (passed !== expectedPassed) {
     reasons.push(`passed ${passed} 与 qualityLevel ${qualityLevel} 不一致（应 = ${expectedPassed}）`);
   }
+  reasons.push(...singleAxisViolations);
 
   // 7. summary（R1 非空 + R11 长度≥50，sig-002 改进）
   if (typeof o.summary !== 'string' || o.summary.trim() === '') {
