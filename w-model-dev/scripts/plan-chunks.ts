@@ -23,6 +23,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 interface Chunk {
   id: string;
@@ -82,11 +83,11 @@ function parseArgs(argv: string[]): {
   return { inputPath, phase: phase!, nodeType: nodeType!, maxTokens };
 }
 
-function estimateTokens(text: string): number {
+export function estimateTokens(text: string): number {
   return Math.ceil(Buffer.byteLength(text, 'utf8') / 4);
 }
 
-function splitMarkdownSections(content: string): string[] {
+export function splitMarkdownSections(content: string): string[] {
   const lines = content.split('\n');
   const sections: string[] = [];
   let current: string[] = [];
@@ -104,7 +105,7 @@ function splitMarkdownSections(content: string): string[] {
   return sections;
 }
 
-function splitByLines(text: string, maxTokens: number, filePath: string, chunkIdPrefix: string): Chunk[] {
+export function splitByLines(text: string, maxTokens: number, filePath: string, chunkIdPrefix: string): Chunk[] {
   const lines = text.split('\n');
   const chunks: Chunk[] = [];
   const OVERLAP = 5;
@@ -130,7 +131,7 @@ function splitByLines(text: string, maxTokens: number, filePath: string, chunkId
   return chunks;
 }
 
-async function splitMarkdownByHeaders(
+export async function splitMarkdownByHeaders(
   content: string,
   maxTokens: number,
   filePath: string,
@@ -161,7 +162,7 @@ async function splitMarkdownByHeaders(
   return chunks;
 }
 
-async function planFile(
+export async function planFile(
   filePath: string,
   maxTokens: number,
   chunkIdPrefix: string,
@@ -226,7 +227,12 @@ async function main(): Promise<void> {
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('分块规划脚本异常:', err);
-  process.exit(2);
-});
+// main 守卫：仅在直接执行时运行，被 import 时不触发（供单测导入纯函数）
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
+if (isMain) {
+  main().catch((err) => {
+    console.error('分块规划脚本异常:', err);
+    process.exit(2);
+  });
+}
