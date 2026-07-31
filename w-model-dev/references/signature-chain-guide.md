@@ -14,6 +14,13 @@
 
 ## 2. 阶段角色签名顺序（强制链）
 
+### 跨阶段连续链语义（[round28 G-E]）
+
+签名链支持跨阶段连续链：阶段 N+1 的首条签名的 `prevSigId` 可指向阶段 N 的末条签名（而非仅限于同阶段 genesis）。这允许将全部 8 阶段构建为一条完整的连续签名链。
+
+- **archive 全链模式**：所有条目按 `signedAt` 排序后校验为一条连续链（首条 `prevSigId="genesis"`，其余条 `prevSigId/prevSigHash` 与前条匹配）
+- **--phase=N 模式**：phase 内首条 `prevSigId` 允许指向上一阶段末条（从全链查找），其余条须等于 phase 内前条（使用列表索引 `phaseEntries[i-1]`）
+
 ### 阶段 1 签名链
 ```
 genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(graph-gate) → G(tla-gate) → G(bdd-gate) → G(coverage-gate) → O(checkpoint-用户确认)
@@ -70,12 +77,12 @@ G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签
 | 规则 | 校验内容 | 失败后果 |
 |---|---|---|
 | R1 | 当前阶段所有强制角色签名齐全 | 门禁失败（exitCode=1），标注缺失角色 |
-| R2 | 签名链连续（prevSigHash 匹配） | 门禁失败，标注断裂点 |
+| R2 | 签名链连续（prevSigHash 匹配）+ 跨阶段连续链语义 | 门禁失败，标注断裂点 |
 | R3 | 时间戳单调递增 | 门禁失败，标注时序异常 |
 | R4 | 签名角色与阶段角色清单匹配 | 门禁失败，标注越权角色 |
 | R5 | O checkpoint 签名 signer 为用户 ID | 门禁失败，标注代签（O4 命中） |
 | R6 | sigHash 重算一致（防篡改） | 门禁失败，标注篡改签名 |
-| R7 | 各角色 sourceSigIds 均存在于签名链中 | 门禁失败，标注悬空来源 |
+| R7 | 各角色 sourceSigIds 均存在于签名链中（--phase=N 模式来源并集 = 本阶段 ∪ 上一阶段） | 门禁失败，标注悬空来源 |
 | R8 | 各角色 sourceArtifacts 路径存在于磁盘 | 门禁失败，标注缺失产物 |
 | R9 | 各角色来源符合"强制来源/禁止来源"矩阵 | 门禁失败，标注越权消费 |
 | R10 | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录 | 门禁失败，标注绕过门禁 |
@@ -86,6 +93,8 @@ G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签
 - 归档时：`check-signature-chain.ts --phase=all --stage=archive`（全阶段链完整性 + 来源正确性）
 
 ## 5. 跨阶段消费者校验
+
+各规则循环（R2/R3/R7/R8/R9）聚合全部违规点（不早停），便于一次性修复所有缺陷。Validation result 的 `violations` 数组包含所有违规项。
 
 后续阶段消费者须校验前一阶段产出来源正确性：
 

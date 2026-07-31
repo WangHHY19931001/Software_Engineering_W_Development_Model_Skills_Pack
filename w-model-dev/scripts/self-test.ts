@@ -765,6 +765,43 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedReasonPatterns: [/R3.*V 复审 rootcause.*≠.*R 记录数/, /R7.*rootcause.*review.*targetKind=rootcause/],
     description: '有 R 但缺 V 复审 rootcause 记录，应被 R3 复审数 + R7 时序校验拦截',
   },
+  // ---- E5: R1 阶段 5-8 分档（produce/review 替代 chunk/cross） ----
+  {
+    file: 'phase5-valid.jsonl',
+    expectedPassed: true,
+    description: '阶段 5 含 produce/review/gate/checkpoint，R1 分档通过（不要求 chunk/cross）',
+  },
+  {
+    file: 'phase5-missing-produce.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R1.*缺 produce/],
+    description: '阶段 5 缺 produce 动作，应被 R1 阶段分档校验拦截',
+  },
+  // ---- E7: gateLogPath 存在但 gateExitCode 未回填 ----
+  {
+    file: 'bad-gateExitCode-null.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R6.*gateLogPath.*gateExitCode/],
+    description: 'gate 条目 gateLogPath 已设但 gateExitCode 为 null，应被 R6 拦截',
+  },
+  // ---- E8: rootcause 之后中间夹普通 review 不误报 ----
+  {
+    file: 'rootcause-intermediate-review.jsonl',
+    expectedPassed: true,
+    description: 'rootcause→普通review→review(targetKind=rootcause)→fix，R7 按 targetKind 定位不误报',
+  },
+  // ---- E9: 1 fix 可覆盖多份 R 报告（去重映射） ----
+  {
+    file: 'rootcause-multi-fix.jsonl',
+    expectedPassed: true,
+    description: '1 fix（basedOnReport="RC-1; RC-2"）覆盖 2 份 R 报告，去重映射应通过',
+  },
+  {
+    file: 'rootcause-multi-uncovered.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R3.*rootcause.*RC-phase5-1-02.*无对应 fix/],
+    description: '2 份 R 报告但仅 1 份有 fix，RC-phase5-1-02 未覆盖应被 R3 拦截',
+  },
 ];
 
 // -------------------- Maturity --------------------
@@ -1446,23 +1483,29 @@ interface SignatureChainCase {
   expectedPassed: boolean;
   /** 期望 rulesFailed 中至少包含以下每个值（全部包含才算通过） */
   expectedRulesFailed?: string[];
+  /** 校验 phase（默认 1）；设为 undefined 表示不传 phase（archive 模式） */
+  phase?: number;
   /** 用例说明 */
   description: string;
 }
 
 const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
-  { file: 'valid-all-roles.jsonl', expectedPassed: true, description: '签名链：阶段 1 完整 9 角色 + 用户确认 checkpoint（R1-R10 全通过）' },
-  { file: 'bad-missing-V.jsonl', expectedPassed: false, expectedRulesFailed: ['R1'], description: '签名链：缺 V 角色，R1 失败' },
-  { file: 'bad-broken-chain.jsonl', expectedPassed: false, expectedRulesFailed: ['R2'], description: '签名链：prevSigHash 不匹配，R2 失败' },
-  { file: 'bad-backdated.jsonl', expectedPassed: false, expectedRulesFailed: ['R3'], description: '签名链：时间戳非单调，R3 失败' },
-  { file: 'bad-O-produce.jsonl', expectedPassed: false, expectedRulesFailed: ['R4'], description: '签名链：非法角色 X，R4 失败' },
-  { file: 'bad-O-self-sign.jsonl', expectedPassed: false, expectedRulesFailed: ['R5'], description: '签名链：O 代签 checkpoint，R5 失败' },
-  { file: 'bad-tampered-hash.jsonl', expectedPassed: false, expectedRulesFailed: ['R6'], description: '签名链：sigHash 篡改，R6 失败' },
-  { file: 'bad-dangling-source.jsonl', expectedPassed: false, expectedRulesFailed: ['R7'], description: '签名链：悬空来源，R7 失败' },
-  { file: 'bad-missing-artifact.jsonl', expectedPassed: false, expectedRulesFailed: ['R8'], description: '签名链：缺失产物，R8 失败' },
-  { file: 'bad-S-consumes-G.jsonl', expectedPassed: false, expectedRulesFailed: ['R9'], description: '签名链：S 越权消费 G，R9 失败' },
-  { file: 'bad-R-consumes-S.jsonl', expectedPassed: false, expectedRulesFailed: ['R9'], description: '签名链：R 越权消费 S，R9 失败' },
-  { file: 'bad-O-bypass-G.jsonl', expectedPassed: false, expectedRulesFailed: ['R10'], description: '签名链：O checkpoint 绕过 G，R10 失败' },
+  { file: 'valid-all-roles.jsonl', expectedPassed: true, phase: 1, description: '签名链：阶段 1 完整 9 角色 + 用户确认 checkpoint（R1-R10 全通过）' },
+  { file: 'bad-missing-V.jsonl', expectedPassed: false, expectedRulesFailed: ['R1'], phase: 1, description: '签名链：缺 V 角色，R1 失败' },
+  { file: 'bad-broken-chain.jsonl', expectedPassed: false, expectedRulesFailed: ['R2'], phase: 1, description: '签名链：prevSigHash 不匹配，R2 失败' },
+  { file: 'bad-backdated.jsonl', expectedPassed: false, expectedRulesFailed: ['R3'], phase: 1, description: '签名链：时间戳非单调，R3 失败' },
+  { file: 'bad-O-produce.jsonl', expectedPassed: false, expectedRulesFailed: ['R4'], phase: 1, description: '签名链：非法角色 X，R4 失败' },
+  { file: 'bad-O-self-sign.jsonl', expectedPassed: false, expectedRulesFailed: ['R5'], phase: 1, description: '签名链：O 代签 checkpoint，R5 失败' },
+  { file: 'bad-tampered-hash.jsonl', expectedPassed: false, expectedRulesFailed: ['R6'], phase: 1, description: '签名链：sigHash 篡改，R6 失败' },
+  { file: 'bad-dangling-source.jsonl', expectedPassed: false, expectedRulesFailed: ['R7'], phase: 1, description: '签名链：悬空来源，R7 失败' },
+  { file: 'bad-missing-artifact.jsonl', expectedPassed: false, expectedRulesFailed: ['R8'], phase: 1, description: '签名链：缺失产物，R8 失败' },
+  { file: 'bad-S-consumes-G.jsonl', expectedPassed: false, expectedRulesFailed: ['R9'], phase: 1, description: '签名链：S 越权消费 G，R9 失败' },
+  { file: 'bad-R-consumes-S.jsonl', expectedPassed: false, expectedRulesFailed: ['R9'], phase: 1, description: '签名链：R 越权消费 S，R9 失败' },
+  { file: 'bad-O-bypass-G.jsonl', expectedPassed: false, expectedRulesFailed: ['R10'], phase: 1, description: '签名链：O checkpoint 绕过 G，R10 失败' },
+  // E1: 跨阶段连续链
+  { file: 'valid-continuous-chain.jsonl', expectedPassed: true, description: '签名链：2 阶段连续链存档模式（R2 跨阶段连续链语义）' },
+  { file: 'valid-continuous-chain.jsonl', expectedPassed: true, phase: 2, description: '签名链：--phase=2 跨阶段连续链（首条 prevSigId 指向上阶段末条）' },
+  { file: 'bad-broken-cross-phase.jsonl', expectedPassed: false, expectedRulesFailed: ['R2'], phase: 2, description: '签名链：跨阶段断链（prevSigId 不存在于全链），R2 失败' },
 ];
 
 // -------------------- ArchiveIntegrity（[21.0.0] 归档完整性：4 样本，1 valid + 3 bad） --------------------
@@ -2455,7 +2498,8 @@ async function runSignatureChainCases(samplesDir: string): Promise<CaseResult[]>
     const entries = raw.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
     // R8 需 existingPaths；仅 bad-missing-artifact 样本传空集触发 R8，其余样本跳过 R8
     const existingPaths = c.file === 'bad-missing-artifact.jsonl' ? new Set<string>() : undefined;
-    const r = checkSignatureChain(entries, { phase: 1, existingPaths });
+    const phase = c.phase;
+    const r = checkSignatureChain(entries, { phase, existingPaths });
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {

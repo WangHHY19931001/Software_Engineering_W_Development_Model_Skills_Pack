@@ -91,4 +91,43 @@ describe('[21.0.0] signature-chain-logic R1-R10', () => {
     const recomputed = computeSigHash(entry);
     expect(recomputed).toBe(entry.sigHash);
   });
+
+  // E1: 跨阶段连续链（archive 模式）
+  it('E1 连续链 archive pass', () => {
+    const entries = loadJsonl('valid-continuous-chain.jsonl');
+    const result = checkSignatureChain(entries, { stage: 'archive' });
+    expect(result.passed).toBe(true);
+    expect(result.rulesFailed).not.toContain('R2');
+  });
+
+  // E1: 跨阶段连续链（--phase=2 模式）
+  it('E1 连续链 --phase=2 pass', () => {
+    const entries = loadJsonl('valid-continuous-chain.jsonl');
+    const result = checkSignatureChain(entries, { phase: 2 });
+    expect(result.passed).toBe(true);
+    expect(result.rulesFailed).not.toContain('R2');
+  });
+
+  // E1: 跨阶段断链（prevSigId 不存在）
+  it('E1 跨阶段断链 --phase=2 fail', () => {
+    const entries = loadJsonl('bad-broken-cross-phase.jsonl');
+    const result = checkSignatureChain(entries, { phase: 2 });
+    expect(result.rulesFailed).toContain('R2');
+  });
+
+  // E2: 跨阶段来源并集（--phase=2 模式允许引用 phase 1 sigIds）
+  it('E2 跨阶段来源并集 --phase=2 pass', () => {
+    const entries = loadJsonl('valid-continuous-chain.jsonl');
+    const result = checkSignatureChain(entries, { phase: 2 });
+    expect(result.passed).toBe(true);
+    expect(result.rulesFailed).not.toContain('R7');
+  });
+
+  // E3: 全违规聚合 — 验证多个违规能被收集
+  it('E3 全违规聚合 multiple violations collected', () => {
+    const entries = loadJsonl('bad-broken-chain.jsonl');
+    const result = checkSignatureChain(entries, { phase: 1 });
+    expect(result.rulesFailed).toContain('R2');
+    expect(result.violations.length).toBeGreaterThanOrEqual(1);
+  });
 });

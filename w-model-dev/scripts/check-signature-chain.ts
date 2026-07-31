@@ -8,9 +8,11 @@
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+ *   npx tsx w-model-dev/scripts/check-signature-chain.ts --chain=<signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
  *
  * 参数：
- *   signature-chain.jsonl   签名链文件路径
+ *   signature-chain.jsonl   签名链文件路径（位置参数或通过 --chain 指定）
+ *   --chain=<path>          显式签名链文件路径（与位置参数二选一，项目根由链文件位置向上推导 .w-model/ 目录）
  *   --phase=N               只校验 phase=N 的签名（1-8）
  *   --stage=...             校验阶段：pre-gate（G 跑 gate 前）/ pre-checkpoint（O checkpoint 前）/ archive（归档时全阶段）
  *
@@ -24,6 +26,7 @@
  */
 
 import { promises as fs } from 'node:fs';
+import { accessSync } from 'node:fs';
 import * as path from 'node:path';
 import { checkSignatureChain, type SignatureChainEntry } from './signature-chain-logic.js';
 
@@ -37,7 +40,10 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const chainFile = args.find(a => !a.startsWith('--'));
+  const chainFlag = args.find(a => a.startsWith('--chain='));
+  const chainFromFlag = chainFlag ? chainFlag.split('=').slice(1).join('=') : undefined;
+  const chainFromPos = args.find(a => !a.startsWith('--'));
+  const chainFile = chainFromFlag ?? chainFromPos;
   const phaseArg = args.find(a => a.startsWith('--phase='));
   const stageArg = args.find(a => a.startsWith('--stage='));
   let phase: number | undefined;
@@ -79,7 +85,7 @@ async function main(): Promise<void> {
   const { chainFile, phase, stage } = parseArgs(process.argv);
 
   if (!chainFile) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]');
+    console.error('用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]');
     process.exit(2);
   }
 
@@ -98,8 +104,21 @@ async function main(): Promise<void> {
   }
 
   // 构建 existingPaths（R8 校验用，基于 artifacts + sourceArtifacts 路径）
-  // 注意：路径相对于项目根目录（signature-chain.jsonl 所在目录的父目录）
-  const projectRoot = path.dirname(path.dirname(chainAbs));
+  // 项目根由链文件位置向上推导：从链文件所在目录开始，向上找到包含 .w-model/ 的目录
+  function findProjectRoot(chainDir: string): string {
+    let dir = chainDir;
+    for (let i = 0; i < 5; i++) {
+      try {
+        accessSync(path.join(dir, '.w-model'));
+        return dir;
+      } catch { /* continue */ }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return path.dirname(chainDir); // fallback
+  }
+  const projectRoot = findProjectRoot(path.dirname(chainAbs));
   const existingPaths = new Set<string>();
   for (const entry of entries as SignatureChainEntry[]) {
     for (const artifact of entry.artifacts ?? []) {

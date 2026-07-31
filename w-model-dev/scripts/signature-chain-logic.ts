@@ -149,17 +149,65 @@ export function checkSignatureChain(
     rulesPassed.push('R1');
   }
 
-  // ==================== R2: 链连续 ====================
-  let prevSigId = 'genesis';
-  let prevSigHash = '0';
-  for (const entry of phaseEntries) {
-    if (entry.prevSigId !== prevSigId || entry.prevSigHash !== prevSigHash) {
-      violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与前环不匹配（期望 prevSigId=${prevSigId}, prevSigHash=${prevSigHash}）`);
-      rulesFailed.push('R2');
-      break;
+  // ==================== R2: 链连续（跨阶段连续链语义） ====================
+  if (options?.phase && options.phase > 0) {
+    // --phase=N mode: cross-phase continuous chain
+    const allSorted = (entries as SignatureChainEntry[])
+      .sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
+    const allSigIds = new Set(allSorted.map(e => e.sigId));
+    allSigIds.add('genesis');
+
+    for (let i = 0; i < phaseEntries.length; i++) {
+      const entry = phaseEntries[i]!;
+      if (i === 0) {
+        // 首条：prevSigId 允许指向上一阶段末条或 genesis
+        if (!allSigIds.has(entry.prevSigId)) {
+          violations.push(`R2: 签名链断裂：${entry.sigId} 首条 prevSigId="${entry.prevSigId}" 不存在于全链中`);
+          rulesFailed.push('R2');
+          break;
+        }
+        if (entry.prevSigId !== 'genesis') {
+          const ref = allSorted.find(e => e.sigId === entry.prevSigId);
+          if (ref && entry.prevSigHash !== ref.sigHash) {
+            violations.push(`R2: 签名链断裂：${entry.sigId} 首条 prevSigHash 与 ${entry.prevSigId} 的 sigHash 不一致`);
+            rulesFailed.push('R2');
+            break;
+          }
+        } else if (entry.prevSigHash !== '0') {
+          violations.push(`R2: 签名链断裂：${entry.sigId} genesis 条 prevSigHash 应为 "0"`);
+          rulesFailed.push('R2');
+          break;
+        }
+      } else {
+        // Phase 内前条用列表索引
+        const prev = phaseEntries[i - 1]!;
+        if (entry.prevSigId !== prev.sigId || entry.prevSigHash !== prev.sigHash) {
+          violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与 phase 内前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`);
+          rulesFailed.push('R2');
+          break;
+        }
+      }
     }
-    prevSigId = entry.sigId;
-    prevSigHash = entry.sigHash;
+  } else {
+    // Archive mode: 全链连续校验（跨阶段一条链）
+    const allSorted = (entries as SignatureChainEntry[])
+      .sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
+    if (allSorted.length > 0) {
+      if (allSorted[0]!.prevSigId !== 'genesis' || allSorted[0]!.prevSigHash !== '0') {
+        violations.push(`R2: 签名链断裂：全链首条 ${allSorted[0]!.sigId} 的 prevSigId/prevSigHash 应为 genesis / "0"`);
+        rulesFailed.push('R2');
+      } else {
+        for (let i = 1; i < allSorted.length; i++) {
+          const entry = allSorted[i]!;
+          const prev = allSorted[i - 1]!;
+          if (entry.prevSigId !== prev.sigId || entry.prevSigHash !== prev.sigHash) {
+            violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`);
+            rulesFailed.push('R2');
+            break;
+          }
+        }
+      }
+    }
   }
   if (!rulesFailed.includes('R2')) {
     rulesPassed.push('R2');
@@ -176,7 +224,6 @@ export function checkSignatureChain(
     if (prev && new Date(entry.signedAt).getTime() < new Date(prev.signedAt).getTime()) {
       violations.push(`R3: 时间戳非单调递增：${entry.sigId}(${entry.signedAt}) 早于 ${entry.prevSigId}(${prev.signedAt})`);
       rulesFailed.push('R3');
-      break;
     }
   }
   if (!rulesFailed.includes('R3')) {
@@ -189,7 +236,6 @@ export function checkSignatureChain(
     if (!allowedRoles.has(entry.role)) {
       violations.push(`R4: 阶段 ${phase} 不允许角色 ${entry.role}（sigId=${entry.sigId}）`);
       rulesFailed.push('R4');
-      break;
     }
   }
   if (!rulesFailed.includes('R4')) {
@@ -215,7 +261,6 @@ export function checkSignatureChain(
     if (recomputed !== entry.sigHash) {
       violations.push(`R6: sigHash 篡改检测：${entry.sigId} 重算 sigHash 与记录不一致`);
       rulesFailed.push('R6');
-      break;
     }
   }
   if (!rulesFailed.includes('R6')) {
@@ -225,15 +270,22 @@ export function checkSignatureChain(
   // ==================== R7: 悬空来源 ====================
   const allSigIds = new Set(phaseEntries.map(e => e.sigId));
   allSigIds.add('genesis');
+  if (options?.phase && options.phase > 0) {
+    // --phase=N mode: 来源并集 = 本阶段 ∪ 上一阶段（跨阶段消费者校验）
+    const allEntries = (entries as SignatureChainEntry[]);
+    for (const e of allEntries) {
+      if (e.phase === options.phase - 1) {
+        allSigIds.add(e.sigId);
+      }
+    }
+  }
   for (const entry of phaseEntries) {
     for (const sourceSigId of entry.inputProvenance?.sourceSigIds ?? []) {
       if (!allSigIds.has(sourceSigId)) {
         violations.push(`R7: ${entry.sigId} 悬空来源：sourceSigId="${sourceSigId}" 不存在于签名链中`);
         rulesFailed.push('R7');
-        break;
       }
     }
-    if (rulesFailed.includes('R7')) break;
   }
   if (!rulesFailed.includes('R7')) {
     rulesPassed.push('R7');
@@ -246,10 +298,8 @@ export function checkSignatureChain(
         if (!options.existingPaths.has(srcArtifact.path)) {
           violations.push(`R8: ${entry.sigId} 缺失产物：sourceArtifacts path="${srcArtifact.path}" 不存在于磁盘`);
           rulesFailed.push('R8');
-          break;
         }
       }
-      if (rulesFailed.includes('R8')) break;
     }
   }
   if (!rulesFailed.includes('R8')) {
@@ -260,7 +310,6 @@ export function checkSignatureChain(
   for (const entry of phaseEntries) {
     const role = entry.role;
     const action = entry.action;
-    // O chunk 无来源约束；O checkpoint 由 R10 校验
     if (role === 'O' && (action === 'chunk' || action === 'checkpoint')) continue;
 
     const sourceRoles = (entry.inputProvenance?.sourceArtifacts ?? []).map(a => a.sourceRole);
@@ -269,10 +318,8 @@ export function checkSignatureChain(
       if (forbidden.includes(srcRole)) {
         violations.push(`R9: ${entry.sigId} 越权消费：角色 ${role} 不得消费 ${srcRole} 产物`);
         rulesFailed.push('R9');
-        break;
       }
     }
-    if (rulesFailed.includes('R9')) break;
   }
   if (!rulesFailed.includes('R9')) {
     rulesPassed.push('R9');
