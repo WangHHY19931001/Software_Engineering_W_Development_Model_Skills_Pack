@@ -73,18 +73,26 @@ async function parseRouteDefinitions(routesDir: string): Promise<RouteDefinition
     if (!fileName.endsWith('.ts')) continue;
     const filePath = path.join(routesDir, fileName);
     const content = await fs.readFile(filePath, 'utf-8');
-    // 提取 router.get/post/put/delete('path', ...) 形式
     const routeRegex = /router\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]/g;
+    const positions: { method: string; path: string; start: number }[] = [];
     let match;
     while ((match = routeRegex.exec(content)) !== null) {
-      const method = match[1]!.toUpperCase();
-      const routePath = match[2]!;
+      positions.push({
+        method: match[1]!.toUpperCase(),
+        path: match[2]!,
+        start: match.index,
+      });
+    }
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i]!;
+      const nextStart = (i + 1 < positions.length) ? positions[i + 1]!.start : content.length;
+      const segment = content.slice(pos.start, nextStart);
       routes.push({
-        method,
-        path: routePath,
-        params: extractParamsFromRoute(content),
-        successStatus: extractSuccessStatus(content),
-        responseFields: extractResponseFields(content),
+        method: pos.method,
+        path: pos.path,
+        params: extractParamsFromRoute(segment),
+        successStatus: extractSuccessStatus(segment),
+        responseFields: extractResponseFields(segment),
       });
     }
   }

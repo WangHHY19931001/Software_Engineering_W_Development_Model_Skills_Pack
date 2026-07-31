@@ -1,0 +1,29 @@
+{
+  "uatPathMappings": [
+    {
+      "uatId": "UAT-020",
+      "designPath": "GET /api/comments",
+      "actualPath": "GET /api/comments",
+      "mappingType": "直接"
+    }
+  ],
+  "routeDefinitions": [
+    {
+      "method": "GET",
+      "path": "/api/posts",
+      "params": ["page"],
+      "successStatus": 200,
+      "responseFields": ["data"]
+    }
+  ],
+  "acceptanceAssertions": [
+    {
+      "uatId": "UAT-020",
+      "method": "GET",
+      "path": "/api/comments",
+      "params": ["page"],
+      "expectedStatus": 200,
+      "assertedFields": ["data"]
+    }
+  ]
+}

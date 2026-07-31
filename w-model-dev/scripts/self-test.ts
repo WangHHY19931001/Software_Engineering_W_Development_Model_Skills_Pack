@@ -1429,6 +1429,12 @@ const DESIGN_CONTRACT_CASES: DesignContractCase[] = [
     expectedReasonPatterns: [/\[D3\]/],
     description: '验收测试预期 204 但路由实际返回 200，应被 D3 拦截',
   },
+  {
+    file: 'bad-route-not-found.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/路由 GET \/api\/comments 未在路由定义中找到/],
+    description: '验收断言指向的路由在路由定义中不存在，应报 violation（不再静默跳过）',
+  },
 ];
 
 // -------------------- SignatureChain（[21.0.0] 签名链：12 样本，1 valid + 11 bad） --------------------

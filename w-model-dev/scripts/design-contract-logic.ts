@@ -100,7 +100,9 @@ export function checkDesignContractConsistency(
     return p.trim();
   }
 
-  for (const mapping of input.uatPathMappings) {
+  const data = input;
+
+  for (const mapping of data.uatPathMappings) {
     if (!mapping.actualPath || mapping.actualPath.trim() === '') {
       continue; // 未回填的跳过（阶段 5 前允许空）
     }
@@ -108,7 +110,7 @@ export function checkDesignContractConsistency(
       continue; // NFR/CON 横切豁免
     }
     const normalizedPath = stripMethodPrefix(mapping.actualPath);
-    const found = input.routeDefinitions.some(
+    const found = data.routeDefinitions.some(
       (route) => route.path === normalizedPath,
     );
     if (!found) {
@@ -122,12 +124,34 @@ export function checkDesignContractConsistency(
     }
   }
 
-  // D2 参数一致性：验收测试使用的参数名须与路由定义一致
-  for (const assertion of input.acceptanceAssertions) {
-    const route = input.routeDefinitions.find(
-      (r) => r.path === assertion.path && r.method === assertion.method,
+  function normalizePath(p: string): string {
+    let normalized = p.replace(/\?.*$/, '');
+    if (normalized !== '/' && normalized.endsWith('/')) {
+      normalized = normalized.slice(0, -1);
+    }
+    return normalized;
+  }
+
+  function findRoute(method: string, path: string): RouteDefinition | undefined {
+    const np = normalizePath(path);
+    return data.routeDefinitions.find(
+      (r) => r.method === method && normalizePath(r.path) === np,
     );
-    if (!route) continue;
+  }
+
+  // D2 参数一致性：验收测试使用的参数名须与路由定义一致
+  for (const assertion of data.acceptanceAssertions) {
+    const route = findRoute(assertion.method, assertion.path);
+    if (!route) {
+      violations.push({
+        dimension: 'D2',
+        severity: 'error',
+        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到`,
+        expected: `${assertion.method} ${assertion.path}`,
+        actual: '路由定义中未找到',
+      });
+      continue;
+    }
     for (const param of assertion.params) {
       if (!route.params.includes(param)) {
         violations.push({
@@ -142,11 +166,18 @@ export function checkDesignContractConsistency(
   }
 
   // D3 状态码一致性：验收测试预期状态码须与路由实际返回一致
-  for (const assertion of input.acceptanceAssertions) {
-    const route = input.routeDefinitions.find(
-      (r) => r.path === assertion.path && r.method === assertion.method,
-    );
-    if (!route) continue;
+  for (const assertion of data.acceptanceAssertions) {
+    const route = findRoute(assertion.method, assertion.path);
+    if (!route) {
+      violations.push({
+        dimension: 'D3',
+        severity: 'error',
+        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到`,
+        expected: `${assertion.method} ${assertion.path}`,
+        actual: '路由定义中未找到',
+      });
+      continue;
+    }
     if (assertion.expectedStatus !== route.successStatus) {
       violations.push({
         dimension: 'D3',
@@ -159,11 +190,18 @@ export function checkDesignContractConsistency(
   }
 
   // D4 响应字段一致性：验收测试断言字段须在实际响应体中存在
-  for (const assertion of input.acceptanceAssertions) {
-    const route = input.routeDefinitions.find(
-      (r) => r.path === assertion.path && r.method === assertion.method,
-    );
-    if (!route) continue;
+  for (const assertion of data.acceptanceAssertions) {
+    const route = findRoute(assertion.method, assertion.path);
+    if (!route) {
+      violations.push({
+        dimension: 'D4',
+        severity: 'error',
+        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到`,
+        expected: `${assertion.method} ${assertion.path}`,
+        actual: '路由定义中未找到',
+      });
+      continue;
+    }
     for (const field of assertion.assertedFields) {
       if (!route.responseFields.includes(field)) {
         violations.push({
