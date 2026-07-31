@@ -17,6 +17,7 @@
 - **codegraph + OpenSpec 集成**（阶段 5-8，第 25 轮）：codegraph 提供修改前符号级影响分析（callers/callees/blast radius），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。技能包通过 `ensure-codegraph-opsx.ts` 自动检测安装，通过 3 个 check 脚本做门禁校验。详见 SSoT §3.4.21。
 - **第 26 轮深度对比吸收**（外部仓库逐文件对比产物）：单轴下限 R13（`check-verifier-output.ts` passed 收紧为 `(A||B) && 所有 subCriterion.score ≥ 0.70`，反模式 #41「加权平均掩盖单轴失败」）/ Fowler 12 坏味道基线（`subagent/engineering-code-reviewer.md`）/ 票据 durability（`phase-5-coding.md` 票据主体 = 符号级契约，位置交 codegraph）/ 术语治理（`references/glossary.md` 权威表 + `_Avoid_`）。详见 SSoT §3.4.22。
 - **第 27 轮 Wayfinder「Fog of War」吸收**：阶段 1 需求分析引入迷雾登记册——REQ 入学锐利性测试（`references/ingestion-chunk.md`，判据 = 能否精确陈述需求的问题，非能否回答）/ A-cross 报告 §7 迷雾汇总（`references/ingestion-cross.md`，不代 S 决定毕业）/ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空，`references/phase-1-requirements.md`「迷雾登记册（Fog of War）」节）/ 规格书 §8.5 Not yet specified（`templates/requirement-spec.md`）。迷雾册为文本节不建图节点、无脚本/schema 变更，治理走 FM-3D-07 + 禁止行为 #12（不新增反模式）。详见 SSoT §3.4.23。
+- **第 28 轮 need_fix.md + 全量脚本 code-review 修正**：`need_fix.md` 两处 bug（estimateTokens CJK 低估 / splitMarkdownByHeaders 分段逻辑）+ 全量 ~66 项缺陷修正（分 6 组域内回归，P1×15 / P2×25 / P3×26）。关键：SD→codeModule 对齐 / security-scan 指纹跨机器归一化 / --rtm R6 纳入 passed / 豁免多 group / 签名链跨阶段连续链 / run-log R1 按阶段分档 / uat-path-mapping 严格解析 + phase 8 终检 / graph.schema.json sourceArtifact 复活 / tla-rework 改为 action=rework 统计。新增 plan-chunks.test.ts + design-contract-logic.ts + 对应单测。self-test 192→213 / vitest 205→269 / 21 test files。删除 need_fix.md。版本号 26.0.0 → 27.0.0。详见 SSoT §3.4.24。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 
@@ -51,7 +52,7 @@
 npm install
 
 # 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
-npm run self-test                           # 192 条样本回归基线（19 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive），退出码 0/1
+npm run self-test                           # 213 条样本回归基线（19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 12 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2
@@ -558,5 +559,5 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-opsx-artifacts.ts | opsx 制品 + R3×3 + V 审查产物齐全性校验（反模式 #39/#40；CLI `<project-root> --phase <5\|6\|7\|8>`） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-openspec-archive.ts | opsx:archive 归档完整性校验（CLI `<project-root> --phase <5\|6\|7\|8>`） | 8（归档） | 0=通过，1=校验失败，2=输入错误 |
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式；CLI `--phase <5-8> --project-root <path> --mode <full\|quick\|light>` | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
-| self-test.ts | 回归基线（192 条样本：18 Verifier + 18 Gate + 27 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 7 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 11 RootCause + 16 Schema + 1 Metadata + 10 BDD + 12 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 3 CodegraphQuery + 2 OpsxArtifact + 2 OpenspecArchive）；vitest 205 条（含 graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + signature-chain R1-R10 + archive-integrity + preventive-review + tla-bdd-sync） | - | 0=通过，1=失败 |
+| self-test.ts | 回归基线（213 条样本：19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 12 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT）；vitest 269 条（含 graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + signature-chain R1-R10 + archive-integrity + preventive-review + tla-bdd-sync + plan-chunks + design-contract-logic，21 test files） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel + codeModule 格式 + uat-path-mapping） | - | 0=通过，1=失败 |

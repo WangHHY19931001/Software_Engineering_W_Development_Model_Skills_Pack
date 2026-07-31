@@ -88,6 +88,7 @@
 **校验规则**（由 `check-artifact-gate.ts` 执行）：
 - phase=1：校验 `docs/uat-path-mapping.md` 文件存在性
 - phase=5：校验每条 UAT-NNN 的「实际路径」列非 `_待阶段5回填_`，且 `mappingType` ∈ `["直接","等价","替代"]`
+- phase=8：终检校验所有 UAT-NNN 的映射行格式完整（≥4 列），缺失或格式不符 → 退出码 1，reasons 列出违规行详情（第 28 轮新增）
 - 缺失文件或未回填项 → 退出码 1，reasons 列出具体 UAT ID
 
 ### demo 范围 N/A 标记要求（第22轮 P1-3 修正）

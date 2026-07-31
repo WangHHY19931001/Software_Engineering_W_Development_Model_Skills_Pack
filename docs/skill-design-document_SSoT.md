@@ -793,6 +793,67 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不改任何脚本（无新增 check 脚本，毕业核验由既有 R/V 承载）；不改任何 schema（迷雾册为文本节，graph/coverage/exemption schema 不变）；不建图节点（FOG 项不进 graph.json）；不新增反模式（41 条不变）；不动 w-model-dev-demo。
 
+#### 3.4.24 第 28 轮：need_fix.md + 全量脚本 code-review 修正（2026-07-31）
+
+> 触发：`need_fix.md` 报告 `plan-chunks.ts` 两处 bug（estimateTokens CJK 低估 / splitMarkdownByHeaders 分段逻辑）+ 用户要求先对全部技能脚本做一轮 code-review 再制定修正计划。设计 spec：[`docs/superpowers/specs/2026-07-31-round28-script-bugfix-design.md`](./superpowers/specs/2026-07-31-round28-script-bugfix-design.md)。5 组并行子代理深度 code-review 共发现约 66 项缺陷（P1×15 / P2×25 / P3×26）。用户决策：D1 一次修完 / D2 签名链跨阶段连续链 / D3 run-log R1 按阶段分档 / D4 opsx 审查产物操作侧补产 stage 级 .md 文件。按 6 组域内回归执行。版本号目标 27.0.0。
+
+**1. G-A plan-chunks.ts（need_fix 本体 + review 扩展，A1-A6）**：
+- `estimateTokens` 改为 `Math.ceil(Buffer.byteLength(text, 'utf8') / 4)`，修复 CJK 4 倍低估。
+- `splitMarkdownByHeaders` 重写：header+content 正确配对（显式两两遍历）、围栏代码块感知（三反引号状态机）、单节超限按行二次切分。
+- 非 md 行切分按累计字节数分块，步长防无限循环；目录递归进入子目录收集叶子文件；`--max-tokens` 正整数严格校验（非法 exit 2）。
+- 新建 `plan-chunks.test.ts`（当前零覆盖 → 有覆盖）。
+
+**2. G-B gate/verifier/schema/security（B1-B12）**：
+- SD→codeModule 校验与 code-tla-logic.ts 对齐（`SD-` 拆段退化 + `SD-5.2.1` 数字层级兼容）。
+- coverageStatus 改为行级比较；coveragePercent 与 missingItems 联动；uat-path-mapping guard 防缺字段崩溃。
+- uat-path-mapping 严格解析（单元格数 < 4 记录 violation，不静默跳过）+ phase 8 终检补校验；parsePhaseArg 严格整数校验。
+- security-scan 指纹 `path.relative` 归一化后哈希 + baseline 重生成（Linux 相对路径）；JSON.parse 容错。
+- verifier-logic.ts passed 基于降级后 compositeScore 重算 + 死代码清理；check-verifier-output --s-output 解析 + 空值报错。
+- schema-loader 全部注册成功后再赋值 ajv 单例（注册失败清理重试）。
+- self-test.ts 补 SD-5.2.1 gate 样本。
+
+**3. G-C graph/coverage/exemption（C1-C9）**：
+- --rtm R6 检查移到 passed 计算前，违规参与最终 passed；豁免重算 roots 与 graph-logic 对齐（消除多 group 豁免永不生效）。
+- 豁免前缀匹配兼容组合前缀（R1-R4 … 命中 ruleId R1）；--phase 严格整数校验。
+- graph.schema.json 加回 `sourceArtifact` 可选字段；warnings 落盘 GRAPH_JSON 并 stdout 输出。
+- coverage --out-of-scope 文件结构不符报错 exit 2（不静默降级）；C9 missingIds 取需求 ID 而非类别名。
+- exemption 四阶段时间戳时序校验。
+
+**4. G-D TLA/BDD/code（D1-D9）**：
+- tla-logic cfg↔TLA 不变式正则兼容 `BusinessInvariant ==`（与 demo 实际用法一致）+ INVARIANT 死分支修复 + `@phase` 严格整数。
+- BDD extractStateVarName 兼容 `TypeOK ==`；D4 缺 --tla-manifest 时提示；Scenario 体内步骤 + `# @states:`/`# @transitions:` 注释声明解析。
+- TLA/BDD 转移抽取支持 `\E ... :` 量化项 + Next 体边界终止条件鲁棒化 + VARIABLES 多行形式。
+- check-design-contract-consistency 路由元数据按路由提取（非整文件首个）；新建 design-contract-logic.ts 纯逻辑 + 路由查找失败报 violation。
+- code-tla-logic cfg 不变式正则兼容 `Invariants ==` 两种命名。
+
+**5. G-E 状态/日志/签名/归档/预防性（E1-E17）**：
+- signature-chain R2 改为跨阶段连续链语义（首条 prevSigId 允许指向上一阶段最后一条 sigId）+ R7 悬空校验放宽为本阶段∪前一阶段 + 收集全部违规点。
+- check-signature-chain 链文件路径显式传参并从位置推导项目根。
+- run-log R1 按阶段分档（阶段 1-4 要求 chunk/cross/gate/checkpoint；阶段 5-8 要求 produce/review/gate/checkpoint）+ R3 返工计数按 phase+TLA target 过滤 + R6 null gateExitCode 判失败 + R7 返工时序扫 rootcause review + R3 rootcause↔fix 按 reportId 去重后计数。
+- check-run-log extractExitCode 模式表补齐；loadGateLogs 加载 gate-logs/ 下全部文件（不限 .log）。
+- check-budget tla-rework 统计改为 `action='rework'` 且 target 含 `tla`（按 phase 限定）；data-models 动作枚举移除 tla-rework。
+- check-maturity O_PATTERN 词边界 `\bO[1-6]\b`；check-checkpoint 前导零 filename parseInt 归一；checkpoint 字符计数 `[...decision].length`。
+- root-cause R10 校验任一有效 partialReport 含 reality-checker 角色；archive-integrity 文件存在性按相对路径精确匹配。
+
+**6. G-F opsx/codegraph + D4 操作文档（F1-F7）**：
+- ensure-codegraph-opsx 探针命令改为 `codegraph query` 位置参数 + L3 `codegraph init` 之后执行 + --phase Number.isNaN 校验 + getArg 支持 `--name=value` / `--name value` 两种形式。
+- check-codegraph-queries blastRadius/queryTimestamp schema 校验 + F7 位置参数误解析 exit 2。
+- check-opsx-artifacts 校验该阶段所有变更目录（readdirSync 排序后逐个校验）+ 精确前缀匹配 `phase<N>-`。
+- check-openspec-archive 精确前缀匹配 + 全部归档目录校验 + 归档清单与归档前 REQUIRED 清单统一。
+- D4 决策：SKILL.md / subagent-delegation.md / anti-patterns #39 同步新增 opsx 阶段 5-8 操作侧补产 stage 级 R3/V .md 文件约束。
+
+**实现状态（2026-07-31）**：6 组域内回归 + 全量回归全部通过：
+- self-test：192 → 213 全通过（+21 新样本：UAT_PATH_MAPPING 5 + DESIGN_CONTRACT 5 + VERIFIER +1 / GATE +1 / GRAPH +1 / RUN_LOG +6 / ROOTCAUSE +1 / CODEGRAPH_QUERY +1 / OPSX_ARTIFACT +1 / OPENSPEC_ARCHIVE +1 / BDD +2 / SIGNATURE_CHAIN +3）
+- vitest：205 → 269 全通过（21 test files，+2 新建 plan-chunks.test.ts + design-contract-logic.test.ts，其余 gate-enhancement/verifier 等扩展）
+- TypeScript strict：0 错误
+- security-scan baseline：指纹归一化后重生成，`npm run lint:security` 转绿
+- prepush：全绿
+- 签名链跨阶段连续链（D2）、run-log R1 分档（D3）、opsx 补产约束（D4）均已用户决策确定
+
+**版本号**：三处同步 27.0.0（package.json + skill-metadata.json + SKILL.md frontmatter），与 CHANGELOG [27.0.0] / SSoT §3.4.24 / AGENTS.md §4 一致。
+
+**不涉及范围**：不新增反模式（41 条不变）；不新增 schema 文件；不新增 check 脚本（现有脚本行为修复）。
+
 ---
 
 ## 4. 技能工作流程
@@ -2365,6 +2426,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.16 第 20 轮 阶段 1 需求提取四维识别与豁免审批 | 四维识别模型（层级关系 R1-R4 + 子系统划分 REQ-group + 交叉逻辑 R5/R6 + 覆盖分析 C1-C10）+ 豁免审批治理（S→R→V→人类 E1-E8）+ 图谱 schema 扩展（level/priority/reqGroup + 3 类边）+ 规格书模板 5→13 节 + 反模式 #30 + 禁止行为 #7-#11 | `w-model-dev/schemas/coverage.schema.json` + `exemption.schema.json` + `w-model-dev/scripts/coverage-logic.ts` / `check-requirement-coverage.ts` + `exemption-logic.ts` / `check-exemption.ts` + `graph-logic.ts`（R1-R6 + reqHierarchy/crossLogic）+ `check-requirement-graph.ts`（--rtm / --exemptions）+ `samples/graph/`（+13）+ `samples/coverage/`（10）+ `samples/exemption/`（7）+ `__tests__/graph-logic.test.ts`（R1-R6）+ `coverage-logic.test.ts`（C1-C10）+ `exemption-logic.test.ts`（E1-E8）+ `templates/requirement-spec.md`（5→13 节）+ `references/anti-patterns.md` #30 + `w-model-dev/SKILL.md` 约束 #15/#16 | 完整（不向后兼容老图谱，历史抛弃重新生成；self-test 基线 121→152；vitest 108→~165） |
 | §3.4.22 第 26 轮 外部技能深度对比吸收 + 单轴下限 + Fowler 12 + 术语治理 | 加权平均掩盖单轴失败 → R13 单轴下限（passed 收紧为 qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70，0.70=B 级分界）+ Fowler 12 坏味道基线 + 票据内容 durability（符号级契约）+ 术语治理 glossary + 角色表 Negation 审计 + 反模式 #41 | `w-model-dev/scripts/verifier-logic.ts`（R13：SINGLE_AXIS_MIN_SCORE + checkR13SingleAxisFloor + expectedPassed 单轴条件）+ `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json`（completeness=0.65 fixture）+ `w-model-dev/scripts/__tests__/verifier-logic.test.ts`（+4 R13 用例）+ `w-model-dev/scripts/self-test.ts`（VERIFIER_CASES +1，基线 191→192）+ `w-model-dev/references/verifier-spec.md`（§3.3/§6.3）+ `w-model-dev/subagent/engineering-code-reviewer.md`（Fowler 12 基线节）+ `w-model-dev/references/glossary.md`（新建，15+ 术语 + `_Avoid_`）+ `w-model-dev/references/phase-5-coding.md`（票据 durability 节）+ `w-model-dev/references/anti-patterns.md` #41 + `w-model-dev/SKILL.md`（角色表 Negation 审计 + references 索引 glossary 条目） | 完整（R13 非破坏性：既有样本全部 score ≥0.70；#41 用户决策直接转正不经 pending 复审；qualityLevel 映射不变，仅 passed 增加单轴条件；验证门 V1-V6 全通过：tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / fixture exit=1 / 全样本 valid=0 bad=1） |
 | §3.4.23 第 27 轮 Wayfinder「Fog of War」吸收 — 阶段 1 迷雾登记册 | 强制 100% 覆盖下「in-scope 尚无法精确陈述」需求无落脚点 → REQ 入学锐利性测试（能否精确陈述，非能否回答）+ 迷雾登记册文本节（Not yet specified，不建图节点）+ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空）+ FM-3D-07 迷雾滥用 + 禁止行为 #12（不新增反模式） | `w-model-dev/references/ingestion-chunk.md`（锐利性测试节 + fogDesc/fogBlocker/fogGroupHint + crossChunkHints edgeType=fog）+ `w-model-dev/references/ingestion-cross.md`（算法步骤 9 + 报告 §7）+ `w-model-dev/references/phase-1-requirements.md`（迷雾登记册节 + FM-3D-07 + 禁止行为 #12 + 返工路径）+ `w-model-dev/templates/requirement-spec.md`（§8.5 Not yet specified）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处 26.0.0） | 完整（纯文档吸收，无脚本/schema 变更；self-test 192 / vitest 205 基线不变；D5 互引一致性通过；版本号三处一致 26.0.0） |
+| §3.4.24 第 28 轮 need_fix.md + 全量脚本 code-review 修正 | need_fix.md Bug 1（estimateTokens CJK 低估）+ Bug 2（splitMarkdownByHeaders 分段逻辑重写）+ 全量 ~66 项缺陷修正（P1×15 / P2×25 / P3×26），分 6 组（G-A plan-chunks A1-A6 / G-B gate/verifier/schema/security B1-B12 / G-C graph/coverage/exemption C1-C9 / G-D TLA/BDD/code D1-D9 / G-E 状态/日志/签名/归档 E1-E17 / G-F opsx/codegraph F1-F7 + D4 操作侧 opsx 补产约束）。关键修正：SD→codeModule 对齐（gate-logic + code-tla-logic）、security-scan 指纹跨机器归一化、--rtm R6 纳入 passed、豁免多 group 兼容、签名链跨阶段连续链（D2）、run-log R1 按阶段分档（D3）、uat-path-mapping 严格解析 + phase 8 终检、graph.schema.json sourceArtifact 字段复活、check-budget.ts tla-rework 统计改为 action=rework。版本号 26.0.0 → 27.0.0。 | `w-model-dev/scripts/plan-chunks.ts`（A1-A5）+ `w-model-dev/scripts/__tests__/plan-chunks.test.ts`（新建，A6）+ `w-model-dev/scripts/gate-logic.ts`（B1-B3）+ `w-model-dev/scripts/check-artifact-gate.ts`（B4-B6）+ `w-model-dev/scripts/security-scan.ts`（B7-B8）+ `w-model-dev/scripts/check-verifier-output.ts`（B9）+ `w-model-dev/scripts/schema-loader.ts`（B10）+ `w-model-dev/scripts/verifier-logic.ts`（B11）+ `w-model-dev/scripts/self-test.ts`（B12）+ `w-model-dev/scripts/check-requirement-graph.ts`（C1-C4）+ `w-model-dev/schemas/graph.schema.json`（C5）+ `w-model-dev/scripts/graph-logic.ts`（C6）+ `w-model-dev/scripts/coverage-logic.ts`（C7-C8）+ `w-model-dev/scripts/exemption-logic.ts`（C9）+ `w-model-dev/scripts/tla-logic.ts`（D1-D3）+ `w-model-dev/scripts/code-tla-logic.ts`（D1）+ `w-model-dev/scripts/check-bdd-model.ts`（D4）+ `w-model-dev/scripts/tla-bdd-sync-logic.ts`（D5-D7）+ `w-model-dev/scripts/check-design-contract-consistency.ts`（D8）+ `w-model-dev/scripts/design-contract-logic.ts`（D9，新建）+ `w-model-dev/scripts/__tests__/design-contract-logic.test.ts`（新建）+ `w-model-dev/scripts/signature-chain-logic.ts`（E1-E3）+ `w-model-dev/scripts/check-signature-chain.ts`（E4）+ `w-model-dev/scripts/run-log-logic.ts`（E5-E9）+ `w-model-dev/scripts/check-run-log.ts`（E10-E11）+ `w-model-dev/scripts/check-budget.ts`（E12）+ `w-model-dev/scripts/check-maturity.ts`（E13）+ `w-model-dev/scripts/check-checkpoint.ts`（E14）+ `w-model-dev/scripts/checkpoint-logic.ts`（E15）+ `w-model-dev/scripts/root-cause-logic.ts`（E16）+ `w-model-dev/scripts/archive-integrity-logic.ts`（E17）+ `w-model-dev/scripts/ensure-codegraph-opsx.ts`（F1-F3）+ `w-model-dev/scripts/check-codegraph-queries.ts`（F4）+ `w-model-dev/scripts/check-opsx-artifacts.ts`（F5）+ `w-model-dev/scripts/check-openspec-archive.ts`（F6）+ `w-model-dev/references/signature-chain-guide.md`（连续链整改）+ `w-model-dev/references/data-models.md`（run-log R1 分档/tla-rework 枚举移除）+ `w-model-dev/references/subagent-delegation.md`（opsx D4 补产约束）+ `w-model-dev/references/anti-patterns.md` #39（同步）+ `w-model-dev/references/phase-8-acceptance-test.md`（uat-path-mapping 终检声明）+ `w-model-dev/SKILL.md`（D4 约束）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 27.0.0） | 完整（6 组域内回归 + 全量回归：self-test 192→213 / vitest 205→269 / 21 test files / TypeScript strict 0 错误 / security-scan baseline 指纹归一化后重生成 / prepush 全绿） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |

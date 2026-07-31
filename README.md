@@ -85,7 +85,7 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # TLA+ 行为门禁，退出码 0/1/2
 npm run check:coverage -- <coverage.json> [--graph=] [--out-of-scope=] [--exemptions=]  # 阶段 1 需求覆盖分析门禁，退出码 0/1/2
 npm run check:exemption -- <exemption.json>  # 豁免审批门禁（S→R→V→人类四阶段），退出码 0/1/2
-npm run self-test                           # 退出码 0/1（192 条样本回归基线）
+npm run self-test                           # 退出码 0/1（213 条样本回归基线）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 
 # 或用 npx tsx 直接调用：
@@ -312,8 +312,8 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 10 个 *-logic.ts 顶部自动 import）
 │   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
-│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 192 条）
-│   │   ├── __tests__/            #   vitest 单元测试（13 个 .test.ts + README.md coverage 矩阵）
+│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
+│   │   ├── __tests__/            #   vitest 单元测试（21 个 .test.ts + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）

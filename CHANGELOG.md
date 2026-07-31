@@ -3,6 +3,74 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [27.0.0] - 2026-07-31
+
+### 第二十八轮 need_fix.md + 全量脚本 code-review 修正（~66 项缺陷 + 21 新样本）
+
+基于 `need_fix.md` 两处 bug 报告 + 全量脚本深度 code-review（5 组并行子代理，最小复现验证）发现的约 66 项缺陷（P1×15 / P2×25 / P3×26），按 6 组域内回归一次修正完成。详见 SSoT §3.4.24。
+
+#### Added
+- 新建 `plan-chunks.test.ts`（A6：CJK 字节估算 / 标题配对 / 围栏代码块 / 单节二次切分 / 目录递归 / --max-tokens 非法值）；当前零覆盖 → 完整覆盖
+- 新建 `design-contract-logic.ts`（D9：设计契约跨文件共享纯逻辑，路由查找失败报 violation）
+- 新建 `design-contract-logic.test.ts`（D9 对应单测，路由匹配 / 缺失 violation / 多路由提取）
+- self-test 新增样本 21 条（UAT_PATH_MAPPING 5 / DESIGN_CONTRACT 5 / VERIFIER +1 / GATE +1 / GRAPH +1 / RUN_LOG +6 / ROOTCAUSE +1 / CODEGRAPH_QUERY +1 / OPSX_ARTIFACT +1 / OPENSPEC_ARCHIVE +1 / BDD +2 / SIGNATURE_CHAIN +3），基线 192 → 213
+- vitest 新增 64 条（plan-chunks 6 + design-contract-logic + gate-enhancement 扩展 + verifier + bdd + signature-chain + run-log 等），总计 205 → 269，21 test files
+
+#### Changed
+- `plan-chunks.ts`（A1-A5）：estimateTokens → Buffer.byteLength(utf8)/4（修复 CJK 4 倍低估）；splitMarkdownByHeaders 重写（header+content 正确配对 + 围栏代码块感知 + 单节按行二次切分）；非 md 行按累计字节数分块；目录递归收集叶子文件；--max-tokens 正整数严格校验
+- `gate-logic.ts`（B1-B3）：SD→codeModule 与 code-tla-logic 对齐（SD-5.2.1 数字层级兼容）；coverageStatus 行级比较 + coveragePercent↔missingItems 联动；uat-path-mapping guard 防缺字段崩溃
+- `check-artifact-gate.ts`（B4-B6）：uat-path-mapping 严格解析（格式不符记录 violation，不静默跳过）；phase 8 终检补 uat-path-mapping 校验（对齐 phase-8-acceptance-test.md 声明）；parsePhaseArg 严格整数校验
+- `security-scan.ts`（B7-B8）：指纹 path.relative 归一化后哈希（修复跨机器失效）；JSON.parse 容错
+- `check-verifier-output.ts`（B9）：--s-output 用 indexOf('=')+slice 切分；空值报输入错误
+- `schema-loader.ts`（B10）：全部注册成功后再赋值 ajv 单例（注册失败清理重试）
+- `verifier-logic.ts`（B11）：passed 基于降级后 compositeScore 重算（含 evidence 扣分后）；R11/R12/P3-5 死代码清理
+- `self-test.ts`（B12）：补带 graph 的 gate 样本（SD-5.2.1 应通过 + 数字层级映射验证）
+- `check-requirement-graph.ts`（C1-C4）：--rtm R6 检查移到 passed 计算前（违规并入 violations）；豁免重算 roots 与 graph-logic 对齐（消除多 group 豁免永不生效）；豁免前缀兼容组合前缀；--phase 严格整数校验
+- `graph.schema.json`（C5）：边对象加回 sourceArtifact 可选字段（语义来源占比复活）
+- `graph-logic.ts`（C6）：warnings 落盘 GRAPH_JSON 并 stdout 输出
+- `coverage-logic.ts`（C7-C8）：--out-of-scope 文件结构不符 → 报错 exit 2（不静默降级）；C9 missingIds 取需求 ID（如 NFR-001）而非类别名
+- `exemption-logic.ts`（C9）：四阶段时间戳时序校验（submittedAt < reviewedAt < verifiedAt < decidedAt）
+- `tla-logic.ts`（D1-D3）：cfg↔TLA 不变式正则兼容 BusinessInvariant ==（demo 实际命名）；INVARIANT 死分支修复；@phase 严格整数校验
+- `code-tla-logic.ts`（D1）：cfg 不变式正则兼容 Invariants == 两种命名
+- `check-bdd-model.ts`（D4）：extractStateVarName 兼容 TypeOK ==；D4 缺 --tla-manifest 时提示而非静默跳过
+- `tla-bdd-sync-logic.ts`（D5-D7）：Scenario 体内步骤 + # @states:/# @transitions: 注释解析；转移抽取支持 \E 量化项；Next 体边界终止条件鲁棒化；VARIABLES 多行形式捕获全部变量
+- `check-design-contract-consistency.ts`（D8）：路由元数据按路由提取（res.status/params/responseFields 归属具体路由而非整文件首个）
+- `signature-chain-logic.ts`（E1-E3）：R2 改为跨阶段连续链（D2 决策：首条 prevSigId 允许指向前一阶段最后 sigId）；R7 sourceSigIds 悬空校验放宽为"本阶段 ∪ 前一阶段"；收集全部违规点不首个命中即 break
+- `check-signature-chain.ts`（E4）：链文件路径显式传参并从位置推导项目根；产物路径按 .w-model/ 前缀解析
+- `run-log-logic.ts`（E5-E9）：R1 按阶段分档（D3 决策：阶段 1-4 chunk/cross/gate/checkpoint；阶段 5-8 produce/review/gate/checkpoint）；R3 返工计数按 phase + TLA target 过滤后对比；R6 null gateExitCode 且设 gateLogPath 判失败；R7 返工时序扫第一个 rootcause review；R3 rootcause↔fix 按 reportId 去重后计数
+- `check-run-log.ts`（E10-E11）：extractExitCode 模式表补齐全部 gate 标记；loadGateLogs 加载 gate-logs/ 下全部文件（不限 .log）
+- `check-budget.ts`（E12）：tla-rework 死代码 → 统计改为 action='rework' 且 target 含 tla（按 phase 限定）
+- `check-maturity.ts`（E13）：O_PATTERN 词边界 \bO[1-6]\b
+- `check-checkpoint.ts`（E14）：前导零 filename 匹配 parseInt 归一
+- `checkpoint-logic.ts`（E15）：字符计数用 [...decision].length
+- `root-cause-logic.ts`（E16）：R10 校验任一有效 partialReport 含 reality-checker 角色（不限 method）
+- `archive-integrity-logic.ts`（E17）：文件存在性按归档清单预期相对路径精确匹配
+- `ensure-codegraph-opsx.ts`（F1-F3）：探针命令改为 codegraph query（位置参数）；探针移到 L3 codegraph init 之后执行；--phase Number.isNaN 校验；getArg 支持 --name=value 与 --name value 两种形式
+- `check-codegraph-queries.ts`（F4）：blastRadius/queryTimestamp 字段形状校验；位置参数误解析 exit 2
+- `check-opsx-artifacts.ts`（F5）：校验该阶段所有变更目录（readdirSync 排序后逐个校验，全过才通过）；精确前缀匹配 phase<N>-
+- `check-openspec-archive.ts`（F6）：精确前缀匹配 + 全部归档目录校验；归档清单与归档前 REQUIRED 清单统一
+- `data-models.md`：run-log R1 分档说明 + tla-rework 动作枚举移除
+- `signature-chain-guide.md`：跨阶段连续链模型说明
+- `subagent-delegation.md`：opsx D4 操作侧补产 stage 级 .md 文件约束
+- `anti-patterns.md` #39：opsx 审查产物操作侧补产约束同步
+- `phase-8-acceptance-test.md`：uat-path-mapping 终检校验声明
+- `SKILL.md`：opsx 补产约束 #21（stage 级 R3×9 + V×3）
+- 版本号三处同步 26.0.0 → 27.0.0（package.json + skill-metadata.json + SKILL.md frontmatter）
+
+#### Removed
+- 删除 `need_fix.md`（两处 bug 已修复）
+- 删除 `check-budget.ts` tla-rework 死代码（改为通用 action='rework' 统计）
+- 删除 `verifier-logic.ts` R11/R12/P3-5 死代码
+- 删除 `tla-logic.ts` INVARIANT 不可达死分支
+
+#### Validation
+- self-test: 213/213 全通过（基线 192 → 213，+21 新样本）
+- vitest: 269/269 全通过（基线 205 → 269，+64 测试，21 test files）
+- TypeScript strict: 0 错误
+- security-scan: 指纹归一化后 baseline 重生成，`npm run lint:security` exit=0
+- prepush: 全绿
+- 回归验证：6 组域内回归 + 全量回归通过
+
 ## [26.0.0] - 2026-07-30
 
 ### 第二十七轮 Wayfinder「Fog of War」吸收（阶段 1 迷雾登记册）
