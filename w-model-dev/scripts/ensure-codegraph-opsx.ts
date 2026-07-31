@@ -58,13 +58,14 @@ function installCli(packageName: string): boolean {
 }
 
 /**
- * 检测 codegraph_explore MCP 工具可调用性（L2）
- * 通过尝试执行 codegraph 查询探针符号判断 MCP 是否注册
+ * 检测 codegraph_explore MCP 工具可调用性
+ * 通过尝试执行 codegraph 查询探针判断 MCP 是否注册
+ * 注意：探针须在 L3 codegraph init 之后执行，否则会出现"未初始化"假阴性
  */
 function checkMcpCodegraph(projectRoot: string): boolean {
   try {
-    // codegraph CLI 可查询图谱验证 MCP 链路；探针符号取项目入口
-    execFileSync('codegraph', ['query', '--symbol', 'main'], {
+    // query 是位置参数，非 --symbol 选项
+    execFileSync('codegraph', ['query', 'main'], {
       cwd: projectRoot,
       stdio: 'pipe',
       timeout: 15000,
@@ -80,7 +81,8 @@ function checkMcpCodegraph(projectRoot: string): boolean {
  */
 function registerMcpCodegraph(): boolean {
   try {
-    execFileSync('codegraph', ['install', '--yes'], { stdio: 'pipe', timeout: 60000 });
+    // 禁止 --yes：不得自动改写全局 opencode 配置
+    execFileSync('codegraph', ['install'], { stdio: 'pipe', timeout: 60000 });
     return true;
   } catch {
     return false;
@@ -143,16 +145,12 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
   // light 模式到此为止
   if (mode === 'light') return results;
 
-  // L2: codegraph MCP 注册（仅 full 模式）
+  // L2: codegraph MCP 注册（仅 full 模式；不在此处做 query 探针，避免 init 前假阴性）
   if (isFull) {
-    if (checkMcpCodegraph(projectRoot)) {
-      results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'ready', detail: '探针查询成功，MCP 已注册' });
+    if (registerMcpCodegraph()) {
+      results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'installed', detail: 'codegraph install 执行成功' });
     } else {
-      if (registerMcpCodegraph() && checkMcpCodegraph(projectRoot)) {
-        results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'installed', detail: 'codegraph install --yes 成功' });
-      } else {
-        results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'checkpoint', detail: '需用户手动运行交互式 codegraph install' });
-      }
+      results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'checkpoint', detail: '需用户手动运行交互式 codegraph install（不使用 --yes 自动改写全局配置）' });
     }
   }
 
@@ -165,6 +163,15 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
       results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'installed', detail: 'codegraph init 成功' });
     } else {
       results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'checkpoint', detail: 'codegraph init 失败，需用户手动执行' });
+    }
+  }
+
+  // L3 探针查询：在 init 之后执行，验证 MCP 链路完整
+  if (existsSync(codegraphDir)) {
+    if (checkMcpCodegraph(projectRoot)) {
+      results.push({ layer: 'L3', item: 'codegraph 探针查询', status: 'ready', detail: 'codegraph query main OK，MCP 链路正常' });
+    } else {
+      results.push({ layer: 'L3', item: 'codegraph 探针查询', status: 'checkpoint', detail: '探针查询失败，请确认 MCP 已注册且索引已构建' });
     }
   }
 
@@ -186,7 +193,10 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const getArg = (name: string): string | undefined => {
-    const i = args.indexOf(`--${name}`);
+    const prefix = `--${name}`;
+    const eqArg = args.find(a => a.startsWith(`${prefix}=`));
+    if (eqArg) return eqArg.slice(prefix.length + 1);
+    const i = args.indexOf(prefix);
     return i >= 0 ? args[i + 1] : undefined;
   };
 
@@ -200,8 +210,8 @@ async function main(): Promise<void> {
   }
 
   const phase = parseInt(phaseStr, 10);
-  if (phase < 5 || phase > 8) {
-    console.error(`✗ phase 须为 5-8，收到 ${phase}`);
+  if (Number.isNaN(phase) || phase < 5 || phase > 8) {
+    console.error(`✗ phase 须为 5-8，收到 ${phaseStr}`);
     process.exit(2);
   }
 
