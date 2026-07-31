@@ -222,6 +222,18 @@ graph TD
 - {{原因：依赖未就绪/范围过大/下轮迭代}}
 - {{覆盖缺失声明：§7 未覆盖项 X 经豁免审批 EXEMPT-NNN 处置}}
 
+## 8.5 Not yet specified（迷雾登记册）
+
+> 第 27 轮新增。登记 in-scope 但尚无法精确陈述的需求（A 子代理经锐利性测试入册，见 [phase-1-requirements.md](../references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节）。
+> **强制项**：阶段末（CHECKPOINT 前）每项须有毕业处置结果；全部终结后可标注「本阶段无未终结迷雾项」。
+> **区分**：本节 = 要做什么但还说不清（in-scope 未成形）；§8 Out of Scope = 不做什么（范围外，不属雾）。
+
+| 迷雾项 ID | 模糊描述 | 疑点（无法精确陈述的部分） | 疑似范围归属（level=1 候选） | 毕业方向（REQ / Out of Scope / 豁免） | 毕业处置结果 |
+|---|---|---|---|---|---|
+| FOG-001 | {{描述}} | {{疑点}} | {{REQ-xxx 或 空}} | {{方向}} | {{处置结果 + 对应 REQ / §8 / EXEMPT 引用}} |
+
+（无迷雾项时填：「无——本阶段未识别尚无法精确陈述的 in-scope 需求」）
+
 ## 9. Implementation Decisions
 
 > 架构/模块/接口/Schema/API 契约决策。避免具体文件路径与代码片段（除非 prototype 产出的决策密集片段）。
