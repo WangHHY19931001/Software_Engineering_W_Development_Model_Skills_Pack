@@ -772,6 +772,27 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改 qualityLevel 映射（仍由 compositeScore 决定）；不修改门禁脚本 CLI/退出码约定；不新增脚本文件（R13 并入既有 check-verifier-output.ts）；不改 schema（R13 复用既有 VerifierOutput 结构）。
 
+#### 3.4.23 第 27 轮：Wayfinder「Fog of War」吸收 — 阶段 1 迷雾登记册（2026-07-30）
+
+> 触发：用户要求分析外部仓库 wayfinder 技能（`skills/skills/engineering/wayfinder/`），评估其对阶段 1（需求分析）的可借鉴性。设计 spec：[`docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md`](./superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md)。经全量精读 wayfinder SKILL.md + 配套 docs + 3 changeset + 上游 skill（domain-modeling / to-spec / to-tickets / research），识别阶段 1 真实缺口：强制 100% 覆盖（C1-C10）下「in-scope 尚无法精确陈述」的需求无落脚点 → A 子代理或捏造浅层 REQ（违背禁止行为 #2）或静默丢弃（违反禁止行为 #10）。吸收 wayfinder「Fog or ticket?」锐利性测试 + Not-yet-specified + 毕业机制。版本号目标 26.0.0。
+
+1. **REQ 入学锐利性测试**：`ingestion-chunk.md` 新增测试判据——现在能否精确陈述需求的问题（不是能否回答它）；能 → 正式 REQ，不能 → 入迷雾册（不建图节点）。迷雾项字段：fogDesc / fogBlocker / fogGroupHint，写入 chunk `.md` 叙事文件；crossChunkHints 支持 `edgeType: "fog"`。
+
+2. **A-cross 迷雾汇总**：`ingestion-cross.md` 算法新增步骤 9 + 报告模板新增 §7 迷雾登记册（去重 + 疑似 REQ-group 归属 + 疑似毕业方向）；A-cross 不代 S 决定毕业。
+
+3. **迷雾登记册治理**：`phase-1-requirements.md` 新增「迷雾登记册（Fog of War）」节——定义与 §8 Out of Scope 区分 + 锐利性测试 + 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批）+ CHECKPOINT 前强制清空 + 覆盖矩阵语义（迷雾项不计入分母）。责任边界：A 准入 / S 毕业产出 / R 审查核验真实性 / V 评审防借雾逃避覆盖 / G 不新增脚本。
+
+4. **失败模式与禁止行为**：FM-3D 新增 FM-3D-07 迷雾滥用（信号 A：借雾逃避覆盖；信号 B：CHECKPOINT 前未终结）；禁止行为新增 #12 迷雾项静默遗留；返工路径补充对应条目。**不新增反模式**（anti-patterns.md 保持 41 条——迷雾滥用是阶段内局部违规，走 FM + 禁止行为）。
+
+5. **模板 §8.5**：`templates/requirement-spec.md` §8 后新增「8.5 Not yet specified（迷雾登记册）」节（含登记表 + 毕业处置结果列）。
+
+**实现状态（2026-07-30）**：全部落地并通过验证（tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / D5 互引一致性通过）：
+- 文档层：ingestion-chunk.md（锐利性测试节）+ ingestion-cross.md（步骤 9 + 报告 §7）+ phase-1-requirements.md（迷雾登记册节 + FM-3D-07 + 禁止行为 #12 + 返工路径）+ requirement-spec.md（§8.5）
+- 顶层：SSoT §3.4.23 + §10A 追溯表、CHANGELOG [26.0.0]、AGENTS.md、README.md
+- 版本号三处同步 26.0.0（package.json + skill-metadata.json + SKILL.md frontmatter）
+
+**不涉及范围**：不改任何脚本（无新增 check 脚本，毕业核验由既有 R/V 承载）；不改任何 schema（迷雾册为文本节，graph/coverage/exemption schema 不变）；不建图节点（FOG 项不进 graph.json）；不新增反模式（41 条不变）；不动 w-model-dev-demo。
+
 ---
 
 ## 4. 技能工作流程
@@ -2343,6 +2364,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.15 第 19.0.1 轮 W 模型 8 阶段端到端调测验证与归档 | check-bdd-model.ts D7 RTM schema 修正（`rtm.requirements` → `rtm.rows` + `requirementId`）+ D7 测试样本补强（3 个）+ 8 阶段调测归档（7 文件）+ demo 产物清理 + 版本号三处同步 19.0.1 | `w-model-dev/scripts/check-bdd-model.ts`（D7 修正）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（+3 D7 测试）+ `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`（7 归档文件）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 19.0.1）+ `CHANGELOG.md` [19.0.1] | 完整（8 阶段端到端调测发现 D7 schema bug；UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过；self-test 基线 121 不变；vitest 105→108） |
 | §3.4.16 第 20 轮 阶段 1 需求提取四维识别与豁免审批 | 四维识别模型（层级关系 R1-R4 + 子系统划分 REQ-group + 交叉逻辑 R5/R6 + 覆盖分析 C1-C10）+ 豁免审批治理（S→R→V→人类 E1-E8）+ 图谱 schema 扩展（level/priority/reqGroup + 3 类边）+ 规格书模板 5→13 节 + 反模式 #30 + 禁止行为 #7-#11 | `w-model-dev/schemas/coverage.schema.json` + `exemption.schema.json` + `w-model-dev/scripts/coverage-logic.ts` / `check-requirement-coverage.ts` + `exemption-logic.ts` / `check-exemption.ts` + `graph-logic.ts`（R1-R6 + reqHierarchy/crossLogic）+ `check-requirement-graph.ts`（--rtm / --exemptions）+ `samples/graph/`（+13）+ `samples/coverage/`（10）+ `samples/exemption/`（7）+ `__tests__/graph-logic.test.ts`（R1-R6）+ `coverage-logic.test.ts`（C1-C10）+ `exemption-logic.test.ts`（E1-E8）+ `templates/requirement-spec.md`（5→13 节）+ `references/anti-patterns.md` #30 + `w-model-dev/SKILL.md` 约束 #15/#16 | 完整（不向后兼容老图谱，历史抛弃重新生成；self-test 基线 121→152；vitest 108→~165） |
 | §3.4.22 第 26 轮 外部技能深度对比吸收 + 单轴下限 + Fowler 12 + 术语治理 | 加权平均掩盖单轴失败 → R13 单轴下限（passed 收紧为 qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70，0.70=B 级分界）+ Fowler 12 坏味道基线 + 票据内容 durability（符号级契约）+ 术语治理 glossary + 角色表 Negation 审计 + 反模式 #41 | `w-model-dev/scripts/verifier-logic.ts`（R13：SINGLE_AXIS_MIN_SCORE + checkR13SingleAxisFloor + expectedPassed 单轴条件）+ `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json`（completeness=0.65 fixture）+ `w-model-dev/scripts/__tests__/verifier-logic.test.ts`（+4 R13 用例）+ `w-model-dev/scripts/self-test.ts`（VERIFIER_CASES +1，基线 191→192）+ `w-model-dev/references/verifier-spec.md`（§3.3/§6.3）+ `w-model-dev/subagent/engineering-code-reviewer.md`（Fowler 12 基线节）+ `w-model-dev/references/glossary.md`（新建，15+ 术语 + `_Avoid_`）+ `w-model-dev/references/phase-5-coding.md`（票据 durability 节）+ `w-model-dev/references/anti-patterns.md` #41 + `w-model-dev/SKILL.md`（角色表 Negation 审计 + references 索引 glossary 条目） | 完整（R13 非破坏性：既有样本全部 score ≥0.70；#41 用户决策直接转正不经 pending 复审；qualityLevel 映射不变，仅 passed 增加单轴条件；验证门 V1-V6 全通过：tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / fixture exit=1 / 全样本 valid=0 bad=1） |
+| §3.4.23 第 27 轮 Wayfinder「Fog of War」吸收 — 阶段 1 迷雾登记册 | 强制 100% 覆盖下「in-scope 尚无法精确陈述」需求无落脚点 → REQ 入学锐利性测试（能否精确陈述，非能否回答）+ 迷雾登记册文本节（Not yet specified，不建图节点）+ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空）+ FM-3D-07 迷雾滥用 + 禁止行为 #12（不新增反模式） | `w-model-dev/references/ingestion-chunk.md`（锐利性测试节 + fogDesc/fogBlocker/fogGroupHint + crossChunkHints edgeType=fog）+ `w-model-dev/references/ingestion-cross.md`（算法步骤 9 + 报告 §7）+ `w-model-dev/references/phase-1-requirements.md`（迷雾登记册节 + FM-3D-07 + 禁止行为 #12 + 返工路径）+ `w-model-dev/templates/requirement-spec.md`（§8.5 Not yet specified）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处 26.0.0） | 完整（纯文档吸收，无脚本/schema 变更；self-test 192 / vitest 205 基线不变；D5 互引一致性通过；版本号三处一致 26.0.0） |
 | 4A 核心操作行为与失败模式 | 6 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |
