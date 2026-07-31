@@ -1,646 +1,1416 @@
 [
   {
-    "hash": "dbc1388d3247d6997ae2268e4805e904b5d4311929ddc751220911aa2d95a44e",
+    "hash": "46b3f52ea55616d31251dd47bd39a3a075f2ae5106df2969300c157d1dabcbed",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\budget-logic.test.ts",
-    "line": 21,
+    "file": "w-model-dev/scripts/__tests__/archive-integrity-logic.test.ts",
+    "line": 9,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "2a72316a3715482689b17487c5433dc50e6c0b1cd35ad3ce14e368c71bf274e7",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\gate-enhancement.test.ts",
-    "line": 27,
+    "hash": "ea4cd11f1bbd6f31d300d081bef6c680a863d14768d7f49a1bba1acc15ee9ea6",
+    "rule_id": "@typescript-eslint/no-explicit-any",
+    "file": "w-model-dev/scripts/__tests__/bdd-logic.test.ts",
+    "line": 233,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "b13b78faba9e03849d1abf2a2b21454b39ed696e9a73b60353cd8c886395f4f2",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\root-cause-logic.test.ts",
-    "line": 27,
+    "hash": "4ff616601e7f13d5eed7aa2a4b28c43197db6ec9fe659627fbb3c7b6cd33c1a9",
+    "rule_id": "@typescript-eslint/no-explicit-any",
+    "file": "w-model-dev/scripts/__tests__/bdd-logic.test.ts",
+    "line": 275,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "360ade7a3b380006d3616c2a95a3b31056028f7a9e044687599acf8cf500c56b",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\run-log-logic.test.ts",
-    "line": 21,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "0a400da34c5118d7851ee6f9f6e0fcc36086e3e1545453d6501f09d3211b03dd",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\schema-validation.test.ts",
-    "line": 29,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "861808943e02a8516e58e0e1a352a83767f19e8b25274932b4cec77639bb55d2",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\skill-metadata.test.ts",
-    "line": 20,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "382015ef392dc32ab9460a8787551c0a55739a6e1009d9154a80af03df166bf4",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\skill-metadata.test.ts",
-    "line": 21,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "67dba6f4211104002f0a108519518ee75c4db048d2155bcb49e039d4669dc61d",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\skill-metadata.test.ts",
-    "line": 26,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "2c6d7f2baa38622dd2284a209eb10969a1a50dcb5ae716983926539b41ef882c",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\skill-metadata.test.ts",
-    "line": 27,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "713d8fdc6c761214664e3d7ccf867a04fbe51852167e375e9e0c98bb30e31dc2",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\__tests__\\skill-metadata.test.ts",
-    "line": 32,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "8c01da0f3495db808f06deb7877232c55bb036439445b50365816b0760022ca5",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-artifact-gate.ts",
-    "line": 46,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "8c881053dcac4934aa03ef50c847ea6b16eeb27da8a3dcc37112025b276341ac",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-artifact-gate.ts",
-    "line": 73,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "557e9b3bf1266ffddaedb266f14d6ac3d1aeedac9db5a9c01cd8f5982d5ae4d1",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-artifact-gate.ts",
-    "line": 94,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "e95ed9b0f0ea4255d908153fb6a48cd8be554f04c634687f50c8dfe2f042929f",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-artifact-gate.ts",
-    "line": 127,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "dcac9f9b52d7e22bcd499d60c69f2ac1c69f6211ec536b5adee283037a7641de",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-artifact-gate.ts",
-    "line": 146,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "a79a490a06bbb07566c1b0baae9577d2fa32de2ea4b6f53a007b95e75f16a247",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-budget.ts",
-    "line": 122,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "531f33c4ba9859898172da822b3792aafefca3998ff5f3a6a959e5dcf40ed9a8",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-budget.ts",
-    "line": 147,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "e409df48870ad951418c5bfcb377c82c254d968d541f27094f9b00412c5af4c8",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-budget.ts",
-    "line": 166,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "562c7b5bd8292be8be58b5217ad05f47d6de7d0a41fb8ab3a85bd44ee1618180",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-checkpoint.ts",
-    "line": 56,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "d1b8e25d20b1e536822e5215303179596e0e5ab48c35777b48e70bce98d745dd",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-checkpoint.ts",
-    "line": 89,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "f36edcf5bedba1bd97b085ba30ab8a8cf6ae6cba251cb53e0358ee83756ced24",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-checkpoint.ts",
-    "line": 107,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "c5e6c52095b0745be4f428c263224ae792496c6696ad1d363344a39e6f3bde86",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-code-tla-consistency.ts",
-    "line": 80,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "eb0e24a14b882fd24ff67f7485517d7d5bc7c3f3cdce0e18bd3102b4caa86513",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-code-tla-consistency.ts",
-    "line": 113,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "8f8645398e36f8ee25593d07426248a7db02f26fc953797d27bb758adc301183",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-code-tla-consistency.ts",
-    "line": 145,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "65820b0538bc1a751faf8fb9bfa8aceeb00dab603f5a8c287959f85138bb68f6",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-code-tla-consistency.ts",
-    "line": 170,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "2d05f312b080b1d2593578ea54e056fcbb0ae1b4d87a15bd7a54ec2293faea6e",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-maturity.ts",
-    "line": 115,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "cd4ebd42f0d63a613312be921b198018d730ef542f4bc08fb8856364c3cf6abd",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-maturity.ts",
-    "line": 141,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "d6d98a84787dd6bae0c1076eafb35ba0c13a8ee6fce66e22d819422f0bad1d40",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-maturity.ts",
-    "line": 173,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "cf37405584cd578547315aa78a57add723bef4d8bb2fbe727bf039ae27efbb2b",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-requirement-graph.ts",
-    "line": 54,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "eab5bf0c3a9edf57f8a58db29693182c1d81f188ec82388aa77bf23714795ff1",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-rootcause-report.ts",
-    "line": 35,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "666385a09fc4693611043ad317a2491cba1da06df8e50a0a7b1117dbaf165bb2",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-run-log.ts",
-    "line": 58,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "173c9607f7eb725c8e6c967c0de6da5e0d9741a9e31a0ba7547f84b03d2f227d",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-run-log.ts",
-    "line": 123,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "7dda6f0403c7d672a8731054b9f83759e946a532fa4816e311a5d9c83ec1ebc5",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-run-log.ts",
-    "line": 139,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "36c642b43c34a4ecd971924d26623eb918ea91fdc57e4ca1990df4f39d6e1c7f",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-run-log.ts",
-    "line": 171,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "cc9486e056f78710bbc25753cdc841277537d4d1264b3d2263866224efa50f8e",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-tla-model.ts",
-    "line": 150,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "11252da917ace83bfb849617c29692318b649f7d8f80002bd6580bf56b32d699",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-tla-model.ts",
-    "line": 181,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "ff52ddcb2e10677c3eb2ef32fc460f006b4f875a9ceceee868f39d9495f7494b",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-tla-model.ts",
+    "hash": "dc149ccab4e4d947959b2f2d3ed6bf92e766ae781f75738e22ec5f9d706d235d",
+    "rule_id": "@typescript-eslint/no-explicit-any",
+    "file": "w-model-dev/scripts/__tests__/bdd-logic.test.ts",
     "line": 318,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "4dffa72a4132437ee497742689cbc020b08103dd0186752f99127612481417e7",
+    "hash": "36541b025d1381b34d92a6fbfd9c6c3c45c4c5e358de1e976fb956f440f9260a",
+    "rule_id": "@typescript-eslint/no-explicit-any",
+    "file": "w-model-dev/scripts/__tests__/bdd-logic.test.ts",
+    "line": 361,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "45c63dda28049bfd0b110871549b2d44ac2bbea81400e9bde3bcd30b2b3306ee",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-tla-model.ts",
-    "line": 377,
+    "file": "w-model-dev/scripts/__tests__/budget-logic.test.ts",
+    "line": 21,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "19389cc7e3611e0096e134c97c248d4f276fdaa9e822a27609d687a7e01cb2a0",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-tla-model.ts",
-    "line": 417,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "68d48caf6775d99287eab9afbdb434200190345f3d5e9d34d7e4e0454fa262ab",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-tla-model.ts",
-    "line": 437,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "4ec827746f0725bc61ec1d3c6763a7cae5180dc71357dd1af3f7759fb61fa244",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\check-verifier-output.ts",
-    "line": 45,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "1cff362ad277dcf7fea62f72e1f3892ed5046254f7f84762bcac10041b946a38",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\checkpoint-logic.ts",
-    "line": 148,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "6cace75e2de4f0c729f5f841a53630bb829bb5278390a500e6b8b6f67172c545",
-    "rule_id": "no-inner-declarations",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\code-tla-logic.ts",
-    "line": 356,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "1c317ef586b4aa717ebd661e5a2a0095859970a469e460232b4b08b4eff39a99",
+    "hash": "35879c5007aff4c50d7b5f71acdf6078f8e9207c30052c29bb4d8bfefc6e6815",
     "rule_id": "@typescript-eslint/no-unused-vars",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\code-tla-logic.ts",
-    "line": 424,
+    "file": "w-model-dev/scripts/__tests__/exemption-logic.test.ts",
+    "line": 53,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "fb1a3335cc1148063334e380abbcf2b85d606df98bae83aca03d2bcee65b9480",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\gate-logic.ts",
-    "line": 184,
+    "hash": "614dcaad7fd6730674ca77cb311971dfae742596ba179ea48538beae25c0671d",
+    "rule_id": "@typescript-eslint/no-unused-vars",
+    "file": "w-model-dev/scripts/__tests__/exemption-logic.test.ts",
+    "line": 107,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "c7d176b7fdae1f4bee5e204e446e349524ab7830e0447623c0b2ad222fede60d",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\gate-logic.ts",
-    "line": 185,
+    "hash": "a5ab71587b0f1d69859c5822cb7774f471be136acc856fef65c292ba0bbac9bb",
+    "rule_id": "@typescript-eslint/no-unused-vars",
+    "file": "w-model-dev/scripts/__tests__/exemption-logic.test.ts",
+    "line": 162,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "2e1bf7cfe3a3c8f6f3c76b799d12d4d7f13c8522212504c3e96a4ad4e9942660",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\gate-logic.ts",
-    "line": 203,
+    "hash": "b1068731a6d9bb0b1e613ca9e8a511841c2440316dc9a720c9cc9e693990df00",
+    "rule_id": "@typescript-eslint/no-unused-vars",
+    "file": "w-model-dev/scripts/__tests__/exemption-logic.test.ts",
+    "line": 173,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "b293eb93ac412acdae994ba3f1e5f7363173fdbd68733edcbd74dfdb289bd998",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\gate-logic.ts",
-    "line": 216,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "1d4f33857271594527b8ae51dfe47dd4cb36dafcc831b6777b0ab636500efee0",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\gate-logic.ts",
-    "line": 239,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "ccafdf62d0859ec61ba0d253ece1f7034bcf7bff8328ff90e8b4ef845c60e887",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\gate-logic.ts",
-    "line": 239,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "b707190fbe6b8ab26bf1a6c5d667b2b6d5243f19a6cf4f7bf4f0ed04c67ab23a",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\plan-chunks.ts",
-    "line": 98,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "56d7d17993a41580e07bfbac2defde6f1e376b64dad892cb6842b3d36b478cb1",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\plan-chunks.ts",
-    "line": 98,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "dde2e306c29a30b38431d027fcdb582fc5fe7821c216e0ac25f5f13238e7d594",
+    "hash": "7128aef0a7590d1361cb576578e32a5ed3cf77fde7edc71360005c6cc18226aa",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\plan-chunks.ts",
-    "line": 130,
+    "file": "w-model-dev/scripts/__tests__/gate-enhancement.test.ts",
+    "line": 30,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "b9a5b294ee05359d0d767c241d0b7cf681180c6e1ed698dc4f7923ac203495a9",
+    "hash": "084fcde4c4750a4c3cb940b4440ea07f127a5b26339bef1aa5a7d8d1c4280d54",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/__tests__/gate-enhancement.test.ts",
+    "line": 444,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d15fc43fb8377ce7c1ad0992f52ea35203c31ce36159e94752ee3441a2134afb",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/__tests__/gate-enhancement.test.ts",
+    "line": 445,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "1d01a29e60b38042fcb5a9308ffca1df8aa9f8b0647f3ded01028eaf991d82c8",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\plan-chunks.ts",
-    "line": 133,
+    "file": "w-model-dev/scripts/__tests__/plan-chunks.test.ts",
+    "line": 89,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "6a47ec89212f56a04163aee5e5e1c662f531923c2b1cf168450f819760d45f00",
+    "hash": "fc236202659138423bff23373968a2082b95e8973e561b76150b63b33f46b436",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\plan-chunks.ts",
-    "line": 148,
+    "file": "w-model-dev/scripts/__tests__/plan-chunks.test.ts",
+    "line": 90,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "ca13967a69cbf4fba3288b05d3ec69d3b1af4f9e827c362574d1cb2085787bc5",
+    "hash": "31d1192b24506808c5195966ebfb1fc54e827573db8da72362e2d04980965a4d",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\plan-chunks.ts",
-    "line": 192,
+    "file": "w-model-dev/scripts/__tests__/plan-chunks.test.ts",
+    "line": 91,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "d1db90adf0c39a6ccd63d2f39b3c2fe57c28b3c5e8b8e3c53e7c992aee2d96dd",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\root-cause-logic.ts",
-    "line": 201,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "38bf09f23344dd46a653a86793f2fdfb58b87e7d708f59929bd61d084ed2f31e",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\root-cause-logic.ts",
-    "line": 243,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "6ecddedf5aacbeef3ee65674d472f835f03076d0b6f14fa3fe96e67abb9bee86",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\root-cause-logic.ts",
-    "line": 260,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "306257b111d3e97892a42f23037cce4b6ac551e36ea4304d0032a00a75907b38",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\run-log-logic.ts",
-    "line": 115,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "3d89cd8200a0ed2a1d6da5a739d9fd0239d91002cab6d5d94b98ef202607a826",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\run-log-logic.ts",
-    "line": 316,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "199367ddf93a328ad8fbda91989f34c757f0146b3211764df1a55914bd298546",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\run-log-logic.ts",
-    "line": 320,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "02cb7801c839a4043ace421655bd4bd287148709ae71c39469903b49644460c6",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\run-log-logic.ts",
-    "line": 321,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "1fa350ea8ac267d809a8b0c412779e6627003814e5b23632cac74be0937cc9c1",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\run-log-logic.ts",
-    "line": 327,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "329650472553044817000bfc1cae93d13cdd5423cdcffc9f4bb8a02e72f7b7cc",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\run-log-logic.ts",
-    "line": 328,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "2726c6bfda2988e3c971a074414640d0e0f87f5153070007554b130f4db615d4",
+    "hash": "6955d0740a393701d1f61d611e983fced77b99d94d788d78c23596b6d739c3ff",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\schema-loader.ts",
+    "file": "w-model-dev/scripts/__tests__/plan-chunks.test.ts",
+    "line": 104,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "efa42cc42d86c46ef20734cf6f3657923f27d503d9e203afcb74ecae901914de",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/root-cause-logic.test.ts",
+    "line": 27,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "2fd1b955cbdf4e9aa0cf7336b0576accd7f1d207b312c9279394cea12c57c6ce",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/run-log-logic.test.ts",
+    "line": 21,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "58b7cf710a58bf5509b8358b9e3485b08150408d41f2d82fc7ae0f84e4c634b5",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/schema-validation.test.ts",
+    "line": 29,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6bfd091a706a30f05d2d87acd6f3c7e294c6c1a962366e34b5cbd5e749af4035",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/signature-chain-logic.test.ts",
+    "line": 9,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d3a8a2a0cee36a42fb95c55a444dfb449dd5464268b41ed3131a98a5427a5bd4",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/skill-metadata.test.ts",
+    "line": 20,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "8c8c03f22d2b2a4c735cdf3aa6a1cf545008f6e7c2565d8d9592cf22cfd9b7c6",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/skill-metadata.test.ts",
+    "line": 21,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a935a4015524f9478621bcb8505ad10e7dede1b3ce1a03d0bd57746665e39302",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/skill-metadata.test.ts",
+    "line": 26,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "fcfff88b84c7ab259bda9fb1c1e0e444641b6d8a0b43a7426907b556727d333c",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/skill-metadata.test.ts",
+    "line": 27,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b58f5de05d4a40f43426f767c95344534ea99ea20b3fa073a1aeb370f97586f4",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/__tests__/skill-metadata.test.ts",
+    "line": 32,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c0007731e47a42808e2c8c4af73fd06767ba2e5925561c9dda8b8158cc20ad6a",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/archive-integrity-logic.ts",
+    "line": 59,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f37be4b589d9536a085a75ba46981ba888f4cd41ce939a9ee9a2a2fedf53eba3",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/bdd-logic.ts",
+    "line": 106,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "84f54fdf04b150dee6986f7a270acf7e40933896dd9a675f88e6451f5fe9a540",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/bdd-logic.ts",
+    "line": 110,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0c5c96d9b05205e45caf5e217803f690351814f0274bdeb4668d5099164ec4df",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/bdd-logic.ts",
+    "line": 128,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "4ccdfe3e7e27437b84f8cf270e8430557af985de2ea814324a1cdf901e0a823a",
+    "rule_id": "security/detect-unsafe-regex",
+    "file": "w-model-dev/scripts/bdd-logic.ts",
+    "line": 159,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a867d48530c117aeb2142c56f89536c4876846c24fb41283766c734952979da2",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/bdd-logic.ts",
+    "line": 350,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a1b5044733401bf9741f04fa6dcdc285438aed08b8b13731e36b85d8b40b7fd3",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-archive-integrity.ts",
     "line": 33,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "d6d09270d4aa3c0374af330f7edb690dfee3edb94a732c5d05f6b414778e58f3",
+    "hash": "0ae60b989800825c5f56f409f907a616e0b22bc03ca5f2be0562fabc44085d00",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 62,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f0752e81632cc398a0cbfb57214454b7be0978e6fd147754a2673ab12139b1ac",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 118,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "cb54d1725cbe83d3c26d980dae968255a2205fc346617809728f049ca16b80b0",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 148,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "dc4ce7e5da1ab8e4eedb8009e9ebf6a12048dd04764ee5e84be1a016091b0b67",
     "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\security-scan.ts",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 169,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5bf7122d145b234c1a7caff4bbc3168be9c51def589407f7bf2dfba8632e065d",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 202,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "262eac378e728532c5843d1c0849055e482fb8b80ca733c555901239ab2e53f7",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 221,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "578227ec4d06dcd1121d26969fbc71c25f51a81023a06aa43971b0b0fce46de4",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 243,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "9f2e9ac9081462994801815cfeb42a7fd881125109c78730d25acd0fcf880f00",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-artifact-gate.ts",
+    "line": 311,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "9501a161e738d43a93c79cbc386bf0c43500db23851014befc0791cdbc2c5129",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 77,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a5a3e9b04d198336514cf45ab131ddf878740c12bfacf920634c2585688d6248",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 94,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b80720ce12d9f600f9b30e60c1eb297329741f17b1a8667e2c86584cf62b7e39",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 107,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "2a0b2468c692630f5e6330efd1b34e087e096c64e9c2b697e35d315e05b6a440",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 252,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "1a903e3dcae8d41d2ebd22abaf54ee428fb0db5897d55892524809aed4874963",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 341,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "3fceb584f1c73114049c055b7586eacc1b32ff0c78e926d02c050f11c713d560",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 342,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6f90c2a642c2c704148f970fb1e2ff20643f9a68fec457004986412596e5a44d",
+    "rule_id": "security/detect-unsafe-regex",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 377,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6545df7fc85d09ac546e22f8fd6eeb5ca2f3de397c41cea8bd8b2d3ac1955003",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 408,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a6334d0cf732e5f192f00d4b6f50491c2d16e1010d5d87c2fca868537df4c5b9",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 436,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "ca25be56a899bc4fffcac39f3b528835d22872512ad64066ce531c7a2e6e88de",
+    "rule_id": "security/detect-unsafe-regex",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 457,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0d46ed24ad9d63e13147c78de11c99c58a872a88626381b08d46606b30b656a9",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 461,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "911b9d23c51cdb4a24cb648e47289f9d5261e0b08df079c90e7599de0a3849b4",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 469,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c06a691de328622d599665c8960e9127fde005c7163171b9e531de070a9184c0",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 478,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "81f778f17f8b9b4b5c4424579d4f9a18cf512cadc13a3d7713ece77df95f51cb",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 483,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a471ffffd60659d839517b0229c1580071449d69d235f669bdc184771627467b",
+    "rule_id": "security/detect-non-literal-regexp",
+    "file": "w-model-dev/scripts/check-bdd-model.ts",
+    "line": 506,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "55b45d63a03c130adb193bc0d32c2c8142ec2c34a54b737b5af0ac0026018515",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-budget.ts",
+    "line": 122,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "1b921e3834e026745e63479e15d8337a8d5dae929041d70d49c94da52fba610a",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-budget.ts",
+    "line": 147,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "eb9482a4edd5602d95ddac00d024e0b38cdcc75c8d5cb8ec7e06338e627a7bc1",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-budget.ts",
+    "line": 166,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "71bec46eace02f0c013aed02a7b653a98b63ae106221f3bfdeb46059576041ca",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-checkpoint.ts",
+    "line": 56,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f4849f8d0710a965fc586177044a8971cdf22c8039f774dafc0a1800270642bf",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-checkpoint.ts",
+    "line": 89,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a9808a992fcb243ffb3286256a154cc6506bbf31e2b30d3832ed29799415f292",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-checkpoint.ts",
+    "line": 107,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "db7ab82c213edd1173067a98844b579d30214168394deabed00cd20f2ba7db2e",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-code-tla-consistency.ts",
+    "line": 80,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "be976811705b770525a8434e8835950094a1e1f6cb16e7d93b214f19564916f3",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-code-tla-consistency.ts",
+    "line": 113,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "4233b42a7f94192f67ae3888205bee3e35c40d8b2765a5c5ac3d45eb77ce9552",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-code-tla-consistency.ts",
+    "line": 145,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "fe2e3305e60e992bd05fe3b8566657ef4adfa805b57b2e6eec48ce5312f084e8",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-code-tla-consistency.ts",
+    "line": 170,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "67c7ea2c69c73bec64283cbed1f746bba26371ef8bd629aa833e237e651e4f6e",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-codegraph-queries.ts",
+    "line": 46,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "9499c6e31c6df5a35e92fe53db19a0f170f07720147be817dd0a562acb00ca8c",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-codegraph-queries.ts",
+    "line": 55,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "dde01ce486946fc9acb875ac22d657e9e6ce4b11f0c3141914d0ac93efa53af8",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-codegraph-queries.ts",
+    "line": 70,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f50fb78fbbcbb1cf8e9d64b2c96e8cc24fdeb38f6b4782b2e1890b488844c0a7",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-design-contract-consistency.ts",
+    "line": 43,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "230f3da79f5da5e7d67db75803aa690e1eac73291dd07ddfe04c4bcf215a42bd",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-design-contract-consistency.ts",
+    "line": 68,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "fd26bda8f9f5c7901e1fdd98fafd85c20c9f4b2964c42ec5f6911be01677c2da",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-design-contract-consistency.ts",
+    "line": 75,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b95e08537a7f7e6cafe890d1203fcfe7d602a799534bb76175f6285461ff274b",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-design-contract-consistency.ts",
+    "line": 138,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d78d100232931e4257a04ed4428b351398724ea5441bef0ab054ce8d89ba5d21",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-design-contract-consistency.ts",
+    "line": 145,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "e78e84e95076dd7d33be4b8d933c47dcb7d963ab8d7b94ff0fcea45ca2e68a75",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-exemption.ts",
+    "line": 30,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "3f6af942145f7df029670539af4498e2ba82ba7ce1c1c60b706b71bcf54ae327",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-maturity.ts",
+    "line": 115,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "1e23ba4cf756c36811240ad77091a9d6ccedbe38afcbdac9161bdc69395f2fa4",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-maturity.ts",
+    "line": 141,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b21e53d457e9018e0d03ea4dc2efc223f12fe255408cf7120cd9d501bb05744e",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-maturity.ts",
+    "line": 173,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "580f26ea254205e3165ef33945525096b162ba04139c304f613bdb2b3148083b",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-openspec-archive.ts",
+    "line": 37,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "cf3cde28bc7981d61b8a9239c0f82bc580b7d58d7ab4173af161646c0f90f754",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-openspec-archive.ts",
+    "line": 44,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0ec1f2d9057a688a2ee083b861dc8ebec3916f701d8f5fb7e63eec392c994ceb",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-openspec-archive.ts",
+    "line": 57,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "e90b5223f6ae7ca997957d4a0e3b3bba85b5605bde5ad2b0d4ee8613eac21f0d",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-openspec-archive.ts",
+    "line": 66,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "ec66f16e5d25aac9bc0fc35cffb9b0603d5c9bc28f42ea28e99dc01a5236a526",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-opsx-artifacts.ts",
+    "line": 43,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d7049eab02ed3ca3c2defddc607b096c07204d289a41000726b76ef9300cfcea",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-opsx-artifacts.ts",
+    "line": 50,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0b72a1aef5cffb8496831fa4ff1972f9c1ff69d087e388d874484d46ecb7cb22",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-opsx-artifacts.ts",
+    "line": 64,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "92f5389949b0511aae5c146577eb1b43ac3d1472e239f29619e92161b0876a83",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-opsx-artifacts.ts",
+    "line": 73,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0d1045bba31bd610c0423665e3a87f917c26e9cac9c8b59f22dc315a48ca9735",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-opsx-artifacts.ts",
+    "line": 86,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "98d2b0cfae701779e655f77a3e33505837c4269ab898f423def4235b43be9198",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-opsx-artifacts.ts",
+    "line": 93,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "33d19b6c841b37db2bf5cd39c937583fbcebd95679fd3c12e95cba1cb96bae34",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-preventive-review.ts",
+    "line": 32,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "42253bc4dc80e7c08a59af620bc9caa21423546c482baa218d2b31dfd36d1dde",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-preventive-review.ts",
     "line": 78,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "0fd1420485ee95e191fc5fac9a72b2cb86d542ce63f1193bdc704c805b0b68ad",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\security-scan.ts",
-    "line": 82,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "8fbf91c05ae887932dfe56b6f93ed467598e8f41c430bc567395dbdc080e1328",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 905,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "205adbea4826d6565b6edb3849662477910eb39c6a814c83df8b6bdd46adf651",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 933,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "d3c2cf81afdbca04bd0db19d0f4490f6ce515bacb3c0b60e96753c6c86e55c3a",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 965,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "b3489cc2376d188f351fd469113c8e85a04ef03b238a34d95095ecd44f931484",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 993,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "5c5913090cae3d899cf68334f891687e707c3d2ecf5296dcc7cad53438edf9d6",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1032,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "42139b45627c3f521d4df407a32f7be69e45f519a5c10e28ba06b194056549ad",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1060,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "17082f3593cb998e4951fc46dfc25ef907985078a5f7f2c963ba7843b2d24c5f",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1088,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "7684970e858daf1ded6e553785527a13e64fa17589af539b6f194fa460dc19d8",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1116,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "27028c835428a8018f5676558b4fab73b5ce8d290b33ded138c051de6cafe9ff",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1144,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "f8fc93e47ee7db3cab26f0820b9091d880b84a3afd753178dfded1aa0c22e94c",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1191,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "df5c6f44e0264781e9ca6175ec09e32b214cc64ef0288af723fd0ce081011af8",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1217,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "d805bb6d4f5f4d093fca9f353d8d0a89dd9585bfc8a4ed4678a3bba8fb228899",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1247,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "ac8a09fe619767e0d9dd8ae09349f522b785fa0293c841335b89a2b0b6471de5",
-    "rule_id": "security/detect-non-literal-fs-filename",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\self-test.ts",
-    "line": 1248,
-    "reason": "Accepted finding (auto-generated baseline)"
-  },
-  {
-    "hash": "8584c21644b158db810e2e3ecf143e980391d3beebbe44c57c196c03f7b7ea27",
+    "hash": "70ac7eff3d3ff0b13ff88c30ce78dab687bc0422d4ad2c47443a025eb3e2b440",
     "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\tla-logic.ts",
-    "line": 268,
+    "file": "w-model-dev/scripts/check-preventive-review.ts",
+    "line": 79,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "461564d227d0ee854ba3aa2dbe812b281b8b30eefb3a8bc6e54d3aa6fdc18787",
+    "hash": "43fc8aa706ce02c34c0934e1903a35ca5f4891ae35cbf83ccc1930ac46528552",
     "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\tla-logic.ts",
-    "line": 270,
+    "file": "w-model-dev/scripts/check-preventive-review.ts",
+    "line": 81,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "3b11d0a5be41b66bee5eecae379389181197cfb2da6f316036838869a973be73",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\tla-logic.ts",
-    "line": 659,
+    "hash": "8517e96af6a82d42ad5e10f4480ec04ab41eefd6d1e01210177730a212573612",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-preventive-review.ts",
+    "line": 101,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "3815b2ed51804766b2705c88a5c114d5f43b1f5e31e32b36a8a49f87724c9e48",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\tla-logic.ts",
-    "line": 942,
+    "hash": "1f924fa272f3dacec51534430f63d385cdcd398bd88e46edbaaeca0bb0876cb1",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-preventive-review.ts",
+    "line": 103,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "25d27dd54e1a1afc0c6aafb052bc0045f5467a5c4ea13740882b48fc412c4983",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\tla-logic.ts",
-    "line": 947,
+    "hash": "969018ca46e15a141c32d2fc68a5866016e6be96b21dc1d4af015bb45ed187ce",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-coverage.ts",
+    "line": 46,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "88de3f6268d1520efb2e25f758ef51f7acbe2053f155f31df04fc94061b8d1d3",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\verifier-logic.ts",
-    "line": 340,
+    "hash": "6270125e9f39de1706830b4159cdd33bc242e0a0642fb86a5c793d824bba28db",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-coverage.ts",
+    "line": 68,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "b5204bc8ed6906bc59c564f88680778b9fc368be0f89688ab9ff998510caff55",
+    "hash": "aa688f52b63354ed74da5912ee3964283b96e581691d360644d285b36e108022",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-coverage.ts",
+    "line": 83,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "774d6baba4c6b04ce245f94ebffff3cb23dafccb512e5be93f6051e8a3f03bf4",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-coverage.ts",
+    "line": 96,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "ff49a30322cc62626fdf82c0a4f9e0e5ed0cb9cb257addcdec4be436bed1c683",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-graph.ts",
+    "line": 58,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "4153725611ad8850c1fdbdc903fe3926b76769bb2e76dd2384156d306aa5f468",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-graph.ts",
+    "line": 75,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "500dadb27e686bc7147f7c00d76ffdfa28f20a57c5ea26382f16c90f251b8d83",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-requirement-graph.ts",
+    "line": 88,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5dd493a49470192b2f0dbd1c1ce0a670ae233065520d43e9c8e60ec70f3b63eb",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-role-dispatch.ts",
+    "line": 118,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "092b7c9eba7563dadb63601c6fdc3e652828b62a8bea2c4bb59142f9d075d12c",
     "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\verifier-logic.ts",
+    "file": "w-model-dev/scripts/check-role-dispatch.ts",
+    "line": 131,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5980ad3aba4f2b3995c5b652202520786e0dbe95a41ce68ba5beb829f55b41de",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-rootcause-report.ts",
+    "line": 35,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "952f0377fbc547b67bfbeaa34842fdd1ef8f8de7871c4c32a284dba484ecf1a7",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-run-log.ts",
+    "line": 58,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "945a110376916969a12d60e3fdb10b684ab2043f21f7158e722f5cefba1ce15c",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-run-log.ts",
+    "line": 123,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5617c37e1d3f6271330f8cb77d9d40f676ed433e7691b51d6f6e935eca4e8ad4",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-run-log.ts",
+    "line": 139,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "1733e19e0dc1aa1892d5679c76d85bc78002029d84fbb9981784b0d2d3145258",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-run-log.ts",
+    "line": 171,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "3f7f57c7d9b26a034a4074ceaec186d7f60f42823d136e8304d081a56ccbe354",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-signature-chain.ts",
+    "line": 61,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f54f35c795bfe97fbada9625d87915996639aaac174f0c6b487ad41960ef3576",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-state-machine-consistency.ts",
+    "line": 114,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "97eb1e390bdc1da8b852d48685d60cd76a8714348f5f52b859571a4b37950fed",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-bdd-sync.ts",
+    "line": 49,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b18694e859149335de96a7cc8c861e0402c6bbe0e96eddb0ef8c1171ddd76ca5",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-bdd-sync.ts",
+    "line": 50,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "2823290a9fbf431543dc29ab36f0846e795b5f6a9749ee1b297b8f2199340599",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-model.ts",
+    "line": 147,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "ff52c72787817dfc7999274950e28001b1fec28f1186c3163584d56270c3d04c",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-model.ts",
+    "line": 178,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c076ea27ddc14ff871b211d8908c9d03c588629563ada336ea4879945a6ef1d5",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-model.ts",
+    "line": 312,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a8472aed9274923cb0731069284b0dac132bded2aba7ffea382e06f685fa29ef",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-model.ts",
+    "line": 371,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "a733d16b24faa71526cf5c3c8cd37c3983038040be4f998a87c4b44c81e378d5",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-model.ts",
+    "line": 411,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "10d4a1169512f42c56ef437946c6161177c27f51770f1a7c1d882a9b54ad27bb",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-tla-model.ts",
+    "line": 431,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "cd48cf01bdbbf2ce8837b9550e5e06c7bce62e5344210e40123ba2ebc77dd078",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/check-verifier-output.ts",
+    "line": 49,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6bbad38b7a01394df25fa09506ee6ea334853fbdf00106bc4755ad4477dcf577",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/checkpoint-logic.ts",
+    "line": 148,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "11025655461f307c8e2c7a3a002cb6501e875b82fd124d160ee896cfe326712e",
+    "rule_id": "no-inner-declarations",
+    "file": "w-model-dev/scripts/code-tla-logic.ts",
+    "line": 362,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "adf7822c2b4829780679e3fe531d37cff3932fb9a8f1c32b32f0ac07b20bbe7c",
+    "rule_id": "@typescript-eslint/no-unused-vars",
+    "file": "w-model-dev/scripts/code-tla-logic.ts",
+    "line": 430,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "aa0c34e25c742404bc890e1c9f774cd809150aaf82c94b76748a0b2e3542fc38",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/coverage-logic.ts",
+    "line": 179,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "7b8c9d47283a2285025af2a043f7067fc18a83f45309e9fa24acc886dcb148aa",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/coverage-logic.ts",
+    "line": 180,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "9d6748b8149e517644452667280c262cdb56e31c59fd21bd8fb698d1d24a0469",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/coverage-logic.ts",
+    "line": 232,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "597ea35cd4b95cc7d1da06475bbafb9d1ce37692934815e2a4584c0d85f0c483",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/coverage-logic.ts",
+    "line": 232,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c276d71b89758fc9147944746857a76d5250486d4080e5925c0dbb1cebb325e2",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/coverage-logic.ts",
+    "line": 233,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6f909d4d3f6468a0a4241ae1b5d6037339aea65a29faa61d32eeed58470ba614",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/coverage-logic.ts",
+    "line": 233,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "7f454ca9e887c26a670fcb4e2950fa7c8373c9e432a60cc76abebdee04be03e5",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/diag-fix.ts",
+    "line": 19,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d3049e0235028c76edbb2ad18b1e8630abe2a083a2496fbf009efbf9d26d1e23",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/ensure-codegraph-opsx.ts",
+    "line": 161,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "e54a73a6efe6b76193052fe84cc7d63c75a3d1567bcc61a7eed81eacf4c6f0b5",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/ensure-codegraph-opsx.ts",
+    "line": 164,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "837729ee1830d600c8c9cdfbe63ad5bda040da7bb22b25535bcc07fff0fd0842",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/ensure-codegraph-opsx.ts",
+    "line": 173,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5d244dce57c6972fbca33f1f009b3a184b95c6575f15139592f835f262f12e93",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/ensure-codegraph-opsx.ts",
+    "line": 176,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "1c06f4d0d650e24b9f640a31d95b9c791db81c5e0455ee27b92bd15bd941334e",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/gate-logic.ts",
+    "line": 266,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "80459995fc400149bfb231ec1089074fca867813c9d2c1a10ee25994248dc686",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/gate-logic.ts",
+    "line": 267,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "fd924319e10746c1e1204a986a3c756f1168e30360f863dc85b4ad13aa3bc629",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/gate-logic.ts",
+    "line": 285,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0847be67755629d2dee79b42143f8569eb7f0ebcccec545062590e5e2b02407a",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/gate-logic.ts",
+    "line": 298,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5e32822b267120929d98a96b83847abdb49c7ff8e85f6c8bbcf2f720affe5078",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/gate-logic.ts",
+    "line": 321,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "9ab8dc2d0d59bda354a825e9c08041339dfd9a882c134a056ea1e8f07137b2bb",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/gate-logic.ts",
+    "line": 321,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "99166ea97ed196c5cbcb0193e154330771387ef44cb331122aa10f63f1b0d09f",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/graph-logic.ts",
+    "line": 664,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "5546a7878cb96ab38ec6e35a05e2bf461bea25f80a5f5af1848d0dae4c1aa678",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/graph-logic.ts",
+    "line": 716,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "9b229ee68870227b38137986bd5344a6b8a434d5e297742f6a80f8bf52c405ff",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/graph-logic.ts",
+    "line": 716,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "58825c18da180b56ce38e058f0c72d95b8b8b4bbe698fc7482c339c6be3edc55",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/plan-chunks.ts",
+    "line": 170,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "cbfddb48e75f46ac09782a04634fb61e12d492acdb20bfc3f32ce1e4a7245d82",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/plan-chunks.ts",
+    "line": 172,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "7983c82247afbe25b2f6daa2db4df22700aaafb710ae0496eaaad1ac55d5003e",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/plan-chunks.ts",
+    "line": 187,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c7e53c30b001f6db439df4206d9774aaee4799f4645aaa135b2455675e09367f",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/plan-chunks.ts",
+    "line": 215,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "13844749789427a98d27887feed5dba40d09ebbfe600c82681fc2e21d6564769",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/preventive-review-logic.ts",
+    "line": 40,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c39d818127f03078f903a190146e3607f84ead2f9ff1be9c28163262df94ffbf",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/root-cause-logic.ts",
+    "line": 201,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "43414d2a9b18ad40cad5fd8e75f9958981d4d9a29f0f41bf16b12efafba54150",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/root-cause-logic.ts",
+    "line": 243,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f3a536e4e9ae8da8b074637aa53b65bc9d2ccea62b3b98d600bb51ed4250092b",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/root-cause-logic.ts",
+    "line": 260,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0279a8d885304acb79c8e2ffc2c192270c67db98a23ec07cd9b722dc05fd2ca0",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
+    "line": 118,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b5d5e108314e86e41818722ff33cc0d8b816666b991c58c3226d046fd437fe55",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
+    "line": 250,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "8adf8cabc89300563265244961e187c5fe509513805d05bbca922f7c0e2f85f0",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
+    "line": 352,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "20028a8c1e54991ce312188e4434c6c009d96f5366dd48b43e1d27e0cdd599d1",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
+    "line": 356,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0476120886231dc81e526a0fb80ce27a7a8cfe7fe5003e9920103ee1cab42897",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
+    "line": 357,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0c6aa249a7ff5d496f4c8593eab028cbeb274508eed2453c18f726b6fd9a955c",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
+    "line": 363,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "3751117ea22a3fe6ca3f3f43e5a508c5889640efcfebf4c587cc59b2d63450f1",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/run-log-logic.ts",
     "line": 364,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "ac2d65e064307c61cb9de280b67c2125cf59faf7aa479c3f3c6449b6ed55ae7b",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\verifier-logic.ts",
-    "line": 427,
+    "hash": "027809bd9ce2a1a706bf5d3601af34403e398d2f61aa2eba07b5ee21f0541696",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/schema-loader.ts",
+    "line": 33,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "c5fd14822cd01dc3d1947d53e6ffaf2ce49ef65cdab300e50d06ecd9f1dbf241",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\verifier-logic.ts",
-    "line": 474,
+    "hash": "e743e3d70e7f6d1bf4459ad2c7a054f7e2b1ccee2e24eb3e29cf851e05bb4079",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/security-scan.ts",
+    "line": 79,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "0141cde5bd0606d0fdfbf4c752d2b7ef83153e5829e76fd03e4e69009dd5bd5a",
-    "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\verifier-logic.ts",
-    "line": 476,
+    "hash": "c3bf580dfd60d6f880754a4b77d769acea1c94e6562145896b660b09c712e036",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/security-scan.ts",
+    "line": 83,
     "reason": "Accepted finding (auto-generated baseline)"
   },
   {
-    "hash": "0348132c226048049e0d8c0fcee0492e482d99d277b72aa149d91049afff44dc",
+    "hash": "bd6fb28071a5560265521f6560af79e6c8b18dfba16171d4cc1e36c16edfe813",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1626,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "095767aabe452b6a7718d71e647756852e28e23b906e7330425e25c8b2dcabb7",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1654,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "159d84f68c381049f1cba032085c5d4c1c837177ab24aa50be3b13b7df2ea37a",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1686,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c8d207a0538c9872c68b98e20cf3e3239b7b87ff24f65faa58c2dcb0f13e0384",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1714,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "7cd44ca6871f8a0015cf72871f7cc3726403a62568fcfd5bdfabe69fdf7ea00f",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1753,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "221743030ad01ded9eaea395e105e440d1b203b62dfd9805858e466af1234604",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1781,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d75b9325f5bd91a0dd30b60faca14cd7b62300a690764c031471ec2a55e51722",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1809,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "2755f41e8331f2c02ffd6b018e4e1c393b29395b6f0b64f87836dbae4b69b4bd",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1842,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "e1f9e37593646d533e63de204bcd785d0919353a08f6d37e1e9f65cd301df3ee",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1870,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "42456ac8dcdf5a018d19fe330b6a412308eb77908fdd4547ecf7a4f4d2799afa",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1917,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "7df0ed31873264f966b2b1fb8b48d25a71934e3419ba6665e3074c50c503877b",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1944,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0a53b7f5331e752102f629299dd2f0771ba1cf82039773c964f28f65dc1e92a6",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 1984,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c316b80c70d78c321fda840c22dfef909f8d0fcf6ac67ef66e3e674596fdd821",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2016,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6106a75d36c6b41c542ae09a41973d1113f41c8f68762fe349be869073247bb0",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2053,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d3694ca001c1dfbb961aaf0c6864446946e7ff460a03c220ab099fb4511321d9",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2183,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "2ec57d84bfc1e3c49a4c80df0961768e6b7e59de28a7e4307a48ceaa84b3c72d",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2248,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "4020dc466016787056bae342d8f68b9919312920023d9cf88ad72678f042e44c",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2266,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "fad937bdef59deb47e26f7f47f1d9daf524bae85c9f1b84c678f60f0db26c144",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2340,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "c665b45464cc964297ab5e4d31bbad4eb328a4e13ddeb0a3ef40d14840f443fc",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2366,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b141dfa2177a93c5461b4adf7408d0bc178c435ad892ca56a7abb5e9bd319e10",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2394,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "22d7b863846da7cbd394195f91e33ddbc12a158de3660fa3a1fa952608d99294",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2426,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "07dd6266b4abce60871516047531acaf0229ae4fdc65f403de65bb0438bcd2e7",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2458,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "ffd2a1447886b6445a1752d089a7e2d59f2c0d1aa8ee28f8bc845bb363484c51",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2489,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d255ae19af95c4196c9bbea1d82cb92333dedd6bfd531677615988addd150d38",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2519,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "d38d8fe2f50303637bbaf804060259c9fc7e9096d48a6205b8b8644eaf4f626e",
+    "rule_id": "security/detect-non-literal-fs-filename",
+    "file": "w-model-dev/scripts/self-test.ts",
+    "line": 2520,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "b4caf80a4704ad318992ec8c53dc55dcbdb4f1f27ac8db425a92479a8d9dfd11",
     "rule_id": "security/detect-object-injection",
-    "file": "D:\\w_skill_opt\\Software_Engineering_W_Development_Model_Skills_Pack\\w-model-dev\\scripts\\verifier-logic.ts",
-    "line": 537,
+    "file": "w-model-dev/scripts/signature-chain-logic.ts",
+    "line": 131,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "78b4eba6fb4cf2d5e726d6a045601f77f864ec72bc310f83bde4a84e35b01891",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/signature-chain-logic.ts",
+    "line": 267,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "18d879336867b17e292ef5785c67d481e4d03856177c37a3e0a019cf3ddfb094",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/signature-chain-logic.ts",
+    "line": 300,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "fbb72aec265c139e4ef30c55cd85ffb5dadb05d9e6271289f59e9bd842e11957",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/tla-logic.ts",
+    "line": 268,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "0598f98ef5fe4c97e7a27e771a73c4265442b3106cdd0e74957edd4a6cd29faa",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/tla-logic.ts",
+    "line": 270,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "6272ac83453144a1c51170b7ef34c2c3b6d6162e5affa59b51e40669e367266b",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/tla-logic.ts",
+    "line": 659,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "13cc5f26cbfcd25b248a0f23cda70eae59679a6135c52eb3d512756bce2dc397",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/tla-logic.ts",
+    "line": 939,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "bad3000e095f4fe223d66e8d45df1c92a867df24859066afd3164ea94a11fdb8",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/tla-logic.ts",
+    "line": 944,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "76b2f71ba3cd8f5383655333f747565976b7b2bed3fac95e832d07e40688c67a",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 193,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "013d1bf069e118b844c3a8b7948b716f7b1a72bd04066cb1454f8978fa9be232",
+    "rule_id": "security/detect-unsafe-regex",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 242,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "da2f75cde3d5d34ce5f7f2cc7108a0b4b03e0428573f38955a85e398f664e4c8",
+    "rule_id": "no-useless-escape",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 242,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "156485b3fc4383de8511b75099b820d245670c3ef47c97f7576aaae47322705b",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 397,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "f56a57e6367a33e43148f88f72cac5c95e7a45fbafcf12930bf765456a121d8a",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 421,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "43d9bb16b6122746c393081fadd04e35b0f335a8e1a6fd2c04804cd7f0a4454c",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 484,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "4e75c67eee279db170a05f06dddedd50a5b70008cc68658ad53d6390bc4bde83",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 531,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "4bc50b42df24f28c7296520e899d78f23d19f63b6c9fa766060a81c764eddcee",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 533,
+    "reason": "Accepted finding (auto-generated baseline)"
+  },
+  {
+    "hash": "43c9709b43668015dda3c0a25d6b17509f5890d7eb40d20274bb804f1a737d0d",
+    "rule_id": "security/detect-object-injection",
+    "file": "w-model-dev/scripts/verifier-logic.ts",
+    "line": 623,
     "reason": "Accepted finding (auto-generated baseline)"
   }
 ]

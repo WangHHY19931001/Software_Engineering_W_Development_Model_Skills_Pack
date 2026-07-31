@@ -57,14 +57,15 @@ export function diffFindings(
   for (const f of findings) {
     for (const m of f.messages) {
       if (!m.ruleId) continue;
-      const h = fingerprint(f.filePath, m.line, m.column, m.ruleId);
+      const rel = path.relative(process.cwd(), f.filePath).split(path.sep).join('/');
+      const h = fingerprint(rel, m.line, m.column, m.ruleId);
       if (baselineHashes.has(h)) {
         baselineHits++;
       } else {
         newFindings.push({
           hash: h,
           rule_id: m.ruleId,
-          file: f.filePath,
+          file: rel,
           line: m.line,
           reason: 'New finding not in baseline',
         });
@@ -89,7 +90,13 @@ async function main(): Promise<void> {
     console.error(`✗ eslint 执行失败: ${r.stderr}`);
     process.exit(2);
   }
-  const findings: EslintResult[] = JSON.parse(r.stdout || '[]');
+  let findings: EslintResult[];
+  try {
+    findings = JSON.parse(r.stdout || '[]') as EslintResult[];
+  } catch {
+    console.error(`✗ eslint 输出不是合法 JSON，无法解析（前 200 字符）: ${String(r.stdout).slice(0, 200)}`);
+    process.exit(2);
+  }
   const { newFindings, baselineHits } = diffFindings(findings, baseline);
 
   console.log('═'.repeat(60));
