@@ -20,6 +20,7 @@
  */
 
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 
@@ -158,7 +159,7 @@ async function main(): Promise<void> {
 // isMain 守卫：仅在直接执行时运行 main，被 import 时不触发
 const isMain = (() => {
   try {
-    return process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.url.replace('file:///', ''));
+    return process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
   } catch {
     return false;
   }
