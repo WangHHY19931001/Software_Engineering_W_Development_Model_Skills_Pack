@@ -957,6 +957,22 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 > 两者均为只读报告工具：不修改 .w-model 状态、不产生 exit 1、不改变既有门禁语义；budget 拦截仍由 `check-budget.ts` 承担。
 
+#### 3.4.30 第 32 轮：错误结构全量归一化 + run-log R6 契约迁移（2026-08-05，[32.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 外部评审 14 条建议高风险批（#3 错误结构 + R6 契约归位）：统一全仓脚本 exit 2 输出为结构化格式；run-log R6 提取/索引规则迁入纯逻辑层 |
+| 新增 | `lib/cli-error.ts`（6 类错误码 ARG_INVALID/FILE_NOT_FOUND/FILE_PARSE/FILE_READ/STRUCTURE_INVALID/UNEXPECTED + `CliError` + `formatCliError/printError/printErrorJson/exitWithError`：人类消息 stderr、`ERROR_JSON` 摘要 stdout，遵循 §10E E.1 exitCode 强一致；`process.exitCode` 自然退出防 stdout 截断）；`__tests__/cli-error.test.ts`（7 用例） |
+| 归一化 | 29 个脚本（23 check-*.ts + 5 工具 + read-json-or-exit）exit 2 路径统一走 `exitWithError`；各脚本 main().catch 统一 UNEXPECTED；wm-status 未初始化保持 exit 0 查询语义；check-role-dispatch 坏行 exit 2 行为保留（仅加类别） |
+| R6 迁移 | `extractExitCode` + `buildGateLogKeys` 自 check-run-log.ts 迁入 `run-log-logic.ts`（纯函数，不 import node:path）；GATE_JSON_PATTERNS 25→26 标记追加 ERROR_JSON（模拟验证驱动：exit 2 存档纳入 R6 交叉校验，防「未提取到 exitCode」误报）；run-log-logic.test.ts 29 用例 |
+| package.json | version `31.0.0` → `32.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| 顶层文档 | SSoT §3.4.30 + §10A 追溯表 + §10E E.1 补充 + command-reference.md 错误码节 + CHANGELOG.md [32.0.0] + AGENTS/README/INSTALL/coverage 矩阵同步 |
+| self-test | 基线 213 不变全通过（仅断言退出码，消息改动零回归） |
+| vitest | 363/363（28 文件）全通过（新增 cli-error 7 + run-log-logic ERROR_JSON 1） |
+| TypeScript strict | 0 错误 |
+
+> 退出码语义不变：0=通过 / 1=校验失败 / 2=输入错误。ERROR_JSON 仅 exit 2 输入错误输出；exit 1 仍走 violations + 既有 `XXX_JSON` 摘要。
+
 ---
 
 ## 4. 技能工作流程
@@ -2238,7 +2254,7 @@ interface RunLogEntry {
 
 **强制校验项**（E.1~E.4，任一层失败 → exitCode=1，O 不得放行）：
 
-- **E.1 各 check-*.ts 的 JSON 摘要须含 exitCode 字段，与 process.exit() 强一致**：每个门禁脚本 stdout 末尾的证据摘要（`GATE_JSON` / `TLA_JSON` / `GRAPH_JSON` 等）须显式含 `exitCode` 字段，且与脚本最终 `process.exit(code)` 调用的码值完全一致；字段缺失或二者不一致 → 视为校验失败（exitCode=1）。
+- **E.1 各 check-*.ts 的 JSON 摘要须含 exitCode 字段，与 process.exit() 强一致**：每个门禁脚本 stdout 末尾的证据摘要（`GATE_JSON` / `TLA_JSON` / `GRAPH_JSON` 等）须显式含 `exitCode` 字段，且与脚本最终 `process.exit(code)` 调用的码值完全一致；字段缺失或二者不一致 → 视为校验失败（exitCode=1）。**ERROR_JSON（exit 2 输入错误的结构化摘要）同属 stdout JSON 摘要家族，遵循本条约定的 exitCode 强一致**（第 32 轮明确化；其 `exitCode` 恒为 2，经 `run-log-logic.ts` `extractExitCode` 26 个标记解析，可被 gate-logs 存档后 R6 交叉校验）。
 - **E.2 G 子代理须将脚本 stdout 完整存档到 `.w-model/gate-logs/phaseN-<script>.log`**：G 子代理跑完每个 `check-*.ts` 后，须把脚本 stdout 原样（含证据摘要 JSON 行）落盘到 `.w-model/gate-logs/phaseN-<script>.log`（如 `phase1-check-tla-model.log`），作为不可篡改的执行凭证；编排者 O 不得放行无对应 gate-log 的阶段门。
 - **E.3 check-run-log.ts 交叉校验 run-log.gateExitCode 与 gate-logs 存档一致**：`check-run-log.ts` 须读取本阶段所有 `gate-logs/phaseN-*.log`，解析其中的 `exitCode`，与 run-log.jsonl 中对应 `action ∈ {gate, tla-gate, graph-gate}` 记录的 `gateExitCode` 逐一比对；任一不一致 → exitCode=1。
 - **E.4 任一层校验失败 → exitCode=1，O 不得放行**：E.1（脚本自身 exitCode 字段缺失/不一致）、E.2（gate-log 缺失）、E.3（run-log 与 gate-log 不一致）三层中任一失败，`check-run-log.ts` 须返回退出码 1，编排者 O 不得放行该阶段门（反模式 #9 谎报状态守护）。
@@ -2556,6 +2572,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.27 | 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁 | `schemas/*.schema.json`（19 份，全量字段补 description）+ `references/operational-recovery.md`（敏感信息禁令）+ `references/anti-patterns.md` #43 + `.githooks/pre-push`（检查 #12 npm audit warn-only）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 30.0.0） | 完整（self-test 213/213、vitest 297、prepush 12 项、tsc 0 错误） |
 | §3.4.28 | 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义 | `scripts/security-scan.ts` + `scripts/__tests__/security-scan.test.ts` + `.eslintsecurity-baseline.json` + `scripts/check-signature-chain.ts` | 完整（self-test 213/213、vitest 301、prepush 12 项、tsc 0 错误） |
 | §3.4.29 | 第 31 轮 /wm status 脚本化 + 流程度量报告 | scripts/wm-status.ts + wm-status-logic.ts + metrics-report.ts + metrics-report-logic.ts | 完整（self-test 213/213、vitest 345、tsc 0 错误） |
+| §3.4.30 | 第 32 轮 错误结构全量归一化 + run-log R6 契约迁移 | scripts/lib/cli-error.ts + 29 脚本 exit 2 归一化 + scripts/run-log-logic.ts（extractExitCode/buildGateLogKeys 迁入）+ scripts/__tests__/cli-error.test.ts | 完整（self-test 213/213、vitest 363、tsc 0 错误） |
 
 ---
 

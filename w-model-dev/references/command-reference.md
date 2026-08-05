@@ -144,3 +144,23 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
 3. `.w-model/` 已有数据时触发覆盖确认检查点；拒绝则不写入。
 4. 确认后编排者（O）原子写入 `project.json` 与 `rtm.json`，刷新 `updatedAt`。
 5. 输出项目名、阶段、需求数、测试用例数和 RTM 覆盖率。
+
+## 错误码与 ERROR_JSON 约定（第 32 轮统一）
+
+所有 check-*.ts 与工具脚本的 **输入错误（exit 2）** 输出统一结构：
+
+- **stderr**（人类可读）：`✗ [CATEGORY] <message>: <file|detail>`（类别见下表）
+- **stdout**（机器可读，遵循 SSoT §10E E.1）：`ERROR_JSON {"category","message","exitCode","file"}`，`exitCode` 与 `process.exit()` 实参强一致
+
+| 类别 | 场景 | 示例 |
+|---|---|---|
+| `ARG_INVALID` | 参数值非法（phase/variant/mode/node-type/max-tokens 等） | `✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数` |
+| `FILE_NOT_FOUND` | 文件/目录不存在（ENOENT） | `✗ [FILE_NOT_FOUND] 文件不存在: C:\...\project.json` |
+| `FILE_PARSE` | JSON 解析失败（含 JSONL 坏行） | `✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: C:\...\rtm.json` |
+| `FILE_READ` | 读取异常非 ENOENT | `✗ [FILE_READ] 文件读取失败: C:\...\x.json（EACCES）` |
+| `STRUCTURE_INVALID` | 合法 JSON 形状不符（顶层非对象/缺字段/类型错） | `✗ [STRUCTURE_INVALID] 结构不符: C:\...\x.json（缺 rows 数组）` |
+| `UNEXPECTED` | 未预期异常（main().catch 兜底） | `✗ [UNEXPECTED] 脚本异常: <message>` |
+
+- exit 1（校验失败）结构不变：violations 列表 + 既有 `XXX_JSON` 摘要（含 exitCode=1），不输出 ERROR_JSON。
+- 异常不变量：`ERROR_JSON.exitCode` 恒等于脚本 `process.exit()` 实参（§10E E.1 防伪三层机制）。
+- 流分离：stderr 承载人类诊断（`✗ [CATEGORY] ...`），stdout 仅承载机器可读 `ERROR_JSON` 行——`ERROR_JSON` 同属 stdout JSON 摘要家族（§10E E.1），可被 gate-logs 存档后由 `check-run-log.ts` R6 交叉校验（`run-log-logic.ts` `extractExitCode` 26 个标记含 ERROR_JSON）。

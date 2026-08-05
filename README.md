@@ -37,6 +37,7 @@
 - **Fowler 12 坏味道基线 + 票据 durability + 术语治理**（第 26 轮新增）：`engineering-code-reviewer.md` 固定 12 条坏味道基线（重复代码 / 过长方法 / 过大类 / 特征依恋 / 数据泥团 / Switch 语句 / 临时字段 / 消息链等，评审命中须引用条目名）；`phase-5-coding.md` 票据主体 = 符号级契约（接口/类型/状态转移），位置信息交给 codegraph，杜绝 fragile reference；新建 [glossary.md](./w-model-dev/references/glossary.md) 术语权威表（15+ 术语 + `_Avoid_` 别名治理）
 - **阶段 1 迷雾登记册（Fog of War）**（第 27 轮新增）：需求分析引入「REQ 入学锐利性测试」（吸收 wayfinder「Fog or ticket?」判据——能否精确陈述，不是能否回答）+ 迷雾登记册文本节（Not yet specified，不建图节点）+ 毕业机制（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空）。为「in-scope 尚无法精确陈述」的需求提供落脚点，杜绝 A 子代理捏造浅层 REQ 或静默丢弃。治理走 FM-3D-07 + 禁止行为 #12（不新增反模式）。详见 [phase-1-requirements.md](./w-model-dev/references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节
 - **第 28 轮 need_fix.md + 全量脚本 code-review 修正**：`need_fix.md` 两处 bug（estimateTokens CJK 低估 / splitMarkdownByHeaders 分段逻辑）修复 + 全量脚本 code-review 发现 ~66 项缺陷修正（SD→codeModule 对齐 / security-scan 指纹跨机器归一化 / --rtm R6 纳入 passed / 豁免多 group / 签名链跨阶段连续链 / run-log R1 按阶段分档 / uat-path-mapping 严格解析 + phase 8 终检 / graph.schema.json sourceArtifact 复活 / tla-rework 改为 action=rework 统计）。self-test 基线 192→213 / vitest 205→269 / 21 test files。新增 plan-chunks.test.ts + design-contract-logic.ts + 对应单测。版本号 26.0.0 → 27.0.0
+- **错误结构全量归一化 + R6 契约迁移**（第 32 轮新增）：统一全仓 29 个脚本 exit 2 错误输出为结构化格式——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（§10E E.1 exitCode 强一致，`process.exitCode` 自然退出防 stdout 截断）；`extractExitCode`/`buildGateLogKeys` 迁入 `run-log-logic.ts` 纯逻辑层（GATE_JSON_PATTERNS 26 个标记含 ERROR_JSON，exit 2 存档可被 R6 交叉校验）。详见 [command-reference.md](./w-model-dev/references/command-reference.md)「错误码与 ERROR_JSON 约定」节与 [SSoT §3.4.30](./docs/skill-design-document_SSoT.md)
 
 ## 架构原则与外部工具边界
 
@@ -326,7 +327,8 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── metrics-report.ts   #   流程度量报告 CLI（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警，只读，退出码 0/2）
 │   │   ├── metrics-report-logic.ts  # 流程度量纯逻辑（computeMetrics）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
-│   │   ├── __tests__/            #   vitest 单元测试（27 个 .test.ts / 345 条 + README.md coverage 矩阵）
+│   │   ├── lib/cli-error.ts      #   exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
+│   │   ├── __tests__/            #   vitest 单元测试（28 个 .test.ts / 363 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）

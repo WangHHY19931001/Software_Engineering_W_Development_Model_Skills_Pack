@@ -3,6 +3,31 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [32.0.0] - 2026-08-05
+
+### 第三十三轮 错误结构全量归一化 + run-log R6 契约迁移
+
+吸收外部评审建议高风险批（设计文档 `docs/superpowers/specs/2026-08-05-round32-error-structure-normalization-design.md`）：统一全仓 29 个脚本的 exit 2 错误输出为结构化格式；run-log R6 提取/索引规则迁入纯逻辑层。详见 SSoT §3.4.30。
+
+#### Added
+- 新建 `scripts/lib/cli-error.ts`：6 类错误码（ARG_INVALID/FILE_NOT_FOUND/FILE_PARSE/FILE_READ/STRUCTURE_INVALID/UNEXPECTED）+ `CliError` + `formatCliError/printError/printErrorJson/exitWithError`；人类消息 stderr、`ERROR_JSON` 摘要 stdout（遵循 §10E E.1 exitCode 强一致；`process.exitCode` 自然退出防 stdout 截断）
+- 新建 `scripts/__tests__/cli-error.test.ts`（7 用例）
+
+#### Changed
+- 29 个脚本（23 check-*.ts + 5 工具 + read-json-or-exit）exit 2 路径统一走 `exitWithError`：参数校验 `[ARG_INVALID]`、文件缺失 `[FILE_NOT_FOUND]`、解析失败 `[FILE_PARSE]`、读取异常 `[FILE_READ]`、结构不符 `[STRUCTURE_INVALID]`、异常兜底 `[UNEXPECTED]`；各脚本 main().catch 统一 UNEXPECTED
+- `run-log-logic.ts`：R6 契约迁移——`extractExitCode` + `buildGateLogKeys`（纯字符串，遵守 *-logic.ts 不 import node:path）自 check-run-log.ts 迁入；GATE_JSON_PATTERNS 追加 STATUS_JSON/METRICS_JSON/ERROR_JSON（ERROR_JSON 为第 32 轮验证驱动新增，exit 2 存档纳入 R6 契约，25→26 标记）；run-log-logic.test.ts +7 用例
+- `check-run-log.ts`：loadGateLogs 删除本地提取/索引实现，改调 logic 层（契约不变）
+- wm-status 未初始化保持 exit 0 查询语义（不输出 ERROR_JSON）；check-role-dispatch 坏行 exit 2 行为保留（第 29 轮决策），消息加类别
+- command-reference.md 新增「错误码与 ERROR_JSON 约定」节；SSoT §3.4.30 + §10A + §10E 补充
+- 版本号三处同步为 32.0.0：package.json + skill-metadata.json + SKILL.md frontmatter
+
+#### 验证
+- vitest 363/363（28 文件）全通过（新增 cli-error 7 + run-log-logic 7 用例）
+- self-test 213/213 不变全通过（仅断言退出码，消息改动零回归）
+- TypeScript strict 0 错误
+- `npm run lint:security` exit 0（0 新增；baseline v2 按 Task 6 脚本改造实测重生成 188→194 指纹）
+- 冒烟：check-artifact-gate --phase=99 / plan-chunks --phase=9 / metrics-report --phase=abc → `✗ [ARG_INVALID]` + `ERROR_JSON` + exit 2；wm-status 空目录 → 未初始化 exit 0
+
 ## [31.0.0] - 2026-08-05
 
 ### 第三十二轮 /wm status 脚本化 + 流程度量报告（metrics-report.ts）

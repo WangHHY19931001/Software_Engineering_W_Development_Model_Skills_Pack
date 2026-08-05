@@ -69,8 +69,9 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── wm-status-logic.ts       # wm-status 纯逻辑（供单元测试）
 │   ├── metrics-report.ts        # 流程度量报告 CLI（run-log + budget 汇总 7 区度量；--from/--to/--phase/--json/--out）
 │   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
+│   ├── lib/cli-error.ts         # exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   ├── self-test.ts             # 回归基线（213 条样本）
-│   └── __tests__/               # vitest 单元测试（27 个 .test.ts / 345 条 + README.md coverage 矩阵）
+│   └── __tests__/               # vitest 单元测试（28 个 .test.ts / 363 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -132,7 +133,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 24.0.0
+version: 32.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -195,6 +196,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | Budget / RunLog / Maturity / Checkpoint / RootCause 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts) |
 | /wm status 状态快照 CLI + 逻辑 | [../w-model-dev/scripts/wm-status.ts](../w-model-dev/scripts/wm-status.ts) + [../w-model-dev/scripts/wm-status-logic.ts](../w-model-dev/scripts/wm-status-logic.ts) |
 | 流程度量报告 CLI + 逻辑 | [../w-model-dev/scripts/metrics-report.ts](../w-model-dev/scripts/metrics-report.ts) + [../w-model-dev/scripts/metrics-report-logic.ts](../w-model-dev/scripts/metrics-report-logic.ts) |
+| exit 2 错误结构统一（6 类错误码 + ERROR_JSON） | [../w-model-dev/scripts/lib/cli-error.ts](../w-model-dev/scripts/lib/cli-error.ts) |
 | 图谱门禁与收敛准则 | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md) |
 | 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
 | 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |
