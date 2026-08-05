@@ -2,27 +2,29 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/preventive-review.schema.json",
   "title": "PreventiveReview",
+  "description": "R3 预防性审查报告形状（S 产出后、V 评审前由 R 子代理按 dimension 产出；第29轮升级为无条件强制，覆盖所有 S 变体）",
   "type": "object",
   "additionalProperties": false,
   "required": ["reviewedAt", "reviewer", "phase", "dimension", "findings", "passed"],
   "properties": {
-    "reviewedAt": { "type": "string", "format": "date-time" },
-    "reviewer": { "type": "string", "minLength": 1 },
-    "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-    "dimension": { "enum": ["completeness", "reliability", "security"] },
+    "reviewedAt": { "description": "审查时间戳，ISO 8601 字符串（R3 报告产出时间）", "type": "string", "format": "date-time" },
+    "reviewer": { "description": "审查者标识（R3 子代理 persona，如 code-reviewer/test-engineer/security-auditor），非空字符串", "type": "string", "minLength": 1 },
+    "phase": { "description": "审查所处阶段编号，取值 1-8（check-preventive-review.ts 校验须与期望阶段一致，不一致报 R3 报告 phase 不一致）", "type": "integer", "minimum": 1, "maximum": 8 },
+    "dimension": { "description": "审查维度枚举：completeness=完整性（字段齐全/模板套用/RTM 登记等）/ reliability=可靠性（TLA+与BDD等价性/状态机一致性/接口契约等）/ security=安全性（输入校验/鉴权/越权/敏感信息等）；R3 三维度（约束 #17）须三份齐备，文件名维度与报告维度须一致", "enum": ["completeness", "reliability", "security"] },
     "findings": {
+      "description": "审查发现数组（可为空数组表示无问题；passed=false 时须含至少一条发现，V 评审须读取本报告将发现纳入 reworkHints，否则命中反模式 #33）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["severity", "description", "evidence"],
         "properties": {
-          "severity": { "enum": ["Critical", "Required", "Optional", "Nit", "FYI"] },
-          "description": { "type": "string", "minLength": 1 },
-          "evidence": { "type": "string", "minLength": 1 }
+          "severity": { "description": "发现严重程度枚举：Critical=阻断级（须修复后才能放行）/ Required=必须修复 / Optional=可选优化 / Nit=吹毛求疵 / FYI=知会（不阻塞）", "enum": ["Critical", "Required", "Optional", "Nit", "FYI"] },
+          "description": { "description": "问题描述（非空字符串，具体指出缺陷内容与影响）", "type": "string", "minLength": 1 },
+          "evidence": { "description": "证据（非空字符串，须具体引用产物路径/行号/代码片段/报告章节等；不得空泛无据，反模式 #33 兜底：V 不得跳过 R3 报告直接评审）", "type": "string", "minLength": 1 }
         }
       }
     },
-    "passed": { "type": "boolean" }
+    "passed": { "description": "该维度审查是否通过（boolean；三份报告 passed=true 或 passed=false 但 V 已纳入 reworkHints，check-preventive-review.ts 校验三份齐备 + phase/dimension 一致）", "type": "boolean" }
   }
 }

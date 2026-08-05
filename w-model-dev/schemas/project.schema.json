@@ -2,29 +2,31 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/project.schema.json",
   "title": "Project",
-  "description": "项目数据模型 schema，对应 data-models.md Project interface",
+  "description": "项目数据模型 schema，对应 data-models.md Project interface（.w-model/project.json 由 /wm analyze 首次初始化）",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "name", "description", "status", "techStack", "createdAt", "updatedAt"],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "name": { "type": "string", "minLength": 1 },
-    "description": { "type": "string" },
+    "id": { "description": "项目 ID（非空字符串；与 budget.json/maturity.json/tla-manifest.json 的 project 字段一致）", "type": "string", "minLength": 1 },
+    "name": { "description": "项目名称，非空字符串", "type": "string", "minLength": 1 },
+    "description": { "description": "项目描述（可为空字符串；用于说明项目背景与范围）", "type": "string" },
     "status": {
+      "description": "项目状态枚举（9 态，与 currentPhase 对应：需求分析=阶段1/系统设计=阶段2/概要设计=阶段3/详细设计=阶段4/编码=阶段5/集成测试=阶段6/系统测试=阶段7/验收测试=阶段8/项目完成=8 阶段全部完成后，currentPhase=9）；随阶段推进更新，阶段切换时同步刷新 updatedAt；状态与产物不一致时以可验证产物为准修正（operational-recovery.md）",
       "enum": ["需求分析", "系统设计", "概要设计", "详细设计", "编码", "集成测试", "系统测试", "验收测试", "项目完成"]
     },
     "techStack": {
+      "description": "技术栈对象（frontend/backend/database/others 四类数组；新增直接 append，删除须先核验代码模块无引用，重命名须同步更新引用文档，见 data-models.md 数据迁移节）",
       "type": "object",
       "additionalProperties": false,
       "required": ["frontend", "backend", "database", "others"],
       "properties": {
-        "frontend": { "type": "array", "items": { "type": "string" } },
-        "backend": { "type": "array", "items": { "type": "string" } },
-        "database": { "type": "array", "items": { "type": "string" } },
-        "others": { "type": "array", "items": { "type": "string" } }
+        "frontend": { "description": "前端技术栈数组（如 React/Vue/TypeScript；与 R2 校验 TECH_KEYWORDS 前端类关键词对齐）", "type": "array", "items": { "type": "string" } },
+        "backend": { "description": "后端技术栈数组（如 Koa/Express/Node.js；与 R2 校验 TECH_KEYWORDS 后端类关键词对齐）", "type": "array", "items": { "type": "string" } },
+        "database": { "description": "数据库技术栈数组（如 PostgreSQL/Redis/SQLite）", "type": "array", "items": { "type": "string" } },
+        "others": { "description": "其他技术栈数组（如 Docker/WebSocket/消息队列等未归入前三类的技术）", "type": "array", "items": { "type": "string" } }
       }
     },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "createdAt": { "description": "创建时间，ISO 8601 字符串（/wm analyze 首次初始化时写入；R4 校验 maturity.leveledUpAt 不得早于此时刻）", "type": "string", "format": "date-time" },
+    "updatedAt": { "description": "最后修改时间，ISO 8601 字符串（阶段切换/status 更新/技术栈变更时同步刷新；budget R1 时效性校验依赖：project.updatedAt > budget.createdAt 时须 budget.updatedAt > budget.createdAt）", "type": "string", "format": "date-time" }
   }
 }
