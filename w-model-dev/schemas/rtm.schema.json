@@ -27,7 +27,7 @@
           "integrationTest": { "description": "集成测试用例 ID（IT-NNN）：阶段 3 设计登记、阶段 6 执行回填；可空（允许 null）", "type": ["string", "null"] },
           "systemTest": { "description": "系统测试用例 ID（ST-NNN）：阶段 2 设计登记、阶段 7 执行回填；可空（允许 null）", "type": ["string", "null"] },
           "acceptanceTest": { "description": "验收测试用例 ID（UAT-NNN）：阶段 1 设计登记、阶段 8 执行回填；可空（允许 null）", "type": ["string", "null"] },
-          "coverageStatus": { "description": "覆盖率状态：\"100%\"=该行追溯完整（矩阵 coveragePercent 须=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #18，不允许（须回退重做）", "type": "string" },
+          "coverageStatus": { "description": "覆盖率状态：\"100%\"=该行追溯完整（全部行完整时矩阵 coveragePercent=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #18，不允许（须回退重做）", "type": "string" },
           "targetValue": { "type": "string", "description": "NFR 生产目标值（NFR 类型时推荐填写）" },
           "testThreshold": { "type": "string", "description": "NFR 测试环境基线（NFR 类型时推荐填写）" }
         }
@@ -52,10 +52,10 @@
       "additionalProperties": false,
       "required": ["total", "passed", "failed", "pending", "coverage"],
       "properties": {
-        "total": { "description": "该级测试用例总数，非负整数", "type": "integer", "minimum": 0 },
-        "passed": { "description": "通过用例数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
-        "failed": { "description": "失败用例数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
-        "pending": { "description": "待执行用例数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
+        "total": { "description": "该级测试用例总数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
+        "passed": { "description": "通过的测试数，非负整数", "type": "integer", "minimum": 0 },
+        "failed": { "description": "失败的测试数，非负整数", "type": "integer", "minimum": 0 },
+        "pending": { "description": "待执行/跳过的测试数，非负整数", "type": "integer", "minimum": 0 },
         "coverage": { "description": "覆盖率百分比，取值 [0,100]（如 99.37 表示 99.37%）；单元测试覆盖率须 ≥80", "type": "number", "minimum": 0, "maximum": 100 }
       }
     }
