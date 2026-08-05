@@ -23,6 +23,7 @@ import { checkRequirementCoverage } from './coverage-logic.js';
 import type { GraphShape } from './graph-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
   if (graphPath) {
     try {
       const graphRaw = await fs.readFile(path.resolve(graphPath), 'utf-8');
-      const graphParsed = JSON.parse(graphRaw) as GraphShape;
+      const graphParsed = parseJsonSafe(graphRaw) as GraphShape;
       graphCrossCuts = graphParsed.edges
         .filter(e => e.type === 'cross-cuts')
         .map(e => ({ from: e.from, to: e.to }));
@@ -91,7 +92,7 @@ async function main(): Promise<void> {
   if (outOfScopePath) {
     try {
       const oosRaw = await fs.readFile(path.resolve(outOfScopePath), 'utf-8');
-      const oosParsed = JSON.parse(oosRaw);
+      const oosParsed = parseJsonSafe(oosRaw);
       if (!oosParsed || !Array.isArray((oosParsed as { items?: unknown }).items)) {
         exitWithError({
           category: 'STRUCTURE_INVALID',
@@ -135,7 +136,7 @@ async function main(): Promise<void> {
   if (exemptionsPath) {
     try {
       const exemptRaw = await fs.readFile(path.resolve(exemptionsPath), 'utf-8');
-      const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
+      const exemptParsed = parseJsonSafe(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
       exemptions = exemptParsed.grantedExemptions?.map(g => g.ruleId);
     } catch (err) {
       if (err instanceof SyntaxError) {

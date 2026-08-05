@@ -29,6 +29,7 @@ import * as path from 'node:path';
 import { checkMaturity, type MaturityConfig } from './maturity-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 // ==================== 参数解析 ====================
 
@@ -84,7 +85,7 @@ function countOperationalFailures(
     if (trimmed === '') continue;
     let entry: unknown;
     try {
-      entry = JSON.parse(trimmed);
+      entry = parseJsonSafe(trimmed);
     } catch {
       console.error(`⚠ run-log 第 ${i + 1} 行非合法 JSON，已跳过: ${runLogAbs}`);
       continue;
@@ -127,7 +128,7 @@ async function main(): Promise<void> {
     const projectAbs = path.resolve(projectFile);
     try {
       const projectRaw = await fs.readFile(projectAbs, 'utf-8');
-      const projectParsed = JSON.parse(projectRaw) as { status?: string; createdAt?: string };
+      const projectParsed = parseJsonSafe(projectRaw) as { status?: string; createdAt?: string };
       if (
         typeof projectParsed.status === 'string' &&
         projectParsed.status in STATUS_TO_PHASES

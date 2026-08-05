@@ -29,6 +29,7 @@ import {
 } from './wm-status-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 interface ParsedArgs {
   projectDir: string;
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
   }
   let project: { status: string; updatedAt?: string };
   try {
-    project = JSON.parse(projectRaw) as { status: string; updatedAt?: string };
+    project = parseJsonSafe(projectRaw) as { status: string; updatedAt?: string };
   } catch (err) {
     exitWithError({
       category: 'FILE_PARSE',
@@ -87,7 +88,7 @@ async function main(): Promise<void> {
   let rtm: RtmLike | null = null;
   try {
     const raw = await fs.readFile(rtmFile, 'utf-8');
-    rtm = JSON.parse(raw) as RtmLike;
+    rtm = parseJsonSafe(raw) as RtmLike;
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code !== 'ENOENT') {

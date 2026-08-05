@@ -29,6 +29,7 @@ import * as path from 'node:path';
 import { checkRunLog, extractExitCode, buildGateLogKeys } from './run-log-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 // ==================== 参数解析 ====================
 
@@ -113,7 +114,7 @@ async function loadTlaCheckRounds(tlaManifestFile: string): Promise<number | und
   const abs = path.resolve(tlaManifestFile);
   try {
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { checkRounds?: unknown };
+    const parsed = parseJsonSafe(raw) as { checkRounds?: unknown };
     if (Array.isArray(parsed.checkRounds)) {
       return parsed.checkRounds.length;
     }

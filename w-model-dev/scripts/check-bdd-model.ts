@@ -45,6 +45,7 @@ import {
 } from './bdd-logic.js';
 import { validateBySchema } from './schema-loader.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 // ==================== 参数解析 ====================
 
@@ -76,7 +77,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 
 async function readJson<T>(file: string): Promise<T> {
   const text = await fs.readFile(file, 'utf-8');
-  return JSON.parse(text) as T;
+  return parseJsonSafe(text) as T;
 }
 
 /**

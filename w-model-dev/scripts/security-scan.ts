@@ -26,6 +26,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 interface EslintMessage {
   line: number;
@@ -163,7 +164,7 @@ async function main(): Promise<void> {
   }
   let findings: EslintResult[];
   try {
-    findings = JSON.parse(r.stdout || '[]') as EslintResult[];
+    findings = parseJsonSafe(r.stdout || '[]') as EslintResult[];
   } catch (err) {
     exitWithError({
       category: 'FILE_PARSE',
@@ -191,7 +192,7 @@ async function main(): Promise<void> {
   // baseline 读取 + 解析合一（ENOENT → FILE_NOT_FOUND / SyntaxError → FILE_PARSE / 其他 → FILE_READ）
   let parsed: BaselineFile | BaselineEntry[];
   try {
-    parsed = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')) as BaselineFile | BaselineEntry[];
+    parsed = parseJsonSafe(readFileSync(BASELINE_PATH, 'utf-8')) as BaselineFile | BaselineEntry[];
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     exitWithError({

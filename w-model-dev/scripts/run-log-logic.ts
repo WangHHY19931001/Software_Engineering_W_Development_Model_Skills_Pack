@@ -14,6 +14,7 @@
  */
 
 import { validateBySchema } from './schema-loader.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -466,7 +467,7 @@ export function extractExitCode(content: string): number | undefined {
     const match = content.match(pattern);
     if (match && match[1]) {
       try {
-        const json = JSON.parse(match[1]) as { exitCode?: unknown };
+        const json = parseJsonSafe(match[1]) as { exitCode?: unknown };
         if (typeof json.exitCode === 'number') return json.exitCode;
       } catch {
         /* 忽略解析失败 */

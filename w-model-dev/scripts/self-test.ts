@@ -48,7 +48,7 @@ import { checkRequirementCoverage, type CoverageCheckOptions } from './coverage-
 import { checkExemption } from './exemption-logic.js';
 import { checkSignatureChain } from './signature-chain-logic.js';
 import { checkArchiveIntegrity } from './archive-integrity-logic.js';
-import { checkDesignContractConsistency } from './design-contract-logic.js';
+import { checkDesignContractConsistency, type DesignContractCheckInput } from './design-contract-logic.js';
 import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 import {
@@ -75,6 +75,7 @@ import { checkCodegraphQueries } from './check-codegraph-queries.js';
 import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
 import { checkOpenspecArchive } from './check-openspec-archive.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -1709,7 +1710,7 @@ async function runVerifierCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of VERIFIER_CASES) {
     const abs = path.join(samplesDir, 'verifier', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkVerifierOutput(parsed);
 
     const details: string[] = [];
@@ -1737,7 +1738,7 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of GATE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const options: Record<string, unknown> = {};
     if (c.phaseOption) options.phaseOption = c.phaseOption;
     if (c.graph) options.graph = c.graph;
@@ -1769,7 +1770,7 @@ async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of GRAPH_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkRequirementGraph(parsed, c.phase);
 
     const details: string[] = [];
@@ -1801,7 +1802,7 @@ async function runTlaCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of TLA_CASES) {
     const abs = path.join(samplesDir, 'tla', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkTlaModel(parsed, c.phase);
 
     const details: string[] = [];
@@ -1832,7 +1833,7 @@ function parseJsonl(raw: string): unknown[] {
   return raw
     .split('\n')
     .filter(l => l.trim() !== '')
-    .map(l => JSON.parse(l));
+    .map(l => parseJsonSafe(l));
 }
 
 async function runBudgetCases(samplesDir: string): Promise<CaseResult[]> {
@@ -1840,7 +1841,7 @@ async function runBudgetCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of BUDGET_CASES) {
     const abs = path.join(samplesDir, 'budget', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkBudget(parsed, c.options);
 
     const details: string[] = [];
@@ -1896,7 +1897,7 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of MATURITY_CASES) {
     const abs = path.join(samplesDir, 'maturity', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkMaturity(parsed, c.options);
 
     const details: string[] = [];
@@ -1957,7 +1958,7 @@ async function runCodeTlaCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of CODE_TLA_CASES) {
     const abs = path.join(samplesDir, 'code-tla', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as {
+    const parsed = parseJsonSafe(raw) as {
       manifest: CodeTlaConsistencyInput['manifest'];
       graph: CodeTlaConsistencyInput['graph'];
       rtm: CodeTlaConsistencyInput['rtm'];
@@ -2004,7 +2005,7 @@ async function runRootCauseCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of ROOTCAUSE_CASES) {
     const abs = path.join(samplesDir, 'rootcause', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkRootCauseReport(parsed);
 
     const details: string[] = [];
@@ -2031,7 +2032,7 @@ async function runPreventiveReviewCases(samplesDir: string): Promise<CaseResult[
     const abs = path.join(samplesDir, 'preventive-review', c.file);
     try {
       const raw = await fs.readFile(abs, 'utf-8');
-      const review = JSON.parse(raw) as PreventiveReview;
+      const review = parseJsonSafe(raw) as PreventiveReview;
       // 单份样本 → 注入到 reviews 字典，其他维度为 null
       const reviews: Record<string, PreventiveReview | null> = {
         completeness: null,
@@ -2071,7 +2072,7 @@ async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'tla-bdd-sync', c.file);
     try {
       const raw = await fs.readFile(abs, 'utf-8');
-      const data = JSON.parse(raw) as { tlaContent: string; featureContent: string };
+      const data = parseJsonSafe(raw) as { tlaContent: string; featureContent: string };
       const r = checkTlaBddSync(data.tlaContent, data.featureContent);
       const details: string[] = [];
       if (r.passed !== c.expectedPassed) {
@@ -2106,7 +2107,7 @@ async function runRoleDispatchCases(samplesDir: string): Promise<CaseResult[]> {
       const entries = raw.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 0)
-        .map(l => JSON.parse(l) as Record<string, unknown>);
+        .map(l => parseJsonSafe(l) as Record<string, unknown>);
       const r = checkRoleDispatch(entries as Parameters<typeof checkRoleDispatch>[0]);
       if (r.passed !== c.expectedPassed) {
         details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
@@ -2140,7 +2141,7 @@ async function runStateMachineCases(samplesDir: string): Promise<CaseResult[]> {
     const details: string[] = [];
     try {
       const raw = await fs.readFile(abs, 'utf-8');
-      const parsed = JSON.parse(raw) as Parameters<typeof checkStateMachineConsistency>[0];
+      const parsed = parseJsonSafe(raw) as Parameters<typeof checkStateMachineConsistency>[0];
       const r = checkStateMachineConsistency(parsed);
       if (r.passed !== c.expectedPassed) {
         details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
@@ -2335,7 +2336,7 @@ async function runBddCases(samplesDir: string): Promise<CaseResult[]> {
     let manifest: BddManifest;
     try {
       const manifestRaw = await fs.readFile(manifestPath, 'utf-8');
-      manifest = JSON.parse(manifestRaw) as BddManifest;
+      manifest = parseJsonSafe(manifestRaw) as BddManifest;
     } catch (e) {
       results.push({
         name,
@@ -2427,7 +2428,7 @@ async function runCoverageCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of COVERAGE_CASES) {
     const abs = path.join(samplesDir, 'coverage', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkRequirementCoverage(parsed, c.options);
 
     const details: string[] = [];
@@ -2453,7 +2454,7 @@ async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of EXEMPTION_CASES) {
     const abs = path.join(samplesDir, 'exemption', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = checkExemption(parsed);
 
     const details: string[] = [];
@@ -2481,7 +2482,7 @@ async function runDesignContractCases(samplesDir: string): Promise<CaseResult[]>
     const name = `design-contract/${tc.file}`;
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      const input = JSON.parse(content);
+      const input = parseJsonSafe<DesignContractCheckInput>(content);
       const result = checkDesignContractConsistency(input);
       const passed = result.passed === tc.expectedPassed &&
         (!tc.expectedReasonPatterns || tc.expectedReasonPatterns.every(
@@ -2513,7 +2514,7 @@ async function runSignatureChainCases(samplesDir: string): Promise<CaseResult[]>
   for (const c of SIGNATURE_CHAIN_CASES) {
     const abs = path.join(samplesDir, 'signature-chain', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const entries = raw.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
+    const entries = raw.split(/\r?\n/).filter(l => l.trim()).map(l => parseJsonSafe(l));
     // R8 需 existingPaths；仅 bad-missing-artifact 样本传空集触发 R8，其余样本跳过 R8
     const existingPaths = c.file === 'bad-missing-artifact.jsonl' ? new Set<string>() : undefined;
     const phase = c.phase;
@@ -2546,7 +2547,7 @@ async function runArchiveIntegrityCases(samplesDir: string): Promise<CaseResult[
   for (const c of ARCHIVE_INTEGRITY_CASES) {
     const abs = path.join(samplesDir, 'archive-integrity', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const contents = new Set<string>(JSON.parse(raw));
+    const contents = new Set<string>(parseJsonSafe<string[]>(raw));
     const r = checkArchiveIntegrity(contents);
 
     const details: string[] = [];
@@ -2577,7 +2578,7 @@ async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of SCHEMA_CASES) {
     const abs = path.join(samplesDir, 'schema', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonSafe(raw);
     const r = validateBySchema(c.schema, parsed);
 
     const details: string[] = [];
@@ -2607,7 +2608,7 @@ async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
   const skill = await fs.readFile(path.join(skillRoot, 'SKILL.md'), 'utf-8');
-  const meta = JSON.parse(await fs.readFile(path.join(skillRoot, 'skill-metadata.json'), 'utf-8')) as { version: string };
+  const meta = parseJsonSafe(await fs.readFile(path.join(skillRoot, 'skill-metadata.json'), 'utf-8')) as { version: string };
   const versionMatch = skill.match(/^version:\s*(.+)$/m);
   const skillVersion = versionMatch?.[1]?.trim();
   const details: string[] = [];

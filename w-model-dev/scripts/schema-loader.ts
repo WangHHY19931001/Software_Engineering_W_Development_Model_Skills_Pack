@@ -18,6 +18,7 @@ import addFormats from 'ajv-formats';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 const SCHEMAS_DIR = join(fileURLToPath(import.meta.url), '..', '..', 'schemas');
 
@@ -34,7 +35,7 @@ function getAjv(): Ajv {
     for (const f of readdirSync(SCHEMAS_DIR)) {
       if (!f.endsWith('.schema.json')) continue;
       const name = basename(f, '.schema.json');
-      const schema = JSON.parse(readFileSync(join(SCHEMAS_DIR, f), 'utf-8'));
+      const schema = parseJsonSafe<object>(readFileSync(join(SCHEMAS_DIR, f), 'utf-8'));
       newAjv.addSchema(schema, name);
     }
   } catch (err) {

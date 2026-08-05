@@ -36,6 +36,7 @@ import {
 } from './gate-logic.js';
 import { validateBySchema } from './schema-loader.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
@@ -193,7 +194,7 @@ async function main(): Promise<void> {
 
   let matrix: RTMMatrixShape;
   try {
-    matrix = JSON.parse(raw) as RTMMatrixShape;
+    matrix = parseJsonSafe(raw) as RTMMatrixShape;
   } catch {
     exitWithError({
       category: 'FILE_PARSE',
@@ -219,7 +220,7 @@ async function main(): Promise<void> {
   for (const candidate of graphCandidates) {
     try {
       const graphRaw = await fs.readFile(candidate, 'utf-8');
-      const graphParsed = JSON.parse(graphRaw) as GateGraph;
+      const graphParsed = parseJsonSafe(graphRaw) as GateGraph;
       if (graphParsed && Array.isArray(graphParsed.nodes)) {
         graph = graphParsed;
         graphSource = path.basename(candidate);
@@ -238,7 +239,7 @@ async function main(): Promise<void> {
   let manifestExists = false;
   try {
     const manifestRaw = await fs.readFile(manifestFile, 'utf-8');
-    const manifestParsed = JSON.parse(manifestRaw) as { specs?: unknown[] };
+    const manifestParsed = parseJsonSafe(manifestRaw) as { specs?: unknown[] };
     if (manifestParsed && Array.isArray(manifestParsed.specs) && manifestParsed.specs.length > 0) {
       manifestExists = true;
     }
@@ -260,7 +261,7 @@ async function main(): Promise<void> {
   const effectivePhase: PhaseOption = phaseOption ?? 8;
   try {
     const bddRaw = await fs.readFile(bddManifestFile, 'utf-8');
-    const bddManifestParsed = JSON.parse(bddRaw) as unknown;
+    const bddManifestParsed = parseJsonSafe(bddRaw) as unknown;
     bddManifestExists = true;
     const bddSchemaResult = validateBySchema('bdd-manifest', bddManifestParsed);
     if (!bddSchemaResult.valid) {

@@ -31,6 +31,7 @@ import {
 } from './graph-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
     if (rtmPath) {
       try {
         const rtmRaw = await fs.readFile(path.resolve(rtmPath), 'utf-8');
-        const rtmParsed = JSON.parse(rtmRaw) as { rows?: Array<{ requirementId: string; type: string }> };
+        const rtmParsed = parseJsonSafe(rtmRaw) as { rows?: Array<{ requirementId: string; type: string }> };
         rtmRows = rtmParsed.rows;
       } catch (err) {
         if (err instanceof SyntaxError) {
@@ -119,7 +120,7 @@ async function main(): Promise<void> {
     if (exemptPath) {
       try {
         const exemptRaw = await fs.readFile(path.resolve(exemptPath), 'utf-8');
-        const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
+        const exemptParsed = parseJsonSafe(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
         exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
       } catch (err) {
         if (err instanceof SyntaxError) {

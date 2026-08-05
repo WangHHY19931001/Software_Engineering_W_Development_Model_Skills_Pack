@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { checkPreventiveReview, type PreventiveReview, type PreventiveReviewOptions } from './preventive-review-logic.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 const PREVENTIVE_REVIEW_JSON = {
   script: 'check-preventive-review.ts',
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
       let lastSAction: string | null = null;
       for (const line of lines) {
         try {
-          const entry = JSON.parse(line) as { phase?: number; action?: string; outcome?: string; role?: string };
+          const entry = parseJsonSafe(line) as { phase?: number; action?: string; outcome?: string; role?: string };
           if (typeof entry.phase === 'number' && entry.action === 'checkpoint' && entry.outcome === 'success') {
             lastPhase = entry.phase;
           }
@@ -159,7 +160,7 @@ async function main(): Promise<void> {
     const filePath = path.resolve(reviewsDir, `${prefix}${dim}.json`);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      reviews[dim] = JSON.parse(content) as PreventiveReview;
+      reviews[dim] = parseJsonSafe(content) as PreventiveReview;
     } catch {
       reviews[dim] = null;
     }

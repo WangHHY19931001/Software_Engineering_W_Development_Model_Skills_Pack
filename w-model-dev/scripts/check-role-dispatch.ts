@@ -26,6 +26,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRoleDispatch, type RoleDispatchEntry } from './role-dispatch-logic.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -67,7 +68,7 @@ async function main(): Promise<void> {
     const line = lines[i]!.trim();
     if (!line) continue;
     try {
-      entries.push(JSON.parse(line) as RoleDispatchEntry);
+      entries.push(parseJsonSafe(line) as RoleDispatchEntry);
     } catch {
       // 第 29 轮决策：坏行 exit 2 行为保留（不等价 readJsonlOrExit 的 warn+skip），仅消息加类别
       exitWithError({

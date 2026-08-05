@@ -19,6 +19,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 interface CodegraphQuery {
   querySymbol: string;
@@ -78,7 +79,7 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
       continue;
     }
     try {
-      const q = JSON.parse(raw) as CodegraphQuery;
+      const q = parseJsonSafe(raw) as CodegraphQuery;
       if (!q.querySymbol || typeof q.querySymbol !== 'string') {
         violations.push(`${f}：缺 querySymbol 字段`);
         continue;

@@ -28,6 +28,7 @@ import * as path from 'node:path';
 import { computeMetrics, type BudgetLike, type MetricsReport, type RunLogEntryLike } from './metrics-report-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { parseJsonSafe } from './lib/safe-json.js';
 
 interface ParsedArgs {
   projectDir: string;
@@ -126,7 +127,7 @@ async function main(): Promise<void> {
   try {
     await fs.access(budgetFile);
     const raw = await fs.readFile(budgetFile, 'utf-8');
-    budget = JSON.parse(raw) as BudgetLike;
+    budget = parseJsonSafe(raw) as BudgetLike;
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code !== 'ENOENT') {
