@@ -125,7 +125,7 @@ export function checkSignatureChain(
   }
 
   const phase = scopedEntries[0]!.phase;
-  const phaseEntries = scopedEntries.sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
+  const phaseEntries = [...scopedEntries].sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
 
   // ==================== R1: 角色齐全 ====================
   const expectedRoles = PHASE_ROLE_CHAINS[phase] ?? [];
@@ -152,7 +152,7 @@ export function checkSignatureChain(
   // ==================== R2: 链连续（跨阶段连续链语义） ====================
   if (options?.phase && options.phase > 0) {
     // --phase=N mode: cross-phase continuous chain
-    const allSorted = (entries as SignatureChainEntry[])
+    const allSorted = [...(entries as SignatureChainEntry[])]
       .sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
     const allSigIds = new Set(allSorted.map(e => e.sigId));
     allSigIds.add('genesis');
@@ -186,7 +186,7 @@ export function checkSignatureChain(
     }
   } else {
     // Archive mode: 全链连续校验（跨阶段一条链）
-    const allSorted = (entries as SignatureChainEntry[])
+    const allSorted = [...(entries as SignatureChainEntry[])]
       .sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
     if (allSorted.length > 0) {
       if (allSorted[0]!.prevSigId !== 'genesis' || allSorted[0]!.prevSigHash !== '0') {
