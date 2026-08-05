@@ -326,7 +326,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── metrics-report.ts   #   流程度量报告 CLI（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警，只读，退出码 0/2）
 │   │   ├── metrics-report-logic.ts  # 流程度量纯逻辑（computeMetrics）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
-│   │   ├── __tests__/            #   vitest 单元测试（23 个 .test.ts / 301 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            #   vitest 单元测试（25 个 .test.ts / 320 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）

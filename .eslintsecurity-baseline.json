@@ -955,6 +955,13 @@
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
+      "hash": "30b3a2f55549b7ea4dae736fca61beaf9e6805b530dddbe1d097b49a077820cd",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/metrics-report.ts",
+      "line": 128,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
       "hash": "f5afd34856f0b8d056b9aa100e6080f482be724ddc8272879311a606a5a575e5",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/plan-chunks.ts",
@@ -1282,6 +1289,34 @@
       "file": "w-model-dev/scripts/verifier-logic.ts",
       "line": 602,
       "reason": "Variable Assigned to Object Injection Sink"
+    },
+    {
+      "hash": "322bf499e2aed30c96e9d5ac389ac39ac97f69a05177e1732f7d2cea9686ea22",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/wm-status-logic.ts",
+      "line": 113,
+      "reason": "Generic Object Injection Sink"
+    },
+    {
+      "hash": "81dddbdfeaedb9662f415da182f54ee49c16f123c06bf75302758172b1e4bbb4",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/wm-status-logic.ts",
+      "line": 149,
+      "reason": "Generic Object Injection Sink"
+    },
+    {
+      "hash": "09744fa00c95826436eb5d19039e64c3113bf4bf68578c6f0fff7c50ce129caf",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/wm-status.ts",
+      "line": 54,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "92046253d52b8f5935ec35adcd186f48ac26d79bd9d355a8c9e516078d6bfa67",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/wm-status.ts",
+      "line": 78,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     }
   ]
 }

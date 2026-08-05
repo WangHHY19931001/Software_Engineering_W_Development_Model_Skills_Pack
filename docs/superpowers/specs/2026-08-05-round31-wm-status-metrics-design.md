@@ -181,7 +181,7 @@ interface MetricsReport {
 7. 预算：killSwitchTriggered（budgetBurnRate 路径）
 8. 过滤（--from/--to/--phase 组合）与空 run-log（0 记录不崩溃）
 
-**基线**：vitest 301 → **316**（+15）；self-test 213 不变；tsc strict 0 错误。
+**基线**：vitest 301 → **320**（+19：wm-status-logic 10 + metrics-report-logic 9）；self-test 213 不变；tsc strict 0 错误。
 
 ## 5. 文档同步清单
 
@@ -201,7 +201,7 @@ interface MetricsReport {
 
 ## 6. 验收标准
 
-- vitest 316/316 全通过（301 + 15）
+- vitest 320/320 全通过（301 + 19）
 - self-test 213/213 不变
 - TypeScript strict 0 错误
 - `npm run lint:security` exit 0（0 新增）
