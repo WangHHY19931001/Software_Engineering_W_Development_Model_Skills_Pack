@@ -66,7 +66,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
 │   ├── security-scan.ts         # eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
 │   ├── self-test.ts             # 回归基线（213 条样本）
-│   └── __tests__/               # vitest 单元测试（21 个 .test.ts + README.md coverage 矩阵）
+│   └── __tests__/               # vitest 单元测试（23 个 .test.ts / 301 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
