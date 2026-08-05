@@ -23,6 +23,7 @@ set -u
 log()  { printf '[pre-push] %s\n' "$*"; }
 ok()   { printf '[pre-push] \033[32m✓\033[0m %s\n' "$*"; }
 fail() { printf '[pre-push] \033[31m✗\033[0m %s\n' "$*"; }
+warn() { printf '[pre-push] \033[33m⚠\033[0m %s\n' "$*"; }
 
 # ---------- 路径过滤：无相关变更直接放行 ----------
 #
@@ -83,7 +84,7 @@ if [ ! -d node_modules ]; then
 fi
 
 # ---------- 门禁用例 ----------
-# 与原 CI 一致：11 项检查，退出码必须全部符合预期才放行。
+# 与原 CI 一致：12 项检查（第 12 项 npm audit 为 warn-only），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 trap 'rm -f "$tmp_log"' EXIT
@@ -145,6 +146,19 @@ run_expect "check:exemption 有效豁免样本退出 0" 0 \
 # 11. [21.0.0] check-signature-chain 对有效签名链样本应退出 0
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
+
+# 12. npm audit：依赖漏洞扫描（warn-only，不阻断；离线/网络失败自动跳过）
+log "npm audit 依赖漏洞扫描（warn-only）..."
+set +e
+npm audit --audit-level=high >"$tmp_log" 2>&1
+local_audit_code=$?
+set -e
+if [ "$local_audit_code" -eq 0 ]; then
+  ok "npm audit 未发现 high 以上漏洞"
+else
+  warn "npm audit 返回码 $local_audit_code（发现 high 以上漏洞或网络不可达），warn-only 不阻断 push"
+  cat "$tmp_log" >&2
+fi
 
 log "全部门禁通过，允许推送 ✓"
 exit 0
