@@ -67,6 +67,10 @@ async function main(): Promise<void> {
     console.error(`✗ 文件解析失败（非合法 JSON）: ${projectFile}（转 operational-recovery，不猜测状态）`);
     process.exit(2);
   }
+  if (project === null || typeof project !== 'object') {
+    console.error(`✗ 文件解析失败（非对象）: ${projectFile}（转 operational-recovery，不猜测状态）`);
+    process.exit(2);
+  }
 
   // rtm.json 可选：缺失降级 null；损坏 → exit 2（输入错误）
   let rtm: RtmLike | null = null;
@@ -93,7 +97,10 @@ async function main(): Promise<void> {
 
   // 归一化 status（JSON 来源可能为任意类型，防 StatusReport.status 类型承诺破坏）
   const report: StatusReport = buildStatusReport(
-    { status: typeof project.status === 'string' ? project.status : '', updatedAt: project.updatedAt },
+    {
+      status: typeof project.status === 'string' ? project.status : '',
+      updatedAt: typeof project.updatedAt === 'string' ? project.updatedAt : undefined,
+    },
     rtm,
     runLog,
   );
@@ -114,7 +121,7 @@ async function main(): Promise<void> {
   if (report.rtmCoverage) {
     console.log(`RTM 覆盖率    : ${report.rtmCoverage.covered}/${report.rtmCoverage.total}（${report.rtmCoverage.percent}%）`);
   } else {
-    console.log('RTM 覆盖率    : 未生成（.w-model/rtm.json 缺失）');
+    console.log('RTM 覆盖率    : 未生成（.w-model/rtm.json 缺失或格式不符）');
   }
   if (report.testSummary) {
     const fmt = (t: { total: number; passed: number; failed: number; pending: number }, label: string) =>
@@ -125,7 +132,7 @@ async function main(): Promise<void> {
     console.log(`  ${fmt(report.testSummary.system, '系统')}`);
     console.log(`  ${fmt(report.testSummary.acceptance, '验收')}`);
   } else {
-    console.log('四级测试      : 无汇总（.w-model/rtm.json 缺失）');
+    console.log('四级测试      : 无汇总（.w-model/rtm.json 缺失或格式不符）');
   }
   if (report.recentActions.length > 0) {
     console.log('最近动作      :');
