@@ -535,9 +535,15 @@ function maybeOpenBrowser() {
   if (clients.size > 0) return; // the user already opened it
   const url = companionUrl(); // must carry the key or the gate 403s it
   const cp = require('child_process');
-  // Operator-provided launcher: run as given (this env var is trusted operator input).
+  // Operator-provided launcher: split on the first run of whitespace into bin + args,
+  // pass the URL as an argv element via execFile (no shell) so shell metacharacters
+  // in the command or URL can't inject a command. Note: paths containing spaces must
+  // be quoted by the operator via a wrapper (e.g. BRAINSTORM_OPEN_CMD="cmd /c start \"\" ...").
   if (process.env.BRAINSTORM_OPEN_CMD) {
-    try { cp.exec(process.env.BRAINSTORM_OPEN_CMD + ' ' + JSON.stringify(url), () => {}); } catch (e) { /* best effort */ }
+    const [bin, ...args] = process.env.BRAINSTORM_OPEN_CMD.trim().split(/\s+/);
+    if (bin) {
+      try { cp.execFile(bin, [...args, url], () => {}); } catch (e) { /* best effort */ }
+    }
     return;
   }
   // Platform launchers: pass the URL as an argv element via execFile (no shell),
