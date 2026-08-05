@@ -217,6 +217,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | verifier-spec.md | V 子代理产出 VerifierOutput 前 |
 | agent-personas.md | V 子代理选用 Persona 时 |
 | subagent-delegation.md | O 分派 S/V/G/R 子代理前 |
+| signature-chain-guide.md | S 回填 `inputProvenance` 来源证明 / G 跑 `check-signature-chain.ts` / 排查签名链失败时 |
 | dispatch-matrix.md | O 分派子代理前必读总览（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本） |
 | subagent-persona-matrix.md | R-lead / V-lead 多角度分析时 |
 | root-cause-locator.md | V/G 不通过后分派 R 子代理时 |
@@ -260,6 +261,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | check-run-log.ts | 阶段门放行前 |
 | check-maturity.ts | 阶段门放行前 |
 | check-checkpoint.ts | 阶段门放行前 |
+| check-signature-chain.ts | 阶段门放行前（R1-R10 链式校验 + 跨阶段消费者） |
 | check-rootcause-report.ts | R 子代理产出后 |
 | schema-loader.ts | logic 层 schema 校验（被自动 import） |
 | security-scan.ts | pre-push / 手动安全扫描 |

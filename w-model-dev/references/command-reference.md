@@ -8,7 +8,7 @@
 
 - 通用命令规则
 - `/wm analyze`、`design`、`code`、`test`
-- `/wm review`、`status`、`help`
+- `/wm review`、`status`、`metrics`、`hill-climbing`、`help`
 - `/wm reset`、`export`、`import`
 
 ## 通用命令规则
@@ -112,6 +112,18 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
   - `--json` 输出完整报告 JSON；`--out <path>` 写入文件；`--phase`/`--from`/`--to` 过滤。
 - 退出码：0 = 生成成功（预警不改退出码）；2 = run-log 缺失 / `--phase` 非法 / JSON 损坏。
 - 纯报告无门禁语义：预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
+
+## `/wm hill-climbing`
+
+- **执行方**：O 确定性分析 run-log，不分派子代理；**无 LLM 调用**（约束 4：基于实际记录，不 LLM 估算）。
+- **适用**：L2+ 项目（maturity.level ≥ L2）。
+- 分析 `.w-model/run-log.jsonl`（可选 `--from=ISO` / `--to=ISO` 时间窗口、`--phase=N` 阶段过滤），产出 `HarnessImprovementReport`：
+  1. 信号（signal）：类别 `prompt` / `tool` / `verification-rule` / `anti-pattern` / `maturity` / `budget`，严重度 S1-S3，含 run-log 证据引用与量化指标（occurrences/trend）；
+  2. 元分析（metaAnalysis）：Top 失败模式、返工热点阶段、V-G 矛盾次数、预算消耗趋势、O 失败模式命中频次、acknowledgedDecisions 信息质量；
+  3. 改进建议（recommendations）：promptTweaks / toolImprovements / verificationRuleTightening / candidateAntiPatterns / maturityAdjustments；
+  4. 应用状态（applicationStatus）：人审后由用户填写 reviewedBy / appliedSignals / deferredSignals / rejectedSignals。
+- 产出存 `.w-model/hill-climbing/<timestamp>-report.json`（符合 `hill-climbing-report.schema.json`）。
+- **边界（反模式 #10）**：只产出改进信号，**不自动改 prompt/工具/验证规则**；外部 SkillOpt/darwin-skill 消费信号做演化，人审后手动应用。详见 [hill-climbing-guide.md](hill-climbing-guide.md)。
 
 ## `/wm help`
 
