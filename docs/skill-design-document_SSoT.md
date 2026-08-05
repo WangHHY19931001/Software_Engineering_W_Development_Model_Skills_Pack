@@ -922,11 +922,11 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | 顶层文档 | SSoT §3.4.27 + §10A 追溯表 + AGENTS.md + CHANGELOG.md [30.0.0] + README.md 反模式计数 41→43 |
 | package.json | version `29.0.0` → `30.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
 | self-test | 基线 213 不变全通过 |
-| vitest | 基线 269 不变全通过 |
+| vitest | 基线 297 不变全通过 |
 | pre-push | 11 → 12 项（新增 npm audit warn-only） |
 | TypeScript strict | 0 错误 |
 
-> 第三十一轮相比第三十轮（§3.4.26 CLI 样板抽取）：吸收外部评审 14 条建议中经头脑风暴选出的低风险批三项（#13 schema 自描述 + #8 敏感信息脱敏 + #7 npm audit 门禁）。19 份 `schemas/*.schema.json` 全量字段补充 `description`（用途 + 期望值，仅注释性关键字，校验行为不变）；`references/operational-recovery.md`「JSON 文件写入工具选择」节新增敏感信息禁令 + 反模式 #43（状态文件/日志不得写入硬编码凭据，敏感配置统一环境变量注入）；`.githooks/pre-push` 新增检查 #12 npm audit（warn-only + 离线容错），11 项 → 12 项。self-test 213/vitest 269 基线不变，prepush 12 项通过，TypeScript strict 0 错误。版本号三处一致 30.0.0。
+> 第三十一轮相比第三十轮（§3.4.26 CLI 样板抽取）：吸收外部评审 14 条建议中经头脑风暴选出的低风险批三项（#13 schema 自描述 + #8 敏感信息脱敏 + #7 npm audit 门禁）。19 份 `schemas/*.schema.json` 全量字段补充 `description`（用途 + 期望值，仅注释性关键字，校验行为不变）；`references/operational-recovery.md`「JSON 文件写入工具选择」节新增敏感信息禁令 + 反模式 #43（状态文件/日志不得写入硬编码凭据，敏感配置统一环境变量注入）；`.githooks/pre-push` 新增检查 #12 npm audit（warn-only + 离线容错），11 项 → 12 项。self-test 213/vitest 297 基线不变，prepush 12 项通过，TypeScript strict 0 错误。版本号三处一致 30.0.0。
 
 ---
 
@@ -2523,7 +2523,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §10H SkillOpt 方法论吸收 | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调 | `w-model-dev/references/skillopt-adoption.md`（可执行细则） | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10E TLA+） |
 | 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
 | §3.4.26 | 第三十轮 CLI 样板抽取 + 分派总览矩阵 | `scripts/lib/read-json-or-exit.ts` + `scripts/__tests__/read-json-or-exit.test.ts` + `references/dispatch-matrix.md` + 13 个 check-*.ts 重构 | 完整（self-test 213/213、vitest 297、tsc 0 错误） |
-| §3.4.27 | 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁 | `schemas/*.schema.json`（19 份，全量字段补 description）+ `references/operational-recovery.md`（敏感信息禁令）+ `references/anti-patterns.md` #43 + `.githooks/pre-push`（检查 #12 npm audit warn-only）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 30.0.0） | 完整（self-test 213/213、vitest 269、prepush 12 项、tsc 0 错误） |
+| §3.4.27 | 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁 | `schemas/*.schema.json`（19 份，全量字段补 description）+ `references/operational-recovery.md`（敏感信息禁令）+ `references/anti-patterns.md` #43 + `.githooks/pre-push`（检查 #12 npm audit warn-only）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 30.0.0） | 完整（self-test 213/213、vitest 297、prepush 12 项、tsc 0 错误） |
 
 ---
 

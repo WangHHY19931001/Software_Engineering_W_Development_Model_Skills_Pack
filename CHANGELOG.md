@@ -46,7 +46,7 @@
 
 #### 验证
 - self-test 213/213 不变全通过
-- vitest 269/269 不变全通过
+- vitest 297/297 不变全通过
 - prepush 12 项通过（npm audit warn-only）
 - TypeScript strict 0 错误
 
