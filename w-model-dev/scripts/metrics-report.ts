@@ -26,13 +26,14 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { computeMetrics, type BudgetLike, type MetricsReport, type RunLogEntryLike } from './metrics-report-logic.js';
-import { readJsonOrExit, readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 interface ParsedArgs {
   projectDir: string;
   from?: string;
   to?: string;
-  phase?: number;
+  phaseStr?: string;
   json: boolean;
   out?: string;
 }
@@ -43,18 +44,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   const positional = args.filter((a) => !a.startsWith('--'));
   const from = args.find((a) => a.startsWith('--from='))?.split('=')[1];
   const to = args.find((a) => a.startsWith('--to='))?.split('=')[1];
-  const phaseArg = args.find((a) => a.startsWith('--phase='));
+  const phaseStr = args.find((a) => a.startsWith('--phase='))?.split('=')[1];
   const out = args.find((a) => a.startsWith('--out='))?.split('=')[1];
-  let phase: number | undefined;
-  if (phaseArg) {
-    const n = Number(phaseArg.split('=')[1]);
-    if (!Number.isInteger(n) || n < 1 || n > 8) {
-      console.error(`✗ --phase 参数非法: ${phaseArg.split('=')[1]}（须为 1-8 整数）`);
-      process.exit(2);
-    }
-    phase = n;
-  }
-  return { projectDir: positional[0] ?? process.cwd(), from, to, phase, json, out };
+  return { projectDir: positional[0] ?? process.cwd(), from, to, phaseStr, json, out };
 }
 
 function fmtRecord(rec: Record<string, number>): string {
@@ -104,7 +96,24 @@ function printHuman(r: MetricsReport, runLogFile: string): void {
 }
 
 async function main(): Promise<void> {
-  const { projectDir, from, to, phase, json, out } = parseArgs(process.argv);
+  const { projectDir, from, to, phaseStr, json, out } = parseArgs(process.argv);
+
+  // --phase 校验（NaN / 越界 / 非整数均 exit 2）
+  let phase: number | undefined;
+  if (phaseStr !== undefined) {
+    const n = Number(phaseStr);
+    if (!Number.isInteger(n) || n < 1 || n > 8) {
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: '--phase 参数非法',
+        detail: `收到 ${phaseStr}（须为 1-8 整数）`,
+        exitCode: 2,
+      });
+      return;
+    }
+    phase = n;
+  }
+
   const wmodelDir = path.join(projectDir, '.w-model');
   const runLogFile = path.join(wmodelDir, 'run-log.jsonl');
   const budgetFile = path.join(wmodelDir, 'budget.json');
@@ -112,14 +121,24 @@ async function main(): Promise<void> {
   // run-log 必读（缺失 → readJsonlOrExit exit 2；坏行 warn 跳过）
   const entries = (await readJsonlOrExit(runLogFile, 'run-log')) as RunLogEntryLike[];
 
-  // budget 可选（缺失 → null）
+  // budget 可选（缺失 → null；损坏 → exit 2 输入错误）
   let budget: BudgetLike | null = null;
   try {
     await fs.access(budgetFile);
-    budget = (await readJsonOrExit(budgetFile)) as BudgetLike;
+    const raw = await fs.readFile(budgetFile, 'utf-8');
+    budget = JSON.parse(raw) as BudgetLike;
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') throw err;
+    if (e.code !== 'ENOENT') {
+      exitWithError({
+        category: err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+        message: err instanceof SyntaxError ? '文件解析失败（非合法 JSON）' : '文件读取失败',
+        file: budgetFile,
+        detail: err instanceof SyntaxError ? undefined : (e.code ?? '未知错误'),
+        exitCode: 2,
+      });
+      return;
+    }
   }
 
   const report = computeMetrics(entries, budget, { from, to, phase });
@@ -138,6 +157,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('metrics-report 脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

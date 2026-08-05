@@ -21,10 +21,11 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { exitWithError } from './lib/cli-error.js';
 
 interface EslintMessage {
   line: number;
@@ -152,15 +153,25 @@ async function main(): Promise<void> {
     shell: process.platform === 'win32',
   });
   if (r.status !== 0 && !r.stdout) {
-    console.error(`✗ eslint 执行失败: ${r.stderr}`);
-    process.exit(2);
+    exitWithError({
+      category: 'FILE_READ',
+      message: 'eslint 执行失败',
+      detail: String(r.stderr).slice(0, 300),
+      exitCode: 2,
+    });
+    return;
   }
   let findings: EslintResult[];
   try {
     findings = JSON.parse(r.stdout || '[]') as EslintResult[];
-  } catch {
-    console.error(`✗ eslint 输出不是合法 JSON，无法解析（前 200 字符）: ${String(r.stdout).slice(0, 200)}`);
-    process.exit(2);
+  } catch (err) {
+    exitWithError({
+      category: 'FILE_PARSE',
+      message: 'eslint 输出不是合法 JSON，无法解析',
+      detail: `前 200 字符: ${String(r.stdout).slice(0, 200)}`,
+      exitCode: 2,
+    });
+    return;
   }
 
   // --regenerate：以当前发现全量重建 baseline v2（不依赖既有 baseline 文件）
@@ -177,18 +188,38 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  if (!existsSync(BASELINE_PATH)) {
-    console.error(`✗ baseline 文件不存在: ${BASELINE_PATH}`);
-    process.exit(2);
+  // baseline 读取 + 解析合一（ENOENT → FILE_NOT_FOUND / SyntaxError → FILE_PARSE / 其他 → FILE_READ）
+  let parsed: BaselineFile | BaselineEntry[];
+  try {
+    parsed = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')) as BaselineFile | BaselineEntry[];
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    exitWithError({
+      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+      message: e.code === 'ENOENT' ? '文件不存在' : err instanceof SyntaxError ? '文件解析失败（非合法 JSON）' : '文件读取失败',
+      file: BASELINE_PATH,
+      detail: e.code ?? '未知错误',
+      exitCode: 2,
+    });
+    return;
   }
-  const parsed = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')) as BaselineFile | BaselineEntry[];
   if (Array.isArray(parsed)) {
-    console.error('✗ baseline 为旧版数组格式（位置指纹），与当前内容敏感指纹算法不兼容；请运行 --regenerate 重生成 v2');
-    process.exit(2);
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      message: 'baseline 为旧版数组格式（位置指纹），与内容敏感指纹算法不兼容（请运行 --regenerate 重生成 v2）',
+      file: BASELINE_PATH,
+      exitCode: 2,
+    });
+    return;
   }
   if (parsed.version !== 2 || parsed.algo !== 'content-line') {
-    console.error(`✗ baseline version=${parsed.version} 不支持（当前仅支持 v2/content-line）；请运行 --regenerate 重生成`);
-    process.exit(2);
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      message: `baseline version=${parsed.version} 不支持（当前仅支持 v2/content-line，请运行 --regenerate 重生成）`,
+      file: BASELINE_PATH,
+      exitCode: 2,
+    });
+    return;
   }
   const baseline: BaselineEntry[] = parsed.entries;
 
@@ -221,8 +252,12 @@ async function main(): Promise<void> {
 const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
-  main().catch((e) => {
-    console.error(e);
-    process.exit(2);
+  main().catch((err) => {
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }

@@ -28,6 +28,7 @@ import {
   type StatusReport,
 } from './wm-status-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 interface ParsedArgs {
   projectDir: string;
@@ -48,7 +49,7 @@ async function main(): Promise<void> {
   const rtmFile = path.join(wmodelDir, 'rtm.json');
   const runLogFile = path.join(wmodelDir, 'run-log.jsonl');
 
-  // 未初始化 → exit 0（查询命令语义）
+  // 未初始化 → exit 0（查询命令语义；保留原样：不加类别前缀、不输出 ERROR_JSON）
   let projectRaw: string;
   try {
     projectRaw = await fs.readFile(projectFile, 'utf-8');
@@ -63,13 +64,23 @@ async function main(): Promise<void> {
   let project: { status: string; updatedAt?: string };
   try {
     project = JSON.parse(projectRaw) as { status: string; updatedAt?: string };
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${projectFile}（转 operational-recovery，不猜测状态）`);
-    process.exit(2);
+  } catch (err) {
+    exitWithError({
+      category: 'FILE_PARSE',
+      message: '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）',
+      file: projectFile,
+      exitCode: 2,
+    });
+    return;
   }
   if (project === null || typeof project !== 'object' || Array.isArray(project)) {
-    console.error(`✗ 文件解析失败（非对象）: ${projectFile}（转 operational-recovery，不猜测状态）`);
-    process.exit(2);
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      message: '文件解析失败（非对象）（转 operational-recovery，不猜测状态）',
+      file: projectFile,
+      exitCode: 2,
+    });
+    return;
   }
 
   // rtm.json 可选：缺失降级 null；损坏 → exit 2（输入错误）
@@ -80,8 +91,16 @@ async function main(): Promise<void> {
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code !== 'ENOENT') {
-      console.error(`✗ 文件解析失败（非合法 JSON）: ${rtmFile}（转 operational-recovery，不猜测状态）`);
-      process.exit(2);
+      exitWithError({
+        category: err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+        message: err instanceof SyntaxError
+          ? '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）'
+          : '文件读取失败（转 operational-recovery，不猜测状态）',
+        file: rtmFile,
+        detail: err instanceof SyntaxError ? undefined : (e.code ?? '未知错误'),
+        exitCode: 2,
+      });
+      return;
     }
   }
 
@@ -155,6 +174,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('/wm status 脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

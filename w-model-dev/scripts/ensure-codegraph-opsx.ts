@@ -20,9 +20,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { exitWithError } from './lib/cli-error.js';
 
 type Mode = 'full' | 'quick' | 'light';
 
@@ -205,22 +206,47 @@ async function main(): Promise<void> {
   const modeStr = getArg('mode') as Mode | undefined;
 
   if (!phaseStr || !projectRoot || !modeStr) {
-    console.error('用法: npx tsx ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 --phase/--project-root/--mode',
+      detail: '用法: npx tsx ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const phase = parseInt(phaseStr, 10);
   if (Number.isNaN(phase) || phase < 5 || phase > 8) {
-    console.error(`✗ phase 须为 5-8，收到 ${phaseStr}`);
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: 'phase 必须为 5-8 整数',
+      detail: `收到 ${phaseStr}`,
+      exitCode: 2,
+    });
+    return;
   }
 
   if (!['full', 'quick', 'light'].includes(modeStr)) {
-    console.error(`✗ mode 须为 full/quick/light，收到 ${modeStr}`);
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: 'mode 必须为 full/quick/light',
+      detail: `收到 ${modeStr}`,
+      exitCode: 2,
+    });
+    return;
   }
 
   const absRoot = path.resolve(projectRoot);
+  // 项目根不存在 → FILE_NOT_FOUND（exit 2 输入错误守卫；非 opsx/openspec 那类 violation 语义）
+  if (!existsSync(absRoot) || !statSync(absRoot).isDirectory()) {
+    exitWithError({
+      category: 'FILE_NOT_FOUND',
+      message: '项目根路径不存在或不是目录',
+      file: absRoot,
+      exitCode: 2,
+    });
+    return;
+  }
   const results = ensureDeps(phase, absRoot, modeStr);
   const hasCheckpoint = results.some(r => r.status === 'checkpoint');
 
@@ -256,7 +282,11 @@ const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
   main().catch((err) => {
-    console.error('ensure-codegraph-opsx 异常:', err);
-    process.exit(2);
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }

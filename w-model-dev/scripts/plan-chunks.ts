@@ -21,9 +21,10 @@
  * 输出：stdout JSON（供编排者读取用于 CHECKPOINT 展示与 A-chunk 分派）
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as fs, type Stats } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { exitWithError } from './lib/cli-error.js';
 
 interface Chunk {
   id: string;
@@ -43,44 +44,25 @@ interface PlanOutput {
 const MAX_TOKENS_DEFAULT = 8000;
 
 function parseArgs(argv: string[]): {
-  inputPath: string;
-  phase: number;
-  nodeType: string;
-  maxTokens: number;
+  inputPath: string | undefined;
+  phaseStr: string | undefined;
+  nodeTypeStr: string | undefined;
+  maxTokensStr: string | undefined;
 } {
   const inputPath = argv[2];
-  if (!inputPath) {
-    console.error('用法: npx tsx w-model-dev/scripts/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]');
-    process.exit(2);
-  }
-  let phase: number | undefined;
-  let nodeType: string | undefined;
-  let maxTokens = MAX_TOKENS_DEFAULT;
+  let phaseStr: string | undefined;
+  let nodeTypeStr: string | undefined;
+  let maxTokensStr: string | undefined;
   for (const a of argv.slice(3)) {
     if (a.startsWith('--phase=')) {
-      const phaseStr = a.split('=')[1];
-      if (phaseStr !== undefined) phase = Number(phaseStr);
+      phaseStr = a.split('=')[1];
     } else if (a.startsWith('--node-type=')) {
-      const typeStr = a.split('=')[1];
-      if (typeStr !== undefined) nodeType = typeStr;
+      nodeTypeStr = a.split('=')[1];
     } else if (a.startsWith('--max-tokens=')) {
-      const tokStr = a.split('=')[1];
-      if (tokStr !== undefined) maxTokens = Number.parseInt(tokStr, 10);
+      maxTokensStr = a.split('=')[1];
     }
   }
-  if (!Number.isInteger(phase) || ![1, 2, 3, 4].includes(phase!)) {
-    console.error(`✗ --phase 必须为 1-4，实际: ${phase}`);
-    process.exit(2);
-  }
-  if (!['REQ', 'SD', 'INTF', 'DD'].includes(nodeType ?? '')) {
-    console.error(`✗ --node-type 必须为 REQ|SD|INTF|DD，实际: ${nodeType}`);
-    process.exit(2);
-  }
-  if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
-    console.error(`✗ --max-tokens 必须为正整数，实际: ${maxTokens}`);
-    process.exit(2);
-  }
-  return { inputPath, phase: phase!, nodeType: nodeType!, maxTokens };
+  return { inputPath, phaseStr, nodeTypeStr, maxTokensStr };
 }
 
 export function estimateTokens(text: string): number {
@@ -202,25 +184,85 @@ export async function planFile(
 }
 
 async function main(): Promise<void> {
-  const { inputPath, phase, nodeType, maxTokens } = parseArgs(process.argv);
+  const { inputPath, phaseStr, nodeTypeStr, maxTokensStr } = parseArgs(process.argv);
 
-  const abs = path.resolve(inputPath);
-  try {
-    await fs.access(abs);
-  } catch {
-    console.error(`✗ 路径不存在: ${abs}`);
-    process.exit(2);
+  if (!inputPath) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <path>',
+      detail: '用法: npx tsx w-model-dev/scripts/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
+      exitCode: 2,
+    });
+    return;
+  }
+  const phase = Number(phaseStr);
+  if (phaseStr === undefined || !Number.isInteger(phase) || phase < 1 || phase > 4) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '--phase 必须为 1-4 整数',
+      detail: `收到 ${phaseStr ?? '(未提供)'}`,
+      exitCode: 2,
+    });
+    return;
+  }
+  if (nodeTypeStr === undefined || !['REQ', 'SD', 'INTF', 'DD'].includes(nodeTypeStr)) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '--node-type 必须为 REQ|SD|INTF|DD',
+      detail: `收到 ${nodeTypeStr ?? '(未提供)'}`,
+      exitCode: 2,
+    });
+    return;
+  }
+  const maxTokens = maxTokensStr === undefined ? MAX_TOKENS_DEFAULT : Number.parseInt(maxTokensStr, 10);
+  if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '--max-tokens 必须为正整数',
+      detail: `收到 ${maxTokensStr ?? '(未提供)'}`,
+      exitCode: 2,
+    });
+    return;
   }
 
-  const stat = await fs.stat(abs);
-  const chunks = await planFile(abs, maxTokens, 'chunk');
+  const abs = path.resolve(inputPath);
+
+  let stat: Stats;
+  try {
+    stat = await fs.stat(abs);
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    exitWithError({
+      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+      message: e.code === 'ENOENT' ? '路径不存在' : '路径读取失败',
+      file: abs,
+      detail: e.code ?? '未知错误',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  let chunks: Chunk[];
+  try {
+    chunks = await planFile(abs, maxTokens, 'chunk');
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    exitWithError({
+      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+      message: e.code === 'ENOENT' ? '路径不存在' : err instanceof SyntaxError ? '文件解析失败' : '文件读取失败',
+      file: abs,
+      detail: e.code ?? '未知错误',
+      exitCode: 2,
+    });
+    return;
+  }
 
   const output: PlanOutput = {
     chunks,
     totalChunks: chunks.length,
     strategy: stat.isDirectory() ? 'dir-tree' : chunks.length > 1 ? 'file-split' : 'single',
     phase,
-    nodeType,
+    nodeType: nodeTypeStr,
   };
 
   console.log(JSON.stringify(output, null, 2));
@@ -232,7 +274,11 @@ const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
   main().catch((err) => {
-    console.error('分块规划脚本异常:', err);
-    process.exit(2);
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }
