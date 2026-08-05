@@ -30,6 +30,26 @@
 - self-test 213/213 不变全通过
 - TypeScript strict 0 错误
 
+## [30.0.0] - 2026-08-05
+
+### 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁
+
+吸收外部评审建议低风险批三项（设计文档 `docs/superpowers/specs/2026-08-05-round30-schema-desc-redaction-audit-design.md`）。详见 SSoT §3.4.27。
+
+#### Added
+- 反模式 #43（敏感信息写入状态文件/日志）—— 状态文件/日志不得含硬编码凭据，敏感配置统一环境变量注入
+
+#### Changed
+- `schemas/*.schema.json`（19 份）：全量字段补充 `description`（用途 + 期望值），仅注释性关键字，校验行为不变
+- `references/operational-recovery.md`：「JSON 文件写入工具选择」节新增敏感信息禁令
+- `.githooks/pre-push`：新增检查 #12 npm audit（warn-only + 离线容错），11 项 → 12 项
+
+#### 验证
+- self-test 213/213 不变全通过
+- vitest 269/269 不变全通过
+- prepush 12 项通过（npm audit warn-only）
+- TypeScript strict 0 错误
+
 ## [29.0.0] - 2026-08-05
 
 ### 第三十轮 CLI 样板抽取 + 分派总览矩阵
