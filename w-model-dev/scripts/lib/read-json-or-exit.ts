@@ -30,7 +30,7 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
+      console.error(`✗ [FILE_NOT_FOUND] 文件不存在: ${abs}`);
       process.exit(2);
     }
     throw err;
@@ -38,7 +38,7 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
   try {
     return JSON.parse(raw) as T;
   } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${abs}`);
+    console.error(`✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: ${abs}`);
     process.exit(2);
   }
 }
@@ -78,7 +78,7 @@ export async function readJsonlOrExit(
     try {
       entries.push(JSON.parse(trimmed));
     } catch {
-      console.error(`⚠ ${label} 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
+      console.error(`⚠ [FILE_PARSE] ${label} 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
     }
   }
   return entries;

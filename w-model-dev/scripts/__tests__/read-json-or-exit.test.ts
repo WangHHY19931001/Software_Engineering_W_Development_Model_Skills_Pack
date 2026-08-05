@@ -47,7 +47,7 @@ describe('readJsonOrExit', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const missing = path.join(tmpDir, 'nope.json');
     await expect(readJsonOrExit(missing)).rejects.toThrow('exit:2');
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('✗ 文件不存在'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
     exitSpy.mockRestore();
     errSpy.mockRestore();
   });
@@ -60,7 +60,7 @@ describe('readJsonOrExit', () => {
     const file = path.join(tmpDir, 'bad.json');
     await fs.writeFile(file, '{not json');
     await expect(readJsonOrExit(file)).rejects.toThrow('exit:2');
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('✗ 文件解析失败'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
     exitSpy.mockRestore();
     errSpy.mockRestore();
   });
@@ -100,7 +100,7 @@ describe('readJsonlOrExit', () => {
     await fs.writeFile(file, '{"ok":1}\n{bad}\n{"ok":2}\n');
     const entries = await readJsonlOrExit(file, 'run-log');
     expect(entries).toEqual([{ ok: 1 }, { ok: 2 }]);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('⚠ run-log 第 2 行'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
     errSpy.mockRestore();
   });
 
@@ -128,7 +128,7 @@ describe('readJsonlOrExit', () => {
     const file = path.join(tmpDir, 'default-label.jsonl');
     await fs.writeFile(file, '{"ok":1}\n{bad}\n');
     await readJsonlOrExit(file);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('⚠ 行 第 2 行'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
     errSpy.mockRestore();
   });
 });
