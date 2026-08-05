@@ -16,6 +16,7 @@
 import { checkExemption } from './exemption-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -46,17 +47,12 @@ async function main(): Promise<void> {
     }
   }
 
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('EXEMPTION_JSON ' + JSON.stringify({
+  printGateReport('EXEMPTION', {
     type: 'exemption',
     passed: result.passed,
-    exitCode,
     stage: result.stage,
     violations: result.violations,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

@@ -34,6 +34,7 @@ import * as path from 'node:path';
 import { checkSignatureChain, type SignatureChainEntry } from './signature-chain-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 // ==================== 参数解析 ====================
 
@@ -157,21 +158,13 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/anti-patterns.md #32');
   }
 
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log(
-    'SIGNATURE_CHAIN_JSON ' +
-      JSON.stringify({
-        type: 'signature-chain',
-        passed: result.passed,
-        exitCode,
-        violations: result.violations,
-        rulesPassed: result.rulesPassed,
-        rulesFailed: result.rulesFailed,
-      }),
-  );
-
-  process.exit(exitCode);
+  printGateReport('SIGNATURE_CHAIN', {
+    type: 'signature-chain',
+    passed: result.passed,
+    violations: result.violations,
+    rulesPassed: result.rulesPassed,
+    rulesFailed: result.rulesFailed,
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

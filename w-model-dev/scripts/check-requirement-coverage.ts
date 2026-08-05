@@ -24,6 +24,7 @@ import type { GraphShape } from './graph-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { printGateReport } from './lib/gate-report.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -198,19 +199,14 @@ async function main(): Promise<void> {
   }
 
   // JSON 摘要
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('COVERAGE_JSON ' + JSON.stringify({
+  printGateReport('COVERAGE', {
     type: 'requirement-coverage',
     passed: result.passed,
-    exitCode,
     metrics: result.metrics,
     exemptionsApplied: result.exemptionsApplied,
     violations: result.violations,
     warnings: result.warnings,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

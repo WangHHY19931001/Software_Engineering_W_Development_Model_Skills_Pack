@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { printGateReport } from './lib/gate-report.js';
 
 interface CodegraphQuery {
   querySymbol: string;
@@ -166,18 +167,13 @@ async function main(): Promise<void> {
     }
   }
 
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('CODEGRAPH_QUERIES_JSON ' + JSON.stringify({
+  printGateReport('CODEGRAPH_QUERIES', {
     type: 'codegraph-queries',
     passed: result.passed,
-    exitCode,
     phase,
     queryCount: result.queryCount,
     violations: result.violations,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 const entryArg = process.argv[1];

@@ -32,6 +32,7 @@ import {
 } from './verifier-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -117,20 +118,15 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('VERIFIER_JSON ' + JSON.stringify({
+  printGateReport('VERIFIER', {
     type: 'verifier-output',
     passed,
-    exitCode,
     selfAsVerifier,
     compositeScore: result.compositeScore,
     expectedCompositeScore: result.expectedCompositeScore,
     qualityLevel: result.qualityLevel,
     reasons: allReasons,
-  }));
-
-  process.exit(exitCode);
+  }, passed ? 0 : 1);
 }
 
 main().catch((err) => {

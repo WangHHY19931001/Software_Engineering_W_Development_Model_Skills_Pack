@@ -37,6 +37,7 @@ import {
 import { validateBySchema } from './schema-loader.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { printGateReport } from './lib/gate-report.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
@@ -366,20 +367,15 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = overallPassed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('GATE_JSON ' + JSON.stringify({
+  printGateReport('GATE', {
     type: 'artifact',
     passed: overallPassed,
-    exitCode,
     coveragePercent: result.coveragePercent,
     unitCoveragePercent: result.unitCoveragePercent,
     missingItems: result.missingItems,
     reasons: allReasons,
     bddManifestExists,
-  }));
-
-  process.exit(exitCode);
+  }, overallPassed ? 0 : 1);
 }
 
 // isMain 守卫：仅直接执行时运行 main，被 self-test 等 import 时不触发

@@ -24,6 +24,7 @@ import { promises as fs, type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { checkArchiveIntegrity } from './archive-integrity-logic.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 // ==================== 目录遍历 ====================
 
@@ -102,20 +103,12 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/anti-patterns.md #31');
   }
 
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log(
-    'ARCHIVE_INTEGRITY_JSON ' +
-      JSON.stringify({
-        type: 'archive-integrity',
-        passed: result.passed,
-        exitCode,
-        missingFiles: result.missingFiles,
-        checkedPhases: result.checkedPhases,
-      }),
-  );
-
-  process.exit(exitCode);
+  printGateReport('ARCHIVE_INTEGRITY', {
+    type: 'archive-integrity',
+    passed: result.passed,
+    missingFiles: result.missingFiles,
+    checkedPhases: result.checkedPhases,
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

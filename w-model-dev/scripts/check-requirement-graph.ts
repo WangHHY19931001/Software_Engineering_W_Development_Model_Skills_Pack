@@ -32,6 +32,7 @@ import {
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { printGateReport } from './lib/gate-report.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -240,12 +241,9 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('GRAPH_JSON ' + JSON.stringify({
+  printGateReport('GRAPH', {
     type: 'requirement-graph',
     passed: result.passed,
-    exitCode,
     phase: result.phase,
     totalNodes: result.totalNodes,
     totalEdges: result.totalEdges,
@@ -263,9 +261,7 @@ async function main(): Promise<void> {
     violations: result.violations,
     warnings: result.warnings ?? [],
     converged: result.passed,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

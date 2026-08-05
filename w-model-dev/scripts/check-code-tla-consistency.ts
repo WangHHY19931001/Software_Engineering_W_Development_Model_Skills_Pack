@@ -47,6 +47,7 @@ import {
 } from './code-tla-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -226,43 +227,35 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log(
-    'CODE_TLA_JSON ' +
-      JSON.stringify({
-        type: 'code-tla-consistency',
-        passed: result.passed,
-        exitCode,
-        dimensions: {
-          sdToCodeModule: {
-            passed: result.dimensions.sdToCodeModule.passed,
-            checked: result.dimensions.sdToCodeModule.checked,
-            violations: result.dimensions.sdToCodeModule.violations,
-          },
-          codeStateTransfer: {
-            passed: result.dimensions.codeStateTransfer.passed,
-            checked: result.dimensions.codeStateTransfer.checked,
-            violations: result.dimensions.codeStateTransfer.violations,
-          },
-          nextBranchCoverage: {
-            passed: result.dimensions.nextBranchCoverage.passed,
-            checked: result.dimensions.nextBranchCoverage.checked,
-            violations: result.dimensions.nextBranchCoverage.violations,
-          },
-          invariantCoverage: {
-            passed: result.dimensions.invariantCoverage.passed,
-            checked: result.dimensions.invariantCoverage.checked,
-            violations: result.dimensions.invariantCoverage.violations,
-          },
-        },
-        violations: result.violations,
-        codeFileCount: codeFiles.length,
-        converged: result.passed,
-      }),
-  );
-
-  process.exit(exitCode);
+  printGateReport('CODE_TLA', {
+    type: 'code-tla-consistency',
+    passed: result.passed,
+    dimensions: {
+      sdToCodeModule: {
+        passed: result.dimensions.sdToCodeModule.passed,
+        checked: result.dimensions.sdToCodeModule.checked,
+        violations: result.dimensions.sdToCodeModule.violations,
+      },
+      codeStateTransfer: {
+        passed: result.dimensions.codeStateTransfer.passed,
+        checked: result.dimensions.codeStateTransfer.checked,
+        violations: result.dimensions.codeStateTransfer.violations,
+      },
+      nextBranchCoverage: {
+        passed: result.dimensions.nextBranchCoverage.passed,
+        checked: result.dimensions.nextBranchCoverage.checked,
+        violations: result.dimensions.nextBranchCoverage.violations,
+      },
+      invariantCoverage: {
+        passed: result.dimensions.invariantCoverage.passed,
+        checked: result.dimensions.invariantCoverage.checked,
+        violations: result.dimensions.invariantCoverage.violations,
+      },
+    },
+    violations: result.violations,
+    codeFileCount: codeFiles.length,
+    converged: result.passed,
+  }, result.passed ? 0 : 1);
 }
 
 main().catch(err => {

@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 interface CheckResult {
   passed: boolean;
@@ -123,19 +124,14 @@ async function main(): Promise<void> {
     }
   }
 
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('OPENSPEC_ARCHIVE_JSON ' + JSON.stringify({
+  printGateReport('OPENSPEC_ARCHIVE', {
     type: 'openspec-archive',
     passed: result.passed,
-    exitCode,
     phase,
     archivedChange: result.archivedChange,
     artifactsFound: result.artifactsFound,
     violations: result.violations,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 const entryArg = process.argv[1];

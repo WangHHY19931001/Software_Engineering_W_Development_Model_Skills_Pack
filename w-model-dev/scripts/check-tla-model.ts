@@ -40,6 +40,7 @@ import {
 } from './tla-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 // ==================== 参数解析 ====================
 
@@ -542,36 +543,28 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log(
-    'TLA_JSON ' +
-      JSON.stringify({
-        type: 'tla-model',
-        passed: result.passed,
-        exitCode,
-        phase: result.phase,
-        totalSpecs: result.totalSpecs,
-        checkedSpecs: result.checkedSpecs,
-        headerViolations: result.headerViolations,
-        hierarchyViolations: result.hierarchyViolations,
-        decompositionViolations: result.decompositionViolations,
-        syntaxErrors: result.syntaxErrors,
-        deadlockViolations: result.deadlockViolations,
-        invariantViolations: result.invariantViolations,
-        stateExplosionSpecs: result.stateExplosionSpecs,
-        coverageViolations: result.coverageViolations,
-        cfgConsistencyViolations: result.cfgConsistencyViolations,
-        cfgStructureViolations: result.cfgStructureViolations,
-        checkRoundsViolations: result.checkRoundsViolations,
-        environmentOk: result.environmentOk,
-        environmentErrors: result.environmentErrors,
-        violations: result.violations,
-        converged: result.passed,
-      }),
-  );
-
-  process.exit(exitCode);
+  printGateReport('TLA', {
+    type: 'tla-model',
+    passed: result.passed,
+    phase: result.phase,
+    totalSpecs: result.totalSpecs,
+    checkedSpecs: result.checkedSpecs,
+    headerViolations: result.headerViolations,
+    hierarchyViolations: result.hierarchyViolations,
+    decompositionViolations: result.decompositionViolations,
+    syntaxErrors: result.syntaxErrors,
+    deadlockViolations: result.deadlockViolations,
+    invariantViolations: result.invariantViolations,
+    stateExplosionSpecs: result.stateExplosionSpecs,
+    coverageViolations: result.coverageViolations,
+    cfgConsistencyViolations: result.cfgConsistencyViolations,
+    cfgStructureViolations: result.cfgStructureViolations,
+    checkRoundsViolations: result.checkRoundsViolations,
+    environmentOk: result.environmentOk,
+    environmentErrors: result.environmentErrors,
+    violations: result.violations,
+    converged: result.passed,
+  }, result.passed ? 0 : 1);
 }
 
 main().catch(err => {

@@ -31,6 +31,7 @@ import { checkBudget, type BudgetConfig } from './budget-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { printGateReport } from './lib/gate-report.js';
 
 // ==================== 参数解析 ====================
 
@@ -209,16 +210,11 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('BUDGET_JSON ' + JSON.stringify({
+  printGateReport('BUDGET', {
     type: 'budget',
     passed: result.passed,
-    exitCode,
     violations: result.violations,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

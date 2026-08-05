@@ -37,6 +37,7 @@ import {
   type AcceptanceTestAssertion,
 } from './design-contract-logic.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 // ==================== uat-path-mapping.md 解析 ====================
 
@@ -275,15 +276,11 @@ async function main(): Promise<void> {
     console.log('✓ 设计契约一致性校验通过');
   }
 
-  console.log('─'.repeat(60));
-  console.log(`CONTRACT_JSON: ${JSON.stringify({
+  printGateReport('CONTRACT', {
     passed: result.passed,
-    exitCode: result.passed ? 0 : 1,
     violationCount: result.violations.length,
     violations: result.violations,
-  })}`);
-
-  process.exit(result.passed ? 0 : 1);
+  }, result.passed ? 0 : 1);
 }
 
 main().catch((err) => {

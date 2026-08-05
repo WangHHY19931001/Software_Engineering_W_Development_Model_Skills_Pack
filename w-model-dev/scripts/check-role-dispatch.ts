@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { checkRoleDispatch, type RoleDispatchEntry } from './role-dispatch-logic.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { printGateReport } from './lib/gate-report.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -108,18 +109,13 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（r3Enabled 恒为 true，向后兼容历史消费者）
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('ROLE_DISPATCH_JSON ' + JSON.stringify({
+  printGateReport('ROLE_DISPATCH', {
     type: 'role-dispatch',
     passed: result.passed,
-    exitCode,
     r3Enabled: true,
     phaseCount: result.phaseSummary.length,
     violations: result.violations,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 // Windows 兼容的 main 模块判断：

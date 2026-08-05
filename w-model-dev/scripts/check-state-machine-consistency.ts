@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
+import { printGateReport } from './lib/gate-report.js';
 
 interface Transition {
   from: string;
@@ -138,12 +139,9 @@ async function main(): Promise<void> {
     }
   }
 
-  const exitCode = result.passed ? 0 : 1;
-  console.log('─'.repeat(60));
-  console.log('STATE_MACHINE_JSON ' + JSON.stringify({
+  printGateReport('STATE_MACHINE', {
     type: 'state-machine-consistency',
     passed: result.passed,
-    exitCode,
     designStateCount: result.designStates.length,
     codeStateCount: result.codeStates.length,
     designTransitionCount: result.designTransitions.length,
@@ -151,9 +149,7 @@ async function main(): Promise<void> {
     missingInCode: result.missingInCode.map(transitionKey),
     extraInCode: result.extraInCode.map(transitionKey),
     reasons: result.reasons,
-  }));
-
-  process.exit(exitCode);
+  }, result.passed ? 0 : 1);
 }
 
 // isMain 守卫：仅在直接执行时运行 main，被 import 时不触发
