@@ -16,7 +16,7 @@
  */
 
 import * as path from 'node:path';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
 
@@ -124,15 +124,6 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       message: '参数缺失 <project-root> 或 --phase',
       detail: '用法: npx tsx check-opsx-artifacts.ts <project-root> --phase <5|6|7|8>',
-      exitCode: 2,
-    });
-    return;
-  }
-  if (!existsSync(file) || !statSync(file).isDirectory()) {
-    exitWithError({
-      category: 'FILE_NOT_FOUND',
-      message: '项目根路径不存在或不是目录',
-      file: path.resolve(file),
       exitCode: 2,
     });
     return;
