@@ -32,4 +32,12 @@ describe('skill-metadata 双写一致性', () => {
     const meta = JSON.parse(readFileSync(join(ROOT, 'skill-metadata.json'), 'utf-8'));
     expect(meta.schemaVersion).toBe('1.0');
   });
+
+  it('package.json version 与 skill-metadata.json / SKILL.md frontmatter version 三处一致', () => {
+    const skill = readFileSync(join(ROOT, 'SKILL.md'), 'utf-8');
+    const meta = JSON.parse(readFileSync(join(ROOT, 'skill-metadata.json'), 'utf-8'));
+    const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
+    expect(pkg.version).toBe(meta.version);
+    expect(pkg.version).toBe(parseFrontmatter(skill).version);
+  });
 });

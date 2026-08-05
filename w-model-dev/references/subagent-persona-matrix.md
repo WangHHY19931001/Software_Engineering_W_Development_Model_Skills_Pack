@@ -10,10 +10,10 @@
 
 | 类别 | 数量 | 人格 | R/V 适用性 |
 |---|---|---|---|
-| **engineering** | 13 | code-reviewer, senior-developer, software-architect, backend-architect, frontend-developer, ai-engineer, data-engineer, database-optimizer, autonomous-optimization-architect, incident-response-commander, threat-detection-engineer, technical-writer×2 | R + V |
+| **engineering** | 12 | code-reviewer, senior-developer, software-architect, backend-architect, frontend-developer, ai-engineer, data-engineer, database-optimizer, autonomous-optimization-architect, incident-response-commander, threat-detection-engineer, technical-writer | R + V |
 | **testing** | 7 | api-tester, performance-benchmarker, reality-checker, evidence-collector, test-results-analyzer, tool-evaluator, workflow-optimizer | R + V |
 | **design** | 3 | ui-designer, ux-architect, ux-researcher | V（阶段 2-3 设计评审） |
-| **product** | 3 | product-manager, feedback-synthesizer, trend-researcher, behavioral-nudge-engine | V（阶段 1 需求评审） |
+| **product** | 4 | product-manager, feedback-synthesizer, trend-researcher, behavioral-nudge-engine | V（阶段 1 需求评审） |
 | **project** | 2 | project-manager-senior, experiment-tracker | V（阶段 1-2 流程评审） |
 
 ---

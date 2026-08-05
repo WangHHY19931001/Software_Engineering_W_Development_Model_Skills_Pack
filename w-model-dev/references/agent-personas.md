@@ -555,7 +555,7 @@
 
 > 对应 spec [§9.1](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 现有人格库盘点。
 
-[`w-model-dev/subagent/`](../subagent/) 含 28 个人格文件，分 5 类（engineering 13 / testing 7 / design 3 / product 3 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
+[`w-model-dev/subagent/`](../subagent/) 含 28 个人格文件，分 5 类（engineering 12 / testing 7 / design 3 / product 4 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
 
 | 本文件 Persona | subagent/ 对应人格 | 关系 |
 |---|---|---|
