@@ -4,7 +4,7 @@
 
 **Goal:** 完成第 30 轮低风险批三项：#13 为 19 份 schema 全量字段补 description、#8 新增反模式 #43 敏感信息脱敏条款、#7 pre-push 新增 npm audit（warn-only），版本号三处同步 30.0.0。
 
-**Architecture:** 纯文档 + 门禁脚本增量。schema 只加 `description` 关键字（ajv draft-07 忽略，校验行为不变）；anti-patterns.md 追加 #43；pre-push 追加 warn-only 的 npm audit 检查。回归基线（self-test 213 条 / vitest 269 条）必须全部保持通过。
+**Architecture:** 纯文档 + 门禁脚本增量。schema 只加 `description` 关键字（ajv draft-07 忽略，校验行为不变）；anti-patterns.md 追加 #43；pre-push 追加 warn-only 的 npm audit 检查。回归基线（self-test 213 条 / vitest 297 条）必须全部保持通过。
 
 **Tech Stack:** TypeScript（tsx runtime）、JSON Schema draft-07、ajv、bash（pre-push hook）。
 
@@ -339,7 +339,7 @@ git commit -m "docs(schemas): Group D 3 份 schema 全字段 description（check
 
 **门禁脚本**：无专用脚本（软检测，V 评审 + G 门禁人工核验；`security-scan.ts` 覆盖源码级扫描，本反模式覆盖数据文件层）。
 
-**关联**：SSoT §3.4.26（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
+**关联**：SSoT §3.4.27（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
 ```
 
 - [ ] **Step 2: operational-recovery.md 补密钥禁令**
@@ -455,9 +455,9 @@ git commit -m "chore(pre-push): 新增 npm audit 依赖漏洞扫描（warn-only 
 ```markdown
 ## [30.0.0] - 2026-08-05
 
-### 第三十轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁
+### 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁
 
-吸收外部评审建议低风险批三项（设计文档 `docs/superpowers/specs/2026-08-05-round30-schema-desc-redaction-audit-design.md`）。详见 SSoT §3.4.26。
+吸收外部评审建议低风险批三项（设计文档 `docs/superpowers/specs/2026-08-05-round30-schema-desc-redaction-audit-design.md`）。详见 SSoT §3.4.27。
 
 #### Added
 - 反模式 #43（敏感信息写入状态文件/日志）—— 状态文件/日志不得含硬编码凭据，敏感配置统一环境变量注入
@@ -469,17 +469,17 @@ git commit -m "chore(pre-push): 新增 npm audit 依赖漏洞扫描（warn-only 
 
 #### 验证
 - self-test 213/213 不变全通过
-- vitest 269/269 不变全通过
+- vitest 297/297 不变全通过
 - prepush 12 项通过（npm audit warn-only）
 - TypeScript strict 0 错误
 ```
 
-- [ ] **Step 3: SSoT §3.4.26 轮次记录 + §10A 追溯表**
+- [ ] **Step 3: SSoT §3.4.27 轮次记录 + §10A 追溯表**
 
-- 定位 SSoT 最后轮次节 `#### 3.4.24 第 28 轮：...`（§3.4.25 可能已有第 29 轮节，若有则在其后新增 3.4.26），按既有格式新增：
+- 定位 SSoT 最后轮次节（现有 `#### 3.4.26 第三十轮：CLI 样板抽取 + 分派总览矩阵（[29.0.0]）`，在其后新增 3.4.27），按既有格式新增：
 
 ```markdown
-#### 3.4.26 第 30 轮：Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁（2026-08-05，[30.0.0]）
+#### 3.4.27 第三十一轮：Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁（2026-08-05，[30.0.0]）
 
 | 维度 | 内容 |
 |---|---|
@@ -487,7 +487,7 @@ git commit -m "chore(pre-push): 新增 npm audit 依赖漏洞扫描（warn-only 
 | 新增 | 反模式 #43（敏感信息写入状态文件/日志）+ operational-recovery 敏感信息禁令 |
 | 脚本改动 | `.githooks/pre-push` 新增检查 #12 npm audit（warn-only + 离线容错） |
 | schema 改动 | 19 份 schemas/*.schema.json 全量字段补充 description（仅注释性关键字，校验行为不变） |
-| 顶层文档 | SSoT §3.4.26 + §10A 追溯表 + AGENTS.md §4 + CHANGELOG.md [30.0.0] + README.md 反模式计数 42→43 |
+| 顶层文档 | SSoT §3.4.27 + §10A 追溯表 + AGENTS.md §4 + CHANGELOG.md [30.0.0] + README.md 反模式计数 42→43 |
 | package.json | version `29.0.0` → `30.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
 | self-test | 基线 213 不变全通过 |
 | vitest | 基线 269 不变全通过 |
@@ -495,14 +495,14 @@ git commit -m "chore(pre-push): 新增 npm audit 依赖漏洞扫描（warn-only 
 | TypeScript strict | 0 错误 |
 ```
 
-- §10A 追溯表：在最后一行之后按既有格式新增 `§3.4.26` 行（内容：本轮变更摘要 + 相关文件）。
+- §10A 追溯表：在最后一行之后按既有格式新增 `§3.4.27` 行（内容：本轮变更摘要 + 相关文件）。
 
 - [ ] **Step 4: AGENTS.md 更新**
 
 - §1 仓库定位：在「第 28 轮」bullet 之后（若有第 29 轮 bullet 则在其后）新增：
 
 ```markdown
-- **第 30 轮 Schema 自描述 + 脱敏 + audit**：19 份 schema 全量字段补 description（仅注释性关键字，校验行为不变）/ 反模式 #43（状态文件/日志不得写入敏感凭据，敏感配置统一环境变量注入）/ pre-push 新增 npm audit warn-only（第 12 项）。详见 SSoT §3.4.26。
+- **第 30 轮 Schema 自描述 + 脱敏 + audit**：19 份 schema 全量字段补 description（仅注释性关键字，校验行为不变）/ 反模式 #43（状态文件/日志不得写入敏感凭据，敏感配置统一环境变量注入）/ pre-push 新增 npm audit warn-only（第 12 项）。详见 SSoT §3.4.27。
 ```
 
 - §3 常用命令：`npm run prepush  # 手动跑推送前门禁（不实际推送，11 项门禁检查）` → 12 项门禁检查。
@@ -517,7 +517,7 @@ git commit -m "chore(pre-push): 新增 npm audit 依赖漏洞扫描（warn-only 
 
 ```bash
 git add package.json w-model-dev/skill-metadata.json w-model-dev/SKILL.md docs/skill-design-document_SSoT.md CHANGELOG.md AGENTS.md README.md CONTRIBUTING.md docs/INSTALL.md
-git commit -m "docs: 版本号三处 30.0.0 + SSoT §3.4.26 + CHANGELOG [30.0.0] + AGENTS/README/INSTALL 同步"
+git commit -m "docs: 版本号三处 30.0.0 + SSoT §3.4.27 + CHANGELOG [30.0.0] + AGENTS/README/INSTALL 同步"
 ```
 
 ---
@@ -578,4 +578,4 @@ Expected: 12 项检查输出；self-test ✓ / security-scan ✓ / 其余 10 项
 
 1. **Spec 覆盖**：#13 → Task 1-4；#8 → Task 5；#7 → Task 6；版本号/文档同步 → Task 7；回归 → Task 8；验收标准全部映射。
 2. **占位符扫描**：无 TBD/TODO；每步含具体文件路径、字段清单、命令与期望输出。
-3. **类型一致性**：版本号三处、pre-push 12 项、反模式 #43、§3.4.26 编号在全部任务间一致。
+3. **类型一致性**：版本号三处、pre-push 12 项、反模式 #43、§3.4.27 编号在全部任务间一致。

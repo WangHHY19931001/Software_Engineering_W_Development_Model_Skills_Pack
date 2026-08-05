@@ -31,7 +31,7 @@
 - **不改变任何校验行为**：schema 只加 `description` 关键字（ajv draft-07 忽略），不增删字段、不改 type/enum/minimum/required。
 - **不新增 SKILL.md 约束号**（避免约束膨胀），脱敏条款由反模式承载。
 - **不引入新依赖**：npm audit 为 npm 内建命令，无 package.json devDep 变更。
-- **不改动样本与测试预期**：self-test 213 条 / vitest 269 条应全部保持通过。
+- **不改动样本与测试预期**：self-test 213 条 / vitest 297 条应全部保持通过。
 - 第 31 / 32 轮内容（/wm status、metrics-report、错误结构归一）**不在本轮**实施。
 
 ## 2. 方案详述
@@ -114,7 +114,7 @@ fi
 | `w-model-dev/references/operational-recovery.md` | 「JSON 文件写入工具选择」节补密钥禁令 |
 | `.githooks/pre-push` | 新增检查 #12 npm audit（warn-only）+ warn() 函数 + 注释更新 |
 | `package.json` / `w-model-dev/SKILL.md` frontmatter / `w-model-dev/skill-metadata.json` | 版本号三处 29.0.0 → 30.0.0 |
-| `docs/skill-design-document_SSoT.md` | §3.4.25 轮次记录 + §10A 追溯表 |
+| `docs/skill-design-document_SSoT.md` | §3.4.27 轮次记录 + §10A 追溯表 |
 | `CHANGELOG.md` | [30.0.0] 条目 |
 | `AGENTS.md` | §4 轮次记录 + §2 目录速查（如涉及 pre-push 描述） |
 | `README.md` | 反模式计数 42 → 43 + 版本号 |
@@ -127,4 +127,4 @@ fi
 3. operational-recovery.md 含密钥禁令条款。
 4. `npm run prepush` 12 项通过（audit warn-only 不阻断）。
 5. 版本号三处一致 30.0.0。
-6. 无样本 / 测试预期改动（self-test 213 条、vitest 269 条基线不变）。
+6. 无样本 / 测试预期改动（self-test 213 条、vitest 297 条基线不变）。
