@@ -45,7 +45,7 @@
 | 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工（第 15 轮共性问题 A） | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
 | 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败（第 15 轮共性问题 B） | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
-| 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 13 份） |
+| 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 19 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
 | #33 | 跳过 R3 预防性审查（第29轮强化为无条件，覆盖所有 S 变体含 S-fix / S-emergency-fix） | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
@@ -112,7 +112,7 @@
 | #25（JSON 文件 PowerShell 写入） | run-log.jsonl `note` 字段检测（"PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词）+ [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
-| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（13 份） |
+| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（19 份） |
 | #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
 | #30（豁免审批跳步） | `check-exemption` E1-E8 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
 
@@ -706,7 +706,7 @@ LLM-as-a-Verifier 在评审中识别到失败模式时，应在 `reworkHints` �
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。SSoT [§4A.2a](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
 >
-> **与 29 条流程反模式（#1~#29）+ 10 条行为退化（F1~F10）的关系**：反模式是「流程破坏」（命中即回退，脚本守护），失败模式是「行为退化」（命中不回退但降低质量，Agent 自检），运维失败模式是「运行健康问题」（命中不回退但应标注，用户+系统协同检测）。三者互补形成三层架构：
+> **与 43 条流程反模式（#1~#43）+ 10 条行为退化（F1~F10）的关系**：反模式是「流程破坏」（命中即回退，脚本守护），失败模式是「行为退化」（命中不回退但降低质量，Agent 自检），运维失败模式是「运行健康问题」（命中不回退但应标注，用户+系统协同检测）。三者互补形成三层架构：
 >
 > ```
 > 层 1：流程反模式 #1~#29（命中即回退，脚本守护）

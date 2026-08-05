@@ -298,7 +298,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
 2. **文件头校验**：8 个 `@` 字段齐全且与 manifest 一致。
 3. **层次一致性**：parent/child/sibling 双向、单 L1 根、层级单调。
 4. **拆解决策**：组合数 >1w 必须 `split-done`。
-5. **清理轨迹**：删除 `*.dump` / `*.out` / `states/`（硬约束，先清后跑）。
+5. **清理轨迹**：删除 `*.dump` / `*.out` / `states/`（硬约束，先清后跑；批次 1 安全加固双守卫：仅当目录含 `.tla` 文件才执行清理，且 `states/` 须含 TLC 产物特征——时间戳子目录或 `.st`/`.fp`/`.dump`/`.out` 文件——才删除，防误删同名业务目录）。
    - 实测 TLC 2.19 产物：`states/<YY-MM-DD-HH-MM-SS>/` 子目录下含 `<Module>.st` / `<Module>-0.st`（状态文件）+ `<Module>_0.fp` / `<Module>_1.fp`（指纹文件）。默认不产生 `.dump` / `.out`，但保留清理作为预防。
 6. **SANY 语法检查**（cwd 置为 `.tla` 所在目录）：
    ```
@@ -332,7 +332,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
 **`check-tla-model.ts` 行为**（第 9 轮 P3.8 已实施）：
 
 - **默认清理**：TLC 校验完成后自动清理所有已校验 spec 的 `states/` 子目录（每个 spec 独立清理）
-  - 实现细节：脚本遍历 `manifest.specs[]`，对每个 spec 解析 `tlaPath` 所在目录，删除其下 `states/` 目录（含全部 `<YY-MM-DD-HH-MM-SS>/` 时间戳子目录及 `.st` / `.fp` 文件）
+  - 实现细节：脚本遍历 `manifest.specs[]`，对每个 spec 解析 `tlaPath` 所在目录，删除其下 `states/` 目录（含全部 `<YY-MM-DD-HH-MM-SS>/` 时间戳子目录及 `.st` / `.fp` 文件）；批次 1 安全加固双守卫——目录无 `.tla` 文件不清理、`states/` 无 TLC 产物特征（时间戳子目录或 `.st`/`.fp`/`.dump`/`.out`）跳过不删
   - 日志输出：`✓ P3.8 已清理 TLA+ states 目录（<N> 个 spec 目录）`
 - **`--keep-states` / `-k` 参数**：调试场景下保留 `states/` 用于排查
   - 日志输出：`⚠ --keep-states 已启用，未清理 states 目录（调试模式）`

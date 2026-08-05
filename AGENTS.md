@@ -55,7 +55,7 @@
 npm install
 
 # 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
-npm run self-test                           # 213 条样本回归基线（19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 12 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT），退出码 0/1
+npm run self-test                           # 213 条样本回归基线（19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 10 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT），退出码 0/1
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2

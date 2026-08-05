@@ -179,7 +179,7 @@ CONSTANTS
 
 ## 编码调试顺序（硬约束）
 
-1. **清理轨迹**：`check-tla-model.ts` 自动删除 `*.dump` / `*.out` / `states/`（实测 TLC 2.19 轨迹落在 `states/<YY-MM-DD-HH-MM-SS>/` 下，含 `.st` 状态文件与 `.fp` 指纹文件）。
+1. **清理轨迹**：`check-tla-model.ts` 自动删除 `*.dump` / `*.out` / `states/`（实测 TLC 2.19 轨迹落在 `states/<YY-MM-DD-HH-MM-SS>/` 下，含 `.st` 状态文件与 `.fp` 指纹文件）。批次 1 安全加固双守卫：仅当目录含 `.tla` 文件才清理，且 `states/` 须含 TLC 产物特征（时间戳子目录或 `.st`/`.fp`/`.dump`/`.out`）才删除。
 2. **SANY 语法检查**：`java -cp <jarPath> tla2sany.SANY <module>.tla`（cwd 置为 `.tla` 所在目录）。实测退出码 **0=成功 / 11=语法错误**；输出走 stdout。
 3. **TLC 模型检查**：语法通过后才允许跑 TLC。语法未通过即跑 TLC → 反模式 #14。
    - 命令：`java -cp <jarPath> tlc2.TLC -nowarning -cleanup -config <spec>.cfg <moduleName>`（cwd 置为 `.tla` 所在目录）。
