@@ -10,6 +10,7 @@
 | budget-logic.test.ts | Budget | R1 时效性 / R2 schema / R3 onExceed / R4 killSwitch / R5 触发检测 |
 | code-tla-logic.test.ts | Code-TLA+ | SD→codeModule 映射 / 状态转移 / Next 分支 / 不变式覆盖 |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
+| gate-report.test.ts | CLI IO | printGateReport 分隔线 + `<LABEL>_JSON ` 行首标记 / exitCode 追加 JSON 末尾 / exit 码 0/1/2 透传 / summary 自带 exitCode 被参数覆盖 |
 | root-cause-logic.test.ts | RootCause | R1 schema / R2 链长 / R3 可证伪 / R4 修复建议 / R5 预防 / R6 上游 / R7 质量 / R8 报告 ID / R9 多角度 / R10 reality |
 | run-log-logic.test.ts | RunLog | R1 完整性 / R2 tokens / R3 返工 / R4 决策 / R5 O越权 / R6 exitCode / R7 时序 |
 | tla-logic.test.ts | TLA+ | 文件头 / 层次 / 拆解 / SANY / TLC / R13 checkRounds schema |
