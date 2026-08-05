@@ -27,7 +27,7 @@ import {
   type RunLogLike,
   type StatusReport,
 } from './wm-status-logic.js';
-import { readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { readJsonlOptional } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 
@@ -105,15 +105,8 @@ async function main(): Promise<void> {
     }
   }
 
-  // run-log.jsonl 可选：缺失降级空数组（先 access 探测，readJsonlOrExit 对 ENOENT 会 exit 2）
-  let runLog: RunLogLike[] = [];
-  try {
-    await fs.access(runLogFile);
-    runLog = (await readJsonlOrExit(runLogFile, 'run-log')) as RunLogLike[];
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') throw err;
-  }
+  // run-log.jsonl 可选：缺失降级空数组（readJsonlOptional ENOENT→[]，坏行 warn+skip 同 readJsonlOrExit）
+  const runLog = (await readJsonlOptional(runLogFile, 'run-log')) as RunLogLike[];
 
   // 归一化 status（JSON 来源可能为任意类型，防 StatusReport.status 类型承诺破坏）
   const report: StatusReport = buildStatusReport(

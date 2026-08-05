@@ -2,6 +2,8 @@
  * CLI 脚本输入读取工具（Read JSON or Exit）
  *
  * 消除 check-*.ts 中重复的「readFile + ENOENT → exit(2) + JSON.parse → exit(2)」样板。
+ * 可选输入变体（readJsonOptional / readJsonlOptional）：ENOENT 降级为 null/[]（不 exit），
+ * 损坏文件仍按输入错误 exit 2（JSONL 坏行 warn+skip 不变）。
  * 仅用于 check-*.ts CLI 层；*-logic.ts 纯逻辑层不依赖本工具。
  *
  * 设计原则：
@@ -71,6 +73,11 @@ export async function readJsonlOrExit(
     }
     throw err;
   }
+  return parseJsonlLines(raw, label, abs);
+}
+
+/** 逐行解析 JSONL 文本（空行跳过；单行非法 JSON → warn+skip）。readJsonlOrExit / readJsonlOptional 共用 */
+function parseJsonlLines(raw: string, label: string, abs: string): unknown[] {
   const lines = raw.split(/\r?\n/);
   const entries: unknown[] = [];
   for (const [i, line] of lines.entries()) {
@@ -83,4 +90,50 @@ export async function readJsonlOrExit(
     }
   }
   return entries;
+}
+
+/**
+ * 可选 JSON 输入：ENOENT→null（不 exit）；解析失败→exit 2（与 readJsonOrExit 一致）。
+ * 用于「附属输入缺失时降级跳过、损坏时按输入错误拒绝」的调用点。
+ *
+ * @param file 文件路径（相对或绝对）
+ * @returns 解析后的 JSON 对象；文件不存在返回 null
+ */
+export async function readJsonOptional<T = unknown>(file: string): Promise<T | null> {
+  const abs = path.resolve(file);
+  let raw: string;
+  try {
+    raw = await fs.readFile(abs, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+  try {
+    return parseJsonSafe<T>(raw);
+  } catch {
+    console.error(`✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: ${abs}`);
+    process.exit(2);
+  }
+}
+
+/**
+ * 可选 JSONL 输入：ENOENT→[]（不 exit）；其余同 readJsonlOrExit（坏行 warn+skip）。
+ *
+ * @param file 文件路径（相对或绝对）
+ * @param label 警告消息中的行类型描述（默认「行」）
+ * @returns 解析后的条目数组；文件不存在返回空数组
+ */
+export async function readJsonlOptional(
+  file: string,
+  label = '行',
+): Promise<unknown[]> {
+  const abs = path.resolve(file);
+  let raw: string;
+  try {
+    raw = await fs.readFile(abs, 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
+  }
+  return parseJsonlLines(raw, label, abs);
 }

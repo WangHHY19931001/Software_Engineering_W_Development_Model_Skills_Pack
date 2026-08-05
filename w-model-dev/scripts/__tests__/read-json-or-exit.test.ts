@@ -4,6 +4,8 @@
  * 覆盖：
  *   - readJsonOrExit：正常路径 / ENOENT / 非法 JSON / 泛型返回
  *   - readJsonlOrExit：正常 / 空行跳过 / 坏行 warn 跳过 / ENOENT
+ *   - readJsonOptional：正常 / ENOENT→null / 非法 JSON→exit 2
+ *   - readJsonlOptional：正常 / ENOENT→[] / 坏行 warn 跳过 / 空行 + CRLF
  *
  * process.exit 测试策略：spyOn + mockImplementation 抛错拦截，避免真实退出。
  */
@@ -12,7 +14,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { readJsonOrExit, readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonlOrExit, readJsonOptional, readJsonlOptional } from '../lib/read-json-or-exit.js';
 
 let tmpDir: string;
 
@@ -130,5 +132,66 @@ describe('readJsonlOrExit', () => {
     await readJsonlOrExit(file);
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
     errSpy.mockRestore();
+  });
+});
+
+describe('readJsonOptional', () => {
+  it('文件存在 → 正常解析（不 exit）', async () => {
+    const file = path.join(tmpDir, 'opt.json');
+    await fs.writeFile(file, JSON.stringify({ a: 1, b: [2, 3] }));
+    const result = await readJsonOptional<{ a: number; b: number[] }>(file);
+    expect(result?.a).toBe(1);
+    expect(result?.b).toEqual([2, 3]);
+  });
+
+  it('文件不存在（ENOENT）→ 返回 null，不 exit', async () => {
+    const missing = path.join(tmpDir, 'nope-opt.json');
+    const result = await readJsonOptional(missing);
+    expect(result).toBeNull();
+  });
+
+  it('非法 JSON → process.exit(2)（与 readJsonOrExit 一致）', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+      throw new Error(`exit:${code}`);
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'bad-opt.json');
+    await fs.writeFile(file, '{not json');
+    await expect(readJsonOptional(file)).rejects.toThrow('exit:2');
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+});
+
+describe('readJsonlOptional', () => {
+  it('文件存在 → 正常解析为数组（不 exit）', async () => {
+    const file = path.join(tmpDir, 'opt.jsonl');
+    await fs.writeFile(file, '{"i":1}\n{"i":2}\n{"i":3}\n');
+    const entries = await readJsonlOptional(file);
+    expect(entries).toEqual([{ i: 1 }, { i: 2 }, { i: 3 }]);
+  });
+
+  it('文件不存在（ENOENT）→ 返回 []，不 exit', async () => {
+    const missing = path.join(tmpDir, 'nope-opt.jsonl');
+    const entries = await readJsonlOptional(missing);
+    expect(entries).toEqual([]);
+  });
+
+  it('坏行 warn+skip 不 exit（label 生效）', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'mixed-opt.jsonl');
+    await fs.writeFile(file, '{"ok":1}\n{bad}\n{"ok":2}\n');
+    const entries = await readJsonlOptional(file, 'run-log');
+    expect(entries).toEqual([{ ok: 1 }, { ok: 2 }]);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
+    errSpy.mockRestore();
+  });
+
+  it('空行跳过 + 支持 CRLF', async () => {
+    const file = path.join(tmpDir, 'blank-crlf-opt.jsonl');
+    await fs.writeFile(file, '{"a":1}\r\n\r\n  \n{"b":2}\r\n');
+    const entries = await readJsonlOptional(file);
+    expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
   });
 });
