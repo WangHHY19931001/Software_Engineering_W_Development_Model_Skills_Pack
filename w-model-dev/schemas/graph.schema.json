@@ -7,61 +7,65 @@
   "additionalProperties": false,
   "required": ["version", "currentPhase", "nodes", "edges"],
   "properties": {
-    "version": { "type": "number" },
-    "project": { "type": "string" },
-    "currentPhase": { "type": "integer", "minimum": 1, "maximum": 8 },
-    "rootId": { "type": ["string", "null"] },
+    "version": { "description": "图谱 schema 版本号", "type": "number" },
+    "project": { "description": "项目 ID（与 project.json 一致）", "type": "string" },
+    "currentPhase": { "description": "当前所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+    "rootId": { "description": "系统根节点 ID（唯一 REQ 根，由 parent 边入度为 0 判定；边界节点除外），可空（null）", "type": ["string", "null"] },
     "nodes": {
+      "description": "图谱节点数组（类型：REQ/SD/INTF/DD/EXT-IN/EXT-OUT）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "type", "phase", "title", "summary"],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "type": { "enum": ["REQ", "SD", "INTF", "DD", "EXT-IN", "EXT-OUT"] },
-          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-          "title": { "type": "string", "minLength": 1 },
-          "summary": { "type": "string" },
-          "sourceChunk": { "type": "string" },
-          "sourceArtifact": { "type": "string" },
-          "attributes": { "type": "object" },
-          "governance": { "type": "boolean" },
-          "derivationProduct": { "type": "boolean" },
-          "level": { "type": "integer", "minimum": 1 },
-          "priority": { "enum": ["P0", "P1", "P2", "P3"] },
-          "reqGroup": { "type": "string" }
+          "id": { "description": "节点 ID（如 REQ-NNN / SD-N.N.N / INTF-N.N.N / DD-N.N.N），须唯一", "type": "string", "minLength": 1 },
+          "type": { "description": "节点类型：REQ=需求（含 NFR/CON 横切需求）/ SD=系统设计 / INTF=接口设计 / DD=详细设计 / EXT-IN=外部输入边界 / EXT-OUT=外部输出边界", "enum": ["REQ", "SD", "INTF", "DD", "EXT-IN", "EXT-OUT"] },
+          "phase": { "description": "节点产出阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+          "title": { "description": "节点标题，非空字符串", "type": "string", "minLength": 1 },
+          "summary": { "description": "节点摘要文本", "type": "string" },
+          "sourceChunk": { "description": "来源分块标识（ingestion chunk），可空", "type": "string" },
+          "sourceArtifact": { "description": "来源产物路径（语义来源标记；从设计文档实体派生的节点此字段非空，语义来源占比校验用）", "type": "string" },
+          "attributes": { "description": "节点附加属性（自由形态对象，如 NFR 目标值等）", "type": "object" },
+          "governance": { "description": "治理类子系统标记：true=允许作为 governs 边的源节点（缺省/undefined 即非治理类）", "type": "boolean" },
+          "derivationProduct": { "description": "派生规格节点标记：true=允许作为 derives 边的源节点（缺省/undefined 即非派生规格节点）", "type": "boolean" },
+          "level": { "description": "REQ 内部层级：1=domain 2=module 3=feature 4=acceptance；REQ 节点强制必填（约束 #15，无降级），第 21 轮起支持更深自适应层级（minimum=1 无上限）；level=1 REQ 即 REQ-group 候选", "type": "integer", "minimum": 1 },
+          "priority": { "description": "需求优先级：P0=必须 P1=应该 P2=可以 P3=不会（可选）", "enum": ["P0", "P1", "P2", "P3"] },
+          "reqGroup": { "description": "所属 REQ-group ID（level≥2 REQ 须指向 level=1 祖先；level=1 REQ 自身为 group 无此字段）", "type": "string" }
         }
       }
     },
     "edges": {
+      "description": "图谱边数组（12 种类型；from/to 引用 nodes[].id，两端节点须存在）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["from", "to", "type"],
         "properties": {
-          "from": { "type": "string", "minLength": 1 },
-          "to": { "type": "string", "minLength": 1 },
+          "from": { "description": "源节点 ID（引用 nodes[].id，须存在）", "type": "string", "minLength": 1 },
+          "to": { "description": "目标节点 ID（引用 nodes[].id，须存在）", "type": "string", "minLength": 1 },
           "type": {
+            "description": "边类型（12 种）：parent=父→子系统层级树主结构边（REQ→SD→INTF→DD，层级单调无环）；depends-on=同层节点依赖（SD→SD / INTF→INTF，禁止环依赖）；implements=SD→REQ 设计实现需求（追溯边）；defines=SD→INTF 系统设计定义接口（追溯边）；realizes=DD→INTF 详细设计实现接口（追溯边）；produces=信息流方向（from 产出信息给 to，双向语义由 from/to 表达）；governs=治理层横切治理（源须 governance=true）；collaborates-with=协作层对等协作（单条边语义双向）；derives=派生层派生规格（源须 derivationProduct=true）；precedes=时序层 REQ→REQ 时序先于（无环）；conflicts-with=冲突层 REQ→REQ 冲突/互斥（单向写入语义双向，须处置）；cross-cuts=横切层 NFR/CON→REQ 横切治理",
             "enum": ["parent", "depends-on", "implements", "defines", "realizes", "produces", "governs", "collaborates-with", "derives", "precedes", "conflicts-with", "cross-cuts"]
           },
-          "sourceArtifact": { "type": "string" }
+          "sourceArtifact": { "description": "语义来源标记：从设计文档实体派生的边此字段非空（语义来源占比校验用，第 24 轮）", "type": "string" }
         }
       }
     },
     "analysisRounds": {
+      "description": "图谱门禁校验轮次记录数组（每轮 check-requirement-graph.ts 执行后追加）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["phase", "round", "violations", "converged"],
         "properties": {
-          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-          "round": { "type": "integer", "minimum": 1 },
-          "timestamp": { "type": "string", "format": "date-time" },
-          "violations": { "type": "array", "items": { "type": "string" } },
-          "converged": { "type": "boolean" }
+          "phase": { "description": "校验时所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+          "round": { "description": "本阶段内校验轮次序号（从 1 起）", "type": "integer", "minimum": 1 },
+          "timestamp": { "description": "校验时间，ISO 8601 字符串", "type": "string", "format": "date-time" },
+          "violations": { "description": "本轮违反列表（字符串数组，每条为具体违反描述）", "type": "array", "items": { "type": "string" } },
+          "converged": { "description": "本轮是否零违反收敛（violations.length === 0）", "type": "boolean" }
         }
       }
     }

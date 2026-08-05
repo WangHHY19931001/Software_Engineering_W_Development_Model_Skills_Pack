@@ -7,40 +7,42 @@
   "additionalProperties": false,
   "required": ["rows", "executionSummary"],
   "properties": {
-    "schemaVersion": { "type": "string" },
-    "projectId": { "type": "string" },
-    "currentPhase": { "type": "integer", "minimum": 1, "maximum": 8 },
-    "lastUpdated": { "type": "string" },
+    "schemaVersion": { "description": "RTM schema 版本标识（与 gate-logic.ts RTMMatrixShape 对齐）", "type": "string" },
+    "projectId": { "description": "项目 ID（与 project.json 的 id 一致）", "type": "string" },
+    "currentPhase": { "description": "当前所处阶段编号，取值 1-8（1=需求分析 … 8=验收测试；阶段门放行后推进）", "type": "integer", "minimum": 1, "maximum": 8 },
+    "lastUpdated": { "description": "RTM 最后更新时间，ISO 8601 字符串（每次回填后刷新）", "type": "string" },
     "rows": {
+      "description": "需求追溯行数组，每行对应一个需求（REQ-NNN / NFR-NNN / CON-NNN）的追溯记录；约束 #18：S 子代理产出后每阶段必须回填",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["requirementId", "description", "designDoc", "codeModule", "unitTest", "integrationTest", "systemTest", "acceptanceTest"],
         "properties": {
-          "requirementId": { "type": "string", "minLength": 1 },
-          "description": { "type": ["string", "null"] },
-          "designDoc": { "type": ["string", "null"] },
-          "codeModule": { "type": ["string", "null"] },
-          "unitTest": { "type": ["string", "null"] },
-          "integrationTest": { "type": ["string", "null"] },
-          "systemTest": { "type": ["string", "null"] },
-          "acceptanceTest": { "type": ["string", "null"] },
-          "coverageStatus": { "type": "string" },
+          "requirementId": { "description": "需求 ID，格式 REQ-NNN / NFR-NNN / CON-NNN，须唯一（重复触发门禁报错）", "type": "string", "minLength": 1 },
+          "description": { "description": "需求描述文本；阶段 1 需求登记时填写，可空（允许 null）", "type": ["string", "null"] },
+          "designDoc": { "description": "设计文档引用：阶段 2 填系统设计 SD-N.N.N、阶段 3 补接口设计、阶段 4 补详细设计；可空（允许 null）", "type": ["string", "null"] },
+          "codeModule": { "description": "代码模块路径，阶段 5 回填；REQ 行须匹配 ^SD-数字.数字:src/路径 格式，NFR/CON 行须匹配 ^src/路径 或等于 \"横切\"；可空（允许 null）", "type": ["string", "null"] },
+          "unitTest": { "description": "单元测试用例 ID（UT-NNN）：阶段 4 设计登记、阶段 5 执行回填；可空（允许 null）", "type": ["string", "null"] },
+          "integrationTest": { "description": "集成测试用例 ID（IT-NNN）：阶段 3 设计登记、阶段 6 执行回填；可空（允许 null）", "type": ["string", "null"] },
+          "systemTest": { "description": "系统测试用例 ID（ST-NNN）：阶段 2 设计登记、阶段 7 执行回填；可空（允许 null）", "type": ["string", "null"] },
+          "acceptanceTest": { "description": "验收测试用例 ID（UAT-NNN）：阶段 1 设计登记、阶段 8 执行回填；可空（允许 null）", "type": ["string", "null"] },
+          "coverageStatus": { "description": "覆盖率状态：\"100%\"=该行追溯完整（矩阵 coveragePercent 须=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #18，不允许（须回退重做）", "type": "string" },
           "targetValue": { "type": "string", "description": "NFR 生产目标值（NFR 类型时推荐填写）" },
           "testThreshold": { "type": "string", "description": "NFR 测试环境基线（NFR 类型时推荐填写）" }
         }
       }
     },
     "executionSummary": {
+      "description": "四级测试执行汇总（单元/集成/系统/验收），对应门禁 check-artifact-gate.ts 的四级测试校验（按阶段递进校验层）",
       "type": "object",
       "additionalProperties": false,
       "required": ["unitTest", "integrationTest", "systemTest", "acceptanceTest"],
       "properties": {
-        "unitTest": { "$ref": "#/$defs/testSummary" },
-        "integrationTest": { "$ref": "#/$defs/testSummary" },
-        "systemTest": { "$ref": "#/$defs/testSummary" },
-        "acceptanceTest": { "$ref": "#/$defs/testSummary" }
+        "unitTest": { "description": "单元测试执行汇总（阶段 5 起校验；覆盖率须 ≥80%）", "$ref": "#/$defs/testSummary" },
+        "integrationTest": { "description": "集成测试执行汇总（阶段 6 起校验）", "$ref": "#/$defs/testSummary" },
+        "systemTest": { "description": "系统测试执行汇总（阶段 7 起校验）", "$ref": "#/$defs/testSummary" },
+        "acceptanceTest": { "description": "验收测试执行汇总（阶段 8 终检校验）", "$ref": "#/$defs/testSummary" }
       }
     }
   },
@@ -50,11 +52,11 @@
       "additionalProperties": false,
       "required": ["total", "passed", "failed", "pending", "coverage"],
       "properties": {
-        "total": { "type": "integer", "minimum": 0 },
-        "passed": { "type": "integer", "minimum": 0 },
-        "failed": { "type": "integer", "minimum": 0 },
-        "pending": { "type": "integer", "minimum": 0 },
-        "coverage": { "type": "number", "minimum": 0, "maximum": 100 }
+        "total": { "description": "该级测试用例总数，非负整数", "type": "integer", "minimum": 0 },
+        "passed": { "description": "通过用例数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
+        "failed": { "description": "失败用例数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
+        "pending": { "description": "待执行用例数，非负整数；passed+failed+pending 必须等于 total（违反被 count-invariant 校验拦截）", "type": "integer", "minimum": 0 },
+        "coverage": { "description": "覆盖率百分比，取值 [0,100]（如 99.37 表示 99.37%）；单元测试覆盖率须 ≥80", "type": "number", "minimum": 0, "maximum": 100 }
       }
     }
   }

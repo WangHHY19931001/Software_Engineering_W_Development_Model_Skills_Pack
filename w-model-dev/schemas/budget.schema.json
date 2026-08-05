@@ -6,59 +6,65 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "projectId", "createdAt", "updatedAt", "perPhase", "project", "onExceed", "killSwitch"],
   "properties": {
-    "schemaVersion": { "type": "string", "pattern": "^1\\.0$" },
-    "projectId": { "type": "string", "minLength": 1 },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" },
+    "schemaVersion": { "description": "Budget schema 版本，当前固定为 \"1.0\"", "type": "string", "pattern": "^1\\.0$" },
+    "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
+    "createdAt": { "description": "预算创建时间，ISO 8601 字符串（/wm analyze 首次初始化时写入）", "type": "string", "format": "date-time" },
+    "updatedAt": { "description": "预算最后修改时间，ISO 8601 字符串；每阶段门放行前须更新，项目推进后不得等于 createdAt（check-budget R1 时效性）", "type": "string", "format": "date-time" },
     "perPhase": {
+      "description": "每阶段预算上限配置（单阶段超限按 onExceed 处置）",
       "type": "object",
       "additionalProperties": false,
       "required": ["maxTokens", "maxSubagentSpawns", "maxReworkRounds"],
       "properties": {
-        "maxTokens": { "type": "integer", "minimum": 0 },
-        "maxSubagentSpawns": { "type": "integer", "minimum": 0 },
-        "maxReworkRounds": { "type": "integer", "minimum": 0 }
+        "maxTokens": { "description": "单阶段累计 token 上限（默认 500000），非负整数；超过触发 onExceed", "type": "integer", "minimum": 0 },
+        "maxSubagentSpawns": { "description": "单阶段子代理分派次数上限（S+V+G+A 合计，默认 30），非负整数；超过触发 onExceed", "type": "integer", "minimum": 0 },
+        "maxReworkRounds": { "description": "单阶段返工循环上限（默认 3），非负整数；返工达此值强制 CHECKPOINT（场景 5）", "type": "integer", "minimum": 0 }
       }
     },
     "project": {
+      "description": "项目级全局预算配置",
       "type": "object",
       "additionalProperties": false,
       "required": ["maxTokensTotal", "maxTokensPerSession"],
       "properties": {
-        "maxTokensTotal": { "type": "integer", "minimum": 0 },
-        "maxTokensPerSession": { "type": "integer", "minimum": 0 }
+        "maxTokensTotal": { "description": "全阶段累计 token 上限（默认 4000000），非负整数；超过立即 halt 并回退当前阶段起点", "type": "integer", "minimum": 0 },
+        "maxTokensPerSession": { "description": "单次会话 token 上限（默认 1000000），非负整数；防止单次交互爆量，超限暂停分派建议开新会话", "type": "integer", "minimum": 0 }
       }
     },
-    "onExceed": { "enum": ["pause", "notify", "halt"] },
+    "onExceed": { "description": "预算超限处置策略：pause=暂停后续子代理分派，🔴 CHECKPOINT 预算告警等用户决定（L0 默认，最保守）；notify=仅在 run-log 记录告警继续执行（L2+ 自主度，连续 3 次告警自动升级为 pause）；halt=立即停止当前阶段推进回退到阶段起点（最保守）", "enum": ["pause", "notify", "halt"] },
     "killSwitch": {
+      "description": "kill switch 触发条件（满足任一即暂停全流程）",
       "type": "object",
       "additionalProperties": false,
       "required": ["consecutiveReworks", "budgetBurnRate", "tlaReworks"],
       "properties": {
-        "consecutiveReworks": { "type": "integer", "minimum": 0 },
-        "budgetBurnRate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "tlaReworks": { "type": "integer", "minimum": 0 }
+        "consecutiveReworks": { "description": "连续阶段返工次数阈值（默认 3），非负整数；返工次数 ≥ 此值暂停全流程（check-budget R5 触发检测）", "type": "integer", "minimum": 0 },
+        "budgetBurnRate": { "description": "单阶段 token 消耗占 maxTokens 比例阈值，取值 [0,1]（默认 0.9）；超出 [0,1] 被 schema maximum 拦截（R4），单阶段消耗占比 ≥ 此值暂停后续子代理", "type": "number", "minimum": 0, "maximum": 1 },
+        "tlaReworks": { "description": "同一 TLA+ 规格返工次数阈值（默认 3），非负整数；≥ 此值暂停 TLA+ 建模（check-budget R5 触发检测）", "type": "integer", "minimum": 0 }
       }
     },
     "rootcauseParallelBudget": {
+      "description": "多角度 R 的 token 预算配置（对应 spec §9.9；不论并行/串行均累计；未配置时不校验，向后兼容）",
       "type": "object",
       "additionalProperties": false,
       "required": ["maxPersonasPerRound", "maxTokensPerPersona", "maxTotalTokensPerRound"],
       "properties": {
-        "maxPersonasPerRound": { "type": "integer", "minimum": 1 },
-        "maxTokensPerPersona": { "type": "integer", "minimum": 0 },
-        "maxTotalTokensPerRound": { "type": "integer", "minimum": 0 }
+        "maxPersonasPerRound": { "description": "每轮 R-persona 数量上限（默认 5），整数 ≥1", "type": "integer", "minimum": 1 },
+        "maxTokensPerPersona": { "description": "单个 R-persona token 上限（默认 50000），非负整数", "type": "integer", "minimum": 0 },
+        "maxTotalTokensPerRound": { "description": "每轮所有 R-persona token 总和上限（默认 200000），非负整数；串行分派时累计校验（R4-A），超限触发 killSwitch", "type": "integer", "minimum": 0 }
       }
     },
     "rootcauseRounds": {
+      "description": "多角度 R 实际执行轮次记录数组（check-budget R4-A 规则校验：每轮 persona 数/每 persona tokens/每轮总 tokens 均不超上限）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["round", "personas", "totalTokens"],
         "properties": {
-          "round": { "type": "integer", "minimum": 1 },
+          "round": { "description": "根因定位轮次序号，整数 ≥1", "type": "integer", "minimum": 1 },
           "personas": {
+            "description": "本轮 R-persona 分派记录数组（≥1 项）",
             "type": "array",
             "minItems": 1,
             "items": {
@@ -66,12 +72,12 @@
               "additionalProperties": false,
               "required": ["personaSlice", "tokens"],
               "properties": {
-                "personaSlice": { "type": "string", "minLength": 1 },
-                "tokens": { "type": "integer", "minimum": 0 }
+                "personaSlice": { "description": "R-persona 切片标识（多角度根因定位各人格切片），非空字符串", "type": "string", "minLength": 1 },
+                "tokens": { "description": "该 persona 消耗 token 数，非负整数", "type": "integer", "minimum": 0 }
               }
             }
           },
-          "totalTokens": { "type": "integer", "minimum": 0 }
+          "totalTokens": { "description": "本轮所有 persona token 总和，非负整数；须 ≤ rootcauseParallelBudget.maxTotalTokensPerRound（R4-A）", "type": "integer", "minimum": 0 }
         }
       }
     }

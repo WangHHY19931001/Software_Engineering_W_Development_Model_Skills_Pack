@@ -7,20 +7,22 @@
   "additionalProperties": false,
   "required": ["version", "currentPhase", "tools", "specs"],
   "properties": {
-    "version": { "type": "number" },
-    "project": { "type": "string" },
-    "currentPhase": { "type": "integer", "minimum": 1, "maximum": 8 },
-    "basePath": { "type": "string", "minLength": 1 },
+    "version": { "description": "TLA+ manifest schema 版本，当前固定为 1", "type": "number" },
+    "project": { "description": "项目 ID（与 project.json 一致）", "type": "string" },
+    "currentPhase": { "description": "当前所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+    "basePath": { "description": "路径解析基准（强制必填，P1.1）：相对 manifest 文件所在目录，jarPath/tlaPath/cfgPath 均基于此解析（tla-plus-guide §2.1）", "type": "string", "minLength": 1 },
     "tools": {
+      "description": "TLA+ 工具链配置（SANY/TLC 依赖 Java 运行时 + tla2tools.jar）",
       "type": "object",
       "additionalProperties": false,
       "required": ["jarPath", "javaMinVersion"],
       "properties": {
-        "jarPath": { "type": "string", "minLength": 1 },
-        "javaMinVersion": { "type": "integer", "minimum": 1 }
+        "jarPath": { "description": "tla2tools.jar 路径（相对 basePath 解析；SANY 语法检查与 TLC 模型检查均依赖此 jar）", "type": "string", "minLength": 1 },
+        "javaMinVersion": { "description": "Java 最低版本号（默认 11；运行 tla2tools.jar 所需）", "type": "integer", "minimum": 1 }
       }
     },
     "specs": {
+      "description": "TLA+ 规格列表（层次化状态机建模规格清单，S 子代理产出 .tla/.cfg 后同步更新）",
       "type": "array",
       "items": {
         "type": "object",
@@ -46,63 +48,55 @@
           "stateExplosion"
         ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "level": { "enum": ["L1", "L2", "L3", "L4", "L5", "L6"] },
-          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-          "system": { "type": "string", "minLength": 1 },
-          "requirementIds": {
-            "type": "array",
-            "items": { "type": "string", "minLength": 1 }
-          },
-          "designRef": { "type": "string" },
-          "tlaPath": { "type": "string", "minLength": 1 },
-          "cfgPath": { "type": "string", "minLength": 1 },
-          "parent": { "type": ["string", "null"] },
-          "siblings": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "children": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "variableCombination": { "type": "number", "minimum": 0 },
-          "decompositionDecision": {
-            "enum": ["must-split", "consider-split", "kept-below-threshold", "split-done"]
-          },
-          "syntaxChecked": { "type": "boolean" },
-          "tlcChecked": { "type": "boolean" },
-          "deadlockFree": { "type": "boolean" },
-          "invariantsHold": { "type": "boolean" },
-          "stateExplosion": { "type": "boolean" },
-          "lastCheckTimestamp": { "type": "string" },
-          "tlaContent": { "type": "string" },
-          "cfgContent": { "type": "string" }
+          "id": { "description": "规格 ID（MODULE 名格式 L<level>_<system>[_<subsystem>]，须符合 §2.0 命名规范，禁止连字符）", "type": "string", "minLength": 1 },
+          "level": { "description": "规格层级：L1=系统内外交互 / L2=子系统 / L3=原子行为 / L4-L6=更深层次分解", "enum": ["L1", "L2", "L3", "L4", "L5", "L6"] },
+          "phase": { "description": "产出阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+          "system": { "description": "所属系统名称（层次路径用 :: 分隔，如 blog-system::auth-subsystem）", "type": "string", "minLength": 1 },
+          "requirementIds": { "description": "关联需求 ID 列表（与 rtm.json 需求 ID 一致，须登记于 RTM）", "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "designRef": { "description": "关联设计文档相对路径（可带锚点 #§，如 docs/outline-design.md#§3）", "type": "string" },
+          "tlaPath": { "description": ".tla 文件路径（相对 manifest 文件所在目录解析，见 §2.1）", "type": "string", "minLength": 1 },
+          "cfgPath": { "description": ".cfg 文件路径（相对 manifest 文件所在目录解析，见 §2.1）", "type": "string", "minLength": 1 },
+          "parent": { "description": "上级 TLA 文件相对路径（相对该 .tla 文件所在目录解析；L1 填 null）", "type": ["string", "null"] },
+          "siblings": { "description": "同级 TLA 文件相对路径列表（无填 []；与文件头 @sibling 双向一致）", "type": "array", "items": { "type": "string" } },
+          "children": { "description": "下级 TLA 文件相对路径列表（叶子填 []；与文件头 @child 双向一致）", "type": "array", "items": { "type": "string" } },
+          "variableCombination": { "description": "变量组合数（各变量取值域笛卡尔积），非负数值；>1000 考虑拆解、>10000 必须拆解", "type": "number", "minimum": 0 },
+          "decompositionDecision": { "description": "拆解决策：kept-below-threshold=组合数低于阈值不拆 / consider-split=>1000 考虑拆解（保留须声明理由）/ must-split=>10000 必须拆解 / split-done=已拆解完成；variableCombination>10000 时必须 split-done", "enum": ["must-split", "consider-split", "kept-below-threshold", "split-done"] },
+          "syntaxChecked": { "description": "SANY 语法检查是否通过（须为真实 SANY 运行结果，禁止占位/简化，反模式 #16）", "type": "boolean" },
+          "tlcChecked": { "description": "TLC 模型检查是否通过（须为真实 TLC 运行结果；--skip-tlc 已移除，所有 specs 强制 TLC）", "type": "boolean" },
+          "deadlockFree": { "description": "是否无死锁（真实 TLC 检查结果）", "type": "boolean" },
+          "invariantsHold": { "description": "不变式是否成立（真实 TLC 检查结果）", "type": "boolean" },
+          "stateExplosion": { "description": "是否发生状态爆炸（真实 TLC 运行结果）", "type": "boolean" },
+          "lastCheckTimestamp": { "description": "最近一次校验时间戳（可选；G 子代理执行 check-tla-model.ts 后回填）", "type": "string" },
+          "tlaContent": { "description": ".tla 文件文本内容（可选；CLI 读取后注入，供 cfg-tla 一致性等纯逻辑校验使用）", "type": "string" },
+          "cfgContent": { "description": ".cfg 文件文本内容（可选；CLI 读取后注入，供 cfg 结构/一致性纯逻辑校验使用）", "type": "string" }
         }
       }
     },
     "graphSdNodes": {
+      "description": "graph.json 中所有 type=SD 节点的 ID 列表（可选；CLI 通过 --graph 提取后注入，供 SD 覆盖率纯逻辑校验使用；未提供时跳过覆盖率校验）",
       "type": "array",
       "items": { "type": "string" }
     },
     "checkRounds": {
+      "description": "TLA+ 校验轮次记录数组（spec 级记录，语义见 tla-plus-guide「checkRounds 字段语义」；首次产出 TLA+ 前填 []；禁止 phase 级摘要字段，违反 R13 拦截）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": true,
         "required": ["phase", "round", "specId", "syntaxCheck", "tlcCheck", "violations", "converged"],
         "properties": {
-          "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-          "round": { "type": "integer", "minimum": 1 },
-          "timestamp": { "type": "string" },
-          "specId": { "type": "string", "minLength": 1 },
-          "syntaxCheck": { "type": "boolean" },
-          "tlcCheck": { "type": "boolean" },
+          "phase": { "description": "校验时所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+          "round": { "description": "本阶段内校验轮次序号（从 1 起）", "type": "integer", "minimum": 1 },
+          "timestamp": { "description": "校验时间戳（ISO 8601 字符串）", "type": "string" },
+          "specId": { "description": "校验的 spec id（引用 specs[].id）", "type": "string", "minLength": 1 },
+          "syntaxCheck": { "description": "本轮 SANY 语法检查是否通过（真实 SANY 运行结果）", "type": "boolean" },
+          "tlcCheck": { "description": "本轮 TLC 模型检查是否通过（真实 TLC 运行结果）", "type": "boolean" },
           "violations": {
+            "description": "本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述）",
             "type": "array",
             "items": { "type": "string" }
           },
-          "converged": { "type": "boolean" }
+          "converged": { "description": "本轮是否零违反收敛（violations.length === 0）", "type": "boolean" }
         }
       }
     }

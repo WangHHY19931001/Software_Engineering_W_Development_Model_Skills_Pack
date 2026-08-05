@@ -6,22 +6,24 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "meta", "subCriteria", "compositeScore", "qualityLevel", "summary", "passed"],
   "properties": {
-    "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+$" },
+    "schemaVersion": { "description": "Verifier 输出 schema 版本，固定为 \"1.0\"（不符即校验失败）", "type": "string", "pattern": "^\\d+\\.\\d+$" },
     "meta": {
+      "description": "评审元信息（目标/时间/评分方式/重复次数/防漂移参数）",
       "type": "object",
       "additionalProperties": false,
       "required": ["targetKind", "target", "reviewedAt", "agent", "scoringMethod", "repeatTimes", "varianceThreshold"],
       "properties": {
-        "targetKind": { "enum": ["requirement", "design", "code", "test"] },
-        "target": { "type": "string", "minLength": 1 },
-        "reviewedAt": { "type": "string", "format": "date-time" },
-        "agent": { "type": "string", "minLength": 1 },
-        "scoringMethod": { "enum": ["logits", "text-parse"] },
-        "repeatTimes": { "type": "integer", "minimum": 1 },
-        "varianceThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+        "targetKind": { "description": "评审目标类型：requirement=阶段1需求规格 / design=阶段2/3/4设计 / code=阶段5源代码 / test=阶段6/7/8测试（'testcase'/'file' 已废弃，分别用 test/code）", "enum": ["requirement", "design", "code", "test"] },
+        "target": { "description": "评审目标（产物路径或 ID），非空字符串", "type": "string", "minLength": 1 },
+        "reviewedAt": { "description": "评审时间，ISO 8601 字符串", "type": "string", "format": "date-time" },
+        "agent": { "description": "评审 Agent 标识（V 子代理），非空字符串", "type": "string", "minLength": 1 },
+        "scoringMethod": { "description": "评分方法：logits（模型概率输出，豁免扰动范围校验）/ text-parse（文本解析，扰动范围须 ∈[0.01,0.10]）", "enum": ["logits", "text-parse"] },
+        "repeatTimes": { "description": "同一目标独立重复评估次数，整数 ≥3（默认 3；rawScores 长度须等于此值）", "type": "integer", "minimum": 1 },
+        "varianceThreshold": { "description": "子标准方差阈值，取值 [0,0.1]（默认 0.10）；防漂移校验阈值，子标准 variance 超出即视为不可重复需重评", "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "subCriteria": {
+      "description": "子标准评估维度数组（长度 ≥3，且须与 verifier-spec §7 对应 targetKind 的子标准集合名称与权重完全匹配，不得改动）",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -29,31 +31,32 @@
         "additionalProperties": false,
         "required": ["name", "weight", "score", "rawScores", "variance", "evidence"],
         "properties": {
-          "name": { "type": "string", "pattern": "^[a-z][a-z-]*$" },
-          "description": { "type": "string" },
-          "weight": { "type": "number", "minimum": 0, "maximum": 1 },
-          "score": { "type": "number", "minimum": 0, "maximum": 1 },
-          "rawScores": { "type": "array", "minItems": 1, "items": { "type": "number" } },
-          "variance": { "type": "number", "minimum": 0 },
-          "evidence": { "type": "string", "minLength": 1 }
+          "name": { "description": "子标准名称（小写连字符格式，如 correctness/completeness；须与 §7 对应 targetKind 集合完全匹配）", "type": "string", "pattern": "^[a-z][a-z-]*$" },
+          "description": { "description": "子标准描述（可选，说明该维度评审要点）", "type": "string" },
+          "weight": { "description": "子标准权重，取值 [0,1]；须与 §7 定义一致不得改动（compositeScore = Σ(score×weight) 防漂移）", "type": "number", "minimum": 0, "maximum": 1 },
+          "score": { "description": "子标准得分，取值 [0,1]（repeatTimes 次评估均值；R13 单轴下限：任一 score<0.70 判失败，反模式 #41）", "type": "number", "minimum": 0, "maximum": 1 },
+          "rawScores": { "description": "各次独立评估的原始分数数组，长度 = meta.repeatTimes（≥3）；用于方差重算（防漂移规则 2）与全同/完美等差检测，禁止复制同一分数填满", "type": "array", "minItems": 1, "items": { "type": "number" } },
+          "variance": { "description": "子标准得分方差（非负），须 ≤ meta.varianceThreshold；且须等于由 rawScores 用总体方差公式重算的方差（误差 ≤1e-6，防漂移规则 2）", "type": "number", "minimum": 0 },
+          "evidence": { "description": "证据字符串，非空且须引用目标内具体片段（行号/文件路径/章节号/ID，如「REQ-001 §3.2」；R12 校验）", "type": "string", "minLength": 1 }
         }
       }
     },
-    "compositeScore": { "type": "number", "minimum": 0, "maximum": 1 },
-    "qualityLevel": { "enum": ["A", "B", "C", "D"] },
-    "summary": { "type": "string", "minLength": 50 },
-    "passed": { "type": "boolean" },
-    "reworkHints": { "type": "array", "items": { "type": "string" } },
+    "compositeScore": { "description": "综合分数，取值 [0,1]；须等于 Σ(score×weight)（误差 ≤1e-4，防漂移校验）", "type": "number", "minimum": 0, "maximum": 1 },
+    "qualityLevel": { "description": "质量等级：A（综合分数 ≥0.85）/ B（≥0.70）/ C（≥0.50）/ D（<0.50），由综合分数映射（§6.1）；evidence 空泛扣分后重新判定", "enum": ["A", "B", "C", "D"] },
+    "summary": { "description": "评审总结文本，长度 ≥50 字符（§6.2 阶段 digest 三要素）", "type": "string", "minLength": 50 },
+    "passed": { "description": "是否通过：qualityLevel=A/B 且所有 subCriterion.score ≥0.70（R13 单轴下限，反模式 #41）", "type": "boolean" },
+    "reworkHints": { "description": "返工提示数组（passed=false 时必须为非空数组）", "type": "array", "items": { "type": "string" } },
     "ranking": {
+      "description": "PPT（Probabilistic Pivot Tournament）优先级排序结果（可选；多候选目标时存在，单候选可省略）",
       "type": "object",
       "additionalProperties": false,
       "required": ["algorithm", "k", "temperature", "rounds", "ordered"],
       "properties": {
-        "algorithm": { "const": "PPT" },
-        "k": { "type": "integer", "minimum": 1 },
-        "temperature": { "type": "number", "minimum": 0 },
-        "rounds": { "type": "integer", "minimum": 1 },
-        "ordered": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        "algorithm": { "description": "排序算法，固定为 \"PPT\"（Probabilistic Pivot Tournament，LLM-as-a-Verifier §4.3）", "const": "PPT" },
+        "k": { "description": "PPT 锦标赛规模，整数 ∈ [2,1000]（默认 5；不得大于候选项数量）", "type": "integer", "minimum": 1 },
+        "temperature": { "description": "PPT 软比较温度，正数 ≤100（默认 4.0；过大 sigmoid 失去区分度）", "type": "number", "minimum": 0 },
+        "rounds": { "description": "PPT 排序轮次，整数 ≥1", "type": "integer", "minimum": 1 },
+        "ordered": { "description": "按优先级排序后的候选项 ID 数组（长度 ≥2，每项非空字符串；不得包含重复候选项，且 k ≤ 数组长度）", "type": "array", "minItems": 1, "items": { "type": "string" } }
       }
     }
   }
