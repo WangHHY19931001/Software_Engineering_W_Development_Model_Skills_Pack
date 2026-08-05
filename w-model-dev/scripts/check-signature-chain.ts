@@ -16,6 +16,9 @@
  *   --phase=N               只校验 phase=N 的签名（1-8）
  *   --stage=...             校验阶段：pre-gate（G 跑 gate 前）/ pre-checkpoint（O checkpoint 前）/ archive（归档时全阶段）
  *
+ * R8 说明：仅当从链文件位置向上能解析到含 .w-model/project.json 的真实项目根时启用（产物存在性校验）；
+ *   独立链文件 / 逻辑夹具（无真实项目）场景自动跳过 R8，与 signature-chain-logic 契约一致。
+ *
  * 退出码：
  *   0  校验通过
  *   1  校验失败（violations 列出具体原因）
@@ -77,37 +80,43 @@ async function main(): Promise<void> {
   const entries = await readJsonlOrExit(chainFile, 'signature-chain');
 
   // 构建 existingPaths（R8 校验用，基于 artifacts + sourceArtifacts 路径）
-  // 项目根由链文件位置向上推导：从链文件所在目录开始，向上找到包含 .w-model/ 的目录
-  function findProjectRoot(chainDir: string): string {
+  // 项目根由链文件位置向上推导：从链文件所在目录开始，向上找到含 .w-model/project.json 的真实项目根。
+  // 真实项目必有 project.json（/wm analyze 初始化创建）；仅含 gate-logs 等测试残留的 .w-model/ 不视为项目根。
+  // 找不到时返回 null → R8 跳过（与 signature-chain-logic 契约一致：existingPaths 未提供即跳过 R8；
+  // 真实项目链文件必位于 <project>/.w-model/ 下，向上必能找到）。
+  function findProjectRoot(chainDir: string): string | null {
     let dir = chainDir;
     for (let i = 0; i < 5; i++) {
       try {
-        accessSync(path.join(dir, '.w-model'));
+        accessSync(path.join(dir, '.w-model', 'project.json'));
         return dir;
       } catch { /* continue */ }
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
     }
-    return path.dirname(chainDir); // fallback
+    return null; // 未找到真实项目根（无 .w-model/project.json），跳过 R8
   }
   const projectRoot = findProjectRoot(path.dirname(chainAbs));
-  const existingPaths = new Set<string>();
-  for (const entry of entries as SignatureChainEntry[]) {
-    for (const artifact of entry.artifacts ?? []) {
-      try {
-        await fs.access(path.resolve(projectRoot, artifact));
-        existingPaths.add(artifact);
-      } catch {
-        // 路径不存在，不加
+  let existingPaths: Set<string> | undefined;
+  if (projectRoot) {
+    existingPaths = new Set<string>();
+    for (const entry of entries as SignatureChainEntry[]) {
+      for (const artifact of entry.artifacts ?? []) {
+        try {
+          await fs.access(path.resolve(projectRoot, artifact));
+          existingPaths.add(artifact);
+        } catch {
+          // 路径不存在，不加
+        }
       }
-    }
-    for (const srcArtifact of entry.inputProvenance?.sourceArtifacts ?? []) {
-      try {
-        await fs.access(path.resolve(projectRoot, srcArtifact.path));
-        existingPaths.add(srcArtifact.path);
-      } catch {
-        // 路径不存在，不加
+      for (const srcArtifact of entry.inputProvenance?.sourceArtifacts ?? []) {
+        try {
+          await fs.access(path.resolve(projectRoot, srcArtifact.path));
+          existingPaths.add(srcArtifact.path);
+        } catch {
+          // 路径不存在，不加
+        }
       }
     }
   }
