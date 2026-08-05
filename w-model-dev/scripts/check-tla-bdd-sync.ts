@@ -80,12 +80,30 @@ async function main(): Promise<void> {
     process.exit(output.exitCode);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    exitWithError({
-      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
-      message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
-      detail: e.message || String(err),
-      exitCode: 2,
-    });
+    const failedFile = e.path ?? tlaFile;
+    if (err instanceof SyntaxError) {
+      exitWithError({
+        category: 'FILE_PARSE',
+        message: '文件解析失败（非合法 JSON）',
+        file: failedFile,
+        exitCode: 2,
+      });
+    } else if (e.code === 'ENOENT') {
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        message: '文件不存在',
+        file: failedFile,
+        exitCode: 2,
+      });
+    } else {
+      exitWithError({
+        category: 'FILE_READ',
+        message: '文件读取失败',
+        file: failedFile,
+        detail: e.code ?? '未知错误',
+        exitCode: 2,
+      });
+    }
     return;
   }
 }

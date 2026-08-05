@@ -59,14 +59,29 @@ async function main(): Promise<void> {
         .filter(e => e.type === 'cross-cuts')
         .map(e => ({ from: e.from, to: e.to }));
     } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      exitWithError({
-        category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
-        message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
-        file: path.resolve(graphPath),
-        detail: e.code,
-        exitCode: 2,
-      });
+      if (err instanceof SyntaxError) {
+        exitWithError({
+          category: 'FILE_PARSE',
+          message: '文件解析失败（非合法 JSON）',
+          exitCode: 2,
+          file: path.resolve(graphPath),
+        });
+      } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        exitWithError({
+          category: 'FILE_NOT_FOUND',
+          message: '文件不存在',
+          exitCode: 2,
+          file: path.resolve(graphPath),
+        });
+      } else {
+        exitWithError({
+          category: 'FILE_READ',
+          message: '文件读取失败',
+          exitCode: 2,
+          file: path.resolve(graphPath),
+          detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
+        });
+      }
       return;
     }
   }
@@ -80,23 +95,37 @@ async function main(): Promise<void> {
       if (!oosParsed || !Array.isArray((oosParsed as { items?: unknown }).items)) {
         exitWithError({
           category: 'STRUCTURE_INVALID',
-          message: `${path.basename(outOfScopePath)} 结构不符`,
+          message: '结构不符（缺 items 数组）',
           file: path.resolve(outOfScopePath),
-          detail: '缺 items 数组',
           exitCode: 2,
         });
         return;
       }
       outOfScope = (oosParsed as { items: string[] }).items;
     } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      exitWithError({
-        category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
-        message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
-        file: path.resolve(outOfScopePath),
-        detail: e.code,
-        exitCode: 2,
-      });
+      if (err instanceof SyntaxError) {
+        exitWithError({
+          category: 'FILE_PARSE',
+          message: '文件解析失败（非合法 JSON）',
+          exitCode: 2,
+          file: path.resolve(outOfScopePath),
+        });
+      } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        exitWithError({
+          category: 'FILE_NOT_FOUND',
+          message: '文件不存在',
+          exitCode: 2,
+          file: path.resolve(outOfScopePath),
+        });
+      } else {
+        exitWithError({
+          category: 'FILE_READ',
+          message: '文件读取失败',
+          exitCode: 2,
+          file: path.resolve(outOfScopePath),
+          detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
+        });
+      }
       return;
     }
   }
@@ -109,14 +138,29 @@ async function main(): Promise<void> {
       const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
       exemptions = exemptParsed.grantedExemptions?.map(g => g.ruleId);
     } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      exitWithError({
-        category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
-        message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
-        file: path.resolve(exemptionsPath),
-        detail: e.code,
-        exitCode: 2,
-      });
+      if (err instanceof SyntaxError) {
+        exitWithError({
+          category: 'FILE_PARSE',
+          message: '文件解析失败（非合法 JSON）',
+          exitCode: 2,
+          file: path.resolve(exemptionsPath),
+        });
+      } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        exitWithError({
+          category: 'FILE_NOT_FOUND',
+          message: '文件不存在',
+          exitCode: 2,
+          file: path.resolve(exemptionsPath),
+        });
+      } else {
+        exitWithError({
+          category: 'FILE_READ',
+          message: '文件读取失败',
+          exitCode: 2,
+          file: path.resolve(exemptionsPath),
+          detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
+        });
+      }
       return;
     }
   }

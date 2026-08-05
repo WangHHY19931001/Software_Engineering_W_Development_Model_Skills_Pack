@@ -340,9 +340,8 @@ async function main(): Promise<void> {
   ) {
     exitWithError({
       category: 'STRUCTURE_INVALID',
-      message: `${path.basename(abs)} 结构不符`,
+      message: '结构不符（manifest.tools 须含 jarPath 与 javaMinVersion）',
       file: abs,
-      detail: 'manifest.tools 必须含 jarPath(string) 与 javaMinVersion(number)',
       exitCode: 2,
     });
     return;

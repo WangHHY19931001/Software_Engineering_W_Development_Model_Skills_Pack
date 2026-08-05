@@ -83,14 +83,29 @@ async function main(): Promise<void> {
         const rtmParsed = JSON.parse(rtmRaw) as { rows?: Array<{ requirementId: string; type: string }> };
         rtmRows = rtmParsed.rows;
       } catch (err) {
-        const e = err as NodeJS.ErrnoException;
-        exitWithError({
-          category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
-          message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
-          file: path.resolve(rtmPath),
-          detail: e.code,
-          exitCode: 2,
-        });
+        if (err instanceof SyntaxError) {
+          exitWithError({
+            category: 'FILE_PARSE',
+            message: '文件解析失败（非合法 JSON）',
+            exitCode: 2,
+            file: path.resolve(rtmPath),
+          });
+        } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          exitWithError({
+            category: 'FILE_NOT_FOUND',
+            message: '文件不存在',
+            exitCode: 2,
+            file: path.resolve(rtmPath),
+          });
+        } else {
+          exitWithError({
+            category: 'FILE_READ',
+            message: '文件读取失败',
+            exitCode: 2,
+            file: path.resolve(rtmPath),
+            detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
+          });
+        }
         return;
       }
     }
@@ -107,14 +122,29 @@ async function main(): Promise<void> {
         const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
         exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
       } catch (err) {
-        const e = err as NodeJS.ErrnoException;
-        exitWithError({
-          category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
-          message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
-          file: path.resolve(exemptPath),
-          detail: e.code,
-          exitCode: 2,
-        });
+        if (err instanceof SyntaxError) {
+          exitWithError({
+            category: 'FILE_PARSE',
+            message: '文件解析失败（非合法 JSON）',
+            exitCode: 2,
+            file: path.resolve(exemptPath),
+          });
+        } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          exitWithError({
+            category: 'FILE_NOT_FOUND',
+            message: '文件不存在',
+            exitCode: 2,
+            file: path.resolve(exemptPath),
+          });
+        } else {
+          exitWithError({
+            category: 'FILE_READ',
+            message: '文件读取失败',
+            exitCode: 2,
+            file: path.resolve(exemptPath),
+            detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
+          });
+        }
         return;
       }
     }

@@ -182,9 +182,8 @@ async function main(): Promise<void> {
     if (e.code === 'ENOENT') {
       exitWithError({
         category: 'FILE_NOT_FOUND',
-        message: '文件不存在',
+        message: '文件不存在（请先执行 /wm 走完 W 模型阶段再校验）',
         file: rtmFile,
-        detail: '请先在项目内执行 /wm 命令走完 W 模型阶段以生成 .w-model/rtm.json',
         exitCode: 2,
       });
       return;
