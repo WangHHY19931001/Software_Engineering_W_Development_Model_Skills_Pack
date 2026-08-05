@@ -620,7 +620,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（软检测，V 评审 + G 门禁人工核验；`security-scan.ts` 覆盖源码级扫描，本反模式覆盖数据文件层）。
 
-**关联**：SSoT §3.4.26（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
+**关联**：SSoT §3.4.27（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
 
 ## 实现层经验教训（来自端到端调测）
 
