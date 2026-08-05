@@ -38,6 +38,7 @@
 | 17 | TLA+ 建模与需求/设计不符未回退 | 规格通过但与需求/设计脱节，或需求/设计本身缺陷被掩盖，问题后移到编码 | 规格忠实于需求/设计但 TLC 仍发现违反 → 修正需求/设计并回退重跑；规格偏离 → 修正规格重跑（见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节） |
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复（见 [root-cause-locator.md](root-cause-locator.md)） |
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
+| 20 | 只规划不执行（子代理返回规划性内容而未调用任何执行工具） | 浪费 token + 轮次，任务无实际进展 | 子代理分派须强调"立即执行"；规划产物必须有对应执行产物（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节） |
 | 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节） |
 | 22 | 角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依，第 15 轮 P7-001 reader 可发博文 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
 | 23 | 跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高，第 15 轮 P7-002/P7-003 类 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
@@ -48,8 +49,19 @@
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 19 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
-| #33 | 跳过 R3 预防性审查（第29轮强化为无条件，覆盖所有 S 变体含 S-fix / S-emergency-fix） | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
-| #42 | S-fix / emergency-fix 后跳过 R3+V（第29轮新增） | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
+| 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，`check-archive-integrity.ts` 退出码 0（见 SSoT §10B.2.1 归档完整性清单） |
+| 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
+| 33 | 跳过 R3 预防性审查（第29轮强化为无条件，覆盖所有 S 变体含 S-fix / S-emergency-fix） | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
+| 34 | 编排者漏派角色（未按约束 #19 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次、R ≥3 次；`check-role-dispatch.ts` 校验（见约束 #19） |
+| 35 | self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
+| 36 | 路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
+| 37 | 产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没） | 稀释产物语义价值，评审难以聚焦 | 精简扩展点/附录，实体引用密度 ≥ 2/章节（V 评审人工校验信息密度） |
+| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先 `codegraph_explore` 查询影响半径并落盘 `.w-model/codegraph-queries/`；`check-codegraph-queries.ts` 校验（约束 #20） |
+| 39 | 跳过 opsx 产物审查（opsx 三段式任一 stage 产物未 R3×3 + V 即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-opsx-artifacts.ts` 校验（约束 #17） |
+| 40 | opsx/S-tickets 职责混淆（tasks.md 与 tickets.md 互相替代或内容错位） | 破坏规格级规划（what/why）与代码级切片（how）职责边界 | tasks.md（opsx:propose）与 tickets.md（S-tickets vertical-slice）职责分离；`check-opsx-artifacts.ts` 校验 |
+| 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
+| 42 | S-fix / emergency-fix 后跳过 R3+V（第29轮新增） | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
+| 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描（SSoT §3.4.27） |
 
 ### 命中高发阶段
 
@@ -84,6 +96,19 @@
 | #28（schema 前置校验缺失） | 阶段 1-8（所有 `*-logic.ts` 校验入口） | [data-models.md](data-models.md)「JSON Schema 强约束」节 |
 | #29（BDD 建模不符未回退） | 阶段 1-4 | [bdd-guide.md](bdd-guide.md)「不符处理流程」节 |
 | #30（豁免审批跳步） | 阶段 1（需求分析，四维识别豁免） | [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05 |
+| #31（归档完整性缺失） | 阶段 8（归档） | [phase-8-acceptance-test.md](phase-8-acceptance-test.md) + [`check-archive-integrity.ts`](../scripts/check-archive-integrity.ts) |
+| #32（签名链断裂） | 全阶段 | [signature-chain-guide.md](signature-chain-guide.md) + [`check-signature-chain.ts`](../scripts/check-signature-chain.ts) |
+| #33（跳过 R3 预防性审查） | 全阶段（所有 S 变体） | 约束 #17 + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) |
+| #34（编排者漏派角色） | 全阶段 | 约束 #19 + [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) |
+| #35（self-as-verifier 产物混合） | 全阶段（self-as-verifier 模式） | SKILL.md「self-as-verifier 模式」节 |
+| #36（路由顺序错误） | 阶段 5/6 | [phase-5-coding.md](phase-5-coding.md) + 集成测试用例 |
+| #37（产物膨胀核心决策稀疏） | 阶段 1-4 | 各 phase-N「产物要求」节 |
+| #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #20 + [`check-codegraph-queries.ts`](../scripts/check-codegraph-queries.ts) |
+| #39（跳过 opsx 产物审查） | 阶段 5-8 | 约束 #17 + [`check-opsx-artifacts.ts`](../scripts/check-opsx-artifacts.ts) |
+| #40（opsx/S-tickets 职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节 |
+| #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
+| #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #17/#19 + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
+| #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 
 ## 与门禁脚本的对应关系
 
@@ -115,6 +140,19 @@
 | #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（19 份） |
 | #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
 | #30（豁免审批跳步） | `check-exemption` E1-E8 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
+| #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |
+| #32（签名链断裂） | [`check-signature-chain.ts`](../scripts/check-signature-chain.ts)（R1-R10 任一失败） |
+| #33（跳过 R3 预防性审查） | [`check-preventive-review.ts`](../scripts/check-preventive-review.ts)（always-on）+ [`check-run-log.ts`](../scripts/check-run-log.ts) R8（S→V 间 R3 记录数） |
+| #34（编排者漏派角色） | [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts)（每阶段 S/V/G ≥1、R ≥3 无条件） |
+| #35（self-as-verifier 产物混合） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) `--self-as-verifier`（V 产物与 S 产出路径不同）+ [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) |
+| #36（路由顺序错误） | 无自动脚本（V 评审 + G 门禁人工校验路由注册顺序表） |
+| #37（产物膨胀核心决策稀疏） | 无自动脚本（V 评审人工校验信息密度） |
+| #38（修改前未查询 codegraph） | [`check-codegraph-queries.ts`](../scripts/check-codegraph-queries.ts)（查询落盘完整性，exitCode=1 命中） |
+| #39（跳过 opsx 产物审查） | [`check-opsx-artifacts.ts`](../scripts/check-opsx-artifacts.ts)（opsx 制品 + R3×3 + V 审查齐全，exitCode=1 命中） |
+| #40（opsx/S-tickets 职责混淆） | [`check-opsx-artifacts.ts`](../scripts/check-opsx-artifacts.ts)（tasks/tickets 职责校验，exitCode=1 命中） |
+| #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
+| #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
+| #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/security-scan.ts) 源码级扫描） |
 
 ## 命中后的处理流程
 

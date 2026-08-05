@@ -5,7 +5,7 @@
 
 ## [32.0.0] - 2026-08-05
 
-### 第三十三轮 错误结构全量归一化 + run-log R6 契约迁移
+### 第三十二轮 错误结构全量归一化 + run-log R6 契约迁移
 
 吸收外部评审建议高风险批（设计文档 `docs/superpowers/specs/2026-08-05-round32-error-structure-normalization-design.md`）：统一全仓 29 个脚本的 exit 2 错误输出为结构化格式；run-log R6 提取/索引规则迁入纯逻辑层。详见 SSoT §3.4.30。
 
@@ -30,7 +30,7 @@
 
 ## [31.0.0] - 2026-08-05
 
-### 第三十二轮 /wm status 脚本化 + 流程度量报告（metrics-report.ts）
+### 第三十一轮 /wm status 脚本化 + 流程度量报告（metrics-report.ts）
 
 吸收外部评审建议新功能批两项（设计文档 `docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md`）：把手工状态查询脚本化为确定性 CLI；新增 run-log/budget 流程度量汇总工具。详见 SSoT §3.4.29。
 
@@ -77,7 +77,7 @@
 
 ## [30.0.0] - 2026-08-05
 
-### 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁
+### 第三十轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁
 
 吸收外部评审建议低风险批三项（设计文档 `docs/superpowers/specs/2026-08-05-round30-schema-desc-redaction-audit-design.md`）。详见 SSoT §3.4.27。
 
@@ -97,7 +97,7 @@
 
 ## [29.0.0] - 2026-08-05
 
-### 第三十轮 CLI 样板抽取 + 分派总览矩阵
+### 第二十九轮 CLI 样板抽取 + 分派总览矩阵
 
 针对「技能代码重复率高 + 流程派遣信息分散」的反馈，做两项针对性优化：抽取 CLI 层 JSON 读取样板工具消除重复；新建分派总览矩阵解决信息分散。详见 SSoT §3.4.26。
 
@@ -124,7 +124,7 @@
 
 ## [28.0.0] - 2026-07-31
 
-### 第二十九轮 S→R3+V 无条件强制（覆盖所有 S 变体，含 S-fix / emergency-fix）
+### 第二十八轮 S→R3+V 无条件强制（覆盖所有 S 变体，含 S-fix / emergency-fix）
 
 将 R3 预防性审查从「条件强制（--r3-enabled flag）」升级为「无条件强制」，覆盖所有 S 变体，堵死 S-fix / emergency-fix 跳过 R3+V 的漏洞。详见 SSoT §3.4.25。
 
@@ -151,7 +151,7 @@
 
 ## [27.0.0] - 2026-07-31
 
-### 第二十八轮 need_fix.md + 全量脚本 code-review 修正（~66 项缺陷 + 21 新样本）
+### 第二十七轮 need_fix.md + 全量脚本 code-review 修正（~66 项缺陷 + 21 新样本）
 
 基于 `need_fix.md` 两处 bug 报告 + 全量脚本深度 code-review（5 组并行子代理，最小复现验证）发现的约 66 项缺陷（P1×15 / P2×25 / P3×26），按 6 组域内回归一次修正完成。详见 SSoT §3.4.24。
 
@@ -219,7 +219,7 @@
 
 ## [26.0.0] - 2026-07-30
 
-### 第二十七轮 Wayfinder「Fog of War」吸收（阶段 1 迷雾登记册）
+### 第二十六轮 Wayfinder「Fog of War」吸收（阶段 1 迷雾登记册）
 
 吸收外部仓库 wayfinder 技能（Matt Pocock "Skills For Real Engineers"，`skills/skills/engineering/wayfinder/`）「Fog of war」理念：阶段 1 需求分析为「in-scope 但尚无法精确陈述」的需求引入显式治理路径——REQ 入学锐利性测试 + Not-yet-specified 文本节 + 毕业机制。纯文档吸收，无脚本/schema 变更。详见 SSoT §3.4.23。
 
@@ -242,7 +242,7 @@
 
 ## [25.0.0] - 2026-07-30
 
-### 第二十六轮 外部技能深度对比吸收（单轴下限 R13 + Fowler 12 基线 + 票据 durability + 术语治理）
+### 第二十五轮 外部技能深度对比吸收（单轴下限 R13 + Fowler 12 基线 + 票据 durability + 术语治理）
 
 深度对比外部参考仓库（Matt Pocock "Skills For Real Engineers"，`/mnt/skill_work_dir/skills`）逐文件提取 5 项借鉴点。核心：Verifier passed 判据从「加权平均 ≥ B」收紧为「每个子标准自身 ≥ B」（单轴下限 R13，反模式 #41）。详见 SSoT §3.4.22。
 
@@ -273,7 +273,7 @@
 
 ## [24.0.0] - 2026-07-30
 
-### 第二十五轮 codegraph + OpenSpec 集成（修改前影响分析 + 规格驱动变更管理 + 三段式 S 分派）
+### 第二十四轮 codegraph + OpenSpec 集成（修改前影响分析 + 规格驱动变更管理 + 三段式 S 分派）
 
 阶段 5 起引入 codegraph（100% 本地符号级 callers/callees/blast radius 查询，修改前预防）与 OpenSpec opsx（opsx:explore/propose/apply/archive 规格驱动变更工作流，任务规划层）。新增约束 #20 + 反模式 #38/#39/#40 + 4 个新脚本 + gate-logic 三布尔扩展 + run-log action 枚举 +6 值。详见 SSoT §3.4.21。
 
@@ -305,7 +305,7 @@
 
 ## [23.0.0] - 2026-07-30
 
-### 第二十四轮 P0-P3 技能包十项修正（RTM 回填 + 角色分派 + R3 实执行 + 状态机一致性 + self-as-verifier + NFR 双字段 + 路由顺序 + 图谱边数 + 门禁 stdout + 信息密度）
+### 第二十三轮 P0-P3 技能包十项修正（RTM 回填 + 角色分派 + R3 实执行 + 状态机一致性 + self-as-verifier + NFR 双字段 + 路由顺序 + 图谱边数 + 门禁 stdout + 信息密度）
 
 修复第 23 轮 8 阶段端到端调测发现的 10 项技能包问题（P0×2 + P1×3 + P2×3 + P3×2），按 P0→P1→P2→P3 分 4 批 19 个任务执行，新增约束 #18/#19 + 反模式 #34-#37 + 2 个新校验脚本（check-role-dispatch.ts / check-state-machine-consistency.ts）。详见 SSoT §3.4.20。
 
