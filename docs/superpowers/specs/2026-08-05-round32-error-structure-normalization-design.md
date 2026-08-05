@@ -135,7 +135,7 @@ ERROR_JSON {"category":"FILE_PARSE","message":"文件解析失败（非合法 JS
 **`run-log-logic.ts` 新增导出（纯函数，自包含）**：
 
 ```ts
-/** 从 gate-log 内容提取 exitCode：扫描 25 个 `XXX_JSON {...}` 摘要标记（含 STATUS_JSON/METRICS_JSON），JSON.parse 后取 exitCode；无匹配返回 undefined（契约与 check-run-log.ts 现行一致，无 exit= 正则回退） */
+/** 从 gate-log 内容提取 exitCode：扫描 26 个 `XXX_JSON {...}` 摘要标记（含 STATUS_JSON/METRICS_JSON；第 32 轮追加 ERROR_JSON），JSON.parse 后取 exitCode；无匹配返回 undefined（契约与 check-run-log.ts 现行一致，无 exit= 正则回退） */
 export function extractExitCode(content: string): number | undefined;
 
 /** 构建 gateLogPath 多索引 key 集：basename / 绝对路径 / 相对 cwd 路径 / 各路径正斜杠归一化（兼容 Windows） */
@@ -145,6 +145,8 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 **`check-run-log.ts` 改造**：`loadGateLogs` 保留目录扫描 + 文件读取（IO），删除内部手写索引构建与 extractExitCode 实现，改调 `buildGateLogKeys` / `extractExitCode`（自 `run-log-logic.js` 导入）；`extractExitCode` 内部 JSON 摘要解析复用既有正则（`(GATE_JSON|TLA_JSON|GRAPH_JSON|RUN_LOG_JSON|MATURITY_JSON|...)\s+(\{.*\})` 模式与 `check-run-log.ts` 现行一致）。
 
 > 契约不变：R5/R6 判定逻辑与 gateLogs Map 结构（`Map<string,{exitCode?,content}>`）不变；仅提取/索引规则归位 logic 层使可单测。
+
+> **增量（验证驱动）**：exit 2 场景输出的 `ERROR_JSON` 摘要行须纳入 R6 交叉校验范围（模拟脚本验证：ERROR_JSON 走 stdout 后被 G 子代理存档到 gate-logs，`extractExitCode` 须能解析 exitCode=2 否则 R6 误报「未提取到 exitCode」）。`GATE_JSON_PATTERNS` 追加 `/ERROR_JSON\s+(\{.*\})/`（25→26 个标记）。
 
 ### 3.4 版本号
 
@@ -162,7 +164,7 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 6. `exitWithError` 设置 `process.exitCode=2` 且正常返回（stdout 先 flush 再退出）
 7. ERROR_JSON 的 exitCode 与传入 CliError.exitCode 一致
 
-### 4.2 `run-log-logic.test.ts` 扩展（6 用例）
+### 4.2 `run-log-logic.test.ts` 扩展（7 用例）
 
 1. `extractExitCode` JSON 摘要行（`GATE_JSON {"exitCode":0}`）→ 0
 2. `extractExitCode` 多标记扫描（`VERIFIER_JSON {"exitCode":1}`）→ 1
@@ -170,8 +172,9 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 4. `buildGateLogKeys` 返回含 basename / 绝对路径 / 相对 cwd / 正斜杠归一化 4 类 key
 5. `buildGateLogKeys` 含反斜杠路径归一化（Windows 兼容）
 6. `buildGateLogKeys` cwd 为空时退化为 basename + 绝对路径（相对 key 省略）
+7. `extractExitCode` 从 ERROR_JSON 摘要行提取 exitCode=2（第 32 轮 exit 2 存档纳入 R6 契约）
 
-**基线**：vitest 345 → **358**（+13）；self-test 213 不变；tsc strict 0 错误。
+**基线**：vitest **363**（实施期实测，含 §4.1 七用例 + §4.2 七用例）；self-test 213 不变；tsc strict 0 错误。
 
 ## 5. 文档同步清单
 
@@ -196,7 +199,7 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 - `npm run lint:security` exit 0（0 新增；新文件若触发误报按惯例 regenerate baseline）
 - 冒烟（任选 3 脚本）：
   - `check-artifact-gate.ts --phase=99` → stderr 含 `✗ [ARG_INVALID]`、stdout 含 `ERROR_JSON {...}`、exit 2
-  - `wm-status.ts <无 .w-model 目录>` → stderr 含 `✗ [FILE_NOT_FOUND]`、stdout 含 `ERROR_JSON`、exit 2
+  - `wm-status.ts <无 .w-model 目录>` → stderr 原样提示「项目未初始化」、stdout 无 ERROR_JSON、exit 0（查询语义，非错误——第 31 轮决策保留）
   - `metrics-report.ts --phase=abc` → `✗ [ARG_INVALID]` + `ERROR_JSON` + exit 2
 - prepush 12 项全通过
 
@@ -205,5 +208,5 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 - **改动面大（~29 文件）**：分批实施（Subagent-Driven，每批一个脚本组 + 回归）；self-test 213 仅断言退出码 → 消息改动零回归风险。
 - **ERROR_JSON 双输出**：stdout 仅 `ERROR_JSON` 行（不混人类消息）；机器消费按 `ERROR_JSON` 前缀截取（与 GATE_JSON 等既有截取方式一致）。
 - **lint:security**：新增 `cli-error.ts` 与批量 `console.error` 改造可能触发 `detect-non-literal-fs-filename` 等误报 → 按仓库惯例 regenerate baseline（历史上 30.1/31 轮已 3 次，模式成熟）。
-- **既有测试回归**：`read-json-or-exit.test.ts` 断言消息含「✗ 文件不存在」——消息统一为 `✗ [FILE_NOT_FOUND] 文件不存在: <abs>` 后仍含「文件不存在」子串；需核对是否受影响（若断言用 `expect.stringContaining('✗ 文件不存在')` 则兼容，若用精确匹配则需同步调整测试）。
+- **既有测试回归**：`read-json-or-exit.test.ts` 原断言 `stringContaining('✗ 文件不存在')` 与新格式 `✗ [FILE_NOT_FOUND] 文件不存在` **不兼容**（stringContaining 要求连续子串）——实施时已同步更新断言为类别前缀匹配（`[FILE_NOT_FOUND]`/`[FILE_PARSE]`），并在 Task 3 一并提交。
 - **口径一致性**：6 类错误码与 command-reference 错误码表、SSoT §3.4.30 三处一致；ERROR_JSON 字段名（category/message/exitCode/file）全仓一致。

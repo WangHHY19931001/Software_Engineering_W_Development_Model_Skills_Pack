@@ -339,7 +339,7 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[] {
 }
 ```
 
-> 注：GATE_JSON_PATTERNS 在原 check-run-log.ts 的 23 个基础上追加 STATUS_JSON / METRICS_JSON（第 31 轮新增脚本的摘要标记，纳入交叉校验范围）。
+> 注：GATE_JSON_PATTERNS 在原 check-run-log.ts 的 23 个基础上追加 STATUS_JSON / METRICS_JSON（第 31 轮新增脚本的摘要标记，纳入交叉校验范围）；第 32 轮实施期再追加 ERROR_JSON（exit 2 存档纳入 R6 契约，模拟验证驱动，25→26 个标记）。
 
 - [ ] **Step 4: check-run-log.ts 改造**
 
@@ -625,7 +625,7 @@ git commit --no-gpg-sign -m "refactor(round32): 5 个工具脚本 exit 2 归一�
 
 #### Changed
 - 29 个脚本（23 check-*.ts + 5 工具 + read-json-or-exit）exit 2 路径统一走 `exitWithError`：参数校验 `[ARG_INVALID]`、文件缺失 `[FILE_NOT_FOUND]`、解析失败 `[FILE_PARSE]`、读取异常 `[FILE_READ]`、结构不符 `[STRUCTURE_INVALID]`、异常兜底 `[UNEXPECTED]`；各脚本 main().catch 统一 UNEXPECTED
-- `run-log-logic.ts`：R6 契约迁移——`extractExitCode` + `buildGateLogKeys`（纯字符串，遵守 *-logic.ts 不 import node:path）自 check-run-log.ts 迁入；GATE_JSON_PATTERNS 追加 STATUS_JSON/METRICS_JSON；run-log-logic.test.ts +6 用例
+- `run-log-logic.ts`：R6 契约迁移——`extractExitCode` + `buildGateLogKeys`（纯字符串，遵守 *-logic.ts 不 import node:path）自 check-run-log.ts 迁入；GATE_JSON_PATTERNS 追加 STATUS_JSON/METRICS_JSON/ERROR_JSON（ERROR_JSON 为第 32 轮验证驱动新增，exit 2 存档纳入 R6 契约）；run-log-logic.test.ts +7 用例
 - `check-run-log.ts`：loadGateLogs 删除本地提取/索引实现，改调 logic 层（契约不变）
 - wm-status 未初始化保持 exit 0 查询语义（不输出 ERROR_JSON）；check-role-dispatch 坏行 exit 2 行为保留（第 29 轮决策），消息加类别
 - command-reference.md 新增「错误码与 ERROR_JSON 约定」节；SSoT §3.4.30 + §10A + §10E 补充

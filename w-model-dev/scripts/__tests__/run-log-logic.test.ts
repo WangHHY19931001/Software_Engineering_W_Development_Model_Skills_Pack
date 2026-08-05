@@ -206,6 +206,12 @@ describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
     expect(extractExitCode(content)).toBe(1);
   });
 
+  it('extractExitCode 从 ERROR_JSON 摘要行提取 exitCode（第 32 轮 exit 2 存档）', () => {
+    const content =
+      '✗ [FILE_NOT_FOUND] 文件不存在\nERROR_JSON {"category":"FILE_NOT_FOUND","message":"文件不存在","exitCode":2,"file":"C:\\\\proj\\\\.w-model\\\\project.json"}';
+    expect(extractExitCode(content)).toBe(2);
+  });
+
   it('extractExitCode 无匹配 → undefined', () => {
     expect(extractExitCode('no json here')).toBeUndefined();
   });

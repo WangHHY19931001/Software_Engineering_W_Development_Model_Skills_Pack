@@ -427,7 +427,7 @@ export function checkRunLog(
 
 // ==================== R6 契约：gate-log exitCode 提取与路径索引（自 check-run-log.ts 迁入） ====================
 
-/** 各门禁脚本 stdout 摘要标记（含第 31 轮新增 STATUS_JSON / METRICS_JSON） */
+/** 各门禁脚本 stdout 摘要标记（含第 31 轮新增 STATUS_JSON / METRICS_JSON；第 32 轮新增 ERROR_JSON） */
 const GATE_JSON_PATTERNS: RegExp[] = [
   /SCRIPT_JSON\s+(\{.*\})/,
   /GRAPH_JSON\s+(\{.*\})/,
@@ -454,6 +454,7 @@ const GATE_JSON_PATTERNS: RegExp[] = [
   /TLA_BDD_SYNC_JSON\s+(\{.*\})/,
   /STATUS_JSON\s+(\{.*\})/,
   /METRICS_JSON\s+(\{.*\})/,
+  /ERROR_JSON\s+(\{.*\})/,
 ];
 
 /**
