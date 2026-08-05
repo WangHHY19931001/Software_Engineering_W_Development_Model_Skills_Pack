@@ -476,9 +476,9 @@ export function extractExitCode(content: string): number | undefined {
 }
 
 /**
- * 构建 gateLogPath 多索引 key 集：basename / 绝对路径 / 相对 cwd 路径 / 各路径正斜杠归一化。
+ * 构建 gateLogPath 多索引 key 集：basename / 绝对路径 / 相对 cwd 路径 / 各路径双向斜杠归一化（正↔反）。
  * 纯字符串实现（不 import node:path，遵守 *-logic.ts pure 边界）；兼容 Windows 反斜杠。
- * 自 check-run-log.ts loadGateLogs 迁入（契约不变：与 path.relative 语义一致的前缀裁剪）。
+ * 自 check-run-log.ts loadGateLogs 迁入（cwd 前缀裁剪：仅覆盖 cwd 内文件，cwd 外无相对 key，依赖 basename/绝对路径兜底；大小写敏感；调用方须保证 cwd 与 fileAbs 同源同分隔符）。
  */
 export function buildGateLogKeys(fileAbs: string, cwd: string): string[] {
   const basename = fileAbs.split(/[\\/]/).filter(Boolean).pop() ?? fileAbs;

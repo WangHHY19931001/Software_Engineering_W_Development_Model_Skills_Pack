@@ -233,4 +233,29 @@ describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
     expect(keys).toContain('C:/proj/a.log');
     expect(keys).not.toContain('proj/a.log');
   });
+
+  it('extractExitCode 畸形 JSON 摘要行 → 跳过继续扫描后续标记', () => {
+    const content = 'GATE_JSON {broken json\nVERIFIER_JSON {"exitCode":1}';
+    expect(extractExitCode(content)).toBe(1);
+  });
+
+  it('extractExitCode exitCode 非 number → undefined', () => {
+    const content = 'GATE_JSON {"passed":true,"exitCode":"0"}';
+    expect(extractExitCode(content)).toBeUndefined();
+  });
+
+  it('extractExitCode 首个标记无 exitCode 时继续扫后续标记（fallthrough）', () => {
+    const content = 'GRAPH_JSON {"passed":true}\nMATURITY_JSON {"exitCode":1}';
+    expect(extractExitCode(content)).toBe(1);
+  });
+
+  it('buildGateLogKeys cwd 外文件 → 无相对 key，仅 basename + 绝对路径 + 归一化', () => {
+    const fileAbs = 'D:/other/x.log';
+    const keys = buildGateLogKeys(fileAbs, 'C:/proj');
+    expect(keys).toContain('x.log');
+    expect(keys).toContain('D:/other/x.log');
+    expect(keys).not.toContain('other/x.log');
+    // 双向归一化 + 去重后应为 3 个 key（basename / 绝对正斜杠 / 绝对反斜杠）
+    expect(keys.length).toBe(3);
+  });
 });

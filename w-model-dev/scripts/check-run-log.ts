@@ -56,7 +56,7 @@ function parseArgs(argv: string[]): ParsedArgs {
  *
  * gateLogPath 匹配策略：run-log 条目的 gateLogPath 可能是相对路径或文件名。
  * 构建 Map 时同时存 basename、绝对路径、相对 cwd 路径作为 key（三索引），
- * 并对含反斜杠的路径额外存正斜杠归一化版本，以兼容 Windows/Unix 路径差异。
+ * 对路径做双向斜杠归一化（正↔反），兼容 Windows/Unix 路径差异。
  */
 interface GateLogsResult {
   map: Map<string, { exitCode?: number; content: string }>;
