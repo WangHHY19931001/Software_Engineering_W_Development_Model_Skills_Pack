@@ -35,6 +35,7 @@ import {
   type UatPathMappingRow,
 } from './gate-logic.js';
 import { validateBySchema } from './schema-loader.js';
+import { parseUatPathMappingContent } from './design-contract-logic.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
@@ -52,6 +53,9 @@ const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
  * - 表头校验：数据行首列必须为 `UAT-` 前缀（`UAT-\d+`）；表头行 / 分隔行 / 其它表格行一律忽略。
  * - 数据行格式不符（单元格数 < 4 或前 4 列含空单元格）→ 记录 violation，不静默跳行。
  * - 文件非空但解析不出任何映射行 → violation「uat-path-mapping 无有效映射行」。
+ *
+ * 实现收敛（批次3 Task7）：统一复用 design-contract-logic.parseUatPathMappingContent（strict=true），
+ * 字段映射到 uatId/actualPath/mappingType；violation 文案与行号格式与历史严格版逐字节一致。
  */
 export interface UatPathMappingParseResult {
   rows: UatPathMappingRow[];
@@ -59,39 +63,13 @@ export interface UatPathMappingParseResult {
 }
 
 export function parseUatPathMappingFromContent(content: string): UatPathMappingParseResult {
-  const rows: UatPathMappingRow[] = [];
-  const violations: string[] = [];
-  const lines = content.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = (lines[i] ?? '').trim();
-    if (line === '' || !line.startsWith('|')) continue; // 非表格行（标题 / 说明段落）
-    let cells = line.split('|').map((c) => c.trim());
-    cells = cells.slice(1); // 去掉行首 '|' 前的空串
-    if (cells.length > 0 && cells[cells.length - 1] === '') {
-      cells = cells.slice(0, -1); // 去掉行尾 '|' 产生的空串
-    }
-    const firstCol = cells[0] ?? '';
-    // 表头校验：首列必须为 UAT- 前缀（表头 / 分隔行 / 其它表格一律忽略）
-    if (!/^UAT-\d+$/.test(firstCol)) continue;
-    const lineNo = i + 1;
-    // 数据行格式校验：单元格数须 ≥4
-    if (cells.length < 4) {
-      violations.push(`uat-path-mapping 第${lineNo}行畸形（单元格数 ${cells.length}，须 ≥4）`);
-      continue;
-    }
-    const actualPath = cells[2] ?? '';
-    const mappingType = cells[3] ?? '';
-    // 前 4 列（uatId/设计路径/实际路径/映射类型）任一为空 → 畸形
-    if (cells[1] === '' || actualPath === '' || mappingType === '') {
-      violations.push(`uat-path-mapping 第${lineNo}行畸形（含空单元格）`);
-      continue;
-    }
-    rows.push({ uatId: firstCol, actualPath, mappingType });
-  }
-  if (rows.length === 0 && content.trim() !== '') {
-    violations.push('uat-path-mapping 无有效映射行');
-  }
-  return { rows, violations };
+  const parsed = parseUatPathMappingContent(content, { strict: true });
+  const rows: UatPathMappingRow[] = parsed.rows.map((row) => ({
+    uatId: row.uatId,
+    actualPath: row.cells[2] ?? '',
+    mappingType: row.cells[3] ?? '',
+  }));
+  return { rows, violations: parsed.violations };
 }
 
 /**

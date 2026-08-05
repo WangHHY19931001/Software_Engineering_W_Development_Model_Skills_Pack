@@ -34,6 +34,82 @@ export interface UatPathMapping {
   mappingType?: '直接' | '等价' | '替代';
 }
 
+// ==================== uat-path-mapping.md 表格解析（批次3 Task7：两调用方合一） ====================
+
+export interface UatPathMappingParseRow {
+  uatId: string;
+  /** 原始单元格（cells[0]=uatId，cells[1]=设计路径，cells[2]=实际路径，cells[3]=映射类型），供调用方各自映射字段 */
+  cells: string[];
+}
+
+export interface UatPathMappingParseResult {
+  rows: UatPathMappingParseRow[];
+  violations: string[];
+}
+
+/**
+ * 从 uat-path-mapping.md 内容解析映射行（严格 / 宽松双语义，strict 开关控制）。
+ *
+ * 统一解析基线（两种模式一致）：
+ * - 逐行 trim 后非空且以 `|` 开头才可能是表格行（标题 / 说明段落跳过）；
+ * - `|` 切分 + 去首尾空串得到 cells；首列须匹配 `UAT-\d+`（表头 / 分隔行 / 其它表格行忽略）；
+ * - 结构性畸形：单元格数 < 4 → 畸形行。
+ *
+ * 空单元格（前 4 列任一为空）语义按 strict 分流：
+ * - strict=true（对齐 check-artifact-gate 严格版）：判畸形 push violation（文案与行号格式逐字节一致），
+ *   文件非空但解析不出映射行 → violation「uat-path-mapping 无有效映射行」；
+ * - strict=false（默认，对齐 check-design-contract-consistency 宽松版）：接受该行（cells 原样入 rows，
+ *   空字段由调用方按自身语义消费——宽松整行正则同样会把空列解析为空字段），不产生 violation。
+ *
+ * 返回 rows 保留原始 cells，字段映射由调用方按各自消费语义完成。
+ * 纯字符串处理，不读文件（*-logic.ts 纯逻辑层约束）。
+ */
+export function parseUatPathMappingContent(
+  content: string,
+  opts?: { strict?: boolean },
+): UatPathMappingParseResult {
+  const strict = opts?.strict ?? false;
+  const rows: UatPathMappingParseRow[] = [];
+  const violations: string[] = [];
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = (lines[i] ?? '').trim();
+    if (line === '' || !line.startsWith('|')) continue; // 非表格行（标题 / 说明段落）
+    let cells = line.split('|').map((c) => c.trim());
+    cells = cells.slice(1); // 去掉行首 '|' 前的空串
+    if (cells.length > 0 && cells[cells.length - 1] === '') {
+      cells = cells.slice(0, -1); // 去掉行尾 '|' 产生的空串
+    }
+    const firstCol = cells[0] ?? '';
+    // 表头校验：首列必须为 UAT- 前缀（表头 / 分隔行 / 其它表格一律忽略）
+    if (!/^UAT-\d+$/.test(firstCol)) continue;
+    const lineNo = i + 1;
+    // 结构性畸形：单元格数须 ≥4（两种模式一致判畸形；strict 才报 violation）
+    if (cells.length < 4) {
+      if (strict) {
+        violations.push(`uat-path-mapping 第${lineNo}行畸形（单元格数 ${cells.length}，须 ≥4）`);
+      }
+      continue;
+    }
+    const actualPath = cells[2] ?? '';
+    const mappingType = cells[3] ?? '';
+    // 空单元格：strict 判畸形（报 violation 跳过，对齐 artifact-gate 严格版）；
+    // 非 strict 接受该行（保留空字段，对齐 design-contract 宽松整行正则的解析结果）
+    if (cells[1] === '' || actualPath === '' || mappingType === '') {
+      if (strict) {
+        violations.push(`uat-path-mapping 第${lineNo}行畸形（含空单元格）`);
+        continue;
+      }
+    }
+    rows.push({ uatId: firstCol, cells });
+  }
+  // 文件非空但解析不出任何映射行 → violation「uat-path-mapping 无有效映射行」（仅严格模式，对齐 artifact-gate）
+  if (strict && rows.length === 0 && content.trim() !== '') {
+    violations.push('uat-path-mapping 无有效映射行');
+  }
+  return { rows, violations };
+}
+
 export interface RouteDefinition {
   method: string;
   path: string;

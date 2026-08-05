@@ -30,6 +30,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import {
   checkDesignContractConsistency,
+  parseUatPathMappingContent,
   type DesignContractCheckInput,
   type DesignContractCheckResult,
   type UatPathMapping,
@@ -43,22 +44,16 @@ import { printGateReport } from './lib/gate-report.js';
 
 async function parseUatPathMapping(filePath: string): Promise<UatPathMapping[]> {
   const content = await fs.readFile(filePath, 'utf-8');
-  const mappings: UatPathMapping[] = [];
-  const lines = content.split('\n');
-  for (const line of lines) {
-    // 解析 Markdown 表格行：| UAT-001 | POST /api/posts | POST /api/posts | 直接 | ... |
-    const match = line.match(/^\|\s*(UAT-\d+)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]*)\|/);
-    if (match) {
-      const [, uatId, designPath, actualPath, mappingType] = match;
-      mappings.push({
-        uatId: uatId!.trim(),
-        designPath: designPath!.trim(),
-        actualPath: actualPath!.trim(),
-        mappingType: mappingType?.trim() as '直接' | '等价' | '替代' | undefined,
-      });
-    }
-  }
-  return mappings;
+  // 宽松解析（默认非 strict）：畸形行静默跳过，对齐 design-contract 历史行为。
+  // 实现收敛（批次3 Task7）：统一复用 design-contract-logic.parseUatPathMappingContent，
+  // 字段映射到 uatId/designPath/actualPath/mappingType；violations 在宽松语义下不消费。
+  const { rows } = parseUatPathMappingContent(content);
+  return rows.map((row) => ({
+    uatId: row.uatId,
+    designPath: row.cells[1] ?? '',
+    actualPath: row.cells[2] ?? '',
+    mappingType: row.cells[3] as UatPathMapping['mappingType'],
+  }));
 }
 
 // ==================== 路由定义提取 ====================
