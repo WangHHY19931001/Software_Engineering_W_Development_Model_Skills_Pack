@@ -23,6 +23,7 @@
 import { promises as fs, type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { checkArchiveIntegrity } from './archive-integrity-logic.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 目录遍历 ====================
 
@@ -55,16 +56,26 @@ async function walkDir(dirAbs: string, baseDir: string): Promise<Set<string>> {
 async function main(): Promise<void> {
   const archiveDir = process.argv[2];
   if (!archiveDir) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <archive-dir>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const archiveAbs = path.resolve(archiveDir);
   try {
     await fs.access(archiveAbs);
   } catch {
-    console.error(`✗ 目录不存在: ${archiveAbs}`);
-    process.exit(2);
+    exitWithError({
+      category: 'FILE_NOT_FOUND',
+      message: '目录不存在',
+      file: archiveAbs,
+      exitCode: 2,
+    });
+    return;
   }
 
   const contents = await walkDir(archiveAbs, archiveAbs);
@@ -108,6 +119,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('归档完整性校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

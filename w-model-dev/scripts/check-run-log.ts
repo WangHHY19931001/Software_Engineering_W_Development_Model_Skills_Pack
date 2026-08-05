@@ -28,6 +28,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkRunLog, extractExitCode, buildGateLogKeys } from './run-log-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -135,10 +136,13 @@ async function main(): Promise<void> {
   const { runLogFile, gateLogsDir, tlaManifestFile } = parseArgs(process.argv);
 
   if (!runLogFile) {
-    console.error(
-      '用法: npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <run-log.jsonl>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const runLogAbs = path.resolve(runLogFile);
@@ -207,6 +211,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('运行日志校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

@@ -29,6 +29,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkBudget, type BudgetConfig } from './budget-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -111,15 +112,23 @@ async function main(): Promise<void> {
   // --phase 合法性校验：NaN / 越界均 exit(2)，避免 countReworks 中
   // `NaN !== NaN` 恒为 true 导致所有 run-log 记录被过滤、reworkCount 静默归零
   if (phase !== undefined && (Number.isNaN(phase) || phase < 1 || phase > 8)) {
-    console.error(`✗ --phase 须为 1-8，实际: ${phase}`);
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: `参数非法 --phase=${phase}`,
+      detail: '须为 1-8 的整数',
+      exitCode: 2,
+    });
+    return;
   }
 
   if (!budgetFile) {
-    console.error(
-      '用法: npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <budget.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const budgetAbs = path.resolve(budgetFile);
@@ -212,6 +221,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('预算校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

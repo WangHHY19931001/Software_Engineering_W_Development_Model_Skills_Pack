@@ -33,6 +33,7 @@ import { accessSync } from 'node:fs';
 import * as path from 'node:path';
 import { checkSignatureChain, type SignatureChainEntry } from './signature-chain-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -71,8 +72,13 @@ async function main(): Promise<void> {
   const { chainFile, phase, stage } = parseArgs(process.argv);
 
   if (!chainFile) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <signature-chain.jsonl>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const chainAbs = path.resolve(chainFile);
@@ -169,6 +175,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('签名链校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

@@ -18,6 +18,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { exitWithError } from './lib/cli-error.js';
 
 interface CodegraphQuery {
   querySymbol: string;
@@ -118,17 +119,31 @@ async function main(): Promise<void> {
   const phase = phaseIdx >= 0 ? parseInt(args[phaseIdx + 1]!, 10) : NaN;
 
   if (!file || Number.isNaN(phase)) {
-    console.error('用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <project-root> 或 --phase',
+      detail: '用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>',
+      exitCode: 2,
+    });
+    return;
   }
   if (!existsSync(file) || !statSync(file).isDirectory()) {
-    console.error(`✗ 项目根路径不存在或不是目录: ${file}`);
-    console.error('用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>');
-    process.exit(2);
+    exitWithError({
+      category: 'FILE_NOT_FOUND',
+      message: '项目根路径不存在或不是目录',
+      file: path.resolve(file),
+      exitCode: 2,
+    });
+    return;
   }
   if (phase < 5 || phase > 8) {
-    console.error(`✗ phase 须为 5-8，收到 ${phase}`);
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: `参数非法 --phase=${phase}`,
+      detail: '须为 5-8 的整数',
+      exitCode: 2,
+    });
+    return;
   }
 
   const abs = path.resolve(file);
@@ -168,7 +183,11 @@ const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
   main().catch((err) => {
-    console.error('check-codegraph-queries 异常:', err);
-    process.exit(2);
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }

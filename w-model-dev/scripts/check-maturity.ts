@@ -28,6 +28,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkMaturity, type MaturityConfig } from './maturity-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -103,10 +104,13 @@ async function main(): Promise<void> {
   const { maturityFile, projectFile, runLogFile } = parseArgs(process.argv);
 
   if (!maturityFile) {
-    console.error(
-      '用法: npx tsx w-model-dev/scripts/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <maturity.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const maturityAbs = path.resolve(maturityFile);
@@ -216,6 +220,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('成熟度校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

@@ -25,6 +25,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRoleDispatch, type RoleDispatchEntry } from './role-dispatch-logic.js';
+import { exitWithError } from './lib/cli-error.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -33,8 +34,13 @@ async function main(): Promise<void> {
   const r3EnabledFlagPassed = args.includes('--r3-enabled');
 
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <run-log.jsonl>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const abs = path.resolve(file);
@@ -44,8 +50,13 @@ async function main(): Promise<void> {
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
-      process.exit(2);
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        message: '文件不存在',
+        file: abs,
+        exitCode: 2,
+      });
+      return;
     }
     throw err;
   }
@@ -58,8 +69,14 @@ async function main(): Promise<void> {
     try {
       entries.push(JSON.parse(line) as RoleDispatchEntry);
     } catch {
-      console.error(`✗ 第 ${i + 1} 行非合法 JSON: ${line.slice(0, 80)}`);
-      process.exit(2);
+      // 第 29 轮决策：坏行 exit 2 行为保留（不等价 readJsonlOrExit 的 warn+skip），仅消息加类别
+      exitWithError({
+        category: 'FILE_PARSE',
+        message: `第 ${i + 1} 行非合法 JSON`,
+        detail: line.slice(0, 80),
+        exitCode: 2,
+      });
+      return;
     }
   }
 
@@ -112,7 +129,11 @@ const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
   main().catch((err) => {
-    console.error('Role Dispatch 校验脚本异常:', err);
-    process.exit(2);
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }

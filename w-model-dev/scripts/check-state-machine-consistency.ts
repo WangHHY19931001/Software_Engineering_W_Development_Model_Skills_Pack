@@ -21,6 +21,7 @@
 
 import * as path from 'node:path';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 interface Transition {
   from: string;
@@ -104,8 +105,13 @@ export function checkStateMachineConsistency(
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <input.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const abs = path.resolve(file);
@@ -160,7 +166,11 @@ const isMain = (() => {
 
 if (isMain) {
   main().catch((err) => {
-    console.error('State Machine Consistency 校验脚本异常:', err);
-    process.exit(2);
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }

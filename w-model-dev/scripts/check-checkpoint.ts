@@ -29,6 +29,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkCheckpoint } from './checkpoint-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -109,15 +110,23 @@ async function main(): Promise<void> {
   const { runLogFile, checkpointLogDir } = parseArgs(process.argv);
 
   if (!runLogFile) {
-    console.error(
-      '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <run-log.jsonl>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
+      exitCode: 2,
+    });
+    return;
   }
 
   if (!checkpointLogDir) {
-    console.error('✗ --checkpoint-log=<dir> 参数为强制（[21.0.0] R3 强化），未提供');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 --checkpoint-log=<dir>（[21.0.0] R3 强化，强制）',
+      detail: '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const runLogAbs = path.resolve(runLogFile);
@@ -181,6 +190,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('Checkpoint 校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

@@ -2,6 +2,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { checkPreventiveReview, type PreventiveReview, type PreventiveReviewOptions } from './preventive-review-logic.js';
+import { exitWithError } from './lib/cli-error.js';
 
 const PREVENTIVE_REVIEW_JSON = {
   script: 'check-preventive-review.ts',
@@ -46,16 +47,26 @@ async function main(): Promise<void> {
     if (v === 'standard' || v === 'fix' || v === 'emergency') {
       variant = v;
     } else {
-      console.error(`✗ 非法 --variant 值: ${v}（合法值: standard | fix | emergency）`);
-      process.exit(2);
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: `参数非法 --variant=${v}`,
+        detail: '须为 standard | fix | emergency',
+        exitCode: 2,
+      });
+      return;
     }
   }
 
   // --auto-trigger 模式：从 run-log 读取当前阶段 + 推断 variant
   if (autoTrigger) {
     if (!runLogArg) {
-      console.error('用法: check-preventive-review.ts <project-dir> --auto-trigger --run-log=<run-log.jsonl>');
-      process.exit(2);
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: '参数缺失 --run-log=<run-log.jsonl>',
+        detail: '用法: check-preventive-review.ts <project-dir> --auto-trigger --run-log=<run-log.jsonl>',
+        exitCode: 2,
+      });
+      return;
     }
     const runLogPath = runLogArg.split('=')[1]!;
     const abs = path.resolve(runLogPath);
@@ -63,8 +74,13 @@ async function main(): Promise<void> {
       const raw = await fs.readFile(abs, 'utf-8');
       const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       if (lines.length === 0) {
-        console.error('✗ run-log 为空');
-        process.exit(2);
+        exitWithError({
+          category: 'FILE_PARSE',
+          message: 'run-log 为空（--auto-trigger 无法推断阶段）',
+          file: abs,
+          exitCode: 2,
+        });
+        return;
       }
       // 取最后一条 checkpoint success 记录的 phase 作为当前阶段
       let lastPhase = 0;
@@ -99,24 +115,39 @@ async function main(): Promise<void> {
         variant = inferredVariant;
       }
       if (lastPhase < 1 || lastPhase > 8) {
-        console.error(`✗ 无法从 run-log 推断当前阶段（最后 checkpoint phase=${lastPhase}）`);
-        process.exit(2);
+        exitWithError({
+          category: 'ARG_INVALID',
+          message: '无法从 run-log 推断当前阶段',
+          detail: `最后 checkpoint phase=${lastPhase}（须为 1-8）`,
+          exitCode: 2,
+        });
+        return;
       }
       phase = lastPhase;
       console.error(`[auto-trigger] 从 run-log 推断: phase=${phase}, variant=${variant}`);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       if (e.code === 'ENOENT') {
-        console.error(`✗ run-log 文件不存在: ${abs}`);
-        process.exit(2);
+        exitWithError({
+          category: 'FILE_NOT_FOUND',
+          message: '文件不存在',
+          file: abs,
+          exitCode: 2,
+        });
+        return;
       }
       throw err;
     }
   }
 
   if (!phase || phase < 1 || phase > 8) {
-    console.error('用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=standard|fix|emergency] | --auto-trigger --run-log=<run-log.jsonl>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失或非法 --phase=<1-8>',
+      detail: '用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=standard|fix|emergency] | --auto-trigger --run-log=<run-log.jsonl>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const reviewsDir = path.resolve(projectDir, '.w-model', 'preventive-reviews');
@@ -165,6 +196,10 @@ async function main(): Promise<void> {
 }
 
 main().catch(err => {
-  console.error(err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });
