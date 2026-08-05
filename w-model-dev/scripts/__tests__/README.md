@@ -19,6 +19,8 @@
 | read-json-or-exit.test.ts | CLI IO | readJsonOrExit 正常/ENOENT/非法 JSON/相对路径 / readJsonlOrExit 正常/空行/坏行 warn/ENOENT/CRLF/label 默认值 |
 | wm-status-logic.test.ts | WmStatus | 9 态 → phase 映射 / completedPhases 与 progress / RTM 覆盖计数 / 四级测试透传 / recentActions 尾部 3 条精简字段 / rtm·runLog 缺失降级 / nextSteps 确定性 |
 | metrics-report-logic.test.ts | Metrics | 总体汇总 / 阶段分组 / 动作·角色·结果分布 / 返工率与连续段 / gate 通过率（0/非0/null 归类）/ 预算 burn rate 与 killSwitch 两路径 / 窗口与 phase 过滤 / 空 run-log |
+| wm-status.test.ts | WmStatus CLI | 子进程：未初始化 exit 0 / project 非法·非对象·数组 exit 2 / rtm 非法 exit 2 / rtm·run-log 缺失降级 / run-log 坏行跳过 / status 非字符串归一化 / --json 结构 / 人类可读 6 项 |
+| metrics-report.test.ts | Metrics CLI | 子进程：run-log 缺失 exit 2 / --phase 非法值系列 exit 2 / budget 缺失(null)·非法 exit 2 / --json·--out 组合 stdout 纯净 / 空 run-log 预警 / 坏行跳过 / --phase 过滤 / 人类可读 9 节 |
 
 ## pure/IO 函数边界（借鉴点 5）
 

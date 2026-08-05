@@ -952,7 +952,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | package.json | version `30.1.0` → `31.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致）+ scripts 新增 `wm:status` / `wm:metrics` |
 | 顶层文档 | SSoT §3.4.29 + §10A 追溯表 + AGENTS.md + CHANGELOG.md [31.0.0] + README/INSTALL/toolbox/coverage 矩阵同步 |
 | self-test | 基线 213 不变全通过 |
-| vitest | 320/320（25 文件）全通过（新增 wm-status-logic 10 + metrics-report-logic 9 用例） |
+| vitest | 345/345（27 文件）全通过（新增 wm-status-logic 10 + metrics-report-logic 9 + CLI 子进程 25 用例） |
 | TypeScript strict | 0 错误 |
 
 > 两者均为只读报告工具：不修改 .w-model 状态、不产生 exit 1、不改变既有门禁语义；budget 拦截仍由 `check-budget.ts` 承担。
@@ -2555,7 +2555,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.26 | 第三十轮 CLI 样板抽取 + 分派总览矩阵 | `scripts/lib/read-json-or-exit.ts` + `scripts/__tests__/read-json-or-exit.test.ts` + `references/dispatch-matrix.md` + 13 个 check-*.ts 重构 | 完整（self-test 213/213、vitest 297、tsc 0 错误） |
 | §3.4.27 | 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁 | `schemas/*.schema.json`（19 份，全量字段补 description）+ `references/operational-recovery.md`（敏感信息禁令）+ `references/anti-patterns.md` #43 + `.githooks/pre-push`（检查 #12 npm audit warn-only）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 30.0.0） | 完整（self-test 213/213、vitest 297、prepush 12 项、tsc 0 错误） |
 | §3.4.28 | 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义 | `scripts/security-scan.ts` + `scripts/__tests__/security-scan.test.ts` + `.eslintsecurity-baseline.json` + `scripts/check-signature-chain.ts` | 完整（self-test 213/213、vitest 301、prepush 12 项、tsc 0 错误） |
-| §3.4.29 | 第 31 轮 /wm status 脚本化 + 流程度量报告 | scripts/wm-status.ts + wm-status-logic.ts + metrics-report.ts + metrics-report-logic.ts | 完整（self-test 213/213、vitest 320、tsc 0 错误） |
+| §3.4.29 | 第 31 轮 /wm status 脚本化 + 流程度量报告 | scripts/wm-status.ts + wm-status-logic.ts + metrics-report.ts + metrics-report-logic.ts | 完整（self-test 213/213、vitest 345、tsc 0 错误） |
 
 ---
 

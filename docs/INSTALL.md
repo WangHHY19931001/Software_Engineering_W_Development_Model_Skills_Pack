@@ -70,7 +70,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── metrics-report.ts        # 流程度量报告 CLI（run-log + budget 汇总 7 区度量；--from/--to/--phase/--json/--out）
 │   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
 │   ├── self-test.ts             # 回归基线（213 条样本）
-│   └── __tests__/               # vitest 单元测试（25 个 .test.ts / 320 条 + README.md coverage 矩阵）
+│   └── __tests__/               # vitest 单元测试（27 个 .test.ts / 345 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```

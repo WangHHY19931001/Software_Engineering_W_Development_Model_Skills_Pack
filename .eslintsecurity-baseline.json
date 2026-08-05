@@ -115,6 +115,27 @@
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
+      "hash": "f8a830924b56400d7833ae4bd32db45088d4fc3631b087ea46c5ad9dff99d8c2",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/metrics-report.test.ts",
+      "line": 44,
+      "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "3d5eaba30597cec3063fa6ebf77b994266578fc8a52d22ac63739c976c9602b6",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/metrics-report.test.ts",
+      "line": 45,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "6f1c64b6984c77c111f4bda46ad3ce309bf5cc6ac255583cb7282b5cbbc4fd33",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/metrics-report.test.ts",
+      "line": 181,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
       "hash": "8d82cbe67cac53260b6ca97534d9c9603ca19a47aacf07b01392506539683d56",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/plan-chunks.test.ts",
@@ -253,6 +274,20 @@
       "file": "w-model-dev/scripts/__tests__/skill-metadata.test.ts",
       "line": 21,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "dc57b06db5727eee2182cf7ea2ad50f4963844d63468798fc9eaf29e691205db",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-status.test.ts",
+      "line": 45,
+      "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "e2f0dc823fa0e8709abcdd7ed9f6e0761204ff147154b28c9abc29310f4208f4",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-status.test.ts",
+      "line": 46,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "c4773b04519bdc1c925841cf659377f519d9fd8b22d6b6cddc660aa5e5ec48e8",

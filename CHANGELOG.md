@@ -21,7 +21,7 @@
 - 版本号三处同步为 31.0.0：package.json + skill-metadata.json + SKILL.md frontmatter
 
 #### 验证
-- vitest 320/320（25 文件）全通过（新增 wm-status-logic 10 + metrics-report-logic 9 用例）
+- vitest 345/345（27 文件）全通过（新增 wm-status-logic 10 + metrics-report-logic 9 + CLI 子进程 25 用例）
 - self-test 213/213 不变全通过
 - TypeScript strict 0 错误
 - `npm run lint:security` exit 0（0 新增）
