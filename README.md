@@ -150,6 +150,13 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 | 票据 durability | phase-5-coding.md | 票据主体 = 符号级契约（接口/类型/状态转移），禁止文件路径+行号作为票据主体（位置交 codegraph 约束 #20） |
 | glossary 术语表 | references/glossary.md | 15+ 术语权威入口（字段名 / 枚举 / `_Avoid_` 别名治理），新增字段前先查本表 |
 
+### 只读报告脚本（第 31 轮，2026-08-05）
+
+| 脚本 | 说明 |
+|---|---|
+| wm-status.ts | 状态快照（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议）；只读，退出码 0/2 |
+| metrics-report.ts | 流程度量报告（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警）；只读，退出码 0/2 |
+
 ## 命令一览
 
 | 命令 | 说明 |
@@ -159,7 +166,8 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 | `/wm code <功能描述>` | 编码实现，同步产出单元测试用例（不自动标记通过） |
 | `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 回填指定类型测试真实执行结果 |
 | `/wm review <目标ID或文件路径>` | 返回结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`，不内置 LLM） |
-| `/wm status` | 查看当前阶段、进度、RTM 覆盖率 |
+| `/wm status` | 查看当前阶段、进度、RTM 覆盖率（脚本化，由 wm-status.ts 输出） |
+| `/wm metrics` | 流程度量报告（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警） |
 | `/wm help` | 显示帮助 |
 | `/wm reset` | 重置项目（保留元信息，清空实体） |
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
@@ -313,6 +321,10 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 10 个 *-logic.ts 顶部自动 import）
 │   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
+│   │   ├── wm-status.ts        #   状态快照 CLI（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议，只读，退出码 0/2）
+│   │   ├── wm-status-logic.ts  #   状态快照纯逻辑（buildStatusReport / STATUS_TO_PHASE）
+│   │   ├── metrics-report.ts   #   流程度量报告 CLI（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警，只读，退出码 0/2）
+│   │   ├── metrics-report-logic.ts  # 流程度量纯逻辑（computeMetrics）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
 │   │   ├── __tests__/            #   vitest 单元测试（23 个 .test.ts / 301 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）

@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 30.1.0
+version: 31.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -269,6 +269,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | check-codegraph-queries.ts | 阶段 5-8 gate —— 校验 codegraph 查询落盘（反模式 #38） |
 | check-opsx-artifacts.ts | 阶段 5-8 gate —— 校验 opsx 制品 + R3/V 审查产物（反模式 #39/#40） |
 | check-openspec-archive.ts | 阶段 5-8 gate 通过后 —— 校验 opsx:archive 归档完整性 |
+| `wm-status.ts` | 状态快照脚本（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议） |
+| `metrics-report.ts` | 流程度量报告脚本（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警） |
 
 ### subagent/（按需读取，仅供 V-lead / R-lead 多角度分析）
 
@@ -306,12 +308,13 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm code <功能>` | 阶段 5 | 必须存在已放行详细设计；生成并真实执行单元测试 | O 路由 → S 产出代码+单测+RTM → V 评审 → G 门禁 |
 | `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 阶段 5–8 | `result` 必填且必须来自真实测试输出 | O 路由 → S 执行测试+回填 RTM → V 评审报告 → G 门禁 |
 | `/wm review <目标>` | 阶段门 | 返回评审指引；外部 Agent 执行评审 | O 路由 → V 评审 → G 门禁（不由 O 自评） |
-| `/wm status` | 状态查询 | 读取状态与 RTM，不修改数据 | O 只读，不分派子代理 |
+| `/wm status` | 状态查询 | 读取状态与 RTM，不修改数据；由 wm-status.ts 脚本化输出 | O 只读，不分派子代理 |
 | `/wm help` | 帮助 | 不读项目状态 | O 只读，不分派子代理 |
 | `/wm reset` | 重置 | 🔴 CHECKPOINT 后清空实体，保留项目元信息 | O 执行（仅状态文件操作，非阶段产物） |
 | `/wm export [目录]` | 导出 | 输出 JSON 与 RTM Markdown | O 只读导出，不分派子代理 |
 | `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
 | `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进 | O 分析（状态读写+分析，非实施） |
+| `/wm metrics` | 流程度量 | 从 run-log/budget 生成流程度量报告；只读 | O 只读，不分派子代理 |
 
 每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 
@@ -320,6 +323,9 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 /wm hill-climbing                              # 全量分析当前 run-log
 /wm hill-climbing --from=2026-07-20 --to=2026-07-26  # 指定时间窗口
 /wm hill-climbing --phase=5                    # 仅分析阶段 5 的 run-log
+/wm status --json                              # 输出状态快照 JSON（供展示证据）
+/wm metrics                                   # 全量流程度量摘要
+/wm metrics --phase=5 --json --out=metrics.json  # 仅阶段 5，写文件
 ```
 产出存 `.w-model/hill-climbing/<timestamp>-report.json`。
 

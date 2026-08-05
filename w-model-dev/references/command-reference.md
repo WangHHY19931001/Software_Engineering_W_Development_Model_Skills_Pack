@@ -92,15 +92,26 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
 ## `/wm status`
 
 - **执行方**：O 只读，不分派子代理。
-- 编排者（O）只读 `.w-model/project.json` 与 `.w-model/rtm.json`，输出：
+- 运行 `npx tsx w-model-dev/scripts/wm-status.ts <project-dir> [--json]`（project-dir 默认 cwd）：
+  - 只读 `.w-model/project.json`（必读）、`.w-model/rtm.json` 与 `.w-model/run-log.jsonl`（缺失降级），输出：
+    1. 当前阶段与 `updatedAt`；
+    2. 已完成阶段数 / 8 与进度；
+    3. RTM 已覆盖需求数 / 总需求数（coverageStatus=100% 计数）；
+    4. 四级测试 `total/passed/failed/pending`；
+    5. 最近 3 条动作；
+    6. 确定性下一步建议。
+  - `--json` 输出单行 `StatusReport` JSON（供展示证据或机器消费）。
+- 退出码：0 = 正常（含未初始化提示「项目未初始化」）；2 = project/rtm JSON 损坏（转 `operational-recovery.md`，不得猜测状态）。
 
-1. 当前阶段和 `updatedAt`；
-2. 已完成阶段数 / 8 与进度；
-3. RTM 已覆盖需求数 / 总需求数；
-4. 四级测试 `total/passed/failed/pending`；
-5. 基于真实状态的下一步建议。
+## `/wm metrics`
 
-状态文件缺失时说明项目未初始化；JSON 损坏时转 `operational-recovery.md`，不得猜测状态。
+- **执行方**：O 只读，不分派子代理。
+- 运行 `npx tsx w-model-dev/scripts/metrics-report.ts <project-dir> [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`：
+  - 必读 `.w-model/run-log.jsonl`，可选读 `.w-model/budget.json`（缺失时预算区为 null）；
+  - 输出 7 区流程度量：总体（tokens/耗时/分派/返工）、阶段汇总、动作分布、角色分布、结果分布、门禁通过率、预算 burn rate 与 killSwitch 预警；
+  - `--json` 输出完整报告 JSON；`--out <path>` 写入文件；`--phase`/`--from`/`--to` 过滤。
+- 退出码：0 = 生成成功（预警不改退出码）；2 = run-log 缺失 / `--phase` 非法 / JSON 损坏。
+- 纯报告无门禁语义：预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
 
 ## `/wm help`
 
