@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（#1~#19 + #20 + #21~#30 + #33~#43；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第 30 轮新增）
+- 反模式清单（#1~#19 + #20 + #21~#30 + #33~#43；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第三十一轮新增）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -605,7 +605,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：约束 #17 + #19 + SSoT §3.4.25（[28.0.0] 新增）；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
-## #43 敏感信息写入状态文件/日志（第30轮新增）
+## #43 敏感信息写入状态文件/日志（第三十一轮新增）
 
 **症状**：`.w-model/*.json`（project/budget/maturity/graph/rtm/tla-manifest 等）、`.w-model/gate-logs/`、`run-log.jsonl` / `event-ingress.jsonl` / `signature-chain.jsonl` 中出现硬编码密钥、令牌、密码、连接串（如 `sk-xxx`、`AKIA...`、`Bearer <token>`、`password=...`）；或 SKILL.md 示例、templates/ 模板、references/ 示例中包含真实凭据而非占位符。
 

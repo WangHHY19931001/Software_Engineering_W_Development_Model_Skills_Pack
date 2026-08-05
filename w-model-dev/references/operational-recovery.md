@@ -129,7 +129,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - 每行一条 JSON 记录，末尾换行 `\n`（Unix 风格，跨平台一致）
 - 不得用 PowerShell `Add-Content` 追加（同上 BOM + 乱码问题）
 
-### 敏感信息禁令（第 30 轮）
+### 敏感信息禁令（第三十一轮）
 
 - **禁止**将密钥、令牌、密码、连接串写入任何状态文件（`.w-model/*.json`）或日志（gate-logs / run-log / event-ingress / signature-chain）。
 - 敏感配置统一经环境变量注入（与 demo `JWT_SECRET` 处理一致，见 [第 15 轮归档](../../docs/changes/archive/2026-07-26-round15-end-to-end-test/README.md)）；状态文件只存引用名（如 `${JWT_SECRET}`），不存值。
