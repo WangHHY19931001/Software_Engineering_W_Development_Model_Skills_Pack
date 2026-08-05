@@ -23,8 +23,8 @@
 | scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/security-scan.ts`（支持 --regenerate 重生成 baseline） |
 | scripts 改动 | 回归基线 | `npm run self-test` |
 | ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/plan-chunks.ts`（O 只读 stdout） |
-| wm-status.ts | 状态快照 | 只读 | 查询命令：O 展示证据前可先跑，输出 STATUS_JSON |
-| metrics-report.ts | 流程度量 | 只读 | 报告工具：预算检查/阶段回顾；无门禁语义 |
+| wm-status.ts（状态快照） | 查看当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步 | `npx tsx w-model-dev/scripts/wm-status.ts <project-dir> [--json]` |
+| metrics-report.ts（流程度量） | 流程度量报告（分布/返工/预算 burn rate/killSwitch 预警） | `npx tsx w-model-dev/scripts/metrics-report.ts <project-dir> [--from=] [--to=] [--phase=N] [--json] [--out=]` |
 
 ## subagent 决策表
 
