@@ -42,10 +42,13 @@
 
 `bdd-manifest` / `budget` / `checkpoint-log` / `code-tla-manifest` / `coverage` / `design-contract` / `event-ingress` / `exemption` / `graph` / `hill-climbing-report` / `maturity` / `preventive-review` / `project` / `rootcause-report` / `rtm` / `run-log` / `signature-chain` / `tla-manifest` / `verifier-output`
 
-**做法**：
-- 每份 schema 为**必填字段（required 列表内）+ 语义关键字段**补充 `description`。
+**做法**（用户决策：**全量字段**，约 430 个）：
+- 为 19 份 schema 的**全部字段定义**（含嵌套对象属性、$defs 引用内字段）补充 `description`，不留遗漏。
 - description 内容：字段用途 + 期望值（含合法取值 / 单位 / 一致性约束引用），与 `data-models.md` / `*-logic.ts` 校验语义一致，避免与既有文档口径冲突。
 - 结构上保持 `properties` 键顺序不变，仅插入 `description` 行。
+- 执行方式：可拆 3-4 个子代理并行（按 schema 分组，组间无依赖），完成后统一 JSON.parse 验证。
+
+**字段覆盖基线**：修改前 19 份 schema 中 17 份字段级 description 为 0；仅 `rtm` 有 2 处（targetValue/testThreshold）、`run-log` 有 1 处（role）。验收标准为全部字段（含既有 3 处）均带 description。
 
 **风险与回归**：
 - 唯一风险为 JSON 语法错误：每文件修改后以 `JSON.parse` 验证。
