@@ -44,6 +44,7 @@ import {
   type BddStateMachine,
 } from './bdd-logic.js';
 import { validateBySchema } from './schema-loader.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -180,7 +181,12 @@ async function main(): Promise<number> {
   const args = parseArgs(process.argv);
 
   if (!args.manifestFile) {
-    console.error('用法: check-bdd-model.ts <bdd-manifest.json> [--phase=N] [--tla-manifest=...] [--rtm=...] [--cucumber-report=...]');
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <bdd-manifest.json>',
+      detail: '用法: check-bdd-model.ts <bdd-manifest.json> [--phase=N] [--tla-manifest=...] [--rtm=...] [--cucumber-report=...]',
+      exitCode: 2,
+    });
     return 2;
   }
 
@@ -189,23 +195,38 @@ async function main(): Promise<number> {
   try {
     manifest = await readJson<BddManifest>(args.manifestFile);
   } catch (e) {
-    console.error(`[input] 无法读取 manifest: ${(e as Error).message}`);
+    const err = e as NodeJS.ErrnoException;
+    exitWithError({
+      category: err.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+      message: err.code === 'ENOENT' ? '文件不存在' : err instanceof SyntaxError ? '文件解析失败（非合法 JSON）' : '文件读取失败',
+      file: path.resolve(args.manifestFile),
+      detail: err.message,
+      exitCode: 2,
+    });
     return 2;
   }
 
   // schema 前置校验
   const schemaResult = validateBySchema('bdd-manifest', manifest);
   if (!schemaResult.valid) {
-    console.error(`[schema] manifest schema 校验失败:`);
-    for (const err of schemaResult.errorMessages) {
-      console.error(`  - ${err}`);
-    }
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      message: `${path.basename(args.manifestFile)} 结构不符`,
+      file: path.resolve(args.manifestFile),
+      detail: `manifest schema 校验失败: ${schemaResult.errorMessages.join('; ')}`,
+      exitCode: 2,
+    });
     return 2;
   }
 
   const phaseRaw = args.phase ?? manifest.currentPhase;
   if (typeof phaseRaw !== 'number' || !Number.isInteger(phaseRaw) || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phaseRaw)) {
-    console.error(`[input] --phase=${args.phase ?? manifest.currentPhase} 非法（须 1-8 整数）`);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: `参数非法 --phase=${args.phase ?? manifest.currentPhase}`,
+      detail: '须为 1-8 整数',
+      exitCode: 2,
+    });
     return 2;
   }
   const phase = phaseRaw as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -525,7 +546,16 @@ function extractTlaInvariants(content: string): string[] {
   return invariants;
 }
 
-main().then(exitCode => process.exit(exitCode)).catch(e => {
-  console.error(e);
-  process.exit(2);
+main().then(exitCode => {
+  // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined）→ 让 Node 自然退出，避免 process.exit 截断 ERROR_JSON
+  if (process.exitCode === undefined) {
+    process.exit(exitCode);
+  }
+}).catch(e => {
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: e instanceof Error ? e.message : String(e),
+    exitCode: 2,
+  });
 });

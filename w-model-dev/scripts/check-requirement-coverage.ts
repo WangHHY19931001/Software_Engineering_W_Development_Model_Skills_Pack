@@ -22,12 +22,18 @@ import * as path from 'node:path';
 import { checkRequirementCoverage } from './coverage-logic.js';
 import type { GraphShape } from './graph-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <coverage.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]',
+      exitCode: 2,
+    });
+    return;
   }
 
   // 解析可选参数
@@ -52,9 +58,16 @@ async function main(): Promise<void> {
       graphCrossCuts = graphParsed.edges
         .filter(e => e.type === 'cross-cuts')
         .map(e => ({ from: e.from, to: e.to }));
-    } catch {
-      console.error(`✗ --graph 文件读取失败: ${graphPath}`);
-      process.exit(2);
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      exitWithError({
+        category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+        message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
+        file: path.resolve(graphPath),
+        detail: e.code,
+        exitCode: 2,
+      });
+      return;
     }
   }
 
@@ -65,13 +78,26 @@ async function main(): Promise<void> {
       const oosRaw = await fs.readFile(path.resolve(outOfScopePath), 'utf-8');
       const oosParsed = JSON.parse(oosRaw);
       if (!oosParsed || !Array.isArray((oosParsed as { items?: unknown }).items)) {
-        console.error(`✗ --out-of-scope 文件无 items 数组（结构不符）: ${outOfScopePath}`);
-        process.exit(2);
+        exitWithError({
+          category: 'STRUCTURE_INVALID',
+          message: `${path.basename(outOfScopePath)} 结构不符`,
+          file: path.resolve(outOfScopePath),
+          detail: '缺 items 数组',
+          exitCode: 2,
+        });
+        return;
       }
       outOfScope = (oosParsed as { items: string[] }).items;
-    } catch {
-      console.error(`✗ --out-of-scope 文件读取失败: ${outOfScopePath}`);
-      process.exit(2);
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      exitWithError({
+        category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+        message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
+        file: path.resolve(outOfScopePath),
+        detail: e.code,
+        exitCode: 2,
+      });
+      return;
     }
   }
 
@@ -82,9 +108,16 @@ async function main(): Promise<void> {
       const exemptRaw = await fs.readFile(path.resolve(exemptionsPath), 'utf-8');
       const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
       exemptions = exemptParsed.grantedExemptions?.map(g => g.ruleId);
-    } catch {
-      console.error(`✗ --exemptions 文件读取失败: ${exemptionsPath}`);
-      process.exit(2);
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      exitWithError({
+        category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+        message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
+        file: path.resolve(exemptionsPath),
+        detail: e.code,
+        exitCode: 2,
+      });
+      return;
     }
   }
 
@@ -136,6 +169,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('覆盖分析校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

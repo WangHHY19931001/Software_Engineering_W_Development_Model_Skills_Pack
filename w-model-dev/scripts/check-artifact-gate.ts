@@ -35,6 +35,7 @@ import {
   type UatPathMappingRow,
 } from './gate-logic.js';
 import { validateBySchema } from './schema-loader.js';
+import { exitWithError } from './lib/cli-error.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
@@ -121,8 +122,12 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
       const next = argv[i + 1] ?? '';
       const val = strictPhase(next);
       if (val === undefined) {
-        console.error(`✗ --phase 参数非法: ${next}（须 1-8 的整数）`);
-        process.exit(2);
+        exitWithError({
+          category: 'ARG_INVALID',
+          message: `参数非法 --phase=${next}`,
+          detail: '须为 1-8 的整数',
+          exitCode: 2,
+        });
       }
       return val;
     }
@@ -130,8 +135,12 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
     if (eqMatch) {
       const val = strictPhase(eqMatch[1] ?? '');
       if (val === undefined) {
-        console.error(`✗ --phase 参数非法: ${eqMatch[1] ?? ''}（须 1-8 的整数）`);
-        process.exit(2);
+        exitWithError({
+          category: 'ARG_INVALID',
+          message: `参数非法 --phase=${eqMatch[1] ?? ''}`,
+          detail: '须为 1-8 的整数',
+          exitCode: 2,
+        });
       }
       return val;
     }
@@ -161,6 +170,7 @@ function parseProjectDir(argv: string[]): string {
 
 async function main(): Promise<void> {
   const phaseOption = parsePhaseArg(process.argv);
+  if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
   const projectDir = parseProjectDir(process.argv);
   const rtmFile = path.resolve(projectDir, RTM_RELATIVE_PATH);
 
@@ -170,9 +180,14 @@ async function main(): Promise<void> {
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      console.error(`✗ RTM 文件不存在: ${rtmFile}`);
-      console.error('  请先在项目内执行 /wm 命令走完 W 模型阶段以生成 .w-model/rtm.json');
-      process.exit(2);
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        message: '文件不存在',
+        file: rtmFile,
+        detail: '请先在项目内执行 /wm 命令走完 W 模型阶段以生成 .w-model/rtm.json',
+        exitCode: 2,
+      });
+      return;
     }
     throw err;
   }
@@ -181,8 +196,13 @@ async function main(): Promise<void> {
   try {
     matrix = JSON.parse(raw) as RTMMatrixShape;
   } catch {
-    console.error(`✗ RTM 文件解析失败（非合法 JSON）: ${rtmFile}`);
-    process.exit(2);
+    exitWithError({
+      category: 'FILE_PARSE',
+      message: '文件解析失败（非合法 JSON）',
+      file: rtmFile,
+      exitCode: 2,
+    });
+    return;
   }
 
   // ==================== TLA+ 资产读取（spec §3.4.4） ====================
@@ -367,7 +387,11 @@ const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
   main().catch((err) => {
-    console.error('门禁校验脚本异常:', err);
-    process.exit(2);
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   });
 }

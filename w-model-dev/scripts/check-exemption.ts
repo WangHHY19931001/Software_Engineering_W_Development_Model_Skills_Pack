@@ -15,12 +15,18 @@
  */
 import { checkExemption } from './exemption-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-exemption.ts <exemption.json>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <exemption.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-exemption.ts <exemption.json>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const parsed = await readJsonOrExit(file);
@@ -54,6 +60,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('豁免审批校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

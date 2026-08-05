@@ -46,6 +46,7 @@ import {
   type TlaSpec,
 } from './code-tla-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -160,10 +161,13 @@ async function main(): Promise<void> {
   const { manifestFile, graphFile, rtmFile, srcDir } = parseArgs(process.argv);
 
   if (!manifestFile || !graphFile || !rtmFile || !srcDir) {
-    console.error(
-      '用法: npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 --manifest/--graph/--rtm/--src',
+      detail: '用法: npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
+      exitCode: 2,
+    });
+    return;
   }
 
   // 读取 JSON 文件
@@ -262,6 +266,10 @@ async function main(): Promise<void> {
 }
 
 main().catch(err => {
-  console.error('代码-TLA+ 一致性校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

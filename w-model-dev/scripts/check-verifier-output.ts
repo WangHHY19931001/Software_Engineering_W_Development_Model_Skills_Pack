@@ -31,6 +31,7 @@ import {
   type VerifierOutputShape,
 } from './verifier-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -39,8 +40,13 @@ async function main(): Promise<void> {
   const sOutputArg = args.find(a => a.startsWith('--s-output='));
 
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <output.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const abs = path.resolve(file);
@@ -57,8 +63,13 @@ async function main(): Promise<void> {
     } else {
       const sOutputValue = sOutputArg.slice(sOutputArg.indexOf('=') + 1);
       if (sOutputValue === '') {
-        console.error('✗ --s-output= 值不能为空');
-        process.exit(2);
+        exitWithError({
+          category: 'ARG_INVALID',
+          message: '参数非法 --s-output=',
+          detail: '值不能为空',
+          exitCode: 2,
+        });
+        return;
       }
       const sOutputPath = path.resolve(sOutputValue);
       if (abs === sOutputPath) {
@@ -123,6 +134,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('Verifier 校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

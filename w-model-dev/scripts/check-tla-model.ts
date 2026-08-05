@@ -39,6 +39,7 @@ import {
   type TlaSpec,
 } from './tla-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== 参数解析 ====================
 
@@ -301,10 +302,13 @@ async function main(): Promise<void> {
   const { manifestFile, phase: phaseArg, specId, graphFile, keepStates } = parseArgs(process.argv);
 
   if (!manifestFile) {
-    console.error(
-      '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]',
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <tla-manifest.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]',
+      exitCode: 2,
+    });
+    return;
   }
 
   const abs = path.resolve(manifestFile);
@@ -318,10 +322,13 @@ async function main(): Promise<void> {
     phase = manifest.currentPhase;
   }
   if (phase === undefined || typeof phase !== 'number' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phase)) {
-    console.error(
-      `✗ 无法确定 phase：未传 --phase 且 manifest.currentPhase=${JSON.stringify(manifest.currentPhase)} 无效（须为 1-8）`,
-    );
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '无法确定 phase',
+      detail: `未传 --phase 且 manifest.currentPhase=${JSON.stringify(manifest.currentPhase)} 无效（须为 1-8）`,
+      exitCode: 2,
+    });
+    return;
   }
 
   // manifest.tools 前置检查（环境检查需要 jarPath）
@@ -331,8 +338,14 @@ async function main(): Promise<void> {
     typeof tools.jarPath !== 'string' ||
     typeof tools.javaMinVersion !== 'number'
   ) {
-    console.error('✗ manifest.tools 必须含 jarPath(string) 与 javaMinVersion(number)');
-    process.exit(2);
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      message: `${path.basename(abs)} 结构不符`,
+      file: abs,
+      detail: 'manifest.tools 必须含 jarPath(string) 与 javaMinVersion(number)',
+      exitCode: 2,
+    });
+    return;
   }
 
   // P1.1: 路径解析统一基准 —— basePath（相对 manifest 文件所在目录）。
@@ -531,6 +544,10 @@ async function main(): Promise<void> {
 }
 
 main().catch(err => {
-  console.error('TLA+ 模型校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

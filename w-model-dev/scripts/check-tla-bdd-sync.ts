@@ -23,6 +23,7 @@
 
 import * as fs from 'node:fs/promises';
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
+import { exitWithError } from './lib/cli-error.js';
 
 const SYNC_JSON = {
   script: 'check-tla-bdd-sync.ts',
@@ -34,15 +35,25 @@ const SYNC_JSON = {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args.length < 2) {
-    console.error('用法: check-tla-bdd-sync.ts <tla-file> <feature-file>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <tla-file> <feature-file>',
+      detail: '用法: check-tla-bdd-sync.ts <tla-file> <feature-file>',
+      exitCode: 2,
+    });
+    return;
   }
 
   const [tlaFile, featureFile] = args;
   // noUncheckedIndexedAccess: 解构后为 string | undefined，须显式守卫
   if (!tlaFile || !featureFile) {
-    console.error('用法: check-tla-bdd-sync.ts <tla-file> <feature-file>');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <tla-file> <feature-file>',
+      detail: '用法: check-tla-bdd-sync.ts <tla-file> <feature-file>',
+      exitCode: 2,
+    });
+    return;
   }
 
   try {
@@ -68,12 +79,22 @@ async function main(): Promise<void> {
     console.log('TLA_BDD_SYNC_JSON ' + JSON.stringify({ type: 'tla-bdd-sync', passed: output.passed, exitCode: output.exitCode, violations: output.violations }));
     process.exit(output.exitCode);
   } catch (err) {
-    console.error('输入错误：', err);
-    process.exit(2);
+    const e = err as NodeJS.ErrnoException;
+    exitWithError({
+      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+      message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
+      detail: e.message || String(err),
+      exitCode: 2,
+    });
+    return;
   }
 }
 
 main().catch(err => {
-  console.error(err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

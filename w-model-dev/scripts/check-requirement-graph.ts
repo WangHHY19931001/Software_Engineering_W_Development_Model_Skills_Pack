@@ -30,12 +30,18 @@ import {
   type GraphShape,
 } from './graph-logic.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { exitWithError } from './lib/cli-error.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]');
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 <graph.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]',
+      exitCode: 2,
+    });
+    return;
   }
 
   // 解析 --phase
@@ -45,14 +51,24 @@ async function main(): Promise<void> {
     const phaseStr = phaseArg.split('=')[1];
     if (phaseStr !== undefined) {
       if (!/^\d+$/.test(phaseStr)) {
-        console.error(`✗ --phase 必须为整数，实际: ${phaseStr}`);
-        process.exit(2);
+        exitWithError({
+          category: 'ARG_INVALID',
+          message: `参数非法 --phase=${phaseStr}`,
+          detail: '须为 1-4 的整数',
+          exitCode: 2,
+        });
+        return;
       }
       phase = Number.parseInt(phaseStr, 10);
     }
     if (phase === undefined || ![1, 2, 3, 4].includes(phase)) {
-      console.error(`✗ --phase 必须为 1-4，实际: ${phase}`);
-      process.exit(2);
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: `参数非法 --phase=${phase}`,
+        detail: '须为 1-4 的整数',
+        exitCode: 2,
+      });
+      return;
     }
   }
 
@@ -66,9 +82,16 @@ async function main(): Promise<void> {
         const rtmRaw = await fs.readFile(path.resolve(rtmPath), 'utf-8');
         const rtmParsed = JSON.parse(rtmRaw) as { rows?: Array<{ requirementId: string; type: string }> };
         rtmRows = rtmParsed.rows;
-      } catch {
-        console.error(`✗ --rtm 文件读取失败: ${rtmPath}`);
-        process.exit(2);
+      } catch (err) {
+        const e = err as NodeJS.ErrnoException;
+        exitWithError({
+          category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+          message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
+          file: path.resolve(rtmPath),
+          detail: e.code,
+          exitCode: 2,
+        });
+        return;
       }
     }
   }
@@ -83,9 +106,16 @@ async function main(): Promise<void> {
         const exemptRaw = await fs.readFile(path.resolve(exemptPath), 'utf-8');
         const exemptParsed = JSON.parse(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
         exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
-      } catch {
-        console.error(`✗ --exemptions 文件读取失败: ${exemptPath}`);
-        process.exit(2);
+      } catch (err) {
+        const e = err as NodeJS.ErrnoException;
+        exitWithError({
+          category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+          message: e.code === 'ENOENT' ? '文件不存在' : '文件读取失败',
+          file: path.resolve(exemptPath),
+          detail: e.code,
+          exitCode: 2,
+        });
+        return;
       }
     }
   }
@@ -95,8 +125,13 @@ async function main(): Promise<void> {
 
   const effectivePhase = phase ?? (parsed as GraphShape)?.currentPhase ?? 1;
   if (!phase && ![1, 2, 3, 4].includes(effectivePhase)) {
-    console.error(`✗ 无法确定 phase：未传 --phase 且 graph.currentPhase=${effectivePhase} 无效`);
-    process.exit(2);
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '无法确定 phase',
+      detail: `未传 --phase 且 graph.currentPhase=${effectivePhase} 无效（须为 1-4）`,
+      exitCode: 2,
+    });
+    return;
   }
 
   const result = checkRequirementGraph(parsed, effectivePhase);
@@ -203,6 +238,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('图谱校验脚本异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });

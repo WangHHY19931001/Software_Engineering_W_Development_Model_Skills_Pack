@@ -36,6 +36,7 @@ import {
   type RouteDefinition,
   type AcceptanceTestAssertion,
 } from './design-contract-logic.js';
+import { exitWithError } from './lib/cli-error.js';
 
 // ==================== uat-path-mapping.md 解析 ====================
 
@@ -215,8 +216,6 @@ async function main(): Promise<void> {
   try {
     await fs.access(mappingPath);
   } catch {
-    console.error('✗ uat-path-mapping.md 不存在，请在阶段1产出该文件（见 phase-1-requirements.md §输出）');
-    console.error(`  期望路径：${mappingPath}`);
     const result: DesignContractCheckResult = {
       passed: false,
       reasons: ['uat-path-mapping.md 不存在'],
@@ -234,7 +233,14 @@ async function main(): Promise<void> {
       violationCount: result.violations.length,
       violations: result.violations,
     }, null, 2)}`);
-    process.exit(2);
+    exitWithError({
+      category: 'FILE_NOT_FOUND',
+      message: '文件不存在',
+      file: mappingPath,
+      detail: 'uat-path-mapping.md 不存在，请在阶段1产出该文件（见 phase-1-requirements.md §输出）',
+      exitCode: 2,
+    });
+    return;
   }
 
   const uatPathMappings = await parseUatPathMapping(mappingPath);
@@ -281,6 +287,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('设计契约一致性校验异常:', err);
-  process.exit(2);
+  exitWithError({
+    category: 'UNEXPECTED',
+    message: '脚本异常',
+    detail: err instanceof Error ? err.message : String(err),
+    exitCode: 2,
+  });
 });
