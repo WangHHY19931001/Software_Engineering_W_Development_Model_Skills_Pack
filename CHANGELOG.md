@@ -25,6 +25,7 @@
 - self-test 213/213 不变全通过
 - TypeScript strict 0 错误
 - `npm run lint:security` exit 0（0 新增）
+- prepush 12 项全通过
 - 冒烟：wm-status（含未初始化 exit 0 / 损坏 JSON exit 2）、metrics-report（含缺失 run-log exit 2）均符合预期
 
 ## [30.1.0] - 2026-08-05

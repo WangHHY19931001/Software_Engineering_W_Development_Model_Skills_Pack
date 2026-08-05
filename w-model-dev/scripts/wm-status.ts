@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     console.error(`✗ 文件解析失败（非合法 JSON）: ${projectFile}（转 operational-recovery，不猜测状态）`);
     process.exit(2);
   }
-  if (project === null || typeof project !== 'object') {
+  if (project === null || typeof project !== 'object' || Array.isArray(project)) {
     console.error(`✗ 文件解析失败（非对象）: ${projectFile}（转 operational-recovery，不猜测状态）`);
     process.exit(2);
   }
