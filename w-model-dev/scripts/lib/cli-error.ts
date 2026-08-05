@@ -1,0 +1,55 @@
+/**
+ * CLI 脚本错误结构工具（lib/cli-error.ts）
+ *
+ * 统一全仓脚本 exit 2 输入错误的输出：
+ *   - 人类可读消息 → stderr（`✗ [CATEGORY] <message>: <file|detail>`）
+ *   - 机器可读摘要 → stdout（`ERROR_JSON {category,message,exitCode,file}`）
+ * 遵循 SSoT §10E E.1「JSON 摘要含 exitCode 字段且输出到 stdout」约定。
+ * 设计：docs/superpowers/specs/2026-08-05-round32-error-structure-normalization-design.md §3.1
+ */
+
+/** 错误类别（exit 1 校验失败走 violations + XXX_JSON，不使用本表） */
+export type ErrorCategory =
+  | 'ARG_INVALID'
+  | 'FILE_NOT_FOUND'
+  | 'FILE_PARSE'
+  | 'FILE_READ'
+  | 'STRUCTURE_INVALID'
+  | 'UNEXPECTED';
+
+export interface CliError {
+  category: ErrorCategory;
+  /** 人类可读描述（不含 ✗ 前缀与路径后缀；由 formatCliError 组装） */
+  message: string;
+  /** 退出码：当前均为 2（输入错误） */
+  exitCode: 0 | 1 | 2;
+  /** 相关文件绝对路径（可选） */
+  file?: string;
+  /** 补充详情（如收到的参数值 / 底层错误码） */
+  detail?: string;
+}
+
+/** 组装人类可读消息：`✗ [CATEGORY] <message>: <file|detail>`（file 优先，其次 detail，均无则省略冒号段） */
+export function formatCliError(e: CliError): string {
+  const head = `✗ [${e.category}] ${e.message}`;
+  const tail = e.file ?? e.detail;
+  return tail ? `${head}: ${tail}` : head;
+}
+
+/** stderr 输出人类可读错误消息 */
+export function printError(e: CliError): void {
+  console.error(formatCliError(e));
+}
+
+/** stdout 输出结构化错误摘要（ERROR_JSON 前缀 + JSON，遵循 §10E E.1） */
+export function printErrorJson(e: CliError): void {
+  const json = { category: e.category, message: e.message, exitCode: e.exitCode, file: e.file };
+  console.log(`ERROR_JSON ${JSON.stringify(json)}`);
+}
+
+/** printError + printErrorJson + process.exit(exitCode) */
+export function exitWithError(e: CliError): never {
+  printError(e);
+  printErrorJson(e);
+  process.exit(e.exitCode);
+}
