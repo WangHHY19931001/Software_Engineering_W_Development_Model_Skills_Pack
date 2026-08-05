@@ -216,14 +216,8 @@ export function extractCodeStateTransfers(
   const assertions: Assertion[] = [];
 
   function getLine(node: TsType.Node): number {
-    const fullText = ast.getFullText();
-    const pos = node.getStart(ast, false);
-    if (pos < 0) return 0;
-    let line = 1;
-    for (let i = 0; i < pos && i < fullText.length; i++) {
-      if (fullText.charCodeAt(i) === 10 /* \n */) line++;
-    }
-    return line;
+    // ts.getLineAndCharacterOfPosition 的 .line 为 0-based，+1 后与逐字符计 \n 语义一致
+    return ts.getLineAndCharacterOfPosition(ast, node.getStart(ast, false)).line + 1;
   }
 
   function getText(node: TsType.Node): string {
