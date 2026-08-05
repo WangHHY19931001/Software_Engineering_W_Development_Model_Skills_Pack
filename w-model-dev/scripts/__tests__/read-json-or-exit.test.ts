@@ -118,7 +118,7 @@ describe('readJsonlOrExit', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const missing = path.join(tmpDir, 'nope.jsonl');
     await expect(readJsonlOrExit(missing)).rejects.toThrow('exit:2');
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('✗ 文件不存在'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
     exitSpy.mockRestore();
     errSpy.mockRestore();
   });

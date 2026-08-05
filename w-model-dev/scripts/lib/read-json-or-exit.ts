@@ -65,7 +65,7 @@ export async function readJsonlOrExit(
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
+      console.error(`✗ [FILE_NOT_FOUND] 文件不存在: ${abs}`);
       process.exit(2);
     }
     throw err;
