@@ -1004,13 +1004,6 @@
       "reason": "Generic Object Injection Sink"
     },
     {
-      "hash": "f1d83c23d10af8129a7e70c28afcfcec6a72a4490003c0349432c06aa708a0c1",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/diag-fix.ts",
-      "line": 19,
-      "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
       "hash": "3f91893a5e7b2ee87f353b3d562054e608e719e5fe594623cfdd9da71d3380d7",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/ensure-codegraph-opsx.ts",

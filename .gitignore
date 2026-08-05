@@ -1,6 +1,9 @@
 # W-Model 运行时状态（项目状态 / RTM 数据）
 .w-model/
 
+# 运行时产物：门禁脚本输出的 gate-logs（check-bdd-model 等写入，历史遗留样本目录显式兜底）
+**/samples/.w-model/gate-logs/
+
 # 本地 Agent 工作目录（如 darwin-skill 评估产物，由外部工具维护，不纳入版本控制）
 .claude/
 
