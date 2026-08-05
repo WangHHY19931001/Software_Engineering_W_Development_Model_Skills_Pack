@@ -107,7 +107,9 @@ async function main(): Promise<void> {
     let inferredVariant: PreventiveReviewOptions['variant'] = 'standard';
     let lastSAction: string | null = null;
     for (const entryRaw of entries) {
-      const entry = entryRaw as { phase?: number; action?: string; outcome?: string; role?: string };
+      const entry = entryRaw as { phase?: number; action?: string; outcome?: string; role?: string } | null;
+      // null / 非对象行静默跳过（readJsonlOrExit 复用后恢复原逐行守卫语义）
+      if (typeof entry !== 'object' || entry === null) continue;
       if (typeof entry.phase === 'number' && entry.action === 'checkpoint' && entry.outcome === 'success') {
         lastPhase = entry.phase;
       }
