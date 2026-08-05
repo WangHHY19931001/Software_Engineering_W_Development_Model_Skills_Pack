@@ -28,6 +28,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkBudget, type BudgetConfig } from './budget-logic.js';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
 
@@ -124,26 +125,7 @@ async function main(): Promise<void> {
   const budgetAbs = path.resolve(budgetFile);
 
   // 读 budget.json（ENOENT / 非法 JSON → exit(2)）
-  let budgetRaw: string;
-  try {
-    budgetRaw = await fs.readFile(budgetAbs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${budgetAbs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(budgetRaw);
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${budgetAbs}`);
-    process.exit(2);
-  }
-
+  const parsed = await readJsonOrExit(budgetAbs);
   const budget = parsed as Partial<BudgetConfig>;
 
   // 可选输入：--project（读失败只警告不 exit）

@@ -18,9 +18,9 @@
  *   2  输入错误（文件不存在 / 非法 JSON）
  */
 
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkRootCauseReport, type RootCauseReportShape } from './root-cause-logic.js';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -30,25 +30,7 @@ async function main(): Promise<void> {
   }
 
   const abs = path.resolve(file);
-  let raw: string;
-  try {
-    raw = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${abs}`);
-    process.exit(2);
-  }
+  const parsed = await readJsonOrExit(file);
 
   const result = checkRootCauseReport(parsed);
   const meta = (parsed as RootCauseReportShape)?.meta;

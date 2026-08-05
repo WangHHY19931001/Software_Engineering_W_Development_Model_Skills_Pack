@@ -45,6 +45,7 @@ import {
   type TlaManifest,
   type TlaSpec,
 } from './code-tla-logic.js';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -69,33 +70,6 @@ function parseArgs(argv: string[]): ParsedArgs {
     rtmFile: get('rtm'),
     srcDir: get('src'),
   };
-}
-
-// ==================== JSON 文件读取 ====================
-
-async function readJson<T>(file: string, label: string): Promise<T> {
-  const abs = path.resolve(file);
-  let raw: string;
-  try {
-    raw = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ ${label} 文件不存在: ${abs}`);
-      process.exit(2);
-    }
-    if (e.code === 'EISDIR') {
-      console.error(`✗ ${label} 参数应为文件路径，实际为目录: ${abs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    console.error(`✗ ${label} 文件解析失败（非合法 JSON）: ${abs}`);
-    process.exit(2);
-  }
 }
 
 // ==================== 源代码扫描 ====================
@@ -193,9 +167,9 @@ async function main(): Promise<void> {
   }
 
   // 读取 JSON 文件
-  const manifest = await readJson<TlaManifest>(manifestFile, 'manifest');
-  const graph = await readJson<Graph>(graphFile, 'graph');
-  const rtm = await readJson<Rtm>(rtmFile, 'rtm');
+  const manifest = await readJsonOrExit<TlaManifest>(manifestFile);
+  const graph = await readJsonOrExit<Graph>(graphFile);
+  const rtm = await readJsonOrExit<Rtm>(rtmFile);
 
   // 读取 L2/L3 spec 的 .tla 内容
   await loadTlaContents(manifest, manifestFile);

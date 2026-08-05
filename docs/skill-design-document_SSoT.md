@@ -886,9 +886,28 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **不涉及范围**：不修改 R3 三维度本身（completeness/reliability/security 保持）；不修改 V 评审 Schema（`verifier-output.schema.json` 不变）；不引入新 R3 维度；不取消 self-as-verifier 兼任豁免（各角色产物文件独立即可，R3 不可省略）；不修改返工 R（root cause locator）机制——R3 与返工 R 仍是两个角色变体，本轮只升级 R3。
 
-**实现状态（2026-07-31）**：[待实施完成后回填 self-test/vitest/prepush 数值]。
+**实现状态（2026-07-31）**：全部落地并通过验证（tsc 0 错误 / self-test 213 通过 / vitest 286 通过 / pre-push 全绿）。
 
 **版本号**：三处同步 28.0.0（package.json + skill-metadata.json + SKILL.md frontmatter），与 CHANGELOG [28.0.0] / SSoT §3.4.25 / AGENTS.md §4 一致。
+
+---
+
+#### 3.4.26 第三十轮：CLI 样板抽取 + 分派总览矩阵（[29.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 外部反馈「技能代码重复率高 + 流程派遣信息分散」 |
+| 修正方案 | 两项针对性优化：①抽取 CLI 层 JSON 读取工具消除样板；②新建分派总览矩阵解决信息分散 |
+| 新增 | `scripts/lib/read-json-or-exit.ts`（CLI 层 JSON/JSONL 读取工具，`readJsonOrExit` + `readJsonlOrExit`）+ `scripts/__tests__/read-json-or-exit.test.ts`（11 测试）+ `references/dispatch-matrix.md`（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵） |
+| 重构 | 13 个 check-*.ts 使用新工具（删除约 258 行样板）：Group A 单 JSON（8 个：check-exemption / check-verifier-output / check-rootcause-report / check-requirement-coverage / check-requirement-graph / check-maturity / check-state-machine-consistency / check-signature-chain）+ Group B JSONL（3 个：check-run-log / check-checkpoint / check-budget 仅主输入）+ Group C 多文件（2 个：check-tla-model / check-code-tla-consistency） |
+| 保留原样 | 3 个 check-*.ts 行为不等价不重构：check-role-dispatch（坏行 exit(2) ≠ warn+skip）/ check-preventive-review（无标准样板）/ check-artifact-gate（输出含可执行修复提示） |
+| 顶层文档 | 4 个（SSoT §3.4.25 + §10A 追溯表 + AGENTS.md §2 + CHANGELOG [29.0.0]） |
+| package.json | version `28.0.0` → `29.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| self-test | 基线 213/213 不变全通过 |
+| vitest | 286→297（+11 read-json-or-exit）全通过 |
+| TypeScript strict | 0 错误 |
+
+> 第三十轮相比第二十九轮（§3.4.25 S→R3+V 无条件强制）：从「R3+V 强制流程升级」转向「CLI 样板抽取 + 分派总览矩阵」。针对外部反馈「代码重复率高 + 流程派遣信息分散」，做两项针对性优化而非架构重构：①抽取 `lib/read-json-or-exit.ts` 工具消除 13 个 check-*.ts 中约 258 行重复的 JSON 读取样板（ENOENT → exit(2) + JSON.parse → exit(2)），行为完全等价；②新建 `references/dispatch-matrix.md` 总览矩阵解决「拼出一次返工的完整派遣流程需交叉读 4-5 份文档」的信息分散痛点。3 个 check-*.ts 因行为不等价保留原样。版本号三处一致 29.0.0。
 
 ---
 
@@ -2484,6 +2503,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | 10G 爬坡循环（Loop 4） | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用） |
 | §10H SkillOpt 方法论吸收 | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调 | `w-model-dev/references/skillopt-adoption.md`（可执行细则） | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10E TLA+） |
 | 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
+| §3.4.26 | 第三十轮 CLI 样板抽取 + 分派总览矩阵 | `scripts/lib/read-json-or-exit.ts` + `scripts/__tests__/read-json-or-exit.test.ts` + `references/dispatch-matrix.md` + 13 个 check-*.ts 重构 | 完整（self-test 213/213、vitest 297、tsc 0 错误） |
 
 ---
 

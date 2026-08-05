@@ -38,6 +38,7 @@ import {
   type TlaManifest,
   type TlaSpec,
 } from './tla-logic.js';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
 
@@ -307,25 +308,7 @@ async function main(): Promise<void> {
   }
 
   const abs = path.resolve(manifestFile);
-  let raw: string;
-  try {
-    raw = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${abs}`);
-    process.exit(2);
-  }
+  const parsed = await readJsonOrExit<unknown>(manifestFile);
 
   const manifest = parsed as Partial<TlaManifest>;
 
@@ -365,26 +348,7 @@ async function main(): Promise<void> {
   // 提取 graph SD 节点（供 checkCoverage 校验 TLA+ 子系统覆盖率，§10）
   let graphSdNodes: string[] | undefined;
   if (graphFile) {
-    const graphAbs = path.resolve(graphFile);
-    let graphRaw: string;
-    try {
-      graphRaw = await fs.readFile(graphAbs, 'utf-8');
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      if (e.code === 'ENOENT') {
-        console.error(`✗ --graph 文件不存在: ${graphAbs}`);
-        process.exit(2);
-      }
-      throw err;
-    }
-    let graphParsed: unknown;
-    try {
-      graphParsed = JSON.parse(graphRaw);
-    } catch {
-      console.error(`✗ --graph 文件解析失败（非合法 JSON）: ${graphAbs}`);
-      process.exit(2);
-    }
-    const g = graphParsed as { nodes?: Array<{ id: string; type: string }> };
+    const g = await readJsonOrExit<{ nodes?: Array<{ id: string; type: string }> }>(graphFile);
     if (Array.isArray(g.nodes)) {
       graphSdNodes = g.nodes.filter(n => n.type === 'SD').map(n => n.id);
     }

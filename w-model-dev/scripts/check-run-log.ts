@@ -27,6 +27,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkRunLog } from './run-log-logic.js';
+import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
 
@@ -46,28 +47,6 @@ function parseArgs(argv: string[]): ParsedArgs {
     ? tlaManifestArg.slice('--tla-manifest='.length)
     : undefined;
   return { runLogFile, gateLogsDir, tlaManifestFile };
-}
-
-// ==================== run-log.jsonl 读取 ====================
-
-/**
- * 读取 run-log.jsonl，每行一个 JSON。
- * 容错：空行跳过，单行非法 JSON 跳过并 console.error 警告（不 exit）。
- */
-async function readRunLog(abs: string): Promise<unknown[]> {
-  const raw = await fs.readFile(abs, 'utf-8');
-  const lines = raw.split(/\r?\n/);
-  const entries: unknown[] = [];
-  for (const [i, line] of lines.entries()) {
-    const trimmed = line.trim();
-    if (trimmed === '') continue;
-    try {
-      entries.push(JSON.parse(trimmed));
-    } catch {
-      console.error(`⚠ run-log 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
-    }
-  }
-  return entries;
 }
 
 // ==================== gate-logs 加载 ====================
@@ -214,17 +193,7 @@ async function main(): Promise<void> {
   const runLogAbs = path.resolve(runLogFile);
 
   // 读 run-log.jsonl（ENOENT → exit(2)；单行非法 JSON 仅警告不 exit）
-  let entries: unknown[];
-  try {
-    entries = await readRunLog(runLogAbs);
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${runLogAbs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
+  const entries = await readJsonlOrExit(runLogAbs, 'run-log');
 
   // 可选输入：--gate-logs（读失败只警告不 exit）
   let gateLogs: Map<string, { exitCode?: number; content: string }> | undefined;

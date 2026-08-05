@@ -25,12 +25,12 @@
  *   - https://github.com/alchaincyf/darwin-skill
  */
 
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import {
   checkVerifierOutput,
   type VerifierOutputShape,
 } from './verifier-logic.js';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -44,25 +44,7 @@ async function main(): Promise<void> {
   }
 
   const abs = path.resolve(file);
-  let raw: string;
-  try {
-    raw = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${abs}`);
-    process.exit(2);
-  }
+  const parsed = await readJsonOrExit(file);
 
   const result = checkVerifierOutput(parsed);
   const meta = (parsed as VerifierOutputShape)?.meta;

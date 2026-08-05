@@ -29,6 +29,7 @@ import { promises as fs } from 'node:fs';
 import { accessSync } from 'node:fs';
 import * as path from 'node:path';
 import { checkSignatureChain, type SignatureChainEntry } from './signature-chain-logic.js';
+import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
 
@@ -61,24 +62,6 @@ function parseArgs(argv: string[]): ParsedArgs {
   return { chainFile, phase, stage };
 }
 
-// ==================== signature-chain.jsonl 读取 ====================
-
-async function readSignatureChain(abs: string): Promise<unknown[]> {
-  const raw = await fs.readFile(abs, 'utf-8');
-  const lines = raw.split(/\r?\n/);
-  const entries: unknown[] = [];
-  for (const [i, line] of lines.entries()) {
-    const trimmed = line.trim();
-    if (trimmed === '') continue;
-    try {
-      entries.push(JSON.parse(trimmed));
-    } catch {
-      console.error(`⚠ signature-chain 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
-    }
-  }
-  return entries;
-}
-
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
@@ -91,17 +74,7 @@ async function main(): Promise<void> {
 
   const chainAbs = path.resolve(chainFile);
 
-  let entries: unknown[];
-  try {
-    entries = await readSignatureChain(chainAbs);
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${chainAbs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
+  const entries = await readJsonlOrExit(chainFile, 'signature-chain');
 
   // 构建 existingPaths（R8 校验用，基于 artifacts + sourceArtifacts 路径）
   // 项目根由链文件位置向上推导：从链文件所在目录开始，向上找到包含 .w-model/ 的目录

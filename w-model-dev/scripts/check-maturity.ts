@@ -27,6 +27,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkMaturity, type MaturityConfig } from './maturity-logic.js';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
 
@@ -111,25 +112,7 @@ async function main(): Promise<void> {
   const maturityAbs = path.resolve(maturityFile);
 
   // 读 maturity.json（ENOENT / 非法 JSON → exit(2)）
-  let maturityRaw: string;
-  try {
-    maturityRaw = await fs.readFile(maturityAbs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${maturityAbs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(maturityRaw);
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${maturityAbs}`);
-    process.exit(2);
-  }
+  const parsed = await readJsonOrExit(maturityFile);
 
   const maturity = parsed as Partial<MaturityConfig>;
 

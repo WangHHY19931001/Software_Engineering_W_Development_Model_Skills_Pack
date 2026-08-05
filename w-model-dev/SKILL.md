@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 28.0.0
+version: 29.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -62,7 +62,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ## 编排者-子代理边界
 
-> SSoT §3.4 为权威定义；[references/subagent-delegation.md](references/subagent-delegation.md) 为可执行细则。本节为编排摘要。
+> SSoT §3.4 为权威定义；[references/subagent-delegation.md](references/subagent-delegation.md) 为可执行细则；[references/dispatch-matrix.md](references/dispatch-matrix.md) 为分派总览矩阵（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本）。本节为编排摘要。
 
 **原则**：编排者工作最小化。编排者（O）只负责路由、状态读写、CHECKPOINT 等待、分派子代理、持久化、只读脚本；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理执行。
 
@@ -217,6 +217,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | verifier-spec.md | V 子代理产出 VerifierOutput 前 |
 | agent-personas.md | V 子代理选用 Persona 时 |
 | subagent-delegation.md | O 分派 S/V/G/R 子代理前 |
+| dispatch-matrix.md | O 分派子代理前必读总览（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本） |
 | subagent-persona-matrix.md | R-lead / V-lead 多角度分析时 |
 | root-cause-locator.md | V/G 不通过后分派 R 子代理时 |
 | definition-of-done.md | 阶段门放行判定时 |

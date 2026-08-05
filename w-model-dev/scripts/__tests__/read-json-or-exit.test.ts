@@ -1,0 +1,134 @@
+/**
+ * lib/read-json-or-exit.ts 单元测试
+ *
+ * 覆盖：
+ *   - readJsonOrExit：正常路径 / ENOENT / 非法 JSON / 泛型返回
+ *   - readJsonlOrExit：正常 / 空行跳过 / 坏行 warn 跳过 / ENOENT
+ *
+ * process.exit 测试策略：spyOn + mockImplementation 抛错拦截，避免真实退出。
+ */
+
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import { readJsonOrExit, readJsonlOrExit } from '../lib/read-json-or-exit.js';
+
+let tmpDir: string;
+
+beforeEach(async () => {
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rjoe-test-'));
+});
+
+afterEach(async () => {
+  await fs.rm(tmpDir, { recursive: true, force: true });
+});
+
+describe('readJsonOrExit', () => {
+  it('正常读取并解析 JSON', async () => {
+    const file = path.join(tmpDir, 'valid.json');
+    await fs.writeFile(file, JSON.stringify({ a: 1, b: [2, 3] }));
+    const result = await readJsonOrExit<{ a: number; b: number[] }>(file);
+    expect(result.a).toBe(1);
+    expect(result.b).toEqual([2, 3]);
+  });
+
+  it('泛型默认 unknown 也可工作', async () => {
+    const file = path.join(tmpDir, 'arr.json');
+    await fs.writeFile(file, JSON.stringify([1, 2, 3]));
+    const result = await readJsonOrExit(file);
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  it('文件不存在时调用 process.exit(2)', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+      throw new Error(`exit:${code}`);
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const missing = path.join(tmpDir, 'nope.json');
+    await expect(readJsonOrExit(missing)).rejects.toThrow('exit:2');
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('✗ 文件不存在'));
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it('非法 JSON 时调用 process.exit(2)', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+      throw new Error(`exit:${code}`);
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'bad.json');
+    await fs.writeFile(file, '{not json');
+    await expect(readJsonOrExit(file)).rejects.toThrow('exit:2');
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('✗ 文件解析失败'));
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it('相对路径也能正常解析', async () => {
+    const file = path.join(tmpDir, 'rel.json');
+    await fs.writeFile(file, JSON.stringify({ ok: true }));
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      const result = await readJsonOrExit<{ ok: boolean }>('rel.json');
+      expect(result.ok).toBe(true);
+    } finally {
+      process.chdir(origCwd);
+    }
+  });
+});
+
+describe('readJsonlOrExit', () => {
+  it('正常读取多行 JSONL', async () => {
+    const file = path.join(tmpDir, 'log.jsonl');
+    await fs.writeFile(file, '{"i":1}\n{"i":2}\n{"i":3}\n');
+    const entries = await readJsonlOrExit(file);
+    expect(entries).toEqual([{ i: 1 }, { i: 2 }, { i: 3 }]);
+  });
+
+  it('空行跳过', async () => {
+    const file = path.join(tmpDir, 'blank.jsonl');
+    await fs.writeFile(file, '{"a":1}\n\n  \n{"b":2}\n');
+    const entries = await readJsonlOrExit(file);
+    expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
+  });
+
+  it('单行非法 JSON 跳过并 warn 不 exit', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'mixed.jsonl');
+    await fs.writeFile(file, '{"ok":1}\n{bad}\n{"ok":2}\n');
+    const entries = await readJsonlOrExit(file, 'run-log');
+    expect(entries).toEqual([{ ok: 1 }, { ok: 2 }]);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('⚠ run-log 第 2 行'));
+    errSpy.mockRestore();
+  });
+
+  it('支持 CRLF 换行', async () => {
+    const file = path.join(tmpDir, 'crlf.jsonl');
+    await fs.writeFile(file, '{"a":1}\r\n{"b":2}\r\n');
+    const entries = await readJsonlOrExit(file);
+    expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
+  });
+
+  it('文件不存在时调用 process.exit(2)', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+      throw new Error(`exit:${code}`);
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const missing = path.join(tmpDir, 'nope.jsonl');
+    await expect(readJsonlOrExit(missing)).rejects.toThrow('exit:2');
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('✗ 文件不存在'));
+    exitSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it('label 默认为「行」', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'default-label.jsonl');
+    await fs.writeFile(file, '{"ok":1}\n{bad}\n');
+    await readJsonlOrExit(file);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('⚠ 行 第 2 行'));
+    errSpy.mockRestore();
+  });
+});

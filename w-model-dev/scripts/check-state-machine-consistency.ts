@@ -19,8 +19,8 @@
  * 退出码：0=一致 1=不一致 2=输入错误
  */
 
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { readJsonOrExit } from './lib/read-json-or-exit.js';
 
 interface Transition {
   from: string;
@@ -109,25 +109,7 @@ async function main(): Promise<void> {
   }
 
   const abs = path.resolve(file);
-  let raw: string;
-  try {
-    raw = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${abs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-
-  let parsed: StateMachineConsistencyInput;
-  try {
-    parsed = JSON.parse(raw) as StateMachineConsistencyInput;
-  } catch {
-    console.error(`✗ 文件解析失败（非合法 JSON）: ${abs}`);
-    process.exit(2);
-  }
+  const parsed = await readJsonOrExit<StateMachineConsistencyInput>(file);
 
   const result = checkStateMachineConsistency(parsed);
 

@@ -28,6 +28,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkCheckpoint } from './checkpoint-logic.js';
+import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
 
@@ -44,28 +45,6 @@ function parseArgs(argv: string[]): ParsedArgs {
     ? checkpointLogArg.slice('--checkpoint-log='.length)
     : undefined;
   return { runLogFile, checkpointLogDir };
-}
-
-// ==================== run-log.jsonl 读取 ====================
-
-/**
- * 读取 run-log.jsonl，每行一个 JSON。
- * 容错：空行跳过，单行非法 JSON 跳过并 console.error 警告（不 exit）。
- */
-async function readRunLog(abs: string): Promise<unknown[]> {
-  const raw = await fs.readFile(abs, 'utf-8');
-  const lines = raw.split(/\r?\n/);
-  const entries: unknown[] = [];
-  for (const [i, line] of lines.entries()) {
-    const trimmed = line.trim();
-    if (trimmed === '') continue;
-    try {
-      entries.push(JSON.parse(trimmed));
-    } catch {
-      console.error(`⚠ run-log 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
-    }
-  }
-  return entries;
 }
 
 // ==================== checkpoint-log 加载 ====================
@@ -144,17 +123,7 @@ async function main(): Promise<void> {
   const runLogAbs = path.resolve(runLogFile);
 
   // 读 run-log.jsonl（ENOENT → exit(2)；单行非法 JSON 仅警告不 exit）
-  let entries: unknown[];
-  try {
-    entries = await readRunLog(runLogAbs);
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      console.error(`✗ 文件不存在: ${runLogAbs}`);
-      process.exit(2);
-    }
-    throw err;
-  }
+  const entries = await readJsonlOrExit(runLogAbs, 'run-log');
 
   // 强制输入：--checkpoint-log（读失败只警告不 exit，但 R3 逻辑会报违规）
   let checkpointLog: Map<string, string> | undefined;
