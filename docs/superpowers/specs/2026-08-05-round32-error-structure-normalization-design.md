@@ -83,8 +83,8 @@ export function printError(e: CliError): void;
 /** stdout 输出结构化错误摘要：`ERROR_JSON {"category","message","exitCode","file"}`（遵循 §10E E.1 约定） */
 export function printErrorJson(e: CliError): void;
 
-/** printError + printErrorJson + process.exit(e.exitCode)；main 内输入错误路径与 main().catch 兜底统一调用 */
-export function exitWithError(e: CliError): never;
+/** printError + printErrorJson + 设置 process.exitCode（返回后由 Node 自然退出，stdout 先 flush——避免 process.exit() 截断 ERROR_JSON）；main 内输入错误路径与 main().catch 兜底统一调用 */
+export function exitWithError(e: CliError): void;
 ```
 
 **消息模板（全仓统一措辞）**：
@@ -105,7 +105,7 @@ ERROR_JSON {"category":"FILE_PARSE","message":"文件解析失败（非合法 JS
 ```
 
 **关键约束**：
-- `ERROR_JSON` 的 `exitCode` 字段与 `process.exit()` 实参**强一致**（沿用 §10E E.1 防伪三层机制精神）。
+- `ERROR_JSON` 的 `exitCode` 字段与脚本最终退出码（`process.exitCode`）**强一致**（沿用 §10E E.1 防伪三层机制精神）。
 - `printError` 走 stderr、`printErrorJson` 走 stdout，两者分离：stdout 不被人类错误消息污染（机器可整体 `ERROR_JSON` 前缀截取）；stderr 不被 JSON 污染（人类可读）。
 - exit 1 场景不调用本模块（校验失败已由 violations + `XXX_JSON` 承载）。
 
@@ -135,7 +135,7 @@ ERROR_JSON {"category":"FILE_PARSE","message":"文件解析失败（非合法 JS
 **`run-log-logic.ts` 新增导出（纯函数，自包含）**：
 
 ```ts
-/** 从 gate-log 内容提取 exitCode：优先 JSON 摘要行（{"exitCode":N}），其次正则 /exit\s*=\s*(\d+)/；无匹配返回 undefined */
+/** 从 gate-log 内容提取 exitCode：扫描 25 个 `XXX_JSON {...}` 摘要标记（含 STATUS_JSON/METRICS_JSON），JSON.parse 后取 exitCode；无匹配返回 undefined（契约与 check-run-log.ts 现行一致，无 exit= 正则回退） */
 export function extractExitCode(content: string): number | undefined;
 
 /** 构建 gateLogPath 多索引 key 集：basename / 绝对路径 / 相对 cwd 路径 / 各路径正斜杠归一化（兼容 Windows） */
@@ -159,13 +159,13 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 3. `formatCliError` 无 file/detail → 省略冒号段
 4. `printError` 输出到 stderr（spyOn console.error）
 5. `printErrorJson` 输出到 stdout（spyOn console.log），格式为 `ERROR_JSON {json}` 且含 exitCode
-6. `exitWithError` 调 `process.exit(2)`（spyOn + mockImplementation 抛错拦截）
+6. `exitWithError` 设置 `process.exitCode=2` 且正常返回（stdout 先 flush 再退出）
 7. ERROR_JSON 的 exitCode 与传入 CliError.exitCode 一致
 
 ### 4.2 `run-log-logic.test.ts` 扩展（6 用例）
 
 1. `extractExitCode` JSON 摘要行（`GATE_JSON {"exitCode":0}`）→ 0
-2. `extractExitCode` 正则 `exit=1` 模式 → 1
+2. `extractExitCode` 多标记扫描（`VERIFIER_JSON {"exitCode":1}`）→ 1
 3. `extractExitCode` 无匹配 → undefined
 4. `buildGateLogKeys` 返回含 basename / 绝对路径 / 相对 cwd / 正斜杠归一化 4 类 key
 5. `buildGateLogKeys` 含反斜杠路径归一化（Windows 兼容）
