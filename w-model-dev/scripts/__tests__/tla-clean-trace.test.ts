@@ -73,7 +73,7 @@ describe('cleanTraceFiles', () => {
     await fs.writeFile(path.join(dir, 'states', '2026-08-05-10-30-00', 'L2-AuthService.st'), 'x');
     await fs.writeFile(path.join(dir, 'trace.dump'), 'x');
     const deleted = await cleanTraceFiles(dir);
-    // cleanTraceFiles 的契约：返回被判定为 TLC 产物并调用删除的路径列表。
+    // cleanTraceFiles 的契约：返回成功删除（fs.rm 未抛错）的路径列表。
     // 注：Windows 上 fs.rm(recursive) 的物理删除时序不可靠（返回后路径可能短暂存留），
     // 因此断言返回契约（deleted 数组）而非文件系统最终状态。
     expect(deleted.sort()).toEqual([
