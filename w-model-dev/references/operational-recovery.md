@@ -129,6 +129,12 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - 每行一条 JSON 记录，末尾换行 `\n`（Unix 风格，跨平台一致）
 - 不得用 PowerShell `Add-Content` 追加（同上 BOM + 乱码问题）
 
+### 敏感信息禁令（第 30 轮）
+
+- **禁止**将密钥、令牌、密码、连接串写入任何状态文件（`.w-model/*.json`）或日志（gate-logs / run-log / event-ingress / signature-chain）。
+- 敏感配置统一经环境变量注入（与 demo `JWT_SECRET` 处理一致，见 [第 15 轮归档](../../docs/changes/archive/2026-07-26-round15-end-to-end-test/README.md)）；状态文件只存引用名（如 `${JWT_SECRET}`），不存值。
+- 命中反模式 #43：从状态文件移除敏感值 → 改环境变量引用 → 回当前阶段起点重跑受影响门禁。
+
 ## 调测者简化行为预防
 
 > 第 15 轮归档反思识别的调测者简化倾向。self-as-verifier 模式下调测者兼具 S/V/G 角色，简化行为无外部评审拦截，须靠自检条款预防。第 17 轮 P5 新增。

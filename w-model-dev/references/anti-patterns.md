@@ -605,6 +605,23 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：约束 #17 + #19 + SSoT §3.4.25（[28.0.0] 新增）；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
+## #43 敏感信息写入状态文件/日志（第30轮新增）
+
+**症状**：`.w-model/*.json`（project/budget/maturity/graph/rtm/tla-manifest 等）、`.w-model/gate-logs/`、`run-log.jsonl` / `event-ingress.jsonl` / `signature-chain.jsonl` 中出现硬编码密钥、令牌、密码、连接串（如 `sk-xxx`、`AKIA...`、`Bearer <token>`、`password=...`）；或 SKILL.md 示例、templates/ 模板、references/ 示例中包含真实凭据而非占位符。
+
+**为何是反模式**：状态文件与日志是项目资产，可能随仓库分发、归档或进入下游 CI；硬编码凭据造成凭据泄露风险，且违反「敏感配置统一经环境变量注入」的运维纪律。即使 demo/教学场景也应以占位符（如 `${JWT_SECRET}`）呈现。
+
+**检测信号**：
+- `.w-model/` 下任一 JSON/JSONL 文件含高熵密钥特征（`sk-` 前缀、32+ 位 Base64、`Bearer `、`AKIA`、`password=`/`passwd=` 字段）
+- gate-logs 存档或 run-log `note` 字段含真实凭据值
+- 模板 / 示例 / 提示词中含非占位符的真实凭据
+
+**回退动作**：从状态文件 / 日志移除敏感值，改为环境变量引用名（如 `${JWT_SECRET}`）或外部 secrets 管理；修正模板/示例为占位符；回当前阶段起点重跑受影响门禁。
+
+**门禁脚本**：无专用脚本（软检测，V 评审 + G 门禁人工核验；`security-scan.ts` 覆盖源码级扫描，本反模式覆盖数据文件层）。
+
+**关联**：SSoT §3.4.26（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
