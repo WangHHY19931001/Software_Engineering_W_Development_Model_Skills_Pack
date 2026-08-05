@@ -8,11 +8,13 @@
   "required": ["manifest", "graph", "rtm"],
   "properties": {
     "manifest": {
+      "description": "TLA+ 规格清单（TlaManifest 兼容形态，含 specs[]）；允许额外字段以兼容完整 TlaManifest 类型；维度3/4 校验从 specs[].tlaContent 读取 Next 分支与 BusinessInvariant（函数运行时接收 codeFiles 含 AST，本 schema 兼容 codeSources 形态）",
       "type": "object",
       "additionalProperties": true,
       "required": ["specs"],
       "properties": {
         "specs": {
+          "description": "TLA+ 规格列表（TlaSpec[]，S 子代理产出 .tla/.cfg 后同步维护）",
           "type": "array",
           "items": {
             "type": "object",
@@ -29,91 +31,100 @@
               "children"
             ],
             "properties": {
-              "id": { "type": "string", "minLength": 1 },
-              "level": { "type": "string", "minLength": 1 },
-              "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-              "system": { "type": "string", "minLength": 1 },
+              "id": { "description": "规格 ID（MODULE 名格式 L<level>_<system>[_<subsystem>]，须符合 tla-plus-guide §2.0 命名规范，禁止连字符）", "type": "string", "minLength": 1 },
+              "level": { "description": "规格层级：L1=系统内外交互 / L2=子系统 / L3=原子行为 / L4-L6=更深层次分解（维度3/4 遍历全部层级 specs 的 tlaContent）", "type": "string", "minLength": 1 },
+              "phase": { "description": "产出阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
+              "system": { "description": "所属系统名称（层次路径用 :: 分隔，如 blog-system::auth-subsystem）", "type": "string", "minLength": 1 },
               "requirementIds": {
+                "description": "关联需求 ID 列表（与 rtm.json 需求 ID 一致，须登记于 RTM）",
                 "type": "array",
                 "items": { "type": "string", "minLength": 1 }
               },
-              "tlaPath": { "type": "string", "minLength": 1 },
-              "cfgPath": { "type": "string", "minLength": 1 },
-              "parent": { "type": ["string", "null"] },
+              "tlaPath": { "description": ".tla 文件路径（相对 manifest 文件所在目录解析，见 tla-plus-guide §2.1）", "type": "string", "minLength": 1 },
+              "cfgPath": { "description": ".cfg 文件路径（相对 manifest 文件所在目录解析，见 tla-plus-guide §2.1）", "type": "string", "minLength": 1 },
+              "parent": { "description": "上级 TLA 文件相对路径（相对该 .tla 文件所在目录解析；L1 填 null）", "type": ["string", "null"] },
               "children": {
+                "description": "下级 TLA 文件相对路径列表（叶子填 []；与文件头 @child 双向一致）",
                 "type": "array",
                 "items": { "type": "string" }
               },
               "siblings": {
+                "description": "同级 TLA 文件相对路径列表（无填 []；与文件头 @sibling 双向一致）",
                 "type": "array",
                 "items": { "type": "string" }
               },
-              "tlaContent": { "type": "string" }
+              "tlaContent": { "description": ".tla 文件文本内容（可选；CLI 读取后注入，供维度3 Next 分支 / 维度4 不变式覆盖校验使用；无 tlaContent 的 spec 跳过维度3/4）", "type": "string" }
             }
           }
         }
       }
     },
     "graph": {
+      "description": "需求图谱（Graph 兼容形态，含 nodes[]/edges[]，结构层数据）；允许额外字段以兼容完整 Graph 类型；维度1 校验读 nodes 中 type=SD 节点与 rtm.rows[].codeModule 做 SD→codeModule 映射",
       "type": "object",
       "additionalProperties": true,
       "required": ["nodes", "edges"],
       "properties": {
         "nodes": {
+          "description": "图谱节点数组（GraphNode[]，结构层；维度1 提取 type=SD 节点做映射校验）",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": true,
             "required": ["id", "type"],
             "properties": {
-              "id": { "type": "string", "minLength": 1 },
-              "type": { "type": "string", "minLength": 1 }
+              "id": { "description": "节点 ID（如 REQ-001 / SD-5.2.1 / INTF-x / DD-x；维度1 对 type=SD 节点的 id 校验是否有 codeModule 映射）", "type": "string", "minLength": 1 },
+              "type": { "description": "节点类型：REQ=需求 / SD=设计 / INTF=接口 / DD=详细设计 / NFR / CON 等（维度1 仅取 type=SD 节点参与 SD→codeModule 映射）", "type": "string", "minLength": 1 }
             }
           }
         },
         "edges": {
+          "description": "图谱边数组（GraphEdge[]，结构层；from/to 引用 nodes[].id）",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": true,
             "required": ["from", "to", "type"],
             "properties": {
-              "from": { "type": "string", "minLength": 1 },
-              "to": { "type": "string", "minLength": 1 },
-              "type": { "type": "string", "minLength": 1 }
+              "from": { "description": "边起点节点 ID（须存在于 nodes[]）", "type": "string", "minLength": 1 },
+              "to": { "description": "边终点节点 ID（须存在于 nodes[]）", "type": "string", "minLength": 1 },
+              "type": { "description": "边类型：parent/depends-on/implements/defines/realizes/produces/governs/collaborates-with/derives", "type": "string", "minLength": 1 }
             }
           }
         }
       }
     },
     "rtm": {
+      "description": "需求追溯矩阵（Rtm 兼容形态，含 rows[]，追溯层数据）；允许额外字段以兼容完整 Rtm 类型；维度1 校验读 rows[].codeModule（阶段5 编码后回填）",
       "type": "object",
       "additionalProperties": true,
       "required": ["rows"],
       "properties": {
         "rows": {
+          "description": "RTM 行数组（RtmRow[]，追溯层；维度1 读取 codeModule 字段做映射判定）",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": true,
             "required": ["requirementId"],
             "properties": {
-              "requirementId": { "type": "string", "minLength": 1 },
-              "codeModule": { "type": "string" }
+              "requirementId": { "description": "需求 ID（与 graph 中 REQ 节点 id / rtm.json 一致）", "type": "string", "minLength": 1 },
+              "codeModule": { "description": "代码模块文件路径（阶段5 编码后回填，格式 SD-xxx:src/path/to/file.ts；维度1 校验每个 type=SD 节点 id 须被至少一个 codeModule 覆盖，匹配 SD id 去前缀分段或包含路径段）", "type": "string" }
             }
           }
         }
       }
     },
     "codeSources": {
+      "description": "代码源文件列表（CLI/test 形态，供注入代码文本；函数运行时接收 codeFiles（含 AST，不可 JSON 序列化）由 codeSources 派生，本 schema 兼容两种形态，codeSources 可选）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["path", "content"],
         "properties": {
-          "path": { "type": "string", "minLength": 1 },
-          "content": { "type": "string" }
+          "path": { "description": "代码文件路径（相对仓库根目录；须存在于磁盘）", "type": "string", "minLength": 1 },
+          "content": { "description": "代码文件文本内容（供 AST 抽取状态转移 / Next 分支 / 不变式覆盖校验）", "type": "string" }
         }
       }
     }

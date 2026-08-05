@@ -7,12 +7,14 @@
   "additionalProperties": false,
   "required": ["eventId", "timestamp", "source", "eventType", "summary"],
   "properties": {
-    "eventId": { "type": "string", "minLength": 1 },
-    "timestamp": { "type": "string", "format": "date-time" },
+    "eventId": { "description": "事件 ID（UUID 或时间戳；与 run-log runId 属不同命名空间，不可混用，反模式 #26）", "type": "string", "minLength": 1 },
+    "timestamp": { "description": "事件发生时间（ISO 8601；路由前由消费方填写）", "type": "string", "format": "date-time" },
     "source": {
+      "description": "事件来源（消费方自填，技能不内置触发器）：webhook=外部 webhook 触发 / cron=定时任务触发 / user-report=用户报告 / ci=CI 流水线触发 / external-agent=外部代理触发 / manual=手动录入",
       "enum": ["webhook", "cron", "user-report", "ci", "external-agent", "manual"]
     },
     "eventType": {
+      "description": "事件类型（决定路由到哪个阶段，见 event-ingress-guide 路由表）：bug-report=缺陷报告（L2+ 路由阶段5 编码修复）/ feature-request=功能请求 / requirement-change=需求变更（须回退阶段1 需求重跑）/ scheduled-review=定期回顾（L3 激活，路由阶段8 验收回顾）/ test-failure=测试失败 / gate-failure=门禁失败 / rework-request=返工请求 / escalation=升级上报 / user-checkpoint=用户检查点",
       "enum": [
         "bug-report",
         "feature-request",
@@ -25,28 +27,32 @@
         "user-checkpoint"
       ]
     },
-    "summary": { "type": "string", "minLength": 1 },
+    "summary": { "description": "事件摘要（简要描述事件内容，供编排者 O 路由判断）", "type": "string", "minLength": 1 },
     "affectedArtifacts": {
+      "description": "受影响产物路径数组（如有；含 auth/加密/发布相关路径 → highRiskGate=true 触发强制 CHECKPOINT）",
       "type": "array",
       "items": { "type": "string" }
     },
     "affectedRequirements": {
+      "description": "受影响需求 ID 数组（如有；对应 rtm.json 需求 ID）",
       "type": "array",
       "items": { "type": "string" }
     },
     "evidence": {
+      "description": "证据数组（链接/日志/截图路径）",
       "type": "array",
       "items": { "type": "string" }
     },
     "routedTo": {
+      "description": "路由决策（编排者 O 填写，消费方不填；L2+ 事件驱动激活后由路由逻辑写入）",
       "type": "object",
       "additionalProperties": false,
       "required": ["phase", "phaseName", "routedAt", "highRiskGate"],
       "properties": {
-        "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-        "phaseName": { "type": "string", "minLength": 1 },
-        "routedAt": { "type": "string", "format": "date-time" },
-        "highRiskGate": { "type": "boolean" }
+        "phase": { "description": "目标阶段编号，取值 1-8（按 eventType 查路由表所得）", "type": "integer", "minimum": 1, "maximum": 8 },
+        "phaseName": { "description": "目标阶段名称（如 编码修复 / 需求重跑，与 phase 对应）", "type": "string", "minLength": 1 },
+        "routedAt": { "description": "路由时间戳（ISO 8601；编排者 O 写入路由决策时填写）", "type": "string", "format": "date-time" },
+        "highRiskGate": { "description": "是否触发高风险路径强制决策型 CHECKPOINT（affectedArtifacts 含 auth/加密/发布相关，或 requirement-change 涉及架构变更时为 true）", "type": "boolean" }
       }
     }
   }

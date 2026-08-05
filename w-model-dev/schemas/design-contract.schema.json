@@ -6,47 +6,50 @@
   "additionalProperties": false,
   "properties": {
     "uatPathMappings": {
+      "description": "UAT 路径映射数组（阶段1 验收测试设计与阶段5 实际实现路径对照表，对应 uat-path-mapping.md）；D1 路径一致性校验：actualPath 须在 routeDefinitions 中存在",
       "type": "array",
       "items": {
         "type": "object",
         "required": ["uatId", "designPath", "actualPath"],
         "additionalProperties": false,
         "properties": {
-          "uatId": { "type": "string", "minLength": 1 },
-          "designPath": { "type": "string" },
-          "actualPath": { "type": "string" },
-          "mappingType": { "enum": ["直接", "等价", "替代"] }
+          "uatId": { "description": "验收测试用例 ID（格式 UAT-NNN，对应 rtm.json acceptanceTest 登记的用例）", "type": "string", "minLength": 1 },
+          "designPath": { "description": "设计文档中声明的请求路径（阶段1 验收测试设计时填写）", "type": "string" },
+          "actualPath": { "description": "实际实现路径（阶段5 编码后回填；可为纯路径 /api/posts 或含方法前缀 POST /api/posts；D1 校验去除方法前缀后须在路由定义中存在；NFR/CON 横切行填「横切」豁免；未回填为空跳过校验）", "type": "string" },
+          "mappingType": { "description": "映射类型：直接=路径逐字一致 / 等价=语义等价路径（归一化后一致）/ 替代=以替代路径实现", "enum": ["直接", "等价", "替代"] }
         }
       }
     },
     "routeDefinitions": {
+      "description": "路由定义数组（编码侧事实源，取自代码路由定义；D1 路径 / D2 参数 / D3 状态码 / D4 响应字段 校验基准）",
       "type": "array",
       "items": {
         "type": "object",
         "required": ["method", "path", "params", "successStatus", "responseFields"],
         "additionalProperties": false,
         "properties": {
-          "method": { "type": "string", "minLength": 1 },
-          "path": { "type": "string", "minLength": 1 },
-          "params": { "type": "array", "items": { "type": "string" } },
-          "successStatus": { "type": "integer", "minimum": 100, "maximum": 599 },
-          "responseFields": { "type": "array", "items": { "type": "string" } }
+          "method": { "description": "HTTP 方法（GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS；D2/D3/D4 按 method+path 定位路由）", "type": "string", "minLength": 1 },
+          "path": { "description": "路由路径（D1 校验 actualPath 去除方法前缀/查询串后须与其匹配；D2/D3/D4 按 method+path 定位路由）", "type": "string", "minLength": 1 },
+          "params": { "description": "路由接受的参数名数组（分页/筛选等；D2 校验验收断言 params 须包含在此）", "type": "array", "items": { "type": "string" } },
+          "successStatus": { "description": "成功状态码（HTTP 100-599，如 200；D3 校验验收断言 expectedStatus 须与其相等）", "type": "integer", "minimum": 100, "maximum": 599 },
+          "responseFields": { "description": "成功响应体字段名数组（D4 校验验收断言 assertedFields 须包含在此）", "type": "array", "items": { "type": "string" } }
         }
       }
     },
     "acceptanceAssertions": {
+      "description": "验收测试断言数组（阶段1 验收设计侧声明）；D2 参数 / D3 状态码 / D4 响应字段 与 routeDefinitions 做一致性校验",
       "type": "array",
       "items": {
         "type": "object",
         "required": ["uatId", "method", "path", "params", "expectedStatus", "assertedFields"],
         "additionalProperties": false,
         "properties": {
-          "uatId": { "type": "string", "minLength": 1 },
-          "method": { "type": "string", "minLength": 1 },
-          "path": { "type": "string", "minLength": 1 },
-          "params": { "type": "array", "items": { "type": "string" } },
-          "expectedStatus": { "type": "integer", "minimum": 100, "maximum": 599 },
-          "assertedFields": { "type": "array", "items": { "type": "string" } }
+          "uatId": { "description": "验收测试用例 ID（格式 UAT-NNN，与 uatPathMappings[].uatId 对应）", "type": "string", "minLength": 1 },
+          "method": { "description": "HTTP 方法（D2/D3/D4 按 method+path 定位路由定义）", "type": "string", "minLength": 1 },
+          "path": { "description": "请求路径（D2/D3/D4 按 method+path 定位路由定义；匹配时归一化去除查询串与尾斜杠）", "type": "string", "minLength": 1 },
+          "params": { "description": "断言使用的参数名数组（D2 校验每个参数须在对应路由定义 params 中）", "type": "array", "items": { "type": "string" } },
+          "expectedStatus": { "description": "预期状态码（HTTP 100-599；D3 校验须等于路由定义 successStatus）", "type": "integer", "minimum": 100, "maximum": 599 },
+          "assertedFields": { "description": "断言字段名数组（D4 校验每个字段须在对应路由定义 responseFields 中）", "type": "array", "items": { "type": "string" } }
         }
       }
     }

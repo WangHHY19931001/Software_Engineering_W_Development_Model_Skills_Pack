@@ -7,23 +7,26 @@
   "additionalProperties": false,
   "required": ["reportId", "generatedAt", "analysisWindow", "signals", "metaAnalysis", "recommendations"],
   "properties": {
-    "reportId": { "type": "string", "minLength": 1 },
-    "generatedAt": { "type": "string", "format": "date-time" },
+    "reportId": { "description": "报告 ID（爬坡循环改进报告唯一标识，如 <timestamp>-report）", "type": "string", "minLength": 1 },
+    "generatedAt": { "description": "报告生成时间（ISO 8601）", "type": "string", "format": "date-time" },
     "analysisWindow": {
+      "description": "分析窗口（本次分析覆盖的 run-log 时间范围与范围描述）",
       "type": "object",
       "additionalProperties": false,
       "required": ["from", "to", "runLogEntries", "phasesCovered"],
       "properties": {
-        "from": { "type": "string", "format": "date-time" },
-        "to": { "type": "string", "format": "date-time" },
-        "runLogEntries": { "type": "integer", "minimum": 0 },
+        "from": { "description": "分析窗口起始时间（ISO 8601）", "type": "string", "format": "date-time" },
+        "to": { "description": "分析窗口结束时间（ISO 8601；不得早于 from）", "type": "string", "format": "date-time" },
+        "runLogEntries": { "description": "分析涉及的 run-log 条目数（非负整数）", "type": "integer", "minimum": 0 },
         "phasesCovered": {
+          "description": "涉及的阶段编号数组（取值 1-8，去重）",
           "type": "array",
           "items": { "type": "integer", "minimum": 1, "maximum": 8 }
         }
       }
     },
     "signals": {
+      "description": "检测到的改进信号数组（prompt/tool/verification-rule/anti-pattern/maturity/budget 类，编排者 O 确定性分析 run-log 产出，无 LLM）",
       "type": "array",
       "items": {
         "type": "object",
@@ -38,43 +41,49 @@
           "priority"
         ],
         "properties": {
-          "signalId": { "type": "string", "minLength": 1 },
-          "category": { "type": "string", "minLength": 1 },
-          "severity": { "type": "string", "minLength": 1 },
+          "signalId": { "description": "信号 ID（唯一标识）", "type": "string", "minLength": 1 },
+          "category": { "description": "信号类别：prompt=提示词 / tool=工具 / verification-rule=验证规则 / anti-pattern=反模式 / maturity=成熟度 / budget=预算", "type": "string", "minLength": 1 },
+          "severity": { "description": "严重度：S1=高 / S2=中 / S3=低", "type": "string", "minLength": 1 },
           "evidence": {
+            "description": "证据（来自 run-log 的引用与量化指标）",
             "type": "object",
             "additionalProperties": false,
             "required": ["runLogRefs", "patterns", "metrics"],
             "properties": {
               "runLogRefs": {
+                "description": "关联的 run-log 条目 ID 数组（引用 run-log.jsonl 记录）",
                 "type": "array",
                 "items": { "type": "string" }
               },
               "patterns": {
+                "description": "检测到的模式描述数组",
                 "type": "array",
                 "items": { "type": "string" }
               },
               "metrics": {
+                "description": "量化指标（发生次数 + 趋势）",
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["occurrences", "trend"],
                 "properties": {
-                  "occurrences": { "type": "integer", "minimum": 0 },
-                  "trend": { "enum": ["stable", "increasing", "decreasing"] }
+                  "occurrences": { "description": "发生次数（非负整数）", "type": "integer", "minimum": 0 },
+                  "trend": { "description": "趋势：stable=稳定 / increasing=上升 / decreasing=下降", "enum": ["stable", "increasing", "decreasing"] }
                 }
               }
             }
           },
-          "suggestion": { "type": "string", "minLength": 1 },
+          "suggestion": { "description": "改进建议（人审后手动应用）", "type": "string", "minLength": 1 },
           "affectedAssets": {
+            "description": "受影响的技能资产路径数组",
             "type": "array",
             "items": { "type": "string" }
           },
-          "priority": { "type": "integer", "minimum": 1, "maximum": 5 }
+          "priority": { "description": "建议应用优先级，取值 1-5（数值越小越优先：1=立即应用 / 2=下个版本 / 3=backlog）", "type": "integer", "minimum": 1, "maximum": 5 }
         }
       }
     },
     "metaAnalysis": {
+      "description": "元分析（跨信号聚合统计）",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -87,31 +96,36 @@
       ],
       "properties": {
         "topFailurePatterns": {
+          "description": "高频失败模式列表（跨信号聚合的 Top 失败模式）",
           "type": "array",
           "items": { "type": "string" }
         },
         "reworkHotspots": {
+          "description": "返工热点阶段列表（返工次数 > 平均+Nσ 的阶段）",
           "type": "array",
           "items": { "type": "string" }
         },
-        "verifierDisagreements": { "type": "integer", "minimum": 0 },
-        "budgetBurnTrend": { "enum": ["stable", "increasing", "decreasing"] },
+        "verifierDisagreements": { "description": "V-G 矛盾次数（V passed=true 但 G exit=1；非负整数）", "type": "integer", "minimum": 0 },
+        "budgetBurnTrend": { "description": "预算消耗趋势：stable=稳定 / increasing=上升 / decreasing=下降", "enum": ["stable", "increasing", "decreasing"] },
         "operationalFailureHits": {
+          "description": "O 系列失败模式命中频次映射（键为 O1-O6，值为命中次数）",
           "type": "object",
           "additionalProperties": { "type": "integer", "minimum": 0 }
         },
         "comprehensionQuality": {
+          "description": "acknowledgedDecisions 信息质量指标（重复/空白比例）",
           "type": "object",
           "additionalProperties": false,
           "required": ["emptyOrTrivialRate", "uniqueDecisionRate"],
           "properties": {
-            "emptyOrTrivialRate": { "type": "number", "minimum": 0, "maximum": 1 },
-            "uniqueDecisionRate": { "type": "number", "minimum": 0, "maximum": 1 }
+            "emptyOrTrivialRate": { "description": "空/trivial 决策占比（0-1 小数；越高表示理解证据质量越差）", "type": "number", "minimum": 0, "maximum": 1 },
+            "uniqueDecisionRate": { "description": "唯一决策占比（0-1 小数；越高表示决策重复越少、信息质量越好）", "type": "number", "minimum": 0, "maximum": 1 }
           }
         }
       }
     },
     "recommendations": {
+      "description": "改进建议聚合（人审后手动应用；技能只产出信号，不自动改 harness，见 SSoT §10G/§10H）",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -123,22 +137,27 @@
       ],
       "properties": {
         "promptTweaks": {
+          "description": "prompt 措辞改进建议数组",
           "type": "array",
           "items": { "type": "string" }
         },
         "toolImprovements": {
+          "description": "工具改进建议数组",
           "type": "array",
           "items": { "type": "string" }
         },
         "verificationRuleTightening": {
+          "description": "验证规则收紧建议数组",
           "type": "array",
           "items": { "type": "string" }
         },
         "candidateAntiPatterns": {
+          "description": "候选新增反模式数组（待人审后加入 anti-patterns.md）",
           "type": "array",
           "items": { "type": "string" }
         },
         "maturityAdjustments": {
+          "description": "成熟度阶梯调整建议数组",
           "type": "array",
           "items": { "type": "string" }
         }

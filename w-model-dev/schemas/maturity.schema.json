@@ -6,45 +6,48 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "projectId", "level", "leveledUpAt", "unlockConditions", "history", "downgradeTriggers"],
   "properties": {
-    "schemaVersion": { "type": "string", "pattern": "^1\\.0$" },
-    "projectId": { "type": "string", "minLength": 1 },
-    "level": { "enum": ["L0", "L1", "L2", "L3"] },
-    "leveledUpAt": { "type": "string", "format": "date-time" },
+    "schemaVersion": { "description": "Schema 版本，当前固定为 1.0", "type": "string", "pattern": "^1\\.0$" },
+    "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
+    "level": { "description": "当前成熟度级别：L0=强制介入（决策型/操作型均等用户）/ L1=操作型 CHECKPOINT 自动放行 / L2=事件驱动循环激活 / L3=低介入自主（高风险路径仍强制决策型 CHECKPOINT）；R2 校验须为 L0/L1/L2/L3 之一", "enum": ["L0", "L1", "L2", "L3"] },
+    "leveledUpAt": { "description": "升级到此级别的时间（ISO 8601；R4 校验不得早于 project.createdAt）", "type": "string", "format": "date-time" },
     "unlockConditions": {
+      "description": "解锁条件达成状态（升级须全部达标；升级不可自动，须用户显式确认，决策型 CHECKPOINT）",
       "type": "object",
       "additionalProperties": false,
       "required": ["stableDays", "completedCycles", "attemptCapRate", "misjudgeRate", "operationalFailures"],
       "properties": {
-        "stableDays": { "type": "integer", "minimum": 0 },
-        "completedCycles": { "type": "integer", "minimum": 0 },
-        "attemptCapRate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "misjudgeRate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "operationalFailures": { "type": "integer", "minimum": 0 }
+        "stableDays": { "description": "稳定运行时长（天，非负整数）", "type": "integer", "minimum": 0 },
+        "completedCycles": { "description": "完整 8 阶段周期数（非负整数；R3 校验须 ≥ floor(completedPhases/8)，1 完整周期 = 8 阶段，与 run-log checkpoint success 计数一致）", "type": "integer", "minimum": 0 },
+        "attemptCapRate": { "description": "attempt cap 达标率（0-1 小数；L1→L2 升级需要 ≥0.8）", "type": "number", "minimum": 0, "maximum": 1 },
+        "misjudgeRate": { "description": "误判率（0-1 小数；L2→L3 升级需要 ≤0.1）", "type": "number", "minimum": 0, "maximum": 1 },
+        "operationalFailures": { "description": "O 系列失败模式命中次数（升级需要为 0）", "type": "integer", "minimum": 0 }
       }
     },
     "history": {
+      "description": "升级历史数组（每次升级 append 一条；R4 校验每条 at 不得早于 project.createdAt）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["from", "to", "at", "reason"],
         "properties": {
-          "from": { "enum": ["L0", "L1", "L2", "L3"] },
-          "to": { "enum": ["L0", "L1", "L2", "L3"] },
-          "at": { "type": "string", "format": "date-time" },
-          "reason": { "type": "string", "minLength": 1 }
+          "from": { "description": "升级前级别（L0/L1/L2/L3）", "enum": ["L0", "L1", "L2", "L3"] },
+          "to": { "description": "升级后级别（L0/L1/L2/L3；须高于 from）", "enum": ["L0", "L1", "L2", "L3"] },
+          "at": { "description": "升级时间（ISO 8601；R4 校验不得早于 project.createdAt）", "type": "string", "format": "date-time" },
+          "reason": { "description": "升级原因（如 unlockConditions 全部达标）", "type": "string", "minLength": 1 }
         }
       }
     },
     "downgradeTriggers": {
+      "description": "降级触发条件（满足即自动降级回 L0，run-log append 降级记录）",
       "type": "object",
       "additionalProperties": false,
       "required": ["operationalFailureStreak", "userRequested"],
       "properties": {
-        "operationalFailureStreak": { "type": "integer", "minimum": 0 },
-        "budgetBurnRateExceeded": { "type": "integer", "minimum": 0 },
-        "checkpointRejectionStreak": { "type": "integer", "minimum": 0 },
-        "userRequested": { "type": "boolean" }
+        "operationalFailureStreak": { "description": "连续 O 系列失败模式命中阈值（命中 ≥ 此值自动降级到 L0；R5 校验比对 run-log O1-O6 命中计数）", "type": "integer", "minimum": 0 },
+        "budgetBurnRateExceeded": { "description": "预算消耗率超限累计次数（非负整数；达到即触发预算类降级评估）", "type": "integer", "minimum": 0 },
+        "checkpointRejectionStreak": { "description": "连续 CHECKPOINT 被拒绝次数（非负整数；达到即触发拒绝类降级评估）", "type": "integer", "minimum": 0 },
+        "userRequested": { "description": "用户显式请求降级标记（true 时更新 maturity.json.level=L0）", "type": "boolean" }
       }
     }
   }
