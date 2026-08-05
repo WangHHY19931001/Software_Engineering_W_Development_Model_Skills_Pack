@@ -15,9 +15,10 @@
  *   - CLI 脚本 check-bdd-model.ts（供 G 子代理执行：读文件、解析 features、调本逻辑校验）
  *   - self-test.ts（驱动 samples/bdd/ 样本回归）
  *
- * 注意：本文件只校验 manifest 声明的结构与字段，不解析 .feature 文件（那是 CLI 的 I/O 职责）。
- *   features 文件头解析（parseFeatureHeader）与 Background 状态机解析（parseBackgroundStateMachine）
- *   为纯函数，供 CLI 调用后将违反合并入最终结果。
+ * 注意：本文件只做纯逻辑校验与纯函数解析，不执行 I/O（读文件是 CLI 的职责）。
+ *   features 文件解析（parseFeatureHeader / parseBackgroundStateMachine / parseFeatureFile）
+ *   与 TLA+ 快照解析（parseTlaSpecSnapshot）为纯函数，供 CLI 与 self-test 调用后
+ *   将违反合并入最终结果。
  */
 
 import { validateBySchema } from './schema-loader.js';
@@ -249,6 +250,82 @@ export function parseBackgroundStateMachine(
   return { sm, violations };
 }
 
+// ==================== features 文件全文解析（纯函数） ====================
+
+/**
+ * 解析 .feature 文件全文：头标注 + Background 状态机 + scenarios。
+ * 纯函数：输入文件内容字符串（不读文件，I/O 由 CLI 负责），输出结构化对象。
+ *
+ * 语义基线（统一 check-bdd-model.ts 与 self-test.ts 的复制漂移，以 self-test 为准）：
+ *   - events：When 与 And 步骤双取（`(?:When|And)`），行末单词为事件名；
+ *     保留行末括号 `)` 容错（check-bdd-model.ts 原实现支持 `When 用户提交注册信息 (Register)` 格式）
+ *   - expectedEndState：取第一个 Then 声明的状态（self-test 基线；check-bdd-model 原取最后一个）
+ *   - startState（Given）/ invariantAssertions（Then|And 不变式）：两处原实现一致
+ */
+export function parseFeatureFile(
+  content: string
+): { header: FeatureHeader; stateMachine: Partial<BddStateMachine>; scenarios: ScenarioPathCheck[]; violations: string[] } {
+  const { header, violations: headerViolations } = parseFeatureHeader(content);
+
+  // 提取 Background 节
+  const bgMatch = content.match(/Background:\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/);
+  const bgContent = bgMatch ? bgMatch[1]! : '';
+  const { sm, violations: smViolations } = parseBackgroundStateMachine(bgContent);
+
+  // 提取 scenarios（简化解析，生产环境用 @cucumber/messages Gherkin 解析器）
+  const scenarios: ScenarioPathCheck[] = [];
+  const scenarioRegex = /Scenario:\s*(.+?)\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = scenarioRegex.exec(content)) !== null) {
+    const name = m[1]!.trim();
+    const body = m[2]!;
+    const startState = extractStateFromStep(body, /Given.*?"(\w+)"/);
+    const events = extractEventsFromStep(body);
+    const expectedEndState = extractStateFromStep(body, /Then.*?"(\w+)"/);
+    const invariantAssertions = extractInvariantsFromThen(body);
+    scenarios.push({ scenarioName: name, startState, events, expectedEndState, invariantAssertions });
+  }
+
+  return {
+    header,
+    stateMachine: sm,
+    scenarios,
+    violations: [...headerViolations, ...smViolations],
+  };
+}
+
+function extractStateFromStep(body: string, pattern: RegExp): string | null {
+  const m = body.match(pattern);
+  return m ? m[1]! : null;
+}
+
+/**
+ * 从 scenario body 中提取事件名（When 与 And 步骤行末英文单词，容忍行末括号）。
+ * 事件名是行末括号中的英文单词，如 (CreateComment)，或行末最后一个英文单词。
+ */
+function extractEventsFromStep(body: string): string[] {
+  const events: string[] = [];
+  const lines = body.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^\s*(?:When|And)\s+.+?\b(\w+)\s*\)?\s*$/);
+    if (m) events.push(m[1]!);
+  }
+  return events;
+}
+
+/**
+ * 从 scenario body 中提取不变式断言（Then/And 步骤的「不变式 "..." 应成立」）。
+ */
+function extractInvariantsFromThen(body: string): string[] {
+  const invs: string[] = [];
+  const lines = body.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^\s*(?:Then|And)\s+不变式\s+"(.+?)"\s+应成立/);
+    if (m) invs.push(m[1]!);
+  }
+  return invs;
+}
+
 // ==================== 七要素完整性校验（纯函数） ====================
 
 /**
@@ -384,6 +461,185 @@ export interface TlaSpecSnapshot {
   initialState: string;
   transitions: Array<{ from: string; event: string; to: string }>;
   invariants: string[];
+}
+
+/**
+ * 从 .tla 文件内容中提取状态机快照（states / initialState / transitions / invariants），
+ * 供 D4 BDD↔TLA+ 等价性校验使用。纯函数：输入 .tla 文本内容 + specId，输出 TlaSpecSnapshot。
+ *
+ * 解析约定（与本项目所有 .tla 文件一致，迁移自 check-bdd-model.ts 的内联实现）：
+ *   - 状态变量：在 TypeInvariant 中以 `var \in {"s1", "s2", ...}` 声明（区别于计数器 `var \in Nat`）
+ *   - 初始状态：在 Init 中以 `var = "Value"` 赋值
+ *   - 转移：每个 Action 定义中 `var = "From"` (或 `var \in {...}`) + `var' = "To"`
+ *   - 不变式：`var = "State" => condition` 格式，归一化为 `State => condition`
+ */
+export function parseTlaSpecSnapshot(tlaContent: string, specId: string): TlaSpecSnapshot {
+  return {
+    specId,
+    states: extractTlaStates(tlaContent),
+    initialState: extractTlaInit(tlaContent),
+    transitions: extractTlaTransitions(tlaContent),
+    invariants: extractTlaInvariants(tlaContent),
+  };
+}
+
+/**
+ * 提取 TLA+ 规格中枚举状态数最多的状态变量名。
+ * 当规格有多个带枚举值的状态变量时（如 L1 的 systemState 和 userState），
+ * 选择状态数最多的那个（通常是 BDD 对应的用户行为状态变量）。
+ */
+function extractStateVarName(content: string): string | null {
+  const typeDefMatch = content.match(/\b(?:TypeOK|TypeInvariant|Invariants)\s*==/);
+  if (!typeDefMatch) return null;
+  const typeInvStart = typeDefMatch.index!;
+  const afterTypeInv = content.slice(typeInvStart);
+  const bodyOffset = typeDefMatch[0].length;
+  const endMatch = afterTypeInv.slice(bodyOffset).match(/\n\w+\s*==|\n====/);
+  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + bodyOffset) : afterTypeInv;
+
+  const varPattern = /(\w+)\s*\\in\s*\{((?:"[^"]+"\s*,?\s*)+)\}/g;
+  let bestVar: string | null = null;
+  let maxCount = 0;
+  let match: RegExpExecArray | null;
+  while ((match = varPattern.exec(typeInvBody)) !== null) {
+    const valMatches = match[2]!.match(/"([^"]+)"/g);
+    const count = valMatches ? valMatches.length : 0;
+    if (count > maxCount) {
+      maxCount = count;
+      bestVar = match[1]!;
+    }
+  }
+  return bestVar;
+}
+
+/**
+ * 提取 TLA+ 规格中的所有状态值（从 TypeInvariant 的 \in {"s1", "s2", ...} 中解析）。
+ */
+function extractTlaStates(content: string): string[] {
+  const states: string[] = [];
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return states;
+  const typeDefMatch = content.match(/\b(?:TypeOK|TypeInvariant|Invariants)\s*==/);
+  if (!typeDefMatch) return states;
+  const typeInvStart = typeDefMatch.index!;
+  const afterTypeInv = content.slice(typeInvStart);
+  const bodyOffset = typeDefMatch[0].length;
+  const endMatch = afterTypeInv.slice(bodyOffset).match(/\n\w+\s*==|\n====/);
+  const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + bodyOffset) : afterTypeInv;
+
+  // 仅匹配第一个状态变量的 \in {"val1", "val2", ...}（不匹配 \in Nat）
+  // 通过 stateVar 名称定位：stateVar \in { ... }
+  const stateVarPattern = new RegExp('\\b' + stateVar + '\\s*\\\\in\\s*\\{((?:"[^"]+"\\s*,?\\s*)+)\\}');
+  const m = stateVarPattern.exec(typeInvBody);
+  if (m) {
+    const valMatches = m[1]!.match(/"([^"]+)"/g);
+    if (valMatches) {
+      for (const v of valMatches) {
+        const val = v.slice(1, -1);
+        if (!states.includes(val)) states.push(val);
+      }
+    }
+  }
+  return states;
+}
+
+/**
+ * 提取 TLA+ 规格的初始状态值（从 Init 中解析状态变量的赋值）。
+ */
+function extractTlaInit(content: string): string {
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return '';
+
+  const initStart = content.indexOf('Init ==');
+  if (initStart === -1) return '';
+  const afterInit = content.slice(initStart);
+  const endMatch = afterInit.slice(8).match(/\n\w+\s*==|\n====/);
+  const initBody = endMatch ? afterInit.slice(0, endMatch.index! + 8) : afterInit;
+
+  // 匹配 stateVar = "Value"（不匹配 stateVar' = ...）
+  const m = initBody.match(new RegExp(stateVar + '\\s*=\\s*"([^"]+)"'));
+  return m ? m[1]! : '';
+}
+
+/**
+ * 提取 TLA+ 规格的转移列表（从各 Action 定义中解析 from→to，事件名转 camelCase）。
+ * 处理 `var \in {"s1", "s2"}` 形式的多 from-state 展开。
+ */
+function extractTlaTransitions(content: string): Array<{ from: string; event: string; to: string }> {
+  const transitions: Array<{ from: string; event: string; to: string }> = [];
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return transitions;
+
+  // 从 Next == 中提取 action 名称列表
+  const nextStart = content.indexOf('Next ==');
+  if (nextStart === -1) return transitions;
+  const afterNext = content.slice(nextStart);
+  const specStart = afterNext.indexOf('Spec ==');
+  const nextBody = specStart > 0 ? afterNext.slice(0, specStart) : afterNext;
+  // 匹配 \/ ActionName 或 \/ \E var \in set : ActionName(args)
+  // 注意：JS 正则中 \E 不是转义序列，需用 \\E 匹配字面反斜杠+E
+  const actionNames = [...nextBody.matchAll(/\\\/\s*(?:\\E[^:]+:\s*)?(\w+)/g)].map(m => m[1]!);
+
+  for (const actionName of actionNames) {
+    // 定位 action 定义体（支持 ActionName == 和 ActionName(params) == 两种形式）
+    const defRegex = new RegExp('\\b' + actionName + '\\s*(?:\\([^)]*\\))?\\s*==');
+    const defMatch = defRegex.exec(content);
+    if (!defMatch) continue;
+    const afterDef = content.slice(defMatch.index + defMatch[0].length);
+    const endMatch = afterDef.match(/\n\w+\s*==|\n====/);
+    const actionBody = endMatch ? afterDef.slice(0, endMatch.index) : afterDef;
+
+    // 提取 to-state: stateVar' = "Value"
+    const toRegex = new RegExp(stateVar + "'\\s*=\\s*\"([^\"]+)\"");
+    const toMatch = actionBody.match(toRegex);
+    if (!toMatch) continue;
+
+    const toState = toMatch[1]!;
+    // 事件名：PascalCase → camelCase
+    const event = actionName.charAt(0).toLowerCase() + actionName.slice(1);
+
+    // 提取 from-state: stateVar = "Value" 或 stateVar \in {"s1", "s2", ...}
+    const fromSingleRegex = new RegExp(stateVar + '\\s*=\\s*"([^"]+)"');
+    const fromSingleMatch = actionBody.match(fromSingleRegex);
+    if (fromSingleMatch) {
+      transitions.push({ from: fromSingleMatch[1]!, event, to: toState });
+    } else {
+      const fromSetRegex = new RegExp(stateVar + '\\s*\\\\in\\s*\\{((?:"[^"]+"\\s*,?\\s*)+)\\}');
+      const fromSetMatch = actionBody.match(fromSetRegex);
+      if (fromSetMatch) {
+        const fromStates = fromSetMatch[1]!.match(/"([^"]+)"/g)!;
+        for (const fs of fromStates) {
+          transitions.push({ from: fs.slice(1, -1), event, to: toState });
+        }
+      }
+    }
+  }
+
+  return transitions;
+}
+
+/**
+ * 提取 TLA+ 规格的不变式列表（归一化 `var = "State" => cond` 为 `State => cond`）。
+ */
+function extractTlaInvariants(content: string): string[] {
+  const invariants: string[] = [];
+  const stateVar = extractStateVarName(content);
+  if (!stateVar) return invariants;
+
+  // 匹配 stateVar = "State" => condition（不匹配 stateVar' = ...）
+  const invRegex = new RegExp(
+    stateVar + '\\s*=\\s*"([^"]+)"\\s*=>\\s*([^\\n]+)',
+    'g'
+  );
+
+  const matches = [...content.matchAll(invRegex)];
+  for (const m of matches) {
+    const stateValue = m[1]!;
+    const condition = m[2]!.trim();
+    invariants.push(`${stateValue} => ${condition}`);
+  }
+
+  return invariants;
 }
 
 /**

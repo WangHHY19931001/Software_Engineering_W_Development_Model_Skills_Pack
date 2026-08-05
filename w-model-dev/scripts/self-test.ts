@@ -60,11 +60,9 @@ import {
 import { checkRootCauseReport } from './root-cause-logic.js';
 import {
   checkBddModel,
-  parseFeatureHeader,
-  parseBackgroundStateMachine,
+  parseFeatureFile,
   type BddManifest,
   type BddCheckInput,
-  type ScenarioPathCheck,
   type TlaSpecSnapshot,
 } from './bdd-logic.js';
 import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
@@ -2297,32 +2295,7 @@ async function runUatPathMappingCases(samplesDir: string): Promise<CaseResult[]>
   return results;
 }
 
-// -------------------- BDD scenario 解析辅助（与 check-bdd-model.ts 同构） --------------------
-
-function extractBddStateFromStep(body: string, pattern: RegExp): string | null {
-  const m = body.match(pattern);
-  return m ? m[1]! : null;
-}
-
-function extractBddEventsFromWhen(body: string): string[] {
-  const events: string[] = [];
-  const lines = body.split('\n');
-  for (const line of lines) {
-    const m = line.match(/^\s*(?:When|And)\s+.+?\b(\w+)\s*$/);
-    if (m) events.push(m[1]!);
-  }
-  return events;
-}
-
-function extractBddInvariantsFromThen(body: string): string[] {
-  const invs: string[] = [];
-  const lines = body.split('\n');
-  for (const line of lines) {
-    const m = line.match(/^\s*(?:Then|And)\s+不变式\s+"(.+?)"\s+应成立/);
-    if (m) invs.push(m[1]!);
-  }
-  return invs;
-}
+// -------------------- BDD 用例（解析收敛至 bdd-logic.ts 的 parseFeatureFile） --------------------
 
 async function runBddCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -2347,41 +2320,23 @@ async function runBddCases(samplesDir: string): Promise<CaseResult[]> {
       continue;
     }
 
-    // 解析 features 文件（头标注 + Background 状态机 + scenarios）
+    // 解析 features 文件（头标注 + Background 状态机 + scenarios；解析收敛至 bdd-logic.parseFeatureFile）
     const parsedFeatures: BddCheckInput['parsedFeatures'] = [];
     const headerViolations: string[] = [];
     for (const ff of c.featureFiles) {
       try {
         const featurePath = path.join(bddSamplesDir, ff);
         const content = await fs.readFile(featurePath, 'utf-8');
-        const { header, violations: hdrViolations } = parseFeatureHeader(content);
-        headerViolations.push(...hdrViolations);
-
-        const bgMatch = content.match(/Background:\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/);
-        const bgContent = bgMatch ? bgMatch[1]! : '';
-        const { sm } = parseBackgroundStateMachine(bgContent);
-
-        // 提取 scenarios（与 check-bdd-model.ts 同构）
-        const scenarios: ScenarioPathCheck[] = [];
-        const scenarioRegex = /Scenario:\s*(.+?)\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/g;
-        let m: RegExpExecArray | null;
-        while ((m = scenarioRegex.exec(content)) !== null) {
-          const sName = m[1]!.trim();
-          const body = m[2]!;
-          const startState = extractBddStateFromStep(body, /Given.*?"(\w+)"/);
-          const events = extractBddEventsFromWhen(body);
-          const expectedEndState = extractBddStateFromStep(body, /Then.*?"(\w+)"/);
-          const invariantAssertions = extractBddInvariantsFromThen(body);
-          scenarios.push({ scenarioName: sName, startState, events, expectedEndState, invariantAssertions });
-        }
+        const parsed = parseFeatureFile(content);
+        headerViolations.push(...parsed.violations);
 
         // 找到 manifest 中对应 feature 的 id
         const featureId = manifest.features.find(f => f.filePath.endsWith(ff))?.id ?? manifest.features[0]?.id ?? '';
         parsedFeatures.push({
           featureId,
-          header,
-          stateMachine: sm,
-          scenarios,
+          header: parsed.header,
+          stateMachine: parsed.stateMachine,
+          scenarios: parsed.scenarios,
         });
       } catch (e) {
         details.push(`  - 无法读取 feature ${ff}: ${(e as Error).message}`);
