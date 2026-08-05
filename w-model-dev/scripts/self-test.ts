@@ -70,7 +70,7 @@ import {
 import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from './role-dispatch-logic.js';
-import { checkStateMachineConsistency } from './check-state-machine-consistency.js';
+import { checkStateMachineConsistency } from './state-machine-logic.js';
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
 import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
 import { checkOpenspecArchive } from './check-openspec-archive.js';
