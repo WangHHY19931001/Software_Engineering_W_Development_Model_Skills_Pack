@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["id", "name", "description", "status", "techStack", "createdAt", "updatedAt"],
   "properties": {
-    "id": { "description": "项目 ID（非空字符串；与 budget.json/maturity.json/tla-manifest.json 的 project 字段一致）", "type": "string", "minLength": 1 },
+    "id": { "description": "项目 ID（非空字符串；与 budget.json/maturity.json 的 projectId 字段、tla-manifest.json 的 project 字段一致）", "type": "string", "minLength": 1 },
     "name": { "description": "项目名称，非空字符串", "type": "string", "minLength": 1 },
     "description": { "description": "项目描述（可为空字符串；用于说明项目背景与范围）", "type": "string" },
     "status": {
@@ -27,6 +27,6 @@
       }
     },
     "createdAt": { "description": "创建时间，ISO 8601 字符串（/wm analyze 首次初始化时写入；R4 校验 maturity.leveledUpAt 不得早于此时刻）", "type": "string", "format": "date-time" },
-    "updatedAt": { "description": "最后修改时间，ISO 8601 字符串（阶段切换/status 更新/技术栈变更时同步刷新；budget R1 时效性校验依赖：project.updatedAt > budget.createdAt 时须 budget.updatedAt > budget.createdAt）", "type": "string", "format": "date-time" }
+    "updatedAt": { "description": "最后修改时间，ISO 8601 字符串（阶段切换/status 更新/技术栈变更时同步刷新；budget R1 时效性校验依赖：项目已推进（project.updatedAt > budget.createdAt）时预算须已刷新（budget.updatedAt ≠ budget.createdAt），否则 budget R1 报违规）", "type": "string", "format": "date-time" }
   }
 }
