@@ -324,6 +324,23 @@ export function checkRequirementGraph(
   const nodeMap = new Map<string, GraphNode>();
   for (const n of g.nodes) nodeMap.set(n.id, n);
 
+  // 出/入边索引（供 rootCandidates / orphan BFS / 追溯校验 / cross-cuts 查找使用）
+  const outEdges = new Map<string, GraphEdge[]>();
+  const inEdges = new Map<string, GraphEdge[]>();
+  for (const id of nodeIds) {
+    outEdges.set(id, []);
+    inEdges.set(id, []);
+  }
+  for (const e of g.edges) {
+    outEdges.get(e.from)?.push(e);
+    inEdges.get(e.to)?.push(e);
+  }
+  // conflicts-with 对称判定索引（只收录实际存在的边，反查 `${to}->${from}` 判对称）
+  const conflictsAdj = new Set<string>();
+  for (const e of g.edges) {
+    if (e.type === 'conflicts-with') conflictsAdj.add(`${e.from}->${e.to}`);
+  }
+
   // --- §3 规则 1-2：单根校验（根候选 = parent 入边为 0 的节点，排除边界节点）---
   // 四维识别：phase=1 纯 REQ 图（无 SD/INTF/DD/EXT-IN/EXT-OUT）启用多 group 模式，
   // 多个 level=1 REQ 视为 group 候选，允许多根（R1 规则）；NFR/CON 节点排除根候选。
@@ -333,7 +350,7 @@ export function checkRequirementGraph(
   const rootCandidates: GraphNode[] = [];
   for (const n of g.nodes) {
     if (BOUNDARY_TYPES.has(n.type)) continue;
-    const hasParentIn = g.edges.some(e => e.type === 'parent' && e.to === n.id);
+    const hasParentIn = inEdges.get(n.id)?.some(e => e.type === 'parent') ?? false;
     if (!hasParentIn) rootCandidates.push(n);
   }
   const reqRoots = rootCandidates.filter(n => n.type === 'REQ' && !isNfrConNode(n));
@@ -389,8 +406,8 @@ export function checkRequirementGraph(
     const queue = [...bfsStartNodes];
     while (queue.length > 0) {
       const cur = queue.shift()!;
-      for (const e of g.edges) {
-        if (e.type === 'parent' && e.from === cur && !reachable.has(e.to)) {
+      for (const e of outEdges.get(cur) ?? []) {
+        if (e.type === 'parent' && !reachable.has(e.to)) {
           reachable.add(e.to);
           queue.push(e.to);
         }
@@ -446,17 +463,6 @@ export function checkRequirementGraph(
   }
 
   // 阶段递进追溯检查（"门禁同步收敛"的核心）
-  const outEdges = new Map<string, GraphEdge[]>();
-  const inEdges = new Map<string, GraphEdge[]>();
-  for (const id of nodeIds) {
-    outEdges.set(id, []);
-    inEdges.set(id, []);
-  }
-  for (const e of g.edges) {
-    outEdges.get(e.from)?.push(e);
-    inEdges.get(e.to)?.push(e);
-  }
-
   if (phase >= 2) {
     for (const n of g.nodes) {
       if (n.type === 'SD') {
@@ -684,11 +690,11 @@ export function checkRequirementGraph(
     const crossCutsTargetTypeViolations: string[] = [];
     for (const e of g.edges) {
       if (e.type === 'conflicts-with') {
-        const hasReverse = g.edges.some(re => re.type === 'conflicts-with' && re.from === e.to && re.to === e.from);
+        const hasReverse = conflictsAdj.has(`${e.to}->${e.from}`);
         if (!hasReverse) conflictsAsymmetric.push(`${e.from}→${e.to}`);
       }
       if (e.type === 'cross-cuts') {
-        const targetNode = g.nodes.find(n => n.id === e.to);
+        const targetNode = nodeMap.get(e.to);
         if (targetNode && targetNode.type !== 'REQ') {
           crossCutsTargetTypeViolations.push(`${e.from}→${e.to}（目标 ${targetNode.type} 非 REQ）`);
         }
