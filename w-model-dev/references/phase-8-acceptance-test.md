@@ -39,7 +39,7 @@
 | 步骤 | 工具 / 命令 | 参数 / 阈值 |
 |---|---|---|
 | UAT-001~003 验收测试 | 按阶段 1 产出验收测试用例手动/半自动执行 | 每条验收标准通过 |
-| UAT-004 文档完整性 | 对照 `templates/` 8 个模板逐一核验 | 文件存在 + 内容与模板结构匹配 |
+| UAT-004 文档完整性 | 对照 `templates/` 12 个模板逐一核验 | 文件存在 + 内容与模板结构匹配 |
 | RTM 终检 | `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]` | 退出码 0（RTM 100% + 四级测试全通过） |
 | 用户确认 | 在验收测试报告「用户确认」区记录 | `confirm` / `confirm-with-comments` / `reject` |
 
@@ -192,7 +192,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 | 3 | 跳过用户确认直接标记项目完成 | 必须暂停等用户 `confirm`，禁止 Agent 自行判定完成 |
 | 4 | 用单元测试代替验收测试 | 验收测试必须从用户场景出发，不得复用单元/集成测试用例 |
 | 5 | 验收用例只覆盖 happy path | UAT 必须覆盖正常流程 + 异常流程 + 边界场景 |
-| 6 | 文档完整性只检查文件存在 | 必须对照 [templates/](../templates/) 8 个模板逐一核验内容完整性 |
+| 6 | 文档完整性只检查文件存在 | 必须对照 [templates/](../templates/) 12 个模板逐一核验内容完整性 |
 
 ### acknowledgedDecisions 决策条目须含关键词
 
