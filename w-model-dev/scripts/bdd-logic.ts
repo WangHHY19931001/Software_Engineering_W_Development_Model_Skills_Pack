@@ -272,7 +272,7 @@ export function parseFeatureFile(
   const bgContent = bgMatch ? bgMatch[1]! : '';
   const { sm, violations: smViolations } = parseBackgroundStateMachine(bgContent);
 
-  // 提取 scenarios（简化解析，生产环境用 @cucumber/messages Gherkin 解析器）
+  // 提取 scenarios（场景解析为手写正则，不依赖 @cucumber/* Gherkin 解析器）
   const scenarios: ScenarioPathCheck[] = [];
   const scenarioRegex = /Scenario:\s*(.+?)\n([\s\S]*?)(?=\n\s*Scenario:|\n\s*Scenario Outline:|$)/g;
   let m: RegExpExecArray | null;

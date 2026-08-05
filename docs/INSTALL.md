@@ -30,7 +30,7 @@
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
     - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 15 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
     - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` — 安全扫描基线（`npm run lint:security` 时使用，devDep）
-    - `@cucumber/cucumber` + `@cucumber/messages` — BDD 建模（Cucumber.js v11 + Gherkin 解析），由 `w-model-dev/scripts/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（devDep，运行 cucumber scenarios 时需要；纯 features 静态校验不需要）
+    - （无 BDD 专属 devDep）— BDD features 场景解析为手写正则（`w-model-dev/scripts/bdd-logic.ts` 的 `parseFeatureFile`），由 `w-model-dev/scripts/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（纯 features 静态校验，无需 Cucumber 运行器）
 
 > 纯 Markdown 技能资产（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零 Node.js、零 `npm install`，可整目录拷贝分发；Node.js/npm/tsx/devDeps 仅用于执行 `scripts/*.ts` 的确定性门禁与回归基线。
 

@@ -19,8 +19,6 @@
     "prepush": "PREPUSH_FORCE=1 bash .githooks/pre-push"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "^11.3.0",
-    "@cucumber/messages": "^27.2.0",
     "@types/node": "^20.19.43",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",

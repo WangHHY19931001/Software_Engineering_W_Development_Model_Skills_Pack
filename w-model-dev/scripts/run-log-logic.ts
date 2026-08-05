@@ -430,7 +430,6 @@ export function checkRunLog(
 
 /** 各门禁脚本 stdout 摘要标记（含第 31 轮新增 STATUS_JSON / METRICS_JSON；第 32 轮新增 ERROR_JSON） */
 const GATE_JSON_PATTERNS: RegExp[] = [
-  /SCRIPT_JSON\s+(\{.*\})/,
   /GRAPH_JSON\s+(\{.*\})/,
   /VERIFIER_JSON\s+(\{.*\})/,
   /TLA_JSON\s+(\{.*\})/,

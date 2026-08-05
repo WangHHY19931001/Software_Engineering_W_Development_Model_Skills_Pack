@@ -34,10 +34,9 @@ BDD 门禁是 W 模型第四维度门禁——与结构连通门禁（graph）�
 
 | 依赖 | 版本 | 位置 |
 |---|---|---|
-| `@cucumber/cucumber` | ^11.0.0 | devDependencies（BDD 运行器） |
-| `@cucumber/messages` | ^27.0.0 | devDependencies（Gherkin AST 解析） |
+| （无 BDD 专属 devDep） | — | features 场景解析为手写正则（`bdd-logic.ts` 的 `parseFeatureFile`），由 `check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用 |
 
-> cucumber.js 是确定性运行器，不调用 LLM。`strict: true` 保证 undefined/pending step 视为失败，与门禁退出码语义一致。
+> 场景解析为手写正则（`bdd-logic.ts` 的 `parseFeatureFile`），不依赖 Cucumber.js/Gherkin 解析器。阶段 5-8 若需实际执行 scenarios（验收测试），Cucumber 运行器由消费方自行安装，仓库不内置；undefined/pending step 视为失败（D5 step 绑定校验），与门禁退出码语义一致。
 
 ---
 
