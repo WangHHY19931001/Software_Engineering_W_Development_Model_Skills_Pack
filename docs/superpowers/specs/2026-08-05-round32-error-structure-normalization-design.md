@@ -193,7 +193,7 @@ export function buildGateLogKeys(fileAbs: string, cwd: string): string[];
 
 ## 6. 验收标准
 
-- vitest 358/358 全通过（345 + 13）
+- vitest 363/363（28 文件）全通过（实测；新增 cli-error 7 + run-log-logic 7 用例）
 - self-test 213/213 不变（消息文本改动不影响——self-test 仅断言退出码）
 - TypeScript strict 0 错误
 - `npm run lint:security` exit 0（0 新增；新文件若触发误报按惯例 regenerate baseline）
