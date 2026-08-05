@@ -5,6 +5,7 @@ import { checkPreventiveReview, type PreventiveReview, type PreventiveReviewOpti
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { parsePhaseArg } from './lib/parse-phase.js';
+import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 
 const PREVENTIVE_REVIEW_JSON = {
   script: 'check-preventive-review.ts',
@@ -74,60 +75,8 @@ async function main(): Promise<void> {
     const runLogPath = runLogArg.split('=')[1]!;
     const abs = path.resolve(runLogPath);
     try {
-      const raw = await fs.readFile(abs, 'utf-8');
-      const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      if (lines.length === 0) {
-        exitWithError({
-          category: 'FILE_PARSE',
-          message: 'run-log 为空（--auto-trigger 无法推断阶段）',
-          file: abs,
-          exitCode: 2,
-        });
-        return;
-      }
-      // 取最后一条 checkpoint success 记录的 phase 作为当前阶段
-      let lastPhase = 0;
-      // 第29轮：扫描 run-log 推断 S 变体（最近一条 fix/emergency-fix 决定 variant）
-      let inferredVariant: PreventiveReviewOptions['variant'] = 'standard';
-      let lastSAction: string | null = null;
-      for (const line of lines) {
-        try {
-          const entry = parseJsonSafe(line) as { phase?: number; action?: string; outcome?: string; role?: string };
-          if (typeof entry.phase === 'number' && entry.action === 'checkpoint' && entry.outcome === 'success') {
-            lastPhase = entry.phase;
-          }
-          // 跟踪最后一条 S 角色 action（用于推断 variant）
-          if (entry.role === 'S' && typeof entry.action === 'string') {
-            if (entry.action === 'fix') {
-              lastSAction = 'fix';
-            } else if (entry.action === 'emergency-fix') {
-              lastSAction = 'emergency-fix';
-            } else if (entry.action === 'produce') {
-              lastSAction = 'produce';
-            }
-          }
-        } catch {
-          // 跳过非法行
-        }
-      }
-      // 推断 variant：若未显式传 --variant，则按最后一条 S action 推断
-      if (!variantArg) {
-        if (lastSAction === 'fix') inferredVariant = 'fix';
-        else if (lastSAction === 'emergency-fix') inferredVariant = 'emergency';
-        else inferredVariant = 'standard';
-        variant = inferredVariant;
-      }
-      if (lastPhase < 1 || lastPhase > 8) {
-        exitWithError({
-          category: 'ARG_INVALID',
-          message: '无法从 run-log 推断当前阶段',
-          detail: `最后 checkpoint phase=${lastPhase}（须为 1-8）`,
-          exitCode: 2,
-        });
-        return;
-      }
-      phase = lastPhase;
-      console.error(`[auto-trigger] 从 run-log 推断: phase=${phase}, variant=${variant}`);
+      // 先 access 探测：保持原 FILE_NOT_FOUND 的 ERROR_JSON stdout 输出（readJsonlOrExit 内部 ENOENT 直接 exit(2) 不输出 ERROR_JSON）
+      await fs.access(abs);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       if (e.code === 'ENOENT') {
@@ -141,6 +90,56 @@ async function main(): Promise<void> {
       }
       throw err;
     }
+    // 读取 + 逐行解析（坏行 warn+skip；ENOENT 已在 access 探测处拦截）
+    const entries = await readJsonlOrExit(abs, 'run-log');
+    if (entries.length === 0) {
+      exitWithError({
+        category: 'FILE_PARSE',
+        message: 'run-log 为空（--auto-trigger 无法推断阶段）',
+        file: abs,
+        exitCode: 2,
+      });
+      return;
+    }
+    // 取最后一条 checkpoint success 记录的 phase 作为当前阶段
+    let lastPhase = 0;
+    // 第29轮：扫描 run-log 推断 S 变体（最近一条 fix/emergency-fix 决定 variant）
+    let inferredVariant: PreventiveReviewOptions['variant'] = 'standard';
+    let lastSAction: string | null = null;
+    for (const entryRaw of entries) {
+      const entry = entryRaw as { phase?: number; action?: string; outcome?: string; role?: string };
+      if (typeof entry.phase === 'number' && entry.action === 'checkpoint' && entry.outcome === 'success') {
+        lastPhase = entry.phase;
+      }
+      // 跟踪最后一条 S 角色 action（用于推断 variant）
+      if (entry.role === 'S' && typeof entry.action === 'string') {
+        if (entry.action === 'fix') {
+          lastSAction = 'fix';
+        } else if (entry.action === 'emergency-fix') {
+          lastSAction = 'emergency-fix';
+        } else if (entry.action === 'produce') {
+          lastSAction = 'produce';
+        }
+      }
+    }
+    // 推断 variant：若未显式传 --variant，则按最后一条 S action 推断
+    if (!variantArg) {
+      if (lastSAction === 'fix') inferredVariant = 'fix';
+      else if (lastSAction === 'emergency-fix') inferredVariant = 'emergency';
+      else inferredVariant = 'standard';
+      variant = inferredVariant;
+    }
+    if (lastPhase < 1 || lastPhase > 8) {
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: '无法从 run-log 推断当前阶段',
+        detail: `最后 checkpoint phase=${lastPhase}（须为 1-8）`,
+        exitCode: 2,
+      });
+      return;
+    }
+    phase = lastPhase;
+    console.error(`[auto-trigger] 从 run-log 推断: phase=${phase}, variant=${variant}`);
   }
 
   if (!phase || phase < 1 || phase > 8) {

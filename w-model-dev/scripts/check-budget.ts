@@ -29,7 +29,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkBudget, type BudgetConfig } from './budget-logic.js';
 import { parsePhaseArg } from './lib/parse-phase.js';
-import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
@@ -73,25 +73,15 @@ interface ReworkStats {
  * - reworkCount     = action === 'rework' 且（若提供 phase）phase === N 的记录数
  * - tlaReworkCount  = action === 'rework' 且（note 或 target 含 'TLA/tla'）且（若提供 phase）phase === N 的记录数
  *
- * 容错：空行跳过，单行解析失败跳过该行并 console.error 警告。
+ * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
  */
 function countReworks(
-  lines: string[],
+  entries: unknown[],
   phase: number | undefined,
-  runLogAbs: string,
 ): ReworkStats {
   let reworkCount = 0;
   let tlaReworkCount = 0;
-  for (const [i, line] of lines.entries()) {
-    const trimmed = line.trim();
-    if (trimmed === '') continue;
-    let entry: unknown;
-    try {
-      entry = parseJsonSafe(trimmed);
-    } catch {
-      console.error(`⚠ run-log 第 ${i + 1} 行非合法 JSON，已跳过: ${runLogAbs}`);
-      continue;
-    }
+  for (const entry of entries) {
     const e = entry as { action?: string; phase?: number; note?: string; target?: string };
     if (phase !== undefined && e.phase !== phase) continue;
     if (e.action === 'rework') {
@@ -162,14 +152,15 @@ async function main(): Promise<void> {
   }
 
   // 可选输入：--run-log（读失败只警告不 exit；jsonl 容错）
+  // 先 access 探测：readJsonlOrExit 对 ENOENT 会 exit(2)，此处须降级为警告（wm-status 同型模式）
   let reworkCount: number | undefined;
   let tlaReworkCount: number | undefined;
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
-      const runLogRaw = await fs.readFile(runLogAbs, 'utf-8');
-      const lines = runLogRaw.split(/\r?\n/);
-      const stats = countReworks(lines, phase, runLogAbs);
+      await fs.access(runLogAbs);
+      const entries = await readJsonlOrExit(runLogAbs, 'run-log');
+      const stats = countReworks(entries, phase);
       reworkCount = stats.reworkCount;
       tlaReworkCount = stats.tlaReworkCount;
     } catch (err) {

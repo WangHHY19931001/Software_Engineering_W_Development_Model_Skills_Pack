@@ -27,7 +27,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkMaturity, type MaturityConfig } from './maturity-logic.js';
-import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
@@ -74,23 +74,13 @@ const O_PATTERN = /\bO[1-6]\b/g;
  * 统计 run-log.jsonl 中 O 系列失败模式命中次数。
  * 扫描每条记录的 note 字段，匹配 /O[1-6]/ 即记一次。
  *
- * 容错：空行跳过，单行解析失败跳过该行并 console.error 警告。
+ * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
  */
 function countOperationalFailures(
-  lines: string[],
-  runLogAbs: string,
+  entries: unknown[],
 ): number {
   let count = 0;
-  for (const [i, line] of lines.entries()) {
-    const trimmed = line.trim();
-    if (trimmed === '') continue;
-    let entry: unknown;
-    try {
-      entry = parseJsonSafe(trimmed);
-    } catch {
-      console.error(`⚠ run-log 第 ${i + 1} 行非合法 JSON，已跳过: ${runLogAbs}`);
-      continue;
-    }
+  for (const entry of entries) {
     const e = entry as { note?: string };
     if (typeof e.note === 'string') {
       const matches = e.note.match(O_PATTERN);
@@ -156,13 +146,14 @@ async function main(): Promise<void> {
   }
 
   // 可选输入：--run-log（读失败只警告不 exit；jsonl 容错）
+  // 先 access 探测：readJsonlOrExit 对 ENOENT 会 exit(2)，此处须降级为警告（wm-status 同型模式）
   let operationalFailureCount: number | undefined;
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
-      const runLogRaw = await fs.readFile(runLogAbs, 'utf-8');
-      const lines = runLogRaw.split(/\r?\n/);
-      operationalFailureCount = countOperationalFailures(lines, runLogAbs);
+      await fs.access(runLogAbs);
+      const entries = await readJsonlOrExit(runLogAbs, 'run-log');
+      operationalFailureCount = countOperationalFailures(entries);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       console.error(

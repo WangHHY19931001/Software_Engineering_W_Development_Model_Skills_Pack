@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     try {
       entries.push(parseJsonSafe(line) as RoleDispatchEntry);
     } catch {
-      // 第 29 轮决策：坏行 exit 2 行为保留（不等价 readJsonlOrExit 的 warn+skip），仅消息加类别
+      // 第 29 轮决策：坏行 exit 2（不复用 readJsonlOrExit 的 warn+skip，行为不等价）
       exitWithError({
         category: 'FILE_PARSE',
         message: `第 ${i + 1} 行非合法 JSON`,
