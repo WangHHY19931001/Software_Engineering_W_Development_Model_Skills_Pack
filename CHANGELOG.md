@@ -3,33 +3,6 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [28.0.0] - 2026-07-31
-
-### 第二十九轮 S→R3+V 无条件强制（覆盖所有 S 变体，含 S-fix / emergency-fix）
-
-将 R3 预防性审查从「条件强制（--r3-enabled flag）」升级为「无条件强制」，覆盖所有 S 变体，堵死 S-fix / emergency-fix 跳过 R3+V 的漏洞。详见 SSoT §3.4.25。
-
-#### Added
-- 新建 `scripts/role-dispatch-logic.ts`（纯逻辑层抽离，与 run-log-logic.ts / preventive-review-logic.ts 一致的自包含纯函数模式）
-- 新建 `scripts/__tests__/role-dispatch-logic.test.ts`（9 个测试：R≥3 无条件 / S/V/G 各 ≥1 / phaseSummary 结构 / 多阶段 / 非法条目容错）
-- 反模式 #42 新增（S-fix / emergency-fix 后跳过 R3+V）
-
-#### Changed
-- `check-role-dispatch.ts`：移除 `--r3-enabled` 参数语义（R≥3 无条件校验，CLI 保留 flag 向后兼容视为 no-op）；JSON 输出 `r3Enabled` 字段恒为 `true`（向后兼容历史消费者）；缺失 R<3 即 violations，exitCode=1
-- `check-preventive-review.ts`：always-on 无 flag；新增 `--variant=standard|fix|emergency` 参数（默认 standard）；报告路径校验扩展（standard `<phase>-{dim}.json` / fix `<phase>-fix-{dim}.json` / emergency `<phase>-emergency-{dim}.json`）；`--auto-trigger` 模式从 run-log 推断 variant
-- `preventive-review-logic.ts`：新增 `PreventiveReviewOptions.variant` 参数
-- `run-log-logic.ts` R8 升级：从「R3 启用时，S→V 间须有 3 条 R3 记录」改为「**无条件**」；S 识别条件从 `action=produce` 扩展为 `['produce', 'fix', 'emergency-fix']`；RunLogEntry.action 联合类型新增 `'emergency-fix'`；违规信息含 S 变体标识 `S(${sVariant})→V`
-- `run-log-logic.test.ts`：新增 2 个用例（S-emergency-fix 后无 R3 应失败 / 有 3 条 R3 再 V 应通过）
-- SKILL.md 约束 #12（删除「（R3 启用时）」）/ #17（删除「启用时」+ 新增含 S-fix / emergency-fix）/ #19（删除「R3 启用时须分派 R 角色」改为「无条件」）
-- `subagent-delegation.md`：「R3 预防性审查分派模板」节删除「启用时」/「角色分派完整性校验」表 R 行改为「无条件必须」/「S 兼 F 修复分派模板（返工变体）」节新增 R3+V 前置 /「S 子代理修改既有产物的边界」节紧急修复通道改前置
-- `anti-patterns.md` #33/#34/#35 强化 + #42 新增
-- `phase-1~8-*.md` 统一删除「启用时」措辞
-
-#### 验证
-- vitest 269→286（+9 role-dispatch +2 run-log-logic 扩展 +5 preventive-review 扩展，含其他调整）全通过
-- self-test 213/213 不变全通过
-- TypeScript strict 0 错误
-
 ## [30.1.0] - 2026-08-05
 
 ### 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义
@@ -40,6 +13,7 @@
 - `security-scan.ts`：指纹算法从位置敏感改为内容敏感（baseline v2：sha256(file + ruleId + 违规行内容)，不含行号列号）；新增 `--regenerate` 按当前发现全量重建 baseline；加载时校验 version=2，旧版位置指纹格式报错提示重生成；diffFindings 拆分为纯函数（normalizeSourceLine / computeFindingHash / buildBaselineEntries）+ 注入式源行读取器
 - `.eslintsecurity-baseline.json`：升级为 `{version: 2, algo: "content-line", entries: [...]}`，183 条（同类内容跨行合并，较位置指纹 215 条精简）
 - `check-signature-chain.ts`：R8（产物存在性）仅在解析到含 `.w-model/project.json` 的真实项目根时启用；独立链文件/逻辑夹具自动跳过，与 signature-chain-logic 契约一致（prepush 样本确定性通过）
+- 版本号三处同步为 30.1.0：`package.json` + `skill-metadata.json` + `SKILL.md` frontmatter
 
 #### Added
 - `security-scan.test.ts` 新增 4 用例（行漂移稳定 / 内容敏感 / CRLF 归一化 / 源行不可读），3 既有用例适配新算法（vitest 297→301）
@@ -95,6 +69,33 @@
 
 #### 验证
 - vitest 286 → 297（+11 read-json-or-exit）全通过
+- self-test 213/213 不变全通过
+- TypeScript strict 0 错误
+
+## [28.0.0] - 2026-07-31
+
+### 第二十九轮 S→R3+V 无条件强制（覆盖所有 S 变体，含 S-fix / emergency-fix）
+
+将 R3 预防性审查从「条件强制（--r3-enabled flag）」升级为「无条件强制」，覆盖所有 S 变体，堵死 S-fix / emergency-fix 跳过 R3+V 的漏洞。详见 SSoT §3.4.25。
+
+#### Added
+- 新建 `scripts/role-dispatch-logic.ts`（纯逻辑层抽离，与 run-log-logic.ts / preventive-review-logic.ts 一致的自包含纯函数模式）
+- 新建 `scripts/__tests__/role-dispatch-logic.test.ts`（9 个测试：R≥3 无条件 / S/V/G 各 ≥1 / phaseSummary 结构 / 多阶段 / 非法条目容错）
+- 反模式 #42 新增（S-fix / emergency-fix 后跳过 R3+V）
+
+#### Changed
+- `check-role-dispatch.ts`：移除 `--r3-enabled` 参数语义（R≥3 无条件校验，CLI 保留 flag 向后兼容视为 no-op）；JSON 输出 `r3Enabled` 字段恒为 `true`（向后兼容历史消费者）；缺失 R<3 即 violations，exitCode=1
+- `check-preventive-review.ts`：always-on 无 flag；新增 `--variant=standard|fix|emergency` 参数（默认 standard）；报告路径校验扩展（standard `<phase>-{dim}.json` / fix `<phase>-fix-{dim}.json` / emergency `<phase>-emergency-{dim}.json`）；`--auto-trigger` 模式从 run-log 推断 variant
+- `preventive-review-logic.ts`：新增 `PreventiveReviewOptions.variant` 参数
+- `run-log-logic.ts` R8 升级：从「R3 启用时，S→V 间须有 3 条 R3 记录」改为「**无条件**」；S 识别条件从 `action=produce` 扩展为 `['produce', 'fix', 'emergency-fix']`；RunLogEntry.action 联合类型新增 `'emergency-fix'`；违规信息含 S 变体标识 `S(${sVariant})→V`
+- `run-log-logic.test.ts`：新增 2 个用例（S-emergency-fix 后无 R3 应失败 / 有 3 条 R3 再 V 应通过）
+- SKILL.md 约束 #12（删除「（R3 启用时）」）/ #17（删除「启用时」+ 新增含 S-fix / emergency-fix）/ #19（删除「R3 启用时须分派 R 角色」改为「无条件」）
+- `subagent-delegation.md`：「R3 预防性审查分派模板」节删除「启用时」/「角色分派完整性校验」表 R 行改为「无条件必须」/「S 兼 F 修复分派模板（返工变体）」节新增 R3+V 前置 /「S 子代理修改既有产物的边界」节紧急修复通道改前置
+- `anti-patterns.md` #33/#34/#35 强化 + #42 新增
+- `phase-1~8-*.md` 统一删除「启用时」措辞
+
+#### 验证
+- vitest 269→286（+9 role-dispatch +2 run-log-logic 扩展 +5 preventive-review 扩展，含其他调整）全通过
 - self-test 213/213 不变全通过
 - TypeScript strict 0 错误
 
