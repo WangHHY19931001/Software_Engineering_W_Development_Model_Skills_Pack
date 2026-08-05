@@ -424,3 +424,75 @@ export function checkRunLog(
 
   return { passed: violations.length === 0, violations };
 }
+
+// ==================== R6 契约：gate-log exitCode 提取与路径索引（自 check-run-log.ts 迁入） ====================
+
+/** 各门禁脚本 stdout 摘要标记（含第 31 轮新增 STATUS_JSON / METRICS_JSON） */
+const GATE_JSON_PATTERNS: RegExp[] = [
+  /SCRIPT_JSON\s+(\{.*\})/,
+  /GRAPH_JSON\s+(\{.*\})/,
+  /VERIFIER_JSON\s+(\{.*\})/,
+  /TLA_JSON\s+(\{.*\})/,
+  /BUDGET_JSON\s+(\{.*\})/,
+  /RUN_LOG_JSON\s+(\{.*\})/,
+  /MATURITY_JSON\s+(\{.*\})/,
+  /CHECKPOINT_JSON\s+(\{.*\})/,
+  /GATE_JSON\s+(\{.*\})/,
+  /SIGNATURE_CHAIN_JSON\s+(\{.*\})/,
+  /ARCHIVE_INTEGRITY_JSON\s+(\{.*\})/,
+  /ROLE_DISPATCH_JSON\s+(\{.*\})/,
+  /CODE_TLA_JSON\s+(\{.*\})/,
+  /COVERAGE_JSON\s+(\{.*\})/,
+  /EXEMPTION_JSON\s+(\{.*\})/,
+  /CONTRACT_JSON[:\s]+(\{.*\})/,
+  /OPSX_ARTIFACTS_JSON\s+(\{.*\})/,
+  /OPENSPEC_ARCHIVE_JSON\s+(\{.*\})/,
+  /CODEGRAPH_QUERIES_JSON\s+(\{.*\})/,
+  /BDD_JSON\s+(\{.*\})/,
+  /PREVENTIVE_REVIEW_JSON\s+(\{.*\})/,
+  /ROOTCAUSE_JSON\s+(\{.*\})/,
+  /TLA_BDD_SYNC_JSON\s+(\{.*\})/,
+  /STATUS_JSON\s+(\{.*\})/,
+  /METRICS_JSON\s+(\{.*\})/,
+];
+
+/**
+ * 从 gate-log 内容提取 exitCode（gate-log 是脚本 stdout 存档，含一行 `XXX_JSON {...}` 摘要）。
+ * 纯函数、无 IO。自 check-run-log.ts 迁入（契约不变）。
+ */
+export function extractExitCode(content: string): number | undefined {
+  for (const pattern of GATE_JSON_PATTERNS) {
+    const match = content.match(pattern);
+    if (match && match[1]) {
+      try {
+        const json = JSON.parse(match[1]) as { exitCode?: unknown };
+        if (typeof json.exitCode === 'number') return json.exitCode;
+      } catch {
+        /* 忽略解析失败 */
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 构建 gateLogPath 多索引 key 集：basename / 绝对路径 / 相对 cwd 路径 / 各路径正斜杠归一化。
+ * 纯字符串实现（不 import node:path，遵守 *-logic.ts pure 边界）；兼容 Windows 反斜杠。
+ * 自 check-run-log.ts loadGateLogs 迁入（契约不变：与 path.relative 语义一致的前缀裁剪）。
+ */
+export function buildGateLogKeys(fileAbs: string, cwd: string): string[] {
+  const basename = fileAbs.split(/[\\/]/).filter(Boolean).pop() ?? fileAbs;
+  const keys = new Set<string>([basename, fileAbs]);
+  if (cwd) {
+    const sep = cwd.includes('\\') ? '\\' : '/';
+    const prefix = cwd.endsWith(sep) ? cwd : `${cwd}${sep}`;
+    if (fileAbs.startsWith(prefix)) {
+      keys.add(fileAbs.slice(prefix.length));
+    }
+  }
+  for (const k of [...keys]) {
+    keys.add(k.replace(/\\/g, '/'));
+    keys.add(k.replace(/\//g, '\\'));
+  }
+  return [...keys];
+}

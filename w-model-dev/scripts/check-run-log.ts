@@ -26,7 +26,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { checkRunLog } from './run-log-logic.js';
+import { checkRunLog, extractExitCode, buildGateLogKeys } from './run-log-logic.js';
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 
 // ==================== 参数解析 ====================
@@ -50,50 +50,6 @@ function parseArgs(argv: string[]): ParsedArgs {
 }
 
 // ==================== gate-logs 加载 ====================
-
-/**
- * 从 gate-log 内容中提取 exitCode。
- * gate-log 是脚本 stdout 的存档，其中包含一行 `XXX_JSON {...}` 的 JSON 摘要。
- */
-function extractExitCode(content: string): number | undefined {
-  const patterns = [
-    /SCRIPT_JSON\s+(\{.*\})/,
-    /GRAPH_JSON\s+(\{.*\})/,
-    /VERIFIER_JSON\s+(\{.*\})/,
-    /TLA_JSON\s+(\{.*\})/,
-    /BUDGET_JSON\s+(\{.*\})/,
-    /RUN_LOG_JSON\s+(\{.*\})/,
-    /MATURITY_JSON\s+(\{.*\})/,
-    /CHECKPOINT_JSON\s+(\{.*\})/,
-    /GATE_JSON\s+(\{.*\})/,
-    /SIGNATURE_CHAIN_JSON\s+(\{.*\})/,
-    /ARCHIVE_INTEGRITY_JSON\s+(\{.*\})/,
-    /ROLE_DISPATCH_JSON\s+(\{.*\})/,
-    /CODE_TLA_JSON\s+(\{.*\})/,
-    /COVERAGE_JSON\s+(\{.*\})/,
-    /EXEMPTION_JSON\s+(\{.*\})/,
-    /CONTRACT_JSON[:\s]+(\{.*\})/,
-    /OPSX_ARTIFACTS_JSON\s+(\{.*\})/,
-    /OPENSPEC_ARCHIVE_JSON\s+(\{.*\})/,
-    /CODEGRAPH_QUERIES_JSON\s+(\{.*\})/,
-    /BDD_JSON\s+(\{.*\})/,
-    /PREVENTIVE_REVIEW_JSON\s+(\{.*\})/,
-    /ROOTCAUSE_JSON\s+(\{.*\})/,
-    /TLA_BDD_SYNC_JSON\s+(\{.*\})/,
-  ];
-  for (const pattern of patterns) {
-    const match = content.match(pattern);
-    if (match && match[1]) {
-      try {
-        const json = JSON.parse(match[1]) as { exitCode?: unknown };
-        if (typeof json.exitCode === 'number') return json.exitCode;
-      } catch {
-        /* 忽略解析失败 */
-      }
-    }
-  }
-  return undefined;
-}
 
 /**
  * 加载 gate-logs 目录下全部文件，构建 Map。
@@ -131,12 +87,7 @@ async function loadGateLogs(
       const content = await fs.readFile(fileAbs, 'utf-8');
       const exitCode = extractExitCode(content);
       const data = { exitCode, content };
-      // 多索引：basename + 绝对路径 + 相对 cwd 路径（含正斜杠归一化）
-      const rel = path.relative(process.cwd(), fileAbs);
-      const keys = new Set<string>([file, fileAbs, rel]);
-      for (const k of [...keys]) {
-        keys.add(k.replace(/\\/g, '/'));
-      }
+      const keys = buildGateLogKeys(fileAbs, process.cwd());
       for (const k of keys) {
         map.set(k, data);
       }

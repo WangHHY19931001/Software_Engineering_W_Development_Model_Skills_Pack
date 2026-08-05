@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkRunLog, type RunLogEntry } from '../run-log-logic.js';
+import { checkRunLog, extractExitCode, buildGateLogKeys, type RunLogEntry } from '../run-log-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const samplesDir = path.join(here, '..', 'samples', 'run-log');
@@ -192,5 +192,45 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3（第29轮）', () =
     ];
     const result = checkRunLog(entries, { gateLogs: new Map() });
     expect(result.violations.some(v => /R3 记录校验失败/.test(v))).toBe(false);
+  });
+});
+
+describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
+  it('extractExitCode 从 GATE_JSON 摘要行提取 exitCode', () => {
+    const content = 'some log\nGATE_JSON {"passed":true,"exitCode":0}\nend';
+    expect(extractExitCode(content)).toBe(0);
+  });
+
+  it('extractExitCode 从 VERIFIER_JSON 摘要行提取 exitCode（多标记扫描）', () => {
+    const content = 'VERIFIER_JSON {"passed":false,"exitCode":1}';
+    expect(extractExitCode(content)).toBe(1);
+  });
+
+  it('extractExitCode 无匹配 → undefined', () => {
+    expect(extractExitCode('no json here')).toBeUndefined();
+  });
+
+  it('buildGateLogKeys 返回 basename / 绝对路径 / 相对 cwd / 正斜杠归一化 4 类 key', () => {
+    const fileAbs = 'C:/proj/.w-model/gate-logs/phase5-check-a.log';
+    const keys = buildGateLogKeys(fileAbs, 'C:/proj');
+    expect(keys).toContain('phase5-check-a.log');
+    expect(keys).toContain(fileAbs);
+    expect(keys).toContain('.w-model/gate-logs/phase5-check-a.log');
+    expect(keys).toContain('C:\\proj\\.w-model\\gate-logs\\phase5-check-a.log');
+  });
+
+  it('buildGateLogKeys 含反斜杠路径输入（Windows 兼容归一化）', () => {
+    const fileAbs = 'C:\\proj\\.w-model\\gate-logs\\phase1-check-tla.log';
+    const keys = buildGateLogKeys(fileAbs, 'C:\\proj');
+    expect(keys).toContain('phase1-check-tla.log');
+    expect(keys).toContain('C:/proj/.w-model/gate-logs/phase1-check-tla.log');
+    expect(keys).toContain('.w-model/gate-logs/phase1-check-tla.log');
+  });
+
+  it('buildGateLogKeys cwd 为空 → 退化为 basename + 绝对路径（无相对 key）', () => {
+    const keys = buildGateLogKeys('C:/proj/a.log', '');
+    expect(keys).toContain('a.log');
+    expect(keys).toContain('C:/proj/a.log');
+    expect(keys).not.toContain('proj/a.log');
   });
 });
