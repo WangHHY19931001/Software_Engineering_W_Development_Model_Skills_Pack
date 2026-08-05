@@ -271,6 +271,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 ```
 .
+├── .cursor/skills/               # Cursor 技能包（20 个中文适配技能：brainstorming / chinese-code-review / chinese-commit-conventions / chinese-documentation / chinese-git-workflow / dispatching-parallel-agents / executing-plans / finishing-a-development-branch / mcp-builder / receiving-code-review / requesting-code-review / subagent-driven-development / systematic-debugging / test-driven-development / using-git-worktrees / using-superpowers / verification-before-completion / workflow-runner / writing-plans / writing-skills）
 ├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
@@ -294,6 +295,13 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── skillopt-adoption.md  #   SkillOpt 方法论吸收（bounded edit + validation gate）
 │   │   ├── subagent-persona-matrix.md  # R-lead / V-lead 多角度 persona 选择矩阵（关联 subagent/ 28 个人格文件）
 │   │   ├── command-reference.md  #   /wm 命令参考
+│   │   ├── bdd-guide.md          #   BDD 建模指南（L1-L4 分层 features + 状态机七要素 + BDD↔TLA+ 协作）
+│   │   ├── bdd-review-checklist.md  # BDD 评审检查清单
+│   │   ├── bdd-syntax-reference.md  # BDD/Gherkin 语法参考
+│   │   ├── bdd-patterns-examples.md # BDD 模式与示例
+│   │   ├── signature-chain-guide.md # 角色链式签名指南（check-signature-chain.ts R1-R10）
+│   │   ├── glossary.md           #   术语权威表（15+ 术语 + _Avoid_ 别名治理）
+│   │   ├── dispatch-matrix.md    #   阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵
 │   │   ├── toolbox.md            #   工具箱决策表（I have X → use Z）
 │   │   └── quality-standards.md #   质量标准
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
@@ -326,22 +334,59 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── wm-status-logic.ts  #   状态快照纯逻辑（buildStatusReport / STATUS_TO_PHASE）
 │   │   ├── metrics-report.ts   #   流程度量报告 CLI（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警，只读，退出码 0/2）
 │   │   ├── metrics-report-logic.ts  # 流程度量纯逻辑（computeMetrics）
+│   │   ├── bdd-logic.ts         #   BDD 模型门禁纯逻辑（D1-D7 七维度）
+│   │   ├── check-bdd-model.ts   #   BDD 模型门禁 CLI（`<bdd-manifest.json>`，退出码 0/1/2）
+│   │   ├── coverage-logic.ts    #   需求覆盖分析纯逻辑（C1-C10）
+│   │   ├── check-requirement-coverage.ts  # 需求覆盖分析门禁 CLI（`<coverage.json> --graph= --out-of-scope= --exemptions=`，退出码 0/1/2）
+│   │   ├── exemption-logic.ts   #   豁免审批纯逻辑（E1-E8）
+│   │   ├── check-exemption.ts   #   豁免审批门禁 CLI（`<exemption.json>`，退出码 0/1/2）
+│   │   ├── signature-chain-logic.ts  # 角色链式签名纯逻辑（R1-R10）
+│   │   ├── check-signature-chain.ts  # 签名链门禁 CLI（`<signature-chain.jsonl>`，退出码 0/1/2）
+│   │   ├── archive-integrity-logic.ts # 归档完整性纯逻辑
+│   │   ├── check-archive-integrity.ts # 归档完整性校验 CLI（退出码 0/1/2）
+│   │   ├── preventive-review-logic.ts # R3 预防性审查纯逻辑
+│   │   ├── check-preventive-review.ts # R3 预防性审查门禁 CLI（`<project-dir> --phase=<1-8>`，支持 --auto-trigger）
+│   │   ├── tla-bdd-sync-logic.ts #   TLA+/BDD 同步纯逻辑（转移集 + 状态集 + 不变式等价）
+│   │   ├── check-tla-bdd-sync.ts #   TLA+/BDD 同步校验 CLI（退出码 0/1/2）
+│   │   ├── role-dispatch-logic.ts #  角色分派完整性纯逻辑
+│   │   ├── check-role-dispatch.ts #  角色分派完整性校验 CLI（每阶段 S/V/G ≥1 条，--r3-enabled 时 R ≥3 条）
+│   │   ├── check-state-machine-consistency.ts  # 设计文档↔代码状态机一致性 CLI（退出码 0/1/2）
+│   │   ├── design-contract-logic.ts  # 设计契约一致性纯逻辑（D1-D4）
+│   │   ├── check-design-contract-consistency.ts  # 设计契约一致性 CLI（`<project-dir>`，退出码 0/1/2）
+│   │   ├── ensure-codegraph-opsx.ts  # codegraph + OpenSpec 依赖三层检测与安装（full/quick/light）
+│   │   ├── check-codegraph-queries.ts  # codegraph 查询落盘完整性校验（退出码 0/1/2）
+│   │   ├── check-opsx-artifacts.ts  # opsx 制品 + R3×3 + V 审查产物校验（退出码 0/1/2）
+│   │   ├── check-openspec-archive.ts  # opsx:archive 归档完整性校验（退出码 0/1/2）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
 │   │   ├── lib/cli-error.ts      #   exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
-│   │   ├── __tests__/            #   vitest 单元测试（28 个 .test.ts / 363 条 + README.md coverage 矩阵）
-│   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）
+│   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具（ENOENT/坏行 → exit 2）
+│   │   ├── lib/safe-json.ts      #   JSON 解析原型污染防御（parseJsonSafe，丢弃 __proto__ 键）
+│   │   ├── __tests__/            #   vitest 单元测试（30 个 .test.ts / 377 条 + README.md coverage 矩阵）
+│   │   └── samples/              #   端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
+├── w-model-dev-demo/             # 第 23 轮端到端调测 demo（blog-system-demo，只读测试夹具，不参与 /wm 编排）
+│   ├── src/ + tests/ + docs/ + features/ + tla/   # 8 阶段产物（Express 4 + TS + vitest）
+│   └── package.json              # 独立依赖（cross-env 等），勿与根 devDeps 混用
+├── docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/  # 第 23 轮 8 阶段调测归档（重建 demo 随仓库提交）
+├── docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/  # 第 20 轮 8 阶段调测归档
 ├── docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/  # 第 19.0.1 轮 8 阶段调测归档（7 文件）
 ├── docs/changes/archive/2026-07-26-round15-end-to-end-test/  # 第 15 轮端到端调测归档摘要（9 文件）
 ├── docs/                         # 设计文档（统一存放）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源）
 │   ├── skill-design-document.md                # 设计文档指针（已废弃独立维护）
+│   ├── adoption-guide.md                       # 采用路径指南（Greenfield vs Brownfield）
 │   ├── llm-verifier-integration-design.md      # LLM Verifier 集成设计（指针文档）
+│   ├── tla-plus-modeling-design.md             # TLA+ 层次化建模设计
+│   ├── ingestion-graph-convergence-design.md   # ingestion 与图谱收敛设计
+│   ├── information-flow-validation-design.md   # 信息流校验设计（黑洞/奇迹/死模块）
+│   ├── loop-engineering-adoption-design.md     # Loop 工程采用设计
+│   ├── superpowers/                            # 设计文档与实施计划（specs/ + plans/）
+│   ├── changes/                                # 变更与归档（archive/ 含 round15/19/20/23）
 │   └── INSTALL.md                              # AI Agent 安装指南
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
-│   ├── w-model-dev-test-prompts.json           #   评估测试场景（3 个典型 / 歧义场景）
+│   ├── w-model-dev-test-prompts.json           #   评估测试场景（15 条：典型 / 歧义 / 反误触发 / 正向）
 │   └── w-model-dev-results.tsv                 #   评估历史记录（得分轨迹）
 ├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI，仅触及脚本 / package.json 时触发）
 ├── AGENTS.md                     # AI Agent 仓库导航（与 README 互补，聚焦 Agent 行动事实集）
@@ -354,7 +399,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 > 编排逻辑由 `w-model-dev/SKILL.md` 承载，Agent 读取后用自身工具执行；不内置任何
 > TypeScript 引擎、npm 包或编程式 SDK。`/wm` 命令、状态持久化、RTM 维护均由 Agent
 > 按 `SKILL.md` 与 `references/` 在项目内（`.w-model/*.json`）完成。
-> 历史参考实现（`w-model-dev-demo/`）已于第 17 轮删除，归档摘要见 `docs/changes/archive/2026-07-26-round15-end-to-end-test/`，不参与 `/wm` 命令编排。
+> 当前仓库含 `w-model-dev-demo/`（第 23 轮重建的只读测试夹具，不参与 `/wm` 编排）；历史端到端调测归档见 `docs/changes/archive/`，不参与 `/wm` 命令编排。
 
 ## 相关文档
 
