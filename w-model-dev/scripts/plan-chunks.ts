@@ -25,6 +25,7 @@ import { promises as fs, type Stats } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 interface Chunk {
   id: string;
@@ -195,8 +196,9 @@ async function main(): Promise<void> {
     });
     return;
   }
-  const phase = Number(phaseStr);
-  if (phaseStr === undefined || !Number.isInteger(phase) || phase < 1 || phase > 4) {
+  // 统一 --phase 校验（lib/parse-phase.ts，1-4；--phase=N / --phase N）
+  const phaseParsed = parsePhaseArg(process.argv, { min: 1, max: 4 });
+  if (phaseParsed === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
       message: '--phase 必须为 1-4 整数',
@@ -205,6 +207,7 @@ async function main(): Promise<void> {
     });
     return;
   }
+  const phase = phaseParsed.phase;
   if (nodeTypeStr === undefined || !['REQ', 'SD', 'INTF', 'DD'].includes(nodeTypeStr)) {
     exitWithError({
       category: 'ARG_INVALID',

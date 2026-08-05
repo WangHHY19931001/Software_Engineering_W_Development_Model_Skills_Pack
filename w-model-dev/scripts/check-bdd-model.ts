@@ -32,6 +32,7 @@
 
 import { promises as fs, existsSync } from 'node:fs';
 import * as path from 'node:path';
+import { parsePhaseArg } from './lib/parse-phase.js';
 import {
   checkBddModel,
   parseFeatureHeader,
@@ -52,6 +53,8 @@ import { parseJsonSafe } from './lib/safe-json.js';
 interface ParsedArgs {
   manifestFile: string | undefined;
   phase: number | undefined;
+  /** --phase 原始值（用于显式传了但非法的 ARG_INVALID 消息） */
+  phaseStr: string | undefined;
   tlaManifestFile: string | undefined;
   rtmFile: string | undefined;
   cucumberReportFile: string | undefined;
@@ -65,12 +68,14 @@ function parseArgs(argv: string[]): ParsedArgs {
   const rtmArg = args.find(a => a.startsWith('--rtm='));
   const cucumberArg = args.find(a => a.startsWith('--cucumber-report='));
 
-  const phase = phaseArg ? Number.parseInt(phaseArg.split('=')[1]!, 10) : undefined;
+  // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
+  const phase = phaseArg ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
+  const phaseStr = phaseArg ? phaseArg.split('=')[1] : undefined;
   const tlaManifestFile = tlaArg ? tlaArg.split('=')[1] : undefined;
   const rtmFile = rtmArg ? rtmArg.split('=')[1] : undefined;
   const cucumberReportFile = cucumberArg ? cucumberArg.split('=')[1] : undefined;
 
-  return { manifestFile, phase, tlaManifestFile, rtmFile, cucumberReportFile };
+  return { manifestFile, phase, phaseStr, tlaManifestFile, rtmFile, cucumberReportFile };
 }
 
 // ==================== I/O 辅助 ====================
@@ -215,6 +220,17 @@ async function main(): Promise<number> {
       message: `${path.basename(args.manifestFile)} 结构不符`,
       file: path.resolve(args.manifestFile),
       detail: `manifest schema 校验失败: ${schemaResult.errorMessages.join('; ')}`,
+      exitCode: 2,
+    });
+    return 2;
+  }
+
+  // 显式传了 --phase 但非法（非数字 / 越界）→ 复刻原消息（parseInt 结果，非数字时为 NaN）
+  if (args.phaseStr !== undefined && args.phase === undefined) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: `参数非法 --phase=${Number.parseInt(args.phaseStr, 10)}`,
+      detail: '须为 1-8 整数',
       exitCode: 2,
     });
     return 2;

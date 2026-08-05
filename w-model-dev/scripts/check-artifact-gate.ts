@@ -38,6 +38,7 @@ import { validateBySchema } from './schema-loader.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
+import { parsePhaseArg as parsePhaseArgLib } from './lib/parse-phase.js';
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
@@ -104,9 +105,10 @@ export function checkUatPathMappingContent(content: string): string[] {
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
- * 解析 --phase=N 或 --phase N 参数。
+ * 解析 --phase=N 或 --phase N 参数（lib/parse-phase.ts 统一校验，范围 1-8），
+ * 兼容历史短参数 -p。
  * 返回 undefined 表示未传（默认终检 phase=8，向后兼容）。
- * 非法值（非 1-8）退出码 2。
+ * 非法值（非 1-8）退出码 2（保留原 ARG_INVALID 消息）。
  */
 function parsePhaseArg(argv: string[]): PhaseOption | undefined {
   // B6（round28 G-B）：严格整数校验——字符串全数字 + Number.isInteger，
@@ -117,10 +119,13 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
     if (!Number.isInteger(val) || val < 1 || val > 8) return undefined;
     return val as PhaseOption;
   };
+  // lib 统一解析（--phase=N / --phase N）
+  const res = parsePhaseArgLib(argv, { min: 1, max: 8 });
+  if (res !== undefined) return res.phase as PhaseOption;
+  // 兼容历史短参数 -p（lib 不识别；值合法即采用，非法报错）
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === undefined) continue;
-    if (arg === '--phase' || arg === '-p') {
+    if (arg === '-p') {
       const next = argv[i + 1] ?? '';
       const val = strictPhase(next);
       if (val === undefined) {
@@ -133,18 +138,28 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
       }
       return val;
     }
-    const eqMatch = arg.match(/^--phase=(.+)$/);
+  }
+  // 显式传了 --phase 但非法（lib 返回 undefined）→ 保留原 ARG_INVALID 报错
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--phase') {
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: `参数非法 --phase=${argv[i + 1] ?? ''}`,
+        detail: '须为 1-8 的整数',
+        exitCode: 2,
+      });
+      return undefined;
+    }
+    const eqMatch = arg?.match(/^--phase=(.+)$/);
     if (eqMatch) {
-      const val = strictPhase(eqMatch[1] ?? '');
-      if (val === undefined) {
-        exitWithError({
-          category: 'ARG_INVALID',
-          message: `参数非法 --phase=${eqMatch[1] ?? ''}`,
-          detail: '须为 1-8 的整数',
-          exitCode: 2,
-        });
-      }
-      return val;
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: `参数非法 --phase=${eqMatch[1] ?? ''}`,
+        detail: '须为 1-8 的整数',
+        exitCode: 2,
+      });
+      return undefined;
     }
   }
   return undefined;

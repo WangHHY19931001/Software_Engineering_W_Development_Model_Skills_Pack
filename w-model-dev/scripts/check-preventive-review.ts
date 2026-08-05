@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { checkPreventiveReview, type PreventiveReview, type PreventiveReviewOptions } from './preventive-review-logic.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 const PREVENTIVE_REVIEW_JSON = {
   script: 'check-preventive-review.ts',
@@ -39,7 +40,8 @@ async function main(): Promise<void> {
   const autoTrigger = args.includes('--auto-trigger');
   const runLogArg = args.find(a => a.startsWith('--run-log='));
 
-  let phase: number | undefined = phaseArg ? parseInt(phaseArg.split('=')[1]!, 10) : undefined;
+  // 统一 --phase 校验（lib/parse-phase.ts，1-8）；非法/缺失由下方 !phase 检查统一拦截
+  let phase: number | undefined = phaseArg ? parsePhaseArg(process.argv, { min: 1, max: 8 })?.phase : undefined;
   let variant: PreventiveReviewOptions['variant'] = 'standard';
 
   // 显式 --variant= 参数解析

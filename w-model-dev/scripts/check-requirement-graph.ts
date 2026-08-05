@@ -33,6 +33,7 @@ import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 async function main(): Promise<void> {
   const file = process.argv[2];
@@ -46,32 +47,22 @@ async function main(): Promise<void> {
     return;
   }
 
-  // 解析 --phase
+  // 解析 --phase（lib/parse-phase.ts 统一校验：--phase=N / --phase N，范围 1-4）
   let phase: number | undefined;
   const phaseArg = process.argv.slice(3).find(a => a.startsWith('--phase='));
-  if (phaseArg) {
+  const phaseParsed = parsePhaseArg(process.argv, { min: 1, max: 4 });
+  if (phaseParsed !== undefined) {
+    phase = phaseParsed.phase;
+  } else if (phaseArg !== undefined) {
+    // 显式传了 --phase 但非法（非数字 / 越界）→ 保留原 ARG_INVALID 消息与退出码
     const phaseStr = phaseArg.split('=')[1];
-    if (phaseStr !== undefined) {
-      if (!/^\d+$/.test(phaseStr)) {
-        exitWithError({
-          category: 'ARG_INVALID',
-          message: `参数非法 --phase=${phaseStr}`,
-          detail: '须为 1-4 的整数',
-          exitCode: 2,
-        });
-        return;
-      }
-      phase = Number.parseInt(phaseStr, 10);
-    }
-    if (phase === undefined || ![1, 2, 3, 4].includes(phase)) {
-      exitWithError({
-        category: 'ARG_INVALID',
-        message: `参数非法 --phase=${phase}`,
-        detail: '须为 1-4 的整数',
-        exitCode: 2,
-      });
-      return;
-    }
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: `参数非法 --phase=${phaseStr ?? ''}`,
+      detail: '须为 1-4 的整数',
+      exitCode: 2,
+    });
+    return;
   }
 
   // 解析 --rtm（可选，用于 R6 cross-cuts 源类型校验）

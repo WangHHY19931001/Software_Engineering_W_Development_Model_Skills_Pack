@@ -28,6 +28,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkBudget, type BudgetConfig } from './budget-logic.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
@@ -53,8 +54,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   const runLogFile = runLogArg ? runLogArg.split('=')[1] : undefined;
   let phase: number | undefined;
   if (phaseArg) {
-    const phaseStr = phaseArg.split('=')[1];
-    if (phaseStr !== undefined) phase = Number.parseInt(phaseStr, 10);
+    // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
+    phase = parsePhaseArg(argv, { min: 1, max: 8 })?.phase;
   }
 
   return { budgetFile, projectFile, runLogFile, phase };
@@ -111,12 +112,15 @@ function countReworks(
 async function main(): Promise<void> {
   const { budgetFile, projectFile, runLogFile, phase } = parseArgs(process.argv);
 
-  // --phase 合法性校验：NaN / 越界均 exit(2)，避免 countReworks 中
+  // --phase 合法性校验：显式传了但非法（非数字 / NaN / 越界）→ exit(2)，避免 countReworks 中
   // `NaN !== NaN` 恒为 true 导致所有 run-log 记录被过滤、reworkCount 静默归零
-  if (phase !== undefined && (Number.isNaN(phase) || phase < 1 || phase > 8)) {
+  const phaseArg = process.argv.find(a => a.startsWith('--phase='));
+  if (phaseArg !== undefined && phase === undefined) {
+    // 复刻原消息值（parseInt 结果，非数字时为 NaN）
+    const phaseVal = Number.parseInt(phaseArg.split('=')[1] ?? '', 10);
     exitWithError({
       category: 'ARG_INVALID',
-      message: `参数非法 --phase=${phase}`,
+      message: `参数非法 --phase=${phaseVal}`,
       detail: '须为 1-8 的整数',
       exitCode: 2,
     });

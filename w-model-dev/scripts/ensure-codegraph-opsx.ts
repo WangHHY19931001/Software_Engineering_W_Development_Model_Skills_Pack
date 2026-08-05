@@ -24,6 +24,7 @@ import { existsSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 type Mode = 'full' | 'quick' | 'light';
 
@@ -215,8 +216,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const phase = Number(phaseStr);
-  if (Number.isNaN(phase) || phase < 5 || phase > 8) {
+  // 统一 --phase 校验（lib/parse-phase.ts，5-8）：getArg 保留 argv 循环外壳，仅校验逻辑收敛
+  const phaseParsed = parsePhaseArg([`--phase=${phaseStr}`], { min: 5, max: 8 });
+  if (phaseParsed === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
       message: 'phase 必须为 5-8 整数',
@@ -225,6 +227,7 @@ async function main(): Promise<void> {
     });
     return;
   }
+  const phase = phaseParsed.phase;
 
   if (!['full', 'quick', 'light'].includes(modeStr)) {
     exitWithError({

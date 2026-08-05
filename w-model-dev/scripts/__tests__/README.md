@@ -23,6 +23,7 @@
 | wm-status.test.ts | WmStatus CLI | 子进程：未初始化 exit 0 / project 非法·非对象·数组 exit 2 / rtm 非法 exit 2 / rtm·run-log 缺失降级 / run-log 坏行跳过 / status 非字符串归一化 / --json 结构 / 人类可读 6 项 |
 | metrics-report.test.ts | Metrics CLI | 子进程：run-log 缺失 exit 2 / --phase 非法值系列 exit 2 / budget 缺失(null)·非法 exit 2 / --json·--out 组合 stdout 纯净 / 空 run-log 预警 / 坏行跳过 / --phase 过滤 / 人类可读 9 节 |
 | cli-error.test.ts | CliError | formatCliError 三类模板（file/detail/均无）/ printError 走 stderr / printErrorJson 走 stdout 含 exitCode / exitWithError 设置 exitCode(2) 且 stdout 先 flush |
+| parse-phase.test.ts | PhaseArg | parsePhaseArg --phase=N / --phase N / 位置参数三形态 / 非法值（abc·0·9·-1·空串·无值）→ undefined / min·max 自定义 / 无 --phase → undefined |
 
 ## pure/IO 函数边界（借鉴点 5）
 

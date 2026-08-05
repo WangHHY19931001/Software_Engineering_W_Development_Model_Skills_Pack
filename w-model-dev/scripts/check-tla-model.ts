@@ -41,6 +41,7 @@ import {
 import { readJsonOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { printGateReport } from './lib/gate-report.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 // ==================== 参数解析 ====================
 
@@ -64,8 +65,15 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   let phase: number | undefined;
   if (phaseArg) {
-    const phaseStr = phaseArg.split('=')[1];
-    phase = phaseStr !== undefined ? Number.parseInt(phaseStr, 10) : undefined;
+    // 统一 --phase 校验（lib/parse-phase.ts，1-8）；非法时回退原 parseInt 语义，
+    // 由 main 的 [1-8] 检查统一拦截（行为等价：非法值原样走 '无法确定 phase' 退出）
+    const parsed = parsePhaseArg(argv, { min: 1, max: 8 });
+    if (parsed !== undefined) {
+      phase = parsed.phase;
+    } else {
+      const phaseStr = phaseArg.split('=')[1];
+      phase = phaseStr !== undefined ? Number.parseInt(phaseStr, 10) : undefined;
+    }
   }
 
   let specId: string | undefined;

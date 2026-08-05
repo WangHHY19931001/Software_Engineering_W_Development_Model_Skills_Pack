@@ -35,6 +35,7 @@ import { checkSignatureChain, type SignatureChainEntry } from './signature-chain
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { printGateReport } from './lib/gate-report.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 // ==================== 参数解析 ====================
 
@@ -52,10 +53,11 @@ function parseArgs(argv: string[]): ParsedArgs {
   const chainFile = chainFromFlag ?? chainFromPos;
   const phaseArg = args.find(a => a.startsWith('--phase='));
   const stageArg = args.find(a => a.startsWith('--stage='));
+  // 统一 --phase 校验（lib/parse-phase.ts，范围 1-8；行为收紧：原无范围校验，
+  // 非法值在 main 中统一 ARG_INVALID 拒绝，与 check-artifact-gate 一致）
   let phase: number | undefined;
   if (phaseArg) {
-    const phaseStr = phaseArg.split('=')[1];
-    phase = phaseStr !== undefined ? Number.parseInt(phaseStr, 10) : undefined;
+    phase = parsePhaseArg(argv, { min: 1, max: 8 })?.phase;
   }
   let stage: ParsedArgs['stage'];
   if (stageArg) {
@@ -77,6 +79,19 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       message: '参数缺失 <signature-chain.jsonl>',
       detail: '用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  // 行为收紧（spec §3.2）：显式传了 --phase 但非法（非 1-8）→ ARG_INVALID。
+  // 原实现无范围校验（parseInt 后直接传给 logic，非法值静默降级为全量校验）。
+  const phaseArg = process.argv.find(a => a.startsWith('--phase='));
+  if (phaseArg !== undefined && phase === undefined) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: `参数非法 --phase=${phaseArg.split('=')[1] ?? ''}`,
+      detail: '须为 1-8 的整数',
       exitCode: 2,
     });
     return;

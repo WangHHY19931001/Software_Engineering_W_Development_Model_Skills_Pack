@@ -29,6 +29,7 @@ import { computeMetrics, type BudgetLike, type MetricsReport, type RunLogEntryLi
 import { readJsonlOrExit } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 interface ParsedArgs {
   projectDir: string;
@@ -99,21 +100,18 @@ function printHuman(r: MetricsReport, runLogFile: string): void {
 async function main(): Promise<void> {
   const { projectDir, from, to, phaseStr, json, out } = parseArgs(process.argv);
 
-  // --phase 校验（NaN / 越界 / 非整数均 exit 2）
-  let phase: number | undefined;
-  if (phaseStr !== undefined) {
-    const n = Number(phaseStr);
-    if (!Number.isInteger(n) || n < 1 || n > 8) {
-      exitWithError({
-        category: 'ARG_INVALID',
-        message: '--phase 参数非法',
-        detail: `收到 ${phaseStr}（须为 1-8 整数）`,
-        exitCode: 2,
-      });
-      return;
-    }
-    phase = n;
+  // --phase 校验（统一 lib/parse-phase.ts：非数字 / 非整数 / 越界均 exit 2）
+  const phaseParsed = phaseStr !== undefined ? parsePhaseArg(process.argv, { min: 1, max: 8 }) : undefined;
+  if (phaseStr !== undefined && phaseParsed === undefined) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '--phase 参数非法',
+      detail: `收到 ${phaseStr}（须为 1-8 整数）`,
+      exitCode: 2,
+    });
+    return;
   }
+  const phase = phaseParsed?.phase;
 
   const wmodelDir = path.join(projectDir, '.w-model');
   const runLogFile = path.join(wmodelDir, 'run-log.jsonl');

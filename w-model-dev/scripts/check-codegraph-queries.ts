@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
 import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
+import { parsePhaseArg } from './lib/parse-phase.js';
 
 interface CodegraphQuery {
   querySymbol: string;
@@ -117,10 +118,11 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const file = args.find(a => !a.startsWith('--'));
-  const phaseIdx = args.indexOf('--phase');
-  const phase = phaseIdx >= 0 ? parseInt(args[phaseIdx + 1]!, 10) : NaN;
+  // 统一 --phase 校验（lib/parse-phase.ts，5-8；支持 --phase N 与 --phase=N）
+  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some(a => a.startsWith('--phase='));
+  const phaseParsed = parsePhaseArg(process.argv, { min: 5, max: 8 });
 
-  if (!file || Number.isNaN(phase)) {
+  if (!file || !hasPhaseFlag) {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <project-root> 或 --phase',
@@ -138,15 +140,28 @@ async function main(): Promise<void> {
     });
     return;
   }
-  if (phase < 5 || phase > 8) {
+  if (phaseParsed === undefined) {
+    // 复刻原分支语义：空格形态数字越界 → '参数非法 --phase=N'；非数字 / 缺值 / 等号形态 → '参数缺失'
+    const phaseIdx = args.indexOf('--phase');
+    const phaseRaw = phaseIdx >= 0 ? args[phaseIdx + 1] : undefined;
+    if (phaseRaw !== undefined && /^\d+$/.test(phaseRaw)) {
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: `参数非法 --phase=${phaseRaw}`,
+        detail: '须为 5-8 的整数',
+        exitCode: 2,
+      });
+      return;
+    }
     exitWithError({
       category: 'ARG_INVALID',
-      message: `参数非法 --phase=${phase}`,
-      detail: '须为 5-8 的整数',
+      message: '参数缺失 <project-root> 或 --phase',
+      detail: '用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>',
       exitCode: 2,
     });
     return;
   }
+  const phase = phaseParsed.phase;
 
   const abs = path.resolve(file);
   const result = checkCodegraphQueries(abs, phase);
