@@ -28,7 +28,7 @@
   - Node.js ≥20
   - [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
-    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
+    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 15 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
     - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` — 安全扫描基线（`npm run lint:security` 时使用，devDep）
     - `@cucumber/cucumber` + `@cucumber/messages` — BDD 建模（Cucumber.js v11 + Gherkin 解析），由 `w-model-dev/scripts/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（devDep，运行 cucumber scenarios 时需要；纯 features 静态校验不需要）
 
@@ -219,7 +219,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 
 **Q：为什么有 `package.json` + `npm install`？**
 Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/*.ts` 校验脚本：
-- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
+- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 15 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免）
 - **runtime**：`tsx`（运行 ESM TypeScript）
 

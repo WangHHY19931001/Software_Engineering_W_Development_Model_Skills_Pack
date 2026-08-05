@@ -72,7 +72,7 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 
 技能包内的校验脚本（`w-model-dev/scripts/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本依赖 [tsx](https://tsx.is/) + 少量 devDependencies（在仓库根目录 `npm install` 一次）：
 
-- **runtime devDep**：`ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import
+- **runtime devDep**：`ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `schema-loader.ts` 在 15 个 `*-logic.ts` 顶部自动 import
 - **devDep（仅安全扫描用）**：`eslint-plugin-security` + `@typescript-eslint/*` — 由 `security-scan.ts` 调用
 - **runtime**：`tsx`（运行 ESM TypeScript）
 
@@ -327,7 +327,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── check-checkpoint.ts   #   Checkpoint 门禁 CLI（`<run-log.jsonl> [--checkpoint-log=]`，退出码 0/1/2）
 │   │   ├── root-cause-logic.ts   #   RootCauseReport 校验纯逻辑（R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度）
 │   │   ├── check-rootcause-report.ts  # RootCauseReport 校验 CLI（`<report.json>`，退出码 0/1/2）
-│   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 10 个 *-logic.ts 顶部自动 import）
+│   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 15 个 *-logic.ts 顶部自动 import）
 │   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
 │   │   ├── wm-status.ts        #   状态快照 CLI（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议，只读，退出码 0/2）
