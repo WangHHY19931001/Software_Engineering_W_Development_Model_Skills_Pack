@@ -215,7 +215,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const phase = parseInt(phaseStr, 10);
+  const phase = Number(phaseStr);
   if (Number.isNaN(phase) || phase < 5 || phase > 8) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -238,14 +238,17 @@ async function main(): Promise<void> {
 
   const absRoot = path.resolve(projectRoot);
   // 项目根不存在 → FILE_NOT_FOUND（exit 2 输入错误守卫；非 opsx/openspec 那类 violation 语义）
-  if (!existsSync(absRoot) || !statSync(absRoot).isDirectory()) {
-    exitWithError({
-      category: 'FILE_NOT_FOUND',
-      message: '项目根路径不存在或不是目录',
-      file: absRoot,
-      exitCode: 2,
-    });
-    return;
+  // light 模式仅做 L1 CLI 检查、不触碰 projectRoot，跳过项目根存在性检查（保持旧行为）
+  if (modeStr !== 'light') {
+    if (!existsSync(absRoot) || !statSync(absRoot).isDirectory()) {
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        message: '项目根路径不存在或不是目录',
+        file: absRoot,
+        exitCode: 2,
+      });
+      return;
+    }
   }
   const results = ensureDeps(phase, absRoot, modeStr);
   const hasCheckpoint = results.some(r => r.status === 'checkpoint');

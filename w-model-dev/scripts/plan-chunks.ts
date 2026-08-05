@@ -248,8 +248,8 @@ async function main(): Promise<void> {
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     exitWithError({
-      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
-      message: e.code === 'ENOENT' ? '路径不存在' : err instanceof SyntaxError ? '文件解析失败' : '文件读取失败',
+      category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+      message: e.code === 'ENOENT' ? '路径不存在' : '文件读取失败',
       file: abs,
       detail: e.code ?? '未知错误',
       exitCode: 2,
