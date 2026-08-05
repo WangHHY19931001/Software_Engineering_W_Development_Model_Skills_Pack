@@ -64,7 +64,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / tla-bdd-sync / role-dispatch / state-machine）
 │   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
 │   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
-│   ├── security-scan.ts         # eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
+│   ├── security-scan.ts         # eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
 │   ├── self-test.ts             # 回归基线（213 条样本）
 │   └── __tests__/               # vitest 单元测试（21 个 .test.ts + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
@@ -176,7 +176,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
 | JSON Schema 文件（draft-07，19 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/schema-loader.ts](../w-model-dev/scripts/schema-loader.ts) |
-| 安全扫描脚本（baseline 指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
+| 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
 | 回归基线脚本（213 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
@@ -212,7 +212,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 **Q：为什么有 `package.json` + `npm install`？**
 Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/*.ts` 校验脚本：
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 10 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
-- **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` 指纹豁免）
+- **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免）
 - **runtime**：`tsx`（运行 ESM TypeScript）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。

@@ -88,7 +88,7 @@ npm run check:gate -- <project-dir>
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
 | 5 | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本） | 1 |
-| 6 | `npx tsx w-model-dev/scripts/security-scan.ts`（安全扫描 + baseline 比对） | 0 |
+| 6 | `npx tsx w-model-dev/scripts/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成） | 0 |
 | 7 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本） | 0 |
 | 8 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本） | 2 |
 | 9 | `npm run check:coverage -- w-model-dev/scripts/samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |

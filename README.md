@@ -311,10 +311,10 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── root-cause-logic.ts   #   RootCauseReport 校验纯逻辑（R1-R10 Schema 完整性/根因链/可证伪/修复建议/预防/上游缺陷/质量等级/报告 ID/多角度/reality-checker 置信度）
 │   │   ├── check-rootcause-report.ts  # RootCauseReport 校验 CLI（`<report.json>`，退出码 0/1/2）
 │   │   ├── schema-loader.ts      #   ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具（被 10 个 *-logic.ts 顶部自动 import）
-│   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + .eslintsecurity-baseline.json 指纹豁免
+│   │   ├── security-scan.ts      #   eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
 │   │   ├── plan-chunks.ts        #   ingestion 分块策略（混合：文件/目录+超限拆分）
 │   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
-│   │   ├── __tests__/            #   vitest 单元测试（23 个 .test.ts / 297 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            #   vitest 单元测试（23 个 .test.ts / 301 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + tla-e2e/ + code-tla/ + budget/ + run-log/ + maturity/ + checkpoint/ + rootcause/ + bdd/）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）

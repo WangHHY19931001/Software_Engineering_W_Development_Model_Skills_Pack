@@ -20,7 +20,7 @@
 | run-log.jsonl（含 CHECKPOINT） | 决策内容具体性检查 | `npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=]` |
 | RootCauseReport.json | 根因报告 schema 校验 | `npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>` |
 | 任意 .w-model/*.json | schema 强约束校验（被 logic 层自动调用，无需手动） | `schema-loader.ts` 内置 |
-| scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/security-scan.ts` |
+| scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/security-scan.ts`（支持 --regenerate 重生成 baseline） |
 | scripts 改动 | 回归基线 | `npm run self-test` |
 | ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/plan-chunks.ts`（O 只读 stdout） |
 

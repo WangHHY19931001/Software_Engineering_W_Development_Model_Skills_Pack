@@ -30,6 +30,27 @@
 - self-test 213/213 不变全通过
 - TypeScript strict 0 错误
 
+## [30.1.0] - 2026-08-05
+
+### 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义
+
+修复位置指纹（file:line:column）因行号漂移导致 baseline 陈旧的问题：指纹改为内容敏感（file + ruleId + 归一化违规行内容），行号漂移免疫，代码模式修改仍触发复审。详见 SSoT §3.4.28。
+
+#### Changed
+- `security-scan.ts`：指纹算法从位置敏感改为内容敏感（baseline v2：sha256(file + ruleId + 违规行内容)，不含行号列号）；新增 `--regenerate` 按当前发现全量重建 baseline；加载时校验 version=2，旧版位置指纹格式报错提示重生成；diffFindings 拆分为纯函数（normalizeSourceLine / computeFindingHash / buildBaselineEntries）+ 注入式源行读取器
+- `.eslintsecurity-baseline.json`：升级为 `{version: 2, algo: "content-line", entries: [...]}`，183 条（同类内容跨行合并，较位置指纹 215 条精简）
+- `check-signature-chain.ts`：R8（产物存在性）仅在解析到含 `.w-model/project.json` 的真实项目根时启用；独立链文件/逻辑夹具自动跳过，与 signature-chain-logic 契约一致（prepush 样本确定性通过）
+
+#### Added
+- `security-scan.test.ts` 新增 4 用例（行漂移稳定 / 内容敏感 / CRLF 归一化 / 源行不可读），3 既有用例适配新算法（vitest 297→301）
+
+#### 验证
+- self-test 213/213 不变全通过
+- vitest 301/301（23 文件）全通过
+- `npm run lint:security` exit 0（0 新增）
+- prepush 12 项全通过
+- TypeScript strict 0 错误
+
 ## [30.0.0] - 2026-08-05
 
 ### 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁

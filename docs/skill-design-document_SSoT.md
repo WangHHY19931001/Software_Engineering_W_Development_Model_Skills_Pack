@@ -928,6 +928,21 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 > 第三十一轮相比第三十轮（§3.4.26 CLI 样板抽取）：吸收外部评审 14 条建议中经头脑风暴选出的低风险批三项（#13 schema 自描述 + #8 敏感信息脱敏 + #7 npm audit 门禁）。19 份 `schemas/*.schema.json` 全量字段补充 `description`（用途 + 期望值，仅注释性关键字，校验行为不变）；`references/operational-recovery.md`「JSON 文件写入工具选择」节新增敏感信息禁令 + 反模式 #43（状态文件/日志不得写入硬编码凭据，敏感配置统一环境变量注入）；`.githooks/pre-push` 新增检查 #12 npm audit（warn-only + 离线容错），11 项 → 12 项。self-test 213/vitest 297 基线不变，prepush 12 项通过，TypeScript strict 0 错误。版本号三处一致 30.0.0。
 
+#### 3.4.28 第 30.1 轮：security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义（2026-08-05，[30.1.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | prepush security-scan baseline 陈旧（位置指纹因行号漂移失配）+ check-signature-chain 样本 R8 误报 |
+| 脚本改动 | `security-scan.ts` 指纹算法内容敏感化（baseline v2）+ `--regenerate` + 版本校验；`check-signature-chain.ts` R8 项目根语义（.w-model/project.json） |
+| 基线 | `.eslintsecurity-baseline.json` v2 格式 183 条（内容指纹，行号漂移免疫） |
+| 测试 | security-scan.test.ts 3→7（新增行漂移稳定/内容敏感/归一化/源行不可读），vitest 297→301 |
+| 顶层文档 | SSoT §3.4.28 + §10A 追溯表 + AGENTS.md + CHANGELOG.md [30.1.0] + README/INSTALL security-scan 描述同步 |
+| package.json | version `30.0.0` → `30.1.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| self-test | 基线 213 不变全通过 |
+| vitest | 301/301（23 文件）全通过 |
+| prepush | 12 项全通过（security-scan exit 0 + check-signature-chain exit 0） |
+| TypeScript strict | 0 错误 |
+
 ---
 
 ## 4. 技能工作流程
@@ -2467,7 +2482,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | R5 | O checkpoint 签名 signer 为用户 ID（非 O 角色） | exitCode=1，标注代签（O4 命中） |
 | R6 | sigHash 重算一致（防篡改） | exitCode=1，标注篡改签名 |
 | R7 | 各角色 sourceSigIds 均存在于签名链中 | exitCode=1，标注悬空来源 |
-| R8 | 各角色 sourceArtifacts 路径存在于磁盘 | exitCode=1，标注缺失产物 |
+| R8 | 各角色 sourceArtifacts 路径存在于磁盘（仅当解析到含 .w-model/project.json 的真实项目根时启用；独立链文件/夹具自动跳过） | exitCode=1，标注缺失产物 |
 | R9 | 各角色来源符合"强制来源/禁止来源"矩阵 | exitCode=1，标注越权消费 |
 | R10 | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录 | exitCode=1，标注绕过门禁 |
 
@@ -2524,6 +2539,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
 | §3.4.26 | 第三十轮 CLI 样板抽取 + 分派总览矩阵 | `scripts/lib/read-json-or-exit.ts` + `scripts/__tests__/read-json-or-exit.test.ts` + `references/dispatch-matrix.md` + 13 个 check-*.ts 重构 | 完整（self-test 213/213、vitest 297、tsc 0 错误） |
 | §3.4.27 | 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁 | `schemas/*.schema.json`（19 份，全量字段补 description）+ `references/operational-recovery.md`（敏感信息禁令）+ `references/anti-patterns.md` #43 + `.githooks/pre-push`（检查 #12 npm audit warn-only）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 30.0.0） | 完整（self-test 213/213、vitest 297、prepush 12 项、tsc 0 错误） |
+| §3.4.28 | 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义 | `scripts/security-scan.ts` + `scripts/__tests__/security-scan.test.ts` + `.eslintsecurity-baseline.json` + `scripts/check-signature-chain.ts` | 完整（self-test 213/213、vitest 301、prepush 12 项、tsc 0 错误） |
 
 ---
 
