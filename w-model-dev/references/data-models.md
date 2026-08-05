@@ -94,11 +94,11 @@ DESIGN 1──* TEST_CASE        (设计生成系统/集成/单元测试)
 ## 图谱节点与边类型（GraphNode / EdgeType）
 
 > ingestion 子流程图谱模型的节点与边类型。完整节点语义、系统层级树与多层图谱（7 层）校验规则见 [graph-guide.md](graph-guide.md)；本节仅定义数据模型层 schema 与横切边源节点标识 marker。
-> 权威实现（待同步）：[`scripts/graph-logic.ts`](../scripts/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。**注意**：当前 graph-logic.ts 尚未包含本节新增的 `governs` / `derives` 边类型与 `governance` / `derivationProduct` marker（且仍兼容 `consumes`），Task B3 将同步移除 `consumes` 并落地新边类型与 marker；B3 落地前以本节 schema 为准。
+> 权威实现：[`scripts/graph-logic.ts`](../scripts/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。`governs` / `derives` 边类型与 `governance` / `derivationProduct` marker 均已落地；`consumes` 兼容已移除（D21）。
 
 ### 横切边源节点 marker（GraphNode 扩展）
 
-`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/graph-logic.ts)（B3 同步前不含下方 marker 字段）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 新增两个可选布尔 marker 字段（B3 前以本节定义为 schema 权威）：
+`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/graph-logic.ts)（含下方两个 marker 字段，已落地）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 含两个可选布尔 marker 字段（`governance` / `derivationProduct`，以 graph-logic.ts 为 schema 权威）：
 
 ```typescript
 // GraphNode 扩展字段（叠加于 graph-logic.ts 现有 GraphNode 之上）
@@ -110,9 +110,9 @@ interface GraphNodeMarkers {
 }
 ```
 
-> 注：上述两个 marker 字段为 **flat 可选字段直接叠加于 `GraphNode`**（非嵌套 `markers` 对象）。B3 实现时写 `node.governance === true` / `node.derivationProduct === true`，而非 `node.markers.governance`。`GraphNodeMarkers` 仅为本文档描述 marker 集合，不引入运行时嵌套层级。
+> 注：上述两个 marker 字段为 **flat 可选字段直接叠加于 `GraphNode`**（非嵌套 `markers` 对象）。实现为 `node.governance === true` / `node.derivationProduct === true`，而非 `node.markers.governance`。`GraphNodeMarkers` 仅为本文档描述 marker 集合，不引入运行时嵌套层级。
 
-**marker 约定**（供 `graph-logic.ts` 实现 `isGovernanceSubsystem(node)` / `isDerivationProduct(node)` 校验；B3 待实现）：
+**marker 约定**（`graph-logic.ts` 已实现 `governs` / `derives` 边源节点 marker 校验）：
 
 - `governance === true`：该节点为治理类子系统。仅此类节点允许作为 `governs` 边的 `from`。
 - `derivationProduct === true`：该节点为派生规格节点。仅此类节点允许作为 `derives` 边的 `from`。
@@ -141,7 +141,7 @@ export type EdgeType =
 | `collaborates-with` | 任意已登记节点（须存在） | 任意已登记节点（须存在） | 不依附 |
 | `derives` | `derivationProduct === true`（派生规格节点） | 派生产物且存在 | 不依附 |
 
-> `consumes` 边类型已废弃（D21）：信息流层统一用 `produces`，双向语义由 `{from, to}` 表达。**当前 `graph-logic.ts` 仍兼容 `consumes`**（视为合法信息流边，B3 待同步移除）；B3 移除 `consumes` 兼容后，历史 `graph.json` 中残留的 `consumes` 边将由 `check-requirement-graph.ts` 报为非法边类型。
+> `consumes` 边类型已废弃（D21）：信息流层统一用 `produces`，双向语义由 `{from, to}` 表达。`graph-logic.ts` 已移除 `consumes` 兼容；历史 `graph.json` 中残留的 `consumes` 边将由 `check-requirement-graph.ts` 报为非法边类型。
 
 ## 与 RTM 的映射
 
@@ -819,7 +819,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（13 份）
+### Schema 清单（19 份）
 
 | Schema 名（注册键） | 文件 | 目标类型 | 关键约束 | 对应 logic.ts |
 | --- | --- | --- | --- | --- |
@@ -830,12 +830,18 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `code-tla-manifest` | `code-tla-manifest.schema.json` | CodeTlaConsistencyInput | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description） | code-tla-logic.ts |
 | `budget` | `budget.schema.json` | BudgetConfig | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1] | budget-logic.ts |
 | `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（15 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
-| `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | checkpoint-logic.ts |
+| `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | （暂未集成到 logic.ts validateBySchema，仅 self-test SCHEMA_CASES 覆盖） |
 | `event-ingress` | `event-ingress.schema.json` | `EventIngressEntry` | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （暂未集成到 logic.ts，仅 self-test 覆盖） |
 | `maturity` | `maturity.schema.json` | MaturityConfig | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格 | maturity-logic.ts |
 | `project` | `project.schema.json` | `Project` | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格 | （暂未集成到 logic.ts，仅 self-test 覆盖） |
 | `hill-climbing-report` | `hill-climbing-report.schema.json` | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required | （暂未集成到 logic.ts，仅 self-test 覆盖） |
 | `rootcause-report` | `rootcause-report.schema.json` | RootCauseReport | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5 | root-cause-logic.ts |
+| `bdd-manifest` | `bdd-manifest.schema.json` | BddManifest | additionalProperties:false；features 嵌套严格；scenario 路径与 RTM 映射 | bdd-logic.ts（check-bdd-model.ts 亦调用） |
+| `coverage` | `coverage.schema.json` | CoverageAnalysis | additionalProperties:false；4 张覆盖矩阵（stakeholder/scenario/requirementType/crossCuts）+ coveragePercent [0,100] | coverage-logic.ts |
+| `design-contract` | `design-contract.schema.json` | DesignContractInput | additionalProperties:false；routes/assertions 契约字段 | design-contract-logic.ts |
+| `exemption` | `exemption.schema.json` | ExemptionRequest | additionalProperties:false；四阶段审批字段（justification/evidence/review/verification/humanDecision） | exemption-logic.ts |
+| `preventive-review` | `preventive-review.schema.json` | PreventiveReview | additionalProperties:false；dimension enum（completeness/reliability/security） | preventive-review-logic.ts |
+| `signature-chain` | `signature-chain.schema.json` | SignatureChainEntry | additionalProperties:false；inputProvenance 来源证明；actorRole enum | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用） |
 
 ### 设计原则
 
@@ -870,7 +876,7 @@ export function checkXxx(input: unknown): XxxResult {
 
 ### 测试基线
 
-- `self-test.ts` SCHEMA_CASES：13 份 schema 各 1 条用例（3 verifier-output 基线 + 12 Task 3 新增），共 15 条。
+- `self-test.ts` SCHEMA_CASES：14 个 schema 名共 16 条用例（3 verifier-output 基线 + 13 其他各 1 条：budget / checkpoint-log / code-tla-manifest / event-ingress / graph / hill-climbing-report / maturity / project / rootcause-report / rtm / run-log / tla-manifest / coverage）。
 - `__tests__/schema-validation.test.ts`：5 条 validateBySchema 单元测试 + 4 条 checkVerifierOutput 集成测试。
 - self-test 基线：99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
 
