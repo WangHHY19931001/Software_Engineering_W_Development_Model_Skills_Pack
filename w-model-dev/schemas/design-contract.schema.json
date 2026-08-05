@@ -29,7 +29,7 @@
         "additionalProperties": false,
         "properties": {
           "method": { "description": "HTTP 方法（GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS；D2/D3/D4 按 method+path 定位路由）", "type": "string", "minLength": 1 },
-          "path": { "description": "路由路径（D1 校验 actualPath 去除方法前缀/查询串后须与其匹配；D2/D3/D4 按 method+path 定位路由）", "type": "string", "minLength": 1 },
+          "path": { "description": "路由定义路径；D1 仅去除方法前缀后比对；D2/D3/D4 匹配时归一化去除查询串与尾斜杠", "type": "string", "minLength": 1 },
           "params": { "description": "路由接受的参数名数组（分页/筛选等；D2 校验验收断言 params 须包含在此）", "type": "array", "items": { "type": "string" } },
           "successStatus": { "description": "成功状态码（HTTP 100-599，如 200；D3 校验验收断言 expectedStatus 须与其相等）", "type": "integer", "minimum": 100, "maximum": 599 },
           "responseFields": { "description": "成功响应体字段名数组（D4 校验验收断言 assertedFields 须包含在此）", "type": "array", "items": { "type": "string" } }

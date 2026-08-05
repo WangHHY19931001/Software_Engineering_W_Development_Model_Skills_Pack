@@ -8,7 +8,7 @@
   "properties": {
     "schemaVersion": { "description": "Schema 版本，当前固定为 1.0", "type": "string", "pattern": "^1\\.0$" },
     "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
-    "level": { "description": "当前成熟度级别：L0=强制介入（决策型/操作型均等用户）/ L1=操作型 CHECKPOINT 自动放行 / L2=事件驱动循环激活 / L3=低介入自主（高风险路径仍强制决策型 CHECKPOINT）；R2 校验须为 L0/L1/L2/L3 之一", "enum": ["L0", "L1", "L2", "L3"] },
+    "level": { "description": "当前成熟度级别：L0=初始级，决策型/操作型 CHECKPOINT 均需用户参与 / L1=操作型 CHECKPOINT 自动放行 / L2=事件驱动循环激活 / L3=低介入自主（高风险路径仍强制决策型 CHECKPOINT）；R2 校验须为 L0/L1/L2/L3 之一", "enum": ["L0", "L1", "L2", "L3"] },
     "leveledUpAt": { "description": "升级到此级别的时间（ISO 8601；R4 校验不得早于 project.createdAt）", "type": "string", "format": "date-time" },
     "unlockConditions": {
       "description": "解锁条件达成状态（升级须全部达标；升级不可自动，须用户显式确认，决策型 CHECKPOINT）",
@@ -45,8 +45,8 @@
       "required": ["operationalFailureStreak", "userRequested"],
       "properties": {
         "operationalFailureStreak": { "description": "连续 O 系列失败模式命中阈值（命中 ≥ 此值自动降级到 L0；R5 校验比对 run-log O1-O6 命中计数）", "type": "integer", "minimum": 0 },
-        "budgetBurnRateExceeded": { "description": "预算消耗率超限累计次数（非负整数；达到即触发预算类降级评估）", "type": "integer", "minimum": 0 },
-        "checkpointRejectionStreak": { "description": "连续 CHECKPOINT 被拒绝次数（非负整数；达到即触发拒绝类降级评估）", "type": "integer", "minimum": 0 },
+        "budgetBurnRateExceeded": { "description": "预留字段，data-models.md 未定义触发规则；当前仅 operationalFailureStreak 自动降级 + userRequested 生效", "type": "integer", "minimum": 0 },
+        "checkpointRejectionStreak": { "description": "预留字段，data-models.md 未定义触发规则；当前仅 operationalFailureStreak 自动降级 + userRequested 生效", "type": "integer", "minimum": 0 },
         "userRequested": { "description": "用户显式请求降级标记（true 时更新 maturity.json.level=L0）", "type": "boolean" }
       }
     }

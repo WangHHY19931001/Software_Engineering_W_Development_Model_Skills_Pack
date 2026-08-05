@@ -14,7 +14,7 @@
       "enum": ["webhook", "cron", "user-report", "ci", "external-agent", "manual"]
     },
     "eventType": {
-      "description": "事件类型（决定路由到哪个阶段，见 event-ingress-guide 路由表）：bug-report=缺陷报告（L2+ 路由阶段5 编码修复）/ feature-request=功能请求 / requirement-change=需求变更（须回退阶段1 需求重跑）/ scheduled-review=定期回顾（L3 激活，路由阶段8 验收回顾）/ test-failure=测试失败 / gate-failure=门禁失败 / rework-request=返工请求 / escalation=升级上报 / user-checkpoint=用户检查点",
+      "description": "事件类型（决定路由到哪个阶段；部分类型路由见 event-ingress-guide 路由表）：bug-report=缺陷报告（L2+ 路由阶段5 编码修复）/ feature-request=功能请求 / requirement-change=需求变更（须回退阶段1 需求重跑）/ scheduled-review=定期回顾（L3 激活，路由阶段8 验收回顾）/ test-failure=测试失败 / gate-failure=门禁失败 / rework-request=返工请求 / escalation=升级上报 / user-checkpoint=用户检查点；guide/data-models 的 eventType 集合为子集，此处为全量枚举",
       "enum": [
         "bug-report",
         "feature-request",

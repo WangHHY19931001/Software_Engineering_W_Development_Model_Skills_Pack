@@ -78,7 +78,7 @@
             "type": "array",
             "items": { "type": "string" }
           },
-          "priority": { "description": "建议应用优先级，取值 1-5（数值越小越优先：1=立即应用 / 2=下个版本 / 3=backlog）", "type": "integer", "minimum": 1, "maximum": 5 }
+          "priority": { "description": "建议应用优先级，取值 1-5（数值越小越优先：1=立即应用 / 2=下个版本 / 3=backlog；4-5 为预留）", "type": "integer", "minimum": 1, "maximum": 5 }
         }
       }
     },
