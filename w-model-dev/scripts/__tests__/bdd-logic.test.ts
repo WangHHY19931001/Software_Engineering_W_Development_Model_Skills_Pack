@@ -11,9 +11,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import {
   parseFeatureHeader,
   parseBackgroundStateMachine,
+  parseFeatureFile,
+  parseTlaSpecSnapshot,
   validateStateMachineCompleteness,
   validateScenarioPath,
   validateTlaEquivalence,
@@ -366,5 +370,339 @@ describe('checkBddModel', () => {
     });
     expect(result.dimensions.rtmMapping.some(v => v.includes('not in RTM'))).toBe(true);
     expect(result.exitCode).toBe(1);
+  });
+});
+
+// ==================== parseTlaSpecSnapshot（批次 3 Task 6 补强：直接单测） ====================
+
+describe('parseTlaSpecSnapshot', () => {
+  // 真实 demo 仓库 TLA+ 规格（w-model-dev-demo/tla/specs/level1/L1-BlogSystem.tla）
+  const L1_REAL_PATH = path.join(
+    __dirname, '..', '..', '..',
+    'w-model-dev-demo', 'tla', 'specs', 'level1', 'L1-BlogSystem.tla'
+  );
+
+  it('real L1 fixture: documents current behavior (named-set style yields empty snapshot)', () => {
+    // 观察项：真实规格用命名集合（SystemStates == {...}），TypeOK 体内仅 `systemState \in SystemStates`
+    // 引用，与解析器约定的内联 `\in {"s1","s2"}` 枚举不符 → 当前实现返回空快照（不抛错）。
+    // 该断言锁定现状，若未来解析器支持命名集合解析，此处需同步更新。
+    const content = readFileSync(L1_REAL_PATH, 'utf-8');
+    const snap = parseTlaSpecSnapshot(content, 'L1-BlogSystem.tla');
+    expect(snap.specId).toBe('L1-BlogSystem.tla');
+    expect(snap.states).toEqual([]);
+    expect(snap.initialState).toBe('');
+    expect(snap.transitions).toEqual([]);
+    expect(snap.invariants).toEqual([]);
+  });
+
+  it('realistic inline-enum spec: full field assertions (TypeInvariant + Init + Next + Invariants)', () => {
+    const content = `---- MODULE L1Handwritten ----
+VARIABLES sysState, pending
+
+TypeInvariant ==
+  /\\ sysState \\in {"INIT", "RUNNING", "SHUTDOWN"}
+  /\\ pending \\in Nat
+
+Init ==
+  /\\ sysState = "INIT"
+  /\\ pending = 0
+
+StartSystem ==
+  /\\ sysState = "INIT"
+  /\\ sysState' = "RUNNING"
+  /\\ UNCHANGED pending
+
+ShutdownSystem ==
+  /\\ sysState = "RUNNING"
+  /\\ sysState' = "SHUTDOWN"
+  /\\ UNCHANGED pending
+
+Next ==
+  \\/ StartSystem
+  \\/ ShutdownSystem
+
+Spec == Init /\\ [][Next]_vars
+
+Invariants ==
+  /\\ TypeInvariant
+  /\\ sysState = "SHUTDOWN" => pending = 0
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'L1-handwritten');
+    expect(snap.specId).toBe('L1-handwritten');
+    expect(snap.states).toEqual(['INIT', 'RUNNING', 'SHUTDOWN']);
+    expect(snap.initialState).toBe('INIT');
+    // 事件名 PascalCase → camelCase；from/to 从 action 内 stateVar 赋值提取
+    expect(snap.transitions).toEqual([
+      { from: 'INIT', event: 'startSystem', to: 'RUNNING' },
+      { from: 'RUNNING', event: 'shutdownSystem', to: 'SHUTDOWN' },
+    ]);
+    // 不变式归一化：`var = "State" => cond` → `State => cond`
+    expect(snap.invariants).toEqual(['SHUTDOWN => pending = 0']);
+  });
+
+  it('picks the state var with the most enum values when multiple vars present', () => {
+    const content = `---- MODULE MultiVar ----
+VARIABLES s, t
+
+TypeOK ==
+  /\\ s \\in {"A", "B"}
+  /\\ t \\in {"X", "Y", "Z"}
+
+Init ==
+  /\\ s = "A"
+  /\\ t = "X"
+
+GoToY ==
+  /\\ t = "X"
+  /\\ t' = "Y"
+  /\\ UNCHANGED s
+
+Next ==
+  \\/ GoToY
+
+Spec == Init /\\ [][Next]_vars
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'multi-var');
+    // t 有 3 个枚举值 > s 的 2 个 → 选 t 作为状态变量
+    expect(snap.states).toEqual(['X', 'Y', 'Z']);
+    expect(snap.initialState).toBe('X');
+    expect(snap.transitions).toEqual([{ from: 'X', event: 'goToY', to: 'Y' }]);
+  });
+
+  it('expands `var \\in {"A", "B"}` from-set into one transition per state', () => {
+    const content = `---- MODULE MultiFrom ----
+VARIABLES s, u
+
+TypeOK ==
+  /\\ s \\in {"A", "B"}
+  /\\ u \\in Nat
+
+Init ==
+  /\\ s = "A"
+  /\\ u = 0
+
+RetryToInflight ==
+  /\\ s \\in {"A", "B"}
+  /\\ s' = "B"
+  /\\ u' = u + 1
+
+Next ==
+  \\/ RetryToInflight
+
+Spec == Init /\\ [][Next]_vars
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'multi-from');
+    expect(snap.transitions).toEqual([
+      { from: 'A', event: 'retryToInflight', to: 'B' },
+      { from: 'B', event: 'retryToInflight', to: 'B' },
+    ]);
+  });
+
+  it('extracts action names from `\\/ \\E u \\in Users : Register(u)` form in Next', () => {
+    const content = `---- MODULE Quantified ----
+VARIABLES s
+
+TypeOK ==
+  /\\ s \\in {"A"}
+
+Init ==
+  /\\ s = "A"
+
+Register(u) ==
+  /\\ u \\in Users
+  /\\ s = "A"
+  /\\ s' = "A"
+
+Next ==
+  \\/ \\E u \\in Users : Register(u)
+
+Spec == Init /\\ [][Next]_vars
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'quantified');
+    // Next 中 `\/ \E u \in Users : Register(u)` → 动作名 Register → camelCase register
+    expect(snap.transitions).toEqual([{ from: 'A', event: 'register', to: 'A' }]);
+  });
+
+  it('stops collecting Next actions at `Spec ==`', () => {
+    const content = `---- MODULE Truncate ----
+VARIABLES s
+
+TypeOK ==
+  /\\ s \\in {"A"}
+
+Init ==
+  /\\ s = "A"
+
+RealAction ==
+  /\\ s = "A"
+  /\\ s' = "A"
+
+Next ==
+  \\/ RealAction
+
+Spec == Init /\\ [][Next]_vars
+
+Invariants ==
+  /\\ TypeOK
+  \\/ \\E u \\in Users : GhostAction(u)
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'truncate');
+    const events = snap.transitions.map(t => t.event);
+    expect(events).toEqual(['realAction']);
+    expect(events).not.toContain('ghostAction');
+  });
+
+  it('degrades gracefully (no throw, empty fields) when TypeInvariant/Init/Next missing', () => {
+    // 缺 TypeInvariant → 各字段全空
+    const bare = `---- MODULE Bare ----
+VARIABLES s
+
+Init ==
+  /\\ s = "A"
+====
+`;
+    const snapBare = parseTlaSpecSnapshot(bare, 'bare');
+    expect(snapBare.states).toEqual([]);
+    expect(snapBare.initialState).toBe('');
+    expect(snapBare.transitions).toEqual([]);
+    expect(snapBare.invariants).toEqual([]);
+
+    // 缺 Init → initialState 为空串，其余正常提取
+    const noInit = `---- MODULE NoInit ----
+VARIABLES s
+
+TypeOK ==
+  /\\ s \\in {"A"}
+
+Foo ==
+  /\\ s = "A"
+  /\\ s' = "A"
+
+Next ==
+  \\/ Foo
+====
+`;
+    const snapNoInit = parseTlaSpecSnapshot(noInit, 'no-init');
+    expect(snapNoInit.states).toEqual(['A']);
+    expect(snapNoInit.initialState).toBe('');
+    expect(snapNoInit.transitions).toEqual([{ from: 'A', event: 'foo', to: 'A' }]);
+
+    // 缺 Next → transitions 为空
+    const noNext = `---- MODULE NoNext ----
+VARIABLES s
+
+TypeOK ==
+  /\\ s \\in {"A"}
+
+Init ==
+  /\\ s = "A"
+====
+`;
+    const snapNoNext = parseTlaSpecSnapshot(noNext, 'no-next');
+    expect(snapNoNext.states).toEqual(['A']);
+    expect(snapNoNext.initialState).toBe('A');
+    expect(snapNoNext.transitions).toEqual([]);
+  });
+
+  it('realistic empty-string enum value (`content \\in {"", "valid"}`) is not matched — known limitation', () => {
+    // 观察项：varPattern 的 (?:"[^"]+"...)+ 无法匹配以空串 "" 开头的枚举集合
+    // （真实文件 L3/L4 的 content / lastError 即此形式），故这些规格同样提取为空。
+    const content = `---- MODULE EmptyStr ----
+VARIABLES content
+
+TypeOK ==
+  /\\ content \\in {"", "valid", "invalid"}
+
+Init ==
+  /\\ content = ""
+
+Foo ==
+  /\\ content = "valid"
+  /\\ content' = "invalid"
+
+Next ==
+  \\/ Foo
+
+Spec == Init /\\ [][Next]_vars
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'empty-str');
+    expect(snap.states).toEqual([]);
+    expect(snap.initialState).toBe('');
+    expect(snap.transitions).toEqual([]);
+  });
+
+  it('passes through specId verbatim', () => {
+    const snap = parseTlaSpecSnapshot('', 'REQ-001/SPEC-2');
+    expect(snap.specId).toBe('REQ-001/SPEC-2');
+  });
+});
+
+// ==================== parseFeatureFile（批次 3 Task 6 补强：直接单测） ====================
+
+describe('parseFeatureFile', () => {
+  const feat = `# @req: REQ-001
+# @design: SD-3.2.1
+# @system: L1_blog_system
+# @tla-spec: L1_blog_system
+# @state-machine: SM-L1-blog_system
+# @parent-features: (none)
+# @child-features: L2_auth-001.feature
+# @scenario-id-prefix: BDD-L1
+Feature: Test
+Background:
+  # @states: A, B, C
+  # @initial-state: A
+  # @terminal-states: ()
+  # @accepting-states: C
+  # @rejecting-states: ()
+  # @transitions:
+  #   A + e -> B
+  # @invariants:
+  #   A => true
+Scenario: 注册成功
+  Given 系统处于 "A"
+  When 用户执行注册 (Register)
+  And 校验通过 (Validate)
+  Then 系统进入 "B"
+  Then 系统进入 "C"
+  And 不变式 "A => true" 应成立
+Scenario Outline: 模板
+  Given 系统处于 "A"
+  When 动作 (Act)
+  Then 系统进入 "B"
+Scenario: 无 Given 无 Then
+  When 动作 (Act)
+`;
+
+  it('collects When and And events (tolerating trailing parens), takes first Then, extracts invariant assertions', () => {
+    const result = parseFeatureFile(feat);
+    const sc = result.scenarios.find(s => s.scenarioName === '注册成功')!;
+    expect(sc.startState).toBe('A');
+    // When 与 And 双取，行末括号 (Register) 容忍
+    expect(sc.events).toEqual(['Register', 'Validate']);
+    // 多 Then 取首个
+    expect(sc.expectedEndState).toBe('B');
+    expect(sc.invariantAssertions).toEqual(['A => true']);
+  });
+
+  it('terminates previous scenario at `Scenario Outline:` and does not parse the outline itself', () => {
+    const result = parseFeatureFile(feat);
+    const names = result.scenarios.map(s => s.scenarioName);
+    // Scenario Outline 只作终结符：注册成功 场景在 Outline 前结束，Outline 本身不入 scenarios
+    expect(names).toEqual(['注册成功', '无 Given 无 Then']);
+  });
+
+  it('returns null start/end state when Given/Then missing', () => {
+    const result = parseFeatureFile(feat);
+    const sc = result.scenarios.find(s => s.scenarioName === '无 Given 无 Then')!;
+    expect(sc.startState).toBeNull();
+    expect(sc.events).toEqual(['Act']);
+    expect(sc.expectedEndState).toBeNull();
   });
 });
