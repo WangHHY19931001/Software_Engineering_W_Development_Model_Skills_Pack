@@ -32,7 +32,7 @@ export interface CliError {
 /** 组装人类可读消息：`✗ [CATEGORY] <message>: <file|detail>`（file 优先，其次 detail，均无则省略冒号段） */
 export function formatCliError(e: CliError): string {
   const head = `✗ [${e.category}] ${e.message}`;
-  const tail = e.file ?? e.detail;
+  const tail = e.file || e.detail;
   return tail ? `${head}: ${tail}` : head;
 }
 
@@ -47,9 +47,9 @@ export function printErrorJson(e: CliError): void {
   console.log(`ERROR_JSON ${JSON.stringify(json)}`);
 }
 
-/** printError + printErrorJson + process.exit(exitCode) */
-export function exitWithError(e: CliError): never {
+/** printError + printErrorJson + 设置 process.exitCode（返回后由 Node 自然退出，stdout 先 flush 再退出，避免 process.exit() 截断 ERROR_JSON） */
+export function exitWithError(e: CliError): void {
   printError(e);
   printErrorJson(e);
-  process.exit(e.exitCode);
+  process.exitCode = e.exitCode;
 }

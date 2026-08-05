@@ -2,7 +2,7 @@
  * lib/cli-error.ts 单元测试
  *
  * 覆盖：formatCliError 三类模板（file / detail / 均无）/ printError 走 stderr /
- *       printErrorJson 走 stdout 且含 exitCode / exitWithError 调 process.exit(2)。
+ *       printErrorJson 走 stdout 且含 exitCode、无 file 时省略 / exitWithError 设置 process.exitCode。
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -23,6 +23,7 @@ const NOT_FOUND: CliError = {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  process.exitCode = 0;
 });
 
 describe('formatCliError', () => {
@@ -67,16 +68,22 @@ describe('printError / printErrorJson', () => {
     };
     expect(parsed).toMatchObject({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2 });
   });
+
+  it('printErrorJson 无 file → JSON 省略 file 字段', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    printErrorJson({ category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 });
+    const out = spy.mock.calls[0]![0] as string;
+    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as Record<string, unknown>;
+    expect(parsed).toMatchObject({ category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 });
+    expect('file' in parsed).toBe(false);
+  });
 });
 
 describe('exitWithError', () => {
-  it('调用 process.exit(2)（消息与 JSON 均已输出）', () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
-      throw new Error(`exit:${code}`);
-    });
+  it('设置 process.exitCode=2 且正常返回（stdout 先 flush）', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    expect(() => exitWithError(NOT_FOUND)).toThrow('exit:2');
-    expect(exitSpy).toHaveBeenCalledWith(2);
+    expect(() => exitWithError(NOT_FOUND)).not.toThrow();
+    expect(process.exitCode).toBe(2);
   });
 });
