@@ -12,6 +12,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { parseJsonSafe } from './safe-json.js';
 
 /**
  * 读取并解析 JSON 文件。
@@ -36,7 +37,7 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
     throw err;
   }
   try {
-    return JSON.parse(raw) as T;
+    return parseJsonSafe<T>(raw);
   } catch {
     console.error(`✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: ${abs}`);
     process.exit(2);
@@ -76,7 +77,7 @@ export async function readJsonlOrExit(
     const trimmed = line.trim();
     if (trimmed === '') continue;
     try {
-      entries.push(JSON.parse(trimmed));
+      entries.push(parseJsonSafe(trimmed));
     } catch {
       console.error(`⚠ [FILE_PARSE] ${label} 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
     }
