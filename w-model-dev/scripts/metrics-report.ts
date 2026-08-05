@@ -126,7 +126,7 @@ async function main(): Promise<void> {
 
   if (out) {
     await fs.writeFile(out, JSON.stringify(report, null, 2), 'utf-8');
-    console.log(`✓ 度量报告已写入: ${path.resolve(out)}`);
+    console.error(`✓ 度量报告已写入: ${path.resolve(out)}`);
   }
   if (json) {
     console.log(JSON.stringify(report));
