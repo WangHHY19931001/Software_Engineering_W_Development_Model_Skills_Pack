@@ -943,14 +943,19 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | prepush | 12 项全通过（security-scan exit 0 + check-signature-chain exit 0） |
 | TypeScript strict | 0 错误 |
 
-### §3.4.29 第 31 轮：/wm status 脚本化 + 流程度量报告（2026-08-05，v31.0.0）
+#### 3.4.29 第 31 轮：/wm status 脚本化 + 流程度量报告（2026-08-05，[31.0.0]）
 
-吸收外部评审建议新功能批两项（设计文档 `docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md`）：
+| 维度 | 内容 |
+|---|---|
+| 触发 | 外部评审 14 条建议，用户经头脑风暴选 3 轮分组，本轮为新功能批（#10 /wm status 脚本化 + #14 流程度量报告） |
+| 新增 | `wm-status.ts` + `wm-status-logic.ts`（状态快照：当前阶段 / 完成进度 / RTM 覆盖率 / 四级测试汇总 / 最近 3 条动作 / 确定性下一步建议；退出码 0/2，`--json` 输出 StatusReport）；`metrics-report.ts` + `metrics-report-logic.ts`（流程度量：总体 / 阶段汇总 / 动作·角色·结果分布 / 门禁通过率 / 返工率与连续段 / 预算 burn rate 与 killSwitch 预警；`--from/--to/--phase/--json/--out`；纯报告无门禁语义） |
+| package.json | version `30.1.0` → `31.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致）+ scripts 新增 `wm:status` / `wm:metrics` |
+| 顶层文档 | SSoT §3.4.29 + §10A 追溯表 + AGENTS.md + CHANGELOG.md [31.0.0] + README/INSTALL/toolbox/coverage 矩阵同步 |
+| self-test | 基线 213 不变全通过 |
+| vitest | 待回归验证（新增 wm-status-logic 10 + metrics-report-logic 9 用例） |
+| TypeScript strict | 0 错误 |
 
-1. **/wm status 脚本化（#10）**：新增 `scripts/wm-status.ts`（CLI）+ `scripts/wm-status-logic.ts`（纯逻辑）。O 只读查询项目状态：当前阶段 / 完成进度 / RTM 覆盖率 / 四级测试汇总 / 最近 3 条动作 / 确定性下一步建议。退出码 0/2（未初始化=0 查询语义；JSON 损坏=2 转 operational-recovery）；`--json` 输出 StatusReport。
-2. **流程度量报告（#14）**：新增 `scripts/metrics-report.ts`（CLI）+ `scripts/metrics-report-logic.ts`（纯逻辑）。从 run-log.jsonl（必读）+ budget.json（可选）生成 7 区度量：总体 / 阶段汇总 / 动作·角色·结果分布 / 门禁通过率 / 返工率与连续段 / 预算 burn rate 与 killSwitch 预警。支持 `--from/--to/--phase/--json/--out` 过滤与输出。纯报告无门禁语义（退出码仅 0/2）。
-
-两者均为只读报告工具：不修改 .w-model 状态、不产生 exit 1、不改变既有门禁语义；budget 拦截仍由 `check-budget.ts` 承担。
+> 两者均为只读报告工具：不修改 .w-model 状态、不产生 exit 1、不改变既有门禁语义；budget 拦截仍由 `check-budget.ts` 承担。
 
 ---
 
