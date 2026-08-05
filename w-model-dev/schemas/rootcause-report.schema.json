@@ -37,13 +37,13 @@
         "analysisTimestamp"
       ],
       "properties": {
-        "reportId": { "description": "报告 ID（格式 RC-<目标>-<阶段>-<序号>，如 RC-rootcause-1-1；R8 校验格式 ^RC-[a-z0-9]+-\\d+-\\d+$）", "type": "string", "minLength": 1 },
+        "reportId": { "description": "报告 ID（格式 RC-<阶段>-<轮次>-<序号>，如 RC-phase5-1-01；R8 校验格式 ^RC-[a-z0-9]+-\\d+-\\d+$）", "type": "string", "minLength": 1 },
         "targetKind": { "description": "报告类型，固定 \"rootcause\"（R1 校验）", "const": "rootcause" },
         "targetArtifact": { "description": "被分析的目标产物路径或 ID（如 .w-model/rtm.json）", "type": "string", "minLength": 1 },
-        "targetPhase": { "description": "目标阶段（如 1=需求分析 / 5=编码实现）", "type": "string", "minLength": 1 },
+        "targetPhase": { "description": "目标阶段（如 阶段 5 - 编码，对应样本值）", "type": "string", "minLength": 1 },
         "reworkRound": { "description": "返工轮次（从 1 起，≥1 整数）", "type": "integer", "minimum": 1 },
         "reworkSource": { "description": "触发返工来源：verifier=V 评审失败 / gate=门禁失败", "enum": ["verifier", "gate"] },
-        "persona": { "description": "执行分析的角色切片标识（如 R-locator）", "type": "string", "minLength": 1 },
+        "persona": { "description": "执行分析的角色切片标识（如 root-cause-locator）", "type": "string", "minLength": 1 },
         "method": {
           "description": "根因分析方法枚举：5-why=连续追问 / fishbone=鱼骨图 / defect-chain=缺陷链 / upstream-trace=上游追溯 / combined=多角度组合（R9：combined 须带 partialReports）",
           "enum": ["5-why", "fishbone", "defect-chain", "upstream-trace", "combined"]

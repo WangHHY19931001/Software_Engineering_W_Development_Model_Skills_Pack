@@ -30,7 +30,7 @@
       "properties": {
         "reviewDecision": { "description": "审查决定：approve=批准 / reject=驳回 / need-more-info=需补充信息（E5 校验须为 approve 才能进入 V 阶段）", "enum": ["approve", "reject", "need-more-info"] },
         "rootCauseAnalysis": { "description": "根因分析文本（E6 校验长度须 ≥30 字符，防模板化）", "type": "string", "minLength": 30 },
-        "falsifiabilityCheck": { "description": "可证伪性检查文本（含「若…则」句式，表明豁免理由可被证伪）", "type": "string", "minLength": 10 },
+        "falsifiabilityCheck": { "description": "可证伪性检查文本（说明何种情形下豁免理由不再成立），minLength 10", "type": "string", "minLength": 10 },
         "riskAssessment": { "description": "风险评估文本", "type": "string", "minLength": 10 },
         "conditions": { "description": "附带放行条件数组（可选，逐条列出豁免生效的前提）", "type": "array", "items": { "type": "string" } },
         "reviewedAt": { "description": "审查时间（ISO 8601；E9 时序校验 reviewedAt < verifiedAt）", "type": "string", "format": "date-time" }

@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["sigId", "phase", "role", "action", "runId", "artifacts", "prevSigId", "prevSigHash", "sigHash", "signedAt", "signer", "inputProvenance"],
   "properties": {
-    "sigId": { "description": "签名 ID，格式 wm<阶段>-r<轮次>-<角色>（如 wm1-r002-S，后缀须与 role 一致，R4 角色匹配）；阶段起点为 \"genesis\"", "type": "string", "pattern": "^wm\\d+-r\\d+-[OSAVGR]$|^genesis$" },
+    "sigId": { "description": "签名 ID，格式 wm<阶段>-r<轮次>-<角色>（如 wm1-r002-S，后缀与 role 对应）；R4 校验角色须在阶段角色清单内；阶段起点为 \"genesis\"", "type": "string", "pattern": "^wm\\d+-r\\d+-[OSAVGR]$|^genesis$" },
     "phase": { "description": "签名所处阶段编号，取值 1-8（R1 各阶段强制角色链齐全）", "type": "integer", "minimum": 1, "maximum": 8 },
     "phaseName": { "description": "阶段名称（如 需求分析 / 系统设计），与 phase 对应", "type": "string" },
     "role": { "description": "签名角色：O=编排者 / A=分析 / S=产出 / V=评审 / G=门禁 / R=根因（R4 校验须在阶段角色清单内）", "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] },

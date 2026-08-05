@@ -16,9 +16,9 @@
         "properties": {
           "id": { "description": "干系人 ID（如 STK-NNN），须唯一", "type": "string" },
           "role": { "description": "干系人角色描述（如 终端用户 / 管理员 / 审核者）", "type": "string" },
-          "relatedReqs": { "description": "该干系人关联的需求 ID 数组（对应 graph.json REQ 节点 ID，C1 校验关联数>0）", "type": "array", "items": { "type": "string" } },
+          "relatedReqs": { "description": "该干系人关联的需求 ID 数组（对应 graph.json REQ 节点 ID，建议 ≥1 条）", "type": "array", "items": { "type": "string" } },
           "status": { "description": "覆盖状态：covered=已覆盖 / partial=部分覆盖 / missing=未覆盖（partial 命中 C8 不达标；missing 须在 Out of Scope 显式声明，C9）", "enum": ["covered", "partial", "missing"] },
-          "gapDescription": { "description": "覆盖缺口说明（status=partial/missing 时须填写缺口原因）", "type": "string" }
+          "gapDescription": { "description": "覆盖缺口说明（可选；status=partial/missing 或声明 Out of Scope 时建议填写原因）", "type": "string" }
         }
       }
     },
@@ -36,7 +36,7 @@
           "relatedReqs": { "description": "场景关联的需求 ID 数组（对应 graph.json REQ 节点 ID）", "type": "array", "items": { "type": "string" } },
           "status": { "description": "覆盖状态：covered=已覆盖 / partial=部分覆盖 / missing=未覆盖（missing 须在 Out of Scope 显式声明，C9）", "enum": ["covered", "partial", "missing"] },
           "scenarioType": { "description": "场景类型：happy=正向正常流程 / error=异常与错误处理 / boundary=边界与极限条件（C4 校验三类须齐全）", "enum": ["happy", "error", "boundary"] },
-          "gapDescription": { "description": "覆盖缺口说明（status=partial/missing 时须填写缺口原因）", "type": "string" }
+          "gapDescription": { "description": "覆盖缺口说明（可选；status=partial/missing 或声明 Out of Scope 时建议填写原因）", "type": "string" }
         }
       }
     },
@@ -51,7 +51,7 @@
           "type": { "description": "需求类型：REQ=功能需求 / NFR=非功能需求 / CON=约束（C5 校验三类齐全）", "enum": ["REQ", "NFR", "CON"] },
           "reqIds": { "description": "该类型下的需求 ID 数组（对应 graph.json 中该类型的节点 ID）", "type": "array", "items": { "type": "string" } },
           "status": { "description": "覆盖状态：covered=已覆盖 / partial=部分覆盖 / missing=未覆盖（missing 须在 Out of Scope 显式声明，C9）", "enum": ["covered", "partial", "missing"] },
-          "gapDescription": { "description": "覆盖缺口说明（status=partial/missing 时须填写缺口原因）", "type": "string" }
+          "gapDescription": { "description": "覆盖缺口说明（可选；status=partial/missing 或声明 Out of Scope 时建议填写原因）", "type": "string" }
         }
       }
     },
@@ -66,7 +66,7 @@
           "nfrConId": { "description": "横切 NFR/CON 节点 ID（对应 graph.json 中 NFR/CON 节点，C7 边源一致性）", "type": "string" },
           "governedReqs": { "description": "受该横切治理的需求 ID 数组（每条 nfrConId→req 须与 graph.json cross-cuts 边一一对应，C7 双向校验）", "type": "array", "items": { "type": "string" } },
           "status": { "description": "覆盖状态：covered=已覆盖 / partial=部分覆盖 / missing=未覆盖（missing 须在 Out of Scope 显式声明，C9）", "enum": ["covered", "partial", "missing"] },
-          "gapDescription": { "description": "覆盖缺口说明（status=partial/missing 时须填写缺口原因）", "type": "string" }
+          "gapDescription": { "description": "覆盖缺口说明（可选；status=partial/missing 或声明 Out of Scope 时建议填写原因）", "type": "string" }
         }
       }
     },
