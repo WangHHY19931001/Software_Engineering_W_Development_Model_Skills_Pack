@@ -65,6 +65,10 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
 │   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
 │   ├── security-scan.ts         # eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
+│   ├── wm-status.ts             # /wm status 脚本化 CLI（状态快照：阶段 / 进度 / RTM 覆盖率 / 测试汇总 / 下一步建议；退出码 0/2）
+│   ├── wm-status-logic.ts       # wm-status 纯逻辑（供单元测试）
+│   ├── metrics-report.ts        # 流程度量报告 CLI（run-log + budget 汇总 7 区度量；--from/--to/--phase/--json/--out）
+│   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
 │   ├── self-test.ts             # 回归基线（213 条样本）
 │   └── __tests__/               # vitest 单元测试（23 个 .test.ts / 301 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
@@ -189,6 +193,8 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | TLA+ 行为门禁 CLI | [../w-model-dev/scripts/check-tla-model.ts](../w-model-dev/scripts/check-tla-model.ts) |
 | 代码-TLA+ 一致性回归 CLI | [../w-model-dev/scripts/check-code-tla-consistency.ts](../w-model-dev/scripts/check-code-tla-consistency.ts) |
 | Budget / RunLog / Maturity / Checkpoint / RootCause 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts) |
+| /wm status 状态快照 CLI + 逻辑 | [../w-model-dev/scripts/wm-status.ts](../w-model-dev/scripts/wm-status.ts) + [../w-model-dev/scripts/wm-status-logic.ts](../w-model-dev/scripts/wm-status-logic.ts) |
+| 流程度量报告 CLI + 逻辑 | [../w-model-dev/scripts/metrics-report.ts](../w-model-dev/scripts/metrics-report.ts) + [../w-model-dev/scripts/metrics-report-logic.ts](../w-model-dev/scripts/metrics-report-logic.ts) |
 | 图谱门禁与收敛准则 | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md) |
 | 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
 | 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |

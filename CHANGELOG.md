@@ -3,6 +3,30 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [31.0.0] - 2026-08-05
+
+### 第三十二轮 /wm status 脚本化 + 流程度量报告（metrics-report.ts）
+
+吸收外部评审建议新功能批两项（设计文档 `docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md`）：把手工状态查询脚本化为确定性 CLI；新增 run-log/budget 流程度量汇总工具。详见 SSoT §3.4.29。
+
+#### Added
+- 新建 `scripts/wm-status.ts` + `scripts/wm-status-logic.ts`（状态快照：当前阶段 / 完成进度 / RTM 覆盖率 / 四级测试汇总 / 最近 3 条动作 / 确定性下一步建议；退出码 0/2，`--json` 输出 StatusReport）
+- 新建 `scripts/metrics-report.ts` + `scripts/metrics-report-logic.ts`（流程度量：总体 / 阶段汇总 / 动作·角色·结果分布 / 门禁通过率 / 返工率与连续段 / 预算 burn rate 与 killSwitch 预警；`--from/--to/--phase/--json/--out`；纯报告无门禁语义）
+- `package.json` scripts 新增 `wm:status` / `wm:metrics`
+
+#### Changed
+- `SKILL.md`：命令速查表 `/wm status` 脚本化 + 新增 `/wm metrics`；参数示例 + Bundled Resources + frontmatter version → 31.0.0
+- `command-reference.md`：§/wm status 改写为脚本化；新增 §/wm metrics
+- SSoT §3.4.29 + §10A 追溯表 + §6.1 命令表 + 附录 A；INSTALL.md / AGENTS.md / README.md / toolbox.md / __tests__ coverage 矩阵同步
+- 版本号三处同步为 31.0.0：package.json + skill-metadata.json + SKILL.md frontmatter
+
+#### 验证
+- vitest <实测总数>/<实测总数>（<实际文件数> 文件）全通过（新增 wm-status-logic 10 + metrics-report-logic 9 用例）
+- self-test 213/213 不变全通过
+- TypeScript strict 0 错误
+- `npm run lint:security` exit 0（0 新增）
+- 冒烟：wm-status（含未初始化 exit 0 / 损坏 JSON exit 2）、metrics-report（含缺失 run-log exit 2）均符合预期
+
 ## [30.1.0] - 2026-08-05
 
 ### 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义

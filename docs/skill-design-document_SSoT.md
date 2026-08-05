@@ -943,6 +943,15 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | prepush | 12 项全通过（security-scan exit 0 + check-signature-chain exit 0） |
 | TypeScript strict | 0 错误 |
 
+### §3.4.29 第 31 轮：/wm status 脚本化 + 流程度量报告（2026-08-05，v31.0.0）
+
+吸收外部评审建议新功能批两项（设计文档 `docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md`）：
+
+1. **/wm status 脚本化（#10）**：新增 `scripts/wm-status.ts`（CLI）+ `scripts/wm-status-logic.ts`（纯逻辑）。O 只读查询项目状态：当前阶段 / 完成进度 / RTM 覆盖率 / 四级测试汇总 / 最近 3 条动作 / 确定性下一步建议。退出码 0/2（未初始化=0 查询语义；JSON 损坏=2 转 operational-recovery）；`--json` 输出 StatusReport。
+2. **流程度量报告（#14）**：新增 `scripts/metrics-report.ts`（CLI）+ `scripts/metrics-report-logic.ts`（纯逻辑）。从 run-log.jsonl（必读）+ budget.json（可选）生成 7 区度量：总体 / 阶段汇总 / 动作·角色·结果分布 / 门禁通过率 / 返工率与连续段 / 预算 burn rate 与 killSwitch 预警。支持 `--from/--to/--phase/--json/--out` 过滤与输出。纯报告无门禁语义（退出码仅 0/2）。
+
+两者均为只读报告工具：不修改 .w-model 状态、不产生 exit 1、不改变既有门禁语义；budget 拦截仍由 `check-budget.ts` 承担。
+
 ---
 
 ## 4. 技能工作流程
@@ -1229,7 +1238,8 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
 | `/wm test` | 测试执行与回填 | `type`: 测试类型(单元/集成/系统/验收)；`result`: pass/fail（必填，真实回填） | 测试报告 |
 | `/wm review` | LLM 评审指引 | `target`: 需求/设计/测试用例 ID 或文件路径 | 结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`，不内置 LLM） |
-| `/wm status` | 项目状态 | 无 | 当前阶段、完成进度、RTM 覆盖率 |
+| `/wm status` | 项目状态（脚本化 `wm-status.ts`，O 只读） | 无 | 当前阶段、完成进度、RTM 覆盖率、确定性下一步建议（`--json` 输出 StatusReport） |
+| `/wm metrics` | 流程度量报告（`metrics-report.ts`，O 只读） | `--from`/`--to`/`--phase`/`--json`/`--out` | 7 区流程度量（阶段汇总 / 门禁通过率 / 返工率 / 预算 burn rate 与 killSwitch 预警） |
 
 ### 6.2 辅助命令
 
@@ -2540,6 +2550,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.26 | 第三十轮 CLI 样板抽取 + 分派总览矩阵 | `scripts/lib/read-json-or-exit.ts` + `scripts/__tests__/read-json-or-exit.test.ts` + `references/dispatch-matrix.md` + 13 个 check-*.ts 重构 | 完整（self-test 213/213、vitest 297、tsc 0 错误） |
 | §3.4.27 | 第三十一轮 Schema 字段描述增强 + 敏感信息脱敏 + npm audit 门禁 | `schemas/*.schema.json`（19 份，全量字段补 description）+ `references/operational-recovery.md`（敏感信息禁令）+ `references/anti-patterns.md` #43 + `.githooks/pre-push`（检查 #12 npm audit warn-only）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 30.0.0） | 完整（self-test 213/213、vitest 297、prepush 12 项、tsc 0 错误） |
 | §3.4.28 | 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义 | `scripts/security-scan.ts` + `scripts/__tests__/security-scan.test.ts` + `.eslintsecurity-baseline.json` + `scripts/check-signature-chain.ts` | 完整（self-test 213/213、vitest 301、prepush 12 项、tsc 0 错误） |
+| §3.4.29 | 第 31 轮 /wm status 脚本化 + 流程度量报告 | scripts/wm-status.ts + wm-status-logic.ts + metrics-report.ts + metrics-report-logic.ts | 待回归验证 |
 
 ---
 
@@ -2997,7 +3008,8 @@ timeline
 | `/wm code <功能>` | 生成代码和单元测试 |
 | `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 执行指定类型测试并真实回填结果 |
 | `/wm review <目标>` | 返回 LLM 评审指引（指向 verifier-spec.md，由外部 Agent 执行） |
-| `/wm status` | 查看项目状态（当前阶段、RTM 覆盖率、四级测试汇总） |
+| `/wm status` | 查看项目状态（脚本化 `wm-status.ts`：当前阶段、完成进度、RTM 覆盖率、四级测试汇总、最近 3 条动作、确定性下一步建议；`--json` 输出 StatusReport） |
+| `/wm metrics` | 流程度量报告（`metrics-report.ts`：run-log + budget 汇总 7 区度量；支持 `--from/--to/--phase/--json/--out`） |
 | `/wm help` | 显示帮助 |
 | `/wm reset` | 重置当前项目状态（保留元信息，清空实体） |
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |

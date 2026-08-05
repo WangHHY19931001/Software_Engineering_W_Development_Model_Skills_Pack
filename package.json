@@ -1,6 +1,6 @@
 {
   "name": "w-model-dev-skill",
-  "version": "30.1.0",
+  "version": "31.0.0",
   "private": true,
   "description": "W-Model AI Assistant Skill — 编排 + 校验脚本技能包（提示词 + 模板 + 自包含门禁脚本，不内置 LLM 调用）",
   "type": "module",
@@ -14,6 +14,8 @@
     "check:exemption": "tsx w-model-dev/scripts/check-exemption.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
     "lint:security": "tsx w-model-dev/scripts/security-scan.ts",
+    "wm:status": "tsx w-model-dev/scripts/wm-status.ts",
+    "wm:metrics": "tsx w-model-dev/scripts/metrics-report.ts",
     "prepush": "PREPUSH_FORCE=1 bash .githooks/pre-push"
   },
   "devDependencies": {
