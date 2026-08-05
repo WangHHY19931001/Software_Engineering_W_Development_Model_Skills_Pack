@@ -20,8 +20,9 @@
     "summary"
   ],
   "properties": {
-    "schemaVersion": { "type": "string", "pattern": "^1\\.0$" },
+    "schemaVersion": { "description": "报告 schema 版本号，固定 \"1.0\"", "type": "string", "pattern": "^1\\.0$" },
     "meta": {
+      "description": "报告元信息（报告 ID / 目标 / 分析方法等，R1 完整性校验）",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -36,43 +37,49 @@
         "analysisTimestamp"
       ],
       "properties": {
-        "reportId": { "type": "string", "minLength": 1 },
-        "targetKind": { "const": "rootcause" },
-        "targetArtifact": { "type": "string", "minLength": 1 },
-        "targetPhase": { "type": "string", "minLength": 1 },
-        "reworkRound": { "type": "integer", "minimum": 1 },
-        "reworkSource": { "enum": ["verifier", "gate"] },
-        "persona": { "type": "string", "minLength": 1 },
+        "reportId": { "description": "报告 ID（格式 RC-<目标>-<阶段>-<序号>，如 RC-rootcause-1-1；R8 校验格式 ^RC-[a-z0-9]+-\\d+-\\d+$）", "type": "string", "minLength": 1 },
+        "targetKind": { "description": "报告类型，固定 \"rootcause\"（R1 校验）", "const": "rootcause" },
+        "targetArtifact": { "description": "被分析的目标产物路径或 ID（如 .w-model/rtm.json）", "type": "string", "minLength": 1 },
+        "targetPhase": { "description": "目标阶段（如 1=需求分析 / 5=编码实现）", "type": "string", "minLength": 1 },
+        "reworkRound": { "description": "返工轮次（从 1 起，≥1 整数）", "type": "integer", "minimum": 1 },
+        "reworkSource": { "description": "触发返工来源：verifier=V 评审失败 / gate=门禁失败", "enum": ["verifier", "gate"] },
+        "persona": { "description": "执行分析的角色切片标识（如 R-locator）", "type": "string", "minLength": 1 },
         "method": {
+          "description": "根因分析方法枚举：5-why=连续追问 / fishbone=鱼骨图 / defect-chain=缺陷链 / upstream-trace=上游追溯 / combined=多角度组合（R9：combined 须带 partialReports）",
           "enum": ["5-why", "fishbone", "defect-chain", "upstream-trace", "combined"]
         },
-        "analysisTimestamp": { "type": "string", "format": "date-time" }
+        "analysisTimestamp": { "description": "分析时间（ISO 8601 date-time）", "type": "string", "format": "date-time" }
       }
     },
     "input": {
+      "description": "触发输入（返工提示与来源文件路径）",
       "type": "object",
       "additionalProperties": false,
       "required": ["reworkHints"],
       "properties": {
         "reworkHints": {
+          "description": "触发返工的提示数组（非空，≥1 条；来自 V 评审或门禁失败信息）",
           "type": "array",
           "minItems": 1,
           "items": { "type": "string" }
         },
-        "verifierOutputPath": { "type": "string" },
-        "gateJsonPath": { "type": "string" }
+        "verifierOutputPath": { "description": "V 评审输出文件路径（reworkSource=verifier 时提供）", "type": "string" },
+        "gateJsonPath": { "description": "门禁 GATE_JSON 存档路径（reworkSource=gate 时提供）", "type": "string" }
       }
     },
     "phenomenon": {
+      "description": "现象描述（问题症状与影响面）",
       "type": "object",
       "additionalProperties": false,
       "required": ["summary", "severity", "affectedArtifacts"],
       "properties": {
-        "summary": { "type": "string", "minLength": 1 },
+        "summary": { "description": "现象摘要（非空字符串）", "type": "string", "minLength": 1 },
         "severity": {
+          "description": "严重级别：Critical=致命 / Required=必须修复 / Optional=可选修复 / Nit=琐碎 / FYI=仅告知",
           "enum": ["Critical", "Required", "Optional", "Nit", "FYI"]
         },
         "affectedArtifacts": {
+          "description": "受影响产物路径数组（非空，≥1 条）",
           "type": "array",
           "minItems": 1,
           "items": { "type": "string" }
@@ -80,6 +87,7 @@
       }
     },
     "rootCauseChain": {
+      "description": "根因分析链数组（5-why 等逐层追问；R2 校验长度 [2,5] 且每环 evidence 非空）",
       "type": "array",
       "minItems": 2,
       "maxItems": 5,
@@ -88,19 +96,21 @@
         "additionalProperties": false,
         "required": ["step", "why", "answer", "evidence"],
         "properties": {
-          "step": { "type": "integer", "minimum": 1 },
-          "why": { "type": "string", "minLength": 1 },
-          "answer": { "type": "string", "minLength": 1 },
-          "evidence": { "type": "string", "minLength": 1 }
+          "step": { "description": "链步骤序号（从 1 起递增）", "type": "integer", "minimum": 1 },
+          "why": { "description": "「为什么」追问问题（非空）", "type": "string", "minLength": 1 },
+          "answer": { "description": "对「为什么」的回答（非空）", "type": "string", "minLength": 1 },
+          "evidence": { "description": "本环节的证据引用（R2 校验非空；具体产物/日志/代码位置）", "type": "string", "minLength": 1 }
         }
       }
     },
     "rootCause": {
+      "description": "根因结论（分类 + 描述 + 证据 + 可证伪检查）",
       "type": "object",
       "additionalProperties": false,
       "required": ["category", "description", "evidence", "falsifiabilityCheck"],
       "properties": {
         "category": {
+          "description": "根因分类（7 类）：requirement-gap=需求缺口 / design-flaw=设计缺陷 / coding-error=编码错误 / test-gap=测试缺口 / process-missing=流程缺失 / tool-gap=工具缺口 / upstream-defect=上游缺陷",
           "enum": [
             "requirement-gap",
             "design-flaw",
@@ -111,24 +121,26 @@
             "upstream-defect"
           ]
         },
-        "description": { "type": "string", "minLength": 1 },
-        "evidence": { "type": "string", "minLength": 1 },
-        "falsifiabilityCheck": { "type": "string", "minLength": 1 }
+        "description": { "description": "根因描述（非空）", "type": "string", "minLength": 1 },
+        "evidence": { "description": "根因证据引用（非空；产物/日志/代码位置）", "type": "string", "minLength": 1 },
+        "falsifiabilityCheck": { "description": "可证伪性检查（须含「若…则」句式，R3 校验可证伪假设）", "type": "string", "minLength": 1 }
       }
     },
     "upstreamDefect": {
+      "description": "上游缺陷标记（present=true 时须补齐上游信息，R6 校验）",
       "type": "object",
       "additionalProperties": false,
       "required": ["present", "rollbackRecommended"],
       "properties": {
-        "present": { "type": "boolean" },
-        "upstreamPhase": { "type": "string" },
-        "upstreamArtifactId": { "type": "string" },
-        "defectDescription": { "type": "string" },
-        "rollbackRecommended": { "type": "boolean" }
+        "present": { "description": "是否检测到上游缺陷（boolean；true 时触发阶段回退升级与 R6 校验）", "type": "boolean" },
+        "upstreamPhase": { "description": "上游缺陷所在阶段（present=true 时必填且非空，R6）", "type": "string" },
+        "upstreamArtifactId": { "description": "上游缺陷产物 ID（present=true 时必填且非空，R6）", "type": "string" },
+        "defectDescription": { "description": "上游缺陷描述（present=true 时必填且非空，R6）", "type": "string" },
+        "rollbackRecommended": { "description": "是否建议阶段回退（boolean）", "type": "boolean" }
       }
     },
     "fixRecommendation": {
+      "description": "修复建议列表（R4 校验非空且每项四字段齐全）",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -136,14 +148,15 @@
         "additionalProperties": false,
         "required": ["target", "location", "action", "rationale"],
         "properties": {
-          "target": { "type": "string", "minLength": 1 },
-          "location": { "type": "string", "minLength": 1 },
-          "action": { "type": "string", "minLength": 1 },
-          "rationale": { "type": "string", "minLength": 1 }
+          "target": { "description": "修复目标（产物/模块/流程环节）", "type": "string", "minLength": 1 },
+          "location": { "description": "修复位置（文件路径/行号/节点 ID）", "type": "string", "minLength": 1 },
+          "action": { "description": "修复动作描述（做什么、怎么做）", "type": "string", "minLength": 1 },
+          "rationale": { "description": "修复理由（为何如此修）", "type": "string", "minLength": 1 }
         }
       }
     },
     "prevention": {
+      "description": "预防措施列表（R5 校验非空且每项三字段齐全）",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -151,26 +164,27 @@
         "additionalProperties": false,
         "required": ["scope", "measure", "owner"],
         "properties": {
-          "scope": { "type": "string", "minLength": 1 },
-          "measure": { "type": "string", "minLength": 1 },
-          "owner": { "type": "string", "minLength": 1 }
+          "scope": { "description": "预防范围（流程 / 工具 / 测试 / 文档等）", "type": "string", "minLength": 1 },
+          "measure": { "description": "预防措施描述", "type": "string", "minLength": 1 },
+          "owner": { "description": "负责角色或人（如 G / V / 用户）", "type": "string", "minLength": 1 }
         }
       }
     },
-    "qualityLevel": { "enum": ["A", "B", "C", "D"] },
-    "passed": { "type": "boolean" },
-    "summary": { "type": "string", "minLength": 1 },
-    "reviewNotes": { "type": "string" },
+    "qualityLevel": { "description": "报告质量等级：A/B/C/D（R7：A/B 须 passed=true，C/D 须 passed=false）", "enum": ["A", "B", "C", "D"] },
+    "passed": { "description": "报告是否通过（R7 与 qualityLevel 一致：A/B→true，C/D→false）", "type": "boolean" },
+    "summary": { "description": "报告摘要（非空，概括根因与处置建议）", "type": "string", "minLength": 1 },
+    "reviewNotes": { "description": "评审备注（可选，V 复审意见补充）", "type": "string" },
     "partialReports": {
+      "description": "多角度场景附录（method=combined 时 R9 校验非空；R10 校验含 personaSlice=reality-checker 且 confidence ≥0.5，防幻想根因）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["personaSlice", "path", "confidence"],
         "properties": {
-          "personaSlice": { "type": "string", "minLength": 1 },
-          "path": { "type": "string", "minLength": 1 },
-          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+          "personaSlice": { "description": "角度切片标识（reality-checker=现实校验角度，R10 强制至少一条）", "type": "string", "minLength": 1 },
+          "path": { "description": "局部报告文件路径", "type": "string", "minLength": 1 },
+          "confidence": { "description": "该角度结论置信度（0-1 小数；reality-checker 须 ≥0.5，R10）", "type": "number", "minimum": 0, "maximum": 1 }
         }
       }
     }

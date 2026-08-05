@@ -7,40 +7,42 @@
   "additionalProperties": false,
   "required": ["sigId", "phase", "role", "action", "runId", "artifacts", "prevSigId", "prevSigHash", "sigHash", "signedAt", "signer", "inputProvenance"],
   "properties": {
-    "sigId": { "type": "string", "pattern": "^wm\\d+-r\\d+-[OSAVGR]$|^genesis$" },
-    "phase": { "type": "integer", "minimum": 1, "maximum": 8 },
-    "phaseName": { "type": "string" },
-    "role": { "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] },
-    "action": { "type": "string" },
-    "runId": { "type": "string" },
-    "artifacts": { "type": "array", "items": { "type": "string" } },
-    "prevSigId": { "type": "string" },
-    "prevSigHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$|^0$" },
-    "sigHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "signedAt": { "type": "string", "format": "date-time" },
-    "signer": { "type": "string" },
-    "gateExitCode": { "type": ["integer", "null"] },
-    "gateLogPath": { "type": ["string", "null"] },
+    "sigId": { "description": "签名 ID，格式 wm<阶段>-r<轮次>-<角色>（如 wm1-r002-S，后缀须与 role 一致，R4 角色匹配）；阶段起点为 \"genesis\"", "type": "string", "pattern": "^wm\\d+-r\\d+-[OSAVGR]$|^genesis$" },
+    "phase": { "description": "签名所处阶段编号，取值 1-8（R1 各阶段强制角色链齐全）", "type": "integer", "minimum": 1, "maximum": 8 },
+    "phaseName": { "description": "阶段名称（如 需求分析 / 系统设计），与 phase 对应", "type": "string" },
+    "role": { "description": "签名角色：O=编排者 / A=分析 / S=产出 / V=评审 / G=门禁 / R=根因（R4 校验须在阶段角色清单内）", "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] },
+    "action": { "description": "动作类型（如 chunk/cross/produce/review/gate/checkpoint/locate/fix），与 run-log action 对应", "type": "string" },
+    "runId": { "description": "关联的 run-log 运行 ID（与 run-log.jsonl 中 runId 对应）", "type": "string" },
+    "artifacts": { "description": "本条签名产出的产物路径数组", "type": "array", "items": { "type": "string" } },
+    "prevSigId": { "description": "前一环签名 ID（首环为 \"genesis\"；R2 链式连续性校验 prevSigId 与前一环 sigId 匹配）", "type": "string" },
+    "prevSigHash": { "description": "前一环 sigHash（首环为 \"0\"；R2 校验与前一环 sigHash 一致，格式 sha256:<64 位 hex> 或 \"0\"）", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$|^0$" },
+    "sigHash": { "description": "本条签名哈希（格式 sha256:<64 位 hex>；R6 防篡改：重算 sigHash=sha256(sigId|phase|role|action|runId|artifacts|prevSigHash|signedAt|signer|inputProvenance)，不一致即报篡改）", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "signedAt": { "description": "签名时间（ISO 8601；R3 校验按链序时间戳单调递增）", "type": "string", "format": "date-time" },
+    "signer": { "description": "签名者标识（O checkpoint 须为用户 ID 而非 O 角色，R5 代签检测）", "type": "string" },
+    "gateExitCode": { "description": "门禁退出码（0=通过/1=校验失败/2=输入错误；G 类签名填写，其他为 null）", "type": ["integer", "null"] },
+    "gateLogPath": { "description": "门禁日志存档路径（G 类签名填写，其他为 null）", "type": ["string", "null"] },
     "inputProvenance": {
+      "description": "产出来源证明（上游签名 + 上游产物 + 变换描述；R7 悬空来源 / R9 越权消费 / R10 绕过门禁校验依据）",
       "type": "object",
       "additionalProperties": false,
       "required": ["sourceSigIds", "sourceArtifacts", "transformDescription"],
       "properties": {
-        "sourceSigIds": { "type": "array", "items": { "type": "string" } },
+        "sourceSigIds": { "description": "上游签名 ID 数组（须存在于签名链中——本阶段 ∪ 上一阶段，R7 悬空来源校验）", "type": "array", "items": { "type": "string" } },
         "sourceArtifacts": {
+          "description": "上游产物数组（每条声明来源路径 + 来源签名 + 来源角色；R8 产物存在性校验）",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["path", "sourceSigId", "sourceRole"],
             "properties": {
-              "path": { "type": "string" },
-              "sourceSigId": { "type": "string" },
-              "sourceRole": { "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] }
+              "path": { "description": "上游产物路径（须存在于磁盘，R8 缺失产物校验）", "type": "string" },
+              "sourceSigId": { "description": "该产物的来源签名 ID（须在签名链中）", "type": "string" },
+              "sourceRole": { "description": "该产物的来源角色：O/A/S/V/G/R（R9 越权消费：禁止来源矩阵校验，如 S 不得消费 V/G/R 产物）", "type": "string", "enum": ["O", "S", "A", "V", "G", "R"] }
             }
           }
         },
-        "transformDescription": { "type": "string" }
+        "transformDescription": { "description": "从上游到本条产出的变换描述（如「A 子代理合并 REQ 节点建图 → S 子代理产出需求规格」）", "type": "string" }
       }
     }
   }

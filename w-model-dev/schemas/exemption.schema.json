@@ -6,8 +6,9 @@
   "additionalProperties": false,
   "required": ["id", "type", "target", "ruleId", "justification", "evidence", "proposedAlternative", "submittedAt"],
   "properties": {
-    "id": { "type": "string", "pattern": "^EXEMPT-\\d{3}$" },
+    "id": { "description": "豁免申请 ID（格式 EXEMPT-NNN，如 EXEMPT-001）", "type": "string", "pattern": "^EXEMPT-\\d{3}$" },
     "type": {
+      "description": "豁免类型（5 类）：small-project-hierarchy=小项目无需 REQ-group 层级拆分 / stakeholder-not-applicable=干系人维度不适用 / scenario-type-not-applicable=某场景类型不适用 / coverage-missing-declared=覆盖缺失已在 Out of Scope 声明 / nfr-subtype-not-applicable=NFR 子类不适用",
       "enum": [
         "small-project-hierarchy",
         "stakeholder-not-applicable",
@@ -16,42 +17,45 @@
         "nfr-subtype-not-applicable"
       ]
     },
-    "target": { "type": "string", "minLength": 1 },
-    "ruleId": { "type": "string", "pattern": "^[RC]\\d+$|^C\\d+$" },
-    "justification": { "type": "string", "minLength": 20 },
-    "evidence": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-    "proposedAlternative": { "type": "string", "minLength": 10 },
-    "submittedAt": { "type": "string", "format": "date-time" },
+    "target": { "description": "豁免目标（被豁免的实体 ID 或产物路径，如 REQ-group / STK-NNN）", "type": "string", "minLength": 1 },
+    "ruleId": { "description": "被豁免的校验规则 ID（如 R4 / C8 等，pattern ^[RC]\\d+$ 或 ^C\\d+$）", "type": "string", "pattern": "^[RC]\\d+$|^C\\d+$" },
+    "justification": { "description": "豁免理由（E2 校验长度须 ≥20 字符，防敷衍）", "type": "string", "minLength": 20 },
+    "evidence": { "description": "证据数组（≥1 条证据引用，E3 校验非空）", "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "proposedAlternative": { "description": "提议的替代方案（如声明单 group / 补覆盖），长度须 ≥10 字符", "type": "string", "minLength": 10 },
+    "submittedAt": { "description": "提交时间（ISO 8601；E9 时序校验 submittedAt < reviewedAt）", "type": "string", "format": "date-time" },
     "review": {
+      "description": "R 审查阶段对象（E4 校验必填；S→R→V→人类四阶段中的 R 环）",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "reviewDecision": { "enum": ["approve", "reject", "need-more-info"] },
-        "rootCauseAnalysis": { "type": "string", "minLength": 30 },
-        "falsifiabilityCheck": { "type": "string", "minLength": 10 },
-        "riskAssessment": { "type": "string", "minLength": 10 },
-        "conditions": { "type": "array", "items": { "type": "string" } },
-        "reviewedAt": { "type": "string", "format": "date-time" }
+        "reviewDecision": { "description": "审查决定：approve=批准 / reject=驳回 / need-more-info=需补充信息（E5 校验须为 approve 才能进入 V 阶段）", "enum": ["approve", "reject", "need-more-info"] },
+        "rootCauseAnalysis": { "description": "根因分析文本（E6 校验长度须 ≥30 字符，防模板化）", "type": "string", "minLength": 30 },
+        "falsifiabilityCheck": { "description": "可证伪性检查文本（含「若…则」句式，表明豁免理由可被证伪）", "type": "string", "minLength": 10 },
+        "riskAssessment": { "description": "风险评估文本", "type": "string", "minLength": 10 },
+        "conditions": { "description": "附带放行条件数组（可选，逐条列出豁免生效的前提）", "type": "array", "items": { "type": "string" } },
+        "reviewedAt": { "description": "审查时间（ISO 8601；E9 时序校验 reviewedAt < verifiedAt）", "type": "string", "format": "date-time" }
       },
       "required": ["reviewDecision", "rootCauseAnalysis", "falsifiabilityCheck", "riskAssessment", "reviewedAt"]
     },
     "verification": {
+      "description": "V 校验阶段对象（E7 校验必填）",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "verified": { "type": "boolean" },
-        "reworkHints": { "type": "array", "items": { "type": "string" } },
-        "verifiedAt": { "type": "string", "format": "date-time" }
+        "verified": { "description": "V 校验是否通过（E7 校验须为 true 才放行豁免生效）", "type": "boolean" },
+        "reworkHints": { "description": "返工提示数组（可选；verified=false 时建议填写返工方向）", "type": "array", "items": { "type": "string" } },
+        "verifiedAt": { "description": "校验时间（ISO 8601；E9 时序校验 verifiedAt < decidedAt）", "type": "string", "format": "date-time" }
       },
       "required": ["verified", "verifiedAt"]
     },
     "humanDecision": {
+      "description": "人类确认阶段对象（E8 校验必填；禁止编排者代签）",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "decision": { "enum": ["approve", "reject"] },
-        "decidedAt": { "type": "string", "format": "date-time" },
-        "decidedBy": { "type": "string" }
+        "decision": { "description": "人类决定：approve=批准（豁免生效，写入 granted.json）/ reject=驳回（豁免不生效，回到原规则校验），E8 校验须为 approve", "enum": ["approve", "reject"] },
+        "decidedAt": { "description": "决定时间（ISO 8601；E9 时序校验为链末）", "type": "string", "format": "date-time" },
+        "decidedBy": { "description": "决策人标识（用户 ID，非 O 角色）", "type": "string" }
       },
       "required": ["decision", "decidedAt"]
     }

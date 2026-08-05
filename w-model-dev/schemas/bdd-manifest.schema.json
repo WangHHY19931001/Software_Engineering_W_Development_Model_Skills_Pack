@@ -7,46 +7,49 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "projectId", "basePath", "currentPhase", "features", "stateMachines"],
   "properties": {
-    "schemaVersion": { "type": "string", "enum": ["1.0"] },
-    "projectId": { "type": "string", "minLength": 1 },
-    "basePath": { "type": "string", "minLength": 1 },
-    "currentPhase": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "schemaVersion": { "description": "manifest schema 版本号，固定 \"1.0\"", "type": "string", "enum": ["1.0"] },
+    "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
+    "basePath": { "description": "features 文件根路径（相对仓库根目录，如 features/）", "type": "string", "minLength": 1 },
+    "currentPhase": { "description": "当前所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
     "features": {
+      "description": "BDD features 清单数组（每项含分层特征 + 关联状态机/TLA+ spec，D1 头标注完整性校验）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "level", "filePath", "scenarioCount", "stateMachineId", "tlaSpecId", "reqIds", "designIds", "parentFeatureIds", "siblingFeatureIds", "childFeatureIds"],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "level": { "type": "integer", "enum": [1, 2, 3, 4] },
-          "filePath": { "type": "string", "minLength": 1 },
-          "scenarioCount": { "type": "integer", "minimum": 0 },
-          "stateMachineId": { "type": "string", "minLength": 1 },
-          "tlaSpecId": { "type": "string", "minLength": 1 },
-          "reqIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "designIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "parentFeatureIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "siblingFeatureIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "childFeatureIds": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          "id": { "description": "feature ID（如 L1_blog_system-001），须唯一", "type": "string", "minLength": 1 },
+          "level": { "description": "BDD 分层 1-4：L1=系统与外部参与者交互 / L2=子系统行为+协作 / L3=模块集成 / L4=原子方法行为；与 TLA+ 层次对齐（L4 对应 TLA+ L3 最细粒度），D7 按 level 映射 RTM 测试列", "type": "integer", "enum": [1, 2, 3, 4] },
+          "filePath": { "description": ".feature 文件路径（相对 basePath，文件名前缀与 @system 一致）", "type": "string", "minLength": 1 },
+          "scenarioCount": { "description": "该 feature 的 scenario 数量，非负整数", "type": "integer", "minimum": 0 },
+          "stateMachineId": { "description": "关联状态机 ID（指向 stateMachines[].id，D1 校验与 feature 头 @state-machine 一致）", "type": "string", "minLength": 1 },
+          "tlaSpecId": { "description": "关联 TLA+ spec ID（指向 tla-manifest specs[].id，D4 等价性校验用）", "type": "string", "minLength": 1 },
+          "reqIds": { "description": "关联需求 ID 数组（对应 RTM rows[].requirementId，D7 映射校验）", "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "designIds": { "description": "关联设计产物 ID 数组", "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "parentFeatureIds": { "description": "上级 features ID 列表（L1 可空，L2-L4 必填且 parent 须在上一层级）", "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "siblingFeatureIds": { "description": "同级 features ID 列表（可选；@sibling-features 未声明时可为空）", "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "childFeatureIds": { "description": "下级 features ID 列表（L4 可空，L1-L3 必填且 child 须在下一层级）", "type": "array", "items": { "type": "string", "minLength": 1 } }
         }
       }
     },
     "stateMachines": {
+      "description": "状态机清单数组（每项含七要素：states/initialState/terminalStates/acceptingStates/rejectingStates/transitions/invariants，D3 完整性校验）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "level", "states", "initialState", "terminalStates", "acceptingStates", "rejectingStates", "transitions", "invariants"],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "level": { "type": "integer", "enum": [1, 2, 3, 4] },
-          "states": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
-          "initialState": { "type": "string", "minLength": 1 },
-          "terminalStates": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "acceptingStates": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
-          "rejectingStates": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "id": { "description": "状态机 ID（如 SM-L1-<system>），须唯一", "type": "string", "minLength": 1 },
+          "level": { "description": "状态机所在 BDD 层级，取值 1-4（与 features[].level 同层对齐）", "type": "integer", "enum": [1, 2, 3, 4] },
+          "states": { "description": "状态集合（≥1 个状态名，与同层 TLA+ spec 的 State 集对应，D4 等价性校验）", "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+          "initialState": { "description": "初始状态名（须在 states 中，与 TLA+ Init 对应，D4 等价性校验）", "type": "string", "minLength": 1 },
+          "terminalStates": { "description": "终止状态集（无终止态时声明空数组；每项须在 states 中，D3 完整性校验）", "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "acceptingStates": { "description": "接受状态集（≥1 个，不能为空集；每项须在 states 中，D3 完整性校验）", "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+          "rejectingStates": { "description": "拒绝状态集（无拒绝态时声明空数组；每项须在 states 中，D3 完整性校验）", "type": "array", "items": { "type": "string", "minLength": 1 } },
           "transitions": {
+            "description": "转移表（≥1 条 from+event->to，与 TLA+ Next 对应；D6 scenario 路径合法性校验依据）",
             "type": "array",
             "minItems": 1,
             "items": {
@@ -54,30 +57,31 @@
               "additionalProperties": false,
               "required": ["from", "event", "to"],
               "properties": {
-                "from": { "type": "string", "minLength": 1 },
-                "event": { "type": "string", "minLength": 1 },
-                "to": { "type": "string", "minLength": 1 },
-                "guard": { "type": "string" },
-                "action": { "type": "string" }
+                "from": { "description": "起始状态名（须在 states 中，D6 路径查找起点）", "type": "string", "minLength": 1 },
+                "event": { "description": "触发事件名（D6 按 from+event 查找转移）", "type": "string", "minLength": 1 },
+                "to": { "description": "目标状态名（须在 states 中，D6 校验期望结束态）", "type": "string", "minLength": 1 },
+                "guard": { "description": "守卫条件表达式（可选，如 [guard: ...]）", "type": "string" },
+                "action": { "description": "动作名称（可选，如 [action: ...]）", "type": "string" }
               }
             }
           },
-          "invariants": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          "invariants": { "description": "不变式列表（≥1 条，与同层 TLA+ Invariants 对应，D4 等价性校验）", "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
         }
       }
     },
     "checkRounds": {
+      "description": "BDD 门禁校验轮次记录数组（每轮 check-bdd-model.ts 执行后追加）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["phase", "round", "timestamp", "violations", "converged"],
         "properties": {
-          "phase": { "type": "integer", "minimum": 1, "maximum": 4 },
-          "round": { "type": "integer", "minimum": 1 },
-          "timestamp": { "type": "string", "minLength": 1 },
-          "violations": { "type": "array", "items": { "type": "string" } },
-          "converged": { "type": "boolean" }
+          "phase": { "description": "校验时所处 BDD 建模阶段编号，取值 1-4", "type": "integer", "minimum": 1, "maximum": 4 },
+          "round": { "description": "本阶段内校验轮次序号（从 1 起）", "type": "integer", "minimum": 1 },
+          "timestamp": { "description": "校验时间戳（ISO 8601 字符串）", "type": "string", "minLength": 1 },
+          "violations": { "description": "本轮违反列表（字符串数组，每条为具体违反描述，如 [D1]...[D7]）", "type": "array", "items": { "type": "string" } },
+          "converged": { "description": "本轮是否零违反收敛（violations.length === 0）", "type": "boolean" }
         }
       }
     }
