@@ -22,16 +22,14 @@
  *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要，便于 Agent 解析）
  */
 
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import {
   checkRequirementGraph,
   recalculatePassed,
   type GraphShape,
 } from './graph-logic.js';
-import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonClassified } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
-import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
 import { parsePhaseArg } from './lib/parse-phase.js';
 
@@ -71,36 +69,8 @@ async function main(): Promise<void> {
   if (rtmArg) {
     const rtmPath = rtmArg.split('=')[1];
     if (rtmPath) {
-      try {
-        const rtmRaw = await fs.readFile(path.resolve(rtmPath), 'utf-8');
-        const rtmParsed = parseJsonSafe(rtmRaw) as { rows?: Array<{ requirementId: string; type: string }> };
-        rtmRows = rtmParsed.rows;
-      } catch (err) {
-        if (err instanceof SyntaxError) {
-          exitWithError({
-            category: 'FILE_PARSE',
-            message: '文件解析失败（非合法 JSON）',
-            exitCode: 2,
-            file: path.resolve(rtmPath),
-          });
-        } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-          exitWithError({
-            category: 'FILE_NOT_FOUND',
-            message: '文件不存在',
-            exitCode: 2,
-            file: path.resolve(rtmPath),
-          });
-        } else {
-          exitWithError({
-            category: 'FILE_READ',
-            message: '文件读取失败',
-            exitCode: 2,
-            file: path.resolve(rtmPath),
-            detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
-          });
-        }
-        return;
-      }
+      const rtmParsed = await readJsonClassified<{ rows?: Array<{ requirementId: string; type: string }> }>(rtmPath);
+      rtmRows = rtmParsed.rows;
     }
   }
 
@@ -110,36 +80,8 @@ async function main(): Promise<void> {
   if (exemptArg) {
     const exemptPath = exemptArg.split('=')[1];
     if (exemptPath) {
-      try {
-        const exemptRaw = await fs.readFile(path.resolve(exemptPath), 'utf-8');
-        const exemptParsed = parseJsonSafe(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
-        exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
-      } catch (err) {
-        if (err instanceof SyntaxError) {
-          exitWithError({
-            category: 'FILE_PARSE',
-            message: '文件解析失败（非合法 JSON）',
-            exitCode: 2,
-            file: path.resolve(exemptPath),
-          });
-        } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-          exitWithError({
-            category: 'FILE_NOT_FOUND',
-            message: '文件不存在',
-            exitCode: 2,
-            file: path.resolve(exemptPath),
-          });
-        } else {
-          exitWithError({
-            category: 'FILE_READ',
-            message: '文件读取失败',
-            exitCode: 2,
-            file: path.resolve(exemptPath),
-            detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
-          });
-        }
-        return;
-      }
+      const exemptParsed = await readJsonClassified<{ grantedExemptions?: Array<{ ruleId: string }> }>(exemptPath);
+      exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
     }
   }
 
@@ -256,6 +198,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
+  if (process.exitCode !== 0) return; // 已由 readJsonClassified 设置 exitCode，避免覆盖 ERROR_JSON
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',

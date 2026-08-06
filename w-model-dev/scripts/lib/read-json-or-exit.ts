@@ -15,6 +15,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { parseJsonSafe } from './safe-json.js';
+import { exitWithError } from './cli-error.js';
 
 /**
  * 读取并解析 JSON 文件。
@@ -136,4 +137,38 @@ export async function readJsonlOptional(
     throw err;
   }
   return parseJsonlLines(raw, label, abs);
+}
+
+/**
+ * 读取可选 JSON 附属输入，失败时按标准三分支分类并 exitWithError（stdout ERROR_JSON）。
+ * 收敛 check-requirement-coverage / check-requirement-graph 等「损坏→ERROR_JSON」调用点样板。
+ * 三分支语义与调用点现状精确一致：
+ *   - ENOENT → exitWithError(FILE_NOT_FOUND)（exit 2，不降级跳过）
+ *   - SyntaxError → exitWithError(FILE_PARSE)（exit 2）
+ *   - 其他读取错误 → exitWithError(FILE_READ)（exit 2）
+ * 与 readJsonOptional（ENOENT→null 降级）不同：本函数所有错误路径均 exit 2，不返回 null。
+ *
+ * @param file 文件路径（相对或绝对）
+ * @returns 解析后的 JSON 对象（错误路径已 exit，不会返回）
+ */
+export async function readJsonClassified<T = unknown>(file: string): Promise<T> {
+  const abs = path.resolve(file);
+  let raw: string;
+  try {
+    raw = await fs.readFile(abs, 'utf-8');
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === 'ENOENT') {
+      exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, file: abs });
+    } else {
+      exitWithError({ category: 'FILE_READ', message: '文件读取失败', exitCode: 2, file: abs, detail: e.code ?? '未知错误' });
+    }
+    throw new Error('readJsonClassified: 输入错误已通过 exitWithError 处理');
+  }
+  try {
+    return parseJsonSafe<T>(raw);
+  } catch {
+    exitWithError({ category: 'FILE_PARSE', message: '文件解析失败（非合法 JSON）', exitCode: 2, file: abs });
+    throw new Error('readJsonClassified: 输入错误已通过 exitWithError 处理');
+  }
 }

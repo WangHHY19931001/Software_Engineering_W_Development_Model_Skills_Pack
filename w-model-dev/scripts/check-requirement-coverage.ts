@@ -17,13 +17,11 @@
  *   1  校验失败
  *   2  输入错误
  */
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { checkRequirementCoverage } from './coverage-logic.js';
 import type { GraphShape } from './graph-logic.js';
-import { readJsonOrExit } from './lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonClassified } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
-import { parseJsonSafe } from './lib/safe-json.js';
 import { printGateReport } from './lib/gate-report.js';
 
 async function main(): Promise<void> {
@@ -54,117 +52,33 @@ async function main(): Promise<void> {
   // 读取 graph.json（可选）
   let graphCrossCuts: Array<{ from: string; to: string }> | undefined;
   if (graphPath) {
-    try {
-      const graphRaw = await fs.readFile(path.resolve(graphPath), 'utf-8');
-      const graphParsed = parseJsonSafe(graphRaw) as GraphShape;
-      graphCrossCuts = graphParsed.edges
-        .filter(e => e.type === 'cross-cuts')
-        .map(e => ({ from: e.from, to: e.to }));
-    } catch (err) {
-      if (err instanceof SyntaxError) {
-        exitWithError({
-          category: 'FILE_PARSE',
-          message: '文件解析失败（非合法 JSON）',
-          exitCode: 2,
-          file: path.resolve(graphPath),
-        });
-      } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        exitWithError({
-          category: 'FILE_NOT_FOUND',
-          message: '文件不存在',
-          exitCode: 2,
-          file: path.resolve(graphPath),
-        });
-      } else {
-        exitWithError({
-          category: 'FILE_READ',
-          message: '文件读取失败',
-          exitCode: 2,
-          file: path.resolve(graphPath),
-          detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
-        });
-      }
-      return;
-    }
+    const graphParsed = await readJsonClassified<GraphShape>(graphPath);
+    graphCrossCuts = graphParsed.edges
+      .filter(e => e.type === 'cross-cuts')
+      .map(e => ({ from: e.from, to: e.to }));
   }
 
   // 读取 outOfScope.json（可选）
   let outOfScope: string[] | undefined;
   if (outOfScopePath) {
-    try {
-      const oosRaw = await fs.readFile(path.resolve(outOfScopePath), 'utf-8');
-      const oosParsed = parseJsonSafe(oosRaw);
-      if (!oosParsed || !Array.isArray((oosParsed as { items?: unknown }).items)) {
-        exitWithError({
-          category: 'STRUCTURE_INVALID',
-          message: '结构不符（缺 items 数组）',
-          file: path.resolve(outOfScopePath),
-          exitCode: 2,
-        });
-        return;
-      }
-      outOfScope = (oosParsed as { items: string[] }).items;
-    } catch (err) {
-      if (err instanceof SyntaxError) {
-        exitWithError({
-          category: 'FILE_PARSE',
-          message: '文件解析失败（非合法 JSON）',
-          exitCode: 2,
-          file: path.resolve(outOfScopePath),
-        });
-      } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        exitWithError({
-          category: 'FILE_NOT_FOUND',
-          message: '文件不存在',
-          exitCode: 2,
-          file: path.resolve(outOfScopePath),
-        });
-      } else {
-        exitWithError({
-          category: 'FILE_READ',
-          message: '文件读取失败',
-          exitCode: 2,
-          file: path.resolve(outOfScopePath),
-          detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
-        });
-      }
+    const oosParsed = await readJsonClassified<{ items?: unknown }>(outOfScopePath);
+    if (!oosParsed || !Array.isArray(oosParsed.items)) {
+      exitWithError({
+        category: 'STRUCTURE_INVALID',
+        message: '结构不符（缺 items 数组）',
+        file: path.resolve(outOfScopePath),
+        exitCode: 2,
+      });
       return;
     }
+    outOfScope = (oosParsed as { items: string[] }).items;
   }
 
   // 读取 exemptions.json（可选）
   let exemptions: string[] | undefined;
   if (exemptionsPath) {
-    try {
-      const exemptRaw = await fs.readFile(path.resolve(exemptionsPath), 'utf-8');
-      const exemptParsed = parseJsonSafe(exemptRaw) as { grantedExemptions?: Array<{ ruleId: string }> };
-      exemptions = exemptParsed.grantedExemptions?.map(g => g.ruleId);
-    } catch (err) {
-      if (err instanceof SyntaxError) {
-        exitWithError({
-          category: 'FILE_PARSE',
-          message: '文件解析失败（非合法 JSON）',
-          exitCode: 2,
-          file: path.resolve(exemptionsPath),
-        });
-      } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        exitWithError({
-          category: 'FILE_NOT_FOUND',
-          message: '文件不存在',
-          exitCode: 2,
-          file: path.resolve(exemptionsPath),
-        });
-      } else {
-        exitWithError({
-          category: 'FILE_READ',
-          message: '文件读取失败',
-          exitCode: 2,
-          file: path.resolve(exemptionsPath),
-          detail: (err as NodeJS.ErrnoException).code ?? '未知错误',
-        });
-      }
-      return;
-    }
+    const exemptParsed = await readJsonClassified<{ grantedExemptions?: Array<{ ruleId: string }> }>(exemptionsPath);
+    exemptions = exemptParsed.grantedExemptions?.map(g => g.ruleId);
   }
 
   // 执行校验
@@ -210,6 +124,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
+  if (process.exitCode !== 0) return; // 已由 readJsonClassified 设置 exitCode，避免覆盖 ERROR_JSON
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',
