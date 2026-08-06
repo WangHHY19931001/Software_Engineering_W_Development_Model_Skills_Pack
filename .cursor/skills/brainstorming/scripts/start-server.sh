@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # Start the brainstorm server and output connection info
 # Usage: start-server.sh [--project-dir <path>] [--host <bind-host>] [--url-host <display-host>] [--foreground] [--background]
 #
@@ -144,7 +145,13 @@ chmod 600 "$SERVER_ID_FILE" 2>/dev/null || true
 # Kill any existing server
 if [[ -f "$PID_FILE" ]]; then
   old_pid=$(cat "$PID_FILE")
-  kill "$old_pid" 2>/dev/null
+  # Only kill if the PID belongs to a server.cjs process started by this
+  # script. A recycled PID could now belong to an unrelated process.
+  if ps -p "$old_pid" -o command= 2>/dev/null | grep -q "server.cjs"; then
+    kill "$old_pid" 2>/dev/null || true
+  else
+    echo "PID $old_pid 非本脚本启动的 server 进程，跳过 kill"
+  fi
   rm -f "$PID_FILE"
 fi
 
@@ -153,7 +160,7 @@ cd "$SCRIPT_DIR" || exit 1
 # Resolve the harness PID (grandparent of this script).
 # $PPID is the ephemeral shell the harness spawned to run us — it dies
 # when this script exits. The harness itself is $PPID's parent.
-OWNER_PID="$(ps -o ppid= -p "$PPID" 2>/dev/null | tr -d ' ')"
+OWNER_PID="$(ps -o ppid= -p "$PPID" 2>/dev/null | tr -d ' ' || true)"
 if [[ -z "$OWNER_PID" || "$OWNER_PID" == "1" ]]; then
   OWNER_PID="$PPID"
 fi
@@ -198,7 +205,7 @@ for _ in {1..50}; do
       echo "{\"error\": \"Server started but was killed. Retry in a persistent terminal with: $SCRIPT_DIR/start-server.sh${PROJECT_DIR:+ --project-dir $PROJECT_DIR} --host $BIND_HOST --url-host $URL_HOST --foreground\"}"
       exit 1
     fi
-    grep "server-started" "$LOG_FILE" | head -1
+    grep -m1 "server-started" "$LOG_FILE"
     exit 0
   fi
   sleep 0.1
