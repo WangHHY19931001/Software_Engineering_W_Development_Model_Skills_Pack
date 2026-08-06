@@ -973,6 +973,21 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 > 退出码语义不变：0=通过 / 1=校验失败 / 2=输入错误。ERROR_JSON 仅 exit 2 输入错误输出；exit 1 仍走 violations + 既有 `XXX_JSON` 摘要。
 
+#### 3.4.31 第 33 轮：全仓库优化 5 批实施（2026-08-05，[33.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 全仓库深入分析（总框架 spec 2026-08-05-optimization-overview-design.md）分 5 批执行：安全加固（批次 1）/ 一致性快修（批次 2）/ 脚本瘦身（批次 3）/ 流程与体验（批次 4）/ 技能缺口 + 评估 + 收尾（批次 5，本批） |
+| 新增 | `.cursor/skills/security-review/SKILL.md`（源码级安全扫描：`npm run lint:security` = security-scan.ts + eslint-plugin-security 6 条规则 + baseline v2 内容敏感指纹豁免 + 凭据脱敏反模式 #43 数据文件层检查 + 修复动作 + 检查清单）；`.cursor/skills/codegraph-exploration/SKILL.md`（约束 #20 封装：阶段 5-8 修改前 `codegraph_explore` 调用 + 落盘 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json` 字段 querySymbol/callers/callees/blastRadius/queryTimestamp + 影响评估 + check-codegraph-queries.ts 校验 + 与 code-TLA+ 互补）；`eval/README.md`（TSV 9 列格式 + test-prompts.json 15 条提示词四类场景 + darwin-skill 外部补跑流程 + 当前状态：2026-07-21 最新记录，33.0.0 后待补跑）；`.cursor/skills/performance-review/SKILL.md`（性能评审 4 维度：响应时间 P95<2s / 吞吐 / 资源占用 / 负载模型 ramp-up→sustain→ramp-down + targetValue vs testThreshold + 与 security-review 对称） |
+| 归一化 | 纯技能资产 + 文档变更，无脚本/schema 代码变更；5.3 eval 补跑依赖外部 darwin-skill，本批只补 README 说明（用户确认）；.cursor/skills 技能数 20→23 |
+| package.json | version `32.0.0` → `33.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| 顶层文档 | SSoT §3.4.31 + §10A 追溯表 + CHANGELOG.md [33.0.0] + README/AGENTS/CONTRIBUTING/INSTALL 同步（self-test 213、vitest 434/33 文件、.cursor/skills 23 个技能） |
+| self-test | 基线 213 不变全通过（批次 5 无脚本变更，仅新增技能文档） |
+| vitest | 434/434（33 文件）全通过（基线不变；skill-metadata.test.ts 三方版本校验通过） |
+| TypeScript strict | 0 错误 |
+
+> 批次 5 是总框架 5 批优化的收尾批：批次 1-4 的回归基线与 vitest 计数在批次 4 后更新为 self-test 213 / vitest 434（批次 4 修复 __tests__ 严格类型并纳入测试，README 旧计数 377 与 INSTALL 旧计数 363 已统一为 434）。
+
 ---
 
 ## 4. 技能工作流程
@@ -2573,6 +2588,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.28 | 第 30.1 轮 security-scan 内容敏感指纹 v2 + 签名链 R8 项目根语义 | `scripts/security-scan.ts` + `scripts/__tests__/security-scan.test.ts` + `.eslintsecurity-baseline.json` + `scripts/check-signature-chain.ts` | 完整（self-test 213/213、vitest 301、prepush 12 项、tsc 0 错误） |
 | §3.4.29 | 第 31 轮 /wm status 脚本化 + 流程度量报告 | scripts/wm-status.ts + wm-status-logic.ts + metrics-report.ts + metrics-report-logic.ts | 完整（self-test 213/213、vitest 345、tsc 0 错误） |
 | §3.4.30 | 第 32 轮 错误结构全量归一化 + run-log R6 契约迁移 | scripts/lib/cli-error.ts + 29 脚本 exit 2 归一化 + scripts/run-log-logic.ts（extractExitCode/buildGateLogKeys 迁入）+ scripts/__tests__/cli-error.test.ts | 完整（self-test 213/213、vitest 363、tsc 0 错误） |
+| §3.4.31 | 第 33 轮 全仓库优化 5 批实施（技能缺口 + 评估 + 收尾） | `.cursor/skills/security-review/SKILL.md`（lint:security + baseline v2 + 反模式 #43 凭据脱敏）+ `.cursor/skills/codegraph-exploration/SKILL.md`（约束 #20 codegraph_explore + 落盘字段）+ `.cursor/skills/performance-review/SKILL.md`（性能评审 4 维度）+ `eval/README.md`（TSV 9 列 + darwin-skill 补跑流程）+ 版本号三处 33.0.0 | 完整（self-test 213/213、vitest 434、tsc 0 错误；eval 补跑留待外部 darwin-skill） |
 
 ---
 

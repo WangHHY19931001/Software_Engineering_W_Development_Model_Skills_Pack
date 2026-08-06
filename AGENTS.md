@@ -40,6 +40,7 @@
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南） | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `w-model-dev-demo/` | 第 23 轮端到端调测 demo（blog-system-demo，Express 4 + TS + vitest），2026-07-30 随仓库提交，含 build-*.cjs 生成脚本 + docs/src/tests/tla/features 阶段产物 | 只读测试夹具；不参与 `/wm` 编排；有独立 package.json 依赖（cross-env 等），勿与根 devDeps 混用 |
+| `.cursor/skills/` | Cursor 技能包（23 个中文适配技能；批次 5 新增 3 个：security-review 源码级安全扫描 + 凭据脱敏、codegraph-exploration 约束 #20 修改前影响分析、performance-review 性能评审） | 安全/性能评审、阶段 5-8 修改前 codegraph 影响分析场景按技能触发语义选用 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
 | `.githooks/pre-push` | 本地推送前门禁（替代远程 CI） | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` 后会触发 |
 
@@ -564,5 +565,5 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-opsx-artifacts.ts | opsx 制品 + R3×3 + V 审查产物齐全性校验（反模式 #39/#40；CLI `<project-root> --phase <5\|6\|7\|8>`） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-openspec-archive.ts | opsx:archive 归档完整性校验（CLI `<project-root> --phase <5\|6\|7\|8>`） | 8（归档） | 0=通过，1=校验失败，2=输入错误 |
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式；CLI `--phase <5-8> --project-root <path> --mode <full\|quick\|light>` | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
-| self-test.ts | 回归基线（213 条样本：19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 12 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT）；vitest 363 条（含 graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + signature-chain R1-R10 + archive-integrity + preventive-review + tla-bdd-sync + plan-chunks + design-contract-logic + wm-status-logic + metrics-report-logic + wm-status CLI + metrics-report CLI + cli-error，28 test files） | - | 0=通过，1=失败 |
+| self-test.ts | 回归基线（213 条样本：19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 12 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT）；vitest 434 条（含 graph-logic R1-R6 + coverage-logic C1-C10 + exemption-logic E1-E8 + signature-chain R1-R10 + archive-integrity + preventive-review + tla-bdd-sync + plan-chunks + design-contract-logic + wm-status-logic + metrics-report-logic + wm-status CLI + metrics-report CLI + cli-error，33 test files） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel + codeModule 格式 + uat-path-mapping） | - | 0=通过，1=失败 |

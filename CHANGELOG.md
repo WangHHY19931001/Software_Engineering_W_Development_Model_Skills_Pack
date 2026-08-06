@@ -3,6 +3,28 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [33.0.0] - 2026-08-05
+
+### 第三十三轮 全仓库优化 5 批实施（安全加固 / 一致性快修 / 脚本瘦身 / 流程与体验 / 技能缺口 + 收尾）
+
+总框架设计文档 `docs/superpowers/specs/2026-08-05-optimization-overview-design.md` 分 5 批执行：批次 1 安全加固（4 项，含 lint:security baseline 引入）；批次 2 一致性快修（~11 项）；批次 3 脚本瘦身（12 项，新增 gate-report.ts / parse-phase.ts / readJsonOptional / readJsonlOptional / readJsonClassified，生产代码净 -319 行）；批次 4 流程与体验（10 项，__tests__ 纳入严格类型 + pre-push Windows 兼容 + demo 清理 7866 行）；批次 5 技能缺口 + 评估 + 收尾（本批：3 个新技能 + eval README + 版本号 33.0.0）。详见 SSoT §3.4.31。
+
+#### Added
+- 新建 `.cursor/skills/security-review/SKILL.md`：源码级安全扫描（`npm run lint:security` = security-scan.ts + eslint-plugin-security 6 条规则 + baseline v2 内容敏感指纹豁免）+ 反模式 #43 凭据脱敏（数据文件层高熵密钥特征清单 + 模板/示例占位符检查）+ 修复动作 + 检查清单
+- 新建 `.cursor/skills/codegraph-exploration/SKILL.md`：约束 #20 封装——阶段 5-8 修改前 `codegraph_explore` 调用 + 落盘 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（querySymbol/callers/callees/blastRadius/queryTimestamp）+ 影响评估 + check-codegraph-queries.ts 校验 + 与 code-TLA+ 互补
+- 新建 `.cursor/skills/performance-review/SKILL.md`：性能评审 4 维度（响应时间 P95<2s / 吞吐 / 资源占用 / 负载模型 ramp-up→sustain→ramp-down）+ targetValue vs testThreshold 区分 + 与 security-review 对称的检查清单
+- 新建 `eval/README.md`：TSV 9 列格式说明（timestamp/commit/skill/old_score/new_score/status/dimension/note/eval_mode）+ test-prompts.json 15 条提示词四类场景用途 + darwin-skill 外部补跑流程 + 当前状态（2026-07-21 最新记录，33.0.0 后待补跑）
+
+#### Changed
+- 版本号三处同步为 33.0.0：package.json + skill-metadata.json + SKILL.md frontmatter
+- SSoT §3.4.31 + §10A 追溯表；README/AGENTS/INSTALL vitest 计数统一为 434（README 旧 377、INSTALL 旧 363 陈旧）；README/INSTALL .cursor/skills 技能数 20→23
+
+#### 验证
+- vitest 434/434（33 文件）全通过（含 skill-metadata.test.ts 三方版本校验）
+- self-test 213/213 不变全通过
+- TypeScript strict 0 错误
+- `npm run lint:security` exit 0（0 新增）
+
 ## [32.0.0] - 2026-08-05
 
 ### 第三十二轮 错误结构全量归一化 + run-log R6 契约迁移

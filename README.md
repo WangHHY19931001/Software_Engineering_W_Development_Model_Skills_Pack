@@ -271,7 +271,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 
 ```
 .
-├── .cursor/skills/               # Cursor 技能包（20 个中文适配技能：brainstorming / chinese-code-review / chinese-commit-conventions / chinese-documentation / chinese-git-workflow / dispatching-parallel-agents / executing-plans / finishing-a-development-branch / mcp-builder / receiving-code-review / requesting-code-review / subagent-driven-development / systematic-debugging / test-driven-development / using-git-worktrees / using-superpowers / verification-before-completion / workflow-runner / writing-plans / writing-skills）
+├── .cursor/skills/               # Cursor 技能包（23 个中文适配技能：brainstorming / chinese-code-review / chinese-commit-conventions / chinese-documentation / chinese-git-workflow / codegraph-exploration / dispatching-parallel-agents / executing-plans / finishing-a-development-branch / mcp-builder / performance-review / receiving-code-review / requesting-code-review / security-review / subagent-driven-development / systematic-debugging / test-driven-development / using-git-worktrees / using-superpowers / verification-before-completion / workflow-runner / writing-plans / writing-skills）
 ├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载）
@@ -361,7 +361,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── lib/cli-error.ts      #   exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具（ENOENT/坏行 → exit 2）
 │   │   ├── lib/safe-json.ts      #   JSON 解析原型污染防御（parseJsonSafe，丢弃 __proto__ 键）
-│   │   ├── __tests__/            #   vitest 单元测试（30 个 .test.ts / 377 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            #   vitest 单元测试（33 个 .test.ts / 434 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）

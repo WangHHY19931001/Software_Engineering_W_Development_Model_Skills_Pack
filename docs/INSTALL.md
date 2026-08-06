@@ -71,7 +71,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
 │   ├── lib/cli-error.ts         # exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   ├── self-test.ts             # 回归基线（213 条样本）
-│   └── __tests__/               # vitest 单元测试（28 个 .test.ts / 363 条 + README.md coverage 矩阵）
+│   └── __tests__/               # vitest 单元测试（33 个 .test.ts / 434 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -133,7 +133,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 32.0.0
+version: 33.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
