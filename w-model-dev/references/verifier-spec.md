@@ -839,3 +839,7 @@ self-as-verifier 模式下（单 Agent 兼任 S/V/G/R），V 评审产出须满�
 ### 校验
 
 `check-verifier-output.ts --self-as-verifier --s-output=<path>` 校验 VerifierOutput JSON 路径与 S 产出路径不同。违反命中反模式 #35。
+
+## 相关资源
+
+- 代码审查员提示模板：参见 [.cursor/skills/requesting-code-review/code-reviewer.md](../../.cursor/skills/requesting-code-review/code-reviewer.md)

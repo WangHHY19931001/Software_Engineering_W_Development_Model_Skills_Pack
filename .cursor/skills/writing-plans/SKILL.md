@@ -155,3 +155,7 @@ git commit -m "feat: add specific feature"
 **如果选择内联执行：**
 - **必需子技能：** 使用 superpowers:executing-plans
 - 批量执行并设有检查点供审查
+
+## 相关资源
+
+- 编码阶段执行规范：参见 [w-model-dev/references/phase-5-coding.md](../../../w-model-dev/references/phase-5-coding.md)

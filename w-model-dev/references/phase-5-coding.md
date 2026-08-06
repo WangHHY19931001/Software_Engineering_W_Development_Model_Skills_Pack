@@ -369,3 +369,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=5 
 ## 退出状态
 
 项目 `status` 更新为 `集成测试`。
+
+## 相关资源
+
+- 编写实现计划技能：参见 [.cursor/skills/writing-plans/SKILL.md](../../.cursor/skills/writing-plans/SKILL.md)

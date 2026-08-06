@@ -164,3 +164,7 @@ Task tool（general-purpose）:
 **理由：** 核心实现扎实，架构和测试都很好。Important 问题（帮助文本、
 日期校验）很容易修，且不影响核心功能。
 ```
+
+## 相关资源
+
+- LLM-as-a-Verifier 评审规范：参见 [w-model-dev/references/verifier-spec.md](../../../w-model-dev/references/verifier-spec.md)
