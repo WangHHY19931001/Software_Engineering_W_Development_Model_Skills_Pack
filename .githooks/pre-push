@@ -16,7 +16,33 @@
 #   - package.json
 #   - .githooks/pre-push
 
-set -u
+set -euo pipefail
+
+# ---------- Windows 兼容入口 ----------
+# pre-push 依赖 bash（package.json prepush 用 `bash .githooks/pre-push`）。
+# Windows 原生 cmd/PowerShell 无 bash，无法直接运行本脚本；检测到 Windows 环境时
+# 给出指引并放行（exit 0），避免在非 Git Bash 环境下误报失败。Linux/macOS 不受影响。
+is_windows_like_shell() {
+  case "${OSTYPE:-}" in
+    msys*|cygwin*|mingw*) return 0 ;;
+  esac
+  if [ -n "${MSYSTEM:-}" ]; then
+    return 0
+  fi
+  local uname_s
+  uname_s="$(uname -s 2>/dev/null || true)"
+  case "$uname_s" in
+    MSYS*|MINGW*|CYGWIN*) return 0 ;;
+  esac
+  return 1
+}
+
+if is_windows_like_shell; then
+  printf '[pre-push] \033[33m⚠\033[0m 检测到 Windows 环境（Git Bash / MSYS / MINGW / CYGWIN）\n'
+  printf '[pre-push] \033[33m⚠\033[0m pre-push 门禁依赖 bash，请使用 Git Bash 运行：npm run prepush\n'
+  printf '[pre-push] \033[33m⚠\033[0m 若已在 Git Bash 中运行，请忽略本提示；否则本次推送门禁已跳过（exit 0）\n'
+  exit 0
+fi
 
 # ---------- 工具函数 ----------
 
@@ -106,7 +132,7 @@ run_expect() {
   return 0
 }
 
-# 1. self-test：149 条样本回归基线（含 10 BDD + 10 Coverage + 7 Exemption），必须 exit 0
+# 1. self-test：213 条样本回归基线（19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 10 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT），必须 exit 0
 run_expect "self-test 全部样本匹配期望" 0 npm run self-test || exit 1
 
 # 2. check:verifier 无参数应退出 2（输入错误）
