@@ -3,4 +3,6 @@ dist/
 coverage/
 .w-model/tla/states/
 .w-model/gate-logs/*.log
+# W-Model 运行时状态（完整忽略，含 tickets.md / codegraph-queries/ 等）
+.w-model/
 *.log

@@ -36,5 +36,10 @@ package-lock.json
 npm-debug.log*
 yarn-error.log*
 
+# 测试与构建缓存
+coverage/
+*.tsbuildinfo
+.eslintcache
+
 # Git worktrees（本地隔离工作区，不入库）
 .worktrees/
