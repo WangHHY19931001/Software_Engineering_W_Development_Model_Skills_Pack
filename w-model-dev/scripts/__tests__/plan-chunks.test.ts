@@ -44,7 +44,7 @@ describe('splitMarkdownSections', () => {
     expect(sections).toHaveLength(2);
     expect(sections[0]).toBe('```\n# not header\n```');
     expect(sections[1]).toBe('# Real\nbody');
-    expect(sections[1].startsWith('# Real')).toBe(true);
+    expect(sections[1]!.startsWith('# Real')).toBe(true);
   });
 });
 
@@ -60,7 +60,7 @@ describe('splitByLines', () => {
       expect(c.path).toBe('/tmp/doc.md');
       expect(c.tokens).toBeLessThanOrEqual(maxTokens);
     }
-    expect(chunks[0].id).toBe('chunk-001-001');
+    expect(chunks[0]!.id).toBe('chunk-001-001');
   });
 
   it('单行超长：该行单独成块可超过 maxTokens（其余块仍受限）', () => {

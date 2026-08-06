@@ -8,9 +8,9 @@ function parseFrontmatter(content: string): Record<string, string> {
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!m) throw new Error('frontmatter not found');
   const out: Record<string, string> = {};
-  for (const line of m[1].split(/\r?\n/)) {
+  for (const line of m[1]!.split(/\r?\n/)) {
     const kv = line.match(/^([a-zA-Z]+):\s*(.+)$/);
-    if (kv) out[kv[1]] = kv[2].trim();
+    if (kv) out[kv[1]!] = kv[2]!.trim();
   }
   return out;
 }

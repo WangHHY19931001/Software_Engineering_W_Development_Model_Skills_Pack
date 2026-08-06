@@ -110,7 +110,7 @@ describe('computeMetrics', () => {
       onExceed: 'halt',
     };
     const r = computeMetrics([e({ tokens: 950 })], budget);
-    expect(r.budget?.byPhase[0].burnRate).toBeCloseTo(0.95);
+    expect(r.budget?.byPhase[0]!.burnRate).toBeCloseTo(0.95);
     expect(r.budget?.killSwitchTriggered).toBe(true);
   });
 
@@ -122,9 +122,9 @@ describe('computeMetrics', () => {
     ];
     const r = computeMetrics(entries, null, { from: '2026-08-06T00:00:00Z', to: '2026-08-06T23:59:59Z' });
     expect(r.meta.recordCount).toBe(1);
-    expect(r.byPhase[0].phase).toBe(2);
+    expect(r.byPhase[0]!.phase).toBe(2);
     const r2 = computeMetrics(entries, null, { phase: 3 });
-    expect(r2.byPhase[0].phase).toBe(3);
+    expect(r2.byPhase[0]!.phase).toBe(3);
     expect(r2.overall.totalRecords).toBe(1);
   });
 

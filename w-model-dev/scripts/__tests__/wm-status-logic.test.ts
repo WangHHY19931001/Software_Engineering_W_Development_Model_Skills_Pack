@@ -79,9 +79,9 @@ describe('buildStatusReport', () => {
     }));
     const r = buildStatusReport({ status: '编码' }, null, log);
     expect(r.recentActions).toHaveLength(3);
-    expect(r.recentActions[0].runId).toBe('r3');
-    expect(r.recentActions[2].runId).toBe('r5');
-    expect(Object.keys(r.recentActions[0]).sort()).toEqual([
+    expect(r.recentActions[0]!.runId).toBe('r3');
+    expect(r.recentActions[2]!.runId).toBe('r5');
+    expect(Object.keys(r.recentActions[0]!).sort()).toEqual([
       'action', 'gateExitCode', 'outcome', 'phase', 'role', 'runId', 'timestamp',
     ]);
   });

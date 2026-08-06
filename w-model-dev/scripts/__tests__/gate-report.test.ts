@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe('printGateReport', () => {
   it('输出分隔线 + `${label}_JSON ` 前缀 + 摘要含 exitCode 键，并携带正确 exit code 调用 process.exit', () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -38,7 +38,7 @@ describe('printGateReport', () => {
   });
 
   it('exitCode 键追加在 JSON 末尾（summary 展开之后），原 summary 键顺序不变', () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -54,7 +54,7 @@ describe('printGateReport', () => {
   });
 
   it('非 0/1 exit code（如错误路径 2）原样透传', () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -65,7 +65,7 @@ describe('printGateReport', () => {
   });
 
   it('summary 自带 exitCode 键时被末位实参覆盖（值与位置以函数签名参数为准）', () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

@@ -334,7 +334,7 @@ BusinessInvariant ==
       codeFiles: [file],
     };
     // 注入 tlaContent（CLI 读取后注入）
-    input.manifest.specs[0].tlaContent = tlaContent;
+    input.manifest.specs[0]!.tlaContent = tlaContent;
     const result = checkCodeTlaConsistency(input);
     expect(result.passed).toBe(true);
     expect(result.violations).toHaveLength(0);

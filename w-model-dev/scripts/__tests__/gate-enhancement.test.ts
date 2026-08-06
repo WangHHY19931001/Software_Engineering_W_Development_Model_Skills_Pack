@@ -441,8 +441,8 @@ function runGate(input: GateInput): GateOutput {
   const suppressAllRules = new Set<string>();
 
   for (let i = 0; i < (input.exemptions ?? []).length; i++) {
-    const exempt = input.exemptions![i];
-    const result = exemptionResults[i];
+    const exempt = input.exemptions![i]!;
+    const result = exemptionResults[i]!;
     if (result.passed) {
       approvedRuleIds.add(exempt.ruleId);
       // small-project-hierarchy 豁免覆盖 R2+R4（同源：小项目无 level=1 REQ）
@@ -538,7 +538,7 @@ describe('阶段 E 集成测试：graph + coverage + exemption 联动', () => {
       exemptions: [exemptWithoutHuman as ExemptionShape],
     });
     expect(result.overallPassed).toBe(false);
-    expect(result.exemptionViolations[0].some(v => v.includes('E8'))).toBe(true);
+    expect(result.exemptionViolations[0]!.some(v => v.includes('E8'))).toBe(true);
   });
 
   it('集成5: graph R4 违规 + 已批准豁免 → R4 被抑制 → 整体通过', () => {
@@ -683,7 +683,7 @@ describe('G-B gate-logic 修正（round28）', () => {
             integrationTest: 'IT-B',
             systemTest: 'ST-B',
             acceptanceTest: '',
-            coverageStatus: '0%',
+            coverageStatus: '部分',
           },
         ],
         executionSummary: {

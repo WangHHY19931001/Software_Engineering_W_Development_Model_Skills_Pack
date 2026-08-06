@@ -70,8 +70,8 @@ describe('parseBackgroundStateMachine', () => {
     expect(violations).toEqual([]);
     expect(sm.states).toEqual(['A', 'B', 'C']);
     expect(sm.transitions).toHaveLength(2);
-    expect(sm.transitions![1].guard).toBe('x>0');
-    expect(sm.transitions![1].action).toBe('log');
+    expect(sm.transitions![1]!.guard).toBe('x>0');
+    expect(sm.transitions![1]!.action).toBe('log');
     expect(sm.invariants).toEqual(['B => x>=0']);
   });
 

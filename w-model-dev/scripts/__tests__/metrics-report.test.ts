@@ -189,6 +189,6 @@ describe('metrics-report CLI（边界与降级）', () => {
     const parsed = JSON.parse(r.stdout) as { overall: { totalRecords: number }; byPhase: Array<{ phase: number }> };
     expect(parsed.overall.totalRecords).toBe(2);
     expect(parsed.byPhase).toHaveLength(1);
-    expect(parsed.byPhase[0].phase).toBe(1);
+    expect(parsed.byPhase[0]!.phase).toBe(1);
   });
 });

@@ -43,7 +43,7 @@ describe('readJsonOrExit', () => {
   });
 
   it('文件不存在时调用 process.exit(2)', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -55,7 +55,7 @@ describe('readJsonOrExit', () => {
   });
 
   it('非法 JSON 时调用 process.exit(2)', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -114,7 +114,7 @@ describe('readJsonlOrExit', () => {
   });
 
   it('文件不存在时调用 process.exit(2)', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -151,7 +151,7 @@ describe('readJsonOptional', () => {
   });
 
   it('非法 JSON → process.exit(2)（与 readJsonOrExit 一致）', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
