@@ -6,7 +6,7 @@
 
 **关联前篇:** [2026-07-28-phase1-4dim-identification.md](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/docs/superpowers/plans/2026-07-28-phase1-4dim-identification.md)（阶段 A-C）
 
-**关联设计文档:** [design.md](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/docs/changes/2026-07-28-round20-phase1-4dim-identification/design.md)
+**关联设计文档:** [design.md](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/docs/changes/archive/2026-07-28-round20-phase1-4dim-identification/design.md)
 
 ---
 

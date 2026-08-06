@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript (strict mode, ESM via tsx), Ajv (JSON schema), Vitest, Node.js 标准库。
 
-**关联设计文档:** [docs/changes/2026-07-28-round20-phase1-4dim-identification/design.md](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/docs/changes/2026-07-28-round20-phase1-4dim-identification/design.md)
+**关联设计文档:** [docs/changes/archive/2026-07-28-round20-phase1-4dim-identification/design.md](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/docs/changes/archive/2026-07-28-round20-phase1-4dim-identification/design.md)
 
 ---
 
