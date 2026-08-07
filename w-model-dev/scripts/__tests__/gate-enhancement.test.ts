@@ -41,6 +41,7 @@ function loadVerifierSample(name: string): VerifierOutputShape {
 /**
  * 构造一份结构合规的极简 manifest（不含 basePath）。
  * 仅一个 L1 根 spec，所有声明标志为通过，故纯逻辑校验仅 basePath 缺失会致失败。
+ * sdCoverage：Task 3 schema 在 currentPhase>=2 时强制必填，此处补空覆盖数据以通过 schema 前置校验。
  */
 function makeValidManifestWithoutBasePath(): unknown {
   return {
@@ -70,6 +71,12 @@ function makeValidManifestWithoutBasePath(): unknown {
       },
     ],
     checkRounds: [],
+    sdCoverage: {
+      totalSdNodes: 0,
+      coveredSdNodes: [],
+      uncoveredSdNodes: [],
+      coverageRate: 1,
+    },
   };
 }
 

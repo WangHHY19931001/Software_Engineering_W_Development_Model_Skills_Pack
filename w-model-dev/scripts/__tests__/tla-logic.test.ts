@@ -274,3 +274,130 @@ describe('G-D D3 @phase 解析拒绝非整数', () => {
     expect(violations.some(v => v.includes('@phase'))).toBe(false);
   });
 });
+
+// ==================== checkCoverage sdCoverage 回填校验（Task 5） ====================
+
+describe('checkCoverage sdCoverage 回填', () => {
+  // 注：schema（Task 3）在 currentPhase>=2 时强制必填 sdCoverage，且 sdCoverage.uncoveredSdNodes
+  // maxItems:0 —— 非空 uncoveredSdNodes / 缺失 sdCoverage 在 schema 层即被拦截（返回 [schema] 前缀 violations，
+  // checkTlaModel 提前返回）。因此以下用例的构造须让 manifest 通过 schema 以触达业务层校验：
+  //   - 用例 1：sdCoverage 与 graphSdNodes 覆盖集合不一致（coveredSdNodes 漏报，uncoveredSdNodes 保持空数组）
+  //   - 用例 2：manifest.currentPhase=1 绕过 schema 必填，以 phase 参数=2 触发业务层「缺失」校验
+  it('sdCoverage 覆盖集合与 graphSdNodes 不一致（coveredSdNodes 漏报已覆盖 SD）应产生 coverageViolations', () => {
+    const manifest = {
+      version: 1,
+      currentPhase: 2,
+      basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [
+        {
+          id: 'L1_Test',
+          level: 'L1',
+          phase: 1,
+          system: 'test',
+          requirementIds: ['SD-001', 'SD-002'],
+          designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
+          tlaPath: 'L1_Test.tla',
+          cfgPath: 'L1_Test.cfg',
+          parent: null,
+          siblings: [],
+          children: [],
+          variableCombination: 100,
+          decompositionDecision: 'kept-below-threshold',
+          syntaxChecked: true,
+          tlcChecked: true,
+          deadlockFree: true,
+          invariantsHold: true,
+          stateExplosion: false,
+        },
+      ],
+      graphSdNodes: ['SD-001', 'SD-002'],
+      sdCoverage: {
+        totalSdNodes: 2,
+        coveredSdNodes: ['SD-001'], // 漏报 SD-002（spec 实际已覆盖）
+        uncoveredSdNodes: [],
+        coverageRate: 0.5,
+      },
+    } as any;
+    const result = checkTlaModel(manifest, 2);
+    expect(result.coverageViolations.length).toBeGreaterThan(0);
+    expect(result.coverageViolations.join(' ')).toMatch(/比对不一致/);
+    expect(result.passed).toBe(false);
+  });
+
+  it('sdCoverage 缺失但 graphSdNodes 非空（phase>=2）应产生 coverageViolations', () => {
+    const manifest = {
+      version: 1,
+      currentPhase: 1, // schema 在 currentPhase>=2 时强制必填 sdCoverage；此处以 phase 参数=2 触发业务层缺失校验
+      basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [
+        {
+          id: 'L1_Test',
+          level: 'L1',
+          phase: 1,
+          system: 'test',
+          requirementIds: ['SD-001'],
+          designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
+          tlaPath: 'L1_Test.tla',
+          cfgPath: 'L1_Test.cfg',
+          parent: null,
+          siblings: [],
+          children: [],
+          variableCombination: 100,
+          decompositionDecision: 'kept-below-threshold',
+          syntaxChecked: true,
+          tlcChecked: true,
+          deadlockFree: true,
+          invariantsHold: true,
+          stateExplosion: false,
+        },
+      ],
+      graphSdNodes: ['SD-001', 'SD-002'],
+    } as any;
+    const result = checkTlaModel(manifest, 2);
+    expect(result.coverageViolations.length).toBeGreaterThan(0);
+    expect(result.coverageViolations.join(' ')).toMatch(/sdCoverage.*缺失|sdCoverage.*missing/);
+    expect(result.passed).toBe(false);
+  });
+
+  it('sdCoverage 全覆盖时 coverageViolations 为空', () => {
+    const manifest = {
+      version: 1,
+      currentPhase: 2,
+      basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [
+        {
+          id: 'L1_Test',
+          level: 'L1',
+          phase: 1,
+          system: 'test',
+          requirementIds: ['SD-001', 'SD-002'],
+          designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
+          tlaPath: 'L1_Test.tla',
+          cfgPath: 'L1_Test.cfg',
+          parent: null,
+          siblings: [],
+          children: [],
+          variableCombination: 100,
+          decompositionDecision: 'kept-below-threshold',
+          syntaxChecked: true,
+          tlcChecked: true,
+          deadlockFree: true,
+          invariantsHold: true,
+          stateExplosion: false,
+        },
+      ],
+      graphSdNodes: ['SD-001', 'SD-002'],
+      sdCoverage: {
+        totalSdNodes: 2,
+        coveredSdNodes: ['SD-001', 'SD-002'],
+        uncoveredSdNodes: [],
+        coverageRate: 1.0,
+      },
+    } as any;
+    const result = checkTlaModel(manifest, 2);
+    expect(result.coverageViolations).toEqual([]);
+  });
+});

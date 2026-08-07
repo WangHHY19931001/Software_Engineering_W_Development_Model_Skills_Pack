@@ -76,6 +76,16 @@ export interface TlaManifest {
    * 供 SD 覆盖率纯逻辑校验使用）。未提供时跳过覆盖率校验。
    */
   graphSdNodes?: string[];
+  /**
+   * SD 覆盖率数据（phase>=2 强制必填，由 S-ingest-tla 从 .tla @designIds + graph.json 比对后回填）。
+   * checkTlaModel 校验 uncoveredSdNodes 须为空。
+   */
+  sdCoverage?: {
+    totalSdNodes: number;
+    coveredSdNodes: string[];
+    uncoveredSdNodes: string[];
+    coverageRate: number;
+  };
   checkRounds?: Array<{
     phase: number;
     round: number;
@@ -972,10 +982,45 @@ export function checkTlaModel(
   const decomp = checkDecomposition(checkedSpecs);
   result.decompositionViolations = decomp.violations;
 
-  // 6. SD 覆盖率校验（§10）：manifest 提供 graphSdNodes 且非空时执行
-  if (Array.isArray(m.graphSdNodes) && m.graphSdNodes.length > 0) {
-    const coverage = checkCoverage(checkedSpecs, m.graphSdNodes);
-    result.coverageViolations = coverage.violations;
+  // 6. SD 覆盖率校验（§10）：phase>=2 时强制执行
+  if (phase >= 2) {
+    if (!m.sdCoverage) {
+      result.coverageViolations.push(
+        'sdCoverage 字段缺失（phase>=2 强制必填，须由 S-ingest-tla 从 .tla @designIds + graph.json 比对后回填）',
+      );
+    } else {
+      // 校验 sdCoverage 字段结构
+      const cov = m.sdCoverage;
+      if (typeof cov.totalSdNodes !== 'number' || typeof cov.coverageRate !== 'number') {
+        result.coverageViolations.push('sdCoverage.totalSdNodes / coverageRate 须为数字');
+      } else if (!Array.isArray(cov.coveredSdNodes) || !Array.isArray(cov.uncoveredSdNodes)) {
+        result.coverageViolations.push('sdCoverage.coveredSdNodes / uncoveredSdNodes 须为数组');
+      } else if (cov.uncoveredSdNodes.length > 0) {
+        result.coverageViolations.push(
+          `以下 SD 节点未被任何 TLA+ spec 覆盖: ${cov.uncoveredSdNodes.join(', ')}`,
+        );
+      }
+      // 交叉校验：sdCoverage.coveredSdNodes 与 graphSdNodes 比对一致
+      if (Array.isArray(m.graphSdNodes) && m.graphSdNodes.length > 0) {
+        const expectedUncovered = m.graphSdNodes.filter(sd => !cov.coveredSdNodes?.includes(sd));
+        if (expectedUncovered.length !== cov.uncoveredSdNodes.length) {
+          result.coverageViolations.push(
+            'sdCoverage 与 graphSdNodes 比对不一致（covered/uncovered 集合不匹配）',
+          );
+        }
+      }
+    }
+    // 保留原有 graphSdNodes 覆盖率校验（作为交叉验证）
+    if (Array.isArray(m.graphSdNodes) && m.graphSdNodes.length > 0) {
+      const coverage = checkCoverage(checkedSpecs, m.graphSdNodes);
+      result.coverageViolations.push(...coverage.violations);
+    }
+  } else {
+    // phase < 2 时保留原有可选行为
+    if (Array.isArray(m.graphSdNodes) && m.graphSdNodes.length > 0) {
+      const coverage = checkCoverage(checkedSpecs, m.graphSdNodes);
+      result.coverageViolations.push(...coverage.violations);
+    }
   }
 
   // 7. cfg-tla 一致性 + cfg 结构校验（§11/§12）：每个含 tlaContent/cfgContent 的 spec 单独校验
