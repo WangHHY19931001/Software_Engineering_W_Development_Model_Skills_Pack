@@ -1271,16 +1271,16 @@ const BDD_CASES: BddCase[] = [
   },
   {
     manifestFile: 'bad-tla-mismatch.manifest.json',
-    featureFiles: ['valid-l1.feature'],
+    featureFiles: ['valid-l2.feature'],
     expectedPassed: false,
     expectedExitCode: 1,
     expectedReasonPatterns: [/state set mismatch/],
     phase: 1,
-    description: 'BDD 状态集与 TLA+ 快照不一致，应被 D4 等价性校验拦截',
+    description: 'L2 子系统级 BDD 状态集与 TLA+ 快照不一致（L2 不豁免 D4 自动等价），应被 D4 等价性校验拦截',
     tlaSnapshots: [
       {
-        specId: 'L1-blog_system',
-        states: ['LoggedOut', 'LoggedIn'],
+        specId: 'L2-blog_system_auth',
+        states: ['LoggedOut', 'LoggedIn', 'Locked'],
         initialState: 'LoggedOut',
         transitions: [{ from: 'LoggedOut', event: 'login', to: 'LoggedIn' }],
         invariants: ['LoggedIn => sessionValid'],

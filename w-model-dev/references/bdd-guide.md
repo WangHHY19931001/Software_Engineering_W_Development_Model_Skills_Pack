@@ -279,6 +279,15 @@ BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
 > TLA+ State 集合与 Next 分支由 `tla-logic.ts` 解析 .tla 文件得出；BDD 状态集与转移表由 `bdd-logic.ts` 解析 Background 节得出。
 
+#### D4 层级豁免与解析风格
+
+- **L1 系统级规格豁免 D4 自动等价比对**：L1 是请求-响应抽象（actor/request/response 类别）而非内部状态机，`check-bdd-model.ts` 对 `level === 1` 的状态机跳过 `validateTlaEquivalence`（不产生 D4 violation）；L1 等价性由 R3/V 语义评审把关。D1/D3/D6/D7/D8 维度对 L1 仍照常校验。
+- **L2+ 子系统级规格自动等价比对**：仍执行完整等价校验；快照解析（`bdd-logic.ts::parseTlaSpecSnapshot`）支持命名集合风格：
+  - 状态变量取值域：`var \in {"s1", "s2", ...}`（内联枚举）或 `var \in SETNAME`（值从文件内 `SETNAME == {...}` 定义解析，支持单行/跨行）
+  - 转移：`var = "From"` / `var \in {...}` / `var \in SETNAME` + `var' = "To"`
+  - 不变式多形态归一化：`var = "State" => cond`、`var # "State" => cond`、`cond => (var = "State")` 均归一化为 `State => cond` 参与字符串等价比对
+- 已知限制：BDD 侧对「不改变状态变量」动作的**投影自环**（如事件总线/通知/审计等横切动作在 TLA+ 中不改状态变量、BDD 投影为自环）、以及措辞不同但实质一致的不变式，自动字符串比对会报 mismatch —— 属预期行为，按 §4.3 走 R→V 语义等价判定，非 BDD 偏离。
+
 ### §4.3 不一致处理流程（R→V）
 
 ```

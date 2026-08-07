@@ -389,26 +389,80 @@ describe('checkBddModel', () => {
     expect(result.dimensions.rtmMapping.some(v => v.includes('not in RTM'))).toBe(true);
     expect(result.exitCode).toBe(1);
   });
+
+  it('D4: L1 系统级规格豁免自动等价（空/不匹配快照零 violation）；L2 不匹配快照仍报 violation', () => {
+    // L1 系统级规格是请求-响应抽象而非内部状态机，D4 自动等价由 R3/V 语义评审把关；
+    // L2+ 子系统级规格仍执行完整自动等价校验（level === 1 时跳过 validateTlaEquivalence）。
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
+      currentPhase: 2,
+      features: [],
+      stateMachines: [
+        {
+          id: 'SM-L1-sys', level: 1,
+          states: ['A', 'B'], initialState: 'A', terminalStates: [],
+          acceptingStates: ['B'], rejectingStates: [],
+          transitions: [{ from: 'A', event: 'e', to: 'B' }],
+          invariants: ['B => done'],
+        },
+        {
+          id: 'SM-L2-sub', level: 2,
+          states: ['X', 'Y'], initialState: 'X', terminalStates: [],
+          acceptingStates: ['Y'], rejectingStates: [],
+          transitions: [{ from: 'X', event: 'f', to: 'Y' }],
+          invariants: ['Y => ok'],
+        },
+      ],
+      designCoverage: { totalSdNodes: 0, coveredSdNodes: [], uncoveredSdNodes: [], coverageRate: 1 },
+    } as any;
+    const result = checkBddModel({
+      manifest,
+      phase: 2,
+      parsedFeatures: [],
+      // L1 快照为空（与 BDD 完全不匹配）；L2 快照同样不匹配（多一个状态 + 转移目标不同）
+      tlaSnapshots: [
+        { specId: 'L1-sys', states: [], initialState: '', transitions: [], invariants: [] },
+        {
+          specId: 'L2-sub',
+          states: ['X', 'Y', 'Z'], initialState: 'X',
+          transitions: [{ from: 'X', event: 'f', to: 'Z' }],
+          invariants: ['Y => ok'],
+        },
+      ],
+    });
+    // L1：即使快照为空也不产生任何 tlaEquivalence violation
+    expect(result.dimensions.tlaEquivalence.filter(v => v.includes('SM-L1-sys'))).toEqual([]);
+    // L2：不匹配快照产生 violation（自动等价校验仍完整执行）
+    expect(result.dimensions.tlaEquivalence.some(v => v.includes('SM-L2-sub'))).toBe(true);
+    expect(result.exitCode).toBe(1);
+  });
 });
 
 // ==================== parseTlaSpecSnapshot（批次 3 Task 6 补强：直接单测） ====================
 
 describe('parseTlaSpecSnapshot', () => {
-  // 真实 demo 仓库 TLA+ 规格（w-model-dev-demo/tla/specs/level1/L1-BlogSystem.tla）
+  // 真实 demo 仓库 TLA+ 规格（w-model-dev-demo/tla/specs/level1/L1_BlogSystem.tla）
   const L1_REAL_PATH = path.join(
     __dirname, '..', '..', '..',
-    'w-model-dev-demo', 'tla', 'specs', 'level1', 'L1-BlogSystem.tla'
+    'w-model-dev-demo', 'tla', 'specs', 'level1', 'L1_BlogSystem.tla'
   );
 
-  it('real L1 fixture: documents current behavior (named-set style yields empty snapshot)', () => {
-    // 观察项：真实规格用命名集合（SystemStates == {...}），TypeOK 体内仅 `systemState \in SystemStates`
-    // 引用，与解析器约定的内联 `\in {"s1","s2"}` 枚举不符 → 当前实现返回空快照（不抛错）。
-    // 该断言锁定现状，若未来解析器支持命名集合解析，此处需同步更新。
+  it('real L1 fixture: named-set style resolves REQUESTS（22 状态）作为状态集', () => {
+    // 真实 L1 规格全部采用命名集合风格（ACTORS / REQUESTS / RESPONSES）：
+    // TypeInvariant 内 `request \in REQUESTS`（22 值）> `actor \in ACTORS`（4）> `response \in RESPONSES`（7）
+    // → 状态变量选择 request，状态集 = REQUESTS 的 22 个请求类别（解析器已支持命名集合）。
     const content = readFileSync(L1_REAL_PATH, 'utf-8');
-    const snap = parseTlaSpecSnapshot(content, 'L1-BlogSystem.tla');
-    expect(snap.specId).toBe('L1-BlogSystem.tla');
-    expect(snap.states).toEqual([]);
-    expect(snap.initialState).toBe('');
+    const snap = parseTlaSpecSnapshot(content, 'L1_BlogSystem');
+    expect(snap.specId).toBe('L1_BlogSystem');
+    expect(snap.states).toHaveLength(22);
+    expect(snap.states).toContain('Register');
+    expect(snap.states).toContain('BrowseArticle');
+    expect(snap.initialState).toBe('BrowseArticle');
+    // L1 动作用 `request' = "..."` 表达新请求、无 `request = "..."` 前置断言，
+    // 且不变式为 `(request = "BrowseArticle" /\ response = "ok2xx") => published` 复合形式
+    // → 单变量快照无法提取转移/不变式（保持空，符合解析器约定）
     expect(snap.transitions).toEqual([]);
     expect(snap.invariants).toEqual([]);
   });
@@ -653,6 +707,93 @@ Spec == Init /\\ [][Next]_vars
     expect(snap.states).toEqual([]);
     expect(snap.initialState).toBe('');
     expect(snap.transitions).toEqual([]);
+  });
+
+  it('named-set style: resolves `var \\in SETNAME` via `SETNAME == {...}` (L2_BlogSystemAuth 风格)', () => {
+    const content = `---- MODULE L2_BlogSystemAuth ----
+VARIABLES authState
+
+TypeInvariant ==
+  /\\ authState \\in AUTH_STATES
+
+AUTH_STATES == {"none", "registered", "loggedIn"}
+
+Init ==
+  /\\ authState = "none"
+
+Register ==
+  /\\ authState = "none"
+  /\\ authState' = "registered"
+
+Next ==
+  \\/ Register
+
+Spec == Init /\\ [][Next]_<<authState>>
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'L2_BlogSystemAuth');
+    // 状态集来自命名集合定义 AUTH_STATES == {...}（非内联字面量）
+    expect(snap.states).toEqual(['none', 'registered', 'loggedIn']);
+    expect(snap.initialState).toBe('none');
+    // 转移沿用 `stateVar = "From"` + `stateVar' = "To"`，事件名 PascalCase → camelCase
+    expect(snap.transitions).toContainEqual({ from: 'none', event: 'register', to: 'registered' });
+  });
+
+  it('expands `stateVar \\in SETNAME` from-state via named-set resolution', () => {
+    const content = `---- MODULE NamedFrom ----
+VARIABLES s, u
+
+TypeOK ==
+  /\\ s \\in S_STATES
+  /\\ u \\in Nat
+
+S_STATES == {"A", "B"}
+
+Init ==
+  /\\ s = "A"
+  /\\ u = 0
+
+Retry ==
+  /\\ s \\in S_STATES
+  /\\ s' = "B"
+
+Next ==
+  \\/ Retry
+
+Spec == Init /\\ [][Next]_vars
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'named-from');
+    expect(snap.states).toEqual(['A', 'B']);
+    expect(snap.transitions).toEqual([
+      { from: 'A', event: 'retry', to: 'B' },
+      { from: 'B', event: 'retry', to: 'B' },
+    ]);
+  });
+
+  it('invariants: normalizes `var # "State" => cond` 与反向 `cond => (var = "State")` 为 `State => cond`', () => {
+    const content = `---- MODULE L2AuthInv ----
+VARIABLES authState, tokenValid, pwdHashed
+
+TypeInvariant ==
+  /\\ authState \\in AUTH_STATES
+
+AUTH_STATES == {"none", "registered", "loggedIn"}
+
+PasswordHashedWhenRegistered ==
+  authState # "none" => pwdHashed
+
+TokenValidRequiresLogin ==
+  tokenValid => (authState = "loggedIn")
+
+Spec == Init /\\ [][Next]_vars
+====
+`;
+    const snap = parseTlaSpecSnapshot(content, 'L2-auth-inv');
+    // # 形式：authState # "none" => pwdHashed → none => pwdHashed（未处于 none 蕴含 pwdHashed）
+    expect(snap.invariants).toContain('none => pwdHashed');
+    // 反向形式：tokenValid => (authState = "loggedIn") → loggedIn => tokenValid
+    expect(snap.invariants).toContain('loggedIn => tokenValid');
   });
 
   it('passes through specId verbatim', () => {

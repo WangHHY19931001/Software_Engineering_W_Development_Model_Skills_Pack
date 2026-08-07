@@ -475,10 +475,12 @@ export interface TlaSpecSnapshot {
  * 供 D4 BDD↔TLA+ 等价性校验使用。纯函数：输入 .tla 文本内容 + specId，输出 TlaSpecSnapshot。
  *
  * 解析约定（与本项目所有 .tla 文件一致，迁移自 check-bdd-model.ts 的内联实现）：
- *   - 状态变量：在 TypeInvariant 中以 `var \in {"s1", "s2", ...}` 声明（区别于计数器 `var \in Nat`）
+ *   - 状态变量：在 TypeInvariant 中以 `var \in {"s1", "s2", ...}`（内联枚举）或
+ *     `var \in SETNAME`（命名集合，值从 `SETNAME == {...}` 定义解析）声明（区别于计数器 `var \in Nat`）
  *   - 初始状态：在 Init 中以 `var = "Value"` 赋值
- *   - 转移：每个 Action 定义中 `var = "From"` (或 `var \in {...}`) + `var' = "To"`
- *   - 不变式：`var = "State" => condition` 格式，归一化为 `State => condition`
+ *   - 转移：每个 Action 定义中 `var = "From"`（或 `var \in {...}` / `var \in SETNAME`）+ `var' = "To"`
+ *   - 不变式：`var = "State" => condition`、`var # "State" => condition`、
+ *     `condition => (var = "State")` 均归一化为 `State => condition`
  */
 export function parseTlaSpecSnapshot(tlaContent: string, specId: string): TlaSpecSnapshot {
   return {
@@ -491,9 +493,32 @@ export function parseTlaSpecSnapshot(tlaContent: string, specId: string): TlaSpe
 }
 
 /**
+ * 解析 TLA+ 命名集合定义 `SETNAME == {"v1", "v2", ...}`（支持单行与跨行、行内注释）中的字符串值。
+ * 找不到定义或集合不含字符串字面量时返回空数组。
+ * 注意：与内联枚举一致的已知限制——不提取空串 "" 值（`"([^"]+)"` 要求至少 1 字符）。
+ */
+function resolveSetValues(content: string, setName: string): string[] {
+  const defRegex = new RegExp('\\b' + setName + '\\s*==\\s*\\{([\\s\\S]*?)\\}');
+  const defMatch = defRegex.exec(content);
+  if (!defMatch) return [];
+  const values: string[] = [];
+  const valMatches = defMatch[1]!.match(/"([^"]+)"/g);
+  if (valMatches) {
+    for (const v of valMatches) {
+      const val = v.slice(1, -1);
+      if (!values.includes(val)) values.push(val);
+    }
+  }
+  return values;
+}
+
+/**
  * 提取 TLA+ 规格中枚举状态数最多的状态变量名。
  * 当规格有多个带枚举值的状态变量时（如 L1 的 systemState 和 userState），
  * 选择状态数最多的那个（通常是 BDD 对应的用户行为状态变量）。
+ * 支持两种取值域声明风格：
+ *   - 内联字面量枚举：`var \in {"s1", "s2", ...}`
+ *   - 命名集合引用：`var \in SETNAME`，值从文件中的 `SETNAME == {...}` 定义解析
  */
 function extractStateVarName(content: string): string | null {
   const typeDefMatch = content.match(/\b(?:TypeOK|TypeInvariant|Invariants)\s*==/);
@@ -516,11 +541,24 @@ function extractStateVarName(content: string): string | null {
       bestVar = match[1]!;
     }
   }
+
+  // 命名集合形式：var \in SETNAME（标识符而非 {..} 字面量；值需从 SETNAME == {...} 解析）。
+  // 仅当解析出 ≥1 个值时计入候选（\in Nat / \in BOOLEAN 等无定义引用不参与选择）。
+  const varNamedPattern = /(\w+)\s*\\in\s*([A-Za-z_]\w*)/g;
+  while ((match = varNamedPattern.exec(typeInvBody)) !== null) {
+    const values = resolveSetValues(content, match[2]!);
+    if (values.length > 0 && values.length > maxCount) {
+      maxCount = values.length;
+      bestVar = match[1]!;
+    }
+  }
   return bestVar;
 }
 
 /**
- * 提取 TLA+ 规格中的所有状态值（从 TypeInvariant 的 \in {"s1", "s2", ...} 中解析）。
+ * 提取 TLA+ 规格中的所有状态值。
+ * 优先匹配 TypeInvariant 中 `stateVar \in {"s1", "s2", ...}` 内联枚举；
+ * 命名集合形式 `stateVar \in SETNAME` 时通过 resolveSetValues 解析 `SETNAME == {...}`。
  */
 function extractTlaStates(content: string): string[] {
   const states: string[] = [];
@@ -534,8 +572,7 @@ function extractTlaStates(content: string): string[] {
   const endMatch = afterTypeInv.slice(bodyOffset).match(/\n\w+\s*==|\n====/);
   const typeInvBody = endMatch ? afterTypeInv.slice(0, endMatch.index! + bodyOffset) : afterTypeInv;
 
-  // 仅匹配第一个状态变量的 \in {"val1", "val2", ...}（不匹配 \in Nat）
-  // 通过 stateVar 名称定位：stateVar \in { ... }
+  // 内联枚举：stateVar \in { "val1", "val2", ... }（不匹配 \in Nat）
   const stateVarPattern = new RegExp('\\b' + stateVar + '\\s*\\\\in\\s*\\{((?:"[^"]+"\\s*,?\\s*)+)\\}');
   const m = stateVarPattern.exec(typeInvBody);
   if (m) {
@@ -545,6 +582,17 @@ function extractTlaStates(content: string): string[] {
         const val = v.slice(1, -1);
         if (!states.includes(val)) states.push(val);
       }
+    }
+    return states;
+  }
+
+  // 命名集合：stateVar \in SETNAME → 解析 SETNAME == {...} 的字面量值
+  const namedPattern = new RegExp('\\b' + stateVar + '\\s*\\\\in\\s*([A-Za-z_]\\w*)');
+  const namedMatch = namedPattern.exec(typeInvBody);
+  if (namedMatch) {
+    const values = resolveSetValues(content, namedMatch[1]!);
+    for (const val of values) {
+      if (!states.includes(val)) states.push(val);
     }
   }
   return states;
@@ -605,7 +653,7 @@ function extractTlaTransitions(content: string): Array<{ from: string; event: st
     // 事件名：PascalCase → camelCase
     const event = actionName.charAt(0).toLowerCase() + actionName.slice(1);
 
-    // 提取 from-state: stateVar = "Value" 或 stateVar \in {"s1", "s2", ...}
+    // 提取 from-state: stateVar = "Value" / stateVar \in {"s1", "s2", ...} / stateVar \in SETNAME
     const fromSingleRegex = new RegExp(stateVar + '\\s*=\\s*"([^"]+)"');
     const fromSingleMatch = actionBody.match(fromSingleRegex);
     if (fromSingleMatch) {
@@ -618,6 +666,16 @@ function extractTlaTransitions(content: string): Array<{ from: string; event: st
         for (const fs of fromStates) {
           transitions.push({ from: fs.slice(1, -1), event, to: toState });
         }
+      } else {
+        // 命名集合 from-state：stateVar \in SETNAME → 解析 SETNAME == {...} 的值展开
+        const fromNamedRegex = new RegExp(stateVar + '\\s*\\\\in\\s*([A-Za-z_]\\w*)');
+        const fromNamedMatch = actionBody.match(fromNamedRegex);
+        if (fromNamedMatch) {
+          const fromStates = resolveSetValues(content, fromNamedMatch[1]!);
+          for (const fs of fromStates) {
+            transitions.push({ from: fs, event, to: toState });
+          }
+        }
       }
     }
   }
@@ -626,16 +684,19 @@ function extractTlaTransitions(content: string): Array<{ from: string; event: st
 }
 
 /**
- * 提取 TLA+ 规格的不变式列表（归一化 `var = "State" => cond` 为 `State => cond`）。
+ * 提取 TLA+ 规格的不变式列表（归一化 `var = "State" => cond` / `var # "State" => cond`
+ * 与反向 `cond => (var = "State")` 为 `State => cond`）。
+ * 其中 # 形式语义为「未处于 State 蕴含 cond」；反向形式语义为「cond 蕴含处于 State」，
+ * 两者均归一化为 `State => cond` 供 D4 字符串等价比对。
  */
 function extractTlaInvariants(content: string): string[] {
   const invariants: string[] = [];
   const stateVar = extractStateVarName(content);
   if (!stateVar) return invariants;
 
-  // 匹配 stateVar = "State" => condition（不匹配 stateVar' = ...）
+  // 形式 1/2：stateVar = "State" => cond 与 stateVar # "State" => cond（不匹配 stateVar' = ...）
   const invRegex = new RegExp(
-    stateVar + '\\s*=\\s*"([^"]+)"\\s*=>\\s*([^\\n]+)',
+    stateVar + '\\s*(?:=|#)\\s*"([^"]+)"\\s*=>\\s*([^\\n]+)',
     'g'
   );
 
@@ -643,6 +704,19 @@ function extractTlaInvariants(content: string): string[] {
   for (const m of matches) {
     const stateValue = m[1]!;
     const condition = m[2]!.trim();
+    invariants.push(`${stateValue} => ${condition}`);
+  }
+
+  // 形式 3（反向）：cond => (stateVar = "State") → State => cond
+  const invReverseRegex = new RegExp(
+    '([^\\n]*?)\\s*=>\\s*\\(?\\s*' + stateVar + '\\s*=\\s*"([^"]+)"\\s*\\)?',
+    'g'
+  );
+
+  const revMatches = [...content.matchAll(invReverseRegex)];
+  for (const m of revMatches) {
+    const condition = m[1]!.trim();
+    const stateValue = m[2]!;
     invariants.push(`${stateValue} => ${condition}`);
   }
 
@@ -815,6 +889,10 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   // D4: BDD↔TLA+ 等价性（阶段 1-4 校验，阶段 5-8 跳过）
   if (phase <= 4 && input.tlaSnapshots) {
     for (const sm of input.manifest.stateMachines) {
+      // L1 系统级规格豁免 D4 自动等价：L1 是请求-响应抽象而非内部状态机，
+      // 自动等价比对无意义，由 R3/V 语义评审把关（不产生任何 D4 violation）；
+      // L2+ 子系统级规格仍执行完整自动等价校验。
+      if (sm.level === 1) continue;
       const tlaSnap = input.tlaSnapshots.find(t => t.specId === sm.id.replace(/^SM-/, ''));
       if (!tlaSnap) {
         // TLA+ 未提供对应 spec：由 R 子代理判定是缺失还是层级不对应

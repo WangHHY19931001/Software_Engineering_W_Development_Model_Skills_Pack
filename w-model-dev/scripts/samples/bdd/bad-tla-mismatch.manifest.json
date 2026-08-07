@@ -5,32 +5,32 @@
   "currentPhase": 1,
   "features": [
     {
-      "id": "L1_blog_system-001",
-      "level": 1,
-      "filePath": "samples/bdd/valid-l1.feature",
+      "id": "L2_blog_system_auth-001",
+      "level": 2,
+      "filePath": "samples/bdd/valid-l2.feature",
       "scenarioCount": 1,
-      "stateMachineId": "SM-L1-blog_system",
-      "tlaSpecId": "L1_blog_system",
+      "stateMachineId": "SM-L2-blog_system_auth",
+      "tlaSpecId": "L2_blog_system_auth",
       "reqIds": ["REQ-001"],
-      "designIds": ["SD-3.2.1"],
-      "parentFeatureIds": [],
+      "designIds": ["SD-3.2.2"],
+      "parentFeatureIds": ["L1_blog_system-001"],
       "siblingFeatureIds": [],
       "childFeatureIds": []
     }
   ],
   "stateMachines": [
     {
-      "id": "SM-L1-blog_system",
-      "level": 1,
-      "states": ["Unauthenticated", "Authenticated"],
-      "initialState": "Unauthenticated",
-      "terminalStates": ["Authenticated"],
-      "acceptingStates": ["Authenticated"],
-      "rejectingStates": ["Unauthenticated"],
+      "id": "SM-L2-blog_system_auth",
+      "level": 2,
+      "states": ["LoggedOut", "LoggedIn"],
+      "initialState": "LoggedOut",
+      "terminalStates": ["LoggedIn"],
+      "acceptingStates": ["LoggedIn"],
+      "rejectingStates": ["LoggedOut"],
       "transitions": [
-        { "from": "Unauthenticated", "event": "login", "to": "Authenticated" }
+        { "from": "LoggedOut", "event": "login", "to": "LoggedIn" }
       ],
-      "invariants": ["Authenticated => sessionValid"]
+      "invariants": ["LoggedIn => sessionValid"]
     }
   ]
 }
