@@ -66,6 +66,7 @@ import {
   type TlaSpecSnapshot,
 } from './bdd-logic.js';
 import { checkPreventiveReview, type PreventiveReview } from './preventive-review-logic.js';
+import { checkIcebergSweep, type IcebergSweepReport } from './iceberg-sweep-logic.js';
 import { checkTlaBddSync } from './tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from './role-dispatch-logic.js';
 import { checkStateMachineConsistency } from './state-machine-logic.js';
@@ -961,6 +962,45 @@ const PREVENTIVE_REVIEW_CASES: PreventiveReviewCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/evidence/],
     description: 'R3 报告缺失 evidence 字段（schema 校验失败 + 其他维度缺失）',
+  },
+];
+
+// -------------------- Iceberg Sweep（第36轮新增） --------------------
+
+interface IcebergCase {
+  /** 样本文件名（相对 samples/iceberg/） */
+  file: string;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望 reasons 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+const ICEBERG_CASES: IcebergCase[] = [
+  {
+    file: 'valid-full.json',
+    expectedPassed: true,
+    description: '合法冰山扫掠报告（无新发现，passed=true）',
+  },
+  {
+    file: 'bad-round-out-of-range.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/icebergRound/],
+    description: 'icebergRound=6 越界（R5，maxIcebergRounds=5）',
+  },
+  {
+    file: 'bad-missing-evidence.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/evidence/],
+    description: 'finding 缺 evidence（R7 可证伪校验失败）',
+  },
+  {
+    file: 'bad-duplicate-finding.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/已在上一轮发现/],
+    description: 'findingId 与 previousFindings 重复（R6 去重失败）',
   },
 ];
 
@@ -2064,6 +2104,39 @@ async function runPreventiveReviewCases(samplesDir: string): Promise<CaseResult[
   return results;
 }
 
+async function runIcebergCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of ICEBERG_CASES) {
+    const abs = path.join(samplesDir, 'iceberg', c.file);
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const report = parseJsonSafe(raw) as IcebergSweepReport;
+      const r = checkIcebergSweep(report);
+      const details: string[] = [];
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed && c.expectedReasonPatterns) {
+        details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
+      }
+      results.push({
+        name: `iceberg/${c.file}`,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name: `iceberg/${c.file}`,
+        passed: false,
+        description: c.description,
+        details: [`  - ${(err as Error).message}`],
+      });
+    }
+  }
+  return results;
+}
+
 async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of TLA_BDD_SYNC_CASES) {
@@ -2609,6 +2682,7 @@ async function main(): Promise<void> {
   console.log(`ArchiveIntegrity 用例: ${ARCHIVE_INTEGRITY_CASES.length}`);
   console.log(`Metadata 用例  : 1`);
   console.log(`PreventiveReview 用例: ${PREVENTIVE_REVIEW_CASES.length}`);
+  console.log(`IcebergSweep 用例: ${ICEBERG_CASES.length}`);
   console.log(`TlaBddSync 用例: ${TLA_BDD_SYNC_CASES.length}`);
   console.log(`RoleDispatch 用例 : ${ROLE_DISPATCH_CASES.length}`);
   console.log(`StateMachine 用例 : ${STATE_MACHINE_CASES.length}`);
@@ -2626,7 +2700,7 @@ async function main(): Promise<void> {
     designContractResults, preventiveReviewResults, tlaBddSyncResults, roleDispatchResults,
     stateMachineResults,
     codegraphQueryResults, opsxArtifactResults, openspecArchiveResults,
-    uatPathMappingResults,
+    uatPathMappingResults, icebergResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2654,6 +2728,7 @@ async function main(): Promise<void> {
     runOpsxArtifactCases(samplesDir),
     runOpenspecArchiveCases(samplesDir),
     runUatPathMappingCases(samplesDir),
+    runIcebergCases(samplesDir),
   ]);
   const all = [
     ...verifierResults, ...gateResults, ...graphResults, ...tlaResults,
@@ -2663,7 +2738,7 @@ async function main(): Promise<void> {
     ...designContractResults, ...preventiveReviewResults, ...tlaBddSyncResults, ...roleDispatchResults,
     ...stateMachineResults,
     ...codegraphQueryResults, ...opsxArtifactResults, ...openspecArchiveResults,
-    ...uatPathMappingResults,
+    ...uatPathMappingResults, ...icebergResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

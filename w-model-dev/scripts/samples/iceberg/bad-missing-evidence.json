@@ -1,0 +1,31 @@
+{
+  "reportId": "IS-phase3-1-02",
+  "phase": "phase3-outline",
+  "triggerType": "ICEBERG-A",
+  "icebergRound": 1,
+  "sweptAt": "2026-08-08T10:00:00Z",
+  "sweptBy": "R-iceberg",
+  "线索来源": {
+    "reworkHintsHistory": [],
+    "fixedPoints": ["docs/phase3-outline/blog-system-outline-design.md:L42"],
+    "previousFindings": []
+  },
+  "newFindings": [
+    {
+      "findingId": "IF-phase3-1-01",
+      "severity": "Required",
+      "category": "coverage-gap",
+      "location": "docs/phase3-outline/blog-system-outline-design.md:L50",
+      "description": "SD-007 未建模",
+      "evidence": "",
+      "hypothesis": "若补齐建模，SD-007 覆盖缺口消除",
+      "relatedFixedPoint": "IS-phase3-1-01"
+    }
+  ],
+  "sweepCoverage": {
+    "sweptArtifacts": ["docs/phase3-outline/blog-system-outline-design.md"],
+    "sweptDimensions": ["completeness", "reliability", "security"]
+  },
+  "summary": "本次扫掠覆盖 completeness/reliability/security 三维度共 1 份产物，以本轮已修复问题为线索深挖，发现 1 项证据缺失的问题，须补充证据后重扫。",
+  "passed": false
+}
