@@ -2,7 +2,7 @@
  * verifier-logic.test.ts —— [21.0.0] evidence 格式校验 + [26.0.0] R13 单轴下限单元测试
  *
  * 覆盖 verifier-logic.ts 中 validateEvidenceFormat 函数：
- *   - 合法 evidence（key=value 格式）通过
+ *   - 合法 evidence（冒号格式）通过
  *   - 空泛声明（C1-C10 全通过 / 质量良好 / 评审通过）命中 O3
  *
  * [26.0.0] 覆盖 checkR13SingleAxisFloor 函数（单轴下限，反模式 #41）：
@@ -14,8 +14,8 @@ import { describe, expect, it } from 'vitest';
 import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../verifier-logic.js';
 
 describe('[21.0.0] evidence 格式校验', () => {
-  it('合法 evidence（key=value 格式）应通过', () => {
-    const evidence = ['req-001.md=需求完整覆盖用户故事', 'article.service.ts=认证模块 JWT 校验逻辑'];
+  it('合法 evidence（冒号格式）应通过', () => {
+    const evidence = ['docs/phase1-requirements/requirement-spec.md:§1.1=需求完整覆盖用户故事', 'src/article.service.ts:L42=认证模块 JWT 校验逻辑'];
     const result = validateEvidenceFormat(evidence);
     expect(result.valid).toBe(true);
     expect(result.vagueItems).toEqual([]);
@@ -102,9 +102,9 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
       subCriteria: [
         { name: 'completeness', weight: 0.30, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: '质量良好' },
         { name: 'clarity', weight: 0.25, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: '评审通过' },
-        { name: 'consistency', weight: 0.20, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md.REQ-001.section=3.2' },
-        { name: 'testability', weight: 0.15, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md.REQ-001.section=3.4' },
-        { name: 'traceability', weight: 0.10, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'rtm.json.REQ-001.coverage=full' },
+        { name: 'consistency', weight: 0.20, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
+        { name: 'testability', weight: 0.15, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.4=REQ-001 需求覆盖' },
+        { name: 'traceability', weight: 0.10, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'rtm.json:§REQ-001=coverage full' },
       ],
       compositeScore: 0.72,
       qualityLevel: 'B',
@@ -132,11 +132,11 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
         varianceThreshold: 0.10,
       },
       subCriteria: [
-        { name: 'completeness', weight: 0.30, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md.REQ-001.section=3.2' },
-        { name: 'clarity', weight: 0.25, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md.REQ-001.section=3.2' },
-        { name: 'consistency', weight: 0.20, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md.REQ-001.section=3.2' },
-        { name: 'testability', weight: 0.15, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md.REQ-001.section=3.4' },
-        { name: 'traceability', weight: 0.10, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'rtm.json.REQ-001.coverage=full' },
+        { name: 'completeness', weight: 0.30, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
+        { name: 'clarity', weight: 0.25, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
+        { name: 'consistency', weight: 0.20, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
+        { name: 'testability', weight: 0.15, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.4=REQ-001 需求覆盖' },
+        { name: 'traceability', weight: 0.10, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'rtm.json:§REQ-001=coverage full' },
       ],
       compositeScore: 0.72,
       qualityLevel: 'B',
@@ -148,5 +148,22 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
     expect(result.passed).toBe(true);
     expect(result.qualityLevel).toBe('B');
     expect(result.compositeScore).toBe(0.72);
+  });
+});
+
+describe('EVIDENCE_PATTERN 冒号格式', () => {
+  it('应接受 path:§section=statement 格式', () => {
+    const result = validateEvidenceFormat(['docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全']);
+    expect(result.valid).toBe(true);
+  });
+
+  it('应接受 path:L42=statement 格式', () => {
+    const result = validateEvidenceFormat(['src/auth.ts:L42-58=JWT 签发逻辑']);
+    expect(result.valid).toBe(true);
+  });
+
+  it('应拒绝 path.field=value 点号格式', () => {
+    const result = validateEvidenceFormat(['coverage.json.matrices.stakeholder.coverage=100%']);
+    expect(result.valid).toBe(false);
   });
 });

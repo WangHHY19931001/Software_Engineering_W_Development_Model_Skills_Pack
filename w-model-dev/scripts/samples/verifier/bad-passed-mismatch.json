@@ -10,11 +10,11 @@
     "varianceThreshold": 0.10
   },
   "subCriteria": [
-    {"name": "completeness", "weight": 0.30, "score": 0.80, "rawScores": [0.79, 0.80, 0.81], "variance": 0.0000667, "evidence": "requirements.md.REQ-001.section=3.2"},
-    {"name": "clarity", "weight": 0.25, "score": 0.75, "rawScores": [0.74, 0.75, 0.76], "variance": 0.0000667, "evidence": "requirements.md.REQ-001.section=3.2"},
-    {"name": "consistency", "weight": 0.20, "score": 0.78, "rawScores": [0.77, 0.78, 0.79], "variance": 0.0000667, "evidence": "requirements.md.REQ-001.section=3.2"},
-    {"name": "testability", "weight": 0.15, "score": 0.72, "rawScores": [0.71, 0.72, 0.73], "variance": 0.0000667, "evidence": "requirements.md.REQ-001.section=3.4"},
-    {"name": "traceability", "weight": 0.10, "score": 0.82, "rawScores": [0.81, 0.82, 0.83], "variance": 0.0000667, "evidence": "rtm.json.REQ-001.coverage=full"}
+    {"name": "completeness", "weight": 0.30, "score": 0.80, "rawScores": [0.79, 0.80, 0.81], "variance": 0.0000667, "evidence": "requirements.md:§3.2=REQ-001 需求覆盖"},
+    {"name": "clarity", "weight": 0.25, "score": 0.75, "rawScores": [0.74, 0.75, 0.76], "variance": 0.0000667, "evidence": "requirements.md:§3.2=REQ-001 需求覆盖"},
+    {"name": "consistency", "weight": 0.20, "score": 0.78, "rawScores": [0.77, 0.78, 0.79], "variance": 0.0000667, "evidence": "requirements.md:§3.2=REQ-001 需求覆盖"},
+    {"name": "testability", "weight": 0.15, "score": 0.72, "rawScores": [0.71, 0.72, 0.73], "variance": 0.0000667, "evidence": "requirements.md:§3.4=REQ-001 需求覆盖"},
+    {"name": "traceability", "weight": 0.10, "score": 0.82, "rawScores": [0.81, 0.82, 0.83], "variance": 0.0000667, "evidence": "rtm.json:§REQ-001=coverage full"}
   ],
   "compositeScore": 0.7735,
   "qualityLevel": "B",

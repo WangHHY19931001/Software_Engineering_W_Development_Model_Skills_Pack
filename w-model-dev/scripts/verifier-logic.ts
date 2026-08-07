@@ -224,7 +224,12 @@ export function determineQualityLevel(score: number): QualityLevel {
 
 // ==================== [21.0.0] evidence 格式校验 ====================
 
-const EVIDENCE_PATTERN = /^[\w/.-]+\.[\w-]+(?:\.[\w-\[\]]+)*=.+$/;
+/**
+ * evidence 格式正则（format-conventions.md §2.1）：
+ *   合法格式：path:§section=statement 或 path:L42=statement 或 path:L42-58=statement
+ *   非法格式：path.field=value（点号，已废弃）/ 纯文件名无定位 / 空泛声明
+ */
+const EVIDENCE_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
 const VAGUE_EVIDENCE_PATTERNS = [
   /^(C\d+-C\d+\s*全通过)/,
   /^(质量良好|评审通过|校验通过|全部通过)/,
