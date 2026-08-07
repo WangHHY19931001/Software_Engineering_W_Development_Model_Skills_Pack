@@ -12,7 +12,8 @@
 (*
   @system        <所属系统名称，如 blog-system 或 blog-system::auth-subsystem>
   @requirement   <关联需求 ID，逗号分隔，如 REQ-001, REQ-003>
-  @design        <关联设计文档相对路径，如 docs/system-design.md#§3.2>
+  @design        <关联设计文档相对路径，如 docs/phase2-design/blog-system-system-design.md:§3.2>
+  @designIds     <关联 SD 节点 ID，逗号分隔，如 SD-001,SD-002,SD-005>
   @parent        <上级 TLA 文件相对路径；L1 填 null>
   @sibling       <同级 TLA 文件相对路径，逗号分隔；无填 null>
   @child         <下级 TLA 文件相对路径，逗号分隔；叶子填 null>
@@ -110,7 +111,8 @@ CONSTANTS
 |---|---|---|
 | `@system` | 是 | 所属系统名称，层次路径用 `::` 分隔（如 `blog-system::auth-subsystem::token-store`） |
 | `@requirement` | 是 | 关联需求 ID（逗号分隔），须与 `rtm.json` 需求 ID 一致 |
-| `@design` | 是 | 关联设计文档相对路径（可带锚点 `#§`） |
+| `@design` | 是 | 关联设计文档相对路径（可带锚点 `:§`） |
+| `@designIds` | 是 | 关联 SD 节点 ID（逗号分隔），须与 graph.json 中 type=SD 节点 ID 一致；S-ingest-tla 据此回填 manifest sdCoverage |
 | `@parent` | 是 | 上级 TLA 文件相对路径；L1 根规格填 `null` |
 | `@sibling` | 是 | 同级 TLA 文件相对路径（逗号分隔）；无同级填 `null` |
 | `@child` | 是 | 下级 TLA 文件相对路径（逗号分隔）；叶子规格填 `null` |
@@ -125,7 +127,8 @@ CONSTANTS
 (*
   @system        blog-system
   @requirement   REQ-001, REQ-002, REQ-003
-  @design        docs/requirement-spec.md#§3
+  @design        docs/phase1-requirements/requirement-spec.md:§3
+  @designIds     SD-001,SD-002,SD-003
   @parent        null
   @sibling       null
   @child         tla/L2_auth_subsystem.tla, tla/L2_article_subsystem.tla
@@ -141,7 +144,8 @@ CONSTANTS
 (*
   @system        blog-system::auth-subsystem
   @requirement   REQ-001
-  @design        docs/system-design.md#§3.2
+  @design        docs/phase2-design/blog-system-system-design.md:§3.2
+  @designIds     SD-004,SD-005
   @parent        tla/L1_blog_system.tla
   @sibling       tla/L2_article_subsystem.tla
   @child         tla/L3_token_store.tla
@@ -157,7 +161,8 @@ CONSTANTS
 (*
   @system        blog-system::auth-subsystem::token-store
   @requirement   REQ-001
-  @design        docs/detailed-design.md#§4.1.2
+  @design        docs/phase4-detailed/blog-system-detailed-design.md:§4.1.2
+  @designIds     SD-006
   @parent        tla/L2_auth_subsystem.tla
   @sibling       null
   @child         null
@@ -299,3 +304,9 @@ INVARIANT TypeInvariant
 INVARIANT SessionUserRegistered
 INVARIANT ArticlePublishedRequiresRegisteredUser
 ```
+
+## 引用约定
+
+- 路径约定见 [directory-conventions.md](../references/directory-conventions.md)
+- 格式约定见 [format-conventions.md](../references/format-conventions.md)
+- @designIds 字段须列出本规格覆盖的所有 SD 节点 ID，S-ingest-tla 据此回填 manifest sdCoverage
