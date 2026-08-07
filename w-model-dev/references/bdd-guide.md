@@ -91,6 +91,7 @@ BDD 分层与 TLA+ 分层对称（L1/L2/L3/L4），最细粒度都到原子方�
 ```gherkin
 # @req: REQ-001, REQ-002
 # @design: SD-3.2.1, INTF-3.1.2
+# @designIds: SD-001,SD-002,SD-005
 # @system: L1_blog_system
 # @tla-spec: L1_blog_system
 # @state-machine: SM-L1-blog_system
@@ -110,6 +111,7 @@ Feature: 博客系统端到端用户场景
 |---|---|---|---|
 | `@req` | 是 | 逗号分隔的 REQ ID | 每个 ID 须在 RTM 中存在 |
 | `@design` | 是 | 逗号分隔的 SD/INTF/DD ID | 每个 ID 须在图谱中存在 |
+| `@designIds` | 是 | 逗号分隔的 SD 节点 ID | 每个 ID 须在 graph.json 中 type=SD 节点中存在 |
 | `@system` | 是 | `<level>_<system>` 命名 | 与文件名前缀一致；与同层 TLA+ MODULE 名一致 |
 | `@tla-spec` | 是 | 同层 TLA+ spec ID | 须在 tla-manifest.json 中存在 |
 | `@state-machine` | 是 | `SM-L<level>-<system>` | 须在 bdd-manifest.json 中存在 |
@@ -117,6 +119,16 @@ Feature: 博客系统端到端用户场景
 | `@sibling-features` | 可填 `(none)` | 同级 features 文件名列表 | 须在 bdd-manifest.json 中存在 |
 | `@child-features` | L4 可填 `(none)`；L1-L3 必填 | 下级 features 文件名列表 | L1 的 child 须在 L2；L2 的 child 须在 L3；L3 的 child 须在 L4 |
 | `@scenario-id-prefix` | 是 | `BDD-L<level>` | 用于 scenario 内 TAG 命名 |
+
+### @designIds 头标注（必填，第 10 个字段）
+
+`.feature` 文件头部须含 `@designIds` 字段，列出本 feature 覆盖的所有 SD 节点 ID（逗号分隔）。
+
+```
+# @designIds: SD-001,SD-002,SD-005
+```
+
+S-ingest-bdd 子代理据此字段与 graph.json 比对后回填 manifest designCoverage。
 
 ### §2.3 文件命名规则
 
@@ -305,7 +317,7 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 | `check-bdd-model.ts` | `w-model-dev/scripts/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
 | `bdd-logic.ts` | `w-model-dev/scripts/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
 
-### §5.2 check-bdd-model.ts 7 个校验维度
+### §5.2 check-bdd-model.ts 8 个校验维度
 
 | 维度 | 名称 | 校验内容 | 阶段边界 |
 |---|---|---|---|
@@ -316,8 +328,20 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 | D5 | stepBinding | step definitions 绑定完整性 | 阶段 1-4 跳过；阶段 5-8 强制 |
 | D6 | scenarioPathValidity | scenario Given→When→Then 是合法路径 | 阶段 1-8 |
 | D7 | rtmMapping | 与 RTM 映射 | 阶段 1-8 |
+| D8 | sdCoverage | SD Coverage（phase>=2 强制） | 阶段 2-8 |
 
-> **阶段边界说明**：阶段 1-4（设计阶段）D5 跳过（step definitions 尚未实现），由 D6（scenario 路径合法性）+ D7（RTM 映射）替代校验；阶段 5-8（执行阶段）D5 强制校验。
+> **阶段边界说明**：阶段 1-4（设计阶段）D5 跳过（step definitions 尚未实现），由 D6（scenario 路径合法性）+ D7（RTM 映射）+ D8（SD Coverage，phase>=2）替代校验；阶段 5-8（执行阶段）D5 强制校验。
+
+### §5.2.1 D8 SD Coverage（phase>=2 强制）
+
+`check-bdd-model.ts` 在 phase>=2 时新增 D8 SD Coverage 校验维度：
+
+1. 校验 manifest.designCoverage 字段存在且 uncoveredSdNodes 为空
+2. 从 .feature 头部 @designIds 提取覆盖的 SD 节点 ID
+3. 与 graph.json 中所有 type=SD 节点比对
+4. uncoveredSdNodes 非空 → D8 violation，exitCode=1
+
+designCoverage 字段由 S-ingest-bdd 子代理从 .feature 文件头部 @designIds 提取后回填 manifest。
 
 ### §5.3 调用方式
 
@@ -328,6 +352,9 @@ npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
   [--tla-manifest=<tla-manifest.json>] \
   [--rtm=<rtm.json>] \
   [--graph=<graph.json>]
+```
+
+> `--graph=<graph.json>` 在 phase>=2 时强制必填（D8 SD Coverage 校验数据源，缺失 → exitCode=2 ARG_INVALID）；phase=1 时可选。
 
 # 阶段 5-8 终检（含 cucumber 执行结果校验）
 npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
@@ -579,3 +606,12 @@ npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
 - [tla-plus-guide.md](./tla-plus-guide.md)：TLA+ 建模指南（BDD 与之正交协作）
 - [verifier-spec.md §7.3](./verifier-spec.md)：测试用例评审 5 维度（BDD features 评审用 `targetKind=test` + bdd-review-checklist）
 - [rtm-guide.md](./rtm-guide.md)：RTM 字段登记契约（BDD 引用附加格式约定）
+
+## S-ingest-bdd 子代理
+
+BDD 覆盖率数据由独立的 S-ingest-bdd 子代理回填，非 S-bdd 自填。
+
+分派时序：
+1. S-bdd 产出 .feature/manifest 基础字段 + @designIds 头部
+2. S-ingest-bdd 从 .feature 提取 @designIds + 比对 graph.json SD 节点 → 回填 manifest designCoverage
+3. R3 → V → G(check-bdd-model --graph 校验)
