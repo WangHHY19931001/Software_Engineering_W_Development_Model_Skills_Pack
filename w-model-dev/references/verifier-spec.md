@@ -456,7 +456,7 @@ V 子代理须在 `summary` 中包含：
 
 `subCriteria[*].evidence` 与 `reworkHints[*]` 中引用产物时：
 
-1. **须标注路径 + 行号**：格式如 `tla/L1_shell_agent.tla:L356-366` / `docs/system-design.md:§3.2` / `src/auth.ts:42-58`。路径相对项目根目录。
+1. **须标注路径 + 行号**：格式如 `tla/L1_shell_agent.tla:L356-366` / `docs/phase2-design/{module}-system-design.md:§3.2` / `src/auth.ts:42-58`。路径相对项目根目录。
 2. **不得仅引用产物名不标注行号**：如仅写 `system-design.md` 或 `L1_shell_agent.tla` 视为 evidence 失效，该子标准判 0 分（§3.3 / §11.4）。
 3. **引用须真实存在**：行号 / 段落 ID 必须能在目标产物中定位到对应内容；编造不存在的引用（如声称「5 个不变量」但实际产物有 10 个）→ 视为 Verifier Theater（O3），V 评审降级重做。
 4. **跨阶段 evidence 一致性**：后阶段 V 评审的 evidence 不得否定前阶段已放行项的 evidence（详见 §12）。

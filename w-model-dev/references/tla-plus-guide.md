@@ -143,7 +143,7 @@ w-model-dev-demo/
 **示例**：
 
 ```tla
-\* @designRef docs/system-design.md#§3.3 分类树无环约束
+\* @designRef docs/phase2-design/blog-system-system-design.md:§3.3 分类树无环约束
 CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\ 
                         \A p \in Categories : categoryParent[p] # c \/ p = None
 ```
@@ -221,7 +221,7 @@ S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCove
     "phase": 1,
     "system": "blog-system",
     "requirementIds": ["REQ-001"],
-    "designRef": "docs/requirement-spec.md#§3",
+    "designRef": "docs/phase1-requirements/requirement-spec.md:§3",
     "tlaPath": "tla/L1_blog_system.tla",
     "cfgPath": "tla/L1_blog_system.cfg",
     "parent": null,
