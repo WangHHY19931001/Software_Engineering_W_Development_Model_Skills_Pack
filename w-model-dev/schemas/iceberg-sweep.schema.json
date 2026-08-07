@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/iceberg-sweep.schema.json",
+  "title": "IcebergSweepReport",
+  "description": "冰山扫掠报告形状（R-iceberg 子代理产出；触发于 S-fix 后或阶段门放行前；以已发现/已修复问题为线索主动深挖隐藏问题）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reportId", "phase", "triggerType", "icebergRound",
+    "sweptAt", "sweptBy", "线索来源",
+    "newFindings", "sweepCoverage", "summary", "passed"
+  ],
+  "properties": {
+    "reportId": {
+      "type": "string",
+      "pattern": "^IS-phase[1-8]-[1-5]-[0-9]+$",
+      "description": "冰山扫掠报告 ID，格式 IS-phase<N>-<round>-<seq>，如 IS-phase3-2-01"
+    },
+    "phase": {
+      "type": "string",
+      "description": "当前阶段标识，如 phase3-outline"
+    },
+    "triggerType": {
+      "type": "string",
+      "enum": ["ICEBERG-A", "ICEBERG-B"],
+      "description": "触发类型：ICEBERG-A=S-fix后深挖（防修复引入新缺陷+同根因扩散），ICEBERG-B=阶段门前全局扫掠"
+    },
+    "icebergRound": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "冰山轮次（1-5，maxIcebergRounds=5），ICEBERG-A 和 ICEBERG-B 共享计数器，每阶段独立计数，阶段进入时重置为 0"
+    },
+    "sweptAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "扫掠时间戳，ISO 8601 字符串"
+    },
+    "sweptBy": {
+      "type": "string",
+      "minLength": 1,
+      "description": "扫掠者标识（R-iceberg 子代理），非空字符串"
+    },
+    "线索来源": {
+      "type": "object",
+      "description": "深挖线索：本轮已发现的问题历史 + 已修复点 + 上一轮冰山发现（去重依据）",
+      "additionalProperties": false,
+      "required": ["reworkHintsHistory", "fixedPoints", "previousFindings"],
+      "properties": {
+        "reworkHintsHistory": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "本阶段所有 V/G reworkHints 历史数组"
+        },
+        "fixedPoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "已修复的缺陷位置列表（文件:行号/节点ID，遵循 format-conventions.md）"
+        },
+        "previousFindings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "上一轮 IcebergSweepReport 的 findingId 列表（去重依据，本轮不得重复发现）"
+        }
+      }
+    },
+    "newFindings": {
+      "type": "array",
+      "description": "新发现的隐藏问题列表，空数组=无新问题=终止条件①满足",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["findingId", "severity", "category", "location", "description", "evidence", "hypothesis", "relatedFixedPoint"],
+        "properties": {
+          "findingId": {
+            "type": "string",
+            "pattern": "^IF-phase[1-8]-[1-5]-[0-9]+$",
+            "description": "冰山发现 ID，格式 IF-phase<N>-<round>-<seq>，如 IF-phase3-2-01"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "Required", "Optional"],
+            "description": "严重等级：Critical=阻断级（须修复后才能放行）/ Required=必须修复 / Optional=可选优化（与 V 的 Severity 对齐，但不含 Nit/FYI 因冰山发现默认须走返工）"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["same-root-cause-spread", "same-defect-class", "fix-induced-regression", "adjacent-logic", "coverage-gap", "cross-artifact-inconsistency"],
+            "description": "发现类别：same-root-cause-spread=同根因扩散 / same-defect-class=同缺陷类 / fix-induced-regression=修复引入回归 / adjacent-logic=相邻逻辑 / coverage-gap=覆盖缺口 / cross-artifact-inconsistency=跨产物不一致"
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "缺陷位置，格式 path:§section 或 path:L42（遵循 format-conventions.md 冒号分隔）"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "缺陷描述（非空字符串，具体指出缺陷内容与影响）"
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "证据引用（具体产物字段/行号/节点ID），禁止空泛（check-iceberg-sweep.ts R7 校验）"
+          },
+          "hypothesis": {
+            "type": "string",
+            "minLength": 1,
+            "description": "可证伪假设：若此发现消除，关联现象是否消失（check-iceberg-sweep.ts R7 校验）"
+          },
+          "relatedFixedPoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "关联的已修复点（说明为何这是冰山扩散发现，与 fixedPoints 中某项关联）"
+          }
+        }
+      }
+    },
+    "sweepCoverage": {
+      "type": "object",
+      "description": "扫掠覆盖范围记录",
+      "additionalProperties": false,
+      "required": ["sweptArtifacts", "sweptDimensions"],
+      "properties": {
+        "sweptArtifacts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "扫掠的产物路径列表"
+        },
+        "sweptDimensions": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["completeness", "reliability", "security"] },
+          "description": "扫掠维度（三维度须全覆盖）",
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 50,
+      "description": "扫掠一句话结论（至少50字符，含发现数+维度覆盖+终止判定）"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "true=newFindings为空（可终止/放行），false=有新发现（须走返工）。check-iceberg-sweep.ts R8 校验 passed 与 newFindings 一致性"
+    }
+  }
+}
