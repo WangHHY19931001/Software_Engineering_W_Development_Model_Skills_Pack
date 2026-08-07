@@ -103,3 +103,51 @@ describe('checkVerifierOutput 集成：schema 前置校验', () => {
     expect(result.reasons.some(r => /compositeScore.*Σ\(score\*weight\)/.test(r))).toBe(true);
   });
 });
+
+describe('tla-manifest sdCoverage (phase>=2)', () => {
+  it('phase>=2 时 sdCoverage 缺失应校验失败', () => {
+    const manifest = {
+      version: 1,
+      project: 'test',
+      currentPhase: 2,
+      basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [{
+        id: 'L1_Test', level: 'L1', phase: 1, system: 'test',
+        requirementIds: ['REQ-001'], designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
+        tlaPath: 'L1_Test.tla', cfgPath: 'L1_Test.cfg',
+        parent: null, siblings: [], children: [],
+        variableCombination: 100, decompositionDecision: 'kept-below-threshold',
+        syntaxChecked: true, tlcChecked: true, deadlockFree: true,
+        invariantsHold: true, stateExplosion: false,
+      }],
+    };
+    const result = validateBySchema('tla-manifest', manifest);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessages.join(' ')).toMatch(/sdCoverage/);
+  });
+
+  it('phase>=2 时 sdCoverage.uncoveredSdNodes 非空应校验失败', () => {
+    const manifest = {
+      version: 1, project: 'test', currentPhase: 2, basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [{
+        id: 'L1_Test', level: 'L1', phase: 1, system: 'test',
+        requirementIds: ['REQ-001'], designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
+        tlaPath: 'L1_Test.tla', cfgPath: 'L1_Test.cfg',
+        parent: null, siblings: [], children: [],
+        variableCombination: 100, decompositionDecision: 'kept-below-threshold',
+        syntaxChecked: true, tlcChecked: true, deadlockFree: true,
+        invariantsHold: true, stateExplosion: false,
+      }],
+      sdCoverage: {
+        totalSdNodes: 3,
+        coveredSdNodes: ['SD-001', 'SD-002'],
+        uncoveredSdNodes: ['SD-003'],
+        coverageRate: 0.667,
+      },
+    };
+    const result = validateBySchema('tla-manifest', manifest);
+    expect(result.valid).toBe(false);
+  });
+});
