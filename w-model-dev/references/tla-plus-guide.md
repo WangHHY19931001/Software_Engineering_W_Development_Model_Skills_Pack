@@ -176,6 +176,7 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
   @system        所属系统名称
   @requirement   关联需求 ID（逗号分隔）
   @design        关联设计文档相对路径
+  @designIds     关联 SD 节点 ID（逗号分隔，如 SD-001,SD-002,SD-005）
   @parent        上级 TLA 文件相对路径（L1 填 null）
   @sibling       同级 TLA 文件相对路径（逗号分隔，无填 null）
   @child         下级 TLA 文件相对路径（逗号分隔，无填 null）
@@ -193,6 +194,16 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 - L1 规格 `@parent=null`；叶子规格 `@child=null`。
 - **双向一致性**：A 声明 B 为 sibling → B 须声明 A 为 sibling；A 声明 C 为 child → C 须声明 A 为 parent。
 - 层级单调：`child.level = parent.level + 1`。
+
+### @designIds 字段（必填）
+
+`.tla` 文件头部须含 `@designIds` 字段，列出本规格覆盖的所有 SD 节点 ID（逗号分隔）。
+
+```
+@designIds     SD-001,SD-002,SD-005
+```
+
+S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCoverage。
 
 ## tla-manifest.json
 
@@ -273,7 +284,7 @@ R13 校验由 [`tla-logic.ts`](../scripts/tla-logic.ts) `checkRoundsSchema` 函�
 ## 校验脚本
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
+npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]
 ```
 
 退出码 `0=通过 / 1=失败 / 2=输入错误`。stdout 末尾输出 `TLA_JSON {...}` 供 Agent 解析。
@@ -289,7 +300,7 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|
 |---|---|
 | `--phase=N` | 只校验 `phase ≤ N` 的规格 |
 | `--spec=<id>` | 只校验单个规格（调试用） |
-| `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §10）；未提供时跳过覆盖率校验 |
+| `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §10）；**phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID** |
 | `--keep-states` / `-k` | **第 9 轮 P3.8**：保留 TLC `states/` 目录用于调试（默认校验后自动清理） |
 
 ### 校验步骤（G 子代理执行）
@@ -466,7 +477,7 @@ TLA+ 建模必须符合需求和设计。TLC 发现违反时：
 npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<graph.json> [--phase=N] [--spec=<id>]
 ```
 
-- `--graph=<graph.json>`：提供结构层图谱，提取 SD 节点供覆盖率校验。未提供时跳过覆盖率校验。
+- `--graph=<graph.json>`：提供结构层图谱，提取 SD 节点供覆盖率校验。**phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID**。
 - 覆盖率违反 → exitCode=1。
 
 > 覆盖率校验与结构层图谱门禁（`check-requirement-graph.ts`）正交：图谱门禁管 SD 是否在层级树中正确依附，本规则管 SD 是否有行为规格。两者均须通过。缺陷对照：D10（11 个子系统但仅 3 个 spec）即本规则检出。
@@ -711,4 +722,13 @@ npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
 ```
 
 退出码：0=一致，1=不一致，2=输入错误。
+
+## S-ingest-tla 子代理
+
+TLA+ 覆盖率数据由独立的 S-ingest-tla 子代理回填，非 S-tla 自填。
+
+分派时序：
+1. S-tla 产出 .tla/.cfg/manifest 基础字段 + @designIds 头部
+2. S-ingest-tla 从 .tla 提取 @designIds + 比对 graph.json SD 节点 → 回填 manifest sdCoverage
+3. R3 → V → G(check-tla-model --graph 校验)
 
