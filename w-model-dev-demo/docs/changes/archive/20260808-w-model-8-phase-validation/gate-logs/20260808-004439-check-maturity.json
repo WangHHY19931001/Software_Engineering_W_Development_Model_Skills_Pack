@@ -1,0 +1,18 @@
+════════════════════════════════════════════════════════════
+成熟度校验（Maturity Checker）
+════════════════════════════════════════════════════════════
+输入文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\maturity.json
+projectId     : blog-system-demo-r35
+schemaVersion : 1.0
+level         : L0
+--project     : 已读取（status→completedPhases=8, createdAt=2026-08-07T11:00:00Z）
+--run-log     : w-model-dev-demo/.w-model/run-log.jsonl（O 系列命中=0）
+校验结果      : ✗ 未通过
+────────────────────────────────────────────────────────────
+未通过原因：
+  - R3: project 已完成 8 阶段（1 完整周期），但 unlockConditions.completedCycles=0 未更新
+
+O 子代理须按上述原因处置（补全 schema / 修正 level / 更新 completedCycles / 修正 history 时序 / 响应降级触发），详见：
+  w-model-dev/references/data-models.md §自主成熟度模型
+────────────────────────────────────────────────────────────
+MATURITY_JSON {"type":"maturity","passed":false,"violations":["R3: project 已完成 8 阶段（1 完整周期），但 unlockConditions.completedCycles=0 未更新"],"exitCode":1}

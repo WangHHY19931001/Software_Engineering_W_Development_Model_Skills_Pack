@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "docs/phase1-requirements/requirement-spec.md（评审范围：acceptance-test-design.md / uat-path-mapping.md / .w-model/rtm.json / .w-model/ingestion/graph.json / features/L1/L1_blog_system-00{1,2,3}.feature / tla/specs/level1/L1_BlogSystem.tla+.cfg）",
+    "reviewedAt": "2026-08-07T10:30:00.000Z",
+    "agent": "trae-w-model-v-subagent",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    {
+      "name": "completeness",
+      "description": "功能/非功能/约束需求齐全性 + 四维识别（§4 层级树 / §5 REQ-group / §6 交叉逻辑 / §7 覆盖矩阵）完整性",
+      "weight": 0.3,
+      "score": 0.84,
+      "rawScores": [
+        0.82,
+        0.87,
+        0.83
+      ],
+      "variance": 0.0004667,
+      "evidence": "docs/phase1-requirements/requirement-spec.md:L167-266=§4 层级树 39 节点（29 REQ+6 NFR+4 CON）全含 level 且与 graph.json 一致；L273-279=§5 GROUP-001 覆盖唯一 level=1 REQ-000；L295-378=§6 四类交叉矩阵与 graph.json 154 边一致（depends-on=23/precedes=6/conflicts-with=0 附说明/cross-cuts=20）；L382-436=§7 四矩阵均 100% 无豁免需求；.w-model/preventive-reviews/1-completeness.json:8-11=R3 P1 未缓解：feature-003 @req 头声明 NFR-004/005 但无对应场景；1-security.json:8-14=CON-004/CON-002 安全约束（敏感凭据排除/错误信息内容）缺口未缓解"
+    },
+    {
+      "name": "clarity",
+      "description": "表述无歧义性、输入输出边界明确性",
+      "weight": 0.25,
+      "score": 0.83,
+      "rawScores": [
+        0.82,
+        0.85,
+        0.82
+      ],
+      "variance": 0.0002,
+      "evidence": "docs/phase1-requirements/requirement-spec.md:L147-165=NFR/CON 双字段（targetValue/testThreshold）可量化；L227-258=§4.2 验收标准均为状态码/计数/阈值断言无「快速/友好」等主观词；L38=去重窗口等参数显式标注阶段 3 确认不构成迷雾；.w-model/preventive-reviews/1-reliability.json:8-16=Critical 未缓解：Webhook「重试 3 次」三方语义歧义（UAT-058 ≤3 次投递 vs TLA+ 允许 4 次投递）；1-reliability.json:43-46=UAT-038「200/409 语义一致」双态含糊；1-reliability.json:37-41=§4.3 单根条目对 NFR/CON level=1 表述歧义"
+    },
+    {
+      "name": "consistency",
+      "description": "需求间冲突、术语前后一致性、conflicts-with 边处置",
+      "weight": 0.2,
+      "score": 0.78,
+      "rawScores": [
+        0.77,
+        0.8,
+        0.77
+      ],
+      "variance": 0.0002,
+      "evidence": "docs/phase1-requirements/acceptance-test-design.md:L1646=UAT-058「≤3 次回调（含首次共 3 次）」与 tla/specs/level1/L1_BlogSystem.tla:L152-163=RetryWebhook/FailWebhook（重试至 3=共 4 次投递）直接冲突（1-reliability.json Critical）；features/L1/L1_blog_system-002.feature:L80-86=BDD-L1-020 @UAT-037 错标（应为 UAT-038）；features/L1/L1_blog_system-003.feature:L46-52=BDD-L1-026 @UAT-049 错标（应为 UAT-048）；feature-003:L90-96=BDD-L1-031 降级语义与 tla:L106-109/L158-163 FailWebhook 不等价；graph.json:499-1424=154 边与 spec §6 数量一致（depends-on 23/precedes 6/cross-cuts 20/conflicts-with 0 且注明处置）"
+    },
+    {
+      "name": "testability",
+      "description": "验收标准可测试性、可观测可量化性",
+      "weight": 0.15,
+      "score": 0.82,
+      "rawScores": [
+        0.81,
+        0.84,
+        0.81
+      ],
+      "variance": 0.0002,
+      "evidence": "docs/phase1-requirements/acceptance-test-design.md:L17-2079=73 条 UAT 均含前置条件三要素（认证状态/数据依赖/接口路径）与量化断言（状态码/错误码/计数）；L1084=UAT-038 200/409 双态可验证性弱化；L990-993+L1001=UAT-035 前置条件缺 cmt-2 数据（数据依赖行以「+」截断）；L1646=UAT-058 断言与 TLA+ 重试语义冲突；L1337=UAT-047 依赖去重窗口过期无控制手段；L1921-1930=UAT-068/069 限流阈值 N 未固化"
+    },
+    {
+      "name": "traceability",
+      "description": "需求到业务目标/验收用例/RTM 的可追溯性",
+      "weight": 0.1,
+      "score": 0.82,
+      "rawScores": [
+        0.8,
+        0.85,
+        0.81
+      ],
+      "variance": 0.0004667,
+      "evidence": ".w-model/rtm.json:L7-370=32 行（22 REQ+6 NFR+4 CON）acceptanceTest 均含 UAT 编号+feature 引用且 designDoc 非空；docs/phase1-requirements/requirement-spec.md:L505-538=§12 REQ→UAT 映射与 RTM 一致；docs/uat-path-mapping.md:L9-83=73 行映射齐全；graph.json:6-498=43 节点与 RTM 32 行 ID 对齐；features/L1/L1_blog_system-003.feature:L1=@req 头 NFR-004/005 无场景致 RTM 追溯断裂；feature-002:L80-86/feature-003:L46-52=BDD @UAT 编号错配；tla/specs/level1/L1_BlogSystem.tla:L3-6=@requirement 注解不完整（缺 REQ-027/028/017/024，SD-000 未登记）"
+    }
+  ],
+  "compositeScore": 0.8205,
+  "qualityLevel": "B",
+  "summary": "阶段 1 需求分析评审结论：22 FR+6 NFR+4 CON 四维识别（层级树/REQ-group/交叉矩阵/覆盖矩阵）齐全且与 43 节点图谱、32 行 RTM、73 条 UAT 对齐；NFR 采用 targetValue/testThreshold 双字段，内存存储+JWT+进程内事务为关键决策。产物结构：requirement-spec.md（§4-7 四维）+ acceptance-test-design.md（73 UAT）+ uat-path-mapping.md（73 行）+ 3 个 L1 BDD（39 scenarios）+ L1 TLA+（7 不变式）。遗留风险：R3 三报告（completeness/reliability/security）均 passed=false 且 P1/P2 findings 未缓解——Webhook 重试语义三方冲突（Critical）、BDD @UAT 编号错配（Critical）、BDD/TLA+ 降级语义不等价、安全约束缺口等，已全量列入 reworkHints 交阶段 2 落实；整体 qualityLevel=B 附条件放行。",
+  "passed": true,
+  "reworkHints": [
+    "Critical: Webhook 重试次数语义三方不一致（.w-model/preventive-reviews/1-reliability.json 第 1 条，未缓解）：REQ-028/NFR-003 与 TLA+（tla/specs/level1/L1_BlogSystem.tla:L152-163 重试至 3=共 4 次投递）语义为「3 次重试」，而 docs/phase1-requirements/acceptance-test-design.md UAT-058（L1646）断言「≤3 次回调（含首次共 3 次）」、UAT-065（L1845）断言 attempts=3。须统一为单一定义并同步 UAT-058/UAT-065 与 TLA+ MaxWebhookRetries（或 cfg 改 2），阶段 8 执行前必改。",
+    "Critical: BDD 场景 TAG 引用 UAT 编号错误（1-reliability.json 第 2 条，未缓解）：features/L1/L1_blog_system-002.feature:L80-86 BDD-L1-020「重复点赞幂等」标注 @UAT-037 应为 @UAT-038；features/L1/L1_blog_system-003.feature:L46-52 BDD-L1-026「同 IP 去重」标注 @UAT-049 应为 @UAT-048。阶段 8 按 TAG 映射将错配，须修正。",
+    "Required: BDD 与 TLA+ 对 Webhook 失败后系统行为建模不等价（1-reliability.json 第 3 条，未缓解）：features/L1/L1_blog_system-003.feature:L90-96 BDD-L1-031 断言 Webhook 重试耗尽→降级 Degraded，而 tla/specs/level1/L1_BlogSystem.tla:L106-109 EnterDegraded 无 Webhook 关联守卫、L158-163 FailWebhook 不改变 phase。须为 EnterDegraded 加守卫（如 webhookState=\"failed\"）或调整 BDD 语义，二选一保持等价。",
+    "Required: UAT-035 前置条件数据依赖缺失（1-reliability.json 第 4 条，未缓解）：docs/phase1-requirements/acceptance-test-design.md:L990-993 数据依赖行以「+」截断仅预创建 cmt-1，但 L1001 步骤 3 引用 POST /api/comments/cmt-2/replies 的 cmt-2 从未定义。须补全前置（预创建 cmt-2）或调整步骤 3 引用已定义实体。",
+    "Required: BDD 追溯断裂（1-completeness.json P1 第 1 条 + 1-reliability.json P3 第 5 条，未缓解）：features/L1/L1_blog_system-003.feature:L1 @req 头声明 NFR-004/NFR-005 但 BDD-L1-025~039 无 @NFR-004/@NFR-005 场景；.w-model/rtm.json NFR-004（L296）/NFR-005（L309）行 acceptanceTest 引用该文件却无场景可解析。须补 2 条场景（覆盖率基线/分层约束）或从 @req 头移除并同步 RTM，保持头声明与 scenario TAG 双向一致。",
+    "Required: CON-004 审计日志未声明排除敏感凭据（1-security.json 第 1 条，未缓解）：requirement-spec.md §4.2 CON-004 行（L258）与 §9（L465）均未声明「不得记录明文密码/密码哈希/JWT」；UAT-073 步骤 2（L2071）仅断言 action/actor/timestamp。须补敏感字段排除约束与对应验收断言，防凭据随日志保留 90 天。",
+    "Required: CON-002 统一错误契约未约束 message 内容（1-security.json 第 2 条，未缓解）：requirement-spec.md §4.2 CON-002 行（L256）仅限响应结构；UAT-071 步骤 2（L2014）仅断言结构无多余顶层字段。须补「message 不得含堆栈/SQL/路径/内部类名」约束与断言，防信息泄露。",
+    "Optional: REQ-019「详情展示收藏数」无验收断言（1-completeness.json P2 第 2 条 + 1-reliability.json P3 第 9 条，未缓解）：requirement-spec.md:L139 描述含「收藏数」，但 acceptance-test-design.md UAT-036（L1031-1035）仅断言 likeCount=1、UAT-037（L1055-1058）仅断言收藏列表。须在 UAT-037 增详情 favoriteCount 断言或修订 REQ-019 语义。",
+    "Optional: 安全关键 UAT 未下沉 BDD 层（1-security.json 第 5 条，未缓解）：UAT-009/012/017/034/054/063/069（越权/未认证/错误密钥/通用限流）在 3 个 feature 中无对应 @UAT 场景。须在阶段 2 起补 BDD 或注明此类静态/安全断言不入 BDD 并同步 RTM feature 引用语义。",
+    "Optional: 安全需求缺口待阶段 3/5 落实（1-security.json 第 3/4/6/7/8 条，未缓解）：Webhook 回调 URL 无 SSRF 防护声明（禁内网/环回地址）；Webhook 签名密钥注入方式未声明（建议与 JWT_SECRET 同策略环境变量注入）；REQ-007 密码强度规则未定义（最小长度/复杂度基线）；JWT 签名算法（HS256）与 alg=none 拒绝策略未声明；账号级失败锁定未登记。须在需求层补登记并在阶段 3 接口设计/阶段 5 编码落实。",
+    "Optional: TLA+ 头注解不一致（1-reliability.json P3 第 6 条，未缓解）：tla/specs/level1/L1_BlogSystem.tla:L3-6 @designIds=SD-000 不在 RTM §12.1 SD-001~006 预登记体系；@requirement 仅列 REQ-000/NFR-003/CON-001/CON-002 未列实际建模的 REQ-027/REQ-017/REQ-024/REQ-028。须明确 SD-000=系统级（L1）占位并登记，补齐 @requirement 注解。",
+    "Optional: §4.3 单根条目表述歧义（1-reliability.json P3 第 7 条，未缓解）：requirement-spec.md:L263「level=1 节点仅 REQ-000」与 graph.json NFR-003（L355-367）/CON-001（L411-423）/CON-002（L425-437）level=1 事实冲突。须限定为「REQ 类型 level=1 节点仅 REQ-000（NFR/CON 横切节点可挂 level=1 但不参与 parent 链单调校验）」。",
+    "Optional: UAT-038 状态码断言 200/409 双态含糊（1-reliability.json P3 第 8 条，未缓解）：acceptance-test-design.md:L1084「第二次幂等或 200/409 语义一致」不可机械判定。须固定单一断言（如第二次请求 200 且计数不变）。",
+    "Optional: REQ-021 7 天窗口阅读量与 REQ-024 累计 readCount 数据源关系未明确（1-reliability.json P3 第 10 条，未缓解）：UAT-041 以注入 readCount 分布近似 7 天排序（L1163/L1171）。阶段 3 接口设计须明确 7 天窗口数据源（独立窗口计数或时间戳过滤）并回填 UAT 断言。",
+    "Optional: UAT-047/048 去重窗口与 UAT-068/069 限流阈值控制手段未注明（1-reliability.json FYI 第 13/14 条，未缓解）：acceptance-test-design.md:L1337/L1357 依赖窗口过期、L1921-1930 依赖阈值 N 配置。阶段 3 确认窗口参数后回填（测试环境窗口可配置缩短）并固化 N 值。",
+    "Optional: BDD-L1-032 场景与 @UAT-065 语义弱关联（1-reliability.json P3 第 11 条，未缓解）：features/L1/L1_blog_system-003.feature:L98-104「外部依赖恢复回就绪」与 UAT-065「失败记录留存」互不含对方核心断言。须调整场景内容覆盖 UAT-065 断言或改 TAG 指向语义更贴近用例。",
+    "Nit: UAT「关联 BDD feature」字段 73 处占位符未回填（1-completeness.json Nit 第 3 条，未缓解）：acceptance-test-design.md:L22 等全部为「—（S-bdd 阶段产出后回填）」，RTM acceptanceTest 已含 feature 引用故不阻断，建议回填或注明以 RTM 为准。",
+    "Nit: uat-path-mapping.md 认证要求列字面偏离枚举（1-completeness.json Nit 第 4 条，未缓解）：L22/L44 填「无（不带 token）」、L16/L19 等以括号注记变体。建议统一为枚举值（无需认证/需普通用户 token/需博主 token/混合/不适用）并在括号保留补充注记。",
+    "FYI: 改密后旧 JWT 24h 内仍有效（无会话撤销机制，1-security.json 第 9 条）；UAT-050/051 无读者访问统计面板 403 断言（1-security.json 第 10 条）；TLA+ 生命周期状态（shutdown 等）与 BDD 请求状态机为分层差异不构成缺陷（1-reliability.json FYI 第 15 条）——登记知会，阶段 3/8 关注。"
+  ]
+}

@@ -1,0 +1,30 @@
+﻿node.exe : 提示：未提供 --tla-manifest，跳过 D4 TLA+ 等价校验
+At C:\Users\wangh\AppData\Roaming\TRAE SOLO CN\ModularData\ai-agent\vm\tools\node\npx.ps1:16 char:5
++     & "$basedir/node$exe"  "$basedir/node_modules/npm/bin/npx-cli.js" ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (提示：未提供 --tla-manifest，跳过 D4 TLA+ 等价校验:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+=== BDD Model Check Report (phase 3) ===
+Passed: true
+ExitCode: 0
+Summary: BDD model check passed (phase 3)
+
+--- D1 Header Completeness: 0 violations
+
+--- D3 State Machine Completeness: 0 violations
+
+--- D4 TLA+ Equivalence: 0 violations
+
+--- D5 Step Binding: 0 violations
+
+--- D6 Scenario Path Validity: 0 violations
+
+--- D7 RTM Mapping: 0 violations
+
+--- D8 SD Coverage: 0 violations
+
+=== JSON Summary ===
+BDD_JSON {"type":"bdd","passed":true,"exitCode":0,"summary":"BDD model check passed (phase 3)"}
+

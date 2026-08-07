@@ -1,258 +1,2179 @@
-# 验收测试设计文档
+# 测试用例文档（验收测试设计）
 
-> 阶段 1（需求分析）同步设计的验收测试用例（UAT）。阶段 8 执行。
-> 类型：验收测试。覆盖 32 需求 × 正常+异常+边界场景。
-> 每条用例含前置条件分析（认证状态 / 数据依赖 / 接口路径，禁止行为 #12/#13）。
+> 阶段 1（需求分析）同步产出；阶段 8（验收测试）执行。套用 `templates/test-case.md` 模板。
+> 对应需求规格：`docs/phase1-requirements/requirement-spec.md`；路径映射：`docs/uat-path-mapping.md`。
+> **接口路径说明**：本文件「接口路径」列为阶段 1 设计路径（约定端点）；若阶段 3 接口设计/阶段 5 编码调整，以 `uat-path-mapping.md` 映射（阶段 5 回填实际路径）为准。
 
 ## 文档信息
 
-- 项目名称：博客系统后端（第 34 轮端到端调测，blog-system-demo-r34）
+- 项目名称：博客系统后端（blog-system-demo-r35）
 - 测试类型：验收测试
-- 设计来源阶段：阶段 1（需求分析）
-- 执行阶段：阶段 8（验收测试）
-- 文档版本：v1.1（S-fix 修订，依据 RC-phase1-1-01 fixRecommendation）
-- 编制者：S-doc（dispatchId=phase1-S-doc-01）；修订：S-fix（dispatchId=phase1-S-fix-01）
+- 设计来源阶段：阶段 1
+- 执行阶段：阶段 8
+- 文档版本：v1.0
 
-## 用例列表（UAT-001 ~ UAT-091）
+## 用例列表
 
-> 前置条件格式：`认证：<角色/token 要求>；数据：<依赖数据>；路径：<METHOD /api/...>`
-> 场景类型：正常 / 异常 / 边界。
+### UAT-001
 
-### UAT-001 ~ UAT-066：功能需求（REQ-001 ~ REQ-022，每需求 正常/异常/边界 3 用例）
+- 标题：读者注册账号成功（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-007
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：读者提供用户名/邮箱/密码注册，注册成功返回用户对象，密码以 bcrypt 哈希存储（NFR-002）
 
-| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
-|---|---|---|---|---|---|---|---|
-| UAT-001 | 注册成功返回用户与令牌 | 高 | REQ-001 | 正常 | 认证：无需；数据：邮箱未注册；路径：POST /api/auth/register | `{"email":"reader1@example.com","password":"pass123456"}` | 201，响应含 userId/email/token，JWT 可访问受保护接口 |
-| UAT-002 | 重复邮箱注册冲突 | 高 | REQ-001 | 异常 | 认证：无需；数据：reader1@example.com 已注册；路径：POST /api/auth/register | 同上邮箱再次注册 | 409 冲突错误体 |
-| UAT-003 | 非法邮箱/短密码拒绝 | 高 | REQ-001 | 边界 | 认证：无需；数据：无；路径：POST /api/auth/register | `{"email":"bad","password":"123"}` | 400 参数错误，含 zod 校验错误明细 |
-| UAT-004 | 查询个人资料 | 高 | REQ-002 | 正常 | 认证：用户 token；数据：用户已注册；路径：GET /api/users/me | 无 body | 200，返回昵称/邮箱等资料字段 |
-| UAT-005 | 未认证访问资料 | 高 | REQ-002 | 异常 | 认证：无 token；数据：无；路径：GET /api/users/me | 无 Authorization 头 | 401 未认证 |
-| UAT-006 | 超长昵称更新拒绝 | 高 | REQ-002 | 边界 | 认证：用户 token；数据：用户已注册；路径：PUT /api/users/me | `{"nickname":"x".repeat(33)}` | 400 参数错误 |
-| UAT-007 | 正确凭据登录换取 JWT | 高 | REQ-003 | 正常 | 认证：无需；数据：用户已注册；路径：POST /api/auth/login | `{"email":"reader1@example.com","password":"pass123456"}` | 200，返回 JWT；用该 JWT 请求受保护接口成功 |
-| UAT-008 | 错误密码登录拒绝 | 高 | REQ-003 | 异常 | 认证：无需；数据：用户已注册；路径：POST /api/auth/login | `{"email":"reader1@example.com","password":"wrongpass"}` | 401 未授权 |
-| UAT-009 | 无效/过期 token 拒绝 | 高 | REQ-003 | 边界 | 认证：伪造/过期 token；数据：无；路径：GET /api/users/me | Authorization: Bearer invalid-token | 401 未认证 |
-| UAT-010 | 开通博主身份 | 高 | REQ-004 | 正常 | 认证：用户 token；数据：用户已注册且非博主；路径：POST /api/bloggers | `{"displayName":"博主甲"}` | 201，返回 bloggerId |
-| UAT-011 | 重复开通博主冲突 | 高 | REQ-004 | 异常 | 认证：用户 token；数据：用户已是博主；路径：POST /api/bloggers | 同上 | 409 冲突 |
-| UAT-012 | 未认证开通博主拒绝 | 高 | REQ-004 | 异常 | 认证：无 token；数据：无；路径：POST /api/bloggers | 同上 | 401 未认证 |
-| UAT-013 | 关注博主成功 | 高 | REQ-005 | 正常 | 认证：用户 token；数据：博主已开通；路径：POST /api/bloggers/:id/follow | 无 body | 200，博主粉丝数 +1 |
-| UAT-014 | 重复关注幂等 | 高 | REQ-005 | 边界 | 认证：用户 token；数据：已关注该博主；路径：POST /api/bloggers/:id/follow | 无 body | 200，粉丝数不变（幂等） |
-| UAT-015 | 关注不存在博主 | 高 | REQ-005 | 异常 | 认证：用户 token；数据：博主 id 不存在；路径：POST /api/bloggers/:id/follow | 无 body | 404 不存在 |
-| UAT-016 | 创建文章成功 | 高 | REQ-006 | 正常 | 认证：博主 token；数据：博主已开通；路径：POST /api/posts | `{"title":"T1","content":"C1"}` | 201，返回文章含 id/title/author |
-| UAT-017 | 非作者更新文章拒绝 | 高 | REQ-006 | 异常 | 认证：博主 B token；数据：文章作者为博主 A；路径：PUT /api/posts/:id | `{"title":"hacked"}` | 403 越权 |
-| UAT-018 | 空标题/内容创建拒绝 | 高 | REQ-006 | 边界 | 认证：博主 token；数据：无；路径：POST /api/posts | `{"title":"","content":""}` | 400 参数错误 |
-| UAT-019 | 保存草稿不公开可见 | 高 | REQ-007 | 正常 | 认证：博主 token；数据：无；路径：POST /api/posts | `{"title":"D1","content":"D","status":"draft"}` | 201 status=draft；访客 GET 公开列表不含该文章 |
-| UAT-020 | 发布文章公开可见 | 高 | REQ-007 | 正常 | 认证：博主 token；数据：草稿已存在；路径：PATCH /api/posts/:id/status | `{"status":"published"}` | 200 status=published；公开列表可见 |
-| UAT-021 | 非作者修改状态拒绝 | 高 | REQ-007 | 异常 | 认证：博主 B token；数据：草稿作者为博主 A；路径：PATCH /api/posts/:id/status | `{"status":"published"}` | 403 越权 |
-| UAT-022 | 浏览公开文章计数 | 高 | REQ-008 | 正常 | 认证：无需；数据：公开文章已存在；路径：GET /api/posts/:id | 无 body | 200 文章内容；再次 GET 后 viewCount +1 且持久化 |
-| UAT-023 | 浏览不存在文章 | 高 | REQ-008 | 异常 | 认证：无需；数据：文章 id 不存在；路径：GET /api/posts/:id | 无 body | 404 不存在 |
-| UAT-024 | 访客浏览草稿 | 高 | REQ-008 | 边界 | 认证：无需（访客）；数据：草稿存在；路径：GET /api/posts/:id | 无 body | 404（草稿仅作者可见） |
-| UAT-025 | 发表评论成功 | 高 | REQ-009 | 正常 | 认证：用户 token；数据：公开文章存在；路径：POST /api/posts/:id/comments | `{"content":"好文"}` | 201，返回评论含 id/content |
-| UAT-026 | 非评论作者删除拒绝 | 高 | REQ-009 | 异常 | 认证：用户 B token；数据：评论作者为用户 A；路径：DELETE /api/comments/:id | 无 body | 403 越权 |
-| UAT-027 | 空/超长评论拒绝 | 高 | REQ-009 | 边界 | 认证：用户 token；数据：公开文章存在；路径：POST /api/posts/:id/comments | `{"content":""}` 或 `{"content":"x".repeat(1001)}` | 400 参数错误 |
-| UAT-028 | 审核通过评论可见 | 高 | REQ-010 | 正常 | 认证：博主 token；数据：待审评论存在；路径：PATCH /api/comments/:id/review | `{"action":"approve"}` | 200，评论公开可见 |
-| UAT-029 | 审核拒绝评论隐藏 | 高 | REQ-010 | 正常 | 认证：博主 token；数据：待审评论存在；路径：PATCH /api/comments/:id/review | `{"action":"reject"}` | 200，评论公开列表不可见 |
-| UAT-030 | 非博主审核拒绝 | 高 | REQ-010 | 异常 | 认证：普通用户 token；数据：待审评论存在；路径：PATCH /api/comments/:id/review | `{"action":"approve"}` | 403 越权 |
-| UAT-031 | 创建标签成功 | 高 | REQ-011 | 正常 | 认证：博主 token；数据：无；路径：POST /api/tags | `{"name":"Node.js"}` | 201，返回标签 |
-| UAT-032 | 重复标签冲突 | 高 | REQ-011 | 异常 | 认证：博主 token；数据：同名标签已存在；路径：POST /api/tags | `{"name":"Node.js"}` | 409 冲突 |
-| UAT-033 | 删除被引用标签拒绝 | 高 | REQ-011 | 边界 | 认证：博主 token；数据：标签已被文章引用；路径：DELETE /api/tags/:id | 无 body | 409（先解绑后删除） |
-| UAT-034 | 创建分类含层级 | 高 | REQ-012 | 正常 | 认证：博主 token；数据：父分类存在；路径：POST /api/categories | `{"name":"前端","parentId":1}` | 201，返回分类含 parent 信息 |
-| UAT-035 | 删除含文章分类拒绝 | 高 | REQ-012 | 异常 | 认证：博主 token；数据：分类下存在文章；路径：DELETE /api/categories/:id | 无 body | 409 冲突 |
-| UAT-036 | parent 分类不存在 | 高 | REQ-012 | 边界 | 认证：博主 token；数据：parentId 不存在；路径：POST /api/categories | `{"name":"x","parentId":9999}` | 400 参数错误 |
-| UAT-037 | 关键词搜索命中 | 高 | REQ-013 | 正常 | 认证：无需；数据：文章含目标关键词；路径：GET /api/search?q=TypeScript&page=1&pageSize=10 | 无 body | 200，结果列表含标题命中文章 + 分页元数据 |
-| UAT-038 | 搜索无命中返回空 | 高 | REQ-013 | 正常 | 认证：无需；数据：无匹配文章；路径：GET /api/search?q=zzzz | 无 body | 200 空列表 |
-| UAT-039 | 空关键词搜索拒绝 | 高 | REQ-013 | 边界 | 认证：无需；数据：无；路径：GET /api/search?q= | 无 body | 400 参数错误 |
-| UAT-040 | 获取推荐文章 | 高 | REQ-014 | 正常 | 认证：无需；数据：≥1 篇公开文章；路径：GET /api/recommendations | 无 body | 200，推荐文章列表 ≤ 10 条，不含草稿 |
-| UAT-041 | 无内容推荐空列表 | 高 | REQ-014 | 正常 | 认证：无需；数据：无文章；路径：GET /api/recommendations | 无 body | 200 空列表 |
-| UAT-042 | 推荐结果上限约束 | 高 | REQ-014 | 边界 | 认证：无需；数据：> 10 篇公开文章；路径：GET /api/recommendations | 无 body | 200，结果数 ≤ 10 |
-| UAT-043 | 查询文章统计 | 高 | REQ-015 | 正常 | 认证：博主 token；数据：文章含浏览/评论数据；路径：GET /api/posts/:id/stats | 无 body | 200，viewCount/commentCount 与实测一致 |
-| UAT-044 | 无数据统计为 0 | 高 | REQ-015 | 边界 | 认证：博主 token；数据：文章无浏览无评论；路径：GET /api/posts/:id/stats | 无 body | 200，viewCount=0、commentCount=0（非 null） |
-| UAT-045 | 统计不存在文章 | 高 | REQ-015 | 异常 | 认证：博主 token；数据：文章 id 不存在；路径：GET /api/posts/:id/stats | 无 body | 404 不存在 |
-| UAT-046 | 事件生成通知可查 | 高 | REQ-016 | 正常 | 认证：用户 token；数据：他人评论了我的文章/关注了我；路径：GET /api/notifications | 无 body | 200，含新评论/新关注通知（unread） |
-| UAT-047 | 标记通知已读 | 高 | REQ-016 | 正常 | 认证：用户 token；数据：存在未读通知；路径：PATCH /api/notifications/:id/read | 无 body | 200，该通知状态变为已读 |
-| UAT-048 | 越权查询他人通知拒绝 | 高 | REQ-016 | 异常 | 认证：用户 B token；数据：通知归属用户 A（可通过 userId 参数指定）；路径：GET /api/notifications?userId=<A 的 userId> | `userId=A` | 403 越权（查询他人通知 → 403，见 requirement-spec.md §9 设计决策「通知/通知类资源越权查询语义」，与 REQ-016 AC3 一致） |
-| UAT-049 | 订阅博主成功 | 高 | REQ-017 | 正常 | 认证：用户 token；数据：博主存在；路径：POST /api/subscriptions | `{"bloggerId":1}` | 200，订阅关系建立 |
-| UAT-050 | 重复订阅幂等 | 高 | REQ-017 | 边界 | 认证：用户 token；数据：已订阅该博主；路径：POST /api/subscriptions | `{"bloggerId":1}` | 200 幂等，订阅列表无重复 |
-| UAT-051 | 订阅不存在博主 | 高 | REQ-017 | 异常 | 认证：用户 token；数据：bloggerId 不存在；路径：POST /api/subscriptions | `{"bloggerId":9999}` | 404 不存在 |
-| UAT-052 | 关键操作写入审计日志 | 高 | REQ-018 | 正常 | 认证：管理员 token（与 UAT-054 管理员专属语义一致）；数据：管理员已创建；路径：POST /api/auth/login（管理员登录，触发）→ GET /api/admin/audit-logs（验证） | 管理员登录一次 | 审计日志新增记录，含 actor=admin/action=login/timestamp |
-| UAT-053 | 审计记录字段完整性 | 高 | REQ-018 | 正常 | 认证：管理员 token；数据：执行过删除文章/改 Webhook；路径：GET /api/admin/audit-logs | 无 body | 日志记录含 actor/action/timestamp/详情四字段 |
-| UAT-054 | 普通用户读审计日志拒绝 | 高 | REQ-018 | 异常 | 认证：普通用户 token；数据：无；路径：GET /api/admin/audit-logs | 无 body | 403 越权 |
-| UAT-055 | 管理员查询审计日志分页 | 高 | REQ-019 | 正常 | 认证：管理员 token；数据：> 10 条日志；路径：GET /api/admin/audit-logs?page=1&pageSize=10 | 无 body | 200，日志列表 + 分页元数据 |
-| UAT-056 | 按条件筛选审计日志 | 高 | REQ-019 | 正常 | 认证：管理员 token；数据：含多种 action；路径：GET /api/admin/audit-logs?action=delete_post | 无 body | 200，仅返回 action=delete_post 记录 |
-| UAT-057 | 非管理员查询拒绝 | 高 | REQ-019 | 异常 | 认证：博主 token（非管理员）；数据：无；路径：GET /api/admin/audit-logs | 无 body | 403 越权 |
-| UAT-058 | 获取系统级 RSS | 高 | REQ-020 | 正常 | 认证：无需；数据：≥1 篇公开文章；路径：GET /api/rss | 无 body | 200，Content-Type application/xml，XML 可解析，含文章条目 |
-| UAT-059 | 无文章返回合法空源 | 高 | REQ-020 | 边界 | 认证：无需；数据：无公开文章；路径：GET /api/rss | 无 body | 200，合法 XML 空源（无 item） |
-| UAT-060 | 获取不存在博主 RSS | 高 | REQ-020 | 异常 | 认证：无需；数据：bloggerId 不存在；路径：GET /api/bloggers/:id/rss | 无 body | 404 不存在 |
-| UAT-061 | 创建 Webhook 并触发投递 | 高 | REQ-021 | 正常 | 认证：博主 token；数据：目标 URL 可达；路径：POST /api/webhooks | `{"url":"https://example.com/hook","event":"post.published"}` | 201；发布文章后目标 URL 收到 POST 投递（含事件负载） |
-| UAT-062 | 更新/删除 Webhook | 高 | REQ-021 | 正常 | 认证：博主 token；数据：Webhook 已创建；路径：PUT/DELETE /api/webhooks/:id | `{"url":"https://new.com/hook"}` | 200，配置更新/删除生效 |
-| UAT-063 | 非法 URL 创建拒绝 | 高 | REQ-021 | 边界 | 认证：博主 token；数据：无；路径：POST /api/webhooks | `{"url":"not-a-url"}` | 400 参数错误 |
-| UAT-064 | 投递失败自动重试 | 高 | REQ-022 | 正常 | 认证：博主 token；数据：Webhook 目标 URL 返回 5xx；路径：POST /api/webhooks（配置）+ 发布文章（触发） | 目标 URL 返回 500 | 投递自动重试 ≤ 3 次，间隔指数退避（日志可证） |
-| UAT-065 | 重试超限标记失败 | 高 | REQ-022 | 异常 | 认证：博主 token；数据：目标 URL 持续失败；路径：POST /api/webhooks（配置）+ 发布文章（触发） | 目标 URL 持续 500 | 重试 3 次后停止，Webhook 状态标记 failed |
-| UAT-066 | 投递成功不重试 | 高 | REQ-022 | 边界 | 认证：博主 token；数据：目标 URL 可达；路径：POST /api/webhooks（配置）+ 发布文章（触发） | 目标 URL 返回 200 | 投递 1 次成功，无重试发生 |
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：无（邮箱 test-reader@example.com 未被占用）
+- 接口路径：POST /api/auth/register
 
-### UAT-067 ~ UAT-078：非功能需求（NFR-001 ~ NFR-006，每 NFR 2 用例）
+**测试步骤**
 
-| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
-|---|---|---|---|---|---|---|---|
-| UAT-067 | 列表接口 P95 响应达标 | 高 | NFR-001 | 正常 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 循环请求 N 次，采集响应时间 | P95 ≤ 200ms（生产目标）/ ≤ 400ms（CI 阈值） |
-| UAT-068 | 并发下响应仍达标 | 高 | NFR-001 | 边界 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 并发 50 请求 | P95 响应时间 ≤ 400ms（CI 阈值），无超时 |
-| UAT-069 | 未认证/越权访问拒绝 | 高 | NFR-002 | 正常 | 认证：无/非资源所有者；数据：受保护资源存在；路径：GET /api/users/me、DELETE /api/posts/:id | 无 token / 他人 token | 未认证 401；越权 403 |
-| UAT-070 | 密码哈希存储验证 | 高 | NFR-002 | 正常 | 认证：无需；数据：新注册用户；路径：POST /api/auth/register | 注册新用户 | 存储中密码为 bcrypt 哈希（非明文）；登录可比对成功 |
-| UAT-071 | 1000 请求零 5xx | 高 | NFR-003 | 正常 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 1000 次连续 GET | 错误率 = 0%（无 5xx 响应） |
-| UAT-072 | 混合请求零 5xx | 高 | NFR-003 | 边界 | 认证：用户/博主 token；数据：完整测试数据；路径：混合 API | 混合读操作 1000 次 | 错误率 = 0% |
-| UAT-073 | 单元行覆盖率达标 | 高 | NFR-004 | 正常 | 认证：n/a；数据：n/a；路径：静态（vitest coverage） | 运行 vitest coverage | 行覆盖率 ≥ 80% |
-| UAT-074 | 覆盖率报告可复现 | 高 | NFR-004 | 边界 | 认证：n/a；数据：n/a；路径：静态（CI 重跑） | 重复运行 coverage | 两次结果均 ≥ 80% |
-| UAT-075 | 峰值内存达标 | 高 | NFR-005 | 正常 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 1000 次请求后测量内存 | 峰值内存 ≤ 100MB（生产）/ ≤ 150MB（CI） |
-| UAT-076 | 长时运行内存稳定 | 高 | NFR-005 | 边界 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 2000 次请求后测量内存 | 峰值内存 ≤ 150MB（CI 阈值） |
-| UAT-077 | 限流阈值内正常放行 | 高 | NFR-006 | 正常 | 认证：无需；数据：无；路径：任意 API（GET /api/posts） | 60 秒内 ≤ 100 次请求 | 全部 2xx，无 429 |
-| UAT-078 | 超限返回 429 | 高 | NFR-006 | 边界 | 认证：无需；数据：无；路径：任意 API（GET /api/posts） | 60 秒内第 101 次请求 | 429 限流 + Retry-After 头 |
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 调用注册接口 | `{ username: "reader01", email: "test-reader@example.com", password: "Passw0rd!x" }` | 201 Created |
+| 2 | 断言响应体 | — | 返回用户对象：id、username、email；**不含密码字段** |
+| 3 | 断言存储层 | — | 存储中的密码为 bcrypt 哈希（非明文，见 UAT-062） |
 
-### UAT-079 ~ UAT-086：约束需求（CON-001 ~ CON-004，每 CON 2 用例）
+**预期结果**
+注册成功（201），用户对象不含密码明文，存储为 bcrypt 哈希；邮箱未被占用时可重复注册不同用户。
 
-| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
-|---|---|---|---|---|---|---|---|
-| UAT-079 | 技术栈编译运行 | 高 | CON-001 | 正常 | 认证：n/a；数据：n/a；路径：静态（package.json/tsconfig） | tsc 编译 + 启动服务 | 编译通过；路由基于 Express 4；源码 TypeScript 5 |
-| UAT-080 | 无其他 Web 框架 | 高 | CON-001 | 边界 | 认证：n/a；数据：n/a；路径：静态（依赖清单） | 检查 package.json 依赖 | 无 Express 之外的 Web 框架依赖 |
-| UAT-081 | 无外部数据库连接 | 高 | CON-002 | 正常 | 认证：n/a；数据：n/a；路径：静态 + 启动行为 | 启动服务 | 启动无外部连接；数据在内存可读写 |
-| UAT-082 | 内存数据可读写 | 高 | CON-002 | 正常 | 认证：博主 token；数据：无；路径：POST /api/posts → GET /api/posts/:id | 创建文章后查询 | 创建成功且内存中可读回 |
-| UAT-083 | 非法入参统一 400 | 高 | CON-003 | 正常 | 认证：博主 token；数据：无；路径：POST /api/posts | `{"title":"","content":""}` | 400 + 结构化错误体（zod 校验） |
-| UAT-084 | 校验基于 zod schema | 高 | CON-003 | 边界 | 认证：n/a；数据：n/a；路径：静态（源码检查） | 检查校验实现 | 入参校验逻辑基于 zod schema 声明 |
-| UAT-085 | 保留期可配置 | 高 | CON-004 | 正常 | 认证：管理员 token；数据：n/a；路径：配置检查 + GET /api/admin/audit-logs | 设置保留期（如 90 天） | 配置项生效，超期记录被清理/不可查 |
-| UAT-086 | 超期日志清理 | 高 | CON-004 | 边界 | 认证：管理员 token；数据：存在超期审计记录；路径：GET /api/admin/audit-logs | 模拟超期记录 | 超期记录不再返回 |
+**执行状态**
+- [ ] 待执行
 
-### UAT-087 ~ UAT-091：AC 级补全用例（依据 RC-phase1-1-01 fixRecommendation）
+---
 
-> 修复 R3-completeness 识别的 4 处 AC 级覆盖缺口（REQ-005 AC2 取关 / REQ-006 AC3 文章不存在 404 / REQ-009 AC3 文章不存在 404 / REQ-017 AC3 退订）+ NFR-002 AC3 JWT_SECRET 密钥管理，确保每条验收标准 ≥1 个可执行用例。
+### UAT-002
 
-| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
-|---|---|---|---|---|---|---|---|
-| UAT-087 | 取关博主粉丝数减一 | 高 | REQ-005 | 正常 | 认证：用户 token；数据：已关注目标博主；路径：DELETE /api/bloggers/:id/follow | 无 body | 200，粉丝数 -1（覆盖 REQ-005 AC2） |
-| UAT-088 | 操作不存在文章 | 高 | REQ-006 | 异常 | 认证：博主 token；数据：文章 id 不存在；路径：PUT /api/posts/:id | `{"title":"x"}` | 404 不存在（覆盖 REQ-006 AC3） |
-| UAT-089 | 评论不存在文章 | 高 | REQ-009 | 异常 | 认证：用户 token；数据：文章 id 不存在；路径：POST /api/posts/:id/comments | `{"content":"好文"}` | 404 不存在（覆盖 REQ-009 AC3） |
-| UAT-090 | 退订博主成功 | 高 | REQ-017 | 正常 | 认证：用户 token；数据：已订阅目标博主；路径：DELETE /api/subscriptions/:id | 无 body | 200，订阅关系解除（覆盖 REQ-017 AC3） |
-| UAT-091 | JWT_SECRET 密钥管理验证 | 高 | NFR-002 | 正常 | 认证：n/a；数据：n/a；路径：静态（环境变量与启动日志检查） | 检查 JWT_SECRET 来源/默认值/日志输出 | JWT_SECRET 经环境变量注入（process.env.JWT_SECRET）、代码无硬编码默认值、生产禁用默认密钥、密钥不出现在日志/错误输出（覆盖 NFR-002 AC3，见 requirement-spec.md §9） |
+- 标题：重复邮箱注册被拒（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-007
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：已占用邮箱再次注册，返回 409 与唯一性错误码，不产生新用户
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建用户（email=dup@example.com）
+- 接口路径：POST /api/auth/register
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 用已占用邮箱注册 | `{ username: "reader02", email: "dup@example.com", password: "Passw0rd!x" }` | 409 Conflict |
+| 2 | 断言错误体 | — | `{ error: { code: "EMAIL_ALREADY_EXISTS", message: <非空> } }`（CON-002 统一结构） |
+| 3 | 断言用户数不变 | — | 用户总数 = 预创建数量 |
+
+**预期结果**
+409 + 唯一性错误码；重复邮箱不产生新用户（邮箱唯一约束生效）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-003
+
+- 标题：注册缺必填字段/弱密码被拒（边界路径）
+- 优先级：高
+- 关联需求/设计：REQ-007
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户名/邮箱/密码任一缺失或密码过弱，返回 400 且不创建用户
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：无
+- 接口路径：POST /api/auth/register
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 缺密码注册 | `{ username: "reader03", email: "r3@example.com" }` | 400 Bad Request |
+| 2 | 弱密码注册 | `{ username: "reader03", email: "r3@example.com", password: "123" }` | 400 Bad Request（密码强度校验） |
+| 3 | 断言错误体 | — | `{ error: { code: "VALIDATION_ERROR", message: <非空> } }` |
+
+**预期结果**
+缺字段/弱密码均 400 + VALIDATION_ERROR；无用户创建。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-004
+
+- 标题：邮箱/用户名+密码登录签发 JWT（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-008
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：注册用户分别用邮箱与用户名登录，成功返回 JWT（带过期时间）
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建用户（email=login@example.com, username=login01, 已知密码）
+- 接口路径：POST /api/auth/login
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 邮箱登录 | `{ account: "login@example.com", password: <已知密码> }` | 200 OK |
+| 2 | 用户名登录 | `{ account: "login01", password: <已知密码> }` | 200 OK |
+| 3 | 断言响应 | — | 返回 `{ token: <JWT> }`；JWT 可解析且含 exp（exp−iat ≤ 24h，CON-003，见 UAT-072） |
+
+**预期结果**
+两种账号形式均登录成功，签发合法 JWT。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-005
+
+- 标题：错误凭据登录失败（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-008
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：错误密码/不存在账号登录，返回 401，不签发 token
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建用户（email=login@example.com）
+- 接口路径：POST /api/auth/login
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 错误密码登录 | `{ account: "login@example.com", password: "WrongPass!1" }` | 401 Unauthorized |
+| 2 | 不存在账号登录 | `{ account: "nobody@example.com", password: "Passw0rd!x" }` | 401 Unauthorized |
+| 3 | 断言错误体 | — | `{ error: { code: "INVALID_CREDENTIALS", message: <非空> } }` |
+
+**预期结果**
+两类错误凭据均 401 + INVALID_CREDENTIALS，无 token 返回。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-006
+
+- 标题：过期 token 访问需认证接口被拒（边界路径，禁止行为 #12 合规）
+- 优先级：高
+- 关联需求/设计：REQ-008、CON-003
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：携带已过期 JWT 访问**需认证接口** GET /api/users/me，返回 401（选用需认证接口验证 token 失效，禁止用公开接口）
+
+**前置条件**
+- 认证状态：需普通用户 token（**已过期**——预签发 exp 在过去的测试 token）
+- 数据依赖：预创建用户；测试密钥签发过期 token
+- 接口路径：GET /api/users/me（需认证接口）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 携带过期 token 调用需认证接口 | `Authorization: Bearer <expired-jwt>` | 401 Unauthorized |
+| 2 | 断言错误体 | — | `{ error: { code: "TOKEN_EXPIRED", message: <非空> } }` |
+
+**预期结果**
+过期 token 在需认证接口上返回 401 + TOKEN_EXPIRED；重新登录后可正常访问（见 UAT-004）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-007
+
+- 标题：注册用户申请成为博主成功（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-009
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：普通注册用户申请成为博主，角色变更为博主并获得发布权限
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建普通用户 reader-user
+- 接口路径：POST /api/users/me/blogger
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 调用博主申请接口 | — | 200 OK |
+| 2 | 断言角色变更 | GET /api/users/me | 响应含 `role: "blogger"` |
+| 3 | 断言发布权限 | 以变更后身份 POST /api/articles | 201（具备发布权限） |
+
+**预期结果**
+申请成功，角色变更为 blogger，具备创建文章权限。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-008
+
+- 标题：普通读者创建文章被拒（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-009、REQ-011
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：未申请博主角色的读者调用创建文章接口，返回 403
+
+**前置条件**
+- 认证状态：需普通用户 token（非博主）
+- 数据依赖：预创建普通用户 reader-user（无博主角色）
+- 接口路径：POST /api/articles
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 读者调用创建文章接口 | `{ title: "t", content: "c" }` | 403 Forbidden |
+| 2 | 断言错误体 | — | `{ error: { code: "FORBIDDEN", message: <非空> } }` |
+
+**预期结果**
+非博主创建文章返回 403；文章未创建。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-009
+
+- 标题：博主越权管理他人文章被拒（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-009、REQ-014
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主 A 尝试编辑/删除博主 B 的文章，返回 403
+
+**前置条件**
+- 认证状态：需博主 token（博主A）
+- 数据依赖：预创建博主 A、博主 B；预创建 B 的文章（draft，id=art-b1）
+- 接口路径：PATCH /api/articles/art-b1、DELETE /api/articles/art-b1
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 博主 A 编辑 B 的文章 | `{ title: "hacked" }` | 403 Forbidden |
+| 2 | 博主 A 删除 B 的文章 | — | 403 Forbidden |
+
+**预期结果**
+越权编辑/删除均 403；B 的文章未被修改。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-010
+
+- 标题：查看与修改自己的资料（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-010
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户查看自己的资料并修改昵称/简介/头像 URL
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建用户
+- 接口路径：GET /api/users/me、PATCH /api/users/me
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取自己资料 | — | 200，含 nickname/bio/avatarUrl |
+| 2 | 修改资料 | `{ nickname: "新昵称", bio: "新简介", avatarUrl: "https://img.example.com/a.png" }` | 200，返回最新资料 |
+| 3 | 再次获取 | — | 修改已持久化 |
+
+**预期结果**
+资料可查看可修改，修改后读取一致。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-011
+
+- 标题：修改密码校验原密码（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-010
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：原密码错误时修改密码被拒；原密码正确时修改成功且旧密码失效
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建用户（已知原密码）
+- 接口路径：PUT /api/users/me/password
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 错误原密码修改 | `{ oldPassword: "Wrong!1", newPassword: "NewPass!2" }` | 400 Bad Request |
+| 2 | 正确原密码修改 | `{ oldPassword: <原密码>, newPassword: "NewPass!2" }` | 200 OK |
+| 3 | 用旧密码登录 | POST /api/auth/login 传旧密码 | 401（旧密码失效） |
+
+**预期结果**
+原密码校验生效：错误被拒（400），正确后修改成功且旧密码不可再登录。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-012
+
+- 标题：未认证访问资料接口被拒（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-010、NFR-002
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：无 token / 缺失 Authorization 头访问需认证接口，返回 401
+
+**前置条件**
+- 认证状态：无（不带 token）
+- 数据依赖：无
+- 接口路径：GET /api/users/me
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 无 token 调用 | — | 401 Unauthorized |
+| 2 | 断言错误体 | — | `{ error: { code: "UNAUTHORIZED", message: <非空> } }` |
+
+**预期结果**
+未认证访问需认证接口返回 401 + UNAUTHORIZED。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-013
+
+- 标题：博主创建文章为草稿状态（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-011
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主创建含标题/正文/摘要/标签/分类的文章，返回 201 且状态为 draft
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建标签 tag-web、分类 cat-tech（供引用）
+- 接口路径：POST /api/articles
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 创建文章 | `{ title: "标题", content: "正文", summary: "摘要", tags: ["tag-web"], categoryId: "cat-tech" }` | 201 Created |
+| 2 | 断言响应 | — | 返回文章对象：id、status=`draft`、title/content/summary/tags/categoryId/authorId |
+
+**预期结果**
+创建成功，status=draft；标签/分类正确关联。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-014
+
+- 标题：创建文章缺必填字段被拒（边界路径）
+- 优先级：高
+- 关联需求/设计：REQ-011
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：缺标题/正文等必填字段创建文章，返回 400，文章不创建
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：无
+- 接口路径：POST /api/articles
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 缺标题创建 | `{ content: "正文" }` | 400 Bad Request |
+| 2 | 断言错误体 | — | `{ error: { code: "VALIDATION_ERROR", message: <非空> } }` |
+| 3 | 断言文章数不变 | GET /api/users/me/articles | 数量未增加 |
+
+**预期结果**
+缺必填字段 400 + VALIDATION_ERROR，无文章创建。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-015
+
+- 标题：发布草稿后读者可见（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-012
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主发布草稿，状态变更为 published，读者浏览列表/详情可见
+
+**前置条件**
+- 认证状态：需博主 token（发布）+ 无需认证（读者浏览）
+- 数据依赖：预创建博主及 draft 文章
+- 接口路径：POST /api/articles/:id/publish
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发布草稿 | — | 200 OK，status=`published` |
+| 2 | 读者浏览列表 | GET /api/articles | 列表含该文章 |
+| 3 | 读者查看详情 | GET /api/articles/:id | 200，含正文与作者信息 |
+
+**预期结果**
+发布后状态 published，读者可浏览/查看详情。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-016
+
+- 标题：已发布文章更新后重新发布（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-012
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主编辑已发布文章后重新发布，更新内容对读者生效
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及 published 文章（id=art-pub-1）
+- 接口路径：PATCH /api/articles/art-pub-1、POST /api/articles/art-pub-1/publish
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 更新已发布文章 | `{ title: "更新标题", content: "更新正文" }` | 200 OK |
+| 2 | 重新发布 | — | 200 OK，status=published |
+| 3 | 读者查看详情 | GET /api/articles/art-pub-1 | 返回更新后的标题/正文 |
+
+**预期结果**
+已发布文章可更新并重新发布，读者可见最新内容。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-017
+
+- 标题：发布不存在/他人文章被拒（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-012
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：发布不存在的文章返回 404；发布他人文章返回 403
+
+**前置条件**
+- 认证状态：需博主 token（博主 A）
+- 数据依赖：预创建博主 A、博主 B；B 的 draft 文章 art-b2
+- 接口路径：POST /api/articles/:id/publish
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发布不存在文章 | POST /api/articles/art-nonexist/publish | 404 Not Found |
+| 2 | 发布他人文章 | POST /api/articles/art-b2/publish | 403 Forbidden |
+
+**预期结果**
+不存在 404、越权 403，均不改变文章状态。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-018
+
+- 标题：文章状态机合法流转（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-013
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：draft → published → archived 全链路合法流转，各步状态正确
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及 draft 文章
+- 接口路径：POST /api/articles/:id/publish、POST /api/articles/:id/archive
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发布 | POST /api/articles/:id/publish | status=draft → published |
+| 2 | 归档 | POST /api/articles/:id/archive | status=published → archived |
+| 3 | 断言终态 | GET /api/articles/:id | status=archived |
+
+**预期结果**
+draft→published→archived 各步合法，终态 archived。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-019
+
+- 标题：已发布文章不可删除（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-013、REQ-014
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：DELETE 已发布文章被拒（仅可归档），返回 409/400 且文章仍在
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及 published 文章
+- 接口路径：DELETE /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 删除已发布文章 | — | 409 Conflict（或 400，错误码 DELETION_NOT_ALLOWED） |
+| 2 | 断言文章仍存在 | GET /api/articles/:id | 200，status=published |
+
+**预期结果**
+已发布文章删除被拒，仅可归档（归档见 UAT-018）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-020
+
+- 标题：已归档文章不可直接再发布（边界路径）
+- 优先级：高
+- 关联需求/设计：REQ-013
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：archived 状态直接调用发布接口，返回 400（须先取消归档回 draft）
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及 archived 文章
+- 接口路径：POST /api/articles/:id/publish
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 对 archived 文章直接发布 | — | 400 Bad Request |
+| 2 | 断言错误体 | — | `{ error: { code: "INVALID_TRANSITION", message: <非空> } }` |
+
+**预期结果**
+archived→published 直跳被拒（400 + INVALID_TRANSITION），状态不变。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-021
+
+- 标题：取消归档回草稿后可再发布（边界路径）
+- 优先级：高
+- 关联需求/设计：REQ-013
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：archived 文章先取消归档回 draft，再发布成功
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及 archived 文章
+- 接口路径：POST /api/articles/:id/unarchive、POST /api/articles/:id/publish
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 取消归档 | POST /api/articles/:id/unarchive | status=archived → draft |
+| 2 | 重新发布 | POST /api/articles/:id/publish | status=draft → published |
+
+**预期结果**
+取消归档回 draft 后发布成功，状态机闭环成立。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-022
+
+- 标题：查看文章列表（草稿+已发布，分页）（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-014
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主查看自己的文章列表，含草稿与已发布，分页正确
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及其 3 篇文章（2 draft + 1 published）
+- 接口路径：GET /api/users/me/articles?page=1&size=2
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 分页获取文章列表 | page=1&size=2 | 200，返回 2 条 + total=3 |
+| 2 | 断言状态混合 | — | 列表中 draft 与 published 并存 |
+| 3 | 断言第 2 页 | page=2&size=2 | 返回剩余 1 条 |
+
+**预期结果**
+列表含草稿与已发布，分页字段（page/size/total）正确。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-023
+
+- 标题：编辑文章（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-014
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主编辑自己文章的标题/正文/摘要，修改生效
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及草稿文章
+- 接口路径：PATCH /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 编辑文章 | `{ title: "新标题", summary: "新摘要" }` | 200 OK |
+| 2 | 断言修改生效 | GET /api/articles/:id | 返回新标题/新摘要 |
+
+**预期结果**
+编辑成功，修改内容持久化。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-024
+
+- 标题：删除草稿成功、已发布仅可归档（边界路径）
+- 优先级：高
+- 关联需求/设计：REQ-014、REQ-013
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主删除草稿返回 204；对已发布文章删除被拒
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及草稿文章（id=art-d1）、已发布文章（id=art-p1）
+- 接口路径：DELETE /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 删除草稿 | DELETE /api/articles/art-d1 | 204 No Content |
+| 2 | 断言草稿消失 | GET /api/articles/art-d1 | 404 |
+| 3 | 删除已发布文章 | DELETE /api/articles/art-p1 | 409/400（仅可归档） |
+
+**预期结果**
+草稿可删除（204）；已发布删除被拒，仅可归档。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-025
+
+- 标题：创建标签（名称唯一）（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-015
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主创建标签，返回 201 与标签对象
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：无
+- 接口路径：POST /api/tags
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 创建标签 | `{ name: "typescript" }` | 201 Created |
+| 2 | 断言响应 | — | 返回标签对象：id、name=typescript |
+
+**预期结果**
+标签创建成功。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-026
+
+- 标题：重复标签名创建被拒（异常路径）
+- 优先级：中
+- 关联需求/设计：REQ-015
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：已存在标签名再次创建，返回 409
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建标签 typescript
+- 接口路径：POST /api/tags
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 重复名创建标签 | `{ name: "typescript" }` | 409 Conflict |
+| 2 | 断言错误体 | — | `{ error: { code: "TAG_NAME_EXISTS", message: <非空> } }` |
+
+**预期结果**
+重复标签名 409 + 唯一性错误码。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-027
+
+- 标题：创建分类并支持嵌套（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-016
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主创建顶级分类与子分类（嵌套 ≤3 层）
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：无
+- 接口路径：POST /api/categories
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 创建顶级分类 | `{ name: "技术" }` | 201，depth=1 |
+| 2 | 创建子分类 | `{ name: "后端", parentId: <技术 id> }` | 201，depth=2 |
+| 3 | 创建孙分类 | `{ name: "Node.js", parentId: <后端 id> }` | 201，depth=3 |
+
+**预期结果**
+三级嵌套分类创建成功，depth 递增且 ≤3。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-028
+
+- 标题：分类嵌套深度超 3 层被拒（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-016
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：在第 3 层分类下创建第 4 层子分类，返回 400
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建三级分类链（depth=3 分类 cat-l3）
+- 接口路径：POST /api/categories
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 在第 3 层下创建子分类 | `{ name: "过深", parentId: <cat-l3 id> }` | 400 Bad Request |
+| 2 | 断言错误体 | — | `{ error: { code: "CATEGORY_DEPTH_EXCEEDED", message: <非空> } }` |
+
+**预期结果**
+深度 >3 层被拒（400 + CATEGORY_DEPTH_EXCEEDED）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-029
+
+- 标题：重复分类名创建被拒（异常路径）
+- 优先级：中
+- 关联需求/设计：REQ-016
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：已存在分类名再次创建（同父级），返回 409
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建分类 技术
+- 接口路径：POST /api/categories
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 重复名创建 | `{ name: "技术" }` | 409 Conflict |
+| 2 | 断言错误体 | — | `{ error: { code: "CATEGORY_NAME_EXISTS", message: <非空> } }` |
+
+**预期结果**
+重复分类名 409 + 唯一性错误码。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-030
+
+- 标题：分页浏览已发布文章（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-017
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：读者分页浏览文章列表，仅返回 published 文章
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建 3 篇 published + 1 篇 draft 文章
+- 接口路径：GET /api/articles?page=1&size=2
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 分页获取列表 | page=1&size=2 | 200，返回 2 条 + total=3 |
+| 2 | 断言仅 published | — | 列表无 draft 文章 |
+
+**预期结果**
+仅 published 可见，分页正确。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-031
+
+- 标题：按分类/标签筛选文章（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-017、REQ-015、REQ-016
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：读者按分类与标签组合筛选已发布文章
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建分类 cat-tech、标签 tag-ts；2 篇打标 published 文章、1 篇未打标
+- 接口路径：GET /api/articles?category=cat-tech&tag=tag-ts
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 按分类+标签筛选 | category=cat-tech&tag=tag-ts | 200，仅返回匹配文章 |
+
+**预期结果**
+组合筛选返回正确文章集。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-032
+
+- 标题：文章详情含正文与作者；草稿对读者 404（边界路径）
+- 优先级：高
+- 关联需求/设计：REQ-017
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：读者查看已发布文章详情（含正文+作者信息）；查看草稿详情返回 404
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建 published 文章（id=art-v1）、draft 文章（id=art-v2）
+- 接口路径：GET /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 查看已发布详情 | GET /api/articles/art-v1 | 200，含 title/content/author{id,username,nickname} |
+| 2 | 查看草稿详情 | GET /api/articles/art-v2 | 404 Not Found |
+
+**预期结果**
+详情含正文与作者信息；草稿对读者不可见（404）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-033
+
+- 标题：发表评论审核自动通过（正常路径）
+- 优先级：高
+- 关联需求/设计：REQ-018
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：注册用户对文章发表评论，评论立即可见（自动通过）
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建 published 文章
+- 接口路径：POST /api/articles/:id/comments
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发表评论 | `{ content: "好文！" }` | 201 Created |
+| 2 | 读者查看评论列表 | GET /api/articles/:id/comments | 评论立即可见 |
+
+**预期结果**
+评论 201 且审核自动通过、立即可见。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-034
+
+- 标题：未登录发表评论被拒（异常路径）
+- 优先级：高
+- 关联需求/设计：REQ-018
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：未认证调用评论接口，返回 401
+
+**前置条件**
+- 认证状态：无（不带 token）
+- 数据依赖：预创建 published 文章
+- 接口路径：POST /api/articles/:id/comments
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 未登录发表评论 | `{ content: "匿名评论" }` | 401 Unauthorized |
+
+**预期结果**
+未认证评论返回 401，评论不创建。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-035
+
+- 标题：作者删除自己文章下评论、非作者被拒；评论支持回复（异常+正常）
+- 优先级：高
+- 关联需求/设计：REQ-018
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：文章作者可删除自己文章下的评论；其他用户删除被拒；评论可回复
+
+**前置条件**
+- 认证状态：需用户 token（作者 blogger-a 与普通用户 reader-u）
+- 数据依赖：预创建博主 A（作者）、普通用户 reader-u；文章 + 评论（id=cmt-1）+
+- 接口路径：DELETE /api/comments/:id、POST /api/comments/:id/replies
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 非作者删除评论 | reader-u DELETE /api/comments/cmt-1 | 403 Forbidden |
+| 2 | 作者删除评论 | blogger-a DELETE /api/comments/cmt-1 | 204 No Content |
+| 3 | 评论回复 | reader-u POST /api/comments/cmt-2/replies | 201，回复挂载于评论 |
+
+**预期结果**
+仅作者可删除自己文章下评论（非作者 403）；评论支持回复。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-036
+
+- 标题：点赞文章且详情展示点赞数（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-019
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：注册用户点赞文章，文章详情点赞数 +1
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建 published 文章（初始点赞数 0）
+- 接口路径：POST /api/articles/:id/like、GET /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 点赞 | — | 200 OK |
+| 2 | 断言详情计数 | GET /api/articles/:id | likeCount=1 |
+
+**预期结果**
+点赞成功，详情 likeCount +1。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-037
+
+- 标题：收藏文章并查看收藏列表（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-019
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户收藏文章，收藏列表可查看
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建 2 篇 published 文章
+- 接口路径：POST /api/articles/:id/favorite、GET /api/users/me/favorites
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 收藏 2 篇文章 | — | 200 OK |
+| 2 | 查看收藏列表 | GET /api/users/me/favorites | 200，返回 2 篇收藏文章 |
+
+**预期结果**
+收藏成功，收藏列表正确。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-038
+
+- 标题：重复点赞幂等（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-019
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：同一用户重复点赞同一文章，计数不重复累加
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建 published 文章
+- 接口路径：POST /api/articles/:id/like、GET /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 连续点赞两次 | — | 200 OK（第二次幂等或 200/409 语义一致） |
+| 2 | 断言计数 | GET /api/articles/:id | likeCount=1（不累加） |
+
+**预期结果**
+重复点赞不重复计数（幂等）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-039
+
+- 标题：关注博主后 feed 出现其新文章（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-020
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户关注博主后，博主发布新文章，用户 feed 可见
+
+**前置条件**
+- 认证状态：需普通用户 token（关注者）+ 博主 token（被关注者）
+- 数据依赖：预创建博主 B、关注者用户 U；U 关注 B
+- 接口路径：POST /api/users/:id/follow、GET /api/users/me/feed
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 关注博主 | POST /api/users/<B id>/follow | 200 OK |
+| 2 | 博主 B 发布新文章 | POST /api/articles（B token） | 201 |
+| 3 | 查看 feed | GET /api/users/me/feed | 含 B 的新文章 |
+
+**预期结果**
+关注后 feed 出现博主新文章。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-040
+
+- 标题：取消关注后不再推送（异常路径）
+- 优先级：中
+- 关联需求/设计：REQ-020
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户取消关注后，博主后续新文章不再出现在 feed
+
+**前置条件**
+- 认证状态：需普通用户 token（关注者）+ 博主 token（被关注者）
+- 数据依赖：预创建博主 B、关注者 U（已关注）
+- 接口路径：DELETE /api/users/:id/follow、GET /api/users/me/feed
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 取消关注 | DELETE /api/users/<B id>/follow | 200 OK |
+| 2 | 博主 B 发布新文章 | POST /api/articles（B token） | 201 |
+| 3 | 查看 feed | GET /api/users/me/feed | 不含 B 的新文章 |
+
+**预期结果**
+取消关注后 feed 不再推送该博主新文章。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-041
+
+- 标题：热门文章按 7 天阅读量 Top10（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-021
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：按最近 7 天阅读量降序返回 Top10 热门文章
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建 12 篇 published 文章并注入不同阅读量（readCount 分布）
+- 接口路径：GET /api/articles/popular?top=10
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取热门列表 | top=10 | 200，返回 10 篇 |
+| 2 | 断言排序 | — | 按 7 天阅读量降序（readCount 单调不增） |
+
+**预期结果**
+热门列表 Top10、按阅读量降序。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-042
+
+- 标题：无阅读数据时热门列表为空（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-021
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：系统无阅读记录时，热门接口返回空列表且不报错
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：无阅读记录（干净数据）
+- 接口路径：GET /api/articles/popular
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取热门列表 | — | 200，返回空列表 `{ items: [], total: 0 }` |
+
+**预期结果**
+空数据返回空列表，无异常。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-043
+
+- 标题：有阅读历史时按标签偏好推荐（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-022、REQ-024
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户有阅读历史（偏好标签），推荐列表含相似标签文章
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建用户及其阅读记录（偏好 tag-node）；预创建 tag-node 与非偏好标签文章各若干
+- 接口路径：GET /api/recommendations
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取推荐 | — | 200，返回推荐文章列表 |
+| 2 | 断言偏好权重 | — | 推荐列表含偏好标签（tag-node）文章 |
+
+**预期结果**
+有历史时按标签偏好推荐相似文章。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-044
+
+- 标题：无阅读历史时推荐回退热门（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-022
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：新用户无阅读历史，推荐接口回退为热门文章
+
+**前置条件**
+- 认证状态：需普通用户 token（无任何阅读记录）
+- 数据依赖：预创建无历史用户；预创建热门文章数据
+- 接口路径：GET /api/recommendations
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取推荐 | — | 200，返回列表 |
+| 2 | 断言回退 | — | 列表 = 热门文章（与 GET /api/articles/popular 一致） |
+
+**预期结果**
+无历史时回退热门文章。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-045
+
+- 标题：全文搜索命中标题/正文/摘要/标签（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-023
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：关键词分别出现在标题/正文/摘要/标签的文章均可被检索
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建 4 篇 published 文章：标题含词、正文含词、摘要含词、标签含词
+- 接口路径：GET /api/search?q=<关键词>
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 搜索关键词 | q="typescript" | 200，命中 4 篇（四字段均覆盖） |
+
+**预期结果**
+四字段均可命中检索。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-046
+
+- 标题：搜索分页与无结果（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-023
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：搜索结果分页正确；无匹配关键词返回空列表
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建 5 篇含关键词的 published 文章
+- 接口路径：GET /api/search?q=<kw>&page=1&size=2、GET /api/search?q=zzz-nomatch
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 分页搜索 | q=<kw>&page=1&size=2 | 200，返回 2 条 + total=5 |
+| 2 | 无匹配搜索 | q="zzz-nomatch" | 200，空列表 total=0 |
+
+**预期结果**
+分页正确、无结果返回空列表（不报错）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-047
+
+- 标题：文章详情访问阅读量 +1（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-024
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：读者访问文章详情，阅读量 +1 且响应返回阅读量
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建 published 文章（readCount=0）
+- 接口路径：GET /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 首次访问详情 | — | 200，响应含 readCount=1 |
+| 2 | 再次访问详情 | — | 200，readCount=2（不同访问窗口） |
+
+**预期结果**
+每次详情访问阅读量 +1 并返回。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-048
+
+- 标题：同 IP 短时间窗口重复访问去重（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-024
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：同一 IP 在去重窗口内多次访问详情，阅读量不重复累加
+
+**前置条件**
+- 认证状态：无需认证（固定 IP 模拟）
+- 数据依赖：预创建 published 文章（readCount=0）；去重窗口内连续请求
+- 接口路径：GET /api/articles/:id（同 IP）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 同 IP 连续访问 3 次 | — | 200 ×3 |
+| 2 | 断言计数 | — | readCount=1（窗口内去重） |
+
+**预期结果**
+同 IP 短窗口内重复访问不重复计数。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-049
+
+- 标题：不同 IP 访问累加计数正确（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-024
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：不同 IP 访问同一文章，阅读量按访问者累加
+
+**前置条件**
+- 认证状态：无需认证（模拟 2 个不同 IP）
+- 数据依赖：预创建 published 文章（readCount=0）
+- 接口路径：GET /api/articles/:id（IP-A / IP-B）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | IP-A 访问 | — | 200 |
+| 2 | IP-B 访问 | — | 200 |
+| 3 | 断言计数 | — | readCount=2（不同 IP 均计数） |
+
+**预期结果**
+不同 IP 分别计数，去重仅限同 IP 窗口。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-050
+
+- 标题：博主统计面板核心指标（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-025
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主查看文章数/总阅读量/总评论数，数值与数据一致
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及其 3 篇文章（阅读量合计 10、评论 5 条）
+- 接口路径：GET /api/users/me/stats
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取统计面板 | — | 200，articleCount=3、totalReads=10、totalComments=5 |
+
+**预期结果**
+三项核心统计数值准确。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-051
+
+- 标题：近 7 天阅读趋势（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-025
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：统计面板返回近 7 天趋势（7 个时间点），含 0 值日期
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及分布在 3 天内的阅读记录
+- 接口路径：GET /api/users/me/stats
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取统计面板 | — | 200，trend 含 7 个时间点 |
+| 2 | 断言趋势数值 | — | 有阅读日期数值 >0，无阅读日期为 0 |
+
+**预期结果**
+趋势覆盖 7 天、数值正确（含 0 值日）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-052
+
+- 标题：三类事件产生通知（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-026
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：被回复评论、文章被点赞、关注博主发文三类事件均产生通知
+
+**前置条件**
+- 认证状态：需普通用户 token（被通知人）与操作方 token
+- 数据依赖：预创建博主 A、用户 U；构造三类事件（回复 U 的评论 / 点赞 A 的文章 / A 发布新文章且 U 已关注 A）
+- 接口路径：GET /api/users/me/notifications
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 触发三类事件 | — | 各操作成功 |
+| 2 | 查看通知列表 | GET /api/users/me/notifications | 含 3 条通知，类型分别为 comment_reply / article_like / new_article |
+
+**预期结果**
+三类事件均产生通知且类型正确。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-053
+
+- 标题：通知列表分页（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-026
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：通知列表分页返回，含已读/未读状态字段
+
+**前置条件**
+- 认证状态：需普通用户 token
+- 数据依赖：预创建用户及 5 条通知
+- 接口路径：GET /api/users/me/notifications?page=1&size=3
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 分页获取通知 | page=1&size=3 | 200，3 条 + total=5 |
+| 2 | 断言状态字段 | — | 每条含 read=false |
+
+**预期结果**
+通知分页正确、含已读状态。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-054
+
+- 标题：标记通知已读；操作他人通知被拒（异常路径）
+- 优先级：中
+- 关联需求/设计：REQ-026
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：用户标记自己的通知已读；标记他人通知返回 404
+
+**前置条件**
+- 认证状态：需普通用户 token（用户 U）与用户 V token
+- 数据依赖：预创建 U 的通知（id=ntf-1）、V 的通知（id=ntf-v）
+- 接口路径：PATCH /api/users/me/notifications/:id/read
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 标记自己的通知已读 | PATCH .../ntf-1/read | 200，read=true |
+| 2 | 标记他人通知 | PATCH .../ntf-v/read（U 的 token） | 404 Not Found（资源不可见） |
+
+**预期结果**
+自己的通知可标记已读；他人通知不可操作（404）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-055
+
+- 标题：RSS 源含文章标题/链接/摘要/发布时间（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-027
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：读者/阅读器获取博主 RSS 源，为合法 XML 且条目含四字段
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建博主及其 2 篇 published 文章
+- 接口路径：GET /api/feeds/:userId/rss
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取 RSS 源 | — | 200，Content-Type: application/rss+xml（或 xml） |
+| 2 | 断言条目 | — | 每条含 title/link/description/pubDate 四字段，共 2 条 |
+
+**预期结果**
+RSS 为合法 XML，条目含四字段。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-056
+
+- 标题：草稿文章不出现在 RSS（边界路径）
+- 优先级：中
+- 关联需求/设计：REQ-027、REQ-012
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主有 draft 与 published 文章，RSS 仅含 published
+
+**前置条件**
+- 认证状态：无需认证
+- 数据依赖：预创建博主及 1 draft + 1 published 文章
+- 接口路径：GET /api/feeds/:userId/rss
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 获取 RSS 源 | — | 200 |
+| 2 | 断言条目数 | — | 仅 1 条（published），无草稿条目 |
+
+**预期结果**
+草稿不出现在 RSS 源。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-057
+
+- 标题：文章发布触发 Webhook 回调且签名可验（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-028
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：博主配置 Webhook 后发布文章，回调收到事件负载且事件签名可验证
+
+**前置条件**
+- 认证状态：需博主 token（配置与发布）
+- 数据依赖：预创建博主并配置 Webhook（URL 指向本地 mock 接收端，共享密钥）；mock 接收端记录回调
+- 接口路径：POST /api/articles/:id/publish（触发）；回调由系统向配置 URL 发起
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发布文章 | — | 200 |
+| 2 | 断言 mock 收到回调 | — | 回调事件 eventType=article.published、含文章数据 |
+| 3 | 断言签名 | — | 请求头签名（X-Webhook-Signature）可用共享密钥验证通过 |
+
+**预期结果**
+发布触发回调，事件负载正确、签名可验。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-058
+
+- 标题：Webhook 回调失败自动重试 3 次（异常路径）
+- 优先级：中
+- 关联需求/设计：REQ-028、NFR-003
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：回调目标不可达/返回 5xx，系统自动重试最多 3 次并留存失败记录
+
+**前置条件**
+- 认证状态：需博主 token（配置与发布）
+- 数据依赖：预创建博主并配置 Webhook（URL 指向始终 500 的 mock 接收端）；失败记录存储可查询
+- 接口路径：POST /api/articles/:id/publish（触发）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发布文章触发回调 | — | 200（主流程不受阻塞） |
+| 2 | 断言重试次数 | — | mock 收到 ≤3 次回调（含首次共 3 次） |
+| 3 | 断言失败记录 | — | 存在该回调的失败记录（attempts、lastError、status=failed） |
+
+**预期结果**
+失败自动重试 3 次、失败记录留存（NFR-003 闭环）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-059
+
+- 标题：评论新增触发 Webhook 回调（正常路径）
+- 优先级：中
+- 关联需求/设计：REQ-028
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：评论新增时触发 Webhook 回调，事件类型为 comment.created
+
+**前置条件**
+- 认证状态：需普通用户 token（评论）+ 博主 token（已配置 Webhook）
+- 数据依赖：预创建博主及其 published 文章；博主配置 Webhook（mock 接收端）
+- 接口路径：POST /api/articles/:id/comments（触发）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 发表评论 | — | 201 |
+| 2 | 断言 mock 收到回调 | — | eventType=comment.created、含评论与文章数据 |
+
+**预期结果**
+评论新增触发回调且事件类型正确。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-060
+
+- 标题：常规 API 响应时间 P95 ≤ 2000ms（性能，NFR-001 测试基线）
+- 优先级：中
+- 关联需求/设计：NFR-001
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：代表性常规 API（注册/登录/文章列表/文章详情）在验收环境 P95 ≤ 2000ms
+
+**前置条件**
+- 认证状态：混合（公开接口无需认证；登录/注册公开；含一次认证调用）
+- 数据依赖：预创建种子数据（用户、published 文章若干）
+- 接口路径：POST /api/auth/register、POST /api/auth/login、GET /api/articles、GET /api/articles/:id（代表性集合）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 对代表性接口各发起 ≥20 次请求（预热后计时） | — | 各接口响应记录 |
+| 2 | 计算 P95 | — | P95 ≤ 2000ms（测试环境基线，生产目标 200ms 见 targetValue） |
+
+**预期结果**
+P95 ≤ 2000ms 达成（NFR-001 testThreshold）；生产目标 200ms 以 targetValue 登记不作为本环境断言。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-061
+
+- 标题：高流量场景性能基线（性能，NFR-001）
+- 优先级：中
+- 关联需求/设计：NFR-001
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：浏览+搜索+推荐组合流量下 P95 响应时间达标（NFR-001 横切治理的代表性场景）
+
+**前置条件**
+- 认证状态：GET /api/recommendations 需普通用户 token；浏览/搜索公开
+- 数据依赖：预创建用户（含阅读历史）、文章与阅读记录
+- 接口路径：GET /api/articles、GET /api/search?q=、GET /api/recommendations
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 混合流量压测（三个接口轮询 ≥30 次） | — | 响应记录 |
+| 2 | 计算组合 P95 | — | P95 ≤ 2000ms |
+
+**预期结果**
+组合场景 P95 ≤ 2000ms（测试基线）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-062
+
+- 标题：密码 bcrypt 加盐哈希存储（安全，NFR-002）
+- 优先级：高
+- 关联需求/设计：NFR-002、REQ-007
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：注册/修改密码后，存储层密码为 bcrypt 哈希且不可逆（非明文）
+
+**前置条件**
+- 认证状态：注册无需认证；需普通用户 token（改密）
+- 数据依赖：无（注册新用户）
+- 接口路径：POST /api/auth/register、PUT /api/users/me/password
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 注册用户 | — | 201 |
+| 2 | 断言存储层 | — | 存储密码为 bcrypt 哈希（以 `$2` 前缀，非明文），同一明文两次注册哈希不同（加盐） |
+| 3 | 修改密码后断言 | — | 新哈希更新，旧哈希不可用 |
+
+**预期结果**
+密码始终以 bcrypt 加盐哈希存储（NFR-002 安全基线）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-063
+
+- 标题：JWT 密钥注入与有效性校验（安全，NFR-002）
+- 优先级：高
+- 关联需求/设计：NFR-002、CON-003
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：错误密钥签发的 token 访问需认证接口返回 401（JWT 校验生效）；JWT_SECRET 经环境变量注入无硬编码
+
+**前置条件**
+- 认证状态：需认证接口（携带错误密钥签发 token）
+- 数据依赖：测试环境以 `JWT_SECRET` 注入测试密钥；另备一错误密钥签发 token
+- 接口路径：GET /api/users/me（需认证接口，禁止行为 #12 合规）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 错误密钥签发 token 访问 | `Authorization: Bearer <wrong-key-jwt>` | 401 Unauthorized |
+| 2 | 断言错误体 | — | `{ error: { code: "INVALID_TOKEN", message: <非空> } }` |
+| 3 | 断言无硬编码 | — | 源码扫描：JWT 密钥不以字面量出现（仅环境变量引用） |
+
+**预期结果**
+错误密钥 token 401 + INVALID_TOKEN；密钥无硬编码（CON-003 注入约束）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-064
+
+- 标题：发布关键操作事务一致性（可靠性，NFR-003）
+- 优先级：中
+- 关联需求/设计：NFR-003、REQ-012
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：发布过程（状态变更+Webhook 事件+审计）在失败时不产生部分状态（进程内事务回滚）
+
+**前置条件**
+- 认证状态：需博主 token
+- 数据依赖：预创建博主及 draft 文章；Webhook 配置指向将失败的目标（模拟发布链路中段失败）
+- 接口路径：POST /api/articles/:id/publish
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 构造发布链路失败（回调配置非法） | — | 发布主流程返回失败/回滚（无部分状态） |
+| 2 | 断言一致性 | GET /api/articles/:id | 状态保持 draft（或发布成功但失败记录完整，二者必居其一且无中间态） |
+
+**预期结果**
+关键操作失败不产生部分状态；Webhook 失败不影响主状态一致性（失败走重试/记录，见 UAT-058）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-065
+
+- 标题：Webhook 失败记录留存（可靠性，NFR-003）
+- 优先级：中
+- 关联需求/设计：NFR-003、REQ-028
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：Webhook 重试耗尽后失败记录留存（attempts/lastError/status 可查询）
+
+**前置条件**
+- 认证状态：需博主 token（配置与发布）
+- 数据依赖：预创建博主并配置始终失败的 Webhook；失败记录存储
+- 接口路径：POST /api/articles/:id/publish（触发）；失败记录查询接口/存储断言
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 触发必然失败的回调 | — | 200（主流程） |
+| 2 | 断言失败记录 | — | 存在记录：attempts=3、lastError 非空、status=failed |
+
+**预期结果**
+失败记录完整留存（NFR-003 失败记录要求闭环）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-066
+
+- 标题：单元测试行覆盖率 ≥ 80%（代码质量，NFR-004）
+- 优先级：中
+- 关联需求/设计：NFR-004
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：项目单元测试覆盖率报告行覆盖率 ≥ 80%
+
+**前置条件**
+- 认证状态：不适用（构建期断言）
+- 数据依赖：全量单元测试已实现（阶段 4 设计、阶段 5 实现）
+- 接口路径：不适用（vitest coverage 报告）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 运行覆盖率采集 | `vitest run --coverage` | 生成 coverage 报告 |
+| 2 | 断言行覆盖率 | — | lines ≥ 80% |
+
+**预期结果**
+行覆盖率 ≥ 80%（NFR-004 达标）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-067
+
+- 标题：分层结构约束（可维护性，NFR-005）
+- 优先级：中
+- 关联需求/设计：NFR-005
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：代码分层（路由/服务/存储）且服务层不直访其他模块存储实例（结构断言）
+
+**前置条件**
+- 认证状态：不适用（静态结构断言）
+- 数据依赖：源码结构（阶段 5 产出）
+- 接口路径：不适用（依赖方向静态检查）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 运行结构断言脚本（依赖方向检查） | — | 违规 0 条 |
+| 2 | 断言分层 | — | 服务层引用仅指向本模块服务/公共存储接口，无跨模块直访存储实例 |
+
+**预期结果**
+分层与依赖方向约束成立（NFR-005 达标）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-068
+
+- 标题：认证接口限流 10 次/分钟/IP（限流，NFR-006）
+- 优先级：中
+- 关联需求/设计：NFR-006、REQ-008
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：同一 IP 对登录接口短时间连续请求超过阈值，返回 429（测试环境阈值可配置）
+
+**前置条件**
+- 认证状态：无需认证（同一源 IP 模拟）
+- 数据依赖：无；测试环境限流阈值已配置（如缩小至 5 次/窗口以缩短测试）
+- 接口路径：POST /api/auth/login
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 同 IP 连续调用登录接口（阈值 N 次） | — | 前 N 次正常响应（200/401） |
+| 2 | 第 N+1 次调用 | — | 429 Too Many Requests |
+| 3 | 断言错误体 | — | `{ error: { code: "RATE_LIMITED", message: <非空> } }` |
+
+**预期结果**
+超限返回 429 + RATE_LIMITED（阈值按 NFR-006 生产 10 次/分钟换算）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-069
+
+- 标题：通用 API 限流 100 次/分钟/IP（限流，NFR-006）
+- 优先级：中
+- 关联需求/设计：NFR-006
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：同一 IP 对通用 API 超限后返回 429（测试环境阈值可配置缩小）
+
+**前置条件**
+- 认证状态：无需认证（同一源 IP 模拟）
+- 数据依赖：预创建 published 文章；测试环境通用限流阈值已配置（缩小窗口）
+- 接口路径：GET /api/articles（通用 API）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 同 IP 连续调用通用 API（阈值 N 次） | — | 前 N 次 200 |
+| 2 | 第 N+1 次调用 | — | 429 Too Many Requests |
+
+**预期结果**
+通用 API 超限返回 429（阈值按生产 100 次/分钟换算）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-070
+
+- 标题：技术栈约束（CON-001）
+- 优先级：高
+- 关联需求/设计：CON-001
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：依赖清单与技术栈一致：Node.js + Express 4 + TypeScript 5 + 内存存储，无外部数据库
+
+**前置条件**
+- 认证状态：不适用（构建期断言）
+- 数据依赖：package.json 与源码（阶段 5 产出）
+- 接口路径：不适用
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 检查运行时依赖 | — | express ^4、typescript ^5；无数据库驱动（pg/mysql/mongodb 等） |
+| 2 | 检查存储实现 | — | 存储为进程内内存实现（Map 等），无外部连接 |
+
+**预期结果**
+技术栈约束成立：无外部数据库依赖（CON-001）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-071
+
+- 标题：统一错误响应结构（CON-002）
+- 优先级：高
+- 关联需求/设计：CON-002
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：触发 400/401/404/409/429 各类错误，响应体均符合 `{ error: { code, message } }`
+
+**前置条件**
+- 认证状态：混合（无需认证即可触发的错误 + 需认证接口）
+- 数据依赖：预创建用户与文章（构造 401/404 场景）
+- 接口路径：POST /api/auth/register（400）、GET /api/users/me（401）、GET /api/articles/art-nonexist（404）、POST /api/tags 重复（409）
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 依次触发四类错误 | — | 400/401/404/409 |
+| 2 | 断言错误体结构 | — | 每类均 `{ error: { code: <非空字符串>, message: <非空字符串> } }`，且无多余顶层字段 |
+
+**预期结果**
+错误响应统一结构成立（CON-002 契约）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-072
+
+- 标题：JWT 有效期 24 小时且密钥环境变量注入（CON-003）
+- 优先级：高
+- 关联需求/设计：CON-003、REQ-008
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：登录签发的 JWT 有效期为 24 小时（exp−iat ≤ 24h）；测试环境使用注入测试密钥
+
+**前置条件**
+- 认证状态：无需认证（登录）；解析 token 无需认证
+- 数据依赖：预创建用户
+- 接口路径：POST /api/auth/login
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 登录获取 token | — | 200 |
+| 2 | 解析 JWT 载荷 | — | exp − iat = 24h（≤86400s） |
+| 3 | 断言密钥注入 | — | 启动日志/配置断言：JWT_SECRET 来自环境变量（测试值 test-*），无硬编码 |
+
+**预期结果**
+JWT 有效期 24h；密钥环境变量注入（CON-003 达标）。
+
+**执行状态**
+- [ ] 待执行
+
+---
+
+### UAT-073
+
+- 标题：关键操作审计日志与保留策略（CON-004）
+- 优先级：中
+- 关联需求/设计：CON-004
+- 关联 BDD feature：—（S-bdd 阶段产出后回填）
+- 测试场景：登录/发布/删除三类关键操作产生审计日志；保留策略 ≥90 天
+
+**前置条件**
+- 认证状态：需博主 token（发布/删除）+ 登录公开
+- 数据依赖：预创建博主与文章；审计日志存储可查询
+- 接口路径：POST /api/auth/login、POST /api/articles/:id/publish、DELETE /api/articles/:id
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | 依次执行登录/发布/删除 | — | 各操作成功 |
+| 2 | 断言审计记录 | — | 审计日志含 3 条记录（action=login/publish/delete、actor、timestamp） |
+| 3 | 断言保留策略 | — | 保留策略配置 ≥90 天（retentionDays ≥ 90） |
+
+**预期结果**
+三类关键操作均有审计日志且保留 ≥90 天（CON-004 达标）。
+
+**执行状态**
+- [ ] 待执行
+
+---
 
 ## 用例汇总
 
-| 用例 ID 区间 | 关联需求 | 用例数 | 场景覆盖 |
-|---|---|---|---|
-| UAT-001~003 | REQ-001 | 3 | 正常/异常/边界 |
-| UAT-004~006 | REQ-002 | 3 | 正常/异常/边界 |
-| UAT-007~009 | REQ-003 | 3 | 正常/异常/边界 |
-| UAT-010~012 | REQ-004 | 3 | 正常/异常/边界 |
-| UAT-013~015, UAT-087 | REQ-005 | 4 | 正常/异常/边界 |
-| UAT-016~018, UAT-088 | REQ-006 | 4 | 正常/异常/边界 |
-| UAT-019~021 | REQ-007 | 3 | 正常/异常/边界 |
-| UAT-022~024 | REQ-008 | 3 | 正常/异常/边界 |
-| UAT-025~027, UAT-089 | REQ-009 | 4 | 正常/异常/边界 |
-| UAT-028~030 | REQ-010 | 3 | 正常/异常/边界 |
-| UAT-031~033 | REQ-011 | 3 | 正常/异常/边界 |
-| UAT-034~036 | REQ-012 | 3 | 正常/异常/边界 |
-| UAT-037~039 | REQ-013 | 3 | 正常/异常/边界 |
-| UAT-040~042 | REQ-014 | 3 | 正常/异常/边界 |
-| UAT-043~045 | REQ-015 | 3 | 正常/异常/边界 |
-| UAT-046~048 | REQ-016 | 3 | 正常/异常/边界 |
-| UAT-049~051, UAT-090 | REQ-017 | 4 | 正常/异常/边界 |
-| UAT-052~054 | REQ-018 | 3 | 正常/异常/边界 |
-| UAT-055~057 | REQ-019 | 3 | 正常/异常/边界 |
-| UAT-058~060 | REQ-020 | 3 | 正常/异常/边界 |
-| UAT-061~063 | REQ-021 | 3 | 正常/异常/边界 |
-| UAT-064~066 | REQ-022 | 3 | 正常/异常/边界 |
-| UAT-067~068 | NFR-001 | 2 | 正常/边界 |
-| UAT-069~070, UAT-091 | NFR-002 | 3 | 正常（验证类） |
-| UAT-071~072 | NFR-003 | 2 | 正常/边界 |
-| UAT-073~074 | NFR-004 | 2 | 正常/边界 |
-| UAT-075~076 | NFR-005 | 2 | 正常/边界 |
-| UAT-077~078 | NFR-006 | 2 | 正常/边界 |
-| UAT-079~080 | CON-001 | 2 | 正常/边界 |
-| UAT-081~082 | CON-002 | 2 | 正常/边界 |
-| UAT-083~084 | CON-003 | 2 | 正常/边界 |
-| UAT-085~086 | CON-004 | 2 | 正常/边界 |
-
-合计：**91 个 UAT 用例**（REQ 70 + NFR 13 + CON 8），32 需求全覆盖。
-
-## 代表用例详解（套用 test-case.md 模板）
-
-> 完整展开全部 91 个用例篇幅过长，以下给出正常/异常/边界各一代表用例的完整结构，其余用例按「用例列表」表结构执行。
-
-### UAT-001（正常场景代表）
-
-- 标题：注册成功返回用户与令牌
-- 优先级：高
-- 关联需求：REQ-001
-- 场景类型：正常
-- 测试场景：访客以合法邮箱+密码注册，验证注册成功与令牌可用性
-
-**前置条件**：认证：无需；数据：邮箱 reader1@example.com 未注册；路径：POST /api/auth/register
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/auth/register | `{"email":"reader1@example.com","password":"pass123456"}` | 201，body 含 userId/email/token |
-| 2 | 用返回 token 请求 GET /api/users/me | Authorization: Bearer <token> | 200，返回该用户资料 |
-
-**预期结果**：注册成功返回 201 与可用 JWT；token 可访问受保护接口。
-
-**执行状态**：[ ] 待执行
-
-### UAT-002（异常场景代表）
-
-- 标题：重复邮箱注册冲突
-- 优先级：高
-- 关联需求：REQ-001
-- 场景类型：异常
-- 测试场景：已注册邮箱再次注册，验证冲突拒绝
-
-**前置条件**：认证：无需；数据：reader1@example.com 已注册；路径：POST /api/auth/register
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/auth/register | `{"email":"reader1@example.com","password":"pass123456"}` | 409 冲突错误体 |
-
-**预期结果**：重复注册返回 409，不创建新用户。
-
-**执行状态**：[ ] 待执行
-
-### UAT-003（边界场景代表）
-
-- 标题：非法邮箱/短密码拒绝
-- 优先级：高
-- 关联需求：REQ-001
-- 场景类型：边界
-- 测试场景：非法邮箱格式与过短密码，验证参数边界校验
-
-**前置条件**：认证：无需；数据：无；路径：POST /api/auth/register
-
-**测试步骤**
-
-| 步骤 | 操作 | 输入 | 预期输出 |
-|---|---|---|---|
-| 1 | POST /api/auth/register | `{"email":"bad","password":"123"}` | 400，zod 校验错误明细 |
-
-**预期结果**：非法入参返回 400 与结构化错误体。
-
-**执行状态**：[ ] 待执行
-
-## N/A 用例说明（demo 范围声明，第 22 轮 P1-3）
-
-| N/A 项 | 说明 |
-|---|---|
-| 前端界面（Web/移动端 UI） | 无对应 API 端点，无 UAT 用例（Out of Scope，本迭代仅后端 API） |
-| 数据库持久化 | 无对应 API 端点（Out of Scope，采用内存存储），无 UAT 用例 |
-| 第三方支付/电商功能 | 无对应 API 端点（Out of Scope，与博客系统无关），无 UAT 用例 |
-| 多语言国际化（i18n） | 无对应 API 端点（Out of Scope，下轮迭代），无 UAT 用例 |
-| 移动端推送（APNs/FCM） | 无对应 API 端点（Out of Scope，依赖未就绪），无 UAT 用例 |
-
-> 上述 N/A 项与 requirement-spec.md §8 Out of Scope 声明一致；R3 完整性校验若发现不一致，以本表注释为准。
+| 用例 ID | 标题 | 优先级 | 关联 | 状态 |
+|---|---|---|---|---|
+| UAT-001 | 读者注册账号成功 | 高 | REQ-007 | 待执行 |
+| UAT-002 | 重复邮箱注册被拒 | 高 | REQ-007 | 待执行 |
+| UAT-003 | 注册缺必填字段/弱密码被拒 | 高 | REQ-007 | 待执行 |
+| UAT-004 | 邮箱/用户名+密码登录签发 JWT | 高 | REQ-008 | 待执行 |
+| UAT-005 | 错误凭据登录失败 | 高 | REQ-008 | 待执行 |
+| UAT-006 | 过期 token 访问需认证接口被拒 | 高 | REQ-008, CON-003 | 待执行 |
+| UAT-007 | 申请成为博主成功 | 高 | REQ-009 | 待执行 |
+| UAT-008 | 普通读者创建文章被拒 | 高 | REQ-009, REQ-011 | 待执行 |
+| UAT-009 | 博主越权管理他人文章被拒 | 高 | REQ-009, REQ-014 | 待执行 |
+| UAT-010 | 查看与修改自己的资料 | 高 | REQ-010 | 待执行 |
+| UAT-011 | 修改密码校验原密码 | 高 | REQ-010 | 待执行 |
+| UAT-012 | 未认证访问资料接口被拒 | 高 | REQ-010, NFR-002 | 待执行 |
+| UAT-013 | 博主创建文章为草稿状态 | 高 | REQ-011 | 待执行 |
+| UAT-014 | 创建文章缺必填字段被拒 | 高 | REQ-011 | 待执行 |
+| UAT-015 | 发布草稿后读者可见 | 高 | REQ-012 | 待执行 |
+| UAT-016 | 已发布文章更新后重新发布 | 高 | REQ-012 | 待执行 |
+| UAT-017 | 发布不存在/他人文章被拒 | 高 | REQ-012 | 待执行 |
+| UAT-018 | 文章状态机合法流转 | 高 | REQ-013 | 待执行 |
+| UAT-019 | 已发布文章不可删除 | 高 | REQ-013, REQ-014 | 待执行 |
+| UAT-020 | 已归档文章不可直接再发布 | 高 | REQ-013 | 待执行 |
+| UAT-021 | 取消归档回草稿后可再发布 | 高 | REQ-013 | 待执行 |
+| UAT-022 | 查看文章列表（草稿+已发布，分页） | 高 | REQ-014 | 待执行 |
+| UAT-023 | 编辑文章 | 高 | REQ-014 | 待执行 |
+| UAT-024 | 删除草稿成功、已发布仅可归档 | 高 | REQ-014, REQ-013 | 待执行 |
+| UAT-025 | 创建标签（名称唯一） | 中 | REQ-015 | 待执行 |
+| UAT-026 | 重复标签名创建被拒 | 中 | REQ-015 | 待执行 |
+| UAT-027 | 创建分类并支持嵌套 | 中 | REQ-016 | 待执行 |
+| UAT-028 | 分类嵌套深度超 3 层被拒 | 中 | REQ-016 | 待执行 |
+| UAT-029 | 重复分类名创建被拒 | 中 | REQ-016 | 待执行 |
+| UAT-030 | 分页浏览已发布文章 | 高 | REQ-017 | 待执行 |
+| UAT-031 | 按分类/标签筛选文章 | 高 | REQ-017, REQ-015, REQ-016 | 待执行 |
+| UAT-032 | 文章详情含正文与作者；草稿 404 | 高 | REQ-017 | 待执行 |
+| UAT-033 | 发表评论审核自动通过 | 高 | REQ-018 | 待执行 |
+| UAT-034 | 未登录发表评论被拒 | 高 | REQ-018 | 待执行 |
+| UAT-035 | 作者删除评论、非作者被拒、支持回复 | 高 | REQ-018 | 待执行 |
+| UAT-036 | 点赞文章且详情展示点赞数 | 中 | REQ-019 | 待执行 |
+| UAT-037 | 收藏文章并查看收藏列表 | 中 | REQ-019 | 待执行 |
+| UAT-038 | 重复点赞幂等 | 中 | REQ-019 | 待执行 |
+| UAT-039 | 关注博主后 feed 出现新文章 | 中 | REQ-020 | 待执行 |
+| UAT-040 | 取消关注后不再推送 | 中 | REQ-020 | 待执行 |
+| UAT-041 | 热门文章按 7 天阅读量 Top10 | 中 | REQ-021 | 待执行 |
+| UAT-042 | 无阅读数据时热门列表为空 | 中 | REQ-021 | 待执行 |
+| UAT-043 | 有阅读历史时按标签偏好推荐 | 中 | REQ-022, REQ-024 | 待执行 |
+| UAT-044 | 无阅读历史时推荐回退热门 | 中 | REQ-022 | 待执行 |
+| UAT-045 | 全文搜索命中四字段 | 中 | REQ-023 | 待执行 |
+| UAT-046 | 搜索分页与无结果 | 中 | REQ-023 | 待执行 |
+| UAT-047 | 文章详情访问阅读量 +1 | 中 | REQ-024 | 待执行 |
+| UAT-048 | 同 IP 短时间窗口去重 | 中 | REQ-024 | 待执行 |
+| UAT-049 | 不同 IP 访问累加计数 | 中 | REQ-024 | 待执行 |
+| UAT-050 | 博主统计面板核心指标 | 中 | REQ-025 | 待执行 |
+| UAT-051 | 近 7 天阅读趋势 | 中 | REQ-025 | 待执行 |
+| UAT-052 | 三类事件产生通知 | 中 | REQ-026 | 待执行 |
+| UAT-053 | 通知列表分页 | 中 | REQ-026 | 待执行 |
+| UAT-054 | 标记通知已读；操作他人通知被拒 | 中 | REQ-026 | 待执行 |
+| UAT-055 | RSS 源含四字段 | 中 | REQ-027 | 待执行 |
+| UAT-056 | 草稿文章不出现在 RSS | 中 | REQ-027, REQ-012 | 待执行 |
+| UAT-057 | 发布触发 Webhook 且签名可验 | 中 | REQ-028 | 待执行 |
+| UAT-058 | Webhook 失败自动重试 3 次 | 中 | REQ-028, NFR-003 | 待执行 |
+| UAT-059 | 评论新增触发 Webhook | 中 | REQ-028 | 待执行 |
+| UAT-060 | 常规 API P95 ≤ 2000ms | 中 | NFR-001 | 待执行 |
+| UAT-061 | 高流量场景性能基线 | 中 | NFR-001 | 待执行 |
+| UAT-062 | 密码 bcrypt 加盐哈希存储 | 高 | NFR-002, REQ-007 | 待执行 |
+| UAT-063 | JWT 密钥注入与有效性校验 | 高 | NFR-002, CON-003 | 待执行 |
+| UAT-064 | 发布关键操作事务一致性 | 中 | NFR-003, REQ-012 | 待执行 |
+| UAT-065 | Webhook 失败记录留存 | 中 | NFR-003, REQ-028 | 待执行 |
+| UAT-066 | 单元测试行覆盖率 ≥ 80% | 中 | NFR-004 | 待执行 |
+| UAT-067 | 分层结构约束 | 中 | NFR-005 | 待执行 |
+| UAT-068 | 认证接口限流超限 429 | 中 | NFR-006, REQ-008 | 待执行 |
+| UAT-069 | 通用 API 限流超限 429 | 中 | NFR-006 | 待执行 |
+| UAT-070 | 技术栈约束 | 高 | CON-001 | 待执行 |
+| UAT-071 | 统一错误响应结构 | 高 | CON-002 | 待执行 |
+| UAT-072 | JWT 有效期与密钥注入 | 高 | CON-003, REQ-008 | 待执行 |
+| UAT-073 | 关键操作审计日志与保留策略 | 中 | CON-004 | 待执行 |
 
 ## 测试用例覆盖说明
 
-- 功能点覆盖：22/22 REQ 全覆盖（每需求 正常/异常/边界 ≥3 用例 = 70 个，含 AC 级补全用例 UAT-087~090）
-- 非功能覆盖：6/6 NFR（指标验证 + 边界 = 13 个，含 UAT-091 JWT_SECRET 密钥管理）
-- 约束覆盖：4/4 CON（行为验证 + 边界，8 个）
-- 边界条件覆盖：每 REQ 1 个边界用例 + NFR/CON 边界场景
-- AC 级映射：每需求验收标准（AC）≥1 个可执行用例（修复 REQ-005 AC2 取关 / REQ-006 AC3 / REQ-009 AC3 / REQ-017 AC3 退订 / NFR-002 AC3 缺口）
-- 前置条件完整性：全部 91 用例声明 认证状态/数据依赖/接口路径（禁止行为 #12/#13）
-- 与 Out of Scope 一致性：N/A 项与 §8 声明一致（见上表）
+- 功能点覆盖：22/22（REQ-007~REQ-028 全覆盖，每功能 ≥2 条：正常 + 异常/边界）
+- 非功能覆盖：6/6（NFR-001~006，每项 1-2 条）
+- 约束覆盖：4/4（CON-001~004，每项 1 条）
+- 用例总量：73 条（UAT-001~UAT-073）
+- 边界条件覆盖：token 过期（UAT-006）、状态机非法流转（UAT-019/020/021）、分类深度 >3 层（UAT-028）、重复点赞幂等（UAT-038）、无历史推荐回退（UAT-044）、同 IP 去重（UAT-048/049）、限流阈值（UAT-068/069）、分页边界（UAT-022/030/046/053）
+- 禁止行为合规：UAT-006/012/063 的认证失效验证均选用**需认证接口**（GET /api/users/me），未用公开接口测认证失效（禁止行为 #12）；全部 73 条用例均含前置条件分析（认证状态/数据依赖/接口路径），无遗漏（禁止行为 #13）
+
+## N/A 用例（Out of Scope 对照）
+
+> 第 22 轮 P1-3 修正：对照 requirement-spec.md §8 Out of Scope 声明，以下场景标记 N/A（不计入可执行 UAT 总数 73 条），附缺失端点名与原因注释。
+
+| N/A 用例 | Out of Scope 条目 | 缺失端点名 | 原因注释 |
+|---|---|---|---|
+| N/A-01 | 前端页面/管理后台 | `GET /admin/*`、前端静态资源端点 | demo 范围仅后端 API，无前端/管理后台子系统 |
+| N/A-02 | 图片/附件上传存储 | `POST /api/uploads` | 对象存储子系统不在 demo 范围，无外部存储依赖（CON-001） |
+| N/A-03 | 多租户隔离 | `/api/tenants/*` | 单系统实例，无租户概念（输入文档显式声明） |
+| N/A-04 | 消息推送 | `/api/push/*` | 移动端推送通道不在 demo 范围（输入文档显式声明） |
+| N/A-05 | 付费订阅 / 广告系统 | `/api/subscriptions`、`/api/ads/*` | 支付/广告子系统不在 demo 范围（输入文档显式声明） |

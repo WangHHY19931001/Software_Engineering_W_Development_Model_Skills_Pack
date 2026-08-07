@@ -1003,6 +1003,22 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 > 多子系统遗漏检出实测：TLA+ 遗漏 auth 子系统（SD-001/002/017）→ check-tla-model exit 1 "未被覆盖: SD-001, SD-002, SD-017"；BDD D8 同样检出。
 
+#### 3.4.33 第 35 轮：8 阶段端到端调测修复入库（2026-08-08，[35.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 34.0.0 全量 8 阶段端到端调测（w-model-dev-demo 重建：32 需求 / 73 UAT / 40 ST / 30 IT / 58 UT）发现 3 处技能包侧真实 bug + 3 处 demo 侧缺陷，调测后修复入库 |
+| 技能包修复 | ① `check-tla-model.ts`：TLC 产物 states 时间戳子目录清理正则 `^\d{4}-...` → `^\d{2,4}-...`（TLC 2.19 实际产出 2 位年份目录 `26-08-07-18-04-31`，原 4 位正则不匹配导致清理静默跳过，P3 bug）；② `design-contract-logic.ts`：D1 实际路径语义归一增强（`stripBrackets`/`normalizeActualPathVariants`/`pathTemplateMatches`/`isDefinedRoute` 新增——「、/，/,」多端点拆分、全/半角括号剥离、`:id` 参数模板段级匹配、「不适用（…）」/「横切」非 HTTP 豁免）；③ `run-log-logic.ts`：`GATE_JSON_PATTERNS` 新增 `/STATE_MACHINE_JSON\s+(\{.*\})/`（check-run-log R6 交叉校验需提取 check-state-machine-consistency.ts 存档的 exitCode） |
+| 单测补强 | `__tests__/tla-clean-trace.test.ts`（+1：2 位年份 TLC 时间戳子目录→true）；`__tests__/design-contract-logic.test.ts`（+6：D1 路径归一 describe 块）；`__tests__/run-log-logic.test.ts`（+1：STATE_MACHINE_JSON 摘要行 exitCode 提取）；`__tests__/bdd-logic.test.ts` 实时 demo fixture 测试改为自包含内联规格（不再依赖 demo 实时文件，解析器命名集合能力覆盖保留） |
+| demo 侧修复 | ① `auditMiddleware.ts` 审计记录硬编码 `id:''` 导致 CON-004 审计互相覆盖（UAT-073 暴露）；② `app.ts` 双限流器共享实例导致认证限额折半；③ 路由结构 app.* → Express Router 惯用法（适配 check-design-contract-consistency 契约扫描） |
+| package.json | version `34.0.0` → `35.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| 顶层文档 | SSoT §3.4.33 + §10A 追溯表 + CHANGELOG.md [35.0.0] + README/AGENTS 同步（vitest 459/33 文件） |
+| self-test | 基线 213 不变全通过 |
+| vitest | 459/459（33 文件）全通过（skill-metadata.test.ts 三方版本校验通过） |
+| TypeScript strict | 0 错误 |
+
+> 8 阶段调测终检：318/318 测试（175 UT + 30 IT + 40 ST + 73 UAT）、覆盖率 94.76% lines、check-artifact-gate exitCode=0、归档 308 文件、`rtm.currentPhase=9`；调测产物保留在 w-model-dev-demo/（只读测试夹具随仓库提交）。
+
 ---
 
 ## 4. 技能工作流程
@@ -2605,6 +2621,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.30 | 第 32 轮 错误结构全量归一化 + run-log R6 契约迁移 | scripts/lib/cli-error.ts + 29 脚本 exit 2 归一化 + scripts/run-log-logic.ts（extractExitCode/buildGateLogKeys 迁入）+ scripts/__tests__/cli-error.test.ts | 完整（self-test 213/213、vitest 363、tsc 0 错误） |
 | §3.4.31 | 第 33 轮 全仓库优化 5 批实施（技能缺口 + 评估 + 收尾） | `.cursor/skills/security-review/SKILL.md`（lint:security + baseline v2 + 反模式 #43 凭据脱敏）+ `.cursor/skills/codegraph-exploration/SKILL.md`（约束 #20 codegraph_explore + 落盘字段）+ `.cursor/skills/performance-review/SKILL.md`（性能评审 4 维度）+ `eval/README.md`（TSV 9 列 + darwin-skill 补跑流程）+ 版本号三处 33.0.0 | 完整（self-test 213/213、vitest 434、tsc 0 错误；eval 补跑留待外部 darwin-skill） |
 | §3.4.32 | 第 34 轮 W 模型技能强化（目录约定 SSoT / 格式统一 / TLA+·BDD 覆盖率校验架构升级） | `references/directory-conventions.md`（路径约定 SSoT）+ `references/format-conventions.md`（冒号格式 SSoT）+ `subagent-delegation.md`（S-ingest-tla / S-ingest-bdd 模板）+ `schemas/tla-manifest.schema.json`（sdCoverage 必填）+ `schemas/bdd-manifest.schema.json`（designCoverage 必填）+ `scripts/check-tla-model.ts`（--graph phase≥2 强制 + SD 覆盖率强制）+ `scripts/check-bdd-model.ts`（--graph + D8 维度）+ `scripts/check-artifact-gate.ts`（resolvePhaseDoc + 终检 model 校验）+ `scripts/verifier-logic.ts`（EVIDENCE_PATTERN 冒号格式）+ `scripts/bdd-logic.ts`（TLA+ 快照解析升级 + L1 豁免 D4）+ demo 重产（TLA+ 7 specs + BDD 9 features 覆盖 21 SD）+ 版本号三处 34.0.0 | 完整（self-test 213/213、vitest 451、tsc 0 错误） |
+| §3.4.33 | 第 35 轮 8 阶段端到端调测修复入库 | `scripts/check-tla-model.ts`（TLC states 清理正则 `\d{4}`→`\d{2,4}`，P3 bug）+ `scripts/design-contract-logic.ts`（D1 路径语义归一：多端点拆分/括号剥离/`:id` 模板段匹配/「不适用」「横切」豁免）+ `scripts/run-log-logic.ts`（GATE_JSON_PATTERNS 新增 STATE_MACHINE_JSON）+ `scripts/__tests__/tla-clean-trace.test.ts`（+1）+ `scripts/__tests__/design-contract-logic.test.ts`（+6）+ `scripts/__tests__/run-log-logic.test.ts`（+1）+ `scripts/__tests__/bdd-logic.test.ts`（实时 fixture 改自包含内联规格）+ demo 侧修复（auditMiddleware id、限流器独立实例、Express Router 路由结构）+ 版本号三处 35.0.0 | 完整（self-test 213/213、vitest 459、tsc 0 错误；8 阶段调测 318/318 测试、覆盖率 94.76% lines、归档 308 文件） |
 
 ---
 

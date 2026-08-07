@@ -1,0 +1,1478 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "blog-system-demo-r35",
+  "basePath": ".",
+  "currentPhase": 4,
+  "features": [
+    {
+      "id": "L1_blog_system-001",
+      "level": 1,
+      "filePath": "features/L1/L1_blog_system-001.feature",
+      "scenarioCount": 14,
+      "stateMachineId": "SM-L1_BlogSystem",
+      "tlaSpecId": "L1_BlogSystem",
+      "reqIds": [
+        "REQ-007",
+        "REQ-008",
+        "REQ-009",
+        "REQ-010",
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014",
+        "REQ-015",
+        "REQ-016"
+      ],
+      "designIds": [
+        "SD-001",
+        "SD-002"
+      ],
+      "parentFeatureIds": [],
+      "siblingFeatureIds": [
+        "L1_blog_system-002",
+        "L1_blog_system-003"
+      ],
+      "childFeatureIds": [
+        "L2_blog_system_auth-001",
+        "L2_blog_system_content-001"
+      ]
+    },
+    {
+      "id": "L1_blog_system-002",
+      "level": 1,
+      "filePath": "features/L1/L1_blog_system-002.feature",
+      "scenarioCount": 10,
+      "stateMachineId": "SM-L1_BlogSystem",
+      "tlaSpecId": "L1_BlogSystem",
+      "reqIds": [
+        "REQ-017",
+        "REQ-018",
+        "REQ-019",
+        "REQ-020",
+        "REQ-021",
+        "REQ-022",
+        "REQ-023"
+      ],
+      "designIds": [
+        "SD-003",
+        "SD-004"
+      ],
+      "parentFeatureIds": [],
+      "siblingFeatureIds": [
+        "L1_blog_system-001",
+        "L1_blog_system-003"
+      ],
+      "childFeatureIds": [
+        "L2_blog_system_interaction-001",
+        "L2_blog_system_discovery-001"
+      ]
+    },
+    {
+      "id": "L1_blog_system-003",
+      "level": 1,
+      "filePath": "features/L1/L1_blog_system-003.feature",
+      "scenarioCount": 15,
+      "stateMachineId": "SM-L1_BlogSystem",
+      "tlaSpecId": "L1_BlogSystem",
+      "reqIds": [
+        "REQ-024",
+        "REQ-025",
+        "REQ-026",
+        "REQ-027",
+        "REQ-028",
+        "NFR-001",
+        "NFR-002",
+        "NFR-003",
+        "NFR-004",
+        "NFR-005",
+        "NFR-006",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004"
+      ],
+      "designIds": [
+        "SD-005",
+        "SD-006"
+      ],
+      "parentFeatureIds": [],
+      "siblingFeatureIds": [
+        "L1_blog_system-001",
+        "L1_blog_system-002"
+      ],
+      "childFeatureIds": [
+        "L2_blog_system_analytics-001",
+        "L2_blog_system_integration-001"
+      ]
+    },
+    {
+      "id": "L2_blog_system_auth-001",
+      "level": 2,
+      "filePath": "features/L2/L2_blog_system_auth-001.feature",
+      "scenarioCount": 6,
+      "stateMachineId": "SM-L2_BlogSystemAuth",
+      "tlaSpecId": "L2_BlogSystemAuth",
+      "reqIds": [
+        "REQ-007",
+        "REQ-008",
+        "REQ-009",
+        "REQ-010"
+      ],
+      "designIds": [
+        "SD-001",
+        "SD-007"
+      ],
+      "parentFeatureIds": [
+        "L1_blog_system-001"
+      ],
+      "siblingFeatureIds": [
+        "L2_blog_system_content-001",
+        "L2_blog_system_interaction-001",
+        "L2_blog_system_discovery-001",
+        "L2_blog_system_analytics-001",
+        "L2_blog_system_integration-001"
+      ],
+      "childFeatureIds": [
+        "L3_blog_system_auth_flow-001",
+        "L3_blog_system_rate_limit-001"
+      ]
+    },
+    {
+      "id": "L2_blog_system_content-001",
+      "level": 2,
+      "filePath": "features/L2/L2_blog_system_content-001.feature",
+      "scenarioCount": 6,
+      "stateMachineId": "SM-L2_BlogSystemContent",
+      "tlaSpecId": "L2_BlogSystemContent",
+      "reqIds": [
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014",
+        "REQ-015",
+        "REQ-016"
+      ],
+      "designIds": [
+        "SD-002"
+      ],
+      "parentFeatureIds": [
+        "L1_blog_system-001"
+      ],
+      "siblingFeatureIds": [
+        "L2_blog_system_auth-001",
+        "L2_blog_system_interaction-001",
+        "L2_blog_system_discovery-001",
+        "L2_blog_system_analytics-001",
+        "L2_blog_system_integration-001"
+      ],
+      "childFeatureIds": [
+        "L3_blog_system_article_state-001"
+      ]
+    },
+    {
+      "id": "L2_blog_system_interaction-001",
+      "level": 2,
+      "filePath": "features/L2/L2_blog_system_interaction-001.feature",
+      "scenarioCount": 5,
+      "stateMachineId": "SM-L2_BlogSystemInteraction",
+      "tlaSpecId": "L2_BlogSystemInteraction",
+      "reqIds": [
+        "REQ-017",
+        "REQ-018",
+        "REQ-019",
+        "REQ-020"
+      ],
+      "designIds": [
+        "SD-003"
+      ],
+      "parentFeatureIds": [
+        "L1_blog_system-002"
+      ],
+      "siblingFeatureIds": [
+        "L2_blog_system_auth-001",
+        "L2_blog_system_content-001",
+        "L2_blog_system_discovery-001",
+        "L2_blog_system_analytics-001",
+        "L2_blog_system_integration-001"
+      ],
+      "childFeatureIds": [
+        "L3_blog_system_comment_flow-001"
+      ]
+    },
+    {
+      "id": "L2_blog_system_discovery-001",
+      "level": 2,
+      "filePath": "features/L2/L2_blog_system_discovery-001.feature",
+      "scenarioCount": 5,
+      "stateMachineId": "SM-L2_BlogSystemDiscovery",
+      "tlaSpecId": "L2_BlogSystemDiscovery",
+      "reqIds": [
+        "REQ-021",
+        "REQ-022",
+        "REQ-023"
+      ],
+      "designIds": [
+        "SD-004"
+      ],
+      "parentFeatureIds": [
+        "L1_blog_system-002"
+      ],
+      "siblingFeatureIds": [
+        "L2_blog_system_auth-001",
+        "L2_blog_system_content-001",
+        "L2_blog_system_interaction-001",
+        "L2_blog_system_analytics-001",
+        "L2_blog_system_integration-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L2_blog_system_analytics-001",
+      "level": 2,
+      "filePath": "features/L2/L2_blog_system_analytics-001.feature",
+      "scenarioCount": 5,
+      "stateMachineId": "SM-L2_BlogSystemAnalytics",
+      "tlaSpecId": "L2_BlogSystemAnalytics",
+      "reqIds": [
+        "REQ-024",
+        "REQ-025",
+        "REQ-026"
+      ],
+      "designIds": [
+        "SD-005"
+      ],
+      "parentFeatureIds": [
+        "L1_blog_system-003"
+      ],
+      "siblingFeatureIds": [
+        "L2_blog_system_auth-001",
+        "L2_blog_system_content-001",
+        "L2_blog_system_interaction-001",
+        "L2_blog_system_discovery-001",
+        "L2_blog_system_integration-001"
+      ],
+      "childFeatureIds": [
+        "L3_blog_system_reading_dedup-001"
+      ]
+    },
+    {
+      "id": "L2_blog_system_integration-001",
+      "level": 2,
+      "filePath": "features/L2/L2_blog_system_integration-001.feature",
+      "scenarioCount": 6,
+      "stateMachineId": "SM-L2_BlogSystemIntegration",
+      "tlaSpecId": "L2_BlogSystemIntegration",
+      "reqIds": [
+        "REQ-027",
+        "REQ-028"
+      ],
+      "designIds": [
+        "SD-006"
+      ],
+      "parentFeatureIds": [
+        "L1_blog_system-003"
+      ],
+      "siblingFeatureIds": [
+        "L2_blog_system_auth-001",
+        "L2_blog_system_content-001",
+        "L2_blog_system_interaction-001",
+        "L2_blog_system_discovery-001",
+        "L2_blog_system_analytics-001"
+      ],
+      "childFeatureIds": [
+        "L3_blog_system_webhook_retry-001"
+      ]
+    },
+    {
+      "id": "L3_blog_system_article_state-001",
+      "level": 3,
+      "filePath": "features/L3/L3_blog_system_article_state-001.feature",
+      "scenarioCount": 7,
+      "stateMachineId": "SM-L3_BlogSystemArticleState",
+      "tlaSpecId": "L3_BlogSystemArticleState",
+      "reqIds": [
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014"
+      ],
+      "designIds": [
+        "SD-002"
+      ],
+      "parentFeatureIds": [
+        "L2_blog_system_content-001"
+      ],
+      "siblingFeatureIds": [
+        "L3_blog_system_auth_flow-001",
+        "L3_blog_system_comment_flow-001",
+        "L3_blog_system_rate_limit-001",
+        "L3_blog_system_webhook_retry-001",
+        "L3_blog_system_reading_dedup-001"
+      ],
+      "childFeatureIds": [
+        "L4_blog_system_article_store-001"
+      ]
+    },
+    {
+      "id": "L3_blog_system_auth_flow-001",
+      "level": 3,
+      "filePath": "features/L3/L3_blog_system_auth_flow-001.feature",
+      "scenarioCount": 5,
+      "stateMachineId": "SM-L3_BlogSystemAuthFlow",
+      "tlaSpecId": "L3_BlogSystemAuthFlow",
+      "reqIds": [
+        "REQ-007",
+        "REQ-008",
+        "REQ-009"
+      ],
+      "designIds": [
+        "SD-001"
+      ],
+      "parentFeatureIds": [
+        "L2_blog_system_auth-001"
+      ],
+      "siblingFeatureIds": [
+        "L3_blog_system_article_state-001",
+        "L3_blog_system_comment_flow-001",
+        "L3_blog_system_rate_limit-001",
+        "L3_blog_system_webhook_retry-001",
+        "L3_blog_system_reading_dedup-001"
+      ],
+      "childFeatureIds": [
+        "L4_blog_system_token_store-001"
+      ]
+    },
+    {
+      "id": "L3_blog_system_comment_flow-001",
+      "level": 3,
+      "filePath": "features/L3/L3_blog_system_comment_flow-001.feature",
+      "scenarioCount": 6,
+      "stateMachineId": "SM-L3_BlogSystemCommentFlow",
+      "tlaSpecId": "L3_BlogSystemCommentFlow",
+      "reqIds": [
+        "REQ-018"
+      ],
+      "designIds": [
+        "SD-003"
+      ],
+      "parentFeatureIds": [
+        "L2_blog_system_interaction-001"
+      ],
+      "siblingFeatureIds": [
+        "L3_blog_system_article_state-001",
+        "L3_blog_system_auth_flow-001",
+        "L3_blog_system_rate_limit-001",
+        "L3_blog_system_webhook_retry-001",
+        "L3_blog_system_reading_dedup-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L3_blog_system_rate_limit-001",
+      "level": 3,
+      "filePath": "features/L3/L3_blog_system_rate_limit-001.feature",
+      "scenarioCount": 4,
+      "stateMachineId": "SM-L3_BlogSystemRateLimit",
+      "tlaSpecId": "L3_BlogSystemRateLimit",
+      "reqIds": [
+        "REQ-008",
+        "NFR-006"
+      ],
+      "designIds": [
+        "SD-007"
+      ],
+      "parentFeatureIds": [
+        "L2_blog_system_auth-001"
+      ],
+      "siblingFeatureIds": [
+        "L3_blog_system_article_state-001",
+        "L3_blog_system_auth_flow-001",
+        "L3_blog_system_comment_flow-001",
+        "L3_blog_system_webhook_retry-001",
+        "L3_blog_system_reading_dedup-001"
+      ],
+      "childFeatureIds": [
+        "L4_blog_system_rate_limit_window-001",
+        "L4_blog_system_audit_log-001"
+      ]
+    },
+    {
+      "id": "L3_blog_system_webhook_retry-001",
+      "level": 3,
+      "filePath": "features/L3/L3_blog_system_webhook_retry-001.feature",
+      "scenarioCount": 6,
+      "stateMachineId": "SM-L3_BlogSystemWebhookRetry",
+      "tlaSpecId": "L3_BlogSystemWebhookRetry",
+      "reqIds": [
+        "REQ-028",
+        "NFR-003"
+      ],
+      "designIds": [
+        "SD-006"
+      ],
+      "parentFeatureIds": [
+        "L2_blog_system_integration-001"
+      ],
+      "siblingFeatureIds": [
+        "L3_blog_system_article_state-001",
+        "L3_blog_system_auth_flow-001",
+        "L3_blog_system_comment_flow-001",
+        "L3_blog_system_rate_limit-001",
+        "L3_blog_system_reading_dedup-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L3_blog_system_reading_dedup-001",
+      "level": 3,
+      "filePath": "features/L3/L3_blog_system_reading_dedup-001.feature",
+      "scenarioCount": 5,
+      "stateMachineId": "SM-L3_BlogSystemReadingDedup",
+      "tlaSpecId": "L3_BlogSystemReadingDedup",
+      "reqIds": [
+        "REQ-024"
+      ],
+      "designIds": [
+        "SD-005"
+      ],
+      "parentFeatureIds": [
+        "L2_blog_system_analytics-001"
+      ],
+      "siblingFeatureIds": [
+        "L3_blog_system_article_state-001",
+        "L3_blog_system_auth_flow-001",
+        "L3_blog_system_comment_flow-001",
+        "L3_blog_system_rate_limit-001",
+        "L3_blog_system_webhook_retry-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L4_blog_system_token_store-001",
+      "level": 4,
+      "filePath": "features/L4/L4_blog_system_token_store-001.feature",
+      "scenarioCount": 7,
+      "stateMachineId": "SM-L4_BlogSystemTokenStore",
+      "tlaSpecId": "L4_BlogSystemTokenStore",
+      "reqIds": [
+        "REQ-008",
+        "REQ-009",
+        "CON-003",
+        "NFR-002"
+      ],
+      "designIds": [
+        "SD-001",
+        "SD-007"
+      ],
+      "parentFeatureIds": [
+        "L3_blog_system_auth_flow-001"
+      ],
+      "siblingFeatureIds": [
+        "L4_blog_system_article_store-001",
+        "L4_blog_system_audit_log-001",
+        "L4_blog_system_rate_limit_window-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L4_blog_system_article_store-001",
+      "level": 4,
+      "filePath": "features/L4/L4_blog_system_article_store-001.feature",
+      "scenarioCount": 8,
+      "stateMachineId": "SM-L4_BlogSystemArticleStore",
+      "tlaSpecId": "L4_BlogSystemArticleStore",
+      "reqIds": [
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014"
+      ],
+      "designIds": [
+        "SD-002"
+      ],
+      "parentFeatureIds": [
+        "L3_blog_system_article_state-001"
+      ],
+      "siblingFeatureIds": [
+        "L4_blog_system_audit_log-001",
+        "L4_blog_system_rate_limit_window-001",
+        "L4_blog_system_token_store-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L4_blog_system_rate_limit_window-001",
+      "level": 4,
+      "filePath": "features/L4/L4_blog_system_rate_limit_window-001.feature",
+      "scenarioCount": 4,
+      "stateMachineId": "SM-L4_BlogSystemRateLimitWindow",
+      "tlaSpecId": "L4_BlogSystemRateLimitWindow",
+      "reqIds": [
+        "REQ-008",
+        "NFR-006"
+      ],
+      "designIds": [
+        "SD-007"
+      ],
+      "parentFeatureIds": [
+        "L3_blog_system_rate_limit-001"
+      ],
+      "siblingFeatureIds": [
+        "L4_blog_system_article_store-001",
+        "L4_blog_system_audit_log-001",
+        "L4_blog_system_token_store-001"
+      ],
+      "childFeatureIds": []
+    },
+    {
+      "id": "L4_blog_system_audit_log-001",
+      "level": 4,
+      "filePath": "features/L4/L4_blog_system_audit_log-001.feature",
+      "scenarioCount": 5,
+      "stateMachineId": "SM-L4_BlogSystemAuditLog",
+      "tlaSpecId": "L4_BlogSystemAuditLog",
+      "reqIds": [
+        "CON-004",
+        "NFR-002"
+      ],
+      "designIds": [
+        "SD-007"
+      ],
+      "parentFeatureIds": [
+        "L3_blog_system_rate_limit-001"
+      ],
+      "siblingFeatureIds": [
+        "L4_blog_system_article_store-001",
+        "L4_blog_system_rate_limit_window-001",
+        "L4_blog_system_token_store-001"
+      ],
+      "childFeatureIds": []
+    }
+  ],
+  "stateMachines": [
+    {
+      "id": "SM-L1_BlogSystem",
+      "level": 1,
+      "states": [
+        "Ready",
+        "Processing",
+        "Completed",
+        "Failed",
+        "Degraded"
+      ],
+      "initialState": "Ready",
+      "terminalStates": [
+        "Completed",
+        "Failed"
+      ],
+      "acceptingStates": [
+        "Completed"
+      ],
+      "rejectingStates": [
+        "Failed"
+      ],
+      "transitions": [
+        {
+          "from": "Ready",
+          "event": "processRequest",
+          "to": "Processing",
+          "guard": "requestAccepted",
+          "action": "dispatchToModule"
+        },
+        {
+          "from": "Processing",
+          "event": "completeRequest",
+          "to": "Completed",
+          "guard": "success",
+          "action": "deliverResponse"
+        },
+        {
+          "from": "Processing",
+          "event": "failRequest",
+          "to": "Failed",
+          "guard": "externalError",
+          "action": "recordFailure"
+        },
+        {
+          "from": "Processing",
+          "event": "rejectRequest",
+          "to": "Failed",
+          "guard": "requestInvalid",
+          "action": "returnError"
+        },
+        {
+          "from": "Processing",
+          "event": "degrade",
+          "to": "Degraded",
+          "guard": "overloadDetected",
+          "action": "enableFallback"
+        },
+        {
+          "from": "Degraded",
+          "event": "recover",
+          "to": "Ready",
+          "action": "restoreService"
+        }
+      ],
+      "invariants": [
+        "Ready => systemAvailable",
+        "Processing => requestInFlight",
+        "Completed => responseDelivered",
+        "Failed => errorRecorded",
+        "Degraded => fallbackEnabled"
+      ]
+    },
+    {
+      "id": "SM-L2_BlogSystemAuth",
+      "level": 2,
+      "states": [
+        "unauthenticated",
+        "authenticated",
+        "token_expired"
+      ],
+      "initialState": "unauthenticated",
+      "terminalStates": [
+        "token_expired"
+      ],
+      "acceptingStates": [
+        "authenticated"
+      ],
+      "rejectingStates": [
+        "token_expired"
+      ],
+      "transitions": [
+        {
+          "from": "unauthenticated",
+          "event": "loginSuccess",
+          "to": "authenticated",
+          "guard": "credentialsValid",
+          "action": "issueJwt"
+        },
+        {
+          "from": "token_expired",
+          "event": "loginSuccess",
+          "to": "authenticated",
+          "guard": "credentialsValid",
+          "action": "issueJwt"
+        },
+        {
+          "from": "authenticated",
+          "event": "tokenExpire",
+          "to": "token_expired",
+          "action": "invalidateJwt"
+        },
+        {
+          "from": "token_expired",
+          "event": "reLogin",
+          "to": "authenticated",
+          "guard": "credentialsValid",
+          "action": "reissueJwt"
+        },
+        {
+          "from": "authenticated",
+          "event": "changePassword",
+          "to": "unauthenticated",
+          "action": "invalidateSession"
+        }
+      ],
+      "invariants": [
+        "authenticated => registered",
+        "token_expired => tokenIssued"
+      ]
+    },
+    {
+      "id": "SM-L2_BlogSystemContent",
+      "level": 2,
+      "states": [
+        "none",
+        "draft",
+        "published",
+        "archived"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "archived"
+      ],
+      "acceptingStates": [
+        "published"
+      ],
+      "rejectingStates": [
+        "none"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "createDraft",
+          "to": "draft",
+          "guard": "creatorIsBlogger",
+          "action": "persistDraft"
+        },
+        {
+          "from": "draft",
+          "event": "publishArticle",
+          "to": "published",
+          "guard": "creatorIsBlogger",
+          "action": "makeVisible"
+        },
+        {
+          "from": "published",
+          "event": "editPublishedArticle",
+          "to": "draft",
+          "action": "reopenDraft"
+        },
+        {
+          "from": "published",
+          "event": "archiveArticle",
+          "to": "archived",
+          "action": "hideFromReaders"
+        },
+        {
+          "from": "archived",
+          "event": "unarchiveArticle",
+          "to": "draft",
+          "action": "restoreDraft"
+        },
+        {
+          "from": "draft",
+          "event": "deleteDraft",
+          "to": "none",
+          "action": "removeArticle"
+        }
+      ],
+      "invariants": [
+        "archived => hasPublished",
+        "none => ~hasPublished"
+      ]
+    },
+    {
+      "id": "SM-L2_BlogSystemInteraction",
+      "level": 2,
+      "states": [
+        "none",
+        "active",
+        "deleted"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "deleted"
+      ],
+      "acceptingStates": [
+        "active"
+      ],
+      "rejectingStates": [
+        "deleted"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "postComment",
+          "to": "active",
+          "guard": "articleVisible",
+          "action": "persistComment"
+        },
+        {
+          "from": "active",
+          "event": "deleteCommentByAuthor",
+          "to": "deleted",
+          "guard": "operatorIsAuthor",
+          "action": "removeComment"
+        }
+      ],
+      "invariants": [
+        "none => articleVisible",
+        "deleted => commentDeleterIsAuthor"
+      ]
+    },
+    {
+      "id": "SM-L2_BlogSystemDiscovery",
+      "level": 2,
+      "states": [
+        "none",
+        "stale",
+        "fresh"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "stale"
+      ],
+      "acceptingStates": [
+        "fresh"
+      ],
+      "rejectingStates": [
+        "stale"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "refreshStats",
+          "to": "fresh",
+          "action": "loadStats"
+        },
+        {
+          "from": "stale",
+          "event": "refreshStats",
+          "to": "fresh",
+          "action": "reloadStats"
+        },
+        {
+          "from": "fresh",
+          "event": "invalidateStats",
+          "to": "stale",
+          "action": "dropHotList"
+        }
+      ],
+      "invariants": [
+        "fresh => hotListState = \"computed\""
+      ]
+    },
+    {
+      "id": "SM-L2_BlogSystemAnalytics",
+      "level": 2,
+      "states": [
+        "none",
+        "comment",
+        "like",
+        "follow_publish"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "comment",
+        "like",
+        "follow_publish"
+      ],
+      "acceptingStates": [
+        "comment",
+        "like",
+        "follow_publish"
+      ],
+      "rejectingStates": [],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "generateCommentEvent",
+          "to": "comment",
+          "action": "createUnreadNotification"
+        },
+        {
+          "from": "none",
+          "event": "generateLikeEvent",
+          "to": "like",
+          "action": "createUnreadNotification"
+        },
+        {
+          "from": "none",
+          "event": "generateFollowPublishEvent",
+          "to": "follow_publish",
+          "action": "createUnreadNotification"
+        }
+      ],
+      "invariants": [
+        "comment => notificationProduced",
+        "like => notificationProduced",
+        "follow_publish => notificationProduced"
+      ]
+    },
+    {
+      "id": "SM-L2_BlogSystemIntegration",
+      "level": 2,
+      "states": [
+        "idle",
+        "delivering",
+        "failed"
+      ],
+      "initialState": "idle",
+      "terminalStates": [
+        "failed"
+      ],
+      "acceptingStates": [
+        "idle"
+      ],
+      "rejectingStates": [
+        "failed"
+      ],
+      "transitions": [
+        {
+          "from": "idle",
+          "event": "triggerWebhook",
+          "to": "delivering",
+          "guard": "webhookConfigured",
+          "action": "signAndDispatch"
+        },
+        {
+          "from": "delivering",
+          "event": "deliverWebhook",
+          "to": "idle",
+          "action": "resetRetries"
+        },
+        {
+          "from": "delivering",
+          "event": "failWebhook",
+          "to": "failed",
+          "guard": "retriesExhausted",
+          "action": "recordFailure"
+        },
+        {
+          "from": "failed",
+          "event": "recoverWebhook",
+          "to": "idle",
+          "action": "resetDelivery"
+        }
+      ],
+      "invariants": [
+        "delivering => webhookConfigured",
+        "failed => failureRecorded"
+      ]
+    },
+    {
+      "id": "SM-L3_BlogSystemArticleState",
+      "level": 3,
+      "states": [
+        "none",
+        "draft",
+        "published",
+        "archived"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "archived"
+      ],
+      "acceptingStates": [
+        "published"
+      ],
+      "rejectingStates": [
+        "none"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "createDraft",
+          "to": "draft",
+          "guard": "isBlogger",
+          "action": "persistDraft"
+        },
+        {
+          "from": "draft",
+          "event": "publishArticle",
+          "to": "published",
+          "guard": "isBlogger",
+          "action": "makeVisible"
+        },
+        {
+          "from": "published",
+          "event": "editPublishedArticle",
+          "to": "draft",
+          "action": "reopenDraft"
+        },
+        {
+          "from": "published",
+          "event": "archiveArticle",
+          "to": "archived",
+          "action": "hideFromReaders"
+        },
+        {
+          "from": "archived",
+          "event": "unarchiveArticle",
+          "to": "draft",
+          "action": "restoreDraft"
+        },
+        {
+          "from": "draft",
+          "event": "deleteDraft",
+          "to": "none",
+          "guard": "~hasPublished",
+          "action": "removeArticle"
+        }
+      ],
+      "invariants": [
+        "archived => hasPublished",
+        "published => hasPublished",
+        "none => ~hasPublished"
+      ]
+    },
+    {
+      "id": "SM-L3_BlogSystemAuthFlow",
+      "level": 3,
+      "states": [
+        "none",
+        "active",
+        "expired"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "expired"
+      ],
+      "acceptingStates": [
+        "active"
+      ],
+      "rejectingStates": [
+        "expired"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "loginSuccess",
+          "to": "active",
+          "guard": "credentialsValid",
+          "action": "issueJwt"
+        },
+        {
+          "from": "expired",
+          "event": "loginSuccess",
+          "to": "active",
+          "guard": "credentialsValid",
+          "action": "issueJwt"
+        },
+        {
+          "from": "active",
+          "event": "tokenExpire",
+          "to": "expired",
+          "action": "invalidateJwt"
+        },
+        {
+          "from": "expired",
+          "event": "reLogin",
+          "to": "active",
+          "guard": "credentialsValid",
+          "action": "reissueJwt"
+        }
+      ],
+      "invariants": [
+        "active => registered",
+        "expired => registered"
+      ]
+    },
+    {
+      "id": "SM-L3_BlogSystemCommentFlow",
+      "level": 3,
+      "states": [
+        "none",
+        "active"
+      ],
+      "initialState": "none",
+      "terminalStates": [],
+      "acceptingStates": [
+        "active"
+      ],
+      "rejectingStates": [],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "createComment",
+          "to": "active",
+          "guard": "articlePublished, authenticated",
+          "action": "persistComment"
+        },
+        {
+          "from": "active",
+          "event": "replyComment",
+          "to": "active",
+          "guard": "articlePublished, authenticated",
+          "action": "persistReply"
+        },
+        {
+          "from": "active",
+          "event": "deleteComment",
+          "to": "none",
+          "guard": "deletionAuthorized",
+          "action": "removeComment"
+        }
+      ],
+      "invariants": [
+        "active => articlePublished",
+        "active => authenticated"
+      ]
+    },
+    {
+      "id": "SM-L3_BlogSystemRateLimit",
+      "level": 3,
+      "states": [
+        "open",
+        "limited"
+      ],
+      "initialState": "open",
+      "terminalStates": [
+        "limited"
+      ],
+      "acceptingStates": [
+        "open"
+      ],
+      "rejectingStates": [
+        "limited"
+      ],
+      "transitions": [
+        {
+          "from": "open",
+          "event": "rejectRequest",
+          "to": "limited",
+          "guard": "windowRequests = MaxRequests",
+          "action": "return429"
+        },
+        {
+          "from": "limited",
+          "event": "windowReset",
+          "to": "open",
+          "action": "resetWindow"
+        }
+      ],
+      "invariants": [
+        "limited => windowRequests = MaxRequests"
+      ]
+    },
+    {
+      "id": "SM-L3_BlogSystemWebhookRetry",
+      "level": 3,
+      "states": [
+        "idle",
+        "delivering",
+        "succeeded",
+        "failed"
+      ],
+      "initialState": "idle",
+      "terminalStates": [
+        "failed"
+      ],
+      "acceptingStates": [
+        "succeeded"
+      ],
+      "rejectingStates": [
+        "failed"
+      ],
+      "transitions": [
+        {
+          "from": "idle",
+          "event": "dispatchWebhook",
+          "to": "delivering",
+          "guard": "webhookConfigured",
+          "action": "signAndDispatch"
+        },
+        {
+          "from": "succeeded",
+          "event": "dispatchWebhook",
+          "to": "delivering",
+          "guard": "webhookConfigured",
+          "action": "signAndDispatch"
+        },
+        {
+          "from": "failed",
+          "event": "dispatchWebhook",
+          "to": "delivering",
+          "guard": "webhookConfigured",
+          "action": "signAndDispatch"
+        },
+        {
+          "from": "delivering",
+          "event": "deliverSucceed",
+          "to": "succeeded",
+          "action": "recordSuccess"
+        },
+        {
+          "from": "delivering",
+          "event": "giveUpDelivery",
+          "to": "failed",
+          "guard": "attempts = MaxRetries",
+          "action": "recordFailure"
+        }
+      ],
+      "invariants": [
+        "failed => failureRecorded",
+        "failed => attempts = MaxRetries"
+      ]
+    },
+    {
+      "id": "SM-L3_BlogSystemReadingDedup",
+      "level": 3,
+      "states": [
+        "unseen",
+        "windowed"
+      ],
+      "initialState": "unseen",
+      "terminalStates": [],
+      "acceptingStates": [
+        "windowed"
+      ],
+      "rejectingStates": [],
+      "transitions": [
+        {
+          "from": "unseen",
+          "event": "viewArticle",
+          "to": "windowed",
+          "guard": "viewCount < capacity",
+          "action": "incrementView"
+        },
+        {
+          "from": "windowed",
+          "event": "repeatView",
+          "to": "windowed",
+          "guard": "sameWindow",
+          "action": "skipCount"
+        },
+        {
+          "from": "windowed",
+          "event": "tickWindow",
+          "to": "windowed",
+          "action": "advanceAge"
+        },
+        {
+          "from": "windowed",
+          "event": "expireWindow",
+          "to": "unseen",
+          "action": "resetWindow"
+        }
+      ],
+      "invariants": [
+        "windowed => viewCount >= 1"
+      ]
+    },
+    {
+      "id": "SM-L4_BlogSystemTokenStore",
+      "level": 4,
+      "states": [
+        "none",
+        "active",
+        "expired"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "expired"
+      ],
+      "acceptingStates": [
+        "active"
+      ],
+      "rejectingStates": [
+        "expired"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "issueToken",
+          "to": "active",
+          "guard": "userRegistered",
+          "action": "signJwt"
+        },
+        {
+          "from": "expired",
+          "event": "issueToken",
+          "to": "active",
+          "guard": "userRegistered",
+          "action": "signJwt"
+        },
+        {
+          "from": "active",
+          "event": "tokenExpire",
+          "to": "expired",
+          "action": "invalidateJwt"
+        },
+        {
+          "from": "expired",
+          "event": "reIssueToken",
+          "to": "active",
+          "action": "reissueJwt"
+        },
+        {
+          "from": "active",
+          "event": "verifyValidToken",
+          "to": "active",
+          "guard": "tokenAge < MaxAgeHours",
+          "action": "returnPayload"
+        },
+        {
+          "from": "none",
+          "event": "verifyInvalidToken",
+          "to": "none",
+          "action": "return40101"
+        },
+        {
+          "from": "expired",
+          "event": "verifyExpiredToken",
+          "to": "expired",
+          "action": "return40102"
+        }
+      ],
+      "invariants": [
+        "active => userRegistered",
+        "expired => tokenAge = MaxAgeHours"
+      ]
+    },
+    {
+      "id": "SM-L4_BlogSystemArticleStore",
+      "level": 4,
+      "states": [
+        "none",
+        "draft",
+        "published",
+        "archived"
+      ],
+      "initialState": "none",
+      "terminalStates": [
+        "archived"
+      ],
+      "acceptingStates": [
+        "published"
+      ],
+      "rejectingStates": [
+        "none"
+      ],
+      "transitions": [
+        {
+          "from": "none",
+          "event": "storeCreateRecord",
+          "to": "draft",
+          "action": "writeRecord"
+        },
+        {
+          "from": "draft",
+          "event": "storePublishRecord",
+          "to": "published",
+          "action": "setPublishedAt"
+        },
+        {
+          "from": "published",
+          "event": "storeUpdatePublished",
+          "to": "draft",
+          "action": "reopenDraft"
+        },
+        {
+          "from": "draft",
+          "event": "storeUpdateDraftOrArchived",
+          "to": "draft",
+          "action": "bumpVersion"
+        },
+        {
+          "from": "archived",
+          "event": "storeUpdateDraftOrArchived",
+          "to": "draft",
+          "action": "bumpVersion"
+        },
+        {
+          "from": "published",
+          "event": "storeArchiveRecord",
+          "to": "archived",
+          "action": "hideRecord"
+        },
+        {
+          "from": "archived",
+          "event": "storeUnarchiveRecord",
+          "to": "draft",
+          "action": "restoreDraft"
+        },
+        {
+          "from": "draft",
+          "event": "storeDeleteRecord",
+          "to": "none",
+          "guard": "~hasPublished",
+          "action": "removeRecord"
+        }
+      ],
+      "invariants": [
+        "archived => hasPublished",
+        "published => hasPublished",
+        "none => ~hasPublished"
+      ]
+    },
+    {
+      "id": "SM-L4_BlogSystemRateLimitWindow",
+      "level": 4,
+      "states": [
+        "open",
+        "limited"
+      ],
+      "initialState": "open",
+      "terminalStates": [
+        "limited"
+      ],
+      "acceptingStates": [
+        "open"
+      ],
+      "rejectingStates": [
+        "limited"
+      ],
+      "transitions": [
+        {
+          "from": "open",
+          "event": "allowRequest",
+          "to": "open",
+          "guard": "requestCount < MaxRequests",
+          "action": "incrementCount"
+        },
+        {
+          "from": "open",
+          "event": "rejectRequest",
+          "to": "limited",
+          "guard": "requestCount = MaxRequests",
+          "action": "return429"
+        },
+        {
+          "from": "limited",
+          "event": "clockTick",
+          "to": "open",
+          "guard": "windowExpired",
+          "action": "resetWindow"
+        }
+      ],
+      "invariants": [
+        "limited => requestCount = MaxRequests",
+        "limited => windowStart + WindowMs > now"
+      ]
+    },
+    {
+      "id": "SM-L4_BlogSystemAuditLog",
+      "level": 4,
+      "states": [
+        "empty",
+        "active"
+      ],
+      "initialState": "empty",
+      "terminalStates": [],
+      "acceptingStates": [
+        "active"
+      ],
+      "rejectingStates": [],
+      "transitions": [
+        {
+          "from": "empty",
+          "event": "appendLog",
+          "to": "active",
+          "action": "writeAuditLog"
+        },
+        {
+          "from": "active",
+          "event": "appendLog",
+          "to": "active",
+          "guard": "belowCapacity",
+          "action": "writeAuditLog"
+        },
+        {
+          "from": "active",
+          "event": "advanceTime",
+          "to": "active",
+          "action": "ageRecords"
+        },
+        {
+          "from": "active",
+          "event": "pruneExpired",
+          "to": "empty",
+          "guard": "oldestAtRetention",
+          "action": "deleteOldest"
+        }
+      ],
+      "invariants": [
+        "active => noSensitiveFieldsRecorded"
+      ]
+    }
+  ],
+  "checkRounds": [],
+  "designCoverage": {
+    "totalSdNodes": 7,
+    "coveredSdNodes": [
+      "SD-001",
+      "SD-002",
+      "SD-003",
+      "SD-004",
+      "SD-005",
+      "SD-006",
+      "SD-007"
+    ],
+    "uncoveredSdNodes": [],
+    "coverageRate": 1
+  }
+}

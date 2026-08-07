@@ -1,0 +1,170 @@
+════════════════════════════════════════════════════════════
+工件质量门校验（Artifact Gate）
+════════════════════════════════════════════════════════════
+项目目录      : w-model-dev-demo
+RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\rtm.json
+校验阶段      : phase=5（阶段级）
+RTM 覆盖率    : 100%
+单元覆盖率    : 94.76%
+TLA+ 资产     : ✓ manifest 存在且 specs 非空
+BDD 资产      : ✓ bdd-manifest.json 存在且 schema 通过
+Model 校验    : ✓ TLA+/BDD model 校验通过
+graph 资产    : ✓ graph.json（122 节点）
+校验结果      : ✗ 未通过
+────────────────────────────────────────────────────────────
+未通过原因：
+  - TLA+ 资产校验失败：SD 节点 SD-001 无对应 codeModule（期望 codeModule 路径包含以下任一段: 001）
+  - TLA+ 资产校验失败：SD 节点 SD-002 无对应 codeModule（期望 codeModule 路径包含以下任一段: 002）
+  - TLA+ 资产校验失败：SD 节点 SD-003 无对应 codeModule（期望 codeModule 路径包含以下任一段: 003）
+  - TLA+ 资产校验失败：SD 节点 SD-004 无对应 codeModule（期望 codeModule 路径包含以下任一段: 004）
+  - TLA+ 资产校验失败：SD 节点 SD-005 无对应 codeModule（期望 codeModule 路径包含以下任一段: 005）
+  - TLA+ 资产校验失败：SD 节点 SD-006 无对应 codeModule（期望 codeModule 路径包含以下任一段: 006）
+  - TLA+ 资产校验失败：SD 节点 SD-007 无对应 codeModule（期望 codeModule 路径包含以下任一段: 007）
+  - uat-path-mapping 未回填：UAT-001 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-001 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-002 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-002 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-003 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-003 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-004 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-004 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-005 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-005 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-006 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-006 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-007 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-007 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-008 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-008 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-009 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-009 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-010 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-010 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-011 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-011 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-012 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-012 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-013 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-013 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-014 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-014 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-015 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-015 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-016 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-016 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-017 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-017 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-018 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-018 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-019 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-019 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-020 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-020 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-021 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-021 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-022 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-022 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-023 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-023 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-024 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-024 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-025 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-025 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-026 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-026 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-027 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-027 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-028 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-028 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-029 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-029 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-030 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-030 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-031 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-031 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-032 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-032 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-033 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-033 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-034 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-034 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-035 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-035 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-036 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-036 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-037 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-037 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-038 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-038 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-039 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-039 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-040 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-040 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-041 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-041 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-042 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-042 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-043 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-043 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-044 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-044 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-045 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-045 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-046 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-046 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-047 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-047 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-048 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-048 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-049 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-049 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-050 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-050 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-051 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-051 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-052 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-052 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-053 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-053 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-054 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-054 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-055 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-055 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-056 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-056 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-057 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-057 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-058 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-058 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-059 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-059 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-060 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-060 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-061 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-061 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-062 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-062 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-063 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-063 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-064 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-064 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-065 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-065 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-066 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-066 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-067 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-067 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-068 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-068 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-069 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-069 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-070 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-070 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-071 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-071 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-072 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-072 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+  - uat-path-mapping 未回填：UAT-073 的实际路径仍为 "_待阶段5回填_" 或为空
+  - uat-path-mapping mappingType 非法：UAT-073 的 mappingType "_待填_" 须 ∈ ["直接", "等价", "替代"]
+────────────────────────────────────────────────────────────
+GATE_JSON {"type":"artifact","passed":false,"coveragePercent":100,"unitCoveragePercent":94.76,"missingItems":[],"reasons":["TLA+ 资产校验失败：SD 节点 SD-001 无对应 codeModule（期望 codeModule 路径包含以下任一段: 001）","TLA+ 资产校验失败：SD 节点 SD-002 无对应 codeModule（期望 codeModule 路径包含以下任一段: 002）","TLA+ 资产校验失败：SD 节点 SD-003 无对应 codeModule（期望 codeModule 路径包含以下任一段: 003）","TLA+ 资产校验失败：SD 节点 SD-004 无对应 codeModule（期望 codeModule 路径包含以下任一段: 004）","TLA+ 资产校验失败：SD 节点 SD-005 无对应 codeModule（期望 codeModule 路径包含以下任一段: 005）","TLA+ 资产校验失败：SD 节点 SD-006 无对应 codeModule（期望 codeModule 路径包含以下任一段: 006）","TLA+ 资产校验失败：SD 节点 SD-007 无对应 codeModule（期望 codeModule 路径包含以下任一段: 007）","uat-path-mapping 未回填：UAT-001 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-001 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-002 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-002 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-003 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-003 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-004 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-004 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-005 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-005 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-006 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-006 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-007 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-007 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-008 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-008 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-009 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-009 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-010 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-010 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-011 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-011 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-012 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-012 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-013 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-013 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-014 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-014 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-015 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-015 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-016 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-016 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-017 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-017 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-018 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-018 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-019 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-019 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-020 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-020 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-021 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-021 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-022 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-022 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-023 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-023 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-024 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-024 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-025 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-025 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-026 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-026 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-027 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-027 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-028 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-028 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-029 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-029 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-030 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-030 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-031 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-031 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-032 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-032 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-033 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-033 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-034 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-034 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-035 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-035 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-036 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-036 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-037 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-037 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-038 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-038 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-039 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-039 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-040 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-040 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-041 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-041 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-042 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-042 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-043 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-043 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-044 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-044 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-045 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-045 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-046 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-046 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-047 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-047 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-048 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-048 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-049 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-049 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-050 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-050 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-051 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-051 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-052 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-052 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-053 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-053 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-054 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-054 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-055 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-055 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-056 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-056 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-057 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-057 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-058 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-058 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-059 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-059 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-060 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-060 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-061 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-061 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-062 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-062 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-063 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-063 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-064 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-064 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-065 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-065 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-066 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-066 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-067 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-067 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-068 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-068 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-069 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-069 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-070 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-070 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-071 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-071 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-072 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-072 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]","uat-path-mapping 未回填：UAT-073 的实际路径仍为 \"_待阶段5回填_\" 或为空","uat-path-mapping mappingType 非法：UAT-073 的 mappingType \"_待填_\" 须 ∈ [\"直接\", \"等价\", \"替代\"]"],"bddManifestExists":true,"exitCode":1}

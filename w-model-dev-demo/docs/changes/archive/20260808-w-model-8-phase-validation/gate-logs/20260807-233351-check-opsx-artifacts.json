@@ -1,0 +1,14 @@
+════════════════════════════════════════════════════════════
+opsx 制品与审查产物校验（Opsx Artifacts Checker）
+════════════════════════════════════════════════════════════
+项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo
+阶段          : 6
+变更目录      : （未找到）
+制品          : （无）
+审查产物      : （无）
+校验结果      : ✗ 未通过
+────────────────────────────────────────────────────────────
+未通过原因：
+  - openspec/changes/ 目录不存在（阶段 6 须有 opsx 变更）
+────────────────────────────────────────────────────────────
+OPSX_ARTIFACTS_JSON {"type":"opsx-artifacts","passed":false,"phase":6,"changesNames":[],"artifactsFound":[],"reviewsFound":[],"violations":["openspec/changes/ 目录不存在（阶段 6 须有 opsx 变更）"],"exitCode":1}

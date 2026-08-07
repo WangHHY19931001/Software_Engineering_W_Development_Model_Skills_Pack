@@ -3,6 +3,29 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [35.0.0] - 2026-08-08
+
+### 第三十五轮 8 阶段端到端调测修复入库（TLC 清理正则 / D1 路径语义归一 / STATE_MACHINE_JSON 交叉校验）
+
+34.0.0 全量 8 阶段端到端调测（w-model-dev-demo 重建）发现 3 处技能包侧真实 bug，调测后修复入库。详见 SSoT §3.4.33。
+
+#### Fixed
+- `check-tla-model.ts`：TLC 产物 states 时间戳子目录清理正则 `^\d{4}-…` → `^\d{2,4}-…`（TLC 2.19 实际产出 2 位年份目录 `26-08-07-18-04-31`，原 4 位正则不匹配导致 states 清理静默跳过，P3 bug）
+- `design-contract-logic.ts`：D1 实际路径语义归一增强（「、/，/,」多端点拆分、全/半角括号剥离、`:id` 参数模板段级匹配、「不适用（…）」/「横切」非 HTTP 豁免）
+- `run-log-logic.ts`：`GATE_JSON_PATTERNS` 新增 `/STATE_MACHINE_JSON\s+(\{.*\})/`（check-run-log R6 交叉校验需提取 check-state-machine-consistency.ts 存档的 exitCode）
+- `bdd-logic.test.ts`：实时 demo fixture 测试改为自包含内联规格（不再依赖 demo 实时文件，解析器命名集合能力覆盖保留）
+
+#### Changed
+- 单测补强：`tla-clean-trace.test.ts`（+1）/ `design-contract-logic.test.ts`（+6）/ `run-log-logic.test.ts`（+1）
+- demo 侧修复（只读测试夹具）：`auditMiddleware.ts` 审计 id 硬编码 `''` 导致 CON-004 审计互相覆盖（UAT-073 暴露）；`app.ts` 双限流器共享实例导致认证限额折半；路由结构 app.* → Express Router 惯用法（适配 check-design-contract-consistency 契约扫描）
+- 版本号三处同步为 35.0.0：package.json + skill-metadata.json + SKILL.md frontmatter
+
+#### 验证
+- vitest 459/459（33 文件）全通过
+- self-test 213/213 全通过
+- TypeScript strict 0 错误
+- 8 阶段调测终检：318/318 测试（175 UT + 30 IT + 40 ST + 73 UAT）、覆盖率 94.76% lines、check-artifact-gate exitCode=0、归档 308 文件
+
 ## [34.0.0] - 2026-08-07
 
 ### 第三十四轮 W 模型技能强化：目录约定 SSoT / 格式统一 / TLA+·BDD 覆盖率校验架构升级

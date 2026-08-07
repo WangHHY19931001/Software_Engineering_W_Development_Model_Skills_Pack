@@ -128,6 +128,100 @@ describe('design-contract-logic', () => {
     });
   });
 
+  describe('D1: UAT 路径映射语义归一（第 35 轮修复）', () => {
+    it('多端点组合（「、」分隔）逐项匹配', () => {
+      const input = makeInput({
+        routeDefinitions: [
+          { method: 'PUT', path: '/api/posts/:id', params: [], successStatus: 200, responseFields: [] },
+          { method: 'DELETE', path: '/api/posts/:id', params: [], successStatus: 204, responseFields: [] },
+        ],
+        uatPathMappings: [
+          { uatId: 'UAT-001', designPath: 'PUT/DELETE /api/posts/:id', actualPath: 'PUT /api/posts/:id、DELETE /api/posts/:id', mappingType: '直接' },
+        ],
+        acceptanceAssertions: [],
+      });
+      const result = checkDesignContractConsistency(input);
+      expect(result.passed).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it('端点带括号说明（含「（触发 Webhook）」）剥离后匹配', () => {
+      const input = makeInput({
+        routeDefinitions: [
+          { method: 'POST', path: '/api/posts/:id/publish', params: [], successStatus: 200, responseFields: [] },
+        ],
+        uatPathMappings: [
+          { uatId: 'UAT-002', designPath: 'POST /api/posts/:id/publish', actualPath: 'POST /api/posts/:id/publish（触发 Webhook 分发）', mappingType: '直接' },
+        ],
+        acceptanceAssertions: [],
+      });
+      const result = checkDesignContractConsistency(input);
+      expect(result.passed).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it('具体请求实例按路由参数模板段级匹配（:id 命中具体值）', () => {
+      const input = makeInput({
+        routeDefinitions: [
+          { method: 'GET', path: '/api/articles/:id', params: [], successStatus: 200, responseFields: [] },
+        ],
+        uatPathMappings: [
+          { uatId: 'UAT-003', designPath: 'GET /api/articles/:id', actualPath: 'GET /api/articles/art-nonexist（404 兜底）', mappingType: '等价' },
+        ],
+        acceptanceAssertions: [],
+      });
+      const result = checkDesignContractConsistency(input);
+      expect(result.passed).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it('「不适用（...）」非 HTTP 行豁免（与横切同语义）', () => {
+      const input = makeInput({
+        routeDefinitions: [
+          { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: [] },
+        ],
+        uatPathMappings: [
+          { uatId: 'UAT-004', designPath: 'NFR-001', actualPath: '不适用（性能 NFR，无独立端点）', mappingType: '直接' },
+        ],
+        acceptanceAssertions: [],
+      });
+      const result = checkDesignContractConsistency(input);
+      expect(result.passed).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it('逗号分隔多端点（，/,）逐项匹配', () => {
+      const input = makeInput({
+        routeDefinitions: [
+          { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: [] },
+          { method: 'GET', path: '/api/comments', params: [], successStatus: 200, responseFields: [] },
+        ],
+        uatPathMappings: [
+          { uatId: 'UAT-005', designPath: 'GET /api/posts + /api/comments', actualPath: 'GET /api/posts, GET /api/comments', mappingType: '直接' },
+        ],
+        acceptanceAssertions: [],
+      });
+      const result = checkDesignContractConsistency(input);
+      expect(result.passed).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    });
+
+    it('多端点组合中存在未定义路由 → D1 violation', () => {
+      const input = makeInput({
+        routeDefinitions: [
+          { method: 'PUT', path: '/api/posts/:id', params: [], successStatus: 200, responseFields: [] },
+        ],
+        uatPathMappings: [
+          { uatId: 'UAT-006', designPath: 'PUT/DELETE /api/posts/:id', actualPath: 'PUT /api/posts/:id、DELETE /api/comments/:id', mappingType: '直接' },
+        ],
+        acceptanceAssertions: [],
+      });
+      const result = checkDesignContractConsistency(input);
+      expect(result.passed).toBe(false);
+      expect(result.violations.some(v => v.dimension === 'D1')).toBe(true);
+    });
+  });
+
   describe('null/undefined input', () => {
     it('null input 返回失败', () => {
       const result = checkDesignContractConsistency(null);

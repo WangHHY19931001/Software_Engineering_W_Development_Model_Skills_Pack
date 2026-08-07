@@ -1,0 +1,15 @@
+════════════════════════════════════════════════════════════
+预算校验（Budget Checker）
+════════════════════════════════════════════════════════════
+输入文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\budget.json
+projectId     : blog-system-demo-r35
+schemaVersion : 1.0
+onExceed      : pause
+--project     : 2026-08-07T15:30:00Z
+--run-log     : w-model-dev-demo/.w-model/run-log.jsonl（rework=0, tla-rework=0）
+--phase       : 7
+校验结果      : ✓ 通过
+────────────────────────────────────────────────────────────
+预算配置符合 data-models.md BudgetConfig schema：时效 + 完整 + onExceed 合法 + killSwitch 未触发。
+────────────────────────────────────────────────────────────
+BUDGET_JSON {"type":"budget","passed":true,"violations":[],"exitCode":0}

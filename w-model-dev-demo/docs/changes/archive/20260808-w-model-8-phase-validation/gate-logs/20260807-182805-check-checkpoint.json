@@ -1,0 +1,17 @@
+﻿════════════════════════════════════════════════════════════
+Checkpoint 校验（Checkpoint Checker）
+════════════════════════════════════════════════════════════
+输入文件          : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\run-log.jsonl
+条目数            : 20
+--checkpoint-log  : w-model-dev-demo/.w-model/checkpoint-log（已加载 1 个 phase 确认文件）
+校验结果          : ✗ 未通过
+────────────────────────────────────────────────────────────
+未通过原因：
+  - R2: 条目 r35-p1-cp001 决策 "3 个 L1 BDD features 39 scenarios + BDD/TLA+ 等价性校验通过" 未含具体名词（技术方案/模块/接口/数据结构名）
+  - R4: 条目 r35-p1-cp001 阶段 1 决策 "L1 TLA+ 死锁经 R→V→G→S-fix→R3 返工循环修复（StayShutdown 自环 + ExtOutRequiresOperational 语义修正）" 与阶段主题不匹配
+  - R4: 条目 r35-p1-cp001 阶段 1 决策 "3 个 L1 BDD features 39 scenarios + BDD/TLA+ 等价性校验通过" 与阶段主题不匹配
+
+O 子代理须按上述原因处置（补 acknowledgedDecisions / 具化决策 / 补用户确认 / 对齐阶段主题 / 显式回退修正），详见：
+  docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.4
+────────────────────────────────────────────────────────────
+CHECKPOINT_JSON {"type":"checkpoint","passed":false,"violations":["R2: 条目 r35-p1-cp001 决策 \"3 个 L1 BDD features 39 scenarios + BDD/TLA+ 等价性校验通过\" 未含具体名词（技术方案/模块/接口/数据结构名）","R4: 条目 r35-p1-cp001 阶段 1 决策 \"L1 TLA+ 死锁经 R→V→G→S-fix→R3 返工循环修复（StayShutdown 自环 + ExtOutRequiresOperational 语义修正）\" 与阶段主题不匹配","R4: 条目 r35-p1-cp001 阶段 1 决策 \"3 个 L1 BDD features 39 scenarios + BDD/TLA+ 等价性校验通过\" 与阶段主题不匹配"],"exitCode":1}

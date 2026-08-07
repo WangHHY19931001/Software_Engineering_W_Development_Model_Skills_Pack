@@ -1,0 +1,1 @@
+﻿PREVENTIVE_REVIEW_JSON {"type":"preventive-review","passed":false,"exitCode":1,"variant":"standard","reasons":["R3 报告缺失：completeness 维度报告未找到","R3 报告缺失：reliability 维度报告未找到","R3 报告缺失：security 维度报告未找到"]}

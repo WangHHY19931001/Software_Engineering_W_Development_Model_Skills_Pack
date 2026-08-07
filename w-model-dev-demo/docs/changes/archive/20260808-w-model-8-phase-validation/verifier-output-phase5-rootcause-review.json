@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "design",
+    "target": "RC-phase5-1-01",
+    "reviewedAt": "2026-08-07T23:10:00+08:00",
+    "agent": "w-model-v-subagent-rootcause-reviewer",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    {
+      "name": "architecture-soundness",
+      "description": "语义映射 rootcause correctness（verifier-spec §7.5）：根因链逻辑自洽、每步 evidence 支持 answer、根因分类准确",
+      "weight": 0.25,
+      "score": 0.88,
+      "rawScores": [
+        0.86,
+        0.88,
+        0.9
+      ],
+      "variance": 0.000267,
+      "evidence": "w-model-dev-demo/.w-model/rootcause/RC-phase5-1-01.json:L34-64=5 步 5-why 链自洽：step1 三门禁失败归因（L36-40）、step2 编号体系错位（graph SD-001..007 vs rtm SD-5.x.y，L43-46）、step3 上游传播（阶段4 详设映射表，L49-52）、step4 四执行缺口（uat 回填/命名契约/断言锚点/工具契约，L55-58）、step5 门禁盲区与 V 未拦截（L61-64）；rootCause.category=process-missing（L67-68）复合判定合理；逐条实证核验：gate-logs/20260807-220436-check-artifact-gate.json=153 reasons（7+73+73，exitCode=1）、20260807-220511-check-code-tla-consistency.json=63 violations（sdToCodeModule×7/nextBranchCoverage×43/invariantCoverage×13，checked=99/65）、20260807-220523-check-state-machine-consistency.json=EISDIR exit=2，rtm.json:L11-L242=22 REQ 行 codeModule 全为 SD-5.x.y 前缀，graph.json:L499/L532/L574/L613/L647/L682/L714=SD-001..007，docs/uat-path-mapping.md:L11-83=73 行占位符，detailed-design.md:L1426-1447=SD-5.x.y 映射表（报告引 L1427-1448 差 1 行）"
+    },
+    {
+      "name": "requirement-coverage",
+      "description": "语义映射 rootcause completeness（§7.5）：触及根本原因、rootCauseChain 充分追溯（2-5 步）、upstreamDefect 正确检测/排除",
+      "weight": 0.25,
+      "score": 0.86,
+      "rawScores": [
+        0.84,
+        0.86,
+        0.88
+      ],
+      "variance": 0.000267,
+      "evidence": "w-model-dev-demo/.w-model/rootcause/RC-phase5-1-01.json:L34-78=根因追溯充分：5 步链触及执行缺口+上游传播+工具契约而非停在现象；upstreamDefect.present=true 判定合理（L72-78）——detailed-design.md:L1426-1447 自创 SD-5.x.y 编号、gate-logic.ts:L83-92=PHASE_TRACE_FIELDS[4] 无 codeModule、L410-418=SD 映射/格式校验仅 phase>=5，跨阶段传播链闭合；V 未拦截实证：.w-model/verifier-outputs/phase5-code.json:L63-71=reworkHints 无 uat 回填/命名契约/断言锚点；工具侧识别准确：check-state-machine-consistency.ts:L33-46=argv[2] 契约为手构 input.json、dispatch-matrix.md:L69=阶段 5 清单仅脚本名无输入构造指引、tla-plus-guide.md:L692=JSON 由编排者/G 解析构造；瑕疵：prevention 未覆盖 phase-5-coding.md:L211 自身示例（SD-5.2.1）即错位编号的契约诱因"
+    },
+    {
+      "name": "interface-consistency",
+      "description": "语义映射 rootcause falsifiability（§7.5）：falsifiabilityCheck 含若-则可验证假设且真可证伪",
+      "weight": 0.2,
+      "score": 0.9,
+      "rawScores": [
+        0.88,
+        0.9,
+        0.92
+      ],
+      "variance": 0.000267,
+      "evidence": "w-model-dev-demo/.w-model/rootcause/RC-phase5-1-01.json:L70=rootCause.falsifiabilityCheck 含若-则可验证假设（S-coding 完成四项强制闭环+G 按 tla-plus-guide.md:L721 契约构造 input.json→三门禁全绿；若仅改格式不改编号体系则 7 条 SD 映射仍报失败），并给出可执行证伪实验（将任一 rtm 行 codeModule 改为 'SD-001:src/services/identity/authService.ts' 重跑门禁→violations 应减少）；五项根因（编号错位/uat 流程缺口/命名契约/断言抽取/工具契约）各以门禁 exitCode 为可复验锚点：gate-logic.ts:L410-418、code-tla-logic.ts:L507-511=维度4 宽松策略判定、check-state-machine-consistency.ts:L19=退出码契约；瑕疵：'7 条 tla-codeModule 减少'措辞略宽（改单行仅消除 SD-001 对应 violation）"
+    },
+    {
+      "name": "feasibility",
+      "description": "语义映射 rootcause actionability（§7.5）：fixRecommendation 针对根因且可执行，每条含 target/location/action/rationale",
+      "weight": 0.15,
+      "score": 0.83,
+      "rawScores": [
+        0.81,
+        0.83,
+        0.85
+      ],
+      "variance": 0.000267,
+      "evidence": "w-model-dev-demo/.w-model/rootcause/RC-phase5-1-01.json:L79-110=5 条 fixRecommendation 均含 target/location/action/rationale 四字段且经实证可行：①SD-5.x.y→SD-00x 前缀替换后格式正则仍满足（gate-logic.ts:L176）且 includes('SD-001:') 命中（code-tla-logic.ts:L163）；②uat 回填符合 gate-logic.ts:L214-234 契约（actualPath 非占位+mappingType∈[直接,等价,替代]，UAT-066/067/070 不适用行处理已提示）；③薄封装载体齐备——webhookService.ts:L84-122=deliverWebhook 循环内含 delivering/delivered/pending/failed 语义、rssService.ts:L27=getBloggerRss、rateLimitMiddleware.ts:L26-44=三动作内联闭包、articleStateMachine.ts:L12-16=TRANSITIONS；④invariant() 锚点契合 code-tla-logic.ts:L507-511 宽松策略（全库断言≥1 即通过）；⑤input.json 构造有 tla-plus-guide.md:L692 依据；瑕疵：fixRecommendation[0] SD-007 补映射'新增 NFR/CON 行'与 checkCodeModuleFormat（gate-logic.ts:L191-197 NFR/CON 须 src/ 或 横切）冲突，'改为 SD-007:...'亦会破坏原 SD-00x 映射"
+    },
+    {
+      "name": "testability",
+      "description": "语义映射 rootcause prevention（§7.5）：prevention 可落实，每条含 scope/measure/owner，措施具体",
+      "weight": 0.15,
+      "score": 0.82,
+      "rawScores": [
+        0.8,
+        0.82,
+        0.84
+      ],
+      "variance": 0.000267,
+      "evidence": "w-model-dev-demo/.w-model/rootcause/RC-phase5-1-01.json:L111-131=4 条 prevention 均含 scope/measure/owner 且措施具体：S-coding 自检清单两项硬性（uat 回填+codeModule 前缀对齐）、门禁编号体系一致性校验纳入 phase 4（gate-logic.ts:L83-92/L410 盲区闭环）、dispatch-matrix 输入契约行（L69 缺口闭环）、phase-5-coding 编码契约样例（camelCase 薄封装+invariant 锚点）；缺口：未将 phase-5-coding.md:L211 示例（SD-5.2.1）与门禁期望（SD-xxx=graph SD id，code-tla-logic.ts:L183）的契约矛盾本身列入预防，且 SD-007 无专属 REQ 的长期豁免路径未提"
+    }
+  ],
+  "compositeScore": 0.8625,
+  "qualityLevel": "A",
+  "summary": "V 复审 R 报告 RC-phase5-1-01（R 报告复审，meta.targetKind=design 枚举适配，语义按 rootcause 五维度映射，5 子标准用 design 标准名）：阶段 5 门禁三类失败根因定位成立并逐条实证核验——artifact-gate 153 reasons（tla-codeModule×7+uat 未回填×73+mappingType×73）、code-tla 63 violations（sdToCodeModule×7+nextBranchCoverage×43+invariantCoverage×13，checked 99/65）、state-machine EISDIR exit=2，全部与 gate-logs 原始数据一致。主根因 process-missing/coding-error 复合归 process-missing 准确：S-coding 未执行 phase-5-coding.md 强制闭环（uat 回填/Next 命名契约/断言锚点），codeModule 前缀照搬阶段 4 详设 SD-5.x.y 与 graph SD-001..007 错位（designDoc 列与 graph 一致反证错位）。upstreamDefect=present（阶段 4）判定合理——详设 §6.2 自创编号体系 + phase4 门禁无 codeModule 校验（PHASE_TRACE_FIELDS[4]、映射/格式校验仅 phase>=5）未拦截，但修复为机械前缀替换可原地完成，rollbackRecommended=false 成立。falsifiabilityCheck 含可执行证伪实验（改单行前缀重跑门禁）。5 条 fixRecommendation 四字段齐全且经实证可行（薄封装载体 getBloggerRss/deliverWebhook 循环/TRANSITIONS 齐备、invariant() 契合维度4 宽松策略、input.json 构造有 §16 依据）。遗留风险：fixRecommendation[0] SD-007 补映射的'新增 NFR/CON 行'路径与 checkCodeModuleFormat（^src/.+）冲突、prevention 未覆盖 phase-5-coding.md L211 示例即错位编号契约诱因，均不影响根因结论，建议下轮修正。compositeScore=0.8625→qualityLevel=A，passed=true",
+  "passed": true,
+  "reworkHints": [
+    "Required: fixRecommendation[0] SD-007 补映射路径与格式门禁冲突——'新增 NFR/CON 行'填 SD-007:src/... 会触发 checkCodeModuleFormat（gate-logic.ts:L191-197，NFR/CON 须 ^src/.+ 或 横切），同一次 check-artifact-gate 仍红；'将任一 store 相关行改为 SD-007:...'若替换 REQ 行前缀又会破坏原 SD-00x 映射（该 SD 随即失配）。正确路径：在既有 REQ 行 codeModule 以逗号追加第二映射（phase-5-coding.md:L202 多模块逗号分隔，如 REQ-024→'SD-005:src/services/stats/readingStatService.ts,SD-007:src/stores/readingRecordStore.ts'，前缀 'SD-007:' 命中且格式正则通过），或与 G 确认 SD-007 门禁豁免口径，须在 S-fix 执行前明确",
+    "Optional: prevention 未覆盖 phase-5-coding.md:L211 自身示例（'SD-5.2.1:src/auth/login.ts'）即 SD-5.x.y 风格、与门禁期望（SD-xxx=graph SD id，code-tla-logic.ts:L183 错误信息明示'期望路径包含以下任一段: 001'）相悖——这是 S-coding 照搬错位编号的直接契约诱因；prevention[3] 应增加'修正 P1.4 示例为 SD-00x 或明示 SD-xxx=graph SD id'条目，否则编号契约歧义复发",
+    "Nit: 行号微偏——detailed-design.md REQ→codeModule 表体实际 L1426-1447（报告 L34-52 引用 L1427-1448 差 1 行）；articleStateMachine.ts TRANSITIONS 实际 L12-16（fixRecommendation[4] 引 L18-30 自类声明起），不影响结论"
+  ]
+}

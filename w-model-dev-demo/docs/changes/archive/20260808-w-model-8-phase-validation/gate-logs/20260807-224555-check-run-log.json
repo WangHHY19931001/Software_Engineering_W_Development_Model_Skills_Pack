@@ -1,0 +1,13 @@
+════════════════════════════════════════════════════════════
+运行日志校验（Run-Log Checker）
+════════════════════════════════════════════════════════════
+输入文件        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\run-log.jsonl
+条目数          : 69
+--gate-logs     : w-model-dev-demo/.w-model/gate-logs（已加载 145 个文件）
+--tla-manifest  : w-model-dev-demo/.w-model/tla-manifest.json（checkRounds=9）
+校验结果        : ✓ 通过
+────────────────────────────────────────────────────────────
+运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only。
+────────────────────────────────────────────────────────────
+RUN_LOG_JSON {"type":"run-log","passed":true,"violations":[],"exitCode":0}
+

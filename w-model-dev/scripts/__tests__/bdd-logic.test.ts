@@ -11,8 +11,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import * as path from 'node:path';
 import {
   parseFeatureHeader,
   parseBackgroundStateMachine,
@@ -443,17 +441,51 @@ describe('checkBddModel', () => {
 // ==================== parseTlaSpecSnapshot（批次 3 Task 6 补强：直接单测） ====================
 
 describe('parseTlaSpecSnapshot', () => {
-  // 真实 demo 仓库 TLA+ 规格（w-model-dev-demo/tla/specs/level1/L1_BlogSystem.tla）
-  const L1_REAL_PATH = path.join(
-    __dirname, '..', '..', '..',
-    'w-model-dev-demo', 'tla', 'specs', 'level1', 'L1_BlogSystem.tla'
-  );
-
-  it('real L1 fixture: named-set style resolves REQUESTS（22 状态）作为状态集', () => {
-    // 真实 L1 规格全部采用命名集合风格（ACTORS / REQUESTS / RESPONSES）：
-    // TypeInvariant 内 `request \in REQUESTS`（22 值）> `actor \in ACTORS`（4）> `response \in RESPONSES`（7）
+  it('named-set style: multi-var TypeInvariant picks the largest named set（22 REQUESTS）作为状态集', () => {
+    // 复刻调测前 demo L1 的命名集合风格：REQUESTS(22) > ACTORS(4) > RESPONSES(7)，
     // → 状态变量选择 request，状态集 = REQUESTS 的 22 个请求类别（解析器已支持命名集合）。
-    const content = readFileSync(L1_REAL_PATH, 'utf-8');
+    // 第 35 轮起改为自包含内联规格，不再依赖 demo 实时文件（demo L1 已重写为 4 状态生命周期风格）。
+    const content = `---- MODULE L1_BlogSystem ----
+VARIABLES request, actor, response, published
+
+TypeInvariant ==
+  /\\ request \\in REQUESTS
+  /\\ actor \\in ACTORS
+  /\\ response \\in RESPONSES
+
+ACTORS == {"Reader", "Writer", "Admin", "Guest"}
+REQUESTS == {"Register", "BrowseArticle", "PublishArticle", "DeleteArticle", "EditArticle",
+             "Comment", "ReplyComment", "DeleteComment", "Like", "Unlike",
+             "Follow", "Unfollow", "CreateBlog", "UpdateBlog", "DeleteBlog",
+             "UploadImage", "DeleteImage", "SearchArticle", "TagArticle", "Subscribe",
+             "Unsubscribe", "Logout"}
+RESPONSES == {"ok1xx", "ok2xx", "ok3xx", "err4xx", "err5xx"}
+
+Init ==
+  /\\ request = "BrowseArticle"
+  /\\ actor = "Guest"
+  /\\ response = "ok2xx"
+  /\\ published = FALSE
+
+RegisterReq ==
+  /\\ request' = "Register"
+  /\\ UNCHANGED <<actor, response, published>>
+
+BrowseReq ==
+  /\\ request' = "BrowseArticle"
+  /\\ UNCHANGED <<actor, response, published>>
+
+Next ==
+  \\/ RegisterReq
+  \\/ BrowseReq
+
+Spec == Init /\\ [][Next]_vars
+
+Invariants ==
+  /\\ TypeInvariant
+  /\\ (request = "BrowseArticle" /\\ response = "ok2xx") => published
+====
+`;
     const snap = parseTlaSpecSnapshot(content, 'L1_BlogSystem');
     expect(snap.specId).toBe('L1_BlogSystem');
     expect(snap.states).toHaveLength(22);

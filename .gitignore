@@ -1,6 +1,9 @@
 # W-Model 运行时状态（项目状态 / RTM 数据）
 .w-model/
 
+# TLC 模型检查运行产物（states/<时间戳子目录>，不入库；第 35 轮修复后清理正则覆盖 2/4 位年份）
+**/tla/specs/*/states/
+
 # 运行时产物：门禁脚本输出的 gate-logs（check-bdd-model 等写入，历史遗留样本目录显式兜底）
 **/samples/.w-model/gate-logs/
 

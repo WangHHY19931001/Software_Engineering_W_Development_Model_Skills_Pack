@@ -1,0 +1,698 @@
+{
+  "version": 1,
+  "project": "blog-system-demo-r35",
+  "currentPhase": 1,
+  "basePath": ".",
+  "tools": {
+    "jarPath": "../../w-model-dev/tools/tla2tools.jar",
+    "javaMinVersion": 11
+  },
+  "specs": [
+    {
+      "id": "L1_BlogSystem",
+      "level": "L1",
+      "phase": 1,
+      "system": "blog-system",
+      "requirementIds": [
+        "REQ-000",
+        "NFR-003",
+        "CON-001",
+        "CON-002",
+        "SD-000"
+      ],
+      "designRef": "docs/phase1-requirements/requirement-spec.md:§2",
+      "tlaPath": "../tla/specs/level1/L1_BlogSystem.tla",
+      "cfgPath": "../tla/specs/level1/L1_BlogSystem.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "variableCombination": 768,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemAuth",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::auth_subsystem",
+      "requirementIds": [
+        "SD-001",
+        "REQ-007",
+        "REQ-008",
+        "REQ-009",
+        "REQ-010"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.2",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemAuth.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemAuth.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "children": [
+        "../tla/specs/level3/L3_BlogSystemAuthFlow.tla"
+      ],
+      "variableCombination": 576,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemContent",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::content_subsystem",
+      "requirementIds": [
+        "SD-002",
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014",
+        "REQ-015",
+        "REQ-016"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.2",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemContent.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemContent.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "children": [
+        "../tla/specs/level3/L3_BlogSystemArticleState.tla"
+      ],
+      "variableCombination": 96,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemInteraction",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::interaction_subsystem",
+      "requirementIds": [
+        "SD-003",
+        "REQ-017",
+        "REQ-018",
+        "REQ-019",
+        "REQ-020"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.2",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemInteraction.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "children": [
+        "../tla/specs/level3/L3_BlogSystemCommentFlow.tla"
+      ],
+      "variableCombination": 576,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemDiscovery",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::discovery_subsystem",
+      "requirementIds": [
+        "SD-004",
+        "REQ-021",
+        "REQ-022",
+        "REQ-023"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.2",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemDiscovery.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "children": [],
+      "variableCombination": 192,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemAnalytics",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::analytics_subsystem",
+      "requirementIds": [
+        "SD-005",
+        "REQ-024",
+        "REQ-025",
+        "REQ-026"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.2",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemAnalytics.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "children": [
+        "../tla/specs/level3/L3_BlogSystemReadingDedup.tla"
+      ],
+      "variableCombination": 144,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemIntegration",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::integration_subsystem",
+      "requirementIds": [
+        "SD-006",
+        "REQ-027",
+        "REQ-028"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.2",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemIntegration.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemInfrastructure.tla"
+      ],
+      "children": [
+        "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla"
+      ],
+      "variableCombination": 192,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L2_BlogSystemInfrastructure",
+      "level": "L2",
+      "phase": 2,
+      "system": "blog-system::infrastructure_subsystem",
+      "requirementIds": [
+        "SD-007",
+        "NFR-003",
+        "NFR-006",
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004"
+      ],
+      "designRef": "docs/phase2-design/blog-system-system-design.md:§3.1",
+      "tlaPath": "../tla/specs/level2/L2_BlogSystemInfrastructure.tla",
+      "cfgPath": "../tla/specs/level2/L2_BlogSystemInfrastructure.cfg",
+      "parent": "../tla/specs/level1/L1_BlogSystem.tla",
+      "siblings": [
+        "../tla/specs/level2/L2_BlogSystemAuth.tla",
+        "../tla/specs/level2/L2_BlogSystemContent.tla",
+        "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+        "../tla/specs/level2/L2_BlogSystemDiscovery.tla",
+        "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+        "../tla/specs/level2/L2_BlogSystemIntegration.tla"
+      ],
+      "children": [
+        "../tla/specs/level3/L3_BlogSystemRateLimit.tla"
+      ],
+      "variableCombination": 768,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3_BlogSystemArticleState",
+      "level": "L3",
+      "phase": 3,
+      "system": "blog-system::content_subsystem::article_state_machine",
+      "requirementIds": [
+        "SD-002",
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014"
+      ],
+      "designRef": "docs/phase3-outline/blog-system-interface-design.md:§2.5",
+      "tlaPath": "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+      "cfgPath": "../tla/specs/level3/L3_BlogSystemArticleState.cfg",
+      "parent": "../tla/specs/level2/L2_BlogSystemContent.tla",
+      "siblings": [
+        "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemCommentFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+        "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla",
+        "../tla/specs/level3/L3_BlogSystemReadingDedup.tla"
+      ],
+      "children": [
+        "../tla/specs/level4/L4_BlogSystemArticleStore.tla"
+      ],
+      "variableCombination": 128,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3_BlogSystemAuthFlow",
+      "level": "L3",
+      "phase": 3,
+      "system": "blog-system::auth_subsystem::auth_flow",
+      "requirementIds": [
+        "SD-001",
+        "REQ-007",
+        "REQ-008",
+        "REQ-009"
+      ],
+      "designRef": "docs/phase3-outline/blog-system-interface-design.md:§2.1",
+      "tlaPath": "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+      "cfgPath": "../tla/specs/level3/L3_BlogSystemAuthFlow.cfg",
+      "parent": "../tla/specs/level2/L2_BlogSystemAuth.tla",
+      "siblings": [
+        "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+        "../tla/specs/level3/L3_BlogSystemCommentFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+        "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla",
+        "../tla/specs/level3/L3_BlogSystemReadingDedup.tla"
+      ],
+      "children": [
+        "../tla/specs/level4/L4_BlogSystemTokenStore.tla"
+      ],
+      "variableCombination": 144,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3_BlogSystemCommentFlow",
+      "level": "L3",
+      "phase": 3,
+      "system": "blog-system::interaction_subsystem::comment_flow",
+      "requirementIds": [
+        "SD-003",
+        "REQ-018"
+      ],
+      "designRef": "docs/phase3-outline/blog-system-interface-design.md:§2.12",
+      "tlaPath": "../tla/specs/level3/L3_BlogSystemCommentFlow.tla",
+      "cfgPath": "../tla/specs/level3/L3_BlogSystemCommentFlow.cfg",
+      "parent": "../tla/specs/level2/L2_BlogSystemInteraction.tla",
+      "siblings": [
+        "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+        "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+        "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla",
+        "../tla/specs/level3/L3_BlogSystemReadingDedup.tla"
+      ],
+      "children": [],
+      "variableCombination": 24,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3_BlogSystemRateLimit",
+      "level": "L3",
+      "phase": 3,
+      "system": "blog-system::infrastructure_subsystem::rate_limit",
+      "requirementIds": [
+        "SD-007",
+        "NFR-006",
+        "REQ-008"
+      ],
+      "designRef": "docs/phase3-outline/blog-system-interface-design.md:§0.3",
+      "tlaPath": "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+      "cfgPath": "../tla/specs/level3/L3_BlogSystemRateLimit.cfg",
+      "parent": "../tla/specs/level2/L2_BlogSystemInfrastructure.tla",
+      "siblings": [
+        "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+        "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemCommentFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla",
+        "../tla/specs/level3/L3_BlogSystemReadingDedup.tla"
+      ],
+      "children": [
+        "../tla/specs/level4/L4_BlogSystemRateLimitWindow.tla",
+        "../tla/specs/level4/L4_BlogSystemAuditLog.tla"
+      ],
+      "variableCombination": 36,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3_BlogSystemWebhookRetry",
+      "level": "L3",
+      "phase": 3,
+      "system": "blog-system::integration_subsystem::webhook_retry",
+      "requirementIds": [
+        "SD-006",
+        "REQ-028",
+        "NFR-003"
+      ],
+      "designRef": "docs/phase3-outline/blog-system-interface-design.md:§2.22",
+      "tlaPath": "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla",
+      "cfgPath": "../tla/specs/level3/L3_BlogSystemWebhookRetry.cfg",
+      "parent": "../tla/specs/level2/L2_BlogSystemIntegration.tla",
+      "siblings": [
+        "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+        "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemCommentFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+        "../tla/specs/level3/L3_BlogSystemReadingDedup.tla"
+      ],
+      "children": [],
+      "variableCombination": 32,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L3_BlogSystemReadingDedup",
+      "level": "L3",
+      "phase": 3,
+      "system": "blog-system::analytics_subsystem::reading_dedup",
+      "requirementIds": [
+        "SD-005",
+        "REQ-024"
+      ],
+      "designRef": "docs/phase3-outline/blog-system-interface-design.md:§2.18",
+      "tlaPath": "../tla/specs/level3/L3_BlogSystemReadingDedup.tla",
+      "cfgPath": "../tla/specs/level3/L3_BlogSystemReadingDedup.cfg",
+      "parent": "../tla/specs/level2/L2_BlogSystemAnalytics.tla",
+      "siblings": [
+        "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+        "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemCommentFlow.tla",
+        "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+        "../tla/specs/level3/L3_BlogSystemWebhookRetry.tla"
+      ],
+      "children": [],
+      "variableCombination": 24,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L4_BlogSystemArticleStore",
+      "level": "L4",
+      "phase": 4,
+      "system": "blog-system::content_subsystem::article_store",
+      "requirementIds": [
+        "SD-002",
+        "REQ-011",
+        "REQ-012",
+        "REQ-013",
+        "REQ-014"
+      ],
+      "designRef": "docs/phase4-detailed/blog-system-detailed-design.md:§DD-011",
+      "tlaPath": "../tla/specs/level4/L4_BlogSystemArticleStore.tla",
+      "cfgPath": "../tla/specs/level4/L4_BlogSystemArticleStore.cfg",
+      "parent": "../tla/specs/level3/L3_BlogSystemArticleState.tla",
+      "siblings": [
+        "../tla/specs/level4/L4_BlogSystemTokenStore.tla",
+        "../tla/specs/level4/L4_BlogSystemRateLimitWindow.tla",
+        "../tla/specs/level4/L4_BlogSystemAuditLog.tla"
+      ],
+      "children": [],
+      "variableCombination": 576,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L4_BlogSystemTokenStore",
+      "level": "L4",
+      "phase": 4,
+      "system": "blog-system::auth_subsystem::token_store",
+      "requirementIds": [
+        "SD-001",
+        "REQ-008",
+        "REQ-009",
+        "CON-003"
+      ],
+      "designRef": "docs/phase4-detailed/blog-system-detailed-design.md:§DD-046",
+      "tlaPath": "../tla/specs/level4/L4_BlogSystemTokenStore.tla",
+      "cfgPath": "../tla/specs/level4/L4_BlogSystemTokenStore.cfg",
+      "parent": "../tla/specs/level3/L3_BlogSystemAuthFlow.tla",
+      "siblings": [
+        "../tla/specs/level4/L4_BlogSystemArticleStore.tla",
+        "../tla/specs/level4/L4_BlogSystemRateLimitWindow.tla",
+        "../tla/specs/level4/L4_BlogSystemAuditLog.tla"
+      ],
+      "children": [],
+      "variableCombination": 144,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L4_BlogSystemRateLimitWindow",
+      "level": "L4",
+      "phase": 4,
+      "system": "blog-system::infrastructure_subsystem::rate_limit_window",
+      "requirementIds": [
+        "SD-007",
+        "NFR-006",
+        "REQ-008"
+      ],
+      "designRef": "docs/phase4-detailed/blog-system-detailed-design.md:§DD-042",
+      "tlaPath": "../tla/specs/level4/L4_BlogSystemRateLimitWindow.tla",
+      "cfgPath": "../tla/specs/level4/L4_BlogSystemRateLimitWindow.cfg",
+      "parent": "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+      "siblings": [
+        "../tla/specs/level4/L4_BlogSystemArticleStore.tla",
+        "../tla/specs/level4/L4_BlogSystemTokenStore.tla",
+        "../tla/specs/level4/L4_BlogSystemAuditLog.tla"
+      ],
+      "children": [],
+      "variableCombination": 490,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    },
+    {
+      "id": "L4_BlogSystemAuditLog",
+      "level": "L4",
+      "phase": 4,
+      "system": "blog-system::infrastructure_subsystem::audit_log",
+      "requirementIds": [
+        "SD-007",
+        "CON-004",
+        "NFR-002"
+      ],
+      "designRef": "docs/phase4-detailed/blog-system-detailed-design.md:§DD-049",
+      "tlaPath": "../tla/specs/level4/L4_BlogSystemAuditLog.tla",
+      "cfgPath": "../tla/specs/level4/L4_BlogSystemAuditLog.cfg",
+      "parent": "../tla/specs/level3/L3_BlogSystemRateLimit.tla",
+      "siblings": [
+        "../tla/specs/level4/L4_BlogSystemArticleStore.tla",
+        "../tla/specs/level4/L4_BlogSystemTokenStore.tla",
+        "../tla/specs/level4/L4_BlogSystemRateLimitWindow.tla"
+      ],
+      "children": [],
+      "variableCombination": 170,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": false,
+      "tlcChecked": false,
+      "deadlockFree": false,
+      "invariantsHold": false,
+      "stateExplosion": false
+    }
+  ],
+  "checkRounds": [
+    {
+      "phase": 1,
+      "round": 2,
+      "timestamp": "2026-08-07T16:47:36+08:00",
+      "specId": "L1_BlogSystem",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemAuth",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemContent",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemInteraction",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemDiscovery",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemAnalytics",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemIntegration",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 2,
+      "round": 1,
+      "timestamp": "2026-08-07T18:10:00+08:00",
+      "specId": "L2_BlogSystemInfrastructure",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    },
+    {
+      "phase": 4,
+      "round": 1,
+      "timestamp": "2026-08-07T20:51:00+08:00",
+      "specId": "L3_BlogSystemCommentFlow",
+      "syntaxCheck": true,
+      "tlcCheck": true,
+      "violations": [],
+      "converged": true
+    }
+  ],
+  "sdCoverage": {
+    "totalSdNodes": 7,
+    "coveredSdNodes": [
+      "SD-001",
+      "SD-002",
+      "SD-003",
+      "SD-004",
+      "SD-005",
+      "SD-006",
+      "SD-007"
+    ],
+    "uncoveredSdNodes": [],
+    "coverageRate": 1
+  }
+}

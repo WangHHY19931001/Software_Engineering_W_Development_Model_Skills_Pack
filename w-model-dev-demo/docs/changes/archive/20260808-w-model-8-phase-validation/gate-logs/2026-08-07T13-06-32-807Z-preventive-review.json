@@ -1,0 +1,26 @@
+{
+  "script": "check-preventive-review.ts",
+  "exitCode": 0,
+  "passed": true,
+  "reasons": [],
+  "reviews": [
+    {
+      "dimension": "completeness",
+      "passed": false,
+      "findingCount": 6
+    },
+    {
+      "dimension": "reliability",
+      "passed": false,
+      "findingCount": 6
+    },
+    {
+      "dimension": "security",
+      "passed": true,
+      "findingCount": 7
+    }
+  ],
+  "autoTrigger": false,
+  "phase": 4,
+  "variant": "standard"
+}

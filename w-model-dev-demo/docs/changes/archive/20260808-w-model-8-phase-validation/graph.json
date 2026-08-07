@@ -1,0 +1,6372 @@
+{
+  "version": 1,
+  "project": "blog-system-demo-r35",
+  "currentPhase": 4,
+  "rootId": "REQ-000",
+  "nodes": [
+    {
+      "id": "REQ-000",
+      "type": "REQ",
+      "phase": 1,
+      "title": "博客系统后端（系统根）",
+      "summary": "为多博主、多读者提供内容发布与消费能力的博客系统后端服务，采用 Node.js + Express 4 + TypeScript 5、进程内内存存储，对外提供 RESTful API",
+      "level": 1,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-001",
+      "type": "REQ",
+      "phase": 1,
+      "title": "用户与身份模块",
+      "summary": "用户注册、登录、博主认证与用户资料管理的身份能力集合",
+      "level": 2,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-002",
+      "type": "REQ",
+      "phase": 1,
+      "title": "内容发布模块",
+      "summary": "文章创建、发布、状态机、管理、标签与分类的内容生产能力集合",
+      "level": 2,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-003",
+      "type": "REQ",
+      "phase": 1,
+      "title": "读者互动模块",
+      "summary": "文章浏览、评论、点赞收藏与关注博主的读者交互能力集合",
+      "level": 2,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-004",
+      "type": "REQ",
+      "phase": 1,
+      "title": "发现与推荐模块",
+      "summary": "热门文章、个性化推荐与全文搜索的内容发现能力集合",
+      "level": 2,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-005",
+      "type": "REQ",
+      "phase": 1,
+      "title": "统计与通知模块",
+      "summary": "阅读统计、博主统计面板与通知的内容度量与触达能力集合",
+      "level": 2,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-006",
+      "type": "REQ",
+      "phase": 1,
+      "title": "订阅与集成模块",
+      "summary": "RSS 订阅与 Webhook 回调的外部集成能力集合",
+      "level": 2,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-007",
+      "type": "REQ",
+      "phase": 1,
+      "title": "用户注册",
+      "summary": "读者与博主注册账号，提供用户名、邮箱、密码，密码加密存储且邮箱唯一",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-008",
+      "type": "REQ",
+      "phase": 1,
+      "title": "用户登录",
+      "summary": "注册用户凭用户名或邮箱加密码登录，登录后签发带过期时间的 JWT 令牌，过期后重新登录",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-009",
+      "type": "REQ",
+      "phase": 1,
+      "title": "博主认证",
+      "summary": "注册用户申请成为博主获得文章发布权限，普通读者无发布权限，博主仅可管理自己的文章",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-010",
+      "type": "REQ",
+      "phase": 1,
+      "title": "用户资料管理",
+      "summary": "用户查看与修改自己的昵称、简介、头像 URL，修改密码时校验原密码",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-011",
+      "type": "REQ",
+      "phase": 1,
+      "title": "创建文章",
+      "summary": "博主创建含标题、正文、摘要、标签、分类的文章，创建后处于草稿状态",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-012",
+      "type": "REQ",
+      "phase": 1,
+      "title": "发布文章",
+      "summary": "博主将草稿发布上线对读者可见，已发布文章可更新后重新发布",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-013",
+      "type": "REQ",
+      "phase": 1,
+      "title": "文章状态机",
+      "summary": "定义文章 draft、published、archived 生命周期状态及发布、归档、取消归档、删除的流转约束",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-014",
+      "type": "REQ",
+      "phase": 1,
+      "title": "管理文章",
+      "summary": "博主查看文章列表、编辑文章、删除草稿，删除已发布文章仅可归档",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-015",
+      "type": "REQ",
+      "phase": 1,
+      "title": "标签管理",
+      "summary": "博主创建名称唯一的标签、为文章打标签、按标签筛选文章列表",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-016",
+      "type": "REQ",
+      "phase": 1,
+      "title": "分类管理",
+      "summary": "博主创建名称唯一且支持嵌套结构的分类、管理文章分类归属、按分类浏览文章",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-017",
+      "type": "REQ",
+      "phase": 1,
+      "title": "浏览文章",
+      "summary": "读者按列表分页浏览已发布文章，按分类、标签、关键词查找，查看含正文与作者信息的文章详情",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-018",
+      "type": "REQ",
+      "phase": 1,
+      "title": "评论",
+      "summary": "注册用户对文章发表评论（审核自动通过后可见），文章作者可删除自己文章下的评论，评论支持回复",
+      "level": 3,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-019",
+      "type": "REQ",
+      "phase": 1,
+      "title": "点赞收藏",
+      "summary": "注册用户对文章点赞与收藏，文章详情展示点赞数与收藏数，用户可查看自己的收藏列表",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-020",
+      "type": "REQ",
+      "phase": 1,
+      "title": "关注博主",
+      "summary": "注册用户关注博主后在其 feed 中看到该博主的新文章，取消关注后不再推送",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-021",
+      "type": "REQ",
+      "phase": 1,
+      "title": "热门文章",
+      "summary": "按最近 7 天阅读量排序展示热门文章 Top N（默认 Top 10）",
+      "level": 3,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-022",
+      "type": "REQ",
+      "phase": 1,
+      "title": "个性化推荐",
+      "summary": "根据读者阅读历史（标签偏好）推荐相似文章列表，无历史时推荐热门文章",
+      "level": 3,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-023",
+      "type": "REQ",
+      "phase": 1,
+      "title": "全文搜索",
+      "summary": "按关键词对标题、正文、摘要、标签做全文检索，支持分页与相关性排序",
+      "level": 3,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-024",
+      "type": "REQ",
+      "phase": 1,
+      "title": "阅读统计",
+      "summary": "记录每篇文章阅读量并在详情返回，详情访问时阅读量加一（同 IP 短时间窗口去重）",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-025",
+      "type": "REQ",
+      "phase": 1,
+      "title": "博主统计面板",
+      "summary": "博主查看自己的文章数、总阅读量、总评论数与近 7 天趋势",
+      "level": 3,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-026",
+      "type": "REQ",
+      "phase": 1,
+      "title": "通知",
+      "summary": "被回复评论、文章被点赞、关注博主发布新文章时产生通知，用户可查看通知列表并标记已读",
+      "level": 3,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-027",
+      "type": "REQ",
+      "phase": 1,
+      "title": "RSS 订阅",
+      "summary": "为每个博主提供含文章标题、链接、摘要、发布时间的 RSS 源，读者可订阅",
+      "level": 3,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "REQ-028",
+      "type": "REQ",
+      "phase": 1,
+      "title": "Webhook",
+      "summary": "文章发布、评论新增时触发博主配置的 Webhook 回调，回调带事件签名，失败自动重试 3 次",
+      "level": 3,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "NFR-001",
+      "type": "REQ",
+      "phase": 1,
+      "title": "性能",
+      "summary": "常规 API 响应时间 P95 ≤ 200ms（生产目标），单接口测试环境基线 ≤ 2000ms",
+      "level": 4,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "nonfunctional"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "NFR-002",
+      "type": "REQ",
+      "phase": 1,
+      "title": "安全",
+      "summary": "密码须以 bcrypt 加盐哈希存储，JWT 密钥须经环境变量注入且不得硬编码，API 请求须校验 JWT 有效性",
+      "level": 4,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "nonfunctional"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "NFR-003",
+      "type": "REQ",
+      "phase": 1,
+      "title": "可靠性",
+      "summary": "系统关键操作（文章发布、Webhook 回调）具备重试与失败记录，单点故障不导致数据丢失（内存存储以进程内事务保证一致性）",
+      "level": 1,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "nonfunctional"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "NFR-004",
+      "type": "REQ",
+      "phase": 1,
+      "title": "代码质量",
+      "summary": "单元测试代码行覆盖率 ≥ 80%",
+      "level": 4,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "nonfunctional"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "NFR-005",
+      "type": "REQ",
+      "phase": 1,
+      "title": "可维护性",
+      "summary": "代码模块化分层（路由/服务/存储），命名遵循领域术语，禁止跨模块直接访问存储实例",
+      "level": 2,
+      "priority": "P2",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "nonfunctional"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "NFR-006",
+      "type": "REQ",
+      "phase": 1,
+      "title": "API 限流",
+      "summary": "认证接口（登录/注册）限流 10 次/分钟/IP，通用 API 限流 100 次/分钟/IP，超限返回 429",
+      "level": 4,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "nonfunctional"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "CON-001",
+      "type": "REQ",
+      "phase": 1,
+      "title": "技术栈约束",
+      "summary": "后端仅使用 Node.js + Express 4 + TypeScript 5，存储为内存实现，不得引入外部数据库",
+      "level": 1,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "constraint"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "CON-002",
+      "type": "REQ",
+      "phase": 1,
+      "title": "接口契约",
+      "summary": "全部接口采用 RESTful 风格与 JSON 请求/响应，错误响应统一 { error: { code, message } } 结构",
+      "level": 1,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "constraint"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "CON-003",
+      "type": "REQ",
+      "phase": 1,
+      "title": "认证约束",
+      "summary": "JWT 令牌有效期 24 小时，密钥由环境变量 JWT_SECRET 注入，测试环境使用注入的测试密钥",
+      "level": 4,
+      "priority": "P0",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "constraint"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "CON-004",
+      "type": "REQ",
+      "phase": 1,
+      "title": "审计日志保留",
+      "summary": "关键操作（登录、发布、删除）须记录审计日志，日志保留至少 90 天",
+      "level": 4,
+      "priority": "P1",
+      "reqGroup": "REQ-000",
+      "attributes": {
+        "reqType": "constraint"
+      },
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "EXT-IN-001",
+      "type": "EXT-IN",
+      "title": "最终用户（读者/博主）输入",
+      "summary": "注册、登录、发文、评论、点赞收藏、关注、标签/分类创建、RSS 订阅等用户操作输入",
+      "phase": 1,
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "EXT-IN-002",
+      "type": "EXT-IN",
+      "title": "外部配置与订阅源",
+      "summary": "JWT_SECRET 环境变量注入、RSS 阅读器订阅请求等外部配置与集成输入",
+      "phase": 1,
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "EXT-OUT-001",
+      "type": "EXT-OUT",
+      "title": "客户端/读者展示",
+      "summary": "文章内容、搜索结果、统计面板、通知列表、点赞收藏数等面向客户端/读者的 API 响应输出",
+      "phase": 1,
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "EXT-OUT-002",
+      "type": "EXT-OUT",
+      "title": "外部集成接收方",
+      "summary": "Webhook 回调目标服务、RSS 阅读器拉取等外部信息汇",
+      "phase": 1,
+      "sourceChunk": "chunk-001"
+    },
+    {
+      "id": "SD-001",
+      "type": "SD",
+      "phase": 2,
+      "title": "用户身份子系统",
+      "summary": "注册（bcrypt 加盐存储、邮箱唯一 409）、登录（JWT 24h 签发）、博主认证（角色变更）、资料管理与密码修改；User 数据所有权；依赖 SD-007 存储基座与认证/限流中间件",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "REQ-001",
+        "reqIds": [
+          "REQ-007",
+          "REQ-008",
+          "REQ-009",
+          "REQ-010"
+        ],
+        "coreServices": [
+          "authService",
+          "profileService"
+        ],
+        "domainEntities": [
+          "User"
+        ],
+        "interfaceIds": [
+          "INTF-001",
+          "INTF-002",
+          "INTF-003",
+          "INTF-004"
+        ],
+        "dependsOn": [
+          "SD-007"
+        ]
+      }
+    },
+    {
+      "id": "SD-002",
+      "type": "SD",
+      "phase": 2,
+      "title": "内容发布子系统",
+      "summary": "文章创建/发布/状态机（draft→published→archived）/管理、标签（唯一重名 409）、分类（嵌套≤3 层）；Article/Tag/Category 数据所有权；依赖 SD-001 身份校验与 SD-007 存储基座",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "REQ-002",
+        "reqIds": [
+          "REQ-011",
+          "REQ-012",
+          "REQ-013",
+          "REQ-014",
+          "REQ-015",
+          "REQ-016"
+        ],
+        "coreServices": [
+          "articleService",
+          "tagService",
+          "categoryService",
+          "articleStateMachine"
+        ],
+        "domainEntities": [
+          "Article",
+          "Tag",
+          "Category"
+        ],
+        "interfaceIds": [
+          "INTF-005",
+          "INTF-006",
+          "INTF-007",
+          "INTF-008",
+          "INTF-009",
+          "INTF-010"
+        ],
+        "dependsOn": [
+          "SD-001",
+          "SD-007"
+        ]
+      }
+    },
+    {
+      "id": "SD-003",
+      "type": "SD",
+      "phase": 2,
+      "title": "读者互动子系统",
+      "summary": "浏览（列表/详情/筛选，草稿对读者 404）、评论（含回复与作者删除）、点赞收藏（幂等）、关注与 feed；Comment/Like/Favorite/Follow 数据所有权；依赖 SD-002 已发布文章与 SD-007 存储基座",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "REQ-003",
+        "reqIds": [
+          "REQ-017",
+          "REQ-018",
+          "REQ-019",
+          "REQ-020"
+        ],
+        "coreServices": [
+          "articleBrowseService",
+          "commentService",
+          "likeService",
+          "followService"
+        ],
+        "domainEntities": [
+          "Comment",
+          "Like",
+          "Favorite",
+          "Follow"
+        ],
+        "interfaceIds": [
+          "INTF-011",
+          "INTF-012",
+          "INTF-013",
+          "INTF-014"
+        ],
+        "dependsOn": [
+          "SD-002",
+          "SD-007"
+        ]
+      }
+    },
+    {
+      "id": "SD-004",
+      "type": "SD",
+      "phase": 2,
+      "title": "发现推荐子系统",
+      "summary": "热门（7 天阅读量降序 Top N 默认 10）、个性化推荐（标签偏好，无历史冷启动回退热门）、全文搜索（标题+正文+摘要+标签索引、分页+相关性排序）；SearchIndex 只读消费；依赖 SD-005 阅读统计、SD-002 文章与 SD-007 存储基座",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "REQ-004",
+        "reqIds": [
+          "REQ-021",
+          "REQ-022",
+          "REQ-023"
+        ],
+        "coreServices": [
+          "hotService",
+          "recommendService",
+          "searchService"
+        ],
+        "domainEntities": [
+          "SearchIndex"
+        ],
+        "interfaceIds": [
+          "INTF-015",
+          "INTF-016",
+          "INTF-017"
+        ],
+        "dependsOn": [
+          "SD-002",
+          "SD-005",
+          "SD-007"
+        ]
+      }
+    },
+    {
+      "id": "SD-005",
+      "type": "SD",
+      "phase": 2,
+      "title": "统计通知子系统",
+      "summary": "阅读统计（详情访问 +1、同 IP 短窗口去重）、博主统计面板（文章数/总阅读量/总评论数/近 7 天趋势）、通知（被回复/被点赞/关注发文三类事件 + 已读）；ReadingRecord/Notification 数据所有权；依赖 SD-002/SD-003 事件源与 SD-007 存储基座",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "REQ-005",
+        "reqIds": [
+          "REQ-024",
+          "REQ-025",
+          "REQ-026"
+        ],
+        "coreServices": [
+          "readingStatService",
+          "bloggerStatsService",
+          "notificationService"
+        ],
+        "domainEntities": [
+          "ReadingRecord",
+          "Notification"
+        ],
+        "interfaceIds": [
+          "INTF-018",
+          "INTF-019",
+          "INTF-020"
+        ],
+        "dependsOn": [
+          "SD-002",
+          "SD-003",
+          "SD-007"
+        ]
+      }
+    },
+    {
+      "id": "SD-006",
+      "type": "SD",
+      "phase": 2,
+      "title": "订阅集成子系统",
+      "summary": "RSS 源生成（已发布文章标题/链接/摘要/发布时间，无草稿）、Webhook 配置与事件分发（HMAC 事件签名、失败重试≤3 次、失败记录）；WebhookConfig/WebhookDelivery 数据所有权；依赖 SD-002 已发布文章、SD-003 评论事件与 SD-007 存储基座",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "REQ-006",
+        "reqIds": [
+          "REQ-027",
+          "REQ-028"
+        ],
+        "coreServices": [
+          "rssService",
+          "webhookService"
+        ],
+        "domainEntities": [
+          "WebhookConfig",
+          "WebhookDelivery"
+        ],
+        "interfaceIds": [
+          "INTF-021",
+          "INTF-022"
+        ],
+        "dependsOn": [
+          "SD-002",
+          "SD-003",
+          "SD-007"
+        ]
+      }
+    },
+    {
+      "id": "SD-007",
+      "type": "SD",
+      "phase": 2,
+      "governance": true,
+      "title": "基础设施子系统（横切）",
+      "summary": "横切基础设施：认证中间件（JWT 解析/有效期 CON-003）、限流中间件（认证 10 次/分、通用 100 次/分/IP，NFR-006）、审计中间件（登录/发布/删除留痕 CON-004）、统一错误处理（CON-002）、内存存储基座（Map 容器 + 进程内事务 CON-001/NFR-003）、日志与 JWT_SECRET 配置注入、zod 校验工具；治理全部业务子系统（governance=true）",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "module": "cross-cutting",
+        "reqIds": [
+          "NFR-001",
+          "NFR-002",
+          "NFR-003",
+          "NFR-004",
+          "NFR-005",
+          "NFR-006",
+          "CON-001",
+          "CON-002",
+          "CON-003",
+          "CON-004"
+        ],
+        "layer": [
+          "middlewares",
+          "stores",
+          "utils"
+        ],
+        "coreServices": [
+          "authMiddleware",
+          "rateLimitMiddleware",
+          "auditMiddleware",
+          "errorMiddleware",
+          "storeFactory",
+          "txManager"
+        ],
+        "domainEntities": [
+          "AuditLog",
+          "RateLimitCounter"
+        ],
+        "interfaceIds": []
+      }
+    },
+    {
+      "id": "INTF-001",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/auth/register",
+      "summary": "注册接口：用户名/邮箱/密码，bcrypt 存储，邮箱唯一返回 409",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-007"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST"
+        ],
+        "path": [
+          "/api/auth/register"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40901",
+          "42901",
+          "50001"
+        ],
+        "provider": "SD-001",
+        "contract": "register：body{username,email,password}→201{userId,username,email,role,createdAt}；邮箱/用户名唯一（40901）；bcrypt 存储；限流 10 次/分/IP",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-002",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/auth/login",
+      "summary": "登录接口：用户名或邮箱+密码 → JWT 24h 令牌；错误凭据返回 401",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-008"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST"
+        ],
+        "path": [
+          "/api/auth/login"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "42901",
+          "50001"
+        ],
+        "provider": "SD-001",
+        "contract": "login：body{identifier,password}→200{token,expiresIn:86400,user}；凭据错误统一 40101 防枚举；JWT HS256 24h",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-003",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/users/me/blogger",
+      "summary": "申请成为博主：角色变更返回 200；读者发文越权 403 由 INTF-005 校验",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt",
+        "reqIds": [
+          "REQ-009"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST"
+        ],
+        "path": [
+          "/api/users/me/blogger"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40101",
+          "40102",
+          "50001"
+        ],
+        "provider": "SD-001",
+        "contract": "applyBlogger：role reader→blogger，幂等（已是 blogger 返回 200）；身份取 Bearer JWT",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-004",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET/PATCH /api/users/me；PUT /api/users/me/password",
+      "summary": "资料查看/修改；修改密码校验原密码（错误返回 400）",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt",
+        "reqIds": [
+          "REQ-010"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET",
+          "PATCH",
+          "PUT"
+        ],
+        "path": [
+          "/api/users/me",
+          "/api/users/me/password"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "40102",
+          "60002",
+          "50001"
+        ],
+        "provider": "SD-001",
+        "contract": "getProfile/updateProfile/changePassword：GET/PATCH /api/users/me；PUT /api/users/me/password；原密码不匹配 60002",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-005",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/articles",
+      "summary": "创建文章：标题/正文/摘要/标签/分类 → draft 201；非博主返回 403",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt-blogger",
+        "reqIds": [
+          "REQ-011"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST"
+        ],
+        "path": [
+          "/api/articles"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "50001"
+        ],
+        "provider": "SD-002",
+        "contract": "createArticle：body{title,body,summary,tags[],categoryId}→201 draft；作者须 role=blogger（40301）；标签/分类不存在 40401；跨模块 user store 校验",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-006",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/articles/:id/publish",
+      "summary": "发布草稿：published 200，读者可见；已发布可更新后重新发布",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt-blogger",
+        "reqIds": [
+          "REQ-012"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST"
+        ],
+        "path": [
+          "/api/articles/:id/publish"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "60001",
+          "50001"
+        ],
+        "provider": "SD-002",
+        "contract": "publishArticle：draft→published；archived→published 直跳 60001；发布成功触发 article.published 事件（SD-005/SD-006 订阅）",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-007",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/articles/:id/archive；/unarchive",
+      "summary": "归档/取消归档：archived→published 直跳返回 400",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt-blogger",
+        "reqIds": [
+          "REQ-013"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST"
+        ],
+        "path": [
+          "/api/articles/:id/archive",
+          "/api/articles/:id/unarchive"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "60001",
+          "50001"
+        ],
+        "provider": "SD-002",
+        "contract": "archiveArticle/unarchiveArticle：archive 仅 published→archived；unarchive 仅 archived→draft；越权 40301",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-008",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/blogger/articles；PUT/DELETE /api/articles/:id",
+      "summary": "文章列表（草稿+已发布）/编辑/删除：删草稿 204；删已发布 409 仅可归档；越权 403",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt-blogger",
+        "reqIds": [
+          "REQ-014"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET",
+          "PUT",
+          "DELETE"
+        ],
+        "path": [
+          "/api/blogger/articles",
+          "/api/articles/:id"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "60001",
+          "50001"
+        ],
+        "provider": "SD-002",
+        "contract": "listMyArticles/updateArticle/deleteArticle：编辑 published 后置回 draft；DELETE 仅 draft（204），published/archived 删 60001",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-009",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST/GET /api/tags；GET /api/articles?tag=",
+      "summary": "标签：创建唯一（重名 409）、列表、按标签筛选",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "create-jwt",
+        "reqIds": [
+          "REQ-015"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST",
+          "GET"
+        ],
+        "path": [
+          "/api/tags",
+          "/api/articles"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "40102",
+          "40301",
+          "40901",
+          "50001"
+        ],
+        "provider": "SD-002",
+        "contract": "createTag/listTags/filterByTag：创建须博主、重名 40901；GET /api/articles?tag= 公开按标签筛选已发布文章",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-010",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST/GET /api/categories；GET /api/articles?category=",
+      "summary": "分类：创建嵌套（深度≤3 层，超深 400、重名 409）、列表、按分类浏览",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "create-jwt",
+        "reqIds": [
+          "REQ-016"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST",
+          "GET"
+        ],
+        "path": [
+          "/api/categories",
+          "/api/articles"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "40901",
+          "60003",
+          "50001"
+        ],
+        "provider": "SD-002",
+        "contract": "createCategory/listCategories/filterByCategory：嵌套 ≤3 层（60003）；同级重名 40901；按分类浏览已发布文章",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-011",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/articles?page=&category=&tag=&keyword=；GET /api/articles/:id",
+      "summary": "浏览：分页浏览已发布（草稿对读者 404）；详情含正文+作者+阅读量",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-017",
+          "REQ-024"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/articles",
+          "/api/articles/:id"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40401",
+          "40402",
+          "50001"
+        ],
+        "provider": "SD-003",
+        "contract": "listArticles/getArticle：仅已发布（草稿/归档 40402 防枚举）；详情含正文+作者+阅读量，触发 reading.viewed 事件（INTF-018 副作用）",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-012",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST/GET /api/articles/:id/comments；DELETE /api/articles/:id/comments/:cid",
+      "summary": "评论：发表（201 立即可见）、列表、作者删除（非作者 403）、回复",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "comment-jwt",
+        "reqIds": [
+          "REQ-018"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST",
+          "GET",
+          "DELETE"
+        ],
+        "path": [
+          "/api/articles/:id/comments",
+          "/api/articles/:id/comments/:cid",
+          "/api/articles/:id/comments/:cid/reply"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "40402",
+          "50001"
+        ],
+        "provider": "SD-003",
+        "contract": "createComment/listComments/deleteComment/replyComment：发表即自动审核可见；作者可删（非作者 40301）；触发 comment.created 事件",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-013",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST /api/articles/:id/like；/favorite；GET /api/me/favorites",
+      "summary": "点赞收藏：点赞重复幂等、收藏、收藏列表；详情返回点赞/收藏数",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt",
+        "reqIds": [
+          "REQ-019"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST",
+          "DELETE",
+          "GET"
+        ],
+        "path": [
+          "/api/articles/:id/like",
+          "/api/articles/:id/favorite",
+          "/api/me/favorites"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40101",
+          "40102",
+          "40401",
+          "40402",
+          "50001"
+        ],
+        "provider": "SD-003",
+        "contract": "likeArticle/.../listMyFavorites：点赞/收藏幂等；首次点赞触发 article.liked 事件；收藏列表仅本人",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-014",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST/DELETE /api/users/:id/follow；GET /api/me/feed",
+      "summary": "关注：关注/取消关注、feed（关注博主新文章）",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt",
+        "reqIds": [
+          "REQ-020"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST",
+          "DELETE",
+          "GET"
+        ],
+        "path": [
+          "/api/users/:id/follow",
+          "/api/me/feed"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40101",
+          "40102",
+          "40401",
+          "50001"
+        ],
+        "provider": "SD-003",
+        "contract": "followBlogger/unfollowBlogger/getFeed：followerId=token.sub、followeeId=:id；禁止自关注（40002）；feed 按 publishedAt 降序；触发 follow.created 事件",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-015",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/articles/hot?limit=",
+      "summary": "热门：7 天阅读量降序 Top N（默认 10）",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-021"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/articles/hot"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "50001"
+        ],
+        "provider": "SD-004",
+        "contract": "getHotArticles：limit∈[1,50]（默认 10）；近 7 天阅读量降序 Top N；跨模块 ReadingRecord store（经 SD-005）",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-016",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/me/recommendations",
+      "summary": "推荐：标签偏好推荐；无历史回退热门",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public-optional-jwt",
+        "reqIds": [
+          "REQ-022"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/me/recommendations"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40101",
+          "50001"
+        ],
+        "provider": "SD-004",
+        "contract": "getRecommendations：按标签偏好推荐；无 JWT/无历史冷启动回退热门；推荐结果去重",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-017",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/search?q=&page=",
+      "summary": "搜索：全文搜索（标题+正文+摘要+标签），分页+相关性排序",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-023"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/search"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "50001"
+        ],
+        "provider": "SD-004",
+        "contract": "searchArticles：q∈[1,100]；标题+正文+摘要+标签四字段索引；相关性降序（标题>标签>摘要>正文）；仅已发布",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-018",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/articles/:id（阅读量副作用）",
+      "summary": "阅读统计：详情访问阅读量 +1（同 IP 短窗口去重），响应含阅读量",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-024"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/articles/:id"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40401",
+          "40402",
+          "50001"
+        ],
+        "provider": "SD-005",
+        "contract": "recordReading（副作用契约）：详情访问阅读量 +1；同 clientIp+articleId 5 分钟窗口去重；reading.viewed 事件由 SD-003 产生、SD-005 订阅写入 ReadingRecord store",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-019",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/blogger/stats",
+      "summary": "博主面板：文章数/总阅读量/总评论数/近 7 天趋势",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt-blogger",
+        "reqIds": [
+          "REQ-025"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/blogger/stats"
+        ],
+        "protocol": "HTTP",
+        "errorCodes": [
+          "40101",
+          "40102",
+          "40301",
+          "50001"
+        ],
+        "provider": "SD-005",
+        "contract": "getBloggerStats：须博主；返回文章数/总阅读量（去重）/总评论数/近 7 天趋势（7 项数组补 0）；跨模块 article/comment store 聚合",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-020",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/me/notifications；PATCH /api/me/notifications/:id/read",
+      "summary": "通知：列表（分页）、标记已读",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt",
+        "reqIds": [
+          "REQ-026"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET",
+          "PATCH"
+        ],
+        "path": [
+          "/api/me/notifications",
+          "/api/me/notifications/:id/read"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40101",
+          "40102",
+          "40401",
+          "50001"
+        ],
+        "provider": "SD-005",
+        "contract": "listNotifications/markNotificationRead：类型 REPLY/LIKE/NEW_ARTICLE；他人通知 40401 防枚举；已读幂等；订阅 SD-002/SD-003 事件",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-021",
+      "type": "INTF",
+      "phase": 2,
+      "title": "GET /api/bloggers/:id/rss",
+      "summary": "RSS：博主 RSS 源（标题/链接/摘要/发布时间 XML；无草稿/归档）",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "public",
+        "reqIds": [
+          "REQ-027"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "GET"
+        ],
+        "path": [
+          "/api/bloggers/:id/rss"
+        ],
+        "protocol": "HTTP(XML)",
+        "errorCodes": [
+          "40001",
+          "40401",
+          "50001"
+        ],
+        "provider": "SD-006",
+        "contract": "getBloggerRss：公开无认证；博主须 role=blogger（40401）；仅已发布文章；返回 RSS 2.0 XML（application/rss+xml，CON-002 例外）",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "INTF-022",
+      "type": "INTF",
+      "phase": 2,
+      "title": "POST/GET/DELETE /api/me/webhooks",
+      "summary": "Webhook：配置管理；发布/评论事件触发回调（HMAC 签名，失败重试≤3 次+失败记录）",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md",
+      "attributes": {
+        "auth": "jwt-blogger",
+        "reqIds": [
+          "REQ-028"
+        ],
+        "direction": "inbound",
+        "detailPhase": 3,
+        "method": [
+          "POST",
+          "GET",
+          "DELETE"
+        ],
+        "path": [
+          "/api/me/webhooks",
+          "/api/me/webhooks/:webhookId"
+        ],
+        "protocol": "HTTP+event",
+        "errorCodes": [
+          "40001",
+          "40002",
+          "40003",
+          "40101",
+          "40102",
+          "40301",
+          "40401",
+          "40901",
+          "50001",
+          "50201"
+        ],
+        "provider": "SD-006",
+        "contract": "createWebhook/listWebhooks/deleteWebhook：events⊆{article.published,comment.created}；同 url+event 去重（40901）；回调 HMAC 签名、失败重试 ≤3 次、失败记录 WebhookDelivery store",
+        "contractSource": "docs/phase3-outline/blog-system-interface-design.md"
+      }
+    },
+    {
+      "id": "DD-001",
+      "type": "DD",
+      "phase": 4,
+      "title": "AuthController（身份域路由处理器）",
+      "summary": "身份域路由处理器：仅做参数透传（校验委托 validationUtil、业务委托 authService/profileService、响应组装），不含业务规则（NFR-005）；装配点 GET/PATCH /api/users/me、PUT /api/users/me/password、POST /api/users/me/blogger",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-001",
+        "sdName": "用户身份子系统",
+        "interfaceIds": [
+          "INTF-001",
+          "INTF-002",
+          "INTF-003",
+          "INTF-004"
+        ],
+        "reqIds": [
+          "REQ-007",
+          "REQ-008",
+          "REQ-009",
+          "REQ-010"
+        ],
+        "methods": [
+          "register(req,res)",
+          "login(req,res)",
+          "applyBlogger(req,res)",
+          "getProfile(req,res)",
+          "updateProfile(req,res)",
+          "changePassword(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-002",
+      "type": "DD",
+      "phase": 4,
+      "title": "authService（身份业务逻辑）",
+      "summary": "注册/登录/博主申请核心业务：bcrypt 加盐哈希（NFR-002）、JWT 签发（CON-003）、凭据错误统一 40101 防枚举；令牌状态机 none→active→expired（RH-02，不变式 active⇒registered）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-001",
+        "sdName": "用户身份子系统",
+        "interfaceIds": [
+          "INTF-001",
+          "INTF-002",
+          "INTF-003"
+        ],
+        "reqIds": [
+          "REQ-007",
+          "REQ-008",
+          "REQ-009"
+        ],
+        "methods": [
+          "register(input)",
+          "login(identifier,password)",
+          "applyBlogger(userId)",
+          "issueToken(userId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-003",
+      "type": "DD",
+      "phase": 4,
+      "title": "profileService（资料业务逻辑）",
+      "summary": "资料查看/更新、修改密码（原密码校验 60002）；未传字段保持不变，响应不含 passwordHash",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-001",
+        "sdName": "用户身份子系统",
+        "interfaceIds": [
+          "INTF-004"
+        ],
+        "reqIds": [
+          "REQ-010"
+        ],
+        "methods": [
+          "getProfile(userId)",
+          "updateProfile(userId,patch)",
+          "changePassword(userId,old,nw)"
+        ]
+      }
+    },
+    {
+      "id": "DD-004",
+      "type": "DD",
+      "phase": 4,
+      "title": "UserStore（内存存储）",
+      "summary": "User 实体内存存储（Map 容器），email/username 唯一索引；blogger 为 role=blogger 过滤视图（非独立实体，ID-1）；仅 SD-001 服务直访（NFR-005）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-001",
+        "sdName": "用户身份子系统",
+        "interfaceIds": [
+          "INTF-001"
+        ],
+        "reqIds": [
+          "REQ-007",
+          "REQ-008"
+        ],
+        "methods": [
+          "create(user)",
+          "findByEmail(e)",
+          "findByUsername(n)",
+          "findById(id)",
+          "update(id,patch)",
+          "updateRole(id,role)"
+        ]
+      }
+    },
+    {
+      "id": "DD-005",
+      "type": "DD",
+      "phase": 4,
+      "title": "ArticleController（文章域路由处理器）",
+      "summary": "文章生命周期路由处理器（创建/发布/归档/取消归档/更新/删除/我的列表），业务委托 articleService；装配点 POST /api/articles、POST /:id/publish|archive|unarchive、PUT/DELETE /api/articles/:id、GET /api/blogger/articles",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-005",
+          "INTF-006",
+          "INTF-007",
+          "INTF-008"
+        ],
+        "reqIds": [
+          "REQ-011",
+          "REQ-012",
+          "REQ-013",
+          "REQ-014"
+        ],
+        "methods": [
+          "createArticle(req,res)",
+          "publishArticle(req,res)",
+          "archiveArticle(req,res)",
+          "unarchiveArticle(req,res)",
+          "updateArticle(req,res)",
+          "deleteArticle(req,res)",
+          "listMyArticles(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-006",
+      "type": "DD",
+      "phase": 4,
+      "title": "MetadataController（标签/分类路由处理器）",
+      "summary": "标签/分类路由处理器（创建须博主、查询公开）；装配点 POST/GET /api/tags、POST/GET /api/categories",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-009",
+          "INTF-010"
+        ],
+        "reqIds": [
+          "REQ-015",
+          "REQ-016"
+        ],
+        "methods": [
+          "createTag(req,res)",
+          "listTags(req,res)",
+          "createCategory(req,res)",
+          "listCategories(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-007",
+      "type": "DD",
+      "phase": 4,
+      "title": "articleService（文章业务逻辑）",
+      "summary": "文章生命周期核心业务：博主/归属校验经 SD-001（user store，P7-002）；状态机 draft→published→archived；事件 article.published/article.updated；跨模块只读方法供 SD-003/004/005/006 消费",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-005",
+          "INTF-006",
+          "INTF-007",
+          "INTF-008"
+        ],
+        "reqIds": [
+          "REQ-011",
+          "REQ-012",
+          "REQ-013",
+          "REQ-014"
+        ],
+        "methods": [
+          "createArticle(authorId,input)",
+          "publishArticle(articleId,authorId)",
+          "archiveArticle(articleId,authorId)",
+          "unarchiveArticle(articleId,authorId)",
+          "updateArticle(articleId,authorId,patch)",
+          "deleteArticle(articleId,authorId)",
+          "listMyArticles(authorId,status,p)",
+          "getPublishedArticleById(id)",
+          "listPublishedArticles(f,p)"
+        ]
+      }
+    },
+    {
+      "id": "DD-008",
+      "type": "DD",
+      "phase": 4,
+      "title": "articleStateMachine（文章状态机）",
+      "summary": "文章状态机唯一裁决者（REQ-013）：draft→published→archived 合法迁移表；非法迁移抛 60001（archived→published 直跳/draft→archived/删除已发布）；纯领域对象无 Express 装配",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-006",
+          "INTF-007"
+        ],
+        "reqIds": [
+          "REQ-012",
+          "REQ-013"
+        ],
+        "methods": [
+          "canTransition(state,action)",
+          "transition(state,action)"
+        ]
+      }
+    },
+    {
+      "id": "DD-009",
+      "type": "DD",
+      "phase": 4,
+      "title": "tagService（标签业务逻辑）",
+      "summary": "标签唯一性（重名 40901）、列表、按标签筛选已发布文章（草稿/归档不可见）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-009"
+        ],
+        "reqIds": [
+          "REQ-015"
+        ],
+        "methods": [
+          "createTag(name,actorId)",
+          "listTags()",
+          "filterByTag(name,p)"
+        ]
+      }
+    },
+    {
+      "id": "DD-010",
+      "type": "DD",
+      "phase": 4,
+      "title": "categoryService（分类业务逻辑）",
+      "summary": "分类唯一性（同级重名 40901）、嵌套（深度 ≤3 层 60003）、按分类浏览已发布文章",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-010"
+        ],
+        "reqIds": [
+          "REQ-016"
+        ],
+        "methods": [
+          "createCategory(name,parentId,actorId)",
+          "listCategories()",
+          "filterByCategory(id,p)",
+          "computeDepth(categoryId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-011",
+      "type": "DD",
+      "phase": 4,
+      "title": "ArticleStore（内存存储）",
+      "summary": "Article 实体存储 + 检索索引（作者/状态/分类/标签/关键词/发布时间）；供 RSS/统计聚合读取；仅 SD-002 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-005"
+        ],
+        "reqIds": [
+          "REQ-011",
+          "REQ-012",
+          "REQ-013",
+          "REQ-014"
+        ],
+        "methods": [
+          "create/findById/update/delete",
+          "listByAuthorAndStatus(authorId,status,p)",
+          "filterPublished(filters,p)",
+          "findByAuthor(authorId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-012",
+      "type": "DD",
+      "phase": 4,
+      "title": "TagStore（内存存储）",
+      "summary": "Tag 实体存储，name 唯一索引（重名 40901）；仅 SD-002 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-009"
+        ],
+        "reqIds": [
+          "REQ-015"
+        ],
+        "methods": [
+          "create(name)",
+          "findByName(name)",
+          "list()",
+          "findById(id)"
+        ]
+      }
+    },
+    {
+      "id": "DD-013",
+      "type": "DD",
+      "phase": 4,
+      "title": "CategoryStore（内存存储）",
+      "summary": "Category 实体存储（树形），(parentId,name) 同级唯一索引；仅 SD-002 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-002",
+        "sdName": "内容发布子系统",
+        "interfaceIds": [
+          "INTF-010"
+        ],
+        "reqIds": [
+          "REQ-016"
+        ],
+        "methods": [
+          "create(cat)",
+          "findById(id)",
+          "findByName(name)",
+          "listByParent(parentId)",
+          "list()"
+        ]
+      }
+    },
+    {
+      "id": "DD-014",
+      "type": "DD",
+      "phase": 4,
+      "title": "BrowseController（公开浏览路由处理器）",
+      "summary": "公开浏览路由（列表/详情）：列表组合筛选参数；详情注入 clientIp、草稿/归档对读者 40402 防枚举；装配点 GET /api/articles（顺序9）、GET /api/articles/:id（顺序10，须在 /hot 之后）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-011"
+        ],
+        "reqIds": [
+          "REQ-017",
+          "REQ-024"
+        ],
+        "methods": [
+          "listArticles(req,res)",
+          "getArticle(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-015",
+      "type": "DD",
+      "phase": 4,
+      "title": "CommentController（评论路由处理器）",
+      "summary": "评论路由（发表/列表/删除/回复）；非作者 40301 由服务层判定；装配点 POST/GET /api/articles/:id/comments、POST /:cid/reply（静态子路径先于 DELETE）、DELETE /:cid",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-012"
+        ],
+        "reqIds": [
+          "REQ-018"
+        ],
+        "methods": [
+          "createComment(req,res)",
+          "listComments(req,res)",
+          "deleteComment(req,res)",
+          "replyComment(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-016",
+      "type": "DD",
+      "phase": 4,
+      "title": "InteractionController（互动路由处理器）",
+      "summary": "点赞/收藏/关注/feed 路由处理器（均取 req.user.userId）；装配点 POST/DELETE /api/articles/:id/like|/favorite、GET /api/me/favorites|feed、POST/DELETE /api/users/:id/follow",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-013",
+          "INTF-014"
+        ],
+        "reqIds": [
+          "REQ-019",
+          "REQ-020"
+        ],
+        "methods": [
+          "likeArticle(req,res)",
+          "unlikeArticle(req,res)",
+          "favoriteArticle(req,res)",
+          "unfavoriteArticle(req,res)",
+          "listMyFavorites(req,res)",
+          "followBlogger(req,res)",
+          "unfollowBlogger(req,res)",
+          "getFeed(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-017",
+      "type": "DD",
+      "phase": 4,
+      "title": "articleBrowseService（浏览业务逻辑）",
+      "summary": "公开浏览（列表/详情）：详情 40402 防枚举（草稿/归档对读者不可见）；详情访问触发 reading.viewed 事件（REQ-024 副作用，同 IP 5 分钟去重由 SD-005 消费，无环）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-011"
+        ],
+        "reqIds": [
+          "REQ-017",
+          "REQ-024"
+        ],
+        "methods": [
+          "listPublishedArticles(f,p)",
+          "getPublishedArticleDetail(id,clientIp)"
+        ]
+      }
+    },
+    {
+      "id": "DD-018",
+      "type": "DD",
+      "phase": 4,
+      "title": "commentService（评论业务逻辑）",
+      "summary": "评论创建/列表/删除/回复：发表即自动审核通过；删除授权上下文（RH-03：deletionAuthorized := actorId===article.authorId）；触发 comment.created 事件；跨模块经 SD-001 身份校验（RH-04 补边落点）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-012"
+        ],
+        "reqIds": [
+          "REQ-018"
+        ],
+        "methods": [
+          "createComment(articleId,authorId,content,parentId)",
+          "listComments(articleId,p)",
+          "deleteComment(articleId,commentId,actorId)",
+          "replyComment(articleId,parentId,authorId,content)"
+        ]
+      }
+    },
+    {
+      "id": "DD-019",
+      "type": "DD",
+      "phase": 4,
+      "title": "likeService（点赞收藏业务逻辑）",
+      "summary": "点赞/收藏（幂等，REQ-019）：首次点赞触发 article.liked 事件；计数聚合供详情/列表；跨模块经 SD-001 校验点赞用户（RH-04 补边落点）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-013"
+        ],
+        "reqIds": [
+          "REQ-019"
+        ],
+        "methods": [
+          "likeArticle(articleId,userId)",
+          "unlikeArticle(articleId,userId)",
+          "favoriteArticle(articleId,userId)",
+          "unfavoriteArticle(articleId,userId)",
+          "listMyFavorites(userId,p)",
+          "countLikes(articleId)",
+          "countFavorites(articleId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-020",
+      "type": "DD",
+      "phase": 4,
+      "title": "followService（关注业务逻辑）",
+      "summary": "关注/取关（幂等）：禁止自关注（40002）、followee 须为博主（40002）、feed 按 publishedAt 降序；触发 follow.created 事件；follower/followee 身份经 SD-001（RH-04 补边落点）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-014"
+        ],
+        "reqIds": [
+          "REQ-020"
+        ],
+        "methods": [
+          "followBlogger(followerId,followeeId)",
+          "unfollowBlogger(followerId,followeeId)",
+          "getFeed(userId,p)"
+        ]
+      }
+    },
+    {
+      "id": "DD-021",
+      "type": "DD",
+      "phase": 4,
+      "title": "CommentStore（内存存储）",
+      "summary": "Comment 实体存储（树形 parentId），按文章分页查询（createdAt 降序）；listReplies 供级联删除、countByArticleIds 供统计聚合；仅 SD-003 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-012"
+        ],
+        "reqIds": [
+          "REQ-018"
+        ],
+        "methods": [
+          "create(c)",
+          "findById(id)",
+          "listByArticle(articleId,p)",
+          "listReplies(commentId)",
+          "countByArticleIds(ids)"
+        ]
+      }
+    },
+    {
+      "id": "DD-022",
+      "type": "DD",
+      "phase": 4,
+      "title": "LikeStore（内存存储）",
+      "summary": "Like 实体存储，(userId,articleId) 唯一索引（幂等）；仅 SD-003 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-013"
+        ],
+        "reqIds": [
+          "REQ-019"
+        ],
+        "methods": [
+          "add(like)",
+          "remove(id)",
+          "findByUserAndArticle(u,a)",
+          "countByArticle(a)",
+          "listByArticle(a)"
+        ]
+      }
+    },
+    {
+      "id": "DD-023",
+      "type": "DD",
+      "phase": 4,
+      "title": "FavoriteStore（内存存储）",
+      "summary": "Favorite 实体存储，(userId,articleId) 唯一索引；仅 SD-003 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-013"
+        ],
+        "reqIds": [
+          "REQ-019"
+        ],
+        "methods": [
+          "add(f)",
+          "remove(id)",
+          "findByUserAndArticle(u,a)",
+          "listByUser(userId,p)",
+          "countByArticle(a)"
+        ]
+      }
+    },
+    {
+      "id": "DD-024",
+      "type": "DD",
+      "phase": 4,
+      "title": "FollowStore（内存存储）",
+      "summary": "Follow 实体存储，(followerId,followeeId) 唯一索引；仅 SD-003 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-003",
+        "sdName": "读者互动子系统",
+        "interfaceIds": [
+          "INTF-014"
+        ],
+        "reqIds": [
+          "REQ-020"
+        ],
+        "methods": [
+          "add(f)",
+          "remove(id)",
+          "findByFollowerAndFollowee(f,f)",
+          "listFolloweeIdsByFollower(f)",
+          "listFollowers(followeeId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-025",
+      "type": "DD",
+      "phase": 4,
+      "title": "DiscoveryController（发现域路由处理器）",
+      "summary": "热门/推荐/搜索路由处理器：limit∈[1,50]、q∈[1,100] 校验、可选 JWT（无效 40101 匿名回退）；装配点 GET /api/articles/hot（静态先于 /:id）、GET /api/me/recommendations、GET /api/search",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-004",
+        "sdName": "发现推荐子系统",
+        "interfaceIds": [
+          "INTF-015",
+          "INTF-016",
+          "INTF-017"
+        ],
+        "reqIds": [
+          "REQ-021",
+          "REQ-022",
+          "REQ-023"
+        ],
+        "methods": [
+          "getHotArticles(req,res)",
+          "getRecommendations(req,res)",
+          "searchArticles(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-026",
+      "type": "DD",
+      "phase": 4,
+      "title": "hotService（热门业务逻辑）",
+      "summary": "近 7 天阅读量降序 Top N（REQ-021）：跨模块消费 ReadingRecord（经 SD-005）与 article（经 SD-002），与已发布文章集合求交",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-004",
+        "sdName": "发现推荐子系统",
+        "interfaceIds": [
+          "INTF-015"
+        ],
+        "reqIds": [
+          "REQ-021"
+        ],
+        "methods": [
+          "getHotArticles(limit)"
+        ]
+      }
+    },
+    {
+      "id": "DD-027",
+      "type": "DD",
+      "phase": 4,
+      "title": "recommendService（推荐业务逻辑）",
+      "summary": "个性化推荐（REQ-022）：阅读历史标签偏好推荐；无 JWT/无历史冷启动回退热门；推荐结果排除已读并去重；跨模块经 SD-005（标签偏好）与 SD-002（文章数据）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-004",
+        "sdName": "发现推荐子系统",
+        "interfaceIds": [
+          "INTF-016"
+        ],
+        "reqIds": [
+          "REQ-022"
+        ],
+        "methods": [
+          "getRecommendations(userId,limit)"
+        ]
+      }
+    },
+    {
+      "id": "DD-028",
+      "type": "DD",
+      "phase": 4,
+      "title": "searchService（搜索业务逻辑）",
+      "summary": "全文搜索（REQ-023）：标题+正文+摘要+标签四字段索引、相关性排序（标题>标签>摘要>正文）、仅已发布；订阅 article.published/article.updated 同步索引，草稿/归档不入索引",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-004",
+        "sdName": "发现推荐子系统",
+        "interfaceIds": [
+          "INTF-017"
+        ],
+        "reqIds": [
+          "REQ-023"
+        ],
+        "methods": [
+          "searchArticles(q,p)",
+          "syncIndex(event)"
+        ]
+      }
+    },
+    {
+      "id": "DD-029",
+      "type": "DD",
+      "phase": 4,
+      "title": "SearchIndexStore（内存存储）",
+      "summary": "四字段拼接倒排索引（词→文章 id 列表 + 字段权重分）；空关键词返回空；仅 SD-004 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-004",
+        "sdName": "发现推荐子系统",
+        "interfaceIds": [
+          "INTF-017"
+        ],
+        "reqIds": [
+          "REQ-023"
+        ],
+        "methods": [
+          "index(articleId,fields)",
+          "remove(articleId)",
+          "query(q,p)"
+        ]
+      }
+    },
+    {
+      "id": "DD-030",
+      "type": "DD",
+      "phase": 4,
+      "title": "StatsController（统计域路由处理器）",
+      "summary": "博主统计面板 + 通知列表/已读路由处理器：面板须博主（40301）；通知他人 40401 防枚举；装配点 GET /api/blogger/stats、GET /api/me/notifications、PATCH /api/me/notifications/:id/read",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-005",
+        "sdName": "统计通知子系统",
+        "interfaceIds": [
+          "INTF-019",
+          "INTF-020"
+        ],
+        "reqIds": [
+          "REQ-025",
+          "REQ-026"
+        ],
+        "methods": [
+          "getBloggerStats(req,res)",
+          "listNotifications(req,res)",
+          "markNotificationRead(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-031",
+      "type": "DD",
+      "phase": 4,
+      "title": "readingStatService（阅读统计业务逻辑）",
+      "summary": "阅读统计（REQ-024）：订阅 reading.viewed 事件，同 clientIp+articleId 5 分钟窗口去重写入 ReadingRecord store；聚合查询供热门/推荐/面板（窗口参数化，ID-8）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-005",
+        "sdName": "统计通知子系统",
+        "interfaceIds": [
+          "INTF-018"
+        ],
+        "reqIds": [
+          "REQ-024"
+        ],
+        "methods": [
+          "recordView(articleId,clientIp)",
+          "getViewCount(articleId)",
+          "getViews7d(articleIds)",
+          "getTrend7d(articleIds)"
+        ]
+      }
+    },
+    {
+      "id": "DD-032",
+      "type": "DD",
+      "phase": 4,
+      "title": "bloggerStatsService（博主面板业务逻辑）",
+      "summary": "博主统计面板（REQ-025）：文章数（经 SD-002）/总阅读量（去重）/总评论数（经 SD-003）/近 7 天趋势（7 项数组补 0）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-005",
+        "sdName": "统计通知子系统",
+        "interfaceIds": [
+          "INTF-019"
+        ],
+        "reqIds": [
+          "REQ-025"
+        ],
+        "methods": [
+          "getBloggerStats(bloggerId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-033",
+      "type": "DD",
+      "phase": 4,
+      "title": "notificationService（通知业务逻辑）",
+      "summary": "通知（REQ-026）：订阅 article.published/comment.created/article.liked/follow.created 四类事件产生通知；列表/已读幂等；他人通知 40401 防枚举",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-005",
+        "sdName": "统计通知子系统",
+        "interfaceIds": [
+          "INTF-020"
+        ],
+        "reqIds": [
+          "REQ-026"
+        ],
+        "methods": [
+          "onArticlePublished(evt)",
+          "onCommentCreated(evt)",
+          "onArticleLiked(evt)",
+          "onFollowCreated(evt)",
+          "listNotifications(userId,p,unreadOnly)",
+          "markNotificationRead(userId,id)"
+        ]
+      }
+    },
+    {
+      "id": "DD-034",
+      "type": "DD",
+      "phase": 4,
+      "title": "ReadingRecordStore（内存存储）",
+      "summary": "ReadingRecord 实体存储：去重判定（clientIp+articleId+时间窗口）、聚合计数、标签偏好聚合；仅 SD-005 服务直访（可注入假时钟测窗口）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-005",
+        "sdName": "统计通知子系统",
+        "interfaceIds": [
+          "INTF-018"
+        ],
+        "reqIds": [
+          "REQ-024"
+        ],
+        "methods": [
+          "add(record)",
+          "isDuplicated(clientIp,articleId,windowMs)",
+          "countByArticle(id)",
+          "countByArticleSince(ids,since)",
+          "countTrend(articleIds,days)",
+          "tagPreference(userId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-035",
+      "type": "DD",
+      "phase": 4,
+      "title": "NotificationStore（内存存储）",
+      "summary": "Notification 实体存储：按用户分页（unreadOnly 过滤）、已读幂等更新；仅 SD-005 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-005",
+        "sdName": "统计通知子系统",
+        "interfaceIds": [
+          "INTF-020"
+        ],
+        "reqIds": [
+          "REQ-026"
+        ],
+        "methods": [
+          "create(n)",
+          "listByUser(userId,p,unreadOnly)",
+          "markRead(id)",
+          "findById(id)"
+        ]
+      }
+    },
+    {
+      "id": "DD-036",
+      "type": "DD",
+      "phase": 4,
+      "title": "IntegrationController（集成域路由处理器）",
+      "summary": "RSS + Webhook 路由处理器：RSS 公开无认证（application/rss+xml）；Webhook 配置管理须博主；装配点 GET /api/bloggers/:id/rss、POST/GET/DELETE /api/me/webhooks",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-006",
+        "sdName": "订阅集成子系统",
+        "interfaceIds": [
+          "INTF-021",
+          "INTF-022"
+        ],
+        "reqIds": [
+          "REQ-027",
+          "REQ-028"
+        ],
+        "methods": [
+          "getBloggerRss(req,res)",
+          "createWebhook(req,res)",
+          "listWebhooks(req,res)",
+          "deleteWebhook(req,res)"
+        ]
+      }
+    },
+    {
+      "id": "DD-037",
+      "type": "DD",
+      "phase": 4,
+      "title": "rssService（RSS 业务逻辑）",
+      "summary": "RSS 2.0 源生成（REQ-027）：博主存在性校验（跨模块 user store 经 SD-001，40401，RH-04 补边落点）；仅已发布文章（article store 经 SD-002）；XML 转义安全，草稿/归档不暴露",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-006",
+        "sdName": "订阅集成子系统",
+        "interfaceIds": [
+          "INTF-021"
+        ],
+        "reqIds": [
+          "REQ-027"
+        ],
+        "methods": [
+          "getBloggerRss(bloggerId)"
+        ]
+      }
+    },
+    {
+      "id": "DD-038",
+      "type": "DD",
+      "phase": 4,
+      "title": "webhookService（Webhook 业务逻辑）",
+      "summary": "Webhook 配置管理 + 事件分发（REQ-028/NFR-003）：HMAC-SHA256 事件签名、X-Blog-Event/Timestamp 头、失败指数退避重试 ≤3 次、最终失败写入 WebhookDelivery store（50201 记录于 delivery）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-006",
+        "sdName": "订阅集成子系统",
+        "interfaceIds": [
+          "INTF-022"
+        ],
+        "reqIds": [
+          "REQ-028"
+        ],
+        "methods": [
+          "createWebhook(ownerId,url,events,secret)",
+          "listWebhooks(ownerId)",
+          "deleteWebhook(ownerId,id)",
+          "deliverWebhook(deliveryId)",
+          "onArticlePublished(evt)",
+          "onCommentCreated(evt)"
+        ]
+      }
+    },
+    {
+      "id": "DD-039",
+      "type": "DD",
+      "phase": 4,
+      "title": "WebhookConfigStore（内存存储）",
+      "summary": "WebhookConfig 实体存储，(ownerId,url,event) 唯一索引（重复 40901）；matchByEvent 供分发匹配；仅 SD-006 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-006",
+        "sdName": "订阅集成子系统",
+        "interfaceIds": [
+          "INTF-022"
+        ],
+        "reqIds": [
+          "REQ-028"
+        ],
+        "methods": [
+          "create(cfg)",
+          "listByOwner(ownerId)",
+          "findById(id)",
+          "delete(id)",
+          "matchByEvent(ownerId,event)"
+        ]
+      }
+    },
+    {
+      "id": "DD-040",
+      "type": "DD",
+      "phase": 4,
+      "title": "WebhookDeliveryStore（内存存储）",
+      "summary": "WebhookDelivery 实体存储（状态 pending→delivering→delivered/failed，attempts≤3，lastError）；仅 SD-006 服务直访",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-006",
+        "sdName": "订阅集成子系统",
+        "interfaceIds": [
+          "INTF-022"
+        ],
+        "reqIds": [
+          "REQ-028"
+        ],
+        "methods": [
+          "create(d)",
+          "updateStatus(id,status,attempts,lastError)",
+          "findById(id)",
+          "listByWebhook(id)"
+        ]
+      }
+    },
+    {
+      "id": "DD-041",
+      "type": "DD",
+      "phase": 4,
+      "title": "authMiddleware（JWT 认证中间件）",
+      "summary": "JWT 认证（CON-003/NFR-002）：Bearer 解析→jwtUtil.verify→req.user={userId,role}；过期 40102、缺失/伪造 40101；requireBlogger 角色守卫 40301；令牌状态机 active→expired（RH-02）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-002",
+          "INTF-003"
+        ],
+        "reqIds": [
+          "REQ-008",
+          "REQ-009",
+          "NFR-002",
+          "CON-003"
+        ],
+        "methods": [
+          "authenticate(req,res,next)",
+          "requireBlogger(req,res,next)"
+        ]
+      }
+    },
+    {
+      "id": "DD-042",
+      "type": "DD",
+      "phase": 4,
+      "title": "rateLimitMiddleware（限流中间件）",
+      "summary": "IP 滑动窗口限流（NFR-006）：认证接口 10 次/分/IP、通用 API 100 次/分/IP（阈值可配置，测试窗口缩小）；超限 42901；装配顺序 2-3 与全部 API 前置",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-001",
+          "INTF-002"
+        ],
+        "reqIds": [
+          "NFR-006"
+        ],
+        "methods": [
+          "rateLimit(opts)"
+        ]
+      }
+    },
+    {
+      "id": "DD-043",
+      "type": "DD",
+      "phase": 4,
+      "title": "auditMiddleware（审计中间件）",
+      "summary": "审计留痕（CON-004，RH-01 处置）：登录/发布/删除写 AuditLog（保留≥90 天）；显式排除 password/token/请求体凭据——仅记录白名单字段（反模式 #43 防护）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-002",
+          "INTF-006"
+        ],
+        "reqIds": [
+          "CON-004"
+        ],
+        "methods": [
+          "audit(actionType)"
+        ]
+      }
+    },
+    {
+      "id": "DD-044",
+      "type": "DD",
+      "phase": 4,
+      "title": "errorMiddleware（统一错误中间件）",
+      "summary": "统一错误响应（CON-002）：{error:{code,message}}；业务错误码目录映射（40001~60003）；未映射异常→50001 通用文案（禁止 unwrapped 堆栈直出）；链末尾兜底挂载",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-001"
+        ],
+        "reqIds": [
+          "CON-002"
+        ],
+        "methods": [
+          "errorHandler(err,req,res,next)"
+        ]
+      }
+    },
+    {
+      "id": "DD-045",
+      "type": "DD",
+      "phase": 4,
+      "title": "asyncHandler（异步包装工具）",
+      "summary": "async 路由处理器异常包装（避免 Express 4 无法捕获 async 拒绝）：捕获 Promise 拒绝→next(err)；全部路由处理器经 wrap 注册",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-001"
+        ],
+        "reqIds": [
+          "NFR-005"
+        ],
+        "methods": [
+          "wrap(handler)"
+        ]
+      }
+    },
+    {
+      "id": "DD-046",
+      "type": "DD",
+      "phase": 4,
+      "title": "jwtUtil（JWT 工具）",
+      "summary": "JWT 签名/校验（CON-003）：HS256、24h 有效期、密钥仅从环境变量 JWT_SECRET 读取（禁止硬编码 NFR-002）；verify 验签+exp 判定（签名非法 40101/过期 40102）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-002"
+        ],
+        "reqIds": [
+          "CON-003",
+          "NFR-002"
+        ],
+        "methods": [
+          "sign(payload)",
+          "verify(token)"
+        ]
+      }
+    },
+    {
+      "id": "DD-047",
+      "type": "DD",
+      "phase": 4,
+      "title": "validationUtil（zod 校验工具）",
+      "summary": "zod schema 校验与统一错误码映射（CON-002）：缺失/类型不符/格式非法→40001；取值越界→40002；JSON 解析失败→40003",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-001"
+        ],
+        "reqIds": [
+          "CON-002"
+        ],
+        "methods": [
+          "parse(schema,input)",
+          "mapError(zodError)"
+        ]
+      }
+    },
+    {
+      "id": "DD-048",
+      "type": "DD",
+      "phase": 4,
+      "title": "storeFactory（存储基座+事务）",
+      "summary": "内存存储基座（CON-001）：工厂创建 14 个 store 实例（依赖注入容器）；txManager 进程内事务（NFR-003：begin/commit/rollback 快照回滚保证发布/删除一致性）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-001"
+        ],
+        "reqIds": [
+          "CON-001",
+          "NFR-003"
+        ],
+        "methods": [
+          "createStores()",
+          "begin()",
+          "commit(tx)",
+          "rollback(tx)"
+        ]
+      }
+    },
+    {
+      "id": "DD-049",
+      "type": "DD",
+      "phase": 4,
+      "title": "AuditLogStore（内存存储）",
+      "summary": "AuditLog 实体存储（CON-004，RH-01 处置）：字段白名单 {id,actionType,actorId,resourceType,resourceId,result,httpStatus,clientIp,requestId,createdAt}——schema 无 password/token/请求体字段；保留 ≥90 天（prune）",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-002"
+        ],
+        "reqIds": [
+          "CON-004"
+        ],
+        "methods": [
+          "append(log)",
+          "list(filter)",
+          "prune(before)"
+        ]
+      }
+    },
+    {
+      "id": "DD-050",
+      "type": "DD",
+      "phase": 4,
+      "title": "AppFactory（应用装配工厂）",
+      "summary": "Express 应用工厂（测试 seam 直连入口）：中间件链装配（rateLimit→validate→auth→audit→routes→errorHandler）+ 路由注册顺序（29 条）+ 事件总线订阅装配（SD-005 通知/SD-006 Webhook/SD-004 索引）；静态路径先于参数路径",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md",
+      "attributes": {
+        "sdId": "SD-007",
+        "sdName": "基础设施子系统（横切）",
+        "interfaceIds": [
+          "INTF-001"
+        ],
+        "reqIds": [
+          "NFR-004",
+          "NFR-005"
+        ],
+        "methods": [
+          "createApp(deps)"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "REQ-000",
+      "to": "REQ-001",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "REQ-002",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "REQ-003",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "REQ-004",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "REQ-005",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "REQ-006",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-001",
+      "to": "REQ-007",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-001",
+      "to": "REQ-008",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-001",
+      "to": "REQ-009",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-001",
+      "to": "REQ-010",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-011",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-012",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-013",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-014",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-015",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-016",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-003",
+      "to": "REQ-017",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-003",
+      "to": "REQ-018",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-003",
+      "to": "REQ-019",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-003",
+      "to": "REQ-020",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-004",
+      "to": "REQ-021",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-004",
+      "to": "REQ-022",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-004",
+      "to": "REQ-023",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-005",
+      "to": "REQ-024",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-005",
+      "to": "REQ-025",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-005",
+      "to": "REQ-026",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-006",
+      "to": "REQ-027",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-006",
+      "to": "REQ-028",
+      "type": "parent",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-008",
+      "to": "REQ-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-009",
+      "to": "REQ-008",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-010",
+      "to": "REQ-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-011",
+      "to": "REQ-015",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-011",
+      "to": "REQ-016",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-011",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-013",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-014",
+      "to": "REQ-013",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-012",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-015",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-016",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-018",
+      "to": "REQ-017",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-019",
+      "to": "REQ-017",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-020",
+      "to": "REQ-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-021",
+      "to": "REQ-024",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-022",
+      "to": "REQ-024",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-023",
+      "to": "REQ-012",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-025",
+      "to": "REQ-024",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-026",
+      "to": "REQ-018",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-026",
+      "to": "REQ-020",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-027",
+      "to": "REQ-012",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-028",
+      "to": "REQ-012",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-028",
+      "to": "REQ-018",
+      "type": "depends-on",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-007",
+      "to": "REQ-008",
+      "type": "precedes",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-008",
+      "to": "REQ-009",
+      "type": "precedes",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-009",
+      "to": "REQ-011",
+      "type": "precedes",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-011",
+      "to": "REQ-012",
+      "type": "precedes",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-017",
+      "type": "precedes",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-018",
+      "type": "precedes",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-001",
+      "to": "REQ-017",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-001",
+      "to": "REQ-023",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-001",
+      "to": "REQ-022",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-002",
+      "to": "REQ-007",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-002",
+      "to": "REQ-008",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-002",
+      "to": "REQ-009",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-002",
+      "to": "REQ-010",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-003",
+      "to": "REQ-012",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-003",
+      "to": "REQ-028",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-004",
+      "to": "REQ-000",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-005",
+      "to": "REQ-000",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-006",
+      "to": "REQ-007",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-006",
+      "to": "REQ-008",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-001",
+      "to": "REQ-000",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-002",
+      "to": "REQ-000",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-003",
+      "to": "REQ-008",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-003",
+      "to": "REQ-009",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-004",
+      "to": "REQ-008",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-004",
+      "to": "REQ-012",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-004",
+      "to": "REQ-014",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-002",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-003",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-015",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-016",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-020",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "REQ-027",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-002",
+      "to": "REQ-008",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "EXT-IN-002",
+      "to": "REQ-027",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-001",
+      "to": "REQ-007",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-011",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-003",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-004",
+      "to": "REQ-021",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-005",
+      "to": "REQ-024",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-006",
+      "to": "REQ-027",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-004",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-005",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-006",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-007",
+      "to": "REQ-008",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-007",
+      "to": "REQ-010",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-008",
+      "to": "REQ-009",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-009",
+      "to": "REQ-011",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-010",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-015",
+      "to": "REQ-011",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-016",
+      "to": "REQ-011",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-011",
+      "to": "REQ-012",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-013",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-013",
+      "to": "REQ-014",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-014",
+      "to": "REQ-012",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-027",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "REQ-028",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-015",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-016",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-018",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-019",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "REQ-024",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-018",
+      "to": "REQ-026",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-018",
+      "to": "REQ-028",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-018",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-019",
+      "to": "REQ-026",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-019",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-020",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-020",
+      "to": "REQ-026",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-021",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-022",
+      "to": "REQ-017",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-023",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-024",
+      "to": "REQ-004",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-024",
+      "to": "REQ-021",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-024",
+      "to": "REQ-022",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-024",
+      "to": "REQ-025",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-025",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-026",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-027",
+      "to": "EXT-OUT-002",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-028",
+      "to": "EXT-OUT-002",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-007",
+      "to": "NFR-002",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-002",
+      "to": "REQ-008",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-017",
+      "to": "NFR-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-001",
+      "to": "REQ-023",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-001",
+      "to": "REQ-022",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-012",
+      "to": "NFR-003",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-003",
+      "to": "REQ-028",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "NFR-004",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-004",
+      "to": "REQ-000",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "NFR-005",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-005",
+      "to": "REQ-000",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-008",
+      "to": "NFR-006",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "NFR-006",
+      "to": "REQ-007",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "CON-001",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-001",
+      "to": "REQ-000",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "CON-002",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-002",
+      "to": "REQ-000",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-008",
+      "to": "CON-003",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-003",
+      "to": "REQ-009",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-014",
+      "to": "CON-004",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "CON-004",
+      "to": "REQ-008",
+      "type": "produces",
+      "sourceArtifact": "docs/input-requirements.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-001",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-002",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-003",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-004",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-005",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-006",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "REQ-000",
+      "to": "SD-007",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-001",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-002",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-003",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-004",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-005",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-006",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-007",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-008",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-009",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-010",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-011",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-012",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-013",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-014",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "INTF-015",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "INTF-016",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "INTF-017",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "INTF-018",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "INTF-019",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "INTF-020",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "INTF-021",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "INTF-022",
+      "type": "parent",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "REQ-007",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "REQ-008",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "REQ-009",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "REQ-010",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "REQ-011",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "REQ-012",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "REQ-013",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "REQ-014",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "REQ-015",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "REQ-016",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "REQ-017",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "REQ-018",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "REQ-019",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "REQ-020",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "REQ-021",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "REQ-022",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "REQ-023",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "REQ-024",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "REQ-025",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "REQ-026",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "REQ-027",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "REQ-028",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "NFR-001",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "NFR-002",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "NFR-003",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "NFR-004",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "NFR-005",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "NFR-006",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "CON-001",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "CON-002",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "CON-003",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "CON-004",
+      "type": "implements",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "SD-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-001",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "SD-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "SD-002",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "SD-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "SD-005",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "SD-002",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "SD-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "SD-002",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "SD-003",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "SD-007",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "SD-002",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "SD-003",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-001",
+      "type": "governs",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-002",
+      "type": "governs",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-003",
+      "type": "governs",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-004",
+      "type": "governs",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-005",
+      "type": "governs",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-006",
+      "type": "governs",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "NFR-001",
+      "to": "SD-004",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "NFR-002",
+      "to": "SD-001",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "NFR-003",
+      "to": "SD-002",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "NFR-003",
+      "to": "SD-006",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "NFR-006",
+      "to": "SD-001",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "CON-001",
+      "to": "SD-007",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "CON-002",
+      "to": "SD-001",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "CON-002",
+      "to": "SD-002",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "CON-003",
+      "to": "SD-001",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "CON-004",
+      "to": "SD-001",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "CON-004",
+      "to": "SD-002",
+      "type": "cross-cuts",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-006",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-008",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-009",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-010",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-011",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-012",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-013",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-014",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-015",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-016",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-017",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-018",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-019",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-020",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-021",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "INTF-022",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "EXT-IN-002",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "SD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "SD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-003",
+      "to": "SD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-004",
+      "to": "SD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-005",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-006",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-007",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-008",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-009",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-010",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-011",
+      "to": "SD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-012",
+      "to": "SD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-013",
+      "to": "SD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-014",
+      "to": "SD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-015",
+      "to": "SD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-016",
+      "to": "SD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-017",
+      "to": "SD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-018",
+      "to": "SD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-019",
+      "to": "SD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-020",
+      "to": "SD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-021",
+      "to": "SD-006",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "INTF-022",
+      "to": "SD-006",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "EXT-OUT-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-006",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "SD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "SD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "SD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-007",
+      "to": "SD-006",
+      "type": "produces",
+      "sourceArtifact": "docs/phase2-design/blog-system-system-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-001",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-002",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-003",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-004",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-005",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-006",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-007",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-008",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-009",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-002",
+      "to": "INTF-010",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-011",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-012",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-013",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "INTF-014",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "INTF-015",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "INTF-016",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-004",
+      "to": "INTF-017",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "INTF-018",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "INTF-019",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-005",
+      "to": "INTF-020",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "INTF-021",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "INTF-022",
+      "type": "defines",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "REQ-007",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "REQ-008",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-003",
+      "to": "REQ-009",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-004",
+      "to": "REQ-010",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-005",
+      "to": "REQ-011",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-006",
+      "to": "REQ-012",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-007",
+      "to": "REQ-013",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-008",
+      "to": "REQ-014",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-009",
+      "to": "REQ-015",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-010",
+      "to": "REQ-016",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-011",
+      "to": "REQ-017",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-011",
+      "to": "REQ-024",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-012",
+      "to": "REQ-018",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-013",
+      "to": "REQ-019",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-014",
+      "to": "REQ-020",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-015",
+      "to": "REQ-021",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-016",
+      "to": "REQ-022",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-017",
+      "to": "REQ-023",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-018",
+      "to": "REQ-024",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-019",
+      "to": "REQ-025",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-020",
+      "to": "REQ-026",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-021",
+      "to": "REQ-027",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-022",
+      "to": "REQ-028",
+      "type": "implements",
+      "sourceArtifact": "docs/phase3-outline/blog-system-interface-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-001",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "DD-002",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-004",
+      "to": "DD-003",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-004",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-005",
+      "to": "DD-005",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-009",
+      "to": "DD-006",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-005",
+      "to": "DD-007",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-006",
+      "to": "DD-008",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-009",
+      "to": "DD-009",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-010",
+      "to": "DD-010",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-005",
+      "to": "DD-011",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-009",
+      "to": "DD-012",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-010",
+      "to": "DD-013",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-011",
+      "to": "DD-014",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-012",
+      "to": "DD-015",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-013",
+      "to": "DD-016",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-011",
+      "to": "DD-017",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-012",
+      "to": "DD-018",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-013",
+      "to": "DD-019",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-014",
+      "to": "DD-020",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-012",
+      "to": "DD-021",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-013",
+      "to": "DD-022",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-013",
+      "to": "DD-023",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-014",
+      "to": "DD-024",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-015",
+      "to": "DD-025",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-015",
+      "to": "DD-026",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-016",
+      "to": "DD-027",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-017",
+      "to": "DD-028",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-017",
+      "to": "DD-029",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-019",
+      "to": "DD-030",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-018",
+      "to": "DD-031",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-019",
+      "to": "DD-032",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-020",
+      "to": "DD-033",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-018",
+      "to": "DD-034",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-020",
+      "to": "DD-035",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-021",
+      "to": "DD-036",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-021",
+      "to": "DD-037",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-022",
+      "to": "DD-038",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-022",
+      "to": "DD-039",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-022",
+      "to": "DD-040",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "DD-041",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-042",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "DD-043",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-044",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-045",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "DD-046",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-047",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-048",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-002",
+      "to": "DD-049",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "INTF-001",
+      "to": "DD-050",
+      "type": "parent",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "INTF-003",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "INTF-004",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "INTF-003",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-003",
+      "to": "INTF-004",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-004",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-005",
+      "to": "INTF-005",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-005",
+      "to": "INTF-006",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-005",
+      "to": "INTF-007",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-005",
+      "to": "INTF-008",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-006",
+      "to": "INTF-009",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-006",
+      "to": "INTF-010",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "INTF-005",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "INTF-006",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "INTF-007",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "INTF-008",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-008",
+      "to": "INTF-006",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-008",
+      "to": "INTF-007",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-009",
+      "to": "INTF-009",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-010",
+      "to": "INTF-010",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-011",
+      "to": "INTF-005",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-012",
+      "to": "INTF-009",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-013",
+      "to": "INTF-010",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-014",
+      "to": "INTF-011",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-015",
+      "to": "INTF-012",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-016",
+      "to": "INTF-013",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-016",
+      "to": "INTF-014",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-017",
+      "to": "INTF-011",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-018",
+      "to": "INTF-012",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-019",
+      "to": "INTF-013",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-020",
+      "to": "INTF-014",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-021",
+      "to": "INTF-012",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-022",
+      "to": "INTF-013",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-023",
+      "to": "INTF-013",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-024",
+      "to": "INTF-014",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "INTF-015",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "INTF-016",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "INTF-017",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-026",
+      "to": "INTF-015",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-027",
+      "to": "INTF-016",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-028",
+      "to": "INTF-017",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-029",
+      "to": "INTF-017",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-030",
+      "to": "INTF-019",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-030",
+      "to": "INTF-020",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-031",
+      "to": "INTF-018",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-032",
+      "to": "INTF-019",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-033",
+      "to": "INTF-020",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-034",
+      "to": "INTF-018",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-035",
+      "to": "INTF-020",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-036",
+      "to": "INTF-021",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-036",
+      "to": "INTF-022",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-037",
+      "to": "INTF-021",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-038",
+      "to": "INTF-022",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-039",
+      "to": "INTF-022",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-040",
+      "to": "INTF-022",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-041",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-041",
+      "to": "INTF-003",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-042",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-042",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-043",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-043",
+      "to": "INTF-006",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-044",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-045",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-046",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-047",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-048",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-049",
+      "to": "INTF-002",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-050",
+      "to": "INTF-001",
+      "type": "realizes",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-005",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-006",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-014",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-015",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-016",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-025",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-030",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-036",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-041",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-042",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-001",
+      "to": "DD-043",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-002",
+      "to": "DD-046",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "EXT-IN-002",
+      "to": "DD-050",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "DD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "DD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "DD-047",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "DD-044",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-005",
+      "to": "DD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-006",
+      "to": "DD-009",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-006",
+      "to": "DD-010",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-014",
+      "to": "DD-017",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-015",
+      "to": "DD-018",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-016",
+      "to": "DD-019",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-016",
+      "to": "DD-020",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "DD-026",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "DD-027",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "DD-028",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-030",
+      "to": "DD-031",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-030",
+      "to": "DD-032",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-030",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-036",
+      "to": "DD-037",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-036",
+      "to": "DD-038",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "DD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-003",
+      "to": "DD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-011",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-009",
+      "to": "DD-012",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-010",
+      "to": "DD-013",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-018",
+      "to": "DD-021",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-019",
+      "to": "DD-022",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-019",
+      "to": "DD-023",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-020",
+      "to": "DD-024",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-031",
+      "to": "DD-034",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-033",
+      "to": "DD-035",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-038",
+      "to": "DD-039",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-038",
+      "to": "DD-040",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-043",
+      "to": "DD-049",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-028",
+      "to": "DD-029",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-041",
+      "to": "DD-046",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-048",
+      "to": "DD-004",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-004",
+      "to": "DD-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-004",
+      "to": "DD-003",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-011",
+      "to": "DD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-012",
+      "to": "DD-009",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-013",
+      "to": "DD-010",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-021",
+      "to": "DD-018",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-022",
+      "to": "DD-019",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-023",
+      "to": "DD-019",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-024",
+      "to": "DD-020",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-029",
+      "to": "DD-028",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-034",
+      "to": "DD-031",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-035",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-039",
+      "to": "DD-038",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-040",
+      "to": "DD-038",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-049",
+      "to": "DD-043",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-046",
+      "to": "DD-041",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-047",
+      "to": "DD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-008",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-008",
+      "to": "DD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-017",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-018",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-019",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-020",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-026",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-027",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-028",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-032",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-037",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-007",
+      "to": "DD-038",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "DD-007",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "DD-018",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "DD-020",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-002",
+      "to": "DD-037",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-031",
+      "to": "DD-026",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-031",
+      "to": "DD-027",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-031",
+      "to": "DD-032",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-018",
+      "to": "DD-032",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-018",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-018",
+      "to": "DD-038",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-019",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-020",
+      "to": "DD-033",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-017",
+      "to": "DD-031",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-001",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-005",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-006",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-014",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-015",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-016",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-025",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-030",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-036",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-037",
+      "to": "EXT-OUT-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-038",
+      "to": "EXT-OUT-002",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-044",
+      "to": "EXT-OUT-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-026",
+      "to": "DD-025",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-027",
+      "to": "DD-025",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-032",
+      "to": "DD-030",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-050",
+      "to": "DD-041",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-050",
+      "to": "DD-045",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-050",
+      "to": "DD-048",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-042",
+      "to": "DD-041",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "DD-045",
+      "to": "DD-001",
+      "type": "produces",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "SD-003",
+      "to": "SD-001",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    },
+    {
+      "from": "SD-006",
+      "to": "SD-001",
+      "type": "depends-on",
+      "sourceArtifact": "docs/phase4-detailed/blog-system-detailed-design.md"
+    }
+  ]
+}

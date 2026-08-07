@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "exitCode": 0,
+  "checkedAt": "2026-08-07T16:45:01.208Z",
+  "phase": 8,
+  "dimensions": {
+    "headerCompleteness": [],
+    "stateMachineCompleteness": [],
+    "tlaEquivalence": [],
+    "stepBinding": [],
+    "scenarioPathValidity": [],
+    "rtmMapping": [],
+    "sdCoverage": []
+  },
+  "summary": "BDD model check passed (phase 8)",
+  "violations": []
+}

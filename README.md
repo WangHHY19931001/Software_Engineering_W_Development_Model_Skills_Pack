@@ -361,7 +361,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── lib/cli-error.ts      #   exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具（ENOENT/坏行 → exit 2）
 │   │   ├── lib/safe-json.ts      #   JSON 解析原型污染防御（parseJsonSafe，丢弃 __proto__ 键）
-│   │   ├── __tests__/            #   vitest 单元测试（33 个 .test.ts / 451 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            #   vitest 单元测试（33 个 .test.ts / 459 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）

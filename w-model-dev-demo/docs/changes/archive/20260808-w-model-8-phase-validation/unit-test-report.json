@@ -1,0 +1,23 @@
+{
+  "testType": "unit",
+  "projectId": "blog-system-demo-r35",
+  "source": "docs/phase5-coding/unit-test-report.md（阶段 5 单元测试执行报告，真实数据）",
+  "executedAt": "2026-08-07",
+  "total": 175,
+  "passed": 175,
+  "failed": 0,
+  "skipped": 0,
+  "passRate": "100%",
+  "coverage": {
+    "lines": 94.76,
+    "branches": 80.71,
+    "functions": 92.5,
+    "statements": 92.63
+  },
+  "coverageThreshold": {
+    "lines": 80
+  },
+  "exitCode": 0,
+  "command": "npm run test:unit（cross-env JWT_SECRET=test-secret-blog-demo vitest run tests/unit）",
+  "testFiles": 45
+}

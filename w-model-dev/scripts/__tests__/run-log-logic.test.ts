@@ -212,6 +212,11 @@ describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
     expect(extractExitCode(content)).toBe(2);
   });
 
+  it('extractExitCode 从 STATE_MACHINE_JSON 摘要行提取 exitCode（第 35 轮修复）', () => {
+    const content = 'STATE_MACHINE_JSON {"passed":true,"exitCode":0}';
+    expect(extractExitCode(content)).toBe(0);
+  });
+
   it('extractExitCode 无匹配 → undefined', () => {
     expect(extractExitCode('no json here')).toBeUndefined();
   });

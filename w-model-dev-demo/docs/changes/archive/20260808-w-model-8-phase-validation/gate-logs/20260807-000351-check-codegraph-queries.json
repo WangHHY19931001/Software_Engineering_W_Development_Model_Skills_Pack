@@ -1,0 +1,12 @@
+════════════════════════════════════════════════════════════
+codegraph 查询落盘校验（Codegraph Queries Checker）
+════════════════════════════════════════════════════════════
+项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo
+阶段          : 7
+有效查询数    : 0
+校验结果      : ✗ 未通过
+────────────────────────────────────────────────────────────
+未通过原因（反模式 #38）：
+  - 阶段 7：.w-model/codegraph-queries/ 下无 phase7-*.json 查询文件（约束 #20）
+────────────────────────────────────────────────────────────
+CODEGRAPH_QUERIES_JSON {"type":"codegraph-queries","passed":false,"phase":7,"queryCount":0,"violations":["阶段 7：.w-model/codegraph-queries/ 下无 phase7-*.json 查询文件（约束 #20）"],"exitCode":1}

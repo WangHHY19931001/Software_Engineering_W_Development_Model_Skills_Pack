@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "test",
+    "target": "tests/integration/（9 测试文件 30 条 IT + helpers.ts）+ docs/phase6-integration/integration-test-report.md + .w-model/rtm.json（integrationTest 回填）+ .w-model/preventive-reviews/6-*.json（R3 三份）",
+    "reviewedAt": "2026-08-07T23:35:00+08:00",
+    "agent": "w-model-v-subagent-testing-api-tester",
+    "scoringMethod": "text-parse",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    {
+      "name": "coverage",
+      "description": "是否覆盖对应需求/设计点；是否含正例与反例（§7.3，test 集合）",
+      "weight": 0.3,
+      "score": 0.9167,
+      "rawScores": [0.92, 0.9, 0.93],
+      "variance": 0.0001556,
+      "evidence": "docs/phase6-integration/integration-test-report.md:§2=30/30 明细（IT-001~030：跨模块 16 条 IT-001/003/006/007/008/011/012/014/015/016/018/019/020/021/023/025/029/030、参数校验 6 条 IT-004/013/018/020/022/026、异常路径 12 条 IT-002/005/007/009/010/013/014/024/025/026/028/029 均含正反例）；.w-model/rtm.json:L7-370=22 REQ + NFR-002/003/006 + CON-002/003/004 integrationTest 全部回填（NFR-001/004/005、CON-001 合理为 null，集成面不适用）；tests/integration/integration.test.ts:L13-178=Webhook/RSS 外部契约 seam 正向+重试负向；V 实测 npm run test:integration exitCode=0（Test Files 9 passed/9、Tests 30 passed/30，2026-08-07T23:29）；反例：SSRF 协议白名单无集成负面断言（integration.test.ts:L22-26 均传合法 mock.url，报告 §4 L77 声称覆盖不实）、60002 仅 ERROR_CATALOG 元数据断言（contract.test.ts:L124-127）"
+    },
+    {
+      "name": "correctness",
+      "description": "预期输出是否正确；步骤是否可复现（§7.3，test 集合）",
+      "weight": 0.25,
+      "score": 0.8867,
+      "rawScores": [0.89, 0.87, 0.9],
+      "variance": 0.0001556,
+      "evidence": "docs/phase6-integration/integration-test-report.md:§1=L29-34 执行输出块（9 files/30 tests passed）+L24 exitCode=0，V 复跑一致；§5=IT-002 首轮失败修复登记（authLimiter/apiLimiter 独立实例，L83）、IT-026 seed 三层链修复（L84）、IT-030 轮询收敛修复（L85）；§6=L99-108 六处设计预期 vs 实现契约差异登记（IT-013/015/020/022/026/030）；tests/integration/integration.test.ts:L42-43=HMAC sha256 签名重算一致；tests/integration/auth.test.ts:L46-47=JWT exp−iat≤86400；tests/integration/contract.test.ts:L124-132=错误码四元组与 ERROR_CATALOG 对照；反例：IT-012 场景 B 固定 sleep 500ms margin 仅 200ms（browse.test.ts:L93）、IT-015 describe 标题与断言实现语义不符（comment.test.ts:L89 vs L115-122，需对照 §6 差异表）"
+    },
+    {
+      "name": "independence",
+      "description": "用例之间是否独立；是否避免耦合依赖（§7.3，test 集合）",
+      "weight": 0.2,
+      "score": 0.9567,
+      "rawScores": [0.97, 0.94, 0.96],
+      "variance": 0.0001556,
+      "evidence": "tests/integration/helpers.ts:L30-41=createTestEnv 每用例 new StoreFactory+createStores+createApp（L31-39，注释「每用例独立，天然隔离」）；30 条 IT 均在各自 it 内独立建 env（auth.test.ts:L16/L75/L99、article.test.ts:L15/L54/L97/L142/L178/L210、browse.test.ts:L11/L61、comment.test.ts:L12/L55/L90、contract.test.ts:L13/L76/L137、discovery.test.ts:L15/L60/L115、integration.test.ts:L14/L61/L102/L147、interaction.test.ts:L13/L56/L96/L136、stats.test.ts:L14/L79）；IT-012 场景 A/B 分设 envA/envB（browse.test.ts:L63/L83）；无 beforeAll 全局种子、无跨用例共享 store/app 状态；mock Webhook 服务 per-test try/finally close（integration.test.ts:L15-57/L62-98/L103-143）"
+    },
+    {
+      "name": "clarity",
+      "description": "步骤描述是否清晰；输入输出是否明确（§7.3，test 集合）",
+      "weight": 0.15,
+      "score": 0.8833,
+      "rawScores": [0.88, 0.9, 0.87],
+      "variance": 0.0001556,
+      "evidence": "tests/integration/article.test.ts:L1-9=文件头域注释+IT 编号清单；每用例分步编号注释与断言一一对应（article.test.ts:L26-50 // 1..3、auth.test.ts:L18-69 // 1..6）；报告 §2 L40-69=30 条明细表（标题/优先级/状态/备注含错误码与契约引用）；helpers.ts:L1-6=seam-HTTP/seam-STORE/外部契约三 seam 说明 + L214-230 pollUntil 文档；反例：IT-015 describe 标题「评论事件→被评论通知」（comment.test.ts:L89）与实现契约通知对象=文章作者（L115-122）语义不符、IT-020 报告备注（报告 L60）与设计预期差异需对照 §6 才可理解（R3 completeness Optional 确认）"
+    },
+    {
+      "name": "priority-reasonableness",
+      "description": "优先级标注是否合理（§7.3，test 集合）",
+      "weight": 0.1,
+      "score": 0.9067,
+      "rawScores": [0.91, 0.89, 0.92],
+      "variance": 0.0001556,
+      "evidence": "docs/phase6-integration/integration-test-report.md:§2=L40-69 优先级标注：24 条高（IT-001~016/018~020/024/026~029：身份链路/发布/状态机/越权/限流/令牌过期/错误结构/审计留痕）+ 6 条中（IT-017/021/022/023/025/030：收藏/推荐/搜索/统计面板/RSS/审计）；高风险功能（越权 IT-003/014/029、限流 IT-002、令牌过期 IT-028、状态机 IT-005）全部标高；IT-030 审计标中由系统测试 ST-027 兜底（rtm.json:L366 systemTest=ST-027）；无高风险标低或低风险标高的明显错位，与阶段 3 设计用例优先级一致"
+    }
+  ],
+  "compositeScore": 0.9112,
+  "qualityLevel": "A",
+  "summary": "阶段 6 集成测试：9 测试文件 30 条 IT（跨模块 16/参数校验 6/异常路径 12）真实执行 30/30 通过 exitCode=0（V 复跑一致），覆盖 22 REQ+3 NFR+3 CON 并回填 RTM integrationTest。关键决策：按实现契约断言并登记 6 处设计差异（IT-013/015/020/022/026/030，报告 §6）；修复 IT-002 双限流器共享实例缺陷（报告 §5）；异步断言统一 pollUntil 轮询收敛（helpers.ts L214-230）。已对照前阶段 evidence 无矛盾。遗留风险：IT-012 固定 sleep 500ms 轻微 flaky、IT-016 重复通知断言时序窗口收窄、SSRF 协议白名单无集成负面断言（报告 §4 声称不实）、60002 无真实接口路径断言、RTM 非适用行 null 无说明（阶段 8 终检可能误判覆盖缺口）。",
+  "passed": true,
+  "reworkHints": [
+    "Nit: IT-012 场景 B 固定 sleep 依赖——tests/integration/browse.test.ts:L93（await new Promise(r=>setTimeout(r,500))，窗口参数化 300ms 仅 200ms margin），CI 高负载/时钟抖动下存在 flaky 风险；Structural Remedy: 仿 helpers.ts L214-230 pollUntil 轮询模式改为条件收敛（如轮询 viewCount 变化），或注入可控制时钟（读取窗口源 readingDedupWindowMs 由 AppDeps 注入已支持，browse.test.ts:L83）",
+    "Nit: IT-016「LIKE 通知仅 1 条」断言时序窗口收窄——tests/integration/interaction.test.ts:L38-51（pollUntil count>=1 收敛后立即 filter length===1），重复通知缺陷若晚于首次观察写入存在假阴性窗口；建议收敛条件满足后再补一轮稳定窗口（如 200ms 复查不增长），与 R3 6-reliability Nit 一致",
+    "Optional: SSRF 协议白名单无集成负面断言——docs/phase6-integration/integration-test-report.md:§4=L77 声称「SSRF url 白名单 http(s) 已在 IT-006/007/009/011/013/025 中覆盖」不实：tests/integration/integration.test.ts:L22-26/L69-72/L112-116 均传合法 http://127.0.0.1 mock.url，无「非 http(s) url → 40002 拒绝」负面断言；阶段 7 补建 webhook 传 ftp:// 的负面用例或修正报告措辞（R3 6-security FYI 升级）",
+    "Optional: IT-015 用例标题语义与实现契约不一致——tests/integration/comment.test.ts:L89 describe 标题「评论事件→被评论通知」（沿用阶段 3 设计预期「被回复读者收到通知」），但 L115-122 断言实现契约（REPLY 通知对象=文章作者，DD-033）；报告 §6 差异表虽已登记，标题处未标注「按实现契约」，建议修改 describe 标题消除误导（R3 6-completeness Optional）",
+    "FYI: RTM 非适用行 integrationTest=null 无说明——.w-model/rtm.json:L254（NFR-001）/L294（NFR-004）/L307（NFR-005）/L333（CON-001）与 L380-386 executionSummary.integrationTest.coverage=0 均未注明「性能/质量门/约束类不设集成测试」「集成测试不设覆盖率门禁」（对照报告 §6 L93）；阶段 8 终检机械回读 coverageStatus 时可能误判为集成覆盖缺口，建议补注释（R3 6-completeness FYI）",
+    "FYI: 60002（原密码校验失败）无集成级接口路径断言——tests/integration/contract.test.ts:L124-127 仅对 ERROR_CATALOG 元数据断言 [60002,400]，未走真实「修改密码/改资料错原密码」接口路径；阶段 3 设计 30 条未列改密场景属设计覆盖边界，阶段 7 系统测试 ST-037（rtm.json:L47 profile 管理）可兜底（R3 6-security FYI）",
+    "Nit: 测试密钥 fallback 双保险存在静默漂移风险——tests/integration/auth.test.ts:L12（JWT_SECRET ?? 'test-secret-blog-demo'）+ tests/setup.ts:L2 与 package.json:L9 cross-env 注入值并存；若未来 script 注入值修改而 fallback 未同步，测试仍通过但不再验证脚本配置；建议单一来源或断言注入值一致（R3 6-security Nit）",
+    "Nit: IT-026 两条登记未编号——docs/phase6-integration/integration-test-report.md §5 表格第 2 行（分类深度 60003 seed 偏差）与 §6 差异表第 5 行（PATCH 非法头像 40002→40001 语义差异）为两个独立问题，建议加序号（如 IT-026-a/b）便于交叉对照（R3 6-completeness Nit）"
+  ]
+}

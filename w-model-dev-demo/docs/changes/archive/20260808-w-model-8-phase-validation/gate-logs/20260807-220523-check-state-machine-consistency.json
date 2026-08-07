@@ -1,0 +1,2 @@
+ERROR_JSON {"category":"UNEXPECTED","message":"脚本异常","exitCode":2}
+✗ [UNEXPECTED] 脚本异常: EISDIR: illegal operation on a directory, read

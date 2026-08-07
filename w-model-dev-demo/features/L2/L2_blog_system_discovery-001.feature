@@ -1,78 +1,67 @@
-# @req: REQ-013, REQ-017, REQ-020
-# @design: docs/phase2-design/blog-system-system-design.md:§3
-# @designIds: SD-010,SD-013,SD-015
+# @req: REQ-021, REQ-022, REQ-023
+# @design: SD-004
+# @designIds: SD-004
 # @system: L2_blog_system_discovery
 # @tla-spec: L2_BlogSystemDiscovery
 # @state-machine: SM-L2_BlogSystemDiscovery
-# @parent-features: L1/L1_blog_system-002.feature, L1/L1_blog_system-003.feature
-# @sibling-features: L2/L2_blog_system_auth-001.feature, L2/L2_blog_system_content-001.feature, L2/L2_blog_system_engagement-001.feature, L2/L2_blog_system_ops-001.feature, L2/L2_blog_system_infra-001.feature
+# @parent-features: L1_blog_system-002.feature
+# @sibling-features: L2_blog_system_auth-001.feature, L2_blog_system_content-001.feature, L2_blog_system_interaction-001.feature, L2_blog_system_analytics-001.feature, L2_blog_system_integration-001.feature
 # @child-features: (none)
 # @scenario-id-prefix: BDD-L2
-Feature: 博客系统发现子系统（M-010 搜索服务 / M-013 订阅服务 / M-015 RSS 服务）
-  作为博客系统的发现子系统
-  我希望完成关键词搜索、博主订阅与 RSS 订阅源生成的状态流转
-  以便验证发现域（REQ-013/REQ-017/REQ-020）满足系统设计
+Feature: 发现推荐子系统统计快照生命周期行为
+  作为发现推荐子系统
+  我希望完成阅读统计快照的刷新与失效状态流转
+  以便热门文章与个性化推荐始终基于最新统计数据（全文搜索独立执行不依赖统计快照）
 
 Background:
-  # @states: none, active
+  # @states: none, stale, fresh
   # @initial-state: none
-  # @terminal-states: ()
-  # @accepting-states: active
-  # @rejecting-states: none
+  # @terminal-states: stale
+  # @accepting-states: fresh
+  # @rejecting-states: stale
   # @transitions:
-  #   none + searchExecute -> none [guard: keywordValid] [action: searchArticles]
-  #   none + subscribe -> active [action: createSubscription]
-  #   active + receiveArticleUpdate -> active [guard: postPublishedEvent] [action: notifySubscriber]
-  #   active + unsubscribe -> none [action: removeSubscription]
-  #   active + generateRss -> active [guard: rssSourceAvailable] [action: generateXml]
+  #   none + refreshStats -> fresh [action: loadStats]
+  #   stale + refreshStats -> fresh [action: reloadStats]
+  #   fresh + invalidateStats -> stale [action: dropHotList]
   # @invariants:
-  #   TypeInvariant
-  #   searchDone => keywordValid
-  #   subscriberUpdated => subscription = active
-  #   rssGenerated => rssValid
+  #   fresh => hotListState = "computed"
   Given 系统处于初始状态
 
-@REQ-013 @ST-011 @BDD-L2-020 @high
-Scenario: 关键词非空时执行搜索返回命中列表
+@REQ-021 @ST-017 @BDD-L2-018 @high
+Scenario: 阅读统计刷新为最新后热门列表可计算
   Given 系统处于 "none" 状态
-  And 关键词命中已发布文章
-  When 用户执行文章搜索 (searchExecute)
-  Then 系统应保持在 "none" 状态
-  And 系统返回分页结果
-  And 不变式 "searchDone => keywordValid" 应成立
+  And 消费方请求热门文章数据
+  When 子系统执行统计快照刷新处理 (refreshStats)
+  Then 系统应转移到 "fresh" 状态
+  And 不变式 "fresh => hotListState = "computed"" 应成立
 
-@REQ-017 @ST-006 @BDD-L2-021 @high
-Scenario: 用户订阅博主建立订阅关系
+@REQ-021 @ST-038 @BDD-L2-019 @medium
+Scenario: 阅读统计失效后热门列表作废
+  Given 系统处于 "fresh" 状态
+  And 阅读统计被新访问数据覆盖
+  When 子系统执行统计失效处理 (invalidateStats)
+  Then 系统应转移到 "stale" 状态
+
+@REQ-021 @ST-004 @BDD-L2-020 @medium
+Scenario: 陈旧统计重新刷新恢复最新
+  Given 系统处于 "stale" 状态
+  And 统计窗口重新聚合完成
+  When 子系统执行统计快照刷新处理 (refreshStats)
+  Then 系统应转移到 "fresh" 状态
+
+@REQ-021 @ST-017 @BDD-L2-021 @medium
+Scenario: 统计快照刷新失效再刷新的完整生命周期
   Given 系统处于 "none" 状态
-  And 目标博主存在且未订阅
-  When 用户执行博主订阅 (subscribe)
-  Then 系统应转移到 "active" 状态
-  And 订阅关系建立
-  And 不变式 "subscriberUpdated => subscription = active" 应成立
+  When 子系统执行统计快照刷新处理 (refreshStats)
+  And 子系统执行统计失效处理 (invalidateStats)
+  And 子系统执行统计快照刷新处理 (refreshStats)
+  Then 系统应转移到 "fresh" 状态
+  And 不变式 "fresh => hotListState = "computed"" 应成立
 
-@REQ-017 @ST-006 @BDD-L2-022 @high
-Scenario: 订阅者接收博主文章发布更新
-  Given 系统处于 "active" 状态
-  And 博主发布新文章事件到达
-  When 订阅者接收文章更新 (receiveArticleUpdate)
-  Then 系统应保持在 "active" 状态
-  And 订阅者收到文章更新通知
-  And 不变式 "subscriberUpdated => subscription = active" 应成立
-
-@REQ-017 @ST-006 @BDD-L2-023 @medium
-Scenario: 用户退订博主解除订阅关系
-  Given 系统处于 "active" 状态
-  And 订阅关系已建立
-  When 用户执行博主退订 (unsubscribe)
-  Then 系统应转移到 "none" 状态
-  And 订阅关系解除且不再接收更新
-  And 不变式 "TypeInvariant" 应成立
-
-@REQ-020 @ST-007 @BDD-L2-024 @high
-Scenario: 生成合法可解析的 RSS 订阅源
-  Given 系统处于 "active" 状态
-  And 存在已发布文章
-  When 系统执行 RSS 生成 (generateRss)
-  Then 系统应保持在 "active" 状态
-  And 系统返回合法可解析的 XML 订阅源
-  And 不变式 "rssGenerated => rssValid" 应成立
+@REQ-022 @ST-018 @BDD-L2-022 @low
+Scenario: 个性化推荐基于最新统计执行不改变快照
+  Given 系统处于 "fresh" 状态
+  And 读者标签偏好数据可用
+  When 子系统执行个性化推荐处理
+  Then 系统应保持在 "fresh" 状态
+  And 不变式 "fresh => hotListState = "computed"" 应成立

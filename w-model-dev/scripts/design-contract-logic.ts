@@ -178,17 +178,47 @@ export function checkDesignContractConsistency(
 
   const data = input;
 
+  // D1 实际路径语义归一（多端点组合 / 括号说明 / 非 HTTP 豁免）：
+  // - 一行 UAT 可覆盖多端点，actualPath 以「、」/「,」/「，」分隔（如 "PUT /api/posts、DELETE /api/posts"），逐项匹配；
+  // - 端点名可带括号说明（如 "POST /api/posts/:id/publish（触发 Webhook 分发）"），匹配前剥离全/半角括号；
+  // - 具体请求实例（如 "GET /api/articles/art-nonexist（404 兜底）"）按路由参数模板段级匹配（/api/articles/:id 命中）；
+  // - "不适用（...）" 行与 "横切" 同语义豁免（无 HTTP 路由断言）。
+  function stripBrackets(p: string): string {
+    return p.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+  }
+  function normalizeActualPathVariants(raw: string): string[] {
+    return raw
+      .split(/[、，,]/)
+      .map((p) => stripMethodPrefix(stripBrackets(p)))
+      .map((p) => p.trim())
+      .filter((p) => p !== '');
+  }
+  function pathTemplateMatches(template: string, concrete: string): boolean {
+    const t = template.split('/');
+    const c = concrete.split('/');
+    if (t.length !== c.length) return false;
+    for (let i = 0; i < t.length; i++) {
+      const seg = t[i]!;
+      if (seg.startsWith(':')) continue;
+      if (seg !== c[i]) return false;
+    }
+    return true;
+  }
+  function isDefinedRoute(p: string): boolean {
+    return data.routeDefinitions.some(
+      (route) => route.path === p || pathTemplateMatches(route.path, p),
+    );
+  }
+
   for (const mapping of data.uatPathMappings) {
     if (!mapping.actualPath || mapping.actualPath.trim() === '') {
       continue; // 未回填的跳过（阶段 5 前允许空）
     }
-    if (mapping.actualPath === '横切') {
-      continue; // NFR/CON 横切豁免
+    if (mapping.actualPath === '横切' || mapping.actualPath.startsWith('不适用')) {
+      continue; // NFR/CON 横切豁免 / 非 HTTP 用例（无路由断言）豁免
     }
-    const normalizedPath = stripMethodPrefix(mapping.actualPath);
-    const found = data.routeDefinitions.some(
-      (route) => route.path === normalizedPath,
-    );
+    const normalizedPaths = normalizeActualPathVariants(mapping.actualPath);
+    const found = normalizedPaths.length > 0 && normalizedPaths.every(isDefinedRoute);
     if (!found) {
       violations.push({
         dimension: 'D1',

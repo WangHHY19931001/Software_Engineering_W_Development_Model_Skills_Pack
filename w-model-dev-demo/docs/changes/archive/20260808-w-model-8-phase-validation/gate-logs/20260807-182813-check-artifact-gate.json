@@ -1,0 +1,17 @@
+﻿════════════════════════════════════════════════════════════
+工件质量门校验（Artifact Gate）
+════════════════════════════════════════════════════════════
+项目目录      : w-model-dev-demo
+RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\rtm.json
+校验阶段      : phase=2（阶段级）
+RTM 覆盖率    : 100%
+单元覆盖率    : 0%
+TLA+ 资产     : ✓ manifest 存在且 specs 非空
+BDD 资产      : ✓ bdd-manifest.json 存在且 schema 通过
+Model 校验    : ✓ TLA+/BDD model 校验通过
+graph 资产    : ✓ graph.json（72 节点）
+校验结果      : ✓ 通过
+────────────────────────────────────────────────────────────
+所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过（含 BDD 资产校验）。
+────────────────────────────────────────────────────────────
+GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"unitCoveragePercent":0,"missingItems":[],"reasons":[],"bddManifestExists":true,"exitCode":0}

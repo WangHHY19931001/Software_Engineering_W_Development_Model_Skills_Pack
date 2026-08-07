@@ -1,0 +1,231 @@
+════════════════════════════════════════════════════════════
+设计契约一致性校验（Design Contract Consistency）
+════════════════════════════════════════════════════════════
+项目目录      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo
+路径映射条目  : 73
+路由定义条目  : 0
+验收断言条目  : 0
+违反数        : 73
+────────────────────────────────────────────────────────────
+✗ [D1] UAT 路径映射 UAT-001 的实际路径 "POST /api/auth/register" 在路由定义中不存在
+  期望: POST /api/auth/register
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-002 的实际路径 "POST /api/auth/register" 在路由定义中不存在
+  期望: POST /api/auth/register
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-003 的实际路径 "POST /api/auth/register" 在路由定义中不存在
+  期望: POST /api/auth/register
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-004 的实际路径 "POST /api/auth/login" 在路由定义中不存在
+  期望: POST /api/auth/login
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-005 的实际路径 "POST /api/auth/login" 在路由定义中不存在
+  期望: POST /api/auth/login
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-006 的实际路径 "GET /api/users/me" 在路由定义中不存在
+  期望: GET /api/users/me
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-007 的实际路径 "POST /api/users/me/blogger" 在路由定义中不存在
+  期望: POST /api/users/me/blogger
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-008 的实际路径 "POST /api/articles" 在路由定义中不存在
+  期望: POST /api/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-009 的实际路径 "PUT /api/articles/:id、DELETE /api/articles/:id" 在路由定义中不存在
+  期望: PUT /api/articles/:id、DELETE /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-010 的实际路径 "GET /api/users/me、PATCH /api/users/me" 在路由定义中不存在
+  期望: GET /api/users/me、PATCH /api/users/me
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-011 的实际路径 "PUT /api/users/me/password" 在路由定义中不存在
+  期望: PUT /api/users/me/password
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-012 的实际路径 "GET /api/users/me" 在路由定义中不存在
+  期望: GET /api/users/me
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-013 的实际路径 "POST /api/articles" 在路由定义中不存在
+  期望: POST /api/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-014 的实际路径 "POST /api/articles" 在路由定义中不存在
+  期望: POST /api/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-015 的实际路径 "POST /api/articles/:id/publish" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-016 的实际路径 "PUT /api/articles/:id、POST /api/articles/:id/publish" 在路由定义中不存在
+  期望: PUT /api/articles/:id、POST /api/articles/:id/publish
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-017 的实际路径 "POST /api/articles/:id/publish" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-018 的实际路径 "POST /api/articles/:id/publish、POST /api/articles/:id/archive" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish、POST /api/articles/:id/archive
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-019 的实际路径 "DELETE /api/articles/:id" 在路由定义中不存在
+  期望: DELETE /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-020 的实际路径 "POST /api/articles/:id/publish" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-021 的实际路径 "POST /api/articles/:id/unarchive、POST /api/articles/:id/publish" 在路由定义中不存在
+  期望: POST /api/articles/:id/unarchive、POST /api/articles/:id/publish
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-022 的实际路径 "GET /api/blogger/articles" 在路由定义中不存在
+  期望: GET /api/blogger/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-023 的实际路径 "PUT /api/articles/:id" 在路由定义中不存在
+  期望: PUT /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-024 的实际路径 "DELETE /api/articles/:id" 在路由定义中不存在
+  期望: DELETE /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-025 的实际路径 "POST /api/tags" 在路由定义中不存在
+  期望: POST /api/tags
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-026 的实际路径 "POST /api/tags" 在路由定义中不存在
+  期望: POST /api/tags
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-027 的实际路径 "POST /api/categories" 在路由定义中不存在
+  期望: POST /api/categories
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-028 的实际路径 "POST /api/categories" 在路由定义中不存在
+  期望: POST /api/categories
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-029 的实际路径 "POST /api/categories" 在路由定义中不存在
+  期望: POST /api/categories
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-030 的实际路径 "GET /api/articles" 在路由定义中不存在
+  期望: GET /api/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-031 的实际路径 "GET /api/articles" 在路由定义中不存在
+  期望: GET /api/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-032 的实际路径 "GET /api/articles/:id" 在路由定义中不存在
+  期望: GET /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-033 的实际路径 "POST /api/articles/:id/comments" 在路由定义中不存在
+  期望: POST /api/articles/:id/comments
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-034 的实际路径 "POST /api/articles/:id/comments" 在路由定义中不存在
+  期望: POST /api/articles/:id/comments
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-035 的实际路径 "DELETE /api/articles/:id/comments/:cid、POST /api/articles/:id/comments/:cid/reply" 在路由定义中不存在
+  期望: DELETE /api/articles/:id/comments/:cid、POST /api/articles/:id/comments/:cid/reply
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-036 的实际路径 "POST /api/articles/:id/like" 在路由定义中不存在
+  期望: POST /api/articles/:id/like
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-037 的实际路径 "POST /api/articles/:id/favorite、GET /api/me/favorites" 在路由定义中不存在
+  期望: POST /api/articles/:id/favorite、GET /api/me/favorites
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-038 的实际路径 "POST /api/articles/:id/like" 在路由定义中不存在
+  期望: POST /api/articles/:id/like
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-039 的实际路径 "POST /api/users/:id/follow、GET /api/me/feed" 在路由定义中不存在
+  期望: POST /api/users/:id/follow、GET /api/me/feed
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-040 的实际路径 "DELETE /api/users/:id/follow、GET /api/me/feed" 在路由定义中不存在
+  期望: DELETE /api/users/:id/follow、GET /api/me/feed
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-041 的实际路径 "GET /api/articles/hot" 在路由定义中不存在
+  期望: GET /api/articles/hot
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-042 的实际路径 "GET /api/articles/hot" 在路由定义中不存在
+  期望: GET /api/articles/hot
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-043 的实际路径 "GET /api/me/recommendations" 在路由定义中不存在
+  期望: GET /api/me/recommendations
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-044 的实际路径 "GET /api/me/recommendations" 在路由定义中不存在
+  期望: GET /api/me/recommendations
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-045 的实际路径 "GET /api/search" 在路由定义中不存在
+  期望: GET /api/search
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-046 的实际路径 "GET /api/search" 在路由定义中不存在
+  期望: GET /api/search
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-047 的实际路径 "GET /api/articles/:id" 在路由定义中不存在
+  期望: GET /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-048 的实际路径 "GET /api/articles/:id" 在路由定义中不存在
+  期望: GET /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-049 的实际路径 "GET /api/articles/:id" 在路由定义中不存在
+  期望: GET /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-050 的实际路径 "GET /api/blogger/stats" 在路由定义中不存在
+  期望: GET /api/blogger/stats
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-051 的实际路径 "GET /api/blogger/stats" 在路由定义中不存在
+  期望: GET /api/blogger/stats
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-052 的实际路径 "GET /api/me/notifications" 在路由定义中不存在
+  期望: GET /api/me/notifications
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-053 的实际路径 "GET /api/me/notifications" 在路由定义中不存在
+  期望: GET /api/me/notifications
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-054 的实际路径 "PATCH /api/me/notifications/:id/read" 在路由定义中不存在
+  期望: PATCH /api/me/notifications/:id/read
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-055 的实际路径 "GET /api/bloggers/:id/rss" 在路由定义中不存在
+  期望: GET /api/bloggers/:id/rss
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-056 的实际路径 "GET /api/bloggers/:id/rss" 在路由定义中不存在
+  期望: GET /api/bloggers/:id/rss
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-057 的实际路径 "POST /api/articles/:id/publish（触发 Webhook 分发）" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish（触发 Webhook 分发）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-058 的实际路径 "POST /api/articles/:id/publish（触发 Webhook 分发）" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish（触发 Webhook 分发）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-059 的实际路径 "POST /api/articles/:id/comments（触发 Webhook 分发）" 在路由定义中不存在
+  期望: POST /api/articles/:id/comments（触发 Webhook 分发）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-060 的实际路径 "POST /api/auth/register、POST /api/auth/login、GET /api/articles、GET /api/articles/:id" 在路由定义中不存在
+  期望: POST /api/auth/register、POST /api/auth/login、GET /api/articles、GET /api/articles/:id
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-061 的实际路径 "GET /api/articles、GET /api/search、GET /api/me/recommendations" 在路由定义中不存在
+  期望: GET /api/articles、GET /api/search、GET /api/me/recommendations
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-062 的实际路径 "POST /api/auth/register、PUT /api/users/me/password" 在路由定义中不存在
+  期望: POST /api/auth/register、PUT /api/users/me/password
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-063 的实际路径 "GET /api/users/me" 在路由定义中不存在
+  期望: GET /api/users/me
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-064 的实际路径 "POST /api/articles/:id/publish" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-065 的实际路径 "POST /api/articles/:id/publish（触发 Webhook 分发）" 在路由定义中不存在
+  期望: POST /api/articles/:id/publish（触发 Webhook 分发）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-066 的实际路径 "不适用（vitest coverage 报告，无 HTTP 路由）" 在路由定义中不存在
+  期望: 不适用（vitest coverage 报告，无 HTTP 路由）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-067 的实际路径 "不适用（静态结构断言，无 HTTP 路由）" 在路由定义中不存在
+  期望: 不适用（静态结构断言，无 HTTP 路由）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-068 的实际路径 "POST /api/auth/login" 在路由定义中不存在
+  期望: POST /api/auth/login
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-069 的实际路径 "GET /api/articles" 在路由定义中不存在
+  期望: GET /api/articles
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-070 的实际路径 "不适用（依赖清单断言，无 HTTP 路由）" 在路由定义中不存在
+  期望: 不适用（依赖清单断言，无 HTTP 路由）
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-071 的实际路径 "POST /api/auth/register、GET /api/users/me、GET /api/articles/art-nonexist（404 兜底）、POST /api/tags" 在路由定义中不存在
+  期望: POST /api/auth/register、GET /api/users/me、GET /api/articles/art-nonexist（404 兜底）、POST /api/tags
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-072 的实际路径 "POST /api/auth/login" 在路由定义中不存在
+  期望: POST /api/auth/login
+  实际: 路由定义中未找到
+✗ [D1] UAT 路径映射 UAT-073 的实际路径 "POST /api/auth/login、POST /api/articles/:id/publish、DELETE /api/articles/:id" 在路由定义中不存在
+  期望: POST /api/auth/login、POST /api/articles/:id/publish、DELETE /api/articles/:id
+  实际: 路由定义中未找到
+────────────────────────────────────────────────────────────
+CONTRACT_JSON {"passed":false,"violationCount":73,"violations":[{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-001 的实际路径 \"POST /api/auth/register\" 在路由定义中不存在","expected":"POST /api/auth/register","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-002 的实际路径 \"POST /api/auth/register\" 在路由定义中不存在","expected":"POST /api/auth/register","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-003 的实际路径 \"POST /api/auth/register\" 在路由定义中不存在","expected":"POST /api/auth/register","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-004 的实际路径 \"POST /api/auth/login\" 在路由定义中不存在","expected":"POST /api/auth/login","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-005 的实际路径 \"POST /api/auth/login\" 在路由定义中不存在","expected":"POST /api/auth/login","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-006 的实际路径 \"GET /api/users/me\" 在路由定义中不存在","expected":"GET /api/users/me","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-007 的实际路径 \"POST /api/users/me/blogger\" 在路由定义中不存在","expected":"POST /api/users/me/blogger","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-008 的实际路径 \"POST /api/articles\" 在路由定义中不存在","expected":"POST /api/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-009 的实际路径 \"PUT /api/articles/:id、DELETE /api/articles/:id\" 在路由定义中不存在","expected":"PUT /api/articles/:id、DELETE /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-010 的实际路径 \"GET /api/users/me、PATCH /api/users/me\" 在路由定义中不存在","expected":"GET /api/users/me、PATCH /api/users/me","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-011 的实际路径 \"PUT /api/users/me/password\" 在路由定义中不存在","expected":"PUT /api/users/me/password","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-012 的实际路径 \"GET /api/users/me\" 在路由定义中不存在","expected":"GET /api/users/me","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-013 的实际路径 \"POST /api/articles\" 在路由定义中不存在","expected":"POST /api/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-014 的实际路径 \"POST /api/articles\" 在路由定义中不存在","expected":"POST /api/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-015 的实际路径 \"POST /api/articles/:id/publish\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-016 的实际路径 \"PUT /api/articles/:id、POST /api/articles/:id/publish\" 在路由定义中不存在","expected":"PUT /api/articles/:id、POST /api/articles/:id/publish","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-017 的实际路径 \"POST /api/articles/:id/publish\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-018 的实际路径 \"POST /api/articles/:id/publish、POST /api/articles/:id/archive\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish、POST /api/articles/:id/archive","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-019 的实际路径 \"DELETE /api/articles/:id\" 在路由定义中不存在","expected":"DELETE /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-020 的实际路径 \"POST /api/articles/:id/publish\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-021 的实际路径 \"POST /api/articles/:id/unarchive、POST /api/articles/:id/publish\" 在路由定义中不存在","expected":"POST /api/articles/:id/unarchive、POST /api/articles/:id/publish","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-022 的实际路径 \"GET /api/blogger/articles\" 在路由定义中不存在","expected":"GET /api/blogger/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-023 的实际路径 \"PUT /api/articles/:id\" 在路由定义中不存在","expected":"PUT /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-024 的实际路径 \"DELETE /api/articles/:id\" 在路由定义中不存在","expected":"DELETE /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-025 的实际路径 \"POST /api/tags\" 在路由定义中不存在","expected":"POST /api/tags","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-026 的实际路径 \"POST /api/tags\" 在路由定义中不存在","expected":"POST /api/tags","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-027 的实际路径 \"POST /api/categories\" 在路由定义中不存在","expected":"POST /api/categories","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-028 的实际路径 \"POST /api/categories\" 在路由定义中不存在","expected":"POST /api/categories","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-029 的实际路径 \"POST /api/categories\" 在路由定义中不存在","expected":"POST /api/categories","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-030 的实际路径 \"GET /api/articles\" 在路由定义中不存在","expected":"GET /api/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-031 的实际路径 \"GET /api/articles\" 在路由定义中不存在","expected":"GET /api/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-032 的实际路径 \"GET /api/articles/:id\" 在路由定义中不存在","expected":"GET /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-033 的实际路径 \"POST /api/articles/:id/comments\" 在路由定义中不存在","expected":"POST /api/articles/:id/comments","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-034 的实际路径 \"POST /api/articles/:id/comments\" 在路由定义中不存在","expected":"POST /api/articles/:id/comments","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-035 的实际路径 \"DELETE /api/articles/:id/comments/:cid、POST /api/articles/:id/comments/:cid/reply\" 在路由定义中不存在","expected":"DELETE /api/articles/:id/comments/:cid、POST /api/articles/:id/comments/:cid/reply","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-036 的实际路径 \"POST /api/articles/:id/like\" 在路由定义中不存在","expected":"POST /api/articles/:id/like","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-037 的实际路径 \"POST /api/articles/:id/favorite、GET /api/me/favorites\" 在路由定义中不存在","expected":"POST /api/articles/:id/favorite、GET /api/me/favorites","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-038 的实际路径 \"POST /api/articles/:id/like\" 在路由定义中不存在","expected":"POST /api/articles/:id/like","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-039 的实际路径 \"POST /api/users/:id/follow、GET /api/me/feed\" 在路由定义中不存在","expected":"POST /api/users/:id/follow、GET /api/me/feed","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-040 的实际路径 \"DELETE /api/users/:id/follow、GET /api/me/feed\" 在路由定义中不存在","expected":"DELETE /api/users/:id/follow、GET /api/me/feed","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-041 的实际路径 \"GET /api/articles/hot\" 在路由定义中不存在","expected":"GET /api/articles/hot","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-042 的实际路径 \"GET /api/articles/hot\" 在路由定义中不存在","expected":"GET /api/articles/hot","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-043 的实际路径 \"GET /api/me/recommendations\" 在路由定义中不存在","expected":"GET /api/me/recommendations","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-044 的实际路径 \"GET /api/me/recommendations\" 在路由定义中不存在","expected":"GET /api/me/recommendations","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-045 的实际路径 \"GET /api/search\" 在路由定义中不存在","expected":"GET /api/search","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-046 的实际路径 \"GET /api/search\" 在路由定义中不存在","expected":"GET /api/search","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-047 的实际路径 \"GET /api/articles/:id\" 在路由定义中不存在","expected":"GET /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-048 的实际路径 \"GET /api/articles/:id\" 在路由定义中不存在","expected":"GET /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-049 的实际路径 \"GET /api/articles/:id\" 在路由定义中不存在","expected":"GET /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-050 的实际路径 \"GET /api/blogger/stats\" 在路由定义中不存在","expected":"GET /api/blogger/stats","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-051 的实际路径 \"GET /api/blogger/stats\" 在路由定义中不存在","expected":"GET /api/blogger/stats","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-052 的实际路径 \"GET /api/me/notifications\" 在路由定义中不存在","expected":"GET /api/me/notifications","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-053 的实际路径 \"GET /api/me/notifications\" 在路由定义中不存在","expected":"GET /api/me/notifications","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-054 的实际路径 \"PATCH /api/me/notifications/:id/read\" 在路由定义中不存在","expected":"PATCH /api/me/notifications/:id/read","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-055 的实际路径 \"GET /api/bloggers/:id/rss\" 在路由定义中不存在","expected":"GET /api/bloggers/:id/rss","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-056 的实际路径 \"GET /api/bloggers/:id/rss\" 在路由定义中不存在","expected":"GET /api/bloggers/:id/rss","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-057 的实际路径 \"POST /api/articles/:id/publish（触发 Webhook 分发）\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish（触发 Webhook 分发）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-058 的实际路径 \"POST /api/articles/:id/publish（触发 Webhook 分发）\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish（触发 Webhook 分发）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-059 的实际路径 \"POST /api/articles/:id/comments（触发 Webhook 分发）\" 在路由定义中不存在","expected":"POST /api/articles/:id/comments（触发 Webhook 分发）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-060 的实际路径 \"POST /api/auth/register、POST /api/auth/login、GET /api/articles、GET /api/articles/:id\" 在路由定义中不存在","expected":"POST /api/auth/register、POST /api/auth/login、GET /api/articles、GET /api/articles/:id","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-061 的实际路径 \"GET /api/articles、GET /api/search、GET /api/me/recommendations\" 在路由定义中不存在","expected":"GET /api/articles、GET /api/search、GET /api/me/recommendations","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-062 的实际路径 \"POST /api/auth/register、PUT /api/users/me/password\" 在路由定义中不存在","expected":"POST /api/auth/register、PUT /api/users/me/password","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-063 的实际路径 \"GET /api/users/me\" 在路由定义中不存在","expected":"GET /api/users/me","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-064 的实际路径 \"POST /api/articles/:id/publish\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-065 的实际路径 \"POST /api/articles/:id/publish（触发 Webhook 分发）\" 在路由定义中不存在","expected":"POST /api/articles/:id/publish（触发 Webhook 分发）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-066 的实际路径 \"不适用（vitest coverage 报告，无 HTTP 路由）\" 在路由定义中不存在","expected":"不适用（vitest coverage 报告，无 HTTP 路由）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-067 的实际路径 \"不适用（静态结构断言，无 HTTP 路由）\" 在路由定义中不存在","expected":"不适用（静态结构断言，无 HTTP 路由）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-068 的实际路径 \"POST /api/auth/login\" 在路由定义中不存在","expected":"POST /api/auth/login","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-069 的实际路径 \"GET /api/articles\" 在路由定义中不存在","expected":"GET /api/articles","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-070 的实际路径 \"不适用（依赖清单断言，无 HTTP 路由）\" 在路由定义中不存在","expected":"不适用（依赖清单断言，无 HTTP 路由）","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-071 的实际路径 \"POST /api/auth/register、GET /api/users/me、GET /api/articles/art-nonexist（404 兜底）、POST /api/tags\" 在路由定义中不存在","expected":"POST /api/auth/register、GET /api/users/me、GET /api/articles/art-nonexist（404 兜底）、POST /api/tags","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-072 的实际路径 \"POST /api/auth/login\" 在路由定义中不存在","expected":"POST /api/auth/login","actual":"路由定义中未找到"},{"dimension":"D1","severity":"error","message":"UAT 路径映射 UAT-073 的实际路径 \"POST /api/auth/login、POST /api/articles/:id/publish、DELETE /api/articles/:id\" 在路由定义中不存在","expected":"POST /api/auth/login、POST /api/articles/:id/publish、DELETE /api/articles/:id","actual":"路由定义中未找到"}],"exitCode":1}
+

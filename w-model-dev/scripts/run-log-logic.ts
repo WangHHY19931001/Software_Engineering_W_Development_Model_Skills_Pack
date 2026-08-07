@@ -452,6 +452,7 @@ const GATE_JSON_PATTERNS: RegExp[] = [
   /PREVENTIVE_REVIEW_JSON\s+(\{.*\})/,
   /ROOTCAUSE_JSON\s+(\{.*\})/,
   /TLA_BDD_SYNC_JSON\s+(\{.*\})/,
+  /STATE_MACHINE_JSON\s+(\{.*\})/,
   /STATUS_JSON\s+(\{.*\})/,
   /METRICS_JSON\s+(\{.*\})/,
   /ERROR_JSON\s+(\{.*\})/,

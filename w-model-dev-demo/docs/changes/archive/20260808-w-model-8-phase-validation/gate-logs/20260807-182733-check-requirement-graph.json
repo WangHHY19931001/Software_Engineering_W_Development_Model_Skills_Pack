@@ -1,0 +1,20 @@
+﻿════════════════════════════════════════════════════════════
+图谱校验（Requirement Graph Checker）
+════════════════════════════════════════════════════════════
+输入文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev-demo\.w-model\ingestion\graph.json
+校验阶段      : 2
+节点总数      : 72
+边总数        : 318
+连通分量      : 1
+孤立节点      : 无
+根节点        : REQ-000
+orphan        : 无
+multiParent   : 无
+追溯违反      : SD_without_implements=0, INTF_without_defines=0, DD_without_realizes=0
+信息流违反    : blackHoles=[], miracles=[], deadModules=[]
+边界完整性    : EXT-IN=2, EXT-OUT=2, complete=true
+校验结果      : ✓ 通过
+────────────────────────────────────────────────────────────
+图谱结构符合 graph-guide.md：连通 + 单根 + 父唯一 + 阶段追溯完整。
+────────────────────────────────────────────────────────────
+GRAPH_JSON {"type":"requirement-graph","passed":true,"phase":2,"totalNodes":72,"totalEdges":318,"connectedComponents":1,"isolatedNodes":[],"roots":["REQ-000"],"orphans":[],"multiParent":[],"traceabilityViolations":{"SD_without_implements":0,"INTF_without_defines":0,"DD_without_realizes":0},"dataflowViolations":{"blackHoles":[],"miracles":[],"deadModules":[]},"boundary":{"extIn":2,"extOut":2,"complete":true},"exemptionsApplied":[],"violations":[],"warnings":[],"converged":true,"exitCode":0}

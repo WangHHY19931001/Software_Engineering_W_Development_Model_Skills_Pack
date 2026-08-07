@@ -34,6 +34,12 @@ describe('isTlcStatesDir', () => {
     expect(await isTlcStatesDir(dir)).toBe(true);
   });
 
+  it('含 2 位年份 TLC 时间戳子目录（26-08-05-10-30-00）→ true（第 35 轮 P3 修复）', async () => {
+    const dir = await makeTmpDir();
+    await fs.mkdir(path.join(dir, '26-08-05-10-30-00'));
+    expect(await isTlcStatesDir(dir)).toBe(true);
+  });
+
   it('含 .st 指纹文件 → true', async () => {
     const dir = await makeTmpDir();
     await fs.writeFile(path.join(dir, 'L2-AuthService.st'), 'x');

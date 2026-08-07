@@ -1,0 +1,23 @@
+提示：未提供 --tla-manifest，跳过 D4 TLA+ 等价校验
+
+=== BDD Model Check Report (phase 4) ===
+Passed: true
+ExitCode: 0
+Summary: BDD model check passed (phase 4)
+
+--- D1 Header Completeness: 0 violations
+
+--- D3 State Machine Completeness: 0 violations
+
+--- D4 TLA+ Equivalence: 0 violations
+
+--- D5 Step Binding: 0 violations
+
+--- D6 Scenario Path Validity: 0 violations
+
+--- D7 RTM Mapping: 0 violations
+
+--- D8 SD Coverage: 0 violations
+
+=== JSON Summary ===
+BDD_JSON {"type":"bdd","passed":true,"exitCode":0,"summary":"BDD model check passed (phase 4)"}
