@@ -12,8 +12,8 @@
 |------|------|----------|------|
 | 1 需求分析 | `docs/phase1-requirements/` | `requirement-spec.md`, `acceptance-test-design.md` | `templates/requirement-spec.md` |
 | 2 系统设计 | `docs/phase2-design/` | `{module}-system-design.md`, `{module}-system-test.md` | `templates/system-design.md`, `templates/test-case.md` |
-| 3 概要设计 | `docs/phase3-outline/` | `{module}-outline-design.md`, `{module}-integration-test.md` | `templates/detailed-design.md`, `templates/test-case.md` |
-| 4 详细设计 | `docs/phase4-detailed/` | `{module}-detailed-design.md`, `{module}-interface-design.md` | `templates/detailed-design.md`, `templates/interface-design.md` |
+| 3 概要设计 | `docs/phase3-outline/` | `{module}-interface-design.md`, `{module}-integration-test.md` | `templates/interface-design.md`, `templates/test-case.md` |
+| 4 详细设计 | `docs/phase4-detailed/` | `{module}-detailed-design.md`, `{module}-unit-test.md` | `templates/detailed-design.md`, `templates/test-case.md` |
 | 5 编码 | `src/` | 按技术栈约定 | — |
 | 6 集成测试 | `docs/phase6-integration-test/` | `integration-test.md` | `templates/test-case.md` |
 | 7 系统测试 | `docs/phase7-system-test/` | `system-test.md` | `templates/test-case.md` |

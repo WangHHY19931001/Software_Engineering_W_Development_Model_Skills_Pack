@@ -54,8 +54,8 @@ const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
  *
  * @param phase 阶段号 1-8
  * @param type  文档类型：'requirement-spec' | 'acceptance-test-design' | 'uat-path-mapping'
- *              | 'system-design' | 'system-test' | 'outline-design' | 'integration-test'
- *              | 'detailed-design' | 'interface-design' | 'integration-test-phase6'
+ *              | 'system-design' | 'system-test' | 'interface-design' | 'integration-test'
+ *              | 'detailed-design' | 'unit-test' | 'integration-test-phase6'
  *              | 'system-test-phase7' | 'acceptance-test-phase8'
  * @returns 相对项目根的路径（如 'docs/phase1-requirements/requirement-spec.md'）
  */
@@ -70,12 +70,12 @@ const PHASE_DOC_MAP: Record<number, Record<string, string>> = {
     'system-test': 'docs/phase2-design/{module}-system-test.md',
   },
   3: {
-    'outline-design': 'docs/phase3-outline/{module}-outline-design.md',
+    'interface-design': 'docs/phase3-outline/{module}-interface-design.md',
     'integration-test': 'docs/phase3-outline/{module}-integration-test.md',
   },
   4: {
     'detailed-design': 'docs/phase4-detailed/{module}-detailed-design.md',
-    'interface-design': 'docs/phase4-detailed/{module}-interface-design.md',
+    'unit-test': 'docs/phase4-detailed/{module}-unit-test.md',
   },
   6: { 'integration-test-phase6': 'docs/phase6-integration-test/integration-test.md' },
   7: { 'system-test-phase7': 'docs/phase7-system-test/system-test.md' },
