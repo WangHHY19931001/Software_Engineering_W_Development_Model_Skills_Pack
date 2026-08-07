@@ -127,7 +127,7 @@ describe('tla-manifest sdCoverage (phase>=2)', () => {
     expect(result.errorMessages.join(' ')).toMatch(/sdCoverage/);
   });
 
-  it('phase>=2 时 sdCoverage.uncoveredSdNodes 非空应校验失败', () => {
+  it('phase>=2 时 sdCoverage.uncoveredSdNodes 非空应通过 schema（由业务层 checkTlaModel 校验）', () => {
     const manifest = {
       version: 1, project: 'test', currentPhase: 2, basePath: '.',
       tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
@@ -148,7 +148,7 @@ describe('tla-manifest sdCoverage (phase>=2)', () => {
       },
     };
     const result = validateBySchema('tla-manifest', manifest);
-    expect(result.valid).toBe(false);
+    expect(result.valid).toBe(true);
   });
 });
 
