@@ -15,6 +15,7 @@
  *   --phase=N            只校验 spec.phase ≤ N 的规格（1-8），默认从 manifest.currentPhase 读取
  *   --spec=<id>          仅对该规格执行 SANY/TLC（调试用；结构/层次校验仍覆盖全部 phase 内规格）
  *   --graph=<graph.json> 提供图谱文件，提取 type=SD 节点 ID 供 SD 覆盖率校验（§10）
+ *                        phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID
  *   --keep-states / -k   P3.8：保留 TLC states 目录用于调试（默认校验后自动清理）
  *
  * 退出码：
@@ -346,7 +347,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <tla-manifest.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]',
+      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
       exitCode: 2,
     });
     return;
@@ -367,6 +368,17 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       message: '无法确定 phase',
       detail: `未传 --phase 且 manifest.currentPhase=${JSON.stringify(manifest.currentPhase)} 无效（须为 1-8）`,
+      exitCode: 2,
+    });
+    return;
+  }
+
+  // --graph phase>=2 强制（设计文档 §3.3.6）
+  if (phase >= 2 && !graphFile) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
+      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
       exitCode: 2,
     });
     return;
