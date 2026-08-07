@@ -199,7 +199,7 @@ S-bdd 子代理在 S-doc 产出需求规格后：
 4. 在 RTM `acceptanceTest` 列登记 `UAT-NNN | BDD-L1-<system>-<num>.feature`
 
 V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md) 7 项清单）。
-G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1` 校验 D1-D7（D5 step 绑定阶段 1-4 跳过）。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=1` 校验 D1-D8（D5 step 绑定阶段 1-4 跳过）。
 
 ### 验收测试前置条件分析（强制）
 

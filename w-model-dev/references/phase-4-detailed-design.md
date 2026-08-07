@@ -89,7 +89,7 @@ S-bdd 子代理在 S-doc 产出详细设计后：
 4. 在 RTM `unitTest` 列登记 `UT-NNN | BDD-L4-<system>_<subsystem>_<atom>-<num>.feature`
 
 V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
-G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4` 校验 D1-D7。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4` 校验 D1-D8。
 
 ## 设计项→装配点→测试 seam 三者一致性（第22轮 P1-5 修正）
 

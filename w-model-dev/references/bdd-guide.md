@@ -414,7 +414,7 @@ JSON 摘要写入 `.w-model/gate-logs/<timestamp>-bdd.json`，含 `exitCode` 字
 | 4 | S-bdd | 更新 `.w-model/bdd-manifest.json`（features + stateMachines） |
 | 5 | S-bdd | 在 RTM `acceptanceTest` 列登记 `UAT-NNN \| BDD-L1-<system>-<num>.feature` |
 | 6 | V | 评审 features（targetKind=test + bdd-review-checklist） |
-| 7 | G | 跑 `check-bdd-model.ts --phase=1` 校验 D1-D7（D5 step 绑定可暂缺，由 D6/D7 替代校验） |
+| 7 | G | 跑 `check-bdd-model.ts --phase=1` 校验 D1-D8（D5 step 绑定可暂缺，由 D6/D7 替代校验） |
 | 8 | O | CHECKPOINT 用户确认 → 放行 |
 
 ### §6.3 阶段 5（L4 features 作为 TDD 夹具）步骤
