@@ -129,7 +129,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ### 失败模式清单（F1~F10）
 
-「看似高效实则埋坑」的 10 条行为退化，与 43 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。详细检测信号与处理流程见 [references/anti-patterns.md](references/anti-patterns.md)「失败模式清单」节。
+「看似高效实则埋坑」的 10 条行为退化，与 44 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。详细检测信号与处理流程见 [references/anti-patterns.md](references/anti-patterns.md)「失败模式清单」节。
 
 | # | 失败模式 | 与反例的关系 |
 |---|---|---|

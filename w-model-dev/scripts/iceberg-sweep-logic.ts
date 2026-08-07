@@ -55,6 +55,19 @@ export function checkIcebergSweep(report: IcebergSweepReport): IcebergSweepCheck
     for (const msg of schemaResult.errorMessages) {
       reasons.push(`[schema] ${msg}`);
     }
+    // 结构违规时短路返回：后续 R5-R8 依赖 required 字段（线索来源/newFindings），
+    // 结构缺失继续访问会抛 TypeError（反模式 #28 语义：结构错误先报告，不进入业务规则校验）
+    return {
+      passed: false,
+      reasons,
+      reportSummary: {
+        reportId: report.reportId,
+        triggerType: report.triggerType,
+        icebergRound: report.icebergRound,
+        newFindingsCount: 0,
+        passed: false,
+      },
+    };
   }
   // R5: icebergRound 边界（1-5）
   if (report.icebergRound < 1 || report.icebergRound > MAX_ICEBERG_ROUNDS) {
@@ -76,15 +89,17 @@ export function checkIcebergSweep(report: IcebergSweepReport): IcebergSweepCheck
   if (report.passed !== expectedPassed) {
     reasons.push(`passed 不一致：newFindings=${report.newFindings.length} 但 passed=${report.passed}`);
   }
+  const passed = reasons.length === 0;
   return {
-    passed: reasons.length === 0,
+    passed,
     reasons,
     reportSummary: {
       reportId: report.reportId,
       triggerType: report.triggerType,
       icebergRound: report.icebergRound,
       newFindingsCount: report.newFindings.length,
-      passed: report.passed,
+      // 以最终校验结果为准（R8 违规时原始 report.passed 可能为 true，避免误导 gate-logs 消费方）
+      passed,
     },
   };
 }

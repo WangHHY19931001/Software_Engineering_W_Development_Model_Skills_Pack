@@ -38,6 +38,11 @@
     "passed": { "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空）", "type": "boolean" },
     "reworkHints": { "description": "review 返工提示数组（passed=false 时必须为非空数组）", "type": "array", "items": { "type": "string" } },
     "round": { "description": "返工轮次（rootcause/fix 动作），从 1 起", "type": "integer", "minimum": 1 },
-    "script": { "description": "gate 类动作的门禁脚本名（如 check-artifact-gate.ts / check-tla-model.ts / check-requirement-graph.ts）", "type": "string" }
+    "script": { "description": "gate 类动作的门禁脚本名（如 check-artifact-gate.ts / check-tla-model.ts / check-requirement-graph.ts）", "type": "string" },
+    "triggerType": { "description": "iceberg-sweep 动作的触发类型（第36轮新增）：ICEBERG-A=S-fix 后深挖 / ICEBERG-B=阶段门前全局扫掠", "enum": ["ICEBERG-A", "ICEBERG-B"] },
+    "icebergRound": { "description": "iceberg-sweep 动作的冰山轮次（第36轮新增，1-5，maxIcebergRounds=5）", "type": "integer", "minimum": 1, "maximum": 5 },
+    "reportPath": { "description": "iceberg-sweep 动作的 IcebergSweepReport 路径（.w-model/iceberg/<reportId>.json）", "type": "string", "minLength": 1 },
+    "newFindingsCount": { "description": "iceberg-sweep 动作的新发现隐藏问题数（第36轮新增，非负整数；0=无新问题=终止判据①满足）", "type": "integer", "minimum": 0 },
+    "validFindings": { "description": "iceberg-review 动作经 V 复审确认的有效发现数（第36轮新增，非负整数）", "type": "integer", "minimum": 0 }
   }
 }
