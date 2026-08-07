@@ -9,7 +9,7 @@
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json>
- *     [--phase=N] [--tla-manifest=<path>] [--rtm=<path>] [--cucumber-report=<path>]
+ *     [--phase=N] [--tla-manifest=<path>] [--rtm=<path>] [--cucumber-report=<path>] [--graph=<graph.json>]
  *
  * 参数：
  *   bdd-manifest.json   manifest 文件路径
@@ -17,6 +17,7 @@
  *   --tla-manifest=<p>   TLA+ manifest 路径（阶段 1-4 用于 D4 等价性校验）
  *   --rtm=<p>            RTM 文件路径（用于 D7 RTM 映射校验）
  *   --cucumber-report=<p>  cucumber 运行报告 JSON（阶段 5-8 用于 D5 step 绑定校验）
+ *   --graph=<p>          graph.json 路径（phase>=2 时强制必填，提取 type=SD 节点供 D8 SD Coverage 校验）
  *
  * 退出码：
  *   0  校验通过（schema + 头标注 + 状态机 + 等价性 + step 绑定 + 路径 + RTM 全过）
@@ -55,6 +56,7 @@ interface ParsedArgs {
   tlaManifestFile: string | undefined;
   rtmFile: string | undefined;
   cucumberReportFile: string | undefined;
+  graphFile: string | undefined;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -64,6 +66,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const tlaArg = args.find(a => a.startsWith('--tla-manifest='));
   const rtmArg = args.find(a => a.startsWith('--rtm='));
   const cucumberArg = args.find(a => a.startsWith('--cucumber-report='));
+  const graphArg = args.find(a => a.startsWith('--graph='));
 
   // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
   const phase = phaseArg ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
@@ -71,8 +74,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   const tlaManifestFile = tlaArg ? tlaArg.split('=')[1] : undefined;
   const rtmFile = rtmArg ? rtmArg.split('=')[1] : undefined;
   const cucumberReportFile = cucumberArg ? cucumberArg.split('=')[1] : undefined;
+  const graphFile = graphArg ? graphArg.split('=')[1] : undefined;
 
-  return { manifestFile, phase, phaseStr, tlaManifestFile, rtmFile, cucumberReportFile };
+  return { manifestFile, phase, phaseStr, tlaManifestFile, rtmFile, cucumberReportFile, graphFile };
 }
 
 // ==================== I/O 辅助 ====================
@@ -178,6 +182,17 @@ async function main(): Promise<number> {
   }
   const phase = phaseRaw as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+  // --graph phase>=2 强制（设计文档 §3.3.7）
+  if (phase >= 2 && !args.graphFile) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
+      detail: '用法: check-bdd-model.ts <bdd-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
+      exitCode: 2,
+    });
+    return 2;
+  }
+
   const manifestDir = path.resolve(path.dirname(args.manifestFile));
   // 项目根目录 = manifest 所在目录的父目录（约定：manifest 在 .w-model/ 下）
   const projectDir = path.resolve(manifestDir, '..');
@@ -265,6 +280,19 @@ async function main(): Promise<number> {
     }
   }
 
+  // 提取 graph SD 节点（供 D8 SD Coverage 交叉校验）
+  let graphSdNodes: string[] | undefined;
+  if (args.graphFile) {
+    try {
+      const g = await readJson<{ nodes?: Array<{ id: string; type: string }> }>(args.graphFile);
+      if (Array.isArray(g.nodes)) {
+        graphSdNodes = g.nodes.filter(n => n.type === 'SD').map(n => n.id);
+      }
+    } catch (e) {
+      console.error(`[D8] 无法读取 graph 文件: ${(e as Error).message}`);
+    }
+  }
+
   // 调用纯逻辑校验
   const result = checkBddModel({
     manifest,
@@ -273,6 +301,7 @@ async function main(): Promise<number> {
     tlaSnapshots,
     rtmRows,
     cucumberReport,
+    graphSdNodes,
   });
 
   // 输出报告
@@ -292,6 +321,8 @@ async function main(): Promise<number> {
   for (const v of result.dimensions.scenarioPathValidity) console.log(`  - ${v}`);
   console.log(`\n--- D7 RTM Mapping: ${result.dimensions.rtmMapping.length} violations`);
   for (const v of result.dimensions.rtmMapping) console.log(`  - ${v}`);
+  console.log(`\n--- D8 SD Coverage: ${result.dimensions.sdCoverage.length} violations`);
+  for (const v of result.dimensions.sdCoverage) console.log(`  - ${v}`);
 
   // JSON 摘要
   console.log(`\n=== JSON Summary ===`);

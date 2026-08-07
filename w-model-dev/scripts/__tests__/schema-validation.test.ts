@@ -175,7 +175,7 @@ describe('bdd-manifest designCoverage (phase>=2)', () => {
     expect(result.errorMessages.join(' ')).toMatch(/designCoverage/);
   });
 
-  it('phase>=2 时 designCoverage.uncoveredSdNodes 非空应校验失败', () => {
+  it('phase>=2 时 designCoverage.uncoveredSdNodes 非空应通过 schema（非空由业务层 D8 校验）', () => {
     const manifest = {
       schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
       currentPhase: 2,
@@ -199,6 +199,6 @@ describe('bdd-manifest designCoverage (phase>=2)', () => {
       },
     };
     const result = validateBySchema('bdd-manifest', manifest);
-    expect(result.valid).toBe(false);
+    expect(result.valid).toBe(true);
   });
 });

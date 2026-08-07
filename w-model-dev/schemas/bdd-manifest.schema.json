@@ -15,7 +15,7 @@
           "designCoverage": {
             "type": "object",
             "properties": {
-              "uncoveredSdNodes": { "type": "array", "maxItems": 0 }
+              "uncoveredSdNodes": { "type": "array" }
             }
           }
         }
