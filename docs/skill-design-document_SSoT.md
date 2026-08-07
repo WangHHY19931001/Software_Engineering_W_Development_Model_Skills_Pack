@@ -988,6 +988,21 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 > 批次 5 是总框架 5 批优化的收尾批：批次 1-4 的回归基线与 vitest 计数在批次 4 后更新为 self-test 213 / vitest 434（批次 4 修复 __tests__ 严格类型并纳入测试，README 旧计数 377 与 INSTALL 旧计数 363 已统一为 434）。
 
+#### 3.4.32 第 34 轮：W 模型技能强化（2026-08-07，[34.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 调测发现三类问题并系统性修复（设计文档 `2026-08-07-w-model-skill-hardening-design.md`）：①目录约定散落四处无 SSoT；②路径-定位分隔符三处不一致（冒号/点号/井号）；③TLA+/BDD 多级精细化时"只做一个子系统"门禁不检出 |
+| 新增 | `references/directory-conventions.md`（路径约定 SSoT：`docs/phaseN-{name}/` 阶段子目录 + TLA+/BDD/.w-model 目录结构 + resolvePhaseDoc 契约）；`references/format-conventions.md`（元数据格式 SSoT：冒号分隔 `path:§section`/`path:L42`，禁止点号/井号）；S-ingest-tla / S-ingest-bdd 子代理模板（subagent-delegation.md：从 .tla/.feature 提取 @designIds + 比对 graph.json SD 节点 → 独立回填 manifest sdCoverage/designCoverage，防 S 自填不可靠）；schema sdCoverage（tla-manifest）/ designCoverage（bdd-manifest）必填字段（phase≥2，allOf/if/then 条件约束）；check-bdd-model.ts `--graph` + D8 SD Coverage 维度（phase≥2 强制）；测试样本 `samples/tla/bad-coverage-uncovered-sd.json` + `samples/bdd/bad-d8-uncovered-sd.json` |
+| 归一化 | 冒号分隔格式统一（verifier-logic EVIDENCE_PATTERN + verifier-spec §6.2 evidence + tla-spec-template/feature.template @designIds + @design 路径 `:§`）；阶段子目录模式（phase-2/3/4 文档路径 + check-artifact-gate resolvePhaseDoc）；check-tla-model `--graph` phase≥2 强制（缺失 → exitCode=2 ARG_INVALID）+ SD 覆盖率 phase≥2 强制执行；check-artifact-gate 终检调用 model 校验；G 子代理模板强制跑 model 校验（--graph）；bdd-logic TLA+ 快照解析升级（命名集合 + 多种不变式形态 + L1 豁免 D4 自动等价，由 R3/V 语义评审）；demo 完整重产（TLA+ 7 specs L1+6 L2，SANY/TLC 全过 + BDD 9 features 覆盖全部 21 SD 节点，sdCoverage/designCoverage 全覆盖） |
+| package.json | version `33.0.0` → `34.0.0`（与 SKILL.md frontmatter + skill-metadata.json 三处一致） |
+| 顶层文档 | SSoT §3.4.32 + §10A 追溯表 + CHANGELOG.md [34.0.0] + README/AGENTS/INSTALL 同步（vitest 451/33 文件、bdd-logic D1-D8 八维度、dispatch-matrix/eval 版本号） |
+| self-test | 基线 213 不变全通过 |
+| vitest | 451/451（33 文件）全通过（skill-metadata.test.ts 三方版本校验通过） |
+| TypeScript strict | 0 错误 |
+
+> 多子系统遗漏检出实测：TLA+ 遗漏 auth 子系统（SD-001/002/017）→ check-tla-model exit 1 "未被覆盖: SD-001, SD-002, SD-017"；BDD D8 同样检出。
+
 ---
 
 ## 4. 技能工作流程
@@ -2589,6 +2604,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.29 | 第 31 轮 /wm status 脚本化 + 流程度量报告 | scripts/wm-status.ts + wm-status-logic.ts + metrics-report.ts + metrics-report-logic.ts | 完整（self-test 213/213、vitest 345、tsc 0 错误） |
 | §3.4.30 | 第 32 轮 错误结构全量归一化 + run-log R6 契约迁移 | scripts/lib/cli-error.ts + 29 脚本 exit 2 归一化 + scripts/run-log-logic.ts（extractExitCode/buildGateLogKeys 迁入）+ scripts/__tests__/cli-error.test.ts | 完整（self-test 213/213、vitest 363、tsc 0 错误） |
 | §3.4.31 | 第 33 轮 全仓库优化 5 批实施（技能缺口 + 评估 + 收尾） | `.cursor/skills/security-review/SKILL.md`（lint:security + baseline v2 + 反模式 #43 凭据脱敏）+ `.cursor/skills/codegraph-exploration/SKILL.md`（约束 #20 codegraph_explore + 落盘字段）+ `.cursor/skills/performance-review/SKILL.md`（性能评审 4 维度）+ `eval/README.md`（TSV 9 列 + darwin-skill 补跑流程）+ 版本号三处 33.0.0 | 完整（self-test 213/213、vitest 434、tsc 0 错误；eval 补跑留待外部 darwin-skill） |
+| §3.4.32 | 第 34 轮 W 模型技能强化（目录约定 SSoT / 格式统一 / TLA+·BDD 覆盖率校验架构升级） | `references/directory-conventions.md`（路径约定 SSoT）+ `references/format-conventions.md`（冒号格式 SSoT）+ `subagent-delegation.md`（S-ingest-tla / S-ingest-bdd 模板）+ `schemas/tla-manifest.schema.json`（sdCoverage 必填）+ `schemas/bdd-manifest.schema.json`（designCoverage 必填）+ `scripts/check-tla-model.ts`（--graph phase≥2 强制 + SD 覆盖率强制）+ `scripts/check-bdd-model.ts`（--graph + D8 维度）+ `scripts/check-artifact-gate.ts`（resolvePhaseDoc + 终检 model 校验）+ `scripts/verifier-logic.ts`（EVIDENCE_PATTERN 冒号格式）+ `scripts/bdd-logic.ts`（TLA+ 快照解析升级 + L1 豁免 D4）+ demo 重产（TLA+ 7 specs + BDD 9 features 覆盖 21 SD）+ 版本号三处 34.0.0 | 完整（self-test 213/213、vitest 451、tsc 0 错误） |
 
 ---
 

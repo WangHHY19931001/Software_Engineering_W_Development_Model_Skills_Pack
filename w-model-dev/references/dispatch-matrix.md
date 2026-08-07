@@ -197,4 +197,4 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | #41 单轴失败掩盖 | check-verifier-output R13 |
 | #42 S-fix 跳过 R3+V | check-preventive-review(--variant=fix/emergency) + check-run-log R8 |
 
-> 数据来源：SKILL.md + subagent-delegation.md + phase-1~8-*.md + anti-patterns.md，版本号 33.0.0。
+> 数据来源：SKILL.md + subagent-delegation.md + phase-1~8-*.md + anti-patterns.md，版本号 34.0.0。

@@ -3,6 +3,36 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [34.0.0] - 2026-08-07
+
+### 第三十四轮 W 模型技能强化：目录约定 SSoT / 格式统一 / TLA+·BDD 覆盖率校验架构升级
+
+调测发现三类问题并系统性修复（设计文档 `docs/superpowers/specs/2026-08-07-w-model-skill-hardening-design.md`）：①目录约定散落四处无 SSoT；②路径-定位分隔符三处不一致（冒号/点号/井号）；③TLA+/BDD 多级精细化时"只做一个子系统"门禁不检出。详见 SSoT §3.4.32。
+
+#### Added
+- 新建 `references/directory-conventions.md`：路径约定 SSoT（`docs/phaseN-{name}/` 阶段子目录 + TLA+/BDD/.w-model 目录结构 + resolvePhaseDoc 契约）
+- 新建 `references/format-conventions.md`：元数据格式 SSoT（冒号分隔 `path:§section`/`path:L42`，禁止点号/井号）
+- 新增 S-ingest-tla / S-ingest-bdd 子代理模板（subagent-delegation.md）：从 .tla/.feature 提取 @designIds + 比对 graph.json SD 节点 → 独立回填 manifest sdCoverage/designCoverage（防 S 自填不可靠）
+- schema 新增 sdCoverage（tla-manifest）/ designCoverage（bdd-manifest）必填字段（phase≥2，allOf/if/then 条件约束）
+- check-bdd-model.ts 新增 `--graph` 参数 + D8 SD Coverage 校验维度（phase≥2 强制）
+- bdd-logic TLA+ 快照解析升级：支持命名集合（`var \in SETNAME`）与多种不变式形态；L1 系统级规格豁免 D4 自动等价（由 R3/V 语义评审）
+- 测试样本：`samples/tla/bad-coverage-uncovered-sd.json` + `samples/bdd/bad-d8-uncovered-sd.json`
+
+#### Changed
+- check-tla-model.ts：`--graph` 参数 phase≥2 强制（缺失 → exitCode=2 ARG_INVALID）；SD 覆盖率校验 phase≥2 强制执行（sdCoverage.uncoveredSdNodes 非空 → exitCode=1）
+- check-artifact-gate.ts：终检调用 check-tla-model + check-bdd-model 并传 `--graph`；新增 resolvePhaseDoc 消除硬编码路径
+- verifier-logic.ts EVIDENCE_PATTERN 更新为冒号格式；verifier-spec §6.2 evidence 格式统一
+- tla-spec-template / feature.template 新增 @designIds 头部字段；@design 路径统一 `:§` 冒号格式
+- phase-2/3/4 文档路径更新为阶段子目录模式；G 子代理模板强制跑 model 校验（--graph）
+- demo 完整重产：TLA+ 7 specs（L1 + 6 L2 子系统，SANY/TLC 全过）+ BDD 9 features 覆盖全部 21 SD 节点（sdCoverage/designCoverage 全覆盖）
+- 版本号三处同步为 34.0.0：package.json + skill-metadata.json + SKILL.md frontmatter
+
+#### 验证
+- vitest 451/451（33 文件）全通过
+- self-test 213/213 全通过
+- TypeScript strict 0 错误
+- 多子系统遗漏检出实测：TLA+ 遗漏 auth 子系统（SD-001/002/017）→ check-tla-model exit 1 "未被覆盖: SD-001, SD-002, SD-017"；BDD D8 同样检出
+
 ## [33.0.0] - 2026-08-05
 
 ### 第三十三轮 全仓库优化 5 批实施（安全加固 / 一致性快修 / 脚本瘦身 / 流程与体验 / 技能缺口 + 收尾）

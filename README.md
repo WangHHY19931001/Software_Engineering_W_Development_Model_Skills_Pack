@@ -334,7 +334,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── wm-status-logic.ts  #   状态快照纯逻辑（buildStatusReport / STATUS_TO_PHASE）
 │   │   ├── metrics-report.ts   #   流程度量报告 CLI（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警，只读，退出码 0/2）
 │   │   ├── metrics-report-logic.ts  # 流程度量纯逻辑（computeMetrics）
-│   │   ├── bdd-logic.ts         #   BDD 模型门禁纯逻辑（D1-D7 七维度）
+│   │   ├── bdd-logic.ts         #   BDD 模型门禁纯逻辑（D1-D8 八维度）
 │   │   ├── check-bdd-model.ts   #   BDD 模型门禁 CLI（`<bdd-manifest.json>`，退出码 0/1/2）
 │   │   ├── coverage-logic.ts    #   需求覆盖分析纯逻辑（C1-C10）
 │   │   ├── check-requirement-coverage.ts  # 需求覆盖分析门禁 CLI（`<coverage.json> --graph= --out-of-scope= --exemptions=`，退出码 0/1/2）
@@ -361,7 +361,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── lib/cli-error.ts      #   exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具（ENOENT/坏行 → exit 2）
 │   │   ├── lib/safe-json.ts      #   JSON 解析原型污染防御（parseJsonSafe，丢弃 __proto__ 键）
-│   │   ├── __tests__/            #   vitest 单元测试（33 个 .test.ts / 434 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            #   vitest 单元测试（33 个 .test.ts / 451 条 + README.md coverage 矩阵）
 │   │   └── samples/              #   端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
