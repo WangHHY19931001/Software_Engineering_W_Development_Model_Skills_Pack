@@ -20,6 +20,8 @@
   - 方法级定义（签名、职责、前置 / 后置条件）
 - 单元测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=单元测试）
 
+> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+
 ## AI 能力应用
 
 - **UML 图自动生成**：类图、ER 图
@@ -33,10 +35,10 @@
 
 | 产出物 | 落地方式 | 文件命名 |
 |---|---|---|
-| 详细设计文档 | 套用 `templates/detailed-design.md` 模板，含类图 / ER 图 / 方法定义 | `<模块>-detailed-design.md` |
-| 单元测试用例 | 套用 `templates/test-case.md` 模板，`type=单元测试`，每个方法 ≥ 1 用例且含 `expect()` 断言 | `<模块>-unit-test.md` |
-| UML 类图 | 用 Mermaid `classDiagram` 语法产出，符合 UML 规范 | 内嵌于 `<模块>-detailed-design.md` |
-| ER 图 | 用 Mermaid `erDiagram` 语法产出，含表结构 + 字段 + 索引 + 关系 | 内嵌于 `<模块>-detailed-design.md` |
+| 详细设计文档 | 套用 `templates/detailed-design.md` 模板，含类图 / ER 图 / 方法定义 | `docs/phase4-detailed/{module}-detailed-design.md` |
+| 单元测试用例 | 套用 `templates/test-case.md` 模板，`type=单元测试`，每个方法 ≥ 1 用例且含 `expect()` 断言 | `docs/phase4-detailed/{module}-unit-test.md` |
+| UML 类图 | 用 Mermaid `classDiagram` 语法产出，符合 UML 规范 | 内嵌于 `docs/phase4-detailed/{module}-detailed-design.md` |
+| ER 图 | 用 Mermaid `erDiagram` 语法产出，含表结构 + 字段 + 索引 + 关系 | 内嵌于 `docs/phase4-detailed/{module}-detailed-design.md` |
 
 **图形语法约束**：类图须体现继承 / 关联 / 依赖关系；ER 图须含主键 / 外键 + 索引标注。禁止以纯文字描述替代图形产出。
 

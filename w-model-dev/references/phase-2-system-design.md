@@ -20,6 +20,8 @@
   - 模块划分方案
 - 系统测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=系统测试）
 
+> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+
 ## AI 能力应用
 
 - **架构设计建议生成**：依据需求规模与质量属性给出分层 / 微服务等架构建议
@@ -33,9 +35,9 @@
 
 | 产出物 | 落地方式 | 文件命名 |
 |---|---|---|
-| 系统设计文档 | 套用 `templates/system-design.md` 模板，含架构图 / 技术选型 / 模块划分 | `<模块>-system-design.md` |
-| 系统测试用例 | 套用 `templates/test-case.md` 模板，`type=系统测试`，必须含 TC-DES-008/009 | `<模块>-system-test.md` |
-| 架构图 | 用 Mermaid / PlantUML 语法产出 C4 组件图 + 部署图（嵌入系统设计文档） | 内嵌于 `<模块>-system-design.md` |
+| 系统设计文档 | 套用 `templates/system-design.md` 模板，含架构图 / 技术选型 / 模块划分 | `docs/phase2-design/{module}-system-design.md` |
+| 系统测试用例 | 套用 `templates/test-case.md` 模板，`type=系统测试`，必须含 TC-DES-008/009 | `docs/phase2-design/{module}-system-test.md` |
+| 架构图 | 用 Mermaid / PlantUML 语法产出 C4 组件图 + 部署图（嵌入系统设计文档） | 内嵌于 `docs/phase2-design/{module}-system-design.md` |
 
 **架构图语法约束**：C4 组件图须体现分层 + 组件间依赖；部署图须体现节点 + 进程 + 数据流。禁止以纯文字描述替代图形产出。
 

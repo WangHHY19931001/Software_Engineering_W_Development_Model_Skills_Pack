@@ -20,6 +20,8 @@
   - 调用关系图
 - 集成测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=集成测试）
 
+> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+
 ## AI 能力应用
 
 - **接口定义文档生成**：依据模块职责推导接口契约
@@ -32,9 +34,9 @@
 
 | 产出物 | 落地方式 | 文件命名 |
 |---|---|---|
-| 接口设计文档 | 套用 `templates/interface-design.md` 模板，含接口签名 / 参数 / 返回值 / 错误码 | `<模块>-interface-design.md` |
-| 集成测试用例 | 套用 `templates/test-case.md` 模板，`type=集成测试`，含参数校验 + 跨模块 + 异常路径 | `<模块>-integration-test.md` |
-| 调用关系图 | 用 Mermaid `graph` 语法产出模块间调用关系，须标注依赖方向，禁止循环依赖 | 内嵌于 `<模块>-interface-design.md` |
+| 接口设计文档 | 套用 `templates/interface-design.md` 模板，含接口签名 / 参数 / 返回值 / 错误码 | `docs/phase3-outline/{module}-interface-design.md` |
+| 集成测试用例 | 套用 `templates/test-case.md` 模板，`type=集成测试`，含参数校验 + 跨模块 + 异常路径 | `docs/phase3-outline/{module}-integration-test.md` |
+| 调用关系图 | 用 Mermaid `graph` 语法产出模块间调用关系，须标注依赖方向，禁止循环依赖 | 内嵌于 `docs/phase3-outline/{module}-interface-design.md` |
 
 **调用关系图语法约束**：每个模块间调用须标注接口名 + 数据流向；存在循环依赖时必须重新划分模块边界，禁止带环放行。
 
