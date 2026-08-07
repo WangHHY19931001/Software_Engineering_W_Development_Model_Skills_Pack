@@ -254,13 +254,18 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 上下文：
   - 待校验文件路径：<V 子代理产出的 VerifierOutput JSON / project-dir>
 执行：
-  - 阶段 1~7 门：npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output.json>"
-  - 阶段 8 终检：npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+  - 阶段 1~7 门：
+    1. npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output.json>"
+    2. npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    3. npx tsx w-model-dev/scripts/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    4. npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir] --phase=<N>
+    5. 其余闭环脚本（按 phase-N 定义）
+  - 阶段 8 终检：npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]（内部已调用 check-tla-model + check-bdd-model 并传 --graph）
 产出契约：
   1. 退出码（0 / 1 / 2）
   2. 证据摘要：
-     - 阶段门：{exitCode, qualityLevel, passed, reworkHints}
-     - 终检：{exitCode, GATE_JSON 摘要（RTM 覆盖率 / 四级测试结果）}
+     - 阶段门：{exitCode, qualityLevel, passed, reworkHints, tlaModelExitCode, bddModelExitCode}
+     - 终检：{exitCode, GATE_JSON 摘要（RTM 覆盖率 / 四级测试结果 / Model 校验结果）}
   3. 返回编排者：上述结构化摘要
 禁止：
   - 改产物文件
@@ -321,9 +326,11 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 > 阶段 1–4 单个 S 子代理任务过重（文档 + 测试设计 + RTM + TLA+ + BDD features 五类产出）时，编排者可将 S 拆为最多三次分派，避免单次上下文超载或产出质量稀释。**拆分为可选项，非强制**；任务粒度可承载时不拆，按标准 S 模板一次产出。
 
 - **S-doc**：产出开发文档 + 同步测试设计 + 更新 RTM 实体；**不产出** `.tla` / `.cfg` / `tla-manifest.json` / `.feature` / `bdd-manifest.json`。
-- **S-tla**：产出对应层级 TLA+ 规格（`.tla` + `.cfg`）+ 更新 `tla-manifest.json`；**依赖 S-doc 已产出的设计文档**作为建模输入。
-- **S-bdd**：产出对应层级 BDD features（`.feature`）+ 更新 `bdd-manifest.json`；**依赖 S-doc 已产出的设计文档 + S-tla 已产出的 TLA+ 规格**作为等价性对齐输入（BDD 状态机七要素须与同层 TLA+ spec 的 State/Init/Next/Invariants 等价）。
-- **分派时序**：S-doc → S-tla → S-bdd → V → G（V 评审三批产物的合集；G 跑 `check-verifier-output.ts` + `check-tla-model.ts` + `check-bdd-model.ts`）。
+- **S-tla**：产出对应层级 TLA+ 规格（`.tla` + `.cfg`）+ 更新 `tla-manifest.json` 基础字段 + **`.tla` 文件头部含 `@designIds` 字段（列出覆盖的 SD 节点 ID）**；**依赖 S-doc 已产出的设计文档**作为建模输入；**不产出** `tla-manifest.json` 的 `sdCoverage` 字段（由 S-ingest-tla 回填）。
+- **S-bdd**：产出对应层级 BDD features（`.feature`）+ 更新 `bdd-manifest.json` 基础字段 + **`.feature` 文件头部含 `@designIds` 字段**；**依赖 S-doc 已产出的设计文档 + S-tla 已产出的 TLA+ 规格**作为等价性对齐输入；**不产出** `bdd-manifest.json` 的 `designCoverage` 字段（由 S-ingest-bdd 回填）。
+- **S-ingest-tla**：从 .tla 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 tla-manifest.json sdCoverage；**依赖 S-tla 已产出的 .tla 文件** + A-evolve 已产出的 graph.json。
+- **S-ingest-bdd**：从 .feature 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 bdd-manifest.json designCoverage；**依赖 S-bdd 已产出的 .feature 文件** + A-evolve 已产出的 graph.json。
+- **分派时序**：S-doc → A-evolve(SD 节点入图谱) → S-tla(产出 .tla/.cfg/manifest 基础字段 + @designIds 头部) → S-ingest-tla(回填 manifest sdCoverage) → S-bdd(产出 .feature/manifest 基础字段 + @designIds 头部) → S-ingest-bdd(回填 manifest designCoverage) → R3 → V → G(check-tla-model + check-bdd-model --graph 校验)。
 - **返工边界**：V/G 命中 TLA+ 问题 → 仅返工 S-tla；命中 BDD 问题 → 仅返工 S-bdd（若 TLA+ 规格变更影响 BDD 等价性则同步触发 S-bdd 重评）；命中文档 / 测试设计 / RTM 问题 → 仅返工 S-doc，若设计变更影响 TLA+ 模型或 BDD features 则同步触发 S-tla / S-bdd 重评。
 
 #### S-doc 子代理分派模板
@@ -349,17 +356,20 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 ```
 角色：产出子代理-TLA+ 变体（S-tla）
 当前 W 模型阶段：<阶段 N - 名称>
-任务：产出对应层级 TLA+ 规格 + 更新 tla-manifest.json
+任务：产出对应层级 TLA+ 规格 + 更新 tla-manifest.json；`.tla` 文件头部须含 `@designIds` 字段，列出覆盖的 SD 节点 ID
 依据：references/tla-plus-guide.md + templates/tla-spec-template.md + S-doc 已产出的设计文档
 产出：
-  1. .tla（按 phase-N 层级：L1/L2/L3/L4）
+  1. .tla（按 phase-N 层级：L1/L2/L3/L4）——头部须含 @designIds 字段，列出覆盖的 SD 节点 ID
   2. .cfg（TLC 模型检查配置）
-  3. tla-manifest.json 实体更新
+  3. tla-manifest.json 实体更新（基础字段，不含 sdCoverage——由 S-ingest-tla 回填）
   4. 返回：{.tla 路径, .cfg 路径, manifest diff, selfCheck}
 不产出：
   - 开发文档 / 测试设计 / RTM 实体（由 S-doc 负责）
   - .feature / bdd-manifest.json（由 S-bdd 负责）
+  - tla-manifest.json 的 sdCoverage 字段（由 S-ingest-tla 回填）
   - 跑门禁脚本 / 越阶段产出 / 改 project.status
+约束：
+  - .tla 文件头部须含 @designIds 字段（逗号分隔的 SD 节点 ID），读取 .w-model/ingestion/graph.json 提取 SD 节点列表作为覆盖范围依据
 ```
 
 #### S-bdd 子代理分派模板
@@ -370,18 +380,68 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 任务：产出对应层级 BDD features + 更新 bdd-manifest.json
 依据：references/bdd-guide.md + templates/feature.template + templates/bdd-manifest.template.json + S-doc 已产出的设计文档 + S-tla 已产出的 TLA+ 规格（用于 BDD↔TLA+ 等价性对齐）
 产出：
-  1. .feature（按 phase-N 层级：L1/L2/L3/L4，每个 REQ/SD/INTF/DD ≥1 个 .feature 文件）
-  2. bdd-manifest.json 实体更新（features + stateMachines + tlaSpecId 关联）
+  1. .feature（按 phase-N 层级：L1/L2/L3/L4，每个 REQ/SD/INTF/DD ≥1 个 .feature 文件）——头部须含 @designIds 字段，列出覆盖的 SD 节点 ID
+  2. bdd-manifest.json 实体更新（features + stateMachines + tlaSpecId 关联，不含 designCoverage——由 S-ingest-bdd 回填）
   3. RTM 测试列追加 BDD 引用（`<Type>-NNN | BDD-L<level>-<system>-<num>.feature`）
   4. 返回：{.feature 路径, manifest diff, RTM diff, selfCheck}
 不产出：
   - 开发文档 / 测试设计 / RTM 实体（由 S-doc 负责）
   - .tla / .cfg / tla-manifest.json（由 S-tla 负责）
+  - bdd-manifest.json 的 designCoverage 字段（由 S-ingest-bdd 回填）
   - 跑门禁脚本 / 越阶段产出 / 改 project.status
 约束：
   - BDD 状态机七要素须与同层 TLA+ spec 等价（states↔State / initialState↔Init / transitions↔Next / invariants↔Invariants）
-  - 文件头 9 个 @ 字段全部必填（@req / @design / @system / @tla-spec / @state-machine / @parent-features / @sibling-features / @child-features / @scenario-id-prefix）
+  - 文件头 10 个 @ 字段全部必填（@req / @design / @designIds / @system / @tla-spec / @state-machine / @parent-features / @sibling-features / @child-features / @scenario-id-prefix）
   - Background 节七要素全部必填（acceptingStates 不可为空，其余可为 ()）
+  - .feature 文件头部须含 @designIds 字段（逗号分隔的 SD 节点 ID），读取 .w-model/ingestion/graph.json 提取 SD 节点列表作为覆盖范围依据
+```
+
+#### S-ingest-tla 子代理分派模板
+
+```
+角色：产出子代理-TLA+ 图谱导入变体（S-ingest-tla）
+当前 W 模型阶段：<阶段 N - 名称>
+任务：从 .tla 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 tla-manifest.json sdCoverage
+依据：references/directory-conventions.md + references/format-conventions.md + references/tla-plus-guide.md §10
+输入：
+  - .tla 文件路径列表（S-tla 已产出）
+  - tla-manifest.json 路径
+  - .w-model/ingestion/graph.json 路径
+产出：
+  1. tla-manifest.json 的 sdCoverage 字段回填（totalSdNodes / coveredSdNodes / uncoveredSdNodes / coverageRate）
+  2. 返回：{manifest 路径, sdCoverage 摘要, uncovered 列表}
+不产出：
+  - .tla / .cfg 文件（由 S-tla 负责，S-ingest 只读不写 .tla）
+  - 开发文档 / 测试设计 / RTM 实体
+  - 跑门禁脚本 / 越阶段产出 / 改 project.status
+约束：
+  - 只读 .tla 文件，不修改
+  - @designIds 提取须与 .tla 文件头部一致
+  - sdCoverage.uncoveredSdNodes 须与 graph.json SD 节点比对结果一致
+```
+
+#### S-ingest-bdd 子代理分派模板
+
+```
+角色：产出子代理-BDD 图谱导入变体（S-ingest-bdd）
+当前 W 模型阶段：<阶段 N - 名称>
+任务：从 .feature 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 bdd-manifest.json designCoverage
+依据：references/directory-conventions.md + references/format-conventions.md + references/bdd-guide.md D8
+输入：
+  - .feature 文件路径列表（S-bdd 已产出）
+  - bdd-manifest.json 路径
+  - .w-model/ingestion/graph.json 路径
+产出：
+  1. bdd-manifest.json 的 designCoverage 字段回填（totalSdNodes / coveredSdNodes / uncoveredSdNodes / coverageRate）
+  2. 返回：{manifest 路径, designCoverage 摘要, uncovered 列表}
+不产出：
+  - .feature 文件（由 S-bdd 负责，S-ingest 只读不写 .feature）
+  - 开发文档 / 测试设计 / RTM 实体
+  - 跑门禁脚本 / 越阶段产出 / 改 project.status
+约束：
+  - 只读 .feature 文件，不修改
+  - @designIds 提取须与 .feature 文件头部一致
+  - designCoverage.uncoveredSdNodes 须与 graph.json SD 节点比对结果一致
 ```
 
 ### 阶段 5-8 S 三段式变体（第 25 轮新增）
@@ -469,6 +529,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 | S 变体 | action | R3 报告路径前缀 |
 |---|---|---|
 | 标准 S / S-doc / S-tla / S-bdd | `produce` | `<phase>-{dim}.json` |
+| S-ingest-tla / S-ingest-bdd | `produce` | `<phase>-ingest.json` |
 | S-fix（返工变体） | `fix` | `<phase>-fix-{dim}.json` |
 | S-emergency-fix（紧急修复变体） | `emergency-fix` | `<phase>-emergency-{dim}.json` |
 
