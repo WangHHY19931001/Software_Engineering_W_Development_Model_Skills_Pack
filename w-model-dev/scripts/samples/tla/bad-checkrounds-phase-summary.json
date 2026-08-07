@@ -49,6 +49,12 @@
       "stateExplosion": false
     }
   ],
+  "sdCoverage": {
+    "totalSdNodes": 0,
+    "coveredSdNodes": [],
+    "uncoveredSdNodes": [],
+    "coverageRate": 1
+  },
   "checkRounds": [
     {
       "phase": 2,

@@ -31,5 +31,11 @@
       "cfgContent": "SPECIFICATION Spec\nINVARIANTS\n  NoExitTerminal\n  ArtifactGateConsistency"
     }
   ],
+  "sdCoverage": {
+    "totalSdNodes": 0,
+    "coveredSdNodes": [],
+    "uncoveredSdNodes": [],
+    "coverageRate": 1
+  },
   "checkRounds": []
 }

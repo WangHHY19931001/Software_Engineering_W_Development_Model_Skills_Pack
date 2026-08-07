@@ -81,5 +81,21 @@
       "stateExplosion": false
     }
   ],
+  "sdCoverage": {
+    "totalSdNodes": 11,
+    "coveredSdNodes": ["SD-5.2.1", "SD-5.2.8"],
+    "uncoveredSdNodes": [
+      "SD-5.2.2",
+      "SD-5.2.3",
+      "SD-5.2.4",
+      "SD-5.2.5",
+      "SD-5.2.6",
+      "SD-5.2.7",
+      "SD-5.2.9",
+      "SD-5.2.10",
+      "SD-5.2.11"
+    ],
+    "coverageRate": 0.18
+  },
   "checkRounds": []
 }

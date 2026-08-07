@@ -32,5 +32,11 @@
       ],
       "invariants": ["LoggedIn => sessionValid"]
     }
-  ]
+  ],
+  "designCoverage": {
+    "totalSdNodes": 0,
+    "coveredSdNodes": [],
+    "uncoveredSdNodes": [],
+    "coverageRate": 1
+  }
 }
