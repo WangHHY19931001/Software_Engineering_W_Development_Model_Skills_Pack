@@ -10,13 +10,14 @@
 #   L3 示例：L3_blog_system_article_store-001.feature
 #   L4 示例：L4_blog_system_token_store_issue-001.feature
 #
-# 头标注 9 个字段全部必填（见 bdd-guide.md §2.2）；L1 @parent-features 填 (none)；L4 @child-features 填 (none)
+# 头标注 10 个字段全部必填（见 bdd-guide.md §2.2）；L1 @parent-features 填 (none)；L4 @child-features 填 (none)
 # Background 节七要素全部必填（见 bdd-guide.md §3.2）；值可空集时填 ()
 # scenario TAG 含 @REQ-NNN / @<UAT|ST|IT|UT>-NNN / @BDD-L<level>-<num> / @high|medium|low
 # BDD L4 ↔ TLA+ L3 最细粒度（原子方法级），@tla-spec 填同层 TLA+ L3 spec ID
 
 # @req: <REQ-NNN>
 # @design: <SD-X.Y.Z>
+# @designIds: <SD-001,SD-002,SD-005>
 # @system: <L>_<system_name>
 # @tla-spec: <L>_<system_name>
 # @state-machine: SM-<L>_<system_name>
@@ -47,3 +48,8 @@ Scenario: <scenario name>
   When 用户执行 <event1>
   Then 系统应转移到 "<State2>" 状态
   And 不变式 "<State2> => <condition>" 应成立
+
+# 引用约定：
+#   路径约定见 references/directory-conventions.md
+#   格式约定见 references/format-conventions.md
+#   @designIds 须列出本 feature 覆盖的所有 SD 节点 ID，S-ingest-bdd 据此回填 manifest designCoverage
