@@ -11,7 +11,14 @@
       "if": { "properties": { "currentPhase": { "type": "integer", "minimum": 2 } }, "required": ["currentPhase"] },
       "then": {
         "required": ["designCoverage"],
-        "properties": { "designCoverage": {} }
+        "properties": {
+          "designCoverage": {
+            "type": "object",
+            "properties": {
+              "uncoveredSdNodes": { "type": "array", "maxItems": 0 }
+            }
+          }
+        }
       }
     }
   ],
@@ -86,7 +93,7 @@
       "properties": {
         "totalSdNodes": { "description": "graph.json 中 type=SD 节点总数", "type": "integer", "minimum": 0 },
         "coveredSdNodes": { "description": "已被 BDD feature 覆盖的 SD 节点 ID 列表", "type": "array", "items": { "type": "string" } },
-        "uncoveredSdNodes": { "description": "未被任何 BDD feature 覆盖的 SD 节点 ID 列表（phase>=2 须为空数组）", "type": "array", "items": { "type": "string" }, "maxItems": 0 },
+        "uncoveredSdNodes": { "description": "未被任何 BDD feature 覆盖的 SD 节点 ID 列表（phase>=2 须为空数组，由业务层 D8 校验）", "type": "array", "items": { "type": "string" } },
         "coverageRate": { "description": "覆盖率 = coveredSdNodes.length / totalSdNodes", "type": "number", "minimum": 0, "maximum": 1 }
       }
     },

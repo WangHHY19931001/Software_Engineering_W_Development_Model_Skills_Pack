@@ -68,6 +68,13 @@ export interface BddManifest {
   currentPhase: number;
   features: BddFeature[];
   stateMachines: BddStateMachine[];
+  /** SD 覆盖率数据（phase>=2 强制，由 S-ingest-bdd 回填） */
+  designCoverage?: {
+    totalSdNodes: number;
+    coveredSdNodes: string[];
+    uncoveredSdNodes: string[];
+    coverageRate: number;
+  };
   checkRounds?: Array<{
     phase: 1 | 2 | 3 | 4;
     round: number;
@@ -717,6 +724,8 @@ export interface BddCheckInput {
   rtmRows?: Array<{ reqId: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }>;
   /** 阶段 5-8 注入：cucumber 运行报告 */
   cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+  /** 由 CLI 通过 --graph 提取的 SD 节点 ID 列表（phase>=2 时用于 D8 交叉校验） */
+  graphSdNodes?: string[];
   /** 校验时间戳：纯函数测试可注入固定值以确保可重放；CLI 不传时回退到当前时间 */
   checkedAt?: string;
 }
@@ -733,6 +742,7 @@ export interface BddCheckResult {
     stepBinding: string[];
     scenarioPathValidity: string[];
     rtmMapping: string[];
+    sdCoverage: string[];
   };
   summary: string;
   violations: string[];
@@ -761,6 +771,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
         stepBinding: [],
         scenarioPathValidity: [],
         rtmMapping: schemaResult.errorMessages.map(m => `[schema] ${m}`),
+        sdCoverage: [],
       },
       summary: `schema validation failed: ${schemaResult.errorMessages.length} errors`,
       violations: schemaResult.errorMessages.map(m => `[schema] ${m}`),
@@ -774,6 +785,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     stepBinding: [] as string[],
     scenarioPathValidity: [] as string[],
     rtmMapping: [] as string[],
+    sdCoverage: [] as string[],
   };
 
   // D1: features 头标注完整性 + D3: 状态机七要素
@@ -863,6 +875,39 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     }
   }
 
+  // D8: SD Coverage 校验（phase>=2 强制）
+  if (phase >= 2) {
+    const dc = (input.manifest as any).designCoverage;
+    if (!dc) {
+      dims.sdCoverage.push(
+        '[D8] designCoverage 字段缺失（phase>=2 强制必填，须由 S-ingest-bdd 从 .feature @designIds + graph.json 比对后回填）',
+      );
+    } else {
+      if (typeof dc.totalSdNodes !== 'number' || typeof dc.coverageRate !== 'number') {
+        dims.sdCoverage.push('[D8] designCoverage.totalSdNodes / coverageRate 须为数字');
+      } else if (!Array.isArray(dc.coveredSdNodes) || !Array.isArray(dc.uncoveredSdNodes)) {
+        dims.sdCoverage.push('[D8] designCoverage.coveredSdNodes / uncoveredSdNodes 须为数组');
+      } else if (dc.uncoveredSdNodes.length > 0) {
+        dims.sdCoverage.push(
+          `[D8] 以下 SD 节点未被任何 BDD feature 覆盖: ${dc.uncoveredSdNodes.join(', ')}`,
+        );
+      }
+      // 交叉校验：与 graphSdNodes 比对
+      if (input.graphSdNodes && input.graphSdNodes.length > 0) {
+        const manifestCovered = new Set<string>();
+        for (const f of input.manifest.features) {
+          for (const did of f.designIds ?? []) manifestCovered.add(did);
+        }
+        const graphUncovered = input.graphSdNodes.filter(sd => !manifestCovered.has(sd));
+        if (graphUncovered.length > 0 && dc.uncoveredSdNodes.length === 0) {
+          dims.sdCoverage.push(
+            `[D8] designCoverage.uncoveredSdNodes 为空但 graphSdNodes 比对发现未覆盖: ${graphUncovered.join(', ')}`,
+          );
+        }
+      }
+    }
+  }
+
   const allViolations = [
     ...dims.headerCompleteness,
     ...dims.stateMachineCompleteness,
@@ -870,6 +915,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     ...dims.stepBinding,
     ...dims.scenarioPathValidity,
     ...dims.rtmMapping,
+    ...dims.sdCoverage,
   ];
 
   const passed = allViolations.length === 0;

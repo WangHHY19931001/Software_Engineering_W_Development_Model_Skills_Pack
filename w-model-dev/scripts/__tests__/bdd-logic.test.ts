@@ -724,3 +724,92 @@ Scenario: 无 Given 无 Then
     expect(sc.expectedEndState).toBeNull();
   });
 });
+
+// ==================== D8 SD Coverage（Task 6） ====================
+// 注：schema（Task 4）在 currentPhase>=2 时强制必填 designCoverage，且 uncoveredSdNodes
+// maxItems:0 —— 非空 uncoveredSdNodes 在 schema 层即被拦截（checkBddModel 提前返回）。
+// 因此以下用例的构造须让 manifest 通过 schema 以触达业务层 D8 校验（与 Task 5 tla-logic 同模式）：
+//   - 用例 1/2：manifest.currentPhase=1 绕过 schema 拦截（uncoveredSdNodes 非空 / designCoverage 缺失），
+//     以 phase 参数=2 触发业务层 D8 校验
+//   - 用例 3：currentPhase=2 + 全覆盖（uncoveredSdNodes 空数组），应零 violation
+
+describe('D8 SD Coverage', () => {
+  it('designCoverage.uncoveredSdNodes 非空时应产生 D8 violations', () => {
+    const manifest = {
+      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      currentPhase: 1, // currentPhase=1 让 schema 放行非空 uncoveredSdNodes；phase 参数=2 触发业务层 D8 校验
+      features: [{
+        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
+        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
+        reqIds: ['REQ-001'], designIds: ['SD-001'],
+        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
+        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
+        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+        invariants: ['S2 => true'],
+      }],
+      designCoverage: {
+        totalSdNodes: 3,
+        coveredSdNodes: ['SD-001'],
+        uncoveredSdNodes: ['SD-002', 'SD-003'],
+        coverageRate: 0.333,
+      },
+    } as any;
+    const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
+    expect(result.dimensions.sdCoverage.length).toBeGreaterThan(0);
+    expect(result.dimensions.sdCoverage.join(' ')).toMatch(/SD-002|SD-003/);
+    expect(result.passed).toBe(false);
+  });
+
+  it('designCoverage 缺失（phase>=2）应产生 D8 violations', () => {
+    const manifest = {
+      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      currentPhase: 1,
+      features: [{
+        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
+        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
+        reqIds: ['REQ-001'], designIds: ['SD-001'],
+        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
+        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
+        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+        invariants: ['S2 => true'],
+      }],
+    } as any;
+    // currentPhase=1 让 schema 放行；phase 参数=2 触发业务层缺失校验
+    const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
+    expect(result.dimensions.sdCoverage.length).toBeGreaterThan(0);
+    expect(result.dimensions.sdCoverage.join(' ')).toMatch(/designCoverage.*缺失|designCoverage.*missing/);
+  });
+
+  it('designCoverage 全覆盖时 D8 violations 为空', () => {
+    const manifest = {
+      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      currentPhase: 2,
+      features: [{
+        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
+        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
+        reqIds: ['REQ-001'], designIds: ['SD-001', 'SD-002'],
+        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
+        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
+        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+        invariants: ['S2 => true'],
+      }],
+      designCoverage: {
+        totalSdNodes: 2,
+        coveredSdNodes: ['SD-001', 'SD-002'],
+        uncoveredSdNodes: [],
+        coverageRate: 1.0,
+      },
+    } as any;
+    const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
+    expect(result.dimensions.sdCoverage).toEqual([]);
+  });
+});
