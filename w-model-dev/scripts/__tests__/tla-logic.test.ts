@@ -81,6 +81,12 @@ function makeValidManifestWithoutBasePath(): unknown {
       },
     ],
     checkRounds: [],
+    sdCoverage: {
+      totalSdNodes: 0,
+      coveredSdNodes: [],
+      uncoveredSdNodes: [],
+      coverageRate: 1,
+    },
   };
 }
 

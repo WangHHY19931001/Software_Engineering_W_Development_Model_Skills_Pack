@@ -274,6 +274,12 @@ describe('checkBddModel', () => {
         transitions: [{ from: 'A', event: 'e', to: 'A' }],
         invariants: ['A => true'],
       }],
+      designCoverage: {
+        totalSdNodes: 0,
+        coveredSdNodes: [],
+        uncoveredSdNodes: [],
+        coverageRate: 1,
+      },
     };
     const result = checkBddModel({
       manifest: manifest as any,
@@ -317,6 +323,12 @@ describe('checkBddModel', () => {
         transitions: [{ from: 'A', event: 'e', to: 'A' }],
         invariants: ['A => true'],
       }],
+      designCoverage: {
+        totalSdNodes: 0,
+        coveredSdNodes: [],
+        uncoveredSdNodes: [],
+        coverageRate: 1,
+      },
     };
     const result = checkBddModel({
       manifest: manifest as any,
@@ -360,6 +372,12 @@ describe('checkBddModel', () => {
         transitions: [{ from: 'A', event: 'e', to: 'A' }],
         invariants: ['A => true'],
       }],
+      designCoverage: {
+        totalSdNodes: 0,
+        coveredSdNodes: [],
+        uncoveredSdNodes: [],
+        coverageRate: 1,
+      },
     };
     const result = checkBddModel({
       manifest: manifest as any,

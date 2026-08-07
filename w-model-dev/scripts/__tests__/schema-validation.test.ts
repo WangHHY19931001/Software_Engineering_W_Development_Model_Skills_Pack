@@ -151,3 +151,54 @@ describe('tla-manifest sdCoverage (phase>=2)', () => {
     expect(result.valid).toBe(false);
   });
 });
+
+describe('bdd-manifest designCoverage (phase>=2)', () => {
+  it('phase>=2 时 designCoverage 缺失应校验失败', () => {
+    const manifest = {
+      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      currentPhase: 2,
+      features: [{
+        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
+        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
+        reqIds: ['REQ-001'], designIds: ['SD-001'],
+        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
+        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
+        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+        invariants: ['S2 => true'],
+      }],
+    };
+    const result = validateBySchema('bdd-manifest', manifest);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessages.join(' ')).toMatch(/designCoverage/);
+  });
+
+  it('phase>=2 时 designCoverage.uncoveredSdNodes 非空应校验失败', () => {
+    const manifest = {
+      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      currentPhase: 2,
+      features: [{
+        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
+        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
+        reqIds: ['REQ-001'], designIds: ['SD-001'],
+        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
+      }],
+      stateMachines: [{
+        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
+        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
+        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+        invariants: ['S2 => true'],
+      }],
+      designCoverage: {
+        totalSdNodes: 3,
+        coveredSdNodes: ['SD-001'],
+        uncoveredSdNodes: ['SD-002', 'SD-003'],
+        coverageRate: 0.333,
+      },
+    };
+    const result = validateBySchema('bdd-manifest', manifest);
+    expect(result.valid).toBe(false);
+  });
+});

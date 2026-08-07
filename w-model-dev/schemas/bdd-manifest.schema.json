@@ -6,6 +6,15 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "projectId", "basePath", "currentPhase", "features", "stateMachines"],
+  "allOf": [
+    {
+      "if": { "properties": { "currentPhase": { "type": "integer", "minimum": 2 } }, "required": ["currentPhase"] },
+      "then": {
+        "required": ["designCoverage"],
+        "properties": { "designCoverage": {} }
+      }
+    }
+  ],
   "properties": {
     "schemaVersion": { "description": "manifest schema 版本号，固定 \"1.0\"", "type": "string", "enum": ["1.0"] },
     "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
@@ -67,6 +76,18 @@
           },
           "invariants": { "description": "不变式列表（≥1 条，与同层 TLA+ Invariants 对应，D4 等价性校验）", "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
         }
+      }
+    },
+    "designCoverage": {
+      "description": "SD 覆盖率数据（phase>=2 强制必填，由 S-ingest-bdd 从 .feature @designIds + graph.json 比对后回填）",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalSdNodes", "coveredSdNodes", "uncoveredSdNodes", "coverageRate"],
+      "properties": {
+        "totalSdNodes": { "description": "graph.json 中 type=SD 节点总数", "type": "integer", "minimum": 0 },
+        "coveredSdNodes": { "description": "已被 BDD feature 覆盖的 SD 节点 ID 列表", "type": "array", "items": { "type": "string" } },
+        "uncoveredSdNodes": { "description": "未被任何 BDD feature 覆盖的 SD 节点 ID 列表（phase>=2 须为空数组）", "type": "array", "items": { "type": "string" }, "maxItems": 0 },
+        "coverageRate": { "description": "覆盖率 = coveredSdNodes.length / totalSdNodes", "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "checkRounds": {
