@@ -1,1162 +1,258 @@
-# 验收测试设计（Acceptance Test Design）
-
-> 阶段 1（需求分析）同步产出。W 模型第 23 轮（2026-07-30）端到端调测。
->
-> **本阶段产出验收测试用例设计，阶段 8（验收测试）执行**。
-> 每个 REQ/NFR/CON 至少 1 条可验证验收场景；不依赖具体代码路径（path-placeholder 由 `docs/uat-path-mapping.md` 维护）。
-> 覆盖正常 / 异常 / 边界 / NFR / CON 五类场景。
->
-> UAT 模板（与 `w-model-dev/templates/test-case.md` 对齐）：
-
-```
-UAT-NNN  <测试场景>        <REQ-XXX>
-  角色:    <actor>
-  前置:    <认证状态> + <数据依赖> + <接口路径>
-  输入:    <HTTP method + path + headers + body>
-  步骤:    <step 1; step 2; ...>
-  预期:    <status code + JSON 字段断言 + 副作用断言>
-  验收:    <可量化阈值（数字/状态码/字段值）>
-  优先级:  <高/中/低>
-  场景类型:<正常/异常/边界/NFR/CON>
-```
-
-## 0. 设计原则与全局约定
-
-### 0.1 前置条件分析（强制）
-
-> 第 22 轮 P1-3 新增。每条 UAT 须明确：
-
-| 前置条件类型 | 要求 | 示例 |
-|---|---|---|
-| 认证状态 | 明确标注是否需认证 + 角色 | 需 admin token / 需 reader token / 需 blogger token / 无需认证 |
-| 数据依赖 | 明确标注依赖的测试数据 | 需预创建用户/博文/标签；需在 beforeEach 中 resetAllRepositories() |
-| 接口路径 | 明确标注 API 路径 + HTTP 方法 | POST /api/users |
-
-### 0.2 demo 范围声明
-
-本批次为后端 demo（无前端），UAT 通过 HTTP API 直接验证。所有 UAT 在 `tests/acceptance/*.spec.ts` 中通过 supertest 注入 `app` 实例执行（不监听端口）。Out of Scope 项（见 `requirement-spec.md §8`）的 UAT 不在本批次（如邮件发送、OAuth 登录、富文本上传）——本设计已剔除此类 UAT。
-
-### 0.3 测试数据约定
-
-- 唯一识别：每条 UAT 的输入数据使用 `it('UAT-NNN ...')` 描述内嵌的固定 seed 数据（如 `email: 'u1@test.com'`），避免依赖其他 UAT 副作用。
-- JWT：`auth-helpers.ts::signTestToken({sub, role})` 生成；HS256 + `JWT_SECRET=test-secret-blog-demo`。
-- 限流豁免：所有 UAT 请求头加 `x-test-bypass-rate-limit: true`（NFR-005 约定）。
-- 时间：使用 `vi.useFakeTimers()` 控制审计 90 天、广告 startAt/endAt、Token 过期。
-
-### 0.4 N/A 用例规则
-
-如某 UAT 对应需求被 §8 Out of Scope 排除，则 UAT 设计中标注 `N/A — <Out of Scope 引用>`，并注明缺失端点。本批次 32 需求全部在范围内，无 N/A 用例。
-
----
-
-## 1. REQ-001 用户注册（UAT-001 ~ UAT-004）
-
-### UAT-001 [正常] reader 注册成功
-- **关联需求**：REQ-001（user domain, level=1, P0）
-- **角色**：匿名访客
-- **前置**：无需认证；`resetAllRepositories()`
-- **接口路径**：`POST /users`
-- **输入**：`{email: 'u1@test.com', username: 'u1', password: 'P@ssw0rd123'}`
-- **步骤**：
-  1. POST /users with valid body
-  2. 检查响应状态码 + body
-- **预期**：
-  - HTTP 201 Created
-  - 响应 `{userId: '<uuid>', email: 'u1@test.com', username: 'u1', role: 'reader', displayName: 'u1', createdAt: '<iso>'}`
-  - 数据库 `users` Map 新增 1 条；`passwordHash` 字段存在且 `bcrypt.getRounds(hash) >= 10`（NFR-006）
-- **验收**：响应时间 < 500ms；密码不以明文出现；`displayName` 默认等于 `username`
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-002 [异常] 重复邮箱注册
-- **关联需求**：REQ-001
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 `users` 中存在 `email='u1@test.com'`
-- **接口路径**：`POST /users`
-- **输入**：`{email: 'u1@test.com', username: 'u2', password: 'P@ssw0rd123'}`
-- **步骤**：
-  1. 预创建 u1
-  2. POST /users with same email
-- **预期**：
-  - HTTP 409 Conflict
-  - 响应 `{error: {code: 'EMAIL_ALREADY_EXISTS', message: '邮箱已被注册'}}`
-- **验收**：数据库未新增记录；响应时间 < 200ms
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-003 [异常] 无效邮箱格式
-- **关联需求**：REQ-001
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`
-- **接口路径**：`POST /users`
-- **输入**：`{email: 'not-an-email', username: 'u1', password: 'P@ssw0rd123'}`
-- **步骤**：
-  1. POST /users with invalid email
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'INVALID_EMAIL', message: '邮箱格式非法', details: {field: 'email'}}}`
-- **验收**：数据库未新增；错误信息明确指出 `email` 字段
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-004 [边界] 密码长度不足
-- **关联需求**：REQ-001 + NFR-006（bcrypt cost 横切）
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`
-- **接口路径**：`POST /users`
-- **输入**：`{email: 'u1@test.com', username: 'u1', password: 'short'}`
-- **步骤**：
-  1. POST /users with short password
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'PASSWORD_TOO_SHORT', message: '密码至少 8 位', details: {minLength: 8}}}`
-- **验收**：数据库未新增；minLength=8 在错误信息中明示
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 2. REQ-002 用户登录（UAT-005 ~ UAT-008）
-
-### UAT-005 [正常] 正确凭证登录
-- **关联需求**：REQ-002
-- **角色**：已注册 reader
-- **前置**：`resetAllRepositories()`；预创建 user `u1@test.com` / `P@ssw0rd123`
-- **接口路径**：`POST /auth/login`
-- **输入**：`{email: 'u1@test.com', password: 'P@ssw0rd123'}`
-- **步骤**：
-  1. POST /auth/login
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{token: '<jwt>', userId: '<uuid>', role: 'reader', expiresIn: 86400}`
-  - JWT 解码后 payload `{sub: '<uuid>', role: 'reader', iat, exp}`；`exp - iat = 86400`（24h TTL）
-- **验收**：JWT HS256 签名验证通过；24h 有效期
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-006 [异常] 错误密码
-- **关联需求**：REQ-002 + NFR-003（不泄露账号存在性）
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 user
-- **接口路径**：`POST /auth/login`
-- **输入**：`{email: 'u1@test.com', password: 'wrong'}`
-- **预期**：
-  - HTTP 401 Unauthorized
-  - 响应 `{error: {code: 'INVALID_CREDENTIALS', message: '邮箱或密码错误'}}`
-  - **关键**：错误信息不区分「账号不存在」与「密码错误」
-- **验收**：响应时间 ≈ 正确登录的耗时（防止时间侧信道）；bcrypt.compare 触发
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-007 [异常] 不存在的邮箱
-- **关联需求**：REQ-002 + NFR-003
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`
-- **接口路径**：`POST /auth/login`
-- **输入**：`{email: 'none@test.com', password: 'whatever'}`
-- **预期**：
-  - HTTP 401 Unauthorized
-  - 响应 `{error: {code: 'INVALID_CREDENTIALS', message: '邮箱或密码错误'}}`（与 UAT-006 完全一致）
-- **验收**：响应 body 与 UAT-006 不可区分
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-008 [边界] JWT 过期
-- **关联需求**：REQ-002
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；预创建 user；签发 24h+1s 前的 token（`vi.setSystemTime(now - 24h - 1s)`）
-- **接口路径**：`GET /users/me`（任意需 JWT 端点）
-- **输入**：`Authorization: Bearer <expired-jwt>`
-- **预期**：
-  - HTTP 401 Unauthorized
-  - 响应 `{error: {code: 'TOKEN_EXPIRED', message: 'token 已过期'}}`
-- **验收**：JWT 校验失败原因明确为 expired（而非 invalid signature）
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 3. REQ-003 用户资料（UAT-009 ~ UAT-011）
-
-### UAT-009 [正常] 查询他人公开资料
-- **关联需求**：REQ-003
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 user u1（`displayName='Alice'`, `bio='hello'`, `avatarUrl='https://...'`)
-- **接口路径**：`GET /users/:id`
-- **输入**：无 auth；path = `u1.userId`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{userId, username, displayName, bio, avatarUrl, createdAt}`（**不返回 email / passwordHash / role**）
-- **验收**：敏感字段过滤
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-010 [正常] 修改自己资料
-- **关联需求**：REQ-003 + NFR-003（JWT）
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；预创建 user；持有有效 JWT
-- **接口路径**：`PUT /users/me`
-- **输入**：`Authorization: Bearer <jwt>` + body `{displayName: 'NewName', bio: 'new bio', avatarUrl: 'https://new'}`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{userId, displayName: 'NewName', bio: 'new bio', avatarUrl: 'https://new', updatedAt}`
-  - 数据库 updatedAt 已更新
-- **验收**：仅修改允许字段（不允许改 email/username）
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-011 [异常] 试图修改邮箱被拒
-- **关联需求**：REQ-003
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；预创建 user；JWT
-- **接口路径**：`PUT /users/me`
-- **输入**：`{email: 'new@test.com', displayName: 'NewName'}`
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'IMMUTABLE_FIELD', message: '邮箱不可修改', details: {field: 'email'}}}`
-- **验收**：email 未被修改
-- **优先级**：中
-- **场景类型**：异常
-
----
-
-## 4. REQ-004 关注/取关（UAT-012 ~ UAT-014）
-
-### UAT-012 [正常] 关注博主
-- **关联需求**：REQ-004 + REQ-011（关注触发通知）
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；预创建 reader u1 + blogger b1
-- **接口路径**：`POST /follows/:bloggerId`
-- **输入**：`Authorization: Bearer <reader-jwt>` + path = `b1.bloggerId`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{bloggerId, followed: true, followedAt: '<iso>'}`
-  - 数据库 `follows` Map 新增 1 条
-  - 事件总线发出 `follow.created`；b1 收到通知 `notifications` 新增 1 条（type=follow）
-- **验收**：幂等（重复调用返回 200 + `followed: true`，数据库无重复）
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-013 [异常] 关注不存在的博主
-- **关联需求**：REQ-004
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；预创建 reader u1
-- **接口路径**：`POST /follows/<nonexistent-uuid>`
-- **输入**：reader JWT
-- **预期**：
-  - HTTP 404 Not Found
-  - 响应 `{error: {code: 'BLOGGER_NOT_FOUND', message: '博主不存在'}}`
-- **验收**：无通知产生
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-014 [边界] 关注自己被拒
-- **关联需求**：REQ-004
-- **角色**：已登录 reader（试图关注作为 blogger 的自己）
-- **前置**：`resetAllRepositories()`；预创建 u1 同时也是 blogger b1（同 email）
-- **接口路径**：`POST /follows/<self-blogger-id>`
-- **输入**：reader JWT（sub=u1.userId）
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'CANNOT_FOLLOW_SELF', message: '不能关注自己'}}`
-- **验收**：数据库无新增 follow 记录
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 5. REQ-005 博主注册（UAT-015 ~ UAT-017）
-
-### UAT-015 [正常] 博主注册
-- **关联需求**：REQ-005
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`
-- **接口路径**：`POST /bloggers`
-- **输入**：`{email: 'b1@test.com', username: 'b1', password: 'P@ssw0rd123', displayName: 'Bob'}`
-- **预期**：
-  - HTTP 201 Created
-  - 响应 `{bloggerId: '<uuid>', email, username, displayName: 'Bob', createdAt}`
-  - 数据库 `bloggers` Map 新增 1 条；`passwordHash` 存在且 `bcrypt.getRounds >= 10`
-- **验收**：与 REQ-001 一致的密码强度校验
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-016 [异常] 博主邮箱已被 reader 占用
-- **关联需求**：REQ-005 + REQ-001（email 跨域唯一）
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 reader u1（email='b1@test.com'）
-- **接口路径**：`POST /bloggers`
-- **输入**：`{email: 'b1@test.com', username: 'b1', password: 'P@ssw0rd123'}`
-- **预期**：
-  - HTTP 409 Conflict
-  - 响应 `{error: {code: 'EMAIL_ALREADY_EXISTS', message: '邮箱已被注册'}}`
-- **验收**：跨域邮箱唯一性
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-017 [边界] 用户名长度边界（19 / 21 字符）
-- **关联需求**：REQ-005
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`
-- **接口路径**：`POST /bloggers`
-- **输入 A**：`{email: 'b1@test.com', username: 'a'.repeat(19), password: 'P@ssw0rd123'}` → 期望 201
-- **输入 B**：`{email: 'b2@test.com', username: 'a'.repeat(21), password: 'P@ssw0rd123'}` → 期望 400 `USERNAME_TOO_LONG`
-- **输入 C**：`{email: 'b3@test.com', username: 'ab', password: 'P@ssw0rd123'}` → 期望 400 `USERNAME_TOO_SHORT`
-- **验收**：用户名 3–20 字符边界精确
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 6. REQ-006 博文 CRUD（UAT-018 ~ UAT-022）
-
-### UAT-018 [正常] 创建草稿
-- **关联需求**：REQ-006
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；预创建 blogger b1；blogger JWT
-- **接口路径**：`POST /posts`
-- **输入**：`{title: 'My First Post', content: 'Hello world content here'}`
-- **预期**：
-  - HTTP 201 Created
-  - 响应 `{postId, authorId: b1.bloggerId, title, content, status: 'draft', tags: [], createdAt, updatedAt, publishedAt: null}`
-  - 数据库 `posts` Map 新增 1 条
-- **验收**：初始 status=draft；publishedAt=null
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-019 [正常] 发布草稿
-- **关联需求**：REQ-006
-- **角色**：已登录 blogger（owner）
-- **前置**：`resetAllRepositories()`；预创建 blogger b1 + 草稿 post p1
-- **接口路径**：`POST /posts/:id/publish`
-- **输入**：blogger JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{postId, status: 'published', publishedAt: '<iso>'}`
-  - 数据库 status: 'draft' → 'published'；publishedAt 已设置
-  - 事件 `post.published` 触发
-- **验收**：状态机转移正确；事件可被监听
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-020 [异常] 非 owner 编辑博文被拒
-- **关联需求**：REQ-006 + NFR-003
-- **角色**：已登录 blogger（b2，非 owner b1）
-- **前置**：`resetAllRepositories()`；预创建 b1（owner）+ b2（other）；b1 拥有 post p1
-- **接口路径**：`PUT /posts/:id`
-- **输入**：b2 JWT + `{title: 'Hacked', content: '...'}`
-- **预期**：
-  - HTTP 403 Forbidden
-  - 响应 `{error: {code: 'NOT_POST_OWNER', message: '无权操作此博文'}}`
-- **验收**：数据库 title/content 未被修改
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-021 [异常] 未认证创建博文
-- **关联需求**：REQ-006 + NFR-003
-- **角色**：匿名
-- **前置**：`resetAllRepositories()`
-- **接口路径**：`POST /posts`
-- **输入**：无 Authorization
-- **预期**：
-  - HTTP 401 Unauthorized
-  - 响应 `{error: {code: 'AUTH_REQUIRED', message: '需要认证'}}`
-- **验收**：未创建记录
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-022 [边界] 空内容发布被拒
-- **关联需求**：REQ-006
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + 草稿 p1（content=空字符串）
-- **接口路径**：`POST /posts/:id/publish`
-- **输入**：blogger JWT
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'EMPTY_CONTENT', message: '正文不能为空'}}`
-- **验收**：status 仍为 draft
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 7. REQ-007 博文浏览（UAT-023 ~ UAT-025）
-
-### UAT-023 [正常] 公开列表 + 分页
-- **关联需求**：REQ-007 + NFR-001（性能横切读 API）
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 50 篇 published 博文
-- **接口路径**：`GET /posts?page=1&pageSize=20`
-- **输入**：无 auth
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{items: [20 个 post], page: 1, pageSize: 20, total: 50, totalPages: 3}`
-  - items 按 publishedAt DESC 排序
-  - 不包含 draft 状态
-- **验收**：分页正确；不含 draft；排序正确
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-024 [异常] 草稿对读者不可见
-- **关联需求**：REQ-007
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 1 个 draft post
-- **接口路径**：`GET /posts/draft-id`
-- **输入**：无 auth
-- **预期**：
-  - HTTP 404 Not Found
-  - 响应 `{error: {code: 'POST_NOT_FOUND', message: '博文不存在或未发布'}}`
-- **验收**：draft 不暴露
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-025 [边界] pageSize 上限 100
-- **关联需求**：REQ-007
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；预创建 150 篇 published
-- **接口路径**：`GET /posts?page=1&pageSize=200`
-- **输入**：无 auth
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{items: [100 个 post], page: 1, pageSize: 100, total: 150, totalPages: 2}`
-  - pageSize 被截断为 100（不报错）
-- **验收**：pageSize 上限生效；不抛错
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 8. REQ-008 点赞/收藏（UAT-026 ~ UAT-029）
-
-### UAT-026 [正常] 点赞博文
-- **关联需求**：REQ-008 + REQ-011（点赞触发通知）
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；reader u1 + blogger b1 + published post p1
-- **接口路径**：`POST /posts/:id/like`
-- **输入**：reader JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{postId, liked: true, totalLikes: 1}`
-  - 数据库 `likes` 新增 1 条
-  - 事件 `like.created` 触发；b1 收到通知（type=like）
-- **验收**：幂等（重复点赞返回 200 + totalLikes=1）
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-027 [异常] 点赞不存在的博文
-- **关联需求**：REQ-008
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；reader u1
-- **接口路径**：`POST /posts/<nonexistent>/like`
-- **预期**：
-  - HTTP 404 Not Found
-- **验收**：无通知
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-028 [异常] 未认证点赞
-- **关联需求**：REQ-008 + NFR-003
-- **角色**：匿名
-- **接口路径**：`POST /posts/:id/like`
-- **预期**：HTTP 401 Unauthorized
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-029 [边界] 收藏列表分页
-- **关联需求**：REQ-008
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；reader u1 + 25 个 published；u1 收藏 25 个
-- **接口路径**：`GET /me/bookmarks?page=1&pageSize=10`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{items: [10], page: 1, pageSize: 10, total: 25, totalPages: 3}`
-- **验收**：分页正确
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 9. REQ-009 评论发表（UAT-030 ~ UAT-033）
-
-### UAT-030 [正常] 顶级评论
-- **关联需求**：REQ-009 + REQ-011（评论触发通知）
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；reader u1 + published post p1（author=b1）
-- **接口路径**：`POST /posts/:postId/comments`
-- **输入**：`{content: 'Great post!'}`
-- **预期**：
-  - HTTP 201 Created
-  - 响应 `{commentId, postId, parentId: null, authorId, content, level: 1, createdAt}`
-  - 数据库 `comments` 新增 1 条
-  - 事件 `comment.created` 触发；p1.author (b1) 收到通知
-- **验收**：level=1
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-031 [异常] 未登录评论
-- **关联需求**：REQ-009 + NFR-003
-- **角色**：匿名
-- **接口路径**：`POST /posts/:postId/comments`
-- **预期**：HTTP 401 Unauthorized
-- **优先级**：高
-- **场景类型**：异常
-
-### UAT-032 [异常] 对不存在的博文评论
-- **关联需求**：REQ-009
-- **角色**：已登录 reader
-- **接口路径**：`POST /posts/<nonexistent>/comments`
-- **预期**：HTTP 404 Not Found
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-033 [边界] 超过 5 层嵌套被拒
-- **关联需求**：REQ-009
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；预创建 5 层评论链 c1→c2→c3→c4→c5（level 1–5）
-- **接口路径**：`POST /comments/:c5-id/replies`
-- **输入**：`{content: 'too deep'}`
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'MAX_DEPTH_EXCEEDED', message: '评论层级超过最大 5 层', details: {maxLevel: 5}}}`
-- **验收**：未创建评论
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 10. REQ-010 评论删除（UAT-034 ~ UAT-036）
-
-### UAT-034 [正常] 作者删除自己评论
-- **关联需求**：REQ-010
-- **角色**：已登录 reader（评论作者）
-- **前置**：`resetAllRepositories()`；reader u1 + comment c1（authorId=u1）
-- **接口路径**：`DELETE /comments/:id`
-- **输入**：u1 JWT
-- **预期**：
-  - HTTP 204 No Content
-  - 数据库 c1.deleted = true；c1.deletedAt = now；content 仍保留
-- **验收**：软删（非物理删除）
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-035 [异常] 第三方删除评论被拒
-- **关联需求**：REQ-010
-- **角色**：已登录 reader（u2，非作者 u1）
-- **前置**：`resetAllRepositories()`；u1 + c1（authorId=u1）+ u2
-- **接口路径**：`DELETE /comments/:c1-id`
-- **输入**：u2 JWT
-- **预期**：
-  - HTTP 403 Forbidden
-  - 响应 `{error: {code: 'NOT_COMMENT_OWNER', message: '无权删除此评论'}}`
-- **验收**：c1.deleted 仍为 false
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-036 [边界] 博主删除他人对自己博文的评论
-- **关联需求**：REQ-010
-- **角色**：已登录 blogger（b1，博文 p1 的作者）
-- **前置**：`resetAllRepositories()`；b1 + p1（authorId=b1）+ reader u1 + c1（authorId=u1, postId=p1）
-- **接口路径**：`DELETE /comments/:c1-id`
-- **输入**：b1 JWT
-- **预期**：
-  - HTTP 204 No Content
-  - c1.deleted = true
-- **验收**：博主对自有博文下他人评论有删除权
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 11. REQ-011 通知系统（UAT-037 ~ UAT-040）
-
-### UAT-037 [正常] 接收关注通知
-- **关联需求**：REQ-011 + REQ-004
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + reader u1；u1 关注 b1（触发 follow.created → b1 收通知）
-- **接口路径**：`GET /me/notifications`
-- **输入**：b1 JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{items: [{id, type: 'follow', payload: {followerId: u1.userId}, read: false, createdAt}], page, pageSize, total}`
-- **验收**：通知按时间倒序
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-038 [正常] 标记已读
-- **关联需求**：REQ-011
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + 1 条未读通知 n1
-- **接口路径**：`PATCH /me/notifications/:id/read`
-- **输入**：b1 JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{id, read: true, readAt: '<iso>'}`
-  - 数据库 n1.read = true
-- **验收**：幂等（重复标记仍 200 + read=true）
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-039 [异常] 他人通知不可见
-- **关联需求**：REQ-011
-- **角色**：已登录 blogger（b2，非 b1）
-- **前置**：`resetAllRepositories()`；b1 + n1
-- **接口路径**：`PATCH /me/notifications/:n1-id/read`
-- **输入**：b2 JWT
-- **预期**：
-  - HTTP 404 Not Found
-  - 响应 `{error: {code: 'NOTIFICATION_NOT_FOUND', message: '通知不存在或无权访问'}}`
-- **验收**：n1.read 仍为 false
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-040 [边界] 通知分页 + 全部已读后 total=0
-- **关联需求**：REQ-011
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + 30 条通知；全部标记已读
-- **接口路径**：`GET /me/notifications?read=true`
-- **预期**：
-  - HTTP 200 OK
-  - `total = 30`（查询条件过滤）
-- **接口路径**：`GET /me/notifications?read=false`
-- **预期**：`total = 0`
-- **验收**：read 过滤参数生效
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 12. REQ-012 文章标签（UAT-041 ~ UAT-043）
-
-### UAT-041 [正常] 创建标签并关联
-- **关联需求**：REQ-012
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + draft post p1
-- **接口路径**：
-  - `POST /tags` body `{name: 'tech'}` → 201 `{tagId, name: 'tech'}`
-  - `POST /posts/:p1-id/tags` body `{tags: ['tech', 'nodejs']}` → 200 `{postId, tags: ['tech', 'nodejs']}`
-- **预期**：
-  - 数据库 `tags` Map 新增 'tech'；`post_tags` Map[p1.id] = ['tech', 'nodejs']
-  - p1.tags 更新
-- **验收**：1–5 个标签限制
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-042 [异常] 关联 6 个标签被拒
-- **关联需求**：REQ-012
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + p1
-- **接口路径**：`POST /posts/:p1-id/tags`
-- **输入**：`{tags: ['a','b','c','d','e','f']}`
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'TOO_MANY_TAGS', message: '标签数量超过 5', details: {max: 5}}}`
-- **验收**：未变更
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-043 [边界] 重复添加相同标签（幂等）
-- **关联需求**：REQ-012
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + p1 + tag 'tech' 已关联
-- **接口路径**：`POST /posts/:p1-id/tags`
-- **输入**：`{tags: ['tech']}`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{postId, tags: ['tech']}`（不重复）
-- **验收**：幂等
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 13. REQ-013 全文搜索（UAT-044 ~ UAT-046）
-
-### UAT-044 [正常] 关键词命中
-- **关联需求**：REQ-013 + NFR-001
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；3 个 published（p1 title='Node.js tutorial', p2 title='Python tips', p3 title='Node best practices'）
-- **接口路径**：`GET /search?q=Node`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{items: [p1, p3], total: 2, page: 1, pageSize: 20}`
-  - 仅 published 博文；title 命中权重 2× > content 命中
-- **验收**：搜索仅覆盖 published；权重生效
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-045 [异常] 空关键词
-- **关联需求**：REQ-013
-- **角色**：匿名
-- **接口路径**：`GET /search?q=`
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'EMPTY_KEYWORD', message: '关键词不能为空'}}`
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-046 [边界] 关键词大小写不敏感 + 草稿不参与
-- **关联需求**：REQ-013
-- **角色**：匿名
-- **前置**：`resetAllRepositories()`；published p1（title='Node'）+ draft p2（title='Node draft'）
-- **接口路径**：`GET /search?q=NODE`
-- **预期**：
-  - 响应只含 p1（大小写不敏感；draft 不参与）
-  - `total = 1`
-- **验收**：综合边界
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 14. REQ-014 RSS 订阅（UAT-047 ~ UAT-048）
-
-### UAT-047 [正常] RSS 输出
-- **关联需求**：REQ-014 + CON-003（RSS 例外）
-- **角色**：匿名访客（第三方 RSS 订阅方）
-- **前置**：`resetAllRepositories()`；site config（title='My Blog'）+ 25 个 published + 5 个 draft
-- **接口路径**：`GET /rss.xml`
-- **输入**：无 auth
-- **预期**：
-  - HTTP 200 OK
-  - `Content-Type: application/rss+xml`
-  - body 为合法 RSS 2.0 XML；含 `<channel><title>My Blog</title>...</channel>`
-  - `<item>` 数量 = 20（最近 20 篇 published）；不含 draft
-- **验收**：XML 合法；item 数量正确
-- **优先级**：低
-- **场景类型**：正常
-
-### UAT-048 [边界] 无 published 时返回空 channel
-- **关联需求**：REQ-014
-- **前置**：`resetAllRepositories()`；site config；0 个 published
-- **接口路径**：`GET /rss.xml`
-- **预期**：
-  - HTTP 200 OK
-  - 合法 XML；`<item>` 0 个
-- **验收**：空 channel 不报错
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 15. REQ-015 Webhook 通知（UAT-049 ~ UAT-052）
-
-### UAT-049 [正常] 注册并触发
-- **关联需求**：REQ-015
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + 1 个 Webhook 端点（nock 模拟）；预注册 `POST /webhooks` `{url: 'https://hook.test/cb', events: ['post.published'], secret: 's1'}`
-- **接口路径**：
-  - `POST /webhooks` → 201
-  - `POST /posts/:p1-id/publish` → 触发 `post.published`
-- **预期**：
-  - nock 收到 1 次回调
-  - 请求体含 `event=post.published` + `payload.postId`
-  - 请求头 `X-Webhook-Signature: sha256=<hmac-hex>` 校验通过
-  - 数据库 `webhook_deliveries` 新增 1 条（status=success）
-- **验收**：签名 + payload + 重试
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-050 [异常] 端点 500 触发重试
-- **关联需求**：REQ-015
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + 1 个 Webhook（nock 模拟 500 响应 3 次后 200）
-- **步骤**：
-  1. POST /posts/:p1-id/publish
-  2. 等待 21s（1+4+16 退避）+ buffer
-- **预期**：
-  - 累计 4 次回调（3 次 500 + 1 次 200）
-  - 数据库 `webhook_deliveries` 最终 1 条（status=success，attempts=4）
-- **验收**：指数退避重试
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-051 [异常] URL 非 https 被拒
-- **关联需求**：REQ-015
-- **角色**：已登录 blogger
-- **接口路径**：`POST /webhooks`
-- **输入**：`{url: 'http://insecure.test/cb', events: ['post.published']}`
-- **预期**：
-  - HTTP 400 Bad Request
-  - 响应 `{error: {code: 'INSECURE_URL', message: 'URL 必须使用 https'}}`
-- **验收**：不注册
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-052 [边界] 重试 3 次后仍失败标记 failed
-- **关联需求**：REQ-015
-- **角色**：已登录 blogger
-- **前置**：`resetAllRepositories()`；b1 + Webhook（nock 持续 500）
-- **步骤**：
-  1. POST /posts/:p1-id/publish
-  2. 等待 22s
-- **预期**：
-  - 累计 4 次回调（1 + 3 重试）
-  - `webhook_deliveries` 1 条（status=failed，attempts=4）
-- **验收**：失败终态
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 16. REQ-016 站点配置（UAT-053 ~ UAT-056）
-
-### UAT-053 [正常] 匿名查询站点配置
-- **关联需求**：REQ-016
-- **角色**：匿名访客
-- **前置**：`resetAllRepositories()`；seed siteConfig（title='My Blog', description='A demo', bannerAd=null）
-- **接口路径**：`GET /site/config`
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{siteTitle, siteDescription, bannerAd: null, updatedAt}`
-- **验收**：anon 可见
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-054 [正常] admin 修改配置
-- **关联需求**：REQ-016 + NFR-003
-- **角色**：已登录 admin
-- **前置**：`resetAllRepositories()`；seed admin user
-- **接口路径**：`PUT /site/config`
-- **输入**：`{siteTitle: 'New Title', siteDescription: 'New Desc'}`
-- **预期**：
-  - HTTP 200 OK
-  - 数据库更新；updatedAt 刷新
-- **验收**：仅 admin
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-055 [异常] reader 修改配置被拒
-- **关联需求**：REQ-016 + NFR-003
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；reader u1
-- **接口路径**：`PUT /site/config`
-- **输入**：`{siteTitle: 'hacked'}`
-- **预期**：
-  - HTTP 403 Forbidden
-  - 响应 `{error: {code: 'INSUFFICIENT_ROLE', message: '需要 admin 角色'}}`
-- **验收**：未修改
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-056 [边界] 当前生效横幅广告
-- **关联需求**：REQ-016 + REQ-022
-- **角色**：匿名
-- **前置**：`resetAllRepositories()`；siteConfig + 3 个广告（a1 已过期、a2 当前生效、a3 未开始）
-- **接口路径**：`GET /site/config`
-- **预期**：
-  - 响应 `bannerAd = a2 的 imageUrl+linkUrl`
-- **验收**：当前生效筛选
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 17. REQ-017 多博主系统（UAT-057 ~ UAT-059）
-
-### UAT-057 [正常] 切换博主身份
-- **关联需求**：REQ-017
-- **角色**：已登录 reader（拥有多博主身份）
-- **前置**：`resetAllRepositories()`；reader u1 + 2 个 blogger b1、b2（均绑定到 u1）
-- **接口路径**：`POST /me/bloggers/:b2.id/switch`
-- **输入**：u1 reader JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{token: '<new-jwt>', bloggerId: b2.id, role: 'blogger', expiresIn: 86400}`
-  - 新 JWT payload `{sub: b2.id, role: 'blogger', iat, exp}`
-- **验收**：新 token 可用于博文 CRUD
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-058 [异常] 切换到非自己绑定的博主
-- **关联需求**：REQ-017
-- **角色**：已登录 reader u1
-- **前置**：`resetAllRepositories()`；u1 + b1、b2（b2 绑定到 u2）
-- **接口路径**：`POST /me/bloggers/:b2.id/switch`
-- **输入**：u1 JWT
-- **预期**：
-  - HTTP 403 Forbidden
-  - 响应 `{error: {code: 'BLOGGER_NOT_BOUND', message: '该博主未绑定到当前用户'}}`
-- **验收**：未签发 token
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-059 [边界] 切换回原身份
-- **关联需求**：REQ-017
-- **角色**：已登录 reader
-- **前置**：UAT-057 后持有 blogger token
-- **接口路径**：`POST /me/switch-back-to-reader`
-- **预期**：
-  - HTTP 200 OK
-  - 新 token payload `{sub: u1.userId, role: 'reader'}`
-- **验收**：双向切换
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 18. REQ-018 审计日志（UAT-060 ~ UAT-062）
-
-### UAT-060 [正常] 关键操作自动记录
-- **关联需求**：REQ-018 + CON-004
-- **角色**：已登录 admin
-- **前置**：`resetAllRepositories()`；admin user；执行 1 次 `POST /posts`（b1 创建草稿）+ 1 次 `POST /posts/:id/publish`
-- **接口路径**：`GET /admin/audit-logs`
-- **输入**：admin JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `items` 至少含 2 条：
-    - `{action: 'post.create', actorId: b1.id, targetType: 'post', targetId: p1.id, ts}`
-    - `{action: 'post.publish', actorId: b1.id, targetType: 'post', targetId: p1.id, ts}`
-- **验收**：关键操作全覆盖
-- **优先级**：高
-- **场景类型**：正常
-
-### UAT-061 [异常] 非 admin 查询被拒
-- **关联需求**：REQ-018 + NFR-003
-- **角色**：已登录 reader
-- **接口路径**：`GET /admin/audit-logs`
-- **输入**：reader JWT
-- **预期**：
-  - HTTP 403 Forbidden
-  - 响应 `{error: {code: 'INSUFFICIENT_ROLE', message: '需要 admin 角色'}}`
-- **验收**：不返回数据
-- **优先级**：中
-- **场景类型**：异常
-
-### UAT-062 [边界] 90 天前日志不可见
-- **关联需求**：REQ-018 + CON-004
-- **角色**：已登录 admin
-- **前置**：`resetAllRepositories()`；admin；1 条新日志（now）+ 1 条 91 天前日志（`vi.setSystemTime(now - 91d)` 写入）
-- **接口路径**：`GET /admin/audit-logs?from=now-100d&to=now`
-- **预期**：
-  - 响应 `items` 仅含 1 条（now 那条）
-  - 91 天前那条自动清理（CON-004）
-- **验收**：90 天保留边界
-- **优先级**：中
-- **场景类型**：边界
-
----
-
-## 19. REQ-019 文章访问记录（UAT-063 ~ UAT-064）
-
-### UAT-063 [正常] 浏览触发访问记录
-- **关联需求**：REQ-019
-- **角色**：匿名 + reader
-- **前置**：`resetAllRepositories()`；b1 + published p1
-- **接口路径**：
-  - `GET /posts/:p1.id`（匿名）→ 1 次
-  - `GET /posts/:p1.id`（reader u1）→ 1 次
-- **接口路径**：`GET /admin/posts/:p1.id/access`
-- **输入**：admin JWT
-- **预期**：
-  - 响应 `items` 长度 = 2
-  - 第 1 条 `userId: null, ip: '127.0.0.1'`
-  - 第 2 条 `userId: u1.id, ip: '127.0.0.1'`
-- **验收**：匿名 vs 登录分别记录
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-064 [边界] 同一用户 5 分钟内多次浏览只记 1 次
-- **关联需求**：REQ-019
-- **角色**：reader u1
-- **前置**：`resetAllRepositories()`；b1 + p1；u1
-- **步骤**：
-  1. GET /posts/:p1.id（t=0）
-  2. GET /posts/:p1.id（t=1min）
-  3. GET /posts/:p1.id（t=4min59s）
-  4. GET /posts/:p1.id（t=5min1s）
-- **预期**：
-  - `access_records` 总数 = 2（首次 + 跨过 5min 窗口）
-- **验收**：去重窗口生效
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 20. REQ-020 站点统计（UAT-065 ~ UAT-066）
-
-### UAT-065 [正常] PV / UV 聚合
-- **关联需求**：REQ-020
-- **角色**：已登录 admin
-- **前置**：`resetAllRepositories()`；admin；过去 24h 内 100 次浏览（80 unique IP + 20 重复 IP）
-- **接口路径**：`GET /admin/stats/site?range=24h`
-- **输入**：admin JWT
-- **预期**：
-  - HTTP 200 OK
-  - 响应 `{pv: 100, uv: 80, range: '24h', hourly: [{hour: '...', pv, uv} × 24]}`
-- **验收**：PV = 浏览总次数；UV = unique IP/用户数
-- **优先级**：中
-- **场景类型**：正常
-
-### UAT-066 [边界] range=7d 包含 7×24 桶
-- **关联需求**：REQ-020
-- **角色**：已登录 admin
-- **接口路径**：`GET /admin/stats/site?range=7d`
-- **预期**：
-  - `hourly` 长度 = 168
-- **验收**：range 参数生效
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 21. REQ-021 推荐系统（UAT-067 ~ UAT-068）
-
-### UAT-067 [正常] 基于标签相似度推荐
-- **关联需求**：REQ-021
-- **角色**：已登录 reader
-- **前置**：`resetAllRepositories()`；reader u1（已浏览 p1 tags=['node','web']）；published p2（tags=['node','js']）、p3（tags=['python','ml']）、p4（tags=['node','server']）
-- **接口路径**：`GET /me/recommendations?limit=3`
-- **输入**：u1 JWT
-- **预期**：
-  - 响应 `{items: [p4, p2]}`（Jaccard 相似度高者优先；不含 p3；不含已浏览 p1）
-- **验收**：标签 Jaccard 排序
-- **优先级**：低
-- **场景类型**：正常
-
-### UAT-068 [边界] 冷启动回退最近热门
-- **关联需求**：REQ-021
-- **角色**：已登录 reader（无浏览历史）
-- **前置**：`resetAllRepositories()`；u1 + 15 个 published（views: 100, 90, 80, ..., 10）
-- **接口路径**：`GET /me/recommendations?limit=10`
-- **预期**：
-  - 响应 `items` 长度 = 10，按 view 数降序
-- **验收**：冷启动兜底
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 22. REQ-022 广告位管理（UAT-069 ~ UAT-071）
-
-### UAT-069 [正常] admin 创建广告
-- **关联需求**：REQ-022
-- **角色**：已登录 admin
-- **前置**：`resetAllRepositories()`；admin
-- **接口路径**：`POST /site/ads`
-- **输入**：`{imageUrl: 'https://cdn/a.png', linkUrl: 'https://target', startAt: 'now', endAt: 'now+7d'}`
-- **预期**：
-  - HTTP 201 Created
-  - 响应 `{adId, imageUrl, linkUrl, startAt, endAt, createdAt}`
-- **验收**：DB 新增
-- **优先级**：低
-- **场景类型**：正常
-
-### UAT-070 [异常] reader 创建广告被拒
-- **关联需求**：REQ-022 + NFR-003
-- **角色**：已登录 reader
-- **接口路径**：`POST /site/ads`
-- **预期**：HTTP 403 Forbidden
-- **优先级**：低
-- **场景类型**：异常
-
-### UAT-071 [边界] 过期广告不展示
-- **关联需求**：REQ-022
-- **角色**：匿名
-- **前置**：`resetAllRepositories()`；3 个广告（a1 endAt=past、a2 endAt=future、a3 endAt=past）
-- **接口路径**：`GET /site/ads/active`
-- **预期**：
-  - 响应 `items: [a2]`（仅未来 + 当前）
-- **验收**：过期自动过滤
-- **优先级**：低
-- **场景类型**：边界
-
----
-
-## 23. NFR / CON 验收（UAT-072）
-
-### UAT-072 [NFR + CON 联合验收] 横切治理
-- **关联需求**：NFR-001~006 + CON-001~004
-- **角色**：多角色（per case）
-- **目的**：在阶段 8 验收阶段统一验证 10 条横切治理指标
-
-#### UAT-072a NFR-001 性能
-- **前置**：seed 1000 博文 + 100 并发
-- **接口路径**：k6 脚本 `tests/perf/k6-read-apis.js`
-- **执行**：`k6 run --vus 100 --duration 30s tests/perf/k6-read-apis.js`
-- **预期**：GET /posts、GET /posts/:id、GET /search P95 ≤ 200ms
-- **优先级**：高
-
-#### UAT-072b NFR-002 内存
-- **前置**：1000 并发稳定 5 分钟
-- **指标**：`process.memoryUsage().heapUsed` 在稳态 ≤ 100MB
-- **验收**：监控采样 5min 中位数 ≤ 100MB；峰值 ≤ 130MB（20% buffer）
-- **优先级**：高
-
-#### UAT-072c NFR-003 单元覆盖率
-- **命令**：`pnpm test:coverage`
-- **验收**：
-  - 全局 `lines ≥ 80%`
-  - 核心模块（auth/posts/comments）`lines ≥ 90%`
-- **优先级**：高
-
-#### UAT-072d NFR-004 1000 并发 0 错误
-- **命令**：`k6 run --vus 1000 --duration 30s tests/perf/k6-health.js`（`/health` 端点）
-- **验收**：`http_req_failed: ['rate==0']` 通过
-- **优先级**：高
-
-#### UAT-072e NFR-005 限流
-- **接口路径**：`GET /posts` 101 次（同一 IP）
-- **验收**：第 101 次返回 HTTP 429 + `Retry-After: 60`
-- **优先级**：高
-
-#### UAT-072f NFR-006 bcrypt
-- **接口路径**：`POST /users` 注册后查 DB
-- **验收**：`bcrypt.getRounds(users[0].passwordHash) >= 10`
-- **优先级**：高
-
-#### UAT-072g CON-001 TypeScript strict
-- **命令**：`pnpm tsc --noEmit`
-- **验收**：exit code = 0；输出为空
-- **优先级**：高
-
-#### UAT-072h CON-002 内存存储
-- **命令**：`cat package.json | grep -E '(mysql|pg|mongoose|sequelize|typeorm|redis)'`
-- **验收**：无匹配（exit 1）
-- **优先级**：高
-
-#### UAT-072i CON-003 RESTful + JSON
-- **接口路径**：任意 `GET /posts`
-- **验收**：`Content-Type: application/json; charset=utf-8`（RSS 端点除外：`application/rss+xml`）
-- **优先级**：中
-
-#### UAT-072j CON-004 审计 90 天
-- **接口路径**：`GET /admin/audit-logs?from=now-100d&to=now`
-- **验收**：响应 items 中所有 `ts >= now - 90d`；> 90d 记录被清理
-- **优先级**：中
-
----
-
-## 24. UAT 数量汇总
-
-| 需求 ID | UAT 范围 | 正常 | 异常 | 边界 | 合计 |
-|---|---|---|---|---|---|
-| REQ-001 | UAT-001~004 | 1 | 2 | 1 | 4 |
-| REQ-002 | UAT-005~008 | 1 | 2 | 1 | 4 |
-| REQ-003 | UAT-009~011 | 2 | 1 | 0 | 3 |
-| REQ-004 | UAT-012~014 | 1 | 1 | 1 | 3 |
-| REQ-005 | UAT-015~017 | 1 | 1 | 1 | 3 |
-| REQ-006 | UAT-018~022 | 2 | 2 | 1 | 5 |
-| REQ-007 | UAT-023~025 | 1 | 1 | 1 | 3 |
-| REQ-008 | UAT-026~029 | 1 | 2 | 1 | 4 |
-| REQ-009 | UAT-030~033 | 1 | 2 | 1 | 4 |
-| REQ-010 | UAT-034~036 | 1 | 1 | 1 | 3 |
-| REQ-011 | UAT-037~040 | 2 | 1 | 1 | 4 |
-| REQ-012 | UAT-041~043 | 1 | 1 | 1 | 3 |
-| REQ-013 | UAT-044~046 | 1 | 1 | 1 | 3 |
-| REQ-014 | UAT-047~048 | 1 | 0 | 1 | 2 |
-| REQ-015 | UAT-049~052 | 1 | 2 | 1 | 4 |
-| REQ-016 | UAT-053~056 | 2 | 1 | 1 | 4 |
-| REQ-017 | UAT-057~059 | 1 | 1 | 1 | 3 |
-| REQ-018 | UAT-060~062 | 1 | 1 | 1 | 3 |
-| REQ-019 | UAT-063~064 | 1 | 0 | 1 | 2 |
-| REQ-020 | UAT-065~066 | 1 | 0 | 1 | 2 |
-| REQ-021 | UAT-067~068 | 1 | 0 | 1 | 2 |
-| REQ-022 | UAT-069~071 | 1 | 1 | 1 | 3 |
-| NFR+CON | UAT-072 (a–j) | 10 | 0 | 0 | 10 |
-| **合计** | **UAT-001 ~ UAT-072** | **35** | **23** | **24** | **82** |
-
-注：UAT-072 内含 10 个子用例（a–j），总 UAT 项 = 72（ID 范围）+ 10（子项）= 82 条独立断言，但 72 个 UAT ID 是 RTM 与 UAT 路径映射表的主键。
-
-> 每条 REQ 至少 1 个 UAT；UAT-001~UAT-072 全部覆盖 32 需求（22 REQ + 6 NFR + 4 CON）。
-> 阶段 1 同步验收测试设计完成；阶段 8（验收测试）执行。
+# 验收测试设计文档
+
+> 阶段 1（需求分析）同步设计的验收测试用例（UAT）。阶段 8 执行。
+> 类型：验收测试。覆盖 32 需求 × 正常+异常+边界场景。
+> 每条用例含前置条件分析（认证状态 / 数据依赖 / 接口路径，禁止行为 #12/#13）。
+
+## 文档信息
+
+- 项目名称：博客系统后端（第 34 轮端到端调测，blog-system-demo-r34）
+- 测试类型：验收测试
+- 设计来源阶段：阶段 1（需求分析）
+- 执行阶段：阶段 8（验收测试）
+- 文档版本：v1.1（S-fix 修订，依据 RC-phase1-1-01 fixRecommendation）
+- 编制者：S-doc（dispatchId=phase1-S-doc-01）；修订：S-fix（dispatchId=phase1-S-fix-01）
+
+## 用例列表（UAT-001 ~ UAT-091）
+
+> 前置条件格式：`认证：<角色/token 要求>；数据：<依赖数据>；路径：<METHOD /api/...>`
+> 场景类型：正常 / 异常 / 边界。
+
+### UAT-001 ~ UAT-066：功能需求（REQ-001 ~ REQ-022，每需求 正常/异常/边界 3 用例）
+
+| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
+|---|---|---|---|---|---|---|---|
+| UAT-001 | 注册成功返回用户与令牌 | 高 | REQ-001 | 正常 | 认证：无需；数据：邮箱未注册；路径：POST /api/auth/register | `{"email":"reader1@example.com","password":"pass123456"}` | 201，响应含 userId/email/token，JWT 可访问受保护接口 |
+| UAT-002 | 重复邮箱注册冲突 | 高 | REQ-001 | 异常 | 认证：无需；数据：reader1@example.com 已注册；路径：POST /api/auth/register | 同上邮箱再次注册 | 409 冲突错误体 |
+| UAT-003 | 非法邮箱/短密码拒绝 | 高 | REQ-001 | 边界 | 认证：无需；数据：无；路径：POST /api/auth/register | `{"email":"bad","password":"123"}` | 400 参数错误，含 zod 校验错误明细 |
+| UAT-004 | 查询个人资料 | 高 | REQ-002 | 正常 | 认证：用户 token；数据：用户已注册；路径：GET /api/users/me | 无 body | 200，返回昵称/邮箱等资料字段 |
+| UAT-005 | 未认证访问资料 | 高 | REQ-002 | 异常 | 认证：无 token；数据：无；路径：GET /api/users/me | 无 Authorization 头 | 401 未认证 |
+| UAT-006 | 超长昵称更新拒绝 | 高 | REQ-002 | 边界 | 认证：用户 token；数据：用户已注册；路径：PUT /api/users/me | `{"nickname":"x".repeat(33)}` | 400 参数错误 |
+| UAT-007 | 正确凭据登录换取 JWT | 高 | REQ-003 | 正常 | 认证：无需；数据：用户已注册；路径：POST /api/auth/login | `{"email":"reader1@example.com","password":"pass123456"}` | 200，返回 JWT；用该 JWT 请求受保护接口成功 |
+| UAT-008 | 错误密码登录拒绝 | 高 | REQ-003 | 异常 | 认证：无需；数据：用户已注册；路径：POST /api/auth/login | `{"email":"reader1@example.com","password":"wrongpass"}` | 401 未授权 |
+| UAT-009 | 无效/过期 token 拒绝 | 高 | REQ-003 | 边界 | 认证：伪造/过期 token；数据：无；路径：GET /api/users/me | Authorization: Bearer invalid-token | 401 未认证 |
+| UAT-010 | 开通博主身份 | 高 | REQ-004 | 正常 | 认证：用户 token；数据：用户已注册且非博主；路径：POST /api/bloggers | `{"displayName":"博主甲"}` | 201，返回 bloggerId |
+| UAT-011 | 重复开通博主冲突 | 高 | REQ-004 | 异常 | 认证：用户 token；数据：用户已是博主；路径：POST /api/bloggers | 同上 | 409 冲突 |
+| UAT-012 | 未认证开通博主拒绝 | 高 | REQ-004 | 异常 | 认证：无 token；数据：无；路径：POST /api/bloggers | 同上 | 401 未认证 |
+| UAT-013 | 关注博主成功 | 高 | REQ-005 | 正常 | 认证：用户 token；数据：博主已开通；路径：POST /api/bloggers/:id/follow | 无 body | 200，博主粉丝数 +1 |
+| UAT-014 | 重复关注幂等 | 高 | REQ-005 | 边界 | 认证：用户 token；数据：已关注该博主；路径：POST /api/bloggers/:id/follow | 无 body | 200，粉丝数不变（幂等） |
+| UAT-015 | 关注不存在博主 | 高 | REQ-005 | 异常 | 认证：用户 token；数据：博主 id 不存在；路径：POST /api/bloggers/:id/follow | 无 body | 404 不存在 |
+| UAT-016 | 创建文章成功 | 高 | REQ-006 | 正常 | 认证：博主 token；数据：博主已开通；路径：POST /api/posts | `{"title":"T1","content":"C1"}` | 201，返回文章含 id/title/author |
+| UAT-017 | 非作者更新文章拒绝 | 高 | REQ-006 | 异常 | 认证：博主 B token；数据：文章作者为博主 A；路径：PUT /api/posts/:id | `{"title":"hacked"}` | 403 越权 |
+| UAT-018 | 空标题/内容创建拒绝 | 高 | REQ-006 | 边界 | 认证：博主 token；数据：无；路径：POST /api/posts | `{"title":"","content":""}` | 400 参数错误 |
+| UAT-019 | 保存草稿不公开可见 | 高 | REQ-007 | 正常 | 认证：博主 token；数据：无；路径：POST /api/posts | `{"title":"D1","content":"D","status":"draft"}` | 201 status=draft；访客 GET 公开列表不含该文章 |
+| UAT-020 | 发布文章公开可见 | 高 | REQ-007 | 正常 | 认证：博主 token；数据：草稿已存在；路径：PATCH /api/posts/:id/status | `{"status":"published"}` | 200 status=published；公开列表可见 |
+| UAT-021 | 非作者修改状态拒绝 | 高 | REQ-007 | 异常 | 认证：博主 B token；数据：草稿作者为博主 A；路径：PATCH /api/posts/:id/status | `{"status":"published"}` | 403 越权 |
+| UAT-022 | 浏览公开文章计数 | 高 | REQ-008 | 正常 | 认证：无需；数据：公开文章已存在；路径：GET /api/posts/:id | 无 body | 200 文章内容；再次 GET 后 viewCount +1 且持久化 |
+| UAT-023 | 浏览不存在文章 | 高 | REQ-008 | 异常 | 认证：无需；数据：文章 id 不存在；路径：GET /api/posts/:id | 无 body | 404 不存在 |
+| UAT-024 | 访客浏览草稿 | 高 | REQ-008 | 边界 | 认证：无需（访客）；数据：草稿存在；路径：GET /api/posts/:id | 无 body | 404（草稿仅作者可见） |
+| UAT-025 | 发表评论成功 | 高 | REQ-009 | 正常 | 认证：用户 token；数据：公开文章存在；路径：POST /api/posts/:id/comments | `{"content":"好文"}` | 201，返回评论含 id/content |
+| UAT-026 | 非评论作者删除拒绝 | 高 | REQ-009 | 异常 | 认证：用户 B token；数据：评论作者为用户 A；路径：DELETE /api/comments/:id | 无 body | 403 越权 |
+| UAT-027 | 空/超长评论拒绝 | 高 | REQ-009 | 边界 | 认证：用户 token；数据：公开文章存在；路径：POST /api/posts/:id/comments | `{"content":""}` 或 `{"content":"x".repeat(1001)}` | 400 参数错误 |
+| UAT-028 | 审核通过评论可见 | 高 | REQ-010 | 正常 | 认证：博主 token；数据：待审评论存在；路径：PATCH /api/comments/:id/review | `{"action":"approve"}` | 200，评论公开可见 |
+| UAT-029 | 审核拒绝评论隐藏 | 高 | REQ-010 | 正常 | 认证：博主 token；数据：待审评论存在；路径：PATCH /api/comments/:id/review | `{"action":"reject"}` | 200，评论公开列表不可见 |
+| UAT-030 | 非博主审核拒绝 | 高 | REQ-010 | 异常 | 认证：普通用户 token；数据：待审评论存在；路径：PATCH /api/comments/:id/review | `{"action":"approve"}` | 403 越权 |
+| UAT-031 | 创建标签成功 | 高 | REQ-011 | 正常 | 认证：博主 token；数据：无；路径：POST /api/tags | `{"name":"Node.js"}` | 201，返回标签 |
+| UAT-032 | 重复标签冲突 | 高 | REQ-011 | 异常 | 认证：博主 token；数据：同名标签已存在；路径：POST /api/tags | `{"name":"Node.js"}` | 409 冲突 |
+| UAT-033 | 删除被引用标签拒绝 | 高 | REQ-011 | 边界 | 认证：博主 token；数据：标签已被文章引用；路径：DELETE /api/tags/:id | 无 body | 409（先解绑后删除） |
+| UAT-034 | 创建分类含层级 | 高 | REQ-012 | 正常 | 认证：博主 token；数据：父分类存在；路径：POST /api/categories | `{"name":"前端","parentId":1}` | 201，返回分类含 parent 信息 |
+| UAT-035 | 删除含文章分类拒绝 | 高 | REQ-012 | 异常 | 认证：博主 token；数据：分类下存在文章；路径：DELETE /api/categories/:id | 无 body | 409 冲突 |
+| UAT-036 | parent 分类不存在 | 高 | REQ-012 | 边界 | 认证：博主 token；数据：parentId 不存在；路径：POST /api/categories | `{"name":"x","parentId":9999}` | 400 参数错误 |
+| UAT-037 | 关键词搜索命中 | 高 | REQ-013 | 正常 | 认证：无需；数据：文章含目标关键词；路径：GET /api/search?q=TypeScript&page=1&pageSize=10 | 无 body | 200，结果列表含标题命中文章 + 分页元数据 |
+| UAT-038 | 搜索无命中返回空 | 高 | REQ-013 | 正常 | 认证：无需；数据：无匹配文章；路径：GET /api/search?q=zzzz | 无 body | 200 空列表 |
+| UAT-039 | 空关键词搜索拒绝 | 高 | REQ-013 | 边界 | 认证：无需；数据：无；路径：GET /api/search?q= | 无 body | 400 参数错误 |
+| UAT-040 | 获取推荐文章 | 高 | REQ-014 | 正常 | 认证：无需；数据：≥1 篇公开文章；路径：GET /api/recommendations | 无 body | 200，推荐文章列表 ≤ 10 条，不含草稿 |
+| UAT-041 | 无内容推荐空列表 | 高 | REQ-014 | 正常 | 认证：无需；数据：无文章；路径：GET /api/recommendations | 无 body | 200 空列表 |
+| UAT-042 | 推荐结果上限约束 | 高 | REQ-014 | 边界 | 认证：无需；数据：> 10 篇公开文章；路径：GET /api/recommendations | 无 body | 200，结果数 ≤ 10 |
+| UAT-043 | 查询文章统计 | 高 | REQ-015 | 正常 | 认证：博主 token；数据：文章含浏览/评论数据；路径：GET /api/posts/:id/stats | 无 body | 200，viewCount/commentCount 与实测一致 |
+| UAT-044 | 无数据统计为 0 | 高 | REQ-015 | 边界 | 认证：博主 token；数据：文章无浏览无评论；路径：GET /api/posts/:id/stats | 无 body | 200，viewCount=0、commentCount=0（非 null） |
+| UAT-045 | 统计不存在文章 | 高 | REQ-015 | 异常 | 认证：博主 token；数据：文章 id 不存在；路径：GET /api/posts/:id/stats | 无 body | 404 不存在 |
+| UAT-046 | 事件生成通知可查 | 高 | REQ-016 | 正常 | 认证：用户 token；数据：他人评论了我的文章/关注了我；路径：GET /api/notifications | 无 body | 200，含新评论/新关注通知（unread） |
+| UAT-047 | 标记通知已读 | 高 | REQ-016 | 正常 | 认证：用户 token；数据：存在未读通知；路径：PATCH /api/notifications/:id/read | 无 body | 200，该通知状态变为已读 |
+| UAT-048 | 越权查询他人通知拒绝 | 高 | REQ-016 | 异常 | 认证：用户 B token；数据：通知归属用户 A（可通过 userId 参数指定）；路径：GET /api/notifications?userId=<A 的 userId> | `userId=A` | 403 越权（查询他人通知 → 403，见 requirement-spec.md §9 设计决策「通知/通知类资源越权查询语义」，与 REQ-016 AC3 一致） |
+| UAT-049 | 订阅博主成功 | 高 | REQ-017 | 正常 | 认证：用户 token；数据：博主存在；路径：POST /api/subscriptions | `{"bloggerId":1}` | 200，订阅关系建立 |
+| UAT-050 | 重复订阅幂等 | 高 | REQ-017 | 边界 | 认证：用户 token；数据：已订阅该博主；路径：POST /api/subscriptions | `{"bloggerId":1}` | 200 幂等，订阅列表无重复 |
+| UAT-051 | 订阅不存在博主 | 高 | REQ-017 | 异常 | 认证：用户 token；数据：bloggerId 不存在；路径：POST /api/subscriptions | `{"bloggerId":9999}` | 404 不存在 |
+| UAT-052 | 关键操作写入审计日志 | 高 | REQ-018 | 正常 | 认证：管理员 token（与 UAT-054 管理员专属语义一致）；数据：管理员已创建；路径：POST /api/auth/login（管理员登录，触发）→ GET /api/admin/audit-logs（验证） | 管理员登录一次 | 审计日志新增记录，含 actor=admin/action=login/timestamp |
+| UAT-053 | 审计记录字段完整性 | 高 | REQ-018 | 正常 | 认证：管理员 token；数据：执行过删除文章/改 Webhook；路径：GET /api/admin/audit-logs | 无 body | 日志记录含 actor/action/timestamp/详情四字段 |
+| UAT-054 | 普通用户读审计日志拒绝 | 高 | REQ-018 | 异常 | 认证：普通用户 token；数据：无；路径：GET /api/admin/audit-logs | 无 body | 403 越权 |
+| UAT-055 | 管理员查询审计日志分页 | 高 | REQ-019 | 正常 | 认证：管理员 token；数据：> 10 条日志；路径：GET /api/admin/audit-logs?page=1&pageSize=10 | 无 body | 200，日志列表 + 分页元数据 |
+| UAT-056 | 按条件筛选审计日志 | 高 | REQ-019 | 正常 | 认证：管理员 token；数据：含多种 action；路径：GET /api/admin/audit-logs?action=delete_post | 无 body | 200，仅返回 action=delete_post 记录 |
+| UAT-057 | 非管理员查询拒绝 | 高 | REQ-019 | 异常 | 认证：博主 token（非管理员）；数据：无；路径：GET /api/admin/audit-logs | 无 body | 403 越权 |
+| UAT-058 | 获取系统级 RSS | 高 | REQ-020 | 正常 | 认证：无需；数据：≥1 篇公开文章；路径：GET /api/rss | 无 body | 200，Content-Type application/xml，XML 可解析，含文章条目 |
+| UAT-059 | 无文章返回合法空源 | 高 | REQ-020 | 边界 | 认证：无需；数据：无公开文章；路径：GET /api/rss | 无 body | 200，合法 XML 空源（无 item） |
+| UAT-060 | 获取不存在博主 RSS | 高 | REQ-020 | 异常 | 认证：无需；数据：bloggerId 不存在；路径：GET /api/bloggers/:id/rss | 无 body | 404 不存在 |
+| UAT-061 | 创建 Webhook 并触发投递 | 高 | REQ-021 | 正常 | 认证：博主 token；数据：目标 URL 可达；路径：POST /api/webhooks | `{"url":"https://example.com/hook","event":"post.published"}` | 201；发布文章后目标 URL 收到 POST 投递（含事件负载） |
+| UAT-062 | 更新/删除 Webhook | 高 | REQ-021 | 正常 | 认证：博主 token；数据：Webhook 已创建；路径：PUT/DELETE /api/webhooks/:id | `{"url":"https://new.com/hook"}` | 200，配置更新/删除生效 |
+| UAT-063 | 非法 URL 创建拒绝 | 高 | REQ-021 | 边界 | 认证：博主 token；数据：无；路径：POST /api/webhooks | `{"url":"not-a-url"}` | 400 参数错误 |
+| UAT-064 | 投递失败自动重试 | 高 | REQ-022 | 正常 | 认证：博主 token；数据：Webhook 目标 URL 返回 5xx；路径：POST /api/webhooks（配置）+ 发布文章（触发） | 目标 URL 返回 500 | 投递自动重试 ≤ 3 次，间隔指数退避（日志可证） |
+| UAT-065 | 重试超限标记失败 | 高 | REQ-022 | 异常 | 认证：博主 token；数据：目标 URL 持续失败；路径：POST /api/webhooks（配置）+ 发布文章（触发） | 目标 URL 持续 500 | 重试 3 次后停止，Webhook 状态标记 failed |
+| UAT-066 | 投递成功不重试 | 高 | REQ-022 | 边界 | 认证：博主 token；数据：目标 URL 可达；路径：POST /api/webhooks（配置）+ 发布文章（触发） | 目标 URL 返回 200 | 投递 1 次成功，无重试发生 |
+
+### UAT-067 ~ UAT-078：非功能需求（NFR-001 ~ NFR-006，每 NFR 2 用例）
+
+| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
+|---|---|---|---|---|---|---|---|
+| UAT-067 | 列表接口 P95 响应达标 | 高 | NFR-001 | 正常 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 循环请求 N 次，采集响应时间 | P95 ≤ 200ms（生产目标）/ ≤ 400ms（CI 阈值） |
+| UAT-068 | 并发下响应仍达标 | 高 | NFR-001 | 边界 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 并发 50 请求 | P95 响应时间 ≤ 400ms（CI 阈值），无超时 |
+| UAT-069 | 未认证/越权访问拒绝 | 高 | NFR-002 | 正常 | 认证：无/非资源所有者；数据：受保护资源存在；路径：GET /api/users/me、DELETE /api/posts/:id | 无 token / 他人 token | 未认证 401；越权 403 |
+| UAT-070 | 密码哈希存储验证 | 高 | NFR-002 | 正常 | 认证：无需；数据：新注册用户；路径：POST /api/auth/register | 注册新用户 | 存储中密码为 bcrypt 哈希（非明文）；登录可比对成功 |
+| UAT-071 | 1000 请求零 5xx | 高 | NFR-003 | 正常 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 1000 次连续 GET | 错误率 = 0%（无 5xx 响应） |
+| UAT-072 | 混合请求零 5xx | 高 | NFR-003 | 边界 | 认证：用户/博主 token；数据：完整测试数据；路径：混合 API | 混合读操作 1000 次 | 错误率 = 0% |
+| UAT-073 | 单元行覆盖率达标 | 高 | NFR-004 | 正常 | 认证：n/a；数据：n/a；路径：静态（vitest coverage） | 运行 vitest coverage | 行覆盖率 ≥ 80% |
+| UAT-074 | 覆盖率报告可复现 | 高 | NFR-004 | 边界 | 认证：n/a；数据：n/a；路径：静态（CI 重跑） | 重复运行 coverage | 两次结果均 ≥ 80% |
+| UAT-075 | 峰值内存达标 | 高 | NFR-005 | 正常 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 1000 次请求后测量内存 | 峰值内存 ≤ 100MB（生产）/ ≤ 150MB（CI） |
+| UAT-076 | 长时运行内存稳定 | 高 | NFR-005 | 边界 | 认证：无需；数据：≥10 篇文章；路径：GET /api/posts | 2000 次请求后测量内存 | 峰值内存 ≤ 150MB（CI 阈值） |
+| UAT-077 | 限流阈值内正常放行 | 高 | NFR-006 | 正常 | 认证：无需；数据：无；路径：任意 API（GET /api/posts） | 60 秒内 ≤ 100 次请求 | 全部 2xx，无 429 |
+| UAT-078 | 超限返回 429 | 高 | NFR-006 | 边界 | 认证：无需；数据：无；路径：任意 API（GET /api/posts） | 60 秒内第 101 次请求 | 429 限流 + Retry-After 头 |
+
+### UAT-079 ~ UAT-086：约束需求（CON-001 ~ CON-004，每 CON 2 用例）
+
+| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
+|---|---|---|---|---|---|---|---|
+| UAT-079 | 技术栈编译运行 | 高 | CON-001 | 正常 | 认证：n/a；数据：n/a；路径：静态（package.json/tsconfig） | tsc 编译 + 启动服务 | 编译通过；路由基于 Express 4；源码 TypeScript 5 |
+| UAT-080 | 无其他 Web 框架 | 高 | CON-001 | 边界 | 认证：n/a；数据：n/a；路径：静态（依赖清单） | 检查 package.json 依赖 | 无 Express 之外的 Web 框架依赖 |
+| UAT-081 | 无外部数据库连接 | 高 | CON-002 | 正常 | 认证：n/a；数据：n/a；路径：静态 + 启动行为 | 启动服务 | 启动无外部连接；数据在内存可读写 |
+| UAT-082 | 内存数据可读写 | 高 | CON-002 | 正常 | 认证：博主 token；数据：无；路径：POST /api/posts → GET /api/posts/:id | 创建文章后查询 | 创建成功且内存中可读回 |
+| UAT-083 | 非法入参统一 400 | 高 | CON-003 | 正常 | 认证：博主 token；数据：无；路径：POST /api/posts | `{"title":"","content":""}` | 400 + 结构化错误体（zod 校验） |
+| UAT-084 | 校验基于 zod schema | 高 | CON-003 | 边界 | 认证：n/a；数据：n/a；路径：静态（源码检查） | 检查校验实现 | 入参校验逻辑基于 zod schema 声明 |
+| UAT-085 | 保留期可配置 | 高 | CON-004 | 正常 | 认证：管理员 token；数据：n/a；路径：配置检查 + GET /api/admin/audit-logs | 设置保留期（如 90 天） | 配置项生效，超期记录被清理/不可查 |
+| UAT-086 | 超期日志清理 | 高 | CON-004 | 边界 | 认证：管理员 token；数据：存在超期审计记录；路径：GET /api/admin/audit-logs | 模拟超期记录 | 超期记录不再返回 |
+
+### UAT-087 ~ UAT-091：AC 级补全用例（依据 RC-phase1-1-01 fixRecommendation）
+
+> 修复 R3-completeness 识别的 4 处 AC 级覆盖缺口（REQ-005 AC2 取关 / REQ-006 AC3 文章不存在 404 / REQ-009 AC3 文章不存在 404 / REQ-017 AC3 退订）+ NFR-002 AC3 JWT_SECRET 密钥管理，确保每条验收标准 ≥1 个可执行用例。
+
+| 用例 ID | 标题 | 优先级 | 关联需求 | 场景类型 | 前置条件 | 输入 | 预期输出 |
+|---|---|---|---|---|---|---|---|
+| UAT-087 | 取关博主粉丝数减一 | 高 | REQ-005 | 正常 | 认证：用户 token；数据：已关注目标博主；路径：DELETE /api/bloggers/:id/follow | 无 body | 200，粉丝数 -1（覆盖 REQ-005 AC2） |
+| UAT-088 | 操作不存在文章 | 高 | REQ-006 | 异常 | 认证：博主 token；数据：文章 id 不存在；路径：PUT /api/posts/:id | `{"title":"x"}` | 404 不存在（覆盖 REQ-006 AC3） |
+| UAT-089 | 评论不存在文章 | 高 | REQ-009 | 异常 | 认证：用户 token；数据：文章 id 不存在；路径：POST /api/posts/:id/comments | `{"content":"好文"}` | 404 不存在（覆盖 REQ-009 AC3） |
+| UAT-090 | 退订博主成功 | 高 | REQ-017 | 正常 | 认证：用户 token；数据：已订阅目标博主；路径：DELETE /api/subscriptions/:id | 无 body | 200，订阅关系解除（覆盖 REQ-017 AC3） |
+| UAT-091 | JWT_SECRET 密钥管理验证 | 高 | NFR-002 | 正常 | 认证：n/a；数据：n/a；路径：静态（环境变量与启动日志检查） | 检查 JWT_SECRET 来源/默认值/日志输出 | JWT_SECRET 经环境变量注入（process.env.JWT_SECRET）、代码无硬编码默认值、生产禁用默认密钥、密钥不出现在日志/错误输出（覆盖 NFR-002 AC3，见 requirement-spec.md §9） |
+
+## 用例汇总
+
+| 用例 ID 区间 | 关联需求 | 用例数 | 场景覆盖 |
+|---|---|---|---|
+| UAT-001~003 | REQ-001 | 3 | 正常/异常/边界 |
+| UAT-004~006 | REQ-002 | 3 | 正常/异常/边界 |
+| UAT-007~009 | REQ-003 | 3 | 正常/异常/边界 |
+| UAT-010~012 | REQ-004 | 3 | 正常/异常/边界 |
+| UAT-013~015, UAT-087 | REQ-005 | 4 | 正常/异常/边界 |
+| UAT-016~018, UAT-088 | REQ-006 | 4 | 正常/异常/边界 |
+| UAT-019~021 | REQ-007 | 3 | 正常/异常/边界 |
+| UAT-022~024 | REQ-008 | 3 | 正常/异常/边界 |
+| UAT-025~027, UAT-089 | REQ-009 | 4 | 正常/异常/边界 |
+| UAT-028~030 | REQ-010 | 3 | 正常/异常/边界 |
+| UAT-031~033 | REQ-011 | 3 | 正常/异常/边界 |
+| UAT-034~036 | REQ-012 | 3 | 正常/异常/边界 |
+| UAT-037~039 | REQ-013 | 3 | 正常/异常/边界 |
+| UAT-040~042 | REQ-014 | 3 | 正常/异常/边界 |
+| UAT-043~045 | REQ-015 | 3 | 正常/异常/边界 |
+| UAT-046~048 | REQ-016 | 3 | 正常/异常/边界 |
+| UAT-049~051, UAT-090 | REQ-017 | 4 | 正常/异常/边界 |
+| UAT-052~054 | REQ-018 | 3 | 正常/异常/边界 |
+| UAT-055~057 | REQ-019 | 3 | 正常/异常/边界 |
+| UAT-058~060 | REQ-020 | 3 | 正常/异常/边界 |
+| UAT-061~063 | REQ-021 | 3 | 正常/异常/边界 |
+| UAT-064~066 | REQ-022 | 3 | 正常/异常/边界 |
+| UAT-067~068 | NFR-001 | 2 | 正常/边界 |
+| UAT-069~070, UAT-091 | NFR-002 | 3 | 正常（验证类） |
+| UAT-071~072 | NFR-003 | 2 | 正常/边界 |
+| UAT-073~074 | NFR-004 | 2 | 正常/边界 |
+| UAT-075~076 | NFR-005 | 2 | 正常/边界 |
+| UAT-077~078 | NFR-006 | 2 | 正常/边界 |
+| UAT-079~080 | CON-001 | 2 | 正常/边界 |
+| UAT-081~082 | CON-002 | 2 | 正常/边界 |
+| UAT-083~084 | CON-003 | 2 | 正常/边界 |
+| UAT-085~086 | CON-004 | 2 | 正常/边界 |
+
+合计：**91 个 UAT 用例**（REQ 70 + NFR 13 + CON 8），32 需求全覆盖。
+
+## 代表用例详解（套用 test-case.md 模板）
+
+> 完整展开全部 91 个用例篇幅过长，以下给出正常/异常/边界各一代表用例的完整结构，其余用例按「用例列表」表结构执行。
+
+### UAT-001（正常场景代表）
+
+- 标题：注册成功返回用户与令牌
+- 优先级：高
+- 关联需求：REQ-001
+- 场景类型：正常
+- 测试场景：访客以合法邮箱+密码注册，验证注册成功与令牌可用性
+
+**前置条件**：认证：无需；数据：邮箱 reader1@example.com 未注册；路径：POST /api/auth/register
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/auth/register | `{"email":"reader1@example.com","password":"pass123456"}` | 201，body 含 userId/email/token |
+| 2 | 用返回 token 请求 GET /api/users/me | Authorization: Bearer <token> | 200，返回该用户资料 |
+
+**预期结果**：注册成功返回 201 与可用 JWT；token 可访问受保护接口。
+
+**执行状态**：[ ] 待执行
+
+### UAT-002（异常场景代表）
+
+- 标题：重复邮箱注册冲突
+- 优先级：高
+- 关联需求：REQ-001
+- 场景类型：异常
+- 测试场景：已注册邮箱再次注册，验证冲突拒绝
+
+**前置条件**：认证：无需；数据：reader1@example.com 已注册；路径：POST /api/auth/register
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/auth/register | `{"email":"reader1@example.com","password":"pass123456"}` | 409 冲突错误体 |
+
+**预期结果**：重复注册返回 409，不创建新用户。
+
+**执行状态**：[ ] 待执行
+
+### UAT-003（边界场景代表）
+
+- 标题：非法邮箱/短密码拒绝
+- 优先级：高
+- 关联需求：REQ-001
+- 场景类型：边界
+- 测试场景：非法邮箱格式与过短密码，验证参数边界校验
+
+**前置条件**：认证：无需；数据：无；路径：POST /api/auth/register
+
+**测试步骤**
+
+| 步骤 | 操作 | 输入 | 预期输出 |
+|---|---|---|---|
+| 1 | POST /api/auth/register | `{"email":"bad","password":"123"}` | 400，zod 校验错误明细 |
+
+**预期结果**：非法入参返回 400 与结构化错误体。
+
+**执行状态**：[ ] 待执行
+
+## N/A 用例说明（demo 范围声明，第 22 轮 P1-3）
+
+| N/A 项 | 说明 |
+|---|---|
+| 前端界面（Web/移动端 UI） | 无对应 API 端点，无 UAT 用例（Out of Scope，本迭代仅后端 API） |
+| 数据库持久化 | 无对应 API 端点（Out of Scope，采用内存存储），无 UAT 用例 |
+| 第三方支付/电商功能 | 无对应 API 端点（Out of Scope，与博客系统无关），无 UAT 用例 |
+| 多语言国际化（i18n） | 无对应 API 端点（Out of Scope，下轮迭代），无 UAT 用例 |
+| 移动端推送（APNs/FCM） | 无对应 API 端点（Out of Scope，依赖未就绪），无 UAT 用例 |
+
+> 上述 N/A 项与 requirement-spec.md §8 Out of Scope 声明一致；R3 完整性校验若发现不一致，以本表注释为准。
+
+## 测试用例覆盖说明
+
+- 功能点覆盖：22/22 REQ 全覆盖（每需求 正常/异常/边界 ≥3 用例 = 70 个，含 AC 级补全用例 UAT-087~090）
+- 非功能覆盖：6/6 NFR（指标验证 + 边界 = 13 个，含 UAT-091 JWT_SECRET 密钥管理）
+- 约束覆盖：4/4 CON（行为验证 + 边界，8 个）
+- 边界条件覆盖：每 REQ 1 个边界用例 + NFR/CON 边界场景
+- AC 级映射：每需求验收标准（AC）≥1 个可执行用例（修复 REQ-005 AC2 取关 / REQ-006 AC3 / REQ-009 AC3 / REQ-017 AC3 退订 / NFR-002 AC3 缺口）
+- 前置条件完整性：全部 91 用例声明 认证状态/数据依赖/接口路径（禁止行为 #12/#13）
+- 与 Out of Scope 一致性：N/A 项与 §8 声明一致（见上表）

@@ -227,10 +227,12 @@ async function main(): Promise<number> {
     if (args.tlaManifestFile) {
       const tlaManifestPath = args.tlaManifestFile;
       try {
-        const tlaManifest = await readJson<{ specs: Array<{ id: string; tlaPath: string }> }>(tlaManifestPath);
+        const tlaManifest = await readJson<{ basePath?: string; specs: Array<{ id: string; tlaPath: string }> }>(tlaManifestPath);
         tlaSnapshots = [];
+        // tlaPath 相对 basePath（相对 manifest 所在目录）解析，与 check-tla-model.ts P1.1 路径基准一致（tla-plus-guide §2.1）
+        const tlaBase = path.resolve(path.dirname(tlaManifestPath), tlaManifest.basePath ?? '');
         for (const spec of tlaManifest.specs) {
-          const tlaPath = path.resolve(path.dirname(tlaManifestPath), spec.tlaPath);
+          const tlaPath = path.resolve(tlaBase, spec.tlaPath);
           const tlaContent = await fs.readFile(tlaPath, 'utf-8');
           // 快照解析已收敛至 bdd-logic.ts 的 parseTlaSpecSnapshot（纯函数）
           tlaSnapshots.push(parseTlaSpecSnapshot(tlaContent, spec.id));

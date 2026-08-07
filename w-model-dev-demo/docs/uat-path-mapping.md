@@ -1,294 +1,113 @@
-# UAT 路径映射表（UAT Path Mapping）
+# UAT 路径映射表
 
-> **第 22 轮 P0-1 强制产出**。W 模型第 23 轮（2026-07-30）端到端调测。
->
-> **本表生命周期**：
-> - **阶段 1（需求分析）**：产出初始模板（路径 placeholder 为空），关联 UAT ID ↔ REQ ID。
-> - **阶段 5（编码）**：回填 `testFile` 字段（实际测试代码路径）。
-> - **阶段 8（验收测试）**：校验完整性（`check-artifact-gate.ts --phase=8`）。
->
-> **格式**：`UAT-XXX | REQ-XXX | testFile:tests/acceptance/... | placeholder | 备注`
->
-> **关联文档**：
-> - 需求规格：`docs/phase1-requirements/requirement-spec.md` §12.3
-> - 验收测试设计：`docs/phase1-requirements/acceptance-test-design.md` §1–§23
+> 阶段 1（需求分析）产出初始模板；阶段 5 编码后回填「实际路径」+「映射类型」；阶段 8 验收时校验完整性。
+> 校验规则：phase=1 校验文件存在性；phase=5 校验实际路径非 `_待阶段5回填_` 且 mappingType ∈ {直接,等价,替代}；phase=8 终检校验格式完整（≥4 列）。
 
-## 文档信息
+## 映射表（UAT-001 ~ UAT-091）
 
-- 项目 ID：`blog-system-demo`
-- Round：23
-- 编制者：S-doc 子代理（阶段 1）
-- 阶段：1（初始模板，路径 placeholder 待阶段 5 回填）
-- UAT 总数：72（UAT-001 ~ UAT-072，其中 UAT-072 含 10 个 NFR/CON 子项）
-- REQ 覆盖：22 REQ + 6 NFR + 4 CON = 32 需求全覆盖
-
-## 路径命名约定（待阶段 5 落地）
-
-```
-tests/acceptance/
-├── auth/
-│   ├── auth-login.spec.ts          # UAT-005~008 (REQ-002)
-│   ├── auth-jwt-expiry.spec.ts     # UAT-008 (REQ-002 边界)
-│   └── rate-limit.spec.ts          # UAT-072e (NFR-005)
-├── user/
-│   ├── user-register.spec.ts       # UAT-001~004 (REQ-001)
-│   ├── user-profile.spec.ts        # UAT-009~011 (REQ-003)
-│   └── follow.spec.ts              # UAT-012~014 (REQ-004)
-├── blogger/
-│   ├── blogger-register.spec.ts    # UAT-015~017 (REQ-005)
-│   └── multi-blogger.spec.ts       # UAT-057~059 (REQ-017)
-├── post/
-│   ├── post-crud.spec.ts           # UAT-018~022 (REQ-006)
-│   ├── post-browse.spec.ts         # UAT-023~025 (REQ-007)
-│   ├── post-like-bookmark.spec.ts  # UAT-026~029 (REQ-008)
-│   ├── post-tags.spec.ts           # UAT-041~043 (REQ-012)
-│   └── post-search.spec.ts         # UAT-044~046 (REQ-013)
-├── comment/
-│   ├── comment-create.spec.ts      # UAT-030~033 (REQ-009)
-│   └── comment-delete.spec.ts      # UAT-034~036 (REQ-010)
-├── notification/
-│   ├── notification-list.spec.ts   # UAT-037~040 (REQ-011)
-│   └── webhook.spec.ts             # UAT-049~052 (REQ-015)
-├── site/
-│   ├── site-config.spec.ts         # UAT-053~056 (REQ-016)
-│   ├── rss.spec.ts                 # UAT-047~048 (REQ-014)
-│   └── ad-management.spec.ts       # UAT-069~071 (REQ-022)
-├── admin/
-│   ├── audit-log.spec.ts           # UAT-060~062 (REQ-018)
-│   ├── access-record.spec.ts       # UAT-063~064 (REQ-019)
-│   └── site-stats.spec.ts          # UAT-065~066 (REQ-020)
-├── recommendation/
-│   └── recommend.spec.ts           # UAT-067~068 (REQ-021)
-├── perf/
-│   ├── k6-read-apis.js             # UAT-072a (NFR-001)
-│   └── k6-health.js                # UAT-072d (NFR-004)
-└── nfr-con/
-    ├── bcrypt.spec.ts              # UAT-072f (NFR-006)
-    ├── tsc-strict.spec.ts          # UAT-072g (CON-001)
-    ├── no-external-db.spec.ts      # UAT-072h (CON-002)
-    ├── restful-json.spec.ts        # UAT-072i (CON-003)
-    └── audit-90d-retention.spec.ts # UAT-072j (CON-004)
-```
-
-> **说明**：上述 `testFile` 字段是**约定路径**（基于 §10 Testing Decisions + 现有仓库结构），阶段 5 编码完成后回填实际路径；如与约定不同，以实际为准。
-
-## 路径映射表
-
-### 1. REQ-001 用户注册（4 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
+| UAT ID | 设计路径（阶段1） | 实际路径（阶段5回填） | 映射类型 | 说明 |
 |---|---|---|---|---|
-| UAT-001 | REQ-001 | tests/acceptance/user/user-register.spec.ts | | 正常注册 |
-| UAT-002 | REQ-001 | tests/acceptance/user/user-register.spec.ts | | 重复邮箱 → 409 |
-| UAT-003 | REQ-001 | tests/acceptance/user/user-register.spec.ts | | 无效邮箱格式 |
-| UAT-004 | REQ-001 | tests/acceptance/user/user-register.spec.ts | | 密码长度 < 8 边界 |
+| UAT-001 | POST /api/auth/register | _待阶段5回填_ | _待填_ | 注册成功 |
+| UAT-002 | POST /api/auth/register | _待阶段5回填_ | _待填_ | 重复邮箱 409 |
+| UAT-003 | POST /api/auth/register | _待阶段5回填_ | _待填_ | 非法邮箱/短密码 400 |
+| UAT-004 | GET /api/users/me | _待阶段5回填_ | _待填_ | 查询资料 |
+| UAT-005 | GET /api/users/me | _待阶段5回填_ | _待填_ | 未认证 401 |
+| UAT-006 | PUT /api/users/me | _待阶段5回填_ | _待填_ | 超长昵称 400 |
+| UAT-007 | POST /api/auth/login | _待阶段5回填_ | _待填_ | 登录换取 JWT |
+| UAT-008 | POST /api/auth/login | _待阶段5回填_ | _待填_ | 错误密码 401 |
+| UAT-009 | GET /api/users/me | _待阶段5回填_ | _待填_ | 无效 token 401 |
+| UAT-010 | POST /api/bloggers | _待阶段5回填_ | _待填_ | 开通博主 |
+| UAT-011 | POST /api/bloggers | _待阶段5回填_ | _待填_ | 重复开通 409 |
+| UAT-012 | POST /api/bloggers | _待阶段5回填_ | _待填_ | 未认证 401 |
+| UAT-013 | POST /api/bloggers/:id/follow | _待阶段5回填_ | _待填_ | 关注博主 |
+| UAT-014 | POST /api/bloggers/:id/follow | _待阶段5回填_ | _待填_ | 重复关注幂等 |
+| UAT-015 | POST /api/bloggers/:id/follow | _待阶段5回填_ | _待填_ | 博主不存在 404 |
+| UAT-016 | POST /api/posts | _待阶段5回填_ | _待填_ | 创建文章 |
+| UAT-017 | PUT /api/posts/:id | _待阶段5回填_ | _待填_ | 非作者 403 |
+| UAT-018 | POST /api/posts | _待阶段5回填_ | _待填_ | 空标题/内容 400 |
+| UAT-019 | POST /api/posts | _待阶段5回填_ | _待填_ | 存草稿不公开 |
+| UAT-020 | PATCH /api/posts/:id/status | _待阶段5回填_ | _待填_ | 发布公开可见 |
+| UAT-021 | PATCH /api/posts/:id/status | _待阶段5回填_ | _待填_ | 非作者 403 |
+| UAT-022 | GET /api/posts/:id | _待阶段5回填_ | _待填_ | 浏览计数 +1 |
+| UAT-023 | GET /api/posts/:id | _待阶段5回填_ | _待填_ | 不存在 404 |
+| UAT-024 | GET /api/posts/:id | _待阶段5回填_ | _待填_ | 访客浏览草稿 404 |
+| UAT-025 | POST /api/posts/:id/comments | _待阶段5回填_ | _待填_ | 发表评论 |
+| UAT-026 | DELETE /api/comments/:id | _待阶段5回填_ | _待填_ | 非作者 403 |
+| UAT-027 | POST /api/posts/:id/comments | _待阶段5回填_ | _待填_ | 空/超长 400 |
+| UAT-028 | PATCH /api/comments/:id/review | _待阶段5回填_ | _待填_ | 审核通过可见 |
+| UAT-029 | PATCH /api/comments/:id/review | _待阶段5回填_ | _待填_ | 审核拒绝隐藏 |
+| UAT-030 | PATCH /api/comments/:id/review | _待阶段5回填_ | _待填_ | 非博主 403 |
+| UAT-031 | POST /api/tags | _待阶段5回填_ | _待填_ | 创建标签 |
+| UAT-032 | POST /api/tags | _待阶段5回填_ | _待填_ | 重复标签 409 |
+| UAT-033 | DELETE /api/tags/:id | _待阶段5回填_ | _待填_ | 引用中删除 409 |
+| UAT-034 | POST /api/categories | _待阶段5回填_ | _待填_ | 创建分类含层级 |
+| UAT-035 | DELETE /api/categories/:id | _待阶段5回填_ | _待填_ | 含文章删除 409 |
+| UAT-036 | POST /api/categories | _待阶段5回填_ | _待填_ | parent 不存在 400 |
+| UAT-037 | GET /api/search?q=TypeScript | _待阶段5回填_ | _待填_ | 关键词命中 |
+| UAT-038 | GET /api/search?q=zzzz | _待阶段5回填_ | _待填_ | 无命中空列表 |
+| UAT-039 | GET /api/search?q= | _待阶段5回填_ | _待填_ | 空关键词 400 |
+| UAT-040 | GET /api/recommendations | _待阶段5回填_ | _待填_ | 推荐文章 |
+| UAT-041 | GET /api/recommendations | _待阶段5回填_ | _待填_ | 无内容空列表 |
+| UAT-042 | GET /api/recommendations | _待阶段5回填_ | _待填_ | 结果 ≤ 10 条 |
+| UAT-043 | GET /api/posts/:id/stats | _待阶段5回填_ | _待填_ | 文章统计 |
+| UAT-044 | GET /api/posts/:id/stats | _待阶段5回填_ | _待填_ | 无数据为 0 |
+| UAT-045 | GET /api/posts/:id/stats | _待阶段5回填_ | _待填_ | 不存在 404 |
+| UAT-046 | GET /api/notifications | _待阶段5回填_ | _待填_ | 事件生成通知 |
+| UAT-047 | PATCH /api/notifications/:id/read | _待阶段5回填_ | _待填_ | 标记已读 |
+| UAT-048 | GET /api/notifications?userId=<A> | _待阶段5回填_ | _待填_ | 越权查询他人通知 403（REQ-016 AC3） |
+| UAT-049 | POST /api/subscriptions | _待阶段5回填_ | _待填_ | 订阅博主 |
+| UAT-050 | POST /api/subscriptions | _待阶段5回填_ | _待填_ | 重复订阅幂等 |
+| UAT-051 | POST /api/subscriptions | _待阶段5回填_ | _待填_ | 博主不存在 404 |
+| UAT-052 | POST /api/auth/login + GET /api/admin/audit-logs | _待阶段5回填_ | _待填_ | 管理员登录触发审计记录（管理员 token） |
+| UAT-053 | GET /api/admin/audit-logs | _待阶段5回填_ | _待填_ | 记录字段完整 |
+| UAT-054 | GET /api/admin/audit-logs | _待阶段5回填_ | _待填_ | 普通用户 403 |
+| UAT-055 | GET /api/admin/audit-logs?page=1&pageSize=10 | _待阶段5回填_ | _待填_ | 分页查询 |
+| UAT-056 | GET /api/admin/audit-logs?action=delete_post | _待阶段5回填_ | _待填_ | 条件筛选 |
+| UAT-057 | GET /api/admin/audit-logs | _待阶段5回填_ | _待填_ | 非管理员 403 |
+| UAT-058 | GET /api/rss | _待阶段5回填_ | _待填_ | 系统级 RSS |
+| UAT-059 | GET /api/rss | _待阶段5回填_ | _待填_ | 空源合法 |
+| UAT-060 | GET /api/bloggers/:id/rss | _待阶段5回填_ | _待填_ | 博主 RSS 404 |
+| UAT-061 | POST /api/webhooks | _待阶段5回填_ | _待填_ | 创建 + 事件触发投递 |
+| UAT-062 | PUT /api/webhooks/:id、DELETE /api/webhooks/:id | _待阶段5回填_ | _待填_ | 更新/删除 |
+| UAT-063 | POST /api/webhooks | _待阶段5回填_ | _待填_ | 非法 URL 400 |
+| UAT-064 | POST /api/webhooks + 发布事件（内部投递队列） | _待阶段5回填_ | _待填_ | 失败自动重试（经日志验证） |
+| UAT-065 | POST /api/webhooks + 发布事件（内部投递队列） | _待阶段5回填_ | _待填_ | 重试超限标记 failed |
+| UAT-066 | POST /api/webhooks + 发布事件（内部投递队列） | _待阶段5回填_ | _待填_ | 成功不重试 |
+| UAT-067 | GET /api/posts（压测） | _待阶段5回填_ | _待填_ | P95 响应时间 |
+| UAT-068 | GET /api/posts（并发压测） | _待阶段5回填_ | _待填_ | 并发响应达标 |
+| UAT-069 | GET /api/users/me、DELETE /api/posts/:id | _待阶段5回填_ | _待填_ | 未认证 401/越权 403 |
+| UAT-070 | POST /api/auth/register | _待阶段5回填_ | _待填_ | 密码哈希验证 |
+| UAT-071 | GET /api/posts（1000 次） | _待阶段5回填_ | _待填_ | 零 5xx |
+| UAT-072 | 混合 API（1000 次） | _待阶段5回填_ | _待填_ | 混合零 5xx |
+| UAT-073 | n/a（静态 vitest coverage） | _待阶段5回填_ | _待填_ | 覆盖率 ≥ 80% |
+| UAT-074 | n/a（静态 vitest coverage） | _待阶段5回填_ | _待填_ | 覆盖率可复现 |
+| UAT-075 | GET /api/posts（1000 次后测内存） | _待阶段5回填_ | _待填_ | 峰值内存 |
+| UAT-076 | GET /api/posts（2000 次后测内存） | _待阶段5回填_ | _待填_ | 内存稳定 |
+| UAT-077 | GET /api/posts（60 秒内 ≤100 次） | _待阶段5回填_ | _待填_ | 限流内放行 |
+| UAT-078 | GET /api/posts（第 101 次） | _待阶段5回填_ | _待填_ | 429 + Retry-After |
+| UAT-079 | n/a（静态 package.json/tsconfig） | _待阶段5回填_ | _待填_ | 技术栈编译运行 |
+| UAT-080 | n/a（静态依赖清单） | _待阶段5回填_ | _待填_ | 无其他 Web 框架 |
+| UAT-081 | 启动行为（静态检查） | _待阶段5回填_ | _待填_ | 无外部连接 |
+| UAT-082 | POST /api/posts → GET /api/posts/:id | _待阶段5回填_ | _待填_ | 内存数据读写 |
+| UAT-083 | POST /api/posts | _待阶段5回填_ | _待填_ | 非法入参 400 |
+| UAT-084 | n/a（静态源码检查） | _待阶段5回填_ | _待填_ | zod 校验 |
+| UAT-085 | 配置检查 + GET /api/admin/audit-logs | _待阶段5回填_ | _待填_ | 保留期配置 |
+| UAT-086 | GET /api/admin/audit-logs | _待阶段5回填_ | _待填_ | 超期清理 |
+| UAT-087 | DELETE /api/bloggers/:id/follow | _待阶段5回填_ | _待填_ | 取关粉丝数 -1（REQ-005 AC2） |
+| UAT-088 | PUT /api/posts/:id | _待阶段5回填_ | _待填_ | 文章不存在 404（REQ-006 AC3） |
+| UAT-089 | POST /api/posts/:id/comments | _待阶段5回填_ | _待填_ | 文章不存在 404（REQ-009 AC3） |
+| UAT-090 | DELETE /api/subscriptions/:id | _待阶段5回填_ | _待填_ | 退订成功（REQ-017 AC3） |
+| UAT-091 | 静态（环境变量与启动日志检查） | _待阶段5回填_ | _待填_ | JWT_SECRET 注入/禁默认/不入日志（NFR-002 AC3） |
 
-### 2. REQ-002 用户登录（4 UAT）
+## 映射类型说明
 
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-005 | REQ-002 | tests/acceptance/auth/auth-login.spec.ts | | 正常登录 + JWT |
-| UAT-006 | REQ-002 | tests/acceptance/auth/auth-login.spec.ts | | 错误密码 → 401 |
-| UAT-007 | REQ-002 | tests/acceptance/auth/auth-login.spec.ts | | 不存在邮箱 → 401 |
-| UAT-008 | REQ-002 | tests/acceptance/auth/auth-jwt-expiry.spec.ts | | JWT 过期边界 |
+- `直接`：路径完全一致（阶段 5 回填）
+- `等价`：路径不同但语义等价（如路由分组调整，阶段 5 回填）
+- `替代`：因技术约束替代（须说明原因，阶段 5 回填）
 
-### 3. REQ-003 用户资料（3 UAT）
+## 设计路径约定（阶段 1）
 
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-009 | REQ-003 | tests/acceptance/user/user-profile.spec.ts | | 匿名查公开资料 |
-| UAT-010 | REQ-003 | tests/acceptance/user/user-profile.spec.ts | | 修改自己资料 |
-| UAT-011 | REQ-003 | tests/acceptance/user/user-profile.spec.ts | | 改邮箱被拒 |
-
-### 4. REQ-004 关注/取关（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-012 | REQ-004 | tests/acceptance/user/follow.spec.ts | | 关注博主成功 |
-| UAT-013 | REQ-004 | tests/acceptance/user/follow.spec.ts | | 关注不存在 → 404 |
-| UAT-014 | REQ-004 | tests/acceptance/user/follow.spec.ts | | 关注自己被拒边界 |
-
-### 5. REQ-005 博主注册（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-015 | REQ-005 | tests/acceptance/blogger/blogger-register.spec.ts | | 博主注册成功 |
-| UAT-016 | REQ-005 | tests/acceptance/blogger/blogger-register.spec.ts | | 邮箱被 reader 占用 |
-| UAT-017 | REQ-005 | tests/acceptance/blogger/blogger-register.spec.ts | | 用户名长度边界 |
-
-### 6. REQ-006 博文 CRUD（5 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-018 | REQ-006 | tests/acceptance/post/post-crud.spec.ts | | 创建草稿 |
-| UAT-019 | REQ-006 | tests/acceptance/post/post-crud.spec.ts | | 发布草稿 |
-| UAT-020 | REQ-006 | tests/acceptance/post/post-crud.spec.ts | | 非 owner 编辑 → 403 |
-| UAT-021 | REQ-006 | tests/acceptance/post/post-crud.spec.ts | | 未认证创建 → 401 |
-| UAT-022 | REQ-006 | tests/acceptance/post/post-crud.spec.ts | | 空内容发布被拒边界 |
-
-### 7. REQ-007 博文浏览（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-023 | REQ-007 | tests/acceptance/post/post-browse.spec.ts | | 公开列表 + 分页 |
-| UAT-024 | REQ-007 | tests/acceptance/post/post-browse.spec.ts | | 草稿不可见 → 404 |
-| UAT-025 | REQ-007 | tests/acceptance/post/post-browse.spec.ts | | pageSize 上限 100 边界 |
-
-### 8. REQ-008 点赞/收藏（4 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-026 | REQ-008 | tests/acceptance/post/post-like-bookmark.spec.ts | | 点赞成功 |
-| UAT-027 | REQ-008 | tests/acceptance/post/post-like-bookmark.spec.ts | | 点赞不存在 → 404 |
-| UAT-028 | REQ-008 | tests/acceptance/post/post-like-bookmark.spec.ts | | 未认证点赞 → 401 |
-| UAT-029 | REQ-008 | tests/acceptance/post/post-like-bookmark.spec.ts | | 收藏列表分页边界 |
-
-### 9. REQ-009 评论发表（4 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-030 | REQ-009 | tests/acceptance/comment/comment-create.spec.ts | | 顶级评论 |
-| UAT-031 | REQ-009 | tests/acceptance/comment/comment-create.spec.ts | | 未登录评论 → 401 |
-| UAT-032 | REQ-009 | tests/acceptance/comment/comment-create.spec.ts | | 不存在博文 → 404 |
-| UAT-033 | REQ-009 | tests/acceptance/comment/comment-create.spec.ts | | 超过 5 层边界 |
-
-### 10. REQ-010 评论删除（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-034 | REQ-010 | tests/acceptance/comment/comment-delete.spec.ts | | 作者删除自己 |
-| UAT-035 | REQ-010 | tests/acceptance/comment/comment-delete.spec.ts | | 第三方删除 → 403 |
-| UAT-036 | REQ-010 | tests/acceptance/comment/comment-delete.spec.ts | | 博主删他人在自有博文下评论边界 |
-
-### 11. REQ-011 通知系统（4 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-037 | REQ-011 | tests/acceptance/notification/notification-list.spec.ts | | 接收关注通知 |
-| UAT-038 | REQ-011 | tests/acceptance/notification/notification-list.spec.ts | | 标记已读 |
-| UAT-039 | REQ-011 | tests/acceptance/notification/notification-list.spec.ts | | 他人通知不可见 → 404 |
-| UAT-040 | REQ-011 | tests/acceptance/notification/notification-list.spec.ts | | read 过滤分页边界 |
-
-### 12. REQ-012 文章标签（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-041 | REQ-012 | tests/acceptance/post/post-tags.spec.ts | | 创建标签并关联 |
-| UAT-042 | REQ-012 | tests/acceptance/post/post-tags.spec.ts | | 6 个标签被拒 |
-| UAT-043 | REQ-012 | tests/acceptance/post/post-tags.spec.ts | | 重复添加幂等边界 |
-
-### 13. REQ-013 全文搜索（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-044 | REQ-013 | tests/acceptance/post/post-search.spec.ts | | 关键词命中 |
-| UAT-045 | REQ-013 | tests/acceptance/post/post-search.spec.ts | | 空关键词 → 400 |
-| UAT-046 | REQ-013 | tests/acceptance/post/post-search.spec.ts | | 大小写不敏感 + draft 过滤边界 |
-
-### 14. REQ-014 RSS 订阅（2 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-047 | REQ-014 | tests/acceptance/site/rss.spec.ts | | RSS 输出 + XML 合法 |
-| UAT-048 | REQ-014 | tests/acceptance/site/rss.spec.ts | | 无 published 空 channel 边界 |
-
-### 15. REQ-015 Webhook 通知（4 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-049 | REQ-015 | tests/acceptance/notification/webhook.spec.ts | | 注册 + 触发 + 签名 |
-| UAT-050 | REQ-015 | tests/acceptance/notification/webhook.spec.ts | | 500 触发重试 |
-| UAT-051 | REQ-015 | tests/acceptance/notification/webhook.spec.ts | | URL 非 https 被拒 |
-| UAT-052 | REQ-015 | tests/acceptance/notification/webhook.spec.ts | | 重试 3 次后仍失败边界 |
-
-### 16. REQ-016 站点配置（4 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-053 | REQ-016 | tests/acceptance/site/site-config.spec.ts | | 匿名查配置 |
-| UAT-054 | REQ-016 | tests/acceptance/site/site-config.spec.ts | | admin 修改配置 |
-| UAT-055 | REQ-016 | tests/acceptance/site/site-config.spec.ts | | reader 修改 → 403 |
-| UAT-056 | REQ-016 | tests/acceptance/site/site-config.spec.ts | | 当前生效横幅边界 |
-
-### 17. REQ-017 多博主系统（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-057 | REQ-017 | tests/acceptance/blogger/multi-blogger.spec.ts | | 切换博主身份 |
-| UAT-058 | REQ-017 | tests/acceptance/blogger/multi-blogger.spec.ts | | 切换到非自己绑定 → 403 |
-| UAT-059 | REQ-017 | tests/acceptance/blogger/multi-blogger.spec.ts | | 切换回原身份边界 |
-
-### 18. REQ-018 审计日志（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-060 | REQ-018 | tests/acceptance/admin/audit-log.spec.ts | | 关键操作自动记录 |
-| UAT-061 | REQ-018 | tests/acceptance/admin/audit-log.spec.ts | | 非 admin 查询 → 403 |
-| UAT-062 | REQ-018 | tests/acceptance/admin/audit-log.spec.ts | | 90 天前日志不可见边界 |
-
-### 19. REQ-019 文章访问记录（2 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-063 | REQ-019 | tests/acceptance/admin/access-record.spec.ts | | 浏览触发访问记录 |
-| UAT-064 | REQ-019 | tests/acceptance/admin/access-record.spec.ts | | 5 分钟去重窗口边界 |
-
-### 20. REQ-020 站点统计（2 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-065 | REQ-020 | tests/acceptance/admin/site-stats.spec.ts | | PV / UV 聚合 |
-| UAT-066 | REQ-020 | tests/acceptance/admin/site-stats.spec.ts | | range=7d 168 桶边界 |
-
-### 21. REQ-021 推荐系统（2 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-067 | REQ-021 | tests/acceptance/recommendation/recommend.spec.ts | | 标签相似度推荐 |
-| UAT-068 | REQ-021 | tests/acceptance/recommendation/recommend.spec.ts | | 冷启动回退最近热门边界 |
-
-### 22. REQ-022 广告位管理（3 UAT）
-
-| UAT ID | REQ ID | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-069 | REQ-022 | tests/acceptance/site/ad-management.spec.ts | | admin 创建广告 |
-| UAT-070 | REQ-022 | tests/acceptance/site/ad-management.spec.ts | | reader 创建 → 403 |
-| UAT-071 | REQ-022 | tests/acceptance/site/ad-management.spec.ts | | 过期广告不展示边界 |
-
-### 23. NFR + CON 横切（UAT-072，含 10 个子项）
-
-| UAT ID | 关联 | testFile（约定） | placeholder（阶段 1 留空） | 备注 |
-|---|---|---|---|---|
-| UAT-072a | NFR-001 | tests/acceptance/perf/k6-read-apis.js | | P95 ≤ 200ms 性能压测 |
-| UAT-072b | NFR-002 | tests/acceptance/perf/memory-monitor.js | | heapUsed ≤ 100MB（1000 并发） |
-| UAT-072c | NFR-003 | tests/acceptance/nfr-con/coverage.spec.ts | | 单元覆盖率 ≥ 80% |
-| UAT-072d | NFR-004 | tests/acceptance/perf/k6-health.js | | 1000 并发 0 错误 |
-| UAT-072e | NFR-005 | tests/acceptance/auth/rate-limit.spec.ts | | 100 req/min/IP 限流 |
-| UAT-072f | NFR-006 | tests/acceptance/nfr-con/bcrypt.spec.ts | | bcrypt cost ≥ 10 |
-| UAT-072g | CON-001 | tests/acceptance/nfr-con/tsc-strict.spec.ts | | TypeScript strict 0 错误 |
-| UAT-072h | CON-002 | tests/acceptance/nfr-con/no-external-db.spec.ts | | 内存存储（无外部 DB） |
-| UAT-072i | CON-003 | tests/acceptance/nfr-con/restful-json.spec.ts | | RESTful + JSON |
-| UAT-072j | CON-004 | tests/acceptance/nfr-con/audit-90d-retention.spec.ts | | 审计日志保留 90 天 |
-
-## 阶段 5 回填约定（待执行）
-
-阶段 5 编码完成后，由 S-rtm 子代理或阶段 5 owner 回填 `placeholder` 列：
-
-```
-| UAT-001 | REQ-001 | tests/acceptance/user/user-register.spec.ts | tests/acceptance/user/user-register.spec.ts#UAT-001 | 已落地 |
-```
-
-回填规则：
-1. **testFile 路径**：以仓库实际文件路径为准（可能与约定不同）。
-2. **placeholder 锚点**：`<filename>#<it-block-name>`（如 `user-register.spec.ts#UAT-001`）；如同一 spec 含多条 UAT，用 `#<describe>-<it>` 锚点。
-3. **回填完整性校验**：阶段 8 验收前 `check-artifact-gate.ts --phase=8` 校验所有 72 条 UAT 的 placeholder 非空。
-
-## 阶段 1 摘要
-
-- 初始 UAT 路径映射表已产出（72 条 UAT + 10 个 NFR/CON 子项）
-- 路径 placeholder 全部留空（待阶段 5 回填）
-- 32 需求全覆盖（22 REQ + 6 NFR + 4 CON）
-- 4 维度覆盖：100%（stakeholder / scenario / requirementType / crossCuts）
-- 0 conflicts-with 冲突
-- 0 豁免审批事项
-- 下阶段门禁：用户 CHECKPOINT 确认 → 放行进入阶段 2（系统设计）
+- 认证语义：`POST /api/auth/*` 承载注册/登录；受保护资源通过 Bearer token 中间件鉴权
+- 管理端点：`/api/admin/*` 仅管理员角色可访问（审计日志查询）
+- 内部机制（REQ-018 审计记录、REQ-022 Webhook 重试）：无独立公开端点，经触发端点 + 日志验证，阶段 5 若实现为独立端点则回填实际路径并标记 `等价`
+- 静态验证（NFR-004 覆盖率、CON-001/002/003 约束）：`n/a`，阶段 8 以静态检查/构建产物验证，不映射 HTTP 端点
