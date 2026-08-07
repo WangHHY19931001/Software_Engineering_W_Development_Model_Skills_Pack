@@ -444,10 +444,11 @@ V 子代理须在 `summary` 中包含：
 
 **禁止措辞**：「评审通过」「质量良好」「符合要求」等空泛表述。summary 长度须 ≥ 50 字符（R11 校验）。
 
-**evidence 格式规范**（[21.0.0] 新增）：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
-- 合法示例：`coverage.json.matrices.stakeholder.coverage=100%`
-- 非法示例：`C1-C10 全通过` / `质量良好` / `评审通过`
+**evidence 格式规范**（[21.0.0] 新增，[22.0.0] 统一为冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`。
+- 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
+- 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `C1-C10 全通过` / `质量良好` / `评审通过`
 - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
+- 格式约定见 [format-conventions.md](format-conventions.md) §2.1
 
 ### 6.2.1 evidence 字段可追溯约束
 
