@@ -9,6 +9,10 @@
  * 用法：
  *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4] [--spec-dir=<dir>]
  *
+ * 用法（第 38 轮新增 R9/R10）：
+ *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
+ *     --spec-dir  Phase 2 时按 *-system-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
+ *
  * 参数：
  *   graph.json   graph.json 或 consolidated.json 文件路径
  *   --phase      校验阶段（1-4），控制追溯项数量，默认从 graph.currentPhase 读取
@@ -26,10 +30,12 @@
 
 import * as path from 'node:path';
 import {
+  checkDesignSpecEnhance,
   checkRequirementGraph,
   checkRequirementSpecEnhance,
   extractRefTargets,
   recalculatePassed,
+  type DesignSpecEnhanceViolations,
   type GraphShape,
   type RequirementSpecEnhanceViolations,
 } from './graph-logic.js';
@@ -90,24 +96,59 @@ async function main(): Promise<void> {
     }
   }
 
-  // 解析 --spec-dir（第 37 轮：R7/R8 需求规格独立产物目录）
+  // 解析 --spec-dir（第 37 轮 R7/R8 + 第 38 轮 R9/R10）
   const specDirArg = process.argv.slice(3).find(a => a.startsWith('--spec-dir='));
   let specEnhanceViolations: RequirementSpecEnhanceViolations | undefined;
+  let designEnhanceViolations: DesignSpecEnhanceViolations | undefined;
   if (specDirArg) {
     const specDir = specDirArg.split('=')[1];
     if (specDir) {
       const fs = await import('node:fs');
+      const readdirSync = (d: string): string[] => {
+        try { return fs.readdirSync(d); } catch { return []; }
+      };
       const readOrEmpty = (p: string): string => {
         try { return fs.readFileSync(p, 'utf-8'); } catch { return ''; }
       };
-      const specContent = readOrEmpty(path.join(specDir, 'requirement-spec.md'));
-      const traceContent = readOrEmpty(path.join(specDir, 'traceability-matrix.md'));
-      const umlContent = readOrEmpty(path.join(specDir, 'uml-modeling.md'));
-      const rtmIds = rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined;
-      specEnhanceViolations = checkRequirementSpecEnhance(traceContent, specContent, umlContent, rtmIds);
-      for (const ref of extractRefTargets(specContent)) {
-        if (!fs.existsSync(path.join(specDir, ref))) {
-          specEnhanceViolations.r7.push(`R7 引用块断裂：主规格引用 ${ref} 但文件不存在`);
+      if (phase === 2) {
+        // 第 38 轮：Phase 2 module 前缀 glob 匹配（每类恰 1 个文件）
+        const mainFile = readdirSync(specDir).find(f => f.endsWith('-system-design.md'));
+        const traceFile = readdirSync(specDir).find(f => f.endsWith('-traceability-matrix.md'));
+        const umlFile = readdirSync(specDir).find(f => f.endsWith('-uml-modeling.md'));
+        const traceContent = traceFile ? readOrEmpty(path.join(specDir, traceFile)) : '';
+        const umlContent = umlFile ? readOrEmpty(path.join(specDir, umlFile)) : '';
+        designEnhanceViolations = checkDesignSpecEnhance(
+          traceContent,
+          mainFile ? readOrEmpty(path.join(specDir, mainFile)) : '',
+          umlContent,
+          rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined,
+        );
+        // 引用块完整性：主文档引用块指向的 6 文件须存在（以主文档 module 前缀核对）
+        if (mainFile) {
+          const module = mainFile.replace(/-system-design\.md$/, '');
+          const subRefs = ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'];
+          for (const sub of subRefs) {
+            if (!fs.existsSync(path.join(specDir, `${module}-${sub}.md`))) {
+              designEnhanceViolations.r9.push(`R9 引用块断裂：主文档引用 ${module}-${sub}.md 但文件不存在`);
+            }
+          }
+          if (readdirSync(specDir).filter(f => f.endsWith('-system-design.md')).length !== 1) {
+            designEnhanceViolations.r9.push(`R9 module 前缀匹配失败：主文档须恰 1 个 *-system-design.md`);
+          }
+        } else {
+          designEnhanceViolations.r9.push('R9 module 前缀匹配失败：未找到 *-system-design.md 主文档');
+        }
+      } else {
+        // 第 37 轮：Phase 1 固定文件名（保留既有行为）
+        const specContent = readOrEmpty(path.join(specDir, 'requirement-spec.md'));
+        const traceContent = readOrEmpty(path.join(specDir, 'traceability-matrix.md'));
+        const umlContent = readOrEmpty(path.join(specDir, 'uml-modeling.md'));
+        const rtmIds = rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined;
+        specEnhanceViolations = checkRequirementSpecEnhance(traceContent, specContent, umlContent, rtmIds);
+        for (const ref of extractRefTargets(specContent)) {
+          if (!fs.existsSync(path.join(specDir, ref))) {
+            specEnhanceViolations.r7.push(`R7 引用块断裂：主规格引用 ${ref} 但文件不存在`);
+          }
         }
       }
     }
@@ -170,6 +211,14 @@ async function main(): Promise<void> {
     // checkRequirementGraph 不感知 R7/R8，重算 passed（与 graph-logic.ts 汇总逻辑一致）
     const isPureReqGraph = (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
     recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
+  }
+
+  // 第 38 轮：合并 R9/R10 Phase 2 设计规格产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
+  if (designEnhanceViolations) {
+    for (const msg of designEnhanceViolations.r9) result.violations.push(msg);
+    for (const msg of designEnhanceViolations.r10) result.violations.push(msg);
+    // phase=2 图非纯 REQ 图，recalculatePassed 第二参传 false 即非多根模式
+    recalculatePassed(result, false);
   }
 
   console.log('═'.repeat(60));
