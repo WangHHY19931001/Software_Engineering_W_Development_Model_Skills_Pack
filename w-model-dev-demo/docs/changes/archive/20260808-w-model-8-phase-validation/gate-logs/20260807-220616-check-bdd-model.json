@@ -1,2 +1,0 @@
-ERROR_JSON {"category":"ARG_INVALID","message":"参数缺失 --graph=<graph.json>（phase>=2 强制）","exitCode":2}
-✗ [ARG_INVALID] 参数缺失 --graph=<graph.json>（phase>=2 强制）: 用法: check-bdd-model.ts <bdd-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json

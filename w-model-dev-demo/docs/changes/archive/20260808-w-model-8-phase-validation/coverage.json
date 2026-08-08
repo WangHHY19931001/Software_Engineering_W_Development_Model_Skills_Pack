@@ -1,7 +1,0 @@
-{
-  "schemaVersion": "1.0",
-  "projectId": "blog-system-demo-r35",
-  "source": "coverage/coverage-final.json（vitest run --coverage 真实产物，阶段 5/8 全量回归时生成）",
-  "generatedAt": "2026-08-07",
-  "note": "阶段 1 coverage 分析（CoverageAnalysis）在本 demo 以 vitest 覆盖率实测承担；归档快照真实复制 coverage-final.json total 汇总"
-}
