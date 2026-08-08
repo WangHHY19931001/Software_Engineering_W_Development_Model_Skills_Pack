@@ -11,7 +11,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { checkRequirementGraph, recalculatePassed, type GraphShape, type GraphCheckResult } from '../graph-logic.js';
+import {
+  checkRequirementGraph,
+  recalculatePassed,
+  checkRequirementSpecEnhance,
+  countMermaidBlocks,
+  parseMarkdownTable,
+  type GraphShape,
+  type GraphCheckResult,
+} from '../graph-logic.js';
 
 describe('R1-R6 四维识别校验', () => {
   // ==================== R1-R4: REQ 层级树 ====================
@@ -473,5 +481,54 @@ describe('recalculatePassed（round28 G-C）', () => {
     };
     recalculatePassed(result, false);
     expect(result.passed).toBe(false);
+  });
+});
+
+// ==================== R7/R8 需求规格产物校验（第 37 轮） ====================
+describe('R7 追踪矩阵一致性', () => {
+  it('合法矩阵通过', () => {
+    const v = checkRequirementSpecEnhance(
+      '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n',
+      '## 4. 需求层级树\n',
+      '```mermaid\ngraph TB\n  A --> B\n```\n',
+    );
+    expect(v.r7).toEqual([]);
+  });
+  it('候选落点§ 非法报 R7', () => {
+    const v = checkRequirementSpecEnhance(
+      '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | xxx | UAT-001 |\n',
+      '## 4. 需求层级树\n',
+      '',
+    );
+    expect(v.r7.some(m => m.includes('候选落点§'))).toBe(true);
+  });
+  it('RTM 集合交叉校验', () => {
+    const v = checkRequirementSpecEnhance(
+      '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n',
+      '## 4. 需求层级树\n',
+      '',
+      new Set(['REQ-002']),
+    );
+    expect(v.r7.some(m => m.includes('RTM 登记缺失'))).toBe(true);
+  });
+});
+
+describe('R8 UML mermaid 块配平', () => {
+  it('配平通过', () => {
+    const { balanced, pairs } = countMermaidBlocks('```mermaid\na\n```\n```mermaid\nb\n```\n');
+    expect(balanced).toBe(true);
+    expect(pairs).toBe(2);
+  });
+  it('未配平报 R8', () => {
+    const v = checkRequirementSpecEnhance('', '', '```mermaid\na\n');
+    expect(v.r8.some(m => m.includes('配平'))).toBe(true);
+  });
+});
+
+describe('parseMarkdownTable', () => {
+  it('解析表头与数据行', () => {
+    const rows = parseMarkdownTable('| 需求号 | 候选落点§ |\n|---|---|\n| REQ-001 | §4.1 |\n');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.['需求号']).toBe('REQ-001');
   });
 });

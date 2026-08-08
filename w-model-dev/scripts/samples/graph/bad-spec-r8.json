@@ -1,0 +1,9 @@
+{
+  "sampleType": "graph-spec-enhance",
+  "description": "R8 失败：mermaid 块未配平",
+  "expectedPassed": false,
+  "expectedReasonPatterns": ["R8 UML mermaid 块配平失败"],
+  "traceabilityMatrix": "| 需求号 | 优先级 | owner | 需求陈述 | 候选子系统 | 候选落点§ | 验收关联 | 逐条验收判据 |\n|---|---|---|---|---|---|---|---|\n| REQ-001 | P0 | owner | 陈述 | GROUP-A | §4.1 | UAT-001 | 判据 |\n",
+  "umlModeling": "```mermaid\ngraph TB\n  A --> B\n",
+  "specContent": "## 4. 需求层级树\n"
+}

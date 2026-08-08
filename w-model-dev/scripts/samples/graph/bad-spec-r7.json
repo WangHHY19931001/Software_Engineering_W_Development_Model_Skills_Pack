@@ -1,0 +1,9 @@
+{
+  "sampleType": "graph-spec-enhance",
+  "description": "R7 失败：候选落点§ 非法 + 验收关联缺 UAT/§ + 需求号非 REQ/NFR",
+  "expectedPassed": false,
+  "expectedReasonPatterns": ["R7 需求号格式失败", "R7 候选落点§ 引用失败", "R7 验收关联失败"],
+  "traceabilityMatrix": "| 需求号 | 优先级 | owner | 需求陈述 | 候选子系统 | 候选落点§ | 验收关联 | 逐条验收判据 |\n|---|---|---|---|---|---|---|---|\n| X-001 | P0 | owner | 陈述 | GROUP-A | xxx | 无 | 响应 < 2s |\n",
+  "umlModeling": "```mermaid\ngraph TB\n  A --> B\n```\n",
+  "specContent": "## 4. 需求层级树\n"
+}

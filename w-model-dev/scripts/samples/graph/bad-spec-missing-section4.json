@@ -1,0 +1,9 @@
+{
+  "sampleType": "graph-spec-enhance",
+  "description": "R7 失败：主规格缺 §4 层级树节",
+  "expectedPassed": false,
+  "expectedReasonPatterns": ["R7 追踪矩阵一致性失败：主规格缺 §4 层级树节"],
+  "traceabilityMatrix": "| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n",
+  "umlModeling": "```mermaid\ngraph TB\n  A --> B\n```\n",
+  "specContent": "## 3. User Stories\n"
+}

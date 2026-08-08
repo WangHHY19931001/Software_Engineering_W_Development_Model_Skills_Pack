@@ -23,6 +23,8 @@
  *   w-model-dev/scripts/samples/bdd/*.json+*.feature  BDD manifest + features 样本（含 5 valid + 5 bad）
  *   w-model-dev/scripts/samples/coverage/*.json   覆盖分析样本（四维·维度4，10 条）
  *   w-model-dev/scripts/samples/exemption/*.json  豁免审批样本（四维·豁免，7 条）
+ *   w-model-dev/scripts/samples/graph/*spec*.json   R7/R8 需求规格产物样本（第 37 轮，4 条）
+ *   w-model-dev/scripts/samples/gate/*requirement-spec-structure*.json  Phase 1 需求规格结构校验样本（第 37 轮，4 条）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -37,8 +39,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkVerifierOutput } from './verifier-logic.js';
 import { validateBySchema } from './schema-loader.js';
-import { checkArtifactGate, type GateGraph } from './gate-logic.js';
-import { checkRequirementGraph } from './graph-logic.js';
+import { checkArtifactGate, checkRequirementSpecStructure, type GateGraph } from './gate-logic.js';
+import { checkRequirementGraph, checkRequirementSpecEnhance } from './graph-logic.js';
 import { checkTlaModel } from './tla-logic.js';
 import { checkBudget } from './budget-logic.js';
 import { checkRunLog } from './run-log-logic.js';
@@ -547,6 +549,42 @@ const GRAPH_CASES: GraphCase[] = [
     expectedWarningPatterns: [/边数下限警告/],
     description: '4 REQ 节点 3 parent 边（边数 < 节点×3），应通过但触发边数下限警告',
   },
+];
+
+// ==================== R7/R8 需求规格产物校验（第 37 轮） ====================
+// 样本为 markdown 纯文本字段（traceabilityMatrix/specContent/umlModeling），
+// 由 runSpecEnhanceCases 读取并喂给 checkRequirementSpecEnhance（纯函数）。
+
+interface SpecEnhanceCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const SPEC_ENHANCE_CASES: SpecEnhanceCase[] = [
+  { file: 'valid-spec-enhance.json', expectedPassed: true, description: 'R7/R8 通过：追踪矩阵字段合法 + mermaid 配平' },
+  { file: 'bad-spec-r7.json', expectedPassed: false, expectedReasonPatterns: [/R7 需求号格式失败/, /R7 候选落点§ 引用失败/, /R7 验收关联失败/], description: 'R7 失败：候选落点§ 非法 + 验收关联缺 UAT/§' },
+  { file: 'bad-spec-r8.json', expectedPassed: false, expectedReasonPatterns: [/R8 UML mermaid 块配平失败/], description: 'R8 失败：mermaid 块未配平' },
+  { file: 'bad-spec-missing-section4.json', expectedPassed: false, expectedReasonPatterns: [/R7 追踪矩阵一致性失败：主规格缺 §4 层级树节/], description: 'R7 失败：主规格缺 §4 层级树节' },
+];
+
+// ==================== Phase 1 需求规格结构校验（第 37 轮） ====================
+// 样本字段（specContent/refFiles/dodContent）由 runSpecStructureCases
+// 用内存 fs stub 喂给 checkRequirementSpecStructure（注入式 fs）。
+
+interface SpecStructureCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const SPEC_STRUCTURE_CASES: SpecStructureCase[] = [
+  { file: 'valid-requirement-spec-structure.json', expectedPassed: true, description: '结构校验通过：6 引用块 + SSOT 头 + DoD 9 项' },
+  { file: 'bad-refs-missing.json', expectedPassed: false, expectedReasonPatterns: [/引用文件不存在 uml-modeling.md/], description: '结构校验失败：引用文件缺失' },
+  { file: 'bad-ssot-header.json', expectedPassed: false, expectedReasonPatterns: [/§0 SSOT 头缺「自身校验」/], description: '结构校验失败：SSOT 头缺声明' },
+  { file: 'bad-dod-incomplete.json', expectedPassed: false, expectedReasonPatterns: [/DoD 清单仅 5 项/], description: '结构校验失败：DoD 清单 < 8' },
 ];
 
 interface TlaCase {
@@ -1835,6 +1873,55 @@ async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// ==================== R7/R8 需求规格产物校验 runner（第 37 轮） ====================
+
+async function runSpecEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of SPEC_ENHANCE_CASES) {
+    const abs = path.join(samplesDir, 'graph', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; specContent: string };
+    const v = checkRequirementSpecEnhance(parsed.traceabilityMatrix, parsed.specContent, parsed.umlModeling);
+    const violations = [...v.r7, ...v.r8];
+    const actualPassed = violations.length === 0;
+    const details: string[] = [];
+    if (actualPassed !== c.expectedPassed) details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${actualPassed}`);
+    if (!c.expectedPassed) details.push(...matchReasonPatterns(violations, c.expectedReasonPatterns));
+    results.push({ name: `graph/${c.file}`, passed: details.length === 0, description: c.description, details: details.length > 0 ? details : undefined });
+  }
+  return results;
+}
+
+// ==================== Phase 1 需求规格结构校验 runner（第 37 轮） ====================
+// 内存 fs stub：键用 path.join 构造，与 checkRequirementSpecStructure 内部 path.join 一致
+//（Windows 下分隔符为反斜杠，避免模板字符串正斜杠导致 existsSync 查不到）。
+
+async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of SPEC_STRUCTURE_CASES) {
+    const abs = path.join(samplesDir, 'gate', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed = JSON.parse(raw) as { specContent: string; refFiles: string[]; dodContent: string };
+    const files: Record<string, string> = {};
+    const dir = 'docs/phase1-requirements';
+    files[path.join(dir, 'requirement-spec.md')] = parsed.specContent;
+    for (const f of parsed.refFiles) files[path.join(dir, f)] = '';
+    files[path.join(dir, 'discipline-dod.md')] = parsed.dodContent;
+    const fsStub = {
+      readFileSync(p: string): string { return files[p] ?? ''; },
+      existsSync(p: string): boolean { return p in files; },
+    };
+    const v = checkRequirementSpecStructure(dir, fsStub);
+    const violations = [...v.refs, ...v.ssot, ...v.dod];
+    const actualPassed = violations.length === 0;
+    const details: string[] = [];
+    if (actualPassed !== c.expectedPassed) details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${actualPassed}`);
+    if (!c.expectedPassed) details.push(...matchReasonPatterns(violations, c.expectedReasonPatterns));
+    results.push({ name: `gate/${c.file}`, passed: details.length === 0, description: c.description, details: details.length > 0 ? details : undefined });
+  }
+  return results;
+}
+
 async function runTlaCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of TLA_CASES) {
@@ -2667,6 +2754,8 @@ async function main(): Promise<void> {
   console.log(`Verifier 用例 : ${VERIFIER_CASES.length}`);
   console.log(`Gate 用例     : ${GATE_CASES.length}`);
   console.log(`Graph 用例    : ${GRAPH_CASES.length}`);
+  console.log(`SpecEnhance 用例 : ${SPEC_ENHANCE_CASES.length}`);
+  console.log(`SpecStructure 用例 : ${SPEC_STRUCTURE_CASES.length}`);
   console.log(`TLA 用例      : ${TLA_CASES.length}`);
   console.log(`Budget 用例   : ${BUDGET_CASES.length}`);
   console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
@@ -2701,10 +2790,13 @@ async function main(): Promise<void> {
     stateMachineResults,
     codegraphQueryResults, opsxArtifactResults, openspecArchiveResults,
     uatPathMappingResults, icebergResults,
+    specEnhanceResults, specStructureResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
     runGraphCases(samplesDir),
+    runSpecEnhanceCases(samplesDir),
+    runSpecStructureCases(samplesDir),
     runTlaCases(samplesDir),
     runBudgetCases(samplesDir),
     runRunLogCases(samplesDir),
@@ -2739,6 +2831,7 @@ async function main(): Promise<void> {
     ...stateMachineResults,
     ...codegraphQueryResults, ...opsxArtifactResults, ...openspecArchiveResults,
     ...uatPathMappingResults, ...icebergResults,
+    ...specEnhanceResults, ...specStructureResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;
