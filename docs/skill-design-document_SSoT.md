@@ -1047,7 +1047,8 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | 结构变更 | 需求规格不再内联 feature 集（行为规格由独立 bdd .feature 文件 + bdd-manifest.json 承接，behavior-spec.md 仅定义引用关系） |
 | 决策 | 6 项拆独立产物文件（主规格引用块串联，对齐 SKILL.md 引用 references/ 模式）；主模板 §1-§12 编号不变防跨引用破坏（tla-plus-guide 引用 requirement-spec.md:§3）；UML 仅用例图+领域类图+活动图（状态机由 TLA+/BDD 覆盖）；代码层向后兼容（--spec-dir 等参数全可选，门禁增量） |
 | self-test | 基线 217→225（+8：4 graph spec-enhance + 4 gate structure） |
-| vitest | 466→475 |
+| vitest | 466→476 |
+| security-scan | baseline 重生成 206→224（含第 37 轮新增指纹；lint:security 0 新增发现） |
 | 版本号 | 37.0.0（三处一致） |
 
 ---
@@ -2654,7 +2655,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.32 | 第 34 轮 W 模型技能强化（目录约定 SSoT / 格式统一 / TLA+·BDD 覆盖率校验架构升级） | `references/directory-conventions.md`（路径约定 SSoT）+ `references/format-conventions.md`（冒号格式 SSoT）+ `subagent-delegation.md`（S-ingest-tla / S-ingest-bdd 模板）+ `schemas/tla-manifest.schema.json`（sdCoverage 必填）+ `schemas/bdd-manifest.schema.json`（designCoverage 必填）+ `scripts/check-tla-model.ts`（--graph phase≥2 强制 + SD 覆盖率强制）+ `scripts/check-bdd-model.ts`（--graph + D8 维度）+ `scripts/check-artifact-gate.ts`（resolvePhaseDoc + 终检 model 校验）+ `scripts/verifier-logic.ts`（EVIDENCE_PATTERN 冒号格式）+ `scripts/bdd-logic.ts`（TLA+ 快照解析升级 + L1 豁免 D4）+ demo 重产（TLA+ 7 specs + BDD 9 features 覆盖 21 SD）+ 版本号三处 34.0.0 | 完整（self-test 213/213、vitest 451、tsc 0 错误） |
 | §3.4.33 | 第 35 轮 8 阶段端到端调测修复入库 | `scripts/check-tla-model.ts`（TLC states 清理正则 `\d{4}`→`\d{2,4}`，P3 bug）+ `scripts/design-contract-logic.ts`（D1 路径语义归一：多端点拆分/括号剥离/`:id` 模板段匹配/「不适用」「横切」豁免）+ `scripts/run-log-logic.ts`（GATE_JSON_PATTERNS 新增 STATE_MACHINE_JSON）+ `scripts/__tests__/tla-clean-trace.test.ts`（+1）+ `scripts/__tests__/design-contract-logic.test.ts`（+6）+ `scripts/__tests__/run-log-logic.test.ts`（+1）+ `scripts/__tests__/bdd-logic.test.ts`（实时 fixture 改自包含内联规格）+ demo 侧修复（auditMiddleware id、限流器独立实例、Express Router 路由结构）+ 版本号三处 35.0.0 | 完整（self-test 213/213、vitest 459、tsc 0 错误；8 阶段调测 318/318 测试、覆盖率 94.76% lines、归档 308 文件） |
 | §3.4.34 | 第 36 轮 冰山扫掠深度分析机制 | `schemas/iceberg-sweep.schema.json` + `scripts/iceberg-sweep-logic.ts`（R1-R8）+ `scripts/check-iceberg-sweep.ts`（CLI）+ `scripts/__tests__/iceberg-logic.test.ts`（+7）+ `scripts/samples/iceberg/`（+4 样本）+ `scripts/self-test.ts`（基线 213→217）+ `schemas/run-log.schema.json`（action 25→27）+ `references/iceberg-sweep-guide.md` + `references/anti-patterns.md`（#44，43→44）+ `references/subagent-delegation.md`（R-iceberg 模板）+ `references/root-cause-locator.md`（边界节）+ `SKILL.md`（工作流 9.5 步）+ 版本号三处 36.0.0 | 完整（self-test 217/217、vitest 466、tsc 0 错误） |
-| §3.4.35 | 第 37 轮 Phase 1 设计级别增强 | `templates/requirement-spec.md`（重构：§0 SSOT 头 + §13-§17/附录 A 引用块）+ `templates/requirement-spec/`（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 6 子模板）+ `references/phase-1-requirements.md`（算法步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14）+ `scripts/check-requirement-graph.ts`（R7/R8 + --spec-dir）+ `scripts/check-artifact-gate.ts`（phase=1 引用块/SSOT/DoD 结构校验 + --spec-dir）+ `scripts/self-test.ts`（基线 217→225）+ 版本号三处 37.0.0 | 完整（self-test 225/225、vitest 475、tsc 0 错误） |
+| §3.4.35 | 第 37 轮 Phase 1 设计级别增强 | `templates/requirement-spec.md`（重构：§0 SSOT 头 + §13-§17/附录 A 引用块）+ `templates/requirement-spec/`（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 6 子模板）+ `references/phase-1-requirements.md`（算法步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14）+ `scripts/check-requirement-graph.ts`（R7/R8 + --spec-dir）+ `scripts/check-artifact-gate.ts`（phase=1 引用块/SSOT/DoD 结构校验 + --spec-dir）+ `scripts/self-test.ts`（基线 217→225）+ 版本号三处 37.0.0 | 完整（self-test 225/225、vitest 476、tsc 0 错误） |
 
 ---
 

@@ -25,9 +25,10 @@
 - 需求规格不再内联 feature 集：行为规格由独立 bdd .feature 文件 + bdd-manifest.json 承接，behavior-spec.md 仅定义引用关系（--spec-dir 等参数全可选，代码层向后兼容）
 
 #### 验证
-- vitest 475/475 全通过
+- vitest 476/476 全通过
 - self-test 225/225 全通过
 - TypeScript strict 0 错误
+- security-scan baseline 重生成（206→224 条，含第 37 轮新增指纹；`npm run lint:security` 0 新增发现）
 
 ## [36.0.0] - 2026-08-08
 

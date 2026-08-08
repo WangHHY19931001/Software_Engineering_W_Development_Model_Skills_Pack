@@ -88,7 +88,7 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # TLA+ 行为门禁，退出码 0/1/2
 npm run check:coverage -- <coverage.json> [--graph=] [--out-of-scope=] [--exemptions=]  # 阶段 1 需求覆盖分析门禁，退出码 0/1/2
 npm run check:exemption -- <exemption.json>  # 豁免审批门禁（S→R→V→人类四阶段），退出码 0/1/2
-npm run self-test                           # 退出码 0/1（213 条样本回归基线）
+npm run self-test                           # 退出码 0/1（225 条样本回归基线）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 
 # 或用 npx tsx 直接调用：
@@ -358,7 +358,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/gate-enhancement.test.ts
 │   │   ├── check-codegraph-queries.ts  # codegraph 查询落盘完整性校验（退出码 0/1/2）
 │   │   ├── check-opsx-artifacts.ts  # opsx 制品 + R3×3 + V 审查产物校验（退出码 0/1/2）
 │   │   ├── check-openspec-archive.ts  # opsx:archive 归档完整性校验（退出码 0/1/2）
-│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 213 条）
+│   │   ├── self-test.ts          #   校验逻辑自检（samples/ 驱动，回归基线 225 条）
 │   │   ├── lib/cli-error.ts      #   exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具（ENOENT/坏行 → exit 2）
 │   │   ├── lib/safe-json.ts      #   JSON 解析原型污染防御（parseJsonSafe，丢弃 __proto__ 键）
