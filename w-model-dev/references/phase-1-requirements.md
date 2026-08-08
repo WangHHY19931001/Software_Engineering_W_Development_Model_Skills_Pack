@@ -18,6 +18,13 @@
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
 - `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**，第22轮 P0-1 修正）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
+- 独立产物文件（第 37 轮新增，主规格引用块指向，均位于 `docs/phase1-requirements/`）：
+  - `system-context.md`：系统上下文（外部实体清单 + 边界原则）
+  - `glossary.md`：术语表（需求域子集）
+  - `traceability-matrix.md`：需求追踪矩阵（8 字段表 + 测试层级承接矩阵）
+  - `behavior-spec.md`：行为规格模型（引用 .feature 文件关系，不内联 feature 块）
+  - `discipline-dod.md`：工程纪律与 DoD 可勾选清单
+  - `uml-modeling.md`：UML 需求建模（用例图 + 领域类图 + 活动图）
 
 ## AI 能力应用
 
@@ -69,6 +76,25 @@
      ├─ partial 覆盖未补齐 → FM-4D-05，须经豁免审批
      ├─ 失败: 覆盖率不达标且未走豁免审批 → 回步骤 6，补覆盖或申请豁免
      └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
+  7. 系统上下文与术语建模（第 37 轮新增）
+     ├─ 识别外部实体（用户/外部系统/外部存储），产出 docs/phase1-requirements/system-context.md（外部实体清单 + 上下文边界原则）
+     ├─ 提取需求域术语，对照 references/glossary.md 权威表，产出 docs/phase1-requirements/glossary.md（需求域术语子集）
+     ├─ 主规格 §13/§14 引用块指向上述独立文件
+     ├─ 失败: 外部实体边界模糊 → 标注待澄清，向用户确认
+     └─ 成功: system-context.md + glossary.md 产出，主规格引用块成立
+  8. UML 需求建模（第 37 轮新增）
+     ├─ 基于步骤 2 层级树 + 步骤 5 REQ-group，产出 docs/phase1-requirements/uml-modeling.md A.1 用例图（参与者=stakeholder，用例=level≥2 REQ）
+     ├─ 基于步骤 2 层级树，产出 A.2 领域类图（领域实体=level=1/2 REQ 名词性概念）
+     ├─ 基于步骤 3 User Stories，产出 A.3 活动图（业务流程=正常场景 user story 序列）
+     ├─ 主规格附录 A 引用块指向 uml-modeling.md
+     ├─ 失败: 用例/领域实体/活动节点无法对应 REQ → 标注待澄清（FM-3D-09）
+     └─ 成功: uml-modeling.md 三图产出，mermaid 块配平，主规格引用块成立
+  9. 需求追踪矩阵与行为规格引用（第 37 轮新增）
+     ├─ 基于步骤 2 层级树 + 步骤 5 REQ-group + 步骤 4 覆盖矩阵，产出 docs/phase1-requirements/traceability-matrix.md（§1 REQ/NFR 8 字段表 + §2 测试层级承接矩阵，仅验收列填实）
+     ├─ 产出 docs/phase1-requirements/behavior-spec.md（列出本模块对应 .feature 文件清单 + 引用关系，不内联 feature 块）
+     ├─ 主规格 §15/§16 引用块指向上述独立文件
+     ├─ 失败: 追踪矩阵字段与步骤 2/5/4 不一致 → 回步骤 9 对齐（FM-3D-08）
+     └─ 成功: traceability-matrix.md + behavior-spec.md 产出，主规格引用块成立
 输出: 结构化需求规格（§1-§12）+ 验收测试用例 + 风险评估报告 + 豁免审批记录
 ```
 
@@ -173,6 +199,13 @@
 | 验收测试用例 | 套用 `templates/test-case.md` 模板，`type=验收测试`，每个功能点 ≥ 1 条用例 | `<模块>-acceptance-test.md` |
 | 风险评估报告 | 产出风险等级（高 / 中 / 低）+ 缓解措施表格；冲突对与缺失项单独列出 | `<模块>-risk-assessment.md` |
 | graph.json | A 子代理产出，记录 REQ 节点与 parent/depends-on 边 | `.w-model/ingestion/graph.json`（跨阶段演进） |
+| 系统上下文 | 套用 `templates/requirement-spec/system-context.md` | `docs/phase1-requirements/system-context.md` |
+| 术语表 | 套用 `templates/requirement-spec/glossary.md` | `docs/phase1-requirements/glossary.md` |
+| UML 需求建模 | 套用 `templates/requirement-spec/uml-modeling.md`，mermaid 三图 | `docs/phase1-requirements/uml-modeling.md` |
+| 需求追踪矩阵 | 套用 `templates/requirement-spec/traceability-matrix.md` | `docs/phase1-requirements/traceability-matrix.md` |
+| 行为规格模型 | 套用 `templates/requirement-spec/behavior-spec.md`（引用 .feature 文件，不内联） | `docs/phase1-requirements/behavior-spec.md` |
+| 工程纪律与 DoD | 套用 `templates/requirement-spec/discipline-dod.md` | `docs/phase1-requirements/discipline-dod.md` |
+| 主规格 | 套用 `templates/requirement-spec.md`（骨架 + §0 SSOT 头 + 引用块指向上述 6 文件） | `docs/phase1-requirements/requirement-spec.md` |
 
 **执行顺序**：需求解析算法（步骤 1-4）→ 套用模板产出需求规格 → 同步产出验收测试用例（覆盖正常 + 异常 + 边界）→ 产出风险评估报告 → RTM 登记。
 
@@ -268,6 +301,10 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - [ ] 需求冲突 / 缺失项均已处理或标注
 - [ ] RTM 已登记需求与验收测试映射
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=1` 退出码 0（连通 + 单根 + 父唯一）
+- [ ] system-context.md + glossary.md 已产出，主规格 §13/§14 引用块成立
+- [ ] traceability-matrix.md（8 字段表 + 测试层级矩阵）与主规格 §4/§7/§12 一致，主规格 §15 引用块成立
+- [ ] uml-modeling.md 三图与主规格 §3/§4 对应、mermaid 块配平，主规格附录 A 引用块成立
+- [ ] behavior-spec.md + discipline-dod.md 已产出，主规格 §16/§17 引用块成立
 
 > 🔴 **CHECKPOINT · 阶段门放行**：需求规格 + 验收测试用例产出后暂停。Agent 必须向用户展示「需求清单 / 冲突与缺失项 / 验收标准可验证性 / 风险评估 / RTM 需求登记」，由用户确认「放行进入阶段 2」或「返工」。存在未解决的冲突或不可验证的验收标准 → 一律返工，不得放行。
 
@@ -293,6 +330,8 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 | FM-3D-05 | 依赖时序环 | depends-on / precedes 边形成环 | 回步骤 3 拆解环或申请豁免 |
 | FM-3D-06 | conflicts-with 未解决 | conflicts-with 边存在但无处置记录 | 启动豁免审批（S→R→V→人类） |
 | FM-3D-07 | 迷雾滥用 | 检测信号 A：把本应正式的 REQ 塞入迷雾册逃避覆盖（R/V 发现迷雾项实为可精确陈述需求）；检测信号 B：CHECKPOINT 前迷雾册存在未终结项 | 处置 A：作废迷雾项，回步骤 2-4 补正式 REQ；处置 B：回 CHECKPOINT 前补毕业处置（毕业 / 判范围 / 豁免） |
+| FM-3D-08 | 追踪矩阵字段不一致 | traceability-matrix.md §1 的「候选落点§」与主规格 §4 层级树节点 § 不一致；「验收关联」与主规格 §7 覆盖矩阵不一致；§2 矩阵验收列与主规格 §12 RTM 不一致 | 回步骤 9 对齐追踪矩阵字段 |
+| FM-3D-09 | UML 建模与层级树脱节 | uml-modeling.md A.1 用例图参与者/用例与主规格 §3 stakeholder/§4 REQ 不对应；A.2 领域类图实体与 §4 REQ 名词性概念不对应；A.3 活动图与 §3 User Stories 正常场景不对应 | 回步骤 8 对齐 UML 建模 |
 
 ### FM-4D（四维覆盖失败模式）
 
@@ -363,6 +402,8 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 10 | 覆盖缺失项隐式遗漏 | 覆盖缺失项须经豁免审批（FM-4D-01/02/03/05）并在 §8 Out of Scope 显式声明，禁止隐式遗漏 |
 | 11 | 跳过豁免审批流程 | 豁免须经 S→R→V→人类四阶段流程 + check-exemption E1-E8 全通过；跳步即命中反模式 #30 |
 | 12 | 迷雾项静默遗留 | CHECKPOINT 前迷雾册每项须有毕业处置结果（毕业成 REQ / 判 Out of Scope / 豁免审批），禁止未终结即放行（FM-3D-07） |
+| 13 | 追踪矩阵字段与主规格 §4/§7/§12 不一致 | 步骤 9 须对齐 traceability-matrix.md 与主规格层级树/覆盖矩阵/RTM 登记（FM-3D-08） |
+| 14 | UML 图表与层级树/User Stories 脱节 | uml-modeling.md 三图须对应主规格 §4 REQ/§3 stakeholder/§3 正常场景（FM-3D-09） |
 
 ## 返工路径
 
@@ -381,6 +422,8 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 - 迷雾项未终结（FM-3D-07）→ 回 CHECKPOINT 前补毕业处置：毕业成 REQ → 回步骤 2-4；判 Out of Scope → 补 §8；豁免 → 回豁免审批流程
 - 迷雾滥用逃避覆盖（FM-3D-07）→ 作废迷雾项，回步骤 2-4 补正式 REQ
 - 验收测试未覆盖全部功能点 → 回到并行任务，补充用例
+- 追踪矩阵不一致（FM-3D-08）→ 回步骤 9，对齐 traceability-matrix.md 字段
+- UML 脱节（FM-3D-09）→ 回步骤 8，对齐 uml-modeling.md 三图
 
 ## 退出状态
 
