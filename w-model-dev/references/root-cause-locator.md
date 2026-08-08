@@ -128,3 +128,25 @@
 ## 6. 分派模板
 
 详见 [subagent-delegation.md](subagent-delegation.md)「R 子代理分派模板」节与「R-lead 子代理分派模板（多角度变体）」节。
+
+---
+
+## 7. R 与 R-iceberg 的边界（第 36 轮新增）
+
+冰山扫掠机制新增 R-iceberg 变体（见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)）。本节点明 R 与 R-iceberg 的职责边界，避免误用：
+
+| 属性 | 返工R（根因定位） | R-iceberg（冰山扫掠） |
+|---|---|---|
+| 触发时机 | V/G 不通过后触发 | S-fix 后（ICEBERG-A）+ 阶段门前（ICEBERG-B） |
+| 目的 | 被动定位**已暴露**问题的根因 | 主动深挖**未暴露**的隐藏问题（找"水面之下"） |
+| 输入线索 | 单条 V/G reworkHints + 失败产物 | reworkHints 历史 + fixedPoints + previousFindings（全量线索） |
+| 产出 | RootCauseReport（单问题根因链） | IcebergSweepReport（多发现扫掠报告） |
+| schema | rootcause-report.schema.json | iceberg-sweep.schema.json |
+| 下游 | S-fix 携 R 报告修复 | V 复审报告 → 每个有效发现走标准 R→V→G→S-fix |
+| 方法论 | 根因分析方法库（5-Why / 鱼骨图 / 缺陷链 / 上游回溯） | 冰山扫掠方法（三维度×六类别，线索驱动横向扩散） |
+
+**关键边界**：
+- **不互相替代**：R 用于"已暴露问题"的根因追溯；R-iceberg 用于"同类/同根因"的横向扩散深挖。R-iceberg 发现的新问题仍走标准 R→V→G→S-fix（R-iceberg 不直接触发 S-fix，须经 V 复审）。
+- **R-iceberg 可复用根因分析方法**：提取 fixedPoint 关联 RootCauseReport 的根因类别（如"状态守卫不完整"），作为 same-root-cause-spread 类别的深挖方向（见 iceberg-sweep-guide.md §4 类别 1 示例）。
+- **R 不含冰山职责**：V/G 不通过后的根因定位仍由返工 R 执行，不得由 R-iceberg 替代（命中反模式 #18/#19）。
+- **跨阶段边界一致**：R 与 R-iceberg 均仅定位当前阶段产物，上游回溯仅标记不修改。

@@ -1019,6 +1019,22 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 > 8 阶段调测终检：318/318 测试（175 UT + 30 IT + 40 ST + 73 UAT）、覆盖率 94.76% lines、check-artifact-gate exitCode=0、归档 308 文件、`rtm.currentPhase=9`；调测产物保留在 w-model-dev-demo/（只读测试夹具随仓库提交）。
 
+#### 3.4.34 第 36 轮：冰山扫掠深度分析机制（2026-08-08，[36.0.0]）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 基于冰山理论：V/G 通过仅证明"既定标准下无问题"，不证明"同类深挖下无问题"。新增 R-iceberg 冰山扫掠机制，S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索主动深挖隐藏问题，直到 `newFindings=[]` 或达 maxIcebergRounds=5 |
+| 机制 | 双重触发：ICEBERG-A（S-fix 返工通过后深挖，防修复引入新缺陷+同根因扩散）+ ICEBERG-B（阶段门放行前全局扫掠）。终止判据：① newFindings=[] 正常终止；② maxIcebergRounds=5 CHECKPOINT 升级由用户裁定；③ Budget killSwitch 强制终止 |
+| 扫掠方法 | 三维度（completeness/reliability/security）×六类别（same-root-cause-spread / same-defect-class / fix-induced-regression / adjacent-logic / coverage-gap / cross-artifact-inconsistency），线索驱动横向扩散 |
+| 新增 schema | `iceberg-sweep.schema.json`（IcebergSweepReport：reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed） |
+| 新增脚本 | `check-iceberg-sweep.ts`（CLI）+ `iceberg-sweep-logic.ts`（纯逻辑 R1-R8：schema 前置/R2 reportId 格式/R3 phase 一致/R4 triggerType 合法/R5 round 边界/R6 去重/R7 可证伪/R8 passed 一致） |
+| run-log 扩展 | action 枚举 +2：`iceberg-sweep`（R-iceberg 分派）+ `iceberg-review`（V 复审冰山报告），25 → 27 值 |
+| 新增参考 | `iceberg-sweep-guide.md`（方法论 + 六类别深挖 + TLA+ 状态机一致性应用示例） |
+| 反模式 | #44 跳过冰山扫掠直接放行（43 → 44） |
+| 文档同步 | subagent-delegation.md（R-iceberg 分派模板 + 角色表 + ICEBERG-A/B 时序）+ root-cause-locator.md（R 与 R-iceberg 边界节）+ SKILL.md（工作流 9.5 步）+ AGENTS.md + README + CHANGELOG |
+| self-test | 基线 213 → 217（+4 冰山样本：valid-full / bad-round-out-of-range / bad-missing-evidence / bad-duplicate-finding） |
+| 版本号 | 35.0.0 → 36.0.0（package.json + skill-metadata.json + SKILL.md frontmatter 三处一致） |
+
 ---
 
 ## 4. 技能工作流程
@@ -2622,6 +2638,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.31 | 第 33 轮 全仓库优化 5 批实施（技能缺口 + 评估 + 收尾） | `.cursor/skills/security-review/SKILL.md`（lint:security + baseline v2 + 反模式 #43 凭据脱敏）+ `.cursor/skills/codegraph-exploration/SKILL.md`（约束 #20 codegraph_explore + 落盘字段）+ `.cursor/skills/performance-review/SKILL.md`（性能评审 4 维度）+ `eval/README.md`（TSV 9 列 + darwin-skill 补跑流程）+ 版本号三处 33.0.0 | 完整（self-test 213/213、vitest 434、tsc 0 错误；eval 补跑留待外部 darwin-skill） |
 | §3.4.32 | 第 34 轮 W 模型技能强化（目录约定 SSoT / 格式统一 / TLA+·BDD 覆盖率校验架构升级） | `references/directory-conventions.md`（路径约定 SSoT）+ `references/format-conventions.md`（冒号格式 SSoT）+ `subagent-delegation.md`（S-ingest-tla / S-ingest-bdd 模板）+ `schemas/tla-manifest.schema.json`（sdCoverage 必填）+ `schemas/bdd-manifest.schema.json`（designCoverage 必填）+ `scripts/check-tla-model.ts`（--graph phase≥2 强制 + SD 覆盖率强制）+ `scripts/check-bdd-model.ts`（--graph + D8 维度）+ `scripts/check-artifact-gate.ts`（resolvePhaseDoc + 终检 model 校验）+ `scripts/verifier-logic.ts`（EVIDENCE_PATTERN 冒号格式）+ `scripts/bdd-logic.ts`（TLA+ 快照解析升级 + L1 豁免 D4）+ demo 重产（TLA+ 7 specs + BDD 9 features 覆盖 21 SD）+ 版本号三处 34.0.0 | 完整（self-test 213/213、vitest 451、tsc 0 错误） |
 | §3.4.33 | 第 35 轮 8 阶段端到端调测修复入库 | `scripts/check-tla-model.ts`（TLC states 清理正则 `\d{4}`→`\d{2,4}`，P3 bug）+ `scripts/design-contract-logic.ts`（D1 路径语义归一：多端点拆分/括号剥离/`:id` 模板段匹配/「不适用」「横切」豁免）+ `scripts/run-log-logic.ts`（GATE_JSON_PATTERNS 新增 STATE_MACHINE_JSON）+ `scripts/__tests__/tla-clean-trace.test.ts`（+1）+ `scripts/__tests__/design-contract-logic.test.ts`（+6）+ `scripts/__tests__/run-log-logic.test.ts`（+1）+ `scripts/__tests__/bdd-logic.test.ts`（实时 fixture 改自包含内联规格）+ demo 侧修复（auditMiddleware id、限流器独立实例、Express Router 路由结构）+ 版本号三处 35.0.0 | 完整（self-test 213/213、vitest 459、tsc 0 错误；8 阶段调测 318/318 测试、覆盖率 94.76% lines、归档 308 文件） |
+| §3.4.34 | 第 36 轮 冰山扫掠深度分析机制 | `schemas/iceberg-sweep.schema.json` + `scripts/iceberg-sweep-logic.ts`（R1-R8）+ `scripts/check-iceberg-sweep.ts`（CLI）+ `scripts/__tests__/iceberg-logic.test.ts`（+7）+ `scripts/samples/iceberg/`（+4 样本）+ `scripts/self-test.ts`（基线 213→217）+ `schemas/run-log.schema.json`（action 25→27）+ `references/iceberg-sweep-guide.md` + `references/anti-patterns.md`（#44，43→44）+ `references/subagent-delegation.md`（R-iceberg 模板）+ `references/root-cause-locator.md`（边界节）+ `SKILL.md`（工作流 9.5 步）+ 版本号三处 36.0.0 | 完整（self-test 217/217、vitest 466、tsc 0 错误） |
 
 ---
 

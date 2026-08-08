@@ -1,0 +1,31 @@
+{
+  "reportId": "IS-phase3-2-01",
+  "phase": "phase3-outline",
+  "triggerType": "ICEBERG-A",
+  "icebergRound": 2,
+  "sweptAt": "2026-08-08T10:00:00Z",
+  "sweptBy": "R-iceberg",
+  "线索来源": {
+    "reworkHintsHistory": [],
+    "fixedPoints": ["docs/phase3-outline/blog-system-outline-design.md:L42"],
+    "previousFindings": ["IF-phase3-1-01"]
+  },
+  "newFindings": [
+    {
+      "findingId": "IF-phase3-1-01",
+      "severity": "Required",
+      "category": "same-defect-class",
+      "location": "docs/phase3-outline/blog-system-outline-design.md:L42",
+      "description": "重复发现的转移守卫缺陷",
+      "evidence": "状态机图 §3.2 缺 archived 守卫",
+      "hypothesis": "若补齐守卫，archived 状态不可发布",
+      "relatedFixedPoint": "IS-phase3-1-01"
+    }
+  ],
+  "sweepCoverage": {
+    "sweptArtifacts": ["docs/phase3-outline/blog-system-outline-design.md"],
+    "sweptDimensions": ["completeness", "reliability", "security"]
+  },
+  "summary": "本次扫掠覆盖 completeness/reliability/security 三维度共 1 份产物，以本轮已修复问题为线索深挖，发现 1 项与上一轮重复的问题，须去重后重扫。",
+  "passed": false
+}

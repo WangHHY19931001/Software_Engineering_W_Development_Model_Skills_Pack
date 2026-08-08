@@ -10,10 +10,10 @@
 
 ## 目录
 
-- 角色划分（O / S / V / G）
+- 角色划分（O / S / V / G / A / R / R-iceberg）
 - 文件落地交接协议与编排者状态日志
 - 每阶段分派时序
-- 子代理分派模板
+- 子代理分派模板（含 R3 预防性审查 + R-iceberg 冰山扫掠 + V 复审根因 + R-lead）
 - 回填契约
 - 强制约束
 - 与现有约束的兼容性
@@ -29,6 +29,7 @@
 | **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | ① 跑 `npx tsx w-model-dev/scripts/check-verifier-output.ts "<json>"`；② 跑 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]`；③ 读 GATE_JSON / Verifier JSON；④ 产出证据摘要字符串（含退出码 / 质量等级 / `passed` / `reworkHints`） | ① 改产物文件；② 产出 `VerifierOutput` JSON（由 V 子代理负责）；③ 改 RTM 实体；④ 跑测试运行器（由 S 子代理负责） |
 | **分析子代理** | A | 分块分析、交叉合并、图谱演进（阶段 1–4） | ① 读原始文档分块 / S 产出的正式文档；② 写 `.w-model/ingestion/<chunk-id>.{md,json}`；③ 读所有 chunk json 合并建图；④ 产出 `consolidated.json` + `cross-analysis-report.md` + `reworkHints`；⑤ 通过晋升 consolidated.json 更新 graph.json | ① 跑 `check-requirement-graph.ts`（G 负责）；② 写正式阶段产物；③ 改 `project.status`；④ 越阶段产出；⑤ 删除前阶段已通过的图谱节点 |
 | **根因定位子代理** | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施） | ① 读失败产物文件 + 上游产物（需求/设计/代码/测试/TLA+/graph.json）；② 读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON；③ 运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）；④ 产出 `RootCauseReport` JSON + `.md` 报告文件；⑤ 标记 `upstreamDefect`（若根因为上游需求/设计缺陷）；⑥ 作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出（见 root-cause-locator.md §4） | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出 |
+| **冰山扫掠子代理** | R-iceberg（R 变体，第36轮新增） | S-fix 后（ICEBERG-A）或阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 `IcebergSweepReport`（多发现扫掠报告，找"水面之下"） | ① 读全阶段产物（需求/设计/代码/测试/TLA+/BDD/graph.json/RTM）；② 读本轮 reworkHints 历史 + 修复点；③ 读上一轮 IcebergSweepReport（避免重复发现）；④ 运用冰山扫掠方法（三维度×六类别，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)）；⑤ 产出 IcebergSweepReport JSON + `.md` | ① 改任何产物文件（由 S-fix 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅当前阶段产物）；⑥ 评审其他角色产出；⑦ 跳过 V 复审直接触发 S-fix |
 
 > **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
@@ -173,8 +174,14 @@ O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D}
    → 分派 G 门禁（check-rootcause-report.ts）→ G 返回 {exitCode, evidence}
    → 分派 S-fix 修复（输入：R 报告 + fixRecommendation）→ S-fix 返回 {artifacts, rtmDiff, fixBasedOn, selfCheck}
    → 重走 V → G（评审修复产物）
-O: 若通过
-   → 🔴 CHECKPOINT · 阶段门放行（编排者展示 G 子代理返回的证据给用户）
+O: 若 S-fix 返工通过 → 分派 R-iceberg（ICEBERG-A，输入：reworkHints + fixedPoints + 全阶段产物）
+   → R-iceberg 产出 IcebergSweepReport
+   → 若 newFindings 非空 → 分派 V 复审冰山报告 → 每个有效发现走 R→V→G→S-fix → 回到 R-iceberg（ICEBERG-A）
+   → 若 newFindings=[] → 继续
+O: 若通过（首次或返工最终）
+   → 分派 R-iceberg（ICEBERG-B，全局扫掠：reworkHints 历史 + fixedPoints + 全阶段产物 + RTM + graph.json）
+   → 若 newFindings 非空 → 分派 V 复审 → 每个有效发现走 R→V→G→S-fix → 回到 R-iceberg（ICEBERG-A）
+   → 若 newFindings=[] → 🔴 CHECKPOINT · 阶段门放行（编排者展示 G 子代理返回的证据给用户）
 O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 ```
 
@@ -572,6 +579,74 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 | schema | rootcause-report.schema.json | preventive-review.schema.json |
 
 **V 评审参考方式**：V 子代理在评审时须读取 R3 三份报告，将 R3 发现的问题纳入 `reworkHints`。V 不得跳过 R3 报告直接评审（命中反模式 #33）。
+
+### R-iceberg 冰山扫掠分派模板（第 36 轮新增）
+
+> S-fix 后（ICEBERG-A）或阶段门放行前（ICEBERG-B）触发。R-iceberg 是 R 子代理的冰山扫掠变体，以已发现/已修复问题为线索主动深挖隐藏问题，与 R（被动定位已暴露问题根因）正交。
+> 方法论见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)；schema 见 `iceberg-sweep.schema.json`；校验脚本 `check-iceberg-sweep.ts`（反模式 #44）。
+
+**分派时序**：
+- ICEBERG-A：`S-fix 修复 → R3×3(fix) → V → G → [G 通过] → R-iceberg 扫掠`
+- ICEBERG-B：`标准 V/G 通过（首次或返工最终）→ R-iceberg 全局扫掠 → newFindings=[] → CHECKPOINT 放行`
+
+**产出路径**：`.w-model/iceberg/<reportId>.json`（JSON 报告）+ `.w-model/iceberg/<reportId>.md`（人类可读报告）
+
+```
+角色：根因定位子代理-冰山扫掠变体（R-iceberg）
+当前 W 模型阶段：<阶段 N - 名称>
+冰山轮次：<icebergRound，1-5>
+触发类型：<ICEBERG-A | ICEBERG-B>
+
+任务：以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 IcebergSweepReport
+
+上下文：
+  - 线索来源：
+    - reworkHints 历史：<本阶段所有 V/G reworkHints 数组>
+    - fixedPoints：<已修复的缺陷位置列表>
+    - 关联 RootCauseReport 路径：<列表，用于提取根因类别>
+    - 上一轮 IcebergSweepReport 路径：<若 icebergRound>1，用于去重>
+  - 全阶段产物路径：<列出本阶段所有产物文件路径>
+  - 上游产物路径（用于跨产物一致性检查）：<列出>
+  - 当前 RTM：<.w-model/rtm.json 路径>
+  - 当前 graph.json（阶段 1-4）：<路径>
+
+必读：
+  - references/iceberg-sweep-guide.md（冰山扫掠方法论）
+  - references/format-conventions.md（location 格式）
+  - references/anti-patterns.md（避免误判流程问题为产物问题）
+
+扫掠方法：
+  - 三维度：completeness / reliability / security
+  - 六类别：same-root-cause-spread / same-defect-class / fix-induced-regression / adjacent-logic / coverage-gap / cross-artifact-inconsistency
+  - 流程：加载线索 → 提取根因类别 → 三维度×六类别扫掠全产物 → 去重 → 产出报告
+
+产出契约：
+  1. IcebergSweepReport JSON：.w-model/iceberg/<reportId>.json
+  2. 人类可读报告：.w-model/iceberg/<reportId>.md
+  3. 必须满足 IcebergSweepReport Schema
+  4. newFindings 每项须含可证伪 hypothesis + 具体 evidence
+  5. 返回编排者：{role:"R", variant:"iceberg", reportId, reportPath, newFindingsCount, passed, summary}
+
+禁止：
+  - 改任何产物文件（由 S-fix 修复）
+  - 跑门禁脚本（由 G 负责）
+  - 改 RTM 实体 / project.status
+  - 跨阶段定位
+  - 跳过 V 复审直接触发 S-fix
+  - 产出空泛发现（须可证伪 + 具体证据）
+```
+
+**ICEBERG 轮次计数**：ICEBERG-A 和 ICEBERG-B 共享 icebergRound 计数器（每阶段独立，阶段进入时重置为 0）。每次 R-iceberg 扫掠递增 1，修复不单独占轮次。达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定（选项：继续深挖 / 接受剩余项并放行 / 阶段回退）。
+
+**R-iceberg 与返工R的区别**：
+
+| 属性 | 返工R（现有） | R-iceberg（第36轮新增） |
+|---|---|---|
+| 触发时机 | V/G 不通过后触发 | S-fix 后（ICEBERG-A）+ 阶段门前（ICEBERG-B） |
+| 目的 | 定位已暴露问题的根因 | 主动深挖未暴露的隐藏问题 |
+| 产出 | RootCauseReport（单问题根因链） | IcebergSweepReport（多发现扫掠报告） |
+| 线索 | V/G reworkHints 单条 | reworkHints 历史 + fixedPoints + previousFindings |
+| schema | rootcause-report.schema.json | iceberg-sweep.schema.json |
 
 ### V 复审根因报告分派模板（targetKind=rootcause）
 

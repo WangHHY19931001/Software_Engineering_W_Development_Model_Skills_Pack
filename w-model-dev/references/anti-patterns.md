@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（#1~#19 + #20 + #21~#30 + #33~#43；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第三十一轮新增）
+- 反模式清单（#1~#19 + #20 + #21~#30 + #33~#44；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第三十一轮新增；#44 第 36 轮新增）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -62,6 +62,7 @@
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
 | 42 | S-fix / emergency-fix 后跳过 R3+V（第29轮新增） | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
 | 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描（SSoT §3.4.27） |
+| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行，第36轮新增） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走标准 R→V→G→S-fix；`newFindings=[]` 或达 maxIcebergRounds=5 才放行（SSoT §3.4.34） |
 
 ### 命中高发阶段
 
@@ -109,6 +110,7 @@
 | #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
 | #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #17/#19 + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
+| #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/check-iceberg-sweep.ts) |
 
 ## 与门禁脚本的对应关系
 
@@ -153,6 +155,7 @@
 | #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/security-scan.ts) 源码级扫描） |
+| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
 
 ## 命中后的处理流程
 
@@ -210,6 +213,9 @@
 | `check-tla-model.ts` | 0 | TLA+ 行为门禁通过（文件头 + 层次 + 拆解 + SANY + TLC 全通过） | — | 可推进（阶段 4 通过即可进阶段 5 编码） |
 | `check-tla-model.ts` | 1 | TLA+ 校验失败（文件头缺失 / 层次不一致 / 拆解未完成 / SANY 语法错 / TLC 死锁 / 不变式违反 / 状态爆炸） | #14 / #15 / #16 | 回到当前阶段起点，分派 S 修正规格或拆解，重跑 `check-tla-model.ts` |
 | `check-tla-model.ts` | 2 | 输入错误（`tla-manifest.json` 缺失 / Java 未找到 / jar 缺失） | #14 | 修复环境或 manifest 后重跑 |
+| `check-iceberg-sweep.ts` | 0 | 冰山扫掠报告校验通过（R1-R8 全过） | — | 可放行（newFindings=[] 或 V 复审后返工闭环） |
+| `check-iceberg-sweep.ts` | 1 | 校验失败（schema / round 越界 / 去重 / 可证伪 / passed 不一致） | #44 | 回到 S-fix 后（ICEBERG-A）或阶段门前（ICEBERG-B），补跑 R-iceberg + V 复审 |
+| `check-iceberg-sweep.ts` | 2 | 输入错误（报告 JSON 缺失 / 路径错误） | #44 | 重新执行 R-iceberg 产出报告 |
 
 > 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
 
@@ -660,6 +666,24 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：SSoT §3.4.27（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
 
+## #44 跳过冰山扫掠直接放行（第 36 轮新增）
+
+**症状**：S-fix 后或阶段门放行前未分派 R-iceberg；或 R-iceberg 发现新问题后未经 V 复审直接放行。
+
+**为何是反模式**：已修复问题只是"水面之上 1/8"，水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移到下游阶段才暴露，修复成本指数级上升。V/G 通过仅证明"既定标准下无问题"，不证明"同类深挖下无问题"（冰山理论）。
+
+**检测信号**：
+- run-log 中 S-fix 后无 `action=iceberg-sweep` 条目
+- 阶段门 CHECKPOINT 前无 ICEBERG-B 报告
+- IcebergSweepReport 存在但无对应 V 复审 VerifierOutput
+- `check-iceberg-sweep.ts` 退出码 1
+
+**回退动作**：回到 S-fix 产出后起点（ICEBERG-A）或阶段门放行前（ICEBERG-B），补跑 R-iceberg + V 复审。
+
+**门禁脚本**：`check-iceberg-sweep.ts`
+
+**关联**：SSoT §3.4.34（[36.0.0] 新增）；[iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节；反模式 #42（S-fix/emergency-fix 后跳过 R3+V）的冰山扩展
+
 ## 实现层经验教训（来自端到端调测）
 
 > 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
@@ -686,7 +710,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills` 元技能的 Failure Modes。
 > SSoT [§4A.2](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
 >
-> **与 43 条流程反模式（#1~#43）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
+> **与 44 条流程反模式（#1~#44）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
 >
 > **与 4 条实现层经验教训（L1~L4）的关系**：L1~L4 是代码层教训（特定技术栈的具体坑），F1~F10 是行为层模式（跨技术栈的通用陷阱）。
 >
@@ -744,7 +768,7 @@ LLM-as-a-Verifier 在评审中识别到失败模式时，应在 `reworkHints` �
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。SSoT [§4A.2a](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
 >
-> **与 43 条流程反模式（#1~#43）+ 10 条行为退化（F1~F10）的关系**：反模式是「流程破坏」（命中即回退，脚本守护），失败模式是「行为退化」（命中不回退但降低质量，Agent 自检），运维失败模式是「运行健康问题」（命中不回退但应标注，用户+系统协同检测）。三者互补形成三层架构：
+> **与 44 条流程反模式（#1~#44）+ 10 条行为退化（F1~F10）的关系**：反模式是「流程破坏」（命中即回退，脚本守护），失败模式是「行为退化」（命中不回退但降低质量，Agent 自检），运维失败模式是「运行健康问题」（命中不回退但应标注，用户+系统协同检测）。三者互补形成三层架构：
 >
 > ```
 > 层 1：流程反模式 #1~#29（命中即回退，脚本守护）

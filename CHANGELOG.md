@@ -3,6 +3,32 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [36.0.0] - 2026-08-08
+
+### 第三十六轮 冰山扫掠深度分析机制（R-iceberg / ICEBERG-A+B / 反模式 #44）
+
+基于冰山理论（发现一个问题意味着存在更多隐藏问题）新增 R-iceberg 冰山扫掠机制：S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索，对全阶段产物做三维度（completeness/reliability/security）×六类别（same-root-cause-spread / same-defect-class / fix-induced-regression / adjacent-logic / coverage-gap / cross-artifact-inconsistency）深挖扫掠，直到 `newFindings=[]` 或达 maxIcebergRounds=5。详见 SSoT §3.4.34。
+
+#### Added
+- `schemas/iceberg-sweep.schema.json`：IcebergSweepReport 结构约束（reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed）
+- `scripts/iceberg-sweep-logic.ts`：纯逻辑层 R1-R8（schema 前置 / reportId 格式 / phase 一致 / triggerType 合法 / round 边界 1-5 / finding 去重 / 可证伪 / passed 一致）
+- `scripts/check-iceberg-sweep.ts`：CLI 层（退出码 0=通过 / 1=校验失败 / 2=输入错误）
+- `references/iceberg-sweep-guide.md`：冰山扫掠方法论（六类别深挖 + TLA+ 状态机一致性应用示例）
+- `scripts/__tests__/iceberg-logic.test.ts`（+7 用例）+ `scripts/samples/iceberg/`（+4 样本）
+- run-log action 枚举 25→27：`iceberg-sweep`（R-iceberg 分派）+ `iceberg-review`（V 复审冰山报告）
+
+#### Changed
+- `references/anti-patterns.md`：反模式 #44「跳过冰山扫掠直接放行」（43 → 44）
+- `references/subagent-delegation.md`：R-iceberg 角色表 + 分派模板 + ICEBERG-A/B 编排时序
+- `references/root-cause-locator.md`：R 与 R-iceberg 边界节
+- `SKILL.md`：执行工作流新增 9.5 步（冰山扫掠）
+- `scripts/self-test.ts`：基线 213 → 217
+
+#### 验证
+- vitest 466/466（34 文件）全通过
+- self-test 217/217 全通过
+- TypeScript strict 0 错误
+
 ## [35.0.0] - 2026-08-08
 
 ### 第三十五轮 8 阶段端到端调测修复入库（TLC 清理正则 / D1 路径语义归一 / STATE_MACHINE_JSON 交叉校验）

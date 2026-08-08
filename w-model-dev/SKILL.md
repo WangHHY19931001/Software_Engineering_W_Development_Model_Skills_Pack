@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 35.0.0
+version: 36.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -129,7 +129,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ### 失败模式清单（F1~F10）
 
-「看似高效实则埋坑」的 10 条行为退化，与 43 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。详细检测信号与处理流程见 [references/anti-patterns.md](references/anti-patterns.md)「失败模式清单」节。
+「看似高效实则埋坑」的 10 条行为退化，与 44 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。详细检测信号与处理流程见 [references/anti-patterns.md](references/anti-patterns.md)「失败模式清单」节。
 
 | # | 失败模式 | 与反例的关系 |
 |---|---|---|
@@ -161,6 +161,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 7. **分派 V 子代理评审**（O → V）：分派评审子代理按 `targetKind` 路由 Persona，产出 `VerifierOutput` JSON。**编排者不得自评**。
 8. **分派 G 子代理门禁**（O → G）：分派门禁子代理跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts`**（TLA+ 行为门禁：文件头 + 层次一致性 + SANY 语法 + TLC 模型检查，无死锁/不变式违反/状态爆炸）+ `check-bdd-model.ts`（BDD 行为门禁：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射），返回 TLA+ / BDD 证据摘要。**阶段 5 额外分派 G 跑 `check-code-tla-consistency.ts`（代码-TLA+ 一致性回归，四维度校验）**。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告**（targetKind=rootcause）→ **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
+9.5. **冰山扫掠**（O → R-iceberg，第 36 轮新增）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理，以已发现/已修复问题为线索对全阶段产物做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）。G 子代理跑 `check-iceberg-sweep.ts` 校验（R1-R8）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定（继续深挖 / 接受剩余项并放行 / 阶段回退）。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
 10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。
 
 > 🔴 **CHECKPOINT · 项目初始化**：复述"进入阶段 / 同步测试设计 / 预期产物"，获得确认后才能分派 S 子代理。
