@@ -272,6 +272,9 @@ export function parseBackgroundStateMachine(
 export function parseFeatureFile(
   content: string
 ): { header: FeatureHeader; stateMachine: Partial<BddStateMachine>; scenarios: ScenarioPathCheck[]; violations: string[] } {
+  // 行尾归一化：Windows 检出为 CRLF 时，`Background:\n` 等正则匹配失败导致状态机解析全空（pre-existing bug）。
+  // 统一归一为 LF，保证头标注 / Background 状态机 / scenarios 三处解析在跨平台下行为一致。
+  content = content.replace(/\r\n/g, '\n');
   const { header, violations: headerViolations } = parseFeatureHeader(content);
 
   // 提取 Background 节
