@@ -1,3 +1,5 @@
+import * as nodeFs from 'node:fs';
+import * as path from 'node:path';
 import { validateBySchema } from './schema-loader.js';
 
 export interface RTMRowShape {
@@ -114,6 +116,8 @@ export interface CheckArtifactGateOptions {
     opsxArtifactsValid?: boolean;
     openspecArchived?: boolean;
   };
+  /** 第 37 轮：phase=1 需求规格独立产物目录（docs/phase1-requirements/），提供时做结构校验。 */
+  specDir?: string;
 }
 
 /**
@@ -233,6 +237,64 @@ export function checkUatPathMappingBackfill(mappings: UatPathMappingRow[]): stri
   return violations;
 }
 
+// ==================== Phase 1 需求规格结构校验（第 37 轮） ====================
+export interface RequirementSpecStructureViolations {
+  refs: string[];
+  ssot: string[];
+  dod: string[];
+}
+
+/** 第 37 轮：真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
+const nodeFsAdapter: { readFileSync(p: string): string; existsSync(p: string): boolean } = {
+  readFileSync: (p: string) => nodeFs.readFileSync(p, 'utf-8'),
+  existsSync: (p: string) => nodeFs.existsSync(p),
+};
+
+/** Phase 1 需求规格结构校验（第 37 轮）：引用块完整性 + §0 SSOT 头 + DoD 清单
+ *  @param specDir  docs/phase1-requirements/ 目录（含 requirement-spec.md + 6 独立产物）
+ *  @param fs       文件系统注入 { readFileSync(p): string; existsSync(p): boolean }，便于单测 mock
+ */
+export function checkRequirementSpecStructure(
+  specDir: string,
+  fs: { readFileSync(p: string): string; existsSync(p: string): boolean },
+): RequirementSpecStructureViolations {
+  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [] };
+  const specPath = path.join(specDir, 'requirement-spec.md');
+  if (!fs.existsSync(specPath)) {
+    v.refs.push('structure: requirement-spec.md 不存在');
+    return v;
+  }
+  // 引用块完整性：6 个独立文件（主规格引用块 `> xxx详见 [name](./name.md)`）
+  // String() 兼容注入 fs 返回 Buffer 的场景（真实 node:fs 无编码 readFileSync 返回 Buffer）
+  const spec = String(fs.readFileSync(specPath));
+  const requiredRefs = [
+    'system-context.md',
+    'glossary.md',
+    'traceability-matrix.md',
+    'behavior-spec.md',
+    'discipline-dod.md',
+    'uml-modeling.md',
+  ];
+  for (const ref of requiredRefs) {
+    if (!spec.includes(`](./${ref})`)) v.refs.push(`structure: 主规格缺引用块 → ${ref}`);
+    if (!fs.existsSync(path.join(specDir, ref))) v.refs.push(`structure: 引用文件不存在 ${ref}`);
+  }
+  // §0 SSOT 头四项声明
+  for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
+    if (!spec.includes(key)) v.ssot.push(`structure: §0 SSOT 头缺「${key}」`);
+  }
+  // DoD 清单：discipline-dod.md - [ ] 项 ≥ 8
+  const dodPath = path.join(specDir, 'discipline-dod.md');
+  if (!fs.existsSync(dodPath)) {
+    v.dod.push('structure: discipline-dod.md 不存在');
+  } else {
+    const dod = String(fs.readFileSync(dodPath));
+    const checks = (dod.match(/- \[ \]/g) ?? []).length;
+    if (checks < 8) v.dod.push(`structure: discipline-dod.md DoD 清单仅 ${checks} 项（须 ≥ 8）`);
+  }
+  return v;
+}
+
 function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
   return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
 }
@@ -267,11 +329,22 @@ export function checkArtifactGate(
   const phaseLayers = PHASE_TEST_LAYERS[phase] ?? [];
 
   const reasons: string[] = [];
+
   if (!Array.isArray(matrix.rows)) reasons.push('RTM 结构错误：rows 字段缺失或非数组');
   if (!matrix.executionSummary || typeof matrix.executionSummary !== 'object') {
     reasons.push('RTM 结构错误：executionSummary 字段缺失或非对象');
   }
   if (reasons.length > 0) return failureResult(reasons);
+
+  // 第 37 轮：phase=1 且提供 specDir 时做需求规格结构校验
+  // （置于 RTM 早退检查后：RTM 结构损坏时直接失败，不叠加 spec 校验；spec 违反仅进 reasons，不影响覆盖率计算）
+  let specStructureViolations: RequirementSpecStructureViolations | undefined;
+  if (phase === 1 && options?.specDir) {
+    specStructureViolations = checkRequirementSpecStructure(options.specDir, nodeFsAdapter);
+    for (const m of [...specStructureViolations.refs, ...specStructureViolations.ssot, ...specStructureViolations.dod]) {
+      reasons.push(m);
+    }
+  }
 
   const requiredTestTypes: Array<{ key: keyof RTMMatrixShape['executionSummary']; name: string; layer: string }> = [
     { key: 'unitTest', name: '单元测试', layer: 'unitTest' },

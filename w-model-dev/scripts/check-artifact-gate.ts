@@ -215,6 +215,9 @@ function parseProjectDir(argv: string[]): string {
 async function main(): Promise<void> {
   const phaseOption = parsePhaseArg(process.argv);
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
+  // 第 37 轮：--spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
+  const specDirArg = process.argv.slice(3).find(a => a.startsWith('--spec-dir='));
+  const specDir = specDirArg?.split('=')[1] ?? undefined;
   const projectDir = parseProjectDir(process.argv);
   const rtmFile = path.resolve(projectDir, RTM_RELATIVE_PATH);
 
@@ -351,8 +354,8 @@ async function main(): Promise<void> {
     bddViolations.push('[artifact:bdd] .w-model/bdd-manifest.json missing (required after phase 4)');
   }
 
-  // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption，启用 TLA+ 资产校验与阶段分层）
-  const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption });
+  // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
+  const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption, specDir });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
   // phase>=2 时，终检调用 check-tla-model.ts + check-bdd-model.ts，传递 --graph + --phase
