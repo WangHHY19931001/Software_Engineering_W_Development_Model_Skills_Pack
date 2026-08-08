@@ -492,6 +492,11 @@ V 子代理须在 `summary` 中包含：
 >
 > - 归档完整性缺失 → completeness 判 0 分（[21.0.0] 新增）
 > - 签名链断裂 → completeness 判 0 分（[21.0.0] 新增）
+> - 阶段 1 需求规格结构完整性（第 37 轮）：
+>   - 主规格 §13/§14/§15/§16/§17/附录 A 引用块指向的 6 个独立文件（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）均存在且内容非空
+>   - traceability-matrix.md 字段与主规格 §4 层级树 / §7 覆盖矩阵 / §12 RTM 一致（对应 R7 门禁）
+>   - uml-modeling.md mermaid 三图配平且与主规格 §3/§4 对应（对应 R8 门禁）
+>   - discipline-dod.md DoD 清单 ≥ 8 项且已勾选核对
 
 ### 7.2 设计（targetKind = `design`）
 

@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 36.0.0
+version: 37.0.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -185,6 +185,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 7 | 系统测试 | 系统测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
 | 8 | 验收测试 | 验收测试执行 | archive 机制 + opsx 三段式 + codegraph 修改前查询 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
 
+- **第 37 轮设计级别增强**：阶段 1 需求规格产出升级——主模板套用 `templates/requirement-spec.md`（§0 SSOT 头 + 引用块）+ 6 独立子模板（`templates/requirement-spec/`），产出 `docs/phase1-requirements/` 下 `requirement-spec.md` + `system-context.md` + `glossary.md` + `traceability-matrix.md` + `behavior-spec.md` + `discipline-dod.md` + `uml-modeling.md`；G 门禁 `check-requirement-graph.ts --phase=1 --spec-dir=docs/phase1-requirements`（R7/R8）+ `check-artifact-gate.ts --phase=1 --spec-dir=docs/phase1-requirements`（引用块/SSOT/DoD 结构校验）
+
 所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。只有以下场景追加读取：
 
 - TLA+ 状态机建模（阶段 1–4 产出 `.tla`/`.cfg`，G 跑 `check-tla-model.ts`） → [references/tla-plus-guide.md](references/tla-plus-guide.md)
@@ -253,8 +255,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | File | Read it when |
 |---|---|
 | check-verifier-output.ts | V 产出 JSON 后 G 校验 |
-| check-artifact-gate.ts | 阶段 8 终检 / 阶段 5/6/7 阶段级校验 |
-| check-requirement-graph.ts | 阶段 1–4 图谱门禁 |
+| check-artifact-gate.ts | 阶段 8 终检 / 阶段 5/6/7 阶段级校验（第 37 轮：`--phase=1 --spec-dir=<dir>` 校验引用块/SSOT/DoD 结构） |
+| check-requirement-graph.ts | 阶段 1–4 图谱门禁（第 37 轮：`--phase=1 --spec-dir=<dir>` 启用 R7 追踪矩阵一致性 + R8 UML mermaid 块配平校验） |
 | check-tla-model.ts | 阶段 1–4 TLA+ 行为门禁 |
 | check-bdd-model.ts | 阶段 1-8 BDD 模型门禁 |
 | check-code-tla-consistency.ts | 阶段 5 代码-TLA+ 一致性回归 |
