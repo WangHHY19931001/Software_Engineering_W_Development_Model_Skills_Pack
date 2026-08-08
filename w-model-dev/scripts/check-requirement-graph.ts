@@ -7,11 +7,13 @@
  * 连通性、单根、父唯一性和阶段递进追溯。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
+ *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4] [--spec-dir=<dir>]
  *
  * 参数：
  *   graph.json   graph.json 或 consolidated.json 文件路径
  *   --phase      校验阶段（1-4），控制追溯项数量，默认从 graph.currentPhase 读取
+ *   --spec-dir   第 37 轮：需求规格独立产物目录（含 requirement-spec.md / traceability-matrix.md / uml-modeling.md），
+ *                启用 R7 追踪矩阵一致性 + R8 UML mermaid 块配平校验（不传则行为完全不变）
  *
  * 退出码：
  *   0  校验通过（连通 + 单根 + 父唯一 + 阶段追溯完整）
@@ -25,8 +27,11 @@
 import * as path from 'node:path';
 import {
   checkRequirementGraph,
+  checkRequirementSpecEnhance,
+  extractRefTargets,
   recalculatePassed,
   type GraphShape,
+  type RequirementSpecEnhanceViolations,
 } from './graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from './lib/read-json-or-exit.js';
 import { exitWithError } from './lib/cli-error.js';
@@ -85,6 +90,29 @@ async function main(): Promise<void> {
     }
   }
 
+  // 解析 --spec-dir（第 37 轮：R7/R8 需求规格独立产物目录）
+  const specDirArg = process.argv.slice(3).find(a => a.startsWith('--spec-dir='));
+  let specEnhanceViolations: RequirementSpecEnhanceViolations | undefined;
+  if (specDirArg) {
+    const specDir = specDirArg.split('=')[1];
+    if (specDir) {
+      const fs = await import('node:fs');
+      const readOrEmpty = (p: string): string => {
+        try { return fs.readFileSync(p, 'utf-8'); } catch { return ''; }
+      };
+      const specContent = readOrEmpty(path.join(specDir, 'requirement-spec.md'));
+      const traceContent = readOrEmpty(path.join(specDir, 'traceability-matrix.md'));
+      const umlContent = readOrEmpty(path.join(specDir, 'uml-modeling.md'));
+      const rtmIds = rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined;
+      specEnhanceViolations = checkRequirementSpecEnhance(traceContent, specContent, umlContent, rtmIds);
+      for (const ref of extractRefTargets(specContent)) {
+        if (!fs.existsSync(path.join(specDir, ref))) {
+          specEnhanceViolations.r7.push(`R7 引用块断裂：主规格引用 ${ref} 但文件不存在`);
+        }
+      }
+    }
+  }
+
   const abs = path.resolve(file);
   const parsed = await readJsonOrExit(file);
 
@@ -132,6 +160,16 @@ async function main(): Promise<void> {
       const isPureReqGraph = (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
       recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
     }
+  }
+
+  // 第 37 轮：合并 R7/R8 需求规格产物校验违规（须在 recalculatePassed 之前纳入 result.violations，
+  // 且 R7/R8 违规必须参与 passed 判定）
+  if (specEnhanceViolations) {
+    for (const msg of specEnhanceViolations.r7) result.violations.push(msg);
+    for (const msg of specEnhanceViolations.r8) result.violations.push(msg);
+    // checkRequirementGraph 不感知 R7/R8，重算 passed（与 graph-logic.ts 汇总逻辑一致）
+    const isPureReqGraph = (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+    recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
   }
 
   console.log('═'.repeat(60));

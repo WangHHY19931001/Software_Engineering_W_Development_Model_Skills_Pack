@@ -816,3 +816,99 @@ export function recalculatePassed(result: GraphCheckResult, isPhase1PureReq: boo
     dataflowOk &&
     result.violations.length === 0;
 }
+
+// ==================== R7/R8 需求规格产物校验（第 37 轮） ====================
+// 独立于 checkRequirementGraph（其接收 graph.json 结构）：
+// 本组函数接收 markdown 纯文本，校验 Phase 1 需求规格独立产物
+//（docs/phase1-requirements/：requirement-spec.md / traceability-matrix.md / uml-modeling.md）。
+// 仍保持纯函数、无 IO 设计原则，文件读取由 CLI 层负责。
+
+/** 解析 markdown 表格为对象数组（首行作表头；跳过 |---| 分隔行） */
+export function parseMarkdownTable(md: string): Array<Record<string, string>> {
+  const rows: Array<Record<string, string>> = [];
+  let header: string[] = [];
+  for (const line of md.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t.startsWith('|')) continue;
+    const cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+    if (cells.every(c => /^:?-{2,}:?$/.test(c))) continue; // 分隔行
+    if (header.length === 0) { header = cells; continue; }
+    const rec: Record<string, string> = {};
+    cells.forEach((c, i) => { if (header[i]) rec[header[i]] = c; });
+    rows.push(rec);
+  }
+  return rows;
+}
+
+/** 校验 mermaid 代码块定界行配平；返回配平布尔 */
+export function countMermaidBlocks(md: string): { pairs: number; balanced: boolean } {
+  const lines = md.split(/\r?\n/);
+  let inBlock = false;
+  let pairs = 0;
+  let opens = 0;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t === '```mermaid') {
+      if (inBlock) { opens++; continue; }
+      inBlock = true;
+      opens++;
+    } else if (t === '```' && inBlock) {
+      inBlock = false;
+      pairs++;
+    }
+  }
+  return { pairs, balanced: !inBlock && opens === pairs };
+}
+
+/** 从 markdown 引用块提取 `[name](./file.md)` 中的 file.md 列表 */
+export function extractRefTargets(md: string): string[] {
+  const out: string[] = [];
+  const re = /\[[\w.-]+\.md\]\(\.\/([\w.-]+\.md)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(md)) !== null) out.push(m[1]!);
+  return out;
+}
+
+export interface RequirementSpecEnhanceViolations {
+  r7: string[];
+  r8: string[];
+}
+
+/** R7 追踪矩阵一致性 + R8 UML mermaid 配平（第 37 轮）
+ *  @param traceMatrixContent  traceability-matrix.md 内容
+ *  @param specContent         主规格 requirement-spec.md 内容（用于校验 §4 层级树节存在）
+ *  @param umlContent          uml-modeling.md 内容
+ *  @param rtmRequirementIds   RTM 需求号集合（可选）
+ */
+export function checkRequirementSpecEnhance(
+  traceMatrixContent: string,
+  specContent: string,
+  umlContent: string,
+  rtmRequirementIds?: Set<string>,
+): RequirementSpecEnhanceViolations {
+  const v: RequirementSpecEnhanceViolations = { r7: [], r8: [] };
+  const mb = countMermaidBlocks(umlContent);
+  if (!mb.balanced) {
+    v.r8.push(`R8 UML mermaid 块配平失败：pairs=${mb.pairs} 但定界未配对`);
+  }
+  if (mb.pairs === 0) {
+    v.r8.push('R8 UML mermaid 块缺失：uml-modeling.md 无 ```mermaid 代码块');
+  }
+  const hasSection4 = /^##\s+4[.\s]/m.test(specContent);
+  if (!hasSection4) v.r7.push('R7 追踪矩阵一致性失败：主规格缺 §4 层级树节');
+  const rows = parseMarkdownTable(traceMatrixContent);
+  if (rows.length === 0) {
+    v.r7.push('R7 追踪矩阵为空：traceability-matrix.md 无数据行');
+    return v;
+  }
+  for (const row of rows) {
+    const id = row['需求号'] ?? '';
+    const loc = row['候选落点§'] ?? '';
+    const acpt = row['验收关联'] ?? '';
+    if (id && !/^(REQ|NFR)-/.test(id)) v.r7.push(`R7 需求号格式失败：${id}`);
+    if (loc && !/^§?\s*\d/.test(loc)) v.r7.push(`R7 候选落点§ 引用失败：${id} → ${loc}`);
+    if (acpt && !/UAT-|§/.test(acpt)) v.r7.push(`R7 验收关联失败：${id} → ${acpt}`);
+    if (rtmRequirementIds && id && !rtmRequirementIds.has(id)) v.r7.push(`R7 RTM 登记缺失：${id}`);
+  }
+  return v;
+}
