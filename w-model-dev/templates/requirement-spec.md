@@ -4,6 +4,8 @@
 >
 > **第 20 轮四维识别与豁免审批增强（v20.0.0）**：§4-§7 为四维识别强制节，禁止省略任一节。
 > 强制项见各节「强制项」标注；豁免须经 S→R→V→人类四阶段审批（见 [phase-1-requirements.md](../references/phase-1-requirements.md)「豁免审批治理」节）。
+>
+> **第 37 轮设计级别增强（v37.0.0）**：§0 SSOT 头 + §13/§14/§15/§16/§17/附录 A 引用块指向独立产物文件（system-context.md / glossary.md / traceability-matrix.md / behavior-spec.md / discipline-dod.md / uml-modeling.md），门禁按引用块校验。
 
 ## 文档信息
 
@@ -11,6 +13,15 @@
 - 文档版本：{{v1.0}}
 - 编制日期：{{YYYY-MM-DD}}
 - 编制者：{{编制者}}
+
+## 0. 文档定位与 SSOT 头
+
+> **文档版本**：v{{1.0}}（{{YYYY-MM-DD}} 首版）
+> **SSOT 声明**：本需求规格说明书为阶段 1（需求分析）的唯一需求事实来源。需求变更须经 §11.5 迷雾毕业/§8 Out of Scope/豁免审批流程，不得无痕修改。
+> **自身校验**：本规格以结构完整性为准——§13/§14/§15/§16/§17/附录 A 引用块指向的独立文件存在、§4 层级树 level 单调、§15 追踪矩阵字段一致、附录 A mermaid 块配平。
+> **禁止占位词**：TBD/TODO/undefined/待补建/待定 不得进入正式交付；`待定` 仅允许出现在 §8 Out of Scope 的显式标注中。
+> **与设计文档关系**：本规格不描述系统设计（架构/运行时/子系统内部），设计事实由阶段 2-4 产出的设计文档承载。
+> **行为规格承接**：行为规格由独立 `.feature` 文件承载（bdd-guide.md §2 头规范管），本规格 §16 引用块指向的 behavior-spec.md 定义引用关系，不内联 feature 块。
 
 ## 1. 问题陈述与背景
 
@@ -304,3 +315,27 @@ graph TD
 - `targetValue` 是生产环境的硬性目标，未达成视为性能不达标
 - `testThreshold` 是测试环境的放宽阈值（因 CI 资源受限等），须明确声明放宽倍数与原因
 - 测试环境类型须在 `system-test.md` 的「性能度量环境声明」节中定义
+
+## 13. 系统上下文
+
+> 系统上下文详见 [system-context.md](./system-context.md)（外部实体清单 + 上下文边界原则，仅外部实体，不画内部架构）。
+
+## 14. 核心概念与术语
+
+> 术语表详见 [glossary.md](./glossary.md)（需求域术语子集，引用 references/glossary.md 权威表）。
+
+## 15. 需求追踪矩阵
+
+> 需求追踪矩阵详见 [traceability-matrix.md](./traceability-matrix.md)（§1 REQ/NFR 8 字段表 + §2 需求×测试层级承接矩阵，仅验收列填实）。
+
+## 16. 行为规格模型
+
+> 行为规格模型详见 [behavior-spec.md](./behavior-spec.md)（引用 .feature 文件关系，不内联 feature 块）。
+
+## 17. Phase 1 工程纪律与 DoD
+
+> Phase 1 工程纪律与 DoD 详见 [discipline-dod.md](./discipline-dod.md)（§1 需求阶段纪律 + §2 DoD 可勾选清单）。
+
+## 附录 A. UML 需求建模
+
+> UML 需求建模详见 [uml-modeling.md](./uml-modeling.md)（A.1 用例图 / A.2 领域类图 / A.3 活动图，mermaid）。
