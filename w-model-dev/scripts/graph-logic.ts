@@ -912,3 +912,49 @@ export function checkRequirementSpecEnhance(
   }
   return v;
 }
+
+export interface DesignSpecEnhanceViolations {
+  r9: string[];
+  r10: string[];
+}
+
+/** R9 系统设计追踪矩阵一致性 + R10 UML mermaid 配平（第 38 轮）
+ *  @param traceMatrixContent  {module}-traceability-matrix.md 内容
+ *  @param designDocContent    主文档 {module}-system-design.md 内容（用于 §3 模块划分校验）
+ *  @param umlContent          {module}-uml-modeling.md 内容
+ *  @param reqTraceIds         phase1 追踪矩阵需求号集合（可选，为空则跳过 phase1 侧校验）
+ */
+export function checkDesignSpecEnhance(
+  traceMatrixContent: string,
+  designDocContent: string,
+  umlContent: string,
+  reqTraceIds?: Set<string>,
+): DesignSpecEnhanceViolations {
+  const v: DesignSpecEnhanceViolations = { r9: [], r10: [] };
+  // R10: mermaid 块配平（先于 R9，轻量）
+  const mb = countMermaidBlocks(umlContent);
+  if (!mb.balanced) {
+    v.r10.push(`R10 UML mermaid 块配平失败：pairs=${mb.pairs} 但定界未配对`);
+  }
+  if (mb.pairs === 0) {
+    v.r10.push('R10 UML mermaid 块缺失：uml-modeling.md 无 ```mermaid 代码块');
+  }
+  // R9: 追踪矩阵一致性
+  const hasSection3 = /^##\s+3[.\s]/m.test(designDocContent);
+  if (!hasSection3) v.r9.push('R9 追踪矩阵一致性失败：主文档缺 §3 模块划分节');
+  const rows = parseMarkdownTable(traceMatrixContent);
+  if (rows.length === 0) {
+    v.r9.push('R9 追踪矩阵为空：traceability-matrix.md 无数据行');
+    return v;
+  }
+  for (const row of rows) {
+    const sd = row['SD 编号'] ?? '';
+    const req = row['对应需求号'] ?? '';
+    const loc = row['设计落点§'] ?? '';
+    if (sd && !/^SD-/.test(sd)) v.r9.push(`R9 SD 编号格式失败：${sd}`);
+    if (req && !/^(REQ|NFR)-/.test(req)) v.r9.push(`R9 需求号格式失败：${req}`);
+    if (loc && !/^M-\d/.test(loc)) v.r9.push(`R9 设计落点§ 引用失败：${sd} → ${loc}（须指向主模板 §3 模块 ID M-xxx）`);
+    if (reqTraceIds && req && !reqTraceIds.has(req)) v.r9.push(`R9 phase1 追踪矩阵需求缺失：${req}`);
+  }
+  return v;
+}
