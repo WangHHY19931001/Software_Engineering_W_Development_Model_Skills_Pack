@@ -3,6 +3,32 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [37.0.0] - 2026-08-09
+
+### 第三十七轮 Phase 1 需求分析设计级别增强（模板 / 参考 / 门禁三层联动）
+
+阶段 1 需求规格产出升级至 DESIGN.md 级别结构严谨性：主模板重构（§0 SSOT 头 + §13-§17/附录 A 引用块）+ 6 独立子模板，主规格以引用块串联；门禁新增 R7/R8 与 phase=1 结构校验；移除需求规格内联 feature 集（bdd 承接）。不新增反模式（总数 44 不变）。详见 SSoT §3.4.35。
+
+#### Added
+- Phase 1 需求规格 6 独立子模板（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）
+- check-requirement-graph.ts R7（追踪矩阵一致性）/ R8（UML mermaid 块配平）+ --spec-dir 参数
+- check-artifact-gate.ts --phase=1 引用块完整性 / §0 SSOT 头 / DoD 清单校验 + --spec-dir 参数
+- self-test 新增 8 条样本（4 graph spec-enhance + 4 gate structure），基线 217→225
+
+#### Changed
+- requirement-spec.md 主模板重构（§0 SSOT 头 + §13-§17/附录 A 引用块串联 6 独立文件）
+- phase-1-requirements.md 算法增步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14
+- verifier-spec.md completeness 维度新增 Phase 1 结构评审项
+- 版本号 36.0.0 → 37.0.0（三处一致）
+
+#### Removed
+- 需求规格内联 BDD feature 集（由 bdd .feature 文件 + bdd-manifest.json 承接）
+
+#### 验证
+- vitest 475/475 全通过
+- self-test 225/225 全通过
+- TypeScript strict 0 错误
+
 ## [36.0.0] - 2026-08-08
 
 ### 第三十六轮 冰山扫掠深度分析机制（R-iceberg / ICEBERG-A+B / 反模式 #44）
