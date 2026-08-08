@@ -7,6 +7,43 @@
 
 基于《需求规格说明书》进行系统架构设计，并**同步设计系统测试用例**。系统设计子模块产出系统架构图、技术选型建议、模块划分方案。
 
+## 系统设计算法
+
+  1. 系统架构建模
+     ├─ 基于需求规格，产出 docs/phase2-design/{module}-system-architecture.md（顶层组件图 + 子系统清单 + 系统树）
+     ├─ 主模板 §1 引用块指向 system-architecture.md
+     ├─ 失败: 架构图无数据流标注 → 补全组件间数据流向（FM-SD-01）
+     └─ 成功: 子系统清单与模块划分候选对应
+  2. 技术选型与 ADR
+     ├─ 按技术选型决策矩阵 5 维度评分（适用性/成熟度/可维护性/引入成本/风险敞口）
+     ├─ 架构决策记录 ADR 写入 system-architecture.md §5
+     ├─ 失败: 选型无评分依据 / ADR 无上下文-后果 → 回步骤 2（FM-SD-02）
+     └─ 成功: 选型理由成立，主模板 §2 技术选型表填实
+  3. 模块划分与部署架构
+     ├─ 基于子系统清单，产出主模板 §3 模块划分表（模块 ID 与子系统清单对应）
+     ├─ 产出主模板 §4 部署架构
+     ├─ 失败: 模块循环依赖 → 列出环路径重新划分（FM-SD-03）；子系统清单与模块划分不对应 → 回步骤 1
+     └─ 成功: 模块划分无环且与子系统清单一致
+  4. 系统上下文与术语建模（第 38 轮新增）
+     ├─ 承接 phase1 system-context.md 外部边界，产出 docs/phase2-design/{module}-glossary.md（系统设计域术语子集）
+     ├─ 主模板 §6 引用块指向 glossary.md
+     └─ 成功: glossary.md 产出，引用块成立
+  5. UML 系统级建模（第 38 轮新增）
+     ├─ 产出 docs/phase2-design/{module}-uml-modeling.md（部署图/顶层组件图/包图/用例图）
+     ├─ 主模板附录 A 引用块指向 uml-modeling.md
+     ├─ 失败: 图与主模板 §1/§3 不对应 → 回步骤 5 对齐（FM-SD-04）
+     └─ 成功: 四图产出，mermaid 块配平
+  6. 追踪矩阵与行为规格引用（第 38 轮新增）
+     ├─ 产出 docs/phase2-design/{module}-traceability-matrix.md（SD×需求 8 字段 + 测试层级矩阵）
+     ├─ 产出 docs/phase2-design/{module}-behavior-spec.md（L2 .feature 引用关系）
+     ├─ 主模板 §7/§8 引用块指向上述独立文件
+     ├─ 失败: 追踪矩阵字段与步骤 1/3 不一致 → 回步骤 6 对齐（FM-SD-05）
+     └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
+  7. Phase 2 工程纪律与 DoD（第 38 轮新增）
+     ├─ 产出 docs/phase2-design/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
+     ├─ 主模板 §9 引用块指向 discipline-dod.md
+     └─ 成功: DoD 清单产出，引用块成立
+
 ## 输入
 
 - 《需求规格说明书》（阶段 1 产出）
@@ -19,6 +56,13 @@
   - 技术选型建议
   - 模块划分方案
 - 系统测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=系统测试）
+- 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase2-design/`，带 `{module}-` 前缀）：
+  - `{module}-system-architecture.md`：系统架构（组件图/子系统清单/系统树/架构原则/ADR/行为总览/运行时架构）
+  - `{module}-glossary.md`：术语表（系统设计域子集）
+  - `{module}-traceability-matrix.md`：系统设计追踪矩阵（SD×需求 8 字段 + 测试层级矩阵）
+  - `{module}-behavior-spec.md`：行为规格模型（L2 .feature 引用关系）
+  - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
+  - `{module}-uml-modeling.md`：UML 系统级建模（部署图/组件图/包图/用例图）
 
 > 路径约定见 [directory-conventions.md](directory-conventions.md)。
 
@@ -37,6 +81,13 @@
 |---|---|---|
 | 系统设计文档 | 套用 `templates/system-design.md` 模板，含架构图 / 技术选型 / 模块划分 | `docs/phase2-design/{module}-system-design.md` |
 | 系统测试用例 | 套用 `templates/test-case.md` 模板，`type=系统测试`，必须含 TC-DES-008/009 | `docs/phase2-design/{module}-system-test.md` |
+| 系统架构 | 套用 `templates/system-design/system-architecture.md` | `docs/phase2-design/{module}-system-architecture.md` |
+| 术语表 | 套用 `templates/system-design/glossary.md` | `docs/phase2-design/{module}-glossary.md` |
+| UML 系统级建模 | 套用 `templates/system-design/uml-modeling.md`，mermaid 四图 | `docs/phase2-design/{module}-uml-modeling.md` |
+| 系统设计追踪矩阵 | 套用 `templates/system-design/traceability-matrix.md` | `docs/phase2-design/{module}-traceability-matrix.md` |
+| 行为规格模型（L2） | 套用 `templates/system-design/behavior-spec.md`（引用 .feature，不内联） | `docs/phase2-design/{module}-behavior-spec.md` |
+| 工程纪律与 DoD | 套用 `templates/system-design/discipline-dod.md` | `docs/phase2-design/{module}-discipline-dod.md` |
+| 主设计文档 | 套用 `templates/system-design.md`（骨架 + 引用块指向上述 6 文件） | `docs/phase2-design/{module}-system-design.md` |
 | 架构图 | 用 Mermaid / PlantUML 语法产出 C4 组件图 + 部署图（嵌入系统设计文档） | 内嵌于 `docs/phase2-design/{module}-system-design.md` |
 
 **架构图语法约束**：C4 组件图须体现分层 + 组件间依赖；部署图须体现节点 + 进程 + 数据流。禁止以纯文字描述替代图形产出。
@@ -65,6 +116,18 @@
 | C4 组件图缺数据流标注 | 图中无 `-.->` 或 `>>` 数据流箭头 | 回到架构图生成，补全组件间数据流向（输入/输出/同步异步） |
 
 执行顺序：先跑检测命令（以退出码为准），再触发 fallback；fallback 后必须重新检测，确保闭环。
+
+## 失败模式矩阵（第 38 轮新增）
+
+| 编号 | 失败模式 | 检测信号 | 处置 |
+|---|---|---|---|
+| FM-SD-01 | 架构图缺数据流标注 | system-architecture.md 组件图无 `-.->`/`>>` 数据流箭头 | 回步骤 1 补全数据流向 |
+| FM-SD-02 | 选型无评分依据 / ADR 缺上下文后果 | 技术选型表无 5 维度评分；ADR 缺 context/consequences | 回步骤 2 补全评分与 ADR 结构 |
+| FM-SD-03 | 模块循环依赖 | 模块划分 DFS 三色染色检测到环 | 回步骤 3 重新划分边界 |
+| FM-SD-04 | UML 建模与架构/模块划分脱节 | uml-modeling.md 图与主模板 §1/§3 不对应 | 回步骤 5 对齐 UML 建模 |
+| FM-SD-05 | 追踪矩阵字段不一致 | traceability-matrix.md 与主模板 §3/phase1 追踪矩阵不一致 | 回步骤 6 对齐追踪矩阵字段 |
+
+> 注：FM-SD-06（越过阶段边界落接口/类级）为越界检测信号，见禁止行为 #8 与返工路径，不单列于上表。
 
 ## 测试用例设计（本阶段产出系统测试用例）
 
@@ -135,6 +198,10 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=2`
 - [ ] 系统架构图、模块划分清晰
 - [ ] 系统测试用例覆盖关键系统级路径
 - [ ] RTM 已补登设计文档与系统测试映射
+- [ ] {module}-system-architecture.md + {module}-glossary.md 已产出，主模板 §1/§6 引用块成立
+- [ ] {module}-traceability-matrix.md（SD×需求 + 测试层级矩阵）与主模板 §3/phase1 矩阵一致，主模板 §7 引用块成立
+- [ ] {module}-uml-modeling.md 四图与主模板 §1/§3 对应、mermaid 块配平，主模板附录 A 引用块成立
+- [ ] {module}-behavior-spec.md + {module}-discipline-dod.md 已产出，主模板 §8/§9 引用块成立
 
 > 🔴 **CHECKPOINT · 阶段门放行**：系统设计 + 系统测试用例产出后暂停。Agent 必须向用户展示「架构图 / 技术选型 / 模块划分 / 系统测试用例（含端到端 + 性能基线 + 安全基线）/ RTM 补登」，由用户确认「放行进入阶段 3」或「返工」。架构图缺失或系统测试用例未含性能/安全基线 → 一律返工。
 
@@ -152,6 +219,9 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=2`
 | 3 | 只生成单模块功能用例 | 系统测试必须覆盖端到端 + 跨模块集成场景 |
 | 4 | 技术选型无原则依据 | 必须按「技术选型决策矩阵」5 维度评分给出选型理由 |
 | 5 | 模块划分存在循环依赖 | 必须检测循环依赖，有则重新划分 |
+| 6 | 追踪矩阵字段与主模板 §3 模块划分 / phase1 追踪矩阵不一致 | 步骤 6 须对齐 traceability-matrix.md（FM-SD-05） |
+| 7 | UML 图表与架构/模块划分脱节 | uml-modeling.md 四图须对应主模板 §1/§3（FM-SD-04） |
+| 8 | 越过阶段边界落接口契约/类定义 | 接口/类级设计属阶段 3/4，本阶段只产系统级（FM-SD-06 禁止越界） |
 
 ## 返工路径
 
@@ -162,6 +232,12 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=2`
 - 系统测试缺性能 / 安全基线 → 回到并行任务，补充 TC-DES-008/009
 - 技术选型无原则依据 → 回到技术选型，按「技术选型决策矩阵」5 维度评分补全理由
 - 端到端用例缺失 → 回到并行任务，补全 TC-DES-007
+- 架构图缺数据流（FM-SD-01）→ 回步骤 1 补全
+- 选型无依据（FM-SD-02）→ 回步骤 2 补全评分/ADR
+- 循环依赖（FM-SD-03）→ 回步骤 3 重新划分
+- UML 脱节（FM-SD-04）→ 回步骤 5 对齐
+- 追踪矩阵不一致（FM-SD-05）→ 回步骤 6 对齐
+- 越界落接口/类级（FM-SD-06）→ 移除越界内容，移交阶段 3/4
 
 ## 退出状态
 
