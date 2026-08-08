@@ -823,13 +823,13 @@ export function recalculatePassed(result: GraphCheckResult, isPhase1PureReq: boo
 //（docs/phase1-requirements/：requirement-spec.md / traceability-matrix.md / uml-modeling.md）。
 // 仍保持纯函数、无 IO 设计原则，文件读取由 CLI 层负责。
 
-/** 解析 markdown 表格为对象数组（首行作表头；跳过 |---| 分隔行） */
+/** 解析 markdown 表格为对象数组（首行作表头；跳过 |---| 分隔行；按表独立解析） */
 export function parseMarkdownTable(md: string): Array<Record<string, string>> {
   const rows: Array<Record<string, string>> = [];
   let header: string[] = [];
   for (const line of md.split(/\r?\n/)) {
     const t = line.trim();
-    if (!t.startsWith('|')) continue;
+    if (!t.startsWith('|')) { header = []; continue; }   // 非表格行 → 重置表头（按表独立解析）
     const cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
     if (cells.every(c => /^:?-{2,}:?$/.test(c))) continue; // 分隔行
     if (header.length === 0) { header = cells; continue; }

@@ -1044,8 +1044,8 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | 新增模板 | 主模板 requirement-spec.md 重构（§0 SSOT 头 + §13-§17/附录 A 引用块）+ 6 独立子模板（templates/requirement-spec/：system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling） |
 | 参考扩展 | phase-1-requirements.md 算法增步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14 + 返工路径 + 验收标准 |
 | 门禁扩展 | check-requirement-graph.ts 新增 R7（追踪矩阵一致性）/R8（UML mermaid 配平）+ --spec-dir；check-artifact-gate.ts phase=1 新增引用块完整性/SSOT 头/DoD 清单校验 + --spec-dir |
-| 移除 | 需求规格内联 feature 集（bdd .feature 文件 + bdd-manifest.json 承接；behavior-spec.md 仅定义引用关系） |
-| 决策 | 6 项拆独立产物文件（主规格引用块串联，对齐 SKILL.md 引用 references/ 模式）；主模板 §1-§12 编号不变防跨引用破坏（tla-plus-guide 引用 requirement-spec.md:§3）；UML 仅用例图+领域类图+活动图（状态机由 TLA+/BDD 覆盖）；不向后兼容 |
+| 结构变更 | 需求规格不再内联 feature 集（行为规格由独立 bdd .feature 文件 + bdd-manifest.json 承接，behavior-spec.md 仅定义引用关系） |
+| 决策 | 6 项拆独立产物文件（主规格引用块串联，对齐 SKILL.md 引用 references/ 模式）；主模板 §1-§12 编号不变防跨引用破坏（tla-plus-guide 引用 requirement-spec.md:§3）；UML 仅用例图+领域类图+活动图（状态机由 TLA+/BDD 覆盖）；代码层向后兼容（--spec-dir 等参数全可选，门禁增量） |
 | self-test | 基线 217→225（+8：4 graph spec-enhance + 4 gate structure） |
 | vitest | 466→475 |
 | 版本号 | 37.0.0（三处一致） |

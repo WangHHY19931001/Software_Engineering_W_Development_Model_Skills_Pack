@@ -531,4 +531,13 @@ describe('parseMarkdownTable', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.['需求号']).toBe('REQ-001');
   });
+
+  it('多表格独立解析（§1 字段表 + §2 承接矩阵，模拟模板真实形态）', () => {
+    const md = '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n\n## 2. 需求×测试层级承接矩阵\n\n| 需求号 | 单元 | 集成 | 系统端到端 | 验收 |\n|---|---|---|---|---|\n| REQ-001 | ― | ― | ― | ● UAT-001 |\n';
+    const rows = parseMarkdownTable(md);
+    // §2 表头行不得被当数据行
+    expect(rows.some(r => r['需求号'] === '需求号')).toBe(false);
+    // 两条真实数据行（REQ-001 各一）
+    expect(rows.filter(r => r['需求号'] === 'REQ-001')).toHaveLength(2);
+  });
 });

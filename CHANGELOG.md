@@ -7,7 +7,7 @@
 
 ### 第三十七轮 Phase 1 需求分析设计级别增强（模板 / 参考 / 门禁三层联动）
 
-阶段 1 需求规格产出升级至 DESIGN.md 级别结构严谨性：主模板重构（§0 SSOT 头 + §13-§17/附录 A 引用块）+ 6 独立子模板，主规格以引用块串联；门禁新增 R7/R8 与 phase=1 结构校验；移除需求规格内联 feature 集（bdd 承接）。不新增反模式（总数 44 不变）。详见 SSoT §3.4.35。
+阶段 1 需求规格产出升级至 DESIGN.md 级别结构严谨性：主模板重构（§0 SSOT 头 + §13-§17/附录 A 引用块）+ 6 独立子模板，主规格以引用块串联；门禁新增 R7/R8 与 phase=1 结构校验；需求规格不再内联 feature 集，行为规格由独立 .feature 文件 + bdd-manifest.json 承接，behavior-spec.md 仅定义引用关系。不新增反模式（总数 44 不变）。详见 SSoT §3.4.35。
 
 #### Added
 - Phase 1 需求规格 6 独立子模板（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）
@@ -21,8 +21,8 @@
 - verifier-spec.md completeness 维度新增 Phase 1 结构评审项
 - 版本号 36.0.0 → 37.0.0（三处一致）
 
-#### Removed
-- 需求规格内联 BDD feature 集（由 bdd .feature 文件 + bdd-manifest.json 承接）
+#### 设计变更
+- 需求规格不再内联 feature 集：行为规格由独立 bdd .feature 文件 + bdd-manifest.json 承接，behavior-spec.md 仅定义引用关系（--spec-dir 等参数全可选，代码层向后兼容）
 
 #### 验证
 - vitest 475/475 全通过
