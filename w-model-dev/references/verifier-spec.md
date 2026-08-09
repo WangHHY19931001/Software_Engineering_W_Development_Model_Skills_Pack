@@ -33,8 +33,8 @@
 |---|---|---|---|
 | 需求 | `requirement` | `REQ-` | §7.1 |
 | 设计文档 | `design` | `DESIGN-` | §7.2 |
-| 测试用例 | `testcase` | `UAT-` / `ST-` / `IT-` / `UT-` | §7.3 |
-| 代码 / 文件 | `file` | （文件路径） | §7.4 |
+| 测试 | `test` | `UAT-` / `ST-` / `IT-` / `UT-` | §7.3 |
+| 代码 | `code` | （文件路径） | §7.4 |
 | 根因报告 | `rootcause` | `RC-` | §7.5 |
 
 > `/wm review <target>` 命令会识别目标类型并指引外部 Agent 加载本规范相应章节。
@@ -45,8 +45,8 @@
 |---|---|---|
 | `requirement` | 阶段 1 需求分析 | 需求规格说明书（`*-requirement-spec.md`） |
 | `design` | 阶段 2 系统设计 / 阶段 3 概要设计 / 阶段 4 详细设计 | 系统设计/接口设计/详细设计文档 |
-| `testcase` | 阶段 1~4（设计）/ 阶段 5~8（执行） | 验收/系统/集成/单元测试用例 |
-| `file` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
+| `test` | 阶段 1~4（设计）/ 阶段 5~8（执行） | 验收/系统/集成/单元测试用例 |
+| `code` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
 | `rootcause` | 全阶段（返工循环 V/G→R→V→G→S-fix→V→G） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
 
 ### 2.2 targetKind 枚举规范（第 9 轮 P2.5）
@@ -351,7 +351,7 @@ interface VerifierOutput {
   /** 评审元信息 */
   meta: {
     /** 评审目标类型 */
-    targetKind: 'requirement' | 'design' | 'testcase' | 'file' | 'rootcause';
+    targetKind: 'requirement' | 'design' | 'code' | 'test'; // 4 值枚举（§2.2）；rootcause 由 check-rootcause-report.ts 独立校验
     /** 目标 ID 或文件路径 */
     target: string;
     /** 评审时间 ISO 8601 */
@@ -530,7 +530,7 @@ V 子代理须在 `summary` 中包含：
 
 **TLA+ 审查参考清单**（第 11 轮外部技能吸收）：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
 
-### 7.3 测试用例（targetKind = `testcase`）
+### 7.3 测试（targetKind = `test`）
 
 | 子标准 name | weight | 描述 |
 |---|---|---|
@@ -545,7 +545,7 @@ V 子代理须在 `summary` 中包含：
 > BDD features 评审额外参考 [bdd-review-checklist.md](bdd-review-checklist.md)（7 项清单）。
 > 不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + 附加清单（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）。
 
-### 7.4 代码 / 文件（targetKind = `file`）
+### 7.4 代码（targetKind = `code`）
 
 | 子标准 name | weight | 描述 |
 |---|---|---|
@@ -561,13 +561,13 @@ V 子代理须在 `summary` 中包含：
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能的五轴评审与 Severity 标签模式。
 > 本节**不改变** §7.4 的子标准 name 与 weight（避免破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 的校验），只规定：
-> 1. 评审 `targetKind=file` 时，发现项按五轴组织；
+> 1. 评审 `targetKind=code` 时，发现项按五轴组织；
 > 2. `reworkHints` 每条建议前缀 Severity 标签；
 > 3. 结构性问题必须配 Structural Remedy。
 
 #### 7.4A.1 五轴与子标准映射
 
-`targetKind=file` 的 5 个子标准（§7.4）与 addyosmani 五轴的映射：
+`targetKind=code` 的 5 个子标准（§7.4）与 addyosmani 五轴的映射：
 
 | 五轴 | 对应子标准 (§7.4) | 评审重点 |
 |---|---|---|
@@ -635,7 +635,7 @@ V 子代理须在 `summary` 中包含：
 - addyosmani 的五轴是**完整评审维度**，每轴独立打分。
 - 本规范的五轴是**发现项组织方式**——子标准仍是 §7.4 的 5 个（`correctness` / `security` / `readability` / `maintainability` / `conformance`），五轴用于在 `reworkHints` 中归类发现项。
 - 这样既吸收了五轴评审的结构化思维，又不破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 对子标准 name/weight 的校验。
-- Performance 轴在 W 模型中通常由阶段 7 系统测试（含 k6 性能基线）独立验证，`file` 评审中只标注明显性能反模式（N+1 / 无界循环），不做完整性能评审。
+- Performance 轴在 W 模型中通常由阶段 7 系统测试（含 k6 性能基线）独立验证，`code` 评审中只标注明显性能反模式（N+1 / 无界循环），不做完整性能评审。
 
 ### 7.5 根因报告（targetKind = `rootcause`）
 
@@ -684,7 +684,7 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 |---|---|---|
 | `{{repeatTimes}}` | 由 Agent 配置，整数 ≥3（spec §3.2 默认 `3`）；与输出 JSON `meta.repeatTimes` 一致 | `3` |
 | `{{scoringMethod}}` | Agent 选择，`logits` 或 `text-parse`（spec §4 / §6）；与输出 JSON `meta.scoringMethod` 一致 | `logits` |
-| `{{targetKind}}` | 评审目标类型，`requirement` / `design` / `testcase` / `file`（spec §2 / §7）；与输出 JSON `meta.targetKind` 一致 | `requirement` |
+| `{{targetKind}}` | 评审目标类型，`requirement` / `design` / `code` / `test`（spec §2 / §7）；与输出 JSON `meta.targetKind` 一致 | `requirement` |
 | `{{target}}` | 目标 ID（前缀见 §2）或文件路径；与输出 JSON `meta.target` 一致 | `REQ-001` |
 | `{{targetContent}}` | 目标的完整文本内容（需求规格 / 设计文档 / 测试用例 / 代码片段），由 Agent 从项目工件中读取后整体填入 | （省略） |
 | `{{subSection}}` | §7 中对应 `targetKind` 的子节号（1-4）；用于让模型按正确子标准集合评估 | `1`（对应 §7.1 需求） |
