@@ -16,7 +16,7 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
-| Vitest（门禁脚本单元测试） | ✅ 34 files / 498 tests |
+| Vitest（门禁脚本单元测试） | ✅ 35 files / 515 tests |
 | TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
@@ -197,7 +197,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── lib/cli-error.ts      # exit 2 错误结构统一（6 类错误码；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具
 │   │   ├── lib/safe-json.ts      # JSON 解析原型污染防御
-│   │   ├── __tests__/            # vitest 单元测试（34 个 .test.ts / 498 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 515 条 + README.md coverage 矩阵）
 │   │   └── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
