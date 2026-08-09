@@ -1004,3 +1004,49 @@ export function checkOutlineSpecEnhance(
   }
   return v;
 }
+
+export interface DetailedSpecEnhanceViolations {
+  r13: string[];
+  r14: string[];
+}
+
+/** R13 详细设计追踪矩阵一致性 + R14 UML mermaid 配平（第 38 轮小轮 C）
+ *  @param traceMatrixContent  {module}-traceability-matrix.md 内容
+ *  @param designDocContent    主文档 {module}-detailed-design.md 内容（用于 §1/§2 校验）
+ *  @param umlContent          {module}-class-design.md + {module}-data-model.md 合并内容（R14 双源）
+ *  @param intfTraceIds        phase3 追踪矩阵 INTF 编号集合（可选，为空则跳过 phase3 侧校验）
+ */
+export function checkDetailedSpecEnhance(
+  traceMatrixContent: string,
+  designDocContent: string,
+  umlContent: string,
+  intfTraceIds?: Set<string>,
+): DetailedSpecEnhanceViolations {
+  const v: DetailedSpecEnhanceViolations = { r13: [], r14: [] };
+  // R14: mermaid 块配平（先于 R13，轻量；class-design + data-model 合并内容）
+  const mb = countMermaidBlocks(umlContent);
+  if (!mb.balanced) {
+    v.r14.push(`R14 UML mermaid 块配平失败：pairs=${mb.pairs} 但定界未配对`);
+  }
+  if (mb.pairs === 0) {
+    v.r14.push('R14 UML mermaid 块缺失：class-design.md/data-model.md 无 ```mermaid 代码块');
+  }
+  // R13: 追踪矩阵一致性
+  const hasSection1 = /^##\s+1[.\s]/m.test(designDocContent);
+  if (!hasSection1) v.r13.push('R13 追踪矩阵一致性失败：主文档缺 §1 类设计节');
+  const rows = parseMarkdownTable(traceMatrixContent);
+  if (rows.length === 0) {
+    v.r13.push('R13 追踪矩阵为空：traceability-matrix.md 无数据行');
+    return v;
+  }
+  for (const row of rows) {
+    const dd = row['DD 编号'] ?? '';
+    const intf = row['对应 INTF 编号'] ?? '';
+    const loc = row['设计落点§'] ?? '';
+    if (dd && !/^DD-/.test(dd)) v.r13.push(`R13 DD 编号格式失败：${dd}`);
+    if (intf && !/^INTF-/.test(intf)) v.r13.push(`R13 对应 INTF 编号格式失败：${intf}`);
+    if (loc && !/^§?\s*[12]/.test(loc)) v.r13.push(`R13 设计落点§ 引用失败：${dd} → ${loc}（须指向主文档 §1 类或 §2 数据）`);
+    if (intfTraceIds && intf && !intfTraceIds.has(intf)) v.r13.push(`R13 phase3 追踪矩阵 INTF 缺失：${intf}`);
+  }
+  return v;
+}
