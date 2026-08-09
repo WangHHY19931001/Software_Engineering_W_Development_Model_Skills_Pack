@@ -1,0 +1,9 @@
+{
+  "sampleType": "gate-phase3-spec-structure",
+  "description": "Phase 3 结构校验通过：6 引用块 + SSOT 头 + DoD 8 项",
+  "expectedPassed": true,
+  "mainDoc": "blog-system-interface-design.md",
+  "specContent": "> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n> 接口契约详见 [blog-system-interface-contract.md](./blog-system-interface-contract.md)\n> 术语表详见 [blog-system-glossary.md](./blog-system-glossary.md)\n> 追踪矩阵详见 [blog-system-traceability-matrix.md](./blog-system-traceability-matrix.md)\n> 行为规格模型详见 [blog-system-behavior-spec.md](./blog-system-behavior-spec.md)\n> Phase 3 工程纪律与 DoD 详见 [blog-system-discipline-dod.md](./blog-system-discipline-dod.md)\n> UML 模块级建模详见 [blog-system-uml-modeling.md](./blog-system-uml-modeling.md)\n",
+  "refFiles": ["blog-system-interface-contract.md", "blog-system-glossary.md", "blog-system-traceability-matrix.md", "blog-system-behavior-spec.md", "blog-system-discipline-dod.md", "blog-system-uml-modeling.md"],
+  "dodContent": "- [ ] a\n- [ ] b\n- [ ] c\n- [ ] d\n- [ ] e\n- [ ] f\n- [ ] g\n- [ ] h\n"
+}

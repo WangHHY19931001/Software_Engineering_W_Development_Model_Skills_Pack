@@ -1,0 +1,9 @@
+{
+  "sampleType": "graph-outline-enhance",
+  "description": "R12 失败样本：mermaid 块未配平",
+  "expectedPassed": false,
+  "expectedReasonPatterns": ["R12 UML mermaid 块配平失败"],
+  "traceabilityMatrix": "| INTF 编号 | 对应 SD 编号 | 优先级 | 设计落点§ | 涉及子系统 | 实现状态 | 验收关联 | 逐条验收判据 |\n|---|---|---|---|---|---|---|---|\n| INTF-001 | SD-001 | P0 | §2.1 | S-01 | 设计完成 | IT-001 | 响应 < 2s |\n",
+  "umlModeling": "```mermaid\ngraph TB\n  A((module)) --> B(module)\n```\n```mermaid\nsequenceDiagram\n  A->>B: call\n",
+  "designDocContent": "## 2. 接口定义\n"
+}

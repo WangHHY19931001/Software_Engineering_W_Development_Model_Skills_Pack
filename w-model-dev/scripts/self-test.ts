@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { checkVerifierOutput } from './verifier-logic.js';
 import { validateBySchema } from './schema-loader.js';
 import { checkArtifactGate, checkPhaseSpecStructure, checkRequirementSpecStructure, type GateGraph } from './gate-logic.js';
-import { checkDesignSpecEnhance, checkRequirementGraph, checkRequirementSpecEnhance } from './graph-logic.js';
+import { checkDesignSpecEnhance, checkOutlineSpecEnhance, checkRequirementGraph, checkRequirementSpecEnhance } from './graph-logic.js';
 import { checkTlaModel } from './tla-logic.js';
 import { checkBudget } from './budget-logic.js';
 import { checkRunLog } from './run-log-logic.js';
@@ -615,6 +615,36 @@ const PHASE2_SPEC_STRUCTURE_CASES: Phase2SpecStructureCase[] = [
   { file: 'bad-phase2-refs-missing.json', expectedPassed: false, expectedReasonPatterns: [/引用文件不存在 blog-system-uml-modeling.md/], description: 'Phase 2 结构校验失败：引用文件缺失' },
   { file: 'bad-phase2-ssot-header.json', expectedPassed: false, expectedReasonPatterns: [/§0 SSOT 头缺「自身校验」/], description: 'Phase 2 结构校验失败：SSOT 头缺声明' },
   { file: 'bad-phase2-dod-incomplete.json', expectedPassed: false, expectedReasonPatterns: [/DoD 清单仅 5 项/], description: 'Phase 2 结构校验失败：DoD 清单 < 8' },
+];
+
+// ==================== Phase 3 概要设计增强（第 38 轮小轮 B） ====================
+
+interface OutlineEnhanceCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const OUTLINE_ENHANCE_CASES: OutlineEnhanceCase[] = [
+  { file: 'valid-outline-enhance.json', expectedPassed: true, description: 'R11/R12 通过：INTF 字段合法 + mermaid 配平' },
+  { file: 'bad-outline-r11.json', expectedPassed: false, expectedReasonPatterns: [/R11 INTF 编号格式失败/, /R11 设计落点§ 引用失败/], description: 'R11 失败：INTF 编号非法 + 落点§ 非法' },
+  { file: 'bad-outline-r12.json', expectedPassed: false, expectedReasonPatterns: [/R12 UML mermaid 块配平失败/], description: 'R12 失败：mermaid 块未配平' },
+  { file: 'bad-outline-missing-section2.json', expectedPassed: false, expectedReasonPatterns: [/R11 追踪矩阵一致性失败：主文档缺 §2 接口定义节/], description: 'R11 失败：主文档缺 §2 接口定义节' },
+];
+
+interface Phase3SpecStructureCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const PHASE3_SPEC_STRUCTURE_CASES: Phase3SpecStructureCase[] = [
+  { file: 'valid-phase3-spec-structure.json', expectedPassed: true, description: 'Phase 3 结构校验通过：6 引用块 + SSOT 头 + DoD 8 项' },
+  { file: 'bad-phase3-refs-missing.json', expectedPassed: false, expectedReasonPatterns: [/引用文件不存在 blog-system-uml-modeling.md/], description: 'Phase 3 结构校验失败：引用文件缺失' },
+  { file: 'bad-phase3-ssot-header.json', expectedPassed: false, expectedReasonPatterns: [/§0 SSOT 头缺「自身校验」/], description: 'Phase 3 结构校验失败：SSOT 头缺声明' },
+  { file: 'bad-phase3-dod-incomplete.json', expectedPassed: false, expectedReasonPatterns: [/DoD 清单仅 5 项/], description: 'Phase 3 结构校验失败：DoD 清单 < 8' },
 ];
 
 interface TlaCase {
@@ -1999,6 +2029,52 @@ async function runPhase2SpecStructureCases(samplesDir: string): Promise<CaseResu
   return results;
 }
 
+// ==================== Phase 3 概要设计增强 runner（第 38 轮小轮 B） ====================
+
+async function runOutlineEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of OUTLINE_ENHANCE_CASES) {
+    const abs = path.join(samplesDir, 'graph', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const v = checkOutlineSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
+    const violations = [...v.r11, ...v.r12];
+    const actualPassed = violations.length === 0;
+    const details: string[] = [];
+    if (actualPassed !== c.expectedPassed) details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${actualPassed}`);
+    if (!c.expectedPassed) details.push(...matchReasonPatterns(violations, c.expectedReasonPatterns));
+    results.push({ name: `graph/${c.file}`, passed: details.length === 0, description: c.description, details: details.length > 0 ? details : undefined });
+  }
+  return results;
+}
+
+async function runPhase3SpecStructureCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of PHASE3_SPEC_STRUCTURE_CASES) {
+    const abs = path.join(samplesDir, 'gate', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const files: Record<string, string> = {};
+    const dir = path.join('docs', 'phase3-outline');
+    files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
+    for (const f of parsed.refFiles) files[path.join(dir, f)] = '';
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = parsed.dodContent;
+    const fsStub = {
+      readFileSync(p: string): string { return files[p] ?? ''; },
+      existsSync(p: string): boolean { return p in files; },
+      readdirSync(p: string): string[] { return Object.keys(files).filter(k => k.startsWith(`${p}${path.sep}`)).map(k => k.split(path.sep).pop()!); },
+    };
+    const v = checkPhaseSpecStructure(3, dir, fsStub);
+    const violations = [...v.refs, ...v.ssot, ...v.dod];
+    const actualPassed = violations.length === 0;
+    const details: string[] = [];
+    if (actualPassed !== c.expectedPassed) details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${actualPassed}`);
+    if (!c.expectedPassed) details.push(...matchReasonPatterns(violations, c.expectedReasonPatterns));
+    results.push({ name: `gate/${c.file}`, passed: details.length === 0, description: c.description, details: details.length > 0 ? details : undefined });
+  }
+  return results;
+}
+
 async function runTlaCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of TLA_CASES) {
@@ -2835,6 +2911,8 @@ async function main(): Promise<void> {
   console.log(`SpecStructure 用例 : ${SPEC_STRUCTURE_CASES.length}`);
   console.log(`DesignEnhance 用例 : ${DESIGN_ENHANCE_CASES.length}`);
   console.log(`Phase2SpecStructure 用例 : ${PHASE2_SPEC_STRUCTURE_CASES.length}`);
+  console.log(`OutlineEnhance 用例 : ${OUTLINE_ENHANCE_CASES.length}`);
+  console.log(`Phase3SpecStructure 用例 : ${PHASE3_SPEC_STRUCTURE_CASES.length}`);
   console.log(`TLA 用例      : ${TLA_CASES.length}`);
   console.log(`Budget 用例   : ${BUDGET_CASES.length}`);
   console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
@@ -2871,6 +2949,7 @@ async function main(): Promise<void> {
     uatPathMappingResults, icebergResults,
     specEnhanceResults, specStructureResults,
     designEnhanceResults, phase2SpecStructureResults,
+    outlineEnhanceResults, phase3SpecStructureResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -2879,6 +2958,8 @@ async function main(): Promise<void> {
     runSpecStructureCases(samplesDir),
     runDesignEnhanceCases(samplesDir),
     runPhase2SpecStructureCases(samplesDir),
+    runOutlineEnhanceCases(samplesDir),
+    runPhase3SpecStructureCases(samplesDir),
     runTlaCases(samplesDir),
     runBudgetCases(samplesDir),
     runRunLogCases(samplesDir),
@@ -2915,6 +2996,7 @@ async function main(): Promise<void> {
     ...uatPathMappingResults, ...icebergResults,
     ...specEnhanceResults, ...specStructureResults,
     ...designEnhanceResults, ...phase2SpecStructureResults,
+    ...outlineEnhanceResults, ...phase3SpecStructureResults,
   ];
 
   const passedCount = all.filter(r => r.passed).length;

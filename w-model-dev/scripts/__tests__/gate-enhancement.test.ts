@@ -827,3 +827,51 @@ describe('Phase 2 系统设计结构校验', () => {
     expect(v.refs.some(m => m.includes('主文档 glob'))).toBe(true);
   });
 });
+
+describe('Phase 3 概要设计结构校验', () => {
+  const mkFs = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      if (!(p in files)) throw new Error(`missing ${p}`);
+      return files[p] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p in files;
+    },
+    readdirSync(p: string): string[] {
+      const prefix = `${p}${path.sep}`;
+      return Object.keys(files)
+        .filter(k => k.startsWith(prefix))
+        .map(k => k.slice(prefix.length));
+    },
+  });
+
+  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
+    const dir = path.join('docs', 'phase3-outline');
+    const refs = ['blog-system-interface-contract.md', 'blog-system-glossary.md', 'blog-system-traceability-matrix.md', 'blog-system-behavior-spec.md', 'blog-system-discipline-dod.md', 'blog-system-uml-modeling.md'];
+    let spec = refs.map(r => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    const files: Record<string, string> = {};
+    for (const r of refs) files[path.join(dir, r)] = '';
+    files[path.join(dir, 'blog-system-interface-design.md')] = spec;
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(3, dir, mkFs(files));
+    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
+  });
+
+  it('引用文件缺失报 refs', () => {
+    const dir = path.join('docs', 'phase3-outline');
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'blog-system-interface-design.md')] = '> 详见 [x](./blog-system-uml-modeling.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(3, dir, mkFs(files));
+    expect(v.refs.length).toBeGreaterThan(0);
+  });
+
+  it('主文档 glob 零个报 refs', () => {
+    const dir = path.join('docs', 'phase3-outline');
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(3, dir, mkFs(files));
+    expect(v.refs.some(m => m.includes('主文档 glob'))).toBe(true);
+  });
+});

@@ -16,6 +16,7 @@ import {
   recalculatePassed,
   checkRequirementSpecEnhance,
   checkDesignSpecEnhance,
+  checkOutlineSpecEnhance,
   countMermaidBlocks,
   parseMarkdownTable,
   type GraphShape,
@@ -566,5 +567,39 @@ describe('R10 UML mermaid 块配平', () => {
   it('未配平报 R10', () => {
     const v = checkDesignSpecEnhance('', '', '```mermaid\na\n');
     expect(v.r10.some(m => m.includes('配平'))).toBe(true);
+  });
+});
+
+describe('R11 概要设计追踪矩阵一致性', () => {
+  it('合法矩阵通过', () => {
+    const v = checkOutlineSpecEnhance(
+      '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| INTF-001 | SD-001 | §2.1 |\n',
+      '## 2. 接口定义\n',
+      '```mermaid\ngraph TB\n  A --> B\n```\n',
+    );
+    expect(v.r11).toEqual([]);
+  });
+  it('INTF 编号非法报 R11', () => {
+    const v = checkOutlineSpecEnhance(
+      '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | SD-001 | §2.1 |\n',
+      '## 2. 接口定义\n',
+      '',
+    );
+    expect(v.r11.some(m => m.includes('INTF 编号格式'))).toBe(true);
+  });
+  it('主文档缺 §2 接口定义节报 R11', () => {
+    const v = checkOutlineSpecEnhance(
+      '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| INTF-001 | SD-001 | §2.1 |\n',
+      '## 1. 模块调用关系\n',
+      '',
+    );
+    expect(v.r11.some(m => m.includes('主文档缺 §2 接口定义节'))).toBe(true);
+  });
+});
+
+describe('R12 UML mermaid 块配平', () => {
+  it('未配平报 R12', () => {
+    const v = checkOutlineSpecEnhance('', '', '```mermaid\na\n');
+    expect(v.r12.some(m => m.includes('配平'))).toBe(true);
   });
 });
