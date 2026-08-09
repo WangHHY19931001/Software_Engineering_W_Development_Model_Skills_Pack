@@ -20,7 +20,7 @@ export interface DocConsistencyInput {
   personaCount: number;
   /** .cursor/skills 目录数（期望 23） */
   cursorSkillCount: number;
-  /** 实测可 exit 2 的 CLI 脚本数（24 个 check-*.ts + 5 工具；期望 30，含 check-docs-consistency 自身） */
+  /** 实测可 exit 2 的 CLI 脚本数（25 个 check-*.ts 含自身 + 5 工具 = 30） */
   exit2ScriptCount: number;
   dataModels: string;
   verifierSpec: string;

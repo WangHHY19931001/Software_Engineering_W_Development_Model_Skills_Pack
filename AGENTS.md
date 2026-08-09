@@ -161,4 +161,4 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式 | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
 | self-test.ts | 回归基线（249 条样本）；vitest 498 条（34 test files） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel + codeModule 格式 + uat-path-mapping） | - | 0=通过，1=失败 |
-| check-docs-consistency.ts | 活体文档一致性门禁（schema 清单 / targetKind / DoD 维度 / 操作行为 / 反模式 / exit-2 脚本数 / pre-push 项数 / glossary action / 资产计数） | - | 0=通过，1=不一致，2=输入错误 |
+| check-docs-consistency.ts | 活体文档一致性门禁（schema 清单 / run-log action 枚举 / targetKind / DoD 维度 / 操作行为 / 反模式 / exit-2 脚本数 / pre-push 项数 / glossary action / 资产计数） | - | 0=通过，1=不一致，2=输入错误 |
