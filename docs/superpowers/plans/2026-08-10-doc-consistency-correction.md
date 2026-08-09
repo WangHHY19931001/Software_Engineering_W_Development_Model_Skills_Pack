@@ -4,7 +4,7 @@
 
 **Goal:** 修正全部活体文档漂移（targetKind 废弃值 / DoD 维度 / 操作行为 / schema 份数 / 反模式范围 / 脚本计数 / pre-push 项数 / 角色表述 / action 枚举 / devDeps），并新增 check-docs-consistency.ts 防漂移门禁。
 
-**Architecture:** 拆两轮。Round 1：约 60 处行级文档修正 + 版本 38.3.0（三处同步）+ CHANGELOG 条目，不涉及脚本逻辑。Round 2：新增 `docs-consistency-logic.ts`（纯逻辑）+ `check-docs-consistency.ts`（CLI，exit 0/1/2）+ vitest 测试，接入 pre-push（13→14 项级联），exit-2 脚本数 27→28 级联，版本 38.4.0。
+**Architecture:** 拆两轮。Round 1：约 60 处行级文档修正 + 版本 38.3.0（三处同步）+ CHANGELOG 条目，不涉及脚本逻辑。Round 2：新增 `docs-consistency-logic.ts`（纯逻辑）+ `check-docs-consistency.ts`（CLI，exit 0/1/2）+ vitest 测试，接入 pre-push（13→14 项级联），exit-2 脚本数 29→30 级联，版本 38.4.0。
 
 **Tech Stack:** TypeScript strict（tsx runtime）、vitest、Markdown 文档编辑。
 
@@ -146,9 +146,9 @@ git commit -m "docs: fix README drift (operating behaviors 7, DoD 7 dimensions, 
 **Files:**
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: L20 脚本数 29→27**
+- [ ] **Step 1: 核对 exit-2 脚本数（保持 29）**
 
-`- **错误结构全量归一化**：全仓 29 个脚本 exit 2 统一输出结构化错误` → `- **错误结构全量归一化**：全仓 27 个脚本 exit 2 统一输出结构化错误`
+实测口径：24 个 check-*.ts + 5 工具（ensure-codegraph-opsx / wm-status / metrics-report / security-scan / plan-chunks，均含 exitWithError exitCode:2 路径）= **29**。AGENTS.md「全仓 29 个脚本 exit 2」为正确值，**保持不变**（曾误改为 27 后已回退，见 Task 4-fix）。
 
 - [ ] **Step 2: §3 常用命令 check-code-tla-consistency 退出码**
 
@@ -456,7 +456,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     schemaFiles: ['verifier-output.schema.json', 'run-log.schema.json', 'iceberg-sweep.schema.json'],
     personaCount: 28,
     cursorSkillCount: 23,
-    exit2ScriptCount: 28,
+    exit2ScriptCount: 30,
     dataModels: [
       '### Schema 清单（20 份）',
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
@@ -472,7 +472,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
     skill: '### 七条操作行为',
-    agents: '28 个脚本',
+    agents: '30 个脚本',
     ssot: [
       '7 条核心操作行为',
       '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
@@ -536,10 +536,10 @@ describe('runDocConsistencyChecks', () => {
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
   });
 
-  it('exit-2 脚本数非 28 / AGENTS 残留 29 → 违规', () => {
-    const input = baseInput({ exit2ScriptCount: 27, agents: '29 个脚本' });
+  it('exit-2 脚本数非 30 / AGENTS 残留 29 → 违规', () => {
+    const input = baseInput({ exit2ScriptCount: 29, agents: '29 个脚本' });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('28'))).toBe(true);
+    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('30'))).toBe(true);
     expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('29 个脚本'))).toBe(true);
   });
 
@@ -619,7 +619,7 @@ export const EXPECTED = {
   schemaCount: 20,
   personaCount: 28,
   cursorSkillCount: 23,
-  exit2ScriptCount: 28,
+  exit2ScriptCount: 30,
   runLogActionCount: 27,
   maxAntiPattern: 44,
   prePushCount: 14,
@@ -882,7 +882,7 @@ function main(): void {
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
   const cursorSkillCount = readdirSync(join(root, '.cursor/skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length;
   const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts')).filter((f) => /^check-.*\.ts$/.test(f)).length;
-  const exit2ScriptCount = checkScriptCount + 3; // + wm-status + metrics-report + ensure-codegraph-opsx
+  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks
 
   const input: DocConsistencyInput = {
     schemaFiles,
@@ -997,9 +997,9 @@ AGENTS §3：`# 手动跑推送前门禁（不实际推送，13 项门禁检查�
 AGENTS §8 脚本导航表末尾追加行：
 `| check-docs-consistency.ts | 活体文档一致性门禁（schema 清单 / targetKind / DoD 维度 / 操作行为 / 反模式 / exit-2 脚本数 / pre-push 项数 / glossary action / 资产计数） | - | 0=通过，1=不一致，2=输入错误 |`
 
-- [ ] **Step 4: AGENTS.md L20 脚本数 27→28**
+- [ ] **Step 4: AGENTS.md L21 脚本数 29→30**
 
-`全仓 27 个脚本 exit 2` → `全仓 28 个脚本 exit 2`
+`全仓 29 个脚本 exit 2` → `全仓 30 个脚本 exit 2`
 
 - [ ] **Step 5: SKILL.md Bundled Resources 表登记**
 
@@ -1020,7 +1020,7 @@ package.json / skill-metadata.json（updatedAt 保持 2026-08-10）/ SKILL.md fr
 - docs-consistency-logic.ts 纯逻辑 + __tests__/docs-consistency-logic.test.ts（vitest，14 用例）
 
 ### Changed
-- AGENTS.md 脚本导航表登记 check-docs-consistency；SKILL.md Bundled Resources 登记；exit-2 脚本数 27 → 28
+- AGENTS.md 脚本导航表登记 check-docs-consistency；SKILL.md Bundled Resources 登记；exit-2 脚本数 29 → 30
 - 版本号 38.3.0 → 38.4.0（三处同步）
 ```
 
@@ -1053,7 +1053,7 @@ npm run check:docs-consistency  # exit 0
 
 ## 自审记录（Self-Review）
 
-- **Spec 覆盖**：Round 1 覆盖 spec §3.1-3.14 全部 60 处；Round 2 覆盖 spec §4.1-4.3（结构 / 10 检查项 / pre-push 接入 + 27→28 级联 + 版本 38.4.0）。
+- **Spec 覆盖**：Round 1 覆盖 spec §3.1-3.14 全部 60 处；Round 2 覆盖 spec §4.1-4.3（结构 / 10 检查项 / pre-push 接入 + 29→30 级联 + 版本 38.4.0）。
 - **占位符扫描**：所有文档修正均给出精确 old→new；脚本给出完整代码；无 TBD/TODO。
 - **类型一致性**：`DocConsistencyInput` 字段在 logic / CLI / 测试三处一致；`EXPECTED` 常量单点定义；`runDocConsistencyChecks` 签名一致。
-- **已捕获的坑**：新脚本自身 exit 2 → 计数 27→28 级联（spec 已补）；pre-push 编号方案二选一已在 Task 17 说明。
+- **已捕获的坑**：新脚本自身 exit 2 → 计数 29→30 级联（spec 已补）；pre-push 编号采用 #14 递增方案（Task 17 已明确）；exit-2 计数口径（24 check-*.ts + 5 工具 = 29）经实测确认（Task 4 曾误改 27 已回退）。

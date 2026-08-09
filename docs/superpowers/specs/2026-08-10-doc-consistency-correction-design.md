@@ -9,7 +9,8 @@
 外部评审报告对仓库做了深入分析（实测校验 + 17 条修正意见），并经逐行复核确认。核心结论：
 
 - 代码 / 脚本 / 测试 / 门禁层质量过硬，量化声称全部属实（self-test 249 / vitest 498 / tsc 0 错误 / pre-push 13 项等）。
-- 系统性问题是「文档漂移」：内容随轮次演进（targetKind testcase/file → test/code、DoD 5→7 维度、schema 19→20 份、操作行为 6→7 条、反模式 #29→#44、exit-2 脚本 29→27 个），但 README / AGENTS / SSoT / 部分 references 的计数与名称未同步。
+- 系统性问题是「文档漂移」：内容随轮次演进（targetKind testcase/file → test/code、DoD 5→7 维度、schema 19→20 份、操作行为 6→7 条、反模式 #29→#44），但 README / AGENTS / SSoT / 部分 references 的计数与名称未同步。
+- 实测澄清：exit-2 脚本数 AGENTS.md 原文「29」即为正确值（24 个 check-*.ts + 5 工具：ensure-codegraph-opsx / wm-status / metrics-report / security-scan / plan-chunks）；外部报告 m8 建议的「27」有误，执行中已回退，AGENTS 维持 29。
 
 本轮修正全部为文档级改动，不涉及任何门禁逻辑变更（Round 1）；Round 2 新增防漂移脚本。
 
@@ -184,7 +185,7 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 4. **DoD 维度**：definition-of-done.md「七维度标准」表维度数 == 7；README 含「7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）」且不含「5 维度（功能」。
 5. **操作行为**：SKILL.md 含「七条操作行为」；README 含「7 条核心操作行为」且不含「6 条核心操作行为」。
 6. **反模式**：anti-patterns.md 反模式表最大编号 == 44；目录行含「#1~#44」。
-7. **exit-2 脚本数**：脚本目录实测计数（check-*.ts 25 + ensure-codegraph-opsx + wm-status + metrics-report，含自身）== 28；AGENTS.md 含「28 个脚本」且无「29 个脚本」「27 个脚本」。
+7. **exit-2 脚本数**：脚本目录实测计数（check-*.ts 25 + 5 工具 ensure-codegraph-opsx/wm-status/metrics-report/security-scan/plan-chunks，含自身）== 30；AGENTS.md 含「30 个脚本」且无「29 个脚本」「27 个脚本」。
 8. **pre-push 项数**：pre-push 编号注释最大值与「N 项检查」注释一致。
 9. **glossary action**：action 条目含 `review` 且不含 `verify`。
 10. **资产计数**：`subagent/` 人格文件数 == 28；`.cursor/skills` 目录数 == 23。
@@ -194,7 +195,7 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 - package.json 新增 `"check:docs-consistency"` script。
 - pre-push 新增检查 #14：`13 项` → `14 项`（同步更新 pre-push:138 注释、README/AGENTS 中所有「13 项」计数）。
 - AGENTS.md §8 脚本导航表 + SKILL.md Bundled Resources 表登记新脚本。
-- **exit-2 脚本数级联**：新脚本自身 exit 2，实测计数 27 → 28；AGENTS.md「27 个脚本」→「28 个脚本」。
+- **exit-2 脚本数级联**：新脚本自身 exit 2，实测计数 29 → 30；AGENTS.md「29 个脚本」→「30 个脚本」。
 - 版本 `38.3.0` → `38.4.0`（三处同步）+ CHANGELOG 新增条目。
 
 ## 5. 验证方案
