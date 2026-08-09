@@ -15,7 +15,8 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve as pathResolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { exitWithError } from './lib/cli-error.js';
 import { printGateReport } from './lib/gate-report.js';
 import { runDocConsistencyChecks, type DocConsistencyInput } from './docs-consistency-logic.js';
@@ -34,10 +35,12 @@ const REQUIRED_PATHS = [
   'AGENTS.md',
   'docs/skill-design-document_SSoT.md',
   '.githooks/pre-push',
+  'w-model-dev/subagent', // 目录（persona 计数）
+  '.cursor/skills', // 目录（cursor skill 计数）
 ];
 
 function main(): void {
-  const root = resolve(process.argv[2] ?? '.');
+  const root = pathResolve(process.argv[2] ?? '.');
   const missing = REQUIRED_PATHS.filter((p) => !existsSync(join(root, p)));
   if (missing.length > 0) {
     exitWithError({
@@ -53,8 +56,8 @@ function main(): void {
   const schemaFiles = readdirSync(join(root, 'w-model-dev/schemas')).filter((f) => f.endsWith('.schema.json')).sort();
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
   const cursorSkillCount = readdirSync(join(root, '.cursor/skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length;
-  const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts')).filter((f) => /^check-.*\.ts$/.test(f)).length;
-  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks
+  const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts')).filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 25
+  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks（合计 30）
 
   const input: DocConsistencyInput = {
     schemaFiles,
@@ -97,13 +100,21 @@ function main(): void {
   printGateReport('DOCS_CONSISTENCY', { passed: violations.length === 0, violationCount: violations.length }, violations.length === 0 ? 0 : 1);
 }
 
-try {
-  main();
-} catch (err) {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
+// Windows 兼容的 main 模块判断：
+//   - import.meta.url 是 file:///D:/... URL 格式
+//   - process.argv[1] 是 Windows 路径 D:\... 或 POSIX 路径
+//   用 fileURLToPath + pathResolve 归一化两端再比较，避免斜杠方向 / 盘符大小写差异。
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === pathResolve(entryArg);
+if (isMain) {
+  try {
+    main();
+  } catch (err) {
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
+  }
 }
