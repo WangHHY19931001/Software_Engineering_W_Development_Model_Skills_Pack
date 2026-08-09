@@ -1051,6 +1051,20 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | security-scan | baseline 重生成 206→224（含第 37 轮新增指纹；lint:security 0 新增发现） |
 | 版本号 | 37.0.0（三处一致） |
 
+#### 第 38 轮·小轮 A（2026-08-09）：Phase 2 系统设计设计级增强（SSoT §3.4.36）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 用户要求系统设计/概要设计/详细设计产出达到 DESIGN.md 级别结构严谨性（分三小轮，本轮为小轮 A：Phase 2） |
+| 修正方案 | 方案 A 全要素对齐：模板 + 参考 + 门禁三层联动，严守系统设计域边界（不落接口/类级） |
+| 新增模板 | 6 独立子模板（templates/system-design/：system-architecture / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）+ 主模板 system-design.md 重构（§0 SSOT 头 + 引用块，保留 §1-§5 节号防 tla-spec-template 跨引用破坏） |
+| 参考扩展 | phase-2-system-design.md 算法增步骤 1-7 + FM-SD-01~05 + 禁止行为 #6/#7/#8 + 返工路径 + 验收标准 |
+| 门禁扩展 | check-requirement-graph.ts 新增 R9（SD 追踪矩阵一致性）/R10（UML mermaid 配平）+ --spec-dir 支持 module 前缀 glob；check-artifact-gate.ts phase=2 新增引用块完整性/SSOT 头/DoD 清单校验（checkPhaseSpecStructure 泛化） |
+| 阶段边界 | Phase 2 只产系统级（架构/子系统/部署/行为总览/运行时架构），FM-SD-06 拦截越界落接口/类级 |
+| 遗留修复 | check-requirement-graph.ts isPureReqGraph 防御式处理缺 nodes 输入（第 37 轮遗留静默放行缺陷） |
+| self-test | 基线 225→233 |
+| 版本号 | 38.0.0（三处一致） |
+
 ---
 
 ## 4. 技能工作流程
@@ -2656,6 +2670,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.33 | 第 35 轮 8 阶段端到端调测修复入库 | `scripts/check-tla-model.ts`（TLC states 清理正则 `\d{4}`→`\d{2,4}`，P3 bug）+ `scripts/design-contract-logic.ts`（D1 路径语义归一：多端点拆分/括号剥离/`:id` 模板段匹配/「不适用」「横切」豁免）+ `scripts/run-log-logic.ts`（GATE_JSON_PATTERNS 新增 STATE_MACHINE_JSON）+ `scripts/__tests__/tla-clean-trace.test.ts`（+1）+ `scripts/__tests__/design-contract-logic.test.ts`（+6）+ `scripts/__tests__/run-log-logic.test.ts`（+1）+ `scripts/__tests__/bdd-logic.test.ts`（实时 fixture 改自包含内联规格）+ demo 侧修复（auditMiddleware id、限流器独立实例、Express Router 路由结构）+ 版本号三处 35.0.0 | 完整（self-test 213/213、vitest 459、tsc 0 错误；8 阶段调测 318/318 测试、覆盖率 94.76% lines、归档 308 文件） |
 | §3.4.34 | 第 36 轮 冰山扫掠深度分析机制 | `schemas/iceberg-sweep.schema.json` + `scripts/iceberg-sweep-logic.ts`（R1-R8）+ `scripts/check-iceberg-sweep.ts`（CLI）+ `scripts/__tests__/iceberg-logic.test.ts`（+7）+ `scripts/samples/iceberg/`（+4 样本）+ `scripts/self-test.ts`（基线 213→217）+ `schemas/run-log.schema.json`（action 25→27）+ `references/iceberg-sweep-guide.md` + `references/anti-patterns.md`（#44，43→44）+ `references/subagent-delegation.md`（R-iceberg 模板）+ `references/root-cause-locator.md`（边界节）+ `SKILL.md`（工作流 9.5 步）+ 版本号三处 36.0.0 | 完整（self-test 217/217、vitest 466、tsc 0 错误） |
 | §3.4.35 | 第 37 轮 Phase 1 设计级别增强 | `templates/requirement-spec.md`（重构：§0 SSOT 头 + §13-§17/附录 A 引用块）+ `templates/requirement-spec/`（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 6 子模板）+ `references/phase-1-requirements.md`（算法步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14）+ `scripts/check-requirement-graph.ts`（R7/R8 + --spec-dir）+ `scripts/check-artifact-gate.ts`（phase=1 引用块/SSOT/DoD 结构校验 + --spec-dir）+ `scripts/self-test.ts`（基线 217→225）+ 版本号三处 37.0.0 | 完整（self-test 225/225、vitest 476、tsc 0 错误） |
+| §3.4.36 | 第 38 轮 Phase 2 设计级增强（小轮 A） |
 
 ---
 

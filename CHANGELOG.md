@@ -3,6 +3,22 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [38.0.0] - 2026-08-09
+
+### Added
+- Phase 2 系统设计 6 独立子模板（system-architecture / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）
+- check-requirement-graph.ts R9（SD 追踪矩阵一致性）/ R10（UML mermaid 块配平）+ --spec-dir 支持 module 前缀 glob
+- check-artifact-gate.ts --phase=2 引用块完整性 / §0 SSOT 头 / DoD 清单校验（checkPhaseSpecStructure 泛化）
+
+### Changed
+- system-design.md 主模板重构（§0 SSOT 头 + 引用块串联，保留 §1-§5 既有节号）
+- phase-2-system-design.md 算法增步骤 1-7 + FM-SD-01~05 + 禁止行为 #6/#7/#8
+- verifier-spec.md completeness 维度新增 Phase 2 结构评审项
+- self-test 基线 225→233；版本号 37.0.0 → 38.0.0
+
+### Fixed
+- check-requirement-graph.ts isPureReqGraph 防御式处理缺 nodes 输入（第 37 轮遗留静默放行缺陷）
+
 ## [37.0.0] - 2026-08-09
 
 ### 第三十七轮 Phase 1 需求分析设计级别增强（模板 / 参考 / 门禁三层联动）
