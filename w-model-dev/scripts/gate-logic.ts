@@ -245,9 +245,10 @@ export interface RequirementSpecStructureViolations {
 }
 
 /** 第 37 轮：真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
-const nodeFsAdapter: { readFileSync(p: string): string; existsSync(p: string): boolean } = {
+const nodeFsAdapter: { readFileSync(p: string): string; existsSync(p: string): boolean; readdirSync(p: string): string[] } = {
   readFileSync: (p: string) => nodeFs.readFileSync(p, 'utf-8'),
   existsSync: (p: string) => nodeFs.existsSync(p),
+  readdirSync: (p: string) => nodeFs.readdirSync(p),
 };
 
 /** Phase 1 需求规格结构校验（第 37 轮）：引用块完整性 + §0 SSOT 头 + DoD 清单
@@ -295,6 +296,78 @@ export function checkRequirementSpecStructure(
   return v;
 }
 
+/** 各阶段独立产物布局（主文档后缀 + 6 独立文件）——第 38 轮泛化
+ *  phase=1: requirement-spec.md 主文档 + 6 子文件（无前缀）
+ *  phase=2: {module}-system-design.md 主文档 + 6 子文件（带 {module}- 前缀）
+ */
+const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> = {
+  1: {
+    mainSuffix: 'requirement-spec.md',
+    refs: ['system-context.md', 'glossary.md', 'traceability-matrix.md', 'behavior-spec.md', 'discipline-dod.md', 'uml-modeling.md'],
+  },
+  2: {
+    mainSuffix: '-system-design.md',
+    refs: ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'],
+  },
+};
+
+/** Phase N 设计/规格结构校验（第 38 轮泛化）：引用块完整性 + §0 SSOT 头 + DoD 清单
+ *  @param phase  1 或 2（3/4 由后续小轮扩展）
+ *  @param specDir  docs/phase{N}-{name}/ 目录
+ *  @param fs       文件系统注入 { readFileSync; existsSync; readdirSync }，便于单测 mock
+ */
+export function checkPhaseSpecStructure(
+  phase: number,
+  specDir: string,
+  fs: { readFileSync(p: string): string; existsSync(p: string): boolean; readdirSync(p: string): string[] },
+): RequirementSpecStructureViolations {
+  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [] };
+  const layout = PHASE_SPEC_LAYOUT[phase];
+  if (!layout) {
+    v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2）`);
+    return v;
+  }
+  // 主文档定位：phase=1 固定文件名；phase=2 按 *-system-design.md glob
+  let mainPath: string | undefined;
+  if (phase === 1) {
+    mainPath = path.join(specDir, layout.mainSuffix);
+  } else {
+    const mains = fs.readdirSync(specDir).filter(f => f.endsWith(layout.mainSuffix));
+    if (mains.length !== 1) {
+      v.refs.push(`structure: 主文档 glob *${layout.mainSuffix} 匹配 ${mains.length} 个（须恰 1 个）`);
+      return v;
+    }
+    mainPath = path.join(specDir, mains[0]!);
+  }
+  if (!fs.existsSync(mainPath)) {
+    v.refs.push(`structure: 主文档 ${layout.mainSuffix} 不存在`);
+    return v;
+  }
+  const spec = String(fs.readFileSync(mainPath));
+  // module 前缀提取（phase=2 时用于引用文件名校对）
+  const modulePrefix = phase === 2 ? path.basename(mainPath).replace(/-system-design\.md$/, '') : '';
+  for (const ref of layout.refs) {
+    const refName = phase === 1 ? ref : `${modulePrefix}-${ref}.md`;
+    if (!spec.includes(`](./${refName})`)) v.refs.push(`structure: 主文档缺引用块 → ${refName}`);
+    if (!fs.existsSync(path.join(specDir, refName))) v.refs.push(`structure: 引用文件不存在 ${refName}`);
+  }
+  // §0 SSOT 头四项声明
+  for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
+    if (!spec.includes(key)) v.ssot.push(`structure: §0 SSOT 头缺「${key}」`);
+  }
+  // DoD 清单：discipline-dod.md - [ ] 项 ≥ 8
+  const dodName = phase === 1 ? 'discipline-dod.md' : `${modulePrefix}-discipline-dod.md`;
+  const dodPath = path.join(specDir, dodName);
+  if (!fs.existsSync(dodPath)) {
+    v.dod.push(`structure: ${dodName} 不存在`);
+  } else {
+    const dod = String(fs.readFileSync(dodPath));
+    const checks = (dod.match(/- \[ \]/g) ?? []).length;
+    if (checks < 8) v.dod.push(`structure: ${dodName} DoD 清单仅 ${checks} 项（须 ≥ 8）`);
+  }
+  return v;
+}
+
 function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
   return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
 }
@@ -336,11 +409,11 @@ export function checkArtifactGate(
   }
   if (reasons.length > 0) return failureResult(reasons);
 
-  // 第 37 轮：phase=1 且提供 specDir 时做需求规格结构校验
+  // 第 37/38 轮：phase=1/2 且提供 specDir 时做规格/设计结构校验
   // （置于 RTM 早退检查后：RTM 结构损坏时直接失败，不叠加 spec 校验；spec 违反仅进 reasons，不影响覆盖率计算）
   let specStructureViolations: RequirementSpecStructureViolations | undefined;
-  if (phase === 1 && options?.specDir) {
-    specStructureViolations = checkRequirementSpecStructure(options.specDir, nodeFsAdapter);
+  if ((phase === 1 || phase === 2) && options?.specDir) {
+    specStructureViolations = checkPhaseSpecStructure(phase, options.specDir, nodeFsAdapter);
     for (const m of [...specStructureViolations.refs, ...specStructureViolations.ssot, ...specStructureViolations.dod]) {
       reasons.push(m);
     }
