@@ -35,7 +35,7 @@
 ### 适用阶段与 targetKind
 
 - W 模型阶段：阶段 5（编码）的门评审；阶段 6（集成测试）后回归时复用
-- 主要 `targetKind`：`file`
+- 主要 `targetKind`：`code`
 - 路由命令：`/wm review <文件路径>`
 
 ### 评审框架（五轴，与 [verifier-spec.md §7.4A.1](verifier-spec.md) 子标准映射）
@@ -98,7 +98,7 @@
 {
   "schemaVersion": "1.0",
   "meta": {
-    "targetKind": "file",
+    "targetKind": "code",
     "targetId": "<文件路径>",
     "persona": "code-reviewer",
     "scoringMethod": "logits-expected-value | text-parse-fallback",
@@ -147,7 +147,7 @@
 ### 适用阶段与 targetKind
 
 - W 模型阶段：阶段 4（详细设计 → 单元测试设计）/ 阶段 6（集成测试）/ 阶段 7（系统测试）
-- 主要 `targetKind`：`testcase`
+- 主要 `targetKind`：`test`
 - 路由命令：`/wm review <UT-NNN | IT-NNN | ST-NNN | UAT-NNN>`
 
 ### 评审方法
@@ -205,7 +205,7 @@
 {
   "schemaVersion": "1.0",
   "meta": {
-    "targetKind": "testcase",
+    "targetKind": "test",
     "targetId": "<UT-NNN | IT-NNN | ST-NNN | UAT-NNN>",
     "persona": "test-engineer",
     "scoringMethod": "logits-expected-value | text-parse-fallback",
@@ -255,7 +255,7 @@
 ### 适用阶段与 targetKind
 
 - W 模型阶段：阶段 7（系统测试）安全子项；阶段 2（系统设计）安全架构评审
-- 主要 `targetKind`：`file` / `design`
+- 主要 `targetKind`：`code` / `design`
 - 路由命令：`/wm review <文件路径 | DESIGN-NNN>`
 
 ### 评审范围
@@ -327,7 +327,7 @@
 {
   "schemaVersion": "1.0",
   "meta": {
-    "targetKind": "file | design",
+    "targetKind": "code | design",
     "targetId": "<文件路径 | DESIGN-NNN>",
     "persona": "security-auditor",
     "scoringMethod": "logits-expected-value | text-parse-fallback",
@@ -380,7 +380,7 @@
 ### 适用阶段与 targetKind
 
 - W 模型阶段：阶段 7（系统测试）性能子项
-- 主要 `targetKind`：`file` / `design`
+- 主要 `targetKind`：`code` / `design`
 - 路由命令：`/wm review <文件路径 | DESIGN-NNN>`
 
 ### 操作模式
@@ -473,7 +473,7 @@
 {
   "schemaVersion": "1.0",
   "meta": {
-    "targetKind": "file | design",
+    "targetKind": "code | design",
     "targetId": "<文件路径 | DESIGN-NNN>",
     "persona": "performance-auditor",
     "scoringMethod": "logits-expected-value | text-parse-fallback",
