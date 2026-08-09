@@ -15,6 +15,7 @@ import {
   checkRequirementGraph,
   recalculatePassed,
   checkRequirementSpecEnhance,
+  checkDesignSpecEnhance,
   countMermaidBlocks,
   parseMarkdownTable,
   type GraphShape,
@@ -539,5 +540,31 @@ describe('parseMarkdownTable', () => {
     expect(rows.some(r => r['需求号'] === '需求号')).toBe(false);
     // 两条真实数据行（REQ-001 各一）
     expect(rows.filter(r => r['需求号'] === 'REQ-001')).toHaveLength(2);
+  });
+});
+
+describe('R9 系统设计追踪矩阵一致性', () => {
+  it('合法矩阵通过', () => {
+    const v = checkDesignSpecEnhance(
+      '| SD 编号 | 对应需求号 | 设计落点§ |\n|---|---|---|\n| SD-001 | REQ-001 | M-001 |\n',
+      '## 3. 模块划分\n',
+      '```mermaid\ngraph TB\n  A --> B\n```\n',
+    );
+    expect(v.r9).toEqual([]);
+  });
+  it('SD 编号非法报 R9', () => {
+    const v = checkDesignSpecEnhance(
+      '| SD 编号 | 对应需求号 | 设计落点§ |\n|---|---|---|\n| DD-001 | REQ-001 | M-001 |\n',
+      '## 3. 模块划分\n',
+      '',
+    );
+    expect(v.r9.some(m => m.includes('SD 编号格式'))).toBe(true);
+  });
+});
+
+describe('R10 UML mermaid 块配平', () => {
+  it('未配平报 R10', () => {
+    const v = checkDesignSpecEnhance('', '', '```mermaid\na\n');
+    expect(v.r10.some(m => m.includes('配平'))).toBe(true);
   });
 });

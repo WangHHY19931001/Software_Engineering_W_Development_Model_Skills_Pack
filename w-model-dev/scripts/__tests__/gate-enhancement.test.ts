@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../tla-logic.js';
 import { checkVerifierOutput, type VerifierOutputShape } from '../verifier-logic.js';
-import { checkArtifactGate, checkRequirementSpecStructure, checkUatPathMappingBackfill, type GateGraph, type RTMMatrixShape, type PhaseOption } from '../gate-logic.js';
+import { checkArtifactGate, checkPhaseSpecStructure, checkRequirementSpecStructure, checkUatPathMappingBackfill, type GateGraph, type RTMMatrixShape, type PhaseOption } from '../gate-logic.js';
 import { checkRequirementGraph, type GraphShape } from '../graph-logic.js';
 import { checkRequirementCoverage, type CoverageShape, type CoverageCheckOptions } from '../coverage-logic.js';
 import { checkExemption, type ExemptionShape } from '../exemption-logic.js';
@@ -767,5 +767,63 @@ describe('Phase 1 需求规格结构校验', () => {
     files[path.join(dir, 'discipline-dod.md')] = Array(5).fill('- [ ] x').join('\n');
     const v = checkRequirementSpecStructure(dir, mkFs(files));
     expect(v.dod.some(m => m.includes('DoD 清单仅 5 项'))).toBe(true);
+  });
+});
+
+describe('Phase 2 系统设计结构校验', () => {
+  const mkFs = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      if (!(p in files)) throw new Error(`missing ${p}`);
+      return files[p] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p in files;
+    },
+    readdirSync(p: string): string[] {
+      const prefix = `${p}${path.sep}`;
+      return Object.keys(files)
+        .filter(k => k.startsWith(prefix))
+        .map(k => k.slice(prefix.length));
+    },
+  });
+
+  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
+    const dir = path.join('docs', 'phase2-design');
+    const refs = ['blog-system-system-architecture.md', 'blog-system-glossary.md', 'blog-system-traceability-matrix.md', 'blog-system-behavior-spec.md', 'blog-system-discipline-dod.md', 'blog-system-uml-modeling.md'];
+    let spec = refs.map(r => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    const files: Record<string, string> = {};
+    for (const r of refs) files[path.join(dir, r)] = '';
+    files[path.join(dir, 'blog-system-system-design.md')] = spec;
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
+  });
+
+  it('引用文件缺失报 refs', () => {
+    const dir = path.join('docs', 'phase2-design');
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'blog-system-system-design.md')] = '> 详见 [x](./blog-system-uml-modeling.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+    expect(v.refs.length).toBeGreaterThan(0);
+  });
+
+  it('主文档 glob 零个报 refs', () => {
+    const dir = path.join('docs', 'phase2-design');
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+    expect(v.refs.some(m => m.includes('主文档 glob'))).toBe(true);
+  });
+
+  it('主文档 glob 多个报 refs', () => {
+    const dir = path.join('docs', 'phase2-design');
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'a-system-design.md')] = '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    files[path.join(dir, 'b-system-design.md')] = '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+    expect(v.refs.some(m => m.includes('主文档 glob'))).toBe(true);
   });
 });

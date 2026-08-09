@@ -1,0 +1,9 @@
+{
+  "sampleType": "graph-design-enhance",
+  "description": "R10 失败样本：mermaid 块未配平",
+  "expectedPassed": false,
+  "expectedReasonPatterns": ["R10 UML mermaid 块配平失败"],
+  "traceabilityMatrix": "| SD 编号 | 对应需求号 | 优先级 | 设计落点§ | 涉及子系统 | 实现状态 | 验收关联 | 逐条验收判据 |\n|---|---|---|---|---|---|---|---|\n| SD-001 | REQ-001 | P0 | M-001 | S-01 | 设计完成 | ST-001 | 响应 < 2s |\n",
+  "umlModeling": "```mermaid\ngraph TB\n  A((actor)) --> UC1(uc)\n```\n```mermaid\nclassDiagram\n  class E1 { +attr }\n",
+  "designDocContent": "## 3. 模块划分\n"
+}
