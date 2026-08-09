@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（#1~#19 + #20 + #21~#30 + #33~#44；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第三十一轮新增；#44 第 36 轮新增）
+- 反模式清单（#1~#44；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第三十一轮新增；#44 第 36 轮新增）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -46,7 +46,7 @@
 | 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工（第 15 轮共性问题 A） | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
 | 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败（第 15 轮共性问题 B） | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
-| 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 19 份） |
+| 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 20 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
 | 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，`check-archive-integrity.ts` 退出码 0（见 SSoT §10B.2.1 归档完整性清单） |
@@ -139,7 +139,7 @@
 | #25（JSON 文件 PowerShell 写入） | run-log.jsonl `note` 字段检测（"PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词）+ [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
-| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（19 份） |
+| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（20 份） |
 | #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
 | #30（豁免审批跳步） | `check-exemption` E1-E8 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
 | #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |
@@ -370,10 +370,8 @@
 **与约束 4 的关系**：schema 前置校验是"真实执行"在结构层的延伸—— 结构错误必须由 schema 拦截并明确标注 `[schema]` 前缀，不得让业务规则校验 crash 或返回模糊错误。借鉴 drawio-skill/styles/schema.json 设计实践。
 
 **实现证据**（Task 3，借鉴点 2）：
-- 13 份 schema 已落地于 `w-model-dev/schemas/*.schema.json`（详见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单）。
-- 10 个 `*-logic.ts`（verifier / gate / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause）已集成 `validateBySchema` 前置校验。
-- self-test 基线 99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
-- vitest 90 测试全通过（9 个 .test.ts 文件）。
+- schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`（详见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单）。
+- 各 `*-logic.ts` 校验函数入口已集成 `validateBySchema` 前置校验，失败时以 `[schema]` 前缀返回错误。
 
 ## #29 BDD 建模与需求/设计/TLA+ 不符未回退
 
@@ -733,7 +731,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 ### 失败模式与反模式的对照
 
-| 维度 | 反模式 #1~#29 | 失败模式 F1~F10 |
+| 维度 | 反模式 #1~#44 | 失败模式 F1~F10 |
 |---|---|---|
 | 性质 | 流程破坏 | 行为退化 |
 | 命中后果 | 立即回退到对应阶段起点 | 不回退，但降低产物质量 |
@@ -771,7 +769,7 @@ LLM-as-a-Verifier 在评审中识别到失败模式时，应在 `reworkHints` �
 > **与 44 条流程反模式（#1~#44）+ 10 条行为退化（F1~F10）的关系**：反模式是「流程破坏」（命中即回退，脚本守护），失败模式是「行为退化」（命中不回退但降低质量，Agent 自检），运维失败模式是「运行健康问题」（命中不回退但应标注，用户+系统协同检测）。三者互补形成三层架构：
 >
 > ```
-> 层 1：流程反模式 #1~#29（命中即回退，脚本守护）
+> 层 1：流程反模式 #1~#44（命中即回退，脚本守护）
 >   ↓ 互补
 > 层 2：行为退化 F1~F10（命中不回退但标注，Agent 自检）
 >   ↓ 互补
@@ -830,7 +828,7 @@ LLM-as-a-Verifier 在评审中识别到运维失败模式时，应在 `reworkHin
 
 > 来源：SSoT [§10G](../../docs/skill-design-document_SSoT.md)。Loop 4 的 HarnessImprovementReport（详见 [hill-climbing-guide.md](hill-climbing-guide.md)）产出候选反模式信号，人审后手动加入本清单。
 >
-> **与已收录反模式的关系**：已收录的 #1~#29 + F1~F10 + O1~O6 是技能包内置清单；候选反模式是 Loop 4 从 run-log 模式聚合产出的**待审**信号，须经人审 + 至少 2 个项目的回归验证后才正式加入清单。
+> **与已收录反模式的关系**：已收录的 #1~#44 + F1~F10 + O1~O6 是技能包内置清单；候选反模式是 Loop 4 从 run-log 模式聚合产出的**待审**信号，须经人审 + 至少 2 个项目的回归验证后才正式加入清单。
 
 ### 候选反模式信号来源
 
@@ -852,7 +850,7 @@ Loop 4 产出候选信号（HarnessImprovementReport.recommendations.candidateAn
   ↓ adopt 后
 加入本节「待回归验证」清单
   ↓ 2 项目回归验证通过
-正式加入 #1~#19 或 F1~F10 或 O1~O6 清单
+正式加入 #1~#44 或 F1~F10 或 O1~O6 清单
 ```
 
 ### 待回归验证清单（初始为空）
