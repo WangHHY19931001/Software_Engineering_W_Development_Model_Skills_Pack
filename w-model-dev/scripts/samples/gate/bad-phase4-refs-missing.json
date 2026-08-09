@@ -1,0 +1,10 @@
+{
+  "sampleType": "gate-phase4-spec-structure",
+  "description": "Phase 4 结构校验失败：引用文件缺失",
+  "expectedPassed": false,
+  "expectedReasonPatterns": ["引用文件不存在 blog-system-class-design.md"],
+  "mainDoc": "blog-system-detailed-design.md",
+  "specContent": "> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n> 数据模型详见 [blog-system-data-model.md](./blog-system-data-model.md)\n> 术语表详见 [blog-system-glossary.md](./blog-system-glossary.md)\n> 追踪矩阵详见 [blog-system-traceability-matrix.md](./blog-system-traceability-matrix.md)\n> 行为规格模型详见 [blog-system-behavior-spec.md](./blog-system-behavior-spec.md)\n> Phase 4 工程纪律与 DoD 详见 [blog-system-discipline-dod.md](./blog-system-discipline-dod.md)\n",
+  "refFiles": ["blog-system-data-model.md", "blog-system-glossary.md", "blog-system-traceability-matrix.md", "blog-system-behavior-spec.md", "blog-system-discipline-dod.md"],
+  "dodContent": "- [ ] a\n- [ ] b\n- [ ] c\n- [ ] d\n- [ ] e\n- [ ] f\n- [ ] g\n- [ ] h\n"
+}

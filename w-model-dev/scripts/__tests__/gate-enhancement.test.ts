@@ -929,3 +929,51 @@ describe('Phase 3 结构校验经 checkArtifactGate 生效', () => {
     }
   });
 });
+
+// ==================== 第 38 轮 Phase 4 详细设计结构校验 ====================
+// 样本键统一用正斜杠书写，mkFs 内部按 path.sep 归一化，保证 Windows 反斜杠下可命中。
+describe('Phase 4 详细设计结构校验', () => {
+  const mkFs = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      const k = p.split(path.sep).join('/');
+      if (!(k in files)) throw new Error(`missing ${p}`);
+      return files[k] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p.split(path.sep).join('/') in files;
+    },
+    readdirSync(p: string): string[] {
+      const prefix = `${p.split(path.sep).join('/')}/`;
+      return Object.keys(files)
+        .filter(k => k.startsWith(prefix))
+        .map(k => k.slice(prefix.length));
+    },
+  });
+
+  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
+    const files: Record<string, string> = {};
+    const refs = ['blog-system-class-design.md', 'blog-system-data-model.md', 'blog-system-glossary.md', 'blog-system-traceability-matrix.md', 'blog-system-behavior-spec.md', 'blog-system-discipline-dod.md'];
+    let spec = refs.map(r => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    for (const r of refs) files[`docs/phase4-detailed/${r}`] = '';
+    files['docs/phase4-detailed/blog-system-detailed-design.md'] = spec;
+    files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
+    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
+  });
+
+  it('引用文件缺失报 refs', () => {
+    const files: Record<string, string> = {};
+    files['docs/phase4-detailed/blog-system-detailed-design.md'] = '> 详见 [x](./blog-system-discipline-dod.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
+    expect(v.refs.length).toBeGreaterThan(0);
+  });
+
+  it('主文档 glob 零个报 refs', () => {
+    const files: Record<string, string> = {};
+    files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
+    expect(v.refs.some(m => m.includes('主文档 glob'))).toBe(true);
+  });
+});

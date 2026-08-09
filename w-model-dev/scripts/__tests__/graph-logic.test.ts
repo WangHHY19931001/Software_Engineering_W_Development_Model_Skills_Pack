@@ -15,6 +15,7 @@ import {
   checkRequirementGraph,
   recalculatePassed,
   checkRequirementSpecEnhance,
+  checkDetailedSpecEnhance,
   checkDesignSpecEnhance,
   checkOutlineSpecEnhance,
   countMermaidBlocks,
@@ -601,5 +602,39 @@ describe('R12 UML mermaid 块配平', () => {
   it('未配平报 R12', () => {
     const v = checkOutlineSpecEnhance('', '', '```mermaid\na\n');
     expect(v.r12.some(m => m.includes('配平'))).toBe(true);
+  });
+});
+
+describe('R13 详细设计追踪矩阵一致性', () => {
+  it('合法矩阵通过', () => {
+    const v = checkDetailedSpecEnhance(
+      '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | INTF-001 | §1 |\n',
+      '## 1. 类设计\n',
+      '```mermaid\nclassDiagram\n  class E1 { +attr }\n```\n',
+    );
+    expect(v.r13).toEqual([]);
+  });
+  it('DD 编号非法报 R13', () => {
+    const v = checkDetailedSpecEnhance(
+      '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| SD-001 | INTF-001 | §1 |\n',
+      '## 1. 类设计\n',
+      '',
+    );
+    expect(v.r13.some(m => m.includes('DD 编号格式'))).toBe(true);
+  });
+  it('主文档缺 §1 类设计节报 R13', () => {
+    const v = checkDetailedSpecEnhance(
+      '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | INTF-001 | §1 |\n',
+      '## 2. 数据库设计\n',
+      '',
+    );
+    expect(v.r13.some(m => m.includes('主文档缺 §1 类设计节'))).toBe(true);
+  });
+});
+
+describe('R14 UML mermaid 块配平', () => {
+  it('未配平报 R14', () => {
+    const v = checkDetailedSpecEnhance('', '', '```mermaid\na\n');
+    expect(v.r14.some(m => m.includes('配平'))).toBe(true);
   });
 });
