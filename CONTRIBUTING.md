@@ -116,7 +116,7 @@ npm run prepush
 git push --no-verify
 ```
 
-> Windows 注意：pre-push 依赖 bash。Windows 原生 cmd/PowerShell 无法直接运行，请使用 Git Bash 执行 `npm run prepush`；非 Git Bash 环境下 hook 检测到后自动放行（exit 0），不误报失败。
+> Windows 注意：pre-push 依赖 bash。**Git Bash（Git for Windows 自带）下会正常执行门禁**；仅纯 cmd/PowerShell（无 bash 解释器）环境无法执行，hook 检测到后给出指引并放行（exit 0），不误报失败。请使用 Git Bash 运行 `npm run prepush`。
 
 ### 4. 提交规范
 

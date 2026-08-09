@@ -19,6 +19,9 @@
 | Vitest（门禁脚本单元测试） | ✅ 34 files / 498 tests |
 | TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
+| Pre-push 门禁（本地 CI） | ✅ 12 项全通过（Git Bash 实测） |
+
+**CI 策略**：本项目不使用远程 CI（GitHub Actions / GitLab CI），门禁由**本地 git `pre-push` hook** 承载——`git push` 时自动跑 self-test + 各门禁脚本 + 安全扫描 + npm audit，任一不符即中止推送。克隆后执行一次 `npm run setup:hooks` 启用。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
 
 ## 快速上手
 
