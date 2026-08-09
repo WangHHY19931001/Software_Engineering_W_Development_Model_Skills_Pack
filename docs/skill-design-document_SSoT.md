@@ -1078,6 +1078,19 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | self-test | 基线 233→241 |
 | 版本号 | 38.1.0（三处一致） |
 
+#### 第 38 轮·小轮 C（2026-08-09）：Phase 4 详细设计设计级增强（SSoT §3.4.38）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 用户要求系统设计/概要设计/详细设计产出达到 DESIGN.md 级别结构严谨性（分三小轮，本轮为小轮 C：Phase 4，三小轮收官） |
+| 修正方案 | 方案 A 全要素对齐：模板 + 参考 + 门禁三层联动，严守详细设计域边界（不回溯接口/不落编码） |
+| 新增模板 | 6 独立子模板（templates/detailed-design/：class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod）+ 主模板 detailed-design.md 重构（§0 SSOT 头 + 引用块，保留 §1-§3 节号）；Phase 4 无独立 UML 附录（类图/ER 图内嵌于 class-design/data-model） |
+| 参考扩展 | phase-4-detailed-design.md 算法增步骤 1-6 + FM-DD-01~05 + 禁止行为 #7/#8/#9 + 返工路径 + 验收标准 |
+| 门禁扩展 | check-requirement-graph.ts 新增 R13（DD 追踪矩阵一致性）/R14（UML mermaid 配平，class-design + data-model 双源）+ --spec-dir 支持 phase=4 glob；check-artifact-gate.ts phase=4 新增结构校验（PHASE_SPEC_LAYOUT 加 phase=4 + checkArtifactGate 调用条件补 phase=4） |
+| 阶段边界 | Phase 4 只产类/数据级（类图/ER 图/方法级/表结构），FM-DD-06 拦截越界回溯接口/落编码 |
+| self-test | 基线 241→249 |
+| 版本号 | 38.2.0（三处一致） |
+
 ---
 
 ## 4. 技能工作流程
@@ -2685,6 +2698,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.35 | 第 37 轮 Phase 1 设计级别增强 | `templates/requirement-spec.md`（重构：§0 SSOT 头 + §13-§17/附录 A 引用块）+ `templates/requirement-spec/`（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 6 子模板）+ `references/phase-1-requirements.md`（算法步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14）+ `scripts/check-requirement-graph.ts`（R7/R8 + --spec-dir）+ `scripts/check-artifact-gate.ts`（phase=1 引用块/SSOT/DoD 结构校验 + --spec-dir）+ `scripts/self-test.ts`（基线 217→225）+ 版本号三处 37.0.0 | 完整（self-test 225/225、vitest 476、tsc 0 错误） |
 | §3.4.36 | 第 38 轮 Phase 2 设计级增强（小轮 A） |
 | §3.4.37 | 第 38 轮 Phase 3 设计级增强（小轮 B） |
+| §3.4.38 | 第 38 轮 Phase 4 设计级增强（小轮 C） |
 
 ---
 

@@ -3,6 +3,19 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [38.2.0] - 2026-08-09
+
+### Added
+- Phase 4 详细设计 6 独立子模板（class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod）
+- check-requirement-graph.ts R13（DD 追踪矩阵一致性）/ R14（UML mermaid 块配平，class-design + data-model 双源）+ --spec-dir 支持 phase=4 glob
+- check-artifact-gate.ts --phase=4 引用块完整性 / §0 SSOT 头 / DoD 清单校验
+
+### Changed
+- detailed-design.md 主模板重构（§0 SSOT 头 + 引用块串联，保留 §1-§3 既有节号）
+- phase-4-detailed-design.md 算法增步骤 1-6 + FM-DD-01~05 + 禁止行为 #7/#8/#9
+- verifier-spec.md completeness 维度新增 Phase 4 结构评审项
+- self-test 基线 241→249；版本号 38.1.0 → 38.2.0
+
 ## [38.1.0] - 2026-08-09
 
 ### Added
