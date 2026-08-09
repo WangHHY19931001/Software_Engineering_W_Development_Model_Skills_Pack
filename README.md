@@ -79,8 +79,8 @@ npx tsx w-model-dev/scripts/self-test.ts
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)
 - **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [subagent-persona-matrix.md](./w-model-dev/references/subagent-persona-matrix.md)）；Persona 文件本身是 Markdown，不调用 LLM
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI）
-- **负面知识库**：6 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记）+ 44 条流程反模式（流程破坏，命中即回退）+ 实现层教训 L1~L4 + 运维失败模式 O1~O6。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
-- **项目级 Definition of Done**：5 维度（功能 / 质量 / 测试 / 文档 / 部署）的每次变更日常标准，与阶段门质量门互补
+- **负面知识库**：7 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记）+ 44 条流程反模式（流程破坏，命中即回退）+ 实现层教训 L1~L4 + 运维失败模式 O1~O6。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
+- **项目级 Definition of Done**：7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储（`.w-model/*.json`），跨多轮交互保持上下文；JSON Schema (draft-07) 强约束
 - **工件质量门**：RTM 需求覆盖率 100% + 四级测试全部通过才允许交付；单元测试代码覆盖率阈值 ≥ 80%
@@ -149,7 +149,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── anti-patterns.md      # 负面知识库：44 条流程反模式 + L1~L4 教训 + F1~F10 失败模式 + O1~O6 运维失败模式
 │   │   ├── workflow.md           # 完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      # LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审）
-│   │   ├── subagent-delegation.md# 编排者-子代理边界（O/A/S/V/G/R 六角色 + 分派模板 + 回填契约）
+│   │   ├── subagent-delegation.md# 编排者-子代理边界（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约）
 │   │   ├── dispatch-matrix.md    # 阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵
 │   │   ├── command-reference.md  # /wm 命令参考
 │   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
@@ -264,7 +264,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
 - [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 44 条流程反模式 + L1~L4 实现层教训 + F1~F10 失败模式 + O1~O6 运维失败模式（#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）
-- [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六角色 + 分派模板 + 回填契约
+- [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约
 - [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）
 - [Persona 选型矩阵](./w-model-dev/references/subagent-persona-matrix.md) - R-lead / V-lead 多角度 persona 选择矩阵
 - [阶段 × 角色 × 脚本总览](./w-model-dev/references/dispatch-matrix.md) - 编排者分派前必读矩阵
@@ -273,7 +273,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [图谱门禁与收敛准则](./w-model-dev/references/graph-guide.md) - check-requirement-graph.ts 用法 + 收敛判定
 - [TLA+ 层次化状态机建模](./w-model-dev/references/tla-plus-guide.md) - check-tla-model.ts 用法 + 层级模型 + SANY/TLC 门禁
 - [BDD 建模指南](./w-model-dev/references/bdd-guide.md) - L1-L4 分层 features + 状态机七要素 + BDD↔TLA+ 协作
-- [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（5 维度）
+- [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（7 维度）
 - [术语权威表](./w-model-dev/references/glossary.md) - 15+ 术语 + `_Avoid_` 别名治理
 - [工具箱决策表](./w-model-dev/references/toolbox.md) - I have X → use Z
 - [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
