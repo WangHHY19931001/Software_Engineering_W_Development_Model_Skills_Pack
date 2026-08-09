@@ -47,7 +47,7 @@
 
 ### action（RunLogEntry）
 
-- **规范定义**：run-log 动作类型枚举（`execute` / `checkpoint` / `verify` / `gate` / `dispatch` / `rework` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` 等）。
+- **规范定义**：run-log 动作类型枚举（共 27 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `evolve` / `produce` / `review`（V 评审）/ `gate` / `tla-gate` / `graph-gate` / `test` / `checkpoint` / `rework` / `rollback` / `rootcause` / `fix` / `emergency-fix` / `escalate` / `r3-completeness` / `r3-reliability` / `r3-security` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` / `iceberg-sweep` / `iceberg-review`。
 - **_Avoid_**：operation/op/行为/事件（「action」字段名固定；EventIngress 的同类字段是 `eventType`）。
 
 ### checkRounds
