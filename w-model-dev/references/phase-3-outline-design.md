@@ -7,6 +7,43 @@
 
 基于系统设计进行模块接口设计，定义模块间交互契约，并**同步设计集成测试用例**。概要设计聚焦模块边界与接口，**不深入类 / 方法内部**（类/方法级设计属阶段 4 详细设计职责，越界即返工）。
 
+## 概要设计算法
+
+  1. 接口识别与契约定义
+     ├─ 基于系统设计模块划分，产出 docs/phase3-outline/{module}-interface-contract.md（接口清单 + Schema 10 字段 + 错误码分层）
+     ├─ 主文档 §2 引用块指向 interface-contract.md
+     ├─ 失败: 接口契约缺 Schema 字段 / 错误码缺段位 → 回步骤 1（FM-OD-01）
+     └─ 成功: 接口契约完整，主文档 §2 接口定义与之对应
+  2. 调用关系建模
+     ├─ 产出 interface-contract.md 调用关系图（模块间调用 + 数据流标注）
+     ├─ 主文档 §1 模块调用关系与之对应
+     ├─ 失败: 循环依赖 → 列出环路径重新划分（FM-OD-03）
+     └─ 成功: 调用关系无环，主文档 §1 对应
+  3. 字段语义对齐与数据源选择
+     ├─ 字段命名与业务语义对齐（followerId/followeeId 而非 userId/bloggerId）
+     ├─ 跨模块调用显式声明 store 选择
+     ├─ 失败: 字段语义模糊且无 Implementation Decisions 说明 → 回步骤 3（FM-OD-02）
+     └─ 成功: 字段语义清晰，store 选择与 schema 一致
+  4. 术语建模（第 38 轮新增）
+     ├─ 产出 docs/phase3-outline/{module}-glossary.md（接口域术语子集）
+     ├─ 主模板 §4 引用块指向 glossary.md
+     └─ 成功: glossary.md 产出，引用块成立
+  5. UML 模块级建模（第 38 轮新增）
+     ├─ 产出 docs/phase3-outline/{module}-uml-modeling.md（包图/序列图/通信图）
+     ├─ 主模板附录 A 引用块指向 uml-modeling.md
+     ├─ 失败: 图与主文档 §1/§2 不对应 → 回步骤 5 对齐（FM-OD-04）
+     └─ 成功: 三图产出，mermaid 块配平
+  6. 追踪矩阵与行为规格引用（第 38 轮新增）
+     ├─ 产出 docs/phase3-outline/{module}-traceability-matrix.md（INTF×SD 8 字段 + 测试层级矩阵）
+     ├─ 产出 docs/phase3-outline/{module}-behavior-spec.md（L3 .feature 引用关系）
+     ├─ 主模板 §5/§6 引用块指向上述独立文件
+     ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 回步骤 6 对齐（FM-OD-05）
+     └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
+  7. Phase 3 工程纪律与 DoD（第 38 轮新增）
+     ├─ 产出 docs/phase3-outline/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
+     ├─ 主模板 §7 引用块指向 discipline-dod.md
+     └─ 成功: DoD 清单产出，引用块成立
+
 ## 输入
 
 - 《系统设计文档》（阶段 2 产出）
@@ -19,6 +56,13 @@
   - 参数定义、返回值、错误码
   - 调用关系图
 - 集成测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=集成测试）
+- 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase3-outline/`，带 `{module}-` 前缀）：
+  - `{module}-interface-contract.md`：接口契约（接口清单 + Schema 10 字段 + 调用关系图 + 错误码分层）
+  - `{module}-glossary.md`：术语表（接口域子集）
+  - `{module}-traceability-matrix.md`：概要设计追踪矩阵（INTF×SD 8 字段 + 测试层级矩阵）
+  - `{module}-behavior-spec.md`：行为规格模型（L3 .feature 引用关系）
+  - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
+  - `{module}-uml-modeling.md`：UML 模块级建模（包图/序列图/通信图）
 
 > 路径约定见 [directory-conventions.md](directory-conventions.md)。
 
@@ -37,6 +81,13 @@
 | 接口设计文档 | 套用 `templates/interface-design.md` 模板，含接口签名 / 参数 / 返回值 / 错误码 | `docs/phase3-outline/{module}-interface-design.md` |
 | 集成测试用例 | 套用 `templates/test-case.md` 模板，`type=集成测试`，含参数校验 + 跨模块 + 异常路径 | `docs/phase3-outline/{module}-integration-test.md` |
 | 调用关系图 | 用 Mermaid `graph` 语法产出模块间调用关系，须标注依赖方向，禁止循环依赖 | 内嵌于 `docs/phase3-outline/{module}-interface-design.md` |
+| 接口契约 | 套用 `templates/interface-design/interface-contract.md` | `docs/phase3-outline/{module}-interface-contract.md` |
+| 术语表 | 套用 `templates/interface-design/glossary.md` | `docs/phase3-outline/{module}-glossary.md` |
+| UML 模块级建模 | 套用 `templates/interface-design/uml-modeling.md`，mermaid 三图 | `docs/phase3-outline/{module}-uml-modeling.md` |
+| 概要设计追踪矩阵 | 套用 `templates/interface-design/traceability-matrix.md` | `docs/phase3-outline/{module}-traceability-matrix.md` |
+| 行为规格模型（L3） | 套用 `templates/interface-design/behavior-spec.md`（引用 .feature，不内联） | `docs/phase3-outline/{module}-behavior-spec.md` |
+| 工程纪律与 DoD | 套用 `templates/interface-design/discipline-dod.md` | `docs/phase3-outline/{module}-discipline-dod.md` |
+| 主设计文档 | 套用 `templates/interface-design.md`（骨架 + 引用块指向上述 6 文件） | `docs/phase3-outline/{module}-interface-design.md` |
 
 **调用关系图语法约束**：每个模块间调用须标注接口名 + 数据流向；存在循环依赖时必须重新划分模块边界，禁止带环放行。
 
@@ -102,6 +153,18 @@
 | 错误码集合不完整 | 接口契约缺 4xx/5xx/业务三类之一 | 回到接口定义按「错误码分层约定」补全三段位 |
 
 检测顺序：先静态扫描（签名/错误码）→ 再图算法（循环依赖）→ 最后语义检查（职责重叠）。
+
+## 失败模式矩阵（第 38 轮新增）
+
+| 编号 | 失败模式 | 检测信号 | 处置 |
+|---|---|---|---|
+| FM-OD-01 | 接口契约缺 Schema 字段 / 错误码缺段位 | interface-contract.md 接口缺 Schema 10 字段之一；错误码缺 4xx/5xx/业务之一 | 回步骤 1 补全契约字段与错误码 |
+| FM-OD-02 | 字段语义模糊 / ADR 缺上下文后果 | 字段命名与业务语义不对应且无 Implementation Decisions 说明 | 回步骤 3 补全字段映射或对齐命名 |
+| FM-OD-03 | 模块循环依赖 | 调用关系 DFS 三色染色检测到环 | 回步骤 2 重新划分边界 |
+| FM-OD-04 | UML 建模与接口/调用关系脱节 | uml-modeling.md 图与主文档 §1/§2 不对应 | 回步骤 5 对齐 UML 建模 |
+| FM-OD-05 | 追踪矩阵字段不一致 | traceability-matrix.md 与主文档 §2/phase2 追踪矩阵不一致 | 回步骤 6 对齐追踪矩阵字段 |
+
+> 注：FM-OD-06（越过阶段边界落类/方法级）为越界检测信号，见禁止行为 #8 与返工路径，不单列于上表。
 
 ## 测试用例设计（本阶段产出集成测试用例）
 
@@ -172,6 +235,10 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=3`
 - [ ] 模块间调用关系清晰，无循环依赖（DFS 三色染色验证）
 - [ ] 集成测试用例覆盖关键模块交互路径
 - [ ] RTM 已补登接口设计与集成测试映射
+- [ ] {module}-interface-contract.md + {module}-glossary.md 已产出，主文档 §2/§4 引用块成立
+- [ ] {module}-traceability-matrix.md（INTF×SD + 测试层级矩阵）与主文档 §2/phase2 矩阵一致，主文档 §5 引用块成立
+- [ ] {module}-uml-modeling.md 三图与主文档 §1/§2 对应、mermaid 块配平，主文档附录 A 引用块成立
+- [ ] {module}-behavior-spec.md + {module}-discipline-dod.md 已产出，主文档 §6/§7 引用块成立
 
 > 🔴 **CHECKPOINT · 阶段门放行**：接口设计 + 集成测试用例产出后暂停。Agent 必须向用户展示「接口契约清单（含错误码）/ 调用关系图（无循环依赖）/ 集成测试用例（含参数校验 + 跨模块 + 异常路径）/ RTM 补登」，由用户确认「放行进入阶段 4」或「返工」。存在循环依赖或接口契约缺错误码 → 一律返工。
 
@@ -189,6 +256,9 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=3`
 | 3 | 集成测试用例只覆盖正向调用 | 必须含参数校验 + 跨模块 + 异常路径（超时/错误码） |
 | 4 | 忽略循环依赖检测 | 必须用 DFS 三色染色检测模块间循环依赖，有则重新划分模块边界 |
 | 5 | 接口签名无类型约束 | 参数与返回值必须按「接口契约 Schema 模板」给出明确类型 + 约束 |
+| 6 | 追踪矩阵字段与主文档 §2 接口定义 / phase2 追踪矩阵不一致 | 步骤 6 须对齐 traceability-matrix.md（FM-OD-05） |
+| 7 | UML 图表与接口/调用关系脱节 | uml-modeling.md 三图须对应主文档 §1/§2（FM-OD-04） |
+| 8 | 越过阶段边界落类/方法级实现 | 类/方法级设计属阶段 4，本阶段只产模块接口级（FM-OD-06 禁止越界） |
 
 ## 返工路径
 
@@ -199,6 +269,12 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=3`
 - 集成测试缺异常路径 → 回到并行任务，补全超时 / 错误码 fallback 用例
 - 接口签名无类型约束 → 回到接口定义，补全参数与返回值类型
 - 越界深入类 / 方法内部 → 回到功能描述，将类 / 方法级设计移交阶段 4
+- 接口契约缺字段/错误码（FM-OD-01）→ 回步骤 1 补全
+- 字段语义模糊（FM-OD-02）→ 回步骤 3 补全映射
+- 循环依赖（FM-OD-03）→ 回步骤 2 重新划分
+- UML 脱节（FM-OD-04）→ 回步骤 5 对齐
+- 追踪矩阵不一致（FM-OD-05）→ 回步骤 6 对齐
+- 越界落类/方法级（FM-OD-06）→ 移除越界内容，移交阶段 4
 
 ## 退出状态
 
