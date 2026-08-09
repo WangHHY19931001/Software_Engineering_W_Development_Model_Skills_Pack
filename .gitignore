@@ -28,7 +28,7 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Node 依赖（package.json 仅声明 tsx 作为开发依赖，依赖目录不入库）
+# Node 依赖（package.json 声明 tsx / ajv / eslint-plugin-security / vitest 等开发依赖，依赖目录不入库）
 node_modules/
 
 # TypeScript 编译产物
