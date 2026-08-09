@@ -110,4 +110,22 @@ describe('runDocConsistencyChecks', () => {
     expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('28'))).toBe(true);
     expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('23'))).toBe(true);
   });
+
+  it('targetkind 违规消息含来源文档名', () => {
+    const input = baseInput({ verifierSpec: 'targetKind=file 路由' });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'targetkind' && x.message.includes('verifier-spec'))).toBe(true);
+  });
+
+  it('run-log schema 解析失败仅报一条违规', () => {
+    const input = baseInput({ runLogSchema: 'not-json{' });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
+    expect(v.length).toBe(1);
+    expect(v[0]!.message).toContain('解析失败');
+  });
+
+  it('data-models 缺 Schema 清单标题 → 违规', () => {
+    const input = baseInput({ dataModels: '| `verifier-output` | ... |' });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('20 份'))).toBe(true);
+  });
 });

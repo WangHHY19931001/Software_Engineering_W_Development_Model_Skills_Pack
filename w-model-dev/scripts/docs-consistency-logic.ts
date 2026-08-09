@@ -95,14 +95,17 @@ function checkSchemaList(schemaFiles: string[], dataModels: string): DocCheckVio
 function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   let count = 0;
+  let parseFailed = false;
   try {
     const schema = JSON.parse(runLogSchema) as { properties?: { action?: { enum?: unknown[] } } };
     const actionEnum = schema.properties?.action?.enum;
     count = Array.isArray(actionEnum) ? actionEnum.length : 0;
   } catch {
-    violations.push({ check: 'run-log-action', message: 'run-log.schema.json 解析失败' });
+    parseFailed = true;
   }
-  if (count !== EXPECTED.runLogActionCount) {
+  if (parseFailed) {
+    violations.push({ check: 'run-log-action', message: 'run-log.schema.json 解析失败' });
+  } else if (count !== EXPECTED.runLogActionCount) {
     violations.push({ check: 'run-log-action', message: `run-log.schema.json action.enum 长度应为 ${EXPECTED.runLogActionCount}，实际 ${count}` });
   }
   if (!dataModels.includes(`action enum（${EXPECTED.runLogActionCount} 类）`)) {
@@ -111,12 +114,18 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
   return violations;
 }
 
-function checkTargetKindLiveDocs(...contents: string[]): DocCheckViolation[] {
+function checkTargetKindLiveDocs(verifierSpec: string, commandReference: string, agentPersonas: string, ssot: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  for (const content of contents) {
+  const docs: Array<[string, string]> = [
+    ['verifier-spec', verifierSpec],
+    ['command-reference', commandReference],
+    ['agent-personas', agentPersonas],
+    ['SSoT', ssot],
+  ];
+  for (const [docName, content] of docs) {
     for (const token of FORBIDDEN_TARGETKIND) {
       if (content.includes(token)) {
-        violations.push({ check: 'targetkind', message: `检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
+        violations.push({ check: 'targetkind', message: `${docName} 检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
       }
     }
   }
@@ -159,8 +168,8 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
   if (!antiPatterns.includes(`\n| ${EXPECTED.maxAntiPattern} |`)) {
     violations.push({ check: 'anti-patterns', message: `anti-patterns.md 反模式表最大编号应为 ${EXPECTED.maxAntiPattern}` });
   }
-  if (!antiPatterns.includes('#1~#44')) {
-    violations.push({ check: 'anti-patterns', message: 'anti-patterns.md 应含连续区间「#1~#44」' });
+  if (!antiPatterns.includes(`#1~#${EXPECTED.maxAntiPattern}`)) {
+    violations.push({ check: 'anti-patterns', message: `anti-patterns.md 应含连续区间「#1~#${EXPECTED.maxAntiPattern}」` });
   }
   for (const stale of STALE_RANGES) {
     if (antiPatterns.includes(stale)) {
@@ -205,7 +214,7 @@ function checkGlossaryAction(glossary: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const start = glossary.indexOf('### action（RunLogEntry）');
   const end = start >= 0 ? glossary.indexOf('### ', start + 1) : -1;
-  const section = start >= 0 ? (end > start ? glossary.slice(start, end) : glossary.slice(start)) : '';
+  const section = start < 0 ? '' : glossary.slice(start, end === -1 ? undefined : end);
   if (!section.includes('`review`')) {
     violations.push({ check: 'glossary-action', message: 'glossary.md action 枚举应含 `review`（V 评审）' });
   }
