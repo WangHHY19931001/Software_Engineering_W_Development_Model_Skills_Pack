@@ -18,7 +18,7 @@
 - **阶段 1 迷雾登记册（Fog of War）**：REQ 入学锐利性测试（`references/ingestion-chunk.md`，判据 = 能否精确陈述需求的问题，非能否回答）/ A-cross 报告 §7 迷雾汇总（`references/ingestion-cross.md`）/ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空，`references/phase-1-requirements.md`「迷雾登记册（Fog of War）」节）。迷雾册为文本节不建图节点。详见 SSoT §3.4.23。
 - **阶段设计级产物**（第 37-38 轮）：阶段 1-4 产出升级为主模板 + 6 独立子模板（system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），主文档引用块串联；`check-requirement-graph.ts` 新增 R7-R14 结构校验 + `check-artifact-gate.ts --phase=N` 引用块/SSOT/DoD 校验。详见 SSoT §3.4.35-38。
 - **冰山扫掠深度分析机制**（R-iceberg）：S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索主动深挖隐藏问题，直到 `newFindings=[]` 或达 maxIcebergRounds=5。反模式 #44。详见 SSoT §3.4.34 与 `references/iceberg-sweep-guide.md`。
-- **错误结构全量归一化**：全仓 29 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 SSoT §3.4.30。
+- **错误结构全量归一化**：全仓 27 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 SSoT §3.4.30。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 
@@ -62,7 +62,7 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # 阶段 1–4 TLA+ 行为门禁，退出码 0/1/2
 npm run wm:status -- <dir>                  # 状态快照（只读），退出码 0/2
 npm run wm:metrics -- <dir>                 # 流程度量报告（只读），退出码 0/2
-npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 阶段 5 代码-TLA+ 一致性回归，退出码 0/1
+npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 阶段 5 代码-TLA+ 一致性回归，退出码 0/1/2
 
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
@@ -139,7 +139,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-requirement-graph.ts | 图谱结构门禁 + 信息流校验（黑洞/奇迹/死模块/边界完整性）+ 边数下限 + 语义来源占比 + 阶段设计级 R7-R14（`--spec-dir`） | 1-4 | 0=通过，1=校验失败，2=输入错误 |
 | check-tla-model.ts | TLA+ 行为门禁（SANY 语法 + TLC 模型检查 + 文件头/层次/拆解一致性；**已移除 `--skip-tlc`**） | 1-4 | 0=通过，1=校验失败，2=输入错误 |
 | check-bdd-model.ts | BDD 模型门禁（D1 头标注+D2 Gherkin 语法+D3 状态机七要素+D4 TLA+ 等价+D5 step 绑定+D6 scenario 路径+D7 RTM 映射） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
-| check-code-tla-consistency.ts | 代码-TLA+ 一致性回归（四维度：SD→codeModule / 代码状态转移 / Next 分支 / 不变式覆盖） | 5 | 0=通过，1=失败 |
+| check-code-tla-consistency.ts | 代码-TLA+ 一致性回归（四维度：SD→codeModule / 代码状态转移 / Next 分支 / 不变式覆盖） | 5 | 0=通过，1=校验失败，2=输入错误 |
 | check-budget.ts | Budget 门禁（R1-R5 时效性/schema/onExceed/killSwitch/触发检测） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-run-log.ts | Run-log 门禁（R1-R7 动作完整性/tokens/返工/决策/O越权/exitCode/时序 + R3 预防性审查记录校验） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-maturity.ts | Maturity 门禁（R1-R5 schema/level/周期/history/降级） | 1-8 | 0=通过，1=校验失败，2=输入错误 |
