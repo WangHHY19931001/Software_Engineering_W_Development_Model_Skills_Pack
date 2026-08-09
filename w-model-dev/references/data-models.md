@@ -819,7 +819,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（19 份）
+### Schema 清单（20 份）
 
 | Schema 名（注册键） | 文件 | 目标类型 | 关键约束 | 对应 logic.ts |
 | --- | --- | --- | --- | --- |
@@ -829,7 +829,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `tla-manifest` | `tla-manifest.schema.json` | TlaManifest | additionalProperties:false；spec.level enum（L1-L6）；decompositionDecision enum（4 类） | tla-logic.ts |
 | `code-tla-manifest` | `code-tla-manifest.schema.json` | CodeTlaConsistencyInput | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description） | code-tla-logic.ts |
 | `budget` | `budget.schema.json` | BudgetConfig | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1] | budget-logic.ts |
-| `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（15 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
+| `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（27 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
 | `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | （暂未集成到 logic.ts validateBySchema，仅 self-test SCHEMA_CASES 覆盖） |
 | `event-ingress` | `event-ingress.schema.json` | `EventIngressEntry` | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （暂未集成到 logic.ts，仅 self-test 覆盖） |
 | `maturity` | `maturity.schema.json` | MaturityConfig | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格 | maturity-logic.ts |
@@ -842,6 +842,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `exemption` | `exemption.schema.json` | ExemptionRequest | additionalProperties:false；四阶段审批字段（justification/evidence/review/verification/humanDecision） | exemption-logic.ts |
 | `preventive-review` | `preventive-review.schema.json` | PreventiveReview | additionalProperties:false；dimension enum（completeness/reliability/security） | preventive-review-logic.ts |
 | `signature-chain` | `signature-chain.schema.json` | SignatureChainEntry | additionalProperties:false；inputProvenance 来源证明；actorRole enum | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用） |
+| `iceberg-sweep` | `iceberg-sweep.schema.json` | IcebergSweepReport | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed | iceberg-sweep-logic.ts |
 
 ### 设计原则
 
