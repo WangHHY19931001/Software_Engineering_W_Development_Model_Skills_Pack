@@ -600,6 +600,7 @@ const DESIGN_ENHANCE_CASES: DesignEnhanceCase[] = [
   { file: 'valid-design-enhance.json', expectedPassed: true, description: 'R9/R10 通过：SD 字段合法 + mermaid 配平' },
   { file: 'bad-design-r9.json', expectedPassed: false, expectedReasonPatterns: [/R9 SD 编号格式失败/, /R9 设计落点§ 引用失败/], description: 'R9 失败：SD 编号非法 + 落点§ 非模块 ID' },
   { file: 'bad-design-r10.json', expectedPassed: false, expectedReasonPatterns: [/R10 UML mermaid 块配平失败/], description: 'R10 失败：mermaid 块未配平' },
+  { file: 'bad-design-missing-section3.json', expectedPassed: false, expectedReasonPatterns: [/R9 追踪矩阵一致性失败：主文档缺 §3 模块划分节/], description: 'R9 失败：主文档缺 §3 模块划分节' },
 ];
 
 interface Phase2SpecStructureCase {
