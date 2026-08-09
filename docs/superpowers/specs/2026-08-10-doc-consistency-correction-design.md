@@ -30,7 +30,7 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 
 「5 维度」在仓库中存在两种不同语义，仅修 DoD 语义，**不得触碰**技术选型决策矩阵「5 维度评分」、五轴评审「五轴」等其它含义。
 
-## 3. Round 1：文档修正清单（约 60 处行级修改）
+## 3. Round 1：文档修正清单（约 68 处行级修改）
 
 ### 3.1 verifier-spec.md（targetKind 全族 11 处）
 
@@ -58,7 +58,7 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 | 72 | `targetKind=testcase` → `targetKind=test` |
 | 81 | `UAT-/ST-/IT-/UT- → testcase；否则为 file` → `UAT-/ST-/IT-/UT- → test；否则为 code` |
 
-### 3.3 agent-personas.md（4 处）
+### 3.3 agent-personas.md（12 处）
 
 | 行 | 修正 |
 |---|---|
@@ -66,6 +66,8 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 | 246 | `targetKind=testcase` → `targetKind=test` |
 | 369 | `targetKind=file` → `targetKind=code` |
 | 526 | `targetKind=file` → `targetKind=code` |
+| 38 / 150 / 258 / 383 | 「主要 `targetKind`：`file`/`testcase`」声明 → `code`/`test` |
+| 101 / 208 / 330 / 476 | JSON 示例 `"targetKind": "file"/"testcase"` → `"code"/"test"` |
 
 ### 3.4 SSoT（19 处）
 
@@ -178,7 +180,7 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 
 1. **schema 一致性**：`schemas/` 目录文件数 == 20；data-models.md「Schema 清单」表逐文件覆盖每个 schema 文件名。
 2. **run-log action 枚举**：run-log.schema.json `action.enum` 长度 == 27；data-models.md run-log 行含「27 类」。
-3. **targetKind 一致性**：verifier-spec.md / command-reference.md / agent-personas.md / SSoT 中不得出现废弃标记（`targetKind=file`、`targetKind=testcase`、`targetKind = \`file\``、`targetKind = \`testcase\``）；verifier-spec §2.2 须含 4 值枚举行。
+3. **targetKind 一致性**：verifier-spec.md / command-reference.md / agent-personas.md / SSoT 中不得出现废弃标记（`targetKind=file`、`targetKind=testcase`、`targetKind = \`file\``、`targetKind = \`testcase\``、`targetKind：\`file\``、`targetKind：\`testcase\``、`"targetKind": "file"`、`"targetKind": "testcase"`）；verifier-spec §2.2 须含 4 值枚举行。
 4. **DoD 维度**：definition-of-done.md「七维度标准」表维度数 == 7；README 含「7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）」且不含「5 维度（功能」。
 5. **操作行为**：SKILL.md 含「七条操作行为」；README 含「7 条核心操作行为」且不含「6 条核心操作行为」。
 6. **反模式**：anti-patterns.md 反模式表最大编号 == 44；目录行含「#1~#44」。

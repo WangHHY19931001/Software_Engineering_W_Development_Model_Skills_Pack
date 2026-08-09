@@ -71,7 +71,7 @@ git add w-model-dev/references/verifier-spec.md
 git commit -m "docs: fix targetKind enum drift in verifier-spec (testcase/file -> test/code)"
 ```
 
-### Task 2: command-reference.md + agent-personas.md targetKind 修正（7 处）
+### Task 2: command-reference.md + agent-personas.md targetKind 修正（7 处 + 延伸 8 处）
 
 **Files:**
 - Modify: `w-model-dev/references/command-reference.md`
@@ -90,12 +90,25 @@ git commit -m "docs: fix targetKind enum drift in verifier-spec (testcase/file -
 `- **经 \`/wm review\` 调用**：\`targetKind=file\` 且文件涉及安全敏感面` → `...\`targetKind=code\` 且文件涉及安全敏感面`
 `- **经 \`/wm review\` 调用**：\`targetKind=file\` 且文件涉及性能热点` → `...\`targetKind=code\` 且文件涉及性能热点`
 
-- [ ] **Step 3: 复核 + Commit**
+- [ ] **Step 3: agent-personas.md「主要 targetKind」声明与 JSON 示例（延伸 8 处，执行中发现的同族遗漏）**
 
-Run: `npx grep -rn "targetKind=file\|targetKind=testcase" w-model-dev/references/command-reference.md w-model-dev/references/agent-personas.md` → 0 命中。
+L38 `- 主要 \`targetKind\`：\`file\`` → `- 主要 \`targetKind\`：\`code\``
+L101 `    "targetKind": "file",` → `    "targetKind": "code",`
+L150 `- 主要 \`targetKind\`：\`testcase\`` → `- 主要 \`targetKind\`：\`test\``
+L208 `    "targetKind": "testcase",` → `    "targetKind": "test",`
+L258/L383 `- 主要 \`targetKind\`：\`file\` / \`design\`` → `- 主要 \`targetKind\`：\`code\` / \`design\``（两处）
+L330/L476 `    "targetKind": "file | design",` → `    "targetKind": "code | design",`（两处）
+
+> 同内容行（258/383、330/476）用携带相邻行的长片段确保精确替换到对应 persona。
+
+- [ ] **Step 4: 复核 + 两次 Commit**
+
+Run: `npx grep -rn "targetKind=file\|targetKind=testcase" w-model-dev/references/command-reference.md w-model-dev/references/agent-personas.md` → 0 命中；另查 `targetKind：\`file\``、`targetKind：\`testcase\``、`"targetKind": "file"`、`"targetKind": "testcase"` → 0 命中。
 ```bash
 git add w-model-dev/references/command-reference.md w-model-dev/references/agent-personas.md
 git commit -m "docs: fix targetKind enum drift in command-reference and agent-personas"
+git add w-model-dev/references/agent-personas.md
+git commit -m "docs: fix remaining targetKind drift in agent-personas (major targetKind declarations and JSON examples)"
 ```
 
 ### Task 3: README.md 修正（5 处）
@@ -615,7 +628,16 @@ export const EXPECTED = {
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
 const DOD_README = '7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
 const DOD_SSOT_TRACE = '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
-const FORBIDDEN_TARGETKIND = ['targetKind=file', 'targetKind=testcase', 'targetKind = `file`', 'targetKind = `testcase`'];
+const FORBIDDEN_TARGETKIND = [
+  'targetKind=file',
+  'targetKind=testcase',
+  'targetKind = `file`',
+  'targetKind = `testcase`',
+  'targetKind：`file`',
+  'targetKind：`testcase`',
+  '"targetKind": "file"',
+  '"targetKind": "testcase"',
+];
 const STALE_RANGES = ['#1~#29', '#1~#19', '#1～#29', '#1～#19'];
 const STALE_EXIT2 = ['29 个脚本', '27 个脚本'];
 
@@ -1023,7 +1045,7 @@ npm run check:docs-consistency  # exit 0
 
 - [ ] **Step 2: 破坏样本回归** — 临时改 `README.md` 中「7 维度」→「5 维度（功能」，`npm run check:docs-consistency` 期望 exit 1 且含 dod 违规；还原后 exit 0。
 
-- [ ] **Step 3: 零残留 grep**（同 Task 13 Step 1，另加 `npx grep -rn "13 项" README.md AGENTS.md .githooks/pre-push` 应仅命中「第 13 项 npm audit」合法语境）。
+- [ ] **Step 3: 零残留 grep**（同 Task 13 Step 1，另加 `npx grep -rn "13 项" README.md AGENTS.md .githooks/pre-push` 应仅命中「第 13 项 npm audit」合法语境；另查 `targetKind：\`file\``、`targetKind：\`testcase\``、`"targetKind": "file"`、`"targetKind": "testcase"` 零命中）。
 
 - [ ] **Step 4: 记录结果** — 全部命令退出码 0 后，Round 2 完成。
 
