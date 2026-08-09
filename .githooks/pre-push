@@ -135,7 +135,7 @@ if ! bash "$(dirname "$0")/ensure-platform-deps.sh"; then
 fi
 
 # ---------- 门禁用例 ----------
-# 与原 CI 一致：12 项检查（第 12 项 npm audit 为 warn-only），退出码必须全部符合预期才放行。
+# 与原 CI 一致：13 项检查（第 13 项 npm audit 为 warn-only），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 trap 'rm -f "$tmp_log"' EXIT

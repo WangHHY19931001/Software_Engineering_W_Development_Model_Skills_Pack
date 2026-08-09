@@ -8,7 +8,7 @@
 
 ## 开发环境准备
 
-本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，仅声明 `tsx` 作为开发依赖（用于运行 `w-model-dev/scripts/*.ts`）+ vitest 测试框架，无构建步骤、无 `src/`、无编程式 SDK。
+本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，声明 `tsx`（运行 `w-model-dev/scripts/*.ts`）+ `ajv`/`ajv-formats`（schema 校验 runtime 依赖）+ `eslint-plugin-security`（安全扫描）+ `@typescript-eslint/*` + `vitest` 等开发依赖，无构建步骤、无 `src/`、无编程式 SDK。
 
 ```bash
 # 1. 克隆仓库
