@@ -3,6 +3,16 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [38.4.0] - 2026-08-10
+
+### Added
+- check-docs-consistency.ts 活体文档一致性门禁（10 项确定性检查：schema 清单 / run-log action 枚举 / targetKind / DoD 维度 / 操作行为 / 反模式范围 / exit-2 脚本数 / pre-push 项数 / glossary action / 资产计数），pre-push 接入（13 项 → 14 项）
+- docs-consistency-logic.ts 纯逻辑 + __tests__/docs-consistency-logic.test.ts（vitest，17 用例）
+
+### Changed
+- AGENTS.md 脚本导航表登记 check-docs-consistency；SKILL.md Bundled Resources 登记；exit-2 脚本数 29 → 30
+- 版本号 38.3.0 → 38.4.0（三处同步）
+
 ## [38.3.0] - 2026-08-10
 
 ### Changed

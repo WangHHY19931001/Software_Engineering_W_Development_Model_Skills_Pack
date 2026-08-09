@@ -9,7 +9,7 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`38.3.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)）
+**当前版本**：`38.4.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)）
 
 **健康指标**（2026-08-09 实测）：
 
@@ -19,7 +19,7 @@
 | Vitest（门禁脚本单元测试） | ✅ 34 files / 498 tests |
 | TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
-| Pre-push 门禁（本地 CI） | ✅ 13 项全通过（Git Bash 与 WSL 双平台实测） |
+| Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
 
 **CI 策略**：本项目不使用远程 CI（GitHub Actions / GitLab CI），门禁由**本地 git `pre-push` hook** 承载——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit，任一不符即中止推送。克隆后执行一次 `npm run setup:hooks` 启用。Windows 用 Git Bash、WSL 直接跑均可；跨平台运行前自动补装对应平台原生二进制（[`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh)）。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
 

@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 38.3.0
+version: 38.4.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -277,6 +277,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | check-codegraph-queries.ts | 阶段 5-8 gate —— 校验 codegraph 查询落盘（反模式 #38） |
 | check-opsx-artifacts.ts | 阶段 5-8 gate —— 校验 opsx 制品 + R3/V 审查产物（反模式 #39/#40） |
 | check-openspec-archive.ts | 阶段 5-8 gate 通过后 —— 校验 opsx:archive 归档完整性 |
+| check-docs-consistency.ts | 文档一致性门禁（活体文档计数/枚举/清单 vs 代码事实）—— 内容升级后必跑 / pre-push 承载 |
 | `wm-status.ts` | 状态快照脚本（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议） |
 | `metrics-report.ts` | 流程度量报告脚本（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警） |
 

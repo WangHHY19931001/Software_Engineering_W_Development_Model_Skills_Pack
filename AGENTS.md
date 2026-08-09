@@ -18,7 +18,7 @@
 - **阶段 1 迷雾登记册（Fog of War）**：REQ 入学锐利性测试（`references/ingestion-chunk.md`，判据 = 能否精确陈述需求的问题，非能否回答）/ A-cross 报告 §7 迷雾汇总（`references/ingestion-cross.md`）/ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空，`references/phase-1-requirements.md`「迷雾登记册（Fog of War）」节）。迷雾册为文本节不建图节点。详见 SSoT §3.4.23。
 - **阶段设计级产物**（第 37-38 轮）：阶段 1-4 产出升级为主模板 + 6 独立子模板（system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），主文档引用块串联；`check-requirement-graph.ts` 新增 R7-R14 结构校验 + `check-artifact-gate.ts --phase=N` 引用块/SSOT/DoD 校验。详见 SSoT §3.4.35-38。
 - **冰山扫掠深度分析机制**（R-iceberg）：S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索主动深挖隐藏问题，直到 `newFindings=[]` 或达 maxIcebergRounds=5。反模式 #44。详见 SSoT §3.4.34 与 `references/iceberg-sweep-guide.md`。
-- **错误结构全量归一化**：全仓 29 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 SSoT §3.4.30。
+- **错误结构全量归一化**：全仓 30 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 SSoT §3.4.30。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 
@@ -41,7 +41,7 @@
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南） | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `.cursor/skills/` | Cursor 技能包（23 个中文适配技能；含 security-review 源码级安全扫描、codegraph-exploration 约束 #20 修改前影响分析、performance-review 性能评审） | 安全/性能评审、阶段 5-8 修改前 codegraph 影响分析场景按技能触发语义选用 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
-| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 13 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit warn-only），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
+| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 14 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit warn-only），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 
 门禁脚本测试：
 - `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，34 个 .test.ts / 498 条）
@@ -67,7 +67,7 @@ npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --gr
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
 
-# 手动跑推送前门禁（不实际推送，13 项门禁检查；Windows 请用 Git Bash，WSL 可直接跑）
+# 手动跑推送前门禁（不实际推送，14 项门禁检查；Windows 请用 Git Bash，WSL 可直接跑）
 npm run prepush
 
 npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1；npx tsx w-model-dev/scripts/security-scan.ts --regenerate 可重生成 baseline
@@ -161,3 +161,4 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式 | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
 | self-test.ts | 回归基线（249 条样本）；vitest 498 条（34 test files） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel + codeModule 格式 + uat-path-mapping） | - | 0=通过，1=失败 |
+| check-docs-consistency.ts | 活体文档一致性门禁（schema 清单 / targetKind / DoD 维度 / 操作行为 / 反模式 / exit-2 脚本数 / pre-push 项数 / glossary action / 资产计数） | - | 0=通过，1=不一致，2=输入错误 |
