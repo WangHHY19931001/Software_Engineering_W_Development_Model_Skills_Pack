@@ -958,3 +958,49 @@ export function checkDesignSpecEnhance(
   }
   return v;
 }
+
+export interface OutlineSpecEnhanceViolations {
+  r11: string[];
+  r12: string[];
+}
+
+/** R11 概要设计追踪矩阵一致性 + R12 UML mermaid 配平（第 38 轮小轮 B）
+ *  @param traceMatrixContent  {module}-traceability-matrix.md 内容
+ *  @param designDocContent    主文档 {module}-interface-design.md 内容（用于 §2 接口定义校验）
+ *  @param umlContent          {module}-uml-modeling.md 内容
+ *  @param sdTraceIds          phase2 追踪矩阵 SD 编号集合（可选，为空则跳过 phase2 侧校验）
+ */
+export function checkOutlineSpecEnhance(
+  traceMatrixContent: string,
+  designDocContent: string,
+  umlContent: string,
+  sdTraceIds?: Set<string>,
+): OutlineSpecEnhanceViolations {
+  const v: OutlineSpecEnhanceViolations = { r11: [], r12: [] };
+  // R12: mermaid 块配平（先于 R11，轻量）
+  const mb = countMermaidBlocks(umlContent);
+  if (!mb.balanced) {
+    v.r12.push(`R12 UML mermaid 块配平失败：pairs=${mb.pairs} 但定界未配对`);
+  }
+  if (mb.pairs === 0) {
+    v.r12.push('R12 UML mermaid 块缺失：uml-modeling.md 无 ```mermaid 代码块');
+  }
+  // R11: 追踪矩阵一致性
+  const hasSection2 = /^##\s+2[.\s]/m.test(designDocContent);
+  if (!hasSection2) v.r11.push('R11 追踪矩阵一致性失败：主文档缺 §2 接口定义节');
+  const rows = parseMarkdownTable(traceMatrixContent);
+  if (rows.length === 0) {
+    v.r11.push('R11 追踪矩阵为空：traceability-matrix.md 无数据行');
+    return v;
+  }
+  for (const row of rows) {
+    const intf = row['INTF 编号'] ?? '';
+    const sd = row['对应 SD 编号'] ?? '';
+    const loc = row['设计落点§'] ?? '';
+    if (intf && !/^INTF-/.test(intf)) v.r11.push(`R11 INTF 编号格式失败：${intf}`);
+    if (sd && !/^SD-/.test(sd)) v.r11.push(`R11 对应 SD 编号格式失败：${sd}`);
+    if (loc && !/^§?\s*\d/.test(loc)) v.r11.push(`R11 设计落点§ 引用失败：${intf} → ${loc}（须指向主文档 §2 接口定义）`);
+    if (sdTraceIds && sd && !sdTraceIds.has(sd)) v.r11.push(`R11 phase2 追踪矩阵 SD 缺失：${sd}`);
+  }
+  return v;
+}
