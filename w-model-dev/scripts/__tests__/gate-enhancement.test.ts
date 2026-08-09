@@ -19,6 +19,7 @@ import { checkRequirementGraph, type GraphShape } from '../graph-logic.js';
 import { checkRequirementCoverage, type CoverageShape, type CoverageCheckOptions } from '../coverage-logic.js';
 import { checkExemption, type ExemptionShape } from '../exemption-logic.js';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -873,5 +874,58 @@ describe('Phase 3 概要设计结构校验', () => {
     files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
     const v = checkPhaseSpecStructure(3, dir, mkFs(files));
     expect(v.refs.some(m => m.includes('主文档 glob'))).toBe(true);
+  });
+});
+
+// ==================== 第 38 轮 Phase 3 结构校验经 checkArtifactGate 生效 ====================
+// checkArtifactGate 内部经 nodeFsAdapter 真实读盘（不可注入内存 fs），故用 node:fs + os.tmpdir
+// 构造真实产物目录，正反双向断言 phase=3 分支被触发（缺陷态：reasons 无任何 structure 消息）。
+describe('Phase 3 结构校验经 checkArtifactGate 生效', () => {
+  // phase=3 合法 RTM（PHASE_TRACE_FIELDS[3]=description/designDoc/acceptanceTest，测试层不强制）
+  const matrix: RTMMatrixShape = {
+    rows: [{
+      requirementId: 'REQ-001',
+      description: '登录',
+      designDoc: 'SD-3.1',
+      codeModule: '',
+      unitTest: '',
+      integrationTest: '',
+      systemTest: '',
+      acceptanceTest: 'UAT-001',
+    }],
+    executionSummary: {
+      unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+      integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+    },
+  };
+
+  it('phase=3 + specDir 合法目录 → 零 structure 违反；删 1 个引用文件 → 含 structure 违反', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'phase3-gate-'));
+    try {
+      const dir = path.join(tmp, 'docs', 'phase3-outline');
+      fs.mkdirSync(dir, { recursive: true });
+      const module = 'blog-system';
+      const refs = ['interface-contract', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'];
+      // 主文档：6 个引用块 + §0 SSOT 头四项
+      const spec =
+        refs.map(r => `> 详见 [x](./${module}-${r}.md)`).join('\n') +
+        '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+      for (const r of refs) fs.writeFileSync(path.join(dir, `${module}-${r}.md`), '');
+      fs.writeFileSync(path.join(dir, `${module}-interface-design.md`), spec);
+      fs.writeFileSync(path.join(dir, `${module}-discipline-dod.md`), Array(9).fill('- [ ] x').join('\n'));
+
+      // 正向：合法 7 文件产物 → structure 零违反
+      const ok = checkArtifactGate(matrix, { phaseOption: 3, specDir: dir });
+      expect(ok.reasons.some(r => r.startsWith('structure'))).toBe(false);
+
+      // 反向：删 1 个引用文件 → structure 违反出现（证明 phase=3 分支被触发，false-pass 已闭合）
+      fs.rmSync(path.join(dir, `${module}-uml-modeling.md`));
+      const bad = checkArtifactGate(matrix, { phaseOption: 3, specDir: dir });
+      expect(bad.reasons.some(r => r.startsWith('structure'))).toBe(true);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

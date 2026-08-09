@@ -413,10 +413,10 @@ export function checkArtifactGate(
   }
   if (reasons.length > 0) return failureResult(reasons);
 
-  // 第 37/38 轮：phase=1/2 且提供 specDir 时做规格/设计结构校验
+  // 第 37/38 轮：phase=1/2/3 且提供 specDir 时做规格/设计结构校验
   // （置于 RTM 早退检查后：RTM 结构损坏时直接失败，不叠加 spec 校验；spec 违反仅进 reasons，不影响覆盖率计算）
   let specStructureViolations: RequirementSpecStructureViolations | undefined;
-  if ((phase === 1 || phase === 2) && options?.specDir) {
+  if ((phase === 1 || phase === 2 || phase === 3) && options?.specDir) {
     specStructureViolations = checkPhaseSpecStructure(phase, options.specDir, nodeFsAdapter);
     for (const m of [...specStructureViolations.refs, ...specStructureViolations.ssot, ...specStructureViolations.dod]) {
       reasons.push(m);
