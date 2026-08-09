@@ -1436,10 +1436,10 @@ sequenceDiagram
 
 | Persona | 角色定位 | W 模型阶段 | 主要 `targetKind` | 输出格式 |
 |---|---|---|---|---|
-| **code-reviewer** | 资深工程师，五轴代码审查 | 阶段 5 编码 | `file` | Critical / Required / Optional / Nit / FYI 分级发现项 + 复审结论 |
+| **code-reviewer** | 资深工程师，五轴代码审查 | 阶段 5 编码 | `code` | Critical / Required / Optional / Nit / FYI 分级发现项 + 复审结论 |
 | **test-engineer** | QA 工程师，测试策略与覆盖率分析 | 阶段 4 详细设计（单测设计）/ 阶段 6 集成测试 / 阶段 7 系统测试 | `test` | 覆盖率缺口清单 + Prove-It 测试 + 优先级（Critical / High / Medium / Low） |
-| **security-auditor** | 安全工程师，OWASP + STRIDE 威胁建模 | 阶段 7 系统测试（安全子项） | `file` / `design` | Critical / High / Medium / Low / Info 分级漏洞 + PoC + 修复建议 |
-| **performance-auditor** | 性能工程师，性能基线与回归 | 阶段 7 系统测试（性能子项） | `file` / `design` | Critical / High / Medium / Low / Info 分级瓶颈 + Metric-Honesty Rule（禁止编造指标） |
+| **security-auditor** | 安全工程师，OWASP + STRIDE 威胁建模 | 阶段 7 系统测试（安全子项） | `code` / `design` | Critical / High / Medium / Low / Info 分级漏洞 + PoC + 修复建议 |
+| **performance-auditor** | 性能工程师，性能基线与回归 | 阶段 7 系统测试（性能子项） | `code` / `design` | Critical / High / Medium / Low / Info 分级瓶颈 + Metric-Honesty Rule（禁止编造指标） |
 
 > 性能 Persona 借鉴 addyosmani `web-performance-auditor`，但**适配 W 模型后端场景**：默认无 Lighthouse / CrUX 工件时退化为「源代码结构反模式扫描」，所有发现标注 `potential impact`；只有当用户提供 k6 / JMeter 等工具产出 JSON 时才填入 measured 值。这是 addyosmani「Metric-Honesty Rule」的直接吸收。
 
