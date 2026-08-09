@@ -8,24 +8,20 @@
 
 ## 开发环境准备
 
-本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，但仅声明 `tsx` 作为开发依赖（用于运行 `w-model-dev/scripts/*.ts`），无构建步骤、无 `src/`、无测试框架。
+本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，仅声明 `tsx` 作为开发依赖（用于运行 `w-model-dev/scripts/*.ts`）+ vitest 测试框架，无构建步骤、无 `src/`、无编程式 SDK。
 
 ```bash
 # 1. 克隆仓库
 git clone <repo-url>
 cd Software_Engineering_W_Development_Model_Skills_Pack
 
-# 2. 安装开发依赖（仅 tsx）
+# 2. 安装开发依赖（tsx / ajv / eslint-plugin-security / vitest 等）
 npm install
-# 之后即可用 npm run self-test / check:verifier / check:gate 快捷运行
 
 # 3. 启用本地推送前门禁（一次性，写入本地 .git/config）
 npm run setup:hooks
 # 等价于 git config core.hooksPath .githooks
 # 启用后每次 git push 会自动跑回归基线，详见下方「本地推送前门禁」一节
-
-# 或不安装依赖，按需用 npx tsx 拉取（适合一次性使用）
-npx tsx w-model-dev/scripts/self-test.ts
 ```
 
 技能资产主体（`SKILL.md` / `references/` / `templates/` / `examples/`）是纯 Markdown，无需任何运行时；`w-model-dev/scripts/*.ts` 是自包含 TypeScript，仅依赖 `tsx` 运行 ESM。
@@ -47,43 +43,41 @@ git checkout -b fix/issue-xxx
 - **单一职责**：每个 `references/phase-N-*.md` 只描述一个阶段，每个脚本只做一件事
 - **类型安全**：`w-model-dev/scripts/*.ts` 启用 TypeScript 严格风格，避免 `any`
 - **自包含**：脚本不得 import `src/` 或任何外部业务模块，仅依赖本目录内文件与 Node 标准库
+- **逻辑/IO 分离**：校验逻辑放 `*-logic.ts`（纯函数），CLI 入口放 `check-*.ts`（IO 抽离）；新增校验规则优先改 logic 层
 - **中文注释**：注释使用中文（与现有风格一致），标识符用英文
 - **避免过度工程**：只实现必要的功能，不为假设的未来需求设计
 
 ### 3. 验证校验脚本
 
-修改 `w-model-dev/scripts/*.ts` 后，必须先跑自检脚本，再用端到端方式验证：
+修改 `w-model-dev/scripts/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 跑自检（samples/ 目录下 213 条样本：19 Verifier + 19 Gate + 28 Graph + 10 Coverage + 7 Exemption + 14 TLA + 5 Budget + 13 RunLog + 3 Maturity + 2 Checkpoint + 5 Code-TLA + 12 RootCause + 16 Schema + 1 Metadata + 12 BDD + 15 SignatureChain + 4 ArchiveIntegrity + 2 PreventiveReview + 2 TlaBddSync + 3 RoleDispatch + 3 StateMachine + 4 CodegraphQuery + 3 OpsxArtifact + 3 OpenspecArchive + 5 UAT_PATH_MAPPING + 5 DESIGN_CONTRACT）
+# 3.1 单元测试（vitest，34 个 test 文件 / 498 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+npx vitest run
+
+# 3.2 自检基线（samples/ 目录下 249 条样本，覆盖全部 check 脚本的通过 / 失败路径）
 npm run self-test
-# 等价于：npx tsx w-model-dev/scripts/self-test.ts
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
 # 新增校验项时，必须同步增加 samples/ 下通过 / 失败各一条样本并在 self-test.ts 中声明期望
 
-# 3.2 端到端验证（用真实文件走 CLI 入口）
+# 3.3 端到端验证（用真实文件走 CLI 入口）
 # 准备一个最小 VerifierOutput JSON 样本，校验通过 / 失败两条路径都要走通
 npm run check:verifier -- <sample.json>
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误
-
-# 准备一个最小 .w-model/rtm.json，校验工件质量门两条路径
-npm run check:gate -- <project-dir>
-# 退出码 0=通过 / 1=未通过 / 2=输入错误
 ```
 
-> 本仓库不设单元测试框架。校验纯逻辑（`gate-logic.ts` / `verifier-logic.ts`）的正确性
-> 通过 `self-test.ts` + `samples/` 端到端样本验证，二者共同构成回归基线。
->
-> 本仓库**不使用远程 CI**：推送前门禁由本地 git hook 承载，详见下方「本地推送前门禁」。
+> 本仓库的校验正确性由两层保障：
+> - **vitest 单元测试**（`w-model-dev/scripts/__tests__/`）覆盖纯逻辑边界路径，coverage 矩阵见 [`__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md)
+> - **self-test 回归基线**（`samples/` 端到端样本）覆盖各 CLI 的通过 / 失败 / 输入错误三态
 
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑与原 CI 一致的 10 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑与原 CI 一致的 12 项检查；任一退出码不符预期即中止推送：
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（213 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（249 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
@@ -91,8 +85,10 @@ npm run check:gate -- <project-dir>
 | 6 | `npx tsx w-model-dev/scripts/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成） | 0 |
 | 7 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本） | 0 |
 | 8 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本） | 2 |
-| 9 | `npm run check:coverage -- w-model-dev/scripts/samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
-| 10 | `npm run check:exemption -- w-model-dev/scripts/samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
+| 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
+| 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
+| 11 | `npx tsx w-model-dev/scripts/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
+| 12 | `npm audit --audit-level=high`（依赖漏洞扫描，**warn-only 不阻断**；离线/网络失败自动跳过） | — |
 
 **启用方式**（仓库克隆后执行一次即可，配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -119,6 +115,8 @@ npm run prepush
 ```bash
 git push --no-verify
 ```
+
+> Windows 注意：pre-push 依赖 bash。Windows 原生 cmd/PowerShell 无法直接运行，请使用 Git Bash 执行 `npm run prepush`；非 Git Bash 环境下 hook 检测到后自动放行（exit 0），不误报失败。
 
 ### 4. 提交规范
 
@@ -158,8 +156,9 @@ refactor(skill): /wm review 编排指引精简
 ### SSoT 原则
 
 - **设计决策**统一记录在 [`docs/skill-design-document_SSoT.md`](./docs/skill-design-document_SSoT.md)
-- `docs/skill-design-document.md` 仅作为指针，不再独立维护内容
+- `docs/skill-design-document.md` 仅作为指针，不再独立维护内容（文件头部已标注「已废弃独立维护」）
 - 修改设计 → 先改 SSoT → 再改 `w-model-dev/` 资产（`SKILL.md` / `references/` / `scripts/` / `templates/`）→ 最后同步 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `CHANGELOG.md` / `docs/INSTALL.md`
+- **数字一致性**：文档中出现的 self-test 基线数、vitest 测试数、schema 份数、版本号（package.json / SKILL.md frontmatter / skill-metadata.json 三处）必须与实测一致，改动后全仓库 grep 复查
 - **BDD 文档维护**：修改 BDD features 结构 / 状态机七要素 / `bdd-manifest.json` schema / `check-bdd-model.ts` 校验维度时，必须同步更新 SSoT §3.4.14 + `bdd-guide.md` + `bdd-review-checklist.md` + `data-models.md` BDD 数据模型节 + `anti-patterns.md` #29 关联节
 
 ### 变更日志
@@ -171,31 +170,29 @@ refactor(skill): /wm review 编排指引精简
 
 ```
 w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
-├── SKILL.md            # 编排逻辑 + 命令接口 + 架构定位
-├── references/         # 阶段细则 + verifier-spec.md + 数据模型 + RTM 指南 + 质量标准
+├── SKILL.md            # 编排逻辑 + 命令接口 + 架构定位（frontmatter version 与 package.json 镜像）
+├── references/         # 阶段细则 + verifier-spec + 数据模型 + 负面知识库 + 各指南（按需加载）
+├── subagent/           # 人格库（28 个 Markdown 文件，分 engineering/testing/design/product/project 5 类）
+├── schemas/            # JSON Schema (draft-07) 文件（20 份）
 ├── scripts/            # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
-│   ├── gate-logic.ts / check-artifact-gate.ts       # 工件质量门
-│   ├── verifier-logic.ts / check-verifier-output.ts # Verifier 输出校验
-│   ├── graph-logic.ts / check-requirement-graph.ts  # 阶段 1-4 图谱结构门禁
-│   ├── tla-logic.ts / check-tla-model.ts            # 阶段 1-4 TLA+ 行为门禁
-│   ├── code-tla-logic.ts / check-code-tla-consistency.ts  # 阶段 5 代码-TLA+ 一致性回归
-│   ├── bdd-logic.ts / check-bdd-model.ts            # BDD 模型 7 维度校验
-│   ├── budget-logic / run-log-logic / maturity-logic / checkpoint-logic / root-cause-logic  # 闭环校验
-│   ├── schema-loader.ts                              # ajv 单例 + schemas/ 自动加载
-│   ├── self-test.ts                                  # 校验逻辑自检（213 条样本，samples/ 驱动）
-│   ├── __tests__/                                    # vitest 单元测试
-│   └── samples/                                      # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ 等）
-├── templates/          # 文档模板
+│   ├── *-logic.ts / check-*.ts    # 纯逻辑层 + CLI 入口层（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / iceberg-sweep / tla-bdd-sync / role-dispatch / design-contract / coverage / exemption / bdd / state-machine）
+│   ├── schema-loader.ts           # ajv 单例 + schemas/ 自动加载
+│   ├── security-scan.ts           # eslint-plugin-security 扫描 + baseline v2 指纹豁免
+│   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
+│   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
+│   ├── self-test.ts               # 校验逻辑自检（249 条样本，samples/ 驱动）
+│   ├── __tests__/                 # vitest 单元测试（34 个 .test.ts / 498 条 + README.md coverage 矩阵）
+│   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
+├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例
-├── subagent/           # 人格库（28 个 Markdown 文件，分 5 类）
-└── schemas/            # JSON Schema (draft-07) 文件（13 份）
+└── skill-metadata.json # 版本号镜像（与 SKILL.md frontmatter 双写）
 docs/                   # 设计文档统一存放（SSoT、集成设计、安装指南等）
-└── changes/archive/    # 历史端到端调测归档（按时间倒序，最新：2026-07-27-round19-w-model-8-phase-validation/）
+└── changes/archive/    # 历史端到端调测归档（按时间倒序，最新：2026-07-30-round23-w-model-8-phase-validation/）
 ```
 
-> 本仓库不包含 `src/` TypeScript 引擎或 `tests/` 测试套件；根目录的 `package.json` 仅声明 `tsx` 作为开发依赖，不引入构建工具链。
+> 本仓库不包含 `src/` TypeScript 引擎或业务 `tests/` 套件；`w-model-dev/scripts/__tests__/` 是技能脚本自身的单元测试，与 W 模型编排产出的四级测试（单元/集成/系统/验收）无关。
 > `/wm` 命令、状态持久化、RTM 维护均由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成。
-> 原 `w-model-dev-demo/` 参考实现已于第 17 轮 P6 删除，第十九轮调测重建后再次清理；端到端调测产物归档于 `docs/changes/archive/`，独立于技能资产，**不参与 `/wm` 命令编排**，也不被 `check-*-gate.ts` 读取。修改技能资产时无需同步改动归档。
+> 端到端调测产物归档于 `docs/changes/archive/`，独立于技能资产，**不参与 `/wm` 命令编排**，也不被 `check-*-gate.ts` 读取。修改技能资产时无需同步改动归档。
 
 ### 添加新命令
 
@@ -228,10 +225,11 @@ LLM 评审逻辑由 `w-model-dev/` 下的提示词 + 校验脚本承载：
 ## 发布流程
 
 1. 更新 `CHANGELOG.md`，将 `[Unreleased]` 改为版本号 + 日期
-2. 创建 git tag：`git tag v0.x.0`
-3. 推送 tag：`git push origin v0.x.0`
+2. 同步版本号三处：`package.json` `version` + `w-model-dev/SKILL.md` frontmatter `version` + `w-model-dev/skill-metadata.json`（`__tests__/skill-metadata.test.ts` 回归校验一致）
+3. 创建 git tag：`git tag v<version>`（如 `v38.2.0`）
+4. 推送 tag：`git push origin v<version>`
 
-> 本仓库版本号以 git tag 为准；`package.json` 中的 `version` 字段仅作开发记录，不发布到 npm（`private: true`）。
+> 本仓库版本号以 git tag + 三处一致为准；`package.json` 不发布到 npm（`private: true`）。
 
 ## 问题反馈
 

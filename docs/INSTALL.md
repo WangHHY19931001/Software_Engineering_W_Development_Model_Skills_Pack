@@ -28,7 +28,7 @@
   - Node.js ≥20
   - [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
-    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 15 个 `*-logic.ts` 顶部自动 import（runtime 依赖）
+    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import（runtime 依赖）
     - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` — 安全扫描基线（`npm run lint:security` 时使用，devDep）
     - （无 BDD 专属 devDep）— BDD features 场景解析为手写正则（`w-model-dev/scripts/bdd-logic.ts` 的 `parseFeatureFile`），由 `w-model-dev/scripts/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（纯 features 静态校验，无需 Cucumber 运行器）
 
@@ -56,12 +56,12 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 ```
 /path/to/agent/skills/w-model-dev/
-├── SKILL.md            # 入口：YAML frontmatter（name + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界 + Bundled Resources 按需加载契约
+├── SKILL.md            # 入口：YAML frontmatter（name + version + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界 + Bundled Resources 按需加载契约
 ├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + anti-patterns.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南（按需加载，详见 SKILL.md Bundled Resources 表）
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
-├── schemas/            # 19 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract），由 schema-loader.ts 在 logic 层前置加载
+├── schemas/            # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep），由 schema-loader.ts 在 logic 层前置加载
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / tla-bdd-sync / role-dispatch / state-machine）
+│   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / iceberg-sweep / tla-bdd-sync / role-dispatch / design-contract / coverage / exemption / bdd / state-machine / wm-status / metrics-report）
 │   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
 │   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
 │   ├── security-scan.ts         # eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
@@ -70,8 +70,8 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── metrics-report.ts        # 流程度量报告 CLI（run-log + budget 汇总 7 区度量；--from/--to/--phase/--json/--out）
 │   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
 │   ├── lib/cli-error.ts         # exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
-│   ├── self-test.ts             # 回归基线（225 条样本）
-│   └── __tests__/               # vitest 单元测试（34 个 .test.ts / 476 条 + README.md coverage 矩阵）
+│   ├── self-test.ts             # 回归基线（249 条样本）
+│   └── __tests__/               # vitest 单元测试（34 个 .test.ts / 498 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -111,6 +111,9 @@ npm install
 npx tsx "w-model-dev/scripts/check-verifier-output.ts"
 # 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
 
+# 验证回归基线（self-test 249 条样本全部通过）：
+npm run self-test
+
 # 验证安全扫描基线（exit 0 = 无新增风险）：
 npm run lint:security
 ```
@@ -121,6 +124,8 @@ PowerShell：
 npm install
 npx tsx "w-model-dev/scripts/check-verifier-output.ts"
 $LASTEXITCODE  # 预期为 2
+npm run self-test
+$LASTEXITCODE  # 预期为 0
 npm run lint:security
 $LASTEXITCODE  # 预期为 0
 ```
@@ -133,7 +138,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 35.0.0
+version: 38.2.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -179,10 +184,11 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | 编排者-子代理边界（O/A/S/V/G/R） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
 | LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
 | 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
-| JSON Schema 文件（draft-07，19 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
+| 负面知识库（44 条反模式 + 教训） | [../w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md) |
+| JSON Schema 文件（draft-07，20 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/schema-loader.ts](../w-model-dev/scripts/schema-loader.ts) |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
-| 回归基线脚本（225 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
+| 回归基线脚本（249 条样本） | [../w-model-dev/scripts/self-test.ts](../w-model-dev/scripts/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/verifier-logic.ts](../w-model-dev/scripts/verifier-logic.ts) |
@@ -193,11 +199,13 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | 图谱结构门禁 CLI | [../w-model-dev/scripts/check-requirement-graph.ts](../w-model-dev/scripts/check-requirement-graph.ts) |
 | TLA+ 行为门禁 CLI | [../w-model-dev/scripts/check-tla-model.ts](../w-model-dev/scripts/check-tla-model.ts) |
 | 代码-TLA+ 一致性回归 CLI | [../w-model-dev/scripts/check-code-tla-consistency.ts](../w-model-dev/scripts/check-code-tla-consistency.ts) |
-| Budget / RunLog / Maturity / Checkpoint / RootCause 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts) |
+| BDD 模型门禁 CLI | [../w-model-dev/scripts/check-bdd-model.ts](../w-model-dev/scripts/check-bdd-model.ts) |
+| Budget / RunLog / Maturity / Checkpoint / RootCause / 签名链 / 归档 / R3 / 冰山扫掠 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts) |
 | /wm status 状态快照 CLI + 逻辑 | [../w-model-dev/scripts/wm-status.ts](../w-model-dev/scripts/wm-status.ts) + [../w-model-dev/scripts/wm-status-logic.ts](../w-model-dev/scripts/wm-status-logic.ts) |
 | 流程度量报告 CLI + 逻辑 | [../w-model-dev/scripts/metrics-report.ts](../w-model-dev/scripts/metrics-report.ts) + [../w-model-dev/scripts/metrics-report-logic.ts](../w-model-dev/scripts/metrics-report-logic.ts) |
 | exit 2 错误结构统一（6 类错误码 + ERROR_JSON） | [../w-model-dev/scripts/lib/cli-error.ts](../w-model-dev/scripts/lib/cli-error.ts) |
 | 图谱门禁与收敛准则 | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md) |
+| 冰山扫掠机制说明 | [../w-model-dev/references/iceberg-sweep-guide.md](../w-model-dev/references/iceberg-sweep-guide.md) |
 | 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
 | 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |
 | 设计文档（SSoT） | [./skill-design-document_SSoT.md](./skill-design-document_SSoT.md) |
@@ -219,9 +227,10 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 
 **Q：为什么有 `package.json` + `npm install`？**
 Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/*.ts` 校验脚本：
-- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 15 个 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
+- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免）
 - **runtime**：`tsx`（运行 ESM TypeScript）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，34 个 test 文件 / 498 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
@@ -249,9 +258,9 @@ Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `
 可以跑只读脚本（`npx tsx check-*.ts`、`git status`、`ls`）看退出码用于展示或路由判定，但**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。详见 SSoT [§3.4.5 强制约束](./skill-design-document_SSoT.md)。
 
 **Q：哪里可以看到 W 模型 8 阶段的完整端到端产出样本？**
-参考实现是博客系统后端（Express + TypeScript）的端到端调测，**已归档**。
-- **归档摘要**：[`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)（9 文件：README / proposal / specs / design / tasks / tla-summary / rtm-snapshot / verifier-summary / test-report-snapshot）
-- **原 `w-model-dev-demo/` 目录已于 2026-07-27 第 17 轮 P6 从仓库删除**，仅保留归档摘要
+参考实现是博客系统后端（Express + TypeScript）的端到端调测，**已归档**（按时间倒序，源码不随仓库保留）：
+- **最新一轮（第二十三轮）**：[`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./changes/archive/2026-07-30-round23-w-model-8-phase-validation/)（32 需求 / 630 测试全通过 / 覆盖率 94.99% lines）
+- **第十五轮**：[`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)（9 文件：README / proposal / specs / design / tasks / tla-summary / rtm-snapshot / verifier-summary / test-report-snapshot）
 
 **第十五轮最终调测数字**（详见归档 [`README.md`](./changes/archive/2026-07-26-round15-end-to-end-test/README.md)）：
 - 需求 32（22 REQ + 6 NFR + 4 CON）/ 设计文档 4 / 接口契约 22 INTF / 详细设计节点 75 DD / TLA+ 规格 22（1 L1 + 9 L2 + 7 L3 + 5 L4）/ 源文件 60 TS
@@ -273,8 +282,6 @@ SSoT §10B 保留**第五轮**（2026-07-24）快照作历史对照（77/77 UT /
 > 阶段 5-8 依赖两个外部工具。技能包通过 `ensure-codegraph-opsx.ts` 自动检测并安装，仅自动失败时需用户手动介入。
 
 ### 自动安装
-
-> **状态**：`ensure-codegraph-opsx.ts` 已实现（v24.0.0），可直接使用。自动安装失败时需手动安装（见下方手动安装步骤）。
 
 技能包在阶段 5 进入 CHECKPOINT 时自动运行：
 ```bash
