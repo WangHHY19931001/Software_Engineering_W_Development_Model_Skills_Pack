@@ -1065,6 +1065,19 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | self-test | 基线 225→233 |
 | 版本号 | 38.0.0（三处一致） |
 
+#### 第 38 轮·小轮 B（2026-08-09）：Phase 3 概要设计设计级增强（SSoT §3.4.37）
+
+| 维度 | 内容 |
+|---|---|
+| 触发 | 用户要求系统设计/概要设计/详细设计产出达到 DESIGN.md 级别结构严谨性（分三小轮，本轮为小轮 B：Phase 3） |
+| 修正方案 | 方案 A 全要素对齐：模板 + 参考 + 门禁三层联动，严守概要设计域边界（不落类/方法级） |
+| 新增模板 | 6 独立子模板（templates/interface-design/：interface-contract / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）+ 主模板 interface-design.md 重构（§0 SSOT 头 + 引用块，保留 §1-§3 节号与路由约束节） |
+| 参考扩展 | phase-3-outline-design.md 算法增步骤 1-7 + FM-OD-01~05 + 禁止行为 #6/#7/#8 + 返工路径 + 验收标准 |
+| 门禁扩展 | check-requirement-graph.ts 新增 R11（INTF 追踪矩阵一致性）/R12（UML mermaid 配平）+ --spec-dir 支持 phase=3 glob；check-artifact-gate.ts phase=3 新增结构校验（checkPhaseSpecStructure PHASE_SPEC_LAYOUT 加 phase=3 + modulePrefix 提取泛化） |
+| 阶段边界 | Phase 3 只产模块接口级（接口契约/调用关系/错误码），FM-OD-06 拦截越界落类/方法级 |
+| self-test | 基线 233→241 |
+| 版本号 | 38.1.0（三处一致） |
+
 ---
 
 ## 4. 技能工作流程
@@ -2671,6 +2684,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.34 | 第 36 轮 冰山扫掠深度分析机制 | `schemas/iceberg-sweep.schema.json` + `scripts/iceberg-sweep-logic.ts`（R1-R8）+ `scripts/check-iceberg-sweep.ts`（CLI）+ `scripts/__tests__/iceberg-logic.test.ts`（+7）+ `scripts/samples/iceberg/`（+4 样本）+ `scripts/self-test.ts`（基线 213→217）+ `schemas/run-log.schema.json`（action 25→27）+ `references/iceberg-sweep-guide.md` + `references/anti-patterns.md`（#44，43→44）+ `references/subagent-delegation.md`（R-iceberg 模板）+ `references/root-cause-locator.md`（边界节）+ `SKILL.md`（工作流 9.5 步）+ 版本号三处 36.0.0 | 完整（self-test 217/217、vitest 466、tsc 0 错误） |
 | §3.4.35 | 第 37 轮 Phase 1 设计级别增强 | `templates/requirement-spec.md`（重构：§0 SSOT 头 + §13-§17/附录 A 引用块）+ `templates/requirement-spec/`（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 6 子模板）+ `references/phase-1-requirements.md`（算法步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14）+ `scripts/check-requirement-graph.ts`（R7/R8 + --spec-dir）+ `scripts/check-artifact-gate.ts`（phase=1 引用块/SSOT/DoD 结构校验 + --spec-dir）+ `scripts/self-test.ts`（基线 217→225）+ 版本号三处 37.0.0 | 完整（self-test 225/225、vitest 476、tsc 0 错误） |
 | §3.4.36 | 第 38 轮 Phase 2 设计级增强（小轮 A） |
+| §3.4.37 | 第 38 轮 Phase 3 设计级增强（小轮 B） |
 
 ---
 

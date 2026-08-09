@@ -3,6 +3,19 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [38.1.0] - 2026-08-09
+
+### Added
+- Phase 3 概要设计 6 独立子模板（interface-contract / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）
+- check-requirement-graph.ts R11（INTF 追踪矩阵一致性）/ R12（UML mermaid 块配平）+ --spec-dir 支持 phase=3 glob
+- check-artifact-gate.ts --phase=3 引用块完整性 / §0 SSOT 头 / DoD 清单校验
+
+### Changed
+- interface-design.md 主模板重构（§0 SSOT 头 + 引用块串联，保留 §1-§3 既有节号）
+- phase-3-outline-design.md 算法增步骤 1-7 + FM-OD-01~05 + 禁止行为 #6/#7/#8
+- verifier-spec.md completeness 维度新增 Phase 3 结构评审项
+- self-test 基线 233→241；版本号 38.0.0 → 38.1.0
+
 ## [38.0.0] - 2026-08-09
 
 ### Added
