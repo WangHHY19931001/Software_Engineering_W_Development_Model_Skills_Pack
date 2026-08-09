@@ -41,7 +41,7 @@
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南） | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `.cursor/skills/` | Cursor 技能包（23 个中文适配技能；含 security-review 源码级安全扫描、codegraph-exploration 约束 #20 修改前影响分析、performance-review 性能评审） | 安全/性能评审、阶段 5-8 修改前 codegraph 影响分析场景按技能触发语义选用 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
-| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 12 项门禁（self-test + 门禁脚本退出码 + security-scan + npm audit warn-only），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG） | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` 后会触发；Git Bash 下正常执行门禁，仅纯 cmd/PowerShell 放行 |
+| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 13 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit warn-only），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 
 门禁脚本测试：
 - `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，34 个 .test.ts / 498 条）
@@ -67,7 +67,7 @@ npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --gr
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
 
-# 手动跑推送前门禁（不实际推送，12 项门禁检查；Windows 请用 Git Bash）
+# 手动跑推送前门禁（不实际推送，13 项门禁检查；Windows 请用 Git Bash，WSL 可直接跑）
 npm run prepush
 
 npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1；npx tsx w-model-dev/scripts/security-scan.ts --regenerate 可重生成 baseline

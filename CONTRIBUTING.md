@@ -73,7 +73,7 @@ npm run check:verifier -- <sample.json>
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑与原 CI 一致的 12 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑与原 CI 一致的 13 项检查；任一退出码不符预期即中止推送：
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
@@ -88,7 +88,8 @@ npm run check:verifier -- <sample.json>
 | 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 | 11 | `npx tsx w-model-dev/scripts/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
-| 12 | `npm audit --audit-level=high`（依赖漏洞扫描，**warn-only 不阻断**；离线/网络失败自动跳过） | — |
+| 12 | `npx vitest run`（单元测试全量，34 files / 498 tests） | 0 |
+| 13 | `npm audit --audit-level=high`（依赖漏洞扫描，**warn-only 不阻断**；离线/网络失败自动跳过） | — |
 
 **启用方式**（仓库克隆后执行一次即可，配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -117,6 +118,7 @@ git push --no-verify
 ```
 
 > Windows 注意：pre-push 依赖 bash。**Git Bash（Git for Windows 自带）下会正常执行门禁**；仅纯 cmd/PowerShell（无 bash 解释器）环境无法执行，hook 检测到后给出指引并放行（exit 0），不误报失败。请使用 Git Bash 运行 `npm run prepush`。
+> **WSL / 双平台**：仓库 node_modules 若在 Windows 侧安装，WSL/Linux 下运行门禁前，pre-push 会自动调用 [`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh) 补装对应平台的原生二进制（esbuild / rolldown，通过 `npm pack` + 解压，绕过 npm 依赖树以免破坏另一平台二进制），保证 Windows 与 WSL 共用同一份 node_modules 均可跑通门禁。
 
 ### 4. 提交规范
 
