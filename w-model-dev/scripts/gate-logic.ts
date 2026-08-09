@@ -309,10 +309,14 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
     mainSuffix: '-system-design.md',
     refs: ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'],
   },
+  3: {
+    mainSuffix: '-interface-design.md',
+    refs: ['interface-contract', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'],
+  },
 };
 
 /** Phase N 设计/规格结构校验（第 38 轮泛化）：引用块完整性 + §0 SSOT 头 + DoD 清单
- *  @param phase  1 或 2（3/4 由后续小轮扩展）
+ *  @param phase  1/2/3（4 由后续小轮扩展）
  *  @param specDir  docs/phase{N}-{name}/ 目录
  *  @param fs       文件系统注入 { readFileSync; existsSync; readdirSync }，便于单测 mock
  */
@@ -324,10 +328,10 @@ export function checkPhaseSpecStructure(
   const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [] };
   const layout = PHASE_SPEC_LAYOUT[phase];
   if (!layout) {
-    v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2）`);
+    v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2/3）`);
     return v;
   }
-  // 主文档定位：phase=1 固定文件名；phase=2 按 *-system-design.md glob
+  // 主文档定位：phase=1 固定文件名；phase≥2 按 *{mainSuffix} glob
   let mainPath: string | undefined;
   if (phase === 1) {
     mainPath = path.join(specDir, layout.mainSuffix);
@@ -344,8 +348,8 @@ export function checkPhaseSpecStructure(
     return v;
   }
   const spec = String(fs.readFileSync(mainPath));
-  // module 前缀提取（phase=2 时用于引用文件名校对）
-  const modulePrefix = phase === 2 ? path.basename(mainPath).replace(/-system-design\.md$/, '') : '';
+  // module 前缀提取（phase≥2 时用于引用文件名校对，通用去掉主文档后缀）
+  const modulePrefix = phase === 1 ? '' : path.basename(mainPath).slice(0, -layout.mainSuffix.length);
   for (const ref of layout.refs) {
     const refName = phase === 1 ? ref : `${modulePrefix}-${ref}.md`;
     if (!spec.includes(`](./${refName})`)) v.refs.push(`structure: 主文档缺引用块 → ${refName}`);
