@@ -13,6 +13,10 @@
  *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
  *     --spec-dir  Phase 2 时按 *-system-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
  *
+ * 用法（第 38 轮小轮 B 新增 R11/R12）：
+ *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=3 --spec-dir=docs/phase3-outline
+ *     --spec-dir  Phase 3 时按 *-interface-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
+ *
  * 参数：
  *   graph.json   graph.json 或 consolidated.json 文件路径
  *   --phase      校验阶段（1-4），控制追溯项数量，默认从 graph.currentPhase 读取
@@ -31,12 +35,14 @@
 import * as path from 'node:path';
 import {
   checkDesignSpecEnhance,
+  checkOutlineSpecEnhance,
   checkRequirementGraph,
   checkRequirementSpecEnhance,
   extractRefTargets,
   recalculatePassed,
   type DesignSpecEnhanceViolations,
   type GraphShape,
+  type OutlineSpecEnhanceViolations,
   type RequirementSpecEnhanceViolations,
 } from './graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from './lib/read-json-or-exit.js';
@@ -96,10 +102,14 @@ async function main(): Promise<void> {
     }
   }
 
-  // 解析 --spec-dir（第 37 轮 R7/R8 + 第 38 轮 R9/R10）
+  // 解析 --spec-dir（第 37 轮 R7/R8 + 第 38 轮 R9/R10 + 第 38 轮小轮 B R11/R12）
+  // 注意：parsed 须在 spec-dir 块之前读取（phase=3 分支需从 graph.json SD 节点提取 SD 集合）
+  const abs = path.resolve(file);
+  const parsed = await readJsonOrExit(file);
   const specDirArg = process.argv.slice(3).find(a => a.startsWith('--spec-dir='));
   let specEnhanceViolations: RequirementSpecEnhanceViolations | undefined;
   let designEnhanceViolations: DesignSpecEnhanceViolations | undefined;
+  let outlineEnhanceViolations: OutlineSpecEnhanceViolations | undefined;
   if (specDirArg) {
     const specDir = specDirArg.split('=')[1];
     if (specDir) {
@@ -110,33 +120,53 @@ async function main(): Promise<void> {
       const readOrEmpty = (p: string): string => {
         try { return fs.readFileSync(p, 'utf-8'); } catch { return ''; }
       };
-      if (phase === 2) {
-        // 第 38 轮：Phase 2 module 前缀 glob 匹配（每类恰 1 个文件）
-        const mainFile = readdirSync(specDir).find(f => f.endsWith('-system-design.md'));
+      if (phase === 2 || phase === 3) {
+        // 第 38 轮：Phase 2/3 module 前缀 glob 匹配（每类恰 1 个文件）
+        const mainSuffix = phase === 2 ? '-system-design.md' : '-interface-design.md';
+        const mainFile = readdirSync(specDir).find(f => f.endsWith(mainSuffix));
         const traceFile = readdirSync(specDir).find(f => f.endsWith('-traceability-matrix.md'));
         const umlFile = readdirSync(specDir).find(f => f.endsWith('-uml-modeling.md'));
         const traceContent = traceFile ? readOrEmpty(path.join(specDir, traceFile)) : '';
         const umlContent = umlFile ? readOrEmpty(path.join(specDir, umlFile)) : '';
-        designEnhanceViolations = checkDesignSpecEnhance(
-          traceContent,
-          mainFile ? readOrEmpty(path.join(specDir, mainFile)) : '',
-          umlContent,
-          rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined,
-        );
+        if (phase === 2) {
+          designEnhanceViolations = checkDesignSpecEnhance(
+            traceContent,
+            mainFile ? readOrEmpty(path.join(specDir, mainFile)) : '',
+            umlContent,
+            rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined,
+          );
+        } else {
+          // phase=3：SD 集合从 graph.json SD 节点提取
+          const sdIds = Array.isArray((parsed as GraphShape)?.nodes)
+            ? new Set((parsed as GraphShape).nodes.filter(n => n.type === 'SD').map(n => n.id))
+            : undefined;
+          outlineEnhanceViolations = checkOutlineSpecEnhance(
+            traceContent,
+            mainFile ? readOrEmpty(path.join(specDir, mainFile)) : '',
+            umlContent,
+            sdIds,
+          );
+        }
         // 引用块完整性：主文档引用块指向的 6 文件须存在（以主文档 module 前缀核对）
+        const pushRefError = (rule: 'r9' | 'r11', msg: string): void => {
+          if (rule === 'r9') designEnhanceViolations?.r9.push(msg);
+          else outlineEnhanceViolations?.r11.push(msg);
+        };
         if (mainFile) {
-          const module = mainFile.replace(/-system-design\.md$/, '');
-          const subRefs = ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'];
+          const module = mainFile.slice(0, -mainSuffix.length);
+          const subRefs = phase === 2
+            ? ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling']
+            : ['interface-contract', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'];
           for (const sub of subRefs) {
             if (!fs.existsSync(path.join(specDir, `${module}-${sub}.md`))) {
-              designEnhanceViolations.r9.push(`R9 引用块断裂：主文档引用 ${module}-${sub}.md 但文件不存在`);
+              pushRefError(phase === 2 ? 'r9' : 'r11', `R${phase === 2 ? 9 : 11} 引用块断裂：主文档引用 ${module}-${sub}.md 但文件不存在`);
             }
           }
-          if (readdirSync(specDir).filter(f => f.endsWith('-system-design.md')).length !== 1) {
-            designEnhanceViolations.r9.push(`R9 module 前缀匹配失败：主文档须恰 1 个 *-system-design.md`);
+          if (readdirSync(specDir).filter(f => f.endsWith(mainSuffix)).length !== 1) {
+            pushRefError(phase === 2 ? 'r9' : 'r11', `R${phase === 2 ? 9 : 11} module 前缀匹配失败：主文档须恰 1 个 *${mainSuffix}`);
           }
         } else {
-          designEnhanceViolations.r9.push('R9 module 前缀匹配失败：未找到 *-system-design.md 主文档');
+          pushRefError(phase === 2 ? 'r9' : 'r11', `R${phase === 2 ? 9 : 11} module 前缀匹配失败：未找到 *${mainSuffix} 主文档`);
         }
       } else {
         // 第 37 轮：Phase 1 固定文件名（保留既有行为）
@@ -153,9 +183,6 @@ async function main(): Promise<void> {
       }
     }
   }
-
-  const abs = path.resolve(file);
-  const parsed = await readJsonOrExit(file);
 
   const effectivePhase = phase ?? (parsed as GraphShape)?.currentPhase ?? 1;
   if (!phase && ![1, 2, 3, 4].includes(effectivePhase)) {
@@ -218,6 +245,14 @@ async function main(): Promise<void> {
     for (const msg of designEnhanceViolations.r9) result.violations.push(msg);
     for (const msg of designEnhanceViolations.r10) result.violations.push(msg);
     // phase=2 图非纯 REQ 图，recalculatePassed 第二参传 false 即非多根模式
+    recalculatePassed(result, false);
+  }
+
+  // 第 38 轮小轮 B：合并 R11/R12 Phase 3 概要设计产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
+  if (outlineEnhanceViolations) {
+    for (const msg of outlineEnhanceViolations.r11) result.violations.push(msg);
+    for (const msg of outlineEnhanceViolations.r12) result.violations.push(msg);
+    // phase=3 图非纯 REQ 图，recalculatePassed 第二参传 false 即非多根模式
     recalculatePassed(result, false);
   }
 
