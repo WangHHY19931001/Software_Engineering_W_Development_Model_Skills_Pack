@@ -11,7 +11,7 @@
   - DoD 维度 5→7：README + definition-of-done（七维度自检）+ SSoT §10.6 补第七维度「签名链完整性」
   - 核心操作行为 6→7：README + SSoT §4A/§10A
   - schema 份数 19→20：anti-patterns + data-models（补 iceberg-sweep 清单行）；SSoT 轮次记录删历史计数
-  - exit-2 脚本数 29→27：AGENTS；check-code-tla-consistency 退出码补充 2=输入错误
+  - check-code-tla-consistency 退出码补充 2=输入错误（exit-2 脚本数维持 29：24 check-*.ts + 5 工具）
   - pre-push 注释 12→13；反模式范围 #1~#44；角色表述「六类核心角色 + R-iceberg 变体」；glossary action 枚举对齐 27 值；CONTRIBUTING/.gitignore devDeps 描述
 - 版本号 38.2.0 → 38.3.0（三处同步）
 
