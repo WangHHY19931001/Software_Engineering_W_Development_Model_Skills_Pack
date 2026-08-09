@@ -16,6 +16,7 @@
     "lint:security": "tsx w-model-dev/scripts/security-scan.ts",
     "wm:status": "tsx w-model-dev/scripts/wm-status.ts",
     "wm:metrics": "tsx w-model-dev/scripts/metrics-report.ts",
+    "check:docs-consistency": "tsx w-model-dev/scripts/check-docs-consistency.ts",
     "prepush": "bash .githooks/pre-push --force"
   },
   "devDependencies": {
