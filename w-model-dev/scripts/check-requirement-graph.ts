@@ -183,7 +183,7 @@ async function main(): Promise<void> {
     }
     if (rtmR6Added) {
       // 重算 passed（与 graph-logic.ts 汇总逻辑一致）
-      const isPureReqGraph = (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+      const isPureReqGraph = Array.isArray((parsed as GraphShape)?.nodes) && (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
       recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
     }
   }
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
       return true;
     });
     if (result.violations.length < beforeLen) {
-      const isPureReqGraph = (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+      const isPureReqGraph = Array.isArray((parsed as GraphShape)?.nodes) && (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
       recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
     }
   }
@@ -209,7 +209,7 @@ async function main(): Promise<void> {
     for (const msg of specEnhanceViolations.r7) result.violations.push(msg);
     for (const msg of specEnhanceViolations.r8) result.violations.push(msg);
     // checkRequirementGraph 不感知 R7/R8，重算 passed（与 graph-logic.ts 汇总逻辑一致）
-    const isPureReqGraph = (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+    const isPureReqGraph = Array.isArray((parsed as GraphShape)?.nodes) && (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
     recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
   }
 
@@ -285,7 +285,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  if (process.exitCode !== 0) return; // 已由 readJsonClassified 设置 exitCode，避免覆盖 ERROR_JSON
+  // exitCode 已设置（exitWithError/readJsonClassified 已输出 ERROR_JSON）→ 不覆盖；
+  // 未设置（异常发生在门禁判定前，如缺 nodes 的 TypeError）→ 显式报错 exit 2，防静默放行
+  if (process.exitCode != null) return;
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',
