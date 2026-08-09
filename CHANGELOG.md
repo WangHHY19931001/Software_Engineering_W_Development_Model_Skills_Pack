@@ -3,6 +3,18 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [38.3.0] - 2026-08-10
+
+### Changed
+- 文档一致性修正（设计文档 `docs/superpowers/specs/2026-08-10-doc-consistency-correction-design.md`）：
+  - targetKind 枚举统一（testcase/file → test/code）：verifier-spec §2/§2.1/§6/§7.3/§7.4/§7.4A/§8 + command-reference + agent-personas + SSoT（含 Persona 表与 JSON 示例）
+  - DoD 维度 5→7：README + definition-of-done（七维度自检）+ SSoT §10.6 补第七维度「签名链完整性」
+  - 核心操作行为 6→7：README + SSoT §4A/§10A
+  - schema 份数 19→20：anti-patterns + data-models（补 iceberg-sweep 清单行）；SSoT 轮次记录删历史计数
+  - exit-2 脚本数 29→27：AGENTS；check-code-tla-consistency 退出码补充 2=输入错误
+  - pre-push 注释 12→13；反模式范围 #1~#44；角色表述「六类核心角色 + R-iceberg 变体」；glossary action 枚举对齐 27 值；CONTRIBUTING/.gitignore devDeps 描述
+- 版本号 38.2.0 → 38.3.0（三处同步）
+
 ## [38.2.0] - 2026-08-09
 
 ### Added
