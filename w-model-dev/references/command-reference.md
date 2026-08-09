@@ -56,7 +56,7 @@
 - **前置**：存在已放行详细设计和单元测试设计。
 - **读取**（S 子代理）：`phase-5-coding.md`、`rtm-guide.md`；质量检查时追加 `quality-standards.md`。
 - **产出**（S 子代理）：实现代码、单元测试、测试与覆盖率输出、代码检查结果、RTM 代码映射。
-- **评审**（V 子代理）：按 `targetKind=file` 路由 `code-reviewer` Persona（五轴评审）。
+- **评审**（V 子代理）：按 `targetKind=code` 路由 `code-reviewer` Persona（五轴评审）。
 - **门禁**（G 子代理）：跑 `check-verifier-output.ts` 回填证据。
 - **失败**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败时留在阶段 5。评审未通过由 O 分派 S 返工。
 - **状态**（O）：代码评审、单元测试和覆盖率门槛均满足且用户放行后才能进入“集成测试”。
@@ -69,7 +69,7 @@
 - **真实回填**（S 子代理）：`result` 必须与测试输出一致；缺证据或冲突时拒绝回填。**编排者不得直接回填 RTM 执行结果**。
 - **`pass`**（S 子代理）：仅将实际通过用例标为通过，并更新 `executionSummary.<type>Test`。
 - **`fail`**（S 子代理）：记录失败用例、根因和关联模块，更新 RTM，按阶段参考回退。
-- **评审**（V 子代理）：按 `targetKind=testcase` 路由 `test-engineer` Persona。
+- **评审**（V 子代理）：按 `targetKind=test` 路由 `test-engineer` Persona。
 - **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 8 跑 `check-artifact-gate.ts`。
 - **产出**（S 子代理）：使用 `templates/test-report.md` 生成测试报告。
 - **禁止**：未执行即标通过、LLM 估算结果、`result` 缺省、把 pending 当 passed、**编排者越权回填 RTM 实体**（反模式 #10）。
@@ -78,7 +78,7 @@
 
 返回评审指引，不由命令本身调用 LLM。**编排者不得自评**——评审必须分派 V 子代理执行（反模式 #10）：
 
-1. 编排者（O）按前缀识别目标：`REQ-` → requirement；`DESIGN-` → design；`UAT-/ST-/IT-/UT-` → testcase；否则为 file。
+1. 编排者（O）按前缀识别目标：`REQ-` → requirement；`DESIGN-` → design；`UAT-/ST-/IT-/UT-` → test；否则为 code。
 2. 编排者（O）读取 `verifier-spec.md` 对应子标准与提示词占位符。
 3. 编排者（O）输出 `targetKind`、目标、子标准、提示词占位符和以下命令：
 

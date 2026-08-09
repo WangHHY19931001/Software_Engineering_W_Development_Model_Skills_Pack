@@ -135,7 +135,7 @@
 ### 组合
 
 - **直接调用场景**：用户请求对具体改动 / 文件 / PR 的评审。
-- **经 `/wm review` 调用**：`targetKind=file` 时默认路由到本 Persona。
+- **经 `/wm review` 调用**：`targetKind=code` 时默认路由到本 Persona。
 - **禁止从其他 Persona 调用**：若 `security-auditor` 或 `performance-auditor` 发现需更深代码评审，在 `reworkHints` 中以「[建议 code-reviewer 深审] xxx」前缀呈现，由用户或后续 `/wm review` 显式触发。见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
 
 ## Persona 2：test-engineer（QA 工程师 · 测试策略与覆盖率分析）
@@ -243,7 +243,7 @@
 ### 组合
 
 - **直接调用场景**：用户请求测试设计、覆盖率分析或为具体 bug 写 Prove-It 测试。
-- **经 `/wm review` 调用**：`targetKind=testcase` 时路由到本 Persona。
+- **经 `/wm review` 调用**：`targetKind=test` 时路由到本 Persona。
 - **禁止从其他 Persona 调用**：若 `code-reviewer` 发现测试缺口，在 `reworkHints` 中以「[建议 test-engineer 深审] xxx」前缀呈现，由用户或后续 `/wm review` 显式触发。见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
 
 ## Persona 3：security-auditor（安全工程师 · OWASP + STRIDE）
@@ -366,7 +366,7 @@
 ### 组合
 
 - **直接调用场景**：用户请求对具体改动 / 文件 / 系统组件的安全评审。
-- **经 `/wm review` 调用**：`targetKind=file` 且文件涉及安全敏感面（auth / 加密 / 输入校验）时，由 `code-reviewer` 在 `reworkHints` 中建议深审；`targetKind=design` 且涉及安全架构时同理。
+- **经 `/wm review` 调用**：`targetKind=code` 且文件涉及安全敏感面（auth / 加密 / 输入校验）时，由 `code-reviewer` 在 `reworkHints` 中建议深审；`targetKind=design` 且涉及安全架构时同理。
 - **禁止从其他 Persona 调用**：见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
 
 ## Persona 4：performance-auditor（性能工程师 · 性能基线与回归）
@@ -523,7 +523,7 @@
 ### 组合
 
 - **直接调用场景**：用户请求对 Web 应用 / 具体组件 / 路由 / 实时 URL 的性能评审。
-- **经 `/wm review` 调用**：`targetKind=file` 且文件涉及性能热点（热点循环 / DB 查询）时，由 `code-reviewer` 在 `reworkHints` 中建议深审。
+- **经 `/wm review` 调用**：`targetKind=code` 且文件涉及性能热点（热点循环 / DB 查询）时，由 `code-reviewer` 在 `reworkHints` 中建议深审。
 - **禁止从其他 Persona 调用**：见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
 - **不纳入 `/wm test type=验收` 自动 fan-out**：性能审计仅适用于有性能 SLA 的场景，对工具库或 CLI 不适用。在阶段 7 系统测试时由用户显式触发。
 
