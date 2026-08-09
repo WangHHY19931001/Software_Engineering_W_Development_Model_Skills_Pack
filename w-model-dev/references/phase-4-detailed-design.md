@@ -7,6 +7,37 @@
 
 基于概要设计进行类 / 方法级设计，并**同步设计单元测试用例**。详细设计子模块产出类图、数据库设计、方法级定义。
 
+## 详细设计算法
+
+  1. 类设计
+     ├─ 基于概要设计接口契约，产出 docs/phase4-detailed/{module}-class-design.md（类图 + 类定义 + 方法级定义 + 类状态机）
+     ├─ 主文档 §1 引用块指向 class-design.md
+     ├─ 失败: 方法定义缺前置/后置/异常 → 回步骤 1（FM-DD-02）
+     └─ 成功: 类设计完整，主文档 §1 类定义与之对应
+  2. 数据模型设计
+     ├─ 产出 docs/phase4-detailed/{module}-data-model.md（ER 图 + 表结构 + 索引 + store 归属）
+     ├─ 主文档 §2 引用块指向 data-model.md
+     ├─ 失败: 表结构缺索引/关系 / store 归属与 phase3 不一致 → 回步骤 2（FM-DD-03）
+     └─ 成功: 数据模型完整，store 归属与 phase3 一致
+  3. 装配点与测试 seam 声明
+     ├─ 每个设计项声明装配点（中间件链位置等）与测试 seam（HTTP 层/独立实例/白盒）
+     ├─ 失败: 装配点空但 seam 为 HTTP 层 → 回步骤 3（FM-DD-05）
+     └─ 成功: 装配点与 seam 一致性成立
+  4. 术语建模（第 38 轮新增）
+     ├─ 产出 docs/phase4-detailed/{module}-glossary.md（详细设计域术语子集）
+     ├─ 主模板 §4 引用块指向 glossary.md
+     └─ 成功: glossary.md 产出，引用块成立
+  5. 追踪矩阵与行为规格引用（第 38 轮新增）
+     ├─ 产出 docs/phase4-detailed/{module}-traceability-matrix.md（DD×INTF 8 字段 + 测试层级矩阵）
+     ├─ 产出 docs/phase4-detailed/{module}-behavior-spec.md（L4 .feature 引用关系）
+     ├─ 主模板 §5/§6 引用块指向上述独立文件
+     ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 回步骤 5 对齐（FM-DD-04）
+     └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
+  6. Phase 4 工程纪律与 DoD（第 38 轮新增）
+     ├─ 产出 docs/phase4-detailed/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
+     ├─ 主模板 §7 引用块指向 discipline-dod.md
+     └─ 成功: DoD 清单产出，引用块成立
+
 ## 输入
 
 - 《接口设计文档》（阶段 3 产出）
@@ -19,6 +50,13 @@
   - 数据库设计（ER 图、表结构、索引设计）
   - 方法级定义（签名、职责、前置 / 后置条件）
 - 单元测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=单元测试）
+- 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase4-detailed/`，带 `{module}-` 前缀）：
+  - `{module}-class-design.md`：类设计（类图 + 类定义 + 方法级定义 + 类状态机）
+  - `{module}-data-model.md`：数据模型（ER 图 + 表结构 + 索引 + store 归属）
+  - `{module}-glossary.md`：术语表（详细设计域子集）
+  - `{module}-traceability-matrix.md`：详细设计追踪矩阵（DD×INTF 8 字段 + 测试层级矩阵）
+  - `{module}-behavior-spec.md`：行为规格模型（L4 .feature 引用关系）
+  - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
 
 > 路径约定见 [directory-conventions.md](directory-conventions.md)。
 
@@ -39,6 +77,13 @@
 | 单元测试用例 | 套用 `templates/test-case.md` 模板，`type=单元测试`，每个方法 ≥ 1 用例且含 `expect()` 断言 | `docs/phase4-detailed/{module}-unit-test.md` |
 | UML 类图 | 用 Mermaid `classDiagram` 语法产出，符合 UML 规范 | 内嵌于 `docs/phase4-detailed/{module}-detailed-design.md` |
 | ER 图 | 用 Mermaid `erDiagram` 语法产出，含表结构 + 字段 + 索引 + 关系 | 内嵌于 `docs/phase4-detailed/{module}-detailed-design.md` |
+| 类设计 | 套用 `templates/detailed-design/class-design.md` | `docs/phase4-detailed/{module}-class-design.md` |
+| 数据模型 | 套用 `templates/detailed-design/data-model.md` | `docs/phase4-detailed/{module}-data-model.md` |
+| 术语表 | 套用 `templates/detailed-design/glossary.md` | `docs/phase4-detailed/{module}-glossary.md` |
+| 详细设计追踪矩阵 | 套用 `templates/detailed-design/traceability-matrix.md` | `docs/phase4-detailed/{module}-traceability-matrix.md` |
+| 行为规格模型（L4） | 套用 `templates/detailed-design/behavior-spec.md`（引用 .feature，不内联） | `docs/phase4-detailed/{module}-behavior-spec.md` |
+| 工程纪律与 DoD | 套用 `templates/detailed-design/discipline-dod.md` | `docs/phase4-detailed/{module}-discipline-dod.md` |
+| 主设计文档 | 套用 `templates/detailed-design.md`（骨架 + 引用块指向上述 6 文件） | `docs/phase4-detailed/{module}-detailed-design.md` |
 
 **图形语法约束**：类图须体现继承 / 关联 / 依赖关系；ER 图须含主键 / 外键 + 索引标注。禁止以纯文字描述替代图形产出。
 
@@ -120,6 +165,18 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4`
 **断言格式约束**：每个用例必须含 `expect()` 或等价断言，禁止 `// TODO: assert` 占位。
 **边界条件必覆盖清单**：空输入、null、极值（MAX/MIN）、越界（±1）、类型不符、并发竞态（若涉及共享状态）。
 
+## 失败模式矩阵（第 38 轮新增）
+
+| 编号 | 失败模式 | 检测信号 | 处置 |
+|---|---|---|---|
+| FM-DD-01 | 无断言占位用例 | 单元测试用例无 `expect()` 或等价断言 | 回测试用例生成，补全断言（禁止 // TODO: assert） |
+| FM-DD-02 | 方法定义缺前置/后置/异常 | 类方法定义缺前置条件/后置条件/异常任一 | 回步骤 1 补全方法契约 |
+| FM-DD-03 | 表结构缺索引/关系 / store 误用 | 表结构缺索引或关系；store 归属与 phase3 不一致 | 回步骤 2 补全表结构或回 phase3 返工 |
+| FM-DD-04 | 追踪矩阵字段不一致 | traceability-matrix.md 与主文档 §1/§2/phase3 追踪矩阵不一致 | 回步骤 5 对齐追踪矩阵字段 |
+| FM-DD-05 | 装配点与测试 seam 不一致 | 设计项装配点为空但测试 seam 为 HTTP 层 | 回步骤 3 补全装配点或调整 seam |
+
+> 注：FM-DD-06（越过阶段边界回溯重定义接口契约/落编码实现）为越界检测信号，见禁止行为 #9 与返工路径，不单列于上表。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中补登：设计文档列（详细设计）、单元测试列。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
@@ -149,6 +206,10 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4`
 - [ ] 方法级定义含签名、职责、前置 / 后置条件
 - [ ] 单元测试用例覆盖核心逻辑与边界条件
 - [ ] RTM 已补登详细设计与单元测试映射
+- [ ] {module}-class-design.md + {module}-data-model.md 已产出，主文档 §1/§2 引用块成立
+- [ ] {module}-traceability-matrix.md（DD×INTF + 测试层级矩阵）与主文档 §1/§2/phase3 矩阵一致，主文档 §5 引用块成立
+- [ ] {module}-glossary.md + {module}-behavior-spec.md 已产出，主文档 §4/§6 引用块成立
+- [ ] {module}-discipline-dod.md 已产出（DoD ≥ 8 项），主文档 §7 引用块成立
 
 > 🔴 **CHECKPOINT · 阶段门放行**：详细设计 + 单元测试用例产出后暂停。Agent 必须向用户展示「类图 / ER 图 / 方法定义（签名+前置后置条件）/ 单元测试用例（含断言格式 + 边界清单）/ RTM 补登」，由用户确认「放行进入阶段 5」或「返工」。单元测试用例存在无断言占位或边界清单未覆盖 → 一律返工。
 
@@ -167,6 +228,9 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4`
 | 4 | 方法签名缺前置 / 后置条件 | 每个方法必须定义前置条件 + 后置条件 + 异常 |
 | 5 | ER 图缺索引设计 | 表结构必须含字段 + 索引 + 关系 |
 | 6 | 覆盖率评估无阈值 | 必须给出分支覆盖 ≥ 80% 目标 + 边界必覆盖清单 |
+| 7 | 追踪矩阵字段与主文档 §1/§2 / phase3 追踪矩阵不一致 | 步骤 5 须对齐 traceability-matrix.md（FM-DD-04） |
+| 8 | 表结构缺索引/关系 / store 归属与 phase3 不一致 | 步骤 2 须补全表结构与 store 归属（FM-DD-03） |
+| 9 | 越过阶段边界回溯重定义接口契约/落编码实现 | 接口契约属阶段 3、编码属阶段 5，本阶段只产类/数据级（FM-DD-06 禁止越界） |
 
 ## 返工路径
 
@@ -178,6 +242,12 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=4`
 - ER 图缺索引设计 → 回到数据库设计，补全字段 + 索引 + 关系
 - 覆盖率评估无阈值 → 回到测试用例生成算法，给出分支覆盖 ≥ 80% 目标
 - 单元测试依赖外部服务 → 回到并行任务，补全 mock / stub 隔离方案
+- 无断言占位（FM-DD-01）→ 回测试用例生成补全断言
+- 方法契约缺失（FM-DD-02）→ 回步骤 1 补全前置/后置/异常
+- 表结构/store 问题（FM-DD-03）→ 回步骤 2 补全或回 phase3 返工
+- 追踪矩阵不一致（FM-DD-04）→ 回步骤 5 对齐
+- 装配点不一致（FM-DD-05）→ 回步骤 3 补全装配点
+- 越界回溯接口/落编码（FM-DD-06）→ 移除越界内容，接口契约移交阶段 3、编码移交阶段 5
 
 ## 退出状态
 
