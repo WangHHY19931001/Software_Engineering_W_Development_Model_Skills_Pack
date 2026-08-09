@@ -313,10 +313,14 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
     mainSuffix: '-interface-design.md',
     refs: ['interface-contract', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'],
   },
+  4: {
+    mainSuffix: '-detailed-design.md',
+    refs: ['class-design', 'data-model', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod'],
+  },
 };
 
 /** Phase N 设计/规格结构校验（第 38 轮泛化）：引用块完整性 + §0 SSOT 头 + DoD 清单
- *  @param phase  1/2/3（4 由后续小轮扩展）
+ *  @param phase  1/2/3/4
  *  @param specDir  docs/phase{N}-{name}/ 目录
  *  @param fs       文件系统注入 { readFileSync; existsSync; readdirSync }，便于单测 mock
  */
@@ -328,7 +332,7 @@ export function checkPhaseSpecStructure(
   const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [] };
   const layout = PHASE_SPEC_LAYOUT[phase];
   if (!layout) {
-    v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2/3）`);
+    v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2/3/4）`);
     return v;
   }
   // 主文档定位：phase=1 固定文件名；phase≥2 按 *{mainSuffix} glob
@@ -413,10 +417,10 @@ export function checkArtifactGate(
   }
   if (reasons.length > 0) return failureResult(reasons);
 
-  // 第 37/38 轮：phase=1/2/3 且提供 specDir 时做规格/设计结构校验
+  // 第 37/38 轮：phase=1/2/3/4 且提供 specDir 时做规格/设计结构校验
   // （置于 RTM 早退检查后：RTM 结构损坏时直接失败，不叠加 spec 校验；spec 违反仅进 reasons，不影响覆盖率计算）
   let specStructureViolations: RequirementSpecStructureViolations | undefined;
-  if ((phase === 1 || phase === 2 || phase === 3) && options?.specDir) {
+  if ((phase === 1 || phase === 2 || phase === 3 || phase === 4) && options?.specDir) {
     specStructureViolations = checkPhaseSpecStructure(phase, options.specDir, nodeFsAdapter);
     for (const m of [...specStructureViolations.refs, ...specStructureViolations.ssot, ...specStructureViolations.dod]) {
       reasons.push(m);
