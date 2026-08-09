@@ -503,6 +503,12 @@ V 子代理须在 `summary` 中包含：
 >   - uml-modeling.md mermaid 四图配平且与主文档 §1/§3 对应（对应 R10 门禁）
 >   - discipline-dod.md DoD 清单 ≥ 8 项且已勾选核对
 >   - 未越过阶段边界落接口契约/类定义（FM-SD-06 检测）
+> - 阶段 3 概要设计结构完整性（第 38 轮小轮 B）：
+>   - 主文档 §2/§4/§5/§6/§7/附录 A 引用块指向的 6 个独立文件（interface-contract / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）均存在且内容非空
+>   - traceability-matrix.md 字段与主文档 §2 接口定义 / phase2 追踪矩阵一致（对应 R11 门禁）
+>   - uml-modeling.md mermaid 三图配平且与主文档 §1/§2 对应（对应 R12 门禁）
+>   - discipline-dod.md DoD 清单 ≥ 8 项且已勾选核对
+>   - 未越过阶段边界落类/方法级实现（FM-OD-06 检测）
 
 ### 7.2 设计（targetKind = `design`）
 
