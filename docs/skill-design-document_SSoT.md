@@ -1089,7 +1089,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | 门禁扩展 | check-requirement-graph.ts 新增 R13（DD 追踪矩阵一致性）/R14（UML mermaid 配平，class-design + data-model 双源）+ --spec-dir 支持 phase=4 glob；check-artifact-gate.ts phase=4 新增结构校验（PHASE_SPEC_LAYOUT 加 phase=4 + checkArtifactGate 调用条件补 phase=4） |
 | 阶段边界 | Phase 4 只产类/数据级（类图/ER 图/方法级/表结构），FM-DD-06 拦截越界回溯接口/落编码 |
 | self-test | 基线 241→249 |
-| 版本号 | 38.2.0（三处一致） |
+| 版本号 | 38.3.0（三处一致） |
 
 ---
 
