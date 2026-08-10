@@ -167,6 +167,19 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 | 1001–10000 | 考虑拆（须在规格「拆解决策」节声明理由） | `"consider-split"` |
 | > 10000 | **必须拆**（不拆即反模式 #16） | `"must-split"` → 拆完后改 `"split-done"` |
 
+## 建模场景库（第 41 轮四源吸收，凤凰架构 + GoF）
+
+以下场景为 TLA+ 状态机建模的成熟参考模式（可作阶段 1-4 建模起点）：
+
+| 场景 | 状态集 | 转移 | 不变式要点 |
+|---|---|---|---|
+| 断路器（凤凰 failure.md） | CLOSED / OPEN / HALF OPEN | CLOSED→OPEN（请求数+故障率双阈值）；OPEN→HALF OPEN（超时探测）；HALF OPEN→CLOSED（探测成功）/→OPEN（探测失败） | 双阈值触发条件；HALF OPEN 探测放行不违反不变式 |
+| TCC 事务（凤凰 distributed.md） | INIT / TRYING / CONFIRMING / CANCELLING / DONE | TRY 冻结资源；Confirm/Cancel 二选一 | 幂等：Confirm/Cancel 重复执行收敛；冻结资源不可双重使用 |
+| SAGA（凤凰 distributed.md） | RUNNING / FAILED / COMPENSATING / DONE | 正向 Ti 失败 → 反向 Ci 补偿；区分正向恢复（重试 Ti）与反向恢复（执行 Ci） | 补偿操作满足交换律；补偿后到达终态 |
+| State 模式（GoF） | 各状态对象 | 事件驱动状态切换 | 每个状态的事件处理完备（无未处理事件死锁） |
+
+> Safety vs Liveness（凤凰架构 consensus 术语）：不变式 = Safety（坏事永不发生）；收敛/最终一致 = Liveness 弱化形式（好事终将发生）。TLA+ 中不变式断言对应 Safety，模型检查的"可达性/活性"对应 Liveness。
+
 ## 文件头规范（强制）
 
 每个 `.tla` 文件**必须**以结构化注释头开始。缺失任一字段，`check-tla-model.ts` 退出码 1（反模式 #16）。
