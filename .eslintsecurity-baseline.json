@@ -311,6 +311,13 @@
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
+      "hash": "683f0335f9a6f2a242460d3d16216b68ae59db36bd0275c8d08b5bdd848608a5",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/__tests__/run-log-logic.test.ts",
+      "line": 295,
+      "reason": "Generic Object Injection Sink"
+    },
+    {
       "hash": "8af0ce3635e1804a1eee8eca1686cfb0a9a0209cd225356d0e7ddeb85be3b193",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/schema-validation.test.ts",
@@ -1378,57 +1385,71 @@
       "hash": "9be42378c7fa25d7aa00ffc78ec19171181db3c8462dafd79ecbb7519447c810",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 122,
+      "line": 123,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "0767857a08ff164f6f46fa4e186feb80859e0c4f5cac04af74d394f8e522dcb8",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 284,
+      "line": 285,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "fe78cfda0635a390631e04c7cc58c5c856c08c719c3c0bb522ddf817e41e5103",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 291,
+      "line": 292,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "3b0fbd9ea87fbdf72530d0056b843efbeb0e7ec4d4683989de1219f5ef38a402",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 405,
+      "line": 406,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "a22f035be5b76f559bba804c8a93f59708a4c705f2525ff87453c58b9810dad4",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 409,
+      "line": 410,
       "reason": "Generic Object Injection Sink"
     },
     {
       "hash": "a8009f82a18d8e535c4da671ed683f0479111cdb7cac59569126e6e4c4c5812f",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 410,
+      "line": 411,
       "reason": "Generic Object Injection Sink"
     },
     {
       "hash": "6873121b081c2525034b901cd70cae1dfc1c04662e39958178795424e966df93",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 418,
+      "line": 419,
       "reason": "Generic Object Injection Sink"
     },
     {
       "hash": "d92122aac1340014761009e5b4092aafdd260c7abcdd49a05bdadc29bb1ebf4a",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/run-log-logic.ts",
-      "line": 419,
+      "line": 420,
       "reason": "Generic Object Injection Sink"
+    },
+    {
+      "hash": "f810693d1fb38d9e6d56c9cb184573d01ff118c379953442f659160f2f44c7a4",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/run-log-logic.ts",
+      "line": 447,
+      "reason": "Variable Assigned to Object Injection Sink"
+    },
+    {
+      "hash": "980196459d3b488aa2b707bf5bb64a88090842c312b61e6d09253ffe50ff6e36",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/run-log-logic.ts",
+      "line": 469,
+      "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "c30a53f232c2d05d550e09c00f1eebdfec2e93d2d3fd19af58c0888ce9041f60",
