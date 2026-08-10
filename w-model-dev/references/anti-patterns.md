@@ -705,7 +705,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（软检测——由 V 评审人工核验断言与需求对应关系）
 
-**关联**：SSoT §3.4.39（[39.0.0] 新增）；[testing-anti-patterns.md](../../.cursor/skills/test-driven-development/testing-anti-patterns.md)「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd-guide.md](bdd-guide.md) P1 批新增节）
+**关联**：SSoT §3.4.39（[39.0.0] 新增）；[testing-anti-patterns.md](../../.cursor/skills/test-driven-development/testing-anti-patterns.md)「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd-guide.md](bdd-guide.md)「记叙性优先」节）
 
 ## #46 只给审计权不给修正权（第 39 轮新增）
 
