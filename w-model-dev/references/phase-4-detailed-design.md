@@ -52,7 +52,7 @@
   - 方法级定义（签名、职责、前置 / 后置条件）
 - 单元测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=单元测试）
 - 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase4-detailed/`，带 `{module}-` 前缀）：
-  - `{module}-class-design.md`：类设计（类图 + 类定义 + 方法级定义 + 类状态机）
+  - `{module}-class-design.md`：类设计（类图 + 类定义 + 方法级定义 + 类状态机 + 方案权衡）
   - `{module}-data-model.md`：数据模型（ER 图 + 表结构 + 索引 + store 归属）
   - `{module}-glossary.md`：术语表（详细设计域子集）
   - `{module}-traceability-matrix.md`：详细设计追踪矩阵（DD×INTF 8 字段 + 测试层级矩阵）
