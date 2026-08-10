@@ -3,6 +3,14 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [40.1.0] - 2026-08-10
+
+### Added
+- 三源吸收 P1（10 项）：多评审分歧上缴人裁决（subagent-persona-matrix）、面向智能体的 API 契约准则（mcp-builder）、R3 来源时效/权威性校验（verifier-spec）、MASS 三阶段优化（hill-climbing-guide）、升级触发条件显式化（operational-recovery）、上下文修剪优先级（context-management-guide）、坏注释黑名单（format-conventions）、类设计规则（quality-standards + phase-4）、对象/数据结构与得墨忒耳律（chinese-code-review + phase-4）
+
+### Changed
+- 版本号 40.0.0 → 40.1.0（6 处同步）
+
 ## [40.0.0] - 2026-08-10
 
 ### Added
