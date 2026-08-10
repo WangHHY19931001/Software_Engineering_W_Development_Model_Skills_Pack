@@ -1129,6 +1129,25 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+### 3.4.41 第 41 轮：四源吸收（软件设计哲学 / 凤凰架构 / GoF 设计模式 / 失控）
+
+**目的**：补四类空白——设计质量判据（深/浅模块、信息泄露、复杂三症状）、方案词汇表（设计模式目录）、架构决策框架（CAP/微服务粒度/容错/安全）、机制说理层（蜂群共识/元控制/约束创造）。
+
+**P0（41.0.0，11 项）**：code-smells-checklist 组 X + 设计判据条目、quality-standards 类设计规则补充 + 设计投资、format-conventions 接口注释清单 + 命名一致性三要求、phase-3/4 备选方案对比 + 设计自检、verifier-spec 评审提问、class-design 模板「方案权衡」列、候选反模式登记（四源-α/β/γ/δ）。
+
+**P1（41.1.0，10 项）**：design-patterns-catalog（新 reference）、refactoring-catalog 目标结构列、phase-2 CAP/粒度决策矩阵、quality-standards 容错/日志、verifier-spec Architecture/Security 评审、tla-plus-guide 断路器/TCC-SAGA 场景、security-review 认证授权维度、phase-6 补偿/故障注入测试。
+
+**P2（41.2.0，10 项）**：subagent-persona-matrix 证据加权共识、verifier-spec 编辑者/调节器说理、anti-patterns 候选转正评审、hill-climbing 爬山法、tla-plus 不连续系统穷举、operational-recovery 混沌预期/超标重写、quality-standards 约束创造/满意化、phase-7 可观测性验收、SKILL.md 受控失控/clockware-swarmware。
+
+**关键决策**：设计判据双轨（静态工具 + LLM 语义评审）；「方案权衡」为模板提示级不触发脚本；候选反模式不正式编号；说理层并入既有文档不新增哲学参考；吸收决策记录见 references/four-source-absorption.md。
+
+| 维度 | 内容 |
+|---|---|
+| self-test | 基线 249 不变 |
+| 版本号 | 41.0.0（P0 批，三处一致） |
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -2741,6 +2760,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | 3.4.40 第 40 轮三源吸收（P0） | 坏味道清单 / 编码规范 / 测试规范 / agentic 4 项 / 反模式 #47 | `w-model-dev/references/code-smells-checklist.md` + phase-5/quality-standards/verifier-spec/operational-recovery 等新增节 + `check-run-log.ts` R8 + `anti-patterns.md` #47 | 已落地（40.0.0） |
 | 3.4.40 第 40 轮三源吸收（P1） | 多评审分歧上缴人 / MCP 契约准则 / R3 来源校验 / MASS 三阶段 / 升级时效 / 修剪优先级 / 坏注释黑名单 / 类设计规则 / 对象数据结构 | `w-model-dev/references/subagent-persona-matrix.md` + mcp-builder / verifier-spec / hill-climbing-guide / operational-recovery / context-management-guide / format-conventions / quality-standards + phase-4 / chinese-code-review + phase-4 | 已落地（40.1.0） |
 | 3.4.40 第 40 轮三源吸收（P2） | concurrency-guide / refactoring-catalog / 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明 / 级联（9 项） | `w-model-dev/references/concurrency-guide.md` + `refactoring-catalog.md` + estimation-guide / run-log.schema.json+data-models+run-log-logic / verifier-spec / phase-5 / operational-recovery / subagent-persona-matrix 新增节 | 已落地（40.2.0） |
+| 3.4.41 第 41 轮四源吸收（P0） | 组 X 复杂度症状 / 设计判据条目 / 类设计规则补充 / 设计投资 / 接口注释清单 / 命名一致性三要求 / 备选方案对比 / 方案权衡列 / 候选反模式登记 | code-smells-checklist + quality-standards + format-conventions + phase-3/4 + verifier-spec + class-design 模板 + anti-patterns | 已落地（41.0.0） |
 
 ---
 
