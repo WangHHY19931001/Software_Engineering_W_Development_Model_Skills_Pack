@@ -597,6 +597,8 @@ V 子代理须在 `summary` 中包含：
 
 > 注：Performance 轴映射到 `conformance` 是 W 模型适配——`conformance` 原指「符合代码规范」，扩展为「符合性能与规范双约束」。若项目有独立性能子标准，可在 [phase-7-system-test.md](phase-7-system-test.md) 单独评审（k6 性能基线）。
 
+- **来源时效/权威性校验（第 40 轮三源吸收，agentic Ch14）**：评审中引用的依据/参考来源（规范文档、需求行、外部资料）须校验时效性与权威性——过期来源（如 2020 博客 vs 2025 政策）与冲突来源须显式标注；知识缺口（无来源支撑的断言）须记录为证据缺失。落点：R3 preventive review 的 reliability 维度检查项。
+
 #### 7.4A.2 Severity 标签
 
 `reworkHints` 数组每条建议**必须**以下列前缀之一开头，便于返工优先级排序：
