@@ -56,7 +56,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 - [ ] `Project.status` / `Requirement.status` 与磁盘产物一致
 - [ ] 阶段门 CHECKPOINT 放行时，run-log `acknowledgedDecisions` 已填入 ≥1 关键决策摘要（非"确认"/"同意"）
 - [ ] 无未提交的产物文件（`git status` 工作树干净，或显式说明未提交原因）
-- [ ] 未命中 [anti-patterns.md](anti-patterns.md) 46 条流程反模式、F1~F10 失败模式与 O1~O6 运维失败模式
+- [ ] 未命中 [anti-patterns.md](anti-patterns.md) 47 条流程反模式、F1~F10 失败模式与 O1~O6 运维失败模式
 - [ ] L2+ 项目：阶段门放行后已审查 Loop 4 产出的 HarnessImprovementReport（若有）；appliedSignals/deferredSignals/rejectedSignals 已填入 applicationStatus
 - [ ] 修正权验收测试：用户能在过程中间修改产物而不用整体重跑（不能 = 仅审计权，反模式 #46）
 - [ ] 完成度矩阵自检：产品化轴（文档/测试/错误处理/边界/可维护性/可观测性）与系统集成轴（接口对齐/版本兼容/多环境/部署回滚/监控告警/备份）逐项打勾，任一轴缺项即未到 9x
