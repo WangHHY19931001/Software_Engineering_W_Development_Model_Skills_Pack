@@ -1135,7 +1135,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **P0（41.0.0，11 项）**：code-smells-checklist 组 X + 设计判据条目、quality-standards 类设计规则补充 + 设计投资、format-conventions 接口注释清单 + 命名一致性三要求、phase-3/4 备选方案对比 + 设计自检、verifier-spec 评审提问、class-design 模板「方案权衡」列、候选反模式登记（四源-α/β/γ/δ）。
 
-**P1（41.1.0，10 项）**：design-patterns-catalog（新 reference）、refactoring-catalog 目标结构列、phase-2 CAP/粒度决策矩阵、quality-standards 容错/日志、verifier-spec Architecture/Security 评审、tla-plus-guide 断路器/TCC-SAGA 场景、security-review 认证授权维度、phase-6 补偿/故障注入测试。
+**P1（41.1.0，10 项）**：design-patterns-catalog（新建 reference，GoF 23 模式目录 + 对照表 + 决策辅助）、refactoring-catalog 目标结构列（坏味道→手法→GoF 模式闭环）、code-smells 补子类爆炸/继承破坏封装/Getter-Setter 浅方法、phase-2 架构决策框架（CAP/微服务粒度/事务模式/前提四问）、quality-standards 容错设计检查清单 + 日志规范、verifier-spec Architecture 评审问题（8 类重新设计原因/Visitor 判据/交集并集/网关轻量）+ Security 评审（认证/授权/凭证/传输）、tla-plus-guide 建模场景库（断路器/TCC/SAGA/State）+ Safety/Liveness 术语、security-review 认证授权传输维度、phase-6 补偿/故障注入测试用例。
 
 **P2（41.2.0，10 项）**：subagent-persona-matrix 证据加权共识、verifier-spec 编辑者/调节器说理、anti-patterns 候选转正评审、hill-climbing 爬山法、tla-plus 不连续系统穷举、operational-recovery 混沌预期/超标重写、quality-standards 约束创造/满意化、phase-7 可观测性验收、SKILL.md 受控失控/clockware-swarmware。
 

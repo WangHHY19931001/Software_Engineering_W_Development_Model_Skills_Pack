@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 41.0.0
+version: 41.1.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -267,6 +267,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | clean-code-refactoring-agentic-absorption.md | 三源吸收（Clean Code / Refactoring 2 / Agentic）决策记录查询 |
 | concurrency-guide.md | 阶段 5 编码涉及并发/多线程/异步代码时 |
 | refactoring-catalog.md | 编码/重构时查重构手法或坏味道→手法映射 |
+| design-patterns-catalog.md | 阶段 3/4 设计时选型参考 / V 评审 Architecture 轴模式恰当性基准 |
 | four-source-absorption.md | 第 41 轮四源吸收（软件设计哲学 / 凤凰架构 / GoF / 失控）决策记录查询 |
 
 ### scripts/（按需读取，仅供 G 子代理执行）
