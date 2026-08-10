@@ -223,7 +223,7 @@ if (subCriteria.length !== expected.length) {
   - **R15 计划坚持度**：产出是否偏离既定计划/票据（对照 tickets.md frontier / opsx propose）。
   - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 subagent-persona-matrix）。
   - **R17 增量价值**：新增角色/子代理是否带来增量价值（无价值则提示精简）。
-  - 实现：R14-R17 为可选维度（`subCriteria` 追加 `collaboration` 组），仅当 `VerifierOutput.targetKind ∈ {design, code}` 且产物含多角色来源时启用；不破坏既有 R1-R13。
+  - 实现：R14-R17 为评审附加检查项，四问结论记录于 VerifierOutput 的 `summary` 字段（如 `collaborationReview: { handoff, planAdherence, roleFit, incrementalValue }`），**不进入 `subCriteria` 数组**——§2.3 与 verifier-logic.ts 强制 subCriteria 数量固定为 5（不允许子集/超集），追加会破坏 `check-verifier-output.ts` 校验。R14-R17 仅当 `VerifierOutput.targetKind ∈ {design, code}` 且产物含多角色来源时启用；不破坏既有 R1-R13。
 
 ## 4. 连续评分（Continuous Scoring）
 
