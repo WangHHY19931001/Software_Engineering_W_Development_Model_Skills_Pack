@@ -3,6 +3,24 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [39.1.0] - 2026-08-10
+
+### Added
+- 操作行为第 8 条 Structure Over Persuasion（结构性约束优先于提示词）；操作行为 7 → 8 级联（SKILL.md/README/SSoT/docs-consistency）
+- 约束 #21 回归测试强制钩子（任何 agent 改动代码后必须跑回归测试）+ AGENTS.md 登记
+- 并行三闸 + 能否通读测试 + 验证账单（dispatching-parallel-agents）
+- 原文装填不转述（subagent-delegation 上下文装填原则）
+- 记叙性优先：测试断言不是金标准 + 失败先归因（bdd-guide / test-driven-development）
+- 独立评审会话模板（verifier-spec / requesting-code-review）
+- 止损三规则（同错弃线 / 30% 预算重评 / 静默失败优先）+ 会话 50-70% 重开（operational-recovery）
+- 辩解义务强制（root-cause-locator）
+- 增量集成纪律（phase-5-coding）
+- 环境契约前置自检（quality-standards）
+
+### Changed
+- P0 遗留术语统一（修正权验收测试 / bdd-guide 记叙性优先引用回检）
+- 版本号 39.0.0 → 39.1.0（7 处同步）
+
 ## [39.0.0] - 2026-08-10
 
 ### Added

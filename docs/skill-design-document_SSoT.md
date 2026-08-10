@@ -1089,11 +1089,11 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | 门禁扩展 | check-requirement-graph.ts 新增 R13（DD 追踪矩阵一致性）/R14（UML mermaid 配平，class-design + data-model 双源）+ --spec-dir 支持 phase=4 glob；check-artifact-gate.ts phase=4 新增结构校验（PHASE_SPEC_LAYOUT 加 phase=4 + checkArtifactGate 调用条件补 phase=4） |
 | 阶段边界 | Phase 4 只产类/数据级（类图/ER 图/方法级/表结构），FM-DD-06 拦截越界回溯接口/落编码 |
 | self-test | 基线 241→249 |
-| 版本号 | 39.0.0（三处一致） |
+| 版本号 | 39.1.0（三处一致） |
 
 #### 第 39 轮（2026-08-10）：人月神话吸收（SSoT §3.4.39）
 
-> 设计 spec：[2026-08-10-mythical-man-month-absorption-design.md](./superpowers/specs/2026-08-10-mythical-man-month-absorption-design.md)（已批准，P0 批实施中）。本轮吸收源为《agent 时代的人月神话》（Brooks《人月神话》2026 年逐章重写，19 章）；对技能包做 26 项概念覆盖审计后，按 P0→P2 分三批吸收。**纯文档为主 + 少量脚本联动**（反模式计数 44→46），不新增子流程/门禁脚本/并行轨，self-test 基线不变。
+> 设计 spec：[2026-08-10-mythical-man-month-absorption-design.md](./superpowers/specs/2026-08-10-mythical-man-month-absorption-design.md)（已批准，P1 批已实施（39.1.0））。本轮吸收源为《agent 时代的人月神话》（Brooks《人月神话》2026 年逐章重写，19 章）；对技能包做 26 项概念覆盖审计后，按 P0→P2 分三批吸收。**纯文档为主 + 少量脚本联动**（反模式计数 44→46），不新增子流程/门禁脚本/并行轨，self-test 基线不变。
 
 | 维度 | 内容 |
 |---|---|
@@ -1103,12 +1103,12 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | P0-2 主刀人设 + 修正权 | 新增反模式 #46（只给审计权不给修正权）；`subagent-delegation.md` 新增「主刀职责映射表」节（主刀=用户/O 代表人的判断，支持角色→agent，目的持有者溯源）；`SKILL.md` 核心原则补「主刀与修正权」段（与编排者最小化互补：O 不实施、用户保留修正权）；`definition-of-done.md` 补「修正权验收测试」 |
 | P0-3 九倍矩阵完成度 | `definition-of-done.md` 补「完成度矩阵自检」（产品化轴×系统集成轴，任一轴缺项即未到 9x）；`phase-5-coding.md` 补任务分配规则（产品化→agent，系统集成判断→人持有）；`phase-6-integration-test.md` 补「集成判断由人持有」 |
 | P0-4 人机分工线 | `SKILL.md` 核心原则补「人机分工线」段（能形式化→agent，不能形式化→人；阶段门/CHECKPOINT 即分工线落地）；`definition-of-done.md` 第七维度「理解证据」补注（acknowledgedDecisions = 判据持有者在形式化门禁之外的记叙性判断） |
-| P1（39.1.0，10 项） | 并行三闸+通读测试+验证账单（dispatching-parallel-agents / subagent-delegation）、原文装填不转述（subagent-delegation）、记叙性优先+失败先归因（bdd-guide / test-driven-development）、结构性约束优先（SKILL.md 操作行为第 8 条）、独立评审会话模板（verifier-spec / requesting-code-review）、止损三规则（同错 N 次弃线 / 30% 预算重评 / 静默失败优先，operational-recovery）、会话 50-70% 重开（operational-recovery）、辩解义务强制（root-cause-locator）、回归测试强制钩子（SKILL.md 新增约束 #21）+ 增量集成纪律（phase-5-coding）、环境契约前置自检（quality-standards） |
+| P1（39.1.0，10 项） | 并行三闸+通读测试+验证账单（dispatching-parallel-agents / subagent-delegation）、原文装填不转述（subagent-delegation）、记叙性优先+失败先归因（bdd-guide / test-driven-development）、结构性约束优先（SKILL.md 操作行为第 8 条）、独立评审会话模板（verifier-spec / requesting-code-review）、止损三规则（同错 N 次弃线 / 30% 预算重评 / 静默失败优先，operational-recovery）、会话 50-70% 重开（operational-recovery）、辩解义务强制（root-cause-locator）、回归测试强制钩子（SKILL.md 新增约束 #21）+ 增量集成纪律（phase-5-coding）、环境契约前置自检（quality-standards）（已实施，39.1.0） |
 | P2（39.2.0，6 项） | 新 reference：`estimation-guide.md`（记账/mini-spike/禁"编码×系数"外推）、`context-management-guide.md`（KV 缓存友好/上下文分层/档位路由/自污染 10-30%）；白箱 vs 黑箱工具选型（SKILL.md）；里程碑设计到无法自欺（writing-plans）；侦察 vs 产出两阶段（hill-climbing-guide）；目的注释写 why 不写 what（format-conventions） |
 | P3 候选（暂缓） | 银弹批判/本质困难体检、判据持有审计（依赖 run-log 数据形态设计）、worktree 警示（与现有技能立场相反，待用户确认取舍） |
 | 决策记录 | 新建 `w-model-dev/references/mythical-man-month-absorption.md`（23 项映射 + 章节出处 + 与约束/反模式关系） |
 | self-test | 基线 249 不变 |
-| 版本号 | 39.0.0（P0 批，三处一致；P1→39.1.0 / P2→39.2.0 排期） |
+| 版本号 | 39.1.0（P1 批，三处一致；P2→39.2.0 排期） |
 
 ---
 
@@ -2720,7 +2720,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.36 | 第 38 轮 Phase 2 设计级增强（小轮 A） |
 | §3.4.37 | 第 38 轮 Phase 3 设计级增强（小轮 B） |
 | §3.4.38 | 第 38 轮 Phase 4 设计级增强（小轮 C） |
-| §3.4.39 | 第 39 轮 人月神话吸收（P0：反指标游戏 #45 / 主刀与修正权 #46 / 九倍矩阵完成度 / 人机分工线；P1：并行三闸·原文装填·记叙性优先·结构性约束·独立评审·止损三规则·会话生命周期·辩解义务·回归约束 #21·环境契约自检；P2：estimation-guide / context-management-guide 新 reference + 白箱黑箱·里程碑元规则·侦察vs产出·目的注释） | `references/mythical-man-month-absorption.md`（决策记录，新建）+ `references/anti-patterns.md`（#45/#46，计数 44→46）+ `.cursor/skills/dispatching-parallel-agents/SKILL.md`（删"调整测试期望"）+ `.cursor/skills/test-driven-development/testing-anti-patterns.md`（改断言凑绿条目）+ `references/subagent-delegation.md`（主刀职责映射表/原文装填/验证账单）+ `references/definition-of-done.md`（修正权验收/九倍矩阵自检）+ `SKILL.md`（主刀与修正权/人机分工线 + 操作行为第 8 条 + 约束 #21 + 白箱黑箱）+ `references/phase-5-coding.md`（任务分配/增量集成）+ `references/phase-6-integration-test.md`（集成判断人持有）+ `references/bdd-guide.md`（记叙性优先）+ `references/verifier-spec.md`（独立评审模板）+ `references/operational-recovery.md`（止损三规则/会话重开）+ `references/root-cause-locator.md`（辩解义务）+ `references/quality-standards.md`（环境契约自检）+ `references/hill-climbing-guide.md`（侦察vs产出）+ `references/format-conventions.md`（目的注释）+ `references/estimation-guide.md` + `references/context-management-guide.md`（新建）+ `.cursor/skills/writing-plans/SKILL.md`（里程碑元规则）+ `scripts/docs-consistency-logic.ts`（maxAntiPattern 44→46）+ 版本号三处 39.0.0（P1→39.1.0 / P2→39.2.0 排期） | 设计 spec 已批准（2026-08-10-mythical-man-month-absorption-design.md）；P0 实施中 |
+| §3.4.39 | 第 39 轮 人月神话吸收（P0：反指标游戏 #45 / 主刀与修正权 #46 / 九倍矩阵完成度 / 人机分工线；P1：并行三闸·原文装填·记叙性优先·结构性约束·独立评审·止损三规则·会话生命周期·辩解义务·回归约束 #21·环境契约自检；P2：estimation-guide / context-management-guide 新 reference + 白箱黑箱·里程碑元规则·侦察vs产出·目的注释） | `references/mythical-man-month-absorption.md`（决策记录，新建）+ `references/anti-patterns.md`（#45/#46，计数 44→46）+ `.cursor/skills/dispatching-parallel-agents/SKILL.md`（删"调整测试期望"）+ `.cursor/skills/test-driven-development/testing-anti-patterns.md`（改断言凑绿条目）+ `references/subagent-delegation.md`（主刀职责映射表/原文装填/验证账单）+ `references/definition-of-done.md`（修正权验收/九倍矩阵自检）+ `SKILL.md`（主刀与修正权/人机分工线 + 操作行为第 8 条 + 约束 #21 + 白箱黑箱）+ `references/phase-5-coding.md`（任务分配/增量集成）+ `references/phase-6-integration-test.md`（集成判断人持有）+ `references/bdd-guide.md`（记叙性优先）+ `references/verifier-spec.md`（独立评审模板）+ `references/operational-recovery.md`（止损三规则/会话重开）+ `references/root-cause-locator.md`（辩解义务）+ `references/quality-standards.md`（环境契约自检）+ `references/hill-climbing-guide.md`（侦察vs产出）+ `references/format-conventions.md`（目的注释）+ `references/estimation-guide.md` + `references/context-management-guide.md`（新建）+ `.cursor/skills/writing-plans/SKILL.md`（里程碑元规则）+ `scripts/docs-consistency-logic.ts`（maxAntiPattern 44→46）+ 版本号三处 39.1.0（P2→39.2.0 排期） | 设计 spec 已批准（2026-08-10-mythical-man-month-absorption-design.md）；P1 已实施（39.1.0） |
 
 ---
 
