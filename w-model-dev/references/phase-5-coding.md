@@ -176,6 +176,14 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - 票据 ID（NN）不写入 RTM（RTM 保持现有 schema，不污染数据模型）
 - 票据的 Next 分支实现必须与 TLA+ Action 名对应（与约束"TLA+ Next 分支 PascalCase ↔ code camelCase"协同）
 
+### 票据动态重排规则（第 40 轮三源吸收）
+
+> 吸收自 Agentic Design Patterns ch20「动态重新优先级」：根据新事件/截止日期动态重排任务优先级。
+
+- **重排触发**：阻塞依赖解除 / 新需求事件 / 评审发现高风险 ticket / 外部截止日期变化时，允许按 frontier 重新排序 tickets。
+- **重排纪律**：重排只改执行顺序，不改票据内容契约（垂直切片/blocking edges 不变）；重排须在 tickets.md 记录原因。
+- **与需求变更的关系**：重排不替代需求变更流程——新需求须先进阶段 1（或 Loop 3 事件接驳），不得直接插队改票。
+
 ### Out of 票据化的例外
 - 单一 bug 修复（直接走 R→S-fix 返工循环）
 - 单一 TLA+ 不变式违反修复（同上）
