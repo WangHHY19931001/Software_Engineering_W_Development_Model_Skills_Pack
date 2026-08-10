@@ -259,6 +259,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | bdd-patterns-examples.md | 撰写 features 时按需加载 |
 | toolbox.md | 「I have X, I want Y → use Z」决策表 |
 | mythical-man-month-absorption.md | 第 39 轮人月神话吸收（反指标游戏 / 主刀与修正权 / 九倍矩阵 / 人机分工线）决策记录查询 |
+| estimation-guide.md | 估算任务 / 编制实施计划前做工作量估算时 |
 
 ### scripts/（按需读取，仅供 G 子代理执行）
 
