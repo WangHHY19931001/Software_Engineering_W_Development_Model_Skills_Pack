@@ -270,3 +270,73 @@ describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
     expect(keys.length).toBe(3);
   });
 });
+
+// ==================== R8 轨迹模板校验辅助 ====================
+// makeEntry：接收部分字段拼默认值构造 RunLogEntry（schema 前置校验要求全部必需字段，
+// additionalProperties=false，故逐字段构建 + 仅透传显式提供的可选字段）。
+
+function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
+  const base: RunLogEntry = {
+    runId: 'run-default',
+    timestamp: '2026-07-31T00:00:00Z',
+    phase: 5,
+    phaseName: '编码',
+    action: 'produce',
+    role: 'S',
+    duration_s: 10,
+    tokens: 100,
+    estimated: false,
+    subagentSpawns: 0,
+    gateExitCode: null,
+    outcome: 'success',
+  };
+  const merged: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v !== undefined) merged[k] = v;
+  }
+  return merged as RunLogEntry;
+}
+
+describe('run-log R8 轨迹模板校验（第 40 轮三源吸收：agentic Ch19 轨迹符合性）', () => {
+  it('已完成阶段 gate 在 checkpoint 之后 → 违规', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 1, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 1, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({ runId: 'r3', phase: 1, action: 'checkpoint', role: 'O', outcome: 'success', acknowledgedDecisions: ['ok'] }),
+      makeEntry({ runId: 'r4', phase: 1, action: 'gate', role: 'G', outcome: 'success', gateExitCode: 0, script: 'check-artifact-gate.ts' }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.some((v) => /R8.*gate.*checkpoint/.test(v))).toBe(true);
+  });
+
+  it('V 失败后无 rootcause 直接 S-fix → 违规（反模式 #18 轨迹检测）', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 1, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 1, action: 'review', role: 'V', outcome: 'fail' }),
+      makeEntry({ runId: 'r3', phase: 1, action: 'fix', role: 'S', outcome: 'rework', basedOnReport: 'RC-1' }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.some((v) => /R8.*rootcause/.test(v))).toBe(true);
+  });
+
+  it('checkpoint 非阶段最后记录 → 违规', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 1, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 1, action: 'checkpoint', role: 'O', outcome: 'success', acknowledgedDecisions: ['ok'] }),
+      makeEntry({ runId: 'r3', phase: 1, action: 'review', role: 'V', outcome: 'success' }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.some((v) => /R8.*checkpoint/.test(v))).toBe(true);
+  });
+
+  it('理想轨迹 produce→V→G→checkpoint 通过', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 1, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 1, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({ runId: 'r3', phase: 1, action: 'gate', role: 'G', outcome: 'success', gateExitCode: 0, script: 'check-artifact-gate.ts' }),
+      makeEntry({ runId: 'r4', phase: 1, action: 'checkpoint', role: 'O', outcome: 'success', acknowledgedDecisions: ['ok'] }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.filter((v) => v.startsWith('R8'))).toHaveLength(0);
+  });
+});
