@@ -48,6 +48,15 @@
 | 测试评审 | 6-7 | testing-api-tester + testing-performance-benchmarker + testing-reality-checker + testing-test-results-analyzer |
 | 根因报告复审（targetKind=rootcause） | 全阶段 | testing-reality-checker + engineering-incident-response-commander + testing-evidence-collector |
 
+### 多评审分歧上缴人裁决（第 40 轮三源吸收）
+
+> 吸收自 Agentic Design Patterns ch7「辩论与共识」：多角度独立评审可降低单评审者偏见。分歧不自动共识，上缴人裁决。
+
+- **触发**：高争议决策（评审间结论冲突 / 质量等级跨 A-B / 方案取舍重大）时，V-lead 分派 2+ V-persona **独立评审**（不共享中间状态）。
+- **分歧纪要**：评审结论分歧时产出 `分歧纪要`（各 persona 结论 + 冲突点 + 各方依据），随 VerifierOutput 提交用户。
+- **不自动共识**：禁止为消除分歧而强行折中/投票；分歧上缴用户裁决（CHECKPOINT 人裁决机制）。
+- **与 R14-R17 的关系**：多评审属协作评审场景，交接/计划/角色匹配/增量价值四问仍须回答（verifier-spec R14-R17）。
+
 ---
 
 ## 4. 分派数量约束
