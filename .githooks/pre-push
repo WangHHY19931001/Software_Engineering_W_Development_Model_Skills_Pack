@@ -11,10 +11,12 @@
 #   git push --no-verify
 #
 # 触发条件：仅当本次推送的提交里包含以下路径的变更时才跑门禁，
-#           纯文档 / 模板改动直接放行，避免无谓延迟：
-#   - w-model-dev/scripts/**
-#   - package.json
-#   - .githooks/pre-push
+#           纯配置/纯目录（docs/superpowers、docs/changes）改动直接放行：
+#   - w-model-dev/**
+#   - 根级活体文档/配置：README.md / AGENTS.md / CONTRIBUTING.md / .gitignore / .eslintsecurity-baseline.json / package.json
+#   - .githooks/**
+#   - docs/*.md（docs/ 根级 .md，子目录归档不触发）
+#   - .cursor/skills/**
 
 set -euo pipefail
 
