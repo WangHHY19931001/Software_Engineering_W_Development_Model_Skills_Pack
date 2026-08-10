@@ -16,7 +16,7 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
-| Vitest（门禁脚本单元测试） | ✅ 35 files / 524 tests |
+| Vitest（门禁脚本单元测试） | ✅ 35 files / 530 tests |
 | TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
@@ -79,7 +79,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)
 - **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [subagent-persona-matrix.md](./w-model-dev/references/subagent-persona-matrix.md)）；Persona 文件本身是 Markdown，不调用 LLM
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI）
-- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记）+ 46 条流程反模式（流程破坏，命中即回退）+ 实现层教训 L1~L4 + 运维失败模式 O1~O6。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
+- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记）+ 47 条流程反模式（流程破坏，命中即回退）+ 实现层教训 L1~L4 + 运维失败模式 O1~O6。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
 - **项目级 Definition of Done**：7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储（`.w-model/*.json`），跨多轮交互保持上下文；JSON Schema (draft-07) 强约束
@@ -146,7 +146,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载；完整列表见 references/ 目录）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md  # 8 阶段细则
-│   │   ├── anti-patterns.md      # 负面知识库：46 条流程反模式 + L1~L4 教训 + F1~F10 失败模式 + O1~O6 运维失败模式
+│   │   ├── anti-patterns.md      # 负面知识库：47 条流程反模式 + L1~L4 教训 + F1~F10 失败模式 + O1~O6 运维失败模式
 │   │   ├── workflow.md           # 完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      # LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审）
 │   │   ├── subagent-delegation.md# 编排者-子代理边界（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约）
@@ -197,7 +197,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── lib/cli-error.ts      # exit 2 错误结构统一（6 类错误码；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具
 │   │   ├── lib/safe-json.ts      # JSON 解析原型污染防御
-│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 524 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 530 条 + README.md coverage 矩阵）
 │   │   └── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
@@ -263,7 +263,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 46 条流程反模式 + L1~L4 实现层教训 + F1~F10 失败模式 + O1~O6 运维失败模式（#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 47 条流程反模式 + L1~L4 实现层教训 + F1~F10 失败模式 + O1~O6 运维失败模式（#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）
 - [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约
 - [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）
 - [Persona 选型矩阵](./w-model-dev/references/subagent-persona-matrix.md) - R-lead / V-lead 多角度 persona 选择矩阵

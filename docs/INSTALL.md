@@ -71,7 +71,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
 │   ├── lib/cli-error.ts         # exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
 │   ├── self-test.ts             # 回归基线（249 条样本）
-│   └── __tests__/               # vitest 单元测试（35 个 .test.ts / 524 条 + README.md coverage 矩阵）
+│   └── __tests__/               # vitest 单元测试（35 个 .test.ts / 530 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -184,7 +184,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | 编排者-子代理边界（O/A/S/V/G/R） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
 | LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
 | 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
-| 负面知识库（46 条反模式 + 教训） | [../w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md) |
+| 负面知识库（47 条反模式 + 教训） | [../w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md) |
 | JSON Schema 文件（draft-07，20 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/schema-loader.ts](../w-model-dev/scripts/schema-loader.ts) |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/security-scan.ts](../w-model-dev/scripts/security-scan.ts) |
@@ -230,7 +230,7 @@ Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 524 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 530 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
