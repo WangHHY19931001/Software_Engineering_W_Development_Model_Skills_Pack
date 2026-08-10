@@ -218,6 +218,12 @@ if (subCriteria.length !== expected.length) {
   任一子标准低于该值即视为该维度不达标，`passed=false`——即使其余子标准高分将
   `compositeScore` 加权平均拉至 ≥ 0.70 也不放行（防止加权平均掩盖单轴失败，
   对应外部 code-review 双轴报告永不合并原则；详见 §6.3 与反模式 #41）。
+- **多子代理协作评审维度（R14-R17，第 40 轮三源吸收）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、opsx 三段式产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
+  - **R14 交接完整性**：角色间交接的信息是否传对/传全（对照 signature-chain inputProvenance）。
+  - **R15 计划坚持度**：产出是否偏离既定计划/票据（对照 tickets.md frontier / opsx propose）。
+  - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 subagent-persona-matrix）。
+  - **R17 增量价值**：新增角色/子代理是否带来增量价值（无价值则提示精简）。
+  - 实现：R14-R17 为可选维度（`subCriteria` 追加 `collaboration` 组），仅当 `VerifierOutput.targetKind ∈ {design, code}` 且产物含多角色来源时启用；不破坏既有 R1-R13。
 
 ## 4. 连续评分（Continuous Scoring）
 
