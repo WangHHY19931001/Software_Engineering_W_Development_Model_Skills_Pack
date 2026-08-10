@@ -1137,14 +1137,14 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **P1（41.1.0，10 项）**：design-patterns-catalog（新建 reference，GoF 23 模式目录 + 对照表 + 决策辅助）、refactoring-catalog 目标结构列（坏味道→手法→GoF 模式闭环）、code-smells 补子类爆炸/继承破坏封装/Getter-Setter 浅方法、phase-2 架构决策框架（CAP/微服务粒度/事务模式/前提四问）、quality-standards 容错设计检查清单 + 日志规范、verifier-spec Architecture 评审问题（8 类重新设计原因/Visitor 判据/交集并集/网关轻量）+ Security 评审（认证/授权/凭证/传输）、tla-plus-guide 建模场景库（断路器/TCC/SAGA/State）+ Safety/Liveness 术语、security-review 认证授权传输维度、phase-6 补偿/故障注入测试用例。
 
-**P2（41.2.0，10 项）**：subagent-persona-matrix 证据加权共识、verifier-spec 编辑者/调节器说理、anti-patterns 候选转正评审、hill-climbing 爬山法、tla-plus 不连续系统穷举、operational-recovery 混沌预期/超标重写、quality-standards 约束创造/满意化、phase-7 可观测性验收、SKILL.md 受控失控/clockware-swarmware。
+**P2（41.2.0，10 项）**：subagent-persona-matrix 证据加权共识（失控 ch2 蜜蜂决策）、verifier-spec 验证器定位三原则（编辑者非作者/调节器不关心原因/运行系统最短路径）、anti-patterns 候选转正评审判据 + 错误聚集/超标丢弃说理、hill-climbing-guide 爬山法哲学基础（变异-选择-累积循环）、tla-plus-guide 不连续系统穷举「为什么」段落、operational-recovery 集成初期混沌预期 + 超标模块重写、quality-standards 硬约束=结构来源 + 满意化完成、phase-7 可观测性验收标准（日志/度量/追踪）、SKILL.md 受控的失控 + clockware/swarmware 选择法则。
 
 **关键决策**：设计判据双轨（静态工具 + LLM 语义评审）；「方案权衡」为模板提示级不触发脚本；候选反模式不正式编号；说理层并入既有文档不新增哲学参考；吸收决策记录见 references/four-source-absorption.md。
 
 | 维度 | 内容 |
 |---|---|
 | self-test | 基线 249 不变 |
-| 版本号 | 41.1.0（P1 批，三处一致） |
+| 版本号 | 41.2.0（P2 批，三处一致） |
 
 ---
 
@@ -2762,6 +2762,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | 3.4.40 第 40 轮三源吸收（P2） | concurrency-guide / refactoring-catalog / 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明 / 级联（9 项） | `w-model-dev/references/concurrency-guide.md` + `refactoring-catalog.md` + estimation-guide / run-log.schema.json+data-models+run-log-logic / verifier-spec / phase-5 / operational-recovery / subagent-persona-matrix 新增节 | 已落地（40.2.0） |
 | 3.4.41 第 41 轮四源吸收（P0） | 组 X 复杂度症状 / 设计判据条目 / 类设计规则补充 / 设计投资 / 接口注释清单 / 命名一致性三要求 / 备选方案对比 / 方案权衡列 / 候选反模式登记 | code-smells-checklist + quality-standards + format-conventions + phase-3/4 + verifier-spec + class-design 模板 + anti-patterns | 已落地（41.0.0） |
 | 3.4.41 第 41 轮四源吸收（P1） | design-patterns-catalog / 重构目标结构列 / code-smells 三坏味道 / phase-2 决策框架 / quality-standards 容错日志 / verifier-spec 双轴评审 / tla-plus 场景库 / security-review 维度 / phase-6 补偿故障注入 | `design-patterns-catalog.md` + refactoring-catalog + code-smells-checklist + phase-2 + quality-standards + verifier-spec + tla-plus-guide + security-review + phase-6 | 已落地（41.1.0） |
+| 3.4.41 第 41 轮四源吸收（P2） | 证据加权共识 / 验证器定位三原则 / 候选转正评审 + 错误聚集超标丢弃 / 爬山法哲学基础 / 不连续系统穷举 / 混沌预期 + 超标重写 / 约束创造 + 满意化完成 / 可观测性验收 / 受控失控 + clockware-swarmware | subagent-persona-matrix + verifier-spec + anti-patterns + hill-climbing-guide + tla-plus-guide + operational-recovery + quality-standards + phase-7 + SKILL.md | 已落地（41.2.0） |
 
 ---
 
