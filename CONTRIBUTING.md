@@ -228,7 +228,7 @@ LLM 评审逻辑由 `w-model-dev/` 下的提示词 + 校验脚本承载：
 
 1. 更新 `CHANGELOG.md`，将 `[Unreleased]` 改为版本号 + 日期
 2. 同步版本号三处：`package.json` `version` + `w-model-dev/SKILL.md` frontmatter `version` + `w-model-dev/skill-metadata.json`（`__tests__/skill-metadata.test.ts` 回归校验一致）
-3. 创建 git tag：`git tag v<version>`（如 `v40.2.0`）
+3. 创建 git tag：`git tag v<version>`（如 `v41.0.0`）
 4. 推送 tag：`git push origin v<version>`
 
 > 本仓库版本号以 git tag + 三处一致为准；`package.json` 不发布到 npm（`private: true`）。
