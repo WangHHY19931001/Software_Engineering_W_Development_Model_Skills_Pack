@@ -6,6 +6,7 @@
  * 校验：R1 阶段动作完整性 + R2 tokens 非负 + R3 返工记录一致
  *       + R4 acknowledgedDecisions 非空 + R5 O 越权检测 + R6 exitCode 一致
  *       + R7 append-only 时序。
+ *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
  *
  * 设计原则（与 budget-logic.ts / graph-logic.ts / tla-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
@@ -420,6 +421,62 @@ export function checkRunLog(
       violations.push(
         `R7: rootcause 记录 ${curEntry.runId} 后须有 fix 记录`,
       );
+    }
+  }
+
+  // R8 轨迹模板校验（第 40 轮三源吸收：agentic Ch19 轨迹符合性）
+  // 理想阶段轨迹：S 变体(produce/fix/emergency-fix) → R3×3 → V(review) → G(gate 类) → checkpoint(阶段最后)。
+  // 从「时序正确」（R7）升级为「轨迹正确」：偏离理想动作序列即违规。
+  const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
+  for (const phase of completedPhases) {
+    const phaseEntries = valid.filter(e => e.phase === phase);
+    const checkpointIndexes = phaseEntries
+      .map((e, i) => (e.action === 'checkpoint' && e.outcome === 'success' ? i : -1))
+      .filter(i => i >= 0);
+    const lastCheckpoint = checkpointIndexes.length > 0 ? checkpointIndexes[checkpointIndexes.length - 1]! : -1;
+
+    // R8-1: checkpoint 必须是该阶段最后一条记录（阶段结束后再无后续动作）
+    if (lastCheckpoint >= 0 && lastCheckpoint !== phaseEntries.length - 1) {
+      violations.push(
+        `R8: 阶段 ${phase} checkpoint 非阶段最后记录（checkpoint 之后仍有 ${phaseEntries.length - 1 - lastCheckpoint} 条动作，理想轨迹中 checkpoint 为阶段终点）`,
+      );
+    }
+
+    // R8-2: gate 类动作必须出现在最后一个 checkpoint 之前
+    for (let i = 0; i < phaseEntries.length; i++) {
+      const entry = phaseEntries[i];
+      if (entry && GATE_ACTIONS.has(entry.action) && lastCheckpoint >= 0 && i > lastCheckpoint) {
+        violations.push(
+          `R8: 阶段 ${phase} gate 动作(${entry.action})出现在 checkpoint 之后，理想轨迹中 gate 先于 checkpoint`,
+        );
+      }
+    }
+  }
+
+  // R8-3: V(review) 失败后不得直接 S 变体——须先 rootcause（反模式 #18 轨迹检测）
+  // 独立于 completedPhases 遍历所有阶段：反模式 #18 是行为级违规，
+  // 未完成阶段（尚无 checkpoint success）同样禁止 V 失败后跳过 R 直接 S 返工。
+  const r8PhaseGroups = new Map<number, RunLogEntry[]>();
+  for (const e of valid) {
+    if (!r8PhaseGroups.has(e.phase)) r8PhaseGroups.set(e.phase, []);
+    r8PhaseGroups.get(e.phase)!.push(e);
+  }
+  for (const [, phaseEntries] of r8PhaseGroups) {
+    for (let i = 0; i < phaseEntries.length; i++) {
+      const entry = phaseEntries[i];
+      if (!entry || entry.action !== 'review' || entry.outcome !== 'fail') continue;
+      for (let j = i + 1; j < phaseEntries.length; j++) {
+        const next = phaseEntries[j];
+        if (!next) continue;
+        if (next.action === 'rootcause') break; // 正确路径：先 R 再 S-fix
+        if (S_VARIANTS.includes(next.action)) {
+          violations.push(
+            `R8: 阶段 ${entry.phase} V(review) 失败(${entry.runId})后直接 S(${next.action})(${next.runId})，理想轨迹须先 rootcause 再 S-fix（反模式 #18）`,
+          );
+          break;
+        }
+        if (next.action === 'checkpoint' && next.outcome === 'success') break; // 阶段结束，不再追溯
+      }
     }
   }
 

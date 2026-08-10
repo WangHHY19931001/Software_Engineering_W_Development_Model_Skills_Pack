@@ -294,7 +294,7 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
   for (const [k, v] of Object.entries(overrides)) {
     if (v !== undefined) merged[k] = v;
   }
-  return merged as RunLogEntry;
+  return merged as unknown as RunLogEntry;
 }
 
 describe('run-log R8 轨迹模板校验（第 40 轮三源吸收：agentic Ch19 轨迹符合性）', () => {
