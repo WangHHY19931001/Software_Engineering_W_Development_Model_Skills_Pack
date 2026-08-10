@@ -832,42 +832,49 @@
       "hash": "3ad2b192fc58b2e3c845338e562e3d17f2e0837414f3eabad2391b6b55b9579c",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/check-docs-consistency.ts",
-      "line": 44,
+      "line": 61,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "ba3c40e115c63255b93031811a619e7e59caf7ee275a8912d8fb9957742589a6",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/check-docs-consistency.ts",
-      "line": 55,
+      "line": 72,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "e5238313ca86b5b1c80a0456adb4bf658fddd2485aa1ae2049f6611b300f64ec",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/check-docs-consistency.ts",
-      "line": 56,
+      "line": 73,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "4822daa8f81c81dbaaaa7cfa53adff1762bcf9f729b2fb06d280cbb944b114dc",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/check-docs-consistency.ts",
-      "line": 57,
+      "line": 74,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "80b43eb3f25a72613c70054036f6d81fff8941e625b7d8070d454b451b26b1a7",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/check-docs-consistency.ts",
-      "line": 58,
+      "line": 75,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "4ed29eb7e6fe747d3235b98e2ea5948ce9d1633039b14ce8aeaee5b3a1956734",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/check-docs-consistency.ts",
-      "line": 59,
+      "line": 76,
+      "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "8d41acdf7898e6b3abc2b806e6a8499ec08bda1fe96b99e845c15ae575d42050",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/check-docs-consistency.ts",
+      "line": 79,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
