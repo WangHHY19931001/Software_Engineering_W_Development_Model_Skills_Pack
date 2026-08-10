@@ -184,15 +184,14 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
 
   if (result.passed) {
-    console.log('运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only。');
+    console.log('运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。');
   } else {
     console.log('未通过原因：');
     for (const r of result.violations) {
       console.log(`  - ${r}`);
     }
     console.log('');
-    console.log('O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only），详见：');
-    console.log('  w-model-dev/references/operational-recovery.md §5.2');
+    console.log('O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）');
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
