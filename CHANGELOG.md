@@ -3,6 +3,14 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [40.2.0] - 2026-08-10
+
+### Added
+- 三源吸收 P2（9 项）：concurrency-guide（并发防御三原则/死锁四条件/偶发失败=线程问题）、refactoring-catalog（24 手法速查表 + 坏味道映射）、模型档位×思考预算（estimation-guide）、run-log decisionConfidence 可选字段、最小权限+数据最小化+prompt 注入提示（verifier-spec security）、票据动态重排（phase-5）、错误分类处置表（operational-recovery）、persona 能力声明（subagent-persona-matrix）
+
+### Changed
+- 版本号 40.1.0 → 40.2.0（6 处同步）
+
 ## [40.1.0] - 2026-08-10
 
 ### Added

@@ -1118,7 +1118,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **P1（40.1.0，10 项）**：多评审分歧上缴人 / MCP 契约准则 / R3 来源校验 / MASS 三阶段 / 升级时效 / 修剪优先级 / 坏注释黑名单 / 类设计规则 / 对象数据结构 / 级联。（已落地，40.1.0）
 
-**P2（40.2.0，9 项）**：concurrency-guide / refactoring-catalog（2 新 reference）/ 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明。
+**P2（40.2.0，9 项）**：concurrency-guide / refactoring-catalog（2 新 reference）/ 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明。（已落地，40.2.0）
 
 **关键决策**：坏味道/并发检查双轨（语言静态工具 + LLM 语义评审，不新增 AST 脚本）；轨迹符合性校验（check-run-log R8）；吸收决策记录见 references/clean-code-refactoring-agentic-absorption.md。
 
@@ -2735,6 +2735,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | §3.4.39 | 第 39 轮 人月神话吸收（P0：反指标游戏 #45 / 主刀与修正权 #46 / 九倍矩阵完成度 / 人机分工线；P1：并行三闸·原文装填·记叙性优先·结构性约束·独立评审·止损三规则·会话生命周期·辩解义务·回归约束 #21·环境契约自检；P2：estimation-guide / context-management-guide 新 reference + 白箱黑箱·里程碑元规则·侦察vs产出·目的注释） | `references/mythical-man-month-absorption.md`（决策记录，新建）+ `references/anti-patterns.md`（#45/#46，计数 44→46）+ `.cursor/skills/dispatching-parallel-agents/SKILL.md`（删"调整测试期望"）+ `.cursor/skills/test-driven-development/testing-anti-patterns.md`（改断言凑绿条目）+ `references/subagent-delegation.md`（主刀职责映射表/原文装填/验证账单）+ `references/definition-of-done.md`（修正权验收/九倍矩阵自检）+ `SKILL.md`（主刀与修正权/人机分工线 + 操作行为第 8 条 + 约束 #21 + 白箱黑箱）+ `references/phase-5-coding.md`（任务分配/增量集成）+ `references/phase-6-integration-test.md`（集成判断人持有）+ `references/bdd-guide.md`（记叙性优先）+ `references/verifier-spec.md`（独立评审模板）+ `references/operational-recovery.md`（止损三规则/会话重开）+ `references/root-cause-locator.md`（辩解义务）+ `references/quality-standards.md`（环境契约自检）+ `references/hill-climbing-guide.md`（侦察vs产出）+ `references/format-conventions.md`（目的注释）+ `references/estimation-guide.md` + `references/context-management-guide.md`（新建）+ `.cursor/skills/writing-plans/SKILL.md`（里程碑元规则）+ `scripts/docs-consistency-logic.ts`（maxAntiPattern 44→46）+ 版本号三处 39.2.0 | 设计 spec 已批准（2026-08-10-mythical-man-month-absorption-design.md）；P2 已实施（39.2.0） |
 | 3.4.40 第 40 轮三源吸收（P0） | 坏味道清单 / 编码规范 / 测试规范 / agentic 4 项 / 反模式 #47 | `w-model-dev/references/code-smells-checklist.md` + phase-5/quality-standards/verifier-spec/operational-recovery 等新增节 + `check-run-log.ts` R8 + `anti-patterns.md` #47 | 已落地（40.0.0） |
 | 3.4.40 第 40 轮三源吸收（P1） | 多评审分歧上缴人 / MCP 契约准则 / R3 来源校验 / MASS 三阶段 / 升级时效 / 修剪优先级 / 坏注释黑名单 / 类设计规则 / 对象数据结构 | `w-model-dev/references/subagent-persona-matrix.md` + mcp-builder / verifier-spec / hill-climbing-guide / operational-recovery / context-management-guide / format-conventions / quality-standards + phase-4 / chinese-code-review + phase-4 | 已落地（40.1.0） |
+| 3.4.40 第 40 轮三源吸收（P2） | concurrency-guide / refactoring-catalog / 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明 / 级联（9 项） | `w-model-dev/references/concurrency-guide.md` + `refactoring-catalog.md` + estimation-guide / run-log.schema.json+data-models+run-log-logic / verifier-spec / phase-5 / operational-recovery / subagent-persona-matrix 新增节 | 已落地（40.2.0） |
 
 ---
 
