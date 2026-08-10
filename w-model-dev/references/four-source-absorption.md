@@ -193,5 +193,24 @@
 ## 7. 未来扩展（非本轮）
 
 - design-patterns-catalog 若需强门禁：可后续扩展「模式引用必须附权衡声明」为字段级校验
-- 微服务粒度判定若需固化：可后续在 phase-2 决策矩阵中增加 check 脚本维度的「拆分边界自检」
+- 微服务粒度判定若需固化：可后续在 phase-4 决策矩阵中增加 check 脚本维度的「拆分边界自检」
 - 失控「九条定律」若需落地：可作为 skillopt-adoption / 机制设计原则附录
+
+## 9. 批次 A（P0，41.0.0）落点明细
+
+| # | 吸收点 | 落地文件 | 落地内容 |
+|---|---|---|---|
+| 1 | 复杂三症状（APoSD P1） | code-smells-checklist.md | 组 X（X1-X3）+ verifier-spec readability 三信息来源 |
+| 2 | 深/浅模块 + 多类症（P3） | quality-standards.md | 深度优先于大小 / 多类症警报 |
+| 3 | 信息隐藏/泄露/时间分解（P4） | phase-4 + code-smells | 信息隐藏检查 / 信息泄露（后门型）/ 时间分解条目 |
+| 4 | 通用模块更深/消特殊情况（P5） | code-smells + phase-4 | 过度专用 / 特殊情况爆炸条目 |
+| 5 | 透传方法/变量（P6） | code-smells | 中间人升级 / 透传变量条目 |
+| 6 | 下沉复杂性（P7） | phase-4 | 下沉复杂性检查 |
+| 7 | 组合 vs 拆分四信号（P8） | quality-standards | 四信号 |
+| 8 | 深方法优先于长度（P9） | code-smells 组 F | F5 + 两源平衡注 |
+| 9 | 通过定义规避错误（P10） | phase-4 + class-design | 异常策略三选项 / 异常列审查提示 |
+| 10 | 设计两次（P11） | phase-3 + phase-4 + verifier-spec | 备选方案对比步骤 + 评审检查项 |
+| 11 | 注释哲学（P12） | format-conventions + code-smells | 接口注释清单 / 分离规则 / 先写注释 / 实现文档污染接口 |
+| 12 | 命名三原则（P13） | format-conventions | 一致性三要求 / 难取名警报 |
+| 13 | 方案必附权衡（GoF G3） | class-design 模板 | 「方案权衡」必填列 |
+| 14 | 候选反模式登记 | anti-patterns.md | 四源-α/β/γ/δ 入候选区 |
