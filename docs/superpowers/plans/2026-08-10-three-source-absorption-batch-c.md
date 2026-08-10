@@ -427,3 +427,4 @@ git commit -m "feat: P2 three-source absorption (40.2.0) — concurrency, refact
 - **占位符扫描**：所有插入内容给出完整 Markdown/JSON/TS；无 TBD/TODO。
 - **类型一致性**：decisionConfidence 在三处（schema/data-models/run-log-logic 接口）字段名与类型（number 0-1）一致。
 - **已知风险**：Task 4 schema 追加逗号位置是易错点（已标注先补逗号）；self-test SCHEMA_CASES 的 run-log 样本不含新字段，additionalProperties:false 下可选字段不破坏；run-log-logic 接口追加字段不影响既有测试（TS 结构化类型允许多余字段）。
+- **执行期补充**：Task 9 额外同步 AGENTS.md references 列表挂接 2 个新 reference（concurrency-guide / refactoring-catalog），属仓库级联既有惯例（同 b6aad36/f88a2a3），已纳入 commit。
