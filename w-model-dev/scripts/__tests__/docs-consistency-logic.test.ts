@@ -17,14 +17,14 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     commandReference: 'UAT-/ST-/IT-/UT- → test；否则为 code',
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
-    readme: '7 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 521 tests',
+    readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 521 tests',
     antiPatterns: '反模式清单（#1~#46；\n| 46 | 冰山扫掠... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
-    skill: '### 七条操作行为',
+    skill: '### 八条操作行为',
     agents: '30 个脚本\n35 个 .test.ts / 521 条',
     ssot: [
-      '7 条核心操作行为',
+      '8 条核心操作行为',
       '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
       '| **签名链完整性** | ... |',
     ].join('\n'),
@@ -76,7 +76,7 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('七维度标准'))).toBe(true);
   });
 
-  it('README 缺 7 条操作行为 → 违规', () => {
+  it('README 缺 8 条操作行为 → 违规', () => {
     const input = baseInput({ readme: '6 条核心操作行为' });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors')).toBe(true);
   });
@@ -157,7 +157,7 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('README/AGENTS 缺 vitest 文件数表述 → 违规', () => {
-    const input = baseInput({ readme: '7 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）', agents: '30 个脚本' });
+    const input = baseInput({ readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）', agents: '30 个脚本' });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-files');
     expect(v.length).toBeGreaterThan(0);
   });

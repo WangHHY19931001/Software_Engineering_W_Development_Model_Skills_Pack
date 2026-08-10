@@ -174,11 +174,11 @@ function checkDoDDimensions(definitionOfDone: string, readme: string, ssot: stri
 
 function checkOperatingBehaviors(skill: string, readme: string, ssot: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (!skill.includes('### 七条操作行为')) {
-    violations.push({ check: 'operating-behaviors', message: 'SKILL.md 应含「### 七条操作行为」' });
+  if (!skill.includes('### 八条操作行为')) {
+    violations.push({ check: 'operating-behaviors', message: 'SKILL.md 应含「### 八条操作行为」' });
   }
-  if (!readme.includes('7 条核心操作行为')) {
-    violations.push({ check: 'operating-behaviors', message: 'README 应含「7 条核心操作行为」' });
+  if (!readme.includes('8 条核心操作行为')) {
+    violations.push({ check: 'operating-behaviors', message: 'README 应含「8 条核心操作行为」' });
   }
   if (readme.includes('6 条核心操作行为') || ssot.includes('6 条核心操作行为')) {
     violations.push({ check: 'operating-behaviors', message: 'README/SSoT 仍含过时「6 条核心操作行为」' });
