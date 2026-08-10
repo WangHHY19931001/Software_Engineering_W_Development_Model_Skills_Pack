@@ -10,7 +10,9 @@
 ## 概要设计算法
 
   1. 接口识别与契约定义
-     ├─ 基于系统设计模块划分，产出 docs/phase3-outline/{module}-interface-contract.md（接口清单 + Schema 10 字段 + 错误码分层）
+     ├─ **备选方案对比（第 41 轮吸收，APoSD ch11）**：每个关键接口先产出 ≥2 个差异较大的备选签名草案 + 一行优缺点（写入 interface-contract.md「备选方案」节）；考虑"什么应可变"（GoF 表 1.2 思想）
+     ├─ **接口交集 vs 并集自检（第 41 轮吸收，GoF ch2）**：抽象接口取"所有实现的功能交集"则只强如最弱实现，取"并集"则庞大——明确取舍并记录理由
+     ├─ 基于系统设计模块划分，产出 docs/phase3-outline/{module}-interface-contract.md（接口清单 + Schema 10 字段 + 错误码分层 + 备选方案）
      ├─ 主文档 §2 引用块指向 interface-contract.md
      ├─ 失败: 接口契约缺 Schema 字段 / 错误码缺段位 → 回步骤 1（FM-OD-01）
      └─ 成功: 接口契约完整，主文档 §2 接口定义与之对应
@@ -90,6 +92,14 @@
 | 主设计文档 | 套用 `templates/interface-design.md`（骨架 + 引用块指向上述 6 文件） | `docs/phase3-outline/{module}-interface-design.md` |
 
 **调用关系图语法约束**：每个模块间调用须标注接口名 + 数据流向；存在循环依赖时必须重新划分模块边界，禁止带环放行。
+
+## 问题驱动叙述格式（第 41 轮四源吸收，GoF ch2 案例方法）
+
+每个关键接口契约按「目标 + 约束 → 方案 → 权衡」叙述（对应 interface-contract.md「Implementation Decisions」节）：
+1. **目标**：本接口要满足什么设计目标（如"统一访问多个存储实现"）。
+2. **约束**：不可违背的约束（如"不得引入跨模块共享可变状态"）。
+3. **方案**：选定接口签名 + 模式引用（引用设计模式命名，如"本接口用 Strategy 封装 X 算法"）。
+4. **权衡**：方案的优点 + 代价（GoF Consequences 写法，缺一即返工 FM-OD-02）。
 
 ## 接口契约 Schema 模板
 
