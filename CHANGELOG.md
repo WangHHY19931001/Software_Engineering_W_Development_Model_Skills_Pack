@@ -3,6 +3,21 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [39.0.0] - 2026-08-10
+
+### Added
+- 反模式 #45（反指标游戏：subagent 为通过测试而修改断言/测试期望）+ #46（只给审计权不给修正权）；反模式计数 44 → 46
+- 主刀人设与修正权原则（subagent-delegation「主刀职责映射表」/ SKILL.md「主刀与修正权」段 / DoD「修正权验收」自检项）
+- 九倍矩阵完成度自检（DoD 产品化轴×系统集成轴）+ phase-5/6 任务分配规则（产品化→agent，集成判断→人）
+- 人机分工线原则（SKILL.md）+ DoD「理解证据」补注
+- 吸收决策记录 `references/mythical-man-month-absorption.md`
+
+### Changed
+- dispatching-parallel-agents/SKILL.md 示例删除"调整测试期望"条款（与反模式 #45 对齐）
+- testing-anti-patterns.md 补「改断言让测试通过（反指标游戏）」条目
+- docs-consistency-logic.ts maxAntiPattern 44→46 + 测试样本同步
+- 版本号 38.5.0 → 39.0.0（7 处同步）
+
 ## [38.5.0] - 2026-08-10
 
 ### Added
