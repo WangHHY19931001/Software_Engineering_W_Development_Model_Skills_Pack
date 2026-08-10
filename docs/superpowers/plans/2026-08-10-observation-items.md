@@ -176,6 +176,24 @@ git commit -m "test: add failing design-docs and vitest-files check tests (TDD r
   testFileCount: number;
 ```
 `EXPECTED` 新增：`vitestFileCount: 35,`（置于 `cursorSkillCount` 之后）
+文件常量区新增（`STALE_RANGES` 附近）：
+
+```typescript
+/**
+ * 过时 DoD 维度表述（用于 design-docs 检查）。
+ * 注意：不用字面「五维度」——设计文档保留历史演变描述（如「五维度扩展为七维度」
+ * 「新增第六维度」），仅当表述把当前标准说成五/六维度时才视为过时。
+ */
+const STALE_DOD_DIMENSIONS = [
+  '五维度标准',       // 表名（当前为七维度标准）
+  '六维度标准',       // 标题/表名（当前为七维度标准）
+  '五维度 → 六维度',  // 演变终点停在六维度
+  '五维度扩展为六维度',
+  '六维度（更新）',   // 章节标题
+  '§10.6 六维度',     // 过时 SSoT 引用
+  '§10.6 五维度',     // 过时 SSoT 引用
+];
+```
 
 - [ ] **Step 2: wiring**
 
@@ -196,8 +214,10 @@ function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): 
         violations.push({ check: 'design-docs', message: `${doc.name} 检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
       }
     }
-    if (doc.content.includes('五维度')) {
-      violations.push({ check: 'design-docs', message: `${doc.name} 仍含过时「五维度」DoD 表述（当前七维度）` });
+    for (const stale of STALE_DOD_DIMENSIONS) {
+      if (doc.content.includes(stale)) {
+        violations.push({ check: 'design-docs', message: `${doc.name} 仍含过时 DoD 维度表述「${stale}」（当前七维度）` });
+      }
     }
     for (const stale of STALE_RANGES) {
       if (doc.content.includes(stale)) {
@@ -392,3 +412,4 @@ bash .githooks/pre-push --force   # 14 项全通过
 - **占位符扫描**：所有替换给出精确 old→new；代码完整；无 TBD/TODO。
 - **类型一致性**：`DocConsistencyInput.designDocs` / `.testFileCount` 在 test（baseInput）、logic（接口）、CLI（input 构造）三处一致；`EXPECTED.vitestFileCount` 单点定义；`checkDesignDocs` / `checkVitestFileCount` 签名一致。
 - **已捕获的坑**：baseInput 的 readme/agents 默认值须含 `35 files` / `35 个 .test.ts` 否则「全部一致零违规」用例失败（Task 3 Step 1 已处理）；vitest 用例数 515→521（6 新用例）；文件数仍 35（不加新测试文件）。
+- **Task 2 执行期修正（checkDesignDocs 精确模式）**：Task 2 清理后 loop-engineering-adoption-design.md 仍保留 4 处历史演变描述（`五维度扩展为七维度` / `五维度 → 七维度` / `新增第六维度`，spec §4.1 明确要求保留）。若 checkDesignDocs 字面扫 `五维度` 将误报违规。故引入 `STALE_DOD_DIMENSIONS` 模式集（仅匹配把当前标准说成五/六维度的表述：`五维度标准` / `六维度标准` / `五维度 → 六维度` / `五维度扩展为六维度` / `六维度（更新）` / `§10.6 五维度` / `§10.6 六维度`），历史演变描述不触发。
