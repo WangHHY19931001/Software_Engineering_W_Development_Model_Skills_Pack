@@ -598,6 +598,8 @@ V 子代理须在 `summary` 中包含：
 > 注：Performance 轴映射到 `conformance` 是 W 模型适配——`conformance` 原指「符合代码规范」，扩展为「符合性能与规范双约束」。若项目有独立性能子标准，可在 [phase-7-system-test.md](phase-7-system-test.md) 单独评审（k6 性能基线）。
 
 - **来源时效/权威性校验（第 40 轮三源吸收，agentic Ch14）**：评审中引用的依据/参考来源（规范文档、需求行、外部资料）须校验时效性与权威性——过期来源（如 2020 博客 vs 2025 政策）与冲突来源须显式标注；知识缺口（无来源支撑的断言）须记录为证据缺失。落点：R3 preventive review 的 reliability 维度检查项。
+- **最小权限与数据暴露最小化（第 40 轮三源吸收，agentic Ch18+Ch13）**：子代理简报/评审输入不得包含任务无关的凭据、密钥、敏感上下文；权限授予遵循最小权限原则（agent 只获得任务所需最小权限）。落点：R3 preventive review 的 security 维度检查项。
+- **prompt 注入防护提示（第 40 轮三源吸收，agentic Ch18）**：对子代理输入（外部资料/用户内容拼入提示词时）做注入风险标注；不构建完整守卫体系，仅作为 R3 security 提示项。
 
 #### 7.4A.2 Severity 标签
 
