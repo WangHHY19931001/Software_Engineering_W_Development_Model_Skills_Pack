@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 落地三源吸收 P1 中吸收项 10 项：多评审分歧上缴人裁决、MCP 契约准则、R3 来源校验、MASS 三阶段、升级时效、修剪优先级、坏注释黑名单、类设计规则、对象/数据结构、遗留代码接缝，版本 40.0.0 → 40.1.0。
+**Goal:** 落地三源吸收 P1 中吸收项 10 项：多评审分歧上缴人裁决、MCP 契约准则、R3 来源校验、MASS 三阶段、升级时效、修剪优先级、坏注释黑名单、类设计规则、对象/数据结构、级联，版本 40.0.0 → 40.1.0。
 
 **Architecture:** 纯文档任务（10 项全部为 reference/.cursor 技能文档插入 + SSoT/CHANGELOG/版本级联），无脚本行为改动。沿用批次 A 的"精确插入文本 + 子代理驱动 + 两阶段评审"模式。
 

@@ -839,7 +839,7 @@ git commit -m "feat(format-conventions): add naming conventions section (Clean-C
 
 **P0（40.0.0，16 项）**：坏味道清单（chinese-code-review + code-smells-checklist）、编码规范（phase-5 六节）、质量规范（quality-standards 三小节）、TDD 四则、复现测试（root-cause-locator §2.5）、反模式 #47、命名约定（format-conventions §6）、agentic 4 项（run-log R8 / 简报质疑权 / R14-R17 / HOTL 授权）。
 
-**P1（40.1.0，10 项）**：多评审分歧上缴人 / MCP 契约准则 / R3 来源校验 / MASS 三阶段 / 升级时效 / 修剪优先级 / 坏注释黑名单 / 类设计规则 / 对象数据结构 / 遗留代码接缝。
+**P1（40.1.0，10 项）**：多评审分歧上缴人 / MCP 契约准则 / R3 来源校验 / MASS 三阶段 / 升级时效 / 修剪优先级 / 坏注释黑名单 / 类设计规则 / 对象数据结构 / 级联。
 
 **P2（40.2.0，9 项）**：concurrency-guide / refactoring-catalog（2 新 reference）/ 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明。
 
