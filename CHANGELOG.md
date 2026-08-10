@@ -3,6 +3,19 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [39.2.0] - 2026-08-10
+
+### Added
+- 新 reference：estimation-guide.md（记账模板 / mini-spike 前置 / 禁"编码×系数"外推 / 玩具外推警戒）
+- 新 reference：context-management-guide.md（KV 缓存友好 / 上下文分层 / 自污染 10-30% / 档位路由 / 输出结构模板库）
+- 白箱 vs 黑箱工具选型（SKILL.md 核心原则）
+- 里程碑设计到无法自欺 + 人作最终审计位点（writing-plans）
+- 侦察 vs 产出两阶段（hill-climbing-guide）
+- 目的注释：写 why 不写 what（format-conventions）
+
+### Changed
+- 版本号 39.1.0 → 39.2.0（7 处同步）
+
 ## [39.1.0] - 2026-08-10
 
 ### Added
