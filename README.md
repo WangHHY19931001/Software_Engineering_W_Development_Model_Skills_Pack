@@ -11,7 +11,7 @@
 
 **当前版本**：`41.2.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)）
 
-**健康指标**（2026-08-09 实测）：
+**健康指标**（2026-08-10 实测）：
 
 | 指标 | 结果 |
 |---|---|
@@ -97,6 +97,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 - **单轴下限 R13**：Verifier 评审 passed 判据收紧为 `qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70`，杜绝「加权平均掩盖单轴失败」
 - **阶段 1 迷雾登记册（Fog of War）**：需求分析引入「REQ 入学锐利性测试」+ 迷雾登记册文本节 + 毕业机制（毕业成 REQ / 判 Out of Scope / 豁免审批）。详见 [phase-1-requirements.md](./w-model-dev/references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节
 - **阶段设计级产物**（第 37-38 轮）：阶段 1-4 产出升级为主模板 + 6 独立子模板（glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 等），主文档引用块串联；门禁新增对应结构校验。详见 [SSoT §3.4.35-38](./docs/skill-design-document_SSoT.md)
+- **四源吸收（软件设计哲学 / 凤凰架构 / GoF 设计模式 / 失控）**（第 41 轮）：吸收《软件设计哲学》设计判据与战略式编程、《凤凰架构》架构决策框架与可观测性三支柱、GoF 23 设计模式目录、《失控》蜂群共识与受控的失控——落地为设计判据条目、方案权衡列、决策矩阵、模式目录与机制说理层（爬山法/约束创造/满意化/不连续系统穷举）。吸收决策记录见 [four-source-absorption.md](./w-model-dev/references/four-source-absorption.md)
 
 ## 架构原则与外部工具边界
 
@@ -154,7 +155,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── command-reference.md  # /wm 命令参考
 │   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
 │   │   ├── toolbox.md            # 工具箱决策表（I have X → use Z）
-│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / mythical-man-month-absorption / code-smells-checklist / clean-code-refactoring-agentic-absorption / concurrency-guide / refactoring-catalog）
+│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / mythical-man-month-absorption / code-smells-checklist / clean-code-refactoring-agentic-absorption / concurrency-guide / four-source-absorption / design-patterns-catalog / refactoring-catalog）
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep）
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）

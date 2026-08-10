@@ -128,6 +128,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 
 ## 7. 修复记录
 
+- **四源吸收（APoSD《软件设计哲学》/ 凤凰架构 / GoF 设计模式 / 失控）**（2026-08-10）：P0/P1/P2 三批落地（41.0.0/41.1.0/41.2.0）——新增 references/four-source-absorption.md（吸收决策记录）+ design-patterns-catalog.md（GoF 23 模式目录）；设计质量判据（组 X 复杂度症状/信息泄露/复杂三症状/方案权衡列）、架构决策框架（CAP/微服务粒度/事务模式）、重构目标结构列、建模场景库（断路器/TCC/SAGA）、可观测性验收标准（日志/度量/追踪）、机制说理层（蜂群共识/验证器定位三原则/爬山法哲学/约束创造/满意化/不连续系统穷举/受控的失控/clockware-swarmware）；候选反模式四源-α/β/γ/δ（候选区，不正式编号）；版本号 41.2.0。
 - **三源吸收（Clean Code / Refactoring 2 / Agentic Design Patterns）**（2026-08-10）：P0/P1/P2 三批落地（40.0.0/40.1.0/40.2.0）——新增 references/code-smells-checklist.md + concurrency-guide.md + refactoring-catalog.md + clean-code-refactoring-agentic-absorption.md；反模式 #47（计数 46→47）；run-log R8 轨迹模板校验；坏味道/并发检查双轨（语言静态工具 + LLM 语义评审，不新增 AST 脚本）；phase-5/quality-standards/verifier-spec/operational-recovery/subagent-delegation/format-conventions 等新增节；版本号 40.2.0。
 - **TLA+ 指南修复 + 编排纪律强化 + 代码-TLA+ 一致性回归**（2026-07-24）：tla-plus-guide.md 新增命名规范/路径基准/前置清单三节；subagent-delegation.md 强化信号 5 + S-doc/S-tla 拆分模板；新建 code-tla-logic.ts/check-code-tla-consistency.ts（四维度校验）；gate-logic.ts 终检新增 TLA+ 资产 + SD→codeModule 校验。
 - **R（根因定位者）+ F（修复者，由 S 兼任）角色新增**（2026-07-24）：新增返工循环 V/G→R→V→G→S-fix→V→G；新增 check-rootcause-report.ts（R1-R10）；新增 references/root-cause-locator.md + subagent-persona-matrix.md + subagent/（28 个人格文件）；新增反模式 #18/#19。
