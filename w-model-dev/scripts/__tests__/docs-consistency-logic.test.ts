@@ -147,7 +147,7 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('design-docs 干净时零违规', () => {
-    const input = baseInput({ designDocs: [{ name: 'x', content: 'requirement / design / code / test' }] });
+    const input = baseInput({ designDocs: [{ name: 'x', content: 'requirement / design / code / test\n五维度扩展为七维度，新增「理解证据」' }] });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs')).toBe(false);
   });
 

@@ -37,6 +37,13 @@ const REQUIRED_PATHS = [
   '.githooks/pre-push',
   'w-model-dev/subagent', // 目录（persona 计数）
   '.cursor/skills', // 目录（cursor skill 计数）
+  'docs/llm-verifier-integration-design.md',
+  'docs/loop-engineering-adoption-design.md',
+  'docs/information-flow-validation-design.md',
+  'docs/ingestion-graph-convergence-design.md',
+  'docs/skill-design-document.md',
+  'docs/tla-plus-modeling-design.md',
+  'w-model-dev/scripts/__tests__', // 目录（vitest 测试文件数）
 ];
 
 /** docs/ 根 6 份设计文档（活体引用，README 导航引用；docs/superpowers/ 与 docs/changes/ 归档不动） */
@@ -102,6 +109,7 @@ function main(): void {
   console.log(`schema 文件   : ${schemaFiles.length}`);
   console.log(`exit-2 脚本   : ${exit2ScriptCount}`);
   console.log(`persona / cur : ${personaCount} / ${cursorSkillCount}`);
+  console.log(`test 文件    : ${testFileCount}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);
 
   if (violations.length > 0) {
