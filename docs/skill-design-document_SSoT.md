@@ -1144,7 +1144,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 | 维度 | 内容 |
 |---|---|
 | self-test | 基线 249 不变 |
-| 版本号 | 41.0.0（P0 批，三处一致） |
+| 版本号 | 41.1.0（P1 批，三处一致） |
 
 ---
 
@@ -2761,6 +2761,7 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | 3.4.40 第 40 轮三源吸收（P1） | 多评审分歧上缴人 / MCP 契约准则 / R3 来源校验 / MASS 三阶段 / 升级时效 / 修剪优先级 / 坏注释黑名单 / 类设计规则 / 对象数据结构 | `w-model-dev/references/subagent-persona-matrix.md` + mcp-builder / verifier-spec / hill-climbing-guide / operational-recovery / context-management-guide / format-conventions / quality-standards + phase-4 / chinese-code-review + phase-4 | 已落地（40.1.0） |
 | 3.4.40 第 40 轮三源吸收（P2） | concurrency-guide / refactoring-catalog / 推理预算 / decisionConfidence 字段 / 最小权限 / 票据动态重排 / 错误分类 / persona 能力声明 / 级联（9 项） | `w-model-dev/references/concurrency-guide.md` + `refactoring-catalog.md` + estimation-guide / run-log.schema.json+data-models+run-log-logic / verifier-spec / phase-5 / operational-recovery / subagent-persona-matrix 新增节 | 已落地（40.2.0） |
 | 3.4.41 第 41 轮四源吸收（P0） | 组 X 复杂度症状 / 设计判据条目 / 类设计规则补充 / 设计投资 / 接口注释清单 / 命名一致性三要求 / 备选方案对比 / 方案权衡列 / 候选反模式登记 | code-smells-checklist + quality-standards + format-conventions + phase-3/4 + verifier-spec + class-design 模板 + anti-patterns | 已落地（41.0.0） |
+| 3.4.41 第 41 轮四源吸收（P1） | design-patterns-catalog / 重构目标结构列 / code-smells 三坏味道 / phase-2 决策框架 / quality-standards 容错日志 / verifier-spec 双轴评审 / tla-plus 场景库 / security-review 维度 / phase-6 补偿故障注入 | `design-patterns-catalog.md` + refactoring-catalog + code-smells-checklist + phase-2 + quality-standards + verifier-spec + tla-plus-guide + security-review + phase-6 | 已落地（41.1.0） |
 
 ---
 
