@@ -132,7 +132,7 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('design-docs 含废弃 targetKind → 违规', () => {
-    const input = baseInput({ designDocs: [{ name: 'llm-verifier', content: 'targetKind=file 路由' }] });
+    const input = baseInput({ designDocs: [{ name: 'llm-verifier', content: '`targetKind`（`requirement` / `design` / `testcase` / `file`）targetKind=file 路由' }] });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('llm-verifier'))).toBe(true);
   });
 

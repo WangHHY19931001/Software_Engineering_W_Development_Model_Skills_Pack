@@ -81,6 +81,8 @@ const STALE_DOD_DIMENSIONS = [
   '§10.6 六维度',     // 过时 SSoT 引用
   '§10.6 五维度',     // 过时 SSoT 引用
 ];
+/** `targetKind`（…）括号枚举形式的废弃值检测（如 `targetKind`（`requirement` / `design` / `testcase` / `file`）） */
+const TARGETKIND_ENUM_PATTERN = /`targetKind`\s*（[^）]*(?:testcase|file)[^）]*）/;
 
 export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
@@ -263,6 +265,10 @@ function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): 
       if (doc.content.includes(token)) {
         violations.push({ check: 'design-docs', message: `${doc.name} 检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
       }
+    }
+    const enumMatch = doc.content.match(TARGETKIND_ENUM_PATTERN);
+    if (enumMatch) {
+      violations.push({ check: 'design-docs', message: `${doc.name} 的 targetKind 括号枚举仍含废弃值「${enumMatch[0]}」（应为 code/test）` });
     }
     for (const stale of STALE_DOD_DIMENSIONS) {
       if (doc.content.includes(stale)) {
