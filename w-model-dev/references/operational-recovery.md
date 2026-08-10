@@ -325,6 +325,15 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | `maturity.json` 字段缺失或类型错误 | 按 [data-models.md](data-models.md) schema 校验；修复后重跑成熟度判定 |
 | `maturity.json` 被误删 | 从 git 恢复；无备份时按默认 L0 重建（丢失升级历史） |
 
+## HOTL 规则化授权（第 40 轮三源吸收）
+
+> 吸收自 Agentic Design Patterns ch13「Human-on-the-loop」：人类以显式、可验证的规则定义授权边界，AI 在规则内自主执行、规则外升级。
+
+- **授权规则必须显式可验证**：L2+ 操作型自动放行不得基于模糊意图，须基于规则化条件（等同 run-log 可校验的条件表达式），如"单元测试全过 + 覆盖率 ≥ 80% + 门禁退出码 0"。
+- **规则外必升级**：超出授权规则（高危路径 / 预算超限 / 新依赖）时强制升级到人（复用豁免 E1-E8 流程）。
+- **与成熟度阶梯的关系**：L0-L1 决策型 CHECKPOINT 在所有级别均等用户（人机分工线）；HOTL 规则化授权只作用于 L2+ 的操作型放行，且规则本身须经人批准。
+- **授权规则登记**：规则条件写入 `project.status` 或成熟度配置，随 run-log 留痕，可审计。
+
 ## 事件驱动与棕地维护
 
 > 来源：SSoT [§10F](../../docs/skill-design-document_SSoT.md)。事件驱动循环（Loop 3）仅在 L2+ 成熟度激活，详见 [event-ingress-guide.md](event-ingress-guide.md)。
@@ -391,7 +400,7 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 | 脚本 | 关键校验项（对应修正设计规则表） |
 |---|---|
 | `check-budget.ts`（§5.1） | R1 时效性（`updatedAt` 滞后）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
-| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only |
+| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑） |
 | `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R3 成功阶段计数更新（`completedCycles` 滞后）· R4 history 一致 · R5 降级触发 |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 
