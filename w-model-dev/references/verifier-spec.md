@@ -548,6 +548,10 @@ V 子代理须在 `summary` 中包含：
 
 **TLA+ 审查参考清单**（第 11 轮外部技能吸收）：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
 
+- **备选方案对比检查（第 41 轮四源吸收，APoSD ch11）**：设计文档是否含关键接口/类的 ≥2 个备选方案对比？无对比的"一次做对"设计 → feasibility 降分。
+- **复杂性下沉提问（APoSD ch8）**：暴露的配置参数/异常是否"用户能比我们确定更好的值"？把决策负担推给用户 = 降分。
+- **概念完整性提问（APoSD ch21）**：最重要的概念是否被突出/中心化（决定周围结构）？"认为太多重要"= 浅类之源，"漏认重要"= 未知的未知之源。
+
 ### 7.3 测试（targetKind = `test`）
 
 | 子标准 name | weight | 描述 |
@@ -574,6 +578,9 @@ V 子代理须在 `summary` 中包含：
 | `conformance` | 0.20 | 是否符合代码规范（ESLint / Prettier / 语言等价工具） |
 
 权重和 = 1.00。
+
+- **三信息来源检查（第 41 轮四源吸收，APoSD ch18.3）**：评审时对目标代码依次问：① 抽象是否减少信息量（深接口掩盖实现细节）？② 是否复用约定/已有知识（相似事物相似处理）？③ 好名称/注释是否补充信息（而非复述）？三来源皆弱 → readability 降分。
+- **复杂三症状提问（APoSD ch2）**：评审顶层提问"这份代码的复杂性来自哪个症状"——变更放大 / 认知负荷 / 未知的未知（对照 code-smells-checklist 组 X）。
 
 ### 7.4A 五轴评审维度与 Severity 标签（吸收自 addyosmani/agent-skills）
 
