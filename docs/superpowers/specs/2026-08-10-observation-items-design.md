@@ -60,7 +60,7 @@ esac
 
 - `docs-consistency-logic.ts` 新增 `checkDesignDocs(designDocs)`：
   - 输入 `designDocs: Array<{ name: string; content: string }>`（6 份设计文档）
-  - 扫描内容：废弃 targetKind 标记（复用 `FORBIDDEN_TARGETKIND` 8 token）+ `五维度`（DoD 语境）+ `STALE_RANGES`（#1~#29 / #1~#19 / 全角变体）
+  - 扫描内容：废弃 targetKind 标记（复用 `FORBIDDEN_TARGETKIND` 8 token）+ 过时 DoD 维度表述（`STALE_DOD_DIMENSIONS` 精确模式集：五维度标准 / 六维度标准 / 五维度 → 六维度 / 五维度扩展为六维度 / 六维度（更新） / §10.6 五维度 / §10.6 六维度；设计文档保留的历史演变描述如「五维度扩展为七维度」不触发）+ `STALE_RANGES`（#1~#29 / #1~#19 / 全角变体）
   - 违规消息带文档名（仿 checkTargetKindLiveDocs 的 `docName 检测到…` 风格）
 - `DocConsistencyInput` 新增 `designDocs` 字段；CLI 读取 6 份文件：`llm-verifier-integration-design.md` / `loop-engineering-adoption-design.md` / `information-flow-validation-design.md` / `ingestion-graph-convergence-design.md` / `skill-design-document.md` / `tla-plus-modeling-design.md`
 

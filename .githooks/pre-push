@@ -202,7 +202,7 @@ run_expect "check:exemption 有效豁免样本退出 0" 0 \
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
 
-# 12. vitest 单元测试全量通过（35 test files / 515 tests；WSL 下 testTimeout 已放宽至 30s）
+# 12. vitest 单元测试全量通过（35 test files / 521 tests；WSL 下 testTimeout 已放宽至 30s）
 run_expect "vitest 单元测试全通过" 0 npx vitest run || exit 1
 
 # 13. npm audit：依赖漏洞扫描（warn-only，不阻断；离线/网络失败自动跳过）

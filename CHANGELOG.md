@@ -3,6 +3,18 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [38.5.0] - 2026-08-10
+
+### Added
+- check-docs-consistency 新增 2 项检查（10 → 12 项）：design-docs（扫描 docs/ 根 6 份设计文档的废弃 targetKind / 过时 DoD 维度表述 / 旧反模式区间）、vitest-files（测试文件数 glob 校验，期望 35）
+- pre-push 变更过滤扩展：w-model-dev/**、根级活体文档、.githooks/*、docs/*.md、.cursor/skills/*（文档推送自动触发门禁）
+
+### Changed
+- 设计文档清理：llm-verifier-integration-design.md targetKind 枚举 → code/test；loop-engineering-adoption-design.md DoD 维度 5 → 7（8 处）
+- vitest 用例数 515 → 521（+6，design-docs + vitest-files 检查测试）；11 处文档同步
+- AGENTS §8 check-docs-consistency 行「10 项」→「12 项确定性检查」
+- 版本号 38.4.0 → 38.5.0（三处同步）
+
 ## [38.4.0] - 2026-08-10
 
 ### Added
