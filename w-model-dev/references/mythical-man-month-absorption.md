@@ -66,6 +66,6 @@
 ## 5. 不做的事
 
 - 不改 verifier-spec.md Schema / schemas/*.json / templates/* / subagent/* 人格
-- 不改既有 44 条反模式语义（#45/#46 为新增）
+- 不改既有 #1~#44 反模式语义（#45/#46 为新增）
 - 不改 self-test 基线（249）/ pre-push 项数（14）
 - 不改 docs/changes/archive/**
