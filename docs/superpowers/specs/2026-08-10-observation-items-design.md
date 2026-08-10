@@ -41,12 +41,12 @@ esac
 
 ## 4. S2：设计文档清理 + design-docs 门禁（Item 2）
 
-### 4.1 清理（2 份文件，8 处）
+### 4.1 清理（2 份文件，9 处）
 
 **llm-verifier-integration-design.md:55**：
 `\`targetKind\`（\`requirement\` / \`design\` / \`testcase\` / \`file\`）` → `\`targetKind\`（\`requirement\` / \`design\` / \`code\` / \`test\`）`
 
-**loop-engineering-adoption-design.md**（7 处，DoD 维度表述对齐当前七维度）：
+**loop-engineering-adoption-design.md**（8 处：7 处替换 + 1 行追加，DoD 维度表述对齐当前七维度）：
 - :517 `「五维度标准」表` → `「七维度标准」表`（整句保留）
 - :520 `## 六维度标准（更新）` → `## 七维度标准（更新）`
 - :529 理解证据行后补第 7 行：`| **签名链完整性** | 每阶段每角色动作完成后写入 \`signature-chain.jsonl\`；G 跑门禁前校验 R1-R10 全通过 | \`check-signature-chain.ts\` R1-R10 | 补齐缺失角色签名与来源证明 |`

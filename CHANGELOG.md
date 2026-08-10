@@ -13,7 +13,7 @@
 - 设计文档清理：llm-verifier-integration-design.md targetKind 枚举 → code/test；loop-engineering-adoption-design.md DoD 维度 5 → 7（8 处）
 - vitest 用例数 515 → 521（+6，design-docs + vitest-files 检查测试）；11 处文档同步
 - AGENTS §8 check-docs-consistency 行追加 design-docs / vitest-files（检查项 10 → 12）
-- 版本号 38.4.0 → 38.5.0（三处同步）
+- 版本号 38.4.0 → 38.5.0（7 处同步）
 
 ## [38.4.0] - 2026-08-10
 
