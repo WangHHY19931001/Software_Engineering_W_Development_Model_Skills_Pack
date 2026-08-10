@@ -78,7 +78,7 @@ esac
 
 - 新检查的 vitest 用例**追加到既有** `docs-consistency-logic.test.ts`（文件数保持 35 ✓）
 - 用例数 515 → **521**（design-docs ≈4 + vitest-files ≈2），同步更新 11 处活体文档的「515 条」→「521 条」
-- AGENTS §8 check-docs-consistency 行描述「10 项确定性检查」→「12 项确定性检查」
+- AGENTS §8 check-docs-consistency 行追加 design-docs / vitest-files（检查项 10 → 12，该行本身无「10 项」字样，仅追加两项）
 - CHANGELOG [38.5.0] 条目注明 12 项检查
 
 ## 6. S4：版本与记录
