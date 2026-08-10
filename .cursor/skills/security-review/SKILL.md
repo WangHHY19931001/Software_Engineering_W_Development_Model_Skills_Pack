@@ -87,6 +87,7 @@ npm run lint:security
 ## 认证/授权/传输安全评审维度（第 41 轮四源吸收）
 
 > 源码扫描（上文）发现"有没有"，本节评审"设计对不对"。对设计/架构评审场景执行。
+> 与 [verifier-spec.md](../../../w-model-dev/references/verifier-spec.md) Security 轴评审提问同源（第 41 轮四源吸收，凤凰架构 system-security/zero-trust）——本节为检查维度表，评审提问见该文档，更新时保持同步。
 
 | 维度 | 检查项 | 高危信号 |
 |---|---|---|
