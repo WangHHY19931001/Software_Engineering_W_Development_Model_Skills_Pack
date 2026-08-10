@@ -18,7 +18,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 524 tests',
-    antiPatterns: '反模式清单（#1~#46；\n| 46 | 冰山扫掠... |',
+    antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
     skill: '### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
@@ -116,7 +116,7 @@ describe('runDocConsistencyChecks', () => {
   it('反模式最大编号非 46 / 旧区间残留 → 违规', () => {
     const input = baseInput({ antiPatterns: '反模式清单（#1~#29；\n| 43 | ... |' });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('46'))).toBe(true);
+    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('47'))).toBe(true);
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
   });
 

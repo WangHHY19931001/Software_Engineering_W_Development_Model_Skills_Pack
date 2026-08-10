@@ -48,7 +48,7 @@ export const EXPECTED = {
   vitestFileCount: 35,
   exit2ScriptCount: 30,
   runLogActionCount: 27,
-  maxAntiPattern: 46,
+  maxAntiPattern: 47,
   prePushCount: 14,
 } as const;
 
