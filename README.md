@@ -16,7 +16,7 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
-| Vitest（门禁脚本单元测试） | ✅ 35 files / 521 tests |
+| Vitest（门禁脚本单元测试） | ✅ 35 files / 524 tests |
 | TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
@@ -154,7 +154,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── command-reference.md  # /wm 命令参考
 │   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
 │   │   ├── toolbox.md            # 工具箱决策表（I have X → use Z）
-│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples）
+│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / mythical-man-month-absorption）
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep）
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）
@@ -197,7 +197,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 │   │   ├── lib/cli-error.ts      # exit 2 错误结构统一（6 类错误码；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具
 │   │   ├── lib/safe-json.ts      # JSON 解析原型污染防御
-│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 521 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 524 条 + README.md coverage 矩阵）
 │   │   └── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
