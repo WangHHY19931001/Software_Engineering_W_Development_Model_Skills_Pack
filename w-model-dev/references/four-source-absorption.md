@@ -200,10 +200,11 @@
 
 | # | 吸收点 | 落地文件 | 落地内容 |
 |---|---|---|---|
+> 注：本表列批次 A 主要落点（含 #15-#18 补充项），与 §3.3 P0 候选清单的组成差异属实施期范围调整。
 | 1 | 复杂三症状（APoSD P1） | code-smells-checklist.md | 组 X（X1-X3）+ verifier-spec readability 三信息来源 |
 | 2 | 深/浅模块 + 多类症（P3） | quality-standards.md | 深度优先于大小 / 多类症警报 |
 | 3 | 信息隐藏/泄露/时间分解（P4） | phase-4 + code-smells | 信息隐藏检查 / 信息泄露（后门型）/ 时间分解条目 |
-| 4 | 通用模块更深/消特殊情况（P5） | code-smells + phase-4 | 过度专用 / 特殊情况爆炸条目 |
+| 4 | 通用模块更深/消特殊情况（P5） | code-smells | 过度专用 / 特殊情况爆炸条目 |
 | 5 | 透传方法/变量（P6） | code-smells | 中间人升级 / 透传变量条目 |
 | 6 | 下沉复杂性（P7） | phase-4 | 下沉复杂性检查 |
 | 7 | 组合 vs 拆分四信号（P8） | quality-standards | 四信号 |
@@ -214,3 +215,7 @@
 | 12 | 命名三原则（P13） | format-conventions | 一致性三要求 / 难取名警报 |
 | 13 | 方案必附权衡（GoF G3） | class-design 模板 | 「方案权衡」必填列 |
 | 14 | 候选反模式登记 | anti-patterns.md | 四源-α/β/γ/δ 入候选区 |
+| 15 | 战略式编程/设计投资（APoSD P2） | quality-standards | 「设计投资」节（10-20% 参考表述） |
+| 16 | 问题驱动叙述格式（GoF G9） | phase-3 | 「问题驱动叙述格式」节（目标+约束→方案→权衡） |
+| 17 | 接口交集 vs 并集自检（GoF G10） | phase-3 | 步骤 1「接口交集 vs 并集自检」 |
+| 18 | 概念完整性提问（APoSD P18） | verifier-spec | §7.2 design 评审「概念完整性提问」 |
