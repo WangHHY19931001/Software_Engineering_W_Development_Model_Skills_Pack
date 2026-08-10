@@ -90,3 +90,11 @@ path:§3.2,L42       （章节+行号混合）
 - `templates/feature.template`（@design 格式）
 - `scripts/verifier-logic.ts`（EVIDENCE_PATTERN）
 - `references/directory-conventions.md` §6（路径引用规则）
+
+## 5. 注释与提示词目的规范（第 39 轮 P2 批吸收）
+
+> 吸收自《agent 时代的人月神话》第 15 章：注释写 why 不写 what；提示词/注释能表达要求但不能表达要求的分量。
+
+- **注释写 why 不写 what**：凡只翻译代码的注释视为废注释（代码本身已表达 what）。
+- **目的注释**：记录"这段代码为什么存在 / 服务于什么目的"，给未来 agent 与人的判断依据。
+- **提示词的边界**：提示词/注释能表达要求，但不能表达要求的分量——分量靠结构（门禁 / 校验 / 权限）承载。
