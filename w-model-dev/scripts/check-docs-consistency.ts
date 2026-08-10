@@ -39,6 +39,16 @@ const REQUIRED_PATHS = [
   '.cursor/skills', // 目录（cursor skill 计数）
 ];
 
+/** docs/ 根 6 份设计文档（活体引用，README 导航引用；docs/superpowers/ 与 docs/changes/ 归档不动） */
+const DESIGN_DOC_NAMES = [
+  'llm-verifier-integration-design.md',
+  'loop-engineering-adoption-design.md',
+  'information-flow-validation-design.md',
+  'ingestion-graph-convergence-design.md',
+  'skill-design-document.md',
+  'tla-plus-modeling-design.md',
+];
+
 function main(): void {
   const root = pathResolve(process.argv[2] ?? '.');
   const missing = REQUIRED_PATHS.filter((p) => !existsSync(join(root, p)));
@@ -58,6 +68,8 @@ function main(): void {
   const cursorSkillCount = readdirSync(join(root, '.cursor/skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length;
   const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts')).filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 25
   const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks（合计 30）
+  const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
+  const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) => f.endsWith('.test.ts')).length;
 
   const input: DocConsistencyInput = {
     schemaFiles,
@@ -77,6 +89,8 @@ function main(): void {
     agents: read('AGENTS.md'),
     ssot: read('docs/skill-design-document_SSoT.md'),
     prePush: read('.githooks/pre-push'),
+    designDocs,
+    testFileCount,
   };
 
   const violations = runDocConsistencyChecks(input);

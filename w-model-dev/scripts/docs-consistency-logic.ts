@@ -35,12 +35,17 @@ export interface DocConsistencyInput {
   agents: string;
   ssot: string;
   prePush: string;
+  /** docs/ 根 6 份设计文档（活体引用） */
+  designDocs: Array<{ name: string; content: string }>;
+  /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（期望 35） */
+  testFileCount: number;
 }
 
 export const EXPECTED = {
   schemaCount: 20,
   personaCount: 28,
   cursorSkillCount: 23,
+  vitestFileCount: 35,
   exit2ScriptCount: 30,
   runLogActionCount: 27,
   maxAntiPattern: 44,
@@ -62,6 +67,20 @@ const FORBIDDEN_TARGETKIND = [
 ];
 const STALE_RANGES = ['#1~#29', '#1~#19', '#1～#29', '#1～#19'];
 const STALE_EXIT2 = ['29 个脚本', '27 个脚本'];
+/**
+ * 过时 DoD 维度表述（用于 design-docs 检查）。
+ * 注意：不用字面「五维度」——设计文档保留历史演变描述（如「五维度扩展为七维度」
+ * 「新增第六维度」），仅当表述把当前标准说成五/六维度时才视为过时。
+ */
+const STALE_DOD_DIMENSIONS = [
+  '五维度标准',       // 表名（当前为七维度标准）
+  '六维度标准',       // 标题/表名（当前为七维度标准）
+  '五维度 → 六维度',  // 演变终点停在六维度
+  '五维度扩展为六维度',
+  '六维度（更新）',   // 章节标题
+  '§10.6 六维度',     // 过时 SSoT 引用
+  '§10.6 五维度',     // 过时 SSoT 引用
+];
 
 export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
@@ -75,6 +94,8 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkPrePushCount(input.prePush));
   violations.push(...checkGlossaryAction(input.glossary));
   violations.push(...checkAssetCounts(input.personaCount, input.cursorSkillCount));
+  violations.push(...checkDesignDocs(input.designDocs));
+  violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   return violations;
 }
 
@@ -231,6 +252,42 @@ function checkAssetCounts(personaCount: number, cursorSkillCount: number): DocCh
   }
   if (cursorSkillCount !== EXPECTED.cursorSkillCount) {
     violations.push({ check: 'asset-counts', message: `.cursor/skills 目录数应为 ${EXPECTED.cursorSkillCount}，实际 ${cursorSkillCount}` });
+  }
+  return violations;
+}
+
+function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  for (const doc of designDocs) {
+    for (const token of FORBIDDEN_TARGETKIND) {
+      if (doc.content.includes(token)) {
+        violations.push({ check: 'design-docs', message: `${doc.name} 检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
+      }
+    }
+    for (const stale of STALE_DOD_DIMENSIONS) {
+      if (doc.content.includes(stale)) {
+        violations.push({ check: 'design-docs', message: `${doc.name} 仍含过时 DoD 维度表述「${stale}」（当前七维度）` });
+      }
+    }
+    for (const stale of STALE_RANGES) {
+      if (doc.content.includes(stale)) {
+        violations.push({ check: 'design-docs', message: `${doc.name} 仍含过时反模式区间「${stale}」` });
+      }
+    }
+  }
+  return violations;
+}
+
+function checkVitestFileCount(testFileCount: number, readme: string, agents: string): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (testFileCount !== EXPECTED.vitestFileCount) {
+    violations.push({ check: 'vitest-files', message: `实测 vitest 测试文件数应为 ${EXPECTED.vitestFileCount}，实际 ${testFileCount}（新增测试文件须同步文档与 EXPECTED）` });
+  }
+  if (!readme.includes(`${EXPECTED.vitestFileCount} files`)) {
+    violations.push({ check: 'vitest-files', message: `README 应含「${EXPECTED.vitestFileCount} files」vitest 表述` });
+  }
+  if (!agents.includes(`${EXPECTED.vitestFileCount} 个 .test.ts`)) {
+    violations.push({ check: 'vitest-files', message: `AGENTS.md 应含「${EXPECTED.vitestFileCount} 个 .test.ts」vitest 表述` });
   }
   return violations;
 }
