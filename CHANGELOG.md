@@ -3,6 +3,17 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 规范，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [40.0.0] - 2026-08-10
+
+### Added
+- 三源吸收 P0（16 项）：坏味道清单（code-smells-checklist + chinese-code-review）、phase-5 六节（坏味道禁令 #9-#13/断言规范/重构纪律/测试基线/第三方边界/静态工具接入）、quality-standards 三小节（测试整洁/函数错误规范/性能三法）、TDD 四则、复现测试强制（root-cause-locator §2.5）、反模式 #47（大规模重构）、命名约定（format-conventions §6）
+- agentic 4 项：run-log R8 轨迹模板校验（agentic Ch19）、S 子代理简报质疑权（subagent-delegation）、verifier-spec R14-R17 协作评审维度、HOTL 规则化授权（operational-recovery）
+- 新 reference：code-smells-checklist.md / clean-code-refactoring-agentic-absorption.md
+
+### Changed
+- 反模式计数 46 → 47（docs-consistency 期望值 + 全仓文档联动）
+- 版本号 39.2.0 → 40.0.0
+
 ## [39.2.0] - 2026-08-10
 
 ### Added
