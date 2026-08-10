@@ -180,8 +180,17 @@ function checkOperatingBehaviors(skill: string, readme: string, ssot: string): D
   if (!readme.includes('8 条核心操作行为')) {
     violations.push({ check: 'operating-behaviors', message: 'README 应含「8 条核心操作行为」' });
   }
-  if (readme.includes('6 条核心操作行为') || ssot.includes('6 条核心操作行为')) {
-    violations.push({ check: 'operating-behaviors', message: 'README/SSoT 仍含过时「6 条核心操作行为」' });
+  if (!ssot.includes('### 4A.1 八条核心操作行为')) {
+    violations.push({ check: 'operating-behaviors', message: 'SSoT §4A.1 应含「### 4A.1 八条核心操作行为」权威标题' });
+  }
+  if (!skill.includes('Structure Over Persuasion')) {
+    violations.push({ check: 'operating-behaviors', message: 'SKILL.md 操作行为表应含第 8 条 Structure Over Persuasion' });
+  }
+  const outdated = ['6 条核心操作行为', '七条核心操作行为', '7 条核心操作行为', '七条操作行为'];
+  for (const token of outdated) {
+    if (readme.includes(token) || ssot.includes(token)) {
+      violations.push({ check: 'operating-behaviors', message: `README/SSoT 仍含过时「${token}」` });
+    }
   }
   return violations;
 }

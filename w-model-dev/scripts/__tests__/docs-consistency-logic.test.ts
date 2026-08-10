@@ -21,9 +21,10 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     antiPatterns: '反模式清单（#1~#46；\n| 46 | 冰山扫掠... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
-    skill: '### 八条操作行为',
+    skill: '### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     agents: '30 个脚本\n35 个 .test.ts / 521 条',
     ssot: [
+      '### 4A.1 八条核心操作行为',
       '8 条核心操作行为',
       '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
       '| **签名链完整性** | ... |',
@@ -79,6 +80,37 @@ describe('runDocConsistencyChecks', () => {
   it('README 缺 8 条操作行为 → 违规', () => {
     const input = baseInput({ readme: '6 条核心操作行为' });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors')).toBe(true);
+  });
+
+  it('SKILL.md 操作行为表缺第 8 行内容 → 违规', () => {
+    const input = baseInput({ skill: '### 八条操作行为' });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'operating-behaviors' && x.message.includes('Structure Over Persuasion'),
+      ),
+    ).toBe(true);
+  });
+
+  it('SSoT §4A.1 缺权威标题 → 违规', () => {
+    const input = baseInput({
+      ssot: [
+        '8 条核心操作行为',
+        '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
+        '| **签名链完整性** | ... |',
+      ].join('\n'),
+    });
+    expect(
+      runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('权威标题')),
+    ).toBe(true);
+  });
+
+  it('SSoT §4A.1 标题仍为七条 → 违规（过时守卫）', () => {
+    const input = baseInput({ ssot: '### 4A.1 七条核心操作行为' });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'operating-behaviors' && x.message.includes('七条核心操作行为'),
+      ),
+    ).toBe(true);
   });
 
   it('反模式最大编号非 46 / 旧区间残留 → 违规', () => {
