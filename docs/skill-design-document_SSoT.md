@@ -1122,6 +1122,11 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 **关键决策**：坏味道/并发检查双轨（语言静态工具 + LLM 语义评审，不新增 AST 脚本）；轨迹符合性校验（check-run-log R8）；吸收决策记录见 references/clean-code-refactoring-agentic-absorption.md。
 
+| 维度 | 内容 |
+|---|---|
+| self-test | 基线 249 不变 |
+| 版本号 | 40.2.0（P2 批，三处一致） |
+
 ---
 
 ## 4. 技能工作流程
