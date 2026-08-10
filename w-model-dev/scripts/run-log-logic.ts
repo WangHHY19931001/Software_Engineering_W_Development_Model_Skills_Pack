@@ -54,6 +54,8 @@ export interface RunLogEntry {
   acknowledgedDecisions?: string[];
   note?: string;
   artifacts?: string[];
+  /** 决策置信度（可选，0.0-1.0；agentic Ch18，第 40 轮新增） */
+  decisionConfidence?: number;
   // ---- rootcause/fix 扩展字段（spec §5.5）----
   /** rootcause: R 报告 ID；fix: 所基于的 R 报告 ID */
   reportId?: string;

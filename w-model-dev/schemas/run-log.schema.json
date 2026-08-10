@@ -43,6 +43,7 @@
     "icebergRound": { "description": "iceberg-sweep 动作的冰山轮次（第36轮新增，1-5，maxIcebergRounds=5）", "type": "integer", "minimum": 1, "maximum": 5 },
     "reportPath": { "description": "iceberg-sweep 动作的 IcebergSweepReport 路径（.w-model/iceberg/<reportId>.json）", "type": "string", "minLength": 1 },
     "newFindingsCount": { "description": "iceberg-sweep 动作的新发现隐藏问题数（第36轮新增，非负整数；0=无新问题=终止判据①满足）", "type": "integer", "minimum": 0 },
-    "validFindings": { "description": "iceberg-review 动作经 V 复审确认的有效发现数（第36轮新增，非负整数）", "type": "integer", "minimum": 0 }
+    "validFindings": { "description": "iceberg-review 动作经 V 复审确认的有效发现数（第36轮新增，非负整数）", "type": "integer", "minimum": 0 },
+    "decisionConfidence": { "description": "决策置信度（agentic Ch18 结构化思维链日志，第40轮新增）：评审/门禁/返工等关键决策的置信度 0.0-1.0，可选字段；供 Loop 4 劣化分析（低置信度高频出现 = 流程或任务定义问题信号）", "type": "number", "minimum": 0, "maximum": 1 }
   }
 }

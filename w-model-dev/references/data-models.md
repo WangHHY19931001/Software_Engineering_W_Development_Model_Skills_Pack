@@ -377,6 +377,8 @@ interface RunLogEntry {
   note?: string;
   /** 本条记录涉及的产物路径（如有） */
   artifacts?: string[];
+  /** 决策置信度（可选，0.0-1.0；agentic Ch18 结构化思维链日志，第 40 轮新增，供 Loop 4 劣化分析） */
+  decisionConfidence?: number;
 }
 ```
 
@@ -393,6 +395,7 @@ interface RunLogEntry {
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
 - **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`。第 15 轮共性问题 B 子代理误用 `eventId` / `eventType` / `decisions` 触发 R1 失败（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`；第 17 轮 P3 修正历史叙述加注）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
+- `decisionConfidence` 为可选字段：评审/门禁/返工等关键决策时可记录置信度（0.0-1.0）；低置信度高频出现是 Loop 4 劣化分析信号。
 
 ### R1 阶段动作完整性：按阶段分档
 
