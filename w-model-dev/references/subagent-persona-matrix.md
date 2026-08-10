@@ -18,6 +18,19 @@
 
 ---
 
+## 1.5 persona 能力声明字段（第 40 轮三源吸收）
+
+> 吸收自 Agentic Design Patterns ch15「Agent 卡片」能力清单理念（不吸收 A2A 协议本身）。
+
+每个 persona 条目建议补充「能力声明」字段（随 persona 文件头或矩阵表注明）：
+
+- **能力**：该 persona 擅长/不擅长什么（如 code-reviewer：擅长类型/错误处理评审，不擅长性能调优）。
+- **输入模式**：接受什么输入（代码文件 / 设计文档 / JSON 产物）。
+- **输出模式**：产出什么（评审意见 / VerifierOutput 片段 / 分析结论）。
+- **使用边界**：何时适用 / 何时应换其它 persona（供 V-lead/R-lead 分派时判断，避免选错角色 = 协作评审 R16 角色-任务匹配）。
+
+---
+
 ## 2. R-persona 选择矩阵（按 rootCause.category 与阶段）
 
 > 分派方式：并行/串行均可（见 [root-cause-locator.md](root-cause-locator.md) §4.2）
