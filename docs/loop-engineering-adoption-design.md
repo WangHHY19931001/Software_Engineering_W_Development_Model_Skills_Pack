@@ -515,10 +515,10 @@ interface MaturityConfig {
 
 ### 4.4 DoD 理解证据维度扩展
 
-> 在 definition-of-done.md「五维度标准」表新增第六维度「理解证据」，与现有测试/行为/文档/RTM/状态并列。
+> 在 definition-of-done.md「七维度标准」表新增第六维度「理解证据」，与现有测试/行为/文档/RTM/状态并列。
 
 ```markdown
-## 六维度标准（更新）
+## 七维度标准（更新）
 
 | 维度 | 标准 | 验证方式 | 不通过 → 动作 |
 |---|---|---|---|
@@ -528,6 +528,7 @@ interface MaturityConfig {
 | RTM | 需求/设计/代码/测试映射同步 | rtm.json 字段无空缺 | 补登记 RTM |
 | 状态 | status 如实反映 | 字段值与磁盘产物一致 | 修正 status |
 | **理解证据**（新增） | 阶段门放行须有用户理解证据 | run-log acknowledgedDecisions 非空且含 ≥1 关键决策摘要 | 拒绝放行；要求用户填入理解证据（O4 命中） |
+| **签名链完整性** | 每阶段每角色动作完成后写入 `signature-chain.jsonl`；G 跑门禁前校验 R1-R10 全通过 | `check-signature-chain.ts` R1-R10 | 补齐缺失角色签名与来源证明 |
 ```
 
 **自检清单新增**：
@@ -546,10 +547,10 @@ interface MaturityConfig {
 
 ### 4.6 SSoT 同步点
 
-- SSoT §10.6「项目级 Definition of Done」：五维度扩展为六维度，新增「理解证据」。
+- SSoT §10.6「项目级 Definition of Done」：五维度扩展为七维度，新增「理解证据」「签名链完整性」。
 - SSoT §7.6 LLM-as-a-Verifier 评审规范：summary 字段内容要求强化（阶段 digest 三要素）。
 - verifier-spec.md §6 summary 字段说明：新增内容要求三要素 + 示例。
-- definition-of-done.md：五维度 → 六维度 + 自检清单新增条目。
+- definition-of-done.md：五维度 → 七维度 + 自检清单新增条目。
 - SSoT §10A 追溯表更新 §10.6 行：实现位置新增「理解证据维度」。
 
 ---
@@ -584,11 +585,11 @@ interface MaturityConfig {
 
 | 文件 | 变更内容 | 对应优化 |
 |---|---|---|
-| `docs/skill-design-document_SSoT.md` | 新增 §10C 成熟度阶梯 / §10D 成本预算与运行日志；§4A.2 扩展 O1~O6；§10.6 六维度；§3.4.2 角色表 O 允许动作扩展；§10A 追溯表新增行 | 优化1~4 |
+| `docs/skill-design-document_SSoT.md` | 新增 §10C 成熟度阶梯 / §10D 成本预算与运行日志；§4A.2 扩展 O1~O6；§10.6 七维度；§3.4.2 角色表 O 允许动作扩展；§10A 追溯表新增行 | 优化1~4 |
 | `w-model-dev/references/operational-recovery.md` | 新增「成本预算与运行日志」节 + 「成熟度与 CHECKPOINT 放行」节 | 优化1~2 |
 | `w-model-dev/references/data-models.md` | 新增 budget.json / run-log.jsonl / maturity.json schema | 优化1~2 |
 | `w-model-dev/references/anti-patterns.md` | 新增「运维失败模式清单（O1~O6）」节 | 优化3 |
-| `w-model-dev/references/definition-of-done.md` | 五维度 → 六维度 + 自检清单新增 | 优化4 |
+| `w-model-dev/references/definition-of-done.md` | 五维度 → 七维度 + 自检清单新增 | 优化4 |
 | `w-model-dev/references/verifier-spec.md` | §6 summary 字段内容要求强化 | 优化4 |
 | `w-model-dev/references/subagent-delegation.md` | O 角色允许动作新增「预算与日志维护」+ 「成熟度判定」 | 优化1~2 |
 | `w-model-dev/SKILL.md` | 约束2 补充（L1+ 自动放行非绕过）；快速自检新增理解证据项 | 优化2~4 |
@@ -610,7 +611,7 @@ interface MaturityConfig {
 
 - [ ] SSoT 新增 §10C / §10D，与本文档双向追溯
 - [ ] SSoT §4A.2 扩展 O1~O6，与 anti-patterns.md 一致
-- [ ] SSoT §10.6 六维度，definition-of-done.md 一致
+- [ ] SSoT §10.6 七维度，definition-of-done.md 一致
 - [ ] data-models.md 含 budget / run-log / maturity schema
 - [ ] operational-recovery.md 含成本预算 + 成熟度两节
 - [ ] anti-patterns.md 含 O1~O6 节

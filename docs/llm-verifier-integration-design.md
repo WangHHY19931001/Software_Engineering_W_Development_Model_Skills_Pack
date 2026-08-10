@@ -52,7 +52,7 @@ flowchart TD
 
 关键设计要点：
 
-- **`/wm review` 不调用 LLM**：命令仅根据目标 ID 识别 `targetKind`（`requirement` / `design` / `testcase` / `file`），提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板、再调用校验脚本。
+- **`/wm review` 不调用 LLM**：命令仅根据目标 ID 识别 `targetKind`（`requirement` / `design` / `code` / `test`），提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板、再调用校验脚本。
 - **提示词与校验脚本同源**：`verifier-spec.md` §6 定义输出 Schema、§7 定义子标准集合；`w-model-dev/scripts/verifier-logic.ts` 是同一套 Schema 与子标准的纯逻辑单点事实源，`check-verifier-output.ts` 是其 CLI 包装。两者指向同一份事实源，避免提示词与校验漂移。
 - **校验项**：schemaVersion、meta 字段、子标准名称与权重（不得改动）、`score ∈ [0,1]`、`rawScores.length = repeatTimes`、`variance ≤ 阈值`、`evidence` 非空、综合分数 = `Σ(score*weight)`、质量等级与综合分数映射一致、`passed = (A or B)`、`passed=false` 时 `reworkHints` 非空、`ranking`（可选）类型合法。
 
