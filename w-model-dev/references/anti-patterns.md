@@ -113,6 +113,8 @@
 | #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #17/#19 + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/check-iceberg-sweep.ts) |
+| #45（为通过测试而修改断言/测试期望） | 阶段门评审 / V 评审 | V 评审人工核验断言与需求对应关系（反指标游戏，Goodhart） |
+| #46（只给审计权不给修正权） | 全流程 | CHECKPOINT 显式标注介入路径（外科手术录像回放） |
 
 ## 与门禁脚本的对应关系
 
@@ -158,6 +160,8 @@
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/security-scan.ts) 源码级扫描） |
 | #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
+| #45（为通过测试而修改断言/测试期望） | 无专用脚本（V 评审人工核验断言与需求对应关系） |
+| #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 
 ## 命中后的处理流程
 
@@ -699,6 +703,8 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **例外**：经用户/主刀明确批准的需求变更（走豁免或 S→R→V→人类四阶段），不视为违反。
 
+**门禁脚本**：无专用脚本（软检测——由 V 评审人工核验断言与需求对应关系）
+
 **关联**：SSoT §3.4.39（[39.0.0] 新增）；[testing-anti-patterns.md](../../.cursor/skills/test-driven-development/testing-anti-patterns.md)「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd-guide.md](bdd-guide.md) P1 批新增节）
 
 ## #46 只给审计权不给修正权（第 39 轮新增）
@@ -715,6 +721,8 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **回退动作**：回到当前阶段起点，为流程补"中途介入"位点（对话式 CHECKPOINT 已提供，须显式标注介入路径）。
 
 **例外**：判据幂等、任务定义清晰、方案空间已被人类踩平的全自动域（如标准数据处理/格式转换），不强制介入位点。
+
+**门禁脚本**：无专用脚本（流程设计属性——由 CHECKPOINT 介入路径标注保证）
 
 **关联**：SSoT §3.4.39（[39.0.0] 新增）；「主刀职责映射表」见 [subagent-delegation.md](subagent-delegation.md)；「修正权验收测试」见 [definition-of-done.md](definition-of-done.md)
 
