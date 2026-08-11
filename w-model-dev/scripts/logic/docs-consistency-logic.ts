@@ -39,6 +39,10 @@ export interface DocConsistencyInput {
   designDocs: Array<{ name: string; content: string }>;
   /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（期望 35） */
   testFileCount: number;
+  /** w-model-dev/scripts 目录下 .ts 文件是否有变更（git diff + porcelain 判定，由 CLI 层注入） */
+  scriptsChanged: boolean;
+  /** 根目录 .eslintsecurity-baseline.json 指纹条目数；-1 = 缺失/不可解析，0 = 空 */
+  securityBaselineEntryCount: number;
 }
 
 export const EXPECTED = {
@@ -98,6 +102,7 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkAssetCounts(input.personaCount, input.cursorSkillCount));
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
+  violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
   return violations;
 }
 
@@ -303,6 +308,28 @@ function checkVitestFileCount(testFileCount: number, readme: string, agents: str
   }
   if (!agents.includes(`${EXPECTED.vitestFileCount} 个 .test.ts`)) {
     violations.push({ check: 'vitest-files', message: `AGENTS.md 应含「${EXPECTED.vitestFileCount} 个 .test.ts」vitest 表述` });
+  }
+  return violations;
+}
+
+/**
+ * 安全 baseline 同步检查（spec §3 B3）：w-model-dev/scripts/** 下 .ts 文件有变更时，
+ * 根目录 .eslintsecurity-baseline.json 必须存在且非空（sha256 指纹文件），否则 security-scan
+ * 无法豁免既有风险，属文档/门禁漂移。
+ */
+function checkBaselineSync(scriptsChanged: boolean, baselineEntryCount: number): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (!scriptsChanged) return violations;
+  if (baselineEntryCount < 0) {
+    violations.push({
+      check: 'baseline-sync',
+      message: 'w-model-dev/scripts/** 有变更，但根目录 .eslintsecurity-baseline.json 缺失或不可解析（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
+    });
+  } else if (baselineEntryCount === 0) {
+    violations.push({
+      check: 'baseline-sync',
+      message: 'w-model-dev/scripts/** 有变更，但 .eslintsecurity-baseline.json 指纹条目为空（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
+    });
   }
   return violations;
 }

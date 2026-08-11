@@ -32,6 +32,8 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     designDocs: [],
     testFileCount: 35,
     prePush: '# 14. docs-consistency\n# 与原 CI 一致：14 项检查',
+    scriptsChanged: false,
+    securityBaselineEntryCount: -1,
     ...overrides,
   };
 }
@@ -192,5 +194,29 @@ describe('runDocConsistencyChecks', () => {
     const input = baseInput({ readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）', agents: '30 个脚本' });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-files');
     expect(v.length).toBeGreaterThan(0);
+  });
+
+  it('scripts 有变更且 baseline 缺失 → baseline-sync 违规', () => {
+    const input = baseInput({ scriptsChanged: true, securityBaselineEntryCount: -1 });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'baseline-sync');
+    expect(v.length).toBe(1);
+    expect(v[0]!.message).toContain('.eslintsecurity-baseline.json');
+  });
+
+  it('scripts 有变更且 baseline 空 → baseline-sync 违规', () => {
+    const input = baseInput({ scriptsChanged: true, securityBaselineEntryCount: 0 });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'baseline-sync');
+    expect(v.length).toBe(1);
+    expect(v[0]!.message).toContain('指纹条目为空');
+  });
+
+  it('scripts 无变更即使 baseline 缺失 → 无 baseline-sync 违规', () => {
+    const input = baseInput({ scriptsChanged: false, securityBaselineEntryCount: -1 });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
+  });
+
+  it('scripts 有变更且 baseline 非空 → 无 baseline-sync 违规', () => {
+    const input = baseInput({ scriptsChanged: true, securityBaselineEntryCount: 42 });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
   });
 });

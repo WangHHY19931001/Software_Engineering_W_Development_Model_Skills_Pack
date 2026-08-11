@@ -15,10 +15,12 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from '../lib/cli-error.js';
 import { printGateReport } from '../lib/gate-report.js';
+import { parseJsonSafe } from '../lib/safe-json.js';
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
 const REQUIRED_PATHS = [
@@ -55,6 +57,45 @@ const DESIGN_DOC_NAMES = [
   'skill-design-document.md',
   'tla-plus-modeling-design.md',
 ];
+
+/**
+ * 判定 w-model-dev/scripts 目录下 .ts 文件是否有变更（spec §3 B3 baseline 同步检查的触发条件）。
+ * 合并两路 git 输出，覆盖 staged / unstaged / 未跟踪新文件：
+ *   - git diff --name-only HEAD：工作树 + 暂存区相对 HEAD 的变更
+ *   - git status --porcelain：含未跟踪（??）新文件，兜底 diff 未覆盖的部分
+ * git 不可用（非 git 仓库 / 命令失败）时保守返回 false —— 无法判定变更时不阻断门禁。
+ */
+function detectScriptsChanges(root: string): boolean {
+  const paths: string[] = [];
+  const diff = spawnSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf-8' });
+  if (diff.error === undefined && diff.status === 0) {
+    paths.push(...String(diff.stdout).split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0));
+  }
+  const status = spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf-8' });
+  if (status.error === undefined && status.status === 0) {
+    for (const line of String(status.stdout).split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t) continue;
+      paths.push(t.slice(3)); // porcelain 每行 "XY path" / "?? path" → 去掉状态前缀
+    }
+  }
+  return paths.some((p) => /^w-model-dev\/scripts\/.*\.ts$/.test(p));
+}
+
+/**
+ * 读取根目录 .eslintsecurity-baseline.json 的指纹条目数。
+ * 返回：-1 = 缺失或不可解析；0 = 存在但 entries 为空；>0 = 正常指纹条目数。
+ */
+function readSecurityBaselineEntryCount(root: string): number {
+  const baselinePath = join(root, '.eslintsecurity-baseline.json');
+  if (!existsSync(baselinePath)) return -1;
+  try {
+    const parsed = parseJsonSafe(readFileSync(baselinePath, 'utf-8')) as { entries?: unknown } | null;
+    return parsed !== null && Array.isArray(parsed.entries) ? parsed.entries.length : -1;
+  } catch {
+    return -1;
+  }
+}
 
 function main(): void {
   const root = pathResolve(process.argv[2] ?? '.');
@@ -99,6 +140,8 @@ function main(): void {
     prePush: read('.githooks/pre-push'),
     designDocs,
     testFileCount,
+    scriptsChanged: detectScriptsChanges(root),
+    securityBaselineEntryCount: readSecurityBaselineEntryCount(root),
   };
 
   const violations = runDocConsistencyChecks(input);
