@@ -2,133 +2,37 @@
 /**
  * 工件质量门校验脚本（Artifact Gate Checker）
  *
- * 对应 SSoT §10.5「工件质量门」。供 AI Agent 在验收测试阶段直接调用，
- * 判定 W 模型产出物是否满足放行条件。
- *
- * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
- *
- * 参数：
- *   project-dir  项目根目录（默认：当前工作目录）
- *
- * 读取：
- *   <project-dir>/.w-model/rtm.json   （由 Agent 在执行 /wm 命令时维护）
- *
- * 退出码：
- *   0  质量门通过（RTM 需求覆盖率 100% 且四级测试全部通过）
- *   1  质量门未通过（reasons 列出具体原因）
- *   2  输入错误（RTM 文件不存在 / 格式非法）
- *
- * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要，便于 Agent 解析）
+ * 对应 SSoT §10.5「工件质量门」。供 AI Agent 在验收测试阶段直接调用，判定 W 模型产出物是否满足放行条件。
+ * 用法：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
+ * 退出码：0 通过；1 未通过（reasons 列出具体原因）；2 输入错误（RTM 不存在 / 格式非法）
+ * 资产读取与校验已拆分至 artifact-gate-assets.ts / uat-path-mapping.ts（Task A1），本文件仅保留
+ * 参数解析、资产装配、gate-logic 调用、结果合并与报告输出。
  */
 
-import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   checkArtifactGate,
-  checkUatPathMappingBackfill,
-  type GateGraph,
   type PhaseOption,
   type RTMMatrixShape,
-  type UatPathMappingRow,
 } from '../logic/gate-logic.js';
-import { validateBySchema } from '../logic/schema-loader.js';
-import { parseUatPathMappingContent } from '../logic/design-contract-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import {
+  discoverGraphAsset,
+  readBddManifest,
+  readTlaManifest,
+  runModelChecks,
+} from './artifact-gate-assets.js';
+import { collectUatMappingViolations } from './uat-path-mapping.js';
+export { checkUatPathMappingContent } from './uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出
 
 const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
 const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
 const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
-
-/**
- * 阶段文档路径解析（directory-conventions.md §7 SSoT）。
- * 禁止在门禁脚本中硬编码 docs/uat-path-mapping.md 等路径，统一走本函数。
- *
- * @param phase 阶段号 1-8
- * @param type  文档类型：'requirement-spec' | 'acceptance-test-design' | 'uat-path-mapping'
- *              | 'system-design' | 'system-test' | 'interface-design' | 'integration-test'
- *              | 'detailed-design' | 'unit-test' | 'integration-test-phase6'
- *              | 'system-test-phase7' | 'acceptance-test-phase8'
- * @returns 相对项目根的路径（如 'docs/phase1-requirements/requirement-spec.md'）
- */
-const PHASE_DOC_MAP: Record<number, Record<string, string>> = {
-  1: {
-    'requirement-spec': 'docs/phase1-requirements/requirement-spec.md',
-    'acceptance-test-design': 'docs/phase1-requirements/acceptance-test-design.md',
-    'uat-path-mapping': 'docs/uat-path-mapping.md',
-  },
-  2: {
-    'system-design': 'docs/phase2-design/{module}-system-design.md',
-    'system-test': 'docs/phase2-design/{module}-system-test.md',
-  },
-  3: {
-    'interface-design': 'docs/phase3-outline/{module}-interface-design.md',
-    'integration-test': 'docs/phase3-outline/{module}-integration-test.md',
-  },
-  4: {
-    'detailed-design': 'docs/phase4-detailed/{module}-detailed-design.md',
-    'unit-test': 'docs/phase4-detailed/{module}-unit-test.md',
-  },
-  6: { 'integration-test-phase6': 'docs/phase6-integration-test/integration-test.md' },
-  7: { 'system-test-phase7': 'docs/phase7-system-test/system-test.md' },
-  8: { 'acceptance-test-phase8': 'docs/phase8-acceptance-test/acceptance-test.md' },
-};
-
-function resolvePhaseDoc(phase: number, type: string): string {
-  const phaseMap = PHASE_DOC_MAP[phase];
-  if (!phaseMap) {
-    throw new Error(`resolvePhaseDoc: 未支持的 phase=${phase}（directory-conventions.md §1）`);
-  }
-  const docPath = phaseMap[type];
-  if (!docPath) {
-    throw new Error(`resolvePhaseDoc: phase=${phase} 无 type="${type}" 映射（directory-conventions.md §1）`);
-  }
-  return docPath;
-}
-
-/**
- * 从 uat-path-mapping.md 内容解析映射行（round28 G-B B4：严格解析）。
- * 格式：| UAT-001 | POST /api/posts | POST /api/posts | 直接 | ... |
- *
- * 严格化规则：
- * - 表头校验：数据行首列必须为 `UAT-` 前缀（`UAT-\d+`）；表头行 / 分隔行 / 其它表格行一律忽略。
- * - 数据行格式不符（单元格数 < 4 或前 4 列含空单元格）→ 记录 violation，不静默跳行。
- * - 文件非空但解析不出任何映射行 → violation「uat-path-mapping 无有效映射行」。
- *
- * 实现收敛（批次3 Task7）：统一复用 design-contract-logic.parseUatPathMappingContent（strict=true），
- * 字段映射到 uatId/actualPath/mappingType；violation 文案与行号格式与历史严格版逐字节一致。
- */
-export interface UatPathMappingParseResult {
-  rows: UatPathMappingRow[];
-  violations: string[];
-}
-
-export function parseUatPathMappingFromContent(content: string): UatPathMappingParseResult {
-  const parsed = parseUatPathMappingContent(content, { strict: true });
-  const rows: UatPathMappingRow[] = parsed.rows.map((row) => ({
-    uatId: row.uatId,
-    actualPath: row.cells[2] ?? '',
-    mappingType: row.cells[3] ?? '',
-  }));
-  return { rows, violations: parsed.violations };
-}
-
-/**
- * uat-path-mapping 内容综合校验（B4 严格解析 + 回填校验）。
- * 供 check-artifact-gate CLI 阶段 5 / 终检与 self-test 共用。
- */
-export function checkUatPathMappingContent(content: string): string[] {
-  const { rows, violations } = parseUatPathMappingFromContent(content);
-  return [...violations, ...checkUatPathMappingBackfill(rows)];
-}
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
@@ -255,178 +159,37 @@ async function main(): Promise<void> {
   // ==================== TLA+ 资产读取（spec §3.4.4） ====================
   // P2.6 graph 资产自动发现：按优先级查找 .w-model/ingestion/ 下的 graph 资产
   const ingestionDir = path.resolve(projectDir, '.w-model', 'ingestion');
-  const graphCandidates = [
-    path.join(ingestionDir, 'graph.json'),
-    path.join(ingestionDir, 'consolidated-phase4.json'),
-    path.join(ingestionDir, 'consolidated-phase3.json'),
-    path.join(ingestionDir, 'consolidated-phase2.json'),
-    path.join(ingestionDir, 'consolidated-phase1.json'),
-  ];
-  let graph: GateGraph | undefined;
-  let graphSource = '';
-  for (const candidate of graphCandidates) {
-    try {
-      const graphRaw = await fs.readFile(candidate, 'utf-8');
-      const graphParsed = parseJsonSafe(graphRaw) as GateGraph;
-      if (graphParsed && Array.isArray(graphParsed.nodes)) {
-        graph = graphParsed;
-        graphSource = path.basename(candidate);
-        break;
-      }
-    } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      if (e.code !== 'ENOENT') {
-        console.error(`⚠ ${path.basename(candidate)} 读取失败（忽略）: ${e.message}`);
-      }
-    }
-  }
+  const { graph, graphSource } = await discoverGraphAsset(ingestionDir);
 
   // 2. 检查 tla-manifest.json 存在性 + specs 非空
   const manifestFile = path.resolve(projectDir, MANIFEST_RELATIVE_PATH);
-  let manifestExists = false;
-  try {
-    const manifestRaw = await fs.readFile(manifestFile, 'utf-8');
-    const manifestParsed = parseJsonSafe(manifestRaw) as { specs?: unknown[] };
-    if (manifestParsed && Array.isArray(manifestParsed.specs) && manifestParsed.specs.length > 0) {
-      manifestExists = true;
-    }
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') {
-      console.error(`⚠ tla-manifest.json 读取失败（忽略，按不存在处理）: ${e.message}`);
-    }
-    // ENOENT 或解析失败 → manifestExists 保持 false
-  }
+  const manifestExists = await readTlaManifest(manifestFile);
 
   // ==================== BDD 资产读取（spec §13.2 #18） ====================
   // 与 TLA+ manifest 校验对称：检查 bdd-manifest.json 存在性 + schema + features 文件存在性
   // + stateMachines 七要素非空（states/acceptingStates/transitions/invariants）。
   // 阶段 4 后才要求 bdd-manifest.json 存在（阶段 1-3 可能还未创建）。
   const bddManifestFile = path.resolve(projectDir, BDD_MANIFEST_RELATIVE_PATH);
-  const bddViolations: string[] = [];
-  let bddManifestExists = false;
   const effectivePhase: PhaseOption = phaseOption ?? 8;
-  try {
-    const bddRaw = await fs.readFile(bddManifestFile, 'utf-8');
-    const bddManifestParsed = parseJsonSafe(bddRaw) as unknown;
-    bddManifestExists = true;
-    const bddSchemaResult = validateBySchema('bdd-manifest', bddManifestParsed);
-    if (!bddSchemaResult.valid) {
-      bddViolations.push(`[artifact:bdd] manifest schema failed: ${bddSchemaResult.errorMessages.join('; ')}`);
-    } else {
-      const bddManifest = bddManifestParsed as {
-        basePath: string;
-        features: Array<{ filePath: string }>;
-        stateMachines: Array<{
-          id: string;
-          states: string[];
-          acceptingStates: string[];
-          transitions: unknown[];
-          invariants: string[];
-        }>;
-      };
-      // 检查 features 文件存在
-      const bddBasePath = path.resolve(projectDir, bddManifest.basePath);
-      for (const f of bddManifest.features ?? []) {
-        const fp = path.resolve(bddBasePath, f.filePath);
-        try {
-          await fs.access(fp);
-        } catch {
-          bddViolations.push(`[artifact:bdd] feature file missing: ${f.filePath}`);
-        }
-      }
-      // 检查 stateMachines 七要素非空
-      for (const sm of bddManifest.stateMachines ?? []) {
-        if (!sm.states?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no states`);
-        if (!sm.acceptingStates?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no accepting states`);
-        if (!sm.transitions?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no transitions`);
-        if (!sm.invariants?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no invariants`);
-      }
-    }
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') {
-      console.error(`⚠ bdd-manifest.json 读取失败（忽略，按不存在处理）: ${e.message}`);
-    }
-    // ENOENT 或解析失败 → bddManifestExists 保持 false
-  }
-  if (!bddManifestExists && effectivePhase >= 4) {
-    // 阶段 4 后必须有 BDD manifest
-    bddViolations.push('[artifact:bdd] .w-model/bdd-manifest.json missing (required after phase 4)');
-  }
+  const { bddViolations, bddManifestExists } = await readBddManifest(bddManifestFile, projectDir, effectivePhase);
 
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
   const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption, specDir });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
   // phase>=2 时，终检调用 check-tla-model.ts + check-bdd-model.ts，传递 --graph + --phase
-  const modelCheckViolations: string[] = [];
   const graphPath = graphSource ? path.join(ingestionDir, graphSource) : '';
-
-  if (manifestExists && effectivePhase >= 2 && graphPath) {
-    // 调用 check-tla-model.ts
-    const tlaModelResult = spawnSync(
-      process.execPath,
-      [
-        '--import', 'tsx',
-        path.resolve(__dirname, 'check-tla-model.ts'),
-        manifestFile,
-        `--phase=${effectivePhase}`,
-        `--graph=${graphPath}`,
-      ],
-      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
-    );
-    if (tlaModelResult.status !== 0) {
-      modelCheckViolations.push(
-        `[artifact:tla-model] check-tla-model 退出码 ${tlaModelResult.status}：${(tlaModelResult.stdout ?? '').split('\n').slice(-5).join(' | ')}`,
-      );
-    }
-
-    // 调用 check-bdd-model.ts
-    if (bddManifestExists) {
-      const bddModelResult = spawnSync(
-        process.execPath,
-        [
-          '--import', 'tsx',
-          path.resolve(__dirname, 'check-bdd-model.ts'),
-          bddManifestFile,
-          `--phase=${effectivePhase}`,
-          `--graph=${graphPath}`,
-        ],
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
-      );
-      if (bddModelResult.status !== 0) {
-        modelCheckViolations.push(
-          `[artifact:bdd-model] check-bdd-model 退出码 ${bddModelResult.status}：${(bddModelResult.stdout ?? '').split('\n').slice(-5).join(' | ')}`,
-        );
-      }
-    }
-  }
+  const modelCheckViolations = runModelChecks({
+    manifestExists,
+    effectivePhase,
+    graphPath,
+    manifestFile,
+    bddManifestExists,
+    bddManifestFile,
+  });
 
   // uat-path-mapping 校验违反（计入终检结果，B4/B5：解析严格化 + 阶段5/终检均校验）
-  const uatMappingViolations: string[] = [];
-
-  const uatMappingRel = resolvePhaseDoc(1, 'uat-path-mapping');
-  // P0-1: phase=1 校验 uat-path-mapping 存在性
-  if (phaseOption === 1) {
-    const uatMappingPath = path.resolve(projectDir, uatMappingRel);
-    try {
-      await fs.access(uatMappingPath);
-    } catch {
-      uatMappingViolations.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在，阶段1须产出该文件（见 phase-1-requirements.md §输出）');
-    }
-  }
-
-  // P0-1: phase=5 / 终检（B5：无 --phase 终检默认 phase 8 也校验）校验 uat-path-mapping 回填
-  if (phaseOption === 5 || phaseOption === undefined) {
-    const uatMappingPath = path.resolve(projectDir, uatMappingRel);
-    try {
-      const content = await fs.readFile(uatMappingPath, 'utf-8');
-      uatMappingViolations.push(...checkUatPathMappingContent(content));
-    } catch {
-      uatMappingViolations.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在或无法读取');
-    }
-  }
+  const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
 
   // 合并 uat-path-mapping + BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
   const allReasons = [...result.reasons, ...uatMappingViolations, ...bddViolations, ...modelCheckViolations];
