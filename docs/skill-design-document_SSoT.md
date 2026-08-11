@@ -2893,7 +2893,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 本技能是**单纯的编排 + 校验脚本技能**，无独立部署物。技能资产（`w-model-dev/` 目录）作为纯文件分发给 AI Agent 使用：
 
 - **Agent 分发**：将 `w-model-dev/` 拷贝到目标 Agent 的 skills 目录（详见 [`docs/INSTALL.md`](./INSTALL.md)），无需构建、无需服务进程。
-- **校验脚本**：`w-model-dev/scripts/*.ts` 由 Agent 在阶段门评审时直接 `npx tsx` 执行，无后端服务。
+- **校验脚本**：`w-model-dev/scripts/cli/*.ts` 由 Agent 在阶段门评审时直接 `npx tsx` 执行，无后端服务。
 
 ### 11.2 外部集成（消费方自行实现）
 
@@ -2915,7 +2915,7 @@ graph TD
 
     subgraph 技能包[本技能：纯资产]
         SKILL[w-model-dev/SKILL.md<br/>编排逻辑]
-        SCRIPTS[w-model-dev/scripts/*.ts<br/>门禁校验]
+        SCRIPTS[w-model-dev/scripts/cli/*.ts<br/>门禁校验]
     end
 
     subgraph 外部能力[外部能力]
