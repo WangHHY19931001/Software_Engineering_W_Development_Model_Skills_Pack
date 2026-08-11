@@ -197,6 +197,7 @@ async function main(): Promise<void> {
     const e = err as NodeJS.ErrnoException;
     exitWithError({
       category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+      rule: e.code === 'ENOENT' ? 'P0-2' : undefined,
       message: e.code === 'ENOENT' ? '文件不存在' : err instanceof SyntaxError ? '文件解析失败（非合法 JSON）' : '文件读取失败',
       file: BASELINE_PATH,
       detail: e.code ?? '未知错误',

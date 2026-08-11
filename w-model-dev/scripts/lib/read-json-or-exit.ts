@@ -159,7 +159,7 @@ export async function readJsonClassified<T = unknown>(file: string): Promise<T> 
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, file: abs });
+      exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, rule: 'P0-2', file: abs });
     } else {
       exitWithError({ category: 'FILE_READ', message: '文件读取失败', exitCode: 2, file: abs, detail: e.code ?? '未知错误' });
     }

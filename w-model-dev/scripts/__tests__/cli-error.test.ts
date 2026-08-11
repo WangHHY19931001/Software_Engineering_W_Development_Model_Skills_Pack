@@ -51,6 +51,10 @@ describe('formatCliError', () => {
   it('formatCliError 附加 [rule=...] 段', () => {
     expect(formatCliError({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1' })).toBe('✗ [ARG_INVALID] m [rule=P0-1]');
   });
+
+  it('formatCliError rule 与 tail 组合输出', () => {
+    expect(formatCliError({ category: 'FILE_NOT_FOUND', message: 'm', exitCode: 2, rule: 'P0-2', file: '/x/rtm.json' })).toBe('✗ [FILE_NOT_FOUND] m [rule=P0-2]: /x/rtm.json');
+  });
 });
 
 describe('printError / printErrorJson', () => {
