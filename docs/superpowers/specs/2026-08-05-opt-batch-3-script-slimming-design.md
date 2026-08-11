@@ -195,7 +195,7 @@ export async function readJsonlOptional(file: string, label?: string): Promise<u
 |---|---|---|
 | 新增 lib | `w-model-dev/scripts/lib/gate-report.ts` | 新增（3.1） |
 | 新增 lib | `w-model-dev/scripts/lib/parse-phase.ts` | 新增（3.2） |
-| 新增 logic | `w-model-dev/scripts/logic/state-machine-logic.ts` | 新增（3.5） |
+| 新增 logic | `w-model-dev/scripts/state-machine-logic.ts` | 新增（3.5） |
 | 修改 lib | `w-model-dev/scripts/lib/read-json-or-exit.ts` | 修改（3.12） |
 | 修改 | 23 个 check-*.ts 收尾（3.1）+ 13 个文件 --phase（3.2） | 修改 |
 | 修改 | `graph-logic.ts`（3.3）、`code-tla-logic.ts`（3.4）、`bdd-logic.ts`（3.6）、`design-contract-logic.ts`（3.7）、`run-log-logic.ts`（3.9）、`signature-chain-logic.ts`（3.11） | 修改 |

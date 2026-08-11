@@ -246,12 +246,12 @@ fixture 设计原则：仅触发目标规则，其余字段保持合法（参考
 | 模板 | `w-model-dev/templates/requirement-spec.md` | NFR 字段增可测量性提示 | 低 |
 | 参考 | `w-model-dev/references/verifier-spec.md` | §6 summary 三要素 + §7 Schema 新增 R11/R12 | 低+高 |
 | 参考 | `w-model-dev/references/anti-patterns.md` | #20/#21 增检测信号字段 + 候选 #22（pending V 复审） | 低 |
-| 脚本 | `w-model-dev/scripts/logic/verifier-logic.ts` | 新增 checkR11SummaryLength + checkR12EvidenceNonEmpty + 方差重算注释 | 高 |
-| 脚本 | `w-model-dev/scripts/cli/check-verifier-output.ts` | **不改**（CLI 入口仅调用 verifier-logic.ts 的 checkVerifierOutput()，新规则在该函数内追加） | — |
+| 脚本 | `w-model-dev/scripts/verifier-logic.ts` | 新增 checkR11SummaryLength + checkR12EvidenceNonEmpty + 方差重算注释 | 高 |
+| 脚本 | `w-model-dev/scripts/check-verifier-output.ts` | **不改**（CLI 入口仅调用 verifier-logic.ts 的 checkVerifierOutput()，新规则在该函数内追加） | — |
 | fixture | `w-model-dev/scripts/samples/verifier/bad-summary-too-short.json` | 新增（R11 触发样本） | 高配套 |
 | fixture | `w-model-dev/scripts/samples/verifier/bad-evidence-empty.json` | 新增（R12 触发样本） | 高配套 |
 | 测试 | `w-model-dev/scripts/__tests__/verifier-r11-r12.test.ts`（新建） | 新增 R11/R12 单元测试 | 高配套 |
-| 测试 | `w-model-dev/scripts/cli/self-test.ts` | 基线 92→94（新增 2 条 R11/R12） | 高配套 |
+| 测试 | `w-model-dev/scripts/self-test.ts` | 基线 92→94（新增 2 条 R11/R12） | 高配套 |
 
 ### 4.3 SSoT 同步点（SSoT 优先原则）
 
@@ -384,9 +384,9 @@ fixture 设计原则：仅触发目标规则，其余字段保持合法（参考
 | CP1 | `npx tsc --noEmit` | 0 | Part C/D 后 |
 | CP2 | `npm run self-test` | 0 | Part C 后（92）/ Part D 后（94） |
 | CP3 | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 | Part D 后（74） |
-| CP4 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts samples/verifier/bad-summary-too-short.json` | 1 | Part D 后 |
-| CP5 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts samples/verifier/bad-evidence-empty.json` | 1 | Part D 后 |
-| CP6 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts samples/verifier/valid.json` | 0 | Part D 后（回归） |
+| CP4 | `npx tsx w-model-dev/scripts/check-verifier-output.ts samples/verifier/bad-summary-too-short.json` | 1 | Part D 后 |
+| CP5 | `npx tsx w-model-dev/scripts/check-verifier-output.ts samples/verifier/bad-evidence-empty.json` | 1 | Part D 后 |
+| CP6 | `npx tsx w-model-dev/scripts/check-verifier-output.ts samples/verifier/valid.json` | 0 | Part D 后（回归） |
 
 ---
 
@@ -400,7 +400,7 @@ fixture 设计原则：仅触发目标规则，其余字段保持合法（参考
 | `w-model-dev/references/external-skills-absorption.md` | 同级，外部技能吸收；本设计是方法论吸收（不冲突） |
 | `w-model-dev/references/anti-patterns.md` | 下游，候选反模式 #22 入清单（pending V 复审） |
 | `w-model-dev/references/verifier-spec.md` | 下游，R11/R12 规则文档化 |
-| `w-model-dev/scripts/logic/verifier-logic.ts` | 下游，R11/R12 实现 |
+| `w-model-dev/scripts/verifier-logic.ts` | 下游，R11/R12 实现 |
 | 第 13 轮 `2026-07-26-round13-gate-robustness-and-maturity-semantics-design.md` | 类比，第 13 轮吸收 TLA+ §14 方法论；本轮吸收 SkillOpt 方法论，同构 |
 
 ---

@@ -31,7 +31,7 @@
 ## Task 1: isMain 守卫修复
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-state-machine-consistency.ts:22`（加 import）、`:159-165`（isMain 守卫）
+- Modify: `w-model-dev/scripts/check-state-machine-consistency.ts:22`（加 import）、`:159-165`（isMain 守卫）
 
 - [ ] **Step 1: 增加 `fileURLToPath` import**
 
@@ -72,14 +72,14 @@ const isMain = (() => {
 Run: `npx tsc --noEmit`
 Expected: 0 错误。
 
-Run: `npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/valid-consistent.json`
+Run: `npx tsx w-model-dev/scripts/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/valid-consistent.json`
 Expected: 输出状态机一致性校验报告，`STATE_MACHINE_JSON ... "passed":true`，退出码 0（确认 isMain=true、main 正常执行）。
 
 Run: 在含空格/中文的临时路径下复制脚本与样本复验：
 ```powershell
 $tmp = Join-Path $env:TEMP "state machine 测试";
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null;
-Copy-Item w-model-dev/scripts/cli/check-state-machine-consistency.ts $tmp;
+Copy-Item w-model-dev/scripts/check-state-machine-consistency.ts $tmp;
 Copy-Item w-model-dev/scripts/samples/state-machine/valid-consistent.json $tmp;
 Copy-Item -Recurse w-model-dev/scripts/lib $tmp;
 npx tsx "$tmp/check-state-machine-consistency.ts" "$tmp/valid-consistent.json"
@@ -89,7 +89,7 @@ Expected: 正常输出校验报告（修复前此处 isMain=false 会静默退�
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/cli/check-state-machine-consistency.ts
+git add w-model-dev/scripts/check-state-machine-consistency.ts
 git commit --no-gpg-sign -m "fix(state-machine): isMain 守卫 fileURLToPath 修复 Windows 路径静默放行"
 ```
 
@@ -98,7 +98,7 @@ git commit --no-gpg-sign -m "fix(state-machine): isMain 守卫 fileURLToPath 修
 ## Task 2: cleanTraceFiles TLC 白名单加固（TDD）
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-tla-model.ts:165-204`（cleanTraceFiles + 新增 isTlcStatesDir）
+- Modify: `w-model-dev/scripts/check-tla-model.ts:165-204`（cleanTraceFiles + 新增 isTlcStatesDir）
 - Create: `w-model-dev/scripts/__tests__/tla-clean-trace.test.ts`
 
 - [ ] **Step 1: 写失败测试**
@@ -295,7 +295,7 @@ Expected: 0 错误。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/__tests__/tla-clean-trace.test.ts
+git add w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/__tests__/tla-clean-trace.test.ts
 git commit --no-gpg-sign -m "fix(tla): cleanTraceFiles TLC 产物白名单（防误删同名 states 目录）"
 ```
 
@@ -497,22 +497,22 @@ git commit --no-gpg-sign -m "feat(lib): safe-json 原型污染防御 + read-json
 ## Task 5: CLI 脚本 parse 入口批量接入
 
 **Files（每个文件做两件事：加 `import { parseJsonSafe } from './lib/safe-json.js'`（或相对路径），并把目标 `JSON.parse(...)` 替换为 `parseJsonSafe(...)`,保持其余不变）：**
-- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts:196/:222/:241/:263`
-- Modify: `w-model-dev/scripts/cli/check-bdd-model.ts:79`
-- Modify: `w-model-dev/scripts/cli/check-budget.ts:87/:146`
-- Modify: `w-model-dev/scripts/cli/check-maturity.ts:87/:130`
-- Modify: `w-model-dev/scripts/cli/check-preventive-review.ts:92/:162`
-- Modify: `w-model-dev/scripts/cli/check-requirement-coverage.ts:57/:94/:138`
-- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts:83/:122`
-- Modify: `w-model-dev/scripts/cli/check-role-dispatch.ts:70`
-- Modify: `w-model-dev/scripts/cli/check-run-log.ts:116`
-- Modify: `w-model-dev/scripts/cli/check-codegraph-queries.ts:81`
-- Modify: `w-model-dev/scripts/cli/metrics-report.ts:129`
-- Modify: `w-model-dev/scripts/cli/wm-status.ts:66/:90`
-- Modify: `w-model-dev/scripts/cli/security-scan.ts:166/:194`
-- Modify: `w-model-dev/scripts/logic/schema-loader.ts:37`
-- Modify: `w-model-dev/scripts/logic/run-log-logic.ts:469`
-- Modify: `w-model-dev/scripts/cli/self-test.ts`（内部 ~25 处 `JSON.parse(` → `parseJsonSafe(`）
+- Modify: `w-model-dev/scripts/check-artifact-gate.ts:196/:222/:241/:263`
+- Modify: `w-model-dev/scripts/check-bdd-model.ts:79`
+- Modify: `w-model-dev/scripts/check-budget.ts:87/:146`
+- Modify: `w-model-dev/scripts/check-maturity.ts:87/:130`
+- Modify: `w-model-dev/scripts/check-preventive-review.ts:92/:162`
+- Modify: `w-model-dev/scripts/check-requirement-coverage.ts:57/:94/:138`
+- Modify: `w-model-dev/scripts/check-requirement-graph.ts:83/:122`
+- Modify: `w-model-dev/scripts/check-role-dispatch.ts:70`
+- Modify: `w-model-dev/scripts/check-run-log.ts:116`
+- Modify: `w-model-dev/scripts/check-codegraph-queries.ts:81`
+- Modify: `w-model-dev/scripts/metrics-report.ts:129`
+- Modify: `w-model-dev/scripts/wm-status.ts:66/:90`
+- Modify: `w-model-dev/scripts/security-scan.ts:166/:194`
+- Modify: `w-model-dev/scripts/schema-loader.ts:37`
+- Modify: `w-model-dev/scripts/run-log-logic.ts:469`
+- Modify: `w-model-dev/scripts/self-test.ts`（内部 ~25 处 `JSON.parse(` → `parseJsonSafe(`）
 
 > 机械替换规则（每处）：
 > 1. 调用点所在文件顶部 import 区加 `import { parseJsonSafe } from '<相对路径>/lib/safe-json.js';`（`w-model-dev/scripts/` 下的脚本用 `./lib/safe-json.js`；`lib/` 内的已由 Task 4 接入）。

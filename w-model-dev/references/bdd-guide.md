@@ -14,7 +14,7 @@
   - [bdd-syntax-reference.md](./bdd-syntax-reference.md)（Gherkin 语法参考）
   - [bdd-patterns-examples.md](./bdd-patterns-examples.md)（BDD 模式示例库）
 - **模板文件**：[../templates/feature.template](../templates/feature.template)、[../templates/bdd-manifest.template.json](../templates/bdd-manifest.template.json)
-- **门禁脚本**：[../scripts/check-bdd-model.ts](../scripts/check-bdd-model.ts)、[../scripts/bdd-logic.ts](../scripts/bdd-logic.ts)
+- **门禁脚本**：[../scripts/cli/check-bdd-model.ts](../scripts/cli/check-bdd-model.ts)、[../scripts/logic/bdd-logic.ts](../scripts/logic/bdd-logic.ts)
 - **Schema**：[../schemas/bdd-manifest.schema.json](../schemas/bdd-manifest.schema.json)
 
 ## 公理

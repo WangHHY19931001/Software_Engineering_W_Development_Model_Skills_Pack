@@ -5,7 +5,7 @@
 >
 > **架构约束**：本技能不内置 LLM 调用（[§3.3](../../docs/skill-design-document_SSoT.md)）。Persona 是「供外部 Agent 在执行 `/wm review` 时采用的角色提示词」，由 Agent 自身 LLM 加载执行。Persona 文件本身只是 Markdown，不调用任何 LLM。
 >
-> **与 [verifier-spec.md](verifier-spec.md) 的关系**：verifier-spec.md §7 定义评审输出的 JSON Schema 与校验脚本；本文件定义评审执行的角色视角与关注点。Persona 产出的 JSON 必须满足 verifier-spec.md Schema，并经 [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) 校验。
+> **与 [verifier-spec.md](verifier-spec.md) 的关系**：verifier-spec.md §7 定义评审输出的 JSON Schema 与校验脚本；本文件定义评审执行的角色视角与关注点。Persona 产出的 JSON 必须满足 verifier-spec.md Schema，并经 [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验。
 >
 > **与 [verifier-spec.md §7.4A](verifier-spec.md) 的关系**：§7.4A 定义五轴评审与 Severity 标签（Critical / Required / Optional / Nit / FYI），是 `code-reviewer` Persona 的发现项组织方式。
 

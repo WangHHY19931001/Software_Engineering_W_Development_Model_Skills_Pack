@@ -600,7 +600,7 @@ interface MaturityConfig {
 
 | 文件 | 不变更理由 |
 |---|---|
-| `w-model-dev/scripts/*.ts`（所有门禁脚本） | 4 项优化均不改门禁逻辑；预算/日志/成熟度/理解证据是状态文件 + 编排者维护 |
+| `w-model-dev/scripts/cli/*.ts`（所有门禁脚本） | 4 项优化均不改门禁逻辑；预算/日志/成熟度/理解证据是状态文件 + 编排者维护 |
 | `w-model-dev/templates/*.md` | 模板不涉及预算/日志/成熟度 |
 | `w-model-dev-demo/` | 参考实现已归档，本次增强不重建 demo |
 | `docs/ingestion-graph-convergence-design.md` / `information-flow-validation-design.md` / `tla-plus-modeling-design.md` | 已完成的设计，本次增强正交 |

@@ -91,7 +91,7 @@
 
 S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 - 失败走 R→V→G→S-fix 循环（反模式 #29）
-- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=6 --cucumber-report=<report.json>` 门禁
+- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=6 --cucumber-report=<report.json>` 门禁
 - cucumber 报告不得有 undefined/pending/failed step（D5 校验）
 
 ## 禁止行为

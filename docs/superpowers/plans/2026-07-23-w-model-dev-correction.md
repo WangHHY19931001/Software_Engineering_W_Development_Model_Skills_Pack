@@ -27,13 +27,13 @@
 | `w-model-dev/references/anti-patterns.md` | 反模式 | #10 强化检测信号 |
 | `w-model-dev/references/data-models.md` | 数据模型 | EdgeType 扩展 + RunLogEntry + RTM 演进 |
 | `w-model-dev/references/ingestion-cross.md` | Ingestion 交叉 | 快照历史 + 根树保持 |
-| `w-model-dev/scripts/logic/verifier-logic.ts` | Verifier 纯逻辑 | 防漂移 3 项校验 |
-| `w-model-dev/scripts/logic/tla-logic.ts` | TLA+ 纯逻辑 | checkCoverage + checkCfgInvariants + checkCfgStructure |
-| `w-model-dev/scripts/logic/graph-logic.ts` | 图谱纯逻辑 | 系统层级树 + 多层图谱 + 单根修正 + 移除 consumes |
-| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 图谱门禁 CLI | exitCode 防伪 JSON 字段 + 多层图谱输出 |
-| `w-model-dev/scripts/cli/check-verifier-output.ts` | Verifier 门禁 CLI | 接入防漂移 + exitCode JSON 字段 |
-| `w-model-dev/scripts/cli/check-tla-model.ts` | TLA+ 门禁 CLI | --graph 入参 + cfg 校验 + 覆盖率校验 + exitCode JSON |
-| `w-model-dev/scripts/cli/self-test.ts` | 自检脚本 | 纳入 4 新逻辑 + 基线 37→61 |
+| `w-model-dev/scripts/verifier-logic.ts` | Verifier 纯逻辑 | 防漂移 3 项校验 |
+| `w-model-dev/scripts/tla-logic.ts` | TLA+ 纯逻辑 | checkCoverage + checkCfgInvariants + checkCfgStructure |
+| `w-model-dev/scripts/graph-logic.ts` | 图谱纯逻辑 | 系统层级树 + 多层图谱 + 单根修正 + 移除 consumes |
+| `w-model-dev/scripts/check-requirement-graph.ts` | 图谱门禁 CLI | exitCode 防伪 JSON 字段 + 多层图谱输出 |
+| `w-model-dev/scripts/check-verifier-output.ts` | Verifier 门禁 CLI | 接入防漂移 + exitCode JSON 字段 |
+| `w-model-dev/scripts/check-tla-model.ts` | TLA+ 门禁 CLI | --graph 入参 + cfg 校验 + 覆盖率校验 + exitCode JSON |
+| `w-model-dev/scripts/self-test.ts` | 自检脚本 | 纳入 4 新逻辑 + 基线 37→61 |
 | `w-model-dev/scripts/samples/graph/bad-orphan.json` | 图谱样例 | 修正预期以反映新单根语义 |
 | `w-model-dev/scripts/samples/graph/bad-multi-root.json` | 图谱样例 | 修正预期以反映新单根语义 |
 | `w-model-dev/SKILL.md` | 技能入口 | 约束更新 + 新脚本 |
@@ -54,14 +54,14 @@
 
 | 文件 | 职责 |
 |------|------|
-| `w-model-dev/scripts/logic/budget-logic.ts` | Budget 校验纯逻辑 |
-| `w-model-dev/scripts/logic/run-log-logic.ts` | Run-log 校验纯逻辑 |
-| `w-model-dev/scripts/logic/maturity-logic.ts` | Maturity 校验纯逻辑 |
-| `w-model-dev/scripts/logic/checkpoint-logic.ts` | Checkpoint 校验纯逻辑 |
-| `w-model-dev/scripts/cli/check-budget.ts` | Budget 门禁 CLI |
-| `w-model-dev/scripts/cli/check-run-log.ts` | Run-log 门禁 CLI |
-| `w-model-dev/scripts/cli/check-maturity.ts` | Maturity 门禁 CLI |
-| `w-model-dev/scripts/cli/check-checkpoint.ts` | Checkpoint 门禁 CLI |
+| `w-model-dev/scripts/budget-logic.ts` | Budget 校验纯逻辑 |
+| `w-model-dev/scripts/run-log-logic.ts` | Run-log 校验纯逻辑 |
+| `w-model-dev/scripts/maturity-logic.ts` | Maturity 校验纯逻辑 |
+| `w-model-dev/scripts/checkpoint-logic.ts` | Checkpoint 校验纯逻辑 |
+| `w-model-dev/scripts/check-budget.ts` | Budget 门禁 CLI |
+| `w-model-dev/scripts/check-run-log.ts` | Run-log 门禁 CLI |
+| `w-model-dev/scripts/check-maturity.ts` | Maturity 门禁 CLI |
+| `w-model-dev/scripts/check-checkpoint.ts` | Checkpoint 门禁 CLI |
 | `w-model-dev/scripts/samples/graph/bad-subsystem-orphan.json` | SD 无 parent 依附 |
 | `w-model-dev/scripts/samples/graph/bad-parent-cycle.json` | parent 边成环 |
 | `w-model-dev/scripts/samples/graph/bad-governance-out-of-scope.json` | governs 源非治理类 |
@@ -389,7 +389,7 @@ git commit -m "docs(refs): anti-patterns #10 强化 + data-models EdgeType/RunLo
 ### Task B1: verifier-logic.ts 防漂移实现
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`
+- Modify: `w-model-dev/scripts/verifier-logic.ts`
 - Test: `w-model-dev/scripts/samples/verifier/bad-rawscores-all-same.json`
 - Test: `w-model-dev/scripts/samples/verifier/bad-variance-mismatch.json`
 - Test: `w-model-dev/scripts/samples/verifier/bad-perturbation-out-of-range.json`
@@ -443,7 +443,7 @@ if (output.scoringMethod === 'text-parse' && dim.rawScores && dim.rawScores.leng
 
 - [ ] **Step 5: 跑 self-test 验证新样例**
 
-Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/self-test.ts`
 
 注意：此时 self-test.ts 尚未声明新样例，预期 37/37 通过（新样例未被纳入）。新样例的声明在 Phase D 完成。但需手动验证 3 个新样例逻辑正确：
 
@@ -454,7 +454,7 @@ Expected: `passed: false`，reasons 含 "rawScores 全同"
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/verifier-logic.ts w-model-dev/scripts/samples/verifier/bad-rawscores-all-same.json w-model-dev/scripts/samples/verifier/bad-variance-mismatch.json w-model-dev/scripts/samples/verifier/bad-perturbation-out-of-range.json
+git add w-model-dev/scripts/verifier-logic.ts w-model-dev/scripts/samples/verifier/bad-rawscores-all-same.json w-model-dev/scripts/samples/verifier/bad-variance-mismatch.json w-model-dev/scripts/samples/verifier/bad-perturbation-out-of-range.json
 git commit -m "feat(verifier-logic): 防漂移 3 项校验 + 3 样例"
 ```
 
@@ -463,7 +463,7 @@ git commit -m "feat(verifier-logic): 防漂移 3 项校验 + 3 样例"
 ### Task B2: tla-logic.ts 三项扩展
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/tla-logic.ts`
+- Modify: `w-model-dev/scripts/tla-logic.ts`
 - Test: `samples/tla/bad-coverage-missing-sd.json`
 - Test: `samples/tla/bad-cfg-missing-invariant.json`
 - Test: `samples/tla/bad-cfg-module-declaration.json`
@@ -587,7 +587,7 @@ Expected: `passed: false`，violations 含 "未被任何 TLA+ spec 覆盖"
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/tla-logic.ts w-model-dev/scripts/samples/tla/bad-coverage-missing-sd.json w-model-dev/scripts/samples/tla/bad-cfg-missing-invariant.json w-model-dev/scripts/samples/tla/bad-cfg-module-declaration.json w-model-dev/scripts/samples/tla/valid-cfg-consistency.json
+git add w-model-dev/scripts/tla-logic.ts w-model-dev/scripts/samples/tla/bad-coverage-missing-sd.json w-model-dev/scripts/samples/tla/bad-cfg-missing-invariant.json w-model-dev/scripts/samples/tla/bad-cfg-module-declaration.json w-model-dev/scripts/samples/tla/valid-cfg-consistency.json
 git commit -m "feat(tla-logic): checkCoverage + checkCfgInvariants + checkCfgStructure + 4 样例"
 ```
 
@@ -596,7 +596,7 @@ git commit -m "feat(tla-logic): checkCoverage + checkCfgInvariants + checkCfgStr
 ### Task B3: graph-logic.ts 系统层级树 + 多层图谱 + 单根修正
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
+- Modify: `w-model-dev/scripts/graph-logic.ts`
 - Modify: `w-model-dev/scripts/samples/graph/bad-orphan.json`
 - Modify: `w-model-dev/scripts/samples/graph/bad-multi-root.json`
 - Test: `samples/graph/bad-subsystem-orphan.json`
@@ -729,7 +729,7 @@ if (node.id === root.id) continue; // 根节点豁免死模块
 
 - [ ] **Step 9: 跑 self-test 验证现有样例不退化**
 
-Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/self-test.ts`
 
 注意：此时 self-test.ts 尚未声明新样例，现有 37 样例可能因 graph-logic 重构而行为变化。若 bad-orphan/bad-multi-root 行为变化，需在 Phase D 同步更新 self-test.ts 预期。
 
@@ -740,7 +740,7 @@ Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
 - [ ] **Step 11: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/graph-logic.ts w-model-dev/scripts/samples/graph/
+git add w-model-dev/scripts/graph-logic.ts w-model-dev/scripts/samples/graph/
 git commit -m "feat(graph-logic): 系统层级树 + 多层图谱 + 单根修正 + 移除 consumes + 5 新样例"
 ```
 
@@ -751,9 +751,9 @@ git commit -m "feat(graph-logic): 系统层级树 + 多层图谱 + 单根修正 
 ### Task C1: 现有 3 个 check-*.ts 添加 exitCode JSON 字段
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`
-- Modify: `w-model-dev/scripts/cli/check-verifier-output.ts`
-- Modify: `w-model-dev/scripts/cli/check-tla-model.ts`
+- Modify: `w-model-dev/scripts/check-requirement-graph.ts`
+- Modify: `w-model-dev/scripts/check-verifier-output.ts`
+- Modify: `w-model-dev/scripts/check-tla-model.ts`
 
 - [ ] **Step 1: check-requirement-graph.ts 添加 exitCode JSON 字段**
 
@@ -779,14 +779,14 @@ process.exit(result.passed ? 0 : 1);
 
 - [ ] **Step 4: 验证 3 脚本 JSON 输出含 exitCode**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev/scripts/samples/graph/valid-graph.json --phase=1 2>&1 | grep SCRIPT_JSON`
+Run: `npx tsx w-model-dev/scripts/check-requirement-graph.ts w-model-dev/scripts/samples/graph/valid-graph.json --phase=1 2>&1 | grep SCRIPT_JSON`
 
 Expected: 输出含 `"exitCode":0`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/cli/check-tla-model.ts
+git add w-model-dev/scripts/check-requirement-graph.ts w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/check-tla-model.ts
 git commit -m "feat(check-*): exitCode JSON 字段 + check-tla-model --graph/cfg 校验"
 ```
 
@@ -795,8 +795,8 @@ git commit -m "feat(check-*): exitCode JSON 字段 + check-tla-model --graph/cfg
 ### Task C2: 新增 budget-logic.ts + check-budget.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/budget-logic.ts`
-- Create: `w-model-dev/scripts/cli/check-budget.ts`
+- Create: `w-model-dev/scripts/budget-logic.ts`
+- Create: `w-model-dev/scripts/check-budget.ts`
 
 - [ ] **Step 1: 实现 budget-logic.ts 纯逻辑**
 
@@ -862,14 +862,14 @@ import { checkBudget } from './budget-logic.js';
 
 - [ ] **Step 3: 手动验证**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-budget.ts w-model-dev/scripts/samples/budget/valid.json`
+Run: `npx tsx w-model-dev/scripts/check-budget.ts w-model-dev/scripts/samples/budget/valid.json`
 
 Expected: exitCode=0
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/budget-logic.ts w-model-dev/scripts/cli/check-budget.ts
+git add w-model-dev/scripts/budget-logic.ts w-model-dev/scripts/check-budget.ts
 git commit -m "feat(budget): budget-logic + check-budget CLI"
 ```
 
@@ -878,8 +878,8 @@ git commit -m "feat(budget): budget-logic + check-budget CLI"
 ### Task C3: 新增 run-log-logic.ts + check-run-log.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/run-log-logic.ts`
-- Create: `w-model-dev/scripts/cli/check-run-log.ts`
+- Create: `w-model-dev/scripts/run-log-logic.ts`
+- Create: `w-model-dev/scripts/check-run-log.ts`
 
 - [ ] **Step 1: 实现 run-log-logic.ts 纯逻辑**
 
@@ -899,7 +899,7 @@ git commit -m "feat(budget): budget-logic + check-budget CLI"
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/run-log-logic.ts w-model-dev/scripts/cli/check-run-log.ts
+git add w-model-dev/scripts/run-log-logic.ts w-model-dev/scripts/check-run-log.ts
 git commit -m "feat(run-log): run-log-logic + check-run-log CLI"
 ```
 
@@ -908,8 +908,8 @@ git commit -m "feat(run-log): run-log-logic + check-run-log CLI"
 ### Task C4: 新增 maturity-logic.ts + check-maturity.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/maturity-logic.ts`
-- Create: `w-model-dev/scripts/cli/check-maturity.ts`
+- Create: `w-model-dev/scripts/maturity-logic.ts`
+- Create: `w-model-dev/scripts/check-maturity.ts`
 
 - [ ] **Step 1: 实现 maturity-logic.ts 纯逻辑**
 
@@ -922,7 +922,7 @@ git commit -m "feat(run-log): run-log-logic + check-run-log CLI"
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/maturity-logic.ts w-model-dev/scripts/cli/check-maturity.ts
+git add w-model-dev/scripts/maturity-logic.ts w-model-dev/scripts/check-maturity.ts
 git commit -m "feat(maturity): maturity-logic + check-maturity CLI"
 ```
 
@@ -931,8 +931,8 @@ git commit -m "feat(maturity): maturity-logic + check-maturity CLI"
 ### Task C5: 新增 checkpoint-logic.ts + check-checkpoint.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/checkpoint-logic.ts`
-- Create: `w-model-dev/scripts/cli/check-checkpoint.ts`
+- Create: `w-model-dev/scripts/checkpoint-logic.ts`
+- Create: `w-model-dev/scripts/check-checkpoint.ts`
 
 - [ ] **Step 1: 实现 checkpoint-logic.ts 纯逻辑**
 
@@ -947,7 +947,7 @@ git commit -m "feat(maturity): maturity-logic + check-maturity CLI"
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/checkpoint-logic.ts w-model-dev/scripts/cli/check-checkpoint.ts
+git add w-model-dev/scripts/checkpoint-logic.ts w-model-dev/scripts/check-checkpoint.ts
 git commit -m "feat(checkpoint): checkpoint-logic + check-checkpoint CLI"
 ```
 
@@ -998,7 +998,7 @@ git commit -m "test(samples): budget 3 + run-log 4 + maturity 2 + checkpoint 2 �
 ### Task D2: self-test.ts 扩展（基线 37→61）
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/self-test.ts`
+- Modify: `w-model-dev/scripts/self-test.ts`
 
 - [ ] **Step 1: 新增 BUDGET_CASES 数组**
 
@@ -1048,7 +1048,7 @@ const BUDGET_CASES: BudgetCase[] = [
 
 - [ ] **Step 8: 跑 self-test 验证 61/61**
 
-Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/self-test.ts`
 
 Expected: `总计 61 条用例：61 通过，0 失败`
 
@@ -1057,7 +1057,7 @@ Expected: `总计 61 条用例：61 通过，0 失败`
 - [ ] **Step 9: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/self-test.ts
 git commit -m "test(self-test): 纳入 budget/run-log/maturity/checkpoint + 新 graph/tla/verifier 样例，基线 37→61"
 ```
 
@@ -1096,9 +1096,9 @@ git commit -m "test(self-test): 纳入 budget/run-log/maturity/checkpoint + 新 
 
 Run:
 ```
-npx tsx w-model-dev/scripts/cli/check-budget.ts 执行情况/.w-model/budget.json --project=执行情况/.w-model/project.json
-npx tsx w-model-dev/scripts/cli/check-run-log.ts 执行情况/.w-model/run-log.jsonl --project=执行情况/.w-model/project.json
-npx tsx w-model-dev/scripts/cli/check-maturity.ts 执行情况/.w-model/maturity.json --project=执行情况/.w-model/project.json
+npx tsx w-model-dev/scripts/check-budget.ts 执行情况/.w-model/budget.json --project=执行情况/.w-model/project.json
+npx tsx w-model-dev/scripts/check-run-log.ts 执行情况/.w-model/run-log.jsonl --project=执行情况/.w-model/project.json
+npx tsx w-model-dev/scripts/check-maturity.ts 执行情况/.w-model/maturity.json --project=执行情况/.w-model/project.json
 ```
 
 Expected: 3 脚本均 exitCode=0
@@ -1135,7 +1135,7 @@ git commit -m "fix(执行情况): budget/run-log/maturity 同步修正为合规�
 
 - [ ] **Step 4: 验证 cfg-tla 一致性**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-tla-model.ts 执行情况/.w-model/tla-manifest.json --graph=执行情况/.w-model/graph.json`
+Run: `npx tsx w-model-dev/scripts/check-tla-model.ts 执行情况/.w-model/tla-manifest.json --graph=执行情况/.w-model/graph.json`
 
 Expected: exitCode=0（覆盖率校验除外，因执行情况 TLA+ 实际只建 3 规格，覆盖率会 fail——这是已知问题，需在 E2 Step 1 中补充说明或暂不校验覆盖率）
 
@@ -1178,7 +1178,7 @@ git commit -m "fix(执行情况): tla-manifest jarPath/checkRounds + L1.cfg 补 
 
 - [ ] **Step 4: 验证 3 个 verifier-output**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts 执行情况/.w-model/verifier-output-phase1.json`
+Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts 执行情况/.w-model/verifier-output-phase1.json`
 
 Expected: exitCode=0（phase1/2/3 均应通过防漂移校验）
 
@@ -1217,7 +1217,7 @@ git commit -m "fix(执行情况): verifier-output 统一方差阈值 + 修正角
 
 - [ ] **Step 4: 验证**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts 执行情况/.w-model/graph.json --phase=3`
+Run: `npx tsx w-model-dev/scripts/check-requirement-graph.ts 执行情况/.w-model/graph.json --phase=3`
 
 Expected: exitCode=0
 
@@ -1276,7 +1276,7 @@ git commit -m "docs(skill): 约束更新（退出码不可伪+系统层级树+�
 
 - [ ] **Step 3: 最终验证**
 
-Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/self-test.ts`
 
 Expected: `总计 61 条用例：61 通过，0 失败`
 

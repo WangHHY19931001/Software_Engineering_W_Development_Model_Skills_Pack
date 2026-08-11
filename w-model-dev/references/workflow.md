@@ -205,7 +205,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
                                                                   回到编码       回到编码
 ```
 
-质量门由 [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts) 守护：
+质量门由 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 守护：
 退出码 0 = 通过（RTM 需求覆盖率 100% + 四级测试全部通过）；退出码 1/2 = 未通过 / 输入错误，一律回到编码实现。
 
 质量标准详见 [`quality-standards.md`](quality-standards.md)。

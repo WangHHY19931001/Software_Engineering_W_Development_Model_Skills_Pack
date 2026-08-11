@@ -2,7 +2,7 @@
 
 > 适用对象：外部 AI Agent（TRAE / Claude / 其他）按本规范对 W 模型各阶段产物执行
 > LLM-as-a-Verifier 评审，并将结构化结果写入 JSON 文件交由
-> [`scripts/check-verifier-output.ts`](../scripts/check-verifier-output.ts) 校验防漂移。
+> [`scripts/check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验防漂移。
 >
 > 本技能**不内置 LLM 调用**。技能只提供「提示词 + 输出 schema + 校验脚本」三件套，
 > 评审执行由外部 Agent 完成。技能演化（SkillOpt / darwin-skill）与本规范解耦：
@@ -23,7 +23,7 @@
 
 1. **技能内不做 LLM 调用**：所有 LLM 推理由外部 Agent 执行。本规范只规定提示词与输出格式。
 2. **结构化输出优先**：评审必须输出严格符合 §6 Schema 的 JSON，禁止自由文本。
-3. **校验脚本防漂移**：[`check-verifier-output.ts`](../scripts/check-verifier-output.ts)
+3. **校验脚本防漂移**：[`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts)
    对输出 JSON 做字段、数值范围、子标准覆盖、可重复性方差等校验，不符合规范直接判失败。
 4. **三维度验证 + 连续评分 + PPT 排序**：保留原 LLM-as-a-Verifier 学术框架的三大支柱
    （见 §3 / §4 / §5），但实现方式改为「提示词描述算法 + 外部 Agent 执行」。
@@ -78,7 +78,7 @@
 
 > `rootcause` 仍作为 V 复审根因报告的 `targetKind`（详见 §7.5），但 `check-verifier-output.ts` 不校验该值（脚本只校验上述 4 值枚举）；rootcause 类 VerifierOutput 由 `check-rootcause-report.ts` 独立校验。
 
-**校验**（由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 强制执行）：
+**校验**（由 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 强制执行）：
 
 ```typescript
 const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test'];
@@ -120,11 +120,11 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 
 **权重说明**：
 
-- 表中所列权重为标准值，所有 subCriteria 权重之和必须为 `1.0`（由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 校验）。
+- 表中所列权重为标准值，所有 subCriteria 权重之和必须为 `1.0`（由 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 校验）。
 - subCriteria 数量必须等于标准集合大小（5 项），不允许子集或超集（与 §3.1「≥3 个」最小约束叠加：脚本强制 == 5 项）。
 - 名称必须精确匹配（大小写敏感、连字符敏感），不允许新增名称或重命名。
 
-**校验逻辑**（由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 强制执行）：
+**校验逻辑**（由 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 强制执行）：
 
 ```typescript
 const expected = SUB_CRITERIA[targetKind as TargetKind];
@@ -291,7 +291,7 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 ### 5.1 算法描述
 
 > 算法源自 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 「LLM-as-a-Verifier: A General-Purpose Verification Framework」§4.3 Probabilistic Pivot Tournament (PPT)。
-> 本节为算法描述，**由外部 Agent 执行**；技能仅校验输出 JSON 的 `ranking` 字段合理性（见 §6 / [`scripts/verifier-logic.ts`](../scripts/verifier-logic.ts)），不实现算法本身。
+> 本节为算法描述，**由外部 Agent 执行**；技能仅校验输出 JSON 的 `ranking` 字段合理性（见 §6 / [`scripts/verifier-logic.ts`](../scripts/logic/verifier-logic.ts)），不实现算法本身。
 
 **核心思路**：将 N 个候选的两两全比较（O(N²)）替换为「每候选 vs k 个枢轴」比较（O(N·k)），在保留排序质量的前提下显著降低 token 预算。
 
@@ -344,7 +344,7 @@ p(i ≻ j) = sigmoid((score_i - score_j) × temperature)
 6. return ordered
 ```
 
-> **本技能的边界**：技能不实现 PPT 算法本身，只校验外部 Agent 输出的 `ranking` 字段（见 §6）。参数 `k` / `temperature` / `rounds` 的合理性边界由 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 强制（`k ∈ [2,1000]`、`temperature ∈ (0,100]`、`rounds ≥ 1` 的整数）。
+> **本技能的边界**：技能不实现 PPT 算法本身，只校验外部 Agent 输出的 `ranking` 字段（见 §6）。参数 `k` / `temperature` / `rounds` 的合理性边界由 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 强制（`k ∈ [2,1000]`、`temperature ∈ (0,100]`、`rounds ≥ 1` 的整数）。
 
 ### 5.2 输出
 
@@ -365,7 +365,7 @@ PPT 结果作为 `ranking` 字段输出（仅当多候选时存在，单候选�
 ## 6. 输出 Schema（JSON）
 
 外部 Agent 必须输出严格符合以下 Schema 的 JSON 文件，供
-[`check-verifier-output.ts`](../scripts/check-verifier-output.ts) 校验：
+[`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验：
 
 ```typescript
 interface VerifierOutput {
@@ -591,7 +591,7 @@ V 子代理须在 `summary` 中包含：
 ### 7.4A 五轴评审维度与 Severity 标签（吸收自 addyosmani/agent-skills）
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能的五轴评审与 Severity 标签模式。
-> 本节**不改变** §7.4 的子标准 name 与 weight（避免破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 的校验），只规定：
+> 本节**不改变** §7.4 的子标准 name 与 weight（避免破坏 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 的校验），只规定：
 > 1. 评审 `targetKind=code` 时，发现项按五轴组织；
 > 2. `reworkHints` 每条建议前缀 Severity 标签；
 > 3. 结构性问题必须配 Structural Remedy。
@@ -646,7 +646,7 @@ V 子代理须在 `summary` 中包含：
 ]
 ```
 
-> Severity 标签是字符串前缀约定，**不改变** §6 Schema 的 `reworkHints: string[]` 类型；[`check-verifier-output.ts`](../scripts/check-verifier-output.ts) 不强制校验前缀（避免误判历史 JSON），由 Agent 自检与 LLM-as-a-Verifier 在 `summary` 中标注「Severity 标签缺失」。
+> Severity 标签是字符串前缀约定，**不改变** §6 Schema 的 `reworkHints: string[]` 类型；[`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 不强制校验前缀（避免误判历史 JSON），由 Agent 自检与 LLM-as-a-Verifier 在 `summary` 中标注「Severity 标签缺失」。
 
 #### 7.4A.3 Structural Remedies
 
@@ -677,7 +677,7 @@ V 子代理须在 `summary` 中包含：
 
 - addyosmani 的五轴是**完整评审维度**，每轴独立打分。
 - 本规范的五轴是**发现项组织方式**——子标准仍是 §7.4 的 5 个（`correctness` / `security` / `readability` / `maintainability` / `conformance`），五轴用于在 `reworkHints` 中归类发现项。
-- 这样既吸收了五轴评审的结构化思维，又不破坏 [`verifier-logic.ts`](../scripts/verifier-logic.ts) 对子标准 name/weight 的校验。
+- 这样既吸收了五轴评审的结构化思维，又不破坏 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 对子标准 name/weight 的校验。
 - Performance 轴在 W 模型中通常由阶段 7 系统测试（含 k6 性能基线）独立验证，`code` 评审中只标注明显性能反模式（N+1 / 无界循环），不做完整性能评审。
 
 ### 7.5 根因报告（targetKind = `rootcause`）
@@ -735,7 +735,7 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 | `{{temperature}}` | PPT 软比较温度，正数 ≤ 100（spec §5.1 默认 `4.0`）；与输出 JSON `ranking.temperature` 一致 | `4.0` |
 | `{{candidates}}` | 候选目标列表，每行 `ID<TAB>综合分数`，由 Agent 收集所有候选的 `compositeScore` 后填充 | （省略） |
 
-> 占位符取值必须与输出 JSON 的对应字段保持一致，否则 [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) 会以「字段不一致」为由判失败。
+> 占位符取值必须与输出 JSON 的对应字段保持一致，否则 [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 会以「字段不一致」为由判失败。
 
 ### 8.1 系统提示词（System Prompt）
 

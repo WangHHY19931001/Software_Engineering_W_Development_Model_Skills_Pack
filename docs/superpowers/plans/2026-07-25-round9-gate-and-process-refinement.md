@@ -18,11 +18,11 @@
 
 | 文件 | 责任 | 改动类型 |
 |---|---|---|
-| `w-model-dev/scripts/logic/gate-logic.ts` | P1.1 阶段级校验逻辑 | Modify（增加 phaseOption + 阶段分层） |
-| `w-model-dev/scripts/cli/check-artifact-gate.ts` | P1.1 --phase 参数 + P2.6 graph 自动发现 | Modify |
-| `w-model-dev/scripts/logic/verifier-logic.ts` | P2.4 subCriteria 命名 + P2.5 targetKind + P3.10 rawScores | Modify |
-| `w-model-dev/scripts/cli/check-tla-model.ts` | P3.8 states 自动清理 + --keep-states | Modify |
-| `w-model-dev/scripts/logic/code-tla-logic.ts` | P3.9 维度 3 扩展遍历全部 specs | Modify |
+| `w-model-dev/scripts/gate-logic.ts` | P1.1 阶段级校验逻辑 | Modify（增加 phaseOption + 阶段分层） |
+| `w-model-dev/scripts/check-artifact-gate.ts` | P1.1 --phase 参数 + P2.6 graph 自动发现 | Modify |
+| `w-model-dev/scripts/verifier-logic.ts` | P2.4 subCriteria 命名 + P2.5 targetKind + P3.10 rawScores | Modify |
+| `w-model-dev/scripts/check-tla-model.ts` | P3.8 states 自动清理 + --keep-states | Modify |
+| `w-model-dev/scripts/code-tla-logic.ts` | P3.9 维度 3 扩展遍历全部 specs | Modify |
 | `w-model-dev/scripts/samples/gate/*.json` ×3 | P1.1 fixture | Create |
 | `w-model-dev/scripts/samples/verifier/*.json` ×3 | P2.4/P2.5/P3.10 fixture | Create |
 | `w-model-dev/tests/gate-enhancement.test.ts` | 6 新 fixture 测试 | Modify |
@@ -59,12 +59,12 @@
 ### Task A1: P1.1 gate-logic.ts 阶段级校验逻辑
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/gate-logic.ts`
+- Modify: `w-model-dev/scripts/gate-logic.ts`
 - Test: `w-model-dev/tests/gate-enhancement.test.ts`
 
 - [ ] **Step 1: 读取 gate-logic.ts 现有 checkArtifactGate 签名与 RTMMatrixShape 定义**
 
-Run: `Read w-model-dev/scripts/logic/gate-logic.ts` lines 1-220
+Run: `Read w-model-dev/scripts/gate-logic.ts` lines 1-220
 Expected: 找到 `checkArtifactGate(matrix, options?)` 签名 + `REQUIRED_TRACE_FIELDS` 常量 + 测试汇总校验逻辑
 
 - [ ] **Step 2: 增加 PhaseOption 类型与阶段分层常量**
@@ -164,14 +164,14 @@ Expected: 现有 6 测试全通过（默认 phase=8 行为不变）
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/gate-logic.ts
+git add w-model-dev/scripts/gate-logic.ts
 git commit -m "feat(gate-logic): P1.1 增加 phaseOption 阶段级校验逻辑"
 ```
 
 ### Task A2: P1.1 + P2.6 check-artifact-gate.ts CLI 改造
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`
+- Modify: `w-model-dev/scripts/check-artifact-gate.ts`
 
 - [ ] **Step 1: 增加 --phase 参数解析**
 
@@ -252,13 +252,13 @@ Expected: 0 errors
 
 - [ ] **Step 6: 运行默认（无 --phase）确认向后兼容**
 
-Run: `cd w-model-dev-demo && npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts`
+Run: `cd w-model-dev-demo && npx tsx ../w-model-dev/scripts/check-artifact-gate.ts`
 Expected: exitCode=0，日志显示 "校验阶段: phase=8（终检）"
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-artifact-gate.ts
+git add w-model-dev/scripts/check-artifact-gate.ts
 git commit -m "feat(check-artifact-gate): P1.1 --phase 参数 + P2.6 graph 自动发现"
 ```
 
@@ -420,7 +420,7 @@ git commit -m "test(gate): P1.1 增加 3 fixture + 6 阶段级校验测试"
 ### Task A4: P2.4 + P2.5 + P3.10 verifier-logic.ts 校验增强
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`
+- Modify: `w-model-dev/scripts/verifier-logic.ts`
 - Create: `w-model-dev/scripts/samples/verifier/bad-targetkind.json`
 - Create: `w-model-dev/scripts/samples/verifier/bad-subcriteria-name.json`
 - Create: `w-model-dev/scripts/samples/verifier/bad-rawscores-constant.json`
@@ -551,18 +551,18 @@ Expected: 全部通过
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/verifier-logic.ts w-model-dev/scripts/samples/verifier/ w-model-dev/tests/
+git add w-model-dev/scripts/verifier-logic.ts w-model-dev/scripts/samples/verifier/ w-model-dev/tests/
 git commit -m "feat(verifier-logic): P2.4/P2.5/P3.10 标准化校验 + 3 fixture"
 ```
 
 ### Task A5: P3.8 check-tla-model.ts states 自动清理
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-tla-model.ts`
+- Modify: `w-model-dev/scripts/check-tla-model.ts`
 
 - [ ] **Step 1: 读取 check-tla-model.ts 现有结构**
 
-Run: `Read w-model-dev/scripts/cli/check-tla-model.ts` 全文
+Run: `Read w-model-dev/scripts/check-tla-model.ts` 全文
 Expected: 找到 TLC 校验完成点 + process.exit 调用
 
 - [ ] **Step 2: 增加 --keep-states 参数解析**
@@ -600,18 +600,18 @@ Expected: 0 errors
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-tla-model.ts
+git add w-model-dev/scripts/check-tla-model.ts
 git commit -m "feat(check-tla-model): P3.8 states 自动清理 + --keep-states"
 ```
 
 ### Task A6: P3.9 code-tla-logic.ts 维度 3 扩展
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/code-tla-logic.ts`
+- Modify: `w-model-dev/scripts/code-tla-logic.ts`
 
 - [ ] **Step 1: 读取现有维度 3 Next 分支覆盖实现**
 
-Run: `Grep "nextBranchCoverage|Next|action" w-model-dev/scripts/logic/code-tla-logic.ts`
+Run: `Grep "nextBranchCoverage|Next|action" w-model-dev/scripts/code-tla-logic.ts`
 Expected: 找到维度 3 函数，确认当前只加载 L4 specs
 
 - [ ] **Step 2: 扩展为遍历 tla-manifest 全部 specs**
@@ -679,13 +679,13 @@ Expected: 0 errors
 
 - [ ] **Step 5: 在第八轮 demo 上验证（应覆盖数 > 2）**
 
-Run: `cd w-model-dev-demo && npx tsx ../w-model-dev/scripts/cli/check-code-tla-consistency.ts`
+Run: `cd w-model-dev-demo && npx tsx ../w-model-dev/scripts/check-code-tla-consistency.ts`
 Expected: 维度 3 checked 数显著增加（从 2 增至 10+），exitCode 可能因新增未覆盖项变 1，记录 violations
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/code-tla-logic.ts
+git add w-model-dev/scripts/code-tla-logic.ts
 git commit -m "feat(code-tla-logic): P3.9 维度 3 扩展遍历全部 specs"
 ```
 
@@ -757,9 +757,9 @@ Expected: 全部通过
 Run:
 ```
 cd w-model-dev-demo
-npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts --phase=6
-npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts --phase=7
-npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts --phase=8
+npx tsx ../w-model-dev/scripts/check-artifact-gate.ts --phase=6
+npx tsx ../w-model-dev/scripts/check-artifact-gate.ts --phase=7
+npx tsx ../w-model-dev/scripts/check-artifact-gate.ts --phase=8
 ```
 Expected: --phase=6 和 --phase=7 exitCode=0（unit/integration 已通过，system/acceptance pending 合理跳过）；--phase=8 exitCode=0（全部已通过，第八轮已归档）
 
@@ -1054,7 +1054,7 @@ check-artifact-gate.ts 支持 `--phase=N`（简写 `--p N`）参数，按阶段�
 
 **用法**：
 ```bash
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=6 [project-dir]
+npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=6 [project-dir]
 ```
 
 **阶段 6 G 门禁推荐**：`check-verifier-output phase6 && check-artifact-gate --phase=6`
@@ -1101,8 +1101,8 @@ targetKind → "test"，subCriteria 对齐 phase 7 标准（e2e-coverage/perform
 Run:
 ```
 cd w-model-dev-demo
-npx tsx ../w-model-dev/scripts/cli/check-verifier-output.ts phase6
-npx tsx ../w-model-dev/scripts/cli/check-verifier-output.ts phase7
+npx tsx ../w-model-dev/scripts/check-verifier-output.ts phase6
+npx tsx ../w-model-dev/scripts/check-verifier-output.ts phase7
 ```
 Expected: 两个 exitCode=0
 
@@ -1297,12 +1297,12 @@ Expected: 全部通过
 Run:
 ```
 cd w-model-dev-demo
-npx tsx ../w-model-dev/scripts/cli/check-verifier-output.ts phase6
-npx tsx ../w-model-dev/scripts/cli/check-verifier-output.ts phase7
-npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts --phase=6
-npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts --phase=7
-npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts --phase=8
-npx tsx ../w-model-dev/scripts/cli/check-code-tla-consistency.ts
+npx tsx ../w-model-dev/scripts/check-verifier-output.ts phase6
+npx tsx ../w-model-dev/scripts/check-verifier-output.ts phase7
+npx tsx ../w-model-dev/scripts/check-artifact-gate.ts --phase=6
+npx tsx ../w-model-dev/scripts/check-artifact-gate.ts --phase=7
+npx tsx ../w-model-dev/scripts/check-artifact-gate.ts --phase=8
+npx tsx ../w-model-dev/scripts/check-code-tla-consistency.ts
 ```
 Expected: 全部 exitCode=0
 

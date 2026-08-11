@@ -27,9 +27,9 @@
 
 | 文件 | 责任 | 动作 |
 |---|---|---|
-| `w-model-dev/scripts/logic/graph-logic.ts` | 图谱校验纯逻辑（含新信息流校验） | Modify |
-| `w-model-dev/scripts/cli/check-requirement-graph.ts` | CLI 输出（人类可读 + GRAPH_JSON） | Modify |
-| `w-model-dev/scripts/cli/self-test.ts` | 样本驱动自检 | Modify |
+| `w-model-dev/scripts/graph-logic.ts` | 图谱校验纯逻辑（含新信息流校验） | Modify |
+| `w-model-dev/scripts/check-requirement-graph.ts` | CLI 输出（人类可读 + GRAPH_JSON） | Modify |
+| `w-model-dev/scripts/self-test.ts` | 样本驱动自检 | Modify |
 | `w-model-dev/scripts/samples/graph/valid-graph.json` | 旧 valid 样本（补信息流边） | Modify |
 | `w-model-dev/scripts/samples/graph/bad-blackhole.json` | 黑洞样本 | Create |
 | `w-model-dev/scripts/samples/graph/bad-miracle.json` | 奇迹样本 | Create |
@@ -53,7 +53,7 @@
 - Create: `w-model-dev/scripts/samples/graph/bad-dead-module.json`
 - Create: `w-model-dev/scripts/samples/graph/valid-dataflow.json`
 - Modify: `w-model-dev/scripts/samples/graph/valid-graph.json`
-- Modify: `w-model-dev/scripts/cli/self-test.ts`（`GRAPH_CASES` 数组，约 167-223 行）
+- Modify: `w-model-dev/scripts/self-test.ts`（`GRAPH_CASES` 数组，约 167-223 行）
 
 - [ ] **Step 1: 创建 bad-blackhole.json**
 
@@ -211,7 +211,7 @@ phase=4 完整图谱，每个业务节点均有入流与出流，边界完整。
 
 - [ ] **Step 6: 在 self-test.ts 的 GRAPH_CASES 数组末尾追加 4 条用例**
 
-在 `w-model-dev/scripts/cli/self-test.ts` 中 `GRAPH_CASES` 数组最后一项（`bad-dd-no-realizes.json` 用例）之后、数组闭合 `];` 之前插入：
+在 `w-model-dev/scripts/self-test.ts` 中 `GRAPH_CASES` 数组最后一项（`bad-dd-no-realizes.json` 用例）之后、数组闭合 `];` 之前插入：
 
 ```typescript
   {
@@ -251,7 +251,7 @@ Expected: 退出码 1。`bad-blackhole/bad-miracle/bad-dead-module` 报「未匹
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/scripts/samples/graph/ w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/samples/graph/ w-model-dev/scripts/self-test.ts
 git commit -m "test: add information-flow samples (blackhole/miracle/dead-module) and dataflow cases"
 ```
 
@@ -260,7 +260,7 @@ git commit -m "test: add information-flow samples (blackhole/miracle/dead-module
 ## Task 2: 扩展 graph-logic.ts 类型 + 单根豁免边界 + 信息流校验（GREEN）
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/graph-logic.ts`（类型 15-16、结果接口 51-69、初始化 77-93、单根 159-183、汇总 242-256）
+- Modify: `w-model-dev/scripts/graph-logic.ts`（类型 15-16、结果接口 51-69、初始化 77-93、单根 159-183、汇总 242-256）
 
 - [ ] **Step 1: 扩展节点/边类型**
 
@@ -475,7 +475,7 @@ Expected: 退出码 0。全部用例通过——新增 4 条信息流用例匹�
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/graph-logic.ts
+git add w-model-dev/scripts/graph-logic.ts
 git commit -m "feat: add information-flow validation (blackhole/miracle/dead-module) to graph gate"
 ```
 
@@ -484,7 +484,7 @@ git commit -m "feat: add information-flow validation (blackhole/miracle/dead-mod
 ## Task 3: 更新 check-requirement-graph.ts CLI 输出
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`（人类可读段 91-92、GRAPH_JSON 109-123）
+- Modify: `w-model-dev/scripts/check-requirement-graph.ts`（人类可读段 91-92、GRAPH_JSON 109-123）
 
 - [ ] **Step 1: 人类可读输出加信息流行**
 
@@ -518,7 +518,7 @@ Expected: 退出码 0；`信息流违反 : blackHoles=[], miracles=[], deadModul
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-requirement-graph.ts
+git add w-model-dev/scripts/check-requirement-graph.ts
 git commit -m "feat: surface dataflow violations and boundary info in graph checker CLI"
 ```
 

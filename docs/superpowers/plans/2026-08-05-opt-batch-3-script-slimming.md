@@ -81,7 +81,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 Run: `npx vitest run`（全量）、`npm run self-test`（213 条）
 ```bash
-git add w-model-dev/scripts/lib/gate-report.ts w-model-dev/scripts/__tests__/gate-report.test.ts w-model-dev/scripts/cli/check-*.ts
+git add w-model-dev/scripts/lib/gate-report.ts w-model-dev/scripts/__tests__/gate-report.test.ts w-model-dev/scripts/check-*.ts
 git commit --no-gpg-sign -m "refactor(scripts): 统一门禁收尾模板 printGateReport（22 处收敛）"
 ```
 
@@ -145,7 +145,7 @@ git commit --no-gpg-sign -m "refactor(scripts): 统一 --phase 校验 parsePhase
 ## Task 3: graph-logic 索引化
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
+- Modify: `w-model-dev/scripts/graph-logic.ts`
 
 - [ ] **Step 1: 构建索引上移**
 
@@ -167,7 +167,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 Run: `npx vitest run`、`npm run self-test`（重点 graph 组）
 ```bash
-git add w-model-dev/scripts/logic/graph-logic.ts
+git add w-model-dev/scripts/graph-logic.ts
 git commit --no-gpg-sign -m "perf(graph): outEdges/inEdges/conflictsAdj 索引替换 4 处线性扫描（O(n²)→O(n)）"
 ```
 
@@ -176,7 +176,7 @@ git commit --no-gpg-sign -m "perf(graph): outEdges/inEdges/conflictsAdj 索引�
 ## Task 4: getLine 改 ts API
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/code-tla-logic.ts`（218-227）
+- Modify: `w-model-dev/scripts/code-tla-logic.ts`（218-227）
 
 - [ ] **Step 1: 替换 getLine**
 
@@ -196,7 +196,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 Run: `npx vitest run`、`npm run self-test`
 ```bash
-git add w-model-dev/scripts/logic/code-tla-logic.ts
+git add w-model-dev/scripts/code-tla-logic.ts
 git commit --no-gpg-sign -m "perf(code-tla): getLine 改用 ts.getLineAndCharacterOfPosition（O(n²)→O(1)）"
 ```
 
@@ -205,9 +205,9 @@ git commit --no-gpg-sign -m "perf(code-tla): getLine 改用 ts.getLineAndCharact
 ## Task 5: state-machine 纯逻辑下沉（TDD）
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/state-machine-logic.ts`
+- Create: `w-model-dev/scripts/state-machine-logic.ts`
 - Create: `w-model-dev/scripts/__tests__/state-machine-logic.test.ts`
-- Modify: `w-model-dev/scripts/cli/check-state-machine-consistency.ts`（瘦身）
+- Modify: `w-model-dev/scripts/check-state-machine-consistency.ts`（瘦身）
 
 - [ ] **Step 1: 写失败测试**
 
@@ -228,13 +228,13 @@ check-state-machine-consistency.ts 改为 import `{ checkStateMachineConsistency
 - [ ] **Step 5: tsc + 行为等价抽查**
 
 Run: `npx tsc --noEmit` → 0 错误。
-抽查：`npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/valid-consistent.json` → STATE_MACHINE_JSON passed:true exit 0；bad 样本 exit 1。
+抽查：`npx tsx w-model-dev/scripts/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/valid-consistent.json` → STATE_MACHINE_JSON passed:true exit 0；bad 样本 exit 1。
 
 - [ ] **Step 6: 全量回归 + 提交**
 
 Run: `npx vitest run`、`npm run self-test`
 ```bash
-git add w-model-dev/scripts/logic/state-machine-logic.ts w-model-dev/scripts/__tests__/state-machine-logic.test.ts w-model-dev/scripts/cli/check-state-machine-consistency.ts
+git add w-model-dev/scripts/state-machine-logic.ts w-model-dev/scripts/__tests__/state-machine-logic.test.ts w-model-dev/scripts/check-state-machine-consistency.ts
 git commit --no-gpg-sign -m "refactor(state-machine): 纯逻辑下沉 state-machine-logic.ts（消除逻辑与 CLI 同文件反例）"
 ```
 
@@ -243,10 +243,10 @@ git commit --no-gpg-sign -m "refactor(state-machine): 纯逻辑下沉 state-mach
 ## Task 6: 收敛 BDD/TLA+ 快照解析（含 self-test）
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/bdd-logic.ts`（新增导出）
-- Modify: `w-model-dev/scripts/cli/check-bdd-model.ts`（改 import）
-- Modify: `w-model-dev/scripts/cli/self-test.ts`（改 import）
-- 参考（不改）：`w-model-dev/scripts/logic/tla-logic.ts`（复用 parseTlaHeader）
+- Modify: `w-model-dev/scripts/bdd-logic.ts`（新增导出）
+- Modify: `w-model-dev/scripts/check-bdd-model.ts`（改 import）
+- Modify: `w-model-dev/scripts/self-test.ts`（改 import）
+- 参考（不改）：`w-model-dev/scripts/tla-logic.ts`（复用 parseTlaHeader）
 
 - [ ] **Step 1: 行为对比表（先记录，后收敛）**
 
@@ -276,7 +276,7 @@ Run: `npx vitest run` → bdd-logic.test.ts / tla-logic.test.ts 通过。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/logic/bdd-logic.ts w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/bdd-logic.ts w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/self-test.ts
 git commit --no-gpg-sign -m "refactor(bdd): scenario/TLA+ 快照解析收敛至 bdd-logic（消除 check-bdd-model 与 self-test 复制漂移）"
 ```
 
@@ -285,9 +285,9 @@ git commit --no-gpg-sign -m "refactor(bdd): scenario/TLA+ 快照解析收敛至 
 ## Task 7: 收敛 UAT 表格解析
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/design-contract-logic.ts`（新增导出）
-- Modify: `w-model-dev/scripts/cli/check-design-contract-consistency.ts`（改调用）
-- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`（复用 strict 版）
+- Modify: `w-model-dev/scripts/design-contract-logic.ts`（新增导出）
+- Modify: `w-model-dev/scripts/check-design-contract-consistency.ts`（改调用）
+- Modify: `w-model-dev/scripts/check-artifact-gate.ts`（复用 strict 版）
 
 - [ ] **Step 1: 对比两套解析字段与语义**
 
@@ -313,7 +313,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 Run: `npm run self-test`、`npx vitest run`
 ```bash
-git add w-model-dev/scripts/logic/design-contract-logic.ts w-model-dev/scripts/cli/check-design-contract-consistency.ts w-model-dev/scripts/cli/check-artifact-gate.ts
+git add w-model-dev/scripts/design-contract-logic.ts w-model-dev/scripts/check-design-contract-consistency.ts w-model-dev/scripts/check-artifact-gate.ts
 git commit --no-gpg-sign -m "refactor(contract): UAT 表格解析合一（strict 开关兼容两语义）"
 ```
 
@@ -322,10 +322,10 @@ git commit --no-gpg-sign -m "refactor(contract): UAT 表格解析合一（strict
 ## Task 8: JSONL 扫描复用 readJsonlOrExit
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-budget.ts`（76-106）
-- Modify: `w-model-dev/scripts/cli/check-maturity.ts`（78-100）
-- Modify: `w-model-dev/scripts/cli/check-preventive-review.ts`（66-141）
-- Modify: `w-model-dev/scripts/cli/check-role-dispatch.ts`（46-81，仅补注释）
+- Modify: `w-model-dev/scripts/check-budget.ts`（76-106）
+- Modify: `w-model-dev/scripts/check-maturity.ts`（78-100）
+- Modify: `w-model-dev/scripts/check-preventive-review.ts`（66-141）
+- Modify: `w-model-dev/scripts/check-role-dispatch.ts`（46-81，仅补注释）
 
 - [ ] **Step 1: 核对语义等价**
 
@@ -350,7 +350,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 Run: `npx vitest run`、`npm run self-test`
 ```bash
-git add w-model-dev/scripts/cli/check-budget.ts w-model-dev/scripts/cli/check-maturity.ts w-model-dev/scripts/cli/check-preventive-review.ts w-model-dev/scripts/cli/check-role-dispatch.ts
+git add w-model-dev/scripts/check-budget.ts w-model-dev/scripts/check-maturity.ts w-model-dev/scripts/check-preventive-review.ts w-model-dev/scripts/check-role-dispatch.ts
 git commit --no-gpg-sign -m "refactor(scripts): JSONL 扫描复用 readJsonlOrExit（role-dispatch 保留第 29 轮 exit 2 语义）"
 ```
 
@@ -362,7 +362,7 @@ git commit --no-gpg-sign -m "refactor(scripts): JSONL 扫描复用 readJsonlOrEx
 - Modify: `package.json`（删 2 个 devDep）
 - Modify: `docs/INSTALL.md`（:33 附近文字）
 - Modify: `w-model-dev/references/bdd-guide.md`（:37-38 附近文字）
-- Modify: `w-model-dev/scripts/logic/run-log-logic.ts`（删 SCRIPT_JSON 正则）
+- Modify: `w-model-dev/scripts/run-log-logic.ts`（删 SCRIPT_JSON 正则）
 - Delete: `w-model-dev/scripts/samples/event-ingress/`、`w-model-dev/scripts/samples/hill-climbing/`、`w-model-dev/scripts/samples/bdd/valid-manifest-root.json`
 
 - [ ] **Step 1: 复核无引用**
@@ -390,7 +390,7 @@ run-log-logic.ts:432-444 数组删 `/SCRIPT_JSON\s+(\{.*\})/,`。
 
 Run: `npx tsc --noEmit`、`npm run self-test`（213 条不变）、`npx vitest run`
 ```bash
-git add package.json package-lock.json docs/INSTALL.md w-model-dev/references/bdd-guide.md w-model-dev/scripts/logic/run-log-logic.ts
+git add package.json package-lock.json docs/INSTALL.md w-model-dev/references/bdd-guide.md w-model-dev/scripts/run-log-logic.ts
 git rm -r w-model-dev/scripts/samples/event-ingress w-model-dev/scripts/samples/hill-climbing w-model-dev/scripts/samples/bdd/valid-manifest-root.json
 git commit --no-gpg-sign -m "chore(deps): 移除 @cucumber devDeps + SCRIPT_JSON 死模式 + 孤儿样本"
 ```
@@ -439,7 +439,7 @@ git commit --no-gpg-sign -m "chore(cleanup): 删 diag-fix.ts 与 gate-logs 运�
 ## Task 11: signature-chain 副本排序
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/signature-chain-logic.ts`（128 / 156 / 190）
+- Modify: `w-model-dev/scripts/signature-chain-logic.ts`（128 / 156 / 190）
 
 - [ ] **Step 1: 三处副本排序**
 
@@ -456,7 +456,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 Run: `npx vitest run`（signature-chain-logic.test.ts）、`npm run self-test`
 ```bash
-git add w-model-dev/scripts/logic/signature-chain-logic.ts
+git add w-model-dev/scripts/signature-chain-logic.ts
 git commit --no-gpg-sign -m "fix(signature-chain): 原地 sort 改副本排序（消除调用方数据副作用）"
 ```
 

@@ -172,8 +172,8 @@ README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL
 
 ### 4.1 结构（仿既有脚本约定）
 
-- `w-model-dev/scripts/logic/docs-consistency-logic.ts`：纯逻辑，无 IO。
-- `w-model-dev/scripts/cli/check-docs-consistency.ts`：CLI，exit `0=通过 / 1=校验失败 / 2=输入错误`，错误结构走 `lib/cli-error.ts`。
+- `w-model-dev/scripts/docs-consistency-logic.ts`：纯逻辑，无 IO。
+- `w-model-dev/scripts/check-docs-consistency.ts`：CLI，exit `0=通过 / 1=校验失败 / 2=输入错误`，错误结构走 `lib/cli-error.ts`。
 - `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`：vitest 覆盖各检查项通过/失败样本。
 - **不新增 self-test 基线样本**（避免 249 计数级联）；不新增 schema 文件。
 

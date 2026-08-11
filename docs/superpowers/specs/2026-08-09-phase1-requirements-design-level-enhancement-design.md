@@ -309,12 +309,12 @@ docs/<module>/
 6. `w-model-dev/templates/requirement-spec/discipline-dod.md` — 新增（§16 工程纪律与 DoD 模板）
 7. `w-model-dev/templates/requirement-spec/uml-modeling.md` — 新增（附录 A UML 建模模板）
 8. `w-model-dev/references/phase-1-requirements.md` — 算法增步骤 7/8/9 + FM-3D-08/09 + 禁止行为 13/14 + 返工路径 + 验收标准
-9. `w-model-dev/scripts/logic/graph-logic.ts` + `check-requirement-graph.ts` — 新增 R7/R8
-10. `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts` — phase=1 新增引用块完整性 + SSOT 头 + DoD 清单校验
+9. `w-model-dev/scripts/graph-logic.ts` + `check-requirement-graph.ts` — 新增 R7/R8
+10. `w-model-dev/scripts/gate-logic.ts` + `check-artifact-gate.ts` — phase=1 新增引用块完整性 + SSOT 头 + DoD 清单校验
 11. `w-model-dev/scripts/__tests__/graph-logic.test.ts` — R7/R8 单测
 12. `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` — 引用块/SSOT/DoD 单测
 13. `w-model-dev/scripts/samples/` — 新增 valid + bad 样本（8 条）
-14. `w-model-dev/scripts/cli/self-test.ts` — 基线 217→225
+14. `w-model-dev/scripts/self-test.ts` — 基线 217→225
 15. `w-model-dev/references/verifier-spec.md` — V 评审新增项
 16. `w-model-dev/SKILL.md` — 阶段路由表 Phase 1 行 + 快速自检清单 + 版本号 36.0.0→37.0.0
 17. `w-model-dev/skill-metadata.json` — 版本号镜像

@@ -18,12 +18,12 @@
 
 | 文件 | 责任 | 改动类型 |
 |---|---|---|
-| `w-model-dev/scripts/logic/tla-logic.ts` | P1.1 新增 R13 checkRounds schema 校验 + `checkRoundsViolations` 字段 | Modify |
-| `w-model-dev/scripts/cli/check-tla-model.ts` | P1.1 JSON 摘要输出 `checkRoundsViolations` | Modify |
+| `w-model-dev/scripts/tla-logic.ts` | P1.1 新增 R13 checkRounds schema 校验 + `checkRoundsViolations` 字段 | Modify |
+| `w-model-dev/scripts/check-tla-model.ts` | P1.1 JSON 摘要输出 `checkRoundsViolations` | Modify |
 | `w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json` | P1.1 R13 触发 fixture | Create |
-| `w-model-dev/scripts/cli/self-test.ts` | P1.1 新增 R13 样本（基线 94→95） | Modify |
+| `w-model-dev/scripts/self-test.ts` | P1.1 新增 R13 样本（基线 94→95） | Modify |
 | `w-model-dev/scripts/__tests__/tla-logic.test.ts` | P1.1 R13 单元测试（可选） | Modify |
-| `w-model-dev/scripts/logic/checkpoint-logic.ts` | P4.1 ID_PATTERNS / TECH_KEYWORDS 注释补充 | Modify |
+| `w-model-dev/scripts/checkpoint-logic.ts` | P4.1 ID_PATTERNS / TECH_KEYWORDS 注释补充 | Modify |
 
 ### Part B：reference 文档（11 个任务）
 
@@ -55,7 +55,7 @@
 | TypeScript strict | `npx tsc --noEmit` |
 | self-test | `npm run self-test` |
 | vitest | `npx vitest run` |
-| R13 手动验证 | `npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc` |
+| R13 手动验证 | `npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc` |
 | 文档一致性 | 5 项互引人工检查 |
 
 ---
@@ -64,7 +64,7 @@
 
 ### Task A1：P1.1 tla-logic.ts 新增 R13 checkRounds schema 校验
 
-- [ ] 在 `w-model-dev/scripts/logic/tla-logic.ts` 的 `TlaCheckResult` 接口新增 `checkRoundsViolations: string[]` 字段（紧跟 `cfgStructureViolations` 后）：
+- [ ] 在 `w-model-dev/scripts/tla-logic.ts` 的 `TlaCheckResult` 接口新增 `checkRoundsViolations: string[]` 字段（紧跟 `cfgStructureViolations` 后）：
   ```typescript
   /** checkRounds schema 违反（如元素缺字段、字段类型错、含 phase 级摘要字段，见 §checkRounds 字段语义） */
   checkRoundsViolations: string[];
@@ -129,7 +129,7 @@
 
 ### Task A2：P1.1 check-tla-model.ts JSON 摘要输出新字段
 
-- [ ] 修改 `w-model-dev/scripts/cli/check-tla-model.ts` 的 JSON 摘要输出（末尾 `console.log('===JSON===...')` 处），新增 `checkRoundsViolations` 字段：
+- [ ] 修改 `w-model-dev/scripts/check-tla-model.ts` 的 JSON 摘要输出（末尾 `console.log('===JSON===...')` 处），新增 `checkRoundsViolations` 字段：
   ```typescript
   const summary = {
     passed: result.passed,
@@ -205,11 +205,11 @@
     ]
   }
   ```
-- [ ] 验证：`npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc` 应输出 `R13: checkRounds[0] 含禁止字段 phaseSummary`，退出码 1
+- [ ] 验证：`npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc` 应输出 `R13: checkRounds[0] 含禁止字段 phaseSummary`，退出码 1
 
 ### Task A4：P1.1 self-test.ts 新增 R13 样本
 
-- [ ] 修改 `w-model-dev/scripts/cli/self-test.ts`，在 TLA 样本组新增 1 条：
+- [ ] 修改 `w-model-dev/scripts/self-test.ts`，在 TLA 样本组新增 1 条：
   ```typescript
   {
     name: 'tla R13 checkRounds schema (phase summary forbidden)',
@@ -234,7 +234,7 @@
 
 ### Task A6：P4.1 checkpoint-logic.ts 注释补充
 
-- [ ] 修改 `w-model-dev/scripts/logic/checkpoint-logic.ts`，在 `ID_PATTERNS`（72 行附近）和 `TECH_KEYWORDS`（81 行附近）定义前新增注释块：
+- [ ] 修改 `w-model-dev/scripts/checkpoint-logic.ts`，在 `ID_PATTERNS`（72 行附近）和 `TECH_KEYWORDS`（81 行附近）定义前新增注释块：
   ```typescript
   /**
    * R2 决策内容具体性校验的关键词集合。
@@ -267,7 +267,7 @@
 - [ ] `npx tsc --noEmit` 0 错误
 - [ ] `npm run self-test` 95/95 全通过
 - [ ] `npx vitest run` 全通过（76/76 或 77+/77+）
-- [ ] R13 fixture 手动验证：`npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc` 退出码 1
+- [ ] R13 fixture 手动验证：`npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc` 退出码 1
 
 ---
 
@@ -624,7 +624,7 @@
 
 ### Task D4：R13 手动验证
 
-- [ ] 执行 `npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc`
+- [ ] 执行 `npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json --skip-tlc`
 - [ ] 预期：输出 `R13: checkRounds[0] 含禁止字段 phaseSummary`，退出码 1
 
 ### Task D5：文档一致性人工检查

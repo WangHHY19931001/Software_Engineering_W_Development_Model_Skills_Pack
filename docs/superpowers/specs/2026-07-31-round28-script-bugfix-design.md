@@ -7,7 +7,7 @@
 
 ## 1. 背景与范围
 
-`need_fix.md` 报告 `w-model-dev/scripts/logic/plan-chunks.ts` 两处 bug（estimateTokens 字符数低估 CJK / splitMarkdownByHeaders 分段逻辑）。按用户要求，先对全部技能脚本执行深度 code-review（5 组并行子代理，全部带最小复现验证），共发现约 66 项缺陷（P1×15 / P2×25 / P3×26，其中部分为同一设计冲突的两种面向）。
+`need_fix.md` 报告 `w-model-dev/scripts/plan-chunks.ts` 两处 bug（estimateTokens 字符数低估 CJK / splitMarkdownByHeaders 分段逻辑）。按用户要求，先对全部技能脚本执行深度 code-review（5 组并行子代理，全部带最小复现验证），共发现约 66 项缺陷（P1×15 / P2×25 / P3×26，其中部分为同一设计冲突的两种面向）。
 
 **用户决策**：
 - D1 本轮一次修完全部 ~66 项；

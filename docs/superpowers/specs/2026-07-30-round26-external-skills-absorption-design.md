@@ -75,12 +75,12 @@
 | 文件 | 改动 | 处数 |
 |---|---|---|
 | `w-model-dev/references/verifier-spec.md` | §6.3 通过判定改写 + §3.3 标准分解补单轴下限说明 | 2 |
-| `w-model-dev/scripts/logic/verifier-logic.ts` | `expectedPassed` 计算增加单轴条件 + 汇总 violation | 1-2 |
+| `w-model-dev/scripts/verifier-logic.ts` | `expectedPassed` 计算增加单轴条件 + 汇总 violation | 1-2 |
 
 **支撑资产**（随信号 1，不计入信号边界但须同步）：
 - `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json`（新增：completeness=0.65，其余 0.95 → compositeScore=0.86 达 A 级，但单轴 <0.70 → passed 应为 false）
 - `w-model-dev/scripts/__tests__/verifier-logic.test.ts`（+2 用例：单轴低分失败 / 单轴全合格通过）
-- `w-model-dev/scripts/cli/self-test.ts`（+1 bad fixture 注册）
+- `w-model-dev/scripts/self-test.ts`（+1 bad fixture 注册）
 - `w-model-dev/scripts/samples/verifier/valid.json`（检查现有样本是否全部子标准 ≥0.70，必要时调整）
 
 ### 3.2 借鉴点 2：Fowler 12 气味固定基线（低风险，E1 批）
@@ -196,10 +196,10 @@
 | # | 资产 | 变更内容 |
 |---|---|---|
 | 1 | `w-model-dev/references/verifier-spec.md` | §6.3 通过判定改写（+单轴下限）+ §3.3 说明 |
-| 2 | `w-model-dev/scripts/logic/verifier-logic.ts` | R13 单轴下限逻辑（passed 判定 + violation） |
+| 2 | `w-model-dev/scripts/verifier-logic.ts` | R13 单轴下限逻辑（passed 判定 + violation） |
 | 3 | `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json` | 新增 fixture（completeness=0.30 其余 0.90，passed 应 false） |
 | 4 | `w-model-dev/scripts/__tests__/verifier-logic.test.ts` | +2 单测（单轴低分失败 / 全合格通过） |
-| 5 | `w-model-dev/scripts/cli/self-test.ts` | +1 bad fixture 注册（self-test 基线 191 → 192） |
+| 5 | `w-model-dev/scripts/self-test.ts` | +1 bad fixture 注册（self-test 基线 191 → 192） |
 | 6 | `w-model-dev/subagent/engineering-code-reviewer.md` | +Fowler 12 固定基线节 |
 | 7 | `w-model-dev/references/glossary.md` | **新增**术语表（≥12 条 + `_Avoid_` 指令） |
 | 8 | `w-model-dev/SKILL.md` | references 索引补 glossary + 角色表 Negation 审计改写 |
@@ -220,7 +220,7 @@
 | V1 TypeScript strict | `npx tsc --noEmit` | 0 | 修正 edit，重跑 V1 |
 | V2 self-test | `npm run self-test` | 0（基线 191 → 192） | 修正 edit，重跑 V2 |
 | V3 vitest | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0（201 → ~203） | 修正 edit，重跑 V3 |
-| V4 fixture | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-single-axis-low.json` | 1（触发 R13） | 修正 fixture，重跑 V4 |
+| V4 fixture | `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-single-axis-low.json` | 1（触发 R13） | 修正 fixture，重跑 V4 |
 | V5 全量回归 | 重跑 V1-V4 全绿 | 全 0 | 任一失败回到对应阶段 |
 | V6 既有样本兼容 | `check-verifier-output.ts` 跑全部既有 valid/bad verifier 样本 | valid=0 / bad=1 | 确认 R13 不误伤既有样本 |
 

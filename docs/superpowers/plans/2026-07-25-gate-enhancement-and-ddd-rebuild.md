@@ -22,8 +22,8 @@
 ### Task A1: P1.1 TLA+ manifest basePath 强制校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/tla-logic.ts`（新增 basePath 类型字段 + 校验函数）
-- Modify: `w-model-dev/scripts/cli/check-tla-model.ts`（CLI 路径解析使用 basePath）
+- Modify: `w-model-dev/scripts/tla-logic.ts`（新增 basePath 类型字段 + 校验函数）
+- Modify: `w-model-dev/scripts/check-tla-model.ts`（CLI 路径解析使用 basePath）
 - Modify: `w-model-dev/references/tla-plus-guide.md`（§2.1 标注 basePath 强制必填）
 - Test: `w-model-dev/scripts/__tests__/tla-logic.test.ts`（新增 basePath 测试用例）
 
@@ -66,7 +66,7 @@ Expected: FAIL（basePath 字段未定义，校验未触发）
 
 - [ ] **Step 3: 实现——tla-logic.ts 新增 basePath 字段与校验**
 
-修改 `w-model-dev/scripts/logic/tla-logic.ts`：
+修改 `w-model-dev/scripts/tla-logic.ts`：
 
 ```typescript
 // 在 TlaManifest 接口（约第 58 行）新增 basePath 字段
@@ -98,7 +98,7 @@ export function checkTlaModel(m: TlaManifest): TlaCheckResult {
 
 - [ ] **Step 4: 实现——check-tla-model.ts CLI 路径解析使用 basePath**
 
-修改 `w-model-dev/scripts/cli/check-tla-model.ts` 路径解析逻辑（约第 100-150 行 jarPath 解析处）：
+修改 `w-model-dev/scripts/check-tla-model.ts` 路径解析逻辑（约第 100-150 行 jarPath 解析处）：
 
 ```typescript
 // 旧：const jarAbs = path.resolve(cwd, manifest.tools.jarPath);
@@ -154,7 +154,7 @@ git commit -m "feat(tla): P1.1 强制 manifest.basePath 字段，路径解析统
 ### Task A2: P1.2 TLA+ SD 覆盖率全规格强制（spec 方向）
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/tla-logic.ts`（checkCoverage 函数增加 spec 方向校验）
+- Modify: `w-model-dev/scripts/tla-logic.ts`（checkCoverage 函数增加 spec 方向校验）
 - Test: `w-model-dev/scripts/__tests__/tla-logic.test.ts`
 
 - [ ] **Step 1: 写失败测试——spec 缺 requirementIds 校验**
@@ -188,7 +188,7 @@ Expected: FAIL（现有 checkCoverage 只校验 SD 被覆盖方向）
 
 - [ ] **Step 3: 实现——checkCoverage 增加 spec 方向校验**
 
-修改 `w-model-dev/scripts/logic/tla-logic.ts` 第 534-559 行 `checkCoverage` 函数：
+修改 `w-model-dev/scripts/tla-logic.ts` 第 534-559 行 `checkCoverage` 函数：
 
 ```typescript
 export function checkCoverage(
@@ -267,7 +267,7 @@ git commit -m "feat(tla): P1.2 SD 覆盖率全规格强制（spec 方向校验�
 ### Task A3: P1.4 codeModule 回填时机错误信息优化
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/code-tla-logic.ts`（维度1错误信息明确回填时机）
+- Modify: `w-model-dev/scripts/code-tla-logic.ts`（维度1错误信息明确回填时机）
 - Modify: `w-model-dev/references/phase-5-coding.md`（RTM 登记章节增加强制条款）
 - Modify: `w-model-dev/SKILL.md`（阶段5门禁清单增加 codeModule 回填检查）
 
@@ -278,7 +278,7 @@ Run: `cd w-model-dev && grep -n "codeModule" scripts/code-tla-logic.ts`
 
 - [ ] **Step 2: 优化错误信息**
 
-修改 `w-model-dev/scripts/logic/code-tla-logic.ts`，将缺 codeModule 的 violation 信息从简单提示改为：
+修改 `w-model-dev/scripts/code-tla-logic.ts`，将缺 codeModule 的 violation 信息从简单提示改为：
 
 ```typescript
 // 旧：violations.push(`REQ ${reqId} 缺 codeModule`);

@@ -38,7 +38,7 @@ cp -r w-model-dev /path/to/agent/skills/w-model-dev
 
 ### 运行门禁校验脚本
 
-技能包内的校验脚本（`w-model-dev/scripts/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本依赖 [tsx](https://tsx.is/) + 少量 devDependencies（在仓库根目录 `npm install` 一次）：
+技能包内的校验脚本（`w-model-dev/scripts/cli/*.ts`）是自包含的 TypeScript，由外部 Agent 在阶段门评审时直接执行。脚本依赖 [tsx](https://tsx.is/) + 少量 devDependencies（在仓库根目录 `npm install` 一次）：
 
 - **runtime devDep**：`ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import
 - **devDep（仅安全扫描用）**：`eslint-plugin-security` + `@typescript-eslint/*` — 由 `security-scan.ts` 调用
@@ -106,7 +106,7 @@ npx tsx w-model-dev/scripts/cli/self-test.ts
 | 能力 | 归属 | 实现位置 |
 |---|---|---|
 | W 模型阶段编排、RTM 维护、状态管理 | 技能内 | `w-model-dev/SKILL.md`（编排逻辑，Agent 执行）+ `w-model-dev/references/*`（阶段细则） |
-| 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts` |
+| 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/logic/gate-logic.ts` + `w-model-dev/scripts/cli/check-artifact-gate.ts` |
 | LLM-as-a-Verifier 评审（三维度 / 连续评分 / PPT / 子标准） | 技能内提供提示词与 Schema，外部 Agent 执行 | `w-model-dev/references/verifier-spec.md` + `scripts/check-verifier-output.ts` |
 | LLM 推理本身 | 外部 | 由外部 Agent（Trae / Claude 等）自行调用其 LLM |
 | 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估） | 外部（工具运行）+ 技能内（方法论吸收） | 工具运行：[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)；方法论吸收：[skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md) |

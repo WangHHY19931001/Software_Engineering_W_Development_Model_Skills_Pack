@@ -401,8 +401,8 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 
 | 脚本 | 路径 | 用途 | 退出码 |
 |---|---|---|---|
-| `check-bdd-model.ts` | `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
-| `bdd-logic.ts` | `w-model-dev/scripts/logic/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
+| `check-bdd-model.ts` | `w-model-dev/scripts/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
+| `bdd-logic.ts` | `w-model-dev/scripts/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
 
 ### 7.2 check-bdd-model.ts 7 个校验维度
 
@@ -483,14 +483,14 @@ Then 状态 C          # 终态断言
 
 ```bash
 # 阶段 1-4 门禁（静态结构校验，不跑 cucumber）
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
+npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
   --phase=1|2|3|4 \
   [--tla-manifest=<tla-manifest.json>] \
   [--rtm=<rtm.json>] \
   [--graph=<graph.json>]
 
 # 阶段 5-8 终检（含 cucumber 执行结果校验）
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
+npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
   --phase=5|6|7|8 \
   --cucumber-report=<.w-model/bdd/reports/report.json> \
   [--tla-manifest=<tla-manifest.json>] \
@@ -927,8 +927,8 @@ BDD features 评审须遵守 §12 跨阶段 evidence 一致性约束：
 | 2 | `w-model-dev/references/bdd-review-checklist.md` | BDD 评审 7 项清单（V 子代理用） |
 | 3 | `w-model-dev/references/bdd-syntax-reference.md` | Gherkin 语法参考 |
 | 4 | `w-model-dev/references/bdd-patterns-examples.md` | BDD 模式示例库（按层级分类） |
-| 5 | `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD 静态结构门禁脚本 |
-| 6 | `w-model-dev/scripts/logic/bdd-logic.ts` | BDD 业务规则校验逻辑 |
+| 5 | `w-model-dev/scripts/check-bdd-model.ts` | BDD 静态结构门禁脚本 |
+| 6 | `w-model-dev/scripts/bdd-logic.ts` | BDD 业务规则校验逻辑 |
 | 7 | `w-model-dev/schemas/bdd-manifest.schema.json` | BDD manifest JSON Schema |
 | 8 | `w-model-dev/templates/feature.template` | features 文件模板 |
 | 9 | `w-model-dev/templates/bdd-manifest.template.json` | bdd-manifest.json 模板 |
@@ -955,8 +955,8 @@ BDD features 评审须遵守 §12 跨阶段 evidence 一致性约束：
 | 14 | `w-model-dev/references/rtm-guide.md` | 「测试用例 ID 命名规则」节扩展 BDD 引用格式约定 |
 | 15 | `w-model-dev/references/workflow.md` | 阶段产物清单表补 BDD 列 |
 | 16 | `w-model-dev/references/operational-recovery.md` | 「调测者简化行为预防」节补 BDD 简化自检条 |
-| 17 | `w-model-dev/scripts/cli/self-test.ts` | 新增 BDD samples 测试组（+10 样本：5 valid + 5 bad） |
-| 18 | `w-model-dev/scripts/cli/check-artifact-gate.ts` | 终检新增 BDD 资产校验（bdd-manifest.json 存在 + check-bdd-model.ts exitCode=0） |
+| 17 | `w-model-dev/scripts/self-test.ts` | 新增 BDD samples 测试组（+10 样本：5 valid + 5 bad） |
+| 18 | `w-model-dev/scripts/check-artifact-gate.ts` | 终检新增 BDD 资产校验（bdd-manifest.json 存在 + check-bdd-model.ts exitCode=0） |
 | 19 | `AGENTS.md` | §4 必读文档表补 bdd-guide.md；§8 脚本导航表补 check-bdd-model.ts 行 |
 | 20 | `README.md` | 反模式总数 28→29；BDD 工具链说明 |
 | 21 | `CHANGELOG.md` | 新增 [19.0.0] 条目 |
@@ -1037,7 +1037,7 @@ cucumber CLI 退出码 0 = 所有 scenario 通过；非 0 = 有失败 scenario�
 
 `.githooks/pre-push` 新增 BDD 校验项：
 - `npm run self-test`（含 BDD samples）
-- `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1 --tla-manifest=samples/tla/valid.json`（边界 4 项：无参数 exit 2 / 不存在目录 exit 2 / 有效样本 exit 0 / 无效样本 exit 1）
+- `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1 --tla-manifest=samples/tla/valid.json`（边界 4 项：无参数 exit 2 / 不存在目录 exit 2 / 有效样本 exit 0 / 无效样本 exit 1）
 
 ---
 

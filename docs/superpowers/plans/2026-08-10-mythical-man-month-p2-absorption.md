@@ -343,7 +343,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 - [ ] **Step 4: docs-consistency**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts` → exit 0。
+Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts` → exit 0。
 
 - [ ] **Step 5: 破坏样本（操作行为计数）**
 

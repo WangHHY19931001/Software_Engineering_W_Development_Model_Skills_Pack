@@ -390,12 +390,12 @@
 6. `w-model-dev/templates/system-design/discipline-dod.md` — 新增
 7. `w-model-dev/templates/system-design/uml-modeling.md` — 新增
 8. `w-model-dev/references/phase-2-system-design.md` — 算法增步骤 1-7 + FM-SD-01~05 + 禁止行为 #6/#7/#8 + 返工路径 + 验收标准 + 执行方法论表
-9. `w-model-dev/scripts/logic/graph-logic.ts` + `check-requirement-graph.ts` — 新增 R9/R10
-10. `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts` — phase=2 结构校验
+9. `w-model-dev/scripts/graph-logic.ts` + `check-requirement-graph.ts` — 新增 R9/R10
+10. `w-model-dev/scripts/gate-logic.ts` + `check-artifact-gate.ts` — phase=2 结构校验
 11. `w-model-dev/scripts/__tests__/graph-logic.test.ts` — R9/R10 单测
 12. `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` — phase=2 结构校验单测
 13. `w-model-dev/scripts/samples/` — 新增样本（8 条）
-14. `w-model-dev/scripts/cli/self-test.ts` — 基线 225→233
+14. `w-model-dev/scripts/self-test.ts` — 基线 225→233
 15. `w-model-dev/references/verifier-spec.md` — V 评审新增项
 16. `w-model-dev/SKILL.md` — 阶段路由表 Phase 2 行 + 快速自检清单 + 版本号 37.0.0→38.0.0
 17. `w-model-dev/skill-metadata.json` — 版本号镜像

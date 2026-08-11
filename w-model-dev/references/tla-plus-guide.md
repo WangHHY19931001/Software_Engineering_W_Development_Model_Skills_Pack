@@ -281,7 +281,7 @@ S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCove
 | `specId` | string | 校验的 spec id（如 `L1_blog_system`） |
 | `syntaxCheck` | boolean | SANY 语法检查是否通过 |
 | `tlcCheck` | boolean | TLC 模型检查是否通过 |
-| `violations` | string[] | 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述，与 [tla-logic.ts](../scripts/tla-logic.ts) 类型定义一致；第 16 轮 P4.3 修正：原 `number` 类型与脚本不一致） |
+| `violations` | string[] | 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述，与 [tla-logic.ts](../scripts/logic/tla-logic.ts) 类型定义一致；第 16 轮 P4.3 修正：原 `number` 类型与脚本不一致） |
 | `converged` | boolean | 本轮是否零违反收敛（`violations.length === 0`） |
 
 **单调递减规则**：同一 `specId` 跨轮 `violations.length` 应单调递减（每轮返工修复一部分违反）。若某轮 `violations.length` 不降反升 → 视为返工失败，编排者分派 S 子代理返工时须在 prompt 中明确「违反数上升」信号。
@@ -301,7 +301,7 @@ S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCove
 | `phaseDecisions` | phase 级决策列表 | `run-log.jsonl` 的 `acknowledgedDecisions` 字段 |
 | `phaseLevelSummary` | phase 级总结 | `run-log.jsonl` 的 `note` 字段 |
 
-R13 校验由 [`tla-logic.ts`](../scripts/tla-logic.ts) `checkRoundsSchema` 函数执行，命中禁止字段 → 报 `R13: checkRounds[i] 含禁止字段 <字段名>（phase 级摘要字段，checkRounds 为 spec 级返工记录）`。
+R13 校验由 [`tla-logic.ts`](../scripts/logic/tla-logic.ts) `checkRoundsSchema` 函数执行，命中禁止字段 → 报 `R13: checkRounds[i] 含禁止字段 <字段名>（phase 级摘要字段，checkRounds 为 spec 级返工记录）`。
 
 ## 校验脚本
 

@@ -8,7 +8,7 @@
 
 ## 开发环境准备
 
-本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，声明 `tsx`（运行 `w-model-dev/scripts/*.ts`）+ `ajv`/`ajv-formats`（schema 校验 runtime 依赖）+ `eslint-plugin-security`（安全扫描）+ `@typescript-eslint/*` + `vitest` 等开发依赖，无构建步骤、无 `src/`、无编程式 SDK。
+本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，声明 `tsx`（运行 `w-model-dev/scripts/cli/*.ts`）+ `ajv`/`ajv-formats`（schema 校验 runtime 依赖）+ `eslint-plugin-security`（安全扫描）+ `@typescript-eslint/*` + `vitest` 等开发依赖，无构建步骤、无 `src/`、无编程式 SDK。
 
 ```bash
 # 1. 克隆仓库
@@ -24,7 +24,7 @@ npm run setup:hooks
 # 启用后每次 git push 会自动跑回归基线，详见下方「本地推送前门禁」一节
 ```
 
-技能资产主体（`SKILL.md` / `references/` / `templates/` / `examples/`）是纯 Markdown，无需任何运行时；`w-model-dev/scripts/*.ts` 是自包含 TypeScript，仅依赖 `tsx` 运行 ESM。
+技能资产主体（`SKILL.md` / `references/` / `templates/` / `examples/`）是纯 Markdown，无需任何运行时；`w-model-dev/scripts/cli/*.ts` 是自包含 TypeScript，仅依赖 `tsx` 运行 ESM。
 
 ## 开发工作流
 
@@ -41,7 +41,7 @@ git checkout -b fix/issue-xxx
 遵循以下原则：
 
 - **单一职责**：每个 `references/phase-N-*.md` 只描述一个阶段，每个脚本只做一件事
-- **类型安全**：`w-model-dev/scripts/*.ts` 启用 TypeScript 严格风格，避免 `any`
+- **类型安全**：`w-model-dev/scripts/cli/*.ts` 启用 TypeScript 严格风格，避免 `any`
 - **自包含**：脚本不得 import `src/` 或任何外部业务模块，仅依赖本目录内文件与 Node 标准库
 - **逻辑/IO 分离**：校验逻辑放 `*-logic.ts`（纯函数），CLI 入口放 `check-*.ts`（IO 抽离）；新增校验规则优先改 logic 层
 - **中文注释**：注释使用中文（与现有风格一致），标识符用英文
@@ -49,7 +49,7 @@ git checkout -b fix/issue-xxx
 
 ### 3. 验证校验脚本
 
-修改 `w-model-dev/scripts/*.ts` 后，必须先跑回归测试，再跑自检基线：
+修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
 # 3.1 单元测试（vitest，35 个 test 文件 / 530 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）

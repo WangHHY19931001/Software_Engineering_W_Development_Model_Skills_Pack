@@ -818,7 +818,7 @@ git commit -m "feat(schemas): 新增preventive-review.schema.json"
 ## Task 16: scripts - gate-logic.ts 新增codeModule格式校验+uat-path-mapping回填校验逻辑
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/gate-logic.ts` (在checkArtifactGate函数前新增校验函数)
+- Modify: `w-model-dev/scripts/gate-logic.ts` (在checkArtifactGate函数前新增校验函数)
 
 - [ ] **Step 1: 在gate-logic.ts中新增codeModule格式校验函数**
 
@@ -913,7 +913,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/logic/gate-logic.ts
+git add w-model-dev/scripts/gate-logic.ts
 git commit -m "feat(scripts): gate-logic 新增codeModule格式校验+uat-path-mapping回填校验"
 ```
 
@@ -922,7 +922,7 @@ git commit -m "feat(scripts): gate-logic 新增codeModule格式校验+uat-path-m
 ## Task 17: scripts - check-artifact-gate.ts 新增phase=1/5校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts` (main函数中)
+- Modify: `w-model-dev/scripts/check-artifact-gate.ts` (main函数中)
 
 - [ ] **Step 1: 在main函数中新增phase=1的uat-path-mapping.md存在性校验**
 
@@ -996,7 +996,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/cli/check-artifact-gate.ts
+git add w-model-dev/scripts/check-artifact-gate.ts
 git commit -m "feat(scripts): check-artifact-gate 新增phase=1/5 uat-path-mapping校验"
 ```
 
@@ -1005,7 +1005,7 @@ git commit -m "feat(scripts): check-artifact-gate 新增phase=1/5 uat-path-mappi
 ## Task 18: scripts - check-bdd-model.ts 多路径查找
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-bdd-model.ts:193-196` (路径解析逻辑)
+- Modify: `w-model-dev/scripts/check-bdd-model.ts:193-196` (路径解析逻辑)
 
 - [ ] **Step 1: 新增resolveFeatureFile多路径查找函数**
 
@@ -1078,7 +1078,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/cli/check-bdd-model.ts
+git add w-model-dev/scripts/check-bdd-model.ts
 git commit -m "fix(scripts): check-bdd-model 多路径查找支持根目录/子目录回退"
 ```
 
@@ -1087,7 +1087,7 @@ git commit -m "fix(scripts): check-bdd-model 多路径查找支持根目录/子�
 ## Task 19: scripts - check-design-contract-consistency.ts 缺失提示
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-design-contract-consistency.ts:205-211` (存在性校验)
+- Modify: `w-model-dev/scripts/check-design-contract-consistency.ts:205-211` (存在性校验)
 
 - [ ] **Step 1: 修改L205-211的ENOENT错误处理**
 
@@ -1123,7 +1123,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/cli/check-design-contract-consistency.ts
+git add w-model-dev/scripts/check-design-contract-consistency.ts
 git commit -m "fix(scripts): check-design-contract uat-path-mapping缺失明确提示"
 ```
 
@@ -1132,8 +1132,8 @@ git commit -m "fix(scripts): check-design-contract uat-path-mapping缺失明确�
 ## Task 20: scripts - check-run-log.ts 新增R3记录校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/run-log-logic.ts` (纯逻辑层新增R3校验)
-- Modify: `w-model-dev/scripts/cli/check-run-log.ts` (main调用)
+- Modify: `w-model-dev/scripts/run-log-logic.ts` (纯逻辑层新增R3校验)
+- Modify: `w-model-dev/scripts/check-run-log.ts` (main调用)
 
 - [ ] **Step 1: 在run-log-logic.ts中新增R3记录校验函数**
 
@@ -1181,7 +1181,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/logic/run-log-logic.ts
+git add w-model-dev/scripts/run-log-logic.ts
 git commit -m "feat(scripts): run-log-logic 新增R3记录校验"
 ```
 
@@ -1190,8 +1190,8 @@ git commit -m "feat(scripts): run-log-logic 新增R3记录校验"
 ## Task 21: scripts - 新增 check-preventive-review.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/preventive-review-logic.ts` (纯逻辑层)
-- Create: `w-model-dev/scripts/cli/check-preventive-review.ts` (CLI入口)
+- Create: `w-model-dev/scripts/preventive-review-logic.ts` (纯逻辑层)
+- Create: `w-model-dev/scripts/check-preventive-review.ts` (CLI入口)
 
 - [ ] **Step 1: 创建preventive-review-logic.ts纯逻辑层**
 
@@ -1360,7 +1360,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/logic/preventive-review-logic.ts w-model-dev/scripts/cli/check-preventive-review.ts
+git add w-model-dev/scripts/preventive-review-logic.ts w-model-dev/scripts/check-preventive-review.ts
 git commit -m "feat(scripts): 新增check-preventive-review.ts校验R3三份报告完整性"
 ```
 
@@ -1369,8 +1369,8 @@ git commit -m "feat(scripts): 新增check-preventive-review.ts校验R3三份报�
 ## Task 22: scripts - 新增 check-tla-bdd-sync.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/tla-bdd-sync-logic.ts` (纯逻辑层)
-- Create: `w-model-dev/scripts/cli/check-tla-bdd-sync.ts` (CLI入口)
+- Create: `w-model-dev/scripts/tla-bdd-sync-logic.ts` (纯逻辑层)
+- Create: `w-model-dev/scripts/check-tla-bdd-sync.ts` (CLI入口)
 
 - [ ] **Step 1: 创建tla-bdd-sync-logic.ts纯逻辑层**
 
@@ -1627,7 +1627,7 @@ Expected: 0 errors
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/logic/tla-bdd-sync-logic.ts w-model-dev/scripts/cli/check-tla-bdd-sync.ts
+git add w-model-dev/scripts/tla-bdd-sync-logic.ts w-model-dev/scripts/check-tla-bdd-sync.ts
 git commit -m "feat(scripts): 新增check-tla-bdd-sync.ts TLA+/BDD自动化同步校验"
 ```
 
@@ -2064,7 +2064,7 @@ git commit -m "test: gate-enhancement 覆盖codeModule格式校验"
 ## Task 34: 测试 - 更新 self-test.ts 注册新校验器
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/self-test.ts`
+- Modify: `w-model-dev/scripts/self-test.ts`
 
 - [ ] **Step 1: 新增 PreventiveReviewCase 接口和用例数组**
 
@@ -2189,7 +2189,7 @@ Expected: 所有用例通过，包括新增的 preventive-review 和 tla-bdd-syn
 
 ```bash
 cd d:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack
-git add w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/self-test.ts
 git commit -m "test: self-test 注册preventive-review和tla-bdd-sync校验器"
 ```
 

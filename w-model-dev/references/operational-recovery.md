@@ -323,7 +323,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### acknowledgedDecisions 真实性约束
 
-> SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 第六维度「理解证据」6.1~6.3 为权威定义；[`check-checkpoint.ts`](../scripts/check-checkpoint.ts) 强制校验。历史缺陷 D19：用户仅说「继续」，O 自行代填 acknowledgedDecisions（含「50个REQ节点完整覆盖」等技术决策）——CHECKPOINT 沦为 O 自问自答。
+> SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 第六维度「理解证据」6.1~6.3 为权威定义；[`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) 强制校验。历史缺陷 D19：用户仅说「继续」，O 自行代填 acknowledgedDecisions（含「50个REQ节点完整覆盖」等技术决策）——CHECKPOINT 沦为 O 自问自答。
 
 | 约束 | 规则 | 违反处置 |
 |---|---|---|
@@ -333,7 +333,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | 决策与阶段匹配 | 阶段 1 决策须与需求相关；阶段 2 与系统设计相关；阶段 3 与概要设计相关 | `check-checkpoint.ts` R4 校验 → exitCode=1 |
 | 跨阶段证据一致 | 后阶段决策不得静默否定前阶段已放行项；矛盾须显式回退修正前阶段产物并重跑 | `check-checkpoint.ts` 交叉比对历史 checkpoint（SSoT §10.6 6.3） → exitCode=1 |
 
-强制校验由 [`check-checkpoint.ts`](../scripts/check-checkpoint.ts) 执行（规则表见修正设计 [§5.4](../../docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md)）；任一规则违反 → exitCode=1，O 不得放行（反模式 #9 谎报状态守护）。
+强制校验由 [`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) 执行（规则表见修正设计 [§5.4](../../docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md)）；任一规则违反 → exitCode=1，O 不得放行（反模式 #9 谎报状态守护）。
 
 ### maturity.json 维护
 
@@ -413,7 +413,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### 检测机制
 
-[`check-run-log.ts`](../scripts/check-run-log.ts) R5 规则交叉 `gate-logs/` 检测 O 越权：
+[`check-run-log.ts`](../scripts/cli/check-run-log.ts) R5 规则交叉 `gate-logs/` 检测 O 越权：
 
 - 读取本阶段 `gate-logs/phaseN-*.log` 与 run-log.jsonl 中 `role=O` 的动作记录
 - 检测 O 是否绕过 A/S 子代理直接操作产物 JSON（`node -e` 命令痕迹、`Write`/`Edit` 落盘产物文件、产物 JSON 的 mtime 与某条 O 动作时间戳吻合但无对应 A/S 子代理分派记录）

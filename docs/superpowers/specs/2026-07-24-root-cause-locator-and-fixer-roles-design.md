@@ -338,7 +338,7 @@ S 产出 → V 评审 → G 门禁 ──通过──► 阶段门放行
 
 ### 4.4 校验脚本：check-rootcause-report.ts
 
-新建 `w-model-dev/scripts/cli/check-rootcause-report.ts`（与 `check-verifier-output.ts` 平级），由 G 子代理执行。
+新建 `w-model-dev/scripts/check-rootcause-report.ts`（与 `check-verifier-output.ts` 平级），由 G 子代理执行。
 
 校验规则（R1-R10）：
 
@@ -791,7 +791,7 @@ SSoT §3.4（编排者-子代理边界）角色表新增 R 行；§6.4（角色�
 | 文件路径 | 用途 |
 |---|---|
 | `w-model-dev/references/root-cause-locator.md` | R 方法论指南（第 3 节内容：4 种方法 + 质量标准 + 方法选择规则 + 多人格多角度分析节） |
-| `w-model-dev/scripts/cli/check-rootcause-report.ts` | R 报告校验脚本（第 4 节 R1-R10 校验规则） |
+| `w-model-dev/scripts/check-rootcause-report.ts` | R 报告校验脚本（第 4 节 R1-R10 校验规则） |
 | `w-model-dev/scripts/__tests__/root-cause-logic.test.ts` | R 校验逻辑单元测试 |
 | `w-model-dev/scripts/samples/rootcause/` | R 报告样本目录（valid.json + 10 个 bad-*.json 对应 R1-R10 失败场景） |
 | `w-model-dev/references/subagent-persona-matrix.md` | R-persona / V-persona 选择矩阵（第 9 节表格） |
@@ -824,10 +824,10 @@ SSoT §3.4（编排者-子代理边界）角色表新增 R 行；§6.4（角色�
 
 | 文件 | 修改内容 |
 |---|---|
-| `w-model-dev/scripts/logic/run-log-logic.ts` | R1 动作枚举扩展（9 种）；R3 返工完整性扩展（R + S-fix 一一对应 + V 复审数 = R 数）；R6 exitCode 一致性新增 ROOTCAUSE_JSON 标记；R7 时序校验扩展（rootcause→review→gate→fix→review→gate） |
-| `w-model-dev/scripts/cli/check-budget.ts` | 新增 R4-A 规则（多角度 R 的 token 预算，rootcauseParallelBudget 校验，不论并行/串行均累计） |
-| `w-model-dev/scripts/cli/self-test.ts` | 回归基线新增 R 样本（预计 11 条：1 valid + 10 bad）；总数从 66 增至 77 |
-| `w-model-dev/scripts/logic/gate-logic.ts` | 若需在终检门纳入 R 资产归档校验，新增 R 报告归档检查（可选，待评估） |
+| `w-model-dev/scripts/run-log-logic.ts` | R1 动作枚举扩展（9 种）；R3 返工完整性扩展（R + S-fix 一一对应 + V 复审数 = R 数）；R6 exitCode 一致性新增 ROOTCAUSE_JSON 标记；R7 时序校验扩展（rootcause→review→gate→fix→review→gate） |
+| `w-model-dev/scripts/check-budget.ts` | 新增 R4-A 规则（多角度 R 的 token 预算，rootcauseParallelBudget 校验，不论并行/串行均累计） |
+| `w-model-dev/scripts/self-test.ts` | 回归基线新增 R 样本（预计 11 条：1 valid + 10 bad）；总数从 66 增至 77 |
+| `w-model-dev/scripts/gate-logic.ts` | 若需在终检门纳入 R 资产归档校验，新增 R 报告归档检查（可选，待评估） |
 
 ### 8.3 影响面统计
 

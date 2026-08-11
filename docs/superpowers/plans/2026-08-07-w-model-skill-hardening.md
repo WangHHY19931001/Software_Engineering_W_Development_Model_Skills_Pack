@@ -509,7 +509,7 @@ git commit -m "feat: bdd-manifest schema 新增 designCoverage 强制字段（ph
 ### Task 5：tla-logic.ts 升级 checkCoverage + sdCoverage 校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/tla-logic.ts`
+- Modify: `w-model-dev/scripts/tla-logic.ts`
 - Test: `w-model-dev/scripts/__tests__/tla-logic.test.ts`
 - Create: `w-model-dev/scripts/samples/tla/bad-coverage-uncovered-sd.json`
 
@@ -600,7 +600,7 @@ Expected: FAIL（当前 checkCoverage 不校验 sdCoverage 字段）
 
 - [ ] **Step 3：升级 TlaManifest 类型**
 
-在 `w-model-dev/scripts/logic/tla-logic.ts` 的 `TlaManifest` 接口中（`graphSdNodes` 之后）新增：
+在 `w-model-dev/scripts/tla-logic.ts` 的 `TlaManifest` 接口中（`graphSdNodes` 之后）新增：
 
 ```typescript
   /**
@@ -617,7 +617,7 @@ Expected: FAIL（当前 checkCoverage 不校验 sdCoverage 字段）
 
 - [ ] **Step 4：升级 checkCoverage 函数**
 
-在 `w-model-dev/scripts/logic/tla-logic.ts` 中找到 `checkCoverage` 函数（约 line 550），在函数末尾（`return { passed, violations }` 之前）追加 sdCoverage 字段校验：
+在 `w-model-dev/scripts/tla-logic.ts` 中找到 `checkCoverage` 函数（约 line 550），在函数末尾（`return { passed, violations }` 之前）追加 sdCoverage 字段校验：
 
 ```typescript
   // sdCoverage 字段校验（phase>=2 强制）：uncoveredSdNodes 非空 → 违反
@@ -718,7 +718,7 @@ Expected: 全部 PASS（如有现有测试因 sdCoverage 缺失失败，须在�
 - [ ] **Step 8：Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/tla-logic.ts w-model-dev/scripts/__tests__/tla-logic.test.ts w-model-dev/scripts/samples/tla/bad-coverage-uncovered-sd.json
+git add w-model-dev/scripts/tla-logic.ts w-model-dev/scripts/__tests__/tla-logic.test.ts w-model-dev/scripts/samples/tla/bad-coverage-uncovered-sd.json
 git commit -m "feat: tla-logic checkCoverage 升级为校验 sdCoverage 字段（phase>=2 强制）"
 ```
 
@@ -727,7 +727,7 @@ git commit -m "feat: tla-logic checkCoverage 升级为校验 sdCoverage 字段�
 ### Task 6：bdd-logic.ts 新增 D8 SD Coverage 维度
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/bdd-logic.ts`
+- Modify: `w-model-dev/scripts/bdd-logic.ts`
 - Test: `w-model-dev/scripts/__tests__/bdd-logic.test.ts`
 - Create: `w-model-dev/scripts/samples/bdd/bad-d8-uncovered-sd.json`
 
@@ -828,7 +828,7 @@ Expected: FAIL（`result.dimensions.sdCoverage` 不存在）
 
 - [ ] **Step 3：升级 BddCheckInput 接口**
 
-在 `w-model-dev/scripts/logic/bdd-logic.ts` 的 `BddCheckInput` 接口中（`cucumberReport` 之后）新增：
+在 `w-model-dev/scripts/bdd-logic.ts` 的 `BddCheckInput` 接口中（`cucumberReport` 之后）新增：
 
 ```typescript
   /** 由 CLI 通过 --graph 提取的 SD 节点 ID 列表（phase>=2 时用于 D8 交叉校验） */
@@ -837,7 +837,7 @@ Expected: FAIL（`result.dimensions.sdCoverage` 不存在）
 
 - [ ] **Step 4：升级 BddCheckResult.dimensions**
 
-在 `w-model-dev/scripts/logic/bdd-logic.ts` 的 `BddCheckResult.dimensions` 中（`rtmMapping` 之后）新增：
+在 `w-model-dev/scripts/bdd-logic.ts` 的 `BddCheckResult.dimensions` 中（`rtmMapping` 之后）新增：
 
 ```typescript
     sdCoverage: string[];
@@ -965,7 +965,7 @@ Expected: 全部 PASS
 - [ ] **Step 13：Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/bdd-logic.ts w-model-dev/scripts/__tests__/bdd-logic.test.ts w-model-dev/scripts/samples/bdd/bad-d8-uncovered-sd.json
+git add w-model-dev/scripts/bdd-logic.ts w-model-dev/scripts/__tests__/bdd-logic.test.ts w-model-dev/scripts/samples/bdd/bad-d8-uncovered-sd.json
 git commit -m "feat: bdd-logic 新增 D8 SD Coverage 维度（phase>=2 强制）"
 ```
 
@@ -976,11 +976,11 @@ git commit -m "feat: bdd-logic 新增 D8 SD Coverage 维度（phase>=2 强制）
 ### Task 7：check-tla-model.ts --graph phase>=2 强制
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-tla-model.ts`
+- Modify: `w-model-dev/scripts/check-tla-model.ts`
 
 - [ ] **Step 1：修改参数解析——--graph phase>=2 强制**
 
-在 `w-model-dev/scripts/cli/check-tla-model.ts` 的 `main` 函数中，phase 确定后（约 line 373 之后）新增 --graph 强制校验：
+在 `w-model-dev/scripts/check-tla-model.ts` 的 `main` 函数中，phase 确定后（约 line 373 之后）新增 --graph 强制校验：
 
 ```typescript
   // --graph phase>=2 强制（设计文档 §3.3.6）
@@ -988,7 +988,7 @@ git commit -m "feat: bdd-logic 新增 D8 SD Coverage 维度（phase>=2 强制）
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
+      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
       exitCode: 2,
     });
     return;
@@ -1006,18 +1006,18 @@ git commit -m "feat: bdd-logic 新增 D8 SD Coverage 维度（phase>=2 强制）
 
 - [ ] **Step 3：验证——跑现有样本确保 phase=1 不受影响**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/samples/tla/valid.json --phase=1`
+Run: `npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/samples/tla/valid.json --phase=1`
 Expected: 正常执行（不要求 --graph）
 
 - [ ] **Step 4：验证——phase=2 缺 --graph 应 exitCode=2**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/samples/tla/valid.json --phase=2`
+Run: `npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/samples/tla/valid.json --phase=2`
 Expected: exitCode=2，输出含"参数缺失 --graph"
 
 - [ ] **Step 5：Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-tla-model.ts
+git add w-model-dev/scripts/check-tla-model.ts
 git commit -m "feat: check-tla-model --graph 参数 phase>=2 时强制必填"
 ```
 
@@ -1026,11 +1026,11 @@ git commit -m "feat: check-tla-model --graph 参数 phase>=2 时强制必填"
 ### Task 8：check-bdd-model.ts 新增 --graph 参数 + D8 校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-bdd-model.ts`
+- Modify: `w-model-dev/scripts/check-bdd-model.ts`
 
 - [ ] **Step 1：修改 ParsedArgs 接口**
 
-在 `w-model-dev/scripts/cli/check-bdd-model.ts` 的 `ParsedArgs` 接口中新增 `graphFile`：
+在 `w-model-dev/scripts/check-bdd-model.ts` 的 `ParsedArgs` 接口中新增 `graphFile`：
 
 ```typescript
 interface ParsedArgs {
@@ -1121,25 +1121,25 @@ interface ParsedArgs {
 将文件头注释（约 line 11-13）更新为：
 
 ```typescript
- *   npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json>
+ *   npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json>
  *     [--phase=N] [--tla-manifest=<path>] [--rtm=<path>] [--cucumber-report=<path>] [--graph=<graph.json>]
  *   --graph=<graph.json>  phase>=2 时强制必填，提取 type=SD 节点供 D8 SD Coverage 校验
 ```
 
 - [ ] **Step 8：验证——phase=2 缺 --graph 应 exitCode=2**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=2`
+Run: `npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=2`
 Expected: exitCode=2，输出含"参数缺失 --graph"
 
 - [ ] **Step 9：验证——D8 uncovered 样本应 exitCode=1**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-d8-uncovered-sd.json --phase=2 --graph=w-model-dev/scripts/samples/graph/valid-cross-logic.json`
+Run: `npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-d8-uncovered-sd.json --phase=2 --graph=w-model-dev/scripts/samples/graph/valid-cross-logic.json`
 Expected: exitCode=1，输出含 "D8 SD Coverage" violations
 
 - [ ] **Step 10：Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-bdd-model.ts
+git add w-model-dev/scripts/check-bdd-model.ts
 git commit -m "feat: check-bdd-model 新增 --graph 参数 + D8 SD Coverage 校验"
 ```
 
@@ -1148,11 +1148,11 @@ git commit -m "feat: check-bdd-model 新增 --graph 参数 + D8 SD Coverage 校�
 ### Task 9：check-artifact-gate.ts 终检调用 model 校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`
+- Modify: `w-model-dev/scripts/check-artifact-gate.ts`
 
 - [ ] **Step 1：新增 spawnTlaModelCheck / spawnBddModelCheck 函数**
 
-在 `w-model-dev/scripts/cli/check-artifact-gate.ts` 中，TLA+/BDD 资产读取之后（约 line 303 之后），新增调用 model 校验的逻辑：
+在 `w-model-dev/scripts/check-artifact-gate.ts` 中，TLA+/BDD 资产读取之后（约 line 303 之后），新增调用 model 校验的逻辑：
 
 ```typescript
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
@@ -1229,7 +1229,7 @@ import { spawnSync } from 'node:child_process';
 
 - [ ] **Step 5：新增 resolvePhaseDoc 函数消除硬编码路径（spec §3.1.2）**
 
-在 `w-model-dev/scripts/cli/check-artifact-gate.ts` 中，文件顶部常量区（约 line 44-46 之后）新增 `resolvePhaseDoc` 函数与内置映射表：
+在 `w-model-dev/scripts/check-artifact-gate.ts` 中，文件顶部常量区（约 line 44-46 之后）新增 `resolvePhaseDoc` 函数与内置映射表：
 
 ```typescript
 /**
@@ -1295,18 +1295,18 @@ export function resolvePhaseDoc(phase: number, type: string): string {
 
 - [ ] **Step 6：验证——终检应调用 model 校验**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts w-model-dev-demo --phase=2`
+Run: `npx tsx w-model-dev/scripts/check-artifact-gate.ts w-model-dev-demo --phase=2`
 Expected: 输出含 "Model 校验" 行
 
 - [ ] **Step 7：验证——resolvePhaseDoc 无残留硬编码**
 
-Run: `grep -n "docs/uat-path-mapping\|docs/system-design\|docs/requirement-spec\|docs/detailed-design" w-model-dev/scripts/cli/check-artifact-gate.ts`
+Run: `grep -n "docs/uat-path-mapping\|docs/system-design\|docs/requirement-spec\|docs/detailed-design" w-model-dev/scripts/check-artifact-gate.ts`
 Expected: 无输出（所有路径已通过 resolvePhaseDoc 解析；字符串常量仅存在于 PHASE_DOC_MAP）
 
 - [ ] **Step 8：Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-artifact-gate.ts
+git add w-model-dev/scripts/check-artifact-gate.ts
 git commit -m "feat: check-artifact-gate 终检调用 model 校验 + resolvePhaseDoc 消除硬编码路径"
 ```
 
@@ -1315,7 +1315,7 @@ git commit -m "feat: check-artifact-gate 终检调用 model 校验 + resolvePhas
 ### Task 10：verifier-logic.ts EVIDENCE_PATTERN 更新
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`
+- Modify: `w-model-dev/scripts/verifier-logic.ts`
 - Test: `w-model-dev/scripts/__tests__/verifier-logic.test.ts`
 
 - [ ] **Step 1：编写失败测试**
@@ -1350,7 +1350,7 @@ Expected: 部分FAIL（当前 EVIDENCE_PATTERN 匹配点号格式）
 
 - [ ] **Step 3：修改 EVIDENCE_PATTERN**
 
-在 `w-model-dev/scripts/logic/verifier-logic.ts` 中找到 `EVIDENCE_PATTERN`（约 line 227），替换为：
+在 `w-model-dev/scripts/verifier-logic.ts` 中找到 `EVIDENCE_PATTERN`（约 line 227），替换为：
 
 ```typescript
 /**
@@ -1378,7 +1378,7 @@ Expected: 全部 PASS（如现有测试用旧点号格式 evidence，须更新�
 - [ ] **Step 7：Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/verifier-logic.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts w-model-dev/scripts/samples/verifier/
+git add w-model-dev/scripts/verifier-logic.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts w-model-dev/scripts/samples/verifier/
 git commit -m "feat: verifier-logic EVIDENCE_PATTERN 更新为冒号格式（format-conventions.md）"
 ```
 
@@ -1833,12 +1833,12 @@ git commit -m "feat: bdd-guide 新增 D8 SD Coverage 维度 + @designIds 字段 
 ```markdown
 执行：
   - 阶段 1~7 门：
-    1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
-    2. npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
-    3. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
-    4. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
+    1. npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output.json>"
+    2. npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    3. npx tsx w-model-dev/scripts/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    4. npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir] --phase=<N>
     5. 其余闭环脚本（按 phase-N 定义）
-  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]（内部已调用 check-tla-model + check-bdd-model 并传 --graph）
+  - 阶段 8 终检：npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]（内部已调用 check-tla-model + check-bdd-model 并传 --graph）
 ```
 
 - [ ] **Step 6：修改产出契约——G 返回 model 校验证据**
@@ -1940,31 +1940,31 @@ Expected: 全部 PASS
 
 - [ ] **Step 2：验证 TLA+ model 校验——demo 通过**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev-demo/.w-model/tla-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
+Run: `npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev-demo/.w-model/tla-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
 Expected: exitCode=0
 
 - [ ] **Step 3：验证 BDD model 校验——demo 通过**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev-demo/.w-model/bdd-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
+Run: `npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev-demo/.w-model/bdd-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
 Expected: exitCode=0
 
 - [ ] **Step 4：验证终检——demo 通过**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts w-model-dev-demo --phase=2`
+Run: `npx tsx w-model-dev/scripts/check-artifact-gate.ts w-model-dev-demo --phase=2`
 Expected: exitCode=0，输出含 "Model 校验: ✓"
 
 - [ ] **Step 5：验证多子系统场景——故意遗漏一个子系统的 TLA+ 规格应被检出**
 
 修改 demo 的 tla-manifest.json，删除一个子系统的 spec + 对应 sdCoverage 条目，运行 check-tla-model：
 
-Run: `npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev-demo/.w-model/tla-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
+Run: `npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev-demo/.w-model/tla-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
 Expected: exitCode=1，输出含 "未覆盖: SD-xxx"
 
 - [ ] **Step 6：验证 BDD 多子系统场景——故意遗漏一个子系统的 feature 应被检出**
 
 修改 demo 的 bdd-manifest.json，删除一个子系统的 feature + 对应 designCoverage 条目，运行 check-bdd-model：
 
-Run: `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev-demo/.w-model/bdd-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
+Run: `npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev-demo/.w-model/bdd-manifest.json --phase=2 --graph=w-model-dev-demo/.w-model/ingestion/graph.json`
 Expected: exitCode=1，输出含 "D8 SD Coverage" violations
 
 - [ ] **Step 7：恢复 demo 产物**

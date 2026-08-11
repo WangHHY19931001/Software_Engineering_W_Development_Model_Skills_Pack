@@ -180,7 +180,7 @@
 
 S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - 失败走 R→V→G→S-fix 循环（反模式 #29）
-- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=8 --cucumber-report=<report.json>` 门禁
+- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=8 --cucumber-report=<report.json>` 门禁
 - cucumber 报告不得有 undefined/pending/failed step（D5 校验）
 
 ## 禁止行为
@@ -198,7 +198,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 
 > 第 15 轮共性问题 C：`acknowledgedDecisions` 多次因未含 ID 模式或 `TECH_KEYWORDS` 返工。第 16 轮 P4.1 补充约束。
 
-每条 `acknowledgedDecisions`（[run-log.jsonl](data-models.md) 的 `RunLogEntry.acknowledgedDecisions` 字段）须命中以下任一，否则触发 [`check-checkpoint.ts`](../scripts/check-checkpoint.ts) R2 名词违规：
+每条 `acknowledgedDecisions`（[run-log.jsonl](data-models.md) 的 `RunLogEntry.acknowledgedDecisions` 字段）须命中以下任一，否则触发 [`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) R2 名词违规：
 
 - **ID 模式**（正则匹配，5 个）：
   - `REQ-\d+`（需求 ID，如 `REQ-001`）
@@ -211,7 +211,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
   - **英文（16 个）**：`REST` / `GraphQL` / `JWT` / `OAuth` / `SQLite` / `PostgreSQL` / `Redis` / `Koa` / `Express` / `React` / `Vue` / `TypeScript` / `WebSocket` / `HTTP` / `API` / `CRUD`
   - **中文（21 个）**：`认证` / `鉴权` / `缓存` / `存储` / `模块` / `接口` / `表` / `字段` / `状态机` / `不变式` / `需求` / `设计` / `架构` / `数据库` / `前端` / `后端` / `网关` / `队列` / `事务` / `锁` / `索引`
 
-泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释，第 16 轮 P4.1 补充）。
+泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/logic/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释，第 16 轮 P4.1 补充）。
 
 ## 返工路径
 

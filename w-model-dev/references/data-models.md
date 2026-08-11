@@ -94,11 +94,11 @@ DESIGN 1──* TEST_CASE        (设计生成系统/集成/单元测试)
 ## 图谱节点与边类型（GraphNode / EdgeType）
 
 > ingestion 子流程图谱模型的节点与边类型。完整节点语义、系统层级树与多层图谱（7 层）校验规则见 [graph-guide.md](graph-guide.md)；本节仅定义数据模型层 schema 与横切边源节点标识 marker。
-> 权威实现：[`scripts/graph-logic.ts`](../scripts/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。`governs` / `derives` 边类型与 `governance` / `derivationProduct` marker 均已落地；`consumes` 兼容已移除（D21）。
+> 权威实现：[`scripts/graph-logic.ts`](../scripts/logic/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。`governs` / `derives` 边类型与 `governance` / `derivationProduct` marker 均已落地；`consumes` 兼容已移除（D21）。
 
 ### 横切边源节点 marker（GraphNode 扩展）
 
-`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/graph-logic.ts)（含下方两个 marker 字段，已落地）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 含两个可选布尔 marker 字段（`governance` / `derivationProduct`，以 graph-logic.ts 为 schema 权威）：
+`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/logic/graph-logic.ts)（含下方两个 marker 字段，已落地）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 含两个可选布尔 marker 字段（`governance` / `derivationProduct`，以 graph-logic.ts 为 schema 权威）：
 
 ```typescript
 // GraphNode 扩展字段（叠加于 graph-logic.ts 现有 GraphNode 之上）
@@ -166,7 +166,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 ## RTM 字段阶段演进规则
 
-> RTM 各列按阶段递进补加，禁止在早期阶段填写晚期字段（防止「提前填晚期字段」缺陷）。本节是对 [rtm-guide.md](rtm-guide.md)「各阶段登记职责」与「各阶段 RTM 字段更新清单」的阶段演进约束补充；RTM 行字段 schema 见 [`scripts/gate-logic.ts`](../scripts/gate-logic.ts) `RTMRowShape`。
+> RTM 各列按阶段递进补加，禁止在早期阶段填写晚期字段（防止「提前填晚期字段」缺陷）。本节是对 [rtm-guide.md](rtm-guide.md)「各阶段登记职责」与「各阶段 RTM 字段更新清单」的阶段演进约束补充；RTM 行字段 schema 见 [`scripts/gate-logic.ts`](../scripts/logic/gate-logic.ts) `RTMRowShape`。
 
 **RTM 行字段阶段演进**（`RTMRowShape`）：
 
@@ -337,7 +337,7 @@ interface BudgetConfig {
 - `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4）。
 - `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐：当 `project.updatedAt > budget.createdAt` 时须满足 `budget.updatedAt > budget.createdAt`，否则报「阶段推进但 budget 未更新」。
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
-- `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
+- `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/cli/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
 
 ## 运行日志模型（run-log.jsonl）
 
@@ -399,7 +399,7 @@ interface RunLogEntry {
 
 ### R1 阶段动作完整性：按阶段分档
 
-> 由 [`scripts/run-log-logic.ts`](../scripts/run-log-logic.ts) R1 校验。对每个已完成阶段（含 checkpoint success），按阶段编号分档检查必需动作：
+> 由 [`scripts/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。对每个已完成阶段（含 checkpoint success），按阶段编号分档检查必需动作：
 
 | 阶段范围 | 必需动作 | 说明 |
 |---|---|---|
@@ -412,7 +412,7 @@ interface RunLogEntry {
 
 ### 动作类型字段约束（rootcause / fix / escalate 扩展）
 
-> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/run-log-logic.ts`](../scripts/run-log-logic.ts) R1 校验。
+> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
 `action` 枚举新增 `rootcause` / `fix` 两个动作（返工循环 V/G→R→V→G→S-fix→V→G 专用）。各动作的额外必填字段约束：
 
@@ -514,7 +514,7 @@ interface MaturityConfig {
 
 ### RunLogEntry vs EventIngress Schema 边界对照表
 
-> 第 15 轮调测发现子代理频繁混用 RunLogEntry（`run-log.jsonl`）与 EventIngress（`event-ingress.jsonl`）字段（共性问题 B），第 16 轮 P2.1 新增此对照表显式区分边界。命中混用 → [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验失败（run-log.jsonl）或 EventIngress schema 校验失败（event-ingress.jsonl）。
+> 第 15 轮调测发现子代理频繁混用 RunLogEntry（`run-log.jsonl`）与 EventIngress（`event-ingress.jsonl`）字段（共性问题 B），第 16 轮 P2.1 新增此对照表显式区分边界。命中混用 → [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R1 动作完整性校验失败（run-log.jsonl）或 EventIngress schema 校验失败（event-ingress.jsonl）。
 
 | 用途 | RunLogEntry 字段 | EventIngress 字段 | 区别 |
 |---|---|---|---|
@@ -813,7 +813,7 @@ interface BddFeature {
 
 ### 与 TLA+ 数据模型的关系
 
-BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同层 TLA+ spec 的 `State` / `Init` / `Next` / `Invariants` 一一对应，由 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 校验等价性（见 [bdd-guide.md](bdd-guide.md)「BDD↔TLA+ 协作」节）。
+BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同层 TLA+ spec 的 `State` / `Init` / `Next` / `Invariants` 一一对应，由 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) D4 校验等价性（见 [bdd-guide.md](bdd-guide.md)「BDD↔TLA+ 协作」节）。
 
 ## JSON Schema 强约束（借鉴 drawio-skill/styles/schema.json）
 

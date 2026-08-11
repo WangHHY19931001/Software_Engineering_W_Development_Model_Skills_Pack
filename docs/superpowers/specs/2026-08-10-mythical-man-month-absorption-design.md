@@ -79,7 +79,7 @@
 | 8 | `w-model-dev/references/phase-6-integration-test.md` | 修订 | 补「集成判断由人持有」节 |
 | 9 | `w-model-dev/references/mythical-man-month-absorption.md` | 新增 | 吸收决策记录（23 项映射 + 章节出处 + 与约束/反模式关系） |
 | 10 | `docs/skill-design-document_SSoT.md` | 修订 | 新增 §3.4.39「第 39 轮：人月神话吸收」；§10A 追溯表补一行 |
-| 11 | `w-model-dev/scripts/logic/docs-consistency-logic.ts` | 修订 | 反模式最大编号期望 44 → 46 |
+| 11 | `w-model-dev/scripts/docs-consistency-logic.ts` | 修订 | 反模式最大编号期望 44 → 46 |
 | 12 | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts` | 修订 | 样本 antiPatterns 更新为 #1~#46 |
 | 13 | 顶层文档 | 修订 | 计数 44 → 46 联动：`AGENTS.md` / `README.md`（3 处）/ `INSTALL.md` / `definition-of-done.md:58`；CHANGELOG [39.0.0]；版本号三处同步（package.json / skill-metadata.json / SKILL.md frontmatter） |
 

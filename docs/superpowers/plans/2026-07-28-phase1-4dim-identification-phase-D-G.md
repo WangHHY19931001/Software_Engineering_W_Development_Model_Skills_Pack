@@ -810,7 +810,7 @@ git commit -m "feat(samples): 新增 7 个豁免审批样本"
 ### Task D4: 扩展 self-test.ts（新增 GRAPH/COVERAGE/EXEMPTION/SCHEMA 用例）
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/self-test.ts`
+- Modify: `w-model-dev/scripts/self-test.ts`
 
 - [ ] **Step 1: 在 self-test.ts 中新增 GRAPH_CASES（13 个图谱样本）**
 
@@ -840,7 +840,7 @@ Expected: 152/152 通过，退出码 0
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/self-test.ts
 git commit -m "feat(self-test): 扩展 self-test 基线 121→152（+13 graph +10 coverage +7 exemption +1 schema）"
 ```
 

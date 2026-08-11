@@ -18,8 +18,8 @@
 
 | 文件路径 | 责任 |
 |---|---|
-| `w-model-dev/scripts/logic/root-cause-logic.ts` | R 报告校验纯逻辑（R1-R10 规则、RootCauseReportShape 类型） |
-| `w-model-dev/scripts/cli/check-rootcause-report.ts` | R 报告校验 CLI 包装（退出码 0/1/2） |
+| `w-model-dev/scripts/root-cause-logic.ts` | R 报告校验纯逻辑（R1-R10 规则、RootCauseReportShape 类型） |
+| `w-model-dev/scripts/check-rootcause-report.ts` | R 报告校验 CLI 包装（退出码 0/1/2） |
 | `w-model-dev/scripts/__tests__/root-cause-logic.test.ts` | R 校验逻辑单元测试（vitest） |
 | `w-model-dev/scripts/samples/rootcause/*.json` | R 报告样本（1 valid + 10 bad，对应 R1-R10） |
 | `w-model-dev/references/root-cause-locator.md` | R 方法论指南（4 种方法 + 质量标准 + 多角度节） |
@@ -355,7 +355,7 @@ git commit -m "test(rootcause): TDD 先写 R1-R10 单元测试（全部 RED）"
 ### Task 4: 实现 root-cause-logic.ts（R1-R10 校验纯逻辑）
 
 **Files:**
-- Create: `w-model-dev/scripts/logic/root-cause-logic.ts`
+- Create: `w-model-dev/scripts/root-cause-logic.ts`
 
 - [ ] **Step 1: 编写 root-cause-logic.ts 完整实现**
 
@@ -660,13 +660,13 @@ Expected: 全部 PASS（11 个测试用例）
 
 - [ ] **Step 3: TypeScript 编译检查**
 
-Run: `cd w-model-dev-demo && npx tsc --noEmit ../w-model-dev/scripts/logic/root-cause-logic.ts --strict --esModuleInterop --moduleResolution node`
+Run: `cd w-model-dev-demo && npx tsc --noEmit ../w-model-dev/scripts/root-cause-logic.ts --strict --esModuleInterop --moduleResolution node`
 Expected: 0 errors
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/root-cause-logic.ts
+git add w-model-dev/scripts/root-cause-logic.ts
 git commit -m "feat(rootcause): 实现 R1-R10 校验纯逻辑（GREEN）"
 ```
 
@@ -675,7 +675,7 @@ git commit -m "feat(rootcause): 实现 R1-R10 校验纯逻辑（GREEN）"
 ### Task 5: 实现 check-rootcause-report.ts CLI 包装
 
 **Files:**
-- Create: `w-model-dev/scripts/cli/check-rootcause-report.ts`
+- Create: `w-model-dev/scripts/check-rootcause-report.ts`
 
 - [ ] **Step 1: 编写 CLI 包装（参照 check-verifier-output.ts 模式）**
 
@@ -689,7 +689,7 @@ git commit -m "feat(rootcause): 实现 R1-R10 校验纯逻辑（GREEN）"
  * 防止 R 子代理输出漂移导致 S-fix 拿到不合规根因报告。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>
+ *   npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>
  *
  * 参数：
  *   report.json  R 子代理产出的 RootCauseReport JSON 文件路径
@@ -707,7 +707,7 @@ import { checkRootCauseReport, type RootCauseReportShape } from './root-cause-lo
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>');
+    console.error('用法: npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>');
     process.exit(2);
   }
 
@@ -769,18 +769,18 @@ main().catch((err) => {
 
 - [ ] **Step 2: 手动验证 valid 样本退出码 0**
 
-Run: `npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts w-model-dev/scripts/samples/rootcause/valid.json`
+Run: `npx tsx w-model-dev/scripts/check-rootcause-report.ts w-model-dev/scripts/samples/rootcause/valid.json`
 Expected: 退出码 0，输出含 `✓ 通过`
 
 - [ ] **Step 3: 手动验证 bad-r1 样本退出码 1**
 
-Run (PowerShell): `$p = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/cli/check-rootcause-report.ts","w-model-dev/scripts/samples/rootcause/bad-r1-missing-fields.json" -Wait -NoNewWindow -PassThru; $p.ExitCode`
+Run (PowerShell): `$p = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/check-rootcause-report.ts","w-model-dev/scripts/samples/rootcause/bad-r1-missing-fields.json" -Wait -NoNewWindow -PassThru; $p.ExitCode`
 Expected: ExitCode = 1
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-rootcause-report.ts
+git add w-model-dev/scripts/check-rootcause-report.ts
 git commit -m "feat(rootcause): 实现 check-rootcause-report.ts CLI 包装"
 ```
 
@@ -789,7 +789,7 @@ git commit -m "feat(rootcause): 实现 check-rootcause-report.ts CLI 包装"
 ### Task 6: 注册 rootcause 用例到 self-test.ts（基线 66→77）
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/self-test.ts`
+- Modify: `w-model-dev/scripts/self-test.ts`
 
 - [ ] **Step 1: 在 self-test.ts 顶部 import 区新增 RootCause 导入**
 
@@ -894,13 +894,13 @@ const all = [
 
 - [ ] **Step 5: 运行 self-test 确认基线从 66 增至 77 且全部通过**
 
-Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/self-test.ts`
 Expected: `总计 77 条用例：77 通过，0 失败`，退出码 0
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/self-test.ts
 git commit -m "test(rootcause): self-test 注册 R 用例（基线 66→77）"
 ```
 
@@ -911,7 +911,7 @@ git commit -m "test(rootcause): self-test 注册 R 用例（基线 66→77）"
 ### Task 7: 扩展 run-log-logic.ts（R1/R3/R6/R7 规则）
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/run-log-logic.ts`
+- Modify: `w-model-dev/scripts/run-log-logic.ts`
 - Modify: `w-model-dev/scripts/__tests__/run-log-logic.test.ts`
 - Create: `w-model-dev/scripts/samples/run-log/rootcause-valid.jsonl`
 - Create: `w-model-dev/scripts/samples/run-log/rootcause-missing-fix.jsonl`
@@ -1066,7 +1066,7 @@ Expected: 全部 PASS
 - [ ] **Step 11: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/run-log-logic.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts w-model-dev/scripts/samples/run-log/rootcause-*.jsonl
+git add w-model-dev/scripts/run-log-logic.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts w-model-dev/scripts/samples/run-log/rootcause-*.jsonl
 git commit -m "feat(run-log): R1/R3/R6/R7 扩展接纳 rootcause/fix 动作类型"
 ```
 
@@ -1075,7 +1075,7 @@ git commit -m "feat(run-log): R1/R3/R6/R7 扩展接纳 rootcause/fix 动作类�
 ### Task 8: 扩展 budget-logic.ts（R4-A 多角度 token 预算规则）
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/budget-logic.ts`
+- Modify: `w-model-dev/scripts/budget-logic.ts`
 - Modify: `w-model-dev/scripts/__tests__/budget-logic.test.ts`
 - Create: `w-model-dev/scripts/samples/budget/rootcause-over-budget.json`
 
@@ -1202,7 +1202,7 @@ Expected: 全部 PASS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/budget-logic.ts w-model-dev/scripts/__tests__/budget-logic.test.ts w-model-dev/scripts/samples/budget/rootcause-over-budget.json
+git add w-model-dev/scripts/budget-logic.ts w-model-dev/scripts/__tests__/budget-logic.test.ts w-model-dev/scripts/samples/budget/rootcause-over-budget.json
 git commit -m "feat(budget): 新增 R4-A 多角度 R token 预算规则（并行/串行均累计）"
 ```
 
@@ -1972,7 +1972,7 @@ Expected: 0 errors
 
 - [ ] **Step 2: self-test 全量通过（77 条用例）**
 
-Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/self-test.ts`
 Expected: `总计 77 条用例：77 通过，0 失败`，退出码 0
 
 - [ ] **Step 3: vitest 单元测试全量通过**
@@ -1990,11 +1990,11 @@ Expected: 现有测试全部 PASS（无回归）
 Run:
 ```powershell
 # valid 样本 → 退出码 0
-$p1 = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/cli/check-rootcause-report.ts","w-model-dev/scripts/samples/rootcause/valid.json" -Wait -NoNewWindow -PassThru
+$p1 = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/check-rootcause-report.ts","w-model-dev/scripts/samples/rootcause/valid.json" -Wait -NoNewWindow -PassThru
 # bad-r1 样本 → 退出码 1
-$p2 = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/cli/check-rootcause-report.ts","w-model-dev/scripts/samples/rootcause/bad-r1-missing-fields.json" -Wait -NoNewWindow -PassThru
+$p2 = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/check-rootcause-report.ts","w-model-dev/scripts/samples/rootcause/bad-r1-missing-fields.json" -Wait -NoNewWindow -PassThru
 # 不存在文件 → 退出码 2
-$p3 = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/cli/check-rootcause-report.ts","nonexistent.json" -Wait -NoNewWindow -PassThru
+$p3 = Start-Process -FilePath "npx" -ArgumentList "tsx","w-model-dev/scripts/check-rootcause-report.ts","nonexistent.json" -Wait -NoNewWindow -PassThru
 Write-Host "valid=$($p1.ExitCode) bad=$($p2.ExitCode) missing=$($p3.ExitCode)"
 ```
 Expected: `valid=0 bad=1 missing=2`

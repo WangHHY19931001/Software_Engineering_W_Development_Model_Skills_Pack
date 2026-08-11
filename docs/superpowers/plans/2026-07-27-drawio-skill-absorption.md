@@ -33,8 +33,8 @@
 | `w-model-dev/schemas/hill-climbing-report.schema.json` | HarnessImprovementReport schema |
 | `w-model-dev/schemas/event-ingress.schema.json` | EventIngress 单条记录 schema |
 | `w-model-dev/schemas/code-tla-manifest.schema.json` | 代码-TLA+ 一致性 manifest schema |
-| `w-model-dev/scripts/logic/schema-loader.ts` | ajv 实例 + schema 加载 + 校验工具（compile once, reuse） |
-| `w-model-dev/scripts/cli/security-scan.ts` | 跑 eslint + 比对 baseline，退出码 0/1 |
+| `w-model-dev/scripts/schema-loader.ts` | ajv 实例 + schema 加载 + 校验工具（compile once, reuse） |
+| `w-model-dev/scripts/security-scan.ts` | 跑 eslint + 比对 baseline，退出码 0/1 |
 | `w-model-dev/skill-metadata.json` | 版本号镜像（frontmatter 双写） |
 | `w-model-dev/scripts/samples/schema/bad-additional-props.json` | 验证 additionalProperties:false 拒绝 |
 | `w-model-dev/scripts/samples/schema/bad-missing-required.json` | 验证必填字段缺失拒绝 |
@@ -54,17 +54,17 @@
 |---|---|
 | `package.json` | 加 devDeps: ajv, ajv-formats, eslint, @typescript-eslint/parser, @typescript-eslint/eslint-plugin, eslint-plugin-security, vitest；加 scripts: lint:security, schema:check |
 | `tsconfig.json` | include 增 `w-model-dev/schemas/**/*`（JSON Schema 文件，仍按 json 解析） |
-| `w-model-dev/scripts/logic/verifier-logic.ts` | 顶部 import schema-loader，先 schema 校验再业务规则 |
-| `w-model-dev/scripts/logic/gate-logic.ts` | 同上（rtm.schema.json + project.schema.json） |
-| `w-model-dev/scripts/logic/graph-logic.ts` | 同上（graph.schema.json） |
-| `w-model-dev/scripts/logic/tla-logic.ts` | 同上（tla-manifest.schema.json） |
-| `w-model-dev/scripts/logic/code-tla-logic.ts` | 同上（code-tla-manifest.schema.json） |
-| `w-model-dev/scripts/logic/budget-logic.ts` | 同上（budget.schema.json） |
-| `w-model-dev/scripts/logic/run-log-logic.ts` | 同上（run-log.schema.json） |
-| `w-model-dev/scripts/logic/maturity-logic.ts` | 同上（maturity.schema.json） |
-| `w-model-dev/scripts/logic/checkpoint-logic.ts` | 同上（checkpoint-log.schema.json + run-log.schema.json） |
-| `w-model-dev/scripts/logic/root-cause-logic.ts` | 同上（rootcause-report.schema.json） |
-| `w-model-dev/scripts/cli/self-test.ts` | 加 3 条 schema 用例 + 1 条 metadata 一致性检查 |
+| `w-model-dev/scripts/verifier-logic.ts` | 顶部 import schema-loader，先 schema 校验再业务规则 |
+| `w-model-dev/scripts/gate-logic.ts` | 同上（rtm.schema.json + project.schema.json） |
+| `w-model-dev/scripts/graph-logic.ts` | 同上（graph.schema.json） |
+| `w-model-dev/scripts/tla-logic.ts` | 同上（tla-manifest.schema.json） |
+| `w-model-dev/scripts/code-tla-logic.ts` | 同上（code-tla-manifest.schema.json） |
+| `w-model-dev/scripts/budget-logic.ts` | 同上（budget.schema.json） |
+| `w-model-dev/scripts/run-log-logic.ts` | 同上（run-log.schema.json） |
+| `w-model-dev/scripts/maturity-logic.ts` | 同上（maturity.schema.json） |
+| `w-model-dev/scripts/checkpoint-logic.ts` | 同上（checkpoint-log.schema.json + run-log.schema.json） |
+| `w-model-dev/scripts/root-cause-logic.ts` | 同上（rootcause-report.schema.json） |
+| `w-model-dev/scripts/self-test.ts` | 加 3 条 schema 用例 + 1 条 metadata 一致性检查 |
 | `w-model-dev/SKILL.md` | frontmatter 加 version / 加 Bundled Resources 章节 / 加 toolbox 链接 / 加 schema 校验约束 |
 | `w-model-dev/references/data-models.md` | 增加「JSON Schema 强约束」节，列出 schemas/ 清单 |
 | `w-model-dev/references/anti-patterns.md` | 新增反模式 #28：JSON 文件未通过 schema 校验放行 |
@@ -84,7 +84,7 @@
 - Modify: `w-model-dev/SKILL.md:1-8`（frontmatter）
 - Create: `w-model-dev/skill-metadata.json`
 - Create: `w-model-dev/scripts/__tests__/skill-metadata.test.ts`
-- Modify: `w-model-dev/scripts/cli/self-test.ts`（追加 1 条）
+- Modify: `w-model-dev/scripts/self-test.ts`（追加 1 条）
 
 - [ ] **Step 1.1: 在 SKILL.md frontmatter 增加 version 字段**
 
@@ -189,7 +189,7 @@ cd w-model-dev && npx vitest run scripts/__tests__/skill-metadata.test.ts && npm
 - [ ] **Step 1.6: Commit**
 
 ```bash
-git add w-model-dev/SKILL.md w-model-dev/skill-metadata.json w-model-dev/scripts/__tests__/skill-metadata.test.ts w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/SKILL.md w-model-dev/skill-metadata.json w-model-dev/scripts/__tests__/skill-metadata.test.ts w-model-dev/scripts/self-test.ts
 git commit -m "feat(skill): 借鉴点4 — 版本号双写 + 元数据回归测试 (借鉴 drawio-skill)"
 ```
 
@@ -202,11 +202,11 @@ git commit -m "feat(skill): 借鉴点4 — 版本号双写 + 元数据回归测�
 **Files:**
 - Modify: `package.json`（加 ajv / ajv-formats devDep）
 - Create: `w-model-dev/schemas/verifier-output.schema.json`
-- Create: `w-model-dev/scripts/logic/schema-loader.ts`
-- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`（顶部加 schema 前置校验）
+- Create: `w-model-dev/scripts/schema-loader.ts`
+- Modify: `w-model-dev/scripts/verifier-logic.ts`（顶部加 schema 前置校验）
 - Create: `w-model-dev/scripts/samples/schema/bad-additional-props.json`、`bad-missing-required.json`、`bad-wrong-type.json`
 - Create: `w-model-dev/scripts/__tests__/schema-validation.test.ts`
-- Modify: `w-model-dev/scripts/cli/self-test.ts`（加 3 条 schema 拒绝用例）
+- Modify: `w-model-dev/scripts/self-test.ts`（加 3 条 schema 拒绝用例）
 
 - [ ] **Step 2.1: 安装 ajv + ajv-formats**
 
@@ -281,7 +281,7 @@ npm install --save-dev ajv@^8.17.1 ajv-formats@^3.0.1
 }
 ```
 
-- [ ] **Step 2.3: 新建 w-model-dev/scripts/logic/schema-loader.ts**
+- [ ] **Step 2.3: 新建 w-model-dev/scripts/schema-loader.ts**
 
 ```typescript
 /**
@@ -508,7 +508,7 @@ npm run self-test
 - [ ] **Step 2.9: Commit**
 
 ```bash
-git add package.json package-lock.json w-model-dev/schemas/verifier-output.schema.json w-model-dev/scripts/logic/schema-loader.ts w-model-dev/scripts/logic/verifier-logic.ts w-model-dev/scripts/samples/schema/ w-model-dev/scripts/__tests__/schema-validation.test.ts w-model-dev/scripts/cli/self-test.ts
+git add package.json package-lock.json w-model-dev/schemas/verifier-output.schema.json w-model-dev/scripts/schema-loader.ts w-model-dev/scripts/verifier-logic.ts w-model-dev/scripts/samples/schema/ w-model-dev/scripts/__tests__/schema-validation.test.ts w-model-dev/scripts/self-test.ts
 git commit -m "feat(schema): 借鉴点2 — 引入 ajv + VerifierOutput schema 强约束 (借鉴 drawio-skill)"
 ```
 
@@ -620,7 +620,7 @@ cd .. && npm run self-test
 - [ ] **Step 3.6: Commit**
 
 ```bash
-git add w-model-dev/schemas/ w-model-dev/scripts/*.ts w-model-dev/references/data-models.md w-model-dev/references/anti-patterns.md w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/schemas/ w-model-dev/scripts/*.ts w-model-dev/references/data-models.md w-model-dev/references/anti-patterns.md w-model-dev/scripts/self-test.ts
 git commit -m "feat(schema): 借鉴点2 — 补齐 12 份 schema + 反模式 #28 (借鉴 drawio-skill)"
 ```
 
@@ -633,7 +633,7 @@ git commit -m "feat(schema): 借鉴点2 — 补齐 12 份 schema + 反模式 #28
 - Create: `.eslintrc.cjs`
 - Create: `.eslintignore`
 - Create: `.eslintsecurity-baseline.json`
-- Create: `w-model-dev/scripts/cli/security-scan.ts`
+- Create: `w-model-dev/scripts/security-scan.ts`
 - Create: `w-model-dev/scripts/__tests__/security-scan.test.ts`
 - Modify: `.githooks/pre-push`（在最后追加 security-scan 步骤）
 
@@ -716,7 +716,7 @@ writeFileSync('.eslintsecurity-baseline.json', JSON.stringify(baseline, null, 2)
 node scripts/gen-baseline.mjs && rm scripts/gen-baseline.mjs .eslintsecurity-report.json
 ```
 
-- [ ] **Step 4.5: 新建 w-model-dev/scripts/cli/security-scan.ts**
+- [ ] **Step 4.5: 新建 w-model-dev/scripts/security-scan.ts**
 
 ```typescript
 #!/usr/bin/env tsx
@@ -729,7 +729,7 @@ node scripts/gen-baseline.mjs && rm scripts/gen-baseline.mjs .eslintsecurity-rep
  *   - 新增同规则不同位置的发现才失败
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/security-scan.ts
+ *   npx tsx w-model-dev/scripts/security-scan.ts
  *
  * 退出码：
  *   0  无新增风险（baseline 覆盖全部发现）
@@ -882,14 +882,14 @@ describe('security-scan diffFindings（借鉴点 3）', () => {
 ```bash
 # 6. security-scan：跑 eslint-plugin-security + baseline 比对，必须 exit 0
 run_expect "security-scan 无新增风险" 0 \
-  npx tsx w-model-dev/scripts/cli/security-scan.ts || exit 1
+  npx tsx w-model-dev/scripts/security-scan.ts || exit 1
 ```
 
 - [ ] **Step 4.8: 在 package.json 增加 scripts**
 
 ```json
 "scripts": {
-  "lint:security": "tsx w-model-dev/scripts/cli/security-scan.ts",
+  "lint:security": "tsx w-model-dev/scripts/security-scan.ts",
   ...
 }
 ```
@@ -909,7 +909,7 @@ npm run prepush
 - [ ] **Step 4.10: Commit**
 
 ```bash
-git add package.json package-lock.json .eslintrc.cjs .eslintignore .eslintsecurity-baseline.json w-model-dev/scripts/cli/security-scan.ts w-model-dev/scripts/__tests__/security-scan.test.ts .githooks/pre-push
+git add package.json package-lock.json .eslintrc.cjs .eslintignore .eslintsecurity-baseline.json w-model-dev/scripts/security-scan.ts w-model-dev/scripts/__tests__/security-scan.test.ts .githooks/pre-push
 git commit -m "feat(security): 借鉴点3 — 引入 eslint-plugin-security + baseline 指纹豁免 (借鉴 drawio-skill)"
 ```
 
@@ -1113,21 +1113,21 @@ git commit -m "docs(skill): 借鉴点1 — Bundled Resources 触发条件总表 
 
 | I have | I want | Use |
 |---|---|---|
-| V 子代理产出 VerifierOutput JSON | 校验防漂移 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>` |
-| RTM + project.json | 阶段 8 终检工件门 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts <project-dir>` |
+| V 子代理产出 VerifierOutput JSON | 校验防漂移 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>` |
+| RTM + project.json | 阶段 8 终检工件门 | `npx tsx w-model-dev/scripts/check-artifact-gate.ts <project-dir>` |
 | RTM | 阶段 5/6/7 阶段级校验 | `check-artifact-gate.ts --phase=5\|6\|7 <project-dir>` |
-| graph.json（阶段 1–4 ingestion） | 图谱结构 + 信息流门禁 | `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=N]` |
-| tla-manifest.json | TLA+ 行为门禁（SANY + TLC） | `npx tsx w-model-dev/scripts/cli/check-tla-model.ts <manifest.json> [--phase=N]` |
-| tla-manifest + graph + rtm + src/ | 阶段 5 代码-TLA+ 一致性回归 | `npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=... --graph=... --rtm=... --src=...` |
-| budget.json | 预算超限检查 | `npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=] [--run-log=] [--phase=N]` |
-| run-log.jsonl | 运行日志完整性检查 | `npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=] [--tla-manifest=]` |
-| maturity.json | 成熟度等级检查 | `npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=] [--run-log=]` |
-| run-log.jsonl（含 CHECKPOINT） | 决策内容具体性检查 | `npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=]` |
-| RootCauseReport.json | 根因报告 schema 校验 | `npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>` |
+| graph.json（阶段 1–4 ingestion） | 图谱结构 + 信息流门禁 | `npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=N]` |
+| tla-manifest.json | TLA+ 行为门禁（SANY + TLC） | `npx tsx w-model-dev/scripts/check-tla-model.ts <manifest.json> [--phase=N]` |
+| tla-manifest + graph + rtm + src/ | 阶段 5 代码-TLA+ 一致性回归 | `npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=... --graph=... --rtm=... --src=...` |
+| budget.json | 预算超限检查 | `npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=] [--run-log=] [--phase=N]` |
+| run-log.jsonl | 运行日志完整性检查 | `npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=] [--tla-manifest=]` |
+| maturity.json | 成熟度等级检查 | `npx tsx w-model-dev/scripts/check-maturity.ts <maturity.json> [--project=] [--run-log=]` |
+| run-log.jsonl（含 CHECKPOINT） | 决策内容具体性检查 | `npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=]` |
+| RootCauseReport.json | 根因报告 schema 校验 | `npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>` |
 | 任意 .w-model/*.json | schema 强约束校验（被 logic 层自动调用，无需手动） | `schema-loader.ts` 内置 |
-| scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/cli/security-scan.ts` |
+| scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/security-scan.ts` |
 | scripts 改动 | 回归基线 | `npm run self-test` |
-| ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/logic/plan-chunks.ts`（O 只读 stdout） |
+| ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/plan-chunks.ts`（O 只读 stdout） |
 
 ## subagent 决策表
 
@@ -1271,7 +1271,7 @@ npm run lint:security              # 跑 eslint-plugin-security + baseline 比�
 - 引入 ajv (draft-07) + 13 份 JSON Schema 强约束 .w-model/*.json
 - 引入 eslint-plugin-security + .eslintsecurity-baseline.json 安全扫描基线
 - 新增 w-model-dev/schemas/ 目录
-- 新增 w-model-dev/scripts/logic/schema-loader.ts / security-scan.ts
+- 新增 w-model-dev/scripts/schema-loader.ts / security-scan.ts
 - 新增 w-model-dev/skill-metadata.json 版本号镜像
 - 新增 w-model-dev/references/toolbox.md 决策表
 - 新增 w-model-dev/scripts/__tests__/README.md coverage 矩阵

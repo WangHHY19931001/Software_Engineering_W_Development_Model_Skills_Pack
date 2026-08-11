@@ -368,7 +368,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 | `references/workflow.md` | 流程图阶段1-4节点加 ingestion 子流程标注；阶段产物清单表加 graph.json 列 |
 | `references/anti-patterns.md` | 新增 #11「ingestion 跳过图谱校验」、#12「A 自评收敛」；F1-F10 失败模式补充 ingestion 相关信号 |
 | `references/command-reference.md` | `/wm analyze` 与 `/wm design` 命令条目加 ingestion 字段说明 |
-| `scripts/self-test.ts` | 新增 plan-chunks + check-requirement-graph 的样本测试用例（与现有 17 条同构追加） |
+| `scripts/cli/self-test.ts` | 新增 plan-chunks + check-requirement-graph 的样本测试用例（与现有 17 条同构追加） |
 | `scripts/samples/graph/` | 新增样本目录：`valid-graph.json`、`bad-isolated.json`、`bad-multi-root.json`、`bad-orphan.json`、`bad-sd-no-implements.json` 等 |
 | `examples/requirement-analysis.md` | 加"超大文档 ingestion"交互样例片段 |
 
@@ -386,8 +386,8 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 
 | 脚本 | 跑者 | 接口 | 退出码 |
 |---|---|---|---|
-| `scripts/plan-chunks.ts` | O（只读 stdout） | `plan-chunks.ts "<path>" --phase=N --node-type=<TYPE> [--max-tokens=8000]` | 0=正常 / 2=输入错误 |
-| `scripts/check-requirement-graph.ts` | G | `check-requirement-graph.ts "<graph.json\|consolidated.json>" --phase=N` | 0=通过 / 1=校验失败 / 2=输入错误 |
+| `scripts/logic/plan-chunks.ts` | O（只读 stdout） | `plan-chunks.ts "<path>" --phase=N --node-type=<TYPE> [--max-tokens=8000]` | 0=正常 / 2=输入错误 |
+| `scripts/cli/check-requirement-graph.ts` | G | `check-requirement-graph.ts "<graph.json\|consolidated.json>" --phase=N` | 0=通过 / 1=校验失败 / 2=输入错误 |
 
 两个脚本均自包含（仅依赖 tsx + Node 标准库，不 import src/），与现有 `check-verifier-output.ts` / `check-artifact-gate.ts` 同构。
 

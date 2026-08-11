@@ -314,7 +314,7 @@ import 'dotenv/config';
 - [ ] 状态码一致性：成功/错误状态码与验收测试设计一致
 - [ ] 响应字段一致性：响应体字段名与验收测试设计一致
 
-G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/check-design-contract-consistency.ts) 校验，exitCode=0 才放行。
+G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-design-contract-consistency.ts) 校验，exitCode=0 才放行。
 
 违反任一条 → 回编码修正，禁止「以代码为准」忽略设计。
 
@@ -427,7 +427,7 @@ S-code 子代理在编码时遵循 TDD 红-绿-重构循环，以 L4 BDD feature
 3. 重跑 cucumber 直到 all scenarios pass（绿）
 4. 重构代码（保持 scenarios 绿）
 
-G 子代理跑 [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) `--phase=5 --cucumber-report=<report.json>` 校验 D5（step 绑定）+ D6（scenario 路径）+ cucumber 报告无失败。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=5 --cucumber-report=<report.json>` 校验 D5（step 绑定）+ D6（scenario 路径）+ cucumber 报告无失败。
 
 ## 返工路径
 

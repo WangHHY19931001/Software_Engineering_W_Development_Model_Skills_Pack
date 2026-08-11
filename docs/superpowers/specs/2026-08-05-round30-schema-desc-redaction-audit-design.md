@@ -16,7 +16,7 @@
 |---|---|---|
 | #13 Schema 自我描述 | [schemas/](../../w-model-dev/schemas) 已有 19 份 draft-07 schema，顶层有 `description`，但字段级 `description` 稀疏（如 `rtm.schema.json` 仅 3 处字段 description） | AI Agent 理解字段用途与期望值依赖人读文档，schema 自身自描述不足，易产生理解偏差 |
 | #8 敏感信息脱敏 | 技能包脚本无硬编码密钥；demo 的 JWT_SECRET 已用 cross-env 注入（第 15 轮）；但无跨阶段「状态文件/日志不得写入密钥」的显式条款 | 编排者/子代理在 `.w-model/*.json`、gate-logs、run-log 中写入密钥或令牌时无反模式拦截 |
-| #7 依赖漏洞扫描 | [security-scan.ts](../../w-model-dev/scripts/cli/security-scan.ts) 为 eslint-plugin-security **源码级**静态扫描 + baseline 指纹豁免；pre-push 已有 11 项门禁 | 无 `npm audit` 依赖级漏洞扫描；pre-push 的 `npm install` 已显式 `--no-audit`，依赖漏洞无感知 |
+| #7 依赖漏洞扫描 | [security-scan.ts](../../w-model-dev/scripts/security-scan.ts) 为 eslint-plugin-security **源码级**静态扫描 + baseline 指纹豁免；pre-push 已有 11 项门禁 | 无 `npm audit` 依赖级漏洞扫描；pre-push 的 `npm install` 已显式 `--no-audit`，依赖漏洞无感知 |
 
 ### 1.2 缺口清单
 

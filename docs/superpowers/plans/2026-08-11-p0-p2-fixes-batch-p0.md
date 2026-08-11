@@ -175,7 +175,7 @@ Expected: 全部样本通过；**METADATA 用例（skill-metadata 一致性）�
 Run (PowerShell)：
 ```powershell
 $c = Get-Content .githooks/pre-push -Raw
-$c = $c -replace "w-model-dev/scripts/cli/check-", "w-model-dev/scripts/cli/check-"
+$c = $c -replace "w-model-dev/scripts/check-", "w-model-dev/scripts/cli/check-"
 $c = $c -replace "w-model-dev/scripts/security-scan\.ts", "w-model-dev/scripts/cli/security-scan.ts"
 $c = $c -replace "w-model-dev/scripts/self-test\.ts", "w-model-dev/scripts/cli/self-test.ts"
 $c = $c -replace "w-model-dev/scripts/wm-status\.ts", "w-model-dev/scripts/cli/wm-status.ts"
@@ -242,7 +242,7 @@ Run (PowerShell, 仓库根)：
 $files = Get-ChildItem -Recurse -Include *.md | Where-Object { $_.FullName -notmatch 'node_modules|\.git' }
 foreach ($f in $files) {
   $c = Get-Content $f.FullName -Raw
-  $new = $c -replace "w-model-dev/scripts/cli/check-", "w-model-dev/scripts/cli/check-"
+  $new = $c -replace "w-model-dev/scripts/check-", "w-model-dev/scripts/cli/check-"
   $new = $new -replace "w-model-dev/scripts/(self-test|security-scan|wm-status|metrics-report|ensure-codegraph-opsx)\.ts", "w-model-dev/scripts/cli/$1.ts"
   $new = $new -replace "w-model-dev/scripts/([\w-]+-logic)\.ts", "w-model-dev/scripts/logic/$1.ts"
   $new = $new -replace "w-model-dev/scripts/(schema-loader|plan-chunks)\.ts", "w-model-dev/scripts/logic/$1.ts"
@@ -483,7 +483,7 @@ git commit -m "docs(readme): add architecture diagram, phase-gate matrix and qui
 
 对每个候选废弃文档（如 `docs/llm-verifier-integration-design.md`）：
 1. Run: `Select-String -Path README.md,AGENTS.md,w-model-dev/scripts/**/*.ts -Pattern "llm-verifier-integration-design"` 核查引用。
-2. 若被 REQUIRED_PATHS / DESIGN_DOC_NAMES 强制（见 [check-docs-consistency.ts:36-44](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-docs-consistency.ts#L36-L44)）——**不得移除**，仅可加头部声明且不得含 FORBIDDEN_TARGETKIND 词。
+2. 若被 REQUIRED_PATHS / DESIGN_DOC_NAMES 强制（见 [check-docs-consistency.ts:36-44](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/check-docs-consistency.ts#L36-L44)）——**不得移除**，仅可加头部声明且不得含 FORBIDDEN_TARGETKIND 词。
 3. 仅对无活跃引用的文档加废弃声明：
 ```markdown
 > **DEPRECATED**（废弃时间：2026-08-11）— 本文档已由 `<最新文档路径>` 取代，请勿继续引用。

@@ -50,9 +50,9 @@ scripts/
 **必改引用点**（全部同步，缺一不可）：
 
 1. **跨文件 import 相对路径**：`check-*.ts` 与 `*-logic.ts` 之间的 `./xxx.js` → `../logic/xxx.js` / `../cli/xxx.js`；logic 层 import lib → `../lib/xxx.js`。
-2. **`.githooks/pre-push`**：14 项门禁中的 `w-model-dev/scripts/cli/check-*.ts`、`security-scan.ts`、`samples/` 路径全部改为 `w-model-dev/scripts/cli/...` 与 `w-model-dev/scripts/samples/...`。
-   - **spawn 路径说明**：唯一子进程 spawn 发生在 [check-artifact-gate.ts:368-372](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-artifact-gate.ts#L368-L372)（终检调 `check-tla-model.ts` / `check-bdd-model.ts`，用 `path.resolve(__dirname, 'check-tla-model.ts')` 相对脚本自身位置）；因 check-artifact-gate 与这两个脚本**同迁至 `cli/`**，`__dirname` 指向 cli/，spawn 相对路径**保持不变**，无需修改。
-3. **`check-docs-consistency.ts`**：`readdirSync(join(root,'w-model-dev/scripts'))` 的 `/^check-.*\.ts$/` 统计路径改为 `w-model-dev/scripts/cli`；**数量不变**（25 个 check-*.ts 含自身 + 5 工具 = 30），故 `EXPECTED.exit2ScriptCount=30` 常量、AGENTS.md「30 个脚本」文本均**不动**，仅更新 [check-docs-consistency.ts:76-77](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-docs-consistency.ts#L76-L77) 注释中的路径描述。注意：plan-chunks.ts 虽迁入 `logic/`，仍计入「5 工具」统计口径，勿改变 +5 逻辑。
+2. **`.githooks/pre-push`**：14 项门禁中的 `w-model-dev/scripts/check-*.ts`、`security-scan.ts`、`samples/` 路径全部改为 `w-model-dev/scripts/cli/...` 与 `w-model-dev/scripts/samples/...`。
+   - **spawn 路径说明**：唯一子进程 spawn 发生在 [check-artifact-gate.ts:368-372](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/check-artifact-gate.ts#L368-L372)（终检调 `check-tla-model.ts` / `check-bdd-model.ts`，用 `path.resolve(__dirname, 'check-tla-model.ts')` 相对脚本自身位置）；因 check-artifact-gate 与这两个脚本**同迁至 `cli/`**，`__dirname` 指向 cli/，spawn 相对路径**保持不变**，无需修改。
+3. **`check-docs-consistency.ts`**：`readdirSync(join(root,'w-model-dev/scripts'))` 的 `/^check-.*\.ts$/` 统计路径改为 `w-model-dev/scripts/cli`；**数量不变**（25 个 check-*.ts 含自身 + 5 工具 = 30），故 `EXPECTED.exit2ScriptCount=30` 常量、AGENTS.md「30 个脚本」文本均**不动**，仅更新 [check-docs-consistency.ts:76-77](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/check-docs-consistency.ts#L76-L77) 注释中的路径描述。注意：plan-chunks.ts 虽迁入 `logic/`，仍计入「5 工具」统计口径，勿改变 +5 逻辑。
 4. **`self-test.ts`**（迁移到 `cli/`，相对原位置多一层目录）：
    - ① 样本路径：`path.join(here, 'samples')` → `path.join(here, '..', 'samples')`
    - ② **skillRoot 修正**：`path.join(here, '..')` → `path.join(here, '..', '..')`（原 `scripts/` 退一层到 `w-model-dev/`，现 `scripts/cli/` 需退两层）；否则 SKILL.md / skill-metadata.json 读取失败，版本三地方程式校验（C9）立即报错
@@ -130,7 +130,7 @@ export interface CliError {
   2. 若存在活跃引用（如 `cli-error.ts:8` 注释引用 `docs/superpowers/specs/2026-08-05-round32-error-structure-normalization-design.md` 作为设计依据），**不得加废弃标记**，改为在文档头部标注「活跃-设计依据」并保留。
   3. 仅对无活跃引用的文档加废弃声明（废弃时间 2026-08-11 + 最新文档路径）。
   4. `docs/superpowers/specs/` 下的设计文档默认为活跃归档，不纳入废弃范围。
-  5. **docs-consistency 强依赖约束（阻断）**：[check-docs-consistency.ts:36-44](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-docs-consistency.ts#L36-L44) 的 REQUIRED_PATHS 强制要求 6 份 docs/ 设计文档存在（skill-design-document.md / llm-verifier-integration-design.md / loop-engineering-adoption-design.md / information-flow-validation-design.md / ingestion-graph-convergence-design.md / tla-plus-modeling-design.md），且 DESIGN_DOC_NAMES 检查其内容（[checkDesignDocs](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/logic/docs-consistency-logic.ts#L270-L294)：不得含废弃 targetKind 标记、过时 DoD 维度、过时反模式区间）。**这 6 份文档是活体，不得删除/重命名/迁移**；A4 仅可加头部「废弃声明」（若适用），且声明内容不得引入 FORBIDDEN_TARGETKIND 等被检查的词。
+  5. **docs-consistency 强依赖约束（阻断）**：[check-docs-consistency.ts:36-44](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/check-docs-consistency.ts#L36-L44) 的 REQUIRED_PATHS 强制要求 6 份 docs/ 设计文档存在（skill-design-document.md / llm-verifier-integration-design.md / loop-engineering-adoption-design.md / information-flow-validation-design.md / ingestion-graph-convergence-design.md / tla-plus-modeling-design.md），且 DESIGN_DOC_NAMES 检查其内容（[checkDesignDocs](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/docs-consistency-logic.ts#L270-L294)：不得含废弃 targetKind 标记、过时 DoD 维度、过时反模式区间）。**这 6 份文档是活体，不得删除/重命名/迁移**；A4 仅可加头部「废弃声明」（若适用），且声明内容不得引入 FORBIDDEN_TARGETKIND 等被检查的词。
 - 新增/更新的文档交叉引用一律用相对链接。
 
 ### A5  根目录与 docs 规整
@@ -193,7 +193,7 @@ export interface CliError {
 ### B8  配置集中 config/
 
 - ESLint / TSConfig / Prettier 配置文件迁入 `config/`；package.json 引用更新（eslint --config、tsc -p、prettier config）。
-- **security-scan 联动（阻断）**：`.eslintrc.cjs` 迁入 `config/` 后，[security-scan.ts:152](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/security-scan.ts#L152) 的 `npx eslint w-model-dev/scripts/` 依赖 cwd 向上自动发现根 `.eslintrc.cjs` 的机制**失效**，必须改为 `npx eslint --config config/.eslintrc.cjs w-model-dev/scripts/`；`BASELINE_PATH = path.resolve(cwd, '.eslintsecurity-baseline.json')`（[security-scan.ts:50](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/security-scan.ts#L50)）**相对 cwd**，故 `.eslintsecurity-baseline.json` **保持根目录不迁移**，BASELINE_PATH 不动。
+- **security-scan 联动（阻断）**：`.eslintrc.cjs` 迁入 `config/` 后，[security-scan.ts:152](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/security-scan.ts#L152) 的 `npx eslint w-model-dev/scripts/` 依赖 cwd 向上自动发现根 `.eslintrc.cjs` 的机制**失效**，必须改为 `npx eslint --config config/.eslintrc.cjs w-model-dev/scripts/`；`BASELINE_PATH = path.resolve(cwd, '.eslintsecurity-baseline.json')`（[security-scan.ts:50](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/security-scan.ts#L50)）**相对 cwd**，故 `.eslintsecurity-baseline.json` **保持根目录不迁移**，BASELINE_PATH 不动。
 - `package.json` scripts 按「校验类 / 测试类 / 工具类」分组 + 注释。
 - **vitest.config.ts 与 .eslintignore 处理**：默认迁入 `config/`；若迁移后 vitest 测试因路径解析失败无法运行，则回退至根目录并在 B8 记录回退原因。
 

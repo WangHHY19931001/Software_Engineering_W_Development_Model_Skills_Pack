@@ -345,7 +345,7 @@ S 子代理据此重做后重审。
 | 文件 | 变更 |
 |---|---|
 | `w-model-dev/schemas/run-log.schema.json` | action 枚举（第 14 行，现有 19 个值）增加 `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` |
-| `w-model-dev/scripts/logic/gate-logic.ts` | 阶段 5-8 gate 校验增加 `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔校验逻辑（调用 check-codegraph-queries.ts / check-opsx-artifacts.ts / check-openspec-archive.ts） |
+| `w-model-dev/scripts/gate-logic.ts` | 阶段 5-8 gate 校验增加 `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔校验逻辑（调用 check-codegraph-queries.ts / check-opsx-artifacts.ts / check-openspec-archive.ts） |
 
 ---
 
@@ -380,13 +380,13 @@ S 子代理据此重做后重审。
 | 12 | `w-model-dev/references/phase-{6,7,8}-*.md` | + opsx 三段式 + codegraph |
 | 13 | `w-model-dev/references/subagent-delegation.md`（第 195-261 行 S 拆分机制） | + S-explore / S-propose / S-coding 变体分派模板 |
 | 14 | `w-model-dev/schemas/run-log.schema.json`（第 14 行 action 枚举） | + `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` / `ensure_deps` |
-| 15 | `w-model-dev/scripts/logic/gate-logic.ts` | + `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔校验逻辑 |
+| 15 | `w-model-dev/scripts/gate-logic.ts` | + `codegraphQueriesValid` / `opsxArtifactsValid` / `openspecArchived` 三个布尔校验逻辑 |
 | 16 | `docs/INSTALL.md` | + codegraph/OpenSpec 自动安装说明节 |
-| 17 | `w-model-dev/scripts/cli/ensure-codegraph-opsx.ts` | 新增（三层依赖检测+自动安装初始化） |
-| 18 | `w-model-dev/scripts/cli/check-codegraph-queries.ts` | 新增（校验 codegraph 查询落盘，命中 #38） |
-| 19 | `w-model-dev/scripts/cli/check-opsx-artifacts.ts` | 新增（校验 opsx 制品+审查产物，命中 #39/#40） |
-| 20 | `w-model-dev/scripts/cli/check-openspec-archive.ts` | 新增（校验 opsx:archive 归档完整性） |
-| 21 | `w-model-dev/scripts/cli/self-test.ts` | + codegraph/opsx 相关 self-test 用例（4 组 CASES + runner + main 注册） |
+| 17 | `w-model-dev/scripts/ensure-codegraph-opsx.ts` | 新增（三层依赖检测+自动安装初始化） |
+| 18 | `w-model-dev/scripts/check-codegraph-queries.ts` | 新增（校验 codegraph 查询落盘，命中 #38） |
+| 19 | `w-model-dev/scripts/check-opsx-artifacts.ts` | 新增（校验 opsx 制品+审查产物，命中 #39/#40） |
+| 20 | `w-model-dev/scripts/check-openspec-archive.ts` | 新增（校验 opsx:archive 归档完整性） |
+| 21 | `w-model-dev/scripts/self-test.ts` | + codegraph/opsx 相关 self-test 用例（4 组 CASES + runner + main 注册） |
 | 22 | `w-model-dev/scripts/samples/` | + codegraph-queries / opsx-artifacts / openspec-archive 样本文件 |
 
 ---

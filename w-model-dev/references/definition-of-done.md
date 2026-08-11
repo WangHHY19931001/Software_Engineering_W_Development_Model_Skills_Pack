@@ -3,7 +3,7 @@
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `references/definition-of-done.md`。
 > SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 为权威定义，本文件为可执行细则。
 >
-> **与工件质量门的关系**：[§10.5 工件质量门](../../docs/skill-design-document_SSoT.md) / [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts) 是「验收阶段的硬门禁」（退出码 0 才放行）；DoD 是「每次变更的日常标准」（每个 `/wm code` / `/wm test` 后自检）。二者不互替。
+> **与工件质量门的关系**：[§10.5 工件质量门](../../docs/skill-design-document_SSoT.md) / [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 是「验收阶段的硬门禁」（退出码 0 才放行）；DoD 是「每次变更的日常标准」（每个 `/wm code` / `/wm test` 后自检）。二者不互替。
 
 ## 适用范围
 

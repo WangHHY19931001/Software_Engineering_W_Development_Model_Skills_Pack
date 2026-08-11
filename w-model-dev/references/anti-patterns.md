@@ -21,7 +21,7 @@
 |---|---|---|---|
 | 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 SKILL.md「阶段门与质量门」节走完评审 + 🔴 CHECKPOINT 放行 |
 | 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
-| 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
+| 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
 | 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评。V/G 不通过后，未经 R 定位直接小修也命中 #4。修复路径必须经 R→V→G→S-fix |
 | 5 | 一次性载入全部 `references/` 或违反 Bundled Resources 表 | 上下文污染，阶段聚焦丢失 | 按 [SKILL.md](../SKILL.md)「Bundled Resources」表按需加载 |
 | 6 | 用 LLM 估算 RTM 覆盖率 | RTM 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，RTM 覆盖率必须 100% |
@@ -29,11 +29,11 @@
 | 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
 | 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
 | 10 | 编排者越权实施（写代码 / 改文档 / 产出评审 JSON / 改 RTM 实体 / 生成测试用例 / 越权做根因分析） | 编排者上下文污染、评审独立性丧失、状态机失真、违反「技能不内置 LLM」架构原则；编排者直接判定根因并分派 S-fix 会绕过 R 独立定位 | 编排者仅分派 S / V / G / R 子代理执行实施动作；自身只做路由 + 状态 + CHECKPOINT + 只读脚本（见 [subagent-delegation.md](subagent-delegation.md)）。检测信号 6：编排者会话出现 rootCauseChain / rootCause 等 RootCauseReport 字段；信号 7：编排者直接判定根因并分派 S-fix（无 R 报告路径作为 S-fix 输入） |
-| 11 | ingestion 跳过图谱校验 | 阶段 1-4 结构连通性失守，孤立 / 多根 / 追溯断裂带入编码，graph.json 形同虚设 | 阶段 1-4 必须跑 [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)，不得跳过 A→G 收敛循环（见 [graph-guide.md](graph-guide.md)） |
+| 11 | ingestion 跳过图谱校验 | 阶段 1-4 结构连通性失守，孤立 / 多根 / 追溯断裂带入编码，graph.json 形同虚设 | 阶段 1-4 必须跑 [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts)，不得跳过 A→G 收敛循环（见 [graph-guide.md](graph-guide.md)） |
 | 12 | A 子代理自评收敛（用 LLM 输出判定收敛） | "LLM 估算质量门"在 ingestion 场景的变体，收敛判定漂移 | 收敛判定由 G 跑 `check-requirement-graph.ts` 退出码决定，A 的 `reworkHints` 仅作指引。A 子流程返工也须走 R 定位（图谱/TLA+ 返工同样适用 R 循环），禁止 A 自评根因 |
-| 13 | ingestion 图谱信息流黑洞/奇迹/死模块放行 | 存在只进不出/只出不进/无流经的模块，信息闭合失守，结构追溯通过却仍有信息断点带入编码 | 阶段 1-4 必须通过 [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts) 信息流校验（无黑洞/奇迹/死模块 + 边界完整），退出码 0 才放行（见 [graph-guide.md](graph-guide.md)「信息流模型」节） |
+| 13 | ingestion 图谱信息流黑洞/奇迹/死模块放行 | 存在只进不出/只出不进/无流经的模块，信息闭合失守，结构追溯通过却仍有信息断点带入编码 | 阶段 1-4 必须通过 [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts) 信息流校验（无黑洞/奇迹/死模块 + 边界完整），退出码 0 才放行（见 [graph-guide.md](graph-guide.md)「信息流模型」节） |
 | 14 | TLA+ 语法检查未通过即跑 TLC / 跳过语法检查 | TLC 报错信息混乱，无法定位是语法还是语义问题，调试效率崩溃 | `check-tla-model.ts` 步骤 6→7 顺序强制：SANY 语法通过后才允许跑 TLC（见 [tla-plus-guide.md](tla-plus-guide.md)「编码调试顺序」节） |
-| 15 | TLA+ 死锁/状态爆炸/不变式违反放行 | 行为正确性失守，并发/时序缺陷带入编码，后期修复成本指数级上升 | 阶段 1-4 必须通过 [`check-tla-model.ts`](../scripts/check-tla-model.ts) 行为门禁（无死锁/不变式违反/状态爆炸），退出码 0 才放行 |
+| 15 | TLA+ 死锁/状态爆炸/不变式违反放行 | 行为正确性失守，并发/时序缺陷带入编码，后期修复成本指数级上升 | 阶段 1-4 必须通过 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts) 行为门禁（无死锁/不变式违反/状态爆炸），退出码 0 才放行 |
 | 16 | TLA+ 占位实现/简化实现/错误实现 | 规格形同虚设，无法作为正确性基准，TLA+ 门禁沦为橡皮图章 | V 评审标注 + G 门禁：不接受 `Next=[]` 空下一步 / 遗漏需求关键状态 / 不变式与设计矛盾（见 [tla-plus-guide.md](tla-plus-guide.md)「合规性约束」节） |
 | 17 | TLA+ 建模与需求/设计不符未回退 | 规格通过但与需求/设计脱节，或需求/设计本身缺陷被掩盖，问题后移到编码 | 规格忠实于需求/设计但 TLC 仍发现违反 → 修正需求/设计并回退重跑；规格偏离 → 修正规格重跑（见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节） |
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复（见 [root-cause-locator.md](root-cause-locator.md)） |
@@ -100,20 +100,20 @@
 | #28（schema 前置校验缺失） | 阶段 1-8（所有 `*-logic.ts` 校验入口） | [data-models.md](data-models.md)「JSON Schema 强约束」节 |
 | #29（BDD 建模不符未回退） | 阶段 1-4 | [bdd-guide.md](bdd-guide.md)「不符处理流程」节 |
 | #30（豁免审批跳步） | 阶段 1（需求分析，四维识别豁免） | [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05 |
-| #31（归档完整性缺失） | 阶段 8（归档） | [phase-8-acceptance-test.md](phase-8-acceptance-test.md) + [`check-archive-integrity.ts`](../scripts/check-archive-integrity.ts) |
-| #32（签名链断裂） | 全阶段 | [signature-chain-guide.md](signature-chain-guide.md) + [`check-signature-chain.ts`](../scripts/check-signature-chain.ts) |
-| #33（跳过 R3 预防性审查） | 全阶段（所有 S 变体） | 约束 #17 + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) |
-| #34（编排者漏派角色） | 全阶段 | 约束 #19 + [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) |
+| #31（归档完整性缺失） | 阶段 8（归档） | [phase-8-acceptance-test.md](phase-8-acceptance-test.md) + [`check-archive-integrity.ts`](../scripts/cli/check-archive-integrity.ts) |
+| #32（签名链断裂） | 全阶段 | [signature-chain-guide.md](signature-chain-guide.md) + [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) |
+| #33（跳过 R3 预防性审查） | 全阶段（所有 S 变体） | 约束 #17 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
+| #34（编排者漏派角色） | 全阶段 | 约束 #19 + [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) |
 | #35（self-as-verifier 产物混合） | 全阶段（self-as-verifier 模式） | SKILL.md「self-as-verifier 模式」节 |
 | #36（路由顺序错误） | 阶段 5/6 | [phase-5-coding.md](phase-5-coding.md) + 集成测试用例 |
 | #37（产物膨胀核心决策稀疏） | 阶段 1-4 | 各 phase-N「产物要求」节 |
-| #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #20 + [`check-codegraph-queries.ts`](../scripts/check-codegraph-queries.ts) |
-| #39（跳过 opsx 产物审查） | 阶段 5-8 | 约束 #17 + [`check-opsx-artifacts.ts`](../scripts/check-opsx-artifacts.ts) |
+| #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #20 + [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts) |
+| #39（跳过 opsx 产物审查） | 阶段 5-8 | 约束 #17 + [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts) |
 | #40（opsx/S-tickets 职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节 |
 | #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
-| #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #17/#19 + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
+| #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #17/#19 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
-| #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/check-iceberg-sweep.ts) |
+| #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts) |
 | #45（为通过测试而修改断言/测试期望） | 阶段门评审 / V 评审 | V 评审人工核验断言与需求对应关系（反指标游戏，Goodhart） |
 | #46（只给审计权不给修正权） | 全流程 | CHECKPOINT 显式标注介入路径（外科手术录像回放） |
 | #47（大规模重构式改动） | 阶段 5 | 单次 diff 重写整个模块 → 拆分为可审 slice 逐片提交，保持每片可编译可测试 |
@@ -124,44 +124,44 @@
 |---|---|
 | #1（跳过评审） | SKILL.md「阶段门与质量门」节 + 🔴 CHECKPOINT · 阶段门放行 |
 | #2（测试设计后置） | SKILL.md「不可违反的约束」第 1 条「测试设计前置」 |
-| #3 / #6（估算质量门 / RTM 覆盖率） | [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts)（退出码 0 才算通过） |
-| #4（评审未通过悄悄小修） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts)（rework 闭环校验） |
+| #3 / #6（估算质量门 / RTM 覆盖率） | [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts)（退出码 0 才算通过） |
+| #4（评审未通过悄悄小修） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts)（rework 闭环校验） |
 | #5（一次性载入全部 references） | SKILL.md「不可违反的约束」第 6 条「按需加载」 |
 | #7（退出码 1/2 放行） | 🔴 CHECKPOINT · 发布放行（明确「退出码 1/2 一律不得放行」） |
 | #8（越过 CHECKPOINT） | 🔴 CHECKPOINT 视觉标记（Agent 扫描锚点） |
 | #9（谎报状态） | [data-models.md](data-models.md)「项目数据模型」+ `status` 字段约束 |
 | #10（编排者越权实施） | [subagent-delegation.md](subagent-delegation.md)「强制约束」节 + 编排者自身动作清单（O/S/V/G 角色表） |
-| #11（ingestion 跳过图谱校验） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)（退出码 0 才算通过）+ 🔴 CHECKPOINT · ingestion 收敛确认 |
-| #12（A 自评收敛） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts) 退出码（A 的 `reworkHints` 不替代 G 判定） |
-| #13（信息流黑洞/奇迹放行） | [`check-requirement-graph.ts`](../scripts/check-requirement-graph.ts)（`dataflowViolations` 全空 + `boundary.complete=true` 才退出码 0） |
-| #14（TLA+ 跳过语法检查） | [`check-tla-model.ts`](../scripts/check-tla-model.ts) 步骤 6→7 顺序强制（SANY 通过后才跑 TLC） |
-| #15（TLA+ 死锁/违反放行） | [`check-tla-model.ts`](../scripts/check-tla-model.ts)（`TLA_JSON.passed=true` 才退出码 0） |
-| #16（TLA+ 占位/简化/错误实现） | V 评审（`reworkHints` 标注）+ [`check-tla-model.ts`](../scripts/check-tla-model.ts)（拆解决策校验） |
+| #11（ingestion 跳过图谱校验） | [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts)（退出码 0 才算通过）+ 🔴 CHECKPOINT · ingestion 收敛确认 |
+| #12（A 自评收敛） | [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts) 退出码（A 的 `reworkHints` 不替代 G 判定） |
+| #13（信息流黑洞/奇迹放行） | [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts)（`dataflowViolations` 全空 + `boundary.complete=true` 才退出码 0） |
+| #14（TLA+ 跳过语法检查） | [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts) 步骤 6→7 顺序强制（SANY 通过后才跑 TLC） |
+| #15（TLA+ 死锁/违反放行） | [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（`TLA_JSON.passed=true` 才退出码 0） |
+| #16（TLA+ 占位/简化/错误实现） | V 评审（`reworkHints` 标注）+ [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（拆解决策校验） |
 | #17（TLA+ 与需求/设计不符未回退） | S 子代理核查 + 回退机制（无脚本；Agent 比对 `@requirement`/`@design` 与规格一致性） |
-| #21（阶段级门禁跳过） | [`check-artifact-gate.ts`](../scripts/check-artifact-gate.ts) `--phase=N` 参数 + run-log R5 O 越权检测（编排者自检阶段 N 是否跑 `--phase=N`） |
+| #21（阶段级门禁跳过） | [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) `--phase=N` 参数 + run-log R5 O 越权检测（编排者自检阶段 N 是否跑 `--phase=N`） |
 | #22（角色越权） | V-code 评审（`reworkHints` 标注）+ 系统测试用例（越权场景应返回 403）+ [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
 | #23（跨模块 store 误用） | V-design 评审（`reworkHints` 标注）+ 集成测试用例（跨模块数据流）+ [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
 | #24（副作用时序不一致） | V-code 评审（`reworkHints` 标注）+ 系统测试用例（副作用与响应体一致性）+ [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |
 | #25（JSON 文件 PowerShell 写入） | run-log.jsonl `note` 字段检测（"PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词）+ [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
-| #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
+| #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
-| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（20 份） |
-| #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
+| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/logic/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（20 份） |
+| #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
 | #30（豁免审批跳步） | `check-exemption` E1-E8 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
-| #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |
-| #32（签名链断裂） | [`check-signature-chain.ts`](../scripts/check-signature-chain.ts)（R1-R10 任一失败） |
-| #33（跳过 R3 预防性审查） | [`check-preventive-review.ts`](../scripts/check-preventive-review.ts)（always-on）+ [`check-run-log.ts`](../scripts/check-run-log.ts) R8（S→V 间 R3 记录数） |
-| #34（编排者漏派角色） | [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts)（每阶段 S/V/G ≥1、R ≥3 无条件） |
-| #35（self-as-verifier 产物混合） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) `--self-as-verifier`（V 产物与 S 产出路径不同）+ [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) |
+| #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/cli/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |
+| #32（签名链断裂） | [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts)（R1-R10 任一失败） |
+| #33（跳过 R3 预防性审查） | [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（always-on）+ [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S→V 间 R3 记录数） |
+| #34（编排者漏派角色） | [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts)（每阶段 S/V/G ≥1、R ≥3 无条件） |
+| #35（self-as-verifier 产物混合） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) `--self-as-verifier`（V 产物与 S 产出路径不同）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
 | #36（路由顺序错误） | 无自动脚本（V 评审 + G 门禁人工校验路由注册顺序表） |
 | #37（产物膨胀核心决策稀疏） | 无自动脚本（V 评审人工校验信息密度） |
-| #38（修改前未查询 codegraph） | [`check-codegraph-queries.ts`](../scripts/check-codegraph-queries.ts)（查询落盘完整性，exitCode=1 命中） |
-| #39（跳过 opsx 产物审查） | [`check-opsx-artifacts.ts`](../scripts/check-opsx-artifacts.ts)（opsx 制品 + R3×3 + V 审查齐全，exitCode=1 命中） |
-| #40（opsx/S-tickets 职责混淆） | [`check-opsx-artifacts.ts`](../scripts/check-opsx-artifacts.ts)（tasks/tickets 职责校验，exitCode=1 命中） |
-| #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
-| #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/check-preventive-review.ts) `--variant=fix\|emergency` |
-| #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/security-scan.ts) 源码级扫描） |
-| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
+| #38（修改前未查询 codegraph） | [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts)（查询落盘完整性，exitCode=1 命中） |
+| #39（跳过 opsx 产物审查） | [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts)（opsx 制品 + R3×3 + V 审查齐全，exitCode=1 命中） |
+| #40（opsx/S-tickets 职责混淆） | [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts)（tasks/tickets 职责校验，exitCode=1 命中） |
+| #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
+| #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
+| #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描） |
+| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
 | #45（为通过测试而修改断言/测试期望） | 无专用脚本（V 评审人工核验断言与需求对应关系） |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |

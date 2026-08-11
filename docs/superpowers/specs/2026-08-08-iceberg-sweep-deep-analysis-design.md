@@ -519,10 +519,10 @@ R-iceberg 采用**线索驱动 + 三维度 + 六类别**扫掠法。
 **CLI 接口**：
 ```bash
 # 单报告校验
-npx tsx w-model-dev/scripts/cli/check-iceberg-sweep.ts <report.json>
+npx tsx w-model-dev/scripts/check-iceberg-sweep.ts <report.json>
 
 # auto-trigger 模式（从 run-log 推断）
-npx tsx w-model-dev/scripts/cli/check-iceberg-sweep.ts <project-dir> --phase=<N> --auto-trigger --run-log=<run-log.jsonl>
+npx tsx w-model-dev/scripts/check-iceberg-sweep.ts <project-dir> --phase=<N> --auto-trigger --run-log=<run-log.jsonl>
 ```
 
 **校验规则（R1-R8）**：

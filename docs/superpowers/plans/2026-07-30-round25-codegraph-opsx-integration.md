@@ -15,10 +15,10 @@
 ## 文件结构
 
 **新建文件：**
-- `w-model-dev/scripts/cli/ensure-codegraph-opsx.ts` — 三层依赖检测+自动安装初始化
-- `w-model-dev/scripts/cli/check-codegraph-queries.ts` — 校验 codegraph 查询落盘（反模式 #38）
-- `w-model-dev/scripts/cli/check-opsx-artifacts.ts` — 校验 opsx 制品+审查产物（反模式 #39/#40）
-- `w-model-dev/scripts/cli/check-openspec-archive.ts` — 校验 opsx:archive 归档完整性
+- `w-model-dev/scripts/ensure-codegraph-opsx.ts` — 三层依赖检测+自动安装初始化
+- `w-model-dev/scripts/check-codegraph-queries.ts` — 校验 codegraph 查询落盘（反模式 #38）
+- `w-model-dev/scripts/check-opsx-artifacts.ts` — 校验 opsx 制品+审查产物（反模式 #39/#40）
+- `w-model-dev/scripts/check-openspec-archive.ts` — 校验 opsx:archive 归档完整性
 
 **修改文件：**
 - `docs/skill-design-document_SSoT.md` — §3.3 外部工具边界 + §3.4.21 第 25 轮记录
@@ -28,8 +28,8 @@
 - `w-model-dev/references/phase-{6,7,8}-*.md` — opsx 三段式 + codegraph
 - `w-model-dev/references/subagent-delegation.md` — S-explore/S-propose/S-coding 变体
 - `w-model-dev/schemas/run-log.schema.json` — action 枚举 +6 值
-- `w-model-dev/scripts/logic/gate-logic.ts` — +3 个布尔校验逻辑
-- `w-model-dev/scripts/cli/self-test.ts` — +codegraph/opsx 用例
+- `w-model-dev/scripts/gate-logic.ts` — +3 个布尔校验逻辑
+- `w-model-dev/scripts/self-test.ts` — +codegraph/opsx 用例
 - `w-model-dev/skill-metadata.json` — version + updatedAt
 - `package.json` — version
 - `docs/INSTALL.md` — codegraph/OpenSpec 安装说明
@@ -267,7 +267,7 @@ git commit -m "feat(schema): run-log action 枚举 +6 codegraph/opsx 值"
 ### Task 7: 新增 ensure-codegraph-opsx.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/cli/ensure-codegraph-opsx.ts`
+- Create: `w-model-dev/scripts/ensure-codegraph-opsx.ts`
 
 - [ ] **Step 1: 编写 ensure-codegraph-opsx.ts**
 
@@ -280,7 +280,7 @@ git commit -m "feat(schema): run-log action 枚举 +6 codegraph/opsx 值"
  * 三层检测（L1 CLI / L2 MCP 注册 / L3 项目目录）+ 自动处置，仅自动失败时 CHECKPOINT。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>
+ *   npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>
  *
  * 模式：
  *   full   = L1→L2→L3 全量检测+自动处置（阶段 5 首次进入）
@@ -535,7 +535,7 @@ Expected: 0 errors
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/ensure-codegraph-opsx.ts
+git add w-model-dev/scripts/ensure-codegraph-opsx.ts
 git commit -m "feat(script): ensure-codegraph-opsx.ts 三层依赖检测+自动安装"
 ```
 
@@ -544,7 +544,7 @@ git commit -m "feat(script): ensure-codegraph-opsx.ts 三层依赖检测+自动�
 ### Task 8: 新增 check-codegraph-queries.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/cli/check-codegraph-queries.ts`
+- Create: `w-model-dev/scripts/check-codegraph-queries.ts`
 
 - [ ] **Step 1: 编写 check-codegraph-queries.ts**
 
@@ -558,7 +558,7 @@ git commit -m "feat(script): ensure-codegraph-opsx.ts 三层依赖检测+自动�
  * `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
  *
  * 退出码：
  *   0  所有修改都有对应 codegraph 查询落盘
@@ -746,7 +746,7 @@ Expected: 0 errors
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-codegraph-queries.ts
+git add w-model-dev/scripts/check-codegraph-queries.ts
 git commit -m "feat(script): check-codegraph-queries.ts 反模式 #38 校验"
 ```
 
@@ -755,7 +755,7 @@ git commit -m "feat(script): check-codegraph-queries.ts 反模式 #38 校验"
 ### Task 9: 新增 check-opsx-artifacts.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/cli/check-opsx-artifacts.ts`
+- Create: `w-model-dev/scripts/check-opsx-artifacts.ts`
 
 - [ ] **Step 1: 编写 check-opsx-artifacts.ts**
 
@@ -769,7 +769,7 @@ git commit -m "feat(script): check-codegraph-queries.ts 反模式 #38 校验"
  * + R3×3 + V 审查产物齐全。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8>
  *
  * 退出码：
  *   0  制品与审查产物齐全
@@ -938,7 +938,7 @@ Expected: 0 errors
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-opsx-artifacts.ts
+git add w-model-dev/scripts/check-opsx-artifacts.ts
 git commit -m "feat(script): check-opsx-artifacts.ts 反模式 #39/#40 校验"
 ```
 
@@ -947,7 +947,7 @@ git commit -m "feat(script): check-opsx-artifacts.ts 反模式 #39/#40 校验"
 ### Task 10: 新增 check-openspec-archive.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/cli/check-openspec-archive.ts`
+- Create: `w-model-dev/scripts/check-openspec-archive.ts`
 
 - [ ] **Step 1: 编写 check-openspec-archive.ts**
 
@@ -959,7 +959,7 @@ git commit -m "feat(script): check-opsx-artifacts.ts 反模式 #39/#40 校验"
  * 对应 SSoT §3.4.21：阶段门 V/G 全通过后须执行 opsx:archive 归档变更。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/check-openspec-archive.ts <project-root> --phase <5|6|7|8>
  *
  * 退出码：
  *   0  归档完整
@@ -1099,7 +1099,7 @@ Expected: 0 errors
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-openspec-archive.ts
+git add w-model-dev/scripts/check-openspec-archive.ts
 git commit -m "feat(script): check-openspec-archive.ts 归档完整性校验"
 ```
 
@@ -1108,11 +1108,11 @@ git commit -m "feat(script): check-openspec-archive.ts 归档完整性校验"
 ### Task 11: gate-logic.ts 扩展 3 个布尔校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/gate-logic.ts`
+- Modify: `w-model-dev/scripts/gate-logic.ts`
 
 - [ ] **Step 1: 读取 gate-logic.ts 找到阶段 5-8 gate 校验逻辑的位置**
 
-Run: `grep -n "phase.*[5-8]\|阶段.*5\|阶段门" w-model-dev/scripts/logic/gate-logic.ts | head -20`
+Run: `grep -n "phase.*[5-8]\|阶段.*5\|阶段门" w-model-dev/scripts/gate-logic.ts | head -20`
 
 - [ ] **Step 2: 在阶段 5-8 gate 校验逻辑中追加 3 个布尔校验字段**
 
@@ -1133,7 +1133,7 @@ Expected: 0 errors
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/logic/gate-logic.ts
+git add w-model-dev/scripts/gate-logic.ts
 git commit -m "feat(script): gate-logic +codegraphQueriesValid/opsxArtifactsValid/openspecArchived"
 ```
 
@@ -1317,7 +1317,7 @@ git commit -m "docs(skill): Bundled Resources +4 脚本 + 阶段 5-8 opsx/codegr
 
 技能包在阶段 5 进入 CHECKPOINT 时自动运行：
 ```bash
-npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase 5 --project-root . --mode full
+npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase 5 --project-root . --mode full
 ```
 
 脚本执行三层检测+自动处置：
@@ -1393,7 +1393,7 @@ git commit -m "test(samples): +codegraph-queries/opsx-artifacts/openspec-archive
 ### Task 18: self-test.ts 新增 codegraph/opsx 用例
 
 **Files:**
-- Modify: `w-model-dev/scripts/cli/self-test.ts`
+- Modify: `w-model-dev/scripts/self-test.ts`
 
 - [ ] **Step 1: 在 self-test.ts 中参照第 918-950 行 ROLE_DISPATCH_CASES 模式，新增 4 组 CASES**
 
@@ -1417,7 +1417,7 @@ Expected: 0 errors
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/self-test.ts
+git add w-model-dev/scripts/self-test.ts
 git commit -m "test(self-test): +codegraph/opsx 用例（4 组 CASES + runner）"
 ```
 
@@ -1440,7 +1440,7 @@ Expected: 0 errors
 
 - [ ] **Step 1: 运行 self-test**
 
-Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/self-test.ts`
 Expected: 全部通过，用例数增加（原基线 + 新增 codegraph/opsx 用例）
 
 ---
@@ -1473,7 +1473,7 @@ Expected: 命中
 
 - [ ] **Step 4: 4 个新脚本存在**
 
-Run: `ls w-model-dev/scripts/cli/ensure-codegraph-opsx.ts w-model-dev/scripts/cli/check-codegraph-queries.ts w-model-dev/scripts/cli/check-opsx-artifacts.ts w-model-dev/scripts/cli/check-openspec-archive.ts`
+Run: `ls w-model-dev/scripts/ensure-codegraph-opsx.ts w-model-dev/scripts/check-codegraph-queries.ts w-model-dev/scripts/check-opsx-artifacts.ts w-model-dev/scripts/check-openspec-archive.ts`
 Expected: 4 文件存在
 
 - [ ] **Step 5: 工作区干净**

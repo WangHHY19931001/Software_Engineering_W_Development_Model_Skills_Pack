@@ -14,7 +14,7 @@
 
 - **编排**：由 `w-model-dev/SKILL.md` 承载，Agent 读取后承担「编排者」角色，用自身工具执行 `/wm` 命令路由、状态维护与 CHECKPOINT 等待。
 - **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理（A 分析 / S 产出 / V 评审 / G 门禁 / R 根因定位）执行。违反命中反模式 #10，回到当前阶段起点。详见 [`w-model-dev/references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
-- **校验脚本**：`w-model-dev/scripts/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/) + 少量 devDependency（见 §2）；由 G 子代理在门禁节点执行 + 回填证据摘要（编排者可同步跑一次只读脚本看退出码，但不替代 G 的回填）。
+- **校验脚本**：`w-model-dev/scripts/cli/*.ts` 自包含，仅做门禁判定，不调用 LLM；运行依赖 [tsx](https://tsx.is/) + 少量 devDependency（见 §2）；由 G 子代理在门禁节点执行 + 回填证据摘要（编排者可同步跑一次只读脚本看退出码，但不替代 G 的回填）。
 - **LLM-as-a-Verifier 评审**：由 V 子代理（即「外部 Agent」）按 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) 提示词执行，技能用校验脚本防输出漂移；编排者不得自评。
 - **技能自演化**：不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 
@@ -226,7 +226,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 - Agent 在执行 LLM-as-a-Verifier 评审时需要调用其自身的 LLM，按 Agent 框架自身的鉴权方式处理（与技能无关）。
 
 **Q：为什么有 `package.json` + `npm install`？**
-Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/*.ts` 校验脚本：
+Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本：
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免）
 - **runtime**：`tsx`（运行 ESM TypeScript）

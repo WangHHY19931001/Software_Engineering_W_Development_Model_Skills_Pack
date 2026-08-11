@@ -325,7 +325,7 @@ package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版�
 npm run self-test            # 249/249 通过
 npx vitest run               # 35 files / 530 tests 全过
 npx tsc --noEmit             # 0 错误
-npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts .  # exit 0 全部一致
+npx tsx w-model-dev/scripts/check-docs-consistency.ts .  # exit 0 全部一致
 bash .githooks/pre-push --force  # 14 项全通过
 ```
 
