@@ -24,9 +24,9 @@ metadata:
 npm run lint:security
 ```
 
-**底层机制**：`lint:security` = `tsx w-model-dev/scripts/cli/security-scan.ts`，脚本内部调用 `npx eslint w-model-dev/scripts/ --format json` 收集 eslint-plugin-security 发现，再与仓库根目录的 `.eslintsecurity-baseline.json` 比对。
+**底层机制**：`lint:security` = `tsx w-model-dev/scripts/cli/security-scan.ts`，脚本内部调用 `npx eslint --no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore w-model-dev/scripts/ --format json` 收集 eslint-plugin-security 发现，再与仓库根目录的 `.eslintsecurity-baseline.json` 比对。
 
-**6 条安全规则**（`.eslintrc.cjs`）：
+**6 条安全规则**（`config/.eslintrc.cjs`）：
 
 | 规则 | 级别 | 检测内容 |
 |---|---|---|
