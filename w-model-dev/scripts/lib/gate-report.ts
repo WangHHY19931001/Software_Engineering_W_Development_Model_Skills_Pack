@@ -48,7 +48,9 @@ export function printJsonReport(report: JsonReport, exitCode: number): void {
  */
 export function buildViolationDistribution(
   violationsCount: number,
-  structuredViolations?: ReadonlyArray<{ rule: string }>,
+  // 放宽为兼容 StructuredViolation 的形状（rule/field/message 全可选），
+  // 使调用方可直接透传 structuredViolations 或带 message/field 的对象字面量（B4 测试）
+  structuredViolations?: ReadonlyArray<{ rule: string; message?: string; field?: string }>,
 ): { rule: string; count: number }[] {
   if (structuredViolations !== undefined && structuredViolations.length > 0) {
     const counts = new Map<string, number>();

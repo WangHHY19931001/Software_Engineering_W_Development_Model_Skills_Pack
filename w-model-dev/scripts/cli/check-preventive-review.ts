@@ -6,6 +6,7 @@ import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const PREVENTIVE_REVIEW_JSON = {
   script: 'check-preventive-review.ts',
@@ -34,6 +35,9 @@ function reportFilePrefix(phase: number, variant: NonNullable<PreventiveReviewOp
 }
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = process.argv.slice(2);
   const projectDir = args.find(a => !a.startsWith('--')) ?? '.';
   const phaseArg = args.find(a => a.startsWith('--phase='));
@@ -185,6 +189,19 @@ async function main(): Promise<void> {
     phase,
     variant,
   };
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'preventive-review',
+      passed: output.passed,
+      reasons: output.reasons,
+      violations: buildViolationDistribution(output.reasons.length),
+      durationMs: Date.now() - startTime,
+    }, output.exitCode);
+    process.exitCode = output.exitCode;
+    return;
+  }
 
   console.log('PREVENTIVE_REVIEW_JSON ' + JSON.stringify({ type: 'preventive-review', passed: output.passed, exitCode: output.exitCode, variant: output.variant, reasons: output.reasons }));
 

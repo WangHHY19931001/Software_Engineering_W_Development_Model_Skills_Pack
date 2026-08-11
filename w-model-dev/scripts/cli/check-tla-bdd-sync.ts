@@ -24,6 +24,7 @@
 import * as fs from 'node:fs/promises';
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const SYNC_JSON = {
   script: 'check-tla-bdd-sync.ts',
@@ -33,8 +34,13 @@ const SYNC_JSON = {
 };
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读 JSON 摘要）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = process.argv.slice(2);
-  if (args.length < 2) {
+  // 位置参数过滤 -- 前缀，兼容 `--json <tla> <feature>` 的参数顺序
+  const positional = args.filter(a => !a.startsWith('--'));
+  if (positional.length < 2) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
@@ -45,7 +51,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const [tlaFile, featureFile] = args;
+  const [tlaFile, featureFile] = positional;
   // noUncheckedIndexedAccess: 解构后为 string | undefined，须显式守卫
   if (!tlaFile || !featureFile) {
     exitWithError({
@@ -82,6 +88,22 @@ async function main(): Promise<void> {
         bddInvariants: result.bddInvariants,
       },
     };
+
+    // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+    if (jsonMode) {
+      // A2b 双轨过渡：reasons 优先结构化 violations 的 message；violations 分布按 rule 聚合
+      printJsonReport({
+        type: 'tla-bdd-sync',
+        passed: output.passed,
+        reasons: result.structuredViolations?.length
+          ? result.structuredViolations.map(v => v.message)
+          : result.violations.map(v => `[${v.dimension}] ${v.description}`),
+        violations: buildViolationDistribution(outReasons.length, result.structuredViolations),
+        durationMs: Date.now() - startTime,
+      }, output.exitCode);
+      process.exitCode = output.exitCode;
+      return;
+    }
 
     console.log('TLA_BDD_SYNC_JSON ' + JSON.stringify({ type: 'tla-bdd-sync', passed: output.passed, exitCode: output.exitCode, violations: output.violations }));
     process.exit(output.exitCode);

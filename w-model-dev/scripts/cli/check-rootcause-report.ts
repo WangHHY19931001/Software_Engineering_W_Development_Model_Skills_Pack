@@ -22,9 +22,13 @@ import * as path from 'node:path';
 import { checkRootCauseReport, type RootCauseReportShape } from '../logic/root-cause-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
-  const file = process.argv[2];
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
+  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -41,6 +45,20 @@ async function main(): Promise<void> {
 
   const result = checkRootCauseReport(parsed);
   const meta = (parsed as RootCauseReportShape)?.meta;
+  const exitCode1 = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'rootcause',
+      passed: result.passed,
+      reasons: result.reasons,
+      violations: buildViolationDistribution(result.reasons.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode1);
+    process.exitCode = exitCode1;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('RootCauseReport 校验（Root Cause Report Checker）');
@@ -63,7 +81,7 @@ async function main(): Promise<void> {
     }
   }
   console.log('═'.repeat(60));
-  const exitCode1 = result.passed ? 0 : 1;
+
   console.log('ROOTCAUSE_JSON ' + JSON.stringify({ type: 'rootcause', passed: result.passed, exitCode: exitCode1, reasonCount: result.reasons.length }));
 
   process.exit(exitCode1);

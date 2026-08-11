@@ -5,6 +5,7 @@ import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-swe
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const ICEBERG_JSON = {
   script: 'check-iceberg-sweep.ts',
@@ -110,6 +111,9 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
 }
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = process.argv.slice(2);
   const reportPathArg = args.find(a => !a.startsWith('--'));
   const autoTrigger = args.includes('--auto-trigger');
@@ -164,6 +168,19 @@ async function main(): Promise<void> {
     reasons,
     reportSummary: result.reportSummary,
   };
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'iceberg-sweep',
+      passed,
+      reasons,
+      violations: buildViolationDistribution(reasons.length),
+      durationMs: Date.now() - startTime,
+    }, output.exitCode);
+    process.exitCode = output.exitCode;
+    return;
+  }
 
   console.log('ICEBERG_JSON ' + JSON.stringify(output));
 

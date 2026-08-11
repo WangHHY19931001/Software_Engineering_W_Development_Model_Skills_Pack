@@ -149,9 +149,12 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const regenerate = args.includes('--regenerate');
 
+  // maxBuffer：eslint --format json 输出约 1.1MB，超过 spawnSync 默认 1MB 会 ENOBUFS 导致 JSON.parse 失败
+  // （曾致 pre-push 第 6 项 security-scan 误报 FILE_PARSE exit 2），放宽至 10MB 确保全量输出可读。
   const r = spawnSync('npx', ['eslint', 'w-model-dev/scripts/', '--format', 'json'], {
     encoding: 'utf-8',
     shell: process.platform === 'win32',
+    maxBuffer: 10 * 1024 * 1024,
   });
   if (r.status !== 0 && !r.stdout) {
     exitWithError({

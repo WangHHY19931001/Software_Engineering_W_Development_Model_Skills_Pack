@@ -46,6 +46,7 @@ import {
 import { validateBySchema } from '../logic/schema-loader.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
+import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 // ==================== 参数解析 ====================
 
@@ -119,6 +120,9 @@ async function readFeatureFile(filePath: string) {
 // ==================== 主流程 ====================
 
 async function main(): Promise<number> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计、不写 gate-logs）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = parseArgs(process.argv);
 
   if (!args.manifestFile) {
@@ -312,6 +316,29 @@ async function main(): Promise<number> {
     cucumberReport,
     graphSdNodes,
   });
+  const exitCode = result.exitCode;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    const allViolations = [
+      ...result.dimensions.headerCompleteness,
+      ...result.dimensions.stateMachineCompleteness,
+      ...result.dimensions.tlaEquivalence,
+      ...result.dimensions.stepBinding,
+      ...result.dimensions.scenarioPathValidity,
+      ...result.dimensions.rtmMapping,
+      ...result.dimensions.sdCoverage,
+    ];
+    printJsonReport({
+      type: 'bdd',
+      passed: result.passed,
+      reasons: allViolations,
+      violations: buildViolationDistribution(allViolations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return exitCode;
+  }
 
   // 输出报告
   console.log(`\n=== BDD Model Check Report (phase ${phase}) ===`);

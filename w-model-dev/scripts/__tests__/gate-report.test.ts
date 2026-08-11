@@ -22,6 +22,9 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const CHECK_RUN_LOG_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-run-log.ts');
+const CHECK_ICEBERG_SWEEP_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-iceberg-sweep.ts');
+const CHECK_TLA_BDD_SYNC_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-tla-bdd-sync.ts');
+const ICEBERG_VALID_SAMPLE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/iceberg/valid-full.json');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -139,6 +142,20 @@ describe('buildViolationDistribution（B4 violations 分布聚合）', () => {
     expect(buildViolationDistribution(0)).toEqual([]);
     expect(buildViolationDistribution(0, [])).toEqual([]);
   });
+
+  it('类型放宽：可传入含 message/field 的 StructuredViolation 形状对象（message 不参与聚合计数）', () => {
+    const dist = buildViolationDistribution(4, [
+      { rule: 'TLA_BDD_TRANSITION', message: 'm1' },
+      { rule: 'TLA_BDD_TRANSITION', message: 'm2', field: 'Next' },
+      { rule: 'TLA_BDD_STATE' },
+      { rule: 'TLA_BDD_INVARIANT', message: 'm4' },
+    ]);
+    expect(dist).toEqual([
+      { rule: 'TLA_BDD_TRANSITION', count: 2 },
+      { rule: 'TLA_BDD_STATE', count: 1 },
+      { rule: 'TLA_BDD_INVARIANT', count: 1 },
+    ]);
+  });
 });
 
 describe('check-run-log.ts --json（B4 子进程冒烟：--json 输出纯 JSON、无分隔线、退出码一致）', () => {
@@ -192,5 +209,99 @@ describe('check-run-log.ts --json（B4 子进程冒烟：--json 输出纯 JSON�
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('check-tla-bdd-sync.ts --json（B4 子进程冒烟：纯 JSON、violations 按 rule 聚合、默认路径保留 TLA_BDD_SYNC_JSON 前缀）', () => {
+  const TLA_CONTENT = [
+    'EXTENDS Naturals',
+    'VARIABLES state',
+    'Init == state = "idle"',
+    'Next == \\/ Login \\/ Logout',
+    'Login == state = "idle" /\\ state\' = "active"',
+    'Logout == state = "active" /\\ state\' = "idle"',
+    'TypeInvariant == state \\in {"idle", "active"}',
+  ].join('\n');
+  const FEATURE_CONTENT = [
+    'Feature: Test',
+    'Background:',
+    '  Given initial state',
+    '  When Login',
+    '  When Logout',
+    '  Then TypeInvariant',
+  ].join('\n');
+
+  it('--json 有效样本 → stdout 为单行纯 JSON（passed=true，exitCode=0），不输出 TLA_BDD_SYNC_JSON 前缀', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-tla-bdd-json-'));
+    try {
+      const tlaFile = path.join(tmpDir, 'model.tla');
+      const featureFile = path.join(tmpDir, 'model.feature');
+      await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
+      await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
+      const r = spawnSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], { encoding: 'utf-8' });
+      expect(r.status).toBe(0);
+      const stdout = r.stdout ?? '';
+      expect(stdout).not.toContain('═');
+      expect(stdout).not.toContain('TLA_BDD_SYNC_JSON ');
+      const parsed = JSON.parse(stdout) as {
+        type: string;
+        passed: boolean;
+        reasons: string[];
+        violations: Array<{ rule: string; count: number }>;
+        durationMs: number;
+        exitCode: number;
+      };
+      expect(parsed.type).toBe('tla-bdd-sync');
+      expect(parsed.passed).toBe(true);
+      expect(parsed.reasons).toEqual([]);
+      expect(parsed.violations).toEqual([]);
+      expect(parsed.exitCode).toBe(0);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('默认路径（不带 --json）保留 TLA_BDD_SYNC_JSON 前缀（run-log-logic 消费者兼容）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-tla-bdd-json-'));
+    try {
+      const tlaFile = path.join(tmpDir, 'model.tla');
+      const featureFile = path.join(tmpDir, 'model.feature');
+      await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
+      await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
+      const r = spawnSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], { encoding: 'utf-8' });
+      expect(r.status).toBe(0);
+      expect(r.stdout ?? '').toContain('TLA_BDD_SYNC_JSON ');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('check-iceberg-sweep.ts --json（B4 子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {
+  it('--json 有效样本 → stdout 为单行纯 JSON（passed=true，exitCode=0），不输出 ICEBERG_JSON 前缀', async () => {
+    const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE], { encoding: 'utf-8' });
+    expect(r.status).toBe(0);
+    const stdout = r.stdout ?? '';
+    expect(stdout).not.toContain('═');
+    expect(stdout).not.toContain('ICEBERG_JSON ');
+    const parsed = JSON.parse(stdout) as {
+      type: string;
+      passed: boolean;
+      reasons: string[];
+      violations: Array<{ rule: string; count: number }>;
+      durationMs: number;
+      exitCode: number;
+    };
+    expect(parsed.type).toBe('iceberg-sweep');
+    expect(parsed.passed).toBe(true);
+    expect(parsed.reasons).toEqual([]);
+    expect(parsed.violations).toEqual([]);
+    expect(parsed.exitCode).toBe(0);
+  });
+
+  it('默认路径（不带 --json）保留 ICEBERG_JSON 前缀', async () => {
+    const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], { encoding: 'utf-8' });
+    expect(r.status).toBe(0);
+    expect(r.stdout ?? '').toContain('ICEBERG_JSON ');
   });
 });
