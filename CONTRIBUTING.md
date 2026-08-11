@@ -17,8 +17,10 @@ cd Software_Engineering_W_Development_Model_Skills_Pack
 
 # 2. 安装开发依赖（tsx / ajv / eslint-plugin-security / vitest 等）
 npm install
+# 克隆后首次 npm install 即自动启用本地推送前门禁：
+# postinstall 自动执行 git config core.hooksPath .githooks（仅当 .githooks/ 存在时，失败仅 warn 不阻断 install）
 
-# 3. 启用本地推送前门禁（一次性，写入本地 .git/config）
+# 3.（可选）如需手动重置 / 确认钩子配置，执行一次（写入本地 .git/config）
 npm run setup:hooks
 # 等价于 git config core.hooksPath .githooks
 # 启用后每次 git push 会自动跑回归基线，详见下方「本地推送前门禁」一节
@@ -91,7 +93,7 @@ npm run check:verifier -- <sample.json>
 | 12 | `npx vitest run --config config/vitest.config.ts`（单元测试全量，35 files / 554 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 
-**启用方式**（仓库克隆后执行一次即可，配置写入本地 `.git/config`，不影响仓库内容）：
+**启用方式**：克隆后首次 `npm install` 即自动启用（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时，失败仅 warn 不阻断 install）。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
 ```bash
 npm run setup:hooks
