@@ -394,6 +394,8 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - [术语权威表](./w-model-dev/references/glossary.md) - 15+ 术语 + `_Avoid_` 别名治理
 - [工具箱决策表](./w-model-dev/references/toolbox.md) - I have X → use Z
 - [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
+- [用户指南](./docs/user-guide.md) - 校验失败排查思路（退出码 0/1/2）/ 规则依据 / 修复建议 / 依赖巡检流程（人工 npm audit + npm outdated）
+- [排障手册](./docs/troubleshooting.md) - FAQ（Windows 非 Git Bash / --no-verify 契约 / node_modules / baseline 指纹）+ 环境问题矩阵
 - [ingestion 与图谱收敛设计](./docs/ingestion-graph-convergence-design.md) - A 角色 / graph.json / check-requirement-graph.ts 权威设计文档
 - [信息流校验设计](./docs/information-flow-validation-design.md) - 黑洞/奇迹/死模块门禁 + EXT-IN/EXT-OUT 边界节点
 - [TLA+ 层次化建模设计](./docs/tla-plus-modeling-design.md) - L1–L6 层级模型 + 文件头规范 + SANY/TLC 门禁
