@@ -493,6 +493,27 @@
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
+      "hash": "360e3f289e5e8f0ea471a526999778c39e5b7eccb29d2eb757deb9ccb782d0e6",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/artifact-gate-assets.ts",
+      "line": 45,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "071fdbe7fc175ffd5bba4090e978a4243672f8b30e079a0556daa13e49548bd7",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/artifact-gate-assets.ts",
+      "line": 66,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "bbafc89c23e908467b464af3d83b4e26f793275c89d2ad82e29c7b2b0bf174f7",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/artifact-gate-assets.ts",
+      "line": 99,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
       "hash": "d6e233349df73b9c6c29af5ace7f8cb4abaad8c27ac89ef5c67f6324b760d879",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-archive-integrity.ts",
@@ -500,59 +521,17 @@
       "reason": "Found readdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "a0c4de15ac57fbedc00b6ddc227c3b489ccaadb47d8d26dc0ab2869eb9e0c8cf",
-      "rule_id": "security/detect-object-injection",
-      "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 86,
-      "reason": "Variable Assigned to Object Injection Sink"
-    },
-    {
-      "hash": "419b98499a714b38dd0d7ae58e731e71304ce42e163ba467354369b08a0dd336",
-      "rule_id": "security/detect-object-injection",
-      "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 90,
-      "reason": "Variable Assigned to Object Injection Sink"
-    },
-    {
       "hash": "042074ef7e22301d59bbab3432964597ac4987507595fe90f5ff97ac21a97c57",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 154,
+      "line": 58,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "4363d91b0d7bf20a0c64fcf469ad987d8a7339143942957295f58108350d097e",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 227,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "61d2df3d562a7278956ece968d85491d3748a3d2011a7f006b73818f8716a24c",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 269,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "ace805facc266d56b333ed56e162c9138375ecdeb89d32e5eab36b4c5ecf6e06",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 288,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "31bed1c8dfd5782ede54f8423b553d3b0997192a0b2c769989fb27f03b86690c",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 310,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "c8ef42f463cc09a949587ace3e67a917968bc7242ef02e504956c773ca4506bc",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 424,
+      "line": 134,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -580,28 +559,28 @@
       "hash": "a1b2805526c025904570388937a712760cf35990a785f06c5edb3185fdd935f2",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-bdd-model.ts",
-      "line": 236,
+      "line": 242,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "69bf55108f7cc9370a5fb5f83c57737338fe594f7f9f073cbbabeaea950b0bb3",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-bdd-model.ts",
-      "line": 338,
+      "line": 344,
       "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "205e0f4e53565c5691a9984f117d6f85a40ea06d7235076ce651e1081814c8a1",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-bdd-model.ts",
-      "line": 339,
+      "line": 345,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "2cbee90d96a3d3e4acbca085c8e7c6a623dcc137dd23902cf027c7a6724e6407",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-budget.ts",
-      "line": 141,
+      "line": 143,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -664,7 +643,7 @@
       "hash": "2b1d66329fe48ab4595a7b0bae91c8e93c11276ab288706eab7bdcadfbf35d73",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-codegraph-queries.ts",
-      "line": 134,
+      "line": 135,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -706,42 +685,42 @@
       "hash": "6aa3f7bb993be96779b9e72062399d35b84410ceda33dbf51b027a3adab9a87c",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 72,
+      "line": 73,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "d124879765a643a43565c4f16ba82ede02920be874524a99bd52d916232033b2",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 73,
+      "line": 74,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "a9e8826d7456c72be8ccd19c788e15d61a2a8b00a483f39870f2b16851e22b35",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 74,
+      "line": 75,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "a7ddbf46786408125c363161b1db86cd0319c7db1a479f5b83c8bbc465c50869",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 75,
+      "line": 76,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "6c0a1bc7e6a87f64c7c04f4a503957c271f8e88fbc6d032c319da0ba239e13c9",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 76,
+      "line": 77,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "a9b3244d0e6aefee16c23653597683f53cbf3f1d275721bd8286eaec5f57b4a3",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 79,
+      "line": 80,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -755,14 +734,14 @@
       "hash": "a9209fdbdc573b58d530dcae6f49b75319834314962a0b2d05701380e83ad2d4",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-iceberg-sweep.ts",
-      "line": 169,
+      "line": 175,
       "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
       "hash": "35b44cd4b67219cf40a62c728236446a6dbdf77e20940336f7fc2c05a05f7b6c",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-maturity.ts",
-      "line": 121,
+      "line": 122,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -853,49 +832,49 @@
       "hash": "f444406bae261c00d92cd0ded56510aa58569d00552ffc329538e1b68b673b4b",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-preventive-review.ts",
-      "line": 165,
+      "line": 170,
       "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
       "hash": "adbbbf0fff3cc4e0036a9d0b7f5d83b116af88db30c284f1a3d8e5a006207d78",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/cli/check-preventive-review.ts",
-      "line": 166,
+      "line": 171,
       "reason": "Generic Object Injection Sink"
     },
     {
       "hash": "fbf7110c44cf96763ec850ef13f492591710195cd31f2d87043368f9b781246f",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/cli/check-preventive-review.ts",
-      "line": 168,
+      "line": 173,
       "reason": "Generic Object Injection Sink"
     },
     {
       "hash": "b106823d0f69926b6715b030ccd732876114f3b92cfd8e97e34d56bac0b507b7",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-preventive-review.ts",
-      "line": 189,
+      "line": 194,
       "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
       "hash": "67c9dc6980a2ed385f9e75ab67f97ff85a0372ff04627759e45edba2b3eece87",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-preventive-review.ts",
-      "line": 191,
+      "line": 196,
       "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
       "hash": "2239487159c2f7d5b690a95a73c114f61bfd0861eb890e2ac756eb680ef3d9d7",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-role-dispatch.ts",
-      "line": 51,
+      "line": 52,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "54d17fcd0bacf12cdf0b421620bf66d33db1ed4fd1a72003a250b4384f55d9e2",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/cli/check-role-dispatch.ts",
-      "line": 69,
+      "line": 71,
       "reason": "Generic Object Injection Sink"
     },
     {
@@ -923,14 +902,14 @@
       "hash": "5290649eb4e9953113f27bccc0e2e67e257de5f5b5eb68eac842df6c5f1a0685",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-bdd-sync.ts",
-      "line": 60,
+      "line": 62,
       "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
       "hash": "e4025e673f914587787f7a72330f8bdf36eb9eb283af5e56790a76520295b685",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-bdd-sync.ts",
-      "line": 61,
+      "line": 63,
       "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
@@ -958,14 +937,14 @@
       "hash": "26e4c91baef49de659ae2b08862e5d37f5cec4e5a5044b76e7ce772cbb27821f",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 441,
+      "line": 445,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "bf45234c4cec8fa9d965786a737e107d9eb8e1937cd10d29aeebf7a1fdbcfad4",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 461,
+      "line": 465,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1000,21 +979,21 @@
       "hash": "a71da28077e117d93c4053dfe493cbd1c0ddfe9f657eb62a1e89a7b9c72183f4",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/ensure-codegraph-opsx.ts",
-      "line": 246,
+      "line": 249,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "74515b173a7450e554c3636beabed238928283e1157751a71e7f75209d08a8ec",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/metrics-report.ts",
-      "line": 127,
+      "line": 128,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "97a2a0f05c744819e6f6677a424320eaf0dbbc3d1c09361b0815ce7bb2537e6a",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/metrics-report.ts",
-      "line": 146,
+      "line": 147,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1095,6 +1074,13 @@
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
+      "hash": "3fb653c1e173e42a0c01320e88e85047b9d4b7e51824388b06b78ee8861d2446",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/uat-path-mapping.ts",
+      "line": 80,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
       "hash": "44f28960276f40ebec7c74aebac9a55e11ffc4d71d5f34d47af01b1430c76a30",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/wm-status.ts",
@@ -1105,7 +1091,7 @@
       "hash": "47b977b9cb8250d2c203cd056ae3e4ae6e8198e204b6c6caef3693cb21cfe02e",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/wm-status.ts",
-      "line": 90,
+      "line": 91,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1113,6 +1099,20 @@
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/lib/parse-phase.ts",
       "line": 50,
+      "reason": "Variable Assigned to Object Injection Sink"
+    },
+    {
+      "hash": "3053c2e2b0b7b66c2caa4e3f4f92a1af3db7b1a96a5a52b021b99f75eec68788",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/lib/phase-doc-map.ts",
+      "line": 48,
+      "reason": "Variable Assigned to Object Injection Sink"
+    },
+    {
+      "hash": "4dc60040539bf1971399fe0417e775e90800d0e7a376c49741bd5773adccf479",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/lib/phase-doc-map.ts",
+      "line": 52,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
