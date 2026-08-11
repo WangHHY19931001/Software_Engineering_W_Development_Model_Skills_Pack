@@ -1,12 +1,7 @@
 #!/usr/bin/env tsx
 /**
- * 工件质量门校验脚本（Artifact Gate Checker）
- *
- * 对应 SSoT §10.5「工件质量门」。供 AI Agent 在验收测试阶段直接调用，判定 W 模型产出物是否满足放行条件。
- * 用法：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
- * 退出码：0 通过；1 未通过（reasons 列出具体原因）；2 输入错误（RTM 不存在 / 格式非法）
- * 资产读取与校验已拆分至 artifact-gate-assets.ts / uat-path-mapping.ts（Task A1），本文件仅保留
- * 参数解析、资产装配、gate-logic 调用、结果合并与报告输出。
+ * 工件质量门校验脚本（SSoT §10.5）：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]`；退出码 0/1/2。
+ * 资产读取已拆分至 artifact-gate-assets.ts / uat-path-mapping.ts（Task A1），本文件仅保留编排。
  */
 
 import { promises as fs } from 'node:fs';
