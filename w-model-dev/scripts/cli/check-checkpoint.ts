@@ -30,7 +30,7 @@ import * as path from 'node:path';
 import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 // ==================== 参数解析 ====================
 
@@ -108,6 +108,9 @@ async function loadCheckpointLog(
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const { runLogFile, checkpointLogDir } = parseArgs(process.argv);
 
   if (!runLogFile) {
@@ -150,6 +153,20 @@ async function main(): Promise<void> {
 
   // 构建 options 并调用纯逻辑校验
   const result = checkCheckpoint(entries, { checkpointLog });
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'checkpoint',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // ==================== 报告输出 ====================
   console.log('═'.repeat(60));
@@ -181,7 +198,7 @@ async function main(): Promise<void> {
     type: 'checkpoint',
     passed: result.passed,
     violations: result.violations,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

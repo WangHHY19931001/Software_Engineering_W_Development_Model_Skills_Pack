@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
@@ -158,7 +158,11 @@ function collectVitestTestCount(root: string): number {
 }
 
 function main(): void {
-  const root = pathResolve(process.argv[2] ?? '.');
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  const args = process.argv.slice(2).filter(a => a !== '--json');
+  const jsonMode = args.length !== process.argv.slice(2).length;
+  const startTime = Date.now();
+  const root = pathResolve(args[0] ?? '.');
   const missing = REQUIRED_PATHS.filter((p) => !existsSync(join(root, p)));
   if (missing.length > 0) {
     exitWithError({
@@ -207,6 +211,23 @@ function main(): void {
   };
 
   const violations = runDocConsistencyChecks(input);
+  const exitCode = violations.length === 0 ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    // violations 分布按检查项聚合（与人类可读 `[${v.check}] ${v.message}` 对齐）
+    const byCheck = new Map<string, number>();
+    for (const v of violations) byCheck.set(v.check, (byCheck.get(v.check) ?? 0) + 1);
+    printJsonReport({
+      type: 'docs-consistency',
+      passed: violations.length === 0,
+      reasons: violations.map(v => `[${v.check}] ${v.message}`),
+      violations: [...byCheck.entries()].map(([rule, count]) => ({ rule, count })),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('文档一致性检查（Doc Consistency Checker）');
@@ -226,7 +247,7 @@ function main(): void {
     }
   }
 
-  printGateReport('DOCS_CONSISTENCY', { passed: violations.length === 0, violationCount: violations.length }, violations.length === 0 ? 0 : 1);
+  printGateReport('DOCS_CONSISTENCY', { passed: violations.length === 0, violationCount: violations.length }, exitCode);
 }
 
 // Windows 兼容的 main 模块判断：

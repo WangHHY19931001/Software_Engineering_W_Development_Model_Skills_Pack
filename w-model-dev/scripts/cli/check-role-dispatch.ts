@@ -27,9 +27,12 @@ import { fileURLToPath } from 'node:url';
 import { checkRoleDispatch, type RoleDispatchEntry } from '../logic/role-dispatch-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = process.argv.slice(2);
   const file = args.find(a => !a.startsWith('--'));
   // 第29轮：--r3-enabled 保留解析以兼容旧调用，但语义为 no-op（R≥3 无条件强制）
@@ -85,6 +88,20 @@ async function main(): Promise<void> {
   }
 
   const result = checkRoleDispatch(entries);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'role-dispatch',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -117,7 +134,7 @@ async function main(): Promise<void> {
     r3Enabled: true,
     phaseCount: result.phaseSummary.length,
     violations: result.violations,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 // Windows 兼容的 main 模块判断：

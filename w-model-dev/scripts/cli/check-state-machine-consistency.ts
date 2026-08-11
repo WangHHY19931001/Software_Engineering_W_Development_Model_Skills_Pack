@@ -23,7 +23,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import {
   checkStateMachineConsistency,
   transitionKey,
@@ -31,7 +31,10 @@ import {
 } from '../logic/state-machine-logic.js';
 
 async function main(): Promise<void> {
-  const file = process.argv[2];
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
+  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -47,6 +50,20 @@ async function main(): Promise<void> {
   const parsed = await readJsonOrExit<StateMachineConsistencyInput>(file);
 
   const result = checkStateMachineConsistency(parsed);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'state-machine-consistency',
+      passed: result.passed,
+      reasons: result.reasons,
+      violations: buildViolationDistribution(result.reasons.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('状态机一致性校验（State Machine Consistency Checker）');
@@ -76,7 +93,7 @@ async function main(): Promise<void> {
     missingInCode: result.missingInCode.map(transitionKey),
     extraInCode: result.extraInCode.map(transitionKey),
     reasons: result.reasons,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 // isMain 守卫：仅在直接执行时运行 main，被 import 时不触发

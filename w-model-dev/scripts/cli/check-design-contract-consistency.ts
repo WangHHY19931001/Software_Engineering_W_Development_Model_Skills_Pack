@@ -38,7 +38,7 @@ import {
   type AcceptanceTestAssertion,
 } from '../logic/design-contract-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 
 // ==================== uat-path-mapping.md 解析 ====================
 
@@ -201,7 +201,10 @@ async function parseAcceptanceAssertions(testDir: string): Promise<AcceptanceTes
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  const projectDir = process.argv[2] ?? '.';
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
+  const projectDir = process.argv.slice(2).find(a => !a.startsWith('--')) ?? '.';
   const projectDirAbs = path.resolve(projectDir);
 
   const mappingPath = path.join(projectDirAbs, 'docs', 'uat-path-mapping.md');
@@ -251,6 +254,23 @@ async function main(): Promise<void> {
   };
 
   const result = checkDesignContractConsistency(input);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    // violations 分布按维度聚合（与人类可读 `[${v.dimension}] ${v.message}` 对齐）
+    const byDimension = new Map<string, number>();
+    for (const v of result.violations) byDimension.set(v.dimension, (byDimension.get(v.dimension) ?? 0) + 1);
+    printJsonReport({
+      type: 'design-contract',
+      passed: result.passed,
+      reasons: result.violations.map(v => `[${v.dimension}] ${v.message}`),
+      violations: [...byDimension.entries()].map(([rule, count]) => ({ rule, count })),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('设计契约一致性校验（Design Contract Consistency）');
@@ -276,7 +296,7 @@ async function main(): Promise<void> {
     passed: result.passed,
     violationCount: result.violations.length,
     violations: result.violations,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

@@ -15,7 +15,7 @@ import {
 import { exitWithError } from '../lib/cli-error.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
 import {
   discoverGraphAsset,
@@ -112,6 +112,9 @@ function parseProjectDir(argv: string[]): string {
 }
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const phaseOption = parsePhaseArg(process.argv);
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
   // 第 37 轮：--spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
@@ -191,6 +194,20 @@ async function main(): Promise<void> {
   const allReasons = [...result.reasons, ...uatMappingViolations, ...bddViolations, ...modelCheckViolations];
   const overallPassed =
     result.passed && uatMappingViolations.length === 0 && bddViolations.length === 0 && modelCheckViolations.length === 0;
+  const exitCode = overallPassed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'artifact',
+      passed: overallPassed,
+      reasons: allReasons,
+      violations: buildViolationDistribution(allReasons.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -227,7 +244,7 @@ async function main(): Promise<void> {
     missingItems: result.missingItems,
     reasons: allReasons,
     bddManifestExists,
-  }, overallPassed ? 0 : 1);
+  }, exitCode);
 }
 
 // isMain 守卫：仅直接执行时运行 main，被 self-test 等 import 时不触发

@@ -47,7 +47,7 @@ import {
 } from '../logic/code-tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -159,6 +159,9 @@ async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Pro
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const { manifestFile, graphFile, rtmFile, srcDir } = parseArgs(process.argv);
 
   if (!manifestFile || !graphFile || !rtmFile || !srcDir) {
@@ -191,6 +194,23 @@ async function main(): Promise<void> {
     codeFiles,
   };
   const result = checkCodeTlaConsistency(input);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    // A2b 双轨过渡：reasons 优先 structuredViolations 的 message，violations 分布按 rule 聚合
+    printJsonReport({
+      type: 'code-tla-consistency',
+      passed: result.passed,
+      reasons: result.structuredViolations?.length
+        ? result.structuredViolations.map(v => v.message)
+        : result.violations.map(v => `[${v.dimension}] ${v.message}`),
+      violations: buildViolationDistribution(result.violations.length, result.structuredViolations),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -264,7 +284,7 @@ async function main(): Promise<void> {
     violations: result.violations,
     codeFileCount: codeFiles.length,
     converged: result.passed,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch(err => {

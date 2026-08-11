@@ -24,7 +24,7 @@ import { promises as fs, type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { checkArchiveIntegrity } from '../logic/archive-integrity-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 // ==================== 目录遍历 ====================
 
@@ -55,7 +55,10 @@ async function walkDir(dirAbs: string, baseDir: string): Promise<Set<string>> {
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  const archiveDir = process.argv[2];
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
+  const archiveDir = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!archiveDir) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -83,6 +86,20 @@ async function main(): Promise<void> {
 
   const contents = await walkDir(archiveAbs, archiveAbs);
   const result = checkArchiveIntegrity(contents);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'archive-integrity',
+      passed: result.passed,
+      reasons: result.missingFiles,
+      violations: buildViolationDistribution(result.missingFiles.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('归档完整性校验（Archive Integrity Checker）');
@@ -110,7 +127,7 @@ async function main(): Promise<void> {
     passed: result.passed,
     missingFiles: result.missingFiles,
     checkedPhases: result.checkedPhases,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

@@ -19,7 +19,7 @@ import * as path from 'node:path';
 import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
 interface CheckResult {
@@ -116,6 +116,9 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
 }
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = process.argv.slice(2);
   const file = args.find(a => !a.startsWith('--'));
   // 统一 --phase 校验（lib/parse-phase.ts，5-8；支持 --phase N 与 --phase=N）
@@ -159,6 +162,20 @@ async function main(): Promise<void> {
 
   const abs = path.resolve(file);
   const result = checkOpsxArtifacts(abs, phase);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'opsx-artifacts',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('opsx 制品与审查产物校验（Opsx Artifacts Checker）');
@@ -186,7 +203,7 @@ async function main(): Promise<void> {
     artifactsFound: result.artifactsFound,
     reviewsFound: result.reviewsFound,
     violations: result.violations,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 const entryArg = process.argv[1];

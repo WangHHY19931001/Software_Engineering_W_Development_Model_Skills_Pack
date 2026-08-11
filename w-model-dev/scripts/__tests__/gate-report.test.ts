@@ -11,7 +11,17 @@
  */
 
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { printGateReport } from '../lib/gate-report.js';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+
+const require = createRequire(import.meta.url);
+const tsxCli = require.resolve('tsx/cli');
+const CHECK_RUN_LOG_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-run-log.ts');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -73,5 +83,114 @@ describe('printGateReport', () => {
     expect(() => printGateReport('GATE', { passed: true, exitCode: 9 }, 0)).toThrow('exit:0');
     expect(logSpy).toHaveBeenNthCalledWith(2, 'GATE_JSON ' + JSON.stringify({ passed: true, exitCode: 0 }));
     expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+});
+
+describe('printJsonReport（B4 --json 机器可读报告）', () => {
+  it('stdout 仅输出单行 JSON（无分隔线），含全部 JsonReport 字段 + 末尾 exitCode，且不调用 process.exit', () => {
+    const exitSpy = vi.spyOn(process, 'exit');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    printJsonReport({
+      type: 'run-log',
+      passed: false,
+      reasons: ['r1', 'r2'],
+      violations: [{ rule: 'violation', count: 2 }],
+      durationMs: 42,
+    }, 1);
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const line = logSpy.mock.calls[0]![0] as string;
+    // 无分隔线、无 LABEL_JSON 前缀，可整体 JSON.parse
+    expect(line).not.toContain('─');
+    expect(line).not.toContain('═');
+    expect(line).not.toContain('_JSON');
+    expect(line).toBe(JSON.stringify({
+      type: 'run-log',
+      passed: false,
+      reasons: ['r1', 'r2'],
+      violations: [{ rule: 'violation', count: 2 }],
+      durationMs: 42,
+      exitCode: 1,
+    }));
+    // exitCode 由调用方处理：printJsonReport 自身不退出
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildViolationDistribution（B4 violations 分布聚合）', () => {
+  it('有 structuredViolations 时按 rule 聚合（保留各规则计数）', () => {
+    const dist = buildViolationDistribution(3, [
+      { rule: 'D1', message: 'a' },
+      { rule: 'D2', message: 'b' },
+      { rule: 'D1', message: 'c' },
+    ]);
+    expect(dist).toEqual([
+      { rule: 'D1', count: 2 },
+      { rule: 'D2', count: 1 },
+    ]);
+  });
+
+  it('无 structuredViolations 时降级固定 violation 规则（count = 违规总数）', () => {
+    expect(buildViolationDistribution(5)).toEqual([{ rule: 'violation', count: 5 }]);
+  });
+
+  it('无违规时返回空数组', () => {
+    expect(buildViolationDistribution(0)).toEqual([]);
+    expect(buildViolationDistribution(0, [])).toEqual([]);
+  });
+});
+
+describe('check-run-log.ts --json（B4 子进程冒烟：--json 输出纯 JSON、无分隔线、退出码一致）', () => {
+  it('schema 违规样本 → stdout 为单行 JSON（type/passed/reasons/violations/durationMs/exitCode），进程退出码与 exitCode 字段一致', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(
+        logFile,
+        '{"phase":1,"action":"produce","role":"S","outcome":"success","timestamp":"2026-08-11T00:00:00Z"}\n',
+        'utf-8',
+      );
+      const r = spawnSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], { encoding: 'utf-8' });
+      expect(r.status).toBe(1); // schema 违规 → exit 1
+      const stdout = r.stdout ?? '';
+      expect(stdout).not.toContain('═');
+      expect(stdout).not.toContain('─');
+      const parsed = JSON.parse(stdout) as {
+        type: string;
+        passed: boolean;
+        reasons: string[];
+        violations: Array<{ rule: string; count: number }>;
+        durationMs: number;
+        exitCode: number;
+      };
+      expect(parsed.type).toBe('run-log');
+      expect(parsed.passed).toBe(false);
+      expect(parsed.reasons.length).toBeGreaterThan(0);
+      expect(parsed.violations).toEqual([{ rule: 'violation', count: parsed.reasons.length }]);
+      expect(typeof parsed.durationMs).toBe('number');
+      expect(parsed.exitCode).toBe(1);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('默认路径（不带 --json）输出人类可读分隔线，行为不变', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(
+        logFile,
+        '{"phase":1,"action":"produce","role":"S","outcome":"success","timestamp":"2026-08-11T00:00:00Z"}\n',
+        'utf-8',
+      );
+      const r = spawnSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, logFile], { encoding: 'utf-8' });
+      expect(r.status).toBe(1);
+      const stdout = r.stdout ?? '';
+      expect(stdout).toContain('═');
+      expect(stdout).toContain('RUN_LOG_JSON ');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });

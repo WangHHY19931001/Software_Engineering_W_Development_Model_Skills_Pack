@@ -53,11 +53,14 @@ import {
 } from '../logic/graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
 async function main(): Promise<void> {
-  const file = process.argv[2];
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
+  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -290,6 +293,20 @@ async function main(): Promise<void> {
     for (const msg of detailedEnhanceViolations.r14) result.violations.push(msg);
     recalculatePassed(result, false);
   }
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'requirement-graph',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('图谱校验（Requirement Graph Checker）');
@@ -351,7 +368,7 @@ async function main(): Promise<void> {
     violations: result.violations,
     warnings: result.warnings ?? [],
     converged: result.passed,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

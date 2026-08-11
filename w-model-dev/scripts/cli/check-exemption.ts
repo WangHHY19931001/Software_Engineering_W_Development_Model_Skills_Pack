@@ -16,10 +16,13 @@
 import { checkExemption } from '../logic/exemption-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
-  const file = process.argv[2];
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
+  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -34,6 +37,20 @@ async function main(): Promise<void> {
   const parsed = await readJsonOrExit(file);
 
   const result = checkExemption(parsed);
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'exemption',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   console.log('═'.repeat(60));
   console.log('豁免审批校验报告');
@@ -53,7 +70,7 @@ async function main(): Promise<void> {
     passed: result.passed,
     stage: result.stage,
     violations: result.violations,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

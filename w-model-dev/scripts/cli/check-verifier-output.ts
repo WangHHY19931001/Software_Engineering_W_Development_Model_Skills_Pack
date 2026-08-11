@@ -32,9 +32,12 @@ import {
 } from '../logic/verifier-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const args = process.argv.slice(2);
   const file = args.find(a => !a.startsWith('--'));
   const selfAsVerifier = args.includes('--self-as-verifier');
@@ -85,6 +88,20 @@ async function main(): Promise<void> {
 
   const allReasons = [...result.reasons, ...selfAsVerifierViolations];
   const passed = result.passed && selfAsVerifierViolations.length === 0;
+  const exitCode = passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'verifier-output',
+      passed,
+      reasons: allReasons,
+      violations: buildViolationDistribution(allReasons.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // 人类可读报告
   console.log('═'.repeat(60));
@@ -128,7 +145,7 @@ async function main(): Promise<void> {
     expectedCompositeScore: result.expectedCompositeScore,
     qualityLevel: result.qualityLevel,
     reasons: allReasons,
-  }, passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

@@ -34,7 +34,7 @@ import * as path from 'node:path';
 import { checkSignatureChain, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
 // ==================== 参数解析 ====================
@@ -72,6 +72,9 @@ function parseArgs(argv: string[]): ParsedArgs {
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const { chainFile, phase, stage } = parseArgs(process.argv);
 
   if (!chainFile) {
@@ -146,6 +149,20 @@ async function main(): Promise<void> {
   }
 
   const result = checkSignatureChain(entries, { phase, stage, existingPaths });
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'signature-chain',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // ==================== 报告输出 ====================
   console.log('═'.repeat(60));
@@ -181,7 +198,7 @@ async function main(): Promise<void> {
     violations: result.violations,
     rulesPassed: result.rulesPassed,
     rulesFailed: result.rulesFailed,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch((err) => {

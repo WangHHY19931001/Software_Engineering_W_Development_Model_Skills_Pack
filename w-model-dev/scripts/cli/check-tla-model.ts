@@ -42,7 +42,7 @@ import {
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { PHASES, type Phase } from '../lib/constants.js';
-import { printGateReport } from '../lib/gate-report.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
 // ==================== 参数解析 ====================
@@ -343,6 +343,9 @@ function runTools(
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
+  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  const jsonMode = process.argv.slice(2).includes('--json');
+  const startTime = Date.now();
   const { manifestFile, phase: phaseArg, specId, graphFile, keepStates } = parseArgs(process.argv);
 
   if (!manifestFile) {
@@ -507,6 +510,20 @@ async function main(): Promise<void> {
   for (const hv of headerViolations) result.violations.push(hv);
   for (const ee of env.errors) result.violations.push(`环境错误：${ee}`);
   result.passed = result.environmentOk && result.violations.length === 0;
+  const exitCode = result.passed ? 0 : 1;
+
+  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  if (jsonMode) {
+    printJsonReport({
+      type: 'tla-model',
+      passed: result.passed,
+      reasons: result.violations,
+      violations: buildViolationDistribution(result.violations.length),
+      durationMs: Date.now() - startTime,
+    }, exitCode);
+    process.exitCode = exitCode;
+    return;
+  }
 
   // ==================== P3.8（第 9 轮）states 自动清理（校验后） ====================
   // 默认在 TLC 校验完成后自动清理 states/ 目录，避免状态文件残留污染仓库。
@@ -590,7 +607,7 @@ async function main(): Promise<void> {
     environmentErrors: result.environmentErrors,
     violations: result.violations,
     converged: result.passed,
-  }, result.passed ? 0 : 1);
+  }, exitCode);
 }
 
 main().catch(err => {
