@@ -75,7 +75,7 @@ npm run check:verifier -- <sample.json>
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑与原 CI 一致的 13 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑与原 CI 一致的 14 项检查；任一退出码不符预期即中止推送：
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
@@ -92,6 +92,7 @@ npm run check:verifier -- <sample.json>
 | 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
 | 12 | `npx vitest run --config config/vitest.config.ts`（单元测试全量，35 files / 554 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
+| 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
 
 **启用方式**：克隆后首次 `npm install` 即自动启用（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时，失败仅 warn 不阻断 install）。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -134,12 +135,31 @@ git push --no-verify
 [optional footer]
 ```
 
-类型：
+**类型（type）**：
 - `feat`: 新功能
 - `fix`: Bug 修复
 - `docs`: 文档变更
 - `refactor`: 重构（不改变功能）
+- `test`: 测试相关（新增 / 修改 vitest 用例或 self-test 样本）
 - `chore`: 构建 / 工具变更
+- `ci`: 门禁 / 钩子相关（`.githooks/`、prepush）
+
+**Scope（可选，按实际模块取有意义的名称）**：
+- `scripts`：校验脚本 / 门禁逻辑（`w-model-dev/scripts/`）
+- `docs`：文档 / SSoT 同步
+- `gate`：阶段门禁规则
+- `error`：错误结构 / 退出码
+- `config`：工程配置（eslint / tsconfig / vitest）
+- `hooks`：git 钩子 / 本地门禁（`.githooks/`）
+
+**PR 标题**：与提交信息同格式 `<type>(<scope>): <summary>`（scope 可省略）。
+
+**提交流程**：
+
+1. 创建分支（见上文「1. 创建分支」）
+2. 本地验证：`npm run prepush`（14 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
+3. 按上述格式提交
+4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
 示例：
 ```
@@ -151,9 +171,10 @@ refactor(skill): /wm review 编排指引精简
 
 ### 5. 提交 Pull Request
 
-- PR 标题遵循 Conventional Commits 格式
-- PR 描述说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
+- PR 标题遵循 Conventional Commits 格式（同提交信息：`<type>(<scope>): <summary>`）
+- PR 描述使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板，说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
 - 关联相关 issue（如 `Closes #5`）
+- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（14 项门禁）验证，合入前请确保本地已通过
 
 ## 文档维护规则
 
