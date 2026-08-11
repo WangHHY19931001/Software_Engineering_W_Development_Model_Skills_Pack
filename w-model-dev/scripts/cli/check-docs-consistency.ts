@@ -14,8 +14,9 @@
  *   2  输入错误（repo-root 缺必需文件）
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { join, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exitWithError } from '../lib/cli-error.js';
@@ -97,6 +98,65 @@ function readSecurityBaselineEntryCount(root: string): number {
   }
 }
 
+/**
+ * 定位根 node_modules 下 vitest 包的可执行入口（package.json `bin.vitest`）。
+ * 返回绝对路径；vitest 未安装 / package.json 不可解析时返回 null（触发 npx 回退）。
+ */
+function findVitestBin(root: string): string | null {
+  try {
+    const pkgPath = join(root, 'node_modules', 'vitest', 'package.json');
+    if (!existsSync(pkgPath)) return null;
+    const pkg = parseJsonSafe(readFileSync(pkgPath, 'utf-8')) as { bin?: { vitest?: unknown } } | null;
+    const bin = pkg?.bin?.vitest;
+    return typeof bin === 'string' ? join(root, 'node_modules', 'vitest', bin) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 采集 vitest 实际运行输出的用例总数（堵住只查文件数不查用例总数的盲区）。
+ * 优先 `vitest run --reporter=json --outputFile=<tmp>`：JSON reporter 输出结构稳定
+ * （numTotalTests 为 vitest 2/3/4 官方字段），vitest 存在失败用例时 JSON 仍会落盘，故不依赖 exit code；
+ * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
+ * spawnSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
+ * 落盘/解析失败回退 stdout 文本解析「Tests  N passed」；全部失败返回 -1（保守放行，不阻断门禁，
+ * 与 git 不可用时 detectScriptsChanges 返回 false 的既有策略一致）。
+ * 注：maxBuffer 必须放宽——vitest 全量进度输出可达数 MB，默认 1MB 会触发
+ * ERR_CHILD_PROCESS_STDIO_MAXBUFFER（此时 spawn 报 error 但 JSON 文件已落盘，仍需继续读文件）。
+ */
+function collectVitestTestCount(root: string): number {
+  const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
+  const vitestArgs = ['run', '--reporter=json', `--outputFile=${outFile}`];
+  const vitestBin = findVitestBin(root);
+  const r = vitestBin !== null
+    ? spawnSync(process.execPath, [vitestBin, ...vitestArgs], { cwd: root, encoding: 'utf-8', timeout: 180_000, maxBuffer: 64 * 1024 * 1024 })
+    : spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
+        cwd: root,
+        encoding: 'utf-8',
+        timeout: 180_000,
+        maxBuffer: 64 * 1024 * 1024,
+        shell: true,
+      });
+  // 无论 spawn 是否报错（含 maxBuffer 超限 / vitest 失败），先尝试读 JSON 落盘文件
+  try {
+    const parsed = parseJsonSafe(readFileSync(outFile, 'utf-8')) as { numTotalTests?: unknown } | null;
+    if (parsed !== null && typeof parsed.numTotalTests === 'number' && Number.isFinite(parsed.numTotalTests)) {
+      return parsed.numTotalTests;
+    }
+  } catch {
+    // 落盘失败（vitest 未启动 / 超时被杀 / 文件不完整）→ 回退 stdout 文本解析
+  } finally {
+    try {
+      rmSync(outFile, { force: true });
+    } catch {
+      // 临时文件清理失败不影响结果
+    }
+  }
+  const textMatch = `${r.stdout ?? ''}${r.stderr ?? ''}`.match(/Tests\s+(\d+)\s+passed/);
+  return textMatch ? Number(textMatch[1]) : -1;
+}
+
 function main(): void {
   const root = pathResolve(process.argv[2] ?? '.');
   const missing = REQUIRED_PATHS.filter((p) => !existsSync(join(root, p)));
@@ -119,6 +179,7 @@ function main(): void {
   const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks（合计 30）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) => f.endsWith('.test.ts')).length;
+  const vitestTestCount = collectVitestTestCount(root);
 
   const input: DocConsistencyInput = {
     schemaFiles,
@@ -140,6 +201,7 @@ function main(): void {
     prePush: read('.githooks/pre-push'),
     designDocs,
     testFileCount,
+    vitestTestCount,
     scriptsChanged: detectScriptsChanges(root),
     securityBaselineEntryCount: readSecurityBaselineEntryCount(root),
   };
@@ -154,6 +216,7 @@ function main(): void {
   console.log(`exit-2 脚本   : ${exit2ScriptCount}`);
   console.log(`persona / cur : ${personaCount} / ${cursorSkillCount}`);
   console.log(`test 文件    : ${testFileCount}`);
+  console.log(`vitest 用例  : ${vitestTestCount < 0 ? '无法采集（放行）' : vitestTestCount}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);
 
   if (violations.length > 0) {

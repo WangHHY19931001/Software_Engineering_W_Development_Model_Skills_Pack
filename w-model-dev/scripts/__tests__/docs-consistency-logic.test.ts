@@ -31,7 +31,8 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     ].join('\n'),
     designDocs: [],
     testFileCount: 35,
-    prePush: '# 14. docs-consistency\n# 与原 CI 一致：14 项检查',
+    vitestTestCount: 530,
+    prePush: '# 14. docs-consistency\n# 与原 CI 一致：14 项检查\n# vitest 全量（530 tests）',
     scriptsChanged: false,
     securityBaselineEntryCount: -1,
     ...overrides,
@@ -194,6 +195,34 @@ describe('runDocConsistencyChecks', () => {
     const input = baseInput({ readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）', agents: '30 个脚本' });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-files');
     expect(v.length).toBeGreaterThan(0);
+  });
+
+  it('vitest 实测用例总数缺失于 README → 违规', () => {
+    const input = baseInput({ readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files' });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.some((x) => x.message.includes('README.md') && x.message.includes('530'))).toBe(true);
+  });
+
+  it('vitest 实测用例总数缺失于 AGENTS → 违规', () => {
+    const input = baseInput({ agents: '30 个脚本\n35 个 .test.ts' });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.some((x) => x.message.includes('AGENTS.md') && x.message.includes('530'))).toBe(true);
+  });
+
+  it('vitest 实测用例总数缺失于 pre-push → 违规', () => {
+    const input = baseInput({ prePush: '# 14. docs-consistency\n# 与原 CI 一致：14 项检查' });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.some((x) => x.message.includes('.githooks/pre-push') && x.message.includes('530'))).toBe(true);
+  });
+
+  it('vitest 用例总数无法采集（-1）→ 不产生 vitest-tests 违规', () => {
+    const input = baseInput({ vitestTestCount: -1 });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
+  });
+
+  it('vitest 用例总数三处文档均同步 → 零 vitest-tests 违规', () => {
+    const input = baseInput();
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
   it('scripts 有变更且 baseline 缺失 → baseline-sync 违规', () => {

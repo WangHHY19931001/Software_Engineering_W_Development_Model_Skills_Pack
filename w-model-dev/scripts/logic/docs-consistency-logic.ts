@@ -39,6 +39,8 @@ export interface DocConsistencyInput {
   designDocs: Array<{ name: string; content: string }>;
   /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（期望 35） */
   testFileCount: number;
+  /** vitest run 实际运行输出的用例总数；-1 = 无法采集（vitest 不可用 / 输出不可解析，此时不校验用例总数） */
+  vitestTestCount: number;
   /** w-model-dev/scripts 目录下 .ts 文件是否有变更（git diff + porcelain 判定，由 CLI 层注入） */
   scriptsChanged: boolean;
   /** 根目录 .eslintsecurity-baseline.json 指纹条目数；-1 = 缺失/不可解析，0 = 空 */
@@ -102,6 +104,7 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkAssetCounts(input.personaCount, input.cursorSkillCount));
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
+  violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
   return violations;
 }
@@ -308,6 +311,33 @@ function checkVitestFileCount(testFileCount: number, readme: string, agents: str
   }
   if (!agents.includes(`${EXPECTED.vitestFileCount} 个 .test.ts`)) {
     violations.push({ check: 'vitest-files', message: `AGENTS.md 应含「${EXPECTED.vitestFileCount} 个 .test.ts」vitest 表述` });
+  }
+  return violations;
+}
+
+/**
+ * vitest 用例总数一致性校验（堵住 checkVitestFileCount 只查文件数不查用例总数的盲区）：
+ * CLI 层从 `npx vitest run` 输出采集实测用例总数并注入，此处要求 README / AGENTS / pre-push
+ * 三处活体文档文本均出现该总数（「N tests」或「N 条」），测试用例增删但文档未同步即触发违规。
+ * 无法采集（vitest 不可用 / 输出不可解析，vitestTestCount < 0）时保守放行，不阻断门禁
+ * （与 detectScriptsChanges 在 git 不可用时保守返回 false 的既有策略一致）。
+ */
+function checkVitestTestCount(vitestTestCount: number, readme: string, agents: string, prePush: string): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (vitestTestCount < 0) return violations;
+  const pattern = new RegExp(`\\b${vitestTestCount}\\s*(?:tests?\\b|条)`);
+  const docs: Array<[string, string]> = [
+    ['README.md', readme],
+    ['AGENTS.md', agents],
+    ['.githooks/pre-push', prePush],
+  ];
+  for (const [docName, content] of docs) {
+    if (!pattern.test(content)) {
+      violations.push({
+        check: 'vitest-tests',
+        message: `${docName} 应含 vitest 实测用例总数「${vitestTestCount} tests」或「${vitestTestCount} 条」（vitest run 实测 ${vitestTestCount} 条，测试用例增删须同步文档）`,
+      });
+    }
   }
   return violations;
 }
