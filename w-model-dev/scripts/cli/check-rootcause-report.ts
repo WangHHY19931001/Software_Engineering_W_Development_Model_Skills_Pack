@@ -32,6 +32,7 @@
  */
 
 import * as path from 'node:path';
+
 import { checkRootCauseReport, type RootCauseReportShape } from '../logic/root-cause-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';

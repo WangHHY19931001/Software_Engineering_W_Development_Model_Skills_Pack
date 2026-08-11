@@ -1,6 +1,8 @@
 import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
+
 import { RTM_FIELDS } from '../lib/constants.js';
+
 import { validateBySchema } from './schema-loader.js';
 
 export interface RTMRowShape {

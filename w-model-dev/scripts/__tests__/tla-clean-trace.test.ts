@@ -9,10 +9,12 @@
  *  - *.dump / *.out 文件仅在有 .tla 的目录删除
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
+import { describe, it, expect, afterEach } from 'vitest';
+
 import { cleanTraceFiles, isTlcStatesDir } from '../cli/check-tla-model.js';
 
 const tmpRoots: string[] = [];

@@ -29,9 +29,11 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+
+import { validateBySchema } from '../logic/schema-loader.js';
+
 import { parseJsonSafe } from './safe-json.js';
 import { exitWithError } from './cli-error.js';
-import { validateBySchema } from '../logic/schema-loader.js';
 
 /**
  * 哨兵错误消息前缀：输入错误已通过 exitWithError 输出（stderr + stdout ERROR_JSON）并设置

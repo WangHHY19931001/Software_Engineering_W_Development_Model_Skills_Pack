@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
 function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistencyInput {

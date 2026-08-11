@@ -34,6 +34,7 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';

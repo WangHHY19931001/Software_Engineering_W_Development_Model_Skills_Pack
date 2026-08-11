@@ -36,6 +36,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
 import { readJsonOrExit, readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';

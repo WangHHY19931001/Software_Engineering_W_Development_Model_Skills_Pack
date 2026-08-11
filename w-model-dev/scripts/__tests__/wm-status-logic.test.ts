@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { buildStatusReport, STATUS_TO_PHASE } from '../logic/wm-status-logic.js';
 
 describe('STATUS_TO_PHASE', () => {

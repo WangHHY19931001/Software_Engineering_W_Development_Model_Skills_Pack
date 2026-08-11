@@ -9,13 +9,14 @@
  * 采用 spawnSync(process.execPath, [tsx/cli, 脚本, ...]) 运行真实进程断言退出码与输出。
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');

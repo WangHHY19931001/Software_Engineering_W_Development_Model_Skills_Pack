@@ -8,10 +8,12 @@
  *   - planFile 目录递归：含嵌套子目录的树产出完整分块计划
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+
 import { estimateTokens, splitMarkdownSections, splitByLines, planFile } from '../logic/plan-chunks.js';
 
 describe('estimateTokens', () => {

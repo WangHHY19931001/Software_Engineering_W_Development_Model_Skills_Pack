@@ -14,11 +14,13 @@
  *   全通过 4 张矩阵完整 + 100% → passed=true
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
+import { describe, it, expect, afterEach } from 'vitest';
+
 import { checkRequirementCoverage, type CoverageShape } from '../logic/coverage-logic.js';
 
 /** 构造一份全通过的合法 CoverageShape（4 张矩阵完整 + 100% 覆盖率） */

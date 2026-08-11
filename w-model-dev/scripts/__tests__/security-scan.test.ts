@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
+
+import { describe, it, expect } from 'vitest';
+
 import { diffFindings, normalizeSourceLine, computeFindingHash } from '../cli/security-scan.js';
 import type { EslintResult, BaselineEntry, ResolveLine } from '../cli/security-scan.js';
 

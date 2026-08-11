@@ -44,7 +44,9 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
+
 import type * as TsType from 'typescript';
+
 import {
   checkCodeTlaConsistency,
   extractCodeStateTransfers,

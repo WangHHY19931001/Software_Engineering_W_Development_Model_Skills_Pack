@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
 import { formatCliError, printError, printErrorJson, exitWithError, type CliError } from '../lib/cli-error.js';
 
 const NOT_FOUND: CliError = {

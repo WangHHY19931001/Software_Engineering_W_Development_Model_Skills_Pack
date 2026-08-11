@@ -14,6 +14,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+
 import { parseJsonSafe } from './safe-json.js';
 import { exitWithError } from './cli-error.js';
 

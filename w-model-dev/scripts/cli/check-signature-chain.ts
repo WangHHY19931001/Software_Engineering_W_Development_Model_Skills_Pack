@@ -41,6 +41,7 @@
 import { promises as fs } from 'node:fs';
 import { accessSync } from 'node:fs';
 import * as path from 'node:path';
+
 import { checkSignatureChain, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';

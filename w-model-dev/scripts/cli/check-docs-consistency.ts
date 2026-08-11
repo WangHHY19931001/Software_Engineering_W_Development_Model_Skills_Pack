@@ -34,6 +34,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { exitWithError } from '../lib/cli-error.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';

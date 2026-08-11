@@ -13,11 +13,13 @@
  * 因为 scripts/ 不打入 bundle，由 tsx 直接执行；技能包分发不含 node_modules。
  */
 
-import Ajv, { type ErrorObject } from 'ajv';
-import addFormats from 'ajv-formats';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import addFormats from 'ajv-formats';
+import Ajv, { type ErrorObject } from 'ajv';
+
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 const SCHEMAS_DIR = join(fileURLToPath(import.meta.url), '..', '..', '..', 'schemas');

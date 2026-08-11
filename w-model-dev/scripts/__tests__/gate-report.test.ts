@@ -10,13 +10,15 @@
  * process.exit 测试策略：spyOn + mockImplementation 抛错拦截，避免真实退出。
  */
 
-import { describe, expect, it, vi, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it, vi, afterEach } from 'vitest';
+
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const require = createRequire(import.meta.url);

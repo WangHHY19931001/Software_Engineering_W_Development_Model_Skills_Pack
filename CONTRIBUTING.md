@@ -66,6 +66,9 @@ npm run self-test
 # 准备一个最小 VerifierOutput JSON 样本，校验通过 / 失败两条路径都要走通
 npm run check:verifier -- <sample.json>
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误
+
+# 3.4 格式化（提交前保证格式一致；幂等，覆盖 w-model-dev/scripts/**/*.ts + config/ + scripts/*.cjs）
+npm run format
 ```
 
 > 本仓库的校验正确性由两层保障：

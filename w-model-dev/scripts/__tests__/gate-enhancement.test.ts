@@ -11,7 +11,13 @@
  *   单一变量切换场景（如缺 basePath）。
  */
 
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, it, expect } from 'vitest';
+
 import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import {
@@ -26,10 +32,6 @@ import {
 import { checkRequirementGraph, type GraphShape } from '../logic/graph-logic.js';
 import { checkRequirementCoverage, type CoverageShape, type CoverageCheckOptions } from '../logic/coverage-logic.js';
 import { checkExemption, type ExemptionShape } from '../logic/exemption-logic.js';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES_DIR = path.resolve(here, '..', 'samples');

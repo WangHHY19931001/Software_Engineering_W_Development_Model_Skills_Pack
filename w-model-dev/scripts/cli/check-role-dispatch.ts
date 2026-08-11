@@ -34,6 +34,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { checkRoleDispatch, type RoleDispatchEntry } from '../logic/role-dispatch-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';

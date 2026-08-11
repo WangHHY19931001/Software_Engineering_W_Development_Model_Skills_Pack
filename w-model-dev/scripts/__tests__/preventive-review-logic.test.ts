@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { checkPreventiveReview, type PreventiveReview } from '../logic/preventive-review-logic.js';
 
 describe('checkPreventiveReview', () => {

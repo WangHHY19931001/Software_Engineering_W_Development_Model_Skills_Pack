@@ -8,10 +8,12 @@
  *   - 向后兼容：未配置 rootcauseParallelBudget 时不校验
  */
 
-import { describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
 import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

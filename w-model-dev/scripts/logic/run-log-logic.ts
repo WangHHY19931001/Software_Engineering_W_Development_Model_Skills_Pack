@@ -14,8 +14,9 @@
  *   3. 单点事实：所有「运行日志是否符合规范」的判定均委托至此
  */
 
-import { validateBySchema } from './schema-loader.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
+
+import { validateBySchema } from './schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 

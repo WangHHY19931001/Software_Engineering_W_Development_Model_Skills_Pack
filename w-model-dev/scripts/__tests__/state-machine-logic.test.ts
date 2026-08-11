@@ -7,10 +7,12 @@
  *   - bad-extra-transition.json    代码多 archived→deleted 转移 + deleted 状态 → passed=false
  */
 
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { describe, it, expect } from 'vitest';
+
 import {
   checkStateMachineConsistency,
   transitionKey,

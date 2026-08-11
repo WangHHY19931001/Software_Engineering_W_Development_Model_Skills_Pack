@@ -32,6 +32,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';

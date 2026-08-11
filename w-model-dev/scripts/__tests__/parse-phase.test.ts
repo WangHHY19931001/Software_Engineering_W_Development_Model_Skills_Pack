@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
 describe('parsePhaseArg', () => {

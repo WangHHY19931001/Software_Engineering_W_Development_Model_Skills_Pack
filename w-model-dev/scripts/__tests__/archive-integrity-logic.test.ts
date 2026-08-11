@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
+
+import { describe, it, expect } from 'vitest';
+
 import { checkArchiveIntegrity, ARCHIVE_INTEGRITY_CHECKLIST } from '../logic/archive-integrity-logic.js';
 
 const SAMPLES_DIR = path.join(__dirname, '..', 'samples', 'archive-integrity');

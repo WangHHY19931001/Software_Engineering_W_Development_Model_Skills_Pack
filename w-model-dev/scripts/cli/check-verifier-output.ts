@@ -38,6 +38,7 @@
  */
 
 import * as path from 'node:path';
+
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';

@@ -37,6 +37,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+
 import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';

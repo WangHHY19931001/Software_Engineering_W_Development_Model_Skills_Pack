@@ -11,10 +11,12 @@
  * process.exit 测试策略：spyOn + mockImplementation 抛错拦截，避免真实退出。
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
 import {
   readJsonOrExit,
   readJsonlOrExit,

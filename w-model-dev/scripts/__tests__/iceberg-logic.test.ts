@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
 
 function validReport(overrides: Partial<IcebergSweepReport> = {}): IcebergSweepReport {

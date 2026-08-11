@@ -105,6 +105,7 @@ npm run check:coverage -- <coverage.json> [--graph=] [--out-of-scope=] [--exempt
 npm run check:exemption -- <exemption.json>  # 豁免审批门禁（S→R→V→人类四阶段），退出码 0/1/2
 npm run self-test                           # 退出码 0/1（249 条样本回归基线）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
+npm run format                              # prettier 格式化（w-model-dev/scripts/**/*.ts + config/ + scripts/*.cjs，幂等）
 
 # 或用 npx tsx 直接调用：
 npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>

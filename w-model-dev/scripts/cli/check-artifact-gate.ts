@@ -35,12 +35,14 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { checkArtifactGate, type PhaseOption, type RTMMatrixShape } from '../logic/gate-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
+
 import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from './artifact-gate-assets.js';
 import { collectUatMappingViolations } from './uat-path-mapping.js';
 export { checkUatPathMappingContent } from './uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出

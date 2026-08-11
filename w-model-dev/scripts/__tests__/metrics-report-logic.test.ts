@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { computeMetrics, type RunLogEntryLike } from '../logic/metrics-report-logic.js';
 
 function e(p: Partial<RunLogEntryLike> = {}): RunLogEntryLike {

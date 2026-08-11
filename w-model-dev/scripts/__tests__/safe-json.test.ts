@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+
 import { parseJsonSafe, safeJsonReviver } from '../lib/safe-json.js';
 
 describe('parseJsonSafe', () => {

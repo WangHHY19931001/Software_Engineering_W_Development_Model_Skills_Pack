@@ -22,7 +22,7 @@
 | 标准项 | 工具 / 命令 | 通过阈值 | 不通过 → 动作 |
 |---|---|---|---|
 | 单元测试代码覆盖率 | `npx vitest --coverage`（或等价运行器） | ≥ 80%（分支 + 行） | 回到编码补测试，禁止调低阈值放行 |
-| 代码规范检查 | `npx eslint . --max-warnings=0` / `npx prettier --check .` | 0 error，0 warning | 回到编码修复违规，禁止 `// eslint-disable` 绕过 |
+| 代码规范检查 | `npx eslint --no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore w-model-dev/scripts/` / `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"` | 0 error，0 warning | 回到编码修复违规，禁止 `// eslint-disable` 绕过 |
 | 安全漏洞扫描 | `npm audit --audit-level=high` + ESLint security plugin | 高危漏洞数 = 0 | 回到编码修复，禁止降级为"已知风险"放行 |
 | 性能指标监控 | k6 / JMeter 负载脚本 | P95 响应 < 2s，高负载无崩溃 | 回到编码定位瓶颈，禁止仅跑 happy path 判定通过 |
 

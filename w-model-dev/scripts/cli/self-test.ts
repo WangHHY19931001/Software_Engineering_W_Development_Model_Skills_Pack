@@ -37,6 +37,10 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+import type * as TsType from 'typescript';
+
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
 import { validateBySchema } from '../logic/schema-loader.js';
 import {
@@ -62,8 +66,6 @@ import { checkExemption } from '../logic/exemption-logic.js';
 import { checkSignatureChain } from '../logic/signature-chain-logic.js';
 import { checkArchiveIntegrity } from '../logic/archive-integrity-logic.js';
 import { checkDesignContractConsistency, type DesignContractCheckInput } from '../logic/design-contract-logic.js';
-import { createRequire } from 'node:module';
-import type * as TsType from 'typescript';
 import {
   checkCodeTlaConsistency,
   extractCodeStateTransfers,
@@ -83,11 +85,12 @@ import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-swe
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
 import { checkStateMachineConsistency } from '../logic/state-machine-logic.js';
+import { parseJsonSafe } from '../lib/safe-json.js';
+
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
 import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
 import { checkOpenspecArchive } from './check-openspec-archive.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 

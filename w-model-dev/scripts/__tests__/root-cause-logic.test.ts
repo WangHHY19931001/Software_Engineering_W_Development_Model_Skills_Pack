@@ -14,10 +14,12 @@
  *   - R10 多角度场景 reality-checker confidence ≥ 0.5
  */
 
-import { describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
 import { checkRootCauseReport, type RootCauseReportShape } from '../logic/root-cause-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

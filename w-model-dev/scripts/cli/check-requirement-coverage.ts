@@ -31,6 +31,7 @@
  * @module
  */
 import * as path from 'node:path';
+
 import { checkRequirementCoverage } from '../logic/coverage-logic.js';
 import type { GraphShape } from '../logic/graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from '../lib/read-json-or-exit.js';

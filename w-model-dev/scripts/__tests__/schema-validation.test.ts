@@ -13,10 +13,12 @@
  *   3. 3 个 schema 拒绝样本（additionalProperties / required / type）
  */
 
-import { describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
 import { validateBySchema } from '../logic/schema-loader.js';
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
 

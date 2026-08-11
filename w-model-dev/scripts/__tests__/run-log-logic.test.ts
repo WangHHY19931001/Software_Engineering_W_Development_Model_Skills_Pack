@@ -8,10 +8,12 @@
  *   - R7 扩展：返工路径时序 rootcause → review(targetKind=rootcause) → fix
  */
 
-import { describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
 import { checkRunLog, extractExitCode, buildGateLogKeys, type RunLogEntry } from '../logic/run-log-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
