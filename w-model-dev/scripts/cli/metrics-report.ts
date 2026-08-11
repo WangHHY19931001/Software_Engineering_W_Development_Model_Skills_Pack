@@ -6,7 +6,7 @@
  * CHECKPOINT 决策 / 阶段回顾使用。纯报告，无门禁语义（预警不改退出码）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/metrics-report.ts [project-dir] [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]
+ *   npx tsx w-model-dev/scripts/cli/metrics-report.ts [project-dir] [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]
  *
  * 参数：
  *   project-dir  项目目录（默认当前工作目录），从 <dir>/.w-model/ 读取

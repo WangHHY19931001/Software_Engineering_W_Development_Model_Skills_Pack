@@ -8,7 +8,7 @@
  * 内容具体、用户确认存在、决策与阶段匹配、跨阶段证据一致。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
+ *   npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
  *
  * 参数：
  *   run-log.jsonl          run-log.jsonl 文件路径
@@ -114,7 +114,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <run-log.jsonl>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
       exitCode: 2,
     });
     return;
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 --checkpoint-log=<dir>（[21.0.0] R3 强化，强制）',
-      detail: '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
       exitCode: 2,
     });
     return;

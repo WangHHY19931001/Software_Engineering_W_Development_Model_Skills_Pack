@@ -8,7 +8,7 @@
  * O 越权检测、exitCode 防伪交叉校验、append-only 时序。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]
+ *   npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]
  *
  * 参数：
  *   run-log.jsonl        run-log.jsonl 文件路径
@@ -141,7 +141,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <run-log.jsonl>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
       exitCode: 2,
     });
     return;

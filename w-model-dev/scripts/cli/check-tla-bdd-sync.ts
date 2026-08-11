@@ -6,7 +6,7 @@
  * 供 G/R 子代理在阶段 1-4 收敛循环中调用，检测 .tla 与 .feature 之间的漂移。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
+ *   npx tsx w-model-dev/scripts/cli/check-tla-bdd-sync.ts <tla-file> <feature-file>
  *
  * 参数：
  *   tla-file       .tla 文件路径

@@ -8,7 +8,7 @@
  * onExceed/killSwitch 合法性与触发状态。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]
+ *   npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]
  *
  * 参数：
  *   budget.json           budget.json 文件路径
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <budget.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
       exitCode: 2,
     });
     return;

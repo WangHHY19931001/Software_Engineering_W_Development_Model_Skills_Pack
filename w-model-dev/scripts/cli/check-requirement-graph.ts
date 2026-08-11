@@ -7,18 +7,18 @@
  * 连通性、单根、父唯一性和阶段递进追溯。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4] [--spec-dir=<dir>]
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4] [--spec-dir=<dir>]
  *
  * 用法（第 38 轮新增 R9/R10）：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
  *     --spec-dir  Phase 2 时按 *-system-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
  *
  * 用法（第 38 轮小轮 B 新增 R11/R12）：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=3 --spec-dir=docs/phase3-outline
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=3 --spec-dir=docs/phase3-outline
  *     --spec-dir  Phase 3 时按 *-interface-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
  *
  * 用法（第 38 轮小轮 C 新增 R13/R14）：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=4 --spec-dir=docs/phase4-detailed
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=4 --spec-dir=docs/phase4-detailed
  *     --spec-dir  Phase 4 时按 *-detailed-design.md / *-traceability-matrix.md / *-class-design.md / *-data-model.md 匹配
  *
  * 参数：
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <graph.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]',
       exitCode: 2,
     });
     return;

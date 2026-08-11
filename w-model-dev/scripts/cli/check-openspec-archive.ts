@@ -5,7 +5,7 @@
  * 对应 SSoT §3.4.21：阶段门 V/G 全通过后须执行 opsx:archive 归档变更。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-openspec-archive.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase <5|6|7|8>
  *
  * 退出码：
  *   0  归档完整

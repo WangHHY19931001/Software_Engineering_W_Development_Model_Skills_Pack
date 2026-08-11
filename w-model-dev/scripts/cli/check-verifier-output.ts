@@ -7,7 +7,7 @@
  * 防止 LLM 输出漂移导致下游消费方拿到不合规结构。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
+ *   npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>
  *
  * 参数：
  *   output.json  外部 Agent 产出的 VerifierOutput JSON 文件路径
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <output.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]',
       exitCode: 2,
     });
     return;

@@ -6,7 +6,7 @@
  * R3 预防性审查无条件须分派 R 角色 ≥3 次（第29轮升级：移除 --r3-enabled flag 语义）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]
+ *   npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]
  *
  * 参数：
  *   run-log.jsonl  run-log 文件路径（每行一条 JSON 对象）
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <run-log.jsonl>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]',
       exitCode: 2,
     });
     return;

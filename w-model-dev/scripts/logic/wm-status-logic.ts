@@ -1,7 +1,7 @@
 /**
  * /wm status 状态快照纯逻辑层（wm-status-logic.ts）
  *
- * 供 scripts/wm-status.ts CLI 层调用；纯函数、无 IO、可单测。
+ * 供 scripts/cli/wm-status.ts CLI 层调用；纯函数、无 IO、可单测。
  * 与 project.schema.json status 枚举、rtm.schema.json 结构、data-models.md RunLogEntry 对齐。
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.1
  */

@@ -7,7 +7,7 @@
  * `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
  *
  * 退出码：
  *   0  所有修改都有对应 codegraph 查询落盘

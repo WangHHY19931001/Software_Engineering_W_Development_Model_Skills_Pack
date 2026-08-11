@@ -6,7 +6,7 @@
  * 编排者（O）以只读方式调用，脚本不写任何文件，仅 stdout 输出 JSON 分块计划。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]
+ *   npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]
  *
  * 参数：
  *   path           文件或目录路径
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <path>',
-      detail: '用法: npx tsx w-model-dev/scripts/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
+      detail: '用法: npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
       exitCode: 2,
     });
     return;

@@ -8,7 +8,7 @@
  *   + scenario 路径合法性 + RTM 映射。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json>
+ *   npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json>
  *     [--phase=N] [--tla-manifest=<path>] [--rtm=<path>] [--cucumber-report=<path>] [--graph=<graph.json>]
  *
  * 参数：

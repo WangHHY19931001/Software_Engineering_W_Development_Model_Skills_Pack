@@ -3,7 +3,7 @@
  * 豁免审批校验脚本（Exemption Checker）
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-exemption.ts <exemption.json>
+ *   npx tsx w-model-dev/scripts/cli/check-exemption.ts <exemption.json>
  *
  * 参数：
  *   exemption.json   exemption.json 文件路径
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <exemption.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-exemption.ts <exemption.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-exemption.ts <exemption.json>',
       exitCode: 2,
     });
     return;

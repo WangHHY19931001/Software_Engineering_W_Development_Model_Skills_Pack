@@ -6,7 +6,7 @@
  * 三层检测（L1 CLI / L2 MCP 注册 / L3 项目目录）+ 自动处置，仅自动失败时 CHECKPOINT。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>
+ *   npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>
  *
  * 模式：
  *   full   = L1→L2→L3 全量检测+自动处置（阶段 5 首次进入）

@@ -1,7 +1,7 @@
 /**
  * 流程度量报告纯逻辑层（metrics-report-logic.ts）
  *
- * 供 scripts/metrics-report.ts CLI 层调用；纯函数、无 IO、可单测。
+ * 供 scripts/cli/metrics-report.ts CLI 层调用；纯函数、无 IO、可单测。
  * 与 data-models.md RunLogEntry / BudgetConfig 对齐（action 枚举、killSwitch 字段名）。
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.2
  */

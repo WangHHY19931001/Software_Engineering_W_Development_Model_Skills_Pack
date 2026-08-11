@@ -11,8 +11,8 @@
  * 不包含行号列号 —— 行号漂移（上方增删行）不改变指纹，避免基线因行号位移而陈旧。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/security-scan.ts            # 校验模式
- *   npx tsx w-model-dev/scripts/security-scan.ts --regenerate  # 按当前发现全量重生成 baseline v2
+ *   npx tsx w-model-dev/scripts/cli/security-scan.ts            # 校验模式
+ *   npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate  # 按当前发现全量重生成 baseline v2
  *
  * 退出码：
  *   0  无新增风险（baseline 覆盖全部发现）或重生成成功

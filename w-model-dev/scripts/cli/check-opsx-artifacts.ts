@@ -7,7 +7,7 @@
  * + R3×3 + V 审查产物齐全。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8>
  *
  * 退出码：
  *   0  制品与审查产物齐全

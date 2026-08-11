@@ -78,7 +78,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 > Skill 资产（除 `scripts/` 外）零依赖、零 Node.js，可整目录拷贝。`scripts/` 需在仓库根目录 `npm install` 一次以拉取 devDeps（ajv / eslint-plugin-security 等），详见 §2。
 
-> Agent 读取 `SKILL.md` 后承担「编排者」（O）角色：每阶段分派 **S 产出子代理**生成开发产物 + 测试设计 + RTM，分派 **V 评审子代理**按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，分派 **G 门禁子代理**跑 `scripts/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。编排者只做路由 + 状态 + CHECKPOINT + 持久化，**不得越权实施**（反模式 #10）。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+> Agent 读取 `SKILL.md` 后承担「编排者」（O）角色：每阶段分派 **S 产出子代理**生成开发产物 + 测试设计 + RTM，分派 **V 评审子代理**按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，分派 **G 门禁子代理**跑 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。编排者只做路由 + 状态 + CHECKPOINT + 持久化，**不得越权实施**（反模式 #10）。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
 
 ---
 

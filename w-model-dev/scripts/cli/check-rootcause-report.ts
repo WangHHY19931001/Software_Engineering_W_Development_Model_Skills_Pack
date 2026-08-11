@@ -7,7 +7,7 @@
  * 防止 R 子代理输出漂移导致 S-fix 拿到不合规根因报告。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>
+ *   npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>
  *
  * 参数：
  *   report.json  R 子代理产出的 RootCauseReport JSON 文件路径
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <report.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>',
       exitCode: 2,
     });
     return;

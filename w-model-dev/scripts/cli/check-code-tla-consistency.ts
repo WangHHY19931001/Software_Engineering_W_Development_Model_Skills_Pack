@@ -10,7 +10,7 @@
  *   4. 断言覆盖不变式（TLA+ BusinessInvariant 子不变式 ←→ 代码 assert/invariant/require）
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-code-tla-consistency.ts \
+ *   npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts \
  *     --manifest=.w-model/tla-manifest.json \
  *     --graph=.w-model/ingestion/graph.json \
  *     --rtm=.w-model/rtm.json \
@@ -165,7 +165,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 --manifest/--graph/--rtm/--src',
-      detail: '用法: npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
       exitCode: 2,
     });
     return;

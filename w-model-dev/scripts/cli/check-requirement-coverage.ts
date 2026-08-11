@@ -3,7 +3,7 @@
  * 覆盖分析校验脚本（Requirement Coverage Checker）
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> \
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> \
  *     [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]
  *
  * 参数：
@@ -30,7 +30,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <coverage.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]',
       exitCode: 2,
     });
     return;

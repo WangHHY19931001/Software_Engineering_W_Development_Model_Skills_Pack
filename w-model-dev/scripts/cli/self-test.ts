@@ -8,7 +8,7 @@
  *   - 每个样本声明 expectedPassed + expectedReasonPatterns，匹配失败即整体失败
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/self-test.ts
+ *   npx tsx w-model-dev/scripts/cli/self-test.ts
  *
  * 退出码：
  *   0  所有样本的校验结果与期望一致

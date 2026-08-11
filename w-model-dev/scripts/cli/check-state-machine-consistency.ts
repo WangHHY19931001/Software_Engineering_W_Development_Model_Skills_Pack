@@ -6,7 +6,7 @@
  * 现有脚本校验"代码↔TLA+"，本脚本补"设计文档↔代码"维度。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
+ *   npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>
  *
  * input.json 格式：
  *   {
@@ -36,7 +36,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <input.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>',
       exitCode: 2,
     });
     return;

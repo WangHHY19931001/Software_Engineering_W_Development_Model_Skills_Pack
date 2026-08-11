@@ -7,8 +7,8 @@
  * 校验 signature-chain.jsonl 的：R1-R10 + 跨阶段消费者校验。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
- *   npx tsx w-model-dev/scripts/check-signature-chain.ts --chain=<signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+ *   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+ *   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts --chain=<signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
  *
  * 参数：
  *   signature-chain.jsonl   签名链文件路径（位置参数或通过 --chain 指定）
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <signature-chain.jsonl>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
       exitCode: 2,
     });
     return;

@@ -7,7 +7,7 @@
  * 校验编码与验收设计一致性（D1 路径 / D2 参数 / D3 状态码 / D4 响应字段）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-design-contract-consistency.ts [project-dir]
+ *   npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts [project-dir]
  *
  * 参数：
  *   project-dir  项目根目录（默认：当前工作目录）

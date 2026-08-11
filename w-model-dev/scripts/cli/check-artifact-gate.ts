@@ -6,7 +6,7 @@
  * 判定 W 模型产出物是否满足放行条件。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+ *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
  *
  * 参数：
  *   project-dir  项目根目录（默认：当前工作目录）

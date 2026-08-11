@@ -8,7 +8,7 @@
  * 成功阶段更新一致性、history 时序、降级触发状态。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]
+ *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]
  *
  * 参数：
  *   maturity.json        maturity.json 文件路径
@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <maturity.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
       exitCode: 2,
     });
     return;

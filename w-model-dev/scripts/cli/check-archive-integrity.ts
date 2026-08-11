@@ -6,7 +6,7 @@
  * 供阶段 8 归档时调用，校验归档目录是否包含各阶段强制快照文件。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>
+ *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>
  *
  * 参数：
  *   archive-dir   归档目录路径
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <archive-dir>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>',
       exitCode: 2,
     });
     return;

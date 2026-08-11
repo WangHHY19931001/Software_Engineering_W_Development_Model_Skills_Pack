@@ -6,7 +6,7 @@
  * 最近动作 / 确定性下一步建议。不修改任何数据。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/wm-status.ts [project-dir] [--json]
+ *   npx tsx w-model-dev/scripts/cli/wm-status.ts [project-dir] [--json]
  *
  * 参数：
  *   project-dir  项目目录（默认当前工作目录），从 <dir>/.w-model/ 读取状态文件

@@ -8,7 +8,7 @@
  *   （死锁 / 不变式违反 / 状态爆炸）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
+ *   npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=N] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
  *
  * 参数：
  *   tla-manifest.json   manifest 文件路径
@@ -348,7 +348,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <tla-manifest.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
       exitCode: 2,
     });
     return;
@@ -379,7 +379,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
-      detail: '用法: npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
+      detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
       exitCode: 2,
     });
     return;

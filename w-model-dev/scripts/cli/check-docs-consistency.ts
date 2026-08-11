@@ -5,7 +5,7 @@
  * 校验活体文档中的计数 / 枚举 / 清单与代码事实一致，防文档漂移。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-docs-consistency.ts [repo-root]
+ *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root]
  *   （repo-root 默认 cwd；本仓库根目录）
  *
  * 退出码：
