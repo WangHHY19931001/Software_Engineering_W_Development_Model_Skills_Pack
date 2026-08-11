@@ -1,4 +1,35 @@
 #!/usr/bin/env node
+/**
+ * 冰山清扫校验脚本（Iceberg Sweep Checker）
+ *
+ * 校验跨阶段遗留问题（iceberg）清扫报告：遗漏项、回归项与新的遗留项，
+ * 并支持 --auto-trigger 从 run-log 交叉核对最近一次 checkpoint 成功阶段。
+ *
+ * 用法：
+ *   npx tsx w-model-dev/scripts/cli/check-iceberg-sweep.ts <report.json> [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-iceberg-sweep.ts <report.json> --auto-trigger --run-log=<run-log.jsonl> [--json]
+ *
+ * 参数：
+ *   report.json            IcebergSweepReport JSON 文件路径
+ *   --auto-trigger         R3 交叉核对模式：从 run-log 推断最近 checkpoint 成功阶段
+ *   --run-log=<path>       run-log.jsonl 路径（--auto-trigger 模式必填）
+ *   --json                 机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *
+ * 退出码：
+ *   0  校验通过（无遗漏 / 回归 / 新增遗留项）
+ *   1  校验失败（violations 列出具体原因）
+ *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
+ *
+ * 输出：
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 ICEBERG_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--auto-trigger、--run-log=
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
+ */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';

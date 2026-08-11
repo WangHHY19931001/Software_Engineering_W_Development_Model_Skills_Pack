@@ -18,6 +18,7 @@
  *   --rtm=<p>            RTM 文件路径（用于 D7 RTM 映射校验）
  *   --cucumber-report=<p>  cucumber 运行报告 JSON（阶段 5-8 用于 D5 step 绑定校验）
  *   --graph=<p>          graph.json 路径（phase>=2 时强制必填，提取 type=SD 节点供 D8 SD Coverage 校验）
+ *   --json               机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse），不写 gate-logs
  *
  * 退出码：
  *   0  校验通过（schema + 头标注 + 状态机 + 等价性 + step 绑定 + 路径 + RTM 全过）
@@ -25,8 +26,15 @@
  *   2  输入错误（文件不存在 / 非法 JSON / 参数非法 / schema 不合规）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要，便于 Agent 解析）
- *   JSON 摘要同时写入 .w-model/gate-logs/<timestamp>-bdd.json
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 BDD_JSON 摘要，便于 Agent 正则截取）
+ *   JSON 摘要同时写入 .w-model/gate-logs/<timestamp>-bdd.json（--json 模式不写）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--phase=N、--tla-manifest=、--rtm=、--cucumber-report=、--graph=
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  *
  * 注意：本脚本不调用任何 LLM。cucumber 是确定性运行器，features/step 是文本+代码。
  */

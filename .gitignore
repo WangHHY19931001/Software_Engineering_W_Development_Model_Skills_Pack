@@ -44,5 +44,8 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 
+# TypeDoc 生成物（npm run docs:build 产物，不入库；docs/ 下只维护手写设计文档）
+docs/api/
+
 # Git worktrees（本地隔离工作区，不入库）
 .worktrees/

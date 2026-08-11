@@ -11,6 +11,7 @@
  * 参数：
  *   tla-file       .tla 文件路径
  *   feature-file   .feature 文件路径
+ *   --json         机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  校验通过（TLA+ 转移/状态/不变式 与 BDD When/Given/Then 一一对应）
@@ -18,7 +19,14 @@
  *   2  输入错误（文件不存在 / 参数缺失）
  *
  * 输出：
- *   stdout 打印结构化 JSON 报告（便于 Agent 解析）
+ *   stdout 打印结构化 JSON 报告（便于 Agent 解析）；人类可读模式收尾打印 TLA_BDD_SYNC_JSON 摘要
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、<tla-file> <feature-file>
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  */
 
 import * as fs from 'node:fs/promises';

@@ -11,6 +11,7 @@
  *
  * 参数：
  *   project-dir  项目根目录（默认：当前工作目录）
+ *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 读取：
  *   <project-dir>/docs/uat-path-mapping.md  （设计路径 ↔ 实际路径映射）
@@ -23,7 +24,14 @@
  *   2  输入错误（文件不存在 / 格式非法）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要 CONTRACT_JSON，便于 Agent 解析）
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 CONTRACT_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、<project-dir>
+ * @returns exitCode 0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
  */
 
 import { promises as fs } from 'node:fs';

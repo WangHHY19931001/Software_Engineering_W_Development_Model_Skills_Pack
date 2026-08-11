@@ -7,12 +7,27 @@
  * `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
+ *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> [--json]
+ *
+ * 参数：
+ *   project-root   项目根目录
+ *   --phase        校验阶段 5|6|7|8（支持 --phase N 与 --phase=N）
+ *   --json         机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  所有修改都有对应 codegraph 查询落盘
  *   1  存在未查询的修改（命中反模式 #38）
- *   2  输入错误
+ *   2  输入错误（stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
+ *
+ * 输出：
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 CODEGRAPH_QUERIES_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--phase 5|6|7|8
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';

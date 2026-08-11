@@ -1,4 +1,37 @@
 #!/usr/bin/env node
+/**
+ * 预防性审查校验脚本（Preventive Review Checker）
+ *
+ * 对应 R3 预防性审查门禁：按 variant 读取各维度审查报告（标准 / fix / emergency），
+ * 校验维度齐全与通过状态，并支持 --auto-trigger 从 run-log 推断当前阶段。
+ *
+ * 用法：
+ *   npx tsx w-model-dev/scripts/cli/check-preventive-review.ts <project-dir> [--phase=N] [--variant=standard|fix|emergency] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-preventive-review.ts <project-dir> --auto-trigger --run-log=<run-log.jsonl> [--json]
+ *
+ * 参数：
+ *   project-dir              项目根目录（默认：当前工作目录）
+ *   --phase=N                当前阶段 1-8（可选，默认从 run-log / 上下文推断）
+ *   --variant=<v>            报告文件名变体：standard | fix | emergency（默认 standard）
+ *   --auto-trigger           从 --run-log 读取当前阶段并推断 variant
+ *   --run-log=<path>         run-log.jsonl 路径（--auto-trigger 模式必填）
+ *   --json                   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *
+ * 退出码：
+ *   0  校验通过（各维度审查齐全且通过）
+ *   1  校验失败（reasons 列出具体原因，S 子代理须按原因返工后重跑）
+ *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
+ *
+ * 输出：
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 PREVENTIVE_REVIEW_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--phase=N、--variant=、--auto-trigger、--run-log=
+ * @returns exitCode 0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
+ */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { checkPreventiveReview, type PreventiveReview, type PreventiveReviewOptions } from '../logic/preventive-review-logic.js';

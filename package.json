@@ -17,7 +17,8 @@
     "wm:status": "tsx w-model-dev/scripts/cli/wm-status.ts",
     "wm:metrics": "tsx w-model-dev/scripts/cli/metrics-report.ts",
     "check:docs-consistency": "tsx w-model-dev/scripts/cli/check-docs-consistency.ts",
-    "prepush": "bash .githooks/pre-push --force"
+    "prepush": "bash .githooks/pre-push --force",
+    "docs:build": "typedoc --out docs/api w-model-dev/scripts/cli w-model-dev/scripts/logic --entryPointStrategy expand --excludeNotDocumented"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
@@ -29,6 +30,7 @@
     "eslint": "^8.57.1",
     "eslint-plugin-security": "^1.7.1",
     "tsx": "^4.19.2",
+    "typedoc": "^0.28.20",
     "typescript": "^5.3.3",
     "vitest": "^4.1.10"
   },

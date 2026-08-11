@@ -11,11 +11,22 @@
  *   --graph             graph.json 路径（可选，用于 C7 cross-cuts 一致性校验）
  *   --out-of-scope      outOfScope.json 路径（可选，提供时 C9 升级为 fail）
  *   --exemptions        granted.json 路径（可选，已批准豁免跳过对应规则）
+ *   --json              机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  校验通过
  *   1  校验失败
- *   2  输入错误
+ *   2  输入错误（stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
+ *
+ * 输出：
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 COVERAGE_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--graph=、--out-of-scope=、--exemptions=
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  */
 import * as path from 'node:path';
 import { checkRequirementCoverage } from '../logic/coverage-logic.js';

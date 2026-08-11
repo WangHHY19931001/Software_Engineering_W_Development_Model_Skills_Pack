@@ -17,6 +17,7 @@
  *   --graph=<graph.json> 提供图谱文件，提取 type=SD 节点 ID 供 SD 覆盖率校验（§10）
  *                        phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID
  *   --keep-states / -k   P3.8：保留 TLC states 目录用于调试（默认校验后自动清理）
+ *   --json               机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  校验通过（环境就绪 + 头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反）
@@ -24,7 +25,14 @@
  *   2  输入错误（文件不存在 / 非法 JSON / 参数非法）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要，便于 Agent 解析）
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 TLA_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--phase=N、--spec=、--graph=、--keep-states/-k
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  *
  * 注意：本脚本不调用任何 LLM。SANY/TLC 为确定性工具（Java + tla2tools.jar）。
  */

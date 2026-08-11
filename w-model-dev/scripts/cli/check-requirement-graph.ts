@@ -26,6 +26,7 @@
  *   --phase      校验阶段（1-4），控制追溯项数量，默认从 graph.currentPhase 读取
  *   --spec-dir   第 37 轮：需求规格独立产物目录（含 requirement-spec.md / traceability-matrix.md / uml-modeling.md），
  *                启用 R7 追踪矩阵一致性 + R8 UML mermaid 块配平校验（不传则行为完全不变）
+ *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  校验通过（连通 + 单根 + 父唯一 + 阶段追溯完整）
@@ -33,7 +34,14 @@
  *   2  输入错误（文件不存在 / 非法 JSON）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要，便于 Agent 解析）
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 GRAPH_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--phase=1|2|3|4、--spec-dir=
+ * @returns exitCode 0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
  */
 
 import * as path from 'node:path';

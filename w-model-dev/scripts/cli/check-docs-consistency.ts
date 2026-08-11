@@ -5,13 +5,26 @@
  * 校验活体文档中的计数 / 枚举 / 清单与代码事实一致，防文档漂移。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root]
+ *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root] [--json]
  *   （repo-root 默认 cwd；本仓库根目录）
+ *
+ * 参数：
+ *   --json   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  全部一致
  *   1  存在不一致（violations 列出）
  *   2  输入错误（repo-root 缺必需文件）
+ *
+ * 输出：
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 DOCS_CONSISTENCY_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、[repo-root]
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  */
 
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';

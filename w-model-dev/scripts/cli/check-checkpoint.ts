@@ -15,6 +15,7 @@
  *   --checkpoint-log=<dir> checkpoint-log 目录路径（强制，R3 用户确认存在校验）
  *                         目录下按 phase 命名的文件（如 phase-1.txt / 1.txt / checkpoint-1.md）
  *                         内容即用户确认原文，key=phase
+ *   --json                机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  校验通过
@@ -22,7 +23,14 @@
  *   2  输入错误（文件不存在 / 非法 JSON / 参数非法）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 末尾 JSON 摘要，便于 Agent 解析）
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 CHECKPOINT_JSON 摘要，便于 Agent 正则截取）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *
+ * 错误字段（ERROR_JSON）：
+ *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
+ *
+ * @param argv 命令行参数；支持 --json（机器可读输出）、--checkpoint-log=
+ * @returns exitCode 0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  */
 
 import { promises as fs } from 'node:fs';
