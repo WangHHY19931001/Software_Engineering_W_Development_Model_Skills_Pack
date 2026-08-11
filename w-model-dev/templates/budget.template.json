@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "demo-project",
+  "createdAt": "2026-08-01T09:00:00.000Z",
+  "updatedAt": "2026-08-05T14:30:00.000Z",
+  "perPhase": {
+    "maxTokens": 500000,
+    "maxSubagentSpawns": 30,
+    "maxReworkRounds": 3
+  },
+  "project": {
+    "maxTokensTotal": 4000000,
+    "maxTokensPerSession": 1000000
+  },
+  "onExceed": "pause",
+  "killSwitch": {
+    "consecutiveReworks": 3,
+    "budgetBurnRate": 0.9,
+    "tlaReworks": 3
+  },
+  "rootcauseParallelBudget": {
+    "maxPersonasPerRound": 5,
+    "maxTokensPerPersona": 50000,
+    "maxTotalTokensPerRound": 200000
+  },
+  "rootcauseRounds": [
+    {
+      "round": 1,
+      "personas": [
+        { "personaSlice": "V-lead: 需求完整性", "tokens": 12000 },
+        { "personaSlice": "R-lead: 缺陷根因", "tokens": 15000 }
+      ],
+      "totalTokens": 27000
+    }
+  ]
+}

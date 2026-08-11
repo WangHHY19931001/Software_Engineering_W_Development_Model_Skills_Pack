@@ -321,11 +321,16 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | system-design.md | 阶段 2 产出系统设计 |
 | detailed-design.md | 阶段 4 产出详细设计 |
 | interface-design.md | 阶段 4 产出接口设计 |
+| coding.md | 阶段 5 产出编码实现文档 |
+| integration-test.md | 阶段 6 产出集成测试文档 |
+| acceptance-test.md | 阶段 8 产出验收测试文档 |
 | test-case.md | 任何阶段产出测试用例 |
-| test-report.md | 阶段 6/7/8 产出测试报告 |
+| test-report.md | 阶段 5/6/7/8 产出测试报告 |
 | rtm.md | RTM 维护 |
 | review-report.md | V 产出评审报告 |
 | tla-spec-template.md | 阶段 1–4 产出 TLA+ 规格 |
+| budget.template.json | 初始化预算（`.w-model/budget.json`）——schema 见 [schemas/budget.schema.json](schemas/budget.schema.json)，校验脚本 `check-budget.ts` |
+| run-log.template.jsonl | 阶段运行日志（`.w-model/run-log.jsonl`）——每行一条记录，schema 见 [schemas/run-log.schema.json](schemas/run-log.schema.json)，校验脚本 `check-run-log.ts` |
 
 ## 命令速查
 
@@ -379,8 +384,10 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 - 需求：[templates/requirement-spec.md](templates/requirement-spec.md)
 - 系统/详细/接口设计：[templates/system-design.md](templates/system-design.md)、[templates/detailed-design.md](templates/detailed-design.md)、[templates/interface-design.md](templates/interface-design.md)
+- 编码/测试文档：[templates/coding.md](templates/coding.md)、[templates/integration-test.md](templates/integration-test.md)、[templates/acceptance-test.md](templates/acceptance-test.md)
 - 测试用例/报告：[templates/test-case.md](templates/test-case.md)、[templates/test-report.md](templates/test-report.md)
 - RTM/评审：[templates/rtm.md](templates/rtm.md)、[templates/review-report.md](templates/review-report.md)
+- 预算/运行日志（JSON 工件）：[templates/budget.template.json](templates/budget.template.json)（→ `.w-model/budget.json`，schema [schemas/budget.schema.json](schemas/budget.schema.json)）、[templates/run-log.template.jsonl](templates/run-log.template.jsonl)（→ `.w-model/run-log.jsonl`，schema [schemas/run-log.schema.json](schemas/run-log.schema.json)）
 
 ## 阶段门与质量门
 
