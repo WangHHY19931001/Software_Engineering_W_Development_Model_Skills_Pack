@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
-  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -62,13 +62,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'rootcause',
-      passed: result.passed,
-      reasons: result.reasons,
-      violations: buildViolationDistribution(result.reasons.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode1);
+    printJsonReport(
+      {
+        type: 'rootcause',
+        passed: result.passed,
+        reasons: result.reasons,
+        violations: buildViolationDistribution(result.reasons.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode1,
+    );
     process.exitCode = exitCode1;
     return;
   }
@@ -95,7 +98,15 @@ async function main(): Promise<void> {
   }
   console.log('═'.repeat(60));
 
-  console.log('ROOTCAUSE_JSON ' + JSON.stringify({ type: 'rootcause', passed: result.passed, exitCode: exitCode1, reasonCount: result.reasons.length }));
+  console.log(
+    'ROOTCAUSE_JSON ' +
+      JSON.stringify({
+        type: 'rootcause',
+        passed: result.passed,
+        exitCode: exitCode1,
+        reasonCount: result.reasons.length,
+      }),
+  );
 
   process.exit(exitCode1);
 }

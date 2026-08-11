@@ -82,7 +82,13 @@ describe('buildStatusReport', () => {
     expect(r.recentActions[0]!.runId).toBe('r3');
     expect(r.recentActions[2]!.runId).toBe('r5');
     expect(Object.keys(r.recentActions[0]!).sort()).toEqual([
-      'action', 'gateExitCode', 'outcome', 'phase', 'role', 'runId', 'timestamp',
+      'action',
+      'gateExitCode',
+      'outcome',
+      'phase',
+      'role',
+      'runId',
+      'timestamp',
     ]);
   });
 

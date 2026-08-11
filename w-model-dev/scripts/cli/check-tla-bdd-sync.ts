@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   const args = process.argv.slice(2);
   // 位置参数过滤 -- 前缀，兼容 `--json <tla> <feature>` 的参数顺序
-  const positional = args.filter(a => !a.startsWith('--'));
+  const positional = args.filter((a) => !a.startsWith('--'));
   if (positional.length < 2) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -102,20 +102,31 @@ async function main(): Promise<void> {
     // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
     if (jsonMode) {
       // A2b 双轨过渡：reasons 优先结构化 violations 的 message；violations 分布按 rule 聚合
-      printJsonReport({
-        type: 'tla-bdd-sync',
-        passed: output.passed,
-        reasons: result.structuredViolations?.length
-          ? result.structuredViolations.map(v => v.message)
-          : result.violations.map(v => `[${v.dimension}] ${v.description}`),
-        violations: buildViolationDistribution(outReasons.length, result.structuredViolations),
-        durationMs: Date.now() - startTime,
-      }, output.exitCode);
+      printJsonReport(
+        {
+          type: 'tla-bdd-sync',
+          passed: output.passed,
+          reasons: result.structuredViolations?.length
+            ? result.structuredViolations.map((v) => v.message)
+            : result.violations.map((v) => `[${v.dimension}] ${v.description}`),
+          violations: buildViolationDistribution(outReasons.length, result.structuredViolations),
+          durationMs: Date.now() - startTime,
+        },
+        output.exitCode,
+      );
       process.exitCode = output.exitCode;
       return;
     }
 
-    console.log('TLA_BDD_SYNC_JSON ' + JSON.stringify({ type: 'tla-bdd-sync', passed: output.passed, exitCode: output.exitCode, violations: output.violations }));
+    console.log(
+      'TLA_BDD_SYNC_JSON ' +
+        JSON.stringify({
+          type: 'tla-bdd-sync',
+          passed: output.passed,
+          exitCode: output.exitCode,
+          violations: output.violations,
+        }),
+    );
     process.exit(output.exitCode);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
@@ -148,7 +159,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',

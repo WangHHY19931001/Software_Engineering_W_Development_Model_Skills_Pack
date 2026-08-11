@@ -92,10 +92,7 @@ describe('computeMetrics', () => {
       killSwitch: { consecutiveReworks: 2, budgetBurnRate: 0.9 },
       onExceed: 'pause',
     };
-    const r = computeMetrics(
-      [e({ tokens: 400 }), e({ action: 'rework' }), e({ action: 'fix' })],
-      budget,
-    );
+    const r = computeMetrics([e({ tokens: 400 }), e({ action: 'rework' }), e({ action: 'fix' })], budget);
     expect(r.budget?.totalBurnRate).toBeCloseTo(0.6);
     expect(r.budget?.byPhase[0]).toMatchObject({ phase: 1, tokens: 600, maxTokens: 300, exceeded: true });
     expect(r.budget?.killSwitchTriggered).toBe(true); // maxConsecutiveRuns=2 >= 2

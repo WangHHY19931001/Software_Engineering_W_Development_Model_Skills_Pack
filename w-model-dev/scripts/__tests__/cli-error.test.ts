@@ -6,13 +6,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  formatCliError,
-  printError,
-  printErrorJson,
-  exitWithError,
-  type CliError,
-} from '../lib/cli-error.js';
+import { formatCliError, printError, printErrorJson, exitWithError, type CliError } from '../lib/cli-error.js';
 
 const NOT_FOUND: CliError = {
   category: 'FILE_NOT_FOUND',
@@ -28,9 +22,7 @@ afterEach(() => {
 
 describe('formatCliError', () => {
   it('带 file → `✗ [CATEGORY] message: file`', () => {
-    expect(formatCliError(NOT_FOUND)).toBe(
-      '✗ [FILE_NOT_FOUND] 文件不存在: C:\\proj\\.w-model\\project.json',
-    );
+    expect(formatCliError(NOT_FOUND)).toBe('✗ [FILE_NOT_FOUND] 文件不存在: C:\\proj\\.w-model\\project.json');
   });
 
   it('带 detail 无 file → `✗ [CATEGORY] message: detail`', () => {
@@ -49,11 +41,15 @@ describe('formatCliError', () => {
   });
 
   it('formatCliError 附加 [rule=...] 段', () => {
-    expect(formatCliError({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1' })).toBe('✗ [ARG_INVALID] m [rule=P0-1]');
+    expect(formatCliError({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1' })).toBe(
+      '✗ [ARG_INVALID] m [rule=P0-1]',
+    );
   });
 
   it('formatCliError rule 与 tail 组合输出', () => {
-    expect(formatCliError({ category: 'FILE_NOT_FOUND', message: 'm', exitCode: 2, rule: 'P0-2', file: '/x/rtm.json' })).toBe('✗ [FILE_NOT_FOUND] m [rule=P0-2]: /x/rtm.json');
+    expect(
+      formatCliError({ category: 'FILE_NOT_FOUND', message: 'm', exitCode: 2, rule: 'P0-2', file: '/x/rtm.json' }),
+    ).toBe('✗ [FILE_NOT_FOUND] m [rule=P0-2]: /x/rtm.json');
   });
 });
 
@@ -88,7 +84,9 @@ describe('printError / printErrorJson', () => {
 
   it('ERROR_JSON 含 rule/field 字段', () => {
     const calls: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => { calls.push(s); });
+    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => {
+      calls.push(s);
+    });
     printErrorJson({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1', field: 'rtm[0].id' });
     spy.mockRestore();
     expect(calls[0]).toContain('"rule":"P0-1"');
@@ -97,7 +95,9 @@ describe('printError / printErrorJson', () => {
 
   it('缺失 rule/field 时 ERROR_JSON 省略', () => {
     const calls: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => { calls.push(s); });
+    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => {
+      calls.push(s);
+    });
     printErrorJson({ category: 'ARG_INVALID', message: 'm', exitCode: 2 });
     spy.mockRestore();
     expect(calls[0]).not.toContain('"rule"');

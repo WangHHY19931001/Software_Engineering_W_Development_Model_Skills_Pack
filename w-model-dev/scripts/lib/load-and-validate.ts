@@ -62,7 +62,13 @@ export async function loadAndValidate<T = unknown>(filePath: string, schemaKey: 
     if (e.code === 'ENOENT') {
       exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, rule: 'P0-2', file: abs });
     } else {
-      exitWithError({ category: 'FILE_READ', message: '文件读取失败', exitCode: 2, file: abs, detail: e.code ?? '未知错误' });
+      exitWithError({
+        category: 'FILE_READ',
+        message: '文件读取失败',
+        exitCode: 2,
+        file: abs,
+        detail: e.code ?? '未知错误',
+      });
     }
     throw new Error(`${LOAD_AND_VALIDATE_SENTINEL_PREFIX}输入错误已通过 exitWithError 处理`);
   }

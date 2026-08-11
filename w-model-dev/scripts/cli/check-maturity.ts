@@ -52,9 +52,9 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const maturityFile = args.find(a => !a.startsWith('--'));
-  const projectArg = args.find(a => a.startsWith('--project='));
-  const runLogArg = args.find(a => a.startsWith('--run-log='));
+  const maturityFile = args.find((a) => !a.startsWith('--'));
+  const projectArg = args.find((a) => a.startsWith('--project='));
+  const runLogArg = args.find((a) => a.startsWith('--run-log='));
   const projectFile = projectArg ? projectArg.split('=')[1] : undefined;
   const runLogFile = runLogArg ? runLogArg.split('=')[1] : undefined;
   return { maturityFile, projectFile, runLogFile };
@@ -64,15 +64,15 @@ function parseArgs(argv: string[]): ParsedArgs {
 
 // status 枚举对应「已推进到的阶段序号」；项目完成视作 8 阶段全部完成
 const STATUS_TO_PHASES: Record<string, number> = {
-  '需求分析': 1,
-  '系统设计': 2,
-  '概要设计': 3,
-  '详细设计': 4,
-  '编码': 5,
-  '集成测试': 6,
-  '系统测试': 7,
-  '验收测试': 8,
-  '项目完成': 8,
+  需求分析: 1,
+  系统设计: 2,
+  概要设计: 3,
+  详细设计: 4,
+  编码: 5,
+  集成测试: 6,
+  系统测试: 7,
+  验收测试: 8,
+  项目完成: 8,
 };
 
 // ==================== run-log O 系列失败模式统计 ====================
@@ -86,9 +86,7 @@ const O_PATTERN = /\bO[1-6]\b/g;
  *
  * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
  */
-function countOperationalFailures(
-  entries: unknown[],
-): number {
+function countOperationalFailures(entries: unknown[]): number {
   let count = 0;
   for (const entry of entries) {
     const e = entry as { note?: string };
@@ -113,7 +111,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <maturity.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
       exitCode: 2,
     });
     return;
@@ -134,10 +133,7 @@ async function main(): Promise<void> {
     try {
       const projectRaw = await fs.readFile(projectAbs, 'utf-8');
       const projectParsed = parseJsonSafe(projectRaw) as { status?: string; createdAt?: string };
-      if (
-        typeof projectParsed.status === 'string' &&
-        projectParsed.status in STATUS_TO_PHASES
-      ) {
+      if (typeof projectParsed.status === 'string' && projectParsed.status in STATUS_TO_PHASES) {
         completedPhases = STATUS_TO_PHASES[projectParsed.status];
       } else {
         console.error(
@@ -147,15 +143,11 @@ async function main(): Promise<void> {
       if (typeof projectParsed.createdAt === 'string') {
         projectCreatedAt = projectParsed.createdAt;
       } else {
-        console.error(
-          `⚠ --project 文件未含 createdAt 字段，跳过 R4 时序校验: ${projectAbs}`,
-        );
+        console.error(`⚠ --project 文件未含 createdAt 字段，跳过 R4 时序校验: ${projectAbs}`);
       }
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(
-        `⚠ --project 文件读取失败，跳过 R3/R4 交叉校验: ${projectAbs}（${e.code ?? e.message}）`,
-      );
+      console.error(`⚠ --project 文件读取失败，跳过 R3/R4 交叉校验: ${projectAbs}（${e.code ?? e.message}）`);
     }
   }
 
@@ -170,9 +162,7 @@ async function main(): Promise<void> {
       operationalFailureCount = countOperationalFailures(entries);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(
-        `⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（${e.code ?? e.message}）`,
-      );
+      console.error(`⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
     }
   }
 
@@ -186,13 +176,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'maturity',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'maturity',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -215,24 +208,32 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
 
   if (result.passed) {
-    console.log('成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + 阶段更新一致 + history 时序 + 降级未触发。');
+    console.log(
+      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + 阶段更新一致 + history 时序 + 降级未触发。',
+    );
   } else {
     console.log('未通过原因：');
     for (const r of result.violations) {
       console.log(`  - ${r}`);
     }
     console.log('');
-    console.log('O 子代理须按上述原因处置（补全 schema / 修正 level / 更新 completedCycles / 修正 history 时序 / 响应降级触发），详见：');
+    console.log(
+      'O 子代理须按上述原因处置（补全 schema / 修正 level / 更新 completedCycles / 修正 history 时序 / 响应降级触发），详见：',
+    );
     console.log('  w-model-dev/references/data-models.md §自主成熟度模型');
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('MATURITY', {
-    type: 'maturity',
-    passed: result.passed,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'MATURITY',
+    {
+      type: 'maturity',
+      passed: result.passed,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

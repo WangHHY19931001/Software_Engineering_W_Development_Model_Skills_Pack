@@ -73,12 +73,10 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
 
   // 收集该阶段的查询文件
   const prefix = `phase${phase}-`;
-  const files = readdirSync(queriesDir).filter(f => f.startsWith(prefix) && f.endsWith('.json'));
+  const files = readdirSync(queriesDir).filter((f) => f.startsWith(prefix) && f.endsWith('.json'));
 
   if (files.length === 0) {
-    violations.push(
-      `阶段 ${phase}：.w-model/codegraph-queries/ 下无 phase${phase}-*.json 查询文件（约束 #20）`,
-    );
+    violations.push(`阶段 ${phase}：.w-model/codegraph-queries/ 下无 phase${phase}-*.json 查询文件（约束 #20）`);
     return { passed: false, violations, queryCount: 0 };
   }
 
@@ -137,9 +135,9 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const file = args.find(a => !a.startsWith('--'));
+  const file = args.find((a) => !a.startsWith('--'));
   // 统一 --phase 校验（lib/parse-phase.ts，5-8；支持 --phase N 与 --phase=N）
-  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some(a => a.startsWith('--phase='));
+  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some((a) => a.startsWith('--phase='));
   const phaseParsed = parsePhaseArg(process.argv, { min: 5, max: 8 });
 
   if (!file || !hasPhaseFlag) {
@@ -193,13 +191,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'codegraph-queries',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'codegraph-queries',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -220,13 +221,17 @@ async function main(): Promise<void> {
     }
   }
 
-  printGateReport('CODEGRAPH_QUERIES', {
-    type: 'codegraph-queries',
-    passed: result.passed,
-    phase,
-    queryCount: result.queryCount,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'CODEGRAPH_QUERIES',
+    {
+      type: 'codegraph-queries',
+      passed: result.passed,
+      phase,
+      queryCount: result.queryCount,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 const entryArg = process.argv[1];

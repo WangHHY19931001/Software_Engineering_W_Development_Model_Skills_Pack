@@ -24,22 +24,39 @@ import { checkRequirementCoverage, type CoverageShape } from '../logic/coverage-
 /** 构造一份全通过的合法 CoverageShape（4 张矩阵完整 + 100% 覆盖率） */
 function makeValidCoverage(): CoverageShape {
   return {
-    stakeholders: [
-      { id: 'SH-001', role: '终端用户', relatedReqs: ['REQ-001'], status: 'covered' },
-    ],
+    stakeholders: [{ id: 'SH-001', role: '终端用户', relatedReqs: ['REQ-001'], status: 'covered' }],
     scenarios: [
-      { id: 'SC-001', description: '正常注册', steps: ['提交'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'happy' },
-      { id: 'SC-002', description: '邮箱错误', steps: ['提交'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'error' },
-      { id: 'SC-003', description: '长度边界', steps: ['提交'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'boundary' },
+      {
+        id: 'SC-001',
+        description: '正常注册',
+        steps: ['提交'],
+        relatedReqs: ['REQ-001'],
+        status: 'covered',
+        scenarioType: 'happy',
+      },
+      {
+        id: 'SC-002',
+        description: '邮箱错误',
+        steps: ['提交'],
+        relatedReqs: ['REQ-001'],
+        status: 'covered',
+        scenarioType: 'error',
+      },
+      {
+        id: 'SC-003',
+        description: '长度边界',
+        steps: ['提交'],
+        relatedReqs: ['REQ-001'],
+        status: 'covered',
+        scenarioType: 'boundary',
+      },
     ],
     requirementTypes: [
       { type: 'REQ', reqIds: ['REQ-001'], status: 'covered' },
       { type: 'NFR', reqIds: ['NFR-001'], status: 'covered' },
       { type: 'CON', reqIds: ['CON-001'], status: 'covered' },
     ],
-    crossCuts: [
-      { nfrConId: 'NFR-001', governedReqs: ['REQ-001'], status: 'covered' },
-    ],
+    crossCuts: [{ nfrConId: 'NFR-001', governedReqs: ['REQ-001'], status: 'covered' }],
     metrics: { stakeholder: 100, scenario: 100, requirementType: 100, crossCut: 100 },
   };
 }
@@ -53,7 +70,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.metrics.stakeholder = 100; // 空集视作 100%（vacuously true），匹配重算避免 C10 噪声
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C1'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C1'))).toBe(true);
     });
   });
 
@@ -65,7 +82,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.metrics.scenario = 100; // 空集视作 100%（vacuously true），匹配重算避免 C10 噪声
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C3'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C3'))).toBe(true);
     });
   });
 
@@ -73,20 +90,20 @@ describe('C1-C10 覆盖分析校验', () => {
   describe('C4: scenarios 场景类型完整', () => {
     it('C4: 缺 error 场景类型应 fail', () => {
       const coverage = makeValidCoverage();
-      coverage.scenarios = coverage.scenarios.filter(s => s.scenarioType !== 'error');
+      coverage.scenarios = coverage.scenarios.filter((s) => s.scenarioType !== 'error');
       coverage.metrics.scenario = 100; // 2 covered → recalc 100，匹配
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C4') && v.includes('error'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C4') && v.includes('error'))).toBe(true);
     });
 
     it('C4: 缺 boundary 场景类型应 fail', () => {
       const coverage = makeValidCoverage();
-      coverage.scenarios = coverage.scenarios.filter(s => s.scenarioType !== 'boundary');
+      coverage.scenarios = coverage.scenarios.filter((s) => s.scenarioType !== 'boundary');
       coverage.metrics.scenario = 100;
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C4') && v.includes('boundary'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C4') && v.includes('boundary'))).toBe(true);
     });
   });
 
@@ -94,20 +111,20 @@ describe('C1-C10 覆盖分析校验', () => {
   describe('C5: requirementTypes 需求类型完整', () => {
     it('C5: 缺 NFR 类型应 fail', () => {
       const coverage = makeValidCoverage();
-      coverage.requirementTypes = coverage.requirementTypes.filter(r => r.type !== 'NFR');
+      coverage.requirementTypes = coverage.requirementTypes.filter((r) => r.type !== 'NFR');
       coverage.metrics.requirementType = 100; // 2 covered → recalc 100
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C5') && v.includes('NFR'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C5') && v.includes('NFR'))).toBe(true);
     });
 
     it('C5: 缺 CON 类型应 fail', () => {
       const coverage = makeValidCoverage();
-      coverage.requirementTypes = coverage.requirementTypes.filter(r => r.type !== 'CON');
+      coverage.requirementTypes = coverage.requirementTypes.filter((r) => r.type !== 'CON');
       coverage.metrics.requirementType = 100;
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C5') && v.includes('CON'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C5') && v.includes('CON'))).toBe(true);
     });
   });
 
@@ -119,7 +136,7 @@ describe('C1-C10 覆盖分析校验', () => {
         graphCrossCuts: [], // graph 无任何 cross-cuts 边
       });
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C7') && v.includes('coverage 有但'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C7') && v.includes('coverage 有但'))).toBe(true);
     });
 
     it('C7: graph 有但 coverage 无的 cross-cuts 边应 fail', () => {
@@ -130,7 +147,7 @@ describe('C1-C10 覆盖分析校验', () => {
         graphCrossCuts: [{ from: 'NFR-001', to: 'REQ-001' }],
       });
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C7') && v.includes('graph.json 有但'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C7') && v.includes('graph.json 有但'))).toBe(true);
     });
 
     it('C7: 双向一致时无违规', () => {
@@ -138,7 +155,7 @@ describe('C1-C10 覆盖分析校验', () => {
       const result = checkRequirementCoverage(coverage, {
         graphCrossCuts: [{ from: 'NFR-001', to: 'REQ-001' }],
       });
-      expect(result.violations.some(v => v.includes('C7'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('C7'))).toBe(false);
     });
   });
 
@@ -153,7 +170,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.metrics.stakeholder = 75; // (1 + 0.5) / 2 * 100 = 75，匹配重算
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C8') && v.includes('stakeholder'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C8') && v.includes('stakeholder'))).toBe(true);
     });
 
     it('C8: 存在 partial 项应 fail（即使 metrics=100）', () => {
@@ -166,7 +183,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.metrics.stakeholder = 75;
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C8') && v.includes('partial'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C8') && v.includes('partial'))).toBe(true);
     });
   });
 
@@ -180,8 +197,8 @@ describe('C1-C10 覆盖分析校验', () => {
       ];
       coverage.metrics.stakeholder = 50; // (1 + 0) / 2 * 100 = 50
       const result = checkRequirementCoverage(coverage);
-      expect(result.warnings.some(w => w.includes('C9'))).toBe(true);
-      expect(result.violations.some(v => v.includes('C9'))).toBe(false);
+      expect(result.warnings.some((w) => w.includes('C9'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C9'))).toBe(false);
     });
 
     it('C9: status=missing 有 outOfScope 但未声明 → fail', () => {
@@ -195,7 +212,7 @@ describe('C1-C10 覆盖分析校验', () => {
         outOfScope: ['SH-OTHER'], // SH-002 未声明
       });
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C9') && v.includes('SH-002'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C9') && v.includes('SH-002'))).toBe(true);
     });
 
     it('C9: status=missing 有 outOfScope 且已声明 → 无违规', () => {
@@ -208,7 +225,7 @@ describe('C1-C10 覆盖分析校验', () => {
       const result = checkRequirementCoverage(coverage, {
         outOfScope: ['SH-002'],
       });
-      expect(result.violations.some(v => v.includes('C9'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('C9'))).toBe(false);
     });
 
     it('C8/C9: requirementType status=missing 的 missingIds 取 reqIds 具体 ID（NFR-001）非类别名', () => {
@@ -223,7 +240,7 @@ describe('C1-C10 覆盖分析校验', () => {
         outOfScope: ['SH-OTHER'],
       });
       expect(result.passed).toBe(false);
-      const c9Violations = result.violations.filter(v => v.includes('C9')).join(' ');
+      const c9Violations = result.violations.filter((v) => v.includes('C9')).join(' ');
       expect(c9Violations).toContain('NFR-001');
     });
   });
@@ -236,7 +253,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.metrics.stakeholder = 90;
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C10') && v.includes('stakeholder'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C10') && v.includes('stakeholder'))).toBe(true);
     });
 
     it('C10: metrics.scenario 与重算不一致应 fail', () => {
@@ -244,7 +261,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.metrics.scenario = 80; // recalc=100 → 不一致
       const result = checkRequirementCoverage(coverage);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('C10') && v.includes('scenario'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('C10') && v.includes('scenario'))).toBe(true);
     });
   });
 
@@ -258,7 +275,7 @@ describe('C1-C10 覆盖分析校验', () => {
       ];
       coverage.metrics.stakeholder = 75; // recalc=75，匹配重算
       const result = checkRequirementCoverage(coverage, { exemptions: ['C8'] });
-      expect(result.violations.some(v => v.includes('C8'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('C8'))).toBe(false);
       expect(result.exemptionsApplied).toContain('C8');
     });
 
@@ -267,7 +284,7 @@ describe('C1-C10 覆盖分析校验', () => {
       coverage.stakeholders = [];
       coverage.metrics.stakeholder = 100; // 空集视作 100%，匹配重算避免 C10 噪声
       const result = checkRequirementCoverage(coverage, { exemptions: ['C1'] });
-      expect(result.violations.some(v => v.includes('C1'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('C1'))).toBe(false);
       expect(result.exemptionsApplied).toContain('C1');
     });
   });
@@ -306,21 +323,45 @@ describe('C7: OOS 形状校验 (CLI exit 2)', () => {
 
   function writeValidCoverage(dir: string): string {
     const p = join(dir, 'coverage.json');
-    writeFileSync(p, JSON.stringify({
-      stakeholders: [{ id: 'SH-001', role: '终端用户', relatedReqs: ['REQ-001'], status: 'covered' }],
-      scenarios: [
-        { id: 'SC-001', description: '正常', steps: ['x'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'happy' },
-        { id: 'SC-002', description: '错误', steps: ['x'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'error' },
-        { id: 'SC-003', description: '边界', steps: ['x'], relatedReqs: ['REQ-001'], status: 'covered', scenarioType: 'boundary' },
-      ],
-      requirementTypes: [
-        { type: 'REQ', reqIds: ['REQ-001'], status: 'covered' },
-        { type: 'NFR', reqIds: ['NFR-001'], status: 'covered' },
-        { type: 'CON', reqIds: ['CON-001'], status: 'covered' },
-      ],
-      crossCuts: [{ nfrConId: 'NFR-001', governedReqs: ['REQ-001'], status: 'covered' }],
-      metrics: { stakeholder: 100, scenario: 100, requirementType: 100, crossCut: 100 },
-    }));
+    writeFileSync(
+      p,
+      JSON.stringify({
+        stakeholders: [{ id: 'SH-001', role: '终端用户', relatedReqs: ['REQ-001'], status: 'covered' }],
+        scenarios: [
+          {
+            id: 'SC-001',
+            description: '正常',
+            steps: ['x'],
+            relatedReqs: ['REQ-001'],
+            status: 'covered',
+            scenarioType: 'happy',
+          },
+          {
+            id: 'SC-002',
+            description: '错误',
+            steps: ['x'],
+            relatedReqs: ['REQ-001'],
+            status: 'covered',
+            scenarioType: 'error',
+          },
+          {
+            id: 'SC-003',
+            description: '边界',
+            steps: ['x'],
+            relatedReqs: ['REQ-001'],
+            status: 'covered',
+            scenarioType: 'boundary',
+          },
+        ],
+        requirementTypes: [
+          { type: 'REQ', reqIds: ['REQ-001'], status: 'covered' },
+          { type: 'NFR', reqIds: ['NFR-001'], status: 'covered' },
+          { type: 'CON', reqIds: ['CON-001'], status: 'covered' },
+        ],
+        crossCuts: [{ nfrConId: 'NFR-001', governedReqs: ['REQ-001'], status: 'covered' }],
+        metrics: { stakeholder: 100, scenario: 100, requirementType: 100, crossCut: 100 },
+      }),
+    );
     return p;
   }
 

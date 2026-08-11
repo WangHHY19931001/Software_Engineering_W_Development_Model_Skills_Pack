@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { checkTlaBddSync, extractTlaTransitions, extractTlaStates, extractBddStateMachine } from '../logic/tla-bdd-sync-logic.js';
+import {
+  checkTlaBddSync,
+  extractTlaTransitions,
+  extractTlaStates,
+  extractBddStateMachine,
+} from '../logic/tla-bdd-sync-logic.js';
 
 describe('checkTlaBddSync', () => {
   const validTla = `EXTENDS Naturals
@@ -24,16 +29,15 @@ Background:
   });
 
   it('TLA+ 有 Register 但 BDD 无 → violations 非空', () => {
-    const tlaWithRegister = validTla.replace(
-      'Next == \\/ Login \\/ Logout',
-      'Next == \\/ Login \\/ Logout \\/ Register',
-    ).replace(
-      'TypeInvariant == state \\in {"idle", "active"}',
-      'Register == state = "idle" /\\ state\' = "registered"\nTypeInvariant == state \\in {"idle", "active", "registered"}',
-    );
+    const tlaWithRegister = validTla
+      .replace('Next == \\/ Login \\/ Logout', 'Next == \\/ Login \\/ Logout \\/ Register')
+      .replace(
+        'TypeInvariant == state \\in {"idle", "active"}',
+        'Register == state = "idle" /\\ state\' = "registered"\nTypeInvariant == state \\in {"idle", "active", "registered"}',
+      );
     const result = checkTlaBddSync(tlaWithRegister, validFeature);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.dimension === 'transition' && v.tlaName === 'Register')).toBe(true);
+    expect(result.violations.some((v) => v.dimension === 'transition' && v.tlaName === 'Register')).toBe(true);
   });
 
   it('extractTlaTransitions 正确解析转移名', () => {

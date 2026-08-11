@@ -61,8 +61,9 @@ export function checkOpenspecArchive(projectRoot: string, phase: number): CheckR
 
   // 找该阶段的归档目录（名称精确前缀匹配 phase<N>-）
   const prefixRegex = new RegExp(`phase${phase}-`);
-  const entries = readdirSync(archiveDir, { withFileTypes: true })
-    .filter(e => e.isDirectory() && prefixRegex.test(e.name));
+  const entries = readdirSync(archiveDir, { withFileTypes: true }).filter(
+    (e) => e.isDirectory() && prefixRegex.test(e.name),
+  );
 
   if (entries.length === 0) {
     violations.push(`阶段 ${phase}：archive/ 下无含 phase${phase}- 前缀的归档目录（opsx:archive 未执行）`);
@@ -102,9 +103,9 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const file = args.find(a => !a.startsWith('--'));
+  const file = args.find((a) => !a.startsWith('--'));
   // 统一 --phase 校验（lib/parse-phase.ts，5-8；支持 --phase N 与 --phase=N）
-  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some(a => a.startsWith('--phase='));
+  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some((a) => a.startsWith('--phase='));
   const phaseParsed = parsePhaseArg(process.argv, { min: 5, max: 8 });
 
   if (!file || !hasPhaseFlag) {
@@ -148,13 +149,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'openspec-archive',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'openspec-archive',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -176,14 +180,18 @@ async function main(): Promise<void> {
     }
   }
 
-  printGateReport('OPENSPEC_ARCHIVE', {
-    type: 'openspec-archive',
-    passed: result.passed,
-    phase,
-    archivedChange: result.archivedChange,
-    artifactsFound: result.artifactsFound,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'OPENSPEC_ARCHIVE',
+    {
+      type: 'openspec-archive',
+      passed: result.passed,
+      phase,
+      archivedChange: result.archivedChange,
+      artifactsFound: result.artifactsFound,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 const entryArg = process.argv[1];

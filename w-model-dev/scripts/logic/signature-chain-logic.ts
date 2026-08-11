@@ -112,7 +112,7 @@ export function checkSignatureChain(
   // 过滤 phase
   let scopedEntries = entries as SignatureChainEntry[];
   if (options?.phase && options.phase > 0) {
-    scopedEntries = scopedEntries.filter(e => e.phase === options.phase);
+    scopedEntries = scopedEntries.filter((e) => e.phase === options.phase);
   }
 
   if (scopedEntries.length === 0) {
@@ -125,12 +125,14 @@ export function checkSignatureChain(
   }
 
   const phase = scopedEntries[0]!.phase;
-  const phaseEntries = [...scopedEntries].sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
+  const phaseEntries = [...scopedEntries].sort(
+    (a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime(),
+  );
 
   // ==================== R1: 角色齐全 ====================
   const expectedRoles = PHASE_ROLE_CHAINS[phase] ?? [];
-  const actualRoles = phaseEntries.filter(e => e.role !== 'O' || e.action !== 'checkpoint').map(e => e.role);
-  const hasCheckpoint = phaseEntries.some(e => e.role === 'O' && e.action === 'checkpoint');
+  const actualRoles = phaseEntries.filter((e) => e.role !== 'O' || e.action !== 'checkpoint').map((e) => e.role);
+  const hasCheckpoint = phaseEntries.some((e) => e.role === 'O' && e.action === 'checkpoint');
   const requiredAllRoles = [...expectedRoles];
   // 检查每个强制角色至少出现一次
   const missingRoles: string[] = [];
@@ -152,9 +154,10 @@ export function checkSignatureChain(
   // ==================== R2: 链连续（跨阶段连续链语义） ====================
   if (options?.phase && options.phase > 0) {
     // --phase=N mode: cross-phase continuous chain
-    const allSorted = [...(entries as SignatureChainEntry[])]
-      .sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
-    const allSigIds = new Set(allSorted.map(e => e.sigId));
+    const allSorted = [...(entries as SignatureChainEntry[])].sort(
+      (a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime(),
+    );
+    const allSigIds = new Set(allSorted.map((e) => e.sigId));
     allSigIds.add('genesis');
 
     for (let i = 0; i < phaseEntries.length; i++) {
@@ -166,7 +169,7 @@ export function checkSignatureChain(
           rulesFailed.push('R2');
         }
         if (entry.prevSigId !== 'genesis') {
-          const ref = allSorted.find(e => e.sigId === entry.prevSigId);
+          const ref = allSorted.find((e) => e.sigId === entry.prevSigId);
           if (ref && entry.prevSigHash !== ref.sigHash) {
             violations.push(`R2: 签名链断裂：${entry.sigId} 首条 prevSigHash 与 ${entry.prevSigId} 的 sigHash 不一致`);
             rulesFailed.push('R2');
@@ -179,15 +182,18 @@ export function checkSignatureChain(
         // Phase 内前条用列表索引
         const prev = phaseEntries[i - 1]!;
         if (entry.prevSigId !== prev.sigId || entry.prevSigHash !== prev.sigHash) {
-          violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与 phase 内前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`);
+          violations.push(
+            `R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与 phase 内前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`,
+          );
           rulesFailed.push('R2');
         }
       }
     }
   } else {
     // Archive mode: 全链连续校验（跨阶段一条链）
-    const allSorted = [...(entries as SignatureChainEntry[])]
-      .sort((a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime());
+    const allSorted = [...(entries as SignatureChainEntry[])].sort(
+      (a, b) => new Date(a.signedAt).getTime() - new Date(b.signedAt).getTime(),
+    );
     if (allSorted.length > 0) {
       if (allSorted[0]!.prevSigId !== 'genesis' || allSorted[0]!.prevSigHash !== '0') {
         violations.push(`R2: 签名链断裂：全链首条 ${allSorted[0]!.sigId} 的 prevSigId/prevSigHash 应为 genesis / "0"`);
@@ -197,7 +203,9 @@ export function checkSignatureChain(
           const entry = allSorted[i]!;
           const prev = allSorted[i - 1]!;
           if (entry.prevSigId !== prev.sigId || entry.prevSigHash !== prev.sigHash) {
-            violations.push(`R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`);
+            violations.push(
+              `R2: 签名链断裂：${entry.sigId} 的 prevSigId/prevSigHash 与前环 ${prev.sigId} 不匹配（期望 prevSigId=${prev.sigId}, prevSigHash=${prev.sigHash}）`,
+            );
             rulesFailed.push('R2');
           }
         }
@@ -217,7 +225,9 @@ export function checkSignatureChain(
     if (entry.prevSigId === 'genesis') continue;
     const prev = entryBySigId.get(entry.prevSigId);
     if (prev && new Date(entry.signedAt).getTime() < new Date(prev.signedAt).getTime()) {
-      violations.push(`R3: 时间戳非单调递增：${entry.sigId}(${entry.signedAt}) 早于 ${entry.prevSigId}(${prev.signedAt})`);
+      violations.push(
+        `R3: 时间戳非单调递增：${entry.sigId}(${entry.signedAt}) 早于 ${entry.prevSigId}(${prev.signedAt})`,
+      );
       rulesFailed.push('R3');
     }
   }
@@ -238,10 +248,14 @@ export function checkSignatureChain(
   }
 
   // ==================== R5: 代签检测 ====================
-  const checkpointEntries = phaseEntries.filter(e => e.role === 'O' && e.action === 'checkpoint');
+  const checkpointEntries = phaseEntries.filter((e) => e.role === 'O' && e.action === 'checkpoint');
   for (const cp of checkpointEntries) {
     // signer 为 O 角色 ID 即代签（简单启发式：signer 包含 'O' 或 'orchestrator' 或 'agent'）
-    if (cp.signer === 'O' || cp.signer.toLowerCase().includes('orchestrator') || cp.signer.toLowerCase().includes('self-as-verifier')) {
+    if (
+      cp.signer === 'O' ||
+      cp.signer.toLowerCase().includes('orchestrator') ||
+      cp.signer.toLowerCase().includes('self-as-verifier')
+    ) {
       violations.push(`R5: 阶段 ${phase} O checkpoint 签名 signer="${cp.signer}" 为 O 角色（代签检测，O4 命中）`);
       rulesFailed.push('R5');
     }
@@ -263,11 +277,11 @@ export function checkSignatureChain(
   }
 
   // ==================== R7: 悬空来源 ====================
-  const allSigIds = new Set(phaseEntries.map(e => e.sigId));
+  const allSigIds = new Set(phaseEntries.map((e) => e.sigId));
   allSigIds.add('genesis');
   if (options?.phase && options.phase > 0) {
     // --phase=N mode: 来源并集 = 本阶段 ∪ 上一阶段（跨阶段消费者校验）
-    const allEntries = (entries as SignatureChainEntry[]);
+    const allEntries = entries as SignatureChainEntry[];
     for (const e of allEntries) {
       if (e.phase === options.phase - 1) {
         allSigIds.add(e.sigId);
@@ -307,7 +321,7 @@ export function checkSignatureChain(
     const action = entry.action;
     if (role === 'O' && (action === 'chunk' || action === 'checkpoint')) continue;
 
-    const sourceRoles = (entry.inputProvenance?.sourceArtifacts ?? []).map(a => a.sourceRole);
+    const sourceRoles = (entry.inputProvenance?.sourceArtifacts ?? []).map((a) => a.sourceRole);
     const forbidden = FORBIDDEN_SOURCE_ROLES[role] ?? [];
     for (const srcRole of sourceRoles) {
       if (forbidden.includes(srcRole)) {
@@ -322,7 +336,7 @@ export function checkSignatureChain(
 
   // ==================== R10: 绕过门禁 ====================
   for (const cp of checkpointEntries) {
-    const sourceRoles = (cp.inputProvenance?.sourceArtifacts ?? []).map(a => a.sourceRole);
+    const sourceRoles = (cp.inputProvenance?.sourceArtifacts ?? []).map((a) => a.sourceRole);
     if (!sourceRoles.includes('G')) {
       violations.push(`R10: ${cp.sigId} 绕过门禁：O checkpoint 的 sourceArtifacts 须含 G gate 产物`);
       rulesFailed.push('R10');
@@ -336,12 +350,14 @@ export function checkSignatureChain(
   if (options?.stage === 'archive' && options.phase === undefined) {
     // 校验阶段连续性：阶段 N+1 的 O chunk 须引用阶段 N 的 O checkpoint
     const allEntries = entries as SignatureChainEntry[];
-    const phaseNumbers = [...new Set(allEntries.map(e => e.phase))].sort((a, b) => a - b);
+    const phaseNumbers = [...new Set(allEntries.map((e) => e.phase))].sort((a, b) => a - b);
     for (let i = 1; i < phaseNumbers.length; i++) {
       const prevPhase = phaseNumbers[i - 1];
       const currPhase = phaseNumbers[i];
-      const prevCheckpoint = allEntries.find(e => e.phase === prevPhase && e.role === 'O' && e.action === 'checkpoint');
-      const currChunk = allEntries.find(e => e.phase === currPhase && e.role === 'O' && e.action === 'chunk');
+      const prevCheckpoint = allEntries.find(
+        (e) => e.phase === prevPhase && e.role === 'O' && e.action === 'checkpoint',
+      );
+      const currChunk = allEntries.find((e) => e.phase === currPhase && e.role === 'O' && e.action === 'chunk');
       if (prevCheckpoint && currChunk) {
         if (!currChunk.inputProvenance?.sourceSigIds?.includes(prevCheckpoint.sigId)) {
           violations.push(`跨阶段：阶段 ${currPhase} O chunk 未引用阶段 ${prevPhase} O checkpoint 签名`);

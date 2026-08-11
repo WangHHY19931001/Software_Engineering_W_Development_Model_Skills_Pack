@@ -127,9 +127,19 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
     results.push({ layer: 'L1', item: 'codegraph CLI', status: 'ready', detail: 'codegraph --version OK' });
   } else {
     if (installCli('@colbymchenry/codegraph') && checkCli('codegraph')) {
-      results.push({ layer: 'L1', item: 'codegraph CLI', status: 'installed', detail: 'npm i -g @colbymchenry/codegraph 成功' });
+      results.push({
+        layer: 'L1',
+        item: 'codegraph CLI',
+        status: 'installed',
+        detail: 'npm i -g @colbymchenry/codegraph 成功',
+      });
     } else {
-      results.push({ layer: 'L1', item: 'codegraph CLI', status: 'checkpoint', detail: '自动安装失败，需用户手动 npm i -g @colbymchenry/codegraph 或检查权限' });
+      results.push({
+        layer: 'L1',
+        item: 'codegraph CLI',
+        status: 'checkpoint',
+        detail: '自动安装失败，需用户手动 npm i -g @colbymchenry/codegraph 或检查权限',
+      });
     }
   }
 
@@ -138,9 +148,19 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
     results.push({ layer: 'L1', item: 'openspec CLI', status: 'ready', detail: 'openspec --version OK' });
   } else {
     if (installCli('@fission-ai/openspec@latest') && checkCli('openspec')) {
-      results.push({ layer: 'L1', item: 'openspec CLI', status: 'installed', detail: 'npm i -g @fission-ai/openspec@latest 成功' });
+      results.push({
+        layer: 'L1',
+        item: 'openspec CLI',
+        status: 'installed',
+        detail: 'npm i -g @fission-ai/openspec@latest 成功',
+      });
     } else {
-      results.push({ layer: 'L1', item: 'openspec CLI', status: 'checkpoint', detail: '自动安装失败，需用户手动 npm i -g @fission-ai/openspec@latest' });
+      results.push({
+        layer: 'L1',
+        item: 'openspec CLI',
+        status: 'checkpoint',
+        detail: '自动安装失败，需用户手动 npm i -g @fission-ai/openspec@latest',
+      });
     }
   }
 
@@ -150,9 +170,19 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
   // L2: codegraph MCP 注册（仅 full 模式；不在此处做 query 探针，避免 init 前假阴性）
   if (isFull) {
     if (registerMcpCodegraph()) {
-      results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'installed', detail: 'codegraph install 执行成功' });
+      results.push({
+        layer: 'L2',
+        item: 'codegraph_explore MCP',
+        status: 'installed',
+        detail: 'codegraph install 执行成功',
+      });
     } else {
-      results.push({ layer: 'L2', item: 'codegraph_explore MCP', status: 'checkpoint', detail: '需用户手动运行交互式 codegraph install（不使用 --yes 自动改写全局配置）' });
+      results.push({
+        layer: 'L2',
+        item: 'codegraph_explore MCP',
+        status: 'checkpoint',
+        detail: '需用户手动运行交互式 codegraph install（不使用 --yes 自动改写全局配置）',
+      });
     }
   }
 
@@ -164,16 +194,31 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
     if (initCodegraph(projectRoot) && existsSync(codegraphDir)) {
       results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'installed', detail: 'codegraph init 成功' });
     } else {
-      results.push({ layer: 'L3', item: '.codegraph/ 图谱', status: 'checkpoint', detail: 'codegraph init 失败，需用户手动执行' });
+      results.push({
+        layer: 'L3',
+        item: '.codegraph/ 图谱',
+        status: 'checkpoint',
+        detail: 'codegraph init 失败，需用户手动执行',
+      });
     }
   }
 
   // L3 探针查询：在 init 之后执行，验证 MCP 链路完整
   if (existsSync(codegraphDir)) {
     if (checkMcpCodegraph(projectRoot)) {
-      results.push({ layer: 'L3', item: 'codegraph 探针查询', status: 'ready', detail: 'codegraph query main OK，MCP 链路正常' });
+      results.push({
+        layer: 'L3',
+        item: 'codegraph 探针查询',
+        status: 'ready',
+        detail: 'codegraph query main OK，MCP 链路正常',
+      });
     } else {
-      results.push({ layer: 'L3', item: 'codegraph 探针查询', status: 'checkpoint', detail: '探针查询失败，请确认 MCP 已注册且索引已构建' });
+      results.push({
+        layer: 'L3',
+        item: 'codegraph 探针查询',
+        status: 'checkpoint',
+        detail: '探针查询失败，请确认 MCP 已注册且索引已构建',
+      });
     }
   }
 
@@ -185,7 +230,12 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
     if (initOpenspec(projectRoot) && existsSync(openspecDir)) {
       results.push({ layer: 'L3', item: 'openspec/ 工作区', status: 'installed', detail: 'openspec init 成功' });
     } else {
-      results.push({ layer: 'L3', item: 'openspec/ 工作区', status: 'checkpoint', detail: 'openspec init 失败，需用户手动执行' });
+      results.push({
+        layer: 'L3',
+        item: 'openspec/ 工作区',
+        status: 'checkpoint',
+        detail: 'openspec init 失败，需用户手动执行',
+      });
     }
   }
 
@@ -196,7 +246,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const getArg = (name: string): string | undefined => {
     const prefix = `--${name}`;
-    const eqArg = args.find(a => a.startsWith(`${prefix}=`));
+    const eqArg = args.find((a) => a.startsWith(`${prefix}=`));
     if (eqArg) return eqArg.slice(prefix.length + 1);
     const i = args.indexOf(prefix);
     return i >= 0 ? args[i + 1] : undefined;
@@ -211,7 +261,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 --phase/--project-root/--mode',
-      detail: '用法: npx tsx ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>',
+      detail:
+        '用法: npx tsx ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>',
       exitCode: 2,
     });
     return;
@@ -258,7 +309,7 @@ async function main(): Promise<void> {
     }
   }
   const results = ensureDeps(phase, absRoot, modeStr);
-  const hasCheckpoint = results.some(r => r.status === 'checkpoint');
+  const hasCheckpoint = results.some((r) => r.status === 'checkpoint');
 
   console.log('═'.repeat(60));
   console.log('codegraph + OpenSpec 依赖检测');
@@ -276,14 +327,17 @@ async function main(): Promise<void> {
 
   const exitCode = hasCheckpoint ? 1 : 0;
   console.log('─'.repeat(60));
-  console.log('ENSURE_DEPS_JSON ' + JSON.stringify({
-    type: 'ensure-deps',
-    phase,
-    mode: modeStr,
-    passed: !hasCheckpoint,
-    exitCode,
-    results,
-  }));
+  console.log(
+    'ENSURE_DEPS_JSON ' +
+      JSON.stringify({
+        type: 'ensure-deps',
+        phase,
+        mode: modeStr,
+        passed: !hasCheckpoint,
+        exitCode,
+        results,
+      }),
+  );
 
   process.exit(exitCode);
 }

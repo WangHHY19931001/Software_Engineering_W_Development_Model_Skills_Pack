@@ -18,13 +18,7 @@ export type TargetKind = 'rootcause';
 export type ReworkSource = 'verifier' | 'gate';
 export type AnalysisMethod = '5-why' | 'fishbone' | 'defect-chain' | 'upstream-trace' | 'combined';
 export type RootCauseCategory =
-  | 'requirement-gap'
-  | 'design-flaw'
-  | 'coding-error'
-  | 'test-gap'
-  | 'process-missing'
-  | 'tool-gap'
-  | 'upstream-defect';
+  'requirement-gap' | 'design-flaw' | 'coding-error' | 'test-gap' | 'process-missing' | 'tool-gap' | 'upstream-defect';
 export type QualityLevel = 'A' | 'B' | 'C' | 'D';
 
 export interface RootCauseReportShape {
@@ -168,8 +162,10 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
     if (r.meta.targetKind !== 'rootcause') reasons.push('meta.targetKind 必须为 "rootcause"');
     if (!isNonEmptyString(r.meta.targetArtifact)) reasons.push('meta.targetArtifact 必填且非空');
     if (!isNonEmptyString(r.meta.targetPhase)) reasons.push('meta.targetPhase 必填且非空');
-    if (typeof r.meta.reworkRound !== 'number' || r.meta.reworkRound < 1) reasons.push('meta.reworkRound 必须为 ≥1 的整数');
-    if (!['verifier', 'gate'].includes(r.meta.reworkSource ?? '')) reasons.push('meta.reworkSource 必须为 verifier|gate');
+    if (typeof r.meta.reworkRound !== 'number' || r.meta.reworkRound < 1)
+      reasons.push('meta.reworkRound 必须为 ≥1 的整数');
+    if (!['verifier', 'gate'].includes(r.meta.reworkSource ?? ''))
+      reasons.push('meta.reworkSource 必须为 verifier|gate');
     if (!isNonEmptyString(r.meta.persona)) reasons.push('meta.persona 必填且非空');
     if (!['5-why', 'fishbone', 'defect-chain', 'upstream-trace', 'combined'].includes(r.meta.method ?? '')) {
       reasons.push('meta.method 必须为 5-why|fishbone|defect-chain|upstream-trace|combined');
@@ -194,8 +190,14 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   }
 
   // R2 rootCauseChain 长度 [2,5] + evidence 非空
-  if (!Array.isArray(r.rootCauseChain) || r.rootCauseChain.length < MIN_CHAIN_LENGTH || r.rootCauseChain.length > MAX_CHAIN_LENGTH) {
-    reasons.push(`rootCauseChain 长度必须在 [${MIN_CHAIN_LENGTH},${MAX_CHAIN_LENGTH}]，实际为 ${Array.isArray(r.rootCauseChain) ? r.rootCauseChain.length : '非数组'}`);
+  if (
+    !Array.isArray(r.rootCauseChain) ||
+    r.rootCauseChain.length < MIN_CHAIN_LENGTH ||
+    r.rootCauseChain.length > MAX_CHAIN_LENGTH
+  ) {
+    reasons.push(
+      `rootCauseChain 长度必须在 [${MIN_CHAIN_LENGTH},${MAX_CHAIN_LENGTH}]，实际为 ${Array.isArray(r.rootCauseChain) ? r.rootCauseChain.length : '非数组'}`,
+    );
   } else {
     for (let i = 0; i < r.rootCauseChain.length; i++) {
       const step = r.rootCauseChain[i];
@@ -213,7 +215,15 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   if (!r.rootCause || typeof r.rootCause !== 'object') {
     reasons.push('rootCause 字段缺失或非对象');
   } else {
-    const validCategories: RootCauseCategory[] = ['requirement-gap', 'design-flaw', 'coding-error', 'test-gap', 'process-missing', 'tool-gap', 'upstream-defect'];
+    const validCategories: RootCauseCategory[] = [
+      'requirement-gap',
+      'design-flaw',
+      'coding-error',
+      'test-gap',
+      'process-missing',
+      'tool-gap',
+      'upstream-defect',
+    ];
     if (!validCategories.includes(r.rootCause.category)) {
       reasons.push(`rootCause.category 必须为 ${validCategories.join('|')} 之一`);
     }
@@ -230,9 +240,12 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   if (!r.upstreamDefect || typeof r.upstreamDefect !== 'object') {
     reasons.push('upstreamDefect 字段缺失或非对象');
   } else if (r.upstreamDefect.present === true) {
-    if (!isNonEmptyString(r.upstreamDefect.upstreamPhase)) reasons.push('upstreamDefect.present=true 时 upstreamPhase 必填且非空');
-    if (!isNonEmptyString(r.upstreamDefect.upstreamArtifactId)) reasons.push('upstreamDefect.present=true 时 upstreamArtifactId 必填且非空');
-    if (!isNonEmptyString(r.upstreamDefect.defectDescription)) reasons.push('upstreamDefect.present=true 时 defectDescription 必填且非空');
+    if (!isNonEmptyString(r.upstreamDefect.upstreamPhase))
+      reasons.push('upstreamDefect.present=true 时 upstreamPhase 必填且非空');
+    if (!isNonEmptyString(r.upstreamDefect.upstreamArtifactId))
+      reasons.push('upstreamDefect.present=true 时 upstreamArtifactId 必填且非空');
+    if (!isNonEmptyString(r.upstreamDefect.defectDescription))
+      reasons.push('upstreamDefect.present=true 时 defectDescription 必填且非空');
   }
 
   // R4 fixRecommendation 四字段
@@ -292,11 +305,13 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   // R10 多角度场景 reality-checker personaSlice 强制（不限 method）：任一有效 partialReport 含 personaSlice==='reality-checker' 且 confidence ≥ 0.5
   const hasPartialReports = Array.isArray(r.partialReports) && r.partialReports.length > 0;
   if (hasPartialReports) {
-    const realityChecker = r.partialReports!.find(p => p.personaSlice === 'reality-checker');
+    const realityChecker = r.partialReports!.find((p) => p.personaSlice === 'reality-checker');
     if (!realityChecker) {
       reasons.push('R10: 多角度场景缺失 reality-checker personaSlice（防幻想根因）');
     } else if (typeof realityChecker.confidence === 'number' && realityChecker.confidence < MIN_REALITY_CONFIDENCE) {
-      reasons.push(`R10: 多角度场景 reality-checker persona confidence=${realityChecker.confidence} < ${MIN_REALITY_CONFIDENCE}（防幻想根因）`);
+      reasons.push(
+        `R10: 多角度场景 reality-checker persona confidence=${realityChecker.confidence} < ${MIN_REALITY_CONFIDENCE}（防幻想根因）`,
+      );
     }
   } else {
     // 无 partialReports 时 R9 不强制（非 combined 方法可能无 partialReports）

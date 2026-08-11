@@ -38,9 +38,7 @@ export function transitionKey(t: Transition): string {
   return `${t.from}→${t.to}${t.event ? ` [${t.event}]` : ''}`;
 }
 
-export function checkStateMachineConsistency(
-  input: StateMachineConsistencyInput,
-): StateMachineConsistencyResult {
+export function checkStateMachineConsistency(input: StateMachineConsistencyInput): StateMachineConsistencyResult {
   const reasons: string[] = [];
   const designTransitions = Array.isArray(input.designTransitions) ? input.designTransitions : [];
   const codeTransitions = Array.isArray(input.codeTransitions) ? input.codeTransitions : [];
@@ -50,8 +48,8 @@ export function checkStateMachineConsistency(
   const designStateSet = new Set(designStates);
   const codeStateSet = new Set(codeStates);
 
-  const missingStatesInCode = designStates.filter(s => !codeStateSet.has(s));
-  const extraStatesInCode = codeStates.filter(s => !designStateSet.has(s));
+  const missingStatesInCode = designStates.filter((s) => !codeStateSet.has(s));
+  const extraStatesInCode = codeStates.filter((s) => !designStateSet.has(s));
 
   if (missingStatesInCode.length > 0) {
     reasons.push(`代码状态机缺状态（设计文档有但代码缺）：${missingStatesInCode.join(', ')}`);
@@ -63,8 +61,8 @@ export function checkStateMachineConsistency(
   const designTransitionKeys = new Set(designTransitions.map(transitionKey));
   const codeTransitionKeys = new Set(codeTransitions.map(transitionKey));
 
-  const missingInCode = designTransitions.filter(t => !codeTransitionKeys.has(transitionKey(t)));
-  const extraInCode = codeTransitions.filter(t => !designTransitionKeys.has(transitionKey(t)));
+  const missingInCode = designTransitions.filter((t) => !codeTransitionKeys.has(transitionKey(t)));
+  const extraInCode = codeTransitions.filter((t) => !designTransitionKeys.has(transitionKey(t)));
 
   if (missingInCode.length > 0) {
     reasons.push(`代码状态机缺转移（设计文档有但代码缺）：${missingInCode.map(transitionKey).join(', ')}`);

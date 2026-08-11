@@ -33,7 +33,7 @@ describe('R1 Schema 完整性', () => {
     const report = await loadSample('bad-r1-missing-fields.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /rootCause/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /rootCause/.test(r))).toBe(true);
   });
 });
 
@@ -43,7 +43,7 @@ describe('R2 rootCauseChain 长度', () => {
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
     // schema minItems:2 前置拦截 1 步链（[schema] 前缀），业务规则长度校验不再触达
-    expect(result.reasons.some(r => /\[schema\].*rootCauseChain/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /\[schema\].*rootCauseChain/.test(r))).toBe(true);
   });
 });
 
@@ -52,7 +52,7 @@ describe('R3 falsifiabilityCheck 句式', () => {
     const report = await loadSample('bad-r3-falsifiability.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /falsifiabilityCheck.*若.*则/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /falsifiabilityCheck.*若.*则/.test(r))).toBe(true);
   });
 });
 
@@ -61,7 +61,7 @@ describe('R4 fixRecommendation 四字段', () => {
     const report = await loadSample('bad-r4-fix-recommendation.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /fixRecommendation.*rationale/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /fixRecommendation.*rationale/.test(r))).toBe(true);
   });
 });
 
@@ -70,7 +70,7 @@ describe('R5 prevention 三字段', () => {
     const report = await loadSample('bad-r5-prevention.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /prevention.*owner/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /prevention.*owner/.test(r))).toBe(true);
   });
 });
 
@@ -79,7 +79,7 @@ describe('R6 upstreamDefect 后续字段', () => {
     const report = await loadSample('bad-r6-upstream-defect.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /upstreamDefect.*upstreamPhase/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /upstreamDefect.*upstreamPhase/.test(r))).toBe(true);
   });
 });
 
@@ -88,7 +88,7 @@ describe('R7 qualityLevel 与 passed 一致', () => {
     const report = await loadSample('bad-r7-quality-level.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /qualityLevel.*passed.*一致/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /qualityLevel.*passed.*一致/.test(r))).toBe(true);
   });
 });
 
@@ -97,7 +97,7 @@ describe('R8 reportId 格式', () => {
     const report = await loadSample('bad-r8-report-id.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /reportId.*格式/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /reportId.*格式/.test(r))).toBe(true);
   });
 });
 
@@ -106,7 +106,7 @@ describe('R9 多角度场景 partialReports', () => {
     const report = await loadSample('bad-r9-partial-missing.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /partialReports.*非空/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /partialReports.*非空/.test(r))).toBe(true);
   });
 });
 
@@ -115,14 +115,14 @@ describe('R10 reality-checker confidence', () => {
     const report = await loadSample('bad-r10-reality-confidence.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /reality-checker.*confidence/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /reality-checker.*confidence/.test(r))).toBe(true);
   });
 
   it('combined 方法 partialReports 缺失 reality-checker 时失败', async () => {
     const report = await loadSample('bad-r10-no-reality-checker.json');
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => /R10.*缺失 reality-checker/.test(r))).toBe(true);
+    expect(result.reasons.some((r) => /R10.*缺失 reality-checker/.test(r))).toBe(true);
   });
 });
 

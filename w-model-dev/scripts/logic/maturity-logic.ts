@@ -70,10 +70,7 @@ export interface MaturityCheckResult {
 
 // ==================== 校验入口 ====================
 
-export function checkMaturity(
-  maturity: unknown,
-  options?: MaturityCheckOptions,
-): MaturityCheckResult {
+export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions): MaturityCheckResult {
   // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
   const schemaResult = validateBySchema('maturity', maturity);
   if (!schemaResult.valid) {
@@ -117,7 +114,9 @@ export function checkMaturity(
     uc.completedCycles < Math.floor(options.completedPhases / 8)
   ) {
     const expectedCycles = Math.floor(options.completedPhases / 8);
-    violations.push(`R3: project 已完成 ${options.completedPhases} 阶段（${expectedCycles} 完整周期），但 unlockConditions.completedCycles=${uc.completedCycles} 未更新`);
+    violations.push(
+      `R3: project 已完成 ${options.completedPhases} 阶段（${expectedCycles} 完整周期），但 unlockConditions.completedCycles=${uc.completedCycles} 未更新`,
+    );
   }
 
   // R4 history 时序一致：history.at 与 leveledUpAt 不得早于 project.createdAt
@@ -143,7 +142,9 @@ export function checkMaturity(
     typeof dt.operationalFailureStreak === 'number' &&
     options.operationalFailureCount >= dt.operationalFailureStreak
   ) {
-    violations.push(`R5: O 系列失败模式命中 ${options.operationalFailureCount} 次 ≥ downgradeTriggers.operationalFailureStreak ${dt.operationalFailureStreak}，应触发降级评估`);
+    violations.push(
+      `R5: O 系列失败模式命中 ${options.operationalFailureCount} 次 ≥ downgradeTriggers.operationalFailureStreak ${dt.operationalFailureStreak}，应触发降级评估`,
+    );
   }
 
   return { passed: violations.length === 0, violations };

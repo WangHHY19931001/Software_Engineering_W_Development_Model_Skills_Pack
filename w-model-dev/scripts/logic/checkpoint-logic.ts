@@ -61,15 +61,7 @@ export interface CheckpointCheckResult {
 // ==================== R2 规则常量 ====================
 
 // 泛化模板黑名单（大小写敏感，OK/yes 英文原样）
-const BLACKLIST = new Set<string>([
-  '确认放行',
-  '继续',
-  '通过',
-  'OK',
-  'yes',
-  '好的',
-  '同意',
-]);
+const BLACKLIST = new Set<string>(['确认放行', '继续', '通过', 'OK', 'yes', '好的', '同意']);
 
 /**
  * R2 决策内容具体性校验的关键词集合（ID_PATTERNS + TECH_KEYWORDS）。
@@ -94,20 +86,47 @@ const BLACKLIST = new Set<string>([
  * 来源：第 15 轮调测共性问题 C（acknowledgedDecisions 多次因未含 ID/关键词返工）。
  */
 // 具体名词识别：ID 模式（满足任一即通过）
-const ID_PATTERNS: RegExp[] = [
-  /REQ-\d+/,
-  /SD-[\d.]+/,
-  /INTF-[\d.]+/,
-  /DD-[\d.]+/,
-  /TC-\w+-\d+/,
-];
+const ID_PATTERNS: RegExp[] = [/REQ-\d+/, /SD-[\d.]+/, /INTF-[\d.]+/, /DD-[\d.]+/, /TC-\w+-\d+/];
 
 // 具体名词识别：技术关键词（中英，满足任一即通过）
 const TECH_KEYWORDS = [
-  'REST', 'GraphQL', 'JWT', 'OAuth', 'SQLite', 'PostgreSQL', 'Redis', 'Koa', 'Express',
-  'React', 'Vue', 'TypeScript', 'WebSocket', 'HTTP', 'API', 'CRUD',
-  '认证', '鉴权', '缓存', '存储', '模块', '接口', '表', '字段', '状态机', '不变式',
-  '需求', '设计', '架构', '数据库', '前端', '后端', '网关', '队列', '事务', '锁', '索引',
+  'REST',
+  'GraphQL',
+  'JWT',
+  'OAuth',
+  'SQLite',
+  'PostgreSQL',
+  'Redis',
+  'Koa',
+  'Express',
+  'React',
+  'Vue',
+  'TypeScript',
+  'WebSocket',
+  'HTTP',
+  'API',
+  'CRUD',
+  '认证',
+  '鉴权',
+  '缓存',
+  '存储',
+  '模块',
+  '接口',
+  '表',
+  '字段',
+  '状态机',
+  '不变式',
+  '需求',
+  '设计',
+  '架构',
+  '数据库',
+  '前端',
+  '后端',
+  '网关',
+  '队列',
+  '事务',
+  '锁',
+  '索引',
 ];
 
 // ==================== R4 阶段关键词 ====================
@@ -124,16 +143,26 @@ const PHASE_KEYWORDS: Record<number, string[]> = {
 
 // 后阶段决策含任一否定关键词 + 该阶段无 rework/rollback → 疑似静默推翻
 const NEGATION_KEYWORDS = [
-  '否定', '推翻', '否决', '废弃', '不用', '放弃', '改为', '改用', '替换',
-  '移除', '删除', '撤销', '回退', '取消', '不采用',
+  '否定',
+  '推翻',
+  '否决',
+  '废弃',
+  '不用',
+  '放弃',
+  '改为',
+  '改用',
+  '替换',
+  '移除',
+  '删除',
+  '撤销',
+  '回退',
+  '取消',
+  '不采用',
 ];
 
 // ==================== 校验入口 ====================
 
-export function checkCheckpoint(
-  entries: unknown,
-  options?: CheckpointCheckOptions,
-): CheckpointCheckResult {
+export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptions): CheckpointCheckResult {
   const violations: string[] = [];
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
@@ -174,17 +203,12 @@ export function checkCheckpoint(
   }
 
   // 收集 checkpoint success 记录（R1-R4 的校验对象）
-  const checkpoints = valid.filter(
-    e => e.action === 'checkpoint' && e.outcome === 'success',
-  );
+  const checkpoints = valid.filter((e) => e.action === 'checkpoint' && e.outcome === 'success');
 
   // R1 acknowledgedDecisions 非空
   // 每个 checkpoint success 须有 ≥1 条 acknowledgedDecisions，防空决策放行（O4 / D19）
   for (const e of checkpoints) {
-    if (
-      !Array.isArray(e.acknowledgedDecisions) ||
-      e.acknowledgedDecisions.length === 0
-    ) {
+    if (!Array.isArray(e.acknowledgedDecisions) || e.acknowledgedDecisions.length === 0) {
       violations.push(
         `R1: 条目 ${e.runId} checkpoint success 但 acknowledgedDecisions 为空（O4 Comprehension Debt / D19）`,
       );
@@ -202,9 +226,7 @@ export function checkCheckpoint(
       if (typeof decision !== 'string') continue;
       // 1. 黑名单检查（大小写敏感，OK/yes 英文原样）
       if (BLACKLIST.has(decision)) {
-        violations.push(
-          `R2: 条目 ${e.runId} 决策 "${decision}" 命中泛化模板黑名单`,
-        );
+        violations.push(`R2: 条目 ${e.runId} 决策 "${decision}" 命中泛化模板黑名单`);
         continue;
       }
       // 2. 长度检查（Unicode 码点数，中英文都算 1）
@@ -213,12 +235,10 @@ export function checkCheckpoint(
         continue;
       }
       // 3. 具体名词检查（启发式）：ID 模式 或 技术关键词，满足任一即通过
-      const hasId = ID_PATTERNS.some(p => p.test(decision));
-      const hasTech = TECH_KEYWORDS.some(k => decision.includes(k));
+      const hasId = ID_PATTERNS.some((p) => p.test(decision));
+      const hasTech = TECH_KEYWORDS.some((k) => decision.includes(k));
       if (!hasId && !hasTech) {
-        violations.push(
-          `R2: 条目 ${e.runId} 决策 "${decision}" 未含具体名词（技术方案/模块/接口/数据结构名）`,
-        );
+        violations.push(`R2: 条目 ${e.runId} 决策 "${decision}" 未含具体名词（技术方案/模块/接口/数据结构名）`);
       }
     }
   }
@@ -227,17 +247,13 @@ export function checkCheckpoint(
   if (!options?.checkpointLog) {
     // [21.0.0] 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规
     for (const e of checkpoints) {
-      violations.push(
-        `R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（未提供 --checkpoint-log，[21.0.0] 强制）`,
-      );
+      violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（未提供 --checkpoint-log，[21.0.0] 强制）`);
     }
   } else {
     for (const e of checkpoints) {
       const userConfirm = options.checkpointLog.get(String(e.phase));
       if (!userConfirm || userConfirm.trim() === '') {
-        violations.push(
-          `R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（疑似 O 自问自答 / D19）`,
-        );
+        violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（疑似 O 自问自答 / D19）`);
       }
     }
   }
@@ -251,11 +267,9 @@ export function checkCheckpoint(
     if (!Array.isArray(e.acknowledgedDecisions)) continue;
     for (const decision of e.acknowledgedDecisions) {
       if (typeof decision !== 'string') continue;
-      const matches = keywords.some(k => decision.includes(k));
+      const matches = keywords.some((k) => decision.includes(k));
       if (!matches) {
-        violations.push(
-          `R4: 条目 ${e.runId} 阶段 ${e.phase} 决策 "${decision}" 与阶段主题不匹配`,
-        );
+        violations.push(`R4: 条目 ${e.runId} 阶段 ${e.phase} 决策 "${decision}" 与阶段主题不匹配`);
       }
     }
   }
@@ -275,7 +289,7 @@ export function checkCheckpoint(
     if (!Array.isArray(e.acknowledgedDecisions)) continue;
     for (const decision of e.acknowledgedDecisions) {
       if (typeof decision !== 'string') continue;
-      const hasNegation = NEGATION_KEYWORDS.some(k => decision.includes(k));
+      const hasNegation = NEGATION_KEYWORDS.some((k) => decision.includes(k));
       if (hasNegation && !reworkedPhases.has(e.phase)) {
         violations.push(
           `R5: 阶段 ${e.phase} 决策 "${decision}" 含否定语义，但该阶段无 rework/rollback 记录，疑似静默推翻前阶段决策（D19）`,

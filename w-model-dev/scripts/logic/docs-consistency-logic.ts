@@ -79,13 +79,13 @@ const STALE_EXIT2 = ['29 个脚本', '27 个脚本'];
  * 「新增第六维度」），仅当表述把当前标准说成五/六维度时才视为过时。
  */
 const STALE_DOD_DIMENSIONS = [
-  '五维度标准',       // 表名（当前为七维度标准）
-  '六维度标准',       // 标题/表名（当前为七维度标准）
-  '五维度 → 六维度',  // 演变终点停在六维度
+  '五维度标准', // 表名（当前为七维度标准）
+  '六维度标准', // 标题/表名（当前为七维度标准）
+  '五维度 → 六维度', // 演变终点停在六维度
   '五维度扩展为六维度',
-  '六维度（更新）',   // 章节标题
-  '§10.6 六维度',     // 过时 SSoT 引用
-  '§10.6 五维度',     // 过时 SSoT 引用
+  '六维度（更新）', // 章节标题
+  '§10.6 六维度', // 过时 SSoT 引用
+  '§10.6 五维度', // 过时 SSoT 引用
 ];
 /** `targetKind`（…）括号枚举形式的废弃值检测（如 `targetKind`（`requirement` / `design` / `testcase` / `file`）） */
 const TARGETKIND_ENUM_PATTERN = /`targetKind`\s*（[^）]*(?:testcase|file)[^）]*）/;
@@ -94,7 +94,9 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   const violations: DocCheckViolation[] = [];
   violations.push(...checkSchemaList(input.schemaFiles, input.dataModels));
   violations.push(...checkRunLogActionEnum(input.runLogSchema, input.dataModels));
-  violations.push(...checkTargetKindLiveDocs(input.verifierSpec, input.commandReference, input.agentPersonas, input.ssot));
+  violations.push(
+    ...checkTargetKindLiveDocs(input.verifierSpec, input.commandReference, input.agentPersonas, input.ssot),
+  );
   violations.push(...checkDoDDimensions(input.definitionOfDone, input.readme, input.ssot));
   violations.push(...checkOperatingBehaviors(input.skill, input.readme, input.ssot));
   violations.push(...checkAntiPatterns(input.antiPatterns));
@@ -112,7 +114,10 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
 function checkSchemaList(schemaFiles: string[], dataModels: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (!dataModels.includes(SCHEMA_TABLE_HEADING)) {
-    violations.push({ check: 'schema-list', message: `data-models.md 应含「${SCHEMA_TABLE_HEADING}」标题（当前 ${schemaFiles.length} 个 schema 文件）` });
+    violations.push({
+      check: 'schema-list',
+      message: `data-models.md 应含「${SCHEMA_TABLE_HEADING}」标题（当前 ${schemaFiles.length} 个 schema 文件）`,
+    });
   }
   for (const file of schemaFiles) {
     const key = file.replace(/\.schema\.json$/, '');
@@ -137,15 +142,26 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
   if (parseFailed) {
     violations.push({ check: 'run-log-action', message: 'run-log.schema.json 解析失败' });
   } else if (count !== EXPECTED.runLogActionCount) {
-    violations.push({ check: 'run-log-action', message: `run-log.schema.json action.enum 长度应为 ${EXPECTED.runLogActionCount}，实际 ${count}` });
+    violations.push({
+      check: 'run-log-action',
+      message: `run-log.schema.json action.enum 长度应为 ${EXPECTED.runLogActionCount}，实际 ${count}`,
+    });
   }
   if (!dataModels.includes(`action enum（${EXPECTED.runLogActionCount} 类）`)) {
-    violations.push({ check: 'run-log-action', message: `data-models.md run-log 行应含「action enum（${EXPECTED.runLogActionCount} 类）」` });
+    violations.push({
+      check: 'run-log-action',
+      message: `data-models.md run-log 行应含「action enum（${EXPECTED.runLogActionCount} 类）」`,
+    });
   }
   return violations;
 }
 
-function checkTargetKindLiveDocs(verifierSpec: string, commandReference: string, agentPersonas: string, ssot: string): DocCheckViolation[] {
+function checkTargetKindLiveDocs(
+  verifierSpec: string,
+  commandReference: string,
+  agentPersonas: string,
+  ssot: string,
+): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const docs: Array<[string, string]> = [
     ['verifier-spec', verifierSpec],
@@ -156,7 +172,10 @@ function checkTargetKindLiveDocs(verifierSpec: string, commandReference: string,
   for (const [docName, content] of docs) {
     for (const token of FORBIDDEN_TARGETKIND) {
       if (content.includes(token)) {
-        violations.push({ check: 'targetkind', message: `${docName} 检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
+        violations.push({
+          check: 'targetkind',
+          message: `${docName} 检测到废弃 targetKind 标记「${token}」（应为 code/test）`,
+        });
       }
     }
   }
@@ -192,7 +211,10 @@ function checkOperatingBehaviors(skill: string, readme: string, ssot: string): D
     violations.push({ check: 'operating-behaviors', message: 'SSoT §4A.1 应含「### 4A.1 八条核心操作行为」权威标题' });
   }
   if (!skill.includes('Structure Over Persuasion')) {
-    violations.push({ check: 'operating-behaviors', message: 'SKILL.md 操作行为表应含第 8 条 Structure Over Persuasion' });
+    violations.push({
+      check: 'operating-behaviors',
+      message: 'SKILL.md 操作行为表应含第 8 条 Structure Over Persuasion',
+    });
   }
   const outdated = ['6 条核心操作行为', '七条核心操作行为', '7 条核心操作行为', '七条操作行为'];
   for (const token of outdated) {
@@ -206,10 +228,16 @@ function checkOperatingBehaviors(skill: string, readme: string, ssot: string): D
 function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (!antiPatterns.includes(`\n| ${EXPECTED.maxAntiPattern} |`)) {
-    violations.push({ check: 'anti-patterns', message: `anti-patterns.md 反模式表最大编号应为 ${EXPECTED.maxAntiPattern}` });
+    violations.push({
+      check: 'anti-patterns',
+      message: `anti-patterns.md 反模式表最大编号应为 ${EXPECTED.maxAntiPattern}`,
+    });
   }
   if (!antiPatterns.includes(`#1~#${EXPECTED.maxAntiPattern}`)) {
-    violations.push({ check: 'anti-patterns', message: `anti-patterns.md 应含连续区间「#1~#${EXPECTED.maxAntiPattern}」` });
+    violations.push({
+      check: 'anti-patterns',
+      message: `anti-patterns.md 应含连续区间「#1~#${EXPECTED.maxAntiPattern}」`,
+    });
   }
   for (const stale of STALE_RANGES) {
     if (antiPatterns.includes(stale)) {
@@ -222,7 +250,10 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
 function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (count !== EXPECTED.exit2ScriptCount) {
-    violations.push({ check: 'exit2-scripts', message: `实测 exit-2 脚本数应为 ${EXPECTED.exit2ScriptCount}，实际 ${count}` });
+    violations.push({
+      check: 'exit2-scripts',
+      message: `实测 exit-2 脚本数应为 ${EXPECTED.exit2ScriptCount}，实际 ${count}`,
+    });
   }
   if (!agents.includes(`${EXPECTED.exit2ScriptCount} 个脚本`)) {
     violations.push({ check: 'exit2-scripts', message: `AGENTS.md 应含「${EXPECTED.exit2ScriptCount} 个脚本」` });
@@ -242,7 +273,10 @@ function checkPrePushCount(prePush: string): DocCheckViolation[] {
     max = Math.max(max, Number(m[1]));
   }
   if (max !== EXPECTED.prePushCount) {
-    violations.push({ check: 'pre-push', message: `pre-push 编号注释最大值应为 ${EXPECTED.prePushCount}，实际 ${max}` });
+    violations.push({
+      check: 'pre-push',
+      message: `pre-push 编号注释最大值应为 ${EXPECTED.prePushCount}，实际 ${max}`,
+    });
   }
   if (!prePush.includes(`${EXPECTED.prePushCount} 项检查`)) {
     violations.push({ check: 'pre-push', message: `pre-push 注释应含「${EXPECTED.prePushCount} 项检查」` });
@@ -267,10 +301,16 @@ function checkGlossaryAction(glossary: string): DocCheckViolation[] {
 function checkAssetCounts(personaCount: number, cursorSkillCount: number): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (personaCount !== EXPECTED.personaCount) {
-    violations.push({ check: 'asset-counts', message: `subagent/ 人格文件数应为 ${EXPECTED.personaCount}，实际 ${personaCount}` });
+    violations.push({
+      check: 'asset-counts',
+      message: `subagent/ 人格文件数应为 ${EXPECTED.personaCount}，实际 ${personaCount}`,
+    });
   }
   if (cursorSkillCount !== EXPECTED.cursorSkillCount) {
-    violations.push({ check: 'asset-counts', message: `.cursor/skills 目录数应为 ${EXPECTED.cursorSkillCount}，实际 ${cursorSkillCount}` });
+    violations.push({
+      check: 'asset-counts',
+      message: `.cursor/skills 目录数应为 ${EXPECTED.cursorSkillCount}，实际 ${cursorSkillCount}`,
+    });
   }
   return violations;
 }
@@ -280,16 +320,25 @@ function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): 
   for (const doc of designDocs) {
     for (const token of FORBIDDEN_TARGETKIND) {
       if (doc.content.includes(token)) {
-        violations.push({ check: 'design-docs', message: `${doc.name} 检测到废弃 targetKind 标记「${token}」（应为 code/test）` });
+        violations.push({
+          check: 'design-docs',
+          message: `${doc.name} 检测到废弃 targetKind 标记「${token}」（应为 code/test）`,
+        });
       }
     }
     const enumMatch = doc.content.match(TARGETKIND_ENUM_PATTERN);
     if (enumMatch) {
-      violations.push({ check: 'design-docs', message: `${doc.name} 的 targetKind 括号枚举仍含废弃值「${enumMatch[0]}」（应为 code/test）` });
+      violations.push({
+        check: 'design-docs',
+        message: `${doc.name} 的 targetKind 括号枚举仍含废弃值「${enumMatch[0]}」（应为 code/test）`,
+      });
     }
     for (const stale of STALE_DOD_DIMENSIONS) {
       if (doc.content.includes(stale)) {
-        violations.push({ check: 'design-docs', message: `${doc.name} 仍含过时 DoD 维度表述「${stale}」（当前七维度）` });
+        violations.push({
+          check: 'design-docs',
+          message: `${doc.name} 仍含过时 DoD 维度表述「${stale}」（当前七维度）`,
+        });
       }
     }
     for (const stale of STALE_RANGES) {
@@ -304,13 +353,19 @@ function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): 
 function checkVitestFileCount(testFileCount: number, readme: string, agents: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (testFileCount !== EXPECTED.vitestFileCount) {
-    violations.push({ check: 'vitest-files', message: `实测 vitest 测试文件数应为 ${EXPECTED.vitestFileCount}，实际 ${testFileCount}（新增测试文件须同步文档与 EXPECTED）` });
+    violations.push({
+      check: 'vitest-files',
+      message: `实测 vitest 测试文件数应为 ${EXPECTED.vitestFileCount}，实际 ${testFileCount}（新增测试文件须同步文档与 EXPECTED）`,
+    });
   }
   if (!readme.includes(`${EXPECTED.vitestFileCount} files`)) {
     violations.push({ check: 'vitest-files', message: `README 应含「${EXPECTED.vitestFileCount} files」vitest 表述` });
   }
   if (!agents.includes(`${EXPECTED.vitestFileCount} 个 .test.ts`)) {
-    violations.push({ check: 'vitest-files', message: `AGENTS.md 应含「${EXPECTED.vitestFileCount} 个 .test.ts」vitest 表述` });
+    violations.push({
+      check: 'vitest-files',
+      message: `AGENTS.md 应含「${EXPECTED.vitestFileCount} 个 .test.ts」vitest 表述`,
+    });
   }
   return violations;
 }
@@ -322,7 +377,12 @@ function checkVitestFileCount(testFileCount: number, readme: string, agents: str
  * 无法采集（vitest 不可用 / 输出不可解析，vitestTestCount < 0）时保守放行，不阻断门禁
  * （与 detectScriptsChanges 在 git 不可用时保守返回 false 的既有策略一致）。
  */
-function checkVitestTestCount(vitestTestCount: number, readme: string, agents: string, prePush: string): DocCheckViolation[] {
+function checkVitestTestCount(
+  vitestTestCount: number,
+  readme: string,
+  agents: string,
+  prePush: string,
+): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (vitestTestCount < 0) return violations;
   const pattern = new RegExp(`\\b${vitestTestCount}\\s*(?:tests?\\b|条)`);
@@ -353,12 +413,14 @@ function checkBaselineSync(scriptsChanged: boolean, baselineEntryCount: number):
   if (baselineEntryCount < 0) {
     violations.push({
       check: 'baseline-sync',
-      message: 'w-model-dev/scripts/** 有变更，但根目录 .eslintsecurity-baseline.json 缺失或不可解析（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
+      message:
+        'w-model-dev/scripts/** 有变更，但根目录 .eslintsecurity-baseline.json 缺失或不可解析（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
     });
   } else if (baselineEntryCount === 0) {
     violations.push({
       check: 'baseline-sync',
-      message: 'w-model-dev/scripts/** 有变更，但 .eslintsecurity-baseline.json 指纹条目为空（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
+      message:
+        'w-model-dev/scripts/** 有变更，但 .eslintsecurity-baseline.json 指纹条目为空（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
     });
   }
   return violations;

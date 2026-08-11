@@ -157,7 +157,10 @@ describe('wm-status CLI（边界与降级）', () => {
 
   it('run-log.jsonl 含坏行 → exit 0，坏行跳过不崩溃（stderr 警告）', async () => {
     await writeWModel('project.json', PROJECT_JSON);
-    await writeWModel('run-log.jsonl', '{"runId":"a","phase":5,"action":"produce","role":"S","outcome":"success"}\n{broken json line}\n');
+    await writeWModel(
+      'run-log.jsonl',
+      '{"runId":"a","phase":5,"action":"produce","role":"S","outcome":"success"}\n{broken json line}\n',
+    );
     const r = run();
     expect(r.code).toBe(0);
     expect(r.stderr).toContain('非合法 JSON');

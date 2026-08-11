@@ -62,7 +62,7 @@ export function checkArchiveIntegrity(
       if (requiredFile.endsWith('/')) {
         // 目录：检查是否有任何路径以此前缀开头
         const prefix = requiredFile.slice(0, -1);
-        const found = Array.from(archiveDirContents).some(p => p.startsWith(prefix + '/') || p === prefix);
+        const found = Array.from(archiveDirContents).some((p) => p.startsWith(prefix + '/') || p === prefix);
         if (!found) {
           missingFiles.push(`[phase=${phase}] ${requiredFile}（目录缺失）`);
         } else {
@@ -70,7 +70,7 @@ export function checkArchiveIntegrity(
         }
       } else if (requiredFile.endsWith('-')) {
         // 前缀匹配（如 verifier-output-），按归档根下 basename 精确前缀匹配
-        const found = Array.from(archiveDirContents).some(p => {
+        const found = Array.from(archiveDirContents).some((p) => {
           const base = p.split('/').pop() ?? '';
           return base.startsWith(requiredFile);
         });

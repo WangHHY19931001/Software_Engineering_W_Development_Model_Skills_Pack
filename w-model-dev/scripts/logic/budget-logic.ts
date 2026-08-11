@@ -109,11 +109,7 @@ export function checkBudget(
   }
 
   // R4 killSwitch.budgetBurnRate 范围 [0,1]
-  if (
-    ks &&
-    typeof ks.budgetBurnRate === 'number' &&
-    (ks.budgetBurnRate < 0 || ks.budgetBurnRate > 1)
-  ) {
+  if (ks && typeof ks.budgetBurnRate === 'number' && (ks.budgetBurnRate < 0 || ks.budgetBurnRate > 1)) {
     violations.push(`killSwitch.budgetBurnRate 超范围 [0,1]: ${ks.budgetBurnRate}`);
   }
 
@@ -165,15 +161,21 @@ export function checkRootcauseBudget(b: Partial<BudgetConfig>): BudgetCheckResul
 
   for (const round of b.rootcauseRounds) {
     if (round.personas.length > cfg.maxPersonasPerRound) {
-      violations.push(`R4-A：round ${round.round} persona 数 ${round.personas.length} > maxPersonasPerRound ${cfg.maxPersonasPerRound}`);
+      violations.push(
+        `R4-A：round ${round.round} persona 数 ${round.personas.length} > maxPersonasPerRound ${cfg.maxPersonasPerRound}`,
+      );
     }
     for (const p of round.personas) {
       if (p.tokens > cfg.maxTokensPerPersona) {
-        violations.push(`R4-A：round ${round.round} persona ${p.personaSlice} tokens ${p.tokens} > maxTokensPerPersona ${cfg.maxTokensPerPersona}`);
+        violations.push(
+          `R4-A：round ${round.round} persona ${p.personaSlice} tokens ${p.tokens} > maxTokensPerPersona ${cfg.maxTokensPerPersona}`,
+        );
       }
     }
     if (round.totalTokens > cfg.maxTotalTokensPerRound) {
-      violations.push(`R4-A：round ${round.round} 总 tokens ${round.totalTokens} > maxTotalTokensPerRound ${cfg.maxTotalTokensPerRound}（串行分派时累计，触发 killSwitch）`);
+      violations.push(
+        `R4-A：round ${round.round} 总 tokens ${round.totalTokens} > maxTotalTokensPerRound ${cfg.maxTotalTokensPerRound}（串行分派时累计，触发 killSwitch）`,
+      );
     }
   }
 

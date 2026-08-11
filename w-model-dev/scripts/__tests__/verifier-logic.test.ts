@@ -15,7 +15,10 @@ import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } 
 
 describe('[21.0.0] evidence 格式校验', () => {
   it('合法 evidence（冒号格式）应通过', () => {
-    const evidence = ['docs/phase1-requirements/requirement-spec.md:§1.1=需求完整覆盖用户故事', 'src/article.service.ts:L42=认证模块 JWT 校验逻辑'];
+    const evidence = [
+      'docs/phase1-requirements/requirement-spec.md:§1.1=需求完整覆盖用户故事',
+      'src/article.service.ts:L42=认证模块 JWT 校验逻辑',
+    ];
     const result = validateEvidenceFormat(evidence);
     expect(result.valid).toBe(true);
     expect(result.vagueItems).toEqual([]);
@@ -43,10 +46,10 @@ describe('[21.0.0] evidence 格式校验', () => {
 describe('[26.0.0] R13 单轴下限（反模式 #41）', () => {
   it('全部子标准 ≥ 0.70 应无违规', () => {
     const subCriteria = [
-      { name: 'completeness', score: 0.90 },
+      { name: 'completeness', score: 0.9 },
       { name: 'clarity', score: 0.85 },
-      { name: 'consistency', score: 0.70 },
-      { name: 'testability', score: 0.80 },
+      { name: 'consistency', score: 0.7 },
+      { name: 'testability', score: 0.8 },
       { name: 'traceability', score: 0.95 },
     ];
     const violations = checkR13SingleAxisFloor(subCriteria);
@@ -70,11 +73,11 @@ describe('[26.0.0] R13 单轴下限（反模式 #41）', () => {
 
   it('边界值 0.70 本身不应命中（B 级分界含等号）', () => {
     const subCriteria = [
-      { name: 'completeness', score: 0.70 },
-      { name: 'clarity', score: 0.70 },
-      { name: 'consistency', score: 0.70 },
-      { name: 'testability', score: 0.70 },
-      { name: 'traceability', score: 0.70 },
+      { name: 'completeness', score: 0.7 },
+      { name: 'clarity', score: 0.7 },
+      { name: 'consistency', score: 0.7 },
+      { name: 'testability', score: 0.7 },
+      { name: 'traceability', score: 0.7 },
     ];
     const violations = checkR13SingleAxisFloor(subCriteria);
     expect(violations).toEqual([]);
@@ -97,14 +100,49 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
         agent: 'test-agent',
         scoringMethod: 'logits',
         repeatTimes: 3,
-        varianceThreshold: 0.10,
+        varianceThreshold: 0.1,
       },
       subCriteria: [
-        { name: 'completeness', weight: 0.30, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: '质量良好' },
-        { name: 'clarity', weight: 0.25, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: '评审通过' },
-        { name: 'consistency', weight: 0.20, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
-        { name: 'testability', weight: 0.15, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.4=REQ-001 需求覆盖' },
-        { name: 'traceability', weight: 0.10, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'rtm.json:§REQ-001=coverage full' },
+        {
+          name: 'completeness',
+          weight: 0.3,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: '质量良好',
+        },
+        {
+          name: 'clarity',
+          weight: 0.25,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: '评审通过',
+        },
+        {
+          name: 'consistency',
+          weight: 0.2,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'requirements.md:§3.2=REQ-001 需求覆盖',
+        },
+        {
+          name: 'testability',
+          weight: 0.15,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'requirements.md:§3.4=REQ-001 需求覆盖',
+        },
+        {
+          name: 'traceability',
+          weight: 0.1,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'rtm.json:§REQ-001=coverage full',
+        },
       ],
       compositeScore: 0.72,
       qualityLevel: 'B',
@@ -116,7 +154,7 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
     expect(result.compositeScore).toBeLessThan(0.72);
     expect(result.qualityLevel).toBe('C');
     expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => r.includes('evidence 格式校验失败'))).toBe(true);
+    expect(result.reasons.some((r) => r.includes('evidence 格式校验失败'))).toBe(true);
   });
 
   it('evidence 合法时不扣分，passed 基于原始 compositeScore 判定', () => {
@@ -129,14 +167,49 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
         agent: 'test-agent',
         scoringMethod: 'logits',
         repeatTimes: 3,
-        varianceThreshold: 0.10,
+        varianceThreshold: 0.1,
       },
       subCriteria: [
-        { name: 'completeness', weight: 0.30, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
-        { name: 'clarity', weight: 0.25, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
-        { name: 'consistency', weight: 0.20, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.2=REQ-001 需求覆盖' },
-        { name: 'testability', weight: 0.15, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'requirements.md:§3.4=REQ-001 需求覆盖' },
-        { name: 'traceability', weight: 0.10, score: 0.72, rawScores: [0.71, 0.72, 0.73], variance: 0.0000667, evidence: 'rtm.json:§REQ-001=coverage full' },
+        {
+          name: 'completeness',
+          weight: 0.3,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'requirements.md:§3.2=REQ-001 需求覆盖',
+        },
+        {
+          name: 'clarity',
+          weight: 0.25,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'requirements.md:§3.2=REQ-001 需求覆盖',
+        },
+        {
+          name: 'consistency',
+          weight: 0.2,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'requirements.md:§3.2=REQ-001 需求覆盖',
+        },
+        {
+          name: 'testability',
+          weight: 0.15,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'requirements.md:§3.4=REQ-001 需求覆盖',
+        },
+        {
+          name: 'traceability',
+          weight: 0.1,
+          score: 0.72,
+          rawScores: [0.71, 0.72, 0.73],
+          variance: 0.0000667,
+          evidence: 'rtm.json:§REQ-001=coverage full',
+        },
       ],
       compositeScore: 0.72,
       qualityLevel: 'B',

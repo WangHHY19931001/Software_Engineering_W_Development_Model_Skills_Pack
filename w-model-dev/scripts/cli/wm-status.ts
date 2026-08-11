@@ -21,12 +21,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import {
-  buildStatusReport,
-  type RtmLike,
-  type RunLogLike,
-  type StatusReport,
-} from '../logic/wm-status-logic.js';
+import { buildStatusReport, type RtmLike, type RunLogLike, type StatusReport } from '../logic/wm-status-logic.js';
 import { readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -95,9 +90,10 @@ async function main(): Promise<void> {
     if (e.code !== 'ENOENT') {
       exitWithError({
         category: err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
-        message: err instanceof SyntaxError
-          ? '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）'
-          : '文件读取失败（转 operational-recovery，不猜测状态）',
+        message:
+          err instanceof SyntaxError
+            ? '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）'
+            : '文件读取失败（转 operational-recovery，不猜测状态）',
         file: rtmFile,
         detail: err instanceof SyntaxError ? undefined : (e.code ?? '未知错误'),
         exitCode: 2,
@@ -133,7 +129,9 @@ async function main(): Promise<void> {
   console.log(`完成进度      : ${report.progress}`);
   console.log(`updatedAt     : ${report.updatedAt}`);
   if (report.rtmCoverage) {
-    console.log(`RTM 覆盖率    : ${report.rtmCoverage.covered}/${report.rtmCoverage.total}（${report.rtmCoverage.percent}%）`);
+    console.log(
+      `RTM 覆盖率    : ${report.rtmCoverage.covered}/${report.rtmCoverage.total}（${report.rtmCoverage.percent}%）`,
+    );
   } else {
     console.log('RTM 覆盖率    : 未生成（.w-model/rtm.json 缺失或格式不符）');
   }

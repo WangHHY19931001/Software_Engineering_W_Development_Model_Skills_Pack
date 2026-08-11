@@ -24,7 +24,7 @@ async function makeTmpDir(): Promise<string> {
 }
 
 afterEach(async () => {
-  await Promise.all(tmpRoots.splice(0).map(d => fs.rm(d, { recursive: true, force: true })));
+  await Promise.all(tmpRoots.splice(0).map((d) => fs.rm(d, { recursive: true, force: true })));
 });
 
 describe('isTlcStatesDir', () => {
@@ -82,10 +82,7 @@ describe('cleanTraceFiles', () => {
     // cleanTraceFiles 的契约：返回成功删除（fs.rm 未抛错）的路径列表。
     // 注：Windows 上 fs.rm(recursive) 的物理删除时序不可靠（返回后路径可能短暂存留），
     // 因此断言返回契约（deleted 数组）而非文件系统最终状态。
-    expect(deleted.sort()).toEqual([
-      path.join(dir, 'states'),
-      path.join(dir, 'trace.dump'),
-    ].sort());
+    expect(deleted.sort()).toEqual([path.join(dir, 'states'), path.join(dir, 'trace.dump')].sort());
     expect((await fs.readdir(dir)).includes('L2-AuthService.tla')).toBe(true);
   });
 

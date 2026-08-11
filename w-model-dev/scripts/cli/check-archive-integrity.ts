@@ -68,7 +68,7 @@ async function main(): Promise<void> {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
-  const archiveDir = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const archiveDir = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!archiveDir) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -100,13 +100,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'archive-integrity',
-      passed: result.passed,
-      reasons: result.missingFiles,
-      violations: buildViolationDistribution(result.missingFiles.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'archive-integrity',
+        passed: result.passed,
+        reasons: result.missingFiles,
+        violations: buildViolationDistribution(result.missingFiles.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -132,12 +135,16 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/anti-patterns.md #31');
   }
 
-  printGateReport('ARCHIVE_INTEGRITY', {
-    type: 'archive-integrity',
-    passed: result.passed,
-    missingFiles: result.missingFiles,
-    checkedPhases: result.checkedPhases,
-  }, exitCode);
+  printGateReport(
+    'ARCHIVE_INTEGRITY',
+    {
+      type: 'archive-integrity',
+      passed: result.passed,
+      missingFiles: result.missingFiles,
+      checkedPhases: result.checkedPhases,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

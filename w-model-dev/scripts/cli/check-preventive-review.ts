@@ -36,7 +36,11 @@
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { checkPreventiveReview, type PreventiveReview, type PreventiveReviewOptions } from '../logic/preventive-review-logic.js';
+import {
+  checkPreventiveReview,
+  type PreventiveReview,
+  type PreventiveReviewOptions,
+} from '../logic/preventive-review-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
@@ -74,11 +78,11 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const projectDir = args.find(a => !a.startsWith('--')) ?? '.';
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const variantArg = args.find(a => a.startsWith('--variant='));
+  const projectDir = args.find((a) => !a.startsWith('--')) ?? '.';
+  const phaseArg = args.find((a) => a.startsWith('--phase='));
+  const variantArg = args.find((a) => a.startsWith('--variant='));
   const autoTrigger = args.includes('--auto-trigger');
-  const runLogArg = args.find(a => a.startsWith('--run-log='));
+  const runLogArg = args.find((a) => a.startsWith('--run-log='));
 
   // 统一 --phase 校验（lib/parse-phase.ts，1-8）；非法/缺失由下方 !phase 检查统一拦截
   let phase: number | undefined = phaseArg ? parsePhaseArg(process.argv, { min: 1, max: 8 })?.phase : undefined;
@@ -192,7 +196,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失或非法 --phase=<1-8>',
-      detail: '用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=standard|fix|emergency] | --auto-trigger --run-log=<run-log.jsonl>',
+      detail:
+        '用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=standard|fix|emergency] | --auto-trigger --run-log=<run-log.jsonl>',
       exitCode: 2,
     });
     return;
@@ -227,18 +232,30 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'preventive-review',
-      passed: output.passed,
-      reasons: output.reasons,
-      violations: buildViolationDistribution(output.reasons.length),
-      durationMs: Date.now() - startTime,
-    }, output.exitCode);
+    printJsonReport(
+      {
+        type: 'preventive-review',
+        passed: output.passed,
+        reasons: output.reasons,
+        violations: buildViolationDistribution(output.reasons.length),
+        durationMs: Date.now() - startTime,
+      },
+      output.exitCode,
+    );
     process.exitCode = output.exitCode;
     return;
   }
 
-  console.log('PREVENTIVE_REVIEW_JSON ' + JSON.stringify({ type: 'preventive-review', passed: output.passed, exitCode: output.exitCode, variant: output.variant, reasons: output.reasons }));
+  console.log(
+    'PREVENTIVE_REVIEW_JSON ' +
+      JSON.stringify({
+        type: 'preventive-review',
+        passed: output.passed,
+        exitCode: output.exitCode,
+        variant: output.variant,
+        reasons: output.reasons,
+      }),
+  );
 
   // 写入 gate-logs
   const gateLogsDir = path.resolve(projectDir, '.w-model', 'gate-logs');
@@ -256,7 +273,7 @@ async function main(): Promise<void> {
   process.exit(output.exitCode);
 }
 
-main().catch(err => {
+main().catch((err) => {
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',

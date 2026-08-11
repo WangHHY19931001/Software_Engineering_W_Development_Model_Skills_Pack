@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const file = args.find(a => !a.startsWith('--'));
+  const file = args.find((a) => !a.startsWith('--'));
   // 第29轮：--r3-enabled 保留解析以兼容旧调用，但语义为 no-op（R≥3 无条件强制）
   const r3EnabledFlagPassed = args.includes('--r3-enabled');
 
@@ -102,13 +102,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'role-dispatch',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'role-dispatch',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -124,7 +127,9 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
 
   for (const p of result.phaseSummary) {
-    const roleStr = Object.entries(p.roles).map(([r, c]) => `${r}=${c}`).join(', ');
+    const roleStr = Object.entries(p.roles)
+      .map(([r, c]) => `${r}=${c}`)
+      .join(', ');
     const missingStr = p.missing.length > 0 ? ` [缺失: ${p.missing.join('/')}]` : '';
     console.log(`  阶段 ${p.phase}: ${roleStr}${missingStr}`);
   }
@@ -138,13 +143,17 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（r3Enabled 恒为 true，向后兼容历史消费者）
-  printGateReport('ROLE_DISPATCH', {
-    type: 'role-dispatch',
-    passed: result.passed,
-    r3Enabled: true,
-    phaseCount: result.phaseSummary.length,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'ROLE_DISPATCH',
+    {
+      type: 'role-dispatch',
+      passed: result.passed,
+      r3Enabled: true,
+      phaseCount: result.phaseSummary.length,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 // Windows 兼容的 main 模块判断：

@@ -20,7 +20,7 @@ describe('role-dispatch-logic: R≥3 无条件（第29轮）', () => {
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.some(v => /缺失 role=R/.test(v))).toBe(true);
+    expect(r.violations.some((v) => /缺失 role=R/.test(v))).toBe(true);
   });
 
   it('S/V/G/R≥3 齐全应通过', () => {
@@ -47,7 +47,7 @@ describe('role-dispatch-logic: R≥3 无条件（第29轮）', () => {
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.some(v => /缺失 role=V/.test(v))).toBe(true);
+    expect(r.violations.some((v) => /缺失 role=V/.test(v))).toBe(true);
   });
 
   it('缺 S 角色应失败', () => {
@@ -60,7 +60,7 @@ describe('role-dispatch-logic: R≥3 无条件（第29轮）', () => {
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.some(v => /缺失 role=S/.test(v))).toBe(true);
+    expect(r.violations.some((v) => /缺失 role=S/.test(v))).toBe(true);
   });
 
   it('缺 G 角色应失败', () => {
@@ -73,7 +73,7 @@ describe('role-dispatch-logic: R≥3 无条件（第29轮）', () => {
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.some(v => /缺失 role=G/.test(v))).toBe(true);
+    expect(r.violations.some((v) => /缺失 role=G/.test(v))).toBe(true);
   });
 
   it('R3 记录多于 3 条应通过', () => {
@@ -105,8 +105,8 @@ describe('role-dispatch-logic: R≥3 无条件（第29轮）', () => {
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.some(v => /阶段 2.*缺失 role=R/.test(v))).toBe(true);
-    expect(r.violations.some(v => /阶段 1.*缺失 role=R/.test(v))).toBe(false);
+    expect(r.violations.some((v) => /阶段 2.*缺失 role=R/.test(v))).toBe(true);
+    expect(r.violations.some((v) => /阶段 1.*缺失 role=R/.test(v))).toBe(false);
   });
 
   it('非法/缺字段条目应被跳过不崩溃', () => {

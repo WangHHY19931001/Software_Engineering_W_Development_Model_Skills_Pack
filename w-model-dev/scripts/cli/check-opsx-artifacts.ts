@@ -67,8 +67,9 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
 
   // 找该阶段所有变更目录 phase<N>-*（精确前缀匹配，排除 archive）
   const prefixRegex = new RegExp(`^phase${phase}-`);
-  const entries = readdirSync(changesDir, { withFileTypes: true })
-    .filter(e => e.isDirectory() && prefixRegex.test(e.name) && e.name !== 'archive');
+  const entries = readdirSync(changesDir, { withFileTypes: true }).filter(
+    (e) => e.isDirectory() && prefixRegex.test(e.name) && e.name !== 'archive',
+  );
 
   if (entries.length === 0) {
     violations.push(`阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`);
@@ -77,7 +78,7 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
 
   // 按名称排序后逐个校验所有变更目录
   const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
-  const changesNames = sorted.map(e => e.name);
+  const changesNames = sorted.map((e) => e.name);
 
   for (const entry of sorted) {
     const changeDir = path.join(changesDir, entry.name);
@@ -137,9 +138,9 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const file = args.find(a => !a.startsWith('--'));
+  const file = args.find((a) => !a.startsWith('--'));
   // 统一 --phase 校验（lib/parse-phase.ts，5-8；支持 --phase N 与 --phase=N）
-  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some(a => a.startsWith('--phase='));
+  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some((a) => a.startsWith('--phase='));
   const phaseParsed = parsePhaseArg(process.argv, { min: 5, max: 8 });
 
   if (!file || !hasPhaseFlag) {
@@ -183,13 +184,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'opsx-artifacts',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'opsx-artifacts',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -212,15 +216,19 @@ async function main(): Promise<void> {
     }
   }
 
-  printGateReport('OPSX_ARTIFACTS', {
-    type: 'opsx-artifacts',
-    passed: result.passed,
-    phase,
-    changesNames: result.changesNames,
-    artifactsFound: result.artifactsFound,
-    reviewsFound: result.reviewsFound,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'OPSX_ARTIFACTS',
+    {
+      type: 'opsx-artifacts',
+      passed: result.passed,
+      phase,
+      changesNames: result.changesNames,
+      artifactsFound: result.artifactsFound,
+      reviewsFound: result.reviewsFound,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 const entryArg = process.argv[1];

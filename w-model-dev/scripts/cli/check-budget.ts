@@ -55,10 +55,10 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const budgetFile = args.find(a => !a.startsWith('--'));
-  const projectArg = args.find(a => a.startsWith('--project='));
-  const runLogArg = args.find(a => a.startsWith('--run-log='));
-  const phaseArg = args.find(a => a.startsWith('--phase='));
+  const budgetFile = args.find((a) => !a.startsWith('--'));
+  const projectArg = args.find((a) => a.startsWith('--project='));
+  const runLogArg = args.find((a) => a.startsWith('--run-log='));
+  const phaseArg = args.find((a) => a.startsWith('--phase='));
 
   const projectFile = projectArg ? projectArg.split('=')[1] : undefined;
   const runLogFile = runLogArg ? runLogArg.split('=')[1] : undefined;
@@ -85,10 +85,7 @@ interface ReworkStats {
  *
  * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
  */
-function countReworks(
-  entries: unknown[],
-  phase: number | undefined,
-): ReworkStats {
+function countReworks(entries: unknown[], phase: number | undefined): ReworkStats {
   let reworkCount = 0;
   let tlaReworkCount = 0;
   for (const entry of entries) {
@@ -117,7 +114,7 @@ async function main(): Promise<void> {
 
   // --phase 合法性校验：显式传了但非法（非数字 / NaN / 越界）→ exit(2)，避免 countReworks 中
   // `NaN !== NaN` 恒为 true 导致所有 run-log 记录被过滤、reworkCount 静默归零
-  const phaseArg = process.argv.find(a => a.startsWith('--phase='));
+  const phaseArg = process.argv.find((a) => a.startsWith('--phase='));
   if (phaseArg !== undefined && phase === undefined) {
     // 复刻原消息值（parseInt 结果，非数字时为 NaN）
     const phaseVal = Number.parseInt(phaseArg.split('=')[1] ?? '', 10);
@@ -136,7 +133,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <budget.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
       exitCode: 2,
     });
     return;
@@ -195,13 +193,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'budget',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'budget',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -215,7 +216,9 @@ async function main(): Promise<void> {
   console.log(`schemaVersion : ${budget.schemaVersion ?? '未设置'}`);
   console.log(`onExceed      : ${budget.onExceed ?? '未设置'}`);
   console.log(`--project     : ${projectFile ? (projectUpdatedAt ?? '已读取但无 updatedAt') : '未提供'}`);
-  console.log(`--run-log     : ${runLogFile ? `${runLogFile}（rework=${reworkCount ?? 'N/A'}, tla-rework=${tlaReworkCount ?? 'N/A'}）` : '未提供'}`);
+  console.log(
+    `--run-log     : ${runLogFile ? `${runLogFile}（rework=${reworkCount ?? 'N/A'}, tla-rework=${tlaReworkCount ?? 'N/A'}）` : '未提供'}`,
+  );
   console.log(`--phase       : ${phase ?? '未提供'}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
@@ -228,17 +231,23 @@ async function main(): Promise<void> {
       console.log(`  - ${r}`);
     }
     console.log('');
-    console.log('O 子代理须按上述原因处置（刷新 budget.updatedAt / 补全 schema / 修正 onExceed / 响应 killSwitch），详见：');
+    console.log(
+      'O 子代理须按上述原因处置（刷新 budget.updatedAt / 补全 schema / 修正 onExceed / 响应 killSwitch），详见：',
+    );
     console.log('  w-model-dev/references/operational-recovery.md §成本预算与运行日志');
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('BUDGET', {
-    type: 'budget',
-    passed: result.passed,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'BUDGET',
+    {
+      type: 'budget',
+      passed: result.passed,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

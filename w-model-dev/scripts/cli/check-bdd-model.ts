@@ -73,12 +73,12 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const manifestFile = args.find(a => !a.startsWith('--'));
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const tlaArg = args.find(a => a.startsWith('--tla-manifest='));
-  const rtmArg = args.find(a => a.startsWith('--rtm='));
-  const cucumberArg = args.find(a => a.startsWith('--cucumber-report='));
-  const graphArg = args.find(a => a.startsWith('--graph='));
+  const manifestFile = args.find((a) => !a.startsWith('--'));
+  const phaseArg = args.find((a) => a.startsWith('--phase='));
+  const tlaArg = args.find((a) => a.startsWith('--tla-manifest='));
+  const rtmArg = args.find((a) => a.startsWith('--rtm='));
+  const cucumberArg = args.find((a) => a.startsWith('--cucumber-report='));
+  const graphArg = args.find((a) => a.startsWith('--graph='));
 
   // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
   const phase = phaseArg ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
@@ -140,7 +140,8 @@ async function main(): Promise<number> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <bdd-manifest.json>',
-      detail: '用法: check-bdd-model.ts <bdd-manifest.json> [--phase=N] [--tla-manifest=...] [--rtm=...] [--cucumber-report=...]',
+      detail:
+        '用法: check-bdd-model.ts <bdd-manifest.json> [--phase=N] [--tla-manifest=...] [--rtm=...] [--cucumber-report=...]',
       exitCode: 2,
     });
     return 2;
@@ -198,16 +199,16 @@ async function main(): Promise<number> {
   const manifestDir = path.resolve(path.dirname(args.manifestFile));
   // 项目根目录 = manifest 所在目录的父目录（约定：manifest 在 .w-model/ 下）
   const projectDir = path.resolve(manifestDir, '..');
-  const basePath = manifest.basePath
-    ? path.resolve(projectDir, manifest.basePath)
-    : manifestDir; // basePath 缺失时回退到 manifest 所在目录
+  const basePath = manifest.basePath ? path.resolve(projectDir, manifest.basePath) : manifestDir; // basePath 缺失时回退到 manifest 所在目录
 
   // 解析所有 features 文件
   const parsedFeatures: BddCheckInput['parsedFeatures'] = [];
   for (const f of manifest.features) {
     const resolved = resolveFeatureFile(basePath, f.filePath, projectDir);
     if (!resolved) {
-      console.error(`[D2] feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`);
+      console.error(
+        `[D2] feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`,
+      );
       continue;
     }
     try {
@@ -229,7 +230,9 @@ async function main(): Promise<number> {
     if (args.tlaManifestFile) {
       const tlaManifestPath = args.tlaManifestFile;
       try {
-        const tlaManifest = await readJson<{ basePath?: string; specs: Array<{ id: string; tlaPath: string }> }>(tlaManifestPath);
+        const tlaManifest = await readJson<{ basePath?: string; specs: Array<{ id: string; tlaPath: string }> }>(
+          tlaManifestPath,
+        );
         tlaSnapshots = [];
         // tlaPath 相对 basePath（相对 manifest 所在目录）解析，与 check-tla-model.ts P1.1 路径基准一致（tla-plus-guide §2.1）
         const tlaBase = path.resolve(path.dirname(tlaManifestPath), tlaManifest.basePath ?? '');
@@ -252,8 +255,16 @@ async function main(): Promise<number> {
   let rtmRows: BddCheckInput['rtmRows'] | undefined;
   if (args.rtmFile) {
     try {
-      const rtm = await readJson<{ rows: Array<{ requirementId: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }> }>(args.rtmFile);
-      rtmRows = rtm.rows.map(r => ({
+      const rtm = await readJson<{
+        rows: Array<{
+          requirementId: string;
+          acceptanceTest: string | null;
+          systemTest: string | null;
+          integrationTest: string | null;
+          unitTest: string | null;
+        }>;
+      }>(args.rtmFile);
+      rtmRows = rtm.rows.map((r) => ({
         reqId: r.requirementId,
         acceptanceTest: r.acceptanceTest,
         systemTest: r.systemTest,
@@ -269,8 +280,12 @@ async function main(): Promise<number> {
   let cucumberReport: BddCheckInput['cucumberReport'] | undefined;
   if (phase >= 5 && args.cucumberReportFile) {
     try {
-      const report = await readJson<{ elements?: Array<{ steps?: Array<{ result?: { status?: string } }> }> }>(args.cucumberReportFile);
-      let undefinedCount = 0, pendingCount = 0, failedCount = 0;
+      const report = await readJson<{ elements?: Array<{ steps?: Array<{ result?: { status?: string } }> }> }>(
+        args.cucumberReportFile,
+      );
+      let undefinedCount = 0,
+        pendingCount = 0,
+        failedCount = 0;
       for (const el of report.elements ?? []) {
         for (const step of el.steps ?? []) {
           if (step.result?.status === 'undefined') undefinedCount++;
@@ -290,7 +305,7 @@ async function main(): Promise<number> {
     try {
       const g = await readJson<{ nodes?: Array<{ id: string; type: string }> }>(args.graphFile);
       if (Array.isArray(g.nodes)) {
-        graphSdNodes = g.nodes.filter(n => n.type === 'SD').map(n => n.id);
+        graphSdNodes = g.nodes.filter((n) => n.type === 'SD').map((n) => n.id);
       }
     } catch (e) {
       console.error(`[D8] 无法读取 graph 文件: ${(e as Error).message}`);
@@ -320,13 +335,16 @@ async function main(): Promise<number> {
       ...result.dimensions.rtmMapping,
       ...result.dimensions.sdCoverage,
     ];
-    printJsonReport({
-      type: 'bdd',
-      passed: result.passed,
-      reasons: allViolations,
-      violations: buildViolationDistribution(allViolations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'bdd',
+        passed: result.passed,
+        reasons: allViolations,
+        violations: buildViolationDistribution(allViolations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return exitCode;
   }
@@ -369,16 +387,18 @@ async function main(): Promise<number> {
   return result.exitCode;
 }
 
-main().then(exitCode => {
-  // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined）→ 让 Node 自然退出，避免 process.exit 截断 ERROR_JSON
-  if (process.exitCode === undefined) {
-    process.exit(exitCode);
-  }
-}).catch(e => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: e instanceof Error ? e.message : String(e),
-    exitCode: 2,
+main()
+  .then((exitCode) => {
+    // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined）→ 让 Node 自然退出，避免 process.exit 截断 ERROR_JSON
+    if (process.exitCode === undefined) {
+      process.exit(exitCode);
+    }
+  })
+  .catch((e) => {
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: e instanceof Error ? e.message : String(e),
+      exitCode: 2,
+    });
   });
-});

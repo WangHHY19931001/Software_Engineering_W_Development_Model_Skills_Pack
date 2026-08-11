@@ -17,7 +17,8 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     commandReference: 'UAT-/ST-/IT-/UT- → test；否则为 code',
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
-    readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
+    readme:
+      '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
     antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
@@ -51,23 +52,34 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('schema 清单标题份数不符 → 违规', () => {
-    const input = baseInput({ dataModels: '### Schema 清单（19 份）\n| `verifier-output` | ... |\n| `run-log` | ... |\n| `iceberg-sweep` | ... |' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('20 份'))).toBe(true);
+    const input = baseInput({
+      dataModels:
+        '### Schema 清单（19 份）\n| `verifier-output` | ... |\n| `run-log` | ... |\n| `iceberg-sweep` | ... |',
+    });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('20 份'))).toBe(
+      true,
+    );
   });
 
   it('run-log action 枚举长度非 27 → 违规', () => {
     const input = baseInput({ runLogSchema: JSON.stringify({ properties: { action: { enum: ['a', 'b'] } } }) });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('27'))).toBe(true);
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('27'))).toBe(
+      true,
+    );
   });
 
   it('data-models run-log 行非 27 类 → 违规', () => {
     const input = baseInput({ dataModels: '### Schema 清单（20 份）\n| `run-log` | ... | action enum（15 类） |' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('27 类'))).toBe(true);
+    expect(
+      runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('27 类')),
+    ).toBe(true);
   });
 
   it('targetKind 废弃标记残留 → 违规', () => {
     const input = baseInput({ commandReference: 'targetKind=file 路由 code-reviewer' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'targetkind' && x.message.includes('targetKind=file'))).toBe(true);
+    expect(
+      runDocConsistencyChecks(input).some((x) => x.check === 'targetkind' && x.message.includes('targetKind=file')),
+    ).toBe(true);
   });
 
   it('README 残留 5 维度 DoD → 违规', () => {
@@ -77,7 +89,9 @@ describe('runDocConsistencyChecks', () => {
 
   it('definition-of-done 缺七维度标题 → 违规', () => {
     const input = baseInput({ definitionOfDone: '## 五维度标准' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('七维度标准'))).toBe(true);
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('七维度标准'))).toBe(
+      true,
+    );
   });
 
   it('README 缺 8 条操作行为 → 违规', () => {
@@ -138,7 +152,9 @@ describe('runDocConsistencyChecks', () => {
 
   it('glossary action 含 verify → 违规', () => {
     const input = baseInput({ glossary: '### action（RunLogEntry）\n`verify` / `gate`' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'glossary-action' && x.message.includes('verify'))).toBe(true);
+    expect(
+      runDocConsistencyChecks(input).some((x) => x.check === 'glossary-action' && x.message.includes('verify')),
+    ).toBe(true);
   });
 
   it('资产计数不符 → 违规', () => {
@@ -163,42 +179,66 @@ describe('runDocConsistencyChecks', () => {
 
   it('data-models 缺 Schema 清单标题 → 违规', () => {
     const input = baseInput({ dataModels: '| `verifier-output` | ... |' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('20 份'))).toBe(true);
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('20 份'))).toBe(
+      true,
+    );
   });
 
   it('design-docs 含废弃 targetKind → 违规', () => {
-    const input = baseInput({ designDocs: [{ name: 'llm-verifier', content: '`targetKind`（`requirement` / `design` / `testcase` / `file`）targetKind=file 路由' }] });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('llm-verifier'))).toBe(true);
+    const input = baseInput({
+      designDocs: [
+        {
+          name: 'llm-verifier',
+          content: '`targetKind`（`requirement` / `design` / `testcase` / `file`）targetKind=file 路由',
+        },
+      ],
+    });
+    expect(
+      runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('llm-verifier')),
+    ).toBe(true);
   });
 
   it('design-docs 含五维度 → 违规', () => {
     const input = baseInput({ designDocs: [{ name: 'loop-engineering', content: '五维度标准' }] });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('五维度'))).toBe(true);
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('五维度'))).toBe(
+      true,
+    );
   });
 
   it('design-docs 含旧反模式区间 → 违规', () => {
     const input = baseInput({ designDocs: [{ name: 'round9', content: '反模式 #1~#29' }] });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('#1~#29'))).toBe(true);
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs' && x.message.includes('#1~#29'))).toBe(
+      true,
+    );
   });
 
   it('design-docs 干净时零违规', () => {
-    const input = baseInput({ designDocs: [{ name: 'x', content: 'requirement / design / code / test\n五维度扩展为七维度，新增「理解证据」' }] });
+    const input = baseInput({
+      designDocs: [{ name: 'x', content: 'requirement / design / code / test\n五维度扩展为七维度，新增「理解证据」' }],
+    });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs')).toBe(false);
   });
 
   it('vitest 文件数非 35 → 违规', () => {
     const input = baseInput({ testFileCount: 36 });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-files' && x.message.includes('35'))).toBe(true);
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-files' && x.message.includes('35'))).toBe(
+      true,
+    );
   });
 
   it('README/AGENTS 缺 vitest 文件数表述 → 违规', () => {
-    const input = baseInput({ readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）', agents: '30 个脚本' });
+    const input = baseInput({
+      readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
+      agents: '30 个脚本',
+    });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-files');
     expect(v.length).toBeGreaterThan(0);
   });
 
   it('vitest 实测用例总数缺失于 README → 违规', () => {
-    const input = baseInput({ readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files' });
+    const input = baseInput({
+      readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files',
+    });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
     expect(v.some((x) => x.message.includes('README.md') && x.message.includes('530'))).toBe(true);
   });

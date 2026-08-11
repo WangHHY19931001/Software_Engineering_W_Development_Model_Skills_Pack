@@ -159,7 +159,10 @@ describe('metrics-report CLI（边界与降级）', () => {
   });
 
   it('run-log.jsonl 含坏行 → exit 0，坏行跳过（stderr 警告，记录数正确）', async () => {
-    await writeWModel('run-log.jsonl', '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100}\n{broken json line}\n');
+    await writeWModel(
+      'run-log.jsonl',
+      '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100}\n{broken json line}\n',
+    );
     const r = run('--json');
     expect(r.code).toBe(0);
     expect(r.stderr).toContain('非合法 JSON');

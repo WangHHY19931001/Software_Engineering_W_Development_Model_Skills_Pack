@@ -38,10 +38,7 @@
  */
 
 import * as path from 'node:path';
-import {
-  checkVerifierOutput,
-  type VerifierOutputShape,
-} from '../logic/verifier-logic.js';
+import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -51,16 +48,17 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const file = args.find(a => !a.startsWith('--'));
+  const file = args.find((a) => !a.startsWith('--'));
   const selfAsVerifier = args.includes('--self-as-verifier');
-  const sOutputArg = args.find(a => a.startsWith('--s-output='));
+  const sOutputArg = args.find((a) => a.startsWith('--s-output='));
 
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <output.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]',
       exitCode: 2,
     });
     return;
@@ -104,13 +102,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'verifier-output',
-      passed,
-      reasons: allReasons,
-      violations: buildViolationDistribution(allReasons.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'verifier-output',
+        passed,
+        reasons: allReasons,
+        violations: buildViolationDistribution(allReasons.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -149,15 +150,19 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('VERIFIER', {
-    type: 'verifier-output',
-    passed,
-    selfAsVerifier,
-    compositeScore: result.compositeScore,
-    expectedCompositeScore: result.expectedCompositeScore,
-    qualityLevel: result.qualityLevel,
-    reasons: allReasons,
-  }, exitCode);
+  printGateReport(
+    'VERIFIER',
+    {
+      type: 'verifier-output',
+      passed,
+      selfAsVerifier,
+      compositeScore: result.compositeScore,
+      expectedCompositeScore: result.expectedCompositeScore,
+      qualityLevel: result.qualityLevel,
+      reasons: allReasons,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

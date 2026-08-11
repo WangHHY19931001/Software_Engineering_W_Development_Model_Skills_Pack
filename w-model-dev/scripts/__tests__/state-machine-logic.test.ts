@@ -44,8 +44,8 @@ describe('state-machine-logic', () => {
     const input = loadSample<StateMachineConsistencyInput>('bad-missing-transition.json');
     const r = checkStateMachineConsistency(input);
     expect(r.passed).toBe(false);
-    expect(r.reasons.some(s => s.includes('代码状态机缺转移'))).toBe(true);
-    expect(r.reasons.some(s => s.includes('draft→published [publish]'))).toBe(true);
+    expect(r.reasons.some((s) => s.includes('代码状态机缺转移'))).toBe(true);
+    expect(r.reasons.some((s) => s.includes('draft→published [publish]'))).toBe(true);
     expect(r.missingInCode).toEqual([{ from: 'draft', to: 'published', event: 'publish' }]);
     expect(r.extraInCode).toEqual([]);
     expect(r.missingStatesInCode).toEqual([]);
@@ -56,8 +56,8 @@ describe('state-machine-logic', () => {
     const input = loadSample<StateMachineConsistencyInput>('bad-extra-transition.json');
     const r = checkStateMachineConsistency(input);
     expect(r.passed).toBe(false);
-    expect(r.reasons.some(s => s.includes('代码状态机多状态'))).toBe(true);
-    expect(r.reasons.some(s => s.includes('代码状态机多转移'))).toBe(true);
+    expect(r.reasons.some((s) => s.includes('代码状态机多状态'))).toBe(true);
+    expect(r.reasons.some((s) => s.includes('代码状态机多转移'))).toBe(true);
     expect(r.extraStatesInCode).toEqual(['deleted']);
     expect(r.extraInCode).toEqual([{ from: 'archived', to: 'deleted', event: 'delete' }]);
     expect(r.missingInCode).toEqual([]);

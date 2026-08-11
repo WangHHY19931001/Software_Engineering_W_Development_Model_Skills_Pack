@@ -3,8 +3,13 @@ import { validateBySchema } from './schema-loader.js';
 export interface IcebergFinding {
   findingId: string;
   severity: 'Critical' | 'Required' | 'Optional';
-  category: 'same-root-cause-spread' | 'same-defect-class' | 'fix-induced-regression'
-           | 'adjacent-logic' | 'coverage-gap' | 'cross-artifact-inconsistency';
+  category:
+    | 'same-root-cause-spread'
+    | 'same-defect-class'
+    | 'fix-induced-regression'
+    | 'adjacent-logic'
+    | 'coverage-gap'
+    | 'cross-artifact-inconsistency';
   location: string;
   description: string;
   evidence: string;

@@ -98,7 +98,12 @@ export function splitByLines(text: string, maxTokens: number, filePath: string, 
   const flush = () => {
     if (buf.length === 0) return;
     const slice = buf.join('\n');
-    chunks.push({ id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`, path: filePath, kind: 'section', tokens: estimateTokens(slice) });
+    chunks.push({
+      id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
+      path: filePath,
+      kind: 'section',
+      tokens: estimateTokens(slice),
+    });
     idx++;
     const keep = buf.slice(-OVERLAP);
     buf = [...keep];
@@ -126,7 +131,12 @@ export async function splitMarkdownByHeaders(
   let idx = 1;
   for (const sec of sections) {
     if (estimateTokens(current + sec) > maxTokens && current.length > 0) {
-      chunks.push({ id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`, path: filePath, kind: 'section', tokens: estimateTokens(current) });
+      chunks.push({
+        id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
+        path: filePath,
+        kind: 'section',
+        tokens: estimateTokens(current),
+      });
       idx++;
       current = '';
     }
@@ -140,16 +150,17 @@ export async function splitMarkdownByHeaders(
     }
   }
   if (current.length > 0) {
-    chunks.push({ id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`, path: filePath, kind: 'section', tokens: estimateTokens(current) });
+    chunks.push({
+      id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
+      path: filePath,
+      kind: 'section',
+      tokens: estimateTokens(current),
+    });
   }
   return chunks;
 }
 
-export async function planFile(
-  filePath: string,
-  maxTokens: number,
-  chunkIdPrefix: string,
-): Promise<Chunk[]> {
+export async function planFile(filePath: string, maxTokens: number, chunkIdPrefix: string): Promise<Chunk[]> {
   const stat = await fs.stat(filePath);
   if (stat.isDirectory()) {
     const entries = await fs.readdir(filePath, { withFileTypes: true });
@@ -170,12 +181,14 @@ export async function planFile(
   const content = await fs.readFile(filePath, 'utf-8');
   const tokens = estimateTokens(content);
   if (tokens <= maxTokens) {
-    return [{
-      id: `${chunkIdPrefix}-001`,
-      path: filePath,
-      kind: 'file',
-      tokens,
-    }];
+    return [
+      {
+        id: `${chunkIdPrefix}-001`,
+        path: filePath,
+        kind: 'file',
+        tokens,
+      },
+    ];
   }
   // 超限：Markdown 按标题切，非 Markdown 按行切
   if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
@@ -191,7 +204,8 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       message: '参数缺失 <path>',
-      detail: '用法: npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
       exitCode: 2,
     });
     return;

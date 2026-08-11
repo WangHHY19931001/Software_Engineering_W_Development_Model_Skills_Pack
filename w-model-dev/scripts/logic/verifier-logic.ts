@@ -73,32 +73,32 @@ export interface VerifierOutputShape {
 
 export const SUB_CRITERIA: Record<TargetKind, Array<{ name: string; weight: number }>> = {
   requirement: [
-    { name: 'completeness', weight: 0.30 },
+    { name: 'completeness', weight: 0.3 },
     { name: 'clarity', weight: 0.25 },
-    { name: 'consistency', weight: 0.20 },
+    { name: 'consistency', weight: 0.2 },
     { name: 'testability', weight: 0.15 },
-    { name: 'traceability', weight: 0.10 },
+    { name: 'traceability', weight: 0.1 },
   ],
   design: [
     { name: 'architecture-soundness', weight: 0.25 },
     { name: 'requirement-coverage', weight: 0.25 },
-    { name: 'interface-consistency', weight: 0.20 },
+    { name: 'interface-consistency', weight: 0.2 },
     { name: 'feasibility', weight: 0.15 },
     { name: 'testability', weight: 0.15 },
   ],
   test: [
-    { name: 'coverage', weight: 0.30 },
+    { name: 'coverage', weight: 0.3 },
     { name: 'correctness', weight: 0.25 },
-    { name: 'independence', weight: 0.20 },
+    { name: 'independence', weight: 0.2 },
     { name: 'clarity', weight: 0.15 },
-    { name: 'priority-reasonableness', weight: 0.10 },
+    { name: 'priority-reasonableness', weight: 0.1 },
   ],
   code: [
-    { name: 'correctness', weight: 0.30 },
-    { name: 'security', weight: 0.20 },
+    { name: 'correctness', weight: 0.3 },
+    { name: 'security', weight: 0.2 },
     { name: 'readability', weight: 0.15 },
     { name: 'maintainability', weight: 0.15 },
-    { name: 'conformance', weight: 0.20 },
+    { name: 'conformance', weight: 0.2 },
   ],
 };
 
@@ -122,7 +122,7 @@ const EPSILON = 1e-4;
 /** variance 字段与重算方差的允许误差（浮点比较；与 verifier-spec.md §3.2.1 规则 2 一致：1e-6） */
 const VARIANCE_EPSILON = 1e-6;
 const MIN_REPEAT_TIMES = 3;
-const MAX_VARIANCE_THRESHOLD = 0.10;
+const MAX_VARIANCE_THRESHOLD = 0.1;
 const SCHEMA_VERSION = '1.0';
 
 /** ranking 字段边界（spec §5.1 默认 k=5 / temperature=4.0，此处给出合理性上界防滥用） */
@@ -135,7 +135,7 @@ const MIN_RANKING_ROUNDS = 1;
 /** R13（第 26 轮）单轴下限：任一子标准得分低于此值 → passed=false。
  *  阈值 = qualityLevel B 级分界（§6.1），语义自洽：passed 原判据为「加权平均 ≥ B」，
  *  收紧为「每个子标准自身 ≥ B」。防止加权平均掩盖单轴失败（反模式 #41）。 */
-const SINGLE_AXIS_MIN_SCORE = 0.70;
+const SINGLE_AXIS_MIN_SCORE = 0.7;
 
 function isNumber(x: unknown): x is number {
   return typeof x === 'number' && !Number.isNaN(x);
@@ -144,8 +144,6 @@ function isNumber(x: unknown): x is number {
 function inRange(x: number, lo: number, hi: number, inclusive = true): boolean {
   return Number.isFinite(x) && (inclusive ? x >= lo && x <= hi : x > lo && x < hi);
 }
-
-
 
 /**
  * R12（sig-002）：subCriteria evidence 非空校验。
@@ -169,22 +167,16 @@ export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): str
  * 防止 compositeScore 加权平均 ≥0.70 放行时，存在子标准低于 B 级（<0.70）被其余高分掩盖。
  * 返回低于下限的子标准违规列表；空数组 = 全部子标准 ≥ 下限。
  */
-export function checkR13SingleAxisFloor(
-  subCriteria: Array<Record<string, unknown>> | unknown[],
-): string[] {
+export function checkR13SingleAxisFloor(subCriteria: Array<Record<string, unknown>> | unknown[]): string[] {
   if (!Array.isArray(subCriteria)) return [];
   const violations: string[] = [];
   for (let i = 0; i < subCriteria.length; i++) {
     const sc = subCriteria[i] as Record<string, unknown>;
     if (!sc || typeof sc !== 'object') continue;
-    const name = typeof sc.name === 'string' && sc.name.trim() !== ''
-      ? sc.name
-      : `subCriteria[${i + 1}]`;
+    const name = typeof sc.name === 'string' && sc.name.trim() !== '' ? sc.name : `subCriteria[${i + 1}]`;
     if (typeof sc.score === 'number' && !Number.isNaN(sc.score)) {
       if (sc.score < SINGLE_AXIS_MIN_SCORE) {
-        violations.push(
-          `子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`,
-        );
+        violations.push(`子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`);
       }
     }
   }
@@ -204,7 +196,7 @@ export function checkR13SingleAxisFloor(
 function computeVariance(scores: number[]): number {
   if (scores.length < 2) return 0;
   // 边界保护：含 NaN/Infinity 的输入返回 NaN
-  if (scores.some(v => !Number.isFinite(v))) return Number.NaN;
+  if (scores.some((v) => !Number.isFinite(v))) return Number.NaN;
   const mean = scores.reduce((sum, v) => sum + v, 0) / scores.length;
   const sumSqDiff = scores.reduce((sum, v) => sum + (v - mean) ** 2, 0);
   const variance = sumSqDiff / scores.length;
@@ -217,8 +209,8 @@ function computeVariance(scores: number[]): number {
  */
 export function determineQualityLevel(score: number): QualityLevel {
   if (score >= 0.85) return 'A';
-  if (score >= 0.70) return 'B';
-  if (score >= 0.50) return 'C';
+  if (score >= 0.7) return 'B';
+  if (score >= 0.5) return 'C';
   return 'D';
 }
 
@@ -274,9 +266,7 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
  *  10. passed=false 时 reworkHints 必须非空数组
  *  11. ranking（可选）字段类型合法
  */
-export function checkVerifierOutput(
-  raw: unknown,
-): VerifierCheckResult {
+export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方业务规则校验（数值合理性 / 防漂移 / 权重匹配等）。
@@ -327,7 +317,9 @@ export function checkVerifierOutput(
   // P2.5（第 9 轮）targetKind 枚举标准化：'testcase'/'file' 已废弃
   const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test'];
   if (!allowedKinds.includes(targetKind as TargetKind)) {
-    reasons.push(`meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`);
+    reasons.push(
+      `meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`,
+    );
     return {
       passed: false,
       reasons,
@@ -354,11 +346,11 @@ export function checkVerifierOutput(
     reasons.push(`meta.repeatTimes 必须为整数且 ≥ ${MIN_REPEAT_TIMES}，实际为 ${JSON.stringify(repeatTimes)}`);
   }
 
-  const varianceThreshold = isNumber(meta.varianceThreshold)
-    ? meta.varianceThreshold
-    : Number.NaN;
+  const varianceThreshold = isNumber(meta.varianceThreshold) ? meta.varianceThreshold : Number.NaN;
   if (!inRange(varianceThreshold, 0, MAX_VARIANCE_THRESHOLD)) {
-    reasons.push(`meta.varianceThreshold 必须在 [0,${MAX_VARIANCE_THRESHOLD}] 范围内，实际为 ${JSON.stringify(meta.varianceThreshold)}`);
+    reasons.push(
+      `meta.varianceThreshold 必须在 [0,${MAX_VARIANCE_THRESHOLD}] 范围内，实际为 ${JSON.stringify(meta.varianceThreshold)}`,
+    );
   }
 
   // 3. subCriteria
@@ -427,42 +419,28 @@ export function checkVerifierOutput(
       const numericScores = sc.rawScores.filter(isNumber) as number[];
       if (numericScores.length === sc.rawScores.length && numericScores.length >= 2 && isNumber(sc.variance)) {
         const recomputed = computeVariance(numericScores);
-      if (Number.isFinite(recomputed) && Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
-        reasons.push(
-          `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
-        );
-      }
+        if (Number.isFinite(recomputed) && Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
+          reasons.push(
+            `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
+          );
+        }
       }
     }
     // 防漂移规则 1（§3.2.1）：rawScores 全同 = 复制填入作弊（D31）。
     // 两种模式均执行：spec §3.2.1 规则 4 明确 logits 模式仅豁免规则 3（扰动范围），
     // 规则 1 / 2 仍对 logits 模式生效。
-    const dimName = typeof sc.name === 'string' && sc.name.trim() !== ''
-      ? sc.name
-      : `subCriteria[${idx}]`;
-    if (
-      Array.isArray(sc.rawScores) &&
-      sc.rawScores.length > 1
-    ) {
+    const dimName = typeof sc.name === 'string' && sc.name.trim() !== '' ? sc.name : `subCriteria[${idx}]`;
+    if (Array.isArray(sc.rawScores) && sc.rawScores.length > 1) {
       const numericScores = sc.rawScores.filter(isNumber) as number[];
-      if (
-        numericScores.length === sc.rawScores.length &&
-        numericScores.every(v => v === numericScores[0])
-      ) {
-        reasons.push(
-          `维度 ${dimName} 的 rawScores 全同 [${numericScores.join(',')}], 疑似手工填写`,
-        );
+      if (numericScores.length === sc.rawScores.length && numericScores.every((v) => v === numericScores[0])) {
+        reasons.push(`维度 ${dimName} 的 rawScores 全同 [${numericScores.join(',')}], 疑似手工填写`);
       }
     }
 
     // P3.10（第 9 轮）rawScores 完美等差数列（公差 0.01）检测。
     // 仅 text-parse 模式执行：text-parse 来源于文本解析，不应形成完美等差数列；
     // logits 模式天然可能产生等差分布（如 [0.89,0.90,0.91]），故豁免。
-    if (
-      scoringMethod === 'text-parse' &&
-      Array.isArray(sc.rawScores) &&
-      sc.rawScores.length >= 3
-    ) {
+    if (scoringMethod === 'text-parse' && Array.isArray(sc.rawScores) && sc.rawScores.length >= 3) {
       const numericScores = sc.rawScores.filter(isNumber) as number[];
       if (numericScores.length === sc.rawScores.length) {
         const sorted = [...numericScores].sort((a, b) => a - b);
@@ -485,22 +463,14 @@ export function checkVerifierOutput(
 
     // 防漂移规则 3（§3.2.1）：text-parse ±0.05 扰动范围须 ∈ [0.01, 0.10]。
     // > 0.10 → fail（reasons）；< 0.01 → 警告（reworkHints）。logits 模式豁免（规则 4）。
-    if (
-      scoringMethod === 'text-parse' &&
-      Array.isArray(sc.rawScores) &&
-      sc.rawScores.length > 1
-    ) {
+    if (scoringMethod === 'text-parse' && Array.isArray(sc.rawScores) && sc.rawScores.length > 1) {
       const numericScores = sc.rawScores.filter(isNumber) as number[];
       if (numericScores.length === sc.rawScores.length) {
         const spread = Math.max(...numericScores) - Math.min(...numericScores);
-        if (spread > 0.10) {
-          reasons.push(
-            `维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} > 0.10, 扰动越界`,
-          );
+        if (spread > 0.1) {
+          reasons.push(`维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} > 0.10, 扰动越界`);
         } else if (spread < 0.01) {
-          reworkHints.push(
-            `维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} < 0.01, 疑似未扰动`,
-          );
+          reworkHints.push(`维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} < 0.01, 疑似未扰动`);
         }
       }
     }
@@ -546,7 +516,7 @@ export function checkVerifierOutput(
 
   // 5. evidence 格式校验（先于 qualityLevel/passed 判定，evidence 扣分后重新判定两者）
   const evidenceList = (subCriteria as Array<Record<string, unknown>>)
-    .map(sc => sc.evidence)
+    .map((sc) => sc.evidence)
     .filter((e): e is string => typeof e === 'string');
   let evidenceDeduction = false;
   if (evidenceList.length > 0) {
@@ -556,9 +526,7 @@ export function checkVerifierOutput(
         compositeScore = Math.max(0, compositeScore - 0.1);
       }
       evidenceDeduction = true;
-      reasons.push(
-        `evidence 格式校验失败（空泛声明，O3 命中）：${evidenceResult.vagueItems.join('; ')}`,
-      );
+      reasons.push(`evidence 格式校验失败（空泛声明，O3 命中）：${evidenceResult.vagueItems.join('; ')}`);
     }
   }
 
@@ -584,8 +552,7 @@ export function checkVerifierOutput(
   // 防止加权平均掩盖单轴失败（反模式 #41）。
   const passed = o.passed;
   const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
-  const expectedPassed =
-    (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
+  const expectedPassed = (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
   if (typeof passed !== 'boolean') {
     reasons.push(`passed 必须为布尔值，实际为 ${JSON.stringify(passed)}`);
   } else if (passed !== expectedPassed) {
@@ -625,7 +592,9 @@ export function checkVerifierOutput(
         reasons.push(`ranking.k 必须为整数且 ∈ [${MIN_RANKING_K}, ${MAX_RANKING_K}]，实际为 ${JSON.stringify(r.k)}`);
       }
       if (!isNumber(r.temperature) || r.temperature <= MIN_TEMPERATURE || r.temperature > MAX_TEMPERATURE) {
-        reasons.push(`ranking.temperature 必须为正数且 ≤ ${MAX_TEMPERATURE}（过大 sigmoid 失去区分度），实际为 ${JSON.stringify(r.temperature)}`);
+        reasons.push(
+          `ranking.temperature 必须为正数且 ≤ ${MAX_TEMPERATURE}（过大 sigmoid 失去区分度），实际为 ${JSON.stringify(r.temperature)}`,
+        );
       }
       if (!isNumber(r.rounds) || !Number.isInteger(r.rounds) || r.rounds < MIN_RANKING_ROUNDS) {
         reasons.push(`ranking.rounds 必须为 ≥${MIN_RANKING_ROUNDS} 的整数，实际为 ${JSON.stringify(r.rounds)}`);
@@ -634,7 +603,7 @@ export function checkVerifierOutput(
         reasons.push('ranking.ordered 必须为长度 ≥2 的字符串数组');
       } else {
         const ordered = r.ordered as unknown[];
-        if (ordered.some(item => typeof item !== 'string' || item.trim() === '')) {
+        if (ordered.some((item) => typeof item !== 'string' || item.trim() === '')) {
           reasons.push('ranking.ordered 的每项必须为非空字符串');
         }
         const unique = new Set(ordered.filter((item): item is string => typeof item === 'string'));

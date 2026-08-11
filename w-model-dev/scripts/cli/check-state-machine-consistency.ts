@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
-  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -67,13 +67,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'state-machine-consistency',
-      passed: result.passed,
-      reasons: result.reasons,
-      violations: buildViolationDistribution(result.reasons.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'state-machine-consistency',
+        passed: result.passed,
+        reasons: result.reasons,
+        violations: buildViolationDistribution(result.reasons.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -96,17 +99,21 @@ async function main(): Promise<void> {
     }
   }
 
-  printGateReport('STATE_MACHINE', {
-    type: 'state-machine-consistency',
-    passed: result.passed,
-    designStateCount: result.designStates.length,
-    codeStateCount: result.codeStates.length,
-    designTransitionCount: result.designTransitions.length,
-    codeTransitionCount: result.codeTransitions.length,
-    missingInCode: result.missingInCode.map(transitionKey),
-    extraInCode: result.extraInCode.map(transitionKey),
-    reasons: result.reasons,
-  }, exitCode);
+  printGateReport(
+    'STATE_MACHINE',
+    {
+      type: 'state-machine-consistency',
+      passed: result.passed,
+      designStateCount: result.designStates.length,
+      codeStateCount: result.codeStates.length,
+      designTransitionCount: result.designTransitions.length,
+      codeTransitionCount: result.codeTransitions.length,
+      missingInCode: result.missingInCode.map(transitionKey),
+      extraInCode: result.extraInCode.map(transitionKey),
+      reasons: result.reasons,
+    },
+    exitCode,
+  );
 }
 
 // isMain 守卫：仅在直接执行时运行 main，被 import 时不触发

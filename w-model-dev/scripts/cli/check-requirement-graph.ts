@@ -70,7 +70,7 @@ async function main(): Promise<void> {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
-  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
 
   // 解析 --phase（lib/parse-phase.ts 统一校验：--phase=N / --phase N，范围 1-4）
   let phase: number | undefined;
-  const phaseArg = process.argv.slice(3).find(a => a.startsWith('--phase='));
+  const phaseArg = process.argv.slice(3).find((a) => a.startsWith('--phase='));
   const phaseParsed = parsePhaseArg(process.argv, { min: 1, max: 4 });
   if (phaseParsed !== undefined) {
     phase = phaseParsed.phase;
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   }
 
   // 解析 --rtm（可选，用于 R6 cross-cuts 源类型校验）
-  const rtmArg = process.argv.slice(3).find(a => a.startsWith('--rtm='));
+  const rtmArg = process.argv.slice(3).find((a) => a.startsWith('--rtm='));
   let rtmRows: Array<{ requirementId: string; type: string }> | undefined;
   if (rtmArg) {
     const rtmPath = rtmArg.split('=')[1];
@@ -113,13 +113,13 @@ async function main(): Promise<void> {
   }
 
   // 解析 --exemptions（可选，用于跳过已批准豁免的规则）
-  const exemptArg = process.argv.slice(3).find(a => a.startsWith('--exemptions='));
+  const exemptArg = process.argv.slice(3).find((a) => a.startsWith('--exemptions='));
   let exemptedRules: string[] | undefined;
   if (exemptArg) {
     const exemptPath = exemptArg.split('=')[1];
     if (exemptPath) {
       const exemptParsed = await readJsonClassified<{ grantedExemptions?: Array<{ ruleId: string }> }>(exemptPath);
-      exemptedRules = exemptParsed.grantedExemptions?.map(g => g.ruleId);
+      exemptedRules = exemptParsed.grantedExemptions?.map((g) => g.ruleId);
     }
   }
 
@@ -127,7 +127,7 @@ async function main(): Promise<void> {
   // 注意：parsed 须在 spec-dir 块之前读取（phase=3 分支需从 graph.json SD 节点提取 SD 集合）
   const abs = path.resolve(file);
   const parsed = await readJsonOrExit(file);
-  const specDirArg = process.argv.slice(3).find(a => a.startsWith('--spec-dir='));
+  const specDirArg = process.argv.slice(3).find((a) => a.startsWith('--spec-dir='));
   let specEnhanceViolations: RequirementSpecEnhanceViolations | undefined;
   let designEnhanceViolations: DesignSpecEnhanceViolations | undefined;
   let outlineEnhanceViolations: OutlineSpecEnhanceViolations | undefined;
@@ -137,34 +137,46 @@ async function main(): Promise<void> {
     if (specDir) {
       const fs = await import('node:fs');
       const readdirSync = (d: string): string[] => {
-        try { return fs.readdirSync(d); } catch { return []; }
+        try {
+          return fs.readdirSync(d);
+        } catch {
+          return [];
+        }
       };
       const readOrEmpty = (p: string): string => {
-        try { return fs.readFileSync(p, 'utf-8'); } catch { return ''; }
+        try {
+          return fs.readFileSync(p, 'utf-8');
+        } catch {
+          return '';
+        }
       };
       if (phase === 2 || phase === 3 || phase === 4) {
         // 第 38 轮：Phase 2/3/4 module 前缀 glob 匹配（每类恰 1 个文件）
-        const mainSuffix = phase === 2 ? '-system-design.md' : phase === 3 ? '-interface-design.md' : '-detailed-design.md';
-        const mainFile = readdirSync(specDir).find(f => f.endsWith(mainSuffix));
-        const traceFile = readdirSync(specDir).find(f => f.endsWith('-traceability-matrix.md'));
-        const umlFile = readdirSync(specDir).find(f => f.endsWith('-uml-modeling.md'));
+        const mainSuffix =
+          phase === 2 ? '-system-design.md' : phase === 3 ? '-interface-design.md' : '-detailed-design.md';
+        const mainFile = readdirSync(specDir).find((f) => f.endsWith(mainSuffix));
+        const traceFile = readdirSync(specDir).find((f) => f.endsWith('-traceability-matrix.md'));
+        const umlFile = readdirSync(specDir).find((f) => f.endsWith('-uml-modeling.md'));
         // Phase 4 无独立 uml-modeling.md：R14 源 = class-design.md + data-model.md 合并
-        const classFile = readdirSync(specDir).find(f => f.endsWith('-class-design.md'));
-        const dataModelFile = readdirSync(specDir).find(f => f.endsWith('-data-model.md'));
-        const umlContent = phase === 4
-          ? `${classFile ? readOrEmpty(path.join(specDir, classFile)) : ''}\n${dataModelFile ? readOrEmpty(path.join(specDir, dataModelFile)) : ''}`
-          : (umlFile ? readOrEmpty(path.join(specDir, umlFile)) : '');
+        const classFile = readdirSync(specDir).find((f) => f.endsWith('-class-design.md'));
+        const dataModelFile = readdirSync(specDir).find((f) => f.endsWith('-data-model.md'));
+        const umlContent =
+          phase === 4
+            ? `${classFile ? readOrEmpty(path.join(specDir, classFile)) : ''}\n${dataModelFile ? readOrEmpty(path.join(specDir, dataModelFile)) : ''}`
+            : umlFile
+              ? readOrEmpty(path.join(specDir, umlFile))
+              : '';
         const traceContent = traceFile ? readOrEmpty(path.join(specDir, traceFile)) : '';
         if (phase === 2) {
           designEnhanceViolations = checkDesignSpecEnhance(
             traceContent,
             mainFile ? readOrEmpty(path.join(specDir, mainFile)) : '',
             umlContent,
-            rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined,
+            rtmRows ? new Set(rtmRows.map((r) => r.requirementId)) : undefined,
           );
         } else if (phase === 3) {
           const sdIds = Array.isArray((parsed as GraphShape)?.nodes)
-            ? new Set((parsed as GraphShape).nodes.filter(n => n.type === 'SD').map(n => n.id))
+            ? new Set((parsed as GraphShape).nodes.filter((n) => n.type === 'SD').map((n) => n.id))
             : undefined;
           outlineEnhanceViolations = checkOutlineSpecEnhance(
             traceContent,
@@ -175,7 +187,7 @@ async function main(): Promise<void> {
         } else {
           // phase=4：INTF 集合从 graph.json INTF 节点提取
           const intfIds = Array.isArray((parsed as GraphShape)?.nodes)
-            ? new Set((parsed as GraphShape).nodes.filter(n => n.type === 'INTF').map(n => n.id))
+            ? new Set((parsed as GraphShape).nodes.filter((n) => n.type === 'INTF').map((n) => n.id))
             : undefined;
           detailedEnhanceViolations = checkDetailedSpecEnhance(
             traceContent,
@@ -192,28 +204,52 @@ async function main(): Promise<void> {
         };
         if (mainFile) {
           const module = mainFile.slice(0, -mainSuffix.length);
-          const subRefs = phase === 2
-            ? ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling']
-            : phase === 3
-              ? ['interface-contract', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling']
-              : ['class-design', 'data-model', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod'];
+          const subRefs =
+            phase === 2
+              ? [
+                  'system-architecture',
+                  'glossary',
+                  'traceability-matrix',
+                  'behavior-spec',
+                  'discipline-dod',
+                  'uml-modeling',
+                ]
+              : phase === 3
+                ? [
+                    'interface-contract',
+                    'glossary',
+                    'traceability-matrix',
+                    'behavior-spec',
+                    'discipline-dod',
+                    'uml-modeling',
+                  ]
+                : ['class-design', 'data-model', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod'];
           for (const sub of subRefs) {
             if (!fs.existsSync(path.join(specDir, `${module}-${sub}.md`))) {
-              pushRefError(phase === 2 ? 'r9' : phase === 3 ? 'r11' : 'r13', `R${phase === 2 ? 9 : phase === 3 ? 11 : 13} 引用块断裂：主文档引用 ${module}-${sub}.md 但文件不存在`);
+              pushRefError(
+                phase === 2 ? 'r9' : phase === 3 ? 'r11' : 'r13',
+                `R${phase === 2 ? 9 : phase === 3 ? 11 : 13} 引用块断裂：主文档引用 ${module}-${sub}.md 但文件不存在`,
+              );
             }
           }
-          if (readdirSync(specDir).filter(f => f.endsWith(mainSuffix)).length !== 1) {
-            pushRefError(phase === 2 ? 'r9' : phase === 3 ? 'r11' : 'r13', `R${phase === 2 ? 9 : phase === 3 ? 11 : 13} module 前缀匹配失败：主文档须恰 1 个 *${mainSuffix}`);
+          if (readdirSync(specDir).filter((f) => f.endsWith(mainSuffix)).length !== 1) {
+            pushRefError(
+              phase === 2 ? 'r9' : phase === 3 ? 'r11' : 'r13',
+              `R${phase === 2 ? 9 : phase === 3 ? 11 : 13} module 前缀匹配失败：主文档须恰 1 个 *${mainSuffix}`,
+            );
           }
         } else {
-          pushRefError(phase === 2 ? 'r9' : phase === 3 ? 'r11' : 'r13', `R${phase === 2 ? 9 : phase === 3 ? 11 : 13} module 前缀匹配失败：未找到 *${mainSuffix} 主文档`);
+          pushRefError(
+            phase === 2 ? 'r9' : phase === 3 ? 'r11' : 'r13',
+            `R${phase === 2 ? 9 : phase === 3 ? 11 : 13} module 前缀匹配失败：未找到 *${mainSuffix} 主文档`,
+          );
         }
       } else {
         // 第 37 轮：Phase 1 固定文件名（保留既有行为）
         const specContent = readOrEmpty(path.join(specDir, 'requirement-spec.md'));
         const traceContent = readOrEmpty(path.join(specDir, 'traceability-matrix.md'));
         const umlContent = readOrEmpty(path.join(specDir, 'uml-modeling.md'));
-        const rtmIds = rtmRows ? new Set(rtmRows.map(r => r.requirementId)) : undefined;
+        const rtmIds = rtmRows ? new Set(rtmRows.map((r) => r.requirementId)) : undefined;
         specEnhanceViolations = checkRequirementSpecEnhance(traceContent, specContent, umlContent, rtmIds);
         for (const ref of extractRefTargets(specContent)) {
           if (!fs.existsSync(path.join(specDir, ref))) {
@@ -240,18 +276,23 @@ async function main(): Promise<void> {
 
   // R6 扩展：cross-cuts 源类型 RTM 关联校验（若提供 --rtm）
   if (rtmRows && result.crossLogic) {
-    const nfrConIds = new Set(rtmRows.filter(r => r.type === 'NFR' || r.type === 'CON').map(r => r.requirementId));
+    const nfrConIds = new Set(rtmRows.filter((r) => r.type === 'NFR' || r.type === 'CON').map((r) => r.requirementId));
     let rtmR6Added = false;
     for (const edge of (parsed as GraphShape).edges) {
       if (edge.type === 'cross-cuts' && !nfrConIds.has(edge.from)) {
-        result.crossLogic.crossCutsSourceTypeViolations.push(`${edge.from}→${edge.to}（源 ${edge.from} 非 NFR/CON 行）`);
+        result.crossLogic.crossCutsSourceTypeViolations.push(
+          `${edge.from}→${edge.to}（源 ${edge.from} 非 NFR/CON 行）`,
+        );
         result.violations.push(`R6 cross-cuts 源类型校验失败：${edge.from} 非 NFR/CON 行`);
         rtmR6Added = true;
       }
     }
     if (rtmR6Added) {
       // 重算 passed（与 graph-logic.ts 汇总逻辑一致）
-      const isPureReqGraph = Array.isArray((parsed as GraphShape)?.nodes) && (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+      const isPureReqGraph =
+        Array.isArray((parsed as GraphShape)?.nodes) &&
+        (parsed as GraphShape).nodes.length > 0 &&
+        (parsed as GraphShape).nodes.every((n) => n.type === 'REQ');
       recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
     }
   }
@@ -259,14 +300,17 @@ async function main(): Promise<void> {
   // 应用豁免：跳过已批准豁免的规则
   if (exemptedRules) {
     const beforeLen = result.violations.length;
-    result.violations = result.violations.filter(v => {
+    result.violations = result.violations.filter((v) => {
       for (const rule of exemptedRules!) {
         if (v.startsWith(`${rule} `) || v.startsWith(`[${rule}]`) || v.startsWith(`${rule}-`)) return false;
       }
       return true;
     });
     if (result.violations.length < beforeLen) {
-      const isPureReqGraph = Array.isArray((parsed as GraphShape)?.nodes) && (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+      const isPureReqGraph =
+        Array.isArray((parsed as GraphShape)?.nodes) &&
+        (parsed as GraphShape).nodes.length > 0 &&
+        (parsed as GraphShape).nodes.every((n) => n.type === 'REQ');
       recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
     }
   }
@@ -277,7 +321,10 @@ async function main(): Promise<void> {
     for (const msg of specEnhanceViolations.r7) result.violations.push(msg);
     for (const msg of specEnhanceViolations.r8) result.violations.push(msg);
     // checkRequirementGraph 不感知 R7/R8，重算 passed（与 graph-logic.ts 汇总逻辑一致）
-    const isPureReqGraph = Array.isArray((parsed as GraphShape)?.nodes) && (parsed as GraphShape).nodes.length > 0 && (parsed as GraphShape).nodes.every(n => n.type === 'REQ');
+    const isPureReqGraph =
+      Array.isArray((parsed as GraphShape)?.nodes) &&
+      (parsed as GraphShape).nodes.length > 0 &&
+      (parsed as GraphShape).nodes.every((n) => n.type === 'REQ');
     recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
   }
 
@@ -307,13 +354,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'requirement-graph',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'requirement-graph',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -330,9 +380,15 @@ async function main(): Promise<void> {
   console.log(`根节点        : ${result.roots.length === 0 ? '无' : result.roots.join(', ')}`);
   console.log(`orphan        : ${result.orphans.length === 0 ? '无' : result.orphans.join(', ')}`);
   console.log(`multiParent   : ${result.multiParent.length === 0 ? '无' : result.multiParent.join(', ')}`);
-  console.log(`追溯违反      : SD_without_implements=${result.traceabilityViolations.SD_without_implements}, INTF_without_defines=${result.traceabilityViolations.INTF_without_defines}, DD_without_realizes=${result.traceabilityViolations.DD_without_realizes}`);
-  console.log(`信息流违反    : blackHoles=[${result.dataflowViolations.blackHoles.join(', ')}], miracles=[${result.dataflowViolations.miracles.join(', ')}], deadModules=[${result.dataflowViolations.deadModules.join(', ')}]`);
-  console.log(`边界完整性    : EXT-IN=${result.boundary.extIn}, EXT-OUT=${result.boundary.extOut}, complete=${result.boundary.complete}`);
+  console.log(
+    `追溯违反      : SD_without_implements=${result.traceabilityViolations.SD_without_implements}, INTF_without_defines=${result.traceabilityViolations.INTF_without_defines}, DD_without_realizes=${result.traceabilityViolations.DD_without_realizes}`,
+  );
+  console.log(
+    `信息流违反    : blackHoles=[${result.dataflowViolations.blackHoles.join(', ')}], miracles=[${result.dataflowViolations.miracles.join(', ')}], deadModules=[${result.dataflowViolations.deadModules.join(', ')}]`,
+  );
+  console.log(
+    `边界完整性    : EXT-IN=${result.boundary.extIn}, EXT-OUT=${result.boundary.extOut}, complete=${result.boundary.complete}`,
+  );
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -358,27 +414,31 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('GRAPH', {
-    type: 'requirement-graph',
-    passed: result.passed,
-    phase: result.phase,
-    totalNodes: result.totalNodes,
-    totalEdges: result.totalEdges,
-    connectedComponents: result.connectedComponents,
-    isolatedNodes: result.isolatedNodes,
-    roots: result.roots,
-    orphans: result.orphans,
-    multiParent: result.multiParent,
-    traceabilityViolations: result.traceabilityViolations,
-    dataflowViolations: result.dataflowViolations,
-    boundary: result.boundary,
-    reqHierarchy: result.reqHierarchy,
-    crossLogic: result.crossLogic,
-    exemptionsApplied: exemptedRules ?? [],
-    violations: result.violations,
-    warnings: result.warnings ?? [],
-    converged: result.passed,
-  }, exitCode);
+  printGateReport(
+    'GRAPH',
+    {
+      type: 'requirement-graph',
+      passed: result.passed,
+      phase: result.phase,
+      totalNodes: result.totalNodes,
+      totalEdges: result.totalEdges,
+      connectedComponents: result.connectedComponents,
+      isolatedNodes: result.isolatedNodes,
+      roots: result.roots,
+      orphans: result.orphans,
+      multiParent: result.multiParent,
+      traceabilityViolations: result.traceabilityViolations,
+      dataflowViolations: result.dataflowViolations,
+      boundary: result.boundary,
+      reqHierarchy: result.reqHierarchy,
+      crossLogic: result.crossLogic,
+      exemptionsApplied: exemptedRules ?? [],
+      violations: result.violations,
+      warnings: result.warnings ?? [],
+      converged: result.passed,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

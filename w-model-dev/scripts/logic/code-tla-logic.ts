@@ -202,7 +202,7 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
   }
 
   // 仅取 type=SD 节点（SSoT §10.8.1 算法 1：graph.json 中所有 type=SD 节点）
-  const sdNodes = graph.nodes.filter(n => n && n.type === 'SD');
+  const sdNodes = graph.nodes.filter((n) => n && n.type === 'SD');
   const codeModules: string[] = [];
   for (const row of rtm.rows) {
     if (row && typeof row.codeModule === 'string' && row.codeModule.trim() !== '') {
@@ -217,7 +217,7 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
 
     // 主匹配：SD ID 前缀精确匹配（codeModule 格式 SD-xxx:src/path per phase-5-coding.md）
     // 处理数字 ID（如 SD-5.2.1）和命名 ID（如 SD-AUTH），最可靠的反向追溯方式
-    const prefixMatch = codeModules.some(cm => cm.includes(`${id}:`));
+    const prefixMatch = codeModules.some((cm) => cm.includes(`${id}:`));
     if (prefixMatch) continue;
 
     // 回退匹配：SD id 去 "SD-" 前缀，转小写，按 -/_/. 拆分成多段
@@ -226,17 +226,17 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
     const raw = id.replace(/^SD-/i, '');
     const segments = raw
       .split(/[-_.]+/)
-      .map(s => s.toLowerCase())
-      .filter(s => s.length >= 2);
+      .map((s) => s.toLowerCase())
+      .filter((s) => s.length >= 2);
     if (segments.length === 0) {
       const msg = `SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts）`;
       violations.push(msg);
       structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: `graph.nodes[${idx}].id`, message: msg });
       continue;
     }
-    const matched = codeModules.some(cm => {
+    const matched = codeModules.some((cm) => {
       const cmLower = cm.toLowerCase();
-      return segments.some(seg => cmLower.includes(seg));
+      return segments.some((seg) => cmLower.includes(seg));
     });
     if (!matched) {
       // P1.4：错误信息须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）与格式
@@ -268,10 +268,7 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
  * @param filePath 文件路径（用于错误消息）
  * @returns CodeFile（含 assignments/conditionals/assertions）
  */
-export function extractCodeStateTransfers(
-  ast: TsType.SourceFile,
-  filePath: string,
-): CodeFile {
+export function extractCodeStateTransfers(ast: TsType.SourceFile, filePath: string): CodeFile {
   const assignments: Assignment[] = [];
   const conditionals: Conditional[] = [];
   const assertions: Assertion[] = [];
@@ -350,7 +347,9 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
       passed: false,
       checked: 0,
       violations: ['codeFiles 为空，无代码状态转移可校验'],
-      structuredViolations: [{ rule: CODE_TLA_RULES.D2, field: 'codeFiles', message: 'codeFiles 为空，无代码状态转移可校验' }],
+      structuredViolations: [
+        { rule: CODE_TLA_RULES.D2, field: 'codeFiles', message: 'codeFiles 为空，无代码状态转移可校验' },
+      ],
     };
   }
 
@@ -385,13 +384,13 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
 export function toCamelCase(name: string): string {
   if (typeof name !== 'string' || name.length === 0) return '';
   // 按下划线/连字符分割，拼接为驼峰
-  const parts = name.split(/[_-]+/).filter(p => p.length > 0);
+  const parts = name.split(/[_-]+/).filter((p) => p.length > 0);
   if (parts.length === 0) return '';
   // 第一段首字母小写，后续段首字母大写
   const firstPart = parts[0];
   if (firstPart === undefined) return '';
   const first = firstPart.charAt(0).toLowerCase() + firstPart.slice(1);
-  const rest = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1));
+  const rest = parts.slice(1).map((p) => p.charAt(0).toUpperCase() + p.slice(1));
   return first + rest.join('');
 }
 
@@ -443,10 +442,7 @@ export function extractCodeFunctionNames(files: CodeFile[]): string[] {
         for (const d of node.declarationList.declarations) {
           if (d.name && ts.isIdentifier(d.name) && d.initializer) {
             // 箭头函数 / 函数表达式赋值给变量：const register = () => {}
-            if (
-              ts.isArrowFunction(d.initializer) ||
-              ts.isFunctionExpression(d.initializer)
-            ) {
+            if (ts.isArrowFunction(d.initializer) || ts.isFunctionExpression(d.initializer)) {
               names.push(d.name.text);
             }
           }
@@ -484,10 +480,7 @@ export function extractCodeFunctionNames(files: CodeFile[]): string[] {
  * @param files      CodeFile 数组
  * @returns DimensionResult
  */
-export function checkNextBranchCoverage(
-  tlaContent: string,
-  files: CodeFile[],
-): DimensionResult {
+export function checkNextBranchCoverage(tlaContent: string, files: CodeFile[]): DimensionResult {
   const violations: string[] = [];
   const structuredViolations: StructuredViolation[] = [];
   const actions = extractNextActions(tlaContent);
@@ -498,7 +491,7 @@ export function checkNextBranchCoverage(
 
   const codeFunctionNames = extractCodeFunctionNames(files);
   // 同时准备驼峰形式和小写形式，做包含匹配
-  const codeNamesLower = codeFunctionNames.map(n => n.toLowerCase());
+  const codeNamesLower = codeFunctionNames.map((n) => n.toLowerCase());
 
   let covered = 0;
   for (const action of actions) {
@@ -508,7 +501,7 @@ export function checkNextBranchCoverage(
     //   1. 代码函数名（小写）包含动作名（小写），或反之
     //   2. 代码函数名（小写）包含驼峰动作名（小写），或反之
     const matched = codeNamesLower.some(
-      cn =>
+      (cn) =>
         cn.includes(lower) ||
         lower.includes(cn) ||
         cn.includes(camel.toLowerCase()) ||
@@ -590,10 +583,7 @@ export function extractBusinessInvariants(tlaContent: string): string[] {
  * @param files      CodeFile 数组
  * @returns DimensionResult
  */
-export function checkInvariantCoverage(
-  tlaContent: string,
-  files: CodeFile[],
-): DimensionResult {
+export function checkInvariantCoverage(tlaContent: string, files: CodeFile[]): DimensionResult {
   const invariants = extractBusinessInvariants(tlaContent);
   if (invariants.length === 0) {
     // 无 BusinessInvariant/Invariants 定义时跳过
@@ -650,9 +640,7 @@ export function checkInvariantCoverage(
  * @param input CodeTlaConsistencyInput（manifest + graph + rtm + codeFiles）
  * @returns ConsistencyResult
  */
-export function checkCodeTlaConsistency(
-  input: CodeTlaConsistencyInput,
-): ConsistencyResult {
+export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): ConsistencyResult {
   const violations: Violation[] = [];
   const structuredViolations: StructuredViolation[] = [];
 
@@ -683,7 +671,7 @@ export function checkCodeTlaConsistency(
   };
   const schemaResult = validateBySchema('code-tla-manifest', schemaInput);
   if (!schemaResult.valid) {
-    const schemaViolations: Violation[] = schemaResult.errorMessages.map(m => ({
+    const schemaViolations: Violation[] = schemaResult.errorMessages.map((m) => ({
       dimension: 'schema',
       message: `[schema] ${m}`,
     }));
@@ -696,7 +684,7 @@ export function checkCodeTlaConsistency(
         invariantCoverage: { passed: false, checked: 0, violations: [] },
       },
       violations: schemaViolations,
-      structuredViolations: schemaViolations.map(v => ({
+      structuredViolations: schemaViolations.map((v) => ({
         rule: CODE_TLA_RULES.SCHEMA,
         field: 'manifest/graph/rtm',
         message: v.message,
@@ -717,7 +705,7 @@ export function checkCodeTlaConsistency(
   // 维度2：代码状态转移抽取
   // 如果 codeFiles 已含 assignments/conditionals/assertions（CLI 注入），直接用；
   // 否则按需重新抽取（保持纯函数自洽）。
-  const codeFilesWithExtract: CodeFile[] = (input.codeFiles ?? []).map(f => {
+  const codeFilesWithExtract: CodeFile[] = (input.codeFiles ?? []).map((f) => {
     if (f.assignments.length > 0 || f.conditionals.length > 0 || f.assertions.length > 0) {
       return f;
     }
@@ -737,9 +725,7 @@ export function checkCodeTlaConsistency(
   const specs = Array.isArray(input.manifest?.specs) ? input.manifest.specs : [];
   // P3.9（第 9 轮）扩展：遍历全部 specs（L1/L2/L3/L4）的 tlaContent，
   // 不再仅限 L2/L3。Next 分支与 BusinessInvariant 可定义于任意层级。
-  const tlaSpecs = specs.filter(
-    s => s && typeof s.tlaContent === 'string',
-  );
+  const tlaSpecs = specs.filter((s) => s && typeof s.tlaContent === 'string');
 
   // 维度3：Next 分支对应
   let nextPassed = true;
@@ -812,10 +798,7 @@ export function checkCodeTlaConsistency(
   }
 
   const passed =
-    sdToCodeModule.passed &&
-    codeStateTransfer.passed &&
-    nextBranchCoverage.passed &&
-    invariantCoverage.passed;
+    sdToCodeModule.passed && codeStateTransfer.passed && nextBranchCoverage.passed && invariantCoverage.passed;
 
   return {
     passed,

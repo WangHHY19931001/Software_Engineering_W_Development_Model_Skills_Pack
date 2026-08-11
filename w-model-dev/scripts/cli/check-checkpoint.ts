@@ -51,11 +51,9 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const runLogFile = args.find(a => !a.startsWith('--'));
-  const checkpointLogArg = args.find(a => a.startsWith('--checkpoint-log='));
-  const checkpointLogDir = checkpointLogArg
-    ? checkpointLogArg.slice('--checkpoint-log='.length)
-    : undefined;
+  const runLogFile = args.find((a) => !a.startsWith('--'));
+  const checkpointLogArg = args.find((a) => a.startsWith('--checkpoint-log='));
+  const checkpointLogDir = checkpointLogArg ? checkpointLogArg.slice('--checkpoint-log='.length) : undefined;
   return { runLogFile, checkpointLogDir };
 }
 
@@ -71,18 +69,14 @@ function parseArgs(argv: string[]): ParsedArgs {
  * 容错：目录读取失败只警告不 exit；单文件读取失败只警告；
  *       未匹配到任何 phase 文件则返回 undefined（跳过 R3）。
  */
-async function loadCheckpointLog(
-  checkpointLogDir: string,
-): Promise<Map<string, string> | undefined> {
+async function loadCheckpointLog(checkpointLogDir: string): Promise<Map<string, string> | undefined> {
   const dirAbs = path.resolve(checkpointLogDir);
   let files: string[];
   try {
     files = await fs.readdir(dirAbs);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    console.error(
-      `⚠ checkpoint-log 目录读取失败，跳过 R3 用户确认校验: ${dirAbs}（${e.code ?? e.message}）`,
-    );
+    console.error(`⚠ checkpoint-log 目录读取失败，跳过 R3 用户确认校验: ${dirAbs}（${e.code ?? e.message}）`);
     return undefined;
   }
 
@@ -101,15 +95,11 @@ async function loadCheckpointLog(
       if (phase) map.set(phase, content);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(
-        `⚠ checkpoint-log 文件读取失败，已跳过: ${fileAbs}（${e.code ?? e.message}）`,
-      );
+      console.error(`⚠ checkpoint-log 文件读取失败，已跳过: ${fileAbs}（${e.code ?? e.message}）`);
     }
   }
   if (map.size === 0) {
-    console.error(
-      `⚠ checkpoint-log 目录未匹配到 phase-N 文件，跳过 R3 用户确认校验: ${dirAbs}`,
-    );
+    console.error(`⚠ checkpoint-log 目录未匹配到 phase-N 文件，跳过 R3 用户确认校验: ${dirAbs}`);
     return undefined;
   }
   return map;
@@ -167,13 +157,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'checkpoint',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'checkpoint',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -198,17 +191,23 @@ async function main(): Promise<void> {
       console.log(`  - ${r}`);
     }
     console.log('');
-    console.log('O 子代理须按上述原因处置（补 acknowledgedDecisions / 具化决策 / 补用户确认 / 对齐阶段主题 / 显式回退修正），详见：');
+    console.log(
+      'O 子代理须按上述原因处置（补 acknowledgedDecisions / 具化决策 / 补用户确认 / 对齐阶段主题 / 显式回退修正），详见：',
+    );
     console.log('  docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.4');
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('CHECKPOINT', {
-    type: 'checkpoint',
-    passed: result.passed,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'CHECKPOINT',
+    {
+      type: 'checkpoint',
+      passed: result.passed,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

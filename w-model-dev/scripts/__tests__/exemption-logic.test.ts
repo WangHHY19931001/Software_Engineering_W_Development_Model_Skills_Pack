@@ -53,7 +53,7 @@ describe('E1-E8 豁免审批校验', () => {
       const { target, ...rest } = e;
       const result = checkExemption(rest);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('[schema]'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
       expect(result.stage).toBe('request');
     });
 
@@ -61,7 +61,7 @@ describe('E1-E8 豁免审批校验', () => {
       const e = makeValidExemption();
       const result = checkExemption({ ...e, id: 'BAD-ID' });
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('[schema]'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
       expect(result.stage).toBe('request');
     });
   });
@@ -72,14 +72,14 @@ describe('E1-E8 豁免审批校验', () => {
       const e = makeValidExemption();
       const result = checkExemption({ ...e, justification: '太短了' });
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('[schema]') && v.includes('justification'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('[schema]') && v.includes('justification'))).toBe(true);
       expect(result.stage).toBe('request');
     });
 
     it('E2: justification ≥ 20 字符 → schema 通过', () => {
       const e = makeValidExemption();
       const result = checkExemption(e);
-      expect(result.violations.some(v => v.includes('E2'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('E2'))).toBe(false);
     });
   });
 
@@ -89,14 +89,14 @@ describe('E1-E8 豁免审批校验', () => {
       const e = makeValidExemption();
       const result = checkExemption({ ...e, evidence: [] });
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('[schema]') && v.includes('evidence'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('[schema]') && v.includes('evidence'))).toBe(true);
       expect(result.stage).toBe('request');
     });
 
     it('E3: evidence 非空 → schema 通过', () => {
       const e = makeValidExemption();
       const result = checkExemption(e);
-      expect(result.violations.some(v => v.includes('E3'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('E3'))).toBe(false);
     });
   });
 
@@ -107,7 +107,7 @@ describe('E1-E8 豁免审批校验', () => {
       const { review, ...rest } = e;
       const result = checkExemption(rest);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E4'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E4'))).toBe(true);
     });
   });
 
@@ -118,7 +118,7 @@ describe('E1-E8 豁免审批校验', () => {
       e.review!.reviewDecision = 'reject';
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E5') && v.includes('reject'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E5') && v.includes('reject'))).toBe(true);
     });
 
     it('E5: reviewDecision = need-more-info → fail', () => {
@@ -126,7 +126,7 @@ describe('E1-E8 豁免审批校验', () => {
       e.review!.reviewDecision = 'need-more-info';
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E5') && v.includes('need-more-info'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E5') && v.includes('need-more-info'))).toBe(true);
     });
   });
 
@@ -137,13 +137,13 @@ describe('E1-E8 豁免审批校验', () => {
       e.review!.rootCauseAnalysis = '太短了根本原因分析不足';
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('[schema]') && v.includes('rootCauseAnalysis'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('[schema]') && v.includes('rootCauseAnalysis'))).toBe(true);
     });
 
     it('E6: rootCauseAnalysis ≥ 30 字符 → schema 通过', () => {
       const e = makeValidExemption();
       const result = checkExemption(e);
-      expect(result.violations.some(v => v.includes('E6'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('E6'))).toBe(false);
     });
   });
 
@@ -154,7 +154,7 @@ describe('E1-E8 豁免审批校验', () => {
       e.verification!.verified = false;
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E7') && v.includes('false'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E7') && v.includes('false'))).toBe(true);
     });
 
     it('E7: verification 缺失 → fail', () => {
@@ -162,7 +162,7 @@ describe('E1-E8 豁免审批校验', () => {
       const { verification, ...rest } = e;
       const result = checkExemption(rest);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E7') && v.includes('缺失'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E7') && v.includes('缺失'))).toBe(true);
     });
   });
 
@@ -173,7 +173,7 @@ describe('E1-E8 豁免审批校验', () => {
       const { humanDecision, ...rest } = e;
       const result = checkExemption(rest);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E8') && v.includes('缺失'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E8') && v.includes('缺失'))).toBe(true);
       expect(result.stage).toBe('verification');
     });
 
@@ -182,7 +182,7 @@ describe('E1-E8 豁免审批校验', () => {
       e.humanDecision!.decision = 'reject';
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E8') && v.includes('reject'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E8') && v.includes('reject'))).toBe(true);
       expect(result.stage).toBe('human');
     });
   });
@@ -194,7 +194,7 @@ describe('E1-E8 豁免审批校验', () => {
       e.submittedAt = '2026-07-28T12:00:00Z'; // 晚于 reviewedAt
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E9') && v.includes('submittedAt'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E9') && v.includes('submittedAt'))).toBe(true);
     });
 
     it('E9: reviewedAt >= verifiedAt（时序乱序）→ fail', () => {
@@ -202,7 +202,7 @@ describe('E1-E8 豁免审批校验', () => {
       e.review!.reviewedAt = '2026-07-28T13:00:00Z'; // 晚于 verifiedAt
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E9') && v.includes('reviewedAt'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E9') && v.includes('reviewedAt'))).toBe(true);
     });
 
     it('E9: verifiedAt >= decidedAt（时序乱序）→ fail', () => {
@@ -210,13 +210,13 @@ describe('E1-E8 豁免审批校验', () => {
       e.verification!.verifiedAt = '2026-07-28T14:00:00Z'; // 晚于 decidedAt
       const result = checkExemption(e);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.includes('E9') && v.includes('verifiedAt'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('E9') && v.includes('verifiedAt'))).toBe(true);
     });
 
     it('E9: 时间戳时序合规 → 无 E9 违规', () => {
       const e = makeValidExemption();
       const result = checkExemption(e);
-      expect(result.violations.some(v => v.includes('E9'))).toBe(false);
+      expect(result.violations.some((v) => v.includes('E9'))).toBe(false);
     });
   });
 

@@ -97,14 +97,14 @@ describe('P1.1 manifest.basePath 强制字段校验', () => {
     const m = makeValidManifestWithoutBasePath();
     const result = checkTlaModel(m, 2);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.includes('basePath 缺失'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('basePath 缺失'))).toBe(true);
   });
 
   it('manifest basePath 存在 → 不报缺失', () => {
     const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
     m.basePath = '.';
     const result = checkTlaModel(m, 2);
-    expect(result.violations.some(v => v.includes('basePath 缺失'))).toBe(false);
+    expect(result.violations.some((v) => v.includes('basePath 缺失'))).toBe(false);
   });
 
   it('basePath 为空字符串 → 报缺失', () => {
@@ -112,7 +112,7 @@ describe('P1.1 manifest.basePath 强制字段校验', () => {
     m.basePath = '';
     const result = checkTlaModel(m, 2);
     // schema minLength:1 前置拦截空字符串（[schema] 前缀），业务规则 basePath 缺失不再触达
-    expect(result.violations.some(v => /\[schema\].*basePath/.test(v))).toBe(true);
+    expect(result.violations.some((v) => /\[schema\].*basePath/.test(v))).toBe(true);
   });
 
   it('basePath 为非字符串 → 报缺失', () => {
@@ -120,7 +120,7 @@ describe('P1.1 manifest.basePath 强制字段校验', () => {
     m.basePath = 123;
     const result = checkTlaModel(m, 2);
     // schema type:string 前置拦截非字符串（[schema] 前缀），业务规则 basePath 缺失不再触达
-    expect(result.violations.some(v => /\[schema\].*basePath/.test(v))).toBe(true);
+    expect(result.violations.some((v) => /\[schema\].*basePath/.test(v))).toBe(true);
   });
 });
 
@@ -150,22 +150,22 @@ describe('P1.2 SD 覆盖率 spec 方向校验', () => {
     const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: [] }];
     const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.includes('L1_system 缺 requirementIds'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('L1_system 缺 requirementIds'))).toBe(true);
   });
 
   it('spec requirementIds 无 SD-xxx 标识 → violation', () => {
     const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: ['REQ-001'] }];
     const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.includes('无 SD 标识'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('无 SD 标识'))).toBe(true);
   });
 
   it('spec requirementIds 含 SD-xxx → 通过 spec 方向', () => {
     const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: ['SD-001', 'REQ-001'] }];
     const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
     // 注意：只要 SD-001 被覆盖且 spec 含 SD 标识就通过
-    expect(result.violations.some(v => v.includes('缺 requirementIds'))).toBe(false);
-    expect(result.violations.some(v => v.includes('无 SD 标识'))).toBe(false);
+    expect(result.violations.some((v) => v.includes('缺 requirementIds'))).toBe(false);
+    expect(result.violations.some((v) => v.includes('无 SD 标识'))).toBe(false);
   });
 
   it('L1/L2/L3/L4 全规格无例外', () => {
@@ -173,7 +173,7 @@ describe('P1.2 SD 覆盖率 spec 方向校验', () => {
     for (const level of ['L1', 'L2', 'L3', 'L4'] as const) {
       const specs = [{ ...baseSpec, id: `${level}_test`, level, requirementIds: [] }];
       const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
-      expect(result.violations.some(v => v.includes(`${level}_test 缺 requirementIds`))).toBe(true);
+      expect(result.violations.some((v) => v.includes(`${level}_test 缺 requirementIds`))).toBe(true);
     }
   });
 });
@@ -198,7 +198,7 @@ Invariants ==
     const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK';
     const result = checkCfgInvariantsConsistency(tlaInvariants, cfg);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.includes('缺失不变式'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('缺失不变式'))).toBe(true);
   });
 
   it('tla 用 BusinessInvariant == 定义（向后兼容）→ passed=true', () => {
@@ -220,13 +220,13 @@ describe('G-D D2 cfg INVARIANT 格式死分支', () => {
   it('cfg 含裸 INVARIANT（无不变式名）→ 报缺少不变式名', () => {
     const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT\nINIT Init');
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
   });
 
   it('cfg 含裸 INVARIANT 带尾随空格 → 报缺少不变式名', () => {
     const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT   \nINIT Init');
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
   });
 
   it('cfg INVARIANT 后跟不变式名 → passed=true', () => {
@@ -243,7 +243,6 @@ describe('G-D D2 cfg INVARIANT 格式死分支', () => {
 // ==================== G-D D3：@phase 严格 ====================
 
 describe('G-D D3 @phase 解析拒绝非整数', () => {
-
   it('@phase="4x" 通过 validateHeader 应触发 violation', () => {
     const header: Record<string, string | null> = {
       system: 'test',
@@ -251,7 +250,7 @@ describe('G-D D3 @phase 解析拒绝非整数', () => {
     };
     const spec = { id: 'L1-test', level: 'L1' as const, phase: 4 };
     const violations = validateHeader(header, spec as never);
-    expect(violations.some(v => v.includes('@phase="4x"'))).toBe(true);
+    expect(violations.some((v) => v.includes('@phase="4x"'))).toBe(true);
   });
 
   it('@phase="3.9" 通过 validateHeader 应触发 violation', () => {
@@ -261,7 +260,7 @@ describe('G-D D3 @phase 解析拒绝非整数', () => {
     };
     const spec = { id: 'L1-test', level: 'L1' as const, phase: 3 };
     const violations = validateHeader(header, spec as never);
-    expect(violations.some(v => v.includes('@phase="3.9"'))).toBe(true);
+    expect(violations.some((v) => v.includes('@phase="3.9"'))).toBe(true);
   });
 
   it('@phase="4" 正常整数 → 不触发 violation', () => {
@@ -271,7 +270,7 @@ describe('G-D D3 @phase 解析拒绝非整数', () => {
     };
     const spec = { id: 'L1-test', level: 'L1' as const, phase: 4 };
     const violations = validateHeader(header, spec as never);
-    expect(violations.some(v => v.includes('@phase'))).toBe(false);
+    expect(violations.some((v) => v.includes('@phase'))).toBe(false);
   });
 });
 

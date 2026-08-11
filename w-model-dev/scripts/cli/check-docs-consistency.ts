@@ -85,7 +85,12 @@ function detectScriptsChanges(root: string): boolean {
   const paths: string[] = [];
   const diff = spawnSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf-8' });
   if (diff.error === undefined && diff.status === 0) {
-    paths.push(...String(diff.stdout).split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0));
+    paths.push(
+      ...String(diff.stdout)
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0),
+    );
   }
   const status = spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf-8' });
   if (status.error === undefined && status.status === 0) {
@@ -148,15 +153,21 @@ function collectVitestTestCount(root: string): number {
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
-  const r = vitestBin !== null
-    ? spawnSync(process.execPath, [vitestBin, ...vitestArgs], { cwd: root, encoding: 'utf-8', timeout: 180_000, maxBuffer: 64 * 1024 * 1024 })
-    : spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
-        cwd: root,
-        encoding: 'utf-8',
-        timeout: 180_000,
-        maxBuffer: 64 * 1024 * 1024,
-        shell: true,
-      });
+  const r =
+    vitestBin !== null
+      ? spawnSync(process.execPath, [vitestBin, ...vitestArgs], {
+          cwd: root,
+          encoding: 'utf-8',
+          timeout: 180_000,
+          maxBuffer: 64 * 1024 * 1024,
+        })
+      : spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
+          cwd: root,
+          encoding: 'utf-8',
+          timeout: 180_000,
+          maxBuffer: 64 * 1024 * 1024,
+          shell: true,
+        });
   // 无论 spawn 是否报错（含 maxBuffer 超限 / vitest 失败），先尝试读 JSON 落盘文件
   try {
     const parsed = parseJsonSafe(readFileSync(outFile, 'utf-8')) as { numTotalTests?: unknown } | null;
@@ -178,7 +189,7 @@ function collectVitestTestCount(root: string): number {
 
 function main(): void {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
-  const args = process.argv.slice(2).filter(a => a !== '--json');
+  const args = process.argv.slice(2).filter((a) => a !== '--json');
   const jsonMode = args.length !== process.argv.slice(2).length;
   const startTime = Date.now();
   const root = pathResolve(args[0] ?? '.');
@@ -195,13 +206,21 @@ function main(): void {
   }
 
   const read = (p: string): string => readFileSync(join(root, p), 'utf-8');
-  const schemaFiles = readdirSync(join(root, 'w-model-dev/schemas')).filter((f) => f.endsWith('.schema.json')).sort();
+  const schemaFiles = readdirSync(join(root, 'w-model-dev/schemas'))
+    .filter((f) => f.endsWith('.schema.json'))
+    .sort();
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
-  const cursorSkillCount = readdirSync(join(root, '.cursor/skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length;
-  const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts/cli')).filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 25（cli/ 层）
+  const cursorSkillCount = readdirSync(join(root, '.cursor/skills'), { withFileTypes: true }).filter((d) =>
+    d.isDirectory(),
+  ).length;
+  const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts/cli')).filter((f) =>
+    /^check-.*\.ts$/.test(f),
+  ).length; // 含 check-docs-consistency 自身 = 25（cli/ 层）
   const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks（合计 30）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
-  const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) => f.endsWith('.test.ts')).length;
+  const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
+    f.endsWith('.test.ts'),
+  ).length;
   const vitestTestCount = collectVitestTestCount(root);
 
   const input: DocConsistencyInput = {
@@ -237,13 +256,16 @@ function main(): void {
     // violations 分布按检查项聚合（与人类可读 `[${v.check}] ${v.message}` 对齐）
     const byCheck = new Map<string, number>();
     for (const v of violations) byCheck.set(v.check, (byCheck.get(v.check) ?? 0) + 1);
-    printJsonReport({
-      type: 'docs-consistency',
-      passed: violations.length === 0,
-      reasons: violations.map(v => `[${v.check}] ${v.message}`),
-      violations: [...byCheck.entries()].map(([rule, count]) => ({ rule, count })),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'docs-consistency',
+        passed: violations.length === 0,
+        reasons: violations.map((v) => `[${v.check}] ${v.message}`),
+        violations: [...byCheck.entries()].map(([rule, count]) => ({ rule, count })),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }

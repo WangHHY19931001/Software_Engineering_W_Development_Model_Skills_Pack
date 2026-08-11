@@ -42,13 +42,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import {
-  checkTlaModel,
-  parseTlaHeader,
-  validateHeader,
-  type TlaManifest,
-  type TlaSpec,
-} from '../logic/tla-logic.js';
+import { checkTlaModel, parseTlaHeader, validateHeader, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { PHASES, type Phase } from '../lib/constants.js';
@@ -68,12 +62,12 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const manifestFile = args.find(a => !a.startsWith('--'));
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const specArg = args.find(a => a.startsWith('--spec='));
+  const manifestFile = args.find((a) => !a.startsWith('--'));
+  const phaseArg = args.find((a) => a.startsWith('--phase='));
+  const specArg = args.find((a) => a.startsWith('--spec='));
   // P3.8（第 9 轮）--keep-states / -k：调试模式下保留 TLC 产物
   const keepStates = args.includes('--keep-states') || args.includes('-k');
-  const graphArg = args.find(a => a.startsWith('--graph='));
+  const graphArg = args.find((a) => a.startsWith('--graph='));
 
   let phase: number | undefined;
   if (phaseArg) {
@@ -132,10 +126,7 @@ interface EnvironmentStatus {
  *   - java -version 可执行且主版本 ≥ javaMinVersion
  *   - tla2tools.jar 文件存在（jarAbs 为按 basePath 基准解析后的绝对路径）
  */
-async function checkEnvironment(
-  jarAbs: string,
-  javaMinVersion: number,
-): Promise<EnvironmentStatus> {
+async function checkEnvironment(jarAbs: string, javaMinVersion: number): Promise<EnvironmentStatus> {
   const errors: string[] = [];
   let javaVersion: number | null = null;
 
@@ -211,7 +202,7 @@ export async function cleanTraceFiles(dir: string): Promise<string[]> {
     return deleted;
   }
   // 守卫 1：TLC 产物只产生于含 .tla 规格文件的目录；无 .tla 则跳过整个清理
-  if (!entries.some(name => name.endsWith('.tla'))) {
+  if (!entries.some((name) => name.endsWith('.tla'))) {
     return deleted;
   }
   for (const name of entries) {
@@ -275,11 +266,7 @@ interface ToolRunResult {
  *
  * 顺序硬约束（反模式 #14）：先 SANY，通过后才允许跑 TLC。
  */
-function runTools(
-  jarAbs: string,
-  tlaAbs: string,
-  cfgAbs: string,
-): ToolRunResult {
+function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult {
   const tlaDir = path.dirname(tlaAbs);
   const moduleName = path.basename(tlaAbs, '.tla');
   const out: ToolRunResult = {
@@ -343,8 +330,7 @@ function runTools(
   out.deadlock = /Deadlock reached/i.test(out.tlcOutput);
   out.invariantViolated = /Invariant\b.*\bviolated/i.test(out.tlcOutput);
   out.stateExplosion =
-    /out of memory/i.test(out.tlcOutput) ||
-    /states?.*(exceeds|exceeded|too many)/i.test(out.tlcOutput);
+    /out of memory/i.test(out.tlcOutput) || /states?.*(exceeds|exceeded|too many)/i.test(out.tlcOutput);
   out.tlcNoError = /Model checking completed\.?\s*No error/i.test(out.tlcOutput);
 
   return out;
@@ -363,7 +349,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <tla-manifest.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
       exitCode: 2,
     });
     return;
@@ -396,7 +383,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
       exitCode: 2,
     });
     return;
@@ -404,11 +392,7 @@ async function main(): Promise<void> {
 
   // manifest.tools 前置检查（环境检查需要 jarPath）
   const tools = manifest.tools;
-  if (
-    !tools ||
-    typeof tools.jarPath !== 'string' ||
-    typeof tools.javaMinVersion !== 'number'
-  ) {
+  if (!tools || typeof tools.jarPath !== 'string' || typeof tools.javaMinVersion !== 'number') {
     exitWithError({
       category: 'STRUCTURE_INVALID',
       rule: 'P0-3',
@@ -434,7 +418,7 @@ async function main(): Promise<void> {
   if (graphFile) {
     const g = await readJsonOrExit<{ nodes?: Array<{ id: string; type: string }> }>(graphFile);
     if (Array.isArray(g.nodes)) {
-      graphSdNodes = g.nodes.filter(n => n.type === 'SD').map(n => n.id);
+      graphSdNodes = g.nodes.filter((n) => n.type === 'SD').map((n) => n.id);
     }
   }
 
@@ -524,13 +508,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'tla-model',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'tla-model',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -568,22 +555,44 @@ async function main(): Promise<void> {
     `环境状态      : ${result.environmentOk ? '✓ 就绪' : '✗ 未就绪'}（Java ${env.javaVersion ?? 'N/A'}，jar ${jarAbs}）`,
   );
   if (specId !== undefined) console.log(`--spec 过滤   : ${specId}`);
-  console.log(`头部违反      : ${result.headerViolations.length === 0 ? '无' : `${result.headerViolations.length} 条`}`);
-  console.log(`层次违反      : ${result.hierarchyViolations.length === 0 ? '无' : `${result.hierarchyViolations.length} 条`}`);
-  console.log(`拆解违反      : ${result.decompositionViolations.length === 0 ? '无' : `${result.decompositionViolations.length} 条`}`);
+  console.log(
+    `头部违反      : ${result.headerViolations.length === 0 ? '无' : `${result.headerViolations.length} 条`}`,
+  );
+  console.log(
+    `层次违反      : ${result.hierarchyViolations.length === 0 ? '无' : `${result.hierarchyViolations.length} 条`}`,
+  );
+  console.log(
+    `拆解违反      : ${result.decompositionViolations.length === 0 ? '无' : `${result.decompositionViolations.length} 条`}`,
+  );
   console.log(`语法错误      : ${result.syntaxErrors.length === 0 ? '无' : `${result.syntaxErrors.length} 条`}`);
-  console.log(`死锁违反      : ${result.deadlockViolations.length === 0 ? '无' : `${result.deadlockViolations.length} 条`}`);
-  console.log(`不变式违反    : ${result.invariantViolations.length === 0 ? '无' : `${result.invariantViolations.length} 条`}`);
-  console.log(`状态爆炸规格  : ${result.stateExplosionSpecs.length === 0 ? '无' : result.stateExplosionSpecs.join(', ')}`);
-  console.log(`覆盖率违反    : ${result.coverageViolations.length === 0 ? '无' : `${result.coverageViolations.length} 条`}`);
-  console.log(`CFG 一致性    : ${result.cfgConsistencyViolations.length === 0 ? '无' : `${result.cfgConsistencyViolations.length} 条`}`);
-  console.log(`CFG 结构      : ${result.cfgStructureViolations.length === 0 ? '无' : `${result.cfgStructureViolations.length} 条`}`);
-  console.log(`checkRounds   : ${result.checkRoundsViolations.length === 0 ? '无' : `${result.checkRoundsViolations.length} 条`}`);
+  console.log(
+    `死锁违反      : ${result.deadlockViolations.length === 0 ? '无' : `${result.deadlockViolations.length} 条`}`,
+  );
+  console.log(
+    `不变式违反    : ${result.invariantViolations.length === 0 ? '无' : `${result.invariantViolations.length} 条`}`,
+  );
+  console.log(
+    `状态爆炸规格  : ${result.stateExplosionSpecs.length === 0 ? '无' : result.stateExplosionSpecs.join(', ')}`,
+  );
+  console.log(
+    `覆盖率违反    : ${result.coverageViolations.length === 0 ? '无' : `${result.coverageViolations.length} 条`}`,
+  );
+  console.log(
+    `CFG 一致性    : ${result.cfgConsistencyViolations.length === 0 ? '无' : `${result.cfgConsistencyViolations.length} 条`}`,
+  );
+  console.log(
+    `CFG 结构      : ${result.cfgStructureViolations.length === 0 ? '无' : `${result.cfgStructureViolations.length} 条`}`,
+  );
+  console.log(
+    `checkRounds   : ${result.checkRoundsViolations.length === 0 ? '无' : `${result.checkRoundsViolations.length} 条`}`,
+  );
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
   if (result.passed) {
-    console.log('TLA+ 模型符合 docs/tla-plus-modeling-design.md：头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反。');
+    console.log(
+      'TLA+ 模型符合 docs/tla-plus-modeling-design.md：头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反。',
+    );
   } else {
     console.log('未通过原因：');
     for (const r of result.violations) {
@@ -596,31 +605,35 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('TLA', {
-    type: 'tla-model',
-    passed: result.passed,
-    phase: result.phase,
-    totalSpecs: result.totalSpecs,
-    checkedSpecs: result.checkedSpecs,
-    headerViolations: result.headerViolations,
-    hierarchyViolations: result.hierarchyViolations,
-    decompositionViolations: result.decompositionViolations,
-    syntaxErrors: result.syntaxErrors,
-    deadlockViolations: result.deadlockViolations,
-    invariantViolations: result.invariantViolations,
-    stateExplosionSpecs: result.stateExplosionSpecs,
-    coverageViolations: result.coverageViolations,
-    cfgConsistencyViolations: result.cfgConsistencyViolations,
-    cfgStructureViolations: result.cfgStructureViolations,
-    checkRoundsViolations: result.checkRoundsViolations,
-    environmentOk: result.environmentOk,
-    environmentErrors: result.environmentErrors,
-    violations: result.violations,
-    converged: result.passed,
-  }, exitCode);
+  printGateReport(
+    'TLA',
+    {
+      type: 'tla-model',
+      passed: result.passed,
+      phase: result.phase,
+      totalSpecs: result.totalSpecs,
+      checkedSpecs: result.checkedSpecs,
+      headerViolations: result.headerViolations,
+      hierarchyViolations: result.hierarchyViolations,
+      decompositionViolations: result.decompositionViolations,
+      syntaxErrors: result.syntaxErrors,
+      deadlockViolations: result.deadlockViolations,
+      invariantViolations: result.invariantViolations,
+      stateExplosionSpecs: result.stateExplosionSpecs,
+      coverageViolations: result.coverageViolations,
+      cfgConsistencyViolations: result.cfgConsistencyViolations,
+      cfgStructureViolations: result.cfgStructureViolations,
+      checkRoundsViolations: result.checkRoundsViolations,
+      environmentOk: result.environmentOk,
+      environmentErrors: result.environmentErrors,
+      violations: result.violations,
+      converged: result.passed,
+    },
+    exitCode,
+  );
 }
 
-main().catch(err => {
+main().catch((err) => {
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',

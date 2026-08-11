@@ -57,12 +57,12 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const chainFlag = args.find(a => a.startsWith('--chain='));
+  const chainFlag = args.find((a) => a.startsWith('--chain='));
   const chainFromFlag = chainFlag ? chainFlag.split('=').slice(1).join('=') : undefined;
-  const chainFromPos = args.find(a => !a.startsWith('--'));
+  const chainFromPos = args.find((a) => !a.startsWith('--'));
   const chainFile = chainFromFlag ?? chainFromPos;
-  const phaseArg = args.find(a => a.startsWith('--phase='));
-  const stageArg = args.find(a => a.startsWith('--stage='));
+  const phaseArg = args.find((a) => a.startsWith('--phase='));
+  const stageArg = args.find((a) => a.startsWith('--stage='));
   // 统一 --phase 校验（lib/parse-phase.ts，范围 1-8；行为收紧：原无范围校验，
   // 非法值在 main 中统一 ARG_INVALID 拒绝，与 check-artifact-gate 一致）
   let phase: number | undefined;
@@ -92,7 +92,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <signature-chain.jsonl>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
       exitCode: 2,
     });
     return;
@@ -100,7 +101,7 @@ async function main(): Promise<void> {
 
   // 行为收紧（spec §3.2）：显式传了 --phase 但非法（非 1-8）→ ARG_INVALID。
   // 原实现无范围校验（parseInt 后直接传给 logic，非法值静默降级为全量校验）。
-  const phaseArg = process.argv.find(a => a.startsWith('--phase='));
+  const phaseArg = process.argv.find((a) => a.startsWith('--phase='));
   if (phaseArg !== undefined && phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -127,7 +128,9 @@ async function main(): Promise<void> {
       try {
         accessSync(path.join(dir, '.w-model', 'project.json'));
         return dir;
-      } catch { /* continue */ }
+      } catch {
+        /* continue */
+      }
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
@@ -163,13 +166,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'signature-chain',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'signature-chain',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -202,13 +208,17 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/anti-patterns.md #32');
   }
 
-  printGateReport('SIGNATURE_CHAIN', {
-    type: 'signature-chain',
-    passed: result.passed,
-    violations: result.violations,
-    rulesPassed: result.rulesPassed,
-    rulesFailed: result.rulesFailed,
-  }, exitCode);
+  printGateReport(
+    'SIGNATURE_CHAIN',
+    {
+      type: 'signature-chain',
+      passed: result.passed,
+      violations: result.violations,
+      rulesPassed: result.rulesPassed,
+      rulesFailed: result.rulesFailed,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

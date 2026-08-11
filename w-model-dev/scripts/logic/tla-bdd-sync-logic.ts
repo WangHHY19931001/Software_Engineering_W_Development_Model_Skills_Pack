@@ -62,23 +62,10 @@ export interface TlaBddSyncResult {
 }
 
 /** TLA+ 关键字黑名单：抽取状态变量时排除（VARIABLES 声明中仅保留业务变量，不含语言关键字） */
-const TLA_KEYWORD_BLACKLIST = [
-  'VARIABLES',
-  'CONSTANTS',
-  'EXTENDS',
-  'MODULE',
-] as const;
+const TLA_KEYWORD_BLACKLIST = ['VARIABLES', 'CONSTANTS', 'EXTENDS', 'MODULE'] as const;
 
 /** TLA+ 定义名黑名单：抽取不变式时排除（Next/Init/vars 等非不变式定义，避免误判为不变式） */
-const TLA_DEF_BLACKLIST = [
-  'Next',
-  'Init',
-  'vars',
-  'VARIABLES',
-  'CONSTANTS',
-  'EXTENDS',
-  'MODULE',
-] as const;
+const TLA_DEF_BLACKLIST = ['Next', 'Init', 'vars', 'VARIABLES', 'CONSTANTS', 'EXTENDS', 'MODULE'] as const;
 
 /**
  * 从 TLA+ 内容抽取转移名（SSoT §3.4.18 第22轮第9点：从 TLA+ 抽取转移名）。
@@ -118,7 +105,7 @@ export function extractTlaStates(tlaContent: string): string[] {
   const matches = varsBody.matchAll(/([A-Za-z_][A-Za-z0-9_]*)/g);
   for (const m of matches) {
     const name = m[1];
-    if (name && !TLA_KEYWORD_BLACKLIST.includes(name as typeof TLA_KEYWORD_BLACKLIST[number])) {
+    if (name && !TLA_KEYWORD_BLACKLIST.includes(name as (typeof TLA_KEYWORD_BLACKLIST)[number])) {
       states.push(name);
     }
   }
@@ -136,7 +123,7 @@ export function extractTlaInvariants(tlaContent: string): string[] {
     const name = m[1];
     if (!name) continue;
     // 排除已知非不变式名称
-    if (TLA_DEF_BLACKLIST.includes(name as typeof TLA_DEF_BLACKLIST[number])) {
+    if (TLA_DEF_BLACKLIST.includes(name as (typeof TLA_DEF_BLACKLIST)[number])) {
       continue;
     }
     // 简单启发：不变式通常包含 Inv 或 Type 前缀
@@ -171,7 +158,7 @@ export function extractBddStateMachine(featureContent: string): {
   // 1. 从 # @states: 注释提取状态名
   const statesMatch = featureContent.match(/^\s*#\s*@states:\s*(.+?)\s*$/m);
   if (statesMatch && statesMatch[1]) {
-    for (const s of statesMatch[1].split(',').map(x => x.trim())) {
+    for (const s of statesMatch[1].split(',').map((x) => x.trim())) {
       if (s) states.push(s);
     }
   }
@@ -201,8 +188,10 @@ export function extractBddStateMachine(featureContent: string): {
   // 4. 提取 Background 节和 Scenario 体的 Given/When/Then 步骤
   const bgMatch = featureContent.match(/Background:\s*([\s\S]+?)(?:\n\s*Scenario|\n@|$)/);
   const bgContent = bgMatch && bgMatch[1] ? bgMatch[1] : '';
-  const scenarioMatches = [...featureContent.matchAll(/Scenario(?: Outline)?:\s*[^\n]*\n([\s\S]*?)(?=\n\s*Scenario|\n@|$)/g)];
-  const scenarioContent = scenarioMatches.map(m => m[1]).join('\n');
+  const scenarioMatches = [
+    ...featureContent.matchAll(/Scenario(?: Outline)?:\s*[^\n]*\n([\s\S]*?)(?=\n\s*Scenario|\n@|$)/g),
+  ];
+  const scenarioContent = scenarioMatches.map((m) => m[1]).join('\n');
   const allStepsContent = bgContent + '\n' + scenarioContent;
 
   // Given → 状态（末尾 token）
@@ -317,7 +306,9 @@ export function checkTlaBddSync(tlaContent: string, featureContent: string): Tla
   // 状态比对较宽松（子串双向包含匹配，容忍命名差异），只记录 TLA+ 有但 BDD 无的状态
   // —— 以 TLA+ 为行为正确性基准（SSoT §3.4.14），BDD 多出的状态不报违规
   for (const s of tlaStates) {
-    if (!bdd.states.some(bs => bs.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(bs.toLowerCase()))) {
+    if (
+      !bdd.states.some((bs) => bs.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(bs.toLowerCase()))
+    ) {
       const msg = `TLA+ 状态变量 "${s}" 在 BDD Given 中未找到对应`;
       violations.push({
         dimension: 'state',
@@ -332,7 +323,11 @@ export function checkTlaBddSync(tlaContent: string, featureContent: string): Tla
   // 不变式比对（单向宽松）：TLA+ Inv/Type/Invariant 名须在 BDD Then 首 token 中找到子串匹配
   // 与状态比对一致，以 TLA+ 为基准，BDD 多出的不变式不报（SSoT §3.4.14 不变式归一化匹配）
   for (const inv of tlaInvariants) {
-    if (!bdd.invariants.some(bi => bi.toLowerCase().includes(inv.toLowerCase()) || inv.toLowerCase().includes(bi.toLowerCase()))) {
+    if (
+      !bdd.invariants.some(
+        (bi) => bi.toLowerCase().includes(inv.toLowerCase()) || inv.toLowerCase().includes(bi.toLowerCase()),
+      )
+    ) {
       const msg = `TLA+ 不变式 "${inv}" 在 BDD Then 中未找到对应`;
       violations.push({
         dimension: 'invariant',

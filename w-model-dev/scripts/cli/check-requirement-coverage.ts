@@ -41,13 +41,14 @@ async function main(): Promise<void> {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
-  const file = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <coverage.json>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]',
       exitCode: 2,
     });
     return;
@@ -55,7 +56,7 @@ async function main(): Promise<void> {
 
   // 解析可选参数
   const getArg = (prefix: string): string | undefined => {
-    const arg = process.argv.slice(3).find(a => a.startsWith(prefix));
+    const arg = process.argv.slice(3).find((a) => a.startsWith(prefix));
     return arg?.split('=')[1];
   };
 
@@ -70,9 +71,7 @@ async function main(): Promise<void> {
   let graphCrossCuts: Array<{ from: string; to: string }> | undefined;
   if (graphPath) {
     const graphParsed = await readJsonClassified<GraphShape>(graphPath);
-    graphCrossCuts = graphParsed.edges
-      .filter(e => e.type === 'cross-cuts')
-      .map(e => ({ from: e.from, to: e.to }));
+    graphCrossCuts = graphParsed.edges.filter((e) => e.type === 'cross-cuts').map((e) => ({ from: e.from, to: e.to }));
   }
 
   // 读取 outOfScope.json（可选）
@@ -96,7 +95,7 @@ async function main(): Promise<void> {
   let exemptions: string[] | undefined;
   if (exemptionsPath) {
     const exemptParsed = await readJsonClassified<{ grantedExemptions?: Array<{ ruleId: string }> }>(exemptionsPath);
-    exemptions = exemptParsed.grantedExemptions?.map(g => g.ruleId);
+    exemptions = exemptParsed.grantedExemptions?.map((g) => g.ruleId);
   }
 
   // 执行校验
@@ -109,13 +108,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'requirement-coverage',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'requirement-coverage',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -125,7 +127,9 @@ async function main(): Promise<void> {
   console.log('覆盖分析校验报告');
   console.log('═'.repeat(60));
   console.log(`结果: ${result.passed ? '✓ 通过' : '✗ 失败'}`);
-  console.log(`覆盖率指标: stakeholder=${result.metrics.stakeholder}% scenario=${result.metrics.scenario}% requirementType=${result.metrics.requirementType}% crossCut=${result.metrics.crossCut}%`);
+  console.log(
+    `覆盖率指标: stakeholder=${result.metrics.stakeholder}% scenario=${result.metrics.scenario}% requirementType=${result.metrics.requirementType}% crossCut=${result.metrics.crossCut}%`,
+  );
   if (result.exemptionsApplied.length > 0) {
     console.log(`已应用豁免: ${result.exemptionsApplied.join(', ')}`);
   }
@@ -145,14 +149,18 @@ async function main(): Promise<void> {
   }
 
   // JSON 摘要
-  printGateReport('COVERAGE', {
-    type: 'requirement-coverage',
-    passed: result.passed,
-    metrics: result.metrics,
-    exemptionsApplied: result.exemptionsApplied,
-    violations: result.violations,
-    warnings: result.warnings,
-  }, exitCode);
+  printGateReport(
+    'COVERAGE',
+    {
+      type: 'requirement-coverage',
+      passed: result.passed,
+      metrics: result.metrics,
+      exemptionsApplied: result.exemptionsApplied,
+      violations: result.violations,
+      warnings: result.warnings,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

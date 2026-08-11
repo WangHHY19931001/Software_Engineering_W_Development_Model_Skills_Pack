@@ -39,7 +39,12 @@ export interface ExemptionHumanDecision {
 
 export interface ExemptionShape {
   id: string;
-  type: 'small-project-hierarchy' | 'stakeholder-not-applicable' | 'scenario-type-not-applicable' | 'coverage-missing-declared' | 'nfr-subtype-not-applicable';
+  type:
+    | 'small-project-hierarchy'
+    | 'stakeholder-not-applicable'
+    | 'scenario-type-not-applicable'
+    | 'coverage-missing-declared'
+    | 'nfr-subtype-not-applicable';
   target: string;
   ruleId: string;
   justification: string;
@@ -69,7 +74,7 @@ export function checkExemption(exemption: unknown): ExemptionCheckResult {
   // E1: schema 完整性
   const schemaResult: SchemaValidationResult = validateBySchema('exemption', exemption);
   if (!schemaResult.valid) {
-    result.violations.push(...schemaResult.errorMessages.map(m => `[schema] ${m}`));
+    result.violations.push(...schemaResult.errorMessages.map((m) => `[schema] ${m}`));
     result.passed = false;
     return result;
   }
@@ -97,7 +102,9 @@ export function checkExemption(exemption: unknown): ExemptionCheckResult {
     }
     // E6: review.rootCauseAnalysis 长度 ≥ 30 字符
     if (e.review.rootCauseAnalysis.length < 30) {
-      result.violations.push(`E6 review.rootCauseAnalysis 长度 ${e.review.rootCauseAnalysis.length} < 30 字符（防止模板化）`);
+      result.violations.push(
+        `E6 review.rootCauseAnalysis 长度 ${e.review.rootCauseAnalysis.length} < 30 字符（防止模板化）`,
+      );
     }
   }
 
@@ -131,13 +138,19 @@ export function checkExemption(exemption: unknown): ExemptionCheckResult {
       result.violations.push('E9 时间戳解析失败（非 ISO 8601 格式）');
     } else {
       if (submitted >= reviewed) {
-        result.violations.push(`E9 时间戳时序违反：submittedAt(${e.submittedAt}) >= reviewedAt(${e.review.reviewedAt})`);
+        result.violations.push(
+          `E9 时间戳时序违反：submittedAt(${e.submittedAt}) >= reviewedAt(${e.review.reviewedAt})`,
+        );
       }
       if (reviewed >= verified) {
-        result.violations.push(`E9 时间戳时序违反：reviewedAt(${e.review.reviewedAt}) >= verifiedAt(${e.verification.verifiedAt})`);
+        result.violations.push(
+          `E9 时间戳时序违反：reviewedAt(${e.review.reviewedAt}) >= verifiedAt(${e.verification.verifiedAt})`,
+        );
       }
       if (verified >= decided) {
-        result.violations.push(`E9 时间戳时序违反：verifiedAt(${e.verification.verifiedAt}) >= decidedAt(${e.humanDecision.decidedAt})`);
+        result.violations.push(
+          `E9 时间戳时序违反：verifiedAt(${e.verification.verifiedAt}) >= decidedAt(${e.humanDecision.decidedAt})`,
+        );
       }
     }
   }

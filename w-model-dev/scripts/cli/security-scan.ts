@@ -124,10 +124,7 @@ export interface BaselineFile {
  * 由 eslint 发现集合构建 baseline entries（v2 重生成用）。
  * 按 hash 去重（同类合并豁免）；按 file:line 排序保证确定性；reason 取 eslint 消息文本。
  */
-export function buildBaselineEntries(
-  findings: EslintResult[],
-  resolveLine: ResolveLine,
-): BaselineEntry[] {
+export function buildBaselineEntries(findings: EslintResult[], resolveLine: ResolveLine): BaselineEntry[] {
   const seen = new Set<string>();
   const entries: BaselineEntry[] = [];
   for (const f of findings) {
@@ -156,7 +153,17 @@ async function main(): Promise<void> {
   // 场景下即主仓库的 .eslintrc.cjs），造成插件双路径冲突（"couldn't determine the plugin uniquely"）。
   const r = spawnSync(
     'npx',
-    ['eslint', '--no-eslintrc', '--config', 'config/.eslintrc.cjs', '--ignore-path', 'config/.eslintignore', 'w-model-dev/scripts/', '--format', 'json'],
+    [
+      'eslint',
+      '--no-eslintrc',
+      '--config',
+      'config/.eslintrc.cjs',
+      '--ignore-path',
+      'config/.eslintignore',
+      'w-model-dev/scripts/',
+      '--format',
+      'json',
+    ],
     {
       encoding: 'utf-8',
       shell: process.platform === 'win32',
@@ -208,7 +215,12 @@ async function main(): Promise<void> {
     exitWithError({
       category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
       rule: e.code === 'ENOENT' ? 'P0-2' : undefined,
-      message: e.code === 'ENOENT' ? '文件不存在' : err instanceof SyntaxError ? '文件解析失败（非合法 JSON）' : '文件读取失败',
+      message:
+        e.code === 'ENOENT'
+          ? '文件不存在'
+          : err instanceof SyntaxError
+            ? '文件解析失败（非合法 JSON）'
+            : '文件读取失败',
       file: BASELINE_PATH,
       detail: e.code ?? '未知错误',
       exitCode: 2,

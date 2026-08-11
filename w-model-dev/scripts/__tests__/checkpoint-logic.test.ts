@@ -30,8 +30,8 @@ describe('[21.0.0] R3 强制用户确认', () => {
   it('未提供 checkpointLog 时应报 R3 违规', () => {
     const result = checkCheckpoint([checkpointEntry], { checkpointLog: undefined });
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => /R3/.test(v))).toBe(true);
-    expect(result.violations.some(v => /未提供 --checkpoint-log/.test(v))).toBe(true);
+    expect(result.violations.some((v) => /R3/.test(v))).toBe(true);
+    expect(result.violations.some((v) => /未提供 --checkpoint-log/.test(v))).toBe(true);
   });
 
   it('checkpointLog 含真实用户确认时 R3 通过', () => {
@@ -44,7 +44,7 @@ describe('[21.0.0] R3 强制用户确认', () => {
     const checkpointLog = new Map([['2', '用户确认：放行进入阶段 3（user-id: bob）']]);
     const result = checkCheckpoint([checkpointEntry], { checkpointLog });
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => /R3/.test(v))).toBe(true);
-    expect(result.violations.some(v => /疑似 O 自问自答/.test(v))).toBe(true);
+    expect(result.violations.some((v) => /R3/.test(v))).toBe(true);
+    expect(result.violations.some((v) => /疑似 O 自问自答/.test(v))).toBe(true);
   });
 });

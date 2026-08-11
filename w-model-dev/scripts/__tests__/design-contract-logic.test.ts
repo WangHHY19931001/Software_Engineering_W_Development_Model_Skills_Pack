@@ -11,7 +11,6 @@ function makeInput(overrides: Partial<DesignContractCheckInput> = {}): DesignCon
 }
 
 describe('design-contract-logic', () => {
-
   describe('valid input', () => {
     it('空输入应通过', () => {
       const result = checkDesignContractConsistency(makeInput());
@@ -27,8 +26,22 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: ['data'] },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-001', method: 'POST', path: '/api/posts', params: ['title'], expectedStatus: 201, assertedFields: ['id'] },
-          { uatId: 'UAT-002', method: 'GET', path: '/api/posts', params: [], expectedStatus: 200, assertedFields: ['data'] },
+          {
+            uatId: 'UAT-001',
+            method: 'POST',
+            path: '/api/posts',
+            params: ['title'],
+            expectedStatus: 201,
+            assertedFields: ['id'],
+          },
+          {
+            uatId: 'UAT-002',
+            method: 'GET',
+            path: '/api/posts',
+            params: [],
+            expectedStatus: 200,
+            assertedFields: ['data'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
@@ -39,12 +52,38 @@ describe('design-contract-logic', () => {
     it('多路由不同 params/responseFields 各自独立', () => {
       const input = makeInput({
         routeDefinitions: [
-          { method: 'POST', path: '/api/posts', params: ['title', 'content'], successStatus: 201, responseFields: ['id', 'title'] },
-          { method: 'GET', path: '/api/posts', params: ['page', 'size'], successStatus: 200, responseFields: ['data', 'total'] },
+          {
+            method: 'POST',
+            path: '/api/posts',
+            params: ['title', 'content'],
+            successStatus: 201,
+            responseFields: ['id', 'title'],
+          },
+          {
+            method: 'GET',
+            path: '/api/posts',
+            params: ['page', 'size'],
+            successStatus: 200,
+            responseFields: ['data', 'total'],
+          },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-001', method: 'POST', path: '/api/posts', params: ['title', 'content'], expectedStatus: 201, assertedFields: ['id', 'title'] },
-          { uatId: 'UAT-002', method: 'GET', path: '/api/posts', params: ['page', 'size'], expectedStatus: 200, assertedFields: ['data', 'total'] },
+          {
+            uatId: 'UAT-001',
+            method: 'POST',
+            path: '/api/posts',
+            params: ['title', 'content'],
+            expectedStatus: 201,
+            assertedFields: ['id', 'title'],
+          },
+          {
+            uatId: 'UAT-002',
+            method: 'GET',
+            path: '/api/posts',
+            params: ['page', 'size'],
+            expectedStatus: 200,
+            assertedFields: ['data', 'total'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
@@ -60,14 +99,21 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/posts', params: ['page'], successStatus: 200, responseFields: ['data'] },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-020', method: 'GET', path: '/api/comments', params: ['page'], expectedStatus: 200, assertedFields: ['data'] },
+          {
+            uatId: 'UAT-020',
+            method: 'GET',
+            path: '/api/comments',
+            params: ['page'],
+            expectedStatus: 200,
+            assertedFields: ['data'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
       expect(result.passed).toBe(false);
       expect(result.violations.length).toBeGreaterThanOrEqual(1);
-      expect(result.violations.some(v => v.message.includes('未在路由定义中找到'))).toBe(true);
-      expect(result.violations.some(v => v.message.includes('GET /api/comments'))).toBe(true);
+      expect(result.violations.some((v) => v.message.includes('未在路由定义中找到'))).toBe(true);
+      expect(result.violations.some((v) => v.message.includes('GET /api/comments'))).toBe(true);
     });
 
     it('路由不存在时每个维度都报告 violation（D2/D3/D4）', () => {
@@ -76,13 +122,18 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/posts', params: ['page'], successStatus: 200, responseFields: ['data'] },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-030', method: 'POST', path: '/api/not-exist', params: ['x'], expectedStatus: 201, assertedFields: ['y'] },
+          {
+            uatId: 'UAT-030',
+            method: 'POST',
+            path: '/api/not-exist',
+            params: ['x'],
+            expectedStatus: 201,
+            assertedFields: ['y'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
-      const routeNotFound = result.violations.filter(
-        v => v.message.includes('未在路由定义中找到'),
-      );
+      const routeNotFound = result.violations.filter((v) => v.message.includes('未在路由定义中找到'));
       expect(routeNotFound.length).toBe(3);
     });
   });
@@ -94,7 +145,14 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: ['data'] },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-040', method: 'GET', path: '/api/posts/', params: [], expectedStatus: 200, assertedFields: ['data'] },
+          {
+            uatId: 'UAT-040',
+            method: 'GET',
+            path: '/api/posts/',
+            params: [],
+            expectedStatus: 200,
+            assertedFields: ['data'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
@@ -107,7 +165,14 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/posts', params: ['page'], successStatus: 200, responseFields: ['data'] },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-041', method: 'GET', path: '/api/posts?page=1', params: ['page'], expectedStatus: 200, assertedFields: ['data'] },
+          {
+            uatId: 'UAT-041',
+            method: 'GET',
+            path: '/api/posts?page=1',
+            params: ['page'],
+            expectedStatus: 200,
+            assertedFields: ['data'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
@@ -120,7 +185,14 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: ['data'] },
         ],
         acceptanceAssertions: [
-          { uatId: 'UAT-042', method: 'GET', path: '/api/posts/?filter=active', params: [], expectedStatus: 200, assertedFields: ['data'] },
+          {
+            uatId: 'UAT-042',
+            method: 'GET',
+            path: '/api/posts/?filter=active',
+            params: [],
+            expectedStatus: 200,
+            assertedFields: ['data'],
+          },
         ],
       });
       const result = checkDesignContractConsistency(input);
@@ -136,7 +208,12 @@ describe('design-contract-logic', () => {
           { method: 'DELETE', path: '/api/posts/:id', params: [], successStatus: 204, responseFields: [] },
         ],
         uatPathMappings: [
-          { uatId: 'UAT-001', designPath: 'PUT/DELETE /api/posts/:id', actualPath: 'PUT /api/posts/:id、DELETE /api/posts/:id', mappingType: '直接' },
+          {
+            uatId: 'UAT-001',
+            designPath: 'PUT/DELETE /api/posts/:id',
+            actualPath: 'PUT /api/posts/:id、DELETE /api/posts/:id',
+            mappingType: '直接',
+          },
         ],
         acceptanceAssertions: [],
       });
@@ -151,7 +228,12 @@ describe('design-contract-logic', () => {
           { method: 'POST', path: '/api/posts/:id/publish', params: [], successStatus: 200, responseFields: [] },
         ],
         uatPathMappings: [
-          { uatId: 'UAT-002', designPath: 'POST /api/posts/:id/publish', actualPath: 'POST /api/posts/:id/publish（触发 Webhook 分发）', mappingType: '直接' },
+          {
+            uatId: 'UAT-002',
+            designPath: 'POST /api/posts/:id/publish',
+            actualPath: 'POST /api/posts/:id/publish（触发 Webhook 分发）',
+            mappingType: '直接',
+          },
         ],
         acceptanceAssertions: [],
       });
@@ -166,7 +248,12 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/articles/:id', params: [], successStatus: 200, responseFields: [] },
         ],
         uatPathMappings: [
-          { uatId: 'UAT-003', designPath: 'GET /api/articles/:id', actualPath: 'GET /api/articles/art-nonexist（404 兜底）', mappingType: '等价' },
+          {
+            uatId: 'UAT-003',
+            designPath: 'GET /api/articles/:id',
+            actualPath: 'GET /api/articles/art-nonexist（404 兜底）',
+            mappingType: '等价',
+          },
         ],
         acceptanceAssertions: [],
       });
@@ -177,11 +264,14 @@ describe('design-contract-logic', () => {
 
     it('「不适用（...）」非 HTTP 行豁免（与横切同语义）', () => {
       const input = makeInput({
-        routeDefinitions: [
-          { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: [] },
-        ],
+        routeDefinitions: [{ method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: [] }],
         uatPathMappings: [
-          { uatId: 'UAT-004', designPath: 'NFR-001', actualPath: '不适用（性能 NFR，无独立端点）', mappingType: '直接' },
+          {
+            uatId: 'UAT-004',
+            designPath: 'NFR-001',
+            actualPath: '不适用（性能 NFR，无独立端点）',
+            mappingType: '直接',
+          },
         ],
         acceptanceAssertions: [],
       });
@@ -197,7 +287,12 @@ describe('design-contract-logic', () => {
           { method: 'GET', path: '/api/comments', params: [], successStatus: 200, responseFields: [] },
         ],
         uatPathMappings: [
-          { uatId: 'UAT-005', designPath: 'GET /api/posts + /api/comments', actualPath: 'GET /api/posts, GET /api/comments', mappingType: '直接' },
+          {
+            uatId: 'UAT-005',
+            designPath: 'GET /api/posts + /api/comments',
+            actualPath: 'GET /api/posts, GET /api/comments',
+            mappingType: '直接',
+          },
         ],
         acceptanceAssertions: [],
       });
@@ -212,13 +307,18 @@ describe('design-contract-logic', () => {
           { method: 'PUT', path: '/api/posts/:id', params: [], successStatus: 200, responseFields: [] },
         ],
         uatPathMappings: [
-          { uatId: 'UAT-006', designPath: 'PUT/DELETE /api/posts/:id', actualPath: 'PUT /api/posts/:id、DELETE /api/comments/:id', mappingType: '直接' },
+          {
+            uatId: 'UAT-006',
+            designPath: 'PUT/DELETE /api/posts/:id',
+            actualPath: 'PUT /api/posts/:id、DELETE /api/comments/:id',
+            mappingType: '直接',
+          },
         ],
         acceptanceAssertions: [],
       });
       const result = checkDesignContractConsistency(input);
       expect(result.passed).toBe(false);
-      expect(result.violations.some(v => v.dimension === 'D1')).toBe(true);
+      expect(result.violations.some((v) => v.dimension === 'D1')).toBe(true);
     });
   });
 

@@ -56,9 +56,7 @@ export function checkRoleDispatch(entries: RoleDispatchEntry[]): RoleDispatchRes
     for (const required of REQUIRED_ROLES) {
       if ((roles.get(required) ?? 0) < 1) {
         missing.push(required);
-        violations.push(
-          `阶段 ${phase} 缺失 role=${required} 记录（约束 #19：每阶段须至少分派 S/V/G 各 1 次）`,
-        );
+        violations.push(`阶段 ${phase} 缺失 role=${required} 记录（约束 #19：每阶段须至少分派 S/V/G 各 1 次）`);
       }
     }
 

@@ -92,7 +92,7 @@ export interface FeatureHeader {
   system: string;
   tlaSpec: string;
   stateMachine: string;
-  parentFeatures: string[] | null | undefined;  // undefined=未声明, null='(none)', string[]=显式列表
+  parentFeatures: string[] | null | undefined; // undefined=未声明, null='(none)', string[]=显式列表
   siblingFeatures: string[] | null | undefined;
   childFeatures: string[] | null | undefined;
   scenarioIdPrefix: string;
@@ -126,9 +126,12 @@ export function parseFeatureHeader(content: string): { header: FeatureHeader; vi
   }
 
   const parseList = (val: string | undefined): string[] | null | undefined => {
-    if (val === undefined) return undefined;  // 未声明
+    if (val === undefined) return undefined; // 未声明
     if (val === '(none)') return null;
-    return val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    return val
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
   };
 
   const required = ['req', 'design', 'system', 'tla-spec', 'state-machine', 'scenario-id-prefix'];
@@ -147,8 +150,18 @@ export function parseFeatureHeader(content: string): { header: FeatureHeader; vi
   }
 
   const header: FeatureHeader = {
-    req: raw['req'] ? raw['req'].split(',').map(s => s.trim()).filter(s => s.length > 0) : [],
-    design: raw['design'] ? raw['design'].split(',').map(s => s.trim()).filter(s => s.length > 0) : [],
+    req: raw['req']
+      ? raw['req']
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+      : [],
+    design: raw['design']
+      ? raw['design']
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+      : [],
     system: raw['system'] ?? '',
     tlaSpec: raw['tla-spec'] ?? '',
     stateMachine: raw['state-machine'] ?? '',
@@ -170,9 +183,10 @@ const TRANSITION_PATTERN =
  * 解析 Background 节中的状态机七要素注释。
  * 纯函数：输入 Background 节文本，输出结构化对象。
  */
-export function parseBackgroundStateMachine(
-  backgroundContent: string
-): { sm: Partial<BddStateMachine>; violations: string[] } {
+export function parseBackgroundStateMachine(backgroundContent: string): {
+  sm: Partial<BddStateMachine>;
+  violations: string[];
+} {
   const violations: string[] = [];
   const lines = backgroundContent.split('\n');
 
@@ -194,7 +208,10 @@ export function parseBackgroundStateMachine(
   for (const line of lines) {
     const statesMatch = line.match(/^\s*#\s*@states:\s*(.+?)\s*$/);
     if (statesMatch) {
-      sm.states = statesMatch[1]!.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      sm.states = statesMatch[1]!
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
       continue;
     }
     const initMatch = line.match(/^\s*#\s*@initial-state:\s*(\w+)\s*$/);
@@ -205,19 +222,37 @@ export function parseBackgroundStateMachine(
     const termMatch = line.match(/^\s*#\s*@terminal-states:\s*(.+?)\s*$/);
     if (termMatch) {
       const val = termMatch[1]!.trim();
-      sm.terminalStates = val === '()' ? [] : val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      sm.terminalStates =
+        val === '()'
+          ? []
+          : val
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
       continue;
     }
     const accMatch = line.match(/^\s*#\s*@accepting-states:\s*(.+?)\s*$/);
     if (accMatch) {
       const val = accMatch[1]!.trim();
-      sm.acceptingStates = val === '()' ? [] : val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      sm.acceptingStates =
+        val === '()'
+          ? []
+          : val
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
       continue;
     }
     const rejMatch = line.match(/^\s*#\s*@rejecting-states:\s*(.+?)\s*$/);
     if (rejMatch) {
       const val = rejMatch[1]!.trim();
-      sm.rejectingStates = val === '()' ? [] : val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      sm.rejectingStates =
+        val === '()'
+          ? []
+          : val
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
       continue;
     }
     if (line.match(/^\s*#\s*@transitions:\s*$/)) {
@@ -269,9 +304,12 @@ export function parseBackgroundStateMachine(
  *   - expectedEndState：取第一个 Then 声明的状态（self-test 基线；check-bdd-model 原取最后一个）
  *   - startState（Given）/ invariantAssertions（Then|And 不变式）：两处原实现一致
  */
-export function parseFeatureFile(
-  content: string
-): { header: FeatureHeader; stateMachine: Partial<BddStateMachine>; scenarios: ScenarioPathCheck[]; violations: string[] } {
+export function parseFeatureFile(content: string): {
+  header: FeatureHeader;
+  stateMachine: Partial<BddStateMachine>;
+  scenarios: ScenarioPathCheck[];
+  violations: string[];
+} {
   // 行尾归一化：Windows 检出为 CRLF 时，`Background:\n` 等正则匹配失败导致状态机解析全空（pre-existing bug）。
   // 统一归一为 LF，保证头标注 / Background 状态机 / scenarios 三处解析在跨平台下行为一致。
   content = content.replace(/\r\n/g, '\n');
@@ -417,10 +455,7 @@ export interface ScenarioPathCheck {
  * 校验 scenario 的 Given→When→Then 路径在状态机转移表中是否合法（spec §7.2 D6）。
  * 多事件 scenario 按链式查找：S0 + e1 -> S1, S1 + e2 -> S2, ...
  */
-export function validateScenarioPath(
-  check: ScenarioPathCheck,
-  sm: BddStateMachine
-): string[] {
+export function validateScenarioPath(check: ScenarioPathCheck, sm: BddStateMachine): string[] {
   const violations: string[] = [];
 
   if (!check.startState) {
@@ -435,11 +470,9 @@ export function validateScenarioPath(
   let currentState = check.startState;
   for (let i = 0; i < check.events.length; i++) {
     const evt = check.events[i];
-    const transition = sm.transitions.find(t => t.from === currentState && t.event === evt);
+    const transition = sm.transitions.find((t) => t.from === currentState && t.event === evt);
     if (!transition) {
-      violations.push(
-        `[scenario:${check.scenarioName}] no transition from "${currentState}" on event "${evt}"`
-      );
+      violations.push(`[scenario:${check.scenarioName}] no transition from "${currentState}" on event "${evt}"`);
       return violations;
     }
     currentState = transition.to;
@@ -447,16 +480,14 @@ export function validateScenarioPath(
 
   if (check.expectedEndState && check.expectedEndState !== currentState) {
     violations.push(
-      `[scenario:${check.scenarioName}] expected end state "${check.expectedEndState}" but got "${currentState}"`
+      `[scenario:${check.scenarioName}] expected end state "${check.expectedEndState}" but got "${currentState}"`,
     );
   }
 
   // 不变式存在性校验（语义求值由 V 子代理执行）
   for (const inv of check.invariantAssertions) {
     if (!sm.invariants.includes(inv)) {
-      violations.push(
-        `[scenario:${check.scenarioName}] invariant "${inv}" not declared in @invariants`
-      );
+      violations.push(`[scenario:${check.scenarioName}] invariant "${inv}" not declared in @invariants`);
     }
   }
 
@@ -636,7 +667,7 @@ function extractTlaTransitions(content: string): Array<{ from: string; event: st
   const nextBody = specStart > 0 ? afterNext.slice(0, specStart) : afterNext;
   // 匹配 \/ ActionName 或 \/ \E var \in set : ActionName(args)
   // 注意：JS 正则中 \E 不是转义序列，需用 \\E 匹配字面反斜杠+E
-  const actionNames = [...nextBody.matchAll(/\\\/\s*(?:\\E[^:]+:\s*)?(\w+)/g)].map(m => m[1]!);
+  const actionNames = [...nextBody.matchAll(/\\\/\s*(?:\\E[^:]+:\s*)?(\w+)/g)].map((m) => m[1]!);
 
   for (const actionName of actionNames) {
     // 定位 action 定义体（支持 ActionName == 和 ActionName(params) == 两种形式）
@@ -648,7 +679,7 @@ function extractTlaTransitions(content: string): Array<{ from: string; event: st
     const actionBody = endMatch ? afterDef.slice(0, endMatch.index) : afterDef;
 
     // 提取 to-state: stateVar' = "Value"
-    const toRegex = new RegExp(stateVar + "'\\s*=\\s*\"([^\"]+)\"");
+    const toRegex = new RegExp(stateVar + '\'\\s*=\\s*"([^"]+)"');
     const toMatch = actionBody.match(toRegex);
     if (!toMatch) continue;
 
@@ -698,10 +729,7 @@ function extractTlaInvariants(content: string): string[] {
   if (!stateVar) return invariants;
 
   // 形式 1/2：stateVar = "State" => cond 与 stateVar # "State" => cond（不匹配 stateVar' = ...）
-  const invRegex = new RegExp(
-    stateVar + '\\s*(?:=|#)\\s*"([^"]+)"\\s*=>\\s*([^\\n]+)',
-    'g'
-  );
+  const invRegex = new RegExp(stateVar + '\\s*(?:=|#)\\s*"([^"]+)"\\s*=>\\s*([^\\n]+)', 'g');
 
   const matches = [...content.matchAll(invRegex)];
   for (const m of matches) {
@@ -711,10 +739,7 @@ function extractTlaInvariants(content: string): string[] {
   }
 
   // 形式 3（反向）：cond => (stateVar = "State") → State => cond
-  const invReverseRegex = new RegExp(
-    '([^\\n]*?)\\s*=>\\s*\\(?\\s*' + stateVar + '\\s*=\\s*"([^"]+)"\\s*\\)?',
-    'g'
-  );
+  const invReverseRegex = new RegExp('([^\\n]*?)\\s*=>\\s*\\(?\\s*' + stateVar + '\\s*=\\s*"([^"]+)"\\s*\\)?', 'g');
 
   const revMatches = [...content.matchAll(invReverseRegex)];
   for (const m of revMatches) {
@@ -731,37 +756,28 @@ function extractTlaInvariants(content: string): string[] {
  * 不变式集语义等价：第一阶段做归一化字符串匹配（去前后空格 + 小写 + 去除多余空白）；
  * 失败时返回 violation，由 R 子代理判定语义等价性。
  */
-export function validateTlaEquivalence(
-  sm: BddStateMachine,
-  tla: TlaSpecSnapshot
-): string[] {
+export function validateTlaEquivalence(sm: BddStateMachine, tla: TlaSpecSnapshot): string[] {
   const violations: string[] = [];
 
   // 大小写不敏感比较：将 BDD 和 TLA+ 的状态集统一转小写后比较
   const normalizeState = (s: string) => s.trim().toLowerCase();
   const bddStates = new Set(sm.states.map(normalizeState));
   const tlaStates = new Set(tla.states.map(normalizeState));
-  if (bddStates.size !== tlaStates.size || ![...bddStates].every(s => tlaStates.has(s))) {
+  if (bddStates.size !== tlaStates.size || ![...bddStates].every((s) => tlaStates.has(s))) {
     violations.push(
-      `[tla-equiv] state set mismatch: BDD=${[...new Set(sm.states)].sort().join(',')} vs TLA+=${[...new Set(tla.states)].sort().join(',')}`
+      `[tla-equiv] state set mismatch: BDD=${[...new Set(sm.states)].sort().join(',')} vs TLA+=${[...new Set(tla.states)].sort().join(',')}`,
     );
   }
 
   if (normalizeState(sm.initialState) !== normalizeState(tla.initialState)) {
-    violations.push(
-      `[tla-equiv] initial state mismatch: BDD="${sm.initialState}" vs TLA+="${tla.initialState}"`
-    );
+    violations.push(`[tla-equiv] initial state mismatch: BDD="${sm.initialState}" vs TLA+="${tla.initialState}"`);
   }
 
   const normalizeTransition = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
-  const bddTrans = new Set(
-    sm.transitions.map(t => normalizeTransition(`${t.from}+${t.event}->${t.to}`))
-  );
-  const tlaTrans = new Set(
-    tla.transitions.map(t => normalizeTransition(`${t.from}+${t.event}->${t.to}`))
-  );
-  const bddMissing = [...tlaTrans].filter(t => !bddTrans.has(t));
-  const tlaMissing = [...bddTrans].filter(t => !tlaTrans.has(t));
+  const bddTrans = new Set(sm.transitions.map((t) => normalizeTransition(`${t.from}+${t.event}->${t.to}`)));
+  const tlaTrans = new Set(tla.transitions.map((t) => normalizeTransition(`${t.from}+${t.event}->${t.to}`)));
+  const bddMissing = [...tlaTrans].filter((t) => !bddTrans.has(t));
+  const tlaMissing = [...bddTrans].filter((t) => !tlaTrans.has(t));
   if (bddMissing.length > 0) {
     violations.push(`[tla-equiv] transitions in TLA+ but not in BDD: ${bddMissing.join('; ')}`);
   }
@@ -772,11 +788,11 @@ export function validateTlaEquivalence(
   const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
   const bddInv = new Set(sm.invariants.map(normalize));
   const tlaInv = new Set(tla.invariants.map(normalize));
-  const invOnlyBdd = [...bddInv].filter(i => !tlaInv.has(i));
-  const invOnlyTla = [...tlaInv].filter(i => !bddInv.has(i));
+  const invOnlyBdd = [...bddInv].filter((i) => !tlaInv.has(i));
+  const invOnlyTla = [...tlaInv].filter((i) => !bddInv.has(i));
   if (invOnlyBdd.length > 0 || invOnlyTla.length > 0) {
     violations.push(
-      `[tla-equiv] invariant set mismatch (normalized string match): only-in-BDD=${invOnlyBdd.join(';')} only-in-TLA+=${invOnlyTla.join(';')}`
+      `[tla-equiv] invariant set mismatch (normalized string match): only-in-BDD=${invOnlyBdd.join(';')} only-in-TLA+=${invOnlyTla.join(';')}`,
     );
   }
 
@@ -798,7 +814,13 @@ export interface BddCheckInput {
   /** 由 CLI 读取 tla-manifest.json + 调 tla-logic 解析后注入（用于 D4 等价性校验） */
   tlaSnapshots?: TlaSpecSnapshot[];
   /** 由 CLI 读取 rtm.json 后注入（用于 D7 RTM 映射校验） */
-  rtmRows?: Array<{ reqId: string; acceptanceTest: string | null; systemTest: string | null; integrationTest: string | null; unitTest: string | null }>;
+  rtmRows?: Array<{
+    reqId: string;
+    acceptanceTest: string | null;
+    systemTest: string | null;
+    integrationTest: string | null;
+    unitTest: string | null;
+  }>;
   /** 阶段 5-8 注入：cucumber 运行报告 */
   cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
   /** 由 CLI 通过 --graph 提取的 SD 节点 ID 列表（phase>=2 时用于 D8 交叉校验） */
@@ -847,11 +869,11 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
         tlaEquivalence: [],
         stepBinding: [],
         scenarioPathValidity: [],
-        rtmMapping: schemaResult.errorMessages.map(m => `[schema] ${m}`),
+        rtmMapping: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
         sdCoverage: [],
       },
       summary: `schema validation failed: ${schemaResult.errorMessages.length} errors`,
-      violations: schemaResult.errorMessages.map(m => `[schema] ${m}`),
+      violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
     };
   }
 
@@ -868,25 +890,25 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   // D1: features 头标注完整性 + D3: 状态机七要素
   for (const pf of input.parsedFeatures ?? []) {
     // 头标注字段必填校验已在 parseFeatureHeader 完成；这里补充跨 manifest 一致性校验
-    const manifestFeature = input.manifest.features.find(f => f.id === pf.featureId);
+    const manifestFeature = input.manifest.features.find((f) => f.id === pf.featureId);
     if (!manifestFeature) {
       dims.headerCompleteness.push(`[D1] feature "${pf.featureId}" not in manifest`);
       continue;
     }
     if (pf.header.tlaSpec && pf.header.tlaSpec !== manifestFeature.tlaSpecId) {
       dims.headerCompleteness.push(
-        `[D1] feature "${pf.featureId}" @tla-spec="${pf.header.tlaSpec}" != manifest.tlaSpecId="${manifestFeature.tlaSpecId}"`
+        `[D1] feature "${pf.featureId}" @tla-spec="${pf.header.tlaSpec}" != manifest.tlaSpecId="${manifestFeature.tlaSpecId}"`,
       );
     }
     if (pf.header.stateMachine && pf.header.stateMachine !== manifestFeature.stateMachineId) {
       dims.headerCompleteness.push(
-        `[D1] feature "${pf.featureId}" @state-machine="${pf.header.stateMachine}" != manifest.stateMachineId="${manifestFeature.stateMachineId}"`
+        `[D1] feature "${pf.featureId}" @state-machine="${pf.header.stateMachine}" != manifest.stateMachineId="${manifestFeature.stateMachineId}"`,
       );
     }
 
     // D3: 状态机七要素完整性
     const smViolations = validateStateMachineCompleteness(pf.stateMachine);
-    dims.stateMachineCompleteness.push(...smViolations.map(v => `[D3:${pf.featureId}] ${v}`));
+    dims.stateMachineCompleteness.push(...smViolations.map((v) => `[D3:${pf.featureId}] ${v}`));
   }
 
   // D4: BDD↔TLA+ 等价性（阶段 1-4 校验，阶段 5-8 跳过）
@@ -896,14 +918,14 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
       // 自动等价比对无意义，由 R3/V 语义评审把关（不产生任何 D4 violation）；
       // L2+ 子系统级规格仍执行完整自动等价校验。
       if (sm.level === 1) continue;
-      const tlaSnap = input.tlaSnapshots.find(t => t.specId === sm.id.replace(/^SM-/, ''));
+      const tlaSnap = input.tlaSnapshots.find((t) => t.specId === sm.id.replace(/^SM-/, ''));
       if (!tlaSnap) {
         // TLA+ 未提供对应 spec：由 R 子代理判定是缺失还是层级不对应
         dims.tlaEquivalence.push(`[D4] no TLA+ snapshot for state machine "${sm.id}"`);
         continue;
       }
       const equivViolations = validateTlaEquivalence(sm, tlaSnap);
-      dims.tlaEquivalence.push(...equivViolations.map(v => `[D4:${sm.id}] ${v}`));
+      dims.tlaEquivalence.push(...equivViolations.map((v) => `[D4:${sm.id}] ${v}`));
     }
   }
 
@@ -924,14 +946,14 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
 
   // D6: scenario 路径合法性
   for (const pf of input.parsedFeatures ?? []) {
-    const sm = input.manifest.stateMachines.find(s => s.id === pf.header.stateMachine);
+    const sm = input.manifest.stateMachines.find((s) => s.id === pf.header.stateMachine);
     if (!sm) {
       dims.scenarioPathValidity.push(`[D6:${pf.featureId}] state machine "${pf.header.stateMachine}" not in manifest`);
       continue;
     }
     for (const sc of pf.scenarios) {
       const pathViolations = validateScenarioPath(sc, sm);
-      dims.scenarioPathValidity.push(...pathViolations.map(v => `[D6:${pf.featureId}:${sc.scenarioName}] ${v}`));
+      dims.scenarioPathValidity.push(...pathViolations.map((v) => `[D6:${pf.featureId}:${sc.scenarioName}] ${v}`));
     }
   }
 
@@ -939,16 +961,20 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   if (input.rtmRows) {
     for (const f of input.manifest.features) {
       for (const reqId of f.reqIds) {
-        const rtmRow = input.rtmRows.find(r => r.reqId === reqId);
+        const rtmRow = input.rtmRows.find((r) => r.reqId === reqId);
         if (!rtmRow) {
           dims.rtmMapping.push(`[D7:${f.id}] req "${reqId}" not in RTM`);
           continue;
         }
         // 检查对应层级的测试列是否登记了本 feature 文件引用
-        const testField = f.level === 1 ? rtmRow.acceptanceTest
-          : f.level === 2 ? rtmRow.systemTest
-          : f.level === 3 ? rtmRow.integrationTest
-          : rtmRow.unitTest;
+        const testField =
+          f.level === 1
+            ? rtmRow.acceptanceTest
+            : f.level === 2
+              ? rtmRow.systemTest
+              : f.level === 3
+                ? rtmRow.integrationTest
+                : rtmRow.unitTest;
         if (!testField || !testField.includes(f.id)) {
           dims.rtmMapping.push(`[D7:${f.id}] feature id not in RTM row ${reqId} test field (level ${f.level})`);
         }
@@ -969,9 +995,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
       } else if (!Array.isArray(dc.coveredSdNodes) || !Array.isArray(dc.uncoveredSdNodes)) {
         dims.sdCoverage.push('[D8] designCoverage.coveredSdNodes / uncoveredSdNodes 须为数组');
       } else if (dc.uncoveredSdNodes.length > 0) {
-        dims.sdCoverage.push(
-          `[D8] 以下 SD 节点未被任何 BDD feature 覆盖: ${dc.uncoveredSdNodes.join(', ')}`,
-        );
+        dims.sdCoverage.push(`[D8] 以下 SD 节点未被任何 BDD feature 覆盖: ${dc.uncoveredSdNodes.join(', ')}`);
       }
       // 交叉校验：与 graphSdNodes 比对
       if (input.graphSdNodes && input.graphSdNodes.length > 0) {
@@ -979,7 +1003,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
         for (const f of input.manifest.features) {
           for (const did of f.designIds ?? []) manifestCovered.add(did);
         }
-        const graphUncovered = input.graphSdNodes.filter(sd => !manifestCovered.has(sd));
+        const graphUncovered = input.graphSdNodes.filter((sd) => !manifestCovered.has(sd));
         if (graphUncovered.length > 0 && dc.uncoveredSdNodes.length === 0) {
           dims.sdCoverage.push(
             `[D8] designCoverage.uncoveredSdNodes 为空但 graphSdNodes 比对发现未覆盖: ${graphUncovered.join(', ')}`,

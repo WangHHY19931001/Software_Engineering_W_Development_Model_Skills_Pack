@@ -92,7 +92,7 @@ async function parseRouteDefinitions(routesDir: string): Promise<RouteDefinition
     }
     for (let i = 0; i < positions.length; i++) {
       const pos = positions[i]!;
-      const nextStart = (i + 1 < positions.length) ? positions[i + 1]!.start : content.length;
+      const nextStart = i + 1 < positions.length ? positions[i + 1]!.start : content.length;
       const segment = content.slice(pos.start, nextStart);
       routes.push({
         method: pos.method,
@@ -159,7 +159,8 @@ async function parseAcceptanceAssertions(testDir: string): Promise<AcceptanceTes
     const filePath = path.join(testDir, fileName);
     const content = await fs.readFile(filePath, 'utf-8');
     // 提取 request(app).get/post/put/delete('path').expect(N) 形式
-    const testRegex = /request\(app\)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`][\s\S]*?\.expect\((\d+)\)/g;
+    const testRegex =
+      /request\(app\)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`][\s\S]*?\.expect\((\d+)\)/g;
     let match;
     while ((match = testRegex.exec(content)) !== null) {
       const method = match[1]!.toUpperCase();
@@ -214,7 +215,7 @@ async function main(): Promise<void> {
   // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
-  const projectDir = process.argv.slice(2).find(a => !a.startsWith('--')) ?? '.';
+  const projectDir = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '.';
   const projectDirAbs = path.resolve(projectDir);
 
   const mappingPath = path.join(projectDirAbs, 'docs', 'uat-path-mapping.md');
@@ -228,20 +229,28 @@ async function main(): Promise<void> {
     const result: DesignContractCheckResult = {
       passed: false,
       reasons: ['uat-path-mapping.md 不存在'],
-      violations: [{
-        dimension: 'D1',
-        severity: 'error',
-        message: 'uat-path-mapping.md 不存在',
-        expected: `期望路径：${mappingPath}`,
-        actual: '文件不存在',
-      }],
+      violations: [
+        {
+          dimension: 'D1',
+          severity: 'error',
+          message: 'uat-path-mapping.md 不存在',
+          expected: `期望路径：${mappingPath}`,
+          actual: '文件不存在',
+        },
+      ],
     };
-    console.log(`CONTRACT_JSON: ${JSON.stringify({
-      passed: false,
-      exitCode: 2,
-      violationCount: result.violations.length,
-      violations: result.violations,
-    }, null, 2)}`);
+    console.log(
+      `CONTRACT_JSON: ${JSON.stringify(
+        {
+          passed: false,
+          exitCode: 2,
+          violationCount: result.violations.length,
+          violations: result.violations,
+        },
+        null,
+        2,
+      )}`,
+    );
     exitWithError({
       category: 'FILE_NOT_FOUND',
       rule: 'P0-2',
@@ -271,13 +280,16 @@ async function main(): Promise<void> {
     // violations 分布按维度聚合（与人类可读 `[${v.dimension}] ${v.message}` 对齐）
     const byDimension = new Map<string, number>();
     for (const v of result.violations) byDimension.set(v.dimension, (byDimension.get(v.dimension) ?? 0) + 1);
-    printJsonReport({
-      type: 'design-contract',
-      passed: result.passed,
-      reasons: result.violations.map(v => `[${v.dimension}] ${v.message}`),
-      violations: [...byDimension.entries()].map(([rule, count]) => ({ rule, count })),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'design-contract',
+        passed: result.passed,
+        reasons: result.violations.map((v) => `[${v.dimension}] ${v.message}`),
+        violations: [...byDimension.entries()].map(([rule, count]) => ({ rule, count })),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -302,11 +314,15 @@ async function main(): Promise<void> {
     console.log('✓ 设计契约一致性校验通过');
   }
 
-  printGateReport('CONTRACT', {
-    passed: result.passed,
-    violationCount: result.violations.length,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'CONTRACT',
+    {
+      passed: result.passed,
+      violationCount: result.violations.length,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

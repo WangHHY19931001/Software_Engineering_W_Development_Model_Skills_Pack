@@ -26,11 +26,7 @@ import { validateBySchema } from './schema-loader.js';
 // ==================== 自包含类型形状 ====================
 
 export type SpecLevel = 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6';
-export type DecompositionDecision =
-  | 'must-split'
-  | 'consider-split'
-  | 'kept-below-threshold'
-  | 'split-done';
+export type DecompositionDecision = 'must-split' | 'consider-split' | 'kept-below-threshold' | 'split-done';
 
 export interface TlaSpec {
   id: string;
@@ -148,12 +144,7 @@ const REQUIRED_HEADER_FIELDS = [
 ] as const;
 
 const VALID_LEVELS: SpecLevel[] = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
-const VALID_DECISIONS: DecompositionDecision[] = [
-  'must-split',
-  'consider-split',
-  'kept-below-threshold',
-  'split-done',
-];
+const VALID_DECISIONS: DecompositionDecision[] = ['must-split', 'consider-split', 'kept-below-threshold', 'split-done'];
 
 // ==================== 内部工具函数 ====================
 
@@ -180,9 +171,7 @@ function levelNum(level: string): number {
  */
 function stripComments(s: string): string {
   if (typeof s !== 'string' || s.length === 0) return '';
-  return s
-    .replace(/\(\*[\s\S]*?\*\)/g, ' ')
-    .replace(/\\\*[^\n]*/g, ' ');
+  return s.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*[^\n]*/g, ' ');
 }
 
 /**
@@ -214,7 +203,7 @@ function parseCfgInvariantNames(cfgContent: string): string[] {
       inList = true;
       const rest = listHead[1] ?? '';
       if (rest.trim() !== '') {
-        for (const n of rest.split(/[\s,]+/).filter(s => s.trim() !== '')) {
+        for (const n of rest.split(/[\s,]+/).filter((s) => s.trim() !== '')) {
           names.push(n.trim());
         }
       }
@@ -230,7 +219,7 @@ function parseCfgInvariantNames(cfgContent: string): string[] {
         inList = false;
         continue;
       }
-      for (const n of line.split(/[\s,]+/).filter(s => s.trim() !== '')) {
+      for (const n of line.split(/[\s,]+/).filter((s) => s.trim() !== '')) {
         names.push(n.trim());
       }
     }
@@ -301,10 +290,7 @@ export function parseTlaHeader(content: string): Record<string, string | null> {
  * @param spec   manifest 中对应的规格声明
  * @returns 违反消息数组（空数组表示一致）
  */
-export function validateHeader(
-  header: Record<string, string | null>,
-  spec: TlaSpec,
-): string[] {
+export function validateHeader(header: Record<string, string | null>, spec: TlaSpec): string[] {
   const violations: string[] = [];
   const id = spec.id ?? '<unknown>';
 
@@ -317,17 +303,15 @@ export function validateHeader(
 
   // 2. @system
   if (header.system != null && header.system !== spec.system) {
-    violations.push(
-      `规格 ${id} 文件头 @system="${header.system}" ≠ manifest.system="${spec.system}"`,
-    );
+    violations.push(`规格 ${id} 文件头 @system="${header.system}" ≠ manifest.system="${spec.system}"`);
   }
 
   // 3. @requirement（逗号分隔列表，集合须一致）
   if (header.requirement != null) {
     const headerReqs = header.requirement
       .split(',')
-      .map(s => s.trim())
-      .filter(s => s !== '');
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
     const expectedReqs = (spec.requirementIds ?? []).slice();
     if (!sameSet(headerReqs, expectedReqs)) {
       violations.push(
@@ -338,9 +322,7 @@ export function validateHeader(
 
   // 4. @design
   if (header.design != null && header.design !== spec.designRef) {
-    violations.push(
-      `规格 ${id} 文件头 @design="${header.design}" ≠ manifest.designRef="${spec.designRef}"`,
-    );
+    violations.push(`规格 ${id} 文件头 @design="${header.design}" ≠ manifest.designRef="${spec.designRef}"`);
   }
 
   // 5. @parent（null ↔ null；非空字符串须相等）
@@ -350,24 +332,20 @@ export function validateHeader(
   } else if (header.parent != null && expectedParent == null) {
     violations.push(`规格 ${id} 文件头 @parent="${header.parent}" 但 manifest.parent=null`);
   } else if (header.parent != null && expectedParent != null && header.parent !== expectedParent) {
-    violations.push(
-      `规格 ${id} 文件头 @parent="${header.parent}" ≠ manifest.parent="${expectedParent}"`,
-    );
+    violations.push(`规格 ${id} 文件头 @parent="${header.parent}" ≠ manifest.parent="${expectedParent}"`);
   }
 
   // 6. @sibling（null ↔ 空数组；逗号列表集合须一致）
   const expectedSiblings = (spec.siblings ?? []).slice();
   if (header.sibling == null) {
     if (expectedSiblings.length > 0) {
-      violations.push(
-        `规格 ${id} 文件头 @sibling=null 但 manifest.siblings 非空 [${expectedSiblings.join(',')}]`,
-      );
+      violations.push(`规格 ${id} 文件头 @sibling=null 但 manifest.siblings 非空 [${expectedSiblings.join(',')}]`);
     }
   } else {
     const headerSibs = header.sibling
       .split(',')
-      .map(s => s.trim())
-      .filter(s => s !== '');
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
     if (!sameSet(headerSibs, expectedSiblings)) {
       violations.push(
         `规格 ${id} 文件头 @sibling=[${headerSibs.join(',')}] ≠ manifest.siblings=[${expectedSiblings.join(',')}]`,
@@ -379,15 +357,13 @@ export function validateHeader(
   const expectedChildren = (spec.children ?? []).slice();
   if (header.child == null) {
     if (expectedChildren.length > 0) {
-      violations.push(
-        `规格 ${id} 文件头 @child=null 但 manifest.children 非空 [${expectedChildren.join(',')}]`,
-      );
+      violations.push(`规格 ${id} 文件头 @child=null 但 manifest.children 非空 [${expectedChildren.join(',')}]`);
     }
   } else {
     const headerChildren = header.child
       .split(',')
-      .map(s => s.trim())
-      .filter(s => s !== '');
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
     if (!sameSet(headerChildren, expectedChildren)) {
       violations.push(
         `规格 ${id} 文件头 @child=[${headerChildren.join(',')}] ≠ manifest.children=[${expectedChildren.join(',')}]`,
@@ -397,18 +373,14 @@ export function validateHeader(
 
   // 8. @level
   if (header.level != null && header.level !== spec.level) {
-    violations.push(
-      `规格 ${id} 文件头 @level="${header.level}" ≠ manifest.level="${spec.level}"`,
-    );
+    violations.push(`规格 ${id} 文件头 @level="${header.level}" ≠ manifest.level="${spec.level}"`);
   }
 
   // 9. @phase（使用 Number+Number.isInteger 拒绝 4x/3.9 等非整数）
   if (header.phase != null) {
     const phaseNum = Number(header.phase);
     if (!Number.isFinite(phaseNum) || !Number.isInteger(phaseNum) || phaseNum !== spec.phase) {
-      violations.push(
-        `规格 ${id} 文件头 @phase="${header.phase}" ≠ manifest.phase=${spec.phase}`,
-      );
+      violations.push(`规格 ${id} 文件头 @phase="${header.phase}" ≠ manifest.phase=${spec.phase}`);
     }
   }
 
@@ -438,13 +410,11 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
   for (const s of specs) byPath.set(s.tlaPath, s);
 
   // 单 L1 根：parent=null 且 level=L1
-  const roots = specs.filter(s => s.parent === null && s.level === 'L1');
+  const roots = specs.filter((s) => s.parent === null && s.level === 'L1');
   if (roots.length === 0) {
     violations.push('层次校验失败：不存在 L1 根规格（parent=null 且 level=L1）');
   } else if (roots.length > 1) {
-    violations.push(
-      `层次校验失败：存在 ${roots.length} 个 L1 根规格（应为 1）：${roots.map(r => r.id).join(', ')}`,
-    );
+    violations.push(`层次校验失败：存在 ${roots.length} 个 L1 根规格（应为 1）：${roots.map((r) => r.id).join(', ')}`);
   }
 
   for (const s of specs) {
@@ -452,13 +422,9 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     if (s.parent != null) {
       const parent = byPath.get(s.parent);
       if (!parent) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 的 parent="${s.parent}" 不在 manifest 中`,
-        );
+        violations.push(`层次校验失败：规格 ${s.id} 的 parent="${s.parent}" 不在 manifest 中`);
       } else if (!(parent.children ?? []).includes(s.tlaPath)) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 声明 parent="${s.parent}"，但 parent.children 未包含 ${s.tlaPath}`,
-        );
+        violations.push(`层次校验失败：规格 ${s.id} 声明 parent="${s.parent}"，但 parent.children 未包含 ${s.tlaPath}`);
       } else {
         const parentLevelNum = levelNum(parent.level);
         const childLevelNum = levelNum(s.level);
@@ -474,9 +440,7 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     for (const childPath of s.children ?? []) {
       const child = byPath.get(childPath);
       if (!child) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 的 child="${childPath}" 不在 manifest 中`,
-        );
+        violations.push(`层次校验失败：规格 ${s.id} 的 child="${childPath}" 不在 manifest 中`);
       } else if (child.parent !== s.tlaPath) {
         violations.push(
           `层次校验失败：规格 ${s.id} 声明 child="${childPath}"，但 ${childPath}.parent="${child.parent}" ≠ "${s.tlaPath}"`,
@@ -488,9 +452,7 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     for (const sibPath of s.siblings ?? []) {
       const sib = byPath.get(sibPath);
       if (!sib) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" 不在 manifest 中`,
-        );
+        violations.push(`层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" 不在 manifest 中`);
       } else if (!(sib.siblings ?? []).includes(s.tlaPath)) {
         violations.push(
           `层次校验失败：规格 ${s.id} 声明 sibling="${sibPath}"，但 ${sibPath}.siblings 未包含 ${s.tlaPath}`,
@@ -513,9 +475,7 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
  * @param specs 待校验的规格数组
  * @returns { violations, warnings }
  */
-export function checkDecomposition(
-  specs: TlaSpec[],
-): { violations: string[]; warnings: string[] } {
+export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; warnings: string[] } {
   const violations: string[] = [];
   const warnings: string[] = [];
   if (!Array.isArray(specs)) {
@@ -557,10 +517,7 @@ export function checkDecomposition(
  * @param graphSdNodes graph.json 中所有 type=SD 节点的 ID 列表
  * @returns { passed, violations }
  */
-export function checkCoverage(
-  specs: TlaSpec[],
-  graphSdNodes: string[],
-): { passed: boolean; violations: string[] } {
+export function checkCoverage(specs: TlaSpec[], graphSdNodes: string[]): { passed: boolean; violations: string[] } {
   const violations: string[] = [];
   if (!Array.isArray(specs) || !Array.isArray(graphSdNodes)) {
     violations.push('checkCoverage: specs 与 graphSdNodes 必须为数组');
@@ -573,7 +530,7 @@ export function checkCoverage(
       violations.push(`规格 ${spec.id} 缺 requirementIds（SD 覆盖强制，全规格无例外）`);
       continue;
     }
-    const hasSdId = spec.requirementIds.some(rid => /^SD-/.test(rid));
+    const hasSdId = spec.requirementIds.some((rid) => /^SD-/.test(rid));
     if (!hasSdId) {
       violations.push(`规格 ${spec.id} requirementIds 无 SD 标识（须含至少一个 SD-xxx，全规格无例外）`);
     }
@@ -584,14 +541,14 @@ export function checkCoverage(
   for (const spec of specs) {
     for (const sd of graphSdNodes) {
       if (
-        (spec.requirementIds ?? []).some(rid => sd.includes(rid) || rid.includes(sd)) ||
+        (spec.requirementIds ?? []).some((rid) => sd.includes(rid) || rid.includes(sd)) ||
         (typeof spec.designRef === 'string' && spec.designRef.includes(sd))
       ) {
         coveredSds.add(sd);
       }
     }
   }
-  const uncovered = graphSdNodes.filter(sd => !coveredSds.has(sd));
+  const uncovered = graphSdNodes.filter((sd) => !coveredSds.has(sd));
   if (uncovered.length > 0) {
     violations.push(`以下 SD 节点未被任何 TLA+ spec 覆盖: ${uncovered.join(', ')}`);
   }
@@ -619,9 +576,7 @@ export function checkCfgInvariantsConsistency(
 
   // 1. 展开 .tla 中 BusinessInvariant/Invariants 的子不变式集合
   const tlaInvariants = new Set<string>();
-  const bizMatch = tla.match(
-    /(?:BusinessInvariant|Invariants)\s*==\s*([\s\S]*?)(?=\n\s*====|\n\s*[A-Z][\w]*\s*==|$)/,
-  );
+  const bizMatch = tla.match(/(?:BusinessInvariant|Invariants)\s*==\s*([\s\S]*?)(?=\n\s*====|\n\s*[A-Z][\w]*\s*==|$)/);
   if (bizMatch && bizMatch[1]) {
     const invRegex = /\/\\\s*([A-Za-z_]\w*)/g;
     let m: RegExpExecArray | null;
@@ -636,8 +591,8 @@ export function checkCfgInvariantsConsistency(
   for (const n of parseCfgInvariantNames(cfg)) cfgInvariants.add(n);
 
   // 3. 集合比较（双向差集）
-  const missing = [...tlaInvariants].filter(i => !cfgInvariants.has(i));
-  const extra = [...cfgInvariants].filter(i => !tlaInvariants.has(i));
+  const missing = [...tlaInvariants].filter((i) => !cfgInvariants.has(i));
+  const extra = [...cfgInvariants].filter((i) => !tlaInvariants.has(i));
   if (missing.length > 0) violations.push(`.cfg 缺失不变式: ${missing.join(', ')}`);
   if (extra.length > 0) violations.push(`.cfg 多余不变式: ${extra.join(', ')}`);
   return { passed: violations.length === 0, violations };
@@ -652,9 +607,11 @@ export function checkCfgInvariantsConsistency(
  * @param cfgContent .cfg 文件文本内容
  * @returns { passed, violations, invariantCount }
  */
-export function checkCfgStructure(
-  cfgContent: string,
-): { passed: boolean; violations: string[]; invariantCount: number } {
+export function checkCfgStructure(cfgContent: string): {
+  passed: boolean;
+  violations: string[];
+  invariantCount: number;
+} {
   const violations: string[] = [];
   const content = typeof cfgContent === 'string' ? cfgContent : '';
 
@@ -853,7 +810,9 @@ export function checkRoundsSchema(manifest: Partial<TlaManifest>): string[] {
       violations.push(`R13: checkRounds[${i}].converged 须为 boolean，实际为 ${typeof e.converged}`);
     }
     if (!Array.isArray(e.violations) || e.violations.some((v: unknown) => typeof v !== 'string')) {
-      violations.push(`R13: checkRounds[${i}].violations 须为 string[]，实际为 ${Array.isArray(e.violations) ? '含非字符串元素' : typeof e.violations}`);
+      violations.push(
+        `R13: checkRounds[${i}].violations 须为 string[]，实际为 ${Array.isArray(e.violations) ? '含非字符串元素' : typeof e.violations}`,
+      );
     }
     // 禁止字段检查（phase 级摘要字段）
     for (const f of FORBIDDEN_FIELDS) {
@@ -865,10 +824,7 @@ export function checkRoundsSchema(manifest: Partial<TlaManifest>): string[] {
   return violations;
 }
 
-export function checkTlaModel(
-  manifest: unknown,
-  phase: number,
-): TlaCheckResult {
+export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult {
   const result: TlaCheckResult = {
     passed: false,
     phase,
@@ -957,9 +913,7 @@ export function checkTlaModel(
   // 3. 声明的 SANY/TLC 结果标志
   for (const s of checkedSpecs) {
     if (!s.syntaxChecked) {
-      result.syntaxErrors.push(
-        `规格 ${s.id} syntaxChecked=false（SANY 语法检查未通过或未执行）`,
-      );
+      result.syntaxErrors.push(`规格 ${s.id} syntaxChecked=false（SANY 语法检查未通过或未执行）`);
     }
     if (!s.tlcChecked) {
       result.violations.push(`规格 ${s.id} tlcChecked=false（TLC 模型检查未完成）`);
@@ -996,17 +950,13 @@ export function checkTlaModel(
       } else if (!Array.isArray(cov.coveredSdNodes) || !Array.isArray(cov.uncoveredSdNodes)) {
         result.coverageViolations.push('sdCoverage.coveredSdNodes / uncoveredSdNodes 须为数组');
       } else if (cov.uncoveredSdNodes.length > 0) {
-        result.coverageViolations.push(
-          `以下 SD 节点未被任何 TLA+ spec 覆盖: ${cov.uncoveredSdNodes.join(', ')}`,
-        );
+        result.coverageViolations.push(`以下 SD 节点未被任何 TLA+ spec 覆盖: ${cov.uncoveredSdNodes.join(', ')}`);
       }
       // 交叉校验：sdCoverage.coveredSdNodes 与 graphSdNodes 比对一致
       if (Array.isArray(m.graphSdNodes) && m.graphSdNodes.length > 0) {
-        const expectedUncovered = m.graphSdNodes.filter(sd => !cov.coveredSdNodes?.includes(sd));
+        const expectedUncovered = m.graphSdNodes.filter((sd) => !cov.coveredSdNodes?.includes(sd));
         if (expectedUncovered.length !== cov.uncoveredSdNodes.length) {
-          result.coverageViolations.push(
-            'sdCoverage 与 graphSdNodes 比对不一致（covered/uncovered 集合不匹配）',
-          );
+          result.coverageViolations.push('sdCoverage 与 graphSdNodes 比对不一致（covered/uncovered 集合不匹配）');
         }
       }
     }

@@ -73,7 +73,7 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const get = (key: string): string | undefined => {
-    const a = args.find(x => x.startsWith(`--${key}=`));
+    const a = args.find((x) => x.startsWith(`--${key}=`));
     return a ? a.split('=').slice(1).join('=') : undefined;
   };
   return {
@@ -149,7 +149,7 @@ async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Pro
   const manifestDir = path.dirname(path.resolve(manifestFile));
   if (!Array.isArray(manifest.specs)) return;
   for (const spec of manifest.specs as TlaSpec[]) {
-    if (!spec || spec.level !== 'L2' && spec.level !== 'L3') continue;
+    if (!spec || (spec.level !== 'L2' && spec.level !== 'L3')) continue;
     if (typeof spec.tlaPath !== 'string' || spec.tlaPath.trim() === '') continue;
     const tlaAbs = path.resolve(manifestDir, spec.tlaPath);
     try {
@@ -179,7 +179,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 --manifest/--graph/--rtm/--src',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
       exitCode: 2,
     });
     return;
@@ -209,15 +210,18 @@ async function main(): Promise<void> {
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     // A2b 双轨过渡：reasons 优先 structuredViolations 的 message，violations 分布按 rule 聚合
-    printJsonReport({
-      type: 'code-tla-consistency',
-      passed: result.passed,
-      reasons: result.structuredViolations?.length
-        ? result.structuredViolations.map(v => v.message)
-        : result.violations.map(v => `[${v.dimension}] ${v.message}`),
-      violations: buildViolationDistribution(result.violations.length, result.structuredViolations),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'code-tla-consistency',
+        passed: result.passed,
+        reasons: result.structuredViolations?.length
+          ? result.structuredViolations.map((v) => v.message)
+          : result.violations.map((v) => `[${v.dimension}] ${v.message}`),
+        violations: buildViolationDistribution(result.violations.length, result.structuredViolations),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -266,38 +270,42 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
-  printGateReport('CODE_TLA', {
-    type: 'code-tla-consistency',
-    passed: result.passed,
-    dimensions: {
-      sdToCodeModule: {
-        passed: result.dimensions.sdToCodeModule.passed,
-        checked: result.dimensions.sdToCodeModule.checked,
-        violations: result.dimensions.sdToCodeModule.violations,
+  printGateReport(
+    'CODE_TLA',
+    {
+      type: 'code-tla-consistency',
+      passed: result.passed,
+      dimensions: {
+        sdToCodeModule: {
+          passed: result.dimensions.sdToCodeModule.passed,
+          checked: result.dimensions.sdToCodeModule.checked,
+          violations: result.dimensions.sdToCodeModule.violations,
+        },
+        codeStateTransfer: {
+          passed: result.dimensions.codeStateTransfer.passed,
+          checked: result.dimensions.codeStateTransfer.checked,
+          violations: result.dimensions.codeStateTransfer.violations,
+        },
+        nextBranchCoverage: {
+          passed: result.dimensions.nextBranchCoverage.passed,
+          checked: result.dimensions.nextBranchCoverage.checked,
+          violations: result.dimensions.nextBranchCoverage.violations,
+        },
+        invariantCoverage: {
+          passed: result.dimensions.invariantCoverage.passed,
+          checked: result.dimensions.invariantCoverage.checked,
+          violations: result.dimensions.invariantCoverage.violations,
+        },
       },
-      codeStateTransfer: {
-        passed: result.dimensions.codeStateTransfer.passed,
-        checked: result.dimensions.codeStateTransfer.checked,
-        violations: result.dimensions.codeStateTransfer.violations,
-      },
-      nextBranchCoverage: {
-        passed: result.dimensions.nextBranchCoverage.passed,
-        checked: result.dimensions.nextBranchCoverage.checked,
-        violations: result.dimensions.nextBranchCoverage.violations,
-      },
-      invariantCoverage: {
-        passed: result.dimensions.invariantCoverage.passed,
-        checked: result.dimensions.invariantCoverage.checked,
-        violations: result.dimensions.invariantCoverage.violations,
-      },
+      violations: result.violations,
+      codeFileCount: codeFiles.length,
+      converged: result.passed,
     },
-    violations: result.violations,
-    codeFileCount: codeFiles.length,
-    converged: result.passed,
-  }, exitCode);
+    exitCode,
+  );
 }
 
-main().catch(err => {
+main().catch((err) => {
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',

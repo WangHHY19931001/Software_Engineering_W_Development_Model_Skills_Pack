@@ -18,17 +18,21 @@ describe('security-scan diffFindings（借鉴点 3，baseline v2 内容敏感指
     const ruleId = 'security/detect-eval-with-expression';
     const rel = 'w-model-dev/scripts/x.ts';
     const lineContent = '  eval(userInput);';
-    const findings: EslintResult[] = [{
-      filePath: rel,
-      messages: [{ line: 10, column: 5, ruleId, message: 'eval' }],
-    }];
-    const baseline: BaselineEntry[] = [{
-      hash: contentHash(rel, ruleId, lineContent),
-      rule_id: ruleId,
-      file: rel,
-      line: 10,
-      reason: 'Accepted',
-    }];
+    const findings: EslintResult[] = [
+      {
+        filePath: rel,
+        messages: [{ line: 10, column: 5, ruleId, message: 'eval' }],
+      },
+    ];
+    const baseline: BaselineEntry[] = [
+      {
+        hash: contentHash(rel, ruleId, lineContent),
+        rule_id: ruleId,
+        file: rel,
+        line: 10,
+        reason: 'Accepted',
+      },
+    ];
     const r = diffFindings(findings, baseline, stubResolve({ 10: lineContent }));
     expect(r.newFindings).toHaveLength(0);
     expect(r.baselineHits).toBe(1);
@@ -37,10 +41,12 @@ describe('security-scan diffFindings（借鉴点 3，baseline v2 内容敏感指
   it('baseline 外的新发现被识别', () => {
     const ruleId = 'security/detect-non-literal-regexp';
     const rel = 'w-model-dev/scripts/y.ts';
-    const findings: EslintResult[] = [{
-      filePath: rel,
-      messages: [{ line: 20, column: 3, ruleId, message: 'regex' }],
-    }];
+    const findings: EslintResult[] = [
+      {
+        filePath: rel,
+        messages: [{ line: 20, column: 3, ruleId, message: 'regex' }],
+      },
+    ];
     const r = diffFindings(findings, [], stubResolve({ 20: 'new RegExp(pattern);' }));
     expect(r.newFindings).toHaveLength(1);
     expect(r.newFindings[0]!.rule_id).toBe(ruleId);
@@ -54,17 +60,21 @@ describe('security-scan diffFindings（借鉴点 3，baseline v2 内容敏感指
     const expectedRel = path.relative(process.cwd(), absFile).split(path.sep).join('/');
     expect(expectedRel).toBe(relFile);
     const lineContent = 'eval(x);';
-    const baseline: BaselineEntry[] = [{
-      hash: contentHash(expectedRel, ruleId, lineContent),
-      rule_id: ruleId,
-      file: expectedRel,
-      line: 10,
-      reason: 'Accepted',
-    }];
-    const findings: EslintResult[] = [{
-      filePath: absFile,
-      messages: [{ line: 10, column: 5, ruleId, message: 'eval' }],
-    }];
+    const baseline: BaselineEntry[] = [
+      {
+        hash: contentHash(expectedRel, ruleId, lineContent),
+        rule_id: ruleId,
+        file: expectedRel,
+        line: 10,
+        reason: 'Accepted',
+      },
+    ];
+    const findings: EslintResult[] = [
+      {
+        filePath: absFile,
+        messages: [{ line: 10, column: 5, ruleId, message: 'eval' }],
+      },
+    ];
     const r = diffFindings(findings, baseline, stubResolve({ 10: lineContent }));
     expect(r.newFindings).toHaveLength(0);
     expect(r.baselineHits).toBe(1);
@@ -81,25 +91,29 @@ describe('security-scan 内容敏感指纹（baseline v2 新增用例）', () =>
     const content = '  const data = fs.readFileSync(filePath);';
 
     // 两次发现：第 10 行（漂移前位置）与第 20 行（漂移后位置），内容完全相同
-    const findings: EslintResult[] = [{
-      filePath: rel,
-      messages: [
-        { line: 10, column: 5, ruleId, message: 'x' },
-        { line: 20, column: 5, ruleId, message: 'x' },
-      ],
-    }];
+    const findings: EslintResult[] = [
+      {
+        filePath: rel,
+        messages: [
+          { line: 10, column: 5, ruleId, message: 'x' },
+          { line: 20, column: 5, ruleId, message: 'x' },
+        ],
+      },
+    ];
     // baseline 仅登记 1 条（line 字段仅作人类参考，不参与 hash）
-    const baseline: BaselineEntry[] = [{
-      hash: contentHash(rel, ruleId, content),
-      rule_id: ruleId,
-      file: rel,
-      line: 10,
-      reason: 'Accepted',
-    }];
+    const baseline: BaselineEntry[] = [
+      {
+        hash: contentHash(rel, ruleId, content),
+        rule_id: ruleId,
+        file: rel,
+        line: 10,
+        reason: 'Accepted',
+      },
+    ];
 
     const r = diffFindings(findings, baseline, stubResolve({ 10: content, 20: content }));
     expect(r.newFindings).toHaveLength(0); // 两次发现均命中基线
-    expect(r.baselineHits).toBe(2);        // 同类合并：同 hash 全部豁免
+    expect(r.baselineHits).toBe(2); // 同类合并：同 hash 全部豁免
   });
 
   // ─── 测试 2：内容敏感 ───
@@ -107,17 +121,21 @@ describe('security-scan 内容敏感指纹（baseline v2 新增用例）', () =>
   it('内容敏感：同一位置代码被修改 → 新指纹（判为新增）', () => {
     const ruleId = 'security/detect-non-literal-fs-filename';
     const rel = 'w-model-dev/scripts/y.ts';
-    const findings: EslintResult[] = [{
-      filePath: rel,
-      messages: [{ line: 10, column: 5, ruleId, message: 'x' }],
-    }];
-    const baseline: BaselineEntry[] = [{
-      hash: contentHash(rel, ruleId, 'const data = fs.readFileSync(filePath);'),
-      rule_id: ruleId,
-      file: rel,
-      line: 10,
-      reason: 'Accepted',
-    }];
+    const findings: EslintResult[] = [
+      {
+        filePath: rel,
+        messages: [{ line: 10, column: 5, ruleId, message: 'x' }],
+      },
+    ];
+    const baseline: BaselineEntry[] = [
+      {
+        hash: contentHash(rel, ruleId, 'const data = fs.readFileSync(filePath);'),
+        rule_id: ruleId,
+        file: rel,
+        line: 10,
+        reason: 'Accepted',
+      },
+    ];
     // 源文件该行内容已改为 readFile（异步）
     const resolveLine: ResolveLine = (f, l) =>
       f === rel && l === 10 ? 'const data = await fs.readFile(filePath);' : null;
@@ -132,7 +150,7 @@ describe('security-scan 内容敏感指纹（baseline v2 新增用例）', () =>
     const ruleId = 'security/detect-non-literal-fs-filename';
     const rel = 'w-model-dev/scripts/z.ts';
     const win = '  const data = fs.readFileSync(filePath);\r\n'; // Windows：带缩进 + CRLF
-    const posix = 'const data = fs.readFileSync(filePath);';      // POSIX：无缩进 + LF
+    const posix = 'const data = fs.readFileSync(filePath);'; // POSIX：无缩进 + LF
 
     expect(normalizeSourceLine(win)).toBe(normalizeSourceLine(posix));
     expect(contentHash(rel, ruleId, win)).toBe(contentHash(rel, ruleId, posix));
@@ -144,10 +162,12 @@ describe('security-scan 内容敏感指纹（baseline v2 新增用例）', () =>
   it('源行不可读（模拟 ENOENT）：不中断，按空内容指纹判定', () => {
     const ruleId = 'security/detect-non-literal-fs-filename';
     const rel = 'w-model-dev/scripts/missing.ts';
-    const findings: EslintResult[] = [{
-      filePath: rel,
-      messages: [{ line: 5, column: 3, ruleId, message: 'x' }],
-    }];
+    const findings: EslintResult[] = [
+      {
+        filePath: rel,
+        messages: [{ line: 5, column: 3, ruleId, message: 'x' }],
+      },
+    ];
     const baseline: BaselineEntry[] = [];
     const resolveLine: ResolveLine = () => null;
 

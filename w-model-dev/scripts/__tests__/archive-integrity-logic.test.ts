@@ -22,21 +22,21 @@ describe('[21.0.0] archive-integrity-logic', () => {
     const contents = loadFileList('bad-missing-phase1-docs.json');
     const result = checkArchiveIntegrity(contents);
     expect(result.passed).toBe(false);
-    expect(result.missingFiles.some(f => f.includes('requirements.md'))).toBe(true);
+    expect(result.missingFiles.some((f) => f.includes('requirements.md'))).toBe(true);
   });
 
   it('bad-missing-signature-chain 失败', () => {
     const contents = loadFileList('bad-missing-signature-chain.json');
     const result = checkArchiveIntegrity(contents);
     expect(result.passed).toBe(false);
-    expect(result.missingFiles.some(f => f.includes('signature-chain.jsonl'))).toBe(true);
+    expect(result.missingFiles.some((f) => f.includes('signature-chain.jsonl'))).toBe(true);
   });
 
   it('bad-missing-gate-logs 失败', () => {
     const contents = loadFileList('bad-missing-gate-logs.json');
     const result = checkArchiveIntegrity(contents);
     expect(result.passed).toBe(false);
-    expect(result.missingFiles.some(f => f.includes('gate-logs/'))).toBe(true);
+    expect(result.missingFiles.some((f) => f.includes('gate-logs/'))).toBe(true);
   });
 
   it('ARCHIVE_INTEGRITY_CHECKLIST 完整性', () => {
@@ -47,11 +47,9 @@ describe('[21.0.0] archive-integrity-logic', () => {
 
   it('非归档根下同名文件不满足 verifier-output- 前缀匹配', () => {
     // 文件在非归档根子目录下，basename 不以 verifier-output- 开头
-    const contents = new Set([
-      'some/deep/path/other-verifier-output-1.json',
-    ]);
+    const contents = new Set(['some/deep/path/other-verifier-output-1.json']);
     const result = checkArchiveIntegrity(contents, ['global']);
     expect(result.passed).toBe(false);
-    expect(result.missingFiles.some(f => f.includes('verifier-output-'))).toBe(true);
+    expect(result.missingFiles.some((f) => f.includes('verifier-output-'))).toBe(true);
   });
 });

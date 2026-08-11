@@ -170,11 +170,7 @@ const LEVEL_MAP: Record<string, number> = {
  * DFS 三色染色检测 parent 边环（零根场景，graph-guide §3 规则 5）。
  * 颜色：0=白（未访问）/ 1=灰（栈中）/ 2=黑（已完成）；发现灰边（回边）即报环。
  */
-function detectParentCycle(
-  edges: GraphEdge[],
-  nodeIds: Set<string>,
-  violations: string[],
-): void {
+function detectParentCycle(edges: GraphEdge[], nodeIds: Set<string>, violations: string[]): void {
   const color = new Map<string, number>();
   for (const id of nodeIds) color.set(id, 0);
   const parentAdj = new Map<string, string[]>();
@@ -212,10 +208,7 @@ function detectParentCycle(
 
 // ==================== 校验入口 ====================
 
-export function checkRequirementGraph(
-  graph: unknown,
-  phase: number,
-): GraphCheckResult {
+export function checkRequirementGraph(graph: unknown, phase: number): GraphCheckResult {
   const result: GraphCheckResult = {
     passed: false,
     phase,
@@ -269,7 +262,7 @@ export function checkRequirementGraph(
   result.totalEdges = g.edges.length;
 
   // 构建邻接表（无向，所有边类型参与连通性）
-  const nodeIds = new Set(g.nodes.map(n => n.id));
+  const nodeIds = new Set(g.nodes.map((n) => n.id));
   const adj = new Map<string, Set<string>>();
   for (const id of nodeIds) adj.set(id, new Set());
   for (const e of g.edges) {
@@ -309,14 +302,10 @@ export function checkRequirementGraph(
   }
 
   if (components !== 1) {
-    result.violations.push(
-      `连通性校验失败：存在 ${components} 个连通分量（应为 1）`,
-    );
+    result.violations.push(`连通性校验失败：存在 ${components} 个连通分量（应为 1）`);
   }
   if (result.isolatedNodes.length > 0) {
-    result.violations.push(
-      `孤立节点：${result.isolatedNodes.join(', ')}`,
-    );
+    result.violations.push(`孤立节点：${result.isolatedNodes.join(', ')}`);
   }
 
   // ============ 系统层级树校验（graph-guide §3）============
@@ -344,23 +333,23 @@ export function checkRequirementGraph(
   // --- §3 规则 1-2：单根校验（根候选 = parent 入边为 0 的节点，排除边界节点）---
   // 四维识别：phase=1 纯 REQ 图（无 SD/INTF/DD/EXT-IN/EXT-OUT）启用多 group 模式，
   // 多个 level=1 REQ 视为 group 候选，允许多根（R1 规则）；NFR/CON 节点排除根候选。
-  const isPureReqGraph = g.nodes.length > 0 && g.nodes.every(n => n.type === 'REQ');
+  const isPureReqGraph = g.nodes.length > 0 && g.nodes.every((n) => n.type === 'REQ');
   const isPhase1PureReq = phase === 1 && isPureReqGraph;
 
   const rootCandidates: GraphNode[] = [];
   for (const n of g.nodes) {
     if (BOUNDARY_TYPES.has(n.type)) continue;
-    const hasParentIn = inEdges.get(n.id)?.some(e => e.type === 'parent') ?? false;
+    const hasParentIn = inEdges.get(n.id)?.some((e) => e.type === 'parent') ?? false;
     if (!hasParentIn) rootCandidates.push(n);
   }
-  const reqRoots = rootCandidates.filter(n => n.type === 'REQ' && !isNfrConNode(n));
-  const nonReqRoots = rootCandidates.filter(n => n.type !== 'REQ');
+  const reqRoots = rootCandidates.filter((n) => n.type === 'REQ' && !isNfrConNode(n));
+  const nonReqRoots = rootCandidates.filter((n) => n.type !== 'REQ');
 
-  result.roots = reqRoots.map(n => n.id);
+  result.roots = reqRoots.map((n) => n.id);
 
   if (nonReqRoots.length > 0) {
     result.violations.push(
-      `单根校验失败：根候选含非 REQ 节点: ${nonReqRoots.map(n => n.id).join(', ')}（根必须是系统 REQ 节点）`,
+      `单根校验失败：根候选含非 REQ 节点: ${nonReqRoots.map((n) => n.id).join(', ')}（根必须是系统 REQ 节点）`,
     );
   }
 
@@ -375,7 +364,7 @@ export function checkRequirementGraph(
       detectParentCycle(g.edges, nodeIds, result.violations);
     } else {
       // 多个 level=1 REQ 视为 group 候选，不报多根违反
-      multiGroupRoots = reqRoots.filter(n => n.level === 1);
+      multiGroupRoots = reqRoots.filter((n) => n.level === 1);
       if (multiGroupRoots.length >= 1) {
         singleRoot = multiGroupRoots[0] ?? null;
       }
@@ -388,7 +377,7 @@ export function checkRequirementGraph(
       detectParentCycle(g.edges, nodeIds, result.violations);
     } else if (reqRoots.length > 1) {
       result.violations.push(
-        `单根校验失败：存在 ${reqRoots.length} 个 REQ 根，多根违反：${reqRoots.map(n => n.id).join(', ')}`,
+        `单根校验失败：存在 ${reqRoots.length} 个 REQ 根，多根违反：${reqRoots.map((n) => n.id).join(', ')}`,
       );
     } else {
       singleRoot = reqRoots[0] ?? null;
@@ -397,9 +386,12 @@ export function checkRequirementGraph(
 
   // --- §3 规则 4：orphan BFS（从根出发，经 parent 边可达性）---
   // 多 group 模式：从所有 level=1 根出发 BFS；单根模式：从 singleRoot 出发
-  const bfsStartNodes = (isPhase1PureReq && multiGroupRoots.length > 0)
-    ? multiGroupRoots.map(n => n.id)
-    : (singleRoot ? [singleRoot.id] : []);
+  const bfsStartNodes =
+    isPhase1PureReq && multiGroupRoots.length > 0
+      ? multiGroupRoots.map((n) => n.id)
+      : singleRoot
+        ? [singleRoot.id]
+        : [];
 
   if (bfsStartNodes.length > 0) {
     const reachable = new Set<string>(bfsStartNodes);
@@ -438,9 +430,7 @@ export function checkRequirementGraph(
     if (cnt > 1) result.multiParent.push(id);
   }
   if (result.multiParent.length > 0) {
-    result.violations.push(
-      `父唯一性校验失败：以下节点有多条 parent 入边：${result.multiParent.join(', ')}`,
-    );
+    result.violations.push(`父唯一性校验失败：以下节点有多条 parent 入边：${result.multiParent.join(', ')}`);
   }
 
   // --- §3 规则 3：层级单调校验（parent 边 跨类型 子 Level = 父 Level + 1；同类型内部分解豁免）---
@@ -466,7 +456,7 @@ export function checkRequirementGraph(
   if (phase >= 2) {
     for (const n of g.nodes) {
       if (n.type === 'SD') {
-        const has = outEdges.get(n.id)?.some(e => e.type === 'implements') ?? false;
+        const has = outEdges.get(n.id)?.some((e) => e.type === 'implements') ?? false;
         if (!has) {
           result.traceabilityViolations.SD_without_implements++;
           result.violations.push(`追溯校验失败：SD 节点 ${n.id} 缺少 implements 出边`);
@@ -477,7 +467,7 @@ export function checkRequirementGraph(
   if (phase >= 3) {
     for (const n of g.nodes) {
       if (n.type === 'INTF') {
-        const has = inEdges.get(n.id)?.some(e => e.type === 'defines') ?? false;
+        const has = inEdges.get(n.id)?.some((e) => e.type === 'defines') ?? false;
         if (!has) {
           result.traceabilityViolations.INTF_without_defines++;
           result.violations.push(`追溯校验失败：INTF 节点 ${n.id} 缺少 defines 入边`);
@@ -488,7 +478,7 @@ export function checkRequirementGraph(
   if (phase >= 4) {
     for (const n of g.nodes) {
       if (n.type === 'DD') {
-        const has = outEdges.get(n.id)?.some(e => e.type === 'realizes') ?? false;
+        const has = outEdges.get(n.id)?.some((e) => e.type === 'realizes') ?? false;
         if (!has) {
           result.traceabilityViolations.DD_without_realizes++;
           result.violations.push(`追溯校验失败：DD 节点 ${n.id} 缺少 realizes 出边`);
@@ -505,20 +495,14 @@ export function checkRequirementGraph(
     if (e.type === 'governs') {
       const src = nodeMap.get(e.from);
       if (src && src.governance !== true) {
-        result.violations.push(
-          `横切边校验失败：governs 边 ${e.from}→${e.to} 源非治理类子系统（须 governance===true）`,
-        );
+        result.violations.push(`横切边校验失败：governs 边 ${e.from}→${e.to} 源非治理类子系统（须 governance===true）`);
       }
       if (!nodeIds.has(e.to)) {
-        result.violations.push(
-          `横切边校验失败：governs 边 ${e.from}→${e.to} 目标节点不存在`,
-        );
+        result.violations.push(`横切边校验失败：governs 边 ${e.from}→${e.to} 目标节点不存在`);
       }
     } else if (e.type === 'collaborates-with') {
       if (!nodeIds.has(e.to)) {
-        result.violations.push(
-          `横切边校验失败：collaborates-with 边 ${e.from}→${e.to} 目标节点不存在`,
-        );
+        result.violations.push(`横切边校验失败：collaborates-with 边 ${e.from}→${e.to} 目标节点不存在`);
       }
     } else if (e.type === 'derives') {
       const src = nodeMap.get(e.from);
@@ -528,9 +512,7 @@ export function checkRequirementGraph(
         );
       }
       if (!nodeIds.has(e.to)) {
-        result.violations.push(
-          `横切边校验失败：derives 边 ${e.from}→${e.to} 目标节点不存在`,
-        );
+        result.violations.push(`横切边校验失败：derives 边 ${e.from}→${e.to} 目标节点不存在`);
       }
     }
   }
@@ -575,8 +557,8 @@ export function checkRequirementGraph(
     }
 
     // 边界完整性（阶段 1 起：至少 1 个 EXT-IN 和 1 个 EXT-OUT）
-    result.boundary.extIn = g.nodes.filter(n => n.type === 'EXT-IN').length;
-    result.boundary.extOut = g.nodes.filter(n => n.type === 'EXT-OUT').length;
+    result.boundary.extIn = g.nodes.filter((n) => n.type === 'EXT-IN').length;
+    result.boundary.extOut = g.nodes.filter((n) => n.type === 'EXT-OUT').length;
     result.boundary.complete = result.boundary.extIn >= 1 && result.boundary.extOut >= 1;
     if (result.boundary.extIn < 1) {
       result.violations.push('信息流校验失败：缺少 EXT-IN 边界源（系统不能凭空产生信息）');
@@ -592,43 +574,49 @@ export function checkRequirementGraph(
   // ==================== 四维识别校验（phase=1 时启用）====================
   if (phase === 1) {
     // 四维识别：NFR/CON 节点（通过 ID 前缀识别，type 仍为 REQ）不参与 R1-R4 层级树校验
-    const reqNodes = g.nodes.filter(n => n.type === 'REQ' && !isNfrConNode(n));
-    const reqIds = new Set(reqNodes.map(n => n.id));
+    const reqNodes = g.nodes.filter((n) => n.type === 'REQ' && !isNfrConNode(n));
+    const reqIds = new Set(reqNodes.map((n) => n.id));
 
     // R1-R4: REQ 层级树校验
-    const missingLevelReqs = reqNodes.filter(n => n.level === undefined).map(n => n.id);
+    const missingLevelReqs = reqNodes.filter((n) => n.level === undefined).map((n) => n.id);
     if (missingLevelReqs.length > 0) {
-      result.violations.push(`R1-R4 层级校验失败：REQ 节点缺 level 字段（强制必填，无降级）：${missingLevelReqs.join(', ')}`);
+      result.violations.push(
+        `R1-R4 层级校验失败：REQ 节点缺 level 字段（强制必填，无降级）：${missingLevelReqs.join(', ')}`,
+      );
     }
 
     // R11: level 正整数校验（[21.0.0] 新增）
     const nonPositiveLevelReqs = reqNodes
-      .filter(n => n.level !== undefined && (!Number.isInteger(n.level) || n.level < 1))
-      .map(n => n.id);
+      .filter((n) => n.level !== undefined && (!Number.isInteger(n.level) || n.level < 1))
+      .map((n) => n.id);
     if (nonPositiveLevelReqs.length > 0) {
       result.violations.push(`R11 level 正整数校验失败：REQ 节点 level 非正整数：${nonPositiveLevelReqs.join(', ')}`);
     }
 
-    const level1Reqs = reqNodes.filter(n => n.level === 1).map(n => n.id);
-    const reqParentEdges = g.edges.filter(e => e.type === 'parent' && reqIds.has(e.from) && reqIds.has(e.to));
+    const level1Reqs = reqNodes.filter((n) => n.level === 1).map((n) => n.id);
+    const reqParentEdges = g.edges.filter((e) => e.type === 'parent' && reqIds.has(e.from) && reqIds.has(e.to));
 
     // R2: parent 唯一
     const parentInCount: Record<string, number> = {};
     for (const e of reqParentEdges) {
       parentInCount[e.to] = (parentInCount[e.to] ?? 0) + 1;
     }
-    const orphanReqs = reqNodes.filter(n => (n.level ?? 0) >= 2 && (parentInCount[n.id] ?? 0) === 0).map(n => n.id);
-    const multiParentReqs = reqNodes.filter(n => (parentInCount[n.id] ?? 0) > 1).map(n => n.id);
+    const orphanReqs = reqNodes.filter((n) => (n.level ?? 0) >= 2 && (parentInCount[n.id] ?? 0) === 0).map((n) => n.id);
+    const multiParentReqs = reqNodes.filter((n) => (parentInCount[n.id] ?? 0) > 1).map((n) => n.id);
     if (orphanReqs.length > 0) {
-      result.violations.push(`R2 父唯一性校验失败：level≥2 REQ 缺 REQ→REQ parent 入边（orphan）：${orphanReqs.join(', ')}`);
+      result.violations.push(
+        `R2 父唯一性校验失败：level≥2 REQ 缺 REQ→REQ parent 入边（orphan）：${orphanReqs.join(', ')}`,
+      );
     }
     if (multiParentReqs.length > 0) {
-      result.violations.push(`R2 父唯一性校验失败：REQ 有多条 REQ→REQ parent 入边（multiParent）：${multiParentReqs.join(', ')}`);
+      result.violations.push(
+        `R2 父唯一性校验失败：REQ 有多条 REQ→REQ parent 入边（multiParent）：${multiParentReqs.join(', ')}`,
+      );
     }
 
     // R3: level 单调
     const levelMonotonicViolations: Array<{ from: string; to: string; fromLevel: number; toLevel: number }> = [];
-    const nodeLevelMap = new Map(reqNodes.map(n => [n.id, n.level ?? 0]));
+    const nodeLevelMap = new Map(reqNodes.map((n) => [n.id, n.level ?? 0]));
     for (const e of reqParentEdges) {
       const fromLevel = nodeLevelMap.get(e.from) ?? 0;
       const toLevel = nodeLevelMap.get(e.to) ?? 0;
@@ -637,7 +625,9 @@ export function checkRequirementGraph(
       }
     }
     if (levelMonotonicViolations.length > 0) {
-      result.violations.push(`R3 level 单调校验失败：REQ→REQ parent 边须满足 子level=父level+1，违反：${levelMonotonicViolations.map(v => `${v.from}(${v.fromLevel})→${v.to}(${v.toLevel})`).join(', ')}`);
+      result.violations.push(
+        `R3 level 单调校验失败：REQ→REQ parent 边须满足 子level=父level+1，违反：${levelMonotonicViolations.map((v) => `${v.from}(${v.fromLevel})→${v.to}(${v.toLevel})`).join(', ')}`,
+      );
     }
 
     // R4: REQ-group 非空
@@ -678,10 +668,14 @@ export function checkRequirementGraph(
     const dependsOnCycles = detectCycle('depends-on');
     const precedesCycles = detectCycle('precedes');
     if (dependsOnCycles.length > 0) {
-      result.violations.push(`R5 依赖无环校验失败：depends-on 子图有环：${dependsOnCycles.map(c => c.join('→')).join('；')}`);
+      result.violations.push(
+        `R5 依赖无环校验失败：depends-on 子图有环：${dependsOnCycles.map((c) => c.join('→')).join('；')}`,
+      );
     }
     if (precedesCycles.length > 0) {
-      result.violations.push(`R5 时序无环校验失败：precedes 子图有环：${precedesCycles.map(c => c.join('→')).join('；')}`);
+      result.violations.push(
+        `R5 时序无环校验失败：precedes 子图有环：${precedesCycles.map((c) => c.join('→')).join('；')}`,
+      );
     }
 
     // R6: 交叉边对称性与源类型
@@ -700,8 +694,8 @@ export function checkRequirementGraph(
         }
       }
       if (e.type === 'precedes') {
-        const sourceNode = g.nodes.find(n => n.id === e.from);
-        const targetNode = g.nodes.find(n => n.id === e.to);
+        const sourceNode = g.nodes.find((n) => n.id === e.from);
+        const targetNode = g.nodes.find((n) => n.id === e.to);
         if (sourceNode && sourceNode.type !== 'REQ') {
           result.violations.push(`R6 precedes 源类型校验失败：${e.from}（${sourceNode.type}）非 REQ`);
         }
@@ -723,7 +717,7 @@ export function checkRequirementGraph(
     }
     result.reqHierarchy = {
       groups: level1Reqs,
-      maxDepth: Math.max(...reqNodes.map(n => n.level ?? 0), 0),
+      maxDepth: Math.max(...reqNodes.map((n) => n.level ?? 0), 0),
       levelDistribution,
       orphanReqs,
       multiParentReqs,
@@ -745,34 +739,39 @@ export function checkRequirementGraph(
   const minEdgeCount = nodeCount * 3;
 
   // 检查 small-project exemption
-  const hasSmallProjectExemption = g.nodes.some(n => n?.attributes && typeof n.attributes === 'object' && 'smallProjectExemption' in n.attributes && n.attributes.smallProjectExemption === true);
+  const hasSmallProjectExemption = g.nodes.some(
+    (n) =>
+      n?.attributes &&
+      typeof n.attributes === 'object' &&
+      'smallProjectExemption' in n.attributes &&
+      n.attributes.smallProjectExemption === true,
+  );
 
   if (!hasSmallProjectExemption && edgeCount < minEdgeCount) {
     warnings.push(`边数下限警告：当前边数 ${edgeCount} < 节点数 × 3 = ${minEdgeCount}（可能存在孤立节点或边缺失）`);
   }
 
   if (!hasSmallProjectExemption && edgeCount > 0) {
-    const semanticEdges = g.edges.filter(e => e && typeof (e as GraphEdge).sourceArtifact === 'string' && (e as GraphEdge).sourceArtifact!.trim() !== '').length;
+    const semanticEdges = g.edges.filter(
+      (e) => e && typeof (e as GraphEdge).sourceArtifact === 'string' && (e as GraphEdge).sourceArtifact!.trim() !== '',
+    ).length;
     const semanticRatio = semanticEdges / edgeCount;
     if (semanticRatio < 0.8) {
-      warnings.push(`语义来源占比警告：语义来源边占比 ${(semanticRatio * 100).toFixed(1)}% < 80%（可能存在过多人工补丁边）`);
+      warnings.push(
+        `语义来源占比警告：语义来源边占比 ${(semanticRatio * 100).toFixed(1)}% < 80%（可能存在过多人工补丁边）`,
+      );
     }
   }
 
   // 汇总 passed
   const tv = result.traceabilityViolations;
   const traceabilityOk =
-    tv.SD_without_implements === 0 &&
-    tv.INTF_without_defines === 0 &&
-    tv.DD_without_realizes === 0;
+    tv.SD_without_implements === 0 && tv.INTF_without_defines === 0 && tv.DD_without_realizes === 0;
   const dv = result.dataflowViolations;
   // 四维识别：phase=1 纯 REQ 图跳过信息流校验，dataflowOk 直接为 true
-  const dataflowOk = isPhase1PureReq ? true : (
-    dv.blackHoles.length === 0 &&
-    dv.miracles.length === 0 &&
-    dv.deadModules.length === 0 &&
-    result.boundary.complete
-  );
+  const dataflowOk = isPhase1PureReq
+    ? true
+    : dv.blackHoles.length === 0 && dv.miracles.length === 0 && dv.deadModules.length === 0 && result.boundary.complete;
   // 四维识别：phase=1 纯 REQ 图允许多个 level=1 REQ 根（多 group 模式）
   const rootsOk = isPhase1PureReq ? result.roots.length >= 1 : result.roots.length === 1;
   result.passed =
@@ -796,15 +795,11 @@ export function checkRequirementGraph(
 export function recalculatePassed(result: GraphCheckResult, isPhase1PureReq: boolean): void {
   const tv = result.traceabilityViolations;
   const traceabilityOk =
-    tv.SD_without_implements === 0 &&
-    tv.INTF_without_defines === 0 &&
-    tv.DD_without_realizes === 0;
+    tv.SD_without_implements === 0 && tv.INTF_without_defines === 0 && tv.DD_without_realizes === 0;
   const dv = result.dataflowViolations;
-  const dataflowOk = isPhase1PureReq ? true : (
-    dv.blackHoles.length === 0 &&
-    dv.miracles.length === 0 &&
-    dv.deadModules.length === 0 &&
-    result.boundary.complete);
+  const dataflowOk = isPhase1PureReq
+    ? true
+    : dv.blackHoles.length === 0 && dv.miracles.length === 0 && dv.deadModules.length === 0 && result.boundary.complete;
   const rootsOk = isPhase1PureReq ? result.roots.length >= 1 : result.roots.length === 1;
   result.passed =
     result.connectedComponents === 1 &&
@@ -829,12 +824,24 @@ export function parseMarkdownTable(md: string): Array<Record<string, string>> {
   let header: string[] = [];
   for (const line of md.split(/\r?\n/)) {
     const t = line.trim();
-    if (!t.startsWith('|')) { header = []; continue; }   // 非表格行 → 重置表头（按表独立解析）
-    const cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
-    if (cells.every(c => /^:?-{2,}:?$/.test(c))) continue; // 分隔行
-    if (header.length === 0) { header = cells; continue; }
+    if (!t.startsWith('|')) {
+      header = [];
+      continue;
+    } // 非表格行 → 重置表头（按表独立解析）
+    const cells = t
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((c) => c.trim());
+    if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue; // 分隔行
+    if (header.length === 0) {
+      header = cells;
+      continue;
+    }
     const rec: Record<string, string> = {};
-    cells.forEach((c, i) => { if (header[i]) rec[header[i]] = c; });
+    cells.forEach((c, i) => {
+      if (header[i]) rec[header[i]] = c;
+    });
     rows.push(rec);
   }
   return rows;
@@ -849,7 +856,10 @@ export function countMermaidBlocks(md: string): { pairs: number; balanced: boole
   for (const line of lines) {
     const t = line.trim();
     if (t === '```mermaid') {
-      if (inBlock) { opens++; continue; }
+      if (inBlock) {
+        opens++;
+        continue;
+      }
       inBlock = true;
       opens++;
     } else if (t === '```' && inBlock) {
@@ -999,7 +1009,8 @@ export function checkOutlineSpecEnhance(
     const loc = row['设计落点§'] ?? '';
     if (intf && !/^INTF-/.test(intf)) v.r11.push(`R11 INTF 编号格式失败：${intf}`);
     if (sd && !/^SD-/.test(sd)) v.r11.push(`R11 对应 SD 编号格式失败：${sd}`);
-    if (loc && !/^§?\s*\d/.test(loc)) v.r11.push(`R11 设计落点§ 引用失败：${intf} → ${loc}（须指向主文档 §2 接口定义）`);
+    if (loc && !/^§?\s*\d/.test(loc))
+      v.r11.push(`R11 设计落点§ 引用失败：${intf} → ${loc}（须指向主文档 §2 接口定义）`);
     if (sdTraceIds && sd && !sdTraceIds.has(sd)) v.r11.push(`R11 phase2 追踪矩阵 SD 缺失：${sd}`);
   }
   return v;
@@ -1045,7 +1056,8 @@ export function checkDetailedSpecEnhance(
     const loc = row['设计落点§'] ?? '';
     if (dd && !/^DD-/.test(dd)) v.r13.push(`R13 DD 编号格式失败：${dd}`);
     if (intf && !/^INTF-/.test(intf)) v.r13.push(`R13 对应 INTF 编号格式失败：${intf}`);
-    if (loc && !/^§?\s*[12]/.test(loc)) v.r13.push(`R13 设计落点§ 引用失败：${dd} → ${loc}（须指向主文档 §1 类或 §2 数据）`);
+    if (loc && !/^§?\s*[12]/.test(loc))
+      v.r13.push(`R13 设计落点§ 引用失败：${dd} → ${loc}（须指向主文档 §1 类或 §2 数据）`);
     if (intfTraceIds && intf && !intfTraceIds.has(intf)) v.r13.push(`R13 phase3 追踪矩阵 INTF 缺失：${intf}`);
   }
   return v;

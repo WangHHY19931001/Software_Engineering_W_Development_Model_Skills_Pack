@@ -35,22 +35,13 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  checkArtifactGate,
-  type PhaseOption,
-  type RTMMatrixShape,
-} from '../logic/gate-logic.js';
+import { checkArtifactGate, type PhaseOption, type RTMMatrixShape } from '../logic/gate-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
-import {
-  discoverGraphAsset,
-  readBddManifest,
-  readTlaManifest,
-  runModelChecks,
-} from './artifact-gate-assets.js';
+import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from './artifact-gate-assets.js';
 import { collectUatMappingViolations } from './uat-path-mapping.js';
 export { checkUatPathMappingContent } from './uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出
 
@@ -147,7 +138,7 @@ async function main(): Promise<void> {
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
   // 第 37 轮：--spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
-  const specDirArg = process.argv.find(a => a.startsWith('--spec-dir='));
+  const specDirArg = process.argv.find((a) => a.startsWith('--spec-dir='));
   const specDir = specDirArg?.split('=')[1] ?? undefined;
   const projectDir = parseProjectDir(process.argv);
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
@@ -221,18 +212,24 @@ async function main(): Promise<void> {
   // 合并 uat-path-mapping + BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
   const allReasons = [...result.reasons, ...uatMappingViolations, ...bddViolations, ...modelCheckViolations];
   const overallPassed =
-    result.passed && uatMappingViolations.length === 0 && bddViolations.length === 0 && modelCheckViolations.length === 0;
+    result.passed &&
+    uatMappingViolations.length === 0 &&
+    bddViolations.length === 0 &&
+    modelCheckViolations.length === 0;
   const exitCode = overallPassed ? 0 : 1;
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'artifact',
-      passed: overallPassed,
-      reasons: allReasons,
-      violations: buildViolationDistribution(allReasons.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'artifact',
+        passed: overallPassed,
+        reasons: allReasons,
+        violations: buildViolationDistribution(allReasons.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -247,9 +244,15 @@ async function main(): Promise<void> {
   console.log(`RTM 覆盖率    : ${result.coveragePercent}%`);
   console.log(`单元覆盖率    : ${result.unitCoveragePercent}%`);
   console.log(`TLA+ 资产     : ${manifestExists ? '✓ manifest 存在且 specs 非空' : '✗ manifest 缺失或 specs 为空'}`);
-  console.log(`BDD 资产      : ${bddManifestExists ? '✓ bdd-manifest.json 存在且 schema 通过' : '✗ bdd-manifest.json 缺失或 schema 失败'}`);
-  console.log(`Model 校验    : ${modelCheckViolations.length === 0 ? '✓ TLA+/BDD model 校验通过' : `✗ ${modelCheckViolations.length} 条违反`}`);
-  console.log(`graph 资产    : ${graph ? `✓ ${graphSource}（${graph.nodes.length} 节点）` : '⚠ 未发现任何 graph 资产'}`);
+  console.log(
+    `BDD 资产      : ${bddManifestExists ? '✓ bdd-manifest.json 存在且 schema 通过' : '✗ bdd-manifest.json 缺失或 schema 失败'}`,
+  );
+  console.log(
+    `Model 校验    : ${modelCheckViolations.length === 0 ? '✓ TLA+/BDD model 校验通过' : `✗ ${modelCheckViolations.length} 条违反`}`,
+  );
+  console.log(
+    `graph 资产    : ${graph ? `✓ ${graphSource}（${graph.nodes.length} 节点）` : '⚠ 未发现任何 graph 资产'}`,
+  );
   console.log(`校验结果      : ${overallPassed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -264,15 +267,19 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('GATE', {
-    type: 'artifact',
-    passed: overallPassed,
-    coveragePercent: result.coveragePercent,
-    unitCoveragePercent: result.unitCoveragePercent,
-    missingItems: result.missingItems,
-    reasons: allReasons,
-    bddManifestExists,
-  }, exitCode);
+  printGateReport(
+    'GATE',
+    {
+      type: 'artifact',
+      passed: overallPassed,
+      coveragePercent: result.coveragePercent,
+      unitCoveragePercent: result.unitCoveragePercent,
+      missingItems: result.missingItems,
+      reasons: allReasons,
+      bddManifestExists,
+    },
+    exitCode,
+  );
 }
 
 // isMain 守卫：仅直接执行时运行 main，被 self-test 等 import 时不触发

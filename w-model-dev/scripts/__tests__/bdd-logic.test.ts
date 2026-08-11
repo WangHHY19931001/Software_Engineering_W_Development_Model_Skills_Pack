@@ -47,7 +47,7 @@ Feature: Test`;
 Feature: Test`;
     const { violations } = parseFeatureHeader(content);
     expect(violations.length).toBeGreaterThan(0);
-    expect(violations.some(v => v.includes('@tla-spec'))).toBe(true);
+    expect(violations.some((v) => v.includes('@tla-spec'))).toBe(true);
   });
 });
 
@@ -115,7 +115,7 @@ describe('validateStateMachineCompleteness', () => {
       invariants: ['A => true'],
     };
     const v = validateStateMachineCompleteness(sm);
-    expect(v.some(s => s.includes('not in @states'))).toBe(true);
+    expect(v.some((s) => s.includes('not in @states'))).toBe(true);
   });
 
   it('fails when accepting-states is empty (cannot be ())', () => {
@@ -129,13 +129,14 @@ describe('validateStateMachineCompleteness', () => {
       invariants: ['A => true'],
     };
     const v = validateStateMachineCompleteness(sm);
-    expect(v.some(s => s.includes('accepting-states'))).toBe(true);
+    expect(v.some((s) => s.includes('accepting-states'))).toBe(true);
   });
 });
 
 describe('validateScenarioPath', () => {
   const sm: BddStateMachine = {
-    id: 'SM-L1-test', level: 1,
+    id: 'SM-L1-test',
+    level: 1,
     states: ['A', 'B', 'C'],
     initialState: 'A',
     terminalStates: ['C'],
@@ -151,15 +152,21 @@ describe('validateScenarioPath', () => {
   it('passes for single-event path', () => {
     const v = validateScenarioPath(
       { scenarioName: 's1', startState: 'A', events: ['e1'], expectedEndState: 'B', invariantAssertions: [] },
-      sm
+      sm,
     );
     expect(v).toEqual([]);
   });
 
   it('passes for chained multi-event path', () => {
     const v = validateScenarioPath(
-      { scenarioName: 's2', startState: 'A', events: ['e1', 'e2'], expectedEndState: 'C', invariantAssertions: ['C => done'] },
-      sm
+      {
+        scenarioName: 's2',
+        startState: 'A',
+        events: ['e1', 'e2'],
+        expectedEndState: 'C',
+        invariantAssertions: ['C => done'],
+      },
+      sm,
     );
     expect(v).toEqual([]);
   });
@@ -167,23 +174,24 @@ describe('validateScenarioPath', () => {
   it('fails for invalid event from current state', () => {
     const v = validateScenarioPath(
       { scenarioName: 's3', startState: 'A', events: ['e2'], expectedEndState: 'C', invariantAssertions: [] },
-      sm
+      sm,
     );
-    expect(v.some(s => s.includes('no transition'))).toBe(true);
+    expect(v.some((s) => s.includes('no transition'))).toBe(true);
   });
 
   it('fails for undeclared invariant assertion', () => {
     const v = validateScenarioPath(
       { scenarioName: 's4', startState: 'A', events: ['e1'], expectedEndState: 'B', invariantAssertions: ['X => y'] },
-      sm
+      sm,
     );
-    expect(v.some(s => s.includes('not declared'))).toBe(true);
+    expect(v.some((s) => s.includes('not declared'))).toBe(true);
   });
 });
 
 describe('validateTlaEquivalence', () => {
   const sm: BddStateMachine = {
-    id: 'SM-L1-test', level: 1,
+    id: 'SM-L1-test',
+    level: 1,
     states: ['A', 'B'],
     initialState: 'A',
     terminalStates: ['B'],
@@ -213,7 +221,7 @@ describe('validateTlaEquivalence', () => {
       invariants: ['B => done'],
     };
     const v = validateTlaEquivalence(sm, tla);
-    expect(v.some(s => s.includes('state set mismatch'))).toBe(true);
+    expect(v.some((s) => s.includes('state set mismatch'))).toBe(true);
   });
 
   it('normalizes invariant strings (whitespace + case)', () => {
@@ -225,14 +233,14 @@ describe('validateTlaEquivalence', () => {
       invariants: ['  b  =>  DONE  '],
     };
     const v = validateTlaEquivalence(sm, tla);
-    expect(v.filter(s => s.includes('invariant'))).toEqual([]);
+    expect(v.filter((s) => s.includes('invariant'))).toEqual([]);
   });
 });
 
 describe('checkBddModel', () => {
   it('returns exitCode=2 when manifest fails schema', () => {
     const result = checkBddModel({
-      manifest: { schemaVersion: '0.0' } as any,  // 故意非法
+      manifest: { schemaVersion: '0.0' } as any, // 故意非法
       phase: 1,
     });
     expect(result.exitCode).toBe(2);
@@ -248,30 +256,34 @@ describe('checkBddModel', () => {
       projectId: 'test',
       basePath: 'bdd',
       currentPhase: 4,
-      features: [{
-        id: 'BDD-L1-test',
-        level: 1,
-        filePath: 'test.feature',
-        scenarioCount: 1,
-        stateMachineId: 'SM-L1-test',
-        tlaSpecId: 'L1-test',
-        reqIds: ['REQ-001'],
-        designIds: [],
-        parentFeatureIds: [],
-        siblingFeatureIds: [],
-        childFeatureIds: [],
-      }],
-      stateMachines: [{
-        id: 'SM-L1-test',
-        level: 1,
-        states: ['A'],
-        initialState: 'A',
-        terminalStates: [],
-        acceptingStates: ['A'],
-        rejectingStates: [],
-        transitions: [{ from: 'A', event: 'e', to: 'A' }],
-        invariants: ['A => true'],
-      }],
+      features: [
+        {
+          id: 'BDD-L1-test',
+          level: 1,
+          filePath: 'test.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1-test',
+          reqIds: ['REQ-001'],
+          designIds: [],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['A'],
+          initialState: 'A',
+          terminalStates: [],
+          acceptingStates: ['A'],
+          rejectingStates: [],
+          transitions: [{ from: 'A', event: 'e', to: 'A' }],
+          invariants: ['A => true'],
+        },
+      ],
       designCoverage: {
         totalSdNodes: 0,
         coveredSdNodes: [],
@@ -284,7 +296,13 @@ describe('checkBddModel', () => {
       phase: 8,
       rtmRows: [
         // 正确 schema：requirementId（非 id），acceptanceTest 含 feature id
-        { reqId: 'REQ-001', acceptanceTest: 'UAT-001 | BDD-L1-test', systemTest: null, integrationTest: null, unitTest: null },
+        {
+          reqId: 'REQ-001',
+          acceptanceTest: 'UAT-001 | BDD-L1-test',
+          systemTest: null,
+          integrationTest: null,
+          unitTest: null,
+        },
       ],
     });
     expect(result.dimensions.rtmMapping).toEqual([]);
@@ -297,30 +315,34 @@ describe('checkBddModel', () => {
       projectId: 'test',
       basePath: 'bdd',
       currentPhase: 4,
-      features: [{
-        id: 'BDD-L1-test',
-        level: 1,
-        filePath: 'test.feature',
-        scenarioCount: 1,
-        stateMachineId: 'SM-L1-test',
-        tlaSpecId: 'L1-test',
-        reqIds: ['REQ-001'],
-        designIds: [],
-        parentFeatureIds: [],
-        siblingFeatureIds: [],
-        childFeatureIds: [],
-      }],
-      stateMachines: [{
-        id: 'SM-L1-test',
-        level: 1,
-        states: ['A'],
-        initialState: 'A',
-        terminalStates: [],
-        acceptingStates: ['A'],
-        rejectingStates: [],
-        transitions: [{ from: 'A', event: 'e', to: 'A' }],
-        invariants: ['A => true'],
-      }],
+      features: [
+        {
+          id: 'BDD-L1-test',
+          level: 1,
+          filePath: 'test.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1-test',
+          reqIds: ['REQ-001'],
+          designIds: [],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['A'],
+          initialState: 'A',
+          terminalStates: [],
+          acceptingStates: ['A'],
+          rejectingStates: [],
+          transitions: [{ from: 'A', event: 'e', to: 'A' }],
+          invariants: ['A => true'],
+        },
+      ],
       designCoverage: {
         totalSdNodes: 0,
         coveredSdNodes: [],
@@ -336,7 +358,7 @@ describe('checkBddModel', () => {
         { reqId: 'REQ-001', acceptanceTest: 'UAT-001', systemTest: null, integrationTest: null, unitTest: null },
       ],
     });
-    expect(result.dimensions.rtmMapping.some(v => v.includes('feature id not in RTM'))).toBe(true);
+    expect(result.dimensions.rtmMapping.some((v) => v.includes('feature id not in RTM'))).toBe(true);
     expect(result.exitCode).toBe(1);
   });
 
@@ -346,30 +368,34 @@ describe('checkBddModel', () => {
       projectId: 'test',
       basePath: 'bdd',
       currentPhase: 4,
-      features: [{
-        id: 'BDD-L1-test',
-        level: 1,
-        filePath: 'test.feature',
-        scenarioCount: 1,
-        stateMachineId: 'SM-L1-test',
-        tlaSpecId: 'L1-test',
-        reqIds: ['REQ-999'],
-        designIds: [],
-        parentFeatureIds: [],
-        siblingFeatureIds: [],
-        childFeatureIds: [],
-      }],
-      stateMachines: [{
-        id: 'SM-L1-test',
-        level: 1,
-        states: ['A'],
-        initialState: 'A',
-        terminalStates: [],
-        acceptingStates: ['A'],
-        rejectingStates: [],
-        transitions: [{ from: 'A', event: 'e', to: 'A' }],
-        invariants: ['A => true'],
-      }],
+      features: [
+        {
+          id: 'BDD-L1-test',
+          level: 1,
+          filePath: 'test.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1-test',
+          reqIds: ['REQ-999'],
+          designIds: [],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['A'],
+          initialState: 'A',
+          terminalStates: [],
+          acceptingStates: ['A'],
+          rejectingStates: [],
+          transitions: [{ from: 'A', event: 'e', to: 'A' }],
+          invariants: ['A => true'],
+        },
+      ],
       designCoverage: {
         totalSdNodes: 0,
         coveredSdNodes: [],
@@ -381,10 +407,16 @@ describe('checkBddModel', () => {
       manifest: manifest as any,
       phase: 8,
       rtmRows: [
-        { reqId: 'REQ-001', acceptanceTest: 'UAT-001 | BDD-L1-test', systemTest: null, integrationTest: null, unitTest: null },
+        {
+          reqId: 'REQ-001',
+          acceptanceTest: 'UAT-001 | BDD-L1-test',
+          systemTest: null,
+          integrationTest: null,
+          unitTest: null,
+        },
       ],
     });
-    expect(result.dimensions.rtmMapping.some(v => v.includes('not in RTM'))).toBe(true);
+    expect(result.dimensions.rtmMapping.some((v) => v.includes('not in RTM'))).toBe(true);
     expect(result.exitCode).toBe(1);
   });
 
@@ -399,16 +431,24 @@ describe('checkBddModel', () => {
       features: [],
       stateMachines: [
         {
-          id: 'SM-L1-sys', level: 1,
-          states: ['A', 'B'], initialState: 'A', terminalStates: [],
-          acceptingStates: ['B'], rejectingStates: [],
+          id: 'SM-L1-sys',
+          level: 1,
+          states: ['A', 'B'],
+          initialState: 'A',
+          terminalStates: [],
+          acceptingStates: ['B'],
+          rejectingStates: [],
           transitions: [{ from: 'A', event: 'e', to: 'B' }],
           invariants: ['B => done'],
         },
         {
-          id: 'SM-L2-sub', level: 2,
-          states: ['X', 'Y'], initialState: 'X', terminalStates: [],
-          acceptingStates: ['Y'], rejectingStates: [],
+          id: 'SM-L2-sub',
+          level: 2,
+          states: ['X', 'Y'],
+          initialState: 'X',
+          terminalStates: [],
+          acceptingStates: ['Y'],
+          rejectingStates: [],
           transitions: [{ from: 'X', event: 'f', to: 'Y' }],
           invariants: ['Y => ok'],
         },
@@ -424,16 +464,17 @@ describe('checkBddModel', () => {
         { specId: 'L1-sys', states: [], initialState: '', transitions: [], invariants: [] },
         {
           specId: 'L2-sub',
-          states: ['X', 'Y', 'Z'], initialState: 'X',
+          states: ['X', 'Y', 'Z'],
+          initialState: 'X',
           transitions: [{ from: 'X', event: 'f', to: 'Z' }],
           invariants: ['Y => ok'],
         },
       ],
     });
     // L1：即使快照为空也不产生任何 tlaEquivalence violation
-    expect(result.dimensions.tlaEquivalence.filter(v => v.includes('SM-L1-sys'))).toEqual([]);
+    expect(result.dimensions.tlaEquivalence.filter((v) => v.includes('SM-L1-sys'))).toEqual([]);
     // L2：不匹配快照产生 violation（自动等价校验仍完整执行）
-    expect(result.dimensions.tlaEquivalence.some(v => v.includes('SM-L2-sub'))).toBe(true);
+    expect(result.dimensions.tlaEquivalence.some((v) => v.includes('SM-L2-sub'))).toBe(true);
     expect(result.exitCode).toBe(1);
   });
 });
@@ -656,7 +697,7 @@ Invariants ==
 ====
 `;
     const snap = parseTlaSpecSnapshot(content, 'truncate');
-    const events = snap.transitions.map(t => t.event);
+    const events = snap.transitions.map((t) => t.event);
     expect(events).toEqual(['realAction']);
     expect(events).not.toContain('ghostAction');
   });
@@ -873,7 +914,7 @@ Scenario: 无 Given 无 Then
 
   it('collects When and And events (tolerating trailing parens), takes first Then, extracts invariant assertions', () => {
     const result = parseFeatureFile(feat);
-    const sc = result.scenarios.find(s => s.scenarioName === '注册成功')!;
+    const sc = result.scenarios.find((s) => s.scenarioName === '注册成功')!;
     expect(sc.startState).toBe('A');
     // When 与 And 双取，行末括号 (Register) 容忍
     expect(sc.events).toEqual(['Register', 'Validate']);
@@ -884,14 +925,14 @@ Scenario: 无 Given 无 Then
 
   it('terminates previous scenario at `Scenario Outline:` and does not parse the outline itself', () => {
     const result = parseFeatureFile(feat);
-    const names = result.scenarios.map(s => s.scenarioName);
+    const names = result.scenarios.map((s) => s.scenarioName);
     // Scenario Outline 只作终结符：注册成功 场景在 Outline 前结束，Outline 本身不入 scenarios
     expect(names).toEqual(['注册成功', '无 Given 无 Then']);
   });
 
   it('returns null start/end state when Given/Then missing', () => {
     const result = parseFeatureFile(feat);
-    const sc = result.scenarios.find(s => s.scenarioName === '无 Given 无 Then')!;
+    const sc = result.scenarios.find((s) => s.scenarioName === '无 Given 无 Then')!;
     expect(sc.startState).toBeNull();
     expect(sc.events).toEqual(['Act']);
     expect(sc.expectedEndState).toBeNull();
@@ -909,20 +950,38 @@ Scenario: 无 Given 无 Then
 describe('D8 SD Coverage', () => {
   it('designCoverage.uncoveredSdNodes 非空时应产生 D8 violations', () => {
     const manifest = {
-      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
       currentPhase: 1, // currentPhase=1 让 schema 放行非空 uncoveredSdNodes；phase 参数=2 触发业务层 D8 校验
-      features: [{
-        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
-        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
-        reqIds: ['REQ-001'], designIds: ['SD-001'],
-        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
-      }],
-      stateMachines: [{
-        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
-        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
-        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-        invariants: ['S2 => true'],
-      }],
+      features: [
+        {
+          id: 'L1_test-001',
+          level: 1,
+          filePath: 'L1/L1_test-001.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1_test',
+          reqIds: ['REQ-001'],
+          designIds: ['SD-001'],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['S1', 'S2'],
+          initialState: 'S1',
+          terminalStates: [],
+          acceptingStates: ['S2'],
+          rejectingStates: [],
+          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+          invariants: ['S2 => true'],
+        },
+      ],
       designCoverage: {
         totalSdNodes: 3,
         coveredSdNodes: ['SD-001'],
@@ -938,20 +997,38 @@ describe('D8 SD Coverage', () => {
 
   it('designCoverage 缺失（phase>=2）应产生 D8 violations', () => {
     const manifest = {
-      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
       currentPhase: 1,
-      features: [{
-        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
-        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
-        reqIds: ['REQ-001'], designIds: ['SD-001'],
-        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
-      }],
-      stateMachines: [{
-        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
-        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
-        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-        invariants: ['S2 => true'],
-      }],
+      features: [
+        {
+          id: 'L1_test-001',
+          level: 1,
+          filePath: 'L1/L1_test-001.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1_test',
+          reqIds: ['REQ-001'],
+          designIds: ['SD-001'],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['S1', 'S2'],
+          initialState: 'S1',
+          terminalStates: [],
+          acceptingStates: ['S2'],
+          rejectingStates: [],
+          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+          invariants: ['S2 => true'],
+        },
+      ],
     } as any;
     // currentPhase=1 让 schema 放行；phase 参数=2 触发业务层缺失校验
     const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
@@ -961,20 +1038,38 @@ describe('D8 SD Coverage', () => {
 
   it('designCoverage 全覆盖时 D8 violations 为空', () => {
     const manifest = {
-      schemaVersion: '1.0', projectId: 'test', basePath: 'features/',
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
       currentPhase: 2,
-      features: [{
-        id: 'L1_test-001', level: 1, filePath: 'L1/L1_test-001.feature',
-        scenarioCount: 1, stateMachineId: 'SM-L1-test', tlaSpecId: 'L1_test',
-        reqIds: ['REQ-001'], designIds: ['SD-001', 'SD-002'],
-        parentFeatureIds: [], siblingFeatureIds: [], childFeatureIds: [],
-      }],
-      stateMachines: [{
-        id: 'SM-L1-test', level: 1, states: ['S1', 'S2'],
-        initialState: 'S1', terminalStates: [], acceptingStates: ['S2'],
-        rejectingStates: [], transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-        invariants: ['S2 => true'],
-      }],
+      features: [
+        {
+          id: 'L1_test-001',
+          level: 1,
+          filePath: 'L1/L1_test-001.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1_test',
+          reqIds: ['REQ-001'],
+          designIds: ['SD-001', 'SD-002'],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['S1', 'S2'],
+          initialState: 'S1',
+          terminalStates: [],
+          acceptingStates: ['S2'],
+          rejectingStates: [],
+          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+          invariants: ['S2 => true'],
+        },
+      ],
       designCoverage: {
         totalSdNodes: 2,
         coveredSdNodes: ['SD-001', 'SD-002'],

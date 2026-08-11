@@ -69,7 +69,9 @@ export async function collectUatMappingViolations(
     try {
       await fs.access(uatMappingPath);
     } catch {
-      uatMappingViolations.push('P0-1 校验失败：docs/uat-path-mapping.md 不存在，阶段1须产出该文件（见 phase-1-requirements.md §输出）');
+      uatMappingViolations.push(
+        'P0-1 校验失败：docs/uat-path-mapping.md 不存在，阶段1须产出该文件（见 phase-1-requirements.md §输出）',
+      );
     }
   }
 

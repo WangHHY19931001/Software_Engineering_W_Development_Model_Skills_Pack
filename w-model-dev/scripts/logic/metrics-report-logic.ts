@@ -99,7 +99,10 @@ export function computeMetrics(
   const totalRecords = filtered.length;
   const totalDurationS = filtered.reduce((s, e) => s + (typeof e.duration_s === 'number' ? e.duration_s : 0), 0);
   const totalTokens = filtered.reduce((s, e) => s + (typeof e.tokens === 'number' ? e.tokens : 0), 0);
-  const totalSubagentSpawns = filtered.reduce((s, e) => s + (typeof e.subagentSpawns === 'number' ? e.subagentSpawns : 0), 0);
+  const totalSubagentSpawns = filtered.reduce(
+    (s, e) => s + (typeof e.subagentSpawns === 'number' ? e.subagentSpawns : 0),
+    0,
+  );
   const reworkRecords = filtered.filter(isRework).length;
   const reworkRate = totalRecords === 0 ? 0 : reworkRecords / totalRecords;
 
@@ -173,7 +176,8 @@ export function computeMetrics(
     });
     const killSwitchConsecutive =
       typeof budget.killSwitch?.consecutiveReworks === 'number' ? budget.killSwitch.consecutiveReworks : 3;
-    const killSwitchBurn = typeof budget.killSwitch?.budgetBurnRate === 'number' ? budget.killSwitch.budgetBurnRate : 0.9;
+    const killSwitchBurn =
+      typeof budget.killSwitch?.budgetBurnRate === 'number' ? budget.killSwitch.budgetBurnRate : 0.9;
     exceedsKillSwitch =
       maxConsecutiveRuns >= killSwitchConsecutive || budgetByPhase.some((b) => b.burnRate >= killSwitchBurn);
     budgetSection = {

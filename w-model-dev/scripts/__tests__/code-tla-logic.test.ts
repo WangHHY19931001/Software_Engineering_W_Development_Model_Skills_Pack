@@ -31,7 +31,7 @@ import {
 
 function makeGraph(sds: string[]): Graph {
   return {
-    nodes: sds.map(id => ({ id, type: 'SD' })),
+    nodes: sds.map((id) => ({ id, type: 'SD' })),
     edges: [],
   };
 }
@@ -68,9 +68,7 @@ describe('维度1 checkSdToCodeModule', () => {
   it('SD 有对应 codeModule 时通过', () => {
     // SD-AUTH → "auth" 子串匹配 codeModule "src/services/auth.service.ts"
     const graph = makeGraph(['SD-AUTH']);
-    const rtm = makeRtm([
-      { requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' },
-    ]);
+    const rtm = makeRtm([{ requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' }]);
     const result = checkSdToCodeModule(graph, rtm);
     expect(result.passed).toBe(true);
     expect(result.checked).toBe(1);
@@ -87,17 +85,15 @@ describe('维度1 checkSdToCodeModule', () => {
     expect(result.passed).toBe(false);
     expect(result.checked).toBe(2);
     expect(result.violations.length).toBeGreaterThanOrEqual(1);
-    expect(result.violations.some(v => v.includes('SD-REVIEW'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('SD-REVIEW'))).toBe(true);
     // P1.4：violation 须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）
-    expect(result.violations.some(v => v.includes('阶段5编码后必须回填'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('阶段5编码后必须回填'))).toBe(true);
   });
 
   it('SD id 去 "SD-" 前缀转小写后做包含匹配', () => {
     // SD-Article-Service → "articleservice" 应匹配 "src/controllers/article.controller.ts"
     const graph = makeGraph(['SD-Article-Service']);
-    const rtm = makeRtm([
-      { requirementId: 'REQ-002', codeModule: 'src/controllers/article.controller.ts' },
-    ]);
+    const rtm = makeRtm([{ requirementId: 'REQ-002', codeModule: 'src/controllers/article.controller.ts' }]);
     const result = checkSdToCodeModule(graph, rtm);
     expect(result.passed).toBe(true);
   });
@@ -116,7 +112,7 @@ describe('维度1 checkSdToCodeModule', () => {
     const result = checkSdToCodeModule(graph, rtm);
     expect(result.passed).toBe(false);
     // P1.4：violation 须明确指出回填时机
-    expect(result.violations.some(v => v.includes('阶段5编码后必须回填'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('阶段5编码后必须回填'))).toBe(true);
   });
 });
 
@@ -133,7 +129,7 @@ describe('维度2 extractCodeStateTransfers / checkCodeStateTransfer', () => {
     const extracted = extractCodeStateTransfers(file.ast, file.path);
     expect(extracted.assignments.length).toBeGreaterThanOrEqual(1);
     // 至少含 x = 2 这条
-    expect(extracted.assignments.some(a => a.text.includes('x = 2'))).toBe(true);
+    expect(extracted.assignments.some((a) => a.text.includes('x = 2'))).toBe(true);
   });
 
   it('抽取条件分支（IfStatement / SwitchStatement）', () => {
@@ -197,7 +193,7 @@ Next ==
     const file = makeCodeFile(source);
     const result = checkNextBranchCoverage(tlaWithNext, [file]);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(v => /Register/i.test(v))).toBe(true);
+    expect(result.violations.some((v) => /Register/i.test(v))).toBe(true);
   });
 
   it('驼峰匹配：Register → register', () => {
@@ -354,7 +350,7 @@ BusinessInvariant ==
     const result = checkCodeTlaConsistency(input);
     expect(result.passed).toBe(false);
     expect(result.dimensions.sdToCodeModule.passed).toBe(false);
-    expect(result.violations.some(v => v.dimension === 'sdToCodeModule')).toBe(true);
+    expect(result.violations.some((v) => v.dimension === 'sdToCodeModule')).toBe(true);
   });
 });
 

@@ -21,11 +21,21 @@ export const STATUS_TO_PHASE: Record<string, number> = {
 
 /** 每状态的确定性下一步建议（含阶段产物要点与门禁提示） */
 export const NEXT_STEPS: Record<string, string[]> = {
-  需求分析: ['阶段 1：产出 requirement-spec.md 与 graph（ingestion A 子代理），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=1'],
-  系统设计: ['阶段 2：产出 system-design.md（含 SD 节点），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=2'],
-  概要设计: ['阶段 3：产出 outline-design.md（含 INTF 节点），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=3'],
-  详细设计: ['阶段 4：产出 detailed-design.md + TLA+ 建模（tla-manifest.json），分派 V 评审 + G 跑 check-tla-model / check-artifact-gate --phase=4'],
-  编码: ['阶段 5：按票据编码并真实执行单元测试，回填 RTM codeModule，分派 V 评审 + G 跑 check-code-tla-consistency / check-artifact-gate --phase=5'],
+  需求分析: [
+    '阶段 1：产出 requirement-spec.md 与 graph（ingestion A 子代理），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=1',
+  ],
+  系统设计: [
+    '阶段 2：产出 system-design.md（含 SD 节点），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=2',
+  ],
+  概要设计: [
+    '阶段 3：产出 outline-design.md（含 INTF 节点），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=3',
+  ],
+  详细设计: [
+    '阶段 4：产出 detailed-design.md + TLA+ 建模（tla-manifest.json），分派 V 评审 + G 跑 check-tla-model / check-artifact-gate --phase=4',
+  ],
+  编码: [
+    '阶段 5：按票据编码并真实执行单元测试，回填 RTM codeModule，分派 V 评审 + G 跑 check-code-tla-consistency / check-artifact-gate --phase=5',
+  ],
   集成测试: ['阶段 6：执行集成测试并回填 RTM，分派 V 评审 + G 跑 check-artifact-gate --phase=6'],
   系统测试: ['阶段 7：执行系统测试（含性能度量环境声明）并回填 RTM，分派 V 评审 + G 跑 check-artifact-gate --phase=7'],
   验收测试: ['阶段 8：执行验收测试 + UAT 路径映射，分派 V 评审 + G 跑 check-artifact-gate --phase=8 终检'],
@@ -146,9 +156,7 @@ export function buildStatusReport(
       }))
     : [];
 
-  const nextSteps = NEXT_STEPS[status] ?? [
-    '状态未知：请人工核对 project.json status 字段（转 operational-recovery）',
-  ];
+  const nextSteps = NEXT_STEPS[status] ?? ['状态未知：请人工核对 project.json status 字段（转 operational-recovery）'];
 
   return {
     phase,

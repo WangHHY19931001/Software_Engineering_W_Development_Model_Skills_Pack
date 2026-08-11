@@ -66,8 +66,8 @@ export function validateBySchema(name: string, data: unknown): SchemaValidationR
   return {
     valid,
     errors,
-    errorMessages: valid ? [] : (errors ?? []).map(
-      (e) => `${e.instancePath || '/'}: ${e.message ?? ''} [${e.keyword}]`
-    ),
+    errorMessages: valid
+      ? []
+      : (errors ?? []).map((e) => `${e.instancePath || '/'}: ${e.message ?? ''} [${e.keyword}]`),
   };
 }

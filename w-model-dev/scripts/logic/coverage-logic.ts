@@ -82,8 +82,8 @@ export interface CoverageCheckResult {
 /** 重算单维度覆盖率 = (covered + 0.5*partial) / total * 100；空集视作 100%（vacuously true） */
 function recalcRate<T extends { status: CoverageStatus }>(entries: T[]): number {
   if (entries.length === 0) return 100;
-  const covered = entries.filter(e => e.status === 'covered').length;
-  const partial = entries.filter(e => e.status === 'partial').length;
+  const covered = entries.filter((e) => e.status === 'covered').length;
+  const partial = entries.filter((e) => e.status === 'partial').length;
   return ((covered + 0.5 * partial) / entries.length) * 100;
 }
 
@@ -98,10 +98,7 @@ export interface CoverageCheckOptions {
   exemptions?: string[];
 }
 
-export function checkRequirementCoverage(
-  coverage: unknown,
-  options: CoverageCheckOptions = {},
-): CoverageCheckResult {
+export function checkRequirementCoverage(coverage: unknown, options: CoverageCheckOptions = {}): CoverageCheckResult {
   const result: CoverageCheckResult = {
     passed: false,
     violations: [],
@@ -113,7 +110,7 @@ export function checkRequirementCoverage(
   // Schema 前置校验
   const schemaResult: SchemaValidationResult = validateBySchema('coverage', coverage);
   if (!schemaResult.valid) {
-    result.violations.push(...schemaResult.errorMessages.map(m => `[schema] ${m}`));
+    result.violations.push(...schemaResult.errorMessages.map((m) => `[schema] ${m}`));
     result.passed = false;
     return result;
   }
@@ -133,9 +130,9 @@ export function checkRequirementCoverage(
 
   // C4: scenarios 含 happy/error/boundary 三类
   if (!exempt.has('C4')) {
-    const types = new Set(c.scenarios.map(s => s.scenarioType));
+    const types = new Set(c.scenarios.map((s) => s.scenarioType));
     const required: ScenarioType[] = ['happy', 'error', 'boundary'];
-    const missing = required.filter(t => !types.has(t));
+    const missing = required.filter((t) => !types.has(t));
     if (missing.length > 0) {
       result.violations.push(`C4 scenarios 缺失场景类型：${missing.join(', ')}`);
     }
@@ -143,9 +140,9 @@ export function checkRequirementCoverage(
 
   // C5: requirementTypes 含 REQ/NFR/CON 三类
   if (!exempt.has('C5')) {
-    const types = new Set(c.requirementTypes.map(r => r.type));
+    const types = new Set(c.requirementTypes.map((r) => r.type));
     const required: RequirementTypeCategory[] = ['REQ', 'NFR', 'CON'];
-    const missing = required.filter(t => !types.has(t));
+    const missing = required.filter((t) => !types.has(t));
     if (missing.length > 0) {
       result.violations.push(`C5 requirementTypes 缺失需求类型：${missing.join(', ')}`);
     }
@@ -153,12 +150,10 @@ export function checkRequirementCoverage(
 
   // C7: crossCuts 与 graph.json cross-cuts 边集一致（双向校验）
   if (!exempt.has('C7') && options.graphCrossCuts) {
-    const coverageEdges = new Set(c.crossCuts.flatMap(cc =>
-      cc.governedReqs.map(req => `${cc.nfrConId}→${req}`)
-    ));
-    const graphEdges = new Set(options.graphCrossCuts.map(e => `${e.from}→${e.to}`));
-    const inCoverageNotGraph = [...coverageEdges].filter(e => !graphEdges.has(e));
-    const inGraphNotCoverage = [...graphEdges].filter(e => !coverageEdges.has(e));
+    const coverageEdges = new Set(c.crossCuts.flatMap((cc) => cc.governedReqs.map((req) => `${cc.nfrConId}→${req}`)));
+    const graphEdges = new Set(options.graphCrossCuts.map((e) => `${e.from}→${e.to}`));
+    const inCoverageNotGraph = [...coverageEdges].filter((e) => !graphEdges.has(e));
+    const inGraphNotCoverage = [...graphEdges].filter((e) => !coverageEdges.has(e));
     if (inCoverageNotGraph.length > 0) {
       result.violations.push(`C7 coverage 有但 graph.json 无的 cross-cuts 边：${inCoverageNotGraph.join('；')}`);
     }
@@ -181,26 +176,16 @@ export function checkRequirementCoverage(
       }
     }
     // 额外：存在 partial 项也算 C8 失败（100% 意味着不允许 partial）
-    const allEntries = [
-      ...c.stakeholders,
-      ...c.scenarios,
-      ...c.requirementTypes,
-      ...c.crossCuts,
-    ];
-    const partialEntries = allEntries.filter(e => e.status === 'partial');
+    const allEntries = [...c.stakeholders, ...c.scenarios, ...c.requirementTypes, ...c.crossCuts];
+    const partialEntries = allEntries.filter((e) => e.status === 'partial');
     if (partialEntries.length > 0) {
       result.violations.push(`C8 存在 partial 项未补齐（100% 阈值不允许 partial）：${partialEntries.length} 项`);
     }
   }
 
   // C9: status=missing 须在 Out of Scope 显式声明
-  const allEntries2 = [
-    ...c.stakeholders,
-    ...c.scenarios,
-    ...c.requirementTypes,
-    ...c.crossCuts,
-  ];
-  const missingEntries = allEntries2.filter(e => e.status === 'missing');
+  const allEntries2 = [...c.stakeholders, ...c.scenarios, ...c.requirementTypes, ...c.crossCuts];
+  const missingEntries = allEntries2.filter((e) => e.status === 'missing');
   if (missingEntries.length > 0) {
     const missingIds: string[] = [];
     for (const e of missingEntries) {
@@ -215,12 +200,14 @@ export function checkRequirementCoverage(
     }
     if (options.outOfScope) {
       const declared = new Set(options.outOfScope);
-      const undeclared = missingIds.filter(id => !declared.has(id));
+      const undeclared = missingIds.filter((id) => !declared.has(id));
       if (!exempt.has('C9') && undeclared.length > 0) {
         result.violations.push(`C9 status=missing 项未在 Out of Scope 声明：${undeclared.join(', ')}`);
       }
     } else {
-      result.warnings.push(`C9 status=missing 项建议在 Out of Scope 声明：${missingIds.join(', ')}（未提供 --out-of-scope，降级为 warning）`);
+      result.warnings.push(
+        `C9 status=missing 项建议在 Out of Scope 声明：${missingIds.join(', ')}（未提供 --out-of-scope，降级为 warning）`,
+      );
     }
   }
 

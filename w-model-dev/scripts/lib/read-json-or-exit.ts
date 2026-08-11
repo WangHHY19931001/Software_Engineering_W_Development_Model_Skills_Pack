@@ -58,10 +58,7 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
  * @param label 警告消息中的行类型描述（默认「行」），如「run-log」「checkpoint」
  * @returns 解析后的条目数组
  */
-export async function readJsonlOrExit(
-  file: string,
-  label = '行',
-): Promise<unknown[]> {
+export async function readJsonlOrExit(file: string, label = '行'): Promise<unknown[]> {
   const abs = path.resolve(file);
   let raw: string;
   try {
@@ -124,10 +121,7 @@ export async function readJsonOptional<T = unknown>(file: string): Promise<T | n
  * @param label 警告消息中的行类型描述（默认「行」）
  * @returns 解析后的条目数组；文件不存在返回空数组
  */
-export async function readJsonlOptional(
-  file: string,
-  label = '行',
-): Promise<unknown[]> {
+export async function readJsonlOptional(file: string, label = '行'): Promise<unknown[]> {
   const abs = path.resolve(file);
   let raw: string;
   try {
@@ -161,7 +155,13 @@ export async function readJsonClassified<T = unknown>(file: string): Promise<T> 
     if (e.code === 'ENOENT') {
       exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, rule: 'P0-2', file: abs });
     } else {
-      exitWithError({ category: 'FILE_READ', message: '文件读取失败', exitCode: 2, file: abs, detail: e.code ?? '未知错误' });
+      exitWithError({
+        category: 'FILE_READ',
+        message: '文件读取失败',
+        exitCode: 2,
+        file: abs,
+        detail: e.code ?? '未知错误',
+      });
     }
     throw new Error('readJsonClassified: 输入错误已通过 exitWithError 处理');
   }

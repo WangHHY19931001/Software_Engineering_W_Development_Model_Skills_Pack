@@ -170,7 +170,8 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
     const tlaModelResult = spawnSync(
       process.execPath,
       [
-        '--import', 'tsx',
+        '--import',
+        'tsx',
         path.resolve(__dirname, 'check-tla-model.ts'),
         manifestFile,
         `--phase=${effectivePhase}`,
@@ -189,7 +190,8 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
       const bddModelResult = spawnSync(
         process.execPath,
         [
-          '--import', 'tsx',
+          '--import',
+          'tsx',
           path.resolve(__dirname, 'check-bdd-model.ts'),
           bddManifestFile,
           `--phase=${effectivePhase}`,

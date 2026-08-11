@@ -15,7 +15,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { readJsonOrExit, readJsonlOrExit, readJsonOptional, readJsonlOptional, readJsonClassified } from '../lib/read-json-or-exit.js';
+import {
+  readJsonOrExit,
+  readJsonlOrExit,
+  readJsonOptional,
+  readJsonlOptional,
+  readJsonClassified,
+} from '../lib/read-json-or-exit.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 
 let tmpDir: string;
@@ -270,7 +276,10 @@ describe('loadAndValidate', () => {
   it('正常路径：合法 bdd-manifest 通过 schema 校验并返回解析对象', async () => {
     const file = path.join(tmpDir, 'valid-bdd.json');
     await fs.writeFile(file, JSON.stringify(validManifest));
-    const result = await loadAndValidate<{ schemaVersion: string; projectId: string; currentPhase: number }>(file, 'bdd-manifest');
+    const result = await loadAndValidate<{ schemaVersion: string; projectId: string; currentPhase: number }>(
+      file,
+      'bdd-manifest',
+    );
     expect(result).toMatchObject({ schemaVersion: '1.0', projectId: 'test-project', currentPhase: 1 });
   });
 

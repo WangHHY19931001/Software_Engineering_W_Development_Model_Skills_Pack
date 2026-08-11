@@ -32,10 +32,7 @@ export interface ParsePhaseOptions {
   positional?: number;
 }
 
-export function parsePhaseArg(
-  argv: string[],
-  opts?: ParsePhaseOptions,
-): PhaseParseResult | undefined {
+export function parsePhaseArg(argv: string[], opts?: ParsePhaseOptions): PhaseParseResult | undefined {
   const min = opts?.min ?? 1;
   const max = opts?.max ?? 8;
 

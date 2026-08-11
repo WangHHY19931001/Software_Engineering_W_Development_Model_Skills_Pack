@@ -27,13 +27,13 @@ describe('R4-A 多角度 R token 预算', () => {
     const b = await loadBudgetSample('rootcause-over-budget.json');
     const result = checkBudget(b);
     expect(result.passed).toBe(false);
-    expect(result.violations.some(r => /R4-A.*总 tokens.*maxTotalTokensPerRound/.test(r))).toBe(true);
+    expect(result.violations.some((r) => /R4-A.*总 tokens.*maxTotalTokensPerRound/.test(r))).toBe(true);
   });
 
   it('单个 persona tokens 超限时失败', async () => {
     const b = await loadBudgetSample('rootcause-over-budget.json');
     const result = checkBudget(b);
-    expect(result.violations.some(r => /R4-A.*persona.*tokens.*maxTokensPerPersona/.test(r))).toBe(true);
+    expect(result.violations.some((r) => /R4-A.*persona.*tokens.*maxTokensPerPersona/.test(r))).toBe(true);
   });
 
   it('合规的 rootcause 预算通过校验', async () => {

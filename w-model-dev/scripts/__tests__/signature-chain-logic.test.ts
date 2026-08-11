@@ -7,7 +7,10 @@ const SAMPLES_DIR = path.join(__dirname, '..', 'samples', 'signature-chain');
 
 function loadJsonl(filename: string): SignatureChainEntry[] {
   const content = readFileSync(path.join(SAMPLES_DIR, filename), 'utf-8');
-  return content.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
+  return content
+    .split(/\r?\n/)
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l));
 }
 
 describe('[21.0.0] signature-chain-logic R1-R10', () => {

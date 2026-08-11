@@ -22,9 +22,18 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const CHECK_RUN_LOG_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-run-log.ts');
-const CHECK_ICEBERG_SWEEP_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-iceberg-sweep.ts');
-const CHECK_TLA_BDD_SYNC_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-tla-bdd-sync.ts');
-const ICEBERG_VALID_SAMPLE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/iceberg/valid-full.json');
+const CHECK_ICEBERG_SWEEP_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-iceberg-sweep.ts',
+);
+const CHECK_TLA_BDD_SYNC_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-tla-bdd-sync.ts',
+);
+const ICEBERG_VALID_SAMPLE = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../samples/iceberg/valid-full.json',
+);
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -37,9 +46,7 @@ describe('printGateReport', () => {
     });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    expect(() =>
-      printGateReport('MATURITY', { type: 'maturity', passed: true, violations: [] }, 0),
-    ).toThrow('exit:0');
+    expect(() => printGateReport('MATURITY', { type: 'maturity', passed: true, violations: [] }, 0)).toThrow('exit:0');
 
     expect(logSpy).toHaveBeenCalledTimes(2);
     expect(logSpy).toHaveBeenNthCalledWith(1, '─'.repeat(60));
@@ -94,13 +101,16 @@ describe('printJsonReport（B4 --json 机器可读报告）', () => {
     const exitSpy = vi.spyOn(process, 'exit');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    printJsonReport({
-      type: 'run-log',
-      passed: false,
-      reasons: ['r1', 'r2'],
-      violations: [{ rule: 'violation', count: 2 }],
-      durationMs: 42,
-    }, 1);
+    printJsonReport(
+      {
+        type: 'run-log',
+        passed: false,
+        reasons: ['r1', 'r2'],
+        violations: [{ rule: 'violation', count: 2 }],
+        durationMs: 42,
+      },
+      1,
+    );
 
     expect(logSpy).toHaveBeenCalledTimes(1);
     const line = logSpy.mock.calls[0]![0] as string;
@@ -108,14 +118,16 @@ describe('printJsonReport（B4 --json 机器可读报告）', () => {
     expect(line).not.toContain('─');
     expect(line).not.toContain('═');
     expect(line).not.toContain('_JSON');
-    expect(line).toBe(JSON.stringify({
-      type: 'run-log',
-      passed: false,
-      reasons: ['r1', 'r2'],
-      violations: [{ rule: 'violation', count: 2 }],
-      durationMs: 42,
-      exitCode: 1,
-    }));
+    expect(line).toBe(
+      JSON.stringify({
+        type: 'run-log',
+        passed: false,
+        reasons: ['r1', 'r2'],
+        violations: [{ rule: 'violation', count: 2 }],
+        durationMs: 42,
+        exitCode: 1,
+      }),
+    );
     // exitCode 由调用方处理：printJsonReport 自身不退出
     expect(exitSpy).not.toHaveBeenCalled();
   });
@@ -238,7 +250,9 @@ describe('check-tla-bdd-sync.ts --json（B4 子进程冒烟：纯 JSON、violati
       const featureFile = path.join(tmpDir, 'model.feature');
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
       await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
-      const r = spawnSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], { encoding: 'utf-8' });
+      const r = spawnSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {
+        encoding: 'utf-8',
+      });
       expect(r.status).toBe(0);
       const stdout = r.stdout ?? '';
       expect(stdout).not.toContain('═');
@@ -268,7 +282,9 @@ describe('check-tla-bdd-sync.ts --json（B4 子进程冒烟：纯 JSON、violati
       const featureFile = path.join(tmpDir, 'model.feature');
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
       await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
-      const r = spawnSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], { encoding: 'utf-8' });
+      const r = spawnSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], {
+        encoding: 'utf-8',
+      });
       expect(r.status).toBe(0);
       expect(r.stdout ?? '').toContain('TLA_BDD_SYNC_JSON ');
     } finally {
@@ -279,7 +295,9 @@ describe('check-tla-bdd-sync.ts --json（B4 子进程冒烟：纯 JSON、violati
 
 describe('check-iceberg-sweep.ts --json（B4 子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {
   it('--json 有效样本 → stdout 为单行纯 JSON（passed=true，exitCode=0），不输出 ICEBERG_JSON 前缀', async () => {
-    const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE], { encoding: 'utf-8' });
+    const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE], {
+      encoding: 'utf-8',
+    });
     expect(r.status).toBe(0);
     const stdout = r.stdout ?? '';
     expect(stdout).not.toContain('═');
@@ -300,7 +318,9 @@ describe('check-iceberg-sweep.ts --json（B4 子进程冒烟：纯 JSON、默认
   });
 
   it('默认路径（不带 --json）保留 ICEBERG_JSON 前缀', async () => {
-    const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], { encoding: 'utf-8' });
+    const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], {
+      encoding: 'utf-8',
+    });
     expect(r.status).toBe(0);
     expect(r.stdout ?? '').toContain('ICEBERG_JSON ');
   });

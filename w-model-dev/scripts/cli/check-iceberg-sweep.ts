@@ -148,9 +148,9 @@ async function main(): Promise<void> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
-  const reportPathArg = args.find(a => !a.startsWith('--'));
+  const reportPathArg = args.find((a) => !a.startsWith('--'));
   const autoTrigger = args.includes('--auto-trigger');
-  const runLogArg = args.find(a => a.startsWith('--run-log='));
+  const runLogArg = args.find((a) => a.startsWith('--run-log='));
 
   if (!reportPathArg) {
     exitWithError({
@@ -204,13 +204,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'iceberg-sweep',
-      passed,
-      reasons,
-      violations: buildViolationDistribution(reasons.length),
-      durationMs: Date.now() - startTime,
-    }, output.exitCode);
+    printJsonReport(
+      {
+        type: 'iceberg-sweep',
+        passed,
+        reasons,
+        violations: buildViolationDistribution(reasons.length),
+        durationMs: Date.now() - startTime,
+      },
+      output.exitCode,
+    );
     process.exitCode = output.exitCode;
     return;
   }
@@ -222,10 +225,7 @@ async function main(): Promise<void> {
   try {
     await fs.mkdir(gateLogsDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    await fs.writeFile(
-      path.resolve(gateLogsDir, `${timestamp}-iceberg-sweep.json`),
-      JSON.stringify(output, null, 2),
-    );
+    await fs.writeFile(path.resolve(gateLogsDir, `${timestamp}-iceberg-sweep.json`), JSON.stringify(output, null, 2));
   } catch {
     // gate-logs 写入失败不阻塞
   }
@@ -233,7 +233,7 @@ async function main(): Promise<void> {
   process.exit(output.exitCode);
 }
 
-main().catch(err => {
+main().catch((err) => {
   exitWithError({
     category: 'UNEXPECTED',
     message: '脚本异常',

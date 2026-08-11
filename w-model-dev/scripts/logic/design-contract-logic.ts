@@ -64,10 +64,7 @@ export interface UatPathMappingParseResult {
  * 返回 rows 保留原始 cells，字段映射由调用方按各自消费语义完成。
  * 纯字符串处理，不读文件（*-logic.ts 纯逻辑层约束）。
  */
-export function parseUatPathMappingContent(
-  content: string,
-  opts?: { strict?: boolean },
-): UatPathMappingParseResult {
+export function parseUatPathMappingContent(content: string, opts?: { strict?: boolean }): UatPathMappingParseResult {
   const strict = opts?.strict ?? false;
   const rows: UatPathMappingParseRow[] = [];
   const violations: string[] = [];
@@ -184,7 +181,10 @@ export function checkDesignContractConsistency(
   // - 具体请求实例（如 "GET /api/articles/art-nonexist（404 兜底）"）按路由参数模板段级匹配（/api/articles/:id 命中）；
   // - "不适用（...）" 行与 "横切" 同语义豁免（无 HTTP 路由断言）。
   function stripBrackets(p: string): string {
-    return p.replace(/（[^）]*）/g, '').replace(/\([^)]*\)/g, '').trim();
+    return p
+      .replace(/（[^）]*）/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .trim();
   }
   function normalizeActualPathVariants(raw: string): string[] {
     return raw
@@ -205,9 +205,7 @@ export function checkDesignContractConsistency(
     return true;
   }
   function isDefinedRoute(p: string): boolean {
-    return data.routeDefinitions.some(
-      (route) => route.path === p || pathTemplateMatches(route.path, p),
-    );
+    return data.routeDefinitions.some((route) => route.path === p || pathTemplateMatches(route.path, p));
   }
 
   for (const mapping of data.uatPathMappings) {
@@ -240,9 +238,7 @@ export function checkDesignContractConsistency(
 
   function findRoute(method: string, path: string): RouteDefinition | undefined {
     const np = normalizePath(path);
-    return data.routeDefinitions.find(
-      (r) => r.method === method && normalizePath(r.path) === np,
-    );
+    return data.routeDefinitions.find((r) => r.method === method && normalizePath(r.path) === np);
   }
 
   // D2 参数一致性：验收测试使用的参数名须与路由定义一致

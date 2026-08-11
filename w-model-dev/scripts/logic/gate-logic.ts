@@ -41,9 +41,9 @@ export interface ArtifactGateResult {
   coveragePercent: number;
   missingItems: Array<{ requirementId: string; fields: string[] }>;
   unitCoveragePercent: number;
-  codegraphQueriesValid?: boolean;   // check-codegraph-queries.ts exitCode=0（phase 5-8）
-  opsxArtifactsValid?: boolean;      // check-opsx-artifacts.ts exitCode=0（phase 5-8）
-  openspecArchived?: boolean;        // check-openspec-archive.ts exitCode=0（phase 5-8 门通过后）
+  codegraphQueriesValid?: boolean; // check-codegraph-queries.ts exitCode=0（phase 5-8）
+  opsxArtifactsValid?: boolean; // check-opsx-artifacts.ts exitCode=0（phase 5-8）
+  openspecArchived?: boolean; // check-openspec-archive.ts exitCode=0（phase 5-8 门通过后）
 }
 
 // RTM 追溯字段单点事实源已收敛至 lib/constants.ts（RTM_FIELDS），此处仅保持名称与类型不变
@@ -120,13 +120,10 @@ export interface CheckArtifactGateOptions {
  * 校验：每个 SD 节点须有至少一个 codeModule 映射。
  * 映射判定：SD id 去 "SD-" 前缀，按 -/_/. 拆段（长度 >= 2），任一段在 codeModule 路径中出现。
  */
-function checkSdToCodeModuleMapping(
-  graph: GateGraph,
-  rows: RTMRowShape[],
-): string[] {
+function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): string[] {
   const violations: string[] = [];
   if (!graph || !Array.isArray(graph.nodes)) return violations;
-  const sdNodes = graph.nodes.filter(n => n && n.type === 'SD');
+  const sdNodes = graph.nodes.filter((n) => n && n.type === 'SD');
   if (sdNodes.length === 0) return violations;
 
   const codeModules: string[] = [];
@@ -141,8 +138,8 @@ function checkSdToCodeModuleMapping(
     const stripped = id.replace(/^SD-/, '');
     const segments = stripped
       .split(/[-_.]+/)
-      .map(s => s.toLowerCase())
-      .filter(s => s.length >= 2);
+      .map((s) => s.toLowerCase())
+      .filter((s) => s.length >= 2);
     if (id !== '' && segments.length === 0 && codeModules.some((m: string) => m.includes(`${id}:`))) {
       continue; // 数字层级 id（如 SD-5.2.1）命中 codeModule 前缀映射
     }
@@ -150,9 +147,9 @@ function checkSdToCodeModuleMapping(
       violations.push(`TLA+ 资产校验失败：SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`);
       continue;
     }
-    const matched = codeModules.some(cm => {
+    const matched = codeModules.some((cm) => {
       const cmLower = cm.toLowerCase();
-      return segments.some(seg => cmLower.includes(seg));
+      return segments.some((seg) => cmLower.includes(seg));
     });
     if (!matched) {
       violations.push(
@@ -239,7 +236,11 @@ export interface RequirementSpecStructureViolations {
 }
 
 /** 第 37 轮：真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
-const nodeFsAdapter: { readFileSync(p: string): string; existsSync(p: string): boolean; readdirSync(p: string): string[] } = {
+const nodeFsAdapter: {
+  readFileSync(p: string): string;
+  existsSync(p: string): boolean;
+  readdirSync(p: string): string[];
+} = {
   readFileSync: (p: string) => nodeFs.readFileSync(p, 'utf-8'),
   existsSync: (p: string) => nodeFs.existsSync(p),
   readdirSync: (p: string) => nodeFs.readdirSync(p),
@@ -297,7 +298,14 @@ export function checkRequirementSpecStructure(
 const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> = {
   1: {
     mainSuffix: 'requirement-spec.md',
-    refs: ['system-context.md', 'glossary.md', 'traceability-matrix.md', 'behavior-spec.md', 'discipline-dod.md', 'uml-modeling.md'],
+    refs: [
+      'system-context.md',
+      'glossary.md',
+      'traceability-matrix.md',
+      'behavior-spec.md',
+      'discipline-dod.md',
+      'uml-modeling.md',
+    ],
   },
   2: {
     mainSuffix: '-system-design.md',
@@ -334,7 +342,7 @@ export function checkPhaseSpecStructure(
   if (phase === 1) {
     mainPath = path.join(specDir, layout.mainSuffix);
   } else {
-    const mains = fs.readdirSync(specDir).filter(f => f.endsWith(layout.mainSuffix));
+    const mains = fs.readdirSync(specDir).filter((f) => f.endsWith(layout.mainSuffix));
     if (mains.length !== 1) {
       v.refs.push(`structure: 主文档 glob *${layout.mainSuffix} 匹配 ${mains.length} 个（须恰 1 个）`);
       return v;
@@ -416,7 +424,11 @@ export function checkArtifactGate(
   let specStructureViolations: RequirementSpecStructureViolations | undefined;
   if ((phase === 1 || phase === 2 || phase === 3 || phase === 4) && options?.specDir) {
     specStructureViolations = checkPhaseSpecStructure(phase, options.specDir, nodeFsAdapter);
-    for (const m of [...specStructureViolations.refs, ...specStructureViolations.ssot, ...specStructureViolations.dod]) {
+    for (const m of [
+      ...specStructureViolations.refs,
+      ...specStructureViolations.ssot,
+      ...specStructureViolations.dod,
+    ]) {
       reasons.push(m);
     }
   }
@@ -458,15 +470,14 @@ export function checkArtifactGate(
     ids.add(row.requirementId);
     // P1.2 横切治理：NFR/CON 行只校验 designDoc（phase<5）或 designDoc+codeModule（phase>=5），
     // 不强制要求 test 字段（横切测试通过 REQ 行的测试用例覆盖）
-    const isCrossCutting =
-      row.requirementId.startsWith('NFR') || row.requirementId.startsWith('CON');
+    const isCrossCutting = row.requirementId.startsWith('NFR') || row.requirementId.startsWith('CON');
     const fieldsToCheck = isCrossCutting
       ? phase >= 5
         ? (['description', 'designDoc', 'codeModule'] as const)
         : (['description', 'designDoc'] as const)
       : phaseFields;
     const missing = fieldsToCheck.filter(
-      field => typeof row[field] !== 'string' || (row[field] as string).trim() === '',
+      (field) => typeof row[field] !== 'string' || (row[field] as string).trim() === '',
     );
     if (missing.length > 0) missingItems.push({ requirementId: row.requirementId, fields: missing });
   }
@@ -488,10 +499,8 @@ export function checkArtifactGate(
   // 约束 #18：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
   //   "100%" → 该行所需 RTM 字段齐全；"部分" → 该行存在追溯缺失；"待覆盖" → 违反
   //   （"完整" 等历史兼容值与非标准值不参与一致性判定，由 missingItems 覆盖检查兜底）
-  const missingReqIds = new Set(missingItems.map(item => item.requirementId));
-  const missingFieldsByReqId = new Map<string, string[]>(
-    missingItems.map(item => [item.requirementId, item.fields]),
-  );
+  const missingReqIds = new Set(missingItems.map((item) => item.requirementId));
+  const missingFieldsByReqId = new Map<string, string[]>(missingItems.map((item) => [item.requirementId, item.fields]));
   for (const row of matrix.rows) {
     if (!row || typeof row.coverageStatus !== 'string') continue;
     const status = row.coverageStatus.trim();
@@ -518,9 +527,12 @@ export function checkArtifactGate(
     if (!row || typeof row.requirementId !== 'string') continue;
     if (!row.requirementId.startsWith('NFR')) continue;
     const hasTarget = 'targetValue' in row && typeof row.targetValue === 'string' && row.targetValue.trim() !== '';
-    const hasThreshold = 'testThreshold' in row && typeof row.testThreshold === 'string' && row.testThreshold.trim() !== '';
+    const hasThreshold =
+      'testThreshold' in row && typeof row.testThreshold === 'string' && row.testThreshold.trim() !== '';
     if (!hasTarget && !hasThreshold) {
-      reasons.push(`NFR 行 ${row.requirementId} 缺 targetValue 与 testThreshold 双字段（性能基线须区分生产目标值与测试环境基线）`);
+      reasons.push(
+        `NFR 行 ${row.requirementId} 缺 targetValue 与 testThreshold 双字段（性能基线须区分生产目标值与测试环境基线）`,
+      );
     }
   }
 
@@ -540,7 +552,12 @@ export function checkArtifactGate(
     if (summary.total === 0) reasons.push(`${name}: 无用例`);
     if (summary.failed > 0) reasons.push(`${name}: ${summary.failed} 个失败`);
     if (summary.pending > 0) reasons.push(`${name}: ${summary.pending} 个待执行`);
-    if (typeof summary.coverage !== 'number' || !Number.isFinite(summary.coverage) || summary.coverage < 0 || summary.coverage > 100) {
+    if (
+      typeof summary.coverage !== 'number' ||
+      !Number.isFinite(summary.coverage) ||
+      summary.coverage < 0 ||
+      summary.coverage > 100
+    ) {
       reasons.push(`${name}: coverage 必须为 [0,100] 范围内的有限数字`);
     }
     if (name === '单元测试' && typeof summary.coverage === 'number' && Number.isFinite(summary.coverage)) {

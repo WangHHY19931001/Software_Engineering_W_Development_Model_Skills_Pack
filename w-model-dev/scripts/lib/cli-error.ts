@@ -10,12 +10,7 @@
 
 /** 错误类别（exit 1 校验失败走 violations + XXX_JSON，不使用本表） */
 export type ErrorCategory =
-  | 'ARG_INVALID'
-  | 'FILE_NOT_FOUND'
-  | 'FILE_PARSE'
-  | 'FILE_READ'
-  | 'STRUCTURE_INVALID'
-  | 'UNEXPECTED';
+  'ARG_INVALID' | 'FILE_NOT_FOUND' | 'FILE_PARSE' | 'FILE_READ' | 'STRUCTURE_INVALID' | 'UNEXPECTED';
 
 export interface CliError {
   category: ErrorCategory;

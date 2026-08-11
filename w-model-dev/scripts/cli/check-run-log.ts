@@ -52,13 +52,11 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const runLogFile = args.find(a => !a.startsWith('--'));
-  const gateLogsArg = args.find(a => a.startsWith('--gate-logs='));
-  const tlaManifestArg = args.find(a => a.startsWith('--tla-manifest='));
+  const runLogFile = args.find((a) => !a.startsWith('--'));
+  const gateLogsArg = args.find((a) => a.startsWith('--gate-logs='));
+  const tlaManifestArg = args.find((a) => a.startsWith('--tla-manifest='));
   const gateLogsDir = gateLogsArg ? gateLogsArg.slice('--gate-logs='.length) : undefined;
-  const tlaManifestFile = tlaManifestArg
-    ? tlaManifestArg.slice('--tla-manifest='.length)
-    : undefined;
+  const tlaManifestFile = tlaManifestArg ? tlaManifestArg.slice('--tla-manifest='.length) : undefined;
   return { runLogFile, gateLogsDir, tlaManifestFile };
 }
 
@@ -76,18 +74,14 @@ interface GateLogsResult {
   fileCount: number;
 }
 
-async function loadGateLogs(
-  gateLogsDir: string,
-): Promise<GateLogsResult | undefined> {
+async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult | undefined> {
   const dirAbs = path.resolve(gateLogsDir);
   let files: string[];
   try {
     files = await fs.readdir(dirAbs);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    console.error(
-      `⚠ gate-logs 目录读取失败，跳过 R5/R6 交叉校验: ${dirAbs}（${e.code ?? e.message}）`,
-    );
+    console.error(`⚠ gate-logs 目录读取失败，跳过 R5/R6 交叉校验: ${dirAbs}（${e.code ?? e.message}）`);
     return undefined;
   }
 
@@ -106,9 +100,7 @@ async function loadGateLogs(
       }
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(
-        `⚠ gate-log 文件读取失败，已跳过: ${fileAbs}（${e.code ?? e.message}）`,
-      );
+      console.error(`⚠ gate-log 文件读取失败，已跳过: ${fileAbs}（${e.code ?? e.message}）`);
     }
   }
   return { map, fileCount };
@@ -129,15 +121,11 @@ async function loadTlaCheckRounds(tlaManifestFile: string): Promise<number | und
     if (Array.isArray(parsed.checkRounds)) {
       return parsed.checkRounds.length;
     }
-    console.error(
-      `⚠ tla-manifest 未含有效 checkRounds 数组，跳过 R3 返工一致性校验: ${abs}`,
-    );
+    console.error(`⚠ tla-manifest 未含有效 checkRounds 数组，跳过 R3 返工一致性校验: ${abs}`);
     return undefined;
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    console.error(
-      `⚠ tla-manifest 文件读取失败，跳过 R3 返工一致性校验: ${abs}（${e.code ?? e.message}）`,
-    );
+    console.error(`⚠ tla-manifest 文件读取失败，跳过 R3 返工一致性校验: ${abs}（${e.code ?? e.message}）`);
     return undefined;
   }
 }
@@ -155,7 +143,8 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <run-log.jsonl>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
       exitCode: 2,
     });
     return;
@@ -189,13 +178,16 @@ async function main(): Promise<void> {
 
   // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport({
-      type: 'run-log',
-      passed: result.passed,
-      reasons: result.violations,
-      violations: buildViolationDistribution(result.violations.length),
-      durationMs: Date.now() - startTime,
-    }, exitCode);
+    printJsonReport(
+      {
+        type: 'run-log',
+        passed: result.passed,
+        reasons: result.violations,
+        violations: buildViolationDistribution(result.violations.length),
+        durationMs: Date.now() - startTime,
+      },
+      exitCode,
+    );
     process.exitCode = exitCode;
     return;
   }
@@ -207,28 +199,38 @@ async function main(): Promise<void> {
   console.log(`输入文件        : ${runLogAbs}`);
   console.log(`条目数          : ${entries.length}`);
   console.log(`--gate-logs     : ${gateLogsDir ?? '未提供'}${gateLogs ? `（已加载 ${gateLogFileCount} 个文件）` : ''}`);
-  console.log(`--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`);
+  console.log(
+    `--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`,
+  );
   console.log(`校验结果        : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
   if (result.passed) {
-    console.log('运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。');
+    console.log(
+      '运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。',
+    );
   } else {
     console.log('未通过原因：');
     for (const r of result.violations) {
       console.log(`  - ${r}`);
     }
     console.log('');
-    console.log('O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）');
+    console.log(
+      'O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）',
+    );
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
-  printGateReport('RUN_LOG', {
-    type: 'run-log',
-    passed: result.passed,
-    violations: result.violations,
-  }, exitCode);
+  printGateReport(
+    'RUN_LOG',
+    {
+      type: 'run-log',
+      passed: result.passed,
+      violations: result.violations,
+    },
+    exitCode,
+  );
 }
 
 main().catch((err) => {

@@ -25,7 +25,12 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { computeMetrics, type BudgetLike, type MetricsReport, type RunLogEntryLike } from '../logic/metrics-report-logic.js';
+import {
+  computeMetrics,
+  type BudgetLike,
+  type MetricsReport,
+  type RunLogEntryLike,
+} from '../logic/metrics-report-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -78,12 +83,16 @@ function printHuman(r: MetricsReport, runLogFile: string): void {
   console.log(`角色分布      : ${fmtRecord(r.byRole)}`);
   console.log(`结果分布      : ${fmtRecord(r.byOutcome)}`);
   console.log(`门禁通过率    : ${r.gate.passed}/${r.gate.total}（${pct(r.gate.passRate)}）`);
-  console.log(`返工连续段    : 最长 ${r.rework.maxConsecutiveRuns} 次${r.rework.exceedsKillSwitch ? '（⚠ 触发 killSwitch）' : ''}`);
+  console.log(
+    `返工连续段    : 最长 ${r.rework.maxConsecutiveRuns} 次${r.rework.exceedsKillSwitch ? '（⚠ 触发 killSwitch）' : ''}`,
+  );
   if (r.budget) {
     console.log('预算          :');
     console.log(`  总消耗 ${r.budget.totalTokens} / 上限 ${r.budget.maxTokensTotal}（${pct(r.budget.totalBurnRate)}）`);
     for (const b of r.budget.byPhase) {
-      console.log(`  阶段 ${b.phase}: ${b.tokens} / ${b.maxTokens}（${pct(b.burnRate)}）${b.exceeded ? ' ⚠ 超限' : ''}`);
+      console.log(
+        `  阶段 ${b.phase}: ${b.tokens} / ${b.maxTokens}（${pct(b.burnRate)}）${b.exceeded ? ' ⚠ 超限' : ''}`,
+      );
     }
     console.log(`  onExceed=${r.budget.onExceed}${r.budget.killSwitchTriggered ? ' · ⚠ killSwitch 触发' : ''}`);
   } else {
