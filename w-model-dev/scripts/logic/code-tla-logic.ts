@@ -637,7 +637,10 @@ export function checkCodeTlaConsistency(
   const sdToCodeModule = checkSdToCodeModule(input.graph, input.rtm);
   for (const v of sdToCodeModule.violations) {
     violations.push({ dimension: 'sdToCodeModule', message: v });
-    structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: 'dimensions.sdToCodeModule', message: v });
+  }
+  // A2b：直接透传子维度结构化违规（保留 graph.nodes[3].id 等细粒度 field），不再字符串重新派生粗粒度 field
+  if (sdToCodeModule.structuredViolations && sdToCodeModule.structuredViolations.length > 0) {
+    structuredViolations.push(...sdToCodeModule.structuredViolations);
   }
 
   // 维度2：代码状态转移抽取
@@ -652,7 +655,10 @@ export function checkCodeTlaConsistency(
   const codeStateTransfer = checkCodeStateTransfer(codeFilesWithExtract);
   for (const v of codeStateTransfer.violations) {
     violations.push({ dimension: 'codeStateTransfer', message: v });
-    structuredViolations.push({ rule: CODE_TLA_RULES.D2, field: 'dimensions.codeStateTransfer', message: v });
+  }
+  // A2b：直接透传子维度结构化违规（保留 codeFiles[*].assignments 等细粒度 field）
+  if (codeStateTransfer.structuredViolations && codeStateTransfer.structuredViolations.length > 0) {
+    structuredViolations.push(...codeStateTransfer.structuredViolations);
   }
 
   // 维度3/4：从 manifest.specs[].tlaContent 读取 .tla 文件内容
@@ -667,6 +673,7 @@ export function checkCodeTlaConsistency(
   // 维度3：Next 分支对应
   let nextPassed = true;
   const nextViolations: string[] = [];
+  const nextStructuredViolations: StructuredViolation[] = [];
   let nextChecked = 0;
   if (tlaSpecs.length === 0) {
     // 无 spec 的 tlaContent → 跳过（视为通过）
@@ -679,6 +686,12 @@ export function checkCodeTlaConsistency(
         for (const v of r.violations) {
           nextViolations.push(`规格 ${spec.id}: ${v}`);
         }
+        // A2b：透传子维度结构化违规，message 保留「规格 ${spec.id}:」前缀（与 violations 文本一致），field 保持细粒度
+        for (const sv of r.structuredViolations ?? []) {
+          const prefixed = { ...sv, message: `规格 ${spec.id}: ${sv.message}` };
+          nextStructuredViolations.push(prefixed);
+          structuredViolations.push(prefixed);
+        }
       }
     }
   }
@@ -686,15 +699,16 @@ export function checkCodeTlaConsistency(
     passed: nextPassed,
     checked: nextChecked,
     violations: nextViolations,
+    structuredViolations: nextStructuredViolations,
   };
   for (const v of nextViolations) {
     violations.push({ dimension: 'nextBranchCoverage', message: v });
-    structuredViolations.push({ rule: CODE_TLA_RULES.D3, field: 'dimensions.nextBranchCoverage', message: v });
   }
 
   // 维度4：断言覆盖不变式
   let invPassed = true;
   const invViolations: string[] = [];
+  const invStructuredViolations: StructuredViolation[] = [];
   let invChecked = 0;
   if (tlaSpecs.length === 0) {
     // 无 spec 的 tlaContent → 跳过
@@ -707,6 +721,12 @@ export function checkCodeTlaConsistency(
         for (const v of r.violations) {
           invViolations.push(`规格 ${spec.id}: ${v}`);
         }
+        // A2b：透传子维度结构化违规，message 保留「规格 ${spec.id}:」前缀，field 保持细粒度
+        for (const sv of r.structuredViolations ?? []) {
+          const prefixed = { ...sv, message: `规格 ${spec.id}: ${sv.message}` };
+          invStructuredViolations.push(prefixed);
+          structuredViolations.push(prefixed);
+        }
       }
     }
   }
@@ -714,10 +734,10 @@ export function checkCodeTlaConsistency(
     passed: invPassed,
     checked: invChecked,
     violations: invViolations,
+    structuredViolations: invStructuredViolations,
   };
   for (const v of invViolations) {
     violations.push({ dimension: 'invariantCoverage', message: v });
-    structuredViolations.push({ rule: CODE_TLA_RULES.D4, field: 'dimensions.invariantCoverage', message: v });
   }
 
   const passed =

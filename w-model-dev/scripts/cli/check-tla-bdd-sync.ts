@@ -63,8 +63,10 @@ async function main(): Promise<void> {
     const featureContent = await fs.readFile(featureFile, 'utf-8');
     const result = checkTlaBddSync(tlaContent, featureContent);
 
-    // A2b 双轨过渡：输出优先读 structuredViolations（message 列表），降级读 violations
-    const outReasons = result.structuredViolations?.map(v => v.message) ?? result.violations;
+    // A2b 双轨过渡：violations 字段直接透传 structuredViolations 对象数组（含 rule/field/message），
+    // 无结构化字段时降级为原对象数组（元素含 dimension/tlaName/bddName/description）。
+    // 与 check-code-tla-consistency.ts 的增强展示（[rule field] message）对称，不再拍平为字符串数组。
+    const outReasons = result.structuredViolations ?? result.violations;
 
     const output = {
       ...SYNC_JSON,
