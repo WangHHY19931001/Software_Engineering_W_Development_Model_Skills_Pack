@@ -4,6 +4,7 @@
   "private": true,
   "description": "W-Model AI Assistant Skill — 编排 + 校验脚本技能包（提示词 + 模板 + 自包含门禁脚本，不内置 LLM 调用）",
   "type": "module",
+  "workspaces": ["w-model-dev"],
   "scripts": {
     "//1 校验类": "阶段与资产门禁",
     "check:verifier": "tsx w-model-dev/scripts/cli/check-verifier-output.ts",
