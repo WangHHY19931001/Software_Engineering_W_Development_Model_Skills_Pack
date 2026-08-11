@@ -4,7 +4,7 @@
  * 对应 P3-10：TLA+ 转移/状态/不变式 与 BDD Background 状态机七要素的自动化比对。
  *
  * 设计原则（与 tla-logic.ts / bdd-logic.ts 一致）：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
+ *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块（A2b 复用 lib/types.js 的 StructuredViolation 类型除外）
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「TLA+ 与 BDD 是否同步」的判定均委托至此
  *
@@ -15,6 +15,8 @@
  *   （那是 tla-logic.ts / bdd-logic.ts 的职责）。
  */
 
+import type { StructuredViolation } from '../lib/types.js';
+
 export interface TlaBddSyncViolation {
   dimension: 'transition' | 'state' | 'invariant';
   tlaName: string;
@@ -22,9 +24,21 @@ export interface TlaBddSyncViolation {
   description: string;
 }
 
+/**
+ * A2b 双轨过渡：TLA+/BDD 同步结构化违规规则 ID。
+ * 命名：TLA_BDD_<类别>，对应 transition/state/invariant 三类比对规则。
+ */
+const TLA_BDD_RULES = {
+  TRANSITION: 'TLA_BDD_TRANSITION',
+  STATE: 'TLA_BDD_STATE',
+  INVARIANT: 'TLA_BDD_INVARIANT',
+} as const;
+
 export interface TlaBddSyncResult {
   passed: boolean;
   violations: TlaBddSyncViolation[];
+  /** A2b 双轨过渡：结构化违规（rule/field/message），可选字段向后兼容 */
+  structuredViolations?: StructuredViolation[];
   tlaTransitions: string[];
   bddTransitions: string[];
   tlaStates: string[];
@@ -235,26 +249,31 @@ export function checkTlaBddSync(tlaContent: string, featureContent: string): Tla
   const bdd = extractBddStateMachine(featureContent);
 
   const violations: TlaBddSyncViolation[] = [];
+  const structuredViolations: StructuredViolation[] = [];
 
   // 转移比对（双向严格）
   for (const t of tlaTransitions) {
     if (!bdd.transitions.includes(t)) {
+      const msg = `TLA+ 转移 "${t}" 在 BDD 中未找到对应 When 步骤`;
       violations.push({
         dimension: 'transition',
         tlaName: t,
         bddName: null,
-        description: `TLA+ 转移 "${t}" 在 BDD 中未找到对应 When 步骤`,
+        description: msg,
       });
+      structuredViolations.push({ rule: TLA_BDD_RULES.TRANSITION, field: 'tlaTransitions', message: msg });
     }
   }
   for (const b of bdd.transitions) {
     if (!tlaTransitions.includes(b)) {
+      const msg = `BDD 转移 "${b}" 在 TLA+ Next 中未找到`;
       violations.push({
         dimension: 'transition',
         tlaName: b,
         bddName: b,
-        description: `BDD 转移 "${b}" 在 TLA+ Next 中未找到`,
+        description: msg,
       });
+      structuredViolations.push({ rule: TLA_BDD_RULES.TRANSITION, field: 'bddTransitions', message: msg });
     }
   }
 
@@ -262,30 +281,35 @@ export function checkTlaBddSync(tlaContent: string, featureContent: string): Tla
   // 状态比对较宽松，只记录 TLA+ 有但 BDD 无的状态
   for (const s of tlaStates) {
     if (!bdd.states.some(bs => bs.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(bs.toLowerCase()))) {
+      const msg = `TLA+ 状态变量 "${s}" 在 BDD Given 中未找到对应`;
       violations.push({
         dimension: 'state',
         tlaName: s,
         bddName: null,
-        description: `TLA+ 状态变量 "${s}" 在 BDD Given 中未找到对应`,
+        description: msg,
       });
+      structuredViolations.push({ rule: TLA_BDD_RULES.STATE, field: 'tlaStates', message: msg });
     }
   }
 
   // 不变式比对
   for (const inv of tlaInvariants) {
     if (!bdd.invariants.some(bi => bi.toLowerCase().includes(inv.toLowerCase()) || inv.toLowerCase().includes(bi.toLowerCase()))) {
+      const msg = `TLA+ 不变式 "${inv}" 在 BDD Then 中未找到对应`;
       violations.push({
         dimension: 'invariant',
         tlaName: inv,
         bddName: null,
-        description: `TLA+ 不变式 "${inv}" 在 BDD Then 中未找到对应`,
+        description: msg,
       });
+      structuredViolations.push({ rule: TLA_BDD_RULES.INVARIANT, field: 'tlaInvariants', message: msg });
     }
   }
 
   return {
     passed: violations.length === 0,
     violations,
+    structuredViolations,
     tlaTransitions,
     bddTransitions: bdd.transitions,
     tlaStates,

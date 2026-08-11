@@ -63,11 +63,14 @@ async function main(): Promise<void> {
     const featureContent = await fs.readFile(featureFile, 'utf-8');
     const result = checkTlaBddSync(tlaContent, featureContent);
 
+    // A2b 双轨过渡：输出优先读 structuredViolations（message 列表），降级读 violations
+    const outReasons = result.structuredViolations?.map(v => v.message) ?? result.violations;
+
     const output = {
       ...SYNC_JSON,
       exitCode: result.passed ? 0 : 1,
       passed: result.passed,
-      violations: result.violations,
+      violations: outReasons,
       summary: {
         tlaTransitions: result.tlaTransitions,
         bddTransitions: result.bddTransitions,

@@ -21,10 +21,24 @@
 import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 import { validateBySchema } from './schema-loader.js';
+import type { StructuredViolation } from '../lib/types.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
 // ==================== 自包含类型形状 ====================
+
+/**
+ * A2b 双轨过渡：代码-TLA+ 一致性结构化违规规则 ID。
+ * 命名：CODE_TLA_<类别>，对应四维度判定规则；INPUT/SCHEMA 对应输入形状与 schema 前置校验。
+ */
+const CODE_TLA_RULES = {
+  D1: 'CODE_TLA_D1',
+  D2: 'CODE_TLA_D2',
+  D3: 'CODE_TLA_D3',
+  D4: 'CODE_TLA_D4',
+  INPUT: 'CODE_TLA_INPUT',
+  SCHEMA: 'CODE_TLA_SCHEMA',
+} as const;
 
 export interface TlaManifest {
   specs: TlaSpec[];
@@ -96,6 +110,8 @@ export interface DimensionResult {
   passed: boolean;
   checked: number;
   violations: string[];
+  /** A2b 双轨过渡：结构化违规（rule/field/message），可选字段向后兼容 */
+  structuredViolations?: StructuredViolation[];
 }
 
 export interface Violation {
@@ -112,6 +128,8 @@ export interface ConsistencyResult {
     invariantCoverage: DimensionResult;
   };
   violations: Violation[];
+  /** A2b 双轨过渡：结构化违规（rule/field/message），可选字段向后兼容 */
+  structuredViolations?: StructuredViolation[];
 }
 
 export interface CodeTlaConsistencyInput {
@@ -138,11 +156,22 @@ export interface CodeTlaConsistencyInput {
  */
 export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
   const violations: string[] = [];
+  const structuredViolations: StructuredViolation[] = [];
   if (!graph || !Array.isArray(graph.nodes)) {
-    return { passed: false, checked: 0, violations: ['graph.nodes 必须为数组'] };
+    return {
+      passed: false,
+      checked: 0,
+      violations: ['graph.nodes 必须为数组'],
+      structuredViolations: [{ rule: CODE_TLA_RULES.D1, field: 'graph.nodes', message: 'graph.nodes 必须为数组' }],
+    };
   }
   if (!rtm || !Array.isArray(rtm.rows)) {
-    return { passed: false, checked: 0, violations: ['rtm.rows 必须为数组'] };
+    return {
+      passed: false,
+      checked: 0,
+      violations: ['rtm.rows 必须为数组'],
+      structuredViolations: [{ rule: CODE_TLA_RULES.D1, field: 'rtm.rows', message: 'rtm.rows 必须为数组' }],
+    };
   }
 
   const sdNodes = graph.nodes.filter(n => n && n.type === 'SD');
@@ -154,7 +183,7 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
   }
 
   let checked = 0;
-  for (const sd of sdNodes) {
+  for (const [idx, sd] of sdNodes.entries()) {
     checked++;
     const id = String(sd.id ?? '');
 
@@ -171,7 +200,9 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
       .map(s => s.toLowerCase())
       .filter(s => s.length >= 2);
     if (segments.length === 0) {
-      violations.push(`SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts）`);
+      const msg = `SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts）`;
+      violations.push(msg);
+      structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: `graph.nodes[${idx}].id`, message: msg });
       continue;
     }
     const matched = codeModules.some(cm => {
@@ -180,9 +211,9 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
     });
     if (!matched) {
       // P1.4：错误信息须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）与格式
-      violations.push(
-        `SD 节点 ${id} 无对应 codeModule（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts；期望路径包含以下任一段: ${segments.join(', ')}）`,
-      );
+      const msg = `SD 节点 ${id} 无对应 codeModule（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts；期望路径包含以下任一段: ${segments.join(', ')}）`;
+      violations.push(msg);
+      structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: `graph.nodes[${idx}].id`, message: msg });
     }
   }
 
@@ -190,6 +221,7 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
     passed: violations.length === 0,
     checked,
     violations,
+    structuredViolations,
   };
 }
 
@@ -272,8 +304,14 @@ export function extractCodeStateTransfers(
  */
 export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
   const violations: string[] = [];
+  const structuredViolations: StructuredViolation[] = [];
   if (!Array.isArray(files) || files.length === 0) {
-    return { passed: false, checked: 0, violations: ['codeFiles 为空，无代码状态转移可校验'] };
+    return {
+      passed: false,
+      checked: 0,
+      violations: ['codeFiles 为空，无代码状态转移可校验'],
+      structuredViolations: [{ rule: CODE_TLA_RULES.D2, field: 'codeFiles', message: 'codeFiles 为空，无代码状态转移可校验' }],
+    };
   }
 
   let totalAssignments = 0;
@@ -282,13 +320,16 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
   }
 
   if (totalAssignments === 0) {
-    violations.push('代码中未抽取到任何赋值语句（BinaryExpression + =），无法与 TLA+ Next 状态转移对应');
+    const msg = '代码中未抽取到任何赋值语句（BinaryExpression + =），无法与 TLA+ Next 状态转移对应';
+    violations.push(msg);
+    structuredViolations.push({ rule: CODE_TLA_RULES.D2, field: 'codeFiles[*].assignments', message: msg });
   }
 
   return {
     passed: violations.length === 0,
     checked: totalAssignments,
     violations,
+    structuredViolations,
   };
 }
 
@@ -396,10 +437,11 @@ export function checkNextBranchCoverage(
   files: CodeFile[],
 ): DimensionResult {
   const violations: string[] = [];
+  const structuredViolations: StructuredViolation[] = [];
   const actions = extractNextActions(tlaContent);
   if (actions.length === 0) {
     // 无 Next 定义时跳过（无可校验项）
-    return { passed: true, checked: 0, violations: [] };
+    return { passed: true, checked: 0, violations: [], structuredViolations };
   }
 
   const codeFunctionNames = extractCodeFunctionNames(files);
@@ -423,9 +465,9 @@ export function checkNextBranchCoverage(
     if (matched) {
       covered++;
     } else {
-      violations.push(
-        `TLA+ Next 分支 "${action}" 在代码中无对应函数/方法实现（驼峰名 "${camel}"）`,
-      );
+      const msg = `TLA+ Next 分支 "${action}" 在代码中无对应函数/方法实现（驼峰名 "${camel}"）`;
+      violations.push(msg);
+      structuredViolations.push({ rule: CODE_TLA_RULES.D3, field: 'tlaContent', message: msg });
     }
   }
 
@@ -433,6 +475,7 @@ export function checkNextBranchCoverage(
     passed: violations.length === 0,
     checked: actions.length,
     violations,
+    structuredViolations,
   };
 }
 
@@ -492,7 +535,7 @@ export function checkInvariantCoverage(
   const invariants = extractBusinessInvariants(tlaContent);
   if (invariants.length === 0) {
     // 无 BusinessInvariant/Invariants 定义时跳过
-    return { passed: true, checked: 0, violations: [] };
+    return { passed: true, checked: 0, violations: [], structuredViolations: [] };
   }
 
   // 统计代码中的断言数
@@ -504,16 +547,18 @@ export function checkInvariantCoverage(
   }
 
   const violations: string[] = [];
+  const structuredViolations: StructuredViolation[] = [];
   if (totalAssertions === 0) {
-    violations.push(
-      `代码中未抽取到任何断言（assert/invariant/require），无法覆盖 TLA+ BusinessInvariant 的 ${invariants.length} 个子不变式`,
-    );
+    const msg = `代码中未抽取到任何断言（assert/invariant/require），无法覆盖 TLA+ BusinessInvariant 的 ${invariants.length} 个子不变式`;
+    violations.push(msg);
+    structuredViolations.push({ rule: CODE_TLA_RULES.D4, field: 'codeFiles[*].assertions', message: msg });
   }
 
   return {
     passed: violations.length === 0,
     checked: invariants.length,
     violations,
+    structuredViolations,
   };
 }
 
@@ -538,6 +583,7 @@ export function checkCodeTlaConsistency(
   input: CodeTlaConsistencyInput,
 ): ConsistencyResult {
   const violations: Violation[] = [];
+  const structuredViolations: StructuredViolation[] = [];
 
   if (!input || typeof input !== 'object') {
     return {
@@ -549,6 +595,7 @@ export function checkCodeTlaConsistency(
         invariantCoverage: { passed: false, checked: 0, violations: [] },
       },
       violations: [{ dimension: 'input', message: 'input 必须为对象' }],
+      structuredViolations: [{ rule: CODE_TLA_RULES.INPUT, field: 'input', message: 'input 必须为对象' }],
     };
   }
 
@@ -578,6 +625,11 @@ export function checkCodeTlaConsistency(
         invariantCoverage: { passed: false, checked: 0, violations: [] },
       },
       violations: schemaViolations,
+      structuredViolations: schemaViolations.map(v => ({
+        rule: CODE_TLA_RULES.SCHEMA,
+        field: 'manifest/graph/rtm',
+        message: v.message,
+      })),
     };
   }
 
@@ -585,6 +637,7 @@ export function checkCodeTlaConsistency(
   const sdToCodeModule = checkSdToCodeModule(input.graph, input.rtm);
   for (const v of sdToCodeModule.violations) {
     violations.push({ dimension: 'sdToCodeModule', message: v });
+    structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: 'dimensions.sdToCodeModule', message: v });
   }
 
   // 维度2：代码状态转移抽取
@@ -599,6 +652,7 @@ export function checkCodeTlaConsistency(
   const codeStateTransfer = checkCodeStateTransfer(codeFilesWithExtract);
   for (const v of codeStateTransfer.violations) {
     violations.push({ dimension: 'codeStateTransfer', message: v });
+    structuredViolations.push({ rule: CODE_TLA_RULES.D2, field: 'dimensions.codeStateTransfer', message: v });
   }
 
   // 维度3/4：从 manifest.specs[].tlaContent 读取 .tla 文件内容
@@ -635,6 +689,7 @@ export function checkCodeTlaConsistency(
   };
   for (const v of nextViolations) {
     violations.push({ dimension: 'nextBranchCoverage', message: v });
+    structuredViolations.push({ rule: CODE_TLA_RULES.D3, field: 'dimensions.nextBranchCoverage', message: v });
   }
 
   // 维度4：断言覆盖不变式
@@ -662,6 +717,7 @@ export function checkCodeTlaConsistency(
   };
   for (const v of invViolations) {
     violations.push({ dimension: 'invariantCoverage', message: v });
+    structuredViolations.push({ rule: CODE_TLA_RULES.D4, field: 'dimensions.invariantCoverage', message: v });
   }
 
   const passed =
@@ -679,5 +735,6 @@ export function checkCodeTlaConsistency(
       invariantCoverage,
     },
     violations,
+    structuredViolations,
   };
 }

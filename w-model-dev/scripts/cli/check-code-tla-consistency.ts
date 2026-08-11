@@ -220,8 +220,16 @@ async function main(): Promise<void> {
 
   if (!result.passed) {
     console.log('未通过原因：');
-    for (const v of result.violations) {
-      console.log(`  - [${v.dimension}] ${v.message}`);
+    // A2b 双轨过渡：优先读 structuredViolations（含 rule/field 增强展示），降级读 violations
+    if (result.structuredViolations && result.structuredViolations.length > 0) {
+      for (const v of result.structuredViolations) {
+        const loc = v.field ? ` ${v.field}` : '';
+        console.log(`  - [${v.rule}${loc}] ${v.message}`);
+      }
+    } else {
+      for (const v of result.violations) {
+        console.log(`  - [${v.dimension}] ${v.message}`);
+      }
     }
     console.log('');
     console.log('S 子代理须按上述原因修正（补充 codeModule 映射 / 实现 Next 分支 / 添加断言覆盖不变式）');
