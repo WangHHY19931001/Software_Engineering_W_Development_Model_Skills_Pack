@@ -372,7 +372,10 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 
 ## 相关文档
 
+> `eval/` 目录为外部工具评估产物，**不属技能包**，不参与 `/wm` 编排，修改技能包时无需关注。
+
 - [设计文档（SSoT）](./docs/skill-design-document_SSoT.md) - 单一事实来源
+- [旧版设计文档（指针）](./docs/skill-design-document.md) - 已废弃独立维护，指向 SSoT
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
@@ -394,6 +397,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - [信息流校验设计](./docs/information-flow-validation-design.md) - 黑洞/奇迹/死模块门禁 + EXT-IN/EXT-OUT 边界节点
 - [TLA+ 层次化建模设计](./docs/tla-plus-modeling-design.md) - L1–L6 层级模型 + 文件头规范 + SANY/TLC 门禁
 - [LLM Verifier 集成设计](./docs/llm-verifier-integration-design.md) - 指针文档
+- [Loop 工程采用设计](./docs/loop-engineering-adoption-design.md) - 运维层与成熟度阶梯采纳设计增量
 - [AI Agent 安装指南](./docs/INSTALL.md)
 - [Agent 仓库导航](./AGENTS.md) - 面向 AI Agent 的最小事实集
 - [变更日志](./CHANGELOG.md)

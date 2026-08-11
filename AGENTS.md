@@ -19,6 +19,7 @@
 - **阶段设计级产物**（第 37-38 轮）：阶段 1-4 产出升级为主模板 + 6 独立子模板（system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），主文档引用块串联；`check-requirement-graph.ts` 新增 R7-R14 结构校验 + `check-artifact-gate.ts --phase=N` 引用块/SSOT/DoD 校验。详见 SSoT §3.4.35-38。
 - **冰山扫掠深度分析机制**（R-iceberg）：S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索主动深挖隐藏问题，直到 `newFindings=[]` 或达 maxIcebergRounds=5。反模式 #44。详见 SSoT §3.4.34 与 `references/iceberg-sweep-guide.md`。
 - **错误结构全量归一化**：全仓 30 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 SSoT §3.4.30。
+- **`eval/` 边界**：`eval/` 目录为外部工具评估产物，**不属技能包**，不参与 `/wm` 编排，修改技能包时无需关注。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 
