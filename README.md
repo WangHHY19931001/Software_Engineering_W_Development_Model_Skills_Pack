@@ -69,7 +69,7 @@ flowchart TB
 | 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM `systemTest` 回填 | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7` | 0/1/2 |
 | 8 验收测试 | 验收测试执行结果、归档产物、RTM `acceptanceTest` 回填 | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts` | 0/1/2 |
 
-> 每个阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts`。完整分派矩阵见 [dispatch-matrix.md](./w-model-dev/references/dispatch-matrix.md)。
+> 每个阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`；阶段 8 终检另含 `check-openspec-archive.ts`。完整分派矩阵见 [dispatch-matrix.md](./w-model-dev/references/dispatch-matrix.md)。
 
 ## 快速上手
 
@@ -214,15 +214,15 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase 4 --spec-dir=docs
 **ERROR_JSON 示例**（exit 2，机器可读；`ERROR_JSON.exitCode` 与进程退出码强一致，防伪三层机制见 SSoT §10E）：
 
 ```
-✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数
-ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99: 须为 1-8 整数","exitCode":2}
+✗ [ARG_INVALID] 参数非法 --phase=99 [rule=P0-1]: 须为 1-8 的整数
+ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCode":2,"rule":"P0-1"}
 ```
 
 6 类错误类别（ARG_INVALID / FILE_NOT_FOUND / FILE_PARSE / FILE_READ / STRUCTURE_INVALID / UNEXPECTED）与 ERROR_JSON 约定的完整定义见 [command-reference.md](./w-model-dev/references/command-reference.md)「错误码与 ERROR_JSON 约定」节。
 
 ## 核心能力
 
-- **W 模型 8 阶段编排**：需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码 → 集成测试 → 系统测试 → 验收测试
+- **W 模型 8 阶段编排**：需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码实现 → 集成测试 → 系统测试 → 验收测试
 - **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何实施动作必须由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位）执行。详见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)
 - **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [subagent-persona-matrix.md](./w-model-dev/references/subagent-persona-matrix.md)）；Persona 文件本身是 Markdown，不调用 LLM
@@ -307,47 +307,11 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99: 须为 
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep）
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）
-│   │   ├── gate-logic.ts         # 工件质量门纯逻辑（含 TLA+ 资产 + SD→codeModule 终检 + 阶段级 `--phase=N`）
-│   │   ├── check-artifact-gate.ts# 工件质量门 CLI（读 .w-model/rtm.json + graph.json + tla-manifest.json，支持 `--phase=N`）
-│   │   ├── verifier-logic.ts     # Verifier 输出校验纯逻辑（4 targetKind × 5 子标准 + rawScores 防漂移 + R13 单轴下限）
-│   │   ├── check-verifier-output.ts  # Verifier 输出校验 CLI（防 Agent 输出漂移）
-│   │   ├── graph-logic.ts        # 图谱结构门禁纯逻辑（阶段 1–4，含信息流校验：黑洞/奇迹/死模块/边界完整性）
-│   │   ├── check-requirement-graph.ts  # 图谱结构门禁 CLI（连通/单根/父唯一/阶段追溯 + 信息流校验，退出码 0/1/2）
-│   │   ├── tla-logic.ts          # TLA+ 行为门禁纯逻辑（阶段 1–4，文件头/层次/拆解一致性校验 + states 自动清理）
-│   │   ├── check-tla-model.ts    # TLA+ 行为门禁 CLI（SANY 语法 + TLC 模型检查，退出码 0/1/2）
-│   │   ├── code-tla-logic.ts     # 代码-TLA+ 一致性校验纯逻辑（阶段 5，四维度校验）
-│   │   ├── check-code-tla-consistency.ts  # 代码-TLA+ 一致性回归 CLI（TypeScript Compiler API 解析 AST，退出码 0/1）
-│   │   ├── budget-logic.ts / check-budget.ts       # Budget 门禁（R1-R5）
-│   │   ├── run-log-logic.ts / check-run-log.ts     # Run-log 门禁（R1-R7）
-│   │   ├── maturity-logic.ts / check-maturity.ts   # Maturity 门禁（R1-R5）
-│   │   ├── checkpoint-logic.ts / check-checkpoint.ts # Checkpoint 门禁（R1-R5）
-│   │   ├── root-cause-logic.ts / check-rootcause-report.ts # RootCauseReport 校验（R1-R10）
-│   │   ├── coverage-logic.ts / check-requirement-coverage.ts # 需求覆盖分析门禁（C1-C10）
-│   │   ├── exemption-logic.ts / check-exemption.ts # 豁免审批门禁（E1-E8）
-│   │   ├── signature-chain-logic.ts / check-signature-chain.ts # 签名链门禁（R1-R10）
-│   │   ├── archive-integrity-logic.ts / check-archive-integrity.ts # 归档完整性校验
-│   │   ├── preventive-review-logic.ts / check-preventive-review.ts # R3 预防性审查门禁
-│   │   ├── bdd-logic.ts / check-bdd-model.ts       # BDD 模型门禁（D1-D8）
-│   │   ├── tla-bdd-sync-logic.ts / check-tla-bdd-sync.ts # TLA+/BDD 同步校验
-│   │   ├── role-dispatch-logic.ts / check-role-dispatch.ts # 角色分派完整性校验
-│   │   ├── check-state-machine-consistency.ts  # 设计文档↔代码状态机一致性 CLI
-│   │   ├── design-contract-logic.ts / check-design-contract-consistency.ts # 设计契约一致性（D1-D4）
-│   │   ├── iceberg-sweep-logic.ts / check-iceberg-sweep.ts # 冰山扫掠报告校验（R1-R8）
-│   │   ├── ensure-codegraph-opsx.ts  # codegraph + OpenSpec 依赖三层检测与安装（full/quick/light）
-│   │   ├── check-codegraph-queries.ts  # codegraph 查询落盘完整性校验
-│   │   ├── check-opsx-artifacts.ts  # opsx 制品 + R3×3 + V 审查产物校验
-│   │   ├── check-openspec-archive.ts  # opsx:archive 归档完整性校验
-│   │   ├── security-scan.ts      # eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
-│   │   ├── wm-status.ts / wm-status-logic.ts    # 状态快照（只读）
-│   │   ├── metrics-report.ts / metrics-report-logic.ts # 流程度量报告（只读）
-│   │   ├── plan-chunks.ts        # ingestion 分块策略
-│   │   ├── self-test.ts          # 校验逻辑自检（samples/ 驱动，回归基线 249 条）
-│   │   ├── schema-loader.ts      # ajv 单例 + schemas/*.schema.json 自动加载
-│   │   ├── lib/cli-error.ts      # exit 2 错误结构统一（6 类错误码；人类消息 stderr + ERROR_JSON stdout）
-│   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具
-│   │   ├── lib/safe-json.ts      # JSON 解析原型污染防御
-│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 534 条 + README.md coverage 矩阵）
-│   │   └── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
+│   │   ├── cli/                  # 门禁与工具 CLI 入口：check-*.ts + self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx
+│   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks
+│   │   ├── lib/                  # 通用工具：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json
+│   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
+│   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 534 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
@@ -366,7 +330,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99: 须为 
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 │   ├── w-model-dev-test-prompts.json           # 评估测试场景（15 条：典型 / 歧义 / 反误触发 / 正向）
 │   └── w-model-dev-results.tsv                 # 评估历史记录（得分轨迹）
-├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI，仅触及脚本 / package.json 时触发）
+├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI；w-model-dev/**、README.md / AGENTS.md / CONTRIBUTING.md / package.json、docs/*.md、.cursor/skills/** 变更时触发）
 ├── AGENTS.md                     # AI Agent 仓库导航（与 README 互补，聚焦 Agent 行动事实集）
 ├── package.json                  # 声明 tsx + devDeps（ajv / eslint-plugin-security 等）+ npm run 快捷脚本（private，不发布）
 ├── CHANGELOG.md                  # 变更日志
