@@ -6,6 +6,7 @@
  *   - readJsonlOrExit：正常 / 空行跳过 / 坏行 warn 跳过 / ENOENT
  *   - readJsonOptional：正常 / ENOENT→null / 非法 JSON→exit 2
  *   - readJsonlOptional：正常 / ENOENT→[] / 坏行 warn 跳过 / 空行 + CRLF
+ *   - loadAndValidate：正常 / ENOENT / 非法 JSON / STRUCTURE_INVALID（错误路径抛哨兵错误，与真实异常可区分）
  *
  * process.exit 测试策略：spyOn + mockImplementation 抛错拦截，避免真实退出。
  */
@@ -15,6 +16,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { readJsonOrExit, readJsonlOrExit, readJsonOptional, readJsonlOptional, readJsonClassified } from '../lib/read-json-or-exit.js';
+import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 
 let tmpDir: string;
 
@@ -248,6 +250,72 @@ describe('readJsonClassified', () => {
     const out = logSpy.mock.calls[0]![0] as string;
     const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
     expect(parsed).toMatchObject({ category: 'FILE_READ', exitCode: 2 });
+    errSpy.mockRestore();
+    logSpy.mockRestore();
+    process.exitCode = 0;
+  });
+});
+
+describe('loadAndValidate', () => {
+  /** 最小合法 bdd-manifest fixture（bdd-manifest.schema.json required：schemaVersion/projectId/basePath/currentPhase/features/stateMachines；basePath minLength 1；currentPhase=1 不触发 designCoverage 分支） */
+  const validManifest = {
+    schemaVersion: '1.0',
+    projectId: 'test-project',
+    basePath: 'features/',
+    currentPhase: 1,
+    features: [],
+    stateMachines: [],
+  };
+
+  it('正常路径：合法 bdd-manifest 通过 schema 校验并返回解析对象', async () => {
+    const file = path.join(tmpDir, 'valid-bdd.json');
+    await fs.writeFile(file, JSON.stringify(validManifest));
+    const result = await loadAndValidate<{ schemaVersion: string; projectId: string; currentPhase: number }>(file, 'bdd-manifest');
+    expect(result).toMatchObject({ schemaVersion: '1.0', projectId: 'test-project', currentPhase: 1 });
+  });
+
+  it('文件不存在（ENOENT）→ exitWithError(FILE_NOT_FOUND) + 抛哨兵 + stdout ERROR_JSON', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const missing = path.join(tmpDir, 'nope-bdd.json');
+    await expect(loadAndValidate(missing, 'bdd-manifest')).rejects.toThrow(LOAD_AND_VALIDATE_SENTINEL_PREFIX);
+    expect(process.exitCode).toBe(2);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
+    expect(parsed).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
+    errSpy.mockRestore();
+    logSpy.mockRestore();
+    process.exitCode = 0;
+  });
+
+  it('非法 JSON → exitWithError(FILE_PARSE) + 抛哨兵 + stdout ERROR_JSON', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'bad-bdd.json');
+    await fs.writeFile(file, '{not json');
+    await expect(loadAndValidate(file, 'bdd-manifest')).rejects.toThrow(LOAD_AND_VALIDATE_SENTINEL_PREFIX);
+    expect(process.exitCode).toBe(2);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
+    expect(parsed).toMatchObject({ category: 'FILE_PARSE', exitCode: 2 });
+    errSpy.mockRestore();
+    logSpy.mockRestore();
+    process.exitCode = 0;
+  });
+
+  it('schema 校验失败（缺必填字段）→ exitWithError(STRUCTURE_INVALID) + 抛哨兵 + stdout ERROR_JSON', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'struct-bdd.json');
+    await fs.writeFile(file, JSON.stringify({ schemaVersion: '1.0' }));
+    await expect(loadAndValidate(file, 'bdd-manifest')).rejects.toThrow(LOAD_AND_VALIDATE_SENTINEL_PREFIX);
+    expect(process.exitCode).toBe(2);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[STRUCTURE_INVALID]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number; rule?: string };
+    expect(parsed).toMatchObject({ category: 'STRUCTURE_INVALID', exitCode: 2, rule: 'P0-3' });
     errSpy.mockRestore();
     logSpy.mockRestore();
     process.exitCode = 0;

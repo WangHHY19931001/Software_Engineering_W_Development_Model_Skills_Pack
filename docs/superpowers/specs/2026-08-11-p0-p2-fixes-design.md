@@ -221,7 +221,7 @@ export interface CliError {
 
 - 在 `lib/read-json-or-exit.ts` / `schema-loader.ts` 之上封装统一「读取 → JSON 解析 → schema 校验」复用方法。
 - **决策**：沿用 AJV（已用于 20 份 JSON Schema 校验），不新增 zod 依赖（最小改动原则，避免依赖膨胀）。
-- 封装方法签名：`loadAndValidate<T>(filePath: string, schemaKey: string): T`，统一错误信息格式（含文件路径 + 字段位置 + 规则 ID）。
+- 封装方法签名：`loadAndValidate<T>(filePath: string, schemaKey: string): Promise<T>`（异步读文件，调用方 `await` 后取返回值；错误路径抛哨兵 Error，见 §4 C1 实现说明），统一错误信息格式（含文件路径 + 字段位置 + 规则 ID）。
 
 ### C2  格式统一
 

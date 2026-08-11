@@ -53,7 +53,7 @@ import {
   type BddCheckInput,
   type TlaSpecSnapshot,
 } from '../logic/bdd-logic.js';
-import { loadAndValidate } from '../lib/load-and-validate.js';
+import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -150,9 +150,12 @@ async function main(): Promise<number> {
   let manifest: BddManifest;
   try {
     manifest = await loadAndValidate<BddManifest>(args.manifestFile, 'bdd-manifest');
-  } catch {
-    // ERROR_JSON 已由 loadAndValidate 统一输出，此处仅终止流程
-    return 2;
+  } catch (e) {
+    // 哨兵错误：ERROR_JSON 已由 loadAndValidate 统一输出，此处仅终止流程
+    if (e instanceof Error && e.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return 2;
+    // 真实异常（如 schema-loader getAjv 在 schemas 目录缺失 / schema 损坏时 throw）继续冒泡，
+    // 由 main().catch 统一输出 UNEXPECTED + ERROR_JSON，不静默吞掉
+    throw e;
   }
 
   // 显式传了 --phase 但非法（非数字 / 越界）→ 复刻原消息（parseInt 结果，非数字时为 NaN）

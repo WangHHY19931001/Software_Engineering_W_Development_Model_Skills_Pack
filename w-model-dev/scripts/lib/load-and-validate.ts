@@ -19,6 +19,11 @@
  *                          detail=首个错误消息）
  *   - 错误路径 exitWithError 后抛哨兵 Error（与 readJsonClassified 同构），
  *     防止调用方继续执行产生「ERROR_JSON + 正常报告」混合输出；调用方 catch 后 return 2。
+ *   - ⚠ 调用方必须区分哨兵错误与真实异常：catch 到
+ *     `message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)` 的哨兵错误 → return 2 终止流程
+ *     （ERROR_JSON 已输出）；其他真实异常（如 schema-loader getAjv 在 schemas 目录缺失 /
+ *     schema 损坏时 throw）必须继续抛出，交由 CLI main().catch 统一输出 UNEXPECTED + ERROR_JSON，
+ *     不得静默吞掉。
  *   - 仅用于 check-*.ts CLI 层；*-logic.ts 纯逻辑层不依赖本工具。
  */
 
@@ -29,7 +34,19 @@ import { exitWithError } from './cli-error.js';
 import { validateBySchema } from '../logic/schema-loader.js';
 
 /**
+ * 哨兵错误消息前缀：输入错误已通过 exitWithError 输出（stderr + stdout ERROR_JSON）并设置
+ * process.exitCode 后抛出的标记 Error。调用方 catch 时应据此与真实异常区分：
+ * 哨兵 → return 2；其余 → 继续 throw（由 main().catch 输出 UNEXPECTED）。
+ */
+export const LOAD_AND_VALIDATE_SENTINEL_PREFIX = 'loadAndValidate:';
+
+/**
  * 读取并解析 JSON 文件，然后按 schemaKey 校验（失败均 exit 2 + ERROR_JSON）。
+ *
+ * 注意：本函数仅处理「输入错误」三分支（FILE_NOT_FOUND / FILE_READ / FILE_PARSE /
+ * STRUCTURE_INVALID），错误路径 exitWithError 后抛出带 LOAD_AND_VALIDATE_SENTINEL_PREFIX
+ * 前缀的哨兵 Error；调用方必须 catch 哨兵错误（return 2），真实异常（schema-loader /
+ * 环境级错误）应继续抛出，不得吞掉。
  *
  * @param filePath 文件路径（相对或绝对）
  * @param schemaKey schema 注册名（schemas/<schemaKey>.schema.json 的 basename）
@@ -47,14 +64,14 @@ export async function loadAndValidate<T = unknown>(filePath: string, schemaKey: 
     } else {
       exitWithError({ category: 'FILE_READ', message: '文件读取失败', exitCode: 2, file: abs, detail: e.code ?? '未知错误' });
     }
-    throw new Error('loadAndValidate: 输入错误已通过 exitWithError 处理');
+    throw new Error(`${LOAD_AND_VALIDATE_SENTINEL_PREFIX}输入错误已通过 exitWithError 处理`);
   }
   let parsed: T;
   try {
     parsed = parseJsonSafe<T>(raw);
   } catch {
     exitWithError({ category: 'FILE_PARSE', message: '文件解析失败（非合法 JSON）', exitCode: 2, file: abs });
-    throw new Error('loadAndValidate: 输入错误已通过 exitWithError 处理');
+    throw new Error(`${LOAD_AND_VALIDATE_SENTINEL_PREFIX}输入错误已通过 exitWithError 处理`);
   }
   const schemaResult = validateBySchema(schemaKey, parsed);
   if (!schemaResult.valid) {
@@ -68,7 +85,7 @@ export async function loadAndValidate<T = unknown>(filePath: string, schemaKey: 
       field: first?.instancePath || '/',
       detail: first?.message ?? schemaResult.errorMessages[0],
     });
-    throw new Error('loadAndValidate: 输入错误已通过 exitWithError 处理');
+    throw new Error(`${LOAD_AND_VALIDATE_SENTINEL_PREFIX}输入错误已通过 exitWithError 处理`);
   }
   return parsed;
 }

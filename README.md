@@ -16,7 +16,7 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
-| Vitest（门禁脚本单元测试） | ✅ 35 files / 554 tests |
+| Vitest（门禁脚本单元测试） | ✅ 35 files / 558 tests |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
@@ -153,7 +153,7 @@ npm run self-test
 npm run prepush
 ```
 
-等价于 `bash .githooks/pre-push --force`，强制跑 14 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（35 files / 554 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency。任一失败即中止。
+等价于 `bash .githooks/pre-push --force`，强制跑 14 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（35 files / 558 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency。任一失败即中止。
 
 **步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
 
@@ -311,7 +311,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks
 │   │   ├── lib/                  # 通用工具：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
-│   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 554 tests）
+│   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 558 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（需求分析 / 系统设计 / 编码 / 测试执行）
