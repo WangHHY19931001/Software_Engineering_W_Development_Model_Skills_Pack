@@ -2,7 +2,8 @@
  * 全局常量（lib/constants.ts）
  *
  * B2 收敛各 check-*.ts / *-logic.ts 中重复定义的门禁常量，全仓单点事实源。
- * 禁止在门禁脚本中重复硬编码退出码 / .w-model 工件路径 / 阶段枚举。
+ * 退出码语义 0=通过 / 1=校验失败 / 2=输入错误，见 SSoT §10E；
+ * 其余 .w-model 工件路径 / 阶段枚举等门禁常量统一在此定义。
  */
 
 /**
@@ -26,11 +27,6 @@ export const PHASES = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 /** 阶段号字面量联合类型（1|2|...|8） */
 export type Phase = (typeof PHASES)[number];
-
-/** 门禁退出码语义（0=通过 / 1=校验失败 / 2=输入错误） */
-export const EXIT_OK = 0;
-export const EXIT_VIOLATION = 1;
-export const EXIT_INPUT_ERROR = 2;
 
 /** 工件相对路径（.w-model 下） */
 export const ARTIFACT_PATHS = {

@@ -23,7 +23,7 @@
     "lint:security": "tsx w-model-dev/scripts/cli/security-scan.ts",
     "wm:status": "tsx w-model-dev/scripts/cli/wm-status.ts",
     "wm:metrics": "tsx w-model-dev/scripts/cli/metrics-report.ts",
-    "docs:build": "typedoc --out docs/api w-model-dev/scripts/cli w-model-dev/scripts/logic --entryPointStrategy expand --excludeNotDocumented",
+    "docs:build": "typedoc --tsconfig config/tsconfig.json --out docs/api w-model-dev/scripts/cli w-model-dev/scripts/logic --entryPointStrategy expand --excludeNotDocumented",
     "prepush": "bash .githooks/pre-push --force"
   },
   "devDependencies": {
