@@ -205,7 +205,10 @@ run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
 # 12. vitest 单元测试全量通过（35 test files / 554 tests；WSL 下 testTimeout 已放宽至 30s）
 run_expect "vitest 单元测试全通过" 0 npx vitest run || exit 1
 
-# 13. npm audit：依赖漏洞扫描（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）
+# 13. npm audit：依赖漏洞扫描（high 以上阻断；仅当网络不可达或 registry 不支持 audit endpoint 时自动跳过）
+#     跳过条件 = 网络不可达（npm error/warn/ERR! network 错误行，或 code ENOTFOUND/ETIMEDOUT/ECONNREFUSED）
+#              或 registry 不支持 audit（NOT_IMPLEMENTED / code ENOTSUP/ENOAUDIT / does not support audit）。
+#     其余输出一律视为真实漏洞报告，阻断放行（fail-closed）。
 log "npm audit 依赖漏洞扫描（high 以上阻断）..."
 set +e
 npm audit --audit-level=high >"$tmp_log" 2>&1
@@ -213,7 +216,7 @@ local_audit_code=$?
 set -e
 if [ "$local_audit_code" -eq 0 ]; then
   ok "npm audit 未发现 high 以上漏洞"
-elif [ "$local_audit_code" -eq 255 ] || [ "$local_audit_code" -eq 1 ] && grep -qiE "ENOTFOUND|ETIMEDOUT|network|ENOTIMPLEMENTED|NOT_IMPLEMENTED|not implemented" "$tmp_log"; then
+elif [ "$local_audit_code" -eq 255 ] || [ "$local_audit_code" -eq 1 ] && grep -qiE "npm (error|warn|err!) network|problem related to network connectivity|audit endpoint returned an error|code (ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ENOTSUP|ENOAUDIT)|NOT_IMPLEMENTED|does not support audit" "$tmp_log"; then
   warn "npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）"
   cat "$tmp_log" >&2
 else
