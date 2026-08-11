@@ -34,7 +34,7 @@ npx tsc --noEmit
 ### 任务 1：G-A plan-chunks.ts 重写（A1-A5，need_fix Bug 1/2 + 扩展）
 
 **文件：**
-- 修改：`w-model-dev/scripts/plan-chunks.ts`
+- 修改：`w-model-dev/scripts/logic/plan-chunks.ts`
 
 - [ ] **步骤 1：重写 `estimateTokens`（A1，need_fix Bug 1）**
 
@@ -178,15 +178,15 @@ if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
 ```bash
 cd /tmp/opencode && mkdir -p dirsplit/sub/nested && printf '# A\n' > dirsplit/sub/nested/b.md
 cd /mnt/skill_work_dir/Software_Engineering_W_Development_Model_Skills_Pack
-npx tsx w-model-dev/scripts/plan-chunks.ts /tmp/opencode/dirsplit --phase=1 --node-type=DD
-npx tsx w-model-dev/scripts/plan-chunks.ts /tmp/opencode/dirsplit --phase=1 --node-type=DD --max-tokens=0; echo "expect exit=2, got $?"
+npx tsx w-model-dev/scripts/logic/plan-chunks.ts /tmp/opencode/dirsplit --phase=1 --node-type=DD
+npx tsx w-model-dev/scripts/logic/plan-chunks.ts /tmp/opencode/dirsplit --phase=1 --node-type=DD --max-tokens=0; echo "expect exit=2, got $?"
 ```
 预期：目录包含嵌套 b.md；`--max-tokens=0` 报错 exit 2。再用含 CJK 的大 md 验证 estimateTokens 输出约为字符数（如 30194 字符 → ≥10000 tokens 触发分段）。
 
 - [ ] **步骤 8：Commit**
 
 ```bash
-git add w-model-dev/scripts/plan-chunks.ts
+git add w-model-dev/scripts/logic/plan-chunks.ts
 git commit -m "fix(plan-chunks): 字节级 token 估算 + 围栏感知标题切分 + 单节二次切分 + 目录递归 + 参数校验（round28 G-A）"
 ```
 
@@ -230,14 +230,14 @@ npx vitest run scripts/__tests__/plan-chunks.test.ts --config vitest.config.ts
 - [ ] **步骤 3：Commit**
 
 ```bash
-git add w-model-dev/scripts/plan-chunks.ts w-model-dev/scripts/__tests__/plan-chunks.test.ts
+git add w-model-dev/scripts/logic/plan-chunks.ts w-model-dev/scripts/__tests__/plan-chunks.test.ts
 git commit -m "test(plan-chunks): 字节估算/标题配对/围栏/二次切分/目录递归单测（round28 G-A）"
 ```
 
 ### 任务 3：G-B gate-logic 修正（B1-B3）
 
 **文件：**
-- 修改：`w-model-dev/scripts/gate-logic.ts`
+- 修改：`w-model-dev/scripts/logic/gate-logic.ts`
 - 测试：`w-model-dev/scripts/__tests__/gate-enhancement.test.ts`
 
 - [ ] **步骤 1：写失败测试（B1：SD-5.2.1 应通过）**
@@ -278,14 +278,14 @@ npx tsc --noEmit
 - [ ] **步骤 7：Commit**
 
 ```bash
-git add w-model-dev/scripts/gate-logic.ts w-model-dev/scripts/__tests__/gate-enhancement.test.ts
+git add w-model-dev/scripts/logic/gate-logic.ts w-model-dev/scripts/__tests__/gate-enhancement.test.ts
 git commit -m "fix(gate-logic): SD 数字层级前缀兜底 + coverageStatus 行级比较 + backfill guard（round28 G-B）"
 ```
 
 ### 任务 4：G-B check-artifact-gate 修正（B4-B6）
 
 **文件：**
-- 修改：`w-model-dev/scripts/check-artifact-gate.ts`
+- 修改：`w-model-dev/scripts/cli/check-artifact-gate.ts`
 
 - [ ] **步骤 1：写失败测试（B4：uat-path-mapping 空表/畸形行报错）**
 
@@ -319,14 +319,14 @@ npx tsc --noEmit
 - [ ] **步骤 7：Commit**
 
 ```bash
-git add w-model-dev/scripts/check-artifact-gate.ts w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/check-artifact-gate.ts w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts
 git commit -m "fix(artifact-gate): uat-path-mapping 严格解析 + phase8 终检校验 + 严格整数参数（round28 G-B）"
 ```
 
 ### 任务 5：G-B security-scan 修正（B7-B8）
 
 **文件：**
-- 修改：`w-model-dev/scripts/security-scan.ts`
+- 修改：`w-model-dev/scripts/cli/security-scan.ts`
 - 修改：`.eslintsecurity-baseline.json`（重新生成）
 - 测试：`w-model-dev/scripts/__tests__/security-scan.test.ts`
 
@@ -375,16 +375,16 @@ npm run lint:security
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add w-model-dev/scripts/security-scan.ts .eslintsecurity-baseline.json w-model-dev/scripts/__tests__/security-scan.test.ts
+git add w-model-dev/scripts/cli/security-scan.ts .eslintsecurity-baseline.json w-model-dev/scripts/__tests__/security-scan.test.ts
 git commit -m "fix(security-scan): 指纹路径归一化 + baseline 重新生成 + JSON 容错（round28 G-B）"
 ```
 
 ### 任务 6：G-B verifier/schema 修正（B9-B11）
 
 **文件：**
-- 修改：`w-model-dev/scripts/check-verifier-output.ts`（B9）
-- 修改：`w-model-dev/scripts/schema-loader.ts`（B10）
-- 修改：`w-model-dev/scripts/verifier-logic.ts`（B11）
+- 修改：`w-model-dev/scripts/cli/check-verifier-output.ts`（B9）
+- 修改：`w-model-dev/scripts/logic/schema-loader.ts`（B10）
+- 修改：`w-model-dev/scripts/logic/verifier-logic.ts`（B11）
 - 测试：`w-model-dev/scripts/__tests__/verifier-logic.test.ts`
 
 - [ ] **步骤 1：修 B9（--s-output 解析）**
@@ -415,14 +415,14 @@ npx tsc --noEmit
 - [ ] **步骤 6：Commit**
 
 ```bash
-git add w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/schema-loader.ts w-model-dev/scripts/verifier-logic.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/logic/schema-loader.ts w-model-dev/scripts/logic/verifier-logic.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts
 git commit -m "fix(verifier/schema): s-output 解析 + ajv 单例原子化 + evidence 扣分后 passed 重算 + 死代码清理（round28 G-B）"
 ```
 
 ### 任务 7：G-B self-test gate 样本补全（B12）
 
 **文件：**
-- 修改：`w-model-dev/scripts/self-test.ts`
+- 修改：`w-model-dev/scripts/cli/self-test.ts`
 - 创建：`w-model-dev/scripts/samples/gate/valid-sd-numeric-levels.json`（若 gate 样本走文件驱动）
 
 - [ ] **步骤 1：补带 graph 的 gate 样本**
@@ -439,15 +439,15 @@ npm run self-test
 - [ ] **步骤 3：Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(self-test): 补带 graph 的 gate 样本覆盖 SD 数字层级映射（round28 G-B）"
 ```
 
 ### 任务 8：G-C check-requirement-graph 修正（C1-C4）
 
 **文件：**
-- 修改：`w-model-dev/scripts/check-requirement-graph.ts`
-- 修改：`w-model-dev/scripts/graph-logic.ts`（仅导出供复用，如需要）
+- 修改：`w-model-dev/scripts/cli/check-requirement-graph.ts`
+- 修改：`w-model-dev/scripts/logic/graph-logic.ts`（仅导出供复用，如需要）
 - 测试：`w-model-dev/scripts/__tests__/graph-logic.test.ts`
 
 - [ ] **步骤 1：写失败测试（C1：--rtm R6 违规应拦）**
@@ -498,7 +498,7 @@ npx tsc --noEmit
 - [ ] **步骤 8：Commit**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-graph.ts w-model-dev/scripts/graph-logic.ts w-model-dev/scripts/self-test.ts w-model-dev/scripts/samples w-model-dev/scripts/__tests__/graph-logic.test.ts
+git add w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev/scripts/logic/graph-logic.ts w-model-dev/scripts/cli/self-test.ts w-model-dev/scripts/samples w-model-dev/scripts/__tests__/graph-logic.test.ts
 git commit -m "fix(graph): rtm R6 纳入 passed + 豁免多 group 对齐 + 前缀匹配 + 严格参数（round28 G-C）"
 ```
 
@@ -506,8 +506,8 @@ git commit -m "fix(graph): rtm R6 纳入 passed + 豁免多 group 对齐 + 前�
 
 **文件：**
 - 修改：`w-model-dev/schemas/graph.schema.json`
-- 修改：`w-model-dev/scripts/graph-logic.ts`
-- 修改：`w-model-dev/scripts/check-requirement-graph.ts`
+- 修改：`w-model-dev/scripts/logic/graph-logic.ts`
+- 修改：`w-model-dev/scripts/cli/check-requirement-graph.ts`
 
 - [ ] **步骤 1：修 C5（schema 放行 sourceArtifact）**
 
@@ -533,16 +533,16 @@ npx tsc --noEmit
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add w-model-dev/schemas/graph.schema.json w-model-dev/scripts/graph-logic.ts w-model-dev/scripts/check-requirement-graph.ts
+git add w-model-dev/schemas/graph.schema.json w-model-dev/scripts/logic/graph-logic.ts w-model-dev/scripts/cli/check-requirement-graph.ts
 git commit -m "fix(graph): schema 放行 sourceArtifact + warnings 落盘输出（round28 G-C）"
 ```
 
 ### 任务 10：G-C coverage-logic + exemption-logic 修正（C7-C9）
 
 **文件：**
-- 修改：`w-model-dev/scripts/coverage-logic.ts`
-- 修改：`w-model-dev/scripts/check-requirement-coverage.ts`
-- 修改：`w-model-dev/scripts/exemption-logic.ts` + `w-model-dev/scripts/check-exemption.ts`
+- 修改：`w-model-dev/scripts/logic/coverage-logic.ts`
+- 修改：`w-model-dev/scripts/cli/check-requirement-coverage.ts`
+- 修改：`w-model-dev/scripts/logic/exemption-logic.ts` + `w-model-dev/scripts/cli/check-exemption.ts`
 - 测试：`w-model-dev/scripts/__tests__/coverage-logic.test.ts` + `exemption-logic.test.ts`
 
 - [ ] **步骤 1：修 C7（out-of-scope 结构不符报错）**
@@ -573,15 +573,15 @@ npx tsc --noEmit
 - [ ] **步骤 6：Commit**
 
 ```bash
-git add w-model-dev/scripts/coverage-logic.ts w-model-dev/scripts/check-requirement-coverage.ts w-model-dev/scripts/exemption-logic.ts w-model-dev/scripts/check-exemption.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/logic/coverage-logic.ts w-model-dev/scripts/cli/check-requirement-coverage.ts w-model-dev/scripts/logic/exemption-logic.ts w-model-dev/scripts/cli/check-exemption.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts
 git commit -m "fix(coverage/exemption): OOS 形状报错 + C9 ID 粒度 + 时间戳时序校验（round28 G-C）"
 ```
 
 ### 任务 11：G-D tla-logic 修正（D1-D3）
 
 **文件：**
-- 修改：`w-model-dev/scripts/tla-logic.ts`
-- 修改：`w-model-dev/scripts/code-tla-logic.ts`（同步 D1）
+- 修改：`w-model-dev/scripts/logic/tla-logic.ts`
+- 修改：`w-model-dev/scripts/logic/code-tla-logic.ts`（同步 D1）
 - 测试：`w-model-dev/scripts/__tests__/tla-logic.test.ts` + `code-tla-logic.test.ts`
 
 - [ ] **步骤 1：写失败测试（D1：`Invariants ==` 命名）**
@@ -612,15 +612,15 @@ npx tsc --noEmit
 - [ ] **步骤 6：Commit**
 
 ```bash
-git add w-model-dev/scripts/tla-logic.ts w-model-dev/scripts/code-tla-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/logic/tla-logic.ts w-model-dev/scripts/logic/code-tla-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts
 git commit -m "fix(tla): cfg↔TLA 不变式命名兼容 Invariants== + INVARIANT 死分支 + @phase 严格（round28 G-D）"
 ```
 
 ### 任务 12：G-D bdd-logic + tla-bdd-sync 修正（D4-D7）
 
 **文件：**
-- 修改：`w-model-dev/scripts/bdd-logic.ts` + `check-bdd-model.ts`（D4/D5）
-- 修改：`w-model-dev/scripts/tla-bdd-sync-logic.ts` + `check-tla-bdd-sync.ts`（D6/D7）
+- 修改：`w-model-dev/scripts/logic/bdd-logic.ts` + `check-bdd-model.ts`（D4/D5）
+- 修改：`w-model-dev/scripts/logic/tla-bdd-sync-logic.ts` + `check-tla-bdd-sync.ts`（D6/D7）
 - 测试：`w-model-dev/scripts/__tests__/bdd-logic.test.ts` + `tla-bdd-sync-logic.test.ts`
 
 - [ ] **步骤 1：修 D5（extractStateVarName 兼容 TypeOK）**
@@ -655,15 +655,15 @@ npx tsc --noEmit
 - [ ] **步骤 7：Commit**
 
 ```bash
-git add w-model-dev/scripts/bdd-logic.ts w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/tla-bdd-sync-logic.ts w-model-dev/scripts/check-tla-bdd-sync.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/logic/bdd-logic.ts w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/logic/tla-bdd-sync-logic.ts w-model-dev/scripts/cli/check-tla-bdd-sync.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts
 git commit -m "fix(bdd/tla-sync): TypeOK 兼容 + Scenario 步骤提取 + \\E 量化 + 边界鲁棒化（round28 G-D）"
 ```
 
 ### 任务 13：G-D design-contract 修正（D8-D9）
 
 **文件：**
-- 修改：`w-model-dev/scripts/check-design-contract-consistency.ts`
-- 修改：`w-model-dev/scripts/design-contract-logic.ts`
+- 修改：`w-model-dev/scripts/cli/check-design-contract-consistency.ts`
+- 修改：`w-model-dev/scripts/logic/design-contract-logic.ts`
 - 测试：`w-model-dev/scripts/__tests__/`（新增 design-contract 测试，若尚无则新建 `design-contract-logic.test.ts`）
 
 - [ ] **步骤 1：修 D8（路由元数据按路由提取）**
@@ -690,15 +690,15 @@ npx tsc --noEmit
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add w-model-dev/scripts/check-design-contract-consistency.ts w-model-dev/scripts/design-contract-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/check-design-contract-consistency.ts w-model-dev/scripts/logic/design-contract-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts
 git commit -m "fix(design-contract): 路由级元数据提取 + 未找到路由报 violation（round28 G-D）"
 ```
 
 ### 任务 14：G-E signature-chain 修正（E1-E4，D2 连续链）
 
 **文件：**
-- 修改：`w-model-dev/scripts/signature-chain-logic.ts`
-- 修改：`w-model-dev/scripts/check-signature-chain.ts`
+- 修改：`w-model-dev/scripts/logic/signature-chain-logic.ts`
+- 修改：`w-model-dev/scripts/cli/check-signature-chain.ts`
 - 测试：`w-model-dev/scripts/__tests__/signature-chain-logic.test.ts`
 - 文档：`w-model-dev/references/signature-chain-guide.md`（§5 同步）
 
@@ -744,14 +744,14 @@ npx tsc --noEmit
 - [ ] **步骤 8：Commit**
 
 ```bash
-git add w-model-dev/scripts/signature-chain-logic.ts w-model-dev/scripts/check-signature-chain.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts w-model-dev/references/signature-chain-guide.md
+git add w-model-dev/scripts/logic/signature-chain-logic.ts w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts w-model-dev/references/signature-chain-guide.md
 git commit -m "fix(signature-chain): 跨阶段连续链 R2 + R7 来源并集 + 全违规聚合 + 基路径显式化（round28 G-E，D2）"
 ```
 
 ### 任务 15：G-E run-log 修正（E5-E9，D3 分档）
 
 **文件：**
-- 修改：`w-model-dev/scripts/run-log-logic.ts`
+- 修改：`w-model-dev/scripts/logic/run-log-logic.ts`
 - 测试：`w-model-dev/scripts/__tests__/run-log-logic.test.ts`
 - 文档：`w-model-dev/references/data-models.md`（动作分档说明）
 
@@ -808,19 +808,19 @@ npx tsc --noEmit
 - [ ] **步骤 10：Commit**
 
 ```bash
-git add w-model-dev/scripts/run-log-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts w-model-dev/references/data-models.md
+git add w-model-dev/scripts/logic/run-log-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts w-model-dev/references/data-models.md
 git commit -m "fix(run-log): R1 阶段分档 + 返工计数归因 + gateExitCode 强制 + targetKind 时序 + reportId 关联（round28 G-E，D3）"
 ```
 
 ### 任务 16：G-E check-run-log/budget/maturity/checkpoint/rootcause/archive 修正（E10-E17）
 
 **文件：**
-- 修改：`w-model-dev/scripts/check-run-log.ts`（E10/E11）
-- 修改：`w-model-dev/scripts/budget-logic.ts` + `check-budget.ts`（E12）
-- 修改：`w-model-dev/scripts/check-maturity.ts`（E13）
-- 修改：`w-model-dev/scripts/check-checkpoint.ts`（E14）+ `checkpoint-logic.ts`（E15）
-- 修改：`w-model-dev/scripts/root-cause-logic.ts`（E16）
-- 修改：`w-model-dev/scripts/archive-integrity-logic.ts`（E17）
+- 修改：`w-model-dev/scripts/cli/check-run-log.ts`（E10/E11）
+- 修改：`w-model-dev/scripts/logic/budget-logic.ts` + `check-budget.ts`（E12）
+- 修改：`w-model-dev/scripts/cli/check-maturity.ts`（E13）
+- 修改：`w-model-dev/scripts/cli/check-checkpoint.ts`（E14）+ `checkpoint-logic.ts`（E15）
+- 修改：`w-model-dev/scripts/logic/root-cause-logic.ts`（E16）
+- 修改：`w-model-dev/scripts/logic/archive-integrity-logic.ts`（E17）
 - 测试：对应 `__tests__/*.test.ts`
 
 - [ ] **步骤 1：修 E10（extractExitCode 模式表补齐）**
@@ -864,14 +864,14 @@ npx tsc --noEmit
 - [ ] **步骤 9：Commit**
 
 ```bash
-git add w-model-dev/scripts/check-run-log.ts w-model-dev/scripts/budget-logic.ts w-model-dev/scripts/check-budget.ts w-model-dev/scripts/check-maturity.ts w-model-dev/scripts/check-checkpoint.ts w-model-dev/scripts/checkpoint-logic.ts w-model-dev/scripts/root-cause-logic.ts w-model-dev/scripts/archive-integrity-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts w-model-dev/references/data-models.md
+git add w-model-dev/scripts/cli/check-run-log.ts w-model-dev/scripts/logic/budget-logic.ts w-model-dev/scripts/cli/check-budget.ts w-model-dev/scripts/cli/check-maturity.ts w-model-dev/scripts/cli/check-checkpoint.ts w-model-dev/scripts/logic/checkpoint-logic.ts w-model-dev/scripts/logic/root-cause-logic.ts w-model-dev/scripts/logic/archive-integrity-logic.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts w-model-dev/references/data-models.md
 git commit -m "fix(state/logs): gate 标记补齐 + gate-log 全量加载 + budget 返工口径 + 词边界 + 前导零 + R10 复用 + 归档精确匹配（round28 G-E）"
 ```
 
 ### 任务 17：G-F ensure-codegraph-opsx 修正（F1-F3）
 
 **文件：**
-- 修改：`w-model-dev/scripts/ensure-codegraph-opsx.ts`
+- 修改：`w-model-dev/scripts/cli/ensure-codegraph-opsx.ts`
 
 - [ ] **步骤 1：修 F1（探针命令 + 执行时机）**
 
@@ -889,25 +889,25 @@ git commit -m "fix(state/logs): gate 标记补齐 + gate-log 全量加载 + budg
 
 ```bash
 cd /mnt/skill_work_dir/Software_Engineering_W_Development_Model_Skills_Pack
-npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase 5 --project-root /tmp/opencode/nonexistent --mode light; echo "exit=$?"
-npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase=5 --project-root=/tmp/opencode/nonexistent --mode=light; echo "exit=$?"
-npx tsx w-model-dev/scripts/ensure-codegraph-opsx.ts --phase abc --project-root /tmp/opencode/nonexistent --mode light; echo "expect exit=2, got=$?"
+npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase 5 --project-root /tmp/opencode/nonexistent --mode light; echo "exit=$?"
+npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase=5 --project-root=/tmp/opencode/nonexistent --mode=light; echo "exit=$?"
+npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase abc --project-root /tmp/opencode/nonexistent --mode light; echo "expect exit=2, got=$?"
 ```
 预期：light 模式输出依赖检测结果（exit 0 或按设计）；`--phase abc` exit 2；两种参数形式等价。注意**不要**以 full 模式在本机实跑（避免再触发全局配置改写）；验证探针参数用 `codegraph query --help` 对照。
 
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add w-model-dev/scripts/ensure-codegraph-opsx.ts
+git add w-model-dev/scripts/cli/ensure-codegraph-opsx.ts
 git commit -m "fix(ensure-codegraph-opsx): 探针命令/时机修正 + phase 校验 + getArg 双形式（round28 G-F）"
 ```
 
 ### 任务 18：G-F check 脚本修正 + opsx 操作文档（F4-F7）
 
 **文件：**
-- 修改：`w-model-dev/scripts/check-codegraph-queries.ts`（F4）
-- 修改：`w-model-dev/scripts/check-opsx-artifacts.ts`（F5/F6）
-- 修改：`w-model-dev/scripts/check-openspec-archive.ts`（F6/F9）
+- 修改：`w-model-dev/scripts/cli/check-codegraph-queries.ts`（F4）
+- 修改：`w-model-dev/scripts/cli/check-opsx-artifacts.ts`（F5/F6）
+- 修改：`w-model-dev/scripts/cli/check-openspec-archive.ts`（F6/F9）
 - 修改：`w-model-dev/SKILL.md`（F7，D4 约束）
 - 修改：`w-model-dev/references/subagent-delegation.md`（F7）
 - 修改：`w-model-dev/references/anti-patterns.md`（#39 描述，F7）
@@ -945,7 +945,7 @@ npx tsc --noEmit
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add w-model-dev/scripts/check-codegraph-queries.ts w-model-dev/scripts/check-opsx-artifacts.ts w-model-dev/scripts/check-openspec-archive.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/self-test.ts w-model-dev/SKILL.md w-model-dev/references/subagent-delegation.md w-model-dev/references/anti-patterns.md
+git add w-model-dev/scripts/cli/check-codegraph-queries.ts w-model-dev/scripts/cli/check-opsx-artifacts.ts w-model-dev/scripts/cli/check-openspec-archive.ts w-model-dev/scripts/__tests__ w-model-dev/scripts/samples w-model-dev/scripts/cli/self-test.ts w-model-dev/SKILL.md w-model-dev/references/subagent-delegation.md w-model-dev/references/anti-patterns.md
 git commit -m "fix(opsx/codegraph): 全目录校验 + blastRadius + 精确前缀 + 操作文档补产 stage 级 R3/V（round28 G-F，D4）"
 ```
 

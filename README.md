@@ -59,12 +59,12 @@ npm run self-test                           # 退出码 0/1（249 条样本回�
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 
 # 或用 npx tsx 直接调用：
-npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
-npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
-npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4]
-npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 代码-TLA+ 一致性回归，退出码 0/1
-npx tsx w-model-dev/scripts/self-test.ts
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
+npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 代码-TLA+ 一致性回归，退出码 0/1
+npx tsx w-model-dev/scripts/cli/self-test.ts
 ```
 
 > 脚本不调用任何 LLM，仅做结构化门禁判定。
@@ -106,7 +106,7 @@ npx tsx w-model-dev/scripts/self-test.ts
 | 能力 | 归属 | 实现位置 |
 |---|---|---|
 | W 模型阶段编排、RTM 维护、状态管理 | 技能内 | `w-model-dev/SKILL.md`（编排逻辑，Agent 执行）+ `w-model-dev/references/*`（阶段细则） |
-| 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/gate-logic.ts` + `check-artifact-gate.ts` |
+| 工件质量门 | 技能内（脚本只做门禁） | `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts` |
 | LLM-as-a-Verifier 评审（三维度 / 连续评分 / PPT / 子标准） | 技能内提供提示词与 Schema，外部 Agent 执行 | `w-model-dev/references/verifier-spec.md` + `scripts/check-verifier-output.ts` |
 | LLM 推理本身 | 外部 | 由外部 Agent（Trae / Claude 等）自行调用其 LLM |
 | 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估） | 外部（工具运行）+ 技能内（方法论吸收） | 工具运行：[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)；方法论吸收：[skillopt-adoption.md](w-model-dev/references/skillopt-adoption.md) |

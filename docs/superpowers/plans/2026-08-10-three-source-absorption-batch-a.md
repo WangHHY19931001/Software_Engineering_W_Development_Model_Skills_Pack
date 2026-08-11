@@ -29,10 +29,10 @@
 | `w-model-dev/references/operational-recovery.md` | 新增「HOTL 规则化授权」节 |
 | `w-model-dev/references/verifier-spec.md` | 新增「多子代理协作评审维度」R14-R17 节 |
 | `w-model-dev/references/format-conventions.md` | 第 6 节「命名约定」 |
-| `w-model-dev/scripts/run-log-logic.ts` | 新增 R8 轨迹模板校验（纯逻辑） |
-| `w-model-dev/scripts/check-run-log.ts` | R8 报告文案 + 摘要 |
+| `w-model-dev/scripts/logic/run-log-logic.ts` | 新增 R8 轨迹模板校验（纯逻辑） |
+| `w-model-dev/scripts/cli/check-run-log.ts` | R8 报告文案 + 摘要 |
 | `w-model-dev/scripts/__tests__/run-log-logic.test.ts` | 新增 R8 用例（TDD） |
-| `w-model-dev/scripts/docs-consistency-logic.ts` | EXPECTED.maxAntiPattern 46→47 |
+| `w-model-dev/scripts/logic/docs-consistency-logic.ts` | EXPECTED.maxAntiPattern 46→47 |
 | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts` | 样本 #1~#46 → #1~#47 |
 | `w-model-dev/references/clean-code-refactoring-agentic-absorption.md` | **新建**：吸收决策记录 |
 | `docs/skill-design-document_SSoT.md` | §3.4.40 + §10A 追溯表补行 |
@@ -113,7 +113,7 @@ git commit -m "test: add failing run-log R8 trajectory template checks (TDD red)
 ### Task 2: 实现 R8 轨迹模板校验（run-log-logic.ts）
 
 **Files:**
-- Modify: `w-model-dev/scripts/run-log-logic.ts`
+- Modify: `w-model-dev/scripts/logic/run-log-logic.ts`
 
 - [ ] **Step 1: 在 R7 扩展之后、`return` 之前插入 R8 块**
 
@@ -193,14 +193,14 @@ Expected: 35 files 全过（注意：样本/既有用例可能触发新 R8 逻�
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/run-log-logic.ts
+git add w-model-dev/scripts/logic/run-log-logic.ts
 git commit -m "feat: add R8 trajectory template check to run-log-logic (TDD green)"
 ```
 
 ### Task 3: check-run-log.ts 报告文案 + 摘要
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-run-log.ts`
+- Modify: `w-model-dev/scripts/cli/check-run-log.ts`
 
 - [ ] **Step 1: 更新输出描述**
 
@@ -219,14 +219,14 @@ L194 的处置提示追加：
 
 Run: `npx tsc --noEmit` — 0 错误。
 ```bash
-git add w-model-dev/scripts/check-run-log.ts
+git add w-model-dev/scripts/cli/check-run-log.ts
 git commit -m "docs: surface R8 trajectory check in check-run-log report"
 ```
 
 ### Task 4: 反模式 #47 级联 — docs-consistency 期望值 46→47
 
 **Files:**
-- Modify: `w-model-dev/scripts/docs-consistency-logic.ts`
+- Modify: `w-model-dev/scripts/logic/docs-consistency-logic.ts`
 - Modify: `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
 
 - [ ] **Step 1: logic 期望值**
@@ -246,7 +246,7 @@ Run: `npx tsc --noEmit` — 0 错误。
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/docs-consistency-logic.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts
+git add w-model-dev/scripts/logic/docs-consistency-logic.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts
 git commit -m "feat: bump expected max anti-pattern 46->47 for #47"
 ```
 

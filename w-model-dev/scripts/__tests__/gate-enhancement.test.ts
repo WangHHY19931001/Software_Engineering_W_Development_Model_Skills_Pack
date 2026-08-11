@@ -12,12 +12,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../tla-logic.js';
-import { checkVerifierOutput, type VerifierOutputShape } from '../verifier-logic.js';
-import { checkArtifactGate, checkPhaseSpecStructure, checkRequirementSpecStructure, checkUatPathMappingBackfill, type GateGraph, type RTMMatrixShape, type PhaseOption } from '../gate-logic.js';
-import { checkRequirementGraph, type GraphShape } from '../graph-logic.js';
-import { checkRequirementCoverage, type CoverageShape, type CoverageCheckOptions } from '../coverage-logic.js';
-import { checkExemption, type ExemptionShape } from '../exemption-logic.js';
+import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
+import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
+import { checkArtifactGate, checkPhaseSpecStructure, checkRequirementSpecStructure, checkUatPathMappingBackfill, type GateGraph, type RTMMatrixShape, type PhaseOption } from '../logic/gate-logic.js';
+import { checkRequirementGraph, type GraphShape } from '../logic/graph-logic.js';
+import { checkRequirementCoverage, type CoverageShape, type CoverageCheckOptions } from '../logic/coverage-logic.js';
+import { checkExemption, type ExemptionShape } from '../logic/exemption-logic.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';

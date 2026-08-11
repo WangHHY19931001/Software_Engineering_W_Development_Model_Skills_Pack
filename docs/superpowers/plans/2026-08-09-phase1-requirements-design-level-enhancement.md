@@ -28,13 +28,13 @@
 | `w-model-dev/templates/requirement-spec/discipline-dod.md` | 新增 | 工程纪律与 DoD 子模板 |
 | `w-model-dev/templates/requirement-spec/uml-modeling.md` | 新增 | UML 需求建模子模板 |
 | `w-model-dev/references/phase-1-requirements.md` | 修改 | 算法增步骤 7/8/9 + FM-3D-08/09 + 禁止行为 #13/#14 + 返工路径 + 验收标准 + 执行方法论表 + 输出节 |
-| `w-model-dev/scripts/graph-logic.ts` | 修改 | 新增 R7 追踪矩阵一致性 + R8 UML mermaid 块配平 |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 修改 | CLI 新增 `--spec-dir=<dir>` 参数 |
-| `w-model-dev/scripts/gate-logic.ts` | 修改 | 新增 `checkRequirementSpecStructure()` |
-| `w-model-dev/scripts/check-artifact-gate.ts` | 修改 | phase=1 调用结构校验 |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 修改 | 新增 R7 追踪矩阵一致性 + R8 UML mermaid 块配平 |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 修改 | CLI 新增 `--spec-dir=<dir>` 参数 |
+| `w-model-dev/scripts/logic/gate-logic.ts` | 修改 | 新增 `checkRequirementSpecStructure()` |
+| `w-model-dev/scripts/cli/check-artifact-gate.ts` | 修改 | phase=1 调用结构校验 |
 | `w-model-dev/scripts/samples/graph/` | 新增 | R7/R8 各 1 valid + 1 bad（4 条） |
 | `w-model-dev/scripts/samples/gate/` | 新增 | 结构校验 1 valid + 3 bad（4 条） |
-| `w-model-dev/scripts/self-test.ts` | 修改 | 基线 217→225 |
+| `w-model-dev/scripts/cli/self-test.ts` | 修改 | 基线 217→225 |
 | `w-model-dev/scripts/__tests__/graph-logic.test.ts` | 修改 | R7/R8 单测 |
 | `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` | 修改 | 结构校验单测 |
 | `w-model-dev/references/verifier-spec.md` | 修改 | V 评审新增项 |
@@ -615,11 +615,11 @@ git commit -m "docs(references): 批2完成——phase-1 参考层扩展"
 ### Task 11: graph-logic.ts 新增 R7/R8 + requirementSpecParse 工具
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 阅读现有 GraphCheckResult 结构与 violations 模式**
 
-Run: `Read w-model-dev/scripts/graph-logic.ts`（重点 118-140 行 GraphCheckResult、215-240 行 checkRequirementGraph 签名）
+Run: `Read w-model-dev/scripts/logic/graph-logic.ts`（重点 118-140 行 GraphCheckResult、215-240 行 checkRequirementGraph 签名）
 Expected: 确认 violations: string[] 字段、checkRequirementGraph(graph, options) 签名
 
 - [ ] **Step 2: 新增 requirementSpecParse 纯函数（解析 markdown 表格 + 代码块 + 引用块）**
@@ -752,13 +752,13 @@ export function checkRequirementSpecEnhance(
 
 - [ ] **Step 4: TypeScript 编译检查**
 
-Run: `npx tsc --noEmit -p w-model-dev/scripts/tsconfig.json`（若脚本目录有 tsconfig；否则 `npx tsc --noEmit --strict w-model-dev/scripts/graph-logic.ts`）
+Run: `npx tsc --noEmit -p w-model-dev/scripts/tsconfig.json`（若脚本目录有 tsconfig；否则 `npx tsc --noEmit --strict w-model-dev/scripts/logic/graph-logic.ts`）
 Expected: 0 错误
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(scripts): graph-logic 新增 requirementSpecParse + R7/R8 校验"
 ```
 
@@ -767,11 +767,11 @@ git commit -m "feat(scripts): graph-logic 新增 requirementSpecParse + R7/R8 �
 ### Task 12: check-requirement-graph.ts CLI 新增 --spec-dir
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-requirement-graph.ts`
+- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`
 
 - [ ] **Step 1: 阅读 CLI 现有 --rtm 解析模式**
 
-Run: `Read w-model-dev/scripts/check-requirement-graph.ts`（重点 66-110 行）
+Run: `Read w-model-dev/scripts/cli/check-requirement-graph.ts`（重点 66-110 行）
 Expected: 确认 `--rtm=` 解析模式可仿照
 
 - [ ] **Step 2: 新增 --spec-dir 参数解析 + R7/R8 接入**
@@ -842,7 +842,7 @@ import {
 
 ```text
  * 用法（第 37 轮新增 R7/R8）：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=1 --spec-dir=docs/phase1-requirements [--rtm=<rtm.json>]
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=1 --spec-dir=docs/phase1-requirements [--rtm=<rtm.json>]
  *     --spec-dir  需求规格独立产物目录（含 requirement-spec.md / traceability-matrix.md / uml-modeling.md）
 ```
 
@@ -854,7 +854,7 @@ Expected: 退出码 0（未传 --spec-dir 时 R7/R8 不激活，不改变既有�
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-graph.ts
+git add w-model-dev/scripts/cli/check-requirement-graph.ts
 git commit -m "feat(scripts): check-requirement-graph 新增 --spec-dir 接入 R7/R8"
 ```
 
@@ -863,12 +863,12 @@ git commit -m "feat(scripts): check-requirement-graph 新增 --spec-dir 接入 R
 ### Task 13: gate-logic.ts + check-artifact-gate.ts 结构校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/gate-logic.ts`
-- Modify: `w-model-dev/scripts/check-artifact-gate.ts`
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`
 
 - [ ] **Step 1: 阅读 gate-logic.ts phaseOption 使用点**
 
-Run: `Grep 'phaseOption' w-model-dev/scripts/gate-logic.ts`
+Run: `Grep 'phaseOption' w-model-dev/scripts/logic/gate-logic.ts`
 Expected: 确认 phase 分支结构（line 265 `const phase = options?.phaseOption ?? 8`）
 
 - [ ] **Step 2: 新增 checkRequirementSpecStructure 函数**
@@ -963,7 +963,7 @@ Expected: 退出码 0（未传 --phase=1 --spec-dir 时不激活结构校验，�
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/gate-logic.ts w-model-dev/scripts/check-artifact-gate.ts
+git add w-model-dev/scripts/logic/gate-logic.ts w-model-dev/scripts/cli/check-artifact-gate.ts
 git commit -m "feat(scripts): gate phase=1 新增引用块/SSOT/DoD 结构校验"
 ```
 
@@ -974,7 +974,7 @@ git commit -m "feat(scripts): gate phase=1 新增引用块/SSOT/DoD 结构校验
 **Files:**
 - Create: `w-model-dev/scripts/samples/graph/valid-spec-enhance.json`、`bad-spec-r7.json`、`bad-spec-r8.json`（R7/R8 各 1 bad + 1 共享 valid）
 - Create: `w-model-dev/scripts/samples/gate/valid-requirement-spec-structure.json`、`bad-refs-missing.json`、`bad-ssot-header.json`、`bad-dod-incomplete.json`
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 - Modify: `w-model-dev/scripts/__tests__/graph-logic.test.ts`
 - Modify: `w-model-dev/scripts/__tests__/gate-enhancement.test.ts`
 
@@ -1145,7 +1145,7 @@ Expected: TypeScript strict 0 错误
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/samples/ w-model-dev/scripts/self-test.ts w-model-dev/scripts/__tests__/
+git add w-model-dev/scripts/samples/ w-model-dev/scripts/cli/self-test.ts w-model-dev/scripts/__tests__/
 git commit -m "test(scripts): R7/R8 + 结构校验 samples/self-test/vitest（基线 217→225）"
 ```
 

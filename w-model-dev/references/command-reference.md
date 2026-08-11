@@ -83,7 +83,7 @@
 3. 编排者（O）输出 `targetKind`、目标、子标准、提示词占位符和以下命令：
 
 ```bash
-npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 ```
 
 4. 编排者（O）分派 V 子代理按 Persona 产出 `VerifierOutput` JSON，再分派 G 子代理跑上述命令。
@@ -92,7 +92,7 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
 ## `/wm status`
 
 - **执行方**：O 只读，不分派子代理。
-- 运行 `npx tsx w-model-dev/scripts/wm-status.ts <project-dir> [--json]`（project-dir 默认 cwd）：
+- 运行 `npx tsx w-model-dev/scripts/cli/wm-status.ts <project-dir> [--json]`（project-dir 默认 cwd）：
   - 只读 `.w-model/project.json`（必读）、`.w-model/rtm.json` 与 `.w-model/run-log.jsonl`（缺失降级），输出：
     1. 当前阶段与 `updatedAt`；
     2. 已完成阶段数 / 8 与进度；
@@ -106,7 +106,7 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
 ## `/wm metrics`
 
 - **执行方**：O 只读，不分派子代理。
-- 运行 `npx tsx w-model-dev/scripts/metrics-report.ts <project-dir> [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`：
+- 运行 `npx tsx w-model-dev/scripts/cli/metrics-report.ts <project-dir> [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`：
   - 必读 `.w-model/run-log.jsonl`，可选读 `.w-model/budget.json`（缺失时预算区为 null）；
   - 输出 9 节流程度量摘要：总体（tokens/耗时/分派/返工）、阶段汇总、动作分布、角色分布、结果分布、门禁通过率、返工连续段、预算 burn rate 与 killSwitch 预警、预警列表；
   - `--json` 输出完整报告 JSON；`--out <path>` 写入文件；`--phase`/`--from`/`--to` 过滤。

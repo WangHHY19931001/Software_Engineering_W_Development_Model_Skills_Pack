@@ -7,24 +7,24 @@
 
 | I have | I want | Use |
 |---|---|---|
-| V 子代理产出 VerifierOutput JSON | 校验防漂移 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>` |
-| RTM + project.json | 阶段 8 终检工件门 | `npx tsx w-model-dev/scripts/check-artifact-gate.ts <project-dir>` |
+| V 子代理产出 VerifierOutput JSON | 校验防漂移 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>` |
+| RTM + project.json | 阶段 8 终检工件门 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts <project-dir>` |
 | RTM | 阶段 5/6/7 阶段级校验 | `check-artifact-gate.ts --phase=5\|6\|7 <project-dir>` |
-| graph.json（阶段 1–4 ingestion） | 图谱结构 + 信息流门禁 | `npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=N]` |
-| tla-manifest.json | TLA+ 行为门禁（SANY + TLC） | `npx tsx w-model-dev/scripts/check-tla-model.ts <manifest.json> [--phase=N]` |
-| bdd-manifest.json | BDD 模型门禁（D1-D8 八维度：头标注/状态机/TLA+ 等价/step 绑定/scenario 路径/RTM 映射/SD 覆盖） | `npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> [--phase=N]` |
-| tla-manifest + graph + rtm + src/ | 阶段 5 代码-TLA+ 一致性回归 | `npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=... --graph=... --rtm=... --src=...` |
-| budget.json | 预算超限检查 | `npx tsx w-model-dev/scripts/check-budget.ts <budget.json> [--project=] [--run-log=] [--phase=N]` |
-| run-log.jsonl | 运行日志完整性检查 | `npx tsx w-model-dev/scripts/check-run-log.ts <run-log.jsonl> [--gate-logs=] [--tla-manifest=]` |
-| maturity.json | 成熟度等级检查 | `npx tsx w-model-dev/scripts/check-maturity.ts <maturity.json> [--project=] [--run-log=]` |
-| run-log.jsonl（含 CHECKPOINT） | 决策内容具体性检查 | `npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=]` |
-| RootCauseReport.json | 根因报告 schema 校验 | `npx tsx w-model-dev/scripts/check-rootcause-report.ts <report.json>` |
+| graph.json（阶段 1–4 ingestion） | 图谱结构 + 信息流门禁 | `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=N]` |
+| tla-manifest.json | TLA+ 行为门禁（SANY + TLC） | `npx tsx w-model-dev/scripts/cli/check-tla-model.ts <manifest.json> [--phase=N]` |
+| bdd-manifest.json | BDD 模型门禁（D1-D8 八维度：头标注/状态机/TLA+ 等价/step 绑定/scenario 路径/RTM 映射/SD 覆盖） | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> [--phase=N]` |
+| tla-manifest + graph + rtm + src/ | 阶段 5 代码-TLA+ 一致性回归 | `npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=... --graph=... --rtm=... --src=...` |
+| budget.json | 预算超限检查 | `npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=] [--run-log=] [--phase=N]` |
+| run-log.jsonl | 运行日志完整性检查 | `npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=] [--tla-manifest=]` |
+| maturity.json | 成熟度等级检查 | `npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=] [--run-log=]` |
+| run-log.jsonl（含 CHECKPOINT） | 决策内容具体性检查 | `npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=]` |
+| RootCauseReport.json | 根因报告 schema 校验 | `npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>` |
 | 任意 .w-model/*.json | schema 强约束校验（被 logic 层自动调用，无需手动） | `schema-loader.ts` 内置 |
-| scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/security-scan.ts`（支持 --regenerate 重生成 baseline） |
+| scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/cli/security-scan.ts`（支持 --regenerate 重生成 baseline） |
 | scripts 改动 | 回归基线 | `npm run self-test` |
-| ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/plan-chunks.ts`（O 只读 stdout） |
-| wm-status.ts（状态快照） | 查看当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步 | `npx tsx w-model-dev/scripts/wm-status.ts <project-dir> [--json]` |
-| metrics-report.ts（流程度量） | 流程度量报告（分布/返工/预算 burn rate/killSwitch 预警） | `npx tsx w-model-dev/scripts/metrics-report.ts <project-dir> [--from=] [--to=] [--phase=N] [--json] [--out=]` |
+| ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/logic/plan-chunks.ts`（O 只读 stdout） |
+| wm-status.ts（状态快照） | 查看当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步 | `npx tsx w-model-dev/scripts/cli/wm-status.ts <project-dir> [--json]` |
+| metrics-report.ts（流程度量） | 流程度量报告（分布/返工/预算 burn rate/killSwitch 预警） | `npx tsx w-model-dev/scripts/cli/metrics-report.ts <project-dir> [--from=] [--to=] [--phase=N] [--json] [--out=]` |
 
 ## subagent 决策表
 

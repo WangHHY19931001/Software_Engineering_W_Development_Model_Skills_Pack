@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
-import { diffFindings, normalizeSourceLine, computeFindingHash } from '../security-scan.js';
-import type { EslintResult, BaselineEntry, ResolveLine } from '../security-scan.js';
+import { diffFindings, normalizeSourceLine, computeFindingHash } from '../cli/security-scan.js';
+import type { EslintResult, BaselineEntry, ResolveLine } from '../cli/security-scan.js';
 
 /** 内容敏感指纹 helper（与 security-scan.ts 同算法：file + ruleId + 归一化行内容） */
 function contentHash(relFile: string, ruleId: string, sourceLine: string): string {

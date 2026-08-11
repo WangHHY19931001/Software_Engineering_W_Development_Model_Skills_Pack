@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { checkSignatureChain, computeSigHash, type SignatureChainEntry } from '../signature-chain-logic.js';
+import { checkSignatureChain, computeSigHash, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 
 const SAMPLES_DIR = path.join(__dirname, '..', 'samples', 'signature-chain');
 

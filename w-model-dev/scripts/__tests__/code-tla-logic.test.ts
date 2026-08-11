@@ -25,7 +25,7 @@ import {
   type Graph,
   type Rtm,
   type TlaManifest,
-} from '../code-tla-logic.js';
+} from '../logic/code-tla-logic.js';
 
 // ==================== 辅助构造函数 ====================
 

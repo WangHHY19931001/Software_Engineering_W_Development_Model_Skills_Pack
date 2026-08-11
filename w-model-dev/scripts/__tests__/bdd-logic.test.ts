@@ -22,7 +22,7 @@ import {
   checkBddModel,
   type BddStateMachine,
   type TlaSpecSnapshot,
-} from '../bdd-logic.js';
+} from '../logic/bdd-logic.js';
 
 describe('parseFeatureHeader', () => {
   it('parses valid header with all required fields', () => {

@@ -488,10 +488,10 @@ G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签
 **调用方式变化**：
 ```bash
 # 改动前
-npx tsx w-model-dev/scripts/check-tla-model.ts <project-dir> [--skip-tlc]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <project-dir> [--skip-tlc]
 
 # 改动后
-npx tsx w-model-dev/scripts/check-tla-model.ts <project-dir>
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <project-dir>
 ```
 
 **退出码不变**：0=通过 / 1=校验失败 / 2=输入错误
@@ -511,10 +511,10 @@ npx tsx w-model-dev/scripts/check-tla-model.ts <project-dir>
 **调用方式变化**：
 ```bash
 # 改动前
-npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=<dir>]
+npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=<dir>]
 
 # 改动后（--checkpoint-log 变为强制）
-npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
+npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
 ```
 
 ### 6.3 check-requirement-graph.ts — 移除 level=4 强制校验
@@ -543,7 +543,7 @@ npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log
 
 **调用方式**：
 ```bash
-npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>
+npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>
 ```
 
 **校验清单**（按阶段）：
@@ -568,7 +568,7 @@ npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>
 
 **调用方式**：
 ```bash
-npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
 ```
 
 **校验规则**：R1-R10（见 §4.4）+ 跨阶段消费者校验（见 §4.5）

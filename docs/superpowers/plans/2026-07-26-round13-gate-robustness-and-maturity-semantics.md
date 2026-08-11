@@ -18,12 +18,12 @@
 
 | 文件 | 责任 | 改动类型 |
 |---|---|---|
-| `w-model-dev/scripts/check-code-tla-consistency.ts` | P1.1 readJson EISDIR 友好处理 | Modify |
-| `w-model-dev/scripts/check-requirement-graph.ts` | P1.1 readFile EISDIR 友好处理 | Modify |
-| `w-model-dev/scripts/maturity-logic.ts` | P2.1 R3 单位修正（floor(completedPhases/8)） | Modify |
-| `w-model-dev/scripts/check-maturity.ts` | P2.1 违规信息文案对齐 | Modify |
+| `w-model-dev/scripts/cli/check-code-tla-consistency.ts` | P1.1 readJson EISDIR 友好处理 | Modify |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | P1.1 readFile EISDIR 友好处理 | Modify |
+| `w-model-dev/scripts/logic/maturity-logic.ts` | P2.1 R3 单位修正（floor(completedPhases/8)） | Modify |
+| `w-model-dev/scripts/cli/check-maturity.ts` | P2.1 违规信息文案对齐 | Modify |
 | `w-model-dev/scripts/samples/maturity/bad-r3-cycle-mismatch.json` | P2.1 新 fixture | Create |
-| `w-model-dev/scripts/self-test.ts` | P2.1 新增 1 条 R3 样本 | Modify |
+| `w-model-dev/scripts/cli/self-test.ts` | P2.1 新增 1 条 R3 样本 | Modify |
 
 ### Part B：reference 文档（3 个任务）
 
@@ -47,7 +47,7 @@
 
 ### Task A1：P1.1 check-code-tla-consistency.ts EISDIR 处理
 
-- [ ] 修改 `w-model-dev/scripts/check-code-tla-consistency.ts` 的 `readJson` 函数（73-92 行），在 ENOENT 分支后增加 EISDIR 分支：
+- [ ] 修改 `w-model-dev/scripts/cli/check-code-tla-consistency.ts` 的 `readJson` 函数（73-92 行），在 ENOENT 分支后增加 EISDIR 分支：
   ```typescript
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
@@ -62,12 +62,12 @@
     throw err;
   }
   ```
-- [ ] 验证：手动调用 `npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=w-model-dev-demo/.w-model/ingestion --rtm=.w-model/rtm.json --src=src/` 应输出"参数应为文件路径"提示
+- [ ] 验证：手动调用 `npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=w-model-dev-demo/.w-model/ingestion --rtm=.w-model/rtm.json --src=src/` 应输出"参数应为文件路径"提示
 - [ ] 验证：TypeScript strict 编译通过（`npx tsc --noEmit`）
 
 ### Task A2：P1.1 check-requirement-graph.ts EISDIR 处理
 
-- [ ] 修改 `w-model-dev/scripts/check-requirement-graph.ts` 的 `readFile` 错误处理（53-62 行），在 ENOENT 分支后增加 EISDIR 分支：
+- [ ] 修改 `w-model-dev/scripts/cli/check-requirement-graph.ts` 的 `readFile` 错误处理（53-62 行），在 ENOENT 分支后增加 EISDIR 分支：
   ```typescript
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
@@ -82,12 +82,12 @@
     throw err;
   }
   ```
-- [ ] 验证：手动调用 `npx tsx w-model-dev/scripts/check-requirement-graph.ts w-model-dev-demo/.w-model/ingestion` 应输出"参数应为文件路径"提示
+- [ ] 验证：手动调用 `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev-demo/.w-model/ingestion` 应输出"参数应为文件路径"提示
 - [ ] 验证：现有 self-test 不受影响
 
 ### Task A3：P2.1 maturity-logic.ts R3 单位修正
 
-- [ ] 修改 `w-model-dev/scripts/maturity-logic.ts` 第 99-109 行 R3 逻辑：
+- [ ] 修改 `w-model-dev/scripts/logic/maturity-logic.ts` 第 99-109 行 R3 逻辑：
   ```typescript
   // R3 成功阶段更新：completedCycles 为完整 8 阶段周期数
   // 语义：1 完整周期 = 8 阶段，completedCycles 应 ≥ floor(completedPhases / 8)
@@ -129,7 +129,7 @@
   }
   ```
   （completedCycles=0 但 completedPhases=8 应触发 R3，因 floor(8/8)=1 > 0）
-- [ ] 修改 `w-model-dev/scripts/self-test.ts`，在 maturity 用例数组中新增 1 条：
+- [ ] 修改 `w-model-dev/scripts/cli/self-test.ts`，在 maturity 用例数组中新增 1 条：
   ```typescript
   {
     name: 'maturity/bad-r3-cycle-mismatch.json',
@@ -147,7 +147,7 @@
 - [ ] 运行 `npm run self-test` → 92/92 通过，退出码 0
 - [ ] 运行 `cd w-model-dev && npx vitest run scripts/__tests__/` → 72/72 通过（不修改 vitest 套件）
 - [ ] 运行 `npx tsc --noEmit` → 0 错误
-- [ ] 手动验证 EISDIR：`npx tsx w-model-dev/scripts/check-requirement-graph.ts w-model-dev-demo/.w-model/ingestion` 应输出"参数应为文件路径"提示并退出码 2
+- [ ] 手动验证 EISDIR：`npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev-demo/.w-model/ingestion` 应输出"参数应为文件路径"提示并退出码 2
 
 ---
 
@@ -325,8 +325,8 @@
 - [ ] 运行 `cd w-model-dev && npx vitest run scripts/__tests__/` → 72/72 通过
 - [ ] 运行 `npx tsc --noEmit` → 0 错误
 - [ ] EISDIR 手动验证（P1.1）：
-  - `npx tsx w-model-dev/scripts/check-requirement-graph.ts w-model-dev-demo/.w-model/ingestion` → 输出"参数应为文件路径，实际为目录" + 退出码 2
-  - `npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=w-model-dev-demo/.w-model/ingestion --rtm=.w-model/rtm.json --src=src/` → 输出"graph 参数应为文件路径" + 退出码 2
+  - `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev-demo/.w-model/ingestion` → 输出"参数应为文件路径，实际为目录" + 退出码 2
+  - `npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=w-model-dev-demo/.w-model/ingestion --rtm=.w-model/rtm.json --src=src/` → 输出"graph 参数应为文件路径" + 退出码 2
 - [ ] maturity R3 回归（P2.1）：第 12 轮 demo maturity.json 不触发新违规
 - [ ] 文档一致性检查：
   - anti-patterns.md #21 ↔ SKILL.md 阶段路由表互引

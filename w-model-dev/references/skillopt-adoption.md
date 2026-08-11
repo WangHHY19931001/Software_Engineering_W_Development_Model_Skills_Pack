@@ -83,7 +83,7 @@
 | V1 TypeScript strict | `npx tsc --noEmit` | 0 | 修正 edit，重跑 V1 |
 | V2 self-test | `npm run self-test` | 0 | 修正 edit，重跑 V2 |
 | V3 vitest | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 | 修正 edit，重跑 V3 |
-| V4 fixture | `npx tsx w-model-dev/scripts/check-verifier-output.ts <bad-fixture>` | 1（触发目标规则） | 修正 fixture，重跑 V4 |
+| V4 fixture | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <bad-fixture>` | 1（触发目标规则） | 修正 fixture，重跑 V4 |
 | V5 全量回归 | 重跑 V1-V4 全绿 | 全 0 | 任一失败回到对应阶段 |
 
 ## 与 Loop 4 的边界

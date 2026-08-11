@@ -24,7 +24,7 @@
 3. **Persona 可引用技能内容**：Persona 在评审中可加载 [verifier-spec.md](verifier-spec.md) §8 提示词模板、[definition-of-done.md](definition-of-done.md) DoD 标准、[quality-standards.md](quality-standards.md) 质量标准作为「如何做」的依据。
 4. **每个 Persona 节以「组合」小节结尾**：声明在 W 模型中的直接调用场景、经 `/wm review` 调用场景、禁止从其他 Persona 调用。
 5. **Persona 产出必须满足 [verifier-spec.md](verifier-spec.md) §7 输出 Schema**：`subCriteria[]` / `compositeScore[0,1]` / `qualityLevel(A/B/C/D)` / `passed` / 可选 `reworkHints` / `ranking`。Severity 标签作为 `reworkHints` 字符串前缀（[§7.4A.2](verifier-spec.md)），不新增 Schema 字段。
-6. **Persona 产出后必须执行校验**：`npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>` 退出码 0 才算评审闭环。
+6. **Persona 产出后必须执行校验**：`npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>` 退出码 0 才算评审闭环。
 
 ## Persona 1：code-reviewer（资深工程师 · 五轴代码审查）
 

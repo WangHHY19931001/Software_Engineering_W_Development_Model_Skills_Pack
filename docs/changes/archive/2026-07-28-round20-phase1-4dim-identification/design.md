@@ -152,7 +152,7 @@ crossLogic: {
 ### 3.6 校验脚本 CLI
 
 ```bash
-npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> \
+npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> \
   [--phase=1|2|3|4] \
   [--rtm=<rtm.json>] \
   [--exemptions=<granted.json>]
@@ -618,7 +618,7 @@ CHECKPOINT 展示项从 5 项扩至 9 项 + 豁免审批项：
 
 **CLI**：
 ```bash
-npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> \
+npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> \
   --graph=<graph.json> \
   --out-of-scope=<outOfScope.json> \
   --exemptions=<granted.json>
@@ -829,10 +829,10 @@ vitest 基线从 108 扩展至 **~146**（+38）：
 |---|---|
 | `w-model-dev/schemas/coverage.schema.json` | 覆盖分析 schema |
 | `w-model-dev/schemas/exemption.schema.json` | 豁免审批 schema |
-| `w-model-dev/scripts/coverage-logic.ts` | C1-C10 纯逻辑层 |
-| `w-model-dev/scripts/check-requirement-coverage.ts` | 覆盖分析 CLI |
-| `w-model-dev/scripts/exemption-logic.ts` | E1-E8 纯逻辑层 |
-| `w-model-dev/scripts/check-exemption.ts` | 豁免审批 CLI |
+| `w-model-dev/scripts/logic/coverage-logic.ts` | C1-C10 纯逻辑层 |
+| `w-model-dev/scripts/cli/check-requirement-coverage.ts` | 覆盖分析 CLI |
+| `w-model-dev/scripts/logic/exemption-logic.ts` | E1-E8 纯逻辑层 |
+| `w-model-dev/scripts/cli/check-exemption.ts` | 豁免审批 CLI |
 | `w-model-dev/scripts/__tests__/coverage-logic.test.ts` | C1-C10 单元测试 |
 | `w-model-dev/scripts/__tests__/exemption-logic.test.ts` | E1-E8 单元测试 |
 | `w-model-dev/scripts/samples/graph/valid-req-hierarchy.json` | 样本 |
@@ -850,10 +850,10 @@ vitest 基线从 108 扩展至 **~146**（+38）：
 |---|---|
 | `docs/skill-design-document_SSoT.md` | 新增 §3.4.16 + §10A 追溯表 |
 | `w-model-dev/schemas/graph.schema.json` | 节点新增 level/priority/reqGroup；边新增 3 类 |
-| `w-model-dev/scripts/graph-logic.ts` | 新增 R1-R6 + reqHierarchy/crossLogic + --exemptions 读取 |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 新增 --rtm + --exemptions 参数 |
-| `w-model-dev/scripts/schema-loader.ts` | 自动加载 coverage/exemption schema |
-| `w-model-dev/scripts/self-test.ts` | 新增 GRAPH/COVERAGE/EXEMPTION/SCHEMA 用例 |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 新增 R1-R6 + reqHierarchy/crossLogic + --exemptions 读取 |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 新增 --rtm + --exemptions 参数 |
+| `w-model-dev/scripts/logic/schema-loader.ts` | 自动加载 coverage/exemption schema |
+| `w-model-dev/scripts/cli/self-test.ts` | 新增 GRAPH/COVERAGE/EXEMPTION/SCHEMA 用例 |
 | `w-model-dev/scripts/__tests__/graph-logic.test.ts` | 新增 R1-R6 测试组 |
 | `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` | 新增集成场景 |
 | `w-model-dev/templates/requirement-spec.md` | 5 节 → 13 节 |

@@ -74,7 +74,7 @@ AI: 已回填系统测试结果到 .w-model/rtm.json：
 
 AI: 触发工件质量门检查（系统测试通过后强制执行）：
 
-    npx tsx w-model-dev/scripts/check-artifact-gate.ts
+    npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts
 
     ════════════════════════════════════════════════════════════
     工件质量门校验（Artifact Gate）
@@ -129,7 +129,7 @@ AI: RTM 终检：所有需求 → 设计 → 代码 → 单元 / 集成 / 系统
 
 AI: 触发工件质量门最终检查：
 
-    npx tsx w-model-dev/scripts/check-artifact-gate.ts
+    npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts
 
     GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"reasons":[]}
 

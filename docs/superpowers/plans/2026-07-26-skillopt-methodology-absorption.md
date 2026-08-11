@@ -34,9 +34,9 @@
 | `w-model-dev/templates/requirement-spec.md` | NFR 字段可测量性提示 |
 | `w-model-dev/references/verifier-spec.md` | §6 summary 三要素 + §7 R11/R12 |
 | `w-model-dev/references/anti-patterns.md` | #20/#21 检测信号字段 + 候选 #22 |
-| `w-model-dev/scripts/verifier-logic.ts` | 新增 R11/R12 + 方差重算注释 |
+| `w-model-dev/scripts/logic/verifier-logic.ts` | 新增 R11/R12 + 方差重算注释 |
 | `w-model-dev/scripts/samples/verifier/valid.json` | summary 扩展至 ≥50 字符（R11 兼容） |
-| `w-model-dev/scripts/self-test.ts` | 基线 92→94（新增 R11/R12 用例） |
+| `w-model-dev/scripts/cli/self-test.ts` | 基线 92→94（新增 R11/R12 用例） |
 | `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` | 新增 R11/R12 单元测试 |
 | `AGENTS.md` + `CHANGELOG.md` + `README.md` | 顶层文档同步 |
 
@@ -95,7 +95,7 @@ Expected: 输出 §10G 末尾到 §11 开头的内容，确认插入点
 | V1 | `npx tsc --noEmit` | 0 |
 | V2 | `npm run self-test` | 0 |
 | V3 | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 |
-| V4 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <fixture>` | 1（触发 R11/R12） |
+| V4 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <fixture>` | 1（触发 R11/R12） |
 
 ### 10H.6 与 Loop 4 的边界
 
@@ -267,7 +267,7 @@ git commit -m "feat(ssoT): §10A 追溯表 + §10G 引用 + §3.4.2 角色表扩
 | V1 TypeScript strict | `npx tsc --noEmit` | 0 | 修正 edit，重跑 V1 |
 | V2 self-test | `npm run self-test` | 0 | 修正 edit，重跑 V2 |
 | V3 vitest | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 | 修正 edit，重跑 V3 |
-| V4 fixture | `npx tsx w-model-dev/scripts/check-verifier-output.ts <bad-fixture>` | 1（触发目标规则） | 修正 fixture，重跑 V4 |
+| V4 fixture | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <bad-fixture>` | 1（触发目标规则） | 修正 fixture，重跑 V4 |
 | V5 全量回归 | 重跑 V1-V4 全绿 | 全 0 | 任一失败回到对应阶段 |
 
 ## 与 Loop 4 的边界
@@ -372,7 +372,7 @@ git commit -m "feat(reference): 新增 skillopt-adoption.md（SkillOpt 方法论
         "metrics": {"occurrences": 4, "trend": "increasing"}
       },
       "suggestion": "收紧 V 评审规则：新增 R11 summary 长度≥50字符 + R12 evidence 非空校验",
-      "affectedAssets": ["w-model-dev/references/verifier-spec.md", "w-model-dev/scripts/verifier-logic.ts"],
+      "affectedAssets": ["w-model-dev/references/verifier-spec.md", "w-model-dev/scripts/logic/verifier-logic.ts"],
       "priority": 1
     },
     {
@@ -463,7 +463,7 @@ git commit -m "feat(reference): 新增 skillopt-adoption.md（SkillOpt 方法论
         "metrics": {"occurrences": 1, "trend": "stable"}
       },
       "suggestion": "verifier-logic.ts 方差重算逻辑加注释 + NaN/Infinity 边界保护",
-      "affectedAssets": ["w-model-dev/scripts/verifier-logic.ts"],
+      "affectedAssets": ["w-model-dev/scripts/logic/verifier-logic.ts"],
       "priority": 2
     },
     {
@@ -822,11 +822,11 @@ Part C 完成 8 个低风险信号应用，self-test/vitest 基线不变。继�
 ### Task D1: sig-002 应用到 verifier-logic.ts（R11 summary 长度 + R12 evidence 非空）
 
 **Files:**
-- Modify: `w-model-dev/scripts/verifier-logic.ts`（新增 R11/R12 校验函数 + 接入 checkVerifierOutput）
+- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`（新增 R11/R12 校验函数 + 接入 checkVerifierOutput）
 
 - [ ] **Step 1: 定位 summary 校验当前逻辑（第 464-467 行）**
 
-Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/verifier-logic.ts','utf-8');const i=c.indexOf('// 7. summary');console.log(c.substring(i,i+200));"`
+Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/logic/verifier-logic.ts','utf-8');const i=c.indexOf('// 7. summary');console.log(c.substring(i,i+200));"`
 Expected: 输出 `// 7. summary` 块当前内容
 
 - [ ] **Step 2: 新增 R11/R12 校验函数（在文件末尾辅助函数区）**
@@ -918,7 +918,7 @@ Expected: 0 错误
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/verifier-logic.ts
+git add w-model-dev/scripts/logic/verifier-logic.ts
 git commit -m "feat(verifier-logic): R11 summary 长度≥50 + R12 evidence 具体引用（sig-002）"
 ```
 
@@ -927,11 +927,11 @@ git commit -m "feat(verifier-logic): R11 summary 长度≥50 + R12 evidence 具�
 ### Task D2: sig-009 应用到 verifier-logic.ts（方差重算注释 + 边界保护）
 
 **Files:**
-- Modify: `w-model-dev/scripts/verifier-logic.ts`（computeVariance 函数 + 第 326-336 行重算块）
+- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`（computeVariance 函数 + 第 326-336 行重算块）
 
 - [ ] **Step 1: 定位 computeVariance 函数**
 
-Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/verifier-logic.ts','utf-8');const i=c.indexOf('function computeVariance');console.log(c.substring(i,i+300));"`
+Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/logic/verifier-logic.ts','utf-8');const i=c.indexOf('function computeVariance');console.log(c.substring(i,i+300));"`
 Expected: 输出 computeVariance 函数当前实现
 
 - [ ] **Step 2: computeVariance 加注释 + NaN/Infinity 边界保护**
@@ -998,7 +998,7 @@ Expected: 0 错误
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/verifier-logic.ts
+git add w-model-dev/scripts/logic/verifier-logic.ts
 git commit -m "feat(verifier-logic): computeVariance 注释 + NaN/Infinity 边界保护（sig-009）"
 ```
 
@@ -1035,7 +1035,7 @@ Expected: length: ≥ 50
 
 - [ ] **Step 4: 验证 valid.json 仍通过校验**
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json`
 Expected: 退出码 0（通过，含 R11/R12 校验）
 
 - [ ] **Step 5: Commit**
@@ -1084,7 +1084,7 @@ git commit -m "fix(fixture): valid.json summary 扩展至 ≥50 字符（R11 兼
 
 - [ ] **Step 2: 验证 fixture 触发 R11**
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-summary-too-short.json`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-summary-too-short.json`
 Expected: 退出码 1，reasons 含「summary 长度」+「R11」
 
 - [ ] **Step 3: Commit**
@@ -1133,7 +1133,7 @@ git commit -m "test(fixture): 新增 bad-summary-too-short.json（R11 触发样�
 
 - [ ] **Step 2: 验证 fixture 触发 R12**
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-evidence-empty.json`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-evidence-empty.json`
 Expected: 退出码 1，reasons 含「evidence」+「R12」+「缺具体引用」
 
 - [ ] **Step 3: Commit**
@@ -1148,11 +1148,11 @@ git commit -m "test(fixture): 新增 bad-evidence-empty.json（R12 触发样本�
 ### Task D6: self-test.ts 基线扩展 92→94
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`（VERIFIER_CASES 新增 2 条）
+- Modify: `w-model-dev/scripts/cli/self-test.ts`（VERIFIER_CASES 新增 2 条）
 
 - [ ] **Step 1: 定位 VERIFIER_CASES 末尾（bad-rawscores-constant.json 后）**
 
-Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/self-test.ts','utf-8');const i=c.indexOf('bad-rawscores-constant');console.log(c.substring(i,i+300));"`
+Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/cli/self-test.ts','utf-8');const i=c.indexOf('bad-rawscores-constant');console.log(c.substring(i,i+300));"`
 Expected: 输出 bad-rawscores-constant.json 用例及后续内容
 
 - [ ] **Step 2: 在 VERIFIER_CASES 末尾新增 2 条用例**
@@ -1178,7 +1178,7 @@ Expected: 输出 bad-rawscores-constant.json 用例及后续内容
 
 定位文件头注释「66 条样本」或「92 条」处，更新为「94 条」。Run 查找：
 
-Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/self-test.ts','utf-8');const lines=c.split('\n');lines.forEach((l,i)=>{if(/92|66 条/.test(l))console.log(i+1,l);});"`
+Run: `npx tsx -e "const fs=require('fs');const c=fs.readFileSync('w-model-dev/scripts/cli/self-test.ts','utf-8');const lines=c.split('\n');lines.forEach((l,i)=>{if(/92|66 条/.test(l))console.log(i+1,l);});"`
 Expected: 输出含 92 或「66 条」的行号
 
 - [ ] **Step 4: 更新基线计数注释**
@@ -1193,7 +1193,7 @@ Expected: 退出码 0，94/94 通过
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(self-test): 基线 92→94（新增 R11/R12 用例）"
 ```
 
@@ -1281,15 +1281,15 @@ Expected: 76/76 通过
 
 - [ ] **Step 4: fixture V4 验证**
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-summary-too-short.json; echo "exit: $?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-summary-too-short.json; echo "exit: $?"`
 Expected: 退出码 1
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-evidence-empty.json; echo "exit: $?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-evidence-empty.json; echo "exit: $?"`
 Expected: 退出码 1
 
 - [ ] **Step 5: 回归验证（valid.json 仍通过）**
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json; echo "exit: $?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json; echo "exit: $?"`
 Expected: 退出码 0
 
 - [ ] **Step 6: 验证总结**
@@ -1476,13 +1476,13 @@ Expected: 76/76 通过
 
 - [ ] **Step 4: fixture 验证**
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-summary-too-short.json; echo "R11 exit: $?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-summary-too-short.json; echo "R11 exit: $?"`
 Expected: R11 exit: 1
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-evidence-empty.json; echo "R12 exit: $?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/bad-evidence-empty.json; echo "R12 exit: $?"`
 Expected: R12 exit: 1
 
-Run: `npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json; echo "valid exit: $?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json; echo "valid exit: $?"`
 Expected: valid exit: 0
 
 - [ ] **Step 5: 验证总结**

@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
-const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../wm-status.ts');
+const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-status.ts');
 
 const PROJECT_JSON =
   '{"id":"smoke","name":"Smoke","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}';

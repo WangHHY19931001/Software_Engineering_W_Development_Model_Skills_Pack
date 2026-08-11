@@ -30,13 +30,13 @@
 | `w-model-dev/templates/detailed-design/behavior-spec.md` | 新增 | 行为规格模型（L4 引用）子模板 |
 | `w-model-dev/templates/detailed-design/discipline-dod.md` | 新增 | 工程纪律与 DoD 子模板 |
 | `w-model-dev/references/phase-4-detailed-design.md` | 修改 | 算法增步骤 + FM-DD-01~05 + 禁止行为 #7/#8/#9 + 返工路径 + 验收标准 + 执行方法论表 + 输出节 |
-| `w-model-dev/scripts/graph-logic.ts` | 修改 | 新增 R13/R14 校验函数 |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 修改 | CLI `--spec-dir` phase=4 分支 |
-| `w-model-dev/scripts/gate-logic.ts` | 修改 | PHASE_SPEC_LAYOUT 加 phase=4 |
-| `w-model-dev/scripts/check-artifact-gate.ts` | 修改 | phase=4 调用结构校验（确认参数传递） |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 修改 | 新增 R13/R14 校验函数 |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 修改 | CLI `--spec-dir` phase=4 分支 |
+| `w-model-dev/scripts/logic/gate-logic.ts` | 修改 | PHASE_SPEC_LAYOUT 加 phase=4 |
+| `w-model-dev/scripts/cli/check-artifact-gate.ts` | 修改 | phase=4 调用结构校验（确认参数传递） |
 | `w-model-dev/scripts/samples/graph/` | 新增 | R13/R14 各 1 valid + 1 bad + 1 补充（5 条） |
 | `w-model-dev/scripts/samples/gate/` | 新增 | phase=4 结构校验 1 valid + 3 bad（4 条） |
-| `w-model-dev/scripts/self-test.ts` | 修改 | 基线 241→249 |
+| `w-model-dev/scripts/cli/self-test.ts` | 修改 | 基线 241→249 |
 | `w-model-dev/scripts/__tests__/graph-logic.test.ts` | 修改 | R13/R14 单测 |
 | `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` | 修改 | phase=4 结构校验单测 |
 | `w-model-dev/references/verifier-spec.md` | 修改 | V 评审新增项 |
@@ -701,11 +701,11 @@ git commit -m "docs(references): 批2完成——phase-4 参考层扩展"
 ### Task 11: graph-logic.ts 新增 R13/R14 校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 阅读现有 R11/R12 区**
 
-Run: `Grep 'checkOutlineSpecEnhance' w-model-dev/scripts/graph-logic.ts`
+Run: `Grep 'checkOutlineSpecEnhance' w-model-dev/scripts/logic/graph-logic.ts`
 Expected: 定位小轮 B 的 checkOutlineSpecEnhance（R11/R12）函数末尾
 
 - [ ] **Step 2: 新增 checkDetailedSpecEnhance 函数（R13/R14，第 38 轮小轮 C）**
@@ -769,7 +769,7 @@ Expected: 0 错误
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(scripts): graph-logic 新增 R13/R14 校验（Phase 4 详细设计）"
 ```
 
@@ -778,11 +778,11 @@ git commit -m "feat(scripts): graph-logic 新增 R13/R14 校验（Phase 4 详细
 ### Task 12: check-requirement-graph.ts CLI phase=4 分支
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-requirement-graph.ts`
+- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`
 
 - [ ] **Step 1: 阅读现有 phase=2/3 分支**
 
-Run: `Grep 'phase === 2 \|\| phase === 3' w-model-dev/scripts/check-requirement-graph.ts`
+Run: `Grep 'phase === 2 \|\| phase === 3' w-model-dev/scripts/cli/check-requirement-graph.ts`
 Expected: 定位小轮 B 的 phase=2/3 分发块
 
 - [ ] **Step 2: 扩展 --spec-dir 解析为 phase=2/3/4 分发**
@@ -877,7 +877,7 @@ Expected: 定位小轮 B 的 phase=2/3 分发块
 
 ```text
  * 用法（第 38 轮小轮 C 新增 R13/R14）：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=4 --spec-dir=docs/phase4-detailed
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=4 --spec-dir=docs/phase4-detailed
  *     --spec-dir  Phase 4 时按 *-detailed-design.md / *-traceability-matrix.md / *-class-design.md / *-data-model.md 匹配
 ```
 
@@ -889,7 +889,7 @@ Run: `npm run self-test` → 退出码 0（既有样本无回归）
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-graph.ts
+git add w-model-dev/scripts/cli/check-requirement-graph.ts
 git commit -m "feat(scripts): check-requirement-graph --spec-dir 支持 Phase 4 module 前缀 glob + R13/R14"
 ```
 
@@ -898,12 +898,12 @@ git commit -m "feat(scripts): check-requirement-graph --spec-dir 支持 Phase 4 
 ### Task 13: gate-logic.ts PHASE_SPEC_LAYOUT 加 phase=4 + check-artifact-gate 确认
 
 **Files:**
-- Modify: `w-model-dev/scripts/gate-logic.ts`
-- Modify: `w-model-dev/scripts/check-artifact-gate.ts`（确认）
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`（确认）
 
 - [ ] **Step 1: 阅读现有 PHASE_SPEC_LAYOUT**
 
-Run: `Read w-model-dev/scripts/gate-logic.ts`（300-330 行）
+Run: `Read w-model-dev/scripts/logic/gate-logic.ts`（300-330 行）
 Expected: 确认 layout 结构（phase 1/2/3）
 
 - [ ] **Step 2: PHASE_SPEC_LAYOUT 追加 phase=4**
@@ -945,7 +945,7 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
 
 - [ ] **Step 5: check-artifact-gate.ts 确认**
 
-Run: `Grep 'checkArtifactGate(matrix' w-model-dev/scripts/check-artifact-gate.ts`
+Run: `Grep 'checkArtifactGate(matrix' w-model-dev/scripts/cli/check-artifact-gate.ts`
 Expected: phaseOption + specDir 已传入，无需改动
 
 - [ ] **Step 6: 编译 + 回归**
@@ -956,7 +956,7 @@ Run: `npm run self-test` → 退出码 0（Phase 1/2/3 结构校验行为不变�
 - [ ] **Step 7: 提交**
 
 ```bash
-git add w-model-dev/scripts/gate-logic.ts
+git add w-model-dev/scripts/logic/gate-logic.ts
 git commit -m "feat(scripts): gate PHASE_SPEC_LAYOUT 加 phase=4 + checkArtifactGate 调用条件补 phase=4"
 ```
 
@@ -967,7 +967,7 @@ git commit -m "feat(scripts): gate PHASE_SPEC_LAYOUT 加 phase=4 + checkArtifact
 **Files:**
 - Create: `w-model-dev/scripts/samples/graph/valid-detailed-enhance.json`、`bad-detailed-r13.json`、`bad-detailed-r14.json`、`bad-detailed-missing-section1.json`
 - Create: `w-model-dev/scripts/samples/gate/valid-phase4-spec-structure.json`、`bad-phase4-refs-missing.json`、`bad-phase4-ssot-header.json`、`bad-phase4-dod-incomplete.json`
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 - Modify: `w-model-dev/scripts/__tests__/graph-logic.test.ts`
 - Modify: `w-model-dev/scripts/__tests__/gate-enhancement.test.ts`
 
@@ -1162,7 +1162,7 @@ Run: `npx tsc --noEmit -p tsconfig.json` → 0 错误
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/samples/ w-model-dev/scripts/self-test.ts w-model-dev/scripts/__tests__/
+git add w-model-dev/scripts/samples/ w-model-dev/scripts/cli/self-test.ts w-model-dev/scripts/__tests__/
 git commit -m "test(scripts): R13/R14 + phase=4 结构校验 samples/self-test/vitest（基线 241→249）"
 ```
 
@@ -1344,7 +1344,7 @@ Expected: 引用一致
 Run: `cd w-model-dev && npm run self-test && npx vitest run && npx tsc --noEmit`
 Expected: 退出码 0，0 错误，基线 249
 
-Run: `npx tsx w-model-dev/scripts/security-scan.ts`（若 baseline 需重生成则执行 `--regenerate` 后提交）
+Run: `npx tsx w-model-dev/scripts/cli/security-scan.ts`（若 baseline 需重生成则执行 `--regenerate` 后提交）
 Expected: 0 新增
 
 - [ ] **Step 3: 完成声明**

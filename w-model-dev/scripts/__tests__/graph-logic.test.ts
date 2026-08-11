@@ -22,7 +22,7 @@ import {
   parseMarkdownTable,
   type GraphShape,
   type GraphCheckResult,
-} from '../graph-logic.js';
+} from '../logic/graph-logic.js';
 
 describe('R1-R6 四维识别校验', () => {
   // ==================== R1-R4: REQ 层级树 ====================

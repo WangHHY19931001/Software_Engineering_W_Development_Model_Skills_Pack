@@ -17,11 +17,11 @@
 | 文件 | 责任 | 类型 |
 |---|---|---|
 | `w-model-dev/schemas/iceberg-sweep.schema.json` | IcebergSweepReport 结构约束 | Create |
-| `w-model-dev/scripts/iceberg-sweep-logic.ts` | 纯校验逻辑（R1-R8） | Create |
-| `w-model-dev/scripts/check-iceberg-sweep.ts` | CLI 层（参数/IO/exit） | Create |
+| `w-model-dev/scripts/logic/iceberg-sweep-logic.ts` | 纯校验逻辑（R1-R8） | Create |
+| `w-model-dev/scripts/cli/check-iceberg-sweep.ts` | CLI 层（参数/IO/exit） | Create |
 | `w-model-dev/scripts/__tests__/iceberg-logic.test.ts` | R1-R8 单测 | Create |
 | `w-model-dev/scripts/samples/iceberg/` | valid + bad 样本（self-test 驱动） | Create |
-| `w-model-dev/scripts/self-test.ts` | 基线扩展（ICEBERG_CASES） | Modify |
+| `w-model-dev/scripts/cli/self-test.ts` | 基线扩展（ICEBERG_CASES） | Modify |
 | `w-model-dev/schemas/run-log.schema.json` | action 枚举 +2 | Modify |
 | `w-model-dev/references/iceberg-sweep-guide.md` | 方法论 + 六类别 + TLA+ 示例 | Create |
 | `w-model-dev/references/anti-patterns.md` | 反模式 #44 | Modify |
@@ -199,7 +199,7 @@
 
 - [ ] **Step 2: 验证 schema 可被 loader 加载**
 
-Run: `npx tsx w-model-dev/scripts/schema-loader.ts` 的既有自测（若 loader 无独立自测，则跳过直接依赖后续 Task 4 的 self-test；**不新增 loader 测试**——schema 加入目录后自动被 Ajv 加载，Task 4 自检会验证）。
+Run: `npx tsx w-model-dev/scripts/logic/schema-loader.ts` 的既有自测（若 loader 无独立自测，则跳过直接依赖后续 Task 4 的 self-test；**不新增 loader 测试**——schema 加入目录后自动被 Ajv 加载，Task 4 自检会验证）。
 
 - [ ] **Step 3: 提交**
 
@@ -213,7 +213,7 @@ git commit -m "feat(iceberg): add iceberg-sweep.schema.json (IcebergSweepReport 
 ## Task 2: iceberg-sweep-logic.ts + 单测（TDD）
 
 **Files:**
-- Create: `w-model-dev/scripts/iceberg-sweep-logic.ts`
+- Create: `w-model-dev/scripts/logic/iceberg-sweep-logic.ts`
 - Create: `w-model-dev/scripts/__tests__/iceberg-logic.test.ts`
 
 - [ ] **Step 1: 写失败单测**
@@ -331,7 +331,7 @@ Expected: FAIL — `Cannot find module '../iceberg-sweep-logic.js'`
 
 - [ ] **Step 3: 实现纯逻辑层**
 
-创建 `w-model-dev/scripts/iceberg-sweep-logic.ts`：
+创建 `w-model-dev/scripts/logic/iceberg-sweep-logic.ts`：
 
 ```typescript
 import { validateBySchema } from './schema-loader.js';
@@ -434,7 +434,7 @@ Expected: PASS — 7 个用例全绿
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/iceberg-sweep-logic.ts w-model-dev/scripts/__tests__/iceberg-logic.test.ts
+git add w-model-dev/scripts/logic/iceberg-sweep-logic.ts w-model-dev/scripts/__tests__/iceberg-logic.test.ts
 git commit -m "feat(iceberg): add iceberg-sweep-logic.ts + R1/R5-R8 unit tests"
 ```
 
@@ -443,11 +443,11 @@ git commit -m "feat(iceberg): add iceberg-sweep-logic.ts + R1/R5-R8 unit tests"
 ## Task 3: check-iceberg-sweep.ts CLI 层
 
 **Files:**
-- Create: `w-model-dev/scripts/check-iceberg-sweep.ts`
+- Create: `w-model-dev/scripts/cli/check-iceberg-sweep.ts`
 
 - [ ] **Step 1: 创建 CLI 脚本**
 
-先读 `w-model-dev/scripts/check-preventive-review.ts` 全文（第 24-34 行 `reportFilePrefix` 函数、第 36-200 行 `main()`、`exitWithError` 6 类错误码），严格对齐其结构。然后创建 `w-model-dev/scripts/check-iceberg-sweep.ts`：
+先读 `w-model-dev/scripts/cli/check-preventive-review.ts` 全文（第 24-34 行 `reportFilePrefix` 函数、第 36-200 行 `main()`、`exitWithError` 6 类错误码），严格对齐其结构。然后创建 `w-model-dev/scripts/cli/check-iceberg-sweep.ts`：
 
 ```typescript
 #!/usr/bin/env node
@@ -517,14 +517,14 @@ main();
 
 - [ ] **Step 2: 手工冒烟测试**
 
-Run: `npx tsx w-model-dev/scripts/check-iceberg-sweep.ts w-model-dev/scripts/samples/iceberg/valid-full.json`
+Run: `npx tsx w-model-dev/scripts/cli/check-iceberg-sweep.ts w-model-dev/scripts/samples/iceberg/valid-full.json`
 （先创建样本，见 Task 4 Step 1）
 Expected: 退出码 0，stdout 输出 `"exitCode": 0` 的 ICEBERG_JSON
 
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-iceberg-sweep.ts
+git add w-model-dev/scripts/cli/check-iceberg-sweep.ts
 git commit -m "feat(iceberg): add check-iceberg-sweep.ts CLI (exit 0/1/2)"
 ```
 
@@ -537,7 +537,7 @@ git commit -m "feat(iceberg): add check-iceberg-sweep.ts CLI (exit 0/1/2)"
 - Create: `w-model-dev/scripts/samples/iceberg/bad-round-out-of-range.json`
 - Create: `w-model-dev/scripts/samples/iceberg/bad-duplicate-finding.json`
 - Create: `w-model-dev/scripts/samples/iceberg/bad-missing-evidence.json`
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 
 - [ ] **Step 1: 创建 valid 样本**
 
@@ -551,7 +551,7 @@ git commit -m "feat(iceberg): add check-iceberg-sweep.ts CLI (exit 0/1/2)"
 
 - [ ] **Step 3: 扩展 self-test.ts**
 
-先读 `w-model-dev/scripts/self-test.ts` 中 `PreventiveReviewCase` 接口 + `PREVENTIVE_REVIEW_CASES` 数组 + `runPreventiveReviewCases` 执行器 + `main()` 中对应调用段（约 4 处），严格仿照追加：
+先读 `w-model-dev/scripts/cli/self-test.ts` 中 `PreventiveReviewCase` 接口 + `PREVENTIVE_REVIEW_CASES` 数组 + `runPreventiveReviewCases` 执行器 + `main()` 中对应调用段（约 4 处），严格仿照追加：
 
 ```typescript
 interface IcebergCase {
@@ -585,7 +585,7 @@ Expected: 退出码 0，基线 213 → 217 条（+4 冰山样本），输出含 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/samples/iceberg/ w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/samples/iceberg/ w-model-dev/scripts/cli/self-test.ts
 git commit -m "feat(iceberg): extend self-test baseline with 4 iceberg samples"
 ```
 

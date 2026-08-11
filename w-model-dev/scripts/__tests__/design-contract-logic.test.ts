@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkDesignContractConsistency, type DesignContractCheckInput } from '../design-contract-logic.js';
+import { checkDesignContractConsistency, type DesignContractCheckInput } from '../logic/design-contract-logic.js';
 
 function makeInput(overrides: Partial<DesignContractCheckInput> = {}): DesignContractCheckInput {
   return {

@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildStatusReport, STATUS_TO_PHASE } from '../wm-status-logic.js';
+import { buildStatusReport, STATUS_TO_PHASE } from '../logic/wm-status-logic.js';
 
 describe('STATUS_TO_PHASE', () => {
   it('9 态映射（需求分析=1 … 验收测试=8，项目完成=9）', () => {

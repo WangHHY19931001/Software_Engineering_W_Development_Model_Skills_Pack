@@ -22,7 +22,7 @@ import {
   checkCfgStructure,
   validateHeader,
   type TlaSpec,
-} from '../tla-logic.js';
+} from '../logic/tla-logic.js';
 
 // ==================== 辅助构造函数 ====================
 

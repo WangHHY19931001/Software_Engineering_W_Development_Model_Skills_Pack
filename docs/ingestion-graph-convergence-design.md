@@ -242,7 +242,7 @@ A-cross/A-evolve 把 `consolidated.json` 作为 `graph.json` 的候选态写入�
 ### 3.1 check-requirement-graph.ts 接口
 
 ```bash
-npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolidated.json>" [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or consolidated.json>" [--phase=1|2|3|4]
 ```
 
 退出码：`0=通过 / 1=校验失败 / 2=输入错误`。stdout 输出 JSON 证据摘要（与 `check-verifier-output.ts` 同构）。

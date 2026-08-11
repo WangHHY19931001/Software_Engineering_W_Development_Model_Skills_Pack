@@ -387,7 +387,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 阶段产物由外部 Agent 按 [references/verifier-spec.md](references/verifier-spec.md) 评审。JSON 产出后立即执行：
 
 ```bash
-npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 ```
 
 仅当脚本退出码 0、`passed=true` 且 `qualityLevel` 为 A/B，才可进入阶段门用户确认。C/D 或退出码 1/2 回到当前阶段起点。
@@ -395,7 +395,7 @@ npx tsx w-model-dev/scripts/check-verifier-output.ts "<output.json>"
 阶段 1–4 额外执行 TLA+ 行为门禁（与图谱门禁正交叠加）：
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" --graph=<graph.json> [--phase=1|2|3|4] [--spec=<id>]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" --graph=<graph.json> [--phase=1|2|3|4] [--spec=<id>]
 ```
 
 > `--graph=<graph.json>` 在 phase>=2 时强制必填（SD 覆盖率校验数据源，缺失 → exitCode=2 ARG_INVALID），phase=1 时可选；`--skip-tlc` 已移除（[21.0.0]），不得跳过 TLC。
@@ -427,31 +427,31 @@ npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" --graph=<gr
 
 ```bash
 # 阶段 6 G 门禁：校验 unit + integration 测试通过，system/acceptance pending 合理跳过
-npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=6 [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=6 [project-dir]
 
 # 阶段 7 G 门禁：校验 unit + integration + system 测试通过，acceptance pending 合理跳过
-npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=7 [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=7 [project-dir]
 
 # 阶段 8 终检（默认，向后兼容）：全部测试通过才放行
-npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
 ```
 
 **阶段 6 G 门禁推荐命令组合**：
 
 ```bash
 # 1. V 评审产出 VerifierOutput JSON 后，G 跑 check-verifier-output.ts
-npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output-phase6.json>"
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output-phase6.json>"
 # 2. G 跑 check-artifact-gate.ts --phase=6（阶段级校验，不否决 pending 的 system/acceptance）
-npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=6 [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=6 [project-dir]
 ```
 
 **阶段 7 G 门禁推荐命令组合**：
 
 ```bash
 # 1. V 评审产出 VerifierOutput JSON 后，G 跑 check-verifier-output.ts
-npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output-phase7.json>"
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output-phase7.json>"
 # 2. G 跑 check-artifact-gate.ts --phase=7（阶段级校验，不否决 pending 的 acceptance）
-npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=7 [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=7 [project-dir]
 ```
 
 > **阶段 5 G 门禁**：阶段 5 仍以 `check-verifier-output.ts` + `check-code-tla-consistency.ts` 为主（code-TLA+ 一致性回归，四维度校验），`check-artifact-gate.ts --phase=5` 可作为补充校验确认 REQ 行 `codeModule` 字段已回填。
@@ -463,7 +463,7 @@ npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=7 [project-dir]
 验收终检执行：
 
 ```bash
-npx tsx w-model-dev/scripts/check-artifact-gate.ts "<project-dir>"
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts "<project-dir>"
 ```
 
 只有退出码 0 且用户在发布检查点确认，项目才可完成。退出码 1/2 一律停止并按 `GATE_JSON` 回退。单元测试代码覆盖率还必须达到 80%，代码规范检查通过且无高危安全漏洞。

@@ -209,8 +209,8 @@ git commit --no-gpg-sign -m "feat(cli-error): 结构化错误对象（6 类错�
 ## Task 2: run-log R6 契约迁移（迁入 logic 层）
 
 **Files:**
-- Modify: `w-model-dev/scripts/run-log-logic.ts`（新增导出）
-- Modify: `w-model-dev/scripts/check-run-log.ts`（loadGateLogs 改造 + 删除本地 extractExitCode）
+- Modify: `w-model-dev/scripts/logic/run-log-logic.ts`（新增导出）
+- Modify: `w-model-dev/scripts/cli/check-run-log.ts`（loadGateLogs 改造 + 删除本地 extractExitCode）
 - Test: `w-model-dev/scripts/__tests__/run-log-logic.test.ts`（扩展 6 用例）
 
 - [ ] **Step 1: 在 run-log-logic.test.ts 追加失败测试**
@@ -375,7 +375,7 @@ npx tsc --noEmit
 - [ ] **Step 7: 提交**
 
 ```bash
-git add w-model-dev/scripts/run-log-logic.ts w-model-dev/scripts/check-run-log.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts
+git add w-model-dev/scripts/logic/run-log-logic.ts w-model-dev/scripts/cli/check-run-log.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts
 git commit --no-gpg-sign -m "refactor(run-log): R6 契约迁移 extractExitCode/buildGateLogKeys 迁入 logic 层（TDD +6 用例，含 STATUS/METRICS_JSON 标记）"
 ```
 
@@ -412,7 +412,7 @@ git commit --no-gpg-sign -m "refactor(cli): read-json-or-exit 错误消息加类
 ## Task 4: check-*.ts 归一化批 A（11 个）
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-artifact-gate.ts` / `check-verifier-output.ts` / `check-requirement-graph.ts` / `check-requirement-coverage.ts` / `check-exemption.ts` / `check-tla-model.ts` / `check-tla-bdd-sync.ts` / `check-bdd-model.ts` / `check-code-tla-consistency.ts` / `check-design-contract-consistency.ts` / `check-rootcause-report.ts`
+- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts` / `check-verifier-output.ts` / `check-requirement-graph.ts` / `check-requirement-coverage.ts` / `check-exemption.ts` / `check-tla-model.ts` / `check-tla-bdd-sync.ts` / `check-bdd-model.ts` / `check-code-tla-consistency.ts` / `check-design-contract-consistency.ts` / `check-rootcause-report.ts`
 
 - [ ] **Step 1: 通用改造模式（应用于本批每个脚本）**
 
@@ -473,15 +473,15 @@ npx vitest run
 npm run self-test
 ```
 冒烟（任选 2 个本批脚本）：
-- `npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=99 x` → stderr 含 `✗ [ARG_INVALID]`、stdout 含 `ERROR_JSON {"category":"ARG_INVALID"`、exit 2
-- `npx tsx w-model-dev/scripts/check-requirement-graph.ts`（无参）→ stderr 含 `✗ [ARG_INVALID]`、exit 2
+- `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=99 x` → stderr 含 `✗ [ARG_INVALID]`、stdout 含 `ERROR_JSON {"category":"ARG_INVALID"`、exit 2
+- `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts`（无参）→ stderr 含 `✗ [ARG_INVALID]`、exit 2
 
 Expected: tsc 0 错误；vitest 全通过（既有断言兼容）；self-test 213/213（仅断言退出码）。
 
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-artifact-gate.ts w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/check-requirement-graph.ts w-model-dev/scripts/check-requirement-coverage.ts w-model-dev/scripts/check-exemption.ts w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/check-tla-bdd-sync.ts w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/check-code-tla-consistency.ts w-model-dev/scripts/check-design-contract-consistency.ts w-model-dev/scripts/check-rootcause-report.ts
+git add w-model-dev/scripts/cli/check-artifact-gate.ts w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev/scripts/cli/check-requirement-coverage.ts w-model-dev/scripts/cli/check-exemption.ts w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/cli/check-tla-bdd-sync.ts w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/cli/check-code-tla-consistency.ts w-model-dev/scripts/cli/check-design-contract-consistency.ts w-model-dev/scripts/cli/check-rootcause-report.ts
 git commit --no-gpg-sign -m "refactor(round32): 11 个 check 脚本 exit 2 归一化（exitWithError + ERROR_JSON，消息类别前缀）"
 ```
 
@@ -490,7 +490,7 @@ git commit --no-gpg-sign -m "refactor(round32): 11 个 check 脚本 exit 2 归�
 ## Task 5: check-*.ts 归一化批 B（12 个）
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-signature-chain.ts` / `check-role-dispatch.ts` / `check-preventive-review.ts` / `check-archive-integrity.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts` / `check-codegraph-queries.ts` / `check-state-machine-consistency.ts`
+- Modify: `w-model-dev/scripts/cli/check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-signature-chain.ts` / `check-role-dispatch.ts` / `check-preventive-review.ts` / `check-archive-integrity.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts` / `check-codegraph-queries.ts` / `check-state-machine-consistency.ts`
 
 - [ ] **Step 1: 应用 Task 4 Step 1 的通用改造模式（本批 12 个脚本）**
 
@@ -515,7 +515,7 @@ git commit --no-gpg-sign -m "refactor(round32): 11 个 check 脚本 exit 2 归�
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-budget.ts w-model-dev/scripts/check-run-log.ts w-model-dev/scripts/check-maturity.ts w-model-dev/scripts/check-checkpoint.ts w-model-dev/scripts/check-signature-chain.ts w-model-dev/scripts/check-role-dispatch.ts w-model-dev/scripts/check-preventive-review.ts w-model-dev/scripts/check-archive-integrity.ts w-model-dev/scripts/check-opsx-artifacts.ts w-model-dev/scripts/check-openspec-archive.ts w-model-dev/scripts/check-codegraph-queries.ts w-model-dev/scripts/check-state-machine-consistency.ts
+git add w-model-dev/scripts/cli/check-budget.ts w-model-dev/scripts/cli/check-run-log.ts w-model-dev/scripts/cli/check-maturity.ts w-model-dev/scripts/cli/check-checkpoint.ts w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/cli/check-role-dispatch.ts w-model-dev/scripts/cli/check-preventive-review.ts w-model-dev/scripts/cli/check-archive-integrity.ts w-model-dev/scripts/cli/check-opsx-artifacts.ts w-model-dev/scripts/cli/check-openspec-archive.ts w-model-dev/scripts/cli/check-codegraph-queries.ts w-model-dev/scripts/cli/check-state-machine-consistency.ts
 git commit --no-gpg-sign -m "refactor(round32): 12 个 check 脚本 exit 2 归一化（exitWithError + ERROR_JSON，含 role-dispatch 坏行行为保留）"
 ```
 
@@ -524,7 +524,7 @@ git commit --no-gpg-sign -m "refactor(round32): 12 个 check 脚本 exit 2 归�
 ## Task 6: 工具脚本归一化（5 个）
 
 **Files:**
-- Modify: `w-model-dev/scripts/plan-chunks.ts` / `ensure-codegraph-opsx.ts` / `security-scan.ts` / `wm-status.ts` / `metrics-report.ts`
+- Modify: `w-model-dev/scripts/logic/plan-chunks.ts` / `ensure-codegraph-opsx.ts` / `security-scan.ts` / `wm-status.ts` / `metrics-report.ts`
 
 - [ ] **Step 1: 应用 Task 4 Step 1 的通用改造模式（5 个脚本）**
 
@@ -545,14 +545,14 @@ npx vitest run
 npm run self-test
 ```
 冒烟：
-- `npx tsx w-model-dev/scripts/plan-chunks.ts --phase=9 x` → `✗ [ARG_INVALID]` + `ERROR_JSON` + exit 2
-- `npx tsx w-model-dev/scripts/metrics-report.ts --phase=abc`（有 run-log 夹具）→ `✗ [ARG_INVALID]` + `ERROR_JSON` + exit 2
-- `npx tsx w-model-dev/scripts/wm-status.ts <空目录>` → 未初始化 exit 0（**无 ERROR_JSON**）
+- `npx tsx w-model-dev/scripts/logic/plan-chunks.ts --phase=9 x` → `✗ [ARG_INVALID]` + `ERROR_JSON` + exit 2
+- `npx tsx w-model-dev/scripts/cli/metrics-report.ts --phase=abc`（有 run-log 夹具）→ `✗ [ARG_INVALID]` + `ERROR_JSON` + exit 2
+- `npx tsx w-model-dev/scripts/cli/wm-status.ts <空目录>` → 未初始化 exit 0（**无 ERROR_JSON**）
 
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/plan-chunks.ts w-model-dev/scripts/ensure-codegraph-opsx.ts w-model-dev/scripts/security-scan.ts w-model-dev/scripts/wm-status.ts w-model-dev/scripts/metrics-report.ts
+git add w-model-dev/scripts/logic/plan-chunks.ts w-model-dev/scripts/cli/ensure-codegraph-opsx.ts w-model-dev/scripts/cli/security-scan.ts w-model-dev/scripts/cli/wm-status.ts w-model-dev/scripts/cli/metrics-report.ts
 git commit --no-gpg-sign -m "refactor(round32): 5 个工具脚本 exit 2 归一化（wm-status 未初始化保持 exit 0 查询语义）"
 ```
 
@@ -666,7 +666,7 @@ Expected:
 - tsc: 0 错误
 - self-test: 213/213
 - vitest: 全部通过（应为 345 + 13 = 358；以实测为准）
-- lint:security: 首跑可能 exit 1（cli-error.ts 与批量改动触发误报）→ 按仓库惯例 `npx tsx w-model-dev/scripts/security-scan.ts --regenerate` 后复跑 exit 0
+- lint:security: 首跑可能 exit 1（cli-error.ts 与批量改动触发误报）→ 按仓库惯例 `npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate` 后复跑 exit 0
 
 - [ ] **Step 2: 按实测修正文档数字**
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkPreventiveReview, type PreventiveReview } from '../preventive-review-logic.js';
+import { checkPreventiveReview, type PreventiveReview } from '../logic/preventive-review-logic.js';
 
 describe('checkPreventiveReview', () => {
   it('三份报告齐全且合规 → passed=true', () => {

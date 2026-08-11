@@ -29,27 +29,27 @@
 |---|---|---|---|
 | 1 | `w-model-dev/SKILL.md:54` | 新增约束 #18 RTM 回填 | Modify |
 | 1 | `w-model-dev/references/subagent-delegation.md` | §S 子代理职责增加 RTM 回填 | Modify |
-| 2 | `w-model-dev/scripts/gate-logic.ts:315` | coverageStatus 字段校验 | Modify |
+| 2 | `w-model-dev/scripts/logic/gate-logic.ts:315` | coverageStatus 字段校验 | Modify |
 | 2 | `w-model-dev/scripts/samples/gate/bad-rtm-coverage-below-100.json` | RTM coverage<100 样本 | Create |
 | 2 | `w-model-dev/scripts/samples/gate/bad-rtm-status-mismatch.json` | coverageStatus 不一致样本 | Create |
 | 3 | `w-model-dev/SKILL.md:54` | 新增约束 #19 角色分派 + §6 时序 | Modify |
 | 3 | `w-model-dev/references/anti-patterns.md:455` | 新增反模式 #34 | Modify |
-| 4 | `w-model-dev/scripts/check-role-dispatch.ts` | 角色分派完整性校验 | Create |
+| 4 | `w-model-dev/scripts/cli/check-role-dispatch.ts` | 角色分派完整性校验 | Create |
 | 4 | `w-model-dev/scripts/samples/run-log/bad-missing-V-role.jsonl` | 缺 V 角色 | Create |
 | 4 | `w-model-dev/scripts/samples/run-log/bad-missing-G-role.jsonl` | 缺 G 角色 | Create |
 | 4 | `w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl` | R3 缺 R 角色 | Create |
 | 5 | `w-model-dev/schemas/run-log.schema.json` | role 字段说明 | Modify |
 | 5 | `w-model-dev/references/subagent-delegation.md` | 角色分派完整性校验节 | Modify |
-| 6 | `w-model-dev/scripts/self-test.ts` | P0 用例 + 验证 | Modify |
+| 6 | `w-model-dev/scripts/cli/self-test.ts` | P0 用例 + 验证 | Modify |
 
 ### P1 批（行为正确性）— 5 任务
 
 | # | 文件 | 职责 | 操作 |
 |---|---|---|---|
 | 7 | `w-model-dev/SKILL.md:49` | 约束 #12 扩展为 5 脚本 | Modify |
-| 7 | `w-model-dev/scripts/check-preventive-review.ts` | `--auto-trigger` 参数 | Modify |
+| 7 | `w-model-dev/scripts/cli/check-preventive-review.ts` | `--auto-trigger` 参数 | Modify |
 | 7 | `w-model-dev/references/phase-1-requirements.md` | R3 触发时机 | Modify |
-| 8 | `w-model-dev/scripts/check-state-machine-consistency.ts` | 状态机一致性校验 | Create |
+| 8 | `w-model-dev/scripts/cli/check-state-machine-consistency.ts` | 状态机一致性校验 | Create |
 | 8 | `w-model-dev/scripts/samples/state-machine/bad-missing-transition.json` | 缺转移样本 | Create |
 | 8 | `w-model-dev/scripts/samples/state-machine/bad-extra-transition.json` | 多转移样本 | Create |
 | 8 | `w-model-dev/scripts/samples/state-machine/valid-consistent.json` | 一致样本 | Create |
@@ -58,8 +58,8 @@
 | 9 | `w-model-dev/references/verifier-spec.md` | self-as-verifier 模式节 | Modify |
 | 9 | `w-model-dev/references/agent-personas.md` | self-as-verifier 兼任规则 | Modify |
 | 9 | `w-model-dev/references/anti-patterns.md` | 新增反模式 #35 | Modify |
-| 10 | `w-model-dev/scripts/check-verifier-output.ts` | `--self-as-verifier` 独立产物校验 | Modify |
-| 11 | `w-model-dev/scripts/self-test.ts` | P1 用例 + 验证 | Modify |
+| 10 | `w-model-dev/scripts/cli/check-verifier-output.ts` | `--self-as-verifier` 独立产物校验 | Modify |
+| 11 | `w-model-dev/scripts/cli/self-test.ts` | P1 用例 + 验证 | Modify |
 
 ### P2 批（设计指导）— 4 任务
 
@@ -69,13 +69,13 @@
 | 12 | `w-model-dev/templates/system-test.md` | 性能度量环境声明节 | Modify |
 | 12 | `w-model-dev/schemas/rtm.schema.json` | NFR 双值字段 | Modify |
 | 12 | `w-model-dev/references/quality-standards.md` | 生产目标 vs 测试基线 | Modify |
-| 12 | `w-model-dev/scripts/gate-logic.ts` | NFR 双值警告级校验 | Modify |
+| 12 | `w-model-dev/scripts/logic/gate-logic.ts` | NFR 双值警告级校验 | Modify |
 | 13 | `w-model-dev/templates/interface-design.md` | 路由注册顺序约束节 | Modify |
 | 13 | `w-model-dev/references/phase-3-outline-design.md` | 路由顺序约束节 | Modify |
 | 13 | `w-model-dev/references/anti-patterns.md` | 新增反模式 #36 | Modify |
 | 14 | `w-model-dev/references/graph-guide.md` | 边数下限与语义来源占比节 | Modify |
-| 14 | `w-model-dev/scripts/graph-logic.ts` | 边数下限 + 语义来源占比校验 | Modify |
-| 15 | `w-model-dev/scripts/self-test.ts` | P2 用例 + 验证 | Modify |
+| 14 | `w-model-dev/scripts/logic/graph-logic.ts` | 边数下限 + 语义来源占比校验 | Modify |
+| 15 | `w-model-dev/scripts/cli/self-test.ts` | P2 用例 + 验证 | Modify |
 
 ### P3 批（质量度量）— 3 任务
 
@@ -87,7 +87,7 @@
 | 17 | `w-model-dev/references/quality-standards.md` | 信息密度指标 | Modify |
 | 17 | `w-model-dev/references/definition-of-done.md` | 信息密度度量 | Modify |
 | 17 | `w-model-dev/references/anti-patterns.md` | 新增反模式 #37 | Modify |
-| 18 | `w-model-dev/scripts/self-test.ts` | P3 验证 | Modify |
+| 18 | `w-model-dev/scripts/cli/self-test.ts` | P3 验证 | Modify |
 
 ### 全量验证 — 1 任务
 
@@ -151,13 +151,13 @@ Refs: SSoT §3.4.20, spec docs/superpowers/specs/2026-07-30-round24-p0-p3-skill-
 ### Task 2: check-artifact-gate.ts + gate-logic.ts RTM coverage 硬校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/gate-logic.ts:315`（coveragePercent 校验后增加 coverageStatus 字段校验）
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts:315`（coveragePercent 校验后增加 coverageStatus 字段校验）
 - Create: `w-model-dev/scripts/samples/gate/bad-rtm-coverage-below-100.json`
 - Create: `w-model-dev/scripts/samples/gate/bad-rtm-status-mismatch.json`
 
 - [ ] **Step 1: gate-logic.ts 在第 315 行 coveragePercent 校验后增加 coverageStatus 字段校验**
 
-打开 `w-model-dev/scripts/gate-logic.ts`，定位第 315 行：
+打开 `w-model-dev/scripts/logic/gate-logic.ts`，定位第 315 行：
 
 ```typescript
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
@@ -260,7 +260,7 @@ Refs: SSoT §3.4.20, spec docs/superpowers/specs/2026-07-30-round24-p0-p3-skill-
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/gate-logic.ts w-model-dev/scripts/samples/gate/bad-rtm-coverage-below-100.json w-model-dev/scripts/samples/gate/bad-rtm-status-mismatch.json
+git add w-model-dev/scripts/logic/gate-logic.ts w-model-dev/scripts/samples/gate/bad-rtm-coverage-below-100.json w-model-dev/scripts/samples/gate/bad-rtm-status-mismatch.json
 git commit -m "feat(gate-logic): RTM coverageStatus 字段一致性硬校验 + 样本
 
 - gate-logic.ts 在 coveragePercent 校验后增加 coverageStatus 字段校验
@@ -348,14 +348,14 @@ Refs: SSoT §3.4.20"
 ### Task 4: 新增 check-role-dispatch.ts + samples
 
 **Files:**
-- Create: `w-model-dev/scripts/check-role-dispatch.ts`
+- Create: `w-model-dev/scripts/cli/check-role-dispatch.ts`
 - Create: `w-model-dev/scripts/samples/run-log/bad-missing-V-role.jsonl`
 - Create: `w-model-dev/scripts/samples/run-log/bad-missing-G-role.jsonl`
 - Create: `w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl`
 
 - [ ] **Step 1: Create check-role-dispatch.ts**
 
-创建 `w-model-dev/scripts/check-role-dispatch.ts`：
+创建 `w-model-dev/scripts/cli/check-role-dispatch.ts`：
 
 ```typescript
 #!/usr/bin/env tsx
@@ -366,7 +366,7 @@ Refs: SSoT §3.4.20"
  * R3 启用时须分派 R 角色（completeness/reliability/security 三阶段各 1 次）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]
+ *   npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]
  *
  * 参数：
  *   run-log.jsonl  run-log 文件路径（每行一条 JSON 对象）
@@ -468,7 +468,7 @@ async function main(): Promise<void> {
   const r3Enabled = args.includes('--r3-enabled');
 
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]');
     process.exit(2);
   }
 
@@ -590,16 +590,16 @@ main().catch((err) => {
 
 - [ ] **Step 6: 验证脚本可执行**
 
-运行：`npx tsx w-model-dev/scripts/check-role-dispatch.ts w-model-dev/scripts/samples/run-log/bad-missing-V-role.jsonl`
+运行：`npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts w-model-dev/scripts/samples/run-log/bad-missing-V-role.jsonl`
 预期输出：`ROLE_DISPATCH_JSON` 行含 `"passed":false`，末尾退出码 1
 
-运行：`npx tsx w-model-dev/scripts/check-role-dispatch.ts w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl --r3-enabled`
+运行：`npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl --r3-enabled`
 预期输出：`ROLE_DISPATCH_JSON` 行含 `"passed":false`，violations 含"须有 3 条"
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-role-dispatch.ts w-model-dev/scripts/samples/run-log/bad-missing-V-role.jsonl w-model-dev/scripts/samples/run-log/bad-missing-G-role.jsonl w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl
+git add w-model-dev/scripts/cli/check-role-dispatch.ts w-model-dev/scripts/samples/run-log/bad-missing-V-role.jsonl w-model-dev/scripts/samples/run-log/bad-missing-G-role.jsonl w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl
 git commit -m "feat(scripts): 新增 check-role-dispatch.ts 角色分派完整性校验 + 3 个 bad 样本
 
 - check-role-dispatch.ts 校验 run-log 每阶段含 S/V/G 各 ≥1 条；--r3-enabled 时 R ≥3 条
@@ -674,10 +674,10 @@ Refs: SSoT §3.4.20"
 
 ```bash
 # 非 R3 模式
-npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl
+npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl
 
 # R3 启用模式
-npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
+npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
 ```
 
 退出码：0=通过，1=缺角色（违反约束 #19），2=输入错误。
@@ -707,11 +707,11 @@ Refs: SSoT §3.4.20"
 ### Task 6: self-test.ts P0 用例 + P0 验证
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`（GATE_CASES 增加 2 条；新增 ROLE_DISPATCH_CASES + runRoleDispatchCases；main() 调整）
+- Modify: `w-model-dev/scripts/cli/self-test.ts`（GATE_CASES 增加 2 条；新增 ROLE_DISPATCH_CASES + runRoleDispatchCases；main() 调整）
 
 - [ ] **Step 1: self-test.ts GATE_CASES 增加 2 条 RTM coverageStatus 用例**
 
-打开 `w-model-dev/scripts/self-test.ts`，定位 GATE_CASES 数组（第 208 行起），在数组末尾（第 304 行 `];` 之前）追加：
+打开 `w-model-dev/scripts/cli/self-test.ts`，定位 GATE_CASES 数组（第 208 行起），在数组末尾（第 304 行 `];` 之前）追加：
 
 ```typescript
   // -------------------- 第24轮 P0 RTM coverageStatus 校验 --------------------
@@ -814,7 +814,7 @@ async function runRoleDispatchCases(samplesDir: string): Promise<CaseResult[]> {
 
 - [ ] **Step 4: self-test.ts 顶部 import 增加 checkRoleDispatch**
 
-打开 `w-model-dev/scripts/self-test.ts` 顶部 import 区（第 38-60 行附近），在 import 区末尾追加：
+打开 `w-model-dev/scripts/cli/self-test.ts` 顶部 import 区（第 38-60 行附近），在 import 区末尾追加：
 
 ```typescript
 import { checkRoleDispatch } from './check-role-dispatch.js';
@@ -822,7 +822,7 @@ import { checkRoleDispatch } from './check-role-dispatch.js';
 
 - [ ] **Step 5: self-test.ts main() 增加 ROLE_DISPATCH_CASES 计数与调用**
 
-打开 `w-model-dev/scripts/self-test.ts`，定位 main() 函数（第 2123 行），在 `console.log(\`PreventiveReview 用例: ${PREVENTIVE_REVIEW_CASES.length}\`);` 之后追加：
+打开 `w-model-dev/scripts/cli/self-test.ts`，定位 main() 函数（第 2123 行），在 `console.log(\`PreventiveReview 用例: ${PREVENTIVE_REVIEW_CASES.length}\`);` 之后追加：
 
 ```typescript
   console.log(`RoleDispatch 用例 : ${ROLE_DISPATCH_CASES.length}`);
@@ -849,7 +849,7 @@ import { checkRoleDispatch } from './check-role-dispatch.js';
 
 - [ ] **Step 7: 运行 self-test 全量验证**
 
-运行：`npx tsx w-model-dev/scripts/self-test.ts`
+运行：`npx tsx w-model-dev/scripts/cli/self-test.ts`
 预期输出：
 - `RoleDispatch 用例 : 3` 出现在用例计数中
 - 所有用例（含新增 5 条：2 GATE + 3 RoleDispatch）显示 `✓`
@@ -859,7 +859,7 @@ import { checkRoleDispatch } from './check-role-dispatch.js';
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(self-test): P0 用例 — RTM coverageStatus + 角色分派完整性
 
 - GATE_CASES 增加 2 条：bad-rtm-coverage-below-100 / bad-rtm-status-mismatch
@@ -880,7 +880,7 @@ Refs: SSoT §3.4.20"
 
 **Files:**
 - Modify: `w-model-dev/SKILL.md:49`（约束 #12 文案扩展）
-- Modify: `w-model-dev/scripts/check-preventive-review.ts`（增加 --auto-trigger 参数）
+- Modify: `w-model-dev/scripts/cli/check-preventive-review.ts`（增加 --auto-trigger 参数）
 - Modify: `w-model-dev/references/phase-1-requirements.md`（§R3 完整性维度校验）
 
 **关键决策：** run-log-logic.ts 第 235-265 行已有 R3 预防性审查记录校验（第22轮新增），不重复增加 R8 规则，仅扩展约束 #12 文案 + check-preventive-review.ts `--auto-trigger` + phase-1-requirements.md。
@@ -901,7 +901,7 @@ Refs: SSoT §3.4.20"
 
 - [ ] **Step 2: check-preventive-review.ts 增加 --auto-trigger 参数**
 
-打开 `w-model-dev/scripts/check-preventive-review.ts`，定位 main() 函数（第 14-64 行）。在现有 `const phaseArg = args.find(a => a.startsWith('--phase='));` 之后增加 `--auto-trigger` 处理逻辑。
+打开 `w-model-dev/scripts/cli/check-preventive-review.ts`，定位 main() 函数（第 14-64 行）。在现有 `const phaseArg = args.find(a => a.startsWith('--phase='));` 之后增加 `--auto-trigger` 处理逻辑。
 
 将 main() 函数替换为：
 
@@ -1026,13 +1026,13 @@ async function main(): Promise<void> {
 
 - [ ] **Step 5: 验证 check-preventive-review.ts --auto-trigger 参数解析**
 
-运行：`npx tsx w-model-dev/scripts/check-preventive-review.ts . --auto-trigger`
+运行：`npx tsx w-model-dev/scripts/cli/check-preventive-review.ts . --auto-trigger`
 预期输出：`用法: check-preventive-review.ts <project-dir> --auto-trigger --run-log=<run-log.jsonl>`（缺 --run-log 时退出码 2）
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/SKILL.md w-model-dev/scripts/check-preventive-review.ts w-model-dev/references/phase-1-requirements.md
+git add w-model-dev/SKILL.md w-model-dev/scripts/cli/check-preventive-review.ts w-model-dev/references/phase-1-requirements.md
 git commit -m "feat(w-model-dev): 约束 #12 扩展为 5 脚本 + check-preventive-review.ts --auto-trigger
 
 - SKILL.md 约束 #12：4 脚本 → 5 脚本（增加 check-preventive-review.ts，R3 启用时）
@@ -1049,7 +1049,7 @@ Refs: SSoT §3.4.20"
 ### Task 8: 新增 check-state-machine-consistency.ts + samples + tla-plus-guide.md
 
 **Files:**
-- Create: `w-model-dev/scripts/check-state-machine-consistency.ts`
+- Create: `w-model-dev/scripts/cli/check-state-machine-consistency.ts`
 - Create: `w-model-dev/scripts/samples/state-machine/bad-missing-transition.json`
 - Create: `w-model-dev/scripts/samples/state-machine/bad-extra-transition.json`
 - Create: `w-model-dev/scripts/samples/state-machine/valid-consistent.json`
@@ -1057,7 +1057,7 @@ Refs: SSoT §3.4.20"
 
 - [ ] **Step 1: Create check-state-machine-consistency.ts**
 
-创建 `w-model-dev/scripts/check-state-machine-consistency.ts`：
+创建 `w-model-dev/scripts/cli/check-state-machine-consistency.ts`：
 
 ```typescript
 #!/usr/bin/env tsx
@@ -1068,7 +1068,7 @@ Refs: SSoT §3.4.20"
  * 现有脚本校验"代码↔TLA+"，本脚本补"设计文档↔代码"维度。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
+ *   npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>
  *
  * input.json 格式：
  *   {
@@ -1188,7 +1188,7 @@ export function checkStateMachineConsistency(
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>');
     process.exit(2);
   }
 
@@ -1370,7 +1370,7 @@ main().catch((err) => {
 ### 校验命令
 
 ```bash
-npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
+npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>
 ```
 
 退出码：0=一致，1=不一致，2=输入错误。
@@ -1383,16 +1383,16 @@ npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
 
 - [ ] **Step 7: 验证脚本可执行**
 
-运行：`npx tsx w-model-dev/scripts/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/valid-consistent.json`
+运行：`npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/valid-consistent.json`
 预期输出：`STATE_MACHINE_JSON` 行含 `"passed":true`，退出码 0
 
-运行：`npx tsx w-model-dev/scripts/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/bad-missing-transition.json`
+运行：`npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/bad-missing-transition.json`
 预期输出：`STATE_MACHINE_JSON` 行含 `"passed":false`，reasons 含"代码状态机缺转移"，退出码 1
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/bad-missing-transition.json w-model-dev/scripts/samples/state-machine/bad-extra-transition.json w-model-dev/scripts/samples/state-machine/valid-consistent.json w-model-dev/references/tla-plus-guide.md
+git add w-model-dev/scripts/cli/check-state-machine-consistency.ts w-model-dev/scripts/samples/state-machine/bad-missing-transition.json w-model-dev/scripts/samples/state-machine/bad-extra-transition.json w-model-dev/scripts/samples/state-machine/valid-consistent.json w-model-dev/references/tla-plus-guide.md
 git commit -m "feat(scripts): 新增 check-state-machine-consistency.ts 设计文档↔代码状态机一致性校验
 
 - check-state-machine-consistency.ts 校验设计文档状态转移表与代码 TRANSITIONS 一致
@@ -1552,11 +1552,11 @@ Refs: SSoT §3.4.20"
 ### Task 10: check-verifier-output.ts 独立产物校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-verifier-output.ts`（增加 --self-as-verifier + --s-output 参数与校验）
+- Modify: `w-model-dev/scripts/cli/check-verifier-output.ts`（增加 --self-as-verifier + --s-output 参数与校验）
 
 - [ ] **Step 1: check-verifier-output.ts 增加 --self-as-verifier 参数与独立产物校验**
 
-打开 `w-model-dev/scripts/check-verifier-output.ts`，定位 main() 函数（第 35-112 行）。将 main() 函数替换为：
+打开 `w-model-dev/scripts/cli/check-verifier-output.ts`，定位 main() 函数（第 35-112 行）。将 main() 函数替换为：
 
 ```typescript
 async function main(): Promise<void> {
@@ -1566,7 +1566,7 @@ async function main(): Promise<void> {
   const sOutputArg = args.find(a => a.startsWith('--s-output='));
 
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<S产出路径>]');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<S产出路径>]');
     process.exit(2);
   }
 
@@ -1670,16 +1670,16 @@ async function main(): Promise<void> {
 
 - [ ] **Step 3: 验证 --self-as-verifier 参数解析**
 
-运行：`npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json --self-as-verifier --s-output=w-model-dev/scripts/samples/verifier/valid.json`
+运行：`npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json --self-as-verifier --s-output=w-model-dev/scripts/samples/verifier/valid.json`
 预期输出：`VERIFIER_JSON` 行含 `"passed":false`，reasons 含"反模式 #35"，退出码 1
 
-运行：`npx tsx w-model-dev/scripts/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json --self-as-verifier --s-output=docs/phase1-requirements/requirements-spec.md`
+运行：`npx tsx w-model-dev/scripts/cli/check-verifier-output.ts w-model-dev/scripts/samples/verifier/valid.json --self-as-verifier --s-output=docs/phase1-requirements/requirements-spec.md`
 预期输出：`VERIFIER_JSON` 行含 `"passed":true`（路径不同），退出码 0
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-verifier-output.ts
+git add w-model-dev/scripts/cli/check-verifier-output.ts
 git commit -m "feat(check-verifier-output): --self-as-verifier 独立产物校验
 
 - check-verifier-output.ts 增加 --self-as-verifier --s-output=<path> 参数
@@ -1695,11 +1695,11 @@ Refs: SSoT §3.4.20"
 ### Task 11: self-test.ts P1 用例 + P1 验证
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`（新增 STATE_MACHINE_CASES + runStateMachineCases；main() 调整）
+- Modify: `w-model-dev/scripts/cli/self-test.ts`（新增 STATE_MACHINE_CASES + runStateMachineCases；main() 调整）
 
 - [ ] **Step 1: self-test.ts 新增 STATE_MACHINE_CASES 数组**
 
-打开 `w-model-dev/scripts/self-test.ts`，在 ROLE_DISPATCH_CASES 数组之后新增 StateMachineCase interface 与 STATE_MACHINE_CASES 数组：
+打开 `w-model-dev/scripts/cli/self-test.ts`，在 ROLE_DISPATCH_CASES 数组之后新增 StateMachineCase interface 与 STATE_MACHINE_CASES 数组：
 
 ```typescript
 // -------------------- 第24轮 P1 状态机一致性校验 --------------------
@@ -1809,7 +1809,7 @@ import { checkStateMachineConsistency } from './check-state-machine-consistency.
 
 - [ ] **Step 6: 运行 self-test 全量验证**
 
-运行：`npx tsx w-model-dev/scripts/self-test.ts`
+运行：`npx tsx w-model-dev/scripts/cli/self-test.ts`
 预期输出：
 - `StateMachine 用例 : 3` 出现在用例计数中
 - 所有用例（含新增 3 条 StateMachine）显示 `✓`
@@ -1819,7 +1819,7 @@ import { checkStateMachineConsistency } from './check-state-machine-consistency.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(self-test): P1 用例 — 状态机一致性校验
 
 - 新增 StateMachineCase interface + STATE_MACHINE_CASES 数组（3 条）
@@ -1842,7 +1842,7 @@ Refs: SSoT §3.4.20"
 - Modify: `w-model-dev/templates/system-test.md`（新增性能度量环境声明节）
 - Modify: `w-model-dev/schemas/rtm.schema.json`（NFR 行增加双字段）
 - Modify: `w-model-dev/references/quality-standards.md`（生产目标 vs 测试基线）
-- Modify: `w-model-dev/scripts/gate-logic.ts`（NFR 双值警告级校验）
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts`（NFR 双值警告级校验）
 
 - [ ] **Step 1: templates/requirement-spec.md NFR 字段增加双字段**
 
@@ -1952,7 +1952,7 @@ Refs: SSoT §3.4.20"
 
 - [ ] **Step 5: gate-logic.ts NFR 双值警告级校验**
 
-打开 `w-model-dev/scripts/gate-logic.ts`，定位 Task 2 Step 1 新增的 coverageStatus 校验之后（或任意 reasons.push 后的位置），追加 NFR 双值警告级校验：
+打开 `w-model-dev/scripts/logic/gate-logic.ts`，定位 Task 2 Step 1 新增的 coverageStatus 校验之后（或任意 reasons.push 后的位置），追加 NFR 双值警告级校验：
 
 ```typescript
 
@@ -2007,7 +2007,7 @@ Refs: SSoT §3.4.20"
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/templates/requirement-spec.md w-model-dev/templates/system-test.md w-model-dev/schemas/rtm.schema.json w-model-dev/references/quality-standards.md w-model-dev/scripts/gate-logic.ts
+git add w-model-dev/templates/requirement-spec.md w-model-dev/templates/system-test.md w-model-dev/schemas/rtm.schema.json w-model-dev/references/quality-standards.md w-model-dev/scripts/logic/gate-logic.ts
 git commit -m "feat(w-model-dev): NFR 双字段 targetValue + testThreshold 性能基线区分
 
 - templates/requirement-spec.md NFR 字段增加 targetValue + testThreshold 双字段
@@ -2145,7 +2145,7 @@ Refs: SSoT §3.4.20"
 
 **Files:**
 - Modify: `w-model-dev/references/graph-guide.md`（新增边数下限与语义来源占比节）
-- Modify: `w-model-dev/scripts/graph-logic.ts`（边数下限 + 语义来源占比校验，警告级）
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`（边数下限 + 语义来源占比校验，警告级）
 
 - [ ] **Step 1: references/graph-guide.md 新增边数下限与语义来源占比节**
 
@@ -2196,7 +2196,7 @@ Refs: SSoT §3.4.20"
 
 - [ ] **Step 2: graph-logic.ts 增加边数下限 + 语义来源占比校验**
 
-打开 `w-model-dev/scripts/graph-logic.ts`，定位 checkRequirementGraph 函数（搜索 `export function checkRequirementGraph`），在该函数的校验逻辑末尾（return 之前）追加边数下限与语义来源占比校验。
+打开 `w-model-dev/scripts/logic/graph-logic.ts`，定位 checkRequirementGraph 函数（搜索 `export function checkRequirementGraph`），在该函数的校验逻辑末尾（return 之前）追加边数下限与语义来源占比校验。
 
 首先定位 GraphEdge 接口定义（第 58 行起），确认是否有 `sourceArtifact` 字段。若无，先在 GraphEdge 接口中增加 `sourceArtifact?: string` 字段（如已存在则跳过）。
 
@@ -2246,7 +2246,7 @@ Refs: SSoT §3.4.20"
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/references/graph-guide.md w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/references/graph-guide.md w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(graph): 边数下限 + 语义来源占比校验（警告级）
 
 - graph-guide.md 新增「边数下限与语义来源占比」节（边 ≥ 节点×3；语义来源 ≥ 80%）
@@ -2263,11 +2263,11 @@ Refs: SSoT §3.4.20"
 ### Task 15: self-test.ts P2 用例 + P2 验证
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`（GRAPH_CASES 增加边数下限用例；GATE_CASES 增加 NFR 双值用例）
+- Modify: `w-model-dev/scripts/cli/self-test.ts`（GRAPH_CASES 增加边数下限用例；GATE_CASES 增加 NFR 双值用例）
 
 - [ ] **Step 1: self-test.ts GRAPH_CASES 增加边数下限用例（可选）**
 
-打开 `w-model-dev/scripts/self-test.ts`，定位 GRAPH_CASES 数组（第 314 行起）。由于 Task 14 的边数下限校验为警告级（不改变 passed 判定），现有 GRAPH_CASES 用例的 expectedPassed 不会受影响。
+打开 `w-model-dev/scripts/cli/self-test.ts`，定位 GRAPH_CASES 数组（第 314 行起）。由于 Task 14 的边数下限校验为警告级（不改变 passed 判定），现有 GRAPH_CASES 用例的 expectedPassed 不会受影响。
 
 **若 Task 14 实现了 warnings 字段且 self-test 需校验 warnings**：在 GRAPH_CASES 中增加用例（可选）：
 
@@ -2292,7 +2292,7 @@ Refs: SSoT §3.4.20"
 
 - [ ] **Step 4: 运行 self-test 全量验证**
 
-运行：`npx tsx w-model-dev/scripts/self-test.ts`
+运行：`npx tsx w-model-dev/scripts/cli/self-test.ts`
 预期输出：
 - 所有用例显示 `✓`（P2 警告级校验不影响 passed 判定）
 - 末行 `总计 N 条用例：N 通过，0 失败`
@@ -2301,7 +2301,7 @@ Refs: SSoT §3.4.20"
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(self-test): P2 验证 — 确认现有用例不受警告级校验影响
 
 - P2 边数下限与 NFR 双值均为警告级/条件 fail，不新增 self-test 用例
@@ -2506,7 +2506,7 @@ Refs: SSoT §3.4.20"
 ### Task 18: self-test.ts P3 用例 + P3 验证
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`（确认现有用例不受影响）
+- Modify: `w-model-dev/scripts/cli/self-test.ts`（确认现有用例不受影响）
 
 - [ ] **Step 1: 确认 P3 修改不影响现有 self-test 用例**
 
@@ -2521,7 +2521,7 @@ P3 批的修改均为文档类（SKILL.md 约束 #10 文案扩展、anti-pattern
 
 - [ ] **Step 3: 运行 self-test 全量验证**
 
-运行：`npx tsx w-model-dev/scripts/self-test.ts`
+运行：`npx tsx w-model-dev/scripts/cli/self-test.ts`
 预期输出：
 - 所有用例显示 `✓`
 - 末行 `总计 N 条用例：N 通过，0 失败`
@@ -2530,7 +2530,7 @@ P3 批的修改均为文档类（SKILL.md 约束 #10 文案扩展、anti-pattern
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(self-test): P3 验证 — 确认现有用例不受文档类修改影响
 
 - P3 批修改均为文档类（约束 #10 文案 + 反模式扩展 + 信息密度指标）
@@ -2566,7 +2566,7 @@ Refs: SSoT §3.4.20"
 
 - [ ] **Step 4: 运行 self-test 全量验证**
 
-运行：`npx tsx w-model-dev/scripts/self-test.ts`
+运行：`npx tsx w-model-dev/scripts/cli/self-test.ts`
 预期输出：
 - 所有用例显示 `✓`
 - 末行 `总计 N 条用例：N 通过，0 失败`
@@ -2594,11 +2594,11 @@ Refs: SSoT §3.4.20"
 运行：`dir w-model-dev\scripts\check-role-dispatch.ts w-model-dev\scripts\check-state-machine-consistency.ts`
 预期输出：两个文件均存在
 
-运行：`npx tsx w-model-dev/scripts/check-role-dispatch.ts`
-预期输出：`用法: npx tsx w-model-dev/scripts/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]`（缺参数时退出码 2）
+运行：`npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts`
+预期输出：`用法: npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]`（缺参数时退出码 2）
 
-运行：`npx tsx w-model-dev/scripts/check-state-machine-consistency.ts`
-预期输出：`用法: npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>`（缺参数时退出码 2）
+运行：`npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts`
+预期输出：`用法: npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>`（缺参数时退出码 2）
 
 - [ ] **Step 8: Commit**
 

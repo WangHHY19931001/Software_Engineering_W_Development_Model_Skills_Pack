@@ -62,8 +62,8 @@
 
 | # | 级别 | 内容 | 位置 |
 |---|---|---|---|
-| 1.1 | P1 | isMain 守卫改 `fileURLToPath(import.meta.url)`（消除 Windows 特殊路径下门禁静默 exit 0 放行） | `w-model-dev/scripts/check-state-machine-consistency.ts:159-165` |
-| 1.2 | P2 | `cleanTraceFiles` 限定 TLC 产物白名单（防 manifest 指向敏感目录时递归误删） | `w-model-dev/scripts/check-tla-model.ts:176-204` |
+| 1.1 | P1 | isMain 守卫改 `fileURLToPath(import.meta.url)`（消除 Windows 特殊路径下门禁静默 exit 0 放行） | `w-model-dev/scripts/cli/check-state-machine-consistency.ts:159-165` |
+| 1.2 | P2 | `cleanTraceFiles` 限定 TLC 产物白名单（防 manifest 指向敏感目录时递归误删） | `w-model-dev/scripts/cli/check-tla-model.ts:176-204` |
 | 1.3 | P2 | `BRAINSTORM_OPEN_CMD` 拼接改 `execFile` 参数数组（消除命令注入面） | `.cursor/skills/brainstorming/scripts/server.cjs:539` |
 | 1.4 | P3 | JSON.parse 入口统一加 `__proto__`/`constructor` reviver 防御 | `lib/read-json-or-exit.ts` 及全部 parse 入口 |
 

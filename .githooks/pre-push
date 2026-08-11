@@ -180,15 +180,15 @@ run_expect "check:verifier 无效样本退出 1" 1 \
 
 # 6. security-scan：跑 eslint-plugin-security + baseline 比对，必须 exit 0
 run_expect "security-scan 无新增风险" 0 \
-  npx tsx w-model-dev/scripts/security-scan.ts || exit 1
+  npx tsx w-model-dev/scripts/cli/security-scan.ts || exit 1
 
 # 7. check-bdd-model 对有效 BDD 样本应退出 0
 run_expect "check-bdd-model 有效 BDD 样本退出 0" 0 \
-  npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1 || exit 1
+  npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1 || exit 1
 
 # 8. check-bdd-model 对 schema 不合规 BDD 样本应退出 2（输入错误）
 run_expect "check-bdd-model schema 不合规 BDD 样本退出 2" 2 \
-  npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1 || exit 1
+  npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1 || exit 1
 
 # 9. check:coverage 对有效覆盖样本应退出 0（阶段 1 需求覆盖分析门禁 C1-C10）
 run_expect "check:coverage 有效覆盖样本退出 0" 0 \
@@ -200,7 +200,7 @@ run_expect "check:exemption 有效豁免样本退出 0" 0 \
 
 # 11. [21.0.0] check-signature-chain 对有效签名链样本应退出 0
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
-  npx tsx w-model-dev/scripts/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
+  npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
 
 # 12. vitest 单元测试全量通过（35 test files / 530 tests；WSL 下 testTimeout 已放宽至 30s）
 run_expect "vitest 单元测试全通过" 0 npx vitest run || exit 1

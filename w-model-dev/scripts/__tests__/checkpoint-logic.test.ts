@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { checkCheckpoint } from '../checkpoint-logic.js';
+import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 
 describe('[21.0.0] R3 强制用户确认', () => {
   const checkpointEntry = {

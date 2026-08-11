@@ -82,12 +82,12 @@ npm run check:verifier -- <sample.json>
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
 | 5 | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本） | 1 |
-| 6 | `npx tsx w-model-dev/scripts/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成） | 0 |
-| 7 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本） | 0 |
-| 8 | `npx tsx w-model-dev/scripts/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本） | 2 |
+| 6 | `npx tsx w-model-dev/scripts/cli/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成） | 0 |
+| 7 | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本） | 0 |
+| 8 | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本） | 2 |
 | 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
-| 11 | `npx tsx w-model-dev/scripts/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
+| 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
 | 12 | `npx vitest run`（单元测试全量，35 files / 530 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，**warn-only 不阻断**；离线/网络失败自动跳过） | — |
 
@@ -209,7 +209,7 @@ docs/                   # 设计文档统一存放（SSoT、集成设计、安�
 LLM 评审逻辑由 `w-model-dev/` 下的提示词 + 校验脚本承载：
 
 1. **修改提示词 / Schema / 子标准**：先改 [`w-model-dev/references/verifier-spec.md`](./w-model-dev/references/verifier-spec.md)（权威来源）
-2. **同步校验逻辑**：修改 [`w-model-dev/scripts/verifier-logic.ts`](./w-model-dev/scripts/verifier-logic.ts) 的 `SUB_CRITERIA` 常量与 `checkVerifierOutput` 校验项
+2. **同步校验逻辑**：修改 [`w-model-dev/scripts/logic/verifier-logic.ts`](./w-model-dev/scripts/logic/verifier-logic.ts) 的 `SUB_CRITERIA` 常量与 `checkVerifierOutput` 校验项
 3. **端到端验证**：在 `w-model-dev/scripts/samples/verifier/` 增加通过 / 失败各一条样本，运行 `npm run self-test` 确认所有样本期望匹配；再用 `npm run check:verifier -- <sample.json>` 走 CLI 入口验证
 4. **同步 SSoT**：更新 [`docs/skill-design-document_SSoT.md`](./docs/skill-design-document_SSoT.md) §7.6 与 §16.2
 5. **同步集成设计**：更新 [`docs/llm-verifier-integration-design.md`](./docs/llm-verifier-integration-design.md)

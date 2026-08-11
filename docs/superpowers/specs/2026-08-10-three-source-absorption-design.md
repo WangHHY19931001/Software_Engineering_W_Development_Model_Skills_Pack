@@ -80,10 +80,10 @@
 | 9 | `w-model-dev/references/operational-recovery.md` | 修订 | 新增「HOTL 规则化授权」节（agentic Ch13：L2+ 操作型自动放行须基于显式可验证规则，而非模糊意图） |
 | 10 | `w-model-dev/references/verifier-spec.md` | 修订 | 新增「多子代理协作评审维度」R14-R17（agentic Ch7+Ch19：交接完整性 / 计划坚持度 / 角色-任务匹配 / 增量价值） |
 | 11 | `w-model-dev/references/format-conventions.md` | 修订 | 新增「命名约定」节（Clean-Code ch2：名副其实 / 有意义区分 / 可搜索 / 一词一义 / 避免思维映射 / 不加多余语境） |
-| 12 | `w-model-dev/scripts/check-run-log.ts` | 修订 | **轨迹模板校验**（agentic Ch19）：每阶段理想轨迹动作序列（阶段门：S→V→G→CHECKPOINT + R3×3），run-log 动作序列偏离即违规；不破坏现有 R1-R7 |
+| 12 | `w-model-dev/scripts/cli/check-run-log.ts` | 修订 | **轨迹模板校验**（agentic Ch19）：每阶段理想轨迹动作序列（阶段门：S→V→G→CHECKPOINT + R3×3），run-log 动作序列偏离即违规；不破坏现有 R1-R7 |
 | 13 | `w-model-dev/references/clean-code-refactoring-agentic-absorption.md` | **新建** | 吸收决策记录（三源映射表 + 章节出处 + 与约束/反模式关系 + 不吸收清单） |
 | 14 | `docs/skill-design-document_SSoT.md` | 修订 | 新增 §3.4.40「第 40 轮：三源吸收」；§10A 追溯表补行 |
-| 15 | `w-model-dev/scripts/docs-consistency-logic.ts` + 测试 | 修订 | 反模式最大编号期望 46 → 47；样本更新 |
+| 15 | `w-model-dev/scripts/logic/docs-consistency-logic.ts` + 测试 | 修订 | 反模式最大编号期望 46 → 47；样本更新 |
 | 16 | 顶层文档 | 修订 | 反模式计数 46 → 47 联动（AGENTS.md / README / INSTALL.md）；新 reference 挂 Bundled Resources；CHANGELOG [40.0.0]；版本号三处同步 |
 
 ### 3.2 批次 B（P1，40.1.0）

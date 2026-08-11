@@ -246,7 +246,7 @@ graph TD
 | 能力 | 归属 | 实现位置 |
 |---|---|---|
 | W 模型阶段编排、RTM 维护、状态管理 | 技能内 | `w-model-dev/SKILL.md`（编排逻辑，Agent 执行）+ `w-model-dev/references/*`（阶段细则） |
-| 阶段产物门禁（工件质量门） | 技能内（脚本只做门禁） | `w-model-dev/scripts/gate-logic.ts` + `check-artifact-gate.ts` |
+| 阶段产物门禁（工件质量门） | 技能内（脚本只做门禁） | `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts` |
 | LLM-as-a-Verifier 评审（三维度验证 / 连续评分 / PPT / 子标准） | **技能内提供提示词与输出 Schema，外部 Agent 执行** | `w-model-dev/references/verifier-spec.md`（提示词）+ `scripts/check-verifier-output.ts`（校验） |
 | LLM 推理本身 | **外部** | 由外部 Agent（Trae / Claude / Cursor 等）自行调用其 LLM 完成 |
 | 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估 / 轨迹分析） | **外部** | [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill) |
@@ -295,7 +295,7 @@ graph TD
 
 > **修复者 F 由 S 兼任**：F 不是新角色，是 S 在返工场景下「携带 R 报告作为额外输入执行修复」的模式。S 首次产出时不带 R 报告；返工时必带已通过 V 复审 + G 门禁的 R 报告（见反模式 #18/#19）。
 >
-> **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。
+> **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/cli/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施。
 
 #### 3.4.3 每阶段分派时序（统一）
 
@@ -307,7 +307,7 @@ S: 产出开发文档 + 同步测试设计 + 更新 RTM 实体 → 返回 {产�
   ↓ 分派 V
 V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
   ↓ 分派 G
-G: npx tsx w-model-dev/scripts/check-verifier-output.ts "<json>" → 返回 {exitCode, qualityLevel, passed, reworkHints}
+G: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>" → 返回 {exitCode, qualityLevel, passed, reworkHints}
 O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D} → 分派 S 返工（带 reworkHints），重走 V → G
 O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（编排者展示 G 子代理返回的证据给用户）
 O: 用户放行 → 编排者更新 project.status → 进入下一阶段
@@ -1686,7 +1686,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **输出 Schema**：`schemaVersion="1.0"` + `meta` + `subCriteria[]` + `compositeScore[0,1]` + `qualityLevel(A/B/C/D)` + `summary` + `passed` + 可选 `reworkHints` / `ranking`。
 - **质量等级映射**：`[0.85,1.0]=A` / `[0.70,0.85)=B` / `[0.50,0.70)=C` / `[0,0.50)=D`；`passed = (A or B) && 所有 subCriterion.score ≥ 0.70`（[25.0.0] 第 26 轮新增 R13 单轴下限：加权重平均只用于汇报，放行判据须逐子标准 ≥ B 级分界；反模式 #41 守护）。
 - **五轴评审与严重等级标签**（吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能）：代码评审（`targetKind=code`）的子标准按五轴（Correctness / Readability / Security / Architecture / Performance）组织发现项；每条发现项标注 Severity（Critical / Required / Nit / Optional / FYI），使作者区分必修与可选。详细子标准映射与 Structural Remedies 见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §7.4A。
-- **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/verifier-logic.ts`。
+- **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/logic/verifier-logic.ts`。
 - **与外部演化工具的关系**：本规范只覆盖「阶段产物校验流程」，是技能内部的产物质量保障；技能演化（Rollout / Reflect / Edit / Skill Lift）由外部 SkillOpt / darwin-skill 完成，可消费本规范产出的 `VerifierOutput` JSON 作为训练信号。
 - **evidence 格式规范**（[21.0.0] 新增）：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
   - 合法示例：`coverage.json.matrices.stakeholder.coverage=100%` / `tla-manifest.json.specs[0].tlcChecked=true`
@@ -1969,7 +1969,7 @@ flowchart TD
 > 架构重构说明：历史版本在此区分「工件质量门」与「技能验证门」两类质量门。
 > 重构后，**技能验证门已移除**——技能演化（Skill Lift 评估、Rollout / Reflect / Edit 等）不再内置技能包，
 > 由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
-> 对应地 `w-model-dev/scripts/check-skill-gate.ts`、`w-model-dev/META-SKILL.md`、
+> 对应地 `w-model-dev/scripts/cli/check-skill-gate.ts`、`w-model-dev/META-SKILL.md`、
 > `src/evolution/skill-optimizer.ts`、`src/eval/skill-lift.ts` 等均已删除。
 > 本节仅保留「工件质量门」。
 
@@ -1978,16 +1978,16 @@ flowchart TD
 | 评估对象 | W 模型产出物（需求 / 设计 / 代码 / 测试用例）对应的 RTM 覆盖与测试执行结果 |
 | 触发时机 | 验收测试阶段（`/wm test type=验收`） |
 | 判定逻辑 | RTM 覆盖率 100% 且四级测试（单元 / 集成 / 系统 / 验收）全部通过 |
-| 判定逻辑实现（单点事实源） | `w-model-dev/scripts/gate-logic.ts` `checkArtifactGate()` |
-| Agent CLI 入口 | `w-model-dev/scripts/check-artifact-gate.ts` |
+| 判定逻辑实现（单点事实源） | `w-model-dev/scripts/logic/gate-logic.ts` `checkArtifactGate()` |
+| Agent CLI 入口 | `w-model-dev/scripts/cli/check-artifact-gate.ts` |
 | 失败后果 | 返工回到编码阶段 |
 | 数据来源 | 真实测试执行结果（`/wm test result=pass\|fail` 回填） |
 
-**门禁脚本与 Markdown 的配合**：门禁判定逻辑沉入技能包内 `w-model-dev/scripts/gate-logic.ts`（纯函数、自包含、不依赖任何外部模块），保证技能包可独立分发给 TRAE / Claude 等 Agent。Agent 在质量门检查点直接执行脚本获取确定性判定，而非靠 LLM 自行估算：
+**门禁脚本与 Markdown 的配合**：门禁判定逻辑沉入技能包内 `w-model-dev/scripts/logic/gate-logic.ts`（纯函数、自包含、不依赖任何外部模块），保证技能包可独立分发给 TRAE / Claude 等 Agent。Agent 在质量门检查点直接执行脚本获取确定性判定，而非靠 LLM 自行估算：
 
 ```bash
 # 退出码 0=通过 / 1=未通过 / 2=输入错误；stdout 末尾输出 GATE_JSON {...} 供 Agent 解析
-npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
 ```
 
 `references/quality-standards.md` 以 Markdown 描述质量标准（人类可读），与脚本互为参照但不再承载判定逻辑。
@@ -2030,14 +2030,14 @@ DoD 与工件质量门的关系：
 
 > 阶段 1–4 ingestion 子流程的结构连通性门禁，与 §10.5 工件质量门（阶段 8 终检）互补。权威定义见 [`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md) §3；本节为摘要，与该设计文档双向追溯。
 >
-> 实现位置：[`w-model-dev/scripts/check-requirement-graph.ts`](../w-model-dev/scripts/check-requirement-graph.ts)（CLI）+ [`w-model-dev/scripts/graph-logic.ts`](../w-model-dev/scripts/graph-logic.ts)（校验纯逻辑，单点事实源）。
+> 实现位置：[`w-model-dev/scripts/cli/check-requirement-graph.ts`](../w-model-dev/scripts/cli/check-requirement-graph.ts)（CLI）+ [`w-model-dev/scripts/logic/graph-logic.ts`](../w-model-dev/scripts/logic/graph-logic.ts)（校验纯逻辑，单点事实源）。
 > 触发方：G 子代理在每轮 A-cross/A-evolve 产出 `consolidated.json` 后跑（编排者不跑，反模式 #10）。
 
 **CLI 接口**：
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 JSON 证据摘要（与 check-verifier-output.ts 同构）
-npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolidated.json>" [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or consolidated.json>" [--phase=1|2|3|4]
 ```
 
 **校验算法**（确定性，无 LLM；设计文档 §3.2）：
@@ -2072,14 +2072,14 @@ npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json or consolida
 
 > 阶段 1–4 TLA+ 层次化状态机建模的**行为正确性门禁**，与 §10.7 图谱门禁（结构层 + 信息流层）正交。权威定义见 [`docs/tla-plus-modeling-design.md`](./tla-plus-modeling-design.md) §3；本节为摘要，与该设计文档双向追溯。
 >
-> 实现位置：[`w-model-dev/scripts/check-tla-model.ts`](../w-model-dev/scripts/check-tla-model.ts)（CLI）+ [`w-model-dev/scripts/tla-logic.ts`](../w-model-dev/scripts/tla-logic.ts)（校验纯逻辑，单点事实源）。
+> 实现位置：[`w-model-dev/scripts/cli/check-tla-model.ts`](../w-model-dev/scripts/cli/check-tla-model.ts)（CLI）+ [`w-model-dev/scripts/logic/tla-logic.ts`](../w-model-dev/scripts/logic/tla-logic.ts)（校验纯逻辑，单点事实源）。
 > 触发方：G 子代理在 S 产出 `.tla` + `.cfg` + `tla-manifest.json` 后跑（编排者不跑，反模式 #10）。
 
 **CLI 接口**：
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 TLA_JSON 证据摘要（与 check-requirement-graph.ts 同构）
-npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
 ```
 
 > [21.0.0] 移除 `--skip-tlc` 参数：所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查，任何场景不得跳过 TLC。若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip），拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段。
@@ -2140,14 +2140,14 @@ npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|
 
 > 阶段 5（编码）的**代码与 TLA+ 规格一致性回归门禁**，将 TLA+ 资产作为状态机验证器回归编码产物。与 §10.8 TLA+ 行为门禁（阶段 1-4）互补：行为门禁校验 TLA+ 规格自身正确性，一致性回归校验代码是否符合 TLA+ 规格。
 >
-> 实现位置：[`w-model-dev/scripts/check-code-tla-consistency.ts`](../w-model-dev/scripts/check-code-tla-consistency.ts)（CLI）+ [`w-model-dev/scripts/code-tla-logic.ts`](../w-model-dev/scripts/code-tla-logic.ts)（校验纯逻辑，单点事实源）。
+> 实现位置：[`w-model-dev/scripts/cli/check-code-tla-consistency.ts`](../w-model-dev/scripts/cli/check-code-tla-consistency.ts)（CLI）+ [`w-model-dev/scripts/logic/code-tla-logic.ts`](../w-model-dev/scripts/logic/code-tla-logic.ts)（校验纯逻辑，单点事实源）。
 > 触发方：G 子代理在 S 产出代码后跑（编排者不跑，反模式 #10）。
 
 **CLI 接口**：
 
 ```bash
 # 退出码 0=通过 / 1=校验失败；stdout 输出 CODE_TLA_JSON 证据摘要
-npx tsx w-model-dev/scripts/check-code-tla-consistency.ts \
+npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts \
   --manifest=<tla-manifest.json> \
   --graph=<graph.json> \
   --rtm=<rtm.json> \
@@ -2173,14 +2173,14 @@ npx tsx w-model-dev/scripts/check-code-tla-consistency.ts \
 
 > 返工循环中 R 子代理产出的 `RootCauseReport` 校验门禁，与 §10.5 工件质量门（阶段 8 终检）/ §10.7 图谱门禁 / §10.8 TLA+ 行为门禁互补：前三者校验阶段产物，本节校验返工路径的根因报告。权威定义见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4 RootCauseReport Schema 与 R1-R10 校验规则。
 >
-> 实现位置：[`w-model-dev/scripts/check-rootcause-report.ts`](../w-model-dev/scripts/check-rootcause-report.ts)（CLI）+ 校验纯逻辑（单点事实源，与 `check-verifier-output.ts` 平级）。
+> 实现位置：[`w-model-dev/scripts/cli/check-rootcause-report.ts`](../w-model-dev/scripts/cli/check-rootcause-report.ts)（CLI）+ 校验纯逻辑（单点事实源，与 `check-verifier-output.ts` 平级）。
 > 触发方：G 子代理在 V 复审根因报告（`targetKind=rootcause`）通过后跑（编排者不跑，反模式 #10）。
 
 **CLI 接口**：
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 ROOTCAUSE_JSON 证据摘要（与 check-verifier-output.ts 同构）
-npx tsx w-model-dev/scripts/check-rootcause-report.ts "<rootcause-report.json>"
+npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.json>"
 ```
 
 **校验规则（R1-R10，确定性，无 LLM）**：
@@ -2301,7 +2301,7 @@ interface MaturityConfig {
 ### 10C.7 阶段完成计数与强制校验（check-maturity.ts）
 
 > 历史缺陷：Shell Agent 项目实跑暴露成熟度阶梯的 `unlockConditions.completedCycles` 此前无强制递增机制——编排者可漏更导致成熟度判定失真，成熟度升降级失去客观依据。本节确立阶段完成计数的强制校验。
-> 实现位置：[`w-model-dev/scripts/check-maturity.ts`](../w-model-dev/scripts/check-maturity.ts)（CLI 校验，确定性无 LLM）。
+> 实现位置：[`w-model-dev/scripts/cli/check-maturity.ts`](../w-model-dev/scripts/cli/check-maturity.ts)（CLI 校验，确定性无 LLM）。
 
 - **阶段完成计数强制递增**：项目每完成一阶段（run-log.jsonl 追加 `action=checkpoint` 且 `outcome=success` 记录后），编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1；漏更 → 计数滞后。
 - **check-maturity.ts 强制校验**：`check-maturity.ts` 须交叉校验 `maturity.json.unlockConditions.completedCycles` 与 run-log.jsonl 中 `action=checkpoint ∧ outcome=success` 记录数——`completedCycles < 实际 checkpoint success 数` 即滞后 → 退出码 1。
@@ -2412,7 +2412,7 @@ interface RunLogEntry {
 ### 10D.7 预算与运行日志强制校验项（check-budget.ts / check-run-log.ts）
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露预算与运行日志为「纸面机制」——`budget.updatedAt` 不更新、killSwitch 触发无告警、run-log 缺类、返工无记录，且无脚本强制校验，闭环机制失效。本节确立强制校验项。
-> 实现位置：[`w-model-dev/scripts/check-budget.ts`](../w-model-dev/scripts/check-budget.ts) + [`w-model-dev/scripts/check-run-log.ts`](../w-model-dev/scripts/check-run-log.ts)（CLI 校验，确定性无 LLM）。
+> 实现位置：[`w-model-dev/scripts/cli/check-budget.ts`](../w-model-dev/scripts/cli/check-budget.ts) + [`w-model-dev/scripts/cli/check-run-log.ts`](../w-model-dev/scripts/cli/check-run-log.ts)（CLI 校验，确定性无 LLM）。
 
 - **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
@@ -2425,7 +2425,7 @@ interface RunLogEntry {
 ## 10E. 门禁退出码不可伪（gate-logs 存档与交叉校验）
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「门禁脚本退出码可被伪造/丢失」——G 子代理只回填退出码摘要却不存档 stdout，编排者无法交叉核验 `run-log.gateExitCode` 与脚本真实输出是否一致，导致门禁形同虚设。本节确立退出码不可伪的三层防线。
-> 实现位置：各 `w-model-dev/scripts/check-*.ts`（exitCode 字段）+ G 子代理存档职责 + [`w-model-dev/scripts/check-run-log.ts`](../w-model-dev/scripts/check-run-log.ts)（交叉校验 CLI，确定性无 LLM）。
+> 实现位置：各 `w-model-dev/scripts/cli/check-*.ts`（exitCode 字段）+ G 子代理存档职责 + [`w-model-dev/scripts/cli/check-run-log.ts`](../w-model-dev/scripts/cli/check-run-log.ts)（交叉校验 CLI，确定性无 LLM）。
 
 **强制校验项**（E.1~E.4，任一层失败 → exitCode=1，O 不得放行）：
 
@@ -2560,7 +2560,7 @@ interface RunLogEntry {
 | V1 | `npx tsc --noEmit` | 0 |
 | V2 | `npm run self-test` | 0 |
 | V3 | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 |
-| V4 | `npx tsx w-model-dev/scripts/check-verifier-output.ts <fixture>` | 1（触发 R11/R12/R13） |
+| V4 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <fixture>` | 1（触发 R11/R12/R13） |
 
 ### 10H.6 与 Loop 4 的边界
 
@@ -2587,7 +2587,7 @@ interface RunLogEntry {
 > 历史缺陷：第 21 轮 8 阶段调测暴露「阶段 1 验收测试设计与阶段 5 编码实现脱节」——
 > 6 处接口路径/参数名/状态码/响应字段不一致，`uat-path-mapping.md` 形同虚设。
 > 本节确立编码后自动校验设计契约一致性的机制。
-> 实现位置：`w-model-dev/scripts/check-design-contract-consistency.ts` + `w-model-dev/references/phase-5-coding.md` 反向对照清单。
+> 实现位置：`w-model-dev/scripts/cli/check-design-contract-consistency.ts` + `w-model-dev/references/phase-5-coding.md` 反向对照清单。
 
 **强制校验维度**（D1~D4，任一失败 → exitCode=1，O 不得放行）：
 
@@ -2630,7 +2630,7 @@ interface RunLogEntry {
 ## 10.10 系统层级树与多层图谱
 
 > 历史缺陷：Shell Agent 项目阶段 1–3 实跑暴露「graph.json 仅有同阶段 `parent` 树，缺乏跨阶段系统层级树与多层图谱语义」——REQ/SD/INTF/DD 节点各自孤立成林，无法表达「系统根 → 子系统根 → 接口根」的层级依附，也无法承载横切治理/协作/派生关系。本节确立系统层级树 + 7 层图谱模型。
-> 实现位置：[`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md)（结构层扩展）+ [`w-model-dev/scripts/graph-logic.ts`](../w-model-dev/scripts/graph-logic.ts)（校验纯逻辑，单点事实源）+ [`w-model-dev/scripts/check-requirement-graph.ts`](../w-model-dev/scripts/check-requirement-graph.ts)（CLI）。
+> 实现位置：[`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md)（结构层扩展）+ [`w-model-dev/scripts/logic/graph-logic.ts`](../w-model-dev/scripts/logic/graph-logic.ts)（校验纯逻辑，单点事实源）+ [`w-model-dev/scripts/cli/check-requirement-graph.ts`](../w-model-dev/scripts/cli/check-requirement-graph.ts)（CLI）。
 
 ### 10.10.1 系统层级树
 
@@ -2667,14 +2667,14 @@ interface RunLogEntry {
 
 > 阶段 1–8 每角色动作完成后产出的**签名链完整性 + 产出来源正确性**门禁。权威定义见 [`w-model-dev/references/signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md)；schema 见 §7.9。
 >
-> 实现位置：[`w-model-dev/scripts/check-signature-chain.ts`](../w-model-dev/scripts/check-signature-chain.ts)（CLI）+ [`w-model-dev/scripts/signature-chain-logic.ts`](../w-model-dev/scripts/signature-chain-logic.ts)（校验纯逻辑，单点事实源）。
+> 实现位置：[`w-model-dev/scripts/cli/check-signature-chain.ts`](../w-model-dev/scripts/cli/check-signature-chain.ts)（CLI）+ [`w-model-dev/scripts/logic/signature-chain-logic.ts`](../w-model-dev/scripts/logic/signature-chain-logic.ts)（校验纯逻辑，单点事实源）。
 > 触发方：G 子代理跑每个 gate 脚本前 + O 子代理 checkpoint 前 + 归档时。
 
 **CLI 接口**：
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误
-npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
 ```
 
 **校验规则**（R1-R10）：
@@ -2715,28 +2715,28 @@ npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--
 | 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
 | 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
 | 3.4 编排者-子代理边界 | 编排者最小化（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体，A 为阶段 1–4 分析子代理，R 为返工循环根因定位，F 由 S 兼任）+ 反模式 #10/#11/#12/#18/#19 守护 | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10/#11/#12/#18/#19 + `ingestion-chunk.md` / `ingestion-cross.md` / `graph-guide.md` | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施 + A 子代理图谱演进 + G 跑 `check-requirement-graph.ts` 守护 #11/#12 + R 返工根因定位守护 #18/#19） |
-| §3.4.13 第 18 轮 drawio-skill 设计吸收 | Bundled Resources 触发条件总表 + JSON Schema 强约束（反模式 #28）+ 安全扫描基线 + 版本号双写 + pure/IO 函数分离 + 测试 coverage 矩阵 + toolbox 决策表 | `w-model-dev/SKILL.md`「Bundled Resources」节 + `w-model-dev/schemas/*.schema.json`（draft-07）+ `w-model-dev/scripts/schema-loader.ts`（ajv 单例）+ `w-model-dev/scripts/security-scan.ts` + `.eslintsecurity-baseline.json`（sha256 指纹豁免）+ `w-model-dev/skill-metadata.json`（版本号镜像）+ `w-model-dev/scripts/__tests__/skill-metadata.test.ts`（双写回归）+ `w-model-dev/references/toolbox.md`（I have X → use Z）+ `w-model-dev/scripts/__tests__/README.md`（coverage 矩阵）+ `w-model-dev/references/anti-patterns.md` #28 | 完整（吸收 drawio-skill 7 项设计实践；纯文档同步不涉及 .ts 代码变更；schema 校验由 logic 层自动调用、security-scan 由 pre-push 承载） |
-| §3.4.14 第 19 轮 BDD 建模与验收夹具 | 分层 BDD features（L1-L4）+ 状态机七要素 + BDD↔TLA+ 等价性 + 7 维度门禁 + RTM 映射扩展 + 验收夹具四类 + 反模式 #29 | `w-model-dev/schemas/bdd-manifest.schema.json` + `w-model-dev/scripts/bdd-logic.ts`（纯逻辑）+ `w-model-dev/scripts/check-bdd-model.ts`（CLI）+ `w-model-dev/scripts/samples/bdd/`（10 样本）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（vitest）+ `w-model-dev/references/bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md` + `w-model-dev/templates/feature.template` / `bdd-manifest.template.json` + `w-model-dev/references/anti-patterns.md` #29 + `w-model-dev/SKILL.md` 约束 #14 | 完整（BDD 与 TLA+ 正交协作；Cucumber.js v11 + @cucumber/messages devDeps；self-test 基线 111→121） |
-| §3.4.15 第 19.0.1 轮 W 模型 8 阶段端到端调测验证与归档 | check-bdd-model.ts D7 RTM schema 修正（`rtm.requirements` → `rtm.rows` + `requirementId`）+ D7 测试样本补强（3 个）+ 8 阶段调测归档（7 文件）+ demo 产物清理 + 版本号三处同步 19.0.1 | `w-model-dev/scripts/check-bdd-model.ts`（D7 修正）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（+3 D7 测试）+ `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`（7 归档文件）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 19.0.1）+ `CHANGELOG.md` [19.0.1] | 完整（8 阶段端到端调测发现 D7 schema bug；UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过；self-test 基线 121 不变；vitest 105→108） |
-| §3.4.16 第 20 轮 阶段 1 需求提取四维识别与豁免审批 | 四维识别模型（层级关系 R1-R4 + 子系统划分 REQ-group + 交叉逻辑 R5/R6 + 覆盖分析 C1-C10）+ 豁免审批治理（S→R→V→人类 E1-E8）+ 图谱 schema 扩展（level/priority/reqGroup + 3 类边）+ 规格书模板 5→13 节 + 反模式 #30 + 禁止行为 #7-#11 | `w-model-dev/schemas/coverage.schema.json` + `exemption.schema.json` + `w-model-dev/scripts/coverage-logic.ts` / `check-requirement-coverage.ts` + `exemption-logic.ts` / `check-exemption.ts` + `graph-logic.ts`（R1-R6 + reqHierarchy/crossLogic）+ `check-requirement-graph.ts`（--rtm / --exemptions）+ `samples/graph/`（+13）+ `samples/coverage/`（10）+ `samples/exemption/`（7）+ `__tests__/graph-logic.test.ts`（R1-R6）+ `coverage-logic.test.ts`（C1-C10）+ `exemption-logic.test.ts`（E1-E8）+ `templates/requirement-spec.md`（5→13 节）+ `references/anti-patterns.md` #30 + `w-model-dev/SKILL.md` 约束 #15/#16 | 完整（不向后兼容老图谱，历史抛弃重新生成；self-test 基线 121→152；vitest 108→~165） |
-| §3.4.22 第 26 轮 外部技能深度对比吸收 + 单轴下限 + Fowler 12 + 术语治理 | 加权平均掩盖单轴失败 → R13 单轴下限（passed 收紧为 qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70，0.70=B 级分界）+ Fowler 12 坏味道基线 + 票据内容 durability（符号级契约）+ 术语治理 glossary + 角色表 Negation 审计 + 反模式 #41 | `w-model-dev/scripts/verifier-logic.ts`（R13：SINGLE_AXIS_MIN_SCORE + checkR13SingleAxisFloor + expectedPassed 单轴条件）+ `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json`（completeness=0.65 fixture）+ `w-model-dev/scripts/__tests__/verifier-logic.test.ts`（+4 R13 用例）+ `w-model-dev/scripts/self-test.ts`（VERIFIER_CASES +1，基线 191→192）+ `w-model-dev/references/verifier-spec.md`（§3.3/§6.3）+ `w-model-dev/subagent/engineering-code-reviewer.md`（Fowler 12 基线节）+ `w-model-dev/references/glossary.md`（新建，15+ 术语 + `_Avoid_`）+ `w-model-dev/references/phase-5-coding.md`（票据 durability 节）+ `w-model-dev/references/anti-patterns.md` #41 + `w-model-dev/SKILL.md`（角色表 Negation 审计 + references 索引 glossary 条目） | 完整（R13 非破坏性：既有样本全部 score ≥0.70；#41 用户决策直接转正不经 pending 复审；qualityLevel 映射不变，仅 passed 增加单轴条件；验证门 V1-V6 全通过：tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / fixture exit=1 / 全样本 valid=0 bad=1） |
+| §3.4.13 第 18 轮 drawio-skill 设计吸收 | Bundled Resources 触发条件总表 + JSON Schema 强约束（反模式 #28）+ 安全扫描基线 + 版本号双写 + pure/IO 函数分离 + 测试 coverage 矩阵 + toolbox 决策表 | `w-model-dev/SKILL.md`「Bundled Resources」节 + `w-model-dev/schemas/*.schema.json`（draft-07）+ `w-model-dev/scripts/logic/schema-loader.ts`（ajv 单例）+ `w-model-dev/scripts/cli/security-scan.ts` + `.eslintsecurity-baseline.json`（sha256 指纹豁免）+ `w-model-dev/skill-metadata.json`（版本号镜像）+ `w-model-dev/scripts/__tests__/skill-metadata.test.ts`（双写回归）+ `w-model-dev/references/toolbox.md`（I have X → use Z）+ `w-model-dev/scripts/__tests__/README.md`（coverage 矩阵）+ `w-model-dev/references/anti-patterns.md` #28 | 完整（吸收 drawio-skill 7 项设计实践；纯文档同步不涉及 .ts 代码变更；schema 校验由 logic 层自动调用、security-scan 由 pre-push 承载） |
+| §3.4.14 第 19 轮 BDD 建模与验收夹具 | 分层 BDD features（L1-L4）+ 状态机七要素 + BDD↔TLA+ 等价性 + 7 维度门禁 + RTM 映射扩展 + 验收夹具四类 + 反模式 #29 | `w-model-dev/schemas/bdd-manifest.schema.json` + `w-model-dev/scripts/logic/bdd-logic.ts`（纯逻辑）+ `w-model-dev/scripts/cli/check-bdd-model.ts`（CLI）+ `w-model-dev/scripts/samples/bdd/`（10 样本）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（vitest）+ `w-model-dev/references/bdd-guide.md` / `bdd-review-checklist.md` / `bdd-syntax-reference.md` / `bdd-patterns-examples.md` + `w-model-dev/templates/feature.template` / `bdd-manifest.template.json` + `w-model-dev/references/anti-patterns.md` #29 + `w-model-dev/SKILL.md` 约束 #14 | 完整（BDD 与 TLA+ 正交协作；Cucumber.js v11 + @cucumber/messages devDeps；self-test 基线 111→121） |
+| §3.4.15 第 19.0.1 轮 W 模型 8 阶段端到端调测验证与归档 | check-bdd-model.ts D7 RTM schema 修正（`rtm.requirements` → `rtm.rows` + `requirementId`）+ D7 测试样本补强（3 个）+ 8 阶段调测归档（7 文件）+ demo 产物清理 + 版本号三处同步 19.0.1 | `w-model-dev/scripts/cli/check-bdd-model.ts`（D7 修正）+ `w-model-dev/scripts/__tests__/bdd-logic.test.ts`（+3 D7 测试）+ `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`（7 归档文件）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 19.0.1）+ `CHANGELOG.md` [19.0.1] | 完整（8 阶段端到端调测发现 D7 schema bug；UT 150/150 + IT 24/24 + ST 32/32 + UAT 25/25 = 231 全通过；self-test 基线 121 不变；vitest 105→108） |
+| §3.4.16 第 20 轮 阶段 1 需求提取四维识别与豁免审批 | 四维识别模型（层级关系 R1-R4 + 子系统划分 REQ-group + 交叉逻辑 R5/R6 + 覆盖分析 C1-C10）+ 豁免审批治理（S→R→V→人类 E1-E8）+ 图谱 schema 扩展（level/priority/reqGroup + 3 类边）+ 规格书模板 5→13 节 + 反模式 #30 + 禁止行为 #7-#11 | `w-model-dev/schemas/coverage.schema.json` + `exemption.schema.json` + `w-model-dev/scripts/logic/coverage-logic.ts` / `check-requirement-coverage.ts` + `exemption-logic.ts` / `check-exemption.ts` + `graph-logic.ts`（R1-R6 + reqHierarchy/crossLogic）+ `check-requirement-graph.ts`（--rtm / --exemptions）+ `samples/graph/`（+13）+ `samples/coverage/`（10）+ `samples/exemption/`（7）+ `__tests__/graph-logic.test.ts`（R1-R6）+ `coverage-logic.test.ts`（C1-C10）+ `exemption-logic.test.ts`（E1-E8）+ `templates/requirement-spec.md`（5→13 节）+ `references/anti-patterns.md` #30 + `w-model-dev/SKILL.md` 约束 #15/#16 | 完整（不向后兼容老图谱，历史抛弃重新生成；self-test 基线 121→152；vitest 108→~165） |
+| §3.4.22 第 26 轮 外部技能深度对比吸收 + 单轴下限 + Fowler 12 + 术语治理 | 加权平均掩盖单轴失败 → R13 单轴下限（passed 收紧为 qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70，0.70=B 级分界）+ Fowler 12 坏味道基线 + 票据内容 durability（符号级契约）+ 术语治理 glossary + 角色表 Negation 审计 + 反模式 #41 | `w-model-dev/scripts/logic/verifier-logic.ts`（R13：SINGLE_AXIS_MIN_SCORE + checkR13SingleAxisFloor + expectedPassed 单轴条件）+ `w-model-dev/scripts/samples/verifier/bad-single-axis-low.json`（completeness=0.65 fixture）+ `w-model-dev/scripts/__tests__/verifier-logic.test.ts`（+4 R13 用例）+ `w-model-dev/scripts/cli/self-test.ts`（VERIFIER_CASES +1，基线 191→192）+ `w-model-dev/references/verifier-spec.md`（§3.3/§6.3）+ `w-model-dev/subagent/engineering-code-reviewer.md`（Fowler 12 基线节）+ `w-model-dev/references/glossary.md`（新建，15+ 术语 + `_Avoid_`）+ `w-model-dev/references/phase-5-coding.md`（票据 durability 节）+ `w-model-dev/references/anti-patterns.md` #41 + `w-model-dev/SKILL.md`（角色表 Negation 审计 + references 索引 glossary 条目） | 完整（R13 非破坏性：既有样本全部 score ≥0.70；#41 用户决策直接转正不经 pending 复审；qualityLevel 映射不变，仅 passed 增加单轴条件；验证门 V1-V6 全通过：tsc 0 错误 / self-test 192 通过 / vitest 205 通过 / fixture exit=1 / 全样本 valid=0 bad=1） |
 | §3.4.23 第 27 轮 Wayfinder「Fog of War」吸收 — 阶段 1 迷雾登记册 | 强制 100% 覆盖下「in-scope 尚无法精确陈述」需求无落脚点 → REQ 入学锐利性测试（能否精确陈述，非能否回答）+ 迷雾登记册文本节（Not yet specified，不建图节点）+ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空）+ FM-3D-07 迷雾滥用 + 禁止行为 #12（不新增反模式） | `w-model-dev/references/ingestion-chunk.md`（锐利性测试节 + fogDesc/fogBlocker/fogGroupHint + crossChunkHints edgeType=fog）+ `w-model-dev/references/ingestion-cross.md`（算法步骤 9 + 报告 §7）+ `w-model-dev/references/phase-1-requirements.md`（迷雾登记册节 + FM-3D-07 + 禁止行为 #12 + 返工路径）+ `w-model-dev/templates/requirement-spec.md`（§8.5 Not yet specified）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处 26.0.0） | 完整（纯文档吸收，无脚本/schema 变更；self-test 192 / vitest 205 基线不变；D5 互引一致性通过；版本号三处一致 26.0.0） |
-| §3.4.24 第 28 轮 need_fix.md + 全量脚本 code-review 修正 | need_fix.md Bug 1（estimateTokens CJK 低估）+ Bug 2（splitMarkdownByHeaders 分段逻辑重写）+ 全量 ~66 项缺陷修正（P1×15 / P2×25 / P3×26），分 6 组（G-A plan-chunks A1-A6 / G-B gate/verifier/schema/security B1-B12 / G-C graph/coverage/exemption C1-C9 / G-D TLA/BDD/code D1-D9 / G-E 状态/日志/签名/归档 E1-E17 / G-F opsx/codegraph F1-F7 + D4 操作侧 opsx 补产约束）。关键修正：SD→codeModule 对齐（gate-logic + code-tla-logic）、security-scan 指纹跨机器归一化、--rtm R6 纳入 passed、豁免多 group 兼容、签名链跨阶段连续链（D2）、run-log R1 按阶段分档（D3）、uat-path-mapping 严格解析 + phase 8 终检、graph.schema.json sourceArtifact 字段复活、check-budget.ts tla-rework 统计改为 action=rework。版本号 26.0.0 → 27.0.0。 | `w-model-dev/scripts/plan-chunks.ts`（A1-A5）+ `w-model-dev/scripts/__tests__/plan-chunks.test.ts`（新建，A6）+ `w-model-dev/scripts/gate-logic.ts`（B1-B3）+ `w-model-dev/scripts/check-artifact-gate.ts`（B4-B6）+ `w-model-dev/scripts/security-scan.ts`（B7-B8）+ `w-model-dev/scripts/check-verifier-output.ts`（B9）+ `w-model-dev/scripts/schema-loader.ts`（B10）+ `w-model-dev/scripts/verifier-logic.ts`（B11）+ `w-model-dev/scripts/self-test.ts`（B12）+ `w-model-dev/scripts/check-requirement-graph.ts`（C1-C4）+ `w-model-dev/schemas/graph.schema.json`（C5）+ `w-model-dev/scripts/graph-logic.ts`（C6）+ `w-model-dev/scripts/coverage-logic.ts`（C7-C8）+ `w-model-dev/scripts/exemption-logic.ts`（C9）+ `w-model-dev/scripts/tla-logic.ts`（D1-D3）+ `w-model-dev/scripts/code-tla-logic.ts`（D1）+ `w-model-dev/scripts/check-bdd-model.ts`（D4）+ `w-model-dev/scripts/tla-bdd-sync-logic.ts`（D5-D7）+ `w-model-dev/scripts/check-design-contract-consistency.ts`（D8）+ `w-model-dev/scripts/design-contract-logic.ts`（D9，新建）+ `w-model-dev/scripts/__tests__/design-contract-logic.test.ts`（新建）+ `w-model-dev/scripts/signature-chain-logic.ts`（E1-E3）+ `w-model-dev/scripts/check-signature-chain.ts`（E4）+ `w-model-dev/scripts/run-log-logic.ts`（E5-E9）+ `w-model-dev/scripts/check-run-log.ts`（E10-E11）+ `w-model-dev/scripts/check-budget.ts`（E12）+ `w-model-dev/scripts/check-maturity.ts`（E13）+ `w-model-dev/scripts/check-checkpoint.ts`（E14）+ `w-model-dev/scripts/checkpoint-logic.ts`（E15）+ `w-model-dev/scripts/root-cause-logic.ts`（E16）+ `w-model-dev/scripts/archive-integrity-logic.ts`（E17）+ `w-model-dev/scripts/ensure-codegraph-opsx.ts`（F1-F3）+ `w-model-dev/scripts/check-codegraph-queries.ts`（F4）+ `w-model-dev/scripts/check-opsx-artifacts.ts`（F5）+ `w-model-dev/scripts/check-openspec-archive.ts`（F6）+ `w-model-dev/references/signature-chain-guide.md`（连续链整改）+ `w-model-dev/references/data-models.md`（run-log R1 分档/tla-rework 枚举移除）+ `w-model-dev/references/subagent-delegation.md`（opsx D4 补产约束）+ `w-model-dev/references/anti-patterns.md` #39（同步）+ `w-model-dev/references/phase-8-acceptance-test.md`（uat-path-mapping 终检声明）+ `w-model-dev/SKILL.md`（D4 约束）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 27.0.0） | 完整（6 组域内回归 + 全量回归：self-test 192→213 / vitest 205→269 / 21 test files / TypeScript strict 0 错误 / security-scan baseline 指纹归一化后重生成 / prepush 全绿） |
+| §3.4.24 第 28 轮 need_fix.md + 全量脚本 code-review 修正 | need_fix.md Bug 1（estimateTokens CJK 低估）+ Bug 2（splitMarkdownByHeaders 分段逻辑重写）+ 全量 ~66 项缺陷修正（P1×15 / P2×25 / P3×26），分 6 组（G-A plan-chunks A1-A6 / G-B gate/verifier/schema/security B1-B12 / G-C graph/coverage/exemption C1-C9 / G-D TLA/BDD/code D1-D9 / G-E 状态/日志/签名/归档 E1-E17 / G-F opsx/codegraph F1-F7 + D4 操作侧 opsx 补产约束）。关键修正：SD→codeModule 对齐（gate-logic + code-tla-logic）、security-scan 指纹跨机器归一化、--rtm R6 纳入 passed、豁免多 group 兼容、签名链跨阶段连续链（D2）、run-log R1 按阶段分档（D3）、uat-path-mapping 严格解析 + phase 8 终检、graph.schema.json sourceArtifact 字段复活、check-budget.ts tla-rework 统计改为 action=rework。版本号 26.0.0 → 27.0.0。 | `w-model-dev/scripts/logic/plan-chunks.ts`（A1-A5）+ `w-model-dev/scripts/__tests__/plan-chunks.test.ts`（新建，A6）+ `w-model-dev/scripts/logic/gate-logic.ts`（B1-B3）+ `w-model-dev/scripts/cli/check-artifact-gate.ts`（B4-B6）+ `w-model-dev/scripts/cli/security-scan.ts`（B7-B8）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（B9）+ `w-model-dev/scripts/logic/schema-loader.ts`（B10）+ `w-model-dev/scripts/logic/verifier-logic.ts`（B11）+ `w-model-dev/scripts/cli/self-test.ts`（B12）+ `w-model-dev/scripts/cli/check-requirement-graph.ts`（C1-C4）+ `w-model-dev/schemas/graph.schema.json`（C5）+ `w-model-dev/scripts/logic/graph-logic.ts`（C6）+ `w-model-dev/scripts/logic/coverage-logic.ts`（C7-C8）+ `w-model-dev/scripts/logic/exemption-logic.ts`（C9）+ `w-model-dev/scripts/logic/tla-logic.ts`（D1-D3）+ `w-model-dev/scripts/logic/code-tla-logic.ts`（D1）+ `w-model-dev/scripts/cli/check-bdd-model.ts`（D4）+ `w-model-dev/scripts/logic/tla-bdd-sync-logic.ts`（D5-D7）+ `w-model-dev/scripts/cli/check-design-contract-consistency.ts`（D8）+ `w-model-dev/scripts/logic/design-contract-logic.ts`（D9，新建）+ `w-model-dev/scripts/__tests__/design-contract-logic.test.ts`（新建）+ `w-model-dev/scripts/logic/signature-chain-logic.ts`（E1-E3）+ `w-model-dev/scripts/cli/check-signature-chain.ts`（E4）+ `w-model-dev/scripts/logic/run-log-logic.ts`（E5-E9）+ `w-model-dev/scripts/cli/check-run-log.ts`（E10-E11）+ `w-model-dev/scripts/cli/check-budget.ts`（E12）+ `w-model-dev/scripts/cli/check-maturity.ts`（E13）+ `w-model-dev/scripts/cli/check-checkpoint.ts`（E14）+ `w-model-dev/scripts/logic/checkpoint-logic.ts`（E15）+ `w-model-dev/scripts/logic/root-cause-logic.ts`（E16）+ `w-model-dev/scripts/logic/archive-integrity-logic.ts`（E17）+ `w-model-dev/scripts/cli/ensure-codegraph-opsx.ts`（F1-F3）+ `w-model-dev/scripts/cli/check-codegraph-queries.ts`（F4）+ `w-model-dev/scripts/cli/check-opsx-artifacts.ts`（F5）+ `w-model-dev/scripts/cli/check-openspec-archive.ts`（F6）+ `w-model-dev/references/signature-chain-guide.md`（连续链整改）+ `w-model-dev/references/data-models.md`（run-log R1 分档/tla-rework 枚举移除）+ `w-model-dev/references/subagent-delegation.md`（opsx D4 补产约束）+ `w-model-dev/references/anti-patterns.md` #39（同步）+ `w-model-dev/references/phase-8-acceptance-test.md`（uat-path-mapping 终检声明）+ `w-model-dev/SKILL.md`（D4 约束）+ `package.json` / `w-model-dev/skill-metadata.json` / `w-model-dev/SKILL.md`（版本号三处同步 27.0.0） | 完整（6 组域内回归 + 全量回归：self-test 192→213 / vitest 205→269 / 21 test files / TypeScript strict 0 错误 / security-scan baseline 指纹归一化后重生成 / prepush 全绿） |
 | 4A 核心操作行为与失败模式 | 8 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/anti-patterns.md`「失败模式清单」节（F1~F10）+「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
 | 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |
 | 7 数据模型 | Project / Requirement / Design / TestCase / RTM | `w-model-dev/references/data-models.md`（Agent 维护 `.w-model/*.json` 的 schema） | 完整 |
-| 7.6 LLM-as-a-Verifier 评审规范 | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 / 五轴评审 / Severity 标签 / Structural Remedies | `w-model-dev/references/verifier-spec.md`（规范，含 §7.4A 五轴+Severity+Remedies）+ `w-model-dev/scripts/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/check-verifier-output.ts`（CLI 校验） | 完整（LLM 推理由外部 Agent 执行；五轴+Severity 吸收自 addyosmani/agent-skills `code-review-and-quality`） |
+| 7.6 LLM-as-a-Verifier 评审规范 | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 / 五轴评审 / Severity 标签 / Structural Remedies | `w-model-dev/references/verifier-spec.md`（规范，含 §7.4A 五轴+Severity+Remedies）+ `w-model-dev/scripts/logic/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（CLI 校验） | 完整（LLM 推理由外部 Agent 执行；五轴+Severity 吸收自 addyosmani/agent-skills `code-review-and-quality`） |
 | 7.7 graph.json schema | ingestion 子流程结构层图谱（节点/边/连通/单根/跨阶段追溯 + 信息流边与边界节点） | `docs/ingestion-graph-convergence-design.md` §2.4（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/references/graph-guide.md` + `w-model-dev/references/ingestion-chunk.md` / `ingestion-cross.md` | 完整（与 `rtm.json` 分工：结构层 vs 追溯层，各自独立校验；信息流边与边界节点用于黑洞/奇迹/死模块校验） |
 | 7.8 tla-manifest.json schema | TLA+ 层次化状态机建模行为层产物（specs/层级/拆解决策/文件头/SANY+TLC 结果） | `docs/tla-plus-modeling-design.md` §2（权威定义）+ `w-model-dev/references/tla-plus-guide.md` + `w-model-dev/templates/tla-spec-template.md` | 完整（与 `graph.json`/`rtm.json` 分工：行为层 vs 结构层 vs 追溯层，三者并存各自独立校验；S 产出 .tla+.cfg+manifest，G 跑 `check-tla-model.ts` 校验） |
 | 8 技术实现方案 | 需求解析 / 测试用例生成 / 代码生成算法 | 上游 AI 按提示词执行（`w-model-dev/references/phase-*.md`） | 完整（算法由提示词承载，技能不内置 LLM） |
 | 9 RTM | 需求跟踪矩阵 | `w-model-dev/references/rtm-guide.md` + `templates/rtm.md`（Agent 维护） | 完整 |
-| 10 质量保障 | 工件质量门 | 判定逻辑：`w-model-dev/scripts/gate-logic.ts`（单点事实源）；CLI：`w-model-dev/scripts/check-artifact-gate.ts` | 完整（见 10.5，门禁逻辑已沉入技能包） |
+| 10 质量保障 | 工件质量门 | 判定逻辑：`w-model-dev/scripts/logic/gate-logic.ts`（单点事实源）；CLI：`w-model-dev/scripts/cli/check-artifact-gate.ts` | 完整（见 10.5，门禁逻辑已沉入技能包） |
 | 10.6 项目级 Definition of Done | 每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性） | `w-model-dev/references/definition-of-done.md` | 完整（吸收自 addyosmani/agent-skills `references/definition-of-done.md`；第六维度「理解证据」吸收自 cobusgreyling/loop-engineering `docs/concepts.md` Comprehension Debt，与 §10.5 工件质量门互补） |
-| 10.7 图谱门禁 | 阶段 1–4 ingestion 子流程结构连通性门禁（连通/单根/父唯一/阶段递进追溯 + 信息流校验：黑洞/奇迹/死模块/边界完整性） | `docs/ingestion-graph-convergence-design.md` §3（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/scripts/graph-logic.ts`（校验纯逻辑，含 `DataflowViolations`/`BoundaryInfo`）+ `w-model-dev/scripts/check-requirement-graph.ts`（CLI）+ `w-model-dev/references/graph-guide.md` | 完整（与 §10.5 工件质量门互补：结构层阶段 1–4 vs 追溯层阶段 8 终检；信息流校验与结构校验正交；守护反模式 #11/#12/#13） |
-| 10.8 TLA+ 行为门禁 | 阶段 1–4 TLA+ 层次化状态机建模行为正确性门禁（环境/manifest/文件头/层次一致性/拆解决策/SANY 语法/TLC 模型检查） | `docs/tla-plus-modeling-design.md` §3（权威定义）+ `w-model-dev/scripts/tla-logic.ts`（校验纯逻辑，含 `parseTlaHeader`/`validateHeader`/`checkHierarchy`/`checkDecomposition`）+ `w-model-dev/scripts/check-tla-model.ts`（CLI）+ `w-model-dev/references/tla-plus-guide.md` | 完整（与 §10.7 图谱门禁正交：行为层 vs 结构层+信息流层；阶段 4 TLA+ 零违反 ∧ 图谱零违反才放行进编码；守护反模式 #14/#15/#16/#17） |
-| 10.8.1 代码-TLA+ 一致性回归 | 阶段 5 代码与 TLA+ 规格一致性回归门禁（四维度：SD→codeModule 映射 / 代码状态转移抽取 / Next 分支对应 / 断言覆盖不变式） | `w-model-dev/scripts/code-tla-logic.ts`（校验纯逻辑，含 `checkSdToCodeModule`/`extractCodeStateTransfers`/`checkNextBranchCoverage`/`checkInvariantCoverage`）+ `w-model-dev/scripts/check-code-tla-consistency.ts`（CLI，使用 TypeScript Compiler API 解析 AST） | 完整（与 §10.8 TLA+ 行为门禁互补：行为门禁校验 TLA+ 规格自身，一致性回归校验代码是否符合 TLA+ 规格；维度1 与 `check-artifact-gate.ts` 终检双向守护；`self-test.ts` 含 5 条样本） |
-| 10.9 根因报告门禁 | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R10：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / reality-checker confidence） | `w-model-dev/scripts/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源） | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4） |
+| 10.7 图谱门禁 | 阶段 1–4 ingestion 子流程结构连通性门禁（连通/单根/父唯一/阶段递进追溯 + 信息流校验：黑洞/奇迹/死模块/边界完整性） | `docs/ingestion-graph-convergence-design.md` §3（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/scripts/logic/graph-logic.ts`（校验纯逻辑，含 `DataflowViolations`/`BoundaryInfo`）+ `w-model-dev/scripts/cli/check-requirement-graph.ts`（CLI）+ `w-model-dev/references/graph-guide.md` | 完整（与 §10.5 工件质量门互补：结构层阶段 1–4 vs 追溯层阶段 8 终检；信息流校验与结构校验正交；守护反模式 #11/#12/#13） |
+| 10.8 TLA+ 行为门禁 | 阶段 1–4 TLA+ 层次化状态机建模行为正确性门禁（环境/manifest/文件头/层次一致性/拆解决策/SANY 语法/TLC 模型检查） | `docs/tla-plus-modeling-design.md` §3（权威定义）+ `w-model-dev/scripts/logic/tla-logic.ts`（校验纯逻辑，含 `parseTlaHeader`/`validateHeader`/`checkHierarchy`/`checkDecomposition`）+ `w-model-dev/scripts/cli/check-tla-model.ts`（CLI）+ `w-model-dev/references/tla-plus-guide.md` | 完整（与 §10.7 图谱门禁正交：行为层 vs 结构层+信息流层；阶段 4 TLA+ 零违反 ∧ 图谱零违反才放行进编码；守护反模式 #14/#15/#16/#17） |
+| 10.8.1 代码-TLA+ 一致性回归 | 阶段 5 代码与 TLA+ 规格一致性回归门禁（四维度：SD→codeModule 映射 / 代码状态转移抽取 / Next 分支对应 / 断言覆盖不变式） | `w-model-dev/scripts/logic/code-tla-logic.ts`（校验纯逻辑，含 `checkSdToCodeModule`/`extractCodeStateTransfers`/`checkNextBranchCoverage`/`checkInvariantCoverage`）+ `w-model-dev/scripts/cli/check-code-tla-consistency.ts`（CLI，使用 TypeScript Compiler API 解析 AST） | 完整（与 §10.8 TLA+ 行为门禁互补：行为门禁校验 TLA+ 规格自身，一致性回归校验代码是否符合 TLA+ 规格；维度1 与 `check-artifact-gate.ts` 终检双向守护；`self-test.ts` 含 5 条样本） |
+| 10.9 根因报告门禁 | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R10：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / reality-checker confidence） | `w-model-dev/scripts/cli/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源） | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4） |
 | 10C 自主成熟度阶梯 | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型始终 attended，操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑 | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过；L3 高风险路径强制人工 gate） |
 | 10D 成本预算与运行日志 | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑 | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4） |
 | 10F 事件驱动循环（Loop 3） | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2） |

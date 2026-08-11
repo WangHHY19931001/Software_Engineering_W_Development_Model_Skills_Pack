@@ -11,7 +11,7 @@
 
 | ID | 问题 | 证据 | 影响 |
 |---|---|---|---|
-| P1.1 | tla-logic.ts 未校验 `checkRounds` schema，子代理误把 phase 级摘要写入 | [tla-logic.ts:76-85](../../w-model-dev/scripts/tla-logic.ts) 定义了 `checkRounds` 类型但校验逻辑无对应 R 编号；第 15 轮阶段 3 子代理把 phase 级摘要（含 `summary` / `phaseSummary` 字段）写入 checkRounds，未被检测；[tla-plus-guide.md:233-256](../../w-model-dev/references/tla-plus-guide.md) 文档明确为 spec 级返工记录，但脚本不强制 | schema 漂移，子代理写入非法字段不被拦截，违反"脚本退出码为准"原则；遗留至本轮（CHANGELOG [15.0.0] 问题 #14） |
+| P1.1 | tla-logic.ts 未校验 `checkRounds` schema，子代理误把 phase 级摘要写入 | [tla-logic.ts:76-85](../../w-model-dev/scripts/logic/tla-logic.ts) 定义了 `checkRounds` 类型但校验逻辑无对应 R 编号；第 15 轮阶段 3 子代理把 phase 级摘要（含 `summary` / `phaseSummary` 字段）写入 checkRounds，未被检测；[tla-plus-guide.md:233-256](../../w-model-dev/references/tla-plus-guide.md) 文档明确为 spec 级返工记录，但脚本不强制 | schema 漂移，子代理写入非法字段不被拦截，违反"脚本退出码为准"原则；遗留至本轮（CHANGELOG [15.0.0] 问题 #14） |
 
 ### P2 schema 边界混淆（1 个）
 
@@ -32,9 +32,9 @@
 
 | ID | 问题 | 证据 | 影响 |
 |---|---|---|---|
-| P4.1 | checkpoint-logic.ts 的 ID_PATTERNS / TECH_KEYWORDS 集合无注释说明 | [checkpoint-logic.ts:71-86](../../w-model-dev/scripts/checkpoint-logic.ts) 定义了 `ID_PATTERNS`（5 个正则）和 `TECH_KEYWORDS`（27 个关键词），但无注释说明集合用途、扩展规则、与 R2 校验的关系；第 15 轮阶段 6/7/8 多次因 acknowledgedDecisions 不含关键词返工（共性问题 C） | 子代理不知道哪些关键词会被识别，凭印象填写；扩展集合时无规则可循 |
+| P4.1 | checkpoint-logic.ts 的 ID_PATTERNS / TECH_KEYWORDS 集合无注释说明 | [checkpoint-logic.ts:71-86](../../w-model-dev/scripts/logic/checkpoint-logic.ts) 定义了 `ID_PATTERNS`（5 个正则）和 `TECH_KEYWORDS`（27 个关键词），但无注释说明集合用途、扩展规则、与 R2 校验的关系；第 15 轮阶段 6/7/8 多次因 acknowledgedDecisions 不含关键词返工（共性问题 C） | 子代理不知道哪些关键词会被识别，凭印象填写；扩展集合时无规则可循 |
 | P4.2 | 无「JSON 文件写入工具选择」约束 | 第 15 轮共性问题 A：PowerShell ConvertTo-Json 不稳定（BOM + 深度）在阶段 5/6/7/8 多次返工；[operational-recovery.md] 无工具选择节；anti-patterns.md 无对应反模式 | 子代理持续用 PowerShell 写 JSON，返工循环未断 |
-| P4.3 | tla-plus-guide.md §checkRounds 字段表 `violations` 类型与脚本不一致 | [tla-plus-guide.md:249](../../w-model-dev/references/tla-plus-guide.md) 文档 `violations: number`，[tla-logic.ts:83](../../w-model-dev/scripts/tla-logic.ts) 脚本 `violations: string[]`；类型不一致 | 子代理按文档填 number 触发类型校验失败 |
+| P4.3 | tla-plus-guide.md §checkRounds 字段表 `violations` 类型与脚本不一致 | [tla-plus-guide.md:249](../../w-model-dev/references/tla-plus-guide.md) 文档 `violations: number`，[tla-logic.ts:83](../../w-model-dev/scripts/logic/tla-logic.ts) 脚本 `violations: string[]`；类型不一致 | 子代理按文档填 number 触发类型校验失败 |
 
 ---
 
@@ -43,7 +43,7 @@
 ### P1.1 tla-logic.ts 新增 R13 checkRounds schema 校验
 
 **当前状态**：
-- [tla-logic.ts:76-85](../../w-model-dev/scripts/tla-logic.ts) 定义 `checkRounds?: Array<{phase, round, timestamp?, specId, syntaxCheck, tlcCheck, violations: string[], converged}>`，但无对应校验函数
+- [tla-logic.ts:76-85](../../w-model-dev/scripts/logic/tla-logic.ts) 定义 `checkRounds?: Array<{phase, round, timestamp?, specId, syntaxCheck, tlcCheck, violations: string[], converged}>`，但无对应校验函数
 - [tla-plus-guide.md:233-256](../../w-model-dev/references/tla-plus-guide.md) 文档明确为 spec 级返工记录
 - [tla/valid.json:52](../../w-model-dev/scripts/samples/tla/valid.json) checkRounds 为 `[]`（合法）
 
@@ -68,9 +68,9 @@
 - valid.json 保持 `checkRounds: []`（合法空数组）
 
 **涉及文件**：
-- `w-model-dev/scripts/tla-logic.ts`：新增 R13 校验函数 + `checkRoundsViolations` 字段
-- `w-model-dev/scripts/check-tla-model.ts`：JSON 摘要输出新字段
-- `w-model-dev/scripts/self-test.ts`：新增 1 条 R13 样本（基线 94 → 95）
+- `w-model-dev/scripts/logic/tla-logic.ts`：新增 R13 校验函数 + `checkRoundsViolations` 字段
+- `w-model-dev/scripts/cli/check-tla-model.ts`：JSON 摘要输出新字段
+- `w-model-dev/scripts/cli/self-test.ts`：新增 1 条 R13 样本（基线 94 → 95）
 - `w-model-dev/scripts/samples/tla/bad-checkrounds-phase-summary.json`：新 fixture
 
 ### P2.1 data-models.md 新增 Schema 边界对照表
@@ -163,7 +163,7 @@
    - 与 R2 关系：命中黑名单 → 报黑名单违规；长度 < 10 → 报长度违规；无 ID/关键词 → 报名词违规
 
 **涉及文件**：
-- `w-model-dev/scripts/checkpoint-logic.ts`：ID_PATTERNS / TECH_KEYWORDS 注释补充
+- `w-model-dev/scripts/logic/checkpoint-logic.ts`：ID_PATTERNS / TECH_KEYWORDS 注释补充
 
 ### P4.2 operational-recovery.md + anti-patterns.md 新增 JSON 写入工具约束
 

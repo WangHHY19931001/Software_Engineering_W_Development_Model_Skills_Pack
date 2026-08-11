@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkTlaBddSync, extractTlaTransitions, extractTlaStates, extractBddStateMachine } from '../tla-bdd-sync-logic.js';
+import { checkTlaBddSync, extractTlaTransitions, extractTlaStates, extractBddStateMachine } from '../logic/tla-bdd-sync-logic.js';
 
 describe('checkTlaBddSync', () => {
   const validTla = `EXTENDS Naturals

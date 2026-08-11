@@ -120,7 +120,7 @@ implements/defines/realizes 追溯边与 governs/collaborates-with/derives 横�
 ## 校验脚本
 
 ```bash
-npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json|consolidated.json>" [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json|consolidated.json>" [--phase=1|2|3|4]
 ```
 
 退出码 0=通过 / 1=失败 / 2=输入错误。算法详见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §3.2。

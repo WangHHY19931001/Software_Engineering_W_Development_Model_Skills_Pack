@@ -21,12 +21,12 @@
 - `w-model-dev/schemas/exemption.schema.json` — 豁免审批 schema（request/review/verification/humanDecision）
 
 **纯逻辑层（2）**
-- `w-model-dev/scripts/coverage-logic.ts` — C1-C10 纯逻辑层 + CoverageShape/CoverageCheckResult 类型
-- `w-model-dev/scripts/exemption-logic.ts` — E1-E8 纯逻辑层 + ExemptionShape/ExemptionCheckResult 类型
+- `w-model-dev/scripts/logic/coverage-logic.ts` — C1-C10 纯逻辑层 + CoverageShape/CoverageCheckResult 类型
+- `w-model-dev/scripts/logic/exemption-logic.ts` — E1-E8 纯逻辑层 + ExemptionShape/ExemptionCheckResult 类型
 
 **CLI 脚本（2）**
-- `w-model-dev/scripts/check-requirement-coverage.ts` — 覆盖分析 CLI
-- `w-model-dev/scripts/check-exemption.ts` — 豁免审批 CLI
+- `w-model-dev/scripts/cli/check-requirement-coverage.ts` — 覆盖分析 CLI
+- `w-model-dev/scripts/cli/check-exemption.ts` — 豁免审批 CLI
 
 **单元测试（3）**
 - `w-model-dev/scripts/__tests__/graph-logic.test.ts` — R1-R6 单元测试（新建，graph 逻辑此前无独立 vitest）
@@ -51,10 +51,10 @@
 |---|---|
 | `docs/skill-design-document_SSoT.md` | 新增 §3.4.16 + §10A 追溯表 |
 | `w-model-dev/schemas/graph.schema.json` | 节点新增 level/priority/reqGroup；边新增 3 类 |
-| `w-model-dev/scripts/graph-logic.ts` | 新增 R1-R6 + reqHierarchy/crossLogic 字段 + --exemptions 读取 |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 新增 --rtm + --exemptions 参数 |
-| `w-model-dev/scripts/schema-loader.ts` | 自动加载 coverage/exemption schema（无需改代码，自动扫描） |
-| `w-model-dev/scripts/self-test.ts` | 新增 GRAPH/COVERAGE/EXEMPTION/SCHEMA 用例 |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 新增 R1-R6 + reqHierarchy/crossLogic 字段 + --exemptions 读取 |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 新增 --rtm + --exemptions 参数 |
+| `w-model-dev/scripts/logic/schema-loader.ts` | 自动加载 coverage/exemption schema（无需改代码，自动扫描） |
+| `w-model-dev/scripts/cli/self-test.ts` | 新增 GRAPH/COVERAGE/EXEMPTION/SCHEMA 用例 |
 | `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` | 新增集成场景 |
 | `w-model-dev/templates/requirement-spec.md` | 5 节 → 13 节 |
 | `w-model-dev/references/phase-1-requirements.md` | 算法步骤 2/3 增强 + 新增 5/6 + FM 矩阵 + 禁止行为 #7-#11 |
@@ -352,7 +352,7 @@ git commit -m "feat(schema): 新增 exemption.schema.json 豁免审批 schema"
 ### Task B1: graph-logic.ts 新增 R1-R6 规则与扩展字段
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 **现有接口（关键）：**
 - `EdgeType` 联合类型（行 20-31）需新增 3 类
@@ -584,7 +584,7 @@ R1-R6 的 violations 已加入 `result.violations`，`result.violations.length =
 
 Run:
 ```bash
-npx tsc --noEmit --strict w-model-dev/scripts/graph-logic.ts
+npx tsc --noEmit --strict w-model-dev/scripts/logic/graph-logic.ts
 ```
 Expected: 0 errors（若有错误，修复类型声明）
 
@@ -592,7 +592,7 @@ Expected: 0 errors（若有错误，修复类型声明）
 
 Run:
 ```bash
-npx tsx w-model-dev/scripts/self-test.ts 2>&1 | grep -E "graph/|总计|通过"
+npx tsx w-model-dev/scripts/cli/self-test.ts 2>&1 | grep -E "graph/|总计|通过"
 ```
 Expected: 17 个 graph 样本全部通过（现有样本无 level 字段，phase=4 时不触发 R1-R6；但 phase=1 的 bad 样本可能受影响——需确认）
 
@@ -601,7 +601,7 @@ Expected: 17 个 graph 样本全部通过（现有样本无 level 字段，phase
 - [ ] **Step 8: Commit**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(graph-logic): 新增 R1-R6 四维识别校验规则与 reqHierarchy/crossLogic 扩展字段"
 ```
 
@@ -610,7 +610,7 @@ git commit -m "feat(graph-logic): 新增 R1-R6 四维识别校验规则与 reqHi
 ### Task B2: 新增 coverage-logic.ts（C1-C10）
 
 **Files:**
-- Create: `w-model-dev/scripts/coverage-logic.ts`
+- Create: `w-model-dev/scripts/logic/coverage-logic.ts`
 
 - [ ] **Step 1: 创建 coverage-logic.ts**
 
@@ -870,14 +870,14 @@ export function checkRequirementCoverage(
 
 Run:
 ```bash
-npx tsc --noEmit --strict w-model-dev/scripts/coverage-logic.ts
+npx tsc --noEmit --strict w-model-dev/scripts/logic/coverage-logic.ts
 ```
 Expected: 0 errors
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/coverage-logic.ts
+git add w-model-dev/scripts/logic/coverage-logic.ts
 git commit -m "feat(coverage-logic): 新增 C1-C10 覆盖分析纯逻辑层"
 ```
 
@@ -886,7 +886,7 @@ git commit -m "feat(coverage-logic): 新增 C1-C10 覆盖分析纯逻辑层"
 ### Task B3: 新增 exemption-logic.ts（E1-E8）
 
 **Files:**
-- Create: `w-model-dev/scripts/exemption-logic.ts`
+- Create: `w-model-dev/scripts/logic/exemption-logic.ts`
 
 - [ ] **Step 1: 创建 exemption-logic.ts**
 
@@ -1029,14 +1029,14 @@ export function checkExemption(exemption: unknown): ExemptionCheckResult {
 
 Run:
 ```bash
-npx tsc --noEmit --strict w-model-dev/scripts/exemption-logic.ts
+npx tsc --noEmit --strict w-model-dev/scripts/logic/exemption-logic.ts
 ```
 Expected: 0 errors
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/exemption-logic.ts
+git add w-model-dev/scripts/logic/exemption-logic.ts
 git commit -m "feat(exemption-logic): 新增 E1-E8 豁免审批纯逻辑层"
 ```
 
@@ -1047,7 +1047,7 @@ git commit -m "feat(exemption-logic): 新增 E1-E8 豁免审批纯逻辑层"
 ### Task C1: 增强 check-requirement-graph.ts（--rtm + --exemptions 参数）
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-requirement-graph.ts`
+- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`
 
 - [ ] **Step 1: 在现有 --phase 参数解析后，新增 --rtm 与 --exemptions 参数解析**
 
@@ -1167,14 +1167,14 @@ git commit -m "feat(exemption-logic): 新增 E1-E8 豁免审批纯逻辑层"
 
 Run:
 ```bash
-npx tsc --noEmit --strict w-model-dev/scripts/check-requirement-graph.ts
+npx tsc --noEmit --strict w-model-dev/scripts/cli/check-requirement-graph.ts
 ```
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-graph.ts
+git add w-model-dev/scripts/cli/check-requirement-graph.ts
 git commit -m "feat(check-requirement-graph): 新增 --rtm 与 --exemptions 参数，输出 reqHierarchy/crossLogic"
 ```
 
@@ -1183,7 +1183,7 @@ git commit -m "feat(check-requirement-graph): 新增 --rtm 与 --exemptions 参�
 ### Task C2: 新增 check-requirement-coverage.ts CLI
 
 **Files:**
-- Create: `w-model-dev/scripts/check-requirement-coverage.ts`
+- Create: `w-model-dev/scripts/cli/check-requirement-coverage.ts`
 
 - [ ] **Step 1: 创建 check-requirement-coverage.ts**
 
@@ -1193,7 +1193,7 @@ git commit -m "feat(check-requirement-graph): 新增 --rtm 与 --exemptions 参�
  * 覆盖分析校验脚本（Requirement Coverage Checker）
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> \
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> \
  *     [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]
  *
  * 参数：
@@ -1215,7 +1215,7 @@ import type { GraphShape } from './graph-logic.js';
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]');
     process.exit(2);
   }
 
@@ -1349,14 +1349,14 @@ main().catch((err) => {
 
 Run:
 ```bash
-npx tsc --noEmit --strict w-model-dev/scripts/check-requirement-coverage.ts
+npx tsc --noEmit --strict w-model-dev/scripts/cli/check-requirement-coverage.ts
 ```
 Expected: 0 errors
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-coverage.ts
+git add w-model-dev/scripts/cli/check-requirement-coverage.ts
 git commit -m "feat(check-requirement-coverage): 新增覆盖分析 CLI 脚本"
 ```
 
@@ -1365,7 +1365,7 @@ git commit -m "feat(check-requirement-coverage): 新增覆盖分析 CLI 脚本"
 ### Task C3: 新增 check-exemption.ts CLI
 
 **Files:**
-- Create: `w-model-dev/scripts/check-exemption.ts`
+- Create: `w-model-dev/scripts/cli/check-exemption.ts`
 
 - [ ] **Step 1: 创建 check-exemption.ts**
 
@@ -1375,7 +1375,7 @@ git commit -m "feat(check-requirement-coverage): 新增覆盖分析 CLI 脚本"
  * 豁免审批校验脚本（Exemption Checker）
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-exemption.ts <exemption.json>
+ *   npx tsx w-model-dev/scripts/cli/check-exemption.ts <exemption.json>
  *
  * 参数：
  *   exemption.json   exemption.json 文件路径
@@ -1392,7 +1392,7 @@ import { checkExemption } from './exemption-logic.js';
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-exemption.ts <exemption.json>');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-exemption.ts <exemption.json>');
     process.exit(2);
   }
 
@@ -1455,14 +1455,14 @@ main().catch((err) => {
 
 Run:
 ```bash
-npx tsc --noEmit --strict w-model-dev/scripts/check-exemption.ts
+npx tsc --noEmit --strict w-model-dev/scripts/cli/check-exemption.ts
 ```
 Expected: 0 errors
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-exemption.ts
+git add w-model-dev/scripts/cli/check-exemption.ts
 git commit -m "feat(check-exemption): 新增豁免审批 CLI 脚本"
 ```
 

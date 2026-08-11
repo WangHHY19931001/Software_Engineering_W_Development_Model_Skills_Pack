@@ -18,12 +18,12 @@
 
 | 文件 | 责任 | 修改类型 |
 |---|---|---|
-| `w-model-dev/scripts/check-role-dispatch.ts` | CLI：移除 `--r3-enabled` 语义，R≥3 无条件 | Modify |
-| `w-model-dev/scripts/role-dispatch-logic.ts` | （若存在）纯逻辑；否则逻辑在 check-role-dispatch.ts 内 | Modify/Create |
-| `w-model-dev/scripts/check-preventive-review.ts` | CLI：扩展 fix/emergency 路径校验 | Modify |
-| `w-model-dev/scripts/preventive-review-logic.ts` | 纯逻辑：支持 variant 参数 | Modify |
-| `w-model-dev/scripts/run-log-logic.ts` | 纯逻辑：R8 无条件 + 覆盖 fix/emergency-fix | Modify |
-| `w-model-dev/scripts/self-test.ts` | 回归：+5 样本，删除 r3Enabled 字段语义 | Modify |
+| `w-model-dev/scripts/cli/check-role-dispatch.ts` | CLI：移除 `--r3-enabled` 语义，R≥3 无条件 | Modify |
+| `w-model-dev/scripts/logic/role-dispatch-logic.ts` | （若存在）纯逻辑；否则逻辑在 check-role-dispatch.ts 内 | Modify/Create |
+| `w-model-dev/scripts/cli/check-preventive-review.ts` | CLI：扩展 fix/emergency 路径校验 | Modify |
+| `w-model-dev/scripts/logic/preventive-review-logic.ts` | 纯逻辑：支持 variant 参数 | Modify |
+| `w-model-dev/scripts/logic/run-log-logic.ts` | 纯逻辑：R8 无条件 + 覆盖 fix/emergency-fix | Modify |
+| `w-model-dev/scripts/cli/self-test.ts` | 回归：+5 样本，删除 r3Enabled 字段语义 | Modify |
 | `w-model-dev/scripts/__tests__/*.test.ts` | vitest：role-dispatch 新建 + preventive/run-log 扩展 | Create/Modify |
 | `w-model-dev/scripts/samples/run-log/*.jsonl` | 样本：bad-missing-R-role 改为无条件 + 新增 fix/emergency 样本 | Modify/Create |
 | `w-model-dev/scripts/samples/preventive-review/*.json` | 样本：fix/emergency 路径样本 | Create |
@@ -41,8 +41,8 @@
 ## Task 1: 抽离 role-dispatch 纯逻辑层 + 无条件 R≥3
 
 **Files:**
-- Create: `w-model-dev/scripts/role-dispatch-logic.ts`
-- Modify: `w-model-dev/scripts/check-role-dispatch.ts`
+- Create: `w-model-dev/scripts/logic/role-dispatch-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-role-dispatch.ts`
 - Test: `w-model-dev/scripts/__tests__/role-dispatch-logic.test.ts`
 
 **说明：** 当前 `checkRoleDispatch` 逻辑在 check-role-dispatch.ts 内联，接受 `r3Enabled: boolean` 参数。本任务抽离到纯逻辑文件，移除 `r3Enabled` 参数语义（R≥3 无条件），CLI 层保留 flag 兼容（视为 no-op）。
@@ -210,14 +210,14 @@ Expected: PASS（3 tests）
 
 - [ ] **Step 6: 运行 self-test 确认现有 role-dispatch 用例不破**
 
-Run: `cd /workspace && npx tsx w-model-dev/scripts/self-test.ts 2>&1 | tail -20`
+Run: `cd /workspace && npx tsx w-model-dev/scripts/cli/self-test.ts 2>&1 | tail -20`
 Expected: 现有 ROLE_DISPATCH_CASES 仍通过（`bad-missing-R-role.jsonl` 在 r3Enabled=true 时本就期望失败；现在无条件也失败，用例描述需在 Task 5 同步）。若 self-test 因 `c.r3Enabled` 字段类型不匹配报错，先在 Task 5 修样本，本步只确认纯逻辑测试通过即可。
 
 - [ ] **Step 7: Commit**
 
 ```bash
 cd /workspace
-git add w-model-dev/scripts/role-dispatch-logic.ts w-model-dev/scripts/check-role-dispatch.ts w-model-dev/scripts/__tests__/role-dispatch-logic.test.ts
+git add w-model-dev/scripts/logic/role-dispatch-logic.ts w-model-dev/scripts/cli/check-role-dispatch.ts w-model-dev/scripts/__tests__/role-dispatch-logic.test.ts
 git commit -m "feat(role-dispatch): R3 unconditional enforcement (round 29)
 
 - Extract pure logic to role-dispatch-logic.ts
@@ -231,8 +231,8 @@ git commit -m "feat(role-dispatch): R3 unconditional enforcement (round 29)
 ## Task 2: preventive-review-logic 支持 S-fix / S-emergency-fix variant
 
 **Files:**
-- Modify: `w-model-dev/scripts/preventive-review-logic.ts`
-- Modify: `w-model-dev/scripts/check-preventive-review.ts`
+- Modify: `w-model-dev/scripts/logic/preventive-review-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-preventive-review.ts`
 - Test: `w-model-dev/scripts/__tests__/preventive-review-logic.test.ts`
 
 **说明：** 当前 `checkPreventiveReview` 只校验 `<phase>-{dim}.json` 标准路径。本任务新增 `variant` 参数，支持 `standard` / `fix` / `emergency` 三种路径前缀。
@@ -311,7 +311,7 @@ JSON 输出新增 `variant` 字段。
 
 ```bash
 cd /workspace
-git add w-model-dev/scripts/preventive-review-logic.ts w-model-dev/scripts/check-preventive-review.ts w-model-dev/scripts/__tests__/preventive-review-logic.test.ts
+git add w-model-dev/scripts/logic/preventive-review-logic.ts w-model-dev/scripts/cli/check-preventive-review.ts w-model-dev/scripts/__tests__/preventive-review-logic.test.ts
 git commit -m "feat(preventive-review): support S-fix/emergency-fix variant paths (round 29)"
 ```
 
@@ -320,7 +320,7 @@ git commit -m "feat(preventive-review): support S-fix/emergency-fix variant path
 ## Task 3: run-log-logic R8 无条件 + 覆盖 fix/emergency-fix
 
 **Files:**
-- Modify: `w-model-dev/scripts/run-log-logic.ts`
+- Modify: `w-model-dev/scripts/logic/run-log-logic.ts`
 - Test: `w-model-dev/scripts/__tests__/run-log-logic.test.ts`
 
 **说明：** 当前 R8（第264行块）已是无条件（无 r3Enabled flag 包裹），但只识别 `action=produce`（标准 S）。本任务扩展识别 `action=fix` / `action=emergency-fix` 作为 S 变体，要求其后到 V 之间也有 3 条 R3 记录。
@@ -411,7 +411,7 @@ Expected: PASS
 
 ```bash
 cd /workspace
-git add w-model-dev/scripts/run-log-logic.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts
+git add w-model-dev/scripts/logic/run-log-logic.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts
 git commit -m "feat(run-log): R8 unconditional + cover S-fix/emergency-fix (round 29)"
 ```
 
@@ -472,7 +472,7 @@ git commit -m "docs(anti-patterns): strengthen #33/#34/#35 + add #42 (round 29)"
 ## Task 5: self-test 样本与用例同步
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 - Modify: `w-model-dev/scripts/samples/run-log/bad-missing-R-role.jsonl`
 - Create: `w-model-dev/scripts/samples/run-log/bad-fix-missing-r3.jsonl`
 - Create: `w-model-dev/scripts/samples/run-log/bad-emergency-missing-r3.jsonl`
@@ -491,14 +491,14 @@ git commit -m "docs(anti-patterns): strengthen #33/#34/#35 + add #42 (round 29)"
 
 - [ ] **Step 4: 运行 self-test 确认全通过**
 
-Run: `cd /workspace && npx tsx w-model-dev/scripts/self-test.ts 2>&1 | tail -30`
+Run: `cd /workspace && npx tsx w-model-dev/scripts/cli/self-test.ts 2>&1 | tail -30`
 Expected: 全通过，用例计数 ≥ 218。
 
 - [ ] **Step 5: Commit**
 
 ```bash
 cd /workspace
-git add w-model-dev/scripts/self-test.ts w-model-dev/scripts/samples/run-log/
+git add w-model-dev/scripts/cli/self-test.ts w-model-dev/scripts/samples/run-log/
 git commit -m "test(self-test): sync role-dispatch unconditional + add fix/emergency samples (round 29)"
 ```
 
@@ -635,12 +635,12 @@ Expected: 全通过，测试数 ≥ 280。
 
 - [ ] **Step 4: 运行 self-test**
 
-Run: `cd /workspace && npx tsx w-model-dev/scripts/self-test.ts 2>&1 | tail -30`
+Run: `cd /workspace && npx tsx w-model-dev/scripts/cli/self-test.ts 2>&1 | tail -30`
 Expected: 全通过，用例数 ≥ 218。
 
 - [ ] **Step 5: 运行 pre-push（若存在）**
 
-Run: `cd /workspace && ls w-model-dev/scripts/pre-push* 2>/dev/null || ls w-model-dev/scripts/check-all* 2>/dev/null`
+Run: `cd /workspace && ls w-model-dev/scripts/pre-push* 2>/dev/null || ls w-model-dev/scripts/cli/check-all* 2>/dev/null`
 若存在 pre-push 脚本，运行之；11 项门禁全 exitCode=0。
 
 - [ ] **Step 6: Commit**
@@ -675,7 +675,7 @@ git commit -m "chore: bump version to 28.0.0 (round 29)"
 
 - [ ] **Step 5: 最终全量回归**
 
-Run: `cd /workspace && npx vitest run 2>&1 | tail -10 && npx tsx w-model-dev/scripts/self-test.ts 2>&1 | tail -10`
+Run: `cd /workspace && npx vitest run 2>&1 | tail -10 && npx tsx w-model-dev/scripts/cli/self-test.ts 2>&1 | tail -10`
 Expected: 全通过。
 
 - [ ] **Step 6: Commit**

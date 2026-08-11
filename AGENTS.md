@@ -62,7 +62,7 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # 阶段 1–4 TLA+ 行为门禁，退出码 0/1/2
 npm run wm:status -- <dir>                  # 状态快照（只读），退出码 0/2
 npm run wm:metrics -- <dir>                 # 流程度量报告（只读），退出码 0/2
-npx tsx w-model-dev/scripts/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 阶段 5 代码-TLA+ 一致性回归，退出码 0/1/2
+npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>  # 阶段 5 代码-TLA+ 一致性回归，退出码 0/1/2
 
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
@@ -70,7 +70,7 @@ npm run setup:hooks
 # 手动跑推送前门禁（不实际推送，14 项门禁检查；Windows 请用 Git Bash，WSL 可直接跑）
 npm run prepush
 
-npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1；npx tsx w-model-dev/scripts/security-scan.ts --regenerate 可重生成 baseline
+npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1；npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 可重生成 baseline
 # schema 校验由 logic 层自动调用，无需独立命令（devDep：ajv + ajv-formats）
 ```
 

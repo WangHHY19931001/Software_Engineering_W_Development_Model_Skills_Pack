@@ -31,7 +31,7 @@
 ## Task 1: wm-status-logic.ts 纯逻辑层（TDD）
 
 **Files:**
-- Create: `w-model-dev/scripts/wm-status-logic.ts`
+- Create: `w-model-dev/scripts/logic/wm-status-logic.ts`
 - Create: `w-model-dev/scripts/__tests__/wm-status-logic.test.ts`
 
 - [ ] **Step 1: 写失败测试**
@@ -157,7 +157,7 @@ Expected: FAIL（`Cannot find module '../wm-status-logic.js'`）
 
 - [ ] **Step 3: 实现纯逻辑层**
 
-创建 `w-model-dev/scripts/wm-status-logic.ts`：
+创建 `w-model-dev/scripts/logic/wm-status-logic.ts`：
 
 ```ts
 /**
@@ -334,7 +334,7 @@ Expected: 9 tests PASS
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/wm-status-logic.ts w-model-dev/scripts/__tests__/wm-status-logic.test.ts
+git add w-model-dev/scripts/logic/wm-status-logic.ts w-model-dev/scripts/__tests__/wm-status-logic.test.ts
 git commit --no-gpg-sign -m "feat(wm-status): 纯逻辑层 buildStatusReport + STATUS_TO_PHASE 9 态映射（TDD 9 用例）"
 ```
 
@@ -343,7 +343,7 @@ git commit --no-gpg-sign -m "feat(wm-status): 纯逻辑层 buildStatusReport + S
 ## Task 2: metrics-report-logic.ts 纯逻辑层（TDD）
 
 **Files:**
-- Create: `w-model-dev/scripts/metrics-report-logic.ts`
+- Create: `w-model-dev/scripts/logic/metrics-report-logic.ts`
 - Create: `w-model-dev/scripts/__tests__/metrics-report-logic.test.ts`
 
 - [ ] **Step 1: 写失败测试**
@@ -498,7 +498,7 @@ Expected: FAIL（`Cannot find module '../metrics-report-logic.js'`）
 
 - [ ] **Step 3: 实现纯逻辑层**
 
-创建 `w-model-dev/scripts/metrics-report-logic.ts`：
+创建 `w-model-dev/scripts/logic/metrics-report-logic.ts`：
 
 ```ts
 /**
@@ -732,7 +732,7 @@ Expected: 9 tests PASS
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/metrics-report-logic.ts w-model-dev/scripts/__tests__/metrics-report-logic.test.ts
+git add w-model-dev/scripts/logic/metrics-report-logic.ts w-model-dev/scripts/__tests__/metrics-report-logic.test.ts
 git commit --no-gpg-sign -m "feat(metrics-report): 纯逻辑层 computeMetrics 流程度量（TDD 9 用例）"
 ```
 
@@ -741,11 +741,11 @@ git commit --no-gpg-sign -m "feat(metrics-report): 纯逻辑层 computeMetrics �
 ## Task 3: wm-status.ts CLI 层
 
 **Files:**
-- Create: `w-model-dev/scripts/wm-status.ts`
+- Create: `w-model-dev/scripts/cli/wm-status.ts`
 
 - [ ] **Step 1: 实现 CLI**
 
-创建 `w-model-dev/scripts/wm-status.ts`：
+创建 `w-model-dev/scripts/cli/wm-status.ts`：
 
 ```ts
 #!/usr/bin/env tsx
@@ -756,7 +756,7 @@ git commit --no-gpg-sign -m "feat(metrics-report): 纯逻辑层 computeMetrics �
  * 最近动作 / 确定性下一步建议。不修改任何数据。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/wm-status.ts [project-dir] [--json]
+ *   npx tsx w-model-dev/scripts/cli/wm-status.ts [project-dir] [--json]
  *
  * 参数：
  *   project-dir  项目目录（默认当前工作目录），从 <dir>/.w-model/ 读取状态文件
@@ -902,7 +902,7 @@ main().catch((err) => {
 
 在仓库自身目录跑（仓库根无 .w-model，应报未初始化 exit 0）：
 ```bash
-npx tsx w-model-dev/scripts/wm-status.ts
+npx tsx w-model-dev/scripts/cli/wm-status.ts
 ```
 Expected: exit 0，输出「✗ 项目未初始化：未找到 <abs>/.w-model/project.json」
 
@@ -912,8 +912,8 @@ $tmp = Join-Path $env:TEMP "wm31-smoke"; New-Item -ItemType Directory -Force -Pa
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\project.json") '{"id":"smoke","name":"Smoke","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}'
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\rtm.json") '{"rows":[{"requirementId":"R1","coverageStatus":"100%"},{"requirementId":"R2","coverageStatus":"部分"}],"executionSummary":{"unitTest":{"total":10,"passed":9,"failed":1,"pending":0},"integrationTest":{"total":5,"passed":5,"failed":0,"pending":0},"systemTest":{"total":3,"passed":3,"failed":0,"pending":0},"acceptanceTest":{"total":8,"passed":8,"failed":0,"pending":0}}}'
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\run-log.jsonl") '{"runId":"a","timestamp":"t1","phase":5,"action":"produce","role":"S","outcome":"success","gateExitCode":null}{"runId":"b","timestamp":"t2","phase":5,"action":"gate","role":"G","outcome":"success","gateExitCode":0}'
-npx tsx w-model-dev/scripts/wm-status.ts $tmp
-npx tsx w-model-dev/scripts/wm-status.ts $tmp --json
+npx tsx w-model-dev/scripts/cli/wm-status.ts $tmp
+npx tsx w-model-dev/scripts/cli/wm-status.ts $tmp --json
 ```
 Expected: 人类可读摘要含「阶段 5/8 · 1/8（12.5%）· RTM 1/2（50%）· 单元 9/10」；--json 输出合法 JSON。清理：`Remove-Item -Recurse -Force $tmp`
 
@@ -921,7 +921,7 @@ Expected: 人类可读摘要含「阶段 5/8 · 1/8（12.5%）· RTM 1/2（50%�
 
 ```powershell
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\project.json") '{bad json'
-npx tsx w-model-dev/scripts/wm-status.ts $tmp
+npx tsx w-model-dev/scripts/cli/wm-status.ts $tmp
 $LASTEXITCODE
 ```
 Expected: 输出「✗ 文件解析失败」且 `$LASTEXITCODE` = 2。清理夹具。
@@ -929,7 +929,7 @@ Expected: 输出「✗ 文件解析失败」且 `$LASTEXITCODE` = 2。清理夹�
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/wm-status.ts
+git add w-model-dev/scripts/cli/wm-status.ts
 git commit --no-gpg-sign -m "feat(wm-status): CLI 层状态快照脚本（0/2 退出码，--json 输出）"
 ```
 
@@ -938,11 +938,11 @@ git commit --no-gpg-sign -m "feat(wm-status): CLI 层状态快照脚本（0/2 �
 ## Task 4: metrics-report.ts CLI 层
 
 **Files:**
-- Create: `w-model-dev/scripts/metrics-report.ts`
+- Create: `w-model-dev/scripts/cli/metrics-report.ts`
 
 - [ ] **Step 1: 实现 CLI**
 
-创建 `w-model-dev/scripts/metrics-report.ts`：
+创建 `w-model-dev/scripts/cli/metrics-report.ts`：
 
 ```ts
 #!/usr/bin/env tsx
@@ -953,7 +953,7 @@ git commit --no-gpg-sign -m "feat(wm-status): CLI 层状态快照脚本（0/2 �
  * CHECKPOINT 决策 / 阶段回顾使用。纯报告，无门禁语义（预警不改退出码）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/metrics-report.ts [project-dir] [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]
+ *   npx tsx w-model-dev/scripts/cli/metrics-report.ts [project-dir] [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]
  *
  * 参数：
  *   project-dir  项目目录（默认当前工作目录），从 <dir>/.w-model/ 读取
@@ -1097,8 +1097,8 @@ main().catch((err) => {
 $tmp = Join-Path $env:TEMP "wm31-smoke"; New-Item -ItemType Directory -Force -Path (Join-Path $tmp ".w-model") | Out-Null
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\run-log.jsonl") '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}{"phase":1,"action":"rework","role":"S","outcome":"rework","tokens":50,"duration_s":5,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T02:00:00Z"}{"phase":2,"action":"gate","role":"G","outcome":"success","tokens":30,"duration_s":3,"subagentSpawns":1,"gateExitCode":0,"timestamp":"2026-08-06T01:00:00Z"}'
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\budget.json") '{"projectId":"smoke","project":{"maxTokensTotal":10000},"perPhase":{"maxTokens":1000},"killSwitch":{"consecutiveReworks":3,"budgetBurnRate":0.9},"onExceed":"pause"}'
-npx tsx w-model-dev/scripts/metrics-report.ts $tmp
-npx tsx w-model-dev/scripts/metrics-report.ts $tmp --json --out (Join-Path $tmp "report.json")
+npx tsx w-model-dev/scripts/cli/metrics-report.ts $tmp
+npx tsx w-model-dev/scripts/cli/metrics-report.ts $tmp --json --out (Join-Path $tmp "report.json")
 ```
 Expected: 人类可读摘要含 9 个节；`--json` 输出合法 JSON；`report.json` 生成且可 JSON.parse。清理：`Remove-Item -Recurse -Force $tmp`
 
@@ -1106,7 +1106,7 @@ Expected: 人类可读摘要含 9 个节；`--json` 输出合法 JSON；`report.
 
 ```powershell
 $tmp2 = Join-Path $env:TEMP "wm31-norunlog"; New-Item -ItemType Directory -Force -Path (Join-Path $tmp2 ".w-model") | Out-Null
-npx tsx w-model-dev/scripts/metrics-report.ts $tmp2
+npx tsx w-model-dev/scripts/cli/metrics-report.ts $tmp2
 $LASTEXITCODE
 ```
 Expected: 「✗ 文件不存在」且 `$LASTEXITCODE` = 2。清理。
@@ -1114,7 +1114,7 @@ Expected: 「✗ 文件不存在」且 `$LASTEXITCODE` = 2。清理。
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/metrics-report.ts
+git add w-model-dev/scripts/cli/metrics-report.ts
 git commit --no-gpg-sign -m "feat(metrics-report): CLI 层流程度量报告脚本（0/2 退出码，--json/--out/--phase/窗口过滤）"
 ```
 
@@ -1155,7 +1155,7 @@ a. §`/wm status` 节整段改写为：
 ## `/wm status`
 
 - **执行方**：O 只读，不分派子代理。
-- 运行 `npx tsx w-model-dev/scripts/wm-status.ts <project-dir> [--json]`（project-dir 默认 cwd）：
+- 运行 `npx tsx w-model-dev/scripts/cli/wm-status.ts <project-dir> [--json]`（project-dir 默认 cwd）：
   - 只读 `.w-model/project.json`（必读）、`.w-model/rtm.json` 与 `.w-model/run-log.jsonl`（缺失降级），输出：
     1. 当前阶段与 `updatedAt`；
     2. 已完成阶段数 / 8 与进度；
@@ -1173,7 +1173,7 @@ b. 新增 §`/wm metrics`（置于 `/wm status` 节之后）：
 ## `/wm metrics`
 
 - **执行方**：O 只读，不分派子代理。
-- 运行 `npx tsx w-model-dev/scripts/metrics-report.ts <project-dir> [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`：
+- 运行 `npx tsx w-model-dev/scripts/cli/metrics-report.ts <project-dir> [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`：
   - 必读 `.w-model/run-log.jsonl`，可选读 `.w-model/budget.json`（缺失时预算区为 null）；
   - 输出 7 区流程度量：总体（tokens/耗时/分派/返工）、阶段汇总、动作分布、角色分布、结果分布、门禁通过率、预算 burn rate 与 killSwitch 预警；
   - `--json` 输出完整报告 JSON；`--out <path>` 写入文件；`--phase`/`--from`/`--to` 过滤。
@@ -1226,8 +1226,8 @@ Expected: tsc 0 错误。
 
 - `package.json`：`"version": "30.1.0"` → `"31.0.0"`；scripts 新增：
   ```json
-  "wm:status": "tsx w-model-dev/scripts/wm-status.ts",
-  "wm:metrics": "tsx w-model-dev/scripts/metrics-report.ts",
+  "wm:status": "tsx w-model-dev/scripts/cli/wm-status.ts",
+  "wm:metrics": "tsx w-model-dev/scripts/cli/metrics-report.ts",
   ```
 - `w-model-dev/skill-metadata.json`：`"version"` → `"31.0.0"`。
 

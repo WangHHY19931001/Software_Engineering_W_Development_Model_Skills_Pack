@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { checkExemption, type ExemptionShape } from '../exemption-logic.js';
+import { checkExemption, type ExemptionShape } from '../logic/exemption-logic.js';
 
 /** 构造一份全通过的合法 ExemptionShape（S→R→V→人类四阶段完整） */
 function makeValidExemption(): ExemptionShape {

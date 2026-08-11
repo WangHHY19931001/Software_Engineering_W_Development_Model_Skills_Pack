@@ -306,7 +306,7 @@ R13 校验由 [`tla-logic.ts`](../scripts/tla-logic.ts) `checkRoundsSchema` 函�
 ## 校验脚本
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]
 ```
 
 退出码 `0=通过 / 1=失败 / 2=输入错误`。stdout 末尾输出 `TLA_JSON {...}` 供 Agent 解析。
@@ -496,7 +496,7 @@ TLA+ 建模必须符合需求和设计。TLC 发现违反时：
 **CLI 入参**：
 
 ```bash
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> --graph=<graph.json> [--phase=N] [--spec=<id>]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> --graph=<graph.json> [--phase=N] [--spec=<id>]
 ```
 
 - `--graph=<graph.json>`：提供结构层图谱，提取 SD 节点供覆盖率校验。**phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID**。
@@ -740,7 +740,7 @@ npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
 ### 校验命令
 
 ```bash
-npx tsx w-model-dev/scripts/check-state-machine-consistency.ts <input.json>
+npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>
 ```
 
 退出码：0=一致，1=不一致，2=输入错误。

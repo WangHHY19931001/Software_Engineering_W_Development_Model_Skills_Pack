@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkRoleDispatch } from '../role-dispatch-logic.js';
+import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
 
 /**
  * role-dispatch-logic.ts 单元测试 —— 第29轮 R3 无条件强制

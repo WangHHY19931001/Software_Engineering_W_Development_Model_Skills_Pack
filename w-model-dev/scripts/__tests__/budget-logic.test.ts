@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../budget-logic.js';
+import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const samplesDir = path.join(here, '..', 'samples', 'budget');

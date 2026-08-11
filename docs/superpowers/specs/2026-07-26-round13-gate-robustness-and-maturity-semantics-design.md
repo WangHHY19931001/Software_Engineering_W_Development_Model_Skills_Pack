@@ -17,7 +17,7 @@
 
 | ID | 问题 | 证据 | 影响 |
 |---|---|---|---|
-| P2.1 | maturity R3 单位不匹配 | [maturity-logic.ts:99-109](../../w-model-dev/scripts/maturity-logic.ts) 注释自承"简化语义——completedCycles < completedPhases 即报违规"；但 schema 定义 `completedCycles` 为"完整 8 阶段周期数"（[data-models.md:440-441](../../w-model-dev/references/data-models.md)），1 周期 = 8 阶段，单位不匹配；第 12 轮调测时 completedCycles=6 触发 R3 违反，被迫人工改为 7，但语义上 7 阶段只对应 0 个完整周期 | R3 校验逻辑与 schema 语义矛盾，编排者每推进 1 阶段都要被迫 +1 completedCycles 才能不违反 R3，违背 completedCycles 的设计本意（衡量完整周期数） |
+| P2.1 | maturity R3 单位不匹配 | [maturity-logic.ts:99-109](../../w-model-dev/scripts/logic/maturity-logic.ts) 注释自承"简化语义——completedCycles < completedPhases 即报违规"；但 schema 定义 `completedCycles` 为"完整 8 阶段周期数"（[data-models.md:440-441](../../w-model-dev/references/data-models.md)），1 周期 = 8 阶段，单位不匹配；第 12 轮调测时 completedCycles=6 触发 R3 违反，被迫人工改为 7，但语义上 7 阶段只对应 0 个完整周期 | R3 校验逻辑与 schema 语义矛盾，编排者每推进 1 阶段都要被迫 +1 completedCycles 才能不违反 R3，违背 completedCycles 的设计本意（衡量完整周期数） |
 
 ### P3 流程反模式问题（1 个）
 
@@ -53,13 +53,13 @@
 - 不新增 fixture（EISDIR 是参数错误，非业务场景）
 
 **涉及文件**：
-- `w-model-dev/scripts/check-code-tla-consistency.ts`：readJson 函数增加 EISDIR 分支
-- `w-model-dev/scripts/check-requirement-graph.ts`：readFile 错误处理增加 EISDIR 分支
+- `w-model-dev/scripts/cli/check-code-tla-consistency.ts`：readJson 函数增加 EISDIR 分支
+- `w-model-dev/scripts/cli/check-requirement-graph.ts`：readFile 错误处理增加 EISDIR 分支
 
 ### P2.1 maturity R3 单位修正
 
 **当前状态**：
-- [maturity-logic.ts:99-109](../../w-model-dev/scripts/maturity-logic.ts) R3 逻辑：`completedCycles < completedPhases` 即报违规
+- [maturity-logic.ts:99-109](../../w-model-dev/scripts/logic/maturity-logic.ts) R3 逻辑：`completedCycles < completedPhases` 即报违规
 - 注释自承"简化语义"，并预留"后续可改为 floor(completedPhases/8)"
 - schema 注释：`completedCycles` = "完整 8 阶段周期数（L0→L1 需要 ≥1）"
 - 语义矛盾：1 周期 = 8 阶段，但 R3 要求 completedCycles ≥ completedPhases（即每阶段 +1）
@@ -80,9 +80,9 @@
 - `completedPhases < 8` 时 `floor(completedPhases/8)=0`，completedCycles=0 也不报违规（合理：未完成 1 个完整周期）
 
 **涉及文件**：
-- `w-model-dev/scripts/maturity-logic.ts`：R3 逻辑修正 + 注释更新
-- `w-model-dev/scripts/check-maturity.ts`：违规信息文案对齐（如有必要）
-- `w-model-dev/scripts/self-test.ts`：新增 1 条 R3 单位不匹配样本
+- `w-model-dev/scripts/logic/maturity-logic.ts`：R3 逻辑修正 + 注释更新
+- `w-model-dev/scripts/cli/check-maturity.ts`：违规信息文案对齐（如有必要）
+- `w-model-dev/scripts/cli/self-test.ts`：新增 1 条 R3 单位不匹配样本
 - `w-model-dev/scripts/samples/maturity/bad-r3-cycle-mismatch.json`：新 fixture
 
 ### P3.1 反模式 #21 新增

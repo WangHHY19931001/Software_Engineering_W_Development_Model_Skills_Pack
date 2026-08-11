@@ -750,7 +750,7 @@ git commit -m "feat(loop-4): data-models 新增 HarnessImprovementReport schema"
         }
       },
       "suggestion": "收紧 V 评审规则：要求 V 引用具体 evidence 行号，G 校验 evidence 非空",
-      "affectedAssets": ["w-model-dev/references/verifier-spec.md", "w-model-dev/scripts/verifier-logic.ts"],
+      "affectedAssets": ["w-model-dev/references/verifier-spec.md", "w-model-dev/scripts/logic/verifier-logic.ts"],
       "priority": 1
     }
   ],

@@ -16,7 +16,7 @@
 
 **修订（10）：** `docs/superpowers/specs/2026-08-10-mythical-man-month-absorption-design.md`（状态）/ `docs/skill-design-document_SSoT.md`（状态×2）/ `w-model-dev/references/anti-patterns.md`（#45/#46 + 计数）/ `.cursor/skills/dispatching-parallel-agents/SKILL.md` / `.cursor/skills/test-driven-development/testing-anti-patterns.md` / `w-model-dev/references/subagent-delegation.md` / `w-model-dev/SKILL.md` / `w-model-dev/references/definition-of-done.md` / `w-model-dev/references/phase-5-coding.md` / `w-model-dev/references/phase-6-integration-test.md`
 
-**脚本联动（2）：** `w-model-dev/scripts/docs-consistency-logic.ts`（maxAntiPattern 44→46）/ `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（样本）
+**脚本联动（2）：** `w-model-dev/scripts/logic/docs-consistency-logic.ts`（maxAntiPattern 44→46）/ `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（样本）
 
 **新增（1）：** `w-model-dev/references/mythical-man-month-absorption.md`（吸收决策记录）
 
@@ -428,7 +428,7 @@ git commit -m "docs: add mythical-man-month absorption decision record"
 ### Task 11: 反模式计数外部联动（44 → 46）
 
 **Files:**
-- Modify: `AGENTS.md` / `README.md` / `docs/INSTALL.md` / `w-model-dev/scripts/docs-consistency-logic.ts` / `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
+- Modify: `AGENTS.md` / `README.md` / `docs/INSTALL.md` / `w-model-dev/scripts/logic/docs-consistency-logic.ts` / `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
 
 - [ ] **Step 1: AGENTS.md L31**
 
@@ -454,13 +454,13 @@ git commit -m "docs: add mythical-man-month absorption decision record"
 
 Run: `npx vitest run w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
 Expected: 全 PASS。
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts`
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts`
 Expected: exit 0「✓ 全部一致」（12 项）。
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add AGENTS.md README.md docs/INSTALL.md w-model-dev/scripts/docs-consistency-logic.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts
+git add AGENTS.md README.md docs/INSTALL.md w-model-dev/scripts/logic/docs-consistency-logic.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts
 git commit -m "chore: cascade anti-pattern count 44->46 (AGENTS/README/INSTALL/docs-consistency)"
 ```
 
@@ -542,7 +542,7 @@ Expected: 0 错误。
 
 - [ ] **Step 4: docs-consistency**
 
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts`
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts`
 Expected: exit 0「✓ 全部一致」（12 项）。
 
 - [ ] **Step 5: pre-push 门禁（需 Git Bash）**

@@ -60,7 +60,7 @@ git commit --no-gpg-sign -m "feat(skill): 新建 security-review 技能（安全
 
 - [ ] **Step 1: 读约束 #20 与字段要求**
 
-读取 `w-model-dev/references/phase-5-coding.md:51-62`（约束 #20）与 `w-model-dev/scripts/check-codegraph-queries.ts:26-32`（字段要求）。
+读取 `w-model-dev/references/phase-5-coding.md:51-62`（约束 #20）与 `w-model-dev/scripts/cli/check-codegraph-queries.ts:26-32`（字段要求）。
 
 - [ ] **Step 2: 创建 SKILL.md**
 

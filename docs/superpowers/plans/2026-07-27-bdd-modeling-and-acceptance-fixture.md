@@ -19,8 +19,8 @@
 | 文件 | 责任 | 任务 |
 |---|---|---|
 | `w-model-dev/schemas/bdd-manifest.schema.json` | BDD manifest JSON Schema | Task 1 |
-| `w-model-dev/scripts/bdd-logic.ts` | BDD 业务规则纯逻辑（自包含 + 纯函数 + 入口 validateBySchema） | Task 3 |
-| `w-model-dev/scripts/check-bdd-model.ts` | BDD 静态结构门禁 CLI（I/O + 调 bdd-logic） | Task 4 |
+| `w-model-dev/scripts/logic/bdd-logic.ts` | BDD 业务规则纯逻辑（自包含 + 纯函数 + 入口 validateBySchema） | Task 3 |
+| `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD 静态结构门禁 CLI（I/O + 调 bdd-logic） | Task 4 |
 | `w-model-dev/scripts/samples/bdd/*.json + *.feature` | BDD fixture 样本（5 valid + 5 bad） | Task 5 |
 | `w-model-dev/scripts/__tests__/bdd-logic.test.ts` | bdd-logic 单元测试 | Task 6 |
 | `w-model-dev/references/bdd-guide.md` | BDD 建模指南（与 tla-plus-guide.md 对称） | Task 7 |
@@ -35,8 +35,8 @@
 | 文件 | 改动 | 任务 |
 |---|---|---|
 | `package.json` | +cucumber devDeps + version bump | Task 2 |
-| `w-model-dev/scripts/self-test.ts` | +runBddCases +10 样本 | Task 5 |
-| `w-model-dev/scripts/check-artifact-gate.ts` | +BDD 资产终检 | Task 8 |
+| `w-model-dev/scripts/cli/self-test.ts` | +runBddCases +10 样本 | Task 5 |
+| `w-model-dev/scripts/cli/check-artifact-gate.ts` | +BDD 资产终检 | Task 8 |
 | `w-model-dev/references/anti-patterns.md` | +#29 | Task 9 |
 | `w-model-dev/references/phase-1-requirements.md` ~ `phase-8-acceptance-test.md` | +BDD 节 | Task 10 |
 | `w-model-dev/references/{verifier-spec,data-models,rtm-guide,workflow,operational-recovery}.md` | +BDD 节 | Task 10 |
@@ -197,11 +197,11 @@ git commit -m "feat(bdd): add cucumber devDeps and bump version to 19.0.0"
 ## Task 3: 实现 bdd-logic.ts（纯逻辑）
 
 **Files:**
-- Create: `w-model-dev/scripts/bdd-logic.ts`
+- Create: `w-model-dev/scripts/logic/bdd-logic.ts`
 
 - [ ] **Step 1: 检查 tla-logic.ts 顶部结构作为参照**
 
-Run: `Read w-model-dev/scripts/tla-logic.ts` (前 80 行已读，参照其「自包含 + 纯函数 + 入口 validateBySchema」模式)
+Run: `Read w-model-dev/scripts/logic/tla-logic.ts` (前 80 行已读，参照其「自包含 + 纯函数 + 入口 validateBySchema」模式)
 
 - [ ] **Step 2: 创建 bdd-logic.ts**
 
@@ -834,13 +834,13 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
 
 - [ ] **Step 3: 验证 TypeScript strict 编译**
 
-Run: `npx tsc --strict --noEmit w-model-dev/scripts/bdd-logic.ts`
+Run: `npx tsc --strict --noEmit w-model-dev/scripts/logic/bdd-logic.ts`
 Expected: 0 errors
 
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/bdd-logic.ts
+git add w-model-dev/scripts/logic/bdd-logic.ts
 git commit -m "feat(bdd): implement bdd-logic.ts pure validation logic"
 ```
 
@@ -849,11 +849,11 @@ git commit -m "feat(bdd): implement bdd-logic.ts pure validation logic"
 ## Task 4: 实现 check-bdd-model.ts（CLI 门禁脚本）
 
 **Files:**
-- Create: `w-model-dev/scripts/check-bdd-model.ts`
+- Create: `w-model-dev/scripts/cli/check-bdd-model.ts`
 
 - [ ] **Step 1: 参照 check-tla-model.ts 顶部结构**
 
-Run: `Read w-model-dev/scripts/check-tla-model.ts` (前 80 行已读，参照其参数解析 + 退出码 + JSON 摘要 + I/O 分离模式)
+Run: `Read w-model-dev/scripts/cli/check-tla-model.ts` (前 80 行已读，参照其参数解析 + 退出码 + JSON 摘要 + I/O 分离模式)
 
 - [ ] **Step 2: 创建 check-bdd-model.ts**
 
@@ -868,7 +868,7 @@ Run: `Read w-model-dev/scripts/check-tla-model.ts` (前 80 行已读，参照其
  *   + scenario 路径合法性 + RTM 映射。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json>
+ *   npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json>
  *     [--phase=N] [--tla-manifest=<path>] [--rtm=<path>] [--cucumber-report=<path>]
  *
  * 参数：
@@ -1185,13 +1185,13 @@ Expected: 0 errors
 
 - [ ] **Step 4: 验证 CLI 基本可用（无参数返回 exit 2）**
 
-Run: `npx tsx w-model-dev/scripts/check-bdd-model.ts; echo "exit=$?"`
+Run: `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts; echo "exit=$?"`
 Expected: 输出用法说明，`exit=2`
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-bdd-model.ts
+git add w-model-dev/scripts/cli/check-bdd-model.ts
 git commit -m "feat(bdd): implement check-bdd-model.ts CLI gate script"
 ```
 
@@ -1211,7 +1211,7 @@ git commit -m "feat(bdd): implement check-bdd-model.ts CLI gate script"
 - Create: `w-model-dev/scripts/samples/bdd/bad-no-rtm-mapping.manifest.json`
 - Create: `w-model-dev/scripts/samples/bdd/bad-schema.manifest.json`
 - Create: `w-model-dev/scripts/samples/bdd/bad-step-unbound.feature`
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 
 - [ ] **Step 1: 创建 valid-l1.feature + valid-manifest.json**
 
@@ -1370,18 +1370,18 @@ async function runBddCases(samplesDir: string): Promise<{ passed: number; failed
 
 - [ ] **Step 4: 运行 self-test 验证 BDD samples**
 
-Run: `npx tsx w-model-dev/scripts/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
 Expected: 0 失败，输出含 `BDD: 10 passed, 0 failed`
 
 - [ ] **Step 5: 验证基线计数**
 
-Run: `npx tsx w-model-dev/scripts/self-test.ts | grep "样本"`
+Run: `npx tsx w-model-dev/scripts/cli/self-test.ts | grep "样本"`
 Expected: 输出含 `121 条样本` 且 `+ 10 BDD`
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/samples/bdd/ w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/samples/bdd/ w-model-dev/scripts/cli/self-test.ts
 git commit -m "feat(bdd): add 10 BDD samples and integrate runBddCases into self-test"
 ```
 
@@ -1780,11 +1780,11 @@ git commit -m "docs(bdd): add BDD guide, review checklist, syntax reference, pat
 ## Task 8: 扩展 check-artifact-gate.ts 终检加 BDD 资产校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-artifact-gate.ts`
+- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`
 
 - [ ] **Step 1: 检查 check-artifact-gate.ts 现有结构**
 
-Run: `Grep -n "BDD\\|TLA\\|manifest" w-model-dev/scripts/check-artifact-gate.ts`
+Run: `Grep -n "BDD\\|TLA\\|manifest" w-model-dev/scripts/cli/check-artifact-gate.ts`
 Expected: 看到现有 TLA+ manifest 校验位置作为参照
 
 - [ ] **Step 2: 在 check-artifact-gate.ts 中新增 BDD 资产校验**
@@ -1823,13 +1823,13 @@ if (fs.existsSync(path.resolve(projectRoot, '.w-model', 'bdd-manifest.json'))) {
 
 - [ ] **Step 3: 运行 self-test 确保未破坏既有 gate 样本**
 
-Run: `npx tsx w-model-dev/scripts/self-test.ts | tail -20`
+Run: `npx tsx w-model-dev/scripts/cli/self-test.ts | tail -20`
 Expected: 全部通过，无新增失败
 
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-artifact-gate.ts
+git add w-model-dev/scripts/cli/check-artifact-gate.ts
 git commit -m "feat(bdd): extend check-artifact-gate.ts with BDD asset terminal check"
 ```
 
@@ -2015,7 +2015,7 @@ RTM 行 schema 字段类型保持 `string | null` 不变。
 
 - [ ] **Step 13: 验证所有改动文件 markdown 语法**
 
-Run: `npx tsx w-model-dev/scripts/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
 Expected: 全部通过（self-test 不直接校验 markdown，但确保未破坏既有逻辑）
 
 - [ ] **Step 14: 提交**
@@ -2109,7 +2109,7 @@ Run: `Read .githooks/pre-push`
 ```bash
 # BDD 校验（spec §14.6）
 echo "[pre-push] Running BDD model check on valid sample..."
-npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1
 bdd_exit=$?
 if [ $bdd_exit -ne 0 ]; then
   echo "[pre-push] FAIL: BDD model check on valid sample exited $bdd_exit (expected 0)"
@@ -2117,7 +2117,7 @@ if [ $bdd_exit -ne 0 ]; then
 fi
 
 echo "[pre-push] Running BDD model check on invalid sample (expect exit 1)..."
-npx tsx w-model-dev/scripts/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1
 bdd_bad_exit=$?
 if [ $bdd_bad_exit -eq 0 ]; then
   echo "[pre-push] FAIL: BDD model check on bad-schema sample exited 0 (expected non-zero)"
@@ -2127,7 +2127,7 @@ fi
 
 - [ ] **Step 3: 运行 self-test 完整回归**
 
-Run: `npx tsx w-model-dev/scripts/self-test.ts`
+Run: `npx tsx w-model-dev/scripts/cli/self-test.ts`
 Expected: 全部 121 个样本通过，输出 `Total: 121 passed, 0 failed`
 
 - [ ] **Step 4: 运行 vitest 完整回归**

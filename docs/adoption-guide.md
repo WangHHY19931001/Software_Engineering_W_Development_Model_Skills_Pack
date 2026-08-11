@@ -62,7 +62,7 @@
 | 首个对外 API 或模块边界 | 调用 [`code-reviewer`](../w-model-dev/references/agent-personas.md) Persona 评审接口设计 |
 | 首次涉及认证 / 加密 / 输入校验 | 调用 [`security-auditor`](../w-model-dev/references/agent-personas.md) Persona 深审 |
 | 首次涉及性能热点循环 / DB 查询 | 调用 [`performance-auditor`](../w-model-dev/references/agent-personas.md) Persona + 准备 k6 基线脚本 |
-| 首次 CI 流水线 | 在 CI 中调用 [`check-artifact-gate.ts`](../w-model-dev/scripts/check-artifact-gate.ts) 作为质量门 |
+| 首次 CI 流水线 | 在 CI 中调用 [`check-artifact-gate.ts`](../w-model-dev/scripts/cli/check-artifact-gate.ts) 作为质量门 |
 | 首次部署到生产 | 执行 SSoT [§10.5](./skill-design-document_SSoT.md) 工件质量门 + 用户确认归档 |
 
 ### Greenfield 反模式

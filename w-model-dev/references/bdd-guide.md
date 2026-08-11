@@ -331,8 +331,8 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 
 | 脚本 | 路径 | 用途 | 退出码 |
 |---|---|---|---|
-| `check-bdd-model.ts` | `w-model-dev/scripts/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
-| `bdd-logic.ts` | `w-model-dev/scripts/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
+| `check-bdd-model.ts` | `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
+| `bdd-logic.ts` | `w-model-dev/scripts/logic/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
 
 ### §5.2 check-bdd-model.ts 8 个校验维度
 
@@ -364,7 +364,7 @@ designCoverage 字段由 S-ingest-bdd 子代理从 .feature 文件头部 @design
 
 ```bash
 # 阶段 1-4 门禁（静态结构校验，不跑 cucumber）
-npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
   --phase=1|2|3|4 \
   [--tla-manifest=<tla-manifest.json>] \
   [--rtm=<rtm.json>] \
@@ -374,7 +374,7 @@ npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
 > `--graph=<graph.json>` 在 phase>=2 时强制必填（D8 SD Coverage 校验数据源，缺失 → exitCode=2 ARG_INVALID）；phase=1 时可选。
 
 # 阶段 5-8 终检（含 cucumber 执行结果校验）
-npx tsx w-model-dev/scripts/check-bdd-model.ts <bdd-manifest.json> \
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
   --phase=5|6|7|8 \
   --cucumber-report=<.w-model/bdd/reports/report.json> \
   [--tla-manifest=<tla-manifest.json>] \

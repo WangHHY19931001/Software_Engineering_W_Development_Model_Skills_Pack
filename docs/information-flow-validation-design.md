@@ -4,7 +4,7 @@
 > **状态**：待评审
 > **作用范围**：w-model-dev 技能包阶段 1–4（需求分析 → 系统设计 → 概要设计 → 详细设计）的图谱门禁
 > **创建日期**：2026-07-23
-> **依赖**：[skill-design-document_SSoT.md](./skill-design-document_SSoT.md) §3.4 / §7.7 / §10.7；[ingestion-graph-convergence-design.md](./ingestion-graph-convergence-design.md)；[w-model-dev/scripts/graph-logic.ts](../w-model-dev/scripts/graph-logic.ts)
+> **依赖**：[skill-design-document_SSoT.md](./skill-design-document_SSoT.md) §3.4 / §7.7 / §10.7；[ingestion-graph-convergence-design.md](./ingestion-graph-convergence-design.md)；[w-model-dev/scripts/logic/graph-logic.ts](../w-model-dev/scripts/logic/graph-logic.ts)
 >
 > **与 SSoT 的关系**：本文件为设计输入文档，定义信息流校验层（黑洞/奇迹/死模块）与显式边界节点。实现阶段须先把这些设计合并入 SSoT §7.7（graph.json schema）与 §10.7（图谱门禁），再同步 `w-model-dev/` 资产（遵循 AGENTS.md「SSoT 优先」约束）。
 
@@ -218,9 +218,9 @@
 | `w-model-dev/references/ingestion-chunk.md` | A-chunk 任务指引加：信息流边提取规则、边界节点识别规则 |
 | `w-model-dev/references/ingestion-cross.md` | A-cross/A-evolve 任务指引加：跨块信息流边确认、信息流 `reworkHints` 产出格式 |
 | `w-model-dev/references/anti-patterns.md` | 新增 #13「信息流黑洞/奇迹放行」；F1-F10 失败模式补充信息流相关信号 |
-| `w-model-dev/scripts/graph-logic.ts` | 新增信息流校验纯函数（黑洞/奇迹/死模块/边界完整性） |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 输出 JSON 加 `dataflowViolations` / `boundary` 字段 |
-| `w-model-dev/scripts/self-test.ts` | 新增信息流样本测试用例 |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 新增信息流校验纯函数（黑洞/奇迹/死模块/边界完整性） |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 输出 JSON 加 `dataflowViolations` / `boundary` 字段 |
+| `w-model-dev/scripts/cli/self-test.ts` | 新增信息流样本测试用例 |
 | `w-model-dev/scripts/samples/graph/` | 新增 `bad-blackhole.json` / `bad-miracle.json` / `bad-dead-module.json` / `valid-dataflow.json`；**给现有 `valid-graph.json` 等补信息流边与边界节点**（见 §6） |
 | `w-model-dev/SKILL.md` | 「快速自检」加"信息流无黑洞/奇迹/死模块"项 |
 

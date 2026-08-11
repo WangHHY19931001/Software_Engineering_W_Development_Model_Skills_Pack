@@ -19,10 +19,10 @@
 | 文件 | 责任 |
 |---|---|
 | `w-model-dev/schemas/signature-chain.schema.json` | SignatureChainEntry JSON Schema（含 inputProvenance） |
-| `w-model-dev/scripts/signature-chain-logic.ts` | 签名链 + 产出来源校验纯逻辑层（R1-R10 + 跨阶段） |
-| `w-model-dev/scripts/check-signature-chain.ts` | 签名链 CLI 入口 |
-| `w-model-dev/scripts/check-archive-integrity.ts` | 归档完整性 CLI 入口 |
-| `w-model-dev/scripts/archive-integrity-logic.ts` | 归档完整性纯逻辑层 |
+| `w-model-dev/scripts/logic/signature-chain-logic.ts` | 签名链 + 产出来源校验纯逻辑层（R1-R10 + 跨阶段） |
+| `w-model-dev/scripts/cli/check-signature-chain.ts` | 签名链 CLI 入口 |
+| `w-model-dev/scripts/cli/check-archive-integrity.ts` | 归档完整性 CLI 入口 |
+| `w-model-dev/scripts/logic/archive-integrity-logic.ts` | 归档完整性纯逻辑层 |
 | `w-model-dev/scripts/__tests__/signature-chain-logic.test.ts` | 签名链单测（R1-R10 + 跨阶段） |
 | `w-model-dev/scripts/__tests__/archive-integrity-logic.test.ts` | 归档完整性单测 |
 | `w-model-dev/scripts/samples/signature-chain/*.jsonl` | 签名链样本（11 valid + 11 bad） |
@@ -39,15 +39,15 @@
 | `w-model-dev/references/definition-of-done.md` | 第六维度强化 + 新增第七维度 |
 | `w-model-dev/references/verifier-spec.md` | evidence 格式规范 + completeness 强化 |
 | `w-model-dev/references/tla-plus-guide.md` | 移除 skip-tlc 条款 |
-| `w-model-dev/scripts/check-tla-model.ts` | 移除 --skip-tlc 参数 |
-| `w-model-dev/scripts/tla-logic.ts` | 移除 skipTlc 选项 |
-| `w-model-dev/scripts/check-checkpoint.ts` | R3 强化（--checkpoint-log 强制） |
-| `w-model-dev/scripts/checkpoint-logic.ts` | R3 拒绝代签 |
-| `w-model-dev/scripts/check-verifier-output.ts` | evidence 格式校验 |
-| `w-model-dev/scripts/verifier-logic.ts` | evidence 格式校验逻辑 |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 移除 level=4 强制（如有） |
-| `w-model-dev/scripts/graph-logic.ts` | 注释修正 + R11（level 正整数） |
-| `w-model-dev/scripts/self-test.ts` | 新增 signature-chain + archive-integrity 样本声明 |
+| `w-model-dev/scripts/cli/check-tla-model.ts` | 移除 --skip-tlc 参数 |
+| `w-model-dev/scripts/logic/tla-logic.ts` | 移除 skipTlc 选项 |
+| `w-model-dev/scripts/cli/check-checkpoint.ts` | R3 强化（--checkpoint-log 强制） |
+| `w-model-dev/scripts/logic/checkpoint-logic.ts` | R3 拒绝代签 |
+| `w-model-dev/scripts/cli/check-verifier-output.ts` | evidence 格式校验 |
+| `w-model-dev/scripts/logic/verifier-logic.ts` | evidence 格式校验逻辑 |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 移除 level=4 强制（如有） |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 注释修正 + R11（level 正整数） |
+| `w-model-dev/scripts/cli/self-test.ts` | 新增 signature-chain + archive-integrity 样本声明 |
 | `w-model-dev/schemas/graph.schema.json` | level 字段移除 maximum: 4 |
 | `w-model-dev/scripts/__tests__/tla-logic.test.ts` | 移除 skip-tlc 测试 |
 | `w-model-dev/scripts/__tests__/graph-logic.test.ts` | 移除 level=4 强制测试 |
@@ -179,7 +179,7 @@ git commit -m "feat(ssot): §3.4/§7.6/§7.7 产出来源正确性 + evidence �
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 TLA_JSON 证据摘要（与 check-requirement-graph.ts 同构）
-npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
 ```
 
 > [21.0.0] 移除 `--skip-tlc` 参数：所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查，任何场景不得跳过 TLC。若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip），拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段。
@@ -269,14 +269,14 @@ git commit -m "feat(ssot): §7.9 SignatureChainEntry schema + §10.8 移除 --sk
 
 > 阶段 1–8 每角色动作完成后产出的**签名链完整性 + 产出来源正确性**门禁。权威定义见 [`w-model-dev/references/signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md)；schema 见 §7.9。
 >
-> 实现位置：[`w-model-dev/scripts/check-signature-chain.ts`](../w-model-dev/scripts/check-signature-chain.ts)（CLI）+ [`w-model-dev/scripts/signature-chain-logic.ts`](../w-model-dev/scripts/signature-chain-logic.ts)（校验纯逻辑，单点事实源）。
+> 实现位置：[`w-model-dev/scripts/cli/check-signature-chain.ts`](../w-model-dev/scripts/cli/check-signature-chain.ts)（CLI）+ [`w-model-dev/scripts/logic/signature-chain-logic.ts`](../w-model-dev/scripts/logic/signature-chain-logic.ts)（校验纯逻辑，单点事实源）。
 > 触发方：G 子代理跑每个 gate 脚本前 + O 子代理 checkpoint 前 + 归档时。
 
 **CLI 接口**：
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误
-npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
 ```
 
 **校验规则**（R1-R10）：
@@ -639,8 +639,8 @@ git commit -m "feat(reference): 新增 signature-chain-guide.md"
 
 **Files:**
 - Modify: `w-model-dev/schemas/graph.schema.json:31`
-- Modify: `w-model-dev/scripts/graph-logic.ts:54`（注释）
-- Modify: `w-model-dev/scripts/check-requirement-graph.ts`（如有 level=4 校验）
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts:54`（注释）
+- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`（如有 level=4 校验）
 
 - [ ] **Step 1: 修改 graph.schema.json level 字段**
 
@@ -691,7 +691,7 @@ Grep 定位 `level.*4|4.*level` 测试用例，移除"4 层强制"相关测试�
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/schemas/graph.schema.json w-model-dev/scripts/graph-logic.ts w-model-dev/scripts/__tests__/graph-logic.test.ts
+git add w-model-dev/schemas/graph.schema.json w-model-dev/scripts/logic/graph-logic.ts w-model-dev/scripts/__tests__/graph-logic.test.ts
 git commit -m "feat(graph): level 字段移除 maximum:4 + R11 正整数校验"
 ```
 
@@ -700,8 +700,8 @@ git commit -m "feat(graph): level 字段移除 maximum:4 + R11 正整数校验"
 ## Task 8: check-tla-model.ts + tla-logic.ts 移除 --skip-tlc
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-tla-model.ts`
-- Modify: `w-model-dev/scripts/tla-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-tla-model.ts`
+- Modify: `w-model-dev/scripts/logic/tla-logic.ts`
 - Modify: `w-model-dev/scripts/__tests__/tla-logic.test.ts`
 
 - [ ] **Step 1: 修改 check-tla-model.ts 移除 --skip-tlc 参数**
@@ -742,7 +742,7 @@ Expected: 0 errors
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-tla-model.ts w-model-dev/scripts/tla-logic.ts w-model-dev/scripts/__tests__/tla-logic.test.ts
+git add w-model-dev/scripts/cli/check-tla-model.ts w-model-dev/scripts/logic/tla-logic.ts w-model-dev/scripts/__tests__/tla-logic.test.ts
 git commit -m "feat(tla): 移除 --skip-tlc 参数（硬约束：所有 specs 强制 TLC）"
 ```
 
@@ -751,15 +751,15 @@ git commit -m "feat(tla): 移除 --skip-tlc 参数（硬约束：所有 specs �
 ## Task 9: check-checkpoint.ts + checkpoint-logic.ts R3 强化
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-checkpoint.ts`
-- Modify: `w-model-dev/scripts/checkpoint-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-checkpoint.ts`
+- Modify: `w-model-dev/scripts/logic/checkpoint-logic.ts`
 - Modify: `w-model-dev/scripts/__tests__/checkpoint-logic.test.ts`
 
 - [ ] **Step 1: 修改 check-checkpoint.ts 将 --checkpoint-log 改为强制**
 
 将第 11 行用法说明改为：
 ```
- *   npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
+ *   npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>
 ```
 
 将第 15 行参数说明改为：
@@ -771,7 +771,7 @@ git commit -m "feat(tla): 移除 --skip-tlc 参数（硬约束：所有 specs �
 ```typescript
   if (!runLogFile) {
     console.error(
-      '用法: npx tsx w-model-dev/scripts/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
+      '用法: npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
     );
     process.exit(2);
   }
@@ -854,7 +854,7 @@ Expected: 0 errors
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-checkpoint.ts w-model-dev/scripts/checkpoint-logic.ts w-model-dev/scripts/__tests__/checkpoint-logic.test.ts
+git add w-model-dev/scripts/cli/check-checkpoint.ts w-model-dev/scripts/logic/checkpoint-logic.ts w-model-dev/scripts/__tests__/checkpoint-logic.test.ts
 git commit -m "feat(checkpoint): R3 强化（--checkpoint-log 强制 + 拒绝代签）"
 ```
 
@@ -863,8 +863,8 @@ git commit -m "feat(checkpoint): R3 强化（--checkpoint-log 强制 + 拒绝代
 ## Task 10: check-verifier-output.ts + verifier-logic.ts evidence 格式校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-verifier-output.ts`
-- Modify: `w-model-dev/scripts/verifier-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-verifier-output.ts`
+- Modify: `w-model-dev/scripts/logic/verifier-logic.ts`
 - Modify: `w-model-dev/scripts/__tests__/verifier-logic.test.ts`
 
 - [ ] **Step 1: 在 verifier-logic.ts 新增 evidence 格式校验**
@@ -971,7 +971,7 @@ Expected: 0 errors
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/verifier-logic.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts
+git add w-model-dev/scripts/logic/verifier-logic.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts
 git commit -m "feat(verifier): evidence 格式校验（空泛声明 → O3 命中 + qualityLevel 降级）"
 ```
 
@@ -1046,7 +1046,7 @@ git commit -m "feat(schema): 新增 signature-chain.schema.json"
 ## Task 12: 新增 signature-chain-logic.ts（纯逻辑层）
 
 **Files:**
-- Create: `w-model-dev/scripts/signature-chain-logic.ts`
+- Create: `w-model-dev/scripts/logic/signature-chain-logic.ts`
 
 - [ ] **Step 1: 创建 signature-chain-logic.ts**
 
@@ -1384,7 +1384,7 @@ Expected: 0 errors
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/signature-chain-logic.ts
+git add w-model-dev/scripts/logic/signature-chain-logic.ts
 git commit -m "feat(logic): 新增 signature-chain-logic.ts（R1-R10 + 跨阶段校验）"
 ```
 
@@ -1393,7 +1393,7 @@ git commit -m "feat(logic): 新增 signature-chain-logic.ts（R1-R10 + 跨阶段
 ## Task 13: 新增 check-signature-chain.ts（CLI 入口）
 
 **Files:**
-- Create: `w-model-dev/scripts/check-signature-chain.ts`
+- Create: `w-model-dev/scripts/cli/check-signature-chain.ts`
 
 - [ ] **Step 1: 创建 check-signature-chain.ts**
 
@@ -1407,7 +1407,7 @@ git commit -m "feat(logic): 新增 signature-chain-logic.ts（R1-R10 + 跨阶段
  * 校验 signature-chain.jsonl 的：R1-R10 + 跨阶段消费者校验。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
+ *   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
  *
  * 参数：
  *   signature-chain.jsonl   签名链文件路径
@@ -1479,7 +1479,7 @@ async function main(): Promise<void> {
   const { chainFile, phase, stage } = parseArgs(process.argv);
 
   if (!chainFile) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]');
     process.exit(2);
   }
 
@@ -1581,7 +1581,7 @@ Expected: 0 errors
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-signature-chain.ts
+git add w-model-dev/scripts/cli/check-signature-chain.ts
 git commit -m "feat(cli): 新增 check-signature-chain.ts（签名链 CLI 入口）"
 ```
 
@@ -1590,8 +1590,8 @@ git commit -m "feat(cli): 新增 check-signature-chain.ts（签名链 CLI 入口
 ## Task 14: 新增 archive-integrity-logic.ts + check-archive-integrity.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/archive-integrity-logic.ts`
-- Create: `w-model-dev/scripts/check-archive-integrity.ts`
+- Create: `w-model-dev/scripts/logic/archive-integrity-logic.ts`
+- Create: `w-model-dev/scripts/cli/check-archive-integrity.ts`
 
 - [ ] **Step 1: 创建 archive-integrity-logic.ts**
 
@@ -1705,7 +1705,7 @@ export function checkArchiveIntegrity(
  * 供阶段 8 归档时调用，校验归档目录是否包含各阶段强制快照文件。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>
+ *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>
  *
  * 参数：
  *   archive-dir   归档目录路径
@@ -1754,7 +1754,7 @@ async function walkDir(dirAbs: string, baseDir: string): Promise<Set<string>> {
 async function main(): Promise<void> {
   const archiveDir = process.argv[2];
   if (!archiveDir) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-archive-integrity.ts <archive-dir>');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>');
     process.exit(2);
   }
 
@@ -1820,7 +1820,7 @@ Expected: 0 errors
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/archive-integrity-logic.ts w-model-dev/scripts/check-archive-integrity.ts
+git add w-model-dev/scripts/logic/archive-integrity-logic.ts w-model-dev/scripts/cli/check-archive-integrity.ts
 git commit -m "feat(archive): 新增归档完整性校验（check-archive-integrity.ts + logic）"
 ```
 
@@ -2032,7 +2032,7 @@ git commit -m "test: 新增签名链 + 归档完整性单测"
 ## Task 17: 更新 self-test.ts 加入新样本声明
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 
 - [ ] **Step 1: 在 self-test.ts SAMPLES 数组新增签名链 + 归档完整性样本声明**
 
@@ -2089,7 +2089,7 @@ Expected: 所有样本通过（基线 149 → 预计 165+）
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "feat(self-test): 新增签名链 + 归档完整性样本声明"
 ```
 
@@ -2110,7 +2110,7 @@ Run: Read `.githooks/pre-push`
 
 ```bash
 # [21.0.0] 签名链有效样本 exit 0
-npx tsx w-model-dev/scripts/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1
+npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1
 if [ $? -ne 0 ]; then
   echo "✗ check-signature-chain valid sample failed"
   exit 1

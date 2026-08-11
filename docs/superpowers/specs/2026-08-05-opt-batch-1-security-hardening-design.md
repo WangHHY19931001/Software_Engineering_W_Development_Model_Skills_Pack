@@ -10,8 +10,8 @@
 
 | # | 级别 | 现状（探索实测） | 风险 |
 |---|---|---|---|
-| 1.1 | P1 | [check-state-machine-consistency.ts:159-165](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/check-state-machine-consistency.ts#L159-L165) 的 isMain 守卫用 `import.meta.url.replace('file:///', '')` 字符串替换做路径比较，未 URL 解码 | 脚本所在路径含空格（`%20`）或非 ASCII 字符时，比较不等 → `isMain=false` → `main()` 永不执行 → Node 以退出码 0 结束 → **门禁在未做任何校验的情况下静默报告通过** |
-| 1.2 | P2 | [check-tla-model.ts:176-204](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/check-tla-model.ts#L176-L204) `cleanTraceFiles(dir)` 对 `dir` 下 `states/` 目录递归删除、`*.dump/*.out` 强制删除；`dir` 来自 manifest 的 `spec.tlaPath`（Agent 可写） | 若 manifest 把 tlaPath 指向仓库根或敏感目录，`fs.rm(dir/states, {recursive})` 会删除该目录下同名业务 `states/` 目录（第 1 轮分析：当前删除面虽已限定文件名，但目录名 `states` 无 TLC 特征校验） |
+| 1.1 | P1 | [check-state-machine-consistency.ts:159-165](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-state-machine-consistency.ts#L159-L165) 的 isMain 守卫用 `import.meta.url.replace('file:///', '')` 字符串替换做路径比较，未 URL 解码 | 脚本所在路径含空格（`%20`）或非 ASCII 字符时，比较不等 → `isMain=false` → `main()` 永不执行 → Node 以退出码 0 结束 → **门禁在未做任何校验的情况下静默报告通过** |
+| 1.2 | P2 | [check-tla-model.ts:176-204](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-tla-model.ts#L176-L204) `cleanTraceFiles(dir)` 对 `dir` 下 `states/` 目录递归删除、`*.dump/*.out` 强制删除；`dir` 来自 manifest 的 `spec.tlaPath`（Agent 可写） | 若 manifest 把 tlaPath 指向仓库根或敏感目录，`fs.rm(dir/states, {recursive})` 会删除该目录下同名业务 `states/` 目录（第 1 轮分析：当前删除面虽已限定文件名，但目录名 `states` 无 TLC 特征校验） |
 | 1.3 | P2 | [server.cjs:537-547](file:///d:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.cursor/skills/brainstorming/scripts/server.cjs#L537-L547) `cp.exec(process.env.BRAINSTORM_OPEN_CMD + ' ' + JSON.stringify(url), ...)` 经 shell 拼接执行 | BRAINSTORM_OPEN_CMD 虽注释为 trusted operator input，仍是通过 shell 的命令注入面（如环境变量值含 shell 元字符）；且 JSON.stringify(url) 对含特殊字符的 url 不构成 shell 安全边界 |
 | 1.4 | P3 | 全仓 ~30 处 `JSON.parse` 入口均未处理 `__proto__` 键 | 现代 V8 的 JSON.parse 本身不污染原型（`__proto__` 成为自有属性），但对象后续若经 `Object.assign`/spread 复制会触发原型污染；为防御性加固 |
 
@@ -187,13 +187,13 @@ export function parseJsonSafe<T = unknown>(text: string): T {
 
 | 文件 | 动作 |
 |---|---|
-| `w-model-dev/scripts/check-state-machine-consistency.ts` | 修改（isMain 修复） |
-| `w-model-dev/scripts/check-tla-model.ts` | 修改（cleanTraceFiles 白名单） |
+| `w-model-dev/scripts/cli/check-state-machine-consistency.ts` | 修改（isMain 修复） |
+| `w-model-dev/scripts/cli/check-tla-model.ts` | 修改（cleanTraceFiles 白名单） |
 | `.cursor/skills/brainstorming/scripts/server.cjs` | 修改（execFile 化） |
 | `w-model-dev/scripts/lib/safe-json.ts` | **新增** |
 | `w-model-dev/scripts/lib/read-json-or-exit.ts` | 修改（parseJsonSafe 接入） |
 | 14 个 CLI/工具脚本（见 §3.4 表） | 修改（parseJsonSafe 机械替换） |
-| `w-model-dev/scripts/self-test.ts` | 修改（内部 parse 替换） |
+| `w-model-dev/scripts/cli/self-test.ts` | 修改（内部 parse 替换） |
 | `w-model-dev/scripts/__tests__/safe-json.test.ts` | **新增**（reviver 单测） |
 | `w-model-dev/scripts/samples/state-machine/valid-consistent.json` | 已存在（复验用） |
 

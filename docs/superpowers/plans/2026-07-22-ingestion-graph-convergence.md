@@ -24,9 +24,9 @@
 
 | 路径 | 责任 |
 |---|---|
-| `w-model-dev/scripts/graph-logic.ts` | 图谱校验纯逻辑（连通性/单根/父唯一/阶段追溯），纯函数无 I/O |
-| `w-model-dev/scripts/check-requirement-graph.ts` | CLI 入口，读 JSON → 调 graph-logic → 输出报告 + JSON 摘要 + 退出码 |
-| `w-model-dev/scripts/plan-chunks.ts` | CLI 入口，读路径 → 分块规划 → stdout 输出 JSON（不写文件） |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 图谱校验纯逻辑（连通性/单根/父唯一/阶段追溯），纯函数无 I/O |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | CLI 入口，读 JSON → 调 graph-logic → 输出报告 + JSON 摘要 + 退出码 |
+| `w-model-dev/scripts/logic/plan-chunks.ts` | CLI 入口，读路径 → 分块规划 → stdout 输出 JSON（不写文件） |
 | `w-model-dev/scripts/samples/graph/*.json` | 图谱样本（valid + 4 类 bad） |
 | `w-model-dev/references/ingestion-chunk.md` | A-chunk 任务指引 |
 | `w-model-dev/references/ingestion-cross.md` | A-cross/A-evolve 任务指引 |
@@ -36,7 +36,7 @@
 
 | 路径 | 改动性质 |
 |---|---|
-| `w-model-dev/scripts/self-test.ts` | 追加 GRAPH_CASES + plan-chunks 用例 |
+| `w-model-dev/scripts/cli/self-test.ts` | 追加 GRAPH_CASES + plan-chunks 用例 |
 | `w-model-dev/SKILL.md` | 角色表加 A、工作流插入 ingestion、自检加项 |
 | `w-model-dev/references/subagent-delegation.md` | 角色表加 A、A 分派模板、回填契约、强制约束 |
 | `w-model-dev/references/phase-1-requirements.md` | 插入 ingestion 引用、验收标准加图谱项 |
@@ -58,11 +58,11 @@
 ## Task 1: graph-logic.ts 纯逻辑骨架与类型
 
 **Files:**
-- Create: `w-model-dev/scripts/graph-logic.ts`
+- Create: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 写 graph-logic.ts 类型与骨架**
 
-创建 `w-model-dev/scripts/graph-logic.ts`：
+创建 `w-model-dev/scripts/logic/graph-logic.ts`：
 
 ```typescript
 /**
@@ -171,7 +171,7 @@ Expected: 输出包含 `checkRequirementGraph`, `GraphShape` 等导出键，无 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(graph): add graph-logic.ts type skeleton and check entry"
 ```
 
@@ -180,7 +180,7 @@ git commit -m "feat(graph): add graph-logic.ts type skeleton and check entry"
 ## Task 2: 连通性校验（BFS + 孤立节点）
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 实现 checkRequirementGraph 的解析与连通性部分**
 
@@ -295,7 +295,7 @@ Expected: `components=2 isolated=['REQ-001','REQ-002'] violations=[两条]`（�
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(graph): implement connectivity check (BFS + isolated nodes)"
 ```
 
@@ -304,7 +304,7 @@ git commit -m "feat(graph): implement connectivity check (BFS + isolated nodes)"
 ## Task 3: 单根与父唯一性校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 在连通性校验后追加单根与父唯一性逻辑**
 
@@ -380,7 +380,7 @@ Expected: `roots=['REQ-001','REQ-002'] orphans=['REQ-001','REQ-002'] violations�
 - [ ] **Step 4: Commit**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(graph): implement single-root and parent-uniqueness checks"
 ```
 
@@ -389,7 +389,7 @@ git commit -m "feat(graph): implement single-root and parent-uniqueness checks"
 ## Task 4: 阶段递进追溯校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 在父唯一性校验后追加阶段追溯逻辑**
 
@@ -496,7 +496,7 @@ Expected: `passed=true violations=[]`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(graph): implement phase-progressive traceability checks and passed summary"
 ```
 
@@ -705,7 +705,7 @@ git commit -m "test(graph): add 8 graph samples (1 valid + 7 bad)"
 ## Task 6: check-requirement-graph.ts CLI 入口
 
 **Files:**
-- Create: `w-model-dev/scripts/check-requirement-graph.ts`
+- Create: `w-model-dev/scripts/cli/check-requirement-graph.ts`
 
 - [ ] **Step 1: 写 check-requirement-graph.ts**
 
@@ -719,7 +719,7 @@ git commit -m "test(graph): add 8 graph samples (1 valid + 7 bad)"
  * 连通性、单根、父唯一性与阶段递进追溯。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]
  *
  * 参数：
  *   graph.json   graph.json 或 consolidated.json 文件路径
@@ -744,7 +744,7 @@ import {
 async function main(): Promise<void> {
   const file = process.argv[2];
   if (!file) {
-    console.error('用法: npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]');
+    console.error('用法: npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]');
     process.exit(2);
   }
 
@@ -845,23 +845,23 @@ main().catch((err) => {
 
 - [ ] **Step 2: 验证 valid-graph.json 通过**
 
-Run: `npx tsx w-model-dev/scripts/check-requirement-graph.ts w-model-dev/scripts/samples/graph/valid-graph.json --phase=4`
+Run: `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev/scripts/samples/graph/valid-graph.json --phase=4`
 Expected: 退出码 0，末尾 `GRAPH_JSON {...,"passed":true,"converged":true}`
 
 - [ ] **Step 3: 验证 bad-sd-no-implements.json 失败**
 
-Run: `npx tsx w-model-dev/scripts/check-requirement-graph.ts w-model-dev/scripts/samples/graph/bad-sd-no-implements.json --phase=2`
+Run: `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts w-model-dev/scripts/samples/graph/bad-sd-no-implements.json --phase=2`
 Expected: 退出码 1，输出含 `SD 节点 SD-001 缺少 implements 出边`
 
 - [ ] **Step 4: 验证文件不存在退出码 2**
 
-Run: `npx tsx w-model-dev/scripts/check-requirement-graph.ts nonexistent.json`
+Run: `npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts nonexistent.json`
 Expected: 退出码 2，输出 `✗ 文件不存在`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-graph.ts
+git add w-model-dev/scripts/cli/check-requirement-graph.ts
 git commit -m "feat(graph): add check-requirement-graph.ts CLI entry"
 ```
 
@@ -870,7 +870,7 @@ git commit -m "feat(graph): add check-requirement-graph.ts CLI entry"
 ## Task 7: plan-chunks.ts CLI 入口
 
 **Files:**
-- Create: `w-model-dev/scripts/plan-chunks.ts`
+- Create: `w-model-dev/scripts/logic/plan-chunks.ts`
 
 - [ ] **Step 1: 写 plan-chunks.ts**
 
@@ -883,7 +883,7 @@ git commit -m "feat(graph): add check-requirement-graph.ts CLI entry"
  * 编排者（O）以只读方式调用，脚本不写任何文件，仅 stdout 输出 JSON 分块计划。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]
+ *   npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]
  *
  * 参数：
  *   path           文件或目录路径
@@ -926,7 +926,7 @@ function parseArgs(argv: string[]): {
 } {
   const inputPath = argv[2];
   if (!inputPath) {
-    console.error('用法: npx tsx w-model-dev/scripts/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]');
+    console.error('用法: npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]');
     process.exit(2);
   }
   let phase: number | undefined;
@@ -1083,23 +1083,23 @@ main().catch((err) => {
 - [ ] **Step 2: 验证单文件分块**
 
 创建临时测试文件后运行（或用现有 md 文件）：
-Run: `npx tsx w-model-dev/scripts/plan-chunks.ts w-model-dev/SKILL.md --phase=1 --node-type=REQ`
+Run: `npx tsx w-model-dev/scripts/logic/plan-chunks.ts w-model-dev/SKILL.md --phase=1 --node-type=REQ`
 Expected: 退出码 0，stdout 输出 JSON 含 `totalChunks`、`strategy`、`chunks` 数组
 
 - [ ] **Step 3: 验证目录分块**
 
-Run: `npx tsx w-model-dev/scripts/plan-chunks.ts w-model-dev/references --phase=2 --node-type=SD`
+Run: `npx tsx w-model-dev/scripts/logic/plan-chunks.ts w-model-dev/references --phase=2 --node-type=SD`
 Expected: 退出码 0，`strategy: "dir-tree"`，`totalChunks` 等于 references 下文件数
 
 - [ ] **Step 4: 验证路径不存在退出码 2**
 
-Run: `npx tsx w-model-dev/scripts/plan-chunks.ts nonexistent --phase=1 --node-type=REQ`
+Run: `npx tsx w-model-dev/scripts/logic/plan-chunks.ts nonexistent --phase=1 --node-type=REQ`
 Expected: 退出码 2，输出 `✗ 路径不存在`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/plan-chunks.ts
+git add w-model-dev/scripts/logic/plan-chunks.ts
 git commit -m "feat(ingestion): add plan-chunks.ts CLI entry (read-only chunk planner)"
 ```
 
@@ -1108,7 +1108,7 @@ git commit -m "feat(ingestion): add plan-chunks.ts CLI entry (read-only chunk pl
 ## Task 8: 扩展 self-test.ts 加入图谱用例
 
 **Files:**
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 
 - [ ] **Step 1: 在 self-test.ts 顶部 import 加入 graph-logic**
 
@@ -1266,7 +1266,7 @@ Expected: 退出码 0，输出 `总计 25 条用例：25 通过，0 失败`（�
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(graph): add 8 graph cases to self-test (17→25 total)"
 ```
 
@@ -1282,8 +1282,8 @@ git commit -m "test(graph): add 8 graph cases to self-test (17→25 total)"
 修改 `package.json` 的 `scripts` 节，在 `"check:gate"` 行后追加：
 
 ```json
-    "check:gate": "tsx w-model-dev/scripts/check-artifact-gate.ts",
-    "check:graph": "tsx w-model-dev/scripts/check-requirement-graph.ts",
+    "check:gate": "tsx w-model-dev/scripts/cli/check-artifact-gate.ts",
+    "check:graph": "tsx w-model-dev/scripts/cli/check-requirement-graph.ts",
 ```
 
 - [ ] **Step 2: 验证 npm run check:graph 可用**
@@ -1363,7 +1363,7 @@ git commit -m "build: add check:graph npm script"
 ## 校验脚本
 
 ```bash
-npx tsx w-model-dev/scripts/check-requirement-graph.ts "<graph.json|consolidated.json>" [--phase=1|2|3|4]
+npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json|consolidated.json>" [--phase=1|2|3|4]
 ```
 
 退出码 0=通过 / 1=失败 / 2=输入错误。算法详见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §3.2。
@@ -2005,7 +2005,7 @@ Run:
 ```bash
 for f in valid-graph bad-isolated bad-multi-root bad-orphan bad-multi-parent bad-sd-no-implements bad-intf-no-defines bad-dd-no-realizes; do
   echo "=== $f ==="
-  npx tsx w-model-dev/scripts/check-requirement-graph.ts "w-model-dev/scripts/samples/graph/$f.json" --phase=4 2>&1 | tail -3
+  npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "w-model-dev/scripts/samples/graph/$f.json" --phase=4 2>&1 | tail -3
   echo "exit=$?"
 done
 ```
@@ -2015,9 +2015,9 @@ Expected: valid 退出 0，其余退出 1（bad-orphan 因 phase=4 无 SD/INTF/D
 
 Run:
 ```bash
-npx tsx w-model-dev/scripts/plan-chunks.ts w-model-dev/SKILL.md --phase=1 --node-type=REQ | head -5
-npx tsx w-model-dev/scripts/plan-chunks.ts w-model-dev/references --phase=2 --node-type=SD | head -5
-npx tsx w-model-dev/scripts/plan-chunks.ts nonexistent --phase=1 --node-type=REQ
+npx tsx w-model-dev/scripts/logic/plan-chunks.ts w-model-dev/SKILL.md --phase=1 --node-type=REQ | head -5
+npx tsx w-model-dev/scripts/logic/plan-chunks.ts w-model-dev/references --phase=2 --node-type=SD | head -5
+npx tsx w-model-dev/scripts/logic/plan-chunks.ts nonexistent --phase=1 --node-type=REQ
 echo "exit=$?"
 ```
 Expected: 前两个退出 0 输出 JSON，第三个退出 2

@@ -862,7 +862,7 @@
 - 引入 ajv (draft-07) + 13 份 JSON Schema 强约束 .w-model/*.json
 - 引入 eslint-plugin-security + .eslintsecurity-baseline.json 安全扫描基线
 - 新增 w-model-dev/schemas/ 目录
-- 新增 w-model-dev/scripts/schema-loader.ts / security-scan.ts
+- 新增 w-model-dev/scripts/logic/schema-loader.ts / security-scan.ts
 - 新增 w-model-dev/skill-metadata.json 版本号镜像
 - 新增 w-model-dev/references/toolbox.md 决策表
 - 新增 w-model-dev/scripts/__tests__/README.md coverage 矩阵
@@ -1515,20 +1515,20 @@
 
 #### 新增
 
-- **`w-model-dev/scripts/code-tla-logic.ts`**：代码-TLA+ 一致性校验纯逻辑（单点事实源），四维度校验：
+- **`w-model-dev/scripts/logic/code-tla-logic.ts`**：代码-TLA+ 一致性校验纯逻辑（单点事实源），四维度校验：
   - 维度1 `checkSdToCodeModule`：SD→codeModule 映射完整性（读 `graph.json` SD 节点，核验 `rtm.json` codeModule 覆盖，多段匹配）
   - 维度2 `extractCodeStateTransfers` + `checkCodeStateTransfer`：代码状态转移抽取（TypeScript Compiler API 解析 AST，抽取 `BinaryExpression(=)` / `IfStatement` / `SwitchStatement`）
   - 维度3 `checkNextBranchCoverage`：Next 分支对应（正则抽取 TLA+ Next 动作名，驼峰匹配代码方法名）
   - 维度4 `checkInvariantCoverage`：断言覆盖不变式（抽取 `BusinessInvariant` 子不变式名，匹配代码 `assert`/`invariant`/`require` 调用）
-- **`w-model-dev/scripts/check-code-tla-consistency.ts`**：CLI 入口（参数 `--manifest`/`--graph`/`--rtm`/`--src`；输出 `CODE_TLA_JSON`；退出码 0/1）
+- **`w-model-dev/scripts/cli/check-code-tla-consistency.ts`**：CLI 入口（参数 `--manifest`/`--graph`/`--rtm`/`--src`；输出 `CODE_TLA_JSON`；退出码 0/1）
 - **`w-model-dev/scripts/__tests__/code-tla-logic.test.ts`**：5 条测试样本（3 合规 + 2 违规）
-- `w-model-dev/scripts/self-test.ts`：新增 5 条 code-TLA+ 样本用例（回归基线 61→66）
+- `w-model-dev/scripts/cli/self-test.ts`：新增 5 条 code-TLA+ 样本用例（回归基线 61→66）
 
 #### 变更
 
-- `w-model-dev/scripts/gate-logic.ts`：`checkArtifactGate` 入参追加 `graph?`/`manifestExists?`；新增 TLA+ 资产存在性校验（manifestExists）+ SD→codeModule 映射校验（读 graph SD 节点）
-- `w-model-dev/scripts/check-artifact-gate.ts`：读取 `.w-model/ingestion/graph.json` + 检查 `.w-model/tla-manifest.json` 存在性 + specs 非空；传入 `checkArtifactGate`；修复 `exitCode` 字段缺失缺陷（缺陷5）
-- `w-model-dev/scripts/check-run-log.ts`：`extractExitCode` 模式数组增加 `GATE_JSON` 标记识别（配合缺陷5修复）
+- `w-model-dev/scripts/logic/gate-logic.ts`：`checkArtifactGate` 入参追加 `graph?`/`manifestExists?`；新增 TLA+ 资产存在性校验（manifestExists）+ SD→codeModule 映射校验（读 graph SD 节点）
+- `w-model-dev/scripts/cli/check-artifact-gate.ts`：读取 `.w-model/ingestion/graph.json` + 检查 `.w-model/tla-manifest.json` 存在性 + specs 非空；传入 `checkArtifactGate`；修复 `exitCode` 字段缺失缺陷（缺陷5）
+- `w-model-dev/scripts/cli/check-run-log.ts`：`extractExitCode` 模式数组增加 `GATE_JSON` 标记识别（配合缺陷5修复）
 
 #### SSoT 修正
 
@@ -1882,7 +1882,7 @@
 - `w-model-dev-demo/` 内 `npm install && npm test` → 98 用例全过（65 unit + 12 integration + 6 system + 15 acceptance）
 - `w-model-dev-demo/` 内 `npm run coverage` → 总覆盖率 98.96% lines / 93.23% branches / 100% functions
 - `w-model-dev-demo/` 内 `npx tsc --noEmit` → 退出码 0
-- `w-model-dev-demo/` 内 `npx tsx ../w-model-dev/scripts/check-artifact-gate.ts .` → 退出码 0
+- `w-model-dev-demo/` 内 `npx tsx ../w-model-dev/scripts/cli/check-artifact-gate.ts .` → 退出码 0
 - `tests/perf/k6-load-test.js` 通过 `node --check` 语法校验
 - 文档一致性：`README.md` / `AGENTS.md` / `docs/skill-design-document_SSoT.md` / `docs/INSTALL.md` / `w-model-dev/references/anti-patterns.md` 均已同步至 2026-07-21 第二轮数据
 - SSoT §10B.4 与 anti-patterns.md「实现层经验教训」节 L1~L4 双向链接校验通过
@@ -1965,8 +1965,8 @@
 
 #### 验证
 
-- `npx tsx w-model-dev/scripts/self-test.ts` → 11/11 通过
-- `npx tsx w-model-dev/scripts/check-verifier-output.ts <sample.json>` 通过 / 失败路径均符合预期
+- `npx tsx w-model-dev/scripts/cli/self-test.ts` → 11/11 通过
+- `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <sample.json>` 通过 / 失败路径均符合预期
 
 ### 一致性补全：命令执行规则与示例覆盖
 
@@ -1997,8 +1997,8 @@
 #### 验证
 
 - `grep -E "helpHandler|REQ-/SD-/AT-|设计类型\(架构/详细\)|测试类型\(单元/集成/系统\)"` 在保留文件中无残留
-- `npx tsx w-model-dev/scripts/check-verifier-output.ts` 退出码 2（输入错误，符合预期，未传文件）
-- `npx tsx w-model-dev/scripts/check-artifact-gate.ts` 退出码 2（输入错误，符合预期，无 .w-model/rtm.json）
+- `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts` 退出码 2（输入错误，符合预期，未传文件）
+- `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts` 退出码 2（输入错误，符合预期，无 .w-model/rtm.json）
 - 校验脚本未受影响：`verifier-logic.ts` `SUB_CRITERIA` 与 `verifier-spec.md` §7 完全一致（20/20 子标准）；`determineQualityLevel` 与 §6.1 完全一致
 - 所有内部 Markdown 链接目标文件均存在，无断链
 
@@ -2018,10 +2018,10 @@
 
 #### 保留（自包含校验脚本）
 
-- `w-model-dev/scripts/gate-logic.ts`：工件质量门纯逻辑（自包含，仅依赖本目录内文件）
-- `w-model-dev/scripts/verifier-logic.ts`：Verifier 输出校验纯逻辑（自包含）
-- `w-model-dev/scripts/check-artifact-gate.ts`：工件质量门 CLI（读 `.w-model/rtm.json`，退出码 0/1/2）
-- `w-model-dev/scripts/check-verifier-output.ts`：Verifier 输出校验 CLI（防外部 Agent 输出漂移）
+- `w-model-dev/scripts/logic/gate-logic.ts`：工件质量门纯逻辑（自包含，仅依赖本目录内文件）
+- `w-model-dev/scripts/logic/verifier-logic.ts`：Verifier 输出校验纯逻辑（自包含）
+- `w-model-dev/scripts/cli/check-artifact-gate.ts`：工件质量门 CLI（读 `.w-model/rtm.json`，退出码 0/1/2）
+- `w-model-dev/scripts/cli/check-verifier-output.ts`：Verifier 输出校验 CLI（防外部 Agent 输出漂移）
 - 校验脚本运行依赖仅为 `tsx`（用户通过 `npx tsx` 或全局安装调用），无需 `npm install`
 
 #### 变更（文档同步至纯技能架构）
@@ -2047,7 +2047,7 @@
 - 内置 `src/core/*` LLM 评分 / 验证 / 排序 / 增强器 / 客户端 / 元技能配置
 - 内置 `src/evolution/skill-optimizer.ts` SkillOpt ReflectTrainer 训练循环
 - 内置 `src/eval/skill-lift.ts` ACES Skill Lift 评估
-- `w-model-dev/scripts/check-skill-gate.ts` 技能验证门
+- `w-model-dev/scripts/cli/check-skill-gate.ts` 技能验证门
 - `w-model-dev/META-SKILL.md` 可演化元技能配置
 - `tests/verifier-logic.test.ts` 等 11 个测试套件、163 个测试
 - `examples/run-wm-flow.ts` 编程式全流程示例

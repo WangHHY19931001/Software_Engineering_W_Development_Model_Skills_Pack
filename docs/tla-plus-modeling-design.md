@@ -211,7 +211,7 @@ TLA+ 的运行时依赖极简：**Java 11 + 单个 `tla2tools.jar`**。该 jar �
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 JSON 证据摘要
-npx tsx w-model-dev/scripts/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc]
 ```
 
 **参数说明**：
@@ -369,8 +369,8 @@ TLA+ 门禁与 ingestion 图谱门禁**正交叠加**：
 |---|---|---|
 | 设计文档 | `docs/tla-plus-modeling-design.md` | 本文件 |
 | 参考指南 | `w-model-dev/references/tla-plus-guide.md` | A/S/V/G 子代理可执行细则 |
-| 纯逻辑 | `w-model-dev/scripts/tla-logic.ts` | 校验纯逻辑（单点事实源） |
-| CLI 脚本 | `w-model-dev/scripts/check-tla-model.ts` | G 子代理调用入口 |
+| 纯逻辑 | `w-model-dev/scripts/logic/tla-logic.ts` | 校验纯逻辑（单点事实源） |
+| CLI 脚本 | `w-model-dev/scripts/cli/check-tla-model.ts` | G 子代理调用入口 |
 | 模板 | `w-model-dev/templates/tla-spec-template.md` | .tla 文件头模板 |
 | 内置工具 | `w-model-dev/tools/tla2tools.jar` | TLA+ 工具链（TLC2 2.19，2026-07-23 已下载置入） |
 | 自检样本（纯逻辑） | `w-model-dev/scripts/samples/tla/*.json` | 8 条 manifest 样本（valid + 7 bad-*），驱动 `checkTlaModel` 纯逻辑，无 Java 依赖，纳入 `npm run self-test` 回归基线 |

@@ -93,7 +93,7 @@
 - [ ] 缺陷已修复或已记录遗留
 - [ ] 可观测性达标（日志含 TraceID、关键指标暴露、调用链可追踪）
 
-> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]` 获取确定性判定，向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 → 一律回编码，不得放行。
+> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定，向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 → 一律回编码，不得放行。
 
 ## 阶段门评审
 

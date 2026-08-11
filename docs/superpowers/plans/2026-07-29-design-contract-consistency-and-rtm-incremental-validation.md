@@ -19,15 +19,15 @@
 | `w-model-dev/references/phase-5-coding.md` | 修改 | 增加验收设计反向对照清单 |
 | `w-model-dev/references/phase-8-acceptance-test.md` | 修改 | 增加前置条件校验清单 |
 | `w-model-dev/references/rtm-guide.md` | 修改 | 增加阶段级增量校验规则 |
-| `w-model-dev/scripts/gate-logic.ts` | 修改 | PHASE_TRACE_FIELDS phase 1-4 增加 acceptanceTest |
-| `w-model-dev/scripts/design-contract-logic.ts` | 创建 | 设计契约一致性校验纯逻辑层 |
-| `w-model-dev/scripts/check-design-contract-consistency.ts` | 创建 | 设计契约一致性校验 CLI |
+| `w-model-dev/scripts/logic/gate-logic.ts` | 修改 | PHASE_TRACE_FIELDS phase 1-4 增加 acceptanceTest |
+| `w-model-dev/scripts/logic/design-contract-logic.ts` | 创建 | 设计契约一致性校验纯逻辑层 |
+| `w-model-dev/scripts/cli/check-design-contract-consistency.ts` | 创建 | 设计契约一致性校验 CLI |
 | `w-model-dev/schemas/design-contract.schema.json` | 创建 | 校验输出 JSON Schema |
 | `w-model-dev/scripts/samples/design-contract/valid-consistent.json` | 创建 | 通过样本：全部一致 |
 | `w-model-dev/scripts/samples/design-contract/bad-path-mismatch.json` | 创建 | 失败样本：路径不一致 |
 | `w-model-dev/scripts/samples/design-contract/bad-param-mismatch.json` | 创建 | 失败样本：参数不一致 |
 | `w-model-dev/scripts/samples/design-contract/bad-status-mismatch.json` | 创建 | 失败样本：状态码不一致 |
-| `w-model-dev/scripts/self-test.ts` | 修改 | 增加 DesignContract 用例 + runDesignContractCases |
+| `w-model-dev/scripts/cli/self-test.ts` | 修改 | 增加 DesignContract 用例 + runDesignContractCases |
 
 ---
 
@@ -46,7 +46,7 @@
 > 历史缺陷：第 21 轮 8 阶段调测暴露「阶段 1 验收测试设计与阶段 5 编码实现脱节」——
 > 6 处接口路径/参数名/状态码/响应字段不一致，`uat-path-mapping.md` 形同虚设。
 > 本节确立编码后自动校验设计契约一致性的机制。
-> 实现位置：`w-model-dev/scripts/check-design-contract-consistency.ts` + `w-model-dev/references/phase-5-coding.md` 反向对照清单。
+> 实现位置：`w-model-dev/scripts/cli/check-design-contract-consistency.ts` + `w-model-dev/references/phase-5-coding.md` 反向对照清单。
 
 **强制校验维度**（D1~D4，任一失败 → exitCode=1，O 不得放行）：
 
@@ -102,11 +102,11 @@ git commit -m "docs(ssot): add §10I design contract consistency and §10J RTM i
 ## Task 2: 修复 gate-logic.ts PHASE_TRACE_FIELDS
 
 **Files:**
-- Modify: `w-model-dev/scripts/gate-logic.ts:78-87`
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts:78-87`
 
 - [ ] **Step 1: 修改 PHASE_TRACE_FIELDS**
 
-将 `w-model-dev/scripts/gate-logic.ts` 第 78-87 行的：
+将 `w-model-dev/scripts/logic/gate-logic.ts` 第 78-87 行的：
 
 ```typescript
 const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
@@ -217,7 +217,7 @@ const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
 
 - [ ] **Step 5: 在 self-test.ts GATE_CASES 增加两条用例**
 
-在 `w-model-dev/scripts/self-test.ts` 的 `GATE_CASES` 数组末尾（第 287 行 `];` 之前）插入：
+在 `w-model-dev/scripts/cli/self-test.ts` 的 `GATE_CASES` 数组末尾（第 287 行 `];` 之前）插入：
 
 ```typescript
   // -------------------- §10J RTM 增量校验修正（第 22 轮） --------------------
@@ -238,13 +238,13 @@ const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
 
 - [ ] **Step 6: 运行 self-test 验证**
 
-Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/self-test.ts`
+Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/cli/self-test.ts`
 Expected: 全部通过（含 2 条新用例）
 
 - [ ] **Step 7: 提交**
 
 ```bash
-git add w-model-dev/scripts/gate-logic.ts w-model-dev/scripts/self-test.ts w-model-dev/scripts/samples/gate/valid-phase1.json w-model-dev/scripts/samples/gate/bad-phase1-missing-acceptance-test.json
+git add w-model-dev/scripts/logic/gate-logic.ts w-model-dev/scripts/cli/self-test.ts w-model-dev/scripts/samples/gate/valid-phase1.json w-model-dev/scripts/samples/gate/bad-phase1-missing-acceptance-test.json
 git commit -m "fix(gate-logic): add acceptanceTest to PHASE_TRACE_FIELDS phase 1-4 (§10J)
 
 Fixes C-class issue: 35 INTF/SD nodes had null acceptanceTest undetected
@@ -257,11 +257,11 @@ REQ/SD/INTF/DD rows. NFR/CON rows remain exempt via isCrossCutting."
 ## Task 3: 创建 design-contract-logic.ts（纯逻辑层）
 
 **Files:**
-- Create: `w-model-dev/scripts/design-contract-logic.ts`
+- Create: `w-model-dev/scripts/logic/design-contract-logic.ts`
 
 - [ ] **Step 1: 创建纯逻辑层文件**
 
-创建 `w-model-dev/scripts/design-contract-logic.ts`：
+创建 `w-model-dev/scripts/logic/design-contract-logic.ts`：
 
 ```typescript
 /**
@@ -503,9 +503,9 @@ export function checkDesignContractConsistency(
 
 - [ ] **Step 3: 在 schema-loader.ts 注册新 schema**
 
-检查 `w-model-dev/scripts/schema-loader.ts` 中的 schema 注册表，添加 `'design-contract'` 条目。
+检查 `w-model-dev/scripts/logic/schema-loader.ts` 中的 schema 注册表，添加 `'design-contract'` 条目。
 
-Run: `grep -n "rtm\|graph\|verifier" w-model-dev/scripts/schema-loader.ts | head -20`
+Run: `grep -n "rtm\|graph\|verifier" w-model-dev/scripts/logic/schema-loader.ts | head -20`
 
 根据现有模式，在 schema 注册表中添加 `'design-contract': 'design-contract.schema.json'`。
 
@@ -517,7 +517,7 @@ Expected: 0 errors
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/design-contract-logic.ts w-model-dev/schemas/design-contract.schema.json w-model-dev/scripts/schema-loader.ts
+git add w-model-dev/scripts/logic/design-contract-logic.ts w-model-dev/schemas/design-contract.schema.json w-model-dev/scripts/logic/schema-loader.ts
 git commit -m "feat(scripts): add design-contract-logic.ts pure logic layer (§10I D1-D4)"
 ```
 
@@ -526,11 +526,11 @@ git commit -m "feat(scripts): add design-contract-logic.ts pure logic layer (§1
 ## Task 4: 创建 check-design-contract-consistency.ts（CLI 层）
 
 **Files:**
-- Create: `w-model-dev/scripts/check-design-contract-consistency.ts`
+- Create: `w-model-dev/scripts/cli/check-design-contract-consistency.ts`
 
 - [ ] **Step 1: 创建 CLI 脚本**
 
-创建 `w-model-dev/scripts/check-design-contract-consistency.ts`：
+创建 `w-model-dev/scripts/cli/check-design-contract-consistency.ts`：
 
 ```typescript
 #!/usr/bin/env tsx
@@ -542,7 +542,7 @@ git commit -m "feat(scripts): add design-contract-logic.ts pure logic layer (§1
  * 校验编码与验收设计一致性（D1 路径 / D2 参数 / D3 状态码 / D4 响应字段）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-design-contract-consistency.ts [project-dir]
+ *   npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts [project-dir]
  *
  * 参数：
  *   project-dir  项目根目录（默认：当前工作目录）
@@ -802,7 +802,7 @@ Expected: 0 errors
 - [ ] **Step 3: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-design-contract-consistency.ts
+git add w-model-dev/scripts/cli/check-design-contract-consistency.ts
 git commit -m "feat(scripts): add check-design-contract-consistency.ts CLI (§10I)"
 ```
 
@@ -815,7 +815,7 @@ git commit -m "feat(scripts): add check-design-contract-consistency.ts CLI (§10
 - Create: `w-model-dev/scripts/samples/design-contract/bad-path-mismatch.json`
 - Create: `w-model-dev/scripts/samples/design-contract/bad-param-mismatch.json`
 - Create: `w-model-dev/scripts/samples/design-contract/bad-status-mismatch.json`
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 
 - [ ] **Step 1: 创建 valid-consistent.json**
 
@@ -963,7 +963,7 @@ git commit -m "feat(scripts): add check-design-contract-consistency.ts CLI (§10
 
 - [ ] **Step 5: 在 self-test.ts 增加 DesignContractCase 接口和用例**
 
-在 `w-model-dev/scripts/self-test.ts` 中，在 `SIGNATURE_CHAIN_CASES` 定义之前（搜索 `// -------------------- SignatureChain --------------------`）插入：
+在 `w-model-dev/scripts/cli/self-test.ts` 中，在 `SIGNATURE_CHAIN_CASES` 定义之前（搜索 `// -------------------- SignatureChain --------------------`）插入：
 
 ```typescript
 // -------------------- DesignContract --------------------
@@ -1062,7 +1062,7 @@ async function runDesignContractCases(samplesDir: string): Promise<TestCaseResul
 
 - [ ] **Step 8: 在 self-test.ts 顶部导入 checkDesignContractConsistency**
 
-在 `w-model-dev/scripts/self-test.ts` 顶部 import 区（约第 50 行 `import { checkArchiveIntegrity } from './archive-integrity-logic.js';` 之后）添加：
+在 `w-model-dev/scripts/cli/self-test.ts` 顶部 import 区（约第 50 行 `import { checkArchiveIntegrity } from './archive-integrity-logic.js';` 之后）添加：
 
 ```typescript
 import { checkDesignContractConsistency } from './design-contract-logic.js';
@@ -1070,13 +1070,13 @@ import { checkDesignContractConsistency } from './design-contract-logic.js';
 
 - [ ] **Step 9: 运行 self-test 验证**
 
-Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/self-test.ts`
+Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/cli/self-test.ts`
 Expected: 全部通过（含 4 条 DesignContract 用例 + 2 条新 Gate 用例）
 
 - [ ] **Step 10: 提交**
 
 ```bash
-git add w-model-dev/scripts/samples/design-contract/ w-model-dev/scripts/self-test.ts
+git add w-model-dev/scripts/samples/design-contract/ w-model-dev/scripts/cli/self-test.ts
 git commit -m "test(scripts): add design-contract samples + self-test cases (§10I D1-D4)"
 ```
 
@@ -1197,7 +1197,7 @@ Expected: 0 errors
 
 - [ ] **Step 2: self-test 全部通过**
 
-Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/self-test.ts`
+Run: `cd Software_Engineering_W_Development_Model_Skills_Pack && npx tsx w-model-dev/scripts/cli/self-test.ts`
 Expected: 全部通过（原有用例 + 2 条新 Gate 用例 + 4 条 DesignContract 用例）
 
 - [ ] **Step 3: Vitest 全部通过**

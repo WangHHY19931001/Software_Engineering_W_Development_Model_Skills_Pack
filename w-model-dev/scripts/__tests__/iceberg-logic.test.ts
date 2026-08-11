@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkIcebergSweep, type IcebergSweepReport } from '../iceberg-sweep-logic.js';
+import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
 
 function validReport(overrides: Partial<IcebergSweepReport> = {}): IcebergSweepReport {
   return {

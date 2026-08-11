@@ -38,7 +38,7 @@ metadata:
 运行校验脚本核验查询落盘是否齐全：
 
 ```bash
-npx tsx w-model-dev/scripts/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
+npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>
 ```
 
 退出码含义：
@@ -65,4 +65,4 @@ npx tsx w-model-dev/scripts/check-codegraph-queries.ts <project-root> --phase <5
 3. 评估修改是否波及 callers，是否需同步修改 callees
 4. 影响确认安全后执行 Edit/Write
 5. （可选）修改后再查一次，确认影响未扩大
-6. 运行 `npx tsx w-model-dev/scripts/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>`，退出码为 0
+6. 运行 `npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8>`，退出码为 0

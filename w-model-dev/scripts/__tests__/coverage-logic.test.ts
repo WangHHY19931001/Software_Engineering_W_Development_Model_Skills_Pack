@@ -19,7 +19,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { checkRequirementCoverage, type CoverageShape } from '../coverage-logic.js';
+import { checkRequirementCoverage, type CoverageShape } from '../logic/coverage-logic.js';
 
 /** 构造一份全通过的合法 CoverageShape（4 张矩阵完整 + 100% 覆盖率） */
 function makeValidCoverage(): CoverageShape {
@@ -288,7 +288,7 @@ describe('C1-C10 覆盖分析校验', () => {
 
 // ==================== C7 OOS 形状校验（CLI 层 exit 2） ====================
 describe('C7: OOS 形状校验 (CLI exit 2)', () => {
-  const scriptPath = 'w-model-dev/scripts/check-requirement-coverage.ts';
+  const scriptPath = 'w-model-dev/scripts/cli/check-requirement-coverage.ts';
   let tmpDirs: string[] = [];
 
   afterEach(() => {

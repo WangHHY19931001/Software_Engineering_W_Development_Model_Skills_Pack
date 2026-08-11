@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
-const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../metrics-report.ts');
+const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/metrics-report.ts');
 
 const RUN_LOG_JSONL =
   '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n' +

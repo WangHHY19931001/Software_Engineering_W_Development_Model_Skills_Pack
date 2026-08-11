@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../verifier-logic.js';
+import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../logic/verifier-logic.js';
 
 describe('[21.0.0] evidence 格式校验', () => {
   it('合法 evidence（冒号格式）应通过', () => {

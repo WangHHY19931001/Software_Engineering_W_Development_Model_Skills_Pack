@@ -16,7 +16,7 @@ import {
   transitionKey,
   type StateMachineConsistencyInput,
   type StateMachineConsistencyResult,
-} from '../state-machine-logic.js';
+} from '../logic/state-machine-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES_DIR = path.resolve(here, '..', 'samples', 'state-machine');

@@ -179,9 +179,9 @@
 
 | # | 检测信号（Agent 自查） | 命中后回退命令 | 对应退出码 |
 |---|---|---|---|
-| #1 | 阶段产物已产出但无 `VerifierOutput` JSON 文件 / 未调用 `check-verifier-output.ts` | `npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>`；JSON 不存在则重新执行评审 | `check-verifier-output.ts` 退出码 0 才算评审闭环 |
+| #1 | 阶段产物已产出但无 `VerifierOutput` JSON 文件 / 未调用 `check-verifier-output.ts` | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>`；JSON 不存在则重新执行评审 | `check-verifier-output.ts` 退出码 0 才算评审闭环 |
 | #2 | 阶段 1~4 产物存在但对应测试设计文档缺失（如阶段 3 无 `interface-test-design.md`） | 回到阶段 N 起点，按 `phase-N-*.md`「并行任务（强制）」节补产出测试设计 | 无脚本；Agent 比对 `templates/` 模板核验 |
-| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]`，退出码非 0 一律回阶段 5 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
+| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]`，退出码非 0 一律回阶段 5 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
 | #4 | `VerifierOutput.passed=false` 但 `Project.status` 已推进到下一阶段 | 回到本阶段起点，按 `reworkHints` 修复后重评，重置 `status` 字段 | `check-verifier-output.ts` 退出码 0 + `passed=true` |
 | #5 | Agent 上下文同时加载 ≥3 个 `references/phase-N-*.md` 文件 | 卸载无关 phase 文档，仅保留当前阶段 + `SKILL.md` + 必要 references | 无脚本；Agent 自检加载列表 |
 | #6 | RTM 覆盖率字段为 LLM 估算（无 `check-artifact-gate.ts` 输出佐证） | 执行 `check-artifact-gate.ts` 重新计算覆盖率；估算值不得写入 `rtm.json` | `check-artifact-gate.ts` 退出码 0 + `GATE_JSON.coverage=100%` |
@@ -198,7 +198,7 @@
 | #17 | TLC 发现违反，S 核查后确认规格忠实于需求/设计，但未回退修正需求/设计 | 回退到对应阶段：修正需求规格或设计文档 → 重写 TLA+ 规格 → 重跑 TLC | `check-tla-model.ts` 退出码 0（修正后重跑通过） |
 | #18 | V/G 不通过后编排者直接分派 S 返工（无 R 报告作为 S-fix 输入） | 回到 V/G 不通过节点，分派 R 定位 → V 复审 → G 门禁 → S-fix | `check-rootcause-report.ts` 退出码 0 + run-log R3 扩展（R+S-fix 一一对应） |
 | #19 | R 报告产出后无 V 复审记录（targetKind=rootcause）直接分派 S-fix | 回到 R 产出节点，分派 V 复审 → G 门禁后才可 S-fix | `check-verifier-output.ts`（targetKind=rootcause）退出码 0 + run-log R3 扩展（V 复审数=R 数） |
-| #21 | run-log.jsonl 中阶段 N（6/7）的 gate 动作参数为 `--phase=8`（或无 `--phase` 参数）且 N < 8；或阶段 N 完成但未跑对应 `--phase=N` 门禁 | 回到阶段 N 起点，强制跑 `npx tsx w-model-dev/scripts/check-artifact-gate.ts --phase=N [project-dir]` | `check-artifact-gate.ts --phase=N` 退出码 0 才算阶段 N 门禁闭环 |
+| #21 | run-log.jsonl 中阶段 N（6/7）的 gate 动作参数为 `--phase=8`（或无 `--phase` 参数）且 N < 8；或阶段 N 完成但未跑对应 `--phase=N` 门禁 | 回到阶段 N 起点，强制跑 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=N [project-dir]` | `check-artifact-gate.ts --phase=N` 退出码 0 才算阶段 N 门禁闭环 |
 | #22 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色）；或受保护端点无 `requiredRole` 声明 | 回到阶段 5 起点，分派 S 在路由层或控制器入口显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403；重跑 V-code 评审 + 单元测试「跨角色越权」场景 | 无脚本（V 评审 `reworkHints` 标注 + 系统测试用例越权场景应返回 403）；详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
 | #23 | 跨模块调用时 store 选择与 schema 不一致（如 `follower` 是 `user` 子集却在 `blogger store` 校验；`comment.bloggerId` 引用 `blogger` 主键却在 `user store` 校验）；或 `token.sub` 与所选 store 主键不对齐 | 回到阶段 3/4 起点，分派 S 在接口设计/详细设计显式声明所用 store，与 schema 一致；重跑 V-design 评审 + 集成测试「跨模块数据流」用例 | 无脚本（V 评审 `reworkHints` 标注 + 集成测试用例跨模块数据流）；详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
 | #24 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值；状态变更后响应体仍返回旧状态） | 回到阶段 5 起点，分派 S 调整副作用与响应体构造顺序（副作用在前，响应体构造在后）；重跑 V-code 评审 + 单元测试「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态） | 无脚本（V 评审 `reworkHints` 标注 + 系统测试用例副作用时序）；详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |

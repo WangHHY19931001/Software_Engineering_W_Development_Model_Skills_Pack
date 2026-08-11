@@ -40,7 +40,7 @@
 |---|---|---|
 | UAT-001~003 验收测试 | 按阶段 1 产出验收测试用例手动/半自动执行 | 每条验收标准通过 |
 | UAT-004 文档完整性 | 对照 `templates/` 12 个模板逐一核验 | 文件存在 + 内容与模板结构匹配 |
-| RTM 终检 | `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]` | 退出码 0（RTM 100% + 四级测试全通过） |
+| RTM 终检 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` | 退出码 0（RTM 100% + 四级测试全通过） |
 | 用户确认 | 在验收测试报告「用户确认」区记录 | `confirm` / `confirm-with-comments` / `reject` |
 
 ## 测试用例设计（执行）

@@ -27,12 +27,12 @@
 | **编排者** | O | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化 | ① 读 `.w-model/project.json` / `.w-model/rtm.json` / `.w-model/budget.json` / `.w-model/run-log.jsonl` / `.w-model/maturity.json`；② 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看**退出码**（只读，用于向用户展示或路由判定）；③ `git status` / `ls` / `Read` 等只读核验；④ 在 CHECKPOINT 暂停等待用户决定；⑤ 用户放行后更新 `project.status` 与 `updatedAt`；⑥ 分派 S / V / G 子代理；⑦ **维护 budget.json / run-log.jsonl / maturity.json**（状态读写+持久化，非实施；见 [operational-recovery.md](operational-recovery.md)「成本预算与运行日志」节 + 「成熟度与 CHECKPOINT 放行」节）：项目初始化创建三文件、每次子代理返回/门禁执行/CHECKPOINT 放行后 append run-log、预算检查、成熟度判定与升降级；⑧ **维护 event-ingress.jsonl + 事件路由**（状态读写+路由判定，非实施；见 [event-ingress-guide.md](event-ingress-guide.md)）：L2+ 激活时读 event-ingress.jsonl 未路由事件、查路由表、写 routedTo、append run-log action=event-route；⑨ **产出 HarnessImprovementReport**（状态分析，非实施；见 [hill-climbing-guide.md](hill-climbing-guide.md)）：分析 run-log 产出改进信号报告，存 `.w-model/hill-climbing/<ts>-report.json`，不自动改 harness | ① 用 `Write` / `Edit` 写或修改任何阶段产物文件；② 产出 `VerifierOutput` JSON 内容；③ 修改 `rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果）；④ 生成测试用例代码或业务代码；⑤ 跳过 S → V → G 顺序（如自评自审） |
 | **产出子代理** | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体 | ① 写文件（需求规格 / 设计文档 / 代码 / 测试用例代码 / 测试报告）；② 跑测试运行器（仅产出阶段，如 `npx vitest run`）；③ 改 `.w-model/rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果）；④ 加载当前阶段 `phase-N-*.md` 与对应模板 | ① 跑 `check-verifier-output.ts` / `check-artifact-gate.ts`（由 G 子代理负责）；② 越阶段产出（仅产当前阶段）；③ 改 `project.status`（由编排者负责） |
 | **评审子代理** | V | 按 [agent-personas.md](agent-personas.md) + [verifier-spec.md](verifier-spec.md) §8 产出 `VerifierOutput` JSON | ① 读产物文件（需求规格 / 设计文档 / 代码 / 测试用例 / 测试报告）；② 按 `targetKind` 选用 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）；③ 产出 `VerifierOutput` JSON（满足 [verifier-spec.md](verifier-spec.md) §7 Schema） | ① 跑门禁脚本（由 G 子代理负责）；② 改产物文件；③ 改 RTM；④ 跨阶段评审 |
-| **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | ① 跑 `npx tsx w-model-dev/scripts/check-verifier-output.ts "<json>"`；② 跑 `npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]`；③ 读 GATE_JSON / Verifier JSON；④ 产出证据摘要字符串（含退出码 / 质量等级 / `passed` / `reworkHints`） | ① 改产物文件；② 产出 `VerifierOutput` JSON（由 V 子代理负责）；③ 改 RTM 实体；④ 跑测试运行器（由 S 子代理负责） |
+| **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | ① 跑 `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>"`；② 跑 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]`；③ 读 GATE_JSON / Verifier JSON；④ 产出证据摘要字符串（含退出码 / 质量等级 / `passed` / `reworkHints`） | ① 改产物文件；② 产出 `VerifierOutput` JSON（由 V 子代理负责）；③ 改 RTM 实体；④ 跑测试运行器（由 S 子代理负责） |
 | **分析子代理** | A | 分块分析、交叉合并、图谱演进（阶段 1–4） | ① 读原始文档分块 / S 产出的正式文档；② 写 `.w-model/ingestion/<chunk-id>.{md,json}`；③ 读所有 chunk json 合并建图；④ 产出 `consolidated.json` + `cross-analysis-report.md` + `reworkHints`；⑤ 通过晋升 consolidated.json 更新 graph.json | ① 跑 `check-requirement-graph.ts`（G 负责）；② 写正式阶段产物；③ 改 `project.status`；④ 越阶段产出；⑤ 删除前阶段已通过的图谱节点 |
 | **根因定位子代理** | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施） | ① 读失败产物文件 + 上游产物（需求/设计/代码/测试/TLA+/graph.json）；② 读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON；③ 运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）；④ 产出 `RootCauseReport` JSON + `.md` 报告文件；⑤ 标记 `upstreamDefect`（若根因为上游需求/设计缺陷）；⑥ 作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出（见 root-cause-locator.md §4） | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出 |
 | **冰山扫掠子代理** | R-iceberg（R 变体，第36轮新增） | S-fix 后（ICEBERG-A）或阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 `IcebergSweepReport`（多发现扫掠报告，找"水面之下"） | ① 读全阶段产物（需求/设计/代码/测试/TLA+/BDD/graph.json/RTM）；② 读本轮 reworkHints 历史 + 修复点；③ 读上一轮 IcebergSweepReport（避免重复发现）；④ 运用冰山扫掠方法（三维度×六类别，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)）；⑤ 产出 IcebergSweepReport JSON + `.md` | ① 改任何产物文件（由 S-fix 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅当前阶段产物）；⑥ 评审其他角色产出；⑦ 跳过 V 复审直接触发 S-fix |
 
-> **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
+> **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/cli/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
 ## 主刀职责映射表（第 39 轮吸收）
 
@@ -199,7 +199,7 @@ S: 产出开发文档 + 同步测试设计 + 更新 RTM 实体 → 返回 {产�
   ↓ 分派 V
 V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
   ↓ 分派 G
-G: npx tsx w-model-dev/scripts/check-verifier-output.ts "<json>"
+G: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>"
    → 返回 {exitCode, qualityLevel, passed, reworkHints}
 O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D}
    → 分派 R 定位（输入：reworkHints + 失败产物 + 上游产物）→ R 产出 RootCauseReport
@@ -223,7 +223,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 ```
 O: 阶段 8 验收测试产物已放行
   ↓ 分派 G
-G: npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]
+G: npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
    → 返回 {exitCode, GATE_JSON 摘要（RTM 覆盖率 / 四级测试结果）}
 O: 若 exitCode ≠ 0 → 分派 S 回阶段 5 返工
 O: 若通过 → 🔴 CHECKPOINT · 发布放行（展示 GATE_JSON 给用户）
@@ -295,12 +295,12 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 待校验文件路径：<V 子代理产出的 VerifierOutput JSON / project-dir>
 执行：
   - 阶段 1~7 门：
-    1. npx tsx w-model-dev/scripts/check-verifier-output.ts "<verifier-output.json>"
-    2. npx tsx w-model-dev/scripts/check-tla-model.ts "<tla-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
-    3. npx tsx w-model-dev/scripts/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
-    4. npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir] --phase=<N>
+    1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
+    2. npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    3. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    4. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
     5. 其余闭环脚本（按 phase-N 定义）
-  - 阶段 8 终检：npx tsx w-model-dev/scripts/check-artifact-gate.ts [project-dir]（内部已调用 check-tla-model + check-bdd-model 并传 --graph）
+  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]（内部已调用 check-tla-model + check-bdd-model 并传 --graph）
 产出契约：
   1. 退出码（0 / 1 / 2）
   2. 证据摘要：
@@ -1195,10 +1195,10 @@ O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
 
 ```bash
 # 第29轮升级：R3 无条件强制，--r3-enabled flag 保留为 no-op 向后兼容
-npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl
+npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl
 
 # 旧调用（flag 视为 no-op，行为一致）
-npx tsx w-model-dev/scripts/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
+npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
 ```
 
 退出码：0=通过，1=缺角色（违反约束 #19，R≥3 无条件校验），2=输入错误。

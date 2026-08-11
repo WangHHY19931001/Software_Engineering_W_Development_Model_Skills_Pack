@@ -24,7 +24,7 @@ metadata:
 npm run lint:security
 ```
 
-**底层机制**：`lint:security` = `tsx w-model-dev/scripts/security-scan.ts`，脚本内部调用 `npx eslint w-model-dev/scripts/ --format json` 收集 eslint-plugin-security 发现，再与仓库根目录的 `.eslintsecurity-baseline.json` 比对。
+**底层机制**：`lint:security` = `tsx w-model-dev/scripts/cli/security-scan.ts`，脚本内部调用 `npx eslint w-model-dev/scripts/ --format json` 收集 eslint-plugin-security 发现，再与仓库根目录的 `.eslintsecurity-baseline.json` 比对。
 
 **6 条安全规则**（`.eslintrc.cjs`）：
 
@@ -43,7 +43,7 @@ npm run lint:security
 
 **定向扫描**：只查单个文件/目录时直接 `npx eslint <file-or-dir>`（如 `npx eslint w-model-dev/scripts/lib/cli-error.ts`），规则与全量扫描一致。
 
-**重生成 baseline**：新增代码触发误报时，先人工确认发现确为可豁免误报，再按仓库惯例执行 `npx tsx w-model-dev/scripts/security-scan.ts --regenerate` 全量重生成 baseline，随后复跑 `npm run lint:security` 确认 exit 0。
+**重生成 baseline**：新增代码触发误报时，先人工确认发现确为可豁免误报，再按仓库惯例执行 `npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate` 全量重生成 baseline，随后复跑 `npm run lint:security` 确认 exit 0。
 
 ## 凭据脱敏检查（反模式 #43）
 

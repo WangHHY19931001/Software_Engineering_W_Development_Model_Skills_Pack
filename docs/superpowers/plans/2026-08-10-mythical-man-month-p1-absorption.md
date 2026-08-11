@@ -16,7 +16,7 @@
 
 **修订（13）：** `w-model-dev/SKILL.md`（操作行为第 8 条 + 约束 #21）/ `.cursor/skills/dispatching-parallel-agents/SKILL.md` / `w-model-dev/references/subagent-delegation.md` / `w-model-dev/references/bdd-guide.md` / `.cursor/skills/test-driven-development/SKILL.md` / `w-model-dev/references/verifier-spec.md` / `.cursor/skills/requesting-code-review/SKILL.md` / `w-model-dev/references/operational-recovery.md` / `w-model-dev/references/root-cause-locator.md` / `w-model-dev/references/phase-5-coding.md` / `w-model-dev/references/quality-standards.md` / `w-model-dev/references/anti-patterns.md`（#45 引用回检）/ `w-model-dev/references/mythical-man-month-absorption.md`（P1 状态）
 
-**脚本联动（2）：** `w-model-dev/scripts/docs-consistency-logic.ts`（操作行为 7→8）/ `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（样本）
+**脚本联动（2）：** `w-model-dev/scripts/logic/docs-consistency-logic.ts`（操作行为 7→8）/ `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（样本）
 
 **顶层（8）：** `README.md`（操作行为 8 条）/ `docs/skill-design-document_SSoT.md`（§3.4.39 P1 状态 + 版本行 + 4A 行）/ `AGENTS.md`（约束 #21 登记）/ `package.json` / `w-model-dev/skill-metadata.json` / `docs/INSTALL.md` / `CONTRIBUTING.md` / `CHANGELOG.md`（[39.1.0]）
 
@@ -25,7 +25,7 @@
 ### Task 1: SKILL.md 操作行为第 8 条 + 七条→八条级联
 
 **Files:**
-- Modify: `w-model-dev/SKILL.md` / `README.md` / `docs/skill-design-document_SSoT.md` / `w-model-dev/scripts/docs-consistency-logic.ts` / `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
+- Modify: `w-model-dev/SKILL.md` / `README.md` / `docs/skill-design-document_SSoT.md` / `w-model-dev/scripts/logic/docs-consistency-logic.ts` / `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
 
 > 设计 §5.4「结构性约束优先」。加第 8 条操作行为会触发 docs-consistency 门禁的「### 七条操作行为」与「7 条核心操作行为」检查，必须全链路级联（参照 P0 反模式 44→46 的联动先例）。
 
@@ -57,12 +57,12 @@
 - [ ] **Step 6: 验证门禁**
 
 Run: `npx vitest run w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts` → 全 PASS
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts` → exit 0
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts` → exit 0
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add w-model-dev/SKILL.md README.md docs/skill-design-document_SSoT.md w-model-dev/scripts/docs-consistency-logic.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts
+git add w-model-dev/SKILL.md README.md docs/skill-design-document_SSoT.md w-model-dev/scripts/logic/docs-consistency-logic.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts
 git commit -m "docs: add operating behavior #8 (structure-over-persuasion), cascade 7->8"
 ```
 
@@ -454,7 +454,7 @@ Run: `npx tsc --noEmit` → 0 错误。
 
 - [ ] **Step 4: docs-consistency**
 
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts` → exit 0。
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts` → exit 0。
 
 - [ ] **Step 5: 破坏样本（操作行为计数）**
 

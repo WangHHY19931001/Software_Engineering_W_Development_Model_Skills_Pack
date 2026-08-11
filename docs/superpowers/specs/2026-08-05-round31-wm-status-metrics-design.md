@@ -49,7 +49,7 @@
 **CLI**：
 
 ```bash
-npx tsx w-model-dev/scripts/wm-status.ts [project-dir] [--json]
+npx tsx w-model-dev/scripts/cli/wm-status.ts [project-dir] [--json]
 ```
 
 - `project-dir` 默认当前工作目录；从 `<dir>/.w-model/` 读取状态文件。
@@ -99,7 +99,7 @@ interface StatusReport {
 **CLI**：
 
 ```bash
-npx tsx w-model-dev/scripts/metrics-report.ts [project-dir] [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]
+npx tsx w-model-dev/scripts/cli/metrics-report.ts [project-dir] [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]
 ```
 
 - `project-dir` 默认当前工作目录；必读 `<dir>/.w-model/run-log.jsonl`，可选读 `budget.json`（缺失时 budget 度量区为 null，不报错）。

@@ -6,7 +6,7 @@
 > LLM-as-a-Verifier 评审的**权威规范**以 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) 为准：
 > - 三维度验证 / 连续评分 `[0,1]` / PPT 排序 / 子标准定义 / 输出 Schema / 提示词模板 → `verifier-spec.md`
 > - 评审执行方式（外部 Agent 按提示词执行）→ `verifier-spec.md` §8
-> - 输出 JSON 防漂移校验 → [`w-model-dev/scripts/check-verifier-output.ts`](../w-model-dev/scripts/check-verifier-output.ts)（纯逻辑单点事实源 [`verifier-logic.ts`](../w-model-dev/scripts/verifier-logic.ts)）
+> - 输出 JSON 防漂移校验 → [`w-model-dev/scripts/cli/check-verifier-output.ts`](../w-model-dev/scripts/cli/check-verifier-output.ts)（纯逻辑单点事实源 [`verifier-logic.ts`](../w-model-dev/scripts/logic/verifier-logic.ts)）
 > - 在 SSoT 中的定位 → [`skill-design-document_SSoT.md`](./skill-design-document_SSoT.md) §7.6（评审规范摘要）/ §3.3（架构原则与外部工具边界）/ §10.5（工件质量门）
 >
 > 本文件仅保留为**历史背景与设计动机**说明，不再独立维护实现细节。与 `verifier-spec.md` 不一致处，以 `verifier-spec.md` 为准。
@@ -41,7 +41,7 @@ flowchart TD
     B -->|读取| C["w-model-dev/references/verifier-spec.md<br/>(三维度 + 连续评分 + PPT + 子标准 + Schema + 提示词)"]
     C -->|按 §8 提示词模板| D["外部 Agent 执行 LLM-as-a-Verifier 评审"]
     D -->|产出| E["VerifierOutput JSON<br/>(schemaVersion 1.0)"]
-    E -->|校验防漂移| F["w-model-dev/scripts/check-verifier-output.ts"]
+    E -->|校验防漂移| F["w-model-dev/scripts/cli/check-verifier-output.ts"]
     F -->|退出码 0=通过 / 1=失败 / 2=输入错误| G{校验通过?}
     G -->|是| H["passed=true (A/B) → 进入下一阶段"]
     G -->|否| I["passed=false (C/D) → 返工，按 reworkHints 修复"]
@@ -53,7 +53,7 @@ flowchart TD
 关键设计要点：
 
 - **`/wm review` 不调用 LLM**：命令仅根据目标 ID 识别 `targetKind`（`requirement` / `design` / `code` / `test`），提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板、再调用校验脚本。
-- **提示词与校验脚本同源**：`verifier-spec.md` §6 定义输出 Schema、§7 定义子标准集合；`w-model-dev/scripts/verifier-logic.ts` 是同一套 Schema 与子标准的纯逻辑单点事实源，`check-verifier-output.ts` 是其 CLI 包装。两者指向同一份事实源，避免提示词与校验漂移。
+- **提示词与校验脚本同源**：`verifier-spec.md` §6 定义输出 Schema、§7 定义子标准集合；`w-model-dev/scripts/logic/verifier-logic.ts` 是同一套 Schema 与子标准的纯逻辑单点事实源，`check-verifier-output.ts` 是其 CLI 包装。两者指向同一份事实源，避免提示词与校验漂移。
 - **校验项**：schemaVersion、meta 字段、子标准名称与权重（不得改动）、`score ∈ [0,1]`、`rawScores.length = repeatTimes`、`variance ≤ 阈值`、`evidence` 非空、综合分数 = `Σ(score*weight)`、质量等级与综合分数映射一致、`passed = (A or B)`、`passed=false` 时 `reworkHints` 非空、`ranking`（可选）类型合法。
 
 ---
@@ -88,8 +88,8 @@ LLM-as-a-Verifier 评审规范只覆盖「阶段产物校验流程」，是 W �
 | 用途 | 位置 |
 |---|---|
 | LLM-as-a-Verifier 权威规范（提示词 + Schema + 子标准 + PPT） | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
-| 输出校验纯逻辑（单点事实源） | [../w-model-dev/scripts/verifier-logic.ts](../w-model-dev/scripts/verifier-logic.ts) |
-| 输出校验 CLI（防外部 Agent 输出漂移） | [../w-model-dev/scripts/check-verifier-output.ts](../w-model-dev/scripts/check-verifier-output.ts) |
+| 输出校验纯逻辑（单点事实源） | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts) |
+| 输出校验 CLI（防外部 Agent 输出漂移） | [../w-model-dev/scripts/cli/check-verifier-output.ts](../w-model-dev/scripts/cli/check-verifier-output.ts) |
 | 设计文档 SSoT（§7.6 评审规范 / §3.3 架构边界 / §10.5 工件质量门） | [./skill-design-document_SSoT.md](./skill-design-document_SSoT.md) |
 | Skill 定义（`/wm review` 命令编排） | [../w-model-dev/SKILL.md](../w-model-dev/SKILL.md) |
 

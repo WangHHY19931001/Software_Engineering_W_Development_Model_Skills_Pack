@@ -16,8 +16,8 @@
 
 **Task 1**：`.githooks/pre-push`（触发过滤 + 跳过提示）
 **Task 2**：`docs/llm-verifier-integration-design.md`、`docs/loop-engineering-adoption-design.md`（清理 8 处）
-**Task 3-4**：`w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（+6 用例 + baseInput 更新）、`w-model-dev/scripts/docs-consistency-logic.ts`（checkDesignDocs + checkVitestFileCount + EXPECTED + 接口 + wiring）
-**Task 5**：`w-model-dev/scripts/check-docs-consistency.ts`（读 6 设计文档 + 数测试文件 + REQUIRED_PATHS）
+**Task 3-4**：`w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（+6 用例 + baseInput 更新）、`w-model-dev/scripts/logic/docs-consistency-logic.ts`（checkDesignDocs + checkVitestFileCount + EXPECTED + 接口 + wiring）
+**Task 5**：`w-model-dev/scripts/cli/check-docs-consistency.ts`（读 6 设计文档 + 数测试文件 + REQUIRED_PATHS）
 **Task 6**：级联 — README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / docs/INSTALL.md / package.json / w-model-dev/skill-metadata.json / w-model-dev/SKILL.md / docs/skill-design-document_SSoT.md / CHANGELOG.md
 **Task 7**：全量验证
 
@@ -164,7 +164,7 @@ git commit -m "test: add failing design-docs and vitest-files check tests (TDD r
 ### Task 4: 实现 checkDesignDocs + checkVitestFileCount
 
 **Files:**
-- Modify: `w-model-dev/scripts/docs-consistency-logic.ts`
+- Modify: `w-model-dev/scripts/logic/docs-consistency-logic.ts`
 
 - [ ] **Step 1: 扩展接口与常量**
 
@@ -252,14 +252,14 @@ Run: `npx tsc --noEmit` — 0 错误。
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/scripts/docs-consistency-logic.ts
+git add w-model-dev/scripts/logic/docs-consistency-logic.ts
 git commit -m "feat: add design-docs and vitest-files checks to docs-consistency-logic (TDD green)"
 ```
 
 ### Task 5: CLI 更新
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-docs-consistency.ts`
+- Modify: `w-model-dev/scripts/cli/check-docs-consistency.ts`
 
 - [ ] **Step 1: REQUIRED_PATHS 追加**
 
@@ -307,10 +307,10 @@ const DESIGN_DOC_PATHS = [
 
 - [ ] **Step 4: 验证 + Commit**
 
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts .` — 期望 exit 0「✓ 全部一致」（12 项检查，含 design-docs / vitest-files）。
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts .` — 期望 exit 0「✓ 全部一致」（12 项检查，含 design-docs / vitest-files）。
 Run: `npx tsc --noEmit` — 0 错误。
 ```bash
-git add w-model-dev/scripts/check-docs-consistency.ts
+git add w-model-dev/scripts/cli/check-docs-consistency.ts
 git commit -m "feat: wire design-docs and vitest-files checks into CLI"
 ```
 
@@ -367,7 +367,7 @@ git commit -m "feat: wire design-docs and vitest-files checks into CLI"
 
 - [ ] **Step 5: 验证 + Commit**
 
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts .` — exit 0。
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts .` — exit 0。
 Grep：活体文档 `515` → 0 命中；`38\.4\.0` → 0 命中（CHANGELOG 历史与 docs/superpowers/ 允许保留）。
 ```bash
 git add README.md AGENTS.md CONTRIBUTING.md .githooks/pre-push docs/INSTALL.md package.json w-model-dev/skill-metadata.json w-model-dev/SKILL.md docs/skill-design-document_SSoT.md CHANGELOG.md

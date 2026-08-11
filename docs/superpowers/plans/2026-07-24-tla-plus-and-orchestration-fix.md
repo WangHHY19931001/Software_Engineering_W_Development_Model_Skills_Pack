@@ -20,7 +20,7 @@
   - §2.2 前置清单：S产出前3项检查、G校验前3项检查（含删除states/）
 - 在manifest schema节补checkRounds语义（记录轮次、单调递减、与run-log R3交叉校验）
 - 修正现有连字符MODULE名示例（L1-blog-system→L1_blog_system）
-- 验证：`npx tsx w-model-dev/scripts/check-tla-model.ts w-model-dev-demo/.w-model/tla-manifest.json --phase=1` 退出码0
+- 验证：`npx tsx w-model-dev/scripts/cli/check-tla-model.ts w-model-dev-demo/.w-model/tla-manifest.json --phase=1` 退出码0
 
 ### Task 2: tla-spec-template.md 修正.cfg + 补聚合示例 + 反例
 - Modify: `w-model-dev/templates/tla-spec-template.md`
@@ -64,7 +64,7 @@
 ## 层3：TLA+ 回归编码（完整版）
 
 ### Task 7: code-tla-logic.ts 接口定义 + 维度1（TDD）
-- Create: `w-model-dev/scripts/code-tla-logic.ts`
+- Create: `w-model-dev/scripts/logic/code-tla-logic.ts`
 - Create: `w-model-dev/scripts/__tests__/code-tla-logic.test.ts`
 - 先写维度1失败测试：SD节点有/无codeModule映射
 - 实现接口：CodeTlaConsistencyInput/CodeFile/ConsistencyResult/DimensionResult
@@ -73,28 +73,28 @@
 - 测试通过后commit
 
 ### Task 8: code-tla-logic.ts 维度2 代码状态转移抽取（TDD）
-- Modify: `w-model-dev/scripts/code-tla-logic.ts` + 测试
+- Modify: `w-model-dev/scripts/logic/code-tla-logic.ts` + 测试
 - 先写失败测试：从代码抽取赋值和条件分支
 - 实现extractCodeStateTransfers：用ts.createSourceFile解析，抽取BinaryExpression(=)/IfStatement/SwitchStatement
 - 实现checkCodeStateTransfer：无赋值则失败
 - 测试通过后commit
 
 ### Task 9: code-tla-logic.ts 维度3 Next分支对应（TDD）
-- Modify: `w-model-dev/scripts/code-tla-logic.ts` + 测试
+- Modify: `w-model-dev/scripts/logic/code-tla-logic.ts` + 测试
 - 先写失败测试：TLA+ Next动作在代码中有/无对应方法
 - 实现checkNextBranchCoverage：正则抽取Next分支动作名，驼峰匹配代码方法名
 - 实现toCamelCase辅助函数
 - 测试通过后commit
 
 ### Task 10: code-tla-logic.ts 维度4 断言覆盖不变式（TDD）
-- Modify: `w-model-dev/scripts/code-tla-logic.ts` + 测试
+- Modify: `w-model-dev/scripts/logic/code-tla-logic.ts` + 测试
 - 先写失败测试：TLA+不变式有/无代码断言覆盖
 - 实现checkInvariantCoverage：抽取BusinessInvariant子不变式，匹配代码assert/invariant
 - 宽松策略：有断言即认为覆盖
 - 测试通过后commit
 
 ### Task 11: check-code-tla-consistency.ts CLI入口
-- Create: `w-model-dev/scripts/check-code-tla-consistency.ts`
+- Create: `w-model-dev/scripts/cli/check-code-tla-consistency.ts`
 - 参数：--manifest/--graph/--rtm/--src
 - 读取JSON+用ts.createSourceFile加载src/*.ts
 - 调用checkCodeTlaConsistency
@@ -103,7 +103,7 @@
 - commit
 
 ### Task 12: gate-logic.ts 终检新增TLA+校验
-- Modify: `w-model-dev/scripts/gate-logic.ts`
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts`
 - checkArtifactGate入参追加graph?/manifestExists?
 - 新增TLA+资产存在性校验（manifestExists）
 - 新增SD→codeModule映射校验（读graph SD节点）
@@ -111,7 +111,7 @@
 - 验证：`npm run self-test` 现有全通过
 
 ### Task 13: check-artifact-gate.ts 读取graph+manifest
-- Modify: `w-model-dev/scripts/check-artifact-gate.ts`
+- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`
 - 读取.w-model/ingestion/graph.json
 - 检查.w-model/tla-manifest.json存在性+specs非空
 - 传入checkArtifactGate
@@ -119,7 +119,7 @@
 - commit
 
 ### Task 14: self-test.ts 新增测试样本
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 - 新增code-tla-logic合规样本（SD有映射/Next有对应/不变式有覆盖）
 - 新增违规样本（SD缺映射/Next无对应/MODULE名连字符）
 - 验证：`npm run self-test` 全通过

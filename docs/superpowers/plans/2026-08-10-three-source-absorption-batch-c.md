@@ -23,7 +23,7 @@
 | `w-model-dev/references/estimation-guide.md` | 「模型档位 × 思考预算」条目（agentic Ch17） |
 | `w-model-dev/schemas/run-log.schema.json` | decisionConfidence 可选字段（agentic Ch18） |
 | `w-model-dev/references/data-models.md` | RunLogEntry 接口补 decisionConfidence |
-| `w-model-dev/scripts/run-log-logic.ts` | RunLogEntry 接口补 decisionConfidence（可选字段） |
+| `w-model-dev/scripts/logic/run-log-logic.ts` | RunLogEntry 接口补 decisionConfidence（可选字段） |
 | `w-model-dev/references/verifier-spec.md` | R3 security 补「最小权限+数据最小化」「prompt 注入防护」（agentic Ch18+Ch13） |
 | `w-model-dev/references/phase-5-coding.md` | Tracer-bullet 票据拆解补「动态重排规则」（agentic Ch20） |
 | `w-model-dev/references/operational-recovery.md` | 「错误分类处置表」（agentic Ch12） |
@@ -231,7 +231,7 @@ git commit -m "feat(estimation): add model-tier x thinking-budget tradeoff (agen
 **Files:**
 - Modify: `w-model-dev/schemas/run-log.schema.json`
 - Modify: `w-model-dev/references/data-models.md`
-- Modify: `w-model-dev/scripts/run-log-logic.ts`
+- Modify: `w-model-dev/scripts/logic/run-log-logic.ts`
 
 - [ ] **Step 1: schema 追加 properties**
 
@@ -273,7 +273,7 @@ Run: `npm run self-test` — 249/249（self-test SCHEMA_CASES 的 run-log 样本
 - [ ] **Step 5: Commit**
 
 ```bash
-git add w-model-dev/schemas/run-log.schema.json w-model-dev/references/data-models.md w-model-dev/scripts/run-log-logic.ts
+git add w-model-dev/schemas/run-log.schema.json w-model-dev/references/data-models.md w-model-dev/scripts/logic/run-log-logic.ts
 git commit -m "feat(run-log): add optional decisionConfidence field (agentic Ch18)"
 ```
 
@@ -408,7 +408,7 @@ package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版�
 npm run self-test            # 249/249 通过
 npx vitest run               # 35 files / 530 tests 全过
 npx tsc --noEmit             # 0 错误
-npx tsx w-model-dev/scripts/check-docs-consistency.ts .  # exit 0 全部一致
+npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts .  # exit 0 全部一致
 bash .githooks/pre-push --force  # 14 项全通过
 ```
 

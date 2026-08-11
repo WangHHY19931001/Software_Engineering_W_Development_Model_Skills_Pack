@@ -28,13 +28,13 @@
 | `w-model-dev/templates/system-design/discipline-dod.md` | 新增 | 工程纪律与 DoD 子模板 |
 | `w-model-dev/templates/system-design/uml-modeling.md` | 新增 | UML 系统级建模子模板 |
 | `w-model-dev/references/phase-2-system-design.md` | 修改 | 算法增步骤 1-7 + FM-SD-01~05 + 禁止行为 #6/#7/#8 + 返工路径 + 验收标准 + 执行方法论表 + 输出节 |
-| `w-model-dev/scripts/graph-logic.ts` | 修改 | 新增 R9/R10 校验函数 |
-| `w-model-dev/scripts/check-requirement-graph.ts` | 修改 | CLI 新增 `--spec-dir` 按 module 前缀 glob 匹配 |
-| `w-model-dev/scripts/gate-logic.ts` | 修改 | 新增 `checkPhaseSpecStructure()` 泛化 |
-| `w-model-dev/scripts/check-artifact-gate.ts` | 修改 | phase=2 调用结构校验 |
+| `w-model-dev/scripts/logic/graph-logic.ts` | 修改 | 新增 R9/R10 校验函数 |
+| `w-model-dev/scripts/cli/check-requirement-graph.ts` | 修改 | CLI 新增 `--spec-dir` 按 module 前缀 glob 匹配 |
+| `w-model-dev/scripts/logic/gate-logic.ts` | 修改 | 新增 `checkPhaseSpecStructure()` 泛化 |
+| `w-model-dev/scripts/cli/check-artifact-gate.ts` | 修改 | phase=2 调用结构校验 |
 | `w-model-dev/scripts/samples/graph/` | 新增 | R9/R10 各 1 valid + 1 bad（4 条） |
 | `w-model-dev/scripts/samples/gate/` | 新增 | phase=2 结构校验 1 valid + 3 bad（4 条） |
-| `w-model-dev/scripts/self-test.ts` | 修改 | 基线 225→233 |
+| `w-model-dev/scripts/cli/self-test.ts` | 修改 | 基线 225→233 |
 | `w-model-dev/scripts/__tests__/graph-logic.test.ts` | 修改 | R9/R10 单测 |
 | `w-model-dev/scripts/__tests__/gate-enhancement.test.ts` | 修改 | phase=2 结构校验单测 |
 | `w-model-dev/references/verifier-spec.md` | 修改 | V 评审新增项 |
@@ -726,11 +726,11 @@ git commit -m "docs(references): 批2完成——phase-2 参考层扩展"
 ### Task 11: graph-logic.ts 新增 R9/R10 校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/graph-logic.ts`
+- Modify: `w-model-dev/scripts/logic/graph-logic.ts`
 
 - [ ] **Step 1: 阅读现有 R7/R8 区**
 
-Run: `Read w-model-dev/scripts/graph-logic.ts`（820-914 行 R7/R8 区）
+Run: `Read w-model-dev/scripts/logic/graph-logic.ts`（820-914 行 R7/R8 区）
 Expected: 确认 parseMarkdownTable / countMermaidBlocks / extractRefTargets 已有、checkRequirementSpecEnhance 签名
 
 - [ ] **Step 2: 新增 checkDesignSpecEnhance 函数（R9/R10，第 38 轮）**
@@ -793,7 +793,7 @@ Expected: 0 错误
 - [ ] **Step 4: 提交**
 
 ```bash
-git add w-model-dev/scripts/graph-logic.ts
+git add w-model-dev/scripts/logic/graph-logic.ts
 git commit -m "feat(scripts): graph-logic 新增 R9/R10 校验（Phase 2 系统设计）"
 ```
 
@@ -802,11 +802,11 @@ git commit -m "feat(scripts): graph-logic 新增 R9/R10 校验（Phase 2 系统�
 ### Task 12: check-requirement-graph.ts CLI 新增 module 前缀 glob 匹配
 
 **Files:**
-- Modify: `w-model-dev/scripts/check-requirement-graph.ts`
+- Modify: `w-model-dev/scripts/cli/check-requirement-graph.ts`
 
 - [ ] **Step 1: 阅读现有 --spec-dir 解析区**
 
-Run: `Read w-model-dev/scripts/check-requirement-graph.ts`（93-114 行）
+Run: `Read w-model-dev/scripts/cli/check-requirement-graph.ts`（93-114 行）
 Expected: 确认 R7/R8 的 --spec-dir 解析模式（固定文件名 requirement-spec.md）
 
 - [ ] **Step 2: 扩展 --spec-dir 解析以支持 module 前缀 glob（phase=2 时）**
@@ -906,7 +906,7 @@ import {
 
 ```text
  * 用法（第 38 轮新增 R9/R10）：
- *   npx tsx w-model-dev/scripts/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
+ *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
  *     --spec-dir  Phase 2 时按 *-system-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
 ```
 
@@ -921,7 +921,7 @@ Expected: 退出码 0（未传 --spec-dir 时 R9/R10 不激活）
 - [ ] **Step 5: 提交**
 
 ```bash
-git add w-model-dev/scripts/check-requirement-graph.ts
+git add w-model-dev/scripts/cli/check-requirement-graph.ts
 git commit -m "feat(scripts): check-requirement-graph --spec-dir 支持 Phase 2 module 前缀 glob + R9/R10"
 ```
 
@@ -930,12 +930,12 @@ git commit -m "feat(scripts): check-requirement-graph --spec-dir 支持 Phase 2 
 ### Task 13: gate-logic.ts + check-artifact-gate.ts phase=2 结构校验
 
 **Files:**
-- Modify: `w-model-dev/scripts/gate-logic.ts`
-- Modify: `w-model-dev/scripts/check-artifact-gate.ts`
+- Modify: `w-model-dev/scripts/logic/gate-logic.ts`
+- Modify: `w-model-dev/scripts/cli/check-artifact-gate.ts`
 
 - [ ] **Step 1: 阅读现有 checkRequirementSpecStructure**
 
-Run: `Read w-model-dev/scripts/gate-logic.ts`（240-296 行）
+Run: `Read w-model-dev/scripts/logic/gate-logic.ts`（240-296 行）
 Expected: 确认 Phase 1 结构校验函数与 nodeFsAdapter
 
 - [ ] **Step 2: 新增 checkPhaseSpecStructure 泛化函数**
@@ -1051,7 +1051,7 @@ Expected: 退出码 0（未传 --phase=1/2 --spec-dir 时不激活结构校验�
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/gate-logic.ts w-model-dev/scripts/check-artifact-gate.ts
+git add w-model-dev/scripts/logic/gate-logic.ts w-model-dev/scripts/cli/check-artifact-gate.ts
 git commit -m "feat(scripts): gate phase=2 新增引用块/SSOT/DoD 结构校验（checkPhaseSpecStructure 泛化）"
 ```
 
@@ -1062,7 +1062,7 @@ git commit -m "feat(scripts): gate phase=2 新增引用块/SSOT/DoD 结构校验
 **Files:**
 - Create: `w-model-dev/scripts/samples/graph/valid-design-enhance.json`、`bad-design-r9.json`、`bad-design-r10.json`
 - Create: `w-model-dev/scripts/samples/gate/valid-phase2-spec-structure.json`、`bad-phase2-refs-missing.json`、`bad-phase2-ssot-header.json`、`bad-phase2-dod-incomplete.json`
-- Modify: `w-model-dev/scripts/self-test.ts`
+- Modify: `w-model-dev/scripts/cli/self-test.ts`
 - Modify: `w-model-dev/scripts/__tests__/graph-logic.test.ts`
 - Modify: `w-model-dev/scripts/__tests__/gate-enhancement.test.ts`
 
@@ -1284,7 +1284,7 @@ Expected: TypeScript strict 0 错误
 - [ ] **Step 6: 提交**
 
 ```bash
-git add w-model-dev/scripts/samples/ w-model-dev/scripts/self-test.ts w-model-dev/scripts/__tests__/
+git add w-model-dev/scripts/samples/ w-model-dev/scripts/cli/self-test.ts w-model-dev/scripts/__tests__/
 git commit -m "test(scripts): R9/R10 + phase=2 结构校验 samples/self-test/vitest（基线 225→233）"
 ```
 

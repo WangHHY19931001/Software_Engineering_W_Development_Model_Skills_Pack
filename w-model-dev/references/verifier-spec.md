@@ -800,7 +800,7 @@ Schema 参见 w-model-dev/references/verifier-spec.md §6。
 ```bash
 # 校验输出 JSON 是否符合 §6 Schema、子标准是否齐全、方差是否达标等
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误
-npx tsx w-model-dev/scripts/check-verifier-output.ts <output.json>
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>
 ```
 
 校验未通过即视为评审无效，Agent 必须按脚本输出的 `reasons` 重新执行评审。

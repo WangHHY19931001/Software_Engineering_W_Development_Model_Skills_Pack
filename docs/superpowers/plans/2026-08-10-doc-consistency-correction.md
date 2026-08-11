@@ -16,7 +16,7 @@
 
 **Round 1 修改（活体文档）：** README.md / AGENTS.md / CONTRIBUTING.md / .githooks/pre-push / w-model-dev/SKILL.md（frontmatter 版本）/ w-model-dev/references/{verifier-spec,command-reference,agent-personas,definition-of-done,anti-patterns,data-models,glossary,subagent-delegation}.md / docs/skill-design-document_SSoT.md / package.json / w-model-dev/skill-metadata.json / CHANGELOG.md（新增条目）。
 
-**Round 2 新增：** `w-model-dev/scripts/docs-consistency-logic.ts`（纯逻辑）/ `w-model-dev/scripts/check-docs-consistency.ts`（CLI）/ `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（vitest）。修改：package.json（script + version）/ .githooks/pre-push（#14）/ AGENTS.md（§8 表 + 计数）/ w-model-dev/SKILL.md（Bundled Resources + frontmatter）/ README.md（14 项）/ w-model-dev/skill-metadata.json / CHANGELOG.md。
+**Round 2 新增：** `w-model-dev/scripts/logic/docs-consistency-logic.ts`（纯逻辑）/ `w-model-dev/scripts/cli/check-docs-consistency.ts`（CLI）/ `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（vitest）。修改：package.json（script + version）/ .githooks/pre-push（#14）/ AGENTS.md（§8 表 + 计数）/ w-model-dev/SKILL.md（Bundled Resources + frontmatter）/ README.md（14 项）/ w-model-dev/skill-metadata.json / CHANGELOG.md。
 
 ---
 
@@ -571,7 +571,7 @@ Expected: FAIL — `Cannot find module '../docs-consistency-logic.js'`
 ### Task 15: 实现 docs-consistency-logic.ts
 
 **Files:**
-- Create: `w-model-dev/scripts/docs-consistency-logic.ts`
+- Create: `w-model-dev/scripts/logic/docs-consistency-logic.ts`
 
 - [ ] **Step 1: 写纯逻辑文件**
 
@@ -813,14 +813,14 @@ Expected: 14 tests PASS（Task 14 的全部用例绿）
 - [ ] **Step 3: Commit**
 
 ```bash
-git add w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts w-model-dev/scripts/docs-consistency-logic.ts
+git add w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts w-model-dev/scripts/logic/docs-consistency-logic.ts
 git commit -m "feat: add docs-consistency-logic with vitest coverage"
 ```
 
 ### Task 16: 实现 check-docs-consistency.ts CLI + package.json script
 
 **Files:**
-- Create: `w-model-dev/scripts/check-docs-consistency.ts`
+- Create: `w-model-dev/scripts/cli/check-docs-consistency.ts`
 - Modify: `package.json`
 
 - [ ] **Step 1: 写 CLI 文件**
@@ -833,7 +833,7 @@ git commit -m "feat: add docs-consistency-logic with vitest coverage"
  * 校验活体文档中的计数 / 枚举 / 清单与代码事实一致，防文档漂移。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/check-docs-consistency.ts [repo-root]
+ *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root]
  *   （repo-root 默认 cwd；本仓库根目录）
  *
  * 退出码：
@@ -940,16 +940,16 @@ try {
 - [ ] **Step 2: package.json 加 script**
 
 在 scripts 中（`"wm:metrics"` 之后）添加：
-`"check:docs-consistency": "tsx w-model-dev/scripts/check-docs-consistency.ts",`
+`"check:docs-consistency": "tsx w-model-dev/scripts/cli/check-docs-consistency.ts",`
 
 - [ ] **Step 3: 运行 CLI 验证通过（exit 0）**
 
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts .`
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts .`
 Expected: 输出「✓ 全部一致」，`DOCS_CONSISTENCY_JSON {"passed":true,...,"exitCode":0}`，退出码 0。
 
 - [ ] **Step 4: 验证 exit 2（错误输入）**
 
-Run: `npx tsx w-model-dev/scripts/check-docs-consistency.ts /nonexistent`
+Run: `npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts /nonexistent`
 Expected: `✗ [ARG_INVALID] ...` 走 stderr、`ERROR_JSON {...}` 走 stdout，退出码 2。
 
 - [ ] **Step 5: 验证 exit 1（故意破坏样本）**
@@ -959,7 +959,7 @@ Expected: `✗ [ARG_INVALID] ...` 走 stderr、`ERROR_JSON {...}` 走 stdout，�
 - [ ] **Step 6: Commit**
 
 ```bash
-git add w-model-dev/scripts/check-docs-consistency.ts package.json
+git add w-model-dev/scripts/cli/check-docs-consistency.ts package.json
 git commit -m "feat: add check-docs-consistency CLI and npm script"
 ```
 

@@ -115,7 +115,7 @@ const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
 
 **用法**：
 ```bash
-npx tsx w-model-dev/scripts/check-design-contract-consistency.ts [project-dir]
+npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts [project-dir]
 ```
 
 **输入**：
@@ -285,7 +285,7 @@ G 子代理跑 `check-design-contract-consistency.ts` 校验，exitCode=0 才放
 
 ### 8.1 自测验证
 
-- `npx tsx w-model-dev/scripts/self-test.ts` 全部通过（含 4 条新用例）
+- `npx tsx w-model-dev/scripts/cli/self-test.ts` 全部通过（含 4 条新用例）
 - 新增样本 4 条，通过/失败各 2 条
 
 ### 8.2 TypeScript 严格模式
