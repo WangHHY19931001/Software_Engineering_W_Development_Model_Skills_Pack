@@ -41,6 +41,7 @@ import {
 } from '../logic/tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { PHASES, type Phase } from '../lib/constants.js';
 import { printGateReport } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
@@ -365,7 +366,7 @@ async function main(): Promise<void> {
   if (phase === undefined) {
     phase = manifest.currentPhase;
   }
-  if (phase === undefined || typeof phase !== 'number' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phase)) {
+  if (phase === undefined || typeof phase !== 'number' || !PHASES.includes(phase as Phase)) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',

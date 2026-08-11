@@ -1,5 +1,6 @@
 import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
+import { RTM_FIELDS } from '../lib/constants.js';
 import { validateBySchema } from './schema-loader.js';
 
 export interface RTMRowShape {
@@ -45,15 +46,8 @@ export interface ArtifactGateResult {
   openspecArchived?: boolean;        // check-openspec-archive.ts exitCode=0（phase 5-8 门通过后）
 }
 
-const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [
-  'description',
-  'designDoc',
-  'codeModule',
-  'unitTest',
-  'integrationTest',
-  'systemTest',
-  'acceptanceTest',
-];
+// RTM 追溯字段单点事实源已收敛至 lib/constants.ts（RTM_FIELDS），此处仅保持名称与类型不变
+const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [...RTM_FIELDS];
 
 // ==================== 阶段级校验（P1.1，第 9 轮） ====================
 /**

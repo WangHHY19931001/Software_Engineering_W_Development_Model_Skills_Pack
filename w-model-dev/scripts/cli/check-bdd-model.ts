@@ -33,6 +33,7 @@
 
 import { promises as fs, existsSync } from 'node:fs';
 import * as path from 'node:path';
+import { PHASES, type Phase } from '../lib/constants.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import {
   checkBddModel,
@@ -175,7 +176,7 @@ async function main(): Promise<number> {
   }
 
   const phaseRaw = args.phase ?? manifest.currentPhase;
-  if (typeof phaseRaw !== 'number' || !Number.isInteger(phaseRaw) || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phaseRaw)) {
+  if (typeof phaseRaw !== 'number' || !Number.isInteger(phaseRaw) || !PHASES.includes(phaseRaw as Phase)) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
@@ -185,7 +186,7 @@ async function main(): Promise<number> {
     });
     return 2;
   }
-  const phase = phaseRaw as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  const phase = phaseRaw as Phase;
 
   // --graph phase>=2 强制（设计文档 §3.3.7）
   if (phase >= 2 && !args.graphFile) {

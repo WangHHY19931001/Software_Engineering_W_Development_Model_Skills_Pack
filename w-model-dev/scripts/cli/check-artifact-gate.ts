@@ -13,6 +13,7 @@ import {
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
@@ -24,10 +25,6 @@ import {
 } from './artifact-gate-assets.js';
 import { collectUatMappingViolations } from './uat-path-mapping.js';
 export { checkUatPathMappingContent } from './uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出
-
-const RTM_RELATIVE_PATH = path.join('.w-model', 'rtm.json');
-const MANIFEST_RELATIVE_PATH = path.join('.w-model', 'tla-manifest.json');
-const BDD_MANIFEST_RELATIVE_PATH = path.join('.w-model', 'bdd-manifest.json');
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
@@ -122,7 +119,7 @@ async function main(): Promise<void> {
   const specDirArg = process.argv.find(a => a.startsWith('--spec-dir='));
   const specDir = specDirArg?.split('=')[1] ?? undefined;
   const projectDir = parseProjectDir(process.argv);
-  const rtmFile = path.resolve(projectDir, RTM_RELATIVE_PATH);
+  const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
 
   let raw: string;
   try {
@@ -161,14 +158,14 @@ async function main(): Promise<void> {
   const { graph, graphSource } = await discoverGraphAsset(ingestionDir);
 
   // 2. 检查 tla-manifest.json 存在性 + specs 非空
-  const manifestFile = path.resolve(projectDir, MANIFEST_RELATIVE_PATH);
+  const manifestFile = path.resolve(projectDir, ARTIFACT_PATHS.tlaManifest);
   const manifestExists = await readTlaManifest(manifestFile);
 
   // ==================== BDD 资产读取（spec §13.2 #18） ====================
   // 与 TLA+ manifest 校验对称：检查 bdd-manifest.json 存在性 + schema + features 文件存在性
   // + stateMachines 七要素非空（states/acceptingStates/transitions/invariants）。
   // 阶段 4 后才要求 bdd-manifest.json 存在（阶段 1-3 可能还未创建）。
-  const bddManifestFile = path.resolve(projectDir, BDD_MANIFEST_RELATIVE_PATH);
+  const bddManifestFile = path.resolve(projectDir, ARTIFACT_PATHS.bddManifest);
   const effectivePhase: PhaseOption = phaseOption ?? 8;
   const { bddViolations, bddManifestExists } = await readBddManifest(bddManifestFile, projectDir, effectivePhase);
 
