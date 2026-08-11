@@ -8,6 +8,7 @@
 ### Added
 - 四源吸收 P2（10 项）：subagent-persona-matrix 证据加权共识、verifier-spec 验证器定位三原则（编辑者非作者/调节器不关心原因/运行系统最短路径）、anti-patterns 候选转正评审判据 + 错误聚集/超标丢弃说理、hill-climbing 爬山法哲学基础、tla-plus 不连续系统穷举「为什么」、operational-recovery 集成混沌预期 + 超标重写、quality-standards 硬约束=结构来源 + 满意化完成、phase-7 可观测性验收标准、SKILL.md 受控的失控 + clockware/swarmware 选择法则
 - P0 工程化批次（2026-08-11，不涉及版本语义）：scripts 四层重组、check-artifact-gate 拆分、CliError rule/field、README 重构（详见 Changed/Fixed）
+- P1 工程化批次（2026-08-11，不涉及版本语义）：violations 双轨结构化、复杂逻辑注释、常量/类型集中、security baseline 维持门禁、--json 可观测性、npm audit 阻断升级、TypeDoc API 文档、归档 INDEX、config/ 配置集中、postinstall 自动钩子、协作模板（详见 Changed）
 
 ### Changed
 - 版本号 41.1.0 → 41.2.0
@@ -18,6 +19,17 @@
 - README/AGENTS 标注 `eval/` 目录为非技能包边界；README「相关文档」补齐 2 个缺失链接；AGENTS vitest 计数 530→534
 - 新增 `.gitattributes`：shell 钩子（.githooks/*）强制 LF 行尾（Windows autocrlf 兼容）
 - 文档一致性审查确认 SKILL.md/toolbox.md/dispatch-matrix.md 无逐字冗余、候选废弃文档均已含指针声明，A4/A5 无结构性改动
+- A2b violations 双轨结构化：各 `*-logic.ts` 保留 `violations: string[]` 并新增可选 `structuredViolations?: Array<{rule; field?; message}>`；check-*.ts 人类可读输出与 `--json` 输出优先读结构化字段（`e13857b`、`0412166`）
+- B1 复杂逻辑注释：`code-tla-logic.ts` 映射一致性四维度判定、`tla-bdd-sync-logic.ts` 状态机同步补设计依据/参考规则/边界处理块注释（`548bd7e`、`2179de2`）
+- B2 常量与类型集中：新增 `lib/constants.ts`（RTM 追溯字段 / phase 枚举 / 门禁退出码 / 工件相对路径）与 `lib/types.ts`（校验输入输出类型），消除多文件重复定义（`da7b261`）
+- B3 security baseline 维持：docs-consistency 新增「scripts/** 变更必须同步 `.eslintsecurity-baseline.json`」检查 + vitest 实测用例数门禁（`1f18931`、`d0bbf3a`）
+- B4 `--json` 可观测性：25 个 check-*.ts 全部支持 `--json` 机器可读报告（类型/passed/reasons/违规类型分布/耗时 ms），复用 gate-report 扩展字段，默认人类可读输出不变（`f8c5328`、`5850c32`）
+- B5 npm audit 阻断升级：pre-push 第 13 项由 warn-only 升级为阻断（exit 1），网络不可达/registry 不支持时跳过（`90970b2`、`e0b5685`、`4728fd6`）
+- B6 TypeDoc API 文档：配置 TypeDoc 输出 `docs/api/`（`npm run docs:build`）；check-*.ts 头注释补 JSDoc（输入参数/输出结构/退出码/错误字段）（`1eee4fc`、`c4b862c`）
+- B7 归档 INDEX.md：新增 `docs/changes/archive/INDEX.md`，为 5 个归档目录提供顶层导航 + 每轮一行摘要，链接各轮 README.md（`80f98de`）
+- B8 config/ 配置集中：ESLint/TSConfig/Vitest 配置迁入 `config/`；security-scan 联动 `npx eslint --config config/.eslintrc.cjs`（`.eslintsecurity-baseline.json` 保持根目录）；package.json scripts 分组注释（`e4fde77`、`1adcb03`）
+- B9 postinstall 钩子：新增跨平台 `postinstall` 自动配置 `core.hooksPath`（Node 实现，非 git 仓库/配置失败仅 warn 不阻断 install），免去手动 `npm run setup:hooks`；不引入 Husky（`5b9fda8`）
+- B10 协作模板：新增 `.github/ISSUE_TEMPLATE/`（bug-report/feature-request）与 `.github/PULL_REQUEST_TEMPLATE.md`；CONTRIBUTING 增补 Conventional Commits 规范（type/scope/PR 标题格式/提交流程）（`ba73357`）
 
 ### Fixed
 - 恢复 A6 批量替换越界改写的历史归档（docs/superpowers、docs/changes、CHANGELOG.md 历史条目）

@@ -4,7 +4,7 @@
 # 目的：替代远程 CI，在 `git push` 前自动跑校验脚本回归基线，防止
 #       w-model-dev/scripts/*.ts 与 samples/ 漂移。任何一项失败即中止 push。
 #
-# 启用方式（仓库克隆后执行一次）：
+# 启用方式（postinstall 已自动启用；手动重置执行 npm run setup:hooks）：
 #   npm run setup:hooks        # 等价于 git config core.hooksPath .githooks
 #
 # 临时跳过（仅紧急情况，勿用于常规开发）：

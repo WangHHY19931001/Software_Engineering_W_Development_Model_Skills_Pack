@@ -4,7 +4,7 @@ closes #N
 
 ## 变更类型
 
-- [ ] feat / fix / refactor / docs / test / chore
+- [ ] feat / fix / refactor / docs / test / chore / ci
 
 ## 校验要点
 
