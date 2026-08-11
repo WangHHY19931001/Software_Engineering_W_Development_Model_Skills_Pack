@@ -139,10 +139,14 @@ function findVitestBin(root: string): string | null {
  * 与 git 不可用时 detectScriptsChanges 返回 false 的既有策略一致）。
  * 注：maxBuffer 必须放宽——vitest 全量进度输出可达数 MB，默认 1MB 会触发
  * ERR_CHILD_PROCESS_STDIO_MAXBUFFER（此时 spawn 报 error 但 JSON 文件已落盘，仍需继续读文件）。
+ * 注：必须显式 --config 限定扫描范围（config/vitest.config.ts 的 include 仅
+ * w-model-dev/scripts/__tests__）——vitest.config.ts 迁入 config/ 后 cwd 无默认配置，
+ * 默认 include 会扫全树，嵌套 git worktree（.worktrees/**）下的测试文件将被重复计数
+ * （实测根仓库 + worktree 双份 554 → 1108），导致 vitest-tests 门禁误报。
  */
 function collectVitestTestCount(root: string): number {
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
-  const vitestArgs = ['run', '--reporter=json', `--outputFile=${outFile}`];
+  const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
   const r = vitestBin !== null
     ? spawnSync(process.execPath, [vitestBin, ...vitestArgs], { cwd: root, encoding: 'utf-8', timeout: 180_000, maxBuffer: 64 * 1024 * 1024 })
