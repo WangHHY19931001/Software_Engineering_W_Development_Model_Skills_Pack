@@ -77,6 +77,7 @@ async function main(): Promise<void> {
   if (!chainFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <signature-chain.jsonl>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--chain=<path>] [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]',
       exitCode: 2,
@@ -90,6 +91,7 @@ async function main(): Promise<void> {
   if (phaseArg !== undefined && phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: `参数非法 --phase=${phaseArg.split('=')[1] ?? ''}`,
       detail: '须为 1-8 的整数',
       exitCode: 2,

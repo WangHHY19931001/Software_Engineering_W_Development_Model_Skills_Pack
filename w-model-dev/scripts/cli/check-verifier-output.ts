@@ -43,6 +43,7 @@ async function main(): Promise<void> {
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <output.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json> [--self-as-verifier --s-output=<path>]',
       exitCode: 2,
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
       if (sOutputValue === '') {
         exitWithError({
           category: 'ARG_INVALID',
+          rule: 'P0-1',
           message: '参数非法 --s-output=',
           detail: '值不能为空',
           exitCode: 2,

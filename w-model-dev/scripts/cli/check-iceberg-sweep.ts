@@ -30,6 +30,7 @@ async function readReport(reportPath: string): Promise<IcebergSweepReport> {
     if (e.code === 'ENOENT') {
       exitWithError({
         category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
         message: '文件不存在',
         file: abs,
         exitCode: 2,
@@ -44,6 +45,7 @@ async function readReport(reportPath: string): Promise<IcebergSweepReport> {
     if (typeof parsed !== 'object' || parsed === null) {
       exitWithError({
         category: 'STRUCTURE_INVALID',
+        rule: 'P0-3',
         message: '报告不是 JSON 对象',
         file: abs,
         exitCode: 2,
@@ -75,6 +77,7 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
     if (e.code === 'ENOENT') {
       exitWithError({
         category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
         message: '文件不存在',
         file: abs,
         exitCode: 2,
@@ -96,6 +99,7 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
   if (lastPhase < 1 || lastPhase > 8) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '无法从 run-log 推断当前阶段',
       detail: `最后 checkpoint phase=${lastPhase}（须为 1-8）`,
       exitCode: 2,
@@ -114,6 +118,7 @@ async function main(): Promise<void> {
   if (!reportPathArg) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '缺少 <report.json> 参数',
       detail: '用法: check-iceberg-sweep.ts <report.json> [--auto-trigger --run-log=<run-log.jsonl>]',
       exitCode: 2,
@@ -135,6 +140,7 @@ async function main(): Promise<void> {
     if (!runLogArg) {
       exitWithError({
         category: 'ARG_INVALID',
+        rule: 'P0-1',
         message: '参数缺失 --run-log=<run-log.jsonl>',
         detail: '用法: check-iceberg-sweep.ts <report.json> --auto-trigger --run-log=<run-log.jsonl>',
         exitCode: 2,

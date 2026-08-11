@@ -77,6 +77,7 @@ async function main(): Promise<void> {
   if (project === null || typeof project !== 'object' || Array.isArray(project)) {
     exitWithError({
       category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
       message: '文件解析失败（非对象）（转 operational-recovery，不猜测状态）',
       file: projectFile,
       exitCode: 2,

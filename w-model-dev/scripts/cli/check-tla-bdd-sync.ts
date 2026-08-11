@@ -37,6 +37,7 @@ async function main(): Promise<void> {
   if (args.length < 2) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <tla-file> <feature-file>',
       detail: '用法: check-tla-bdd-sync.ts <tla-file> <feature-file>',
       exitCode: 2,
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
   if (!tlaFile || !featureFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <tla-file> <feature-file>',
       detail: '用法: check-tla-bdd-sync.ts <tla-file> <feature-file>',
       exitCode: 2,
@@ -91,6 +93,7 @@ async function main(): Promise<void> {
     } else if (e.code === 'ENOENT') {
       exitWithError({
         category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
         message: '文件不存在',
         file: failedFile,
         exitCode: 2,

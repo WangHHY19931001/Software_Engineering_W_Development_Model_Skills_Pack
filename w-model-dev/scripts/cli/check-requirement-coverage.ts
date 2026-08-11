@@ -29,6 +29,7 @@ async function main(): Promise<void> {
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <coverage.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>]',
       exitCode: 2,
@@ -65,6 +66,7 @@ async function main(): Promise<void> {
     if (!oosParsed || !Array.isArray(oosParsed.items)) {
       exitWithError({
         category: 'STRUCTURE_INVALID',
+        rule: 'P0-3',
         message: '结构不符（缺 items 数组）',
         file: path.resolve(outOfScopePath),
         exitCode: 2,

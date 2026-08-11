@@ -347,6 +347,7 @@ async function main(): Promise<void> {
   if (!manifestFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <tla-manifest.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
       exitCode: 2,
@@ -367,6 +368,7 @@ async function main(): Promise<void> {
   if (phase === undefined || typeof phase !== 'number' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phase)) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '无法确定 phase',
       detail: `未传 --phase 且 manifest.currentPhase=${JSON.stringify(manifest.currentPhase)} 无效（须为 1-8）`,
       exitCode: 2,
@@ -378,6 +380,7 @@ async function main(): Promise<void> {
   if (phase >= 2 && !graphFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
       exitCode: 2,
@@ -394,6 +397,7 @@ async function main(): Promise<void> {
   ) {
     exitWithError({
       category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
       message: '结构不符（manifest.tools 须含 jarPath 与 javaMinVersion）',
       file: abs,
       exitCode: 2,

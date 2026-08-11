@@ -47,6 +47,10 @@ describe('formatCliError', () => {
     const e: CliError = { category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 };
     expect(formatCliError(e)).toBe('✗ [UNEXPECTED] 脚本异常');
   });
+
+  it('formatCliError 附加 [rule=...] 段', () => {
+    expect(formatCliError({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1' })).toBe('✗ [ARG_INVALID] m [rule=P0-1]');
+  });
 });
 
 describe('printError / printErrorJson', () => {
@@ -76,6 +80,24 @@ describe('printError / printErrorJson', () => {
     const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as Record<string, unknown>;
     expect(parsed).toMatchObject({ category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 });
     expect('file' in parsed).toBe(false);
+  });
+
+  it('ERROR_JSON 含 rule/field 字段', () => {
+    const calls: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => { calls.push(s); });
+    printErrorJson({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1', field: 'rtm[0].id' });
+    spy.mockRestore();
+    expect(calls[0]).toContain('"rule":"P0-1"');
+    expect(calls[0]).toContain('"field":"rtm[0].id"');
+  });
+
+  it('缺失 rule/field 时 ERROR_JSON 省略', () => {
+    const calls: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => { calls.push(s); });
+    printErrorJson({ category: 'ARG_INVALID', message: 'm', exitCode: 2 });
+    spy.mockRestore();
+    expect(calls[0]).not.toContain('"rule"');
+    expect(calls[0]).not.toContain('"field"');
   });
 });
 

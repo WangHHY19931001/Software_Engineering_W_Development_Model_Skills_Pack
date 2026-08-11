@@ -164,6 +164,7 @@ async function main(): Promise<void> {
   if (!manifestFile || !graphFile || !rtmFile || !srcDir) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 --manifest/--graph/--rtm/--src',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> --graph=<path> --rtm=<path> --src=<dir>',
       exitCode: 2,

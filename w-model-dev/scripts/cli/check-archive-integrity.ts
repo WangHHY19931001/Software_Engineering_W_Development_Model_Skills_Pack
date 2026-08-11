@@ -59,6 +59,7 @@ async function main(): Promise<void> {
   if (!archiveDir) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <archive-dir>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>',
       exitCode: 2,
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
   } catch {
     exitWithError({
       category: 'FILE_NOT_FOUND',
+      rule: 'P0-2',
       message: '目录不存在',
       file: archiveAbs,
       exitCode: 2,

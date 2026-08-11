@@ -231,6 +231,7 @@ async function main(): Promise<void> {
     }, null, 2)}`);
     exitWithError({
       category: 'FILE_NOT_FOUND',
+      rule: 'P0-2',
       message: '文件不存在',
       file: mappingPath,
       detail: 'uat-path-mapping.md 不存在，请在阶段1产出该文件（见 phase-1-requirements.md §输出）',

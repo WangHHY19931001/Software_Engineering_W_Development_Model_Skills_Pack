@@ -140,6 +140,7 @@ async function main(): Promise<void> {
   if (!runLogFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <run-log.jsonl>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
       exitCode: 2,

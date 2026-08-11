@@ -98,6 +98,7 @@ async function main(): Promise<void> {
   if (!maturityFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <maturity.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
       exitCode: 2,

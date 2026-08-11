@@ -90,6 +90,7 @@ async function main(): Promise<void> {
   if (!file || !hasPhaseFlag) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <project-root> 或 --phase',
       detail: '用法: npx tsx check-openspec-archive.ts <project-root> --phase <5|6|7|8>',
       exitCode: 2,
@@ -103,6 +104,7 @@ async function main(): Promise<void> {
     if (phaseRaw !== undefined && /^\d+$/.test(phaseRaw)) {
       exitWithError({
         category: 'ARG_INVALID',
+        rule: 'P0-1',
         message: `参数非法 --phase=${phaseRaw}`,
         detail: '须为 5-8 的整数',
         exitCode: 2,
@@ -111,6 +113,7 @@ async function main(): Promise<void> {
     }
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <project-root> 或 --phase',
       detail: '用法: npx tsx check-openspec-archive.ts <project-root> --phase <5|6|7|8>',
       exitCode: 2,

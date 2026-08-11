@@ -105,6 +105,7 @@ async function main(): Promise<void> {
   if (phaseStr !== undefined && phaseParsed === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '--phase 参数非法',
       detail: `收到 ${phaseStr}（须为 1-8 整数）`,
       exitCode: 2,

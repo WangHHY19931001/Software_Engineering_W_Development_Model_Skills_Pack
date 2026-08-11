@@ -61,6 +61,7 @@ async function main(): Promise<void> {
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <graph.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4]',
       exitCode: 2,
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
     const phaseStr = phaseArg.split('=')[1];
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: `参数非法 --phase=${phaseStr ?? ''}`,
       detail: '须为 1-4 的整数',
       exitCode: 2,
@@ -213,6 +215,7 @@ async function main(): Promise<void> {
   if (!phase && ![1, 2, 3, 4].includes(effectivePhase)) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '无法确定 phase',
       detail: `未传 --phase 且 graph.currentPhase=${effectivePhase} 无效（须为 1-4）`,
       exitCode: 2,

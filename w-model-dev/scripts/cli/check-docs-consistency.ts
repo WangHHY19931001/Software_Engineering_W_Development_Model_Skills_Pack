@@ -62,6 +62,7 @@ function main(): void {
   if (missing.length > 0) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: 'repo-root 缺少必需文件',
       detail: `[${missing.join(', ')}]（用法: check-docs-consistency.ts [repo-root]）`,
       exitCode: 2,

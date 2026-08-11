@@ -110,6 +110,7 @@ async function main(): Promise<void> {
     const phaseVal = Number.parseInt(phaseArg.split('=')[1] ?? '', 10);
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: `参数非法 --phase=${phaseVal}`,
       detail: '须为 1-8 的整数',
       exitCode: 2,
@@ -120,6 +121,7 @@ async function main(): Promise<void> {
   if (!budgetFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <budget.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
       exitCode: 2,

@@ -38,6 +38,7 @@ async function main(): Promise<void> {
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <run-log.jsonl>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]',
       exitCode: 2,
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
     if (e.code === 'ENOENT') {
       exitWithError({
         category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
         message: '文件不存在',
         file: abs,
         exitCode: 2,

@@ -207,6 +207,7 @@ async function main(): Promise<void> {
   if (Array.isArray(parsed)) {
     exitWithError({
       category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
       message: 'baseline 为旧版数组格式（位置指纹），与内容敏感指纹算法不兼容（请运行 --regenerate 重生成 v2）',
       file: BASELINE_PATH,
       exitCode: 2,
@@ -216,6 +217,7 @@ async function main(): Promise<void> {
   if (parsed.version !== 2 || parsed.algo !== 'content-line') {
     exitWithError({
       category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
       message: `baseline version=${parsed.version} 不支持（当前仅支持 v2/content-line，请运行 --regenerate 重生成）`,
       file: BASELINE_PATH,
       exitCode: 2,

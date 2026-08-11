@@ -123,6 +123,7 @@ async function main(): Promise<number> {
   if (!args.manifestFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <bdd-manifest.json>',
       detail: '用法: check-bdd-model.ts <bdd-manifest.json> [--phase=N] [--tla-manifest=...] [--rtm=...] [--cucumber-report=...]',
       exitCode: 2,
@@ -151,6 +152,7 @@ async function main(): Promise<number> {
   if (!schemaResult.valid) {
     exitWithError({
       category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
       message: `${path.basename(args.manifestFile)} 结构不符`,
       file: path.resolve(args.manifestFile),
       detail: `manifest schema 校验失败: ${schemaResult.errorMessages.join('; ')}`,
@@ -163,6 +165,7 @@ async function main(): Promise<number> {
   if (args.phaseStr !== undefined && args.phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: `参数非法 --phase=${Number.parseInt(args.phaseStr, 10)}`,
       detail: '须为 1-8 整数',
       exitCode: 2,
@@ -174,6 +177,7 @@ async function main(): Promise<number> {
   if (typeof phaseRaw !== 'number' || !Number.isInteger(phaseRaw) || ![1, 2, 3, 4, 5, 6, 7, 8].includes(phaseRaw)) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: `参数非法 --phase=${args.phase ?? manifest.currentPhase}`,
       detail: '须为 1-8 整数',
       exitCode: 2,
@@ -186,6 +190,7 @@ async function main(): Promise<number> {
   if (phase >= 2 && !args.graphFile) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 --graph=<graph.json>（phase>=2 强制）',
       detail: '用法: check-bdd-model.ts <bdd-manifest.json> --phase=N --graph=.w-model/ingestion/graph.json',
       exitCode: 2,

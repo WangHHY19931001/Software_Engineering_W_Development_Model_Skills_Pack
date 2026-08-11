@@ -62,6 +62,7 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
       if (val === undefined) {
         exitWithError({
           category: 'ARG_INVALID',
+          rule: 'P0-1',
           message: `参数非法 --phase=${next}`,
           detail: '须为 1-8 的整数',
           exitCode: 2,
@@ -76,6 +77,7 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
     if (arg === '--phase') {
       exitWithError({
         category: 'ARG_INVALID',
+        rule: 'P0-1',
         message: `参数非法 --phase=${argv[i + 1] ?? ''}`,
         detail: '须为 1-8 的整数',
         exitCode: 2,
@@ -86,6 +88,7 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
     if (eqMatch) {
       exitWithError({
         category: 'ARG_INVALID',
+        rule: 'P0-1',
         message: `参数非法 --phase=${eqMatch[1] ?? ''}`,
         detail: '须为 1-8 的整数',
         exitCode: 2,
@@ -134,6 +137,7 @@ async function main(): Promise<void> {
     if (e.code === 'ENOENT') {
       exitWithError({
         category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
         message: '文件不存在（请先执行 /wm 走完 W 模型阶段再校验）',
         file: rtmFile,
         exitCode: 2,

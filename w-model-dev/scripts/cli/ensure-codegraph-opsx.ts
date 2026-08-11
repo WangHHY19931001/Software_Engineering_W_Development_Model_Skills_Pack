@@ -209,6 +209,7 @@ async function main(): Promise<void> {
   if (!phaseStr || !projectRoot || !modeStr) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 --phase/--project-root/--mode',
       detail: '用法: npx tsx ensure-codegraph-opsx.ts --phase <5|6|7|8> --project-root <path> --mode <full|quick|light>',
       exitCode: 2,
@@ -221,6 +222,7 @@ async function main(): Promise<void> {
   if (phaseParsed === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: 'phase 必须为 5-8 整数',
       detail: `收到 ${phaseStr}`,
       exitCode: 2,
@@ -232,6 +234,7 @@ async function main(): Promise<void> {
   if (!['full', 'quick', 'light'].includes(modeStr)) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: 'mode 必须为 full/quick/light',
       detail: `收到 ${modeStr}`,
       exitCode: 2,
@@ -246,6 +249,7 @@ async function main(): Promise<void> {
     if (!existsSync(absRoot) || !statSync(absRoot).isDirectory()) {
       exitWithError({
         category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
         message: '项目根路径不存在或不是目录',
         file: absRoot,
         exitCode: 2,

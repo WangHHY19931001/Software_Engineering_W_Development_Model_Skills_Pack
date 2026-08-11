@@ -28,6 +28,7 @@ async function main(): Promise<void> {
   if (!file) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <report.json>',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>',
       exitCode: 2,
