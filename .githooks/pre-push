@@ -139,7 +139,7 @@ if ! bash "$(dirname "$0")/ensure-platform-deps.sh"; then
 fi
 
 # ---------- 门禁用例 ----------
-# 与原 CI 一致：14 项检查（第 13 项 npm audit 为 warn-only），退出码必须全部符合预期才放行。
+# 与原 CI 一致：14 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 trap 'rm -f "$tmp_log"' EXIT
@@ -205,17 +205,21 @@ run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
 # 12. vitest 单元测试全量通过（35 test files / 554 tests；WSL 下 testTimeout 已放宽至 30s）
 run_expect "vitest 单元测试全通过" 0 npx vitest run || exit 1
 
-# 13. npm audit：依赖漏洞扫描（warn-only，不阻断；离线/网络失败自动跳过）
-log "npm audit 依赖漏洞扫描（warn-only）..."
+# 13. npm audit：依赖漏洞扫描（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）
+log "npm audit 依赖漏洞扫描（high 以上阻断）..."
 set +e
 npm audit --audit-level=high >"$tmp_log" 2>&1
 local_audit_code=$?
 set -e
 if [ "$local_audit_code" -eq 0 ]; then
   ok "npm audit 未发现 high 以上漏洞"
-else
-  warn "npm audit 返回码 $local_audit_code（发现 high 以上漏洞或网络不可达），warn-only 不阻断 push"
+elif [ "$local_audit_code" -eq 255 ] || [ "$local_audit_code" -eq 1 ] && grep -qiE "ENOTFOUND|ETIMEDOUT|network|ENOTIMPLEMENTED|NOT_IMPLEMENTED|not implemented" "$tmp_log"; then
+  warn "npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）"
   cat "$tmp_log" >&2
+else
+  fail "npm audit 发现 high 以上漏洞或执行失败（返回码 $local_audit_code）"
+  cat "$tmp_log" >&2
+  exit 1
 fi
 
 # 14. check-docs-consistency：活体文档一致性门禁（2026-08-10 新增）
