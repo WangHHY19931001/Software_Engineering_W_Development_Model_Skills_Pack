@@ -11,4 +11,13 @@ export default {
     testTimeout: 30000,
     hookTimeout: 30000,
   },
+  // 覆盖率门禁：仅统计门禁核心实现（logic/ + lib/），不包括 CLI 入口与 __tests__。
+  // include 与 test.include 一样相对仓库根解析（cwd=仓库根）。
+  // thresholds 基线 = 2026-08-12 实测（logic+lib 合并）：stmts 75.32 / branch 66.57 / funcs 85.5 / lines 76.62，
+  // 取实际值向下取整到 5 的倍数，随测试补充逐步上调。
+  coverage: {
+    provider: 'v8',
+    include: ['w-model-dev/scripts/logic/**', 'w-model-dev/scripts/lib/**'],
+    thresholds: { statements: 75, branches: 65, functions: 85, lines: 75 },
+  },
 };
