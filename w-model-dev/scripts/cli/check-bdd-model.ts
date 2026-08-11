@@ -53,7 +53,7 @@ import {
   type BddCheckInput,
   type TlaSpecSnapshot,
 } from '../logic/bdd-logic.js';
-import { validateBySchema } from '../logic/schema-loader.js';
+import { loadAndValidate } from '../lib/load-and-validate.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -146,34 +146,12 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  // 读取 manifest
+  // 读取 manifest + schema 前置校验（C1 统一封装：FILE_NOT_FOUND / FILE_PARSE / STRUCTURE_INVALID → exit 2 + ERROR_JSON）
   let manifest: BddManifest;
   try {
-    manifest = await readJson<BddManifest>(args.manifestFile);
-  } catch (e) {
-    const err = e as NodeJS.ErrnoException;
-    exitWithError({
-      category: err.code === 'ENOENT' ? 'FILE_NOT_FOUND' : err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
-      rule: err.code === 'ENOENT' ? 'P0-2' : undefined,
-      message: err.code === 'ENOENT' ? '文件不存在' : err instanceof SyntaxError ? '文件解析失败（非合法 JSON）' : '文件读取失败',
-      file: path.resolve(args.manifestFile),
-      detail: err.message,
-      exitCode: 2,
-    });
-    return 2;
-  }
-
-  // schema 前置校验
-  const schemaResult = validateBySchema('bdd-manifest', manifest);
-  if (!schemaResult.valid) {
-    exitWithError({
-      category: 'STRUCTURE_INVALID',
-      rule: 'P0-3',
-      message: `${path.basename(args.manifestFile)} 结构不符`,
-      file: path.resolve(args.manifestFile),
-      detail: `manifest schema 校验失败: ${schemaResult.errorMessages.join('; ')}`,
-      exitCode: 2,
-    });
+    manifest = await loadAndValidate<BddManifest>(args.manifestFile, 'bdd-manifest');
+  } catch {
+    // ERROR_JSON 已由 loadAndValidate 统一输出，此处仅终止流程
     return 2;
   }
 
