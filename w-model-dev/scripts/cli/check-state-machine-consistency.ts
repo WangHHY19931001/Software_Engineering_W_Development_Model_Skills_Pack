@@ -21,13 +21,15 @@
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 STATE_MACHINE_JSON 摘要，便于 Agent 正则截取）
  *   --json 模式：stdout 仅输出单行纯 JSON（printJsonReport，可整体 JSON.parse），exitCode 由进程退出码表达
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
- * @param argv 命令行参数；支持 --json（机器可读输出）、<input.json>
- * @returns exitCode 0=一致 / 1=不一致（violations）/ 2=输入错误（ERROR_JSON）
+ * 命令行参数：支持 --json（机器可读输出）、<input.json>
+ * 退出码：0=一致 / 1=不一致（violations）/ 2=输入错误（ERROR_JSON）
+ *
+ * @module
  */
 
 import * as path from 'node:path';
