@@ -96,7 +96,7 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 
 | 门禁 | 常见失败信号 | 规则依据 | 修复建议 |
 |---|---|---|---|
-| 图谱门禁 `check-requirement-graph.ts` | 连通性 / 多根 / 父唯一 / 信息流黑洞·奇迹·死模块 | 反模式 #11/#12/#13 | 修正 ingestion 分块或合并结果后重跑；详见 [`graph-guide.md`](../w-model-dev/references/graph-guide.md)「信息流模型」节 |
+| 图谱门禁 `check-requirement-graph.ts` | 连通性 / 多根 / 父唯一 / 信息流黑洞·奇迹·死模块 | 反模式 #11/#12/#13 | 修正 ingestion 分块或合并结果后重跑；信息流校验详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) |
 | TLA+ 门禁 `check-tla-model.ts` | SANY 语法失败 / TLC 死锁 / 不变式违反 | 反模式 #14/#15/#16/#17 | 先修语法再跑 TLC（顺序强制）；规格与需求/设计不符须回退修正；详见 [`tla-plus-guide.md`](../w-model-dev/references/tla-plus-guide.md) |
 | BDD 门禁 `check-bdd-model.ts` | D1 头标注不一致 / D4 不等价 / D7 RTM 无映射 | 反模式 #29 | feature 忠实需求/设计；D4 不等价须走 R→V→G→S-fix，实质不一致上报人类；详见 [`bdd-guide.md`](../w-model-dev/references/bdd-guide.md)「不符处理流程」节 |
 | Verifier 输出 `check-verifier-output.ts` | R13 单轴 score < 0.70 | 反模式 #41 | 补强该维度评审，不得以总分掩盖；详见 [`verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §3.3 / §6.3 |

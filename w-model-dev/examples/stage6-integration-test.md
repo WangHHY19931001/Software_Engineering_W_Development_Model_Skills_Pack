@@ -2,6 +2,7 @@
 
 > 对应 W 模型阶段 6（右 V 测试执行）。命令入口：`/wm test type=集成 result=<pass|fail>`。
 > 本示例聚焦编排流程中的 check 脚本调用、命令行与预期输出；交互对话示例见 [test-execution.md](test-execution.md)。
+> 示例输出为示意，实际字段以脚本输出为准。
 
 ## 阶段目标
 

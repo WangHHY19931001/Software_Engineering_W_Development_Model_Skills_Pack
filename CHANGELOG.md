@@ -9,6 +9,7 @@
 - 四源吸收 P2（10 项）：subagent-persona-matrix 证据加权共识、verifier-spec 验证器定位三原则（编辑者非作者/调节器不关心原因/运行系统最短路径）、anti-patterns 候选转正评审判据 + 错误聚集/超标丢弃说理、hill-climbing 爬山法哲学基础、tla-plus 不连续系统穷举「为什么」、operational-recovery 集成混沌预期 + 超标重写、quality-standards 硬约束=结构来源 + 满意化完成、phase-7 可观测性验收标准、SKILL.md 受控的失控 + clockware/swarmware 选择法则
 - P0 工程化批次（2026-08-11，不涉及版本语义）：scripts 四层重组、check-artifact-gate 拆分、CliError rule/field、README 重构（详见 Changed/Fixed）
 - P1 工程化批次（2026-08-11，不涉及版本语义）：violations 双轨结构化、复杂逻辑注释、常量/类型集中、security baseline 维持门禁、--json 可观测性、npm audit 阻断升级、TypeDoc API 文档、归档 INDEX、config/ 配置集中、postinstall 自动钩子、协作模板（详见 Changed）
+- P2 工程化批次（2026-08-12，不涉及版本语义）：loadAndValidate 统一 IO 封装、格式统一（import/order + Prettier + editorconfig）、vitest 覆盖率入 pre-push、用户文档、Docsify 文档站点、templates 阶段 5-8 扩充、npm Workspace、examples 8 阶段扩充、版本机制维持（详见 Changed）
 
 ### Changed
 - 版本号 41.1.0 → 41.2.0
@@ -30,6 +31,15 @@
 - B8 config/ 配置集中：ESLint/TSConfig/Vitest 配置迁入 `config/`；security-scan 联动 `npx eslint --config config/.eslintrc.cjs`（`.eslintsecurity-baseline.json` 保持根目录）；package.json scripts 分组注释（`e4fde77`、`1adcb03`）
 - B9 postinstall 钩子：新增跨平台 `postinstall` 自动配置 `core.hooksPath`（Node 实现，非 git 仓库/配置失败仅 warn 不阻断 install），免去手动 `npm run setup:hooks`；不引入 Husky（`5b9fda8`）
 - B10 协作模板：新增 `.github/ISSUE_TEMPLATE/`（bug-report/feature-request）与 `.github/PULL_REQUEST_TEMPLATE.md`；CONTRIBUTING 增补 Conventional Commits 规范（type/scope/PR 标题格式/提交流程）（`ba73357`）
+- C1 loadAndValidate 统一 IO：`lib/read-json-or-exit.ts` / `schema-loader.ts` 之上封装「读取 → JSON 解析 → schema 校验」复用方法（沿用 AJV，不引入 zod），哨兵错误区分调用方并补覆盖率（`6509420`、`c0512da`）
+- C2 格式统一：ESLint `import/order` 规则 + Prettier 全仓格式化 + 新增 `.editorconfig`（缩进/换行/字符集），一次格式化后全量回归（`6138321`、`e48fb51`）
+- C3 vitest 覆盖率入 pre-push：`config/vitest.config.ts` 配置 coverage 阈值（stmts 75 / branch 65 / funcs 85 / lines 75，仅统计 logic/ + lib/），pre-push 第 12 项升级为 `vitest run --coverage` 阈值门禁；docs-consistency vitest 计数收集改为按 config include 范围（修复嵌套 worktree 双倍计数误报）、docs:build 补 `--tsconfig`（`e4f463e`、`0351b50`、`3640cff`）
+- C4 用户文档：新增 `docs/user-guide.md`（常见校验失败排查 + 规则依据 + 修复建议）与 `docs/troubleshooting.md`（FAQ + 环境问题），README 导航同步（`008559b`）
+- C5 文档站点：新增 docsify 入口与侧边栏（docs/ + w-model-dev/references/ 渲染为可浏览 HTML 站点），package.json 新增 `docs:site` 本地预览命令（`a8b54e9`）
+- C6 templates 扩充：补齐阶段 5-8 缺口——coding / integration-test / acceptance-test 3 份 Markdown 模板 + budget / run-log 2 份 JSON 工件模板（SKILL.md Bundled Resources 同步）（`2de4bd7`）
+- C7 npm Workspace：仓库根 + `w-model-dev/` 双 workspace，分离开发依赖与技能包运行时依赖；新建的 `w-model-dev/package.json` 不声明 version，避免第四处版本破坏三地方程式（`88cbc4e`）
+- C8 examples 扩充：新增 stage 1/5/6/7/8 阶段编排示例（含可复用命令行），与既有 4 份示例覆盖 8 阶段完整编排流程（`fc11507`）
+- C9 版本机制维持：维持现有人工三地方程式（根 package.json + SKILL.md frontmatter + skill-metadata.json），`skill-metadata.test.ts` 4 用例验证通过，未引入自动化版本发布；semantic-release 已剔除（spec §6 决策记录）；C9 无代码改动
 
 ### Fixed
 - 恢复 A6 批量替换越界改写的历史归档（docs/superpowers、docs/changes、CHANGELOG.md 历史条目）

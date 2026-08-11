@@ -2,6 +2,7 @@
 
 > 对应 W 模型阶段 1（左 V 首阶段，同步右 V 验收测试设计）。命令入口：`/wm analyze <需求描述>`。
 > 本示例聚焦编排流程中的 check 脚本调用、命令行与预期输出；交互对话示例见 [requirement-analysis.md](requirement-analysis.md)。
+> 示例输出为示意，实际字段以脚本输出为准。
 
 ## 阶段目标
 

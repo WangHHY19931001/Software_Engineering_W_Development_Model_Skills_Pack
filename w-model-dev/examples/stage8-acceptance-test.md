@@ -2,6 +2,7 @@
 
 > 对应 W 模型阶段 8（右 V 测试执行终点）。命令入口：`/wm test type=验收 result=<pass|fail>`。
 > 本示例聚焦编排流程中的 check 脚本调用、命令行与预期输出；交互对话示例见 [test-execution.md](test-execution.md)。
+> 示例输出为示意，实际字段以脚本输出为准。
 
 ## 阶段目标
 
@@ -78,7 +79,7 @@ ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":false,"checkedFiles"
 ### 退出码 2（输入错误示例）
 
 ```
-ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"目录不存在: docs/archive","exitCode":2}
+ERROR_JSON {"category":"FILE_NOT_FOUND","rule":"P0-2","message":"目录不存在","file":"<abs路径>"}
 ```
 
 → 退出码 2：目录 / 文件缺失或非法，修正后重跑。
