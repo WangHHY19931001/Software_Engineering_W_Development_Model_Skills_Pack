@@ -17,7 +17,7 @@
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
 | Vitest（门禁脚本单元测试） | ✅ 35 files / 554 tests |
-| TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
+| TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
 

@@ -202,8 +202,8 @@ run_expect "check:exemption 有效豁免样本退出 0" 0 \
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
 
-# 12. vitest 单元测试全量通过（35 test files / 554 tests；WSL 下 testTimeout 已放宽至 30s）
-run_expect "vitest 单元测试全通过" 0 npx vitest run || exit 1
+# 12. vitest 单元测试全量通过（35 test files / 554 tests；WSL 下 testTimeout 已放宽至 30s；B8 后配置集中于 config/vitest.config.ts）
+run_expect "vitest 单元测试全通过" 0 npx vitest run --config config/vitest.config.ts || exit 1
 
 # 13. npm audit：依赖漏洞扫描（high 以上阻断；仅当网络不可达或 registry 不支持 audit endpoint 时自动跳过）
 #     跳过条件 = 网络不可达（npm error/warn/ERR! network 错误行，或 code ENOTFOUND/ETIMEDOUT/ECONNREFUSED）

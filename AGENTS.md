@@ -47,7 +47,7 @@
 门禁脚本测试：
 - `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，35 个 .test.ts / 554 条）
 - `w-model-dev/scripts/samples/`：fixture 样本（含 gate-enhancement 场景）
-- 运行：`cd w-model-dev && npx vitest run scripts/__tests__/`
+- 运行：`npx vitest run --config config/vitest.config.ts`（仓库根目录；配置集中于 config/）
 
 ## 3. 常用命令
 

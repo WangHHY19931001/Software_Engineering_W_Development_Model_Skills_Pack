@@ -29,6 +29,6 @@
     "sourceMap": true,
     "noEmit": true
   },
-  "include": ["w-model-dev/scripts/**/*"],
-  "exclude": ["node_modules", "dist", "coverage"]
+  "include": ["../w-model-dev/scripts/**/*"],
+  "exclude": ["../node_modules", "../dist", "../coverage"]
 }
