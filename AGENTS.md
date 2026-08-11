@@ -45,7 +45,7 @@
 | `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 14 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit warn-only），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 
 门禁脚本测试：
-- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，35 个 .test.ts / 530 条）
+- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，35 个 .test.ts / 534 条）
 - `w-model-dev/scripts/samples/`：fixture 样本（含 gate-enhancement 场景）
 - 运行：`cd w-model-dev && npx vitest run scripts/__tests__/`
 
@@ -163,6 +163,6 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-opsx-artifacts.ts | opsx 制品 + R3×3 + V 审查产物齐全性校验（反模式 #39/#40） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-openspec-archive.ts | opsx:archive 归档完整性校验 | 8（归档） | 0=通过，1=校验失败，2=输入错误 |
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式 | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
-| self-test.ts | 回归基线（249 条样本）；vitest 530 条（35 test files） | - | 0=通过，1=失败 |
+| self-test.ts | 回归基线（249 条样本）；vitest 534 条（35 test files） | - | 0=通过，1=失败 |
 | gate-enhancement.test.ts | 门禁增强回归测试（basePath/SD 覆盖/passed↔qualityLevel + codeModule 格式 + uat-path-mapping） | - | 0=通过，1=失败 |
 | check-docs-consistency.ts | 活体文档一致性门禁（schema 清单 / run-log action 枚举 / targetKind / DoD 维度 / 操作行为 / 反模式 / exit-2 脚本数 / pre-push 项数 / glossary action / 资产计数 / design-docs / vitest-files） | - | 0=通过，1=不一致，2=输入错误 |
