@@ -16,12 +16,60 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
-| Vitest（门禁脚本单元测试） | ✅ 35 files / 530 tests |
+| Vitest（门禁脚本单元测试） | ✅ 35 files / 534 tests |
 | TypeScript strict（`tsc --noEmit`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
 
-**CI 策略**：本项目不使用远程 CI（GitHub Actions / GitLab CI），门禁由**本地 git `pre-push` hook** 承载——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit，任一不符即中止推送。克隆后执行一次 `npm run setup:hooks` 启用。Windows 用 Git Bash、WSL 直接跑均可；跨平台运行前自动补装对应平台原生二进制（[`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh)）。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
+**CI 策略**：本项目**不集成云端 CI（GitHub Actions / GitLab CI）**，本地 git `pre-push` hook 为**唯一门禁**——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit，任一不符即中止推送。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负（`.githooks/pre-push` 头部有显式警告）。克隆后执行一次 `npm run setup:hooks` 启用。Windows 用 Git Bash、WSL 直接跑均可；跨平台运行前自动补装对应平台原生二进制（[`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh)）。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
+
+## 架构总览
+
+W 模型将开发与测试设计同步推进，8 个阶段串行推进并由确定性门禁脚本守住阶段边界；技能包内部按「编排 → 门禁 → 纯逻辑 → 约束/细则」分层，六角色（O/A/S/V/G/R）驱动编排。
+
+```mermaid
+flowchart TB
+  subgraph W["W-Model 8 阶段（质量门串行推进）"]
+    direction LR
+    P1["1 需求分析"] --> P2["2 系统设计"] --> P3["3 概要设计"] --> P4["4 详细设计"]
+    P4 --> P5["5 编码实现"] --> P6["6 集成测试"] --> P7["7 系统测试"] --> P8["8 验收测试"]
+  end
+
+  subgraph Roles["六角色驱动编排"]
+    O["O 编排者（只路由/状态/分派，不实施）"] --> S["S 产出子代理"]
+    S --> V["V 评审子代理（LLM-as-a-Verifier）"]
+    V --> G["G 门禁子代理（跑 check-*.ts）"]
+    O -. 分派 .-> A["A 分析子代理（ingestion 图谱）"]
+    O -. 分派 .-> R["R 根因定位子代理（返工前置）"]
+  end
+
+  subgraph Pack["w-model-dev 技能包（自包含，不调用 LLM）"]
+    SKILL["SKILL.md 编排规则"] --> CLI["check-*.ts 门禁 CLI（scripts/cli/）"]
+    CLI --> LOGIC["*-logic.ts 纯逻辑（scripts/logic/）"]
+    CLI --> SCHEMA["schemas JSON Schema 约束（draft-07）"]
+    CLI --> REFS["references 细则 + templates 模板"]
+  end
+
+  Roles --> SKILL
+  W -. 阶段门禁（G 子代理执行，退出码 0/1/2） .-> CLI
+```
+
+### W 模型 8 阶段 × 门禁对应
+
+每阶段完成时，G 子代理跑对应门禁脚本并回填退出码证据；退出码语义全表统一为 **0 = 通过 / 1 = 校验失败 / 2 = 输入错误（ERROR_JSON）**：
+
+| 阶段 | 产出工件 | 门禁脚本（`w-model-dev/scripts/cli/`） | 退出码语义 |
+|---|---|---|---|
+| 1 需求分析 | 需求规格（主模板 + 6 子模板）、验收测试设计、RTM、图谱 REQ 节点、TLA+ L1、BDD L1 | `check-requirement-graph.ts --phase=1`、`check-requirement-coverage.ts`、`check-tla-model.ts --phase=1`、`check-bdd-model.ts --phase=1` | 0/1/2 |
+| 2 系统设计 | 系统设计文档（+ 6 子模板）、系统测试设计、RTM、图谱 SD 节点、TLA+ L2、BDD L2 | `check-requirement-graph.ts --phase=2`、`check-tla-model.ts --phase=2 --graph=`、`check-bdd-model.ts --phase=2 --graph=` | 0/1/2 |
+| 3 概要设计 | 接口设计文档（+ 6 子模板）、集成测试设计、RTM、图谱 INTF 节点、TLA+ L3、BDD L3 | `check-requirement-graph.ts --phase=3`、`check-tla-model.ts --phase=3 --graph=`、`check-bdd-model.ts --phase=3 --graph=` | 0/1/2 |
+| 4 详细设计 | 详细设计文档（+ 6 子模板）、单元测试设计、RTM、图谱 DD 节点、TLA+ L3/L4、BDD L4 | `check-requirement-graph.ts --phase=4`、`check-tla-model.ts --phase=4 --graph=`、`check-bdd-model.ts --phase=4 --graph=`、`check-artifact-gate.ts --phase=4 --spec-dir=` | 0/1/2（零违反硬约束才放行进编码） |
+| 5 编码实现 | 实现代码、单元测试执行结果、RTM `codeModule` 回填、codegraph 查询落盘、opsx 制品 | `check-verifier-output.ts`、`check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-artifact-gate.ts --phase=5` | 0/1/2 |
+| 6 集成测试 | 集成测试执行结果、测试报告、RTM `integrationTest` 回填 | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6` | 0/1/2 |
+| 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM `systemTest` 回填 | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7` | 0/1/2 |
+| 8 验收测试 | 验收测试执行结果、归档产物、RTM `acceptanceTest` 回填 | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts` | 0/1/2 |
+
+> 每个阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts`。完整分派矩阵见 [dispatch-matrix.md](./w-model-dev/references/dispatch-matrix.md)。
 
 ## 快速上手
 
@@ -71,6 +119,106 @@ npx tsx w-model-dev/scripts/cli/self-test.ts
 > `self-test.ts` 是校验逻辑的回归基线：每次修改 `*-logic.ts` 后必须跑通，新增校验项需同步增加样本（详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
 > 「I have X, I want Y → use Z」工具路由见 [`references/toolbox.md`](./w-model-dev/references/toolbox.md)。
 > 门禁脚本增强历史（v2~v5 及后续各轮）已并入 [CHANGELOG.md](./CHANGELOG.md)，此处不再重复。
+
+### 完整教程：从克隆到跑通一次阶段门禁
+
+以下 5 步可从零跑通本仓库的完整校验链路：
+
+**步骤 1：克隆仓库**
+
+```bash
+git clone <仓库地址> w-model-skill-pack && cd w-model-skill-pack
+```
+
+**步骤 2：安装依赖并启用本地 git 钩子**
+
+```bash
+npm install              # 安装 tsx / ajv / eslint-plugin-security 等 devDependencies
+npm run setup:hooks      # 启用本地 pre-push 钩子（等价于 git config core.hooksPath .githooks，只需一次）
+```
+
+> 不启用钩子不影响手动跑门禁；但未启用时 `git push` 不会自动校验（门禁契约见上方「CI 策略」）。
+
+**步骤 3：跑样本回归基线**
+
+```bash
+npm run self-test
+```
+
+`self-test.ts` 以 `w-model-dev/scripts/samples/` 下 **249 条端到端样本**回归全部 `*-logic.ts` 的通过 / 失败 / 输入错误三态，期望退出码 0。每次修改校验逻辑后必须跑通（新增校验项需同步增加样本，详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
+
+**步骤 4：跑本地 pre-push 门禁（14 项）**
+
+```bash
+npm run prepush
+```
+
+等价于 `bash .githooks/pre-push --force`，强制跑 14 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（35 files / 534 tests）、npm audit（warn-only）、check-docs-consistency。任一失败即中止。
+
+**步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
+
+阶段 4 的 G 门禁组合（详见上方「W 模型 8 阶段 × 门禁对应」表）：
+
+| 门禁 | 命令（`w-model-dev/scripts/cli/`） | 校验内容 |
+|---|---|---|
+| 图谱结构门禁 | `check-requirement-graph.ts --phase=4` | 连通 / 单根 / 父唯一 / DD 节点 realizes 校验，**零违反硬约束** |
+| TLA+ 行为门禁 | `check-tla-model.ts --phase=4 --graph=<graph.json>` | 文件头 + 层次一致性 + SANY 语法 + TLC 模型检查 |
+| BDD 行为门禁 | `check-bdd-model.ts --phase=4` | D1-D8（头标注 / Gherkin / 状态机七要素 / BDD↔TLA+ 等价 / RTM 映射等） |
+| 工件质量门 | `check-artifact-gate.ts --phase 4` | RTM 结构 + REQ 行 `designDoc` 回填 + （可选）详细设计文档结构 |
+
+**输入工件（项目根下 `.w-model/` 目录）**：
+
+| 工件 | 阶段 4 要求 |
+|---|---|
+| `rtm.json` | ✅ 必读；REQ 行 `designDoc` 非空（NFR/CON 行登记 `designDoc`），`coverageStatus` 与字段一致 |
+| `ingestion/graph.json`（或 `consolidated-phase4.json`） | ✅ 图谱门禁单独读；`check-artifact-gate.ts` 按 `ingestion/` 优先级自动发现 |
+| `tla-manifest.json` + `.tla` / `.cfg` | ✅ 阶段 1-4 必产；存在时工件质量门自动联动 `check-tla-model.ts` |
+| `bdd-manifest.json` + `.feature` | ✅ 阶段 1-4 必产；存在时工件质量门自动联动 `check-bdd-model.ts` |
+| `docs/phase4-detailed/*-detailed-design.md` 等 | 结构校验时传 `--spec-dir=docs/phase4-detailed`（SSOT 头 + 6 引用块 + DoD ≥ 8 项） |
+
+**`rtm.json` 最小示例**（阶段 4 相关字段）：
+
+```json
+{
+  "rows": [
+    { "requirementId": "REQ-001", "description": "用户注册", "designDoc": "DD-001", "coverageStatus": "部分" },
+    { "requirementId": "REQ-002", "description": "用户登录", "designDoc": "DD-002", "coverageStatus": "部分" }
+  ],
+  "executionSummary": {
+    "unitTest":        { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "integrationTest": { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "systemTest":      { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 },
+    "acceptanceTest":  { "total": 0, "passed": 0, "failed": 0, "pending": 0, "coverage": 0 }
+  }
+}
+```
+
+**命令行**：
+
+```bash
+# 阶段 4 工件质量门（--phase 4 与 --phase=4 等价；不传项目目录默认当前目录 cwd）
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase 4 <项目目录>
+
+# 追加详细设计文档结构校验（SSOT 头 + 6 引用块 + DoD 清单）
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase 4 --spec-dir=docs/phase4-detailed <项目目录>
+```
+
+**预期输出与退出码解读**：
+
+| 退出码 | 含义 | 输出形态 | 处置 |
+|---|---|---|---|
+| 0 | 通过 | stdout 结构化报告 + 末尾 `GATE_JSON` 摘要（`exitCode: 0`、`passed: true`） | 阶段 4 零违反硬约束达成，进入用户 CHECKPOINT；放行后进阶段 5 编码 |
+| 1 | 校验失败 | stdout 报告 + `violations` 列表 + `GATE_JSON`（`exitCode: 1`） | 分派 R 根因定位 → V 复审 → S-fix 返工 → 重跑门禁；退出码 1/2 一律不得放行 |
+| 2 | 输入错误 | stderr `✗ [CATEGORY] <message>` + stdout 单行 `ERROR_JSON` | 修正输入（参数 / 文件路径 / JSON 格式）后重跑 |
+
+**ERROR_JSON 示例**（exit 2，机器可读；`ERROR_JSON.exitCode` 与进程退出码强一致，防伪三层机制见 SSoT §10E）：
+
+```
+✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数
+ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99: 须为 1-8 整数","exitCode":2}
+```
+
+6 类错误类别（ARG_INVALID / FILE_NOT_FOUND / FILE_PARSE / FILE_READ / STRUCTURE_INVALID / UNEXPECTED）与 ERROR_JSON 约定的完整定义见 [command-reference.md](./w-model-dev/references/command-reference.md)「错误码与 ERROR_JSON 约定」节。
 
 ## 核心能力
 
@@ -198,7 +346,7 @@ npx tsx w-model-dev/scripts/cli/self-test.ts
 │   │   ├── lib/cli-error.ts      # exit 2 错误结构统一（6 类错误码；人类消息 stderr + ERROR_JSON stdout）
 │   │   ├── lib/read-json-or-exit.ts  # CLI 层 JSON/JSONL 读取工具
 │   │   ├── lib/safe-json.ts      # JSON 解析原型污染防御
-│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 530 条 + README.md coverage 矩阵）
+│   │   ├── __tests__/            # vitest 单元测试（35 个 .test.ts / 534 条 + README.md coverage 矩阵）
 │   │   └── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
