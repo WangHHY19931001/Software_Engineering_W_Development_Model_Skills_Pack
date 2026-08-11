@@ -35,7 +35,7 @@ const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
  *   - D1：维度1 SD→codeModule 映射完整性（SSoT §10.8.1 算法 1；阶段约束 P1.4：阶段5编码完成后
  *        必须回填 RTM.codeModule 列，格式 `SD-xxx:src/path/to/file.ts`，缺失即维度1 违规）
  *   - D2：维度2 代码状态转移抽取（SSoT §10.8.1 算法 2：AST 抽取赋值/条件分支，无赋值即违规）
- *   - D3：维度3 Next 分支对应（SSoT §10.8.1 算法 3 + P2.8 PascalCase→camelCase 自动映射 +
+ *   - D3：维度3 Next 分支对应（SSoT §10.8.1 算法 3 + SSoT §3.4.6 P2.8 PascalCase→camelCase 自动映射 +
  *        P3.9 遍历 manifest 全部 specs 的 Next actions，不再仅限 L4）
  *   - D4：维度4 断言覆盖不变式（SSoT §10.8.1 算法 4：assert/invariant/require 宽松覆盖）
  *   - INPUT / SCHEMA：A2b 新增的前置校验（输入形状合法性 + code-tla-manifest schema 结构性约束），
@@ -465,7 +465,7 @@ export function extractCodeFunctionNames(files: CodeFile[]): string[] {
  * 设计依据：
  *   - SSoT §10.8.1 维度3：正则抽取 TLA+ `Next` 分支动作名，驼峰匹配代码方法名
  *     （如 Logout → logout，StartNewArticle → startNewArticle）；每个 Next 分支须有对应代码方法。
- *   - SSoT §3.4.7 P2.8「TLA+ Next 分支命名约定」：TLA+ Action 名 PascalCase，代码方法名
+ *   - SSoT §3.4.6 P2.8「TLA+ Next 分支命名约定」：TLA+ Action 名 PascalCase，代码方法名
  *     camelCase，本维度支持 PascalCase→camelCase 自动映射。
  *   - SSoT §3.4.7 P3.9「Next 分支覆盖扩展」：遍历 tla-manifest.json 全部 specs 的 Next actions
  *     （旧实现仅遍历 L4 specs；新实现覆盖 L1/L2/L3/L4 全部 specs）。

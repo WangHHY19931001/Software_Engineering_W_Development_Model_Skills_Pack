@@ -149,7 +149,7 @@ export function extractTlaInvariants(tlaContent: string): string[] {
 }
 
 /**
- * 从 BDD feature 内容抽取状态机七要素（SSoT §3.4.14 第3点：Background 节声明状态机七要素）。
+ * 从 BDD feature 内容抽取状态机七要素（SSoT §3.4.14 第2-3点：第2点 Background 节声明状态机七要素，第3点状态机七要素约束）。
  * 提取来源：
  *   - `# @states: value1, value2, ...` 注释声明（状态名）
  *   - `# @transitions:` 块注释声明（事件名：A + event -> B 的 event 部分）
