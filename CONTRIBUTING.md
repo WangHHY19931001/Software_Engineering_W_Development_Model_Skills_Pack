@@ -89,7 +89,7 @@ npm run check:verifier -- <sample.json>
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 | 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
 | 12 | `npx vitest run`（单元测试全量，35 files / 530 tests） | 0 |
-| 13 | `npm audit --audit-level=high`（依赖漏洞扫描，**warn-only 不阻断**；离线/网络失败自动跳过） | — |
+| 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 
 **启用方式**（仓库克隆后执行一次即可，配置写入本地 `.git/config`，不影响仓库内容）：
 
