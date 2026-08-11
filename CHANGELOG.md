@@ -7,9 +7,22 @@
 
 ### Added
 - 四源吸收 P2（10 项）：subagent-persona-matrix 证据加权共识、verifier-spec 验证器定位三原则（编辑者非作者/调节器不关心原因/运行系统最短路径）、anti-patterns 候选转正评审判据 + 错误聚集/超标丢弃说理、hill-climbing 爬山法哲学基础、tla-plus 不连续系统穷举「为什么」、operational-recovery 集成混沌预期 + 超标重写、quality-standards 硬约束=结构来源 + 满意化完成、phase-7 可观测性验收标准、SKILL.md 受控的失控 + clockware/swarmware 选择法则
+- P0 工程化批次（2026-08-11，不涉及版本语义）：scripts 四层重组、check-artifact-gate 拆分、CliError rule/field、README 重构（详见 Changed/Fixed）
 
 ### Changed
 - 版本号 41.1.0 → 41.2.0
+- `w-model-dev/scripts/` 四层重组：25 个 check-*.ts + 5 工具（self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx）迁入 `cli/`；全部 *-logic.ts + schema-loader/plan-chunks 迁入 `logic/`；`lib/` 保持。同步全部跨层 import（含 __tests__ 29 处）、`.githooks/pre-push` 路径、`check-docs-consistency` 统计路径（数量 30 不变）、`package.json` scripts、100+ 文档引用（含 .cursor/skills、examples）
+- `check-artifact-gate.ts` 拆分（486→249 行）：拆出 `lib/phase-doc-map.ts`、`cli/artifact-gate-assets.ts`、`cli/uat-path-mapping.ts`；`checkUatPathMappingContent` 保持 re-export 兼容 self-test
+- `lib/cli-error.ts`：CliError 新增 `rule`/`field` 可选字段；`formatCliError` 附加 `[rule=...]` 段；`printErrorJson` 条件输出（向后兼容）；全仓 exitWithError 按已知规则 ID 补齐 P0-1/P0-2/P0-3（含 readJsonClassified 与动态 category 分支）
+- README.md 重构：新增 Mermaid 架构图、W 模型 8 阶段×门禁对应表、5 步快速入门教程、阶段 4 典型场景（含真实 ERROR_JSON 示例）；项目结构树对齐四层布局；健康指标同步 35 files / 534 tests
+- README/AGENTS 标注 `eval/` 目录为非技能包边界；README「相关文档」补齐 2 个缺失链接；AGENTS vitest 计数 530→534
+- 新增 `.gitattributes`：shell 钩子（.githooks/*）强制 LF 行尾（Windows autocrlf 兼容）
+- 文档一致性审查确认 SKILL.md/toolbox.md/dispatch-matrix.md 无逐字冗余、候选废弃文档均已含指针声明，A4/A5 无结构性改动
+
+### Fixed
+- 恢复 A6 批量替换越界改写的历史归档（docs/superpowers、docs/changes、CHANGELOG.md 历史条目）
+- 修正 usage 注释 / ARG_INVALID 错误消息 / references 相对链接中的旧平铺脚本路径（54 处源码 + 3 处文档）
+- security baseline 重生成（A1 拆分新模块的 6 条文件移动所致 hash 失配）
 
 ## [41.1.0] - 2026-08-10
 
