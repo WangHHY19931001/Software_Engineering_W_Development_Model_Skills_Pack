@@ -1168,6 +1168,22 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+### 3.4.43 第 43 轮：移除 .cursor 技能包（仓库级资产清理 + docs-consistency 门禁解耦）
+
+**目的**：完成 `.cursor/skills/` 技能包（23 个 Cursor 适配技能，已在 e74b886 中删除，12097 行）的残留引用清理——`check-docs-consistency` 门禁因 `REQUIRED_PATHS` 硬编码 `.cursor/skills` 缺失而每次推送必失败（exit 2），本轮将门禁与已删除资产解耦并同步全部活动文档（2026-08-13）。
+
+**变更（2026-08-13）**：C1 docs-consistency 门禁解耦——`check-docs-consistency.ts` REQUIRED_PATHS 移除 `.cursor/skills`、目录计数删除、input 组装与日志同步；`docs-consistency-logic.ts` EXPECTED 移除 `cursorSkillCount=23`、`DocConsistencyInput` 移除字段、`checkAssetCounts` 单参数化（仅 persona）；`docs-consistency-logic.test.ts` 同步（vitest 总数 558 不变）；C2 `.githooks/pre-push` 变更过滤移除 `.cursor/skills/**` case 分支与触发条件注释；C3 活动文档清理——AGENTS.md 导航表行、README.md 结构树行与 pre-push 注释、references 5 处死链（phase-5-coding 删除空「相关资源」节 / phase-4-detailed-design 去链接保文字 / verifier-spec 重定向 agent-personas.md / anti-patterns 去链接 / subagent-delegation 两处去链接）；C4 `.gitignore` 追加 `.cursor/`（与 `.claude/` 同款）；C5 版本号 41.2.0 → 41.3.0（三处一致：package.json / skill-metadata.json / SKILL.md frontmatter）+ CHANGELOG [41.3.0] 段。
+
+**关键决策**：references 死链统一「保留文字、去除链接标记」（引用的方法论描述仍有价值）；verifier-spec 代码审查员提示重定向到技能包内 `agent-personas.md`（等价物）；历史记录（CHANGELOG 旧条目 / SSoT §3.4.31/39/41/42 / docs/superpowers 归档）保留不动。
+
+| 维度 | 内容 |
+|---|---|
+| self-test | 基线 249 不变 |
+| vitest | 35 files / 558 tests |
+| 版本号 | 41.3.0（三处一致） |
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -2783,6 +2799,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 3.4.41 第 41 轮四源吸收（P0） | 组 X 复杂度症状 / 设计判据条目 / 类设计规则补充 / 设计投资 / 接口注释清单 / 命名一致性三要求 / 备选方案对比 / 方案权衡列 / 候选反模式登记 | code-smells-checklist + quality-standards + format-conventions + phase-3/4 + verifier-spec + class-design 模板 + anti-patterns | 已落地（41.0.0） |
 | 3.4.41 第 41 轮四源吸收（P1） | design-patterns-catalog / 重构目标结构列 / code-smells 三坏味道 / phase-2 决策框架 / quality-standards 容错日志 / verifier-spec 双轴评审 / tla-plus 场景库 / security-review 维度 / phase-6 补偿故障注入 | `design-patterns-catalog.md` + refactoring-catalog + code-smells-checklist + phase-2 + quality-standards + verifier-spec + tla-plus-guide + security-review + phase-6 | 已落地（41.1.0） |
 | 3.4.41 第 41 轮四源吸收（P2） | 证据加权共识 / 验证器定位三原则 / 候选转正评审 + 错误聚集超标丢弃 / 爬山法哲学基础 / 不连续系统穷举 / 混沌预期 + 超标重写 / 约束创造 + 满意化完成 / 可观测性验收 / 受控失控 + clockware-swarmware | subagent-persona-matrix + verifier-spec + anti-patterns + hill-climbing-guide + tla-plus-guide + operational-recovery + quality-standards + phase-7 + SKILL.md | 已落地（41.2.0） |
+| 3.4.43 第 43 轮移除 .cursor 技能包 | docs-consistency 门禁解耦（REQUIRED_PATHS / EXPECTED / checkAssetCounts）/ pre-push 过滤清理 / 活动文档与 5 处死链同步 / .gitignore 追加 .cursor / 版本号三处 41.3.0 | `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + `.githooks/pre-push` + AGENTS.md + README.md + references 5 处 + `.gitignore` + package.json / skill-metadata.json / SKILL.md / INSTALL.md | 已落地（41.3.0） |
 
 ---
 

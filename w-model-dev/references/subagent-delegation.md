@@ -72,7 +72,7 @@
 >
 > **强制等级**：违反本节「禁止转发」「状态日志强制」命中反模式 #10 变体（编排者越权承担信息搬运），回退到当前分派起点。
 >
-> **与既有机制的关系**：本节**不替代** `run-log.jsonl`（事件流水 / append-only 审计）、`progress.md`（SDD 完成账本）、[task-brief / review-package 脚本模式](../../.cursor/skills/subagent-driven-development/scripts/)（brief / report 文件雏形）；在它们之上增加「状态日志当前快照」+「status.json 信标」+「O 不读 output」硬约束。
+> **与既有机制的关系**：本节**不替代** `run-log.jsonl`（事件流水 / append-only 审计）、`progress.md`（SDD 完成账本）、task-brief / review-package 文件模式（brief / report 文件雏形）；在它们之上增加「状态日志当前快照」+「status.json 信标」+「O 不读 output」硬约束。
 
 ### 1. 编排者状态日志（current / done / next）
 
@@ -146,7 +146,7 @@ phase: <N - 名称>
 - O 在下游 `brief.md` 里只写"读 `handoff/<prev-dispatch-id>/output.md`"指针，不粘贴内容。
 - 子代理返回 O 的文本 ≤ 5 行：仅 `{state, dispatchId, status.json 路径, one-line}`。完整产出在 `output.md`。
 
-> 与 [task-brief / review-package 脚本模式](../../.cursor/skills/subagent-driven-development/scripts/) 的关系：SDD 技能的 brief / report 文件即本协议 `brief.md` / `output.md` 的雏形；本协议增加 `status.json` 信标与"O 不读 output"硬约束，把"O 读路径"进一步降为"O 只读信标"。
+> 与 task-brief / review-package 文件模式的关系：SDD 的 brief / report 文件即本协议 `brief.md` / `output.md` 的雏形；本协议增加 `status.json` 信标与"O 不读 output"硬约束，把"O 读路径"进一步降为"O 只读信标"。
 
 ### 3. 任务拆分预算（simplicity budget）
 

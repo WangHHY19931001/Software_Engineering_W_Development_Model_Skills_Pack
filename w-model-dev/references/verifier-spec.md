@@ -909,4 +909,4 @@ self-as-verifier 模式下（单 Agent 兼任 S/V/G/R），V 评审产出须满�
 
 ## 相关资源
 
-- 代码审查员提示模板：参见 [.cursor/skills/requesting-code-review/code-reviewer.md](../../.cursor/skills/requesting-code-review/code-reviewer.md)
+- 代码审查员提示模板：参见 [agent-personas.md](agent-personas.md)（code-reviewer persona）

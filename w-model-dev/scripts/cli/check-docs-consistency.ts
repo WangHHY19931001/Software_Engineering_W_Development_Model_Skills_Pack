@@ -55,7 +55,6 @@ const REQUIRED_PATHS = [
   'docs/skill-design-document_SSoT.md',
   '.githooks/pre-push',
   'w-model-dev/subagent', // 目录（persona 计数）
-  '.cursor/skills', // 目录（cursor skill 计数）
   'docs/llm-verifier-integration-design.md',
   'docs/loop-engineering-adoption-design.md',
   'docs/information-flow-validation-design.md',
@@ -211,9 +210,6 @@ function main(): void {
     .filter((f) => f.endsWith('.schema.json'))
     .sort();
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
-  const cursorSkillCount = readdirSync(join(root, '.cursor/skills'), { withFileTypes: true }).filter((d) =>
-    d.isDirectory(),
-  ).length;
   const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts/cli')).filter((f) =>
     /^check-.*\.ts$/.test(f),
   ).length; // 含 check-docs-consistency 自身 = 25（cli/ 层）
@@ -227,7 +223,6 @@ function main(): void {
   const input: DocConsistencyInput = {
     schemaFiles,
     personaCount,
-    cursorSkillCount,
     exit2ScriptCount,
     dataModels: read('w-model-dev/references/data-models.md'),
     verifierSpec: read('w-model-dev/references/verifier-spec.md'),
@@ -277,7 +272,7 @@ function main(): void {
   console.log(`repo-root     : ${root}`);
   console.log(`schema 文件   : ${schemaFiles.length}`);
   console.log(`exit-2 脚本   : ${exit2ScriptCount}`);
-  console.log(`persona / cur : ${personaCount} / ${cursorSkillCount}`);
+  console.log(`persona 文件   : ${personaCount}`);
   console.log(`test 文件    : ${testFileCount}`);
   console.log(`vitest 用例  : ${vitestTestCount < 0 ? '无法采集（放行）' : vitestTestCount}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);

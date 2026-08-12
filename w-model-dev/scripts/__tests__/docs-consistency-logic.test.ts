@@ -6,7 +6,6 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
   return {
     schemaFiles: ['verifier-output.schema.json', 'run-log.schema.json', 'iceberg-sweep.schema.json'],
     personaCount: 28,
-    cursorSkillCount: 23,
     exit2ScriptCount: 30,
     dataModels: [
       '### Schema 清单（20 份）',
@@ -159,10 +158,9 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('资产计数不符 → 违规', () => {
-    const input = baseInput({ personaCount: 27, cursorSkillCount: 22 });
+    const input = baseInput({ personaCount: 27 });
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('28'))).toBe(true);
-    expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('23'))).toBe(true);
   });
 
   it('targetkind 违规消息含来源文档名', () => {

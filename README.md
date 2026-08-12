@@ -292,7 +292,6 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 
 ```
 .
-├── .cursor/skills/               # Cursor 技能包（23 个中文适配技能：brainstorming / chinese-code-review / chinese-commit-conventions / chinese-documentation / chinese-git-workflow / codegraph-exploration / dispatching-parallel-agents / executing-plans / finishing-a-development-branch / mcp-builder / performance-review / receiving-code-review / requesting-code-review / security-review / subagent-driven-development / systematic-debugging / test-driven-development / using-git-worktrees / using-superpowers / verification-before-completion / workflow-runner / writing-plans / writing-skills）
 ├── w-model-dev/                  # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载；完整列表见 references/ 目录）
@@ -332,7 +331,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 │   ├── w-model-dev-test-prompts.json           # 评估测试场景（15 条：典型 / 歧义 / 反误触发 / 正向）
 │   └── w-model-dev-results.tsv                 # 评估历史记录（得分轨迹）
-├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI；w-model-dev/**、README.md / AGENTS.md / CONTRIBUTING.md / package.json、docs/*.md、.cursor/skills/** 变更时触发）
+├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI；w-model-dev/**、README.md / AGENTS.md / CONTRIBUTING.md / package.json、docs/*.md 变更时触发）
 ├── AGENTS.md                     # AI Agent 仓库导航（与 README 互补，聚焦 Agent 行动事实集）
 ├── package.json                  # 声明 tsx + devDeps（ajv / eslint-plugin-security 等）+ npm run 快捷脚本（private，不发布）
 ├── CHANGELOG.md                  # 变更日志

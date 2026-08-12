@@ -18,8 +18,6 @@ export interface DocConsistencyInput {
   schemaFiles: string[];
   /** subagent/ 目录 .md 人格文件数（期望 28） */
   personaCount: number;
-  /** .cursor/skills 目录数（期望 23） */
-  cursorSkillCount: number;
   /** 实测可 exit 2 的 CLI 脚本数（25 个 check-*.ts 含自身 + 5 工具 = 30） */
   exit2ScriptCount: number;
   dataModels: string;
@@ -50,7 +48,6 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   schemaCount: 20,
   personaCount: 28,
-  cursorSkillCount: 23,
   vitestFileCount: 35,
   exit2ScriptCount: 30,
   runLogActionCount: 27,
@@ -103,7 +100,7 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkExit2ScriptCount(input.exit2ScriptCount, input.agents));
   violations.push(...checkPrePushCount(input.prePush));
   violations.push(...checkGlossaryAction(input.glossary));
-  violations.push(...checkAssetCounts(input.personaCount, input.cursorSkillCount));
+  violations.push(...checkAssetCounts(input.personaCount));
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
@@ -298,18 +295,12 @@ function checkGlossaryAction(glossary: string): DocCheckViolation[] {
   return violations;
 }
 
-function checkAssetCounts(personaCount: number, cursorSkillCount: number): DocCheckViolation[] {
+function checkAssetCounts(personaCount: number): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (personaCount !== EXPECTED.personaCount) {
     violations.push({
       check: 'asset-counts',
       message: `subagent/ 人格文件数应为 ${EXPECTED.personaCount}，实际 ${personaCount}`,
-    });
-  }
-  if (cursorSkillCount !== EXPECTED.cursorSkillCount) {
-    violations.push({
-      check: 'asset-counts',
-      message: `.cursor/skills 目录数应为 ${EXPECTED.cursorSkillCount}，实际 ${cursorSkillCount}`,
     });
   }
   return violations;

@@ -10,6 +10,12 @@
 # 本地 Agent 工作目录（如 darwin-skill 评估产物，由外部工具维护，不纳入版本控制）
 .claude/
 
+# Cursor IDE 技能包/配置（第 43 轮起不再维护仓库内 .cursor 资产，防误跟踪）
+.cursor/
+
+# ZCode 客户端本地计划/会话产物
+.zcode/
+
 # IDE
 .vscode/
 .idea/
