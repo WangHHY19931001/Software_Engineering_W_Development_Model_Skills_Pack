@@ -55,18 +55,20 @@ is_pure_windows_shell() {
 }
 
 if is_pure_windows_shell; then
-  printf '[pre-push] \033[33m⚠\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n'
-  printf '[pre-push] \033[33m⚠\033[0m 请安装 Git for Windows 并使用 Git Bash 运行：npm run prepush\n'
-  printf '[pre-push] \033[33m⚠\033[0m 本次推送门禁已跳过（exit 0）\n'
+  printf '[pre-push] \033[33m⚠\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n' 2>/dev/null || true
+  printf '[pre-push] \033[33m⚠\033[0m 请安装 Git for Windows 并使用 Git Bash 运行：npm run prepush\n' 2>/dev/null || true
+  printf '[pre-push] \033[33m⚠\033[0m 本次推送门禁已跳过（exit 0）\n' 2>/dev/null || true
   exit 0
 fi
 
 # ---------- 工具函数 ----------
+# 说明：Git for Windows 下 hook 的 stdout fd 可能无效（Bad file descriptor），
+# 所有输出统一容错（2>/dev/null || true），避免 set -e 下 printf 写失败中断 hook。
 
-log()  { printf '[pre-push] %s\n' "$*"; }
-ok()   { printf '[pre-push] \033[32m✓\033[0m %s\n' "$*"; }
-fail() { printf '[pre-push] \033[31m✗\033[0m %s\n' "$*"; }
-warn() { printf '[pre-push] \033[33m⚠\033[0m %s\n' "$*"; }
+log()  { printf '[pre-push] %s\n' "$*" 2>/dev/null || true; }
+ok()   { printf '[pre-push] \033[32m✓\033[0m %s\n' "$*" 2>/dev/null || true; }
+fail() { printf '[pre-push] \033[31m✗\033[0m %s\n' "$*" 2>/dev/null || true; }
+warn() { printf '[pre-push] \033[33m⚠\033[0m %s\n' "$*" 2>/dev/null || true; }
 
 # ---------- 路径过滤：无相关变更直接放行 ----------
 #
