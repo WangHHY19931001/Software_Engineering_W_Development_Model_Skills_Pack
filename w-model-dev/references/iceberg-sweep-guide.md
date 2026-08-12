@@ -1,7 +1,7 @@
 # 冰山扫掠方法论（Iceberg Sweep Guide）
 
 > 第 36 轮新增。本指南供 R-iceberg 子代理使用：以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 IcebergSweepReport。
-> Schema：`schemas/iceberg-sweep.schema.json`；校验脚本：`scripts/check-iceberg-sweep.ts`；反模式：#44。
+> Schema：`schemas/iceberg-sweep.schema.json`；校验脚本：`scripts/cli/check-iceberg-sweep.ts`；反模式：#44。
 
 ## 1. 冰山理论在 W 模型的映射
 

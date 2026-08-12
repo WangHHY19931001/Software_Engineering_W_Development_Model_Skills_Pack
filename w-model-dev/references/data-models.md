@@ -94,11 +94,11 @@ DESIGN 1──* TEST_CASE        (设计生成系统/集成/单元测试)
 ## 图谱节点与边类型（GraphNode / EdgeType）
 
 > ingestion 子流程图谱模型的节点与边类型。完整节点语义、系统层级树与多层图谱（7 层）校验规则见 [graph-guide.md](graph-guide.md)；本节仅定义数据模型层 schema 与横切边源节点标识 marker。
-> 权威实现：[`scripts/graph-logic.ts`](../scripts/logic/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。`governs` / `derives` 边类型与 `governance` / `derivationProduct` marker 均已落地；`consumes` 兼容已移除（D21）。
+> 权威实现：[`scripts/logic/graph-logic.ts`](../scripts/logic/graph-logic.ts) 为 `GraphNode` / `GraphEdge` / `EdgeType` 单点事实源。`governs` / `derives` 边类型与 `governance` / `derivationProduct` marker 均已落地；`consumes` 兼容已移除（D21）。
 
 ### 横切边源节点 marker（GraphNode 扩展）
 
-`GraphNode` 完整 schema 见 [`scripts/graph-logic.ts`](../scripts/logic/graph-logic.ts)（含下方两个 marker 字段，已落地）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 含两个可选布尔 marker 字段（`governance` / `derivationProduct`，以 graph-logic.ts 为 schema 权威）：
+`GraphNode` 完整 schema 见 [`scripts/logic/graph-logic.ts`](../scripts/logic/graph-logic.ts)（含下方两个 marker 字段，已落地）。为支持横切边（`governs` / `derives`）的源节点校验，`GraphNode` 含两个可选布尔 marker 字段（`governance` / `derivationProduct`，以 graph-logic.ts 为 schema 权威）：
 
 ```typescript
 // GraphNode 扩展字段（叠加于 graph-logic.ts 现有 GraphNode 之上）
@@ -166,7 +166,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 ## RTM 字段阶段演进规则
 
-> RTM 各列按阶段递进补加，禁止在早期阶段填写晚期字段（防止「提前填晚期字段」缺陷）。本节是对 [rtm-guide.md](rtm-guide.md)「各阶段登记职责」与「各阶段 RTM 字段更新清单」的阶段演进约束补充；RTM 行字段 schema 见 [`scripts/gate-logic.ts`](../scripts/logic/gate-logic.ts) `RTMRowShape`。
+> RTM 各列按阶段递进补加，禁止在早期阶段填写晚期字段（防止「提前填晚期字段」缺陷）。本节是对 [rtm-guide.md](rtm-guide.md)「各阶段登记职责」与「各阶段 RTM 字段更新清单」的阶段演进约束补充；RTM 行字段 schema 见 [`scripts/logic/gate-logic.ts`](../scripts/logic/gate-logic.ts) `RTMRowShape`。
 
 **RTM 行字段阶段演进**（`RTMRowShape`）：
 
@@ -399,7 +399,7 @@ interface RunLogEntry {
 
 ### R1 阶段动作完整性：按阶段分档
 
-> 由 [`scripts/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。对每个已完成阶段（含 checkpoint success），按阶段编号分档检查必需动作：
+> 由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。对每个已完成阶段（含 checkpoint success），按阶段编号分档检查必需动作：
 
 | 阶段范围 | 必需动作 | 说明 |
 |---|---|---|
@@ -412,7 +412,7 @@ interface RunLogEntry {
 
 ### 动作类型字段约束（rootcause / fix / escalate 扩展）
 
-> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
+> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
 `action` 枚举新增 `rootcause` / `fix` 两个动作（返工循环 V/G→R→V→G→S-fix→V→G 专用）。各动作的额外必填字段约束：
 
@@ -819,7 +819,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 
 > 借鉴点 2（Task 3）：所有 .w-model/*.json 在进入业务规则校验前，必须先过 JSON Schema 前置校验。
 > schema 用 draft-07 + `additionalProperties:false` 防字段漂移、`required` 防字段缺失、`type`/`enum`/`format` 防类型/枚举/格式错误。
-> schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
+> schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/logic/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
 ### Schema 清单（20 份）

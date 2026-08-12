@@ -52,7 +52,7 @@ IO 调用必须在 `check-*.ts` 入口层完成，传纯数据给 logic 层。
 违反检测：
 
 ```bash
-cd w-model-dev/scripts && grep -nE "from 'node:fs'|from 'node:child_process'|process\.(exit|argv|env|stdout|stderr)" *-logic.ts
+cd w-model-dev/scripts/logic && grep -nE "from 'node:fs'|from 'node:child_process'|process\.(exit|argv|env|stdout|stderr)" *-logic.ts
 ```
 
 应无输出。

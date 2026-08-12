@@ -1,7 +1,7 @@
 # 质量保障体系
 
 > 来源：SSoT 第 10 章。代码 / 文档 / 测试三类质量标准与质量门流程。
-> 本文件为人类可读的质量标准；可执行判定以 [scripts/check-artifact-gate.ts](../scripts/cli/check-artifact-gate.ts) 为准（读取 `.w-model/rtm.json`，退出码 0=通过 / 1=未通过 / 2=输入错误）。
+> 本文件为人类可读的质量标准；可执行判定以 [scripts/cli/check-artifact-gate.ts](../scripts/cli/check-artifact-gate.ts) 为准（读取 `.w-model/rtm.json`，退出码 0=通过 / 1=未通过 / 2=输入错误）。
 
 ## 硬约束 = 结构来源（第 41 轮四源吸收，失控 ch19）
 

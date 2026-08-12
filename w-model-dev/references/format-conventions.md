@@ -88,7 +88,7 @@ path:§3.2,L42       （章节+行号混合）
 - `references/verifier-spec.md` §6.2（evidence 格式）
 - `templates/tla-spec-template.md`（@design 格式）
 - `templates/feature.template`（@design 格式）
-- `scripts/verifier-logic.ts`（EVIDENCE_PATTERN）
+- `scripts/logic/verifier-logic.ts`（EVIDENCE_PATTERN）
 - `references/directory-conventions.md` §6（路径引用规则）
 
 ## 5. 注释与提示词目的规范（第 39 轮 P2 批吸收）

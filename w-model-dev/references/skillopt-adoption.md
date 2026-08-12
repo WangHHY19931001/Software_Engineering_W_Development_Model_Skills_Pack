@@ -123,9 +123,9 @@ SSoT §3.4.2 角色表已扩展明确限定「离线进化场景下主代理执�
 |---|---|
 | [hill-climbing-guide.md](hill-climbing-guide.md) | 上游，产出 HarnessImprovementReport 信号 |
 | [anti-patterns.md](anti-patterns.md) | 下游，候选反模式入清单（pending V 复审） |
-| `scripts/self-test.ts` | validation gate V2 |
+| `scripts/cli/self-test.ts` | validation gate V2 |
 | `scripts/__tests__/` | validation gate V3 |
 | [verifier-spec.md](verifier-spec.md) | 信号消费对象 + 规则收紧对象（R11/R12） |
-| `scripts/verifier-logic.ts` | 信号消费对象 + 规则实现对象（R11/R12） |
+| `scripts/logic/verifier-logic.ts` | 信号消费对象 + 规则实现对象（R11/R12） |
 | SSoT §10H | 上游权威定义 |
 | SSoT §3.4.2 | 离线进化场景角色表扩展 |

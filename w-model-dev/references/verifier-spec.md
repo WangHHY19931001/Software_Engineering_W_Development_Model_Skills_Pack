@@ -2,7 +2,7 @@
 
 > 适用对象：外部 AI Agent（TRAE / Claude / 其他）按本规范对 W 模型各阶段产物执行
 > LLM-as-a-Verifier 评审，并将结构化结果写入 JSON 文件交由
-> [`scripts/check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验防漂移。
+> [`scripts/cli/check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验防漂移。
 >
 > 本技能**不内置 LLM 调用**。技能只提供「提示词 + 输出 schema + 校验脚本」三件套，
 > 评审执行由外部 Agent 完成。技能演化（SkillOpt / darwin-skill）与本规范解耦：
@@ -291,7 +291,7 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 ### 5.1 算法描述
 
 > 算法源自 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 「LLM-as-a-Verifier: A General-Purpose Verification Framework」§4.3 Probabilistic Pivot Tournament (PPT)。
-> 本节为算法描述，**由外部 Agent 执行**；技能仅校验输出 JSON 的 `ranking` 字段合理性（见 §6 / [`scripts/verifier-logic.ts`](../scripts/logic/verifier-logic.ts)），不实现算法本身。
+> 本节为算法描述，**由外部 Agent 执行**；技能仅校验输出 JSON 的 `ranking` 字段合理性（见 §6 / [`scripts/logic/verifier-logic.ts`](../scripts/logic/verifier-logic.ts)），不实现算法本身。
 
 **核心思路**：将 N 个候选的两两全比较（O(N²)）替换为「每候选 vs k 个枢轴」比较（O(N·k)），在保留排序质量的前提下显著降低 token 预算。
 

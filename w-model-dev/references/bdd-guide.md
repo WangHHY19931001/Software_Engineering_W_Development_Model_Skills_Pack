@@ -605,7 +605,7 @@ V 子代理复审 R 报告
 ### 脚本调用
 
 ```bash
-npx tsx scripts/check-tla-bdd-sync.ts <tla-file> <feature-file>
+npx tsx w-model-dev/scripts/cli/check-tla-bdd-sync.ts <tla-file> <feature-file>
 ```
 
 退出码：0=一致 / 1=有差异 / 2=输入错误
