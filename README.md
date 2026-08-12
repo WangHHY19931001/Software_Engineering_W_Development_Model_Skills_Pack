@@ -11,12 +11,13 @@
 
 **当前版本**：`41.2.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)）
 
-**健康指标**（2026-08-10 实测）：
+**健康指标**（2026-08-12 实测）：
 
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 249/249 |
 | Vitest（门禁脚本单元测试） | ✅ 35 files / 558 tests |
+| Vitest coverage（logic/+lib/ 阈值） | ✅ stmts 75 / branch 65 / funcs 85 / lines 75 |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
 | Pre-push 门禁（本地 CI） | ✅ 14 项全通过（Git Bash 与 WSL 双平台实测） |
