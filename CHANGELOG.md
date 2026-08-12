@@ -46,6 +46,9 @@
 - 修正 usage 注释 / ARG_INVALID 错误消息 / references 相对链接中的旧平铺脚本路径（54 处源码 + 3 处文档）
 - security baseline 重生成（A1 拆分新模块的 6 条文件移动所致 hash 失配）
 
+### Docs
+- P0-P2 工程化批次合并后文档一致性同步（2026-08-12，不涉及版本语义）：SSoT 新增 §3.4.42 第 42 轮 P0-P2 批次记录 + 修正 §10H.5 V1/V3 命令（`9ecc7b4`）；SKILL.md 修复 5 处 `scripts/` → `scripts/cli/` 旧路径链接（`e523123`）；INSTALL.md 结构树同步 cli/logic/lib、计数 530→558、devDeps 补充 eslint-plugin-import/prettier/typedoc/docsify-cli、workspaces 说明（`f4a4f8c`）；README 健康指标日期刷新 2026-08-12 + coverage 阈值行（`debac0f`）；AGENTS.md 确认无残留（P0-P2 批次中已同步）
+
 ## [41.1.0] - 2026-08-10
 
 ### Added
