@@ -1148,6 +1148,26 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+### 3.4.42 第 42 轮：P0-P2 工程化批次（脚本分层重构 + 错误结构统一 + 可观测性 + 配置集中 + 工程化基础设施）
+
+**目的**：完成 P0-P2 三批工程化修正（2026-08-11~12）——重构脚本分层（scripts/cli/logic/lib 四层）、错误结构统一（CliError rule/field + violations 双轨结构化）、可观测性（--json 机器可读 + npm audit 阻断 + TypeDoc）、配置集中（config/）、工程化基础设施（postinstall 钩子 / 协作模板 / npm workspaces / Docsify 站点 / 用户文档 / 覆盖率门禁）。
+
+**P0（6 项，2026-08-11）**：A1 check-artifact-gate 拆分（486→249 行，拆出 `lib/phase-doc-map.ts` / `cli/artifact-gate-assets.ts` / `cli/uat-path-mapping.ts`，`checkUatPathMappingContent` 保持 re-export 兼容 self-test）+ 全仓脚本四层重组（25 个 check-*.ts 迁入 `cli/`、*-logic.ts 迁入 `logic/`，`lib/` 保持，同步跨层 import、`.githooks/pre-push` 路径、100+ 文档引用）；A2a CliError 新增 `rule`/`field` 可选字段（`lib/cli-error.ts`，`formatCliError` 附加 `[rule=...]` 段、`printErrorJson` 条件输出向后兼容，全仓 exitWithError 按已知规则 ID 补齐，exit 2 统一 ERROR_JSON）；A3 新增 `.gitattributes` 强制 shell 钩子（.githooks/*）LF 行尾（Windows autocrlf 兼容）；A4 AGENTS.md 同步（vitest 计数 530→534）+ README/AGENTS 标注 `eval/` 目录为非技能包边界；A5 security baseline 重生成（A1 拆分新模块 6 条文件移动所致 hash 失配）；A6 CHANGELOG 记录（[41.2.0] 条目 Added/Changed/Fixed）。
+
+**P1（11 项，2026-08-11）**：A2b violations 双轨结构化（各 `*-logic.ts` 保留 `violations: string[]` 并新增可选 `structuredViolations?: Array<{rule; field?; message}>`，check-*.ts 人类可读与 `--json` 输出优先读结构化字段，试点 code-tla-logic + tla-bdd-sync-logic）；B1 复杂逻辑注释（`code-tla-logic.ts` 映射一致性四维度判定、`tla-bdd-sync-logic.ts` 状态机同步补设计依据/参考规则/边界处理块注释）；B2 常量与类型集中（新建 `lib/constants.ts`：RTM 追溯字段 / phase 枚举 / 门禁退出码 / 工件相对路径；`lib/types.ts`：校验输入输出类型，全仓复用消除多文件重复定义）；B3 docs-consistency 新增 baseline-sync 门禁（`scripts/**` 变更必须同步 `.eslintsecurity-baseline.json`）+ vitest 实测用例数门禁；B4 `--json` 可观测性（25 个 check-*.ts 全部支持 `--json` 机器可读报告，gate-report.ts 新增 printJsonReport/buildViolationDistribution，默认人类可读输出不变）；B5 npm audit 阻断升级（pre-push 第 13 项由 warn-only 升级为 high 以上阻断 exit 1，网络不可达/registry 不支持 audit 时跳过）；B6 TypeDoc API 文档（配置输出 `docs/api/`，`npm run docs:build`，docs/api/ 生成物入 .gitignore，check-*.ts 头注释补 JSDoc）；B7 新增 `docs/changes/archive/INDEX.md` 归档导航（5 个归档目录顶层导航 + 每轮一行摘要）；B8 配置集中（`.eslintrc.cjs` / `tsconfig.json` / `vitest.config.ts` / `.eslintignore` 迁入 `config/`，security-scan 改 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore`，`.eslintsecurity-baseline.json` 留根目录，package.json scripts 分组注释）；B9 postinstall 钩子（`scripts/setup-hooks.cjs` 跨平台 Node 实现自动配置 `core.hooksPath`，非 git 仓库/配置失败仅 warn 不阻断 install，不引入 Husky）；B10 协作模板（`.github/ISSUE_TEMPLATE/` bug-report/feature-request + `.github/PULL_REQUEST_TEMPLATE.md`，CONTRIBUTING 增补 Conventional Commits 规范）。
+
+**P2（9 项，2026-08-12）**：C1 loadAndValidate 统一 IO（`lib/load-and-validate.ts` 在 `read-json-or-exit.ts` / `schema-loader.ts` 之上封装「读取→JSON 解析→schema 校验」复用方法，复用 schema-loader 单例，哨兵错误区分调用方并补覆盖率，沿用 AJV 不引入 zod）；C2 格式统一（ESLint `import/order` 规则 + Prettier 全仓格式化 + 新增 `.editorconfig`，import/order 存量 108→0，一次格式化后全量回归）；C3 vitest 覆盖率入 pre-push（`config/vitest.config.ts` 配置 v8 阈值 stmts 75 / branch 65 / funcs 85 / lines 75，仅统计 `logic/` + `lib/`，pre-push 第 12 项升级为 `vitest run --coverage` 阈值门禁，docs-consistency vitest 计数收集改为按 config include 范围）；C4 用户文档（新增 `docs/user-guide.md` 常见校验失败排查 + `docs/troubleshooting.md` FAQ，README 导航同步）；C5 Docsify 文档站点（`docs/index.html` + `_sidebar.md`，docs/ + w-model-dev/references/ 渲染为可浏览 HTML 站点，package.json 新增 `docs:site` 本地预览）；C6 templates 扩充（补齐阶段 5-8 缺口：coding / integration-test / acceptance-test 3 份 Markdown 模板 + budget / run-log 2 份 JSON 工件模板，SKILL.md Bundled Resources 同步）；C7 npm workspaces（仓库根 + `w-model-dev/` 双 workspace 分离开发依赖与技能包运行时依赖，新建 `w-model-dev/package.json` 不声明 version 避免第四处版本破坏三地方程式，createRequire typescript 解析验证）；C8 examples 扩充（新增 stage 1/5/6/7/8 阶段编排示例含可复用命令行，与既有 4 份覆盖 8 阶段完整编排流程 + 编排导览 README）；C9 版本机制维持（维持人工三地方程式：根 package.json + SKILL.md frontmatter + skill-metadata.json，`skill-metadata.test.ts` 4 用例验证通过，不引入 semantic-release，spec §6 决策记录；C9 无代码改动）。
+
+**关键决策**：错误结构统一扩展采用双轨过渡（structuredViolations 可选字段，历史违规点保持 `string[]` 不动，向后兼容）；`--json` 机器可读输出全量铺开（默认人类可读不变）；config/ 配置集中 + security-scan 显式 `--config` 联动（`--no-eslintrc` 防 worktree 级联污染）；npm audit 阻断 fail-closed（网络不可达/registry 不支持跳过）；npm workspaces 子包不声明 version（防第四处 version 破坏三地方程式）；版本机制维持人工三地方程式（不引入 semantic-release）；设计 spec：docs/superpowers/specs/2026-08-11-p0-p2-fixes-design.md。
+
+| 维度 | 内容 |
+|---|---|
+| self-test | 基线 249 不变 |
+| vitest | 35 files / 558 tests |
+| 版本号 | 41.2.0（维持，批次不涉及版本语义，三处一致） |
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -2557,9 +2577,9 @@ interface RunLogEntry {
 
 | 阶段 | 命令 | 退出码 |
 |---|---|---|
-| V1 | `npx tsc --noEmit` | 0 |
+| V1 | `npx tsc -p config/tsconfig.json` | 0 |
 | V2 | `npm run self-test` | 0 |
-| V3 | `cd w-model-dev && npx vitest run scripts/__tests__/` | 0 |
+| V3 | `npx vitest run --config config/vitest.config.ts` | 0 |
 | V4 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <fixture>` | 1（触发 R11/R12/R13） |
 
 ### 10H.6 与 Loop 4 的边界
