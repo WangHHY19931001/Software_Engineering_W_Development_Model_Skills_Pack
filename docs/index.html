@@ -5,9 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>W-Model Skills</title>
   <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+  <style>
+    #offline-notice {
+      display: none;
+      max-width: 720px;
+      margin: 48px auto;
+      padding: 24px;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.7;
+      color: #333;
+    }
+  </style>
 </head>
 <body>
+  <noscript>
+    <div id="offline-notice">
+      <h2>文档站点需要启用 JavaScript</h2>
+      <p>本站点由 docsify 渲染，当前浏览器禁用了 JavaScript，无法显示文档内容。</p>
+      <p>可在浏览器设置中启用 JavaScript 后刷新；或直接阅读仓库内的 Markdown 源文件（<code>README.md</code> / <code>docs/*.md</code>）。</p>
+    </div>
+  </noscript>
   <div id="app"></div>
+  <div id="offline-notice" style="display:none">
+    <h2>无法加载文档（离线或 CDN 不可达）</h2>
+    <p>docsify 资源来自 jsdelivr CDN，当前网络无法访问。</p>
+    <p>可选方案：联网后刷新本页；本地预览运行 <code>npm install && npm run docs:site</code>；或直接阅读仓库内 Markdown 源文件。</p>
+  </div>
   <script>
     window.$docsify = {
       name: 'W-Model Skills',
@@ -17,6 +40,7 @@
       homepage: 'user-guide.md',
     };
   </script>
-  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"
+          onerror="document.getElementById('offline-notice').style.display='block'"></script>
 </body>
 </html>

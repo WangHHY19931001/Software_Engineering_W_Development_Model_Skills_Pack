@@ -41,6 +41,8 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
 const REQUIRED_PATHS = [
+  'package.json',
+  'w-model-dev/skill-metadata.json',
   'w-model-dev/references/data-models.md',
   'w-model-dev/references/verifier-spec.md',
   'w-model-dev/references/command-reference.md',
@@ -50,9 +52,12 @@ const REQUIRED_PATHS = [
   'w-model-dev/references/glossary.md',
   'w-model-dev/schemas/run-log.schema.json',
   'w-model-dev/SKILL.md',
+  'w-model-dev/references/operation-behaviors.md',
+  'w-model-dev/references/hard-constraints.md',
   'README.md',
   'AGENTS.md',
   'docs/skill-design-document_SSoT.md',
+  'docs/INSTALL.md',
   '.githooks/pre-push',
   'w-model-dev/subagent', // 目录（persona 计数）
   'docs/llm-verifier-integration-design.md',
@@ -233,10 +238,15 @@ function main(): void {
     glossary: read('w-model-dev/references/glossary.md'),
     runLogSchema: read('w-model-dev/schemas/run-log.schema.json'),
     skill: read('w-model-dev/SKILL.md'),
+    operationBehaviors: read('w-model-dev/references/operation-behaviors.md'),
+    hardConstraints: read('w-model-dev/references/hard-constraints.md'),
     readme: read('README.md'),
     agents: read('AGENTS.md'),
     ssot: read('docs/skill-design-document_SSoT.md'),
     prePush: read('.githooks/pre-push'),
+    pkgJson: read('package.json'),
+    metaJson: read('w-model-dev/skill-metadata.json'),
+    installDoc: read('docs/INSTALL.md'),
     designDocs,
     testFileCount,
     vitestTestCount,

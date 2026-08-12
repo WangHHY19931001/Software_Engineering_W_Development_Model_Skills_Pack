@@ -10,7 +10,7 @@
     "reviewedAt": { "description": "审查时间戳，ISO 8601 字符串（R3 报告产出时间）", "type": "string", "format": "date-time" },
     "reviewer": { "description": "审查者标识（R3 子代理 persona，如 code-reviewer/test-engineer/security-auditor），非空字符串", "type": "string", "minLength": 1 },
     "phase": { "description": "审查所处阶段编号，取值 1-8（check-preventive-review.ts 校验须与期望阶段一致，不一致报 R3 报告 phase 不一致）", "type": "integer", "minimum": 1, "maximum": 8 },
-    "dimension": { "description": "审查维度枚举：completeness=完整性（字段齐全/模板套用/RTM 登记等）/ reliability=可靠性（TLA+与BDD等价性/状态机一致性/接口契约等）/ security=安全性（输入校验/鉴权/越权/敏感信息等）；R3 三维度（约束 #17）须三份齐备，文件名维度与报告维度须一致", "enum": ["completeness", "reliability", "security"] },
+    "dimension": { "description": "审查维度枚举：completeness=完整性（字段齐全/模板套用/RTM 登记等）/ reliability=可靠性（TLA+与BDD等价性/状态机一致性/接口契约等）/ security=安全性（输入校验/鉴权/越权/敏感信息等）；R3 三维度（约束 #11）须三份齐备，文件名维度与报告维度须一致", "enum": ["completeness", "reliability", "security"] },
     "findings": {
       "description": "审查发现数组（可为空数组表示无问题；passed=false 时须含至少一条发现，V 评审须读取本报告将发现纳入 reworkHints，否则命中反模式 #33）",
       "type": "array",

@@ -48,7 +48,7 @@
 ### 4.2 阶段 2-4（phase-2/3/4-*.md 新增「测试 seam 决策」节）
 - Seam-first testing 决策（to-spec）
 - 三层 seam 一致性约束（to-spec）
-- 与 TLA+ 行为门禁正交（已有约束 9）
+- 与 TLA+ 行为门禁正交（已有约束 13）
 
 ### 4.3 阶段 5（[phase-5-coding.md](phase-5-coding.md) 新增「Tracer-bullet 票据拆解」节）
 - 票据清单 + blocking edges（to-tickets）
@@ -73,7 +73,7 @@
 | 约束 5（Maintain Scope Discipline） | Out of Scope 显式声明 + brownfield 不重构无关历史代码 | to-spec + OpenSpec |
 | 约束 6（按需加载） | context hygiene 提示性补强（阶段切换新会话） | OpenSpec |
 | 约束 8（编排者最小化） | S-tickets 由 S 兼任，编排者只按 frontier 路由 | to-tickets |
-| 约束 9（TLA+ 行为门禁） | TLA+ 不变式断言覆盖私有状态机，不在代码层引入测试 seam | to-spec |
+| 约束 13（TLA+ 行为门禁） | TLA+ 不变式断言覆盖私有状态机，不在代码层引入测试 seam | to-spec |
 
 ### 5.2 不引入新约束
 - 三源吸收不新增硬红线（保持 19 条约束 + 19 条反模式 + 10 条失败模式不变）

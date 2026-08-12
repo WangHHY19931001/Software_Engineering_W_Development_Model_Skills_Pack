@@ -17,7 +17,7 @@
 
 ## 2. 每阶段分派时序
 
-标准流程（约束 #19 + #17 R3 无条件强制）：
+标准流程（约束 #8 + #11 R3 无条件强制）：
 
 ```
 O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集
@@ -81,9 +81,11 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > V 子代理通用加载：agent-personas / verifier-spec / definition-of-done（阶段门时）；评审 BDD 时加 bdd-review-checklist；评审代码时加 quality-standards。
 
+> O / 全角色通用加载（第 44 轮新增，SKILL.md 减负后按需取用）：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）。
+
 ## 4. 返工循环分派
 
-V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 → V → G（约束 #13 + #17 + #19）
+V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 → V → G（约束 #12 + #11 + #8）
 
 | 步骤 | 角色 | 产物 | check 脚本 | R3 报告路径前缀 |
 |---|---|---|---|---|
@@ -104,13 +106,13 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | 3 | V | VerifierOutput | check-verifier-output | — |
 | 4 | G | gate-logs 证据 | 原阶段门禁脚本 + 5 闭环脚本 | — |
 
-> 约束 #17（第29轮升级）：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
+> 约束 #11（第29轮升级）：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
 
 > 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。
 
 ## 5. 阶段 5-8 三段式 S 分派（opsx + codegraph）
 
-> 对应 SSoT §3.4.21 + 约束 #20。每段产物须跑 R3×3 + V 审查（反模式 #39）。
+> 对应 SSoT §3.4.21 + 约束 #14。每段产物须跑 R3×3 + V 审查（反模式 #39）。
 
 | 段 | S 变体 | 产物 | reference | check 脚本 |
 |---|---|---|---|---|
@@ -134,11 +136,11 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | tasks.md | opsx:propose | 高层任务清单（what/why） | 规格级规划 |
 | tickets.md | S-tickets（S-propose 兼任） | 代码垂直切片（how，端到端可 demo） | 代码级切片 |
 
-> S-coding 不做拆解，只按 tickets.md frontier 执行。每片 Edit/Write 前须 codegraph_explore（约束 #20，反模式 #38）。
+> S-coding 不做拆解，只按 tickets.md frontier 执行。每片 Edit/Write 前须 codegraph_explore（约束 #14，反模式 #38）。
 
 ## 6. 每阶段门禁脚本清单
 
-### 6.1 全阶段必跑脚本（约束 #12，5 个闭环脚本）
+### 6.1 全阶段必跑脚本（约束 #11，5 个闭环脚本）
 
 | 脚本 | 用途 | 触发时机 |
 |---|---|---|
@@ -153,12 +155,12 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | 脚本 | 用途 | 触发时机 |
 |---|---|---|
 | check-verifier-output | V 评审 JSON 校验（R1-R13，含 R13 单轴下限） | V 产出后 G 跑 |
-| check-role-dispatch | 角色 S/V/G 各 ≥1 + R ≥3 无条件校验（约束 #19） | 每阶段门放行前 |
+| check-role-dispatch | 角色 S/V/G 各 ≥1 + R ≥3 无条件校验（约束 #8） | 每阶段门放行前 |
 | check-signature-chain | 签名链 R1-R10（含 O 越权 / 代签检测） | 每阶段门放行前 |
 
 ### 6.3 阶段专属脚本
 
-| 阶段门 | 必跑脚本（约束 #12 通用） | 阶段专属脚本 |
+| 阶段门 | 必跑脚本（约束 #11 通用） | 阶段专属脚本 |
 |---|---|---|
 | 1 需求 | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-tla-model(--phase=1) / check-bdd-model(--phase=1) / check-exemption(豁免时) |
 | 2 系统设计 | 同上 | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制) |

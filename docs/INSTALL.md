@@ -35,6 +35,19 @@
 
 > 纯 Markdown 技能资产（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零 Node.js、零 `npm install`，可整目录拷贝分发；Node.js/npm/tsx/devDeps 仅用于执行 `scripts/*.ts` 的确定性门禁与回归基线。
 
+### 交付层选择：L0（纯 skill）/ L1（带门禁）（第 44 轮）
+
+技能包按两个交付层分发，按需取用：
+
+| 交付层 | 包含 | 激活条件 | 前置依赖 |
+|---|---|---|---|
+| **L0「纯 skill」**（默认） | `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` | 拷贝到 Agent skills 目录即可 | 无（纯 Markdown） |
+| **L1「带门禁」** | L0 + `scripts/` + `samples/` | 需要确定性门禁（阶段门 / 图谱 / TLA+ / BDD / 工件质量门等）时 | Node.js ≥20 + `npm install`（tsx + ajv 等 devDeps，见上） |
+
+- **L0 用户**：拷贝时删除 `scripts/` 与 `samples/` 即可（或拷贝全部但只加载 Markdown 资产）；编排者以 L0 模式运行时跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并将 `project.status` 标记 `gateLevel: "l0"`。
+- **L1 用户**：完整拷贝 `w-model-dev/`，按 §3 标准安装 + 仓库根 `npm install` 跑门禁脚本。
+- 两种交付层的编排差异仅在于 G 角色是否执行脚本门禁；阶段流程、RTM、CHECKPOINT 机制完全相同。
+
 ---
 
 ## 3. 标准安装步骤
@@ -65,7 +78,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── cli/            # CLI 入口层（25 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / self-test / ensure-codegraph-opsx 等 30 个 exit-2 脚本；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（9 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate）
-│   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 558 条 + README.md coverage 矩阵）
+│   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 571 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -132,7 +145,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.3.0
+version: 41.3.1
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -225,7 +238,7 @@ Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 558 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 571 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。

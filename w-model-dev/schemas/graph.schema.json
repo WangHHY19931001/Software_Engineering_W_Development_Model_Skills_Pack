@@ -29,7 +29,7 @@
           "attributes": { "description": "节点附加属性（自由形态对象，如 NFR 目标值等）", "type": "object" },
           "governance": { "description": "治理类子系统标记：true=允许作为 governs 边的源节点（缺省/undefined 即非治理类）", "type": "boolean" },
           "derivationProduct": { "description": "派生规格节点标记：true=允许作为 derives 边的源节点（缺省/undefined 即非派生规格节点）", "type": "boolean" },
-          "level": { "description": "REQ 内部层级：1=domain 2=module 3=feature 4=acceptance；REQ 节点强制必填（约束 #15，无降级），第 21 轮起支持更深自适应层级（minimum=1 无上限）；level=1 REQ 即 REQ-group 候选", "type": "integer", "minimum": 1 },
+          "level": { "description": "REQ 内部层级：1=domain 2=module 3=feature 4=acceptance；REQ 节点强制必填（约束 #10，无降级），第 21 轮起支持更深自适应层级（minimum=1 无上限）；level=1 REQ 即 REQ-group 候选", "type": "integer", "minimum": 1 },
           "priority": { "description": "需求优先级：P0=必须 P1=应该 P2=可以 P3=不会（可选）", "enum": ["P0", "P1", "P2", "P3"] },
           "reqGroup": { "description": "所属 REQ-group ID（level≥2 REQ 须指向 level=1 祖先；level=1 REQ 自身为 group 无此字段）", "type": "string" }
         }

@@ -99,7 +99,7 @@ phase: <N - 名称>
 **更新规则**：
 - 每次**分派前**与**收到 beacon 后**，O 用 `Write` 整文件覆盖（原子更新，非 append）。
 - compaction / 会话恢复后，O 先 `Read` 本文件 + `run-log.jsonl` 尾部重建位置；**不得凭记忆分派**。
-- 阶段门 CHECKPOINT 须展示本文件 `DONE` 段作为分派完整性证据（与约束 #19 互补）。
+- 阶段门 CHECKPOINT 须展示本文件 `DONE` 段作为分派完整性证据（与约束 #8 互补）。
 
 **与既有三文件互补、不替代**：
 
@@ -167,7 +167,7 @@ phase: <N - 名称>
 
 O 会话**禁止**出现：阶段产物正文、VerifierOutput JSON 内容、diff 内容、业务/测试代码正文、根因报告正文。
 
-O **只读**：`project.json` / `rtm.json`（仅状态字段）/ `orchestrator-state.md` / `handoff/*/status.json` / `run-log.jsonl`（尾部）/ `check-*.ts` 退出码与 stdout 末尾 5 行（约束 #10 放行证据）。
+O **只读**：`project.json` / `rtm.json`（仅状态字段）/ `orchestrator-state.md` / `handoff/*/status.json` / `run-log.jsonl`（尾部）/ `check-*.ts` 退出码与 stdout 末尾 5 行（约束 #9 放行证据）。
 
 O **只写**：`orchestrator-state.md` / `project.status` / `run-log.jsonl`（append）/ `handoff/<id>/brief.md`（指针型）/ `handoff/<id>/` 目录创建。
 
@@ -509,7 +509,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 - **调用**：按 tickets.md frontier 逐片执行；每片 `codegraph_explore(目标符号)` → 落盘 `.w-model/codegraph-queries/` → `opsx:apply` 推进 → `Edit`/`Write` 代码 + 单元测试 →该片 code-TLA+ 一致性校验
 - **产出**：代码 + 测试 + `.w-model/codegraph-queries/` + TLA 校验报告
 - **审查**：R3×3 → V 评审 → 不合格打回（指定返工票据）
-- **约束 #20**：任何 Edit/Write 前须 codegraph_explore，否则命中反模式 #38
+- **约束 #14**：任何 Edit/Write 前须 codegraph_explore，否则命中反模式 #38
 
 ### R 子代理分派模板
 
@@ -823,7 +823,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 - RTM 实体回填是 S 子代理的强制职责，不得委托给其他角色；S 子代理产出后须立即更新 `.w-model/rtm.json`。
 - S 子代理返回时须列出 `rtm.json` 文件路径与 coverage 百分比（如 `coveragePercent=100%`）。
 - `coverageStatus` 字段值须与实际 coveragePercent 一致："100%" 对应 100%，"部分" 对应 < 100%，"待覆盖" 不允许（须回退重做）。
-- 阶段门 CHECKPOINT 须展示 RTM 文件路径（`.w-model/rtm.json`）与 coverage 字段值，未展示视为约束 #18 违反。
+- 阶段门 CHECKPOINT 须展示 RTM 文件路径（`.w-model/rtm.json`）与 coverage 字段值，未展示视为约束 #3 违反。
 
 ### V 子代理返回
 
@@ -1165,7 +1165,7 @@ O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
 
 ## 角色分派完整性校验
 
-> 对应约束 #19 + 反模式 #34。`check-role-dispatch.ts` 自动校验。
+> 对应约束 #8 + 反模式 #34。`check-role-dispatch.ts` 自动校验。
 
 ### 必分派条件
 
@@ -1201,4 +1201,4 @@ npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl
 npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
 ```
 
-退出码：0=通过，1=缺角色（违反约束 #19，R≥3 无条件校验），2=输入错误。
+退出码：0=通过，1=缺角色（违反约束 #8，R≥3 无条件校验），2=输入错误。

@@ -12,7 +12,7 @@
     "currentPhase": { "description": "当前所处阶段编号，取值 1-8（1=需求分析 … 8=验收测试；阶段门放行后推进）", "type": "integer", "minimum": 1, "maximum": 8 },
     "lastUpdated": { "description": "RTM 最后更新时间，ISO 8601 字符串（每次回填后刷新）", "type": "string" },
     "rows": {
-      "description": "需求追溯行数组，每行对应一个需求（REQ-NNN / NFR-NNN / CON-NNN）的追溯记录；约束 #18：S 子代理产出后每阶段必须回填",
+      "description": "需求追溯行数组，每行对应一个需求（REQ-NNN / NFR-NNN / CON-NNN）的追溯记录；约束 #3：S 子代理产出后每阶段必须回填",
       "type": "array",
       "items": {
         "type": "object",
@@ -27,7 +27,7 @@
           "integrationTest": { "description": "集成测试用例 ID（IT-NNN）：阶段 3 设计登记、阶段 6 执行回填；可空（允许 null）", "type": ["string", "null"] },
           "systemTest": { "description": "系统测试用例 ID（ST-NNN）：阶段 2 设计登记、阶段 7 执行回填；可空（允许 null）", "type": ["string", "null"] },
           "acceptanceTest": { "description": "验收测试用例 ID（UAT-NNN）：阶段 1 设计登记、阶段 8 执行回填；可空（允许 null）", "type": ["string", "null"] },
-          "coverageStatus": { "description": "覆盖率状态：\"100%\"=该行追溯完整（全部行完整时矩阵 coveragePercent=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #18，不允许（须回退重做）", "type": "string" },
+          "coverageStatus": { "description": "覆盖率状态：\"100%\"=该行追溯完整（全部行完整时矩阵 coveragePercent=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #3，不允许（须回退重做）", "type": "string" },
           "targetValue": { "type": "string", "description": "NFR 生产目标值（NFR 类型时推荐填写）" },
           "testThreshold": { "type": "string", "description": "NFR 测试环境基线（NFR 类型时推荐填写）" }
         }

@@ -40,7 +40,7 @@
 
 - **每次 agent 改动 = 可审 diff + 有对应测试 + 能被独立评审**。
 - **禁止大而稀的整体重写式变更**（变更量子无穷大时连 diff 都不存在，"这次改了什么"在结构上不可问）。
-- **回归测试强制钩子**（约束 #21）：任何 agent 改动代码后必须跑回归测试；禁止"改动代码但不跑回归"的工作流。
+- **回归测试强制钩子**（约束 #14）：任何 agent 改动代码后必须跑回归测试；禁止"改动代码但不跑回归"的工作流。
 
 ## 代码生成算法
 
@@ -66,7 +66,7 @@
 
 ## codegraph 修改前影响分析（第 25 轮新增）
 
-> 对应约束 #20 + 反模式 #38。阶段 5 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
+> 对应约束 #14 + 反模式 #38。阶段 5 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
 
 **修改前流程**：
 1. `codegraph_explore(目标符号)` → 查询 callers / callees / blast radius
@@ -163,7 +163,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 > 对应外部 implement-* 系列 SKILL.md 的 Agent Brief durability 原则：票据主体是**符号级契约**（接口 / 类型 / 行为），不是**文件路径 / 行号**（fragile reference，重构即失效）。
 
 - **票据主体 = 符号级契约**：目标行为的接口签名 / 类型约束 / 状态转移（与 TLA+ 状态机 Action 对齐），如「实现 `ArticleService.create` 契约：入参 `{title, content}`，返回 `Article`，触发状态 `draft → published`」——而非「改 `src/services/article-service.ts:42`」
-- **位置信息交给 codegraph**（约束 #20）：文件路径由 `codegraph_explore` 查询获得，票据不预设路径。票据只写「实现 `XX` 符号契约」，位置由查询结果落盘的 `.w-model/codegraph-queries/` 决定
+- **位置信息交给 codegraph**（约束 #14）：文件路径由 `codegraph_explore` 查询获得，票据不预设路径。票据只写「实现 `XX` 符号契约」，位置由查询结果落盘的 `.w-model/codegraph-queries/` 决定
 - **与评审 evidence 的边界**：评审 evidence 须路径 + 行号（[verifier-spec.md](verifier-spec.md) §6.2.1，可追溯性）；实施票据**不**须——二者定位不同：evidence 是「评审时证明我看过哪」，票据是「实现时做什么契约」
 - 票据引用术语统一用 [glossary.md](glossary.md) 规范名（如 `codeModule` / `mappingType`），不得自造别名
 
@@ -398,7 +398,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 
 - **改动前确认覆盖基线**：对即将修改的模块先跑覆盖率工具 + 既有测试，确认改动前基线。
 - **缺口先补**：基线覆盖率低的模块，先补关键路径测试再动手，避免改动后无法区分"新 bug vs 旧债"。
-- **与约束 #21 的关系**：约束 #21 管"改动后必跑回归"，本节补"改动前基线"形成闭环。
+- **与约束 #14 的关系**：约束 #14 管"改动后必跑回归"，本节补"改动前基线"形成闭环。
 
 ## 第三方代码边界管理（第 40 轮三源吸收）
 

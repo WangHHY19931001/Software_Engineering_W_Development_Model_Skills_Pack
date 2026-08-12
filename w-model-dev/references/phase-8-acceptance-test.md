@@ -32,7 +32,7 @@
 - S-propose：opsx:propose 规划测试用例 + S-tickets 拆解测试代码切片
 - S-coding：按 tickets.md frontier 逐片编写测试，每片 codegraph_explore 查被测模块影响半径
 
-**约束 #20 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
+**约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
 
 ## 执行方法论
 
@@ -121,7 +121,7 @@
 - 编排者须贴出 `check-artifact-gate.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` / `check-bdd-model.ts` / `check-role-dispatch.ts` 等门禁脚本 stdout 末尾 5 行作为放行证据
 - 不得仅引用 JSON 摘要中的 `passed: true` 作为放行依据
 - 违反命中反模式 #27 S2（门禁脚本未实跑）
-- 约束 #10 已扩展：编排者展示证据时须贴出门禁脚本 stdout 末尾 5 行
+- 约束 #9 已扩展：编排者展示证据时须贴出门禁脚本 stdout 末尾 5 行
 
 ## 验收标准
 

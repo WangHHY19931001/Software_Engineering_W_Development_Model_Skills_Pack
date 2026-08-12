@@ -491,14 +491,14 @@ export function checkArtifactGate(
   const totalRows = matrix.rows.length;
   const coveredRows = totalRows - missingItems.length;
   let coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
-  // coveragePercent 与 missingItems 联动（约束 #18）：存在追溯缺失项时覆盖率强制 < 100，
+  // coveragePercent 与 missingItems 联动（约束 #3）：存在追溯缺失项时覆盖率强制 < 100，
   // 防止 (total-1)/total 舍入边界（如 199/200=99.5→100）掩盖缺失
   if (missingItems.length > 0 && coveragePercent >= 100) coveragePercent = 99;
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
   if (totalRows === 0) reasons.push('RTM 无需求行');
 
   // ==================== coverageStatus 字段一致性校验（第24轮 P0，round28 改行级） ====================
-  // 约束 #18：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
+  // 约束 #3：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
   //   "100%" → 该行所需 RTM 字段齐全；"部分" → 该行存在追溯缺失；"待覆盖" → 违反
   //   （"完整" 等历史兼容值与非标准值不参与一致性判定，由 missingItems 覆盖检查兜底）
   const missingReqIds = new Set(missingItems.map((item) => item.requirementId));
@@ -507,7 +507,7 @@ export function checkArtifactGate(
     if (!row || typeof row.coverageStatus !== 'string') continue;
     const status = row.coverageStatus.trim();
     if (status === '待覆盖') {
-      reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #18）`);
+      reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #3）`);
       continue;
     }
     const rowComplete = !missingReqIds.has(row.requirementId);

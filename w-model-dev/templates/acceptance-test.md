@@ -15,7 +15,7 @@
 
 ## 0. 文档定位与 SSOT 头
 
-> **文档版本**：v{{1.0}}（{{YYYY-MM-DD}} 首版）
+> **文档版本**：{{v1.0}}（{{YYYY-MM-DD}} 首版）
 > **SSOT 声明**：本验收测试文档为阶段 8 验收结果的记录载体；`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown RTM 仅用于导出或展示。
 > **DoD 引用**：项目完成度按 [definition-of-done.md](../references/definition-of-done.md) 七维度标准 + [phase-8-acceptance-test.md](../references/phase-8-acceptance-test.md)「项目级验收检查清单」判定；RTM 需求覆盖率须 100%。
 > **自身校验**：`check-artifact-gate.ts` 终检（RTM 100% + 四级测试全通过，退出码 0）；`check-bdd-model.ts --phase=8` 校验 L1 features（如启用）。
@@ -77,7 +77,7 @@
 
 - `check-artifact-gate.ts`（终检）：退出码 0（RTM 100% + 四级测试全通过）
 - `check-bdd-model.ts --phase=8 --cucumber-report=<report.json>`（L1 features 时）：退出码 0
-- 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #10，第 24 轮新增）
+- 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9，第 24 轮新增）
 
 ## 8. 用户确认
 

@@ -15,6 +15,28 @@
 - 运维失败模式清单（6 条运行健康 O1~O6）
 - 候选反模式检测信号（来自 Loop 4 爬坡循环）
 
+## 反模式-硬约束映射（第 44 轮新增）
+
+> 反模式（本文件）与硬约束（[hard-constraints.md](hard-constraints.md)，14 条）是两个互补视图：硬约束是"必须怎么做"，反模式是"不要怎么做"。命中反模式 = 违反对应硬约束 = 回退。本表用于快速定位，避免重复记忆；「高频」标注基于历轮调测与吸收记录。
+
+| 硬约束 | 相关反模式 | 命中频率 |
+|---|---|---|
+| #1 测试设计前置 | #2 | 高 |
+| #2 阶段门放行（含豁免审批） | #1、#8、#30、#46 | 高 |
+| #3 RTM 为事实源 + 每阶段回填 | #6、#26（schema 边界同源） | 中 |
+| #4 真实执行 | #3、#12、#20、#25、#45 | 高 |
+| #5 失败即回退 | #7、#21、#31、#41 | 高 |
+| #6 按需加载 | #5 | 中 |
+| #7 如实状态 | #9、#45 | 中 |
+| #8 编排者最小化 + 角色分派完整性 | #10、#27、#34、#35、#40 | 高 |
+| #9 门禁退出码不可伪 | #3（同源）、#32 | 高 |
+| #10 系统层级树 + REQ 层级标注 | #11、#13 | 中 |
+| #11 闭环机制强制校验 + R3 预防性审查 | #33、#39、#42、#44 | 高 |
+| #12 返工必经根因定位 | #4（小修继续）、#18、#19 | 高 |
+| #13 行为门禁按成熟度分级（TLA+/BDD） | #14、#15、#16、#17、#29 | 中（L2/L3 项目） |
+| #14 代码改动前后门禁（codegraph + 回归） | #38、#47 | 中（阶段 5-8） |
+| 实现层质量门（无流程约束映射，V/G 人工校验） | #22、#23、#24、#26、#28、#36、#37、#43 | — |
+
 ## 反模式清单
 
 | # | 反模式（不要做） | 危害 | 正确做法 |
@@ -52,12 +74,12 @@
 | 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，`check-archive-integrity.ts` 退出码 0（见 SSoT §10B.2.1 归档完整性清单） |
 | 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
 | 33 | 跳过 R3 预防性审查（第29轮强化为无条件，覆盖所有 S 变体含 S-fix / S-emergency-fix） | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
-| 34 | 编排者漏派角色（未按约束 #19 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次、R ≥3 次；`check-role-dispatch.ts` 校验（见约束 #19） |
+| 34 | 编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次、R ≥3 次；`check-role-dispatch.ts` 校验（见约束 #8） |
 | 35 | self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
 | 36 | 路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
 | 37 | 产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没） | 稀释产物语义价值，评审难以聚焦 | 精简扩展点/附录，实体引用密度 ≥ 2/章节（V 评审人工校验信息密度） |
-| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先 `codegraph_explore` 查询影响半径并落盘 `.w-model/codegraph-queries/`；`check-codegraph-queries.ts` 校验（约束 #20） |
-| 39 | 跳过 opsx 产物审查（opsx 三段式任一 stage 产物未 R3×3 + V 即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-opsx-artifacts.ts` 校验（约束 #17） |
+| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先 `codegraph_explore` 查询影响半径并落盘 `.w-model/codegraph-queries/`；`check-codegraph-queries.ts` 校验（约束 #14） |
+| 39 | 跳过 opsx 产物审查（opsx 三段式任一 stage 产物未 R3×3 + V 即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-opsx-artifacts.ts` 校验（约束 #11） |
 | 40 | opsx/S-tickets 职责混淆（tasks.md 与 tickets.md 互相替代或内容错位） | 破坏规格级规划（what/why）与代码级切片（how）职责边界 | tasks.md（opsx:propose）与 tickets.md（S-tickets vertical-slice）职责分离；`check-opsx-artifacts.ts` 校验 |
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
 | 42 | S-fix / emergency-fix 后跳过 R3+V（第29轮新增） | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
@@ -102,16 +124,16 @@
 | #30（豁免审批跳步） | 阶段 1（需求分析，四维识别豁免） | [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05 |
 | #31（归档完整性缺失） | 阶段 8（归档） | [phase-8-acceptance-test.md](phase-8-acceptance-test.md) + [`check-archive-integrity.ts`](../scripts/cli/check-archive-integrity.ts) |
 | #32（签名链断裂） | 全阶段 | [signature-chain-guide.md](signature-chain-guide.md) + [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) |
-| #33（跳过 R3 预防性审查） | 全阶段（所有 S 变体） | 约束 #17 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
-| #34（编排者漏派角色） | 全阶段 | 约束 #19 + [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) |
+| #33（跳过 R3 预防性审查） | 全阶段（所有 S 变体） | 约束 #11 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
+| #34（编排者漏派角色） | 全阶段 | 约束 #8 + [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) |
 | #35（self-as-verifier 产物混合） | 全阶段（self-as-verifier 模式） | SKILL.md「self-as-verifier 模式」节 |
 | #36（路由顺序错误） | 阶段 5/6 | [phase-5-coding.md](phase-5-coding.md) + 集成测试用例 |
 | #37（产物膨胀核心决策稀疏） | 阶段 1-4 | 各 phase-N「产物要求」节 |
-| #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #20 + [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts) |
-| #39（跳过 opsx 产物审查） | 阶段 5-8 | 约束 #17 + [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts) |
+| #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #14 + [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts) |
+| #39（跳过 opsx 产物审查） | 阶段 5-8 | 约束 #11 + [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts) |
 | #40（opsx/S-tickets 职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节 |
 | #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
-| #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #17/#19 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
+| #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #11/#8 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts) |
 | #45（为通过测试而修改断言/测试期望） | 阶段门评审 / V 评审 | V 评审人工核验断言与需求对应关系（反指标游戏，Goodhart） |
@@ -286,7 +308,7 @@
 
 **回退动作**：回到当前规格，先修语法错误使 SANY 退出码 0，再重跑 TLC。
 
-**与约束 9 的关系**：TLA+ 编码调试须按「先清轨迹 → SANY 语法通过 → TLC 模型检查」顺序，语法未通过即跑 TLC 会导致报错信息混乱。
+**与约束 13 的关系**：TLA+ 编码调试须按「先清轨迹 → SANY 语法通过 → TLC 模型检查」顺序，语法未通过即跑 TLC 会导致报错信息混乱。
 
 ## #15 TLA+ 死锁/状态爆炸/不变式违反放行
 
@@ -306,7 +328,7 @@
 
 **回退动作**：回到当前阶段起点，分派 S 重写 TLA+ 规格（补全状态分支、对齐需求/设计），重跑 V→G。
 
-**与约束 9 的关系**：TLA+ 不接受占位实现、简化实现、错误实现——规格须如实建模系统行为，否则无法作为正确性基准。
+**与约束 13 的关系**：TLA+ 不接受占位实现、简化实现、错误实现——规格须如实建模系统行为，否则无法作为正确性基准。
 
 ## #17 TLA+ 建模与需求/设计不符未回退
 
@@ -337,7 +359,7 @@
 
 **与反模式 #1 的关系**：#1 是"跳过阶段门评审直接进入下一阶段"（完全不跑门禁），#21 是"跑了门禁但跳过阶段级校验直接跑终检"（跑了但参数错误）。前者完全不校验，后者校验粒度错误。
 
-**与 SKILL.md 阶段路由表的对应**：SKILL.md「阶段 5-8 工件质量门」节已指引阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，本反模式是 self-as-verifier 模式下的强制约束。
+**与 SKILL.md 阶段路由表的对应**：SKILL.md「阶段门与质量门」节已指引阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，本反模式是 self-as-verifier 模式下的强制约束。
 
 **检测信号**（sig-008）：run-log 中阶段 6/7/8 的 GATE 条目缺 `--phase=N` 参数；或 gate JSON 输出中 phaseOption 字段缺失。
 
@@ -510,7 +532,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 ## #34 编排者漏派角色（第24轮新增）
 
-**危害**：编排者未按约束 #19 分派 S/V/G/R 角色，导致评审、门禁或根因定位环节缺失，流程完整性失守。
+**危害**：编排者未按约束 #8 分派 S/V/G/R 角色，导致评审、门禁或根因定位环节缺失，流程完整性失守。
 
 **检测信号**：
 - run-log 中某阶段缺 role=V 记录（V 评审被跳过）
@@ -523,7 +545,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；**无条件**含 R ≥3 条记录（第29轮升级，`--r3-enabled` flag 保留为 no-op 向后兼容）。
 
-**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮强化为无条件）
+**关联**：约束 #8 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮强化为无条件）
 
 ## #35 self-as-verifier 模式下 V/G/R 产物混合（第24轮新增，第29轮扩展含 R3 产物）
 
@@ -541,7 +563,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同；`check-role-dispatch.ts` 校验 run-log artifacts 字段含各角色独立产物路径；`check-preventive-review.ts` 校验三份 PreventiveReview JSON 独立存在（第29轮扩展）。
 
-**关联**：约束 #19 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮扩展含 R3 产物）
+**关联**：约束 #8 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮扩展含 R3 产物）
 
 ## #36 路由顺序错误（第24轮新增）
 
@@ -588,7 +610,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）。
 
-**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #20
+**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #14
 
 ## #39 跳过 opsx 产物审查（第25轮新增）
 
@@ -603,7 +625,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
 
-**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #17（R3 预防性审查强制）
+**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #11（R3 预防性审查强制）
 
 ## #40 opsx/S-tickets 职责混淆（第25轮新增）
 
@@ -654,7 +676,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-run-log.ts` R8 无条件校验 S(任意变体，含 fix/emergency-fix)→V 间 R3 记录数；`check-role-dispatch.ts` 校验 R≥3 无条件；`check-preventive-review.ts --variant=fix|emergency` 校验对应路径三份报告完整性。
 
-**关联**：约束 #17 + #19 + SSoT §3.4.25（[28.0.0] 新增）；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
+**关联**：约束 #11 + #8 + SSoT §3.4.25（[28.0.0] 新增）；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
 ## #43 敏感信息写入状态文件/日志（第三十一轮新增）
 

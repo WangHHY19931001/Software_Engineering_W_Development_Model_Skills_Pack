@@ -18,12 +18,18 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
-      '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
+      '**当前版本**：`41.3.1`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
     antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
-    skill: '### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+    skill:
+      '---\nname: w-model-dev\nversion: 41.3.1\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。',
+    operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+    hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
     agents: '30 个脚本\n35 个 .test.ts / 530 条',
+    pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.3.1' }),
+    metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.3.1' }),
+    installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.3.1\n```',
     ssot: [
       '### 4A.1 八条核心操作行为',
       '8 条核心操作行为',
@@ -100,10 +106,51 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('SKILL.md 操作行为表缺第 8 行内容 → 违规', () => {
-    const input = baseInput({ skill: '### 八条操作行为' });
+    const input = baseInput({ operationBehaviors: '## 八条操作行为' });
     expect(
       runDocConsistencyChecks(input).some(
         (x) => x.check === 'operating-behaviors' && x.message.includes('Structure Over Persuasion'),
+      ),
+    ).toBe(true);
+  });
+
+  it('SKILL.md 内联八条操作行为完整表 → 违规（第 44 轮已移入 references）', () => {
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.3.1\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...' });
+    expect(
+      runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('不应再内联')),
+    ).toBe(true);
+  });
+
+  it('SKILL.md 缺操作行为指针 → 违规', () => {
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.3.1\n---\n## 核心操作行为\n（无指针）' });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'operating-behaviors' && x.message.includes('operation-behaviors.md'),
+      ),
+    ).toBe(true);
+  });
+
+  it('硬约束编号缺失 → 违规', () => {
+    const input = baseInput({
+      hardConstraints: Array.from({ length: 13 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
+    });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'hard-constraints' && x.message.includes('## #14'))).toBe(true);
+  });
+
+  it('硬约束编号超出 → 违规', () => {
+    const input = baseInput({
+      hardConstraints: Array.from({ length: 15 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
+    });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'hard-constraints' && x.message.includes('#15'))).toBe(true);
+  });
+
+  it('SKILL.md 缺硬约束指针 → 违规', () => {
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.3.1\n---\n## 不可违反的约束\n（无指针）' });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'hard-constraints' && x.message.includes('hard-constraints.md'),
       ),
     ).toBe(true);
   });
@@ -286,5 +333,64 @@ describe('runDocConsistencyChecks', () => {
   it('scripts 有变更且 baseline 非空 → 无 baseline-sync 违规', () => {
     const input = baseInput({ scriptsChanged: true, securityBaselineEntryCount: 42 });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
+  });
+
+  it('五处版本一致 → 零 version-consistency 违规', () => {
+    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'version-consistency')).toBe(false);
+  });
+
+  it('README 版本漂移 → 违规', () => {
+    const input = baseInput({ readme: '**当前版本**：`41.2.0`\n8 条核心操作行为' });
+    const v = runDocConsistencyChecks(input);
+    expect(
+      v.some((x) => x.check === 'version-consistency' && x.message.includes('README') && x.message.includes('41.2.0')),
+    ).toBe(true);
+  });
+
+  it('package.json 版本漂移 → 违规', () => {
+    const input = baseInput({ pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.2.0' }) });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'version-consistency' && x.message.includes('package.json'),
+      ),
+    ).toBe(true);
+  });
+
+  it('skill-metadata.json 版本漂移 → 违规', () => {
+    const input = baseInput({ metaJson: JSON.stringify({ name: 'w-model-dev', version: '42.0.0' }) });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'version-consistency' && x.message.includes('skill-metadata.json'),
+      ),
+    ).toBe(true);
+  });
+
+  it('SKILL.md frontmatter 版本漂移 → 违规', () => {
+    const input = baseInput({
+      skill: '---\nname: w-model-dev\nversion: 41.0.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+    });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'version-consistency' && x.message.includes('SKILL.md frontmatter'),
+      ),
+    ).toBe(true);
+  });
+
+  it('INSTALL.md 激活示例版本漂移 → 违规', () => {
+    const input = baseInput({ installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.0.0\n```' });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'version-consistency' && x.message.includes('INSTALL.md'),
+      ),
+    ).toBe(true);
+  });
+
+  it('package.json 不可解析 → 违规（fail loud）', () => {
+    const input = baseInput({ pkgJson: 'not-json{' });
+    expect(
+      runDocConsistencyChecks(input).some(
+        (x) => x.check === 'version-consistency' && x.message.includes('无法解析'),
+      ),
+    ).toBe(true);
   });
 });

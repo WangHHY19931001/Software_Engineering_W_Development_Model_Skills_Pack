@@ -2,7 +2,7 @@
 /**
  * codegraph 查询落盘校验脚本（Codegraph Queries Checker）
  *
- * 对应约束 #20 + 反模式 #38：阶段 5-8 任何代码/测试文件修改前，
+ * 对应约束 #14 + 反模式 #38：阶段 5-8 任何代码/测试文件修改前，
  * S-coding 须先调用 codegraph_explore 查询并落盘到
  * `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`。
  *
@@ -67,7 +67,7 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
   // 查询目录存在性
   if (!existsSync(queriesDir)) {
     violations.push(
-      `阶段 ${phase}：.w-model/codegraph-queries/ 目录不存在（约束 #20：阶段 5-8 代码修改须先落盘 codegraph 查询）`,
+      `阶段 ${phase}：.w-model/codegraph-queries/ 目录不存在（约束 #14：阶段 5-8 代码修改须先落盘 codegraph 查询）`,
     );
     return { passed: false, violations, queryCount: 0 };
   }
@@ -77,7 +77,7 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
   const files = readdirSync(queriesDir).filter((f) => f.startsWith(prefix) && f.endsWith('.json'));
 
   if (files.length === 0) {
-    violations.push(`阶段 ${phase}：.w-model/codegraph-queries/ 下无 phase${phase}-*.json 查询文件（约束 #20）`);
+    violations.push(`阶段 ${phase}：.w-model/codegraph-queries/ 下无 phase${phase}-*.json 查询文件（约束 #14）`);
     return { passed: false, violations, queryCount: 0 };
   }
 

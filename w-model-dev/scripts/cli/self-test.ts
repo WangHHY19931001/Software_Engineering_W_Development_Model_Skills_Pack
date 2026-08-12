@@ -337,7 +337,7 @@ const GATE_CASES: GateCase[] = [
     file: 'bad-rtm-coverage-below-100.json',
     expectedPassed: false,
     expectedReasonPatterns: [/覆盖率未达 100/],
-    description: 'RTM coveragePercent=66% < 100%，应被覆盖率门禁拦截（约束 #18）',
+    description: 'RTM coveragePercent=66% < 100%，应被覆盖率门禁拦截（约束 #3）',
   },
   {
     file: 'bad-rtm-status-mismatch.json',
@@ -1379,13 +1379,13 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
     file: 'bad-missing-V-role.jsonl',
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=V/],
-    description: '阶段 1 缺 role=V 评审记录，应被角色分派校验拦截（约束 #19）',
+    description: '阶段 1 缺 role=V 评审记录，应被角色分派校验拦截（约束 #8）',
   },
   {
     file: 'bad-missing-G-role.jsonl',
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=G/],
-    description: '阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #19）',
+    description: '阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #8）',
   },
   {
     file: 'bad-missing-R-role.jsonl',

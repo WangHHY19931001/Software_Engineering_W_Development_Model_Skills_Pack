@@ -33,7 +33,7 @@
 - S-propose：opsx:propose 规划测试用例 + S-tickets 拆解测试代码切片
 - S-coding：按 tickets.md frontier 逐片编写测试，每片 codegraph_explore 查被测模块影响半径
 
-**约束 #20 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
+**约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
 
 ## 测试用例设计（执行）
 

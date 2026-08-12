@@ -28,11 +28,22 @@ export interface DocConsistencyInput {
   antiPatterns: string;
   glossary: string;
   runLogSchema: string;
+  /** w-model-dev/SKILL.md 原文（version 一致性 + 操作行为/硬约束指针检查数据源） */
   skill: string;
   readme: string;
   agents: string;
   ssot: string;
   prePush: string;
+  /** w-model-dev/references/operation-behaviors.md 原文（八条操作行为 + F1-F10，第 44 轮自 SKILL.md 移出） */
+  operationBehaviors: string;
+  /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版，第 44 轮自 SKILL.md 移出） */
+  hardConstraints: string;
+  /** 根 package.json 原文（version 一致性检查数据源） */
+  pkgJson: string;
+  /** w-model-dev/skill-metadata.json 原文（version 一致性检查数据源） */
+  metaJson: string;
+  /** docs/INSTALL.md 原文（version 一致性检查数据源） */
+  installDoc: string;
   /** docs/ 根 6 份设计文档（活体引用） */
   designDocs: Array<{ name: string; content: string }>;
   /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（期望 35） */
@@ -53,6 +64,10 @@ export const EXPECTED = {
   runLogActionCount: 27,
   maxAntiPattern: 47,
   prePushCount: 14,
+  /** 硬约束条数（第 44 轮由 21 条重排合并为 14 条） */
+  hardConstraintCount: 14,
+  /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
+  currentVersion: '41.3.1',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
@@ -95,7 +110,10 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
     ...checkTargetKindLiveDocs(input.verifierSpec, input.commandReference, input.agentPersonas, input.ssot),
   );
   violations.push(...checkDoDDimensions(input.definitionOfDone, input.readme, input.ssot));
-  violations.push(...checkOperatingBehaviors(input.skill, input.readme, input.ssot));
+  violations.push(
+    ...checkOperatingBehaviors(input.skill, input.readme, input.ssot, input.operationBehaviors),
+  );
+  violations.push(...checkHardConstraints(input.skill, input.hardConstraints));
   violations.push(...checkAntiPatterns(input.antiPatterns));
   violations.push(...checkExit2ScriptCount(input.exit2ScriptCount, input.agents));
   violations.push(...checkPrePushCount(input.prePush));
@@ -104,7 +122,66 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
+  violations.push(...checkVersionConsistency(input.pkgJson, input.metaJson, input.skill, input.readme, input.installDoc));
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
+  return violations;
+}
+
+const VERSION_PATTERN = /\d+\.\d+\.\d+/;
+
+/** 从 YAML frontmatter（SKILL.md 头部）或 YAML 块（INSTALL.md §5 激活机制）中提取 version 行 */
+function extractYamlVersion(content: string): string | null {
+  const block = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const yaml = block ? block[1]! : content;
+  const line = yaml.split(/\r?\n/).find((l) => /^version:\s*/.test(l));
+  return line ? (line.match(VERSION_PATTERN)?.[0] ?? null) : null;
+}
+
+function extractJsonVersion(json: string): string | null {
+  try {
+    const parsed = JSON.parse(json) as { version?: unknown } | null;
+    return parsed !== null && typeof parsed.version === 'string' ? parsed.version : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 版本号五处一致性校验（堵住 README/INSTALL 版本漂移盲区）：
+ * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json / skill-metadata.json /
+ * SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例五处版本声明必须全部
+ * 等于 EXPECTED.currentVersion。任一处缺失/不可解析/不一致即报违规（fail loud，不静默放行）。
+ * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.3.1 写成 41.3.10）
+ * 都会被捕获，符合「防漂移」定位。
+ */
+function checkVersionConsistency(
+  pkgJson: string,
+  metaJson: string,
+  skill: string,
+  readme: string,
+  installDoc: string,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const sources: Array<[string, string | null]> = [
+    ['package.json', extractJsonVersion(pkgJson)],
+    ['skill-metadata.json', extractJsonVersion(metaJson)],
+    ['SKILL.md frontmatter', extractYamlVersion(skill)],
+    ['README「当前版本」', readme.match(new RegExp(`当前版本[^\\d]*(${VERSION_PATTERN.source})`))?.[1] ?? null],
+    ['docs/INSTALL.md 激活示例', extractYamlVersion(installDoc)],
+  ];
+  for (const [docName, actual] of sources) {
+    if (actual === null) {
+      violations.push({
+        check: 'version-consistency',
+        message: `${docName} 无法解析版本号（应为 ${EXPECTED.currentVersion}）`,
+      });
+    } else if (actual !== EXPECTED.currentVersion) {
+      violations.push({
+        check: 'version-consistency',
+        message: `${docName} 版本应为 ${EXPECTED.currentVersion}，实际 ${actual}`,
+      });
+    }
+  }
   return violations;
 }
 
@@ -196,10 +273,42 @@ function checkDoDDimensions(definitionOfDone: string, readme: string, ssot: stri
   return violations;
 }
 
-function checkOperatingBehaviors(skill: string, readme: string, ssot: string): DocCheckViolation[] {
+/**
+ * 操作行为一致性（第 44 轮改为指针模式）：
+ * 八条操作行为完整表已移入 references/operation-behaviors.md；SKILL.md 只保留「核心操作行为」节指针。
+ * 要求：operation-behavives.md 含完整表（含第 8 条 Structure Over Persuasion）；SKILL.md 含指针且不再内联完整表；
+ * README / SSoT 表述不变（仍要求「8 条核心操作行为」与 §4A.1 权威标题）。
+ */
+function checkOperatingBehaviors(
+  skill: string,
+  readme: string,
+  ssot: string,
+  operationBehaviors: string,
+): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (!skill.includes('### 八条操作行为')) {
-    violations.push({ check: 'operating-behaviors', message: 'SKILL.md 应含「### 八条操作行为」' });
+  if (!operationBehaviors.includes('## 八条操作行为')) {
+    violations.push({
+      check: 'operating-behaviors',
+      message: 'operation-behaviors.md 应含「## 八条操作行为」标题',
+    });
+  }
+  if (!operationBehaviors.includes('Structure Over Persuasion')) {
+    violations.push({
+      check: 'operating-behaviors',
+      message: 'operation-behaviors.md 操作行为表应含第 8 条 Structure Over Persuasion',
+    });
+  }
+  if (!skill.includes('operation-behaviors.md')) {
+    violations.push({
+      check: 'operating-behaviors',
+      message: 'SKILL.md 应含「核心操作行为」指针（指向 references/operation-behaviors.md）',
+    });
+  }
+  if (skill.includes('| 8 | **Structure Over Persuasion**')) {
+    violations.push({
+      check: 'operating-behaviors',
+      message: 'SKILL.md 不应再内联八条操作行为完整表（已移入 references/operation-behaviors.md，第 44 轮）',
+    });
   }
   if (!readme.includes('8 条核心操作行为')) {
     violations.push({ check: 'operating-behaviors', message: 'README 应含「8 条核心操作行为」' });
@@ -207,17 +316,41 @@ function checkOperatingBehaviors(skill: string, readme: string, ssot: string): D
   if (!ssot.includes('### 4A.1 八条核心操作行为')) {
     violations.push({ check: 'operating-behaviors', message: 'SSoT §4A.1 应含「### 4A.1 八条核心操作行为」权威标题' });
   }
-  if (!skill.includes('Structure Over Persuasion')) {
-    violations.push({
-      check: 'operating-behaviors',
-      message: 'SKILL.md 操作行为表应含第 8 条 Structure Over Persuasion',
-    });
-  }
   const outdated = ['6 条核心操作行为', '七条核心操作行为', '7 条核心操作行为', '七条操作行为'];
   for (const token of outdated) {
     if (readme.includes(token) || ssot.includes(token)) {
       violations.push({ check: 'operating-behaviors', message: `README/SSoT 仍含过时「${token}」` });
     }
+  }
+  return violations;
+}
+
+/**
+ * 硬约束清单一致性（第 44 轮新增）：
+ * 14 条硬约束完整版在 references/hard-constraints.md；SKILL.md 只保留单行摘要 + 指针。
+ * 要求：SKILL.md 含指针；hard-constraints.md 含 ## #1 ~ ## #N（N=EXPECTED.hardConstraintCount）连续标题。
+ */
+function checkHardConstraints(skill: string, hardConstraints: string): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (!skill.includes('hard-constraints.md')) {
+    violations.push({
+      check: 'hard-constraints',
+      message: 'SKILL.md 应含「不可违反的约束」指针（指向 references/hard-constraints.md）',
+    });
+  }
+  for (let i = 1; i <= EXPECTED.hardConstraintCount; i++) {
+    if (!hardConstraints.includes(`## #${i} `)) {
+      violations.push({
+        check: 'hard-constraints',
+        message: `hard-constraints.md 缺「## #${i}」标题（应有 ${EXPECTED.hardConstraintCount} 条）`,
+      });
+    }
+  }
+  if (hardConstraints.includes(`## #${EXPECTED.hardConstraintCount + 1} `)) {
+    violations.push({
+      check: 'hard-constraints',
+      message: `hard-constraints.md 出现超出 ${EXPECTED.hardConstraintCount} 条的「## #${EXPECTED.hardConstraintCount + 1}」标题`,
+    });
   }
   return violations;
 }

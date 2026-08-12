@@ -266,7 +266,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - `check-preventive-review.ts` 须在 V 评审前由 G 子代理执行，`exitCode=0` 方可进入 V 评审。
 - 支持 `--auto-trigger --run-log=<path>` 模式：从 run-log 读取最后一条 checkpoint success 记录的 phase 作为当前阶段，自动校验对应阶段的 3 份 R3 报告（`<phase>-completeness.json` / `<phase>-reliability.json` / `<phase>-security.json`）。
 - 跳过 check-preventive-review.ts 直接进入 V 评审命中反模式 #33。
-- 约束 #12 闭环机制强制校验已扩展为 5 脚本（增加 check-preventive-review.ts，第29轮升级为无条件强制）。
+- 约束 #11 闭环机制强制校验已扩展为 5 脚本（增加 check-preventive-review.ts，第29轮升级为无条件强制）。
 
 ## RTM 登记
 

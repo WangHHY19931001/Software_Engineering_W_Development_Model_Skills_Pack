@@ -1,7 +1,7 @@
 /**
  * 角色分派完整性校验纯逻辑（Role Dispatch Logic）
  *
- * 对应约束 #19 + 反模式 #34：编排者每阶段须至少分派 S/V/G 三角色各 1 次；
+ * 对应约束 #8 + 反模式 #34：编排者每阶段须至少分派 S/V/G 三角色各 1 次；
  * R3 预防性审查无条件须分派 R 角色 ≥3 次（第29轮升级：移除 --r3-enabled flag）。
  *
  * 设计原则（与 run-log-logic.ts / preventive-review-logic.ts 一致）：
@@ -56,7 +56,7 @@ export function checkRoleDispatch(entries: RoleDispatchEntry[]): RoleDispatchRes
     for (const required of REQUIRED_ROLES) {
       if ((roles.get(required) ?? 0) < 1) {
         missing.push(required);
-        violations.push(`阶段 ${phase} 缺失 role=${required} 记录（约束 #19：每阶段须至少分派 S/V/G 各 1 次）`);
+        violations.push(`阶段 ${phase} 缺失 role=${required} 记录（约束 #8：每阶段须至少分派 S/V/G 各 1 次）`);
       }
     }
 
@@ -65,7 +65,7 @@ export function checkRoleDispatch(entries: RoleDispatchEntry[]): RoleDispatchRes
     if (rCount < R3_REQUIRED_COUNT) {
       missing.push('R');
       violations.push(
-        `阶段 ${phase} 缺失 role=R 记录（约束 #19：R3 无条件强制，须有 3 条 R3 记录 completeness/reliability/security，当前 ${rCount} 条）`,
+        `阶段 ${phase} 缺失 role=R 记录（约束 #8：R3 无条件强制，须有 3 条 R3 记录 completeness/reliability/security，当前 ${rCount} 条）`,
       );
     }
 

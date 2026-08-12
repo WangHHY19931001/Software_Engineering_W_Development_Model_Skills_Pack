@@ -42,7 +42,7 @@ npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
 ```
 
-> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #20：改码前必须 codegraph 查询）与 `check-opsx-artifacts.ts`（opsx 三段式制品完整）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须 codegraph 查询）与 `check-opsx-artifacts.ts`（opsx 三段式制品完整）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 
@@ -69,7 +69,7 @@ GATE_JSON {"type":"artifact","phase":5,"passed":true,"coveragePercent":100,"reas
 CODE_TLA_JSON {"type":"code-tla-consistency","passed":false,"checkedSymbols":12,"violations":[{"file":"src/services/userService.ts","rule":"C1-3"}],"reasons":["C1-3 状态转移不一致"]}
 ```
 
-→ 退出码 1：O 按 `reworkHints` 分派 S 返工（回阶段 5 编码），修复后重跑全部门禁；回归测试强制钩子（约束 #21）同时触发。
+→ 退出码 1：O 按 `reworkHints` 分派 S 返工（回阶段 5 编码），修复后重跑全部门禁；回归测试强制钩子（约束 #14）同时触发。
 
 ### 退出码 2（输入错误示例）
 

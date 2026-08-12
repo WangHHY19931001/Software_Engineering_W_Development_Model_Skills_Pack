@@ -41,4 +41,14 @@ describe('skill-metadata 双写一致性', () => {
     expect(pkg.version).toBe(meta.version);
     expect(pkg.version).toBe(parseFrontmatter(skill).version);
   });
+
+  it('README / INSTALL.md 版本与 package.json 一致（五处镜像）', () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
+    const readme = readFileSync(join(ROOT, '..', 'README.md'), 'utf-8');
+    const install = readFileSync(join(ROOT, '..', 'docs', 'INSTALL.md'), 'utf-8');
+    const readmeVersion = readme.match(/当前版本[^\d]*(\d+\.\d+\.\d+)/)?.[1];
+    const installVersion = install.match(/^version:\s*(\d+\.\d+\.\d+)\s*$/m)?.[1];
+    expect(readmeVersion).toBe(pkg.version);
+    expect(installVersion).toBe(pkg.version);
+  });
 });
