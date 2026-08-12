@@ -29,7 +29,8 @@
   - [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
     - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/logic/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import（runtime 依赖）
-    - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` — 安全扫描基线（`npm run lint:security` 时使用，devDep）
+    - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` + `eslint-plugin-import` — 安全扫描 / 静态检查基线（`npm run lint:security` 时使用，devDep）；ESLint 配置集中于 `config/.eslintrc.cjs`（含 import/order 规则），security-scan 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 显式调用
+    - `prettier` / `typedoc` / `docsify-cli` — 工程工具 devDep（`npm run format` / `npm run docs:build` / `npm run docs:site`）
     - （无 BDD 专属 devDep）— BDD features 场景解析为手写正则（`w-model-dev/scripts/logic/bdd-logic.ts` 的 `parseFeatureFile`），由 `w-model-dev/scripts/cli/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（纯 features 静态校验，无需 Cucumber 运行器）
 
 > 纯 Markdown 技能资产（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零 Node.js、零 `npm install`，可整目录拷贝分发；Node.js/npm/tsx/devDeps 仅用于执行 `scripts/*.ts` 的确定性门禁与回归基线。
@@ -61,17 +62,10 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
 ├── schemas/            # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep），由 schema-loader.ts 在 logic 层前置加载
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── *-logic.ts               # 纯函数校验逻辑（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / iceberg-sweep / tla-bdd-sync / role-dispatch / design-contract / coverage / exemption / bdd / state-machine / wm-status / metrics-report）
-│   ├── check-*.ts               # CLI 入口层（IO 抽离，传纯数据给 logic 层）
-│   ├── schema-loader.ts         # ajv 单例 + schemas/*.schema.json 自动加载 + validateBySchema 工具
-│   ├── security-scan.ts         # eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（--regenerate 重生成）
-│   ├── wm-status.ts             # /wm status 脚本化 CLI（状态快照：阶段 / 进度 / RTM 覆盖率 / 测试汇总 / 下一步建议；退出码 0/2）
-│   ├── wm-status-logic.ts       # wm-status 纯逻辑（供单元测试）
-│   ├── metrics-report.ts        # 流程度量报告 CLI（run-log + budget 汇总 7 区度量；--from/--to/--phase/--json/--out）
-│   ├── metrics-report-logic.ts  # metrics-report 纯逻辑（供单元测试）
-│   ├── lib/cli-error.ts         # exit 2 错误结构统一（6 类错误码 + CliError + exitWithError；人类消息 stderr + ERROR_JSON stdout）
-│   ├── self-test.ts             # 回归基线（249 条样本）
-│   └── __tests__/               # vitest 单元测试（35 个 .test.ts / 530 条 + README.md coverage 矩阵）
+│   ├── cli/            # CLI 入口层（25 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / self-test / ensure-codegraph-opsx 等 30 个 exit-2 脚本；IO 抽离，传纯数据给 logic 层）
+│   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
+│   ├── lib/            # 共享工具（9 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate）
+│   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 558 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -226,11 +220,12 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 - Agent 在执行 LLM-as-a-Verifier 评审时需要调用其自身的 LLM，按 Agent 框架自身的鉴权方式处理（与技能无关）。
 
 **Q：为什么有 `package.json` + `npm install`？**
-Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本：
+Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本。仓库为 npm workspaces（根包 + `w-model-dev` 子包），在仓库根目录 `npm install` 一次即可，devDeps 会提升至根 `node_modules`：
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
-- **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security`（由 `security-scan.ts` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免）
+- **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
+- **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 530 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 558 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
