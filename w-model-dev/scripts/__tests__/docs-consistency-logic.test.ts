@@ -6,7 +6,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
   return {
     schemaFiles: ['verifier-output.schema.json', 'run-log.schema.json', 'iceberg-sweep.schema.json'],
     personaCount: 28,
-    exit2ScriptCount: 30,
+    exit2ScriptCount: 31,
     referencesCount: 57,
     dataModels: [
       '### Schema 清单（20 份）',
@@ -19,18 +19,18 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
-      '**当前版本**：`41.4.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
+      '**当前版本**：`41.5.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
     antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.4.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（57 个 .md） | 按需加载 |',
+      '---\nname: w-model-dev\nversion: 41.5.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（57 个 .md） | 按需加载 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
-    agents: '30 个脚本\n35 个 .test.ts / 530 条',
-    pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.4.0' }),
-    metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.4.0' }),
-    installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.4.0\n```',
+    agents: '31 个脚本\n35 个 .test.ts / 530 条',
+    pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.5.0' }),
+    metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.5.0' }),
+    installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.5.0\n```',
     ssot: [
       '### 4A.1 八条核心操作行为',
       '8 条核心操作行为',
@@ -40,7 +40,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     designDocs: [],
     testFileCount: 35,
     vitestTestCount: 530,
-    prePush: '# 14. docs-consistency\n# 与原 CI 一致：14 项检查\n# vitest 全量（530 tests）',
+    prePush: '# 15. samples-coverage\n# 与原 CI 一致：15 项检查\n# vitest 全量（530 tests）',
     scriptsChanged: false,
     securityBaselineEntryCount: -1,
     ...overrides,
@@ -116,14 +116,14 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('SKILL.md 内联八条操作行为完整表 → 违规（第 44 轮已移入 references）', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.4.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...' });
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.5.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...' });
     expect(
       runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('不应再内联')),
     ).toBe(true);
   });
 
   it('SKILL.md 缺操作行为指针 → 违规', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.4.0\n---\n## 核心操作行为\n（无指针）' });
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.5.0\n---\n## 核心操作行为\n（无指针）' });
     expect(
       runDocConsistencyChecks(input).some(
         (x) => x.check === 'operating-behaviors' && x.message.includes('operation-behaviors.md'),
@@ -148,7 +148,7 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('SKILL.md 缺硬约束指针 → 违规', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.4.0\n---\n## 不可违反的约束\n（无指针）' });
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.5.0\n---\n## 不可违反的约束\n（无指针）' });
     expect(
       runDocConsistencyChecks(input).some(
         (x) => x.check === 'hard-constraints' && x.message.includes('hard-constraints.md'),
@@ -185,17 +185,17 @@ describe('runDocConsistencyChecks', () => {
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
   });
 
-  it('exit-2 脚本数非 30 / AGENTS 残留 29 → 违规', () => {
+  it('exit-2 脚本数非 31 / AGENTS 残留 29 → 违规', () => {
     const input = baseInput({ exit2ScriptCount: 29, agents: '29 个脚本' });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('30'))).toBe(true);
+    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('31'))).toBe(true);
     expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('29 个脚本'))).toBe(true);
   });
 
-  it('pre-push 编号最大值非 14 → 违规', () => {
+  it('pre-push 编号最大值非 15 → 违规', () => {
     const input = baseInput({ prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查' });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('14'))).toBe(true);
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('15'))).toBe(true);
   });
 
   it('glossary action 含 verify → 违规', () => {
@@ -209,11 +209,11 @@ describe('runDocConsistencyChecks', () => {
     const input = baseInput({ personaCount: 27 });
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('28'))).toBe(true);
-    // references 计数漂移 → 违规（41.4.0 新增）
+    // references 计数漂移 → 违规（41.5.0 新增）
     const vRef = runDocConsistencyChecks(baseInput({ referencesCount: 56 }));
     expect(vRef.some((x) => x.check === 'references-count' && x.message.includes('57'))).toBe(true);
     const vSkill = runDocConsistencyChecks(
-      baseInput({ skill: '---\nversion: 41.4.0\n---\n无 references 计数表述' }),
+      baseInput({ skill: '---\nversion: 41.5.0\n---\n无 references 计数表述' }),
     );
     expect(vSkill.some((x) => x.check === 'references-count' && x.message.includes('57 个 .md'))).toBe(true);
   });
@@ -283,7 +283,7 @@ describe('runDocConsistencyChecks', () => {
   it('README/AGENTS 缺 vitest 文件数表述 → 违规', () => {
     const input = baseInput({
       readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
-      agents: '30 个脚本',
+      agents: '31 个脚本',
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-files');
     expect(v.length).toBeGreaterThan(0);
@@ -298,13 +298,13 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('vitest 实测用例总数缺失于 AGENTS → 违规', () => {
-    const input = baseInput({ agents: '30 个脚本\n35 个 .test.ts' });
+    const input = baseInput({ agents: '31 个脚本\n35 个 .test.ts' });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
     expect(v.some((x) => x.message.includes('AGENTS.md') && x.message.includes('530'))).toBe(true);
   });
 
   it('vitest 实测用例总数缺失于 pre-push → 违规', () => {
-    const input = baseInput({ prePush: '# 14. docs-consistency\n# 与原 CI 一致：14 项检查' });
+    const input = baseInput({ prePush: '# 15. samples-coverage\n# 与原 CI 一致：15 项检查' });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
     expect(v.some((x) => x.message.includes('.githooks/pre-push') && x.message.includes('530'))).toBe(true);
   });

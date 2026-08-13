@@ -3,6 +3,10 @@
 > 对应 W 模型阶段 1。命令：`/wm analyze`。
 > 本阶段同步产出验收测试设计（W 模型并行原则）。
 
+> **⚠️ 伪示例（仅供 LLM 行为对齐）**：本文件为「示例对话」风格的编排演示，对话中的产物字段、数字
+> 与输出均为示意，不代表真实校验结果。**真实命令输出以 [real-run-evidence.md](./real-run-evidence.md) 为准**；
+> 任何门禁结论必须以脚本退出码为准（反模式 #6/#7/#12），不得用对话内容替代。
+
 ## 示例对话
 
 ```
@@ -61,14 +65,14 @@ AI: 分块规划（plan-chunks.ts）：
 
 AI: 并行分派 23 个 A-chunk 提取 REQ 节点...
     （收敛循环 round 1）
-    A-cross 合并: 87 个 REQ 节点, 102 条边, 3 个孤立节点, 2 个连通分量
+    A-cross 合并: 87 个 REQ 节点, 102 条边, 3 个孤立节点, 2 个连通分量（示意数字）
     G 跑 check-requirement-graph.ts --phase=1: exit 1（连通分量=2, 孤立=[REQ-041,REQ-058,REQ-073]）
     reworkHints: chunk-007 补 REQ-041 关系, chunk-015 补 REQ-058/073 关系
     
     （针对性补漏后 round 2）
     G: exit 0, passed=true, 连通分量=1, 单根=REQ-ROOT
     
-    🔴 CHECKPOINT · ingestion 收敛确认：图谱 87 节点/115 边，单根 REQ-ROOT，是否放行进入需求产出？
+    🔴 CHECKPOINT · ingestion 收敛确认：图谱 87 节点/115 边，单根 REQ-ROOT，是否放行进入需求产出？（节点/边数以真实 GRAPH_JSON 为准）
 
 用户: 放行
 

@@ -3,6 +3,10 @@
 > 对应 W 模型阶段 6 / 7 / 8（右 V 测试执行）。命令：`/wm test type=<集成|系统|验收> result=<pass|fail>`。
 > 本阶段执行前置阶段已设计的测试用例，**必须由真实测试运行器执行后通过 `result` 参数回填**，不得由 LLM 估算。
 
+> **⚠️ 伪示例（仅供 LLM 行为对齐）**：本文件为「示例对话」风格的编排演示，对话中的产物字段、数字
+> 与输出均为示意，不代表真实校验结果。**真实命令输出以 [real-run-evidence.md](./real-run-evidence.md) 为准**；
+> 任何门禁结论必须以脚本退出码为准（反模式 #6/#7/#12），不得用对话内容替代。
+
 ## 示例对话（阶段 6：集成测试执行）
 
 ```
@@ -101,7 +105,8 @@ AI: 🔴 CHECKPOINT · 发布放行
 ```
 
 > 注意：`check-artifact-gate.ts` 校验四级测试全部通过，本示例中验收测试尚未执行，
-> 严格意义上质量门应在验收测试通过后才完整放行。这里展示的是系统测试后的中间检查。
+> 严格意义上质量门应在验收测试通过后才完整放行。这里展示的是系统测试后的中间检查
+> （真实门禁语义以脚本退出码为准，见 [real-run-evidence.md](./real-run-evidence.md)）。
 
 ## 示例对话（阶段 8：验收测试执行 + 项目交付）
 
@@ -110,19 +115,19 @@ AI: 🔴 CHECKPOINT · 发布放行
 
 AI: 正在执行【验收测试】阶段，将按用户场景验证阶段 1 设计的验收测试用例...
 
-AI: 已识别验收测试用例（来自阶段 1 需求分析）：
+AI: 已识别验收测试用例（来自阶段 1 需求分析，ID 为示意）：
     - UAT-001~012 用户注册 / 登录
     - UAT-013~024 商品浏览
     - UAT-025~038 购物车
     - UAT-039~050 订单管理
 
 AI: 调用真实测试运行器（端到端 UI 自动化 / 用户场景脚本）执行中...
-    ✅ 50/50 全部通过
+    ✅ 全部通过（通过/失败数以真实运行器输出为准）
 
 用户: /wm test type=验收 result=pass
 
 AI: 已回填验收测试结果到 .w-model/rtm.json：
-    - executionSummary.acceptanceTest: { total: 50, passed: 50, failed: 0, pending: 0 }
+    - executionSummary.acceptanceTest: { total: 50, passed: 50, failed: 0, pending: 0 }（示意，以真实回填值为准）
     - RTM 验收测试列：UAT-001~050 全部 ✅
 
 AI: RTM 终检：所有需求 → 设计 → 代码 → 单元 / 集成 / 系统 / 验收测试均建立映射，RTM 需求覆盖率 100%。
@@ -131,12 +136,12 @@ AI: 触发工件质量门最终检查：
 
     npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts
 
-    GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"reasons":[]}
+    GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"reasons":[],"exitCode":0}（字段为示意，以脚本实际输出为准）
 
 AI: 🔴 CHECKPOINT · 发布放行
     质量门脚本退出码 0（通过）。
-    - RTM 覆盖率：100%
-    - 四级测试全部通过：单元 18/18、集成 5/5、系统 5/5、验收 50/50
+    - RTM 覆盖率：100%（以真实 GATE_JSON 为准）
+    - 四级测试全部通过：单元 / 集成 / 系统 / 验收（各自通过数以真实运行器为准）
     - 项目级验收检查清单：✅ 需求规格 / 设计文档 / 代码 / 各级测试 / RTM 全部满足
 
     请确认是否完成项目交付（用户签字）。

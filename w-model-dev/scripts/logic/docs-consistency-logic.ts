@@ -18,7 +18,7 @@ export interface DocConsistencyInput {
   schemaFiles: string[];
   /** subagent/ 目录 .md 人格文件数（期望 28） */
   personaCount: number;
-  /** 实测可 exit 2 的 CLI 脚本数（25 个 check-*.ts 含自身 + 4 工具 CLI + logic/plan-chunks.ts = 30；self-test.ts 非 exit-2 不计入） */
+  /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 4 工具 CLI + logic/plan-chunks.ts = 31；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
   /** references/ 目录 .md 文件数（期望 57） */
   referencesCount: number;
@@ -64,14 +64,14 @@ export const EXPECTED = {
   /** references/ 目录 .md 文件数（第 44 轮新建 4 篇后为 57；SKILL.md「Bundled Resources」表须同步） */
   referencesCount: 57,
   vitestFileCount: 35,
-  exit2ScriptCount: 30,
+  exit2ScriptCount: 31,
   runLogActionCount: 27,
   maxAntiPattern: 47,
-  prePushCount: 14,
+  prePushCount: 15,
   /** 硬约束条数（第 44 轮由 21 条重排合并为 14 条） */
   hardConstraintCount: 14,
   /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
-  currentVersion: '41.4.0',
+  currentVersion: '41.5.0',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
@@ -156,7 +156,7 @@ function extractJsonVersion(json: string): string | null {
  * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json / skill-metadata.json /
  * SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例五处版本声明必须全部
  * 等于 EXPECTED.currentVersion。任一处缺失/不可解析/不一致即报违规（fail loud，不静默放行）。
- * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.4.0 写成 41.4.10）
+ * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.5.0 写成 41.5.10）
  * 都会被捕获，符合「防漂移」定位。
  */
 function checkVersionConsistency(

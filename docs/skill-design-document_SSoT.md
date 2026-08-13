@@ -1233,6 +1233,29 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+### 3.4.46 第 46 轮：samples 覆盖门禁 + 真实证据示例 + 去重/批次/workspaces 收尾（T1/T2/A2/A5/O1 五项落地）
+
+**目的**：落实外部评审报告顺延项（41.4.0 轮未做）——T1 samples 覆盖矩阵门禁、T2 examples 真实命令证据、A2 Markdown 去重（收敛版）、A5 CHANGELOG 批次拆分、O1 workspaces 决策（2026-08-13，41.5.0）。
+
+**变更（2026-08-13，41.5.0）**：
+
+- **T1 samples 覆盖矩阵门禁**：新建 `scripts/cli/check-samples-coverage.ts`——扫描 `samples/` 全树（排除 .w-model 运行时产物 / states / README / 隐藏文件），按行号区间解析 self-test.ts 的 run 函数（`for (const v of X_CASES)` ↔ `path.join(samplesDir, '<dir>', ...)` 配对 + 两参 join 目录变量 + 循环变量非 c + manifestFile 字段四类兼容形态）与用例数组（file / sampleDir / manifestFile / featureFiles 字段），核对每个 fixture 被引用 + 每个子目录在 `samples/README.md` 矩阵声明；tla-e2e 豁免（手动/CI 端到端 fixture，README 声明兜底）。新建成 `samples/README.md` 覆盖矩阵（26 子目录 × check 脚本 × 用例数组 × 嵌套说明 + 新增 fixture 四步流程）；pre-push 新增第 15 项（`prePushCount` 14→15，EXPECTED / pre-push 注释「15 项检查」/ README / AGENTS 同步）。
+- **T1 首跑发现并处置 5 个孤儿 fixture**：`samples/` 5 个全仓零引用文件——登记 3 个有效样本（gate/bad-phase5-codemodule-format → GATE_CASES phaseOption=5 codeModule 格式校验；tla/bad-coverage-uncovered-sd → TLA_CASES SD 覆盖完整性；bdd/bad-d8-uncovered-sd → BDD_CASES D8，featureFiles=[] 空数组）；删除 2 个「名字与实际行为不符」伪样本（valid-phase5-with-uat-path-mapping 任何 phase 均 failed、bad-phase5-missing-uat-path-mapping 纯逻辑 passed=true，均由真实逻辑探针验证）。self-test 基线 249→252；exit-2 脚本计数 30→31（新增 check-samples-coverage，26 check-* + 4 工具 CLI + logic/plan-chunks.ts）。
+- **T2 真实证据示例**：新建 `examples/real-run-evidence.md`（唯一真实证据：5 命令 × exit 0/1/2 三态真实输出实录 + 使用约定）；4 份对话文件（coding / requirement-analysis / system-design / test-execution）头部标注「伪示例，仅供 LLM 行为对齐」+ 虚构数字改「以真实运行器为准」+ coding.md 删除 `echo > .env`（反模式 #25 冲突）改环境变量注入两方式 + test-execution.md 质量门语义修正（GATE_JSON 补 exitCode 字段）；examples/README.md 文件清单表补 real-run-evidence 行并区分「真实证据 / 伪示例 / 编排示例」三类。
+- **A2 Markdown 去重（收敛版）**：实测文本级复制仅 3 处（原报告 8h 估计基于泛泛判断）——AGENTS.md §6「编排者最小化」与 §1 双份 → 一句 + 指针；INSTALL.md 安装引导段角色描述（:88）与 §1/FAQ 重复 → 指针化；SKILL.md 内联 14 行硬约束摘要表**保留**（编排入口速查价值 + :57 已有指针，第 44 轮刻意设计；`checkHardConstraints` 只要求指针字串）。b/e/f 主题（CHECKPOINT / 角色表 / 反模式列表）实测已是健康分层指针结构，无需动。
+- **A5 CHANGELOG 批次拆分**：41.2.0 的 P0/P1/P2 工程化批次（27 项 Changed + 3 修复 + 1 文档同步，显式标注「不涉及版本语义」）移入新建 `docs/changes/engineering-batches/2026-08-11-p0-p2-batches/README.md`（批次总览表 + 三批逐项清单 + 批次内修复/文档同步）；CHANGELOG [41.2.0] 精简为四源吸收 P2 + 版本 bump + 批次指针；清理 `docs/changes/` 空目录（2026-07-28-round20-phase1-4dim-identification/）；批次 README 声明「41.3.0 之后批次与评审修正一体不拆」。
+- **O1 移除 npm workspaces（C7 决策逆转）**：删除根 package.json `workspaces: ["w-model-dev"]` + `w-model-dev/package.json`。逆转理由：① 子包零依赖（devDeps 全在根包）、② 全仓零 `w-model-dev` 包名 import/require（脚本全走显式相对路径）、③ createRequire('typescript')（2 处）/ vitest / tsconfig / typedoc / eslint / pre-push 均不依赖 workspace 解析（Node 向上查找根 node_modules 两种模式等价）、④ 空包无实际作用且造成「npm workspaces」心智负担；INSTALL.md FAQ 改为单根包表述。package-lock.json 由 npm install 重装重写。
+
+**关键决策**：① 门禁提取用「行号区间切块」而非正则前瞻（避免 run 函数块误吞），目录型用例（sampleDir）覆盖子树、bdd .feature 由 featureFiles 字段显式登记（manifest 虚引用不产生文件级覆盖要求）；② 孤儿 fixture 处置三原则——有效样本登记进 self-test.ts（校验规则回归保护）、伪样本删除（名字与行为不符且零引用）、tla-e2e 豁免（端到端手动 fixture，README 声明兜底）；③ 计数联动走既有「EXPECTED + 锚文本」门禁机制（prePushCount 15 / exit2ScriptCount 31 / self-test 252，vitest 571 保持稳定）；④ A2 收敛不采纳原报告 8h 全量重构（实测复制少、门禁红线锚文本集中在少数字面量）；⑤ O1 逆转 C7 需在轮次记录中显式声明（41.3.1 曾重申 C7，本轮回转有据）。
+
+| 维度 | 内容 |
+|---|---|
+| self-test | 基线 249 → 252（登记 3 条孤儿样本） |
+| vitest | 35 files / 571 tests |
+| 版本号 | 41.5.0（五处一致：package.json / skill-metadata.json / SKILL.md frontmatter / README / INSTALL.md） |
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -2851,6 +2874,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 3.4.43 第 43 轮移除 .cursor 技能包 | docs-consistency 门禁解耦（REQUIRED_PATHS / EXPECTED / checkAssetCounts）/ pre-push 过滤清理 / 活动文档与 5 处死链同步 / .gitignore 追加 .cursor / 版本号三处 41.3.0 | `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + `.githooks/pre-push` + AGENTS.md + README.md + references 5 处 + `.gitignore` + package.json / skill-metadata.json / SKILL.md / INSTALL.md | 已落地（41.3.0） |
 | 3.4.44 第 44 轮评审修正批次 | 版本号五处一致性门禁（version-consistency）/ 模板占位符统一（{{v1.0}}）/ docsify noscript 降级 / SKILL.md 减负 524→216（hard-constraints + operation-behaviors + quick-self-check + design-philosophy）/ 硬约束 21→14 重排（全仓引用同步）/ TLA+/BDD 成熟度开关（L1/L2/L3）/ L0/L1 双交付层 / 孤儿 test-prompts.json 删除 / CHANGELOG 拆分 | `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + `skill-metadata.test.ts` + SKILL.md + 7 模板 + format-conventions + operational-recovery + 新建 references×4 + INSTALL.md + README.md + AGENTS.md + CONTRIBUTING.md + docs/index.html + 32 处约束引用文件 + CHANGELOG.md + CHANGELOG-archive.md + SSoT | 已落地（41.3.1） |
 | 3.4.45 第 45 轮外部评审核实修正批次 | cli/ 两 IO 模块移入 lib/（artifact-gate-assets + uat-path-mapping，exit-2 注释修正）/ SKILL.md references 53→57 + 新增 references-count 门禁（EXPECTED.referencesCount=57）/ cleanTraceFiles+isTlcStatesDir 移入新建 lib/tla-clean-trace.ts / dispatch-matrix 过时版本号移除 / AGENTS 角色表述（O+五子代理+R-iceberg）/ docs/superpowers 内部目录声明 / tools/README.md（tla2tools.jar 声明） | `check-artifact-gate.ts` + 新建 `lib/artifact-gate-assets.ts` + `lib/uat-path-mapping.ts` + `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + 新建 `lib/tla-clean-trace.ts` + `check-tla-model.ts` + `tla-clean-trace.test.ts` + SKILL.md + dispatch-matrix.md + AGENTS.md + 新建 tools/README.md + package.json / skill-metadata.json / README.md / INSTALL.md + CHANGELOG.md + SSoT | 已落地（41.4.0） |
+| 3.4.46 第 46 轮五项落地批次 | 新建 check-samples-coverage.ts（fixture 引用 + 矩阵声明双核对，行号区间切块提取）+ 新建 samples/README.md 覆盖矩阵 + pre-push 15 项（prePushCount 14→15）/ 孤儿样本处置（登记 gate/tla/bdd 3 条 + 删除 2 伪样本，self-test 249→252，exit-2 30→31）/ 新建 examples/real-run-evidence.md（真实输出实录）+ 4 对话文件伪示例标注与数字修正 / A2 收敛去重（AGENTS §6 + INSTALL:88 指针化，SKILL 摘要表保留）/ engineering-batches 归档 + CHANGELOG [41.2.0] 精简 + 空目录清理 / 移除 workspaces（C7 逆转） | 新建 `check-samples-coverage.ts` + `samples/README.md` + `examples/real-run-evidence.md` + `docs/changes/engineering-batches/2026-08-11-p0-p2-batches/README.md` + `self-test.ts`（+3 用例，删 2 样本）+ `.githooks/pre-push` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + AGENTS.md + README.md + INSTALL.md + SKILL.md + 4 examples 对话文件 + examples/README.md + CHANGELOG.md（[41.5.0] + [41.2.0] 精简）+ package.json（去 workspaces）+ 删 `w-model-dev/package.json` + SSoT | 已落地（41.5.0） |
 
 ---
 

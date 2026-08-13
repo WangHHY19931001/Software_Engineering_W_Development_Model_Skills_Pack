@@ -361,6 +361,14 @@ const GATE_CASES: GateCase[] = [
     description:
       'SD 数字层级 id（SD-5.2.1）经 checkSdToCodeModuleMapping 识别为数字层级，命中 codeModule 前缀映射应通过',
   },
+  // -------------------- 41.5.0 登记孤儿样本（check-samples-coverage 发现未引用） --------------------
+  {
+    file: 'bad-phase5-codemodule-format.json',
+    expectedPassed: false,
+    phaseOption: 5,
+    expectedReasonPatterns: [/codeModule 格式错误/],
+    description: 'phase5 终检：REQ 行 codeModule 缺 SD 前缀（"src/auth/login.ts"），应被 SD→codeModule 格式校验拦截',
+  },
 ];
 
 interface GraphCase {
@@ -948,6 +956,14 @@ const TLA_CASES: TlaCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R13.*checkRounds\[0\] 含禁止字段 phaseSummary.*phase 级摘要字段/],
     description: 'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 R13 schema 校验拦截（第 16 轮 P1.1）',
+  },
+  // -------------------- 41.5.0 登记孤儿样本（check-samples-coverage 发现未引用） --------------------
+  {
+    file: 'bad-coverage-uncovered-sd.json',
+    phase: 2,
+    expectedPassed: false,
+    expectedReasonPatterns: [/SD 节点未被任何 TLA\+ spec 覆盖/],
+    description: '部分 SD 节点（SD-002/SD-003）未被任何 TLA+ spec 覆盖，应被覆盖完整性校验拦截',
   },
 ];
 
@@ -1697,6 +1713,16 @@ const BDD_CASES: BddCase[] = [
     phase: 5,
     description: 'feature 含未绑定 step（注入 cucumberReport.undefinedCount=1），应被 D5 step 绑定校验拦截',
     cucumberReport: { undefinedCount: 1, pendingCount: 0, failedCount: 0 },
+  },
+  // -------------------- 41.5.0 登记孤儿样本（check-samples-coverage 发现未引用） --------------------
+  {
+    manifestFile: 'bad-d8-uncovered-sd.json',
+    featureFiles: [],
+    expectedPassed: false,
+    expectedExitCode: 1,
+    expectedReasonPatterns: [/\[D8\]/],
+    phase: 2,
+    description: '部分 SD 节点（SD-002/SD-003）未被任何 BDD feature 覆盖，应被 D8 覆盖校验拦截',
   },
 ];
 

@@ -2,15 +2,17 @@
 
 > 本目录收录 W 模型 8 阶段完整编排流程的示例：左侧 4 份为历史交互示例，右侧 6 份（含本 README）为 8 阶段串联导览与逐阶段 check 脚本调用示例。
 > 全部门禁脚本位于 `w-model-dev/scripts/cli/`，退出码语义统一为 **0 = 通过 / 1 = 校验失败 / 2 = 输入错误（ERROR_JSON）**。
+> **真实命令输出实录见 [real-run-evidence.md](real-run-evidence.md)**（唯一真实证据示例）；对话类示例均为「伪示例」，仅供 LLM 行为对齐，字段不代表真实输出。
 
 ## 文件清单
 
 | 文件 | 覆盖阶段 | 内容 |
 |---|---|---|
-| [requirement-analysis.md](requirement-analysis.md) | 1 需求分析 | 交互对话示例（含 ingestion 子流程） |
-| [system-design.md](system-design.md) | 2/3/4 系统/概要/详细设计 | 交互对话示例（同步测试设计） |
-| [coding.md](coding.md) | 5 编码实现 | 交互对话示例（含跨平台环境变量） |
-| [test-execution.md](test-execution.md) | 6/7/8 测试执行 | 交互对话示例（集成/系统/验收 + 质量门） |
+| [real-run-evidence.md](real-run-evidence.md) | 全阶段 | **真实证据**：门禁脚本实际执行输出实录（exit 0/1/2 + JSON 摘要） |
+| [requirement-analysis.md](requirement-analysis.md) | 1 需求分析 | 伪示例：交互对话（含 ingestion 子流程） |
+| [system-design.md](system-design.md) | 2/3/4 系统/概要/详细设计 | 伪示例：交互对话（同步测试设计） |
+| [coding.md](coding.md) | 5 编码实现 | 伪示例：交互对话（含环境变量注入） |
+| [test-execution.md](test-execution.md) | 6/7/8 测试执行 | 伪示例：交互对话（集成/系统/验收 + 质量门） |
 | [stage1-requirement-analysis.md](stage1-requirement-analysis.md) | 1 需求分析 | 编排示例：目标 / 输入工件 / check 命令 / 预期输出 |
 | [stage5-coding.md](stage5-coding.md) | 5 编码实现 | 编排示例：同上（含单元测试执行） |
 | [stage6-integration-test.md](stage6-integration-test.md) | 6 集成测试 | 编排示例：同上 |

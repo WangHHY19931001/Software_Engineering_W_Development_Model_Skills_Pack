@@ -75,7 +75,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
 ├── schemas/            # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep），由 schema-loader.ts 在 logic 层前置加载
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── cli/            # CLI 入口层（25 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / self-test / ensure-codegraph-opsx 等 30 个 exit-2 脚本；IO 抽离，传纯数据给 logic 层）
+│   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / self-test / ensure-codegraph-opsx 等 31 个 exit-2 脚本；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（9 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate）
 │   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 571 条 + README.md coverage 矩阵）
@@ -85,7 +85,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 > Skill 资产（除 `scripts/` 外）零依赖、零 Node.js，可整目录拷贝。`scripts/` 需在仓库根目录 `npm install` 一次以拉取 devDeps（ajv / eslint-plugin-security 等），详见 §2。
 
-> Agent 读取 `SKILL.md` 后承担「编排者」（O）角色：每阶段分派 **S 产出子代理**生成开发产物 + 测试设计 + RTM，分派 **V 评审子代理**按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，分派 **G 门禁子代理**跑 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。编排者只做路由 + 状态 + CHECKPOINT + 持久化，**不得越权实施**（反模式 #10）。详见 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+> Agent 读取 `SKILL.md` 后承担「编排者」（O）角色，分派 S 产出 / V 评审 / G 门禁子代理执行各阶段实施：V 按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，G 跑 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。角色边界与「编排者最小化」（反模式 #10）权威定义见 §1 与 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
 
 ---
 
@@ -118,7 +118,7 @@ npm install
 npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 # 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
 
-# 验证回归基线（self-test 249 条样本全部通过）：
+# 验证回归基线（self-test 252 条样本全部通过）：
 npm run self-test
 
 # 验证安全扫描基线（exit 0 = 无新增风险）：
@@ -145,7 +145,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.4.0
+version: 41.5.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -195,7 +195,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | JSON Schema 文件（draft-07，20 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/logic/schema-loader.ts](../w-model-dev/scripts/logic/schema-loader.ts) |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts) |
-| 回归基线脚本（249 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
+| 回归基线脚本（252 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts) |
@@ -233,7 +233,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 - Agent 在执行 LLM-as-a-Verifier 评审时需要调用其自身的 LLM，按 Agent 框架自身的鉴权方式处理（与技能无关）。
 
 **Q：为什么有 `package.json` + `npm install`？**
-Skill 资产本身零依赖（纯 Markdown）；`package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本。仓库为 npm workspaces（根包 + `w-model-dev` 子包），在仓库根目录 `npm install` 一次即可，devDeps 会提升至根 `node_modules`：
+Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本。仓库为**单根包**（41.5.0 起移除 npm workspaces——`w-model-dev/` 无独立依赖与包名引用，子包空转无作用），在仓库根目录 `npm install` 一次即可，devDeps 装至根 `node_modules`：
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
