@@ -20,7 +20,7 @@ export interface DocConsistencyInput {
   personaCount: number;
   /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 4 工具 CLI + logic/plan-chunks.ts = 31；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
-  /** references/ 目录 .md 文件数（期望 57） */
+  /** references/ 目录 .md 文件数（期望 53） */
   referencesCount: number;
   dataModels: string;
   verifierSpec: string;
@@ -61,7 +61,7 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   schemaCount: 20,
   personaCount: 28,
-  /** references/ 目录 .md 文件数（第 44 轮新建 4 篇后为 57；SKILL.md「Bundled Resources」表须同步） */
+  /** references/ 目录 .md 文件数（第 44 轮重排后为 53；SKILL.md「Bundled Resources」表须同步） */
   referencesCount: 53,
   vitestFileCount: 35,
   exit2ScriptCount: 31,
@@ -71,7 +71,7 @@ export const EXPECTED = {
   /** 硬约束条数（第 44 轮由 21 条重排合并为 14 条） */
   hardConstraintCount: 14,
   /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
-  currentVersion: '41.7.0',
+  currentVersion: '41.8.0',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';

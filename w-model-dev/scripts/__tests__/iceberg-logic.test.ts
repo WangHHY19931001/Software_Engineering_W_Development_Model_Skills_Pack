@@ -30,19 +30,19 @@ describe('checkIcebergSweep', () => {
     expect(r.reasons).toHaveLength(0);
   });
 
-  it('icebergRound=0 越界 → passed=false（R5）', () => {
+  it('icebergRound=0 越界 → passed=false（R2）', () => {
     const r = checkIcebergSweep(validReport({ icebergRound: 0 }));
     expect(r.passed).toBe(false);
     expect(r.reasons.some((m) => m.includes('icebergRound'))).toBe(true);
   });
 
-  it('icebergRound=6 越界 → passed=false（R5）', () => {
+  it('icebergRound=6 越界 → passed=false（R2）', () => {
     const r = checkIcebergSweep(validReport({ icebergRound: 6 }));
     expect(r.passed).toBe(false);
     expect(r.reasons.some((m) => m.includes('icebergRound'))).toBe(true);
   });
 
-  it('findingId 与 previousFindings 重复 → passed=false（R6）', () => {
+  it('findingId 与 previousFindings 重复 → passed=false（R3）', () => {
     const r = checkIcebergSweep(
       validReport({
         线索来源: { reworkHintsHistory: [], fixedPoints: [], previousFindings: ['IF-phase3-1-01'] },
@@ -65,7 +65,7 @@ describe('checkIcebergSweep', () => {
     expect(r.reasons.some((m) => m.includes('已在上一轮发现'))).toBe(true);
   });
 
-  it('finding 缺 hypothesis 或 evidence → passed=false（R7）', () => {
+  it('finding 缺 hypothesis 或 evidence → passed=false（R4）', () => {
     const r = checkIcebergSweep(
       validReport({
         newFindings: [
@@ -87,7 +87,7 @@ describe('checkIcebergSweep', () => {
     expect(r.reasons.some((m) => m.includes('hypothesis'))).toBe(true);
   });
 
-  it('passed 与 newFindings 不一致 → passed=false（R8）', () => {
+  it('passed 与 newFindings 不一致 → passed=false（R5）', () => {
     const r = checkIcebergSweep(
       validReport({
         newFindings: [

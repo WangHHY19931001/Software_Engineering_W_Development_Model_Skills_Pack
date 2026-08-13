@@ -2,17 +2,18 @@
 /**
  * 预防性审查校验脚本（Preventive Review Checker）
  *
- * 对应 R3 预防性审查门禁：按 variant 读取各维度审查报告（标准 / fix / emergency），
+ * 对应 R3 预防性审查门禁：按 variant 读取各维度审查报告（标准 / fix / emergency / ingest），
  * 校验维度齐全与通过状态，并支持 --auto-trigger 从 run-log 推断当前阶段。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-preventive-review.ts <project-dir> [--phase=N] [--variant=standard|fix|emergency] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-preventive-review.ts <project-dir> [--phase=N] [--variant=standard|fix|emergency|ingest] [--json]
  *   npx tsx w-model-dev/scripts/cli/check-preventive-review.ts <project-dir> --auto-trigger --run-log=<run-log.jsonl> [--json]
  *
  * 参数：
  *   project-dir              项目根目录（默认：当前工作目录）
  *   --phase=N                当前阶段 1-8（可选，默认从 run-log / 上下文推断）
- *   --variant=<v>            报告文件名变体：standard | fix | emergency（默认 standard）
+ *   --variant=<v>            报告文件名变体：standard | fix | emergency | ingest（默认 standard；
+ *                            ingest 为 S-ingest-tla / S-ingest-bdd 后 R3，须显式传参，auto-trigger 不推断）
  *   --auto-trigger           从 --run-log 读取当前阶段并推断 variant
  *   --run-log=<path>         run-log.jsonl 路径（--auto-trigger 模式必填）
  *   --json                   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
@@ -61,6 +62,7 @@ const PREVENTIVE_REVIEW_JSON = {
  *   - standard → `<phase>-{dim}.json`
  *   - fix      → `<phase>-fix-{dim}.json`        （S-fix 返工后 R3）
  *   - emergency→ `<phase>-emergency-{dim}.json`  （S-emergency-fix 后 R3）
+ *   - ingest   → `<phase>-ingest-{dim}.json`     （S-ingest-tla / S-ingest-bdd 后 R3，第 41.8.0 轮补全）
  */
 function reportFilePrefix(phase: number, variant: NonNullable<PreventiveReviewOptions['variant']>): string {
   switch (variant) {
@@ -68,6 +70,8 @@ function reportFilePrefix(phase: number, variant: NonNullable<PreventiveReviewOp
       return `${phase}-fix-`;
     case 'emergency':
       return `${phase}-emergency-`;
+    case 'ingest':
+      return `${phase}-ingest-`;
     case 'standard':
     default:
       return `${phase}-`;
@@ -92,14 +96,14 @@ async function main(): Promise<void> {
   // 显式 --variant= 参数解析
   if (variantArg) {
     const v = variantArg.split('=')[1] as PreventiveReviewOptions['variant'];
-    if (v === 'standard' || v === 'fix' || v === 'emergency') {
+    if (v === 'standard' || v === 'fix' || v === 'emergency' || v === 'ingest') {
       variant = v;
     } else {
       exitWithError({
         category: 'ARG_INVALID',
         rule: 'P0-1',
         message: `参数非法 --variant=${v}`,
-        detail: '须为 standard | fix | emergency',
+        detail: '须为 standard | fix | emergency | ingest',
         exitCode: 2,
       });
       return;
@@ -198,7 +202,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '参数缺失或非法 --phase=<1-8>',
       detail:
-        '用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=standard|fix|emergency] | --auto-trigger --run-log=<run-log.jsonl>',
+        '用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=standard|fix|emergency|ingest] | --auto-trigger --run-log=<run-log.jsonl>',
       exitCode: 2,
     });
     return;

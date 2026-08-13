@@ -219,7 +219,7 @@ function main(): void {
   const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts/cli')).filter((f) =>
     /^check-.*\.ts$/.test(f),
   ).length; // 含 check-docs-consistency 自身 = 26（cli/ 层）
-  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + metrics-report + security-scan + wm-status（cli/）+ logic/plan-chunks.ts（非 cli/，合计 30；self-test.ts 非 exit-2 不计入）
+  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + metrics-report + security-scan + wm-status（cli/）+ logic/plan-chunks.ts（非 cli/，合计 31；self-test.ts 非 exit-2 不计入）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),

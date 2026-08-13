@@ -132,11 +132,11 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 - `check-requirement-graph.ts`：图谱门禁（结构连通 + 信息流闭合），退出码 0 才放行
 - `check-tla-model.ts`：TLA+ 行为门禁（文件头 + 层次一致性 + SANY 语法 + TLC 模型检查，无死锁/不变式违反/状态爆炸），退出码 0 才放行（反模式 #15）
-- `check-bdd-model.ts --phase=N`：BDD 行为门禁（7 维度：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射），退出码 0 才放行（反模式 #29）
+- `check-bdd-model.ts --phase=N`：BDD 行为门禁（8 维度：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage），退出码 0 才放行（反模式 #29）
 
 阶段 5 额外跑 `check-code-tla-consistency.ts`（代码-TLA+ 一致性回归，四维度校验）。
 返工时额外跑 `check-rootcause-report.ts`（R 报告 schema 校验）。
-闭环校验脚本（每阶段门均跑）：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts`，详见 [operational-recovery.md](operational-recovery.md)「闭环校验脚本调用约定」节。
+闭环校验脚本（每阶段门均跑）：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件，约束 #11），详见 [operational-recovery.md](operational-recovery.md)「闭环校验脚本调用约定」节。
 
 ### 返工循环（V/G→R→V→G→S-fix→V→G）
 

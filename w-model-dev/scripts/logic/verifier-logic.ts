@@ -28,8 +28,10 @@ import { validateBySchema } from './schema-loader.js';
  *   - 'design'      : phase 2/3/4 系统/接口/详细设计
  *   - 'code'        : phase 5 源代码（原 'file' 已废弃）
  *   - 'test'        : phase 6/7/8 集成/系统/验收测试（原 'testcase' 已废弃）
+ *   - 'rootcause'   : 返工循环 V 复审根因报告（§7.5 子标准集合；第 41.8.0 轮补全入枚举，
+ *                     与 verifier-spec §2.2 / §7.5、dispatch-matrix §4、反模式 #19 检测信号对齐）
  */
-export type TargetKind = 'requirement' | 'design' | 'code' | 'test';
+export type TargetKind = 'requirement' | 'design' | 'code' | 'test' | 'rootcause';
 export type ScoringMethod = 'logits' | 'text-parse';
 export type QualityLevel = 'A' | 'B' | 'C' | 'D';
 
@@ -99,6 +101,14 @@ export const SUB_CRITERIA: Record<TargetKind, Array<{ name: string; weight: numb
     { name: 'readability', weight: 0.15 },
     { name: 'maintainability', weight: 0.15 },
     { name: 'conformance', weight: 0.2 },
+  ],
+  // V 复审根因报告（verifier-spec §7.5；第 41.8.0 轮补全，此前文档定义但脚本未校验）
+  rootcause: [
+    { name: 'correctness', weight: 0.25 },
+    { name: 'completeness', weight: 0.25 },
+    { name: 'falsifiability', weight: 0.2 },
+    { name: 'actionability', weight: 0.15 },
+    { name: 'prevention', weight: 0.15 },
   ],
 };
 
@@ -314,8 +324,8 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   }
 
   const targetKind = meta.targetKind as string;
-  // P2.5（第 9 轮）targetKind 枚举标准化：'testcase'/'file' 已废弃
-  const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test'];
+  // P2.5（第 9 轮）targetKind 枚举标准化：'testcase'/'file' 已废弃；'rootcause' 第 41.8.0 轮补全（§7.5）
+  const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test', 'rootcause'];
   if (!allowedKinds.includes(targetKind as TargetKind)) {
     reasons.push(
       `meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`,

@@ -13,7 +13,7 @@
       "additionalProperties": false,
       "required": ["targetKind", "target", "reviewedAt", "agent", "scoringMethod", "repeatTimes", "varianceThreshold"],
       "properties": {
-        "targetKind": { "description": "评审目标类型：requirement=阶段1需求规格 / design=阶段2/3/4设计 / code=阶段5源代码 / test=阶段6/7/8测试（'testcase'/'file' 已废弃，分别用 test/code）", "enum": ["requirement", "design", "code", "test"] },
+        "targetKind": { "description": "评审目标类型：requirement=阶段1需求规格 / design=阶段2/3/4设计 / code=阶段5源代码 / test=阶段6/7/8测试 / rootcause=返工循环 V 复审根因报告（§7.5 子标准集合；'testcase'/'file' 已废弃，分别用 test/code）", "enum": ["requirement", "design", "code", "test", "rootcause"] },
         "target": { "description": "评审目标（产物路径或 ID），非空字符串", "type": "string", "minLength": 1 },
         "reviewedAt": { "description": "评审时间，ISO 8601 字符串", "type": "string", "format": "date-time" },
         "agent": { "description": "评审 Agent 标识（V 子代理），非空字符串", "type": "string", "minLength": 1 },

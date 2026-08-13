@@ -11,7 +11,7 @@
 
 产物评审通过且用户在 🔴 CHECKPOINT 明确确认后，才能推进。L1+ 自主成熟度下的操作型 CHECKPOINT 自动放行是选择性激活（见 [operational-recovery.md](operational-recovery.md)「成熟度与 CHECKPOINT 放行」节），非绕过；决策型 CHECKPOINT 在所有级别均等用户；阶段门放行须填 `acknowledgedDecisions` 理解证据（见 [definition-of-done.md](definition-of-done.md) 第六维度）。
 
-**豁免审批强制四阶段**（原约束 #16 并入）：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](../scripts/cli/check-exemption.ts) E1-E8 全通过。跳过任一阶段命中反模式 #30。
+**豁免审批强制四阶段**（原约束 #16 并入）：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](../scripts/cli/check-exemption.ts) E1-E9 全通过。跳过任一阶段命中反模式 #30。
 
 ## #3 RTM 为事实源 + 每阶段回填
 
@@ -55,7 +55,7 @@
 
 `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
 
-**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**第 29 轮升级为无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency`）校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
+**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**第 29 轮升级为无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
 ## #12 返工必经根因定位
 
@@ -63,7 +63,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ## #13 行为门禁按成熟度分级（TLA+ + BDD）
 
-阶段 1–4 须产出对应层级的 TLA+ 状态机规格（L1 系统内外交互 → L2 子系统 → L3 原子行为，`.tla` + `.cfg` + `tla-manifest.json`）与对应层级 BDD features（L1/L2/L3/L4，`.feature` + `bdd-manifest.json`）；阶段 5-8 执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) exitCode=0。G 子代理跑 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（语法 + TLC + 无死锁/不变式违反/状态爆炸）与 `check-bdd-model.ts`（D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage）。
+阶段 1–4 须产出对应层级的 TLA+ 状态机规格（L1 系统内外交互 → L2 子系统 → L3 原子行为 → L4 递归拆解按需，`.tla` + `.cfg` + `tla-manifest.json`）与对应层级 BDD features（L1/L2/L3/L4，`.feature` + `bdd-manifest.json`）；阶段 5-8 执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) exitCode=0。G 子代理跑 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（语法 + TLC + 无死锁/不变式违反/状态爆炸）与 `check-bdd-model.ts`（D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage）。
 
 **强制级别按项目成熟度分级**：
 

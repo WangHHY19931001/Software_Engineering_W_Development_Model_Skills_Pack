@@ -241,3 +241,64 @@ describe('EVIDENCE_PATTERN 冒号格式', () => {
     expect(result.valid).toBe(false);
   });
 });
+
+describe('[41.8.0] targetKind=rootcause（§7.5 V 复审根因报告）', () => {
+  const baseRootcause = {
+    schemaVersion: '1.0',
+    meta: {
+      targetKind: 'rootcause' as const,
+      target: 'RC-phase5-1-01',
+      reviewedAt: '2026-08-12T00:00:00Z',
+      agent: 'test-agent',
+      scoringMethod: 'logits' as const,
+      repeatTimes: 3,
+      varianceThreshold: 0.1,
+    },
+    subCriteria: [
+      { name: 'correctness', weight: 0.25, score: 0.9, rawScores: [0.89, 0.9, 0.91], variance: 0.0000667, evidence: 'rootcause.json:§4.2=rootCauseChain[0].evidence 支持该步 answer' },
+      { name: 'completeness', weight: 0.25, score: 0.85, rawScores: [0.84, 0.85, 0.86], variance: 0.0000667, evidence: 'rootcause.json:§4.3=rootCauseChain 共 3 步触及根本原因' },
+      { name: 'falsifiability', weight: 0.2, score: 0.88, rawScores: [0.87, 0.88, 0.89], variance: 0.0000667, evidence: 'rootcause.json:§4.4=falsifiabilityCheck 含可验证假设' },
+      { name: 'actionability', weight: 0.15, score: 0.8, rawScores: [0.79, 0.8, 0.81], variance: 0.0000667, evidence: 'rootcause.json:§5.1=fixRecommendation[0] 四字段' },
+      { name: 'prevention', weight: 0.15, score: 0.95, rawScores: [0.94, 0.95, 0.96], variance: 0.0000667, evidence: 'rootcause.json:§5.2=prevention[0] 三字段' },
+    ],
+    compositeScore: 0.876,
+    qualityLevel: 'A' as const,
+    summary: 'RC-phase5-1-01 根因链逻辑自洽，可证伪假设成立，修复建议与预防措施可执行，V 复审结论：通过。',
+    passed: true,
+  };
+
+  it('合法 rootcause VerifierOutput（§7.5 子标准 + 权重）应通过', () => {
+    const result = checkVerifierOutput(baseRootcause);
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toHaveLength(0);
+  });
+
+  it('rootcause 误用 test 集合子标准名称应被拦截', () => {
+    const bad = {
+      ...baseRootcause,
+      subCriteria: baseRootcause.subCriteria.map((sc) => ({ ...sc, name: sc.name === 'correctness' ? 'coverage' : sc.name })),
+    };
+    const result = checkVerifierOutput(bad);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((m: string) => /subCriteria.*name 应为/.test(m))).toBe(true);
+  });
+
+  it('rootcause 子标准权重被改动应被拦截', () => {
+    const bad = {
+      ...baseRootcause,
+      subCriteria: baseRootcause.subCriteria.map((sc, i) => (i === 0 ? { ...sc, weight: 0.3 } : sc)),
+      compositeScore: 0.901,
+    };
+    const result = checkVerifierOutput(bad);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((m: string) => /weight 应为/.test(m))).toBe(true);
+  });
+
+  it('非法 targetKind 仍被枚举拦截（rootcause 之外的任意值）', () => {
+    const bad = { ...baseRootcause, meta: { ...baseRootcause.meta, targetKind: 'report' } };
+    const result = checkVerifierOutput(bad);
+    expect(result.passed).toBe(false);
+    // schema enum 前置拦截（[schema] 前缀）或逻辑层枚举校验均视为拦截成功
+    expect(result.reasons.some((m: string) => /targetKind/.test(m))).toBe(true);
+  });
+});

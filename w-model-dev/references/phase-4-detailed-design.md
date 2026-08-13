@@ -124,7 +124,7 @@
 
 ## 类设计规则引用
 
-详细设计阶段的类划分须遵循 [quality-standards.md](quality-standards.md)「类设计规则」小节：25 词职责测试、SRP/OCP/DIP、类名警报、内聚性。类设计不满足时回改设计再进入编码。
+详细设计阶段的类划分须遵循 [quality-standards.md](quality-standards.md)「类设计规则」小节：25 词职责测试、SRP/OCP/DIP、类名警报、内聚性。类设计不满足时回改设计再进入编码。模式选用（命名后讨论 + 权衡声明）见 [design-patterns-catalog.md](design-patterns-catalog.md)。
 
 ### 信息隐藏检查
 

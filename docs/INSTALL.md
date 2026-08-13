@@ -42,7 +42,7 @@
 | 交付层 | 包含 | 激活条件 | 前置依赖 |
 |---|---|---|---|
 | **L0「纯 skill」**（默认） | `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` | 拷贝到 Agent skills 目录即可 | 无（纯 Markdown） |
-| **L1「带门禁」** | L0 + `scripts/` + `samples/` | 需要确定性门禁（阶段门 / 图谱 / TLA+ / BDD / 工件质量门等）时 | Node.js ≥20 + `npm install`（tsx + ajv 等 devDeps，见上） |
+| **L1「带门禁」** | L0 + `scripts/` + `samples/` + `tools/`（tla2tools.jar，TLA+ 门禁运行时依赖） | 需要确定性门禁（阶段门 / 图谱 / TLA+ / BDD / 工件质量门等）时 | Node.js ≥20 + `npm install`（tsx + ajv 等 devDeps，见上） |
 
 - **L0 用户**：拷贝时删除 `scripts/` 与 `samples/` 即可（或拷贝全部但只加载 Markdown 资产）；编排者以 L0 模式运行时跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并将 `project.status` 标记 `gateLevel: "l0"`。
 - **L1 用户**：完整拷贝 `w-model-dev/`，按 §3 标准安装 + 仓库根 `npm install` 跑门禁脚本。
@@ -74,11 +74,12 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 ├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + anti-patterns.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南 + 设计模式目录（design-patterns-catalog）（按需加载，详见 SKILL.md Bundled Resources 表）
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
 ├── schemas/            # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep），由 schema-loader.ts 在 logic 层前置加载
+├── tools/              # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
 │   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / self-test / ensure-codegraph-opsx 等 31 个 exit-2 脚本；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（9 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate）
-│   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 571 条 + README.md coverage 矩阵）
+│   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 576 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -118,7 +119,7 @@ npm install
 npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 # 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
 
-# 验证回归基线（self-test 252 条样本全部通过）：
+# 验证回归基线（self-test 254 条样本全部通过）：
 npm run self-test
 
 # 验证安全扫描基线（exit 0 = 无新增风险）：
@@ -145,7 +146,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.7.0
+version: 41.8.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -195,7 +196,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | JSON Schema 文件（draft-07，20 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/logic/schema-loader.ts](../w-model-dev/scripts/logic/schema-loader.ts) |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts) |
-| 回归基线脚本（252 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
+| 回归基线脚本（254 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts) |
@@ -238,7 +239,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 571 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 576 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
@@ -270,7 +271,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - [`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./changes/archive/2026-07-30-round23-w-model-8-phase-validation/)
 - [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)
 
-调测明细（各轮指标、缺陷清单 L1~L4 沉淀、门禁验证数据）见各归档目录 README 与 [CHANGELOG.md](../CHANGELOG.md)。
+调测明细（各轮指标、缺陷清单 L1~L4 沉淀——原文已归档至 [`decision-log/legacy-sections.md`](./changes/decision-log/legacy-sections.md)、门禁验证数据）见各归档目录 README 与 [CHANGELOG.md](../CHANGELOG.md)。
 
 ## codegraph + OpenSpec 自动安装
 

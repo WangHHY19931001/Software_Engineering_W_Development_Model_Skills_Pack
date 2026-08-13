@@ -209,6 +209,8 @@
 
 **执行顺序**：需求解析算法（步骤 1-4）→ 套用模板产出需求规格 → 同步产出验收测试用例（覆盖正常 + 异常 + 边界）→ 产出风险评估报告 → RTM 登记。
 
+> 工期 / 工作量估算纪律（禁「编码×系数」外推 / mini-spike 前置 / 记账模板）见 [estimation-guide.md](estimation-guide.md)，按需加载。
+
 ## 测试用例设计（本阶段产出验收测试用例）
 
 | 用例 ID | 测试场景 | 输入 | 预期输出 | 优先级 |
@@ -380,9 +382,9 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 - **V 角色**：校验 `reviewDecision` / `rootCauseAnalysis` / `falsifiabilityCheck` / `conditions`，产出 `exemption-verification.json`。
 - **人类**：CHECKPOINT 确认，approve 写入 `granted.json`，reject 回到原规则。
 
-### check-exemption 校验（E1-E8）
+### check-exemption 校验（E1-E9）
 
-豁免生效前须通过 `check-exemption` E1-E8 全部校验（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）。
+豁免生效前须通过 `check-exemption` E1-E9 全部校验（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实 / 时间戳时序）。
 
 > 与反模式 #30（豁免审批跳步）的关系：任何豁免未按四阶段流程执行即命中 #30，见 [anti-patterns.md](anti-patterns.md)。
 
@@ -400,7 +402,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 8 | LLM 自行决定 REQ-group 归属 | level=1 REQ 即 REQ-group 候选（确定性规则）；group 边界模糊（FM-3D-04）须向用户确认，禁止 LLM 自行裁定 |
 | 9 | 省略 §4-§7 任一节（层级树/REQ-group/交叉逻辑/覆盖分析） | 四维识别强制节必须全部产出；无内容时填「无」并加说明，禁止省略 |
 | 10 | 覆盖缺失项隐式遗漏 | 覆盖缺失项须经豁免审批（FM-4D-01/02/03/05）并在 §8 Out of Scope 显式声明，禁止隐式遗漏 |
-| 11 | 跳过豁免审批流程 | 豁免须经 S→R→V→人类四阶段流程 + check-exemption E1-E8 全通过；跳步即命中反模式 #30 |
+| 11 | 跳过豁免审批流程 | 豁免须经 S→R→V→人类四阶段流程 + check-exemption E1-E9 全通过；跳步即命中反模式 #30 |
 | 12 | 迷雾项静默遗留 | CHECKPOINT 前迷雾册每项须有毕业处置结果（毕业成 REQ / 判 Out of Scope / 豁免审批），禁止未终结即放行（FM-3D-07） |
 | 13 | 追踪矩阵字段与主规格 §4/§7/§12 不一致 | 步骤 9 须对齐 traceability-matrix.md 与主规格层级树/覆盖矩阵/RTM 登记（FM-3D-08） |
 | 14 | UML 图表与层级树/User Stories 脱节 | uml-modeling.md 三图须对应主规格 §4 REQ/§3 stakeholder/§3 正常场景（FM-3D-09） |

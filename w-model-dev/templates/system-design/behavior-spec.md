@@ -17,7 +17,7 @@
 |---|---|---|---|
 | SD-{{xx}} | `features/L2/{{system}}_{{subsystem}}-{{num}}.feature` | {{Scenario 名}} | {{是/否}} |
 
-> 强制：每个 L2 行为规格条目列出对应 .feature 文件路径；`.feature` 文件存在性由 `check-bdd-model.ts` D1-D7 校验。
+> 强制：每个 L2 行为规格条目列出对应 .feature 文件路径；`.feature` 文件存在性由 `check-bdd-model.ts` D1-D8 校验。
 
 ## 3. 与系统设计文档的关系
 

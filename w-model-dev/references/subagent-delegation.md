@@ -560,7 +560,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 > S 产出后、V 评审前触发。R3 复用 R 子代理机制，但目的为预防性审查而非根因定位。
 >
-> **第29轮升级**：R3 从「条件强制（--r3-enabled flag）」升级为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神。
+> **第29轮升级**：R3 从「条件强制（--r3-enabled flag）」升级为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神。
 
 **分派时序**：S 产出（任意变体）→ R3-completeness / R3-reliability / R3-security（可并行）→ V 评审
 
@@ -569,11 +569,11 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 | S 变体 | action | R3 报告路径前缀 |
 |---|---|---|
 | 标准 S / S-doc / S-tla / S-bdd | `produce` | `<phase>-{dim}.json` |
-| S-ingest-tla / S-ingest-bdd | `produce` | `<phase>-ingest.json` |
+| S-ingest-tla / S-ingest-bdd | `produce` | `<phase>-ingest-{dim}.json` |
 | S-fix（返工变体） | `fix` | `<phase>-fix-{dim}.json` |
 | S-emergency-fix（紧急修复变体） | `emergency-fix` | `<phase>-emergency-{dim}.json` |
 
-`check-preventive-review.ts` 支持 `--variant=standard|fix|emergency` 参数校验对应路径；`--auto-trigger` 模式从 run-log 推断 S 变体。
+`check-preventive-review.ts` 支持 `--variant=standard|fix|emergency|ingest` 参数校验对应路径（ingest 须显式传参）；`--auto-trigger` 模式从 run-log 推断 S 变体。
 
 **R3 子代理输入**：
 - 当前阶段产物路径
@@ -1073,7 +1073,7 @@ O: 🔴 CHECKPOINT · 豁免审批确认（展示豁免请求 + R 审查 + V 校
   ↓
 人类: approve → O 写入 granted.json / reject → 回到原规则（补需求或补覆盖）
   ↓
-O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
+O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ```
 
 ### 分派模板
@@ -1127,7 +1127,7 @@ O: 分派 G 跑 check-exemption E1-E8 全通过 → 豁免生效
   - 跳过校验直接放行（FM-EXEMPT-03）
 ```
 
-> 豁免审批流程的收敛判定由 G 跑 `check-exemption` E1-E8 退出码决定（仿 ingestion 收敛由 G 跑 `check-requirement-graph.ts` 决定）。S/R/V 的产出仅作流程输入，不替代脚本判定。
+> 豁免审批流程的收敛判定由 G 跑 `check-exemption` E1-E9 退出码决定（仿 ingestion 收敛由 G 跑 `check-requirement-graph.ts` 决定）。S/R/V 的产出仅作流程输入，不替代脚本判定。
 
 ## 与现有约束的兼容性
 

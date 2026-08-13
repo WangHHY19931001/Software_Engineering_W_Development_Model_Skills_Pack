@@ -117,7 +117,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   }
 
   // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则跳过并记录（容错，不 crash）
-  // 必需字段为 R1-R7 实际访问的核心字段：runId / timestamp / phase / action / outcome
+  // 必需字段为 R1-R8 实际访问的核心字段：runId / timestamp / phase / action / outcome
   const valid: RunLogEntry[] = [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];

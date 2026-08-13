@@ -9,14 +9,14 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.7.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.8.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-13 实测）：
 
 | 指标 | 结果 |
 |---|---|
-| Self-test（samples 回归基线） | ✅ 252/252 |
-| Vitest（门禁脚本单元测试） | ✅ 35 files / 571 tests |
+| Self-test（samples 回归基线） | ✅ 254/254 |
+| Vitest（门禁脚本单元测试） | ✅ 35 files / 576 tests |
 | Vitest coverage（logic/+lib/ 阈值） | ✅ stmts 75 / branch 65 / funcs 85 / lines 75 |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
@@ -104,7 +104,7 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # TLA+ 行为门禁，退出码 0/1/2
 npm run check:coverage -- <coverage.json> [--graph=] [--out-of-scope=] [--exemptions=]  # 阶段 1 需求覆盖分析门禁，退出码 0/1/2
 npm run check:exemption -- <exemption.json>  # 豁免审批门禁（S→R→V→人类四阶段），退出码 0/1/2
-npm run self-test                           # 退出码 0/1（252 条样本回归基线）
+npm run self-test                           # 退出码 0/1（254 条样本回归基线）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 npm run format                              # prettier 格式化（w-model-dev/scripts/**/*.ts + config/ + scripts/*.cjs，幂等）
 
@@ -147,7 +147,7 @@ npm run setup:hooks # （可选）如需手动重置/确认钩子配置，执行
 npm run self-test
 ```
 
-`self-test.ts` 以 `w-model-dev/scripts/samples/` 下 **252 条端到端样本**回归全部 `*-logic.ts` 的通过 / 失败 / 输入错误三态，期望退出码 0。每次修改校验逻辑后必须跑通（新增校验项需同步增加样本，详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
+`self-test.ts` 以 `w-model-dev/scripts/samples/` 下 **254 条端到端样本**回归全部 `*-logic.ts` 的通过 / 失败 / 输入错误三态，期望退出码 0。每次修改校验逻辑后必须跑通（新增校验项需同步增加样本，详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
 
 **步骤 4：跑本地 pre-push 门禁（15 项）**
 
@@ -155,7 +155,7 @@ npm run self-test
 npm run prepush
 ```
 
-等价于 `bash .githooks/pre-push --force`，强制跑 15 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（35 files / 571 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）。任一失败即中止。
+等价于 `bash .githooks/pre-push --force`，强制跑 15 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（35 files / 576 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）。任一失败即中止。
 
 **步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
 
@@ -229,7 +229,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)
 - **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [subagent-persona-matrix.md](./w-model-dev/references/subagent-persona-matrix.md)）；Persona 文件本身是 Markdown，不调用 LLM
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI）
-- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记）+ 47 条流程反模式（流程破坏，命中即回退）+ 实现层教训 L1~L4 + 运维失败模式 O1~O6。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
+- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记，见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)）+ 47 条流程反模式（流程破坏，命中即回退）+ 运维失败模式 O1~O6（见 SSoT §4A.2a）。历史实现层教训 L1~L4 已归档至 [decision-log/legacy-sections.md](./docs/changes/decision-log/legacy-sections.md)。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
 - **项目级 Definition of Done**：7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储（`.w-model/*.json`），跨多轮交互保持上下文；JSON Schema (draft-07) 强约束
@@ -246,7 +246,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - **OpenSpec opsx 三段式 S 分派**（阶段 5-8）：S-explore（思路探索）→ S-propose（规格级变更规划+S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码），每段产物跑 R3×3 + V 评审
 - **单轴下限 R13**：Verifier 评审 passed 判据收紧为 `qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70`，杜绝「加权平均掩盖单轴失败」
 - **阶段 1 迷雾登记册（Fog of War）**：需求分析引入「REQ 入学锐利性测试」+ 迷雾登记册文本节 + 毕业机制（毕业成 REQ / 判 Out of Scope / 豁免审批）。详见 [phase-1-requirements.md](./w-model-dev/references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节
-- **阶段设计级产物**：阶段 1-4 产出升级为主模板 + 6 独立子模板（glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 等），主文档引用块串联；门禁新增对应结构校验。详见 [SSoT §10.7](./docs/skill-design-document_SSoT.md) 与 `w-model-dev/templates/`
+- **阶段设计级产物**：阶段 1-4 产出升级为主模板 + 每阶段 6 独立子模板（跨阶段去重后共 10 种：glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 等），主文档引用块串联；门禁新增对应结构校验。详见 [SSoT §10.7](./docs/skill-design-document_SSoT.md) 与 `w-model-dev/templates/`
 - **四源吸收（软件设计哲学 / 凤凰架构 / GoF 设计模式 / 失控）**：吸收《软件设计哲学》设计判据与战略式编程、《凤凰架构》架构决策框架与可观测性三支柱、GoF 23 设计模式目录、《失控》蜂群共识与受控的失控——落地为设计判据条目、方案权衡列、决策矩阵、模式目录与机制说理层（爬山法/约束创造/满意化/不连续系统穷举）。吸收决策记录见 [decision-log/absorptions.md](./docs/changes/decision-log/absorptions.md)
 
 ## 架构原则与外部工具边界
@@ -312,7 +312,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks
 │   │   ├── lib/                  # 通用工具与 IO 辅助：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json/artifact-gate-assets/uat-path-mapping/tla-clean-trace 等
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集 + README.md 覆盖矩阵，check-samples-coverage 门禁核对）
-│   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 571 tests）
+│   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 576 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（4 份伪示例对话 + 5 份 stage 编排示例 + real-run-evidence.md 真实命令证据）

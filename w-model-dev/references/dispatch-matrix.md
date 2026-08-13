@@ -47,7 +47,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 | 阶段 | S 变体 | 产出物 | 加载的 reference | 触发的 check 脚本 |
 |---|---|---|---|---|
-| 1 需求 | S-doc | 需求规格 + 验收测试用例 + 风险评估 + uat-path-mapping.md + RTM | phase-1-requirements / ingestion-chunk / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=1) / check-verifier-output / check-exemption(豁免时) |
+| 1 需求 | S-doc | 需求规格 + 验收测试用例 + 风险评估 + uat-path-mapping.md + RTM | phase-1-requirements / ingestion-chunk / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=1) / check-requirement-coverage / check-verifier-output / check-exemption(豁免时) |
 | 1 需求 | S-tla | L1 TLA+ 规格（.tla + .cfg）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=1) |
 | 1 需求 | S-bdd | L1 BDD features + bdd-manifest.json + RTM acceptanceTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=1) |
 | 2 系统设计 | S-doc | 系统设计文档 + 系统测试用例（含性能/安全基线）+ RTM | phase-2-system-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=2) / check-verifier-output |
@@ -56,7 +56,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | 3 概要设计 | S-doc | 接口设计文档 + 集成测试用例 + RTM | phase-3-outline-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=3) / check-verifier-output |
 | 3 概要设计 | S-tla | L3 TLA+ 规格（L2 细化 + L3）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=3, --graph 强制) |
 | 3 概要设计 | S-bdd | L3 BDD features（parent→L2）+ bdd-manifest.json + RTM integrationTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=3, --graph 强制) |
-| 4 详细设计 | S-doc | 详细设计文档 + 单元测试用例 + RTM | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output |
+| 4 详细设计 | S-doc | 详细设计文档 + 单元测试用例 + RTM | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide / design-patterns-catalog | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output |
 | 4 详细设计 | S-tla | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=4, --graph 强制) |
 | 4 详细设计 | S-bdd | L4 BDD features（parent→L3）+ bdd-manifest.json + RTM unitTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=4, --graph 强制) |
 
@@ -81,7 +81,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > V 子代理通用加载：agent-personas / verifier-spec / definition-of-done（阶段门时）；评审 BDD 时加 bdd-review-checklist；评审代码时加 quality-standards。
 
-> O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）。
+> O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）/ estimation-guide（工期/预算估算时）/ context-management-guide（长会话上下文管理时）。
 
 ## 4. 返工循环分派
 
@@ -148,7 +148,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | check-run-log | run-log 完整性 + 字段 schema + R3 记录数 | 每阶段门放行前 |
 | check-maturity | 成熟度判定 | 每阶段门放行前 |
 | check-checkpoint | CHECKPOINT acknowledgedDecisions 关键词 | 每阶段门放行前 |
-| check-preventive-review | R3 三份报告完整性（--variant=standard/fix/emergency） | V 评审前（always-on） |
+| check-preventive-review | R3 三份报告完整性（--variant=standard/fix/emergency/ingest） | V 评审前（always-on） |
 
 ### 6.2 全阶段通用脚本
 
@@ -162,14 +162,14 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 | 阶段门 | 必跑脚本（约束 #11 通用） | 阶段专属脚本 |
 |---|---|---|
-| 1 需求 | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-tla-model(--phase=1) / check-bdd-model(--phase=1) / check-exemption(豁免时) |
-| 2 系统设计 | 同上 | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制) |
-| 3 概要设计 | 同上 | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制) |
-| 4 详细设计 | 同上 | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制) |
+| 1 需求 | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1) / check-tla-bdd-sync / check-exemption(豁免时) |
+| 2 系统设计 | 同上 | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制) / check-tla-bdd-sync |
+| 3 概要设计 | 同上 | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制) / check-tla-bdd-sync |
+| 4 详细设计 | 同上 | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制) / check-tla-bdd-sync |
 | 5 编码 | 同上 | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
 | 6 集成测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6) |
 | 7 系统测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7) |
-| 8 验收测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-openspec-archive |
+| 8 验收测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive |
 
 > 阶段 4 硬约束：check-requirement-graph.ts --phase=4 + check-tla-model.ts --phase=4 退出码必须为 0（零违反），否则不放行进阶段 5 编码。
 
@@ -192,7 +192,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | #28 schema 前置校验缺失 | schema-loader validateBySchema |
 | #29 BDD 不符未回退 | check-bdd-model D4 等价性 |
 | #30 豁免审批跳步 | check-exemption E1-E8 |
-| #33 跳过 R3 | check-preventive-review + check-run-log R8 |
+| #33 跳过 R3 | check-preventive-review（--variant=standard|fix|emergency|ingest）+ check-run-log R8 |
 | #34 漏派角色 | check-role-dispatch（R≥3 无条件） |
 | #38 codegraph 未查询 | check-codegraph-queries |
 | #39 跳过 opsx 审查 | check-opsx-artifacts |

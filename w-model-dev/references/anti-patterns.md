@@ -6,13 +6,11 @@
 
 ## 目录
 
-- 反模式清单（#1~#47；#20 在 subagent-delegation.md；#33~#41 见各 detailed 节）
+- 反模式清单（#1~#47，含 detailed 节与检测信号）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
-- 实现层经验教训（代码层 L1~L4）
-- 失败模式清单（10 条行为退化 F1~F10）
-- 运维失败模式清单（6 条运行健康 O1~O6）
+- 失败模式与运维失败模式导航（F1~F10 见 [operation-behaviors.md](operation-behaviors.md)；O1~O6 见 SSoT §4A.2a；历史实现层教训 L1~L4 已归档至 [legacy-sections.md](../../docs/changes/decision-log/legacy-sections.md)）
 - 候选反模式检测信号（来自 Loop 4 爬坡循环）
 
 ## 反模式-硬约束映射
@@ -27,7 +25,7 @@
 | #4 真实执行 | #3、#12、#20、#25、#45 | 高 |
 | #5 失败即回退 | #7、#21、#31、#41 | 高 |
 | #6 按需加载 | #5 | 中 |
-| #7 如实状态 | #9、#45 | 中 |
+| #7 如实状态 | #9 | 中 |
 | #8 编排者最小化 + 角色分派完整性 | #10、#27、#34、#35、#40 | 高 |
 | #9 门禁退出码不可伪 | #3（同源）、#32 | 高 |
 | #10 系统层级树 + REQ 层级标注 | #11、#13 | 中 |
@@ -35,7 +33,7 @@
 | #12 返工必经根因定位 | #4（小修继续）、#18、#19 | 高 |
 | #13 行为门禁按成熟度分级（TLA+/BDD） | #14、#15、#16、#17、#29 | 中（L2/L3 项目） |
 | #14 代码改动前后门禁（codegraph + 回归） | #38、#47 | 中（阶段 5-8） |
-| 实现层质量门（无流程约束映射，V/G 人工校验） | #22、#23、#24、#26、#28、#36、#37、#43 | — |
+| 实现层质量门（无流程约束映射，V/G 人工校验） | #22、#23、#24、#28、#36、#37、#43 | — |
 
 ## 反模式清单
 
@@ -70,7 +68,7 @@
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 20 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
-| 30 | 豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
+| 30 | 豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E9 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
 | 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，`check-archive-integrity.ts` 退出码 0（见 SSoT §10B.2.1 归档完整性清单） |
 | 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
 | 33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
@@ -112,6 +110,7 @@
 | #17（TLA+ 与需求/设计不符未回退） | 阶段 1~4 | [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节 |
 | #18（跳过 R 直接 S 返工） | 全阶段 | [root-cause-locator.md](root-cause-locator.md) + 各 phase-N「返工路径」节 |
 | #19（R 报告未 V 复审） | 全阶段 | [root-cause-locator.md](root-cause-locator.md)「R 产出质量标准」节 |
+| #20（只规划不执行） | 全阶段（S 分派） | [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节 |
 | #21（阶段级门禁跳过） | 阶段 6/7/8 | [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节 |
 | #22（角色越权） | 阶段 5 | [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
 | #23（跨模块 store 误用） | 阶段 3/4 | [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
@@ -134,7 +133,7 @@
 | #40（opsx/S-tickets 职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节 |
 | #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
 | #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #11/#8 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
-| #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
+| #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「敏感信息禁令（第三十一轮）」节 |
 | #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts) |
 | #45（为通过测试而修改断言/测试期望） | 阶段门评审 / V 评审 | V 评审人工核验断言与需求对应关系（反指标游戏，Goodhart） |
 | #46（只给审计权不给修正权） | 全流程 | CHECKPOINT 显式标注介入路径（外科手术录像回放） |
@@ -169,7 +168,7 @@
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
 | #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/logic/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（20 份） |
 | #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
-| #30（豁免审批跳步） | `check-exemption` E1-E8 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
+| #30（豁免审批跳步） | `check-exemption` E1-E9 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
 | #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/cli/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |
 | #32（签名链断裂） | [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts)（R1-R10 任一失败） |
 | #33（跳过 R3 预防性审查） | [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（always-on）+ [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S→V 间 R3 记录数） |
@@ -183,7 +182,7 @@
 | #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描） |
-| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
+| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R5 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
 | #45（为通过测试而修改断言/测试期望） | 无专用脚本（V 评审人工核验断言与需求对应关系） |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
@@ -244,7 +243,7 @@
 | `check-tla-model.ts` | 0 | TLA+ 行为门禁通过（文件头 + 层次 + 拆解 + SANY + TLC 全通过） | — | 可推进（阶段 4 通过即可进阶段 5 编码） |
 | `check-tla-model.ts` | 1 | TLA+ 校验失败（文件头缺失 / 层次不一致 / 拆解未完成 / SANY 语法错 / TLC 死锁 / 不变式违反 / 状态爆炸） | #14 / #15 / #16 | 回到当前阶段起点，分派 S 修正规格或拆解，重跑 `check-tla-model.ts` |
 | `check-tla-model.ts` | 2 | 输入错误（`tla-manifest.json` 缺失 / Java 未找到 / jar 缺失） | #14 | 修复环境或 manifest 后重跑 |
-| `check-iceberg-sweep.ts` | 0 | 冰山扫掠报告校验通过（R1-R8 全过） | — | 可放行（newFindings=[] 或 V 复审后返工闭环） |
+| `check-iceberg-sweep.ts` | 0 | 冰山扫掠报告校验通过（R1-R5 全过） | — | 可放行（newFindings=[] 或 V 复审后返工闭环） |
 | `check-iceberg-sweep.ts` | 1 | 校验失败（schema / round 越界 / 去重 / 可证伪 / passed 不一致） | #44 | 回到 S-fix 后（ICEBERG-A）或阶段门前（ICEBERG-B），补跑 R-iceberg + V 复审 |
 | `check-iceberg-sweep.ts` | 2 | 输入错误（报告 JSON 缺失 / 路径错误） | #44 | 重新执行 R-iceberg 产出报告 |
 
@@ -464,7 +463,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
     （R 不得直接批准豁免生效）
   → V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions 产出 exemption-verification.json
   → 人类 CHECKPOINT 确认 → approve 写入 granted.json / reject 回到原规则
-  → check-exemption E1-E8 全通过
+  → check-exemption E1-E9 全通过
 ```
 
 **检测信号**：
@@ -473,7 +472,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - `exemption-verification.json` `passed=false` 但 `granted.json` 已写入（FM-EXEMPT-03）。
 - 无 CHECKPOINT 人类确认记录（run-log 无 `action=checkpoint` + 人类确认），但豁免已生效（FM-EXEMPT-04）。
 - 豁免理由为「需求遗漏」类但未补需求（FM-EXEMPT-05）。
-- `check-exemption` E1-E8 任一未通过。
+- `check-exemption` E1-E9 任一未通过。
 
 **回退动作**：
 1. 作废已生效的豁免（删除 `granted.json` 对应条目，回退需求规格 §8 Out of Scope 中的豁免声明）。
@@ -691,7 +690,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（软检测，V 评审 + G 门禁人工核验；`security-scan.ts` 覆盖源码级扫描，本反模式覆盖数据文件层）。
 
-**关联**：[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理
+**关联**：[operational-recovery.md](operational-recovery.md)「敏感信息禁令（第三十一轮）」节；demo `JWT_SECRET` 环境变量处理
 
 ## #44 跳过冰山扫掠直接放行
 

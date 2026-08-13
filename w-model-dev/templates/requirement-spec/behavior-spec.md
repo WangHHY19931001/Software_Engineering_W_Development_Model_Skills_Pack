@@ -16,7 +16,7 @@
 |---|---|---|---|
 | REQ-{{xxx}} | `features/L1_{{system}}-001.feature` | {{Scenario 名}} | {{是/否}} |
 
-> 强制：每个 L1 行为规格条目列出对应 .feature 文件路径；`.feature` 文件存在性由 `check-bdd-model.ts` D1-D7 校验。
+> 强制：每个 L1 行为规格条目列出对应 .feature 文件路径；`.feature` 文件存在性由 `check-bdd-model.ts` D1-D8 校验。
 
 ## 3. 与需求规格的关系
 

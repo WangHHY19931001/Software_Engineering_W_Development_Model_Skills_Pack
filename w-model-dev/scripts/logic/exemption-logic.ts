@@ -2,7 +2,7 @@
  * 豁免审批纯逻辑层（Exemption Logic）
  *
  * 校验豁免审批流程完整性（S→R→V→人类四阶段）。
- * 规则 E1-E8：
+ * 规则 E1-E9：
  *   E1  schema 完整性
  *   E2  justification 长度 ≥ 20 字符
  *   E3  evidence 数组非空
@@ -11,6 +11,7 @@
  *   E6  review.rootCauseAnalysis 长度 ≥ 30 字符
  *   E7  verification.verified = true
  *   E8  humanDecision.decision = approve
+ *   E9  时间戳时序 submittedAt < reviewedAt < verifiedAt < decidedAt
  */
 import { validateBySchema, type SchemaValidationResult } from './schema-loader.js';
 

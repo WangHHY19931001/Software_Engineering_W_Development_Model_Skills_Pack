@@ -32,7 +32,7 @@ W 模型 8 阶段**串行**推进，每阶段由确定性门禁脚本守住边�
 | 5 编码实现 | 实现代码、单元测试执行结果、RTM codeModule、codegraph 落盘、opsx 制品 | `check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-artifact-gate.ts --phase=5` | [stage5-coding.md](stage5-coding.md) |
 | 6 集成测试 | 集成测试执行结果、测试报告、RTM integrationTest | `check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6` | [stage6-integration-test.md](stage6-integration-test.md) |
 | 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7` | [stage7-system-test.md](stage7-system-test.md) |
-| 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8`、`check-openspec-archive.ts` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
+| 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8`、`check-design-contract-consistency.ts`、`check-openspec-archive.ts` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
 
 > 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [dispatch-matrix.md](../references/dispatch-matrix.md)。
 

@@ -100,12 +100,12 @@
           "evidence": {
             "type": "string",
             "minLength": 1,
-            "description": "证据引用（具体产物字段/行号/节点ID），禁止空泛（check-iceberg-sweep.ts R7 校验）"
+            "description": "证据引用（具体产物字段/行号/节点ID），禁止空泛（check-iceberg-sweep.ts R4 校验）"
           },
           "hypothesis": {
             "type": "string",
             "minLength": 1,
-            "description": "可证伪假设：若此发现消除，关联现象是否消失（check-iceberg-sweep.ts R7 校验）"
+            "description": "可证伪假设：若此发现消除，关联现象是否消失（check-iceberg-sweep.ts R4 校验）"
           },
           "relatedFixedPoint": {
             "type": "string",
@@ -142,7 +142,7 @@
     },
     "passed": {
       "type": "boolean",
-      "description": "true=newFindings为空（可终止/放行），false=有新发现（须走返工）。check-iceberg-sweep.ts R8 校验 passed 与 newFindings 一致性"
+      "description": "true=newFindings为空（可终止/放行），false=有新发现（须走返工）。check-iceberg-sweep.ts R5 校验 passed 与 newFindings 一致性"
     }
   }
 }

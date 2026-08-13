@@ -17,6 +17,7 @@
 - §8：外部 Agent 提示词模板
 - §9–11：校验、集成与异常处理
 - §12：跨阶段 evidence 一致性
+- §13：self-as-verifier 模式（V 评审产出独立性）
 - 独立评审会话模板
 
 ## 1. 设计原则
@@ -58,7 +59,7 @@
 
 ### 2.2 targetKind 枚举规范
 
-> 第 9 轮标准化：`meta.targetKind` 必须取自以下 4 值枚举。原 `testcase` / `file` 已废弃，分别用 `test` / `code` 替代。`rootcause` 不由 `check-verifier-output.ts` 校验（由 `check-rootcause-report.ts` 独立校验），故不在本枚举内。
+> 第 9 轮标准化：`meta.targetKind` 必须取自以下 5 值枚举。原 `testcase` / `file` 已废弃，分别用 `test` / `code` 替代。`rootcause` 为 V 复审根因报告（RootCauseReport）的专用 `targetKind`（第 41.8.0 轮补全入枚举，此前仅存在于 §7.5 定义而脚本未校验）。
 
 **合法枚举**：
 
@@ -68,6 +69,7 @@
 | `design` | phase 2 / 3 / 4 | 系统 / 接口 / 详细设计 | 不变 |
 | `code` | phase 5 | 源代码 | **取代原 `file`** |
 | `test` | phase 6 / 7 / 8 | 集成 / 系统 / 验收测试 | **取代原 `testcase`** |
+| `rootcause` | 返工循环（V 复审 R 报告） | 根因报告复审（§7.5 子标准集合） | 新增 |
 
 **废弃值映射**：
 
@@ -76,19 +78,19 @@
 | `testcase` | `test` | 阶段 1~4 测试用例设计文档 + 阶段 6~8 测试执行报告统一用 `test` |
 | `file` | `code` | 阶段 5 源代码评审用 `code`，与 `code-tla-consistency` 维度命名对齐 |
 
-> `rootcause` 仍作为 V 复审根因报告的 `targetKind`（详见 §7.5），但 `check-verifier-output.ts` 不校验该值（脚本只校验上述 4 值枚举）；rootcause 类 VerifierOutput 由 `check-rootcause-report.ts` 独立校验。
+> `rootcause` 为 V 复审根因报告（RootCauseReport）的合法 `targetKind`（详见 §7.5）：`check-verifier-output.ts` 按 §7.5 子标准集合（correctness / completeness / falsifiability / actionability / prevention）校验该 VerifierOutput；RootCauseReport 本身（rootCauseChain / fixRecommendation / prevention 等字段）由 `check-rootcause-report.ts` 独立校验（R1-R10）。两者互补不互替。
 
 **校验**（由 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 强制执行）：
 
 ```typescript
-const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test'];
+const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test', 'rootcause'];
 if (!allowedKinds.includes(targetKind as TargetKind)) {
   reasons.push(`meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`);
   return { passed: false, ... };
 }
 ```
 
-非法值（含 `testcase` / `file` / `rootcause` / 其他任意值）→ 退出码 1，VerifierOutput 判定不通过。
+非法值（含 `testcase` / `file` / 其他任意值）→ 退出码 1，VerifierOutput 判定不通过。
 
 > 迁移策略：第八轮及更早的 demo / fixture 中含 `targetKind="testcase"` 的 VerifierOutput 须在第 9 轮 Part C 修正为 `targetKind="test"`（详见 CHANGELOG 第 9 轮条目）。
 
@@ -96,7 +98,7 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 
 > 各阶段的 `verifier-output.subCriteria` 名称必须取自下表标准集合（允许子集，但不允许新增名称）。本表与 §7 子标准定义一致，按 `targetKind` 推断阶段后校验。
 
-**4 targetKind × subCriteria 标准模板**：
+**5 targetKind × subCriteria 标准模板**：
 
 | targetKind | 适用阶段 | subCriteria 标准名称（权重） | 权重和 |
 |---|---|---|---|
@@ -104,6 +106,7 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 | `design` | phase 2 / 3 / 4 | `architecture-soundness`(0.25) / `requirement-coverage`(0.25) / `interface-consistency`(0.20) / `feasibility`(0.15) / `testability`(0.15) | 1.00 |
 | `code` | phase 5 | `correctness`(0.30) / `security`(0.20) / `readability`(0.15) / `maintainability`(0.15) / `conformance`(0.20) | 1.00 |
 | `test` | phase 6 / 7 / 8 | `coverage`(0.30) / `correctness`(0.25) / `independence`(0.20) / `clarity`(0.15) / `priority-reasonableness`(0.10) | 1.00 |
+| `rootcause` | 返工循环（V 复审 R 报告） | `correctness`(0.25) / `completeness`(0.25) / `falsifiability`(0.20) / `actionability`(0.15) / `prevention`(0.15)（§7.5） | 1.00 |
 
 **8 阶段对照表**（按 `targetKind` 推断阶段）：
 
@@ -117,6 +120,7 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 | phase 6 集成测试 | `test` | §7.3 | 5 项标准 |
 | phase 7 系统测试 | `test` | §7.3 | 同 phase 6（集成/系统/验收测试共用 test 集合） |
 | phase 8 验收测试 | `test` | §7.3 | 同 phase 6 |
+| 返工循环（V 复审 R 报告） | `rootcause` | §7.5 | 5 项标准；根因诊断专用维度（不使用 §7.4A 五轴） |
 
 **权重说明**：
 
@@ -134,7 +138,7 @@ if (subCriteria.length !== expected.length) {
 // 逐项校验 name 与 weight
 ```
 
-> 与原计划的差异：第 9 轮设计曾提议按 8 阶段细分（如 phase 1 用 `requirement-completeness` / `stakeholder-coverage` 等），但实际实施时为避免破坏既有 VerifierOutput 历史数据与 §7 子标准定义，保留原 4 targetKind × 5 项标准的颗粒度。8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）。
+> 与原计划的差异：第 9 轮设计曾提议按 8 阶段细分（如 phase 1 用 `requirement-completeness` / `stakeholder-coverage` 等），但实际实施时为避免破坏既有 VerifierOutput 历史数据与 §7 子标准定义，保留原 4 targetKind × 5 项标准的颗粒度（第 41.8.0 轮按 §7.5 补全 `rootcause` 为第 5 targetKind）。8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）。
 
 > 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
 
@@ -201,7 +205,7 @@ if (subCriteria.length !== expected.length) {
 - 子标准方差必须 ≤ `varianceThreshold`（默认 `0.10`），否则视为不可重复，
   `check-verifier-output.ts` 会判失败并要求重评。
 - **防漂移**：`check-verifier-output.ts` 会根据 `rawScores` **重算方差**并与输出
-  的 `variance` 字段对比，误差超过 `1e-4` 即判失败。Agent 不得谎报低方差以
+  的 `variance` 字段对比，误差超过 `1e-6`（§3.2.1 规则 2）即判失败。Agent 不得谎报低方差以
   掩盖「实际只评估 1 次、复制 N 次填入 rawScores」的作弊行为。
 
 #### 3.2.1 防漂移实现规则（`check-verifier-output.ts` 强制执行）
@@ -390,7 +394,7 @@ interface VerifierOutput {
     varianceThreshold: number;
   };
 
-  /** 子标准评估结果（≥3 项，对应 §7 各目标类型） */
+  /** 子标准评估结果（== 5 项，对应 §7 各目标类型；§2.3 与脚本强制固定为 5 项，不允许子集/超集） */
   subCriteria: Array<{
     /** 子标准名称，必须命中 §7 中定义的子标准名 */
     name: string;
@@ -727,10 +731,10 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 |---|---|---|
 | `{{repeatTimes}}` | 由 Agent 配置，整数 ≥3（spec §3.2 默认 `3`）；与输出 JSON `meta.repeatTimes` 一致 | `3` |
 | `{{scoringMethod}}` | Agent 选择，`logits` 或 `text-parse`（spec §4 / §6）；与输出 JSON `meta.scoringMethod` 一致 | `logits` |
-| `{{targetKind}}` | 评审目标类型，`requirement` / `design` / `code` / `test`（spec §2 / §7）；与输出 JSON `meta.targetKind` 一致 | `requirement` |
+| `{{targetKind}}` | 评审目标类型，`requirement` / `design` / `code` / `test` / `rootcause`（spec §2 / §7）；与输出 JSON `meta.targetKind` 一致 | `requirement` |
 | `{{target}}` | 目标 ID（前缀见 §2）或文件路径；与输出 JSON `meta.target` 一致 | `REQ-001` |
 | `{{targetContent}}` | 目标的完整文本内容（需求规格 / 设计文档 / 测试用例 / 代码片段），由 Agent 从项目工件中读取后整体填入 | （省略） |
-| `{{subSection}}` | §7 中对应 `targetKind` 的子节号（1-4）；用于让模型按正确子标准集合评估 | `1`（对应 §7.1 需求） |
+| `{{subSection}}` | §7 中对应 `targetKind` 的子节号（1-5）；用于让模型按正确子标准集合评估 | `1`（对应 §7.1 需求） |
 | `{{k}}` | PPT 锦标赛规模，整数 ∈ [2, 1000]（spec §5.1 默认 `5`）；与输出 JSON `ranking.k` 一致 | `5` |
 | `{{temperature}}` | PPT 软比较温度，正数 ≤ 100（spec §5.1 默认 `4.0`）；与输出 JSON `ranking.temperature` 一致 | `4.0` |
 | `{{candidates}}` | 候选目标列表，每行 `ID<TAB>综合分数`，由 Agent 收集所有候选的 `compositeScore` 后填充 | （省略） |
@@ -835,7 +839,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>
 
 当 `subCriteria[i].variance > meta.varianceThreshold`（默认 0.10）时：
 
-1. **检测**：`check-verifier-output.ts` 重算方差并对比，误差 > `1e-4` 或方差超阈值 → 退出码 1。
+1. **检测**：`check-verifier-output.ts` 重算方差并对比，误差 > `1e-6`（§3.2.1 规则 2）或方差超阈值 → 退出码 1。
 2. **重评**：对该子标准增加 `repeatTimes` 至 5 次（默认 3 次基础上 +2），使用更强温度扰动（如 0.7 → 0.9）。
 3. **离群值剔除**：若 `rawScores` 中存在明显离群值（与中位数偏差 > 2×MAD），剔除后重算均值与方差。
 4. **仍超阈值**：判定该子标准不可重复 → `passed=false`，`reworkHints` 标注「子标准 `<name>` 不可重复，须人工评审」。

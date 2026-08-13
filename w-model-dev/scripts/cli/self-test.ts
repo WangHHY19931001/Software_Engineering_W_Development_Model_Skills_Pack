@@ -14,17 +14,12 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定：
- *   w-model-dev/scripts/samples/verifier/*.json   Verifier 输出样本
- *   w-model-dev/scripts/samples/gate/*.json       RTM 矩阵样本
- *   w-model-dev/scripts/samples/graph/*.json      图谱样本
- *   w-model-dev/scripts/samples/tla/*.json        TLA+ manifest 样本（纯逻辑校验，不跑 SANY/TLC）
- *   w-model-dev/scripts/samples/code-tla/*.json   代码-TLA+ 一致性样本（含 manifest+graph+rtm+codeSources）
- *   w-model-dev/scripts/samples/bdd/*.json+*.feature  BDD manifest + features 样本（含 5 valid + 5 bad）
- *   w-model-dev/scripts/samples/coverage/*.json   覆盖分析样本（四维·维度4，10 条）
- *   w-model-dev/scripts/samples/exemption/*.json  豁免审批样本（四维·豁免，7 条）
- *   w-model-dev/scripts/samples/graph/*spec*.json   R7/R8 需求规格产物样本（第 37 轮，4 条）
- *   w-model-dev/scripts/samples/gate/*requirement-spec-structure*.json  Phase 1 需求规格结构校验样本（第 37 轮，4 条）
+ * 样本目录约定（samples/<area>/，26 个用例数组，详见 samples/README.md 覆盖矩阵）：
+ *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
+ *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
+ *   tla-bdd-sync / state-machine / design-contract / signature-chain /
+ *   archive-integrity / schema / codegraph-queries / opsx-artifacts /
+ *   openspec-archive / uat-path-mapping（tla-e2e 为需 Java 的手动 fixture，豁免）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -233,6 +228,18 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/completeness.*0\.65.*0\.7(?!\d).*单轴下限/],
     description:
       'R13 单轴下限：completeness=0.65<0.70 加权平均达 A 级（0.86）但单轴失败，应 passed=false（反模式 #41）',
+  },
+  // -------------------- rootcause targetKind（第 41.8.0 轮补全，§7.5） --------------------
+  {
+    file: 'valid-rootcause.json',
+    expectedPassed: true,
+    description: 'targetKind=rootcause 合法 VerifierOutput（§7.5 子标准集合 + 权重），应通过全部校验',
+  },
+  {
+    file: 'bad-rootcause-subcriteria.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/subCriteria.*name 应为/],
+    description: 'targetKind=rootcause 但误用 test 集合子标准，应被 §7.5 子标准集合校验拦截',
   },
 ];
 
@@ -1349,19 +1356,19 @@ const ICEBERG_CASES: IcebergCase[] = [
     file: 'bad-round-out-of-range.json',
     expectedPassed: false,
     expectedReasonPatterns: [/icebergRound/],
-    description: 'icebergRound=6 越界（R5，maxIcebergRounds=5）',
+    description: 'icebergRound=6 越界（R2，maxIcebergRounds=5）',
   },
   {
     file: 'bad-missing-evidence.json',
     expectedPassed: false,
     expectedReasonPatterns: [/evidence/],
-    description: 'finding 缺 evidence（R7 可证伪校验失败）',
+    description: 'finding 缺 evidence（R4 可证伪校验失败）',
   },
   {
     file: 'bad-duplicate-finding.json',
     expectedPassed: false,
     expectedReasonPatterns: [/已在上一轮发现/],
-    description: 'findingId 与 previousFindings 重复（R6 去重失败）',
+    description: 'findingId 与 previousFindings 重复（R3 去重失败）',
   },
 ];
 

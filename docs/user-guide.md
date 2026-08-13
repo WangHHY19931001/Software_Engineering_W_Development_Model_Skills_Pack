@@ -35,7 +35,7 @@
 排查步骤：
 
 1. **读 violations 列表**：每条违规含规则链前缀，如 `[D7:feature-001] req "REQ-001" not in RTM`、`R1: 阶段 4 缺 gate 类动作`。先按前缀在 第 4 节速查表定位规则归属。
-2. **对照规则依据**：反模式编号 `#N` → 查 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 对应行的「正确做法」列；维度编号（R1-R8 / D1-D8 / C1-C10 / E1-E8）→ 查 第 5 节指向的 reference 细则。
+2. **对照规则依据**：反模式编号 `#N` → 查 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 对应行的「正确做法」列；维度编号（R1-R5 / D1-D8 / C1-C10 / E1-E9）→ 查 第 5 节指向的 reference 细则。
 3. **走标准返工路径**：V/G 不通过后**不得悄悄小修后继续**（反模式 #4），必须先分派 R 根因定位 → V 复审 → G 门禁 → S-fix 携报告修复（反模式 #18/#19）。
 4. **重跑门禁**直到 exit 0；退出码 1/2 一律不得放行（反模式 #7）。
 
@@ -72,8 +72,8 @@
 
 规则依据的权威清单在 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)：
 
-- **47 条流程反模式** `#1~#47`（命中即视为流程破坏、必须回退；#20 在 [`subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)）
-- **实现层教训** `L1~L4`、**失败模式** `F1~F10`（行为退化，命中不回退但登记）、**运维失败模式** `O1~O6`
+- **47 条流程反模式** `#1~#47`（命中即视为流程破坏、必须回退）
+- **失败模式** `F1~F10`（行为退化，命中不回退但登记，见 [`operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)）、**运维失败模式** `O1~O6`（见 SSoT §4A.2a）；历史实现层教训 `L1~L4` 已归档至 [`legacy-sections.md`](../docs/changes/decision-log/legacy-sections.md)
 
 ### 4.2 规则链编号速查表
 
@@ -103,11 +103,11 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 | 工件质量门 `check-artifact-gate.ts` | RTM 覆盖率 < 100% / `designDoc` 未回填 | 反模式 #3/#6/#7 | 实际核验 RTM 登记项并回填真实结果；详见 [`quality-standards.md`](../w-model-dev/references/quality-standards.md)「质量门检查清单」 |
 | run-log 门禁 `check-run-log.ts` | R1 缺动作 / R5 O 越权 / R6 exitCode 不一致 | 反模式 #10/#25/#26/#27 | 补记真实动作（勿伪造）；字段按 [`data-models.md`](../w-model-dev/references/data-models.md) 对照表修正 |
 | 签名链 `check-signature-chain.ts` | R1-R10 任一断裂 | 反模式 #32 | 补齐缺失角色签名与来源证明；详见 [`signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) |
-| 豁免门禁 `check-exemption.ts` | E1-E8 任一失败（跳步） | 反模式 #30 | 按 S→R→V→人类四阶段补流程；详见 [`phase-1-requirements.md`](../w-model-dev/references/phase-1-requirements.md)「豁免审批治理」节 |
+| 豁免门禁 `check-exemption.ts` | E1-E9 任一失败（跳步） | 反模式 #30 | 按 S→R→V→人类四阶段补流程；详见 [`phase-1-requirements.md`](../w-model-dev/references/phase-1-requirements.md)「豁免审批治理」节 |
 | 归档完整性 `check-archive-integrity.ts` | 强制快照清单缺文件 | 反模式 #31 | 补齐归档强制产出文档后重跑 |
 | 预防性审查 `check-preventive-review.ts` | R3×3 缺失 | 反模式 #33/#42 | 回 S 产出后起点补跑 R3×3 + V |
 
-> 修改 `*-logic.ts` 校验逻辑后必须跑 `npm run self-test`（252 条样本回归基线）与 `npm run prepush`，并同步样本（见 [`__tests__/README.md`](../w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
+> 修改 `*-logic.ts` 校验逻辑后必须跑 `npm run self-test`（254 条样本回归基线）与 `npm run prepush`，并同步样本（见 [`__tests__/README.md`](../w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
 
 ## 6. 依赖巡检流程（人工 npm audit + npm outdated）
 

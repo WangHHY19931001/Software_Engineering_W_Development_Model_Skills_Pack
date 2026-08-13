@@ -211,4 +211,36 @@ describe('checkPreventiveReview: variant 选项（第29轮 S-fix/emergency）', 
     expect(r.passed).toBe(false);
     expect(r.reasons.some((msg) => /security.*未找到/.test(msg))).toBe(true);
   });
+
+  it('variant=ingest 时三份齐备判定与 standard 一致（逻辑层校验对所有 S 变体不变）', () => {
+    const reviews: Record<string, PreventiveReview | null> = {
+      completeness: {
+        reviewedAt: '2026-07-31T00:00:00Z',
+        reviewer: 'R',
+        phase: 5,
+        dimension: 'completeness',
+        findings: [],
+        passed: true,
+      },
+      reliability: {
+        reviewedAt: '2026-07-31T00:00:00Z',
+        reviewer: 'R',
+        phase: 5,
+        dimension: 'reliability',
+        findings: [],
+        passed: true,
+      },
+      security: {
+        reviewedAt: '2026-07-31T00:00:00Z',
+        reviewer: 'R',
+        phase: 5,
+        dimension: 'security',
+        findings: [],
+        passed: true,
+      },
+    };
+    const r = checkPreventiveReview(reviews, 5, { variant: 'ingest' });
+    expect(r.passed).toBe(true);
+    expect(r.reasons).toHaveLength(0);
+  });
 });

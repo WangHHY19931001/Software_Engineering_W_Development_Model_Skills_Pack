@@ -17,7 +17,7 @@
 |---|---|---|---|
 | INTF-{{xx}} | `features/L3/{{system}}_{{subsystem}}_{{atom}}-{{num}}.feature` | {{Scenario 名}} | {{是/否}} |
 
-> 强制：每个 L3 行为规格条目列出对应 .feature 文件路径；`.feature` 文件存在性由 `check-bdd-model.ts` D1-D7 校验。
+> 强制：每个 L3 行为规格条目列出对应 .feature 文件路径；`.feature` 文件存在性由 `check-bdd-model.ts` D1-D8 校验。
 
 ## 3. 与接口设计文档的关系
 

@@ -19,18 +19,18 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
-      '**当前版本**：`41.7.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
+      '**当前版本**：`41.8.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n35 files / 530 tests',
     antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.7.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |',
+      '---\nname: w-model-dev\nversion: 41.8.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
     agents: '31 个脚本\n35 个 .test.ts / 530 条',
-    pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.7.0' }),
-    metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.7.0' }),
-    installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.7.0\n```',
+    pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.8.0' }),
+    metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.8.0' }),
+    installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.8.0\n```',
     ssot: [
       '### 4A.1 八条核心操作行为',
       '8 条核心操作行为',
@@ -116,14 +116,14 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('SKILL.md 内联八条操作行为完整表 → 违规（第 44 轮已移入 references）', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.7.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...' });
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.8.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...' });
     expect(
       runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('不应再内联')),
     ).toBe(true);
   });
 
   it('SKILL.md 缺操作行为指针 → 违规', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.7.0\n---\n## 核心操作行为\n（无指针）' });
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.8.0\n---\n## 核心操作行为\n（无指针）' });
     expect(
       runDocConsistencyChecks(input).some(
         (x) => x.check === 'operating-behaviors' && x.message.includes('operation-behaviors.md'),
@@ -148,7 +148,7 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('SKILL.md 缺硬约束指针 → 违规', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.7.0\n---\n## 不可违反的约束\n（无指针）' });
+    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.8.0\n---\n## 不可违反的约束\n（无指针）' });
     expect(
       runDocConsistencyChecks(input).some(
         (x) => x.check === 'hard-constraints' && x.message.includes('hard-constraints.md'),
@@ -209,11 +209,11 @@ describe('runDocConsistencyChecks', () => {
     const input = baseInput({ personaCount: 27 });
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('28'))).toBe(true);
-    // references 计数漂移 → 违规（41.7.0 新增）
+    // references 计数漂移 → 违规（41.4.0 新增）
     const vRef = runDocConsistencyChecks(baseInput({ referencesCount: 56 }));
     expect(vRef.some((x) => x.check === 'references-count' && x.message.includes('53'))).toBe(true);
     const vSkill = runDocConsistencyChecks(
-      baseInput({ skill: '---\nversion: 41.7.0\n---\n无 references 计数表述' }),
+      baseInput({ skill: '---\nversion: 41.8.0\n---\n无 references 计数表述' }),
     );
     expect(vSkill.some((x) => x.check === 'references-count' && x.message.includes('53 个 .md'))).toBe(true);
   });

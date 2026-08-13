@@ -165,7 +165,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - [ ] 每阶段 V 评审后，确认 reworkHints 非空（即使 passed=true 也有 FYI 提示）
 - [ ] 每阶段 G 门禁后，确认 9 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint；阶段 1-4 额外 check-tla-model / check-requirement-graph / check-bdd-model）
 - [ ] 归档前确认 acceptance-test-report.md §9 用户确认区已勾选（self-as-verifier 模式须留代签痕迹）
-- [ ] 长会话（>20 轮）后重读 project_memory.md 硬约束 + 当前阶段 phase-N-*.md 摘要
+- [ ] 长会话（>20 轮）后重读 project_memory.md 硬约束 + 当前阶段 phase-N-*.md 摘要；上下文分层 / 修剪 / KV 缓存友好纪律见 [context-management-guide.md](context-management-guide.md)
 - [ ] BDD features 是否完整产出（每个 REQ/SD/INTF/DD 至少 1 个对应层级 .feature 文件）？
 - [ ] BDD 状态机七要素是否齐全（不接受「占位状态机」）？
 - [ ] BDD↔TLA+ 等价性是否校验通过（不接受「BDD 写完就跳过等价性校验」）？
@@ -365,7 +365,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 > 吸收自 Agentic Design Patterns ch13「Human-on-the-loop」：人类以显式、可验证的规则定义授权边界，AI 在规则内自主执行、规则外升级。
 
 - **授权规则必须显式可验证**：L2+ 操作型自动放行不得基于模糊意图，须基于规则化条件（等同 run-log 可校验的条件表达式），如"单元测试全过 + 覆盖率 ≥ 80% + 门禁退出码 0"。
-- **规则外必升级**：超出授权规则（高危路径 / 预算超限 / 新依赖）时强制升级到人（复用豁免 E1-E8 流程）。
+- **规则外必升级**：超出授权规则（高危路径 / 预算超限 / 新依赖）时强制升级到人（复用豁免 E1-E9 流程）。
 - **与成熟度阶梯的关系**：L0-L1 决策型 CHECKPOINT 在所有级别均等用户（人机分工线）；HOTL 规则化授权只作用于 L2+ 的操作型放行，且规则本身须经人批准。
 - **授权规则登记**：规则条件写入 `project.status` 或成熟度配置，随 run-log 留痕，可审计。
 
@@ -377,7 +377,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
   1. **触发条件**：什么情况升级（超出授权规则 / 高危路径 / 预算超限 / 新依赖 / 评审争议）。
   2. **升级对象**：升级给谁（用户 / 主刀 / 指定评审人）。
   3. **等待时长与降级选项**：等多久（如 10 分钟 / 1 小时）；超时未响应时的降级选项（暂停等待 / 按最保守路径回退，禁止静默推进）。
-- **与豁免 E1-E8 的关系**：E1-E8 管豁免审批流程结构；本节补升级时效与降级选项维度。
+- **与豁免 E1-E9 的关系**：E1-E9 管豁免审批流程结构；本节补升级时效与降级选项维度。
 - **登记**：升级触发条件写入 run-log 的 `outcome=escalate` 条目 note，随留痕可审计。
 
 ## 错误分类处置表
@@ -387,7 +387,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | 错误类别 | 特征 | 处置 |
 |---|---|---|
 | 瞬态错误 | 网络抖动 / 服务暂时不可用 / 超时 | 指数退避重试（如 3 次：1s/2s/4s），重试仍失败转永久处理 |
-| 永久错误 | 权限缺失 / 数据损坏 / 依赖变更 | 不重试，记录根因 → 回退或升级（复用豁免 E1-E8 / 升级触发条件显式化节） |
+| 永久错误 | 权限缺失 / 数据损坏 / 依赖变更 | 不重试，记录根因 → 回退或升级（复用豁免 E1-E9 / 升级触发条件显式化节） |
 | 损坏输入 | 上游产物/数据文件损坏 | 跳过并记录 note，不中止流程（若为关键路径则升级） |
 
 - **重试边界**：重试次数与退避策略须显式（禁止无限重试 = 静默死循环）。
@@ -440,7 +440,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## 闭环校验脚本调用约定
 
-> 四个闭环校验脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts`）在每个阶段门由 G 子代理执行，强制校验 budget / run-log / maturity / checkpoint 四套机制的完整性。规则表见修正设计 [§5.1-5.4](../../docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md)；SSoT [§10.6](../../docs/skill-design-document_SSoT.md) / [§10C.7](../../docs/skill-design-document_SSoT.md) / [§10D.7](../../docs/skill-design-document_SSoT.md) / [§10E](../../docs/skill-design-document_SSoT.md) 为权威定义。本节仅约定调用时机与校验内容摘要；异常处置（预算超限、kill switch、日志损坏、成熟度降级等）见上方「成本预算与运行日志」「成熟度与 CHECKPOINT 放行」两节，不在此重复。
+> 五个闭环校验脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`，约束 #11 无条件）在每个阶段门由 G 子代理执行，强制校验 budget / run-log / maturity / checkpoint 四套机制的完整性与 R3 预防性审查三份报告（preventive-review 在 V 评审前执行）。规则表见修正设计 [§5.1-5.4](../../docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md)；SSoT [§10.6](../../docs/skill-design-document_SSoT.md) / [§10C.7](../../docs/skill-design-document_SSoT.md) / [§10D.7](../../docs/skill-design-document_SSoT.md) / [§10E](../../docs/skill-design-document_SSoT.md) 为权威定义。本节仅约定调用时机与校验内容摘要；异常处置（预算超限、kill switch、日志损坏、成熟度降级等）见上方「成本预算与运行日志」「成熟度与 CHECKPOINT 放行」两节，不在此重复。
 
 ### 调用时机（阶段门执行顺序）
 

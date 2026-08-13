@@ -29,11 +29,12 @@ export interface PreventiveReviewCheckResult {
  *   - standard  → `<phase>-{dim}.json`
  *   - fix       → `<phase>-fix-{dim}.json`        （S-fix 返工后 R3）
  *   - emergency → `<phase>-emergency-{dim}.json`  （S-emergency-fix 后 R3）
+ *   - ingest    → `<phase>-ingest-{dim}.json`     （S-ingest-tla / S-ingest-bdd 后 R3，第 41.8.0 轮补全）
  *
- * 第29轮升级：R3 无条件强制，覆盖所有 S 变体（含 S-fix / S-emergency-fix）。
+ * 第29轮升级：R3 无条件强制，覆盖所有 S 变体（含 S-fix / S-emergency-fix / S-ingest）。
  */
 export interface PreventiveReviewOptions {
-  variant?: 'standard' | 'fix' | 'emergency';
+  variant?: 'standard' | 'fix' | 'emergency' | 'ingest';
 }
 
 const REQUIRED_DIMENSIONS = ['completeness', 'reliability', 'security'] as const;

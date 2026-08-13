@@ -1,5 +1,5 @@
 /**
- * exemption-logic.test.ts —— E1-E8 豁免审批校验单元测试
+ * exemption-logic.test.ts —— E1-E9 豁免审批校验单元测试
  *
  * 覆盖 exemption-logic.ts 中 S→R→V→人类四阶段审批流程规则：
  *   E1  schema 完整性
@@ -46,7 +46,7 @@ function makeValidExemption(): ExemptionShape {
   };
 }
 
-describe('E1-E8 豁免审批校验', () => {
+describe('E1-E9 豁免审批校验', () => {
   // ==================== E1: schema 完整性 ====================
   describe('E1: schema 完整性', () => {
     it('E1: 缺 target 必填字段 → schema 失败 → fail', () => {

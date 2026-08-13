@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 41.7.0
+version: 41.8.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -16,7 +16,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 技能只提供编排、参考、模板和确定性门禁脚本。LLM-as-a-Verifier 由外部 Agent 按提示词执行；技能脚本不调用 LLM。设计决策以 `docs/skill-design-document_SSoT.md` 为准。
 
-**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即可激活；L1「带门禁」= L0 + `scripts/` + `samples/`（需项目根 `npm install` 跑门禁）。安装路径见 [docs/INSTALL.md](../docs/INSTALL.md) §2「交付层选择」。
+**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即可激活；L1「带门禁」= L0 + `scripts/` + `samples/` + `tools/`（tla2tools.jar，TLA+ 门禁运行时依赖；需项目根 `npm install` 跑门禁）。安装路径见 [docs/INSTALL.md](../docs/INSTALL.md) §2「交付层选择」。
 
 **设计哲学**：主刀与修正权 / 人机分工线 / 白箱 vs 黑箱 / 受控的失控 / clockware vs swarmware 五条方法论取向见 [references/design-philosophy.md](references/design-philosophy.md)，按需加载。
 
@@ -40,7 +40,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | # | 约束 | 核心语义（完整版见 hard-constraints.md） |
 |---|---|---|
 | 1 | 测试设计前置 | 阶段 1–4 开发产物完成后立即产出对应测试设计，不得推迟到编码后 |
-| 2 | 阶段门放行 | 评审通过 + 🔴 CHECKPOINT 用户确认才推进；豁免审批走 S→R→V→人类四阶段（E1-E8） |
+| 2 | 阶段门放行 | 评审通过 + 🔴 CHECKPOINT 用户确认才推进；豁免审批走 S→R→V→人类四阶段（E1-E9） |
 | 3 | RTM 为事实源 | `.w-model/rtm.json` 唯一事实源；实体每阶段回填，coverageStatus 与 coveragePercent 强一致 |
 | 4 | 真实执行 | 不得估算覆盖率/测试结果/门禁结果；必须执行真实测试并记录输出 |
 | 5 | 失败即回退 | 评审 C/D、测试失败、门禁退出码 1/2 均不得放行 |
@@ -51,7 +51,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 10 | 系统层级树 + REQ 层级 | 7 层图谱；REQ `level` 1-4 必填、`level≥2` 须 `reqGroup` 指向 `level=1` 祖先 |
 | 11 | 闭环机制 + R3 审查 | 5 脚本（含 check-preventive-review 无条件）每阶段门 exitCode=0；S 产出后 R3 三报告强制（反模式 #33/#42） |
 | 12 | 返工必经根因定位 | V/G 不通过先 R 报告 → V 复审 → G 门禁 → S-fix（反模式 #18/#19） |
-| 13 | 行为门禁按成熟度分级 | 阶段 1-4 TLA+（L1-L3）+ BDD（L1-L4）按项目成熟度强制（L1 可选 / L2 部分 / L3 全必跑） |
+| 13 | 行为门禁按成熟度分级 | 阶段 1-4 TLA+（L1-L3 + 按需 L4）+ BDD（L1-L4）按项目成熟度强制（L1 可选 / L2 部分 / L3 全必跑） |
 | 14 | 代码改动前后门禁 | 阶段 5-8 修改前 codegraph 影响分析落盘（反模式 #38）+ 改动后回归测试 |
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
@@ -112,7 +112,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 7. **分派 V 子代理评审**（O → V）：按 `targetKind` 路由 Persona，产出 `VerifierOutput` JSON。**编排者不得自评**。
 8. **分派 G 子代理门禁**（O → G）：跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts` + `check-bdd-model.ts`**（约束 #13）；**阶段 5 额外跑 `check-code-tla-consistency.ts`**（代码-TLA+ 一致性回归，四维度校验）。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告** → **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
-9.5. **冰山扫掠**（O → R-iceberg）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）；G 跑 `check-iceberg-sweep.ts`（R1-R8）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
+9.5. **冰山扫掠**（O → R-iceberg）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）；G 跑 `check-iceberg-sweep.ts`（R1-R5）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
 10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。
 
 > 🔴 **CHECKPOINT · 项目初始化**：复述"进入阶段 / 同步测试设计 / 预期产物"，获得确认后才能分派 S 子代理。
@@ -136,7 +136,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 7 | 系统测试 | 系统测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
 | 8 | 验收测试 | 验收测试执行 | archive 机制 + opsx 三段式 + codegraph 修改前查询 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
 
-**设计级别增强**：阶段 1-4 产出升级为主模板（§0 SSOT 头 + 引用块）+ 6 独立子模板（system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），产出目录 `docs/phase<N>-*/`；G 门禁 `check-requirement-graph.ts --phase=N --spec-dir=<dir>`（R7-R14）+ `check-artifact-gate.ts --phase=N --spec-dir=<dir>`（引用块/SSOT/DoD 结构校验）。
+**设计级别增强**：阶段 1-4 产出升级为主模板（§0 SSOT 头 + 引用块）+ 每阶段 6 独立子模板（跨阶段去重后共 10 种：system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），产出目录 `docs/phase<N>-*/`；G 门禁 `check-requirement-graph.ts --phase=N --spec-dir=<dir>`（R7-R14）+ `check-artifact-gate.ts --phase=N --spec-dir=<dir>`（引用块/SSOT/DoD 结构校验）。
 
 所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。TLA+（阶段 1-4）→ [references/tla-plus-guide.md](references/tla-plus-guide.md)；BDD（阶段 1-8）→ [references/bdd-guide.md](references/bdd-guide.md)；阶段门评审 → [references/verifier-spec.md](references/verifier-spec.md)；编码后质量检查 → [references/quality-standards.md](references/quality-standards.md)；状态 Schema → [references/data-models.md](references/data-models.md)；异常/跨平台/大项目 → [references/operational-recovery.md](references/operational-recovery.md)；子代理分派 → [references/subagent-delegation.md](references/subagent-delegation.md)。
 
@@ -149,7 +149,9 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、其余见 dispatch-matrix 逐文件表 |
 | `scripts/cli/`（31 个 .ts：26 个 check-* 门禁 + 5 个工具 CLI） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
 | `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
-| `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / budget / run-log） |
+| `schemas/`（20 份 JSON Schema draft-07） | 由 `scripts/logic/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
+| `tools/`（tla2tools.jar） | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝） |
+| `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget / run-log） |
 
 ## 命令速查
 
@@ -167,10 +169,10 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm reset` | 重置 | 🔴 CHECKPOINT 后清空实体，保留项目元信息 | O 执行（仅状态文件操作，非阶段产物） |
 | `/wm export [目录]` | 导出 | 输出 JSON 与 RTM Markdown | O 只读导出，不分派子代理 |
 | `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
-| `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进 | O 分析（状态读写+分析，非实施） |
+| `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进；报告存 `.w-model/hill-climbing/<timestamp>-report.json` | O 分析（状态读写+分析，非实施） |
 | `/wm metrics` | 流程度量 | 从 run-log/budget 生成流程度量报告；只读 | O 只读，不分派子代理 |
 
-每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。产出存 `.w-model/hill-climbing/<timestamp>-report.json`。
+每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 
 ## 阶段统一产出契约
 
@@ -211,6 +213,6 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=5|6|7|8 [project-
 
 ## 快速自检
 
-在任何推进或完成声明前，按 [references/quick-self-check.md](references/quick-self-check.md) 逐项核验（触发边界 / 上游一致 / 产物与测试设计齐全 / RTM 无估算 / 真实证据可复核 / CHECKPOINT 确认 / 按需加载 / 编排者未越权 / 图谱与行为门禁通过 / 阶段门理解证据 / 预算与成熟度 / 闭环 4 脚本 exitCode=0）。
+在任何推进或完成声明前，按 [references/quick-self-check.md](references/quick-self-check.md) 逐项核验（触发边界 / 上游一致 / 产物与测试设计齐全 / RTM 无估算 / 真实证据可复核 / CHECKPOINT 确认 / 按需加载 / 编排者未越权 / 图谱与行为门禁通过 / 阶段门理解证据 / 预算与成熟度 / 闭环 5 脚本 exitCode=0）。
 
 交互样例按需读取 [examples/requirement-analysis.md](examples/requirement-analysis.md)、[examples/system-design.md](examples/system-design.md)、[examples/coding.md](examples/coding.md) 或 [examples/test-execution.md](examples/test-execution.md)。

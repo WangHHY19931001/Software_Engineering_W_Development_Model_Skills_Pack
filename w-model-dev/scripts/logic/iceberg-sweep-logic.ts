@@ -60,7 +60,7 @@ export function checkIcebergSweep(report: IcebergSweepReport): IcebergSweepCheck
     for (const msg of schemaResult.errorMessages) {
       reasons.push(`[schema] ${msg}`);
     }
-    // 结构违规时短路返回：后续 R5-R8 依赖 required 字段（线索来源/newFindings），
+    // 结构违规时短路返回：后续 R2-R5 依赖 required 字段（线索来源/newFindings），
     // 结构缺失继续访问会抛 TypeError（反模式 #28 语义：结构错误先报告，不进入业务规则校验）
     return {
       passed: false,
@@ -74,22 +74,22 @@ export function checkIcebergSweep(report: IcebergSweepReport): IcebergSweepCheck
       },
     };
   }
-  // R5: icebergRound 边界（1-5）
+  // R2: icebergRound 边界（1-5）
   if (report.icebergRound < 1 || report.icebergRound > MAX_ICEBERG_ROUNDS) {
     reasons.push(`icebergRound 越界：${report.icebergRound}，须 1-${MAX_ICEBERG_ROUNDS}`);
   }
-  // R6: newFindings 去重
+  // R3: newFindings 去重
   const prevSet = new Set(report.线索来源.previousFindings);
   for (const f of report.newFindings) {
     if (prevSet.has(f.findingId)) {
       reasons.push(`findingId 重复：${f.findingId} 已在上一轮发现`);
     }
-    // R7: 可证伪 + 证据非空
+    // R4: 可证伪 + 证据非空
     if (!f.hypothesis || !f.evidence) {
       reasons.push(`finding ${f.findingId} 缺 hypothesis 或 evidence（禁止空泛）`);
     }
   }
-  // R8: passed 一致性
+  // R5: passed 一致性
   const expectedPassed = report.newFindings.length === 0;
   if (report.passed !== expectedPassed) {
     reasons.push(`passed 不一致：newFindings=${report.newFindings.length} 但 passed=${report.passed}`);
@@ -103,7 +103,7 @@ export function checkIcebergSweep(report: IcebergSweepReport): IcebergSweepCheck
       triggerType: report.triggerType,
       icebergRound: report.icebergRound,
       newFindingsCount: report.newFindings.length,
-      // 以最终校验结果为准（R8 违规时原始 report.passed 可能为 true，避免误导 gate-logs 消费方）
+      // 以最终校验结果为准（R5 违规时原始 report.passed 可能为 true，避免误导 gate-logs 消费方）
       passed,
     },
   };

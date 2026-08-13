@@ -90,7 +90,6 @@
 | V-persona（复审根因） | 2 | 3 | reality-checker + evidence-collector 必含 |
 
 > persona 数量约束与分派方式（并行/串行）无关：串行分派 3 个 persona 与并行分派 3 个 persona 在数量约束上等价。
-> 数量可在 `project.json` 的 `phaseConfig.<phase>.parallelPersonas` 覆盖（字段名保留向后兼容，实际含义为「每轮 persona 数」）。
 
 ---
 
@@ -137,7 +136,7 @@
 
 ## 7. R 子代理「修复既有产物」职责强化
 
-> R 子代理（根因定位子代理）的修复职责与 S-fix 子代理的协作流程强化。R 定位根因 → S-fix 执行修复 → R 复核紧急修复，形成闭环。对应 [subagent-delegation.md](subagent-delegation.md)「S 子代理修改既有产物的边界」节。
+> R 子代理（根因定位子代理）的修复职责与 S-fix 子代理的协作流程强化。R 定位根因 → S-fix 执行修复 → 前置 R3×3 + V 兜底修复质量。对应 [subagent-delegation.md](subagent-delegation.md)「S 子代理修改既有产物的边界」节。
 
 **R 子代理工作流程**（修复既有产物时）：
 
@@ -145,27 +144,15 @@
 2. **定位 bug 根因**：运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯），定位到具体文件、行号、错误逻辑
 3. **产出 RootCauseReport**：含 `rootCauseChain` / `fixRecommendation` / `prevention` / `upstreamDefect` 等字段（详见 [root-cause-locator.md](root-cause-locator.md) §4 Schema）
 4. **交 V 复审 + G 门禁**：R 报告经 V 复审（targetKind=rootcause）+ G 门禁（`check-rootcause-report.ts`）通过后，分派 S-fix 携 R 报告执行修复
-5. **S-fix 修复后**：S-fix 返回 `{artifacts, rtmDiff, fixBasedOn, selfCheck}`，重走 V → G 验证修复有效
-6. **紧急修复复核**：若 run-log 中存在 `role=S, action=fix, variant=emergency-fix` 条目，R 子代理须在产出 RootCauseReport 时追加 `emergencyFixReview` 字段：
-   - `emergencyFixReview.complete`：紧急修复是否完整解决根因
-   - `emergencyFixReview.gaps`：未覆盖的修复点（若有）
-   - `emergencyFixReview.recommendation`：`"accept"` / `"supplement"` / `"redo"`
-   - `complete=false` 或 `recommendation!="accept"` → 转 S-fix 补充或重做
+5. **S-fix 修复后**：S-fix 返回 `{artifacts, rtmDiff, fixBasedOn, selfCheck}`，重走 R3×3 → V → G 验证修复有效
+6. **紧急修复质量兜底**：原「事后 R 复核机制（`emergencyFixReview` 字段）」已移除（见 [dispatch-matrix.md](dispatch-matrix.md) §4）；紧急修复的完整性由前置 R3×3 + V 兜底
 
 **R 子代理 persona 强化要求**：
 
 | persona | 强化职责 | 加载时机 |
 |---|---|---|
-| `engineering-incident-response-commander` | 紧急修复复核（5-Why 主导，判断紧急修复是否触及根因） | run-log 含 `emergency-fix` 条目时必含 |
+| `engineering-incident-response-commander` | 紧急修复分派场景主导（5-Why 主导，判断紧急修复是否触及根因） | run-log 含 `emergency-fix` 条目时必含 |
 | `testing-evidence-collector` | 收集 S-fix 修复后的测试证据，验证修复有效 | S-fix 修复后 V 复审时必含 |
 | `testing-reality-checker` | 防幻想根因（R 自评根因准确但 S-fix 修复后 bug 仍存在 → 重新定位） | R 重派（round ≥ 2）时必含 |
 
-**R 复核紧急修复的判定矩阵**：
-
-| `emergencyFixReview.complete` | `recommendation` | 编排者动作 |
-|---|---|---|
-| `true` | `"accept"` | 阶段门放行，紧急修复条目归档 |
-| `false` | `"supplement"` | 分派 S-fix 补充修复，重走 V → G |
-| `false` | `"redo"` | 回滚紧急修复，分派 S-fix 重做，重走 V → G |
-
-> 与反模式 #18（跳过 R 直接 S 返工）的关系：R 子代理紧急修复复核是 #18 防线的延伸——紧急修复虽由 S 直接执行（受时间压力），但 R 事后复核保证根因未被掩盖。R 复核不通过 → 仍须走标准 S-fix 流程。
+> 与反模式 #18（跳过 R 直接 S 返工）的关系：紧急修复虽由 S 直接执行（受时间压力），但前置 R3×3 + V 保证修复质量与根因对齐；事后复核机制已移除（见 [dispatch-matrix.md](dispatch-matrix.md) §4）。R3/V 不通过 → 仍须走标准 S-fix 流程。
