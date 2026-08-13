@@ -3,7 +3,7 @@
  * 工件质量门校验脚本（Artifact Gate Checker，SSoT §10.5）
  *
  * 供 G 子代理在阶段 1-8 收敛循环中调用，校验各阶段工件（需求 / 设计 / UAT 映射等）
- * 的齐全性与质量门槛；资产读取已拆分至 artifact-gate-assets.ts / uat-path-mapping.ts（Task A1），
+ * 的齐全性与质量门槛；资产读取已拆分至 lib/artifact-gate-assets.ts / lib/uat-path-mapping.ts（Task A1），
  * 本文件仅保留编排。
  *
  * 用法：
@@ -42,10 +42,9 @@ import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
-
-import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from './artifact-gate-assets.js';
-import { collectUatMappingViolations } from './uat-path-mapping.js';
-export { checkUatPathMappingContent } from './uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出
+import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from '../lib/artifact-gate-assets.js';
+import { collectUatMappingViolations } from '../lib/uat-path-mapping.js';
+export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**

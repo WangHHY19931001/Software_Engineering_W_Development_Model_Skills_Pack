@@ -9,9 +9,9 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.3.1`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.4.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
-**健康指标**（2026-08-12 实测）：
+**健康指标**（2026-08-13 实测）：
 
 | 指标 | 结果 |
 |---|---|
@@ -310,7 +310,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）
 │   │   ├── cli/                  # 门禁与工具 CLI 入口：check-*.ts + self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks
-│   │   ├── lib/                  # 通用工具：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json
+│   │   ├── lib/                  # 通用工具与 IO 辅助：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json/artifact-gate-assets/uat-path-mapping/tla-clean-trace 等
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集）
 │   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 571 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
@@ -325,7 +325,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── ingestion-graph-convergence-design.md   # ingestion 与图谱收敛设计
 │   ├── information-flow-validation-design.md   # 信息流校验设计（黑洞/奇迹/死模块）
 │   ├── loop-engineering-adoption-design.md     # Loop 工程采用设计
-│   ├── superpowers/                            # 设计文档与实施计划（specs/ + plans/）
+│   ├── superpowers/                            # 内部规划目录（specs/ + plans/，不参与门禁、非面向用户）
 │   ├── changes/archive/                        # 端到端调测归档（round15 / 19 / 20 / 23）
 │   └── INSTALL.md                              # AI Agent 安装指南
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包

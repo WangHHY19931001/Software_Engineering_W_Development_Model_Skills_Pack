@@ -1209,6 +1209,30 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ---
 
+### 3.4.45 第 45 轮：外部评审报告核实修正批次（cli/lib 分层 + 文档-实际数据自洽 + 计数门禁）
+
+**目的**：落实外部评审报告（2026-08-13，沙箱静态阅读版）中经三路 Explore 核实为属实的问题——cli/ 目录命名/分层残留（N1）、references 计数漂移（D1）、dispatch-matrix 过时版本号（D2）、测试跨层导入 cli IO 函数（N2）、AGENTS 角色表述（A4）、docs/superpowers 未声明（O3）、tla2tools.jar 无本地声明（A6）；报告中的 D3（SSoT 558 为历史轮次记录，非残留，不改）、A1（SSoT 按轮次记录是设计，不改）、T4（两套测试体系定位不同，不合并）经核实为误判/低价值，不采纳（2026-08-13，41.4.0）。
+
+**变更（2026-08-13，41.4.0）**：
+
+- **N1 cli/ 分层修正**：`cli/artifact-gate-assets.ts` / `cli/uat-path-mapping.ts`（check-artifact-gate 拆出的 IO 解析模块，仅被其 import）移入 `lib/`；`check-artifact-gate.ts` import ×2 + re-export + 头部注释同步；exit-2 脚本计数 30 不变（实测构成：25 check-* + 4 工具 CLI + `logic/plan-chunks.ts`；self-test.ts 非 exit-2），`check-docs-consistency.ts` / `docs-consistency-logic.ts` 注释修正；SKILL.md Bundled Resources `scripts/cli/` 表述由「30 个 exit-2 脚本」改为「30 个 .ts：25 个 check-* 门禁 + 5 个工具 CLI」。
+- **D1 references 计数自洽 + 门禁**：SKILL.md「references/（53 个 .md）」→「（57 个 .md）」（第 44 轮新建 4 篇漏同步）；`docs-consistency-logic.ts` 新增 `checkReferencesCount`（`EXPECTED.referencesCount=57` + 实测 references/*.md 数 + SKILL.md 表述三重比对，镜像 `checkAssetCounts`/personaCount 模式）；CLI 层 readdirSync 计数；`docs-consistency-logic.test.ts` 扩展（vitest 计数 571 不变）。
+- **N2 TLA 轨迹清理跨层修正**：`cleanTraceFiles` / `isTlcStatesDir` 自 `cli/check-tla-model.ts` 移入新建 `lib/tla-clean-trace.ts`（IO 辅助归 lib/ 层，logic/ 保持纯函数约定——评审建议的「logic/ + 注入式 IO 适配器」无先例，不采纳）；`tla-clean-trace.test.ts` import 同步。
+- **D2**：`dispatch-matrix.md` 数据来源行移除过时版本号 35.0.0，改为「随版本演进，以当前 SKILL.md 为准」。
+- **A4**：AGENTS.md 角色表述澄清——六类角色 = O（编排者）+ 五类子代理（A/S/V/G/R；R 含 R-iceberg 变体）。
+- **O3**：AGENTS.md `docs/` 行声明 `docs/superpowers/`（plans/ + specs/）为内部规划目录，不参与门禁、非面向用户。
+- **A6**：新建 `w-model-dev/tools/README.md`（tla2tools.jar 版本 TLC2 2.19 of 08 August 2024 / 来源 / BSD-2-Clause / 手动同步策略；权威记录指向 tla-plus-guide.md「工具链」节——评审报告漏查该处已有版本声明）。
+
+**关键决策**：① 计数门禁镜像既有 `checkAssetCounts` 模式（实测数 + EXPECTED + 文档表述三重比对，fail-loud），references/*.md 新增时强制同步 SKILL.md 与 EXPECTED；② 历史记录（SSoT §3.4.42/43 的 558、CHANGELOG 41.2.0 的 cli/ 路径）一律不动，不篡改演进史；③ N2 归属 lib/ 而非 logic/——`__tests__/README.md` 的纯函数约定只约束 `*-logic.ts`，lib/ 已有 read-json-or-exit 等 IO 辅助先例；④ 测试扩展并入既有用例，vitest 计数 571 保持稳定（避免 README/AGENTS/pre-push 三处计数文档涟漪）。
+
+| 维度 | 内容 |
+|---|---|
+| self-test | 基线 249 不变 |
+| vitest | 35 files / 571 tests |
+| 版本号 | 41.4.0（五处一致：package.json / skill-metadata.json / SKILL.md frontmatter / README / INSTALL.md） |
+
+---
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
@@ -2826,6 +2850,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 3.4.41 第 41 轮四源吸收（P2） | 证据加权共识 / 验证器定位三原则 / 候选转正评审 + 错误聚集超标丢弃 / 爬山法哲学基础 / 不连续系统穷举 / 混沌预期 + 超标重写 / 约束创造 + 满意化完成 / 可观测性验收 / 受控失控 + clockware-swarmware | subagent-persona-matrix + verifier-spec + anti-patterns + hill-climbing-guide + tla-plus-guide + operational-recovery + quality-standards + phase-7 + SKILL.md | 已落地（41.2.0） |
 | 3.4.43 第 43 轮移除 .cursor 技能包 | docs-consistency 门禁解耦（REQUIRED_PATHS / EXPECTED / checkAssetCounts）/ pre-push 过滤清理 / 活动文档与 5 处死链同步 / .gitignore 追加 .cursor / 版本号三处 41.3.0 | `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + `.githooks/pre-push` + AGENTS.md + README.md + references 5 处 + `.gitignore` + package.json / skill-metadata.json / SKILL.md / INSTALL.md | 已落地（41.3.0） |
 | 3.4.44 第 44 轮评审修正批次 | 版本号五处一致性门禁（version-consistency）/ 模板占位符统一（{{v1.0}}）/ docsify noscript 降级 / SKILL.md 减负 524→216（hard-constraints + operation-behaviors + quick-self-check + design-philosophy）/ 硬约束 21→14 重排（全仓引用同步）/ TLA+/BDD 成熟度开关（L1/L2/L3）/ L0/L1 双交付层 / 孤儿 test-prompts.json 删除 / CHANGELOG 拆分 | `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + `skill-metadata.test.ts` + SKILL.md + 7 模板 + format-conventions + operational-recovery + 新建 references×4 + INSTALL.md + README.md + AGENTS.md + CONTRIBUTING.md + docs/index.html + 32 处约束引用文件 + CHANGELOG.md + CHANGELOG-archive.md + SSoT | 已落地（41.3.1） |
+| 3.4.45 第 45 轮外部评审核实修正批次 | cli/ 两 IO 模块移入 lib/（artifact-gate-assets + uat-path-mapping，exit-2 注释修正）/ SKILL.md references 53→57 + 新增 references-count 门禁（EXPECTED.referencesCount=57）/ cleanTraceFiles+isTlcStatesDir 移入新建 lib/tla-clean-trace.ts / dispatch-matrix 过时版本号移除 / AGENTS 角色表述（O+五子代理+R-iceberg）/ docs/superpowers 内部目录声明 / tools/README.md（tla2tools.jar 声明） | `check-artifact-gate.ts` + 新建 `lib/artifact-gate-assets.ts` + `lib/uat-path-mapping.ts` + `check-docs-consistency.ts` + `docs-consistency-logic.ts` + `docs-consistency-logic.test.ts` + 新建 `lib/tla-clean-trace.ts` + `check-tla-model.ts` + `tla-clean-trace.test.ts` + SKILL.md + dispatch-matrix.md + AGENTS.md + 新建 tools/README.md + package.json / skill-metadata.json / README.md / INSTALL.md + CHANGELOG.md + SSoT | 已落地（41.4.0） |
 
 ---
 

@@ -18,8 +18,10 @@ export interface DocConsistencyInput {
   schemaFiles: string[];
   /** subagent/ 目录 .md 人格文件数（期望 28） */
   personaCount: number;
-  /** 实测可 exit 2 的 CLI 脚本数（25 个 check-*.ts 含自身 + 5 工具 = 30） */
+  /** 实测可 exit 2 的 CLI 脚本数（25 个 check-*.ts 含自身 + 4 工具 CLI + logic/plan-chunks.ts = 30；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
+  /** references/ 目录 .md 文件数（期望 57） */
+  referencesCount: number;
   dataModels: string;
   verifierSpec: string;
   commandReference: string;
@@ -59,6 +61,8 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   schemaCount: 20,
   personaCount: 28,
+  /** references/ 目录 .md 文件数（第 44 轮新建 4 篇后为 57；SKILL.md「Bundled Resources」表须同步） */
+  referencesCount: 57,
   vitestFileCount: 35,
   exit2ScriptCount: 30,
   runLogActionCount: 27,
@@ -67,7 +71,7 @@ export const EXPECTED = {
   /** 硬约束条数（第 44 轮由 21 条重排合并为 14 条） */
   hardConstraintCount: 14,
   /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
-  currentVersion: '41.3.1',
+  currentVersion: '41.4.0',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
@@ -119,6 +123,7 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkPrePushCount(input.prePush));
   violations.push(...checkGlossaryAction(input.glossary));
   violations.push(...checkAssetCounts(input.personaCount));
+  violations.push(...checkReferencesCount(input.referencesCount, input.skill));
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
@@ -151,7 +156,7 @@ function extractJsonVersion(json: string): string | null {
  * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json / skill-metadata.json /
  * SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例五处版本声明必须全部
  * 等于 EXPECTED.currentVersion。任一处缺失/不可解析/不一致即报违规（fail loud，不静默放行）。
- * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.3.1 写成 41.3.10）
+ * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.4.0 写成 41.4.10）
  * 都会被捕获，符合「防漂移」定位。
  */
 function checkVersionConsistency(
@@ -434,6 +439,29 @@ function checkAssetCounts(personaCount: number): DocCheckViolation[] {
     violations.push({
       check: 'asset-counts',
       message: `subagent/ 人格文件数应为 ${EXPECTED.personaCount}，实际 ${personaCount}`,
+    });
+  }
+  return violations;
+}
+
+/**
+ * references/ 目录 .md 文件数一致性（41.4.0 新增）：
+ * 实际文件数须等于 EXPECTED.referencesCount，且 SKILL.md「Bundled Resources」表须含
+ * 「（N 个 .md）」计数表述（如 `` `references/`（57 个 .md） ``，资源名反引号格式可异）——
+ * 新增 references/*.md 时强制同步 SKILL.md 与 EXPECTED，防再次漂移。
+ */
+function checkReferencesCount(referencesCount: number, skill: string): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (referencesCount !== EXPECTED.referencesCount) {
+    violations.push({
+      check: 'references-count',
+      message: `references/ 目录 .md 文件数应为 ${EXPECTED.referencesCount}，实际 ${referencesCount}（新增文件须同步 SKILL.md 与 EXPECTED）`,
+    });
+  }
+  if (!skill.includes(`（${EXPECTED.referencesCount} 个 .md）`)) {
+    violations.push({
+      check: 'references-count',
+      message: `SKILL.md 应含「（${EXPECTED.referencesCount} 个 .md）」表述`,
     });
   }
   return violations;

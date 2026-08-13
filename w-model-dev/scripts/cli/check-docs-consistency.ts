@@ -215,10 +215,11 @@ function main(): void {
     .filter((f) => f.endsWith('.schema.json'))
     .sort();
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
+  const referencesCount = readdirSync(join(root, 'w-model-dev/references')).filter((f) => f.endsWith('.md')).length;
   const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts/cli')).filter((f) =>
     /^check-.*\.ts$/.test(f),
   ).length; // 含 check-docs-consistency 自身 = 25（cli/ 层）
-  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + wm-status + metrics-report + security-scan + plan-chunks（合计 30）
+  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + metrics-report + security-scan + wm-status（cli/）+ logic/plan-chunks.ts（非 cli/，合计 30；self-test.ts 非 exit-2 不计入）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),
@@ -228,6 +229,7 @@ function main(): void {
   const input: DocConsistencyInput = {
     schemaFiles,
     personaCount,
+    referencesCount,
     exit2ScriptCount,
     dataModels: read('w-model-dev/references/data-models.md'),
     verifierSpec: read('w-model-dev/references/verifier-spec.md'),

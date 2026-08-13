@@ -1,5 +1,5 @@
 /**
- * check-tla-model.ts cleanTraceFiles / isTlcStatesDir 单元测试
+ * lib/tla-clean-trace.ts cleanTraceFiles / isTlcStatesDir 单元测试
  *
  * 覆盖（批次 1 安全加固 §3.2）：
  *  - 守卫 1：目录无 .tla 文件 → 不删除任何内容
@@ -15,7 +15,7 @@ import * as path from 'node:path';
 
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { cleanTraceFiles, isTlcStatesDir } from '../cli/check-tla-model.js';
+import { cleanTraceFiles, isTlcStatesDir } from '../lib/tla-clean-trace.js';
 
 const tmpRoots: string[] = [];
 

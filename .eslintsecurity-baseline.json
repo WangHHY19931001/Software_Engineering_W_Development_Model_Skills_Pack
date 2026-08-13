@@ -542,27 +542,6 @@
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "360e3f289e5e8f0ea471a526999778c39e5b7eccb29d2eb757deb9ccb782d0e6",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/artifact-gate-assets.ts",
-      "line": 46,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "071fdbe7fc175ffd5bba4090e978a4243672f8b30e079a0556daa13e49548bd7",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/artifact-gate-assets.ts",
-      "line": 67,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "bbafc89c23e908467b464af3d83b4e26f793275c89d2ad82e29c7b2b0bf174f7",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/artifact-gate-assets.ts",
-      "line": 100,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
       "hash": "d6e233349df73b9c6c29af5ace7f8cb4abaad8c27ac89ef5c67f6324b760d879",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-archive-integrity.ts",
@@ -573,14 +552,14 @@
       "hash": "042074ef7e22301d59bbab3432964597ac4987507595fe90f5ff97ac21a97c57",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 71,
+      "line": 70,
       "reason": "Variable Assigned to Object Injection Sink"
     },
     {
       "hash": "4363d91b0d7bf20a0c64fcf469ad987d8a7339143942957295f58108350d097e",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-artifact-gate.ts",
-      "line": 150,
+      "line": 149,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -787,17 +766,24 @@
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "46126bea7f66d44664895ae10d8f5813bb2978636e5ac6436b9da0c015088476",
+      "hash": "b163a71240b7b846a925b79ded2baffd9935841a3757fa82f2fce8e6c71163da",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
       "line": 218,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
+      "hash": "46126bea7f66d44664895ae10d8f5813bb2978636e5ac6436b9da0c015088476",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
+      "line": 219,
+      "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
       "hash": "dc2f0301acaf7a40face8cb0f3beabd472ff115a02f3bb07ef0be70d05d975fa",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 223,
+      "line": 224,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -993,35 +979,21 @@
       "hash": "596a34ac0a170c37308c11af8650da29e1dc537be94d3dcd64f27f42fe0bfe62",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 162,
+      "line": 163,
       "reason": "Found stat from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "64e0c887add804f27c0398eaedb0da57e67286f91cd86068221a6f294ee4061b",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 201,
-      "reason": "Found readdir from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "7105ff02c544a977035136d3879740b565516cf0417a566e85752a826f86724c",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 241,
-      "reason": "Found readdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "26e4c91baef49de659ae2b08862e5d37f5cec4e5a5044b76e7ce772cbb27821f",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 444,
+      "line": 371,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "bf45234c4cec8fa9d965786a737e107d9eb8e1937cd10d29aeebf7a1fdbcfad4",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-tla-model.ts",
-      "line": 464,
+      "line": 391,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1151,13 +1123,6 @@
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "3fb653c1e173e42a0c01320e88e85047b9d4b7e51824388b06b78ee8861d2446",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/uat-path-mapping.ts",
-      "line": 83,
-      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
       "hash": "44f28960276f40ebec7c74aebac9a55e11ffc4d71d5f34d47af01b1430c76a30",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/wm-status.ts",
@@ -1169,6 +1134,27 @@
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/wm-status.ts",
       "line": 87,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "9511a7cc68256532904e1a83602be660225361e36195287dcb8d0790de079990",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/lib/artifact-gate-assets.ts",
+      "line": 46,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "0ae09b041d4a41a2c9059c89b8929058964c5e4910fd6f1ec1c145976d9678c9",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/lib/artifact-gate-assets.ts",
+      "line": 67,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "b0d758dad67ef4801151a35e75998cfa5aa09ba164df24ece8c678a6046c834e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/lib/artifact-gate-assets.ts",
+      "line": 100,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1204,6 +1190,27 @@
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/lib/read-json-or-exit.ts",
       "line": 34,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "426a4d79b621326984b6f928305dde37655f76958a987633a37aa604f2d68906",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/lib/tla-clean-trace.ts",
+      "line": 33,
+      "reason": "Found readdir from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "3a9d3667ac80e64bbeecabcf0419dbb9db661c4aa6eba048b9281f8c3d0edb29",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/lib/tla-clean-trace.ts",
+      "line": 73,
+      "reason": "Found readdir from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "07c20cd5a22b7a186c385ab4a5b7c9f4de437e2057af53bea662c9952d47f61f",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/lib/uat-path-mapping.ts",
+      "line": 83,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1420,14 +1427,14 @@
       "hash": "9e853bf2930c8ddc4b65ae347f3b00acfe40f499c4f561a578511d133a5f86a6",
       "rule_id": "security/detect-non-literal-regexp",
       "file": "w-model-dev/scripts/logic/docs-consistency-logic.ts",
-      "line": 169,
+      "line": 174,
       "reason": "Found non-literal argument to RegExp Constructor"
     },
     {
       "hash": "0c82159b16452db32fc2bdfda28035cd45cdab30c2211e39ce244185dce9060a",
       "rule_id": "security/detect-non-literal-regexp",
       "file": "w-model-dev/scripts/logic/docs-consistency-logic.ts",
-      "line": 512,
+      "line": 540,
       "reason": "Found non-literal argument to RegExp Constructor"
     },
     {
