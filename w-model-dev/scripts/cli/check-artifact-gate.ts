@@ -3,7 +3,7 @@
  * 工件质量门校验脚本（Artifact Gate Checker，SSoT §10.5）
  *
  * 供 G 子代理在阶段 1-8 收敛循环中调用，校验各阶段工件（需求 / 设计 / UAT 映射等）
- * 的齐全性与质量门槛；资产读取已拆分至 lib/artifact-gate-assets.ts / lib/uat-path-mapping.ts（Task A1），
+ * 的齐全性与质量门槛；（资产读取已拆分至 lib/artifact-gate-assets.ts / lib/uat-path-mapping.ts），
  * 本文件仅保留编排。
  *
  * 用法：
@@ -12,7 +12,7 @@
  * 参数：
  *   project-dir   项目根目录（默认：当前工作目录）
  *   --phase=N     校验阶段 1-8（默认终检 phase=8，向后兼容；兼容历史短参数 -p）
- *   --json        机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
@@ -44,7 +44,7 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
 import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from '../lib/artifact-gate-assets.js';
 import { collectUatMappingViolations } from '../lib/uat-path-mapping.js';
-export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self-test 兼容：B4/B5 内容校验保持从本入口导出
+export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self-test 兼容：UAT 映射内容校验保持从本入口导出
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
@@ -54,7 +54,7 @@ export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self
  * 非法值（非 1-8）退出码 2（保留原 ARG_INVALID 消息）。
  */
 function parsePhaseArg(argv: string[]): PhaseOption | undefined {
-  // B6：严格整数校验——字符串全数字 + Number.isInteger，
+  // 严格整数校验——字符串全数字 + Number.isInteger，
   // 拒绝 "5abc" / "3.7" 这类 parseInt 会部分解析的非法输入
   const strictPhase = (s: string): PhaseOption | undefined => {
     if (!/^\d+$/.test(s)) return undefined;
@@ -132,7 +132,7 @@ function parseProjectDir(argv: string[]): string {
 }
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const phaseOption = parsePhaseArg(process.argv);
@@ -207,7 +207,7 @@ async function main(): Promise<void> {
     bddManifestFile,
   });
 
-  // uat-path-mapping 校验违反（计入终检结果，B4/B5：解析严格化 + 阶段5/终检均校验）
+  // uat-path-mapping 校验违反（计入终检结果；解析严格化 + 阶段 5/终检均校验）
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
 
   // 合并 uat-path-mapping + BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
     modelCheckViolations.length === 0;
   const exitCode = overallPassed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

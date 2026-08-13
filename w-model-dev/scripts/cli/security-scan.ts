@@ -149,7 +149,7 @@ async function main(): Promise<void> {
 
   // maxBuffer：eslint --format json 输出约 1.1MB，超过 spawnSync 默认 1MB 会 ENOBUFS 导致 JSON.parse 失败，
   // 故放宽至 10MB 确保全量输出可读。
-  // B8：.eslintrc.cjs 迁入 config/ 后，cwd 向上自动发现的机制失效，须显式 --config。
+  // .eslintrc.cjs 位于 config/，cwd 向上自动发现的机制失效，须显式 --config。
   // --no-eslintrc：关闭 eslintrc 级联查找，否则会向上找到仓库根之外的同名配置（git worktree
   // 场景下即主仓库的 .eslintrc.cjs），造成插件双路径冲突（"couldn't determine the plugin uniquely"）。
   const r = spawnSync(

@@ -12,7 +12,7 @@
  * 参数：
  *   project-root   项目根目录
  *   --phase        校验阶段 5|6|7|8（支持 --phase N 与 --phase=N）
- *   --json         机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  制品与审查产物齐全
@@ -135,7 +135,7 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
 }
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   const result = checkOpsxArtifacts(abs, phase);
   const exitCode = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

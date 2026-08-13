@@ -71,7 +71,7 @@ export interface MaturityCheckResult {
 // ==================== 校验入口 ====================
 
 export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions): MaturityCheckResult {
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   const schemaResult = validateBySchema('maturity', maturity);
   if (!schemaResult.valid) {
     return {

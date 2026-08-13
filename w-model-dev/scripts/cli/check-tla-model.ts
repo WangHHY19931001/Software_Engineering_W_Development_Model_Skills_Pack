@@ -17,7 +17,7 @@
  *   --graph=<graph.json> 提供图谱文件，提取 type=SD 节点 ID 供 SD 覆盖率校验（§10）
  *                        phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID
  *   --keep-states / -k   P3.8：保留 TLC states 目录用于调试（默认校验后自动清理）
- *   --json               机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过（环境就绪 + 头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反）
@@ -267,7 +267,7 @@ function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const { manifestFile, phase: phaseArg, specId, graphFile, keepStates } = parseArgs(process.argv);
@@ -434,7 +434,7 @@ async function main(): Promise<void> {
   result.passed = result.environmentOk && result.violations.length === 0;
   const exitCode = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

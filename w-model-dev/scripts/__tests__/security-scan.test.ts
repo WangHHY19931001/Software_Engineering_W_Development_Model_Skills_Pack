@@ -15,7 +15,7 @@ function stubResolve(map: Record<number, string>): ResolveLine {
   return (_file, line) => map[line] ?? null;
 }
 
-describe('security-scan diffFindings（借鉴点 3，baseline v2 内容敏感指纹）', () => {
+describe('security-scan diffFindings（baseline v2 内容敏感指纹）', () => {
   it('baseline 内的发现被豁免', () => {
     const ruleId = 'security/detect-eval-with-expression';
     const rel = 'w-model-dev/scripts/x.ts';

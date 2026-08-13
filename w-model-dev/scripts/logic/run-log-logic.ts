@@ -121,7 +121,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   const valid: RunLogEntry[] = [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
-    // === Schema 前置校验（借鉴点 2） ===
+    // === Schema 前置校验 ===
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
       // schema 拒绝：记录 [schema] 前缀违规并跳过该条

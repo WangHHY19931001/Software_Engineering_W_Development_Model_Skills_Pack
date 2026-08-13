@@ -18,7 +18,7 @@
  *   --rtm=<p>            RTM 文件路径（用于 D7 RTM 映射校验）
  *   --cucumber-report=<p>  cucumber 运行报告 JSON（阶段 5-8 用于 D5 step 绑定校验）
  *   --graph=<p>          graph.json 路径（phase>=2 时强制必填，提取 type=SD 节点供 D8 SD Coverage 校验）
- *   --json               机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse），不写 gate-logs
+ *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节），不写 gate-logs
  *
  * 退出码：
  *   0  校验通过（schema + 头标注 + 状态机 + 等价性 + step 绑定 + 路径 + RTM 全过）
@@ -131,7 +131,7 @@ async function readFeatureFile(filePath: string) {
 // ==================== 主流程 ====================
 
 async function main(): Promise<number> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计、不写 gate-logs）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计、不写 gate-logs）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = parseArgs(process.argv);
@@ -325,7 +325,7 @@ async function main(): Promise<number> {
   });
   const exitCode = result.exitCode;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     const allViolations = [
       ...result.dimensions.headerCompleteness,

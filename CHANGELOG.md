@@ -7,6 +7,18 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.11.0] - 2026-08-13
+
+### Changed
+- 版本号 41.10.0 → 41.11.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **遗留五项收尾**（41.10.0「明确不做」清单）：
+  - **technical-writer 占位符规范化**：4 个围栏交付物模板各加「占位符说明」注记；5 处坏 URL 占位（`[工具 X](链接)`、`(链接)` 等）改为合法示例 URL（example.com / docs.npmjs.com）；标准占位（your-package、RFC 2606 示例域、[目标成果] 等）保留
+  - **--json 声明张力统一（26 个 check-\*.ts 实测，非 8 个）**：--json 参数说明改为「stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）」；实现不动（ERROR_JSON 前缀为权威约定）
+  - **批量任务编号注释自解释化（96 处）**：`B4 --json`×50 去前缀；B5/B6/B8/B3 → 直接描述；`A2b 双轨过渡`×19 → 「结构化违规双轨」；Task A1/批次3 Task7/Task 5/Task 3 → 直接描述；借鉴点 2/3/4 ×12 → 直接描述（Schema 前置校验/内容敏感指纹 diff/版本号双写一致性）；规则 ID 与 spec 文件指针保留
+  - **readJsonOptional 死导出删除**（零生产调用）：lib 函数 + 3 条测试移除；__tests__/README 矩阵行补登记 readJsonlOptional / readJsonClassified / loadAndValidate
+  - **lib 层 4 模块专属测试**（constants / phase-doc-map / uat-path-mapping / artifact-gate-assets 各 1 个测试文件，41 条用例；runModelChecks 用 vi.mock('node:child_process') mock spawnSync，CLI 集成侧由 pre-push 第 3/7/8 项覆盖）
+- **计数级联**：vitest 36 → **40 文件** / 581 → **619 条**（-3 死导出测试 + 41 新 lib 测试）；EXPECTED.vitestFileCount、docs-consistency 测试 fixture、README/AGENTS/INSTALL/CONTRIBUTING/troubleshooting/pre-push 计数全部同步；__tests__/README 矩阵 +4 行
+
 ## [41.10.0] - 2026-08-13
 
 ### Changed

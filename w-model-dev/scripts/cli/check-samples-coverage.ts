@@ -12,7 +12,7 @@
  *   （repo-root 默认 cwd；本仓库根目录）
  *
  * 参数：
- *   --json   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  全部覆盖（无未登记 fixture，矩阵声明齐全）

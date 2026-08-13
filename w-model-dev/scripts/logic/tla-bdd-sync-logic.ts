@@ -12,7 +12,7 @@
  *     不等价时走 R→V→G→S-fix 循环（反模式 #29：BDD 建模与需求/设计/TLA+ 不符未回退）。
  *
  * 设计原则（与 tla-logic.ts / bdd-logic.ts 一致）：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块（A2b 复用 lib/types.js 的 StructuredViolation 类型除外）
+ *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块（复用 lib/types.js 的 StructuredViolation 类型除外）
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「TLA+ 与 BDD 是否同步」的判定均委托至此
  *
@@ -33,7 +33,7 @@ export interface TlaBddSyncViolation {
 }
 
 /**
- * A2b 双轨过渡：TLA+/BDD 同步结构化违规规则 ID。
+ * 结构化违规双轨：TLA+/BDD 同步结构化违规规则 ID。
  * 命名：TLA_BDD_<类别>，对应 transition/state/invariant 三类比对规则。
  *
  * 规则 ID → 设计依据映射：
@@ -51,7 +51,7 @@ const TLA_BDD_RULES = {
 export interface TlaBddSyncResult {
   passed: boolean;
   violations: TlaBddSyncViolation[];
-  /** A2b 双轨过渡：结构化违规（rule/field/message），可选字段向后兼容 */
+  /** 结构化违规双轨：结构化违规（rule/field/message），可选字段向后兼容 */
   structuredViolations?: StructuredViolation[];
   tlaTransitions: string[];
   bddTransitions: string[];

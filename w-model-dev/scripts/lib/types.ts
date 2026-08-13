@@ -2,12 +2,12 @@
  * 复用类型（lib/types.ts）
  *
  * 校验输入输出通用类型定义，全仓复用：
- * - StructuredViolation / GateCheckResult：A2b violations 双轨过渡的结构化形态
+ * - StructuredViolation / GateCheckResult：结构化违规双轨的结构化形态
  * - JsonReport：--json 输出摘要形态
  */
 export type { Phase } from './constants.js';
 
-/** 结构化违规（A2b：rule/field/message 三要素） */
+/** 结构化违规（rule/field/message 三要素） */
 export interface StructuredViolation {
   rule: string;
   field?: string;

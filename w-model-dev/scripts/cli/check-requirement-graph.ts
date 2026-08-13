@@ -28,7 +28,7 @@
  *                启用 R7 追踪矩阵一致性 + R8 UML mermaid 块配平校验（不传则行为完全不变）
  *   --rtm        RTM 文件路径（R6 扩展：阶段 4 验收用例 ↔ 需求覆盖交叉核对）
  *   --exemptions 豁免文件路径（存在时跳过对应豁免规则，与 check-exemption.ts granted.json 口径一致）
- *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json       机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过（连通 + 单根 + 父唯一 + 阶段追溯完整）
@@ -70,7 +70,7 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
@@ -355,7 +355,7 @@ async function main(): Promise<void> {
   }
   const exitCode = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

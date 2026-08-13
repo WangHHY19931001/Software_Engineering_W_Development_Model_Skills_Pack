@@ -59,6 +59,8 @@ color: teal
 
 ### 高质量 README 模板
 
+> 以下为交付物模板示例：`your-package`、`docs.yourproject.com`、`Your Name` 等为占位符，使用时应替换为实际内容。
+
 ```markdown
 # 项目名称
 
@@ -129,6 +131,8 @@ MIT © [Your Name](https://github.com/yourname)
 ```
 
 ### OpenAPI 文档示例
+
+> 以下为交付物模板示例：`app.example.com` / `docs.example.com` 为 RFC 2606 保留示例域，`Orders API` 等为占位示例内容，使用时应替换为实际内容。
 
 ```yaml
 # openapi.yml - 文档优先的 API 设计
@@ -209,6 +213,8 @@ paths:
 
 ### 教程结构模板
 
+> 以下为交付物模板示例：`[目标成果]`、`[预估时间]`、`[工具 X]`、`[概念]` 等为占位符，使用时应替换为实际内容。
+
 ```markdown
 # 教程：[目标成果] [预估时间]
 
@@ -220,9 +226,9 @@ paths:
 - 概念 C
 
 **前置条件**：
-- [ ] 已安装 [工具 X](链接)（版本 Y+）
+- [ ] 已安装 [工具 X](https://example.com/tool-x)（版本 Y+）
 - [ ] 了解 [概念] 的基础知识
-- [ ] 拥有 [服务] 的账号（[免费注册](链接)）
+- [ ] 拥有 [服务] 的账号（[免费注册](https://example.com/signup)）
 
 ---
 
@@ -242,7 +248,7 @@ npm init -y
 Wrote to /path/to/my-project/package.json: { ... }
 ```
 
-> **提示**：如果遇到 `EACCES` 错误，[修复 npm 权限](链接) 或使用 `npx`。
+> **提示**：如果遇到 `EACCES` 错误，[修复 npm 权限](https://docs.npmjs.com/resolving-eacces-permissions-errors) 或使用 `npx`。
 
 ## 第 2 步：安装依赖
 
@@ -258,12 +264,14 @@ Wrote to /path/to/my-project/package.json: { ... }
 
 ## 下一步
 
-- [进阶教程：添加认证](链接)
-- [参考：完整 API 文档](链接)
-- [示例：生产级完整版本](链接)
+- [进阶教程：添加认证](https://example.com/advanced-auth)
+- [参考：完整 API 文档](https://example.com/api-reference)
+- [示例：生产级完整版本](https://example.com/production-example)
 ```
 
 ### Docusaurus 配置
+
+> 以下为交付物模板示例：`docs.yourproject.com`、`org/repo`、`YOUR_APP_ID` 等为占位符，使用时应替换为实际内容。
 
 ```javascript
 // docusaurus.config.js

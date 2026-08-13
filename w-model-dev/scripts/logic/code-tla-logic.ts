@@ -31,7 +31,7 @@ const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 // ==================== 自包含类型形状 ====================
 
 /**
- * A2b 双轨过渡：代码-TLA+ 一致性结构化违规规则 ID。
+ * 结构化违规双轨：代码-TLA+ 一致性结构化违规规则 ID。
  * 命名：CODE_TLA_<类别>，对应四维度判定规则；INPUT/SCHEMA 对应输入形状与 schema 前置校验。
  *
  * 规则 ID → 设计依据映射（设计依据 SSoT §10.8.1 四维度算法）：
@@ -41,7 +41,7 @@ const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
  *   - D3：维度3 Next 分支对应（SSoT §10.8.1 算法 3 + SSoT §3.4.6 P2.8 PascalCase→camelCase 自动映射 +
  *        P3.9 遍历 manifest 全部 specs 的 Next actions，不再仅限 L4）
  *   - D4：维度4 断言覆盖不变式（SSoT §10.8.1 算法 4：assert/invariant/require 宽松覆盖）
- *   - INPUT / SCHEMA：A2b 新增的前置校验（输入形状合法性 + code-tla-manifest schema 结构性约束），
+ *   - INPUT / SCHEMA：新增的前置校验（输入形状合法性 + code-tla-manifest schema 结构性约束），
  *        通过后才进入上方四维度业务规则校验
  */
 const CODE_TLA_RULES = {
@@ -123,7 +123,7 @@ export interface DimensionResult {
   passed: boolean;
   checked: number;
   violations: string[];
-  /** A2b 双轨过渡：结构化违规（rule/field/message），可选字段向后兼容 */
+  /** 结构化违规双轨：结构化违规（rule/field/message），可选字段向后兼容 */
   structuredViolations?: StructuredViolation[];
 }
 
@@ -141,7 +141,7 @@ export interface ConsistencyResult {
     invariantCoverage: DimensionResult;
   };
   violations: Violation[];
-  /** A2b 双轨过渡：结构化违规（rule/field/message），可选字段向后兼容 */
+  /** 结构化违规双轨：结构化违规（rule/field/message），可选字段向后兼容 */
   structuredViolations?: StructuredViolation[];
 }
 
@@ -637,7 +637,7 @@ export function checkInvariantCoverage(tlaContent: string, files: CodeFile[]): D
  *
  * 边界处理：
  *   - input 非对象 / schema 前置校验失败 → 直接返回失败，不进入四维度业务校验
- *     （INPUT/SCHEMA 规则，A2b）
+ *     （INPUT/SCHEMA 规则）
  *   - manifest 无任何 spec 含 tlaContent → 维度3/4 跳过（视为通过）；维度1/2 仍照常强校验
  *
  * @param input CodeTlaConsistencyInput（manifest + graph + rtm + codeFiles）
@@ -661,7 +661,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
     };
   }
 
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方四维度业务规则校验（SD→codeModule / 状态转移 / Next 分支 / 不变式覆盖）。
   // 注意：schema 兼容两种形态 —— codeSources（CLI/test）与 codeFiles（运行时含 AST）；
@@ -700,7 +700,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
   for (const v of sdToCodeModule.violations) {
     violations.push({ dimension: 'sdToCodeModule', message: v });
   }
-  // A2b：直接透传子维度结构化违规（保留 graph.nodes[3].id 等细粒度 field），不再字符串重新派生粗粒度 field
+  // 结构化违规双轨：直接透传子维度结构化违规（保留 graph.nodes[3].id 等细粒度 field），不再字符串重新派生粗粒度 field
   if (sdToCodeModule.structuredViolations && sdToCodeModule.structuredViolations.length > 0) {
     structuredViolations.push(...sdToCodeModule.structuredViolations);
   }
@@ -718,7 +718,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
   for (const v of codeStateTransfer.violations) {
     violations.push({ dimension: 'codeStateTransfer', message: v });
   }
-  // A2b：直接透传子维度结构化违规（保留 codeFiles[*].assignments 等细粒度 field）
+  // 结构化违规双轨：直接透传子维度结构化违规（保留 codeFiles[*].assignments 等细粒度 field）
   if (codeStateTransfer.structuredViolations && codeStateTransfer.structuredViolations.length > 0) {
     structuredViolations.push(...codeStateTransfer.structuredViolations);
   }
@@ -746,7 +746,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
         for (const v of r.violations) {
           nextViolations.push(`规格 ${spec.id}: ${v}`);
         }
-        // A2b：透传子维度结构化违规，message 保留「规格 ${spec.id}:」前缀（与 violations 文本一致），field 保持细粒度
+        // 结构化违规双轨：透传子维度结构化违规，message 保留「规格 ${spec.id}:」前缀（与 violations 文本一致），field 保持细粒度
         for (const sv of r.structuredViolations ?? []) {
           const prefixed = { ...sv, message: `规格 ${spec.id}: ${sv.message}` };
           nextStructuredViolations.push(prefixed);
@@ -781,7 +781,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
         for (const v of r.violations) {
           invViolations.push(`规格 ${spec.id}: ${v}`);
         }
-        // A2b：透传子维度结构化违规，message 保留「规格 ${spec.id}:」前缀，field 保持细粒度
+        // 结构化违规双轨：透传子维度结构化违规，message 保留「规格 ${spec.id}:」前缀，field 保持细粒度
         for (const sv of r.structuredViolations ?? []) {
           const prefixed = { ...sv, message: `规格 ${spec.id}: ${sv.message}` };
           invStructuredViolations.push(prefixed);

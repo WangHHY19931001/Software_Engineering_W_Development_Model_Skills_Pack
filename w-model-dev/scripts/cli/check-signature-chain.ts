@@ -15,7 +15,7 @@
  *   --chain=<path>          显式签名链文件路径（与位置参数二选一，项目根由链文件位置向上推导 .w-model/ 目录）
  *   --phase=N               只校验 phase=N 的签名（1-8）
  *   --stage=...             校验阶段：pre-gate（G 跑 gate 前）/ pre-checkpoint（O checkpoint 前）/ archive（归档时全阶段）
- *   --json                  机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json                  机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * R8 说明：仅当从链文件位置向上能解析到含 .w-model/project.json 的真实项目根时启用（产物存在性校验）；
  *   独立链文件 / 逻辑夹具（无真实项目）场景自动跳过 R8，与 signature-chain-logic 契约一致。
@@ -83,7 +83,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const { chainFile, phase, stage } = parseArgs(process.argv);
@@ -165,7 +165,7 @@ async function main(): Promise<void> {
   const result = checkSignatureChain(entries, { phase, stage, existingPaths });
   const exitCode = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

@@ -277,7 +277,7 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
  *  11. ranking（可选）字段类型合法
  */
 export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方业务规则校验（数值合理性 / 防漂移 / 权重匹配等）。
   const schemaResult = validateBySchema('verifier-output', raw);

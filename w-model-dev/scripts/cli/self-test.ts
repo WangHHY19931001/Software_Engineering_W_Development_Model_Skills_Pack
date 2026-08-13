@@ -1560,35 +1560,35 @@ const UAT_PATH_MAPPING_CASES: UatPathMappingCase[] = [
   {
     sampleDir: 'uat-path-mapping/valid-phase5',
     expectedPassed: true,
-    description: 'B4 阶段5回填完整（实际路径非占位符 + mappingType 合法），应通过',
+    description: '阶段5回填完整（实际路径非占位符 + mappingType 合法），应通过',
   },
   {
     sampleDir: 'uat-path-mapping/bad-empty-table',
     expectedPassed: false,
     expectedViolationPatterns: [/无有效映射行/],
-    description: 'B4 空表（仅表头无数据行）应报"无有效映射行"，不静默通过',
+    description: '空表（仅表头无数据行）应报"无有效映射行"，不静默通过',
   },
   {
     sampleDir: 'uat-path-mapping/bad-malformed-row',
     expectedPassed: false,
     expectedViolationPatterns: [/行畸形/],
-    description: 'B4 畸形行（单元格数 < 4）应记录 violation，不静默跳行',
+    description: '畸形行（单元格数 < 4）应记录 violation，不静默跳行',
   },
   {
     sampleDir: 'uat-path-mapping/bad-empty-cell',
     expectedPassed: false,
     expectedViolationPatterns: [/含空单元格/],
-    description: 'B4 畸形行（空单元格）应记录 violation，不静默跳行',
+    description: '畸形行（空单元格）应记录 violation，不静默跳行',
   },
   {
     sampleDir: 'uat-path-mapping/bad-unbackfilled',
     expectedPassed: false,
     expectedViolationPatterns: [/未回填/],
-    description: 'B5 终检语义（checkUatPathMappingContent 供阶段5/终检共用）下含未回填行应失败',
+    description: '终检语义（checkUatPathMappingContent 供阶段5/终检共用）下含未回填行应失败',
   },
 ];
 
-// -------------------- BDD（Task 5：10 样本，2 valid + 8 bad） --------------------
+// -------------------- BDD（10 样本，2 valid + 8 bad） --------------------
 
 interface BddCase {
   /** manifest 文件名（相对 samples/bdd/） */
@@ -2106,7 +2106,7 @@ const SCHEMA_CASES: SchemaCase[] = [
     expectedErrorPatterns: [/type/],
     description: 'compositeScore 为字符串应被 type:number 拦截',
   },
-  // -------------------- 借鉴点 2：12 份 schema 各加一条用例（Task 3） --------------------
+  // -------------------- Schema 用例：12 份 schema 各加一条前置校验用例 --------------------
   {
     file: 'bad-budget-additional-props.json',
     schema: 'budget',
@@ -3366,7 +3366,7 @@ async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
-// -------------------- Metadata（借鉴点 4：版本号双写一致性） --------------------
+// -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
   const skill = await fs.readFile(path.join(skillRoot, 'SKILL.md'), 'utf-8');

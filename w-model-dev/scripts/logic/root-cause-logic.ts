@@ -136,7 +136,7 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
     return { passed: false, reasons: ['RootCauseReport 必须为对象'] };
   }
 
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方 R1-R10 业务规则校验。
   const schemaResult = validateBySchema('rootcause-report', input);

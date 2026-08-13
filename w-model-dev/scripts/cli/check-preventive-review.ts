@@ -16,7 +16,7 @@
  *                            ingest 为 S-ingest-tla / S-ingest-bdd 后 R3，须显式传参，auto-trigger 不推断）
  *   --auto-trigger           从 --run-log 读取当前阶段并推断 variant
  *   --run-log=<path>         run-log.jsonl 路径（--auto-trigger 模式必填）
- *   --json                   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json                   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过（各维度审查报告齐全且格式合规——存在性 + schema + phase/dimension 一致；报告内 passed 状态由 V 评审纳入 reworkHints）
@@ -79,7 +79,7 @@ function reportFilePrefix(phase: number, variant: NonNullable<PreventiveReviewOp
 }
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
+  // --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
@@ -235,7 +235,7 @@ async function main(): Promise<void> {
     variant,
   };
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

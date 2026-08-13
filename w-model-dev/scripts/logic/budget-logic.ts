@@ -65,7 +65,7 @@ export function checkBudget(
     tlaReworkCount?: number;
   },
 ): BudgetCheckResult {
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   const schemaResult = validateBySchema('budget', budget);
   if (!schemaResult.valid) {
     return {

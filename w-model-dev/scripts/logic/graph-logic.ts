@@ -242,7 +242,7 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     return result;
   }
 
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方业务规则校验（连通性 / 层级树 / 信息流等）。
   const schemaResult = validateBySchema('graph', graph);

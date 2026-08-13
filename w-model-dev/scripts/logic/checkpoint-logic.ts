@@ -174,7 +174,7 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
   const valid: RunLogEntry[] = [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
-    // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+    // === Schema 前置校验 ===
     // 结构性约束（additionalProperties / required / type）由 schema 拦截，
     // 拒绝时记录 [schema] 前缀违规并跳过该条（与 run-log-logic.ts 一致）。
     const schemaResult = validateBySchema('run-log', raw);

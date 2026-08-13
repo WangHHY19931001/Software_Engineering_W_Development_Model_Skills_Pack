@@ -11,7 +11,7 @@
  *
  * 参数：
  *   project-dir  项目根目录（默认：当前工作目录）
- *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json       机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 读取：
  *   <project-dir>/docs/uat-path-mapping.md  （设计路径 ↔ 实际路径映射）
@@ -56,7 +56,7 @@ import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 async function parseUatPathMapping(filePath: string): Promise<UatPathMapping[]> {
   const content = await fs.readFile(filePath, 'utf-8');
   // 宽松解析（默认非 strict）：畸形行静默跳过，对齐 design-contract 历史行为。
-  // 实现收敛（批次3 Task7）：统一复用 design-contract-logic.parseUatPathMappingContent，
+  // 实现收敛：统一复用 design-contract-logic.parseUatPathMappingContent，
   // 字段映射到 uatId/designPath/actualPath/mappingType；violations 在宽松语义下不消费。
   const { rows } = parseUatPathMappingContent(content);
   return rows.map((row) => ({
@@ -213,7 +213,7 @@ async function parseAcceptanceAssertions(testDir: string): Promise<AcceptanceTes
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const projectDir = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '.';
@@ -276,7 +276,7 @@ async function main(): Promise<void> {
   const result = checkDesignContractConsistency(input);
   const exitCode = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     // violations 分布按维度聚合（与人类可读 `[${v.dimension}] ${v.message}` 对齐）
     const byDimension = new Map<string, number>();

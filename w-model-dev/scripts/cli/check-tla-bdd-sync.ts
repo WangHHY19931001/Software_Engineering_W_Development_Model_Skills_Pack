@@ -11,7 +11,7 @@
  * 参数：
  *   tla-file       .tla 文件路径
  *   feature-file   .feature 文件路径
- *   --json         机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过（TLA+ 转移/状态/不变式 与 BDD When/Given/Then 一一对应）
@@ -45,7 +45,7 @@ const SYNC_JSON = {
 };
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读 JSON 摘要）
+  // --json：机器可读报告模式（不打印人类可读 JSON 摘要）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     const featureContent = await fs.readFile(featureFile, 'utf-8');
     const result = checkTlaBddSync(tlaContent, featureContent);
 
-    // A2b 双轨过渡：violations 字段直接透传 structuredViolations 对象数组（含 rule/field/message），
+    // 结构化违规双轨：violations 字段直接透传 structuredViolations 对象数组（含 rule/field/message），
     // 无结构化字段时降级为原对象数组（元素含 dimension/tlaName/bddName/description）。
     // 与 check-code-tla-consistency.ts 的增强展示（[rule field] message）对称，不再拍平为字符串数组。
     const outReasons = result.structuredViolations ?? result.violations;
@@ -100,9 +100,9 @@ async function main(): Promise<void> {
       },
     };
 
-    // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+    // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
     if (jsonMode) {
-      // A2b 双轨过渡：reasons 优先结构化 violations 的 message；violations 分布按 rule 聚合
+      // 结构化违规双轨：reasons 优先结构化 violations 的 message；violations 分布按 rule 聚合
       printJsonReport(
         {
           type: 'tla-bdd-sync',

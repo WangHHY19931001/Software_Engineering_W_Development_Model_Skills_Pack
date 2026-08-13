@@ -41,7 +41,7 @@ export function printJsonReport(report: JsonReport, exitCode: number): void {
 
 /**
  * 聚合违规类型分布（--json 的 violations 字段）：
- * 优先按 structuredViolations 的 rule 聚合（A2b 双轨过渡的结构化形态）；
+ * 优先按 structuredViolations 的 rule 聚合（结构化违规双轨的形态）；
  * 无结构化违规时降级固定 'violation' 规则（count = violations.length）。
  * @param violationsCount      违规总数（降级分支的 count）
  * @param structuredViolations 可选的结构化违规数组（按 rule 聚合优先）

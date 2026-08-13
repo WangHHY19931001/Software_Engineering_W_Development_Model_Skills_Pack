@@ -4,7 +4,6 @@
  * 覆盖：
  *   - readJsonOrExit：正常路径 / ENOENT / 非法 JSON / 泛型返回
  *   - readJsonlOrExit：正常 / 空行跳过 / 坏行 warn 跳过 / ENOENT
- *   - readJsonOptional：正常 / ENOENT→null / 非法 JSON→exit 2
  *   - readJsonlOptional：正常 / ENOENT→[] / 坏行 warn 跳过 / 空行 + CRLF
  *   - loadAndValidate：正常 / ENOENT / 非法 JSON / STRUCTURE_INVALID（错误路径抛哨兵错误，与真实异常可区分）
  *
@@ -20,7 +19,6 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   readJsonOrExit,
   readJsonlOrExit,
-  readJsonOptional,
   readJsonlOptional,
   readJsonClassified,
 } from '../lib/read-json-or-exit.js';
@@ -157,40 +155,6 @@ describe('readJsonlOrExit', () => {
     await readJsonlOrExit(file);
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
     errSpy.mockRestore();
-  });
-});
-
-describe('readJsonOptional', () => {
-  it('文件存在 → 正常解析（不 exit）', async () => {
-    const file = path.join(tmpDir, 'opt.json');
-    await fs.writeFile(file, JSON.stringify({ a: 1, b: [2, 3] }));
-    const result = await readJsonOptional<{ a: number; b: number[] }>(file);
-    expect(result?.a).toBe(1);
-    expect(result?.b).toEqual([2, 3]);
-  });
-
-  it('文件不存在（ENOENT）→ 返回 null，不 exit', async () => {
-    const missing = path.join(tmpDir, 'nope-opt.json');
-    const result = await readJsonOptional(missing);
-    expect(result).toBeNull();
-  });
-
-  it('非法 JSON → process.exit(2) 并输出 ERROR_JSON（与 readJsonOrExit 一致）', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
-      throw new Error(`exit:${code}`);
-    });
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const file = path.join(tmpDir, 'bad-opt.json');
-    await fs.writeFile(file, '{not json');
-    await expect(readJsonOptional(file)).rejects.toThrow('exit:2');
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
-    const out = logSpy.mock.calls[0]![0] as string;
-    expect(out.startsWith('ERROR_JSON ')).toBe(true);
-    expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_PARSE', exitCode: 2 });
-    exitSpy.mockRestore();
-    errSpy.mockRestore();
-    logSpy.mockRestore();
   });
 });
 

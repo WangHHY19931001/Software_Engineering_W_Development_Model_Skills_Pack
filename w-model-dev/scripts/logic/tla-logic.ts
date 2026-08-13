@@ -850,7 +850,7 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
     return result;
   }
 
-  // === Schema 前置校验（借鉴点 2 — 借鉴 drawio-skill/styles/schema.json） ===
+  // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方业务规则校验（层次 / 拆解 / 声明标志 / cfg 一致性等）。
   const schemaResult = validateBySchema('tla-manifest', manifest);

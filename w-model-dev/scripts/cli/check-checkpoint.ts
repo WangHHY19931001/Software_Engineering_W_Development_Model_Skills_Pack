@@ -15,7 +15,7 @@
  *   --checkpoint-log=<dir> checkpoint-log 目录路径（强制，R3 用户确认存在校验）
  *                         目录下按 phase 命名的文件（如 phase-1.txt / 1.txt / checkpoint-1.md）
  *                         内容即用户确认原文，key=phase
- *   --json                机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
@@ -109,7 +109,7 @@ async function loadCheckpointLog(checkpointLogDir: string): Promise<Map<string, 
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const { runLogFile, checkpointLogDir } = parseArgs(process.argv);
@@ -156,7 +156,7 @@ async function main(): Promise<void> {
   const result = checkCheckpoint(entries, { checkpointLog });
   const exitCode = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {

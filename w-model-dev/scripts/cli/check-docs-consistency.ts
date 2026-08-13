@@ -9,7 +9,7 @@
  *   （repo-root 默认 cwd；本仓库根目录）
  *
  * 参数：
- *   --json   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  全部一致
@@ -80,7 +80,7 @@ const DESIGN_DOC_NAMES = [
 ];
 
 /**
- * 判定 w-model-dev/scripts 目录下 .ts 文件是否有变更（spec §3 B3 baseline 同步检查的触发条件）。
+ * 判定 w-model-dev/scripts 目录下 .ts 文件是否有变更（baseline 同步检查的触发条件）。
  * 合并两路 git 输出，覆盖 staged / unstaged / 未跟踪新文件：
  *   - git diff --name-only HEAD：工作树 + 暂存区相对 HEAD 的变更
  *   - git status --porcelain：含未跟踪（??）新文件，兜底 diff 未覆盖的部分
@@ -193,7 +193,7 @@ function collectVitestTestCount(root: string): number {
 }
 
 function main(): void {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const args = process.argv.slice(2).filter((a) => a !== '--json');
   const jsonMode = args.length !== process.argv.slice(2).length;
   const startTime = Date.now();
@@ -259,7 +259,7 @@ function main(): void {
   const violations = runDocConsistencyChecks(input);
   const exitCode = violations.length === 0 ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     // violations 分布按检查项聚合（与人类可读 `[${v.check}] ${v.message}` 对齐）
     const byCheck = new Map<string, number>();

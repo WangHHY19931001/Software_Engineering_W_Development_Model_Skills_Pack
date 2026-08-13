@@ -11,7 +11,7 @@
  *
  * 参数：
  *   report.json  R 子代理产出的 RootCauseReport JSON 文件路径
- *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
+ *   --json       机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
@@ -39,7 +39,7 @@ import { exitWithError } from '../lib/cli-error.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
-  // B4 --json：机器可读报告模式（不打印人类可读分隔线与统计）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const meta = (parsed as RootCauseReportShape)?.meta;
   const exitCode1 = result.passed ? 0 : 1;
 
-  // B4 --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {
