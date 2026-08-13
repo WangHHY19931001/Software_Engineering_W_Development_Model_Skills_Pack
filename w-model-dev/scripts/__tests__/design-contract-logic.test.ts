@@ -201,7 +201,7 @@ describe('design-contract-logic', () => {
     });
   });
 
-  describe('D1: UAT 路径映射语义归一（第 35 轮修复）', () => {
+  describe('D1: UAT 路径映射语义归一', () => {
     it('多端点组合（「、」分隔）逐项匹配', () => {
       const input = makeInput({
         routeDefinitions: [

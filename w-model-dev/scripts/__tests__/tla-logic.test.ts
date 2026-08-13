@@ -275,10 +275,10 @@ describe('G-D D3 @phase 解析拒绝非整数', () => {
   });
 });
 
-// ==================== checkCoverage sdCoverage 回填校验（Task 5） ====================
+// ==================== checkCoverage sdCoverage 回填校验 ====================
 
 describe('checkCoverage sdCoverage 回填', () => {
-  // 注：schema（Task 3）在 currentPhase>=2 时强制必填 sdCoverage，且 sdCoverage.uncoveredSdNodes
+  // 注：schema 在 currentPhase>=2 时强制必填 sdCoverage，且 sdCoverage.uncoveredSdNodes
   // maxItems:0 —— 非空 uncoveredSdNodes / 缺失 sdCoverage 在 schema 层即被拦截（返回 [schema] 前缀 violations，
   // checkTlaModel 提前返回）。因此以下用例的构造须让 manifest 通过 schema 以触达业务层校验：
   //   - 用例 1：sdCoverage 与 graphSdNodes 覆盖集合不一致（coveredSdNodes 漏报，uncoveredSdNodes 保持空数组）

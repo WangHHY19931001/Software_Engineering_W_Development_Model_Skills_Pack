@@ -480,13 +480,13 @@ describe('checkBddModel', () => {
   });
 });
 
-// ==================== parseTlaSpecSnapshot（批次 3 Task 6 补强：直接单测） ====================
+// ==================== parseTlaSpecSnapshot ====================
 
 describe('parseTlaSpecSnapshot', () => {
   it('named-set style: multi-var TypeInvariant picks the largest named set（22 REQUESTS）作为状态集', () => {
-    // 复刻调测前 demo L1 的命名集合风格：REQUESTS(22) > ACTORS(4) > RESPONSES(7)，
+    // demo L1 的命名集合风格：REQUESTS(22) > ACTORS(4) > RESPONSES(7)，
     // → 状态变量选择 request，状态集 = REQUESTS 的 22 个请求类别（解析器已支持命名集合）。
-    // 第 35 轮起改为自包含内联规格，不再依赖 demo 实时文件（demo L1 已重写为 4 状态生命周期风格）。
+    // 测试规格为自包含内联，不依赖 demo 实时文件（demo L1 为 4 状态生命周期风格）。
     const content = `---- MODULE L1_BlogSystem ----
 VARIABLES request, actor, response, published
 
@@ -876,7 +876,7 @@ Spec == Init /\\ [][Next]_vars
   });
 });
 
-// ==================== parseFeatureFile（批次 3 Task 6 补强：直接单测） ====================
+// ==================== parseFeatureFile ====================
 
 describe('parseFeatureFile', () => {
   const feat = `# @req: REQ-001
@@ -940,10 +940,10 @@ Scenario: 无 Given 无 Then
   });
 });
 
-// ==================== D8 SD Coverage（Task 6） ====================
-// 注：schema（Task 4）在 currentPhase>=2 时强制必填 designCoverage，且 uncoveredSdNodes
+// ==================== D8 SD Coverage ====================
+// 注：schema 在 currentPhase>=2 时强制必填 designCoverage，且 uncoveredSdNodes
 // maxItems:0 —— 非空 uncoveredSdNodes 在 schema 层即被拦截（checkBddModel 提前返回）。
-// 因此以下用例的构造须让 manifest 通过 schema 以触达业务层 D8 校验（与 Task 5 tla-logic 同模式）：
+// 因此以下用例的构造须让 manifest 通过 schema 以触达业务层 D8 校验（与 tla-logic 同模式）：
 //   - 用例 1/2：manifest.currentPhase=1 绕过 schema 拦截（uncoveredSdNodes 非空 / designCoverage 缺失），
 //     以 phase 参数=2 触发业务层 D8 校验
 //   - 用例 3：currentPhase=2 + 全覆盖（uncoveredSdNodes 空数组），应零 violation

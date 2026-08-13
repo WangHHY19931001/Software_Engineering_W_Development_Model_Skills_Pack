@@ -133,7 +133,7 @@
 
 ## 跨模块数据源选择约束
 
-> 第 15 轮 P7-002 `BloggerService.follow` 校验 `follower` 在 blogger store（设计标注 user+）、P7-003 `CommentService.create` 仅校验 user store（blogger token sub 是 bloggerId）缺陷的预防约束。第 16 轮 P3.2 新增。
+> 缺陷 P7-002（`BloggerService.follow` 校验 `follower` 在 blogger store，设计标注 user+）与 P7-003（`CommentService.create` 仅校验 user store，blogger token sub 是 bloggerId）的预防约束。
 
 跨模块调用时，数据源（store）选择须满足：
 

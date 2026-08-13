@@ -1,8 +1,8 @@
 /**
  * 门禁脚本统一收尾报告（Gate Report）
  *
- * 收敛 check-*.ts 的「分隔线 + XXX_JSON 摘要 + exit」样板（批次 3 §3.1）。
- * 输出格式与历史一致：
+ * check-*.ts 的「分隔线 + XXX_JSON 摘要 + exit」样板（§3.1）。
+ * 输出格式：
  *   - 第一行：'─'.repeat(60) 分隔线
  *   - 第二行：`<LABEL>_JSON <json>`（空格分隔，供 Agent 正则截取）
  *   - exitCode 键追加在 JSON 末尾（`{ ...summary, exitCode }`，值来自参数）
@@ -28,7 +28,7 @@ export function printGateReport(label: string, summary: Record<string, unknown>,
 }
 
 /**
- * 输出机器可读 JSON 报告（check-*.ts --json 选项用，B4 可观测性）。
+ * 输出机器可读 JSON 报告（check-*.ts --json 选项用）。
  * 与 printGateReport 的区别：
  *   - 不打印分隔线，stdout 仅输出单行 JSON（可整体 JSON.parse）
  *   - 不调用 process.exit，进程退出码由调用方处理（设置 process.exitCode 后 return）
@@ -40,7 +40,7 @@ export function printJsonReport(report: JsonReport, exitCode: number): void {
 }
 
 /**
- * 聚合违规类型分布（B4 --json 的 violations 字段）：
+ * 聚合违规类型分布（--json 的 violations 字段）：
  * 优先按 structuredViolations 的 rule 聚合（A2b 双轨过渡的结构化形态）；
  * 无结构化违规时降级固定 'violation' 规则（count = violations.length）。
  * @param violationsCount      违规总数（降级分支的 count）
@@ -49,7 +49,7 @@ export function printJsonReport(report: JsonReport, exitCode: number): void {
 export function buildViolationDistribution(
   violationsCount: number,
   // 放宽为兼容 StructuredViolation 的形状（rule/field/message 全可选），
-  // 使调用方可直接透传 structuredViolations 或带 message/field 的对象字面量（B4 测试）
+  // 使调用方可直接透传 structuredViolations 或带 message/field 的对象字面量
   structuredViolations?: ReadonlyArray<{ rule: string; message?: string; field?: string }>,
 ): { rule: string; count: number }[] {
   if (structuredViolations !== undefined && structuredViolations.length > 0) {

@@ -52,7 +52,7 @@
 
 - `check-artifact-gate.ts --phase=6`：集成测试列回填校验，退出码 0
 - `check-bdd-model.ts --phase=6 --cucumber-report=<report.json>`（L3 features 时）：退出码 0
-- 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9，第 24 轮新增）
+- 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9）
 
 ## 6. 结论
 

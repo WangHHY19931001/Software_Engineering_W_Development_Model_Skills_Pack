@@ -139,7 +139,7 @@ if ! bash "$(dirname "$0")/ensure-platform-deps.sh"; then
 fi
 
 # ---------- 门禁用例 ----------
-# 与原 CI 一致：15 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
+# 全部门禁共 15 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 trap 'rm -f "$tmp_log"' EXIT
@@ -198,7 +198,7 @@ run_expect "check:coverage 有效覆盖样本退出 0" 0 \
 run_expect "check:exemption 有效豁免样本退出 0" 0 \
   npm run check:exemption -- w-model-dev/scripts/samples/exemption/valid-full-approval.json || exit 1
 
-# 11. [21.0.0] check-signature-chain 对有效签名链样本应退出 0
+# 11. check-signature-chain 对有效签名链样本应退出 0
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
 
@@ -227,10 +227,10 @@ else
   exit 1
 fi
 
-# 14. check-docs-consistency：活体文档一致性门禁（2026-08-10 新增）
+# 14. check-docs-consistency：活体文档一致性门禁
 run_expect "docs-consistency 活体文档一致" 0 npm run check:docs-consistency || exit 1
 
-# 15. check-samples-coverage：samples 覆盖矩阵门禁（41.5.0 新增）
+# 15. check-samples-coverage：samples 覆盖矩阵门禁
 #     核对每个 fixture 被 self-test.ts 用例数组引用 + 每个子目录在 samples/README.md 矩阵声明，
 #     堵住「新增 fixture 遗忘登记」（未登记 fixture 不参与任何检查，self-test 仍全绿）
 run_expect "samples 覆盖矩阵一致（无未登记 fixture）" 0 npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts || exit 1

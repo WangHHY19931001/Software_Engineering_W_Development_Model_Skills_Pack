@@ -9,22 +9,22 @@
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> [--phase=1|2|3|4] [--spec-dir=<dir>]
  *
- * 用法（第 38 轮新增 R9/R10）：
+ * 用法（R9/R10）：
  *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=2 --spec-dir=docs/phase2-design
  *     --spec-dir  Phase 2 时按 *-system-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
  *
- * 用法（第 38 轮小轮 B 新增 R11/R12）：
+ * 用法（R11/R12）：
  *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=3 --spec-dir=docs/phase3-outline
  *     --spec-dir  Phase 3 时按 *-interface-design.md / *-traceability-matrix.md / *-uml-modeling.md 匹配
  *
- * 用法（第 38 轮小轮 C 新增 R13/R14）：
+ * 用法（R13/R14）：
  *   npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts <graph.json> --phase=4 --spec-dir=docs/phase4-detailed
  *     --spec-dir  Phase 4 时按 *-detailed-design.md / *-traceability-matrix.md / *-class-design.md / *-data-model.md 匹配
  *
  * 参数：
  *   graph.json   graph.json 或 consolidated.json 文件路径
  *   --phase      校验阶段（1-4），控制追溯项数量，默认从 graph.currentPhase 读取
- *   --spec-dir   第 37 轮：需求规格独立产物目录（含 requirement-spec.md / traceability-matrix.md / uml-modeling.md），
+ *   --spec-dir   需求规格独立产物目录（含 requirement-spec.md / traceability-matrix.md / uml-modeling.md），
  *                启用 R7 追踪矩阵一致性 + R8 UML mermaid 块配平校验（不传则行为完全不变）
  *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // 解析 --spec-dir（第 37 轮 R7/R8 + 第 38 轮 R9/R10 + 第 38 轮小轮 B R11/R12）
+  // 解析 --spec-dir（R7/R8 + R9/R10 + R11/R12）
   // 注意：parsed 须在 spec-dir 块之前读取（phase=3 分支需从 graph.json SD 节点提取 SD 集合）
   const abs = path.resolve(file);
   const parsed = await readJsonOrExit(file);
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
         }
       };
       if (phase === 2 || phase === 3 || phase === 4) {
-        // 第 38 轮：Phase 2/3/4 module 前缀 glob 匹配（每类恰 1 个文件）
+        // Phase 2/3/4 module 前缀 glob 匹配（每类恰 1 个文件）
         const mainSuffix =
           phase === 2 ? '-system-design.md' : phase === 3 ? '-interface-design.md' : '-detailed-design.md';
         const mainFile = readdirSync(specDir).find((f) => f.endsWith(mainSuffix));
@@ -246,7 +246,7 @@ async function main(): Promise<void> {
           );
         }
       } else {
-        // 第 37 轮：Phase 1 固定文件名（保留既有行为）
+        // Phase 1 固定文件名（保留既有行为）
         const specContent = readOrEmpty(path.join(specDir, 'requirement-spec.md'));
         const traceContent = readOrEmpty(path.join(specDir, 'traceability-matrix.md'));
         const umlContent = readOrEmpty(path.join(specDir, 'uml-modeling.md'));
@@ -316,7 +316,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // 第 37 轮：合并 R7/R8 需求规格产物校验违规（须在 recalculatePassed 之前纳入 result.violations，
+  // 合并 R7/R8 需求规格产物校验违规（须在 recalculatePassed 之前纳入 result.violations，
   // 且 R7/R8 违规必须参与 passed 判定）
   if (specEnhanceViolations) {
     for (const msg of specEnhanceViolations.r7) result.violations.push(msg);
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
     recalculatePassed(result, effectivePhase === 1 && isPureReqGraph);
   }
 
-  // 第 38 轮：合并 R9/R10 Phase 2 设计规格产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
+  // 合并 R9/R10 Phase 2 设计规格产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
   if (designEnhanceViolations) {
     for (const msg of designEnhanceViolations.r9) result.violations.push(msg);
     for (const msg of designEnhanceViolations.r10) result.violations.push(msg);
@@ -337,7 +337,7 @@ async function main(): Promise<void> {
     recalculatePassed(result, false);
   }
 
-  // 第 38 轮小轮 B：合并 R11/R12 Phase 3 概要设计产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
+  // 合并 R11/R12 Phase 3 概要设计产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
   if (outlineEnhanceViolations) {
     for (const msg of outlineEnhanceViolations.r11) result.violations.push(msg);
     for (const msg of outlineEnhanceViolations.r12) result.violations.push(msg);
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
     recalculatePassed(result, false);
   }
 
-  // 第 38 轮小轮 C：合并 R13/R14 Phase 4 详细设计产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
+  // 合并 R13/R14 Phase 4 详细设计产物校验违规（须在 recalculatePassed 之前纳入 result.violations）
   if (detailedEnhanceViolations) {
     for (const msg of detailedEnhanceViolations.r13) result.violations.push(msg);
     for (const msg of detailedEnhanceViolations.r14) result.violations.push(msg);

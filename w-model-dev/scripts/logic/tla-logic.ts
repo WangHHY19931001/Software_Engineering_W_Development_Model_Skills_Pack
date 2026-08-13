@@ -117,7 +117,7 @@ export interface TlaCheckResult {
   cfgConsistencyViolations: string[];
   /** .cfg 结构违反（如混入 MODULE 声明、INVARIANT 行格式错误，见 §12） */
   cfgStructureViolations: string[];
-  /** checkRounds schema 违反（如元素缺字段、字段类型错、含 phase 级摘要字段，见 §checkRounds 字段语义，R13 第 16 轮新增） */
+  /** checkRounds schema 违反（如元素缺字段、字段类型错、含 phase 级摘要字段，见 §checkRounds 字段语义，R13） */
   checkRoundsViolations: string[];
   environmentOk: boolean;
   environmentErrors: string[];
@@ -741,7 +741,7 @@ function validateSpec(raw: unknown, index: number): string[] {
  */
 
 /**
- * R13 checkRounds schema 校验（第 16 轮 P1.1）。
+ * R13 checkRounds schema 校验。
  *
  * 语义权威定义见 tla-plus-guide.md §checkRounds 字段语义：
  * checkRounds 数组记录每次 TLA+ 校验轮次的结果（spec 级返工记录），
@@ -760,13 +760,11 @@ function validateSpec(raw: unknown, index: number): string[] {
  *     - syntaxCheck / tlcCheck / converged: boolean
  *     - violations: string[]（与 tla-logic.ts TlaManifest.checkRounds 类型定义一致）
  *   - 禁止字段：元素不得含 phaseSummary / summary / phaseDecisions / phaseLevelSummary 等
- *     phase 级摘要字段（命中 → R13 违反，第 15 轮遗留 #14 闭环）
+ *     phase 级摘要字段（命中 → R13 违反）
  *
  * 关联：
  *   - tla-plus-guide.md §checkRounds（语义权威）
  *   - data-models.md tla-manifest.json 节字段表（指向 tla-plus-guide.md）
- *   - CHANGELOG [15.0.0] 问题 #14（第 15 轮遗留）
- *   - CHANGELOG [16.0.0] P1.1（第 16 轮闭环）
  */
 export function checkRoundsSchema(manifest: Partial<TlaManifest>): string[] {
   const violations: string[] = [];
@@ -1000,7 +998,7 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
   result.violations.push(...result.cfgConsistencyViolations);
   result.violations.push(...result.cfgStructureViolations);
 
-  // 8.1 R13 checkRounds schema 校验（第 16 轮 P1.1，第 15 轮遗留 #14 闭环）
+  // 8.1 R13 checkRounds schema 校验
   result.checkRoundsViolations.push(...checkRoundsSchema(m));
   result.violations.push(...result.checkRoundsViolations);
 

@@ -34,7 +34,7 @@ export interface UatPathMapping {
   mappingType?: '直接' | '等价' | '替代';
 }
 
-// ==================== uat-path-mapping.md 表格解析（批次3 Task7：两调用方合一） ====================
+// ==================== uat-path-mapping.md 表格解析 ====================
 
 export interface UatPathMappingParseRow {
   uatId: string;

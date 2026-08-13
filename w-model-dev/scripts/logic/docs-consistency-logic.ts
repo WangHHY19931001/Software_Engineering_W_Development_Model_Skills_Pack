@@ -36,9 +36,9 @@ export interface DocConsistencyInput {
   agents: string;
   ssot: string;
   prePush: string;
-  /** w-model-dev/references/operation-behaviors.md 原文（八条操作行为 + F1-F10，第 44 轮自 SKILL.md 移出） */
+  /** w-model-dev/references/operation-behaviors.md 原文（八条操作行为 + F1-F10） */
   operationBehaviors: string;
-  /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版，第 44 轮自 SKILL.md 移出） */
+  /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版） */
   hardConstraints: string;
   /** 根 package.json 原文（version 一致性检查数据源） */
   pkgJson: string;
@@ -61,17 +61,17 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   schemaCount: 20,
   personaCount: 28,
-  /** references/ 目录 .md 文件数（第 44 轮重排后为 53；SKILL.md「Bundled Resources」表须同步） */
+  /** references/ 目录 .md 文件数（期望 53；SKILL.md「Bundled Resources」表须同步） */
   referencesCount: 53,
   vitestFileCount: 35,
   exit2ScriptCount: 31,
   runLogActionCount: 27,
   maxAntiPattern: 47,
   prePushCount: 15,
-  /** 硬约束条数（第 44 轮由 21 条重排合并为 14 条） */
+  /** 硬约束条数（14 条） */
   hardConstraintCount: 14,
   /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
-  currentVersion: '41.8.0',
+  currentVersion: '41.9.0',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
@@ -279,7 +279,7 @@ function checkDoDDimensions(definitionOfDone: string, readme: string, ssot: stri
 }
 
 /**
- * 操作行为一致性（第 44 轮改为指针模式）：
+ * 操作行为一致性（指针模式）：
  * 八条操作行为完整表已移入 references/operation-behaviors.md；SKILL.md 只保留「核心操作行为」节指针。
  * 要求：operation-behavives.md 含完整表（含第 8 条 Structure Over Persuasion）；SKILL.md 含指针且不再内联完整表；
  * README / SSoT 表述不变（仍要求「8 条核心操作行为」与 §4A.1 权威标题）。
@@ -312,7 +312,7 @@ function checkOperatingBehaviors(
   if (skill.includes('| 8 | **Structure Over Persuasion**')) {
     violations.push({
       check: 'operating-behaviors',
-      message: 'SKILL.md 不应再内联八条操作行为完整表（已移入 references/operation-behaviors.md，第 44 轮）',
+      message: 'SKILL.md 不应再内联八条操作行为完整表（已移入 references/operation-behaviors.md）',
     });
   }
   if (!readme.includes('8 条核心操作行为')) {
@@ -331,7 +331,7 @@ function checkOperatingBehaviors(
 }
 
 /**
- * 硬约束清单一致性（第 44 轮新增）：
+ * 硬约束清单一致性：
  * 14 条硬约束完整版在 references/hard-constraints.md；SKILL.md 只保留单行摘要 + 指针。
  * 要求：SKILL.md 含指针；hard-constraints.md 含 ## #1 ~ ## #N（N=EXPECTED.hardConstraintCount）连续标题。
  */
@@ -445,7 +445,7 @@ function checkAssetCounts(personaCount: number): DocCheckViolation[] {
 }
 
 /**
- * references/ 目录 .md 文件数一致性（41.4.0 新增）：
+ * references/ 目录 .md 文件数一致性：
  * 实际文件数须等于 EXPECTED.referencesCount，且 SKILL.md「Bundled Resources」表须含
  * 「（N 个 .md）」计数表述（如 `` `references/`（57 个 .md） ``，资源名反引号格式可异）——
  * 新增 references/*.md 时强制同步 SKILL.md 与 EXPECTED，防再次漂移。
@@ -555,7 +555,7 @@ function checkVitestTestCount(
 }
 
 /**
- * 安全 baseline 同步检查（spec §3 B3）：w-model-dev/scripts/** 下 .ts 文件有变更时，
+ * 安全 baseline 同步检查（spec §3）：w-model-dev/scripts/** 下 .ts 文件有变更时，
  * 根目录 .eslintsecurity-baseline.json 必须存在且非空（sha256 指纹文件），否则 security-scan
  * 无法豁免既有风险，属文档/门禁漂移。
  */

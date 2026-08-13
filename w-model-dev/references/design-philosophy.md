@@ -1,6 +1,6 @@
 # 设计哲学（Design Philosophy）
 
-> 本文件收录 W 模型技能包吸收自外部方法论的设计哲学（第 39/41 轮吸收），第 44 轮从 `SKILL.md` 顶部移入独立 reference 按需加载。
+> 本文件收录 W 模型技能包吸收自外部方法论的设计哲学。
 > 定位：**价值观宣言**（违反不触发回退），与「不可违反的约束」（硬红线，命中即回退）互补——哲学解释"为什么这么设计"，约束清单规定"必须怎么做"。
 > 相关资产：[hard-constraints.md](hard-constraints.md)（约束清单）/ [anti-patterns.md](anti-patterns.md)（反模式库）/ [subagent-delegation.md](subagent-delegation.md)（角色边界）。
 

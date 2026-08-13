@@ -247,9 +247,9 @@ interface RunLogEntry {
 
 ### 1.6 SSoT 同步点
 
-- SSoT §10D「成本预算与运行日志」（新增）：权威定义 budget.json / run-log.jsonl schema + 编排者维护职责 + 预算检查逻辑。
-- SSoT §3.4.2 角色表「编排者 O 允许动作」新增：「维护 budget.json / run-log.jsonl（状态读写，非实施）」。
-- SSoT §10A 追溯表新增行：§10D → `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget/run-log schema）。
+- SSoT §10D「成本预算与运行日志」：权威定义 budget.json / run-log.jsonl schema + 编排者维护职责 + 预算检查逻辑。
+- SSoT §3.4.2 角色表「编排者 O 允许动作」含：「维护 budget.json / run-log.jsonl（状态读写，非实施）」。
+- SSoT §10A 追溯表行：§10D → `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget/run-log schema）。
 
 ---
 
@@ -381,10 +381,10 @@ interface MaturityConfig {
 
 ### 2.6 SSoT 同步点
 
-- SSoT §10C「自主成熟度阶梯」（新增）：权威定义 L0~L3 + 放行矩阵 + 高风险路径 + maturity.json schema + 升级/降级逻辑。
-- SSoT §3.4.3「每阶段分派时序」补充：CHECKPOINT 类型由 §10C maturity.json.level 决定。
-- SSKILL.md「不可违反的约束」第 2 条补充：「CHECKPOINT 不可绕过——L1+ 的自动放行是操作型 CHECKPOINT 的选择性激活，非绕过；决策型 CHECKPOINT 在所有级别均等用户」。
-- SSoT §10A 追溯表新增行：§10C → `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）。
+- SSoT §10C「自主成熟度阶梯」：权威定义 L0~L3 + 放行矩阵 + 高风险路径 + maturity.json schema + 升级/降级逻辑。
+- SSoT §3.4.3「每阶段分派时序」：CHECKPOINT 类型由 §10C maturity.json.level 决定。
+- SSKILL.md「不可违反的约束」第 2 条：「CHECKPOINT 不可绕过——L1+ 的自动放行是操作型 CHECKPOINT 的选择性激活，非绕过；决策型 CHECKPOINT 在所有级别均等用户」。
+- SSoT §10A 追溯表行：§10C → `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）。
 
 ---
 
@@ -527,7 +527,7 @@ interface MaturityConfig {
 | 文档 | API/接口/数据模型变更须同步更新 | git diff 包含 docs/ 更新 | 补文档更新 |
 | RTM | 需求/设计/代码/测试映射同步 | rtm.json 字段无空缺 | 补登记 RTM |
 | 状态 | status 如实反映 | 字段值与磁盘产物一致 | 修正 status |
-| **理解证据**（新增） | 阶段门放行须有用户理解证据 | run-log acknowledgedDecisions 非空且含 ≥1 关键决策摘要 | 拒绝放行；要求用户填入理解证据（O4 命中） |
+| **理解证据** | 阶段门放行须有用户理解证据 | run-log acknowledgedDecisions 非空且含 ≥1 关键决策摘要 | 拒绝放行；要求用户填入理解证据（O4 命中） |
 | **签名链完整性** | 每阶段每角色动作完成后写入 `signature-chain.jsonl`；G 跑门禁前校验 R1-R10 全通过 | `check-signature-chain.ts` R1-R10 | 补齐缺失角色签名与来源证明 |
 ```
 

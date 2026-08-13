@@ -215,7 +215,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 ## 跨模块数据源选择约束（同步 phase-3）
 
-> 详细设计文档须列出每个跨模块调用的数据源选择，与 phase-3 接口设计一致。第 16 轮 P3.2 新增。详见 [phase-3-outline-design.md「跨模块数据源选择约束」](phase-3-outline-design.md#跨模块数据源选择约束)。
+> 详细设计文档须列出每个跨模块调用的数据源选择，与 phase-3 接口设计一致。详见 [phase-3-outline-design.md「跨模块数据源选择约束」](phase-3-outline-design.md#跨模块数据源选择约束)。
 
 - 每个跨模块调用须在详细设计中显式声明所用 store（写入类图/方法定义的「依赖」或「数据源」字段）
 - store 选择须与 phase-3 接口设计一致（**不得在详细设计阶段变更 store 选择**）

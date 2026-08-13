@@ -191,7 +191,7 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/扰动.*> 0\.10/],
     description: 'text-parse 扰动范围 0.45 > 0.10，应被防漂移规则 3 拦截',
   },
-  // -------------------- P2.4/P2.5/P3.10 verifier 标准化校验（第 9 轮） --------------------
+  // -------------------- P2.4/P2.5/P3.10 verifier 标准化校验 --------------------
   {
     file: 'bad-targetkind.json',
     expectedPassed: false,
@@ -229,7 +229,7 @@ const VERIFIER_CASES: VerifierCase[] = [
     description:
       'R13 单轴下限：completeness=0.65<0.70 加权平均达 A 级（0.86）但单轴失败，应 passed=false（反模式 #41）',
   },
-  // -------------------- rootcause targetKind（第 41.8.0 轮补全，§7.5） --------------------
+  // -------------------- rootcause targetKind（§7.5） --------------------
   {
     file: 'valid-rootcause.json',
     expectedPassed: true,
@@ -285,7 +285,7 @@ const GATE_CASES: GateCase[] = [
     expectedReasonPatterns: [/\[schema\].*executionSummary/],
     description: 'RTM 缺 executionSummary，应被 schema required 前置校验拦截（[schema] 前缀）',
   },
-  // -------------------- P1.1 阶段级校验（第 9 轮） --------------------
+  // -------------------- P1.1 阶段级校验 --------------------
   {
     file: 'valid-phase6.json',
     expectedPassed: true,
@@ -325,7 +325,7 @@ const GATE_CASES: GateCase[] = [
     expectedPassed: false,
     description: 'P1.1 未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）',
   },
-  // -------------------- §10J RTM 增量校验修正（第 22 轮） --------------------
+  // -------------------- §10J RTM 增量校验修正 --------------------
   {
     file: 'valid-phase1.json',
     expectedPassed: true,
@@ -339,7 +339,7 @@ const GATE_CASES: GateCase[] = [
     expectedReasonPatterns: [/REQ-001.*acceptanceTest/],
     description: '§10J phase=1 REQ 行 acceptanceTest 为空，应被增量校验拦截',
   },
-  // -------------------- 第24轮 P0 RTM coverageStatus 校验 --------------------
+  // -------------------- P0 RTM coverageStatus 校验 --------------------
   {
     file: 'bad-rtm-coverage-below-100.json',
     expectedPassed: false,
@@ -352,14 +352,14 @@ const GATE_CASES: GateCase[] = [
     expectedReasonPatterns: [/coverageStatus.*不一致/],
     description: 'RTM coverageStatus="100%" 但 coveragePercent=66%，应被 coverageStatus 一致性校验拦截',
   },
-  // -------------------- 第24轮 P2 NFR 双值校验 --------------------
+  // -------------------- P2 NFR 双值校验 --------------------
   {
     file: 'bad-nfr-missing-dual-fields.json',
     expectedPassed: false,
     expectedReasonPatterns: [/NFR 行 NFR-001 缺 targetValue 与 testThreshold/],
     description: 'NFR-001 行缺 targetValue + testThreshold 双字段，应被 NFR 双值校验拦截',
   },
-  // -------------------- round28 G-B SD 数字层级映射 --------------------
+  // -------------------- G-B SD 数字层级映射 --------------------
   {
     file: 'valid-sd-numeric-levels.json',
     expectedPassed: true,
@@ -368,7 +368,7 @@ const GATE_CASES: GateCase[] = [
     description:
       'SD 数字层级 id（SD-5.2.1）经 checkSdToCodeModuleMapping 识别为数字层级，命中 codeModule 前缀映射应通过',
   },
-  // -------------------- 41.5.0 登记孤儿样本（check-samples-coverage 发现未引用） --------------------
+  // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
     file: 'bad-phase5-codemodule-format.json',
     expectedPassed: false,
@@ -486,7 +486,7 @@ const GRAPH_CASES: GraphCase[] = [
     expectedReasonPatterns: [/collaborates-with.*目标节点不存在/],
     description: 'collaborates-with 目标 SD-5.2.9 不存在，应被横切边校验拦截',
   },
-  // -------------------- 四维识别·维度1/3：13 个 phase=1 纯 REQ 图样本（第 20 轮） --------------------
+  // -------------------- 四维识别·维度1/3：13 个 phase=1 纯 REQ 图样本 --------------------
   {
     file: 'valid-req-hierarchy.json',
     phase: 1,
@@ -582,7 +582,7 @@ const GRAPH_CASES: GraphCase[] = [
   },
 ];
 
-// ==================== R7/R8 需求规格产物校验（第 37 轮） ====================
+// ==================== R7/R8 需求规格产物校验 ====================
 // 样本为 markdown 纯文本字段（traceabilityMatrix/specContent/umlModeling），
 // 由 runSpecEnhanceCases 读取并喂给 checkRequirementSpecEnhance（纯函数）。
 
@@ -615,7 +615,7 @@ const SPEC_ENHANCE_CASES: SpecEnhanceCase[] = [
   },
 ];
 
-// ==================== Phase 1 需求规格结构校验（第 37 轮） ====================
+// ==================== Phase 1 需求规格结构校验 ====================
 // 样本字段（specContent/refFiles/dodContent）由 runSpecStructureCases
 // 用内存 fs stub 喂给 checkRequirementSpecStructure（注入式 fs）。
 
@@ -652,7 +652,7 @@ const SPEC_STRUCTURE_CASES: SpecStructureCase[] = [
   },
 ];
 
-// ==================== Phase 2 系统设计增强（第 38 轮） ====================
+// ==================== Phase 2 系统设计增强 ====================
 
 interface DesignEnhanceCase {
   file: string;
@@ -716,7 +716,7 @@ const PHASE2_SPEC_STRUCTURE_CASES: Phase2SpecStructureCase[] = [
   },
 ];
 
-// ==================== Phase 3 概要设计增强（第 38 轮小轮 B） ====================
+// ==================== Phase 3 概要设计增强 ====================
 
 interface OutlineEnhanceCase {
   file: string;
@@ -784,7 +784,7 @@ const PHASE3_SPEC_STRUCTURE_CASES: Phase3SpecStructureCase[] = [
   },
 ];
 
-// ==================== Phase 4 详细设计增强（第 38 轮小轮 C） ====================
+// ==================== Phase 4 详细设计增强 ====================
 
 interface DetailedEnhanceCase {
   file: string;
@@ -962,9 +962,9 @@ const TLA_CASES: TlaCase[] = [
     phase: 2,
     expectedPassed: false,
     expectedReasonPatterns: [/R13.*checkRounds\[0\] 含禁止字段 phaseSummary.*phase 级摘要字段/],
-    description: 'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 R13 schema 校验拦截（第 16 轮 P1.1）',
+    description: 'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 R13 schema 校验拦截',
   },
-  // -------------------- 41.5.0 登记孤儿样本（check-samples-coverage 发现未引用） --------------------
+  // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
     file: 'bad-coverage-uncovered-sd.json',
     phase: 2,
@@ -1306,7 +1306,7 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
   },
 ];
 
-// -------------------- Preventive Review（第22轮新增） --------------------
+// -------------------- Preventive Review --------------------
 
 interface PreventiveReviewCase {
   /** 样本文件名（相对 samples/preventive-review/） */
@@ -1333,7 +1333,7 @@ const PREVENTIVE_REVIEW_CASES: PreventiveReviewCase[] = [
   },
 ];
 
-// -------------------- Iceberg Sweep（第36轮新增） --------------------
+// -------------------- Iceberg Sweep --------------------
 
 interface IcebergCase {
   /** 样本文件名（相对 samples/iceberg/） */
@@ -1372,7 +1372,7 @@ const ICEBERG_CASES: IcebergCase[] = [
   },
 ];
 
-// -------------------- TLA+/BDD Sync（第22轮新增） --------------------
+// -------------------- TLA+/BDD Sync --------------------
 
 interface TlaBddSyncCase {
   /** 样本文件名（相对 samples/tla-bdd-sync/） */
@@ -1388,7 +1388,7 @@ const TLA_BDD_SYNC_CASES: TlaBddSyncCase[] = [
   { file: 'bad-transition-mismatch.json', expectedPassed: false, description: 'TLA+/BDD 转移不一致' },
 ];
 
-// -------------------- 第24轮 P0 角色分派完整性校验 --------------------
+// -------------------- P0 角色分派完整性校验 --------------------
 
 interface RoleDispatchCase {
   file: string;
@@ -1414,11 +1414,11 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
     file: 'bad-missing-R-role.jsonl',
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=R/],
-    description: '阶段 1 仅有 1 条 R3 记录（缺 reliability/security），第29轮 R3 无条件强制应被拦截',
+    description: '阶段 1 仅有 1 条 R3 记录（缺 reliability/security），R3 无条件强制应被拦截',
   },
 ];
 
-// -------------------- 第24轮 P1 状态机一致性校验 --------------------
+// -------------------- P1 状态机一致性校验 --------------------
 
 interface StateMachineCase {
   file: string;
@@ -1447,7 +1447,7 @@ const STATE_MACHINE_CASES: StateMachineCase[] = [
   },
 ];
 
-// -------------------- 第25轮 codegraph/opsx 校验 --------------------
+// -------------------- codegraph/opsx 校验 --------------------
 
 interface CodegraphQueryCase {
   sampleDir: string; // samples/ 下的子目录路径（作为 projectRoot）
@@ -1721,7 +1721,7 @@ const BDD_CASES: BddCase[] = [
     description: 'feature 含未绑定 step（注入 cucumberReport.undefinedCount=1），应被 D5 step 绑定校验拦截',
     cucumberReport: { undefinedCount: 1, pendingCount: 0, failedCount: 0 },
   },
-  // -------------------- 41.5.0 登记孤儿样本（check-samples-coverage 发现未引用） --------------------
+  // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
     manifestFile: 'bad-d8-uncovered-sd.json',
     featureFiles: [],
@@ -1913,7 +1913,7 @@ const DESIGN_CONTRACT_CASES: DesignContractCase[] = [
   },
 ];
 
-// -------------------- SignatureChain（[21.0.0] 签名链：12 样本，1 valid + 11 bad） --------------------
+// -------------------- SignatureChain（签名链：12 样本，1 valid + 11 bad） --------------------
 
 interface SignatureChainCase {
   /** 样本文件名（相对 samples/signature-chain/） */
@@ -2033,7 +2033,7 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
   },
 ];
 
-// -------------------- ArchiveIntegrity（[21.0.0] 归档完整性：4 样本，1 valid + 3 bad） --------------------
+// -------------------- ArchiveIntegrity（归档完整性：4 样本，1 valid + 3 bad） --------------------
 
 interface ArchiveIntegrityCase {
   /** 样本文件名（相对 samples/archive-integrity/） */
@@ -2191,7 +2191,7 @@ const SCHEMA_CASES: SchemaCase[] = [
     expectedErrorPatterns: [/additionalProperties/],
     description: 'tla-manifest 顶层未知字段 unknownManifestField 应被 additionalProperties:false 拦截',
   },
-  // -------------------- 四维识别·coverage schema（第 20 轮） --------------------
+  // -------------------- 四维识别·coverage schema --------------------
   {
     file: 'bad-coverage-missing-required.json',
     schema: 'coverage',
@@ -2309,7 +2309,7 @@ async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
-// ==================== R7/R8 需求规格产物校验 runner（第 37 轮） ====================
+// ==================== R7/R8 需求规格产物校验 runner ====================
 
 async function runSpecEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -2334,7 +2334,7 @@ async function runSpecEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
-// ==================== Phase 1 需求规格结构校验 runner（第 37 轮） ====================
+// ==================== Phase 1 需求规格结构校验 runner ====================
 // 内存 fs stub：键用 path.join 构造，与 checkRequirementSpecStructure 内部 path.join 一致
 //（Windows 下分隔符为反斜杠，避免模板字符串正斜杠导致 existsSync 查不到）。
 
@@ -2374,7 +2374,7 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
   return results;
 }
 
-// ==================== Phase 2 系统设计增强 runner（第 38 轮） ====================
+// ==================== Phase 2 系统设计增强 runner ====================
 
 async function runDesignEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -2441,7 +2441,7 @@ async function runPhase2SpecStructureCases(samplesDir: string): Promise<CaseResu
   return results;
 }
 
-// ==================== Phase 3 概要设计增强 runner（第 38 轮小轮 B） ====================
+// ==================== Phase 3 概要设计增强 runner ====================
 
 async function runOutlineEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -2507,7 +2507,7 @@ async function runPhase3SpecStructureCases(samplesDir: string): Promise<CaseResu
   return results;
 }
 
-// ==================== Phase 4 详细设计增强 runner（第 38 轮小轮 C） ====================
+// ==================== Phase 4 详细设计增强 runner ====================
 
 async function runDetailedEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -2690,7 +2690,7 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
 
 async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
-  // [21.0.0] R3 强化：valid 样本须提供 checkpointLog（含用户确认记录）
+  // valid 样本须提供 checkpointLog（含用户确认记录）
   const validCheckpointLog = new Map<string, string>([
     ['1', '用户确认：放行进入阶段 2（user-id: alice）'],
     ['2', '用户确认：放行进入阶段 3（user-id: alice）'],

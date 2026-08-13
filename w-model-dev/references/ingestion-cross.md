@@ -14,10 +14,10 @@
 3. 根据 crossChunkHints 确认跨块边：若两端节点存在且关系合理，写入合并图谱
 4. 识别孤立节点、连通分量、根节点、orphan、multiParent
 5. 产出 reworkHints：指向具体 chunkId 与原因（孤立节点归属哪个 chunk、缺根、缺跨块边）
-6. **REQ 层级树构建**【维度1，第 20 轮新增】：从 level=1 REQ 出发，经 REQ→REQ `parent` 边构建 4 层层级树（domain→module→feature→acceptance）；验证 level 沿 parent 链严格单调递减（子 = 父 + 1）；验证每个 level≥2 REQ 恰好一个 parent（FM-3D-03 multiParent 检测）；验证 REQ-group 非空（每个 level=1 REQ 至少挂一个 level=2 子节点，否则 FM-3D-01 层级缺根）；产出层级树摘要写入 `cross-analysis-report.md` §4
-7. **REQ-group 识别**【维度2，第 20 轮新增】：level=1 REQ 即 REQ-group 候选（确定性规则，非 LLM 裁定）；验证每个 level≥2 REQ 的 `reqGroup` 字段指向其 level=1 祖先（指向非 level=1 节点 → FM-3D-04 边界模糊，写入 reworkHints）；产出 REQ-group 候选清单写入 `cross-analysis-report.md` §5
-8. **交叉逻辑矩阵汇总**【维度3，第 20 轮新增】：汇总四类交叉边（depends-on / precedes / conflicts-with / cross-cuts）的数量与端点；识别异常项写入 reworkHints（conflicts-with 边无处置记录 → FM-3D-06；depends-on/precedes 形成环 → FM-3D-05；cross-cuts 端点缺失 → FM-4D-04）；产出交叉逻辑矩阵写入 `cross-analysis-report.md` §6（§6.1-§6.4 四类边分表）
-9. **迷雾登记册汇总**【第 27 轮新增】：读取各 chunk `.md` 叙事文件中的「迷雾项」节，跨块去重；汇总每项疑似 REQ-group 归属（fogGroupHint）与疑似毕业方向（REQ / Out of Scope / 待澄清）供 S 参考，写入 `cross-analysis-report.md` §7。**A-cross 不代 S 决定毕业**（毕业是 S 产出 + R/V 核验职责，见 [phase-1-requirements.md](phase-1-requirements.md)「迷雾登记册（Fog of War）」节）；疑似方向仅作指引，不建图节点。
+6. **REQ 层级树构建**【维度1】：从 level=1 REQ 出发，经 REQ→REQ `parent` 边构建 4 层层级树（domain→module→feature→acceptance）；验证 level 沿 parent 链严格单调递减（子 = 父 + 1）；验证每个 level≥2 REQ 恰好一个 parent（FM-3D-03 multiParent 检测）；验证 REQ-group 非空（每个 level=1 REQ 至少挂一个 level=2 子节点，否则 FM-3D-01 层级缺根）；产出层级树摘要写入 `cross-analysis-report.md` §4
+7. **REQ-group 识别**【维度2】：level=1 REQ 即 REQ-group 候选（确定性规则，非 LLM 裁定）；验证每个 level≥2 REQ 的 `reqGroup` 字段指向其 level=1 祖先（指向非 level=1 节点 → FM-3D-04 边界模糊，写入 reworkHints）；产出 REQ-group 候选清单写入 `cross-analysis-report.md` §5
+8. **交叉逻辑矩阵汇总**【维度3】：汇总四类交叉边（depends-on / precedes / conflicts-with / cross-cuts）的数量与端点；识别异常项写入 reworkHints（conflicts-with 边无处置记录 → FM-3D-06；depends-on/precedes 形成环 → FM-3D-05；cross-cuts 端点缺失 → FM-4D-04）；产出交叉逻辑矩阵写入 `cross-analysis-report.md` §6（§6.1-§6.4 四类边分表）
+9. **迷雾登记册汇总**：读取各 chunk `.md` 叙事文件中的「迷雾项」节，跨块去重；汇总每项疑似 REQ-group 归属（fogGroupHint）与疑似毕业方向（REQ / Out of Scope / 待澄清）供 S 参考，写入 `cross-analysis-report.md` §7。**A-cross 不代 S 决定毕业**（毕业是 S 产出 + R/V 核验职责，见 [phase-1-requirements.md](phase-1-requirements.md)「迷雾登记册（Fog of War）」节）；疑似方向仅作指引，不建图节点。
 
 ## A-evolve（阶段2-4）演进算法
 
@@ -53,7 +53,7 @@ A-cross/A-evolve 合并时：
 
 ## cross-analysis-report.md 模板
 
-> A-cross 产出的 `cross-analysis-report.md` 须含以下章节。§1-§3 为既有内容，§4-§6 为第 20 轮新增（对应 A-cross 算法步骤 6/7/8）。
+> A-cross 产出的 `cross-analysis-report.md` 须含以下章节（§4-§7 对应 A-cross 算法步骤 6/7/8/9）。
 
 ```markdown
 # 交叉分析报告
@@ -67,7 +67,7 @@ A-cross/A-evolve 合并时：
 ## 3. reworkHints
 {{指向具体 chunkId 与原因}}
 
-## 4. REQ 层级树【维度1，第 20 轮新增】
+## 4. REQ 层级树【维度1】
 ### 4.1 层级树结构
 {{从 level=1 REQ 出发构建的 4 层树摘要：domain→module→feature→acceptance}}
 ### 4.2 level 单调性校验
@@ -75,13 +75,13 @@ A-cross/A-evolve 合并时：
 ### 4.3 缺根 / orphan 检测
 {{level=1 缺根（FM-3D-01）/ orphan（FM-3D-02）检测结果}}
 
-## 5. REQ-group 候选清单【维度2，第 20 轮新增】
+## 5. REQ-group 候选清单【维度2】
 | group ID | 对应 level=1 REQ | 包含 module（level=2） | reqGroup 字段校验 |
 |---|---|---|---|
 | GROUP-001 | REQ-001 | REQ-002, REQ-005 | ✅ 一致 |
 {{reqGroup 指向非 level=1 节点 → FM-3D-04，列入 reworkHints}}
 
-## 6. 交叉逻辑矩阵【维度3，第 20 轮新增】
+## 6. 交叉逻辑矩阵【维度3】
 ### 6.1 依赖逻辑（depends-on）
 | 源 REQ | 目标 REQ | 依赖类型 | 说明 |
 ### 6.2 时序优先级（precedes）
@@ -92,7 +92,7 @@ A-cross/A-evolve 合并时：
 ### 6.4 横切关注点（cross-cuts）
 | 源 REQ | 目标 REQ | 横切类型 | 说明 |
 {{端点缺失 → FM-4D-04，列入 reworkHints}}
-## 7. 迷雾登记册【第 27 轮新增】
+## 7. 迷雾登记册
 > 汇总各 chunk 迷雾项（A-chunk 经锐利性测试入册）。A-cross 只产出疑似方向，不代 S 决定毕业。
 ### 7.1 迷雾项清单
 | fogId | fogDesc | fogBlocker | fogGroupHint | 来源 chunk |

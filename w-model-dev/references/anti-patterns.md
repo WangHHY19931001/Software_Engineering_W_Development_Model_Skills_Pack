@@ -10,12 +10,12 @@
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
-- 失败模式与运维失败模式导航（F1~F10 见 [operation-behaviors.md](operation-behaviors.md)；O1~O6 见 SSoT §4A.2a；历史实现层教训 L1~L4 已归档至 [legacy-sections.md](../../docs/changes/decision-log/legacy-sections.md)）
+- 失败模式与运维失败模式导航（F1~F10 见 [operation-behaviors.md](operation-behaviors.md)；O1~O6 见 SSoT §4A.2a）
 - 候选反模式检测信号（来自 Loop 4 爬坡循环）
 
 ## 反模式-硬约束映射
 
-> 反模式（本文件）与硬约束（[hard-constraints.md](hard-constraints.md)，14 条）是两个互补视图：硬约束是"必须怎么做"，反模式是"不要怎么做"。命中反模式 = 违反对应硬约束 = 回退。本表用于快速定位，避免重复记忆；「高频」标注基于历轮调测与吸收记录。
+> 反模式（本文件）与硬约束（[hard-constraints.md](hard-constraints.md)，14 条）是两个互补视图：硬约束是"必须怎么做"，反模式是"不要怎么做"。命中反模式 = 违反对应硬约束 = 回退。本表用于快速定位，避免重复记忆。
 
 | 硬约束 | 相关反模式 | 命中频率 |
 |---|---|---|
@@ -133,7 +133,7 @@
 | #40（opsx/S-tickets 职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节 |
 | #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
 | #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #11/#8 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
-| #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「敏感信息禁令（第三十一轮）」节 |
+| #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「敏感信息禁令」节 |
 | #44（跳过冰山扫掠直接放行） | 全阶段（S-fix 后 + 阶段门前） | [iceberg-sweep-guide.md](iceberg-sweep-guide.md) + [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts) |
 | #45（为通过测试而修改断言/测试期望） | 阶段门评审 / V 评审 | V 评审人工核验断言与需求对应关系（反指标游戏，Goodhart） |
 | #46（只给审计权不给修正权） | 全流程 | CHECKPOINT 显式标注介入路径（外科手术录像回放） |
@@ -546,7 +546,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 ## #35 self-as-verifier 模式下 V/G/R 产物混合
 
-**危害**：self-as-verifier 模式下 V/G/R 产物与 S 产出混合在同一文件中，导致评审独立性失守，评审结论可能被 S 产出污染或覆盖。第29轮扩展：R3 预防性审查三份报告（PreventiveReview JSON）若与 S 产出混合，会令 R3 审查沦为 S 自评，破坏 R3 无条件强制的精神。
+**危害**：self-as-verifier 模式下 V/G/R 产物与 S 产出混合在同一文件中，导致评审独立性失守，评审结论可能被 S 产出污染或覆盖。R3 预防性审查三份报告（PreventiveReview JSON）若与 S 产出混合，会令 R3 审查沦为 S 自评，破坏 R3 无条件强制的精神。
 
 **检测信号**：
 - 评审报告（VerifierOutput JSON）与产出文档（S 产出）在同一文件中
@@ -659,7 +659,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **症状**：S-fix（返工变体）或 S-emergency-fix（紧急修复变体）产出后，未派遣 R3×3（completeness/reliability/security）+ V 评审，直接进入 G 门禁或放行。
 
-**为何是反模式**：第29轮升级后，R3 预防性审查对所有 S 变体无条件强制。「修复就是小改不用审」「紧急救援优先跳过审查」属合理化借口——修复恰好是引入回归风险最高的环节，紧急修复往往跳过完整设计审查，更需要 R3 三维度（完整性/可靠性/安全性）兜底。跳过 R3+V 的修复等于未经验证直接合入。
+**为何是反模式**：R3 预防性审查对所有 S 变体无条件强制。「修复就是小改不用审」「紧急救援优先跳过审查」属合理化借口——修复恰好是引入回归风险最高的环节，紧急修复往往跳过完整设计审查，更需要 R3 三维度（完整性/可靠性/安全性）兜底。跳过 R3+V 的修复等于未经验证直接合入。
 
 **检测信号**：
 - run-log 中 `action=fix` 或 `action=emergency-fix` 后无 3 条 R3 记录直接出现 `action=review` role=V
@@ -675,7 +675,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **关联**：约束 #11 + #8 ；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
-## #43 敏感信息写入状态文件/日志（第三十一轮新增）
+## #43 敏感信息写入状态文件/日志
 
 **症状**：`.w-model/*.json`（project/budget/maturity/graph/rtm/tla-manifest 等）、`.w-model/gate-logs/`、`run-log.jsonl` / `event-ingress.jsonl` / `signature-chain.jsonl` 中出现硬编码密钥、令牌、密码、连接串（如 `sk-xxx`、`AKIA...`、`Bearer <token>`、`password=...`）；或 SKILL.md 示例、templates/ 模板、references/ 示例中包含真实凭据而非占位符。
 
@@ -690,7 +690,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（软检测，V 评审 + G 门禁人工核验；`security-scan.ts` 覆盖源码级扫描，本反模式覆盖数据文件层）。
 
-**关联**：[operational-recovery.md](operational-recovery.md)「敏感信息禁令（第三十一轮）」节；demo `JWT_SECRET` 环境变量处理
+**关联**：[operational-recovery.md](operational-recovery.md)「敏感信息禁令」节；demo `JWT_SECRET` 环境变量处理
 
 ## #44 跳过冰山扫掠直接放行
 

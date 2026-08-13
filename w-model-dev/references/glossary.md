@@ -63,7 +63,7 @@
 ### acknowledgedDecisions
 
 - **规范定义**：CHECKPOINT 用户确认的决策数组，须含 ID 模式（REQ-NNN / INTF-NNN）或技术关键词（接口/状态机/不变式等），「同意」「确认」视为空（check-checkpoint R2）。
-- **_Avoid_**：decisions/确认项/决策列表（字段名必须为「acknowledgedDecisions」，第 17 轮 D5 修正）。
+- **_Avoid_**：decisions/确认项/决策列表（字段名必须为「acknowledgedDecisions」）。
 
 ## 3. 工程资产相关
 

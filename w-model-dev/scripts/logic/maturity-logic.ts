@@ -106,7 +106,7 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
 
   // R3 成功阶段更新：completedCycles 为完整 8 阶段周期数（与 schema 语义对齐）
   // 语义：1 完整周期 = 8 阶段，completedCycles 应 ≥ floor(completedPhases / 8)
-  // 第 13 轮 P2.1 修正：原逻辑 completedCycles < completedPhases 单位不匹配（阶段数 vs 周期数）
+  // 单位换算：completedCycles 为完整周期数，completedPhases 为阶段数（比较前须 floor(阶段数/8)）
   if (
     options?.completedPhases !== undefined &&
     uc &&

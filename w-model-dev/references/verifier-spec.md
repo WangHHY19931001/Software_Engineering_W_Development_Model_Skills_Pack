@@ -59,7 +59,7 @@
 
 ### 2.2 targetKind 枚举规范
 
-> 第 9 轮标准化：`meta.targetKind` 必须取自以下 5 值枚举。原 `testcase` / `file` 已废弃，分别用 `test` / `code` 替代。`rootcause` 为 V 复审根因报告（RootCauseReport）的专用 `targetKind`（第 41.8.0 轮补全入枚举，此前仅存在于 §7.5 定义而脚本未校验）。
+> `meta.targetKind` 必须取自以下 5 值枚举。`testcase` / `file` 已废弃，分别用 `test` / `code` 替代。`rootcause` 为 V 复审根因报告（RootCauseReport）的专用 `targetKind`。
 
 **合法枚举**：
 
@@ -69,7 +69,7 @@
 | `design` | phase 2 / 3 / 4 | 系统 / 接口 / 详细设计 | 不变 |
 | `code` | phase 5 | 源代码 | **取代原 `file`** |
 | `test` | phase 6 / 7 / 8 | 集成 / 系统 / 验收测试 | **取代原 `testcase`** |
-| `rootcause` | 返工循环（V 复审 R 报告） | 根因报告复审（§7.5 子标准集合） | 新增 |
+| `rootcause` | 返工循环（V 复审 R 报告） | 根因报告复审（§7.5 子标准集合） | —（无旧值映射） |
 
 **废弃值映射**：
 
@@ -91,8 +91,6 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 ```
 
 非法值（含 `testcase` / `file` / 其他任意值）→ 退出码 1，VerifierOutput 判定不通过。
-
-> 迁移策略：第八轮及更早的 demo / fixture 中含 `targetKind="testcase"` 的 VerifierOutput 须在第 9 轮 Part C 修正为 `targetKind="test"`（详见 CHANGELOG 第 9 轮条目）。
 
 ### 2.3 各阶段 subCriteria 标准模板
 
@@ -138,13 +136,13 @@ if (subCriteria.length !== expected.length) {
 // 逐项校验 name 与 weight
 ```
 
-> 与原计划的差异：第 9 轮设计曾提议按 8 阶段细分（如 phase 1 用 `requirement-completeness` / `stakeholder-coverage` 等），但实际实施时为避免破坏既有 VerifierOutput 历史数据与 §7 子标准定义，保留原 4 targetKind × 5 项标准的颗粒度（第 41.8.0 轮按 §7.5 补全 `rootcause` 为第 5 targetKind）。8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）。
+> 8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）；subCriteria 标准按 targetKind × 5 项组织（`rootcause` 按 §7.5 集合）。
 
 > 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
 
 ### 2.4 常见违规示例
 
-> 针对 D12/D31 缺陷：V 子代理曾手工编造 subCriteria 名称、使用非法 mappingType、添加额外字段。以下为常见违规示例及正确写法。
+> V 子代理常见违规：手工编造 subCriteria 名称、使用非法 mappingType、添加额外字段（缺陷 D12/D31 类）。以下为常见违规示例及正确写法。
 
 **违规示例 1：mappingType 使用非法值**
 
@@ -224,11 +222,11 @@ if (subCriteria.length !== expected.length) {
 - 每个子标准必须给出：`name` / `description` / `weight` / `score` / `evidence`。
 - `evidence` 必须引用目标内部的具体片段（行号 / 段落 ID / 字段名），不得空泛描述。
 - `evidence` 缺失或与目标内容无关 → 子标准判 0 分。
-- **单轴下限（R13，第 26 轮）**：每个子标准 `score` 必须 ≥ `0.70`（B 级分界，§6.1）。
+- **单轴下限（R13）**：每个子标准 `score` 必须 ≥ `0.70`（B 级分界，§6.1）。
   任一子标准低于该值即视为该维度不达标，`passed=false`——即使其余子标准高分将
   `compositeScore` 加权平均拉至 ≥ 0.70 也不放行（防止加权平均掩盖单轴失败，
   对应外部 code-review 双轴报告永不合并原则；详见 §6.3 与反模式 #41）。
-- **多子代理协作评审维度（R14-R17，第 40 轮三源吸收）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、opsx 三段式产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
+- **多子代理协作评审维度（R14-R17）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、opsx 三段式产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
   - **R14 交接完整性**：角色间交接的信息是否传对/传全（对照 signature-chain inputProvenance）。
   - **R15 计划坚持度**：产出是否偏离既定计划/票据（对照 tickets.md frontier / opsx propose）。
   - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 subagent-persona-matrix）。
@@ -493,7 +491,7 @@ V 子代理须在 `summary` 中包含：
 
 `passed = (qualityLevel === 'A' || qualityLevel === 'B') && 所有 subCriterion.score >= 0.70`。
 
-（即综合分数 ≥ 0.70 视为通过阶段门，**且**每个子标准得分 ≥ 0.70——单轴下限 R13，第 26 轮。）
+（即综合分数 ≥ 0.70 视为通过阶段门，**且**每个子标准得分 ≥ 0.70——单轴下限 R13。）
 
 > **单轴下限（R13）说明**：`qualityLevel` 仍由 `compositeScore` 加权平均按 §6.1 映射，
 > 但 `passed` 判定额外要求每个子标准 ≥ 0.70（B 级分界）。理由：
@@ -508,7 +506,7 @@ V 子代理须在 `summary` 中包含：
 
 | 子标准 name | weight | 描述 |
 |---|---|---|
-| `completeness` | 0.30 | 功能 / 非功能 / 约束需求是否齐全；缺失项是否标注。**第 20 轮四维识别增强**：须额外核验①§4 层级树覆盖所有 REQ（每个 REQ 出现且 level 必填）；②§5 REQ-group 覆盖所有 level=1 REQ（至少 1 个 group）；③§6 四类交叉逻辑矩阵（depends-on/precedes/conflicts-with/cross-cuts）无遗漏，无内容时填「无」并加说明；④§7 四张覆盖矩阵（stakeholder/业务场景/需求类型/NFR-CON 横切）完整且每维度覆盖率 100%。覆盖缺失项须经豁免审批（FM-4D-01~05），不得隐式遗漏。 |
+| `completeness` | 0.30 | 功能 / 非功能 / 约束需求是否齐全；缺失项是否标注。**四维识别增强**：须额外核验①§4 层级树覆盖所有 REQ（每个 REQ 出现且 level 必填）；②§5 REQ-group 覆盖所有 level=1 REQ（至少 1 个 group）；③§6 四类交叉逻辑矩阵（depends-on/precedes/conflicts-with/cross-cuts）无遗漏，无内容时填「无」并加说明；④§7 四张覆盖矩阵（stakeholder/业务场景/需求类型/NFR-CON 横切）完整且每维度覆盖率 100%。覆盖缺失项须经豁免审批（FM-4D-01~05），不得隐式遗漏。 |
 | `clarity` | 0.25 | 表述是否无歧义；输入输出边界是否明确 |
 | `consistency` | 0.20 | 需求之间是否冲突；术语是否前后一致；conflicts-with 边是否均有处置 |
 | `testability` | 0.15 | 验收标准是否可测试；是否可观测可量化 |

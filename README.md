@@ -9,7 +9,7 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.8.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.9.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-13 实测）：
 
@@ -120,7 +120,7 @@ npx tsx w-model-dev/scripts/cli/self-test.ts
 > 脚本不调用任何 LLM，仅做结构化门禁判定。
 > `self-test.ts` 是校验逻辑的回归基线：每次修改 `*-logic.ts` 后必须跑通，新增校验项需同步增加样本（详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
 > 「I have X, I want Y → use Z」工具路由见 [`references/toolbox.md`](./w-model-dev/references/toolbox.md)。
-> 门禁脚本增强历史（v2~v5 及后续各轮）已并入 [CHANGELOG.md](./CHANGELOG.md)，此处不再重复。
+> 门禁脚本增强历史已并入 [CHANGELOG.md](./CHANGELOG.md)，此处不再重复。
 
 ### 完整教程：从克隆到跑通一次阶段门禁
 
@@ -229,7 +229,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)
 - **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [subagent-persona-matrix.md](./w-model-dev/references/subagent-persona-matrix.md)）；Persona 文件本身是 Markdown，不调用 LLM
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI）
-- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记，见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)）+ 47 条流程反模式（流程破坏，命中即回退）+ 运维失败模式 O1~O6（见 SSoT §4A.2a）。历史实现层教训 L1~L4 已归档至 [decision-log/legacy-sections.md](./docs/changes/decision-log/legacy-sections.md)。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
+- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~F10（行为退化，命中不回退但登记，见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)）+ 47 条流程反模式（流程破坏，命中即回退）+ 运维失败模式 O1~O6（见 SSoT §4A.2a）。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
 - **项目级 Definition of Done**：7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储（`.w-model/*.json`），跨多轮交互保持上下文；JSON Schema (draft-07) 强约束

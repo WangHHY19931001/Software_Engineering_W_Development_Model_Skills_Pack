@@ -305,7 +305,7 @@ import 'dotenv/config';
 
 ### 验收设计反向对照（强制）
 
-> 第 22 轮新增。第 21 轮调测发现 6 处编码与验收设计不一致（路径/参数/状态码/字段偏离设计）。
+> 编码与验收设计不一致（路径/参数/状态码/字段偏离设计）是高频缺陷源，须逐条反向对照。
 
 编码完成后，S 子代理须对照阶段 1 的 `docs/uat-path-mapping.md` 逐条核对：
 
@@ -346,7 +346,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 | 6 | 伪造实现（TODO/stub）当完成 | 缺失依赖必须暂停标注，不得伪造业务逻辑 |
 | 7 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色） | 路由层或控制器入口必须显式校验 `requiredRole`，与需求/设计中的角色枚举一致；token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden。详见下方「角色校验清单」节 |
 | 8 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值） | 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成；响应体字段须反映已生效的状态。详见下方「副作用时序一致性清单」节 |
-| 9 | 复制粘贴重复代码段 | 须提炼函数/类消除重复（坏味道清单 #1，第 40 轮吸收） |
+| 9 | 复制粘贴重复代码段 | 须提炼函数/类消除重复（坏味道清单 #1） |
 | 10 | 单函数超 ~40 行不拆分 | 按单一职责拆分，保持函数短小（坏味道清单 #2） |
 | 11 | 使用布尔标记参数 | 拆分为两个意图明确的函数或枚举参数（坏味道清单 #4） |
 | 12 | 有返回值函数还产生可见副作用 | 命令与查询分离：有返回值的函数不修改状态（坏味道清单 #5） |
@@ -354,7 +354,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 
 ## 角色校验清单
 
-> 第 15 轮 P7-001 reader 可发博文（`authRequired` 未校验角色）缺陷的预防清单。每个受保护端点须通过以下检查：
+> reader 可发博文（`authRequired` 未校验角色，缺陷 P7-001）的预防清单。每个受保护端点须通过以下检查：
 
 - [ ] 每个受保护端点须有 `requiredRole` 显式声明（在路由配置或控制器入口）
 - [ ] `requiredRole` 须与需求/设计文档中的角色枚举一致（如 `user` / `reader` / `blogger` / `admin`）
@@ -366,7 +366,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 
 ## 副作用时序一致性清单
 
-> 第 15 轮 P7-004 `PostController.get` 响应体返回 `recordView` 自增前旧 `viewCount` 缺陷的预防清单。每个含副作用端点须通过以下检查：
+> `PostController.get` 响应体返回 `recordView` 自增前旧 `viewCount`（缺陷 P7-004）的预防清单。每个含副作用端点须通过以下检查：
 
 - [ ] 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成
 - [ ] 响应体字段须反映已生效的状态（如自增后的 `viewCount`，不是自增前的旧值）

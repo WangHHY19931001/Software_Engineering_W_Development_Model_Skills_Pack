@@ -4,7 +4,7 @@
 >
 > **与 Loop 4 关系**：消费 [hill-climbing-guide.md](hill-climbing-guide.md) 产出的 `HarnessImprovementReport` 信号。Loop 4 产出信号，本指南消费信号。
 >
-> **架构原则**：吸收 SkillOpt「bounded edit + validation gate」方法论，不引入 Python 依赖、不调用 LLM、不做 rollout 训练。类比第 13 轮 TLA+ §14 方法论吸收。
+> **架构原则**：吸收 SkillOpt「bounded edit + validation gate」方法论，不引入 Python 依赖、不调用 LLM、不做 rollout 训练。类比 TLA+ §14 方法论吸收。
 
 ## 目录
 
@@ -98,7 +98,7 @@
 
 - **§11 原意**：技能**自动演化**（LLM 驱动 rollout/reflect）不在本仓库
 - **本指南吸收**：**方法论**（bounded edit + validation gate 流程范式），不是工具运行
-- **类比**：第 13 轮吸收 TLA+「时间推进建模模式」（tla-plus-guide.md §14）是方法论吸收，非 TLA+ 工具内置——本指南同构
+- **类比**：TLA+「时间推进建模模式」（tla-plus-guide.md §14）是方法论吸收，非 TLA+ 工具内置——本指南同构
 
 ## 与反模式 #10「编排者越权实施」的协调
 

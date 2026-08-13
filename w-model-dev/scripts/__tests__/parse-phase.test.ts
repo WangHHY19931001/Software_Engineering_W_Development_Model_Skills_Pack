@@ -1,7 +1,7 @@
 /**
  * lib/parse-phase.ts 单元测试
  *
- * 批次 3「脚本瘦身」Task 2：统一 --phase 校验。
+ * 统一 --phase 校验。
  * 覆盖（spec §3.2）：
  *   - --phase=N 与 --phase N（空格分离）与位置参数三种形态
  *   - 非法值（abc / 0 / 9 / -1 / 空串 / 无值）→ undefined

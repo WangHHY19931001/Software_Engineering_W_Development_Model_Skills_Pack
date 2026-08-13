@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/preventive-review.schema.json",
   "title": "PreventiveReview",
-  "description": "R3 预防性审查报告形状（S 产出后、V 评审前由 R 子代理按 dimension 产出；第29轮升级为无条件强制，覆盖所有 S 变体）",
+  "description": "R3 预防性审查报告形状（S 产出后、V 评审前由 R 子代理按 dimension 产出；无条件强制，覆盖所有 S 变体）",
   "type": "object",
   "additionalProperties": false,
   "required": ["reviewedAt", "reviewer", "phase", "dimension", "findings", "passed"],

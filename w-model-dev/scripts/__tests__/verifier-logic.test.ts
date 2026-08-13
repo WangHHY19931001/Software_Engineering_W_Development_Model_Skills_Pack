@@ -1,11 +1,11 @@
 /**
- * verifier-logic.test.ts —— [21.0.0] evidence 格式校验 + [26.0.0] R13 单轴下限单元测试
+ * verifier-logic.test.ts —— evidence 格式校验 + R13 单轴下限单元测试
  *
  * 覆盖 verifier-logic.ts 中 validateEvidenceFormat 函数：
  *   - 合法 evidence（冒号格式）通过
  *   - 空泛声明（C1-C10 全通过 / 质量良好 / 评审通过）命中 O3
  *
- * [26.0.0] 覆盖 checkR13SingleAxisFloor 函数（单轴下限，反模式 #41）：
+ * 覆盖 checkR13SingleAxisFloor 函数（单轴下限，反模式 #41）：
  *   - 全部子标准 ≥ 0.70 → 无违规
  *   - 任一子标准 < 0.70 → 违规列表含该子标准名
  */
@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../logic/verifier-logic.js';
 
-describe('[21.0.0] evidence 格式校验', () => {
+describe('evidence 格式校验', () => {
   it('合法 evidence（冒号格式）应通过', () => {
     const evidence = [
       'docs/phase1-requirements/requirement-spec.md:§1.1=需求完整覆盖用户故事',
@@ -44,7 +44,7 @@ describe('[21.0.0] evidence 格式校验', () => {
   });
 });
 
-describe('[26.0.0] R13 单轴下限（反模式 #41）', () => {
+describe('R13 单轴下限（反模式 #41）', () => {
   it('全部子标准 ≥ 0.70 应无违规', () => {
     const subCriteria = [
       { name: 'completeness', score: 0.9 },
@@ -90,7 +90,7 @@ describe('[26.0.0] R13 单轴下限（反模式 #41）', () => {
   });
 });
 
-describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
+describe('evidence 扣分后 passed 重算', () => {
   it('evidence 空泛导致 compositeScore 降级、qualityLevel 重新判定、passed 自洽', () => {
     const output = {
       schemaVersion: '1.0',
@@ -151,7 +151,7 @@ describe('[round28 G-B B11] evidence 扣分后 passed 重算', () => {
       passed: true,
     };
     const result = checkVerifierOutput(output);
-    // evidence 扣分: 0.72 - 0.1 = 0.62 → qualityLevel 'C' → passed=false（round28 B11）
+    // evidence 扣分: 0.72 - 0.1 = 0.62 → qualityLevel 'C' → passed=false
     expect(result.compositeScore).toBeLessThan(0.72);
     expect(result.qualityLevel).toBe('C');
     expect(result.passed).toBe(false);
@@ -242,7 +242,7 @@ describe('EVIDENCE_PATTERN 冒号格式', () => {
   });
 });
 
-describe('[41.8.0] targetKind=rootcause（§7.5 V 复审根因报告）', () => {
+describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
   const baseRootcause = {
     schemaVersion: '1.0',
     meta: {

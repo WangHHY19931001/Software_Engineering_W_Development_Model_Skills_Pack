@@ -23,7 +23,7 @@
 - **验收测试用例执行**：按用户场景验证
 - **用户需求匹配验证**：逐条比对原始需求与系统功能
 
-## 第 25 轮新增：opsx 三段式 S 分派 + codegraph 影响分析
+## opsx 三段式 S 分派 + codegraph 影响分析
 
 > 本阶段（验收测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
 
@@ -54,7 +54,7 @@
 
 ### 验收测试前置条件校验清单
 
-> 第 22 轮新增。第 21 轮调测发现 5 个验收用例因前置条件未满足而失败。
+> 验收用例常因前置条件未满足而失败（如用公开接口测 token 失效、管理员场景未预创建管理员用户）。
 
 执行验收测试前，须逐条校验用例的前置条件：
 
@@ -196,8 +196,6 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 
 ### acknowledgedDecisions 决策条目须含关键词
 
-> 第 15 轮共性问题 C：`acknowledgedDecisions` 多次因未含 ID 模式或 `TECH_KEYWORDS` 返工。第 16 轮 P4.1 补充约束。
-
 每条 `acknowledgedDecisions`（[run-log.jsonl](data-models.md) 的 `RunLogEntry.acknowledgedDecisions` 字段）须命中以下任一，否则触发 [`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) R2 名词违规：
 
 - **ID 模式**（正则匹配，5 个）：
@@ -211,7 +209,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
   - **英文（16 个）**：`REST` / `GraphQL` / `JWT` / `OAuth` / `SQLite` / `PostgreSQL` / `Redis` / `Koa` / `Express` / `React` / `Vue` / `TypeScript` / `WebSocket` / `HTTP` / `API` / `CRUD`
   - **中文（21 个）**：`认证` / `鉴权` / `缓存` / `存储` / `模块` / `接口` / `表` / `字段` / `状态机` / `不变式` / `需求` / `设计` / `架构` / `数据库` / `前端` / `后端` / `网关` / `队列` / `事务` / `锁` / `索引`
 
-泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/logic/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释，第 16 轮 P4.1 补充）。
+泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/logic/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释）。
 
 ## 返工路径
 

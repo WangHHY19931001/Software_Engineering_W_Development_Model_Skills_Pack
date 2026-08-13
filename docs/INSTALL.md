@@ -146,7 +146,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.8.0
+version: 41.9.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -271,7 +271,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - [`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./changes/archive/2026-07-30-round23-w-model-8-phase-validation/)
 - [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)
 
-调测明细（各轮指标、缺陷清单 L1~L4 沉淀——原文已归档至 [`decision-log/legacy-sections.md`](./changes/decision-log/legacy-sections.md)、门禁验证数据）见各归档目录 README 与 [CHANGELOG.md](../CHANGELOG.md)。
+调测明细（各轮指标、缺陷清单 L1~L4 沉淀、门禁验证数据）见各归档目录 README 与 [CHANGELOG.md](../CHANGELOG.md)。
 
 ## codegraph + OpenSpec 自动安装
 

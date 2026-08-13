@@ -55,7 +55,7 @@ describe('security-scan diffFindings（借鉴点 3，baseline v2 内容敏感指
     expect(r.newFindings[0]!.file).toBe(rel);
   });
 
-  it('同一文件以相对路径与绝对路径给出时命中同一 hash（B7 归一化）', () => {
+  it('同一文件以相对路径与绝对路径给出时命中同一 hash', () => {
     const ruleId = 'security/detect-eval-with-expression';
     const relFile = 'w-model-dev/scripts/x.ts';
     const absFile = path.resolve(relFile);

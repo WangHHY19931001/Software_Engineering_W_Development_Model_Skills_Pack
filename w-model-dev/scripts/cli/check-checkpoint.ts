@@ -129,7 +129,7 @@ async function main(): Promise<void> {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
-      message: '参数缺失 --checkpoint-log=<dir>（[21.0.0] R3 强化，强制）',
+      message: '参数缺失 --checkpoint-log=<dir>（R3 强化，强制）',
       detail: '用法: npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> --checkpoint-log=<dir>',
       exitCode: 2,
     });

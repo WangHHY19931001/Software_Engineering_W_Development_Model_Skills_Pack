@@ -54,7 +54,7 @@ export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self
  * 非法值（非 1-8）退出码 2（保留原 ARG_INVALID 消息）。
  */
 function parsePhaseArg(argv: string[]): PhaseOption | undefined {
-  // B6（round28 G-B）：严格整数校验——字符串全数字 + Number.isInteger，
+  // B6：严格整数校验——字符串全数字 + Number.isInteger，
   // 拒绝 "5abc" / "3.7" 这类 parseInt 会部分解析的非法输入
   const strictPhase = (s: string): PhaseOption | undefined => {
     if (!/^\d+$/.test(s)) return undefined;
@@ -137,7 +137,7 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   const phaseOption = parsePhaseArg(process.argv);
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
-  // 第 37 轮：--spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
+  // --spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
   const specDirArg = process.argv.find((a) => a.startsWith('--spec-dir='));
   const specDir = specDirArg?.split('=')[1] ?? undefined;

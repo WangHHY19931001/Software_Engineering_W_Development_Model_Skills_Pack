@@ -58,7 +58,7 @@ interface ParsedArgs {
   phase: number | undefined;
   specId: string | undefined;
   graphFile: string | undefined;
-  /** P3.8（第 9 轮）--keep-states：保留 states 目录用于调试 */
+  /** P3.8 --keep-states：保留 states 目录用于调试 */
   keepStates: boolean;
 }
 
@@ -67,7 +67,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const manifestFile = args.find((a) => !a.startsWith('--'));
   const phaseArg = args.find((a) => a.startsWith('--phase='));
   const specArg = args.find((a) => a.startsWith('--spec='));
-  // P3.8（第 9 轮）--keep-states / -k：调试模式下保留 TLC 产物
+  // P3.8 --keep-states / -k：调试模式下保留 TLC 产物
   const keepStates = args.includes('--keep-states') || args.includes('-k');
   const graphArg = args.find((a) => a.startsWith('--graph='));
 
@@ -450,7 +450,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // ==================== P3.8（第 9 轮）states 自动清理（校验后） ====================
+  // ==================== P3.8 states 自动清理（校验后） ====================
   // 默认在 TLC 校验完成后自动清理 states/ 目录，避免状态文件残留污染仓库。
   // --keep-states / -k：调试模式下保留 states 用于排查。
   if (!keepStates) {

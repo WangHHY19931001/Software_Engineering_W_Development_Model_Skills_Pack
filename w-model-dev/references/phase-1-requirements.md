@@ -17,7 +17,7 @@
 - 《需求规格说明书》（套用 [templates/requirement-spec.md](../templates/requirement-spec.md)）
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
-- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**，第22轮 P0-1 修正）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
+- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
 - 独立产物文件：
   - `system-context.md`：系统上下文（外部实体清单 + 边界原则）
   - `glossary.md`：术语表（需求域子集）
@@ -238,7 +238,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 ### 验收测试前置条件分析（强制）
 
-> 第 22 轮新增。第 21 轮调测发现 5 个验收用例因前置条件缺失而失败（如用公开接口测 token 失效、管理员场景未预创建管理员用户）。
+> 前置条件缺失会导致验收用例失败（如用公开接口测 token 失效、管理员场景未预创建管理员用户）。每条验收测试用例须含以下前置条件分析。
 
 每条验收测试用例须包含以下前置条件分析：
 
@@ -248,7 +248,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 | 数据依赖 | 明确标注依赖的测试数据 | 需预创建文章/用户/标签 |
 | 接口路径 | 明确标注 API 路径 + HTTP 方法 | POST /api/posts |
 
-**禁止行为（新增）**：
+**禁止行为**：
 
 | # | 禁止行为 | 正确做法 |
 |---|---|---|
@@ -268,7 +268,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - `check-preventive-review.ts` 须在 V 评审前由 G 子代理执行，`exitCode=0` 方可进入 V 评审。
 - 支持 `--auto-trigger --run-log=<path>` 模式：从 run-log 读取最后一条 checkpoint success 记录的 phase 作为当前阶段，自动校验对应阶段的 3 份 R3 报告（`<phase>-completeness.json` / `<phase>-reliability.json` / `<phase>-security.json`）。
 - 跳过 check-preventive-review.ts 直接进入 V 评审命中反模式 #33。
-- 约束 #11 闭环机制强制校验已扩展为 5 脚本（增加 check-preventive-review.ts，第29轮升级为无条件强制）。
+- 约束 #11 闭环机制强制校验共 5 脚本（含 check-preventive-review.ts，无条件强制）。
 
 ## RTM 登记
 
@@ -317,7 +317,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 
 ## 失败模式矩阵（FM）
 
-> 第 20 轮四维识别与豁免审批增强（v20.0.0）。FM 矩阵定义四维识别与豁免审批流程的失败模式，由 V 子代理在评审时对照核验，命中即触发返工或豁免审批。
+> FM 矩阵定义四维识别与豁免审批流程的失败模式，由 V 子代理在评审时对照核验，命中即触发返工或豁免审批。
 
 ### FM-3D（三维结构失败模式）
 
@@ -361,7 +361,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 
 ## 豁免审批治理（S→R→V→人类四阶段）
 
-> 第 20 轮新增。覆盖缺失、conflicts-with 冲突、覆盖率不达标等事项须经强制四阶段审批流程，禁止任何角色自行决定豁免生效。
+> 覆盖缺失、conflicts-with 冲突、覆盖率不达标等事项须经强制四阶段审批流程，禁止任何角色自行决定豁免生效。
 
 ### 流程
 

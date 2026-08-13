@@ -377,7 +377,7 @@ interface RunLogEntry {
   note?: string;
   /** 本条记录涉及的产物路径（如有） */
   artifacts?: string[];
-  /** 决策置信度（可选，0.0-1.0；agentic Ch18 结构化思维链日志，第 40 轮新增，供 Loop 4 劣化分析） */
+  /** 决策置信度（可选，0.0-1.0；agentic Ch18 结构化思维链日志，供 Loop 4 劣化分析） */
   decisionConfidence?: number;
 }
 ```
@@ -394,7 +394,7 @@ interface RunLogEntry {
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
-- **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`。第 15 轮共性问题 B 子代理误用 `eventId` / `eventType` / `decisions` 触发 R1 失败（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`；第 17 轮 P3 修正历史叙述加注）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
+- **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
 - `decisionConfidence` 为可选字段：评审/门禁/返工等关键决策时可记录置信度（0.0-1.0）；低置信度高频出现是 Loop 4 劣化分析信号。
 
 ### R1 阶段动作完整性：按阶段分档
@@ -514,7 +514,7 @@ interface MaturityConfig {
 
 ### RunLogEntry vs EventIngress Schema 边界对照表
 
-> 第 15 轮调测发现子代理频繁混用 RunLogEntry（`run-log.jsonl`）与 EventIngress（`event-ingress.jsonl`）字段（共性问题 B），第 16 轮 P2.1 新增此对照表显式区分边界。命中混用 → [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R1 动作完整性校验失败（run-log.jsonl）或 EventIngress schema 校验失败（event-ingress.jsonl）。
+> 本对照表显式区分 RunLogEntry（`run-log.jsonl`）与 EventIngress（`event-ingress.jsonl`）字段边界。命中混用 → [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R1 动作完整性校验失败（run-log.jsonl）或 EventIngress schema 校验失败（event-ingress.jsonl）。
 
 | 用途 | RunLogEntry 字段 | EventIngress 字段 | 区别 |
 |---|---|---|---|
@@ -746,7 +746,7 @@ interface TlaCheckRound {
 | `specs[].tlaPath` / `cfgPath` | string | 是 | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus-guide.md#§21-路径解析基准)） |
 | `specs[].parent` / `siblings` / `children` | string / string[] | 是 | 相对 **该 .tla 文件所在目录**解析；L1 `parent=null`，叶子 `children=[]` |
 | `specs[].decompositionDecision` | enum | 是 | 拆解决策（组合数 >1w 必须 `split-done`） |
-| `checkRounds[]` | TlaCheckRound[] | 是 | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus-guide.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致，第 16 轮 P4.3 修正）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
+| `checkRounds[]` | TlaCheckRound[] | 是 | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus-guide.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
 
 **使用约定**：
 

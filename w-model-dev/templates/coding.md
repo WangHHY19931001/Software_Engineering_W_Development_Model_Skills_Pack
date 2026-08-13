@@ -60,7 +60,7 @@
 
 ## 5. 验收设计反向对照（强制）
 
-> 第 22 轮新增。编码完成后逐条核对，违反任一条 → 回编码修正，禁止「以代码为准」忽略设计。
+> 编码完成后逐条核对，违反任一条 → 回编码修正，禁止「以代码为准」忽略设计。
 
 - [ ] 路径一致性：`docs/uat-path-mapping.md`「实际路径」已回填且与路由定义一致
 - [ ] 参数一致性：分页/筛选参数名与验收测试设计一致
@@ -77,7 +77,7 @@
 - `check-code-tla-consistency.ts`：codeModule↔TLA+ 一致性回归，退出码 0
 - `check-artifact-gate.ts --phase=5`：阶段级校验（codeModule 格式 + NFR/CON 回填），退出码 0
 - `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`（启用 opsx 三段式时）：退出码 0
-- 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9，第 24 轮新增）
+- 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9）
 
 ## 8. 结论
 

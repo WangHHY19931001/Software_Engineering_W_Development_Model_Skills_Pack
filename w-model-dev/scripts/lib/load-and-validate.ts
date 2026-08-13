@@ -1,7 +1,7 @@
 /**
  * 统一「读取 → JSON 解析 → schema 校验」工具（lib/load-and-validate.ts）
  *
- * 收敛 check-*.ts CLI 层重复的「readFileSync + JSON.parse + AJV 校验」样板：
+ * check-*.ts CLI 层「readFileSync + JSON.parse + AJV 校验」统一样板：
  * 一次调用完成读取 → 解析 → schema 校验，错误统一分类并经 exitWithError 输出
  * （stderr 人类消息 `✗ [CATEGORY] ...` + stdout `ERROR_JSON {...}`），
  * 返回类型由调用方指定（泛型）。

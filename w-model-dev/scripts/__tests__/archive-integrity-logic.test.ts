@@ -12,7 +12,7 @@ function loadFileList(filename: string): Set<string> {
   return new Set(JSON.parse(content));
 }
 
-describe('[21.0.0] archive-integrity-logic', () => {
+describe('archive-integrity-logic', () => {
   it('valid-full 通过', () => {
     const contents = loadFileList('valid-full.json');
     const result = checkArchiveIntegrity(contents);

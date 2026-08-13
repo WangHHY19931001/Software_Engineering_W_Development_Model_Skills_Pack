@@ -48,7 +48,7 @@
 迷雾项写入本 chunk 的 `.md` 叙事文件，固定表格格式：
 
 ```markdown
-## 迷雾项（Fog of War，第 27 轮）
+## 迷雾项（Fog of War）
 
 | fogId | fogDesc | fogBlocker | fogGroupHint |
 |---|---|---|---|
@@ -96,7 +96,7 @@
 {"target":"<疑似关联的chunk-id>","reason":"<为什么认为有关联>"}
 ```
 
-第 20 轮增强：crossChunkHints 新增 `edgeType` 与 `direction` 字段，便于 A-cross 确认跨块边类型与方向：
+扩展形式：crossChunkHints 可含 `edgeType` 与 `direction` 字段，便于 A-cross 确认跨块边类型与方向：
 
 ```json
 {

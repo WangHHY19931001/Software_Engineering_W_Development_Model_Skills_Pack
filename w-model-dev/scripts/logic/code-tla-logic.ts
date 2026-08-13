@@ -164,7 +164,7 @@ export interface CodeTlaConsistencyInput {
  *   - SSoT §3.4.6 P1.4「RTM codeModule 回填时机」：阶段5编码完成后、code-TLA 一致性检查前
  *     必须回填 RTM.codeModule 列（格式 `SD-xxx:src/path/to/file.ts`，多个模块用逗号分隔），
  *     缺失 → 本维度退出码 1。
- *   - SSoT §3.4.18 第22轮「codeModule 格式规范」：REQ 行匹配 `^SD-[\d.]+:src/.+\.(ts|js|py|java)$`。
+ *   - SSoT §3.4.18「codeModule 格式规范」：REQ 行匹配 `^SD-[\d.]+:src/.+\.(ts|js|py|java)$`。
  *   - verifier-spec.md §2.2：阶段 5 源代码评审用 targetKind=`code`，与 code-tla-consistency
  *     维度命名对齐。
  *
@@ -547,8 +547,8 @@ export function checkNextBranchCoverage(tlaContent: string, files: CodeFile[]): 
  */
 export function extractBusinessInvariants(tlaContent: string): string[] {
   if (typeof tlaContent !== 'string' || tlaContent.length === 0) return [];
-  // 匹配 BusinessInvariant 或 Invariants 两种命名（SSoT 第28轮 D 组修正：
-  // code-tla-logic 不变式正则兼容 `Invariants ==` 两种命名），直到下一个顶层定义或文件末尾
+  // 匹配 BusinessInvariant 或 Invariants 两种命名（兼容 `Invariants ==` 命名），
+  // 直到下一个顶层定义或文件末尾
   const invMatch = tlaContent.match(
     /(?:BusinessInvariant|Invariants)\s*==\s*([\s\S]*?)(?=\n\s*[A-Z][A-Za-z0-9_]*\s*==|\n\s*====|$)/,
   );
@@ -637,7 +637,7 @@ export function checkInvariantCoverage(tlaContent: string, files: CodeFile[]): D
  *
  * 边界处理：
  *   - input 非对象 / schema 前置校验失败 → 直接返回失败，不进入四维度业务校验
- *     （INPUT/SCHEMA 规则，A2b 双轨过渡新增）
+ *     （INPUT/SCHEMA 规则，A2b）
  *   - manifest 无任何 spec 含 tlaContent → 维度3/4 跳过（视为通过）；维度1/2 仍照常强校验
  *
  * @param input CodeTlaConsistencyInput（manifest + graph + rtm + codeFiles）
@@ -726,7 +726,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
   // 维度3/4：从 manifest.specs[].tlaContent 读取 .tla 文件内容
   // 多个 spec 的 tlaContent 拼接校验：任一 spec 的 Next 分支无对应 → 失败
   const specs = Array.isArray(input.manifest?.specs) ? input.manifest.specs : [];
-  // P3.9（第 9 轮）扩展：遍历全部 specs（L1/L2/L3/L4）的 tlaContent，
+  // P3.9 扩展：遍历全部 specs（L1/L2/L3/L4）的 tlaContent，
   // 不再仅限 L2/L3。Next 分支与 BusinessInvariant 可定义于任意层级。
   const tlaSpecs = specs.filter((s) => s && typeof s.tlaContent === 'string');
 

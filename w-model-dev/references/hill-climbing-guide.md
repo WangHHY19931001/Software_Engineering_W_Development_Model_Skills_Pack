@@ -160,7 +160,7 @@ interface HarnessImprovementReport {
 
 | 触发方式 | 条件 | 动作 |
 |---|---|---|
-| 用户请求 | `/wm hill-climbing` 命令（新增） | O 分析全量 run-log 产出报告 |
+| 用户请求 | `/wm hill-climbing` 命令 | O 分析全量 run-log 产出报告 |
 | 阶段门后自动 | 每个阶段门放行后 | O 增量分析本阶段 run-log，append 信号到当前报告 |
 | 定期触发（L3） | maturity.level=L3 且距上次报告 ≥ 7 天 | O 自动产出全量报告 |
 | 失败模式命中 | O 系列失败模式命中 ≥ 2 次 | O 强制产出专项报告 |

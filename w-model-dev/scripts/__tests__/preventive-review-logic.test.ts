@@ -93,7 +93,7 @@ describe('checkPreventiveReview', () => {
   });
 });
 
-describe('checkPreventiveReview: variant 选项（第29轮 S-fix/emergency）', () => {
+describe('checkPreventiveReview: variant 选项（S-fix/emergency）', () => {
   it('variant=fix 时三份齐备应通过（逻辑层不依赖 variant）', () => {
     const reviews: Record<string, PreventiveReview> = {
       completeness: {

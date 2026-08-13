@@ -100,7 +100,7 @@ async function readJson<T>(file: string): Promise<T> {
 }
 
 /**
- * 多路径查找 feature 文件（第22轮 P2-6 修正）。
+ * 多路径查找 feature 文件（P2-6 修正）。
  * 依次尝试：basePath + filePath → .w-model/ + filePath → .w-model/bdd/ + filePath → projectDir + filePath
  * 返回第一个存在的路径，都不存在返回 null
  */

@@ -3,7 +3,6 @@
  *
  * directory-conventions.md §7 SSoT 的代码侧单点事实源。
  * 禁止在门禁脚本中硬编码 docs/uat-path-mapping.md 等路径，统一走 resolvePhaseDoc。
- * 自 check-artifact-gate.ts 拆分（Task A1）。
  */
 
 /**

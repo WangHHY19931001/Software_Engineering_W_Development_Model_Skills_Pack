@@ -1,7 +1,7 @@
 /**
  * lib/tla-clean-trace.ts cleanTraceFiles / isTlcStatesDir 单元测试
  *
- * 覆盖（批次 1 安全加固 §3.2）：
+ * 覆盖（安全加固 §3.2）：
  *  - 守卫 1：目录无 .tla 文件 → 不删除任何内容
  *  - 守卫 2：states/ 含 TLC 时间戳子目录 → 递归删除
  *  - 守卫 2：states/ 含 .st/.fp 指纹文件 → 递归删除
@@ -36,7 +36,7 @@ describe('isTlcStatesDir', () => {
     expect(await isTlcStatesDir(dir)).toBe(true);
   });
 
-  it('含 2 位年份 TLC 时间戳子目录（26-08-05-10-30-00）→ true（第 35 轮 P3 修复）', async () => {
+  it('含 2 位年份 TLC 时间戳子目录（26-08-05-10-30-00）→ true', async () => {
     const dir = await makeTmpDir();
     await fs.mkdir(path.join(dir, '26-08-05-10-30-00'));
     expect(await isTlcStatesDir(dir)).toBe(true);

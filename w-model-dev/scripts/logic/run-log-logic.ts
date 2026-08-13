@@ -55,7 +55,7 @@ export interface RunLogEntry {
   acknowledgedDecisions?: string[];
   note?: string;
   artifacts?: string[];
-  /** 决策置信度（可选，0.0-1.0；agentic Ch18，第 40 轮新增） */
+  /** 决策置信度（可选，0.0-1.0；agentic Ch18） */
   decisionConfidence?: number;
   // ---- rootcause/fix 扩展字段（spec §5.5）----
   /** rootcause: R 报告 ID；fix: 所基于的 R 报告 ID */
@@ -260,8 +260,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     );
   }
 
-  // ==================== R3 预防性审查记录校验（第22轮新增，第29轮升级） ====================
-  // 第29轮升级：R3 无条件强制，覆盖所有 S 变体（含 S-fix / S-emergency-fix）。
+  // ==================== R3 预防性审查记录校验 ====================
+  // R3 无条件强制，覆盖所有 S 变体（含 S-fix / S-emergency-fix）。
   // 校验：每个阶段的 S(任意变体)→V 之间须有 3 条 R3 记录（completeness/reliability/security）。
   // S 变体识别：produce（标准）/ fix（返工）/ emergency-fix（紧急修复）。
   const r3Dimensions = ['completeness', 'reliability', 'security'];
@@ -406,9 +406,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R8 轨迹模板校验（第 40 轮三源吸收：agentic Ch19 轨迹符合性）
+  // R8 轨迹模板校验（agentic Ch19 轨迹符合性）
   // 理想阶段轨迹：S 变体(produce/fix/emergency-fix) → R3×3 → V(review) → G(gate 类) → checkpoint(阶段最后)。
-  // 从「时序正确」（R7）升级为「轨迹正确」：偏离理想动作序列即违规。
+  // R8 校验「轨迹正确」（R7 仅「时序正确」）：偏离理想动作序列即违规。
   const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
   for (const phase of completedPhases) {
     const phaseEntries = valid.filter((e) => e.phase === phase);
@@ -465,9 +465,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   return { passed: violations.length === 0, violations };
 }
 
-// ==================== R6 契约：gate-log exitCode 提取与路径索引（自 check-run-log.ts 迁入） ====================
+// ==================== R6 契约：gate-log exitCode 提取与路径索引 ====================
 
-/** 各门禁脚本 stdout 摘要标记（含第 31 轮新增 STATUS_JSON / METRICS_JSON；第 32 轮新增 ERROR_JSON） */
+/** 各门禁脚本 stdout 摘要标记 */
 const GATE_JSON_PATTERNS: RegExp[] = [
   /GRAPH_JSON\s+(\{.*\})/,
   /VERIFIER_JSON\s+(\{.*\})/,
@@ -499,7 +499,7 @@ const GATE_JSON_PATTERNS: RegExp[] = [
 
 /**
  * 从 gate-log 内容提取 exitCode（gate-log 是脚本 stdout 存档，含一行 `XXX_JSON {...}` 摘要）。
- * 纯函数、无 IO。自 check-run-log.ts 迁入（契约不变）。
+ * 纯函数、无 IO。
  */
 export function extractExitCode(content: string): number | undefined {
   for (const pattern of GATE_JSON_PATTERNS) {
@@ -519,7 +519,7 @@ export function extractExitCode(content: string): number | undefined {
 /**
  * 构建 gateLogPath 多索引 key 集：basename / 绝对路径 / 相对 cwd 路径 / 各路径双向斜杠归一化（正↔反）。
  * 纯字符串实现（不 import node:path，遵守 *-logic.ts pure 边界）；兼容 Windows 反斜杠。
- * 自 check-run-log.ts loadGateLogs 迁入（cwd 前缀裁剪：仅覆盖 cwd 内文件，cwd 外无相对 key，依赖 basename/绝对路径兜底；大小写敏感；调用方须保证 cwd 与 fileAbs 同源同分隔符）。
+ * cwd 前缀裁剪：仅覆盖 cwd 内文件，cwd 外无相对 key，依赖 basename/绝对路径兜底；大小写敏感；调用方须保证 cwd 与 fileAbs 同源同分隔符。
  */
 export function buildGateLogKeys(fileAbs: string, cwd: string): string[] {
   const basename = fileAbs.split(/[\\/]/).filter(Boolean).pop() ?? fileAbs;

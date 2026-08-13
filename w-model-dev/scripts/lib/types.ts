@@ -1,9 +1,9 @@
 /**
  * 复用类型（lib/types.ts）
  *
- * B2 校验输入输出通用类型定义，全仓复用：
+ * 校验输入输出通用类型定义，全仓复用：
  * - StructuredViolation / GateCheckResult：A2b violations 双轨过渡的结构化形态
- * - JsonReport：B4 --json 输出摘要形态
+ * - JsonReport：--json 输出摘要形态
  */
 export type { Phase } from './constants.js';
 
@@ -21,7 +21,7 @@ export interface GateCheckResult {
   structuredViolations?: StructuredViolation[];
 }
 
-/** 门禁 JSON 摘要报告（B4 --json 输出形态） */
+/** 门禁 JSON 摘要报告（--json 输出形态） */
 export interface JsonReport {
   type: string;
   passed: boolean;

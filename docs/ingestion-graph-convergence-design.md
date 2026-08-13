@@ -62,7 +62,7 @@
 
 ```
 [O] 命令路由 + 读状态 + 检查前置产物（不变）
-[O] 加载最小引用集：SKILL.md + 当前 phase-N-*.md + ingestion-{chunk,cross}.md（新增）+ graph-guide.md（新增）
+[O] 加载最小引用集：SKILL.md + 当前 phase-N-*.md + ingestion-{chunk,cross}.md + graph-guide.md
 [O] 🔴 CHECKPOINT · 阶段进入确认（原 CHECKPOINT，复用）
   ↓
 [O] 跑 plan-chunks.ts "<input-path>" --phase=N --node-type=<REQ|SD|INTF|DD>

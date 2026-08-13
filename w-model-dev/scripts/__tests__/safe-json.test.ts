@@ -1,5 +1,5 @@
 /**
- * lib/safe-json.ts 单元测试（批次 1 安全加固 §3.4）
+ * lib/safe-json.ts 单元测试（安全加固 §3.4）
  *
  * 覆盖：__proto__ 键被丢弃 / 普通键与嵌套对象保留 / 数组 / 标量 / null /
  *       行为与 JSON.parse 一致（含非法 JSON 抛错）。

@@ -429,7 +429,7 @@ describe('R1-R6 四维识别校验', () => {
   });
 });
 
-describe('[21.0.0] R11 level 正整数校验', () => {
+describe('R11 level 正整数校验', () => {
   it('R11: REQ 节点 level 为非正整数应 fail', () => {
     const graph: GraphShape = {
       version: 1,
@@ -450,8 +450,8 @@ describe('[21.0.0] R11 level 正整数校验', () => {
   });
 });
 
-// ==================== recalculatePassed（round28 C1/C2） ====================
-describe('recalculatePassed（round28 G-C）', () => {
+// ==================== recalculatePassed（C1/C2） ====================
+describe('recalculatePassed', () => {
   it('C1: 新增 violation 后 passed 应变为 false', () => {
     const graph: GraphShape = {
       version: 1,
@@ -522,7 +522,7 @@ describe('recalculatePassed（round28 G-C）', () => {
   });
 });
 
-// ==================== R7/R8 需求规格产物校验（第 37 轮） ====================
+// ==================== R7/R8 需求规格产物校验 ====================
 describe('R7 追踪矩阵一致性', () => {
   it('合法矩阵通过', () => {
     const v = checkRequirementSpecEnhance(

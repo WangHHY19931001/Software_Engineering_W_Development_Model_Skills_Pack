@@ -1,7 +1,6 @@
 # 核心操作行为（Operating Behaviors）
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills`，适配 W 模型语境。与「不可违反的约束」互补：约束是硬红线（命中即回退），操作行为是日常准则（违反不回退但降低质量）。SSoT §4A 为权威定义。
-> 第 44 轮由 `SKILL.md` 移入本文件按需加载；`SKILL.md` 保留一行指针。
 
 ## 八条操作行为
 
@@ -33,4 +32,4 @@
 | F9 | 因「显而易见」而无规格就编码 | 与「测试设计前置」冲突 |
 | F10 | 因「看起来对」跳过验证 | 与 #3 / #6 互补 |
 
-> Agent 重复命中同一失败模式 ≥2 次时，应在 SSoT §10B.4 登记为新教训（历史实现层教训 L1~L4 已归档至 [legacy-sections.md](../../docs/changes/decision-log/legacy-sections.md)）。
+> Agent 重复命中同一失败模式 ≥2 次时，应在 SSoT §10B.4 登记为新教训。

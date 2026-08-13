@@ -73,7 +73,7 @@
 规则依据的权威清单在 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)：
 
 - **47 条流程反模式** `#1~#47`（命中即视为流程破坏、必须回退）
-- **失败模式** `F1~F10`（行为退化，命中不回退但登记，见 [`operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)）、**运维失败模式** `O1~O6`（见 SSoT §4A.2a）；历史实现层教训 `L1~L4` 已归档至 [`legacy-sections.md`](../docs/changes/decision-log/legacy-sections.md)
+- **失败模式** `F1~F10`（行为退化，命中不回退但登记，见 [`operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)）、**运维失败模式** `O1~O6`（见 SSoT §4A.2a）
 
 ### 4.2 规则链编号速查表
 

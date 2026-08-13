@@ -2,10 +2,10 @@
 
 > 阶段 1（需求分析）产出。套用时替换 `{{}}` 占位符。
 >
-> **第 20 轮四维识别与豁免审批增强（v20.0.0）**：§4-§7 为四维识别强制节，禁止省略任一节。
+> **四维识别强制节**：§4-§7 为四维识别强制节，禁止省略任一节。
 > 强制项见各节「强制项」标注；豁免须经 S→R→V→人类四阶段审批（见 [phase-1-requirements.md](../references/phase-1-requirements.md)「豁免审批治理」节）。
 >
-> **第 37 轮设计级别增强（v37.0.0）**：§0 SSOT 头 + §13/§14/§15/§16/§17/附录 A 引用块指向独立产物文件（system-context.md / glossary.md / traceability-matrix.md / behavior-spec.md / discipline-dod.md / uml-modeling.md），门禁按引用块校验。
+> **独立产物引用块**：§0 SSOT 头 + §13/§14/§15/§16/§17/附录 A 引用块指向独立产物文件（system-context.md / glossary.md / traceability-matrix.md / behavior-spec.md / discipline-dod.md / uml-modeling.md），门禁按引用块校验。
 
 ## 文档信息
 
@@ -235,7 +235,7 @@ graph TD
 
 ## 8.5 Not yet specified（迷雾登记册）
 
-> 第 27 轮新增。登记 in-scope 但尚无法精确陈述的需求（A 子代理经锐利性测试入册，见 [phase-1-requirements.md](../references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节）。
+> 登记 in-scope 但尚无法精确陈述的需求（A 子代理经锐利性测试入册，见 [phase-1-requirements.md](../references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节）。
 > **强制项**：阶段末（CHECKPOINT 前）每项须有毕业处置结果；全部终结后可标注「本阶段无未终结迷雾项」。
 > **区分**：本节 = 要做什么但还说不清（in-scope 未成形）；§8 Out of Scope = 不做什么（范围外，不属雾）。
 

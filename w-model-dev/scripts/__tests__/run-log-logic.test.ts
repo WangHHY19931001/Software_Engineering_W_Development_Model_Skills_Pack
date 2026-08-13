@@ -139,7 +139,7 @@ describe('run-log E9: 1 fix 可覆盖多份 R 报告（去重映射）', () => {
   });
 });
 
-describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3（第29轮）', () => {
+describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
   it('S-fix 后无 R3 直接 V 应失败', () => {
     const entries: RunLogEntry[] = [
       {
@@ -378,13 +378,13 @@ describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
     expect(extractExitCode(content)).toBe(1);
   });
 
-  it('extractExitCode 从 ERROR_JSON 摘要行提取 exitCode（第 32 轮 exit 2 存档）', () => {
+  it('extractExitCode 从 ERROR_JSON 摘要行提取 exitCode（exit 2 存档）', () => {
     const content =
       '✗ [FILE_NOT_FOUND] 文件不存在\nERROR_JSON {"category":"FILE_NOT_FOUND","message":"文件不存在","exitCode":2,"file":"C:\\\\proj\\\\.w-model\\\\project.json"}';
     expect(extractExitCode(content)).toBe(2);
   });
 
-  it('extractExitCode 从 STATE_MACHINE_JSON 摘要行提取 exitCode（第 35 轮修复）', () => {
+  it('extractExitCode 从 STATE_MACHINE_JSON 摘要行提取 exitCode', () => {
     const content = 'STATE_MACHINE_JSON {"passed":true,"exitCode":0}';
     expect(extractExitCode(content)).toBe(0);
   });
@@ -469,7 +469,7 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
   return merged as unknown as RunLogEntry;
 }
 
-describe('run-log R8 轨迹模板校验（第 40 轮三源吸收：agentic Ch19 轨迹符合性）', () => {
+describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () => {
   it('已完成阶段 gate 在 checkpoint 之后 → 违规', () => {
     const lines = [
       makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),

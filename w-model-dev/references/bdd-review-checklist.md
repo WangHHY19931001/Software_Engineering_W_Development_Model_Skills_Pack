@@ -1,7 +1,7 @@
 # BDD 审查参考清单（BDD Review Checklist）
 
-> **来源**：W 模型 v19.0.0 新增（与 [bdd-guide.md](./bdd-guide.md) 配套）
-> **W 模型适配**：不新增 `targetKind=bdd`（违反第 9 轮 P2.5 的 4 值枚举约束）。V-bdd 子代理评审 BDD features 时仍用 `targetKind=test`，本清单作为 §7.3「测试用例」的参考资料
+> **配套**：[bdd-guide.md](./bdd-guide.md)
+> **W 模型适配**：不新增 `targetKind=bdd`（违反 P2.5 的 4 值枚举约束）。V-bdd 子代理评审 BDD features 时仍用 `targetKind=test`，本清单作为 §7.3「测试用例」的参考资料
 > **加载时机**：V-bdd 子代理审查 BDD features 时必读
 
 ## 7 项审查清单

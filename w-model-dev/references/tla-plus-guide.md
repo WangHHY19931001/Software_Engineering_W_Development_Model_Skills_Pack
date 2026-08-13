@@ -267,7 +267,7 @@ S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCove
 
 > `checkRounds` 数组记录每次 TLA+ 校验轮次的结果，用于追踪返工收敛趋势。语义权威定义见本节，[data-models.md](data-models.md) `tla-manifest.json` 节字段表指向本节。
 >
-> **spec 级返工记录**：每条 checkRounds 元素对应一次 spec 的 TLA+ 校验轮次（`specId` 标识），**不是 phase 级摘要**。phase 级摘要应写在 `run-log.jsonl` 的 `note` 字段，phase 级决策列表应写在 `acknowledgedDecisions` 字段。第 15 轮调测发现子代理误把 phase 级摘要（含 `phaseSummary` / `summary` / `phaseDecisions` 字段）写入 checkRounds（共性问题 D），第 16 轮 R13 校验强制拦截。
+> **spec 级返工记录**：每条 checkRounds 元素对应一次 spec 的 TLA+ 校验轮次（`specId` 标识），**不是 phase 级摘要**。phase 级摘要应写在 `run-log.jsonl` 的 `note` 字段，phase 级决策列表应写在 `acknowledgedDecisions` 字段。误把 phase 级摘要（含 `phaseSummary` / `summary` / `phaseDecisions` 字段）写入 checkRounds 由 R13 校验强制拦截。
 
 **记录时机**：每轮 TLA+ 校验（SANY + TLC）完成后，由 G 子代理向 `checkRounds` 数组追加一条记录。
 
@@ -281,7 +281,7 @@ S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCove
 | `specId` | string | 校验的 spec id（如 `L1_blog_system`） |
 | `syntaxCheck` | boolean | SANY 语法检查是否通过 |
 | `tlcCheck` | boolean | TLC 模型检查是否通过 |
-| `violations` | string[] | 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述，与 [tla-logic.ts](../scripts/logic/tla-logic.ts) 类型定义一致；第 16 轮 P4.3 修正：原 `number` 类型与脚本不一致） |
+| `violations` | string[] | 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述，与 [tla-logic.ts](../scripts/logic/tla-logic.ts) 类型定义一致） |
 | `converged` | boolean | 本轮是否零违反收敛（`violations.length === 0`） |
 
 **单调递减规则**：同一 `specId` 跨轮 `violations.length` 应单调递减（每轮返工修复一部分违反）。若某轮 `violations.length` 不降反升 → 视为返工失败，编排者分派 S 子代理返工时须在 prompt 中明确「违反数上升」信号。
@@ -292,7 +292,7 @@ S-ingest-tla 子代理据此字段与 graph.json 比对后回填 manifest sdCove
 
 ### 禁止字段（phase 级摘要）
 
-> checkRounds 元素为 **spec 级返工记录**，不得含 phase 级摘要字段。第 15 轮调测发现子代理误把 phase 级摘要写入 checkRounds（共性问题 D），第 16 轮 R13 校验强制拦截。违反 → `check-tla-model.ts` 退出码 1。
+> checkRounds 元素为 **spec 级返工记录**，不得含 phase 级摘要字段（R13 校验强制拦截）。违反 → `check-tla-model.ts` 退出码 1。
 
 | 禁止字段 | 说明 | 应写入位置 |
 |---|---|---|
@@ -312,7 +312,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=
 退出码 `0=通过 / 1=失败 / 2=输入错误`。stdout 末尾输出 `TLA_JSON {...}` 供 Agent 解析。
 
 所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查
-- 不得使用 `--skip-tlc` 跳过 TLC（参数已移除，[21.0.0]）
+- 不得使用 `--skip-tlc` 跳过 TLC（参数已移除）
 - 若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip）
 - 拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段
 
@@ -323,7 +323,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=
 | `--phase=N` | 只校验 `phase ≤ N` 的规格 |
 | `--spec=<id>` | 只校验单个规格（调试用） |
 | `--graph=<graph.json>` | 提供结构层图谱，提取 `type=SD` 节点供 SD 覆盖率校验（见 §10）；**phase>=2 时强制必填，缺失 → exitCode=2 ARG_INVALID** |
-| `--keep-states` / `-k` | **第 9 轮 P3.8**：保留 TLC `states/` 目录用于调试（默认校验后自动清理） |
+| `--keep-states` / `-k` | 保留 TLC `states/` 目录用于调试（默认校验后自动清理） |
 
 ### 校验步骤（G 子代理执行）
 
@@ -360,7 +360,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=
 
 ### TLA+ states 目录自动清理
 
-> TLA+ 校验完成后必须清理 `<tla-dir>/states/` 目录，避免状态文件残留污染仓库。第 8 轮调测发现 demo 项目 `w-model-dev-demo/tla/states/` 累积 229 个残留文件（多轮 TLC 校验产物未清理），第 9 轮将其硬约束化为脚本默认行为。
+> TLA+ 校验完成后必须清理 `<tla-dir>/states/` 目录，避免状态文件残留污染仓库（脚本默认行为，硬约束）。
 
 **`check-tla-model.ts` 行为**：
 
@@ -395,9 +395,8 @@ npm run clean:tla-states
 
 - `check-tla-model.ts` 默认运行（无 `--keep-states`）后，`<tla-dir>/states/` 目录应不存在或为空
 - `--keep-states` 运行后，`<tla-dir>/states/` 目录应保留，含 TLC 产物
-- 第八轮 demo 残留 229 个文件由 Part C Task C2 集中清理，第 9 轮后不再产生新残留
 
-> 与 `.gitignore` 的配合：项目应在 `.gitignore` 中排除 `tla/states/` 目录，避免 TLC 产物误提交。第 9 轮 Part A Task A7 已增加 `coverage/.tmp/` 排除规则，`tla/states/` 排除规则由项目自行维护（不同项目 `<tla-dir>` 路径不同，技能包不强制约定）。
+> 与 `.gitignore` 的配合：项目应在 `.gitignore` 中排除 `tla/states/` 目录，避免 TLC 产物误提交；`tla/states/` 排除规则由项目自行维护（不同项目 `<tla-dir>` 路径不同，技能包不强制约定）。
 
 ## 阶段产出契约
 
@@ -556,7 +555,7 @@ INVARIANT ArtifactGateConsistency
 
 > 不变式数量计数是跨产物交叉校验的枢纽：`.cfg` 声明数 = `.tla` `BusinessInvariant` 展开数 = verifier-output 不变式描述数，三者一致才放行（治 D27 三处不一致）。
 
-## 13. 第 11 轮吸收的参考资料
+## 13. 参考资料（claude-tla-plus-plugin）
 
 > 吸收 `claude-tla-plus-plugin` 的 4 份 skill 资料与 review 命令语义。
 
@@ -589,7 +588,7 @@ INVARIANT ArtifactGateConsistency
 
 ## 14. L4 时间推进/保留期建模模式
 
-> S-tla 子代理在 L4 层级建模涉及"时间推进/保留期/过期清理"场景时的模式指引。第 12 轮 `L4_audit_log_retention` 靠 TLC 拦截才发现 `AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1` 违反 `Retention90Days` 不变式），本节提供正反例与通用规则，降低 S-tla 子代理对 TLC 试错的依赖。
+> S-tla 子代理在 L4 层级建模涉及"时间推进/保留期/过期清理"场景时的模式指引。`AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1` 违反 `Retention90Days` 不变式）是典型缺陷，本节提供正反例与通用规则，降低 S-tla 子代理对 TLC 试错的依赖。
 
 ### 14.1 模式概述
 

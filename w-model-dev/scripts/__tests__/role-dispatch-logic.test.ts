@@ -3,14 +3,14 @@ import { describe, it, expect } from 'vitest';
 import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
 
 /**
- * role-dispatch-logic.ts 单元测试 —— 第29轮 R3 无条件强制
+ * role-dispatch-logic.ts 单元测试 —— R3 无条件强制
  *
  * 覆盖：
  *   - R≥3 无条件（不再需要 r3Enabled flag）
  *   - S/V/G 各 ≥1 仍强制
  *   - phaseSummary 结构
  */
-describe('role-dispatch-logic: R≥3 无条件（第29轮）', () => {
+describe('role-dispatch-logic: R≥3 无条件', () => {
   it('缺 R3 记录应失败（不再需要 r3Enabled flag）', () => {
     const entries = [
       { phase: 1, role: 'S', action: 'produce', outcome: 'success' },

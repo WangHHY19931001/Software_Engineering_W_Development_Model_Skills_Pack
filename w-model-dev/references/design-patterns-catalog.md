@@ -1,6 +1,6 @@
 # 设计模式速查表（Design Patterns Catalog）
 
-> 第 41 轮四源吸收：提炼自 GoF《Design Patterns》23 模式 + 引言（1.1/1.3-1.8）+ 案例（ch2）+ 结论（ch6）。
+> 提炼自 GoF《Design Patterns》23 模式 + 引言（1.1/1.3-1.8）+ 案例（ch2）+ 结论（ch6）。
 > 用法：S 子代理在阶段 3/4 设计时作"可选方案词汇表"（引用的前提是命名后讨论）；V 子代理评审 Architecture 轴时作"模式恰当性基准"（声称用了某模式须能指出参与者与意图，否则判定过度设计）。
 > 记录格式：名称 / 速写 / 意图 / 适用性 / 权衡（一句话）。与 [refactoring-catalog.md](refactoring-catalog.md)（重构手法）+ [code-smells-checklist.md](code-smells-checklist.md)（坏味道）互引。
 

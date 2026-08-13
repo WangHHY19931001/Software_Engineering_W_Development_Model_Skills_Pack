@@ -104,7 +104,7 @@ Agent 应依据项目已有脚本和声明选择真实工具链，不默认伪�
 
 ## JSON 文件写入工具选择
 
-> 第 15 轮共性问题 A：PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` 在阶段 5/6/7/8 多次返工（BOM + 深度 + 中文乱码）。第 16 轮 P4.2 强制工具选择，关联反模式 [#25 JSON 文件 PowerShell 写入](anti-patterns.md)。
+> PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` 在阶段 5/6/7/8 易引发返工（BOM + 深度 + 中文乱码），强制改用 Node.js 工具，关联反模式 [#25 JSON 文件 PowerShell 写入](anti-patterns.md)。
 
 ### 强制工具
 
@@ -141,15 +141,15 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - 每行一条 JSON 记录，末尾换行 `\n`（Unix 风格，跨平台一致）
 - 不得用 PowerShell `Add-Content` 追加（同上 BOM + 乱码问题）
 
-### 敏感信息禁令（第三十一轮）
+### 敏感信息禁令
 
 - **禁止**将密钥、令牌、密码、连接串写入任何状态文件（`.w-model/*.json`）或日志（gate-logs / run-log / event-ingress / signature-chain）。
-- 敏感配置统一经环境变量注入（与 demo `JWT_SECRET` 处理一致，见 [第 15 轮归档](../../docs/changes/archive/2026-07-26-round15-end-to-end-test/README.md)）；状态文件只存引用名（如 `${JWT_SECRET}`），不存值。
+- 敏感配置统一经环境变量注入（与 demo `JWT_SECRET` 处理一致）；状态文件只存引用名（如 `${JWT_SECRET}`），不存值。
 - 命中反模式 #43：从状态文件移除敏感值 → 改环境变量引用 → 回当前阶段起点重跑受影响门禁。
 
 ## 调测者简化行为预防
 
-> 第 15 轮归档反思识别的调测者简化倾向。self-as-verifier 模式下调测者兼具 S/V/G 角色，简化行为无外部评审拦截，须靠自检条款预防。第 17 轮 P5 新增。
+> self-as-verifier 模式下调测者兼具 S/V/G 角色，简化行为无外部评审拦截，须靠自检条款预防。
 
 ### 三类简化倾向
 
@@ -227,7 +227,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | `run-log.jsonl` 需要导出运行历史 | `/wm export` 包含 `run-log.jsonl`；可离线分析成本与返工模式 |
 | `budget.json` 字段缺失或类型错误 | 按 [data-models.md](data-models.md) schema 校验；修复后重跑预算检查 |
 
-### rootcause / fix 动作 token 计量（新增）
+### rootcause / fix 动作 token 计量
 
 > 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§9.9](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) Token 预算扩展。返工循环 V/G→R→V→G→S-fix→V→G 中的 token 计量约定。
 
@@ -266,7 +266,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | TLA+ 建模不符需求/设计（反模式 #17） | TLC 发现违反且规格忠实于需求/设计 | 决策型 CHECKPOINT 等用户（须回退修正需求/设计） |
 | 阶段回退（场景 5，R 标记 upstreamDefect） | R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true`，V 复审通过，`round ≥ 2` | 决策型 CHECKPOINT 等用户（见下方「场景 5：阶段回退」） |
 
-### 成熟度与行为门禁（约束 #13 可执行细则，第 44 轮新增）
+### 成熟度与行为门禁（约束 #13 可执行细则）
 
 > 约束 #13「行为门禁按成熟度分级」：TLA+（`check-tla-model.ts`）与 BDD（`check-bdd-model.ts`）的强制级别随项目成熟度分级，降低 L1（教学/demo）项目的采用门槛。
 
@@ -278,12 +278,12 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 **执行规则**：
 
-1. **编排层开关，不是脚本参数**：强制级别由 O 按 `maturity.json.level` 决定是否分派 S-tla / S-bdd 与 G 行为门禁；**不得**给 `check-tla-model.ts` / `check-bdd-model.ts` 加跳过参数（历史上 `--skip-tlc` 已移除，禁止重新引入削弱门禁的 flag）。L2/L3 项目一旦产出 TLA+/BDD 资产，门禁即无条件强制（语法 + TLC + D1-D8 全维度）。
+1. **编排层开关，不是脚本参数**：强制级别由 O 按 `maturity.json.level` 决定是否分派 S-tla / S-bdd 与 G 行为门禁；**不得**给 `check-tla-model.ts` / `check-bdd-model.ts` 加跳过参数（`--skip-tlc` 已移除，禁止重新引入削弱门禁的 flag）。L2/L3 项目一旦产出 TLA+/BDD 资产，门禁即无条件强制（语法 + TLC + D1-D8 全维度）。
 2. **降级路径**：成熟度 L2 降至 L1（预算/时间受限）时，已产出的 TLA+/BDD 资产仍须过门禁；未产出的层级不再补产，在 run-log 决策记录中登记"按 L1 成熟度豁免 L2-L4 行为门禁"。
 3. **升优路径**：L1 项目选择产出 TLA+/BDD 时，按对应层级完整执行（无"产出但免检"）。
 4. **记录**：O 在 run-log 的决策条目中登记实际采用的行为门禁级别（如 `maturity=L2 → TLA+ L1 + BDD L1 必跑`），供 `check-run-log.ts` 审计。
 
-### 场景 5：阶段回退（新增）
+### 场景 5：阶段回退
 
 > 对应 spec [§6.3 场景 5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 阶段回退 + [§6.4](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 回退路径阶段编号映射。返工循环 V/G→R→V→G→S-fix→V→G 中，R 定位根因为上游缺陷时的阶段回退决策。
 

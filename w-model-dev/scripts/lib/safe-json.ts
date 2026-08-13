@@ -4,7 +4,7 @@
  * 背景：JSON.parse 将 `__proto__` 创建为对象自有属性（不污染原型），但对象后续
  * 经 Object.assign / spread 复制时会触发原型污染。对不受信输入统一丢弃 `__proto__` 键。
  *
- * 决策（批次 1 spec §2.1）：仅丢弃 `__proto__`；`constructor`/`prototype` 在 JSON.parse
+ * 决策（spec §2.1）：仅丢弃 `__proto__`；`constructor`/`prototype` 在 JSON.parse
  * 语义下无污染风险，不做处理（避免破坏合法字段）。
  *
  * 仅 node 内置，无新依赖。接入点见 2026-08-05-opt-batch-1-security-hardening-design.md §3.4。

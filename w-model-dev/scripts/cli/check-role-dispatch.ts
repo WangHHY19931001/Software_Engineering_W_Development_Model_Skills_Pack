@@ -3,14 +3,14 @@
  * 角色分派完整性校验脚本（Role Dispatch Checker）
  *
  * 对应约束 #8 + 反模式 #34：编排者每阶段须至少分派 S/V/G 三角色各 1 次；
- * R3 预防性审查无条件须分派 R 角色 ≥3 次（第29轮升级：移除 --r3-enabled flag 语义）。
+ * R3 预防性审查无条件须分派 R 角色 ≥3 次。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--r3-enabled]
  *
  * 参数：
  *   run-log.jsonl  run-log 文件路径（每行一条 JSON 对象）
- *   --r3-enabled   （第29轮起为 no-op，向后兼容保留；R≥3 现已无条件强制）
+ *   --r3-enabled   （no-op，向后兼容保留；R≥3 无条件强制）
  *   --json         机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   const args = process.argv.slice(2);
   const file = args.find((a) => !a.startsWith('--'));
-  // 第29轮：--r3-enabled 保留解析以兼容旧调用，但语义为 no-op（R≥3 无条件强制）
+  // --r3-enabled 保留解析以兼容旧调用，但语义为 no-op（R≥3 无条件强制）
   const r3EnabledFlagPassed = args.includes('--r3-enabled');
 
   if (!file) {
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     try {
       entries.push(parseJsonSafe(line) as RoleDispatchEntry);
     } catch {
-      // 第 29 轮决策：坏行 exit 2（不复用 readJsonlOrExit 的 warn+skip，行为不等价）
+      // 坏行 exit 2（不复用 readJsonlOrExit 的 warn+skip，行为不等价）
       exitWithError({
         category: 'FILE_PARSE',
         message: `第 ${i + 1} 行非合法 JSON`,
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
   console.log('角色分派完整性校验（Role Dispatch Checker）');
   console.log('═'.repeat(60));
   console.log(`输入文件      : ${abs}`);
-  console.log(`R3 强制       : 是（无条件，第29轮）${r3EnabledFlagPassed ? ' [--r3-enabled flag 已视为 no-op]' : ''}`);
+  console.log(`R3 强制       : 是（无条件）${r3EnabledFlagPassed ? ' [--r3-enabled flag 已视为 no-op]' : ''}`);
   console.log(`阶段数        : ${result.phaseSummary.length}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));

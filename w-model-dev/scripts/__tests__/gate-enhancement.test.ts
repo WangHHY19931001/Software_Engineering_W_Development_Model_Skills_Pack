@@ -52,7 +52,7 @@ function loadVerifierSample(name: string): VerifierOutputShape {
 /**
  * 构造一份结构合规的极简 manifest（不含 basePath）。
  * 仅一个 L1 根 spec，所有声明标志为通过，故纯逻辑校验仅 basePath 缺失会致失败。
- * sdCoverage：Task 3 schema 在 currentPhase>=2 时强制必填，此处补空覆盖数据以通过 schema 前置校验。
+ * sdCoverage：schema 在 currentPhase>=2 时强制必填，此处补空覆盖数据以通过 schema 前置校验。
  */
 function makeValidManifestWithoutBasePath(): unknown {
   return {
@@ -164,7 +164,7 @@ describe('Part A 门禁增强回归测试', () => {
     });
   });
 
-  // ==================== 第 9 轮 P1.1 阶段级校验 ====================
+  // ==================== P1.1 阶段级校验 ====================
   describe('P1.1 阶段级校验（phaseOption）', () => {
     it('phase=6 合法场景：unit+integration 通过，system+acceptance pending 应通过', () => {
       const matrix = loadGateSample('valid-phase6.json');
@@ -207,7 +207,7 @@ describe('Part A 门禁增强回归测试', () => {
     });
   });
 
-  // ==================== 第 9 轮 P2.4/P2.5/P3.10 verifier 标准化校验 ====================
+  // ==================== P2.4/P2.5/P3.10 verifier 标准化校验 ====================
   describe('P2.4/P2.5/P3.10 verifier 标准化校验', () => {
     it('P2.5 targetKind=testcase 应失败（已废弃，须用 test）', () => {
       const v = loadVerifierSample('bad-targetkind.json');
@@ -597,7 +597,7 @@ describe('阶段 E 集成测试：graph + coverage + exemption 联动', () => {
   });
 });
 
-describe('P0-2 codeModule 格式校验（第22轮）', () => {
+describe('P0-2 codeModule 格式校验', () => {
   it('REQ 行 codeModule 缺 SD 前缀 → 失败', () => {
     const matrix: RTMMatrixShape = {
       rows: [
@@ -676,9 +676,9 @@ describe('P0-2 codeModule 格式校验（第22轮）', () => {
   });
 });
 
-// ==================== 第 28 轮 G-B gate-logic 修正（B1-B3） ====================
-describe('G-B gate-logic 修正（round28）', () => {
-  describe('B1: SD 数字层级 id codeModule 前缀映射兜底', () => {
+// ==================== gate-logic 修正 ====================
+describe('gate-logic 修正', () => {
+  describe('SD 数字层级 id codeModule 前缀映射兜底', () => {
     it('SD-5.2.1 命中 codeModule "SD-5.2.1:src/..." 前缀 → 应通过，不误报"无可识别段"', () => {
       const matrix: RTMMatrixShape = {
         rows: [
@@ -708,7 +708,7 @@ describe('G-B gate-logic 修正（round28）', () => {
     });
   });
 
-  describe('B2: coverageStatus 行级一致性比较', () => {
+  describe('coverageStatus 行级一致性比较', () => {
     it('行 A 完整+"100%" 不应被 flag；行 B 缺 acceptanceTest 应被 flag（不误报行 A）', () => {
       const matrix: RTMMatrixShape = {
         rows: [
@@ -752,7 +752,7 @@ describe('G-B gate-logic 修正（round28）', () => {
     });
   });
 
-  describe('B3: uat-path-mapping 回填校验类型 guard', () => {
+  describe('uat-path-mapping 回填校验类型 guard', () => {
     it('actualPath/mappingType 非字符串 → 不抛 TypeError，push violation 后继续', () => {
       const violations = checkUatPathMappingBackfill([
         { uatId: 'UAT-001', actualPath: 123 as unknown as string, mappingType: '直接' },
@@ -762,7 +762,7 @@ describe('G-B gate-logic 修正（round28）', () => {
   });
 });
 
-// ==================== 第 37 轮 Phase 1 需求规格结构校验 ====================
+// ==================== Phase 1 需求规格结构校验 ====================
 // 内存 fs stub：文件键用 path.join 构造，与 checkRequirementSpecStructure 内部
 // path.join 分隔符一致（Windows 反斜杠），保证 existsSync/readFileSync 命中。
 describe('Phase 1 需求规格结构校验', () => {
@@ -949,7 +949,7 @@ describe('Phase 3 概要设计结构校验', () => {
   });
 });
 
-// ==================== 第 38 轮 Phase 3 结构校验经 checkArtifactGate 生效 ====================
+// ==================== Phase 3 结构校验经 checkArtifactGate 生效 ====================
 // checkArtifactGate 内部经 nodeFsAdapter 真实读盘（不可注入内存 fs），故用 node:fs + os.tmpdir
 // 构造真实产物目录，正反双向断言 phase=3 分支被触发（缺陷态：reasons 无任何 structure 消息）。
 describe('Phase 3 结构校验经 checkArtifactGate 生效', () => {
@@ -1011,7 +1011,7 @@ describe('Phase 3 结构校验经 checkArtifactGate 生效', () => {
   });
 });
 
-// ==================== 第 38 轮 Phase 4 详细设计结构校验 ====================
+// ==================== Phase 4 详细设计结构校验 ====================
 // 样本键统一用正斜杠书写，mkFs 内部按 path.sep 归一化，保证 Windows 反斜杠下可命中。
 describe('Phase 4 详细设计结构校验', () => {
   const mkFs = (files: Record<string, string>) => ({

@@ -48,10 +48,10 @@ export interface ArtifactGateResult {
   openspecArchived?: boolean; // check-openspec-archive.ts exitCode=0（phase 5-8 门通过后）
 }
 
-// RTM 追溯字段单点事实源已收敛至 lib/constants.ts（RTM_FIELDS），此处仅保持名称与类型不变
+// RTM 追溯字段单点事实源：lib/constants.ts（RTM_FIELDS），此处仅保持名称与类型不变
 const REQUIRED_TRACE_FIELDS: Array<keyof RTMRowShape> = [...RTM_FIELDS];
 
-// ==================== 阶段级校验（P1.1，第 9 轮） ====================
+// ==================== 阶段级校验（P1.1） ====================
 /**
  * 阶段级校验选项。
  * - phase 1-4：跳过测试汇总校验（设计阶段，pending 合理）
@@ -112,7 +112,7 @@ export interface CheckArtifactGateOptions {
     opsxArtifactsValid?: boolean;
     openspecArchived?: boolean;
   };
-  /** 第 37 轮：phase=1 需求规格独立产物目录（docs/phase1-requirements/），提供时做结构校验。 */
+  /** phase=1 需求规格独立产物目录（docs/phase1-requirements/），提供时做结构校验。 */
   specDir?: string;
 }
 
@@ -162,7 +162,7 @@ function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): stri
   return violations;
 }
 
-// ==================== codeModule 格式校验（第22轮 P0-2） ====================
+// ==================== codeModule 格式校验（P0-2） ====================
 /**
  * codeModule 格式校验（按行类型分支）。
  * - REQ 行：^SD-[\d.]+:src/.+
@@ -196,7 +196,7 @@ export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
   return violations;
 }
 
-// ==================== uat-path-mapping 回填校验（第22轮 P0-1） ====================
+// ==================== uat-path-mapping 回填校验（P0-1） ====================
 export interface UatPathMappingRow {
   uatId: string;
   actualPath: string;
@@ -230,14 +230,14 @@ export function checkUatPathMappingBackfill(mappings: UatPathMappingRow[]): stri
   return violations;
 }
 
-// ==================== Phase 1 需求规格结构校验（第 37 轮） ====================
+// ==================== Phase 1 需求规格结构校验 ====================
 export interface RequirementSpecStructureViolations {
   refs: string[];
   ssot: string[];
   dod: string[];
 }
 
-/** 第 37 轮：真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
+/** 真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
 const nodeFsAdapter: {
   readFileSync(p: string): string;
   existsSync(p: string): boolean;
@@ -248,7 +248,7 @@ const nodeFsAdapter: {
   readdirSync: (p: string) => nodeFs.readdirSync(p),
 };
 
-/** Phase 1 需求规格结构校验（第 37 轮）：引用块完整性 + §0 SSOT 头 + DoD 清单
+/** Phase 1 需求规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单
  *  @param specDir  docs/phase1-requirements/ 目录（含 requirement-spec.md + 6 独立产物）
  *  @param fs       文件系统注入 { readFileSync(p): string; existsSync(p): boolean }，便于单测 mock
  */
@@ -293,7 +293,7 @@ export function checkRequirementSpecStructure(
   return v;
 }
 
-/** 各阶段独立产物布局（主文档后缀 + 6 独立文件）——第 38 轮泛化
+/** 各阶段独立产物布局（主文档后缀 + 6 独立文件）
  *  phase=1: requirement-spec.md 主文档 + 6 子文件（无前缀）
  *  phase=2: {module}-system-design.md 主文档 + 6 子文件（带 {module}- 前缀）
  */
@@ -323,7 +323,7 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
   },
 };
 
-/** Phase N 设计/规格结构校验（第 38 轮泛化）：引用块完整性 + §0 SSOT 头 + DoD 清单
+/** Phase N 设计/规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单
  *  @param phase  1/2/3/4
  *  @param specDir  docs/phase{N}-{name}/ 目录
  *  @param fs       文件系统注入 { readFileSync; existsSync; readdirSync }，便于单测 mock
@@ -421,7 +421,7 @@ export function checkArtifactGate(
   }
   if (reasons.length > 0) return failureResult(reasons);
 
-  // 第 37/38 轮：phase=1/2/3/4 且提供 specDir 时做规格/设计结构校验
+  // phase=1/2/3/4 且提供 specDir 时做规格/设计结构校验
   // （置于 RTM 早退检查后：RTM 结构损坏时直接失败，不叠加 spec 校验；spec 违反仅进 reasons，不影响覆盖率计算）
   let specStructureViolations: RequirementSpecStructureViolations | undefined;
   if ((phase === 1 || phase === 2 || phase === 3 || phase === 4) && options?.specDir) {
@@ -497,7 +497,7 @@ export function checkArtifactGate(
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
   if (totalRows === 0) reasons.push('RTM 无需求行');
 
-  // ==================== coverageStatus 字段一致性校验（第24轮 P0，round28 改行级） ====================
+  // ==================== coverageStatus 字段一致性校验（P0，行级） ====================
   // 约束 #3：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
   //   "100%" → 该行所需 RTM 字段齐全；"部分" → 该行存在追溯缺失；"待覆盖" → 违反
   //   （"完整" 等历史兼容值与非标准值不参与一致性判定，由 missingItems 覆盖检查兜底）
@@ -521,7 +521,7 @@ export function checkArtifactGate(
     }
   }
 
-  // ==================== NFR 双值字段校验（第24轮 P2 新增） ====================
+  // ==================== NFR 双值字段校验（P2） ====================
   // 问题 4：性能基线须区分生产目标值与测试环境基线
   // 仅对 NFR 类型行校验（requirementId 以 NFR 开头）；非 NFR 行跳过
   // 双字段都缺失才 fail，单字段缺失不 fail
@@ -579,7 +579,7 @@ export function checkArtifactGate(
     for (const v of sdViolations) reasons.push(v);
   }
 
-  // ==================== codeModule 格式校验（第22轮 P0-2，仅 phase >= 5） ====================
+  // ==================== codeModule 格式校验（P0-2，仅 phase >= 5） ====================
   if (phase >= 5) {
     const formatViolations = checkCodeModuleFormat(matrix.rows);
     for (const v of formatViolations) reasons.push(v);

@@ -15,7 +15,7 @@ function loadJsonl(filename: string): SignatureChainEntry[] {
     .map((l) => JSON.parse(l));
 }
 
-describe('[21.0.0] signature-chain-logic R1-R10', () => {
+describe('signature-chain-logic R1-R10', () => {
   it('R1 valid-all-roles 通过', () => {
     const entries = loadJsonl('valid-all-roles.jsonl');
     const result = checkSignatureChain(entries, { phase: 1 });

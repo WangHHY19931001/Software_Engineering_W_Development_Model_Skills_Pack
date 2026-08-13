@@ -7,6 +7,17 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.9.0] - 2026-08-13
+
+### Changed
+- 版本号 41.8.0 → 41.9.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **文档层 + 脚本层去历史化全量清扫**（历史只由 CHANGELOG 体系承载；41.7.0 已清 references/templates，本轮扩展至 scripts/** 与全部根文档）：
+  - **脚本层**（logic 18 / lib 12 / cli 12 / __tests__ 18，共 60 文件）：删除注释、usage 帮助文本、运行时展示文本、describe/it 名称中的「（第 N 轮）」「[x.y.z]」「第 N 轮新增/升级/移入」标注与演进叙事（如「第 N 轮调测发现 X」）；schema 3 份 description 字段同步（enum/required/type 等约束字段零改动，run-log action enum 27 值零改动）；规则 ID（R1-R10 / D1-D8 / C1-C10 / E1-E9 / P2.5 / R13 等）与「已废弃」「无条件强制」「no-op 向后兼容」等现状声明保留
+  - **文档层**（SKILL / references 37 / templates 5 / examples / subagent / docs 6 / README / AGENTS / CONTRIBUTING / pre-push 共 54 文件）：删除残留轮次标注与「第 N 轮由 SKILL.md 移入」句；41.8.0 批次遗留的历史归档指针（「已归档至 legacy-sections.md」等）统一删除，导航由 CHANGELOG/decision-log README 承担；演进叙事（「与原计划的差异」等）改写为当前事实陈述；pre-push「与原 CI 一致」→「全部门禁共 15 项检查」
+  - **收尾修正**：checkpoint-logic 运行时消息、docs-consistency 违规消息、docs-consistency 测试 fixture 中的版本/轮次残留清零；verifier-spec rootcause 枚举行「新增」→「—（无旧值映射）」；README 门禁增强历史导航句去轮次
+  - **保留项（B 类设计事实/导航）**：规则 ID、反模式 #N、约束 #N、SSoT §X 指针、文件指针、hard-constraints「原约束 #XX 并入」注记、「已废弃/已移除」现状声明、ISO 时间戳、docs/changes/archive 目录名中的 roundN（归档目录名不可改）、examples/real-run-evidence 快照版本元数据
+- **门禁必需字符串复核**：anti-patterns `| 47 |` / `#1~#47`、hard-constraints `## #1`~`## #14`、operation-behaviors 八条表、DoD 七维度标题、data-models Schema 清单 20 份、glossary action 枚举、SKILL「（53 个 .md）」、SSoT 4A.1 权威标题、README/AGENTS/pre-push vitest 计数等全部原样保留
+
 ## [41.8.0] - 2026-08-13
 
 ### Changed

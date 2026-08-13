@@ -1,7 +1,7 @@
 /**
  * 统一 --phase 参数解析（lib/parse-phase.ts）
  *
- * 批次 3「脚本瘦身」Task 2：13 个 CLI 脚本的 --phase 解析/校验收敛到本模块（spec §3.2）。
+ * 13 个 CLI 脚本的 --phase 解析/校验统一由本模块实现（spec §3.2）。
  * 支持三种形态：
  *   - `--phase=N`（等号内联）
  *   - `--phase N`（空格分离）
@@ -9,11 +9,11 @@
  *
  * 语义：
  *   - 严格整数校验：字符串须全为数字（/^\d+$/）+ Number.isInteger + [min, max] 范围，拒绝
- *     "5abc" / "3.7" / "-1" / 空串 这类 parseInt 会部分解析或误接受的输入（B6 严格化）。
+ *     "5abc" / "3.7" / "-1" / 空串 这类 parseInt 会部分解析或误接受的输入。
  *   - 默认 min=1, max=8；未传 --phase（或传入值非法）返回 undefined，由调用方决定
  *     是静默降级（如按 manifest.currentPhase / 终检 8）还是报错退出。
  *   - 顺序语义：从 argv[0] 起按出现顺序取第一个 --phase 相关参数，合法即返回，非法即
- *     undefined（与 check-artifact-gate 原本地实现一致：先到先得，不继续向后找）。
+ *     undefined（先到先得，不继续向后找）。
  *
  * 纯函数：无 I/O、无 process 访问，可安全用于 lib 层与单测。
  */

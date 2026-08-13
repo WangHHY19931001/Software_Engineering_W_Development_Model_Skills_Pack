@@ -48,7 +48,7 @@
 
 ### 阶段级增量校验（强制）
 
-> 第 22 轮新增。第 21 轮调测发现 35 个节点 acceptanceTest 为 null 直到阶段 8 才发现。
+> 每阶段门的 RTM 字段增量校验，防止 acceptanceTest 等字段留空至阶段 8 终检才暴露。
 
 `check-artifact-gate.ts --phase=N` 在每阶段门执行，校验当前阶段应完成的 RTM 字段：
 

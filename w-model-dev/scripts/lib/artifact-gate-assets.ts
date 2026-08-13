@@ -1,7 +1,7 @@
 /**
  * 工件质量门资产读取/校验层（Artifact Gate Assets）
  *
- * 自 check-artifact-gate.ts 拆分的资产侧逻辑（Task A1）：
+ * 资产侧逻辑：
  * - graph 资产自动发现（P2.6：.w-model/ingestion/ 下的 graph.json / consolidated-phaseN.json）
  * - tla-manifest.json 存在性 + specs 非空检查（spec §3.4.4）
  * - bdd-manifest.json 存在性 + schema + features 文件存在性 + stateMachines 七要素非空（spec §13.2 #18）

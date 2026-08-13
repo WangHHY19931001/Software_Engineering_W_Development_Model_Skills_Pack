@@ -224,5 +224,5 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 | 6 | 越过 🔴 CHECKPOINT 自动推进 | #8 | CHECKPOINT 标记的暂停点必须等用户确认 |
 | 7 | 谎报阶段状态（未完成标为完成） | #9 | 状态字段必须如实反映实际进度 |
 | 8 | 编排者越权实施（直接产出 / 评审 / 替代 G 回填） | #10 | 编排者只分派 S / V / G；自身只做路由 + 状态 + CHECKPOINT + 只读脚本（见 [subagent-delegation.md](subagent-delegation.md)） |
-| 9 | ingestion 跳过图谱校验直接进 S 产出 | #11（新增） | 阶段 1-4 必须跑 `check-requirement-graph.ts`，不得跳过 A→G 收敛循环 |
-| 10 | A 子代理自评收敛（用 LLM 输出判定收敛） | #12（新增） | 收敛判定由 G 跑脚本退出码决定，A 的 reworkHints 仅作指引 |
+| 9 | ingestion 跳过图谱校验直接进 S 产出 | #11 | 阶段 1-4 必须跑 `check-requirement-graph.ts`，不得跳过 A→G 收敛循环 |
+| 10 | A 子代理自评收敛（用 LLM 输出判定收敛） | #12 | 收敛判定由 G 跑脚本退出码决定，A 的 reworkHints 仅作指引 |

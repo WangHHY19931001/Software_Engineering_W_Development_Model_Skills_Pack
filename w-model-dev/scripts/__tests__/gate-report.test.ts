@@ -4,7 +4,7 @@
  * 覆盖：
  *   - 分隔线 '─'.repeat(60)
  *   - `${label}_JSON ` 行首标记（空格分隔，供 Agent 正则截取）
- *   - JSON 摘要含全部 summary 键 + exitCode 键（追加在末尾，与历史契约一致）
+ *   - JSON 摘要含全部 summary 键 + exitCode 键（追加在末尾）
  *   - process.exit 收到正确 exit code
  *
  * process.exit 测试策略：spyOn + mockImplementation 抛错拦截，避免真实退出。
@@ -98,7 +98,7 @@ describe('printGateReport', () => {
   });
 });
 
-describe('printJsonReport（B4 --json 机器可读报告）', () => {
+describe('printJsonReport（--json 机器可读报告）', () => {
   it('stdout 仅输出单行 JSON（无分隔线），含全部 JsonReport 字段 + 末尾 exitCode，且不调用 process.exit', () => {
     const exitSpy = vi.spyOn(process, 'exit');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -135,7 +135,7 @@ describe('printJsonReport（B4 --json 机器可读报告）', () => {
   });
 });
 
-describe('buildViolationDistribution（B4 violations 分布聚合）', () => {
+describe('buildViolationDistribution（violations 分布聚合）', () => {
   it('有 structuredViolations 时按 rule 聚合（保留各规则计数）', () => {
     const dist = buildViolationDistribution(3, [
       { rule: 'D1', message: 'a' },
@@ -172,7 +172,7 @@ describe('buildViolationDistribution（B4 violations 分布聚合）', () => {
   });
 });
 
-describe('check-run-log.ts --json（B4 子进程冒烟：--json 输出纯 JSON、无分隔线、退出码一致）', () => {
+describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、无分隔线、退出码一致）', () => {
   it('schema 违规样本 → stdout 为单行 JSON（type/passed/reasons/violations/durationMs/exitCode），进程退出码与 exitCode 字段一致', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
     try {
@@ -226,7 +226,7 @@ describe('check-run-log.ts --json（B4 子进程冒烟：--json 输出纯 JSON�
   });
 });
 
-describe('check-tla-bdd-sync.ts --json（B4 子进程冒烟：纯 JSON、violations 按 rule 聚合、默认路径保留 TLA_BDD_SYNC_JSON 前缀）', () => {
+describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations 按 rule 聚合、默认路径保留 TLA_BDD_SYNC_JSON 前缀）', () => {
   const TLA_CONTENT = [
     'EXTENDS Naturals',
     'VARIABLES state',
@@ -295,7 +295,7 @@ describe('check-tla-bdd-sync.ts --json（B4 子进程冒烟：纯 JSON、violati
   });
 });
 
-describe('check-iceberg-sweep.ts --json（B4 子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {
+describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {
   it('--json 有效样本 → stdout 为单行纯 JSON（passed=true，exitCode=0），不输出 ICEBERG_JSON 前缀', async () => {
     const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE], {
       encoding: 'utf-8',

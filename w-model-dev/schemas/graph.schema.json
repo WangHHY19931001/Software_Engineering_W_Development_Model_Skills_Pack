@@ -29,7 +29,7 @@
           "attributes": { "description": "节点附加属性（自由形态对象，如 NFR 目标值等）", "type": "object" },
           "governance": { "description": "治理类子系统标记：true=允许作为 governs 边的源节点（缺省/undefined 即非治理类）", "type": "boolean" },
           "derivationProduct": { "description": "派生规格节点标记：true=允许作为 derives 边的源节点（缺省/undefined 即非派生规格节点）", "type": "boolean" },
-          "level": { "description": "REQ 内部层级：1=domain 2=module 3=feature 4=acceptance；REQ 节点强制必填（约束 #10，无降级），第 21 轮起支持更深自适应层级（minimum=1 无上限）；level=1 REQ 即 REQ-group 候选", "type": "integer", "minimum": 1 },
+          "level": { "description": "REQ 内部层级：1=domain 2=module 3=feature 4=acceptance；REQ 节点强制必填（约束 #10，无降级），支持更深自适应层级（minimum=1 无上限）；level=1 REQ 即 REQ-group 候选", "type": "integer", "minimum": 1 },
           "priority": { "description": "需求优先级：P0=必须 P1=应该 P2=可以 P3=不会（可选）", "enum": ["P0", "P1", "P2", "P3"] },
           "reqGroup": { "description": "所属 REQ-group ID（level≥2 REQ 须指向 level=1 祖先；level=1 REQ 自身为 group 无此字段）", "type": "string" }
         }
@@ -49,7 +49,7 @@
             "description": "边类型（12 种）：parent=父→子系统层级树主结构边（REQ→SD→INTF→DD，层级单调无环）；depends-on=同层节点依赖（SD→SD / INTF→INTF，禁止环依赖）；implements=SD→REQ 设计实现需求（追溯边）；defines=SD→INTF 系统设计定义接口（追溯边）；realizes=DD→INTF 详细设计实现接口（追溯边）；produces=信息流方向（from 产出信息给 to，双向语义由 from/to 表达）；governs=治理层横切治理（源须 governance=true）；collaborates-with=协作层对等协作（单条边语义双向）；derives=派生层派生规格（源须 derivationProduct=true）；precedes=时序层 REQ→REQ 时序先于（无环）；conflicts-with=冲突层 REQ→REQ 冲突/互斥（单向写入语义双向，须处置）；cross-cuts=横切层 NFR/CON→REQ 横切治理",
             "enum": ["parent", "depends-on", "implements", "defines", "realizes", "produces", "governs", "collaborates-with", "derives", "precedes", "conflicts-with", "cross-cuts"]
           },
-          "sourceArtifact": { "description": "语义来源标记：从设计文档实体派生的边此字段非空（语义来源占比校验用，第 24 轮）", "type": "string" }
+          "sourceArtifact": { "description": "语义来源标记：从设计文档实体派生的边此字段非空（语义来源占比校验用）", "type": "string" }
         }
       }
     },

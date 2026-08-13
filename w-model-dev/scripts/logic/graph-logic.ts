@@ -59,7 +59,7 @@ export interface GraphEdge {
   from: string;
   to: string;
   type: EdgeType;
-  /** 语义来源标记：从设计文档实体派生的边此字段非空（语义来源占比校验用，第24轮 P2 新增） */
+  /** 语义来源标记：从设计文档实体派生的边此字段非空（语义来源占比校验用） */
   sourceArtifact?: string;
 }
 
@@ -129,7 +129,7 @@ export interface GraphCheckResult {
   dataflowViolations: DataflowViolations;
   boundary: BoundaryInfo;
   violations: string[];
-  /** 警告列表（不影响 passed 判定，第24轮 P2 新增：边数下限 + 语义来源占比） */
+  /** 警告列表（不影响 passed 判定：边数下限 + 语义来源占比） */
   warnings?: string[];
   /** REQ 层级树信息（四维·维度1，phase=1 时填充） */
   reqHierarchy?: ReqHierarchy;
@@ -233,7 +233,7 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     violations: [],
   };
 
-  // 警告列表（不影响 passed 判定，第24轮 P2 新增：边数下限 + 语义来源占比）
+  // 警告列表（不影响 passed 判定：边数下限 + 语义来源占比）
   const warnings: string[] = [];
 
   // 输入校验
@@ -585,7 +585,7 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
       );
     }
 
-    // R11: level 正整数校验（[21.0.0] 新增）
+    // R11: level 正整数校验
     const nonPositiveLevelReqs = reqNodes
       .filter((n) => n.level !== undefined && (!Number.isInteger(n.level) || n.level < 1))
       .map((n) => n.id);
@@ -733,7 +733,7 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     };
   }
 
-  // ==================== 边数下限 + 语义来源占比校验（第24轮 P2 新增） ====================
+  // ==================== 边数下限 + 语义来源占比校验 ====================
   const nodeCount = g.nodes.length;
   const edgeCount = g.edges.length;
   const minEdgeCount = nodeCount * 3;
@@ -812,7 +812,7 @@ export function recalculatePassed(result: GraphCheckResult, isPhase1PureReq: boo
     result.violations.length === 0;
 }
 
-// ==================== R7/R8 需求规格产物校验（第 37 轮） ====================
+// ==================== R7/R8 需求规格产物校验 ====================
 // 独立于 checkRequirementGraph（其接收 graph.json 结构）：
 // 本组函数接收 markdown 纯文本，校验 Phase 1 需求规格独立产物
 //（docs/phase1-requirements/：requirement-spec.md / traceability-matrix.md / uml-modeling.md）。
@@ -884,7 +884,7 @@ export interface RequirementSpecEnhanceViolations {
   r8: string[];
 }
 
-/** R7 追踪矩阵一致性 + R8 UML mermaid 配平（第 37 轮）
+/** R7 追踪矩阵一致性 + R8 UML mermaid 配平
  *  @param traceMatrixContent  traceability-matrix.md 内容
  *  @param specContent         主规格 requirement-spec.md 内容（用于校验 §4 层级树节存在）
  *  @param umlContent          uml-modeling.md 内容
@@ -928,7 +928,7 @@ export interface DesignSpecEnhanceViolations {
   r10: string[];
 }
 
-/** R9 系统设计追踪矩阵一致性 + R10 UML mermaid 配平（第 38 轮）
+/** R9 系统设计追踪矩阵一致性 + R10 UML mermaid 配平
  *  @param traceMatrixContent  {module}-traceability-matrix.md 内容
  *  @param designDocContent    主文档 {module}-system-design.md 内容（用于 §3 模块划分校验）
  *  @param umlContent          {module}-uml-modeling.md 内容
@@ -974,7 +974,7 @@ export interface OutlineSpecEnhanceViolations {
   r12: string[];
 }
 
-/** R11 概要设计追踪矩阵一致性 + R12 UML mermaid 配平（第 38 轮小轮 B）
+/** R11 概要设计追踪矩阵一致性 + R12 UML mermaid 配平
  *  @param traceMatrixContent  {module}-traceability-matrix.md 内容
  *  @param designDocContent    主文档 {module}-interface-design.md 内容（用于 §2 接口定义校验）
  *  @param umlContent          {module}-uml-modeling.md 内容
@@ -1021,7 +1021,7 @@ export interface DetailedSpecEnhanceViolations {
   r14: string[];
 }
 
-/** R13 详细设计追踪矩阵一致性 + R14 UML mermaid 配平（第 38 轮小轮 C）
+/** R13 详细设计追踪矩阵一致性 + R14 UML mermaid 配平
  *  @param traceMatrixContent  {module}-traceability-matrix.md 内容
  *  @param designDocContent    主文档 {module}-detailed-design.md 内容（用于 §1/§2 校验）
  *  @param umlContent          {module}-class-design.md + {module}-data-model.md 合并内容（R14 双源）

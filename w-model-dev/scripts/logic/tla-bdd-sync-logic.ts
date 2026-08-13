@@ -4,10 +4,10 @@
  * 对应 P3-10：TLA+ 转移/状态/不变式 与 BDD Background 状态机七要素的自动化比对。
  *
  * 设计依据：
- *   - SSoT §3.4.18 第22轮第9点（check-tla-bdd-sync.ts 新增脚本）：从 TLA+ 抽取转移名
+ *   - SSoT §3.4.18 第9点（check-tla-bdd-sync.ts）：从 TLA+ 抽取转移名
  *     （`Next == \/ Act1 \/ Act2`）/ 状态名（`vars` 声明）/ 不变式名，从 BDD feature
  *     Background 节抽取状态机七要素，diff 比对两者差异。退出码 0=一致 / 1=有差异 / 2=输入错误。
- *   - SSoT §3.4.14 第19轮 BDD 建模：BDD features 作为可执行规格，TLA+ 作为行为正确性基准，
+ *   - SSoT §3.4.14 BDD 建模：BDD features 作为可执行规格，TLA+ 作为行为正确性基准，
  *     二者通过等价性校验互锁（状态集等价 + 初始状态一致 + 转移集等价 + 不变式归一化匹配）；
  *     不等价时走 R→V→G→S-fix 循环（反模式 #29：BDD 建模与需求/设计/TLA+ 不符未回退）。
  *
@@ -68,7 +68,7 @@ const TLA_KEYWORD_BLACKLIST = ['VARIABLES', 'CONSTANTS', 'EXTENDS', 'MODULE'] as
 const TLA_DEF_BLACKLIST = ['Next', 'Init', 'vars', 'VARIABLES', 'CONSTANTS', 'EXTENDS', 'MODULE'] as const;
 
 /**
- * 从 TLA+ 内容抽取转移名（SSoT §3.4.18 第22轮第9点：从 TLA+ 抽取转移名）。
+ * 从 TLA+ 内容抽取转移名（SSoT §3.4.18 第9点：从 TLA+ 抽取转移名）。
  * 匹配 Next == \/ Act1 \/ Act2 格式（TLA+ 析取运算符 \/）。
  *
  * 支持 \E 量化形式：`\/ \E var \in set : ActionName` 提取 ActionName。
@@ -91,7 +91,7 @@ export function extractTlaTransitions(tlaContent: string): string[] {
 }
 
 /**
- * 从 TLA+ 内容抽取状态变量名（SSoT §3.4.18 第22轮第9点：从 TLA+ 抽取状态名）。
+ * 从 TLA+ 内容抽取状态变量名（SSoT §3.4.18 第9点：从 TLA+ 抽取状态名）。
  * 匹配 VARIABLES var1 var2 ... 格式（或 VARIABLE 单数形式）。
  * 支持多行 VARIABLES 声明（变量跨多行以逗号分隔）。
  */
@@ -113,7 +113,7 @@ export function extractTlaStates(tlaContent: string): string[] {
 }
 
 /**
- * 从 TLA+ 内容抽取不变式名（SSoT §3.4.18 第22轮第9点：从 TLA+ 抽取不变式名）。
+ * 从 TLA+ 内容抽取不变式名（SSoT §3.4.18 第9点：从 TLA+ 抽取不变式名）。
  * 匹配 InvName == ... 格式，并按命名启发过滤（含 Inv / Type / Invariant 子串）。
  */
 export function extractTlaInvariants(tlaContent: string): string[] {
@@ -240,7 +240,7 @@ export function extractBddStateMachine(featureContent: string): {
 /**
  * diff 比对 TLA+ 与 BDD 的转移/状态/不变式（TLA+ 与 BDD 状态机同步判定，单点事实源）。
  *
- * 设计依据：SSoT §3.4.18 第22轮第9点（check-tla-bdd-sync.ts）+ SSoT §3.4.14 第4点
+ * 设计依据：SSoT §3.4.18 第9点（check-tla-bdd-sync.ts）+ SSoT §3.4.14 第4点
  * （BDD↔TLA+ 等价性校验：状态集等价 + 初始状态一致 + 转移集等价 + 不变式归一化匹配）。
  *
  * 状态集合提取规则：

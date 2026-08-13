@@ -596,7 +596,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | F9 | 因「显而易见」而无规格就编码 | 与 W 模型「测试设计前置」冲突 |
 | F10 | 因「看起来对」跳过验证 | 与 #3（估算质量门）/ #6（估算 RTM 覆盖率）互补 |
 
-> F1~F10 命中时不触发门禁脚本回退（它们不是流程反模式），但应在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注。Agent 重复命中同一失败模式 ≥2 次时，应在 SSoT §10B.4 登记为新教训（历史「实现层经验教训」节 L1~L4 已于 41.7.0 归档至 [`decision-log/legacy-sections.md`](./changes/decision-log/legacy-sections.md)）。
+> F1~F10 命中时不触发门禁脚本回退（它们不是流程反模式），但应在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注。Agent 重复命中同一失败模式 ≥2 次时，应在 SSoT §10B.4 登记为新教训。
 
 ### 4A.2a 运维失败模式清单（O1~O6）
 
@@ -943,7 +943,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **五轴评审与严重等级标签**（吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能）：代码评审（`targetKind=code`）的子标准按五轴（Correctness / Readability / Security / Architecture / Performance）组织发现项；每条发现项标注 Severity（Critical / Required / Nit / Optional / FYI），使作者区分必修与可选。详细子标准映射与 Structural Remedies 见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §7.4A。
 - **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/logic/verifier-logic.ts`。
 - **与外部演化工具的关系**：本规范只覆盖「阶段产物校验流程」，是技能内部的产物质量保障；技能演化（Rollout / Reflect / Edit / Skill Lift）由外部 SkillOpt / darwin-skill 完成，可消费本规范产出的 `VerifierOutput` JSON 作为训练信号。
-- **evidence 格式规范**（[21.0.0] 新增）：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
+- **evidence 格式规范**：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
   - 合法示例：`coverage.json.matrices.stakeholder.coverage=100%` / `tla-manifest.json.specs[0].tlcChecked=true`
   - 非法示例：`C1-C10 全通过` / `质量良好` / `评审通过`（空泛声明）
   - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
@@ -973,7 +973,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
 要点：
 - **节点类型**（每阶段一种，设计文档 §2.1）：阶段 1 `REQ` / 阶段 2 `SD` / 阶段 3 `INTF` / 阶段 4 `DD`；另含边界节点 `EXT-IN`（合法外部信息源，DFD terminator）/ `EXT-OUT`（合法外部信息汇），二者豁免黑洞/奇迹判定且不参与 `parent` 单根树。节点 schema 统一含 `id` / `type` / `phase` / `sourcePath` / `summary` 等字段（设计文档 §2.2）。
-- **REQ level 自适应层级深度**（[21.0.0] 修正）：每个 REQ 节点须标注 level（正整数，从 1 开始单调递增，无上限）
+- **REQ level 自适应层级深度**：每个 REQ 节点须标注 level（正整数，从 1 开始单调递增，无上限）
   - 最小层级深度 = 2（domain → acceptance，适用极小项目）
   - 推荐层级深度 = 4（domain → module → feature → acceptance）
   - 最大层级深度 = 不限（复杂项目可扩展至 5+ 层）
@@ -1338,7 +1338,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>] [--keep-states]
 ```
 
-> [21.0.0] 移除 `--skip-tlc` 参数：所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查，任何场景不得跳过 TLC。若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip），拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段。
+> `--skip-tlc` 参数已移除：所有 TLA+ specs（L1/L2/L3/L4+）均须通过 SANY 语法检查 + TLC 模型检查，任何场景不得跳过 TLC。若 TLC 因状态爆炸无法完成，须走规格拆解（而非 skip），拆解决策须记录在 `tla-manifest.json` 的 `splitDecision` 字段。
 
 **校验算法**（确定性，无 LLM；设计文档 §3.1）：
 
@@ -1350,7 +1350,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phas
 6. **拆解决策校验**（设计文档 §3.1 步骤 4 / §1.1）：`checkDecomposition()` 校验 `variableCombination > MUST_SPLIT_THRESHOLD(10000)` 必须 `decompositionDecision='split-done'`，否则违反；`> CONSIDER_SPLIT_THRESHOLD(1000)` 且 `kept-below-threshold` 为警告（不导致失败）。违反 → `decompositionViolations++`。
 7. **轨迹/状态文件清理**（设计文档 §3.4）：每个 spec 校验前删除 `*.dump` / `*.out` / `states/` 目录，避免旧轨迹污染本轮 TLC。实测 TLC 2.19 产物落在 `states/<YY-MM-DD-HH-MM-SS>/` 下（含 `<Module>.st` / `<Module>-0.st` 状态文件与 `<Module>_0.fp` / `<Module>_1.fp` 指纹文件），默认不产生 `.dump` / `.out`。
 8. **SANY 语法检查**（设计文档 §3.1 步骤 6，硬约束顺序；cwd 置为 `.tla` 所在目录）：`java -cp <jarPath> tla2sany.SANY <spec>.tla`，捕获 stdout。实测退出码 **0=成功 / 11=语法错误**（输出走 stdout，含 `Fatal errors while parsing` 等错误消息）。语法失败 → `syntaxErrors++`，**跳过该 spec 的 TLC**（反模式 #14 守护），该 spec 标 `syntaxChecked=false`。
-9. **TLC 模型检查**（仅 SANY 通过时；[21.0.0] 移除 skip-tlc 选项；cwd 置为 `.tla` 所在目录）：`java -cp <jarPath> tlc2.TLC -nowarning -cleanup -config <spec>.cfg <moduleName>`，捕获 stdout。
+9. **TLC 模型检查**（仅 SANY 通过时，无 skip-tlc 选项；cwd 置为 `.tla` 所在目录）：`java -cp <jarPath> tlc2.TLC -nowarning -cleanup -config <spec>.cfg <moduleName>`，捕获 stdout。
    - `-nowarning`：抑制 GC 建议警告（输出更干净）。
    - `-cleanup`：TLC 自身在运行前清理 `states/` 目录（与步骤 7 互补，双保险）。
    - `<moduleName>` 为 `.tla` 文件名去后缀（如 `L1_blog_system.tla` → `L1_blog_system`），**非** `.tla` 路径。

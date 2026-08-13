@@ -1,7 +1,7 @@
 /**
  * checkpoint-logic.test.ts —— R3 强制用户确认单元测试
  *
- * 覆盖 checkpoint-logic.ts 中 [21.0.0] R3 强化逻辑：
+ * 覆盖 checkpoint-logic.ts 中 R3 强化逻辑：
  *   - 未提供 checkpointLog → 所有 checkpoint 报 R3 违规
  *   - checkpointLog 含真实用户确认 → R3 通过
  *   - checkpointLog 提供但对应 phase 缺确认 → R3 违规（疑似代签）
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 
-describe('[21.0.0] R3 强制用户确认', () => {
+describe('R3 强制用户确认', () => {
   const checkpointEntry = {
     runId: 'cp1',
     timestamp: '2026-07-10T04:00:00Z',

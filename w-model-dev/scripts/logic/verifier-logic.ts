@@ -23,12 +23,12 @@ import { validateBySchema } from './schema-loader.js';
 // ==================== 自包含类型形状 ====================
 
 /**
- * P2.5（第 9 轮）targetKind 枚举标准化：
+ * P2.5 targetKind 枚举标准化：
  *   - 'requirement' : phase 1 需求规格
  *   - 'design'      : phase 2/3/4 系统/接口/详细设计
  *   - 'code'        : phase 5 源代码（原 'file' 已废弃）
  *   - 'test'        : phase 6/7/8 集成/系统/验收测试（原 'testcase' 已废弃）
- *   - 'rootcause'   : 返工循环 V 复审根因报告（§7.5 子标准集合；第 41.8.0 轮补全入枚举，
+ *   - 'rootcause'   : 返工循环 V 复审根因报告（§7.5 子标准集合，
  *                     与 verifier-spec §2.2 / §7.5、dispatch-matrix §4、反模式 #19 检测信号对齐）
  */
 export type TargetKind = 'requirement' | 'design' | 'code' | 'test' | 'rootcause';
@@ -102,7 +102,7 @@ export const SUB_CRITERIA: Record<TargetKind, Array<{ name: string; weight: numb
     { name: 'maintainability', weight: 0.15 },
     { name: 'conformance', weight: 0.2 },
   ],
-  // V 复审根因报告（verifier-spec §7.5；第 41.8.0 轮补全，此前文档定义但脚本未校验）
+  // V 复审根因报告（verifier-spec §7.5）
   rootcause: [
     { name: 'correctness', weight: 0.25 },
     { name: 'completeness', weight: 0.25 },
@@ -142,7 +142,7 @@ const MIN_TEMPERATURE = 1e-6;
 const MAX_TEMPERATURE = 100;
 const MIN_RANKING_ROUNDS = 1;
 
-/** R13（第 26 轮）单轴下限：任一子标准得分低于此值 → passed=false。
+/** R13 单轴下限：任一子标准得分低于此值 → passed=false。
  *  阈值 = qualityLevel B 级分界（§6.1），语义自洽：passed 原判据为「加权平均 ≥ B」，
  *  收紧为「每个子标准自身 ≥ B」。防止加权平均掩盖单轴失败（反模式 #41）。 */
 const SINGLE_AXIS_MIN_SCORE = 0.7;
@@ -173,7 +173,7 @@ export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): str
 }
 
 /**
- * R13（第 26 轮）单轴下限校验（反模式 #41 加权平均掩盖单轴失败）。
+ * R13 单轴下限校验（反模式 #41 加权平均掩盖单轴失败）。
  * 防止 compositeScore 加权平均 ≥0.70 放行时，存在子标准低于 B 级（<0.70）被其余高分掩盖。
  * 返回低于下限的子标准违规列表；空数组 = 全部子标准 ≥ 下限。
  */
@@ -224,7 +224,7 @@ export function determineQualityLevel(score: number): QualityLevel {
   return 'D';
 }
 
-// ==================== [21.0.0] evidence 格式校验 ====================
+// ==================== evidence 格式校验 ====================
 
 /**
  * evidence 格式正则（format-conventions.md §2.1）：
@@ -272,7 +272,7 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
  *   6. 综合分数 = Σ(score * weight)，与输出 compositeScore 误差 ≤ EPSILON
  *   7. 证据格式校验（O3 空泛声明→compositeScore -0.1，再判定 qualityLevel/passed）
  *   8. qualityLevel 与降级后综合分数映射一致（§6.1），evidence 扣分后重新判定
- *   9. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限，第 26 轮）
+ *   9. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限）
  *  10. passed=false 时 reworkHints 必须非空数组
  *  11. ranking（可选）字段类型合法
  */
@@ -324,7 +324,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   }
 
   const targetKind = meta.targetKind as string;
-  // P2.5（第 9 轮）targetKind 枚举标准化：'testcase'/'file' 已废弃；'rootcause' 第 41.8.0 轮补全（§7.5）
+  // P2.5 targetKind 枚举标准化：'testcase'/'file' 已废弃；'rootcause' 用于返工循环 V 复审根因报告（§7.5）
   const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test', 'rootcause'];
   if (!allowedKinds.includes(targetKind as TargetKind)) {
     reasons.push(
@@ -447,7 +447,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
       }
     }
 
-    // P3.10（第 9 轮）rawScores 完美等差数列（公差 0.01）检测。
+    // P3.10 rawScores 完美等差数列（公差 0.01）检测。
     // 仅 text-parse 模式执行：text-parse 来源于文本解析，不应形成完美等差数列；
     // logits 模式天然可能产生等差分布（如 [0.89,0.90,0.91]），故豁免。
     if (scoringMethod === 'text-parse' && Array.isArray(sc.rawScores) && sc.rawScores.length >= 3) {
@@ -540,7 +540,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
     }
   }
 
-  // 6. qualityLevel — 基于证据扣分后的 compositeScore 重新判定（round28 G-B B11）
+  // 6. qualityLevel — 基于证据扣分后的 compositeScore 重新判定
   let qualityLevel = o.qualityLevel;
   const allowedLevels: QualityLevel[] = ['A', 'B', 'C', 'D'];
   if (!allowedLevels.includes(qualityLevel as QualityLevel)) {
@@ -557,7 +557,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   }
 
   // 7. passed
-  // R13（第 26 轮）：单轴下限。qualityLevel 由证据扣分后的 compositeScore 映射（§6.1），
+  // R13：单轴下限。qualityLevel 由证据扣分后的 compositeScore 映射（§6.1），
   // passed 判定收紧为「加权平均 ≥ B 且每个子标准得分 ≥ 0.70（B 级分界）」。
   // 防止加权平均掩盖单轴失败（反模式 #41）。
   const passed = o.passed;

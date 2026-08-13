@@ -24,7 +24,7 @@
 - **性能测试脚本生成**：负载 / 压力 / 稳定性
 - **安全漏洞检测**：常见攻击向量扫描
 
-## 第 25 轮新增：opsx 三段式 S 分派 + codegraph 影响分析
+## opsx 三段式 S 分派 + codegraph 影响分析
 
 > 本阶段（系统测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
 
@@ -117,7 +117,7 @@ S-test 子代理执行 `npx cucumber-js features/L2/` 运行所有 scenarios：
 | 4 | 跳过兼容性测试矩阵 | ST-004 必须覆盖 Chrome/Firefox/Safari/Edge + 移动端 |
 | 5 | 可靠性测试只跑 1 小时 | ST-005 必须持续 ≥ 24h 才能判定内存泄漏 |
 | 6 | 把质量门退出码 1/2 当警告忽略 | 退出码 1/2 一律回编码，禁止放行 |
-| 7 | 系统测试未覆盖跨模块数据流校验 / 角色越权检测 / 副作用时序一致性检测 | 系统测试用例须包含：(1) **跨模块数据流用例**（验证 store 选择与 schema 一致，详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节）；(2) **角色越权用例**（验证 `reader` 不能调用 `blogger-only` 端点，应返回 403，详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节）；(3) **副作用时序用例**（验证响应体字段反映已生效状态，详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节）。第 16 轮 P3.4 新增（预防 P7-001~P7-004 类缺陷） |
+| 7 | 系统测试未覆盖跨模块数据流校验 / 角色越权检测 / 副作用时序一致性检测 | 系统测试用例须包含：(1) **跨模块数据流用例**（验证 store 选择与 schema 一致，详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节）；(2) **角色越权用例**（验证 `reader` 不能调用 `blogger-only` 端点，应返回 403，详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节）；(3) **副作用时序用例**（验证响应体字段反映已生效状态，详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节）。（预防 P7-001~P7-004 类缺陷） |
 
 ## 返工路径
 

@@ -136,7 +136,7 @@ export async function readJsonlOptional(file: string, label = '行'): Promise<un
 
 /**
  * 读取可选 JSON 附属输入，失败时按标准三分支分类并 exitWithError（stdout ERROR_JSON）。
- * 收敛 check-requirement-coverage / check-requirement-graph 等「损坏→ERROR_JSON」调用点样板。
+ * check-requirement-coverage / check-requirement-graph 等「损坏→ERROR_JSON」调用点样板。
  * 三分支语义与调用点现状精确一致：
  *   - ENOENT → exitWithError(FILE_NOT_FOUND)（exit 2，不降级跳过）
  *   - SyntaxError → exitWithError(FILE_PARSE)（exit 2）

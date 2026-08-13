@@ -82,8 +82,7 @@ const BLACKLIST = new Set<string>(['确认放行', '继续', '通过', 'OK', 'ye
  *   - 长度 < 10 → 报长度违规（同条决策不再重复报名词）
  *   - 无 ID_PATTERN 命中 且 无 TECH_KEYWORD 命中 → 报名词违规
  *
- * 当前集合（共 5 个 ID 模式 + 37 个技术关键词：16 个英文 + 21 个中文）由第 16 轮 P4.1 补充注释。
- * 来源：第 15 轮调测共性问题 C（acknowledgedDecisions 多次因未含 ID/关键词返工）。
+ * 当前集合（共 5 个 ID 模式 + 37 个技术关键词：16 个英文 + 21 个中文）。
  */
 // 具体名词识别：ID 模式（满足任一即通过）
 const ID_PATTERNS: RegExp[] = [/REQ-\d+/, /SD-[\d.]+/, /INTF-[\d.]+/, /DD-[\d.]+/, /TC-\w+-\d+/];
@@ -243,11 +242,11 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
     }
   }
 
-  // R3 用户确认存在（[21.0.0] 强化：强制校验，拒绝代签）
+  // R3 用户确认存在（强制校验，拒绝代签）
   if (!options?.checkpointLog) {
-    // [21.0.0] 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规
+    // 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规
     for (const e of checkpoints) {
-      violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（未提供 --checkpoint-log，[21.0.0] 强制）`);
+      violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（未提供 --checkpoint-log，强制）`);
     }
   } else {
     for (const e of checkpoints) {

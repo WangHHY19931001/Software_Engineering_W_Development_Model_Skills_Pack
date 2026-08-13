@@ -58,11 +58,11 @@ const PREVENTIVE_REVIEW_JSON = {
 };
 
 /**
- * 第29轮：根据 variant 构造 R3 报告文件名前缀。
+ * 根据 variant 构造 R3 报告文件名前缀。
  *   - standard → `<phase>-{dim}.json`
  *   - fix      → `<phase>-fix-{dim}.json`        （S-fix 返工后 R3）
  *   - emergency→ `<phase>-emergency-{dim}.json`  （S-emergency-fix 后 R3）
- *   - ingest   → `<phase>-ingest-{dim}.json`     （S-ingest-tla / S-ingest-bdd 后 R3，第 41.8.0 轮补全）
+ *   - ingest   → `<phase>-ingest-{dim}.json`     （S-ingest-tla / S-ingest-bdd 后 R3）
  */
 function reportFilePrefix(phase: number, variant: NonNullable<PreventiveReviewOptions['variant']>): string {
   switch (variant) {
@@ -154,7 +154,7 @@ async function main(): Promise<void> {
     }
     // 取最后一条 checkpoint success 记录的 phase 作为当前阶段
     let lastPhase = 0;
-    // 第29轮：扫描 run-log 推断 S 变体（最近一条 fix/emergency-fix 决定 variant）
+    // 扫描 run-log 推断 S 变体（最近一条 fix/emergency-fix 决定 variant）
     let inferredVariant: PreventiveReviewOptions['variant'] = 'standard';
     let lastSAction: string | null = null;
     for (const entryRaw of entries) {
