@@ -26,7 +26,7 @@
 - **单元测试用例生成**：将设计用例转为可执行测试
 - **测试执行与报告生成**：运行测试、统计覆盖率
 
-## 任务分配规则：产品化 vs 系统集成（第 39 轮吸收）
+## 任务分配规则：产品化 vs 系统集成
 
 > 吸收自《agent 时代的人月神话》第 1 章「九倍矩阵」：9x = 3x（产品化）× 3x（系统集成）。
 
@@ -34,7 +34,7 @@
 - **系统集成类判断**（判据住大系统处境里，agent 不擅长）：对接外部系统、生产环境适配、跨模块契约裁决、版本兼容决策 → 必须由人/主刀持有，不得外包给 agent。
 - 完成度判定："agent 跑通了"只证明左下角（1x 一次性脚本）；交付到右上角（可依赖构件产品）须产品化轴与系统集成轴逐项自检（见 [definition-of-done.md](definition-of-done.md)「完成度矩阵自检」）。
 
-## 增量集成纪律（第 39 轮 P1 批吸收）
+## 增量集成纪律
 
 > 吸收自《agent 时代的人月神话》第 11/13 章：修复引入新 bug 概率 20-50%（agent 时代只高不低）；大而稀的整体重写让"这次改了什么"在结构上不可问。
 
@@ -64,7 +64,7 @@
 输出: 可运行代码 + 单元测试 + 覆盖率报告
 ```
 
-## codegraph 修改前影响分析（第 25 轮新增）
+## codegraph 修改前影响分析
 
 > 对应约束 #14 + 反模式 #38。阶段 5 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
 
@@ -77,9 +77,9 @@
 
 **与 code-TLA+ 一致性校验的关系**：codegraph = 修改前预防，code-TLA+ = 修改后回归，互补不冲突。
 
-## OpenSpec opsx 三段式 S 分派（第 25 轮新增）
+## OpenSpec opsx 三段式 S 分派
 
-> 对应 SSoT §3.4.21。阶段 5-8 引入 opsx 工作流做规格级规划，与 S-tickets（代码级切片）共存。
+> 阶段 5-8 引入 opsx 工作流做规格级规划，与 S-tickets（代码级切片）共存。
 
 **三段式分派**：
 ```
@@ -95,7 +95,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 **每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，不合格打回重做（反模式 #39）。
 
-## Tracer-bullet 票据拆解（第 10 轮外部技能吸收）
+## Tracer-bullet 票据拆解
 
 > 吸收 to-tickets tracer-bullet 垂直切片 + blocking edges + wide refactor expand-contract 方法论。S 子代理编码前兼任 S-tickets 角色，产出 `tickets.md` 作为 S-coding 执行单元。
 
@@ -108,7 +108,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 - S-tickets 由 S 子代理兼任（不新增角色）
 - S-tickets 产出 `tickets.md`（位于 `.w-model/tickets.md` 或 `docs/tickets.md`，由用户选择）
-- S-tickets 必须在 S-coding 前完成，V/G 不单独评审 tickets.md（合并到阶段 5 V/G 评审）（第25轮更新：启用 opsx 三段式分派时，S-propose 段的 tickets.md 须按三段式 R3×3 + V 审查执行，见上方「OpenSpec opsx 三段式 S 分派」节；未启用 opsx 时本规则仍适用。）
+- S-tickets 必须在 S-coding 前完成，V/G 不单独评审 tickets.md（合并到阶段 5 V/G 评审）
 
 ### 票据清单模板
 
@@ -158,7 +158,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - 例外：prototype 产出的决策密集片段（状态机/reducer/schema/type shape）可内联，标注来源
 - 验收标准与 RTM `unitTest` 字段对应（每张票据 ≥1 单元测试）
 
-### 票据内容 durability（第 26 轮外部技能吸收）
+### 票据内容 durability
 
 > 对应外部 implement-* 系列 SKILL.md 的 Agent Brief durability 原则：票据主体是**符号级契约**（接口 / 类型 / 行为），不是**文件路径 / 行号**（fragile reference，重构即失效）。
 
@@ -176,7 +176,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - 票据 ID（NN）不写入 RTM（RTM 保持现有 schema，不污染数据模型）
 - 票据的 Next 分支实现必须与 TLA+ Action 名对应（与约束"TLA+ Next 分支 PascalCase ↔ code camelCase"协同）
 
-### 票据动态重排规则（第 40 轮三源吸收）
+### 票据动态重排规则
 
 > 吸收自 Agentic Design Patterns ch20「动态重新优先级」：根据新事件/截止日期动态重排任务优先级。
 
@@ -226,7 +226,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 > 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）。
 > 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1，violation 明确指出回填时机。
 
-### codeModule 格式规范（第22轮 P0-2 修正）
+### codeModule 格式规范
 
 `codeModule` 字段须按以下格式填写，由 `check-artifact-gate.ts --phase=5` 强制校验：
 
@@ -242,7 +242,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - CON 行（`requirementId` 以 `CON-` 开头）：同 NFR
 - 格式不匹配 → check-artifact-gate.ts 退出码 1，reasons 列出具体 requirementId
 
-### NFR/CON codeModule 回填（第 9 轮 P1.2）
+### NFR/CON codeModule 回填
 
 > NFR（非功能需求）与 CON（技术约束）行的 `codeModule` 字段在阶段 5 须回填。与 [phase-1-requirements.md](phase-1-requirements.md)「NFR/CON 横切治理字段登记」节配套：阶段 1 已登记 `designDoc`（横切关系），阶段 5 闭环到代码层。
 
@@ -262,7 +262,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 > 与阶段 1 的衔接：阶段 1 已登记 `NFR/CON.designDoc`（横切 SD 清单或 `"横切"`），阶段 5 须保证 `codeModule` 与 `designDoc` 横切关系一致——若 `designDoc="横切"` 而 `codeModule` 只指向单个文件，V 子代理评审时应提示「横切范围与代码实现不匹配」（可选 reworkHint，非阻断）。
 
-## 跨平台环境变量设置（第22轮 P3-9 修正）
+## 跨平台环境变量设置
 
 Windows PowerShell 下 `cross-env` 可能失效。推荐方案：
 
@@ -344,8 +344,8 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 | 4 | 用 `// eslint-disable` 绕过规范检查 | 修复违规源，禁止整文件 disable |
 | 5 | 覆盖率不达标时调低阈值放行 | 阈值固定 ≥ 80%，不达标必须补测试 |
 | 6 | 伪造实现（TODO/stub）当完成 | 缺失依赖必须暂停标注，不得伪造业务逻辑 |
-| 7 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色） | 路由层或控制器入口必须显式校验 `requiredRole`，与需求/设计中的角色枚举一致；token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden。详见下方「角色校验清单」节（第 16 轮 P3.1，预防 P7-001 类缺陷） |
-| 8 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值） | 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成；响应体字段须反映已生效的状态。详见下方「副作用时序一致性清单」节（第 16 轮 P3.3，预防 P7-004 类缺陷） |
+| 7 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色） | 路由层或控制器入口必须显式校验 `requiredRole`，与需求/设计中的角色枚举一致；token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden。详见下方「角色校验清单」节 |
+| 8 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值） | 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成；响应体字段须反映已生效的状态。详见下方「副作用时序一致性清单」节 |
 | 9 | 复制粘贴重复代码段 | 须提炼函数/类消除重复（坏味道清单 #1，第 40 轮吸收） |
 | 10 | 单函数超 ~40 行不拆分 | 按单一职责拆分，保持函数短小（坏味道清单 #2） |
 | 11 | 使用布尔标记参数 | 拆分为两个意图明确的函数或枚举参数（坏味道清单 #4） |
@@ -375,7 +375,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 
 违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](anti-patterns.md)。
 
-## 断言规范（第 40 轮三源吸收）
+## 断言规范
 
 > 吸收自《重构 2》ch10.6「引入断言」：断言标注"必须为真"的假设，失败表示程序员错误，不应被捕获。
 
@@ -383,7 +383,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - **外部输入用一等校验**：用户输入/外部服务数据须显式校验并返回错误，不得用断言代替（断言失败 = 崩溃，不适合用户输入）。
 - **断言失败不捕获**：断言表示代码错误，捕获即掩盖；禁止 `try { assert(...) } catch {}`。
 
-## 重构纪律（第 40 轮三源吸收）
+## 重构纪律
 
 > 吸收自《重构 2》ch2：两顶帽子 / 三次法则 / 何时不该重构。
 
@@ -392,7 +392,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - **何时不该重构**：① 代码凌乱但无需修改且可藏在接口后 → 不动；② 重写比重构容易 → 重写（但须先建测试基线）。
 - **营地法则边界**：顺手的小清理限本次改动触及的代码半径内（与操作行为 #5 划界）；大清理记便笺另立票据。
 
-## 改动前测试基线（第 40 轮三源吸收）
+## 改动前测试基线
 
 > 吸收自《代码整洁之道》ch16：重构遗留/不熟代码前先跑覆盖率工具测基线（案例 50%→92%），自己写独立测试补足，再动手改。
 
@@ -400,7 +400,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - **缺口先补**：基线覆盖率低的模块，先补关键路径测试再动手，避免改动后无法区分"新 bug vs 旧债"。
 - **与约束 #14 的关系**：约束 #14 管"改动后必跑回归"，本节补"改动前基线"形成闭环。
 
-## 第三方代码边界管理（第 40 轮三源吸收）
+## 第三方代码边界管理
 
 > 吸收自《代码整洁之道》ch8「边界」。
 
@@ -408,7 +408,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - **学习性测试**：用测试学习第三方 API 行为；在库升级时自动检测行为变化（写入 phase-6 集成测试对第三方依赖执行）。
 - **使用尚不存在的代码**：接口契约未定时先定义"我想要的接口"+ ADAPTER 桥接，测试用 Fake，待真实实现就绪再替换。
 
-## 静态检查工具接入（第 40 轮三源吸收）
+## 静态检查工具接入
 
 > 用户确认：代码坏味道/并发无法用脚本可靠检查，须用"特定开发语言的静态检查工具 + LLM 语义理解"双轨。
 

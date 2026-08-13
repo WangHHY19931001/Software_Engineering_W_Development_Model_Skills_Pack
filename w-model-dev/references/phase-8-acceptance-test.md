@@ -25,7 +25,7 @@
 
 ## 第 25 轮新增：opsx 三段式 S 分派 + codegraph 影响分析
 
-> 对应 SSoT §3.4.21。本阶段（验收测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
+> 本阶段（验收测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
 
 **三段式分派**（与阶段 5 一致）：
 - S-explore：opsx:explore 探索测试策略 + codegraph 查被测模块影响
@@ -81,17 +81,17 @@
 2. 阶段5编码后回填实际路径列 + 映射类型
 3. 阶段8验收测试编写时按此表映射，禁止凭主观判断
 
-### 强制校验说明（第22轮 P0-1 修正）
+### 强制校验说明
 
 `docs/uat-path-mapping.md` 为阶段1强制产出，阶段5回填实际路径，阶段8验收时校验完整性。
 
 **校验规则**（由 `check-artifact-gate.ts` 执行）：
 - phase=1：校验 `docs/uat-path-mapping.md` 文件存在性
 - phase=5：校验每条 UAT-NNN 的「实际路径」列非 `_待阶段5回填_`，且 `mappingType` ∈ `["直接","等价","替代"]`
-- phase=8：终检校验所有 UAT-NNN 的映射行格式完整（≥4 列），缺失或格式不符 → 退出码 1，reasons 列出违规行详情（第 28 轮新增）
+- phase=8：终检校验所有 UAT-NNN 的映射行格式完整（≥4 列），缺失或格式不符 → 退出码 1，reasons 列出违规行详情
 - 缺失文件或未回填项 → 退出码 1，reasons 列出具体 UAT ID
 
-### demo 范围 N/A 标记要求（第22轮 P1-3 修正）
+### demo 范围 N/A 标记要求
 
 验收测试设计的 N/A 用例须：
 - 与阶段1 Out of Scope 声明一致
@@ -117,7 +117,7 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中核验：所有需求 → 设计 → 代码 → 单元 / 集成 / 系统 / 验收测试均建立映射，RTM 需求覆盖率 100%。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
-**门禁脚本 stdout 贴出要求**（第24轮新增）：
+**门禁脚本 stdout 贴出要求**：
 - 编排者须贴出 `check-artifact-gate.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` / `check-bdd-model.ts` / `check-role-dispatch.ts` 等门禁脚本 stdout 末尾 5 行作为放行证据
 - 不得仅引用 JSON 摘要中的 `passed: true` 作为放行依据
 - 违反命中反模式 #27 S2（门禁脚本未实跑）
@@ -244,7 +244,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - 实现缺陷 → 回阶段 5（编码）
 - 测试覆盖不足 → 回对应测试阶段（6/7）
 
-## Archive 机制（第 10 轮外部技能吸收）
+## Archive 机制
 
 > 吸收 OpenSpec archive 机制。项目级放行后，S 子代理执行 archive，沉淀产物到只读目录。
 

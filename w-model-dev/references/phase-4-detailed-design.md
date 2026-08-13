@@ -10,7 +10,7 @@
 ## 详细设计算法
 
   1. 类设计
-     ├─ **备选方案对比（第 41 轮吸收，APoSD ch11）**：每个关键类/接口先产出 ≥2 个差异较大的备选签名草案 + 一行优缺点，写入 class-design.md「方案权衡」列；"聪明人一次做对"是幻觉
+     ├─ **备选方案对比**：每个关键类/接口先产出 ≥2 个差异较大的备选签名草案 + 一行优缺点，写入 class-design.md「方案权衡」列；"聪明人一次做对"是幻觉
      ├─ 基于概要设计接口契约，产出 docs/phase4-detailed/{module}-class-design.md（类图 + 类定义 + 方法级定义 + 类状态机 + 方案权衡）
      ├─ 主文档 §1 引用块指向 class-design.md
      ├─ 失败: 方法定义缺前置/后置/异常 → 回步骤 1（FM-DD-02）
@@ -24,17 +24,17 @@
      ├─ 每个设计项声明装配点（中间件链位置等）与测试 seam（HTTP 层/独立实例/白盒）
      ├─ 失败: 装配点空但 seam 为 HTTP 层 → 回步骤 3（FM-DD-05）
      └─ 成功: 装配点与 seam 一致性成立
-  4. 术语建模（第 38 轮新增）
+  4. 术语建模
      ├─ 产出 docs/phase4-detailed/{module}-glossary.md（详细设计域术语子集）
      ├─ 主模板 §4 引用块指向 glossary.md
      └─ 成功: glossary.md 产出，引用块成立
-  5. 追踪矩阵与行为规格引用（第 38 轮新增）
+  5. 追踪矩阵与行为规格引用
      ├─ 产出 docs/phase4-detailed/{module}-traceability-matrix.md（DD×INTF 8 字段 + 测试层级矩阵）
      ├─ 产出 docs/phase4-detailed/{module}-behavior-spec.md（L4 .feature 引用关系）
      ├─ 主模板 §5/§6 引用块指向上述独立文件
      ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 回步骤 5 对齐（FM-DD-04）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
-  6. Phase 4 工程纪律与 DoD（第 38 轮新增）
+  6. Phase 4 工程纪律与 DoD
      ├─ 产出 docs/phase4-detailed/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
      ├─ 主模板 §7 引用块指向 discipline-dod.md
      └─ 成功: DoD 清单产出，引用块成立
@@ -51,7 +51,7 @@
   - 数据库设计（ER 图、表结构、索引设计）
   - 方法级定义（签名、职责、前置 / 后置条件）
 - 单元测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=单元测试）
-- 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase4-detailed/`，带 `{module}-` 前缀）：
+- 独立产物文件：
   - `{module}-class-design.md`：类设计（类图 + 类定义 + 方法级定义 + 类状态机 + 方案权衡）
   - `{module}-data-model.md`：数据模型（ER 图 + 表结构 + 索引 + store 归属）
   - `{module}-glossary.md`：术语表（详细设计域子集）
@@ -95,7 +95,7 @@
 | TC-DES-002 | 类图生成 | 详细需求描述 | 符合 UML 规范的类图 | 高 |
 | TC-DES-003 | 数据库设计 | 数据需求 | ER 图、表结构定义、索引设计 | 高 |
 
-## 测试 seam 决策（第 10 轮外部技能吸收）
+## 测试 seam 决策
 
 > 吸收 to-spec seam-first testing 方法论。原子单元级 seam 决策服务于阶段 5 单元测试设计（同步产物），与现有「测试用例生成算法」互补。
 
@@ -122,11 +122,11 @@
 - 私有状态机/内部转移的测试通过 TLA+ 不变式断言覆盖（与约束 13 TLA+ 行为门禁协同），不在代码层引入测试 seam
 - 必须显式引用阶段 3 选定 seam
 
-## 类设计规则引用（第 40 轮三源吸收）
+## 类设计规则引用
 
 详细设计阶段的类划分须遵循 [quality-standards.md](quality-standards.md)「类设计规则」小节：25 词职责测试、SRP/OCP/DIP、类名警报、内聚性。类设计不满足时回改设计再进入编码。
 
-### 信息隐藏检查（第 41 轮四源吸收，APoSD ch5）
+### 信息隐藏检查
 
 每个类设计时回答两个问题，答案记录在 class-design.md 类定义「职责」列旁：
 1. **本类封装了什么知识（设计决策）？**
@@ -134,13 +134,13 @@
 
 修复：合并受影响类，或提取新类封装该知识。
 
-### 下沉复杂性检查（第 41 轮四源吸收，APoSD ch8）
+### 下沉复杂性检查
 
 每个暴露的配置参数/异常回答："用户能比我们确定更好的值吗？"
 - 不能 → 自动计算 + 合理默认值，不暴露参数（"把难题推给用户 = 偷懒"）。
 - 必须暴露 → 提供自动计算默认值，并下沉实现复杂性（接口简单比实现简单更重要）。
 
-### 异常策略三选项（第 41 轮四源吸收，APoSD ch10）
+### 异常策略三选项
 
 每个方法定义的「异常」列先过此审查（对应 class-design 模板「异常」列提示）：
 1. **规避**（首选）：能否通过语义重定义消除异常？（unset→确保变量不存在、substring 越界→截断）；异常是接口一部分，异常多 = 接口浅。
@@ -149,7 +149,7 @@
 
 崩溃是最后手段：仅内存不足等场景，须人工判定、默认不采用（W 模型强调错误处理完备性）。
 
-## 对象/数据结构设计引用（第 40 轮三源吸收）
+## 对象/数据结构设计引用
 
 详细设计阶段的对象/数据结构划分须遵循「对象/数据结构与得墨忒耳律」原则：遵守得墨忒耳律、数据抽象、避免混合结构、DTO 不塞业务规则。
 
@@ -168,7 +168,7 @@ S-bdd 子代理在 S-doc 产出详细设计后：
 V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=4` 校验 D1-D8。
 
-## 设计项→装配点→测试 seam 三者一致性（第22轮 P1-5 修正）
+## 设计项→装配点→测试 seam 三者一致性
 
 每个设计项（如 DD-026 RateLimitMiddleware）须声明：
 - **装配点**：中间件链位置（如 `app.use('/api/', rateLimitMiddleware)`）
@@ -178,7 +178,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - 若装配点为空但测试 seam 为 HTTP 层 → R3 可靠性审查标注 finding
 - 设计项须在详细设计文档中显式声明装配点和测试 seam
 
-## 字段命名业务语义对齐（第22轮 P1-4 修正，同步 phase-3）
+## 字段命名业务语义对齐
 
 详细设计文档中的字段命名须与 phase-3 概要设计保持一致。若因技术约束无法对齐，须在「Implementation Decisions」节说明字段映射。
 
@@ -197,7 +197,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 **断言格式约束**：每个用例必须含 `expect()` 或等价断言，禁止 `// TODO: assert` 占位。
 **边界条件必覆盖清单**：空输入、null、极值（MAX/MIN）、越界（±1）、类型不符、并发竞态（若涉及共享状态）。
 
-## 失败模式矩阵（第 38 轮新增）
+## 失败模式矩阵
 
 | 编号 | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|

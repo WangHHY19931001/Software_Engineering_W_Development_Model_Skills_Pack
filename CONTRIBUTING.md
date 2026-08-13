@@ -57,7 +57,7 @@ git checkout -b fix/issue-xxx
 # 3.1 单元测试（vitest，35 个 test 文件 / 571 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
-# 3.2 自检基线（samples/ 目录下 249 条样本，覆盖全部 check 脚本的通过 / 失败路径）
+# 3.2 自检基线（samples/ 目录下 252 条样本，覆盖全部 check 脚本的通过 / 失败路径）
 npm run self-test
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
 # 新增校验项时，必须同步增加 samples/ 下通过 / 失败各一条样本并在 self-test.ts 中声明期望
@@ -78,11 +78,11 @@ npm run format
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑与原 CI 一致的 14 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑 15 项检查；任一退出码不符预期即中止推送：
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（249 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（252 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
@@ -96,6 +96,7 @@ npm run format
 | 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；35 files / 571 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 | 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
+| 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
 
 **启用方式**：克隆后首次 `npm install` 即自动启用（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时，失败仅 warn 不阻断 install）。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -160,7 +161,7 @@ git push --no-verify
 **提交流程**：
 
 1. 创建分支（见上文「1. 创建分支」）
-2. 本地验证：`npm run prepush`（14 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
+2. 本地验证：`npm run prepush`（15 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
 3. 按上述格式提交
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
@@ -177,7 +178,7 @@ refactor(skill): /wm review 编排指引精简
 - PR 标题遵循 Conventional Commits 格式（同提交信息：`<type>(<scope>): <summary>`）
 - PR 描述使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板，说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
 - 关联相关 issue（如 `Closes #5`）
-- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（14 项门禁）验证，合入前请确保本地已通过
+- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（15 项门禁）验证，合入前请确保本地已通过
 
 ## 文档维护规则
 
@@ -208,14 +209,14 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── security-scan.ts           # eslint-plugin-security 扫描 + baseline v2 指纹豁免
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
-│   ├── self-test.ts               # 校验逻辑自检（249 条样本，samples/ 驱动）
+│   ├── self-test.ts               # 校验逻辑自检（252 条样本，samples/ 驱动）
 │   ├── __tests__/                 # vitest 单元测试（35 个 .test.ts / 571 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例
 └── skill-metadata.json # 版本号镜像（与 SKILL.md frontmatter 双写）
 docs/                   # 设计文档统一存放（SSoT、集成设计、安装指南等）
-└── changes/archive/    # 历史端到端调测归档（按时间倒序，最新：2026-07-30-round23-w-model-8-phase-validation/）
+└── changes/archive/    # 端到端调测归档（按时间倒序）
 ```
 
 > 本仓库不包含 `src/` TypeScript 引擎或业务 `tests/` 套件；`w-model-dev/scripts/__tests__/` 是技能脚本自身的单元测试，与 W 模型编排产出的四级测试（单元/集成/系统/验收）无关。

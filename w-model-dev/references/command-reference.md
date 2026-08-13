@@ -157,7 +157,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 4. 确认后编排者（O）原子写入 `project.json` 与 `rtm.json`，刷新 `updatedAt`。
 5. 输出项目名、阶段、需求数、测试用例数和 RTM 覆盖率。
 
-## 错误码与 ERROR_JSON 约定（第 32 轮统一）
+## 错误码与 ERROR_JSON 约定
 
 所有 check-*.ts 与工具脚本的 **输入错误（exit 2）** 输出统一结构：
 

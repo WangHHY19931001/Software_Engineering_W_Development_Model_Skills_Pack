@@ -1,10 +1,10 @@
 # 术语表（Glossary）
 
-> **权威定义入口（第 26 轮新增）**：本文件为 W-Model skill 包核心术语的**单一权威定义**。
+> **权威定义入口**：本文件为 W-Model skill 包核心术语的**单一权威定义**。
 > 各参考文档定义与本节冲突时，以本节为准（SSoT 例外——SSoT §7 数据模型 schema 为结构权威，本节为语义权威）。
 > 每条含「规范定义 + `_Avoid_` 指令」（禁用别名 / 易混词），防止术语同义异写。
 >
-> 来源：外部 domain-modeling/CONTEXT-FORMAT.md 的 GLOSSARY + `_Avoid_` 治理实践（第 26 轮吸收）。
+> 来源：外部 domain-modeling/CONTEXT-FORMAT.md 的 GLOSSARY + `_Avoid_` 治理实践。
 
 ## 1. 评审相关
 
@@ -20,7 +20,7 @@
 
 ### passed
 
-- **规范定义**：阶段门通过判定布尔值。`passed = (qualityLevel === 'A' || 'B') && 所有 subCriterion.score >= 0.70`（第 26 轮 R13 单轴下限，反模式 #41）。
+- **规范定义**：阶段门通过判定布尔值。`passed = (qualityLevel === 'A' || 'B') && 所有 subCriterion.score >= 0.70`。
 - **_Avoid_**：是否通过/通过与否/approved/accepted（产物字段名必须为「passed」）。
 
 ### 单轴下限（R13）
@@ -53,11 +53,11 @@
 ### checkRounds
 
 - **规范定义**：tla-manifest.json 中 **spec 级** 返工记录（每次 TLA+ spec 因门禁失败返工的记录项），非 phase 级摘要；无返工时为空数组。
-- **_Avoid_**：phase 级摘要/轮次记录/检查轮数（第 15 轮遗留 bug 即因把 phase 级摘要写入 checkRounds 触发 R13 拦截；见 tla-plus-guide.md）。
+- **_Avoid_**：phase 级摘要/轮次记录/检查轮数。
 
 ### coverageStatus
 
-- **规范定义**：RTM 行覆盖状态（`covered` / `partial` / `not-covered`），与 `coveragePercent` 数值须一致（第 24 轮硬校验）。
+- **规范定义**：RTM 行覆盖状态（`covered` / `partial` / `not-covered`），与 `coveragePercent` 数值须一致。
 - **_Avoid_**：状态/status（「status」字段在 project.json 等其它上下文使用，RTM 行必须用「coverageStatus」）。
 
 ### acknowledgedDecisions
@@ -69,7 +69,7 @@
 
 ### codeModule
 
-- **规范定义**：代码模块映射标识，格式 `SD-xxx:src/path.ts`（SD 概要设计 ID + 冒号 + 相对项目根的代码路径）。check-artifact-gate 强制格式校验（第 22 轮）。
+- **规范定义**：代码模块映射标识，格式 `SD-xxx:src/path.ts`（SD 概要设计 ID + 冒号 + 相对项目根的代码路径）。check-artifact-gate 强制格式校验。
 - **_Avoid_**：codeFile/module/路径（「codeFile」是 code-TLA+ 输入里的代码文件对象，不同结构）。
 
 ### signatureHash
@@ -94,4 +94,4 @@
 
 ---
 
-> **维护规则**：新增 `.w-model/*.json` 字段或脚本 violation 消息前，先在本表登记术语，再改 schema / 文档（反模式 #28 schema 前置校验缺失同类纪律）。首版 12+ 条（第 26 轮）。
+> **维护规则**：新增 `.w-model/*.json` 字段或脚本 violation 消息前，先在本表登记术语，再改 schema / 文档（反模式 #28 schema 前置校验缺失同类纪律）。首版 12+ 条。

@@ -1,7 +1,7 @@
 # 术语表（Glossary）
 
 > 对应 DESIGN.md §3 核心概念与术语。需求域术语子集；全量术语权威表见 `references/glossary.md`，本文件仅收录本项目需求域新引入/易混淆术语，引用权威表编号。
-> 模板版本：v1.0（第 37 轮）。主规格引用块：`> 术语表详见 [glossary.md](./glossary.md)`。
+> 模板版本：v1.0。主规格引用块：`> 术语表详见 [glossary.md](./glossary.md)`。
 
 ## 术语表
 

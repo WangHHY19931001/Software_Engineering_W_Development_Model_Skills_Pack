@@ -1,6 +1,6 @@
 # TLC 模型检查器配置指南（TLC Configuration Guide）
 
-> **来源**：吸收自 [`claude-tla-plus-plugin`](https://github.com/andrueandersoncs/claude-tla-plus-plugin) `skills/tla-plus-generator/tlc-configuration.md`（第 11 轮外部技能吸收）
+> **来源**：吸收自 [`claude-tla-plus-plugin`](https://github.com/andrueandersoncs/claude-tla-plus-plugin) `skills/tla-plus-generator/tlc-configuration.md`
 > **W 模型适配**：.cfg 须遵循 [tla-plus-guide.md §11 cfg-tla 一致性规则](./tla-plus-guide.md) + [§12 cfg 结构规则](./tla-plus-guide.md)；不得含 `MODULE` 声明；`INVARIANTS` 须列出 .tla 中所有不变式（即 `BusinessInvariant == /\ Inv1 /\ Inv2 ...` 展开的全部子不变式）
 > **加载时机**：S-tla 子代理产出 .cfg 时必读
 

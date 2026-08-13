@@ -18,7 +18,7 @@
 
 ---
 
-## 1.5 persona 能力声明字段（第 40 轮三源吸收）
+## 1.5 persona 能力声明字段
 
 > 吸收自 Agentic Design Patterns ch15「Agent 卡片」能力清单理念（不吸收 A2A 协议本身）。
 
@@ -61,7 +61,7 @@
 | 测试评审 | 6-7 | testing-api-tester + testing-performance-benchmarker + testing-reality-checker + testing-test-results-analyzer |
 | 根因报告复审（targetKind=rootcause） | 全阶段 | testing-reality-checker + engineering-incident-response-commander + testing-evidence-collector |
 
-### 多评审分歧上缴人裁决（第 40 轮三源吸收）
+### 多评审分歧上缴人裁决
 
 > 吸收自 Agentic Design Patterns ch7「辩论与共识」：多角度独立评审可降低单评审者偏见。分歧不自动共识，上缴人裁决。
 
@@ -70,7 +70,7 @@
 - **不自动共识**：禁止为消除分歧而强行折中/投票；分歧上缴用户裁决（CHECKPOINT 人裁决机制）。
 - **与 R14-R17 的关系**：多评审属协作评审场景，交接/计划/角色匹配/增量价值四问仍须回答（verifier-spec R14-R17）。
 
-### 证据加权共识（第 41 轮四源吸收，失控 ch2 蜂群思维）
+### 证据加权共识
 
 > 吸收自《失控》第 2 章：蜜蜂选巢 = 舞蹈强度加权投票 + 递增回报，无中心仲裁，涌现共识（"愚者的选举大厅却运作得极好"）。女王只是谦卑的跟随者。
 
@@ -108,7 +108,7 @@
 
 ---
 
-## 6. S 子代理「立即执行」约束（第 9 轮 P1.3）
+## 6. S 子代理「立即执行」约束
 
 > S 子代理（产出子代理）的分派 prompt 必须包含「立即执行」约束语句，对应反模式 #20（只规划不执行，详见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节）。
 
@@ -135,7 +135,7 @@
 
 ---
 
-## 7. R 子代理「修复既有产物」职责强化（第 9 轮 P2.7）
+## 7. R 子代理「修复既有产物」职责强化
 
 > R 子代理（根因定位子代理）的修复职责与 S-fix 子代理的协作流程强化。R 定位根因 → S-fix 执行修复 → R 复核紧急修复，形成闭环。对应 [subagent-delegation.md](subagent-delegation.md)「S 子代理修改既有产物的边界」节。
 

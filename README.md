@@ -9,7 +9,7 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.5.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.7.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-13 实测）：
 
@@ -246,8 +246,8 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - **OpenSpec opsx 三段式 S 分派**（阶段 5-8）：S-explore（思路探索）→ S-propose（规格级变更规划+S-tickets 拆解）→ S-coding（按 tickets frontier 逐片编码），每段产物跑 R3×3 + V 评审
 - **单轴下限 R13**：Verifier 评审 passed 判据收紧为 `qualityLevel∈{A,B} && 所有 subCriterion.score ≥ 0.70`，杜绝「加权平均掩盖单轴失败」
 - **阶段 1 迷雾登记册（Fog of War）**：需求分析引入「REQ 入学锐利性测试」+ 迷雾登记册文本节 + 毕业机制（毕业成 REQ / 判 Out of Scope / 豁免审批）。详见 [phase-1-requirements.md](./w-model-dev/references/phase-1-requirements.md)「迷雾登记册（Fog of War）」节
-- **阶段设计级产物**（第 37-38 轮）：阶段 1-4 产出升级为主模板 + 6 独立子模板（glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 等），主文档引用块串联；门禁新增对应结构校验。详见 [SSoT §3.4.35-38](./docs/skill-design-document_SSoT.md)
-- **四源吸收（软件设计哲学 / 凤凰架构 / GoF 设计模式 / 失控）**（第 41 轮）：吸收《软件设计哲学》设计判据与战略式编程、《凤凰架构》架构决策框架与可观测性三支柱、GoF 23 设计模式目录、《失控》蜂群共识与受控的失控——落地为设计判据条目、方案权衡列、决策矩阵、模式目录与机制说理层（爬山法/约束创造/满意化/不连续系统穷举）。吸收决策记录见 [four-source-absorption.md](./w-model-dev/references/four-source-absorption.md)
+- **阶段设计级产物**：阶段 1-4 产出升级为主模板 + 6 独立子模板（glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling 等），主文档引用块串联；门禁新增对应结构校验。详见 [SSoT §10.7](./docs/skill-design-document_SSoT.md) 与 `w-model-dev/templates/`
+- **四源吸收（软件设计哲学 / 凤凰架构 / GoF 设计模式 / 失控）**：吸收《软件设计哲学》设计判据与战略式编程、《凤凰架构》架构决策框架与可观测性三支柱、GoF 23 设计模式目录、《失控》蜂群共识与受控的失控——落地为设计判据条目、方案权衡列、决策矩阵、模式目录与机制说理层（爬山法/约束创造/满意化/不连续系统穷举）。吸收决策记录见 [decision-log/absorptions.md](./docs/changes/decision-log/absorptions.md)
 
 ## 架构原则与外部工具边界
 
@@ -281,7 +281,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
 | `/wm import <文件路径>` | 从 JSON 导入项目 |
 
-只读报告脚本（第 31 轮新增，均不写状态、退出码 0/2）：
+只读报告脚本（均不写状态、退出码 0/2）：
 
 | 脚本 | 说明 |
 |---|---|
@@ -346,29 +346,14 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 
 ## 参考实现（已归档）
 
-历史端到端调测归档（按时间倒序）：
+端到端调测归档（按时间倒序）：
 
-- [`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/) — 第二十三轮 8 阶段端到端调测归档（32 需求 / 630 测试全通过 / 覆盖率 94.99% lines）
-- [`docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/) — 第二十轮 8 阶段端到端调测归档（7 文件）
-- [`docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/) — 第十九轮 8 阶段端到端调测归档（7 文件，32 需求 / 231 测试全通过 / 1 完整周期闭环 / 发现 check-bdd-model.ts D7 RTM schema bug）
-- [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/) — 第十五轮端到端调测归档摘要（9 文件，32 需求 / 889 测试全通过 / 32 个流程问题修复）
+- [`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/)
+- [`docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-28-round20-w-model-8-phase-validation/)
+- [`docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/`](./docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/)
+- [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./docs/changes/archive/2026-07-26-round15-end-to-end-test/)
 
-**最新一轮调测结论**（第二十三轮，2026-07-30，扩展博客系统 32 需求，编排者-子代理分派 + self-as-verifier 自驱模式）：
-
-| 指标 | 数值 |
-|---|---|
-| 需求 | 32（22 REQ + 6 NFR + 4 CON） |
-| 设计 | 22 SD + 22 INTF + 75 DD |
-| TLA+ 规格 | 4（1 L1 + 1 L2 + 1 L3 + 1 L4） |
-| BDD features | 4（32 scenarios） |
-| 源码 | 52 TS 文件 |
-| 图谱 | 282 节点 / 1343 边（无违反） |
-| 测试用例 | 630（390 UT + 130 IT + 38 ST + 72 UAT）全通过 |
-| 覆盖率 | 94.99% lines / 84.91% branches / 95.69% functions |
-| 门禁 | `tsc --noEmit` 0 错误；`npm test` 38 test files / 630 tests / 退出码 0 |
-| 关键修复 | R23-001~005：性能阈值 headroom 调整 / 状态机转移修正（archived→draft）/ 路由顺序冲突（`/api/articles/popular` vs `/:id`） |
-
-> 完整 8 阶段调测细节与各轮对比见归档目录与 [CHANGELOG.md](./CHANGELOG.md)。
+> 完整调测细节与各轮对比见归档目录与 [CHANGELOG.md](./CHANGELOG.md)。
 > 归档目录是参考实现，**不参与 `/wm` 命令编排**，也不会被 `check-*-gate.ts` 读取。Agent 在向用户解释 W 模型实际产出形态、阶段产物颗粒度、测试用例设计粒度时可指向上述归档。
 
 ## 相关文档

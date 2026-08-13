@@ -81,7 +81,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > V 子代理通用加载：agent-personas / verifier-spec / definition-of-done（阶段门时）；评审 BDD 时加 bdd-review-checklist；评审代码时加 quality-standards。
 
-> O / 全角色通用加载（第 44 轮新增，SKILL.md 减负后按需取用）：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）。
+> O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）。
 
 ## 4. 返工循环分派
 
@@ -106,13 +106,13 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | 3 | V | VerifierOutput | check-verifier-output | — |
 | 4 | G | gate-logs 证据 | 原阶段门禁脚本 + 5 闭环脚本 | — |
 
-> 约束 #11（第29轮升级）：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
+> 约束 #11：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
 
 > 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。
 
 ## 5. 阶段 5-8 三段式 S 分派（opsx + codegraph）
 
-> 对应 SSoT §3.4.21 + 约束 #14。每段产物须跑 R3×3 + V 审查（反模式 #39）。
+> 约束 #14。每段产物须跑 R3×3 + V 审查（反模式 #39）。
 
 | 段 | S 变体 | 产物 | reference | check 脚本 |
 |---|---|---|---|---|

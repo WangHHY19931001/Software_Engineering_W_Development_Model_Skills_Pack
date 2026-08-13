@@ -26,7 +26,7 @@
 
 ## 第 25 轮新增：opsx 三段式 S 分派 + codegraph 影响分析
 
-> 对应 SSoT §3.4.21。本阶段（系统测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
+> 本阶段（系统测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
 
 **三段式分派**（与阶段 5 一致）：
 - S-explore：opsx:explore 探索测试策略 + codegraph 查被测模块影响
@@ -71,7 +71,7 @@
 
 在 [templates/rtm.md](../templates/rtm.md) 中更新：系统测试列的状态。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
-## 可观测性验收标准（第 41 轮四源吸收，凤凰架构 observability）
+## 可观测性验收标准
 
 > 吸收自《凤凰架构》可观测性三支柱（日志/度量/追踪）。系统测试验收除既有测试维度（功能/性能/安全/兼容性/可靠性）外，须验证系统的"可观测性"是否达交付标准。
 

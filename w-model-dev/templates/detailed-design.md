@@ -1,6 +1,6 @@
 # 详细设计文档
 
-> **模板版本**：v2.0（第 38 轮设计级别增强：§0 SSOT 头 + 6 独立产物文件引用块）
+> **模板版本**：v2.0
 > 套用本模板时，引用块指向同目录独立文件，独立文件套用
 > `templates/detailed-design/` 下对应子模板。产出物见
 > `references/phase-4-detailed-design.md` §执行方法论。

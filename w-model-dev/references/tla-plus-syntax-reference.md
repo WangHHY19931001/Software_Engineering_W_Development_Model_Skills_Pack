@@ -1,6 +1,6 @@
 # TLA+ 完整语法参考（TLA+ Syntax Reference）
 
-> **来源**：本文件内容主体复制自 `andrueandersoncs/claude-tla-plus-plugin` 仓库的 `skills/tla-plus-generator/syntax-reference.md`（第 11 轮外部技能吸收）。
+> **来源**：本文件内容主体复制自 `andrueandersoncs/claude-tla-plus-plugin` 仓库的 `skills/tla-plus-generator/syntax-reference.md`。
 > **W 模型约束**：模块名须为 PascalCase（如 `KeyValueStore`），禁止连字符；命名规范遵循 [tla-plus-guide.md](tla-plus-guide.md) §2.0。所有 ```tla 代码块原样保留来源内容，仅作语法速查用途。
 > **加载时机**：S-tla 子代理产出 TLA+ 规格时必读；V 子代理评审语法合规性、G 子代理排查 SANY 语法错误（退出码 11）时参考。
 

@@ -3,7 +3,7 @@
 > 对应 DESIGN.md §5 顶层架构 + §8 系统行为总览 + §9 运行时架构。系统级设计：
 > 组件图 / 子系统清单 / 系统树 / 架构原则 / ADR / 行为总览 / 运行时架构。
 > **阶段边界**：本文件只产系统级设计，不落接口契约（阶段 3）与类/方法定义（阶段 4），越界即返工（FM-SD-06）。
-> 模板版本：v1.0（第 38 轮）。主文档引用块：`> 系统架构详见 [{{module}}-system-architecture.md](./{{module}}-system-architecture.md)`。
+> 模板版本：v1.0。主文档引用块：`> 系统架构详见 [{{module}}-system-architecture.md](./{{module}}-system-architecture.md)`。
 
 ## 1. 顶层组件图
 

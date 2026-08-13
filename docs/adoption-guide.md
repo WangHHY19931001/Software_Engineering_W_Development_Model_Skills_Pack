@@ -121,7 +121,7 @@
 
 ---
 
-## Brownfield 阶段级适配（第 10 轮外部技能吸收）
+## Brownfield 阶段级适配
 
 > 吸收 OpenSpec brownfield 优先理念，对路径 B 补充阶段级适配细则。权威定义见 SSoT [§11A.5](./skill-design-document_SSoT.md)。
 

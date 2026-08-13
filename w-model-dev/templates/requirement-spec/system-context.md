@@ -1,7 +1,7 @@
 # 系统上下文（System Context）
 
 > 对应 DESIGN.md §4 系统上下文图与边界原则。需求级：仅外部实体 + 边界，不画内部架构（内部架构属阶段 2-4 设计文档）。
-> 模板版本：v1.0（第 37 轮）。主规格引用块：`> 系统上下文详见 [system-context.md](./system-context.md)`。
+> 模板版本：v1.0。主规格引用块：`> 系统上下文详见 [system-context.md](./system-context.md)`。
 
 ## 1. 外部实体清单
 

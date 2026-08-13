@@ -25,11 +25,11 @@
 - [ ] `check-run-log.ts` 是否 exitCode=0
 - [ ] `check-maturity.ts` 是否 exitCode=0
 - [ ] `check-checkpoint.ts` 是否 exitCode=0
-- [ ] **上下文窗口已清理**（第 10 轮外部技能吸收）：阶段切换时 S 子代理是新会话，不继承前阶段上下文（OpenSpec context hygiene）
-- [ ] **TLA+ 资料按需加载**（第 11 轮外部技能吸收）：S-tla/V-tla 子代理按 [tla-plus-guide.md §13 加载矩阵](tla-plus-guide.md) 加载 4 份参考文件，禁止一次加载全部
+- [ ] **上下文窗口已清理**：阶段切换时 S 子代理是新会话，不继承前阶段上下文（OpenSpec context hygiene）
+- [ ] **TLA+ 资料按需加载**：S-tla/V-tla 子代理按 [tla-plus-guide.md §13 加载矩阵](tla-plus-guide.md) 加载 4 份参考文件，禁止一次加载全部
 - [ ] 反模式 #20（只规划不执行）：确认所有规划都有对应执行动作，未停留在规划阶段
 - [ ] 反模式 #21（阶段级门禁跳过）：确认阶段 6/7/8 都跑了 `--phase=N` 门禁，未跳过阶段级校验
 - [ ] **JSON 文件写入工具**（反模式 #25，第 16 轮 P4.2）：所有 JSON 文件写入用 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`（BOM + 深度 + 中文乱码）。详见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节
-- [ ] **acknowledgedDecisions 关键词**（第 16 轮 P4.1，R2 校验；与反模式 #26 字段混用同属 schema 边界约束但维度不同：#26 管字段归属 R1，本条管字段内容 R2）：每条 `acknowledgedDecisions` 决策条目须命中 ID 模式（`REQ-\d+` / `SD-[\d.]+` / `INTF-[\d.]+` / `DD-[\d.]+` / `TC-\w+-\d+`）或 TECH_KEYWORDS（`REST` / `JWT` / `HTTP` / `状态机` / `不变式` / `接口` / `存储` 等 37 个中英关键词）；「同意」/「确认」/「OK」/「好的」视为空，触发 `check-checkpoint.ts` R2 名词违规。完整集合见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md)「acknowledgedDecisions 决策条目须含关键词」节
+- [ ] **acknowledgedDecisions 关键词**：每条 `acknowledgedDecisions` 决策条目须命中 ID 模式（`REQ-\d+` / `SD-[\d.]+` / `INTF-[\d.]+` / `DD-[\d.]+` / `TC-\w+-\d+`）或 TECH_KEYWORDS（`REST` / `JWT` / `HTTP` / `状态机` / `不变式` / `接口` / `存储` 等 37 个中英关键词）；「同意」/「确认」/「OK」/「好的」视为空，触发 `check-checkpoint.ts` R2 名词违规。完整集合见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md)「acknowledgedDecisions 决策条目须含关键词」节
 - [ ] **调测者简化行为自检**（反模式 #27，第 17 轮 P5）：self-as-verifier 模式下每阶段须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（硬约束复述 / reworkHints 非空 / 9 脚本全 exitCode=0 / §9 确认 / 长会话重读硬约束）。命中任一简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）回阶段起点
-- [ ] **Bundled Resources 按需加载**（第 18 轮 P1，借鉴 drawio-skill）：会话内已加载的文件清单与「Bundled Resources」表对照，未加载无关文件（约束 #6 可执行化）
+- [ ] **Bundled Resources 按需加载**：会话内已加载的文件清单与「Bundled Resources」表对照，未加载无关文件（约束 #6 可执行化）

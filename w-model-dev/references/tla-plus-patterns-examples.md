@@ -4,7 +4,7 @@
 
 ## 来源说明
 
-- **吸收自**：claude-tla-plus-plugin `skills/tla-plus-generator/patterns-examples.md`（第 11 轮外部技能吸收）。
+- **吸收自**：claude-tla-plus-plugin `skills/tla-plus-generator/patterns-examples.md`。
 - **原始来源仓库**：`andrueandersoncs/claude-tla-plus-plugin`（GitHub，commit `60646ae8a549921a58aec0f853e40a9dc53f3fb3`）。
 - **内容范围**：8 个完整 `.tla` 示例 + 末尾"Common Specification Patterns Summary"。
 - **变更类型**：仅作 W 模型适配（每示例补文件头注释、补示例索引表、补交叉引用），未改动任何 `.tla` 规格体。
@@ -61,7 +61,7 @@ A concurrent key-value store with transactional semantics:
 \* @parent REQ-kv-store
 \* @sibling SD-tx-manager
 \* @child DD-kv-get, DD-kv-put
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 CONSTANTS   Key,            \* The set of all keys
             Val,            \* The set of all values
             TxId            \* The set of all transaction IDs
@@ -125,7 +125,7 @@ Lamport's bakery algorithm for mutual exclusion:
 \* @parent REQ-mutex
 \* @sibling SD-peterson-lock
 \* @child DD-bakery-entry, DD-bakery-exit
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Naturals
 CONSTANT N
 ASSUME N \in Nat
@@ -200,7 +200,7 @@ TypeOK ==
 \* @parent REQ-bounded-buffer
 \* @sibling SD-readers-writers
 \* @child DD-produce, DD-consume
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Naturals, Sequences
 CONSTANTS Producers, Consumers, BufferSize, Data
 VARIABLES buffer, prodState, consState
@@ -261,7 +261,7 @@ Progress == \A d \in Data :
 \* @parent REQ-spanning-tree
 \* @sibling SD-flooding
 \* @child DD-echo-init, DD-echo-receive
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Naturals, FiniteSets
 CONSTANTS Node, initiator, R  \* R is adjacency relation
 ASSUME /\ initiator \in Node
@@ -345,7 +345,7 @@ SpanningTree ==
 \* @parent REQ-elevator
 \* @sibling SD-scheduler
 \* @child DD-call-elevator, DD-move-elevator
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Integers
 CONSTANTS Person, Elevator, FloorCount
 VARIABLES PersonState, ActiveElevatorCalls, ElevatorState
@@ -442,7 +442,7 @@ Classic synchronization problem:
 \* @parent REQ-sync
 \* @sibling SD-dining-philosophers
 \* @child DD-start-smoking, DD-stop-smoking
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Integers, FiniteSets
 CONSTANT Ingredients, Offers
 VARIABLE smokers, dealer
@@ -483,7 +483,7 @@ AtMostOne == Cardinality({r \in Ingredients : smokers[r].smoking}) <= 1
 \* @parent REQ-consensus
 \* @sibling SD-paxos
 \* @child DD-vote, DD-decide
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Naturals, FiniteSets
 CONSTANTS Value, Acceptor, Quorum
 ASSUME /\ \A Q \in Quorum : Q \subseteq Acceptor
@@ -525,7 +525,7 @@ Validity == decision \subseteq Value
 \* @parent REQ-transaction-commit
 \* @sibling SD-3pc
 \* @child DD-prepare, DD-commit
-\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md（第 11 轮）
+\* 来源：吸收自 claude-tla-plus-plugin patterns-examples.md
 EXTENDS Naturals
 CONSTANTS RM  \* Set of resource managers
 VARIABLES rmState, tmState, tmPrepared, msgs

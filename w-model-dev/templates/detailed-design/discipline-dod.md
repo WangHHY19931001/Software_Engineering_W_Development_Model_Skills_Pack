@@ -3,7 +3,7 @@
 > 对应 DESIGN.md §2.4 工程纪律 + §2.4.6 DoD 可勾选清单。Phase 4 收敛子集；完整工程宪法见 `SKILL.md`，
 > 项目级 DoD 见 `references/definition-of-done.md`。
 > **阶段边界**：本文件只约束详细设计阶段纪律。
-> 模板版本：v1.0（第 38 轮）。主文档引用块：`> Phase 4 工程纪律与 DoD 详见 [{{module}}-discipline-dod.md](./{{module}}-discipline-dod.md)`。
+> 模板版本：v1.0。主文档引用块：`> Phase 4 工程纪律与 DoD 详见 [{{module}}-discipline-dod.md](./{{module}}-discipline-dod.md)`。
 
 ## 1. 详细设计阶段纪律
 

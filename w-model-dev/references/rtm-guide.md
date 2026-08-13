@@ -95,7 +95,7 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 | 7 系统测试 | 系统测试状态列 | `rtm.updateStatus(stId, '通过' \| '失败')` | 同上 |
 | 8 验收测试 | 验收测试状态列、覆盖率终检 | `rtm.updateStatus(uatId, '通过' \| '失败')` + 跑 `check-artifact-gate.ts` | 退出码 0 |
 
-### codeModule 格式规范（第22轮 P0-2 修正）
+### codeModule 格式规范
 
 `codeModule` 字段须按行类型填写不同格式：
 

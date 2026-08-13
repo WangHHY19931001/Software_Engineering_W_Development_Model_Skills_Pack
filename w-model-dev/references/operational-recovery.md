@@ -15,10 +15,10 @@
 - 事件驱动与棕地维护
 - O 越权检测（编排者越权实施守护）
 - 闭环校验脚本调用约定
-- 集成初期混沌预期管理（第 41 轮四源吸收）
-- 超标模块重写（第 41 轮四源吸收）
-- 止损与弃线规则（第 39 轮 P1 批吸收）
-- 会话生命周期管理（第 39 轮 P1 批吸收）
+- 集成初期混沌预期管理
+- 超标模块重写
+- 止损与弃线规则
+- 会话生命周期管理
 
 ## 路径与运行环境
 
@@ -94,7 +94,7 @@ Agent 应依据项目已有脚本和声明选择真实工具链，不默认伪�
 - CHECKPOINT 拒绝：不重试同一请求；询问调整方向，修改后再进入检查点。
 - 同一阶段返工超过 2 次：展示失败子标准与证据，询问缺失上下文；必要时经用户确认回退到上游阶段。不得把硬门槛降级为"已知限制"后放行。
 
-## 会话生命周期管理（第 39 轮 P1 批吸收）
+## 会话生命周期管理
 
 > 吸收自《agent 时代的人月神话》第 11 章「未雨绸缪」：长会话的上下文是 Lehman-Belady 熵增的新宿主——重开会话就是重新设计。
 
@@ -173,7 +173,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [anti-patterns.md #27](anti-patterns.md#27-调测者简化行为)。
 
-## 集成初期混沌预期管理（第 41 轮四源吸收，失控 ch8 封闭系统）
+## 集成初期混沌预期管理
 
 > 吸收自《失控》第 8 章：密封生态需 60-100 天初始混沌期，之后「很少有什么能颠覆它」；「适度多样性的封闭生态几乎从不失败」。
 
@@ -181,7 +181,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - **重试预算**：集成初期的失败重试有预算上限（与「止损与弃线规则」联动）；预算内重试仅限瞬态/环境性失败（指数退避），产物/门禁失败仍走 R→V→G→S-fix（约束 #12），超预算走 R 根因定位。
 - **适度多样性 = 鲁棒性**：容忍小失败/冗余（而非追求完美纯净）是系统长期稳定的前提（失控 ch5：一点点随机性/错误反而创造长期稳定）——与「受控的失控」边界一致（容忍发生在硬约束包络内）。
 
-## 超标模块重写（第 41 轮四源吸收，失控 ch11）
+## 超标模块重写
 
 > 吸收自《失控》第 11 章「网络经济学」：早期错误预示后期错误（early errors predict late errors）——错误密度超阈值的模块应丢弃重写（换不同开发者），而非原地修补。
 
@@ -189,7 +189,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - **重写前先建测试基线**：与 phase-5「改动前测试基线」节联动——重写前用既有测试/覆盖率锁定行为契约，重写后回归。
 - **与返工循环的关系**：超标重写不绕过 R→V→G→S-fix；重写本身是 S-fix 的一种形式，仍须 R 报告 + V 复审 + G 门禁。
 
-## 止损与弃线规则（第 39 轮 P1 批吸收）
+## 止损与弃线规则
 
 > 吸收自《agent 时代的人月神话》第 14 章「祸起萧墙」：项目这样延迟——一次一天；agent 静默失败按小时计费，成本是崩溃失败的几十倍且不打断你。
 
@@ -360,7 +360,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | `maturity.json` 字段缺失或类型错误 | 按 [data-models.md](data-models.md) schema 校验；修复后重跑成熟度判定 |
 | `maturity.json` 被误删 | 从 git 恢复；无备份时按默认 L0 重建（丢失升级历史） |
 
-## HOTL 规则化授权（第 40 轮三源吸收）
+## HOTL 规则化授权
 
 > 吸收自 Agentic Design Patterns ch13「Human-on-the-loop」：人类以显式、可验证的规则定义授权边界，AI 在规则内自主执行、规则外升级。
 
@@ -369,7 +369,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - **与成熟度阶梯的关系**：L0-L1 决策型 CHECKPOINT 在所有级别均等用户（人机分工线）；HOTL 规则化授权只作用于 L2+ 的操作型放行，且规则本身须经人批准。
 - **授权规则登记**：规则条件写入 `project.status` 或成熟度配置，随 run-log 留痕，可审计。
 
-## 升级触发条件显式化（第 40 轮三源吸收）
+## 升级触发条件显式化
 
 > 吸收自 Agentic Design Patterns ch13「升级策略」：升级触发条件应显式化——什么情况升级、升级给谁、等待多久。
 
@@ -380,7 +380,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - **与豁免 E1-E8 的关系**：E1-E8 管豁免审批流程结构；本节补升级时效与降级选项维度。
 - **登记**：升级触发条件写入 run-log 的 `outcome=escalate` 条目 note，随留痕可审计。
 
-## 错误分类处置表（第 40 轮三源吸收）
+## 错误分类处置表
 
 > 吸收自 Agentic Design Patterns ch12「异常处理」：瞬态错误重试（指数退避）vs 永久错误回退/升级的分类。
 
@@ -426,7 +426,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | O 用 `node -e` 直接操作 `.w-model/*.json` | `node -e` 内联脚本修改产物 JSON（graph.json 边、consolidated.json、chunk-*.json、tla-manifest.json、rtm.json 实体字段、verifier-output-*.json 等）属实施动作 | 分派 A/S 子代理产出/修改产物 JSON；O 仅从子代理返回值回填状态 |
 | O 直接 `Write`/`Edit` 产物 JSON | 同上——产物 JSON 须由 A/S 子代理产出，O 不得直接落盘 | 同上 |
 
-> **边界澄清**：O **允许**维护 `.w-model/budget.json` / `.w-model/run-log.jsonl` / `.w-model/maturity.json` 三个状态文件（SSoT §3.4.5，状态读写+持久化，非实施）；允许更新 `project.status` 与 `updatedAt`。除此之外的 `.w-model/*.json` 产物文件，O 一律不得用 `node -e` 或 `Write`/`Edit` 直接操作，须分派 A/S 子代理。
+> **边界澄清**：O **允许**维护 `.w-model/budget.json` / `.w-model/run-log.jsonl` / `.w-model/maturity.json` 三个状态文件；允许更新 `project.status` 与 `updatedAt`。除此之外的 `.w-model/*.json` 产物文件，O 一律不得用 `node -e` 或 `Write`/`Edit` 直接操作，须分派 A/S 子代理。
 
 ### 检测机制
 

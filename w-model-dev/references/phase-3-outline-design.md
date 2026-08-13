@@ -10,8 +10,8 @@
 ## 概要设计算法
 
   1. 接口识别与契约定义
-     ├─ **备选方案对比（第 41 轮吸收，APoSD ch11）**：每个关键接口先产出 ≥2 个差异较大的备选签名草案 + 一行优缺点（写入 interface-contract.md「备选方案」节）；考虑"什么应可变"（GoF 表 1.2 思想）
-     ├─ **接口交集 vs 并集自检（第 41 轮吸收，GoF ch2）**：抽象接口取"所有实现的功能交集"则只强如最弱实现，取"并集"则庞大——明确取舍并记录理由
+     ├─ **备选方案对比**：每个关键接口先产出 ≥2 个差异较大的备选签名草案 + 一行优缺点（写入 interface-contract.md「备选方案」节）；考虑"什么应可变"（GoF 表 1.2 思想）
+     ├─ **接口交集 vs 并集自检**：抽象接口取"所有实现的功能交集"则只强如最弱实现，取"并集"则庞大——明确取舍并记录理由
      ├─ 基于系统设计模块划分，产出 docs/phase3-outline/{module}-interface-contract.md（接口清单 + Schema 10 字段 + 错误码分层 + 备选方案）
      ├─ 主文档 §2 引用块指向 interface-contract.md
      ├─ 失败: 接口契约缺 Schema 字段 / 错误码缺段位 → 回步骤 1（FM-OD-01）
@@ -26,22 +26,22 @@
      ├─ 跨模块调用显式声明 store 选择
      ├─ 失败: 字段语义模糊且无 Implementation Decisions 说明 → 回步骤 3（FM-OD-02）
      └─ 成功: 字段语义清晰，store 选择与 schema 一致
-  4. 术语建模（第 38 轮新增）
+  4. 术语建模
      ├─ 产出 docs/phase3-outline/{module}-glossary.md（接口域术语子集）
      ├─ 主模板 §4 引用块指向 glossary.md
      └─ 成功: glossary.md 产出，引用块成立
-  5. UML 模块级建模（第 38 轮新增）
+  5. UML 模块级建模
      ├─ 产出 docs/phase3-outline/{module}-uml-modeling.md（包图/序列图/通信图）
      ├─ 主模板附录 A 引用块指向 uml-modeling.md
      ├─ 失败: 图与主文档 §1/§2 不对应 → 回步骤 5 对齐（FM-OD-04）
      └─ 成功: 三图产出，mermaid 块配平
-  6. 追踪矩阵与行为规格引用（第 38 轮新增）
+  6. 追踪矩阵与行为规格引用
      ├─ 产出 docs/phase3-outline/{module}-traceability-matrix.md（INTF×SD 8 字段 + 测试层级矩阵）
      ├─ 产出 docs/phase3-outline/{module}-behavior-spec.md（L3 .feature 引用关系）
      ├─ 主模板 §5/§6 引用块指向上述独立文件
      ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 回步骤 6 对齐（FM-OD-05）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
-  7. Phase 3 工程纪律与 DoD（第 38 轮新增）
+  7. Phase 3 工程纪律与 DoD
      ├─ 产出 docs/phase3-outline/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
      ├─ 主模板 §7 引用块指向 discipline-dod.md
      └─ 成功: DoD 清单产出，引用块成立
@@ -58,7 +58,7 @@
   - 参数定义、返回值、错误码
   - 调用关系图
 - 集成测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=集成测试）
-- 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase3-outline/`，带 `{module}-` 前缀）：
+- 独立产物文件：
   - `{module}-interface-contract.md`：接口契约（接口清单 + Schema 10 字段 + 调用关系图 + 错误码分层）
   - `{module}-glossary.md`：术语表（接口域子集）
   - `{module}-traceability-matrix.md`：概要设计追踪矩阵（INTF×SD 8 字段 + 测试层级矩阵）
@@ -93,9 +93,9 @@
 
 **调用关系图语法约束**：每个模块间调用须标注接口名 + 数据流向；存在循环依赖时必须重新划分模块边界，禁止带环放行。
 
-## 问题驱动叙述格式（第 41 轮四源吸收，GoF ch2 案例方法）
+## 问题驱动叙述格式
 
-每个关键接口契约按「目标 + 约束 → 方案 → 权衡」叙述（对应 interface-contract.md「Implementation Decisions」节）：
+每个关键接口契约按「目标 约束 → 方案 → 权衡」叙述（对应 interface-contract.md「Implementation Decisions」节）：
 1. **目标**：本接口要满足什么设计目标（如"统一访问多个存储实现"）。
 2. **约束**：不可违背的约束（如"不得引入跨模块共享可变状态"）。
 3. **方案**：选定接口签名 + 模式引用（引用设计模式命名，如"本接口用 Strategy 封装 X 算法"）。
@@ -118,7 +118,7 @@
 | 返回值结构 | ✅ | `{code, message, data: {orderId, status}}` |
 | 错误码集合 | ✅ | `40001, 40002, 50001` |
 
-## 字段命名业务语义对齐（第22轮 P1-4 修正）
+## 字段命名业务语义对齐
 
 设计文档字段命名须与业务语义对齐。若因技术约束无法对齐，须在设计文档「Implementation Decisions」节说明字段映射。
 
@@ -164,7 +164,7 @@
 
 检测顺序：先静态扫描（签名/错误码）→ 再图算法（循环依赖）→ 最后语义检查（职责重叠）。
 
-## 失败模式矩阵（第 38 轮新增）
+## 失败模式矩阵
 
 | 编号 | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|
@@ -186,7 +186,7 @@
 | TC-DES-011 | 跨模块调用（设计） | 模块 A → 模块 B 调用 | 数据正确传递，返回结构符合契约 | 高 |
 | TC-DES-012 | 数据传递异常路径（设计） | 模块 B 超时 / 返回错误码 | 模块 A 按错误码 fallback，不崩溃 | 高 |
 
-## 测试 seam 决策（第 10 轮外部技能吸收）
+## 测试 seam 决策
 
 > 吸收 to-spec seam-first testing 方法论。模块交互级 seam 决策服务于阶段 6 集成测试设计，与现有「集成测试设计」节互补。
 
@@ -265,7 +265,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 | 2 | 接口契约缺错误码定义 | 每个接口必须按「错误码分层约定」定义 4xx/5xx/业务三段位错误码集合 |
 | 3 | 集成测试用例只覆盖正向调用 | 必须含参数校验 + 跨模块 + 异常路径（超时/错误码） |
 | 4 | 忽略循环依赖检测 | 必须用 DFS 三色染色检测模块间循环依赖，有则重新划分模块边界 |
-| 5 | 接口签名无类型约束 | 参数与返回值必须按「接口契约 Schema 模板」给出明确类型 + 约束 |
+| 5 | 接口签名无类型约束 | 参数与返回值必须按「接口契约 Schema 模板」给出明确类型 约束 |
 | 6 | 追踪矩阵字段与主文档 §2 接口定义 / phase2 追踪矩阵不一致 | 步骤 6 须对齐 traceability-matrix.md（FM-OD-05） |
 | 7 | UML 图表与接口/调用关系脱节 | uml-modeling.md 三图须对应主文档 §1/§2（FM-OD-04） |
 | 8 | 越过阶段边界落类/方法级实现 | 类/方法级设计属阶段 4，本阶段只产模块接口级（FM-OD-06 禁止越界） |
@@ -292,7 +292,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 ## 路由顺序约束
 
-> 对应 Round 24 P2 问题 5。阶段 3 接口设计须明确路由注册顺序约束。
+> 阶段 3 接口设计须明确路由注册顺序约束。
 
 ### 框架级约束
 

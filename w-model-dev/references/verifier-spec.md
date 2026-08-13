@@ -17,7 +17,7 @@
 - §8：外部 Agent 提示词模板
 - §9–11：校验、集成与异常处理
 - §12：跨阶段 evidence 一致性
-- 独立评审会话模板（第 39 轮 P1 批吸收）
+- 独立评审会话模板
 
 ## 1. 设计原则
 
@@ -28,7 +28,7 @@
 4. **三维度验证 + 连续评分 + PPT 排序**：保留原 LLM-as-a-Verifier 学术框架的三大支柱
    （见 §3 / §4 / §5），但实现方式改为「提示词描述算法 + 外部 Agent 执行」。
 
-### 验证器定位三原则（第 41 轮四源吸收，失控）
+### 验证器定位三原则
 
 1. **验证器是编辑者，不是作者**（失控 ch19）：自然选择/评审只裁剪不合适的变体，不承担创造职责；创造来自变体（S 子代理多方案），验证器负责选择——与「编排者最小化」同构（O 不实施，V 只校验）。
 2. **调节器不关心原因，只检测偏差并纠正**（失控 ch7）：外部验证 Agent 检测偏差（对照硬约束/RTM/TLA+ 不变式），不需要也不应该承担根因定位——根因定位归专门的 R 循环（root-cause-locator.md）；单一强门禁可间接约束全局质量状态（钢厂只控制牵引一个变量稳住全部厚度偏差）。
@@ -56,7 +56,7 @@
 | `code` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
 | `rootcause` | 全阶段（返工循环 V/G→R→V→G→S-fix→V→G） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
 
-### 2.2 targetKind 枚举规范（第 9 轮 P2.5）
+### 2.2 targetKind 枚举规范
 
 > 第 9 轮标准化：`meta.targetKind` 必须取自以下 4 值枚举。原 `testcase` / `file` 已废弃，分别用 `test` / `code` 替代。`rootcause` 不由 `check-verifier-output.ts` 校验（由 `check-rootcause-report.ts` 独立校验），故不在本枚举内。
 
@@ -92,7 +92,7 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 
 > 迁移策略：第八轮及更早的 demo / fixture 中含 `targetKind="testcase"` 的 VerifierOutput 须在第 9 轮 Part C 修正为 `targetKind="test"`（详见 CHANGELOG 第 9 轮条目）。
 
-### 2.3 各阶段 subCriteria 标准模板（第 9 轮 P2.4）
+### 2.3 各阶段 subCriteria 标准模板
 
 > 各阶段的 `verifier-output.subCriteria` 名称必须取自下表标准集合（允许子集，但不允许新增名称）。本表与 §7 子标准定义一致，按 `targetKind` 推断阶段后校验。
 
@@ -138,7 +138,7 @@ if (subCriteria.length !== expected.length) {
 
 > 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
 
-### 2.4 常见违规示例（第22轮 P2-7 修正）
+### 2.4 常见违规示例
 
 > 针对 D12/D31 缺陷：V 子代理曾手工编造 subCriteria 名称、使用非法 mappingType、添加额外字段。以下为常见违规示例及正确写法。
 
@@ -273,7 +273,7 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
    - 评分权重：纳入 compositeScore 计算
    - 不变式仅语法/模型检查通过但业务语义无法对应设计文档 → 该项 0 分
 
-## 独立评审会话模板（第 39 轮 P1 批吸收）
+## 独立评审会话模板
 
 > 吸收自《agent 时代的人月神话》第 6/13 章：新会话是不带沉没成本的独立评审者——成本几美分，换来真正独立、无内部政治的评审。
 
@@ -468,7 +468,7 @@ V 子代理须在 `summary` 中包含：
 
 **禁止措辞**：「评审通过」「质量良好」「符合要求」等空泛表述。summary 长度须 ≥ 50 字符（R11 校验）。
 
-**evidence 格式规范**（[21.0.0] 新增，[22.0.0] 统一为冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`。
+**evidence 格式规范**（冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`。
 - 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
 - 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `C1-C10 全通过` / `质量良好` / `评审通过`
 - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
@@ -512,28 +512,28 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-> **completeness 四维核验对照**（第 20 轮，权重不变 0.30）：V 子代理评审 `targetKind=requirement` 时，须在 `evidence` 中引用需求规格 §4-§7 的具体位置作为四维覆盖证据。任一维度缺失（如 §6 某矩阵只写「无」未加说明，或 §7.5 覆盖率 < 100% 且无豁免审批）→ `completeness` 判 0 分。四维核验命中 FM-3D-01~06 / FM-4D-01~05 / FM-EXEMPT-01~05 任一失败模式 → `passed=false`。
+> **completeness 四维核验对照**：V 子代理评审 `targetKind=requirement` 时，须在 `evidence` 中引用需求规格 §4-§7 的具体位置作为四维覆盖证据。任一维度缺失（如 §6 某矩阵只写「无」未加说明，或 §7.5 覆盖率 < 100% 且无豁免审批）→ `completeness` 判 0 分。四维核验命中 FM-3D-01~06 / FM-4D-01~05 / FM-EXEMPT-01~05 任一失败模式 → `passed=false`。
 >
-> - 归档完整性缺失 → completeness 判 0 分（[21.0.0] 新增）
-> - 签名链断裂 → completeness 判 0 分（[21.0.0] 新增）
-> - 阶段 1 需求规格结构完整性（第 37 轮）：
+> - 归档完整性缺失 → completeness 判 0 分
+> - 签名链断裂 → completeness 判 0 分
+> - 阶段 1 需求规格结构完整性：
 >   - 主规格 §13/§14/§15/§16/§17/附录 A 引用块指向的 6 个独立文件（system-context / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）均存在且内容非空
 >   - traceability-matrix.md 字段与主规格 §4 层级树 / §7 覆盖矩阵 / §12 RTM 一致（对应 R7 门禁）
 >   - uml-modeling.md mermaid 三图配平且与主规格 §3/§4 对应（对应 R8 门禁）
 >   - discipline-dod.md DoD 清单 ≥ 8 项且已勾选核对
-> - 阶段 2 系统设计结构完整性（第 38 轮）：
+> - 阶段 2 系统设计结构完整性：
 >   - 主文档 §1/§6/§7/§8/§9/附录 A 引用块指向的 6 个独立文件（system-architecture / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）均存在且内容非空
 >   - traceability-matrix.md 字段与主文档 §3 模块划分 / phase1 追踪矩阵一致（对应 R9 门禁）
 >   - uml-modeling.md mermaid 四图配平且与主文档 §1/§3 对应（对应 R10 门禁）
 >   - discipline-dod.md DoD 清单 ≥ 8 项且已勾选核对
 >   - 未越过阶段边界落接口契约/类定义（FM-SD-06 检测）
-> - 阶段 3 概要设计结构完整性（第 38 轮小轮 B）：
+> - 阶段 3 概要设计结构完整性：
 >   - 主文档 §2/§4/§5/§6/§7/附录 A 引用块指向的 6 个独立文件（interface-contract / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling）均存在且内容非空
 >   - traceability-matrix.md 字段与主文档 §2 接口定义 / phase2 追踪矩阵一致（对应 R11 门禁）
 >   - uml-modeling.md mermaid 三图配平且与主文档 §1/§2 对应（对应 R12 门禁）
 >   - discipline-dod.md DoD 清单 ≥ 8 项且已勾选核对
 >   - 未越过阶段边界落类/方法级实现（FM-OD-06 检测）
-- 阶段 4 详细设计结构完整性（第 38 轮小轮 C）：
+- 阶段 4 详细设计结构完整性：
   - 主文档 §1/§2/§4/§5/§6/§7 引用块指向的 6 个独立文件（class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod）均存在且内容非空
   - traceability-matrix.md 字段与主文档 §1/§2 / phase3 追踪矩阵一致（对应 R13 门禁）
   - class-design.md + data-model.md mermaid 块配平且与主文档 §1/§2 对应（对应 R14 门禁）
@@ -552,9 +552,9 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-**TLA+ 审查参考清单**（第 11 轮外部技能吸收）：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
+**TLA+ 审查参考清单**：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
 
-- **备选方案对比检查（第 41 轮四源吸收，APoSD ch11）**：设计文档是否含关键接口/类的 ≥2 个备选方案对比？无对比的"一次做对"设计 → feasibility 降分。
+- **备选方案对比检查**：设计文档是否含关键接口/类的 ≥2 个备选方案对比？无对比的"一次做对"设计 → feasibility 降分。
 - **复杂性下沉提问（APoSD ch8）**：暴露的配置参数/异常是否"用户能比我们确定更好的值"？把决策负担推给用户 = 降分。
 - **概念完整性提问（APoSD ch21）**：最重要的概念是否被突出/中心化（决定周围结构）？"认为太多重要"= 浅类之源，"漏认重要"= 未知的未知之源。
 
@@ -585,7 +585,7 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-- **三信息来源检查（第 41 轮四源吸收，APoSD ch18.3）**：评审时对目标代码依次问：① 抽象是否减少信息量（深接口掩盖实现细节）？② 是否复用约定/已有知识（相似事物相似处理）？③ 好名称/注释是否补充信息（而非复述）？三来源皆弱 → readability 降分。
+- **三信息来源检查**：评审时对目标代码依次问：① 抽象是否减少信息量（深接口掩盖实现细节）？② 是否复用约定/已有知识（相似事物相似处理）？③ 好名称/注释是否补充信息（而非复述）？三来源皆弱 → readability 降分。
 - **复杂三症状提问（APoSD ch2）**：评审顶层提问"这份代码的复杂性来自哪个症状"——变更放大 / 认知负荷 / 未知的未知（对照 code-smells-checklist 组 X）。
 
 ### 7.4A 五轴评审维度与 Severity 标签（吸收自 addyosmani/agent-skills）
@@ -610,14 +610,14 @@ V 子代理须在 `summary` 中包含：
 
 > 注：Performance 轴映射到 `conformance` 是 W 模型适配——`conformance` 原指「符合代码规范」，扩展为「符合性能与规范双约束」。若项目有独立性能子标准，可在 [phase-7-system-test.md](phase-7-system-test.md) 单独评审（k6 性能基线）。
 
-- **来源时效/权威性校验（第 40 轮三源吸收，agentic Ch14）**：评审中引用的依据/参考来源（规范文档、需求行、外部资料）须校验时效性与权威性——过期来源（如 2020 博客 vs 2025 政策）与冲突来源须显式标注；知识缺口（无来源支撑的断言）须记录为证据缺失。落点：R3 preventive review 的 reliability 维度检查项。
-- **最小权限与数据暴露最小化（第 40 轮三源吸收，agentic Ch18+Ch13）**：子代理简报/评审输入不得包含任务无关的凭据、密钥、敏感上下文；权限授予遵循最小权限原则（agent 只获得任务所需最小权限）。落点：R3 preventive review 的 security 维度检查项。
-- **prompt 注入防护提示（第 40 轮三源吸收，agentic Ch18）**：对子代理输入（外部资料/用户内容拼入提示词时）做注入风险标注；不构建完整守卫体系，仅作为 R3 security 提示项。
-- **8 类重新设计原因检查（第 41 轮四源吸收，GoF ch1.6）**：逐条问"当前设计是否因 ① 显式指定类 ② 依赖特定操作 ③ 平台依赖 ④ 依赖对象表示/实现 ⑤ 算法依赖 ⑥ 紧耦合 ⑦ 子类化扩展爆炸 ⑧ 无法方便改类 而被迫重构"，命中即要求补对应模式的权衡声明（对照 design-patterns-catalog「8 类原因→模式」表）。
+- **来源时效/权威性校验**：评审中引用的依据/参考来源（规范文档、需求行、外部资料）须校验时效性与权威性——过期来源（如 2020 博客 vs 2025 政策）与冲突来源须显式标注；知识缺口（无来源支撑的断言）须记录为证据缺失。落点：R3 preventive review 的 reliability 维度检查项。
+- **最小权限与数据暴露最小化**：子代理简报/评审输入不得包含任务无关的凭据、密钥、敏感上下文；权限授予遵循最小权限原则（agent 只获得任务所需最小权限）。落点：R3 preventive review 的 security 维度检查项。
+- **prompt 注入防护提示**：对子代理输入（外部资料/用户内容拼入提示词时）做注入风险标注；不构建完整守卫体系，仅作为 R3 security 提示项。
+- **8 类重新设计原因检查**：逐条问"当前设计是否因 ① 显式指定类 ② 依赖特定操作 ③ 平台依赖 ④ 依赖对象表示/实现 ⑤ 算法依赖 ⑥ 紧耦合 ⑦ 子类化扩展爆炸 ⑧ 无法方便改类 而被迫重构"，命中即要求补对应模式的权衡声明（对照 design-patterns-catalog「8 类原因→模式」表）。
 - **"哪个类层次最常变化"（GoF Visitor 判据）**：结构稳定而操作多变用 Visitor，反之用其他——评审问"设计声称封装的变化点是否与最常变化的层次一致"。
 - **接口交集 vs 并集**（GoF ch2）：抽象接口取功能交集则只强如最弱实现，取并集则庞大且漂移——评审问"此抽象接口取交集还是并集、为何"。
 - **网关/编排层职责是否轻量**（凤凰架构 service-routing）：网关=路由器+过滤器；过度增加网关职责是危险的——与编排者最小化同构，评审问"中间层是否承载了过多业务职责"。
-- **认证方案检查**（第 41 轮四源吸收，凤凰架构 system-security）：认证三层（信道 TLS / 协议 HTTP 认证框架 / 内容 Web 表单/WebAuthn）；OAuth2 四模式适配（授权码最严谨/隐式无服务端/密码仅限高度可信/客户端用于服务间）。
+- **认证方案检查**：认证三层（信道 TLS / 协议 HTTP 认证框架 / 内容 Web 表单/WebAuthn）；OAuth2 四模式适配（授权码最严谨/隐式无服务端/密码仅限高度可信/客户端用于服务间）。
 - **授权模型检查**：RBAC96（角色/许可/资源建模、最小特权、角色继承与互斥）；最小特权 + 职责分离。
 - **凭证管理检查**：Cookie-Session（服务端状态，集群遇 CAP 三难）vs JWT（客户端状态、防篡改不防泄漏、难以主动失效）；密码存储 = 慢哈希（BCrypt）+ 每用户随机盐 + 服务端二次哈希。
 - **传输安全检查**：HTTPS 为唯一可行传输方案；mTLS 用于服务间认证；零信任五特征（身份只来源于服务/服务间无默认信任/集中策略实施点/软件供应链/强隔离）。
@@ -891,7 +891,7 @@ LLM 调用 → 失败？─是─► §11.1 重试策略（≤5 次指数退避�
 
 ## 13. self-as-verifier 模式
 
-> 对应 Round 24 P1 问题 10。V 评审产出独立性要求。
+> V 评审产出独立性要求。
 
 ### V 评审产出独立性
 

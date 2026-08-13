@@ -14,7 +14,7 @@
 3. 阶段1：识别功能/非功能/约束需求；非功能需求必须标记 reqType
 4. 阶段2-4：从 S 已产出的正式文档提取 SD/INTF/DD 实体
 
-### 阶段1 REQ 节点额外字段（第 20 轮四维识别增强）
+### 阶段1 REQ 节点额外字段
 
 每个 REQ 节点须额外提取下列字段（对应 [phase-1-requirements.md](phase-1-requirements.md) 维度1）：
 
@@ -38,7 +38,7 @@
 
 > level 识别是确定性规则匹配，不是 LLM 估算。匹配失败即 blocked，由 S 子代理或用户澄清后重跑 A-chunk。
 
-### REQ 入学锐利性测试（第 27 轮，吸收 wayfinder「Fog or ticket?」）
+### REQ 入学锐利性测试
 
 提取候选需求时，先执行锐利性测试——判断标准是**现在能否精确陈述该需求的问题**（不是能否回答它）：
 
@@ -77,7 +77,7 @@
 1. 仅提取本块内部的边（parent/depends-on/implements/defines/realizes）
 2. 跨块关系不要直接写边，而是写入 crossChunkHints
 
-### 阶段1 额外边类型（第 20 轮四维识别增强）
+### 阶段1 额外边类型
 
 阶段1 除现有 `parent`（结构边）外，须同步提取两类边：
 

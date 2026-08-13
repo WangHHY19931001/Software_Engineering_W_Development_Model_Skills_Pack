@@ -1,6 +1,6 @@
 # TLA+ 审查参考清单
 
-> **来源**：吸收自 [`claude-tla-plus-plugin`](https://github.com/andrueandersoncs/claude-tla-plus-plugin) `commands/review.md`（第 11 轮外部技能吸收）
+> **来源**：吸收自 [`claude-tla-plus-plugin`](https://github.com/andrueandersoncs/claude-tla-plus-plugin) `commands/review.md`
 > **W 模型适配**：不新增 `targetKind=tla`（违反第 9 轮 P2.5 的 4 值枚举约束）。V-tla 子代理评审 TLA+ 时仍用 `targetKind=design`，本清单作为 §7.2「设计」的参考资料
 > **加载时机**：V-tla 子代理审查 TLA+ 规格时必读
 

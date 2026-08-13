@@ -51,7 +51,7 @@ A-cross/A-evolve 合并时：
 
 见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §2.6。
 
-## cross-analysis-report.md 模板（第 20 轮四维识别增强）
+## cross-analysis-report.md 模板
 
 > A-cross 产出的 `cross-analysis-report.md` 须含以下章节。§1-§3 为既有内容，§4-§6 为第 20 轮新增（对应 A-cross 算法步骤 6/7/8）。
 

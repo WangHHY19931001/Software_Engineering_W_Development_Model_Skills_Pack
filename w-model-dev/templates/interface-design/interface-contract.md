@@ -3,7 +3,7 @@
 > 对应 DESIGN.md §13.5/§13.7 接口契约 + 错误码分层 + 调用关系。模块接口级设计：
 > 接口签名 / 参数 / 返回值 / 错误码 / 调用关系。
 > **阶段边界**：本文件只产模块接口级契约，不落类/方法实现（阶段 4），越界即返工（FM-OD-06）。
-> 模板版本：v1.0（第 38 轮）。主文档引用块：`> 接口契约细节详见 [{{module}}-interface-contract.md](./{{module}}-interface-contract.md)`。
+> 模板版本：v1.0。主文档引用块：`> 接口契约细节详见 [{{module}}-interface-contract.md](./{{module}}-interface-contract.md)`。
 
 ## 1. 接口契约清单
 

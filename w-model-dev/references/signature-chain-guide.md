@@ -1,6 +1,6 @@
 # 签名链与产出来源正确性指南
 
-> [21.0.0] 新增。对应 SSoT §7.9 SignatureChainEntry schema + §10.11 签名链门禁 + §3.4.17 产出来源正确性。
+> 。对应 SSoT §7.9 SignatureChainEntry schema + §10.11 签名链门禁 + §3.4.17 产出来源正确性。
 
 ## 1. 签名链数据结构
 

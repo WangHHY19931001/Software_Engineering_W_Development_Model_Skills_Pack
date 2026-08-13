@@ -16,7 +16,7 @@ TLA+ 门禁是 W 模型第三维度门禁——与结构连通门禁（graph）�
 | 信息流闭合 | 节点既是生产者又是消费者 | `check-requirement-graph.ts` |
 | **行为正确性** | **状态机无死锁、不变式成立、无状态爆炸** | **`check-tla-model.ts`** |
 
-## 为什么需要模型检查穷举（第 41 轮四源吸收，失控 ch11）
+## 为什么需要模型检查穷举
 
 > 吸收自《失控》第 11 章：汽车是连续系统（50/60/70mph 通过测试即可推断 55/67mph），但软件/分布式网络/活系统是**不连续系统**——「运行多年后在某组特定值（63.25mph）突然炸掉」，不可能测试每个案例，也不能依赖抽样外推。
 
@@ -176,7 +176,7 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 | 1001–10000 | 考虑拆（须在规格「拆解决策」节声明理由） | `"consider-split"` |
 | > 10000 | **必须拆**（不拆即反模式 #16） | `"must-split"` → 拆完后改 `"split-done"` |
 
-## 建模场景库（第 41 轮四源吸收，凤凰架构 + GoF）
+## 建模场景库
 
 以下场景为 TLA+ 状态机建模的成熟参考模式（可作阶段 1-4 建模起点）：
 
@@ -353,16 +353,16 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=
      | 不变式违反 | `Error: Invariant <Inv> is violated.` |
      | 状态爆炸 | `out of memory` / `states ... exceeds ... exceeded` / `too many` |
 8. **汇总**：零违反才 `passed=true`。
-9. **states 自动清理**（第 9 轮 P3.8，校验后）：见下方「TLA+ states 目录自动清理」节。
+9. **states 自动清理**：见下方「TLA+ states 目录自动清理」节。
 
 > **编码调试顺序（硬约束）**：先清轨迹 → SANY 语法通过 → 才允许跑 TLC。违反命中反模式 #14。
 > **.cfg 模式选择**：`SPECIFICATION Spec` 使用 `[Next]_vars` 带 stuttering，可避免终态被误报为死锁；`INIT Init` + `NEXT Next` 不带 stuttering，终态会触发死锁。建模时通常用 `SPECIFICATION Spec`，仅在刻意要检测终态死锁时才用 `INIT/NEXT`。
 
-### TLA+ states 目录自动清理（第 9 轮 P3.8）
+### TLA+ states 目录自动清理
 
 > TLA+ 校验完成后必须清理 `<tla-dir>/states/` 目录，避免状态文件残留污染仓库。第 8 轮调测发现 demo 项目 `w-model-dev-demo/tla/states/` 累积 229 个残留文件（多轮 TLC 校验产物未清理），第 9 轮将其硬约束化为脚本默认行为。
 
-**`check-tla-model.ts` 行为**（第 9 轮 P3.8 已实施）：
+**`check-tla-model.ts` 行为**：
 
 - **默认清理**：TLC 校验完成后自动清理所有已校验 spec 的 `states/` 子目录（每个 spec 独立清理）
   - 实现细节：脚本遍历 `manifest.specs[]`，对每个 spec 解析 `tlaPath` 所在目录，删除其下 `states/` 目录（含全部 `<YY-MM-DD-HH-MM-SS>/` 时间戳子目录及 `.st` / `.fp` 文件）；批次 1 安全加固双守卫——目录无 `.tla` 文件不清理、`states/` 无 TLC 产物特征（时间戳子目录或 `.st`/`.fp`/`.dump`/`.out`）跳过不删
@@ -391,7 +391,7 @@ npm run clean:tla-states
 
 > 项目可将上述 script 加入 `package.json`，或直接使用 `Remove-Item -Recurse -Force w-model-dev-demo/tla/states`（PowerShell）/ `rm -rf w-model-dev-demo/tla/states`（bash）等价命令。
 
-**校验**（第 9 轮 Part C 验收）：
+**校验**：
 
 - `check-tla-model.ts` 默认运行（无 `--keep-states`）后，`<tla-dir>/states/` 目录应不存在或为空
 - `--keep-states` 运行后，`<tla-dir>/states/` 目录应保留，含 TLC 产物
@@ -558,7 +558,7 @@ INVARIANT ArtifactGateConsistency
 
 ## 13. 第 11 轮吸收的参考资料
 
-> 第 11 轮外部技能吸收（2026-07-26）：吸收 `claude-tla-plus-plugin` 的 4 份 skill 资料与 review 命令语义。详见 SSoT §3.4.9。
+> 吸收 `claude-tla-plus-plugin` 的 4 份 skill 资料与 review 命令语义。
 
 ### 13.1 参考资料索引
 
@@ -587,7 +587,7 @@ INVARIANT ArtifactGateConsistency
 - V-tla 子代理审查时仍用 `targetKind=design`（不新增 targetKind 枚举值）
 - 现有反模式 #15-17（TLA+ 占位/简化/错误实现、建模不符合需求设计）仍为合规边界
 
-## 14. L4 时间推进/保留期建模模式（第 13 轮 P4.1）
+## 14. L4 时间推进/保留期建模模式
 
 > S-tla 子代理在 L4 层级建模涉及"时间推进/保留期/过期清理"场景时的模式指引。第 12 轮 `L4_audit_log_retention` 靠 TLC 拦截才发现 `AdvanceTime` 越界（`oldestAge` 推至 `RETENTION_DAYS+1` 违反 `Retention90Days` 不变式），本节提供正反例与通用规则，降低 S-tla 子代理对 TLC 试错的依赖。
 
@@ -596,12 +596,12 @@ INVARIANT ArtifactGateConsistency
 时间推进动作（`AdvanceTime`/`Tick`）+ 保留期不变式（`Retention`/`Expiry`）是 L4 状态机常见模式：系统按时间推进，过期数据按保留期清理。
 
 典型场景：
-- 审计日志保留 N 天后清理（第 12 轮 `L4_audit_log_retention`，CON-004 要求 90 天）
+- 审计日志保留 N 天后清理
 - Token 过期清理（`L4_auth_token_lifecycle`）
 - 密码重置 Token 生命周期（`L4_password_reset_token_lifecycle`）
 - 限流器令牌桶补充（`L4_rate_limiter_token_bucket`）
 
-### 14.2 反例（第 12 轮 L4_audit_log_retention 错误实现）
+### 14.2 反例
 
 **错误实现**：
 
@@ -619,7 +619,7 @@ Retention90Days == oldestAge <= RETENTION_DAYS
 - 不变式 `Retention90Days` 要求 `oldestAge <= RETENTION_DAYS`，但 `AdvanceTime` 无上限守卫
 - 即使有 `PurgeExpiredLogs` 动作，若 `Next` 分支允许连续 `AdvanceTime` 不触发清理，不变式必然违反
 
-### 14.3 正例（第 12 轮修正后实现）
+### 14.3 正例
 
 ```tla
 AdvanceTime ==
@@ -673,7 +673,7 @@ Retention90Days == oldestAge <= RETENTION_DAYS
    - §14 是 S-tla 产出参考（建模模式指引）
    - 两者互补：S-tla 按 §14 建模，V-tla 按 §4 评审
 
-## 15. TLA+/BDD 自动化同步校验（第22轮 P3-10 修正）
+## 15. TLA+/BDD 自动化同步校验
 
 > TLA+ 与 BDD 等价性维护成本高，手动比对易遗漏。新增 `check-tla-bdd-sync.ts` 脚本自动化 diff 比对。
 
@@ -700,7 +700,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-bdd-sync.ts <tla-file> <feature-file>
 
 ## 16. 设计文档 ↔ 代码状态机一致性
 
-> 对应 Round 24 P1 问题 6。现有脚本校验"代码↔TLA+"，本节补充"设计文档↔代码"维度。
+> 现有脚本校验"代码↔TLA+"，本节补充"设计文档↔代码"维度。
 
 ### 校验范围
 

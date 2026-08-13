@@ -2,7 +2,7 @@
 
 > 对应 DESIGN.md 附录 A UML 2.0 系统建模图表集。需求级建模，仅用例图 + 领域类图 + 活动图；
 > 序列图/状态机图由 TLA+/BDD 覆盖（.feature 文件 + .tla 文件承载），不在此重复。
-> 模板版本：v1.0（第 37 轮）。主规格引用块：`> UML 需求建模详见 [uml-modeling.md](./uml-modeling.md)`。
+> 模板版本：v1.0。主规格引用块：`> UML 需求建模详见 [uml-modeling.md](./uml-modeling.md)`。
 
 ## A.1 用例图
 

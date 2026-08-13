@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 41.5.0
+version: 41.7.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -16,9 +16,9 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 技能只提供编排、参考、模板和确定性门禁脚本。LLM-as-a-Verifier 由外部 Agent 按提示词执行；技能脚本不调用 LLM。设计决策以 `docs/skill-design-document_SSoT.md` 为准。
 
-**交付层**（第 44 轮）：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即可激活；L1「带门禁」= L0 + `scripts/` + `samples/`（需项目根 `npm install` 跑门禁）。安装路径见 [docs/INSTALL.md](../docs/INSTALL.md) §2「交付层选择」。
+**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即可激活；L1「带门禁」= L0 + `scripts/` + `samples/`（需项目根 `npm install` 跑门禁）。安装路径见 [docs/INSTALL.md](../docs/INSTALL.md) §2「交付层选择」。
 
-**设计哲学**：主刀与修正权 / 人机分工线 / 白箱 vs 黑箱 / 受控的失控 / clockware vs swarmware 五条方法论取向（第 39/41 轮吸收）见 [references/design-philosophy.md](references/design-philosophy.md)，按需加载。
+**设计哲学**：主刀与修正权 / 人机分工线 / 白箱 vs 黑箱 / 受控的失控 / clockware vs swarmware 五条方法论取向见 [references/design-philosophy.md](references/design-philosophy.md)，按需加载。
 
 ## 触发决策
 
@@ -35,7 +35,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ## 不可违反的约束
 
-> 14 条硬红线（第 44 轮由 21 条重排合并）：**命中即回退**（回到当前阶段起点）。完整版（含违反回退、脚本、反模式链接）见 [references/hard-constraints.md](references/hard-constraints.md)，**执行前必读**。旧编号映射见该文件「编号迁移表」。
+> 14 条硬红线：**命中即回退**（回到当前阶段起点）。完整版（含违反回退、脚本、反模式链接）见 [references/hard-constraints.md](references/hard-constraints.md)，**执行前必读**。
 
 | # | 约束 | 核心语义（完整版见 hard-constraints.md） |
 |---|---|---|
@@ -83,7 +83,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ## self-as-verifier 模式
 
-> 对应 Round 24 P1 问题 10。单 Agent 兼任 S/V/G/R 多角色的正式定义与独立性保证。
+> 单 Agent 兼任 S/V/G/R 多角色的正式定义与独立性保证。
 
 **定义**：self-as-verifier 模式指单 Agent 在同一阶段内兼任 S（产出）/ V（评审）/ G（门禁）/ R（根因/R3）多角色的执行模式。**启用条件**：仅限 demo / 非生产 / 教学演示项目（生产项目禁止）；启用时须在 `project.status` 标记 `selfAsVerifier: true`。
 
@@ -125,7 +125,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ## 阶段路由
 
-| # | 开发阶段 | 同步/执行测试 | 第 10 轮外部技能吸收标记 | 必读参考 |
+| # | 开发阶段 | 同步/执行测试 | 外部技能吸收标记 | 必读参考 |
 |---|---|---|---|---|
 | 1 | 需求分析 | 验收测试设计 | User Stories + Out of Scope + Implementation/Testing Decisions | [references/phase-1-requirements.md](references/phase-1-requirements.md) |
 | 2 | 系统设计 | 系统测试设计 | seam 决策 | [references/phase-2-system-design.md](references/phase-2-system-design.md) |
@@ -136,17 +136,17 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 7 | 系统测试 | 系统测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
 | 8 | 验收测试 | 验收测试执行 | archive 机制 + opsx 三段式 + codegraph 修改前查询 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
 
-**第 37/38 轮设计级别增强**：阶段 1-4 产出升级为主模板（§0 SSOT 头 + 引用块）+ 6 独立子模板（system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），产出目录 `docs/phase<N>-*/`；G 门禁 `check-requirement-graph.ts --phase=N --spec-dir=<dir>`（R7-R14）+ `check-artifact-gate.ts --phase=N --spec-dir=<dir>`（引用块/SSOT/DoD 结构校验）。
+**设计级别增强**：阶段 1-4 产出升级为主模板（§0 SSOT 头 + 引用块）+ 6 独立子模板（system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），产出目录 `docs/phase<N>-*/`；G 门禁 `check-requirement-graph.ts --phase=N --spec-dir=<dir>`（R7-R14）+ `check-artifact-gate.ts --phase=N --spec-dir=<dir>`（引用块/SSOT/DoD 结构校验）。
 
 所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。TLA+（阶段 1-4）→ [references/tla-plus-guide.md](references/tla-plus-guide.md)；BDD（阶段 1-8）→ [references/bdd-guide.md](references/bdd-guide.md)；阶段门评审 → [references/verifier-spec.md](references/verifier-spec.md)；编码后质量检查 → [references/quality-standards.md](references/quality-standards.md)；状态 Schema → [references/data-models.md](references/data-models.md)；异常/跨平台/大项目 → [references/operational-recovery.md](references/operational-recovery.md)；子代理分派 → [references/subagent-delegation.md](references/subagent-delegation.md)。
 
 ## Bundled Resources（按需加载契约）
 
-> 借鉴 drawio-skill 的 Bundled Resources 设计：明示每个资源的触发条件，**none of them need to be in context up front**。约束 #6「按需加载」的可执行清单。第 44 轮压缩为目录级索引——完整逐文件表见 [references/dispatch-matrix.md](references/dispatch-matrix.md)（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）与 [references/command-reference.md](references/command-reference.md)（/wm 命令细节）。
+> 借鉴 drawio-skill 的 Bundled Resources 设计：明示每个资源的触发条件，**none of them need to be in context up front**。约束 #6「按需加载」的可执行清单。目录级索引——完整逐文件表见 [references/dispatch-matrix.md](references/dispatch-matrix.md)（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）与 [references/command-reference.md](references/command-reference.md)（/wm 命令细节）。
 
 | 资源目录 | 触发条件 |
 |---|---|
-| `references/`（57 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、其余见 dispatch-matrix 逐文件表 |
+| `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、其余见 dispatch-matrix 逐文件表 |
 | `scripts/cli/`（31 个 .ts：26 个 check-* 门禁 + 5 个工具 CLI） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
 | `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
 | `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / budget / run-log） |
@@ -181,7 +181,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 3. 同步更新 `.w-model/rtm.json` 的需求、设计、代码与测试映射。
 4. 给出风险/缺陷等级和缓解措施。
 5. 输出阶段摘要：产物路径、RTM 覆盖状态、验证证据、阻塞项和下一步。
-6. **第 10 轮外部技能吸收三要素**（适用阶段）：阶段 1 = User Stories + Out of Scope + Implementation/Testing Decisions；阶段 2-4 = 测试 seam 决策（三层一致性）；阶段 5 = Tracer-bullet 票据拆解（tickets.md）；阶段 8 = archive 机制。详见 [references/external-skills-absorption.md](references/external-skills-absorption.md)。
+6. **外部技能吸收三要素**（适用阶段）：阶段 1 = User Stories + Out of Scope + Implementation/Testing Decisions；阶段 2-4 = 测试 seam 决策（三层一致性）；阶段 5 = Tracer-bullet 票据拆解（tickets.md）；阶段 8 = archive 机制。详见 [decision-log/absorptions.md](../docs/changes/decision-log/absorptions.md)。
 
 ## 阶段门与质量门
 

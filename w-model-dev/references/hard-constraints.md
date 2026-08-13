@@ -2,7 +2,6 @@
 
 > 14 条硬红线：**命中即回退**（回到当前阶段起点），与「核心操作行为」（日常准则，违反不回退）互补。
 > 第 44 轮由 `SKILL.md` 移入本文件按需加载；`SKILL.md` 保留 14 条单行摘要 + 本文件指针。
-> SSoT §3.4.44 为第 44 轮重排记录；旧编号映射见文末「编号迁移表」。
 
 ## #1 测试设计前置
 
@@ -66,7 +65,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 阶段 1–4 须产出对应层级的 TLA+ 状态机规格（L1 系统内外交互 → L2 子系统 → L3 原子行为，`.tla` + `.cfg` + `tla-manifest.json`）与对应层级 BDD features（L1/L2/L3/L4，`.feature` + `bdd-manifest.json`）；阶段 5-8 执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) exitCode=0。G 子代理跑 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（语法 + TLC + 无死锁/不变式违反/状态爆炸）与 `check-bdd-model.ts`（D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage）。
 
-**强制级别按项目成熟度分级**（第 44 轮新增，见 [operational-recovery.md](operational-recovery.md)「成熟度与行为门禁」节）：
+**强制级别按项目成熟度分级**：
 
 | 成熟度 | 适用 | TLA+ / BDD 强制级别 |
 |---|---|---|
@@ -84,21 +83,3 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 详见 [phase-5-coding.md](phase-5-coding.md)「codegraph 修改前影响分析」+「增量集成纪律」节。
 
-## 编号迁移表（第 44 轮，21 条 → 14 条）
-
-| 旧编号 | 新编号 | 合并说明 |
-|---|---|---|
-| #1-#8 | #1-#8 | 原样保留 |
-| #9 TLA+ 行为门禁 | #13 | 与 #14 BDD 合并 + 成熟度分级 |
-| #10 门禁退出码不可伪 | #9 | 重排 |
-| #11 系统层级树 | #10 | 与 #15 REQ 层级合并 |
-| #12 闭环机制强制校验 | #11 | 与 #17 R3 合并 |
-| #13 返工必经根因定位 | #12 | 重排 |
-| #14 BDD 行为门禁 | #13 | 与 #9 TLA+ 合并 + 成熟度分级 |
-| #15 REQ 层级强制标注 | #10 | 并入系统层级树 |
-| #16 豁免审批强制四阶段 | #2 | 并入阶段门放行 |
-| #17 R3 预防性审查强制 | #11 | 并入闭环机制 |
-| #18 RTM 实体每阶段回填 | #3 | 并入 RTM 为事实源 |
-| #19 角色分派完整性 | #8 | 并入编排者最小化 |
-| #20 codegraph 修改前查询 | #14 | 与 #21 回归测试合并 |
-| #21 回归测试强制钩子 | #14 | 与 #20 codegraph 合并 |

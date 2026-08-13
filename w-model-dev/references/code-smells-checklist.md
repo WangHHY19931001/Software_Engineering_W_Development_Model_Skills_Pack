@@ -125,6 +125,6 @@
 
 ## 参考
 
-- 重构手法速查见 [refactoring-catalog.md](refactoring-catalog.md)（第 40 轮批次 C 新建，P2）
-- 并发专项检查见 [concurrency-guide.md](concurrency-guide.md)（第 40 轮批次 C 新建，P2）
-- 设计判据来源见《软件设计哲学》危险信号总清单（第 41 轮四源吸收，详见 four-source-absorption.md）
+- 重构手法速查见 [refactoring-catalog.md](refactoring-catalog.md)
+- 并发专项检查见 [concurrency-guide.md](concurrency-guide.md)
+- 设计判据来源见《软件设计哲学》危险信号总清单（吸收决策记录见 [decision-log/absorptions.md](../../docs/changes/decision-log/absorptions.md)）

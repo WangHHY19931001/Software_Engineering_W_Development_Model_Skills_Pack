@@ -11,7 +11,7 @@
 ## 目录
 
 - 角色划分（O / S / V / G / A / R / R-iceberg）
-- 主刀职责映射表（第 39 轮吸收）
+- 主刀职责映射表
 - 文件落地交接协议与编排者状态日志
 - 每阶段分派时序
 - 子代理分派模板（含 R3 预防性审查 + R-iceberg 冰山扫掠 + V 复审根因 + R-lead）
@@ -34,7 +34,7 @@
 
 > **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/cli/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
-## 主刀职责映射表（第 39 轮吸收）
+## 主刀职责映射表
 
 > 吸收自《agent 时代的人月神话》第 3 章「外科手术队伍」。概念完整性只能从"一个头脑的持续持有"里长出来——主刀由人坐，支持角色全部可由 agent 出任。
 
@@ -48,7 +48,7 @@
 
 **修正权**（与约束 #8『编排者最小化』、反模式 #10『编排者越权实施』互补）：O 不实施（agent 侧约束），但**用户**保留修正权——人在回路的最低标准 = 能在过程中间改产物而不用整体重跑。凡只提供审计权（日志/面板/思维链展示）而无修正路径的产物设计视为不合格（见 [anti-patterns.md](anti-patterns.md) 反模式 #46）。
 
-## 上下文装填原则（第 39 轮 P1 批吸收）
+## 上下文装填原则
 
 > 吸收自《agent 时代的人月神话》第 6 章「贯彻执行」：任何一次转述都是一次未声明的重新定义。
 
@@ -56,7 +56,7 @@
 - **禁止自撰摘要**：长期项目启动禁止给"自己整理的摘要"——让 agent 读原始文档，或 RAG/grep 随用随取；你以为在帮 agent，实际是在替它做你没意识到的判断。
 - **验证账单**：每加一个 subagent，预算一笔"主读产出并验证"的 token/时间成本；验证链可省步、省不到零，最终裁决者必须是持有目的的人。
 
-## S 子代理简报质疑权（第 40 轮三源吸收）
+## S 子代理简报质疑权
 
 > 吸收自 Agentic Design Patterns ch19「承包商模型·协商反馈」：承包商对合约可协商——发现数据源不可达/范围歧义时，先返回质疑，而非硬做或静默改动。
 
@@ -484,9 +484,9 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - designCoverage.uncoveredSdNodes 须与 graph.json SD 节点比对结果一致
 ```
 
-### 阶段 5-8 S 三段式变体（第 25 轮新增）
+### 阶段 5-8 S 三段式变体
 
-> 对应 SSoT §3.4.21。阶段 5-8 引入 codegraph + OpenSpec opsx 后，S 角色拆分为三段式变体。每段产物须跑 R3×3 + V 审查。
+> 阶段 5-8 opsx 工作流。阶段 5-8 引入 codegraph + OpenSpec opsx 后，S 角色拆分为三段式变体。每段产物须跑 R3×3 + V 审查。
 
 #### S-explore 子代理分派模板
 
@@ -556,7 +556,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 跨阶段定位（仅当前阶段产物 + 上游回溯标记）
 ```
 
-### R3 预防性审查分派模板（第22轮新增，第29轮升级为无条件，覆盖所有 S 变体）
+### R3 预防性审查分派模板
 
 > S 产出后、V 评审前触发。R3 复用 R 子代理机制，但目的为预防性审查而非根因定位。
 >
@@ -564,7 +564,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 **分派时序**：S 产出（任意变体）→ R3-completeness / R3-reliability / R3-security（可并行）→ V 评审
 
-**S 变体与 R3 报告路径对应**（第29轮新增）：
+**S 变体与 R3 报告路径对应**：
 
 | S 变体 | action | R3 报告路径前缀 |
 |---|---|---|
@@ -582,7 +582,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 **R3 子代理产出**：`.w-model/preventive-reviews/<phase>[-fix|-emergency]-{completeness,reliability,security}.json`
 
-**阶段 5-8 opsx 三段式 stage 级 R3+V 产物**（第28轮 D4 明确）：
+**阶段 5-8 opsx 三段式 stage 级 R3+V 产物**：
 
 opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 stage 级审查产物：
 
@@ -613,7 +613,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 **V 评审参考方式**：V 子代理在评审时须读取 R3 三份报告，将 R3 发现的问题纳入 `reworkHints`。V 不得跳过 R3 报告直接评审（命中反模式 #33）。
 
-### R-iceberg 冰山扫掠分派模板（第 36 轮新增）
+### R-iceberg 冰山扫掠分派模板
 
 > S-fix 后（ICEBERG-A）或阶段门放行前（ICEBERG-B）触发。R-iceberg 是 R 子代理的冰山扫掠变体，以已发现/已修复问题为线索主动深挖隐藏问题，与 R（被动定位已暴露问题根因）正交。
 > 方法论见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)；schema 见 `iceberg-sweep.schema.json`；校验脚本 `check-iceberg-sweep.ts`（反模式 #44）。
@@ -673,7 +673,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 **R-iceberg 与返工R的区别**：
 
-| 属性 | 返工R（现有） | R-iceberg（第36轮新增） |
+| 属性 | 返工R（现有） | R-iceberg |
 |---|---|---|
 | 触发时机 | V/G 不通过后触发 | S-fix 后（ICEBERG-A）+ 阶段门前（ICEBERG-B） |
 | 目的 | 定位已暴露问题的根因 | 主动深挖未暴露的隐藏问题 |
@@ -970,7 +970,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 > **回退动作**：① 立即停止编排者当前动作；② 已越权产出的实体作废重做；③ 重新分派 S 子代理产出；④ 重走 V → G；⑤ 编排者会话内仅保留路由 / 状态 / CHECKPOINT / 只读脚本记录。
 
-## 反模式 #20：只规划不执行（第 9 轮 P1.3）
+## 反模式 #20：只规划不执行
 
 > 子代理返回规划性内容而未调用任何执行工具，浪费 token + 轮次，任务无实际进展。本反模式由编排者在子代理返回后立即检测，命中即重派并强调「立即执行」约束。
 
@@ -1005,7 +1005,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 > 与反模式 #9（谎报状态）的关系：#20 是「未执行却声称在执行」的前兆；若子代理不仅规划还声称「已完成」但产物不存在 → 同时命中 #9 + #20，按 #9 处置（回退 + 标注教训）。
 
-## S 子代理修改既有产物的边界（第 9 轮 P2.7）
+## S 子代理修改既有产物的边界
 
 > S 子代理（产出子代理）与 R 子代理（根因定位）+ S-fix 子代理（修复变体）的职责边界。S 负责新增，R 负责定位，S-fix 负责修复——边界混淆会导致修复无根因依据、新产物污染既有产物、紧急修复无复核。
 
@@ -1027,9 +1027,9 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 3. **紧急修复通道**（仅当 bug 阻塞当前阶段推进时启用，第29轮升级为前置 R3+V+G）：
    - S 子代理可执行**最小修复**（仅修复阻塞点，不扩展功能、不重构）
    - 必须在 `.w-model/run-log.jsonl` 追加 `fix` 条目，标注 `"紧急修复": true` 和阻塞原因
-   - 紧急修复条目格式：`{role:"S", action:"emergency-fix", variant:"emergency-fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment"}`（第29轮：移除 `needsReview:true` 字段，紧急修复不再走事后 R 复核）
+   - 紧急修复条目格式：`{role:"S", action:"emergency-fix", variant:"emergency-fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment"}`
    - **第29轮升级（前置 R3+V+G）**：emergency-fix 与其他 S 变体一视同仁，产出后须前置 **R3×3（completeness/reliability/security）→ V → G**，不得跳过。R3 报告路径走 `<phase>-emergency-{completeness,reliability,security}.json`（与 `check-preventive-review.ts --variant=emergency` 一致）。跳过 R3+V 命中反模式 #42。`variant=emergency-fix` + `blocker` 字段保留用于 run-log 审计，仅作为「为何走紧急通道」的说明，不再意味跳过审查。
-   - **移除机制**：原「阶段完成后由 R 子代理复核紧急修复的完整性（R 复核产出追加到 `RootCauseReport` 的 `emergencyFixReview` 字段）」事后复核机制已移除（第29轮）。紧急修复的完整性由前置 R3×3 + V 兜底。
+   - **移除机制**：原「阶段完成后由 R 子代理复核紧急修复的完整性（R 复核产出追加到 `RootCauseReport` 的 `emergencyFixReview` 字段）」事后复核机制已移除。紧急修复的完整性由前置 R3×3 + V 兜底。
 
 **违规检测**：
 
@@ -1041,7 +1041,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 > 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。第29轮升级后，紧急修复通道不再是「跳过 R3+V 的事后复核例外」，而是「与其他 S 变体一视同仁的前置 R3+V+G 通道」——emergency-fix 产出后仍须 R3×3 + V + G，命中反模式 #42 一律回退。
 
-## 豁免审批角色边界（第 20 轮四维识别与豁免审批扩展）
+## 豁免审批角色边界
 
 > 第 20 轮新增。覆盖缺失、conflicts-with 冲突、覆盖率不达标等事项须经强制 S→R→V→人类四阶段审批流程。本节扩展 S/R/V 角色边界，明确各角色在豁免审批中的职责与禁止动作。违反即命中反模式 #30（豁免审批跳步），见 [anti-patterns.md](anti-patterns.md)。
 

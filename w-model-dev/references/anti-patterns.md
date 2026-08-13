@@ -6,7 +6,7 @@
 
 ## 目录
 
-- 反模式清单（#1~#47；#20 在 subagent-delegation.md；#30 第 20 轮新增；#33~#41 见各 detailed 节；#42 第 29 轮新增；#43 第三十一轮新增；#44 第 36 轮新增；#45/#46 第 39 轮新增，#47 第 40 轮新增）
+- 反模式清单（#1~#47；#20 在 subagent-delegation.md；#33~#41 见各 detailed 节）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
@@ -15,7 +15,7 @@
 - 运维失败模式清单（6 条运行健康 O1~O6）
 - 候选反模式检测信号（来自 Loop 4 爬坡循环）
 
-## 反模式-硬约束映射（第 44 轮新增）
+## 反模式-硬约束映射
 
 > 反模式（本文件）与硬约束（[hard-constraints.md](hard-constraints.md)，14 条）是两个互补视图：硬约束是"必须怎么做"，反模式是"不要怎么做"。命中反模式 = 违反对应硬约束 = 回退。本表用于快速定位，避免重复记忆；「高频」标注基于历轮调测与吸收记录。
 
@@ -62,18 +62,18 @@
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
 | 20 | 只规划不执行（子代理返回规划性内容而未调用任何执行工具） | 浪费 token + 轮次，任务无实际进展 | 子代理分派须强调"立即执行"；规划产物必须有对应执行产物（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节） |
 | 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节） |
-| 22 | 角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依，第 15 轮 P7-001 reader 可发博文 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
-| 23 | 跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高，第 15 轮 P7-002/P7-003 类 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
-| 24 | 副作用时序不一致（响应体字段返回副作用自增前的旧值） | 响应体字段与已生效状态不一致，集成测试难发现，第 15 轮 P7-004 类 | 副作用须在响应体构造前完成，响应体字段反映已生效状态（见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节） |
-| 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工（第 15 轮共性问题 A） | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
-| 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败（第 15 轮共性问题 B） | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
+| 22 | 角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
+| 23 | 跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
+| 24 | 副作用时序不一致（响应体字段返回副作用自增前的旧值） | 响应体字段与已生效状态不一致，集成测试难发现 | 副作用须在响应体构造前完成，响应体字段反映已生效状态（见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节） |
+| 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工 | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
+| 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败 | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 20 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
-| 30 | 豁免审批跳步（第 20 轮新增） | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
+| 30 | 豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E8 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
 | 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，`check-archive-integrity.ts` 退出码 0（见 SSoT §10B.2.1 归档完整性清单） |
 | 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
-| 33 | 跳过 R3 预防性审查（第29轮强化为无条件，覆盖所有 S 变体含 S-fix / S-emergency-fix） | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
+| 33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
 | 34 | 编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次、R ≥3 次；`check-role-dispatch.ts` 校验（见约束 #8） |
 | 35 | self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
 | 36 | 路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
@@ -82,12 +82,12 @@
 | 39 | 跳过 opsx 产物审查（opsx 三段式任一 stage 产物未 R3×3 + V 即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-opsx-artifacts.ts` 校验（约束 #11） |
 | 40 | opsx/S-tickets 职责混淆（tasks.md 与 tickets.md 互相替代或内容错位） | 破坏规格级规划（what/why）与代码级切片（how）职责边界 | tasks.md（opsx:propose）与 tickets.md（S-tickets vertical-slice）职责分离；`check-opsx-artifacts.ts` 校验 |
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
-| 42 | S-fix / emergency-fix 后跳过 R3+V（第29轮新增） | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
-| 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描（SSoT §3.4.27） |
-| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行，第36轮新增） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走标准 R→V→G→S-fix；`newFindings=[]` 或达 maxIcebergRounds=5 才放行（SSoT §3.4.34） |
-| 45 | subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏，第39轮新增） | "通过"失去与需求的对应关系，覆盖率与断言语义脱节，Goodhart 击穿判据 | 测试断言修改必须先行报告；断言与需求不符走 R→V→G 归因，禁止擅自改断言凑通过（SSoT §3.4.39） |
-| 46 | 只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外，第39轮新增） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径（SSoT §3.4.39） |
-| 47 | 大规模重构式改动（单次 diff 重写整个模块，第40轮新增） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
+| 42 | S-fix / emergency-fix 后跳过 R3+V | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
+| 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描 |
+| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走标准 R→V→G→S-fix；`newFindings=[]` 或达 maxIcebergRounds=5 才放行 |
+| 45 | subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏） | "通过"失去与需求的对应关系，覆盖率与断言语义脱节，Goodhart 击穿判据 | 测试断言修改必须先行报告；断言与需求不符走 R→V→G 归因，禁止擅自改断言凑通过 |
+| 46 | 只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径 |
+| 47 | 大规模重构式改动（单次 diff 重写整个模块） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
 
 ### 命中高发阶段
 
@@ -262,21 +262,21 @@
 
 **检测信号**：到达 🔴 CHECKPOINT 节点后无「等待用户确认」记录直接推进。
 
-- `signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID（代签检测，[21.0.0] 新增）
+- `signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID（代签检测，）
 
 **回退动作**：回到 CHECKPOINT 节点重新暂停，向用户展示放行判定并由用户确认。
 
-- 清空 O 代签的 `acknowledgedDecisions`，要求用户重新陈述决策（[21.0.0] 新增）
+- 清空 O 代签的 `acknowledgedDecisions`，要求用户重新陈述决策
 
 ## #10 编排者越权实施
 
 **检测信号**：编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者直接判定根因并分派 S-fix（无 R 报告路径作为 S-fix 输入）；或编排者自行填写 `acknowledgedDecisions`。
 
-- `signature-chain.jsonl` 中 O 角色 `action=produce/review/gate`（O 越权承担 S/V/G 职责，[21.0.0] 新增）
+- `signature-chain.jsonl` 中 O 角色 `action=produce/review/gate`（O 越权承担 S/V/G 职责，）
 
 **回退动作**：回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ `acknowledgedDecisions` 清空并要求用户重新陈述决策。
 
-- 作废 O 越权签名，重新分派对应角色子代理（[21.0.0] 新增）
+- 作废 O 越权签名，重新分派对应角色子代理
 
 ## #11 ingestion 跳过图谱校验
 
@@ -314,11 +314,11 @@
 
 **检测信号**：`TLA_JSON.passed=false`（`deadlockViolations`/`invariantViolations`/`stateExplosionSpecs` 非空）但阶段已推进。
 
-- `signature-chain.jsonl` 中 G 签名 `action=gate` 但 `gateExitCode` 字段缺失（skip-tlc 无 GATE_JSON，[21.0.0] 新增）
+- `signature-chain.jsonl` 中 G 签名 `action=gate` 但 `gateExitCode` 字段缺失（skip-tlc 无 GATE_JSON，）
 
 **回退动作**：回到当前阶段起点，分派 S 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），重跑 `check-tla-model.ts`。
 
-- 回到当前阶段起点，跑完整 TLC 检查（[21.0.0] 新增，--skip-tlc 已移除）
+- 回到当前阶段起点，跑完整 TLC 检查（--skip-tlc 已移除）
 
 **与公理的关系**：正常软件系统不允许死锁。死锁或矛盾分支须定位根因修正，而非绕过。
 
@@ -338,7 +338,7 @@
 
 **与 #16 的关系**：#16 是规格本身有缺陷（偏离需求/设计），#17 是规格忠实但需求/设计本身有缺陷——前者修规格，后者修需求/设计并回退。判定流程见 [tla-plus-guide.md](tla-plus-guide.md)「建模与需求/设计一致性」节。
 
-## #20 只规划不执行（第 9 轮 P1.3）
+## #20 只规划不执行
 
 > 详细描述见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节。子代理返回规划性内容而未调用任何执行工具，浪费 token + 轮次，任务无实际进展。
 
@@ -346,8 +346,6 @@
 
 ## #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
 
-> 第 13 轮 P3.1 新增。self-as-verifier 模式下编排者为加速调测，跳过阶段 6/7 的 `--phase=N` 门禁直接跑 `--phase=8` 终检，导致阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则。
-> 第 12 轮阶段 7 跳过 `--phase=7` 直接跑 `--phase=8`，导致 REQ-019/021 的 `systemTest` 字段缺失到终检才发现（详见 [AGENTS.md](../../AGENTS.md) §4 第十二轮"修复"节）。
 
 **检测信号**：run-log.jsonl 中阶段 N（6/7）的 gate 动作类型为 `check-artifact-gate` 但参数为 `--phase=8`（或无 `--phase` 参数，默认终检），且 N < 8；或阶段 N 完成但未跑对应 `--phase=N` 门禁。
 
@@ -446,9 +444,9 @@
 - `bdd-logic.ts` 的 `validateStateMachineCompleteness()` 校验七要素完整性，与 TLA+ 端 `tla-logic.ts` 状态机校验对称。
 - self-test BDD 样本中 `bad-tla-mismatch.manifest.json` 专测 D4 等价性违反拦截。
 
-## #30 豁免审批跳步（第 20 轮新增）
+## #30 豁免审批跳步
 
-> 第 20 轮四维识别与豁免审批增强（v20.0.0）。任何豁免未按 S→R→V→人类四阶段流程执行即命中本反模式。
+> 任何豁免未按 S→R→V→人类四阶段流程执行即命中本反模式。
 
 **危害**：覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经四阶段流程即生效，需求遗漏被豁免掩盖，治理失守，缺陷后移到设计/编码阶段。
 
@@ -502,7 +500,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **回退动作**：
 - 回到归档前状态，补齐缺失文件后重跑 `check-archive-integrity.ts`
 
-**关联**：SSoT §10B.2.1 归档完整性清单（[21.0.0] 新增）
+**关联**：SSoT §10B.2.1 归档完整性清单
 
 ## #32 签名链断裂
 
@@ -514,9 +512,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **回退动作**：
 - 回到当前阶段起点，补齐缺失角色签名 / 来源证明，重跑签名链校验
 
-**关联**：SSoT §10.11 签名链门禁 + §7.9 SignatureChainEntry schema（[21.0.0] 新增）
+**关联**：SSoT §10.11 签名链门禁 + §7.9 SignatureChainEntry schema
 
-## #33 跳过 R3 预防性审查（第22轮新增，第29轮强化为无条件）
+## #33 跳过 R3 预防性审查
 
 **检测信号**：
 - S 产出后未触发 R3 三阶段审查，直接进入 V 评审
@@ -524,13 +522,13 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 文件缺失
 - V 评审未读取 R3 报告（reworkHints 未纳入 R3 发现）
 
-**第29轮强化（无条件强制）**：R3 从「条件强制（--r3-enabled flag）」升级为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json`。
+**无条件强制**：R3 为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json`。
 
 **回退动作**：回到 S 产出后起点，补跑 R3 三阶段审查，产出三份 PreventiveReview JSON，再进入 V 评审。
 
 **门禁脚本**：`check-preventive-review.ts`（always-on，无 flag，支持 `--variant=standard|fix|emergency`）校验三份报告完整性；`check-run-log.ts` R8 无条件校验 S(任意变体)→V 间 R3 记录数。
 
-## #34 编排者漏派角色（第24轮新增）
+## #34 编排者漏派角色
 
 **危害**：编排者未按约束 #8 分派 S/V/G/R 角色，导致评审、门禁或根因定位环节缺失，流程完整性失守。
 
@@ -538,16 +536,16 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - run-log 中某阶段缺 role=V 记录（V 评审被跳过）
 - run-log 中某阶段缺 role=G 记录（门禁被跳过）
 - run-log 中某阶段缺 role=S 记录（产出环节被跳过或由 O 越权产出）
-- 缺 role=R 记录（completeness/reliability/security 三阶段任一缺失）—— 第29轮升级为**无条件**强制，不再需要 R3 启用 flag
+- 缺 role=R 记录（completeness/reliability/security 三阶段任一缺失）—— **无条件**强制，无启用 flag
 - self-as-verifier 模式下兼任时未产出独立产物文件（VerifierOutput JSON 与 S 产出同路径）
 
 **回退动作**：回到当前阶段起点，补派缺失角色（S/V/G/R），重跑对应环节并补记 run-log，再进入 CHECKPOINT。
 
-**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；**无条件**含 R ≥3 条记录（第29轮升级，`--r3-enabled` flag 保留为 no-op 向后兼容）。
+**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；**无条件**含 R ≥3 条记录。
 
-**关联**：约束 #8 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮强化为无条件）
+**关联**：约束 #8 
 
-## #35 self-as-verifier 模式下 V/G/R 产物混合（第24轮新增，第29轮扩展含 R3 产物）
+## #35 self-as-verifier 模式下 V/G/R 产物混合
 
 **危害**：self-as-verifier 模式下 V/G/R 产物与 S 产出混合在同一文件中，导致评审独立性失守，评审结论可能被 S 产出污染或覆盖。第29轮扩展：R3 预防性审查三份报告（PreventiveReview JSON）若与 S 产出混合，会令 R3 审查沦为 S 自评，破坏 R3 无条件强制的精神。
 
@@ -556,16 +554,16 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - VerifierOutput JSON 文件路径与 S 产出文件路径相同
 - gate-logs JSON 文件路径与 S 产出文件路径相同
 - RootCauseReport JSON 文件路径与 S 产出文件路径相同
-- PreventiveReview JSON（`<phase>[-fix|-emergency]-{completeness,reliability,security}.json`）文件路径与 S 产出文件路径相同（第29轮扩展）
+- PreventiveReview JSON（`<phase>[-fix|-emergency]-{completeness,reliability,security}.json`）文件路径与 S 产出文件路径相同
 - run-log 条目的 `artifacts` 字段未列出各角色独立产物路径（含 R3 三份报告独立路径）
 
 **回退动作**：回到当前阶段起点，拆分为独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON / PreventiveReview JSON 三份路径均不同），重审 V/G/R 环节并补跑 R3×3。
 
-**门禁脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同；`check-role-dispatch.ts` 校验 run-log artifacts 字段含各角色独立产物路径；`check-preventive-review.ts` 校验三份 PreventiveReview JSON 独立存在（第29轮扩展）。
+**门禁脚本**：`check-verifier-output.ts --self-as-verifier` 校验 VerifierOutput JSON 路径与 S 产出路径不同；`check-role-dispatch.ts` 校验 run-log artifacts 字段含各角色独立产物路径；`check-preventive-review.ts` 校验三份 PreventiveReview JSON 独立存在。
 
-**关联**：约束 #8 + SSoT §3.4.20（[23.0.0] 新增，[28.0.0] 第29轮扩展含 R3 产物）
+**关联**：约束 #8 
 
-## #36 路由顺序错误（第24轮新增）
+## #36 路由顺序错误
 
 **危害**：路由注册顺序错误导致参数路径拦截静态路径（如 `/users/:id` 拦截 `/users/me`，`id="me"`），或鉴权路由注册在公开路由之后导致鉴权失效。
 
@@ -579,9 +577,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无自动脚本（由 V 评审 + G 门禁人工校验路由注册顺序表）。
 
-**关联**：SSoT §3.4.20（[23.0.0] 新增）
+**关联**：
 
-## #37 产物膨胀但核心决策稀疏（第24轮新增）
+## #37 产物膨胀但核心决策稀疏
 
 **危害**：产物文件大小达标（1-2MB）但核心决策稀疏，大量内容为扩展点/附录/重复说明，稀释了产物的语义价值。
 
@@ -595,9 +593,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无自动脚本（由 V 评审人工校验信息密度）。
 
-**关联**：SSoT §3.4.20（[23.0.0] 新增）
+**关联**：
 
-## #38 修改前未查询 codegraph（第25轮新增）
+## #38 修改前未查询 codegraph
 
 **危害**：S-coding 子代理在阶段 5-8 直接修改代码/测试文件，未先查询 codegraph 影响半径，可能误改被广泛依赖的符号，引入隐蔽回归。
 
@@ -610,9 +608,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）。
 
-**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #14
+**关联**：约束 #14
 
-## #39 跳过 opsx 产物审查（第25轮新增）
+## #39 跳过 opsx 产物审查
 
 **危害**：opsx:explore/propose/apply 工作流步骤产物未经 R3×3（completeness/reliability/security）+ V 评审即进入下一步，导致规划缺陷或实现偏差未被发现。
 
@@ -625,9 +623,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
 
-**关联**：SSoT §3.4.21（[24.0.0] 新增）；约束 #11（R3 预防性审查强制）
+**关联**：约束 #11（R3 预防性审查强制）
 
-## #40 opsx/S-tickets 职责混淆（第25轮新增）
+## #40 opsx/S-tickets 职责混淆
 
 **危害**：用 opsx:propose 的 tasks.md 替代 S-tickets 的 tickets.md（或反之），破坏规格级规划（what/why）与代码级切片（how）的职责边界，导致切片缺失端到端可 demo 性或规划缺失设计依据。
 
@@ -641,9 +639,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
 
-**关联**：SSoT §3.4.21（[24.0.0] 新增）
+**关联**：
 
-## #41 加权平均掩盖单轴失败（第26轮新增）
+## #41 加权平均掩盖单轴失败
 
 **危害**：V 评审产物通过加权平均 `compositeScore` 掩盖某一子标准的显著失败——如 completeness=0.65 但其余四项 0.95，加权后仍达 A 级被放行，需求遗漏/分析缺失的单轴缺陷被「平均」抹平。这与外部 code-review 技能「单轴（completeness / correctness）永不合并计分」原则一致：评审各轴独立成环，加权平均只用于汇报，不用于放行判据。
 
@@ -656,9 +654,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-verifier-output.ts` R13 单轴下限（exitCode=1 命中本反模式）。
 
-**关联**：SSoT §3.4.22（[25.0.0] 新增）；[verifier-spec.md](verifier-spec.md) §3.3 / §6.3；[glossary.md](glossary.md)「单轴下限（R13）」；外部原则「评审各轴独立成环，永不合并计分」
+**关联**：[verifier-spec.md](verifier-spec.md) §3.3 / §6.3；[glossary.md](glossary.md)「单轴下限（R13）」；外部原则「评审各轴独立成环，永不合并计分」
 
-## #42 S-fix / emergency-fix 后跳过 R3+V（第29轮新增）
+## #42 S-fix / emergency-fix 后跳过 R3+V
 
 **症状**：S-fix（返工变体）或 S-emergency-fix（紧急修复变体）产出后，未派遣 R3×3（completeness/reliability/security）+ V 评审，直接进入 G 门禁或放行。
 
@@ -676,7 +674,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-run-log.ts` R8 无条件校验 S(任意变体，含 fix/emergency-fix)→V 间 R3 记录数；`check-role-dispatch.ts` 校验 R≥3 无条件；`check-preventive-review.ts --variant=fix|emergency` 校验对应路径三份报告完整性。
 
-**关联**：约束 #11 + #8 + SSoT §3.4.25（[28.0.0] 新增）；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
+**关联**：约束 #11 + #8 ；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
 ## #43 敏感信息写入状态文件/日志（第三十一轮新增）
 
@@ -693,9 +691,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（软检测，V 评审 + G 门禁人工核验；`security-scan.ts` 覆盖源码级扫描，本反模式覆盖数据文件层）。
 
-**关联**：SSoT §3.4.27（[30.0.0] 新增）；[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理（第 15 轮）
+**关联**：[operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节；demo `JWT_SECRET` 环境变量处理
 
-## #44 跳过冰山扫掠直接放行（第 36 轮新增）
+## #44 跳过冰山扫掠直接放行
 
 **症状**：S-fix 后或阶段门放行前未分派 R-iceberg；或 R-iceberg 发现新问题后未经 V 复审直接放行。
 
@@ -711,9 +709,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-iceberg-sweep.ts`
 
-**关联**：SSoT §3.4.34（[36.0.0] 新增）；[iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节；反模式 #42（S-fix/emergency-fix 后跳过 R3+V）的冰山扩展
+**关联**：[iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节；反模式 #42（S-fix/emergency-fix 后跳过 R3+V）的冰山扩展
 
-## #45 subagent 为通过测试而修改断言/测试期望（反指标游戏）（第 39 轮新增）
+## #45 subagent 为通过测试而修改断言/测试期望（反指标游戏）
 
 **症状**：subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据；S 返回总结出现"调整测试期望""更新断言"且未先行报告；覆盖率 100% 但关键行为场景未被任何断言覆盖。
 
@@ -730,9 +728,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（软检测——由 V 评审人工核验断言与需求对应关系）
 
-**关联**：SSoT §3.4.39（[39.0.0] 新增）；「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd-guide.md](bdd-guide.md)「记叙性优先」节）
+**关联**：「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd-guide.md](bdd-guide.md)「记叙性优先」节）
 
-## #46 只给审计权不给修正权（第 39 轮新增）
+## #46 只给审计权不给修正权
 
 **症状**：评审/CHECKPOINT 中发现用户只能看日志与产物而不能在过程中间介入修正；全自动流程把用户锁在"跑完再看"之外；提供监控面板/日志/思维链展示但介入手段只有改提示词重跑。
 
@@ -749,9 +747,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（流程设计属性——由 CHECKPOINT 介入路径标注保证）
 
-**关联**：SSoT §3.4.39（[39.0.0] 新增）；「主刀职责映射表」见 [subagent-delegation.md](subagent-delegation.md)；「修正权验收测试」见 [definition-of-done.md](definition-of-done.md)
+**关联**：「主刀职责映射表」见 [subagent-delegation.md](subagent-delegation.md)；「修正权验收测试」见 [definition-of-done.md](definition-of-done.md)
 
-## #47 大规模重构式改动（第 40 轮新增）
+## #47 大规模重构式改动
 
 **症状**：单次 diff 重写整个模块/大面积重构与非目标功能改动混杂；变更量子无穷大，评审无法回答"这次改了什么"。
 
@@ -768,207 +766,5 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束）
 
-**关联**：SSoT §3.4.40（[40.0.0] 新增）；[phase-5-coding.md](phase-5-coding.md)「增量集成纪律」节；反模式 #21（阶段级门禁跳过）
+**关联**：[phase-5-coding.md](phase-5-coding.md)「增量集成纪律」节；反模式 #21（阶段级门禁跳过）
 
-## 实现层经验教训（来自端到端调测）
-
-> 以下不属于 W 模型**流程**反模式（命中不会触发阶段回退），而是 W 模型端到端调测中沉淀的**代码层**经验教训。
-> Agent 在阶段 5（编码）与阶段 6（集成测试）应主动规避，避免重蹈覆辙。
-> 来源：博客系统后端端到端调测（两轮：2026-07-20 首轮 + 2026-07-21 从零重建第二轮）。
-> **归档说明（2026-07-27 第 17 轮 P6）**：原 `w-model-dev-demo/` 目录已删除，归档摘要位于 [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](../../docs/changes/archive/2026-07-26-round15-end-to-end-test/)。下文「详见」链接为**历史记录**（源码已不在仓库），仅作教训检索参考；最终调测数字见归档 [`README.md`](../../docs/changes/archive/2026-07-26-round15-end-to-end-test/README.md)。
-
-| # | 教训 | 触发场景 | 危害 | 规避做法 |
-|---|---|---|---|---|
-| L1 | Express 4 路由直接使用 `async (req, res, next) => {...}` 而不包装 | 阶段 5 编码：在 Express 4 路由中抛出 `AppError` 子类（如 `ForbiddenError` / `NotFoundError`） | rejected promise 不被错误中间件捕获，表现为 Unhandled Rejection，错误响应体不符合 `{error: string}` 契约，首轮集成测试集体失败 | 引入 `asyncHandler` 包装器包裹全部路由：`(fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)`；详见历史 `w-model-dev-demo/src/utils/async-handler.ts` 与 `integration-test-report.md` §5（已归档） |
-| L2 | 模块加载阶段读取环境变量并直接 `throw`（如 `process.env.JWT_SECRET ?? (() => { throw ... })()`） | 阶段 5 编码：在 `src/utils/env.ts` 等模块顶层用 IIFE 抛错保护必填环境变量 | 测试套件在 `collect` 阶段即崩溃（模块 import 失败），连锁导致所有间接依赖该模块的测试文件 0 用例；vitest 报 `0 test` 而非 `fail`，掩盖真实失败数 | ① 模块加载阶段只读不抛，运行时（如服务启动）再校验必填；② 测试脚本统一注入环境变量（如 `cross-env JWT_SECRET=test-secret`）；详见历史 `w-model-dev-demo/src/utils/env.ts` 与 `w-model-dev-demo/package.json`（已归档） |
-| L3 | service 类导出方式反复：内部 `class Foo` + `export const foo = new Foo()` 实例，丢失类型导出 | 阶段 5 编码：将原 `export class ArticleService` 改为内部 `class ArticleService` + `export const articleService`，但其他模块仍 `import type { ArticleService }` | `tsc --strict` 报 TS2724「no exported member named 'ArticleService'」，违反 NFR-003「tsc 0 错误」；回归测试发现后必须回退导出 | 类型与实例可同时导出：`export class ArticleService {}` + `export const articleService = new ArticleService()`；改导出方式前先 `grep -rE "import type \{ .*ArticleService"` 全仓库扫描消费者；详见历史 `w-model-dev-demo/src/services/article-service.ts`（已归档） |
-| L4 | vitest mock 与 express 中间件类型不兼容：`vi.fn() as unknown as NextFunction` 后访问 `next.mock.calls` | 阶段 5 编码：测试中 `const next = vi.fn() as unknown as NextFunction`，断言 `next.mock.calls[0][0]` | `tsc --strict` 报 TS2339「Property 'mock' does not exist on type 'NextFunction'」；vitest 1.6 类型定义与 express 4 类型定义存在兼容性差异 | 用 `ReturnType<typeof vi.fn>` 做类型断言：`(next as ReturnType<typeof vi.fn>).mock.calls[0][0]`；或断言为 vitest `Mock` 类型：`import type { Mock } from 'vitest'; (next as Mock).mock.calls[0][0]`；详见历史 `w-model-dev-demo/tests/unit/auth-middleware.test.ts`（已归档） |
-
-### 适用范围与扩展规则
-
-- 本节仅记录**真实调测中发现并修正过**的代码层教训，每条须可指向具体的缺陷与修正证据（demo 内的代码 / 报告链接）。
-- 新增教训时，同步在 SSoT [§10B.4](../../docs/skill-design-document_SSoT.md) 「过程中发现的缺陷与修正」表登记对应缺陷行，保证双向可追溯。
-- 教训不命中阶段回退；若 Agent 在阶段 6 集成测试中再次触发已记录教训，应在《测试报告》「备注」节标注「重蹈 L#」并提示用户复核阶段 5 编码规范。
-- L1 来自 2026-07-20 首轮调测；L2/L3/L4 来自 2026-07-21 从零重建第二轮回归测试发现。
-
-## 失败模式清单（F1~F10）
-
-> 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `using-agent-skills` 元技能的 Failure Modes。
-> SSoT [§4A.2](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
->
-> **与 47 条流程反模式（#1~#47）的关系**：反模式是「流程破坏」，命中即触发阶段回退（由门禁脚本或 CHECKPOINT 强制）；失败模式是「行为退化」，命中不触发回退但降低产物质量。二者互补：反模式关注「是否走完流程」，失败模式关注「流程中行为是否健康」。
->
-> **与 4 条实现层经验教训（L1~L4）的关系**：L1~L4 是代码层教训（特定技术栈的具体坑），F1~F10 是行为层模式（跨技术栈的通用陷阱）。
->
-> **登记规则**：Agent 重复命中同一失败模式 ≥2 次时，应在本节「实现层经验教训」登记为新 L# 教训（即 F# 退化如果具体化为代码层坑，升级为 L#），并在 SSoT [§10B.4](../../docs/skill-design-document_SSoT.md) 同步登记对应缺陷行。
-
-#### 错误聚集与超标丢弃（第 41 轮四源吸收，失控 ch11）
-
-- **错误聚集（蟑螂法则）**：见到一个错误，还有二十三个潜伏——失败模块的错误不是孤立的，R 根因定位与冰山扫掠（iceberg-sweep）须沿失败聚集处深挖，而非修完单点即止。
-- **超标模块重写**：错误超过阈值 → 丢弃重写（换不同开发者/视角），而非原地修补；早期错误预示后期错误——高错误密度模块是候选重写对象（operational-recovery.md「超标模块重写」节）。
-- **与反模式 #18 的关系**：错误聚集支持 R 深挖（先根因再修），不绕过返工循环。
-
-### F1~F10 失败模式表
-
-| # | 失败模式 | 检测信号（Agent 自查） | 与反模式 / 操作行为的关系 | 处理流程 |
-|---|---|---|---|---|
-| F1 | 静默假设未检查就推进 | 阶段产物中存在「未询问用户就采用的假设」（如默认技术栈、默认数据模型、默认错误码）；ingestion 场景：A-chunk 静默跳过疑似跨块关系而不在 `crossChunkHints` 登记 | 与 #9（谎报状态）互补：#9 是结果撒谎，F1 是过程撒谎；对应 §4A.1 行为 1「Surface Assumptions」 | ① 立即暂停推进；② 在产物「假设声明」节显式列出已采用的假设；③ 向用户确认假设是否成立；④ 假设被否决则回退到产物起点修正 |
-| F2 | 困惑时不暂停、硬猜推进 | Agent 内部对话出现「这里不太确定，但应该是 X 吧」类语句；RTM 字段值与上游不一致但未提出 | 与 #8（越过 CHECKPOINT）互补：#8 是显式节点越过，F2 是隐式困惑越过；对应 §4A.1 行为 2「Manage Confusion Actively」 | ① STOP 当前任务；② 命名具体困惑（「RTM 的 REQ-001 与设计文档 SD-3.2 字段名不一致」）；③ 向用户提出具体澄清问题；④ 等待解决后再继续 |
-| F3 | 注意到不一致但不指出 | Agent 跨文档扫描时发现术语 / 接口 / 字段冲突但未在产物「备注」节登记 | 与 #4（评审未通过悄悄小修）互补：#4 是评审后，F3 是评审中；对应 §4A.1 行为 3「Push Back When Warranted」 | ① 在当前产物「备注」节登记不一致点（位置 + 描述 + 影响）；② 在阶段门评审的 `reworkHints` 中以「[FYI] 跨文档不一致：xxx」前缀呈现；③ 由用户决定是否本阶段修复或下阶段修复 |
-| F4 | 非显然决策不呈现 tradeoff | 设计文档 / 评审报告中只有结论无替代方案对比（如「采用 JWT」但无「vs Session vs OAuth」对比） | — | ① 在决策点补 tradeoff 表（选项 / 优势 / 劣势 / 选择理由）；② tradeoff 写入设计文档「技术选型」节或评审报告 `summary` 字段 |
-| F5 | 对明显有问题的方案 sycophantic「当然可以」 | 用户提出违反硬约束的请求（如「跳过 CHECKPOINT」「估算覆盖率放行」），Agent 直接同意 | 对应 §4A.1 行为 3「Push Back When Warranted」 | ① 指出与哪条硬约束冲突（约束编号 + 原文）；② 量化代价（「跳过 CHECKPOINT 会导致用户失去决策权，后续阶段全部失真」）；③ 提出替代方案（「我可以加速但不跳过：把 CHECKPOINT 与下一阶段初始化合并展示」）；④ 接受用户在完整信息下的覆盖决策，但在产物「备注」节登记冲突 |
-| F6 | 过度复杂化代码与 API | 代码中出现「资深工程师会问『为何不直接……』」的抽象；1000 行能 100 行完成；为单次使用建抽象层 | 对应 §4A.1 行为 4「Enforce Simplicity」 | ① 编码前自问「能否更少行？抽象是否物有所值？」；② 命中后在代码评审 `reworkHints` 中以「[Required] 过度复杂化：建议简化为 xxx」前缀呈现；③ 回到编码返工 |
-| F7 | 修改任务外的代码或注释 | `git diff` 显示改动触及了规格外的文件（如修 bug 时顺手「清理」无关代码） | 对应 §4A.1 行为 5「Maintain Scope Discipline」 | ① 立即回滚任务外改动；② 如改动确有价值，单独创建任务处理；③ 在产物「备注」节登记「已识别但未处理的改进点：xxx」 |
-| F8 | 删除未完全理解的代码 | Agent 删除了「看似无用」的代码 / 注释 / 配置但无法解释其存在原因 | 对应 §4A.1 行为 5「Maintain Scope Discipline」；与 Chesterton's Fence 原则冲突 | ① 立即恢复删除；② 通过 git blame / 提交历史 / 上下文调查代码存在原因；③ 如确认无用，在产物「备注」节登记「拟删除 + 调查证据」；④ 由用户决定是否删除 |
-| F9 | 因「显而易见」而无规格就编码 | 阶段 5 编码开始但阶段 4 详细设计文档对该功能无对应条目；或测试设计前置约束被绕过 | 与 W 模型核心约束「测试设计前置」冲突 | ① 回到阶段 4 补详细设计 + 单元测试设计；② 不得以「这功能太简单不需要设计」为由跳过；③ 在阶段门评审中如发现此模式，`passed=false` |
-| F10 | 因「看起来对」跳过验证 | 阶段产物已产出但未执行测试运行器 / 门禁脚本；或仅凭 LLM 文本说「通过」就推进；ingestion 场景：仅凭 A-cross/A-evolve 的 LLM 输出说「图谱已收敛」就推进，未跑 `check-requirement-graph.ts`（与 #12 互补） | 与 #3（估算质量门）/ #6（估算 RTM 覆盖率）互补；对应 §4A.1 行为 6「Verify, Don't Assume」 | ① 立即执行对应验证（单元测试 / `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-requirement-graph.ts`（阶段 1-4 图谱门禁））；② 验证证据（退出码 + 输出摘要）写入产物「验证证据」节；③ 无证据不得推进 |
-
-### 失败模式与反模式的对照
-
-| 维度 | 反模式 #1~#47 | 失败模式 F1~F10 |
-|---|---|---|
-| 性质 | 流程破坏 | 行为退化 |
-| 命中后果 | 立即回退到对应阶段起点 | 不回退，但降低产物质量 |
-| 强制方式 | 门禁脚本退出码 / 🔴 CHECKPOINT | Agent 自检 / LLM-as-a-Verifier 在评审中标注 |
-| 登记位置 | 《测试报告》「备注」节 + `reworkHints` | 阶段产物「备注」节 + `reworkHints`（前缀 `[FYI]` 或对应 Severity） |
-| 升级规则 | 命中即升级，无升级概念 | 重复命中同一 F# ≥2 次 → 升级为新 L# 教训（如 F1 多次命中且具体化为某技术栈坑 → L5） |
-| 与操作行为关系 | 部分反模式对应操作行为违反（如 #8 ↔ 行为 2） | 大部分失败模式直接对应操作行为违反（F1↔行为1 / F2↔行为2 / F5↔行为3 / F6↔行为4 / F7/F8↔行为5 / F10↔行为6） |
-
-### 失败模式的标注约定
-
-在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注失败模式：
-
-```
-[F1] 阶段 1 需求规格 — 静默假设：默认采用 JWT 而非 Session，未询问用户
-[F3] 阶段 2 系统设计 — 跨文档不一致：REQ-001 字段名 userId 与 SD-3.2 字段名 uid 冲突，未在产物登记
-[F6] 阶段 5 编码 — 过度复杂化：src/utils/auth-helper.ts 为单次使用建了 3 层抽象
-```
-
-LLM-as-a-Verifier 在评审中识别到失败模式时，应在 `reworkHints` 中以 `[F#]` 前缀呈现，并在 `summary` 字段统计命中数（如「命中 2 条失败模式：F1 / F6」）。
-
-### 与 addyosmani/agent-skills 的差异
-
-| 维度 | addyosmani 原版 | W 模型适配版 |
-|---|---|---|
-| 失败模式触发后果 | 由 Agent 自检，无强制机制 | 命中不回退但须登记；重复 ≥2 次升级为 L# 教训 |
-| 与反模式关系 | 失败模式与反模式未明确区分 | 明确二分：反模式 = 流程破坏（回退），失败模式 = 行为退化（登记） |
-| 标注位置 | Agent 内部对话 | 阶段产物「备注」节 + 评审报告 `reworkHints`（`[F#]` 前缀） |
-| 升级路径 | 无 | F# 重复命中 → L# 教训 → SSoT §10B.4 缺陷表（双向追溯） |
-| 与操作行为对应 | 失败模式与 Core Operating Behaviors 一一对应 | 直接吸收对应关系，且与 W 模型 7 条硬约束互补 |
-
-## 运维失败模式清单（O1~O6）
-
-> 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。SSoT [§4A.2a](../../docs/skill-design-document_SSoT.md) 为权威定义，本节为可执行细则。
->
-> **与 47 条流程反模式（#1~#47）+ 10 条行为退化（F1~F10）的关系**：反模式是「流程破坏」（命中即回退，脚本守护），失败模式是「行为退化」（命中不回退但降低质量，Agent 自检），运维失败模式是「运行健康问题」（命中不回退但应标注，用户+系统协同检测）。三者互补形成三层架构：
->
-> ```
-> 层 1：流程反模式 #1~#47（命中即回退，脚本守护）
->   ↓ 互补
-> 层 2：行为退化 F1~F10（命中不回退但标注，Agent 自检）
->   ↓ 互补
-> 层 3：运维失败模式 O1~O6（命中不回退但标注，用户+系统协同检测）
-> ```
->
-> O 系列命中**不触发脚本回退**（与 F1~F10 同级），但应在 run-log 的 `note` 字段标注，并在阶段产物「备注」节或评审报告 `reworkHints` 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
-
-### O1~O6 运维失败模式表
-
-| # | 失败模式 | 症状 | 与现有反模式/失败模式的关系 | 缓解措施 |
-|---|---|---|---|---|
-| O1 | **Token Burn**（子代理链对空/噪声 triage 全跑） | 单阶段 token 消耗异常高；ingestion 对低信息量输入仍全跑 A-chunk×N | 与 F10（跳过验证）互补：F10 是不验证，O1 是过度验证 | 预算检查（§10D）+ 早退：triage 发现空输入时 A-chunk 数=1；`budgetBurnRate` 触发 kill switch |
-| O2 | **State Rot**（状态文件引用已合并/已废弃产物） | `rtm.json`/`graph.json` 引用已删除文件或已废弃 ID | 与 #9（谎报状态）互补：#9 是状态造假，O2 是状态腐烂 | 每阶段门 G 子代理校验产物路径存活（`ls`/`git status`）；ID 失活 → 标记并 prune |
-| O3 | **Verifier Theater**（V 子代理"looks good"但 CI 挂） | V 评审 `passed=true` `qualityLevel=A` 但下游测试失败 | 与 #1（跳过评审）对立面：评审走了形式 | 强化 [verifier-spec.md](verifier-spec.md) §1 设计原则：V 默认拒绝姿态（"find reasons to reject"）；V 须引用具体 evidence 非空泛；G 校验 evidence 非空 |
-| O4 | **Comprehension Debt Spiral**（用户橡皮图章 CHECKPOINT） | 用户对所有 CHECKPOINT 输入"确认"无修改意见；阶段产物无人理解 | 与 F5（sycophantic）互补：F5 是 Agent 奉承用户，O4 是用户奉承 Agent | 理解证据机制（[definition-of-done.md](definition-of-done.md) 第六维度）：放行前须填 `acknowledgedDecisions` ≥1 关键决策；空确认视为 O4 命中 |
-| O5 | **Cognitive Surrender**（"循环处理了"无设计意见） | 用户放弃对设计/架构的意见；全权委托 Agent | 与 §4A.1 第 3 条（Push Back）对立面 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中 |
-| O6 | **Escalation Failure**（attempt cap 触发但无人被通知） | 返工达 `maxReworkRounds` 但用户未被告知；循环卡死 | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死 | attempt cap 触发 → run-log append `escalate` 记录 + 强制 🔴 CHECKPOINT 展示返工历史 |
-
-### 检测信号与处理流程
-
-> 与现有「检测信号与回退动作」节同构。O 系列命中不回退，但应在 run-log 的 `note` 字段标注，并在阶段产物的「备注」节或评审报告的 `reworkHints` 中记录。
-
-| # | 检测信号（Agent 自查） | 命中后动作 | 关联机制 |
-|---|---|---|---|
-| O1 | `budget.json` 触发预算告警 / 单阶段 tokens > `maxTokens`×0.8 | 暂停后续子代理；展示消耗明细；询问降范围/增预算 | §10D 预算检查 |
-| O2 | G 子代理校验产物路径时发现 `rtm.json`/`graph.json` 引用的文件不存在 | 标记失活 ID；prune 状态文件；run-log append note="O2 State Rot" | G 子代理职责扩展（路径存活校验） |
-| O3 | V 评审 `passed=true` 但 G 门禁退出码 1（V 与 G 矛盾） | 标注 O3；V 评审降级重做（强化 evidence 引用）；run-log append note="O3 Verifier Theater" | [verifier-spec.md](verifier-spec.md) §1 设计原则 |
-| O4 | 阶段门 CHECKPOINT 用户放行但 `acknowledgedDecisions` 为空/仅"确认" | 拒绝放行；要求用户填入 ≥1 关键决策摘要；run-log append note="O4 Comprehension Debt" | §10.6 第六维度（理解证据） |
-| O5 | 阶段 2/4 设计 CHECKPOINT 用户无修改意见/替代方案 | 拒绝放行；要求用户提出 ≥1 修改意见或替代；run-log append note="O5 Cognitive Surrender" | 阶段 2/4 CHECKPOINT 强化 |
-| O6 | attempt cap（`maxReworkRounds`）触发但无 `escalate` 记录 | 强制 🔴 CHECKPOINT 展示返工历史；run-log append action=escalate；询问降级/取消 | §10D killSwitch + 返工循环 |
-
-### 运维失败模式的标注约定
-
-在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注运维失败模式：
-
-```
-[O1] 阶段 1 需求分析 — Token Burn：单阶段消耗 480k tokens（预算 500k），ingestion 对一句话输入跑了 8 个 A-chunk
-[O3] 阶段 5 编码 — Verifier Theater：V 评审 qualityLevel=A 但单元测试 3 项失败，evidence 引用空泛
-[O4] 阶段 2 系统设计 — Comprehension Debt：用户放行时 acknowledgedDecisions 为空，未填写关键决策摘要
-```
-
-LLM-as-a-Verifier 在评审中识别到运维失败模式时，应在 `reworkHints` 中以 `[O#]` 前缀呈现，并在 `summary` 字段统计命中数（如「命中 1 条运维失败模式：O3」）。
-
-### 与 cobusgreyling/loop-engineering 的差异
-
-| 维度 | loop-engineering 原版 | W 模型适配版 |
-|---|---|---|
-| 失败模式触发后果 | 由 loop 系统自检，无强制机制 | 命中不回退但须标注；O4/O5 命中时拒绝放行（直接关联 CHECKPOINT 有效性） |
-| 与反模式关系 | 失败模式与反模式未明确区分 | 明确三层：反模式 = 流程破坏（回退），失败模式 = 行为退化（登记），运维失败模式 = 运行健康（标注） |
-| 标注位置 | loop-run-log.md | run-log.jsonl 的 `note` 字段 + 阶段产物「备注」节 + 评审报告 `reworkHints`（`[O#]` 前缀） |
-| 检测机制 | loop 系统自动检测 | 预算检查（O1/O6）/ 路径存活校验（O2）/ V-G 矛盾检测（O3）/ 理解证据机制（O4/O5）协同检测 |
-| 与成熟度关系 | 无 | O 系列命中影响成熟度升级判定（L0→L1 需无 O 系列命中）与降级（连续命中触发自动降级回 L0） |
-
-## 候选反模式检测信号（来自 Loop 4 爬坡循环）
-
-> 来源：SSoT [§10G](../../docs/skill-design-document_SSoT.md)。Loop 4 的 HarnessImprovementReport（详见 [hill-climbing-guide.md](hill-climbing-guide.md)）产出候选反模式信号，人审后手动加入本清单。
->
-> **与已收录反模式的关系**：已收录的 #1~#47 + F1~F10 + O1~O6 是技能包内置清单；候选反模式是 Loop 4 从 run-log 模式聚合产出的**待审**信号，须经人审 + 至少 2 个项目的回归验证后才正式加入清单。
-
-### 候选反模式信号来源
-
-Loop 4 的信号检测逻辑（确定性，无 LLM）会从 run-log 聚合以下模式作为候选反模式：
-
-| 检测信号 | 来源 | 转正条件 |
-|---|---|---|
-| run-log note 字段反复出现同类问题（≥3 次跨 ≥2 阶段） | Loop 4 `anti-pattern` 信号类别 | 人审 + 2 项目回归验证 |
-| V 评审 summary 跨阶段 Jaccard 相似度 > 0.8 且长度 < 50 字符 | Loop 4 `prompt` 信号 + 信息熵检测 | 人审 + 2 项目回归验证 |
-| V passed=true 但 G exit=1 频次 > 阈值（≥3 次/阶段） | Loop 4 `verification-rule` 信号 | 人审 + 2 项目回归验证 |
-| L1+ 自动放行后误判率 > 10% | Loop 4 `maturity` 信号 | 人审 + 2 项目回归验证 |
-
-### 四源吸收候选（第 41 轮四源吸收登记）
-
-> 批次 A 登记的四源候选（α/β/γ/δ）按 §11 候选生命周期评估转正（人审 + ≥2 项目回归验证）；本批不正式编号（不计入最大编号期望，docs-consistency 期望保持 47）。
-
-| 候选 | 来源 | 检测信号 | 建议处置 |
-|---|---|---|---|
-| 四源-α 复杂性增量累积 | APoSD ch02.4/ch03 | 每个小改都塞一点复杂性，累积后不可控；与 #47 反向呼应 | 战略式编程（quality-standards「设计投资」节）；转正须人审 + ≥2 项目回归 |
-| 四源-β 模式装饰性引用 | GoF ch1.8/ch6 | 设计引用模式名但无参与者/意图/权衡支撑（橡皮图章，类比 #16 占位） | V 评审按「方案权衡」必填列降分；转正须人审 + ≥2 项目回归 |
-| 四源-γ 过度 swarm 化 | 失控 ch2 | 无门禁的多代理自由发挥，缺确定性收口（clockware/swarmware 失衡） | 门禁收口（约束 4/10）；转正须人审 + ≥2 项目回归 |
-| 四源-δ 纸面理由替代真实门禁 | 失控 ch2/ch11 | 以评审意见/纸面推演替代 exitCode 真实执行 | 强化约束 4/10；转正须人审 + ≥2 项目回归 |
-
-### 候选反模式生命周期
-
-```
-Loop 4 产出候选信号（HarnessImprovementReport.recommendations.candidateAntiPatterns）
-  ↓ 人审
-人决定 adopt / defer / reject
-  ↓ adopt 后
-加入本节「待回归验证」清单
-  ↓ 2 项目回归验证通过
-正式加入 #1~#47 或 F1~F10 或 O1~O6 清单
-```
-
-#### 四源候选转正评审（第 41 轮）
-
-批次 A 登记的四源候选（α 复杂性增量累积 / β 模式装饰性引用 / γ 过度 swarm 化 / δ 纸面理由替代真实门禁）按下列判据评估转正：
-- **人审通过**：用户确认该反模式在真实项目中可识别、有检测信号、有明确回退动作。
-- **≥2 项目回归验证**：在至少 2 个 W 模型项目中确认命中时确实对应流程/质量破坏。
-- **不强制编号**：未达转正判据的候选保持候选区（不触发 docs-consistency 最大编号联动）；本批不新增正式反模式编号。
-
-### 待回归验证清单（初始为空）
-
-> 本节随 Loop 4 报告累积。每条记录格式：`候选 ID | 描述 | 来源报告 ID | 首次发现时间 | 验证项目数`
-
-| 候选 ID | 描述 | 来源报告 | 首次发现 | 验证项目数 |
-|---|---|---|---|---|
-| （初始为空） | | | | |

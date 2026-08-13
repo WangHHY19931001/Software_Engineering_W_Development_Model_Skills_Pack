@@ -2,7 +2,7 @@
 
 > 对应 DESIGN.md §2.1.1 需求条目化追踪矩阵。Phase 3 适配：INTF 编号 → 主文档 §2 接口定义。
 > **阶段边界**：本文件是概要设计级追踪（INTF×SD），类级（DD×INTF）追踪由阶段 4 承接。
-> 模板版本：v1.0（第 38 轮）。主文档引用块：`> 追踪矩阵详见 [{{module}}-traceability-matrix.md](./{{module}}-traceability-matrix.md)`。
+> 模板版本：v1.0。主文档引用块：`> 追踪矩阵详见 [{{module}}-traceability-matrix.md](./{{module}}-traceability-matrix.md)`。
 
 ## 1. INTF×SD 8 字段表
 

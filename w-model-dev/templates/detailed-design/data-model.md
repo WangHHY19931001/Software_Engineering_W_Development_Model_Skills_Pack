@@ -3,7 +3,7 @@
 > 对应 DESIGN.md 附录 A.5 ER 图 + §21.5 store 物理层。数据级设计：
 > ER 图 / 表结构 / 索引 / store 归属。
 > **阶段边界**：本文件只产数据模型级设计，不定义接口契约（阶段 3），越界即返工（FM-DD-06）。
-> 模板版本：v1.0（第 38 轮）。主文档引用块：`> ER 图 / 表结构 / 索引 / store 归属细节详见 [{{module}}-data-model.md](./{{module}}-data-model.md)`。
+> 模板版本：v1.0。主文档引用块：`> ER 图 / 表结构 / 索引 / store 归属细节详见 [{{module}}-data-model.md](./{{module}}-data-model.md)`。
 
 ## 1. ER 图
 

@@ -3,7 +3,7 @@
 > 对应 DESIGN.md §7 行为规格模型。**本文件仅定义引用关系，不内联 feature 块、不定义文档级头规范**——
 > `.feature` 文件由 `references/bdd-guide.md` §2 头规范管（@req/@design/@designIds/@system/@tla-spec/@state-machine 等 10 字段），
 > `bdd-manifest.json` 登记 feature 资产。**阶段边界**：本文件只定义 L2（系统级）行为规格引用，L3/L4 由阶段 3/4 承接。
-> 模板版本：v1.0（第 38 轮）。主文档引用块：`> 行为规格模型详见 [{{module}}-behavior-spec.md](./{{module}}-behavior-spec.md)`。
+> 模板版本：v1.0。主文档引用块：`> 行为规格模型详见 [{{module}}-behavior-spec.md](./{{module}}-behavior-spec.md)`。
 
 ## 1. L2 行为规格角色
 

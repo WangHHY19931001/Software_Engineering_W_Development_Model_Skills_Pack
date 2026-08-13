@@ -24,22 +24,22 @@
      ├─ 产出主模板 §4 部署架构
      ├─ 失败: 模块循环依赖 → 列出环路径重新划分（FM-SD-03）；子系统清单与模块划分不对应 → 回步骤 1
      └─ 成功: 模块划分无环且与子系统清单一致
-  4. 系统上下文与术语建模（第 38 轮新增）
+  4. 系统上下文与术语建模
      ├─ 承接 phase1 system-context.md 外部边界，产出 docs/phase2-design/{module}-glossary.md（系统设计域术语子集）
      ├─ 主模板 §6 引用块指向 glossary.md
      └─ 成功: glossary.md 产出，引用块成立
-  5. UML 系统级建模（第 38 轮新增）
+  5. UML 系统级建模
      ├─ 产出 docs/phase2-design/{module}-uml-modeling.md（部署图/顶层组件图/包图/用例图）
      ├─ 主模板附录 A 引用块指向 uml-modeling.md
      ├─ 失败: 图与主模板 §1/§3 不对应 → 回步骤 5 对齐（FM-SD-04）
      └─ 成功: 四图产出，mermaid 块配平
-  6. 追踪矩阵与行为规格引用（第 38 轮新增）
+  6. 追踪矩阵与行为规格引用
      ├─ 产出 docs/phase2-design/{module}-traceability-matrix.md（SD×需求 8 字段 + 测试层级矩阵）
      ├─ 产出 docs/phase2-design/{module}-behavior-spec.md（L2 .feature 引用关系）
      ├─ 主模板 §7/§8 引用块指向上述独立文件
      ├─ 失败: 追踪矩阵字段与步骤 1/3 不一致 → 回步骤 6 对齐（FM-SD-05）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
-  7. Phase 2 工程纪律与 DoD（第 38 轮新增）
+  7. Phase 2 工程纪律与 DoD
      ├─ 产出 docs/phase2-design/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
      ├─ 主模板 §9 引用块指向 discipline-dod.md
      └─ 成功: DoD 清单产出，引用块成立
@@ -56,7 +56,7 @@
   - 技术选型建议
   - 模块划分方案
 - 系统测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=系统测试）
-- 独立产物文件（第 38 轮新增，主文档引用块指向，均位于 `docs/phase2-design/`，带 `{module}-` 前缀）：
+- 独立产物文件：
   - `{module}-system-architecture.md`：系统架构（组件图/子系统清单/系统树/架构原则/ADR/行为总览/运行时架构）
   - `{module}-glossary.md`：术语表（系统设计域子集）
   - `{module}-traceability-matrix.md`：系统设计追踪矩阵（SD×需求 8 字段 + 测试层级矩阵）
@@ -106,7 +106,7 @@
 
 输出格式：候选清单 + 每项 5 维度评分 + 总分 + 一句话选型理由。无评分依据的选型一律返工。
 
-### 架构决策框架（第 41 轮四源吸收，凤凰架构）
+### 架构决策框架
 
 技术选型评分时，以下第一性原则作为 5 维度评分的约束输入（写入 ADR 的「上下文」节）：
 
@@ -134,7 +134,7 @@
 
 执行顺序：先跑检测命令（以退出码为准），再触发 fallback；fallback 后必须重新检测，确保闭环。
 
-## 失败模式矩阵（第 38 轮新增）
+## 失败模式矩阵
 
 | 编号 | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|
@@ -156,7 +156,7 @@
 | TC-DES-008 | 性能基线（设计） | 预期用户量 / QPS | 性能基线用例（P95 < 2s，100 QPS 持续 10min） | 高 |
 | TC-DES-009 | 安全基线（设计） | OWASP Top 10 | 安全基线用例（SQL注入/XSS/CSRF 防御验证） | 高 |
 
-## 测试 seam 决策（第 10 轮外部技能吸收）
+## 测试 seam 决策
 
 > 吸收 to-spec seam-first testing 方法论。系统级 seam 决策服务于阶段 7 系统测试设计，与现有「系统测试设计」节互补：seam 决策是「在哪测」，系统测试设计是「测什么」。
 

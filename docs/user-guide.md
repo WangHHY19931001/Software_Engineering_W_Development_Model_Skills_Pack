@@ -107,7 +107,7 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 | 归档完整性 `check-archive-integrity.ts` | 强制快照清单缺文件 | 反模式 #31 | 补齐归档强制产出文档后重跑 |
 | 预防性审查 `check-preventive-review.ts` | R3×3 缺失 | 反模式 #33/#42 | 回 S 产出后起点补跑 R3×3 + V |
 
-> 修改 `*-logic.ts` 校验逻辑后必须跑 `npm run self-test`（249 条样本回归基线）与 `npm run prepush`，并同步样本（见 [`__tests__/README.md`](../w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
+> 修改 `*-logic.ts` 校验逻辑后必须跑 `npm run self-test`（252 条样本回归基线）与 `npm run prepush`，并同步样本（见 [`__tests__/README.md`](../w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
 
 ## 6. 依赖巡检流程（人工 npm audit + npm outdated）
 

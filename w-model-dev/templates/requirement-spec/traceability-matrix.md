@@ -1,7 +1,7 @@
 # 需求追踪矩阵（Traceability Matrix）
 
 > 对应 DESIGN.md §2.1.1 需求条目化追踪矩阵。Phase 1 适配：涉及子系统→候选子系统，设计落点→候选落点§。
-> 模板版本：v1.0（第 37 轮）。主规格引用块：`> 需求追踪矩阵详见 [traceability-matrix.md](./traceability-matrix.md)`。
+> 模板版本：v1.0。主规格引用块：`> 需求追踪矩阵详见 [traceability-matrix.md](./traceability-matrix.md)`。
 
 ## 1. REQ/NFR 字段表
 

@@ -1,6 +1,6 @@
 # samples/ 覆盖矩阵
 
-> 本目录为 `self-test.ts`（249 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
+> 本目录为 `self-test.ts`（252 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
 > **每个 fixture 必须被 `w-model-dev/scripts/cli/self-test.ts` 用例数组引用**（`file` / `sampleDir` 字段），
 > 未登记的 fixture 不参与任何检查——由 `check-samples-coverage.ts` 门禁自动核对（新增样本后运行
 > `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` 确认全绿）。
@@ -36,7 +36,7 @@
 | `openspec-archive` | check-openspec-archive | OPENSPEC_ARCHIVE_CASES（3，sampleDir 形态） | opsx:archive 归档完整性 | 嵌套 `openspec/changes/archive/` |
 | `uat-path-mapping` | check-artifact-gate（B4/B5） | UAT_PATH_MAPPING_CASES（5，sampleDir 形态） | uat-path-mapping.md 解析与回填校验 | 嵌套 `docs/uat-path-mapping.md` |
 
-合计 248 条用例 + 1 条 metadata 用例 = **249 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
+合计 251 条用例 + 1 条 metadata 用例 = **252 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
 
 ## 排除项
 

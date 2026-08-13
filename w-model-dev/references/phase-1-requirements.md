@@ -18,7 +18,7 @@
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
 - `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**，第22轮 P0-1 修正）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
-- 独立产物文件（第 37 轮新增，主规格引用块指向，均位于 `docs/phase1-requirements/`）：
+- 独立产物文件：
   - `system-context.md`：系统上下文（外部实体清单 + 边界原则）
   - `glossary.md`：术语表（需求域子集）
   - `traceability-matrix.md`：需求追踪矩阵（8 字段表 + 测试层级承接矩阵）
@@ -76,20 +76,20 @@
      ├─ partial 覆盖未补齐 → FM-4D-05，须经豁免审批
      ├─ 失败: 覆盖率不达标且未走豁免审批 → 回步骤 6，补覆盖或申请豁免
      └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
-  7. 系统上下文与术语建模（第 37 轮新增）
+  7. 系统上下文与术语建模
      ├─ 识别外部实体（用户/外部系统/外部存储），产出 docs/phase1-requirements/system-context.md（外部实体清单 + 上下文边界原则）
      ├─ 提取需求域术语，对照 references/glossary.md 权威表，产出 docs/phase1-requirements/glossary.md（需求域术语子集）
      ├─ 主规格 §13/§14 引用块指向上述独立文件
      ├─ 失败: 外部实体边界模糊 → 标注待澄清，向用户确认
      └─ 成功: system-context.md + glossary.md 产出，主规格引用块成立
-  8. UML 需求建模（第 37 轮新增）
+  8. UML 需求建模
      ├─ 基于步骤 2 层级树 + 步骤 5 REQ-group，产出 docs/phase1-requirements/uml-modeling.md A.1 用例图（参与者=stakeholder，用例=level≥2 REQ）
      ├─ 基于步骤 2 层级树，产出 A.2 领域类图（领域实体=level=1/2 REQ 名词性概念）
      ├─ 基于步骤 3 User Stories，产出 A.3 活动图（业务流程=正常场景 user story 序列）
      ├─ 主规格附录 A 引用块指向 uml-modeling.md
      ├─ 失败: 用例/领域实体/活动节点无法对应 REQ → 标注待澄清（FM-3D-09）
      └─ 成功: uml-modeling.md 三图产出，mermaid 块配平，主规格引用块成立
-  9. 需求追踪矩阵与行为规格引用（第 37 轮新增）
+  9. 需求追踪矩阵与行为规格引用
      ├─ 基于步骤 2 层级树 + 步骤 5 REQ-group + 步骤 4 覆盖矩阵，产出 docs/phase1-requirements/traceability-matrix.md（§1 REQ/NFR 8 字段表 + §2 测试层级承接矩阵，仅验收列填实）
      ├─ 产出 docs/phase1-requirements/behavior-spec.md（列出本模块对应 .feature 文件清单 + 引用关系，不内联 feature 块）
      ├─ 主规格 §15/§16 引用块指向上述独立文件
@@ -98,14 +98,14 @@
 输出: 结构化需求规格（§1-§12）+ 验收测试用例 + 风险评估报告 + 豁免审批记录
 ```
 
-**自适应层级深度规则**（[21.0.0] 新增）：
+**自适应层级深度规则**：
 
 - 最小层级深度 = 2（domain → acceptance，适用极小项目）
 - 推荐层级深度 = 4（domain → module → feature → acceptance）
 - 最大层级深度 = 不限（复杂项目可扩展至 5+ 层）
 - 校验规则：level 单调性（子节点 level > 父节点 level）+ 根节点 level=1 + 叶节点须可追溯到验收级
 
-## User Stories 长列表（第 10 轮外部技能吸收）
+## User Stories 长列表
 
 > 吸收 to-spec PRD 结构。S-doc 产出需求规格时，在「需求清单」前必须包含 User Stories 节，覆盖正常/异常/边界/NFR/CON 全场景。
 
@@ -125,7 +125,7 @@
 - 与「需求清单」互补：user stories 是用户视角，需求清单是系统视角
 - A 子代理 ingestion 时把 user stories 作为 chunk 之一（不破坏现有分块策略）
 
-## Out of Scope 显式声明（第 10 轮外部技能吸收）
+## Out of Scope 显式声明
 
 > 吸收 to-spec PRD 结构。S-doc 在「需求清单」后必须包含 Out of Scope 节，明确排除的功能/场景。
 
@@ -144,7 +144,7 @@
 - V 子代理评审时检查「Out of Scope 是否覆盖了用户提到的边界场景」
 - Brownfield 项目须明确声明不动哪些历史模块（见 SSoT §11A.5）
 
-## 迷雾登记册（Fog of War）（第 27 轮新增）
+## 迷雾登记册（Fog of War）
 
 > 吸收 wayfinder「Fog of war」理念。W 阶段 1 强制 100% 覆盖（C1-C10）下，为「in-scope 但尚无法精确陈述」的需求提供显式落脚点，防止 A 子代理提前捏造浅层 REQ（违背禁止行为 #2 精神）或静默丢弃（违反禁止行为 #10）。设计 spec：[`docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md`](../../docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md)。
 
@@ -168,7 +168,7 @@
 
 迷雾项**不计入**覆盖矩阵分母（非正式 REQ、非图节点）；毕业 / 判范围 / 豁免的处置结果在规格书 §8.5、§8 与 exemption.json 中可见，禁止隐式消失。
 
-## Implementation/Testing Decisions 分离（第 10 轮外部技能吸收）
+## Implementation/Testing Decisions 分离
 
 > 吸收 to-spec PRD 结构。S-doc 在「风险与缓解」前必须包含 Implementation Decisions + Testing Decisions 两节，分离架构决策与测试决策。
 
@@ -253,7 +253,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 | 12 | 用公开接口测试认证失效 | 须选需要认证的接口验证 token 失效 |
 | 13 | 验收用例未声明前置条件 | 每条用例须含前置条件分析节 |
 
-### demo 范围声明（第22轮 P1-3 修正）
+### demo 范围声明
 
 S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围外子系统。验收测试设计须对照 Out of Scope 标记 N/A 用例（附注释说明缺失端点名和原因）。
 
@@ -262,7 +262,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - N/A 用例是否附注释说明缺失端点名和原因
 - 不一致或注释缺失 → R3 报告标注 finding，V 评审纳入 reworkHints
 
-**check-preventive-review.ts 触发时机**（第24轮新增）：
+**check-preventive-review.ts 触发时机**：
 - `check-preventive-review.ts` 须在 V 评审前由 G 子代理执行，`exitCode=0` 方可进入 V 评审。
 - 支持 `--auto-trigger --run-log=<path>` 模式：从 run-log 读取最后一条 checkpoint success 记录的 phase 作为当前阶段，自动校验对应阶段的 3 份 R3 报告（`<phase>-completeness.json` / `<phase>-reliability.json` / `<phase>-security.json`）。
 - 跳过 check-preventive-review.ts 直接进入 V 评审命中反模式 #33。
@@ -272,7 +272,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 
 在 [templates/rtm.md](../templates/rtm.md) 中登记：需求 ID、需求描述、验收测试列。其余列（设计文档 / 代码模块 / 单元 / 集成 / 系统测试）留待后续阶段填充。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
-### NFR/CON 横切治理字段登记（第 9 轮 P1.2）
+### NFR/CON 横切治理字段登记
 
 > NFR（非功能需求）与 CON（技术约束）的 RTM 字段登记要求。横切治理类需求在阶段 1 完成 `designDoc` 字段登记，避免阶段 5 编码后才发现"未挂载到任何 SD 子系统"。
 
