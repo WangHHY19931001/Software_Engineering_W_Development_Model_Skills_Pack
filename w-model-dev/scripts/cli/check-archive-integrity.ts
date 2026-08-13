@@ -2,7 +2,7 @@
 /**
  * 归档完整性校验脚本（Archive Integrity Checker）
  *
- * 对应 SSoT §10B.2.1 归档完整性清单。
+ * 归档完整性强制快照清单由本脚本校验（清单定义见 archive-integrity-logic.ts）。
  * 供阶段 8 归档时调用，校验归档目录是否包含各阶段强制快照文件。
  *
  * 用法：

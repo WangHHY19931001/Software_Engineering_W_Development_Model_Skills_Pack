@@ -22,7 +22,7 @@
 | 需求图谱 | `.w-model/ingestion/graph.json` | A→G 收敛后的 REQ 节点（连通 + 单根） |
 | TLA+ L1 规格 | `.w-model/tla-manifest.json` | 指向 `specs/` 下 `.tla` + `.cfg` |
 | BDD L1 features | `.w-model/bdd-manifest.json` | 指向 `features/` 下 `.feature` |
-| 需求覆盖分析 | `.w-model/coverage.json` | C1~C9 覆盖规则分析输入 |
+| 需求覆盖分析 | `.w-model/coverage.json` | C1~C10 覆盖规则分析输入 |
 | RTM | `.w-model/rtm.json` | 登记需求列 + 验收测试列（覆盖状态：部分） |
 
 ## 门禁脚本与命令行
@@ -33,7 +33,7 @@
 # 1) 需求图谱门禁：连通性 + 单根 + 父唯一 + 阶段追溯（A→G 收敛后必跑）
 npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts .w-model/ingestion/graph.json --phase=1
 
-# 2) 需求覆盖分析门禁：C1~C9 覆盖规则（--graph 可选，用于 C7 cross-cuts 一致性）
+# 2) 需求覆盖分析门禁：C1~C10 覆盖规则（--graph 可选，用于 C7 cross-cuts 一致性）
 npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts .w-model/coverage.json --graph=.w-model/ingestion/graph.json
 
 # 3) TLA+ L1 行为门禁：SANY 语法 + TLC 模型检查（阶段 1 无需 --graph）

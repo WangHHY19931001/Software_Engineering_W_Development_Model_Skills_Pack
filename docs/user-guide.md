@@ -87,7 +87,7 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 | `R13` | [`check-verifier-output.ts`](../w-model-dev/scripts/cli/check-verifier-output.ts) | 单轴下限：所有 subCriterion.score ≥ 0.70（防加权平均掩盖，反模式 #41） |
 | `D1`、`D3`-`D8` | [`check-bdd-model.ts`](../w-model-dev/scripts/cli/check-bdd-model.ts) | D1 头标注 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径合法性 / D7 RTM 映射 / D8 SD coverage |
 | `C1`-`C10` | [`check-requirement-coverage.ts`](../w-model-dev/scripts/cli/check-requirement-coverage.ts) | 阶段 1 需求覆盖分析 |
-| `E1`-`E8` | [`check-exemption.ts`](../w-model-dev/scripts/cli/check-exemption.ts) | 豁免审批（S→R→V→人类四阶段） |
+| `E1`-`E9` | [`check-exemption.ts`](../w-model-dev/scripts/cli/check-exemption.ts) | 豁免审批（S→R→V→人类四阶段） |
 | `R3×3` | [`check-preventive-review.ts`](../w-model-dev/scripts/cli/check-preventive-review.ts) | 预防性审查（覆盖所有 S 变体，反模式 #33/#42） |
 
 > 注：`rule` / `field` 字段仅在已知规则 ID 的场景输出；无明确规则 ID 的违规以 violations 文本为准，不强行套编号。

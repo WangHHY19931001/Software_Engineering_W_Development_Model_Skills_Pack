@@ -7,6 +7,20 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.10.0] - 2026-08-13
+
+### Changed
+- 版本号 41.9.0 → 41.10.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **全仓校核修复批次**（4 路并行审计 8 高 / 23 中 / ~14 低，按「以实现为事实源」原则修复）：
+  - **高**：dispatch-matrix 补 check-iceberg-sweep（§6.2 通用脚本表 + §7 #44 守护行 + §4 ICEBERG-A/B 说明）；`lib/read-json-or-exit.ts` 4 处 exit 路径统一经 `exitWithError` 输出 ERROR_JSON（14 个 CLI 头注释契约补全；read-json-or-exit.test.ts 同步断言；check-preventive-review/check-iceberg-sweep 绕行注释更新）；CONTRIBUTING 六处陈旧计数（571→576×3、252→254×3）；SSoT §10A 追溯表死节名指针 +「10 个 →12 个 /wm 命令」；user-guide/pre-push/dispatch-matrix 的 E1-E8→E1-E9 ×3；examples/stage1 C1~C9→C1-C10；operational-recovery 锚点死链改无锚点链接
+  - **中**：SSoT 死指针/误指清零（verifier-spec §7.6→§1、§10E→§10.8 ×2、「17 条→47 条」演进叙事 ×2、§932/§2219 历史叙事注改现状陈述、「候选反模式检测信号」→「C1（候选）」节 + anti-patterns TOC 对齐）；tla-plus-modeling-design 4 处 `--skip-tlc` 对齐「已移除」；skill-design-document §14/§15 结构描述；troubleshooting 558→576；loop-engineering-design 计数快照（17→47 ×7、37→254）+ SSKILL 笔误；README 树移除 3 个已移出吸收文档 + L1~L4 残留 + 补 /wm hill-climbing；INSTALL lib 9→12 + exit-2 构成口径；references 9 处（SKILL.md 节名 ×2、S 变体 8→10、workflow 拆出节名 + 阶段 3/4 产物 ID 前缀 INTF/DD、real-run-evidence 41.5.0→41.9.0、subagent-delegation 锚点、9→10 脚本自检 ×2、dispatch-matrix #21 守护去「run-log R5」）；**signature-chain-logic 入口补 validateBySchema**（反模式 #28 对齐；schema sigId 模式补 P2-/序号变体；self-test/vitest 期望同步）；**新增 maturity-logic.test.ts**（R1-R5 + schema 前置，vitest 35→36 文件 / 576→581 条级联同步）；check-requirement-graph 头注释补 --rtm/--exemptions；bdd-logic exitCode:2 语义注释、check-preventive-review 头注释对齐实现、check-iceberg-sweep CLI「R3」改名
+  - **仓库卫生**：git rm `samples/tla-e2e/states/` 4 个 TLC 残留 + .gitignore 补规则；samples/README 矩阵 3 行条数修正（GATE 20 / TLA 15 / BDD 11，合计 253）
+  - **低**：AGENTS §2 补 2 个漏列脚本；dispatch-matrix §3 补 check-tla-bdd-sync（阶段 1-4 S-tla 行）/ check-design-contract-consistency（阶段 8）+ §5 ensure-codegraph-opsx 说明；归档目录补第 5 个（README 树 + AGENTS 表）；「§4 约束 N/SSoT 约束 N」前缀 → 硬约束 #N（SSoT ×4 + adoption-guide ×8）；persona 文件 `project-management-experiment-tracker.md` → `project-experiment-tracker.md`（对齐矩阵短名）；SKILL.md templates 行补 budget.template.json / run-log.template.jsonl 全名；脚本注释类 8 处（Round 24 残留、人类可读报告声明 ×2、violations→reasons ×3、bdd [D2] 标签 ×2、run-log-logic「不 import」旧文案、check-run-log 头注释补 R8 + usage 补 --json、parse-phase 13 口径）
+  - **明确不做**（观察清单）：technical-writer 围栏内占位符（示例样板合理）；B4/A2b 等批量任务编号注释（内部批次标识可追溯）；--json 模式 exit 2 单行张力（8 脚本一致固有）；readJsonOptional 公开 API；lib 层 4 模块无专属测试
+
+### Docs
+- SSoT §4A.2b/#7.6/#12.4 演进叙事改写为当前事实陈述；troubleshooting/CONTRIBUTING/design-docs 计数与事实对齐
+
 ## [41.9.0] - 2026-08-13
 
 ### Changed

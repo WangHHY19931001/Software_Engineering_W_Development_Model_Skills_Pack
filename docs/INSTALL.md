@@ -76,10 +76,10 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 ├── schemas/            # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep），由 schema-loader.ts 在 logic 层前置加载
 ├── tools/              # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / self-test / ensure-codegraph-opsx 等 31 个 exit-2 脚本；IO 抽离，传纯数据给 logic 层）
+│   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph-opsx；exit-2 脚本口径 = 26 check + 4 工具 + logic/plan-chunks.ts = 31，self-test 非 exit-2；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
-│   ├── lib/            # 共享工具（9 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate）
-│   └── __tests__/      # vitest 单元测试（35 个 .test.ts / 576 条 + README.md coverage 矩阵）
+│   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
+│   └── __tests__/      # vitest 单元测试（36 个 .test.ts / 581 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -146,7 +146,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.9.0
+version: 41.10.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -239,7 +239,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，35 个 test 文件 / 576 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，36 个 test 文件 / 581 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。

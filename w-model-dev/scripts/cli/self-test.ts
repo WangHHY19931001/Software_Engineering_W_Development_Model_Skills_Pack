@@ -1828,7 +1828,7 @@ const EXEMPTION_CASES: ExemptionCase[] = [
   {
     file: 'valid-full-approval.json',
     expectedPassed: true,
-    description: '四维·豁免：完整 S→R→V→人类 四阶段 approve（E1-E8 全通过）',
+    description: '四维·豁免：完整 S→R→V→人类 四阶段 approve（E1-E9 全通过）',
   },
   {
     file: 'valid-coverage-exemption.json',
@@ -1959,9 +1959,9 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
   {
     file: 'bad-O-produce.jsonl',
     expectedPassed: false,
-    expectedRulesFailed: ['R4'],
+    expectedRulesFailed: ['R1'],
     phase: 1,
-    description: '签名链：非法角色 X，R4 失败',
+    description: '签名链：非法角色 X 被 schema role enum 前置拦截（[schema] 违规 + R1 失败）',
   },
   {
     file: 'bad-O-self-sign.jsonl',

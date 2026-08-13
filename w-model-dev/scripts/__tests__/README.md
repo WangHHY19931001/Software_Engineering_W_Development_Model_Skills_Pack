@@ -20,6 +20,7 @@
 | gate-report.test.ts | CLI IO | printGateReport 分隔线 + `<LABEL>_JSON ` 行首标记 / exitCode 追加 JSON 末尾 / exit 码 0/1/2 透传 / summary 自带 exitCode 被参数覆盖 |
 | graph-logic.test.ts | Graph | R1-R4 REQ 层级树（level·orphan·multiParent·单调·REQ-group）/ R5 depends-on·precedes 无环 / R6 交叉边对称性与源/目标类型 / R11 level 正整数 / recalculatePassed 重算 / reqHierarchy·crossLogic 填充 |
 | iceberg-logic.test.ts | IcebergSweep | R1 schema 前置短路 / R2 icebergRound 边界（0·6）/ R3 findingId 去重 / R4 可证伪（缺 hypothesis·evidence）/ R5 passed 与 newFindings 一致 |
+| maturity-logic.test.ts | Maturity | 合法 MaturityConfig 通过 / schema 前置校验（缺 projectId → [schema]）/ R3 completedCycles 周期换算 / R4 history 早于 createdAt / R5 降级评估提醒 |
 | metrics-report.test.ts | Metrics CLI | 子进程：run-log 缺失 exit 2 / --phase 非法值系列 exit 2 / budget 缺失(null)·非法 exit 2 / --json·--out 组合 stdout 纯净 / 空 run-log 预警 / 坏行跳过 / --phase 过滤 / 人类可读 9 节 |
 | metrics-report-logic.test.ts | Metrics | 总体汇总 / 阶段分组 / 动作·角色·结果分布 / 返工率与连续段 / gate 通过率（0/非0/null 归类）/ 预算 burn rate 与 killSwitch 两路径 / 窗口与 phase 过滤 / 空 run-log |
 | parse-phase.test.ts | PhaseArg | parsePhaseArg --phase=N / --phase N / 位置参数三形态 / 非法值（abc·0·9·-1·空串·无值）→ undefined / min·max 自定义 / 无 --phase → undefined |

@@ -9,7 +9,7 @@
  *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
  *
  * 设计原则（与 budget-logic.ts / graph-logic.ts / tla-logic.ts 一致）：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
+ *   1. 仅依赖本文件类型形状 + lib/safe-json.js（parseJsonSafe）+ schema-loader.js（validateBySchema），无 I/O 副作用
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「运行日志是否符合规范」的判定均委托至此
  */

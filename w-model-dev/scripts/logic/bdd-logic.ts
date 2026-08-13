@@ -856,6 +856,8 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   const phase = input.phase;
 
   // 入口 schema 校验（防反模式 #28）
+  // 说明：此处 exitCode 2 为 logic 层内部语义（输入结构非法），供 self-test / 单测直接调用 logic 时区分输入错误；
+  // CLI 层（check-bdd-model.ts）经 loadAndValidate 预校验后以 exit 2 + ERROR_JSON 呈现，该分支在 CLI 流程中不可达。
   const schemaResult = validateBySchema('bdd-manifest', input.manifest);
   if (!schemaResult.valid) {
     return {

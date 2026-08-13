@@ -10,12 +10,12 @@
 | 子目录 | 对应 check 脚本 | self-test 用例数组（条数） | 用途 | 嵌套结构 |
 |---|---|---|---|---|
 | `verifier` | check-verifier-output | VERIFIER_CASES（21） | Verifier 输出校验（R13 单轴下限 / self-as-verifier / targetKind=rootcause §7.5） | 平铺 JSON |
-| `gate` | check-artifact-gate | GATE_CASES（19）+ SPEC_STRUCTURE×4（16） | RTM 矩阵 / DoD / 阶段 1-6 门禁 + spec-structure 校验 | 平铺 JSON |
+| `gate` | check-artifact-gate | GATE_CASES（20）+ SPEC_STRUCTURE×4（16） | RTM 矩阵 / DoD / 阶段 1-6 门禁 + spec-structure 校验 | 平铺 JSON |
 | `graph` | check-requirement-graph | GRAPH_CASES（28）+ ENHANCE×4（16） | 图谱 R1-R14 + 规格/大纲/详细设计增强 | 平铺 JSON |
-| `tla` | check-tla-model | TLA_CASES（14） | TLA+ manifest 纯逻辑校验（self-test 驱动，不跑 SANY/TLC） | 平铺 JSON |
+| `tla` | check-tla-model | TLA_CASES（15） | TLA+ manifest 纯逻辑校验（self-test 驱动，不跑 SANY/TLC） | 平铺 JSON |
 | `tla-e2e` | check-tla-model（SANY/TLC 全链路） | —（豁免，手动 / CI 执行） | 端到端 fixture（Counter / DeadlockDemo / InvViolation / SyntaxError） | `.tla` + `.cfg` + manifest + states/（TLC 残留，勿提交） |
 | `tla-bdd-sync` | check-tla-bdd-sync | TLA_BDD_SYNC_CASES（2） | TLA+↔BDD 转移集 / 状态集 / 不变式等价 | 平铺 JSON |
-| `bdd` | check-bdd-model | BDD_CASES（10） | BDD manifest + .feature 解析 / 状态机七要素 / RTM 映射 | 平铺 JSON + .feature |
+| `bdd` | check-bdd-model | BDD_CASES（11） | BDD manifest + .feature 解析 / 状态机七要素 / RTM 映射 | 平铺 JSON + .feature |
 | `budget` | check-budget | BUDGET_CASES（5） | BudgetConfig R1-R5（时效性 / onExceed / killSwitch） | 平铺 JSON |
 | `run-log` | check-run-log + check-role-dispatch | RUN_LOG_CASES（13）+ ROLE_DISPATCH_CASES（3，复用本目录） | RunLog R1-R8 + 角色分派完整性 | 平铺 JSONL |
 | `maturity` | check-maturity | MATURITY_CASES（3） | 成熟度 R1-R5 | 平铺 JSON |

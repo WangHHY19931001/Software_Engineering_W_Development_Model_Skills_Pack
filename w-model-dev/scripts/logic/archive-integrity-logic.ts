@@ -1,7 +1,7 @@
 /**
  * 归档完整性校验纯逻辑层（Archive Integrity Logic）
  *
- * 对应 SSoT §10B.2.1 归档完整性清单。
+ * 归档完整性强制快照清单（单点定义于本文件）。
  * 供 check-archive-integrity.ts（CLI）调用，校验归档目录是否包含各阶段强制快照文件。
  *
  * 单点事实源，不依赖任何 LLM。

@@ -1,6 +1,6 @@
 # 完整工作流程（W-Model Workflow）
 
-> 本文件由 [`w-model-dev/SKILL.md`](../SKILL.md)「完整工作流程」节拆出，
+> 本文件由 [`w-model-dev/SKILL.md`](../SKILL.md)「执行工作流」节拆出，
 > 供 Agent 在初始化项目、阶段切换、向用户解释整体流程时按需加载。
 > SKILL.md 中保留简短摘要 + 指针。
 
@@ -75,8 +75,8 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 |---|---|---|---|---|---|
 | 1 需求分析 | 用户需求陈述 / 业务背景 | 需求规格说明书（`*-requirement-spec.md`）、RTM 需求列 + 验收测试列、graph.json（REQ 节点）、L1 TLA+ 规格（`.tla`+`.cfg`）+ `tla-manifest.json`、L1 BDD features（`.feature`）+ `bdd-manifest.json` | O 路由 → S 产出 → V 评审 → G 门禁 | `check-verifier-output.ts` 退出码 0 且 `VerifierOutput.passed=true` 且 `qualityLevel ∈ {A,B}` 且 `check-tla-model.ts` 退出码 0 且 `check-bdd-model.ts --phase=1` 退出码 0 | — |
 | 2 系统设计 | 阶段 1 全部产物 | 系统设计文档（`SD-N.N.N`）、RTM 设计文档列 + 系统测试列、graph.json（SD 节点）、L2 TLA+ 规格 + `tla-manifest.json` 更新、L2 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=2`） | 阶段 1 |
-| 3 概要设计 | 阶段 2 全部产物 | 接口设计文档（`SD-N.N.N`）、RTM 接口列 + 集成测试列、graph.json（INTF 节点）、L3 TLA+ 规格 + `tla-manifest.json` 更新、L3 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=3`） | 阶段 2 |
-| 4 详细设计 | 阶段 3 全部产物 | 详细设计文档（`SD-N.N.N`）、RTM 详细列 + 单元测试列、graph.json（DD 节点）、L4 TLA+ 规格（按需）+ `tla-manifest.json` 更新、L4 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=4`） | 阶段 3 |
+| 3 概要设计 | 阶段 2 全部产物 | 接口设计文档（`INTF-N.N.N`）、RTM 接口列 + 集成测试列、graph.json（INTF 节点）、L3 TLA+ 规格 + `tla-manifest.json` 更新、L3 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=3`） | 阶段 2 |
+| 4 详细设计 | 阶段 3 全部产物 | 详细设计文档（`DD-N.N.N`）、RTM 详细列 + 单元测试列、graph.json（DD 节点）、L4 TLA+ 规格（按需）+ `tla-manifest.json` 更新、L4 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=4`） | 阶段 3 |
 | 5 编码实现 | 阶段 4 全部产物 | 源代码文件、RTM 代码模块列、step_definitions + cucumber L4 报告 | O 路由 → S 产出代码+单测 → V 代码审查 → G 门禁 | `check-verifier-output.ts` 退出码 0 + 单元测试退出码 0 + 覆盖率 ≥ 80% | 阶段 4 |
 | 6 集成测试 | 阶段 5 全部产物 + 集成测试设计 | 集成测试报告、RTM 集成测试状态列、cucumber L3 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 集成测试退出码 0，`rtm.json.executionSummary.failed=0` | 阶段 5 |
 | 7 系统测试 | 阶段 6 全部产物 + 系统测试设计 | 系统测试报告、RTM 系统测试状态列、cucumber L2 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 系统测试退出码 0，性能 P95 < 2s，高危漏洞数 = 0 | 阶段 5 |

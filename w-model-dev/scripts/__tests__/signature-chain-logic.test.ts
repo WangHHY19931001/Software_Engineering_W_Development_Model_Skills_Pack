@@ -41,10 +41,11 @@ describe('signature-chain-logic R1-R10', () => {
     expect(result.rulesFailed).toContain('R3');
   });
 
-  it('R4 bad-O-produce 失败', () => {
+  it('bad-O-produce（非法角色 X）被 schema role enum 前置拦截', () => {
     const entries = loadJsonl('bad-O-produce.jsonl');
     const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R4');
+    expect(result.rulesFailed).toContain('R1');
+    expect(result.violations.some((v) => v.startsWith('[schema]'))).toBe(true);
   });
 
   it('R5 bad-O-self-sign 失败（代签检测）', () => {

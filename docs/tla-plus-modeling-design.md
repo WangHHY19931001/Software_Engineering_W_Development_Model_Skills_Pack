@@ -163,7 +163,7 @@ TLA+ 的运行时依赖极简：**Java 11 + 单个 `tla2tools.jar`**。该 jar �
 ### 3.1 算法（确定性，无 LLM）
 
 ```
-输入: tla-manifest.json, [--phase=N], [--spec=<id>], [--skip-tlc]
+输入: tla-manifest.json, [--phase=N], [--spec=<id>]（--skip-tlc 已移除：任何场景不得跳过 TLC）
 （步骤 1）环境检查:
    java -version ≥ 11 否则 fail("Java ≥ 11 未找到")
    jar 文件存在（w-model-dev/tools/tla2tools.jar）否则 fail("tla2tools.jar 缺失")
@@ -183,7 +183,7 @@ TLA+ 的运行时依赖极简：**Java 11 + 单个 `tla2tools.jar`**。该 jar �
    实测 TLC 2.19 产物落在 states/<YY-MM-DD-HH-MM-SS>/ 下：
      <Module>.st / <Module>-0.st（状态文件）+ <Module>_0.fp / <Module>_1.fp（指纹文件）
    默认不产生 .dump/.out（特定 flag 才产生），保留清理作为预防
-（步骤 6）SANY 语法检查（若 --skip-tlc 则止于此；cwd 置为 .tla 所在目录）:
+（步骤 6）SANY 语法检查（强制，无跳过开关；cwd 置为 .tla 所在目录）:
    java -cp <jar> tla2sany.SANY <tlaPath>
    实测退出码：0=成功 / 11=语法错误；输出走 stdout（含错误消息）
    退出码 ≠ 0 → syntaxError++，记录 stdout
@@ -211,13 +211,13 @@ TLA+ 的运行时依赖极简：**Java 11 + 单个 `tla2tools.jar`**。该 jar �
 
 ```bash
 # 退出码 0=通过 / 1=校验失败 / 2=输入错误；stdout 输出 JSON 证据摘要
-npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--skip-tlc]
+npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>]
 ```
 
 **参数说明**：
 - `--phase=N`：只校验 `phase ≤ N` 的规格（与 `check-requirement-graph.ts` 语义一致）。
 - `--spec=<id>`：只校验单个规格（调试用）。
-- `--skip-tlc`：只跑文件头 + 层次一致性 + SANY 语法检查，跳过 TLC（快速反馈用；阶段门放行前不可跳过 TLC）。
+- `--skip-tlc`：已移除。任何场景（含阶段门放行前与快速反馈）都必须跑完整 SANY + TLC，无跳过开关。
 
 ### 3.3 收敛准则
 

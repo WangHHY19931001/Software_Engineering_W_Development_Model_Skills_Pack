@@ -163,7 +163,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 - [ ] 每阶段 S 产出后，复述硬约束清单（RTM 100% / TLA+ 零违反 / 信息流零违反 / exitCode 与 passed 一致 / acknowledgedDecisions 含关键词）
 - [ ] 每阶段 V 评审后，确认 reworkHints 非空（即使 passed=true 也有 FYI 提示）
-- [ ] 每阶段 G 门禁后，确认 9 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint；阶段 1-4 额外 check-tla-model / check-requirement-graph / check-bdd-model）
+- [ ] 每阶段 G 门禁后，确认 10 脚本全 exitCode=0（check-verifier / check-artifact-gate --phase=N / check-budget / check-maturity / check-run-log / check-checkpoint / check-preventive-review；阶段 1-4 额外 check-tla-model / check-requirement-graph / check-bdd-model）
 - [ ] 归档前确认 acceptance-test-report.md §9 用户确认区已勾选（self-as-verifier 模式须留代签痕迹）
 - [ ] 长会话（>20 轮）后重读 project_memory.md 硬约束 + 当前阶段 phase-N-*.md 摘要；上下文分层 / 修剪 / KV 缓存友好纪律见 [context-management-guide.md](context-management-guide.md)
 - [ ] BDD features 是否完整产出（每个 REQ/SD/INTF/DD 至少 1 个对应层级 .feature 文件）？
@@ -171,7 +171,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - [ ] BDD↔TLA+ 等价性是否校验通过（不接受「BDD 写完就跳过等价性校验」）？
 - [ ] cucumber 报告是否有 undefined/pending step（不接受「step 没写也放行」）？
 
-命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [anti-patterns.md #27](anti-patterns.md#27-调测者简化行为)。
+命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [anti-patterns.md](anti-patterns.md) #27 检测信号行。
 
 ## 集成初期混沌预期管理
 

@@ -9,14 +9,14 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.9.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.10.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-13 实测）：
 
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 254/254 |
-| Vitest（门禁脚本单元测试） | ✅ 35 files / 576 tests |
+| Vitest（门禁脚本单元测试） | ✅ 36 files / 581 tests |
 | Vitest coverage（logic/+lib/ 阈值） | ✅ stmts 75 / branch 65 / funcs 85 / lines 75 |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
@@ -155,7 +155,7 @@ npm run self-test
 npm run prepush
 ```
 
-等价于 `bash .githooks/pre-push --force`，强制跑 15 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（35 files / 576 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）。任一失败即中止。
+等价于 `bash .githooks/pre-push --force`，强制跑 15 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（36 files / 581 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）。任一失败即中止。
 
 **步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
 
@@ -280,6 +280,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 | `/wm reset` | 重置项目（保留元信息，清空实体） |
 | `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
 | `/wm import <文件路径>` | 从 JSON 导入项目 |
+| `/wm hill-climbing` | 分析 run-log 产出 HarnessImprovementReport（改进信号，人审后手动应用；L2+ 项目） |
 
 只读报告脚本（均不写状态、退出码 0/2）：
 
@@ -304,7 +305,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── command-reference.md  # /wm 命令参考
 │   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
 │   │   ├── toolbox.md            # 工具箱决策表（I have X → use Z）
-│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / mythical-man-month-absorption / code-smells-checklist / clean-code-refactoring-agentic-absorption / concurrency-guide / four-source-absorption / design-patterns-catalog / refactoring-catalog）
+│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / code-smells-checklist / concurrency-guide / design-patterns-catalog / refactoring-catalog）
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep）
 │   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
@@ -313,7 +314,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks
 │   │   ├── lib/                  # 通用工具与 IO 辅助：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json/artifact-gate-assets/uat-path-mapping/tla-clean-trace 等
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集 + README.md 覆盖矩阵，check-samples-coverage 门禁核对）
-│   │   └── __tests__/            # vitest 单元测试（35 个 .test.ts / 576 tests）
+│   │   └── __tests__/            # vitest 单元测试（36 个 .test.ts / 581 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（4 份伪示例对话 + 5 份 stage 编排示例 + real-run-evidence.md 真实命令证据）
@@ -327,7 +328,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── information-flow-validation-design.md   # 信息流校验设计（黑洞/奇迹/死模块）
 │   ├── loop-engineering-adoption-design.md     # Loop 工程采用设计
 │   ├── superpowers/                            # 内部规划目录（specs/ + plans/，不参与门禁、非面向用户）
-│   ├── changes/archive/                        # 端到端调测归档（round15 / 19 / 20 / 23）
+│   ├── changes/archive/                        # 端到端调测归档（round15 / 19 / 20 ×2 / 23）
 │   └── INSTALL.md                              # AI Agent 安装指南
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 │   ├── w-model-dev-test-prompts.json           # 评估测试场景（15 条：典型 / 歧义 / 反误触发 / 正向）
@@ -366,7 +367,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 47 条流程反模式 + L1~L4 实现层教训 + F1~F10 失败模式 + O1~O6 运维失败模式（#20 见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)）
+- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 47 条流程反模式（F1~F10 失败模式见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)，O1~O6 运维失败模式见 SSoT §4A.2a）
 - [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约
 - [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）
 - [Persona 选型矩阵](./w-model-dev/references/subagent-persona-matrix.md) - R-lead / V-lead 多角度 persona 选择矩阵

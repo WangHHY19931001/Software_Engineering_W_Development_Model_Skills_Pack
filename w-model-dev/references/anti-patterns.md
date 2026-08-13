@@ -11,7 +11,7 @@
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
 - 失败模式与运维失败模式导航（F1~F10 见 [operation-behaviors.md](operation-behaviors.md)；O1~O6 见 SSoT §4A.2a）
-- 候选反模式检测信号（来自 Loop 4 爬坡循环）
+- 候选反模式（C1，来自 Loop 4 爬坡循环）
 
 ## 反模式-硬约束映射
 
@@ -59,7 +59,7 @@
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复（见 [root-cause-locator.md](root-cause-locator.md)） |
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
 | 20 | 只规划不执行（子代理返回规划性内容而未调用任何执行工具） | 浪费 token + 轮次，任务无实际进展 | 子代理分派须强调"立即执行"；规划产物必须有对应执行产物（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节） |
-| 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节） |
+| 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [SKILL.md](../SKILL.md)「阶段门与质量门」节） |
 | 22 | 角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
 | 23 | 跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
 | 24 | 副作用时序不一致（响应体字段返回副作用自增前的旧值） | 响应体字段与已生效状态不一致，集成测试难发现 | 副作用须在响应体构造前完成，响应体字段反映已生效状态（见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节） |
@@ -111,7 +111,7 @@
 | #18（跳过 R 直接 S 返工） | 全阶段 | [root-cause-locator.md](root-cause-locator.md) + 各 phase-N「返工路径」节 |
 | #19（R 报告未 V 复审） | 全阶段 | [root-cause-locator.md](root-cause-locator.md)「R 产出质量标准」节 |
 | #20（只规划不执行） | 全阶段（S 分派） | [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节 |
-| #21（阶段级门禁跳过） | 阶段 6/7/8 | [SKILL.md](../SKILL.md)「阶段 5-8 工件质量门」节 |
+| #21（阶段级门禁跳过） | 阶段 6/7/8 | [SKILL.md](../SKILL.md)「阶段门与质量门」节 |
 | #22（角色越权） | 阶段 5 | [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
 | #23（跨模块 store 误用） | 阶段 3/4 | [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
 | #24（副作用时序不一致） | 阶段 5 | [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节 |
@@ -521,7 +521,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 文件缺失
 - V 评审未读取 R3 报告（reworkHints 未纳入 R3 发现）
 
-**无条件强制**：R3 为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json`。
+**无条件强制**：R3 为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json` / `<phase>-ingest-{dim}.json`。
 
 **回退动作**：回到 S 产出后起点，补跑 R3 三阶段审查，产出三份 PreventiveReview JSON，再进入 V 评审。
 

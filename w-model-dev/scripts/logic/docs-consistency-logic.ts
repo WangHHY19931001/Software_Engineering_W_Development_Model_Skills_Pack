@@ -63,7 +63,7 @@ export const EXPECTED = {
   personaCount: 28,
   /** references/ 目录 .md 文件数（期望 53；SKILL.md「Bundled Resources」表须同步） */
   referencesCount: 53,
-  vitestFileCount: 35,
+  vitestFileCount: 36,
   exit2ScriptCount: 31,
   runLogActionCount: 27,
   maxAntiPattern: 47,
@@ -71,7 +71,7 @@ export const EXPECTED = {
   /** 硬约束条数（14 条） */
   hardConstraintCount: 14,
   /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
-  currentVersion: '41.9.0',
+  currentVersion: '41.10.0',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';

@@ -52,29 +52,39 @@ describe('readJsonOrExit', () => {
     expect(result).toEqual([1, 2, 3]);
   });
 
-  it('文件不存在时调用 process.exit(2)', async () => {
+  it('文件不存在时调用 process.exit(2) 并输出 ERROR_JSON', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const missing = path.join(tmpDir, 'nope.json');
     await expect(readJsonOrExit(missing)).rejects.toThrow('exit:2');
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    expect(out.startsWith('ERROR_JSON ')).toBe(true);
+    expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
     exitSpy.mockRestore();
     errSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
-  it('非法 JSON 时调用 process.exit(2)', async () => {
+  it('非法 JSON 时调用 process.exit(2) 并输出 ERROR_JSON', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const file = path.join(tmpDir, 'bad.json');
     await fs.writeFile(file, '{not json');
     await expect(readJsonOrExit(file)).rejects.toThrow('exit:2');
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    expect(out.startsWith('ERROR_JSON ')).toBe(true);
+    expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_PARSE', exitCode: 2 });
     exitSpy.mockRestore();
     errSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it('相对路径也能正常解析', async () => {
@@ -123,16 +133,21 @@ describe('readJsonlOrExit', () => {
     expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
   });
 
-  it('文件不存在时调用 process.exit(2)', async () => {
+  it('文件不存在时调用 process.exit(2) 并输出 ERROR_JSON', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const missing = path.join(tmpDir, 'nope.jsonl');
     await expect(readJsonlOrExit(missing)).rejects.toThrow('exit:2');
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    expect(out.startsWith('ERROR_JSON ')).toBe(true);
+    expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
     exitSpy.mockRestore();
     errSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it('label 默认为「行」', async () => {
@@ -160,17 +175,22 @@ describe('readJsonOptional', () => {
     expect(result).toBeNull();
   });
 
-  it('非法 JSON → process.exit(2)（与 readJsonOrExit 一致）', async () => {
+  it('非法 JSON → process.exit(2) 并输出 ERROR_JSON（与 readJsonOrExit 一致）', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const file = path.join(tmpDir, 'bad-opt.json');
     await fs.writeFile(file, '{not json');
     await expect(readJsonOptional(file)).rejects.toThrow('exit:2');
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
+    const out = logSpy.mock.calls[0]![0] as string;
+    expect(out.startsWith('ERROR_JSON ')).toBe(true);
+    expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_PARSE', exitCode: 2 });
     exitSpy.mockRestore();
     errSpy.mockRestore();
+    logSpy.mockRestore();
   });
 });
 

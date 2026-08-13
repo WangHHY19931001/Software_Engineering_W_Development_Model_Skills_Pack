@@ -16,7 +16,7 @@
  *
  * 退出码：
  *   0  校验通过
- *   1  校验失败（violations 列出具体原因）
+ *   1  校验失败（reasons 列出具体原因）
  *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：
@@ -27,7 +27,7 @@
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
  * 命令行参数：支持 --json（机器可读输出）、--phase=N（1-8，默认 8）
- * 退出码：0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
+ * 退出码：0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
  *
  * @module
  */

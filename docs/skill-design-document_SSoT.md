@@ -280,7 +280,7 @@ graph TD
 1. **上下文隔离**：编排者上下文不被产物内容污染，保留用于全局协调。
 2. **评审独立性**：评审子代理不接触产出子代理的内部推理，避免自产自评漂移。
 3. **可追溯**：每个产物/评审/门禁结果可归属到具体子代理调用，便于回退与审计。
-4. **与现有架构一致**：`verifier-spec.md` §7.6「LLM-as-a-Verifier 由外部 Agent 执行」与 `agent-personas.md` Persona 体系天然映射为 V 子代理；门禁脚本由 G 子代理跑，保留「技能不内置 LLM」原则。
+4. **与现有架构一致**：`verifier-spec.md` §1 设计原则（技能内不做 LLM 调用，评审由外部 Agent 执行）与 `agent-personas.md` Persona 体系天然映射为 V 子代理；门禁脚本由 G 子代理跑，保留「技能不内置 LLM」原则。
 
 #### 3.4.2 角色划分（五层子代理 + 编排者：O / A / S / V / G / R；F 由 S 兼任）
 
@@ -322,7 +322,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 - **约束 4「真实执行」**：G 子代理跑脚本 + 回填退出码 = 真实执行，不冲突。
 - **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载 `SKILL.md` + 状态文件，加载面更窄。
 - **约束 2「阶段门放行」**：G 子代理返回证据 → 编排者展示给用户 → CHECKPOINT 等待，不冲突。
-- **`verifier-spec.md` §7.6「外部 Agent 执行」**：V 子代理即「外部 Agent」，边界一致。
+- **`verifier-spec.md` §1 设计原则（外部 Agent 执行）**：V 子代理即「外部 Agent」，边界一致。
 - **`agent-personas.md` 4 个 Persona**：V 子代理按 `targetKind` 选用，无改动。
 - **技能不内置 LLM**：V 子代理由编排者通过宿主 Agent 的子代理机制（如 Task 工具）启动，技能包自身仍只含提示词 + 脚本，不引入 LLM 调用。
 
@@ -617,7 +617,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 4A.2b 返工循环反模式扩展（#18/#19）
 
-> 伴随根因定位者（R）角色引入，在现有 17 条流程反模式（#1~#17，见 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)）基础上新增 #18/#19，守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束。命中即回退到当前阶段起点。
+> #18/#19 守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束（47 条流程反模式 #1~#47 之一族，权威定义见 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)）。命中即回退到当前阶段起点。
 > 权威定义见 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md) + [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §7.1。
 
 | # | 反模式 | 危害 | 正确做法 |
@@ -625,7 +625,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复 |
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
 
-> #18/#19 命中即回退（与 #1~#17 同级流程反模式）。R 方法论与多角度分析机制详见 §6.4.5 与 [`root-cause-locator.md`](../w-model-dev/references/root-cause-locator.md)；R 报告校验门禁详见 §10.9。
+> #18/#19 命中即回退（与其余 45 条流程反模式同级）。R 方法论与多角度分析机制详见 §6.4.5 与 [`root-cause-locator.md`](../w-model-dev/references/root-cause-locator.md)；R 报告校验门禁详见 §10.9。
 
 ### 4A.3 与现有约束的关系
 
@@ -929,8 +929,7 @@ erDiagram
 
 ### 7.6 LLM-as-a-Verifier 评审规范（外部 Agent 执行）
 
-> 历史版本曾在此定义 `VerificationResult` / `ContinuousScoringEngine` / `LLMClient` / `LLMResponse` / `VerifierConfig` 等 TypeScript 类型。
-> 架构重构后，本技能不再内置 LLM 调用，上述类型与对应实现（`src/core/scoring-engine.ts` / `verification-framework.ts` / `ppt-ranker.ts` / `llm-client.ts` 等）均已删除。
+> 本技能不内置 LLM 调用：评审由外部 Agent 按 `verifier-spec.md` 提示词执行，技能只提供提示词 + 输出 Schema + 校验脚本（历史内置类型与实现已删除，演进记录见 CHANGELOG 体系）。
 
 LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定义 LLM 相关类型**。权威规范定义在 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md)，要点如下：
 
@@ -1736,7 +1735,7 @@ interface RunLogEntry {
 ## 10G. 爬坡循环（Loop 4）
 
 > 权威定义：[docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md](./superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md) §3。
-> 实现位置：`w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节。
+> 实现位置：`w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「C1（候选，pending V 复审）」节。
 >
 > **与 §11 的关系**：技能只产出改进信号，不自动改 harness；外部 SkillOpt/darwin-skill 消费信号做演化；人审后手动应用。
 > **与 §10D run-log 的关系**：run-log 是 Loop 4 的主要分析输入。
@@ -1790,7 +1789,7 @@ interface RunLogEntry {
 
 - §11 原意：技能**自动演化**（LLM 驱动 rollout/reflect）不在本仓库
 - 本节吸收：**方法论**（bounded edit + validation gate 流程范式），不是工具运行
-- 类比：§10E TLA+ 方法论吸收（tla-plus-guide.md）是方法论吸收而非 TLA+ 工具内置——本节同构
+- 类比：§10.8 TLA+ 行为门禁（tla-plus-guide.md）是方法论吸收而非 TLA+ 工具内置——本节同构
 
 ### 10H.3 六段式循环类比映射
 
@@ -1964,10 +1963,10 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 3.2.2 设计阶段模块 | 架构 / 概要 / 详细设计 + 对应测试设计 | `w-model-dev/SKILL.md` `/wm design` 编排 + `references/phase-2/3-*.md` | 编排完整（文档生成由 Agent 完成） |
 | 3.2.3 编码与单元测试 | 代码生成、单元测试用例生成 | `w-model-dev/SKILL.md` `/wm code` 编排 + `references/phase-4/5-*.md` | 编排完整（不自动标记通过，需 `result` 回填） |
 | 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
-| 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「架构定位」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
+| 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「核心原则」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
 | 3.4 编排者-子代理边界 | 编排者最小化（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体，A 为阶段 1–4 分析子代理，R 为返工循环根因定位，F 由 S 兼任）+ 反模式 #10/#11/#12/#18/#19 守护 | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10/#11/#12/#18/#19 + `ingestion-chunk.md` / `ingestion-cross.md` / `graph-guide.md` | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施 + A 子代理图谱演进 + G 跑 `check-requirement-graph.ts` 守护 #11/#12 + R 返工根因定位守护 #18/#19） |
 | 4A 核心操作行为与失败模式 | 8 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/operation-behaviors.md`「失败模式清单」节（F1~F10）+ SSoT §4A.2a「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
-| 6 命令接口 | 10 个 `/wm` 命令 | `w-model-dev/SKILL.md`「命令接口」+「指令（执行规则）§5 `/wm test` 回填机制 + §6 辅助命令执行规则」（编排，Agent 执行） | 完整 |
+| 6 命令接口 | 12 个 `/wm` 命令（含 `/wm hill-climbing`，见 §10G） | `w-model-dev/SKILL.md`「命令速查」节（编排，Agent 执行） | 完整 |
 | 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |
 | 7 数据模型 | Project / Requirement / Design / TestCase / RTM | `w-model-dev/references/data-models.md`（Agent 维护 `.w-model/*.json` 的 schema） | 完整 |
 | 7.6 LLM-as-a-Verifier 评审规范 | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 / 五轴评审 / Severity 标签 / Structural Remedies | `w-model-dev/references/verifier-spec.md`（规范，含 §7.4A 五轴+Severity+Remedies）+ `w-model-dev/scripts/logic/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（CLI 校验） | 完整（LLM 推理由外部 Agent 执行；五轴+Severity 吸收自 addyosmani/agent-skills `code-review-and-quality`） |
@@ -1984,8 +1983,8 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 10C 自主成熟度阶梯 | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型始终 attended，操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑 | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过；L3 高风险路径强制人工 gate） |
 | 10D 成本预算与运行日志 | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑 | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4） |
 | 10F 事件驱动循环（Loop 3） | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2） |
-| 10G 爬坡循环（Loop 4） | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「候选反模式检测信号」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用） |
-| §10H SkillOpt 方法论吸收 | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调 | `w-model-dev/references/skillopt-adoption.md`（可执行细则） | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10E TLA+） |
+| 10G 爬坡循环（Loop 4） | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「C1（候选，pending V 复审）」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用） |
+| §10H SkillOpt 方法论吸收 | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调 | `w-model-dev/references/skillopt-adoption.md`（可执行细则） | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+） |
 | 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
 
 ---
@@ -2084,9 +2083,9 @@ graph TD
 
 **从 Day 0 起视为常开：**
 
-- **测试设计前置**（§4 约束 1）：阶段 1–4 的开发产物完成后立即产出对应测试设计。
-- **RTM 维护**（§4 约束 3）：每次产物变更同步更新 `.w-model/rtm.json`。
-- **真实执行**（§4 约束 4）：不得估算覆盖率或测试结果，必须执行真实测试 / 脚本并回填。
+- **测试设计前置**（硬约束 #1）：阶段 1–4 的开发产物完成后立即产出对应测试设计。
+- **RTM 维护**（硬约束 #3）：每次产物变更同步更新 `.w-model/rtm.json`。
+- **真实执行**（硬约束 #4）：不得估算覆盖率或测试结果，必须执行真实测试 / 脚本并回填。
 
 **项目成长后追加：**
 
@@ -2216,8 +2215,7 @@ S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
 
 ### 12.4 外部演化工具协作
 
-> 历史版本曾在此规划「第四阶段（自演化版）」，由内置 `SkillOptimizer` / `SkillLiftEvaluator` 完成技能自演化。
-> 架构重构后，**技能演化已移出技能包**，由外部工具完成。本技能不再包含 Rollout / Reflect / Edit / Skill Lift 评估等内容。
+> **技能演化不在本仓库**，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。本技能不包含 Rollout / Reflect / Edit / Skill Lift 评估等内容（历史自演化版规划见 CHANGELOG 体系）。
 
 本技能与外部演化工具的协作方式：
 

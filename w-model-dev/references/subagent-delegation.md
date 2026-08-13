@@ -798,7 +798,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 子代理返回编排者的数据格式（结构化，便于编排者路由判定与 CHECKPOINT 展示）：
 
-> **前置约束（[文件落地交接协议](#文件落地交接协议与编排者状态日志)）**：启用文件落地模式时，下列结构化数据须写入 `handoff/<dispatch-id>/status.json` + `output.md`，子代理返回 O 的文本进一步降至 ≤ 5 行信标（`state` + `dispatchId` + `status.json` 路径 + 一句话）。O 只 `Read` `status.json`，不读 `output.md`。下文 JSON 结构即 `status.json` / `output.md` 的内容契约。
+> **前置约束（[文件落地交接协议](#文件落地交接协议)）**：启用文件落地模式时，下列结构化数据须写入 `handoff/<dispatch-id>/status.json` + `output.md`，子代理返回 O 的文本进一步降至 ≤ 5 行信标（`state` + `dispatchId` + `status.json` 路径 + 一句话）。O 只 `Read` `status.json`，不读 `output.md`。下文 JSON 结构即 `status.json` / `output.md` 的内容契约。
 
 ### S 子代理返回
 

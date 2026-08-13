@@ -4,7 +4,7 @@
 > **状态**：待评审
 > **作用范围**：w-model-dev 技能包全阶段（运维层、成熟度、失败模式、理解债务）
 > **创建日期**：2026-07-23
-> **依赖**：[skill-design-document_SSoT.md](./skill-design-document_SSoT.md) §3.3 / §3.4 / §4 / §4A / §10.5 / §10.6 / §10A；[w-model-dev/SKILL.md](../w-model-dev/SKILL.md)「不可违反的约束」/「编排者-子代理边界」/「核心操作行为」；[w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md)（17 反模式 + F1~F10）；[w-model-dev/references/operational-recovery.md](../w-model-dev/references/operational-recovery.md)；[w-model-dev/references/data-models.md](../w-model-dev/references/data-models.md)；[w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) §6
+> **依赖**：[skill-design-document_SSoT.md](./skill-design-document_SSoT.md) §3.3 / §3.4 / §4 / §4A / §10.5 / §10.6 / §10A；[w-model-dev/SKILL.md](../w-model-dev/SKILL.md)「不可违反的约束」/「编排者-子代理边界」/「核心操作行为」；[w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md)（47 反模式 + F1~F10）；[w-model-dev/references/operational-recovery.md](../w-model-dev/references/operational-recovery.md)；[w-model-dev/references/data-models.md](../w-model-dev/references/data-models.md)；[w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) §6
 >
 > **参考来源**：[cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering)（MIT，调研于 2026-07-23）—— `docs/primitives.md` / `docs/failure-modes.md` / `docs/anti-patterns.md` / `docs/loop-design-checklist.md` / `docs/concepts.md` / `docs/operating-loops.md`
 >
@@ -18,14 +18,14 @@
 
 1. **成本不可见**：一次 W 模型 8 阶段全跑 = 多子代理 × 8 阶段 + ingestion 收敛轮 + TLA+ 建模，成本可观且完全不可见。`operational-recovery.md` 只覆盖异常恢复（JSON 损坏/并发写入/技术栈漂移），不覆盖成本预算与 kill switch。对照 loop-engineering 的 `loop-budget.md` + `loop-cost` + `loop-run-log.md`，w-model-dev 完全缺失。
 2. **自主度无阶梯**：当前每个 🔴 CHECKPOINT 都等用户，等于强制最高介入度。大项目/成熟团队无法"毕业"，CHECKPOINT 密度成为瓶颈。loop-engineering 的 L0/L1/L2/L3 阶梯正解此题——但 w-model-dev 隐式全 attended，无成熟度模型。
-3. **运维失败模式未命名**：现有 17 条流程反模式（#1~#17）+ 10 条行为退化（F1~F10）全是**流程正确性/行为退化**，缺**运维层**失败。W 模型产出大量产物，理解债务风险高。loop-engineering failure-modes.md 的 Token Burn / State Rot / Verifier Theater / Comprehension Debt Spiral / Cognitive Surrender / Notification Fatigue 是运维层正解。
+3. **运维失败模式未命名**：现有 47 条流程反模式（#1~#47）+ 10 条行为退化（F1~F10）全是**流程正确性/行为退化**，缺**运维层**失败。W 模型产出大量产物，理解债务风险高。loop-engineering failure-modes.md 的 Token Burn / State Rot / Verifier Theater / Comprehension Debt Spiral / Cognitive Surrender / Notification Fatigue 是运维层正解。
 4. **理解债务隐性化**：loop-engineering 的 comprehension debt 概念直击 W 模型最大隐性风险——用户对 8 阶段产物逐一 rubber-stamp。w-model-dev 的 CHECKPOINT 是"门"不是"理解证据"，放行 ≠ 理解。
 
 ### 0.2 目标
 
 - **优化1**：引入声明式成本预算（`.w-model/budget.json`）+ append-only 运行日志（`.w-model/run-log.jsonl`），使一次 W 模型运行的成本与历史可追溯。**不引入 LLM 估算**（避免反模式 #3 同源风险）。
 - **优化2**：引入 L0~L3 自主成熟度阶梯，按级别选择性激活 CHECKPOINT，使成熟团队可"毕业"到低介入度。不违反约束 2（CHECKPOINT 不可绕过——L3 仍有人工 gate 在高风险路径）。
-- **优化3**：新增 6 条运维失败模式（O1~O6），与现有 17 反模式 + F1~F10 互补，命名运维层风险。
+- **优化3**：新增 6 条运维失败模式（O1~O6），与现有 47 反模式 + F1~F10 互补，命名运维层风险。
 - **优化4**：将 CHECKPOINT 放行升级为"理解证据"——用户放行前须在 run-log 填入本阶段 ≥1 关键决策摘要，对抗 rubber-stamp。
 
 ### 0.3 设计原则
@@ -383,7 +383,7 @@ interface MaturityConfig {
 
 - SSoT §10C「自主成熟度阶梯」：权威定义 L0~L3 + 放行矩阵 + 高风险路径 + maturity.json schema + 升级/降级逻辑。
 - SSoT §3.4.3「每阶段分派时序」：CHECKPOINT 类型由 §10C maturity.json.level 决定。
-- SSKILL.md「不可违反的约束」第 2 条：「CHECKPOINT 不可绕过——L1+ 的自动放行是操作型 CHECKPOINT 的选择性激活，非绕过；决策型 CHECKPOINT 在所有级别均等用户」。
+- SKILL.md「不可违反的约束」第 2 条：「CHECKPOINT 不可绕过——L1+ 的自动放行是操作型 CHECKPOINT 的选择性激活，非绕过；决策型 CHECKPOINT 在所有级别均等用户」。
 - SSoT §10A 追溯表行：§10C → `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）。
 
 ---
@@ -392,7 +392,7 @@ interface MaturityConfig {
 
 ### 3.1 设计动机
 
-对照 loop-engineering `failure-modes.md` 的 10 条运维失败模式，w-model-dev 现有 17 反模式（流程破坏）+ F1~F10（行为退化）缺**运维层**：
+对照 loop-engineering `failure-modes.md` 的 10 条运维失败模式，w-model-dev 现有 47 反模式（流程破坏）+ F1~F10（行为退化）缺**运维层**：
 
 - 现有反模式聚焦"流程是否走对"（跳评审/估算门禁/越权实施），不覆盖"运行是否健康"（成本/状态腐烂/评审形式化/理解债务）。
 - 现有 F1~F10 聚焦"Agent 行为是否退化"（静默假设/硬猜推进），不覆盖"用户与系统交互是否健康"（rubber-stamp/通知疲劳/认知放弃）。
@@ -439,13 +439,13 @@ interface MaturityConfig {
 
 ### 3.5 anti-patterns.md 扩展
 
-在现有「反模式清单（17 条）」+「失败模式清单（F1~F10）」基础上，新增第三类：
+在现有「反模式清单（47 条）」+「失败模式清单（F1~F10）」基础上，新增第三类：
 
 ```markdown
 ## 运维失败模式清单（O1~O6）
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
-> 与 17 条流程反模式（#1~#17）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
+> 与 47 条流程反模式（#1~#47）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
 > O 系列命中**不触发脚本回退**（与 F1~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
 
 [此处插入 §3.2 的 O1~O6 表格 + §3.3 的检测信号表]
@@ -618,7 +618,7 @@ interface MaturityConfig {
 - [ ] verifier-spec.md summary 字段内容要求强化
 - [ ] subagent-delegation.md O 角色允许动作扩展
 - [ ] SKILL.md 约束2 补充 + 自检新增
-- [ ] `npm run self-test` 仍 37/37 通过（无脚本变更，回归基线不变）
+- [ ] `npm run self-test` 仍 254/254 通过（无脚本变更，回归基线不变）
 - [ ] w-model-dev-demo 可按新 schema 重跑（可选，验证 budget/run-log/maturity 初始化）
 
 ---

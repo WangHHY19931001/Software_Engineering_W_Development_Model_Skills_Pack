@@ -11,24 +11,24 @@
  *
  * 参数：
  *   report.json            IcebergSweepReport JSON 文件路径
- *   --auto-trigger         R3 交叉核对模式：从 run-log 推断最近 checkpoint 成功阶段
+ *   --auto-trigger         交叉核对模式：从 run-log 推断最近 checkpoint 成功阶段
  *   --run-log=<path>       run-log.jsonl 路径（--auto-trigger 模式必填）
  *   --json                 机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
  *   0  校验通过（无遗漏 / 回归 / 新增遗留项）
- *   1  校验失败（violations 列出具体原因）
+ *   1  校验失败（reasons 列出具体原因）
  *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 收尾 ICEBERG_JSON 摘要，便于 Agent 正则截取）
+ *   stdout 打印单行 ICEBERG_JSON 摘要（便于 Agent 正则截取；非 --json 模式无人类可读正文）
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
  * 命令行参数：支持 --json（机器可读输出）、--auto-trigger、--run-log=
- * 退出码：0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
+ * 退出码：0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
  *
  * @module
  */
@@ -102,7 +102,7 @@ async function readReport(reportPath: string): Promise<IcebergSweepReport> {
   }
 }
 
-/** 从 run-log 推断最近一次 checkpoint success 的阶段（--auto-trigger 模式 R3 交叉核对依据） */
+/** 从 run-log 推断最近一次 checkpoint success 的阶段（--auto-trigger 模式交叉核对依据） */
 async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
   const abs = path.resolve(runLogPath);
   try {
@@ -173,7 +173,7 @@ async function main(): Promise<void> {
   const result = checkIcebergSweep(report);
   const reasons = [...result.reasons];
 
-  // R3: --auto-trigger 模式交叉核对 report.phase 与 run-log 最近 checkpoint phase 一致
+  // 交叉核对：--auto-trigger 模式下校验 report.phase 与 run-log 最近 checkpoint phase 一致（独立于 logic 层 R1-R5 编号体系）
   if (autoTrigger) {
     if (!runLogArg) {
       exitWithError({

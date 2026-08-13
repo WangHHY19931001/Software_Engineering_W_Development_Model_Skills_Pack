@@ -5,10 +5,10 @@
  * 对应 w-model-dev/references/data-models.md RunLogEntry schema
  * 与 docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.2。
  * 供 O 子代理在阶段推进前调用，校验运行日志完整性、tokens 合规、返工一致、
- * O 越权检测、exitCode 防伪交叉校验、append-only 时序。
+ * O 越权检测、exitCode 防伪交叉校验、append-only 时序、轨迹模板（R1-R8）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]
+ *   npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]
  *
  * 参数：
  *   run-log.jsonl        run-log.jsonl 文件路径

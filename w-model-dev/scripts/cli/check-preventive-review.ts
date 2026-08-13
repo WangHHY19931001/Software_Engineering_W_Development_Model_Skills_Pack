@@ -11,7 +11,7 @@
  *
  * 参数：
  *   project-dir              项目根目录（默认：当前工作目录）
- *   --phase=N                当前阶段 1-8（可选，默认从 run-log / 上下文推断）
+ *   --phase=N                当前阶段 1-8（与 --auto-trigger 二选一必填；--auto-trigger 从 --run-log 推断阶段）
  *   --variant=<v>            报告文件名变体：standard | fix | emergency | ingest（默认 standard；
  *                            ingest 为 S-ingest-tla / S-ingest-bdd 后 R3，须显式传参，auto-trigger 不推断）
  *   --auto-trigger           从 --run-log 读取当前阶段并推断 variant
@@ -19,12 +19,12 @@
  *   --json                   机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
- *   0  校验通过（各维度审查齐全且通过）
+ *   0  校验通过（各维度审查报告齐全且格式合规——存在性 + schema + phase/dimension 一致；报告内 passed 状态由 V 评审纳入 reworkHints）
  *   1  校验失败（reasons 列出具体原因，S 子代理须按原因返工后重跑）
  *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 收尾 PREVENTIVE_REVIEW_JSON 摘要，便于 Agent 正则截取）
+ *   stdout 打印单行 PREVENTIVE_REVIEW_JSON 摘要（便于 Agent 正则截取；非 --json 模式无人类可读正文）
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
@@ -125,7 +125,7 @@ async function main(): Promise<void> {
     const runLogPath = runLogArg.split('=')[1]!;
     const abs = path.resolve(runLogPath);
     try {
-      // 先 access 探测：保持原 FILE_NOT_FOUND 的 ERROR_JSON stdout 输出（readJsonlOrExit 内部 ENOENT 直接 exit(2) 不输出 ERROR_JSON）
+      // 先 access 探测：FILE_NOT_FOUND 走 ERROR_JSON 输出（readJsonlOrExit 对 ENOENT 同样输出 ERROR_JSON 并 exit 2，此处预探测保证本分支 `return` 后由 Node 自然退出、stdout 完整 flush）
       await fs.access(abs);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;

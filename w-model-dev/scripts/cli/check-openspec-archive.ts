@@ -2,7 +2,7 @@
 /**
  * OpenSpec 归档完整性校验脚本（Openspec Archive Checker）
  *
- * 对应 SSoT §3.4.21：阶段门 V/G 全通过后须执行 opsx:archive 归档变更。
+ * 对应 SKILL.md「codegraph + OpenSpec 集成」机制：阶段门 V/G 全通过后须执行 opsx:archive 归档变更。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase <5|6|7|8> [--json]

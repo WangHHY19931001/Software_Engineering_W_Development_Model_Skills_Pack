@@ -12,6 +12,8 @@
 
 import { createHash } from 'node:crypto';
 
+import { validateBySchema } from './schema-loader.js';
+
 // ==================== 类型定义 ====================
 
 export type Role = 'O' | 'S' | 'A' | 'V' | 'G' | 'R';
@@ -108,6 +110,19 @@ export function checkSignatureChain(
   const violations: string[] = [];
   const rulesPassed: string[] = [];
   const rulesFailed: string[] = [];
+
+  // 入口 schema 校验（防反模式 #28）：逐条校验记录结构，违规以 [schema] 前缀报告
+  for (const [i, e] of entries.entries()) {
+    const schemaResult = validateBySchema('signature-chain', e);
+    if (!schemaResult.valid) {
+      for (const msg of schemaResult.errorMessages) {
+        violations.push(`[schema] 第 ${i + 1} 条: ${msg}`);
+      }
+    }
+  }
+  if (violations.length > 0) {
+    return { passed: false, violations, rulesPassed: [], rulesFailed: ['R1'] };
+  }
 
   // 过滤 phase
   let scopedEntries = entries as SignatureChainEntry[];

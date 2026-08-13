@@ -26,6 +26,8 @@
  *   --phase      校验阶段（1-4），控制追溯项数量，默认从 graph.currentPhase 读取
  *   --spec-dir   需求规格独立产物目录（含 requirement-spec.md / traceability-matrix.md / uml-modeling.md），
  *                启用 R7 追踪矩阵一致性 + R8 UML mermaid 块配平校验（不传则行为完全不变）
+ *   --rtm        RTM 文件路径（R6 扩展：阶段 4 验收用例 ↔ 需求覆盖交叉核对）
+ *   --exemptions 豁免文件路径（存在时跳过对应豁免规则，与 check-exemption.ts granted.json 口径一致）
  *   --json       机器可读输出模式：stdout 仅输出单行纯 JSON（可整体 JSON.parse）
  *
  * 退出码：
@@ -40,7 +42,7 @@
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
- * 命令行参数：支持 --json（机器可读输出）、--phase=1|2|3|4、--spec-dir=
+ * 命令行参数：支持 --json（机器可读输出）、--phase=1|2|3|4、--spec-dir=、--rtm=、--exemptions=
  * 退出码：0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
  *
  * @module

@@ -2,7 +2,7 @@
 /**
  * codegraph + OpenSpec 依赖检测与自动安装初始化脚本
  *
- * 对应 SSoT §3.4.21：阶段 5-8 引入 codegraph（修改前影响分析）+ OpenSpec opsx（任务规划层）。
+ * 对应 SKILL.md「codegraph + OpenSpec 集成」机制：阶段 5-8 引入 codegraph（修改前影响分析）+ OpenSpec opsx（任务规划层）。
  * 三层检测（L1 CLI / L2 MCP 注册 / L3 项目目录）+ 自动处置，仅自动失败时 CHECKPOINT。
  *
  * 用法：

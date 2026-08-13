@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 41.9.0
+version: 41.10.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -151,7 +151,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
 | `schemas/`（20 份 JSON Schema draft-07） | 由 `scripts/logic/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
 | `tools/`（tla2tools.jar） | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝） |
-| `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget / run-log） |
+| `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget.template.json / run-log.template.jsonl） |
 
 ## 命令速查
 

@@ -33,6 +33,6 @@
 - 旧版缺少第 7 章「数据模型」与第 9 章「RTM 需求跟踪矩阵」的完整定义
 - 旧版缺少 LLM-as-a-Verifier 集成规范（SSoT 现分布在 §7.6 数据模型 + §8 技术实现方案；项目内详细方案见 `llm-verifier-integration-design.md`）
 - 旧版缺少验收标准与质量门的具体阈值
-- 旧版缺少第 14 章「技能演化机制」与第 15 章「技能评估标准」（SkillOpt / ACES / SkillsBench / SkillLearnBench）
+- 旧版缺少技能演化机制与技能评估标准章节（历史 §14/§15 已随架构重构移除，原文归档于 [`changes/decision-log/legacy-sections.md`](./changes/decision-log/legacy-sections.md)；演化由外部工具 SkillOpt / darwin-skill 完成，评估基准 ACES / SkillsBench / SkillLearnBench 见 SSoT §16.3）
 
-这些差异已在 SSoT 中补齐，旧版本不再维护。SSoT 章节编号：§1-§12 主体 + §14 演化 + §15 评估 + §16 参考文献（§13 已合并入 §16）。
+这些差异已在 SSoT 中补齐，旧版本不再维护。SSoT 章节编号：§1-§12 主体 + §16 参考文献（§13 已合并入 §16；§14/§15 已移除）。

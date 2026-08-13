@@ -208,7 +208,7 @@ async function main(): Promise<number> {
     const resolved = resolveFeatureFile(basePath, f.filePath, projectDir);
     if (!resolved) {
       console.error(
-        `[D2] feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`,
+        `feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`,
       );
       continue;
     }
@@ -221,7 +221,7 @@ async function main(): Promise<number> {
         scenarios: parsed.scenarios,
       });
     } catch (e) {
-      console.error(`[D2] 无法读取 feature 文件 ${resolved}: ${(e as Error).message}`);
+      console.error(`无法读取 feature 文件 ${resolved}: ${(e as Error).message}`);
     }
   }
 

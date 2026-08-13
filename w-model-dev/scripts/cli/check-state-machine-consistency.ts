@@ -2,8 +2,8 @@
 /**
  * 状态机一致性校验脚本（State Machine Consistency Checker）
  *
- * 对应 Round 24 P1 问题 6：设计文档 ↔ 代码状态机一致性无自动校验。
- * 现有脚本校验"代码↔TLA+"，本脚本补"设计文档↔代码"维度。
+ * 校验设计文档 ↔ 代码状态机一致性（补齐「代码↔TLA+」之外的「设计文档↔代码」维度）。
+ * 现有 `check-code-tla-consistency.ts` 校验"代码↔TLA+"，本脚本补"设计文档↔代码"维度。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts <input.json>
