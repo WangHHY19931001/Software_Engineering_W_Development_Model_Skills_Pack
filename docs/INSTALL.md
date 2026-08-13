@@ -247,7 +247,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 **Q：技能自演化在哪里？**
 不在本仓库。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具完成：
 [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)。
-本技能产出的 `VerifierOutput` JSON 可作为这些工具的训练信号。详见 SSoT [§12.4 与外部 SkillOpt/darwin-skill 的边界](./skill-design-document_SSoT.md) 与 [§14 技能演化机制（已移除）](./skill-design-document_SSoT.md)。
+本技能产出的 `VerifierOutput` JSON 可作为这些工具的训练信号。详见 SSoT [§12.4 与外部 SkillOpt/darwin-skill 的边界](./skill-design-document_SSoT.md)。
 
 **Q：能否只安装部分阶段？**
 不建议。W 模型的核心是开发与测试并行，阶段之间存在阶段门依赖。`SKILL.md` 已按需

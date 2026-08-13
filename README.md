@@ -296,10 +296,10 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载；完整列表见 references/ 目录）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md  # 8 阶段细则
-│   │   ├── anti-patterns.md      # 负面知识库：47 条流程反模式 + L1~L4 教训 + F1~F10 失败模式 + O1~O6 运维失败模式
+│   │   ├── anti-patterns.md      # 负面知识库：47 条流程反模式（F1~F10 失败模式见 operation-behaviors.md；O1~O6 运维失败模式见 SSoT §4A.2a）
 │   │   ├── workflow.md           # 完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      # LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审）
-│   │   ├── subagent-delegation.md# 编排者-子代理边界（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约）
+│   │   ├── subagent-delegation.md # 编排者-子代理边界（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约）
 │   │   ├── dispatch-matrix.md    # 阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵
 │   │   ├── command-reference.md  # /wm 命令参考
 │   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
@@ -307,6 +307,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / mythical-man-month-absorption / code-smells-checklist / clean-code-refactoring-agentic-absorption / concurrency-guide / four-source-absorption / design-patterns-catalog / refactoring-catalog）
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep）
+│   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）
 │   │   ├── cli/                  # 门禁与工具 CLI 入口：check-*.ts + self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks

@@ -117,4 +117,4 @@ R6 校验规则：对每条签名记录，用上述公式重算 sigHash，与记
 
 ## 8. 与归档完整性清单的协同
 
-`signature-chain.jsonl` 须纳入归档完整性强制快照清单（SSoT §10B.2.1）。归档时由 `check-archive-integrity.ts` 校验存在性，由 `check-signature-chain.ts --stage=archive` 校验完整性。
+`signature-chain.jsonl` 须纳入归档完整性强制快照清单。归档时由 `check-archive-integrity.ts` 校验存在性，由 `check-signature-chain.ts --stage=archive` 校验完整性。

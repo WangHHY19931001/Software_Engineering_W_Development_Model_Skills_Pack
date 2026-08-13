@@ -32,4 +32,4 @@
 | F9 | 因「显而易见」而无规格就编码 | 与「测试设计前置」冲突 |
 | F10 | 因「看起来对」跳过验证 | 与 #3 / #6 互补 |
 
-> Agent 重复命中同一失败模式 ≥2 次时，应在 SSoT §10B.4 登记为新教训。
+> Agent 重复命中同一失败模式 ≥2 次时，应在 CHANGELOG 体系（[decision-log](../../docs/changes/decision-log/README.md)）登记为新教训。

@@ -596,7 +596,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | F9 | 因「显而易见」而无规格就编码 | 与 W 模型「测试设计前置」冲突 |
 | F10 | 因「看起来对」跳过验证 | 与 #3（估算质量门）/ #6（估算 RTM 覆盖率）互补 |
 
-> F1~F10 命中时不触发门禁脚本回退（它们不是流程反模式），但应在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注。Agent 重复命中同一失败模式 ≥2 次时，应在 SSoT §10B.4 登记为新教训。
+> F1~F10 命中时不触发门禁脚本回退（它们不是流程反模式），但应在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注。Agent 重复命中同一失败模式 ≥2 次时，应在 CHANGELOG 体系（[`decision-log`](./changes/decision-log/README.md)）登记为新教训。
 
 ### 4A.2a 运维失败模式清单（O1~O6）
 
@@ -1066,7 +1066,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **角色签名顺序**（强制链）：`genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(gate) → O(checkpoint-用户确认)`；阶段 5 无 A，阶段 6-8 视具体阶段调整。
 - **产出来源正确性**（`inputProvenance`）：各角色产出须声明上游签名 + 上游产物 + 变换描述；强制来源/禁止来源矩阵见 [`signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) §3。
 - **G 角色校验职责**：G 跑门禁脚本前先跑 `check-signature-chain.ts`（R1-R10）；O checkpoint 前须跑签名链校验 + 用户确认签名。
-- **归档**：`signature-chain.jsonl` 须纳入归档完整性强制快照清单（见 §10B.2）。
+- **归档**：`signature-chain.jsonl` 须纳入归档完整性强制快照清单（由 `check-archive-integrity.ts` 校验）。
 
 ---
 

@@ -69,7 +69,7 @@
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 20 份） |
 | 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd-guide.md](bdd-guide.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E9 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
-| 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，`check-archive-integrity.ts` 退出码 0（见 SSoT §10B.2.1 归档完整性清单） |
+| 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，由 `check-archive-integrity.ts` 校验归档完整性清单（退出码 0） |
 | 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
 | 33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
 | 34 | 编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次、R ≥3 次；`check-role-dispatch.ts` 校验（见约束 #8） |
@@ -499,7 +499,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **回退动作**：
 - 回到归档前状态，补齐缺失文件后重跑 `check-archive-integrity.ts`
 
-**关联**：SSoT §10B.2.1 归档完整性清单
+**关联**：`check-archive-integrity.ts` 归档完整性清单
 
 ## #32 签名链断裂
 

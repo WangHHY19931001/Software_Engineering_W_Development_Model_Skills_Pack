@@ -14,11 +14,11 @@
 - **LLM-as-a-Verifier 评审** 由 V 子代理按 `w-model-dev/references/verifier-spec.md` 提示词执行（即「外部 Agent」），技能用校验脚本防输出漂移；编排者不得自评。
 - **Agent Personas（评审角色提示词）** 由 V 子代理在执行 `/wm review` 时按 `w-model-dev/references/agent-personas.md` 选用对应 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema。多角度分析时，R-lead / V-lead 按 `w-model-dev/references/subagent-persona-matrix.md` 从 `w-model-dev/subagent/`（28 个人格文件，分 engineering / testing / design / product / project 5 类）选用 persona 并行/串行分派。
 - **技能自演化** 不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
-- **codegraph + OpenSpec 集成**（阶段 5-8）：codegraph 提供修改前符号级影响分析（callers/callees/blast radius），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。技能包通过 `ensure-codegraph-opsx.ts` 自动检测安装，通过 3 个 check 脚本做门禁校验。详见 SSoT §3.4.21。
-- **阶段 1 迷雾登记册（Fog of War）**：REQ 入学锐利性测试（`references/ingestion-chunk.md`，判据 = 能否精确陈述需求的问题，非能否回答）/ A-cross 报告 §7 迷雾汇总（`references/ingestion-cross.md`）/ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空，`references/phase-1-requirements.md`「迷雾登记册（Fog of War）」节）。迷雾册为文本节不建图节点。详见 SSoT §3.4.23。
+- **codegraph + OpenSpec 集成**（阶段 5-8）：codegraph 提供修改前符号级影响分析（callers/callees/blast radius），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。技能包通过 `ensure-codegraph-opsx.ts` 自动检测安装，通过 3 个 check 脚本做门禁校验。详见 `w-model-dev/references/phase-5-coding.md`「codegraph 修改前影响分析」节。
+- **阶段 1 迷雾登记册（Fog of War）**：REQ 入学锐利性测试（`references/ingestion-chunk.md`，判据 = 能否精确陈述需求的问题，非能否回答）/ A-cross 报告 §7 迷雾汇总（`references/ingestion-cross.md`）/ 毕业机制三选一（毕业成 REQ / 判 Out of Scope / 豁免审批，CHECKPOINT 前强制清空，`references/phase-1-requirements.md`「迷雾登记册（Fog of War）」节）。迷雾册为文本节不建图节点。
 - **阶段设计级产物**：阶段 1-4 产出升级为主模板 + 每阶段 6 独立子模板（跨阶段去重后共 10 种：system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），主文档引用块串联；`check-requirement-graph.ts` 新增 R7-R14 结构校验 + `check-artifact-gate.ts --phase=N` 引用块/SSOT/DoD 校验。详见 SSoT §10.7 与 `w-model-dev/templates/`。
-- **冰山扫掠深度分析机制**（R-iceberg）：S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索主动深挖隐藏问题，直到 `newFindings=[]` 或达 maxIcebergRounds=5。反模式 #44。详见 SSoT §3.4.34 与 `references/iceberg-sweep-guide.md`。
-- **错误结构全量归一化**：全仓 31 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 SSoT §3.4.30（全量归一化）+ §3.4.42（CliError rule/field 扩展，当前定义）。
+- **冰山扫掠深度分析机制**（R-iceberg）：S-fix 后（ICEBERG-A）与阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索主动深挖隐藏问题，直到 `newFindings=[]` 或达 maxIcebergRounds=5。反模式 #44。详见 `w-model-dev/references/iceberg-sweep-guide.md`。
+- **错误结构全量归一化**：全仓 31 个脚本 exit 2 统一输出结构化错误——人类消息 `✗ [CATEGORY] ...` 走 stderr、`ERROR_JSON {...}` 摘要走 stdout（`lib/cli-error.ts`，6 类错误码）。详见 `w-model-dev/references/command-reference.md`「错误码与 ERROR_JSON 约定」节。
 - **`eval/` 边界**：`eval/` 目录为外部工具评估产物，**不属技能包**，不参与 `/wm` 编排，修改技能包时无需关注。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
