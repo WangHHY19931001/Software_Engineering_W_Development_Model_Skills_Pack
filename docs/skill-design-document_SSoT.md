@@ -256,7 +256,7 @@ graph TD
 - **LLM-as-a-Verifier 属于技能内部各阶段产物校验流程的一部分**，是 W 模型阶段门评审的实现方式，并非独立的「LLM 引擎」模块。
 - **技能本身不包含演化机制与轨迹分析**。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具（SkillOpt / darwin-skill）完成，它们可消费本技能产出的 `VerifierOutput` JSON 作为训练信号。
 
-### 3.3.x 外部工具集成
+### 3.3.1 外部工具集成
 
 | 工具 | 定位 | 集成方式 | 应用阶段 | 触发条件 |
 |---|---|---|---|---|
@@ -2274,9 +2274,9 @@ timeline
 
 ---
 
-## 16. 参考文献
+## 13. 参考文献
 
-### 16.1 W 模型与软件工程基础
+### 13.1 W 模型与软件工程基础
 
 1. 软件开发常见模型（瀑布模型、V模型、W模型、敏捷开发模型）. CSDN博客. https://blog.csdn.net/yao_zhuang/article/details/114273475
 2. W模型和瀑布模型与"V"模式开发模型有何异同？. 阿里云开发者社区. https://developer.aliyun.com/article/1566339
@@ -2289,18 +2289,18 @@ timeline
 9. What is Requirements Traceability Matrix (RTM) in Testing?. https://www.guru99.com/traceability-matrix.html
 10. 需求跟踪深度解析：架构师视角下的全链路追溯体系. https://blog.csdn.net/ZxqSoftWare/article/details/149282779
 
-### 16.2 LLM-as-a-Verifier（§7.6 评审规范）
+### 13.2 LLM-as-a-Verifier（§7.6 评审规范）
 
 11. LLM-as-a-Verifier: A General-Purpose Verification Framework. arXiv:2607.05391. Stanford University + UC Berkeley + NVIDIA Research.
 12. LLM-as-a-Judge: 本技能的评审规范见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md)（三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板），SSoT §7.6 为摘要。历史集成设计见 `llm-verifier-integration-design.md`（仅作背景，不作为权威来源）。
 13. PPT (Probabilistic Pivot Tournament): O(N×k) 复杂度排名算法，本技能在 `verifier-spec.md` §5 以提示词描述，由外部 Agent 执行；不再内置 `src/core/ppt-ranker.ts`。
 
-### 16.3 外部技能演化工具
+### 13.3 外部技能演化工具
 
 > 技能演化与评估已移出技能包（原第 14 章 / 第 15 章已移除）。下列工具 / 基准由外部消费本技能产出的 `VerifierOutput` JSON，不在技能内置：
 > - 训练循环与 Skill Lift 评估 → SkillOpt / darwin-skill
 > - 技能评估基准 → ACES / SkillsBench / SkillLearnBench
-> - 多候选排序算法 → PPT（已纳入 `verifier-spec.md` 提示词，见 §16.2）
+> - 多候选排序算法 → PPT（已纳入 `verifier-spec.md` 提示词，见 §13.2）
 
 14. SkillOpt: 把技能文档视为可训练外部状态，通过 Rollout → Reflect → Edit → Gate 闭环优化。Microsoft Research. https://github.com/microsoft/SkillOpt （SkillsBench 实证：自生成技能平均 -1.3pp，必须搭配验证门）
 15. darwin-skill: 基于进化算法的技能搜索与筛选。 https://github.com/alchaincyf/darwin-skill

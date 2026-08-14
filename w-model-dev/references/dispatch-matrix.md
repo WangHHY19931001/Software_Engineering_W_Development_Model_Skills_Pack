@@ -179,6 +179,22 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 > 反模式 #21（阶段级门禁跳过）：阶段 6/7/8 完成时必须跑对应 `--phase=N`，不得跳过直接跑 `--phase=8` 终检。
 
+### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
+
+> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 31 个 .ts
+> 一一对应（26 个 check-* + 5 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
+> **新增 / 改名门禁脚本时只在本文件登记一处**——`check-docs-consistency.ts` 的 script-registry 检查
+> 核对全部 31 个 cli 脚本名均出现于本文件（漏登记即门禁失败，pre-push 第 14 项拦截）。
+
+| 脚本 | 类别 | 用途 | 触发时机 |
+|---|---|---|---|
+| check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本六处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
+| check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
+| security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
+| self-test | 工具 | 254 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
+| wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
+| metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
+
 ## 7. 反模式 → check 脚本映射速查
 
 | 反模式 | 守护脚本 / 机制 |

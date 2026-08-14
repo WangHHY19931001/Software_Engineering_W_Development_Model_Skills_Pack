@@ -7,6 +7,18 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.16.0] - 2026-08-14
+
+### Changed
+- 版本号 41.15.0 → 41.16.0（**首次由新脚本 `npm run version:bump` 一处改版、六文件同步**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例 / CHANGELOG.md 节头；`version-consistency` 检查扩展为六处比对）
+- **P0-1 消除 vitest 双跑**：pre-push 第 12 项 vitest 落盘 JSON（`--reporter=json --outputFile`），第 14 项 `check-docs-consistency` 经 `WM_VITEST_COUNT_FILE` 复用用例数，不再二次全量 vitest；脚本未变更时跳过重采（软放行）。每次 push vitest 由两次 → 一次，纯文档 push 零次。
+- **P0-2 SSoT 章节号归一 + ssot-headings 元门禁**：`3.3.x` → `3.3.1`；`16. 参考文献` → `13. 参考文献`（16.1~16.3 → 13.1~13.3，内部 §16.2 引用同步）；新增 `checkSsotHeadings`（顶层章节号 1..N 连续 + 字面 x 占位标题检测），堵住「章节删节未重排」盲点。
+- **P1-4 导航表收敛**：`dispatch-matrix.md` §6.4 补全为 31/31 权威登记表（新增/改名门禁脚本只登记一处）；AGENTS.md §2 巨型脚本枚举（~5000 字符）压缩为指针（见 §8 + dispatch-matrix §6），消除唯一整表重复；新增 `script-registry` 检查（全部 cli 脚本名须登记于 dispatch-matrix + SKILL「N 个 .ts」计数一致）。
+- **P1-5 eval 状态如实化**：`eval/README.md` 标注「评估暂停中」（v36.0.0~v41.16.0 未外部盲评）+ 待评估版本表 + 恢复评估指引，不再假装闭环在跑。
+- **P1-6 硬编码税最小化**：`REQUIRED_PATHS` 补「新增活体文档契约」注释（26 项）+ exit-2 工具数具名常量；`CONTRIBUTING.md` 数字一致性条删陈旧 `EXPECTED.currentVersion` 引用、改指 version:bump。
+- 测试增长：vitest 623 → **634 条**（新增 ssot-headings / script-registry / version-consistency CHANGELOG 用例）；同步 README/AGENTS/pre-push 计数表述。
+- `check-docs-consistency.ts` REQUIRED_PATHS 增 `dispatch-matrix.md` 与 `CHANGELOG.md`。
+
 ## [41.15.0] - 2026-08-14
 
 ### Changed

@@ -2,6 +2,41 @@ import { describe, expect, it } from 'vitest';
 
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
+/** scripts/cli 当前 31 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
+const CLI_SCRIPT_NAMES = [
+  'check-archive-integrity',
+  'check-artifact-gate',
+  'check-bdd-model',
+  'check-budget',
+  'check-checkpoint',
+  'check-code-tla-consistency',
+  'check-codegraph-queries',
+  'check-design-contract-consistency',
+  'check-docs-consistency',
+  'check-exemption',
+  'check-iceberg-sweep',
+  'check-maturity',
+  'check-openspec-archive',
+  'check-opsx-artifacts',
+  'check-preventive-review',
+  'check-requirement-coverage',
+  'check-requirement-graph',
+  'check-role-dispatch',
+  'check-rootcause-report',
+  'check-run-log',
+  'check-samples-coverage',
+  'check-signature-chain',
+  'check-state-machine-consistency',
+  'check-tla-bdd-sync',
+  'check-tla-model',
+  'check-verifier-output',
+  'ensure-codegraph-opsx',
+  'metrics-report',
+  'security-scan',
+  'self-test',
+  'wm-status',
+];
+
 function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistencyInput {
   return {
     schemaFiles: ['verifier-output.schema.json', 'run-log.schema.json', 'iceberg-sweep.schema.json'],
@@ -24,7 +59,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |',
+      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（31 个 .ts） | 仅 G 子代理执行 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
     agents: '31 个脚本\n40 个 .test.ts / 530 条',
@@ -37,6 +72,9 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
       '| **签名链完整性** | ... |',
     ].join('\n'),
+    changelog: '# Changelog\n\n## [41.11.0] - 2026-08-14\n\n- 示例条目\n',
+    dispatchMatrix: ['# 分派矩阵', '## 6. 门禁脚本清单', ...CLI_SCRIPT_NAMES.map((n) => `- ${n}`)].join('\n'),
+    cliScriptFiles: CLI_SCRIPT_NAMES.map((n) => `${n}.ts`),
     designDocs: [],
     testFileCount: 40,
     vitestTestCount: 530,
@@ -430,5 +468,84 @@ describe('runDocConsistencyChecks', () => {
     expect(
       runDocConsistencyChecks(input).some((x) => x.check === 'version-consistency' && x.message.includes('无法解析')),
     ).toBe(true);
+  });
+
+  it('CHANGELOG.md 缺版本节头 → version-consistency 违规', () => {
+    const input = baseInput({ changelog: '# Changelog\n\n- 无版本节头\n' });
+    const v = runDocConsistencyChecks(input);
+    expect(
+      v.some(
+        (x) => x.check === 'version-consistency' && x.message.includes('CHANGELOG') && x.message.includes('41.11.0'),
+      ),
+    ).toBe(true);
+  });
+
+  it('CHANGELOG.md 版本节头漂移 → version-consistency 违规', () => {
+    const input = baseInput({ changelog: '# Changelog\n\n## [41.10.0] - 2026-08-13\n\n- 旧条目\n' });
+    const v = runDocConsistencyChecks(input);
+    expect(
+      v.some(
+        (x) => x.check === 'version-consistency' && x.message.includes('CHANGELOG') && x.message.includes('41.10.0'),
+      ),
+    ).toBe(true);
+  });
+
+  it('CHANGELOG.md 版本节头一致 → 零 version-consistency 违规', () => {
+    const input = baseInput();
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'version-consistency')).toBe(false);
+  });
+
+  it('SSoT 顶层章节号连续（含字母后缀章 4A/10C/11A）→ 零 ssot-headings 违规', () => {
+    const lines: string[] = [];
+    for (let n = 1; n <= 11; n++) lines.push(`## ${n}. 标题${n}`);
+    // 字母后缀章归并到基础号，不新增基础号：4A / 10A / 10C / 11A
+    lines.push('## 4A. 标题4', '## 10A. 标题10', '## 10C. 标题10', '## 11A. 标题11');
+    const input = baseInput({ ssot: lines.join('\n') });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'ssot-headings')).toBe(false);
+  });
+
+  it('SSoT 顶层章节号缺号 → ssot-headings 违规', () => {
+    const input = baseInput({ ssot: ['## 1. 项目概述', '## 2. 理论基础', '## 4. 工作流'].join('\n') });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'ssot-headings');
+    expect(v.some((x) => x.message.includes('缺 3'))).toBe(true);
+  });
+
+  it('SSoT 未决占位标题（3.3.x）→ ssot-headings 违规', () => {
+    const input = baseInput({
+      ssot: '## 3. 技能架构设计\n\n### 3.3.x 外部工具集成\n\n## 4. 技能工作流程',
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'ssot-headings');
+    expect(v.some((x) => x.message.includes('3.3.x'))).toBe(true);
+  });
+
+  it('SSoT 无编号顶层章 → ssot-headings 守卫跳过（零违规）', () => {
+    const input = baseInput({ ssot: '### 4A.1 八条核心操作行为\n纯文本无章节号' });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'ssot-headings')).toBe(false);
+  });
+
+  it('全部脚本已登记 + SKILL 计数一致 → 零 script-registry 违规', () => {
+    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'script-registry')).toBe(false);
+  });
+
+  it('dispatch-matrix 漏登记某脚本 → script-registry 违规', () => {
+    const input = baseInput({
+      dispatchMatrix: [
+        '# 分派矩阵',
+        ...CLI_SCRIPT_NAMES.filter((n) => n !== 'check-tla-model').map((n) => `- ${n}`),
+      ].join('\n'),
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
+    expect(v.some((x) => x.message.includes('check-tla-model') && x.message.includes('未登记'))).toBe(true);
+  });
+
+  it('SKILL.md 声明 .ts 计数与实测不符 → script-registry 违规', () => {
+    const input = baseInput({ skill: baseInput().skill.replace('（31 个 .ts）', '（30 个 .ts）') });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
+    expect(v.some((x) => x.message.includes('30') && x.message.includes('31'))).toBe(true);
+  });
+
+  it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
+    const input = baseInput({ cliScriptFiles: [] });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'script-registry')).toBe(false);
   });
 });

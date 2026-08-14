@@ -46,6 +46,12 @@ export interface DocConsistencyInput {
   metaJson: string;
   /** docs/INSTALL.md 原文（version 一致性检查数据源） */
   installDoc: string;
+  /** CHANGELOG.md 原文（version 一致性检查数据源：首个 `## [<ver>]` 头须 == 当前版本） */
+  changelog: string;
+  /** w-model-dev/references/dispatch-matrix.md 原文（script-registry 检查数据源：门禁脚本权威登记表） */
+  dispatchMatrix: string;
+  /** w-model-dev/scripts/cli/ 下全部 .ts 文件名（实测；script-registry 检查数据源） */
+  cliScriptFiles: string[];
   /** docs/ 根 6 份设计文档（活体引用） */
   designDocs: Array<{ name: string; content: string }>;
   /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（实测；期望值由 README「N files」/ AGENTS「N 个 .test.ts」表述声明） */
@@ -123,8 +129,17 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
   violations.push(
-    ...checkVersionConsistency(input.pkgJson, input.metaJson, input.skill, input.readme, input.installDoc),
+    ...checkVersionConsistency(
+      input.pkgJson,
+      input.metaJson,
+      input.skill,
+      input.readme,
+      input.installDoc,
+      input.changelog,
+    ),
   );
+  violations.push(...checkSsotHeadings(input.ssot));
+  violations.push(...checkScriptRegistry(input.cliScriptFiles, input.dispatchMatrix, input.skill));
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
   return violations;
 }
@@ -148,14 +163,20 @@ function extractJsonVersion(json: string): string | null {
   }
 }
 
+/** 从 CHANGELOG.md 首个 `## [<ver>]` 标题提取版本（Keep-a-Changelog 约定） */
+function extractChangelogVersion(changelog: string): string | null {
+  const m = changelog.match(/^##\s*\[([^\]]+)\]/m);
+  return m !== null ? (m[1]!.match(VERSION_PATTERN)?.[0] ?? null) : null;
+}
+
 /**
- * 版本号五处一致性校验（堵住 README/INSTALL 版本漂移盲区）：
+ * 版本号六处一致性校验（堵住 README/INSTALL/CHANGELOG 版本漂移盲区）：
  * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json 为版本唯一源，
  * skill-metadata.json / SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例
- * 四处声明必须全部等于 package.json 解析值。任一处缺失/不可解析/不一致即报违规
- * （fail loud，不静默放行）。版本提升只需改五处文档，无需同步代码常量。
- * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.5.0 写成 41.5.10）
- * 都会被捕获，符合「防漂移」定位。
+ * / CHANGELOG.md 首个版本节头 五处声明必须全部等于 package.json 解析值。任一处缺失/不可解析/不一致
+ * 即报违规（fail loud，不静默放行）。版本提升用 `npm run version:bump`（scripts/version-bump.cjs）一处改版，
+ * 脚本同步五处文档 + 插 CHANGELOG 节头。注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异
+ * （如 41.5.0 写成 41.5.10）都会被捕获，符合「防漂移」定位。
  */
 function checkVersionConsistency(
   pkgJson: string,
@@ -163,6 +184,7 @@ function checkVersionConsistency(
   skill: string,
   readme: string,
   installDoc: string,
+  changelog: string,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const expected = extractJsonVersion(pkgJson);
@@ -178,6 +200,7 @@ function checkVersionConsistency(
     ['SKILL.md frontmatter', extractYamlVersion(skill)],
     ['README「当前版本」', readme.match(new RegExp(`当前版本[^\\d]*(${VERSION_PATTERN.source})`))?.[1] ?? null],
     ['docs/INSTALL.md 激活示例', extractYamlVersion(installDoc)],
+    ['CHANGELOG.md 首个版本节头', extractChangelogVersion(changelog)],
   ];
   for (const [docName, actual] of sources) {
     if (actual === null) {
@@ -191,6 +214,83 @@ function checkVersionConsistency(
         message: `${docName} 版本应为 ${expected}，实际 ${actual}`,
       });
     }
+  }
+  return violations;
+}
+
+/**
+ * SSoT 顶层章节号连续性与未决占位标题检查（元门禁盲点补充，防章节残骸回归）。
+ *  Rule A：解析 SSoT 全部 `## <N>[字母]?. ` 顶层标题，剥离尾部字母得基础号集合，断言 = 1..max 无缺。
+ *    字母后缀章（4A / 10A / 10C~10J / 11A 等）归并到基础数字，不新增基础号；只查连续性、不查字母序
+ *    （10A 排于 10J 之后为可读性选择，不视为违规）。
+ *  Rule B：`^#{2,4} <数字片段>[xX]` 标题视为未决占位（如 `3.3.x`），一律 flag。
+ * 守卫：SSoT 无任何 `## N.` 顶层编号标题时返回空（不误伤空 fixture / 未用编号的输入）。
+ */
+function checkSsotHeadings(ssot: string): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const lines = ssot.split(/\r?\n/);
+  const chapters: number[] = [];
+  for (const line of lines) {
+    const m = line.match(/^##\s+(\d+)([A-Z])?\.\s/);
+    if (m === null) continue;
+    const base = Number(m[1]);
+    if (!chapters.includes(base)) chapters.push(base);
+  }
+  for (const line of lines) {
+    // Rule B：标题数字序头（点分段）末段为字面 x/X → 未决占位（如 `3.3.x`）。
+    // \d[\d.]* 贪婪吃数字与点，`[xX]` 落在末段；`(?:\s|$)` 保证 x 是标题号末尾而非词中。
+    // 与 Rule A 的 `## <N>[字母]?. ` 区分：后者捕捉 4A / 10C 等法定字母章（归并入基础号）。
+    if (/^#{2,4}\s+\d[\d.]*[xX](?:\s|$)/.test(line)) {
+      violations.push({
+        check: 'ssot-headings',
+        message: `SSoT 含未决占位标题「${line.trim().slice(0, 60)}」（应改为具体编号）`,
+      });
+    }
+  }
+  if (chapters.length === 0) return violations; // 守卫：无编号顶层章，跳过连续性校验
+  chapters.sort((a, b) => a - b);
+  const max = chapters[chapters.length - 1];
+  const baseSet = new Set(chapters);
+  for (let i = 1; i <= max; i++) {
+    if (!baseSet.has(i)) {
+      violations.push({
+        check: 'ssot-headings',
+        message: `SSoT 顶层章节号缺 ${i}（当前基础号集合 [${chapters.join(', ')}]）`,
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * script-registry 检查：堵住「新增门禁脚本但漏登记导航表」——任何脚本改名 / 增删后，若
+ * dispatch-matrix.md（权威登记表，阶段 × S 变体 × check 脚本总览，SKILL.md「完整逐文件表」）漏同步
+ * 即报违规。SKILL.md「N 个 .ts」计数表述也须与实测一致（计数动态化：期望值从 SKILL.md 文本解析，
+ * 不硬编码）。守卫：cliScriptFiles 为空时返回空（目录不可读 / fixture 未注入时不误报）。
+ */
+function checkScriptRegistry(cliScriptFiles: string[], dispatchMatrix: string, skill: string): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (cliScriptFiles.length === 0) return violations;
+  for (const file of cliScriptFiles) {
+    const name = file.replace(/\.ts$/, '');
+    if (!dispatchMatrix.includes(name)) {
+      violations.push({
+        check: 'script-registry',
+        message: `dispatch-matrix.md 未登记脚本「${name}」（新增/改名门禁脚本须同步权威登记表）`,
+      });
+    }
+  }
+  const declared = skill.match(/(\d+)\s*个\s*\.ts/);
+  if (declared === null) {
+    violations.push({
+      check: 'script-registry',
+      message: `SKILL.md 缺「N 个 .ts」脚本计数表述（实测 ${cliScriptFiles.length} 个）`,
+    });
+  } else if (Number(declared[1]) !== cliScriptFiles.length) {
+    violations.push({
+      check: 'script-registry',
+      message: `SKILL.md 声明 ${declared[1]} 个 .ts，实际 ${cliScriptFiles.length}`,
+    });
   }
   return violations;
 }

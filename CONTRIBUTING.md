@@ -188,7 +188,7 @@ refactor(skill): /wm review 编排指引精简
 - **设计决策**统一记录在 [`docs/skill-design-document_SSoT.md`](./docs/skill-design-document_SSoT.md)
 - `docs/skill-design-document.md` 仅作为指针，不再独立维护内容（文件头部已标注「已废弃独立维护」）
 - 修改设计 → 先改 SSoT → 再改 `w-model-dev/` 资产（`SKILL.md` / `references/` / `scripts/` / `templates/`）→ 最后同步 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `CHANGELOG.md` / `docs/INSTALL.md`
-- **数字一致性**：文档中出现的 self-test 基线数、vitest 测试数、schema 份数、版本号（package.json / SKILL.md frontmatter / skill-metadata.json / README「当前版本」 / docs/INSTALL.md 激活示例五处）必须与实测一致，改动后全仓库 grep 复查；版本号五处一致性已由 `check-docs-consistency.ts`（version-consistency 检查项）与 `skill-metadata.test.ts` 自动门禁，bump 版本号时同步更新 `docs-consistency-logic.ts` 的 `EXPECTED.currentVersion`
+- **数字一致性**：文档中出现的 self-test 基线数、vitest 测试数、schema 份数、版本号（package.json / SKILL.md frontmatter / skill-metadata.json / README「当前版本」 / docs/INSTALL.md 激活示例 / CHANGELOG.md 首个版本节头六处）必须与实测一致，改动后全仓库 grep 复查；版本号六处一致性已由 `check-docs-consistency.ts`（version-consistency 检查项）与 `skill-metadata.test.ts` 自动门禁，bump 版本号用 `npm run version:bump -- <新版本>`（`scripts/version-bump.cjs`，一处改版、六文件同步 + 插 CHANGELOG 节头），不再手工多文件改版
 - **BDD 文档维护**：修改 BDD features 结构 / 状态机七要素 / `bdd-manifest.json` schema / `check-bdd-model.ts` 校验维度时，必须同步更新 SSoT §10.8 + `bdd-guide.md` + `bdd-review-checklist.md` + `data-models.md` BDD 数据模型节 + `anti-patterns.md` #29 关联节
 
 ### 变更日志

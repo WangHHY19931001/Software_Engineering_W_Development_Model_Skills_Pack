@@ -1,6 +1,6 @@
 {
   "name": "w-model-dev-skill",
-  "version": "41.15.0",
+  "version": "41.16.0",
   "private": true,
   "description": "W-Model AI Assistant Skill — 编排 + 校验脚本技能包（提示词 + 模板 + 自包含门禁脚本，不内置 LLM 调用）",
   "type": "module",
@@ -26,6 +26,7 @@
     "wm:metrics": "tsx w-model-dev/scripts/cli/metrics-report.ts",
     "docs:build": "typedoc --tsconfig config/tsconfig.json --out docs/api w-model-dev/scripts/cli w-model-dev/scripts/logic --entryPointStrategy expand --excludeNotDocumented",
     "docs:site": "docsify serve docs",
+    "version:bump": "node scripts/version-bump.cjs",
     "prepush": "bash .githooks/pre-push --force"
   },
   "devDependencies": {

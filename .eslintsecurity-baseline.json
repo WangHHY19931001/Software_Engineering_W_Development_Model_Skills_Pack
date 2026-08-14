@@ -797,84 +797,98 @@
       "hash": "e9e3cbeacbcec2f4f516a01b00cbf9d3f4f4202fc360b726390b78b2fe1dea34",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 117,
+      "line": 125,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "81ac366b020a6bb001bc66afd939d43ba9e287a17843a323ec24422672f0d5cc",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 119,
+      "line": 127,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "c397899a9bdc876064c9e9edb8e13f927e7acfeed9ae5ad1d489e4ae8029b44a",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 133,
+      "line": 141,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "d9661ab719d95e45c3ac151a8b003507bc5b057e3db0caaa70a2c021449a0761",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 134,
+      "line": 142,
+      "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "13e2143c825fee136df91f1526c18c8329054e9b3e9e90612b32c5d972e67ba5",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
+      "line": 163,
+      "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "2d726970814f249bd1f71ae755db993357333e4b97233a422d9ebff168eabbad",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
+      "line": 165,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "4c9e2a6a51252fa516d5d1fa87ed41a186ea5bc2343afd86c7fdb41d6291a1e3",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 178,
+      "line": 219,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "50e341acd7230ab5f20a03fd5ebaf64a31662bd0059ff0b4b71ce913ffad1393",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 201,
+      "line": 242,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "6aa3f7bb993be96779b9e72062399d35b84410ceda33dbf51b027a3adab9a87c",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 213,
+      "line": 254,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "489c0f4efa27c2bb13c7fac4cc59bd3b58fe90bf19f79ed22a7fdb7fbe5e59e4",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 214,
+      "line": 255,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "a9e8826d7456c72be8ccd19c788e15d61a2a8b00a483f39870f2b16851e22b35",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 217,
+      "line": 258,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "b163a71240b7b846a925b79ded2baffd9935841a3757fa82f2fce8e6c71163da",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 218,
+      "line": 259,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "46126bea7f66d44664895ae10d8f5813bb2978636e5ac6436b9da0c015088476",
+      "hash": "5d1a5c2e8bef8db11b51b71df003966d73d33a149fc30367cfcbd40e62ade81b",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 219,
+      "line": 260,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "dc2f0301acaf7a40face8cb0f3beabd472ff115a02f3bb07ef0be70d05d975fa",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-docs-consistency.ts",
-      "line": 224,
+      "line": 268,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1595,14 +1609,14 @@
       "hash": "9e853bf2930c8ddc4b65ae347f3b00acfe40f499c4f561a578511d133a5f86a6",
       "rule_id": "security/detect-non-literal-regexp",
       "file": "w-model-dev/scripts/logic/docs-consistency-logic.ts",
-      "line": 179,
+      "line": 201,
       "reason": "Found non-literal argument to RegExp Constructor"
     },
     {
       "hash": "0c82159b16452db32fc2bdfda28035cd45cdab30c2211e39ce244185dce9060a",
       "rule_id": "security/detect-non-literal-regexp",
       "file": "w-model-dev/scripts/logic/docs-consistency-logic.ts",
-      "line": 569,
+      "line": 669,
       "reason": "Found non-literal argument to RegExp Constructor"
     },
     {

@@ -32,7 +32,7 @@
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join, resolve as pathResolve } from 'node:path';
+import { isAbsolute, join, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
@@ -40,6 +40,12 @@ import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
+/**
+ * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
+ * 契约：新增 schema / 脚本 / 设计文档等资产时，若其计数或枚举被任一检查消费，须在此登记路径
+ * 并在 docs-consistency-logic.ts 增加对应输入字段与检查规则；只登记「被读取的活体文档」，
+ * 目录类（schemas/、subagent/、__tests__/）由 readdir 动态发现，不进本表。
+ */
 const REQUIRED_PATHS = [
   'package.json',
   'w-model-dev/skill-metadata.json',
@@ -54,10 +60,12 @@ const REQUIRED_PATHS = [
   'w-model-dev/SKILL.md',
   'w-model-dev/references/operation-behaviors.md',
   'w-model-dev/references/hard-constraints.md',
+  'w-model-dev/references/dispatch-matrix.md',
   'README.md',
   'AGENTS.md',
   'docs/skill-design-document_SSoT.md',
   'docs/INSTALL.md',
+  'CHANGELOG.md',
   '.githooks/pre-push',
   'w-model-dev/subagent', // 目录（persona 计数）
   'docs/llm-verifier-integration-design.md',
@@ -140,9 +148,39 @@ function findVitestBin(root: string): string | null {
 }
 
 /**
+ * 从 vitest JSON outputFile 提取实测用例总数（不 spawn）。
+ * 来源：pre-push 第 12 项已全量跑过 vitest 并 `--reporter=json --outputFile=...`，
+ * 通过环境变量 WM_VITEST_COUNT_FILE 传入本脚本，直接复用其结果，避免二次全量 vitest。
+ * 文件缺失 / 路径不可读 / 无 numTotalTests 字段时返回 null（由调用方决定回退策略）。
+ */
+function readVitestCountFile(): number | null {
+  const envFile = process.env.WM_VITEST_COUNT_FILE;
+  if (envFile === undefined || envFile === '') return null;
+  // 绝对路径（含 Windows 盘符路径、WSL 的 /tmp/x）直接用 resolve；未翻译的 MSYS `/tmp/x`（相对 root
+  // 拼接错位，Windows 下 join('D:/repo','/tmp/x') → 'D:\\repo\\tmp\\x'）视为不可用回退 spawn。
+  // Git Bash 下 pre-push 已用 cygpath -w 把 /tmp 翻译成 Windows 路径，故走 isAbsolute 分支。
+  const filePath = isAbsolute(envFile) || /^[a-zA-Z]:[\\/]/.test(envFile) ? pathResolve(envFile) : null;
+  if (filePath === null || !existsSync(filePath)) return null;
+  try {
+    const parsed = parseJsonSafe(readFileSync(filePath, 'utf-8')) as {
+      numTotalTests?: unknown;
+    } | null;
+    if (parsed !== null && typeof parsed.numTotalTests === 'number' && Number.isFinite(parsed.numTotalTests)) {
+      return parsed.numTotalTests;
+    }
+  } catch {
+    // 解析失败 → 回退到显式 spawn（conservative）
+  }
+  return null;
+}
+
+/**
  * 采集 vitest 实际运行输出的用例总数（堵住只查文件数不查用例总数的盲区）。
- * 优先 `vitest run --reporter=json --outputFile=<tmp>`：JSON reporter 输出结构稳定
- * （numTotalTests 为 vitest 2/3/4 官方字段），vitest 存在失败用例时 JSON 仍会落盘，故不依赖 exit code；
+ * 优先级（快路径优先，避免重复全量 vitest）：
+ *   1. 环境变量 WM_VITEST_COUNT_FILE 指向的 vitest JSON outputFile（pre-push 第 12 项复用）→ 直接读取，不 spawn；
+ *   2. scripts 未变更（scriptsChanged=false）→ 返回 -1（vitest-tests 检查软放行）：用例总数仅在
+ *      w-model-dev/scripts/** 下测试文件增删时变化，任何此类变更必使 scriptsChanged=true，届时才重采；
+ *   3. 否则显式 spawn vitest（既有逻辑）。
  * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
  * spawnSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
  * 落盘/解析失败回退 stdout 文本解析「Tests  N passed」；全部失败返回 -1（保守放行，不阻断门禁，
@@ -154,7 +192,10 @@ function findVitestBin(root: string): string | null {
  * 默认 include 会扫全树，嵌套 git worktree（.worktrees/**）下的测试文件将被重复计数
  * （实测根仓库 + worktree 双份 554 → 1108），导致 vitest-tests 门禁误报。
  */
-function collectVitestTestCount(root: string): number {
+function collectVitestTestCount(root: string, scriptsChanged: boolean): number {
+  const fromFile = readVitestCountFile();
+  if (fromFile !== null) return fromFile;
+  if (!scriptsChanged) return -1; // 用例总数不会变化，跳过全量 vitest 重采
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
@@ -216,15 +257,19 @@ function main(): void {
     .sort();
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
   const referencesCount = readdirSync(join(root, 'w-model-dev/references')).filter((f) => f.endsWith('.md')).length;
-  const checkScriptCount = readdirSync(join(root, 'w-model-dev/scripts/cli')).filter((f) =>
-    /^check-.*\.ts$/.test(f),
-  ).length; // 含 check-docs-consistency 自身 = 26（cli/ 层）
-  const exit2ScriptCount = checkScriptCount + 5; // + 5 工具：ensure-codegraph-opsx + metrics-report + security-scan + wm-status（cli/）+ logic/plan-chunks.ts（非 cli/，合计 31；self-test.ts 非 exit-2 不计入）
+  const cliScriptFiles = readdirSync(join(root, 'w-model-dev/scripts/cli'))
+    .filter((f) => f.endsWith('.ts'))
+    .sort();
+  const checkScriptCount = cliScriptFiles.filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 26（cli/ 层）
+  /** 非 check-* 但可 exit 2 的脚本数：4 个工具 CLI（ensure-codegraph-opsx / metrics-report / security-scan / wm-status）+ logic/plan-chunks.ts；self-test.ts 非 exit-2 不计入 */
+  const TOOL_OR_LOGIC_EXIT2_COUNT = 5;
+  const exit2ScriptCount = checkScriptCount + TOOL_OR_LOGIC_EXIT2_COUNT; // = 31（「31 个脚本」表述来源）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),
   ).length;
-  const vitestTestCount = collectVitestTestCount(root);
+  const scriptsChanged = detectScriptsChanges(root);
+  const vitestTestCount = collectVitestTestCount(root, scriptsChanged);
 
   const input: DocConsistencyInput = {
     schemaFiles,
@@ -242,17 +287,20 @@ function main(): void {
     skill: read('w-model-dev/SKILL.md'),
     operationBehaviors: read('w-model-dev/references/operation-behaviors.md'),
     hardConstraints: read('w-model-dev/references/hard-constraints.md'),
+    dispatchMatrix: read('w-model-dev/references/dispatch-matrix.md'),
     readme: read('README.md'),
     agents: read('AGENTS.md'),
     ssot: read('docs/skill-design-document_SSoT.md'),
     prePush: read('.githooks/pre-push'),
+    changelog: read('CHANGELOG.md'),
     pkgJson: read('package.json'),
     metaJson: read('w-model-dev/skill-metadata.json'),
     installDoc: read('docs/INSTALL.md'),
     designDocs,
     testFileCount,
     vitestTestCount,
-    scriptsChanged: detectScriptsChanges(root),
+    scriptsChanged,
+    cliScriptFiles,
     securityBaselineEntryCount: readSecurityBaselineEntryCount(root),
   };
 
