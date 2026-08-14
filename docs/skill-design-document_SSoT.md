@@ -950,6 +950,15 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
 `/wm review <target>` 命令（见 §6）仅返回结构化评审指引——根据目标 ID 识别 `targetKind`，提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板执行评审、再调用校验脚本。命令本身不调用 LLM。
 
+### 7.6A self-as-verifier 模式（demo-only 例外）
+
+> 单 Agent 兼任 S/V/G/R 多角色的例外模式。正式定义与独立性细则见 [`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)「self-as-verifier 模式」节与 `verifier-spec.md` §13；本节为 SSoT 权威定位。
+
+- **启用边界**：仅限 demo / 非生产 / 教学演示项目，**生产项目禁止**；启用时 `project.status` 标记 `selfAsVerifier: true`。生产路径默认编排仍为 O 编排 + S/V/G/R 子代理分派，独立评审依赖 V 子代理物理隔离（§3.4 编排者-子代理边界），**编排者不得自评**（反模式 #10）。
+- **独立性底线**：S/V/G/R 各角色产物文件路径必须独立（VerifierOutput / gate-logs / RootCauseReport / PreventiveReview 三份），违反命中反模式 #35，回退当前阶段起点；R3 预防性审查三份报告无条件强制（不因兼任豁免）。
+- **偏置缓解**：V 评审须选用与 S 产出视角不同的 Persona 提示词运行（agent-personas.md 4 个评审 Persona 或 `subagent/` 人格库），并在 VerifierOutput `summary` 注明所用 Persona；该模式不消除自我偏置，仅将其限制在 demo / 教学范围。
+- **校验**：`check-verifier-output.ts --self-as-verifier --s-output=<path>`（路径独立）；`check-role-dispatch.ts`（S/V/G 各 ≥1、R ≥3 无条件）；代签检测见 §10C（O4）。
+
 ### 7.7 graph.json schema（ingestion 子流程产物）
 
 > 阶段 1–4 ingestion 子流程产出的**结构层**图谱 schema。权威定义见 [`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md) §2.4；本节为摘要，与该设计文档双向追溯。
@@ -2192,6 +2201,18 @@ S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
 - 不全量补建历史 RTM（除非用户明确要求，作为独立项目）
 - 不全量补建历史 TLA+ 规格（同上）
 - 不重构无关历史代码（与 §4A.1 行为 5「Maintain Scope Discipline」协同）
+
+### 11A.6 任务规模维度（轻量路径）
+
+> 采用路径（绿地/棕地）按代码库成熟度选；任务规模维度在其上叠加**门禁强度适配**。「轻量路径」是**门禁降载**（maturity L0/L1 免 TLA+/BDD、L0 交付层无脚本门禁、demo 可 self-as-verifier），**不是阶段裁剪**：阶段流程、RTM、CHECKPOINT 机制与生产项目完全一致，任何「以任务小为由跳过 S→V→G 顺序 / RTM 回填 / 用户确认」的行为命中反模式 #10 / #21 并回退。
+
+| 任务规模 | 适配形态 | 门禁强度 |
+|---|---|---|
+| 极小任务（原型 / demo / 教学演示） | L0 交付层（无脚本门禁，V 评审 + 用户确认把关）+ self-as-verifier（仅 demo，见 §7.6A）+ maturity L0/L1 | TLA+/BDD 可选 |
+| 生产小项目 / 小工具 | 完整 8 阶段 + maturity L2 | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
+| 常规生产功能 | 完整 8 阶段 + maturity L3 | 全必跑，无降载 |
+
+> 实现位置：`SKILL.md`「触发决策 → 任务规模适配（轻量路径）」；maturity 分级权威定义见 §10C；L0/L1 交付层见 INSTALL §2。
 
 ---
 

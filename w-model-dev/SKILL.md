@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 41.13.0
+version: 41.14.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -32,6 +32,18 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 普通需求、设计、编码、测试、修复或技术解释 | 不启用，按普通任务处理 |
 
 **边界示例**：“用 W 模型开发登录功能” → 启用；“从需求开始走完整流程” → 先询问；“修复 `src/auth.ts` 并运行测试” → 不启用。
+
+### 任务规模适配（轻量路径）
+
+启用 W 模型后，按任务规模选择适配形态。**轻量 = 降载门禁强度，不是跳过阶段**：阶段流程、RTM、CHECKPOINT 机制一律不变；禁止以「任务小」为由跳过 S→V→G 顺序、RTM 回填或用户确认（命中反模式 #10 / #21）。
+
+| 任务规模 | 适配形态 | 门禁强度 |
+|---|---|---|
+| 极小任务（原型 / demo / 教学演示） | L0 交付层（无脚本门禁，V 评审 + 用户确认把关）+ self-as-verifier（仅 demo，见下文「self-as-verifier 模式」节）+ maturity L0/L1 | TLA+/BDD 可选，其余门禁照跑 |
+| 生产小项目 / 小工具 | 完整 8 阶段 + maturity L2 | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
+| 常规生产功能 | 完整 8 阶段 + maturity L3 | 全必跑，无降载 |
+
+判据与细则：成熟度分级见上方约束 #13 与 [references/operational-recovery.md](references/operational-recovery.md)「成熟度与行为门禁」；L0/L1 交付层见 [docs/INSTALL.md](../docs/INSTALL.md) §2；REQ 最小层级深度 = 2（适用极小项目）见 [references/phase-1-requirements.md](references/phase-1-requirements.md)。
 
 ## 不可违反的约束
 
@@ -88,6 +100,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 **定义**：self-as-verifier 模式指单 Agent 在同一阶段内兼任 S（产出）/ V（评审）/ G（门禁）/ R（根因/R3）多角色的执行模式。**启用条件**：仅限 demo / 非生产 / 教学演示项目（生产项目禁止）；启用时须在 `project.status` 标记 `selfAsVerifier: true`。
 
 **独立性保证**（关键约束）：兼任时须产出各角色独立产物文件，路径不得相同——S 产出阶段产物；V 产出 `.w-model/verifier-outputs/<phase>-<target>.json`；G 产出 `.w-model/gate-logs/<timestamp>-<script>.json`；R 产出 `RootCauseReport` / `PreventiveReview` JSON。run-log 条目的 `artifacts` 字段须列出各角色独立产物路径。违反独立性（V/G/R 产物与 S 产出同路径）命中反模式 #35。
+
+**偏置缓解（自我评审残余风险）**：同一 Agent 兼任 S/V 时，V 评审须选用与 S 产出视角**不同的 Persona 提示词**运行（按 `targetKind` 从 [references/agent-personas.md](references/agent-personas.md) 4 个评审 Persona 或 `subagent/` 人格库选用），并在 VerifierOutput `summary` 中注明所用 Persona 名称；不得以 S 产出者视角重复评审自身产出。该模式不消除自我偏置，仅将其限制在 demo / 教学范围内（生产项目禁止）。
 
 **与约束 #8 的关系**：self-as-verifier 模式下 S/V/G 可同一 `runId` 条目标记多角色（如 `role="S/V"`），但 `check-role-dispatch.ts` 仍须校验每阶段含 S/V/G 各 ≥1 条记录；R 角色 ≥3 条不可由同一行满足（R3 三报告须独立）。
 

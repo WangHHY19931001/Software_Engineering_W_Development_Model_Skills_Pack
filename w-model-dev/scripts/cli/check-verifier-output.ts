@@ -11,8 +11,8 @@
  *
  * 参数：
  *   output.json  外部 Agent 产出的 VerifierOutput JSON 文件路径
- *   --self-as-verifier  本脚本自评模式：使用脚本内建 VerifierOutput 生成逻辑，配合 --s-output=
- *   --s-output=<path>   自评模式产物写出路径
+ *   --self-as-verifier  self-as-verifier 模式路径独立性校验：校验 output.json 与 --s-output=<path> 指向的 S 产出路径不同（反模式 #35）；模式定义与 demo-only 边界见 SKILL.md「self-as-verifier 模式」节
+ *   --s-output=<path>   S 产出文件路径（配合 --self-as-verifier 使用）
  *   --json       机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：

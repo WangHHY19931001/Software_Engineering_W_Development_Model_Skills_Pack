@@ -893,7 +893,7 @@ LLM 调用 → 失败？─是─► §11.1 重试策略（≤5 次指数退避�
 
 ## 13. self-as-verifier 模式
 
-> V 评审产出独立性要求。
+> V 评审产出独立性要求。**启用条件（同 SKILL.md）：仅限 demo / 非生产 / 教学演示项目，生产项目禁止**；启用时 `project.status` 须标记 `selfAsVerifier: true`。
 
 ### V 评审产出独立性
 
@@ -904,6 +904,7 @@ self-as-verifier 模式下（单 Agent 兼任 S/V/G/R），V 评审产出须满�
    - 违规：`S 产出 = docs/phase1-requirements/requirements-spec.md`，`V 产出 = docs/phase1-requirements/requirements-spec.md`（同路径）
 2. **VerifierOutput 内容须独立**：不得在 S 产出文档中直接嵌入评审结论；评审结论须以独立 JSON 结构产出（按 §6 Schema）
 3. **run-log 记录独立**：V 评审须有独立 run-log 条目（即使 `runId` 与 S 相同，`role` 字段须明确标记 V）
+4. **评审视角独立（偏置缓解）**：V 评审须选用与 S 产出视角**不同的 Persona 提示词**运行（按 `targetKind` 从 [agent-personas.md](agent-personas.md) 4 个评审 Persona 或 `subagent/` 人格库选用），并在 VerifierOutput `summary` 中注明所用 Persona 名称；不得以 S 产出者视角重复评审自身产出。该模式不消除自我偏置，仅将其限制在 demo / 教学范围。
 
 ### 校验
 

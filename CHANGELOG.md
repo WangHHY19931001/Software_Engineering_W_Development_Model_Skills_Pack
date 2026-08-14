@@ -7,6 +7,18 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.14.0] - 2026-08-14
+
+### Changed
+- 版本号 41.13.0 → 41.14.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **self-as-verifier 措辞加固（设计观察 #5）**：
+  - SKILL.md self-as-verifier 节新增「偏置缓解」要点：V 评审须切换与 S 产出视角不同的 Persona 提示词 + VerifierOutput `summary` 注明所用 Persona；明确「不消除自我偏置，仅限 demo/教学」
+  - verifier-spec §13 补 demo-only 边界复述（原仅 SKILL.md 一处）+ 第 4 条「评审视角独立（偏置缓解）」
+  - command-reference `/wm review` 节补 `--self-as-verifier --s-output=<S产出路径>` 参数文档（此前命令参考无该 flag 说明）
+  - check-verifier-output.ts 头注释「本脚本自评模式」→ 准确的路径独立性校验措辞（与实现语义一致）
+  - **SSoT 补 §7.6A self-as-verifier 模式（demo-only 例外）**——修复 decision-log 声称「SSoT 已新增该节」但正文缺失的文档-实现缺口
+- **复杂度收敛引导（设计观察 #6）**：SKILL.md 触发决策节新增「任务规模适配（轻量路径）」小节（极小任务 → L0 交付层 + self-as-verifier + maturity L0/L1；生产小项目 → L2；常规生产 → L3；红线：轻量 = 门禁降载而非跳过阶段）+ SSoT §11A.6 权威段落
+
 ## [41.13.0] - 2026-08-14
 
 ### Changed
