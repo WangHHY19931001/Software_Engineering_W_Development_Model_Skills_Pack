@@ -16,12 +16,7 @@ import * as os from 'node:os';
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-import {
-  readJsonOrExit,
-  readJsonlOrExit,
-  readJsonlOptional,
-  readJsonClassified,
-} from '../lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonlOrExit, readJsonlOptional, readJsonClassified } from '../lib/read-json-or-exit.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 
 let tmpDir: string;

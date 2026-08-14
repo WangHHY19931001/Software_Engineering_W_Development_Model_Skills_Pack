@@ -13,91 +13,77 @@
       "hash": "1bc0a3eae6449c37447d608fff6e2171581b9c21ae46f29c912c812fa8617a9f",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 78,
+      "line": 73,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "ca3b7bbf756bfeb0bfbf2fe0b45f5d92ed7d5256575b8e98a79bee966827e192",
+      "hash": "352d56e4eceb797e79a558e404c695c1800125bfc239b9e58e64ffa987ee037a",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 79,
+      "line": 74,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "6b96542f90fbaa61ab375fb7bb348a8d75c5249b375f4e2db5a6c73e7892fe9c",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 86,
-      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "52b4a54973fdd9cd3d173708c9be49a21d743e40187574f5201eef2d06c74018",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 87,
+      "line": 85,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "534efad4e0d97fc6e38f3e395e2a143c19b52560f697fd59dd6e9697f63cd1f9",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 94,
-      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
-    },
-    {
-      "hash": "f1df1bbce1fac62ca6cf72010ee448bdea9d557f5a7fae574b3f3b84fbc96d35",
-      "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 95,
+      "line": 97,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "42f5605c34778d2b91cf5a6e7f74eedcd266808ed7220b28832562574f1ce18d",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 103,
+      "line": 110,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "57d5b2163244fe45ebe6ec876cd8b84b3a12ef4909533dee6850f25aef6a65fc",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 113,
+      "line": 120,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "20ad7cb64a1603dc73ef7ed4c8645cc129f224031ff3acded908d55a3f19b1e6",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 119,
+      "line": 126,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "26e01e9a08c49d4271fc38ccbf738a60f1335ddf30d233c25f29954edec12947",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 131,
+      "line": 138,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "637a7255703a4c6f636a07b37574481d3ea2b277cba3fcfaa985a2b754c02489",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 132,
+      "line": 139,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "0e33089d4b2aa9874b21a9c24777fd27e111358588b9b1c94e2a1ee14bf3bfed",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 140,
+      "line": 147,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "82ee0216f4b46cb4defc6d058a926b61d2b534df1e92850669bd6014096c0237",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts",
-      "line": 165,
+      "line": 172,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -335,91 +321,91 @@
       "hash": "e208dd56cef8b4a7b56f04d6d9a2d686245d459fa7da7e8b2fd34f4c2baa8692",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 40,
+      "line": 35,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "1f79e4ab3c2e218df8ee0fd400b9a3f2ce615676e47a23fd5512f4508dfbd68b",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 48,
+      "line": 43,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "027e39934c350cfe5f074ec69fb305c8c7e82fd2c5ff1514d068cdd1d6f986ea",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 77,
+      "line": 72,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "088ac2352470489ab7d40dac4e2c3453f19955a4cc0ed472700dcd8e4161bf9c",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 90,
+      "line": 85,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "3bf7a1b8f570784f2baa7dd358979e19a39037eaa5941aa2d25d802ffffe56a2",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 105,
+      "line": 100,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "6f78df9e6241916ddde74f53093f4d143e4e9375559868d25a68b2a06e99587b",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 112,
+      "line": 107,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "e583e0f2682764aa46460d6cab1cba1d23d9eae06b05e529962caf0b4d8f34a4",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 120,
+      "line": 115,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "6ae99689c1a2560d8c6a5fe308644f931b5d6151f8d189a5893853a689c0076a",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 129,
+      "line": 124,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "a6aca3f5b4aa852840cc5ceae7d81bfe10f5542be579649366b09faf6daa60cd",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 154,
+      "line": 149,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "6b6ef3322c903ca82704bd0c155c602c94135094d660293cc27f05de5b40da9d",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 187,
+      "line": 182,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "2413d4b4cc80f28b5a2a960f76a30752b9202da6d6b627e4622d803fd1582cab",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 238,
+      "line": 233,
       "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "9e7b42ca7f2a83d3f635ffee2baf54d8b64eac9f2c2afc0fa8e93f56a503d6f8",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 264,
+      "line": 259,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "972d14e93a578a65dc6c9271caf35fb83ac4ce8c62b4da81dc45f2561c68b3a5",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/read-json-or-exit.test.ts",
-      "line": 307,
+      "line": 302,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -622,14 +608,14 @@
       "hash": "ed2e806a152ae50ee8f2432d21abb8a5d092fc34ec2b40ca7d8870eb4a06262b",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/uat-path-mapping.test.ts",
-      "line": 98,
+      "line": 96,
       "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "64d86b24af64f9c41c17f3bd4cdbf6423371636222d8604cbedbc78e1727eba3",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/uat-path-mapping.test.ts",
-      "line": 99,
+      "line": 97,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -692,21 +678,21 @@
       "hash": "a1b2805526c025904570388937a712760cf35990a785f06c5edb3185fdd935f2",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-bdd-model.ts",
-      "line": 242,
+      "line": 240,
       "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "69bf55108f7cc9370a5fb5f83c57737338fe594f7f9f073cbbabeaea950b0bb3",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-bdd-model.ts",
-      "line": 382,
+      "line": 380,
       "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "205e0f4e53565c5691a9984f117d6f85a40ea06d7235076ce651e1081814c8a1",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-bdd-model.ts",
-      "line": 383,
+      "line": 381,
       "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1133,14 +1119,14 @@
       "hash": "beafc1647cea8290a4d2a0de372bf9e823a7b54e5fbd864dfdc8995a12733d72",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-samples-coverage.ts",
-      "line": 235,
+      "line": 241,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "562277e86298b2932cbf59614081bd7e818406feddbb4288bf9af490b42a8ce2",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-samples-coverage.ts",
-      "line": 240,
+      "line": 246,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1609,14 +1595,14 @@
       "hash": "9e853bf2930c8ddc4b65ae347f3b00acfe40f499c4f561a578511d133a5f86a6",
       "rule_id": "security/detect-non-literal-regexp",
       "file": "w-model-dev/scripts/logic/docs-consistency-logic.ts",
-      "line": 174,
+      "line": 179,
       "reason": "Found non-literal argument to RegExp Constructor"
     },
     {
       "hash": "0c82159b16452db32fc2bdfda28035cd45cdab30c2211e39ce244185dce9060a",
       "rule_id": "security/detect-non-literal-regexp",
       "file": "w-model-dev/scripts/logic/docs-consistency-logic.ts",
-      "line": 540,
+      "line": 569,
       "reason": "Found non-literal argument to RegExp Constructor"
     },
     {

@@ -255,11 +255,46 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
       varianceThreshold: 0.1,
     },
     subCriteria: [
-      { name: 'correctness', weight: 0.25, score: 0.9, rawScores: [0.89, 0.9, 0.91], variance: 0.0000667, evidence: 'rootcause.json:§4.2=rootCauseChain[0].evidence 支持该步 answer' },
-      { name: 'completeness', weight: 0.25, score: 0.85, rawScores: [0.84, 0.85, 0.86], variance: 0.0000667, evidence: 'rootcause.json:§4.3=rootCauseChain 共 3 步触及根本原因' },
-      { name: 'falsifiability', weight: 0.2, score: 0.88, rawScores: [0.87, 0.88, 0.89], variance: 0.0000667, evidence: 'rootcause.json:§4.4=falsifiabilityCheck 含可验证假设' },
-      { name: 'actionability', weight: 0.15, score: 0.8, rawScores: [0.79, 0.8, 0.81], variance: 0.0000667, evidence: 'rootcause.json:§5.1=fixRecommendation[0] 四字段' },
-      { name: 'prevention', weight: 0.15, score: 0.95, rawScores: [0.94, 0.95, 0.96], variance: 0.0000667, evidence: 'rootcause.json:§5.2=prevention[0] 三字段' },
+      {
+        name: 'correctness',
+        weight: 0.25,
+        score: 0.9,
+        rawScores: [0.89, 0.9, 0.91],
+        variance: 0.0000667,
+        evidence: 'rootcause.json:§4.2=rootCauseChain[0].evidence 支持该步 answer',
+      },
+      {
+        name: 'completeness',
+        weight: 0.25,
+        score: 0.85,
+        rawScores: [0.84, 0.85, 0.86],
+        variance: 0.0000667,
+        evidence: 'rootcause.json:§4.3=rootCauseChain 共 3 步触及根本原因',
+      },
+      {
+        name: 'falsifiability',
+        weight: 0.2,
+        score: 0.88,
+        rawScores: [0.87, 0.88, 0.89],
+        variance: 0.0000667,
+        evidence: 'rootcause.json:§4.4=falsifiabilityCheck 含可验证假设',
+      },
+      {
+        name: 'actionability',
+        weight: 0.15,
+        score: 0.8,
+        rawScores: [0.79, 0.8, 0.81],
+        variance: 0.0000667,
+        evidence: 'rootcause.json:§5.1=fixRecommendation[0] 四字段',
+      },
+      {
+        name: 'prevention',
+        weight: 0.15,
+        score: 0.95,
+        rawScores: [0.94, 0.95, 0.96],
+        variance: 0.0000667,
+        evidence: 'rootcause.json:§5.2=prevention[0] 三字段',
+      },
     ],
     compositeScore: 0.876,
     qualityLevel: 'A' as const,
@@ -276,7 +311,10 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
   it('rootcause 误用 test 集合子标准名称应被拦截', () => {
     const bad = {
       ...baseRootcause,
-      subCriteria: baseRootcause.subCriteria.map((sc) => ({ ...sc, name: sc.name === 'correctness' ? 'coverage' : sc.name })),
+      subCriteria: baseRootcause.subCriteria.map((sc) => ({
+        ...sc,
+        name: sc.name === 'correctness' ? 'coverage' : sc.name,
+      })),
     };
     const result = checkVerifierOutput(bad);
     expect(result.passed).toBe(false);

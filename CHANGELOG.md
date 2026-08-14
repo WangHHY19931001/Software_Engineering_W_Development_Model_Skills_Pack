@@ -7,6 +7,17 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.13.0] - 2026-08-14
+
+### Changed
+- 版本号 41.12.0 → 41.13.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **format 幂等性修复 + 防复发门禁**：
+  - 根因：prettier 版本无漂移（3.9.6 三处一致）；「npm run format 重排 100+ 文件」实为默认 endOfLine=lf 与 Windows CRLF 工作树的行尾归一化 churn，真实格式漂移仅 7 个文件（artifact-gate-assets / phase-doc-map / read-json-or-exit / uat-path-mapping / verifier-logic 五个测试 + check-bdd-model / check-samples-coverage 两个 CLI）
+  - `config/prettier.config.cjs` 增加 `endOfLine: 'auto'`（Windows CRLF / WSL LF 双兼容，不改变检出行为）
+  - 全量 `npm run format` 统一格式化 7 文件 + `security-scan --regenerate` 重生成 baseline v2（282 → 280 条目）
+  - **pre-push 新增第 16 项「prettier --check」格式一致性门禁**：任何 .ts/.cjs 编辑未跑 format 即被阻断，从根上堵住格式漂移复发
+  - **15→16 计数级联**：EXPECTED.prePushCount、docs-consistency 测试 fixture、README / AGENTS / CONTRIBUTING（门禁表 +16 行）/ troubleshooting / pre-push 注释全部同步
+
 ## [41.12.0] - 2026-08-14
 
 ### Changed

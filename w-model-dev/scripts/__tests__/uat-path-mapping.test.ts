@@ -72,19 +72,17 @@ describe('checkUatPathMappingContent', () => {
   });
 
   it('actualPath 为待回填占位符 → 「未回填」violation', () => {
-    const content =
-      '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-005 | x | _待阶段5回填_ | 直接 | z |';
+    const content = '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-005 | x | _待阶段5回填_ | 直接 | z |';
     const v = checkUatPathMappingContent(content);
     expect(v.some((m) => m.includes('未回填') && m.includes('UAT-005'))).toBe(true);
   });
 
   it('mappingType 非法 → violation 且含合法值提示', () => {
-    const content =
-      '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-006 | x | y | 错误 | z |';
+    const content = '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-006 | x | y | 错误 | z |';
     const v = checkUatPathMappingContent(content);
-    expect(v.some((m) => m.includes('mappingType 非法') && m.includes('UAT-006') && m.includes('["直接", "等价", "替代"]'))).toBe(
-      true,
-    );
+    expect(
+      v.some((m) => m.includes('mappingType 非法') && m.includes('UAT-006') && m.includes('["直接", "等价", "替代"]')),
+    ).toBe(true);
   });
 });
 

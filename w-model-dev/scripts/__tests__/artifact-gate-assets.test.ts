@@ -17,12 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
 
-import {
-  discoverGraphAsset,
-  readTlaManifest,
-  readBddManifest,
-  runModelChecks,
-} from '../lib/artifact-gate-assets.js';
+import { discoverGraphAsset, readTlaManifest, readBddManifest, runModelChecks } from '../lib/artifact-gate-assets.js';
 
 let tmpDir: string;
 
@@ -76,7 +71,11 @@ function makeBddManifest(overrides: Record<string, unknown> = {}): Record<string
 describe('discoverGraphAsset', () => {
   it('graph.json 优先于 consolidated-phaseN', async () => {
     await fs.writeFile(path.join(tmpDir, 'graph.json'), JSON.stringify({ nodes: [{ id: 'REQ-1' }] }), 'utf-8');
-    await fs.writeFile(path.join(tmpDir, 'consolidated-phase4.json'), JSON.stringify({ nodes: [{ id: 'REQ-2' }] }), 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, 'consolidated-phase4.json'),
+      JSON.stringify({ nodes: [{ id: 'REQ-2' }] }),
+      'utf-8',
+    );
     const r = await discoverGraphAsset(tmpDir);
     expect(r.graphSource).toBe('graph.json');
     expect(r.graph?.nodes).toHaveLength(1);
@@ -84,7 +83,11 @@ describe('discoverGraphAsset', () => {
 
   it('无 graph.json 时回退到 consolidated-phaseN（按 4→1 优先级）', async () => {
     await fs.writeFile(path.join(tmpDir, 'consolidated-phase1.json'), JSON.stringify({ nodes: [] }), 'utf-8');
-    await fs.writeFile(path.join(tmpDir, 'consolidated-phase3.json'), JSON.stringify({ nodes: [{ id: 'REQ-3' }] }), 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, 'consolidated-phase3.json'),
+      JSON.stringify({ nodes: [{ id: 'REQ-3' }] }),
+      'utf-8',
+    );
     const r = await discoverGraphAsset(tmpDir);
     expect(r.graphSource).toBe('consolidated-phase3.json');
   });
@@ -92,7 +95,11 @@ describe('discoverGraphAsset', () => {
   it('候选 JSON 非法 → 告警并继续回退（首个合法含 nodes 者胜出）', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await fs.writeFile(path.join(tmpDir, 'graph.json'), '{not json', 'utf-8');
-    await fs.writeFile(path.join(tmpDir, 'consolidated-phase2.json'), JSON.stringify({ nodes: [{ id: 'REQ-2' }] }), 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, 'consolidated-phase2.json'),
+      JSON.stringify({ nodes: [{ id: 'REQ-2' }] }),
+      'utf-8',
+    );
     const r = await discoverGraphAsset(tmpDir);
     expect(r.graphSource).toBe('consolidated-phase2.json');
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('graph.json 读取失败'));
@@ -172,22 +179,63 @@ describe('readBddManifest', () => {
 
 describe('runModelChecks', () => {
   it('manifest 不存在 / phase<2 / 无 graphPath → 不调用子进程', () => {
-    expect(runModelChecks({ manifestExists: false, effectivePhase: 2, graphPath: 'g', manifestFile: 'm', bddManifestExists: false, bddManifestFile: 'b' })).toHaveLength(0);
-    expect(runModelChecks({ manifestExists: true, effectivePhase: 1, graphPath: 'g', manifestFile: 'm', bddManifestExists: false, bddManifestFile: 'b' })).toHaveLength(0);
-    expect(runModelChecks({ manifestExists: true, effectivePhase: 2, graphPath: '', manifestFile: 'm', bddManifestExists: false, bddManifestFile: 'b' })).toHaveLength(0);
+    expect(
+      runModelChecks({
+        manifestExists: false,
+        effectivePhase: 2,
+        graphPath: 'g',
+        manifestFile: 'm',
+        bddManifestExists: false,
+        bddManifestFile: 'b',
+      }),
+    ).toHaveLength(0);
+    expect(
+      runModelChecks({
+        manifestExists: true,
+        effectivePhase: 1,
+        graphPath: 'g',
+        manifestFile: 'm',
+        bddManifestExists: false,
+        bddManifestFile: 'b',
+      }),
+    ).toHaveLength(0);
+    expect(
+      runModelChecks({
+        manifestExists: true,
+        effectivePhase: 2,
+        graphPath: '',
+        manifestFile: 'm',
+        bddManifestExists: false,
+        bddManifestFile: 'b',
+      }),
+    ).toHaveLength(0);
     expect(spawnSyncMock).not.toHaveBeenCalled();
   });
 
   it('TLA+ 与 BDD 子进程均退出 0 → 零 violation', () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
-    const v = runModelChecks({ manifestExists: true, effectivePhase: 2, graphPath: 'g.json', manifestFile: 'm.json', bddManifestExists: true, bddManifestFile: 'b.json' });
+    const v = runModelChecks({
+      manifestExists: true,
+      effectivePhase: 2,
+      graphPath: 'g.json',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestFile: 'b.json',
+    });
     expect(v).toHaveLength(0);
     expect(spawnSyncMock).toHaveBeenCalledTimes(2);
   });
 
   it('TLA+ 子进程退出码非 0 → [artifact:tla-model] 违反（含 stdout 末尾摘要）', () => {
     spawnSyncMock.mockReturnValue({ status: 1, stdout: 'line1\nline2\nline3\nline4\nline5\nline6' });
-    const v = runModelChecks({ manifestExists: true, effectivePhase: 2, graphPath: 'g.json', manifestFile: 'm.json', bddManifestExists: false, bddManifestFile: 'b.json' });
+    const v = runModelChecks({
+      manifestExists: true,
+      effectivePhase: 2,
+      graphPath: 'g.json',
+      manifestFile: 'm.json',
+      bddManifestExists: false,
+      bddManifestFile: 'b.json',
+    });
     expect(v).toHaveLength(1);
     expect(v[0]).toContain('[artifact:tla-model] check-tla-model 退出码 1');
     expect(v[0]).toContain('line6');
@@ -197,7 +245,14 @@ describe('runModelChecks', () => {
     spawnSyncMock
       .mockReturnValueOnce({ status: 0, stdout: '' })
       .mockReturnValueOnce({ status: 2, stdout: 'bdd error' });
-    const v = runModelChecks({ manifestExists: true, effectivePhase: 2, graphPath: 'g.json', manifestFile: 'm.json', bddManifestExists: true, bddManifestFile: 'b.json' });
+    const v = runModelChecks({
+      manifestExists: true,
+      effectivePhase: 2,
+      graphPath: 'g.json',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestFile: 'b.json',
+    });
     expect(v).toHaveLength(1);
     expect(v[0]).toContain('[artifact:bdd-model] check-bdd-model 退出码 2');
   });

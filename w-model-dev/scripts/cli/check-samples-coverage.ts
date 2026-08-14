@@ -177,8 +177,14 @@ function main(): void {
     const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
 
     const violations: Array<{ check: string; message: string }> = [
-      ...uncovered.map((rel) => ({ check: 'fixture-unregistered', message: `fixture 未被 self-test.ts 引用：samples/${rel}（新增样本须在 self-test.ts 用例数组登记）` })),
-      ...undeclared.map((dir) => ({ check: 'matrix-undeclared', message: `samples/${dir}/ 未在 samples/README.md 覆盖矩阵声明` })),
+      ...uncovered.map((rel) => ({
+        check: 'fixture-unregistered',
+        message: `fixture 未被 self-test.ts 引用：samples/${rel}（新增样本须在 self-test.ts 用例数组登记）`,
+      })),
+      ...undeclared.map((dir) => ({
+        check: 'matrix-undeclared',
+        message: `samples/${dir}/ 未在 samples/README.md 覆盖矩阵声明`,
+      })),
     ];
 
     if (jsonMode) {

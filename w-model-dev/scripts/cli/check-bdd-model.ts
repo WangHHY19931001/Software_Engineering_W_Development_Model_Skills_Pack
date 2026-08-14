@@ -207,9 +207,7 @@ async function main(): Promise<number> {
   for (const f of manifest.features) {
     const resolved = resolveFeatureFile(basePath, f.filePath, projectDir);
     if (!resolved) {
-      console.error(
-        `feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`,
-      );
+      console.error(`feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`);
       continue;
     }
     try {

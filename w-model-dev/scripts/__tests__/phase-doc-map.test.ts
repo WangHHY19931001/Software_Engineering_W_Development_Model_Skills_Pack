@@ -13,7 +13,11 @@ import { PHASE_DOC_MAP, resolvePhaseDoc } from '../lib/phase-doc-map.js';
 
 describe('PHASE_DOC_MAP', () => {
   it('键为 1/2/3/4/6/7/8（阶段 5 无独立文档目录）', () => {
-    expect(Object.keys(PHASE_DOC_MAP).map(Number).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 6, 7, 8]);
+    expect(
+      Object.keys(PHASE_DOC_MAP)
+        .map(Number)
+        .sort((a, b) => a - b),
+    ).toEqual([1, 2, 3, 4, 6, 7, 8]);
     expect(PHASE_DOC_MAP[5]).toBeUndefined();
   });
 
