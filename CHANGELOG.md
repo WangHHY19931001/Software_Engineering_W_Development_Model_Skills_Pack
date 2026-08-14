@@ -7,6 +7,17 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.15.0] - 2026-08-14
+
+### Changed
+- 版本号 41.14.0 → 41.15.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **README/AGENTS/INSTALL/SSoT 文档同步批次（目录结构等）**：
+  - README 项目结构树补 docs/ 缺项（user-guide / troubleshooting / index.html + _sidebar.md / changes/decision-log/；docs/api 注明为 gitignored 生成物）+ 根级 config/、scripts/setup-hooks.cjs、.eslintsecurity-baseline.json；.githooks 行补「16 项」
+  - SSoT 追溯表补 7.6A 行（self-as-verifier demo-only 例外：独立产物路径 + Persona 切换 + 反模式 #35 守护）
+  - AGENTS §1 补 self-as-verifier 例外指针（SSoT §7.6A）；§2 docs/ 行补排障/用户指南与 docs/api 生成物说明
+  - INSTALL 目录树补 skill-metadata.json 行
+  - docs/api 本地产物重生成（`npm run docs:build`；docs/api 为 gitignored 生成物，不入库）
+
 ## [41.14.0] - 2026-08-14
 
 ### Changed

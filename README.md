@@ -9,7 +9,7 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.14.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.15.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-14 实测）：
 
@@ -318,22 +318,28 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（4 份伪示例对话 + 5 份 stage 编排示例 + real-run-evidence.md 真实命令证据）
-├── docs/                         # 设计文档（统一存放）
+├── docs/                         # 设计文档（统一存放；docs/api/ 为 typedoc 生成物，gitignored 不入库）
 │   ├── skill-design-document_SSoT.md           # 设计文档（单一事实来源 SSoT）
 │   ├── skill-design-document.md                # 旧版设计文档指针（已废弃独立维护，见文件头部声明）
-│   ├── adoption-guide.md                       # 采用路径指南（Greenfield vs Brownfield）
+│   ├── adoption-guide.md                       # 采用路径指南（Greenfield vs Brownfield；SSoT §11A 为权威定义）
 │   ├── llm-verifier-integration-design.md      # LLM Verifier 集成设计（指针文档）
 │   ├── tla-plus-modeling-design.md             # TLA+ 层次化建模设计
 │   ├── ingestion-graph-convergence-design.md   # ingestion 与图谱收敛设计
 │   ├── information-flow-validation-design.md   # 信息流校验设计（黑洞/奇迹/死模块）
 │   ├── loop-engineering-adoption-design.md     # Loop 工程采用设计
+│   ├── INSTALL.md                              # AI Agent 安装指南
+│   ├── user-guide.md                           # 用户指南（docsify 站点首页）
+│   ├── troubleshooting.md                      # 排障手册（校验失败排查 / 依赖巡检 / 门禁降级）
+│   ├── index.html + _sidebar.md                # docsify 站点入口与侧边栏（npm run docs:site）
 │   ├── superpowers/                            # 内部规划目录（specs/ + plans/，不参与门禁、非面向用户）
-│   ├── changes/archive/                        # 端到端调测归档（round15 / 19 / 20 ×2 / 23）
-│   └── INSTALL.md                              # AI Agent 安装指南
+│   └── changes/                                # archive/（端到端调测归档 round15/19/20×2/23）+ decision-log/（轮次 → 版本决策记录）
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 │   ├── w-model-dev-test-prompts.json           # 评估测试场景（15 条：典型 / 歧义 / 反误触发 / 正向）
 │   └── w-model-dev-results.tsv                 # 评估历史记录（得分轨迹）
-├── .githooks/pre-push            # 本地推送前门禁（替代远程 CI；w-model-dev/**、README.md / AGENTS.md / CONTRIBUTING.md / package.json、docs/*.md 变更时触发）
+├── config/                       # 工程配置集中目录（prettier.config.cjs / vitest.config.ts / tsconfig.json / .eslintrc.cjs / .eslintignore）
+├── scripts/setup-hooks.cjs       # 一次性启用 pre-push 钩子（npm run setup:hooks，写入本地 .git/config）
+├── .eslintsecurity-baseline.json # security-scan baseline v2（内容敏感指纹豁免清单；--regenerate 重生成）
+├── .githooks/pre-push            # 本地推送前门禁（16 项，替代远程 CI；w-model-dev/**、README.md / AGENTS.md / CONTRIBUTING.md / package.json、docs/*.md 变更时触发）
 ├── AGENTS.md                     # AI Agent 仓库导航（与 README 互补，聚焦 Agent 行动事实集）
 ├── package.json                  # 声明 tsx + devDeps（ajv / eslint-plugin-security 等）+ npm run 快捷脚本（private，不发布）
 ├── CHANGELOG.md                  # 变更日志

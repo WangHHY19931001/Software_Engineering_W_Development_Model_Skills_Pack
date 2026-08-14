@@ -11,7 +11,7 @@
 - **`/wm` 命令、状态持久化、RTM 维护** 由 Agent 读取 `w-model-dev/SKILL.md` 后用自身工具执行，状态写入项目内 `.w-model/*.json`。
 - **编排者最小化（Orchestrator Minimization）**：六类角色 = O（编排者）+ 五类子代理（A 分析 / S 产出 / V 评审 / G 门禁 / R 根因定位；R 另有 R-iceberg 变体，见下）。Agent 读取 `w-model-dev/SKILL.md` 后承担「编排者」角色，只做路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理执行。详见 `w-model-dev/references/subagent-delegation.md`；违反命中反模式 #10，回到当前阶段起点。
 - **根因定位者（R）与修复者（F）**：V/G 不通过后，编排者分派 R 子代理接收 reworkHints + 失败产物 + 上游产物，运用根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位缺陷根因，产出 RootCauseReport；R 报告经 V 复审 + G 门禁（`check-rootcause-report.ts` 退出码 0）后，分派 S 兼任 F（修复者）携带 R 报告执行返工修复。详见 `w-model-dev/references/root-cause-locator.md`；跳过 R 直接 S 返工命中反模式 #18，R 报告未 V 复审直接 S-fix 命中反模式 #19。
-- **LLM-as-a-Verifier 评审** 由 V 子代理按 `w-model-dev/references/verifier-spec.md` 提示词执行（即「外部 Agent」），技能用校验脚本防输出漂移；编排者不得自评。
+- **LLM-as-a-Verifier 评审** 由 V 子代理按 `w-model-dev/references/verifier-spec.md` 提示词执行（即「外部 Agent」），技能用校验脚本防输出漂移；编排者不得自评。self-as-verifier 兼任为仅限 demo/教学的例外（SSoT §7.6A；生产项目禁止，V 须切换 Persona 视角）。
 - **Agent Personas（评审角色提示词）** 由 V 子代理在执行 `/wm review` 时按 `w-model-dev/references/agent-personas.md` 选用对应 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor），Persona 文件本身是 Markdown，不调用 LLM；产出 JSON 须满足 `verifier-spec.md` §7 Schema。多角度分析时，R-lead / V-lead 按 `w-model-dev/references/subagent-persona-matrix.md` 从 `w-model-dev/subagent/`（28 个人格文件，分 engineering / testing / design / product / project 5 类）选用 persona 并行/串行分派。
 - **技能自演化** 不在本仓库，由外部工具（[SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)）完成。
 - **codegraph + OpenSpec 集成**（阶段 5-8）：codegraph 提供修改前符号级影响分析（callers/callees/blast radius），OpenSpec opsx 提供规格驱动变更工作流（explore/propose/apply/archive）。技能包通过 `ensure-codegraph-opsx.ts` 自动检测安装，通过 3 个 check 脚本做门禁校验。详见 `w-model-dev/references/phase-5-coding.md`「codegraph 修改前影响分析」节。
@@ -40,7 +40,7 @@
 | `docs/changes/archive/2026-07-28-round20-phase1-4dim-identification/` | 第 20 轮阶段 1 四维识别调测归档 | 查阅历史调测结论时 |
 | `docs/changes/archive/2026-07-27-round19-w-model-8-phase-validation/` | 第 19.0.1 轮 8 阶段调测归档（7 文件，含 D7 bug 修复记录） | 查阅历史调测结论时 |
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
-| `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装指南）；`docs/superpowers/`（plans/ + specs/）为内部规划目录，不参与门禁、非面向用户 | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
+| `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装 / 排障 / 用户指南）；`docs/api/` 为 typedoc 生成物（`npm run docs:build`，gitignored 不入库）；`docs/superpowers/`（plans/ + specs/）为内部规划目录，不参与门禁、非面向用户 | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
 | `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 16 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 

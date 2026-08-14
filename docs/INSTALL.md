@@ -71,6 +71,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 ```
 /path/to/agent/skills/w-model-dev/
 ├── SKILL.md            # 入口：YAML frontmatter（name + version + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界 + Bundled Resources 按需加载契约
+├── skill-metadata.json # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 ├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + anti-patterns.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南 + 设计模式目录（design-patterns-catalog）（按需加载，详见 SKILL.md Bundled Resources 表）
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
 ├── schemas/            # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep），由 schema-loader.ts 在 logic 层前置加载
@@ -146,7 +147,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.14.0
+version: 41.15.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
