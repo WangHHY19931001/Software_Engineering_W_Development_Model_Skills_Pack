@@ -19,7 +19,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
-      '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n40 files / 530 tests',
+      '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests',
     antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({ properties: { action: { enum: new Array(27).fill('x') } } }),
@@ -116,7 +116,10 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('SKILL.md 内联八条操作行为完整表 → 违规（已移入 references）', () => {
-    const input = baseInput({ skill: '---\nname: w-model-dev\nversion: 41.11.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...' });
+    const input = baseInput({
+      skill:
+        '---\nname: w-model-dev\nversion: 41.11.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+    });
     expect(
       runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('不应再内联')),
     ).toBe(true);
@@ -185,11 +188,14 @@ describe('runDocConsistencyChecks', () => {
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
   });
 
-  it('exit-2 脚本数非 31 / AGENTS 残留 29 → 违规', () => {
-    const input = baseInput({ exit2ScriptCount: 29, agents: '29 个脚本' });
+  it('exit-2 脚本数声明 31 实测 29 → 违规；AGENTS 残留 29 → 过时违规', () => {
+    const input = baseInput({ exit2ScriptCount: 29, agents: '31 个脚本' });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('31'))).toBe(true);
-    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('29 个脚本'))).toBe(true);
+    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('31') && x.message.includes('29'))).toBe(
+      true,
+    );
+    const vStale = runDocConsistencyChecks(baseInput({ agents: '29 个脚本' }));
+    expect(vStale.some((x) => x.check === 'exit2-scripts' && x.message.includes('仍含过时「29 个脚本」'))).toBe(true);
   });
 
   it('pre-push 编号最大值非 15 → 违规', () => {
@@ -212,10 +218,36 @@ describe('runDocConsistencyChecks', () => {
     // references 计数漂移 → 违规
     const vRef = runDocConsistencyChecks(baseInput({ referencesCount: 56 }));
     expect(vRef.some((x) => x.check === 'references-count' && x.message.includes('53'))).toBe(true);
-    const vSkill = runDocConsistencyChecks(
-      baseInput({ skill: '---\nversion: 41.11.0\n---\n无 references 计数表述' }),
-    );
+    const vSkill = runDocConsistencyChecks(baseInput({ skill: '---\nversion: 41.11.0\n---\n无 references 计数表述' }));
     expect(vSkill.some((x) => x.check === 'references-count' && x.message.includes('53 个 .md'))).toBe(true);
+  });
+
+  it('SKILL.md 声明 references 计数高于实测 → 违规（文档方向）', () => {
+    const input = baseInput({ skill: baseInput().skill.replace('（53 个 .md）', '（60 个 .md）') });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'references-count' && x.message.includes('60') && x.message.includes('53'))).toBe(
+      true,
+    );
+  });
+
+  it('README 声明 persona 计数与实测不符 → 违规（文档方向）', () => {
+    const input = baseInput({ readme: baseInput().readme.replace('28 个人格文件', '27 个人格文件') });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'asset-counts' && x.message.includes('27') && x.message.includes('28'))).toBe(
+      true,
+    );
+  });
+
+  it('README 声明 files 计数与实测不符 → 违规（文档方向）', () => {
+    const input = baseInput({ readme: baseInput().readme.replace('40 files', '50 files') });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'vitest-files' && x.message.includes('50'))).toBe(true);
+  });
+
+  it('AGENTS 声明 .test.ts 计数与实测不符 → 违规（文档方向）', () => {
+    const input = baseInput({ agents: '31 个脚本\n50 个 .test.ts / 530 条' });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'vitest-files' && x.message.includes('50'))).toBe(true);
   });
 
   it('targetkind 违规消息含来源文档名', () => {
@@ -355,13 +387,14 @@ describe('runDocConsistencyChecks', () => {
     ).toBe(true);
   });
 
-  it('package.json 版本漂移 → 违规', () => {
+  it('package.json 为唯一源：其版本漂移导致其余四处报违规（自身不再直接报）', () => {
     const input = baseInput({ pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.2.0' }) });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'version-consistency' && x.message.includes('package.json'),
-      ),
-    ).toBe(true);
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'version-consistency');
+    expect(v.some((x) => x.message.includes('skill-metadata.json'))).toBe(true);
+    expect(v.some((x) => x.message.includes('SKILL.md frontmatter'))).toBe(true);
+    expect(v.some((x) => x.message.includes('README'))).toBe(true);
+    expect(v.some((x) => x.message.includes('INSTALL.md'))).toBe(true);
+    expect(v.some((x) => x.message.includes('package.json'))).toBe(false);
   });
 
   it('skill-metadata.json 版本漂移 → 违规', () => {
@@ -375,7 +408,8 @@ describe('runDocConsistencyChecks', () => {
 
   it('SKILL.md frontmatter 版本漂移 → 违规', () => {
     const input = baseInput({
-      skill: '---\nname: w-model-dev\nversion: 41.0.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+      skill:
+        '---\nname: w-model-dev\nversion: 41.0.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     });
     expect(
       runDocConsistencyChecks(input).some(
@@ -387,18 +421,14 @@ describe('runDocConsistencyChecks', () => {
   it('INSTALL.md 激活示例版本漂移 → 违规', () => {
     const input = baseInput({ installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.0.0\n```' });
     expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'version-consistency' && x.message.includes('INSTALL.md'),
-      ),
+      runDocConsistencyChecks(input).some((x) => x.check === 'version-consistency' && x.message.includes('INSTALL.md')),
     ).toBe(true);
   });
 
   it('package.json 不可解析 → 违规（fail loud）', () => {
     const input = baseInput({ pkgJson: 'not-json{' });
     expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'version-consistency' && x.message.includes('无法解析'),
-      ),
+      runDocConsistencyChecks(input).some((x) => x.check === 'version-consistency' && x.message.includes('无法解析')),
     ).toBe(true);
   });
 });

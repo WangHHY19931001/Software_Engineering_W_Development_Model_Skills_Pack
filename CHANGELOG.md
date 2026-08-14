@@ -7,6 +7,22 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.12.0] - 2026-08-14
+
+### Changed
+- 版本号 41.11.0 → 41.12.0（**五处一致**：package.json / skill-metadata.json / SKILL.md frontmatter / README「当前版本」/ docs/INSTALL.md 激活示例）
+- **文档一致性门禁动态化（消除「文件系统 ↔ EXPECTED 常量 ↔ 文档」三方同步）**：
+  - `checkVersionConsistency`：package.json 为版本唯一源，其余四处声明与之比对；删除 `EXPECTED.currentVersion`（版本提升不再需第 6 处代码同步）
+  - `checkReferencesCount`：期望值改从 SKILL.md「（N 个 .md）」表述解析，与实测比对
+  - `checkAssetCounts`：期望值改从 README「N 个人格文件」表述解析，与实测比对
+  - `checkVitestFileCount`：期望值改从 README「N files」/ AGENTS「N 个 .test.ts」表述解析（实测须命中声明集）
+  - `checkExit2ScriptCount`：期望值改从 AGENTS「N 个脚本」表述解析，与实测比对
+  - 删除死代码 `EXPECTED.schemaCount`（schema 检查早已用动态 `schemaFiles`）
+  - docs-consistency 测试：baseInput 补 persona token + package.json 漂移用例语义改写（源漂移 → 其余四处报违规）+ 4 个「文档方向」新用例（51 条）
+- **README:116 退出码标注漂移**：check-code-tla-consistency.ts「退出码 0/1」→「0/1/2」（全仓唯一漂移点；docs-consistency 只查计数不查退出码标注的盲区）
+- **__tests__/README pure/IO 边界与实现对齐**：gate-logic.ts 标注为唯一例外（nodeFsAdapter 依赖注入做 spec 目录 IO）；检测命令补 `from 'node:path'` 并排除 gate-logic.ts；coverage 矩阵「vitest 35」→「vitest 40」
+- **计数级联**：vitest 619 → **623 条**（+4 个 docs-consistency「文档方向」新用例）；README/AGENTS/CONTRIBUTING/INSTALL/troubleshooting/pre-push 计数全部同步（动态门禁自动校验捕获，无需再同步 EXPECTED）
+
 ## [41.11.0] - 2026-08-13
 
 ### Changed

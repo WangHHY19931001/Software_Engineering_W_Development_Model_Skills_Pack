@@ -79,11 +79,11 @@ bash .githooks/ensure-platform-deps.sh
 
 ### 1.7 docs-consistency 报 vitest 用例数 / 文件数不匹配
 
-**现象**：`npm run check:docs-consistency` 退出码 1，提示 README / AGENTS.md / `.githooks/pre-push` 应含实测用例总数「N tests」或「N 条」，或提示测试文件数应为 35。
+**现象**：`npm run check:docs-consistency` 退出码 1，提示 README / AGENTS.md / `.githooks/pre-push` 应含实测用例总数「N tests」或「N 条」，或提示 README 声明「N files」/ AGENTS 声明「N 个 .test.ts」与实测文件数不符。
 
-**原因**：docs-consistency 门禁强制文档中的计数与实测一致（`40 files / 619 tests` 与 `EXPECTED.vitestFileCount=40` 联动）；**新增 / 删除 `.test.ts` 文件或增删测试用例**后未同步文档。
+**原因**：docs-consistency 门禁强制活体文档中的计数与实测一致——实测 vitest 文件数须命中 README「N files」/ AGENTS「N 个 .test.ts」声明集，实测用例总数须出现在 README / AGENTS / pre-push 三处文本；**新增 / 删除 `.test.ts` 文件或增删测试用例**后未同步文档。期望值从文档解析（无代码常量），无需同步 `docs-consistency-logic.ts`。
 
-**处置**：同步 4 处——`EXPECTED.vitestFileCount`（`docs-consistency-logic.ts`）、README「40 files」、AGENTS.md「40 个 .test.ts」、`__tests__/README.md` 覆盖矩阵；用例总数（vitest 实测）同步 README / AGENTS / pre-push 三处文本。
+**处置**：文件数同步 README「N files」+ AGENTS「N 个 .test.ts」；用例总数（vitest 实测）同步 README / AGENTS / pre-push 三处文本（「N tests」/「N 条」表述）。
 
 ### 1.8 self-test 新增校验项但未加样本
 

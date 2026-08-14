@@ -16,7 +16,7 @@
 | constants.test.ts | Constants | RTM_FIELDS 七字段顺序 / PHASES 1-8 / ARTIFACT_PATHS .w-model 路径前缀 |
 | coverage-logic.test.ts | Coverage | C1 stakeholders 非空 / C3 scenarios 非空 / C4 happy·error·boundary / C5 REQ·NFR·CON / C7 crossCuts↔graphCrossCuts 双向一致 / C8 metrics 4 项=100% / C9 missing 须 Out of Scope 声明 / C10 metrics 重算一致 / exemptions 跳过 / OOS 形状 CLI exit 2 |
 | design-contract-logic.test.ts | DesignContract | D8 多路由不同状态码无交叉污染 / D9 路由未找到报 D2/D3/D4 / D9 路径归一化（尾部斜杠·query）/ null·undefined 输入失败 |
-| docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 31 / pre-push 15 / vitest 35）/ 版本五处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#47 / baseline-sync |
+| docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 31 / pre-push 15 / vitest 40）/ 版本五处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#47 / baseline-sync |
 | exemption-logic.test.ts | Exemption | E1 schema / E2 justification≥20 / E3 evidence 非空 / E4 review 完整 / E5 reviewDecision=approve / E6 rootCauseAnalysis≥30 / E7 verified=true / E8 humanDecision=approve / E9 时间戳时序 / 四阶段全通过 stage=complete |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
 | gate-report.test.ts | CLI IO | printGateReport 分隔线 + `<LABEL>_JSON ` 行首标记 / exitCode 追加 JSON 末尾 / exit 码 0/1/2 透传 / summary 自带 exitCode 被参数覆盖 |
@@ -56,13 +56,15 @@
 
 IO 调用必须在 `check-*.ts` 入口层完成，传纯数据给 logic 层。
 
+唯一例外：`gate-logic.ts` —— `checkRequirementSpecStructure` 经注入的 `nodeFsAdapter` 适配器（gate-logic.ts:240-248）对 spec 目录做 IO，默认回退真实 node:fs，依赖注入保持可测试性；其余规则不变。
+
 违反检测：
 
 ```bash
-cd w-model-dev/scripts/logic && grep -nE "from 'node:fs'|from 'node:child_process'|process\.(exit|argv|env|stdout|stderr)" *-logic.ts
+cd w-model-dev/scripts/logic && grep -nE "from 'node:fs'|from 'node:path'|from 'node:child_process'|process\.(exit|argv|env|stdout|stderr)" *-logic.ts | grep -v '^gate-logic\.ts'
 ```
 
-应无输出。
+应无输出（`gate-logic.ts` 为唯一例外）。
 
 ## 新增测试时
 

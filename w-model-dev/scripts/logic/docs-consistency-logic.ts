@@ -16,11 +16,11 @@ export interface DocCheckViolation {
 export interface DocConsistencyInput {
   /** schemas/ 目录 *.schema.json 文件名列表（含后缀） */
   schemaFiles: string[];
-  /** subagent/ 目录 .md 人格文件数（期望 28） */
+  /** subagent/ 目录 .md 人格文件数（实测；期望值由 README「N 个人格文件」表述声明） */
   personaCount: number;
   /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 4 工具 CLI + logic/plan-chunks.ts = 31；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
-  /** references/ 目录 .md 文件数（期望 53） */
+  /** references/ 目录 .md 文件数（实测；期望值由 SKILL.md「（N 个 .md）」表述声明） */
   referencesCount: number;
   dataModels: string;
   verifierSpec: string;
@@ -48,7 +48,7 @@ export interface DocConsistencyInput {
   installDoc: string;
   /** docs/ 根 6 份设计文档（活体引用） */
   designDocs: Array<{ name: string; content: string }>;
-  /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（期望 35） */
+  /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（实测；期望值由 README「N files」/ AGENTS「N 个 .test.ts」表述声明） */
   testFileCount: number;
   /** vitest run 实际运行输出的用例总数；-1 = 无法采集（vitest 不可用 / 输出不可解析，此时不校验用例总数） */
   vitestTestCount: number;
@@ -58,20 +58,17 @@ export interface DocConsistencyInput {
   securityBaselineEntryCount: number;
 }
 
+/**
+ * 语义性常量（低频变更，无法从活体文档解析或解析成本过高）。
+ * 文件计数类期望值（schema / references / persona / vitest 文件数 / exit-2 脚本数）与版本号
+ * 一律从活体文档解析，不在此硬编码——消除「文件系统 ↔ 代码常量 ↔ 文档」三方同步。
+ */
 export const EXPECTED = {
-  schemaCount: 20,
-  personaCount: 28,
-  /** references/ 目录 .md 文件数（期望 53；SKILL.md「Bundled Resources」表须同步） */
-  referencesCount: 53,
-  vitestFileCount: 40,
-  exit2ScriptCount: 31,
   runLogActionCount: 27,
   maxAntiPattern: 47,
   prePushCount: 15,
   /** 硬约束条数（14 条） */
   hardConstraintCount: 14,
-  /** 当前版本号：五处声明（package.json / skill-metadata.json / SKILL.md frontmatter / README / docs/INSTALL.md）必须全部等于此值 */
-  currentVersion: '41.11.0',
 } as const;
 
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
@@ -114,20 +111,20 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
     ...checkTargetKindLiveDocs(input.verifierSpec, input.commandReference, input.agentPersonas, input.ssot),
   );
   violations.push(...checkDoDDimensions(input.definitionOfDone, input.readme, input.ssot));
-  violations.push(
-    ...checkOperatingBehaviors(input.skill, input.readme, input.ssot, input.operationBehaviors),
-  );
+  violations.push(...checkOperatingBehaviors(input.skill, input.readme, input.ssot, input.operationBehaviors));
   violations.push(...checkHardConstraints(input.skill, input.hardConstraints));
   violations.push(...checkAntiPatterns(input.antiPatterns));
   violations.push(...checkExit2ScriptCount(input.exit2ScriptCount, input.agents));
   violations.push(...checkPrePushCount(input.prePush));
   violations.push(...checkGlossaryAction(input.glossary));
-  violations.push(...checkAssetCounts(input.personaCount));
+  violations.push(...checkAssetCounts(input.personaCount, input.readme));
   violations.push(...checkReferencesCount(input.referencesCount, input.skill));
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
-  violations.push(...checkVersionConsistency(input.pkgJson, input.metaJson, input.skill, input.readme, input.installDoc));
+  violations.push(
+    ...checkVersionConsistency(input.pkgJson, input.metaJson, input.skill, input.readme, input.installDoc),
+  );
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
   return violations;
 }
@@ -153,9 +150,10 @@ function extractJsonVersion(json: string): string | null {
 
 /**
  * 版本号五处一致性校验（堵住 README/INSTALL 版本漂移盲区）：
- * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json / skill-metadata.json /
- * SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例五处版本声明必须全部
- * 等于 EXPECTED.currentVersion。任一处缺失/不可解析/不一致即报违规（fail loud，不静默放行）。
+ * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json 为版本唯一源，
+ * skill-metadata.json / SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例
+ * 四处声明必须全部等于 package.json 解析值。任一处缺失/不可解析/不一致即报违规
+ * （fail loud，不静默放行）。版本提升只需改五处文档，无需同步代码常量。
  * 注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异（如 41.5.0 写成 41.5.10）
  * 都会被捕获，符合「防漂移」定位。
  */
@@ -167,8 +165,15 @@ function checkVersionConsistency(
   installDoc: string,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
+  const expected = extractJsonVersion(pkgJson);
+  if (expected === null) {
+    violations.push({
+      check: 'version-consistency',
+      message: 'package.json 无法解析版本号（fail loud）',
+    });
+    return violations;
+  }
   const sources: Array<[string, string | null]> = [
-    ['package.json', extractJsonVersion(pkgJson)],
     ['skill-metadata.json', extractJsonVersion(metaJson)],
     ['SKILL.md frontmatter', extractYamlVersion(skill)],
     ['README「当前版本」', readme.match(new RegExp(`当前版本[^\\d]*(${VERSION_PATTERN.source})`))?.[1] ?? null],
@@ -178,12 +183,12 @@ function checkVersionConsistency(
     if (actual === null) {
       violations.push({
         check: 'version-consistency',
-        message: `${docName} 无法解析版本号（应为 ${EXPECTED.currentVersion}）`,
+        message: `${docName} 无法解析版本号（应为 ${expected}）`,
       });
-    } else if (actual !== EXPECTED.currentVersion) {
+    } else if (actual !== expected) {
       violations.push({
         check: 'version-consistency',
-        message: `${docName} 版本应为 ${EXPECTED.currentVersion}，实际 ${actual}`,
+        message: `${docName} 版本应为 ${expected}，实际 ${actual}`,
       });
     }
   }
@@ -382,16 +387,23 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
   return violations;
 }
 
+/** exit-2 脚本数：期望值从 AGENTS.md「N 个脚本」表述解析，与实测（cli 计数 + 5）比对。 */
 function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (count !== EXPECTED.exit2ScriptCount) {
+  const match = agents.match(/(\d+) 个脚本/);
+  if (match === null) {
     violations.push({
       check: 'exit2-scripts',
-      message: `实测 exit-2 脚本数应为 ${EXPECTED.exit2ScriptCount}，实际 ${count}`,
+      message: `AGENTS.md 缺「N 个脚本」exit-2 脚本数表述（实测 ${count}）`,
     });
-  }
-  if (!agents.includes(`${EXPECTED.exit2ScriptCount} 个脚本`)) {
-    violations.push({ check: 'exit2-scripts', message: `AGENTS.md 应含「${EXPECTED.exit2ScriptCount} 个脚本」` });
+  } else {
+    const declared = Number(match[1]);
+    if (declared !== count) {
+      violations.push({
+        check: 'exit2-scripts',
+        message: `AGENTS.md 声明 ${declared} 个脚本，实际 ${count}`,
+      });
+    }
   }
   for (const stale of STALE_EXIT2) {
     if (agents.includes(stale)) {
@@ -433,35 +445,48 @@ function checkGlossaryAction(glossary: string): DocCheckViolation[] {
   return violations;
 }
 
-function checkAssetCounts(personaCount: number): DocCheckViolation[] {
+/** subagent/ 人格文件数：期望值从 README「N 个人格文件」表述解析，与实测比对。 */
+function checkAssetCounts(personaCount: number, readme: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (personaCount !== EXPECTED.personaCount) {
+  const match = readme.match(/(\d+) 个人格文件/);
+  if (match === null) {
     violations.push({
       check: 'asset-counts',
-      message: `subagent/ 人格文件数应为 ${EXPECTED.personaCount}，实际 ${personaCount}`,
+      message: `README 缺「N 个人格文件」计数表述（实测 ${personaCount} 个）`,
     });
+  } else {
+    const declared = Number(match[1]);
+    if (declared !== personaCount) {
+      violations.push({
+        check: 'asset-counts',
+        message: `README 声明 ${declared} 个人格文件，实际 ${personaCount}`,
+      });
+    }
   }
   return violations;
 }
 
 /**
  * references/ 目录 .md 文件数一致性：
- * 实际文件数须等于 EXPECTED.referencesCount，且 SKILL.md「Bundled Resources」表须含
- * 「（N 个 .md）」计数表述（如 `` `references/`（57 个 .md） ``，资源名反引号格式可异）——
- * 新增 references/*.md 时强制同步 SKILL.md 与 EXPECTED，防再次漂移。
+ * 期望值从 SKILL.md「Bundled Resources」表「（N 个 .md）」计数表述解析
+ * （如 `` `references/`（57 个 .md） ``，资源名反引号格式可异），与实测比对——
+ * 新增 references/*.md 时只需同步 SKILL.md，门禁自动校验一致性，防再次漂移。
  */
 function checkReferencesCount(referencesCount: number, skill: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (referencesCount !== EXPECTED.referencesCount) {
+  const match = skill.match(/（(\d+) 个 \.md）/);
+  if (match === null) {
     violations.push({
       check: 'references-count',
-      message: `references/ 目录 .md 文件数应为 ${EXPECTED.referencesCount}，实际 ${referencesCount}（新增文件须同步 SKILL.md 与 EXPECTED）`,
+      message: `SKILL.md 缺「（N 个 .md）」计数表述（实测 ${referencesCount} 个 .md，新增文件须同步 SKILL.md）`,
     });
+    return violations;
   }
-  if (!skill.includes(`（${EXPECTED.referencesCount} 个 .md）`)) {
+  const declared = Number(match[1]);
+  if (declared !== referencesCount) {
     violations.push({
       check: 'references-count',
-      message: `SKILL.md 应含「（${EXPECTED.referencesCount} 个 .md）」表述`,
+      message: `SKILL.md 声明 ${declared} 个 .md，实际 ${referencesCount}（新增文件须同步 SKILL.md）`,
     });
   }
   return violations;
@@ -502,21 +527,25 @@ function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): 
   return violations;
 }
 
+/** vitest 测试文件数：期望值从 README「N files」/ AGENTS「N 个 .test.ts」表述解析，实测须命中声明集。 */
 function checkVitestFileCount(testFileCount: number, readme: string, agents: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (testFileCount !== EXPECTED.vitestFileCount) {
+  const readmeDeclared = [...readme.matchAll(/(\d+)\s*files/g)].map((m) => Number(m[1]));
+  if (readmeDeclared.length === 0) {
+    violations.push({ check: 'vitest-files', message: 'README 缺「N files」vitest 文件数表述' });
+  } else if (!readmeDeclared.includes(testFileCount)) {
     violations.push({
       check: 'vitest-files',
-      message: `实测 vitest 测试文件数应为 ${EXPECTED.vitestFileCount}，实际 ${testFileCount}（新增测试文件须同步文档与 EXPECTED）`,
+      message: `README 声明 ${readmeDeclared.join('/')} files，实际 ${testFileCount}（新增测试文件须同步文档）`,
     });
   }
-  if (!readme.includes(`${EXPECTED.vitestFileCount} files`)) {
-    violations.push({ check: 'vitest-files', message: `README 应含「${EXPECTED.vitestFileCount} files」vitest 表述` });
-  }
-  if (!agents.includes(`${EXPECTED.vitestFileCount} 个 .test.ts`)) {
+  const agentsDeclared = [...agents.matchAll(/(\d+)\s*个\s*\.test\.ts/g)].map((m) => Number(m[1]));
+  if (agentsDeclared.length === 0) {
+    violations.push({ check: 'vitest-files', message: 'AGENTS.md 缺「N 个 .test.ts」vitest 文件数表述' });
+  } else if (!agentsDeclared.includes(testFileCount)) {
     violations.push({
       check: 'vitest-files',
-      message: `AGENTS.md 应含「${EXPECTED.vitestFileCount} 个 .test.ts」vitest 表述`,
+      message: `AGENTS.md 声明 ${agentsDeclared.join('/')} 个 .test.ts，实际 ${testFileCount}（新增测试文件须同步文档）`,
     });
   }
   return violations;
