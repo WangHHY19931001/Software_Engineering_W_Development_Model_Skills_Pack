@@ -1,7 +1,7 @@
 # TLA+ 规格模板（TLA+ Spec Template）
 
 > 本模板定义 `.tla` 文件与 `.cfg` 文件的标准结构。S 子代理产出 TLA+ 规格时套用本模板。
-> 权威设计见 [docs/tla-plus-modeling-design.md](../../docs/tla-plus-modeling-design.md)；可执行细则见 [references/tla-plus-guide.md](../references/tla-plus-guide.md)。
+> 权威设计见 `docs/tla-plus-modeling-design.md`；可执行细则见 [references/tla-plus-guide.md](../references/tla-plus-guide.md)。
 
 ## .tla 文件模板
 

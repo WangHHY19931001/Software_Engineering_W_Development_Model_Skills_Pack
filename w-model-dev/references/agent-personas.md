@@ -1,9 +1,9 @@
 # Agent Personas（评审角色提示词）
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `agents/` 目录的 4 个 Persona。
-> SSoT [§6.4](../../docs/skill-design-document_SSoT.md) 为权威定义，本文件为可执行提示词。
+> SSoT §6.4（`docs/skill-design-document_SSoT.md`） 为权威定义，本文件为可执行提示词。
 >
-> **架构约束**：本技能不内置 LLM 调用（[§3.3](../../docs/skill-design-document_SSoT.md)）。Persona 是「供外部 Agent 在执行 `/wm review` 时采用的角色提示词」，由 Agent 自身 LLM 加载执行。Persona 文件本身只是 Markdown，不调用任何 LLM。
+> **架构约束**：本技能不内置 LLM 调用（§3.3（`docs/skill-design-document_SSoT.md`））。Persona 是「供外部 Agent 在执行 `/wm review` 时采用的角色提示词」，由 Agent 自身 LLM 加载执行。Persona 文件本身只是 Markdown，不调用任何 LLM。
 >
 > **与 [verifier-spec.md](verifier-spec.md) 的关系**：verifier-spec.md §7 定义评审输出的 JSON Schema 与校验脚本；本文件定义评审执行的角色视角与关注点。Persona 产出的 JSON 必须满足 verifier-spec.md Schema，并经 [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验。
 >
@@ -166,7 +166,7 @@
 
 - **直接调用场景**：用户请求对具体改动 / 文件 / PR 的评审。
 - **经 `/wm review` 调用**：`targetKind=code` 时默认路由到本 Persona。
-- **禁止从其他 Persona 调用**：若 `security-auditor` 或 `performance-auditor` 发现需更深代码评审，在 `reworkHints` 中以「[建议 code-reviewer 深审] xxx」前缀呈现，由用户或后续 `/wm review` 显式触发。见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
+- **禁止从其他 Persona 调用**：若 `security-auditor` 或 `performance-auditor` 发现需更深代码评审，在 `reworkHints` 中以「[建议 code-reviewer 深审] xxx」前缀呈现，由用户或后续 `/wm review` 显式触发。见 SSoT §6.4.3（`docs/skill-design-document_SSoT.md`）。
 
 ## Persona 2：test-engineer（QA 工程师 · 测试策略与覆盖率分析）
 
@@ -274,7 +274,7 @@
 
 - **直接调用场景**：用户请求测试设计、覆盖率分析或为具体 bug 写 Prove-It 测试。
 - **经 `/wm review` 调用**：`targetKind=test` 时路由到本 Persona。
-- **禁止从其他 Persona 调用**：若 `code-reviewer` 发现测试缺口，在 `reworkHints` 中以「[建议 test-engineer 深审] xxx」前缀呈现，由用户或后续 `/wm review` 显式触发。见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
+- **禁止从其他 Persona 调用**：若 `code-reviewer` 发现测试缺口，在 `reworkHints` 中以「[建议 test-engineer 深审] xxx」前缀呈现，由用户或后续 `/wm review` 显式触发。见 SSoT §6.4.3（`docs/skill-design-document_SSoT.md`）。
 
 ## Persona 3：security-auditor（安全工程师 · OWASP + STRIDE）
 
@@ -397,7 +397,7 @@
 
 - **直接调用场景**：用户请求对具体改动 / 文件 / 系统组件的安全评审。
 - **经 `/wm review` 调用**：`targetKind=code` 且文件涉及安全敏感面（auth / 加密 / 输入校验）时，由 `code-reviewer` 在 `reworkHints` 中建议深审；`targetKind=design` 且涉及安全架构时同理。
-- **禁止从其他 Persona 调用**：见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
+- **禁止从其他 Persona 调用**：见 SSoT §6.4.3（`docs/skill-design-document_SSoT.md`）。
 
 ## Persona 4：performance-auditor（性能工程师 · 性能基线与回归）
 
@@ -554,7 +554,7 @@
 
 - **直接调用场景**：用户请求对 Web 应用 / 具体组件 / 路由 / 实时 URL 的性能评审。
 - **经 `/wm review` 调用**：`targetKind=code` 且文件涉及性能热点（热点循环 / DB 查询）时，由 `code-reviewer` 在 `reworkHints` 中建议深审。
-- **禁止从其他 Persona 调用**：见 SSoT [§6.4.3](../../docs/skill-design-document_SSoT.md)。
+- **禁止从其他 Persona 调用**：见 SSoT §6.4.3（`docs/skill-design-document_SSoT.md`）。
 - **不纳入 `/wm test type=验收` 自动 fan-out**：性能审计仅适用于有性能 SLA 的场景，对工具库或 CLI 不适用。在阶段 7 系统测试时由用户显式触发。
 
 ## 与 addyosmani/agent-skills 的差异
@@ -572,7 +572,7 @@
 
 ## 与 root-cause-locator.md 的关系
 
-> 对应 spec [§8.2](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) agent-personas.md 修改 + [§9.10](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 兼容性。
+> 对应 spec §8.2（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） agent-personas.md 修改 + §9.10（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 兼容性。
 
 - `agent-personas.md` 定义 **V 子代理**的评审角色视角（product-manager / code-reviewer / security-auditor / performance-auditor / test-engineer 等），用于评审 W 模型各阶段产物。
 - [root-cause-locator.md](root-cause-locator.md) 定义 **R 子代理**的诊断方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯），用于返工循环中根因定位。
@@ -583,7 +583,7 @@
 
 ## 与 subagent/ 人格库的关系
 
-> 对应 spec [§9.1](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 现有人格库盘点。
+> 对应 spec §9.1（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 现有人格库盘点。
 
 [`w-model-dev/subagent/`](../subagent/) 含 28 个人格文件，分 5 类（engineering 12 / testing 7 / design 3 / product 4 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
 
@@ -598,7 +598,7 @@
 
 ## 多角度分派说明（并行/串行均可）
 
-> 对应 spec [§9.2](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 核心原则：多角度 > 并行 + [§9.10](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 兼容性。
+> 对应 spec §9.2（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 核心原则：多角度 > 并行 + §9.10（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 兼容性。
 
 **多角度分析的本质是「多角度」，不是「并行」。** 并行只是性能优化，串行同样合法。
 

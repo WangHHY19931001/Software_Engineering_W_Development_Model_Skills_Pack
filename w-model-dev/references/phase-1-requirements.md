@@ -37,7 +37,7 @@
 
 阶段 1 进入时，编排者先跑 `plan-chunks.ts` 对输入分块（一句话输入产 1 chunk，仍走完整流程），并行分派 A-chunk 提取 REQ 节点，再分派 A-cross 合并建图、G 跑 `check-requirement-graph.ts` 校验连通性与单根。收敛后 S 子代理读 `graph.json` 产出正式需求规格。
 
-详见 [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md) 与设计文档 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §1.3。
+详见 [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md) 与设计文档 `docs/ingestion-graph-convergence-design.md` §1.3。
 
 ## 需求解析算法
 
@@ -146,7 +146,7 @@
 
 ## 迷雾登记册（Fog of War）
 
-> 吸收 wayfinder「Fog of war」理念。W 阶段 1 强制 100% 覆盖（C1-C10）下，为「in-scope 但尚无法精确陈述」的需求提供显式落脚点，防止 A 子代理提前捏造浅层 REQ（违背禁止行为 #2 精神）或静默丢弃（违反禁止行为 #10）。设计 spec：[`docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md`](../../docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md)。
+> 吸收 wayfinder「Fog of war」理念。W 阶段 1 强制 100% 覆盖（C1-C10）下，为「in-scope 但尚无法精确陈述」的需求提供显式落脚点，防止 A 子代理提前捏造浅层 REQ（违背禁止行为 #2 精神）或静默丢弃（违反禁止行为 #10）。设计 spec：`docs/superpowers/specs/2026-07-30-round27-wayfinder-fog-absorption-design.md`。
 
 ### 定义与区分
 

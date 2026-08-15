@@ -70,6 +70,13 @@ export interface DocConsistencyInput {
   linkDocs?: Array<{ name: string; content: string; baseDir: string }>;
   /** 内链存在性判定（相对 repo-root 的 resolve 后路径 → 是否存在；CLI 层注入 existsSync 包装） */
   linkExists?: (relPath: string) => boolean;
+  /**
+   * 技能包出站链接检查数据源：w-model-dev/ 包内全部 .md 文档。
+   * name = 相对 repo-root 路径（如 w-model-dev/references/verifier-spec.md）；
+   * baseDir = 相对技能包根 w-model-dev/ 的所在目录（如 references；包根文件为 '.'）。
+   * 可选——缺省（fixture 未注入）时跳过出站链接检查。
+   */
+  skillPkgDocs?: Array<{ name: string; content: string; baseDir: string }>;
 }
 
 /**
@@ -135,7 +142,9 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkReferencesCount(input.referencesCount, input.skill));
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
-  violations.push(...checkVitestTestCount(input.vitestTestCount, input.readme, input.agents, input.prePush));
+  violations.push(
+    ...checkVitestTestCount(input.vitestTestCount, input.testFileCount, input.readme, input.agents, input.prePush),
+  );
   violations.push(
     ...checkVersionConsistency(
       input.pkgJson,
@@ -151,6 +160,9 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
   if (input.linkDocs !== undefined && input.linkExists !== undefined) {
     violations.push(...checkInternalLinks(input.linkDocs, input.linkExists));
+  }
+  if (input.skillPkgDocs !== undefined) {
+    violations.push(...checkSkillOutboundLinks(input.skillPkgDocs));
   }
   return violations;
 }
@@ -668,9 +680,14 @@ function checkVitestFileCount(testFileCount: number, readme: string, agents: str
  * 三处活体文档文本均出现该总数（「N tests」或「N 条」），测试用例增删但文档未同步即触发违规。
  * 无法采集（vitest 不可用 / 输出不可解析，vitestTestCount < 0）时保守放行，不阻断门禁
  * （与 detectScriptsChanges 在 git 不可用时保守返回 false 的既有策略一致）。
+ *
+ * 过期计数检查（stale-count）：出现性检查只能保证实测总数「存在」于文档，无法拦截同一文档
+ * 内并存的旧数字（如 README 一处写 686、另一处残留 663）。因此对 vitest 语境的两种计数
+ * 格式逐处比对：文件数须等于 testFileCount、用例数须等于 vitestTestCount，任一不符即违规。
  */
 function checkVitestTestCount(
   vitestTestCount: number,
+  testFileCount: number,
   readme: string,
   agents: string,
   prePush: string,
@@ -689,6 +706,23 @@ function checkVitestTestCount(
         check: 'vitest-tests',
         message: `${docName} 应含 vitest 实测用例总数「${vitestTestCount} tests」或「${vitestTestCount} 条」（vitest run 实测 ${vitestTestCount} 条，测试用例增删须同步文档）`,
       });
+    }
+    const staleFormats: RegExp[] = [
+      /(\d+)\s*files?\s*\/\s*(\d+)\s*tests?\b/g,
+      /(\d+)\s*个\s*\.test\.ts\s*\/\s*(\d+)\s*(?:tests?|条)/g,
+    ];
+    for (const re of staleFormats) {
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(content)) !== null) {
+        const fileN = Number(m[1]);
+        const testN = Number(m[2]);
+        if (testN !== vitestTestCount || (testFileCount >= 0 && fileN !== testFileCount)) {
+          violations.push({
+            check: 'vitest-tests',
+            message: `${docName} 存在过期 vitest 计数「${m[0]}」（实测 ${testFileCount} 个 .test.ts / ${vitestTestCount} 条），须同步`,
+          });
+        }
+      }
     }
   }
   return violations;
@@ -781,6 +815,31 @@ function checkInternalLinks(
         violations.push({
           check: 'internal-links',
           message: `${doc.name} 内链断链：${target}（resolve → ${resolved}，目标文件不存在；改名/移动文件后须同步引用处）`,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * 技能包出站链接检查（skill-outbound-links）：w-model-dev/ 是可整体拷贝分发的自包含技能包，
+ * 包内任何 .md 的相对链接解析后不得逃逸包根（如 references/ 下用 ../../docs/ 指向仓库根资产）。
+ * 逃逸链接在独立安装（拷贝 w-model-dev/ 至用户项目）后必断；C3 内链检查按 repo-root 存在性
+ * 放行，无法发现「仓库内存在、包外失效」的链接，故需本规则独立拦截。
+ * 修法：改包内相对路径，或转纯文本引用（如「SSoT §10.6（`docs/skill-design-document_SSoT.md`）」）。
+ */
+export function checkSkillOutboundLinks(
+  skillPkgDocs: Array<{ name: string; content: string; baseDir: string }>,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  for (const doc of skillPkgDocs) {
+    for (const target of extractMarkdownRelLinks(doc.content)) {
+      const resolved = path.posix.normalize(path.posix.join(doc.baseDir, target));
+      if (resolved === '..' || resolved.startsWith('../')) {
+        violations.push({
+          check: 'skill-outbound-links',
+          message: `${doc.name} 链接逃逸技能包根：${target}（resolve → ${resolved}，超出 w-model-dev/）；技能包须自包含，改包内相对路径或纯文本引用（如「见仓库 docs/xxx.md」）`,
         });
       }
     }

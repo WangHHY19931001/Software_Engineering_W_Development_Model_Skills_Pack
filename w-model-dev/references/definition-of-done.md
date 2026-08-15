@@ -1,9 +1,9 @@
 # 项目级 Definition of Done（每次变更的日常标准）
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `references/definition-of-done.md`。
-> SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 为权威定义，本文件为可执行细则。
+> SSoT §10.6（`docs/skill-design-document_SSoT.md`） 为权威定义，本文件为可执行细则。
 >
-> **与工件质量门的关系**：[§10.5 工件质量门](../../docs/skill-design-document_SSoT.md) / [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 是「验收阶段的硬门禁」（退出码 0 才放行）；DoD 是「每次变更的日常标准」（每个 `/wm code` / `/wm test` 后自检）。二者不互替。
+> **与工件质量门的关系**：§10.5 工件质量门（`docs/skill-design-document_SSoT.md`） / [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 是「验收阶段的硬门禁」（退出码 0 才放行）；DoD 是「每次变更的日常标准」（每个 `/wm code` / `/wm test` 后自检）。二者不互替。
 
 ## 适用范围
 
@@ -26,7 +26,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 | **理解证据** | 阶段门放行须有用户理解证据 | run-log `acknowledgedDecisions` 非空且含 ≥1 关键决策摘要（非"确认"/"同意"） | 拒绝放行；要求用户填入理解证据（O4 命中） |
 | **签名链完整性** | 每阶段每角色动作写入 `signature-chain.jsonl`；断裂视为 #32 命中 | `check-signature-chain.ts` R1-R10 全通过 | 补齐缺失角色签名与来源证明（详见下方「第七维度」节） |
 
-> 第六维度「理解证据」吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念，对抗用户对阶段产物 rubber-stamp。放行 ≠ 理解；`acknowledgedDecisions` 非空才算放行。SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 为权威定义。
+> 第六维度「理解证据」吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念，对抗用户对阶段产物 rubber-stamp。放行 ≠ 理解；`acknowledgedDecisions` 非空才算放行。SSoT §10.6（`docs/skill-design-document_SSoT.md`） 为权威定义。
 > 补注：acknowledgedDecisions 非空 = 判据持有者（人）在形式化门禁之外行使记叙性判断——这是"人机分工线"在阶段门上的显式兑现（能形式化 → 门禁校验；不能形式化 → 人类确认）。
 
 **代签判定**：self-as-verifier 代签视为 O4 命中（`signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID 即代签）。

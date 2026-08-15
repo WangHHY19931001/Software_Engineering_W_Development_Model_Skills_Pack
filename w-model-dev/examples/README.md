@@ -81,4 +81,4 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase 8
 ```
 
-> 各命令的预期输出（退出码 0/1/2 示例）见对应阶段示例文件；阶段 2/3/4 门禁命令详见 [dispatch-matrix.md](../references/dispatch-matrix.md) 与 [README.md](../../README.md)「W 模型 8 阶段 × 门禁对应」。
+> 各命令的预期输出（退出码 0/1/2 示例）见对应阶段示例文件；阶段 2/3/4 门禁命令详见 [dispatch-matrix.md](../references/dispatch-matrix.md) 与 `README.md`（仓库根）「W 模型 8 阶段 × 门禁对应」。

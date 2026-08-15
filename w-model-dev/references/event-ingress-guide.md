@@ -1,6 +1,6 @@
 # 事件接驳指南（Event Ingress Guide）
 
-> 来源：SSoT [§10F](../../docs/skill-design-document_SSoT.md)（事件驱动循环 Loop 3）。本文件为可执行细则。
+> 来源：SSoT §10F（`docs/skill-design-document_SSoT.md`）（事件驱动循环 Loop 3）。本文件为可执行细则。
 >
 > **目的**：为棕地持续维护场景提供事件接驳能力——消费方自行实现 webhook/cron 触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段重跑）。
 >
