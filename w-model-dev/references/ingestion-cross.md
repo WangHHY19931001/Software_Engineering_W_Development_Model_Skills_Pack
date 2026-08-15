@@ -49,7 +49,7 @@ A-cross/A-evolve 合并时：
 
 ## consolidated.json schema
 
-见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §2.6。
+见 `docs/ingestion-graph-convergence-design.md` §2.6。
 
 ## cross-analysis-report.md 模板
 

@@ -131,7 +131,7 @@ A-chunk 提取每个实体时，同步识别信息流（与结构边正交）：
 
 ## 产出 schema
 
-见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §2.5。
+见 `docs/ingestion-graph-convergence-design.md` §2.5。
 
 ## 禁止
 

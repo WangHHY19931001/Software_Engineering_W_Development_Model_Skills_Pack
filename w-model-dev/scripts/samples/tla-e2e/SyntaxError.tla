@@ -16,4 +16,6 @@ VARIABLES n
 Init == n = 0
 Next == n' = n + 1
 Spec == Init [][Next]_n
+Inv == n <= 3
+BusinessInvariant == /\ Inv
 ====

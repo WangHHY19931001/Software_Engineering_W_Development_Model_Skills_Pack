@@ -1,7 +1,7 @@
 # 上下文管理手册（Context Management Guide）
 
 > 吸收自《agent 时代的人月神话》第 9/10 章：上下文窗口是有限资源，管理糟糕的账单可达合理版本十倍。
-> 吸收决策见 [decision-log/absorptions.md](../../docs/changes/decision-log/absorptions.md)「人月神话吸收」；本文件为可执行细则。
+> 吸收决策见 `docs/changes/decision-log/absorptions.md`「人月神话吸收」；本文件为可执行细则。
 > 强制等级：违反本文件「KV 缓存友好」规则（随意改系统提示词前缀）属高成本反模式，禁止。
 
 ## 目录

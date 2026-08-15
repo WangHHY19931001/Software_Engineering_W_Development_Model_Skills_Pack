@@ -32,7 +32,7 @@
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, resolve as pathResolve } from 'node:path';
+import { isAbsolute, join, relative, resolve as pathResolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
@@ -129,6 +129,31 @@ function readSecurityBaselineEntryCount(root: string): number {
   } catch {
     return -1;
   }
+}
+
+/**
+ * 采集技能包（w-model-dev/）内全部 .md 文档，供出站链接检查（skill-outbound-links）。
+ * name = 相对 repo-root 的 POSIX 路径；baseDir = 相对技能包根 w-model-dev/ 的所在目录
+ * （包根文件为 '.'，与 logic 层 checkSkillOutboundLinks 的解析语义一致）。
+ */
+function collectSkillPkgDocs(root: string): Array<{ name: string; content: string; baseDir: string }> {
+  const pkgRoot = join(root, 'w-model-dev');
+  const docs: Array<{ name: string; content: string; baseDir: string }> = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (entry.isFile() && entry.name.endsWith('.md')) {
+        const relToRoot = relative(root, p).split(sep).join('/');
+        const pkgPrefix = 'w-model-dev/';
+        const inPkg = relToRoot.startsWith(pkgPrefix) ? relToRoot.slice(pkgPrefix.length) : relToRoot;
+        const baseDir = inPkg.includes('/') ? inPkg.slice(0, inPkg.lastIndexOf('/')) : '.';
+        docs.push({ name: relToRoot, content: readFileSync(p, 'utf-8'), baseDir });
+      }
+    }
+  };
+  walk(pkgRoot);
+  return docs;
 }
 
 /**
@@ -319,6 +344,7 @@ function main(): void {
     securityBaselineEntryCount: readSecurityBaselineEntryCount(root),
     linkDocs,
     linkExists: (relPath: string) => existsSync(join(root, relPath)),
+    skillPkgDocs: collectSkillPkgDocs(root),
   };
 
   const violations = runDocConsistencyChecks(input);

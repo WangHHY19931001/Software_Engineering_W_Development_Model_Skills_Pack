@@ -17,7 +17,7 @@
 
 ## 失败模式清单（F1~F10）
 
-「看似高效实则埋坑」的 10 条行为退化，与 47 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。权威定义与缓解措施见 SSoT [§4A.2](../../docs/skill-design-document_SSoT.md)。
+「看似高效实则埋坑」的 10 条行为退化，与 47 条流程反模式互补。命中不触发回退，但应在阶段产物「备注」节或 `reworkHints` 中标注。权威定义与缓解措施见 SSoT §4A.2（`docs/skill-design-document_SSoT.md`）。
 
 | # | 失败模式 | 与反例的关系 |
 |---|---|---|
@@ -32,4 +32,4 @@
 | F9 | 因「显而易见」而无规格就编码 | 与「测试设计前置」冲突 |
 | F10 | 因「看起来对」跳过验证 | 与 #3 / #6 互补 |
 
-> Agent 重复命中同一失败模式 ≥2 次时，应在 CHANGELOG 体系（[decision-log](../../docs/changes/decision-log/README.md)）登记为新教训。
+> Agent 重复命中同一失败模式 ≥2 次时，应在 CHANGELOG 体系（decision-log（`docs/changes/decision-log/README.md`））登记为新教训。

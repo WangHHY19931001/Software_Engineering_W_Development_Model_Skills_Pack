@@ -127,4 +127,4 @@
 
 - 重构手法速查见 [refactoring-catalog.md](refactoring-catalog.md)
 - 并发专项检查见 [concurrency-guide.md](concurrency-guide.md)
-- 设计判据来源见《软件设计哲学》危险信号总清单（吸收决策记录见 [decision-log/absorptions.md](../../docs/changes/decision-log/absorptions.md)）
+- 设计判据来源见《软件设计哲学》危险信号总清单（吸收决策记录见 `docs/changes/decision-log/absorptions.md`）

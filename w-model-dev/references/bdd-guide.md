@@ -2,7 +2,7 @@
 
 > 本文件定义 BDD（Behavior-Driven Development）建模与验收夹具的可执行细则：features 文件头标注、状态机七要素、门禁脚本用法、阶段产出契约。
 > S 子代理（产出 .feature + 更新 bdd-manifest.json）、V 子代理（评审合规性）、G 子代理（跑 check-bdd-model.ts）必读。
-> 权威设计见 [docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md](../../docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md)。
+> 权威设计见 `docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md`。
 
 ## 速查摘要
 

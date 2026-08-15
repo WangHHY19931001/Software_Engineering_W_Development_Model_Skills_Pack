@@ -2,7 +2,7 @@
 
 > 本文件定义 TLA+ 层次化状态机建模的可执行细则：文件头规范、层级拆解、门禁脚本用法、阶段产出契约。
 > S 子代理（产出 .tla + .cfg + 更新 manifest）、V 子代理（评审合规性）、G 子代理（跑 check-tla-model.ts）必读。
-> 权威设计见 [docs/tla-plus-modeling-design.md](../../docs/tla-plus-modeling-design.md)。
+> 权威设计见 `docs/tla-plus-modeling-design.md`。
 
 ## 速查摘要
 

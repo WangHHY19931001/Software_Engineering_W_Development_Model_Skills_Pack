@@ -1,7 +1,7 @@
 # 估算纪律（Estimation Guide）
 
 > 吸收自《agent 时代的人月神话》第 8 章：编码份额趋近零——"五分钟是编码，一小时×3 是其他工序"。
-> 吸收决策见 [decision-log/absorptions.md](../../docs/changes/decision-log/absorptions.md)「人月神话吸收」；本文件为可执行细则。
+> 吸收决策见 `docs/changes/decision-log/absorptions.md`「人月神话吸收」；本文件为可执行细则。
 > 强制等级：违反本文件「禁外推」规则属估算失实（与约束 #4『真实执行』同族）。
 
 ## 目录

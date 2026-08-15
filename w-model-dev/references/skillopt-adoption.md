@@ -1,6 +1,6 @@
 # SkillOpt 方法论采用指南（SkillOpt Adoption Guide）
 
-> 来源：SSoT [§10H](../../docs/skill-design-document_SSoT.md)（SkillOpt 方法论吸收）。本文件为可执行细则。
+> 来源：SSoT §10H（`docs/skill-design-document_SSoT.md`）（SkillOpt 方法论吸收）。本文件为可执行细则。
 >
 > **与 Loop 4 关系**：消费 [hill-climbing-guide.md](hill-climbing-guide.md) 产出的 `HarnessImprovementReport` 信号。Loop 4 产出信号，本指南消费信号。
 >
