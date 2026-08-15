@@ -8,11 +8,16 @@
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --validate-templates [--json]
  *
  * 参数：
  *   project-dir   项目根目录（默认：当前工作目录）
  *   --phase=N     校验阶段 1-8（默认终检 phase=8，向后兼容；兼容历史短参数 -p）
  *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   --validate-templates  模板漂移校验（C9）：按 PHASE_SPEC_LAYOUT 校验技能包 templates/ 资产
+ *                         含必需结构标记（引用块 / §0 SSOT 头 / DoD 清单 ≥8 项）。
+ *                         校验对象是技能包自身资产（相对脚本定位 ../../templates），与 project-dir 无关；
+ *                         与常规门禁互斥，命中即走独立分支，不读 RTM。
  *
  * 退出码：
  *   0  校验通过
@@ -32,11 +37,17 @@
  * @module
  */
 
+import * as nodeFs from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { checkArtifactGate, type PhaseOption, type RTMMatrixShape } from '../logic/gate-logic.js';
+import {
+  checkArtifactGate,
+  checkTemplatesStructure,
+  type PhaseOption,
+  type RTMMatrixShape,
+} from '../logic/gate-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -135,6 +146,47 @@ async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
+
+  // ==================== --validate-templates 模式（C9 模板漂移校验） ====================
+  // 校验对象是技能包自身 templates/ 资产（相对脚本定位 ../../templates），与 project-dir 无关；
+  // 独立分支：不读 RTM、不受 --phase 影响，violations 非空 → exit 1。
+  if (process.argv.slice(2).includes('--validate-templates')) {
+    const templatesDir = path.resolve(fileURLToPath(import.meta.url), '..', '..', '..', 'templates');
+    const violations = checkTemplatesStructure(templatesDir, {
+      existsSync: (p) => nodeFs.existsSync(p),
+      readFileSync: (p) => nodeFs.readFileSync(p, 'utf-8'),
+    });
+    const tplPassed = violations.length === 0;
+    const tplExit = tplPassed ? 0 : 1;
+    if (jsonMode) {
+      printJsonReport(
+        {
+          type: 'templates',
+          passed: tplPassed,
+          reasons: violations,
+          violations: buildViolationDistribution(violations.length),
+          durationMs: Date.now() - startTime,
+        },
+        tplExit,
+      );
+      process.exitCode = tplExit;
+      return;
+    }
+    console.log('═'.repeat(60));
+    console.log('模板漂移校验（Templates Structure Gate，C9）');
+    console.log('═'.repeat(60));
+    console.log(`templates 目录: ${templatesDir}`);
+    console.log(`校验结果      : ${tplPassed ? '✓ 通过' : '✗ 未通过'}`);
+    console.log('─'.repeat(60));
+    if (!tplPassed) {
+      console.log('未通过原因：');
+      for (const v of violations) console.log(`  - ${v}`);
+    }
+    printGateReport('GATE', { type: 'templates', passed: tplPassed, reasons: violations }, tplExit);
+    process.exitCode = tplExit;
+    return;
+  }
+
   const phaseOption = parsePhaseArg(process.argv);
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
   // --spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
@@ -193,7 +245,12 @@ async function main(): Promise<void> {
   const { bddViolations, bddManifestExists } = await readBddManifest(bddManifestFile, projectDir, effectivePhase);
 
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
-  const result = checkArtifactGate(matrix, { graph, manifestExists, phaseOption, specDir });
+  const result = checkArtifactGate(matrix, {
+    graph,
+    manifestExists,
+    phaseOption,
+    specDir,
+  });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
   // phase>=2 时，终检调用 check-tla-model.ts + check-bdd-model.ts，传递 --graph + --phase

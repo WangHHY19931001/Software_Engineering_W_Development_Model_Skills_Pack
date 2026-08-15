@@ -37,8 +37,7 @@ import * as path from 'node:path';
 
 import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
-import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { readJsonClassified, readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const ICEBERG_JSON = {
@@ -55,55 +54,31 @@ const ICEBERG_JSON = {
   } | null,
 };
 
-async function readReport(reportPath: string): Promise<IcebergSweepReport> {
+async function readReport(reportPath: string): Promise<IcebergSweepReport | null> {
   const abs = path.resolve(reportPath);
-  let content: string;
+  let parsed: unknown;
   try {
-    content = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      exitWithError({
-        category: 'FILE_NOT_FOUND',
-        rule: 'P0-2',
-        message: '文件不存在',
-        file: abs,
-        exitCode: 2,
-      });
-      process.exitCode = 2;
-      return null as unknown as IcebergSweepReport;
-    }
-    throw err;
+    parsed = await readJsonClassified<unknown>(abs);
+  } catch {
+    // readJsonClassified 已经 exitWithError 输出 ERROR_JSON（单条）并抛出以中断调用链；
+    // 此处捕获防止 main().catch 二次打印，保持 stdout 单条 ERROR_JSON 语义
+    return null;
   }
-  try {
-    const parsed = parseJsonSafe<unknown>(content);
-    if (typeof parsed !== 'object' || parsed === null) {
-      exitWithError({
-        category: 'STRUCTURE_INVALID',
-        rule: 'P0-3',
-        message: '报告不是 JSON 对象',
-        file: abs,
-        exitCode: 2,
-      });
-      process.exitCode = 2;
-      return null as unknown as IcebergSweepReport;
-    }
-    return parsed as IcebergSweepReport;
-  } catch (err) {
+  if (typeof parsed !== 'object' || parsed === null) {
     exitWithError({
-      category: 'FILE_PARSE',
-      message: '报告 JSON 解析失败',
+      category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
+      message: '报告不是 JSON 对象',
       file: abs,
-      detail: err instanceof Error ? err.message : String(err),
       exitCode: 2,
     });
-    process.exitCode = 2;
-    return null as unknown as IcebergSweepReport;
+    return null;
   }
+  return parsed as IcebergSweepReport;
 }
 
-/** 从 run-log 推断最近一次 checkpoint success 的阶段（--auto-trigger 模式交叉核对依据） */
-async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
+/** 从 run-log 推断最近一次 checkpoint success 的阶段（--auto-trigger 模式交叉核对依据）；错误路径返回 null（exitCode 已置 2） */
+async function inferPhaseFromRunLog(runLogPath: string): Promise<number | null> {
   const abs = path.resolve(runLogPath);
   try {
     await fs.access(abs);
@@ -117,8 +92,7 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
         file: abs,
         exitCode: 2,
       });
-      process.exitCode = 2;
-      return 0;
+      return null;
     }
     throw err;
   }
@@ -139,7 +113,7 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number> {
       detail: `最后 checkpoint phase=${lastPhase}（须为 1-8）`,
       exitCode: 2,
     });
-    process.exitCode = 2;
+    return null;
   }
   return lastPhase;
 }
@@ -186,7 +160,10 @@ async function main(): Promise<void> {
       return;
     }
     const expectedPhase = await inferPhaseFromRunLog(runLogArg.split('=')[1]!);
-    // inferPhaseFromRunLog 失败路径已 exit 2，此处 expectedPhase 合法
+    // inferPhaseFromRunLog 错误路径返回 null（exitCode 已置 2），直接返回避免后续 process.exit 覆盖退出码
+    if (expectedPhase === null) {
+      return;
+    }
     // 报告 phase 为字符串（如 phase3-outline），run-log phase 为数字 1-8，按 phase<N>- 前缀比较
     if (!report.phase.startsWith(`phase${expectedPhase}-`)) {
       reasons.push(`phase 不一致：报告 phase=${report.phase}，run-log 最近 checkpoint phase=${expectedPhase}`);

@@ -396,6 +396,13 @@ const GRAPH_CASES: GraphCase[] = [
     description: '存在孤立节点 REQ-002，应被连通性校验拦截',
   },
   {
+    file: 'bad-round-exceeded.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/轮次上限校验失败.*round > 5.*phase1\/round6/],
+    description: 'analysisRounds 含 round=6 > MAX_GRAPH_ROUNDS(5)，应被轮次上限校验拦截（防无限返工循环）',
+  },
+  {
     file: 'bad-multi-root.json',
     phase: 1,
     expectedPassed: false,
@@ -1060,6 +1067,12 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R7.*非 append-only/],
     description: 'r1 时间戳 02:00 早于 r2 时间戳 01:00（时间戳倒序），应被 R7 append-only 校验拦截',
+  },
+  {
+    file: 'bad-ordering.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R8.*轨迹顺序倒置.*V\(review\).*S/],
+    description: 'V(review) 先于 S(produce) 出现（评审在产出前），应被 R8-4 轨迹顺序链校验拦截',
   },
   {
     file: 'rootcause-valid.jsonl',

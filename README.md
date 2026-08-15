@@ -9,14 +9,14 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
 
-**当前版本**：`41.16.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`41.17.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
-**健康指标**（2026-08-14 实测）：
+**健康指标**（2026-08-15 实测）：
 
 | 指标 | 结果 |
 |---|---|
-| Self-test（samples 回归基线） | ✅ 254/254 |
-| Vitest（门禁脚本单元测试） | ✅ 40 files / 634 tests |
+| Self-test（samples 回归基线） | ✅ 256/256 |
+| Vitest（门禁脚本单元测试） | ✅ 42 files / 686 tests |
 | Vitest coverage（logic/+lib/ 阈值） | ✅ stmts 75 / branch 65 / funcs 85 / lines 75 |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
@@ -104,7 +104,8 @@ npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 图谱结构门禁，�
 npm run check:tla -- <tla-manifest.json> [--phase=1|2|3|4] [--spec=<id>]  # TLA+ 行为门禁，退出码 0/1/2
 npm run check:coverage -- <coverage.json> [--graph=] [--out-of-scope=] [--exemptions=]  # 阶段 1 需求覆盖分析门禁，退出码 0/1/2
 npm run check:exemption -- <exemption.json>  # 豁免审批门禁（S→R→V→人类四阶段），退出码 0/1/2
-npm run self-test                           # 退出码 0/1（254 条样本回归基线）
+npm run self-test                           # 退出码 0/1（256 条样本回归基线）
+npm run doctor                              # 环境自检（node/tsx/ajv 等就绪性，退出码 0/1/2）
 npm run lint:security                       # 安全扫描 + baseline 比对，退出码 0/1
 npm run format                              # prettier 格式化（w-model-dev/scripts/**/*.ts + config/ + scripts/*.cjs，幂等）
 
@@ -147,7 +148,7 @@ npm run setup:hooks # （可选）如需手动重置/确认钩子配置，执行
 npm run self-test
 ```
 
-`self-test.ts` 以 `w-model-dev/scripts/samples/` 下 **254 条端到端样本**回归全部 `*-logic.ts` 的通过 / 失败 / 输入错误三态，期望退出码 0。每次修改校验逻辑后必须跑通（新增校验项需同步增加样本，详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
+`self-test.ts` 以 `w-model-dev/scripts/samples/` 下 **256 条端到端样本**回归全部 `*-logic.ts` 的通过 / 失败 / 输入错误三态，期望退出码 0。每次修改校验逻辑后必须跑通（新增校验项需同步增加样本，详见 [`scripts/__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md) coverage 矩阵）。
 
 **步骤 4：跑本地 pre-push 门禁（16 项）**
 
@@ -155,7 +156,7 @@ npm run self-test
 npm run prepush
 ```
 
-等价于 `bash .githooks/pre-push --force`，强制跑 16 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（40 files / 634 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）、prettier 格式一致性。任一失败即中止。
+等价于 `bash .githooks/pre-push --force`，强制跑 16 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（42 files / 663 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）、prettier 格式一致性。任一失败即中止。
 
 **步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
 
@@ -310,11 +311,11 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── schemas/                  # 20 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep）
 │   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 │   ├── scripts/                  # 只做门禁 / 校验，不调用 LLM（自包含，依赖 tsx + devDeps：ajv / eslint-plugin-security 等）
-│   │   ├── cli/                  # 门禁与工具 CLI 入口：check-*.ts + self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx
+│   │   ├── cli/                  # 门禁与工具 CLI 入口：check-*.ts + self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx/wm-write/doctor
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks
 │   │   ├── lib/                  # 通用工具与 IO 辅助：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json/artifact-gate-assets/uat-path-mapping/tla-clean-trace 等
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集 + README.md 覆盖矩阵，check-samples-coverage 门禁核对）
-│   │   └── __tests__/            # vitest 单元测试（40 个 .test.ts / 634 tests）
+│   │   └── __tests__/            # vitest 单元测试（42 个 .test.ts / 686 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（4 份伪示例对话 + 5 份 stage 编排示例 + real-run-evidence.md 真实命令证据）

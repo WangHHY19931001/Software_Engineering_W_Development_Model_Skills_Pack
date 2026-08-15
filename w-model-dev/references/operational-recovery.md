@@ -48,7 +48,7 @@
 
 - EPERM/EBUSY：提示关闭编辑器锁、同步软件或占用进程，解除后重试当前写入。
 - 并发修改：比较读取前后的 mtime；变化时停止覆盖、重新读取并合并差异。
-- 所有 JSON 写入使用“临时文件 → 校验 → 原子 rename”。
+- 所有 JSON 状态写入统一经 `scripts/cli/wm-write.ts`（已实现「临时文件 → 校验 → 原子 rename + `.bak` 备份 + mtime 乐观锁 + 回读校验」；用法：`echo '<json>' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin [--expect-mtime <ms>]`，冲突时 exit 1 + `WMWRITE_JSON {"ok":false,"reason":"MTIME_CONFLICT"}`，重读目标后按最新 mtime 重试）。
 
 ## 外部评审与门禁异常
 

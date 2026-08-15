@@ -1,6 +1,29 @@
 # 分派总览矩阵（Dispatch Matrix）
 
+> 工具/命令速查见 [toolbox.md](toolbox.md)（「I have X, I want Y → use Z」决策表，按用户意图组织，与本文档按阶段/角色组织互补）。
+
 > 编排者分派子代理前的必读总览。本文件是 [subagent-delegation.md](subagent-delegation.md) 的索引视图，不替代其权威定义。
+
+## 0. 按阶段分节加载导引
+
+> 编排者进入某阶段前，按本导引只加载该阶段所需分节，避免一次性载入全文（反例 #5）。
+> 各阶段对应分节如下：
+
+| 阶段 | 加载分节 | 对应表格 |
+|---|---|---|
+| 1 需求 | §1 + §2 + §3（阶段 1 行）+ §6.3（阶段 1 门） | §3 阶段 1 需求 S-doc/S-tla/S-bdd 三行；§6.3 阶段 1 门禁 |
+| 2 系统设计 | §1 + §2 + §3（阶段 2 行）+ §6.3（阶段 2 门） | §3 阶段 2 系统设计三行；§6.3 阶段 2 门禁 |
+| 3 概要设计 | §1 + §2 + §3（阶段 3 行）+ §6.3（阶段 3 门） | §3 阶段 3 概要设计三行；§6.3 阶段 3 门禁 |
+| 4 详细设计 | §1 + §2 + §3（阶段 4 行）+ §6.3（阶段 4 门） | §3 阶段 4 详细设计三行；§6.3 阶段 4 门禁 |
+| 5 编码 | §1 + §2 + §3（阶段 5 行）+ §5 三段式 + §6.3（阶段 5 门） | §3 阶段 5 编码三行；§5 explore/propose/coding 表；§6.3 阶段 5 门禁 |
+| 6 集成测试 | §1 + §2 + §3（阶段 6 行）+ §5 三段式 + §6.3（阶段 6 门） | §3 阶段 6 集成测试三行；§5 三段式表；§6.3 阶段 6 门禁 |
+| 7 系统测试 | §1 + §2 + §3（阶段 7 行）+ §5 三段式 + §6.3（阶段 7 门） | §3 阶段 7 系统测试三行；§5 三段式表；§6.3 阶段 7 门禁 |
+| 8 验收测试 | §1 + §2 + §3（阶段 8 行）+ §5 三段式 + §6.3（阶段 8 门） | §3 阶段 8 验收测试三行；§5 三段式表；§6.3 阶段 8 门禁 |
+| 返工循环 | §4 返工循环分派 + §1（R 角色）+ §6.2 | §4 返工循环表 + S-emergency-fix 表 |
+| 全阶段通用 | §1 角色速查 + §7 反模式→check 映射 | §1 角色表 + §7 反模式映射表 |
+
+> 阶段 1-4 的 A 子代理 ingestion 子流程见 §2 注（A-chunk/A-cross/A-evolve 分别加载 ingestion-chunk/ingestion-cross/graph-guide）。
+> 阶段 5-8 进入 CHECKPOINT 时另跑 ensure-codegraph-opsx（见 §5 依赖引导）。
 
 ## 1. 角色速查
 
@@ -14,6 +37,25 @@
 | R | 根因 | 返工时定位根因 + R3 预防性审查 | 不实施修复 / 不跨阶段 |
 
 > S 变体（10 种）：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd（阶段 1-4 拆分）/ S-explore / S-propose / S-coding（阶段 5-8 三段式）/ S-fix / S-emergency-fix（返工）。
+
+### 1.1 S 变体 × R3/V/G 触发矩阵（消歧）
+
+> 事实基准（check-preventive-review.ts 已确认）：R3 变体按**工作类型** 4 种（standard / fix / emergency / ingest），**不按 S 角色拆分**——S-doc / S-tla / S-bdd 共享同一套 standard R3×3。每阶段每变体一套 R3×3 + V×1 + G×1；阶段 5-8 opsx 按段（explore / propose / apply）各一套。消除 18→30 分派漂移歧义。
+
+| 工作类型 variant | 触发场景 | R3 报告前缀 | R3×3 | V×1 | G×1 |
+|---|---|---|---|---|---|
+| standard | 标准 S 产出（S-doc / S-tla / S-bdd 共享一套） | `<phase>-{dim}.json` | ✅ | ✅ | ✅ |
+| fix | S-fix 返工后 | `<phase>-fix-{dim}.json` | ✅ | ✅ | ✅ |
+| emergency | S-emergency-fix 紧急修复后 | `<phase>-emergency-{dim}.json` | ✅ | ✅ | ✅ |
+| ingest | S-ingest-tla / S-ingest-bdd 后 | `<phase>-ingest-{dim}.json` | ✅ | ✅ | ✅ |
+
+阶段 5-8 opsx 三段式（每段各一套 R3×3 + V×1 + G×1）：
+
+| 段 | S 变体 | R3×3 | V×1 | G×1 |
+|---|---|---|---|---|
+| explore | S-explore | ✅ | ✅ | ✅ |
+| propose | S-propose | ✅ | ✅ | ✅ |
+| apply | S-coding | ✅ | ✅ | ✅ |
 
 ## 2. 每阶段分派时序
 
@@ -82,6 +124,70 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 > V 子代理通用加载：agent-personas / verifier-spec / definition-of-done（阶段门时）；评审 BDD 时加 bdd-review-checklist；评审代码时加 quality-standards。
 
 > O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）/ estimation-guide（工期/预算估算时）/ context-management-guide（长会话上下文管理时）。
+
+## 3.1 全 references 触发条件表（53 文件）
+
+> `references/` 目录恰 53 份 .md。下表按「触发条件」组织，供编排者判断何时加载某文件。
+> 标注 **2 跳** 的文件不直接出现在 §3 各阶段 reference 列，需经其上游文件（如 anti-patterns / phase-N / subagent-delegation）间接引用才可达——编排者按需显式加载，勿遗漏。
+
+| 文件 | 触发条件 | 可达性 |
+|---|---|---|
+| agent-personas | V 子代理评审时选用 Persona（code-reviewer/test-engineer/security-auditor/performance-auditor） | 1 跳 |
+| anti-patterns | 全阶段反模式 #1-#47 权威清单；编排者自查 / V/G 核验时 | 1 跳 |
+| bdd-guide | 阶段 1-4 S-bdd 建模 + BDD↔TLA+ 同步 | 1 跳 |
+| bdd-patterns-examples | S-bdd 产出 BDD features 时参考示例 | 1 跳 |
+| bdd-review-checklist | V 评审 BDD 时 | 1 跳 |
+| bdd-syntax-reference | S-bdd 产出 BDD features 时语法参考 | 1 跳 |
+| code-smells-checklist | 阶段 5 代码评审 / 重构时识别坏味道（组 C/N 等） | 2 跳 |
+| command-reference | 全命令 / 错误码 / ERROR_JSON 约定速查；O 分派脚本前 | 2 跳 |
+| concurrency-guide | 阶段 5 并发专项检查 / 并发代码评审时 | 2 跳 |
+| context-management-guide | 长会话上下文管理时（O 通用加载） | 1 跳 |
+| data-models | `.w-model/*.json` 数据模型 / schema 强约束 / RunLogEntry vs EventIngress 边界 | 2 跳 |
+| definition-of-done | 项目级 DoD 七维度；V 阶段门评审时 | 1 跳 |
+| design-patterns-catalog | 阶段 4 详细设计套用设计模式时 | 1 跳 |
+| design-philosophy | 五条设计哲学（主刀与修正权等）；O 通用加载 | 1 跳 |
+| directory-conventions | 产出路径约定（阶段 1-4 产物落盘路径） | 2 跳 |
+| dispatch-matrix | 本文件；编排者分派前必读总览 | — |
+| estimation-guide | 工期 / 预算估算时（O 通用加载） | 1 跳 |
+| event-ingress-guide | Loop 3 事件接驳；L2+ 成熟度激活时 | 2 跳 |
+| format-conventions | 文档格式 / 命名 / 分隔符约定 | 2 跳 |
+| glossary | 术语表权威定义；阶段 1-4 产出 glossary 子集时 | 2 跳 |
+| graph-guide | 阶段 1-4 图谱门禁与收敛准则（A 子代理 + G） | 1 跳 |
+| hard-constraints | 14 条硬约束完整版；执行前必读（O 通用加载） | 1 跳 |
+| hill-climbing-guide | Loop 4 爬坡循环；run-log 分析伴侣 | 2 跳 |
+| iceberg-sweep-guide | 冰山扫掠深度分析（S-fix 后 ICEBERG-A / 阶段门前 ICEBERG-B） | 2 跳 |
+| ingestion-chunk | 阶段 1-4 A-chunk 分块细则 | 1 跳 |
+| ingestion-cross | 阶段 1-4 A-cross/A-evolve 合并与图谱演进 | 1 跳 |
+| operation-behaviors | 八条操作行为 + 失败模式 F1-F10；O 通用加载 | 1 跳 |
+| operational-recovery | 恢复 / 成熟度与行为门禁分级（约束 #13）；O 通用加载 | 1 跳 |
+| phase-1-requirements | 阶段 1 需求细则（含迷雾登记册 Fog of War） | 1 跳 |
+| phase-2-system-design | 阶段 2 系统设计细则 | 1 跳 |
+| phase-3-outline-design | 阶段 3 概要设计细则 | 1 跳 |
+| phase-4-detailed-design | 阶段 4 详细设计细则 | 1 跳 |
+| phase-5-coding | 阶段 5 编码细则（codegraph 修改前影响分析） | 1 跳 |
+| phase-6-integration-test | 阶段 6 集成测试细则 | 1 跳 |
+| phase-7-system-test | 阶段 7 系统测试细则 | 1 跳 |
+| phase-8-acceptance-test | 阶段 8 验收测试细则 | 1 跳 |
+| quality-standards | 阶段 5/7 代码质量 / 评审代码时 | 1 跳 |
+| quick-self-check | 推进前自检清单；O 通用加载 | 1 跳 |
+| refactoring-catalog | 阶段 5 重构手法速查（与 code-smells-checklist 互引） | 2 跳 |
+| root-cause-locator | R 子代理根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯） | 2 跳 |
+| rtm-guide | RTM 维护 / 回填规则 | 1 跳 |
+| signature-chain-guide | 角色链式签名 + 产出来源正确性（反模式 #32） | 2 跳 |
+| skillopt-adoption | SkillOpt 方法论吸收（bounded edit 边界规则） | 2 跳 |
+| subagent-delegation | O/A/S/V/G/R 编排者-子代理边界权威定义 | 1 跳 |
+| subagent-persona-matrix | R-lead / V-lead 多角度 persona 选择矩阵 | 2 跳 |
+| tla-plus-guide | 阶段 1-4 TLA+ 层次化状态机建模与行为门禁 | 1 跳 |
+| tla-plus-patterns-examples | S-tla 产出 TLA+ 规格时参考示例 | 1 跳 |
+| tla-plus-review-checklist | V 评审 TLA+ 时 | 1 跳 |
+| tla-plus-syntax-reference | S-tla 产出 TLA+ 规格时语法参考 | 1 跳 |
+| tla-plus-tlc-configuration | S-tla 配置 TLC 模型检查时 | 1 跳 |
+| toolbox | 工具/命令速查（「I have X, I want Y → use Z」决策表） | 1 跳 |
+| verifier-spec | V 子代理评审提示词 + 五轴评审 §7.4A + self-as-verifier 模式 | 1 跳 |
+| workflow | 完整工作流程（初始化项目 / 阶段切换 / 向用户解释整体流程时） | 2 跳 |
+
+> 2 跳文件共 16 个：code-smells-checklist / command-reference / concurrency-guide / data-models / directory-conventions / event-ingress-guide / format-conventions / glossary / hill-climbing-guide / iceberg-sweep-guide / refactoring-catalog / root-cause-locator / signature-chain-guide / skillopt-adoption / subagent-persona-matrix / workflow。
+> 其余 36 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳），加本文件共 37 个 1 跳可达。
 
 ## 4. 返工循环分派
 
@@ -181,19 +287,21 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 31 个 .ts
-> 一一对应（26 个 check-* + 5 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
+> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 33 个 .ts
+> 一一对应（26 个 check-* + 7 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
 > **新增 / 改名门禁脚本时只在本文件登记一处**——`check-docs-consistency.ts` 的 script-registry 检查
-> 核对全部 31 个 cli 脚本名均出现于本文件（漏登记即门禁失败，pre-push 第 14 项拦截）。
+> 核对全部 33 个 cli 脚本名均出现于本文件（漏登记即门禁失败，pre-push 第 14 项拦截）。
 
 | 脚本 | 类别 | 用途 | 触发时机 |
 |---|---|---|---|
 | check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本六处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
 | check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
 | security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
-| self-test | 工具 | 254 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
+| self-test | 工具 | 256 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
 | wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
 | metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
+| wm-write | 工具 | 状态文件安全写（.bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验；logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |
+| doctor | 工具 | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts） | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门 |
 
 ## 7. 反模式 → check 脚本映射速查
 

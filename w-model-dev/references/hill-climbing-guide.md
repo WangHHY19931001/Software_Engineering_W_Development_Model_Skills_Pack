@@ -138,6 +138,22 @@ interface HarnessImprovementReport {
 }
 ```
 
+## 指标映射（metrics-report.ts orchestration 区复用）
+
+`HarnessImprovementReport` 的多项 metaAnalysis 指标可直接由 `metrics-report.ts`（`scripts/cli/metrics-report.ts`）派生，避免重复实现统计逻辑：
+
+| metaAnalysis 指标 | metrics-report 数据源 | 说明 |
+|---|---|---|
+| `reworkHotspots` | `rework.maxConsecutiveRuns` + `byPhase[].rework` | 按阶段聚合返工次数，超均值 + Nσ 即热点 |
+| `verifierDisagreements` | `gate.passed` vs run-log V 记录 `passed` 交叉 | V passed=true 但 G exit=1 的频次 |
+| `budgetBurnTrend` | `budget.byPhase[].burnRate` 时间序列 | 窗口切片后比对趋势 |
+| `comprehensionQuality` | run-log checkpoint `acknowledgedDecisions` | 直接读 run-log 字段 |
+| （补充）R3 审查质量 | `orchestration.r3.findingsBySeverity` / `avgFindingsPerReport` | R3 findings 密度趋势 → prompt 预防效果信号 |
+| （补充）冰山扫掠收敛性 | `orchestration.iceberg.roundsDistribution` / `totalNewFindings` / `maxRound` | 轮次分布右移 / 新发现不降 → S-fix 质量信号 |
+| （补充）返工提示密度 | `orchestration.reworkHints.avgHintsPerEntry` | 提示密度上升 → V 评审粒度变化信号 |
+
+> `orchestration` 区数据源：run-log + `.w-model/preventive-reviews/` + `.w-model/iceberg/`（存在才统计，缺失 → null）；只读统计，无门禁语义。
+
 ## 信号检测逻辑（确定性，无 LLM）
 
 | 信号类别 | 检测逻辑 | 关联失败模式 |

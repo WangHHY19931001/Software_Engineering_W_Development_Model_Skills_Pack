@@ -16,6 +16,7 @@
 | constants.test.ts | Constants | RTM_FIELDS 七字段顺序 / PHASES 1-8 / ARTIFACT_PATHS .w-model 路径前缀 |
 | coverage-logic.test.ts | Coverage | C1 stakeholders 非空 / C3 scenarios 非空 / C4 happy·error·boundary / C5 REQ·NFR·CON / C7 crossCuts↔graphCrossCuts 双向一致 / C8 metrics 4 项=100% / C9 missing 须 Out of Scope 声明 / C10 metrics 重算一致 / exemptions 跳过 / OOS 形状 CLI exit 2 |
 | design-contract-logic.test.ts | DesignContract | D8 多路由不同状态码无交叉污染 / D9 路由未找到报 D2/D3/D4 / D9 路径归一化（尾部斜杠·query）/ null·undefined 输入失败 |
+| doctor-logic.test.ts | Doctor | parseJavaMajor（8/11/17/21/未知格式）/ deriveDoctorExitCode（fail 阻断·warn 放行）/ checkEnvironment：全绿 exit 0·node<18 fail·tsx 缺失 fail·java 默认 warn 且 --with-tla 升 fail·tla2tools 双态·codegraph/openspec 可选 warn |
 | docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 31 / pre-push 15 / vitest 40）/ 版本五处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#47 / baseline-sync |
 | exemption-logic.test.ts | Exemption | E1 schema / E2 justification≥20 / E3 evidence 非空 / E4 review 完整 / E5 reviewDecision=approve / E6 rootCauseAnalysis≥30 / E7 verified=true / E8 humanDecision=approve / E9 时间戳时序 / 四阶段全通过 stage=complete |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
@@ -23,8 +24,8 @@
 | graph-logic.test.ts | Graph | R1-R4 REQ 层级树（level·orphan·multiParent·单调·REQ-group）/ R5 depends-on·precedes 无环 / R6 交叉边对称性与源/目标类型 / R11 level 正整数 / recalculatePassed 重算 / reqHierarchy·crossLogic 填充 |
 | iceberg-logic.test.ts | IcebergSweep | R1 schema 前置短路 / R2 icebergRound 边界（0·6）/ R3 findingId 去重 / R4 可证伪（缺 hypothesis·evidence）/ R5 passed 与 newFindings 一致 |
 | maturity-logic.test.ts | Maturity | 合法 MaturityConfig 通过 / schema 前置校验（缺 projectId → [schema]）/ R3 completedCycles 周期换算 / R4 history 早于 createdAt / R5 降级评估提醒 |
-| metrics-report.test.ts | Metrics CLI | 子进程：run-log 缺失 exit 2 / --phase 非法值系列 exit 2 / budget 缺失(null)·非法 exit 2 / --json·--out 组合 stdout 纯净 / 空 run-log 预警 / 坏行跳过 / --phase 过滤 / 人类可读 9 节 |
-| metrics-report-logic.test.ts | Metrics | 总体汇总 / 阶段分组 / 动作·角色·结果分布 / 返工率与连续段 / gate 通过率（0/非0/null 归类）/ 预算 burn rate 与 killSwitch 两路径 / 窗口与 phase 过滤 / 空 run-log |
+| metrics-report.test.ts | Metrics CLI | 子进程：run-log 缺失 exit 2 / --phase 非法值系列 exit 2 / budget 缺失(null)·非法 exit 2 / --json·--out 组合 stdout 纯净 / 空 run-log 预警 / 坏行跳过 / --phase 过滤 / 人类可读 10 节（含编排质量） |
+| metrics-report-logic.test.ts | Metrics | 总体汇总 / 阶段分组 / 动作·角色·结果分布 / 返工率与连续段 / gate 通过率（0/非0/null 归类）/ 预算 burn rate 与 killSwitch 两路径 / 窗口与 phase 过滤 / 空 run-log / orchestration 编排质量（r3Stats·icebergStats·reworkHints·缺省 null） |
 | parse-phase.test.ts | PhaseArg | parsePhaseArg --phase=N / --phase N / 位置参数三形态 / 非法值（abc·0·9·-1·空串·无值）→ undefined / min·max 自定义 / 无 --phase → undefined |
 | phase-doc-map.test.ts | PhaseDocMap | PHASE_DOC_MAP 键 1-8（缺 5）/ uat-path-mapping 特殊映射 / resolvePhaseDoc 支持·未支持 phase·未知 type 抛错 |
 | plan-chunks.test.ts | PlanChunks | estimateTokens（ASCII/4·CJK 字节/4）/ splitMarkdownSections header+content 配对·围栏代码块内 # 不切分 / splitByLines 二次切分·overlap / planFile 目录递归·单文件超限 |
@@ -32,13 +33,14 @@
 | read-json-or-exit.test.ts | CLI IO | readJsonOrExit 正常/ENOENT/非法 JSON/相对路径 / readJsonlOrExit 正常/空行/坏行 warn/ENOENT/CRLF/label 默认值 / readJsonlOptional 正常/ENOENT→[]/坏行 warn/空行+CRLF / readJsonClassified 三态 exitWithError / loadAndValidate 哨兵 |
 | role-dispatch-logic.test.ts | RoleDispatch | R≥3 无条件（无需 r3Enabled）/ S·V·G 各≥1 强制 / 多阶段只报缺阶段 / 非法条目跳过 / phaseSummary 结构 |
 | root-cause-logic.test.ts | RootCause | R1 schema / R2 链长 / R3 可证伪 / R4 修复建议 / R5 预防 / R6 上游 / R7 质量 / R8 报告 ID / R9 多角度 / R10 reality |
-| run-log-logic.test.ts | RunLog | R1 完整性 / R2 tokens / R3 返工 / R4 决策 / R5 O越权 / R6 exitCode / R7 时序 / R8 轨迹模板 |
-| safe-json.test.ts | SafeJson | __proto__ 键丢弃（顶层·嵌套）/ 普通键·数组·标量·null 与 JSON.parse 一致 / 非法 JSON 抛 SyntaxError / safeJsonReviver |
+| run-log-logic.test.ts | RunLog | R1 完整性 / R2 tokens / R3 返工 / R4 决策 / R5 O越权 / R6 exitCode / R7 时序 / R8 轨迹模板 / R8-4 轨迹顺序链（S→R3→V→G→checkpoint 倒置拦截·标准全链通过·多轮返工通过） |
+| safe-json.test.ts | SafeJson | __proto__ 键丢弃（顶层·嵌套）/ 普通键·数组·标量·null 与 JSON.parse 一致 / 非法 JSON 抛 SyntaxError / BOM 剥离（PowerShell 产物容错·BOM+非法仍抛错）/ safeJsonReviver |
 | schema-validation.test.ts | Schema | additionalProperties 拒绝 / missing required 拒绝 / wrong type 拒绝 / 合法样本接受 |
 | security-scan.test.ts | Security | baseline 命中豁免 / 新增发现识别 / sha256 指纹稳定性 |
 | signature-chain-logic.test.ts | SignatureChain | R1-R10 签名链规则 / computeSigHash 一致性 / E1 跨阶段连续链 / E2 跨阶段来源并集 / E3 全违规聚合 |
 | skill-metadata.test.ts | Metadata | frontmatter version 与 metadata.json 一致 / name 一致 / schemaVersion 存在 |
 | state-machine-logic.test.ts | StateMachine | 设计↔代码状态机一致性 / 缺转移·多转移·多状态检测 / transitionKey 格式 / 缺省字段容错 / 返回结构完整性 |
+| state-write-logic.test.ts | StateWrite | 新目标直接写入无备份 / 非法 JSON 拒绝（INVALID_JSON）/ mtime 冲突拒绝·相符放行 / 备份内容为旧值 + keepBackups 轮换 / 原子替换无 .tmp 残留 / backup:false 跳过 / BOM 输入语义 |
 | tla-bdd-sync-logic.test.ts | TLA-BDD | TLA+↔BDD 同步 / \E 量化·多行 VARIABLES 解析 / Scenario 体 Given·When·Then / @states·@transitions 注释 |
 | tla-clean-trace.test.ts | TLA-Clean | isTlcStatesDir 识别（时间戳子目录·.st 指纹·空·无关·不存在）/ cleanTraceFiles 守卫1 无 .tla 不删 / 守卫2 states 递归删除·无 TLC 特征跳过 / *.dump·*.out 仅在有 .tla 目录删 |
 | tla-logic.test.ts | TLA+ | 文件头 / 层次 / 拆解 / SANY / TLC / R13 checkRounds schema |

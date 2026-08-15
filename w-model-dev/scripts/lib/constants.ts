@@ -34,3 +34,9 @@ export const ARTIFACT_PATHS = {
   tlaManifest: '.w-model/tla-manifest.json',
   bddManifest: '.w-model/bdd-manifest.json',
 } as const;
+
+/**
+ * 图谱校验轮次上限（graph.json analysisRounds[].round > 此值 → violation）。
+ * 图谱在收敛循环中打转时（> 5 轮仍未通过）应升级人工介入，而非继续机械重跑。
+ */
+export const MAX_GRAPH_ROUNDS = 5 as const;

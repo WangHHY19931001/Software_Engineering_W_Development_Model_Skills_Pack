@@ -12,6 +12,7 @@
  *   3. 单点事实：所有「图谱是否符合规范」的判定均委托至此
  */
 
+import { MAX_GRAPH_ROUNDS } from '../lib/constants.js';
 import { validateBySchema } from './schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
@@ -103,7 +104,12 @@ export interface ReqHierarchy {
   levelDistribution: Record<number, number>;
   orphanReqs: string[];
   multiParentReqs: string[];
-  levelMonotonicViolations: Array<{ from: string; to: string; fromLevel: number; toLevel: number }>;
+  levelMonotonicViolations: Array<{
+    from: string;
+    to: string;
+    fromLevel: number;
+    toLevel: number;
+  }>;
   missingLevelReqs: string[];
 }
 
@@ -615,13 +621,23 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     }
 
     // R3: level 单调
-    const levelMonotonicViolations: Array<{ from: string; to: string; fromLevel: number; toLevel: number }> = [];
+    const levelMonotonicViolations: Array<{
+      from: string;
+      to: string;
+      fromLevel: number;
+      toLevel: number;
+    }> = [];
     const nodeLevelMap = new Map(reqNodes.map((n) => [n.id, n.level ?? 0]));
     for (const e of reqParentEdges) {
       const fromLevel = nodeLevelMap.get(e.from) ?? 0;
       const toLevel = nodeLevelMap.get(e.to) ?? 0;
       if (toLevel !== fromLevel + 1) {
-        levelMonotonicViolations.push({ from: e.from, to: e.to, fromLevel, toLevel });
+        levelMonotonicViolations.push({
+          from: e.from,
+          to: e.to,
+          fromLevel,
+          toLevel,
+        });
       }
     }
     if (levelMonotonicViolations.length > 0) {
@@ -763,6 +779,21 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     }
   }
 
+  // ==================== 轮次上限校验（防无限返工循环）====================
+  // analysisRounds 记录每次门禁校验轮次（schema 已必填 round）；round 超过
+  // MAX_GRAPH_ROUNDS 说明图谱在收敛循环中打转，应暂停机械重跑，转人工根因
+  // 分析或走豁免流程，而非继续累计轮次。
+  const overRoundRecords = (g.analysisRounds ?? []).filter((r) => r.round > MAX_GRAPH_ROUNDS);
+  if (overRoundRecords.length > 0) {
+    result.violations.push(
+      `轮次上限校验失败：analysisRounds 存在 round > ${MAX_GRAPH_ROUNDS} 的记录（${overRoundRecords
+        .map((r) => `phase${r.phase}/round${r.round}`)
+        .join(
+          ', ',
+        )}）（应暂停机械重跑，转人工根因分析或走豁免流程；示例：定位不收敛的违规类别后重构图谱，而非继续累加轮次）`,
+    );
+  }
+
   // 汇总 passed
   const tv = result.traceabilityViolations;
   const traceabilityOk =
@@ -848,7 +879,10 @@ export function parseMarkdownTable(md: string): Array<Record<string, string>> {
 }
 
 /** 校验 mermaid 代码块定界行配平；返回配平布尔 */
-export function countMermaidBlocks(md: string): { pairs: number; balanced: boolean } {
+export function countMermaidBlocks(md: string): {
+  pairs: number;
+  balanced: boolean;
+} {
   const lines = md.split(/\r?\n/);
   let inBlock = false;
   let pairs = 0;

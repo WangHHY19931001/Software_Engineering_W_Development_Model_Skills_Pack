@@ -4,6 +4,37 @@
 > S 子代理（产出 .feature + 更新 bdd-manifest.json）、V 子代理（评审合规性）、G 子代理（跑 check-bdd-model.ts）必读。
 > 权威设计见 [docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md](../../docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md)。
 
+## 速查摘要
+
+> 一页速查：BDD 建模与验收夹具细则。行为具象化门禁（第四维度），与结构连通（graph）、信息流（dataflow）、行为正确性（TLA+）正交。S/V/G 子代理必读。
+
+| 维度 | 核心锚点 | 详见 |
+|---|---|---|
+| 公理 | BDD features 是 TLA+ 抽象规格的具象化层，靠 check-bdd-model.ts 等价性校验保证一致 | 「公理」节 |
+| 分层架构 | L1↔L1 ... L4↔L4 与 TLA+ 对称，最细粒度到原子方法 | §1 |
+| 头标注契约 | 10 个 `@` 字段（@req/@design/@designIds/@tla-spec/@state-machine 等） | §2 |
+| 状态机七要素 | @states/@initial-state/@terminal-states/@accepting-states/@rejecting-states/@transitions/@invariants | §3 |
+| BDD↔TLA+ 协作 | 独立门禁回退 + 等价性跨校验（D4）+ 不一致走 R→V | §4 |
+| 记叙性优先 | 测试断言不是金标准，失败先归因（呼应反模式 #45） | 「记叙性优先」节 |
+| 门禁脚本 | check-bdd-model.ts 8 维度（D1-D8）+ 退出码 | §5 |
+| 阶段产出时序 | 阶段 1-4 设计 features，5-8 执行 | §6 |
+| 验收夹具 | World / 数据 fixture / setup-teardown / 快照 四类 | §7 |
+| 不符处理流程 | 反模式 #29 + R 子代理流程 + 联网调研约束 | §8 |
+| 同步校验 | check-tla-bdd-sync.ts | §9 |
+
+**按场景只读 §X**：
+
+| 场景 | 应读章节 |
+|---|---|
+| 产出 .feature 前（头标注/命名） | §2 |
+| 声明状态机七要素 | §3 |
+| BDD↔TLA+ 等价性 / 不一致处理 | §4 |
+| G 跑门禁脚本（8 维度） | §5 |
+| 各阶段产出时序 | §6 |
+| 设计验收夹具 | §7 |
+| 建模不符回退 | §8 |
+| S-ingest-bdd 回填覆盖率 | 「S-ingest-bdd 子代理」节 |
+
 ## 所属系统
 
 - **所属技能**：w-model-dev

@@ -14,5 +14,8 @@ export function safeJsonReviver(key: string, value: unknown): unknown {
 }
 
 export function parseJsonSafe<T = unknown>(text: string): T {
-  return JSON.parse(text, safeJsonReviver) as T;
+  // 剥离首部 UTF-8 BOM（Windows PowerShell Out-File/Set-Content 默认带 BOM；
+  // 不剥离时 JSON.parse 报 Unexpected token '\uFEFF'，JSONL 首行会被静默丢弃）
+  const stripped = text.startsWith('\uFEFF') ? text.slice(1) : text;
+  return JSON.parse(stripped, safeJsonReviver) as T;
 }

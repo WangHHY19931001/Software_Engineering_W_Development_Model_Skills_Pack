@@ -412,9 +412,13 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
   // 单 L1 根：parent=null 且 level=L1
   const roots = specs.filter((s) => s.parent === null && s.level === 'L1');
   if (roots.length === 0) {
-    violations.push('层次校验失败：不存在 L1 根规格（parent=null 且 level=L1）');
+    violations.push(
+      '层次校验失败：不存在 L1 根规格（parent=null 且 level=L1；应恰有 1 个根规格作为层次起点，示例：{ id: "L1-system", tlaPath: "tla/L1-system.tla", level: "L1", parent: null }）',
+    );
   } else if (roots.length > 1) {
-    violations.push(`层次校验失败：存在 ${roots.length} 个 L1 根规格（应为 1）：${roots.map((r) => r.id).join(', ')}`);
+    violations.push(
+      `层次校验失败：存在 ${roots.length} 个 L1 根规格（应为 1）：${roots.map((r) => r.id).join(', ')}（修法：保留单一系统根，其余规格改挂到 L1 根之下或合并）`,
+    );
   }
 
   for (const s of specs) {
@@ -422,15 +426,19 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     if (s.parent != null) {
       const parent = byPath.get(s.parent);
       if (!parent) {
-        violations.push(`层次校验失败：规格 ${s.id} 的 parent="${s.parent}" 不在 manifest 中`);
+        violations.push(
+          `层次校验失败：规格 ${s.id} 的 parent="${s.parent}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，示例：parent: "tla/L1-system.tla"）`,
+        );
       } else if (!(parent.children ?? []).includes(s.tlaPath)) {
-        violations.push(`层次校验失败：规格 ${s.id} 声明 parent="${s.parent}"，但 parent.children 未包含 ${s.tlaPath}`);
+        violations.push(
+          `层次校验失败：规格 ${s.id} 声明 parent="${s.parent}"，但 parent.children 未包含 ${s.tlaPath}（应在 parent 规格的 children 数组中补登 "${s.tlaPath}"，保持双向一致）`,
+        );
       } else {
         const parentLevelNum = levelNum(parent.level);
         const childLevelNum = levelNum(s.level);
         if (parentLevelNum > 0 && childLevelNum > 0 && childLevelNum !== parentLevelNum + 1) {
           violations.push(
-            `层次校验失败：规格 ${s.id} level=${s.level} ≠ parent(${parent.id}) level ${parent.level} + 1`,
+            `层次校验失败：规格 ${s.id} level=${s.level} ≠ parent(${parent.id}) level ${parent.level} + 1（应为相邻层级，示例：parent 为 L1 时子规格 level 填 "L2"）`,
           );
         }
       }
@@ -440,10 +448,12 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     for (const childPath of s.children ?? []) {
       const child = byPath.get(childPath);
       if (!child) {
-        violations.push(`层次校验失败：规格 ${s.id} 的 child="${childPath}" 不在 manifest 中`);
+        violations.push(
+          `层次校验失败：规格 ${s.id} 的 child="${childPath}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 child 引用）`,
+        );
       } else if (child.parent !== s.tlaPath) {
         violations.push(
-          `层次校验失败：规格 ${s.id} 声明 child="${childPath}"，但 ${childPath}.parent="${child.parent}" ≠ "${s.tlaPath}"`,
+          `层次校验失败：规格 ${s.id} 声明 child="${childPath}"，但 ${childPath}.parent="${child.parent}" ≠ "${s.tlaPath}"（应将 ${childPath} 的 parent 修正为 "${s.tlaPath}"，保持双向一致）`,
         );
       }
     }
@@ -452,10 +462,12 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     for (const sibPath of s.siblings ?? []) {
       const sib = byPath.get(sibPath);
       if (!sib) {
-        violations.push(`层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" 不在 manifest 中`);
+        violations.push(
+          `层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 sibling 引用）`,
+        );
       } else if (!(sib.siblings ?? []).includes(s.tlaPath)) {
         violations.push(
-          `层次校验失败：规格 ${s.id} 声明 sibling="${sibPath}"，但 ${sibPath}.siblings 未包含 ${s.tlaPath}`,
+          `层次校验失败：规格 ${s.id} 声明 sibling="${sibPath}"，但 ${sibPath}.siblings 未包含 ${s.tlaPath}（应在 ${sibPath} 的 siblings 数组中补登 "${s.tlaPath}"，保持双向一致）`,
         );
       }
     }

@@ -1139,6 +1139,15 @@ flowchart TD
     style G fill:#fff3e0,stroke:#ff9800
 ```
 
+#### 8.2.4 工具脚本
+
+除门禁校验脚本外，技能包另提供两个工具脚本，供编排者 O 与各角色在流程中调用（非阶段门，不参与放行判定）：
+
+| 脚本 | 用途 | 实现位置 |
+|------|------|----------|
+| `wm-write.ts` | 状态文件安全写助手：`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验。O/S 更新 `.w-model/*.json` 状态文件时统一经此写入，防止手写漂移与并发覆盖 | [`w-model-dev/scripts/cli/wm-write.ts`](../w-model-dev/scripts/cli/wm-write.ts) + [`w-model-dev/scripts/logic/state-write-logic.ts`](../w-model-dev/scripts/logic/state-write-logic.ts) |
+| `doctor.ts` | 环境自检：node / tsx / ajv / java / tla2tools / codegraph / openspec 逐项检查并给出修复指引（`--with-tla` 将 TLA+ 项升级为阻断级）。首次启用或门禁报依赖错误时运行 | [`w-model-dev/scripts/cli/doctor.ts`](../w-model-dev/scripts/cli/doctor.ts) + [`w-model-dev/scripts/logic/doctor-logic.ts`](../w-model-dev/scripts/logic/doctor-logic.ts) |
+
 ---
 
 ## 9. 需求跟踪矩阵（RTM）
@@ -1253,6 +1262,8 @@ flowchart TD
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
 ```
 
+**`--validate-templates` 模式（模板漂移校验）**：`check-artifact-gate.ts` 支持 `--validate-templates` 独立模式，按 `gate-logic.ts` 的 `PHASE_SPEC_LAYOUT` 校验技能包自身 `templates/` 资产是否含必需结构标记（SSOT 头 / 引用块 / DoD 节），用于检出模板漂移。该模式校验对象是技能包自身 `templates/` 目录（相对脚本定位，与 project-dir 无关），独立分支：不读 RTM、不受 `--phase` 影响，violations 非空 → 退出码 1。支持 `--json` 输出机器可读报告（`type: 'templates'`）。
+
 `references/quality-standards.md` 以 Markdown 描述质量标准（人类可读），与脚本互为参照但不再承载判定逻辑。
 
 **关键约束**：工件质量门的有效性依赖真实测试结果回填。`/wm test` 命令不得自动将测试标记为通过——必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填，否则质量门形同虚设。
@@ -1322,7 +1333,9 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
    - 边界完整性（阶段 1 起）：`EXT-IN ≥ 1 ∧ EXT-OUT ≥ 1`，否则 `boundary.complete=false`。
 6. **汇总**：`passed = (connectedComponents=1) ∧ (isolatedNodes=[]) ∧ (roots.length=1) ∧ (orphans=[]) ∧ (multiParent=[]) ∧ (所有追溯违反=0) ∧ dataflowOk`，其中 `dataflowOk = (blackHoles=[]) ∧ (miracles=[]) ∧ (deadModules=[]) ∧ boundary.complete`。
 
-**收敛准则**（设计文档 §3.4）：`passed=true`（零违反）即收敛；`violations` 跨轮应单调递减，不降反升则分派 A 返工而非加轮；`round = MAX_ROUNDS(5)` 未收敛 → 🔴 CHECKPOINT 介入（展示 violations + reworkHints，用户决定补漏/强制接受标注/取消）。
+**收敛准则**（设计文档 §3.4）：`passed=true`（零违反）即收敛；`violations` 跨轮应单调递减，不降反升则分派 A 返工而非加轮；`round = MAX_GRAPH_ROUNDS(5)` 未收敛 → 🔴 CHECKPOINT 介入（展示 violations + reworkHints，用户决定补漏/强制接受标注/取消）。
+
+**轮次上限校验（MAX_GRAPH_ROUNDS=5）**：`graph.json` 校验记录含必填 `round` 字段（schema 已必填），`check-requirement-graph.ts` 校验 `round > MAX_GRAPH_ROUNDS(5)` → 判为 violation（退出码 1）。常量 `MAX_GRAPH_ROUNDS = 5` 定义于 [`w-model-dev/scripts/lib/constants.ts`](../w-model-dev/scripts/lib/constants.ts)，为单点事实源，与收敛准则中的轮次上限保持一致。
 
 **信息流跨阶段收敛**：阶段 1 REQ 信息流闭合（严格，与结构连通同级）；阶段 2/3/4 SD/INTF/DD 各自无黑洞/奇迹/死模块；阶段 4 信息流零违反 + 结构零违反才放行进编码。
 
@@ -1682,6 +1695,8 @@ interface RunLogEntry {
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
 - **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
+- **R8 相对顺序约束（同阶段内动作链序）**：`check-run-log.ts` 校验同阶段内关键动作类的相对顺序，理想链为 **S 动作（`produce`/`fix`/`emergency-fix`）→ R3（`r3-completeness`/`r3-reliability`/`r3-security`）→ V（`review`）→ G（gate 类）→ checkpoint**。S/R3/V 取首次出现位置（首轮次序），gate/checkpoint 取最后一次出现位置（与 R8-1/R8-2 的 lastCheckpoint 语义一致——中间 checkpoint 是进度标记，不参与链序）；仅当两类动作均出现且前者位置晚于后者才判违规，不新增存在性要求，多轮返工不受影响。违反 → `check-run-log.ts` 退出码 1（修法：按链序补录缺失动作或用 `/wm` 修正轨迹后重跑门禁）。
+- **编排质量指标（orchestrationQuality，只读统计，不加门禁）**：`metrics-report.ts` 在 7 区度量基础上新增 `orchestration` 子区，统计编排质量信号——`r3`（R3 预防性审查套数 / 维度分布 / findings 严重度分布，数据源 `.w-model/preventive-reviews/`）、`iceberg`（冰山扫掠轮次分布 / 新发现计数 / 严重度分布，数据源 `.w-model/iceberg/`）、`reworkHints`（V 审查返工提示密度，数据源 run-log 本身）。`r3`/`iceberg` 数据源缺失时对应子区为 `null`（不告警、不阻断）；该指标仅供汇报与诊断，不参与任何门禁放行判定。
 - **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。
 
 ---

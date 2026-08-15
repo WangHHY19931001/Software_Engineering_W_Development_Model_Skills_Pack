@@ -23,6 +23,8 @@ export interface RunLogEntryLike {
   subagentSpawns?: number;
   gateExitCode?: number | null;
   timestamp?: string;
+  /** V 审查返工提示（outcome=rework/fail 时非空数组）；reworkHints 统计用 */
+  reworkHints?: string[];
 }
 
 export interface BudgetLike {
@@ -39,6 +41,26 @@ export interface MetricsOptions {
   phase?: number;
 }
 
+/**
+ * 编排质量指标输入（只读统计，不加门禁）：
+ *   - r3Reports：`.w-model/preventive-reviews/` 下各 R3 报告（文件 IO 在 CLI 层完成）
+ *   - icebergReports：`.w-model/iceberg/` 下各冰山扫掠报告
+ * 两者均「存在才统计」：缺省时对应 orchestration 子区为 null（不告警、不阻断）。
+ */
+export interface OrchestrationInputs {
+  r3Reports?: Array<{
+    phase?: number;
+    dimension?: string;
+    findings?: Array<{ severity?: string }>;
+    passed?: boolean;
+  }>;
+  icebergReports?: Array<{
+    icebergRound?: number;
+    newFindings?: Array<{ findingId?: string; severity?: string }>;
+    passed?: boolean;
+  }>;
+}
+
 export interface PhaseMetrics {
   phase: number;
   phaseName?: string;
@@ -51,7 +73,11 @@ export interface PhaseMetrics {
 }
 
 export interface MetricsReport {
-  meta: { projectId: string | null; recordCount: number; window: { from?: string; to?: string } };
+  meta: {
+    projectId: string | null;
+    recordCount: number;
+    window: { from?: string; to?: string };
+  };
   overall: {
     totalRecords: number;
     totalDurationS: number;
@@ -65,14 +91,47 @@ export interface MetricsReport {
   byRole: Record<string, number>;
   byOutcome: Record<string, number>;
   gate: { total: number; passed: number; failed: number; passRate: number };
-  rework: { count: number; rate: number; maxConsecutiveRuns: number; exceedsKillSwitch: boolean };
+  rework: {
+    count: number;
+    rate: number;
+    maxConsecutiveRuns: number;
+    exceedsKillSwitch: boolean;
+  };
   budget: null | {
     totalTokens: number;
     maxTokensTotal: number;
     totalBurnRate: number;
-    byPhase: Array<{ phase: number; tokens: number; maxTokens: number; burnRate: number; exceeded: boolean }>;
+    byPhase: Array<{
+      phase: number;
+      tokens: number;
+      maxTokens: number;
+      burnRate: number;
+      exceeded: boolean;
+    }>;
     onExceed: string;
     killSwitchTriggered: boolean;
+  };
+  /** 编排质量指标（只读统计，不加门禁；数据源缺省时对应子区为 null） */
+  orchestration: {
+    r3: null | {
+      totalReports: number;
+      byDimension: Record<string, number>;
+      findingsBySeverity: Record<string, number>;
+      totalFindings: number;
+      avgFindingsPerReport: number;
+    };
+    iceberg: null | {
+      totalSweeps: number;
+      roundsDistribution: Record<string, number>;
+      totalNewFindings: number;
+      findingsBySeverity: Record<string, number>;
+      maxRound: number;
+    };
+    reworkHints: {
+      entriesWithHints: number;
+      totalHints: number;
+      avgHintsPerEntry: number;
+    };
   };
   warnings: string[];
 }
@@ -85,6 +144,7 @@ export function computeMetrics(
   entries: RunLogEntryLike[],
   budget?: BudgetLike | null,
   opts: MetricsOptions = {},
+  orch: OrchestrationInputs = {},
 ): MetricsReport {
   // ============ 过滤 ============
   let filtered = entries;
@@ -172,7 +232,13 @@ export function computeMetrics(
     const budgetByPhase = byPhase.map((pm) => {
       const burnRate = maxTokensPerPhase === 0 ? 0 : pm.tokens / maxTokensPerPhase;
       const exceeded = maxTokensPerPhase > 0 && pm.tokens > maxTokensPerPhase;
-      return { phase: pm.phase, tokens: pm.tokens, maxTokens: maxTokensPerPhase, burnRate, exceeded };
+      return {
+        phase: pm.phase,
+        tokens: pm.tokens,
+        maxTokens: maxTokensPerPhase,
+        burnRate,
+        exceeded,
+      };
     });
     const killSwitchConsecutive =
       typeof budget.killSwitch?.consecutiveReworks === 'number' ? budget.killSwitch.consecutiveReworks : 3;
@@ -189,6 +255,67 @@ export function computeMetrics(
       killSwitchTriggered: exceedsKillSwitch,
     };
   }
+
+  // ============ 编排质量指标（只读统计，不加门禁） ============
+  // R3 预防性审查：套数 / 维度分布 / findings 严重度分布（数据源缺失 → null）
+  let r3Section: MetricsReport['orchestration']['r3'] = null;
+  if (orch.r3Reports && orch.r3Reports.length > 0) {
+    const byDimension: Record<string, number> = {};
+    const findingsBySeverity: Record<string, number> = {};
+    let totalFindings = 0;
+    for (const r of orch.r3Reports!) {
+      const dim = typeof r.dimension === 'string' ? r.dimension : 'unknown';
+      byDimension[dim] = (byDimension[dim] ?? 0) + 1;
+      for (const f of r.findings ?? []) {
+        totalFindings += 1;
+        const sev = typeof f.severity === 'string' ? f.severity : 'unknown';
+        findingsBySeverity[sev] = (findingsBySeverity[sev] ?? 0) + 1;
+      }
+    }
+    r3Section = {
+      totalReports: orch.r3Reports.length,
+      byDimension,
+      findingsBySeverity,
+      totalFindings,
+      avgFindingsPerReport: totalFindings / orch.r3Reports.length,
+    };
+  }
+
+  // 冰山扫掠：轮次分布 / 新发现计数 / 严重度分布（数据源缺失 → null）
+  let icebergSection: MetricsReport['orchestration']['iceberg'] = null;
+  if (orch.icebergReports && orch.icebergReports.length > 0) {
+    const roundsDistribution: Record<string, number> = {};
+    const findingsBySeverity: Record<string, number> = {};
+    let totalNewFindings = 0;
+    let maxRound = 0;
+    for (const r of orch.icebergReports!) {
+      const round = typeof r.icebergRound === 'number' ? r.icebergRound : 0;
+      const key = String(round);
+      roundsDistribution[key] = (roundsDistribution[key] ?? 0) + 1;
+      if (round > maxRound) maxRound = round;
+      for (const f of r.newFindings ?? []) {
+        totalNewFindings += 1;
+        const sev = typeof f.severity === 'string' ? f.severity : 'unknown';
+        findingsBySeverity[sev] = (findingsBySeverity[sev] ?? 0) + 1;
+      }
+    }
+    icebergSection = {
+      totalSweeps: orch.icebergReports.length,
+      roundsDistribution,
+      totalNewFindings,
+      findingsBySeverity,
+      maxRound,
+    };
+  }
+
+  // reworkHints：V 审查返工提示密度（数据源为 run-log 本身，始终可统计）
+  const hintEntries = filtered.filter((e) => Array.isArray(e.reworkHints) && e.reworkHints.length > 0);
+  const totalHints = hintEntries.reduce((s, e) => s + (e.reworkHints?.length ?? 0), 0);
+  const reworkHintsSection = {
+    entriesWithHints: hintEntries.length,
+    totalHints,
+    avgHintsPerEntry: hintEntries.length === 0 ? 0 : totalHints / hintEntries.length,
+  };
 
   // ============ 预警 ============
   if (filtered.some((e) => e.estimated === true)) {
@@ -212,14 +339,36 @@ export function computeMetrics(
       recordCount: totalRecords,
       window: { from: opts.from, to: opts.to },
     },
-    overall: { totalRecords, totalDurationS, totalTokens, totalSubagentSpawns, reworkRecords, reworkRate },
+    overall: {
+      totalRecords,
+      totalDurationS,
+      totalTokens,
+      totalSubagentSpawns,
+      reworkRecords,
+      reworkRate,
+    },
     byPhase,
     byAction,
     byRole,
     byOutcome,
-    gate: { total: gateTotal, passed: gatePassed, failed: gateFailed, passRate: gatePassRate },
-    rework: { count: reworkRecords, rate: reworkRate, maxConsecutiveRuns, exceedsKillSwitch },
+    gate: {
+      total: gateTotal,
+      passed: gatePassed,
+      failed: gateFailed,
+      passRate: gatePassRate,
+    },
+    rework: {
+      count: reworkRecords,
+      rate: reworkRate,
+      maxConsecutiveRuns,
+      exceedsKillSwitch,
+    },
     budget: budgetSection,
+    orchestration: {
+      r3: r3Section,
+      iceberg: icebergSection,
+      reworkHints: reworkHintsSection,
+    },
     warnings,
   };
 }

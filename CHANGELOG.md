@@ -7,6 +7,30 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.17.0] - 2026-08-15
+
+### Added
+- `wm-write` 状态写助手：`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验，状态文件统一经此写入（防手写漂移）
+- `doctor` 环境自检：node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项检查 + 修复指引（`--with-tla` 升级 TLA+ 项为阻断级）
+- `check-artifact-gate --validate-templates` 模板漂移校验：按 PHASE_SPEC_LAYOUT 校验 templates/ 资产结构标记
+- 图谱轮次上限校验（MAX_GRAPH_ROUNDS=5）：防收敛循环无限返工
+- 编排质量指标（metrics-report orchestration 区）：R3 套数/findings 分布 + 冰山扫掠轮次分布 + reworkHints 统计
+- 评估提示词 15→25 条（w-model-dev-test-prompts.json）
+- `templates/README.md` 阶段 × 主模板 × 子模板映射索引
+
+### Changed
+- run-log R8 轨迹校验扩展：同阶段内 S 动作 < R3 < V < G < checkpoint 相对顺序约束
+- 错误消息补「期望 + 修法」尾注（design-contract-logic / tla-logic 层次校验）
+- safe-json BOM 剥离：Windows 下 BOM 导致的 JSON 解析问题修复
+- check-docs-consistency 新增文档内链存在性门禁（C3）
+
+### Docs
+- 六份重型参考（anti-patterns/verifier-spec/tla-plus-guide/bdd-guide/agent-personas/data-models）分层速查摘要
+- anti-patterns 阶段 N 必读反模式索引
+- dispatch-matrix S 变体 × R3/V/G 触发矩阵消歧 + 按阶段分节加载导引 + 53 文件触发条件表补全
+- subagent-delegation 加载导引（已存在，确认）
+- toolbox.md 去孤岛（SKILL.md + dispatch-matrix 指针）
+
 ## [41.16.0] - 2026-08-14
 
 ### Changed

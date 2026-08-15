@@ -462,6 +462,47 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  // R8-4（审计修复 B7）：同 phase 段内关键动作类的相对顺序
+  // 理想链：S(produce|fix|emergency-fix) → R3(r3-*) → V(review) → G(gate 类) → checkpoint。
+  // S/R3/V 取首次出现位置（首轮次序），gate/checkpoint 取最后一次出现位置
+  // （与 R8-1/R8-2 的 lastCheckpoint 语义一致——中间 checkpoint 是进度标记，不参与链序）。
+  // 存在才校验顺序（两类均出现且前者位置晚于后者才违规），不新增存在性要求；
+  // 多轮返工不受影响（首轮 S→R3→V 次序天然保持，末轮 gate→checkpoint 同理）。
+  const R3_ACTIONS = ['r3-completeness', 'r3-reliability', 'r3-security'];
+  for (const [, phaseEntries] of r8PhaseGroups) {
+    const firstIndex = (pred: (e: RunLogEntry) => boolean): number => {
+      for (let i = 0; i < phaseEntries.length; i++) {
+        if (pred(phaseEntries[i]!)) return i;
+      }
+      return -1;
+    };
+    const lastIndex = (pred: (e: RunLogEntry) => boolean): number => {
+      for (let i = phaseEntries.length - 1; i >= 0; i--) {
+        if (pred(phaseEntries[i]!)) return i;
+      }
+      return -1;
+    };
+    const phaseNo = phaseEntries[0]?.phase;
+    const chain: Array<[string, number]> = [
+      ['S(produce|fix|emergency-fix)', firstIndex((e) => S_VARIANTS.includes(e.action))],
+      ['R3(r3-completeness|r3-reliability|r3-security)', firstIndex((e) => R3_ACTIONS.includes(e.action))],
+      ['V(review)', firstIndex((e) => e.action === 'review')],
+      ['G(gate 类)', lastIndex((e) => GATE_ACTIONS.has(e.action))],
+      ['checkpoint', lastIndex((e) => e.action === 'checkpoint' && e.outcome === 'success')],
+    ];
+    for (let a = 0; a < chain.length - 1; a++) {
+      for (let b = a + 1; b < chain.length; b++) {
+        const [nameA, idxA] = chain[a]!;
+        const [nameB, idxB] = chain[b]!;
+        if (idxA >= 0 && idxB >= 0 && idxA > idxB) {
+          violations.push(
+            `R8: 阶段 ${phaseNo} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，理想链为 S → R3 → V → G → checkpoint（修法：按链序补录缺失动作或用 /wm 修正轨迹后重跑门禁）`,
+          );
+        }
+      }
+    }
+  }
+
   return { passed: violations.length === 0, violations };
 }
 

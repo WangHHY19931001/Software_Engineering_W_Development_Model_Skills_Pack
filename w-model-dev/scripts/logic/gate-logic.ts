@@ -380,6 +380,75 @@ export function checkPhaseSpecStructure(
   return v;
 }
 
+/** 技能包 templates/ 各阶段目录映射（主模板文件名 + 子模板目录名） */
+const TEMPLATES_PHASE_DIR: Record<number, { main: string; dir: string }> = {
+  1: { main: 'requirement-spec.md', dir: 'requirement-spec' },
+  2: { main: 'system-design.md', dir: 'system-design' },
+  3: { main: 'interface-design.md', dir: 'interface-design' },
+  4: { main: 'detailed-design.md', dir: 'detailed-design' },
+};
+
+/**
+ * 模板漂移校验（--validate-templates 模式，C9）：按 PHASE_SPEC_LAYOUT 校验技能包
+ * templates/ 资产含必需结构标记（引用块 / §0 SSOT 头 / DoD 清单），模板漂移可检出。
+ *
+ * 与 checkPhaseSpecStructure 的差异（模板 vs 项目产物）：
+ *   - 主模板固定文件名（phase≥2 无 {module} 前缀，引用块用 {{module}} 占位符）
+ *   - 子模板位于同名子目录（templates/requirement-spec/system-context.md 等，无前缀）
+ *
+ * @param templatesDir  技能包 templates/ 目录
+ * @param fs            文件系统注入（同 checkPhaseSpecStructure，便于单测 mock）
+ * @returns violations 列表（空数组 = 全部通过）
+ */
+export function checkTemplatesStructure(
+  templatesDir: string,
+  fs: { readFileSync(p: string): string; existsSync(p: string): boolean },
+): string[] {
+  const violations: string[] = [];
+  for (const phase of [1, 2, 3, 4] as const) {
+    const layout = PHASE_SPEC_LAYOUT[phase]!;
+    const tdir = TEMPLATES_PHASE_DIR[phase]!;
+    const prefix = 'templates:';
+
+    // 1. 主模板存在
+    const mainPath = path.join(templatesDir, tdir.main);
+    if (!fs.existsSync(mainPath)) {
+      violations.push(`${prefix} 阶段 ${phase} 主模板缺失 ${tdir.main}`);
+      continue;
+    }
+    const main = String(fs.readFileSync(mainPath));
+
+    for (const ref of layout.refs) {
+      const refFile = ref.endsWith('.md') ? ref : `${ref}.md`;
+      // 2. 引用块存在（phase=1 直接文件名；phase≥2 {{module}} 占位符形式）
+      const refLink = phase === 1 ? `](./${refFile})` : `](./{{module}}-${refFile})`;
+      if (!main.includes(refLink)) {
+        violations.push(`${prefix} 阶段 ${phase} 主模板 ${tdir.main} 缺引用块 → ${refLink}`);
+      }
+      // 3. 子模板存在（子目录内，无前缀）
+      if (!fs.existsSync(path.join(templatesDir, tdir.dir, refFile))) {
+        violations.push(`${prefix} 阶段 ${phase} 子模板缺失 ${tdir.dir}/${refFile}`);
+      }
+    }
+
+    // 4. §0 SSOT 头四项声明
+    for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
+      if (!main.includes(key)) violations.push(`${prefix} 阶段 ${phase} 主模板 §0 SSOT 头缺「${key}」`);
+    }
+
+    // 5. DoD 清单：discipline-dod 子模板 - [ ] 项 ≥ 8
+    const dodPath = path.join(templatesDir, tdir.dir, 'discipline-dod.md');
+    if (!fs.existsSync(dodPath)) {
+      violations.push(`${prefix} 阶段 ${phase} DoD 子模板缺失 ${tdir.dir}/discipline-dod.md`);
+    } else {
+      const dod = String(fs.readFileSync(dodPath));
+      const checks = (dod.match(/- \[ \]/g) ?? []).length;
+      if (checks < 8) violations.push(`${prefix} 阶段 ${phase} DoD 清单仅 ${checks} 项（须 ≥ 8）`);
+    }
+  }
+  return violations;
+}
+
 function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
   return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
 }

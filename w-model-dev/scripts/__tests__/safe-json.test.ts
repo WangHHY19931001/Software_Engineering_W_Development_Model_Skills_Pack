@@ -39,6 +39,19 @@ describe('parseJsonSafe', () => {
   it('非法 JSON 抛 SyntaxError（与原行为一致）', () => {
     expect(() => parseJsonSafe('{not json')).toThrow(SyntaxError);
   });
+
+  it('剥离首部 UTF-8 BOM 后正常解析（Windows PowerShell 产物容错）', () => {
+    const obj = parseJsonSafe<Record<string, number>>('\uFEFF{"a":1}');
+    expect(obj.a).toBe(1);
+  });
+
+  it('BOM + 非法 JSON 仍抛 SyntaxError（剥离不掩盖真实解析错误）', () => {
+    expect(() => parseJsonSafe('\uFEFF{not json')).toThrow(SyntaxError);
+  });
+
+  it('无 BOM 输入不受剥离逻辑影响', () => {
+    expect(parseJsonSafe<number>('7')).toBe(7);
+  });
 });
 
 describe('safeJsonReviver', () => {

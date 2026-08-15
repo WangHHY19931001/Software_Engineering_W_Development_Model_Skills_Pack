@@ -5,6 +5,7 @@
  * 纯逻辑无 IO；IO（读文件 / 数目录）由 check-docs-consistency.ts 承担。
  * 设计：docs/superpowers/specs/2026-08-10-doc-consistency-correction-design.md §4
  */
+import * as path from 'node:path';
 
 export interface DocCheckViolation {
   /** 检查项标识（如 schema-list / targetkind） */
@@ -18,7 +19,7 @@ export interface DocConsistencyInput {
   schemaFiles: string[];
   /** subagent/ 目录 .md 人格文件数（实测；期望值由 README「N 个人格文件」表述声明） */
   personaCount: number;
-  /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 4 工具 CLI + logic/plan-chunks.ts = 31；self-test.ts 非 exit-2 不计入） */
+  /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 6 工具 CLI + logic/plan-chunks.ts = 33；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
   /** references/ 目录 .md 文件数（实测；期望值由 SKILL.md「（N 个 .md）」表述声明） */
   referencesCount: number;
@@ -62,6 +63,13 @@ export interface DocConsistencyInput {
   scriptsChanged: boolean;
   /** 根目录 .eslintsecurity-baseline.json 指纹条目数；-1 = 缺失/不可解析，0 = 空 */
   securityBaselineEntryCount: number;
+  /**
+   * 内链存在性检查数据源（C3）：文档名 + 原文 + 所在目录（相对 repo-root，POSIX 风格）。
+   * 可选——缺省（fixture 未注入）时跳过内链检查，与 cliScriptFiles 空守卫策略一致。
+   */
+  linkDocs?: Array<{ name: string; content: string; baseDir: string }>;
+  /** 内链存在性判定（相对 repo-root 的 resolve 后路径 → 是否存在；CLI 层注入 existsSync 包装） */
+  linkExists?: (relPath: string) => boolean;
 }
 
 /**
@@ -141,6 +149,9 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkSsotHeadings(input.ssot));
   violations.push(...checkScriptRegistry(input.cliScriptFiles, input.dispatchMatrix, input.skill));
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
+  if (input.linkDocs !== undefined && input.linkExists !== undefined) {
+    violations.push(...checkInternalLinks(input.linkDocs, input.linkExists));
+  }
   return violations;
 }
 
@@ -249,7 +260,7 @@ function checkSsotHeadings(ssot: string): DocCheckViolation[] {
   }
   if (chapters.length === 0) return violations; // 守卫：无编号顶层章，跳过连续性校验
   chapters.sort((a, b) => a - b);
-  const max = chapters[chapters.length - 1];
+  const max = chapters[chapters.length - 1] ?? 0; // 守卫：chapters 非空已保证，?? 0 满足 noUncheckedIndexedAccess
   const baseSet = new Set(chapters);
   for (let i = 1; i <= max; i++) {
     if (!baseSet.has(i)) {
@@ -703,6 +714,76 @@ function checkBaselineSync(scriptsChanged: boolean, baselineEntryCount: number):
       message:
         'w-model-dev/scripts/** 有变更，但 .eslintsecurity-baseline.json 指纹条目为空（须运行 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 同步 baseline）',
     });
+  }
+  return violations;
+}
+
+// ==================== 内链存在性检查（C3） ====================
+
+/**
+ * 剥离围栏代码块（``` / ~~~）与行内 code span（`...`）后的可渲染文本。
+ * 围栏内的 `[x](y)` 是代码示例（命令用法 / 正则演示），不参与链接提取；
+ * 行内 code span 同理（渲染器不解析其中的链接语法）。
+ */
+export function stripMarkdownCode(content: string): string {
+  let inFence = false;
+  const lines = content.split(/\r?\n/).filter((line) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      return false; // 围栏边界行本身也剔除
+    }
+    return !inFence;
+  });
+  return lines.join('\n').replace(/`[^`\n]*`/g, '');
+}
+
+/**
+ * 提取 Markdown 相对链接目标（文档级导航链接存在性检查数据源）。
+ * 规则（与设计文档 C3 对齐）：
+ *   - 匹配 `[text](target)`（含图片 `![alt](src)` 的内层——资源缺失同属漂移）；
+ *   - 跳过绝对 URL（http:/https:/mailto:/data:）与纯锚点（#xxx）；
+ *   - 剥离锚点（foo.md#sec → foo.md）与 query（foo.md?q=1 → foo.md）；
+ *   - 剥离后为空的目标跳过；
+ *   - 只处理剥离代码块后的文本（见 stripMarkdownCode）。
+ */
+export function extractMarkdownRelLinks(content: string): string[] {
+  const text = stripMarkdownCode(content);
+  const out: string[] = [];
+  for (const m of text.matchAll(/\[[^\]]*\]\(\s*<?([^)\s>]*)>?[^)]*\)/g)) {
+    const raw = m[1];
+    if (raw === undefined || raw === '') continue;
+    if (/^(https?:|mailto:|data:|file:)/i.test(raw)) continue; // 外部/协议 URL
+    if (raw.startsWith('#')) continue; // 纯锚点
+    const target = raw.split('#')[0]!.split('?')[0]!;
+    if (target === '') continue; // 剥离后为空（纯锚点/纯 query 变体）
+    out.push(target);
+  }
+  return out;
+}
+
+/**
+ * 文档内链存在性检查（C3）：提取各文档相对链接 → 相对文档所在目录拼接归一化
+ * （保持「相对 repo-root 的 POSIX 路径」语义，与 baseDir 一致；不用 path.resolve——
+ * 它会基于 process.cwd() 产出绝对路径，破坏 CLI 层 join(root, relPath) 注入约定）
+ * → linkExists 判定。断链（文件改名/删除/路径笔误后文档未同步）即报违规；
+ * 同一断链目标在多文档出现会逐条报（每条带文档名定位，便于修复）。
+ * 守卫：linkDocs/linkExists 缺省时不检查（fixture 兼容）。
+ */
+function checkInternalLinks(
+  linkDocs: Array<{ name: string; content: string; baseDir: string }>,
+  linkExists: (relPath: string) => boolean,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  for (const doc of linkDocs) {
+    for (const target of extractMarkdownRelLinks(doc.content)) {
+      const resolved = path.posix.normalize(path.posix.join(doc.baseDir, target));
+      if (!linkExists(resolved)) {
+        violations.push({
+          check: 'internal-links',
+          message: `${doc.name} 内链断链：${target}（resolve → ${resolved}，目标文件不存在；改名/移动文件后须同步引用处）`,
+        });
+      }
+    }
   }
   return violations;
 }

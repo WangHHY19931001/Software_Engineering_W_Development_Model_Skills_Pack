@@ -601,4 +601,115 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
     const result = checkRunLog(lines);
     expect(result.violations.filter((v) => v.startsWith('R8'))).toHaveLength(0);
   });
+
+  // ==================== R8-4 轨迹顺序链（审计修复 B7）====================
+
+  it('R8-4: V(review) 先于任何 S 变体 → 轨迹顺序倒置违规', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.some((v) => /R8.*轨迹顺序倒置.*V\(review\).*S/.test(v))).toBe(true);
+  });
+
+  it('R8-4: R3 先于任何 S 变体 → 轨迹顺序倒置违规', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.some((v) => /R8.*轨迹顺序倒置.*S.*R3/.test(v))).toBe(true);
+  });
+
+  it('R8-4: gate 先于 V(review) → 轨迹顺序倒置违规', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'gate',
+        role: 'G',
+        outcome: 'success',
+        gateExitCode: 0,
+        script: 'check-artifact-gate.ts',
+      }),
+      makeEntry({ runId: 'r3', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.some((v) => /R8.*轨迹顺序倒置.*V\(review\).*G/.test(v))).toBe(true);
+  });
+
+  it('R8-4: 标准全链 S → R3×3 → V → G → checkpoint 通过', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r3', phase: 5, action: 'r3-reliability', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r4', phase: 5, action: 'r3-security', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r5', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r6',
+        phase: 5,
+        action: 'gate',
+        role: 'G',
+        outcome: 'success',
+        gateExitCode: 0,
+        script: 'check-artifact-gate.ts',
+      }),
+      makeEntry({
+        runId: 'r7',
+        phase: 5,
+        action: 'checkpoint',
+        role: 'O',
+        outcome: 'success',
+        acknowledgedDecisions: ['ok'],
+      }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.filter((v) => v.startsWith('R8'))).toHaveLength(0);
+  });
+
+  it('R8-4: 多轮返工轨迹（首轮 V 失败 → R → 复审 → fix → R3 → V → G → checkpoint）通过', () => {
+    const lines = [
+      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'r2', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r3', phase: 5, action: 'r3-reliability', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r4', phase: 5, action: 'r3-security', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r5', phase: 5, action: 'review', role: 'V', outcome: 'fail' }),
+      makeEntry({ runId: 'r6', phase: 5, action: 'rootcause', role: 'R', outcome: 'success', reportId: 'RC-1' }),
+      makeEntry({
+        runId: 'r7',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        targetKind: 'rootcause',
+        target: 'RC-1',
+      }),
+      makeEntry({ runId: 'r8', phase: 5, action: 'fix', role: 'S', outcome: 'rework', basedOnReport: 'RC-1' }),
+      makeEntry({ runId: 'r9', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r10', phase: 5, action: 'r3-reliability', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r11', phase: 5, action: 'r3-security', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'r12', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r13',
+        phase: 5,
+        action: 'gate',
+        role: 'G',
+        outcome: 'success',
+        gateExitCode: 0,
+        script: 'check-artifact-gate.ts',
+      }),
+      makeEntry({
+        runId: 'r14',
+        phase: 5,
+        action: 'checkpoint',
+        role: 'O',
+        outcome: 'success',
+        acknowledgedDecisions: ['ok'],
+      }),
+    ];
+    const result = checkRunLog(lines);
+    expect(result.violations.filter((v) => v.startsWith('R8'))).toHaveLength(0);
+  });
 });

@@ -3,6 +3,40 @@
 > 来源：SSoT 第 7 章。项目状态、需求、设计、测试用例的数据结构定义。
 > 技能执行时按需读取，用于在项目存储中维护结构化记录。
 
+## 速查摘要
+
+> 一页速查：W 模型各状态文件的数据结构定义（来源 SSoT 第 7 章）。技能执行时按需读取，用于在项目存储中维护结构化记录。
+
+| 维度 | 核心锚点 | 详见 |
+|---|---|---|
+| 核心实体 | Project / Requirement / Design / TestCase + 实体关系 | 「项目/需求/设计/测试用例数据模型」节 + 「实体关系」节 |
+| 图谱模型 | GraphNode / EdgeType（governs/collaborates-with/derives + marker） | 「图谱节点与边类型」节 |
+| RTM 映射 | RTM 列 ↔ 数据模型 id + 登记阶段 | 「与 RTM 的映射」节 |
+| RTM 阶段演进 | 各字段首次填写阶段，禁止提前填晚期字段 | 「RTM 字段阶段演进规则」节 |
+| 数据迁移 | status 枚举 / techStack / JSON 损坏恢复 / 并发写入 | 「数据迁移与异常处理」节 |
+| 预算模型 | budget.json（perPhase/project/onExceed/killSwitch） | 「成本预算模型」节 |
+| 运行日志 | run-log.jsonl（RunLogEntry + R1 阶段动作完整性） | 「运行日志模型」节 |
+| 成熟度模型 | maturity.json（L0-L3 + 升级/降级触发） | 「自主成熟度模型」节 |
+| Schema 边界 | RunLogEntry vs EventIngress 字段对照（禁止混用） | 「RunLogEntry vs EventIngress Schema 边界对照表」节 |
+| 事件接驳 | event-ingress.jsonl（EventIngress） | 「事件接驳模型」节 |
+| 爬坡报告 | HarnessImprovementReport | 「爬坡循环改进报告模型」节 |
+| TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound） | 「TLA+ manifest 模型」节 |
+| BDD 模型 | BddManifest / BddStateMachine / BddFeature | 「BDD 数据模型」节 |
+| JSON Schema | 20 份 schema + structural-first + [schema] 前缀 | 「JSON Schema 强约束」节 |
+
+**按场景只读 §X**：
+
+| 场景 | 应读章节 |
+|---|---|
+| 维护项目/需求/设计/测试实体 | 「项目/需求/设计/测试用例数据模型」节 |
+| 图谱节点/边类型 | 「图谱节点与边类型」节 |
+| RTM 登记 / 阶段演进 | 「与 RTM 的映射」节 + 「RTM 字段阶段演进规则」节 |
+| 数据损坏 / 并发写入 | 「数据迁移与异常处理」节 |
+| 预算 / 成熟度配置 | 「成本预算模型」节 + 「自主成熟度模型」节 |
+| 写 run-log / event-ingress | 「运行日志模型」节 + 「事件接驳模型」节 + 「Schema 边界对照表」节 |
+| TLA+ / BDD manifest | 「TLA+ manifest 模型」节 + 「BDD 数据模型」节 |
+| schema 前置校验 | 「JSON Schema 强约束」节 |
+
 ## 目录
 
 - 项目、需求、设计与测试用例模型

@@ -20,7 +20,19 @@
 5. 编排者（O）写入前使用项目语言可用的原子写入方式（临时文件后 rename），避免并发写坏 JSON。
 6. **实施动作分派**：产出由 S 子代理执行；评审由 V 子代理执行；门禁由 G 子代理执行。编排者越权实施命中反模式 #10（见 [anti-patterns.md](anti-patterns.md) #10）。
 
+> 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
+
 ## `/wm analyze <需求>`
+
+- **速查行**：`/wm analyze <需求>`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `<需求>` | 是 | 需求描述文本 | — | 需求描述、业务背景；首次进入还需技术栈 |
+
+- **失败动作**：信息不足时列出缺失项并暂停，不得猜测关键业务规则；评审未通过由 O 分派 S 返工。
+- **guide 链接**：[phase-1-requirements.md](phase-1-requirements.md)（阶段 1 需求分析）、[rtm-guide.md](rtm-guide.md)（RTM 映射）、[ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)（ingestion 子流程）。
 
 - **路由**：阶段 1 需求分析。
 - **执行方**：O 路由 + CHECKPOINT → **S 产出** → **V 评审** → **G 门禁** → O 持久化。
@@ -30,10 +42,19 @@
 - **评审**（V 子代理）：按 `targetKind=requirement` 路由 Persona，产出 `VerifierOutput` JSON。
 - **门禁**（G 子代理）：跑 `check-verifier-output.ts`，回填 `{exitCode, qualityLevel, passed, reworkHints}`。
 - **ingestion**：触发 A 角色 ingestion 子流程（`plan-chunks` → A-chunk → A-cross → G 图谱校验 → 收敛循环），产出 `graph.json`（REQ 节点）；A→S 路径——先由 A 收敛图谱（连通 + 单根），再分派 S 读 `graph.json` 产出需求规格。详见 [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)。
-- **失败**：信息不足时列出缺失项并暂停；不得猜测关键业务规则。评审未通过由 O 分派 S 返工。
 - **状态**（O）：初始化为“需求分析”；阶段门与用户均放行后才更新为“系统设计”。
 
 ## `/wm design type=<架构|概要|详细>`
+
+- **速查行**：`/wm design type=<架构|概要|详细>`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `type` | 是 | `架构` \| `概要` \| `详细` | — | 设计类型；`架构`→阶段 2、`概要`→阶段 3、`详细`→阶段 4 |
+
+- **失败动作**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段；评审未通过由 O 分派 S 返工。
+- **guide 链接**：[phase-2-system-design.md](phase-2-system-design.md) / [phase-3-outline-design.md](phase-3-outline-design.md) / [phase-4-detailed-design.md](phase-4-detailed-design.md)（对应设计阶段）、[graph-guide.md](graph-guide.md)（图谱演进）。
 
 | `type` | 路由 | 必需上游产物 | 同步测试设计 |
 |---|---|---|---|
@@ -46,10 +67,19 @@
 - **评审**（V 子代理）：按 `targetKind=design` 路由 Persona（系统设计可选 security-auditor 架构评审）。
 - **门禁**（G 子代理）：跑 `check-verifier-output.ts` 回填证据。
 - **ingestion**：触发 A 角色 ingestion 子流程（S→A 路径——S 先产出正式设计文档，再 A-chunk 分块 → A-evolve 图谱演进 → G 跑 `check-requirement-graph.ts` → 收敛循环）；按 `type` 追加对应节点到 `graph.json`：`架构`→SD 节点（implements 校验）、`概要`→INTF 节点（defines 校验）、`详细`→DD 节点（realizes 校验，零违反硬约束才放行进编码）。详见 [graph-guide.md](graph-guide.md)。
-- **失败**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段。评审未通过由 O 分派 S 返工。
 - **状态**（O）：对应阶段门与用户放行后才切换到下一阶段。
 
 ## `/wm code <功能>`
+
+- **速查行**：`/wm code <功能>`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `<功能>` | 是 | 功能描述文本 | — | 待编码实现的功能 |
+
+- **失败动作**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败时留在阶段 5；评审未通过由 O 分派 S 返工。
+- **guide 链接**：[phase-5-coding.md](phase-5-coding.md)（阶段 5 编码实现）、[rtm-guide.md](rtm-guide.md)（RTM 代码列）、[quality-standards.md](quality-standards.md)（质量检查）。
 
 - **路由**：阶段 5 编码实现。
 - **执行方**：O 路由 + CHECKPOINT → **S 产出代码 + 单测 + 跑测试运行器 + RTM 代码列** → **V 代码审查** → **G 门禁** → O 持久化。
@@ -58,12 +88,21 @@
 - **产出**（S 子代理）：实现代码、单元测试、测试与覆盖率输出、代码检查结果、RTM 代码映射。
 - **评审**（V 子代理）：按 `targetKind=code` 路由 `code-reviewer` Persona（五轴评审）。
 - **门禁**（G 子代理）：跑 `check-verifier-output.ts` 回填证据。
-- **失败**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败时留在阶段 5。评审未通过由 O 分派 S 返工。
 - **状态**（O）：代码评审、单元测试和覆盖率门槛均满足且用户放行后才能进入“集成测试”。
 
 ## `/wm test type=<类型> result=<pass|fail>`
 
-- **类型**：`单元 | 集成 | 系统 | 验收`。
+- **速查行**：`/wm test type=<类型> result=<pass|fail>`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `type` | 是 | `单元` \| `集成` \| `系统` \| `验收` | — | 测试类型 |
+| `result` | 是 | `pass` \| `fail` | — | 测试结果，必须与测试输出一致 |
+
+- **失败动作**：`result` 缺省或与测试输出冲突时拒绝回填；未执行即标通过、LLM 估算结果、把 pending 当 passed、**编排者越权回填 RTM 实体**（反模式 #10）均禁止。
+- **guide 链接**：[phase-6-integration-test.md](phase-6-integration-test.md) / [phase-7-system-test.md](phase-7-system-test.md) / [phase-8-acceptance-test.md](phase-8-acceptance-test.md)（对应测试阶段）、[rtm-guide.md](rtm-guide.md)（RTM 执行结果回填）。
+
 - **执行方**：O 路由 + CHECKPOINT → **S 执行测试运行器 + 回填 RTM 执行结果** → **V 评审测试报告** → **G 门禁**（阶段 8 跑 `check-artifact-gate.ts`）→ O 持久化。
 - **必要证据**（S 子代理产出）：测试命令、退出码、`passed/failed/pending`；单元测试还需覆盖率。
 - **真实回填**（S 子代理）：`result` 必须与测试输出一致；缺证据或冲突时拒绝回填。**编排者不得直接回填 RTM 执行结果**。
@@ -72,9 +111,18 @@
 - **评审**（V 子代理）：按 `targetKind=test` 路由 `test-engineer` Persona。
 - **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 8 跑 `check-artifact-gate.ts`。
 - **产出**（S 子代理）：使用 `templates/test-report.md` 生成测试报告。
-- **禁止**：未执行即标通过、LLM 估算结果、`result` 缺省、把 pending 当 passed、**编排者越权回填 RTM 实体**（反模式 #10）。
 
 ## `/wm review <target>`
+
+- **速查行**：`/wm review <target>`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `<target>` | 是 | `REQ-*` \| `DESIGN-*` \| `UAT-/ST-/IT-/UT-*` \| code | — | 评审目标；按前缀识别类型 |
+
+- **失败动作**：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；C/D 由 O 分派 S 子代理按 `reworkHints` 返工。
+- **guide 链接**：[verifier-spec.md](verifier-spec.md)（子标准与提示词占位符）、[subagent-delegation.md](subagent-delegation.md)（V 分派边界）。
 
 返回评审指引，不由命令本身调用 LLM。**编排者不得自评**——评审必须分派 V 子代理执行（反模式 #10）：
 
@@ -97,6 +145,16 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
 
 ## `/wm status`
 
+- **速查行**：`/wm status [--json]`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `--json` | 否 | 标志 | 关闭 | 输出单行 `StatusReport` JSON（供展示证据或机器消费） |
+
+- **失败动作**：退出码 2 = project/rtm JSON 损坏（转 [operational-recovery.md](operational-recovery.md)，不得猜测状态）。
+- **guide 链接**：[operational-recovery.md](operational-recovery.md)（JSON 损坏恢复）。
+
 - **执行方**：O 只读，不分派子代理。
 - 运行 `npx tsx w-model-dev/scripts/cli/wm-status.ts <project-dir> [--json]`（project-dir 默认 cwd）：
   - 只读 `.w-model/project.json`（必读）、`.w-model/rtm.json` 与 `.w-model/run-log.jsonl`（缺失降级），输出：
@@ -106,10 +164,23 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
     4. 四级测试 `total/passed/failed/pending`；
     5. 最近 3 条动作；
     6. 确定性下一步建议。
-  - `--json` 输出单行 `StatusReport` JSON（供展示证据或机器消费）。
 - 退出码：0 = 正常（含未初始化提示「项目未初始化」）；2 = project/rtm JSON 损坏（转 `operational-recovery.md`，不得猜测状态）。
 
 ## `/wm metrics`
+
+- **速查行**：`/wm metrics [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `--from` | 否 | ISO 时间 | — | 起始时间窗口 |
+| `--to` | 否 | ISO 时间 | — | 结束时间窗口 |
+| `--phase` | 否 | 1-8 整数 | — | 阶段过滤 |
+| `--json` | 否 | 标志 | 关闭 | 输出完整报告 JSON |
+| `--out` | 否 | 文件路径 | — | 报告写入路径 |
+
+- **失败动作**：退出码 2 = run-log 缺失 / `--phase` 非法 / JSON 损坏；纯报告无门禁语义——预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
+- **guide 链接**：[hill-climbing-guide.md](hill-climbing-guide.md)（run-log 分析伴侣，指标映射注记）。
 
 - **执行方**：O 只读，不分派子代理。
 - 运行 `npx tsx w-model-dev/scripts/cli/metrics-report.ts <project-dir> [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`：
@@ -117,9 +188,20 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
   - 输出 9 节流程度量摘要：总体（tokens/耗时/分派/返工）、阶段汇总、动作分布、角色分布、结果分布、门禁通过率、返工连续段、预算 burn rate 与 killSwitch 预警、预警列表；
   - `--json` 输出完整报告 JSON；`--out <path>` 写入文件；`--phase`/`--from`/`--to` 过滤。
 - 退出码：0 = 生成成功（预警不改退出码）；2 = run-log 缺失 / `--phase` 非法 / JSON 损坏。
-- 纯报告无门禁语义：预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
 
 ## `/wm hill-climbing`
+
+- **速查行**：`/wm hill-climbing [--from=ISO] [--to=ISO] [--phase=N]`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `--from` | 否 | ISO 时间 | — | 起始时间窗口 |
+| `--to` | 否 | ISO 时间 | — | 结束时间窗口 |
+| `--phase` | 否 | 1-8 整数 | — | 阶段过滤 |
+
+- **失败动作**：只产出改进信号，**不自动改 prompt/工具/验证规则**（反模式 #10）；外部 SkillOpt/darwin-skill 消费信号做演化，人审后手动应用。
+- **guide 链接**：[hill-climbing-guide.md](hill-climbing-guide.md)（信号产出与消费）。
 
 - **执行方**：O 确定性分析 run-log，不分派子代理；**无 LLM 调用**（约束 4：基于实际记录，不 LLM 估算）。
 - **适用**：L2+ 项目（maturity.level ≥ L2）。
@@ -129,14 +211,33 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
   3. 改进建议（recommendations）：promptTweaks / toolImprovements / verificationRuleTightening / candidateAntiPatterns / maturityAdjustments；
   4. 应用状态（applicationStatus）：人审后由用户填写 reviewedBy / appliedSignals / deferredSignals / rejectedSignals。
 - 产出存 `.w-model/hill-climbing/<timestamp>-report.json`（符合 `hill-climbing-report.schema.json`）。
-- **边界（反模式 #10）**：只产出改进信号，**不自动改 prompt/工具/验证规则**；外部 SkillOpt/darwin-skill 消费信号做演化，人审后手动应用。详见 [hill-climbing-guide.md](hill-climbing-guide.md)。
 
 ## `/wm help`
+
+- **速查行**：`/wm help`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| （无） | — | — | — | 无参数 |
+
+- **失败动作**：纯只读输出，不读取项目状态，无失败动作。
+- **guide 链接**：[anti-patterns.md](anti-patterns.md)（反模式 #10 越权实施）、[subagent-delegation.md](subagent-delegation.md)（编排者-子代理边界）。
 
 - **执行方**：O 只读，不分派子代理。
 - 输出命令速查、阶段与测试对应关系，以及以下五条：测试设计前置、阶段门不可跳过、测试结果必须真实、退出码 1/2 不得放行、**编排者不得越权实施（反模式 #10）**。不读取项目状态。
 
 ## `/wm reset`
+
+- **速查行**：`/wm reset`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| （无） | — | — | — | 无参数 |
+
+- **失败动作**：用户拒绝时不修改文件，也不重复施压；执行前必须获得 CHECKPOINT 重置确认。
+- **guide 链接**：[data-models.md](data-models.md)（保留/清空字段定义）。
 
 - **执行方**：O 执行（仅状态文件操作，非阶段产物，不构成越权实施）。
 > 🔴 **CHECKPOINT · 重置确认**：执行前展示将删除的实体和将保留的项目元信息，必须获得确认。
@@ -144,9 +245,18 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
 - **保留**：`id/name/description/techStack/createdAt`。
 - **清空**：需求、设计、测试用例、RTM 实体与执行结果。
 - **重置**：`status=需求分析`，刷新 `updatedAt`。
-- 用户拒绝时不修改文件，也不重复施压。
 
 ## `/wm export [输出目录]`
+
+- **速查行**：`/wm export [输出目录]`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `[输出目录]` | 否 | 目录路径 | `./w-model-export/` | 导出目录 |
+
+- **失败动作**：校验聚合文件与独立文件实体数不一致时导出失败并列出差异；路径含空格时命令参数加双引号。
+- **guide 链接**：[data-models.md](data-models.md)（导出文件 schema）。
 
 - **执行方**：O 只读导出，不分派子代理。
 - 默认目录 `./w-model-export/`。
@@ -155,6 +265,16 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
 - 输出路径、文件大小和实体数；路径含空格时命令参数加双引号。
 
 ## `/wm import <project.json>`
+
+- **速查行**：`/wm import <project.json>`
+- **参数表**：
+
+| 参数 | 必填 | 取值 | 默认 | 说明 |
+|---|---|---|---|---|
+| `<project.json>` | 是 | 文件路径 | — | 待导入的 project.json |
+
+- **失败动作**：校验失败列出字段路径和原因，退出码语义为 2，不写任何文件；`.w-model/` 已有数据时触发覆盖确认检查点，拒绝则不写入。
+- **guide 链接**：[data-models.md](data-models.md)（必填字段/阶段枚举/实体枚举/ID 唯一性校验）。
 
 - **执行方**：O 执行（仅状态文件操作）。
 1. 编排者（O）按 `data-models.md` 校验必填字段、阶段枚举、实体枚举和 ID 唯一性。

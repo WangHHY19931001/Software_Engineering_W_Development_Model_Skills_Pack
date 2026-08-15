@@ -33,8 +33,20 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: '缺 level' },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: '缺 level' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: '缺 level',
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: '缺 level',
+          },
         ],
         edges: [{ from: 'REQ-001', to: 'REQ-002', type: 'parent' }],
       };
@@ -49,8 +61,23 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
           {
             id: 'REQ-003',
             type: 'REQ',
@@ -74,8 +101,22 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域A', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '域B', summary: 'level=1', level: 1 },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域A',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '域B',
+            summary: 'level=1',
+            level: 1,
+          },
           {
             id: 'REQ-003',
             type: 'REQ',
@@ -102,7 +143,14 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
           {
             id: 'REQ-002',
             type: 'REQ',
@@ -132,11 +180,51 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-G1' },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块B', summary: 'level=2', level: 2, reqGroup: 'REQ-G1' },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: '功能A', summary: 'level=3', level: 3, reqGroup: 'REQ-G1' },
-          { id: 'REQ-004', type: 'REQ', phase: 1, title: '功能B', summary: 'level=3', level: 3, reqGroup: 'REQ-G1' },
-          { id: 'REQ-005', type: 'REQ', phase: 1, title: '验收', summary: 'level=4', level: 4, reqGroup: 'REQ-G1' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '模块A',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-G1',
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块B',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-G1',
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: '功能A',
+            summary: 'level=3',
+            level: 3,
+            reqGroup: 'REQ-G1',
+          },
+          {
+            id: 'REQ-004',
+            type: 'REQ',
+            phase: 1,
+            title: '功能B',
+            summary: 'level=3',
+            level: 3,
+            reqGroup: 'REQ-G1',
+          },
+          {
+            id: 'REQ-005',
+            type: 'REQ',
+            phase: 1,
+            title: '验收',
+            summary: 'level=4',
+            level: 4,
+            reqGroup: 'REQ-G1',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
@@ -164,7 +252,15 @@ describe('R1-R6 四维识别校验', () => {
             level: 2,
             reqGroup: 'REQ-G1',
           },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '功能', summary: 'level=3', level: 3, reqGroup: 'REQ-G1' },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '功能',
+            summary: 'level=3',
+            level: 3,
+            reqGroup: 'REQ-G1',
+          },
         ],
         edges: [{ from: 'REQ-001', to: 'REQ-002', type: 'parent' }],
       };
@@ -180,9 +276,32 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块B', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块A',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: '模块B',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -202,9 +321,32 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块B', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块A',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: '模块B',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -224,9 +366,32 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块B', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块A',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: '模块B',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -249,8 +414,23 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -267,8 +447,23 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -285,9 +480,29 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: 'NFR', summary: '横切NFR', level: 1 },
-          { id: 'EXT-OUT-001', type: 'EXT-OUT', phase: 1, title: '边界汇', summary: '外部输出' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: 'NFR',
+            summary: '横切NFR',
+            level: 1,
+          },
+          {
+            id: 'EXT-OUT-001',
+            type: 'EXT-OUT',
+            phase: 1,
+            title: '边界汇',
+            summary: '外部输出',
+          },
         ],
         edges: [{ from: 'REQ-002', to: 'EXT-OUT-001', type: 'cross-cuts' }],
       };
@@ -304,9 +519,30 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'EXT-IN-001', type: 'EXT-IN', phase: 1, title: '边界源', summary: '外部输入' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'EXT-IN-001',
+            type: 'EXT-IN',
+            phase: 1,
+            title: '边界源',
+            summary: '外部输入',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -323,9 +559,30 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'EXT-OUT-001', type: 'EXT-OUT', phase: 1, title: '边界汇', summary: '外部输出' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'EXT-OUT-001',
+            type: 'EXT-OUT',
+            phase: 1,
+            title: '边界汇',
+            summary: '外部输出',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -347,11 +604,49 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域A', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '域B', summary: 'level=1', level: 1 },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'REQ-004', type: 'REQ', phase: 1, title: '功能A', summary: 'level=3', level: 3, reqGroup: 'REQ-001' },
-          { id: 'REQ-005', type: 'REQ', phase: 1, title: '验收A', summary: 'level=4', level: 4, reqGroup: 'REQ-001' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域A',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '域B',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: '模块A',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-004',
+            type: 'REQ',
+            phase: 1,
+            title: '功能A',
+            summary: 'level=3',
+            level: 3,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-005',
+            type: 'REQ',
+            phase: 1,
+            title: '验收A',
+            summary: 'level=4',
+            level: 4,
+            reqGroup: 'REQ-001',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
@@ -373,10 +668,38 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: 'NFR', summary: '横切NFR', level: 1 },
-          { id: 'EXT-OUT-001', type: 'EXT-OUT', phase: 1, title: '边界汇', summary: '外部输出' },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: 'NFR',
+            summary: '横切NFR',
+            level: 1,
+          },
+          {
+            id: 'EXT-OUT-001',
+            type: 'EXT-OUT',
+            phase: 1,
+            title: '边界汇',
+            summary: '外部输出',
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -404,9 +727,31 @@ describe('R1-R6 四维识别校验', () => {
         version: 1,
         currentPhase: 1,
         nodes: [
-          { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-          { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-          { id: 'REQ-003', type: 'REQ', phase: 1, title: 'NFR', summary: '横切NFR', level: 1 },
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: '域',
+            summary: 'level=1',
+            level: 1,
+          },
+          {
+            id: 'REQ-002',
+            type: 'REQ',
+            phase: 1,
+            title: '模块',
+            summary: 'level=2',
+            level: 2,
+            reqGroup: 'REQ-001',
+          },
+          {
+            id: 'REQ-003',
+            type: 'REQ',
+            phase: 1,
+            title: 'NFR',
+            summary: '横切NFR',
+            level: 1,
+          },
         ],
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -429,15 +774,100 @@ describe('R1-R6 四维识别校验', () => {
   });
 });
 
+describe('轮次上限校验（MAX_GRAPH_ROUNDS=5）', () => {
+  /** 合法 phase=1 纯 REQ 图基底（单根 + 单子，无其他违规） */
+  function baseGraph(analysisRounds?: GraphShape['analysisRounds']): GraphShape {
+    return {
+      version: 1,
+      currentPhase: 1,
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '域',
+          summary: 'level=1',
+          level: 1,
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '模块',
+          summary: 'level=2',
+          level: 2,
+          reqGroup: 'REQ-001',
+        },
+      ],
+      edges: [{ from: 'REQ-001', to: 'REQ-002', type: 'parent' }],
+      ...(analysisRounds ? { analysisRounds } : {}),
+    };
+  }
+
+  it('analysisRounds 含 round=6 > 5 → 轮次上限违规且 passed=false', () => {
+    const graph = baseGraph([{ phase: 1, round: 6, violations: [], converged: false }]);
+    const result = checkRequirementGraph(graph, 1);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => /轮次上限校验失败.*round > 5.*phase1\/round6/.test(v))).toBe(true);
+  });
+
+  it('round=5 恰好等于上限 → 不报轮次违规（passed 由其余校验决定）', () => {
+    const graph = baseGraph([{ phase: 1, round: 5, violations: [], converged: true }]);
+    const result = checkRequirementGraph(graph, 1);
+    expect(result.violations.some((v) => v.includes('轮次上限校验失败'))).toBe(false);
+    expect(result.passed).toBe(true);
+  });
+
+  it('多轮记录仅越界者被点名（round 1-4 合法 + round 7 越界）', () => {
+    const graph = baseGraph([
+      { phase: 1, round: 1, violations: ['x'], converged: false },
+      { phase: 1, round: 4, violations: [], converged: false },
+      { phase: 1, round: 7, violations: [], converged: false },
+    ]);
+    const result = checkRequirementGraph(graph, 1);
+    const v = result.violations.find((x) => x.includes('轮次上限校验失败'))!;
+    expect(v).toContain('phase1/round7');
+    expect(v).not.toContain('phase1/round4');
+  });
+
+  it('无 analysisRounds 字段 → 不报轮次违规（存在才校验）', () => {
+    const result = checkRequirementGraph(baseGraph(), 1);
+    expect(result.violations.some((v) => v.includes('轮次上限校验失败'))).toBe(false);
+  });
+});
+
 describe('R11 level 正整数校验', () => {
   it('R11: REQ 节点 level 为非正整数应 fail', () => {
     const graph: GraphShape = {
       version: 1,
       currentPhase: 1,
       nodes: [
-        { id: 'REQ-001', type: 'REQ', phase: 1, title: '域A', summary: 'level=1', level: 1 },
-        { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块A', summary: 'level=0', level: 0, reqGroup: 'REQ-001' },
-        { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块B', summary: 'level=-1', level: -1, reqGroup: 'REQ-001' },
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '域A',
+          summary: 'level=1',
+          level: 1,
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '模块A',
+          summary: 'level=0',
+          level: 0,
+          reqGroup: 'REQ-001',
+        },
+        {
+          id: 'REQ-003',
+          type: 'REQ',
+          phase: 1,
+          title: '模块B',
+          summary: 'level=-1',
+          level: -1,
+          reqGroup: 'REQ-001',
+        },
       ],
       edges: [
         { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
@@ -457,8 +887,23 @@ describe('recalculatePassed', () => {
       version: 1,
       currentPhase: 1,
       nodes: [
-        { id: 'REQ-001', type: 'REQ', phase: 1, title: '域', summary: 'level=1', level: 1 },
-        { id: 'REQ-002', type: 'REQ', phase: 1, title: '模块', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '域',
+          summary: 'level=1',
+          level: 1,
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '模块',
+          summary: 'level=2',
+          level: 2,
+          reqGroup: 'REQ-001',
+        },
         { id: 'NFR-001', type: 'REQ', phase: 1, title: '横切NFR', summary: '' },
       ],
       edges: [
@@ -481,10 +926,40 @@ describe('recalculatePassed', () => {
       version: 1,
       currentPhase: 1,
       nodes: [
-        { id: 'REQ-001', type: 'REQ', phase: 1, title: '域A', summary: 'level=1', level: 1 },
-        { id: 'REQ-002', type: 'REQ', phase: 1, title: '域B', summary: 'level=1', level: 1 },
-        { id: 'REQ-003', type: 'REQ', phase: 1, title: '模块A', summary: 'level=2', level: 2, reqGroup: 'REQ-001' },
-        { id: 'REQ-004', type: 'REQ', phase: 1, title: '模块B', summary: 'level=2', level: 2, reqGroup: 'REQ-002' },
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '域A',
+          summary: 'level=1',
+          level: 1,
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '域B',
+          summary: 'level=1',
+          level: 1,
+        },
+        {
+          id: 'REQ-003',
+          type: 'REQ',
+          phase: 1,
+          title: '模块A',
+          summary: 'level=2',
+          level: 2,
+          reqGroup: 'REQ-001',
+        },
+        {
+          id: 'REQ-004',
+          type: 'REQ',
+          phase: 1,
+          title: '模块B',
+          summary: 'level=2',
+          level: 2,
+          reqGroup: 'REQ-002',
+        },
       ],
       edges: [
         { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
@@ -512,7 +987,11 @@ describe('recalculatePassed', () => {
       roots: ['REQ-001', 'REQ-002'],
       orphans: [],
       multiParent: [],
-      traceabilityViolations: { SD_without_implements: 0, INTF_without_defines: 0, DD_without_realizes: 0 },
+      traceabilityViolations: {
+        SD_without_implements: 0,
+        INTF_without_defines: 0,
+        DD_without_realizes: 0,
+      },
       dataflowViolations: { blackHoles: [], miracles: [], deadModules: [] },
       boundary: { extIn: 1, extOut: 1, complete: true },
       violations: [],

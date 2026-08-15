@@ -284,6 +284,29 @@ async function main(): Promise<void> {
     return;
   }
 
+  // B2 环境前置（审计修复）：Java 缺失/版本不足在 manifest 解析前快速失败（exit 2 + 安装指引），
+  // 避免「环境问题被误读为模型校验失败（exit 1 violations 混排）」。jar 路径依赖 manifest.tools
+  // 声明（basePath 相对），无法在本阶段预检，仍由后续 checkEnvironment 按声明值复核。
+  {
+    const res = spawnSync('java', ['-version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = `${res.stderr ?? ''}${res.stdout ?? ''}`;
+    const major = res.error ? null : parseJavaMajorVersion(out);
+    if (res.error || major === null || major < 11) {
+      exitWithError({
+        category: 'UNEXPECTED',
+        rule: 'P0-2',
+        message:
+          res.error || major === null
+            ? 'Java 环境缺失：未找到可用的 java 可执行文件（TLA+ 门禁需要 Java >= 11）'
+            : `Java 版本不满足 TLA+ 门禁要求（需 >= 11，实测主版本 ${major}）`,
+        detail:
+          '修法：安装 JDK/JRE 11+ 并确保 java 在 PATH 后重试；可先运行 npx tsx w-model-dev/scripts/cli/doctor.ts --with-tla 自检（详见 references/tla-plus-guide.md「环境准备」）',
+        exitCode: 2,
+      });
+      return;
+    }
+  }
+
   const abs = path.resolve(manifestFile);
   const parsed = await readJsonOrExit<unknown>(manifestFile);
 

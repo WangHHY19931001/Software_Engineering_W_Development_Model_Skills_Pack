@@ -9,6 +9,36 @@
 >
 > **与 [verifier-spec.md §7.4A](verifier-spec.md) 的关系**：§7.4A 定义五轴评审与 Severity 标签（Critical / Required / Optional / Nit / FYI），是 `code-reviewer` Persona 的发现项组织方式。
 
+## 速查摘要
+
+> 一页速查：4 个评审 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）。Persona 是「供外部 Agent 在执行 /wm review 时采用的角色提示词」，不内置 LLM 调用。
+
+| 维度 | 核心锚点 | 详见 |
+|---|---|---|
+| 三层架构 | Skill（如何做）/ Persona（谁来做）/ Command（何时做） | 「三层架构」节 |
+| Persona 规则 | 单一角色 + 单一输出格式；不调用其他 Persona；产出须满足 verifier-spec §7 Schema | 「Persona 规则」节 |
+| code-reviewer | 五轴代码审查（Correctness/Readability/Architecture/Security/Performance），targetKind=code，阶段 5 | Persona 1 |
+| test-engineer | 测试策略与覆盖率，targetKind=test，阶段 4/6/7 | Persona 2 |
+| security-auditor | OWASP + STRIDE，targetKind=code/design，阶段 7/2 | Persona 3 |
+| performance-auditor | 性能基线与回归，Quick/Deep 模式，Metric-Honesty Rule，阶段 7 | Persona 4 |
+| Severity 标签 | Critical/Required/Optional/Nit/FYI（reworkHints 前缀） | Persona 1 + verifier-spec §7.4A.2 |
+| 与 R 的关系 | R 不调用 Persona，Persona 不调用 R，两者互补 | 「与 root-cause-locator.md 的关系」节 |
+| 与 subagent/ 人格库 | 4 Persona ↔ subagent/ 28 人格映射 | 「与 subagent/ 人格库的关系」节 |
+| 多角度分派 | 多角度 > 并行；N 份 PartialReport 独立产出 | 「多角度分派说明」节 |
+| self-as-verifier | S/V/G/R 兼任时产物路径独立（反模式 #35） | 「self-as-verifier 兼任规则」节 |
+
+**按场景只读 §X**：
+
+| 场景 | 应读章节 |
+|---|---|
+| 评审代码（阶段 5） | Persona 1（code-reviewer） |
+| 评审测试（阶段 4/6/7） | Persona 2（test-engineer） |
+| 安全评审（阶段 7/2） | Persona 3（security-auditor） |
+| 性能评审（阶段 7） | Persona 4（performance-auditor） |
+| 多角度 R/V 分派 | 「多角度分派说明」节 |
+| self-as-verifier 兼任 | 「self-as-verifier 兼任规则」节 |
+| 选 Persona 视角 | 「与 subagent/ 人格库的关系」节 |
+
 ## 三层架构（Skill / Persona / Command）
 
 | 层 | 是什么 | W 模型例子 | 组合角色 |

@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 41.16.0
+version: 41.17.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -116,6 +116,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 每次启用技能后按顺序执行。**编排者只做编排**——所有实施动作（产出 / 评审 / 门禁）必须分派子代理执行（见「编排者-子代理边界」节与 [references/subagent-delegation.md](references/subagent-delegation.md)）。
 
 1. **路由任务**（O）：识别命令、当前阶段和用户意图；歧义触发先确认。
+1.5. **环境自检 doctor**（O）：首次启用或门禁报依赖错误时，运行 `npx tsx w-model-dev/scripts/cli/doctor.ts [--with-tla]` 逐项自检环境（node/tsx/ajv/java/tla2tools/codegraph/openspec），按输出修复缺失项后再继续；`--with-tla` 将 TLA+ 相关项升级为阻断级校验。非阶段门，仅诊断。
 2. **读取状态**（O）：若 `.w-model/` 存在，读取 `project.json` 与 `rtm.json`；状态损坏时先恢复，不得继续推进。
 3. **检查前置产物**（O）：缺少上游阶段产物时拒绝跳阶段，并指出应返回的命令。
 4. **加载最小引用集**（O）：只加载 `SKILL.md` + 当前阶段 `phase-N-*.md` 摘要 + 所需状态文件；阶段细则由 S 子代理按需加载。
@@ -127,7 +128,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 8. **分派 G 子代理门禁**（O → G）：跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts` + `check-bdd-model.ts`**（约束 #13）；**阶段 5 额外跑 `check-code-tla-consistency.ts`**（代码-TLA+ 一致性回归，四维度校验）。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告** → **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
 9.5. **冰山扫掠**（O → R-iceberg）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）；G 跑 `check-iceberg-sweep.ts`（R1-R5）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
-10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。
+10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。状态文件写入统一经 `wm-write.ts`（`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验），不得手写。
 
 > 🔴 **CHECKPOINT · 项目初始化**：复述"进入阶段 / 同步测试设计 / 预期产物"，获得确认后才能分派 S 子代理。
 >
@@ -160,8 +161,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 | 资源目录 | 触发条件 |
 |---|---|
-| `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、其余见 dispatch-matrix 逐文件表 |
-| `scripts/cli/`（31 个 .ts：26 个 check-* 门禁 + 5 个工具 CLI） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
+| `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
+| `scripts/cli/`（33 个 .ts：26 个 check-* 门禁 + 7 个工具 CLI） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
 | `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
 | `schemas/`（20 份 JSON Schema draft-07） | 由 `scripts/logic/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
 | `tools/`（tla2tools.jar） | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝） |
@@ -185,6 +186,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
 | `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进；报告存 `.w-model/hill-climbing/<timestamp>-report.json` | O 分析（状态读写+分析，非实施） |
 | `/wm metrics` | 流程度量 | 从 run-log/budget 生成流程度量报告；只读 | O 只读，不分派子代理 |
+| `wm-write.ts` | 状态写入 | 状态文件安全写（`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验）；O/A/S 持久化 `.w-model/*.json` 统一经此写入 | O/A/S 执行（仅状态文件操作） |
+| `doctor.ts` | 环境自检 | 首次启用 / 依赖报错时诊断环境（node/tsx/ajv/java/tla2tools/codegraph/openspec）；`--with-tla` 升级 TLA+ 项为阻断级 | O 执行（非阶段门） |
 
 每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 
@@ -218,6 +221,8 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=5|6|7|8 [project-
 **NFR/CON 横切行特殊规则**：阶段 1~4 仅校验 `designDoc` 非空（横切登记）；阶段 5~8 校验 `designDoc` + `codeModule` 非空（横切回填）；不校验 NFR/CON 行的四级测试字段。
 
 **graph 自动发现**：`check-artifact-gate.ts` 按 `graph.json` → `consolidated-phase4.json` → … → `consolidated-phase1.json` 优先级自动查找。
+
+**模板漂移校验**：`check-artifact-gate.ts --validate-templates` 按 PHASE_SPEC_LAYOUT 校验技能包自身 `templates/` 资产（引用块 / §0 SSOT 头 / DoD 清单 ≥8 项），与 project-dir 无关、不读 RTM，命中即走独立分支；violations 非空 → exit 1。
 
 验收终检：`check-artifact-gate.ts "<project-dir>"`——退出码 0 且用户在发布检查点确认，项目才可完成；退出码 1/2 一律停止并按 `GATE_JSON` 回退。单元测试代码覆盖率须达 80%，代码规范检查通过且无高危安全漏洞。阶段门与质量门完整说明见 [references/workflow.md](references/workflow.md) 与 [references/quality-standards.md](references/quality-standards.md)。
 

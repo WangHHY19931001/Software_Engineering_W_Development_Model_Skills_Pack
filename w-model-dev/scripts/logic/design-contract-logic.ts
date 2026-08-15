@@ -221,7 +221,7 @@ export function checkDesignContractConsistency(
       violations.push({
         dimension: 'D1',
         severity: 'error',
-        message: `UAT 路径映射 ${mapping.uatId} 的实际路径 "${mapping.actualPath}" 在路由定义中不存在`,
+        message: `UAT 路径映射 ${mapping.uatId} 的实际路径 "${mapping.actualPath}" 在路由定义中不存在（应修正 actualPath 为已登记路由，或在 routeDefinitions 中补登该路由；示例：actualPath 填 "/api/auth/login"，对应 routeDefinitions 中 { method: "POST", path: "/api/auth/login" } 条目）`,
         expected: mapping.actualPath,
         actual: '路由定义中未找到',
       });
@@ -248,7 +248,7 @@ export function checkDesignContractConsistency(
       violations.push({
         dimension: 'D2',
         severity: 'error',
-        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到`,
+        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
         expected: `${assertion.method} ${assertion.path}`,
         actual: '路由定义中未找到',
       });
@@ -259,7 +259,7 @@ export function checkDesignContractConsistency(
         violations.push({
           dimension: 'D2',
           severity: 'error',
-          message: `验收断言 ${assertion.uatId} 使用参数 "${param}" 但路由 ${assertion.method} ${assertion.path} 定义中未包含该参数`,
+          message: `验收断言 ${assertion.uatId} 使用参数 "${param}" 但路由 ${assertion.method} ${assertion.path} 定义中未包含该参数（应取齐两侧：在路由定义 params 中补登 "${param}"，或从断言 params 中移除该参数）`,
           expected: param,
           actual: route.params.join(', '),
         });
@@ -274,7 +274,7 @@ export function checkDesignContractConsistency(
       violations.push({
         dimension: 'D3',
         severity: 'error',
-        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到`,
+        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
         expected: `${assertion.method} ${assertion.path}`,
         actual: '路由定义中未找到',
       });
@@ -284,7 +284,7 @@ export function checkDesignContractConsistency(
       violations.push({
         dimension: 'D3',
         severity: 'error',
-        message: `验收断言 ${assertion.uatId} 预期状态码 ${assertion.expectedStatus} 但路由 ${assertion.method} ${assertion.path} 实际返回 ${route.successStatus}`,
+        message: `验收断言 ${assertion.uatId} 预期状态码 ${assertion.expectedStatus} 但路由 ${assertion.method} ${assertion.path} 实际返回 ${route.successStatus}（应按设计文档核对该路由的成功状态码后统一两侧；示例：查询成功统一 200、创建统一 201、删除统一 204）`,
         expected: String(assertion.expectedStatus),
         actual: String(route.successStatus),
       });
@@ -298,7 +298,7 @@ export function checkDesignContractConsistency(
       violations.push({
         dimension: 'D4',
         severity: 'error',
-        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到`,
+        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
         expected: `${assertion.method} ${assertion.path}`,
         actual: '路由定义中未找到',
       });
@@ -309,7 +309,7 @@ export function checkDesignContractConsistency(
         violations.push({
           dimension: 'D4',
           severity: 'error',
-          message: `验收断言 ${assertion.uatId} 断言字段 "${field}" 但路由 ${assertion.method} ${assertion.path} 响应体中未包含该字段`,
+          message: `验收断言 ${assertion.uatId} 断言字段 "${field}" 但路由 ${assertion.method} ${assertion.path} 响应体中未包含该字段（应取齐两侧：在路由定义 responseFields 中补登 "${field}"，或从断言 assertedFields 中移除该字段）`,
           expected: field,
           actual: route.responseFields.join(', '),
         });

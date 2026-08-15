@@ -1,6 +1,6 @@
 # samples/ 覆盖矩阵
 
-> 本目录为 `self-test.ts`（254 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
+> 本目录为 `self-test.ts`（256 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
 > **每个 fixture 必须被 `w-model-dev/scripts/cli/self-test.ts` 用例数组引用**（`file` / `sampleDir` 字段），
 > 未登记的 fixture 不参与任何检查——由 `check-samples-coverage.ts` 门禁自动核对（新增样本后运行
 > `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` 确认全绿）。
@@ -17,7 +17,7 @@
 | `tla-bdd-sync` | check-tla-bdd-sync | TLA_BDD_SYNC_CASES（2） | TLA+↔BDD 转移集 / 状态集 / 不变式等价 | 平铺 JSON |
 | `bdd` | check-bdd-model | BDD_CASES（11） | BDD manifest + .feature 解析 / 状态机七要素 / RTM 映射 | 平铺 JSON + .feature |
 | `budget` | check-budget | BUDGET_CASES（5） | BudgetConfig R1-R5（时效性 / onExceed / killSwitch） | 平铺 JSON |
-| `run-log` | check-run-log + check-role-dispatch | RUN_LOG_CASES（13）+ ROLE_DISPATCH_CASES（3，复用本目录） | RunLog R1-R8 + 角色分派完整性 | 平铺 JSONL |
+| `run-log` | check-run-log + check-role-dispatch | RUN_LOG_CASES（14）+ ROLE_DISPATCH_CASES（3，复用本目录） | RunLog R1-R8（含 R8-4 轨迹顺序链）+ 角色分派完整性 | 平铺 JSONL |
 | `maturity` | check-maturity | MATURITY_CASES（3） | 成熟度 R1-R5 | 平铺 JSON |
 | `checkpoint` | check-checkpoint | CHECKPOINT_CASES（2） | Checkpoint R1-R5（决策非空 / 拒绝代签） | 平铺 JSONL |
 | `code-tla` | check-code-tla-consistency | CODE_TLA_CASES（5） | 代码-TLA+ 四维度一致性（SD→codeModule / Next / 不变式） | 平铺 JSON |
@@ -36,7 +36,7 @@
 | `openspec-archive` | check-openspec-archive | OPENSPEC_ARCHIVE_CASES（3，sampleDir 形态） | opsx:archive 归档完整性 | 嵌套 `openspec/changes/archive/` |
 | `uat-path-mapping` | check-artifact-gate（B4/B5） | UAT_PATH_MAPPING_CASES（5，sampleDir 形态） | uat-path-mapping.md 解析与回填校验 | 嵌套 `docs/uat-path-mapping.md` |
 
-合计 253 条用例 + 1 条 metadata 用例 = **254 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
+合计 255 条用例 + 1 条 metadata 用例 = **256 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
 
 ## 排除项
 

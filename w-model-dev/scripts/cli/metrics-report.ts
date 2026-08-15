@@ -30,6 +30,7 @@ import {
   computeMetrics,
   type BudgetLike,
   type MetricsReport,
+  type OrchestrationInputs,
   type RunLogEntryLike,
 } from '../logic/metrics-report-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
@@ -54,12 +55,55 @@ function parseArgs(argv: string[]): ParsedArgs {
   const to = args.find((a) => a.startsWith('--to='))?.split('=')[1];
   const phaseStr = args.find((a) => a.startsWith('--phase='))?.split('=')[1];
   const out = args.find((a) => a.startsWith('--out='))?.split('=')[1];
-  return { projectDir: positional[0] ?? process.cwd(), from, to, phaseStr, json, out };
+  return {
+    projectDir: positional[0] ?? process.cwd(),
+    from,
+    to,
+    phaseStr,
+    json,
+    out,
+  };
 }
 
 function fmtRecord(rec: Record<string, number>): string {
   const entries = Object.entries(rec).sort((a, b) => b[1] - a[1]);
   return entries.length === 0 ? '无' : entries.map(([k, v]) => `${k}=${v}`).join(', ');
+}
+
+/**
+ * 采集编排质量指标数据源（存在才统计，缺目录 → 空数组 → logic 层对应子区为 null）：
+ *   - `.w-model/preventive-reviews/*.json`（R3 三维度报告；路径约定 SKILL.md §6.5）
+ *   - `.w-model/iceberg/*.json`（冰山扫掠报告；路径约定 iceberg-sweep-guide.md §产出）
+ * 坏文件（非法 JSON / 非对象）console.warn 跳过，不阻断报告生成（纯只读统计，无门禁语义）。
+ */
+async function collectOrchestrationInputs(wmodelDir: string): Promise<OrchestrationInputs> {
+  const readJsonDir = async (dir: string): Promise<Record<string, unknown>[]> => {
+    let names: string[];
+    try {
+      names = await fs.readdir(dir);
+    } catch {
+      return []; // 目录不存在 → 不统计
+    }
+    const out: Record<string, unknown>[] = [];
+    for (const name of names.filter((n) => n.endsWith('.json')).sort()) {
+      try {
+        const parsed = parseJsonSafe(await fs.readFile(path.join(dir, name), 'utf-8'));
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          out.push(parsed as Record<string, unknown>);
+        } else {
+          console.warn(`⚠ 编排指标：${name} 非对象 JSON，已跳过`);
+        }
+      } catch {
+        console.warn(`⚠ 编排指标：${name} 非合法 JSON，已跳过`);
+      }
+    }
+    return out;
+  };
+
+  return {
+    r3Reports: await readJsonDir(path.join(wmodelDir, 'preventive-reviews')),
+    icebergReports: await readJsonDir(path.join(wmodelDir, 'iceberg')),
+  };
 }
 
 function printHuman(r: MetricsReport, runLogFile: string): void {
@@ -98,6 +142,29 @@ function printHuman(r: MetricsReport, runLogFile: string): void {
     console.log(`  onExceed=${r.budget.onExceed}${r.budget.killSwitchTriggered ? ' · ⚠ killSwitch 触发' : ''}`);
   } else {
     console.log('预算          : 未提供（.w-model/budget.json 缺失）');
+  }
+  console.log('编排质量      :');
+  if (r.orchestration.r3) {
+    const r3 = r.orchestration.r3;
+    console.log(
+      `  R3 审查     : ${r3.totalReports} 份（${fmtRecord(r3.byDimension)}）· findings ${r3.totalFindings}（均 ${r3.avgFindingsPerReport.toFixed(1)}/份）· ${fmtRecord(r3.findingsBySeverity)}`,
+    );
+  } else {
+    console.log('  R3 审查     : 未统计（.w-model/preventive-reviews/ 缺失或为空）');
+  }
+  if (r.orchestration.iceberg) {
+    const ic = r.orchestration.iceberg;
+    console.log(
+      `  冰山扫掠    : ${ic.totalSweeps} 次（round 分布 ${fmtRecord(ic.roundsDistribution)}）· 新发现 ${ic.totalNewFindings}（最高 round ${ic.maxRound}）· ${fmtRecord(ic.findingsBySeverity)}`,
+    );
+  } else {
+    console.log('  冰山扫掠    : 未统计（.w-model/iceberg/ 缺失或为空）');
+  }
+  {
+    const rh = r.orchestration.reworkHints;
+    console.log(
+      `  返工提示    : ${rh.entriesWithHints} 条记录携带 · 共 ${rh.totalHints} 条提示（均 ${rh.avgHintsPerEntry.toFixed(1)}/条）`,
+    );
   }
   if (r.warnings.length > 0) {
     console.log('预警          :');
@@ -151,7 +218,10 @@ async function main(): Promise<void> {
     }
   }
 
-  const report = computeMetrics(entries, budget, { from, to, phase });
+  // 编排质量指标数据源（存在才统计；缺目录 → 对应子区为 null）
+  const orch = await collectOrchestrationInputs(wmodelDir);
+
+  const report = computeMetrics(entries, budget, { from, to, phase }, orch);
 
   if (out) {
     await fs.writeFile(out, JSON.stringify(report, null, 2), 'utf-8');

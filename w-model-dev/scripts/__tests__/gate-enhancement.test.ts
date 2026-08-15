@@ -24,6 +24,7 @@ import {
   checkArtifactGate,
   checkPhaseSpecStructure,
   checkRequirementSpecStructure,
+  checkTemplatesStructure,
   checkUatPathMappingBackfill,
   type GateGraph,
   type RTMMatrixShape,
@@ -168,34 +169,44 @@ describe('Part A 门禁增强回归测试', () => {
   describe('P1.1 阶段级校验（phaseOption）', () => {
     it('phase=6 合法场景：unit+integration 通过，system+acceptance pending 应通过', () => {
       const matrix = loadGateSample('valid-phase6.json');
-      const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+      const result = checkArtifactGate(matrix, {
+        phaseOption: 6 as PhaseOption,
+      });
       expect(result.passed).toBe(true);
       expect(result.reasons).toEqual([]);
     });
 
     it('phase=6 REQ 缺 integrationTest 字段应失败', () => {
       const matrix = loadGateSample('bad-phase6-pending-system.json');
-      const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+      const result = checkArtifactGate(matrix, {
+        phaseOption: 6 as PhaseOption,
+      });
       expect(result.passed).toBe(false);
       expect(result.reasons.some((r) => r.includes('REQ-001') && r.includes('integrationTest'))).toBe(true);
     });
 
     it('phase=5 REQ 缺 codeModule 应失败', () => {
       const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
-      const result = checkArtifactGate(matrix, { phaseOption: 5 as PhaseOption });
+      const result = checkArtifactGate(matrix, {
+        phaseOption: 5 as PhaseOption,
+      });
       expect(result.passed).toBe(false);
       expect(result.reasons.some((r) => r.includes('REQ-001') && r.includes('codeModule'))).toBe(true);
     });
 
     it('phase=5 bad 样本在 phase=8 终检也应失败', () => {
       const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
-      const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+      const result = checkArtifactGate(matrix, {
+        phaseOption: 8 as PhaseOption,
+      });
       expect(result.passed).toBe(false);
     });
 
     it('phase=6 合法场景在 phase=8 终检应失败（system/acceptance pending）', () => {
       const matrix = loadGateSample('valid-phase6.json');
-      const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+      const result = checkArtifactGate(matrix, {
+        phaseOption: 8 as PhaseOption,
+      });
       expect(result.passed).toBe(false);
       expect(result.reasons.some((r) => r.includes('待执行'))).toBe(true);
     });
@@ -281,8 +292,21 @@ function makeValidGraph(): GraphShape {
     version: 1,
     currentPhase: 1,
     nodes: [
-      { id: 'EXT-IN-001', type: 'EXT-IN', phase: 1, title: '外部输入', summary: '边界源' },
-      { id: 'REQ-001', type: 'REQ', phase: 1, title: '用户域', summary: 'level=1 domain', level: 1 },
+      {
+        id: 'EXT-IN-001',
+        type: 'EXT-IN',
+        phase: 1,
+        title: '外部输入',
+        summary: '边界源',
+      },
+      {
+        id: 'REQ-001',
+        type: 'REQ',
+        phase: 1,
+        title: '用户域',
+        summary: 'level=1 domain',
+        level: 1,
+      },
       {
         id: 'REQ-002',
         type: 'REQ',
@@ -292,8 +316,22 @@ function makeValidGraph(): GraphShape {
         level: 2,
         reqGroup: 'REQ-001',
       },
-      { id: 'NFR-001', type: 'REQ', phase: 1, title: '性能NFR', summary: 'level=2 NFR', level: 2, reqGroup: 'REQ-001' },
-      { id: 'EXT-OUT-001', type: 'EXT-OUT', phase: 1, title: '外部输出', summary: '边界汇' },
+      {
+        id: 'NFR-001',
+        type: 'REQ',
+        phase: 1,
+        title: '性能NFR',
+        summary: 'level=2 NFR',
+        level: 2,
+        reqGroup: 'REQ-001',
+      },
+      {
+        id: 'EXT-OUT-001',
+        type: 'EXT-OUT',
+        phase: 1,
+        title: '外部输出',
+        summary: '边界汇',
+      },
     ],
     edges: [
       // REQ 层级树（from=parent → to=child，与 R2 parentInCount / R3 toLevel=fromLevel+1 一致）
@@ -316,7 +354,14 @@ function makeValidGraph(): GraphShape {
  */
 function makeValidCoverage(): CoverageShape {
   return {
-    stakeholders: [{ id: 'SH-001', role: '终端用户', relatedReqs: ['REQ-001'], status: 'covered' }],
+    stakeholders: [
+      {
+        id: 'SH-001',
+        role: '终端用户',
+        relatedReqs: ['REQ-001'],
+        status: 'covered',
+      },
+    ],
     scenarios: [
       {
         id: 'SC-001',
@@ -349,7 +394,12 @@ function makeValidCoverage(): CoverageShape {
       { type: 'CON', reqIds: ['CON-001'], status: 'covered' },
     ],
     crossCuts: [{ nfrConId: 'NFR-001', governedReqs: ['REQ-002'], status: 'covered' }],
-    metrics: { stakeholder: 100, scenario: 100, requirementType: 100, crossCut: 100 },
+    metrics: {
+      stakeholder: 100,
+      scenario: 100,
+      requirementType: 100,
+      crossCut: 100,
+    },
   };
 }
 
@@ -401,7 +451,13 @@ function makeR4ViolationGraph(): GraphShape {
     version: 1,
     currentPhase: 1,
     nodes: [
-      { id: 'EXT-IN-001', type: 'EXT-IN', phase: 1, title: '外部输入', summary: '边界源' },
+      {
+        id: 'EXT-IN-001',
+        type: 'EXT-IN',
+        phase: 1,
+        title: '外部输入',
+        summary: '边界源',
+      },
       {
         id: 'REQ-001',
         type: 'REQ',
@@ -411,12 +467,58 @@ function makeR4ViolationGraph(): GraphShape {
         level: 2,
         reqGroup: 'REQ-G1',
       },
-      { id: 'REQ-002', type: 'REQ', phase: 1, title: '功能B', summary: 'level=3', level: 3, reqGroup: 'REQ-G1' },
-      { id: 'REQ-003', type: 'REQ', phase: 1, title: '功能C', summary: 'level=4', level: 4, reqGroup: 'REQ-G1' },
-      { id: 'REQ-004', type: 'REQ', phase: 1, title: '功能D', summary: 'level=4', level: 4, reqGroup: 'REQ-G1' },
-      { id: 'REQ-005', type: 'REQ', phase: 1, title: '功能E', summary: 'level=4', level: 4, reqGroup: 'REQ-G1' },
-      { id: 'NFR-001', type: 'REQ', phase: 1, title: '性能NFR', summary: 'level=4 NFR', level: 4, reqGroup: 'REQ-G1' },
-      { id: 'EXT-OUT-001', type: 'EXT-OUT', phase: 1, title: '外部输出', summary: '边界汇' },
+      {
+        id: 'REQ-002',
+        type: 'REQ',
+        phase: 1,
+        title: '功能B',
+        summary: 'level=3',
+        level: 3,
+        reqGroup: 'REQ-G1',
+      },
+      {
+        id: 'REQ-003',
+        type: 'REQ',
+        phase: 1,
+        title: '功能C',
+        summary: 'level=4',
+        level: 4,
+        reqGroup: 'REQ-G1',
+      },
+      {
+        id: 'REQ-004',
+        type: 'REQ',
+        phase: 1,
+        title: '功能D',
+        summary: 'level=4',
+        level: 4,
+        reqGroup: 'REQ-G1',
+      },
+      {
+        id: 'REQ-005',
+        type: 'REQ',
+        phase: 1,
+        title: '功能E',
+        summary: 'level=4',
+        level: 4,
+        reqGroup: 'REQ-G1',
+      },
+      {
+        id: 'NFR-001',
+        type: 'REQ',
+        phase: 1,
+        title: '性能NFR',
+        summary: 'level=4 NFR',
+        level: 4,
+        reqGroup: 'REQ-G1',
+      },
+      {
+        id: 'EXT-OUT-001',
+        type: 'EXT-OUT',
+        phase: 1,
+        title: '外部输出',
+        summary: '边界汇',
+      },
     ],
     edges: [
       // REQ 层级树（from=parent → to=child）
@@ -555,8 +657,18 @@ describe('阶段 E 集成测试：graph + coverage + exemption 联动', () => {
     const coverage = makeValidCoverage();
     // 制造 partial 项触发 C8（100% 阈值不允许 partial）
     coverage.stakeholders = [
-      { id: 'SH-001', role: '用户', relatedReqs: ['REQ-001'], status: 'covered' },
-      { id: 'SH-002', role: '管理员', relatedReqs: ['REQ-002'], status: 'partial' },
+      {
+        id: 'SH-001',
+        role: '用户',
+        relatedReqs: ['REQ-001'],
+        status: 'covered',
+      },
+      {
+        id: 'SH-002',
+        role: '管理员',
+        relatedReqs: ['REQ-002'],
+        status: 'partial',
+      },
     ];
     // recalc = (1 + 0.5) / 2 * 100 = 75，匹配重算避免 C10 噪声
     coverage.metrics.stakeholder = 75;
@@ -614,9 +726,21 @@ describe('P0-2 codeModule 格式校验', () => {
       ],
       executionSummary: {
         unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
-        integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        integrationTest: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          pending: 0,
+          coverage: 0,
+        },
         systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
-        acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        acceptanceTest: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          pending: 0,
+          coverage: 0,
+        },
       },
     };
     const result = checkArtifactGate(matrix, { phaseOption: 5 });
@@ -640,9 +764,21 @@ describe('P0-2 codeModule 格式校验', () => {
       ],
       executionSummary: {
         unitTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
-        integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        integrationTest: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          pending: 0,
+          coverage: 0,
+        },
         systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
-        acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        acceptanceTest: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          pending: 0,
+          coverage: 0,
+        },
       },
     };
     const result = checkArtifactGate(matrix, { phaseOption: 5 });
@@ -666,9 +802,21 @@ describe('P0-2 codeModule 格式校验', () => {
       ],
       executionSummary: {
         unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
-        integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        integrationTest: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          pending: 0,
+          coverage: 0,
+        },
         systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
-        acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+        acceptanceTest: {
+          total: 0,
+          passed: 0,
+          failed: 0,
+          pending: 0,
+          coverage: 0,
+        },
       },
     };
     const result = checkArtifactGate(matrix, { phaseOption: 5 });
@@ -695,10 +843,34 @@ describe('gate-logic 修正', () => {
           },
         ],
         executionSummary: {
-          unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
-          integrationTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
-          systemTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
-          acceptanceTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+          unitTest: {
+            total: 1,
+            passed: 1,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
+          integrationTest: {
+            total: 1,
+            passed: 1,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
+          systemTest: {
+            total: 1,
+            passed: 1,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
+          acceptanceTest: {
+            total: 1,
+            passed: 1,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
         },
       };
       const graph: GateGraph = { nodes: [{ id: 'SD-5.2.1', type: 'SD' }] };
@@ -736,10 +908,34 @@ describe('gate-logic 修正', () => {
           },
         ],
         executionSummary: {
-          unitTest: { total: 2, passed: 2, failed: 0, pending: 0, coverage: 90 },
-          integrationTest: { total: 2, passed: 2, failed: 0, pending: 0, coverage: 90 },
-          systemTest: { total: 2, passed: 2, failed: 0, pending: 0, coverage: 90 },
-          acceptanceTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
+          unitTest: {
+            total: 2,
+            passed: 2,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
+          integrationTest: {
+            total: 2,
+            passed: 2,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
+          systemTest: {
+            total: 2,
+            passed: 2,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
+          acceptanceTest: {
+            total: 1,
+            passed: 1,
+            failed: 0,
+            pending: 0,
+            coverage: 90,
+          },
         },
       };
       const result = checkArtifactGate(matrix, { phaseOption: 8 });
@@ -755,7 +951,11 @@ describe('gate-logic 修正', () => {
   describe('uat-path-mapping 回填校验类型 guard', () => {
     it('actualPath/mappingType 非字符串 → 不抛 TypeError，push violation 后继续', () => {
       const violations = checkUatPathMappingBackfill([
-        { uatId: 'UAT-001', actualPath: 123 as unknown as string, mappingType: '直接' },
+        {
+          uatId: 'UAT-001',
+          actualPath: 123 as unknown as string,
+          mappingType: '直接',
+        },
       ]);
       expect(violations.some((v) => v.includes('UAT-001') && v.includes('类型'))).toBe(true);
     });
@@ -969,9 +1169,21 @@ describe('Phase 3 结构校验经 checkArtifactGate 生效', () => {
     ],
     executionSummary: {
       unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },
-      integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      integrationTest: {
+        total: 0,
+        passed: 0,
+        failed: 0,
+        pending: 0,
+        coverage: 0,
+      },
       systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
-      acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
+      acceptanceTest: {
+        total: 0,
+        passed: 0,
+        failed: 0,
+        pending: 0,
+        coverage: 0,
+      },
     },
   };
 
@@ -1064,5 +1276,154 @@ describe('Phase 4 详细设计结构校验', () => {
     files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
     const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
     expect(v.refs.some((m) => m.includes('主文档 glob'))).toBe(true);
+  });
+});
+
+describe('模板漂移校验（--validate-templates，C9）', () => {
+  /** 路径分隔符归一化 mkFs（模板校验不需要 readdirSync） */
+  const mkFs = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      const k = p.split(path.sep).join('/');
+      if (!(k in files)) throw new Error(`missing ${p}`);
+      return files[k] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p.split(path.sep).join('/') in files;
+    },
+  });
+
+  /** 各阶段模板布局（与 gate-logic TEMPLATES_PHASE_DIR + PHASE_SPEC_LAYOUT 对齐） */
+  const TPL_LAYOUT: Record<number, { main: string; dir: string; refs: string[]; prefixed: boolean }> = {
+    1: {
+      main: 'requirement-spec.md',
+      dir: 'requirement-spec',
+      refs: [
+        'system-context.md',
+        'glossary.md',
+        'traceability-matrix.md',
+        'behavior-spec.md',
+        'discipline-dod.md',
+        'uml-modeling.md',
+      ],
+      prefixed: false,
+    },
+    2: {
+      main: 'system-design.md',
+      dir: 'system-design',
+      refs: [
+        'system-architecture.md',
+        'glossary.md',
+        'traceability-matrix.md',
+        'behavior-spec.md',
+        'discipline-dod.md',
+        'uml-modeling.md',
+      ],
+      prefixed: true,
+    },
+    3: {
+      main: 'interface-design.md',
+      dir: 'interface-design',
+      refs: [
+        'interface-contract.md',
+        'glossary.md',
+        'traceability-matrix.md',
+        'behavior-spec.md',
+        'discipline-dod.md',
+        'uml-modeling.md',
+      ],
+      prefixed: true,
+    },
+    4: {
+      main: 'detailed-design.md',
+      dir: 'detailed-design',
+      refs: [
+        'class-design.md',
+        'data-model.md',
+        'glossary.md',
+        'traceability-matrix.md',
+        'behavior-spec.md',
+        'discipline-dod.md',
+      ],
+      prefixed: true,
+    },
+  };
+
+  /** 构造一套完整合规的 templates 文件集（4 阶段全绿基线；key 相对校验根目录，与 path.join(templatesDir,...) 对齐） */
+  function mkValidTemplates(): Record<string, string> {
+    const files: Record<string, string> = {};
+    const ssot = '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    for (const phase of [1, 2, 3, 4]) {
+      const { main, dir, refs, prefixed } = TPL_LAYOUT[phase]!;
+      // 引用块：phase=1 直接文件名；phase≥2 {{module}} 占位符
+      const links = refs.map((r) => `> 详见 [x](./${prefixed ? `{{module}}-${r}` : r})`).join('\n');
+      files[`templates/${main}`] = links + ssot;
+      for (const r of refs) files[`templates/${dir}/${r}`] = '';
+      files[`templates/${dir}/discipline-dod.md`] = Array(8).fill('- [ ] x').join('\n');
+    }
+    return files;
+  }
+
+  it('四阶段模板齐全合规 → violations 为空', () => {
+    expect(checkTemplatesStructure('templates', mkFs(mkValidTemplates()))).toEqual([]);
+  });
+
+  it('主模板缺失 → 报「主模板缺失」且跳过该阶段其余检查', () => {
+    const files = mkValidTemplates();
+    delete files['templates/system-design.md'];
+    const v = checkTemplatesStructure('templates', mkFs(files));
+    expect(v.some((m) => m.includes('阶段 2 主模板缺失 system-design.md'))).toBe(true);
+    // continue 短路：阶段 2 子模板缺失不重复报
+    expect(v.some((m) => m.includes('阶段 2 子模板缺失'))).toBe(false);
+    expect(v.some((m) => m.includes('阶段 2 主模板 §0'))).toBe(false);
+  });
+
+  it('phase≥2 引用块漏 {{module}} 占位符 → 报缺引用块', () => {
+    const files = mkValidTemplates();
+    // 漂移：把 phase 3 引用块写成项目产物形式（{{module}} 前缀丢失）
+    files['templates/interface-design.md'] = files['templates/interface-design.md']!.replace(
+      '(./{{module}}-interface-contract.md)',
+      '(./interface-contract.md)',
+    );
+    const v = checkTemplatesStructure('templates', mkFs(files));
+    expect(
+      v.some((m) => m.includes('阶段 3 主模板 interface-design.md 缺引用块 → ](./{{module}}-interface-contract.md)')),
+    ).toBe(true);
+  });
+
+  it('子模板缺失 → 报「子模板缺失」', () => {
+    const files = mkValidTemplates();
+    delete files['templates/requirement-spec/uml-modeling.md'];
+    const v = checkTemplatesStructure('templates', mkFs(files));
+    expect(v.some((m) => m.includes('阶段 1 子模板缺失 requirement-spec/uml-modeling.md'))).toBe(true);
+  });
+
+  it('§0 SSOT 头缺项 → 报缺对应声明', () => {
+    const files = mkValidTemplates();
+    files['templates/detailed-design.md'] = files['templates/detailed-design.md']!.replace('禁止占位词', '禁止占位');
+    const v = checkTemplatesStructure('templates', mkFs(files));
+    expect(v.some((m) => m.includes('阶段 4 主模板 §0 SSOT 头缺「禁止占位词」'))).toBe(true);
+  });
+
+  it('DoD 子模板清单 < 8 项 → 报项数不足', () => {
+    const files = mkValidTemplates();
+    files['templates/system-design/discipline-dod.md'] = Array(7).fill('- [ ] x').join('\n');
+    const v = checkTemplatesStructure('templates', mkFs(files));
+    expect(v.some((m) => m.includes('阶段 2 DoD 清单仅 7 项（须 ≥ 8）'))).toBe(true);
+  });
+
+  it('DoD 子模板缺失 → 报 DoD 子模板缺失', () => {
+    const files = mkValidTemplates();
+    delete files['templates/interface-design/discipline-dod.md'];
+    const v = checkTemplatesStructure('templates', mkFs(files));
+    expect(v.some((m) => m.includes('阶段 3 DoD 子模板缺失 interface-design/discipline-dod.md'))).toBe(true);
+  });
+
+  it('真实技能包 templates/ 资产 → violations 为空（资产回归保护）', () => {
+    const templatesDir = path.resolve(here, '..', '..', 'templates');
+    const v = checkTemplatesStructure(templatesDir, {
+      readFileSync: (p) => fs.readFileSync(p, 'utf-8'),
+      existsSync: (p) => fs.existsSync(p),
+    });
+    expect(v).toEqual([]);
   });
 });

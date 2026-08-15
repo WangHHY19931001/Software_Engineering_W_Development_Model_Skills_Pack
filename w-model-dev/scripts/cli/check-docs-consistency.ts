@@ -261,15 +261,30 @@ function main(): void {
     .filter((f) => f.endsWith('.ts'))
     .sort();
   const checkScriptCount = cliScriptFiles.filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 26（cli/ 层）
-  /** 非 check-* 但可 exit 2 的脚本数：4 个工具 CLI（ensure-codegraph-opsx / metrics-report / security-scan / wm-status）+ logic/plan-chunks.ts；self-test.ts 非 exit-2 不计入 */
-  const TOOL_OR_LOGIC_EXIT2_COUNT = 5;
-  const exit2ScriptCount = checkScriptCount + TOOL_OR_LOGIC_EXIT2_COUNT; // = 31（「31 个脚本」表述来源）
+  /** 非 check-* 但可 exit 2 的脚本数：6 个工具 CLI（ensure-codegraph-opsx / metrics-report / security-scan / wm-status / wm-write / doctor）+ logic/plan-chunks.ts；self-test.ts 非 exit-2 不计入 */
+  const TOOL_OR_LOGIC_EXIT2_COUNT = 7;
+  const exit2ScriptCount = checkScriptCount + TOOL_OR_LOGIC_EXIT2_COUNT; // = 33（「33 个脚本」表述来源）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),
   ).length;
   const scriptsChanged = detectScriptsChanges(root);
   const vitestTestCount = collectVitestTestCount(root, scriptsChanged);
+
+  // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md（核心导航文档集）
+  const referenceFiles = readdirSync(join(root, 'w-model-dev/references'))
+    .filter((f) => f.endsWith('.md'))
+    .sort();
+  const linkDocs = [
+    { name: 'SKILL.md', content: read('w-model-dev/SKILL.md'), baseDir: 'w-model-dev' },
+    ...referenceFiles.map((f) => ({
+      name: `references/${f}`,
+      content: read(join('w-model-dev/references', f)),
+      baseDir: 'w-model-dev/references',
+    })),
+    { name: 'README.md', content: read('README.md'), baseDir: '.' },
+    { name: 'AGENTS.md', content: read('AGENTS.md'), baseDir: '.' },
+  ];
 
   const input: DocConsistencyInput = {
     schemaFiles,
@@ -302,6 +317,8 @@ function main(): void {
     scriptsChanged,
     cliScriptFiles,
     securityBaselineEntryCount: readSecurityBaselineEntryCount(root),
+    linkDocs,
+    linkExists: (relPath: string) => existsSync(join(root, relPath)),
   };
 
   const violations = runDocConsistencyChecks(input);

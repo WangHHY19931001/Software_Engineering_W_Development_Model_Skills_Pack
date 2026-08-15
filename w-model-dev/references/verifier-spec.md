@@ -8,6 +8,38 @@
 > 评审执行由外部 Agent 完成。技能演化（SkillOpt / darwin-skill）与本规范解耦：
 > 本规范只覆盖「阶段产物校验流程」，不包含 Rollout / Reflect / Edit 等轨迹内容。
 
+## 速查摘要
+
+> 一页速查：LLM-as-a-Verifier 评审规范。评审执行由外部 Agent 完成，技能只提供「提示词 + 输出 schema + 校验脚本」三件套，不内置 LLM 调用。
+
+| 维度 | 核心锚点 | 详见 |
+|---|---|---|
+| 目标类型 | 5 种 targetKind（requirement/design/code/test/rootcause）+ 各阶段 subCriteria 标准模板 | §2 |
+| 三维度验证 | 评分粒度（≥3 子标准）/ 重复评估（repeatTimes≥3）/ 标准分解（evidence 必填） | §3 |
+| 连续评分 | logits 期望值 / text-parse 回退（±0.05 扰动） | §4 |
+| PPT 排序 | 多候选优先级排序（k/temperature/rounds） | §5 |
+| 输出 Schema | VerifierOutput JSON（subCriteria==5 项 / compositeScore / qualityLevel / passed） | §6 |
+| 质量等级 | A[0.85,1] / B[0.70,0.85) / C[0.50,0.70) / D[0,0.50) | §6.1 |
+| 通过判定 | passed = (A‖B) && 所有子标准 ≥0.70（单轴下限 R13） | §6.3 |
+| 子标准定义 | 5 类目标各自的 5 项子标准 + 权重 | §7 |
+| 校验脚本 | check-verifier-output.ts（退出码 0/1/2） | §10 |
+| 异常处理 | 重试 / 降级 / 方差超阈值 / evidence 失效 | §11 |
+| 跨阶段一致性 | 后阶段 evidence 不得否定前阶段 | §12 |
+| self-as-verifier | V 评审产出独立性（路径/内容/run-log/视角） | §13 |
+
+**按场景只读 §X**：
+
+| 场景 | 应读章节 |
+|---|---|
+| 评审某 targetKind 用哪套子标准 | §2 + §7（对应子节） |
+| 构造评审提示词 | §8（模板 + 占位符） |
+| 输出 JSON 前自检必填字段 / 防编造 | §4.2.1 + §6 |
+| 校验脚本调用与退出码 | §10 |
+| LLM 失败 / 降级 / 方差超阈值 | §11 |
+| 多候选排序 | §5 |
+| 跨阶段 evidence 一致性 | §12 |
+| self-as-verifier 模式 | §13 |
+
 ## 目录
 
 - §1–2：设计原则与目标类型

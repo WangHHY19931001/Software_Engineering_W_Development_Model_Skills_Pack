@@ -120,8 +120,11 @@ npm install
 npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 # 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
 
-# 验证回归基线（self-test 254 条样本全部通过）：
+# 验证回归基线（self-test 256 条样本全部通过）：
 npm run self-test
+
+# 环境自检（doctor：node/tsx/ajv 等就绪性，exit 0 = 环境就绪）：
+npm run doctor
 
 # 验证安全扫描基线（exit 0 = 无新增风险）：
 npm run lint:security
@@ -135,6 +138,8 @@ npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 $LASTEXITCODE  # 预期为 2
 npm run self-test
 $LASTEXITCODE  # 预期为 0
+npm run doctor
+$LASTEXITCODE  # 预期为 0
 npm run lint:security
 $LASTEXITCODE  # 预期为 0
 ```
@@ -147,7 +152,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 41.16.0
+version: 41.17.0
 description: >-
   Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
   requests requirements traceability (RTM), stage gates, quality gates, or development
@@ -197,7 +202,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 | JSON Schema 文件（draft-07，20 份） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
 | Schema 加载与校验工具 | [../w-model-dev/scripts/logic/schema-loader.ts](../w-model-dev/scripts/logic/schema-loader.ts) |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts) |
-| 回归基线脚本（254 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
+| 回归基线脚本（256 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
 | 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
 | Verifier 输出校验逻辑 | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts) |
