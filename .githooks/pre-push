@@ -203,7 +203,7 @@ run_expect "check:exemption 有效豁免样本退出 0" 0 \
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
 
-# 12. vitest 单元测试全量通过（42 test files / 695 tests）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
+# 12. vitest 单元测试全量通过（42 test files / 699 tests）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
 #     logic/ + lib/ 阈值 stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest 会 exit 1 阻断推送；
 #     基线见 config/vitest.config.ts coverage.thresholds 注释）
 #     --reporter=json --outputFile 落盘实测用例总数，供第 14 项 check-docs-consistency 复用（避免 vitest 双跑）

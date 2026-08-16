@@ -3,7 +3,8 @@
  *
  * 覆盖：backupPathFor 命名 / 目标不存在直接写 / 非法 JSON 拒绝 /
  *       mtime 守卫（MTIME_CONFLICT 与放行）/ 备份生成 / 备份轮换 keepBackups /
- *       原子替换后内容正确且无 .tmp 残留 / --no-backup 跳过备份。
+ *       原子替换后内容正确且无 .tmp 残留 / --no-backup 跳过备份 /
+ *       审计修复 P4：tmpPath 唯一化（同进程并发写）+ 回读失败三分支自动回滚。
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -133,5 +134,79 @@ describe('writeStateJson', () => {
     expect(r.ok).toBe(true);
     const raw = await fs.readFile(p, 'utf-8');
     expect(raw).toBe('\uFEFF{"a":1}');
+  });
+});
+
+describe('writeStateJson 审计修复 P4（tmpPath 唯一化 + 回读失败自动回滚）', () => {
+  it('同进程并发两次写同一目标：无未捕获异常，终态一致，无 tmp 残留', async () => {
+    // 调度不变量断言（弱化理由：固有竞态 = 一方回读可能读到对方落盘内容 →
+    // WRITE_VERIFY_FAILED + 回滚，属合法结果，无法也无需强制单一路径）
+    // 目标预存在故 backupPath 必非空，失败方回滚走 copyFile 分支，tmpdir 可写故必成功
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-conc-'));
+    try {
+      const target = path.join(dir, 'state.json');
+      await fs.writeFile(target, '{"v":0}', 'utf-8');
+      const results = await Promise.all([writeStateJson(target, '{"v":1}'), writeStateJson(target, '{"v":2}')]);
+      for (const r of results) {
+        const okOrVerify = r.ok === true || (r.reason === 'WRITE_VERIFY_FAILED' && r.rolledBack === true);
+        expect(okOrVerify).toBe(true);
+      }
+      const final = JSON.parse(await fs.readFile(target, 'utf-8')) as { v: number };
+      expect([0, 1, 2]).toContain(final.v);
+      const leftovers = (await fs.readdir(dir)).filter((f) => f.includes('.tmp-'));
+      expect(leftovers).toEqual([]);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('回读校验失败时自动回滚备份并报告 rolledBack', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-rollback-'));
+    try {
+      const target = path.join(dir, 'state.json');
+      await fs.writeFile(target, '{"v":"original"}', 'utf-8');
+      const result = await writeStateJson(target, '{"v":"new"}', {
+        readbackImpl: async () => '{"v":"corrupted"}',
+      });
+      expect(result.ok).toBe(false);
+      expect(result.reason).toBe('WRITE_VERIFY_FAILED');
+      expect(result.rolledBack).toBe(true);
+      expect(await fs.readFile(target, 'utf-8')).toBe('{"v":"original"}');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('回读失败且无备份（目标原不存在）时删除损坏文件', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-nobak-'));
+    try {
+      const target = path.join(dir, 'state.json');
+      const result = await writeStateJson(target, '{"v":"new"}', {
+        readbackImpl: async () => 'garbage',
+      });
+      expect(result.ok).toBe(false);
+      expect(result.reason).toBe('WRITE_VERIFY_FAILED');
+      await expect(fs.readFile(target, 'utf-8')).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('backup:false 且目标已存在时回读失败：不删除文件、rolledBack:false', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-nobak-exist-'));
+    try {
+      const target = path.join(dir, 'state.json');
+      await fs.writeFile(target, '{"v":"original"}', 'utf-8');
+      const result = await writeStateJson(target, '{"v":"new"}', {
+        backup: false,
+        readbackImpl: async () => 'garbage',
+      });
+      expect(result.ok).toBe(false);
+      expect(result.reason).toBe('WRITE_VERIFY_FAILED');
+      expect(result.rolledBack).toBe(false); // 无备份可恢复，不谎报
+      expect(await fs.readFile(target, 'utf-8')).toBe('{"v":"new"}'); // 文件保留
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 });
