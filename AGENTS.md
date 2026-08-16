@@ -31,7 +31,7 @@
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
 | `w-model-dev/references/` | 阶段细则（阶段 1 含迷雾登记册 Fog of War）/ verifier-spec（含五轴评审 §7.4A + self-as-verifier 模式节）/ agent-personas（4 个评审角色提示词）/ subagent-delegation（O/A/S/V/G/R 编排者-子代理边界；含角色分派完整性校验节 + S 子代理 RTM 回填强制职责）/ root-cause-locator（R 子代理根因分析方法论）/ subagent-persona-matrix（R-lead / V-lead 多角度 persona 选择矩阵）/ definition-of-done（项目级 DoD 七维度）/ signature-chain-guide（角色链式签名 + 产出来源正确性）/ event-ingress-guide（Loop 3 事件接驳）/ hill-climbing-guide（Loop 4 爬坡循环）/ skillopt-adoption（SkillOpt 方法论吸收）/ anti-patterns（47 条流程反模式 #1-#47；F1~F10 失败模式见 operation-behaviors.md；O1~O6 运维失败模式见 SSoT §4A.2a）/ hard-constraints（14 条硬约束完整版）/ operation-behaviors（八条操作行为 + 失败模式 F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学：主刀与修正权等）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则）/ tla-plus-guide（TLA+ 层次化状态机建模与行为门禁）/ bdd-guide（BDD 建模 + TLA+/BDD 自动化同步校验节）/ command-reference / operational-recovery（含成熟度与行为门禁分级）/ dispatch-matrix（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）/ 数据模型（含 budget/run-log/maturity schema）/ rtm-guide / quality-standards / iceberg-sweep-guide / glossary / toolbox / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / tla-plus-syntax-reference / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-tlc-configuration / directory-conventions / format-conventions / estimation-guide / context-management-guide / code-smells-checklist / concurrency-guide / refactoring-catalog / design-patterns-catalog | **按需加载**，禁止一次性载入全部（反例 #5） |
 | `w-model-dev/subagent/` | **人格库**（28 个 Markdown 人格文件，分 engineering / testing / design / product / project 5 类） | R-lead / V-lead 多角度分析时按 `references/subagent-persona-matrix.md` 选用 persona；Persona 文件本身是 Markdown，不调用 LLM |
-| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`logic/`（校验逻辑）+ `cli/`（CLI 入口）+ `lib/`（JSON/错误结构工具）。**完整 33 脚本清单见 §8「脚本导航表」与 [dispatch-matrix.md](w-model-dev/references/dispatch-matrix.md) §6 权威登记表**——新增 / 改名门禁脚本只须登记 dispatch-matrix 一处，`check-docs-consistency.ts` script-registry 检查兜底。`samples/`（fixture 样本）/ `__tests__/`（vitest 单元测试，42 个 .test.ts / 691 条 + README.md coverage 矩阵） | 阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 预防性审查 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点直接 `npx tsx` 执行 |
+| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`logic/`（校验逻辑）+ `cli/`（CLI 入口）+ `lib/`（JSON/错误结构工具）。**完整 33 脚本清单见 §8「脚本导航表」与 [dispatch-matrix.md](w-model-dev/references/dispatch-matrix.md) §6 权威登记表**——新增 / 改名门禁脚本只须登记 dispatch-matrix 一处，`check-docs-consistency.ts` script-registry 检查兜底。`samples/`（fixture 样本）/ `__tests__/`（vitest 单元测试，42 个 .test.ts / 695 条 + README.md coverage 矩阵） | 阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 预防性审查 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等，阶段 1-4 含主模板 + 每阶段 6 独立子模板，跨阶段共 10 种） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
 | `w-model-dev/schemas/` | JSON Schema (draft-07) 文件（20 份，全字段 description 自描述） | logic 层 schema 校验时自动加载；新增 .w-model/*.json 字段必先改 schema |
@@ -45,7 +45,7 @@
 | `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 16 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 
 门禁脚本测试：
-- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，42 个 .test.ts / 691 条）
+- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，42 个 .test.ts / 695 条）
 - `w-model-dev/scripts/samples/`：fixture 样本（含 gate-enhancement 场景）
 - 运行：`npx vitest run --config config/vitest.config.ts`（仓库根目录；配置集中于 config/）
 
@@ -150,7 +150,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-opsx-artifacts.ts | opsx 制品 + R3×3 + V 审查产物齐全性校验（反模式 #39/#40） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-openspec-archive.ts | opsx:archive 归档完整性校验 | 8（归档） | 0=通过，1=校验失败，2=输入错误 |
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式 | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
-| self-test.ts | 回归基线（256 条样本）；vitest 691 条（42 test files） | - | 0=通过，1=失败 |
+| self-test.ts | 回归基线（256 条样本）；vitest 695 条（42 test files） | - | 0=通过，1=失败 |
 | wm-status.ts | 状态快照（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议），只读 | - | 0=通过，2=输入错误 |
 | metrics-report.ts | 流程度量报告（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警），只读 | - | 0=通过，2=输入错误 |
 | security-scan.ts | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（`--regenerate` 重生成 baseline） | - | 0=通过，1=新增发现，2=输入错误 |

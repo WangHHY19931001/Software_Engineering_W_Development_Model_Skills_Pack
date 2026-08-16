@@ -339,10 +339,14 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
   const violations: DocCheckViolation[] = [];
   let count = 0;
   let parseFailed = false;
+  let enumValues: string[] = [];
   try {
     const schema = JSON.parse(runLogSchema) as { properties?: { action?: { enum?: unknown[] } } };
     const actionEnum = schema.properties?.action?.enum;
-    count = Array.isArray(actionEnum) ? actionEnum.length : 0;
+    if (Array.isArray(actionEnum)) {
+      count = actionEnum.length;
+      enumValues = actionEnum.filter((v): v is string => typeof v === 'string');
+    }
   } catch {
     parseFailed = true;
   }
@@ -359,6 +363,34 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
       check: 'run-log-action',
       message: `data-models.md run-log 行应含「action enum（${EXPECTED.runLogActionCount} 类）」`,
     });
+  }
+  // 语义比对：data-models.md RunLogEntry.action 联合类型与 schema enum 逐值双向 diff（schema 可解析时）。
+  // 行级定位声明行（安全正则，禁用跨行嵌套量词——会触发 eslint security/detect-unsafe-regex 导致 pre-push 阻断）。
+  // 假设 data-models.md 中该声明唯一（全文仅一处匹配）；出现第二处同形声明时此处只校验首行。
+  if (!parseFailed) {
+    const declLine = dataModels.split(/\r?\n/).find((l) => /^\s*action:\s*'[^']+'/.test(l) && l.endsWith(';'));
+    if (declLine === undefined) {
+      violations.push({
+        check: 'run-log-action',
+        message: 'data-models.md 未找到 RunLogEntry.action 联合类型声明（应为 action: ... | ... ; 形式）',
+      });
+    } else {
+      const unionValues = Array.from(declLine.matchAll(/'([^']+)'/g), (m) => m[1] as string);
+      const enumSet = new Set(enumValues);
+      const unionSet = new Set(unionValues);
+      // missing = schema enum 有而文档联合类型缺；extra = 文档联合类型有而 schema enum 无
+      const missing = enumValues.filter((v) => !unionSet.has(v));
+      const extra = unionValues.filter((v) => !enumSet.has(v));
+      const driftParts: string[] = [];
+      if (missing.length > 0) driftParts.push(`缺 ${missing.join(',')}`);
+      if (extra.length > 0) driftParts.push(`多 ${extra.join(',')}`);
+      if (driftParts.length > 0) {
+        violations.push({
+          check: 'run-log-action',
+          message: `data-models.md RunLogEntry.action 联合类型与 run-log.schema.json enum 漂移（${driftParts.join('；')}）`,
+        });
+      }
+    }
   }
   return violations;
 }
