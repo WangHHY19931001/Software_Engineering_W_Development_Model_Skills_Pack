@@ -28,7 +28,7 @@
 >
 > **强制等级**：违反本文件「强制约束」节命中反模式 #10「编排者越权实施」（见 [anti-patterns.md](anti-patterns.md)），**命中即回退到当前阶段起点**。
 >
-> **与 [agent-personas.md](agent-personas.md) / [verifier-spec.md](verifier-spec.md) 的关系**：本文件定义「谁来做」（角色划分与分派），agent-personas.md 定义 V 子代理内部的角色视角，verifier-spec.md §7-§8 定义 V 子代理的输出 Schema 与提示词模板。三者互补，不冲突。
+> **与 [agent-personas.md](agent-personas.md) / [verifier-spec.md](verifier-spec.md) 的关系**：本文件定义「谁来做」（角色划分与分派），agent-personas.md 定义 V 子代理内部的角色视角，verifier-spec.md §6（输出 Schema）+ §8（提示词模板）定义 V 子代理的输出 Schema 与提示词模板。三者互补，不冲突。
 
 ## 目录
 
@@ -719,7 +719,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 必读：
   - references/root-cause-locator.md（方法与质量标准）
-  - references/verifier-spec.md §7（输出 Schema，rootcause 复审仍用 VerifierOutput）
+  - references/verifier-spec.md §6（输出 Schema，rootcause 复审仍用 VerifierOutput）
 
 复审维度（rootcause 专用子标准）：
   - correctness：根因链是否逻辑自洽？证据是否支持？
