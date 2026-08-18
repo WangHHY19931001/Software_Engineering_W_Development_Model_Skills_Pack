@@ -18,9 +18,15 @@ describe('writeGateLog（lib/gate-log-writer.ts）', () => {
     expect(content).toEqual({ exitCode: 0, passed: true });
   });
   it('目录不可写时不抛异常', async () => {
-    // 用普通文件充当"目录"，其下 mkdir 报 ENOTDIR 快速失败（跨平台稳健；/proc 路径在 WSL 下 mkdir 会挂起超时）
-    const blocking = path.join(os.tmpdir(), `wm-gatelog-block-${Date.now()}`);
-    await fs.writeFile(blocking, 'x');
-    await expect(writeGateLog('x', {}, blocking)).resolves.toBeUndefined();
+    // 用普通文件充当"目录"，其下 mkdir 报 ENOTDIR 快速失败（跨平台稳健；/proc 路径在 WSL 下 mkdir 会挂起超时）；
+    // 阻塞文件建在 mkdtemp 临时目录内，finally 清理避免 tmp 残留
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gatelog-'));
+    try {
+      const blocking = path.join(dir, 'blocked');
+      await fs.writeFile(blocking, 'x');
+      await expect(writeGateLog('x', {}, blocking)).resolves.toBeUndefined();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 });
