@@ -728,7 +728,7 @@ V 子代理须在 `summary` 中包含：
 
 ### 7.5 根因报告（targetKind = `rootcause`）
 
-> V 复审 R 子代理产出的 RootCauseReport 时使用。对应 spec [§5.2](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) V 复审根因报告分派模板。
+> V 复审 R 子代理产出的 RootCauseReport 时使用。对应 spec §5.2（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） V 复审根因报告分派模板。
 > V 复审仍输出 VerifierOutput JSON（§6 Schema），`meta.targetKind='rootcause'`，`meta.target` 为 R 报告 `reportId`（如 `RC-phase5-1-01`）。
 
 | 子标准 name | weight | 描述 |

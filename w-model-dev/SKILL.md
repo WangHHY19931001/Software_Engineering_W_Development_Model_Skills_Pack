@@ -16,7 +16,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 技能只提供编排、参考、模板和确定性门禁脚本。LLM-as-a-Verifier 由外部 Agent 按提示词执行；技能脚本不调用 LLM。设计决策以 `docs/skill-design-document_SSoT.md` 为准。
 
-**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即可激活；L1「带门禁」= L0 + `scripts/` + `samples/` + `tools/`（tla2tools.jar，TLA+ 门禁运行时依赖；需项目根 `npm install` 跑门禁）。安装路径见 [docs/INSTALL.md](../docs/INSTALL.md) §2「交付层选择」。
+**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即可激活；L1「带门禁」= L0 + `scripts/` + `samples/` + `tools/`（tla2tools.jar，TLA+ 门禁运行时依赖；需项目根 `npm install` 跑门禁）。安装路径见 `docs/INSTALL.md` §2「交付层选择」。
 
 **设计哲学**：主刀与修正权 / 人机分工线 / 白箱 vs 黑箱 / 受控的失控 / clockware vs swarmware 五条方法论取向见 [references/design-philosophy.md](references/design-philosophy.md)，按需加载。
 
@@ -43,7 +43,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 生产小项目 / 小工具 | 完整 8 阶段 + maturity L2 | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
 | 常规生产功能 | 完整 8 阶段 + maturity L3 | 全必跑，无降载 |
 
-判据与细则：成熟度分级见上方约束 #13 与 [references/operational-recovery.md](references/operational-recovery.md)「成熟度与行为门禁」；L0/L1 交付层见 [docs/INSTALL.md](../docs/INSTALL.md) §2；REQ 最小层级深度 = 2（适用极小项目）见 [references/phase-1-requirements.md](references/phase-1-requirements.md)。
+判据与细则：成熟度分级见上方约束 #13 与 [references/operational-recovery.md](references/operational-recovery.md)「成熟度与行为门禁」；L0/L1 交付层见 `docs/INSTALL.md` §2；REQ 最小层级深度 = 2（适用极小项目）见 [references/phase-1-requirements.md](references/phase-1-requirements.md)。
 
 ## 不可违反的约束
 
@@ -200,7 +200,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 3. 同步更新 `.w-model/rtm.json` 的需求、设计、代码与测试映射。
 4. 给出风险/缺陷等级和缓解措施。
 5. 输出阶段摘要：产物路径、RTM 覆盖状态、验证证据、阻塞项和下一步。
-6. **外部技能吸收三要素**（适用阶段）：阶段 1 = User Stories + Out of Scope + Implementation/Testing Decisions；阶段 2-4 = 测试 seam 决策（三层一致性）；阶段 5 = Tracer-bullet 票据拆解（tickets.md）；阶段 8 = archive 机制。详见 [decision-log/absorptions.md](../docs/changes/decision-log/absorptions.md)。
+6. **外部技能吸收三要素**（适用阶段）：阶段 1 = User Stories + Out of Scope + Implementation/Testing Decisions；阶段 2-4 = 测试 seam 决策（三层一致性）；阶段 5 = Tracer-bullet 票据拆解（tickets.md）；阶段 8 = archive 机制。详见 `docs/changes/decision-log/absorptions.md`。
 
 ## 阶段门与质量门
 

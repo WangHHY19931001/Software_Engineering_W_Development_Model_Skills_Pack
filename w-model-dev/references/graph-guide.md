@@ -72,7 +72,7 @@ implements/defines/realizes 追溯边与 governs/collaborates-with/derives 横�
 
 ## graph.json schema
 
-见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §2.4。
+见 `docs/ingestion-graph-convergence-design.md` §2.4。
 
 ## 与 rtm.json 的分工
 
@@ -123,7 +123,7 @@ implements/defines/realizes 追溯边与 governs/collaborates-with/derives 横�
 npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json|consolidated.json>" [--phase=1|2|3|4]
 ```
 
-退出码 0=通过 / 1=失败 / 2=输入错误。算法详见 [ingestion-graph-convergence-design.md](../../docs/ingestion-graph-convergence-design.md) §3.2。
+退出码 0=通过 / 1=失败 / 2=输入错误。算法详见 `docs/ingestion-graph-convergence-design.md` §3.2。
 
 ## 与 TLA+ 行为门禁的关系
 
@@ -136,7 +136,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json|consolid
 
 **阶段 4 硬约束**：`--phase=4` 图谱零违反 ∧ TLA+ 零违反才放行进阶段 5 编码。两个门禁均由 G 子代理跑、退出码为准（约束 4，反模式 #12）。
 
-TLA+ 层次化建模（L1–L6）、文件头规范、SANY/TLC 校验顺序、拆解阈值（>1k 考虑拆 / >1w 必须拆）详见 [tla-plus-guide.md](./tla-plus-guide.md) 与 [tla-plus-modeling-design.md](../../docs/tla-plus-modeling-design.md)。
+TLA+ 层次化建模（L1–L6）、文件头规范、SANY/TLC 校验顺序、拆解阈值（>1k 考虑拆 / >1w 必须拆）详见 [tla-plus-guide.md](./tla-plus-guide.md) 与 `docs/tla-plus-modeling-design.md`。
 
 ## 边数下限与语义来源占比
 

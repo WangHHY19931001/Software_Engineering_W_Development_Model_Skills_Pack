@@ -1,8 +1,8 @@
 # 根因定位者方法论指南（Root Cause Locator Guide）
 
 > **定位**：R 子代理的可执行方法论指南，与 `agent-personas.md` 平级。
-> **权威定义**：见 [skill-design-document_SSoT.md](../../docs/skill-design-document_SSoT.md) §6.4 R 角色定义节。
-> **关联 spec**：[2026-07-24-root-cause-locator-and-fixer-roles-design.md](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §3 + §9
+> **权威定义**：见 `docs/skill-design-document_SSoT.md` §6.4 R 角色定义节。
+> **关联 spec**：`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md` §3 + §9
 > **与 agent-personas.md 的关系**：agent-personas.md 定义 V 子代理的评审角色视角；本文件定义 R 子代理的诊断方法论。两者互补，R 不调用 Persona，Persona 不调用 R。
 
 ---

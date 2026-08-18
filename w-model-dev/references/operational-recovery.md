@@ -1,7 +1,7 @@
 # 运维与恢复参考
 
 > 仅在异常、跨平台路径、技术栈切换或大项目场景下读取。正常阶段执行不加载本文件。
-> SSoT [§10C](../../docs/skill-design-document_SSoT.md)（成熟度阶梯）/ [§10D](../../docs/skill-design-document_SSoT.md)（成本预算与运行日志）为权威定义，本文件为可执行细则。
+> SSoT §10C（`docs/skill-design-document_SSoT.md`）（成熟度阶梯）/ §10D（`docs/skill-design-document_SSoT.md`）（成本预算与运行日志）为权威定义，本文件为可执行细则。
 
 ## 目录
 
@@ -199,7 +199,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## 成本预算与运行日志
 
-> SSoT [§10D](../../docs/skill-design-document_SSoT.md) 为权威定义。编排者 O 维护 `.w-model/budget.json` 与 `.w-model/run-log.jsonl`，属"状态读写+持久化"允许动作（非实施，不触发反模式 #10）。
+> SSoT §10D（`docs/skill-design-document_SSoT.md`） 为权威定义。编排者 O 维护 `.w-model/budget.json` 与 `.w-model/run-log.jsonl`，属"状态读写+持久化"允许动作（非实施，不触发反模式 #10）。
 
 ### 预算超限
 
@@ -229,7 +229,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### rootcause / fix 动作 token 计量
 
-> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§9.9](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) Token 预算扩展。返工循环 V/G→R→V→G→S-fix→V→G 中的 token 计量约定。
+> 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §9.9（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） Token 预算扩展。返工循环 V/G→R→V→G→S-fix→V→G 中的 token 计量约定。
 
 | 动作 | 计量方式 | 预算校验 |
 |---|---|---|
@@ -246,7 +246,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## 成熟度与 CHECKPOINT 放行
 
-> SSoT [§10C](../../docs/skill-design-document_SSoT.md) 为权威定义。编排者 O 维护 `.w-model/maturity.json`，按当前 level 决定 CHECKPOINT 类型（决策型 / 操作型）。
+> SSoT §10C（`docs/skill-design-document_SSoT.md`） 为权威定义。编排者 O 维护 `.w-model/maturity.json`，按当前 level 决定 CHECKPOINT 类型（决策型 / 操作型）。
 
 ### CHECKPOINT 分类与放行
 
@@ -285,7 +285,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### 场景 5：阶段回退
 
-> 对应 spec [§6.3 场景 5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 阶段回退 + [§6.4](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) 回退路径阶段编号映射。返工循环 V/G→R→V→G→S-fix→V→G 中，R 定位根因为上游缺陷时的阶段回退决策。
+> 对应 spec §6.3 场景 5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 阶段回退 + §6.4（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 回退路径阶段编号映射。返工循环 V/G→R→V→G→S-fix→V→G 中，R 定位根因为上游缺陷时的阶段回退决策。
 
 **触发条件**（三者全部满足）：
 
@@ -340,7 +340,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### acknowledgedDecisions 真实性约束
 
-> SSoT [§10.6](../../docs/skill-design-document_SSoT.md) 第六维度「理解证据」6.1~6.3 为权威定义；[`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) 强制校验。历史缺陷 D19：用户仅说「继续」，O 自行代填 acknowledgedDecisions（含「50个REQ节点完整覆盖」等技术决策）——CHECKPOINT 沦为 O 自问自答。
+> SSoT §10.6（`docs/skill-design-document_SSoT.md`） 第六维度「理解证据」6.1~6.3 为权威定义；[`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) 强制校验。历史缺陷 D19：用户仅说「继续」，O 自行代填 acknowledgedDecisions（含「50个REQ节点完整覆盖」等技术决策）——CHECKPOINT 沦为 O 自问自答。
 
 | 约束 | 规则 | 违反处置 |
 |---|---|---|
@@ -350,7 +350,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | 决策与阶段匹配 | 阶段 1 决策须与需求相关；阶段 2 与系统设计相关；阶段 3 与概要设计相关 | `check-checkpoint.ts` R4 校验 → exitCode=1 |
 | 跨阶段证据一致 | 后阶段决策不得静默否定前阶段已放行项；矛盾须显式回退修正前阶段产物并重跑 | `check-checkpoint.ts` 交叉比对历史 checkpoint（SSoT §10.6 6.3） → exitCode=1 |
 
-强制校验由 [`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) 执行（规则表见修正设计 [§5.4](../../docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md)）；任一规则违反 → exitCode=1，O 不得放行（反模式 #9 谎报状态守护）。
+强制校验由 [`check-checkpoint.ts`](../scripts/cli/check-checkpoint.ts) 执行（规则表见修正设计 §5.4（`docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md`））；任一规则违反 → exitCode=1，O 不得放行（反模式 #9 谎报状态守护）。
 
 ### maturity.json 维护
 
@@ -395,7 +395,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## 事件驱动与棕地维护
 
-> 来源：SSoT [§10F](../../docs/skill-design-document_SSoT.md)。事件驱动循环（Loop 3）仅在 L2+ 成熟度激活，详见 [event-ingress-guide.md](event-ingress-guide.md)。
+> 来源：SSoT §10F（`docs/skill-design-document_SSoT.md`）。事件驱动循环（Loop 3）仅在 L2+ 成熟度激活，详见 [event-ingress-guide.md](event-ingress-guide.md)。
 
 ### 事件路由失败
 
@@ -417,7 +417,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## O 越权检测（编排者越权实施守护）
 
-> SSoT [§3.4.5](../../docs/skill-design-document_SSoT.md)「编排者允许的动作」为权威边界；命中反模式 [#10 编排者越权实施](anti-patterns.md)。历史缺陷 D18：O 用 `node -e` 直接添加 22 条 produces 边、自己写 chunk-001.json，绕过 A 子代理承担实施职责。
+> SSoT §3.4.5（`docs/skill-design-document_SSoT.md`）「编排者允许的动作」为权威边界；命中反模式 [#10 编排者越权实施](anti-patterns.md)。历史缺陷 D18：O 用 `node -e` 直接添加 22 条 produces 边、自己写 chunk-001.json，绕过 A 子代理承担实施职责。
 
 ### 禁止动作
 
@@ -440,7 +440,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## 闭环校验脚本调用约定
 
-> 五个闭环校验脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`，约束 #11 无条件）在每个阶段门由 G 子代理执行，强制校验 budget / run-log / maturity / checkpoint 四套机制的完整性与 R3 预防性审查三份报告（preventive-review 在 V 评审前执行）。规则表见修正设计 [§5.1-5.4](../../docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md)；SSoT [§10.6](../../docs/skill-design-document_SSoT.md) / [§10C.7](../../docs/skill-design-document_SSoT.md) / [§10D.7](../../docs/skill-design-document_SSoT.md) / [§10E](../../docs/skill-design-document_SSoT.md) 为权威定义。本节仅约定调用时机与校验内容摘要；异常处置（预算超限、kill switch、日志损坏、成熟度降级等）见上方「成本预算与运行日志」「成熟度与 CHECKPOINT 放行」两节，不在此重复。
+> 五个闭环校验脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`，约束 #11 无条件）在每个阶段门由 G 子代理执行，强制校验 budget / run-log / maturity / checkpoint 四套机制的完整性与 R3 预防性审查三份报告（preventive-review 在 V 评审前执行）。规则表见修正设计 §5.1-5.4（`docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md`）；SSoT §10.6（`docs/skill-design-document_SSoT.md`） / §10C.7（`docs/skill-design-document_SSoT.md`） / §10D.7（`docs/skill-design-document_SSoT.md`） / §10E（`docs/skill-design-document_SSoT.md`） 为权威定义。本节仅约定调用时机与校验内容摘要；异常处置（预算超限、kill switch、日志损坏、成熟度降级等）见上方「成本预算与运行日志」「成熟度与 CHECKPOINT 放行」两节，不在此重复。
 
 ### 调用时机（阶段门执行顺序）
 

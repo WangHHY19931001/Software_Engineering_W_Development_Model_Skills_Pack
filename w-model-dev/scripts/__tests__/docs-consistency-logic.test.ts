@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   runDocConsistencyChecks,
   extractMarkdownRelLinks,
+  checkSkillOutboundLinks,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 
@@ -494,6 +495,74 @@ describe('runDocConsistencyChecks', () => {
   it('vitest 用例总数三处文档均同步 → 零 vitest-tests 违规', () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
+  });
+
+  it('README 含过期 vitest 计数（正确总数与旧数字并存）→ vitest-tests 违规', () => {
+    const input = baseInput({
+      readme: '**当前版本**：`41.11.0`\n40 files / 530 tests\n42 files / 663 tests',
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.length).toBe(1);
+    expect(v[0]!.message).toContain('过期 vitest 计数');
+    expect(v[0]!.message).toContain('42 files / 663 tests');
+  });
+
+  it('AGENTS 含过期 .test.ts 计数（文件数不符）→ vitest-tests 违规', () => {
+    const input = baseInput({
+      agents: '31 个脚本\n41 个 .test.ts / 530 条',
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.some((x) => x.message.includes('41 个 .test.ts / 530 条'))).toBe(true);
+  });
+
+  it('技能包文档含逃逸链接 → skill-outbound-links 违规', () => {
+    const docs = [
+      {
+        name: 'w-model-dev/references/verifier-spec.md',
+        content: '见 [SKILL.md](../SKILL.md) 与 [SSoT](../../docs/skill-design-document_SSoT.md)。',
+        baseDir: 'references',
+      },
+      {
+        name: 'w-model-dev/SKILL.md',
+        content: '安装路径见 [INSTALL](../docs/INSTALL.md)。',
+        baseDir: '.',
+      },
+    ];
+    const v = checkSkillOutboundLinks(docs);
+    expect(v.length).toBe(2);
+    expect(v.every((x) => x.check === 'skill-outbound-links')).toBe(true);
+    expect(v[0]!.message).toContain('../../docs/skill-design-document_SSoT.md');
+    expect(v[1]!.message).toContain('../docs/INSTALL.md');
+  });
+
+  it('技能包文档仅包内链接 / 外部 URL → 零 skill-outbound-links 违规', () => {
+    const docs = [
+      {
+        name: 'w-model-dev/references/verifier-spec.md',
+        content: '见 [SKILL.md](../SKILL.md) 与 [反模式](anti-patterns.md)；外部 [spec](https://example.com/x.md)。',
+        baseDir: 'references',
+      },
+      {
+        name: 'w-model-dev/scripts/samples/tla-e2e/README.md',
+        content: '运行 [check-tla-model.ts](../../cli/check-tla-model.ts)。',
+        baseDir: 'scripts/samples/tla-e2e',
+      },
+    ];
+    expect(checkSkillOutboundLinks(docs)).toEqual([]);
+  });
+
+  it('skillPkgDocs 注入时经 runDocConsistencyChecks 触发出站链接违规；缺省时跳过', () => {
+    const bad = [
+      {
+        name: 'w-model-dev/references/a.md',
+        content: '[x](../../docs/b.md)',
+        baseDir: 'references',
+      },
+    ];
+    expect(
+      runDocConsistencyChecks(baseInput({ skillPkgDocs: bad })).some((x) => x.check === 'skill-outbound-links'),
+    ).toBe(true);
+    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'skill-outbound-links')).toBe(false);
   });
 
   it('scripts 有变更且 baseline 缺失 → baseline-sync 违规', () => {

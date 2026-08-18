@@ -44,16 +44,16 @@
 
 ```bash
 # 场景 1：正常通过（期望退出码 0）
-npx tsx ../../../check-tla-model.ts tla-manifest-counter-pass.json
+npx tsx ../../cli/check-tla-model.ts tla-manifest-counter-pass.json
 
 # 场景 2：死锁（期望退出码 1，violations 含 "Deadlock"）
-npx tsx ../../../check-tla-model.ts tla-manifest-deadlock-fail.json
+npx tsx ../../cli/check-tla-model.ts tla-manifest-deadlock-fail.json
 
 # 场景 3：不变式违反（期望退出码 1，violations 含 "Invariant" "violated"）
-npx tsx ../../../check-tla-model.ts tla-manifest-invviolation-fail.json
+npx tsx ../../cli/check-tla-model.ts tla-manifest-invviolation-fail.json
 
 # 场景 4：语法错误（期望退出码 1，violations 含 "SANY 语法检查失败"）
-npx tsx ../../../check-tla-model.ts tla-manifest-syntax-error-fail.json
+npx tsx ../../cli/check-tla-model.ts tla-manifest-syntax-error-fail.json
 ```
 
 ## 退出码约定

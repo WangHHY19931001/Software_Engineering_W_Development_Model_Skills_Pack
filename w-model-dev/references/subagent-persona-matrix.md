@@ -1,7 +1,7 @@
 # 人格选择矩阵（Subagent Persona Matrix）
 
 > **定位**：R-lead / V-lead 在多角度分析时选择 persona 的参考矩阵。
-> **关联 spec**：[2026-07-24-root-cause-locator-and-fixer-roles-design.md](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §9.3 + §9.4
+> **关联 spec**：`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md` §9.3 + §9.4
 > **人格库**：[w-model-dev/subagent/](../subagent/) 含 28 个人格文件，分 5 类。
 
 ---
@@ -38,7 +38,7 @@
 | rootCause.category 候选 | 阶段 | 加载的 R-persona |
 |---|---|---|
 | `coding-error` | 5 | engineering-code-reviewer + engineering-senior-developer + testing-evidence-collector |
-| `design-flaw` | 2-4 | engineering-software-architect + engineering-backend-architect（或 frontend-developer）+ testing-reality-checker |
+| `design-flaw` | 2-4 | engineering-software-architect + engineering-backend-architect（或 engineering-frontend-developer）+ testing-reality-checker |
 | `requirement-gap` | 1-4 | product-manager + product-feedback-synthesizer + testing-reality-checker |
 | `test-gap` | 4-7 | testing-api-tester + testing-performance-benchmarker + testing-test-results-analyzer |
 | `process-missing` | 全阶段 | project-manager-senior + testing-workflow-optimizer + engineering-incident-response-commander |

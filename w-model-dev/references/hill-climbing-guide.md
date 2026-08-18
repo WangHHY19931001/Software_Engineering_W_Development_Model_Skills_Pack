@@ -1,6 +1,6 @@
 # 爬坡循环指南（Hill Climbing Guide）
 
-> 来源：SSoT [§10G](../../docs/skill-design-document_SSoT.md)（爬坡循环 Loop 4）。本文件为可执行细则。
+> 来源：SSoT §10G（`docs/skill-design-document_SSoT.md`）（爬坡循环 Loop 4）。本文件为可执行细则。
 >
 > **目的**：把 run-log/trace 转成改进 prompt/工具/验证规则的信号。技能只产出改进信号，不自动改 harness（保持"技能自演化不在本仓库"原则）；外部 SkillOpt/darwin-skill 消费信号做演化；人审后手动应用。
 >

@@ -288,7 +288,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 ## 成本预算模型（budget.json）
 
-> SSoT [§10D](../../docs/skill-design-document_SSoT.md) 为权威定义。编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json` 的初始化。用户可在任意时刻编辑调整。
+> SSoT §10D（`docs/skill-design-document_SSoT.md`） 为权威定义。编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json` 的初始化。用户可在任意时刻编辑调整。
 
 ```typescript
 interface BudgetConfig {
@@ -388,7 +388,7 @@ interface BudgetConfig {
 
 ## 运行日志模型（run-log.jsonl）
 
-> SSoT [§10D](../../docs/skill-design-document_SSoT.md) 为权威定义。Append-only JSON Lines 格式，每行一条记录。编排者 O 在每个子代理分派返回后与每个阶段门/质量门完成后 append 一条。
+> SSoT §10D（`docs/skill-design-document_SSoT.md`） 为权威定义。Append-only JSON Lines 格式，每行一条记录。编排者 O 在每个子代理分派返回后与每个阶段门/质量门完成后 append 一条。
 
 ```typescript
 interface RunLogEntry {
@@ -459,7 +459,7 @@ interface RunLogEntry {
 
 ### 动作类型字段约束（rootcause / fix / escalate 扩展）
 
-> 对应 spec [§5.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) run-log 新增动作 + [§7.5](../../docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
+> 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §7.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
 `action` 枚举新增 `rootcause` / `fix` 两个动作（返工循环 V/G→R→V→G→S-fix→V→G 专用）。各动作的额外必填字段约束：
 
@@ -485,7 +485,7 @@ interface RunLogEntry {
 
 ## 自主成熟度模型（maturity.json）
 
-> SSoT [§10C](../../docs/skill-design-document_SSoT.md) 为权威定义。编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json`/`budget.json`。
+> SSoT §10C（`docs/skill-design-document_SSoT.md`） 为权威定义。编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json`/`budget.json`。
 
 ```typescript
 interface MaturityConfig {
@@ -585,7 +585,7 @@ interface MaturityConfig {
 
 ## 事件接驳模型（EventIngress / event-ingress.jsonl）
 
-> 来源：SSoT [§10F](../../docs/skill-design-document_SSoT.md)。Append-only JSON Lines 格式，每行一条事件记录。编排者 O 维护，消费方自行实现触发器写入。
+> 来源：SSoT §10F（`docs/skill-design-document_SSoT.md`）。Append-only JSON Lines 格式，每行一条事件记录。编排者 O 维护，消费方自行实现触发器写入。
 
 ```typescript
 interface EventIngress {
@@ -625,7 +625,7 @@ interface EventIngress {
 
 ## 爬坡循环改进报告模型（HarnessImprovementReport / hill-climbing/<timestamp>-report.json）
 
-> 来源：SSoT [§10G](../../docs/skill-design-document_SSoT.md)。编排者 O 确定性分析 run-log 产出，存 `.w-model/hill-climbing/<timestamp>-report.json`。详见 [hill-climbing-guide.md](hill-climbing-guide.md)。
+> 来源：SSoT §10G（`docs/skill-design-document_SSoT.md`）。编排者 O 确定性分析 run-log 产出，存 `.w-model/hill-climbing/<timestamp>-report.json`。详见 [hill-climbing-guide.md](hill-climbing-guide.md)。
 
 ```typescript
 interface HarnessImprovementReport {

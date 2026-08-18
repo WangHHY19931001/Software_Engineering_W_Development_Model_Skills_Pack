@@ -264,6 +264,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | 脚本 | 用途 | 触发时机 |
 |---|---|---|
 | check-verifier-output | V 评审 JSON 校验（R1-R13，含 R13 单轴下限） | V 产出后 G 跑 |
+| check-rootcause-report | RootCauseReport 校验（R1-R10：根因链 / 可证伪 / 修复建议 / 预防 / 上游缺陷 / 质量等级 / 报告 ID / 多角度 / reality-checker 置信度） | 返工循环：R 定位后 G 校验（见 §4 步骤 1/3） |
 | check-role-dispatch | 角色 S/V/G 各 ≥1 + R ≥3 无条件校验（约束 #8） | 每阶段门放行前 |
 | check-signature-chain | 签名链 R1-R10（含 O 越权 / 代签检测） | 每阶段门放行前 |
 | check-iceberg-sweep | 冰山扫掠报告校验（R1-R5，反模式 #44） | S-fix 通过后（ICEBERG-A）+ 阶段门放行前（ICEBERG-B） |
