@@ -6,12 +6,13 @@
  *
  * 流程：parse 校验（经 parseJsonSafe）→ mtime 守卫（不符→MTIME_CONFLICT）→
  *       备份现有文件（复制 + 按 keepBackups 轮换）→ 写 <abs>.tmp-<pid> → fs.rename 原子替换 →
- *       回读校验（不符→WRITE_VERIFY_FAILED）。
+ *       回读校验（不符→WRITE_VERIFY_FAILED，自动回滚备份或删除新写文件）。
  *
  * 退出语义由 CLI 层（cli/wm-write.ts）映射：ok=true→exit 0；reason 非空→exit 1；输入错误→exit 2。
  * 设计：docs/superpowers/specs/2026-08-15-skill-opt-audit-21fixes-design.md §A1
  */
 
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -24,6 +25,8 @@ export interface StateWriteOptions {
   keepBackups?: number;
   /** 乐观锁：期望的目标当前 mtimeMs；null/undefined 表示不校验（默认 null） */
   expectMtimeMs?: number | null;
+  /** 测试注入：覆盖回读实现（默认 fs.readFile）。仅测试使用，生产不得传。 */
+  readbackImpl?: (absPath: string) => Promise<string>;
 }
 
 export interface StateWriteResult {
@@ -34,6 +37,8 @@ export interface StateWriteResult {
   backupPath?: string;
   /** 失败原因：INVALID_JSON / MTIME_CONFLICT / TARGET_MISSING_FOR_MTIME / WRITE_VERIFY_FAILED */
   reason?: string;
+  /** 回读校验失败后是否已自动恢复备份（WRITE_VERIFY_FAILED 时有意义） */
+  rolledBack?: boolean;
 }
 
 /** 备份命名：<absPath>.bak.YYYYMMDD-HHMM（同分钟重复写覆盖同一备份，视为同一版本链） */
@@ -42,6 +47,25 @@ export function backupPathFor(absPath: string, now?: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
   return `${absPath}.bak.${stamp}`;
+}
+
+/** 原子替换的 rename 封装：Windows 上并发替换同一目标会瞬时 EPERM/EBUSY（MoveFileEx 替换竞态），
+ *  短时线性退避重试以等待前一次替换的锁释放。POSIX 上 rename 总是原子覆盖，通常一次成功。 */
+async function renameWithRetry(src: string, dest: string): Promise<void> {
+  const maxAttempts = 8;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await fs.rename(src, dest);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code === 'EPERM' || code === 'EBUSY') && attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 10 * attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /** 枚举目标同目录下同基名的备份文件，按文件名（=时间戳）升序；超出 keep 份的从最旧删除 */
@@ -121,15 +145,33 @@ export async function writeStateJson(
     }
   }
 
-  // 4. 原子替换：tmp-<pid> 唯一命名避免并发写互踩，rename 在同目录下原子
-  const tmpPath = `${absPath}.tmp-${process.pid}`;
+  // 4. 原子替换：tmp-<pid>-<uuid> 全局唯一命名，避免同进程并发写互踩（审计修复 P4：
+  //    此前仅用 pid，同进程并发会复用同一 tmp 路径导致互踩 + rename ENOENT）
+  const tmpPath = `${absPath}.tmp-${process.pid}-${randomUUID()}`;
   await fs.writeFile(tmpPath, jsonText, 'utf-8');
-  await fs.rename(tmpPath, absPath);
+  await renameWithRetry(tmpPath, absPath);
 
-  // 5. 回读校验
-  const readBack = await fs.readFile(absPath, 'utf-8');
+  // 5. 回读校验：不一致 → 自动回滚（审计修复 P4：此前不回滚，目标停留在损坏内容）
+  const readBack = await (opts.readbackImpl ?? ((p: string) => fs.readFile(p, 'utf-8')))(absPath);
   if (readBack !== jsonText) {
-    return { ok: false, writtenPath: absPath, reason: 'WRITE_VERIFY_FAILED' };
+    let rolledBack = false;
+    if (backupPath !== undefined) {
+      try {
+        await fs.copyFile(backupPath, absPath); // copy 而非 rename，保留备份供取证
+        rolledBack = true;
+      } catch {
+        rolledBack = false; // 回滚失败（备份亦不可读），保持损坏现状并如实报告
+      }
+    } else {
+      // 写前目标不存在（无备份）：删除损坏文件即恢复原状
+      try {
+        await fs.unlink(absPath);
+        rolledBack = true;
+      } catch {
+        rolledBack = false;
+      }
+    }
+    return { ok: false, writtenPath: absPath, reason: 'WRITE_VERIFY_FAILED', rolledBack };
   }
   return { ok: true, writtenPath: absPath, backupPath };
 }

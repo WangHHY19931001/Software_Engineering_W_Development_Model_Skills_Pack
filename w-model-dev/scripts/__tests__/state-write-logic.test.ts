@@ -135,3 +135,46 @@ describe('writeStateJson', () => {
     expect(raw).toBe('\uFEFF{"a":1}');
   });
 });
+
+describe('审计修复 P4：tmpPath 唯一化与回读失败回滚', () => {
+  it('同进程并发两次写同一目标：均成功且无异常，终态为二者之一', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-conc-'));
+    const target = path.join(dir, 'state.json');
+    await fs.writeFile(target, '{"v":0}', 'utf-8');
+    const [a, b] = await Promise.all([
+      writeStateJson(target, '{"v":1}'),
+      writeStateJson(target, '{"v":2}'),
+    ]);
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true); // 修复前：第二次 rename 抛 ENOENT
+    const final = JSON.parse(await fs.readFile(target, 'utf-8')) as { v: number };
+    expect([1, 2]).toContain(final.v);
+    // 不残留 tmp 文件
+    const leftovers = (await fs.readdir(dir)).filter((f) => f.includes('.tmp-'));
+    expect(leftovers).toEqual([]);
+  });
+
+  it('回读校验失败时自动回滚备份并报告 rolledBack', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-rollback-'));
+    const target = path.join(dir, 'state.json');
+    await fs.writeFile(target, '{"v":"original"}', 'utf-8');
+    const result = await writeStateJson(target, '{"v":"new"}', {
+      readbackImpl: async () => '{"v":"corrupted"}', // 模拟回读不一致
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('WRITE_VERIFY_FAILED');
+    expect(result.rolledBack).toBe(true);
+    expect(await fs.readFile(target, 'utf-8')).toBe('{"v":"original"}'); // 已恢复
+  });
+
+  it('回读失败且无备份（目标原不存在）时删除损坏文件', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-nobak-'));
+    const target = path.join(dir, 'state.json');
+    const result = await writeStateJson(target, '{"v":"new"}', {
+      readbackImpl: async () => 'garbage',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('WRITE_VERIFY_FAILED');
+    await expect(fs.readFile(target, 'utf-8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+});
