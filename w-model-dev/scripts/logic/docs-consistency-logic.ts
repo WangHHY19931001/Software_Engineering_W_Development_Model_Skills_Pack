@@ -520,7 +520,7 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
   return violations;
 }
 
-/** exit-2 脚本数：期望值从 AGENTS.md「N 个脚本」表述解析，与实测（cli 计数 + 5）比对。 */
+/** exit-2 脚本数：期望值从 AGENTS.md「N 个脚本」表述解析，与实测（checkScriptCount + TOOL_CLI_EXIT2_COUNT = 26 + 7 = 33）比对。 */
 function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const match = agents.match(/(\d+) 个脚本/);
