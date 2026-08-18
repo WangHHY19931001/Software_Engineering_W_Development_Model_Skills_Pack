@@ -35,6 +35,7 @@ import * as fs from 'node:fs/promises';
 
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const SYNC_JSON = {
@@ -160,11 +161,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

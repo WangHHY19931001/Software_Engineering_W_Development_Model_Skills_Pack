@@ -36,6 +36,7 @@ import { checkRequirementCoverage } from '../logic/coverage-logic.js';
 import type { GraphShape } from '../logic/graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
@@ -164,12 +165,4 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err) => {
-  if (process.exitCode !== 0) return; // 已由 readJsonClassified 设置 exitCode，避免覆盖 ERROR_JSON
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

@@ -7,7 +7,7 @@
  * 仅用于 check-*.ts CLI 层；*-logic.ts 纯逻辑层不依赖本工具。
  *
  * 设计原则：
- *   - 行为与原样板一致（exit code 2 + 相同错误消息格式；exit 2 路径统一经 exitWithError 输出 stderr 人类消息 + stdout ERROR_JSON）
+ *   - 行为与原样板一致（exit code 2 + 相同错误消息格式；exit 2 路径统一经 exitWithError 输出 stderr 人类消息 + stdout ERROR_JSON，随后抛 HandledCliError 由 runMain 静默退出，避免 process.exit 截断）
  *   - 不引入新依赖（仅 node:fs / node:path）
  *   - 泛型支持调用方指定返回类型
  */
@@ -16,12 +16,12 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 import { parseJsonSafe } from './safe-json.js';
-import { exitWithError } from './cli-error.js';
+import { exitWithError, HandledCliError } from './cli-error.js';
 
 /**
  * 读取并解析 JSON 文件。
- * - 文件不存在（ENOENT）→ exitWithError(FILE_NOT_FOUND) 输出 ERROR_JSON + process.exit(2)
- * - JSON 解析失败 → exitWithError(FILE_PARSE) 输出 ERROR_JSON + process.exit(2)
+ * - 文件不存在（ENOENT）→ exitWithError(FILE_NOT_FOUND) 输出 ERROR_JSON + 抛 HandledCliError
+ * - JSON 解析失败 → exitWithError(FILE_PARSE) 输出 ERROR_JSON + 抛 HandledCliError
  * - 其他读取异常 → rethrow
  *
  * @param file 文件路径（相对或绝对）
@@ -36,7 +36,7 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
       exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, rule: 'P0-2', file: abs });
-      process.exit(2);
+      throw new HandledCliError();
     }
     throw err;
   }
@@ -44,13 +44,13 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
     return parseJsonSafe<T>(raw);
   } catch {
     exitWithError({ category: 'FILE_PARSE', message: '文件解析失败（非合法 JSON）', exitCode: 2, file: abs });
-    process.exit(2);
+    throw new HandledCliError();
   }
 }
 
 /**
  * 读取 JSONL 文件（每行一个 JSON）。
- * - 文件不存在（ENOENT）→ exitWithError(FILE_NOT_FOUND) 输出 ERROR_JSON + process.exit(2)
+ * - 文件不存在（ENOENT）→ exitWithError(FILE_NOT_FOUND) 输出 ERROR_JSON + 抛 HandledCliError
  * - 空行跳过
  * - 单行非法 JSON → 跳过并 console.error 警告（不 exit，与原 run-log/checkpoint 行为一致）
  * - 其他读取异常 → rethrow
@@ -68,7 +68,7 @@ export async function readJsonlOrExit(file: string, label = '行'): Promise<unkn
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
       exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2, rule: 'P0-2', file: abs });
-      process.exit(2);
+      throw new HandledCliError();
     }
     throw err;
   }
@@ -140,12 +140,12 @@ export async function readJsonClassified<T = unknown>(file: string): Promise<T> 
         detail: e.code ?? '未知错误',
       });
     }
-    throw new Error('readJsonClassified: 输入错误已通过 exitWithError 处理');
+    throw new HandledCliError();
   }
   try {
     return parseJsonSafe<T>(raw);
   } catch {
     exitWithError({ category: 'FILE_PARSE', message: '文件解析失败（非合法 JSON）', exitCode: 2, file: abs });
-    throw new Error('readJsonClassified: 输入错误已通过 exitWithError 处理');
+    throw new HandledCliError();
   }
 }

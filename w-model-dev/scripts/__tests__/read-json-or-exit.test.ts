@@ -18,6 +18,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { readJsonOrExit, readJsonlOrExit, readJsonlOptional, readJsonClassified } from '../lib/read-json-or-exit.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
+import { HandledCliError } from '../lib/cli-error.js';
 
 let tmpDir: string;
 
@@ -45,24 +46,27 @@ describe('readJsonOrExit', () => {
     expect(result).toEqual([1, 2, 3]);
   });
 
-  it('文件不存在时调用 process.exit(2) 并输出 ERROR_JSON', async () => {
+  it('文件不存在时抛 HandledCliError 并输出 ERROR_JSON（不再 process.exit）', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const missing = path.join(tmpDir, 'nope.json');
-    await expect(readJsonOrExit(missing)).rejects.toThrow('exit:2');
+    await expect(readJsonOrExit(missing)).rejects.toBeInstanceOf(HandledCliError);
+    expect(process.exitCode).toBe(2);
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
     const out = logSpy.mock.calls[0]![0] as string;
     expect(out.startsWith('ERROR_JSON ')).toBe(true);
     expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     errSpy.mockRestore();
     logSpy.mockRestore();
+    process.exitCode = undefined;
   });
 
-  it('非法 JSON 时调用 process.exit(2) 并输出 ERROR_JSON', async () => {
+  it('非法 JSON 时抛 HandledCliError 并输出 ERROR_JSON（不再 process.exit）', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
@@ -70,14 +74,17 @@ describe('readJsonOrExit', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const file = path.join(tmpDir, 'bad.json');
     await fs.writeFile(file, '{not json');
-    await expect(readJsonOrExit(file)).rejects.toThrow('exit:2');
+    await expect(readJsonOrExit(file)).rejects.toBeInstanceOf(HandledCliError);
+    expect(process.exitCode).toBe(2);
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
     const out = logSpy.mock.calls[0]![0] as string;
     expect(out.startsWith('ERROR_JSON ')).toBe(true);
     expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_PARSE', exitCode: 2 });
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     errSpy.mockRestore();
     logSpy.mockRestore();
+    process.exitCode = undefined;
   });
 
   it('相对路径也能正常解析', async () => {
@@ -91,6 +98,19 @@ describe('readJsonOrExit', () => {
     } finally {
       process.chdir(origCwd);
     }
+  });
+
+  it('readJsonOrExit 文件不存在：抛 HandledCliError 且 exitCode=2，不再 process.exit（P10）', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await expect(readJsonOrExit(path.join(os.tmpdir(), `nonexistent-${Date.now()}.json`))).rejects.toBeInstanceOf(
+      HandledCliError,
+    );
+    expect(process.exitCode).toBe(2);
+    expect(logSpy).toHaveBeenCalledTimes(1); // 仅一条 ERROR_JSON，无双打印
+    errSpy.mockRestore();
+    logSpy.mockRestore();
+    process.exitCode = undefined;
   });
 });
 
@@ -126,21 +146,24 @@ describe('readJsonlOrExit', () => {
     expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
   });
 
-  it('文件不存在时调用 process.exit(2) 并输出 ERROR_JSON', async () => {
+  it('文件不存在时抛 HandledCliError 并输出 ERROR_JSON（不再 process.exit）', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`exit:${code}`);
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const missing = path.join(tmpDir, 'nope.jsonl');
-    await expect(readJsonlOrExit(missing)).rejects.toThrow('exit:2');
+    await expect(readJsonlOrExit(missing)).rejects.toBeInstanceOf(HandledCliError);
+    expect(process.exitCode).toBe(2);
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
     const out = logSpy.mock.calls[0]![0] as string;
     expect(out.startsWith('ERROR_JSON ')).toBe(true);
     expect(JSON.parse(out.slice('ERROR_JSON '.length))).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     errSpy.mockRestore();
     logSpy.mockRestore();
+    process.exitCode = undefined;
   });
 
   it('label 默认为「行」', async () => {

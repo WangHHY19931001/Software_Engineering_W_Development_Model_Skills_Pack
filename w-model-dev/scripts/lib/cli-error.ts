@@ -56,3 +56,14 @@ export function exitWithError(e: CliError): void {
   printErrorJson(e);
   process.exitCode = e.exitCode;
 }
+
+/**
+ * 哨兵异常：exitWithError 已完成输出并设置退出码后抛出，用于中断调用链；
+ * runMain（lib/run-main.ts）识别后静默退出，防止 main().catch 二次输出 UNEXPECTED（审计修复 P10）。
+ */
+export class HandledCliError extends Error {
+  constructor() {
+    super('已通过 exitWithError 输出错误并设置退出码');
+    this.name = 'HandledCliError';
+  }
+}

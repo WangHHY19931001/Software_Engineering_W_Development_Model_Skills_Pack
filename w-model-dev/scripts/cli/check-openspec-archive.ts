@@ -35,6 +35,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
@@ -198,12 +199,5 @@ async function main(): Promise<void> {
 const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
 if (isMain) {
-  main().catch((err) => {
-    exitWithError({
-      category: 'UNEXPECTED',
-      message: '脚本异常',
-      detail: err instanceof Error ? err.message : String(err),
-      exitCode: 2,
-    });
-  });
+  runMain(main);
 }

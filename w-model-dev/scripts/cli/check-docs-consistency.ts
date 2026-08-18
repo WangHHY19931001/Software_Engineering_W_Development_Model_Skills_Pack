@@ -36,6 +36,7 @@ import { isAbsolute, join, resolve as pathResolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
@@ -371,14 +372,5 @@ function main(): void {
 const entryArg = process.argv[1];
 const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === pathResolve(entryArg);
 if (isMain) {
-  try {
-    main();
-  } catch (err) {
-    exitWithError({
-      category: 'UNEXPECTED',
-      message: '脚本异常',
-      detail: err instanceof Error ? err.message : String(err),
-      exitCode: 2,
-    });
-  }
+  runMain(main);
 }

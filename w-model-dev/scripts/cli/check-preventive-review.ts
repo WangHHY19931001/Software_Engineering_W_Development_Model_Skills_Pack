@@ -44,6 +44,7 @@ import {
   type PreventiveReviewOptions,
 } from '../logic/preventive-review-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
@@ -278,11 +279,4 @@ async function main(): Promise<void> {
   process.exit(output.exitCode);
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

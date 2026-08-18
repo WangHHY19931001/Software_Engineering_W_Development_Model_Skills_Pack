@@ -66,6 +66,7 @@ import {
 } from '../logic/graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
@@ -444,14 +445,4 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err) => {
-  // exitCode 已设置（exitWithError/readJsonClassified 已输出 ERROR_JSON）→ 不覆盖；
-  // 未设置（异常发生在门禁判定前，如缺 nodes 的 TypeError）→ 显式报错 exit 2，防静默放行
-  if (process.exitCode != null) return;
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

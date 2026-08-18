@@ -29,6 +29,7 @@
 import { checkExemption } from '../logic/exemption-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
@@ -93,11 +94,4 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

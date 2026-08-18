@@ -30,6 +30,7 @@ import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { checkEnvironment, deriveDoctorExitCode, type EnvProbe } from '../logic/doctor-logic.js';
 
 const execFile = promisify(execFileCb);
@@ -107,11 +108,4 @@ async function main(): Promise<void> {
   process.exitCode = exitCode;
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

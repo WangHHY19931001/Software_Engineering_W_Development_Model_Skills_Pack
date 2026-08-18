@@ -46,6 +46,7 @@ import * as path from 'node:path';
 import { checkTlaModel, parseTlaHeader, validateHeader, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { EXEC_LIMITS, PHASES, type Phase } from '../lib/constants.js';
 import { parseJavaMajor } from '../lib/java-version.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -588,11 +589,4 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

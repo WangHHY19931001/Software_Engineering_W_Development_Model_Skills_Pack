@@ -56,6 +56,7 @@ import {
 } from '../logic/bdd-logic.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
@@ -386,18 +387,10 @@ async function main(): Promise<number> {
   return result.exitCode;
 }
 
-main()
-  .then((exitCode) => {
-    // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined）→ 让 Node 自然退出，避免 process.exit 截断 ERROR_JSON
-    if (process.exitCode === undefined) {
-      process.exit(exitCode);
-    }
-  })
-  .catch((e) => {
-    exitWithError({
-      category: 'UNEXPECTED',
-      message: '脚本异常',
-      detail: e instanceof Error ? e.message : String(e),
-      exitCode: 2,
-    });
-  });
+runMain(async () => {
+  const exitCode = await main();
+  // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined）→ 让 Node 自然退出，避免 process.exit 截断 ERROR_JSON
+  if (process.exitCode === undefined) {
+    process.exit(exitCode);
+  }
+});

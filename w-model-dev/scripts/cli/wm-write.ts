@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
 
 const USAGE = '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup]';
@@ -150,11 +151,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);

@@ -35,6 +35,7 @@ import {
 } from '../logic/metrics-report-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 
@@ -236,11 +237,4 @@ async function main(): Promise<void> {
   process.exit(0);
 }
 
-main().catch((err) => {
-  exitWithError({
-    category: 'UNEXPECTED',
-    message: '脚本异常',
-    detail: err instanceof Error ? err.message : String(err),
-    exitCode: 2,
-  });
-});
+runMain(main);
