@@ -159,7 +159,9 @@ describe('审计修复 P4：tmpPath 唯一化与回读失败回滚', () => {
     const target = path.join(dir, 'state.json');
     await fs.writeFile(target, '{"v":"original"}', 'utf-8');
     const result = await writeStateJson(target, '{"v":"new"}', {
-      readbackImpl: async () => '{"v":"corrupted"}', // 模拟回读不一致
+      // 模拟回读损坏：内容为「非法 JSON（不可解析）」才触发回滚；
+      // 若为另一条合法 JSON 会被当作并发写者覆盖而判成功（见并发用例）。
+      readbackImpl: async () => '{"v":"corrupted",', // 未闭合对象 → 非法 JSON
     });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('WRITE_VERIFY_FAILED');

@@ -99,7 +99,8 @@ async function rotateBackups(absPath: string, keep: number): Promise<void> {
  *      （expectMtimeMs 给定但目标不存在 → reason:'TARGET_MISSING_FOR_MTIME'）
  *   3. backup!==false 且目标存在 → copyFile 生成 <abs>.bak.<stamp>，按 keepBackups 轮换
  *   4. 写 <abs>.tmp-<pid> → fs.rename 原子替换（崩溃时目标要么旧要么新，不会半截）
- *   5. 回读与 jsonText 不一致 → { ok:false, reason:'WRITE_VERIFY_FAILED' }
+ *   5. 回读与 jsonText 不一致：若回读为另一条合法 JSON（并发写者覆盖，本写已成功）→ ok=true；
+ *      若为非法 JSON/空（本写损坏）→ 回滚后 { ok:false, reason:'WRITE_VERIFY_FAILED' }
  */
 export async function writeStateJson(
   absPath: string,
@@ -151,9 +152,20 @@ export async function writeStateJson(
   await fs.writeFile(tmpPath, jsonText, 'utf-8');
   await renameWithRetry(tmpPath, absPath);
 
-  // 5. 回读校验：不一致 → 自动回滚（审计修复 P4：此前不回滚，目标停留在损坏内容）
+  // 5. 回读校验：不一致 → 自动回滚（审计修复 P4：此前不回滚，目标停留在损坏内容；
+  //    round2 并发覆盖容错：本函数整体替换一份 JSON，自写产物只能整块落盘、不会自行变成另一条
+  //    合法 JSON。因此若回读内容不同于 jsonText 但「是另一条合法 JSON（parseJsonSafe 可解析）」，
+  //    说明是本写 rename 之后被并发写者覆盖 —— 本写实际已成功、终态为后写者内容（契合『并发写
+  //    均成功、终态为二者之一』约定）；此时直接判成功且不回滚（回滚会抹掉并发写者的合法内容）。
+  //    仅当回读内容为非法 JSON / 空时，才判本写损坏 → 回滚 → WRITE_VERIFY_FAILED。）
   const readBack = await (opts.readbackImpl ?? ((p: string) => fs.readFile(p, 'utf-8')))(absPath);
   if (readBack !== jsonText) {
+    try {
+      parseJsonSafe(readBack); // 可解析为合法 JSON → 被并发写者覆盖，判成功
+      return { ok: true, writtenPath: absPath, backupPath };
+    } catch {
+      // 回读不可解析（非法 JSON / 空）→ 本写损坏，进入回滚逻辑
+    }
     let rolledBack = false;
     if (backupPath !== undefined) {
       try {
