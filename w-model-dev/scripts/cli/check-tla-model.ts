@@ -46,7 +46,8 @@ import * as path from 'node:path';
 import { checkTlaModel, parseTlaHeader, validateHeader, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { PHASES, type Phase } from '../lib/constants.js';
+import { EXEC_LIMITS, PHASES, type Phase } from '../lib/constants.js';
+import { parseJavaMajor } from '../lib/java-version.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { cleanTraceFiles } from '../lib/tla-clean-trace.js';
@@ -96,27 +97,6 @@ function parseArgs(argv: string[]): ParsedArgs {
 
 // ==================== 环境检查 ====================
 
-/**
- * 由 `java -version` 的 stderr 输出解析 Java 主版本号。
- * 兼容 Java 8（"1.8.0_xxx" → 8）与 Java 11+（"11.0.x" → 11）。
- */
-function parseJavaMajorVersion(stderr: string): number | null {
-  const m = stderr.match(/version\s+"([0-9._]+)"/i);
-  if (!m || m[1] === undefined) return null;
-  const parts = m[1].split(/[._]/);
-  const firstStr = parts[0];
-  if (firstStr === undefined) return null;
-  const first = Number.parseInt(firstStr, 10);
-  if (Number.isNaN(first)) return null;
-  if (first === 1 && parts.length > 1) {
-    const secondStr = parts[1];
-    if (secondStr === undefined) return null;
-    const second = Number.parseInt(secondStr, 10);
-    return Number.isNaN(second) ? null : second;
-  }
-  return first;
-}
-
 interface EnvironmentStatus {
   ok: boolean;
   errors: string[];
@@ -150,7 +130,7 @@ async function checkEnvironment(jarAbs: string, javaMinVersion: number): Promise
   }
 
   if (errors.length === 0) {
-    javaVersion = parseJavaMajorVersion(javaStderr);
+    javaVersion = parseJavaMajor(javaStderr);
     if (javaVersion == null) {
       errors.push(`无法从 java -version 输出解析版本号：${javaStderr.trim()}`);
     } else if (javaVersion < javaMinVersion) {
@@ -181,8 +161,10 @@ async function checkEnvironment(jarAbs: string, javaMinVersion: number): Promise
 interface ToolRunResult {
   syntaxOk: boolean;
   syntaxOutput: string;
+  sanyTimedOut: boolean; // 审计修复 P3：SANY 超时标记
   tlcRan: boolean;
   tlcOutput: string;
+  tlcTimedOut: boolean; // 审计修复 P3：TLC 超时标记
   deadlock: boolean;
   invariantViolated: boolean;
   stateExplosion: boolean;
@@ -200,8 +182,10 @@ function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult
   const out: ToolRunResult = {
     syntaxOk: false,
     syntaxOutput: '',
+    sanyTimedOut: false,
     tlcRan: false,
     tlcOutput: '',
+    tlcTimedOut: false,
     deadlock: false,
     invariantViolated: false,
     stateExplosion: false,
@@ -214,16 +198,21 @@ function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult
     const stdout = execFileSync('java', ['-cp', jarAbs, 'tla2sany.SANY', tlaAbs], {
       encoding: 'utf-8',
       cwd: tlaDir,
-      maxBuffer: 16 * 1024 * 1024,
+      maxBuffer: EXEC_LIMITS.maxBufferSmall,
+      timeout: EXEC_LIMITS.sanyTimeoutMs, // 审计修复 P3：防 JVM 挂死
+      killSignal: 'SIGKILL',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     out.syntaxOk = true;
     out.syntaxOutput = stdout;
   } catch (err) {
-    const e = err as { stdout?: string; stderr?: string; message?: string; status?: number };
+    const e = err as { stdout?: string; stderr?: string; message?: string; killed?: boolean };
     out.syntaxOk = false;
+    out.sanyTimedOut = e.killed === true;
     // SANY 错误输出在 stdout（含 "Fatal errors while parsing" / "Could not parse module"）
-    out.syntaxOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}`.trim() || (e.message ?? 'SANY 执行失败');
+    out.syntaxOutput = out.sanyTimedOut
+      ? `SANY 执行超时（>${EXEC_LIMITS.sanyTimeoutMs / 1000}s），已终止。排查：模块规模过大或 JVM 异常`
+      : `${e.stdout ?? ''}\n${e.stderr ?? ''}`.trim() || (e.message ?? 'SANY 执行失败');
     return out; // 语法未通过 → 不跑 TLC（反模式 #14 守护）
   }
 
@@ -239,15 +228,22 @@ function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult
       {
         encoding: 'utf-8',
         cwd: tlaDir,
-        maxBuffer: 64 * 1024 * 1024,
+        maxBuffer: EXEC_LIMITS.maxBufferLarge,
+        timeout: EXEC_LIMITS.tlcTimeoutMs, // 审计修复 P3：TLC 状态爆炸防门禁挂死
+        killSignal: 'SIGKILL',
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
     out.tlcOutput = stdout;
   } catch (err) {
     // TLC 发现违反时退出码非 0（11=死锁 / 12=不变式违反），输出仍在 stdout
-    const e = err as { stdout?: string; stderr?: string; status?: number };
-    out.tlcOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}`;
+    const e = err as { stdout?: string; stderr?: string; killed?: boolean };
+    out.tlcTimedOut = e.killed === true;
+    if (out.tlcTimedOut) {
+      out.tlcOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}\nTLC 执行超时（>${EXEC_LIMITS.tlcTimeoutMs / 1000}s），已终止。排查：缩小状态空间 / 调整 .cfg 约束（references/tla-plus-tlc-configuration.md）`;
+    } else {
+      out.tlcOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}`;
+    }
   }
 
   // 实测 TLC 输出模式（2026-07-23 tla2tools.jar TLC2 2.19 实测确认）：
@@ -284,23 +280,26 @@ async function main(): Promise<void> {
     return;
   }
 
-  // B2 环境前置（审计修复）：Java 缺失/版本不足在 manifest 解析前快速失败（exit 2 + 安装指引），
-  // 避免「环境问题被误读为模型校验失败（exit 1 violations 混排）」。jar 路径依赖 manifest.tools
-  // 声明（basePath 相对），无法在本阶段预检，仍由后续 checkEnvironment 按声明值复核。
+  // B2 环境前置（审计修复）：Java 缺失/不可解析在 manifest 解析前快速失败（exit 2 + 安装指引），
+  // 避免「环境问题被误读为模型校验失败（exit 1 violations 混排）」。版本阈值不在此硬编码，
+  // 唯一事实源 = manifest.tools.javaMinVersion，由 checkEnvironment 按声明值复核（P15 去硬编码 11）。
+  // jar 路径依赖 manifest.tools 声明（basePath 相对），无法在本阶段预检，仍由后续 checkEnvironment 复核。
   {
-    const res = spawnSync('java', ['-version'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const res = spawnSync('java', ['-version'], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: EXEC_LIMITS.shortTimeoutMs,
+    });
     const out = `${res.stderr ?? ''}${res.stdout ?? ''}`;
-    const major = res.error ? null : parseJavaMajorVersion(out);
-    if (res.error || major === null || major < 11) {
+    const major = res.error ? null : parseJavaMajor(out);
+    if (res.error || major === null) {
       exitWithError({
         category: 'UNEXPECTED',
         rule: 'P0-2',
         message:
-          res.error || major === null
-            ? 'Java 环境缺失：未找到可用的 java 可执行文件（TLA+ 门禁需要 Java >= 11）'
-            : `Java 版本不满足 TLA+ 门禁要求（需 >= 11，实测主版本 ${major}）`,
+          'Java 环境缺失：未找到可用的 java 可执行文件（TLA+ 门禁需要 Java，最低版本以 manifest.tools.javaMinVersion 声明为准）',
         detail:
-          '修法：安装 JDK/JRE 11+ 并确保 java 在 PATH 后重试；可先运行 npx tsx w-model-dev/scripts/cli/doctor.ts --with-tla 自检（详见 references/tla-plus-guide.md「环境准备」）',
+          '修法：安装 JDK/JRE 并确保 java 在 PATH 后重试；可先运行 npx tsx w-model-dev/scripts/cli/doctor.ts --with-tla 自检（详见 references/tla-plus-guide.md「环境准备」）',
         exitCode: 2,
       });
       return;
@@ -436,6 +435,11 @@ async function main(): Promise<void> {
         spec.invariantsHold = !run.invariantViolated;
         spec.stateExplosion = run.stateExplosion;
         spec.lastCheckTimestamp = new Date().toISOString();
+        if (run.tlcTimedOut) {
+          headerViolations.push(
+            `规格 ${spec.id} TLC 模型检查超时（>${EXEC_LIMITS.tlcTimeoutMs / 1000}s）：需缩小状态空间或调整 TLC 配置后重跑`,
+          );
+        }
       }
     }
   }

@@ -9,6 +9,8 @@
  * 设计：docs/superpowers/specs/2026-08-15-skill-opt-audit-21fixes-design.md §B1
  */
 
+import { parseJavaMajor } from '../lib/java-version.js'; // 审计修复 P15：Java 版本解析单源化（单点维护）
+
 export interface DoctorCheckResult {
   /** 检查项名：node / tsx / ajv / java / tla2tools / codegraph / openspec */
   name: string;
@@ -38,15 +40,6 @@ export interface DoctorOptions {
 
 export const NODE_MIN_MAJOR = 18;
 export const JAVA_MIN_MAJOR = 11;
-
-/** 解析 `java -version` 输出中的主版本号；旧式 1.x 命名（如 1.8.0_392）取次版本号；无法解析返回 null */
-export function parseJavaMajor(output: string): number | null {
-  const m = output.match(/version "(\d+)(?:\.(\d+))?/);
-  if (m === null) return null;
-  const major = Number(m[1]);
-  if (major === 1 && m[2] !== undefined) return Number(m[2]); // 1.8.0_392 → 8
-  return major;
-}
 
 /** 汇总退出码：任一 fail → 1；否则 0（warn 不阻断） */
 export function deriveDoctorExitCode(results: DoctorCheckResult[]): 0 | 1 {

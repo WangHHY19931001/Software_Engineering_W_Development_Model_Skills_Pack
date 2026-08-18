@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { checkEnvironment, deriveDoctorExitCode, parseJavaMajor, type EnvProbe } from '../logic/doctor-logic.js';
+import { checkEnvironment, deriveDoctorExitCode, type EnvProbe } from '../logic/doctor-logic.js';
+import { parseJavaMajor } from '../lib/java-version.js'; // 审计修复 P15：Java 版本解析单源化（自 lib 导入）
 
 /** 全绿探测桩：node 20 / 依赖全装 / java 11 / jar 存在 / codegraph+openspec 可用 */
 function greenProbe(): EnvProbe {
