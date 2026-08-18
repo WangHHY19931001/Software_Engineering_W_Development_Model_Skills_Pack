@@ -327,5 +327,6 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | #41 单轴失败掩盖 | check-verifier-output R13 |
 | #42 S-fix 跳过 R3+V | check-preventive-review(--variant=fix/emergency) + check-run-log R8 |
 | #44 跳过冰山扫掠直接放行 | check-iceberg-sweep（R1-R5，ICEBERG-A/B 触发）+ V 复审新发现 |
+| #48 子代理越界实施 | check-run-log.ts（R5 role-action 配对）/ check-signature-chain.ts |
 
 > 数据来源：SKILL.md + subagent-delegation.md + phase-1~8-*.md + anti-patterns.md；本矩阵随版本演进，以当前 SKILL.md 为准。
