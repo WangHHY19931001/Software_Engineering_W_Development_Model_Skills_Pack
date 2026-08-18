@@ -157,6 +157,13 @@ async function main(): Promise<void> {
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
+      // ENOENT 预探测：readJsonlOptional 对缺失文件静默返回 []，此处补回原「文件读取失败」warning（降级语义不变）
+      try {
+        await fs.access(runLogAbs);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+        console.error(`⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（ENOENT）`);
+      }
       const entries = await readJsonlOptional(runLogAbs, 'run-log');
       operationalFailureCount = countOperationalFailures(entries);
     } catch (err) {
