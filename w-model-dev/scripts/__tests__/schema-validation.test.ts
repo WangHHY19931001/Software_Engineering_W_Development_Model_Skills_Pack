@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 
 import { validateBySchema } from '../logic/schema-loader.js';
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
+import { readSchemasDir } from '../lib/schema-fs.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const samplesDir = path.join(here, '..', 'samples');
@@ -267,5 +268,24 @@ describe('bdd-manifest designCoverage (phase>=2)', () => {
     };
     const result = validateBySchema('bdd-manifest', manifest);
     expect(result.valid).toBe(true);
+  });
+});
+
+describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
+  it('schema-loader 不再直接依赖 node:fs / process.exit（审计修复 P5）', async () => {
+    const src = await fs.readFile(
+      path.resolve(here, '../logic/schema-loader.ts'),
+      'utf-8',
+    );
+    expect(src).not.toMatch(/from 'node:fs'/);
+    expect(src).not.toMatch(/process\.exit/);
+    expect(src).not.toMatch(/ERROR_JSON/); // 手拼 ERROR_JSON 绕过 cli-error 的行为已移除
+  });
+
+  it('lib/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
+    const dir = path.resolve(here, '../../schemas');
+    const map = await readSchemasDir(dir);
+    expect(Object.keys(map).length).toBe(20);
+    expect(map['rtm.schema.json']).toBeDefined();
   });
 });
