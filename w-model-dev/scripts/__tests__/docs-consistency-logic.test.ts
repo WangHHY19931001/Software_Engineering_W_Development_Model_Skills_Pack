@@ -74,7 +74,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
       '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests',
-    antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
+    antiPatterns: '反模式清单（#1~#48；\n| 48 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({
       properties: { action: { enum: ACTION_ENUM_27 } },
@@ -261,7 +261,7 @@ describe('runDocConsistencyChecks', () => {
       antiPatterns: '反模式清单（#1~#29；\n| 43 | ... |',
     });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('47'))).toBe(true);
+    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('48'))).toBe(true);
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
   });
 
