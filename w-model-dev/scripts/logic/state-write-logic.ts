@@ -98,7 +98,7 @@ async function rotateBackups(absPath: string, keep: number): Promise<void> {
  *   2. expectMtimeMs 给定且与目标当前 mtime 不符 → { ok:false, reason:'MTIME_CONFLICT' }（目标不动）
  *      （expectMtimeMs 给定但目标不存在 → reason:'TARGET_MISSING_FOR_MTIME'）
  *   3. backup!==false 且目标存在 → copyFile 生成 <abs>.bak.<stamp>，按 keepBackups 轮换
- *   4. 写 <abs>.tmp-<pid> → fs.rename 原子替换（崩溃时目标要么旧要么新，不会半截）
+ *   4. 写 <abs>.tmp-<pid>-<uuid> → fs.rename 原子替换（崩溃时目标要么旧要么新，不会半截）
  *   5. 回读与 jsonText 不一致：若回读为另一条合法 JSON（并发写者覆盖，本写已成功）→ ok=true；
  *      若为非法 JSON/空（本写损坏）→ 回滚后 { ok:false, reason:'WRITE_VERIFY_FAILED' }
  */
