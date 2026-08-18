@@ -83,7 +83,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 评审子代理 | V | 按 [references/agent-personas.md](references/agent-personas.md) + [references/verifier-spec.md](references/verifier-spec.md) §6（输出 Schema）+ §8（提示词模板）产出 `VerifierOutput` JSON | 独立评审 + 产出 VerifierOutput（evidence 须具体引用）。不变式：`check-verifier-output.ts` R1-R13（含 R13 单轴下限 <0.70 判失败，反模式 #41）；越界跑门禁/改产物命中反模式 #48 |
 | 门禁子代理 | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | 独立跑门禁 + 回填 exitCode 证据。不变式：`check-run-log.ts` R6 用 gate-logs 交叉校验 exitCode；越界改产物/产出评审 JSON 命中反模式 #48 |
 | 分析子代理 | A | 分块分析、交叉合并、图谱演进（阶段 1–4）；产出 `.w-model/ingestion/*` 与 `consolidated.json` | 只产出 ingestion 分析中间产物。不变式：`check-requirement-graph.ts` 由 G 独立跑（A 跑命中反模式 #48）；越界写正式阶段产物/改 status 命中反模式 #48 |
-| 根因定位子代理 | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`；可作为 R-lead 分派 R-persona 子代理并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 只产出根因定位报告，不实施修复。不变式：`check-rootcause-report.ts` R1-R10 由 G 校验 + V 复审后才可派 S-fix（反模式 #18/#19）；越界改产物/跑门禁/跨阶段定位命中反模式 #48 |
+| 根因定位子代理 | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`；可作为 R-lead 分派 R-persona 子代理并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 只产出根因定位报告，不实施修复。不变式：`check-rootcause-report.ts` R1-R10 由 G 校验 + V 复审后才可派 S-fix（反模式 #18/#19）；越界实施修复/跑门禁/跨阶段定位命中反模式 #48 |
 
 **每阶段分派时序**：O 路由 → 🔴 CHECKPOINT 进入确认 → **分派 S 产出** → **分派 V 评审** → **分派 G 门禁** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新 `project.status`。阶段 8 终检额外分派 G 跑 `check-artifact-gate.ts`。
 
