@@ -186,6 +186,21 @@ async function main(): Promise<void> {
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
 
   // RTM 读取（FILE_NOT_FOUND / FILE_READ / FILE_PARSE 统一走 readJsonClassified，哨兵由 runMain 兜底）
+  // ENOENT 预探测：readJsonClassified 对缺失文件只报通用「文件不存在」，此处补回原「请先执行 /wm」引导语（非 ENOENT 交回统一分类）
+  try {
+    nodeFs.accessSync(rtmFile);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
+        message: '文件不存在（请先执行 /wm 走完 W 模型阶段再校验）',
+        exitCode: 2,
+        file: rtmFile,
+      });
+      return;
+    }
+  }
   const matrix = await readJsonClassified<RTMMatrixShape>(rtmFile);
 
   // ==================== TLA+ 资产读取（spec §3.4.4） ====================
