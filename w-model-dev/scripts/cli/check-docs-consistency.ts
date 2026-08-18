@@ -234,7 +234,7 @@ function collectVitestTestCount(root: string, scriptsChanged: boolean): number {
   return textMatch ? Number(textMatch[1]) : -1;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
   const args = process.argv.slice(2).filter((a) => a !== '--json');
   const jsonMode = args.length !== process.argv.slice(2).length;
