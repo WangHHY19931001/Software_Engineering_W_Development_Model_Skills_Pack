@@ -295,18 +295,14 @@ describe('runDocConsistencyChecks', () => {
     });
     const v = runDocConsistencyChecks(input);
     expect(
-      v.some(
-        (x) =>
-          x.check === 'anti-patterns' &&
-          x.message.includes('48') &&
-          x.message.includes('主清单表区间之外'),
-      ),
+      v.some((x) => x.check === 'anti-patterns' && x.message.includes('48') && x.message.includes('主清单表区间之外')),
     ).toBe(true);
   });
 
   it('| 48 | 缺主清单表头（仅在其他表出现）→ 违规', () => {
     const input = baseInput({
-      antiPatterns: '反模式清单（#1~#48；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+      antiPatterns:
+        '反模式清单（#1~#48；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
     });
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('主清单表最大编号应为 48'))).toBe(true);
