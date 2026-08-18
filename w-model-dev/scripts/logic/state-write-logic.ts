@@ -5,7 +5,7 @@
  * 消除 SKILL/参考文档承诺与 Agent 手写实现之间的漂移（此前承诺未实现）。
  *
  * 流程：parse 校验（经 parseJsonSafe）→ mtime 守卫（不符→MTIME_CONFLICT）→
- *       备份现有文件（复制 + 按 keepBackups 轮换）→ 写 <abs>.tmp-<pid> → fs.rename 原子替换 →
+ *       备份现有文件（复制 + 按 keepBackups 轮换）→ 写 <abs>.tmp-<pid>-<uuid> → fs.rename 原子替换 →
  *       回读校验（不符→WRITE_VERIFY_FAILED，自动回滚备份或删除新写文件）。
  *
  * 退出语义由 CLI 层（cli/wm-write.ts）映射：ok=true→exit 0；reason 非空→exit 1；输入错误→exit 2。
