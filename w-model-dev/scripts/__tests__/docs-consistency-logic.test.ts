@@ -667,6 +667,19 @@ describe('run-log action 枚举语义同步（data-models.md interface vs schema
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
     expect(v.some((x) => x.message.includes('漂移'))).toBe(false);
   });
+
+  it('interface 含 enum 之外的额外值时应报带「多」的 run-log-action 漂移 violation', () => {
+    // 在 27 值基础上追加 enum 之外的多余值
+    const drifted = [
+      '### Schema 清单（20 份）',
+      '| `run-log` | ... | action enum（27 类） |',
+      '## RunLogEntry',
+      ACTION_UNION_27.replace("'iceberg-review';", "'iceberg-review' | 'bogus-action';"),
+    ].join('\n');
+    const input = baseInput({ dataModels: drifted });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
+    expect(v.some((x) => x.message.includes('漂移') && x.message.includes('多 bogus-action'))).toBe(true);
+  });
 });
 
 describe('内链存在性检查（internal-links，C3）', () => {
