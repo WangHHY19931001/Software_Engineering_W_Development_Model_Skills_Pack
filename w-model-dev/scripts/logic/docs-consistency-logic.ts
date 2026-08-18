@@ -327,9 +327,10 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
   const violations: DocCheckViolation[] = [];
   let count = 0;
   let parseFailed = false;
+  let actionEnum: unknown[] | undefined;
   try {
     const schema = JSON.parse(runLogSchema) as { properties?: { action?: { enum?: unknown[] } } };
-    const actionEnum = schema.properties?.action?.enum;
+    actionEnum = schema.properties?.action?.enum;
     count = Array.isArray(actionEnum) ? actionEnum.length : 0;
   } catch {
     parseFailed = true;
@@ -347,6 +348,27 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
       check: 'run-log-action',
       message: `data-models.md run-log 行应含「action enum（${EXPECTED.runLogActionCount} 类）」`,
     });
+  }
+  // 语义级同步：data-models.md RunLogEntry interface 的 action 联合类型须与 schema enum 完全一致
+  // （审计修复 P2：此前仅查计数文本，interface 漂移 12 值未被捕获）
+  if (Array.isArray(actionEnum) && actionEnum.every((v) => typeof v === 'string')) {
+    const unionMatch = dataModels.match(/action:\s*'[^']+'(\s*\|\s*'[^']+')*;/);
+    if (unionMatch) {
+      const unionVals = Array.from(unionMatch[0].matchAll(/'([^']+)'/g), (m) => m[1] as string);
+      const missing = (actionEnum as string[]).filter((v) => !unionVals.includes(v));
+      const extra = unionVals.filter((v) => !(actionEnum as string[]).includes(v));
+      if (missing.length > 0 || extra.length > 0) {
+        violations.push({
+          check: 'run-log-action',
+          message: `data-models.md RunLogEntry.action 联合类型与 run-log.schema.json enum 漂移（缺 ${missing.join(',')}；多 ${extra.join(',')}）`,
+        });
+      }
+    } else {
+      violations.push({
+        check: 'run-log-action',
+        message: 'data-models.md 未找到 RunLogEntry.action 联合类型声明（应为 action: ... | ... ; 形式）',
+      });
+    }
   }
   return violations;
 }

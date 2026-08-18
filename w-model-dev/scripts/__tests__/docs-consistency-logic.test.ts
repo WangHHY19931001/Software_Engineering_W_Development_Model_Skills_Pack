@@ -6,6 +6,19 @@ import {
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 
+/** run-log.schema.json action.enum 27 值（与 schema 逐值一致、同序；审计修复 P2 同步源） */
+const ACTION_ENUM_27 = [
+  'chunk', 'cross', 'evolve', 'produce', 'review', 'gate', 'tla-gate', 'graph-gate',
+  'test', 'checkpoint', 'rework', 'rollback', 'rootcause', 'fix', 'emergency-fix', 'escalate',
+  'r3-completeness', 'r3-reliability', 'r3-security', 'codegraph_query',
+  'opsx_explore', 'opsx_propose', 'opsx_apply', 'opsx_archive',
+  'ensure_deps', 'iceberg-sweep', 'iceberg-review',
+];
+
+/** data-models.md RunLogEntry.action 联合类型（27 值，与 ACTION_ENUM_27 一致） */
+const ACTION_UNION_27 =
+  "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
+
 /** scripts/cli 当前 31 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
 const CLI_SCRIPT_NAMES = [
   'check-archive-integrity',
@@ -52,6 +65,8 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
       '| `run-log` | `run-log.schema.json` | ... | action enum（27 类） |',
       '| `iceberg-sweep` | `iceberg-sweep.schema.json` | ... |',
+      '## RunLogEntry',
+      ACTION_UNION_27,
     ].join('\n'),
     verifierSpec: 'targetKind 枚举：requirement / design / code / test / rootcause。',
     commandReference: 'UAT-/ST-/IT-/UT- → test；否则为 code',
@@ -62,7 +77,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     antiPatterns: '反模式清单（#1~#47；\n| 47 | 大规模重构... |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({
-      properties: { action: { enum: new Array(27).fill('x') } },
+      properties: { action: { enum: ACTION_ENUM_27 } },
     }),
     skill:
       '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（31 个 .ts） | 仅 G 子代理执行 |',
@@ -624,6 +639,33 @@ describe('runDocConsistencyChecks', () => {
   it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
     const input = baseInput({ cliScriptFiles: [] });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'script-registry')).toBe(false);
+  });
+});
+
+describe('run-log action 枚举语义同步（data-models.md interface vs schema enum）', () => {
+  it('interface 联合类型缺值时应报 run-log-action 漂移 violation', () => {
+    // dataModels 含「action enum（27 类）」文本但 interface 只有 15 值（复刻当前漂移）
+    const drifted = [
+      '### Schema 清单（20 份）',
+      '| `run-log` | ... | action enum（27 类） |',
+      '## RunLogEntry',
+      "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';",
+    ].join('\n');
+    const input = baseInput({ dataModels: drifted });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
+    expect(v.some((x) => x.message.includes('漂移'))).toBe(true);
+  });
+
+  it('interface 与 enum 完全一致时无漂移 violation', () => {
+    const synced = [
+      '### Schema 清单（20 份）',
+      '| `run-log` | ... | action enum（27 类） |',
+      '## RunLogEntry',
+      ACTION_UNION_27,
+    ].join('\n');
+    const input = baseInput({ dataModels: synced });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
+    expect(v.some((x) => x.message.includes('漂移'))).toBe(false);
   });
 });
 

@@ -388,7 +388,7 @@ interface RunLogEntry {
   /** 阶段名称 */
   phaseName: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试';
   /** 动作类型 */
-  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';
+  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';
   /** 子代理角色 */
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   /** 本次动作持续时间（秒） */
@@ -555,7 +555,7 @@ interface MaturityConfig {
 | 标识 | `runId`（UUID 或时间戳） | `eventId`（UUID 或时间戳） | 不同 ID 命名空间，不可混用 |
 | 时间戳 | `timestamp` | `timestamp` | 相同（ISO 8601） |
 | 阶段 | `phase` + `phaseName` | 无（路由后才有阶段） | RunLogEntry 强制阶段，EventIngress 路由前无 |
-| 动作 | `action`（chunk/cross/produce/review/gate/tla-gate/graph-gate/test/checkpoint/rework/rollback/rootcause/fix/escalate） | `eventType`（bug-report/requirement-change/...） | 不同枚举集，不可混用 |
+| 动作 | `action`（27 值枚举，与 run-log.schema.json 完全一致：chunk/cross/evolve/produce/review/gate/tla-gate/graph-gate/test/checkpoint/rework/rollback/rootcause/fix/emergency-fix/escalate/r3-completeness/r3-reliability/r3-security/codegraph_query/opsx_explore/opsx_propose/opsx_apply/opsx_archive/ensure_deps/iceberg-sweep/iceberg-review） | `eventType`（bug-report/requirement-change/...） | 不同枚举集，不可混用 |
 | 角色 | `role`（O/A/S/V/G/R） | `source`（webhook/cron/manual/external-ci/user-report） | 不同维度，不可混用 |
 | 结果 | `outcome`（success/fail/rework/escalate/blocked/cancelled） | `routedTo`（路由决策对象） | 不同语义，不可混用 |
 | 决策 | `acknowledgedDecisions`（数组） | 无 | 仅 RunLogEntry |
