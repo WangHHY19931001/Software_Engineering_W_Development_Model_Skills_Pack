@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/exemption.schema.json",
+  "description": "豁免审批（exemption.json）结构 schema，对应 exemption-logic.ts E1-E9 强制 S→R→V→人类四阶段校验",
   "title": "ExemptionShape",
   "type": "object",
   "additionalProperties": false,

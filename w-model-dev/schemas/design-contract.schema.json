@@ -1,5 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/design-contract.schema.json",
+  "description": "设计契约一致性（design-contract.json）结构 schema，对应 design-contract-logic.ts D1-D4 校验（路径/参数/状态码/响应字段）",
   "title": "Design Contract Consistency Check Input",
   "type": "object",
   "required": ["uatPathMappings", "routeDefinitions", "acceptanceAssertions"],

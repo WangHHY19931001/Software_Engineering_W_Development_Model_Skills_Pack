@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/budget.schema.json",
+  "description": "预算追踪（budget.json）结构 schema，对应 budget-logic.ts R1-R5 时效性/onExceed/killSwitch 校验",
   "title": "BudgetConfig",
   "type": "object",
   "additionalProperties": false,

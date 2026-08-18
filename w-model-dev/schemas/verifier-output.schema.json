@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/verifier-output.schema.json",
+  "description": "LLM-as-a-Verifier 评审输出（VerifierOutput）结构 schema，字段定义见 references/verifier-spec.md §7，校验对应 verifier-logic.ts R1-R13",
   "title": "VerifierOutput",
   "type": "object",
   "additionalProperties": false,

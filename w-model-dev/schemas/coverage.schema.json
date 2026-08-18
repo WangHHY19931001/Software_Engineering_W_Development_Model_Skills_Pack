@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/coverage.schema.json",
+  "description": "需求覆盖分析（coverage.json）结构 schema，对应 coverage-logic.ts C1-C10 四矩阵完整性/100% 覆盖率校验",
   "title": "CoverageShape",
   "type": "object",
   "additionalProperties": false,

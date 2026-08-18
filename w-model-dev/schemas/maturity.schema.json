@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/maturity.schema.json",
+  "description": "成熟度等级（maturity.json）结构 schema，对应 maturity-logic.ts R1-R5 schema/level/周期/history 校验",
   "title": "MaturityConfig",
   "type": "object",
   "additionalProperties": false,
