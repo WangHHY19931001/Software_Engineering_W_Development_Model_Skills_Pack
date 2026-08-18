@@ -92,6 +92,16 @@
 - **规范定义**：S 产出后强制触发的三阶段审查（completeness / reliability / security），产物落盘 `.w-model/preventive-reviews/<phase>-<dimension>.json`（约束 #11，反模式 #33）。
 - **_Avoid_**：预防性检查/预防审查/R3 评审（固定称呼「R3 预防性审查」，三份报告维度名固定为 completeness / reliability / security）。
 
+### 反模式（Anti-Pattern）
+
+- **规范定义**：流程级负面知识库条目（#1-#48），命中即回退到当前阶段起点。规范用词为「反模式」；「反例」为弃用别名（_Avoid_）。与「失败模式 F1-F10」（行为退化，登记不回退）、「运维失败模式 O1-O6」三库互补。
+- **_Avoid_**：反例（仅用于 TLA+ 反例轨迹 / 正例反例对照等字面「反例」含义；指代编号反模式条目时一律用「反模式」）。
+
+### exit-2 脚本口径
+
+- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：26 个 check-* + 7 个工具 CLI（含 plan-chunks.ts）= 33。计数变更须同步 docs-consistency-logic EXPECTED。
+- **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
+
 ---
 
 > **维护规则**：新增 `.w-model/*.json` 字段或脚本 violation 消息前，先在本表登记术语，再改 schema / 文档（反模式 #28 schema 前置校验缺失同类纪律）。首版 12+ 条。

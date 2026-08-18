@@ -1,5 +1,17 @@
 # LLM-as-a-Verifier 评审规范（Verifier Spec）
 
+> **§0 按需分节加载导引**（约束 #6）：本文件较大，按下表只读所需节，禁止整文件载入上下文。
+>
+> | 触发场景 | 只读章节 |
+> |---|---|
+> | 评审某 targetKind 用哪套子标准 | §2 + §7（对应子节） |
+> | 构造评审提示词 | §8 |
+> | 输出 JSON 前自检必填字段 / 防编造 | §4.2.1 + §6 |
+> | 校验脚本调用与退出码 | §10 |
+> | LLM 失败 / 降级 / 方差超阈值 | §11 |
+> | 多候选排序 | §5 |
+> | 跨阶段 evidence 一致性 | §12 |
+>
 > 适用对象：外部 AI Agent（TRAE / Claude / 其他）按本规范对 W 模型各阶段产物执行
 > LLM-as-a-Verifier 评审，并将结构化结果写入 JSON 文件交由
 > [`scripts/cli/check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验防漂移。

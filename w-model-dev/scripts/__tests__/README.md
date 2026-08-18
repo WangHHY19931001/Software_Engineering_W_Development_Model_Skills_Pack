@@ -21,6 +21,7 @@
 | exemption-logic.test.ts | Exemption | E1 schema / E2 justification≥20 / E3 evidence 非空 / E4 review 完整 / E5 reviewDecision=approve / E6 rootCauseAnalysis≥30 / E7 verified=true / E8 humanDecision=approve / E9 时间戳时序 / 四阶段全通过 stage=complete |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
 | gate-log-writer.test.ts | CLI IO | writeGateLog 写入 gate-logs/<timestamp>-<script>.json（pretty JSON）/ 目录不可写静默不抛 |
+| gate-logic.test.ts | Gate | 审计修复 P16 专属单测：valid-rtm 终检通过 / bad-coverage 覆盖率违反 / bad-nfr-missing-dual-fields NFR 双字段 / bad-phase5-missing-codemodule（phase=5）codeModule 缺失 / valid-phase6（phase=5）后续测试层不否决（反模式 #21） |
 | gate-report.test.ts | CLI IO | printGateReport 分隔线 + `<LABEL>_JSON ` 行首标记 / exitCode 追加 JSON 末尾 / exit 码 0/1/2 透传 / summary 自带 exitCode 被参数覆盖 |
 | graph-logic.test.ts | Graph | R1-R4 REQ 层级树（level·orphan·multiParent·单调·REQ-group）/ R5 depends-on·precedes 无环 / R6 交叉边对称性与源/目标类型 / R11 level 正整数 / recalculatePassed 重算 / reqHierarchy·crossLogic 填充 |
 | iceberg-logic.test.ts | IcebergSweep | R1 schema 前置短路 / R2 icebergRound 边界（0·6）/ R3 findingId 去重 / R4 可证伪（缺 hypothesis·evidence）/ R5 passed 与 newFindings 一致 |

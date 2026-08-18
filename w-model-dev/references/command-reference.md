@@ -302,3 +302,15 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
 - exit 1（校验失败）结构不变：violations 列表 + 既有 `XXX_JSON` 摘要（含 exitCode=1），不输出 ERROR_JSON。
 - 异常不变量：`ERROR_JSON.exitCode` 恒等于脚本 `process.exit()` 实参（§10E E.1 防伪三层机制）。
 - 流分离：stderr 承载人类诊断（`✗ [CATEGORY] ...`），stdout 仅承载机器可读 `ERROR_JSON` 行——`ERROR_JSON` 同属 stdout JSON 摘要家族（§10E E.1），可被 gate-logs 存档后由 `check-run-log.ts` R6 交叉校验（`run-log-logic.ts` `extractExitCode` 26 个标记含 ERROR_JSON）。
+
+## CHECKPOINT 统一清单
+
+| CHECKPOINT | 触发点 | 确认对象 |
+|---|---|---|
+| 项目初始化 | 首次进入阶段前（SKILL.md 执行工作流步骤 5） | 进入阶段 / 同步测试设计 / 预期产物清单 |
+| ingestion 规划确认 | 阶段 1-4 plan-chunks 产出后（步骤 5.5） | 分块计划与 A-chunk 分派 |
+| ingestion 收敛确认 | 收敛循环结束（MAX_ROUNDS=5 或通过） | 图谱收敛结果 |
+| 阶段门放行 | G 门禁通过后（步骤 9） | 质量等级 / 子标准分 / reworkHints → 放行或返工 |
+| 发布放行 | 阶段 8 终检 exitCode=0 后 | RTM 覆盖率 / 四级测试 / GATE_JSON → 发布或回退 |
+| 重置确认 | /wm reset | 清空实体不可逆操作 |
+| 导入覆盖确认 | /wm import 目标已有数据 | 覆盖现有数据 |
