@@ -2,7 +2,7 @@
 
 > 仅在执行 `/wm` 命令时读取。本文件定义输入、输出、失败动作和状态更新；阶段内容仍以对应 `phase-N-*.md` 为准。
 >
-> **编排者-子代理边界**：所有实施动作（产出 / 评审 / 门禁）由子代理执行，编排者（O）只路由 + CHECKPOINT + 状态持久化 + 只读脚本。详见 [subagent-delegation.md](subagent-delegation.md)。下表「执行方」列标注每个动作由哪个角色执行（O / S / V / G）。
+> **编排者-子代理边界**：所有实施动作（产出 / 评审 / 门禁）由子代理执行，编排者（O）只路由 + CHECKPOINT + 状态持久化 + 只读脚本。详见 [subagent-delegation.md](subagent-delegation.md)。下表「执行方」列标注每个动作由哪个角色执行（O / S / V / G / A / R；A 阶段 1-4 ingestion 分派、R 返工/预防性审查分派）。
 
 ## 目录
 

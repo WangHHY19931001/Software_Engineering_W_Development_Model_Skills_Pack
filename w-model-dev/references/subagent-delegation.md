@@ -281,12 +281,12 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 上游产物路径（用于追溯）：<列出>
 必读：
   - references/agent-personas.md（按 targetKind 选用 Persona）
-  - references/verifier-spec.md §7（输出 Schema）+ §8（提示词模板）+ §7.4A（五轴 + Severity）
+  - references/verifier-spec.md §6（输出 Schema）+ §8（提示词模板）+ §7.4A（五轴 + Severity）
   - references/quality-standards.md（如评审代码 / 测试）
   - references/definition-of-done.md（如评审阶段门）
 产出契约：
   1. VerifierOutput JSON 文件路径：<约定路径>
-  2. 必须满足 verifier-spec.md §7 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
+  2. 必须满足 verifier-spec.md §6 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
   3. Severity 标签作为 reworkHints 前缀（[Critical] / [Required] / [Optional] / [Nit] / [FYI]）
   4. 返回编排者：{VerifierOutput JSON 路径, summary 摘要}
 禁止：
@@ -1168,7 +1168,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 | 维度 | addyosmani 原版 | W 模型适配版 |
 |---|---|---|
-| 子代理分派方式 | 由 Agent 自身决定 | 强制 O / S / V / G 四角色，编排者不得越权实施 |
+| 子代理分派方式 | 由 Agent 自身决定 | 强制 O / S / V / G / A / R 六角色协同：S/V/G 每阶段必派、R3 无条件 ≥3 条、A 阶段 1-4 必派（见本文件「角色分派完整性校验」节），编排者不得越权实施 |
 | 评审独立性 | 由 Agent 自评 | V 子代理物理隔离，不接触 S 子代理内部推理 |
 | 门禁执行 | 由 Agent 直接跑 | G 子代理独立跑 + 回填证据摘要 |
 | 编排者越权处置 | 无强制机制 | 反模式 #10，命中即回退 |
@@ -1184,7 +1184,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 | 角色 | 必分派条件 | 校验脚本 |
 |---|---|---|
 | S（产出） | 每阶段必须（产出开发产物 + 测试设计 + RTM 更新） | check-role-dispatch.ts |
-| V（评审） | 每阶段必须（按 verifier-spec.md §8 产出 VerifierOutput JSON） | check-role-dispatch.ts |
+| V（评审） | 每阶段必须（按 verifier-spec.md §6（输出 Schema）+ §8（提示词模板）产出 VerifierOutput JSON） | check-role-dispatch.ts |
 | G（门禁） | 每阶段必须（跑 check-*.ts + 回填证据摘要） | check-role-dispatch.ts |
 | R（根因/R3） | **无条件必须**（completeness/reliability/security 三阶段各 1 次，共 ≥3 条，无条件强制，覆盖所有 S 变体含 S-fix / S-emergency-fix） | check-role-dispatch.ts（`--r3-enabled` flag 保留为 no-op 向后兼容） |
 
