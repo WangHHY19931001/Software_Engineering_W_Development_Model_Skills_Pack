@@ -16,7 +16,7 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 256/256 |
-| Vitest（门禁脚本单元测试） | ✅ 47 files / 712 tests |
+| Vitest（门禁脚本单元测试） | ✅ 47 files / 717 tests |
 | Vitest coverage（logic/+lib/ 阈值） | ✅ stmts 75 / branch 65 / funcs 85 / lines 75 |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
@@ -156,7 +156,7 @@ npm run self-test
 npm run prepush
 ```
 
-等价于 `bash .githooks/pre-push --force`，强制跑 16 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（47 files / 712 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）、prettier 格式一致性。任一失败即中止。
+等价于 `bash .githooks/pre-push --force`，强制跑 16 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（47 files / 717 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）、prettier 格式一致性。任一失败即中止。
 
 **步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
 
@@ -315,7 +315,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks-logic（纯分块规划）
 │   │   ├── lib/                  # 通用工具与 IO 辅助：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json/artifact-gate-assets/uat-path-mapping/tla-clean-trace 等
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集 + README.md 覆盖矩阵，check-samples-coverage 门禁核对）
-│   │   └── __tests__/            # vitest 单元测试（47 个 .test.ts / 712 tests）
+│   │   └── __tests__/            # vitest 单元测试（47 个 .test.ts / 717 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（4 份伪示例对话 + 5 份 stage 编排示例 + real-run-evidence.md 真实命令证据）
