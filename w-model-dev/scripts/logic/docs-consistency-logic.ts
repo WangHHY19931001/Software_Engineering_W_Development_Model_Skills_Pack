@@ -88,6 +88,12 @@ export const EXPECTED = {
 const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
 const DOD_README = '7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
 const DOD_SSOT_TRACE = '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
+/**
+ * 反模式主清单表头（checkAntiPatterns 区间定位锚点）。
+ * `| <max> |` 行必须落在该表头与其后首个标题（如「### 命中高发阶段」）之间——
+ * 仅「存在」不够：若 #48 被错放其他表（阶段表 / 检测信号表等）同样判定违规。
+ */
+const ANTI_PATTERN_MAIN_TABLE_HEADER = '| # | 反模式（不要做） | 危害 | 正确做法 |';
 const FORBIDDEN_TARGETKIND = [
   'targetKind=file',
   'targetKind=testcase',
@@ -500,10 +506,23 @@ function checkHardConstraints(skill: string, hardConstraints: string): DocCheckV
 
 function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (!antiPatterns.includes(`\n| ${EXPECTED.maxAntiPattern} |`)) {
+  const headerIdx = antiPatterns.indexOf(ANTI_PATTERN_MAIN_TABLE_HEADER);
+  // 主清单表区间：表头行 → 其后首个标题行（真实文档为「### 命中高发阶段」）。
+  // 仅断言「| 48 | 行存在」无法判定其归属（阶段表 / 检测信号表同样含 # 行）——
+  // #48 必须落在主清单表区间内，否则即使其他表出现 `| 48 |` 也判定违规（终审盲区修复）。
+  let mainTable = '';
+  if (headerIdx >= 0) {
+    const tail = antiPatterns.slice(headerIdx);
+    const nextHeading = tail.search(/\r?\n#{1,6} /);
+    mainTable = nextHeading < 0 ? tail : tail.slice(0, nextHeading);
+  }
+  if (!mainTable.includes(`\n| ${EXPECTED.maxAntiPattern} |`)) {
     violations.push({
       check: 'anti-patterns',
-      message: `anti-patterns.md 反模式表最大编号应为 ${EXPECTED.maxAntiPattern}`,
+      message:
+        headerIdx < 0
+          ? `anti-patterns.md 缺反模式清单表头「${ANTI_PATTERN_MAIN_TABLE_HEADER}」（主清单表最大编号应为 ${EXPECTED.maxAntiPattern}）`
+          : `anti-patterns.md 反模式清单表内应含最大编号 ${EXPECTED.maxAntiPattern} 行（「| ${EXPECTED.maxAntiPattern} |」出现在主清单表区间之外不计数）`,
     });
   }
   if (!antiPatterns.includes(`#1~#${EXPECTED.maxAntiPattern}`)) {

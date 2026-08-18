@@ -96,7 +96,8 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
       '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests',
-    antiPatterns: '反模式清单（#1~#48；\n| 48 | 大规模重构... |',
+    antiPatterns:
+      '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 1 | 跳过阶段门评审 | 缺陷后移 | 走完评审 |\n| 48 | 大规模重构式改动 | 变更量子无穷大 | 小步重构 |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
     runLogSchema: JSON.stringify({
       properties: { action: { enum: ACTION_ENUM_27 } },
@@ -285,6 +286,30 @@ describe('runDocConsistencyChecks', () => {
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('48'))).toBe(true);
     expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
+  });
+
+  it('| 48 | 被错放主清单表外（检测信号表）→ 违规（归属盲区修复）', () => {
+    const input = baseInput({
+      antiPatterns:
+        '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 47 | 大规模重构式改动 | ... |\n### 命中高发阶段\n| 阶段 | 高发反模式编号 |\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+    });
+    const v = runDocConsistencyChecks(input);
+    expect(
+      v.some(
+        (x) =>
+          x.check === 'anti-patterns' &&
+          x.message.includes('48') &&
+          x.message.includes('主清单表区间之外'),
+      ),
+    ).toBe(true);
+  });
+
+  it('| 48 | 缺主清单表头（仅在其他表出现）→ 违规', () => {
+    const input = baseInput({
+      antiPatterns: '反模式清单（#1~#48；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+    });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('主清单表最大编号应为 48'))).toBe(true);
   });
 
   it('exit-2 脚本数声明 31 实测 29 → 违规；AGENTS 残留 29 → 过时违规', () => {

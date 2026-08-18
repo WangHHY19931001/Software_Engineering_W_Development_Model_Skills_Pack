@@ -54,7 +54,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 单元测试（vitest，47 个 test 文件 / 710 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+# 3.1 单元测试（vitest，47 个 test 文件 / 712 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
 # 3.2 自检基线（samples/ 目录下 256 条样本，覆盖全部 check 脚本的通过 / 失败路径）
@@ -211,7 +211,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
 │   ├── self-test.ts               # 校验逻辑自检（256 条样本，samples/ 驱动）
-│   ├── __tests__/                 # vitest 单元测试（47 个 .test.ts / 710 条 + README.md coverage 矩阵）
+│   ├── __tests__/                 # vitest 单元测试（47 个 .test.ts / 712 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例
