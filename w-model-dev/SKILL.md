@@ -162,7 +162,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 资源目录 | 触发条件 |
 |---|---|
 | `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
-| `scripts/cli/`（33 个 .ts：26 个 check-* 门禁 + 7 个工具 CLI） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
+| `scripts/cli/`（34 个 .ts：26 个 check-* 门禁 + 7 个工具 CLI + self-test.ts 回归基线；其中 33 个为 exit-2 结构化错误脚本） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
 | `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
 | `schemas/`（20 份 JSON Schema draft-07） | 由 `scripts/logic/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
 | `tools/`（tla2tools.jar） | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝） |

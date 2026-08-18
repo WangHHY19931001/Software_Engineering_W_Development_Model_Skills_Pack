@@ -22,7 +22,7 @@
 | 任意 .w-model/*.json | schema 强约束校验（被 logic 层自动调用，无需手动） | `schema-loader.ts` 内置 |
 | scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/cli/security-scan.ts`（支持 --regenerate 重生成 baseline） |
 | scripts 改动 | 回归基线 | `npm run self-test` |
-| ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/logic/plan-chunks.ts`（O 只读 stdout） |
+| ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/cli/plan-chunks.ts`（O 只读 stdout） |
 | wm-status.ts（状态快照） | 查看当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步 | `npx tsx w-model-dev/scripts/cli/wm-status.ts <project-dir> [--json]` |
 | metrics-report.ts（流程度量） | 流程度量报告（分布/返工/预算 burn rate/killSwitch 预警） | `npx tsx w-model-dev/scripts/cli/metrics-report.ts <project-dir> [--from=] [--to=] [--phase=N] [--json] [--out=]` |
 

@@ -262,9 +262,9 @@ async function main(): Promise<void> {
     .filter((f) => f.endsWith('.ts'))
     .sort();
   const checkScriptCount = cliScriptFiles.filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 26（cli/ 层）
-  /** 非 check-* 但可 exit 2 的脚本数：6 个工具 CLI（ensure-codegraph-opsx / metrics-report / security-scan / wm-status / wm-write / doctor）+ logic/plan-chunks.ts；self-test.ts 非 exit-2 不计入 */
-  const TOOL_OR_LOGIC_EXIT2_COUNT = 7;
-  const exit2ScriptCount = checkScriptCount + TOOL_OR_LOGIC_EXIT2_COUNT; // = 33（「33 个脚本」表述来源）
+  /** 非 check-* 但可 exit 2 的脚本数（7 个工具 CLI（ensure-codegraph-opsx / metrics-report / security-scan / wm-status / wm-write / doctor / plan-chunks），全数位于 cli/；self-test.ts 非 exit-2 不计入） */
+  const TOOL_CLI_EXIT2_COUNT = 7;
+  const exit2ScriptCount = checkScriptCount + TOOL_CLI_EXIT2_COUNT; // = 33（「33 个脚本」表述来源）
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),

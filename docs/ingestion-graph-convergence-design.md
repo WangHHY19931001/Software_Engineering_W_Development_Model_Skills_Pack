@@ -386,7 +386,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 
 | 脚本 | 跑者 | 接口 | 退出码 |
 |---|---|---|---|
-| `scripts/logic/plan-chunks.ts` | O（只读 stdout） | `plan-chunks.ts "<path>" --phase=N --node-type=<TYPE> [--max-tokens=8000]` | 0=正常 / 2=输入错误 |
+| `scripts/cli/plan-chunks.ts` | O（只读 stdout） | `plan-chunks.ts "<path>" --phase=N --node-type=<TYPE> [--max-tokens=8000]` | 0=正常 / 2=输入错误 |
 | `scripts/cli/check-requirement-graph.ts` | G | `check-requirement-graph.ts "<graph.json\|consolidated.json>" --phase=N` | 0=通过 / 1=校验失败 / 2=输入错误 |
 
 两个脚本均自包含（仅依赖 tsx + Node 标准库，不 import src/），与现有 `check-verifier-output.ts` / `check-artifact-gate.ts` 同构。

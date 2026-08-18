@@ -1,20 +1,21 @@
 /**
- * plan-chunks.ts 单元测试 —— 分块规划纯逻辑
+ * plan-chunks-logic.ts 单元测试 —— 分块规划纯逻辑
  *
  * 覆盖：
  *   - estimateTokens：ASCII 字符数/4；CJK 字节数/4（中文 30194 字符 ≥ 10000 tokens 阈值）
  *   - splitMarkdownSections：header+content 正确配对不丢内容；围栏代码块内 # 行不切分
  *   - splitByLines：单节超限按行二次切分（每块 ≤ maxTokens）；overlap 5 行
- *   - planFile 目录递归：含嵌套子目录的树产出完整分块计划
+ *   - planChunksFromContent：未超限单块 kind=file；超限按标题切分产出 section chunks
  */
 
-import { promises as fs } from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
+import { describe, it, expect } from 'vitest';
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-
-import { estimateTokens, splitMarkdownSections, splitByLines, planFile } from '../logic/plan-chunks.js';
+import {
+  estimateTokens,
+  splitMarkdownSections,
+  splitByLines,
+  planChunksFromContent,
+} from '../logic/plan-chunks-logic.js';
 
 describe('estimateTokens', () => {
   it('ASCII：字符数/4 向上取整', () => {
@@ -75,37 +76,20 @@ describe('splitByLines', () => {
   });
 });
 
-describe('planFile', () => {
-  let tmpRoot: string;
-
-  beforeAll(async () => {
-    tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'plan-chunks-'));
+describe('planChunksFromContent', () => {
+  it('未超限：整个文件产出单块 kind=file', () => {
+    const content = '# A\ncontent';
+    const chunks = planChunksFromContent(content, '/tmp/doc.md', 8000, 'chunk', true);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]!.kind).toBe('file');
+    expect(chunks[0]!.id).toBe('chunk-001');
+    expect(chunks[0]!.path).toBe('/tmp/doc.md');
+    expect(chunks[0]!.tokens).toBeLessThanOrEqual(8000);
   });
 
-  afterAll(async () => {
-    await fs.rm(tmpRoot, { recursive: true, force: true });
-  });
-
-  it('目录递归：含嵌套子目录的树产出完整分块计划', async () => {
-    const tree = path.join(tmpRoot, 'tree');
-    await fs.mkdir(path.join(tree, 'sub', 'nested'), { recursive: true });
-    await fs.writeFile(path.join(tree, 'a.md'), '# A\ncontent');
-    await fs.writeFile(path.join(tree, 'sub', 'nested', 'b.md'), '# B\ncontent');
-
-    const chunks = await planFile(tree, 8000, 'chunk');
-    expect(chunks).toHaveLength(2);
-    expect(chunks.map((c) => c.path).sort()).toEqual(
-      [path.join(tree, 'a.md'), path.join(tree, 'sub', 'nested', 'b.md')].sort(),
-    );
-    expect(chunks.every((c) => c.kind === 'file')).toBe(true);
-  });
-
-  it('单文件超限：按标题切分产出 section chunks，每块 ≤ maxTokens', async () => {
-    const f = path.join(tmpRoot, 'big.md');
+  it('超限 Markdown：按标题切分产出 section chunks，每块 ≤ maxTokens', () => {
     const body = '# H1\n' + Array.from({ length: 200 }, (_, i) => `para-${i}-${'x'.repeat(30)}`).join('\n');
-    await fs.writeFile(f, body);
-
-    const chunks = await planFile(f, 100, 'chunk');
+    const chunks = planChunksFromContent(body, '/tmp/big.md', 100, 'chunk', true);
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every((c) => c.kind === 'section')).toBe(true);
     expect(chunks.every((c) => c.tokens <= 100)).toBe(true);

@@ -4,9 +4,10 @@
  *
  * 对应 w-model-dev/references/ingestion-chunk.md。
  * 编排者（O）以只读方式调用，脚本不写任何文件，仅 stdout 输出 JSON 分块计划。
+ * 纯逻辑在 logic/plan-chunks-logic.ts；本文件为 CLI 入口层（审计修复 P5b）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]
+ *   npx tsx w-model-dev/scripts/cli/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]
  *
  * 参数：
  *   path           文件或目录路径
@@ -23,25 +24,15 @@
 
 import { promises as fs, type Stats } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
-
-interface Chunk {
-  id: string;
-  path: string;
-  kind: 'file' | 'dir' | 'section';
-  tokens: number;
-}
-
-interface PlanOutput {
-  chunks: Chunk[];
-  totalChunks: number;
-  strategy: 'file-split' | 'dir-tree' | 'single';
-  phase: number;
-  nodeType: string;
-}
+import {
+  planChunksFromContent,
+  type Chunk,
+  type PlanOutput,
+} from '../logic/plan-chunks-logic.js';
 
 const MAX_TOKENS_DEFAULT = 8000;
 
@@ -67,101 +58,8 @@ function parseArgs(argv: string[]): {
   return { inputPath, phaseStr, nodeTypeStr, maxTokensStr };
 }
 
-export function estimateTokens(text: string): number {
-  return Math.ceil(Buffer.byteLength(text, 'utf8') / 4);
-}
-
-export function splitMarkdownSections(content: string): string[] {
-  const lines = content.split('\n');
-  const sections: string[] = [];
-  let current: string[] = [];
-  let inFence = false;
-  for (const line of lines) {
-    const fence = line.match(/^\s*(```|~~~)/);
-    if (fence) inFence = !inFence;
-    if (!inFence && /^#{1,6}\s/.test(line) && current.length > 0) {
-      sections.push(current.join('\n'));
-      current = [];
-    }
-    current.push(line);
-  }
-  if (current.length > 0) sections.push(current.join('\n'));
-  return sections;
-}
-
-export function splitByLines(text: string, maxTokens: number, filePath: string, chunkIdPrefix: string): Chunk[] {
-  const lines = text.split('\n');
-  const chunks: Chunk[] = [];
-  const OVERLAP = 5;
-  let buf: string[] = [];
-  let bufBytes = 0;
-  let idx = 1;
-  const flush = () => {
-    if (buf.length === 0) return;
-    const slice = buf.join('\n');
-    chunks.push({
-      id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
-      path: filePath,
-      kind: 'section',
-      tokens: estimateTokens(slice),
-    });
-    idx++;
-    const keep = buf.slice(-OVERLAP);
-    buf = [...keep];
-    bufBytes = keep.reduce((a, l) => a + Buffer.byteLength(l, 'utf8') + 1, 0);
-  };
-  for (const line of lines) {
-    const lineBytes = Buffer.byteLength(line, 'utf8') + 1;
-    if (bufBytes + lineBytes > maxTokens * 4 && buf.length > 0) flush();
-    buf.push(line);
-    bufBytes += lineBytes;
-  }
-  if (buf.length > 0) flush();
-  return chunks;
-}
-
-export async function splitMarkdownByHeaders(
-  content: string,
-  maxTokens: number,
-  filePath: string,
-  chunkIdPrefix: string,
-): Promise<Chunk[]> {
-  const sections = splitMarkdownSections(content);
-  const chunks: Chunk[] = [];
-  let current = '';
-  let idx = 1;
-  for (const sec of sections) {
-    if (estimateTokens(current + sec) > maxTokens && current.length > 0) {
-      chunks.push({
-        id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
-        path: filePath,
-        kind: 'section',
-        tokens: estimateTokens(current),
-      });
-      idx++;
-      current = '';
-    }
-    if (estimateTokens(sec) > maxTokens) {
-      const sub = splitByLines(sec, maxTokens, filePath, `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`);
-      chunks.push(...sub);
-      idx += sub.length;
-      current = '';
-    } else {
-      current += sec;
-    }
-  }
-  if (current.length > 0) {
-    chunks.push({
-      id: `${chunkIdPrefix}-${String(idx).padStart(3, '0')}`,
-      path: filePath,
-      kind: 'section',
-      tokens: estimateTokens(current),
-    });
-  }
-  return chunks;
-}
-
-export async function planFile(filePath: string, maxTokens: number, chunkIdPrefix: string): Promise<Chunk[]> {
+/** 目录/文件遍历 + 文件内容读取（IO 层）；纯分块逻辑委托给 logic/plan-chunks-logic.ts */
+async function planFile(filePath: string, maxTokens: number, chunkIdPrefix: string): Promise<Chunk[]> {
   const stat = await fs.stat(filePath);
   if (stat.isDirectory()) {
     const entries = await fs.readdir(filePath, { withFileTypes: true });
@@ -178,24 +76,9 @@ export async function planFile(filePath: string, maxTokens: number, chunkIdPrefi
     }
     return chunks;
   }
-  // 文件
+  // 文件：读取内容 → 纯逻辑产块
   const content = await fs.readFile(filePath, 'utf-8');
-  const tokens = estimateTokens(content);
-  if (tokens <= maxTokens) {
-    return [
-      {
-        id: `${chunkIdPrefix}-001`,
-        path: filePath,
-        kind: 'file',
-        tokens,
-      },
-    ];
-  }
-  // 超限：Markdown 按标题切，非 Markdown 按行切
-  if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
-    return splitMarkdownByHeaders(content, maxTokens, filePath, chunkIdPrefix);
-  }
-  return splitByLines(content, maxTokens, filePath, chunkIdPrefix);
+  return planChunksFromContent(content, filePath, maxTokens, chunkIdPrefix);
 }
 
 async function main(): Promise<void> {
@@ -206,7 +89,7 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       message: '参数缺失 <path>',
       detail:
-        '用法: npx tsx w-model-dev/scripts/logic/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
+        '用法: npx tsx w-model-dev/scripts/cli/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
       exitCode: 2,
     });
     return;
@@ -284,19 +167,8 @@ async function main(): Promise<void> {
   };
 
   console.log(JSON.stringify(output, null, 2));
-  process.exit(0);
+  process.exitCode = 0;
 }
 
-// main 守卫：仅在直接执行时运行，被 import 时不触发（供单测导入纯函数）
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
-  main().catch((err) => {
-    exitWithError({
-      category: 'UNEXPECTED',
-      message: '脚本异常',
-      detail: err instanceof Error ? err.message : String(err),
-      exitCode: 2,
-    });
-  });
-}
+// 统一入口（lib/run-main.ts）：main().catch 统一为 UNEXPECTED + exit 2；exitWithError 已完成输出则静默退出
+runMain(main);

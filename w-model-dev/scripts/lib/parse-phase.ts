@@ -1,7 +1,7 @@
 /**
  * 统一 --phase 参数解析（lib/parse-phase.ts）
  *
- * 12 个 cli/*.ts 脚本 + logic/plan-chunks.ts（非 cli/ 独立入口）共 13 个调用方的 --phase 解析/校验统一由本模块实现（spec §3.2）。
+ * 13 个 cli/*.ts 脚本（含 cli/plan-chunks.ts）的 --phase 解析/校验统一由本模块实现（spec §3.2）。
  * 支持三种形态：
  *   - `--phase=N`（等号内联）
  *   - `--phase N`（空格分离）

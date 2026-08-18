@@ -19,7 +19,7 @@ export interface DocConsistencyInput {
   schemaFiles: string[];
   /** subagent/ 目录 .md 人格文件数（实测；期望值由 README「N 个人格文件」表述声明） */
   personaCount: number;
-  /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 6 工具 CLI + logic/plan-chunks.ts = 33；self-test.ts 非 exit-2 不计入） */
+  /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 7 个工具 CLI（含 cli/plan-chunks.ts）= 33，全数位于 cli/；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
   /** references/ 目录 .md 文件数（实测；期望值由 SKILL.md「（N 个 .md）」表述声明） */
   referencesCount: number;
