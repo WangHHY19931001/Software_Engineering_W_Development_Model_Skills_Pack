@@ -581,7 +581,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 4A.2 失败模式清单
 
-以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 的 47 条流程反模式（#1~#47）互补：反模式是「流程破坏」，失败模式是「行为退化」。
+以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 的 48 条流程反模式（#1~#48）互补：反模式是「流程破坏」，失败模式是「行为退化」。
 
 | # | 失败模式 | 与 W 模型反例的关系 |
 |---|---|---|
@@ -601,7 +601,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 ### 4A.2a 运维失败模式清单（O1~O6）
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
-> 与 47 条流程反模式（#1~#47）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
+> 与 48 条流程反模式（#1~#48）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
 > O 系列命中**不触发脚本回退**（与 F1~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
 
 | # | 失败模式 | 症状 | 与现有反模式/失败模式的关系 | 缓解措施 |
@@ -617,7 +617,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 4A.2b 返工循环反模式扩展（#18/#19）
 
-> #18/#19 守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束（47 条流程反模式 #1~#47 之一族，权威定义见 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)）。命中即回退到当前阶段起点。
+> #18/#19 守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束（48 条流程反模式 #1~#48 之一族，权威定义见 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)）。命中即回退到当前阶段起点。
 > 权威定义见 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md) + [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §7.1。
 
 | # | 反模式 | 危害 | 正确做法 |
@@ -625,13 +625,13 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复 |
 | 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
 
-> #18/#19 命中即回退（与其余 45 条流程反模式同级）。R 方法论与多角度分析机制详见 §6.4.5 与 [`root-cause-locator.md`](../w-model-dev/references/root-cause-locator.md)；R 报告校验门禁详见 §10.9。
+> #18/#19 命中即回退（与其余 46 条流程反模式同级）。R 方法论与多角度分析机制详见 §6.4.5 与 [`root-cause-locator.md`](../w-model-dev/references/root-cause-locator.md)；R 报告校验门禁详见 §10.9。
 
 ### 4A.3 与现有约束的关系
 
 - **「不可违反的约束」（[`SKILL.md`](../w-model-dev/SKILL.md)）** 是硬红线，命中即触发阶段回退；由门禁脚本或 CHECKPOINT 强制。
 - **「核心操作行为」（本节 §4A.1）** 是日常准则，违反不立即触发回退但会降低产物质量；由 Agent 自检或 LLM-as-a-Verifier 在评审中标注。
-- **「流程反模式」（[`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 47 条（#1~#47），含返工循环 #18/#19）** 是流程破坏，命中即回退；与门禁脚本退出码精确对应。
+- **「流程反模式」（[`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 48 条（#1~#48），含返工循环 #18/#19）** 是流程破坏，命中即回退；与门禁脚本退出码精确对应。
 - **「失败模式」（本节 §4A.2 F1~F10）** 是行为退化，命中不回退但应记录；与反模式互补。
 - **「运维失败模式」（本节 §4A.2a O1~O6）** 是运行健康问题，命中不回退但应标注；由预算检查（O1/O6）/路径存活校验（O2）/V-G 矛盾检测（O3）/理解证据机制（O4/O5）协同检测。
 
@@ -1145,7 +1145,7 @@ flowchart TD
 
 | 脚本 | 用途 | 实现位置 |
 |------|------|----------|
-| `wm-write.ts` | 状态文件安全写助手：`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验。O/S 更新 `.w-model/*.json` 状态文件时统一经此写入，防止手写漂移与并发覆盖 | [`w-model-dev/scripts/cli/wm-write.ts`](../w-model-dev/scripts/cli/wm-write.ts) + [`w-model-dev/scripts/logic/state-write-logic.ts`](../w-model-dev/scripts/logic/state-write-logic.ts) |
+| `wm-write.ts` | 状态文件安全写助手：`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验（回读失败自动回滚备份）。O/S 更新 `.w-model/*.json` 状态文件时统一经此写入，防止手写漂移与并发覆盖 | [`w-model-dev/scripts/cli/wm-write.ts`](../w-model-dev/scripts/cli/wm-write.ts) + [`w-model-dev/scripts/logic/state-write-logic.ts`](../w-model-dev/scripts/logic/state-write-logic.ts) |
 | `doctor.ts` | 环境自检：node / tsx / ajv / java / tla2tools / codegraph / openspec 逐项检查并给出修复指引（`--with-tla` 将 TLA+ 项升级为阻断级）。首次启用或门禁报依赖错误时运行 | [`w-model-dev/scripts/cli/doctor.ts`](../w-model-dev/scripts/cli/doctor.ts) + [`w-model-dev/scripts/logic/doctor-logic.ts`](../w-model-dev/scripts/logic/doctor-logic.ts) |
 
 ---

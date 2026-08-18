@@ -7,6 +7,20 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [41.18.0] - 2026-08-18
+
+### 修复（审计 2026-08-16 十六项问题）
+- **反模式 #48 新增**（子代理越界实施）：修正 SKILL.md 五处 #22 误引（#22 实为目标系统 RBAC 角色越权）；补 #18/#19 详细节；maxAntiPattern 47→48
+- **run-log action 枚举同步**：data-models.md interface 15→27 值（补 emergency-fix/r3-*/codegraph_query/opsx_*/ensure_deps/iceberg-*），docs-consistency 新增 interface↔enum 语义比对
+- **TLA+ 门禁超时**：SANY 60s / TLC 300s（EXEC_LIMITS 集中），TLC 挂死不再阻塞 CHECKPOINT；Java 版本解析单源化（lib/java-version.ts），预检不再硬编码 11
+- **wm-write 原子写**：tmpPath 追加 randomUUID（同进程并发安全）；回读失败自动回滚备份（rolledBack 字段）
+- **错误出口统一**：HandledCliError + runMain，消除 readJsonOrExit process.exit 截断 ERROR_JSON 风险与 readJsonClassified 双打印
+- **分层修复**：plan-chunks 拆分 logic（纯）/cli（入口）；schema-loader 去 process.exit、IO 下沉 lib/schema-fs.ts；bdd-logic 去 as any
+- **样板抽取**：lib/parse-args.ts、lib/run-main.ts、lib/gate-log-writer.ts；budget/maturity 复用 readJsonlOptional；artifact-gate 瘦身
+- **schema 自描述**：design-contract 补 $id；6 份 schema 补顶层 description
+- **persona 统一**：product-manager 删 tools 字段；5 份 hex color 统一命名色
+- **文档一致性**：subagent-delegation 六角色矛盾修正；verifier-spec §6/§8 引用修正；command-reference 补 A/R 与 CHECKPOINT 统一清单；INSTALL 目录树 exit-2 脚本计数 31→33 修正；glossary 增反模式/exit-2 口径条目；三个超大引用文件增 §0 分节导引；ensure-codegraph-opsx 吞错加 stderr 日志；gate-logic 首次获得专属单测
+
 ## [41.17.0] - 2026-08-15
 
 ### Added

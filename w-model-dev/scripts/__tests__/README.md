@@ -17,6 +17,7 @@
 | coverage-logic.test.ts | Coverage | C1 stakeholders 非空 / C3 scenarios 非空 / C4 happy·error·boundary / C5 REQ·NFR·CON / C7 crossCuts↔graphCrossCuts 双向一致 / C8 metrics 4 项=100% / C9 missing 须 Out of Scope 声明 / C10 metrics 重算一致 / exemptions 跳过 / OOS 形状 CLI exit 2 |
 | design-contract-logic.test.ts | DesignContract | D8 多路由不同状态码无交叉污染 / D9 路由未找到报 D2/D3/D4 / D9 路径归一化（尾部斜杠·query）/ null·undefined 输入失败 |
 | doctor-logic.test.ts | Doctor | parseJavaMajor（8/11/17/21/未知格式）/ deriveDoctorExitCode（fail 阻断·warn 放行）/ checkEnvironment：全绿 exit 0·node<18 fail·tsx 缺失 fail·java 默认 warn 且 --with-tla 升 fail·tla2tools 双态·codegraph/openspec 可选 warn |
+| java-version.test.ts | Java | parseJavaMajor 单一事实源（lib/java-version.ts）：Java 8 旧式（1.8.x→8）/ 11/17/21 新式 / 无法解析返回 null |
 | docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 31 / pre-push 15 / vitest 40）/ 版本五处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#47 / baseline-sync |
 | exemption-logic.test.ts | Exemption | E1 schema / E2 justification≥20 / E3 evidence 非空 / E4 review 完整 / E5 reviewDecision=approve / E6 rootCauseAnalysis≥30 / E7 verified=true / E8 humanDecision=approve / E9 时间戳时序 / 四阶段全通过 stage=complete |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
@@ -34,6 +35,7 @@
 | plan-chunks.test.ts | PlanChunks | estimateTokens（ASCII/4·CJK 字节/4）/ splitMarkdownSections header+content 配对·围栏代码块内 # 不切分 / splitByLines 二次切分·overlap / planFile 目录递归·单文件超限 |
 | preventive-review-logic.test.ts | PreventiveReview | 三份报告（completeness·reliability·security）齐全合规通过 / 缺失 completeness 失败 / phase 不一致失败 / variant fix·emergency·standard·ingest 通过（纯逻辑对所有变体一致）/ 缺 security 仍失败 |
 | read-json-or-exit.test.ts | CLI IO | readJsonOrExit 正常/ENOENT/非法 JSON/相对路径 / readJsonlOrExit 正常/空行/坏行 warn/ENOENT/CRLF/label 默认值 / readJsonlOptional 正常/ENOENT→[]/坏行 warn/空行+CRLF / readJsonClassified 三态 exitWithError / loadAndValidate 哨兵 |
+| run-main.test.ts | CLI | runMain 正常完成不动作 / main 抛 HandledCliError 不重复输出（exitCode=2、仅一条 ERROR_JSON）/ 普通异常输出 UNEXPECTED + exitCode 2 |
 | role-dispatch-logic.test.ts | RoleDispatch | R≥3 无条件（无需 r3Enabled）/ S·V·G 各≥1 强制 / 多阶段只报缺阶段 / 非法条目跳过 / phaseSummary 结构 |
 | root-cause-logic.test.ts | RootCause | R1 schema / R2 链长 / R3 可证伪 / R4 修复建议 / R5 预防 / R6 上游 / R7 质量 / R8 报告 ID / R9 多角度 / R10 reality |
 | run-log-logic.test.ts | RunLog | R1 完整性 / R2 tokens / R3 返工 / R4 决策 / R5 O越权 / R6 exitCode / R7 时序 / R8 轨迹模板 / R8-4 轨迹顺序链（S→R3→V→G→checkpoint 倒置拦截·标准全链通过·多轮返工通过） |

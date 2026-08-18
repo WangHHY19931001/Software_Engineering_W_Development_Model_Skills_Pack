@@ -11,12 +11,16 @@ describe('writeGateLog（lib/gate-log-writer.ts）', () => {
     const files = await fs.readdir(path.join(dir, '.w-model', 'gate-logs'));
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-demo-check\.json$/);
-    const content = JSON.parse(
-      await fs.readFile(path.join(dir, '.w-model', 'gate-logs', files[0]!), 'utf-8'),
-    ) as { exitCode: number; passed: boolean };
+    const content = JSON.parse(await fs.readFile(path.join(dir, '.w-model', 'gate-logs', files[0]!), 'utf-8')) as {
+      exitCode: number;
+      passed: boolean;
+    };
     expect(content).toEqual({ exitCode: 0, passed: true });
   });
   it('目录不可写时不抛异常', async () => {
-    await expect(writeGateLog('x', {}, '/proc/definitely-not-writable')).resolves.toBeUndefined();
+    // 用普通文件充当"目录"，其下 mkdir 报 ENOTDIR 快速失败（跨平台稳健；/proc 路径在 WSL 下 mkdir 会挂起超时）
+    const blocking = path.join(os.tmpdir(), `wm-gatelog-block-${Date.now()}`);
+    await fs.writeFile(blocking, 'x');
+    await expect(writeGateLog('x', {}, blocking)).resolves.toBeUndefined();
   });
 });
