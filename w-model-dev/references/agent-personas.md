@@ -5,7 +5,7 @@
 >
 > **架构约束**：本技能不内置 LLM 调用（[§3.3](../../docs/skill-design-document_SSoT.md)）。Persona 是「供外部 Agent 在执行 `/wm review` 时采用的角色提示词」，由 Agent 自身 LLM 加载执行。Persona 文件本身只是 Markdown，不调用任何 LLM。
 >
-> **与 [verifier-spec.md](verifier-spec.md) 的关系**：verifier-spec.md §7 定义评审输出的 JSON Schema 与校验脚本；本文件定义评审执行的角色视角与关注点。Persona 产出的 JSON 必须满足 verifier-spec.md Schema，并经 [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验。
+> **与 [verifier-spec.md](verifier-spec.md) 的关系**：verifier-spec.md §6 定义评审输出的 JSON Schema 与校验脚本；本文件定义评审执行的角色视角与关注点。Persona 产出的 JSON 必须满足 verifier-spec.md Schema，并经 [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) 校验。
 >
 > **与 [verifier-spec.md §7.4A](verifier-spec.md) 的关系**：§7.4A 定义五轴评审与 Severity 标签（Critical / Required / Optional / Nit / FYI），是 `code-reviewer` Persona 的发现项组织方式。
 
@@ -16,7 +16,7 @@
 | 维度 | 核心锚点 | 详见 |
 |---|---|---|
 | 三层架构 | Skill（如何做）/ Persona（谁来做）/ Command（何时做） | 「三层架构」节 |
-| Persona 规则 | 单一角色 + 单一输出格式；不调用其他 Persona；产出须满足 verifier-spec §7 Schema | 「Persona 规则」节 |
+| Persona 规则 | 单一角色 + 单一输出格式；不调用其他 Persona；产出须满足 verifier-spec §6 Schema | 「Persona 规则」节 |
 | code-reviewer | 五轴代码审查（Correctness/Readability/Architecture/Security/Performance），targetKind=code，阶段 5 | Persona 1 |
 | test-engineer | 测试策略与覆盖率，targetKind=test，阶段 4/6/7 | Persona 2 |
 | security-auditor | OWASP + STRIDE，targetKind=code/design，阶段 7/2 | Persona 3 |
@@ -53,7 +53,7 @@
 2. **Persona 不调用其他 Persona**：组合由命令或用户完成。`code-reviewer` 发现安全问题时不直接调用 `security-auditor`，而是在 `reworkHints` 中以「[建议 security-auditor 深审] xxx」前缀形式呈现，由用户或后续 `/wm review` 显式触发。
 3. **Persona 可引用技能内容**：Persona 在评审中可加载 [verifier-spec.md](verifier-spec.md) §8 提示词模板、[definition-of-done.md](definition-of-done.md) DoD 标准、[quality-standards.md](quality-standards.md) 质量标准作为「如何做」的依据。
 4. **每个 Persona 节以「组合」小节结尾**：声明在 W 模型中的直接调用场景、经 `/wm review` 调用场景、禁止从其他 Persona 调用。
-5. **Persona 产出必须满足 [verifier-spec.md](verifier-spec.md) §7 输出 Schema**：`subCriteria[]` / `compositeScore[0,1]` / `qualityLevel(A/B/C/D)` / `passed` / 可选 `reworkHints` / `ranking`。Severity 标签作为 `reworkHints` 字符串前缀（[§7.4A.2](verifier-spec.md)），不新增 Schema 字段。
+5. **Persona 产出必须满足 [verifier-spec.md](verifier-spec.md) §6 输出 Schema**：`subCriteria[]` / `compositeScore[0,1]` / `qualityLevel(A/B/C/D)` / `passed` / 可选 `reworkHints` / `ranking`。Severity 标签作为 `reworkHints` 字符串前缀（[§7.4A.2](verifier-spec.md)），不新增 Schema 字段。
 6. **Persona 产出后必须执行校验**：`npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>` 退出码 0 才算评审闭环。
 
 ## Persona 1：code-reviewer（资深工程师 · 五轴代码审查）
@@ -122,7 +122,7 @@
 | `[FYI]` | 仅供参考（架构观察 / 未来风险） | 不阻断 |
 | 无前缀 | 一般性说明 | 不阻断 |
 
-### 输出格式（JSON，满足 [verifier-spec.md §7](verifier-spec.md) Schema）
+### 输出格式（JSON，满足 [verifier-spec.md §6](verifier-spec.md) Schema）
 
 ```json
 {
@@ -562,7 +562,7 @@
 | 维度 | addyosmani 原版 | W 模型适配版 |
 |---|---|---|
 | Persona 调用方式 | 直接由 Agent 加载执行（Claude Code / Cursor / Copilot 等原生支持） | 由 `/wm review <target>` 命令按 `targetKind` 路由；外部 Agent 加载本文件作为提示词 |
-| 输出格式 | 自由 Markdown 报告 | 强制 JSON，满足 [verifier-spec.md §7](verifier-spec.md) Schema |
+| 输出格式 | 自由 Markdown 报告 | 强制 JSON，满足 [verifier-spec.md §6](verifier-spec.md) Schema |
 | 校验 | 无 | 必须执行 `check-verifier-output.ts`，退出码 0 才算闭环 |
 | Persona 间组合 | `/ship` 命令并行 fan-out 3 个 Persona | `/wm review` 单一 Persona 路由；不并行 fan-out（W 模型按阶段顺序执行） |
 | 严重等级 | Critical / Important / Suggestion（code-reviewer）等不一致 | 统一为 Critical / Required / Optional / Nit / FYI（[§7.4A.2](verifier-spec.md)），作为 `reworkHints` 前缀 |
