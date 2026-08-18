@@ -55,6 +55,7 @@ import {
   type TlaSpecSnapshot,
 } from '../logic/bdd-logic.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
+import { writeGateLog } from '../lib/gate-log-writer.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -375,14 +376,7 @@ async function main(): Promise<number> {
   console.log('BDD_JSON ' + JSON.stringify(summary));
 
   // 写入 gate-logs（失败不污染退出码）
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logDir = path.resolve(manifestDir, '..', '.w-model', 'gate-logs');
-  try {
-    await fs.mkdir(logDir, { recursive: true });
-    await fs.writeFile(path.join(logDir, `${timestamp}-bdd.json`), JSON.stringify(result, null, 2));
-  } catch (e) {
-    console.error(`[gate-logs] 写入失败（不影响校验结果）: ${(e as Error).message}`);
-  }
+  await writeGateLog('bdd', result, projectDir);
 
   return result.exitCode;
 }

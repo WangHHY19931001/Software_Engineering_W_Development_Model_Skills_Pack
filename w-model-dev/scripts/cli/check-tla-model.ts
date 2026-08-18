@@ -51,6 +51,7 @@ import { EXEC_LIMITS, PHASES, type Phase } from '../lib/constants.js';
 import { parseJavaMajor } from '../lib/java-version.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { cleanTraceFiles } from '../lib/tla-clean-trace.js';
 
 // ==================== 参数解析 ====================
@@ -67,11 +68,11 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const manifestFile = args.find((a) => !a.startsWith('--'));
-  const phaseArg = args.find((a) => a.startsWith('--phase='));
-  const specArg = args.find((a) => a.startsWith('--spec='));
+  const phaseArg = parseFlagValue(args, 'phase');
+  const specId = parseFlagValue(args, 'spec');
   // P3.8 --keep-states / -k：调试模式下保留 TLC 产物
-  const keepStates = args.includes('--keep-states') || args.includes('-k');
-  const graphArg = args.find((a) => a.startsWith('--graph='));
+  const keepStates = hasFlag(args, 'keep-states') || args.includes('-k');
+  const graphFile = parseFlagValue(args, 'graph');
 
   let phase: number | undefined;
   if (phaseArg) {
@@ -81,17 +82,10 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (parsed !== undefined) {
       phase = parsed.phase;
     } else {
-      const phaseStr = phaseArg.split('=')[1];
+      const phaseStr = phaseArg;
       phase = phaseStr !== undefined ? Number.parseInt(phaseStr, 10) : undefined;
     }
   }
-
-  let specId: string | undefined;
-  if (specArg) {
-    specId = specArg.split('=')[1];
-  }
-
-  const graphFile = graphArg ? graphArg.split('=')[1] : undefined;
 
   return { manifestFile, phase, specId, graphFile, keepStates };
 }
@@ -265,7 +259,7 @@ function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const { manifestFile, phase: phaseArg, specId, graphFile, keepStates } = parseArgs(process.argv);
 

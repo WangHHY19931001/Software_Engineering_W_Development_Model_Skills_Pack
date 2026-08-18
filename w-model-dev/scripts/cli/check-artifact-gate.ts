@@ -38,7 +38,6 @@
  */
 
 import * as nodeFs from 'node:fs';
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,9 +50,10 @@ import {
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { readJsonClassified } from '../lib/read-json-or-exit.js';
 import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from '../lib/artifact-gate-assets.js';
 import { collectUatMappingViolations } from '../lib/uat-path-mapping.js';
 export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self-test 兼容：UAT 映射内容校验保持从本入口导出
@@ -95,30 +95,19 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
       return val;
     }
   }
-  // 显式传了 --phase 但非法（lib 返回 undefined）→ 保留原 ARG_INVALID 报错
-  for (let i = 2; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--phase') {
-      exitWithError({
-        category: 'ARG_INVALID',
-        rule: 'P0-1',
-        message: `参数非法 --phase=${argv[i + 1] ?? ''}`,
-        detail: '须为 1-8 的整数',
-        exitCode: 2,
-      });
-      return undefined;
-    }
-    const eqMatch = arg?.match(/^--phase=(.+)$/);
-    if (eqMatch) {
-      exitWithError({
-        category: 'ARG_INVALID',
-        rule: 'P0-1',
-        message: `参数非法 --phase=${eqMatch[1] ?? ''}`,
-        detail: '须为 1-8 的整数',
-        exitCode: 2,
-      });
-      return undefined;
-    }
+  // 显式传了 --phase 但非法（lib 返回 undefined）→ 保留原 ARG_INVALID 报错。
+  // --phase=<value> 值提取用 parseFlagValue；--phase <value> 空格式用 includes 检测
+  const eqPhase = parseFlagValue(argv, 'phase');
+  const spaceIdx = argv.indexOf('--phase');
+  if ((eqPhase !== undefined && eqPhase !== '') || spaceIdx !== -1) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: `参数非法 --phase=${eqPhase ?? argv[spaceIdx + 1] ?? ''}`,
+      detail: '须为 1-8 的整数',
+      exitCode: 2,
+    });
+    return undefined;
   }
   return undefined;
 }
@@ -145,13 +134,13 @@ function parseProjectDir(argv: string[]): string {
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
 
   // ==================== --validate-templates 模式（C9 模板漂移校验） ====================
   // 校验对象是技能包自身 templates/ 资产（相对脚本定位 ../../templates），与 project-dir 无关；
   // 独立分支：不读 RTM、不受 --phase 影响，violations 非空 → exit 1。
-  if (process.argv.slice(2).includes('--validate-templates')) {
+  if (hasFlag(process.argv.slice(2), 'validate-templates')) {
     const templatesDir = path.resolve(fileURLToPath(import.meta.url), '..', '..', '..', 'templates');
     const violations = checkTemplatesStructure(templatesDir, {
       existsSync: (p) => nodeFs.existsSync(p),
@@ -192,41 +181,12 @@ async function main(): Promise<void> {
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
   // --spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
-  const specDirArg = process.argv.find((a) => a.startsWith('--spec-dir='));
-  const specDir = specDirArg?.split('=')[1] ?? undefined;
+  const specDir = parseFlagValue(process.argv, 'spec-dir');
   const projectDir = parseProjectDir(process.argv);
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
 
-  let raw: string;
-  try {
-    raw = await fs.readFile(rtmFile, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      exitWithError({
-        category: 'FILE_NOT_FOUND',
-        rule: 'P0-2',
-        message: '文件不存在（请先执行 /wm 走完 W 模型阶段再校验）',
-        file: rtmFile,
-        exitCode: 2,
-      });
-      return;
-    }
-    throw err;
-  }
-
-  let matrix: RTMMatrixShape;
-  try {
-    matrix = parseJsonSafe(raw) as RTMMatrixShape;
-  } catch {
-    exitWithError({
-      category: 'FILE_PARSE',
-      message: '文件解析失败（非合法 JSON）',
-      file: rtmFile,
-      exitCode: 2,
-    });
-    return;
-  }
+  // RTM 读取（FILE_NOT_FOUND / FILE_READ / FILE_PARSE 统一走 readJsonClassified，哨兵由 runMain 兜底）
+  const matrix = await readJsonClassified<RTMMatrixShape>(rtmFile);
 
   // ==================== TLA+ 资产读取（spec §3.4.4） ====================
   // P2.6 graph 资产自动发现：按优先级查找 .w-model/ingestion/ 下的 graph 资产

@@ -60,6 +60,7 @@ import {
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { hasFlag } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
@@ -173,7 +174,7 @@ async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Pro
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const { manifestFile, graphFile, rtmFile, srcDir } = parseArgs(process.argv);
 

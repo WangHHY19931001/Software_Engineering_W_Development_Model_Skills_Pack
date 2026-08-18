@@ -36,6 +36,7 @@ import * as fs from 'node:fs/promises';
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { hasFlag } from '../lib/parse-args.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const SYNC_JSON = {
@@ -47,7 +48,7 @@ const SYNC_JSON = {
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读 JSON 摘要）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
   // 位置参数过滤 -- 前缀，兼容 `--json <tla> <feature>` 的参数顺序

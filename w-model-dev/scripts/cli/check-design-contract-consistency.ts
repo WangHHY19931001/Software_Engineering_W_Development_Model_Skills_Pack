@@ -50,6 +50,7 @@ import {
 } from '../logic/design-contract-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { hasFlag } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 
 // ==================== uat-path-mapping.md 解析 ====================
@@ -215,7 +216,7 @@ async function parseAcceptanceAssertions(testDir: string): Promise<AcceptanceTes
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const projectDir = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '.';
   const projectDirAbs = path.resolve(projectDir);

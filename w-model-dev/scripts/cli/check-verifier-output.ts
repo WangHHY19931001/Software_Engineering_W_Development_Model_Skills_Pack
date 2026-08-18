@@ -44,15 +44,16 @@ import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
   const file = args.find((a) => !a.startsWith('--'));
-  const selfAsVerifier = args.includes('--self-as-verifier');
-  const sOutputArg = args.find((a) => a.startsWith('--s-output='));
+  const selfAsVerifier = hasFlag(args, 'self-as-verifier');
+  const sOutput = parseFlagValue(args, 's-output');
 
   if (!file) {
     exitWithError({
@@ -75,10 +76,10 @@ async function main(): Promise<void> {
   // self-as-verifier 模式：校验 VerifierOutput JSON 路径与 S 产出路径不同（反模式 #35）
   const selfAsVerifierViolations: string[] = [];
   if (selfAsVerifier) {
-    if (!sOutputArg) {
+    if (!sOutput) {
       selfAsVerifierViolations.push('--self-as-verifier 模式须同时提供 --s-output=<S产出路径>');
     } else {
-      const sOutputValue = sOutputArg.slice(sOutputArg.indexOf('=') + 1);
+      const sOutputValue = sOutput;
       if (sOutputValue === '') {
         exitWithError({
           category: 'ARG_INVALID',

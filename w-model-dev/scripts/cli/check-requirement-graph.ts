@@ -69,10 +69,11 @@ import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const file = process.argv.slice(2).find((a) => !a.startsWith('--'));
   if (!file) {
@@ -88,13 +89,13 @@ async function main(): Promise<void> {
 
   // 解析 --phase（lib/parse-phase.ts 统一校验：--phase=N / --phase N，范围 1-4）
   let phase: number | undefined;
-  const phaseArg = process.argv.slice(3).find((a) => a.startsWith('--phase='));
+  const phaseArg = parseFlagValue(process.argv.slice(3), 'phase');
   const phaseParsed = parsePhaseArg(process.argv, { min: 1, max: 4 });
   if (phaseParsed !== undefined) {
     phase = phaseParsed.phase;
   } else if (phaseArg !== undefined) {
     // 显式传了 --phase 但非法（非数字 / 越界）→ 保留原 ARG_INVALID 消息与退出码
-    const phaseStr = phaseArg.split('=')[1];
+    const phaseStr = phaseArg;
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
@@ -106,10 +107,10 @@ async function main(): Promise<void> {
   }
 
   // 解析 --rtm（可选，用于 R6 cross-cuts 源类型校验）
-  const rtmArg = process.argv.slice(3).find((a) => a.startsWith('--rtm='));
+  const rtmArg = parseFlagValue(process.argv.slice(3), 'rtm');
   let rtmRows: Array<{ requirementId: string; type: string }> | undefined;
   if (rtmArg) {
-    const rtmPath = rtmArg.split('=')[1];
+    const rtmPath = rtmArg;
     if (rtmPath) {
       const rtmParsed = await readJsonClassified<{ rows?: Array<{ requirementId: string; type: string }> }>(rtmPath);
       rtmRows = rtmParsed.rows;
@@ -117,10 +118,10 @@ async function main(): Promise<void> {
   }
 
   // 解析 --exemptions（可选，用于跳过已批准豁免的规则）
-  const exemptArg = process.argv.slice(3).find((a) => a.startsWith('--exemptions='));
+  const exemptArg = parseFlagValue(process.argv.slice(3), 'exemptions');
   let exemptedRules: string[] | undefined;
   if (exemptArg) {
-    const exemptPath = exemptArg.split('=')[1];
+    const exemptPath = exemptArg;
     if (exemptPath) {
       const exemptParsed = await readJsonClassified<{ grantedExemptions?: Array<{ ruleId: string }> }>(exemptPath);
       exemptedRules = exemptParsed.grantedExemptions?.map((g) => g.ruleId);
@@ -131,13 +132,13 @@ async function main(): Promise<void> {
   // 注意：parsed 须在 spec-dir 块之前读取（phase=3 分支需从 graph.json SD 节点提取 SD 集合）
   const abs = path.resolve(file);
   const parsed = await readJsonOrExit(file);
-  const specDirArg = process.argv.slice(3).find((a) => a.startsWith('--spec-dir='));
+  const specDirArg = parseFlagValue(process.argv.slice(3), 'spec-dir');
   let specEnhanceViolations: RequirementSpecEnhanceViolations | undefined;
   let designEnhanceViolations: DesignSpecEnhanceViolations | undefined;
   let outlineEnhanceViolations: OutlineSpecEnhanceViolations | undefined;
   let detailedEnhanceViolations: DetailedSpecEnhanceViolations | undefined;
   if (specDirArg) {
-    const specDir = specDirArg.split('=')[1];
+    const specDir = specDirArg;
     if (specDir) {
       const fs = await import('node:fs');
       const readdirSync = (d: string): string[] => {

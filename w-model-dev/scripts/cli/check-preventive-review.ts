@@ -44,7 +44,9 @@ import {
   type PreventiveReviewOptions,
 } from '../logic/preventive-review-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { writeGateLog } from '../lib/gate-log-writer.js';
 import { runMain } from '../lib/run-main.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
@@ -81,14 +83,14 @@ function reportFilePrefix(phase: number, variant: NonNullable<PreventiveReviewOp
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
   const projectDir = args.find((a) => !a.startsWith('--')) ?? '.';
-  const phaseArg = args.find((a) => a.startsWith('--phase='));
-  const variantArg = args.find((a) => a.startsWith('--variant='));
-  const autoTrigger = args.includes('--auto-trigger');
-  const runLogArg = args.find((a) => a.startsWith('--run-log='));
+  const phaseArg = parseFlagValue(args, 'phase');
+  const variantArg = parseFlagValue(args, 'variant');
+  const autoTrigger = hasFlag(args, 'auto-trigger');
+  const runLogFile = parseFlagValue(args, 'run-log');
 
   // 统一 --phase 校验（lib/parse-phase.ts，1-8）；非法/缺失由下方 !phase 检查统一拦截
   let phase: number | undefined = phaseArg ? parsePhaseArg(process.argv, { min: 1, max: 8 })?.phase : undefined;
@@ -96,7 +98,7 @@ async function main(): Promise<void> {
 
   // 显式 --variant= 参数解析
   if (variantArg) {
-    const v = variantArg.split('=')[1] as PreventiveReviewOptions['variant'];
+    const v = variantArg as PreventiveReviewOptions['variant'];
     if (v === 'standard' || v === 'fix' || v === 'emergency' || v === 'ingest') {
       variant = v;
     } else {
@@ -113,7 +115,7 @@ async function main(): Promise<void> {
 
   // --auto-trigger 模式：从 run-log 读取当前阶段 + 推断 variant
   if (autoTrigger) {
-    if (!runLogArg) {
+    if (!runLogFile) {
       exitWithError({
         category: 'ARG_INVALID',
         rule: 'P0-1',
@@ -123,7 +125,7 @@ async function main(): Promise<void> {
       });
       return;
     }
-    const runLogPath = runLogArg.split('=')[1]!;
+    const runLogPath = runLogFile;
     const abs = path.resolve(runLogPath);
     try {
       // 先 access 探测：FILE_NOT_FOUND 走 ERROR_JSON 输出（readJsonlOrExit 对 ENOENT 同样输出 ERROR_JSON 并 exit 2，此处预探测保证本分支 `return` 后由 Node 自然退出、stdout 完整 flush）
@@ -263,18 +265,8 @@ async function main(): Promise<void> {
       }),
   );
 
-  // 写入 gate-logs
-  const gateLogsDir = path.resolve(projectDir, '.w-model', 'gate-logs');
-  try {
-    await fs.mkdir(gateLogsDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    await fs.writeFile(
-      path.resolve(gateLogsDir, `${timestamp}-preventive-review.json`),
-      JSON.stringify(output, null, 2),
-    );
-  } catch {
-    // gate-logs 写入失败不阻塞
-  }
+  // 写入 gate-logs（失败不阻塞）
+  await writeGateLog('preventive-review', output, projectDir);
 
   process.exit(output.exitCode);
 }

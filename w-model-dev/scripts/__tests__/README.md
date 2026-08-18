@@ -20,6 +20,7 @@
 | docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 31 / pre-push 15 / vitest 40）/ 版本五处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#47 / baseline-sync |
 | exemption-logic.test.ts | Exemption | E1 schema / E2 justification≥20 / E3 evidence 非空 / E4 review 完整 / E5 reviewDecision=approve / E6 rootCauseAnalysis≥30 / E7 verified=true / E8 humanDecision=approve / E9 时间戳时序 / 四阶段全通过 stage=complete |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
+| gate-log-writer.test.ts | CLI IO | writeGateLog 写入 gate-logs/<timestamp>-<script>.json（pretty JSON）/ 目录不可写静默不抛 |
 | gate-report.test.ts | CLI IO | printGateReport 分隔线 + `<LABEL>_JSON ` 行首标记 / exitCode 追加 JSON 末尾 / exit 码 0/1/2 透传 / summary 自带 exitCode 被参数覆盖 |
 | graph-logic.test.ts | Graph | R1-R4 REQ 层级树（level·orphan·multiParent·单调·REQ-group）/ R5 depends-on·precedes 无环 / R6 交叉边对称性与源/目标类型 / R11 level 正整数 / recalculatePassed 重算 / reqHierarchy·crossLogic 填充 |
 | iceberg-logic.test.ts | IcebergSweep | R1 schema 前置短路 / R2 icebergRound 边界（0·6）/ R3 findingId 去重 / R4 可证伪（缺 hypothesis·evidence）/ R5 passed 与 newFindings 一致 |
@@ -27,6 +28,7 @@
 | metrics-report.test.ts | Metrics CLI | 子进程：run-log 缺失 exit 2 / --phase 非法值系列 exit 2 / budget 缺失(null)·非法 exit 2 / --json·--out 组合 stdout 纯净 / 空 run-log 预警 / 坏行跳过 / --phase 过滤 / 人类可读 10 节（含编排质量） |
 | metrics-report-logic.test.ts | Metrics | 总体汇总 / 阶段分组 / 动作·角色·结果分布 / 返工率与连续段 / gate 通过率（0/非0/null 归类）/ 预算 burn rate 与 killSwitch 两路径 / 窗口与 phase 过滤 / 空 run-log / orchestration 编排质量（r3Stats·icebergStats·reworkHints·缺省 null） |
 | parse-phase.test.ts | PhaseArg | parsePhaseArg --phase=N / --phase N / 位置参数三形态 / 非法值（abc·0·9·-1·空串·无值）→ undefined / min·max 自定义 / 无 --phase → undefined |
+| parse-args.test.ts | CLI Args | parseFlagValue 取 `--name=value` / 缺失→undefined / hasFlag 检测布尔旗标 |
 | phase-doc-map.test.ts | PhaseDocMap | PHASE_DOC_MAP 键 1-8（缺 5）/ uat-path-mapping 特殊映射 / resolvePhaseDoc 支持·未支持 phase·未知 type 抛错 |
 | plan-chunks.test.ts | PlanChunks | estimateTokens（ASCII/4·CJK 字节/4）/ splitMarkdownSections header+content 配对·围栏代码块内 # 不切分 / splitByLines 二次切分·overlap / planFile 目录递归·单文件超限 |
 | preventive-review-logic.test.ts | PreventiveReview | 三份报告（completeness·reliability·security）齐全合规通过 / 缺失 completeness 失败 / phase 不一致失败 / variant fix·emergency·standard·ingest 通过（纯逻辑对所有变体一致）/ 缺 security 仍失败 |

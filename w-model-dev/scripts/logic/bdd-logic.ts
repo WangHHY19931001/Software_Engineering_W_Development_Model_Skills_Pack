@@ -986,7 +986,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
 
   // D8: SD Coverage 校验（phase>=2 强制）
   if (phase >= 2) {
-    const dc = (input.manifest as any).designCoverage;
+    const dc = input.manifest.designCoverage;
     if (!dc) {
       dims.sdCoverage.push(
         '[D8] designCoverage 字段缺失（phase>=2 强制必填，须由 S-ingest-bdd 从 .feature @designIds + graph.json 比对后回填）',

@@ -40,11 +40,12 @@ import * as path from 'node:path';
 
 import { checkBudget, type BudgetConfig } from '../logic/budget-logic.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
-import { readJsonOrExit, readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 // ==================== 参数解析 ====================
 
@@ -58,12 +59,10 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const budgetFile = args.find((a) => !a.startsWith('--'));
-  const projectArg = args.find((a) => a.startsWith('--project='));
-  const runLogArg = args.find((a) => a.startsWith('--run-log='));
-  const phaseArg = args.find((a) => a.startsWith('--phase='));
+  const projectFile = parseFlagValue(args, 'project');
+  const runLogFile = parseFlagValue(args, 'run-log');
+  const phaseArg = parseFlagValue(args, 'phase');
 
-  const projectFile = projectArg ? projectArg.split('=')[1] : undefined;
-  const runLogFile = runLogArg ? runLogArg.split('=')[1] : undefined;
   let phase: number | undefined;
   if (phaseArg) {
     // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
@@ -110,16 +109,16 @@ function countReworks(entries: unknown[], phase: number | undefined): ReworkStat
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const { budgetFile, projectFile, runLogFile, phase } = parseArgs(process.argv);
 
   // --phase 合法性校验：显式传了但非法（非数字 / NaN / 越界）→ exit(2)，避免 countReworks 中
   // `NaN !== NaN` 恒为 true 导致所有 run-log 记录被过滤、reworkCount 静默归零
-  const phaseArg = process.argv.find((a) => a.startsWith('--phase='));
+  const phaseArg = parseFlagValue(process.argv, 'phase');
   if (phaseArg !== undefined && phase === undefined) {
     // 复刻原消息值（parseInt 结果，非数字时为 NaN）
-    const phaseVal = Number.parseInt(phaseArg.split('=')[1] ?? '', 10);
+    const phaseVal = Number.parseInt(phaseArg ?? '', 10);
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
@@ -166,15 +165,13 @@ async function main(): Promise<void> {
     }
   }
 
-  // 可选输入：--run-log（读失败只警告不 exit；jsonl 容错）
-  // 先 access 探测：readJsonlOrExit 对 ENOENT 会 exit(2)，此处须降级为警告（wm-status 同型模式）
+  // 可选输入：--run-log（读失败只警告不 exit；ENOENT→[] 降级复用 readJsonlOptional）
   let reworkCount: number | undefined;
   let tlaReworkCount: number | undefined;
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
-      await fs.access(runLogAbs);
-      const entries = await readJsonlOrExit(runLogAbs, 'run-log');
+      const entries = await readJsonlOptional(runLogAbs, 'run-log');
       const stats = countReworks(entries, phase);
       reworkCount = stats.reworkCount;
       tlaReworkCount = stats.tlaReworkCount;

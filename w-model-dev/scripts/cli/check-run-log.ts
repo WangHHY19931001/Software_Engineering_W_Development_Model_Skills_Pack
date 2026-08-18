@@ -43,6 +43,7 @@ import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 // ==================== 参数解析 ====================
 
@@ -55,10 +56,8 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const runLogFile = args.find((a) => !a.startsWith('--'));
-  const gateLogsArg = args.find((a) => a.startsWith('--gate-logs='));
-  const tlaManifestArg = args.find((a) => a.startsWith('--tla-manifest='));
-  const gateLogsDir = gateLogsArg ? gateLogsArg.slice('--gate-logs='.length) : undefined;
-  const tlaManifestFile = tlaManifestArg ? tlaManifestArg.slice('--tla-manifest='.length) : undefined;
+  const gateLogsDir = parseFlagValue(args, 'gate-logs');
+  const tlaManifestFile = parseFlagValue(args, 'tla-manifest');
   return { runLogFile, gateLogsDir, tlaManifestFile };
 }
 
@@ -136,7 +135,7 @@ async function loadTlaCheckRounds(tlaManifestFile: string): Promise<number | und
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const { runLogFile, gateLogsDir, tlaManifestFile } = parseArgs(process.argv);
 

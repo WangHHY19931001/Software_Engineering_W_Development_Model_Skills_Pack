@@ -43,6 +43,7 @@ import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 // ==================== 参数解析 ====================
 
@@ -54,8 +55,7 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const runLogFile = args.find((a) => !a.startsWith('--'));
-  const checkpointLogArg = args.find((a) => a.startsWith('--checkpoint-log='));
-  const checkpointLogDir = checkpointLogArg ? checkpointLogArg.slice('--checkpoint-log='.length) : undefined;
+  const checkpointLogDir = parseFlagValue(args, 'checkpoint-log');
   return { runLogFile, checkpointLogDir };
 }
 
@@ -111,7 +111,7 @@ async function loadCheckpointLog(checkpointLogDir: string): Promise<Map<string, 
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const { runLogFile, checkpointLogDir } = parseArgs(process.argv);
 

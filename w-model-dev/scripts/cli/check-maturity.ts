@@ -38,11 +38,12 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
-import { readJsonOrExit, readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 // ==================== 参数解析 ====================
 
@@ -55,10 +56,8 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const maturityFile = args.find((a) => !a.startsWith('--'));
-  const projectArg = args.find((a) => a.startsWith('--project='));
-  const runLogArg = args.find((a) => a.startsWith('--run-log='));
-  const projectFile = projectArg ? projectArg.split('=')[1] : undefined;
-  const runLogFile = runLogArg ? runLogArg.split('=')[1] : undefined;
+  const projectFile = parseFlagValue(args, 'project');
+  const runLogFile = parseFlagValue(args, 'run-log');
   return { maturityFile, projectFile, runLogFile };
 }
 
@@ -104,7 +103,7 @@ function countOperationalFailures(entries: unknown[]): number {
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const { maturityFile, projectFile, runLogFile } = parseArgs(process.argv);
 
@@ -153,14 +152,12 @@ async function main(): Promise<void> {
     }
   }
 
-  // 可选输入：--run-log（读失败只警告不 exit；jsonl 容错）
-  // 先 access 探测：readJsonlOrExit 对 ENOENT 会 exit(2)，此处须降级为警告（wm-status 同型模式）
+  // 可选输入：--run-log（读失败只警告不 exit；ENOENT→[] 降级复用 readJsonlOptional）
   let operationalFailureCount: number | undefined;
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
-      await fs.access(runLogAbs);
-      const entries = await readJsonlOrExit(runLogAbs, 'run-log');
+      const entries = await readJsonlOptional(runLogAbs, 'run-log');
       operationalFailureCount = countOperationalFailures(entries);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;

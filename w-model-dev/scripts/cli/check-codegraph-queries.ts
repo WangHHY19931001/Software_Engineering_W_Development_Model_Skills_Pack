@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { hasFlag } from '../lib/parse-args.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
@@ -134,7 +135,7 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
   const file = args.find((a) => !a.startsWith('--'));

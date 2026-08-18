@@ -37,7 +37,9 @@ import * as path from 'node:path';
 
 import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { writeGateLog } from '../lib/gate-log-writer.js';
 import { runMain } from '../lib/run-main.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified, readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
@@ -121,12 +123,12 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number | null> 
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
   const args = process.argv.slice(2);
   const reportPathArg = args.find((a) => !a.startsWith('--'));
-  const autoTrigger = args.includes('--auto-trigger');
-  const runLogArg = args.find((a) => a.startsWith('--run-log='));
+  const autoTrigger = hasFlag(args, 'auto-trigger');
+  const runLogFile = parseFlagValue(args, 'run-log');
 
   if (!reportPathArg) {
     exitWithError({
@@ -150,7 +152,7 @@ async function main(): Promise<void> {
 
   // 交叉核对：--auto-trigger 模式下校验 report.phase 与 run-log 最近 checkpoint phase 一致（独立于 logic 层 R1-R5 编号体系）
   if (autoTrigger) {
-    if (!runLogArg) {
+    if (!runLogFile) {
       exitWithError({
         category: 'ARG_INVALID',
         rule: 'P0-1',
@@ -160,7 +162,7 @@ async function main(): Promise<void> {
       });
       return;
     }
-    const expectedPhase = await inferPhaseFromRunLog(runLogArg.split('=')[1]!);
+    const expectedPhase = await inferPhaseFromRunLog(runLogFile);
     // inferPhaseFromRunLog 错误路径返回 null（exitCode 已置 2），直接返回避免后续 process.exit 覆盖退出码
     if (expectedPhase === null) {
       return;
@@ -200,14 +202,7 @@ async function main(): Promise<void> {
   console.log('ICEBERG_JSON ' + JSON.stringify(output));
 
   // 写入 gate-logs（与 check-preventive-review.ts 一致，写入失败不阻塞）
-  const gateLogsDir = path.resolve('.w-model', 'gate-logs');
-  try {
-    await fs.mkdir(gateLogsDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    await fs.writeFile(path.resolve(gateLogsDir, `${timestamp}-iceberg-sweep.json`), JSON.stringify(output, null, 2));
-  } catch {
-    // gate-logs 写入失败不阻塞
-  }
+  await writeGateLog('iceberg-sweep', output);
 
   process.exit(output.exitCode);
 }
