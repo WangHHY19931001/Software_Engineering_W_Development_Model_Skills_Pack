@@ -536,7 +536,7 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
   });
 
-  it('五处版本一致 → 零 version-consistency 违规', () => {
+  it('版本六处一致 → 零 version-consistency 违规', () => {
     expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'version-consistency')).toBe(false);
   });
 
