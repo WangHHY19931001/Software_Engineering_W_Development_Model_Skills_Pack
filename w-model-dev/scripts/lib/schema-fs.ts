@@ -22,7 +22,10 @@ export async function readSchemasDir(dir: string): Promise<Record<string, unknow
 
 /** 同步读取目录下全部 .json schema 文件，返回 { basename: parsedSchema }（logic 惰性 Ajv 初始化用） */
 export function readSchemasDirSync(dir: string): Record<string, unknown> {
-  const files = fsSync.readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
+  const files = fsSync
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .sort();
   const map: Record<string, unknown> = {};
   for (const f of files) {
     map[f] = parseJsonSafe<unknown>(fsSync.readFileSync(path.join(dir, f), 'utf-8'));

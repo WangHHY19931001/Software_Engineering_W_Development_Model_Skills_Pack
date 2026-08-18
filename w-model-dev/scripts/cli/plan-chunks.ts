@@ -28,11 +28,7 @@ import * as path from 'node:path';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
-import {
-  planChunksFromContent,
-  type Chunk,
-  type PlanOutput,
-} from '../logic/plan-chunks-logic.js';
+import { planChunksFromContent, type Chunk, type PlanOutput } from '../logic/plan-chunks-logic.js';
 
 const MAX_TOKENS_DEFAULT = 8000;
 

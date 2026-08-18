@@ -141,10 +141,7 @@ describe('审计修复 P4：tmpPath 唯一化与回读失败回滚', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-conc-'));
     const target = path.join(dir, 'state.json');
     await fs.writeFile(target, '{"v":0}', 'utf-8');
-    const [a, b] = await Promise.all([
-      writeStateJson(target, '{"v":1}'),
-      writeStateJson(target, '{"v":2}'),
-    ]);
+    const [a, b] = await Promise.all([writeStateJson(target, '{"v":1}'), writeStateJson(target, '{"v":2}')]);
     expect(a.ok).toBe(true);
     expect(b.ok).toBe(true); // 修复前：第二次 rename 抛 ENOENT
     const final = JSON.parse(await fs.readFile(target, 'utf-8')) as { v: number };

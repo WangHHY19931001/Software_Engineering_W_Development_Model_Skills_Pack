@@ -8,11 +8,33 @@ import {
 
 /** run-log.schema.json action.enum 27 值（与 schema 逐值一致、同序；审计修复 P2 同步源） */
 const ACTION_ENUM_27 = [
-  'chunk', 'cross', 'evolve', 'produce', 'review', 'gate', 'tla-gate', 'graph-gate',
-  'test', 'checkpoint', 'rework', 'rollback', 'rootcause', 'fix', 'emergency-fix', 'escalate',
-  'r3-completeness', 'r3-reliability', 'r3-security', 'codegraph_query',
-  'opsx_explore', 'opsx_propose', 'opsx_apply', 'opsx_archive',
-  'ensure_deps', 'iceberg-sweep', 'iceberg-review',
+  'chunk',
+  'cross',
+  'evolve',
+  'produce',
+  'review',
+  'gate',
+  'tla-gate',
+  'graph-gate',
+  'test',
+  'checkpoint',
+  'rework',
+  'rollback',
+  'rootcause',
+  'fix',
+  'emergency-fix',
+  'escalate',
+  'r3-completeness',
+  'r3-reliability',
+  'r3-security',
+  'codegraph_query',
+  'opsx_explore',
+  'opsx_propose',
+  'opsx_apply',
+  'opsx_archive',
+  'ensure_deps',
+  'iceberg-sweep',
+  'iceberg-review',
 ];
 
 /** data-models.md RunLogEntry.action 联合类型（27 值，与 ACTION_ENUM_27 一致） */

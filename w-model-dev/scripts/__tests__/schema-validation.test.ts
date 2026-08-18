@@ -273,10 +273,7 @@ describe('bdd-manifest designCoverage (phase>=2)', () => {
 
 describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('schema-loader 不再直接依赖 node:fs / process.exit（审计修复 P5）', async () => {
-    const src = await fs.readFile(
-      path.resolve(here, '../logic/schema-loader.ts'),
-      'utf-8',
-    );
+    const src = await fs.readFile(path.resolve(here, '../logic/schema-loader.ts'), 'utf-8');
     expect(src).not.toMatch(/from 'node:fs'/);
     expect(src).not.toMatch(/process\.exit/);
     expect(src).not.toMatch(/ERROR_JSON/); // 手拼 ERROR_JSON 绕过 cli-error 的行为已移除

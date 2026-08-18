@@ -45,7 +45,9 @@ function checkCli(name: string): boolean {
     execFileSync(name, ['--version'], { stdio: 'pipe', timeout: 10000 });
     return true;
   } catch (err) {
-    console.error(`⚠ [ensure-codegraph-opsx] CLI 版本探测（${name}）失败: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `⚠ [ensure-codegraph-opsx] CLI 版本探测（${name}）失败: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return false;
   }
 }
@@ -58,7 +60,9 @@ function installCli(packageName: string): boolean {
     execFileSync('npm', ['i', '-g', packageName], { stdio: 'pipe', timeout: 120000 });
     return true;
   } catch (err) {
-    console.error(`⚠ [ensure-codegraph-opsx] npm 全局安装（${packageName}）失败: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `⚠ [ensure-codegraph-opsx] npm 全局安装（${packageName}）失败: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return false;
   }
 }
@@ -78,7 +82,9 @@ function checkMcpCodegraph(projectRoot: string): boolean {
     });
     return true;
   } catch (err) {
-    console.error(`⚠ [ensure-codegraph-opsx] codegraph 探针查询（MCP）失败: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `⚠ [ensure-codegraph-opsx] codegraph 探针查询（MCP）失败: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return false;
   }
 }
@@ -92,7 +98,9 @@ function registerMcpCodegraph(): boolean {
     execFileSync('codegraph', ['install'], { stdio: 'pipe', timeout: 60000 });
     return true;
   } catch (err) {
-    console.error(`⚠ [ensure-codegraph-opsx] codegraph MCP 注册（install）失败: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `⚠ [ensure-codegraph-opsx] codegraph MCP 注册（install）失败: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return false;
   }
 }
@@ -105,7 +113,9 @@ function initCodegraph(projectRoot: string): boolean {
     execFileSync('codegraph', ['init'], { cwd: projectRoot, stdio: 'pipe', timeout: 300000 });
     return true;
   } catch (err) {
-    console.error(`⚠ [ensure-codegraph-opsx] codegraph 项目初始化（init）失败: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `⚠ [ensure-codegraph-opsx] codegraph 项目初始化（init）失败: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return false;
   }
 }
@@ -118,7 +128,9 @@ function initOpenspec(projectRoot: string): boolean {
     execFileSync('openspec', ['init'], { cwd: projectRoot, stdio: 'pipe', timeout: 60000 });
     return true;
   } catch (err) {
-    console.error(`⚠ [ensure-codegraph-opsx] openspec 项目初始化（init）失败: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      `⚠ [ensure-codegraph-opsx] openspec 项目初始化（init）失败: ${err instanceof Error ? err.message : String(err)}`,
+    );
     return false;
   }
 }

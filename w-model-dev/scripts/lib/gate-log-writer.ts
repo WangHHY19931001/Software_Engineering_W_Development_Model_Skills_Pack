@@ -9,11 +9,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 /** 向 <projectDir>/.w-model/gate-logs/ 写 <ISO 时间戳>-<scriptName>.json；失败静默（不阻塞门禁） */
-export async function writeGateLog(
-  scriptName: string,
-  payload: unknown,
-  projectDir: string = '.',
-): Promise<void> {
+export async function writeGateLog(scriptName: string, payload: unknown, projectDir: string = '.'): Promise<void> {
   try {
     const dir = path.resolve(projectDir, '.w-model', 'gate-logs');
     await fs.mkdir(dir, { recursive: true });
