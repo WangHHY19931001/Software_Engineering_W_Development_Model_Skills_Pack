@@ -50,7 +50,7 @@ import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
-import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { buildViolationDistribution } from '../lib/gate-report.js';
 
 const PREVENTIVE_REVIEW_JSON = {
   script: 'check-preventive-review.ts',
@@ -238,22 +238,6 @@ async function main(): Promise<void> {
     variant,
   };
 
-  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
-  if (jsonMode) {
-    printJsonReport(
-      {
-        type: 'preventive-review',
-        passed: output.passed,
-        reasons: output.reasons,
-        violations: buildViolationDistribution(output.reasons.length),
-        durationMs: Date.now() - startTime,
-      },
-      output.exitCode,
-    );
-    process.exitCode = output.exitCode;
-    return;
-  }
-
   const gateLog = await writeGateLog(
     {
       script: 'check-preventive-review.ts',
@@ -270,6 +254,25 @@ async function main(): Promise<void> {
     projectDir,
   );
   const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
+
+  // --json：写入审计日志后输出机器可读报告，主门禁结果保持不变
+  if (jsonMode) {
+    console.log(
+      JSON.stringify({
+        type: 'preventive-review',
+        passed: output.passed,
+        reasons: output.reasons,
+        violations: buildViolationDistribution(output.reasons.length),
+        durationMs: Date.now() - startTime,
+        ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
+        exitCode: output.exitCode,
+      }),
+    );
+    if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
+    process.exitCode = output.exitCode;
+    return;
+  }
+
   const summary = {
     type: 'preventive-review',
     passed: output.passed,
@@ -280,7 +283,7 @@ async function main(): Promise<void> {
   };
 
   console.log('PREVENTIVE_REVIEW_JSON ' + JSON.stringify(summary));
-  if (gateLogWriteError !== undefined) console.error(`[gate-log] 写入失败: ${gateLogWriteError}`);
+  if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
 
   process.exit(output.exitCode);
 }

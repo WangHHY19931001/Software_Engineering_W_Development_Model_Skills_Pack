@@ -41,7 +41,7 @@ import { writeGateLog } from '../lib/gate-log-writer.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified, readJsonlOrExit } from '../lib/read-json-or-exit.js';
-import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { buildViolationDistribution } from '../lib/gate-report.js';
 
 const ICEBERG_JSON = {
   script: 'check-iceberg-sweep.ts',
@@ -183,22 +183,6 @@ async function main(): Promise<void> {
     reportSummary: result.reportSummary,
   };
 
-  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
-  if (jsonMode) {
-    printJsonReport(
-      {
-        type: 'iceberg-sweep',
-        passed,
-        reasons,
-        violations: buildViolationDistribution(reasons.length),
-        durationMs: Date.now() - startTime,
-      },
-      output.exitCode,
-    );
-    process.exitCode = output.exitCode;
-    return;
-  }
-
   const gateLog = await writeGateLog({
     script: 'check-iceberg-sweep.ts',
     exitCode: output.exitCode,
@@ -207,10 +191,28 @@ async function main(): Promise<void> {
     reportSummary: output.reportSummary,
   });
   const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
-  const summary = gateLogWriteError === undefined ? output : { ...output, gateLogWriteError };
 
+  // --json：写入审计日志后输出机器可读报告，主门禁结果保持不变
+  if (jsonMode) {
+    console.log(
+      JSON.stringify({
+        type: 'iceberg-sweep',
+        passed,
+        reasons,
+        violations: buildViolationDistribution(reasons.length),
+        durationMs: Date.now() - startTime,
+        ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
+        exitCode: output.exitCode,
+      }),
+    );
+    if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
+    process.exitCode = output.exitCode;
+    return;
+  }
+
+  const summary = gateLogWriteError === undefined ? output : { ...output, gateLogWriteError };
   console.log('ICEBERG_JSON ' + JSON.stringify(summary));
-  if (gateLogWriteError !== undefined) console.error(`[gate-log] 写入失败: ${gateLogWriteError}`);
+  if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
 
   process.exit(output.exitCode);
 }

@@ -2,15 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/gate-log.schema.json",
   "title": "GateLog",
-  "description": "门禁脚本的 append-only 运行时审计日志；独立于阶段报告 schema。",
+  "description": "门禁脚本的 append-only 运行时审计日志；独立于阶段报告 schema，并绑定每个生产脚本的摘要形状。",
   "type": "object",
   "additionalProperties": false,
   "required": ["script", "exitCode", "passed", "reasons", "reportSummary"],
   "properties": {
     "script": {
       "type": "string",
-      "minLength": 1,
-      "description": "生成日志的门禁脚本文件名。"
+      "enum": ["check-bdd-model.ts", "check-iceberg-sweep.ts", "check-preventive-review.ts"],
+      "description": "生成日志的生产门禁脚本文件名。"
     },
     "exitCode": {
       "type": "integer",
@@ -19,7 +19,7 @@
     },
     "passed": {
       "type": "boolean",
-      "description": "主门禁是否通过，与 exitCode 共同记录而不由日志写入结果改变。"
+      "description": "主门禁是否通过；审计写入结果不得改变该值。"
     },
     "reasons": {
       "type": "array",
@@ -27,49 +27,58 @@
       "description": "主门禁失败或告警原因列表。"
     },
     "reportSummary": {
-      "description": "调用方显式投影的阶段报告摘要。",
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["phase", "checkedAt", "summary", "violationsCount"],
-          "properties": {
-            "phase": { "type": "integer", "minimum": 1, "maximum": 8, "description": "BDD 校验阶段。" },
-            "checkedAt": { "type": "string", "format": "date-time", "description": "BDD 校验执行时间。" },
-            "summary": { "type": "string", "description": "BDD 校验结论摘要。" },
-            "violationsCount": { "type": "integer", "minimum": 0, "description": "BDD 违规数量。" }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["reportId", "triggerType", "icebergRound", "newFindingsCount", "passed"],
-          "properties": {
-            "reportId": { "type": "string", "minLength": 1, "description": "冰山扫掠报告 ID。" },
-            "triggerType": { "type": "string", "enum": ["ICEBERG-A", "ICEBERG-B"], "description": "冰山扫掠触发类型。" },
-            "icebergRound": { "type": "integer", "minimum": 1, "maximum": 5, "description": "冰山扫掠轮次。" },
-            "newFindingsCount": { "type": "integer", "minimum": 0, "description": "本轮新发现数量。" },
-            "passed": { "type": "boolean", "description": "冰山扫掠结论。" }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["phase", "variant", "autoTrigger", "reviewCount"],
-          "properties": {
-            "phase": { "type": "integer", "minimum": 1, "maximum": 8, "description": "预防性审查阶段。" },
-            "variant": { "type": "string", "enum": ["standard", "fix", "emergency", "ingest"], "description": "预防性审查变体。" },
-            "autoTrigger": { "type": "boolean", "description": "是否由 run-log 自动触发。" },
-            "reviewCount": { "type": "integer", "minimum": 0, "maximum": 3, "description": "成功读取的审查报告数量。" }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "maxProperties": 0,
-          "description": "仅供 writer 独立契约测试的空摘要。"
-        }
-      ]
+      "type": "object",
+      "description": "调用方的显式阶段报告摘要；由 script 条件绑定到准确结构。"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "script": { "const": "check-bdd-model.ts" } } },
+      "then": { "properties": { "reportSummary": { "$ref": "#/definitions/bddSummary" } } }
+    },
+    {
+      "if": { "properties": { "script": { "const": "check-iceberg-sweep.ts" } } },
+      "then": { "properties": { "reportSummary": { "$ref": "#/definitions/icebergSummary" } } }
+    },
+    {
+      "if": { "properties": { "script": { "const": "check-preventive-review.ts" } } },
+      "then": { "properties": { "reportSummary": { "$ref": "#/definitions/preventiveReviewSummary" } } }
+    }
+  ],
+  "definitions": {
+    "bddSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "checkedAt", "summary", "violationsCount"],
+      "properties": {
+        "phase": { "type": "integer", "minimum": 1, "maximum": 8, "description": "BDD 校验阶段。" },
+        "checkedAt": { "type": "string", "format": "date-time", "description": "BDD 校验执行时间。" },
+        "summary": { "type": "string", "description": "BDD 校验结论摘要。" },
+        "violationsCount": { "type": "integer", "minimum": 0, "description": "BDD 违规数量。" }
+      }
+    },
+    "icebergSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reportId", "triggerType", "icebergRound", "newFindingsCount", "passed"],
+      "properties": {
+        "reportId": { "type": "string", "minLength": 1, "description": "冰山扫掠报告 ID。" },
+        "triggerType": { "type": "string", "enum": ["ICEBERG-A", "ICEBERG-B"], "description": "冰山扫掠触发类型。" },
+        "icebergRound": { "type": "integer", "minimum": 1, "maximum": 5, "description": "冰山扫掠轮次。" },
+        "newFindingsCount": { "type": "integer", "minimum": 0, "description": "本轮新发现数量。" },
+        "passed": { "type": "boolean", "description": "冰山扫掠结论。" }
+      }
+    },
+    "preventiveReviewSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "variant", "autoTrigger", "reviewCount"],
+      "properties": {
+        "phase": { "type": "integer", "minimum": 1, "maximum": 8, "description": "预防性审查阶段。" },
+        "variant": { "type": "string", "enum": ["standard", "fix", "emergency", "ingest"], "description": "预防性审查变体。" },
+        "autoTrigger": { "type": "boolean", "description": "是否由 run-log 自动触发。" },
+        "reviewCount": { "type": "integer", "minimum": 0, "maximum": 3, "description": "成功读取的审查报告数量。" }
+      }
     }
   }
 }

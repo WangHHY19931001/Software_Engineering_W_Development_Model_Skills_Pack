@@ -360,7 +360,24 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       });
       expect(iceberg.status).toBe(0);
       const icebergSummary = JSON.parse((iceberg.stdout ?? '').replace('ICEBERG_JSON ', '')) as Record<string, unknown>;
-      expect(icebergSummary).toMatchObject({ passed: true, exitCode: 0, gateLogWriteError: expect.any(String) });
+      expect(icebergSummary).toMatchObject({
+        passed: true,
+        exitCode: 0,
+        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+      });
+      expect(iceberg.stdout ?? '').not.toContain(blockedLogRoot);
+      expect(iceberg.stderr ?? '').not.toContain(blockedLogRoot);
+
+      const icebergJson = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE], {
+        encoding: 'utf-8',
+        cwd: tmpDir,
+      });
+      expect(icebergJson.status).toBe(0);
+      expect(JSON.parse(icebergJson.stdout ?? '')).toMatchObject({
+        passed: true,
+        exitCode: 0,
+        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+      });
 
       const preventive = spawnSync(process.execPath, [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1'], {
         encoding: 'utf-8',
@@ -370,14 +387,42 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
         string,
         unknown
       >;
-      expect(preventiveSummary).toMatchObject({ passed: false, exitCode: 1, gateLogWriteError: expect.any(String) });
+      expect(preventiveSummary).toMatchObject({
+        passed: false,
+        exitCode: 1,
+        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+      });
+      const preventiveJson = spawnSync(process.execPath, [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1', '--json'], {
+        encoding: 'utf-8',
+      });
+      expect(preventiveJson.status).toBe(1);
+      expect(JSON.parse(preventiveJson.stdout ?? '')).toMatchObject({
+        passed: false,
+        exitCode: 1,
+        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+      });
 
       const bdd = spawnSync(process.execPath, [tsxCli, CHECK_BDD_MODEL_SCRIPT, path.join(bddModelDir, 'manifest.json')], {
         encoding: 'utf-8',
       });
       expect(bdd.status).toBe(0);
       const bddSummary = JSON.parse((bdd.stdout ?? '').match(/BDD_JSON (.+)/)?.[1] ?? '') as Record<string, unknown>;
-      expect(bddSummary).toMatchObject({ passed: true, exitCode: 0, gateLogWriteError: expect.any(String) });
+      expect(bddSummary).toMatchObject({
+        passed: true,
+        exitCode: 0,
+        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+      });
+      const bddJson = spawnSync(
+        process.execPath,
+        [tsxCli, CHECK_BDD_MODEL_SCRIPT, path.join(bddModelDir, 'manifest.json'), '--json'],
+        { encoding: 'utf-8' },
+      );
+      expect(bddJson.status).toBe(0);
+      expect(JSON.parse(bddJson.stdout ?? '')).toMatchObject({
+        passed: true,
+        exitCode: 0,
+        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+      });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

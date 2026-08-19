@@ -69,16 +69,34 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     expect(result.errorMessages.some((m) => /schema 未注册/.test(m))).toBe(true);
 
     const validGateLog = {
-      script: 'check-example.ts',
+      script: 'check-bdd-model.ts',
       exitCode: 0,
       passed: true,
       reasons: [],
-      reportSummary: {},
+      reportSummary: {
+        phase: 1,
+        checkedAt: '2026-08-19T00:00:00.000Z',
+        summary: 'BDD model check passed (phase 1)',
+        violationsCount: 0,
+      },
     };
     expect(validateBySchema('gate-log', validGateLog).valid).toBe(true);
     expect(validateBySchema('gate-log', { ...validGateLog, script: '' }).valid).toBe(false);
     expect(validateBySchema('gate-log', { ...validGateLog, exitCode: 3 }).valid).toBe(false);
     expect(validateBySchema('gate-log', { ...validGateLog, extra: true }).valid).toBe(false);
+    expect(
+      validateBySchema('gate-log', {
+        ...validGateLog,
+        reportSummary: {
+          reportId: 'IS-phase3-1-01',
+          triggerType: 'ICEBERG-A',
+          icebergRound: 1,
+          newFindingsCount: 0,
+          passed: true,
+        },
+      }).valid,
+    ).toBe(false);
+    expect(validateBySchema('gate-log', { ...validGateLog, script: 'test-gate-log-writer' }).valid).toBe(false);
   });
 });
 

@@ -59,7 +59,7 @@ import { writeGateLog } from '../lib/gate-log-writer.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { buildViolationDistribution } from '../lib/gate-report.js';
 
 // ==================== 参数解析 ====================
 
@@ -324,28 +324,46 @@ async function main(): Promise<number> {
     graphSdNodes,
   });
   const exitCode = result.exitCode;
+  const allViolations = [
+    ...result.dimensions.headerCompleteness,
+    ...result.dimensions.stateMachineCompleteness,
+    ...result.dimensions.tlaEquivalence,
+    ...result.dimensions.stepBinding,
+    ...result.dimensions.scenarioPathValidity,
+    ...result.dimensions.rtmMapping,
+    ...result.dimensions.sdCoverage,
+  ];
+  const gateLog = await writeGateLog(
+    {
+      script: 'check-bdd-model.ts',
+      exitCode: result.exitCode,
+      passed: result.passed,
+      reasons: result.violations,
+      reportSummary: {
+        phase: result.phase,
+        checkedAt: result.checkedAt,
+        summary: result.summary,
+        violationsCount: result.violations.length,
+      },
+    },
+    projectDir,
+  );
+  const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
 
-  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：写入审计日志后输出机器可读报告，主门禁结果保持不变
   if (jsonMode) {
-    const allViolations = [
-      ...result.dimensions.headerCompleteness,
-      ...result.dimensions.stateMachineCompleteness,
-      ...result.dimensions.tlaEquivalence,
-      ...result.dimensions.stepBinding,
-      ...result.dimensions.scenarioPathValidity,
-      ...result.dimensions.rtmMapping,
-      ...result.dimensions.sdCoverage,
-    ];
-    printJsonReport(
-      {
+    console.log(
+      JSON.stringify({
         type: 'bdd',
         passed: result.passed,
         reasons: allViolations,
         violations: buildViolationDistribution(allViolations.length),
         durationMs: Date.now() - startTime,
-      },
-      exitCode,
+        ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
+        exitCode,
+      }),
     );
+    if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
     process.exitCode = exitCode;
     return exitCode;
   }
@@ -370,23 +388,6 @@ async function main(): Promise<number> {
   console.log(`\n--- D8 SD Coverage: ${result.dimensions.sdCoverage.length} violations`);
   for (const v of result.dimensions.sdCoverage) console.log(`  - ${v}`);
 
-  const gateLog = await writeGateLog(
-    {
-      script: 'check-bdd-model.ts',
-      exitCode: result.exitCode,
-      passed: result.passed,
-      reasons: result.violations,
-      reportSummary: {
-        phase: result.phase,
-        checkedAt: result.checkedAt,
-        summary: result.summary,
-        violationsCount: result.violations.length,
-      },
-    },
-    projectDir,
-  );
-  const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
-
   // JSON 摘要
   console.log(`\n=== JSON Summary ===`);
   const summary = {
@@ -397,7 +398,7 @@ async function main(): Promise<number> {
     ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
   };
   console.log('BDD_JSON ' + JSON.stringify(summary));
-  if (gateLogWriteError !== undefined) console.error(`[gate-log] 写入失败: ${gateLogWriteError}`);
+  if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
 
   return result.exitCode;
 }
