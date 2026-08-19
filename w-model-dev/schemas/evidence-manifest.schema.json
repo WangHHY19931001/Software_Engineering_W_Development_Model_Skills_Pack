@@ -31,9 +31,9 @@
         "required": ["path", "sha256", "kind"],
         "properties": {
           "path": {
-            "description": "相对于导出目录的安全 POSIX 路径。",
+            "description": "相对于导出目录的安全 POSIX 路径：禁止反斜杠、绝对路径、空段和 .. 段。重复路径由 verify 语义校验拒绝。",
             "type": "string",
-            "minLength": 1
+            "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*(?:^|/)\\.(?:/|$)).+$"
           },
           "sha256": {
             "description": "导出后文件内容的 SHA-256（64 位小写十六进制）。",

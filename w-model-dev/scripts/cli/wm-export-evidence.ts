@@ -42,8 +42,12 @@ async function main(): Promise<void> {
 
   console.log('EVIDENCE_EXPORT_JSON ' + JSON.stringify({ script: 'wm-export-evidence.ts', ...result }));
   if (!result.ok) {
-    console.error(`✗ [EVIDENCE_${result.mode.toUpperCase()}_FAILED] ${result.reason ?? 'evidence operation failed'}`);
-    process.exitCode = result.exitCode;
+    exitWithError({
+      category: result.exitCode === 2 ? 'FILE_NOT_FOUND' : 'STRUCTURE_INVALID',
+      rule: result.reason,
+      message: '证据导出或验证失败',
+      exitCode: result.exitCode,
+    });
   }
 }
 
