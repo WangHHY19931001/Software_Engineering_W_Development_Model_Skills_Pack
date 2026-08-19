@@ -122,6 +122,8 @@ export interface DocConsistencyInput {
   dispatchMatrix: string;
   /** w-model-dev/scripts/cli/ 下全部 .ts 文件名（实测；script-registry 检查数据源） */
   cliScriptFiles: string[];
+  /** 本地生成物与证据导出契约的逐文档输入；缺省时跳过，以保持旧调用方与 fixture 兼容。 */
+  localEvidenceDocs?: Array<{ name: string; content: string }>;
   /** docs/ 根 6 份设计文档（活体引用） */
   designDocs: Array<{ name: string; content: string }>;
   /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（实测；期望值由 README「N files」/ AGENTS「N 个 .test.ts」表述声明） */
@@ -200,7 +202,36 @@ const STALE_DOD_DIMENSIONS = [
 /** `targetKind`（…）括号枚举形式的废弃值检测（如 `targetKind`（`requirement` / `design` / `testcase` / `file`）） */
 const TARGETKIND_ENUM_PATTERN = /`targetKind`\s*（[^）]*(?:testcase|file)[^）]*）/;
 
-export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckViolation[] {
+export interface DocConsistencyReport {
+  /** 兼容既有 gate consumers 的全量违规字段。 */
+  violations: DocCheckViolation[];
+  /** 静态规范违规：登记、文档契约、结构和语义规则。 */
+  staticViolations: DocCheckViolation[];
+  /** 动态事实违规：由当前文件系统或真实 Vitest JSON 测量得到的计数漂移。 */
+  dynamicViolations: DocCheckViolation[];
+  /** 当前运行的实测元数据，不是硬编码规范。 */
+  dynamicMeasurements: {
+    schemaCount: number;
+    cliScriptCount: number;
+    testFileCount: number;
+    vitestTestCount: number;
+  };
+}
+
+const DYNAMIC_CHECKS = new Set(['exit2-scripts', 'references-count', 'asset-counts', 'vitest-files', 'vitest-tests']);
+
+function isDynamicViolation(violation: DocCheckViolation): boolean {
+  if (DYNAMIC_CHECKS.has(violation.check)) return true;
+  if (violation.check === 'schema-list') {
+    return /应含「### Schema 清单（\d+ 份）」|声明 \d+ 份 Schema，实际 \d+ 份/.test(violation.message);
+  }
+  if (violation.check === 'script-registry') {
+    return /SKILL\.md 声明 \d+ 个 \.ts，实际 \d+/.test(violation.message);
+  }
+  return false;
+}
+
+export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsistencyReport {
   const violations: DocCheckViolation[] = [];
   violations.push(...checkSchemaList(input.schemaFiles, input.dataModels, input.schemaInventoryDocs));
   violations.push(...checkRunLogActionEnum(input.runLogSchema, input.dataModels));
@@ -245,6 +276,9 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   );
   violations.push(...checkSsotHeadings(input.ssot));
   violations.push(...checkScriptRegistry(input.cliScriptFiles, input.dispatchMatrix, input.skill));
+  if (input.localEvidenceDocs !== undefined) {
+    violations.push(...checkLocalEvidenceArtifacts(input.localEvidenceDocs));
+  }
   violations.push(...checkBaselineSync(input.scriptsChanged, input.securityBaselineEntryCount));
   if (input.linkDocs !== undefined && input.linkExists !== undefined) {
     violations.push(...checkInternalLinks(input.linkDocs, input.linkExists));
@@ -252,7 +286,22 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   if (input.skillPkgDocs !== undefined) {
     violations.push(...checkSkillOutboundLinks(input.skillPkgDocs));
   }
-  return violations;
+  return {
+    violations,
+    staticViolations: violations.filter((v) => !isDynamicViolation(v)),
+    dynamicViolations: violations.filter(isDynamicViolation),
+    dynamicMeasurements: {
+      schemaCount: input.schemaFiles.length,
+      cliScriptCount: input.cliScriptFiles.length,
+      testFileCount: input.testFileCount,
+      vitestTestCount: input.vitestTestCount,
+    },
+  };
+}
+
+/** 兼容既有调用方：仍返回未分组的全量违规数组。 */
+export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckViolation[] {
+  return buildDocConsistencyReport(input).violations;
 }
 
 const VERSION_PATTERN = /\d+\.\d+\.\d+/;
@@ -406,6 +455,40 @@ function checkScriptRegistry(cliScriptFiles: string[], dispatchMatrix: string, s
       check: 'script-registry',
       message: `SKILL.md 声明 ${declared[1]} 个 .ts，实际 ${cliScriptFiles.length}`,
     });
+  }
+  return violations;
+}
+
+/**
+ * 本地运行期生成物与审计证据交付边界：覆盖率、宿主状态和 Agent 运行目录必须
+ * 逐文档说明为 Git 忽略的本地生成物；审计交付必须显式使用脱敏 SHA-256 manifest
+ * 导出命令，且 archive 不能被误表述为这类本地状态目录。
+ */
+function checkLocalEvidenceArtifacts(docs: Array<{ name: string; content: string }>): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const requiredTokens = [
+    'coverage/',
+    '.zcode/',
+    '.w-model/',
+    'Git 忽略',
+    'npm run wm:export-evidence -- <project-dir> <output-dir>',
+    '脱敏',
+    'SHA-256',
+  ];
+  for (const doc of docs) {
+    const missing = requiredTokens.filter((token) => !doc.content.includes(token));
+    if (missing.length > 0) {
+      violations.push({
+        check: 'local-evidence-artifacts',
+        message: `${doc.name} 缺本地生成物/证据导出契约「${missing.join('、')}」`,
+      });
+    }
+    if (doc.name === 'README.md' && !doc.content.includes('docs/changes/archive/')) {
+      violations.push({
+        check: 'local-evidence-artifacts',
+        message: 'README.md 应区分受控 Git 历史归档 docs/changes/archive/ 与本地 .w-model/ 状态',
+      });
+    }
   }
   return violations;
 }

@@ -796,7 +796,7 @@ R 子代理的方法论详见 [root-cause-locator.md](../w-model-dev/references/
 
 ## 7. 数据模型设计
 
-> **结构权威**：§7.1-§7.5 数据模型与 Schema 清单（21 份）的结构权威为 [`w-model-dev/references/data-models.md`](../w-model-dev/references/data-models.md)；本节约为全量定义，两者须保持一致（schema 增减先改 data-models.md 与 `w-model-dev/schemas/`）。
+> **结构权威**：§7.1-§7.5 数据模型与 Schema 清单（22 份，含 evidence-manifest）的结构权威为 [`w-model-dev/references/data-models.md`](../w-model-dev/references/data-models.md)；本节约为全量定义，两者须保持一致（schema 增减先改 data-models.md 与 `w-model-dev/schemas/`）。
 
 ### 7.1 项目数据模型
 

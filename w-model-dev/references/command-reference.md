@@ -21,6 +21,9 @@
 6. **docs-consistency 的明确句式契约边界**：门禁仅拒绝集中维护、逐条测试的禁止句式（限 pre-push / 平台检查 / 平台依赖修复的自动安装主张，以及已列明的 mtime 错误安全主张），不声称理解所有自然语言；清单外的复杂语义矛盾由 V review 评审。该边界不限制人工或手动执行 `npm install` 的明确指引。
 7. **实施动作分派**：产出由 S 子代理执行；评审由 V 子代理执行；门禁由 G 子代理执行。编排者越权实施命中反模式 #10（见 [anti-patterns.md](anti-patterns.md) #10）。
 
+> **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时运行 `npm run wm:export-evidence -- <project-dir> <output-dir>`，它生成脱敏、带 SHA-256 manifest 的证据包；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
+
+
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
 
 ## `/wm analyze <需求>`

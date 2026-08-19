@@ -39,7 +39,7 @@ import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { runDocConsistencyChecks, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
+import { buildDocConsistencyReport, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
 
 /**
  * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
@@ -382,9 +382,18 @@ async function main(): Promise<void> {
     linkDocs,
     linkExists: (relPath: string) => existsSync(join(root, relPath)),
     skillPkgDocs: collectSkillPkgDocs(root),
+    localEvidenceDocs: [
+      { name: 'README.md', content: read('README.md') },
+      { name: 'AGENTS.md', content: read('AGENTS.md') },
+      { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
+      { name: 'docs/INSTALL.md', content: installDocText },
+      { name: 'SKILL.md', content: read('w-model-dev/SKILL.md') },
+      { name: 'command-reference.md', content: read('w-model-dev/references/command-reference.md') },
+    ],
   };
 
-  const violations = runDocConsistencyChecks(input);
+  const report = buildDocConsistencyReport(input);
+  const { violations } = report;
   const exitCode = violations.length === 0 ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
@@ -398,6 +407,9 @@ async function main(): Promise<void> {
         passed: violations.length === 0,
         reasons: violations.map((v) => `[${v.check}] ${v.message}`),
         violations: [...byCheck.entries()].map(([rule, count]) => ({ rule, count })),
+        staticViolations: report.staticViolations,
+        dynamicViolations: report.dynamicViolations,
+        dynamicMeasurements: report.dynamicMeasurements,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -415,6 +427,8 @@ async function main(): Promise<void> {
   console.log(`persona 文件   : ${personaCount}`);
   console.log(`test 文件    : ${testFileCount}`);
   console.log(`vitest 用例  : ${vitestTestCount < 0 ? '无法采集（不一致）' : vitestTestCount}`);
+  console.log(`静态违规      : ${report.staticViolations.length}`);
+  console.log(`动态违规      : ${report.dynamicViolations.length}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);
 
   if (violations.length > 0) {
@@ -424,7 +438,17 @@ async function main(): Promise<void> {
     }
   }
 
-  printGateReport('DOCS_CONSISTENCY', { passed: violations.length === 0, violationCount: violations.length }, exitCode);
+  printGateReport(
+    'DOCS_CONSISTENCY',
+    {
+      passed: violations.length === 0,
+      violationCount: violations.length,
+      staticViolationCount: report.staticViolations.length,
+      dynamicViolationCount: report.dynamicViolations.length,
+      dynamicMeasurements: report.dynamicMeasurements,
+    },
+    exitCode,
+  );
   process.exitCode = exitCode;
   return;
 }

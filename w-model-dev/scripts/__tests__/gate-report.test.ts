@@ -183,11 +183,8 @@ describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JS
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
     await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli', 'self-test.ts'), '', 'utf-8');
     if (withViolation) {
-      await fs.writeFile(
-        path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'unregistered.json'),
-        '{}',
-        'utf-8',
-      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+      await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'unregistered.json'), '{}', 'utf-8');
     }
     return tmpDir;
   }

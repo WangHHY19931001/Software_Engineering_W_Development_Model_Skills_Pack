@@ -11,6 +11,7 @@ import {
   A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS,
   A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS,
   runDocConsistencyChecks,
+  buildDocConsistencyReport,
   extractMarkdownRelLinks,
   checkSkillOutboundLinks,
   type DocConsistencyInput,
@@ -51,7 +52,7 @@ const ACTION_ENUM_27 = [
 const ACTION_UNION_27 =
   "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
 
-/** scripts/cli 当前 31 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
+/** scripts/cli 当前 35 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
 const CLI_SCRIPT_NAMES = [
   'check-archive-integrity',
   'check-artifact-gate',
@@ -79,11 +80,15 @@ const CLI_SCRIPT_NAMES = [
   'check-tla-bdd-sync',
   'check-tla-model',
   'check-verifier-output',
+  'doctor',
   'ensure-codegraph-opsx',
   'metrics-report',
+  'plan-chunks',
   'security-scan',
   'self-test',
+  'wm-export-evidence',
   'wm-status',
+  'wm-write',
 ];
 
 function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistencyInput {
@@ -93,16 +98,18 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       'run-log.schema.json',
       'gate-log.schema.json',
       'iceberg-sweep.schema.json',
+      'evidence-manifest.schema.json',
     ],
     personaCount: 28,
     exit2ScriptCount: 31,
     referencesCount: 53,
     dataModels: [
-      '### Schema 清单（4 份）',
+      '### Schema 清单（5 份）',
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
       '| `run-log` | `run-log.schema.json` | ... | action enum（27 类） |',
       '| `gate-log` | `gate-log.schema.json` | ... | append-only gate-logs 审计记录 |',
       '| `iceberg-sweep` | `iceberg-sweep.schema.json` | ... |',
+      '| `evidence-manifest` | `evidence-manifest.schema.json` | ... |',
       '## RunLogEntry',
       ACTION_UNION_27,
     ].join('\n'),
@@ -111,7 +118,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     agentPersonas: '`targetKind=code` 时默认路由到本 Persona。',
     definitionOfDone: '## 七维度标准\n| 测试 | ... |\n| **签名链完整性** | ... |',
     readme:
-      '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests',
+      '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests\ncoverage/、.zcode/、.w-model/ 为 Git 忽略的本地生成物；使用 npm run wm:export-evidence -- <project-dir> <output-dir> 导出脱敏 SHA-256 manifest 证据包。docs/changes/archive/ 是受控归档。',
     antiPatterns:
       '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 1 | 跳过阶段门评审 | 缺陷后移 | 走完评审 |\n| 48 | 大规模重构式改动 | 变更量子无穷大 | 小步重构 |',
     glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
@@ -119,10 +126,11 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       properties: { action: { enum: ACTION_ENUM_27 } },
     }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（31 个 .ts） | 仅 G 子代理执行 |',
+      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（35 个 .ts） | 仅 G 子代理执行 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
-    agents: '31 个脚本\n40 个 .test.ts / 530 条',
+    agents:
+      '31 个脚本\n40 个 .test.ts / 530 条\ncoverage/、.zcode/、.w-model/ 是 Git 忽略的本地生成物，不随 Git 交付；需要审计证据时运行 npm run wm:export-evidence -- <project-dir> <output-dir>。',
     pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.11.0' }),
     metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.11.0' }),
     installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.11.0\n```',
@@ -328,7 +336,7 @@ describe('runDocConsistencyChecks', () => {
       dataModels:
         '### Schema 清单（19 份）\n| `verifier-output` | ... |\n| `run-log` | ... |\n| `iceberg-sweep` | ... |',
     });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('4 份'))).toBe(
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('5 份'))).toBe(
       true,
     );
   });
@@ -580,7 +588,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('data-models 缺 Schema 清单标题 → 违规', () => {
     const input = baseInput({ dataModels: '| `verifier-output` | ... |' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('4 份'))).toBe(
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('5 份'))).toBe(
       true,
     );
   });
@@ -725,49 +733,37 @@ describe('runDocConsistencyChecks', () => {
     expect(violations.some((x) => x.check === 'vitest-tests')).toBe(true);
   });
 
-  it('coverage JSON 的 52/853 元数据与五处文档均同步 → 零 vitest-tests 违规；CLI 消费 JSON 注入计数', async () => {
+  it('coverage JSON 的 54/875 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 853);
-      expect([coverage.testResults.length, coverage.numTotalTests]).toEqual([52, 853]);
-      const dataModels = path.join(fixtureRoot, 'w-model-dev', 'references', 'data-models.md');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      const dataModelsContent = await fs.readFile(dataModels, 'utf-8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(
-        dataModels,
-        dataModelsContent
-          .replace('### Schema 清单（20 份）', '### Schema 清单（21 份）')
-          .replace(
-            '| `run-log` |',
-            '| `gate-log` | `gate-log.schema.json` | GateLogEntry | append-only gate-logs 审计记录 | gate-log.ts |\n| `run-log` |',
-          ),
-        'utf-8',
-      );
+      const coverage = await writeVitestCount(fixtureRoot, 875);
+      expect([coverage.testResults.length, coverage.numTotalTests]).toEqual([54, 875]);
       const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push'];
       for (const doc of docsWithLiveCount) {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('853');
+        expect(docContent).toContain('875');
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, passing.stdout).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 853');
+      expect(passing.stdout).toContain('vitest 用例  : 875');
+      expect(passing.stdout).toContain('静态违规      : 0');
+      expect(passing.stdout).toContain('动态违规      : 0');
       expect(passing.stdout).not.toContain('[vitest-tests]');
 
       const readme = path.join(fixtureRoot, 'README.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('52 files / 853 tests', '52 files / 787 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('54 files / 875 tests', '54 files / 787 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 853');
+      expect(stale.stdout).toContain('vitest 用例  : 875');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
-      expect(stale.stdout).toContain('52 files / 787 tests');
+      expect(stale.stdout).toContain('54 files / 787 tests');
     });
   });
 
@@ -1125,10 +1121,10 @@ describe('runDocConsistencyChecks', () => {
 
   it('SKILL.md 声明 .ts 计数与实测不符 → script-registry 违规', () => {
     const input = baseInput({
-      skill: baseInput().skill.replace('（31 个 .ts）', '（30 个 .ts）'),
+      skill: baseInput().skill.replace('（35 个 .ts）', '（34 个 .ts）'),
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
-    expect(v.some((x) => x.message.includes('30') && x.message.includes('31'))).toBe(true);
+    expect(v.some((x) => x.message.includes('34') && x.message.includes('35'))).toBe(true);
   });
 
   it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
@@ -1336,6 +1332,7 @@ function runDocsConsistencyCli(
   const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot], {
     cwd: REPO_ROOT,
     encoding: 'utf-8',
+    timeout: 15_000,
     env: { ...process.env, WM_VITEST_COUNT_FILE: countFile, ...envOverrides },
   });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
@@ -1343,7 +1340,7 @@ function runDocsConsistencyCli(
 
 async function writeVitestCount(fixtureRoot: string, count: number) {
   const coverage = {
-    testResults: Array.from({ length: 52 }),
+    testResults: Array.from({ length: 54 }),
     numTotalTests: count,
     numPassedTests: count,
     numFailedTests: 0,
@@ -1352,6 +1349,43 @@ async function writeVitestCount(fixtureRoot: string, count: number) {
   await fs.writeFile(path.join(fixtureRoot, 'vitest-results.json'), JSON.stringify(coverage), 'utf-8');
   return coverage;
 }
+
+describe('D4 动态元数据和本地证据文档治理', () => {
+  it('evidence-manifest / wm-export-evidence 缺登记与本地证据文档缺失均为 static violation', () => {
+    const input = baseInput({
+      dataModels: baseInput().dataModels.replace(
+        '| `evidence-manifest` | `evidence-manifest.schema.json` | ... |\n',
+        '',
+      ),
+      dispatchMatrix: baseInput().dispatchMatrix.replace('wm-export-evidence', ''),
+      localEvidenceDocs: [
+        {
+          name: 'README.md',
+          content: '仅说明安装。',
+        },
+      ],
+    } as DocConsistencyInput);
+
+    const report = buildDocConsistencyReport(input);
+    expect(report.staticViolations.some((x) => x.check === 'schema-list')).toBe(true);
+    expect(report.staticViolations.some((x) => x.check === 'script-registry')).toBe(true);
+    expect(report.staticViolations.some((x) => x.check === 'local-evidence-artifacts')).toBe(true);
+  });
+
+  it('dynamic measurements 保留顶层兼容 violations 字段并分组 dynamic drift', () => {
+    const input = baseInput({ testFileCount: 41, vitestTestCount: 531 });
+    const report = buildDocConsistencyReport(input);
+
+    expect([...report.staticViolations, ...report.dynamicViolations]).toEqual(report.violations);
+    expect(report.dynamicMeasurements).toMatchObject({
+      schemaCount: 5,
+      cliScriptCount: CLI_SCRIPT_NAMES.length,
+      testFileCount: 41,
+      vitestTestCount: 531,
+    });
+    expect(report.dynamicViolations.some((x) => x.check === 'vitest-files')).toBe(true);
+  });
+});
 
 async function assertSsotExternalBoundaryFile(): Promise<void> {
   const ssotPath = path.join(REPO_ROOT, 'docs', 'skill-design-document_SSoT.md');

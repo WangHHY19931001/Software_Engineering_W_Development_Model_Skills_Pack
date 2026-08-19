@@ -27,5 +27,10 @@ export interface JsonReport {
   passed: boolean;
   reasons: string[];
   violations: { rule: string; count: number }[];
+  /** 可选的规则原始分组，供 docs-consistency 等报告保留兼容摘要同时暴露分类明细。 */
+  staticViolations?: unknown[];
+  dynamicViolations?: unknown[];
+  /** 当前运行时采集的数值事实，不是硬编码规范。 */
+  dynamicMeasurements?: Record<string, number>;
   durationMs: number;
 }

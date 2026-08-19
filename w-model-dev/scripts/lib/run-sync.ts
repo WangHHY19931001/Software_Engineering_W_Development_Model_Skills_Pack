@@ -175,10 +175,10 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1336,
+    line: 1332,
     symbol: 'runDocsConsistencyCli',
-    reason: 'B4 excludes docs-consistency tests; real CLI helper has no timeout and needs a dedicated follow-up.',
-    timeout: { required: true, status: 'missing-followup' },
+    reason: 'D4 keeps the real docs-consistency CLI boundary test with an explicit 15-second timeout.',
+    timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',

@@ -25,6 +25,7 @@
 
 ### 新增（审计整改批次 D）
 - **D3 可验证运行时审计证据导出**：新增 `wm:export-evidence`，仅导出 `.w-model` 白名单目录与 run-log 的常规文本记录；JSON/JSONL 递归脱敏 `token`、`secret`、`password`、`apiKey` 字段，使用临时目录+原子 rename 发布严格 Schema 的 SHA-256 manifest。`--verify` 会重新执行 manifest Schema、路径安全、文件存在性与哈希校验；输出目录冲突、符号链接/路径逃逸、二进制或未知扩展均 fail-closed，CLI 保持真实 exit 0/1/2 与 `EVIDENCE_EXPORT_JSON` 摘要。
+- **D4 动态元数据与本地证据治理**：docs-consistency 保持顶层 `violations` 兼容字段，并按 `staticViolations` / `dynamicViolations` 分组，输出真实 `dynamicMeasurements`。以 coverage JSON 的 `testResults.length` / `numTotalTests` 为事实源同步活体计数；登记 `evidence-manifest` Schema 与 `wm-export-evidence` CLI；README、Agent、安装、贡献、Skill 和命令参考明确 `coverage/` / `.zcode/` / `.w-model/` 是 Git 忽略的本地生成物，审计交付须显式导出脱敏 SHA-256 manifest 包，且与受控 `docs/changes/archive/` 区分。
 
 ### 修复（审计整改批次 A）
 - **状态写并发协议**：`wm-write` 改为 `<target>.lock` 持久目录与可转移 owner 的跨进程锁；锁内执行 mtime、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 增加 `--lock-timeout` 与显式 `--recover-stale-lock`；默认对陈旧锁 fail-closed（`STALE_LOCK` / exit 1），同时保留直接 `writeStateJson` 调用的兼容性隐式恢复。显式恢复仅授权 TTL 已过且 owner/operator PID 已退出的锁或 transition，不能夺取活跃 writer；逻辑层 barrier 与真实 CLI 回归测试覆盖该排他性边界。
