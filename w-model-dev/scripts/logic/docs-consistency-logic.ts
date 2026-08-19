@@ -37,6 +37,10 @@ export interface DocConsistencyInput {
   agents: string;
   ssot: string;
   prePush: string;
+  /** vitest 计数检查的额外文档原文（可选——缺省跳过；CLI 层注入 CONTRIBUTING.md 与 docs/INSTALL.md，与 linkDocs 注入策略一致） */
+  vitestExtraDocs?: Array<{ name: string; content: string }>;
+  /** .github/PULL_REQUEST_TEMPLATE.md 原文（可选——缺省时跳过 PR 模板门禁项数检查） */
+  prTemplate?: string;
   /** w-model-dev/references/operation-behaviors.md 原文（八条操作行为 + F1-F10） */
   operationBehaviors: string;
   /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版） */
@@ -149,8 +153,16 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
   violations.push(...checkDesignDocs(input.designDocs));
   violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
   violations.push(
-    ...checkVitestTestCount(input.vitestTestCount, input.testFileCount, input.readme, input.agents, input.prePush),
+    ...checkVitestTestCount(
+      input.vitestTestCount,
+      input.testFileCount,
+      input.readme,
+      input.agents,
+      input.prePush,
+      input.vitestExtraDocs,
+    ),
   );
+  violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
   violations.push(
     ...checkVersionConsistency(
       input.pkgJson,
@@ -732,6 +744,7 @@ function checkVitestTestCount(
   readme: string,
   agents: string,
   prePush: string,
+  extraVitestDocs?: Array<{ name: string; content: string }>,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (vitestTestCount < 0) return violations;
@@ -740,6 +753,7 @@ function checkVitestTestCount(
     ['README.md', readme],
     ['AGENTS.md', agents],
     ['.githooks/pre-push', prePush],
+    ...(extraVitestDocs?.map((d) => [d.name, d.content] as [string, string]) ?? []),
   ];
   for (const [docName, content] of docs) {
     if (!pattern.test(content)) {
@@ -764,6 +778,27 @@ function checkVitestTestCount(
           });
         }
       }
+    }
+  }
+  return violations;
+}
+
+/**
+ * PR 模板 pre-push 项数同步检查（P1-1 反哺）：模板内全部「N 项」表述须与
+ * EXPECTED.prePushCount 一致。历史盲区：PR 模板曾长期停留「14 项通过」。
+ * prTemplate 未注入（缺省）时跳过。字面量正则 → 不触发 detect-non-literal-regexp。
+ */
+function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (prTemplate === undefined) return violations;
+  const re = /(\d+)\s*项/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(prTemplate)) !== null) {
+    if (Number(m[1]) !== EXPECTED.prePushCount) {
+      violations.push({
+        check: 'pre-push',
+        message: `.github/PULL_REQUEST_TEMPLATE.md 存在过期门禁项数「${m[0]}」（当前 ${EXPECTED.prePushCount} 项），须同步`,
+      });
     }
   }
   return violations;

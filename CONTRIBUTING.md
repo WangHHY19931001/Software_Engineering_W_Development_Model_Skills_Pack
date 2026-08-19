@@ -54,7 +54,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 单元测试（vitest，47 个 test 文件 / 717 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+# 3.1 单元测试（vitest，47 个 test 文件 / 723 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
 # 3.2 自检基线（samples/ 目录下 256 条样本，覆盖全部 check 脚本的通过 / 失败路径）
@@ -93,7 +93,7 @@ npm run format
 | 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 | 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
-| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；40 files / 623 tests） | 0 |
+| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；47 files / 723 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 | 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
 | 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
@@ -212,7 +212,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
 │   ├── self-test.ts               # 校验逻辑自检（256 条样本，samples/ 驱动）
-│   ├── __tests__/                 # vitest 单元测试（47 个 .test.ts / 717 条 + README.md coverage 矩阵）
+│   ├── __tests__/                 # vitest 单元测试（47 个 .test.ts / 723 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例
@@ -256,11 +256,11 @@ LLM 评审逻辑由 `w-model-dev/` 下的提示词 + 校验脚本承载：
 ## 发布流程
 
 1. 更新 `CHANGELOG.md`，将 `[Unreleased]` 改为版本号 + 日期
-2. 同步版本号五处：`package.json` `version` + `w-model-dev/SKILL.md` frontmatter `version` + `w-model-dev/skill-metadata.json` + `README.md`「当前版本」 + `docs/INSTALL.md` 激活示例（`check-docs-consistency.ts` version-consistency 检查项与 `skill-metadata.test.ts` 回归校验）
+2. 同步版本号六处：`package.json` `version` + `w-model-dev/SKILL.md` frontmatter `version` + `w-model-dev/skill-metadata.json` + `README.md`「当前版本」 + `docs/INSTALL.md` 激活示例 + `CHANGELOG.md` 首个版本节头（`check-docs-consistency.ts` version-consistency 检查项与 `skill-metadata.test.ts` 回归校验）
 3. 创建 git tag：`git tag v<version>`（如 `v41.2.0`）
 4. 推送 tag：`git push origin v<version>`
 
-> 本仓库版本号以 git tag + 五处一致为准（门禁校验五处，见上「数字一致性」）；`package.json` 不发布到 npm（`private: true`）。
+> 本仓库版本号以 git tag + 六处一致为准（门禁校验六处，见上「数字一致性」）；`package.json` 不发布到 npm（`private: true`）。
 
 ## 问题反馈
 

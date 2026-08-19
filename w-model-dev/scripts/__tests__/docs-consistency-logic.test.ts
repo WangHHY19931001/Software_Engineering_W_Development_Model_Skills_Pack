@@ -515,6 +515,58 @@ describe('runDocConsistencyChecks', () => {
     expect(v.some((x) => x.message.includes('41 个 .test.ts / 530 条'))).toBe(true);
   });
 
+  it('CONTRIBUTING 含过期 vitest 计数（40 files / 623 tests）→ vitest-tests 违规', () => {
+    const input = baseInput({
+      vitestExtraDocs: [{ name: 'CONTRIBUTING.md', content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |' }],
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.some((x) => x.message.includes('CONTRIBUTING.md') && x.message.includes('40 files / 623 tests'))).toBe(
+      true,
+    );
+  });
+
+  it('CONTRIBUTING 计数与实测一致 → 零 vitest-tests 违规', () => {
+    const input = baseInput({
+      vitestExtraDocs: [
+        { name: 'CONTRIBUTING.md', content: '单元测试全量（40 files / 530 tests）。\n（40 个 .test.ts / 530 条）' },
+      ],
+    });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
+  });
+
+  it('INSTALL 含过期 vitest 计数（40 个 .test.ts / 623 条）→ vitest-tests 违规（P1-1 复核补充）', () => {
+    const input = baseInput({
+      vitestExtraDocs: [{ name: 'docs/INSTALL.md', content: '# vitest 单元测试（40 个 .test.ts / 623 条）' }],
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v.some((x) => x.message.includes('docs/INSTALL.md') && x.message.includes('40 个 .test.ts / 623 条'))).toBe(
+      true,
+    );
+  });
+
+  it('PR 模板含过期门禁项数（14 项）→ pre-push 违规', () => {
+    const input = baseInput({
+      prTemplate: '- [ ] `npm run prepush` 14 项通过',
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'pre-push');
+    expect(v.some((x) => x.message.includes('PULL_REQUEST_TEMPLATE') && x.message.includes('14 项'))).toBe(true);
+  });
+
+  it('PR 模板项数与 EXPECTED 一致 → 零 pre-push 违规', () => {
+    const input = baseInput({
+      prTemplate: '- [ ] `npm run prepush` 17 项通过',
+    });
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'pre-push')).toBe(false);
+  });
+
+  it('vitestExtraDocs / prTemplate 缺省注入 → 跳过检查不产生违规', () => {
+    expect(
+      runDocConsistencyChecks(baseInput()).some(
+        (x) => x.message.includes('CONTRIBUTING.md') || x.message.includes('PULL_REQUEST_TEMPLATE'),
+      ),
+    ).toBe(false);
+  });
+
   it('技能包文档含逃逸链接 → skill-outbound-links 违规', () => {
     const docs = [
       {
