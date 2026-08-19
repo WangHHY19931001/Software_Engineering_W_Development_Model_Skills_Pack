@@ -187,7 +187,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         '{"phase":1,"action":"produce","role":"S","outcome":"success","timestamp":"2026-08-11T00:00:00Z"}\n',
         'utf-8',
       );
-      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], { encoding: 'utf-8' });
+      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
       expect(r.status).toBe(1); // schema 违规 → exit 1
       const stdout = r.stdout ?? '';
       expect(stdout).not.toContain('═');
@@ -220,7 +220,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         '{"phase":1,"action":"produce","role":"S","outcome":"success","timestamp":"2026-08-11T00:00:00Z"}\n',
         'utf-8',
       );
-      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, logFile], { encoding: 'utf-8' });
+      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, logFile], {});
       expect(r.status).toBe(1);
       const stdout = r.stdout ?? '';
       expect(stdout).toContain('═');
@@ -257,9 +257,7 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
       const featureFile = path.join(tmpDir, 'model.feature');
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
       await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
-      const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {
-        encoding: 'utf-8',
-      });
+      const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {});
       expect(r.status).toBe(0);
       const stdout = r.stdout ?? '';
       expect(stdout).not.toContain('═');
@@ -289,9 +287,7 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
       const featureFile = path.join(tmpDir, 'model.feature');
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
       await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
-      const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], {
-        encoding: 'utf-8',
-      });
+      const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], {});
       expect(r.status).toBe(0);
       expect(r.stdout ?? '').toContain('TLA_BDD_SYNC_JSON ');
     } finally {
@@ -302,9 +298,7 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
 
 describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {
   it('--json 有效样本 → stdout 为单行纯 JSON（passed=true，exitCode=0），不输出 ICEBERG_JSON 前缀', async () => {
-    const r = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE], {
-      encoding: 'utf-8',
-    });
+    const r = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE]);
     expect(r.status).toBe(0);
     const stdout = r.stdout ?? '';
     expect(stdout).not.toContain('═');
@@ -325,9 +319,7 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
   });
 
   it('默认路径保留 ICEBERG_JSON 前缀；三调用方写失败仍保留主结论并输出 gateLogWriteError', async () => {
-    const r = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], {
-      encoding: 'utf-8',
-    });
+    const r = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE]);
     expect(r.status).toBe(0);
     expect(r.stdout ?? '').toContain('ICEBERG_JSON ');
 
@@ -355,7 +347,6 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       await fs.writeFile(path.join(bddModelDir, 'gate-logs'), 'not a directory', 'utf-8');
 
       const iceberg = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], {
-        encoding: 'utf-8',
         cwd: tmpDir,
       });
       expect(iceberg.status).toBe(0);
@@ -372,7 +363,6 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
         process.execPath,
         [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE],
         {
-          encoding: 'utf-8',
           cwd: tmpDir,
         },
       );
@@ -383,9 +373,7 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
         gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
       });
 
-      const preventive = runSync(process.execPath, [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1'], {
-        encoding: 'utf-8',
-      });
+      const preventive = runSync(process.execPath, [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1'], {});
       expect(preventive.status).toBe(1);
       const preventiveSummary = JSON.parse((preventive.stdout ?? '').replace('PREVENTIVE_REVIEW_JSON ', '')) as Record<
         string,
@@ -399,9 +387,7 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       const preventiveJson = runSync(
         process.execPath,
         [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1', '--json'],
-        {
-          encoding: 'utf-8',
-        },
+        {},
       );
       expect(preventiveJson.status).toBe(1);
       expect(JSON.parse(preventiveJson.stdout ?? '')).toMatchObject({
@@ -410,9 +396,11 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
         gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
       });
 
-      const bdd = runSync(process.execPath, [tsxCli, CHECK_BDD_MODEL_SCRIPT, path.join(bddModelDir, 'manifest.json')], {
-        encoding: 'utf-8',
-      });
+      const bdd = runSync(
+        process.execPath,
+        [tsxCli, CHECK_BDD_MODEL_SCRIPT, path.join(bddModelDir, 'manifest.json')],
+        {},
+      );
       expect(bdd.status).toBe(0);
       const bddSummary = JSON.parse((bdd.stdout ?? '').match(/BDD_JSON (.+)/)?.[1] ?? '') as Record<string, unknown>;
       expect(bddSummary).toMatchObject({
@@ -423,7 +411,7 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       const bddJson = runSync(
         process.execPath,
         [tsxCli, CHECK_BDD_MODEL_SCRIPT, path.join(bddModelDir, 'manifest.json'), '--json'],
-        { encoding: 'utf-8' },
+        {},
       );
       expect(bddJson.status).toBe(0);
       expect(JSON.parse(bddJson.stdout ?? '')).toMatchObject({

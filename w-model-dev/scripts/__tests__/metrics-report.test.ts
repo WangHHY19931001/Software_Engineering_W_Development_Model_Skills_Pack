@@ -50,7 +50,7 @@ async function writeWModel(rel: string, content: string): Promise<string> {
 
 /** 运行 metrics-report 子进程 */
 function run(...args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir, ...args], { encoding: 'utf-8' });
+  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir, ...args]);
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 

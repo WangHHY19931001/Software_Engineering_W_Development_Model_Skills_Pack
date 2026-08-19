@@ -61,3 +61,34 @@ npm run prepush
 - 未修改 docs-consistency、hook、schema、state/wm-write、gate-log、package、baseline、计划或规格。
 - 未改动 `coverage-logic.test.ts` 现有 15 秒 `execSync` timeout。
 - codegraph 查询已尝试；目标仓库无 `.codegraph/` 索引，按简报采用无索引替代：完整 `rg` 调用点审计 + focused static test。
+
+## 审查返工（第 1/5 轮）
+
+已处理 `task-B4-review.md` 的 I1 与 I2。
+
+### I1：helper 有界契约
+
+- `RunSyncOptions` 收窄为 `Omit<SpawnSyncOptions, 'encoding' | 'killSignal'>`，返回值字符串类型不再可由公开 options 破坏。
+- `timeout` 与 `maxBuffer` 只接受 `Number.isFinite(value) && value > 0`；`0`、`NaN`、`Infinity` 与缺失值均回退默认边界。
+- `killSignal` 固定为 `SIGKILL`，`encoding` 固定为 `utf-8`；即使不安全类型断言传入弱信号或非字符串编码，实际传给 `spawnSync` 的仍为固定值。
+- 新增测试覆盖上述 0/NaN/Infinity/弱 killSignal/encoding override 路径。
+
+### I2：全目录盘点与例外
+
+- `SYNC_PROCESS_EXCEPTIONS` 是 `w-model-dev/scripts` 的集中、显式同步 API 清单。每项记录 API、文件、准确行号、符号、理由及 timeout 状态。
+- `run-sync.test.ts` 递归扫描整个 `w-model-dev/scripts/**/*.ts` 的 `spawnSync`、`execSync` 和 `execFileSync` 直接调用；helper 本身的唯一底层 `spawnSync` 除外。每个扫描结果必须与清单一一对应、具有理由并声明 timeout 已存在或需后续整改。
+- 已审计的范围外无 timeout 例外：`check-tla-model.ts` 的 `checkEnvironment` Java 探针、`check-docs-consistency.ts` 的两项 git 探针、`security-scan.ts` eslint 调用、`docs-consistency-logic.test.ts` 和 `wm-write.test.ts` 的真实 CLI helpers。它们均标为 `missing-followup`，未宣称由 B4 修复；按照任务限制没有修改这些实现。
+- 已审计的既有明确 timeout 例外：check-tla-model SANY/TLC/预检、docs-consistency Vitest、ensure-codegraph-opsx 操作及 coverage-logic 15 秒 CLI 测试。
+
+### 返工验证
+
+通过：
+
+```text
+focused Vitest: 5 files / 67 tests
+npm run typecheck
+npm run lint:security
+Prettier --check
+```
+
+全量 `npm test` 仍仅有既有 docs-consistency fixture 失败：新增 `run-sync.test.ts` 后实际测试文件为 51，fixture/活体计数仍为 50；结果为 50 files / 819 tests passed，1 fixture failure。该文件与 docs 变更受 B4 范围禁止，未修改。`npm run prepush` 已实际运行：通过平台依赖、self-test、门禁样本和安全扫描，在全量 Vitest/coverage 的同一 docs-count 漂移处阻断。

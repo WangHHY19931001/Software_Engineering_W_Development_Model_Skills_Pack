@@ -179,7 +179,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
         `--phase=${effectivePhase}`,
         `--graph=${graphPath}`,
       ],
-      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     if (tlaModelResult.status !== 0) {
       modelCheckViolations.push(
@@ -199,7 +199,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
           `--phase=${effectivePhase}`,
           `--graph=${graphPath}`,
         ],
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
+        { stdio: ['ignore', 'pipe', 'pipe'] },
       );
       if (bddModelResult.status !== 0) {
         modelCheckViolations.push(
