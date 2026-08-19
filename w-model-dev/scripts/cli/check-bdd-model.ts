@@ -373,23 +373,48 @@ async function main(): Promise<number> {
         let undefinedCount = 0,
           pendingCount = 0,
           failedCount = 0,
+          skippedCount = 0,
+          unknownStatusCount = 0,
+          invalidScenarioCount = 0,
           executedScenarioCount = 0,
           executedStepCount = 0;
         for (const element of report.elements) {
           if (!isRecord(element) || !Array.isArray(element.steps)) continue;
-          const executedSteps = element.steps.filter(
-            (step) => isRecord(step) && isRecord(step.result) && typeof step.result.status === 'string',
-          );
-          if (executedSteps.length > 0) executedScenarioCount++;
-          executedStepCount += executedSteps.length;
-          for (const step of executedSteps) {
+          const hasScenarioName = typeof element.name === 'string' && element.name.trim().length > 0;
+          if (!hasScenarioName && element.steps.length > 0) invalidScenarioCount++;
+          let hasPassedStep = false;
+          for (const step of element.steps) {
+            if (!isRecord(step) || !isRecord(step.result) || typeof step.result.status !== 'string') continue;
             const status = step.result.status;
-            if (status === 'undefined') undefinedCount++;
-            if (status === 'pending') pendingCount++;
-            if (status === 'failed') failedCount++;
+            if (status === 'passed') {
+              if (hasScenarioName) {
+                hasPassedStep = true;
+                executedStepCount++;
+              }
+            } else if (status === 'failed') {
+              failedCount++;
+            } else if (status === 'undefined') {
+              undefinedCount++;
+            } else if (status === 'pending') {
+              pendingCount++;
+            } else if (status === 'skipped') {
+              skippedCount++;
+            } else {
+              unknownStatusCount++;
+            }
           }
+          if (hasPassedStep) executedScenarioCount++;
         }
-        cucumberReport = { undefinedCount, pendingCount, failedCount, executedScenarioCount, executedStepCount };
+        cucumberReport = {
+          undefinedCount,
+          pendingCount,
+          failedCount,
+          skippedCount,
+          unknownStatusCount,
+          invalidScenarioCount,
+          executedScenarioCount,
+          executedStepCount,
+        };
       } else {
         console.error('[D5] cucumber 报告不是包含 elements 数组的合法 Cucumber JSON');
       }

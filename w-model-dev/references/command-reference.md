@@ -296,7 +296,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-
 | `--graph=<path>` | phase>=2 必填 | 2-8 | 缺少 → exit 2（D8 数据源） |
 
 - **参数完整性**：仅接受此速查行中的精确选项；require flags 必须是无赋值的裸 flag。`--require-…=true`、重复、拼写近似和未知 `--*` 均为 `ARG_INVALID` / exit 2，绝不降级为兼容 skip。
-- **失败动作**：exit 1 时由 S 修复/补齐项目工件后走 V→G；required Cucumber 报告必须为 `{ elements: [...] }`，并至少含一个带 `result` 的 scenario/step 执行记录；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
+- **失败动作**：exit 1 时由 S 修复/补齐项目工件后走 V→G；required Cucumber 报告必须为 `{ elements: [...] }`，且至少一个非空 `name` 的 scenario element 含 `result.status="passed"`。`failed` 只作失败诊断，`skipped` / `pending` / `undefined` / 未知 status 和匿名 element 都不能满足证据并产生 D5 violation；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
 - **边界**：本地 pre-push 直接运行的是技能包 `check-bdd-model` fixture 回归；它不直接运行 TLA、TLA↔BDD 同步或任何项目工件阶段门。项目阶段门才按成熟度传入上述 require flags 和真实工件。
 - **guide 链接**：[bdd-guide.md](bdd-guide.md)（BDD 门禁调用）与 [tla-plus-guide.md](tla-plus-guide.md)（TLA+ / BDD 协作）。
 

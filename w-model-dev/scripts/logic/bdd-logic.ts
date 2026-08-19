@@ -826,9 +826,15 @@ export interface BddCheckInput {
     undefinedCount: number;
     pendingCount: number;
     failedCount: number;
-    /** 合法 Cucumber element 场景记录数（require 模式下必需）。 */
+    /** 未执行的 skipped step 数（require 模式下为 D5 violation）。 */
+    skippedCount?: number;
+    /** 非 Cucumber allowlist 的 result.status 数（require 模式下为 D5 violation）。 */
+    unknownStatusCount?: number;
+    /** 具有 steps 但缺稳定 scenario name 的 element 数。 */
+    invalidScenarioCount?: number;
+    /** 仅已命名 scenario 的 passed step 才计入真实执行证据。 */
     executedScenarioCount?: number;
-    /** 带 result 的实际 step 执行记录数（require 模式下必需）。 */
+    /** 仅已命名 scenario 的 passed step 才计入真实执行证据。 */
     executedStepCount?: number;
   };
   /** 阶段 1-4 项目门要求 D4 证据；默认 false 以保持 fixture 回归兼容。 */
@@ -959,6 +965,19 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
       }
       if (input.manifest.features.length > 0 && executedScenarioCount === 0) {
         dims.stepBinding.push('[D5] required cucumber report has no executed scenarios for manifest features');
+      }
+      if ((input.cucumberReport.invalidScenarioCount ?? 0) > 0) {
+        dims.stepBinding.push(
+          `[D5] required cucumber report has ${input.cucumberReport.invalidScenarioCount} anonymous scenario elements`,
+        );
+      }
+      if ((input.cucumberReport.skippedCount ?? 0) > 0) {
+        dims.stepBinding.push(`[D5] cucumber report has ${input.cucumberReport.skippedCount} skipped steps`);
+      }
+      if ((input.cucumberReport.unknownStatusCount ?? 0) > 0) {
+        dims.stepBinding.push(
+          `[D5] cucumber report has ${input.cucumberReport.unknownStatusCount} unknown-status steps`,
+        );
       }
     }
     if (input.cucumberReport) {

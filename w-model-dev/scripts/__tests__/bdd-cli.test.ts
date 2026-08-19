@@ -133,7 +133,7 @@ Invariant == state = "B" => done
     const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
     const graph = await writeJson('.w-model/graph.json', { nodes: [] });
     const report = await writeJson('.w-model/cucumber-report.json', {
-      elements: [{ steps: [{ result: { status: 'passed' } }] }],
+      elements: [{ name: 'authenticated user can continue', steps: [{ result: { status: 'passed' } }] }],
     });
 
     const result = run([
@@ -207,6 +207,49 @@ Invariant == state = "B" => done
       exitCode: 1,
       reasons: expect.arrayContaining([expect.stringContaining('[D5] required cucumber report')]),
     });
+  });
+
+  it.each([
+    ['a fabricated status', { elements: [{ name: 'forged scenario', steps: [{ result: { status: 'fabricated' } }] }] }],
+    ['a skipped status', { elements: [{ name: 'skipped scenario', steps: [{ result: { status: 'skipped' } }] }] }],
+    ['an anonymous element', { elements: [{ steps: [{ result: { status: 'passed' } }] }] }],
+  ])('fails D5 with exit 1 for required cucumber evidence containing %s', async (_caseName, reportValue) => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
+    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
+    const report = await writeJson('.w-model/cucumber-report.json', reportValue);
+
+    const result = run([
+      manifest,
+      '--phase=5',
+      `--graph=${graph}`,
+      `--cucumber-report=${report}`,
+      '--require-cucumber-report',
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      exitCode: 1,
+      reasons: expect.arrayContaining([expect.stringContaining('[D5]')]),
+    });
+  });
+
+  it('keeps a named passed Cucumber scenario as required execution evidence', async () => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
+    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
+    const report = await writeJson('.w-model/cucumber-report.json', {
+      elements: [{ name: 'user signs in', steps: [{ result: { status: 'passed' } }] }],
+    });
+
+    const result = run([
+      manifest,
+      '--phase=5',
+      `--graph=${graph}`,
+      `--cucumber-report=${report}`,
+      '--require-cucumber-report',
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ exitCode: 0, passed: true });
   });
 
   it('fails D5 when manifest features exist but the required report has no executed scenarios', async () => {
