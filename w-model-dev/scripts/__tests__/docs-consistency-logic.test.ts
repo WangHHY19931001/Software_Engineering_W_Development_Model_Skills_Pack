@@ -1,3 +1,10 @@
+import { spawnSync } from 'node:child_process';
+import { cpSync, promises as fs } from 'node:fs';
+import { createRequire } from 'node:module';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -666,9 +673,29 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
-  it('vitest 用例总数三处文档均同步 → 零 vitest-tests 违规', () => {
+  it('vitest 用例总数三处文档均同步 → 零 vitest-tests 违规；CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
+
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 785);
+      const passing = runDocsConsistencyCli(fixtureRoot);
+      expect(passing.code).toBe(0);
+      expect(passing.stdout).toContain('vitest 用例  : 785');
+      expect(passing.stdout).not.toContain('[vitest-tests]');
+
+      await writeVitestCount(fixtureRoot, 766);
+      const readme = path.join(fixtureRoot, 'README.md');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
+      const content = await fs.readFile(readme, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
+      await fs.writeFile(readme, content.replace('49 files / 785 tests', '49 files / 766 tests'), 'utf-8');
+      const stale = runDocsConsistencyCli(fixtureRoot);
+      expect(stale.code).toBe(1);
+      expect(stale.stdout).toContain('vitest 用例  : 766');
+      expect(stale.stdout).toContain('[vitest-tests]');
+      expect(stale.stdout).toContain('README.md');
+    });
   });
 
   it('README 含过期 vitest 计数（正确总数与旧数字并存）→ vitest-tests 违规', () => {
@@ -1151,3 +1178,48 @@ describe('内链存在性检查（internal-links，C3）', () => {
     expect(seen).toEqual(['CHANGELOG.md']);
   });
 });
+
+const require = createRequire(import.meta.url);
+const tsxCli = require.resolve('tsx/cli');
+const DOCS_CONSISTENCY_CLI = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-docs-consistency.ts',
+);
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+
+async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) => Promise<void>): Promise<void> {
+  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-docs-consistency-cli-'));
+  try {
+    cpSync(REPO_ROOT, fixtureRoot, {
+      recursive: true,
+      filter: (source) => {
+        const relative = path.relative(REPO_ROOT, source);
+        return !['node_modules', '.git', '.w-model'].some(
+          (excluded) => relative === excluded || relative.startsWith(`${excluded}${path.sep}`),
+        );
+      },
+    });
+    await assertResult(fixtureRoot);
+  } finally {
+    await fs.rm(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+function runDocsConsistencyCli(fixtureRoot: string): { code: number | null; stdout: string; stderr: string } {
+  const countFile = path.join(fixtureRoot, 'vitest-results.json');
+  const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot], {
+    cwd: REPO_ROOT,
+    encoding: 'utf-8',
+    env: { ...process.env, WM_VITEST_COUNT_FILE: countFile },
+  });
+  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
+async function writeVitestCount(fixtureRoot: string, count: number): Promise<void> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
+  await fs.writeFile(
+    path.join(fixtureRoot, 'vitest-results.json'),
+    JSON.stringify({ numTotalTests: count, numPassedTests: count, numFailedTests: 0 }),
+    'utf-8',
+  );
+}
