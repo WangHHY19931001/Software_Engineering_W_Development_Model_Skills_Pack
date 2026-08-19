@@ -162,7 +162,7 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
           troubleshooting: 'pre-push 自动执行 npm install --no-audit --no-fund；WSL 自动补装平台依赖。',
           changelog: '状态写并发协议；显式平台修复；Vitest test-count fail-closed 已完成。',
         },
-        vitestTestCount: 766,
+        vitestTestCount: 785,
         testFileCount: 49,
         vitestExtraDocs: [
           {
@@ -214,6 +214,9 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
     expect(
       oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('vitest 725 条（47 test files）')),
     ).toBe(true);
+    expect(oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('49 个 test 文件 / 766 条'))).toBe(
+      true,
+    );
     expect(missingDataModels.some((x) => x.check === 'a4-state-lock' && x.message.includes('data-models.md'))).toBe(
       true,
     );
@@ -252,9 +255,9 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
         }),
       );
 
-      expect(
-        violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md')),
-      ).toBe(true);
+      expect(violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
+        true,
+      );
     },
   );
 
