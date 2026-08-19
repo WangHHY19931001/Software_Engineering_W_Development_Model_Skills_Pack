@@ -3,7 +3,7 @@
  * 工件质量门校验脚本（Artifact Gate Checker，SSoT §10.5）
  *
  * 供 G 子代理在阶段 1-8 收敛循环中调用，校验各阶段工件（需求 / 设计 / UAT 映射等）
- * 的齐全性与质量门槛；（资产读取已拆分至 lib/artifact-gate-assets.ts / lib/uat-path-mapping.ts），
+ * 的齐全性与质量门槛；（资产读取已拆分至 application/artifact-gate-assets.ts / application/uat-path-mapping.ts），
  * 本文件仅保留编排。
  *
  * 用法：

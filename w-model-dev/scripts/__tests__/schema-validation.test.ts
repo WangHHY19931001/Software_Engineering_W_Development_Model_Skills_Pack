@@ -15,6 +15,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -25,6 +26,7 @@ import { readSchemasDir } from '../infrastructure/schema-fs.js';
 import { resolveStateSchema } from '../lib/state-schema-registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const nodeRequire = createRequire(import.meta.url);
 const samplesDir = path.join(here, '..', 'samples');
 const schemaSamplesDir = path.join(samplesDir, 'schema');
 const verifierSamplesDir = path.join(samplesDir, 'verifier');
@@ -33,6 +35,13 @@ async function loadJson(dir: string, file: string): Promise<unknown> {
   const raw = await fs.readFile(path.join(dir, file), 'utf-8');
   return JSON.parse(raw);
 }
+
+describe('schema-loader TypeDoc public API', () => {
+  it('includes infrastructure as a TypeDoc entry path and exposes validateBySchema with SchemaValidationResult', () => {
+    const packageJson = nodeRequire('../../../package.json') as { scripts: { 'docs:build': string } };
+    expect(packageJson.scripts['docs:build']).toContain('w-model-dev/scripts/infrastructure');
+  });
+});
 
 describe('JSON Schema 前置校验（validateBySchema）', () => {
   it('合法 VerifierOutput 通过 schema 校验', async () => {
@@ -319,7 +328,7 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
     expect(src).not.toMatch(/ERROR_JSON/); // 手拼 ERROR_JSON 绕过 cli-error 的行为已移除
   });
 
-  it('lib/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
+  it('infrastructure/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
     const dir = path.resolve(here, '../../schemas');
     const map = await readSchemasDir(dir);
     expect(Object.keys(map).length).toBe(21);

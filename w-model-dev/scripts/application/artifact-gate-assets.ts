@@ -175,7 +175,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
       [
         '--import',
         'tsx',
-        path.resolve(__dirname, 'check-tla-model.ts'),
+        path.resolve(__dirname, '..', 'cli', 'check-tla-model.ts'),
         manifestFile,
         `--phase=${effectivePhase}`,
         `--graph=${graphPath}`,
@@ -195,7 +195,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
         [
           '--import',
           'tsx',
-          path.resolve(__dirname, 'check-bdd-model.ts'),
+          path.resolve(__dirname, '..', 'cli', 'check-bdd-model.ts'),
           bddManifestFile,
           `--phase=${effectivePhase}`,
           `--graph=${graphPath}`,

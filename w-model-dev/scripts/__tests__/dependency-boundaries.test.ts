@@ -12,6 +12,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 type ScriptLayer = 'cli' | 'application' | 'logic' | 'lib' | 'infrastructure';
@@ -54,17 +55,35 @@ async function findTypeScriptFiles(dir: string): Promise<string[]> {
 }
 
 function importStatements(source: string): Array<{ specifier: string; typeOnly: boolean }> {
+  const sourceFile = ts.createSourceFile(
+    'dependency-fixture.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS,
+  );
   const statements: Array<{ specifier: string; typeOnly: boolean }> = [];
-  const statementPattern = /(?:^|\n)\s*(import|export)\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
-  for (const match of source.matchAll(statementPattern)) {
-    const clause = match[2] ?? '';
-    const specifier = match[3];
-    if (specifier) statements.push({ specifier, typeOnly: /^type\b/.test(clause.trim()) });
-  }
-  const sideEffectPattern = /(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g;
-  for (const match of source.matchAll(sideEffectPattern)) {
-    const specifier = match[1];
-    if (specifier) statements.push({ specifier, typeOnly: false });
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
+    if (statement.moduleSpecifier === undefined || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+
+    let typeOnly = false;
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      typeOnly =
+        clause?.isTypeOnly === true ||
+        (clause?.namedBindings !== undefined &&
+          ts.isNamedImports(clause.namedBindings) &&
+          clause.namedBindings.elements.every((element) => element.isTypeOnly));
+    } else {
+      const clause = statement.exportClause;
+      typeOnly =
+        statement.isTypeOnly ||
+        (clause !== undefined && ts.isNamedExports(clause) && clause.elements.every((element) => element.isTypeOnly));
+    }
+
+    statements.push({ specifier: statement.moduleSpecifier.text, typeOnly });
   }
   return statements;
 }
@@ -166,9 +185,21 @@ describe('scripts runtime dependency boundaries', () => {
     expect(cycles).toEqual([]);
   });
 
-  it('keeps type-only imports out of the runtime dependency graph', () => {
-    expect(importStatements("import type { GateGraph } from '../logic/gate-logic.js';")).toEqual([
-      { specifier: '../logic/gate-logic.js', typeOnly: true },
+  it('classifies import and export specifiers by their runtime presence', () => {
+    expect(
+      importStatements(`
+        import type { ModuleType } from '../logic/type-only.js';
+        import { type NamedType } from '../logic/named-type-only.js';
+        import { value, type MixedType } from '../logic/mixed.js';
+        export { type ExportedType } from '../logic/re-export-type-only.js';
+        export { value as exportedValue, type ExportedMixedType } from '../logic/re-export-mixed.js';
+      `),
+    ).toEqual([
+      { specifier: '../logic/type-only.js', typeOnly: true },
+      { specifier: '../logic/named-type-only.js', typeOnly: true },
+      { specifier: '../logic/mixed.js', typeOnly: false },
+      { specifier: '../logic/re-export-type-only.js', typeOnly: true },
+      { specifier: '../logic/re-export-mixed.js', typeOnly: false },
     ]);
   });
 });

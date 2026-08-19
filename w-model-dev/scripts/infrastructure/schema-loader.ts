@@ -68,12 +68,20 @@ function getAjv(): AjvDefault {
   return ajv;
 }
 
+/** Result of validating an input against a registered JSON Schema. */
 export interface SchemaValidationResult {
   valid: boolean;
   errors: ErrorObject[] | null;
   errorMessages: string[];
 }
 
+/**
+ * Validates input against a schema registered from `schemas/*.schema.json`.
+ *
+ * @param name Registered schema basename without the `.schema.json` suffix.
+ * @param data Value to validate.
+ * @returns The validation verdict and normalized Ajv diagnostics.
+ */
 export function validateBySchema(name: string, data: unknown): SchemaValidationResult {
   const v = getAjv();
   const validate = v.getSchema(name);

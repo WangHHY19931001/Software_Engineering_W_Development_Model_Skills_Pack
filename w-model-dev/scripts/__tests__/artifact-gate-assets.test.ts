@@ -1,5 +1,5 @@
 /**
- * artifact-gate-assets.test.ts —— lib/artifact-gate-assets.ts 资产读取/校验层单元测试
+ * artifact-gate-assets.test.ts —— application/artifact-gate-assets.ts 资产读取/校验层单元测试
  *
  * 覆盖：
  *   - discoverGraphAsset：graph.json → consolidated-phaseN 优先级回退 / 非法 JSON 告警回退 / 无资产
@@ -11,6 +11,7 @@
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -217,7 +218,7 @@ describe('runModelChecks', () => {
     expect(spawnSyncMock).not.toHaveBeenCalled();
   });
 
-  it('TLA+ 与 BDD 子进程均退出 0 → 零 violation，并经受控 helper 传递进程级边界', () => {
+  it('TLA+ 与 BDD 子进程均退出 0 → 零 violation，并经受控 helper 传递实际 CLI 入口和进程级边界', async () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
     const v = runModelChecks({
       manifestExists: true,
@@ -229,6 +230,18 @@ describe('runModelChecks', () => {
     });
     expect(v).toHaveLength(0);
     expect(spawnSyncMock).toHaveBeenCalledTimes(2);
+
+    const scriptsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const expectedEntries = [
+      path.join(scriptsDir, 'cli', 'check-tla-model.ts'),
+      path.join(scriptsDir, 'cli', 'check-bdd-model.ts'),
+    ];
+    const actualEntries = spawnSyncMock.mock.calls.map(([, args]) => args[2]);
+    expect(actualEntries).toEqual(expectedEntries);
+    for (const entry of actualEntries) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- Assert the application resolves repository-owned CLI entry files.
+      await expect(fs.access(entry)).resolves.toBeUndefined();
+    }
     for (const [, , options] of spawnSyncMock.mock.calls) {
       expect(options).toMatchObject({
         timeout: 15_000,

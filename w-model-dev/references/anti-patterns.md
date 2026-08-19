@@ -206,7 +206,7 @@
 | #25（JSON 文件 PowerShell 写入） | run-log.jsonl `note` 字段检测（"PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词）+ [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26（RunLogEntry 与 EventIngress 字段混用） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R1 动作完整性校验（字段不符 RunLogEntry schema 即失败）+ [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27（调测者简化行为） | run-log.jsonl 动作完整性（R1 缺 chunk/cross/review/gate 动作）+ checkpoint R2（acknowledgedDecisions 缺硬约束 ID）+ gate exitCode 一致性（R6 exitCode ≠ JSON passed）交叉检测 + [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单 |
-| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/logic/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（21 份） |
+| #28（schema 前置校验缺失） | [`schema-loader.ts`](../scripts/infrastructure/schema-loader.ts) `validateBySchema` 调用检测（`*-logic.ts` 入口未 import / 未调用即命中）+ 错误信息缺 `[schema]` 前缀检测 + [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单（21 份） |
 | #29（BDD 建模不符未回退） | [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) D4 等价性校验（退出码 0 才算通过） |
 | #30（豁免审批跳步） | `check-exemption` E1-E9 全通过（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实）+ FM-EXEMPT-01~05 检测 |
 | #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/cli/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |

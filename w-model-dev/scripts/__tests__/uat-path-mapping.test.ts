@@ -1,5 +1,5 @@
 /**
- * uat-path-mapping.test.ts —— lib/uat-path-mapping.ts 解析与校验单元测试
+ * uat-path-mapping.test.ts —— application/uat-path-mapping.ts 解析与校验单元测试
  *
  * 覆盖：
  *   - parseUatPathMappingFromContent：合法表解析 / 畸形行（单元格数 <4）/ 空单元格 / 无有效映射行

@@ -47,3 +47,28 @@ Blocked outside the permitted scope:
 ## Behavior preservation
 
 No schema content, gate decision logic, package configuration, hook behavior, or security baseline was changed. The migration preserves existing exports and call behavior while separating runtime layers.
+
+---
+
+## Review remediation — round 1 of 5
+
+### Closed findings
+
+1. **TypeDoc API preservation**: `docs:build` now includes `w-model-dev/scripts/infrastructure`. `schema-loader.ts` documents its public `validateBySchema` function and `SchemaValidationResult` interface, and the generated API output includes both symbols.
+2. **Runtime import classification**: dependency-boundaries now uses the TypeScript AST for import/export declarations. It distinguishes declaration-level and named type-only specifiers, including `import { type T }`, mixed value/type imports, and type-only/mixed re-exports. Only declarations containing a runtime specifier form runtime graph edges.
+3. **Model child-process entry paths**: `runModelChecks` resolves TLA+/BDD scripts explicitly through `../cli/`. The regression test asserts the exact CLI entry paths and verifies the files exist before checking the bounded spawn options.
+4. **Migration terminology**: stale script comments now refer to `application/` and `infrastructure/` rather than the old `lib/` and `logic/` locations.
+
+### Additional TDD evidence
+
+- Before the remediation, the added AST fixture classified `import { type NamedType }` as a runtime dependency, and the added model-check regression received nonexistent `scripts/application/check-*.ts` arguments.
+- Both tests passed after the minimal implementation changes.
+
+### Round-1 validation
+
+- Focused review regression suite: 5 files / 50 tests passed.
+- `npm run typecheck` passed.
+- `npm run lint:security` passed with 0 new findings.
+- `npm run docs:build` passed and generated public pages for `validateBySchema` and `SchemaValidationResult` (33 existing TypeDoc warnings remain).
+- Full `npm test` ran 53 files / 856 tests: 855 passed; the sole failing docs-consistency fixture is the known 52/853 live-count drift and is outside this round's permitted hook/docs-consistency scope.
+- `npm run prepush` reached the coverage gate; all preceding checks passed, and coverage exited 1 because the same docs-consistency count drift is included in the coverage run. The drift is recorded rather than changing hook, baseline, or docs-consistency files.
