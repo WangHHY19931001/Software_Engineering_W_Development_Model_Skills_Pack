@@ -77,6 +77,16 @@ function cliSummary(stdout: string): Record<string, unknown> {
 }
 
 describe('evidence export logic', () => {
+  it.each([[[]], [['--d4-invalid-argument']], [['--verify']]])(
+    'returns structured exit 2 for invalid argument set %j without creating an output directory',
+    (args) => {
+      const result = runCli(args);
+      expect(result.code).toBe(2);
+      const line = result.stdout.split(/\r?\n/).find((entry) => entry.startsWith('ERROR_JSON '));
+      expect(line).toBeDefined();
+      expect(JSON.parse(line!.slice('ERROR_JSON '.length))).toMatchObject({ exitCode: 2 });
+    },
+  );
   it('exports allowlisted runtime records with stable kinds, sorted paths, and verifiable hashes', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');

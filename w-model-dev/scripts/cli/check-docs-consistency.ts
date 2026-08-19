@@ -29,11 +29,12 @@
  * @module
  */
 
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve as pathResolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
@@ -126,6 +127,67 @@ function detectScriptsChanges(root: string): boolean {
  * 读取根目录 .eslintsecurity-baseline.json 的指纹条目数。
  * 返回：-1 = 缺失或不可解析；0 = 存在但 entries 为空；>0 = 正常指纹条目数。
  */
+interface Exit2Probe {
+  script: string;
+  args: string[];
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+/**
+ * 唯一 exit-2 事实源：每个候选 CLI 的无副作用非法调用。登记只定义如何探测，
+ * 最终计数仅来自真实子进程 status=2 且 ERROR_JSON.exitCode=2 的结果。
+ */
+function collectExit2ScriptCount(root: string, cliScriptFiles: string[]): number {
+  const probeRoot = join(tmpdir(), `w-model-exit2-probe-${process.pid}`);
+  const invalidStatusProject = join(probeRoot, 'invalid-status-project');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
+  mkdirSync(join(invalidStatusProject, '.w-model'), { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
+  writeFileSync(join(invalidStatusProject, '.w-model', 'project.json'), '{', 'utf-8');
+
+  const require = createRequire(import.meta.url);
+  let tsxCli: string;
+  try {
+    tsxCli = require.resolve('tsx/cli');
+  } catch {
+    return 0;
+  }
+  const probes = new Map<string, Exit2Probe>();
+  for (const file of cliScriptFiles) {
+    if (file === 'self-test.ts' || file === 'security-scan.ts') continue;
+    probes.set(file, { script: file, args: ['--d4-invalid-argument'] });
+  }
+  probes.set('security-scan.ts', {
+    script: 'security-scan.ts',
+    args: [],
+    env: { ...process.env, PATH: '', Path: '' },
+  });
+  probes.set('wm-status.ts', { script: 'wm-status.ts', args: [invalidStatusProject] });
+  let count = 0;
+  try {
+    for (const probe of probes.values()) {
+      const scriptPath = join(root, 'w-model-dev', 'scripts', 'cli', probe.script);
+      const result = spawnSync(process.execPath, [tsxCli, scriptPath, ...probe.args], {
+        cwd: probe.cwd ?? root,
+        env: probe.env,
+        encoding: 'utf-8',
+        timeout: 30_000,
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      const jsonLine = String(result.stdout ?? '')
+        .split(/\r?\n/)
+        .find((line) => line.startsWith('ERROR_JSON '));
+      if (result.status !== 2 || jsonLine === undefined) continue;
+      const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as { exitCode?: unknown } | null;
+      if (parsed?.exitCode === 2) count++;
+    }
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+  return count;
+}
+
 function readSecurityBaselineEntryCount(root: string): number {
   const baselinePath = join(root, '.eslintsecurity-baseline.json');
   if (!existsSync(baselinePath)) return -1;
@@ -178,35 +240,80 @@ function findVitestBin(root: string): string | null {
   }
 }
 
-/**
- * 从 vitest JSON outputFile 提取实测用例总数（不 spawn）。
- * 来源：pre-push 第 12 项已全量跑过 vitest 并 `--reporter=json --outputFile=...`，
- * 通过环境变量 WM_VITEST_COUNT_FILE 传入本脚本，直接复用其结果，避免二次全量 vitest。
- * 文件缺失 / 路径不可读 / 无 numTotalTests 字段时返回 null（由调用方决定回退策略）。
- */
-function readVitestCountFile(): number | null {
-  const envFile = process.env.WM_VITEST_COUNT_FILE;
-  if (envFile === undefined || envFile === '') return null;
-  // 绝对路径（含 Windows 盘符路径、WSL 的 /tmp/x）直接用 resolve；未翻译的 MSYS `/tmp/x`（相对 root
-  // 拼接错位，Windows 下 join('D:/repo','/tmp/x') → 'D:\\repo\\tmp\\x'）视为不可用回退 spawn。
-  // Git Bash 下 pre-push 已用 cygpath -w 把 /tmp 翻译成 Windows 路径，故走 isAbsolute 分支。
-  const filePath = isAbsolute(envFile) || /^[a-zA-Z]:[\\/]/.test(envFile) ? pathResolve(envFile) : null;
-  if (filePath === null || !existsSync(filePath)) return null;
-  try {
-    const parsed = parseJsonSafe(readFileSync(filePath, 'utf-8')) as {
-      numTotalTests?: unknown;
-    } | null;
-    if (parsed !== null && typeof parsed.numTotalTests === 'number' && Number.isFinite(parsed.numTotalTests)) {
-      return parsed.numTotalTests;
-    }
-  } catch {
-    // 解析失败 → 回退到显式 spawn（conservative）
+interface VitestMeasurements {
+  testFileCount: number;
+  vitestTestCount: number;
+  numPassedTests: number;
+  numFailedTests: number;
+  success: boolean;
+  valid: boolean;
+  reason?: string;
+}
+
+function invalidVitestMeasurements(reason: string): VitestMeasurements {
+  return {
+    testFileCount: -1,
+    vitestTestCount: -1,
+    numPassedTests: -1,
+    numFailedTests: -1,
+    success: false,
+    valid: false,
+    reason,
+  };
+}
+
+/** 同一 JSON 是动态文件数、测试数和执行成功状态的不可分割事实包。 */
+function parseVitestMeasurements(value: unknown): VitestMeasurements {
+  if (value === null || typeof value !== 'object') return invalidVitestMeasurements('JSON 根必须为对象');
+  const record = value as Record<string, unknown>;
+  const { testResults, numTotalTests, numPassedTests, numFailedTests, success } = record;
+  const counts = [numTotalTests, numPassedTests, numFailedTests];
+  if (!Array.isArray(testResults)) return invalidVitestMeasurements('testResults 必须为数组');
+  if (
+    !counts.every(
+      (count) => typeof count === 'number' && Number.isFinite(count) && Number.isInteger(count) && count >= 0,
+    )
+  ) {
+    return invalidVitestMeasurements('测试计数字段必须为有限非负整数');
   }
-  return null;
+  if (typeof success !== 'boolean') return invalidVitestMeasurements('success 必须为布尔值');
+  const measurements = {
+    testFileCount: testResults.length,
+    vitestTestCount: numTotalTests as number,
+    numPassedTests: numPassedTests as number,
+    numFailedTests: numFailedTests as number,
+    success,
+  };
+  if (
+    measurements.success !== true ||
+    measurements.numFailedTests !== 0 ||
+    measurements.numPassedTests !== measurements.vitestTestCount
+  ) {
+    return { ...measurements, valid: false, reason: 'success 必须为 true、失败数为 0 且 passed 必须等于 total' };
+  }
+  return { ...measurements, valid: true };
 }
 
 /**
- * 采集 vitest 实际运行输出的用例总数（堵住只查文件数不查用例总数的盲区）。
+ * 从 Vitest JSON outputFile 提取完整实测事实包（不 spawn）。
+ * 来源：pre-push 第 12 项已全量跑过 vitest 并 `--reporter=json --outputFile=...`，
+ * 通过环境变量 WM_VITEST_COUNT_FILE 传入本脚本，直接复用同一次成功运行的所有字段。
+ */
+function readVitestCountFile(): VitestMeasurements | null {
+  const envFile = process.env.WM_VITEST_COUNT_FILE;
+  if (envFile === undefined || envFile === '') return null;
+  const filePath = isAbsolute(envFile) || /^[a-zA-Z]:[\\/]/.test(envFile) ? pathResolve(envFile) : null;
+  if (filePath === null || !existsSync(filePath)) return null;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- explicit external evidence path from WM_VITEST_COUNT_FILE
+    return parseVitestMeasurements(parseJsonSafe(readFileSync(filePath, 'utf-8')));
+  } catch {
+    return invalidVitestMeasurements('无法读取或解析 WM_VITEST_COUNT_FILE');
+  }
+}
+
+/**
+ * 采集 Vitest 完整运行事实包（堵住只查文件数或用例总数的盲区）。
  * 优先级（快路径优先，避免重复全量 vitest）：
  *   1. 环境变量 WM_VITEST_COUNT_FILE 指向的 vitest JSON outputFile（pre-push 第 12 项复用）→ 直接读取，不 spawn；
  *   2. 未提供可用 JSON 时，一律显式 spawn Vitest 采集（不以 scriptsChanged 跳过）。
@@ -221,35 +328,34 @@ function readVitestCountFile(): number | null {
  * 默认 include 会扫全树，嵌套 git worktree（.worktrees/**）下的测试文件将被重复计数
  * （实测根仓库 + worktree 双份 554 → 1108），导致 vitest-tests 门禁误报。
  */
-function collectVitestTestCount(root: string): number {
+function collectVitestMeasurements(root: string): VitestMeasurements {
   const fromFile = readVitestCountFile();
   if (fromFile !== null) return fromFile;
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
-  const r =
-    vitestBin !== null
-      ? spawnSync(process.execPath, [vitestBin, ...vitestArgs], {
-          cwd: root,
-          encoding: 'utf-8',
-          timeout: 180_000,
-          maxBuffer: 64 * 1024 * 1024,
-        })
-      : spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
-          cwd: root,
-          encoding: 'utf-8',
-          timeout: 180_000,
-          maxBuffer: 64 * 1024 * 1024,
-          shell: true,
-        });
+  if (vitestBin !== null) {
+    spawnSync(process.execPath, [vitestBin, ...vitestArgs], {
+      cwd: root,
+      encoding: 'utf-8',
+      timeout: 180_000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } else {
+    spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
+      cwd: root,
+      encoding: 'utf-8',
+      timeout: 180_000,
+      maxBuffer: 64 * 1024 * 1024,
+      shell: true,
+    });
+  }
   // 无论 spawn 是否报错（含 maxBuffer 超限 / vitest 失败），先尝试读 JSON 落盘文件
   try {
-    const parsed = parseJsonSafe(readFileSync(outFile, 'utf-8')) as { numTotalTests?: unknown } | null;
-    if (parsed !== null && typeof parsed.numTotalTests === 'number' && Number.isFinite(parsed.numTotalTests)) {
-      return parsed.numTotalTests;
-    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- process-owned OS temp output path
+    return parseVitestMeasurements(parseJsonSafe(readFileSync(outFile, 'utf-8')));
   } catch {
-    // 落盘失败（vitest 未启动 / 超时被杀 / 文件不完整）→ 回退 stdout 文本解析
+    return invalidVitestMeasurements('Vitest JSON 未生成或不可解析');
   } finally {
     try {
       rmSync(outFile, { force: true });
@@ -257,8 +363,6 @@ function collectVitestTestCount(root: string): number {
       // 临时文件清理失败不影响结果
     }
   }
-  const textMatch = `${r.stdout ?? ''}${r.stderr ?? ''}`.match(/Tests\s+(\d+)\s+passed/);
-  return textMatch ? Number(textMatch[1]) : -1;
 }
 
 async function main(): Promise<void> {
@@ -279,6 +383,7 @@ async function main(): Promise<void> {
     return;
   }
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- REQUIRED_PATHS and document inventories are repository-controlled
   const read = (p: string): string => readFileSync(join(root, p), 'utf-8');
   const schemaFiles = readdirSync(join(root, 'w-model-dev/schemas'))
     .filter((f) => f.endsWith('.schema.json'))
@@ -288,16 +393,17 @@ async function main(): Promise<void> {
   const cliScriptFiles = readdirSync(join(root, 'w-model-dev/scripts/cli'))
     .filter((f) => f.endsWith('.ts'))
     .sort();
-  const checkScriptCount = cliScriptFiles.filter((f) => /^check-.*\.ts$/.test(f)).length; // 含 check-docs-consistency 自身 = 26（cli/ 层）
-  /** 非 check-* 但可 exit 2 的脚本数（7 个工具 CLI（ensure-codegraph-opsx / metrics-report / security-scan / wm-status / wm-write / doctor / plan-chunks），全数位于 cli/；self-test.ts 非 exit-2 不计入） */
-  const TOOL_CLI_EXIT2_COUNT = 7;
-  const exit2ScriptCount = checkScriptCount + TOOL_CLI_EXIT2_COUNT; // = 33（「33 个脚本」表述来源）
+  const exit2ScriptCount = collectExit2ScriptCount(root, cliScriptFiles);
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
-  const testFileCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
+  // 目录枚举仅用于 inventory 诊断；活体 Vitest 文件/用例计数必须来自同一份 JSON 事实包。
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled test inventory path
+  const testDirectoryInventoryCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),
   ).length;
+  const vitestMeasurements = collectVitestMeasurements(root);
+  const testFileCount = vitestMeasurements.testFileCount;
+  const vitestTestCount = vitestMeasurements.vitestTestCount;
   const scriptsChanged = detectScriptsChanges(root);
-  const vitestTestCount = collectVitestTestCount(root);
 
   // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md + SSoT（核心导航文档集）
   const referenceFiles = readdirSync(join(root, 'w-model-dev/references'))
@@ -329,6 +435,10 @@ async function main(): Promise<void> {
     exit2ScriptCount,
     dataModels: read('w-model-dev/references/data-models.md'),
     schemaInventoryDocs: [
+      { name: 'README.md', content: read('README.md') },
+      { name: 'AGENTS.md', content: read('AGENTS.md') },
+      { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
+      { name: 'docs/INSTALL.md', content: installDocText },
       { name: 'SSoT', content: read('docs/skill-design-document_SSoT.md') },
       { name: 'SKILL.md', content: read('w-model-dev/SKILL.md') },
       { name: 'anti-patterns.md #28', content: read('w-model-dev/references/anti-patterns.md') },
@@ -362,6 +472,12 @@ async function main(): Promise<void> {
     designDocs,
     testFileCount,
     vitestTestCount,
+    vitestMeasurementsValid: vitestMeasurements.valid,
+    vitestMeasurementsReason: vitestMeasurements.reason,
+    vitestPassedCount: vitestMeasurements.numPassedTests,
+    vitestFailedCount: vitestMeasurements.numFailedTests,
+    vitestSuccess: vitestMeasurements.success,
+    testDirectoryInventoryCount,
     a4Docs: {
       ssot: read('docs/skill-design-document_SSoT.md'),
       skill: read('w-model-dev/SKILL.md'),

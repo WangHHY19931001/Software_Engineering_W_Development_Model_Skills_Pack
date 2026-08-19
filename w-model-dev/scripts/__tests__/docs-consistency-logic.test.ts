@@ -733,22 +733,55 @@ describe('runDocConsistencyChecks', () => {
     expect(violations.some((x) => x.check === 'vitest-tests')).toBe(true);
   });
 
-  it('coverage JSON 的 54/875 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
+  it('所有 D4 Schema 声明文档各自 22→21 时均报 schema-list', () => {
+    const schemaFiles = Array.from({ length: 22 }, (_, index) => `schema-${index + 1}.schema.json`);
+    const inventoryDocs = [
+      'README.md',
+      'AGENTS.md',
+      'CONTRIBUTING.md',
+      'docs/INSTALL.md',
+      'SSoT',
+      'docs/user-guide.md',
+      'SKILL.md',
+      'anti-patterns.md #28',
+      'anti-patterns.md #28 检测信号',
+    ];
+    for (const staleName of inventoryDocs) {
+      const report = buildDocConsistencyReport(
+        baseInput({
+          schemaFiles,
+          dataModels: '### Schema 清单（22 份）',
+          schemaInventoryDocs: inventoryDocs.map((name) => ({
+            name,
+            content: name === staleName ? 'JSON Schema 清单（21 份）' : 'JSON Schema 清单（22 份）',
+          })),
+        }),
+      );
+      expect(
+        report.violations.some(
+          (violation) => violation.check === 'schema-list' && violation.message.includes(staleName),
+        ),
+        `${staleName} 的旧 Schema 数必须被拒绝`,
+      ).toBe(true);
+    }
+  });
+
+  it('coverage JSON 的 54/882 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 875);
-      expect([coverage.testResults.length, coverage.numTotalTests]).toEqual([54, 875]);
+      const coverage = await writeVitestCount(fixtureRoot, 882);
+      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([54, 882]);
       const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push'];
       for (const doc of docsWithLiveCount) {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('875');
+        expect(docContent).toContain('882');
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, passing.stdout).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 875');
+      expect(passing.stdout).toContain('vitest 用例  : 882');
       expect(passing.stdout).toContain('静态违规      : 0');
       expect(passing.stdout).toContain('动态违规      : 0');
       expect(passing.stdout).not.toContain('[vitest-tests]');
@@ -757,13 +790,33 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('54 files / 875 tests', '54 files / 787 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('54 files / 882 tests', '54 files / 787 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 875');
+      expect(stale.stdout).toContain('vitest 用例  : 882');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
       expect(stale.stdout).toContain('54 files / 787 tests');
+    });
+  });
+
+  it('CLI 注入 testResults=[] 的 coverage JSON 时以 JSON 文件数为准，不能由目录枚举掩盖', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 882, { testResults: [] });
+      const result = runDocsConsistencyCli(fixtureRoot);
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain('test 文件    : 0');
+      expect(result.stdout).toContain('[vitest-files]');
+    });
+  });
+
+  it('CLI 拒绝 failed 或 success=false 的 coverage JSON，而不是只提取总用例数', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 882, { numPassedTests: 874, numFailedTests: 1, success: false });
+      const result = runDocsConsistencyCli(fixtureRoot);
+      expect(result.code).toBe(1);
+      expect(result.stdout).toMatch(/\[vitest-(tests|results)\]/);
+      expect(result.stdout).toMatch(/失败|不可采信|success/);
     });
   });
 
@@ -1338,12 +1391,23 @@ function runDocsConsistencyCli(
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-async function writeVitestCount(fixtureRoot: string, count: number) {
+async function writeVitestCount(
+  fixtureRoot: string,
+  count: number,
+  overrides: Partial<{
+    testResults: unknown;
+    numPassedTests: unknown;
+    numFailedTests: unknown;
+    success: unknown;
+  }> = {},
+) {
   const coverage = {
-    testResults: Array.from({ length: 54 }),
+    testResults: Array.from({ length: 54 }) as unknown[],
     numTotalTests: count,
     numPassedTests: count,
     numFailedTests: 0,
+    success: true,
+    ...overrides,
   };
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
   await fs.writeFile(path.join(fixtureRoot, 'vitest-results.json'), JSON.stringify(coverage), 'utf-8');
@@ -1373,17 +1437,47 @@ describe('D4 动态元数据和本地证据文档治理', () => {
   });
 
   it('dynamic measurements 保留顶层兼容 violations 字段并分组 dynamic drift', () => {
-    const input = baseInput({ testFileCount: 41, vitestTestCount: 531 });
+    const input = baseInput({ testFileCount: 41, vitestTestCount: 531, exit2ScriptCount: 34 });
     const report = buildDocConsistencyReport(input);
 
     expect([...report.staticViolations, ...report.dynamicViolations]).toEqual(report.violations);
     expect(report.dynamicMeasurements).toMatchObject({
       schemaCount: 5,
       cliScriptCount: CLI_SCRIPT_NAMES.length,
+      exit2ScriptCount: 34,
       testFileCount: 41,
       vitestTestCount: 531,
     });
     expect(report.dynamicViolations.some((x) => x.check === 'vitest-files')).toBe(true);
+  });
+
+  it('每份本地证据文档分别缺安全审阅、自动发布边界或 archive 边界时均为 static violation', () => {
+    const fullContract =
+      'coverage/ .zcode/ .w-model/ Git 忽略 默认不随 Git 交付 npm run wm:export-evidence -- <project-dir> <output-dir> 脱敏 SHA-256 安全策略审阅 不会自动提交或发布 docs/changes/archive/ 与 .w-model/ 边界';
+    const docs = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', 'SKILL.md', 'command-reference.md'];
+
+    for (const [token, label] of [
+      ['安全策略审阅', '安全审阅'],
+      ['不会自动提交或发布', '自动发布边界'],
+      ['docs/changes/archive/', 'archive 边界'],
+    ] as const) {
+      for (const name of docs) {
+        const report = buildDocConsistencyReport(
+          baseInput({
+            localEvidenceDocs: docs.map((docName) => ({
+              name: docName,
+              content: docName === name ? fullContract.replace(token, '') : fullContract,
+            })),
+          }),
+        );
+        expect(
+          report.staticViolations.some(
+            (violation) => violation.check === 'local-evidence-artifacts' && violation.message.includes(name),
+          ),
+          `${name} 缺${label}必须被拒绝`,
+        ).toBe(true);
+      }
+    }
   });
 });
 

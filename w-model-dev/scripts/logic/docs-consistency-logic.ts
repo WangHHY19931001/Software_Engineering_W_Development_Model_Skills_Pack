@@ -80,7 +80,7 @@ export interface DocConsistencyInput {
   schemaFiles: string[];
   /** subagent/ 目录 .md 人格文件数（实测；期望值由 README「N 个人格文件」表述声明） */
   personaCount: number;
-  /** 实测可 exit 2 的 CLI 脚本数（26 个 check-*.ts 含自身 + 7 个工具 CLI（含 cli/plan-chunks.ts）= 33，全数位于 cli/；self-test.ts 非 exit-2 不计入） */
+  /** 实测可 exit 2 的 CLI 脚本数（由每个候选 CLI 的真实无副作用输入错误探针统计；self-test.ts 非 exit-2 不计入） */
   exit2ScriptCount: number;
   /** references/ 目录 .md 文件数（实测；期望值由 SKILL.md「（N 个 .md）」表述声明） */
   referencesCount: number;
@@ -130,6 +130,16 @@ export interface DocConsistencyInput {
   testFileCount: number;
   /** vitest run 实际运行输出的用例总数；-1 = 无法采集（vitest 不可用 / 输出不可解析，此时不校验用例总数） */
   vitestTestCount: number;
+  /** 同一份 Vitest JSON 测量的运行结果完整性；false 时不可用动态计数支撑通过结论。 */
+  vitestMeasurementsValid?: boolean;
+  /** Vitest JSON 缺字段、失败或状态不一致时的确定性原因。 */
+  vitestMeasurementsReason?: string;
+  /** 同一 Vitest JSON 的完整通过/失败状态，供输出审计。 */
+  vitestPassedCount?: number;
+  vitestFailedCount?: number;
+  vitestSuccess?: boolean;
+  /** 目录枚举仅为库存诊断，不能代替 JSON 的 testResults.length。 */
+  testDirectoryInventoryCount?: number;
   /** A4 状态锁 / 平台修复 / batch B 边界的逐文档文本；缺省时跳过（fixture 兼容）。 */
   a4Docs?: A4DocumentationInput;
   /** w-model-dev/scripts 目录下 .ts 文件是否有变更（git diff + porcelain 判定，由 CLI 层注入） */
@@ -213,6 +223,7 @@ export interface DocConsistencyReport {
   dynamicMeasurements: {
     schemaCount: number;
     cliScriptCount: number;
+    exit2ScriptCount?: number;
     testFileCount: number;
     vitestTestCount: number;
   };
@@ -257,6 +268,8 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
       input.agents,
       input.prePush,
       input.vitestExtraDocs,
+      input.vitestMeasurementsValid,
+      input.vitestMeasurementsReason,
     ),
   );
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
@@ -293,8 +306,15 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
     dynamicMeasurements: {
       schemaCount: input.schemaFiles.length,
       cliScriptCount: input.cliScriptFiles.length,
+      exit2ScriptCount: input.exit2ScriptCount,
       testFileCount: input.testFileCount,
       vitestTestCount: input.vitestTestCount,
+      ...(input.vitestPassedCount === undefined ? {} : { vitestPassedCount: input.vitestPassedCount }),
+      ...(input.vitestFailedCount === undefined ? {} : { vitestFailedCount: input.vitestFailedCount }),
+      ...(input.vitestSuccess === undefined ? {} : { vitestSuccess: input.vitestSuccess ? 1 : 0 }),
+      ...(input.testDirectoryInventoryCount === undefined
+        ? {}
+        : { testDirectoryInventoryCount: input.testDirectoryInventoryCount }),
     },
   };
 }
@@ -466,28 +486,24 @@ function checkScriptRegistry(cliScriptFiles: string[], dispatchMatrix: string, s
  */
 function checkLocalEvidenceArtifacts(docs: Array<{ name: string; content: string }>): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  const requiredTokens = [
-    'coverage/',
-    '.zcode/',
-    '.w-model/',
-    'Git 忽略',
-    'npm run wm:export-evidence -- <project-dir> <output-dir>',
-    '脱敏',
-    'SHA-256',
+  const clauses: Array<[string, string[]]> = [
+    ['本地生成物', ['coverage/', '.zcode/', '.w-model/']],
+    ['默认不交付', ['Git 忽略', '默认不随 Git 交付']],
+    ['显式导出命令', ['npm run wm:export-evidence -- <project-dir> <output-dir>']],
+    ['脱敏与哈希', ['脱敏', 'SHA-256']],
+    ['安全审阅', ['安全策略审阅']],
+    ['自动发布边界', ['不会自动提交或发布']],
+    ['归档边界', ['docs/changes/archive/', '.w-model/']],
   ];
   for (const doc of docs) {
-    const missing = requiredTokens.filter((token) => !doc.content.includes(token));
-    if (missing.length > 0) {
-      violations.push({
-        check: 'local-evidence-artifacts',
-        message: `${doc.name} 缺本地生成物/证据导出契约「${missing.join('、')}」`,
-      });
-    }
-    if (doc.name === 'README.md' && !doc.content.includes('docs/changes/archive/')) {
-      violations.push({
-        check: 'local-evidence-artifacts',
-        message: 'README.md 应区分受控 Git 历史归档 docs/changes/archive/ 与本地 .w-model/ 状态',
-      });
+    for (const [clause, tokens] of clauses) {
+      const missing = tokens.filter((token) => !doc.content.includes(token));
+      if (missing.length > 0) {
+        violations.push({
+          check: 'local-evidence-artifacts',
+          message: `${doc.name} 缺本地证据契约「${clause}: ${missing.join('、')}」`,
+        });
+      }
     }
   }
   return violations;
@@ -514,19 +530,17 @@ function checkSchemaList(
     }
   }
   for (const doc of schemaInventoryDocs ?? []) {
-    const declarations = ['Schema 清单', 'schema 清单', 'schema（', 'schemas/`（'];
-    const declaredCounts: number[] = [];
-    for (const declaration of declarations) {
-      for (
-        let start = doc.content.indexOf(declaration);
-        start >= 0;
-        start = doc.content.indexOf(declaration, start + declaration.length)
-      ) {
-        const suffix = doc.content.slice(start + declaration.length, start + declaration.length + 32);
-        const countMatch = suffix.match(/[（\s]*(\d+)\s*份/i);
-        if (countMatch !== null) declaredCounts.push(Number(countMatch[1]));
-      }
-    }
+    const declaredCounts = [
+      ...Array.from(
+        doc.content.matchAll(
+          /(?:JSON\s*Schema|Schema\s*清单|schema\s*清单|schemas\/`|schema)[^\n]{0,80}?[（(]?\s*(\d+)\s*份/gi,
+        ),
+        (match) => Number(match[1]),
+      ),
+      ...Array.from(doc.content.matchAll(/(\d+)\s*份[^\n]{0,80}?(?:JSON\s*Schema|Schema|schema)/gi), (match) =>
+        Number(match[1]),
+      ),
+    ];
     if (declaredCounts.length === 0) {
       violations.push({
         check: 'schema-list',
@@ -756,7 +770,7 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
   return violations;
 }
 
-/** exit-2 脚本数：期望值从 AGENTS.md「N 个脚本」表述解析，与实测（checkScriptCount + TOOL_CLI_EXIT2_COUNT = 26 + 7 = 33）比对。 */
+/** exit-2 脚本数：期望值从 AGENTS.md「N 个脚本」表述解析，与真实 CLI 输入错误契约探针结果比对。 */
 function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const match = agents.match(/(\d+) 个脚本/);
@@ -938,8 +952,16 @@ function checkVitestTestCount(
   agents: string,
   prePush: string,
   extraVitestDocs?: Array<{ name: string; content: string }>,
+  vitestMeasurementsValid?: boolean,
+  vitestMeasurementsReason?: string,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
+  if (vitestMeasurementsValid === false) {
+    violations.push({
+      check: 'vitest-results',
+      message: `Vitest JSON 运行结果不可采信：${vitestMeasurementsReason ?? '缺失完整成功状态'}（fail-closed）`,
+    });
+  }
   if (vitestTestCount < 0) {
     violations.push({
       check: 'vitest-tests',

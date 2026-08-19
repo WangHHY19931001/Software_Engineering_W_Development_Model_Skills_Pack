@@ -31,7 +31,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 105,
+    line: 106,
     symbol: 'detectScriptsChanges',
     reason: 'B4 excludes docs-consistency; git diff probe has no timeout and needs a dedicated follow-up.',
     timeout: { required: true, status: 'missing-followup' },
@@ -39,7 +39,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 114,
+    line: 115,
     symbol: 'detectScriptsChanges',
     reason: 'B4 excludes docs-consistency; git status probe has no timeout and needs a dedicated follow-up.',
     timeout: { required: true, status: 'missing-followup' },
@@ -47,7 +47,15 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 232,
+    line: 171,
+    symbol: 'collectExit2ScriptCount',
+    reason: 'D4 invokes each registered no-side-effect invalid-input probe with an explicit 30-second timeout.',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: 'cli/check-docs-consistency.ts',
+    line: 338,
     symbol: 'collectVitestTestCount',
     reason: 'B4 excludes docs-consistency; direct Node Vitest execution needs its 180-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -55,7 +63,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 238,
+    line: 345,
     symbol: 'collectVitestTestCount',
     reason: 'B4 excludes docs-consistency; shell fallback keeps its 180-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -175,7 +183,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1332,
+    line: 1385,
     symbol: 'runDocsConsistencyCli',
     reason: 'D4 keeps the real docs-consistency CLI boundary test with an explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },

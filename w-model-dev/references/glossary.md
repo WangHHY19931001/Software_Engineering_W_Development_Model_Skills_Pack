@@ -99,7 +99,7 @@
 
 ### exit-2 脚本口径
 
-- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：26 个 check-* + 7 个工具 CLI（含 plan-chunks.ts）= 33。计数变更须同步 docs-consistency-logic EXPECTED。
+- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：26 个 check-* + 8 个工具 CLI（含 wm-export-evidence.ts）= 34；计数由 docs-consistency 的真实输入错误契约探针得出，不维护固定补数。
 - **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
 
 ---
