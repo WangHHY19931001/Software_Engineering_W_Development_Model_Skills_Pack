@@ -358,6 +358,8 @@ async function main(): Promise<void> {
       skill: read('w-model-dev/SKILL.md'),
       dispatchMatrix: read('w-model-dev/references/dispatch-matrix.md'),
       operationalRecovery: read('w-model-dev/references/operational-recovery.md'),
+      dataModels: read('w-model-dev/references/data-models.md'),
+      commandReference: read('w-model-dev/references/command-reference.md'),
       readme: read('README.md'),
       install: installDocText,
       agents: read('AGENTS.md'),

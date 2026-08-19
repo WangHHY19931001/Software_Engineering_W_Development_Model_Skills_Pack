@@ -20,6 +20,8 @@ export interface A4DocumentationInput {
   skill: string;
   dispatchMatrix: string;
   operationalRecovery: string;
+  dataModels: string;
+  commandReference: string;
   readme: string;
   install: string;
   agents: string;
@@ -825,6 +827,8 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
     ['SKILL.md', docs.skill],
     ['dispatch-matrix.md', docs.dispatchMatrix],
     ['operational-recovery.md', docs.operationalRecovery],
+    ['data-models.md', docs.dataModels],
+    ['command-reference.md', docs.commandReference],
   ];
   for (const [name, content] of stateLockDocs) {
     if (!content.includes('<target>.lock') || !content.includes('owner')) {
@@ -833,19 +837,18 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
         message: `${name} 应逐文档声明 <target>.lock 持久目录与 owner 跨进程锁协议`,
       });
     }
-    if (/mtime\s*乐观锁/.test(content) && !content.includes('<target>.lock')) {
+    if (
+      /mtime\s*乐观锁[^。\n]*(?:(?<!不)(?<!非)足以|(?<!不)(?<!非)(?:可|能)(?:以)?(?:保证|处理|解决))[^。\n]*(?:并发|竞争写|竞争|写入)/.test(
+        content,
+      )
+    ) {
       violations.push({
         check: 'a4-state-lock',
-        message: `${name} 不得将仅 mtime 乐观锁描述为并发写入处理（须说明跨进程锁）`,
+        message: `${name} 不得将 mtime 乐观锁描述为足以保证并发、竞争写或并发处理`,
       });
     }
   }
-  for (const [name, content] of [
-    ['SSoT', docs.ssot],
-    ['SKILL.md', docs.skill],
-    ['dispatch-matrix.md', docs.dispatchMatrix],
-    ['operational-recovery.md', docs.operationalRecovery],
-  ] as Array<[string, string]>) {
+  for (const [name, content] of stateLockDocs) {
     if (!content.includes('--lock-timeout') || !content.includes('--recover-stale-lock')) {
       violations.push({
         check: 'a4-state-lock',
@@ -875,9 +878,9 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
       });
     }
     const forbidden = [
-      /pre-push[^。\n]*?(?<!不)(?<!会)自动执行\s*`?npm install/i,
-      /(?<!不)(?<!会)自动补装/,
-      /(?<!不)(?<!会)自动平台修复/,
+      /pre-push\s*自动(?:执行)?\s*npm install/i,
+      /(?<!不)(?<!不会)自动补装/,
+      /(?<!不)(?<!不会)自动平台修复/,
       /自动跑[^\n]*补装/,
     ];
     for (const pattern of forbidden) {

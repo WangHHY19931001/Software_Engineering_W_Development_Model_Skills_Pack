@@ -134,6 +134,10 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       dispatchMatrix: 'wm-write 使用 <target>.lock 与 owner，支持 --lock-timeout 和 --recover-stale-lock。',
       operationalRecovery:
         '状态写使用 <target>.lock 与 owner，不是仅 mtime 乐观锁。--lock-timeout 与 --recover-stale-lock 适用于陈旧锁。',
+      dataModels:
+        '状态写使用 <target>.lock 与 owner；锁内校验 mtime。--lock-timeout 与 --recover-stale-lock 适用于陈旧锁。',
+      commandReference:
+        '所有状态写通过 <target>.lock 与 owner；锁内校验 mtime。--lock-timeout 与 --recover-stale-lock 为 CLI 参数。',
       readme: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
       install: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
       agents: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
@@ -147,31 +151,84 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
 }
 
 describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
-  it('逐文档拒绝审查发现的四类旧语义与混合 Vitest 计数', () => {
-    const input = baseInput({
-      a4Docs: {
-        ...baseInput().a4Docs!,
-        dispatchMatrix: 'wm-write 使用 .bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验。',
-        troubleshooting: 'pre-push 自动执行 npm install --no-audit --no-fund；WSL 自动补装平台依赖。',
-        changelog: '状态写并发协议；显式平台修复；Vitest test-count fail-closed 已完成。',
-      },
-      vitestTestCount: 766,
-      testFileCount: 49,
-      vitestExtraDocs: [{ name: 'docs/INSTALL.md', content: '47 个 test 文件 / 725 条\n49 个 test 文件 / 766 条' }],
-      agents: 'vitest 725 条（47 test files）\nvitest 766 条（49 test files）',
-    });
-    const violations = runDocConsistencyChecks(input);
+  it('逐文档拒绝旧语义、确认新增文档职责，并防止正确文本与旧文本共存绕过', () => {
+    const oldSemantics = runDocConsistencyChecks(
+      baseInput({
+        a4Docs: {
+          ...baseInput().a4Docs!,
+          dispatchMatrix: 'wm-write 使用 .bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验。',
+          troubleshooting: 'pre-push 自动执行 npm install --no-audit --no-fund；WSL 自动补装平台依赖。',
+          changelog: '状态写并发协议；显式平台修复；Vitest test-count fail-closed 已完成。',
+        },
+        vitestTestCount: 766,
+        testFileCount: 49,
+        vitestExtraDocs: [
+          {
+            name: 'docs/INSTALL.md',
+            content: '47 个 test 文件 / 725 条\n49 个 test 文件 / 766 条',
+          },
+        ],
+        agents: 'vitest 725 条（47 test files）\nvitest 766 条（49 test files）',
+      }),
+    );
+    const missingDataModels = runDocConsistencyChecks(
+      baseInput({
+        a4Docs: { ...baseInput().a4Docs!, dataModels: '只说明 mtime。' },
+      }),
+    );
+    const missingCommandReference = runDocConsistencyChecks(
+      baseInput({
+        a4Docs: { ...baseInput().a4Docs!, commandReference: '只说明 CLI。' },
+      }),
+    );
+    const conflictingSemantics = runDocConsistencyChecks(
+      baseInput({
+        a4Docs: {
+          ...baseInput().a4Docs!,
+          operationalRecovery:
+            '状态写使用 <target>.lock 与 owner；mtime 乐观锁足以保证并发写入安全。--lock-timeout 与 --recover-stale-lock。',
+          dataModels:
+            '状态写使用 <target>.lock 与 owner；mtime 乐观锁足以处理竞争写。--lock-timeout 与 --recover-stale-lock。',
+          commandReference:
+            '所有状态写通过 <target>.lock 与 owner；mtime 乐观锁足以保证并发处理。--lock-timeout 与 --recover-stale-lock。',
+          troubleshooting:
+            'pre-push 不自动 npm install；开发者手动 npm install；但 pre-push 自动 npm install，且会自动补装平台依赖；platform-deps:check 和 platform-deps:install 为显式入口。',
+        },
+      }),
+    );
 
-    expect(violations.some((x) => x.check === 'a4-state-lock' && x.message.includes('dispatch-matrix.md'))).toBe(true);
-    expect(violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
+    expect(oldSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('dispatch-matrix.md'))).toBe(
       true,
     );
-    expect(violations.some((x) => x.check === 'a4-batch-b-boundary' && x.message.includes('CHANGELOG.md'))).toBe(true);
-    expect(violations.some((x) => x.check === 'vitest-tests' && x.message.includes('47 个 test 文件 / 725 条'))).toBe(
+    expect(oldSemantics.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
+      true,
+    );
+    expect(oldSemantics.some((x) => x.check === 'a4-batch-b-boundary' && x.message.includes('CHANGELOG.md'))).toBe(
+      true,
+    );
+    expect(oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('47 个 test 文件 / 725 条'))).toBe(
       true,
     );
     expect(
-      violations.some((x) => x.check === 'vitest-tests' && x.message.includes('vitest 725 条（47 test files）')),
+      oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('vitest 725 条（47 test files）')),
+    ).toBe(true);
+    expect(missingDataModels.some((x) => x.check === 'a4-state-lock' && x.message.includes('data-models.md'))).toBe(
+      true,
+    );
+    expect(
+      missingCommandReference.some((x) => x.check === 'a4-state-lock' && x.message.includes('command-reference.md')),
+    ).toBe(true);
+    expect(
+      conflictingSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('operational-recovery.md')),
+    ).toBe(true);
+    expect(conflictingSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('data-models.md'))).toBe(
+      true,
+    );
+    expect(
+      conflictingSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('command-reference.md')),
+    ).toBe(true);
+    expect(
+      conflictingSemantics.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md')),
     ).toBe(true);
   });
 });
@@ -563,7 +620,12 @@ describe('runDocConsistencyChecks', () => {
 
   it('CONTRIBUTING 含过期 vitest 计数（40 files / 623 tests）→ vitest-tests 违规', () => {
     const input = baseInput({
-      vitestExtraDocs: [{ name: 'CONTRIBUTING.md', content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |' }],
+      vitestExtraDocs: [
+        {
+          name: 'CONTRIBUTING.md',
+          content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |',
+        },
+      ],
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
     expect(v.some((x) => x.message.includes('CONTRIBUTING.md') && x.message.includes('40 files / 623 tests'))).toBe(
@@ -574,7 +636,10 @@ describe('runDocConsistencyChecks', () => {
   it('CONTRIBUTING 计数与实测一致 → 零 vitest-tests 违规', () => {
     const input = baseInput({
       vitestExtraDocs: [
-        { name: 'CONTRIBUTING.md', content: '单元测试全量（40 files / 530 tests）。\n（40 个 .test.ts / 530 条）' },
+        {
+          name: 'CONTRIBUTING.md',
+          content: '单元测试全量（40 files / 530 tests）。\n（40 个 .test.ts / 530 条）',
+        },
       ],
     });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
@@ -582,7 +647,12 @@ describe('runDocConsistencyChecks', () => {
 
   it('INSTALL 含过期 vitest 计数（40 个 .test.ts / 623 条）→ vitest-tests 违规（P1-1 复核补充）', () => {
     const input = baseInput({
-      vitestExtraDocs: [{ name: 'docs/INSTALL.md', content: '# vitest 单元测试（40 个 .test.ts / 623 条）' }],
+      vitestExtraDocs: [
+        {
+          name: 'docs/INSTALL.md',
+          content: '# vitest 单元测试（40 个 .test.ts / 623 条）',
+        },
+      ],
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
     expect(v.some((x) => x.message.includes('docs/INSTALL.md') && x.message.includes('40 个 .test.ts / 623 条'))).toBe(
@@ -714,7 +784,9 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('package-lock 根 version 漂移 → version-consistency 违规', () => {
-    const input = baseInput({ lockJson: JSON.stringify({ name: 'x', version: '41.10.0' }) });
+    const input = baseInput({
+      lockJson: JSON.stringify({ name: 'x', version: '41.10.0' }),
+    });
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'version-consistency' && x.message.includes('package-lock.json'))).toBe(true);
   });

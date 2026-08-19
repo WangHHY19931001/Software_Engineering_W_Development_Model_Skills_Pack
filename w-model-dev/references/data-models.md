@@ -284,6 +284,8 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | 锁等待超时 | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1 | 保留原状态，稍后重试或协调 writer |
 | 测试状态冲突 | 应由业务合并逻辑判断 | 以「失败」为优先（保守原则），回阶段 5 返工 |
 
+`mtime` 乐观锁只在 `<target>.lock` 持久目录与可转移 owner 对象建立的跨进程锁内用于版本冲突检测；它**不足以**单独保证并发安全、竞争写处理或并发处理。所有 writer 必须经 `wm-write` 的锁协议串行化。
+
 锁内依次执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；回滚不会直接 copyFile 到目标或直接 unlink 目标。备份保留与恢复均由 `wm-write` 处理。
 
 > 并发写入处理不改变数据模型 schema，仅约定状态写协议。
