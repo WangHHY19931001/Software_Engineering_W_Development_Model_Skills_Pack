@@ -111,6 +111,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.11.0' }),
     metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.11.0' }),
     installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.11.0\n```',
+    lockJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.11.0' }),
     ssot: [
       '### 4A.1 八条核心操作行为',
       '8 条核心操作行为',
@@ -653,7 +654,7 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
   });
 
-  it('版本六处一致 → 零 version-consistency 违规', () => {
+  it('版本七处一致 → 零 version-consistency 违规', () => {
     expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'version-consistency')).toBe(false);
   });
 
@@ -665,6 +666,18 @@ describe('runDocConsistencyChecks', () => {
     expect(
       v.some((x) => x.check === 'version-consistency' && x.message.includes('README') && x.message.includes('41.2.0')),
     ).toBe(true);
+  });
+
+  it('package-lock 根 version 漂移 → version-consistency 违规', () => {
+    const input = baseInput({ lockJson: JSON.stringify({ name: 'x', version: '41.10.0' }) });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'version-consistency' && x.message.includes('package-lock.json'))).toBe(true);
+  });
+
+  it('lockJson 缺省注入 → 不产生 package-lock version 违规', () => {
+    const input = baseInput({ lockJson: undefined });
+    const v = runDocConsistencyChecks(input);
+    expect(v.some((x) => x.check === 'version-consistency' && x.message.includes('package-lock.json'))).toBe(false);
   });
 
   it('package.json 为唯一源：其版本漂移导致其余四处报违规（自身不再直接报）', () => {

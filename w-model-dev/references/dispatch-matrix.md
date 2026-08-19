@@ -295,7 +295,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 | 脚本 | 类别 | 用途 | 触发时机 |
 |---|---|---|---|
-| check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本六处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
+| check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本七处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
 | check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
 | security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
 | self-test | 工具 | 256 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |

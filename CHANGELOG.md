@@ -10,13 +10,20 @@
 ## [41.19.0] - 2026-08-19
 
 ### 修复（核查报告 2026-08-19 六项问题）
-
 - **P1-1 文档数字漂移**：CONTRIBUTING 门禁表 vitest 计数 40/623 → 47/723（与同文件 :214 自相矛盾修复）；docs/INSTALL.md :83/:248 同类漂移一并修正（复核补充）；PR 模板「14 项」→「17 项」；docs-consistency 新增 `vitestExtraDocs` / `prTemplate` 可选输入（checkVitestTestCount 参数化 + checkPrTemplatePrePushCount），堵住 REQUIRED_PATHS 未覆盖 CONTRIBUTING/INSTALL/PR 模板的盲区；CONTRIBUTING 版本机制「五处」→「六处」同步
 - **P1-2 typecheck 门禁**：package.json 新增 `typecheck` script；pre-push 第 17 项 `npx tsc -p config/tsconfig.json`（对齐 SSoT §10H.5 V1）——README 健康指标「tsc 0 错误」由手动验证升级为自动化门禁
 - **P1-3 IDE 产物出库**：`.trae-html-share-packages/` 移出版本控制并加入 .gitignore（会话生成物，非仓库资产）
 - **P1-4 依赖可复现**：package-lock.json 入库（.gitignore 移除忽略行），不同环境 install 结果与 npm audit 行为可复现
 - **P2-1 纯 Windows 警告升级**：pre-push 无 bash 环境时黄色 ⚠ 升级为红色 ✗ + 「本次推送未执行 17 项门禁」明示 + 补跑指引（保留 exit 0 刻意妥协）
 - **P2-2 PR 模板强化**：校验要点改可勾选清单 + 新增「门禁输出」节要求附 prepush 末尾摘要（远程 runner 仍受限，不加 GitHub Actions）
+
+### 修订（发布后延后项处理）
+- version-bump / version-consistency 纳入 package-lock.json 根 version（版本六处 → 七处；防 lock 漂移脏 diff 复发）
+- version-bump 顺带刷新 skill-metadata.json updatedAt
+- README 健康指标日期更新为 2026-08-19 实测
+- docs-consistency CLI 消除 docs/INSTALL.md 重复读取
+- pre-push 第 17 项注释括号平衡（纯注释）
+- 计划文档残留 grep 验证排除表补 __tests__/logic/cli 源
 
 ## [41.18.0] - 2026-08-18
 

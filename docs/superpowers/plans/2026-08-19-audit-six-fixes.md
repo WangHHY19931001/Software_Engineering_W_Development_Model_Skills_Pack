@@ -554,7 +554,7 @@ Expected: 再生后第二次运行 exit 0。若第一次就 exit 0 则跳过再�
 - [ ] **Step 7: 残留 grep 验证**
 
 ```bash
-git grep -nE "717|623" -- ':!CHANGELOG.md' ':!CHANGELOG-archive.md' ':!docs/changes' ':!docs/superpowers' ':!.eslintsecurity-baseline.json' ':!w-model-dev/scripts/samples'
+git grep -nE "717|623" -- ':!CHANGELOG.md' ':!CHANGELOG-archive.md' ':!docs/changes' ':!docs/superpowers' ':!.eslintsecurity-baseline.json' ':!w-model-dev/scripts/samples' ':!w-model-dev/scripts/__tests__' ':!w-model-dev/scripts/logic' ':!w-model-dev/scripts/cli'
 git grep -n "14 项" -- ':!CHANGELOG.md' ':!CHANGELOG-archive.md' ':!docs/changes' ':!docs/superpowers'
 git grep -nE "版本号五处|门禁校验五处" -- CONTRIBUTING.md
 ```

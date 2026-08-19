@@ -53,6 +53,8 @@ export interface DocConsistencyInput {
   installDoc: string;
   /** CHANGELOG.md 原文（version 一致性检查数据源：首个 `## [<ver>]` 头须 == 当前版本） */
   changelog: string;
+  /** package-lock.json 原文（version 一致性检查数据源：顶层「根 version」；可选——缺省跳过 lock 版本检查；CLI 层注入） */
+  lockJson?: string;
   /** w-model-dev/references/dispatch-matrix.md 原文（script-registry 检查数据源：门禁脚本权威登记表） */
   dispatchMatrix: string;
   /** w-model-dev/scripts/cli/ 下全部 .ts 文件名（实测；script-registry 检查数据源） */
@@ -171,6 +173,7 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
       input.readme,
       input.installDoc,
       input.changelog,
+      input.lockJson,
     ),
   );
   violations.push(...checkSsotHeadings(input.ssot));
@@ -211,13 +214,13 @@ function extractChangelogVersion(changelog: string): string | null {
 }
 
 /**
- * 版本号六处一致性校验（堵住 README/INSTALL/CHANGELOG 版本漂移盲区）：
+ * 版本号七处一致性校验（含 package-lock.json 根 version）（堵住 README/INSTALL/CHANGELOG 版本漂移盲区）：
  * CONTRIBUTING.md「数字一致性」约束的自动化落地——package.json 为版本唯一源，
  * skill-metadata.json / SKILL.md frontmatter / README「当前版本」行 / docs/INSTALL.md 激活示例
- * / CHANGELOG.md 首个版本节头 五处声明必须全部等于 package.json 解析值。任一处缺失/不可解析/不一致
- * 即报违规（fail loud，不静默放行）。版本提升用 `npm run version:bump`（scripts/version-bump.cjs）一处改版，
- * 脚本同步五处文档 + 插 CHANGELOG 节头。注意：version 字段为字符串比较，不做 semver 归一化——任何细微差异
- * （如 41.5.0 写成 41.5.10）都会被捕获，符合「防漂移」定位。
+ * / CHANGELOG.md 首个版本节头 / package-lock.json 根 version 六处声明必须全部等于 package.json 解析值。
+ * 任一处缺失/不可解析/不一致即报违规（fail loud，不静默放行）。版本提升用 `npm run version:bump`
+ * （scripts/version-bump.cjs）一处改版，脚本同步六处文档 + 插 CHANGELOG 节头。注意：version 字段为
+ * 字符串比较，不做 semver 归一化——任何细微差异（如 41.5.0 写成 41.5.10）都会被捕获，符合「防漂移」定位。
  */
 function checkVersionConsistency(
   pkgJson: string,
@@ -226,6 +229,7 @@ function checkVersionConsistency(
   readme: string,
   installDoc: string,
   changelog: string,
+  lockJson?: string,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const expected = extractJsonVersion(pkgJson);
@@ -243,6 +247,9 @@ function checkVersionConsistency(
     ['docs/INSTALL.md 激活示例', extractYamlVersion(installDoc)],
     ['CHANGELOG.md 首个版本节头', extractChangelogVersion(changelog)],
   ];
+  if (lockJson !== undefined) {
+    sources.push(['package-lock.json 根 version', extractJsonVersion(lockJson)]);
+  }
   for (const [docName, actual] of sources) {
     if (actual === null) {
       violations.push({

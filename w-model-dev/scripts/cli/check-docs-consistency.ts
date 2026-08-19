@@ -314,6 +314,9 @@ async function main(): Promise<void> {
     { name: 'AGENTS.md', content: read('AGENTS.md'), baseDir: '.' },
   ];
 
+  // docs/INSTALL.md 被 installDoc 与 vitestExtraDocs 各消费一次——先读取复用到两处，避免重复 IO
+  const installDocText = read('docs/INSTALL.md');
+
   const input: DocConsistencyInput = {
     schemaFiles,
     personaCount,
@@ -337,13 +340,14 @@ async function main(): Promise<void> {
     prePush: read('.githooks/pre-push'),
     vitestExtraDocs: [
       { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
-      { name: 'docs/INSTALL.md', content: read('docs/INSTALL.md') },
+      { name: 'docs/INSTALL.md', content: installDocText },
     ],
     prTemplate: read('.github/PULL_REQUEST_TEMPLATE.md'),
     changelog: read('CHANGELOG.md'),
     pkgJson: read('package.json'),
     metaJson: read('w-model-dev/skill-metadata.json'),
-    installDoc: read('docs/INSTALL.md'),
+    installDoc: installDocText,
+    lockJson: read('package-lock.json'),
     designDocs,
     testFileCount,
     vitestTestCount,

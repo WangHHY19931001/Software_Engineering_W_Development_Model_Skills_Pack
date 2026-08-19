@@ -18,7 +18,7 @@
 | design-contract-logic.test.ts | DesignContract | D8 多路由不同状态码无交叉污染 / D9 路由未找到报 D2/D3/D4 / D9 路径归一化（尾部斜杠·query）/ null·undefined 输入失败 |
 | doctor-logic.test.ts | Doctor | parseJavaMajor（8/11/17/21/未知格式）/ deriveDoctorExitCode（fail 阻断·warn 放行）/ checkEnvironment：全绿 exit 0·node<18 fail·tsx 缺失 fail·java 默认 warn 且 --with-tla 升 fail·tla2tools 双态·codegraph/openspec 可选 warn |
 | java-version.test.ts | Java | parseJavaMajor 单一事实源（lib/java-version.ts）：Java 8 旧式（1.8.x→8）/ 11/17/21 新式 / 无法解析返回 null |
-| docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 33 / pre-push 16 / vitest 47）/ 版本六处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#48 / baseline-sync |
+| docs-consistency-logic.test.ts | DocConsistency | 活体文档计数（schema 20 / references 53 / persona 28 / exit2 33 / pre-push 16 / vitest 47）/ 版本七处一致 / targetKind 废弃标记 / DoD 七维度 / 反模式区间 #1~#48 / baseline-sync |
 | exemption-logic.test.ts | Exemption | E1 schema / E2 justification≥20 / E3 evidence 非空 / E4 review 完整 / E5 reviewDecision=approve / E6 rootCauseAnalysis≥30 / E7 verified=true / E8 humanDecision=approve / E9 时间戳时序 / 四阶段全通过 stage=complete |
 | gate-enhancement.test.ts | Gate | basePath 强制 / SD 覆盖率 / passed↔qualityLevel / phase 三段语义 |
 | gate-log-writer.test.ts | CLI IO | writeGateLog 写入 gate-logs/<timestamp>-<script>.json（pretty JSON）/ 目录不可写静默不抛 |

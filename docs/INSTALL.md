@@ -80,7 +80,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 7 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph-opsx / wm-write / doctor / plan-chunks；exit-2 脚本口径 = 26 check + 7 工具 CLI = 33，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks-logic.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
-│   └── __tests__/      # vitest 单元测试（47 个 .test.ts / 723 条 + README.md coverage 矩阵）
+│   └── __tests__/      # vitest 单元测试（47 个 .test.ts / 725 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -245,7 +245,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，47 个 test 文件 / 723 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，47 个 test 文件 / 725 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
