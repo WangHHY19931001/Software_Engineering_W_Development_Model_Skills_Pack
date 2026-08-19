@@ -1,12 +1,14 @@
 import { spawnSync, type SpawnSyncOptions, type SpawnSyncReturns } from 'node:child_process';
 
+import * as ts from 'typescript';
+
 export const DEFAULT_SYNC_TIMEOUT_MS = 15_000;
 export const DEFAULT_SYNC_MAX_BUFFER = 64 * 1024 * 1024;
 
 /** Callers may tune safe execution settings but cannot weaken process termination or output typing. */
 export type RunSyncOptions = Omit<SpawnSyncOptions, 'encoding' | 'killSignal'>;
 
-type DirectSyncApi = 'spawnSync' | 'execSync' | 'execFileSync';
+export type DirectSyncApi = 'spawnSync' | 'execSync' | 'execFileSync';
 type SyncProcessException = {
   api: DirectSyncApi;
   file: string;
@@ -187,6 +189,120 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     timeout: { required: true, status: 'missing-followup' },
   },
 ];
+
+export interface SynchronousChildProcessCall {
+  api: DirectSyncApi;
+  file: string;
+  line: number;
+}
+
+export interface SynchronousChildProcessAuditViolation {
+  file: string;
+  line: number;
+  message: 'dynamic child_process property access cannot be safely audited';
+}
+
+export interface SynchronousChildProcessAudit {
+  calls: SynchronousChildProcessCall[];
+  violations: SynchronousChildProcessAuditViolation[];
+}
+
+const SYNC_APIS = new Set<DirectSyncApi>(['spawnSync', 'execSync', 'execFileSync']);
+const CHILD_PROCESS_MODULES = new Set(['node:child_process', 'child_process']);
+
+function isSyncApi(name: string): name is DirectSyncApi {
+  return SYNC_APIS.has(name as DirectSyncApi);
+}
+
+function isChildProcessModule(moduleSpecifier: ts.Expression): boolean {
+  return ts.isStringLiteral(moduleSpecifier) && CHILD_PROCESS_MODULES.has(moduleSpecifier.text);
+}
+
+function childProcessPropertyName(expression: ts.ElementAccessExpression): DirectSyncApi | undefined {
+  const argument = expression.argumentExpression;
+  if (argument === undefined) return undefined;
+  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) {
+    return isSyncApi(argument.text) ? argument.text : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Parses one TypeScript source file and inventories synchronous child_process API calls.
+ * Imports, aliases, namespace access, and static element access resolve to stable call
+ * records. Non-literal namespace element access is reported rather than ignored.
+ */
+export function auditSynchronousChildProcessSource(source: string, file: string): SynchronousChildProcessAudit {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const directBindings = new Map<string, DirectSyncApi>();
+  const namespaceBindings = new Set<string>();
+  const calls: SynchronousChildProcessCall[] = [];
+  const violations: SynchronousChildProcessAuditViolation[] = [];
+
+  const addCall = (api: DirectSyncApi, node: ts.Node): void => {
+    calls.push({ api, file, line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1 });
+  };
+  const addDynamicViolation = (node: ts.Node): void => {
+    violations.push({
+      file,
+      line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+      message: 'dynamic child_process property access cannot be safely audited',
+    });
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !isChildProcessModule(statement.moduleSpecifier)) continue;
+    const clause = statement.importClause;
+    if (clause === undefined || clause.namedBindings === undefined) continue;
+    if (ts.isNamespaceImport(clause.namedBindings)) {
+      namespaceBindings.add(clause.namedBindings.name.text);
+      continue;
+    }
+    for (const element of clause.namedBindings.elements) {
+      const imported = element.propertyName?.text ?? element.name.text;
+      if (isSyncApi(imported)) directBindings.set(element.name.text, imported);
+    }
+  }
+
+  const inspectVariableDeclaration = (node: ts.VariableDeclaration): void => {
+    if (!ts.isObjectBindingPattern(node.name) || node.initializer === undefined || !ts.isIdentifier(node.initializer))
+      return;
+    if (!namespaceBindings.has(node.initializer.text)) return;
+    for (const element of node.name.elements) {
+      const property = element.propertyName?.getText(sourceFile) ?? element.name.getText(sourceFile);
+      if (isSyncApi(property)) directBindings.set(element.name.getText(sourceFile), property);
+    }
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) inspectVariableDeclaration(node);
+
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      if (ts.isIdentifier(expression)) {
+        const api = directBindings.get(expression.text);
+        // eslint-disable-next-line security/detect-possible-timing-attacks -- AST symbol classification, not a secret comparison
+        if (api !== undefined) addCall(api, node);
+      } else if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
+        if (namespaceBindings.has(expression.expression.text) && isSyncApi(expression.name.text)) {
+          addCall(expression.name.text, node);
+        }
+      } else if (ts.isElementAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
+        if (namespaceBindings.has(expression.expression.text)) {
+          const api = childProcessPropertyName(expression);
+          // eslint-disable-next-line security/detect-possible-timing-attacks -- AST symbol classification, not a secret comparison
+          if (api !== undefined) addCall(api, node);
+          else addDynamicViolation(node);
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  return { calls, violations };
+}
 
 function boundedPositiveNumber(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;

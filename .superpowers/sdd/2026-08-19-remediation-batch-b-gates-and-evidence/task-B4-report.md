@@ -92,3 +92,14 @@ Prettier --check
 ```
 
 全量 `npm test` 仍仅有既有 docs-consistency fixture 失败：新增 `run-sync.test.ts` 后实际测试文件为 51，fixture/活体计数仍为 50；结果为 50 files / 819 tests passed，1 fixture failure。该文件与 docs 变更受 B4 范围禁止，未修改。`npm run prepush` 已实际运行：通过平台依赖、self-test、门禁样本和安全扫描，在全量 Vitest/coverage 的同一 docs-count 漂移处阻断。
+
+## 审查返工（第 2/5 轮）
+
+第 1 轮复审确认 I2 的正则扫描无法识别 `node:child_process` 的别名、namespace、解构和属性访问。本轮以 TypeScript 编译器 API 替代文本正则：
+
+- `auditSynchronousChildProcessSource` 解析 import declarations，并跟踪 `spawnSync`、`execSync`、`execFileSync` 的直接和 alias bindings，以及 namespace bindings。
+- AST visitor 盘点直接 identifier 调用、namespace 静态 property access、静态 element access 和从 namespace 解构后的 alias 调用，输出稳定 `{ api, file, line }`。
+- 发现非字面量 namespace 计算属性（例如 `childProcess[operation](...)`）时输出审计 violation，不允许静默绕过。
+- 全目录测试要求 AST 盘点结果无 violation，除 `run-sync.ts` 唯一底层 `spawnSync` 外的每一个调用都必须与 `SYNC_PROCESS_EXCEPTIONS` 一一对应。
+- TDD：新增 alias/namespace/static element access/解构 alias fixture 和动态属性 fixture，在审计 API 实现前失败；实现后，`run-sync.test.ts` 13 项通过。
+- 第 2 轮验证：focused B4 suite 为 5 files / 69 tests；`npm run typecheck`、`npm run lint:security` 与 Prettier 通过。全量 `npm test` 为 50 files / 821 tests 通过、1 个既有 docs-consistency count fixture 失败；`npm run prepush` 在同一 Vitest/coverage 计数漂移处阻断，前置平台、自测、门禁样本和安全扫描均通过。

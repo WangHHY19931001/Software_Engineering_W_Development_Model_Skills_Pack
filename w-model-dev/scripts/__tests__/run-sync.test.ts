@@ -8,6 +8,7 @@ const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
 
 import {
+  auditSynchronousChildProcessSource,
   DEFAULT_SYNC_MAX_BUFFER,
   DEFAULT_SYNC_TIMEOUT_MS,
   runSync,
@@ -17,13 +18,6 @@ import {
 
 const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUN_SYNC_FILE = 'lib/run-sync.ts';
-const DIRECT_SYNC_APIS = /\b(spawnSync|execSync|execFileSync)\s*\(/g;
-
-interface DirectSyncCall {
-  api: 'spawnSync' | 'execSync' | 'execFileSync';
-  file: string;
-  line: number;
-}
 
 async function collectTypeScriptFiles(directory: string): Promise<string[]> {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- test starts from repository-controlled scripts root
@@ -38,23 +32,18 @@ async function collectTypeScriptFiles(directory: string): Promise<string[]> {
   return files.flat();
 }
 
-async function findDirectSyncCalls(): Promise<DirectSyncCall[]> {
-  const calls: DirectSyncCall[] = [];
+async function findDirectSyncCalls() {
+  const calls: Array<{ api: string; file: string; line: number }> = [];
+  const violations: Array<{ file: string; line: number; message: string }> = [];
   for (const absolutePath of await collectTypeScriptFiles(SCRIPT_ROOT)) {
     const file = path.relative(SCRIPT_ROOT, absolutePath).replaceAll(path.sep, '/');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled TypeScript path
     const source = await fs.readFile(absolutePath, 'utf-8');
-    for (const match of source.matchAll(DIRECT_SYNC_APIS)) {
-      const api = match[1] as DirectSyncCall['api'];
-      if (file === RUN_SYNC_FILE && api === 'spawnSync') continue;
-      calls.push({
-        api,
-        file,
-        line: source.slice(0, match.index).split('\n').length,
-      });
-    }
+    const audit = auditSynchronousChildProcessSource(source, file);
+    calls.push(...audit.calls);
+    violations.push(...audit.violations);
   }
-  return calls;
+  return { calls, violations };
 }
 
 describe('runSync', () => {
@@ -132,9 +121,55 @@ describe('runSync', () => {
     );
   });
 
+  it('resolves direct aliases, namespace properties, static element access, and destructured aliases with the TypeScript AST', () => {
+    const source = [
+      "import { spawnSync as runChild, execSync } from 'node:child_process';",
+      "import * as childProcess from 'node:child_process';",
+      "runChild('node', []);",
+      "execSync('node -v');",
+      "childProcess.execFileSync('node', []);",
+      "childProcess['spawnSync']('node', []);",
+      'const { execSync: destructuredExec } = childProcess;',
+      "destructuredExec('node -v');",
+    ].join('\n');
+
+    expect(auditSynchronousChildProcessSource(source, 'fixtures/aliases.ts')).toEqual({
+      calls: [
+        { api: 'spawnSync', file: 'fixtures/aliases.ts', line: 3 },
+        { api: 'execSync', file: 'fixtures/aliases.ts', line: 4 },
+        { api: 'execFileSync', file: 'fixtures/aliases.ts', line: 5 },
+        { api: 'spawnSync', file: 'fixtures/aliases.ts', line: 6 },
+        { api: 'execSync', file: 'fixtures/aliases.ts', line: 8 },
+      ],
+      violations: [],
+    });
+  });
+
+  it('reports non-literal namespace property access rather than silently skipping it', () => {
+    const source = [
+      "import * as childProcess from 'node:child_process';",
+      'const operation = process.argv[2];',
+      "childProcess[operation]('node', []);",
+    ].join('\n');
+
+    expect(auditSynchronousChildProcessSource(source, 'fixtures/dynamic.ts')).toEqual({
+      calls: [],
+      violations: [
+        {
+          file: 'fixtures/dynamic.ts',
+          line: 3,
+          message: 'dynamic child_process property access cannot be safely audited',
+        },
+      ],
+    });
+  });
+
   it('audits every direct synchronous child-process call against the centralized exception manifest', async () => {
-    const directCalls = await findDirectSyncCalls();
+    const audit = await findDirectSyncCalls();
+    expect(audit.violations).toEqual([]);
+    const directCalls = audit.calls.filter((call) => !(call.file === RUN_SYNC_FILE && call.api === 'spawnSync'));
     expect(directCalls).not.toHaveLength(0);
+    expect(audit.calls.filter((call) => call.file === RUN_SYNC_FILE && call.api === 'spawnSync')).toHaveLength(1);
 
     for (const call of directCalls) {
       const exception = SYNC_PROCESS_EXCEPTIONS.find(
