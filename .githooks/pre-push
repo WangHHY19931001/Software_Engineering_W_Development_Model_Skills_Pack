@@ -54,9 +54,10 @@ is_pure_windows_shell() {
 }
 
 if is_pure_windows_shell; then
-  printf '[pre-push] \033[33m⚠\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n' 2>/dev/null || true
-  printf '[pre-push] \033[33m⚠\033[0m 请安装 Git for Windows 并使用 Git Bash 运行：npm run prepush\n' 2>/dev/null || true
-  printf '[pre-push] \033[33m⚠\033[0m 本次推送门禁已跳过（exit 0）\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 17 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 17 项\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 请安装 Git for Windows 并在 Git Bash 补跑：npm run prepush（全绿后再合入）\n' 2>/dev/null || true
   exit 0
 fi
 

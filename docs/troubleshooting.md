@@ -10,7 +10,7 @@
 **现象**：
 
 - `npm run prepush` 报 `'bash' 不是内部或外部命令` 或类似找不到 bash；
-- `git push` 时终端出现 `[pre-push] ⚠ 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）` 提示。
+- `git push` 时终端出现红色 `[pre-push] ✗ 检测到纯 Windows cmd/PowerShell 环境` 与「本次推送未执行 17 项门禁（exit 0 放行）」提示。
 
 **原因**：`.githooks/pre-push` 是 bash 脚本（`package.json` 的 `prepush` 用 `bash .githooks/pre-push` 调用），依赖 bash 解释器；原生 cmd/PowerShell 没有 bash。
 
