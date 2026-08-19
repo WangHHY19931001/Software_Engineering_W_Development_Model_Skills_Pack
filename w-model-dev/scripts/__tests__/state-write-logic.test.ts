@@ -226,6 +226,29 @@ describe('review round 1 ownership races', () => {
     await fs.rm(lockDir, { recursive: true, force: true });
   });
 
+  it('does not let a second writer recover an active stale-owner recovery transition', async () => {
+    const p = target('active-recovery.json');
+    const owner = path.join(`${p}.lock`, 'owner');
+    await fs.mkdir(owner, { recursive: true });
+    await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: 999_999_999, token: 'dead-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
+    }));
+    const moved = await deferred();
+    const continueRecovery = await deferred();
+    const first = writeStateJson(p, '{"v":"first"}', {
+      staleLockTtlMs: 1,
+      afterRecoveryOwnershipMoved: async () => { moved.resolve(); await continueRecovery.promise; },
+    } as never);
+    await moved.promise;
+    const second = await writeStateJson(p, '{"v":"second"}', { staleLockTtlMs: 1, lockTimeoutMs: 25 });
+    expect(second).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
+    const activeTransition = (await fs.readdir(`${p}.lock`)).find((entry) => entry.startsWith('.recovering-'));
+    expect(activeTransition).toBeDefined();
+    continueRecovery.resolve();
+    await expect(first).resolves.toMatchObject({ ok: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"first"}');
+  });
+
   it('does not delete a replacement owner after release ownership transfer', async () => {
     const p = target('release-owner-swap.json');
     const moved = await deferred();
@@ -267,8 +290,11 @@ describe('review round 1 ownership races', () => {
     const p = target(`orphan-${transition.slice(1)}.json`);
     const transitionDir = path.join(`${p}.lock`, transition);
     await fs.mkdir(transitionDir, { recursive: true });
-    await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: 999_999_999, token: transition, createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
+    const origin = { targetPath: p, pid: 999_999_999, token: transition, createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write' };
+    await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify(origin));
+    await fs.writeFile(path.join(transitionDir, 'transition.json'), JSON.stringify({
+      kind: transition.includes('recovering') ? 'recovering' : 'releasing',
+      operatorPid: 999_999_999, operatorToken: 'dead-operator', operatorStartedAt: '2000-01-01T00:00:00.000Z', origin,
     }));
     const result = await writeStateJson(p, '{"v":"recovered"}', { staleLockTtlMs: 1 });
     expect(result.ok).toBe(true);

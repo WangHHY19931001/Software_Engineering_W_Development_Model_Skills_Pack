@@ -23,6 +23,7 @@ export interface StateWriteOptions {
   afterLockAcquired?: () => void | Promise<void>;
   beforeCommit?: () => void | Promise<void>;
   afterStaleMetadataRead?: () => void | Promise<void>;
+  afterRecoveryOwnershipMoved?: () => void | Promise<void>;
   afterReleaseOwnershipMoved?: () => void | Promise<void>;
   beforeRollback?: () => void | Promise<void>;
 }
@@ -40,7 +41,13 @@ const ownerPathFor = (lockDir: string) => path.join(lockDir, 'owner');
 const metadataPathFor = (ownerDir: string) => path.join(ownerDir, 'metadata.json');
 const transitionPathFor = (ownerDir: string) => path.join(ownerDir, 'transition.json');
 
-type TransitionMetadata = Pick<StateLockMetadata, 'pid' | 'createdAt' | 'token'> & { kind: 'recovering' | 'releasing' };
+interface TransitionMetadata {
+  kind: 'recovering' | 'releasing';
+  operatorPid: number;
+  operatorToken: string;
+  operatorStartedAt: string;
+  origin: StateLockMetadata;
+}
 
 export function backupPathFor(absPath: string, now: Date = new Date()): string {
   const pad = (n: number, length = 2) => String(n).padStart(length, '0');
@@ -78,12 +85,7 @@ async function readMetadata(ownerDir: string): Promise<StateLockMetadata | undef
 }
 
 async function readTransition(transitionDir: string): Promise<TransitionMetadata | undefined> {
-  try { return JSON.parse(await fs.readFile(transitionPathFor(transitionDir), 'utf-8')) as TransitionMetadata; } catch {
-    const owner = await readMetadata(transitionDir);
-    return owner && (transitionDir.includes('.recovering-') || transitionDir.includes('.releasing-'))
-      ? { pid: owner.pid, token: owner.token, createdAt: owner.createdAt, kind: transitionDir.includes('.recovering-') ? 'recovering' : 'releasing' }
-      : undefined;
-  }
+  try { return JSON.parse(await fs.readFile(transitionPathFor(transitionDir), 'utf-8')) as TransitionMetadata; } catch { return undefined; }
 }
 
 async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions): Promise<boolean> {
@@ -95,8 +97,8 @@ async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions
     const transitionDir = path.join(lockDir, entry);
     const transition = await readTransition(transitionDir);
     if (!transition) continue;
-    const expired = Date.now() - Date.parse(transition.createdAt) > (opts.staleLockTtlMs ?? 60_000);
-    if (!opts.recoverStaleLock && !(expired && !isPidRunning(transition.pid))) continue;
+    const expired = Date.now() - Date.parse(transition.operatorStartedAt) > (opts.staleLockTtlMs ?? 60_000);
+    if (!opts.recoverStaleLock && !(expired && !isPidRunning(transition.operatorPid))) continue;
     const auditDir = path.join(lockDir, `.stale-transition-${Date.now()}-${randomUUID()}`);
     try {
       await renameWithRetry(transitionDir, auditDir);
@@ -122,9 +124,12 @@ async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Pro
   const candidate = path.join(lockDir, `.recovering-${randomUUID()}`);
   const current = await readMetadata(ownerDir);
   if (!current) return false;
-  const transition: TransitionMetadata = { pid: current.pid, token: current.token, createdAt: current.createdAt, kind: 'recovering' };
+  const transition: TransitionMetadata = { kind: 'recovering', operatorPid: process.pid, operatorToken: randomUUID(), operatorStartedAt: new Date().toISOString(), origin: current };
   await fs.writeFile(transitionPathFor(ownerDir), JSON.stringify(transition), 'utf-8');
-  try { await renameWithRetry(ownerDir, candidate); } catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT'; }
+  try {
+    await renameWithRetry(ownerDir, candidate);
+    await opts.afterRecoveryOwnershipMoved?.();
+  } catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT'; }
   const metadata = await readMetadata(candidate);
   await opts.afterStaleMetadataRead?.();
   const expired = metadata !== undefined && Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
@@ -166,7 +171,9 @@ async function ownsLock(ownerDir: string, token: string): Promise<boolean> {
 async function releaseLock(lockDir: string, ownerDir: string, token: string, opts: StateWriteOptions): Promise<void> {
   if (!await ownsLock(ownerDir, token)) return;
   const released = path.join(lockDir, `.releasing-${randomUUID()}`);
-  const transition: TransitionMetadata = { pid: process.pid, token, createdAt: new Date().toISOString(), kind: 'releasing' };
+  const origin = await readMetadata(ownerDir);
+  if (!origin) return;
+  const transition: TransitionMetadata = { kind: 'releasing', operatorPid: process.pid, operatorToken: randomUUID(), operatorStartedAt: new Date().toISOString(), origin };
   try {
     await fs.writeFile(transitionPathFor(ownerDir), JSON.stringify(transition), 'utf-8');
     await renameWithRetry(ownerDir, released);
