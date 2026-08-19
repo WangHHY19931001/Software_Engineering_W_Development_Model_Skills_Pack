@@ -53,7 +53,10 @@ export const A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS: ReadonlyArray<{
   { description: 'mtime 乐观锁能够保证并发安全', pattern: /mtime\s*乐观锁\s*能够保证并发安全/i },
   { description: 'mtime 乐观锁可以确保并发安全', pattern: /mtime\s*乐观锁\s*可以确保并发安全/i },
   { description: 'mtime 乐观锁可防止竞争写', pattern: /mtime\s*乐观锁\s*可防止竞争写/i },
-  { description: 'mtime 乐观锁确保竞争 writer 不会双成功', pattern: /mtime\s*乐观锁\s*确保竞争\s*writer\s*不会双成功/i },
+  {
+    description: 'mtime 乐观锁确保竞争 writer 不会双成功',
+    pattern: /mtime\s*乐观锁\s*确保竞争\s*writer\s*不会双成功/i,
+  },
   { description: 'mtime 乐观锁是并发安全保证', pattern: /mtime\s*乐观锁\s*是并发安全保证/i },
 ];
 

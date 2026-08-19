@@ -14,6 +14,7 @@
 - **显式平台修复**：pre-push 不再自动 `npm install`，缺少 `node_modules` 即 exit 1；仅调用 `ensure-platform-deps.sh --check`，默认/`--check` 不下载、不执行 `npm pack`、不解包也不覆盖 `node_modules`。`npm run platform-deps:check` 与 `npm run platform-deps:install` 是显式入口，后者目前 fail-closed 并指引人工 `npm install`。
 - **文档契约**：SSoT、skill、状态/命令参考、README、安装/贡献/Agent 指南和 docs-consistency 断言同步上述状态锁与平台依赖边界；batch B 的 Vitest test-count fail-closed 缺口**尚未完成**，不得声称已修复。
 - **Vitest 真实计数同步**：以覆盖率启用的 Vitest JSON `numTotalTests` 实测为唯一来源，将活体文档与 pre-push 第 12 项描述性注释统一为 **49 test files / 785 tests**；本项不改变 batch B 的无 JSON 采集 fail-closed 缺口。
+- **Prettier 格式阻断修复**：按仓库 `config/prettier.config.cjs` 格式化 `w-model-dev/scripts/logic/docs-consistency-logic.ts`，消除 pre-push 第 16 项格式检查阻断；仅调整尾随逗号与换行，不改变运行时逻辑。
 
 ### 修复（核查报告 2026-08-19 六项问题）
 - **P1-1 文档数字漂移**：CONTRIBUTING 门禁表 vitest 计数 40/623 → 47/723（与同文件 :214 自相矛盾修复）；docs/INSTALL.md :83/:248 同类漂移一并修正（复核补充）；PR 模板「14 项」→「17 项」；docs-consistency 新增 `vitestExtraDocs` / `prTemplate` 可选输入（checkVitestTestCount 参数化 + checkPrTemplatePrePushCount），堵住 REQUIRED_PATHS 未覆盖 CONTRIBUTING/INSTALL/PR 模板的盲区；CONTRIBUTING 版本机制「五处」→「六处」同步
