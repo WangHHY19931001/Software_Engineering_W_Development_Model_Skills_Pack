@@ -37,7 +37,7 @@ import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
-import { validateBySchema } from '../logic/schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   checkArtifactGate,
   checkPhaseSpecStructure,

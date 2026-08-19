@@ -19,9 +19,9 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { validateBySchema } from '../logic/schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
-import { readSchemasDir } from '../lib/schema-fs.js';
+import { readSchemasDir } from '../infrastructure/schema-fs.js';
 import { resolveStateSchema } from '../lib/state-schema-registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -313,7 +313,7 @@ describe('bdd-manifest designCoverage (phase>=2)', () => {
 
 describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('schema-loader 不再直接依赖 node:fs / process.exit（审计修复 P5）', async () => {
-    const src = await fs.readFile(path.resolve(here, '../logic/schema-loader.ts'), 'utf-8');
+    const src = await fs.readFile(path.resolve(here, '../infrastructure/schema-loader.ts'), 'utf-8');
     expect(src).not.toMatch(/from 'node:fs'/);
     expect(src).not.toMatch(/process\.exit/);
     expect(src).not.toMatch(/ERROR_JSON/); // 手拼 ERROR_JSON 绕过 cli-error 的行为已移除

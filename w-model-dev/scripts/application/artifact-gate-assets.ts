@@ -1,3 +1,5 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- These paths are caller-selected project artifacts checked by the gate. */
+
 /**
  * 工件质量门资产读取/校验层（Artifact Gate Assets）
  *
@@ -12,11 +14,10 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { type GateGraph, type PhaseOption } from '../logic/gate-logic.js';
-import { validateBySchema } from '../logic/schema-loader.js';
-
-import { runSync } from './run-sync.js';
-import { parseJsonSafe } from './safe-json.js';
+import { runSync } from '../lib/run-sync.js';
+import { parseJsonSafe } from '../lib/safe-json.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

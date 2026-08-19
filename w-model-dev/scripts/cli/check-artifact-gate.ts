@@ -42,6 +42,13 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  discoverGraphAsset,
+  readBddManifest,
+  readTlaManifest,
+  runModelChecks,
+} from '../application/artifact-gate-assets.js';
+import { checkUatPathMappingContent, collectUatMappingViolations } from '../application/uat-path-mapping.js';
+import {
   checkArtifactGate,
   checkTemplatesStructure,
   type PhaseOption,
@@ -54,9 +61,7 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified } from '../lib/read-json-or-exit.js';
-import { discoverGraphAsset, readBddManifest, readTlaManifest, runModelChecks } from '../lib/artifact-gate-assets.js';
-import { collectUatMappingViolations } from '../lib/uat-path-mapping.js';
-export { checkUatPathMappingContent } from '../lib/uat-path-mapping.js'; // self-test 兼容：UAT 映射内容校验保持从本入口导出
+export { checkUatPathMappingContent }; // self-test 兼容：UAT 映射内容校验保持从本入口导出
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**

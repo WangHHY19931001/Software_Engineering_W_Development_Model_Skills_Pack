@@ -1,4 +1,4 @@
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 export interface IcebergFinding {
   findingId: string;

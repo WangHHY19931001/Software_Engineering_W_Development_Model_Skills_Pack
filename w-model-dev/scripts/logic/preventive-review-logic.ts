@@ -1,4 +1,4 @@
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 export interface PreventiveReviewFinding {
   severity: 'Critical' | 'Required' | 'Optional' | 'Nit' | 'FYI';

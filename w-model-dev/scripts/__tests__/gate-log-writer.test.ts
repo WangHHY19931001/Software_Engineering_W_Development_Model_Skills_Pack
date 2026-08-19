@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { validateBySchema } from '../logic/schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { writeGateLog } from '../lib/gate-log-writer.js';
 
 const validPayload = {

@@ -13,7 +13,7 @@
  *   E8  humanDecision.decision = approve
  *   E9  时间戳时序 submittedAt < reviewedAt < verifiedAt < decidedAt
  */
-import { validateBySchema, type SchemaValidationResult } from './schema-loader.js';
+import { validateBySchema, type SchemaValidationResult } from '../infrastructure/schema-loader.js';
 
 // ==================== 类型定义 ====================
 

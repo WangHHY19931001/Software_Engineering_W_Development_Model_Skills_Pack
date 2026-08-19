@@ -12,7 +12,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 类型定义 ====================
 

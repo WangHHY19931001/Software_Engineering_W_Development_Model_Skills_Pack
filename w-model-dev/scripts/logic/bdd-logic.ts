@@ -21,7 +21,7 @@
  *   将违反合并入最终结果。
  */
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 

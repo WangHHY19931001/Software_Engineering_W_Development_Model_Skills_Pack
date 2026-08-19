@@ -21,7 +21,7 @@
  *   在纯逻辑中分别留空 / 置真 / 置空，由 CLI 在执行 I/O 后回填并重算 passed。
  */
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 

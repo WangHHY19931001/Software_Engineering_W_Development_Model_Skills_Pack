@@ -17,7 +17,7 @@ import {
   parseUatPathMappingFromContent,
   checkUatPathMappingContent,
   collectUatMappingViolations,
-} from '../lib/uat-path-mapping.js';
+} from '../application/uat-path-mapping.js';
 
 let tmpDir: string;
 

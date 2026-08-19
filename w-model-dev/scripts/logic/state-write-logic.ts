@@ -2,10 +2,9 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+import { validateBySchema, type SchemaValidationResult } from '../infrastructure/schema-loader.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { inferProjectRoot, isProjectStateTarget, resolveStateSchema } from '../lib/state-schema-registry.js';
-
-import { validateBySchema, type SchemaValidationResult } from './schema-loader.js';
 
 export interface StateLockMetadata {
   targetPath: string;

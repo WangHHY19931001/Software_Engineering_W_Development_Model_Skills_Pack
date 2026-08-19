@@ -30,7 +30,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-import { validateBySchema } from '../logic/schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 import { parseJsonSafe } from './safe-json.js';
 import { exitWithError } from './cli-error.js';

@@ -7,7 +7,7 @@
  * 单点事实源，不依赖任何 LLM。
  */
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 类型定义 ====================
 

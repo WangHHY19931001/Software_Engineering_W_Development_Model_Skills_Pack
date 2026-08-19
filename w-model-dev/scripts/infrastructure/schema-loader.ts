@@ -12,8 +12,8 @@
  * 不引入运行时依赖到分发产物：本模块 import 'ajv'，但 ajv 仅作为 devDependency，
  * 因为 scripts/ 不打入 bundle，由 tsx 直接执行；技能包分发不含 node_modules。
  *
- * // 审计修复 P5：磁盘 IO 经 lib/schema-fs.ts（readSchemasDirSync）；错误经抛异常上抛，
- *    由 CLI 层 runMain 统一格式化（不直接退出进程、不手拼错误 JSON）。
+ * 磁盘 IO 经 infrastructure/schema-fs.ts（readSchemasDirSync）；错误经抛异常上抛，
+ * 由 CLI 层 runMain 统一格式化（不直接退出进程、不手拼错误 JSON）。
  */
 
 import { join } from 'node:path';
@@ -24,7 +24,7 @@ import type AjvDefault from 'ajv';
 import type { ErrorObject } from 'ajv';
 import type addFormatsDefault from 'ajv-formats';
 
-import { readSchemasDirSync } from '../lib/schema-fs.js';
+import { readSchemasDirSync } from './schema-fs.js';
 
 const SCHEMAS_DIR = join(fileURLToPath(import.meta.url), '..', '..', '..', 'schemas');
 
@@ -63,7 +63,7 @@ function buildAjv(schemas: Record<string, unknown>): AjvDefault {
 
 function getAjv(): AjvDefault {
   if (ajv) return ajv;
-  // 磁盘 IO 经 lib/schema-fs.ts（审计修复 P5，logic 层不直接 fs）
+  // 磁盘 IO 经 infrastructure/schema-fs.ts（logic 层不直接 fs）
   ajv = buildAjv(readSchemasDirSync(SCHEMAS_DIR));
   return ajv;
 }

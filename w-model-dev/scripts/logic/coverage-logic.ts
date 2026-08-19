@@ -14,7 +14,7 @@
  *   C9  status=missing 须在 Out of Scope 显式声明（提供 outOfScope 时 fail，否则 warning）
  *   C10 metrics 重算一致性
  */
-import { validateBySchema, type SchemaValidationResult } from './schema-loader.js';
+import { validateBySchema, type SchemaValidationResult } from '../infrastructure/schema-loader.js';
 
 // ==================== 类型定义 ====================
 

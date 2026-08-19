@@ -17,7 +17,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
 
-import { discoverGraphAsset, readTlaManifest, readBddManifest, runModelChecks } from '../lib/artifact-gate-assets.js';
+import {
+  discoverGraphAsset,
+  readTlaManifest,
+  readBddManifest,
+  runModelChecks,
+} from '../application/artifact-gate-assets.js';
 
 let tmpDir: string;
 

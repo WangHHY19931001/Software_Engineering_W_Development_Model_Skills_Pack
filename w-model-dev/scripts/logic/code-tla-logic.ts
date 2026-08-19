@@ -22,9 +22,8 @@ import { createRequire } from 'node:module';
 
 import type * as TsType from 'typescript';
 
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import type { StructuredViolation } from '../lib/types.js';
-
-import { validateBySchema } from './schema-loader.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 

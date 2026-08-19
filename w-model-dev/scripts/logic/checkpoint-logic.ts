@@ -13,7 +13,7 @@
  *   3. 单点事实：所有「checkpoint 是否符合规范」的判定均委托至此
  */
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 

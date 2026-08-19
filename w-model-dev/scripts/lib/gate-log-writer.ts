@@ -9,7 +9,7 @@ import { promises as fs } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
-import { validateBySchema } from '../logic/schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 export type GateLogWriteErrorCode = 'GATE_LOG_SCHEMA_INVALID' | 'GATE_LOG_WRITE_FAILED' | 'GATE_LOG_CLEANUP_FAILED';
 

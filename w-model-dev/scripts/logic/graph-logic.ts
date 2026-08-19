@@ -13,7 +13,7 @@
  */
 
 import { MAX_GRAPH_ROUNDS } from '../lib/constants.js';
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 

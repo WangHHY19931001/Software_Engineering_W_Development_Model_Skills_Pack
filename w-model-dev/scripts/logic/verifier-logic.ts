@@ -18,7 +18,7 @@
  *   - https://github.com/alchaincyf/darwin-skill
  */
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
 

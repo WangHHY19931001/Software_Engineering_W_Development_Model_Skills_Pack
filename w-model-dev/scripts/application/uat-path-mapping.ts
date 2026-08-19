@@ -1,3 +1,5 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- The project root selects the gate-owned UAT mapping artifact. */
+
 /**
  * uat-path-mapping.md 解析与校验（UAT Path Mapping）
  *
