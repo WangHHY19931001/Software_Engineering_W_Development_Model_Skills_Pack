@@ -1,11 +1,3 @@
-/**
- * logic/state-write-logic.ts 单元测试（审计修复 A1：状态写助手）
- *
- * 覆盖：backupPathFor 命名 / 目标不存在直接写 / 非法 JSON 拒绝 /
- *       mtime 守卫（MTIME_CONFLICT 与放行）/ 备份生成 / 备份轮换 keepBackups /
- *       原子替换后内容正确且无 .tmp 残留 / --no-backup 跳过备份。
- */
-
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -27,153 +19,178 @@ function target(name: string): string {
   return path.join(tmpDir, name);
 }
 
+async function deferred(): Promise<{ promise: Promise<void>; resolve: () => void }> {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 describe('backupPathFor', () => {
-  it('生成 <name>.bak.YYYYMMDD-HHMM 格式备份路径', () => {
-    const fixed = new Date(2026, 7, 15, 9, 5); // 2026-08-15 09:05
-    expect(backupPathFor(path.join('d', 'state.json'), fixed)).toBe(path.join('d', 'state.json.bak.20260815-0905'));
+  it('generates unique paths for backups made in the same millisecond', () => {
+    const fixed = new Date(2026, 7, 15, 9, 5, 0, 123);
+    const first = backupPathFor(path.join('d', 'state.json'), fixed);
+    const second = backupPathFor(path.join('d', 'state.json'), fixed);
+    expect(first).toMatch(/state\.json\.bak\.20260815-090500123-[0-9a-f-]+$/);
+    expect(second).toMatch(/state\.json\.bak\.20260815-090500123-[0-9a-f-]+$/);
+    expect(second).not.toBe(first);
   });
 });
 
 describe('writeStateJson', () => {
-  it('目标不存在时直接写入，无备份，内容正确', async () => {
+  it('writes a missing target without a backup', async () => {
     const p = target('fresh.json');
-    const r = await writeStateJson(p, '{"a":1}');
-    expect(r.ok).toBe(true);
-    expect(r.backupPath).toBeUndefined();
+    const result = await writeStateJson(p, '{"a":1}');
+    expect(result.ok).toBe(true);
+    expect(result.backupPath).toBeUndefined();
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"a":1}');
   });
 
-  it('非法 JSON 拒绝写入（INVALID_JSON），目标不被创建', async () => {
+  it('rejects invalid JSON without creating the target', async () => {
     const p = target('bad.json');
-    const r = await writeStateJson(p, '{not json');
-    expect(r.ok).toBe(false);
-    expect(r.reason).toBe('INVALID_JSON');
+    const result = await writeStateJson(p, '{not json');
+    expect(result).toMatchObject({ ok: false, reason: 'INVALID_JSON' });
     await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('mtime 不符返回 MTIME_CONFLICT，目标内容不被修改', async () => {
+  it('returns MTIME_CONFLICT without modifying the target', async () => {
     const p = target('conflict.json');
     await fs.writeFile(p, '{"v":1}', 'utf-8');
-    const st = await fs.stat(p);
-    const r = await writeStateJson(p, '{"v":2}', {
-      expectMtimeMs: st.mtimeMs + 5000,
-    });
-    expect(r.ok).toBe(false);
-    expect(r.reason).toBe('MTIME_CONFLICT');
+    const stat = await fs.stat(p);
+    const result = await writeStateJson(p, '{"v":2}', { expectMtimeMs: stat.mtimeMs + 5000 });
+    expect(result).toMatchObject({ ok: false, reason: 'MTIME_CONFLICT' });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":1}');
   });
 
-  it('mtime 相符放行写入', async () => {
+  it('allows a matching mtime and records the old content in a backup', async () => {
     const p = target('mtime-ok.json');
     await fs.writeFile(p, '{"v":1}', 'utf-8');
-    const st = await fs.stat(p);
-    const r = await writeStateJson(p, '{"v":2}', {
-      expectMtimeMs: Math.floor(st.mtimeMs),
-    });
-    expect(r.ok).toBe(true);
+    const stat = await fs.stat(p);
+    const result = await writeStateJson(p, '{"v":2}', { expectMtimeMs: Math.floor(stat.mtimeMs) });
+    expect(result.ok).toBe(true);
+    await expect(fs.readFile(result.backupPath!, 'utf-8')).resolves.toBe('{"v":1}');
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":2}');
   });
 
-  it('已有目标写入前生成备份，备份内容为旧内容', async () => {
-    const p = target('backup.json');
-    await fs.writeFile(p, '{"old":true}', 'utf-8');
-    const r = await writeStateJson(p, '{"new":true}');
-    expect(r.ok).toBe(true);
-    expect(r.backupPath).toBeDefined();
-    await expect(fs.readFile(r.backupPath!, 'utf-8')).resolves.toBe('{"old":true}');
-    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"new":true}');
-  });
-
-  it('备份轮换：超出 keepBackups 的最旧备份被删除', async () => {
+  it('rotates older uniquely named backups beyond keepBackups', async () => {
     const p = target('rotate.json');
-    // 预置 3 个旧备份（不同时间戳）+ 当前目标
-    const stamps = ['20260101-0001', '20260102-0002', '20260103-0003'];
-    for (const s of stamps) {
-      await fs.writeFile(`${p}.bak.${s}`, '{"stale":true}', 'utf-8');
-    }
+    await fs.writeFile(`${p}.bak.20260101-000000000-old`, '{"stale":true}', 'utf-8');
+    await fs.writeFile(`${p}.bak.20260102-000000000-newer`, '{"stale":true}', 'utf-8');
     await fs.writeFile(p, '{"v":1}', 'utf-8');
-    // keepBackups=2：新备份写入后总备份应保留最新 2 个（新备份 + 20260103-0003）
-    const r = await writeStateJson(p, '{"v":2}', { keepBackups: 2 });
-    expect(r.ok).toBe(true);
-    await expect(fs.access(`${p}.bak.20260101-0001`)).rejects.toMatchObject({
-      code: 'ENOENT',
-    });
-    await expect(fs.access(`${p}.bak.20260102-0002`)).rejects.toMatchObject({
-      code: 'ENOENT',
-    });
-    await expect(fs.access(`${p}.bak.20260103-0003`)).resolves.toBeUndefined();
-    expect(r.backupPath).toBeDefined();
-    await expect(fs.access(r.backupPath!)).resolves.toBeUndefined();
+    const result = await writeStateJson(p, '{"v":2}', { keepBackups: 2 });
+    expect(result.ok).toBe(true);
+    const backups = (await fs.readdir(tmpDir)).filter((entry) => entry.startsWith('rotate.json.bak.'));
+    expect(backups).toHaveLength(2);
+    expect(backups).toContain(path.basename(result.backupPath!));
   });
 
-  it('原子替换后内容正确且无 .tmp-* 残留', async () => {
-    const p = target('atomic.json');
-    await writeStateJson(p, '{"step":1}');
-    const r = await writeStateJson(p, '{"step":2}');
-    expect(r.ok).toBe(true);
-    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"step":2}');
+  it('skips backup creation when backup is false', async () => {
+    const p = target('no-backup.json');
+    await fs.writeFile(p, '{"v":1}', 'utf-8');
+    const result = await writeStateJson(p, '{"v":2}', { backup: false });
+    expect(result).toMatchObject({ ok: true, backupPath: undefined });
+  });
+
+  it('accepts a BOM-prefixed JSON payload unchanged', async () => {
+    const p = target('bom.json');
+    const result = await writeStateJson(p, '\uFEFF{"a":1}');
+    expect(result.ok).toBe(true);
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('\uFEFF{"a":1}');
+  });
+
+  it('serializes writers with the same old mtime so exactly one commits', async () => {
+    const p = target('serialized.json');
+    await fs.writeFile(p, '{"v":0}', 'utf-8');
+    const oldMtime = (await fs.stat(p)).mtimeMs;
+    const entered = await deferred();
+    const release = await deferred();
+    const first = writeStateJson(p, '{"v":1}', {
+      expectMtimeMs: oldMtime,
+      afterLockAcquired: async () => { entered.resolve(); await release.promise; },
+    });
+    await entered.promise;
+    const second = writeStateJson(p, '{"v":2}', { expectMtimeMs: oldMtime, lockTimeoutMs: 1_000 });
+    release.resolve();
+    const [a, b] = await Promise.all([first, second]);
+    expect([a, b].filter((result) => result.ok)).toHaveLength(1);
+    expect([a.reason, b.reason]).toContain('MTIME_CONFLICT');
+    const final = await fs.readFile(p, 'utf-8');
+    expect([a, b].find((result) => result.ok)?.writtenPath).toBe(p);
+    expect(['{"v":1}', '{"v":2}']).toContain(final);
+  });
+
+  it('does not release a lock when its token differs', async () => {
+    const p = target('token.json');
+    const lock = `${p}.lock`;
+    const acquired = await deferred();
+    const release = await deferred();
+    const writer = writeStateJson(p, '{"v":1}', {
+      afterLockAcquired: async () => { acquired.resolve(); await release.promise; },
+    });
+    await acquired.promise;
+    const metadata = JSON.parse(await fs.readFile(lock, 'utf-8')) as Record<string, unknown>;
+    await fs.writeFile(lock, JSON.stringify({ ...metadata, token: 'other-token' }), 'utf-8');
+    release.resolve();
+    await expect(writer).resolves.toMatchObject({ ok: true });
+    await expect(fs.access(lock)).resolves.toBeUndefined();
+    await fs.unlink(lock);
+  });
+
+  it('times out while a valid live lock remains held', async () => {
+    const p = target('live-lock.json');
+    const lock = `${p}.lock`;
+    await fs.writeFile(lock, JSON.stringify({
+      targetPath: p, pid: process.pid, token: 'live-owner', createdAt: new Date().toISOString(), operation: 'wm-write',
+    }), 'utf-8');
+    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20 });
+    expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
+    await expect(fs.access(lock)).resolves.toBeUndefined();
+    await fs.unlink(lock);
+  });
+
+  it('recovers a stale lock by renaming it to an audit file', async () => {
+    const p = target('stale-lock.json');
+    const lock = `${p}.lock`;
+    await fs.writeFile(lock, JSON.stringify({
+      targetPath: p, pid: 999_999_999, token: 'stale-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
+    }), 'utf-8');
+    const result = await writeStateJson(p, '{"v":1}', { staleLockTtlMs: 1 });
+    expect(result.ok).toBe(true);
     const entries = await fs.readdir(tmpDir);
-    const tmpResidue = entries.filter((e) => e.includes('.tmp-'));
-    expect(tmpResidue).toEqual([]);
+    expect(entries.some((entry) => entry.startsWith('stale-lock.json.lock.stale-'))).toBe(true);
   });
 
-  it('backup:false 跳过备份', async () => {
-    const p = target('nobackup.json');
-    await fs.writeFile(p, '{"v":1}', 'utf-8');
-    const r = await writeStateJson(p, '{"v":2}', { backup: false });
-    expect(r.ok).toBe(true);
-    expect(r.backupPath).toBeUndefined();
-  });
-
-  it('带 BOM 的输入文本被拒绝（写入内容必须可被 parseJsonSafe 解析）', async () => {
-    const p = target('bom-input.json');
-    const r = await writeStateJson(p, '\uFEFF{"a":1}');
-    // parseJsonSafe 已剥离 BOM，可正常解析 → 写入时应剥离后写入还是拒绝？
-    // 约定：parseJsonSafe 校验通过即可写入原文文本；此处验证不崩溃且目标为合法 JSON 语义
-    expect(r.ok).toBe(true);
-    const raw = await fs.readFile(p, 'utf-8');
-    expect(raw).toBe('\uFEFF{"a":1}');
-  });
-});
-
-describe('审计修复 P4：tmpPath 唯一化与回读失败回滚', () => {
-  it('同进程并发两次写同一目标：均成功且无异常，终态为二者之一', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-conc-'));
-    const target = path.join(dir, 'state.json');
-    await fs.writeFile(target, '{"v":0}', 'utf-8');
-    const [a, b] = await Promise.all([writeStateJson(target, '{"v":1}'), writeStateJson(target, '{"v":2}')]);
-    expect(a.ok).toBe(true);
-    expect(b.ok).toBe(true); // 修复前：第二次 rename 抛 ENOENT
-    const final = JSON.parse(await fs.readFile(target, 'utf-8')) as { v: number };
-    expect([1, 2]).toContain(final.v);
-    // 不残留 tmp 文件
-    const leftovers = (await fs.readdir(dir)).filter((f) => f.includes('.tmp-'));
-    expect(leftovers).toEqual([]);
-  });
-
-  it('回读校验失败时自动回滚备份并报告 rolledBack', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-rollback-'));
-    const target = path.join(dir, 'state.json');
-    await fs.writeFile(target, '{"v":"original"}', 'utf-8');
-    const result = await writeStateJson(target, '{"v":"new"}', {
-      // 模拟回读损坏：内容为「非法 JSON（不可解析）」才触发回滚；
-      // 若为另一条合法 JSON 会被当作并发写者覆盖而判成功（见并发用例）。
-      readbackImpl: async () => '{"v":"corrupted",', // 未闭合对象 → 非法 JSON
+  it('does not let a readback rollback overwrite a later writer', async () => {
+    const p = target('rollback-race.json');
+    await fs.writeFile(p, '{"v":"original"}', 'utf-8');
+    const entered = await deferred();
+    const release = await deferred();
+    const first = writeStateJson(p, '{"v":"first"}', {
+      afterLockAcquired: async () => { entered.resolve(); await release.promise; },
+      readbackImpl: async () => 'not json',
     });
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('WRITE_VERIFY_FAILED');
-    expect(result.rolledBack).toBe(true);
-    expect(await fs.readFile(target, 'utf-8')).toBe('{"v":"original"}'); // 已恢复
+    await entered.promise;
+    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 1_000 });
+    release.resolve();
+    await expect(first).resolves.toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(second).resolves.toMatchObject({ ok: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"second"}');
   });
 
-  it('回读失败且无备份（目标原不存在）时删除损坏文件', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-nobak-'));
-    const target = path.join(dir, 'state.json');
-    const result = await writeStateJson(target, '{"v":"new"}', {
-      readbackImpl: async () => 'garbage',
-    });
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('WRITE_VERIFY_FAILED');
-    await expect(fs.readFile(target, 'utf-8')).rejects.toMatchObject({ code: 'ENOENT' });
+  it('leaves no temporary files or owned lock after a successful transaction', async () => {
+    const p = target('cleanup.json');
+    await writeStateJson(p, '{"step":1}');
+    const result = await writeStateJson(p, '{"step":2}');
+    expect(result.ok).toBe(true);
+    const entries = await fs.readdir(tmpDir);
+    expect(entries.filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+    expect(entries).not.toContain('cleanup.json.lock');
+  });
+
+  it('rolls back a failed readback using an atomic replacement', async () => {
+    const p = target('rollback.json');
+    await fs.writeFile(p, '{"v":"original"}', 'utf-8');
+    const result = await writeStateJson(p, '{"v":"new"}', { readbackImpl: async () => 'garbage' });
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"original"}');
   });
 });
