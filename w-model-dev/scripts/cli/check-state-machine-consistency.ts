@@ -117,6 +117,8 @@ async function main(): Promise<void> {
     },
     exitCode,
   );
+  process.exitCode = exitCode;
+  return;
 }
 
 // isMain 守卫：仅在直接执行时运行 main，被 import 时不触发

@@ -156,6 +156,8 @@ async function main(): Promise<void> {
     },
     exitCode,
   );
+  process.exitCode = exitCode;
+  return;
 }
 
 // Windows 兼容的 main 模块判断：

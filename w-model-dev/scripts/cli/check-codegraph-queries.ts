@@ -235,6 +235,8 @@ async function main(): Promise<void> {
     },
     exitCode,
   );
+  process.exitCode = exitCode;
+  return;
 }
 
 const entryArg = process.argv[1];

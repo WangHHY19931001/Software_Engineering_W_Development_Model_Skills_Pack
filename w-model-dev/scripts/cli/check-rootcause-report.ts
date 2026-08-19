@@ -111,7 +111,8 @@ async function main(): Promise<void> {
       }),
   );
 
-  process.exit(exitCode1);
+  process.exitCode = exitCode1;
+  return;
 }
 
 runMain(main);

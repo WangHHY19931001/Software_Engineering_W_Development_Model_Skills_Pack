@@ -286,7 +286,8 @@ async function main(): Promise<void> {
   console.log('PREVENTIVE_REVIEW_JSON ' + JSON.stringify(summary));
   if (gateLogWriteError !== undefined) console.error(`[gate-log] persistence failed: ${gateLogWriteError.code}`);
 
-  process.exit(output.exitCode);
+  process.exitCode = output.exitCode;
+  return;
 }
 
 runMain(main);

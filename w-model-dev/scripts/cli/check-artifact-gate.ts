@@ -305,7 +305,7 @@ async function main(): Promise<void> {
   }
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
-  // exitCode 与 process.exit() 实参一致（门禁防伪造三层机制之一）
+  // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
   printGateReport(
     'GATE',
     {
@@ -319,6 +319,8 @@ async function main(): Promise<void> {
     },
     exitCode,
   );
+  process.exitCode = exitCode;
+  return;
 }
 
 // isMain 守卫：仅直接执行时运行 main，被 self-test 等 import 时不触发

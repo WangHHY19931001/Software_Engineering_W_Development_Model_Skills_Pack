@@ -218,6 +218,8 @@ function main(): void {
       },
       violations.length === 0 ? 0 : 1,
     );
+    process.exitCode = violations.length === 0 ? 0 : 1;
+    return;
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     exitWithError({

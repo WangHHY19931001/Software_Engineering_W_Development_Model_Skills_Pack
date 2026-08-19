@@ -532,8 +532,8 @@ async function main(): Promise<number> {
 
 runMain(async () => {
   const exitCode = await main();
-  // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined）→ 让 Node 自然退出，避免 process.exit 截断 ERROR_JSON
+  // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined），否则由 Node 自然退出
   if (process.exitCode === undefined) {
-    process.exit(exitCode);
+    process.exitCode = exitCode;
   }
 });

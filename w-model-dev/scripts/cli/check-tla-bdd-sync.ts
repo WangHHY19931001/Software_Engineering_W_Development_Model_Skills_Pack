@@ -130,7 +130,8 @@ async function main(): Promise<void> {
           violations: output.violations,
         }),
     );
-    process.exit(output.exitCode);
+    process.exitCode = output.exitCode;
+    return;
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     const failedFile = e.path ?? tlaFile;

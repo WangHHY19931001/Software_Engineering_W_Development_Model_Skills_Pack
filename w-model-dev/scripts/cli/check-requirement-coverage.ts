@@ -159,6 +159,8 @@ async function main(): Promise<void> {
     },
     exitCode,
   );
+  process.exitCode = exitCode;
+  return;
 }
 
 runMain(main);

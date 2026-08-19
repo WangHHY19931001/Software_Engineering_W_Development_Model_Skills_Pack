@@ -425,6 +425,8 @@ async function main(): Promise<void> {
   }
 
   printGateReport('DOCS_CONSISTENCY', { passed: violations.length === 0, violationCount: violations.length }, exitCode);
+  process.exitCode = exitCode;
+  return;
 }
 
 // Windows 兼容的 main 模块判断：
