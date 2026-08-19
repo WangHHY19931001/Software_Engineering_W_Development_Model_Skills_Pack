@@ -143,6 +143,30 @@ describe('wm-write CLI lock controls', () => {
     expect(result.stdout).toContain('ERROR_JSON ');
   });
 
+  it('--recover-stale-lock rejects an active external owner without removing it', async () => {
+    const p = target('active-owner-explicit-recovery.json');
+    const holder = await holdLiveLock(p, 5_000);
+
+    try {
+      const result = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"B"}');
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('✗ [WRITE_REJECTED]');
+      expect(wmwriteSummary(result.stdout)).toMatchObject({
+        script: 'wm-write.ts',
+        ok: false,
+        reason: 'LOCK_TIMEOUT',
+        writtenPath: p,
+      });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-controlled temporary path
+      await expect(fs.readFile(path.join(`${p}.lock`, 'owner', 'metadata.json'), 'utf-8')).resolves.toContain(
+        '"token":"holder"',
+      );
+    } finally {
+      await waitForExit(holder);
+    }
+  });
+
   it('returns a WRITE_REJECTED LOCK_TIMEOUT summary for a valid live lock', async () => {
     const p = target('live-lock.json');
     await writeLock(p, {

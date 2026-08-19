@@ -141,8 +141,8 @@ async function recoverOrphanTransitions(
     if (!transition) continue;
     const expired = Date.now() - Date.parse(transition.operatorStartedAt) > (opts.staleLockTtlMs ?? 60_000);
     const stale = expired && !isPidRunning(transition.operatorPid);
-    if (!opts.recoverStaleLock && !stale) continue;
-    if (stale && opts.recoverStaleLock !== true && opts.allowImplicitStaleRecovery === false) return 'stale';
+    if (!stale) continue;
+    if (opts.recoverStaleLock !== true && opts.allowImplicitStaleRecovery === false) return 'stale';
     const auditDir = path.join(lockDir, `.stale-transition-${Date.now()}-${randomUUID()}`);
     try {
       await renameWithRetry(transitionDir, auditDir);
@@ -169,9 +169,8 @@ async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promis
   if (!metadata) return 'none';
   const expired = Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
   const stale = expired && !isPidRunning(metadata.pid);
-  if (opts.recoverStaleLock === true) return 'recoverable';
   if (!stale) return 'none';
-  return opts.allowImplicitStaleRecovery === false ? 'stale' : 'recoverable';
+  return opts.recoverStaleLock === true || opts.allowImplicitStaleRecovery !== false ? 'recoverable' : 'stale';
 }
 
 async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Promise<boolean> {
@@ -197,7 +196,7 @@ async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Pro
   await opts.afterStaleMetadataRead?.();
   const expired =
     metadata !== undefined && Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
-  const stale = metadata !== undefined && (opts.recoverStaleLock === true || (expired && !isPidRunning(metadata.pid)));
+  const stale = metadata !== undefined && expired && !isPidRunning(metadata.pid);
   if (stale) {
     await renameWithRetry(candidate, path.join(lockDir, `.stale-${Date.now()}-${randomUUID()}`));
     return true;

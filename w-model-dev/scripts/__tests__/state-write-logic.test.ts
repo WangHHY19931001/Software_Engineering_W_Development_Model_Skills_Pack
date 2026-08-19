@@ -123,6 +123,35 @@ describe('writeStateJson', () => {
     expect(['{"v":1}', '{"v":2}']).toContain(final);
   });
 
+  it('does not let explicit stale recovery take over an active writer before its commit', async () => {
+    const p = target('active-owner-explicit-recovery.json');
+    const acquired = await deferred();
+    const release = await deferred();
+    const first = writeStateJson(p, '{"writer":"A"}', {
+      afterLockAcquired: async () => {
+        acquired.resolve();
+        await release.promise;
+      },
+    });
+
+    await acquired.promise;
+    const ownerMetadataPath = path.join(`${p}.lock`, 'owner', 'metadata.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-controlled temporary path
+    const activeOwner = await fs.readFile(ownerMetadataPath, 'utf-8');
+    const second = await writeStateJson(p, '{"writer":"B"}', {
+      recoverStaleLock: true,
+      lockTimeoutMs: 25,
+    });
+
+    expect(second).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-controlled temporary path
+    await expect(fs.readFile(ownerMetadataPath, 'utf-8')).resolves.toBe(activeOwner);
+    release.resolve();
+    await expect(first).resolves.toMatchObject({ ok: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-controlled temporary path
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"writer":"A"}');
+  });
+
   it('does not release a lock when its token differs', async () => {
     const p = target('token.json');
     const lock = `${p}.lock`;
@@ -317,7 +346,11 @@ describe('review round 1 ownership races', () => {
       },
     } as never);
     await moved.promise;
-    const second = await writeStateJson(p, '{"v":"second"}', { staleLockTtlMs: 1, lockTimeoutMs: 25 });
+    const second = await writeStateJson(p, '{"v":"second"}', {
+      recoverStaleLock: true,
+      staleLockTtlMs: 1,
+      lockTimeoutMs: 25,
+    });
     expect(second).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
     const activeTransition = (await fs.readdir(`${p}.lock`)).find((entry) => entry.startsWith('.recovering-'));
     expect(activeTransition).toBeDefined();
