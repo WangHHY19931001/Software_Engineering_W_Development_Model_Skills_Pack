@@ -13,8 +13,8 @@
 # 触发条件：仅当本次推送的提交里包含以下路径的变更时才跑门禁，
 #           纯配置/纯目录（docs/superpowers、docs/changes）改动直接放行：
 #   - w-model-dev/**
-#   - 根级活体文档/配置：README.md / AGENTS.md / CONTRIBUTING.md / .gitignore / .eslintsecurity-baseline.json / package.json
-#   - .githooks/**
+#   - 根级活体文档/配置：README.md / AGENTS.md / CONTRIBUTING.md / .gitignore / .eslintsecurity-baseline.json / package.json / package-lock.json
+#   - config/** / scripts/** / .githooks/**
 #   - docs/*.md（docs/ 根级 .md，子目录归档不触发）
 
 set -euo pipefail
@@ -98,8 +98,8 @@ if [ "$FORCE" != "1" ] && [ "${PREPUSH_FORCE:-0}" != "1" ]; then
     [ -z "$f" ] && continue
     case "$f" in
       w-model-dev/*)                             needs_gate=1; break ;;
-      README.md|AGENTS.md|CONTRIBUTING.md|.gitignore|.eslintsecurity-baseline.json|package.json) needs_gate=1; break ;;
-      .githooks/*)                               needs_gate=1; break ;;
+      README.md|AGENTS.md|CONTRIBUTING.md|.gitignore|.eslintsecurity-baseline.json|package.json|package-lock.json) needs_gate=1; break ;;
+      config/*|scripts/*|.githooks/*)            needs_gate=1; break ;;
       docs/*.md)                                 needs_gate=1; break ;;
     esac
   done <<EOF
@@ -122,20 +122,14 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if [ ! -d node_modules ]; then
-  log "node_modules 缺失，先执行 npm install --no-audit --no-fund"
-  npm install --no-audit --no-fund >/dev/null 2>&1 || {
-    fail "npm install 失败"
-    exit 1
-  }
+  fail "node_modules 缺失，请先运行 npm install"
+  exit 1
 fi
 
-# ---------- 平台依赖自动补装（WSL / Windows 双平台共存） ----------
-# node_modules 在 Windows 侧安装时仅含 win32 原生二进制（esbuild / rolldown）；
-# 在 WSL/Linux 侧运行门禁前自动补装对应平台二进制（npm pack + 解压，绕过 npm
-# 依赖树，避免单侧 npm install 删除另一平台包）。仅提示 + 失败即中止。
-log "平台依赖检查（ensure-platform-deps）..."
-if ! bash "$(dirname "$0")/ensure-platform-deps.sh"; then
-  fail "平台依赖补装失败，中止推送"
+# ---------- 平台依赖检查（只读） ----------
+log "平台依赖检查（ensure-platform-deps --check）..."
+if ! bash "$(dirname "$0")/ensure-platform-deps.sh" --check; then
+  fail "平台依赖检查失败，中止推送"
   exit 1
 fi
 
