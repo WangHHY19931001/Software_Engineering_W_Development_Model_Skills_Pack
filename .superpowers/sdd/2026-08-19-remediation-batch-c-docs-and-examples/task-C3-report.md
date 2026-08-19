@@ -26,6 +26,18 @@
 - `npm run self-test`：通过，全部样本匹配期望。
 - `npm run prepush`：通过全部 17 项门禁，包括 npm audit、文档一致性、samples 覆盖、Prettier 与 typecheck。
 
+## 第 1/5 轮审查整改
+
+审查文件：`task-C3-review.md`。4 个 Important 已按 TDD 修复：
+
+- README TL;DR 改为 `[验证仓库]` / `[安装 Skill]` 两个独立锚点选择，移除混合箭头流程；README 的激活说明限定为支持对应 Skill 发现/激活机制的 Agent。
+- README、`docs/INSTALL.md`、`CONTRIBUTING.md` 明确保存已有自定义 `core.hooksPath`，提供 `git config --unset core.hooksPath` 撤销命令，并提供按旧值回写的命令。
+- `docs/INSTALL.md` Bash/PowerShell 卸载命令统一为 Agent-specific placeholder，明确破坏性命令只能在将占位符替换为安装时目标并确认路径后执行，完全移除卸载段 `.agent` 通用路径。
+- 文档测试改为按文档局部切片执行语义断言，并构造旧 TL;DR、缺 Bash 边界、旧卸载路径等局部负例；覆盖标题顺序、TL;DR、恢复命令、卸载、Bash 边界和 Agent-specific 安装/卸载。
+- adoption Day 0 编号修正为连续 `1` 至 `5`。
+
+本轮仍只修改 C3 允许的文档、文档测试和 CHANGELOG；未修改实现、hook、package、schema、baseline、plan 或 spec。测试总数保持 `52 files / 853 tests`。
+
 ## 提交
 
-提交信息：`docs: separate repository verification from skill installation`
+提交信息：`docs: harden onboarding path contracts`

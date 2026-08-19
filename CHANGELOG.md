@@ -14,6 +14,7 @@
 - **同步子进程边界**：`runSync` 为 B4 受控调用提供 15 秒进程级 timeout、固定 `SIGKILL`、固定 UTF-8 编码和 64 MiB 输出缓冲；非有限/非正 timeout 或 maxBuffer 均回退默认值。artifact gate 的 TLA+/BDD 校验及 gate-report、metrics-report、wm-status 测试调用均迁移至 helper。全目录同步调用已通过 TypeScript AST 与集中清单审计：解析 `node:child_process` 的直接、别名、namespace、解构和静态属性绑定；每处调用均声明理由及现有 timeout 或后续整改状态，动态计算属性访问将阻断审计，未在 B4 范围内的无 timeout 调用不再被默默放过。
 
 ### 文档对齐（审计整改批次 C）
+- **C3 入口契约加固**：README TL;DR 改为两个独立锚点选择，不再混合 Skill 复制与仓库验证命令；README、INSTALL、CONTRIBUTING 补充 `core.hooksPath` 旧值保存、`git config --unset core.hooksPath` 撤销和按需回写命令；INSTALL 卸载命令统一使用 Agent-specific placeholder，并要求替换安装时目标后再执行破坏性删除；文档测试增加按路径的局部负例和标题顺序、TL;DR、恢复命令、卸载、Bash 边界语义断言。
 - **仓库验证与 Skill 安装入口拆分**：README 首屏新增「验证仓库」与「安装 Skill」两个独立入口。仓库验证固定为 canonical GitHub URL、仓库根目录、Node.js ≥20、Git、npm registry/网络、`npm install` → `npm run self-test` → `npm run doctor`；PowerShell 5.1 使用逐行命令，`self-test` / `doctor` 不要求 Git Bash。Skill 安装改为复制 `w-model-dev/` 到 Agent-specific skills 目录，不将 `.agent` 作为通用路径，也不伪造无法验证的 Agent canonical URL。
 - **平台与 Hook 边界披露**：文档明确 `postinstall` 运行 `scripts/setup-hooks.cjs` 并设置本地 `core.hooksPath=.githooks`，该副作用不是 Skill 激活必需；Bash 仅用于 `pre-push` 与平台依赖检查；`platform-deps:check` 只检查、`platform-deps:install` 当前 fail-closed 并指引人工 `npm install`；Windows/WSL 不混用同一 checkout 的 `node_modules`。
 - **采用与贡献导航**：adoption Day 0 先验证仓库再安装 Skill；INSTALL、AGENTS、CONTRIBUTING 分别引用两个入口，并保留真实测试计数，不新增样本或改变实现逻辑。文档入口的语义由按路径契约测试逐项守护。

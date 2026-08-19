@@ -128,7 +128,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 
 ### 3.1 本地 pre-push 与平台依赖
 
-仓库验证时，`npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，只在本仓库的本地 Git 配置中设置 `core.hooksPath=.githooks`；这是本地配置副作用，不是 Agent Skill 激活必需。pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
+仓库验证时，`npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，只在本仓库的本地 Git 配置中设置 `core.hooksPath=.githooks`；这是本地配置副作用，不是 Agent Skill 激活必需。若安装前已有自定义 `core.hooksPath`，请先保存旧值。撤销本地覆盖可执行 `git config --unset core.hooksPath`；需要恢复自定义路径时按保存的旧值执行 `git config core.hooksPath <旧值>`。pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
 
 pre-push 仅运行 `bash .githooks/ensure-platform-deps.sh --check`。默认和 `--check` 均只检查当前平台所需原生包，**不自动**网络下载、`npm pack`、解包或覆盖 `node_modules`。平台检查与显式修复入口都必须在 Bash（Git Bash / WSL / POSIX shell）中运行：
 
@@ -226,20 +226,21 @@ description: >-
 
 ## 6. 卸载
 
-删除 skills 目录下的 `w-model-dev/` 即可：
+删除安装时使用的 Agent-specific 目标目录下的 `w-model-dev/`。下面的命令包含破坏性删除操作，只能在确认路径并将占位符替换为安装时目标后执行；不要直接复制：
 
 Bash：
 
 ```bash
-rm -rf "/path/to/agent/skills/w-model-dev"
+rm -rf "/path/to/<agent-specific-skills>/w-model-dev"
 ```
 
 PowerShell：
 
 ```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
+Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 ```
 
+若需要撤销仓库验证期间的本地 Hook 配置，按需执行 `git config --unset core.hooksPath`；若此前保存了自定义旧值，则执行 `git config core.hooksPath <旧值>` 回写。
 ---
 
 ## 7. 目录速查

@@ -109,6 +109,13 @@ npm run setup:hooks
 # 等价于 git config core.hooksPath .githooks
 ```
 
+如果启用前已有自定义 `core.hooksPath`，请先保存旧值。撤销本地覆盖可执行：
+
+```bash
+git config --unset core.hooksPath
+# 如需恢复已保存的自定义路径：git config core.hooksPath <旧值>
+```
+
 **手动触发**（不实际推送，仅跑门禁验证）：
 
 ```bash

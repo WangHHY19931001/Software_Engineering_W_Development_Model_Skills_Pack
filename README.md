@@ -7,7 +7,7 @@
 > 把软件工程 W 模型（需求 → 设计 → 编码 → 测试）的 8 个阶段编排为可执行的 `/wm` 命令，
 > 自动维护需求跟踪矩阵（RTM）、在验收阶段触发工件质量门检查。
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
-> 开始：拷贝 `w-model-dev/` 到你的 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。
+> 两个独立入口：选择 [验证仓库](#验证仓库) 检查仓库脚本健康，或选择 [安装 Skill](#安装-skill) 将资产复制到 Agent-specific skills 目录；两者不是同一条命令链。
 
 **当前版本**：`41.19.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
@@ -47,7 +47,7 @@ Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
 
 Bash 和 PowerShell 7 可以使用命令简写；`self-test` 与 `doctor` 可在 PowerShell 或 Windows Terminal 中运行，不要求 Git Bash。Git Bash 仅在运行 `pre-push` 或平台依赖检查时需要。
 
-> `npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，在本仓库本地 Git 配置中设置 `core.hooksPath=.githooks`。这是仓库验证的本地配置副作用，不是 Agent Skill 激活的必需步骤。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或运行当前 fail-closed 的 `npm run platform-deps:install` 获取人工 `npm install` 指引。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
+> `npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，在本仓库本地 Git 配置中设置 `core.hooksPath=.githooks`。这是仓库验证的本地配置副作用，不是 Agent Skill 激活的必需步骤。若安装前已有自定义 `core.hooksPath`，请先保存旧值；撤销本地覆盖可执行 `git config --unset core.hooksPath`，需要恢复自定义路径时按保存的旧值执行 `git config core.hooksPath <旧值>`。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或运行当前 fail-closed 的 `npm run platform-deps:install` 获取人工 `npm install` 指引。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
 
 ## 安装 Skill
 
@@ -113,7 +113,7 @@ flowchart TB
 
 ### AI Agent 安装
 
-安装入口见上面的 [安装 Skill](#安装-skill)。**Skill 资产零依赖**：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` / `subagent/` / `schemas/` 按需加载，纯 Markdown 无需 Node.js 或 npm。安装后，Agent 在用户提及 W 模型或 `/wm` 命令时自动激活本技能；详细步骤与验证方法见 [docs/INSTALL.md](./docs/INSTALL.md)。
+安装入口见上面的 [安装 Skill](#安装-skill)。**Skill 资产零依赖**：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` / `subagent/` / `schemas/` 按需加载，纯 Markdown 无需 Node.js 或 npm。安装后，支持对应 Skill 发现/激活机制的 Agent 可在用户提及 W 模型或 `/wm` 命令时激活本技能；详细步骤与验证方法见 [docs/INSTALL.md](./docs/INSTALL.md)。
 
 ### 运行门禁校验脚本
 
