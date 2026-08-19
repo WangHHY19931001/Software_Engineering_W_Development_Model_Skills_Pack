@@ -63,10 +63,22 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     expect(result.errorMessages.some((m) => /type/.test(m))).toBe(true);
   });
 
-  it('未注册的 schema 名返回明确错误', () => {
+  it('未注册的 schema 返回明确错误，gate-log 使用独立 schema 拒绝无效结构', () => {
     const result = validateBySchema('nonexistent-schema', {});
     expect(result.valid).toBe(false);
     expect(result.errorMessages.some((m) => /schema 未注册/.test(m))).toBe(true);
+
+    const validGateLog = {
+      script: 'check-example.ts',
+      exitCode: 0,
+      passed: true,
+      reasons: [],
+      reportSummary: {},
+    };
+    expect(validateBySchema('gate-log', validGateLog).valid).toBe(true);
+    expect(validateBySchema('gate-log', { ...validGateLog, script: '' }).valid).toBe(false);
+    expect(validateBySchema('gate-log', { ...validGateLog, exitCode: 3 }).valid).toBe(false);
+    expect(validateBySchema('gate-log', { ...validGateLog, extra: true }).valid).toBe(false);
   });
 });
 
@@ -282,7 +294,7 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('lib/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
     const dir = path.resolve(here, '../../schemas');
     const map = await readSchemasDir(dir);
-    expect(Object.keys(map).length).toBe(20);
+    expect(Object.keys(map).length).toBe(21);
     expect(map['rtm.schema.json']).toBeDefined();
   });
 });

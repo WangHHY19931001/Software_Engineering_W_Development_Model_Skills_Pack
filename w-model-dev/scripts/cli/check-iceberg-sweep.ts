@@ -199,10 +199,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log('ICEBERG_JSON ' + JSON.stringify(output));
+  const gateLog = await writeGateLog({
+    script: 'check-iceberg-sweep.ts',
+    exitCode: output.exitCode,
+    passed: output.passed,
+    reasons: output.reasons,
+    reportSummary: output.reportSummary,
+  });
+  const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
+  const summary = gateLogWriteError === undefined ? output : { ...output, gateLogWriteError };
 
-  // 写入 gate-logs（与 check-preventive-review.ts 一致，写入失败不阻塞）
-  await writeGateLog('iceberg-sweep', output);
+  console.log('ICEBERG_JSON ' + JSON.stringify(summary));
+  if (gateLogWriteError !== undefined) console.error(`[gate-log] 写入失败: ${gateLogWriteError}`);
 
   process.exit(output.exitCode);
 }

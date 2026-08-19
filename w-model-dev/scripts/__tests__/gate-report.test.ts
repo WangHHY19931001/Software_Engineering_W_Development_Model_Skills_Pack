@@ -28,6 +28,11 @@ const CHECK_ICEBERG_SWEEP_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../cli/check-iceberg-sweep.ts',
 );
+const CHECK_BDD_MODEL_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-bdd-model.ts');
+const CHECK_PREVENTIVE_REVIEW_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-preventive-review.ts',
+);
 const CHECK_TLA_BDD_SYNC_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../cli/check-tla-bdd-sync.ts',
@@ -319,11 +324,62 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
     expect(parsed.exitCode).toBe(0);
   });
 
-  it('默认路径（不带 --json）保留 ICEBERG_JSON 前缀', async () => {
+  it('默认路径保留 ICEBERG_JSON 前缀；三调用方写失败仍保留主结论并输出 gateLogWriteError', async () => {
     const r = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], {
       encoding: 'utf-8',
     });
     expect(r.status).toBe(0);
     expect(r.stdout ?? '').toContain('ICEBERG_JSON ');
+
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gatelog-cli-'));
+    const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples');
+    const blockedLogRoot = path.join(tmpDir, '.w-model');
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
+      await fs.writeFile(blockedLogRoot, 'not a directory', 'utf-8');
+
+      const bddProject = path.join(tmpDir, 'bdd-project');
+      const bddModelDir = path.join(bddProject, '.w-model');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
+      await fs.mkdir(bddModelDir, { recursive: true });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture and destination are test-controlled
+      await fs.copyFile(path.join(fixturesDir, 'bdd', 'valid-manifest.json'), path.join(bddModelDir, 'manifest.json'));
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
+      await fs.mkdir(path.join(bddProject, 'samples', 'bdd'), { recursive: true });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture and destination are test-controlled
+      await fs.copyFile(
+        path.join(fixturesDir, 'bdd', 'valid-l1.feature'),
+        path.join(bddProject, 'samples', 'bdd', 'valid-l1.feature'),
+      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
+      await fs.writeFile(path.join(bddModelDir, 'gate-logs'), 'not a directory', 'utf-8');
+
+      const iceberg = spawnSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], {
+        encoding: 'utf-8',
+        cwd: tmpDir,
+      });
+      expect(iceberg.status).toBe(0);
+      const icebergSummary = JSON.parse((iceberg.stdout ?? '').replace('ICEBERG_JSON ', '')) as Record<string, unknown>;
+      expect(icebergSummary).toMatchObject({ passed: true, exitCode: 0, gateLogWriteError: expect.any(String) });
+
+      const preventive = spawnSync(process.execPath, [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1'], {
+        encoding: 'utf-8',
+      });
+      expect(preventive.status).toBe(1);
+      const preventiveSummary = JSON.parse((preventive.stdout ?? '').replace('PREVENTIVE_REVIEW_JSON ', '')) as Record<
+        string,
+        unknown
+      >;
+      expect(preventiveSummary).toMatchObject({ passed: false, exitCode: 1, gateLogWriteError: expect.any(String) });
+
+      const bdd = spawnSync(process.execPath, [tsxCli, CHECK_BDD_MODEL_SCRIPT, path.join(bddModelDir, 'manifest.json')], {
+        encoding: 'utf-8',
+      });
+      expect(bdd.status).toBe(0);
+      const bddSummary = JSON.parse((bdd.stdout ?? '').match(/BDD_JSON (.+)/)?.[1] ?? '') as Record<string, unknown>;
+      expect(bddSummary).toMatchObject({ passed: true, exitCode: 0, gateLogWriteError: expect.any(String) });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });

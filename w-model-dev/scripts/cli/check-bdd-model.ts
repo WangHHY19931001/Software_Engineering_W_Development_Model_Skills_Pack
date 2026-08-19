@@ -370,13 +370,34 @@ async function main(): Promise<number> {
   console.log(`\n--- D8 SD Coverage: ${result.dimensions.sdCoverage.length} violations`);
   for (const v of result.dimensions.sdCoverage) console.log(`  - ${v}`);
 
+  const gateLog = await writeGateLog(
+    {
+      script: 'check-bdd-model.ts',
+      exitCode: result.exitCode,
+      passed: result.passed,
+      reasons: result.violations,
+      reportSummary: {
+        phase: result.phase,
+        checkedAt: result.checkedAt,
+        summary: result.summary,
+        violationsCount: result.violations.length,
+      },
+    },
+    projectDir,
+  );
+  const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
+
   // JSON 摘要
   console.log(`\n=== JSON Summary ===`);
-  const summary = { type: 'bdd', passed: result.passed, exitCode: result.exitCode, summary: result.summary };
+  const summary = {
+    type: 'bdd',
+    passed: result.passed,
+    exitCode: result.exitCode,
+    summary: result.summary,
+    ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
+  };
   console.log('BDD_JSON ' + JSON.stringify(summary));
-
-  // 写入 gate-logs（失败不污染退出码）
-  await writeGateLog('bdd', result, projectDir);
+  if (gateLogWriteError !== undefined) console.error(`[gate-log] 写入失败: ${gateLogWriteError}`);
 
   return result.exitCode;
 }

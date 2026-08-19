@@ -254,19 +254,33 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(
-    'PREVENTIVE_REVIEW_JSON ' +
-      JSON.stringify({
-        type: 'preventive-review',
-        passed: output.passed,
-        exitCode: output.exitCode,
+  const gateLog = await writeGateLog(
+    {
+      script: 'check-preventive-review.ts',
+      exitCode: output.exitCode,
+      passed: output.passed,
+      reasons: output.reasons,
+      reportSummary: {
+        phase: output.phase,
         variant: output.variant,
-        reasons: output.reasons,
-      }),
+        autoTrigger: output.autoTrigger,
+        reviewCount: Object.values(output.reviews).filter((review) => review !== null).length,
+      },
+    },
+    projectDir,
   );
+  const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
+  const summary = {
+    type: 'preventive-review',
+    passed: output.passed,
+    exitCode: output.exitCode,
+    variant: output.variant,
+    reasons: output.reasons,
+    ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
+  };
 
-  // 写入 gate-logs（失败不阻塞）
-  await writeGateLog('preventive-review', output, projectDir);
+  console.log('PREVENTIVE_REVIEW_JSON ' + JSON.stringify(summary));
+  if (gateLogWriteError !== undefined) console.error(`[gate-log] 写入失败: ${gateLogWriteError}`);
 
   process.exit(output.exitCode);
 }
