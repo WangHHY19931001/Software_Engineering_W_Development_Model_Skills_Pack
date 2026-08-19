@@ -161,7 +161,7 @@ export const EXPECTED = {
   hardConstraintCount: 14,
 } as const;
 
-const SCHEMA_TABLE_HEADING = '### Schema 清单（20 份）';
+const SCHEMA_TABLE_HEADING = '### Schema 清单（21 份）';
 const DOD_README = '7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
 const DOD_SSOT_TRACE = '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
 /**
@@ -804,8 +804,8 @@ function checkVitestFileCount(testFileCount: number, readme: string, agents: str
  * vitest 用例总数一致性校验（堵住 checkVitestFileCount 只查文件数不查用例总数的盲区）：
  * CLI 层从 `npx vitest run` 输出采集实测用例总数并注入，此处要求 README / AGENTS / pre-push
  * 三处活体文档文本均出现该总数（「N tests」或「N 条」），测试用例增删但文档未同步即触发违规。
- * 无法采集（vitest 不可用 / 输出不可解析，vitestTestCount < 0）时保守放行，不阻断门禁
- * （与 detectScriptsChanges 在 git 不可用时保守返回 false 的既有策略一致）。
+ * 无法采集（vitest 不可用 / 输出不可解析，vitestTestCount < 0）时 fail-closed：产生
+ * `vitest-tests` 违规并阻断门禁。计数是活体文档的一致性证据，缺失证据不可放行。
  *
  * 过期计数检查（stale-count）：出现性检查只能保证实测总数「存在」于文档，无法拦截同一文档
  * 内并存的旧数字（如 README 一处写 686、另一处残留 663）。因此对 vitest 语境的两种计数
@@ -820,7 +820,13 @@ function checkVitestTestCount(
   extraVitestDocs?: Array<{ name: string; content: string }>,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (vitestTestCount < 0) return violations;
+  if (vitestTestCount < 0) {
+    violations.push({
+      check: 'vitest-tests',
+      message: 'Vitest 实测用例总数无法采集（Vitest 启动、JSON 或文本解析失败；fail-closed）',
+    });
+    return violations;
+  }
   const pattern = new RegExp(`\\b${vitestTestCount}\\s*(?:tests?\\b|条)`);
   const docs: Array<[string, string]> = [
     ['README.md', readme],
@@ -930,26 +936,6 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
     }
   }
 
-  if (!/Vitest.*(?:fail-closed|用例采集).*未完成|(?:fail-closed|用例采集).*未完成/.test(docs.changelog)) {
-    violations.push({
-      check: 'a4-batch-b-boundary',
-      message: 'CHANGELOG.md 应保留 batch B 的 Vitest test-count fail-closed 未完成边界说明',
-    });
-  }
-  const batchBCompletionClaim = docs.changelog
-    .split(/\r?\n/)
-    .some(
-      (line) =>
-        /Vitest.*(?:fail-closed|用例采集)|(?:fail-closed|用例采集)/.test(line) &&
-        /已完成|已修复/.test(line) &&
-        !/不得声称|未声称/.test(line),
-    );
-  if (batchBCompletionClaim) {
-    violations.push({
-      check: 'a4-batch-b-boundary',
-      message: 'CHANGELOG.md 不得声称 batch B 的 Vitest test-count fail-closed 已完成或已修复',
-    });
-  }
   return violations;
 }
 

@@ -394,9 +394,9 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 #### 设计决策历史（历史信息由 CHANGELOG 体系承载）
 
 > 本技能的设计演进记录（轮次决策、关键决策、验证数据）统一由 **CHANGELOG 体系**承载，
-> 不再在本文档内维护：变更条目见 [CHANGELOG.md](../../CHANGELOG.md)（41.0.0 之后）与
-> [CHANGELOG-archive.md](../../CHANGELOG-archive.md)（41.0.0 之前）；
-> 轮次详细决策记录（原文）归档于 [docs/changes/decision-log/](../../docs/changes/decision-log/README.md)；
+> 不再在本文档内维护：变更条目见 [CHANGELOG.md](../CHANGELOG.md)（41.0.0 之后）与
+> [CHANGELOG-archive.md](../CHANGELOG-archive.md)（41.0.0 之前）；
+> 轮次详细决策记录（原文）归档于 [docs/changes/decision-log/](./changes/decision-log/README.md)；
 > 轮次 → 版本 → CHANGELOG 条目映射见 decision-log README。
 
 ## 4. 技能工作流程

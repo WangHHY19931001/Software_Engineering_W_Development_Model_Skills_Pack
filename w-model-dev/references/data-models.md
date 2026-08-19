@@ -35,7 +35,7 @@
 | 爬坡报告 | HarnessImprovementReport | 「爬坡循环改进报告模型」节 |
 | TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound） | 「TLA+ manifest 模型」节 |
 | BDD 模型 | BddManifest / BddStateMachine / BddFeature | 「BDD 数据模型」节 |
-| JSON Schema | 20 份 schema + structural-first + [schema] 前缀 | 「JSON Schema 强约束」节 |
+| JSON Schema | 21 份 schema + structural-first + [schema] 前缀 | 「JSON Schema 强约束」节 |
 
 **按场景只读 §X**：
 
@@ -873,7 +873,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/logic/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（20 份）
+### Schema 清单（21 份）
 
 | Schema 名（注册键） | 文件 | 目标类型 | 关键约束 | 对应 logic.ts |
 | --- | --- | --- | --- | --- |
@@ -883,6 +883,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `tla-manifest` | `tla-manifest.schema.json` | TlaManifest | additionalProperties:false；spec.level enum（L1-L6）；decompositionDecision enum（4 类） | tla-logic.ts |
 | `code-tla-manifest` | `code-tla-manifest.schema.json` | CodeTlaConsistencyInput | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description） | code-tla-logic.ts |
 | `budget` | `budget.schema.json` | BudgetConfig | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1] | budget-logic.ts |
+| `gate-log` | `gate-log.schema.json` | GateLogEntry | gate-logs append-only 审计记录；gate/tla-gate/graph-gate 输出与退出码可追溯 | gate-log.ts |
 | `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（27 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
 | `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | （暂未集成到 logic.ts validateBySchema，仅 self-test SCHEMA_CASES 覆盖） |
 | `event-ingress` | `event-ingress.schema.json` | `EventIngressEntry` | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （暂未集成到 logic.ts，仅 self-test 覆盖） |

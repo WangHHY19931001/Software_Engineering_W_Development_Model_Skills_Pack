@@ -208,13 +208,11 @@ function readVitestCountFile(): number | null {
  * 采集 vitest 实际运行输出的用例总数（堵住只查文件数不查用例总数的盲区）。
  * 优先级（快路径优先，避免重复全量 vitest）：
  *   1. 环境变量 WM_VITEST_COUNT_FILE 指向的 vitest JSON outputFile（pre-push 第 12 项复用）→ 直接读取，不 spawn；
- *   2. scripts 未变更（scriptsChanged=false）→ 返回 -1（vitest-tests 检查软放行）：用例总数仅在
- *      w-model-dev/scripts/** 下测试文件增删时变化，任何此类变更必使 scriptsChanged=true，届时才重采；
- *   3. 否则显式 spawn vitest（既有逻辑）。
+ *   2. 未提供可用 JSON 时，一律显式 spawn Vitest 采集（不以 scriptsChanged 跳过）。
  * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
  * spawnSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
- * 落盘/解析失败回退 stdout 文本解析「Tests  N passed」；全部失败返回 -1（保守放行，不阻断门禁，
- * 与 git 不可用时 detectScriptsChanges 返回 false 的既有策略一致）。
+ * 落盘/解析失败回退 stdout 文本解析「Tests  N passed」；全部失败返回 -1，由逻辑层生成
+ * `vitest-tests` 违规并 fail-closed。
  * 注：maxBuffer 必须放宽——vitest 全量进度输出可达数 MB，默认 1MB 会触发
  * ERR_CHILD_PROCESS_STDIO_MAXBUFFER（此时 spawn 报 error 但 JSON 文件已落盘，仍需继续读文件）。
  * 注：必须显式 --config 限定扫描范围（config/vitest.config.ts 的 include 仅
@@ -222,10 +220,9 @@ function readVitestCountFile(): number | null {
  * 默认 include 会扫全树，嵌套 git worktree（.worktrees/**）下的测试文件将被重复计数
  * （实测根仓库 + worktree 双份 554 → 1108），导致 vitest-tests 门禁误报。
  */
-function collectVitestTestCount(root: string, scriptsChanged: boolean): number {
+function collectVitestTestCount(root: string): number {
   const fromFile = readVitestCountFile();
   if (fromFile !== null) return fromFile;
-  if (!scriptsChanged) return -1; // 用例总数不会变化，跳过全量 vitest 重采
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
@@ -299,9 +296,9 @@ async function main(): Promise<void> {
     f.endsWith('.test.ts'),
   ).length;
   const scriptsChanged = detectScriptsChanges(root);
-  const vitestTestCount = collectVitestTestCount(root, scriptsChanged);
+  const vitestTestCount = collectVitestTestCount(root);
 
-  // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md（核心导航文档集）
+  // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md + SSoT（核心导航文档集）
   const referenceFiles = readdirSync(join(root, 'w-model-dev/references'))
     .filter((f) => f.endsWith('.md'))
     .sort();
@@ -314,6 +311,11 @@ async function main(): Promise<void> {
     })),
     { name: 'README.md', content: read('README.md'), baseDir: '.' },
     { name: 'AGENTS.md', content: read('AGENTS.md'), baseDir: '.' },
+    {
+      name: 'docs/skill-design-document_SSoT.md',
+      content: read('docs/skill-design-document_SSoT.md'),
+      baseDir: 'docs',
+    },
   ];
 
   // docs/INSTALL.md 被 installDoc 与 vitestExtraDocs 各消费一次——先读取复用到两处，避免重复 IO
@@ -405,7 +407,7 @@ async function main(): Promise<void> {
   console.log(`exit-2 脚本   : ${exit2ScriptCount}`);
   console.log(`persona 文件   : ${personaCount}`);
   console.log(`test 文件    : ${testFileCount}`);
-  console.log(`vitest 用例  : ${vitestTestCount < 0 ? '无法采集（放行）' : vitestTestCount}`);
+  console.log(`vitest 用例  : ${vitestTestCount < 0 ? '无法采集（不一致）' : vitestTestCount}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);
 
   if (violations.length > 0) {
