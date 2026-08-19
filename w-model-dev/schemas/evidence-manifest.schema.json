@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/evidence-manifest.schema.json",
+  "title": "EvidenceExportManifest",
+  "description": "脱敏运行时审计证据导出清单；files 中每条记录导出相对路径、类别与 SHA-256。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "exportedAt", "sourceProject", "files"],
+  "properties": {
+    "schemaVersion": {
+      "description": "导出 manifest 格式版本。",
+      "type": "string",
+      "const": "1.0"
+    },
+    "exportedAt": {
+      "description": "导出时间（ISO-8601 UTC）。",
+      "type": "string",
+      "format": "date-time"
+    },
+    "sourceProject": {
+      "description": "已脱敏的源项目标识，不得包含原始绝对路径。",
+      "type": "string",
+      "minLength": 1
+    },
+    "files": {
+      "description": "导出文件清单（不包含 manifest 本身）。",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "kind"],
+        "properties": {
+          "path": {
+            "description": "相对于导出目录的安全 POSIX 路径。",
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "description": "导出后文件内容的 SHA-256（64 位小写十六进制）。",
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "kind": {
+            "description": "允许导出的运行时证据类别。",
+            "type": "string",
+            "enum": ["gate-log", "verifier-output", "signature-chain", "codegraph-query", "run-log"]
+          }
+        }
+      }
+    }
+  }
+}

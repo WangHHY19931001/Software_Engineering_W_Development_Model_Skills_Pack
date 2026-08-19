@@ -27,6 +27,7 @@
     "typecheck": "tsc -p config/tsconfig.json",
     "wm:status": "tsx w-model-dev/scripts/cli/wm-status.ts",
     "wm:metrics": "tsx w-model-dev/scripts/cli/metrics-report.ts",
+    "wm:export-evidence": "tsx w-model-dev/scripts/cli/wm-export-evidence.ts",
     "docs:build": "typedoc --tsconfig config/tsconfig.json --out docs/api w-model-dev/scripts/cli w-model-dev/scripts/logic w-model-dev/scripts/infrastructure --entryPointStrategy expand --excludeNotDocumented",
     "docs:site": "docsify serve docs",
     "version:bump": "node scripts/version-bump.cjs",

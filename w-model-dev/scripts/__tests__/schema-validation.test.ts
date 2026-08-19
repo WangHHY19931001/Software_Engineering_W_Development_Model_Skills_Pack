@@ -331,7 +331,7 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('infrastructure/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
     const dir = path.resolve(here, '../../schemas');
     const map = await readSchemasDir(dir);
-    expect(Object.keys(map).length).toBe(21);
+    expect(Object.keys(map).length).toBe(22);
     expect(map['rtm.schema.json']).toBeDefined();
   });
 });

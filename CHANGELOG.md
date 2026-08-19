@@ -23,6 +23,9 @@
 - **可执行 Persona Verifier 样例**：将四个 Persona 的失效内嵌 JSON 迁为 `samples/verifier/persona-*.json` 可执行 fixture；每个 fixture 使用当前 Schema 的 meta、子标准、方差与可追溯 evidence，并由 CLI、self-test、samples 覆盖门和 Vitest 逐项验证。`agent-personas.md` 保留字段约束、fixture 链接与校验命令，明确真实评审须基于目标证据重建输出，不能复制固定评分或证据。self-test 基线 256→260，Vitest 实测 52 files / 849→853 tests。
 - **SSoT 外部 Agent 边界**：重画 §3.1 架构图，明确技能包仅交付 Markdown 资产、Schema 与确定性 gate scripts；宿主 Agent / 外部 LLM 负责推理、子代理调度和 LLM-as-Verifier；TLA+ TLC、CodeGraph、OpenSpec 为可选外部工具，不属于技能包交付物。同步三项 CLI JSDoc：默认和 `--json` 均先尝试写 gate log，写入失败以 `gateLogWriteError` 报告且不改变主 gate 结果，并由静态测试守护。
 
+### 新增（审计整改批次 D）
+- **D3 可验证运行时审计证据导出**：新增 `wm:export-evidence`，仅导出 `.w-model` 白名单目录与 run-log 的常规文本记录；JSON/JSONL 递归脱敏 `token`、`secret`、`password`、`apiKey` 字段，使用临时目录+原子 rename 发布严格 Schema 的 SHA-256 manifest。`--verify` 会重新执行 manifest Schema、路径安全、文件存在性与哈希校验；输出目录冲突、符号链接/路径逃逸、二进制或未知扩展均 fail-closed，CLI 保持真实 exit 0/1/2 与 `EVIDENCE_EXPORT_JSON` 摘要。
+
 ### 修复（审计整改批次 A）
 - **状态写并发协议**：`wm-write` 改为 `<target>.lock` 持久目录与可转移 owner 的跨进程锁；锁内执行 mtime、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 增加 `--lock-timeout` 与显式 `--recover-stale-lock`；默认对陈旧锁 fail-closed（`STALE_LOCK` / exit 1），同时保留直接 `writeStateJson` 调用的兼容性隐式恢复。显式恢复仅授权 TTL 已过且 owner/operator PID 已退出的锁或 transition，不能夺取活跃 writer；逻辑层 barrier 与真实 CLI 回归测试覆盖该排他性边界。
 - **状态 Schema 写时校验**：`wm-write` 在锁临界区内通过唯一注册表验证 project/rtm/budget/maturity JSON 与 run-log JSONL；未注册 `.w-model` 目标默认以 `UNREGISTERED_TARGET` 拒绝，`--allow-untyped` 只允许该类目标且在 JSON 摘要标识 `untyped:true`，从不绕过注册目标的 `SCHEMA_INVALID` 拒绝。真实子进程回归覆盖两种 exit 1 协议、JSONL 安全行号与无备份/tmp 残留。

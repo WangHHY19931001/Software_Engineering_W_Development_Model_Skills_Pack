@@ -182,6 +182,15 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   },
   {
     api: 'spawnSync',
+    file: '__tests__/evidence-export-logic.test.ts',
+    line: 68,
+    symbol: 'runCli',
+    reason:
+      'D3 requires actual CLI child-process exit-code tests; execution uses the default 15-second process timeout.',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
     file: '__tests__/wm-write.test.ts',
     line: 35,
     symbol: 'runArgs',
