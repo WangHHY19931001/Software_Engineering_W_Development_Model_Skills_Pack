@@ -35,7 +35,9 @@ describe('writeGateLog（lib/gate-log-writer.ts）', () => {
       expect(first.ok).toBe(true);
       expect(second.ok).toBe(true);
       if (!first.ok || !second.ok) throw new Error('expected successful writes');
-      expect(first.path).toContain('2026-08-19T12-34-56-789Z-11111111-1111-4111-8111-111111111111-check-bdd-model.ts.json');
+      expect(first.path).toContain(
+        '2026-08-19T12-34-56-789Z-11111111-1111-4111-8111-111111111111-check-bdd-model.ts.json',
+      );
       expect(first.path).not.toBe(second.path);
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- writer returns this mkdtemp-controlled path
       expect(validateBySchema('gate-log', JSON.parse(await fs.readFile(first.path, 'utf-8'))).valid).toBe(true);

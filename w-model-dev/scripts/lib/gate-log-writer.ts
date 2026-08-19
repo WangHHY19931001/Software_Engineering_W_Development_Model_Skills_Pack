@@ -99,7 +99,14 @@ export async function writeGateLog(
     if (await removeTemporaryFile(fileSystem, temporary)) {
       return { ok: true, path: destination };
     }
-    return { ok: false, error: { code: 'GATE_LOG_CLEANUP_FAILED', message: 'Gate log persisted but temporary cleanup failed', cleanupFailed: true } };
+    return {
+      ok: false,
+      error: {
+        code: 'GATE_LOG_CLEANUP_FAILED',
+        message: 'Gate log persisted but temporary cleanup failed',
+        cleanupFailed: true,
+      },
+    };
   }
 
   return { ok: false, error: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' } };
