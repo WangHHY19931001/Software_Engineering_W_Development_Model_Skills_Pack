@@ -23,3 +23,11 @@ Implemented `refactor(cli): use natural process exit for gate reports`.
 ## Scope
 
 No business logic, schemas, hooks, package files, security baseline, plans, or specs were changed.
+
+## 第 1/5 轮复审修复
+
+- 修复 `check-samples-coverage.ts --json`：计算单一 `exitCode`，`printJsonReport` 后设置 `process.exitCode` 并自然返回。
+- `gate-report.test.ts` 新增真实子进程成功/违规断言：shell status 与 JSON `exitCode` 分别为 0/1。
+- 定向测试：17/17 通过。
+- 后续验证：typecheck、安全扫描通过；全量测试/prepush 的已知 docs/test-file 计数漂移按要求记录。
+- 最终验证：定向 `gate-report.test.ts` 17/17 通过；`npm run typecheck` 与 `npm run lint:security` 通过。`npm test` 为 857 passed / 1 failed，且 `npm run prepush` 在同一既有 53-vs-52 文档计数漂移的 Vitest 覆盖门停止；prepush 之前的所有门禁通过。

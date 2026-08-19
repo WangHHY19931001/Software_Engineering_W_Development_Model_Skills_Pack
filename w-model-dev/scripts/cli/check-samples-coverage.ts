@@ -190,6 +190,7 @@ function main(): void {
     if (jsonMode) {
       const dist = new Map<string, number>();
       for (const v of violations) dist.set(v.check, (dist.get(v.check) ?? 0) + 1);
+      const exitCode = violations.length === 0 ? 0 : 1;
       printJsonReport(
         {
           type: 'samples-coverage',
@@ -198,8 +199,9 @@ function main(): void {
           violations: [...dist.entries()].map(([rule, count]) => ({ rule, count })),
           durationMs: 0,
         },
-        violations.length === 0 ? 0 : 1,
+        exitCode,
       );
+      process.exitCode = exitCode;
       return;
     }
     console.log('─'.repeat(60));

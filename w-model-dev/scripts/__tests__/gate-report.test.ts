@@ -39,6 +39,10 @@ const ICEBERG_VALID_SAMPLE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../samples/iceberg/valid-full.json',
 );
+const CHECK_SAMPLES_COVERAGE_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-samples-coverage.ts',
+);
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -164,6 +168,54 @@ describe('buildViolationDistribution（violations 分布聚合）', () => {
       { rule: 'TLA_BDD_STATE', count: 1 },
       { rule: 'TLA_BDD_INVARIANT', count: 1 },
     ]);
+  });
+});
+
+describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JSON exitCode 一致）', () => {
+  async function createSamplesCoverageFixture(withViolation: boolean): Promise<string> {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-samples-coverage-json-'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+    await fs.mkdir(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+    await fs.mkdir(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+    await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'README.md'), '', 'utf-8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+    await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli', 'self-test.ts'), '', 'utf-8');
+    if (withViolation) {
+      await fs.writeFile(
+        path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'unregistered.json'),
+        '{}',
+        'utf-8',
+      );
+    }
+    return tmpDir;
+  }
+
+  it('违规样本 → shell status=1 且 JSON exitCode=1', async () => {
+    const tmpDir = await createSamplesCoverageFixture(true);
+    try {
+      const result = runSync(process.execPath, [tsxCli, CHECK_SAMPLES_COVERAGE_SCRIPT, tmpDir, '--json'], {});
+      expect(result.status).toBe(1);
+      const report = JSON.parse(result.stdout ?? '') as { passed: boolean; exitCode: number };
+      expect(report.passed).toBe(false);
+      expect(report.exitCode).toBe(1);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('无违规样本 → shell status=0 且 JSON exitCode=0', async () => {
+    const tmpDir = await createSamplesCoverageFixture(false);
+    try {
+      const result = runSync(process.execPath, [tsxCli, CHECK_SAMPLES_COVERAGE_SCRIPT, tmpDir, '--json'], {});
+      expect(result.status).toBe(0);
+      const report = JSON.parse(result.stdout ?? '') as { passed: boolean; exitCode: number };
+      expect(report.passed).toBe(true);
+      expect(report.exitCode).toBe(0);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
