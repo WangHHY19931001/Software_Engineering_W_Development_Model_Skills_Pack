@@ -42,7 +42,7 @@
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装 / 排障 / 用户指南）；`docs/api/` 为 typedoc 生成物（`npm run docs:build`，gitignored 不入库）；`docs/superpowers/`（plans/ + specs/）为内部规划目录，不参与门禁、非面向用户 | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
-| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 17 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性 + tsc 类型检查），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）。缺 `node_modules` 即 exit 1，绝不自动 `npm install`；仅运行 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。`npm run platform-deps:check` / `npm run platform-deps:install` 均为显式入口，后者 fail-closed 并指引人工 `npm install` | `config/**`、根 `scripts/**`、`package-lock.json`、`w-model-dev/scripts/**`、`package.json`、`.githooks/**` 与活体文档变更会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
+| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 17 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性 + tsc 类型检查），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）。缺 `node_modules` 即 exit 1，绝不自动 `npm install`；仅运行 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。`npm run platform-deps:check` / `npm run platform-deps:install` 均为显式入口，后者 fail-closed 并指引人工 `npm install` | `config/**`、根 `scripts/**`、`package-lock.json`、`w-model-dev/scripts/**`、`package.json`、`.githooks/**` 与活体文档变更会触发；Git Bash / WSL 执行 pre-push 与平台检查；self-test / doctor 可在 PowerShell / Windows Terminal 运行 |
 
 门禁脚本测试：
 - `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，52 个 .test.ts / 853 条）
@@ -50,6 +50,17 @@
 - 运行：`npx vitest run --config config/vitest.config.ts`（仓库根目录；配置集中于 config/）
 
 ## 3. 常用命令
+
+仓库验证与 Skill 安装是两个独立入口：从仓库根目录执行 `npm install`、`npm run self-test`、`npm run doctor` 只验证仓库脚本健康；安装 Skill 时只复制 `w-model-dev/` 到具体 Agent 的 Agent-specific skills 目录，路径以官方文档为准，不要把 `.agent` 当通用路径。Windows 与 WSL 不要在同一个 checkout 混用 `node_modules`。
+
+PowerShell 5.1 请逐行执行，不能使用 `&&`：
+
+```powershell
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
+```
+
+`self-test` / `doctor` 可在 PowerShell 或 Windows Terminal 中运行；Bash 只用于 `pre-push` 和平台依赖检查。`npm install` 的 `postinstall` 会设置当前仓库本地 Git 配置 `core.hooksPath=.githooks`，这是仓库验证的副作用，不是 Skill 激活必需。缺平台依赖时须显式运行 `npm run platform-deps:check` 或当前 fail-closed 的 `npm run platform-deps:install`，pre-push 不会自动修复。
 
 ```bash
 # 首次：在仓库根目录安装 devDependencies（ajv / ajv-formats / eslint-plugin-security / tsx / typescript / vitest 等，约 30MB）

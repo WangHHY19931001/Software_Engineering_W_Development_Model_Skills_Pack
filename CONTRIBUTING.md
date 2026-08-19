@@ -10,10 +10,12 @@
 
 本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，声明 `tsx`（运行 `w-model-dev/scripts/cli/*.ts`）+ `ajv`/`ajv-formats`（schema 校验 runtime 依赖）+ `eslint-plugin-security`（安全扫描）+ `@typescript-eslint/*` + `vitest` 等开发依赖，无构建步骤、无 `src/`、无编程式 SDK。
 
+贡献者先验证仓库，再参与修改。以下命令必须从仓库根目录执行；需要 Node.js ≥20、Git 和 npm registry/网络。普通用户只需按 README 的「验证仓库」或「安装 Skill」入口选择目标，不需要运行贡献者的 pre-push 门禁：
+
 ```bash
 # 1. 克隆仓库
-git clone <repo-url>
-cd Software_Engineering_W_Development_Model_Skills_Pack
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+cd w-model-skill-pack
 
 # 2. 安装开发依赖（tsx / ajv / eslint-plugin-security / vitest 等）
 npm install
@@ -26,7 +28,7 @@ npm run setup:hooks
 # 启用后每次 git push 会自动跑回归基线，详见下方「本地推送前门禁」一节
 ```
 
-技能资产主体（`SKILL.md` / `references/` / `templates/` / `examples/`）是纯 Markdown，无需任何运行时；`w-model-dev/scripts/cli/*.ts` 是自包含 TypeScript，仅依赖 `tsx` 运行 ESM。
+技能资产主体（`SKILL.md` / `references/` / `templates/` / `examples/`）是纯 Markdown，无需任何运行时；`w-model-dev/scripts/cli/*.ts` 是自包含 TypeScript，仅依赖 `tsx` 运行 ESM。仓库验证不等于 Skill 安装：安装 Skill 时只复制 `w-model-dev/` 到具体 Agent 的 Agent-specific skills 目录，路径以官方文档为准，不要把 `.agent` 当通用路径。
 
 ## 开发工作流
 
@@ -100,7 +102,7 @@ npm run format
 | 16 | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断） | 0 |
 | 17 | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5） | 0 |
 
-**启用方式**：克隆后首次 `npm install` 即自动启用（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时，失败仅 warn 不阻断 install）。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
+**启用方式**：仓库验证期间首次 `npm install` 即自动启用（`postinstall` 运行 `scripts/setup-hooks.cjs`，在当前 checkout 的本地 `.git/config` 设置 `core.hooksPath=.githooks`；失败仅 warn，不阻断 install）。这是仓库验证的本地 Git 配置副作用，不是 Agent Skill 激活必需。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
 ```bash
 npm run setup:hooks
@@ -128,8 +130,8 @@ npm run platform-deps:install  # 当前只提示人工 npm install，不自动�
 git push --no-verify
 ```
 
-> Windows 注意：pre-push 依赖 bash。**Git Bash（Git for Windows 自带）下会正常执行门禁**；仅纯 cmd/PowerShell（无 bash 解释器）环境无法执行，hook 检测到后给出指引并放行（exit 0），不误报失败。请使用 Git Bash 运行 `npm run prepush`。
-> **WSL / 双平台**：仓库 node_modules 若在 Windows 侧安装，WSL/Linux 下的 pre-push 只调用 [`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh) `--check` 验证当前平台原生包；它不会自动修复。检查失败时使用 Git Bash/WSL 显式运行 `npm run platform-deps:check`，并按 `npm run platform-deps:install` 给出的人工 `npm install` 指引修复。
+> Windows 注意：pre-push 依赖 Bash。Git Bash（Git for Windows 自带）下会执行门禁；纯 cmd/PowerShell 不能执行 `pre-push`，但 `self-test` 与 `doctor` 可在 PowerShell / Windows Terminal 运行。请仅在 Git Bash 中运行 `npm run prepush`。
+> **WSL / 双平台**：不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`。建议每个平台使用独立 checkout，或切换平台后重新执行 `npm install`。平台检查失败时使用 Git Bash/WSL 显式运行 `npm run platform-deps:check`，并按 `npm run platform-deps:install` 给出的人工 `npm install` 指引修复。
 
 ### 4. 提交规范
 

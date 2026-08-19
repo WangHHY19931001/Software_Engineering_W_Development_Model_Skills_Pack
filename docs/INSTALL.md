@@ -5,6 +5,41 @@
 >
 > 设计文档统一存放在 [`docs/`](.) 目录；Skill 资产按标准 skill 结构集中在项目根的
 > [`w-model-dev/`](../w-model-dev) 目录。
+>
+> 本指南区分两个入口：先验证仓库脚本健康，再把 Skill 安装到具体 Agent。Agent-specific 路径必须以对应 Agent 的官方文档为准；本仓库不把 `.agent` 声称为通用标准路径，也不伪造无法验证的 Agent canonical URL。
+
+---
+
+## 验证仓库
+
+该入口验证仓库本身，不安装 Skill。命令必须从仓库根目录执行，需要 Node.js ≥20、Git，以及可访问的 npm registry/网络。
+
+```bash
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+cd w-model-skill-pack
+npm install
+npm run self-test
+npm run doctor
+```
+
+PowerShell 5.1 请使用两行或逐行命令，不要使用 `&&`：
+
+```powershell
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
+```
+
+`self-test` 与 `doctor` 可在 PowerShell 或 Windows Terminal 中运行，不需要 Git Bash。Bash 只用于 `pre-push` 和平台依赖检查。
+
+## 安装 Skill
+
+该入口只复制 `w-model-dev/` 到 Agent-specific skills 目录。完成仓库验证后，按照目标 Agent 的官方文档填写 `<agent-specific-skills>`；下面的路径是占位符，不能直接复制执行：
+
+```powershell
+Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
+```
+
+不要把 `.agent` 当作通用路径。安装和激活方式由具体 Agent 决定；请使用该 Agent 官方文档中的 canonical URL。Skill 资产是纯 Markdown 和随附资源，复制 Skill 不等于在 Agent 目录安装仓库的 `node_modules`。
 
 ---
 
@@ -55,16 +90,16 @@
 ### Bash / macOS / Linux
 
 ```bash
-cp -r "w-model-dev" "/path/to/agent/skills/w-model-dev"
+cp -r "w-model-dev" "/path/to/<agent-specific-skills>/w-model-dev"
 ```
 
 ### PowerShell / Windows
 
 ```powershell
-Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-dev"
+Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 ```
 
-目标 skills 路径以具体 Agent 文档为准；路径包含空格时始终使用引号。
+上述目标路径是 Agent-specific placeholder，不是通用路径，也不能直接复制执行。目标 skills 路径、激活机制和官方链接以具体 Agent 文档为准；路径包含空格时始终使用引号。
 
 安装后的目录结构应为：
 
@@ -93,7 +128,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 
 ### 3.1 本地 pre-push 与平台依赖
 
-`npm install` 的 postinstall 只负责设置本仓库的 `core.hooksPath=.githooks`；pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
+仓库验证时，`npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，只在本仓库的本地 Git 配置中设置 `core.hooksPath=.githooks`；这是本地配置副作用，不是 Agent Skill 激活必需。pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
 
 pre-push 仅运行 `bash .githooks/ensure-platform-deps.sh --check`。默认和 `--check` 均只检查当前平台所需原生包，**不自动**网络下载、`npm pack`、解包或覆盖 `node_modules`。平台检查与显式修复入口都必须在 Bash（Git Bash / WSL / POSIX shell）中运行：
 
@@ -146,7 +181,7 @@ npm run doctor
 npm run lint:security
 ```
 
-PowerShell：
+PowerShell 5.1：请逐行执行，不能使用 `&&`。
 
 ```powershell
 npm install
@@ -159,6 +194,8 @@ $LASTEXITCODE  # 预期为 0
 npm run lint:security
 $LASTEXITCODE  # 预期为 0
 ```
+
+Bash 和 PowerShell 7 可使用命令简写；`self-test` / `doctor` 不要求 Git Bash。
 
 ---
 
@@ -250,6 +287,10 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.agent\skills\w-model-dev"
 
 ## 8. 常见问题
 
+**Q：仓库验证和 Skill 安装是同一件事吗？**
+- 不是。仓库验证是从仓库根目录执行 `npm install`、`npm run self-test`、`npm run doctor`，用于确认脚本环境健康；Skill 安装只复制 `w-model-dev/` 到目标 Agent 的 Agent-specific skills 目录。
+- `npm install` 的 `postinstall` 只设置当前 checkout 的 `core.hooksPath=.githooks`，不负责激活 Agent Skill。
+
 **Q：安装需要联网或 API key 吗？**
 - **纯 Skill 资产**（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零联网，拷贝即可用。
 - **运行门禁脚本** 需联网一次 `npm install` 拉取 devDeps（`ajv` / `ajv-formats` / `eslint-plugin-security` 等，首次安装约 30MB）。之后离线可用。
@@ -264,7 +305,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，52 个 test 文件 / 853 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
-若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。
+若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。Windows 与 WSL 不要在同一个 checkout 混用 `node_modules`；建议为每个平台使用独立 checkout，或切换平台后重新执行 `npm install`。
 
 **Q：技能自演化在哪里？**
 不在本仓库。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具完成：

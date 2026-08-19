@@ -24,6 +24,43 @@
 
 **CI 策略**：本项目**不集成云端 CI（GitHub Actions / GitLab CI）**，本地 git `pre-push` hook 为**唯一门禁**——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit（high 以上漏洞阻断；网络不可达或 registry 不支持 audit endpoint 时自动跳过），任一不符即中止推送。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负（`.githooks/pre-push` 头部有显式警告）。克隆后首次 `npm install` 自动启用钩子（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时；失败仅 warn 不阻断 install）；如需手动重置执行 `npm run setup:hooks`。Windows 用 Git Bash、WSL 直接跑均可。pre-push 不会自动执行 `npm install`：缺少 `node_modules` 即 exit 1 并提示安装；它只调用 `ensure-platform-deps.sh --check`，该默认检查无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台问题须由开发者显式执行 `npm run platform-deps:check` 或 `npm run platform-deps:install`（后者同样 fail-closed，仅输出人工 `npm install` 指引）。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
 
+## 验证仓库
+
+这个入口只验证仓库脚本和依赖是否健康，不会把 Skill 安装到任何 Agent。命令必须从仓库根目录执行；需要 Node.js ≥20、Git，以及可访问的 npm registry/网络。
+
+仓库地址使用本项目的 canonical URL：
+
+```bash
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+cd w-model-skill-pack
+npm install
+npm run self-test
+npm run doctor
+```
+
+PowerShell 5.1 请逐行执行，不要使用 `&&`：
+
+```powershell
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
+```
+
+Bash 和 PowerShell 7 可以使用命令简写；`self-test` 与 `doctor` 可在 PowerShell 或 Windows Terminal 中运行，不要求 Git Bash。Git Bash 仅在运行 `pre-push` 或平台依赖检查时需要。
+
+> `npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，在本仓库本地 Git 配置中设置 `core.hooksPath=.githooks`。这是仓库验证的本地配置副作用，不是 Agent Skill 激活的必需步骤。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或运行当前 fail-closed 的 `npm run platform-deps:install` 获取人工 `npm install` 指引。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
+
+## 安装 Skill
+
+这个入口只安装 `w-model-dev/` Skill 资产到具体 Agent，不代表仓库脚本已经验证，也不要求把仓库依赖安装到 Agent 目录。请先完成上面的“验证仓库”，再按目标 Agent 的官方文档确定 skills 目录。
+
+不要把 `.agent` 当通用标准路径。以下路径只是 Agent-specific placeholder，不能直接复制执行：
+
+```bash
+cp -r w-model-dev /path/to/<agent-specific-skills>/w-model-dev
+```
+
+具体 Agent 的目录、激活方式和官方 canonical URL 以该 Agent 文档为准；本仓库不伪造无法验证的 Agent 路径或链接。安装范围和 PowerShell 示例见 [docs/INSTALL.md](./docs/INSTALL.md)。
+
 ## 架构总览
 
 W 模型将开发与测试设计同步推进，8 个阶段串行推进并由确定性门禁脚本守住阶段边界；技能包内部按「编排 → 门禁 → 纯逻辑 → 约束/细则」分层，六角色（O/A/S/V/G/R）驱动编排。
@@ -76,14 +113,7 @@ flowchart TB
 
 ### AI Agent 安装
 
-将 [`w-model-dev/`](./w-model-dev) 目录拷贝到你的 AI Agent（Trae / Claude Code 等）的 skills 目录即可。**Skill 资产零依赖**：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` / `subagent/` / `schemas/` 按需加载，纯 Markdown 无需 Node.js 或 npm。
-
-```bash
-# 拷贝 skill 目录到 agent 的 skills 位置（路径以你的 agent 为准）
-cp -r w-model-dev /path/to/agent/skills/w-model-dev
-```
-
-安装后，agent 在用户提及 W 模型或 `/wm` 命令时自动激活本技能。详细步骤与验证方法见 [docs/INSTALL.md](./docs/INSTALL.md)。
+安装入口见上面的 [安装 Skill](#安装-skill)。**Skill 资产零依赖**：`SKILL.md` 定义触发条件与编排，`references/` / `templates/` / `examples/` / `subagent/` / `schemas/` 按需加载，纯 Markdown 无需 Node.js 或 npm。安装后，Agent 在用户提及 W 模型或 `/wm` 命令时自动激活本技能；详细步骤与验证方法见 [docs/INSTALL.md](./docs/INSTALL.md)。
 
 ### 运行门禁校验脚本
 
@@ -125,12 +155,13 @@ npx tsx w-model-dev/scripts/cli/self-test.ts
 
 ### 完整教程：从克隆到跑通一次阶段门禁
 
-以下 5 步可从零跑通本仓库的完整校验链路：
+以下步骤只用于验证本仓库的完整校验链路，不是 Skill 安装步骤：
 
 **步骤 1：克隆仓库**
 
 ```bash
-git clone <仓库地址> w-model-skill-pack && cd w-model-skill-pack
+git clone https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
+cd w-model-skill-pack
 ```
 
 **步骤 2：安装依赖并启用本地 git 钩子**

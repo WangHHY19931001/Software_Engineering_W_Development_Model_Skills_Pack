@@ -14,6 +14,9 @@
 - **同步子进程边界**：`runSync` 为 B4 受控调用提供 15 秒进程级 timeout、固定 `SIGKILL`、固定 UTF-8 编码和 64 MiB 输出缓冲；非有限/非正 timeout 或 maxBuffer 均回退默认值。artifact gate 的 TLA+/BDD 校验及 gate-report、metrics-report、wm-status 测试调用均迁移至 helper。全目录同步调用已通过 TypeScript AST 与集中清单审计：解析 `node:child_process` 的直接、别名、namespace、解构和静态属性绑定；每处调用均声明理由及现有 timeout 或后续整改状态，动态计算属性访问将阻断审计，未在 B4 范围内的无 timeout 调用不再被默默放过。
 
 ### 文档对齐（审计整改批次 C）
+- **仓库验证与 Skill 安装入口拆分**：README 首屏新增「验证仓库」与「安装 Skill」两个独立入口。仓库验证固定为 canonical GitHub URL、仓库根目录、Node.js ≥20、Git、npm registry/网络、`npm install` → `npm run self-test` → `npm run doctor`；PowerShell 5.1 使用逐行命令，`self-test` / `doctor` 不要求 Git Bash。Skill 安装改为复制 `w-model-dev/` 到 Agent-specific skills 目录，不将 `.agent` 作为通用路径，也不伪造无法验证的 Agent canonical URL。
+- **平台与 Hook 边界披露**：文档明确 `postinstall` 运行 `scripts/setup-hooks.cjs` 并设置本地 `core.hooksPath=.githooks`，该副作用不是 Skill 激活必需；Bash 仅用于 `pre-push` 与平台依赖检查；`platform-deps:check` 只检查、`platform-deps:install` 当前 fail-closed 并指引人工 `npm install`；Windows/WSL 不混用同一 checkout 的 `node_modules`。
+- **采用与贡献导航**：adoption Day 0 先验证仓库再安装 Skill；INSTALL、AGENTS、CONTRIBUTING 分别引用两个入口，并保留真实测试计数，不新增样本或改变实现逻辑。文档入口的语义由按路径契约测试逐项守护。
 - **可执行 Persona Verifier 样例**：将四个 Persona 的失效内嵌 JSON 迁为 `samples/verifier/persona-*.json` 可执行 fixture；每个 fixture 使用当前 Schema 的 meta、子标准、方差与可追溯 evidence，并由 CLI、self-test、samples 覆盖门和 Vitest 逐项验证。`agent-personas.md` 保留字段约束、fixture 链接与校验命令，明确真实评审须基于目标证据重建输出，不能复制固定评分或证据。self-test 基线 256→260，Vitest 实测 52 files / 849→853 tests。
 - **SSoT 外部 Agent 边界**：重画 §3.1 架构图，明确技能包仅交付 Markdown 资产、Schema 与确定性 gate scripts；宿主 Agent / 外部 LLM 负责推理、子代理调度和 LLM-as-Verifier；TLA+ TLC、CodeGraph、OpenSpec 为可选外部工具，不属于技能包交付物。同步三项 CLI JSDoc：默认和 `--json` 均先尝试写 gate log，写入失败以 `gateLogWriteError` 报告且不改变主 gate 结果，并由静态测试守护。
 

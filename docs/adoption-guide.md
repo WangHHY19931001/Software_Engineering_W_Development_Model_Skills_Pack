@@ -5,7 +5,7 @@
 >
 > 如何推广 W 模型技能包很大程度上取决于代码库所处阶段。绿地项目可从首次提交就采用完整生命周期；数年历史的代码库则需要一条增量路径，尊重既有代码、约定、未文档化的决策，以及你宁愿不去盲改的测试覆盖缺口。
 >
-> 本指南覆盖两条路径。安装机制见 [`INSTALL.md`](./INSTALL.md)；技能功能见 [`../w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)。
+> 本指南覆盖两条路径。仓库验证和安装入口见 [`README.md`](../README.md) 与 [`INSTALL.md`](./INSTALL.md)；技能功能见 [`../w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)。
 
 ## 你在哪条路径上？
 
@@ -26,10 +26,11 @@
 
 新项目是最佳场景：无遗留行为需保留，质量门成本几乎为零且从首次提交开始复利。
 
-### Day 0 | 安装与初始化
+### Day 0 | 先验证仓库，再安装 Skill
 
-1. 按 [`INSTALL.md`](./INSTALL.md) 安装 `w-model-dev/` 到目标 Agent 的 skills 目录（Trae / Claude Code / Cursor / Codex 等）。
-2. 首次启用执行 `/wm analyze`，触发 SSoT [§4A.1](./skill-design-document_SSoT.md)「显式声明假设」：列出对需求 / 技术栈 / 范围的假设，等用户确认。
+1. 先按 [`README.md`](../README.md) 的「验证仓库」入口，从仓库根目录执行 `git clone`、`npm install`、`npm run self-test`、`npm run doctor`。这一步验证仓库脚本健康，不会安装 Agent Skill。
+2. 再按 [`INSTALL.md`](./INSTALL.md) 的「安装 Skill」入口，将 `w-model-dev/` 复制到目标 Agent-specific skills 目录。目标路径、激活方式和官方 canonical URL 以具体 Agent 文档为准，不要把 `.agent` 当通用路径。
+3. 首次启用执行 `/wm analyze`，触发 SSoT [§4A.1](./skill-design-document_SSoT.md)「显式声明假设」：列出对需求 / 技术栈 / 范围的假设，等用户确认。
 3. 创建 `.w-model/` 持久化目录，初始化 `project.json` / `rtm.json`。
 4. 在仓库根 `AGENTS.md`（或 `CLAUDE.md`）写入项目规则：技术栈、构建 / 测试命令、目录含义、已知雷区。
 

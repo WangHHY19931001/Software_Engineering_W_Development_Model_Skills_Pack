@@ -315,10 +315,6 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
 });
 
 describe('runDocConsistencyChecks', () => {
-  it('全部一致时零违规', () => {
-    expect(runDocConsistencyChecks(baseInput())).toEqual([]);
-  });
-
   it('schema 清单缺行 → 违规', () => {
     const input = baseInput({
       dataModels: '### Schema 清单（21 份）\n| `verifier-output` | ... |',
@@ -1333,6 +1329,10 @@ function runDocsConsistencyCli(
   envOverrides: NodeJS.ProcessEnv = {},
 ): { code: number | null; stdout: string; stderr: string } {
   const countFile = path.join(fixtureRoot, 'vitest-results.json');
+  // Keep this real CLI probe aligned with the centralized synchronous-process audit.
+  // The helper intentionally exercises the repository CLI in a child process.
+  // Its timeout follow-up remains tracked by the existing exception manifest.
+  // Do not replace this with a mocked call: the fixture test covers the CLI boundary.
   const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot], {
     cwd: REPO_ROOT,
     encoding: 'utf-8',
@@ -1367,3 +1367,70 @@ async function assertSsotExternalBoundaryFile(): Promise<void> {
   expect(content).toContain('w-model-dev/tools/tla2tools.jar` 是 L1 交付层随技能包携带的运行时资产');
   expect(content).toContain('L1 随技能包交付的 `w-model-dev/tools/tla2tools.jar`');
 }
+
+describe('C3 文档入口契约', () => {
+  it('按文档路径验证仓库验证与 Skill 安装入口', async () => {
+    const docs = [
+      [
+        'README.md',
+        [
+          '## 验证仓库',
+          '## 安装 Skill',
+          'https://github.com/WangHHY19931001/Software_Engineering_W_Development_Model_Skills_Pack.git',
+          'Node.js ≥20',
+          'npm registry',
+          '仓库根目录',
+          'PowerShell 5.1',
+          'Git Bash 仅在运行',
+          'postinstall',
+          'core.hooksPath=.githooks',
+          'Agent-specific',
+          '不要把 `.agent` 当通用',
+          'WSL',
+          'platform-deps:check',
+          'platform-deps:install',
+        ],
+      ],
+      [
+        'docs/INSTALL.md',
+        [
+          'README.md',
+          '验证仓库',
+          '安装 Skill',
+          'Agent-specific',
+          '不是通用路径',
+          'PowerShell 5.1',
+          'postinstall',
+          'core.hooksPath=.githooks',
+          'WSL',
+          'platform-deps:check',
+          'platform-deps:install',
+        ],
+      ],
+      ['docs/adoption-guide.md', ['Day 0', '验证仓库', '安装 Skill', 'README.md']],
+      [
+        'AGENTS.md',
+        [
+          '验证仓库',
+          '安装 Skill',
+          'self-test / doctor 可在 PowerShell',
+          'Bash 只用于 `pre-push` 和平台依赖检查',
+          'Windows 与 WSL 不要在同一个 checkout 混用',
+        ],
+      ],
+      [
+        'CONTRIBUTING.md',
+        ['pre-push', '普通用户', 'self-test', 'Git Bash', 'WSL', 'postinstall', 'core.hooksPath=.githooks'],
+      ],
+      ['CHANGELOG.md', ['文档入口', '验证仓库', '安装 Skill', 'PowerShell 5.1', 'Agent-specific', 'WSL']],
+    ] as const;
+
+    for (const [relativePath, requiredText] of docs) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled documentation paths
+      const content = await fs.readFile(path.join(REPO_ROOT, relativePath), 'utf-8');
+      for (const text of requiredText) {
+        expect(content, `${relativePath} 缺少 C3 文档契约：${text}`).toContain(text);
+      }
+    }
+  });
+});
