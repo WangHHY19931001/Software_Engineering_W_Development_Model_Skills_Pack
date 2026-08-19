@@ -278,6 +278,38 @@ describe('wm-write CLI schema validation', () => {
     });
   });
 
+  it('rejects invalid registered and unregistered Windows case variants through real child processes', async () => {
+    const stateDir = path.join(tmpDir, '.W-MODEL');
+    const registered = path.join(stateDir, 'PROJECT.JSON');
+    const unregistered = path.join(stateDir, 'CUSTOM.JSON');
+    await fs.mkdir(stateDir, { recursive: true });
+
+    const invalidRegistered = run(
+      registered,
+      ['--stdin'],
+      JSON.stringify({ ...validProject, unexpected: true }),
+      tmpDir,
+    );
+    expect(invalidRegistered.code).toBe(1);
+    expect(wmwriteSummary(invalidRegistered.stdout)).toMatchObject({
+      ok: false,
+      reason: 'SCHEMA_INVALID',
+      writtenPath: registered,
+    });
+
+    const rejectedUnregistered = run(unregistered, ['--stdin'], '{"custom":true}', tmpDir);
+    expect(rejectedUnregistered.code).toBe(1);
+    expect(wmwriteSummary(rejectedUnregistered.stdout)).toMatchObject({
+      ok: false,
+      reason: 'UNREGISTERED_TARGET',
+      writtenPath: unregistered,
+    });
+
+    const allowedUnregistered = run(unregistered, ['--stdin', '--allow-untyped'], '{"custom":true}', tmpDir);
+    expect(allowedUnregistered.code).toBe(0);
+    expect(wmwriteSummary(allowedUnregistered.stdout)).toMatchObject({ ok: true, untyped: true });
+  });
+
   it('returns UNREGISTERED_TARGET with exit 1, then writes with --allow-untyped and marks the JSON summary', async () => {
     const stateDir = path.join(tmpDir, '.w-model');
     const p = path.join(stateDir, 'custom.json');

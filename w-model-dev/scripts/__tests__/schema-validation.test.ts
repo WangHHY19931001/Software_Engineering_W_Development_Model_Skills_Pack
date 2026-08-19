@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { validateBySchema } from '../logic/schema-loader.js';
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
 import { readSchemasDir } from '../lib/schema-fs.js';
+import { resolveStateSchema } from '../lib/state-schema-registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const samplesDir = path.join(here, '..', 'samples');
@@ -97,6 +98,15 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
       }).valid,
     ).toBe(false);
     expect(validateBySchema('gate-log', { ...validGateLog, script: 'test-gate-log-writer' }).valid).toBe(false);
+  });
+});
+
+describe('state schema registry fixture-only schemas', () => {
+  it('does not expose fixture-only checkpoint, event-ingress, or hill-climbing schemas as runtime write targets', () => {
+    const projectRoot = path.resolve('C:', 'workspace', 'example-project');
+    for (const name of ['checkpoint-log', 'event-ingress', 'hill-climbing-report']) {
+      expect(resolveStateSchema(path.join(projectRoot, '.w-model', `${name}.json`), projectRoot, 'win32')).toBeNull();
+    }
   });
 });
 

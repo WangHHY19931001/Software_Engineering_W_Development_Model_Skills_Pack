@@ -153,6 +153,43 @@ describe('writeStateJson', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe(JSON.stringify(validProject));
   });
 
+  it('rejects an invalid registered Windows case variant without creating transaction side effects', async () => {
+    const projectRoot = target('case-variant-project');
+    const p = path.join(projectRoot, '.W-MODEL', 'PROJECT.JSON');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, JSON.stringify(validProject), 'utf-8');
+
+    const result = await writeStateJson(p, JSON.stringify({ ...validProject, unexpected: true }), {
+      projectRoot,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID' });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe(JSON.stringify(validProject));
+    const entries = await fs.readdir(path.dirname(p));
+    expect(entries.filter((entry) => entry.includes('.tmp-') || entry.includes('.bak.'))).toEqual([]);
+    await expect(fs.readdir(`${p}.lock`)).resolves.toEqual([]);
+  });
+
+  it('propagates schema infrastructure errors while releasing the acquired lock without transaction artifacts', async () => {
+    const projectRoot = target('schema-infrastructure-project');
+    const p = path.join(projectRoot, '.w-model', 'project.json');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    const infrastructureError = new Error('schema infrastructure unavailable');
+
+    await expect(
+      writeStateJson(p, JSON.stringify(validProject), {
+        projectRoot,
+        schemaValidator: () => {
+          throw infrastructureError;
+        },
+      }),
+    ).rejects.toBe(infrastructureError);
+
+    const entries = await fs.readdir(path.dirname(p));
+    expect(entries.filter((entry) => entry.includes('.tmp-') || entry.includes('.bak.'))).toEqual([]);
+    await expect(fs.readdir(`${p}.lock`)).resolves.toEqual([]);
+  });
+
   it('rejects an invalid registered JSONL line and reports only the line number', async () => {
     const p = stateTarget('run-log.jsonl');
     await fs.mkdir(path.dirname(p), { recursive: true });

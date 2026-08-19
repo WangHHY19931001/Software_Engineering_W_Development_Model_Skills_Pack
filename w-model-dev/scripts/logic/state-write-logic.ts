@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { inferProjectRoot, isProjectStateTarget, resolveStateSchema } from '../lib/state-schema-registry.js';
 
-import { validateBySchema } from './schema-loader.js';
+import { validateBySchema, type SchemaValidationResult } from './schema-loader.js';
 
 export interface StateLockMetadata {
   targetPath: string;
@@ -35,6 +35,8 @@ export interface StateWriteOptions {
   projectRoot?: string;
   /** Allows an otherwise unregistered .w-model target, never bypassing registered schema validation. */
   allowUntyped?: boolean;
+  /** Injectable only for state-write tests; validator infrastructure failures must propagate. */
+  schemaValidator?: (name: string, data: unknown) => SchemaValidationResult;
 }
 
 export interface StateWriteResult {
@@ -283,11 +285,28 @@ async function releaseLock(lockDir: string, ownerDir: string, token: string, opt
   await fs.rm(released, { recursive: true, force: true });
 }
 
+function parseStatePayload(
+  jsonText: string,
+  line?: number,
+): { parsed?: unknown; invalid?: Pick<StateWriteResult, 'reason' | 'schemaInvalidLine'> } {
+  try {
+    return { parsed: parseJsonSafe(jsonText) };
+  } catch {
+    return {
+      invalid: {
+        reason: 'SCHEMA_INVALID',
+        ...(line === undefined ? {} : { schemaInvalidLine: line }),
+      },
+    };
+  }
+}
+
 function validateRegisteredStatePayload(
   absPath: string,
   jsonText: string,
   projectRoot: string,
   allowUntyped: boolean,
+  schemaValidator: (name: string, data: unknown) => SchemaValidationResult,
 ): Pick<StateWriteResult, 'reason' | 'schemaInvalidLine' | 'untyped'> | undefined {
   const registered = resolveStateSchema(absPath, projectRoot);
   if (!registered) {
@@ -296,23 +315,18 @@ function validateRegisteredStatePayload(
   }
 
   if (registered.format === 'json') {
-    try {
-      const result = validateBySchema(registered.schemaName, parseJsonSafe(jsonText));
-      return result.valid ? undefined : { reason: 'SCHEMA_INVALID' };
-    } catch {
-      return { reason: 'SCHEMA_INVALID' };
-    }
+    const payload = parseStatePayload(jsonText);
+    if (payload.invalid) return payload.invalid;
+    return schemaValidator(registered.schemaName, payload.parsed).valid ? undefined : { reason: 'SCHEMA_INVALID' };
   }
 
   const lines = jsonText.split(/\r?\n/);
   for (const [index, rawLine] of lines.entries()) {
     const line = rawLine.trim();
     if (line === '') continue;
-    try {
-      if (!validateBySchema(registered.schemaName, parseJsonSafe(line)).valid) {
-        return { reason: 'SCHEMA_INVALID', schemaInvalidLine: index + 1 };
-      }
-    } catch {
+    const payload = parseStatePayload(line, index + 1);
+    if (payload.invalid) return payload.invalid;
+    if (!schemaValidator(registered.schemaName, payload.parsed).valid) {
       return { reason: 'SCHEMA_INVALID', schemaInvalidLine: index + 1 };
     }
   }
@@ -377,7 +391,13 @@ export async function writeStateJson(
   let tmpPath: string | undefined;
   try {
     await opts.afterLockAcquired?.();
-    const validation = validateRegisteredStatePayload(absPath, jsonText, projectRoot, opts.allowUntyped === true);
+    const validation = validateRegisteredStatePayload(
+      absPath,
+      jsonText,
+      projectRoot,
+      opts.allowUntyped === true,
+      opts.schemaValidator ?? validateBySchema,
+    );
     if (validation?.reason) return { ok: false, writtenPath: absPath, ...validation };
     if (opts.expectMtimeMs != null) {
       let stat: Awaited<ReturnType<typeof fs.stat>>;
