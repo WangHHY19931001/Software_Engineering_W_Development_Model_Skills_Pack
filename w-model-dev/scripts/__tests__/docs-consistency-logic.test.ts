@@ -684,7 +684,6 @@ describe('runDocConsistencyChecks', () => {
       expect(passing.stdout).toContain('vitest 用例  : 785');
       expect(passing.stdout).not.toContain('[vitest-tests]');
 
-      await writeVitestCount(fixtureRoot, 766);
       const readme = path.join(fixtureRoot, 'README.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
@@ -692,9 +691,10 @@ describe('runDocConsistencyChecks', () => {
       await fs.writeFile(readme, content.replace('49 files / 785 tests', '49 files / 766 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 766');
+      expect(stale.stdout).toContain('vitest 用例  : 785');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
+      expect(stale.stdout).toContain('49 files / 766 tests');
     });
   });
 
