@@ -14,6 +14,20 @@ export interface DocCheckViolation {
   message: string;
 }
 
+/** A4 状态锁 / 平台修复 / batch B 边界的逐文档输入，由 CLI 读取活体文档后注入。 */
+export interface A4DocumentationInput {
+  ssot: string;
+  skill: string;
+  dispatchMatrix: string;
+  operationalRecovery: string;
+  readme: string;
+  install: string;
+  agents: string;
+  contributing: string;
+  troubleshooting: string;
+  changelog: string;
+}
+
 export interface DocConsistencyInput {
   /** schemas/ 目录 *.schema.json 文件名列表（含后缀） */
   schemaFiles: string[];
@@ -65,6 +79,8 @@ export interface DocConsistencyInput {
   testFileCount: number;
   /** vitest run 实际运行输出的用例总数；-1 = 无法采集（vitest 不可用 / 输出不可解析，此时不校验用例总数） */
   vitestTestCount: number;
+  /** A4 状态锁 / 平台修复 / batch B 边界的逐文档文本；缺省时跳过（fixture 兼容）。 */
+  a4Docs?: A4DocumentationInput;
   /** w-model-dev/scripts 目录下 .ts 文件是否有变更（git diff + porcelain 判定，由 CLI 层注入） */
   scriptsChanged: boolean;
   /** 根目录 .eslintsecurity-baseline.json 指纹条目数；-1 = 缺失/不可解析，0 = 空 */
@@ -165,6 +181,9 @@ export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckVio
     ),
   );
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
+  if (input.a4Docs !== undefined) {
+    violations.push(...checkA4DocumentationContracts(input.a4Docs));
+  }
   violations.push(
     ...checkVersionConsistency(
       input.pkgJson,
@@ -769,23 +788,127 @@ function checkVitestTestCount(
         message: `${docName} 应含 vitest 实测用例总数「${vitestTestCount} tests」或「${vitestTestCount} 条」（vitest run 实测 ${vitestTestCount} 条，测试用例增删须同步文档）`,
       });
     }
-    const staleFormats: RegExp[] = [
+    const reportStaleCount = (text: string, fileN: number, testN: number): void => {
+      if (testN !== vitestTestCount || (testFileCount >= 0 && fileN !== testFileCount)) {
+        violations.push({
+          check: 'vitest-tests',
+          message: `${docName} 存在过期 vitest 计数「${text}」（实测 ${testFileCount} 个 .test.ts / ${vitestTestCount} 条），须同步`,
+        });
+      }
+    };
+    const fileFirstFormats = [
       /(\d+)\s*files?\s*\/\s*(\d+)\s*tests?\b/g,
       /(\d+)\s*个\s*\.test\.ts\s*\/\s*(\d+)\s*(?:tests?|条)/g,
+      /(\d+)\s*个\s*test\s*文件\s*\/\s*(\d+)\s*(?:tests?|条)/g,
     ];
-    for (const re of staleFormats) {
+    for (const re of fileFirstFormats) {
       let m: RegExpExecArray | null;
-      while ((m = re.exec(content)) !== null) {
-        const fileN = Number(m[1]);
-        const testN = Number(m[2]);
-        if (testN !== vitestTestCount || (testFileCount >= 0 && fileN !== testFileCount)) {
-          violations.push({
-            check: 'vitest-tests',
-            message: `${docName} 存在过期 vitest 计数「${m[0]}」（实测 ${testFileCount} 个 .test.ts / ${vitestTestCount} 条），须同步`,
-          });
-        }
+      while ((m = re.exec(content)) !== null) reportStaleCount(m[0], Number(m[1]), Number(m[2]));
+    }
+    const testFirstFormat = /vitest\s*(\d+)\s*(?:tests?|条)\s*（\s*(\d+)\s*test\s*files?\s*）/gi;
+    let testFirstMatch: RegExpExecArray | null;
+    while ((testFirstMatch = testFirstFormat.exec(content)) !== null) {
+      reportStaleCount(testFirstMatch[0], Number(testFirstMatch[2]), Number(testFirstMatch[1]));
+    }
+  }
+  return violations;
+}
+
+/**
+ * A4 文档契约：将状态锁、显式平台修复和 batch B 未完成边界接入真正的 docs-consistency
+ * 门禁。每项按文档职责逐一验证，禁止以多份文档拼接后「任一字符串存在」的方式放行。
+ */
+function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const stateLockDocs: Array<[string, string]> = [
+    ['SSoT', docs.ssot],
+    ['SKILL.md', docs.skill],
+    ['dispatch-matrix.md', docs.dispatchMatrix],
+    ['operational-recovery.md', docs.operationalRecovery],
+  ];
+  for (const [name, content] of stateLockDocs) {
+    if (!content.includes('<target>.lock') || !content.includes('owner')) {
+      violations.push({
+        check: 'a4-state-lock',
+        message: `${name} 应逐文档声明 <target>.lock 持久目录与 owner 跨进程锁协议`,
+      });
+    }
+    if (/mtime\s*乐观锁/.test(content) && !content.includes('<target>.lock')) {
+      violations.push({
+        check: 'a4-state-lock',
+        message: `${name} 不得将仅 mtime 乐观锁描述为并发写入处理（须说明跨进程锁）`,
+      });
+    }
+  }
+  for (const [name, content] of [
+    ['SSoT', docs.ssot],
+    ['SKILL.md', docs.skill],
+    ['dispatch-matrix.md', docs.dispatchMatrix],
+    ['operational-recovery.md', docs.operationalRecovery],
+  ] as Array<[string, string]>) {
+    if (!content.includes('--lock-timeout') || !content.includes('--recover-stale-lock')) {
+      violations.push({
+        check: 'a4-state-lock',
+        message: `${name} 应声明 --lock-timeout 与显式 --recover-stale-lock 边界`,
+      });
+    }
+  }
+
+  const platformDocs: Array<[string, string]> = [
+    ['README.md', docs.readme],
+    ['docs/INSTALL.md', docs.install],
+    ['AGENTS.md', docs.agents],
+    ['CONTRIBUTING.md', docs.contributing],
+    ['docs/troubleshooting.md', docs.troubleshooting],
+  ];
+  for (const [name, content] of platformDocs) {
+    if (!content.includes('platform-deps:check') || !content.includes('platform-deps:install')) {
+      violations.push({
+        check: 'a4-platform-repair',
+        message: `${name} 应声明 platform-deps:check 与 platform-deps:install 为显式入口`,
+      });
+    }
+    if (!/不自动|不会自动|绝不自动/.test(content)) {
+      violations.push({
+        check: 'a4-platform-repair',
+        message: `${name} 应明确 pre-push/平台检查不自动安装或修复`,
+      });
+    }
+    const forbidden = [
+      /pre-push[^。\n]*?(?<!不)(?<!会)自动执行\s*`?npm install/i,
+      /(?<!不)(?<!会)自动补装/,
+      /(?<!不)(?<!会)自动平台修复/,
+      /自动跑[^\n]*补装/,
+    ];
+    for (const pattern of forbidden) {
+      if (pattern.test(content)) {
+        violations.push({
+          check: 'a4-platform-repair',
+          message: `${name} 仍含自动安装/补装/平台修复旧语义「${pattern.source}」`,
+        });
       }
     }
+  }
+
+  if (!/Vitest.*(?:fail-closed|用例采集).*未完成|(?:fail-closed|用例采集).*未完成/.test(docs.changelog)) {
+    violations.push({
+      check: 'a4-batch-b-boundary',
+      message: 'CHANGELOG.md 应保留 batch B 的 Vitest test-count fail-closed 未完成边界说明',
+    });
+  }
+  const batchBCompletionClaim = docs.changelog
+    .split(/\r?\n/)
+    .some(
+      (line) =>
+        /Vitest.*(?:fail-closed|用例采集)|(?:fail-closed|用例采集)/.test(line) &&
+        /已完成|已修复/.test(line) &&
+        !/不得声称|未声称/.test(line),
+    );
+  if (batchBCompletionClaim) {
+    violations.push({
+      check: 'a4-batch-b-boundary',
+      message: 'CHANGELOG.md 不得声称 batch B 的 Vitest test-count fail-closed 已完成或已修复',
+    });
   }
   return violations;
 }

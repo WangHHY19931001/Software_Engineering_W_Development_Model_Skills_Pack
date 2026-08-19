@@ -301,7 +301,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | self-test | 工具 | 256 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
 | wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
 | metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
-| wm-write | 工具 | 状态文件安全写（.bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验；logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |
+| wm-write | 工具 | 状态文件安全写：`<target>.lock` 持久目录和可转移 owner 对象保证跨进程竞争 writer 不会双成功；锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--lock-timeout` 为安全非负整数；CLI 陈旧锁须显式 `--recover-stale-lock`，否则 `STALE_LOCK` / exit 1（logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |
 | doctor | 工具 | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts） | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门 |
 
 ## 7. 反模式 → check 脚本映射速查

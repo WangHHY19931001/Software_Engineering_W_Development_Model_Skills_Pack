@@ -17,7 +17,7 @@
 **处置**：
 
 1. 安装 [Git for Windows](https://git-scm.com/)，**用 Git Bash** 运行 `npm run prepush` / `git push`；
-2. 或使用 WSL，在 WSL 侧运行门禁（平台依赖会自动补装，见 [1.6](#16-wsl--windows-双平台-node_modules)）。
+2. 或使用 WSL，在 WSL 侧运行门禁；平台原生依赖只会被检查，不会自动补装，见 [1.6](#16-wsl--windows-双平台-node_modules)。
 
 **注意**：pre-push 检测到纯 Windows shell 时会**提示并放行（exit 0），但门禁并未真正执行**——此时推送没有经过任何校验，需要时请手动在 Git Bash 中补跑 `npm run prepush`。
 
@@ -33,7 +33,7 @@
 
 **处置**：
 
-- pre-push 检测到 `node_modules` 缺失时会**自动执行 `npm install --no-audit --no-fund`**，装不上才报错阻断；
+- pre-push 检测到 `node_modules` 缺失时以 exit 1 拒绝推送，并提示开发者先运行 `npm install`；它**不自动**安装依赖；
 - 手动场景直接 `npm install`（同时触发 `postinstall` 自动启用钩子，见 [1.5](#15-postinstall-未自动启用钩子)）。
 
 ### 1.4 eslint security baseline 指纹失效 / 需重生成
@@ -71,10 +71,12 @@ git config core.hooksPath   # 确认输出 .githooks
 
 **现象**：同一仓库在 Windows 与 WSL 两侧共用 node_modules 时，门禁脚本可能报平台二进制缺失（esbuild / rolldown 等原生包）。
 
-**处置**：pre-push 会自动跑 `.githooks/ensure-platform-deps.sh` 补装当前平台原生二进制（npm pack + 解压，不破坏另一侧依赖树）；补装失败即中止推送。手动补装可执行：
+**处置**：pre-push 只运行 `.githooks/ensure-platform-deps.sh --check`，检查当前平台原生包；默认/`--check` 均**不自动**下载、`npm pack`、解包或覆盖 `node_modules`。检查失败即中止推送。使用 Bash（Git Bash / WSL）显式执行：
 
 ```bash
-bash .githooks/ensure-platform-deps.sh
+npm run platform-deps:check
+npm run platform-deps:install  # fail-closed：仅输出人工 npm install 指引
+npm install                    # 开发者实际执行的安装/修复
 ```
 
 ### 1.7 docs-consistency 报 vitest 用例数 / 文件数不匹配
@@ -97,12 +99,12 @@ bash .githooks/ensure-platform-deps.sh
 |---|---|---|---|
 | Windows 原生 cmd / PowerShell | `git push` / `npm run prepush` | pre-push 检测到无 bash 解释器 → 提示 + 放行（exit 0），门禁**未执行** | 改用 Git Bash / WSL 跑门禁（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)） |
 | Windows + Git Bash | `git push` / `npm run prepush` | 正常执行 17 项门禁 | — |
-| WSL | `git push` / `npm run prepush` | 正常执行；自动补装 Linux 侧原生二进制 | 补装失败则中止，检查网络 |
+| WSL | `git push` / `npm run prepush` | 正常执行；仅检查 Linux 侧原生二进制 | 缺失则中止；在 Bash 中显式运行 `npm run platform-deps:check`，按 `platform-deps:install` 的人工 `npm install` 指引修复 |
 | Linux / macOS | `git push` / `npm run prepush` | 正常执行 | — |
 | 任意 | `npm audit` 网络不可达（ENOTFOUND / ETIMEDOUT / ECONNREFUSED） | pre-push 第 13 项 warn 并跳过（不阻断） | 网络恢复后手动补跑 `npm audit --audit-level=high` |
 | 任意 | registry 不支持 audit endpoint（ENOTSUP / ENOAUDIT / NOT_IMPLEMENTED） | 同上，跳过不阻断 | 换 registry 后重跑 |
 | 任意 | `npm audit` 检出 high 以上漏洞 | pre-push **阻断**（fail-closed，其余输出一律视为真实漏洞） | 升级依赖修复后重跑；见 [user-guide.md §6](./user-guide.md) 依赖巡检流程 |
-| 任意 | `node_modules` 缺失 | pre-push 自动 `npm install --no-audit --no-fund` | 装不上则报错阻断，检查网络 / npm 配置 |
+| 任意 | `node_modules` 缺失 | pre-push exit 1，提示先运行 `npm install` | 开发者手动执行 `npm install` 后重跑；hook 不自动安装 |
 | 任意 | 钩子未启用 | push 不触发门禁 | `npm run setup:hooks`（见 [1.5](#15-postinstall-未自动启用钩子)） |
 
 ## 3. 快速排查路径

@@ -2,8 +2,8 @@
 /**
  * 状态文件安全写助手（wm-write）
  *
- * 审计修复 A1：SKILL/参考文档承诺的「.bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验」
- * 此前无实现，Agent 只能手写易错版本；本脚本将 logic/state-write-logic.ts 固化为唯一写入口。
+ * 状态写协议：`<target>.lock` 持久目录与可转移 owner 对象在跨进程锁内保护
+ * mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；本脚本是唯一 CLI 写入口。
  *
  * 用法：
  *   echo '{"k":1}' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin
@@ -14,7 +14,7 @@
  *   --stdin                 从 stdin 读入完整 JSON 文本
  *   --from <src.json>       从源文件读入 JSON 文本
  *   --expect-mtime <ms>     乐观锁：期望目标当前 mtimeMs（不符则拒绝写入）
- *   --no-backup             跳过 .bak 备份（默认生成 <name>.bak.YYYYMMDD-HHMM，保留 5 份）
+ *   --no-backup             跳过 .bak 备份（默认生成 <target>.bak.YYYYMMDD-HHMMSS-mmm-<UUID>，保留 5 份）
  *   --lock-timeout <ms>     跨进程锁等待超时（非负整数毫秒）
  *   --recover-stale-lock    显式恢复陈旧锁
  *   --help                  打印用法

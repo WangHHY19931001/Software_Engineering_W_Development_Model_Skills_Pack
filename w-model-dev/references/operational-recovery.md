@@ -39,7 +39,7 @@
 ### JSON 无法解析
 
 1. 立即停止阶段推进、测试回填和质量门。
-2. 将损坏文件复制为 `<name>.bak.YYYYMMDD-HHMM`，保留取证。
+2. 通过 `wm-write` 的毫秒+UUID 备份命名（`<target>.bak.YYYYMMDD-HHMMSS-mmm-<UUID>`）定位最近有效备份，保留取证。
 3. 按顺序尝试恢复：最近有效 `.bak` → git 中最近有效版本 → 用户提供的导出。
 4. 每个候选恢复后先解析并按 `data-models.md` 校验。
 5. 均失败时请求用户选择重建或手工修复；未确认前不得 `/wm reset`。
@@ -47,8 +47,8 @@
 ### 写入冲突或文件锁
 
 - EPERM/EBUSY：提示关闭编辑器锁、同步软件或占用进程，解除后重试当前写入。
-- 并发修改：比较读取前后的 mtime；变化时停止覆盖、重新读取并合并差异。
-- 所有 JSON 状态写入统一经 `scripts/cli/wm-write.ts`（已实现「临时文件 → 校验 → 原子 rename + `.bak` 备份 + mtime 乐观锁 + 回读校验」；用法：`echo '<json>' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin [--expect-mtime <ms>]`，冲突时 exit 1 + `WMWRITE_JSON {"ok":false,"reason":"MTIME_CONFLICT"}`，重读目标后按最新 mtime 重试）。
+- 并发修改：不得只靠读取前后的 mtime 判断。所有 writer 统一通过 `wm-write` 的 `<target>.lock` 持久目录和可转移 owner 对象串行化，竞争 writer 不会双成功；锁内才校验 `--expect-mtime`，冲突时返回 `MTIME_CONFLICT` / exit 1，再重读合并。
+- 所有 JSON 状态写入统一经 `scripts/cli/wm-write.ts`（锁内执行 mtime 校验、毫秒+UUID `.bak` 备份、tmp+rename、回读与原子恢复；用法：`echo '<json>' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin [--expect-mtime <ms>] [--lock-timeout <ms>] [--recover-stale-lock]`。`--lock-timeout` 必须为安全非负整数；CLI 检出陈旧锁时未显式给 `--recover-stale-lock` 即返回 `STALE_LOCK` / exit 1）。
 
 ## 外部评审与门禁异常
 

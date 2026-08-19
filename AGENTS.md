@@ -150,7 +150,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-opsx-artifacts.ts | opsx 制品 + R3×3 + V 审查产物齐全性校验（反模式 #39/#40） | 5-8 | 0=通过，1=校验失败，2=输入错误 |
 | check-openspec-archive.ts | opsx:archive 归档完整性校验 | 8（归档） | 0=通过，1=校验失败，2=输入错误 |
 | ensure-codegraph-opsx.ts | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式 | 5（初始化），6-8（复检） | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误 |
-| self-test.ts | 回归基线（256 条样本）；vitest 725 条（47 test files） | - | 0=通过，1=失败 |
+| self-test.ts | 回归基线（256 条样本）；vitest 766 条（49 test files） | - | 0=通过，1=失败 |
 | wm-status.ts | 状态快照（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议），只读 | - | 0=通过，2=输入错误 |
 | metrics-report.ts | 流程度量报告（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警），只读 | - | 0=通过，2=输入错误 |
 | security-scan.ts | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（`--regenerate` 重生成 baseline） | - | 0=通过，1=新增发现，2=输入错误 |

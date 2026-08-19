@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import * as path from 'node:path';
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -130,43 +127,52 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     prePush: '# 17. typecheck\n# 与原 CI 一致：17 项检查\n# vitest 全量（530 tests）',
     scriptsChanged: false,
     securityBaselineEntryCount: -1,
+    a4Docs: {
+      ssot: '状态锁使用 <target>.lock 和 owner；--lock-timeout 与 --recover-stale-lock。平台修复显式，不自动 npm install。',
+      skill:
+        '状态锁使用 <target>.lock 和 owner；--lock-timeout 与 --recover-stale-lock。平台修复显式，不自动 npm install。',
+      dispatchMatrix: 'wm-write 使用 <target>.lock 与 owner，支持 --lock-timeout 和 --recover-stale-lock。',
+      operationalRecovery:
+        '状态写使用 <target>.lock 与 owner，不是仅 mtime 乐观锁。--lock-timeout 与 --recover-stale-lock 适用于陈旧锁。',
+      readme: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
+      install: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
+      agents: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
+      contributing: 'pre-push 不自动 npm install；platform-deps:check 和 platform-deps:install 为显式入口。',
+      troubleshooting:
+        'pre-push 不自动 npm install；不自动补装；platform-deps:check 和 platform-deps:install 为显式入口。',
+      changelog: '状态写并发协议；显式平台修复；Vitest 用例采集 fail-closed 缺口尚未完成。',
+    },
     ...overrides,
   };
 }
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
+describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
+  it('逐文档拒绝审查发现的四类旧语义与混合 Vitest 计数', () => {
+    const input = baseInput({
+      a4Docs: {
+        ...baseInput().a4Docs!,
+        dispatchMatrix: 'wm-write 使用 .bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验。',
+        troubleshooting: 'pre-push 自动执行 npm install --no-audit --no-fund；WSL 自动补装平台依赖。',
+        changelog: '状态写并发协议；显式平台修复；Vitest test-count fail-closed 已完成。',
+      },
+      vitestTestCount: 766,
+      testFileCount: 49,
+      vitestExtraDocs: [{ name: 'docs/INSTALL.md', content: '47 个 test 文件 / 725 条\n49 个 test 文件 / 766 条' }],
+      agents: 'vitest 725 条（47 test files）\nvitest 766 条（49 test files）',
+    });
+    const violations = runDocConsistencyChecks(input);
 
-function readLiveDoc(relativePath: string): string {
-  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf-8');
-}
-
-describe('A4 状态锁与显式平台修复文档契约', () => {
-  it('全套文档准确声明状态锁与显式平台依赖边界', () => {
-    const activeDocs = [
-      'docs/skill-design-document_SSoT.md',
-      'w-model-dev/SKILL.md',
-      'w-model-dev/references/data-models.md',
-      'w-model-dev/references/command-reference.md',
-      'README.md',
-      'docs/INSTALL.md',
-      'AGENTS.md',
-      'CONTRIBUTING.md',
-    ].map(readLiveDoc);
-    const activeText = activeDocs.join('\n');
-    const changelog = readLiveDoc('CHANGELOG.md');
-
-    expect(activeText).toContain('<target>.lock');
-    expect(activeText).toContain('--lock-timeout');
-    expect(activeText).toContain('--recover-stale-lock');
-    expect(activeText).toContain('platform-deps:check');
-    expect(activeText).toContain('platform-deps:install');
-    expect(activeText).toMatch(/显式|不自动/);
-    expect(activeText).not.toContain('pre-push 自动 npm install');
-    expect(activeText).not.toContain('平台补装见');
-    expect(activeText).not.toContain('自动补装对应平台');
-    expect(changelog).toContain('状态写并发协议');
-    expect(changelog).toContain('显式平台修复');
-    expect(changelog).toContain('Vitest 用例采集 fail-closed 缺口');
+    expect(violations.some((x) => x.check === 'a4-state-lock' && x.message.includes('dispatch-matrix.md'))).toBe(true);
+    expect(violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
+      true,
+    );
+    expect(violations.some((x) => x.check === 'a4-batch-b-boundary' && x.message.includes('CHANGELOG.md'))).toBe(true);
+    expect(violations.some((x) => x.check === 'vitest-tests' && x.message.includes('47 个 test 文件 / 725 条'))).toBe(
+      true,
+    );
+    expect(
+      violations.some((x) => x.check === 'vitest-tests' && x.message.includes('vitest 725 条（47 test files）')),
+    ).toBe(true);
   });
 });
 
