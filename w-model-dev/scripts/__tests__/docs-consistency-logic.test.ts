@@ -729,12 +729,12 @@ describe('runDocConsistencyChecks', () => {
     expect(violations.some((x) => x.check === 'vitest-tests')).toBe(true);
   });
 
-  it('vitest 用例总数三处文档均同步 → 零 vitest-tests 违规；CLI 消费 JSON 注入计数', async () => {
+  it('coverage JSON 的 52/849 元数据与五处文档均同步 → 零 vitest-tests 违规；CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
-
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 849);
+      const coverage = await writeVitestCount(fixtureRoot, 849);
+      expect([coverage.testResults.length, coverage.numTotalTests]).toEqual([52, 849]);
       const dataModels = path.join(fixtureRoot, 'w-model-dev', 'references', 'data-models.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const dataModelsContent = await fs.readFile(dataModels, 'utf-8');
@@ -1341,11 +1341,14 @@ function runDocsConsistencyCli(
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-async function writeVitestCount(fixtureRoot: string, count: number): Promise<void> {
+async function writeVitestCount(fixtureRoot: string, count: number) {
+  const coverage = {
+    testResults: Array.from({ length: 52 }),
+    numTotalTests: count,
+    numPassedTests: count,
+    numFailedTests: 0,
+  };
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-  await fs.writeFile(
-    path.join(fixtureRoot, 'vitest-results.json'),
-    JSON.stringify({ numTotalTests: count, numPassedTests: count, numFailedTests: 0 }),
-    'utf-8',
-  );
+  await fs.writeFile(path.join(fixtureRoot, 'vitest-results.json'), JSON.stringify(coverage), 'utf-8');
+  return coverage;
 }
