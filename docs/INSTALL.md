@@ -80,7 +80,7 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 │   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 7 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph-opsx / wm-write / doctor / plan-chunks；exit-2 脚本口径 = 26 check + 7 工具 CLI = 33，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks-logic.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
-│   └── __tests__/      # vitest 单元测试（47 个 .test.ts / 725 条 + README.md coverage 矩阵）
+│   └── __tests__/      # vitest 单元测试（49 个 .test.ts / 766 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -88,6 +88,22 @@ Copy-Item -Recurse -Force "w-model-dev" "$env:USERPROFILE\.agent\skills\w-model-
 > Skill 资产（除 `scripts/` 外）零依赖、零 Node.js，可整目录拷贝。`scripts/` 需在仓库根目录 `npm install` 一次以拉取 devDeps（ajv / eslint-plugin-security 等），详见 §2。
 
 > Agent 读取 `SKILL.md` 后承担「编排者」（O）角色，分派 S 产出 / V 评审 / G 门禁子代理执行各阶段实施：V 按 [`references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 提示词产出 `VerifierOutput` JSON，G 跑 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验防漂移（退出码 0 通过 / 1 校验失败 / 2 用法错误）并回填证据。角色边界与「编排者最小化」（反模式 #10）权威定义见 §1 与 [`references/subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
+
+---
+
+### 3.1 本地 pre-push 与平台依赖
+
+`npm install` 的 postinstall 只负责设置本仓库的 `core.hooksPath=.githooks`；pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
+
+pre-push 仅运行 `bash .githooks/ensure-platform-deps.sh --check`。默认和 `--check` 均只检查当前平台所需原生包，**不自动**网络下载、`npm pack`、解包或覆盖 `node_modules`。平台检查与显式修复入口都必须在 Bash（Git Bash / WSL / POSIX shell）中运行：
+
+```bash
+npm run platform-deps:check    # 只检查，不修改 node_modules
+npm run platform-deps:install  # 显式 fail-closed 入口；当前仅提示人工 npm install
+npm install                    # 开发者执行的实际安装/修复命令
+```
+
+`self-test` 与 `doctor` 可在 PowerShell 中运行；pre-push 与上述平台依赖命令需要 Bash。
 
 ---
 

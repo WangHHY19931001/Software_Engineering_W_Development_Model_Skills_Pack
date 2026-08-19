@@ -274,17 +274,19 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 ### 4. 并发写入冲突处理
 
-多 Agent / 多会话同时写 `rtm.json` 时：
+多 Agent / 多会话同时写 `rtm.json` 时，必须统一通过 `wm-write.ts`，而非手写 `stat` 比较：
 
-| 冲突类型 | 检测信号 | 处理 |
+| 情况 | `wm-write` 行为 | 后续处理 |
 |---|---|---|
-| 文件 mtime 与读取时不一致 | 读取后写回前先 `stat` 比较 mtime；不一致即冲突 | 拒绝覆盖；重新读取最新版本合并后再写 |
-| 同一字段被多次修改 | 写入前对比读取时的 `updatedAt` 与当前 `updatedAt` | 后写者基于最新版本重做修改；冲突字段需用户裁决 |
-| 测试状态被并发翻转 | `TestCase.status` 在两次读取间从「通过」翻转为「失败」 | 以「失败」为优先（保守原则），回阶段 5 返工 |
+| 并发 writer 竞争 | `<target>.lock` 持久目录与可转移 owner 对象保证同一时刻仅一个 writer 在锁内执行；竞争 writer 不会双成功 | 被拒绝 writer 重读最新状态、重新合并后再调用 `wm-write` |
+| mtime 版本不符 | 锁内比较 `--expect-mtime`（有限非负数、向下取整）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1 | 重读目标，按最新 mtime 重试 |
+| 陈旧锁 | CLI 默认 fail-closed：`STALE_LOCK` / exit 1 | 经人工判断后显式使用 `--recover-stale-lock`；直接 `writeStateJson` 调用仅为兼容既有调用允许隐式恢复 |
+| 锁等待超时 | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1 | 保留原状态，稍后重试或协调 writer |
+| 测试状态冲突 | 应由业务合并逻辑判断 | 以「失败」为优先（保守原则），回阶段 5 返工 |
 
-并发写入约定：写入前必须 `stat` 校验 mtime，不一致即重读合并；同一字段冲突时测试状态取「失败」优先（保守），其他字段取「最新 mtime」优先；同一记录 ≥3 次并发修改须暂停并向用户报告。
+锁内依次执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；回滚不会直接 copyFile 到目标或直接 unlink 目标。备份保留与恢复均由 `wm-write` 处理。
 
-> 并发写入冲突处理不改变数据模型 schema，仅约定写入时的并发控制策略。
+> 并发写入处理不改变数据模型 schema，仅约定状态写协议。
 
 ## 成本预算模型（budget.json）
 

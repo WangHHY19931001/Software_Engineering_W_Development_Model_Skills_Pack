@@ -20,6 +20,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **设计哲学**：主刀与修正权 / 人机分工线 / 白箱 vs 黑箱 / 受控的失控 / clockware vs swarmware 五条方法论取向见 [references/design-philosophy.md](references/design-philosophy.md)，按需加载。
 
+**本地 pre-push 依赖边界**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示 `npm install`，不自动安装；它只调用 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台检查与显式 fail-closed 指引入口是 `npm run platform-deps:check` 与 `npm run platform-deps:install`，必须在 Bash 中运行；`self-test` 与 `doctor` 可在 PowerShell 运行。
+
 ## 触发决策
 
 按以下优先级判断，不要把普通软件任务升级为 W 模型流程：
@@ -128,7 +130,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 8. **分派 G 子代理门禁**（O → G）：跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts` + `check-bdd-model.ts`**（约束 #13）；**阶段 5 额外跑 `check-code-tla-consistency.ts`**（代码-TLA+ 一致性回归，四维度校验）。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告** → **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
 9.5. **冰山扫掠**（O → R-iceberg）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）；G 跑 `check-iceberg-sweep.ts`（R1-R5）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
-10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。状态文件写入统一经 `wm-write.ts`（`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验），不得手写。
+10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。状态文件写入统一经 `wm-write.ts`：使用 `<target>.lock` 持久目录与可转移 owner 对象实施跨进程锁，锁内完成 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 用 `--lock-timeout <ms>` 控制等待；陈旧锁必须显式传 `--recover-stale-lock`，否则以 `STALE_LOCK` / exit 1 拒绝写入；不得手写。
 
 > 🔴 **CHECKPOINT · 项目初始化**：复述"进入阶段 / 同步测试设计 / 预期产物"，获得确认后才能分派 S 子代理。
 >
@@ -186,7 +188,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
 | `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进；报告存 `.w-model/hill-climbing/<timestamp>-report.json` | O 分析（状态读写+分析，非实施） |
 | `/wm metrics` | 流程度量 | 从 run-log/budget 生成流程度量报告；只读 | O 只读，不分派子代理 |
-| `wm-write.ts` | 状态写入 | 状态文件安全写（`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验）；O/A/S 持久化 `.w-model/*.json` 统一经此写入 | O/A/S 执行（仅状态文件操作） |
+| `wm-write.ts` | 状态写入 | `<target>.lock` 跨进程锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`--expect-mtime` 为有限非负数向下取整，`--lock-timeout` 为安全非负整数，CLI 陈旧锁须显式 `--recover-stale-lock` | O/A/S 执行（仅状态文件操作） |
 | `doctor.ts` | 环境自检 | 首次启用 / 依赖报错时诊断环境（node/tsx/ajv/java/tla2tools/codegraph/openspec）；`--with-tla` 升级 TLA+ 项为阻断级 | O 执行（非阶段门） |
 
 每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。

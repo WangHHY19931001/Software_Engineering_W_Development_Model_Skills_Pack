@@ -1145,8 +1145,10 @@ flowchart TD
 
 | 脚本 | 用途 | 实现位置 |
 |------|------|----------|
-| `wm-write.ts` | 状态文件安全写助手：`.bak` 备份 + mtime 乐观锁 + 原子替换 + 回读校验（回读失败自动回滚备份）。O/S 更新 `.w-model/*.json` 状态文件时统一经此写入，防止手写漂移与并发覆盖 | [`w-model-dev/scripts/cli/wm-write.ts`](../w-model-dev/scripts/cli/wm-write.ts) + [`w-model-dev/scripts/logic/state-write-logic.ts`](../w-model-dev/scripts/logic/state-write-logic.ts) |
+| `wm-write.ts` | 状态文件安全写助手：以 `<target>.lock` 持久目录和可转移 owner 对象实现跨进程锁；锁内完成 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 支持 `--lock-timeout <ms>` 与 `--recover-stale-lock`，不带恢复标志的陈旧锁以 `STALE_LOCK` / exit 1 拒绝写入；直接 `writeStateJson` 调用保留隐式恢复兼容行为。`--expect-mtime` 接受有限非负数并向下取整，`--lock-timeout` 必须为安全非负整数 | [`w-model-dev/scripts/cli/wm-write.ts`](../w-model-dev/scripts/cli/wm-write.ts) + [`w-model-dev/scripts/logic/state-write-logic.ts`](../w-model-dev/scripts/logic/state-write-logic.ts) |
 | `doctor.ts` | 环境自检：node / tsx / ajv / java / tla2tools / codegraph / openspec 逐项检查并给出修复指引（`--with-tla` 将 TLA+ 项升级为阻断级）。首次启用或门禁报依赖错误时运行 | [`w-model-dev/scripts/cli/doctor.ts`](../w-model-dev/scripts/cli/doctor.ts) + [`w-model-dev/scripts/logic/doctor-logic.ts`](../w-model-dev/scripts/logic/doctor-logic.ts) |
+
+**本地 pre-push 平台依赖**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示开发者运行 `npm install`，不自动安装。它只调用 `ensure-platform-deps.sh --check`；默认/`--check` 不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。开发者可在 Bash 中显式运行 `npm run platform-deps:check` 或 `npm run platform-deps:install`；后者当前 fail-closed，仅输出人工 `npm install` 指引。`self-test` 与 `doctor` 可在 PowerShell 运行，pre-push 与平台依赖命令需要 Bash。
 
 ---
 

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -130,6 +133,42 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     ...overrides,
   };
 }
+
+const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
+
+function readLiveDoc(relativePath: string): string {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf-8');
+}
+
+describe('A4 状态锁与显式平台修复文档契约', () => {
+  it('全套文档准确声明状态锁与显式平台依赖边界', () => {
+    const activeDocs = [
+      'docs/skill-design-document_SSoT.md',
+      'w-model-dev/SKILL.md',
+      'w-model-dev/references/data-models.md',
+      'w-model-dev/references/command-reference.md',
+      'README.md',
+      'docs/INSTALL.md',
+      'AGENTS.md',
+      'CONTRIBUTING.md',
+    ].map(readLiveDoc);
+    const activeText = activeDocs.join('\n');
+    const changelog = readLiveDoc('CHANGELOG.md');
+
+    expect(activeText).toContain('<target>.lock');
+    expect(activeText).toContain('--lock-timeout');
+    expect(activeText).toContain('--recover-stale-lock');
+    expect(activeText).toContain('platform-deps:check');
+    expect(activeText).toContain('platform-deps:install');
+    expect(activeText).toMatch(/显式|不自动/);
+    expect(activeText).not.toContain('pre-push 自动 npm install');
+    expect(activeText).not.toContain('平台补装见');
+    expect(activeText).not.toContain('自动补装对应平台');
+    expect(changelog).toContain('状态写并发协议');
+    expect(changelog).toContain('显式平台修复');
+    expect(changelog).toContain('Vitest 用例采集 fail-closed 缺口');
+  });
+});
 
 describe('runDocConsistencyChecks', () => {
   it('全部一致时零违规', () => {

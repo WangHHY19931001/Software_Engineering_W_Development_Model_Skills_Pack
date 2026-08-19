@@ -54,7 +54,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 单元测试（vitest，47 个 test 文件 / 725 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+# 3.1 单元测试（vitest，49 个 test 文件 / 766 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
 # 3.2 自检基线（samples/ 目录下 256 条样本，覆盖全部 check 脚本的通过 / 失败路径）
@@ -93,7 +93,7 @@ npm run format
 | 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 | 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
-| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；47 files / 725 tests） | 0 |
+| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；49 files / 766 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 | 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
 | 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
@@ -113,12 +113,14 @@ npm run setup:hooks
 npm run prepush
 ```
 
-**触发条件**：hook 会先判断本次推送的提交里是否包含以下路径的变更，命中才跑门禁，
-纯文档 / 模板改动直接放行，避免无谓延迟：
+**触发条件**：hook 会先判断本次推送的提交里是否包含以下路径的变更，命中才跑门禁；`w-model-dev/**`、活体根文档、`docs/*.md`、`config/**`、根 `scripts/**`、`package.json`、`package-lock.json` 与 `.githooks/**` 均在范围内，纯归档/规划目录改动才直接放行。
 
-- `w-model-dev/scripts/**`
-- `package.json`
-- `.githooks/pre-push`
+**依赖与平台边界**：pre-push 缺少 `node_modules` 时 exit 1 并提示开发者运行 `npm install`，绝不自动安装。它仅调用 `ensure-platform-deps.sh --check`；默认/`--check` 不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。使用以下 Bash 命令显式检查或获得 fail-closed 指引：
+
+```bash
+npm run platform-deps:check
+npm run platform-deps:install  # 当前只提示人工 npm install，不自动修复
+```
 
 **临时跳过**（仅紧急情况，勿用于常规开发）：
 
@@ -127,7 +129,7 @@ git push --no-verify
 ```
 
 > Windows 注意：pre-push 依赖 bash。**Git Bash（Git for Windows 自带）下会正常执行门禁**；仅纯 cmd/PowerShell（无 bash 解释器）环境无法执行，hook 检测到后给出指引并放行（exit 0），不误报失败。请使用 Git Bash 运行 `npm run prepush`。
-> **WSL / 双平台**：仓库 node_modules 若在 Windows 侧安装，WSL/Linux 下运行门禁前，pre-push 会自动调用 [`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh) 补装对应平台的原生二进制（esbuild / rolldown，通过 `npm pack` + 解压，绕过 npm 依赖树以免破坏另一平台二进制），保证 Windows 与 WSL 共用同一份 node_modules 均可跑通门禁。
+> **WSL / 双平台**：仓库 node_modules 若在 Windows 侧安装，WSL/Linux 下的 pre-push 只调用 [`.githooks/ensure-platform-deps.sh`](./.githooks/ensure-platform-deps.sh) `--check` 验证当前平台原生包；它不会自动修复。检查失败时使用 Git Bash/WSL 显式运行 `npm run platform-deps:check`，并按 `npm run platform-deps:install` 给出的人工 `npm install` 指引修复。
 
 ### 4. 提交规范
 
@@ -212,7 +214,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
 │   ├── self-test.ts               # 校验逻辑自检（256 条样本，samples/ 驱动）
-│   ├── __tests__/                 # vitest 单元测试（47 个 .test.ts / 725 条 + README.md coverage 矩阵）
+│   ├── __tests__/                 # vitest 单元测试（49 个 .test.ts / 766 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例

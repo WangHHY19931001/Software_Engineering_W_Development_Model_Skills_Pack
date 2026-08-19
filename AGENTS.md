@@ -31,7 +31,7 @@
 | `w-model-dev/SKILL.md` | 编排逻辑 + 命令接口 + 架构定位 | Agent 首次进入仓库必读；`/wm` 命令由其承载 |
 | `w-model-dev/references/` | 阶段细则（阶段 1 含迷雾登记册 Fog of War）/ verifier-spec（含五轴评审 §7.4A + self-as-verifier 模式节）/ agent-personas（4 个评审角色提示词）/ subagent-delegation（O/A/S/V/G/R 编排者-子代理边界；含角色分派完整性校验节 + S 子代理 RTM 回填强制职责）/ root-cause-locator（R 子代理根因分析方法论）/ subagent-persona-matrix（R-lead / V-lead 多角度 persona 选择矩阵）/ definition-of-done（项目级 DoD 七维度）/ signature-chain-guide（角色链式签名 + 产出来源正确性）/ event-ingress-guide（Loop 3 事件接驳）/ hill-climbing-guide（Loop 4 爬坡循环）/ skillopt-adoption（SkillOpt 方法论吸收）/ anti-patterns（48 条流程反模式 #1-#48；F1~F10 失败模式见 operation-behaviors.md；O1~O6 运维失败模式见 SSoT §4A.2a）/ hard-constraints（14 条硬约束完整版）/ operation-behaviors（八条操作行为 + 失败模式 F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学：主刀与修正权等）/ ingestion-chunk / ingestion-cross（A 子代理分块与合并细则）/ graph-guide（图谱门禁与收敛准则）/ tla-plus-guide（TLA+ 层次化状态机建模与行为门禁）/ bdd-guide（BDD 建模 + TLA+/BDD 自动化同步校验节）/ command-reference / operational-recovery（含成熟度与行为门禁分级）/ dispatch-matrix（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）/ 数据模型（含 budget/run-log/maturity schema）/ rtm-guide / quality-standards / iceberg-sweep-guide / glossary / toolbox / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / tla-plus-syntax-reference / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-tlc-configuration / directory-conventions / format-conventions / estimation-guide / context-management-guide / code-smells-checklist / concurrency-guide / refactoring-catalog / design-patterns-catalog | **按需加载**，禁止一次性载入全部（反例 #5） |
 | `w-model-dev/subagent/` | **人格库**（28 个 Markdown 人格文件，分 engineering / testing / design / product / project 5 类） | R-lead / V-lead 多角度分析时按 `references/subagent-persona-matrix.md` 选用 persona；Persona 文件本身是 Markdown，不调用 LLM |
-| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`logic/`（校验逻辑）+ `cli/`（CLI 入口）+ `lib/`（JSON/错误结构工具）。**完整 exit-2 脚本 33 清单见 §8「脚本导航表」与 [dispatch-matrix.md](w-model-dev/references/dispatch-matrix.md) §6 权威登记表**——新增 / 改名门禁脚本只须登记 dispatch-matrix 一处，`check-docs-consistency.ts` script-registry 检查兜底。`samples/`（fixture 样本）/ `__tests__/`（vitest 单元测试，47 个 .test.ts / 725 条 + README.md coverage 矩阵） | 阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 预防性审查 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点直接 `npx tsx` 执行 |
+| `w-model-dev/scripts/` | 自包含门禁脚本（依赖 `tsx` runtime + devDeps：ajv / eslint-plugin-security，需 `npm install` 一次）：`logic/`（校验逻辑）+ `cli/`（CLI 入口）+ `lib/`（JSON/错误结构工具）。**完整 exit-2 脚本 33 清单见 §8「脚本导航表」与 [dispatch-matrix.md](w-model-dev/references/dispatch-matrix.md) §6 权威登记表**——新增 / 改名门禁脚本只须登记 dispatch-matrix 一处，`check-docs-consistency.ts` script-registry 检查兜底。`samples/`（fixture 样本）/ `__tests__/`（vitest 单元测试，49 个 .test.ts / 766 条 + README.md coverage 矩阵） | 阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 预防性审查 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点直接 `npx tsx` 执行 |
 | `w-model-dev/templates/` | 文档模板（需求 / 设计 / 测试 / RTM 等，阶段 1-4 含主模板 + 每阶段 6 独立子模板，跨阶段共 10 种） | 产出文档时套用对应模板 |
 | `w-model-dev/examples/` | 交互示例（需求分析 / 设计 / 编码 / 测试执行） | 产出前参考对应示例 |
 | `w-model-dev/schemas/` | JSON Schema (draft-07) 文件（20 份，全字段 description 自描述） | logic 层 schema 校验时自动加载；新增 .w-model/*.json 字段必先改 schema |
@@ -42,10 +42,10 @@
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装 / 排障 / 用户指南）；`docs/api/` 为 typedoc 生成物（`npm run docs:build`，gitignored 不入库）；`docs/superpowers/`（plans/ + specs/）为内部规划目录，不参与门禁、非面向用户 | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
-| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 17 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性 + tsc 类型检查），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
+| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 17 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性 + tsc 类型检查），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）。缺 `node_modules` 即 exit 1，绝不自动 `npm install`；仅运行 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。`npm run platform-deps:check` / `npm run platform-deps:install` 均为显式入口，后者 fail-closed 并指引人工 `npm install` | `config/**`、根 `scripts/**`、`package-lock.json`、`w-model-dev/scripts/**`、`package.json`、`.githooks/**` 与活体文档变更会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 
 门禁脚本测试：
-- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，47 个 .test.ts / 725 条）
+- `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，49 个 .test.ts / 766 条）
 - `w-model-dev/scripts/samples/`：fixture 样本（含 gate-enhancement 场景）
 - 运行：`npx vitest run --config config/vitest.config.ts`（仓库根目录；配置集中于 config/）
 
@@ -108,7 +108,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 - **不引入 LLM 调用**：技能包内任何文件都不得直接调用 LLM；LLM-as-a-Verifier 评审通过提示词委托 V 子代理执行。
 - **CHECKPOINT 不可绕过**：`w-model-dev/SKILL.md` 中 `🔴 CHECKPOINT` 标记的暂停点必须等用户确认，不得自动推进。
 - **真实测试结果回填**：`/wm test` 不得自动将测试标记为通过，必须由真实测试运行器执行后通过 `result=pass|fail` 回填（由 S 子代理执行回填，编排者不得越权）。
-- **状态写入经 wm-write**：`.w-model/*.json` 状态文件写入统一走 `wm-write.ts`（.bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验，回读失败自动回滚备份），禁止手写易错版本；`--expect-mtime` 用于并发安全，写入被拒（退出码 1）时重读目标按最新 mtime 重试。
+- **状态写入经 wm-write**：`.w-model/*.json` 状态文件写入统一走 `wm-write.ts`：`<target>.lock` 持久目录与可转移 owner 对象保证跨进程竞争 writer 不会双成功，锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--expect-mtime` 接受有限非负数并向下取整；`--lock-timeout` 必须为安全非负整数；CLI 陈旧锁未显式给出 `--recover-stale-lock` 时返回 `STALE_LOCK` / exit 1。
 - **编排者最小化**：编排者只做编排，任何实施动作由子代理执行（六类角色定义与边界见 §1 与 [`w-model-dev/references/subagent-delegation.md`](./w-model-dev/references/subagent-delegation.md)）。违反命中反模式 #10，回到当前阶段起点。
 - **返工必先根因定位**：V/G 不通过后必须分派 R 子代理定位根因，禁止直接分派 S 返工（命中反模式 #18）。R 子代理按 [`w-model-dev/references/root-cause-locator.md`](./w-model-dev/references/root-cause-locator.md) 方法论产出 RootCauseReport。
 - **R 报告须 V 复审 + G 门禁**：R 报告必须经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）才可分派 S-fix（命中反模式 #19）。返工循环：V/G→R→V→G→S-fix→V→G。
@@ -158,4 +158,4 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | check-samples-coverage.ts | samples 覆盖矩阵门禁（每个 fixture 被 self-test.ts 引用 + 每个子目录在 samples/README.md 矩阵声明） | - | 0=通过，1=不一致，2=输入错误 |
 | doctor.ts | 环境自检（node/tsx/ajv+ajv-formats/java/tla2tools.jar/codegraph/openspec 就绪性；`--with-tla` 将 TLA+ 项升为阻断级，`--json` 输出 DOCTOR_JSON） | - | 0=就绪，1=存在阻断级缺失，2=输入错误 |
 | plan-chunks.ts | ingestion 分块规划（O 只读 stdout） | 1-4 | 0=正常，2=输入错误 |
-| wm-write.ts | 状态文件安全写助手（.bak 备份 + mtime 乐观锁 + 原子替换 + 回读校验，回读失败自动回滚；`--stdin`/`--from` 读入，`--expect-mtime` 乐观锁，`--no-backup` 跳过备份） | - | 0=写入成功，1=写入拒绝，2=输入错误 |
+| wm-write.ts | 状态文件安全写助手（`<target>.lock` 跨进程锁 + 可转移 owner；锁内 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`--stdin`/`--from` 读入，`--expect-mtime` 向下取整，`--lock-timeout`，显式 `--recover-stale-lock`，`--no-backup`） | - | 0=写入成功，1=写入拒绝，2=输入错误 |
