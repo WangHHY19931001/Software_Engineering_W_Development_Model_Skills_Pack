@@ -23,6 +23,9 @@
 *.swp
 *.swo
 
+# Trae IDE HTML 分享产物（会话生成，非仓库资产）
+.trae-html-share-packages/
+
 # 系统
 .DS_Store
 Thumbs.db
@@ -41,8 +44,7 @@ node_modules/
 # TypeScript 编译产物
 dist/
 
-# npm 安装产物
-package-lock.json
+# npm 运行产物（package-lock.json 已入库：依赖树与 npm audit 可复现）
 npm-debug.log*
 yarn-error.log*
 
