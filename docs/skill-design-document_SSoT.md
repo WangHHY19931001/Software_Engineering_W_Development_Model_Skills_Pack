@@ -1021,7 +1021,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **行为校验**（设计文档 §3）：SANY 语法检查 → TLC 模型检查（无死锁/不变式违反/状态爆炸）；编码调试顺序为硬约束（反模式 #14）。
 - **阶段 4 硬约束**：`--phase=4` TLA+ 零违反 + 图谱零违反才放行进阶段 5 编码。
 - **维护边界**：S 子代理产出（.tla + .cfg + manifest 实体）；G 子代理跑 `check-tla-model.ts` 校验；编排者不写。TLA+ 不接受占位/简化/错误实现（反模式 #16）；建模须符合需求和设计，符合后仍有问题须修正需求/设计并回退重跑（反模式 #17）。
-- **工具链**：Java ≥ 11 与 `tla2tools.jar`（均由宿主环境提供的可选外部依赖，含 SANY + TLC + PlusCal）；技能包只负责调用门禁并报告确定性结果。
+- **工具链**：TLA+/TLC 是外部工具能力；Java ≥ 11 是宿主环境依赖；`w-model-dev/tools/tla2tools.jar` 是 L1 交付层随技能包携带的运行时资产，含 SANY + TLC + PlusCal，由 `check-tla-model.ts` 按 manifest 路径加载。
 - **checkRounds 语义**（与 [`w-model-dev/references/tla-plus-guide.md`](../w-model-dev/references/tla-plus-guide.md) 双向追溯）：记录每轮 `check-tla-model.ts` 校验结果（含 violations 摘要与 round 编号）；`violations` 跨轮须单调递减（设计文档 §3.4）；与 `run-log.jsonl` R3（返工动作完整性）交叉校验——每轮 checkRound 须对应 run-log 中一条返工记录；无返工（首次即收敛）填 `[]`。
 
 ### 7.9 signature-chain.jsonl schema（角色链式签名产物）
@@ -1351,7 +1351,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phas
 
 **校验算法**（确定性，无 LLM；设计文档 §3.1）：
 
-1. **环境就绪**：`java -version` ≥ 11（捕获 stderr，因 `java -version` 在退出码 0 时写 stderr）；宿主环境提供的可选外部依赖 `tla2tools.jar` 存在。环境失败 → `environmentOk=false`，整体 `passed=false`，退出码 1。
+1. **环境就绪**：`java -version` ≥ 11（捕获 stderr，因 `java -version` 在退出码 0 时写 stderr）；L1 随技能包交付的 `w-model-dev/tools/tla2tools.jar` 存在且可由 manifest 路径加载。Java 缺失或版本不满足、或随包 JAR 缺失时，`environmentOk=false`，整体 `passed=false`，退出码 1。
 2. **manifest 结构校验**：`version` / `currentPhase` / `tools` / `specs` 字段齐全；`tools.jarPath` / `tools.javaMinVersion` 合法。结构失败 → 退出码 2。
 3. **规格字段校验**：每个 spec 的 `id` / `level` / `phase` / `system` / `requirementIds` / `designRef` / `tlaPath` / `cfgPath` / `parent` / `siblings` / `children` / `variableCombination` / `decompositionDecision` / `syntaxChecked` / `tlcChecked` / `deadlockFree` / `invariantsHold` / `stateExplosion` 字段齐全且类型合法。
 4. **文件头校验**（每个 spec）：读取 `.tla` 文件内容，`parseTlaHeader()` 解析 8 个 `@` 字段，`validateHeader()` 比对 manifest 中 spec 声明——`@system` / `@requirement` / `@design` / `@parent` / `@sibling` / `@child` / `@level` / `@phase` 八字段须全部存在且与 manifest 一致（`null` ↔ `null` / 空数组；逗号列表集合须相等）。违反 → `headerViolations++`。

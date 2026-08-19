@@ -31,3 +31,7 @@
 ## Scope Guard
 
 Only the seven C1-allowed files plus this report are included in the commit. Existing untracked plans/specs, temporary coverage output, and review diff remain untouched and unstaged.
+
+## Review Remediation
+
+The independent review identified an Important boundary error in the TLA+ runtime description. The SSoT previously grouped Java and `tla2tools.jar` as host-provided dependencies. Repository verification confirms `w-model-dev/tools/tla2tools.jar` is Git-tracked and delivered with the L1 skill package, while Java remains a host-environment dependency. The SSoT now distinguishes TLA+/TLC as external tool capability, Java as the host dependency, and the JAR as the L1 bundled runtime asset loaded by `check-tla-model.ts` from the manifest path. Existing C1 SSoT assertions now protect this distinction.

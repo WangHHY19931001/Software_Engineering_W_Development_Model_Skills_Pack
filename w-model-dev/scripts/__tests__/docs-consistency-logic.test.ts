@@ -1362,4 +1362,8 @@ async function assertSsotExternalBoundaryFile(): Promise<void> {
   expect(content).toContain('宿主 Agent / 外部 LLM');
   expect(content).toContain('W-Model Skill 技能包');
   expect(content).toContain('可选外部工具');
+  expect(content).toContain('TLA+/TLC 是外部工具能力');
+  expect(content).toContain('Java ≥ 11 是宿主环境依赖');
+  expect(content).toContain('w-model-dev/tools/tla2tools.jar` 是 L1 交付层随技能包携带的运行时资产');
+  expect(content).toContain('L1 随技能包交付的 `w-model-dev/tools/tla2tools.jar`');
 }
