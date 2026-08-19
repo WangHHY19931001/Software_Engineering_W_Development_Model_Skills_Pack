@@ -6,17 +6,18 @@
  *       status 非字符串归一化 / 仅 project 的降级组合。
  *
  * 子进程说明：CLI 脚本 main() 顶层执行并调用 process.exit，无法直接 import 测试；
- * 采用 spawnSync(process.execPath, [tsx/cli, 脚本, ...]) 运行真实进程断言退出码与输出。
+ * 采用 runSync(process.execPath, [tsx/cli, 脚本, ...]) 运行真实进程断言退出码与输出。
  */
 
-import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
+import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+import { runSync } from '../lib/run-sync.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -50,7 +51,7 @@ async function writeWModel(rel: string, content: string): Promise<string> {
 
 /** 运行 wm-status 子进程 */
 function run(...args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const r = spawnSync(process.execPath, [tsxCli, SCRIPT, tmpDir, ...args], { encoding: 'utf-8' });
+  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir, ...args], { encoding: 'utf-8' });
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 

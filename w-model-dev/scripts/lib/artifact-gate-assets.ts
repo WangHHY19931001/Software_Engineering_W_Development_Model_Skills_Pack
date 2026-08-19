@@ -8,14 +8,15 @@
  * - TLA+/BDD model 校验（设计文档 §3.3.8：终检时经子进程调用 check-tla-model.ts / check-bdd-model.ts）
  */
 
-import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { type GateGraph, type PhaseOption } from '../logic/gate-logic.js';
 import { validateBySchema } from '../logic/schema-loader.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
+
+import { runSync } from './run-sync.js';
+import { parseJsonSafe } from './safe-json.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -168,7 +169,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
 
   if (manifestExists && effectivePhase >= 2 && graphPath) {
     // 调用 check-tla-model.ts
-    const tlaModelResult = spawnSync(
+    const tlaModelResult = runSync(
       process.execPath,
       [
         '--import',
@@ -188,7 +189,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
 
     // 调用 check-bdd-model.ts
     if (bddManifestExists) {
-      const bddModelResult = spawnSync(
+      const bddModelResult = runSync(
         process.execPath,
         [
           '--import',

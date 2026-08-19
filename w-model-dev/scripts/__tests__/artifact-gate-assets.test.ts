@@ -212,7 +212,7 @@ describe('runModelChecks', () => {
     expect(spawnSyncMock).not.toHaveBeenCalled();
   });
 
-  it('TLA+ 与 BDD 子进程均退出 0 → 零 violation', () => {
+  it('TLA+ 与 BDD 子进程均退出 0 → 零 violation，并经受控 helper 传递进程级边界', () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
     const v = runModelChecks({
       manifestExists: true,
@@ -224,6 +224,15 @@ describe('runModelChecks', () => {
     });
     expect(v).toHaveLength(0);
     expect(spawnSyncMock).toHaveBeenCalledTimes(2);
+    for (const [, , options] of spawnSyncMock.mock.calls) {
+      expect(options).toMatchObject({
+        timeout: 15_000,
+        killSignal: 'SIGKILL',
+        encoding: 'utf-8',
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    }
   });
 
   it('TLA+ 子进程退出码非 0 → [artifact:tla-model] 违反（含 stdout 末尾摘要）', () => {

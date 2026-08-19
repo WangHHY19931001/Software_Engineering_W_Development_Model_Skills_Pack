@@ -9,6 +9,9 @@
 
 ## [41.19.0] - 2026-08-19
 
+### 修复（审计整改批次 B）
+- **同步子进程边界**：新增 `runSync` 统一为受控同步调用提供 15 秒进程级 timeout、`SIGKILL`、UTF-8 编码和 64 MiB 输出缓冲；artifact gate 的 TLA+/BDD 校验及 gate-report、metrics-report、wm-status 测试调用均迁移至该 helper。测试覆盖子进程选项实际透传、短超时终止，以及受控调用点不得绕过 helper。
+
 ### 修复（审计整改批次 A）
 - **状态写并发协议**：`wm-write` 改为 `<target>.lock` 持久目录与可转移 owner 的跨进程锁；锁内执行 mtime、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 增加 `--lock-timeout` 与显式 `--recover-stale-lock`；默认对陈旧锁 fail-closed（`STALE_LOCK` / exit 1），同时保留直接 `writeStateJson` 调用的兼容性隐式恢复。显式恢复仅授权 TTL 已过且 owner/operator PID 已退出的锁或 transition，不能夺取活跃 writer；逻辑层 barrier 与真实 CLI 回归测试覆盖该排他性边界。
 - **状态 Schema 写时校验**：`wm-write` 在锁临界区内通过唯一注册表验证 project/rtm/budget/maturity JSON 与 run-log JSONL；未注册 `.w-model` 目标默认以 `UNREGISTERED_TARGET` 拒绝，`--allow-untyped` 只允许该类目标且在 JSON 摘要标识 `untyped:true`，从不绕过注册目标的 `SCHEMA_INVALID` 拒绝。真实子进程回归覆盖两种 exit 1 协议、JSONL 安全行号与无备份/tmp 残留。
