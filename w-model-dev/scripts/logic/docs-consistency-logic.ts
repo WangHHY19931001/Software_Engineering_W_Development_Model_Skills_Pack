@@ -15,6 +15,48 @@ export interface DocCheckViolation {
 }
 
 /** A4 状态锁 / 平台修复 / batch B 边界的逐文档输入，由 CLI 读取活体文档后注入。 */
+/**
+ * A4 的确定性文档矛盾契约。它们只拒绝逐条列明的、位于 pre-push / 平台检查 /
+ * 平台依赖修复语境中的自动安装主张；不声称理解所有自然语言语义，清单外复杂
+ * 语义必须由 V review 判断。
+ */
+export const A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS: ReadonlyArray<{
+  description: string;
+  pattern: RegExp;
+}> = [
+  { description: 'pre-push 自动 npm install', pattern: /pre-push\s*自动(?:执行)?\s*npm\s+install/i },
+  { description: 'pre-push 会自动 npm install', pattern: /pre-push\s*会自动(?:执行)?\s*npm\s+install/i },
+  { description: 'pre-push 将自动 npm install', pattern: /pre-push\s*将自动(?:执行)?\s*npm\s+install/i },
+  { description: 'pre-push 自动安装依赖', pattern: /pre-push\s*自动安装依赖/i },
+  { description: 'pre-push 会自动安装依赖', pattern: /pre-push\s*会自动安装依赖/i },
+  { description: '平台检查自动安装依赖', pattern: /平台检查\s*自动安装依赖/i },
+  { description: '缺少依赖时自动安装', pattern: /缺少依赖时\s*自动安装/i },
+  { description: '自动补装平台依赖', pattern: /自动补装平台依赖/i },
+  { description: '自动平台修复', pattern: /自动平台修复/i },
+];
+
+/**
+ * A4 的确定性 mtime 错误安全主张契约。每一条都是已审计的不实断言；
+ * “mtime 仅锁内版本检测、不能单独保证并发安全”等限定说明不在此列表中。
+ */
+export const A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS: ReadonlyArray<{
+  description: string;
+  pattern: RegExp;
+}> = [
+  { description: 'mtime 乐观锁足以保证并发安全', pattern: /mtime\s*乐观锁\s*足以保证并发安全/i },
+  {
+    description: 'mtime 乐观锁足以保证并发写入安全',
+    pattern: /mtime\s*乐观锁\s*足以保证并发写入安全/i,
+  },
+  { description: 'mtime 乐观锁足以处理竞争写', pattern: /mtime\s*乐观锁\s*足以处理竞争写/i },
+  { description: 'mtime 乐观锁足以保证并发处理', pattern: /mtime\s*乐观锁\s*足以保证并发处理/i },
+  { description: 'mtime 乐观锁能够保证并发安全', pattern: /mtime\s*乐观锁\s*能够保证并发安全/i },
+  { description: 'mtime 乐观锁可以确保并发安全', pattern: /mtime\s*乐观锁\s*可以确保并发安全/i },
+  { description: 'mtime 乐观锁可防止竞争写', pattern: /mtime\s*乐观锁\s*可防止竞争写/i },
+  { description: 'mtime 乐观锁确保竞争 writer 不会双成功', pattern: /mtime\s*乐观锁\s*确保竞争\s*writer\s*不会双成功/i },
+  { description: 'mtime 乐观锁是并发安全保证', pattern: /mtime\s*乐观锁\s*是并发安全保证/i },
+];
+
 export interface A4DocumentationInput {
   ssot: string;
   skill: string;
@@ -837,15 +879,13 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
         message: `${name} 应逐文档声明 <target>.lock 持久目录与 owner 跨进程锁协议`,
       });
     }
-    if (
-      /mtime\s*乐观锁[^。\n]*(?:(?<!不)(?<!非)足以|(?<!不)(?<!非)(?:可|能)(?:以)?(?:保证|处理|解决))[^。\n]*(?:并发|竞争写|竞争|写入)/.test(
-        content,
-      )
-    ) {
-      violations.push({
-        check: 'a4-state-lock',
-        message: `${name} 不得将 mtime 乐观锁描述为足以保证并发、竞争写或并发处理`,
-      });
+    for (const { description, pattern } of A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS) {
+      if (pattern.test(content)) {
+        violations.push({
+          check: 'a4-state-lock',
+          message: `${name} 不得包含 mtime 错误安全主张「${description}」`,
+        });
+      }
     }
   }
   for (const [name, content] of stateLockDocs) {
@@ -877,17 +917,11 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
         message: `${name} 应明确 pre-push/平台检查不自动安装或修复`,
       });
     }
-    const forbidden = [
-      /pre-push\s*自动(?:执行)?\s*npm install/i,
-      /(?<!不)(?<!不会)自动补装/,
-      /(?<!不)(?<!不会)自动平台修复/,
-      /自动跑[^\n]*补装/,
-    ];
-    for (const pattern of forbidden) {
+    for (const { description, pattern } of A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS) {
       if (pattern.test(content)) {
         violations.push({
           check: 'a4-platform-repair',
-          message: `${name} 仍含自动安装/补装/平台修复旧语义「${pattern.source}」`,
+          message: `${name} 仍含自动安装/补装/平台修复禁止句式「${description}」`,
         });
       }
     }

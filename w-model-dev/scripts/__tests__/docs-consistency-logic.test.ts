@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS,
+  A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS,
   runDocConsistencyChecks,
   extractMarkdownRelLinks,
   checkSkillOutboundLinks,
@@ -230,6 +232,72 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
     expect(
       conflictingSemantics.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md')),
     ).toBe(true);
+  });
+
+  // 明确句式契约：每项仅注入一个错误断言；不试图理解清单外的自然语言语义。
+  // 保持与逻辑中的具名清单一一对应，防止新增禁止句式时遗漏隔离回归测试。
+  it.each(A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS)(
+    '拒绝隔离的自动安装禁止句式：$description',
+    ({ description: forbiddenStatement }) => {
+      const violations = runDocConsistencyChecks(
+        baseInput({
+          a4Docs: {
+            ...baseInput().a4Docs!,
+            troubleshooting: [
+              'pre-push 不自动 npm install；开发者手动 npm install。',
+              'platform-deps:check 和 platform-deps:install 为显式入口。',
+              forbiddenStatement,
+            ].join('\n'),
+          },
+        }),
+      );
+
+      expect(
+        violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md')),
+      ).toBe(true);
+    },
+  );
+
+  it.each(A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS)(
+    '拒绝隔离的 mtime 错误安全主张：$description',
+    ({ description: forbiddenStatement }) => {
+      const violations = runDocConsistencyChecks(
+        baseInput({
+          a4Docs: {
+            ...baseInput().a4Docs!,
+            commandReference: [
+              '所有状态写通过 <target>.lock 与 owner；mtime 仅锁内版本检测，不能单独提供并发安全。',
+              '--lock-timeout 与 --recover-stale-lock 为 CLI 参数。',
+              forbiddenStatement,
+            ].join('\n'),
+          },
+        }),
+      );
+
+      expect(violations.some((x) => x.check === 'a4-state-lock' && x.message.includes('command-reference.md'))).toBe(
+        true,
+      );
+    },
+  );
+
+  it('允许人工 npm install 与 mtime 锁内版本检测的正确契约', () => {
+    const violations = runDocConsistencyChecks(
+      baseInput({
+        a4Docs: {
+          ...baseInput().a4Docs!,
+          commandReference: [
+            '所有状态写通过 <target>.lock 与 owner；mtime 仅锁内版本检测，不能单独提供并发安全。',
+            '--lock-timeout 与 --recover-stale-lock 为 CLI 参数。',
+          ].join('\n'),
+          troubleshooting: [
+            'pre-push 不自动 npm install；开发者手动 npm install。',
+            'platform-deps:check 和 platform-deps:install 为显式入口。',
+          ].join('\n'),
+        },
+      }),
+    );
+
+    expect(violations.some((x) => x.check === 'a4-state-lock' || x.check === 'a4-platform-repair')).toBe(false);
   });
 });
 
