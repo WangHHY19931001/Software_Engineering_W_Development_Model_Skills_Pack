@@ -140,6 +140,13 @@ export interface DocConsistencyInput {
   vitestSuccess?: boolean;
   /** 目录枚举仅为库存诊断，不能代替 JSON 的 testResults.length。 */
   testDirectoryInventoryCount?: number;
+  /** 同次成功 artifact 的机器可验证身份与内容哈希。 */
+  vitestRunId?: string;
+  vitestArtifactId?: string;
+  vitestArtifactSha256?: string;
+  vitestCommitSha?: string;
+  /** 真实 exit-2 探针逐候选结果。 */
+  exit2ProbeResults?: Array<{ script: string; status: number; errorExitCode: number | null }>;
   /** A4 状态锁 / 平台修复 / batch B 边界的逐文档文本；缺省时跳过（fixture 兼容）。 */
   a4Docs?: A4DocumentationInput;
   /** w-model-dev/scripts 目录下 .ts 文件是否有变更（git diff + porcelain 判定，由 CLI 层注入） */
@@ -226,6 +233,11 @@ export interface DocConsistencyReport {
     exit2ScriptCount?: number;
     testFileCount: number;
     vitestTestCount: number;
+    vitestArtifactId?: string;
+    vitestRunId?: string;
+    vitestArtifactSha256?: string;
+    exit2ProbeResults?: Array<{ script: string; status: number; errorExitCode: number | null }>;
+    [key: string]: unknown;
   };
 }
 
@@ -309,12 +321,17 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
       exit2ScriptCount: input.exit2ScriptCount,
       testFileCount: input.testFileCount,
       vitestTestCount: input.vitestTestCount,
-      ...(input.vitestPassedCount === undefined ? {} : { vitestPassedCount: input.vitestPassedCount }),
-      ...(input.vitestFailedCount === undefined ? {} : { vitestFailedCount: input.vitestFailedCount }),
-      ...(input.vitestSuccess === undefined ? {} : { vitestSuccess: input.vitestSuccess ? 1 : 0 }),
       ...(input.testDirectoryInventoryCount === undefined
         ? {}
         : { testDirectoryInventoryCount: input.testDirectoryInventoryCount }),
+      ...(input.vitestPassedCount === undefined ? {} : { numPassedTests: input.vitestPassedCount }),
+      ...(input.vitestFailedCount === undefined ? {} : { numFailedTests: input.vitestFailedCount }),
+      ...(input.vitestSuccess === undefined ? {} : { success: input.vitestSuccess }),
+      ...(input.vitestRunId === undefined ? {} : { vitestRunId: input.vitestRunId }),
+      ...(input.vitestArtifactId === undefined ? {} : { vitestArtifactId: input.vitestArtifactId }),
+      ...(input.vitestArtifactSha256 === undefined ? {} : { vitestArtifactSha256: input.vitestArtifactSha256 }),
+      ...(input.vitestCommitSha === undefined ? {} : { vitestCommitSha: input.vitestCommitSha }),
+      ...(input.exit2ProbeResults === undefined ? {} : { exit2ProbeResults: input.exit2ProbeResults }),
     },
   };
 }

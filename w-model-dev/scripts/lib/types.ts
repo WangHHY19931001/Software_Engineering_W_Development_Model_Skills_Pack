@@ -31,6 +31,6 @@ export interface JsonReport {
   staticViolations?: unknown[];
   dynamicViolations?: unknown[];
   /** 当前运行时采集的数值事实，不是硬编码规范。 */
-  dynamicMeasurements?: Record<string, number>;
+  dynamicMeasurements?: Record<string, unknown>;
   durationMs: number;
 }
