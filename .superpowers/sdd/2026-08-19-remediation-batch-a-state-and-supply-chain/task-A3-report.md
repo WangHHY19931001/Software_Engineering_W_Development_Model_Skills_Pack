@@ -30,3 +30,11 @@
 - `bash -n .githooks/ensure-platform-deps.sh`、`bash -n .githooks/pre-push`、`git diff --check` — 通过。
 
 未执行 npm install、npm pack、tar、真实 push，也未修改状态逻辑、Schema、文档或计划。
+
+## 第 1/5 轮审查修复
+
+- I1：新增 `--install` 的两条执行级受控 shell 测试：缺失 native 包时断言 fail-closed、精确人工 `npm install` 指引和零 npm/tar/cp/rm/mv/mkdir 调用；依赖齐备时断言 exit 0、仅报告齐备且不宣称补装。
+- I2：移除源码正则“无副作用”断言，改为实际运行已触发且最小 node_modules 齐备的 pre-push。测试通过记录型 npm/tar/cp/rm/mv/mkdir 包装器验证实际经过 `ensure-platform-deps.sh --check`，没有平台补装、下载、归档、复制、移动、建目录或 node_modules 删除。既有 pre-push 临时日志清理只允许删除其 `/tmp` 文件。
+- I3：参数解析按完整 argc + argv 校验；`--check unexpected` 与 `--install unexpected` 都输出 usage 并 exit 2。
+
+第 1/5 轮验证：目标测试 14 passed；`npm run platform-deps:check`、`npm run typecheck` 和 `npm test`（49 文件、765 测试）通过；hook 语法和 `git diff --check` 通过。

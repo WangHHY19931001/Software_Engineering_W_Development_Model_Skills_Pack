@@ -20,7 +20,7 @@ async function makeTempDir(prefix: string): Promise<string> {
 
 async function run(script: string, args: string[], environment: Record<string, string> = {}, cwd = repoRoot) {
   try {
-    const result = await execFileAsync('bash', ['-c', 'source "$BASH_ENV"; export -f git node npm tar 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"', '--', script, ...args], {
+    const result = await execFileAsync('bash', ['-c', 'source "$BASH_ENV"; export -f git node npm tar cp rm mv mkdir 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"', '--', script, ...args], {
       cwd,
       env: { ...process.env, ...environment },
     });
@@ -44,6 +44,10 @@ ${nodeBody}
 }
 npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; exit 99; }
 tar() { printf 'tar %s\\n' "$*" >> "$CALLS"; exit 99; }
+cp() { printf 'cp %s\\n' "$*" >> "$CALLS"; exit 99; }
+rm() { printf 'rm %s\\n' "$*" >> "$CALLS"; exit 99; }
+mv() { printf 'mv %s\\n' "$*" >> "$CALLS"; exit 99; }
+mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
 `, 'utf8');
   const result = await run(ensureScript, args, {
     PATH: `${binDir}:${process.env.PATH}`,
@@ -104,11 +108,70 @@ esac`);
     expect(result.calls).toBe('');
   });
 
-  it('rejects an unknown argument with usage error code 2', async () => {
-    const result = await simulatedEnsure(['--unsupported'], 'printf "linux\\n"');
+  it.each([
+    { args: ['--unsupported'] },
+    { args: ['--check', 'unexpected'] },
+    { args: ['--install', 'unexpected'] },
+  ])('rejects unsupported arguments $args with usage error code 2', async ({ args }) => {
+    const result = await simulatedEnsure(args, 'printf "linux\\n"');
 
     expect(result.code).toBe(2);
+    expect(result.stdout).toContain('用法');
     expect(result.calls).toBe('');
+  });
+
+  it('keeps --install fail-closed without package, archive, or filesystem side effects when native dependencies are missing', async () => {
+    const result = await simulatedEnsure(['--install'], `
+case "$*" in
+  *process.platform*) printf 'linux\\n' ;;
+  *process.arch*) printf 'x64\\n' ;;
+  *esbuild/package.json*) printf '0.25.0\\n' ;;
+  *rolldown/package.json*) printf '1.0.0\\n' ;;
+  *) printf '\\n' ;;
+esac`);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('请手动运行 npm install');
+    expect(result.stdout).not.toContain('补装完成');
+    expect(result.calls).toBe('');
+  });
+
+  it('returns success for complete dependencies in --install mode without claiming to install anything', async () => {
+    const binDir = await makeTempDir('platform-deps-complete-bin-');
+    const workspace = await makeTempDir('platform-deps-complete-workspace-');
+    const callsPath = path.join(binDir, 'calls.log');
+    const bashEnv = path.join(binDir, 'bash-env.sh');
+    await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+    await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
+    await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
+    await fs.writeFile(bashEnv, `
+git() { printf '%s\\n' "$PWD"; }
+node() {
+  case "$*" in
+    *process.platform*) printf 'linux\\n' ;;
+    *process.arch*) printf 'x64\\n' ;;
+    *esbuild/package.json*) printf '0.25.0\\n' ;;
+    *rolldown/package.json*) printf '1.0.0\\n' ;;
+    *) printf '\\n' ;;
+  esac
+}
+npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; exit 99; }
+tar() { printf 'tar %s\\n' "$*" >> "$CALLS"; exit 99; }
+cp() { printf 'cp %s\\n' "$*" >> "$CALLS"; exit 99; }
+rm() { printf 'rm %s\\n' "$*" >> "$CALLS"; exit 99; }
+mv() { printf 'mv %s\\n' "$*" >> "$CALLS"; exit 99; }
+mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
+`, 'utf8');
+
+    const result = await run(ensureScript, ['--install'], {
+      BASH_ENV: bashEnv,
+      CALLS: callsPath,
+    }, workspace);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('平台依赖齐备');
+    expect(result.stdout).not.toContain('补装完成');
+    expect(await fs.readFile(callsPath, 'utf8').catch(() => '')).toBe('');
   });
 });
 
@@ -175,7 +238,12 @@ git() {
     await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
     await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
     await fs.writeFile(bashEnv, `
-git() { printf '%s\\n' "$PWD"; }
+git() {
+  case "$*" in
+    *'diff --name-only'*) printf 'config/probe.ts\\n' ;;
+    *) printf '%s\\n' "$PWD" ;;
+  esac
+}
 node() {
   case "$*" in
     *process.platform*) printf 'linux\\n' ;;
@@ -186,33 +254,25 @@ node() {
   esac
 }
 npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
+tar() { printf 'tar %s\\n' "$*" >> "$CALLS"; return 98; }
+cp() { printf 'cp %s\\n' "$*" >> "$CALLS"; return 98; }
+rm() { printf 'rm %s\\n' "$*" >> "$CALLS"; return 98; }
+mv() { printf 'mv %s\\n' "$*" >> "$CALLS"; return 98; }
+mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
 `, 'utf8');
 
-    const result = await run(prePushScript, ['--force'], {
+    const result = await run(prePushScript, [], {
       BASH_ENV: bashEnv,
       CALLS: callsPath,
+      PREPUSH_FORCE: '0',
       OSTYPE: 'linux-gnu',
     }, workspace);
     const calls = await fs.readFile(callsPath, 'utf8').catch(() => '');
 
-    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.code, `${result.stdout}\n${result.stderr}`).not.toBe(0);
+    expect(result.stdout).toContain('平台依赖齐备（linux-x64）');
     expect(calls, `${result.stdout}\n${result.stderr}`).toContain('npm run self-test');
-    expect(calls).not.toMatch(/npm install|npm pack|\btar\b/);
-  });
-
-  it('contains no automatic npm installation, package download, or tar extraction commands', async () => {
-    const [prePush, ensure] = await Promise.all([
-      fs.readFile(prePushScript, 'utf8'),
-      fs.readFile(ensureScript, 'utf8'),
-    ]);
-
-    expect(prePush).toMatch(/ensure-platform-deps\.sh"? --check/);
-    expect(prePush).not.toMatch(/npm[[:space:]]+install/);
-    expect(prePush).not.toMatch(/npm[[:space:]]+pack/);
-    expect(prePush).not.toMatch(/\btar\b/);
-    expect(ensure).not.toMatch(/npm[[:space:]]+pack/);
-    expect(ensure).not.toMatch(/\btar\b/);
-    expect(ensure).not.toMatch(/rm -rf.*node_modules/);
+    expect(calls).not.toMatch(/npm (install|pack)|\btar\b|\bcp\b|\bmv\b|\bmkdir\b|\brm\b.*node_modules/);
   });
 });
 

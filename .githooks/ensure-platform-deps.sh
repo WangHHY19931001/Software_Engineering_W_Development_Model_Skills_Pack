@@ -13,9 +13,10 @@ usage() {
 }
 
 mode="check"
-case "${1:-}" in
-  ""|--check) ;;
-  --install) mode="install" ;;
+case "$#:${1:-}" in
+  0:*) ;;
+  1:--check) ;;
+  1:--install) mode="install" ;;
   *)
     usage
     exit 2
