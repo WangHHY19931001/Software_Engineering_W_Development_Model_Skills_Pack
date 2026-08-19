@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
@@ -25,8 +26,14 @@ function target(name: string): string {
   return path.join(tmpDir, name);
 }
 
-function run(targetPath: string, args: string[], input?: string): { code: number | null; stdout: string; stderr: string } {
+function run(
+  targetPath: string,
+  args: string[],
+  input?: string,
+  cwd = process.cwd(),
+): { code: number | null; stdout: string; stderr: string } {
   const result = spawnSync(process.execPath, [tsxCli, SCRIPT, targetPath, ...args], {
+    cwd,
     encoding: 'utf-8',
     input,
   });
@@ -45,21 +52,65 @@ async function writeLock(targetPath: string, metadata: Record<string, unknown>):
   await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify(metadata), 'utf-8');
 }
 
+async function holdLiveLock(targetPath: string, holdMs: number): Promise<ChildProcess> {
+  const holder = spawn(
+    process.execPath,
+    [
+      '-e',
+      `
+    const fs = require('node:fs/promises');
+    const path = require('node:path');
+    const target = process.argv[1];
+    const holdMs = Number(process.argv[2]);
+    const owner = target + '.lock' + path.sep + 'owner';
+    (async () => {
+      await fs.mkdir(owner, { recursive: true });
+      await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify({
+        targetPath: target,
+        pid: process.pid,
+        token: 'holder',
+        createdAt: new Date().toISOString(),
+        operation: 'wm-write',
+      }));
+      process.stdout.write('ready\\n');
+      setTimeout(async () => {
+        await fs.rm(owner, { recursive: true, force: true });
+        process.exit(0);
+      }, holdMs);
+    })().catch((error) => { console.error(error); process.exit(1); });
+  `,
+      targetPath,
+      String(holdMs),
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  await once(holder.stdout!, 'data');
+  return holder;
+}
+
+async function waitForExit(child: ChildProcess): Promise<void> {
+  const code = child.exitCode ?? ((await once(child, 'exit')) as [number | null])[0];
+  expect(code).toBe(0);
+}
+
 describe('wm-write CLI lock controls', () => {
-  it('--lock-timeout 0 parses and is forwarded to the real writer', async () => {
+  it('--lock-timeout 0 is distinguishable from the default timeout while a real child process holds the lock', async () => {
     const p = target('zero-timeout.json');
-    await writeLock(p, {
-      targetPath: p,
-      pid: process.pid,
-      token: 'live-owner',
-      createdAt: new Date().toISOString(),
-      operation: 'wm-write',
-    });
+    const holder = await holdLiveLock(p, 1500);
 
-    const result = run(p, ['--stdin', '--lock-timeout', '0'], '{"value":0}');
+    try {
+      const explicitZero = run(p, ['--stdin', '--lock-timeout', '0'], '{"value":"zero"}');
+      expect(explicitZero.code).toBe(1);
+      expect(wmwriteSummary(explicitZero.stdout)).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT', writtenPath: p });
+      await expect(fs.access(path.join(`${p}.lock`, 'owner'))).resolves.toBeUndefined();
 
-    expect(result.code).toBe(1);
-    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT', writtenPath: p });
+      const defaultTimeout = run(p, ['--stdin'], '{"value":"default"}');
+      expect(defaultTimeout.code).toBe(0);
+      expect(wmwriteSummary(defaultTimeout.stdout)).toMatchObject({ ok: true, writtenPath: p });
+      await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"default"}');
+    } finally {
+      await waitForExit(holder);
+    }
   });
 
   it.each([
@@ -67,6 +118,7 @@ describe('wm-write CLI lock controls', () => {
     ['negative value', ['--stdin', '--lock-timeout', '-1']],
     ['decimal value', ['--stdin', '--lock-timeout', '1.5']],
     ['non-numeric value', ['--stdin', '--lock-timeout', 'abc']],
+    ['unsafe integer', ['--stdin', '--lock-timeout', '9007199254740992']],
   ])('--lock-timeout %s is ARG_INVALID with exit 2', (_caseName, args) => {
     const result = run(target(`invalid-${_caseName}.json`), args, '{"value":1}');
 
@@ -97,6 +149,25 @@ describe('wm-write CLI lock controls', () => {
     });
   });
 
+  it('rejects a stale lock without --recover-stale-lock and does not modify the target', async () => {
+    const p = target('stale-rejected.json');
+    await fs.writeFile(p, '{"value":"unchanged"}', 'utf-8');
+    await writeLock(p, {
+      targetPath: p,
+      pid: 999_999_999,
+      token: 'stale-owner',
+      createdAt: '2000-01-01T00:00:00.000Z',
+      operation: 'wm-write',
+    });
+
+    const result = run(p, ['--stdin', '--lock-timeout', '1000'], '{"value":"new"}');
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('✗ [WRITE_REJECTED]');
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"unchanged"}');
+  });
+
   it('--recover-stale-lock recovers a stale owner and writes successfully', async () => {
     const p = target('stale-lock.json');
     await writeLock(p, {
@@ -115,7 +186,27 @@ describe('wm-write CLI lock controls', () => {
   });
 });
 
-describe('wm-write CLI existing contract', () => {
+describe('wm-write CLI argument boundaries and existing contract', () => {
+  it('--from consumes a path named --lock-timeout instead of parsing it as a timeout flag', async () => {
+    const source = path.join(tmpDir, '--lock-timeout');
+    const p = target('from-option-looking-path.json');
+    await fs.writeFile(source, '{"source":"file"}', 'utf-8');
+
+    const result = run(p, ['--from', '--lock-timeout'], undefined, tmpDir);
+
+    expect(result.code).toBe(0);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: true, writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"source":"file"}');
+  });
+
+  it('rejects unknown extra positional arguments', () => {
+    const result = run(target('extra-positional.json'), ['--stdin', 'unexpected.json'], '{"value":1}');
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('✗ [ARG_INVALID]');
+    expect(result.stdout).toContain('ERROR_JSON ');
+  });
+
   it('--stdin and --from both write successfully', async () => {
     const stdinTarget = target('stdin.json');
     const stdinResult = run(stdinTarget, ['--stdin'], '{"source":"stdin"}');

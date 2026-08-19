@@ -31,11 +31,12 @@ import * as fs from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
 
-const USAGE = '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock]';
+const USAGE =
+  '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock]';
 
 const REASON_MESSAGES: Record<string, string> = {
   INVALID_JSON: '写入内容不是合法 JSON，已拒绝（目标未修改）',
@@ -46,6 +47,41 @@ const REASON_MESSAGES: Record<string, string> = {
   STALE_LOCK: '检测到陈旧状态文件锁，写入已拒绝；可使用 --recover-stale-lock 显式恢复',
 };
 
+function exitArgInvalid(message: string, detail = USAGE): never {
+  exitWithError({ category: 'ARG_INVALID', rule: 'P0-1', message, detail, exitCode: 2 });
+  throw new HandledCliError();
+}
+
+function isPidRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+async function hasStaleLock(absTarget: string): Promise<boolean> {
+  try {
+    const metadata = JSON.parse(
+      await fs.readFile(path.join(`${absTarget}.lock`, 'owner', 'metadata.json'), 'utf-8'),
+    ) as {
+      pid?: unknown;
+      createdAt?: unknown;
+    };
+    const createdAt = typeof metadata.createdAt === 'string' ? Date.parse(metadata.createdAt) : NaN;
+    return (
+      typeof metadata.pid === 'number' &&
+      Number.isInteger(metadata.pid) &&
+      Number.isFinite(createdAt) &&
+      Date.now() - createdAt > 60_000 &&
+      !isPidRunning(metadata.pid)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -54,42 +90,62 @@ async function main(): Promise<void> {
     return;
   }
 
-  const targetArg = args.find((a) => !a.startsWith('--'));
-  if (!targetArg) {
-    exitWithError({
-      category: 'ARG_INVALID',
-      rule: 'P0-1',
-      message: '缺少 <target.json> 参数',
-      detail: USAGE,
-      exitCode: 2,
-    });
-    return;
-  }
+  const targetArg = args[0];
+  if (targetArg === undefined) exitArgInvalid('缺少 <target.json> 参数');
   const absTarget = path.resolve(targetArg);
 
-  const useStdin = args.includes('--stdin');
-  const fromIdx = args.indexOf('--from');
-  const fromArg = fromIdx >= 0 ? args[fromIdx + 1] : undefined;
-  if (useStdin && fromArg) {
-    exitWithError({
-      category: 'ARG_INVALID',
-      rule: 'P0-1',
-      message: '--stdin 与 --from 互斥',
-      detail: USAGE,
-      exitCode: 2,
-    });
-    return;
+  let useStdin = false;
+  let fromArg: string | undefined;
+  let expectMtimeMs: number | null = null;
+  let lockTimeoutMs: number | undefined;
+  let recoverStaleLock = false;
+  let backup = true;
+
+  for (let index = 1; index < args.length; index++) {
+    const arg = args[index]!;
+    switch (arg) {
+      case '--stdin':
+        useStdin = true;
+        break;
+      case '--from':
+        fromArg = args[++index];
+        if (fromArg === undefined) exitArgInvalid('--from 缺少 <src.json>');
+        break;
+      case '--expect-mtime': {
+        const raw = args[++index];
+        const parsed = raw === undefined ? NaN : Number(raw);
+        if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
+          exitArgInvalid(
+            '--expect-mtime 需为非负整数（毫秒时间戳）',
+            raw === undefined ? '（缺少值）' : `收到: ${raw}`,
+          );
+        }
+        expectMtimeMs = parsed;
+        break;
+      }
+      case '--lock-timeout': {
+        const raw = args[++index];
+        const parsed = raw === undefined ? NaN : Number(raw);
+        if (raw === undefined || !/^\d+$/.test(raw) || !Number.isSafeInteger(parsed) || parsed < 0) {
+          exitArgInvalid('--lock-timeout 需为非负安全整数（毫秒）', raw === undefined ? '（缺少值）' : `收到: ${raw}`);
+        }
+        lockTimeoutMs = parsed;
+        break;
+      }
+      case '--recover-stale-lock':
+        recoverStaleLock = true;
+        break;
+      case '--no-backup':
+        backup = false;
+        break;
+      default:
+        if (arg.startsWith('--')) exitArgInvalid(`未知选项: ${arg}`);
+        exitArgInvalid(`未知额外位置参数: ${arg}`);
+    }
   }
-  if (!useStdin && !fromArg) {
-    exitWithError({
-      category: 'ARG_INVALID',
-      rule: 'P0-1',
-      message: '必须指定内容来源：--stdin 或 --from <src.json>',
-      detail: USAGE,
-      exitCode: 2,
-    });
-    return;
-  }
+
+  if (useStdin && fromArg !== undefined) exitArgInvalid('--stdin 与 --from 互斥');
+  if (!useStdin && fromArg === undefined) exitArgInvalid('必须指定内容来源：--stdin 或 --from <src.json>');
 
   // 读取待写文本（保留原文写入；合法性校验在 logic 层经 parseJsonSafe 完成）
   let jsonText: string;
@@ -115,47 +171,19 @@ async function main(): Promise<void> {
     }
   }
 
-  // --expect-mtime <ms>：可选整数
-  const mtimeIdx = args.indexOf('--expect-mtime');
-  let expectMtimeMs: number | null = null;
-  if (mtimeIdx >= 0) {
-    const raw = args[mtimeIdx + 1];
-    const parsed = raw !== undefined ? Number(raw) : NaN;
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      exitWithError({
-        category: 'ARG_INVALID',
-        rule: 'P0-1',
-        message: '--expect-mtime 需为非负整数（毫秒时间戳）',
-        detail: raw === undefined ? '（缺少值）' : `收到: ${raw}`,
-        exitCode: 2,
-      });
-      return;
-    }
-    expectMtimeMs = Math.floor(parsed);
-  }
-
-  const lockTimeoutIdx = args.indexOf('--lock-timeout');
-  let lockTimeoutMs: number | undefined;
-  if (lockTimeoutIdx >= 0) {
-    const raw = args[lockTimeoutIdx + 1];
-    if (raw === undefined || !/^\d+$/.test(raw)) {
-      exitWithError({
-        category: 'ARG_INVALID',
-        rule: 'P0-1',
-        message: '--lock-timeout 需为非负整数（毫秒）',
-        detail: raw === undefined ? '（缺少值）' : `收到: ${raw}`,
-        exitCode: 2,
-      });
-      return;
-    }
-    lockTimeoutMs = Number(raw);
+  if (!recoverStaleLock && (await hasStaleLock(absTarget))) {
+    const summary = { script: 'wm-write.ts', ok: false, reason: 'STALE_LOCK', writtenPath: absTarget };
+    console.log('WMWRITE_JSON ' + JSON.stringify(summary));
+    console.error(`✗ [WRITE_REJECTED] ${REASON_MESSAGES.STALE_LOCK}: ${absTarget}`);
+    process.exitCode = 1;
+    return;
   }
 
   const result = await writeStateJson(absTarget, jsonText, {
-    backup: !args.includes('--no-backup'),
+    backup,
     expectMtimeMs,
     ...(lockTimeoutMs !== undefined ? { lockTimeoutMs } : {}),
-    ...(args.includes('--recover-stale-lock') ? { recoverStaleLock: true } : {}),
+    ...(recoverStaleLock ? { recoverStaleLock: true } : {}),
   });
 
   const summary = {
