@@ -98,7 +98,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     exit2ScriptCount: 31,
     referencesCount: 53,
     dataModels: [
-      '### Schema 清单（21 份）',
+      '### Schema 清单（4 份）',
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
       '| `run-log` | `run-log.schema.json` | ... | action enum（27 类） |',
       '| `gate-log` | `gate-log.schema.json` | ... | append-only gate-logs 审计记录 |',
@@ -332,7 +332,7 @@ describe('runDocConsistencyChecks', () => {
       dataModels:
         '### Schema 清单（19 份）\n| `verifier-output` | ... |\n| `run-log` | ... |\n| `iceberg-sweep` | ... |',
     });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('21 份'))).toBe(
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('4 份'))).toBe(
       true,
     );
   });
@@ -584,7 +584,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('data-models 缺 Schema 清单标题 → 违规', () => {
     const input = baseInput({ dataModels: '| `verifier-output` | ... |' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('21 份'))).toBe(
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('4 份'))).toBe(
       true,
     );
   });
@@ -690,6 +690,35 @@ describe('runDocConsistencyChecks', () => {
     ).toBe(true);
   });
 
+  it('实际 Schema 数与 SSoT/SKILL/anti-patterns/user-guide 权威声明漂移 → schema-list 违规', () => {
+    const input = {
+      ...baseInput({
+        schemaFiles: Array.from({ length: 21 }, (_, i) => `schema-${i + 1}.schema.json`),
+        dataModels: '### Schema 清单（21 份）',
+      }),
+      schemaInventoryDocs: [
+        { name: 'SSoT', content: 'Schema 清单（20 份）' },
+        { name: 'SKILL.md', content: 'schemas/（20 份 JSON Schema draft-07）' },
+        { name: 'anti-patterns.md #28', content: 'schema 清单 20 份' },
+        { name: 'anti-patterns.md #28 检测信号', content: 'schema 清单（20 份）' },
+        { name: 'docs/user-guide.md', content: 'schema（20 份清单）' },
+      ],
+    } as DocConsistencyInput;
+
+    const violations = runDocConsistencyChecks(input);
+    for (const name of [
+      'SSoT',
+      'SKILL.md',
+      'anti-patterns.md #28',
+      'anti-patterns.md #28 检测信号',
+      'docs/user-guide.md',
+    ]) {
+      expect(
+        violations.some((x) => x.check === 'schema-list' && x.message.includes(name) && x.message.includes('21 份')),
+      ).toBe(true);
+    }
+  });
+
   it('真实 JSON 计数与旧活体声明不一致 → vitest-files / vitest-tests 违规', () => {
     const input = baseInput({
       testFileCount: 50,
@@ -725,7 +754,7 @@ describe('runDocConsistencyChecks', () => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-        await fs.writeFile(docPath, docContent.replaceAll('49', '50').replaceAll('808', '787'), 'utf-8');
+        await fs.writeFile(docPath, docContent.replaceAll('49', '50').replaceAll('809', '787'), 'utf-8');
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, passing.stdout).toBe(0);
@@ -746,9 +775,14 @@ describe('runDocConsistencyChecks', () => {
     });
   });
 
-  it('CLI 无 JSON 且 Vitest 不可用 → vitest-tests 违规并 exit 1（fail-closed）', async () => {
+  it('CLI 无 JSON 且 Vitest 不可用（显式清除外部 JSON 环境变量）→ vitest-tests 违规并 exit 1', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const result = runDocsConsistencyCli(fixtureRoot, { ...process.env, PATH: '', Path: '' });
+      const result = runDocsConsistencyCli(fixtureRoot, {
+        ...process.env,
+        WM_VITEST_COUNT_FILE: '',
+        PATH: '',
+        Path: '',
+      });
       expect(result.code).toBe(1);
       expect(result.stdout).toContain('vitest 用例  : 无法采集（不一致）');
       expect(result.stdout).toContain('[vitest-tests]');
@@ -1110,7 +1144,7 @@ describe('run-log action 枚举语义同步（data-models.md interface vs schema
   it('interface 联合类型缺值时应报 run-log-action 漂移 violation', () => {
     // dataModels 含「action enum（27 类）」文本但 interface 只有 15 值（复刻当前漂移）
     const drifted = [
-      '### Schema 清单（21 份）',
+      '### Schema 清单（4 份）',
       '| `run-log` | ... | action enum（27 类） |',
       '## RunLogEntry',
       "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';",
@@ -1122,7 +1156,7 @@ describe('run-log action 枚举语义同步（data-models.md interface vs schema
 
   it('interface 与 enum 完全一致时无漂移 violation', () => {
     const synced = [
-      '### Schema 清单（21 份）',
+      '### Schema 清单（4 份）',
       '| `run-log` | ... | action enum（27 类） |',
       '## RunLogEntry',
       ACTION_UNION_27,
@@ -1135,7 +1169,7 @@ describe('run-log action 枚举语义同步（data-models.md interface vs schema
   it('interface 含 enum 之外的额外值时应报带「多」的 run-log-action 漂移 violation', () => {
     // 在 27 值基础上追加 enum 之外的多余值
     const drifted = [
-      '### Schema 清单（21 份）',
+      '### Schema 清单（4 份）',
       '| `run-log` | ... | action enum（27 类） |',
       '## RunLogEntry',
       ACTION_UNION_27.replace("'iceberg-review';", "'iceberg-review' | 'bogus-action';"),

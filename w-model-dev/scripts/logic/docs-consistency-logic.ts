@@ -85,6 +85,8 @@ export interface DocConsistencyInput {
   /** references/ 目录 .md 文件数（实测；期望值由 SKILL.md「（N 个 .md）」表述声明） */
   referencesCount: number;
   dataModels: string;
+  /** 活体 Schema 数量权威声明；每项必须声明 schemas/ 目录实测总数，缺失或漂移即违规。 */
+  schemaInventoryDocs?: Array<{ name: string; content: string }>;
   verifierSpec: string;
   commandReference: string;
   agentPersonas: string;
@@ -161,7 +163,6 @@ export const EXPECTED = {
   hardConstraintCount: 14,
 } as const;
 
-const SCHEMA_TABLE_HEADING = '### Schema 清单（21 份）';
 const DOD_README = '7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
 const DOD_SSOT_TRACE = '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）';
 /**
@@ -201,7 +202,7 @@ const TARGETKIND_ENUM_PATTERN = /`targetKind`\s*（[^）]*(?:testcase|file)[^）
 
 export function runDocConsistencyChecks(input: DocConsistencyInput): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  violations.push(...checkSchemaList(input.schemaFiles, input.dataModels));
+  violations.push(...checkSchemaList(input.schemaFiles, input.dataModels, input.schemaInventoryDocs));
   violations.push(...checkRunLogActionEnum(input.runLogSchema, input.dataModels));
   violations.push(
     ...checkTargetKindLiveDocs(input.verifierSpec, input.commandReference, input.agentPersonas, input.ssot),
@@ -409,18 +410,54 @@ function checkScriptRegistry(cliScriptFiles: string[], dispatchMatrix: string, s
   return violations;
 }
 
-function checkSchemaList(schemaFiles: string[], dataModels: string): DocCheckViolation[] {
+function checkSchemaList(
+  schemaFiles: string[],
+  dataModels: string,
+  schemaInventoryDocs?: Array<{ name: string; content: string }>,
+): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (!dataModels.includes(SCHEMA_TABLE_HEADING)) {
+  const expectedCount = schemaFiles.length;
+  const expectedHeading = `### Schema 清单（${expectedCount} 份）`;
+  if (!dataModels.includes(expectedHeading)) {
     violations.push({
       check: 'schema-list',
-      message: `data-models.md 应含「${SCHEMA_TABLE_HEADING}」标题（当前 ${schemaFiles.length} 个 schema 文件）`,
+      message: `data-models.md 应含「${expectedHeading}」标题（当前 ${expectedCount} 个 schema 文件）`,
     });
   }
   for (const file of schemaFiles) {
     const key = file.replace(/\.schema\.json$/, '');
     if (!dataModels.includes(`\`${key}\``)) {
       violations.push({ check: 'schema-list', message: `data-models.md「Schema 清单」表未覆盖 ${file}` });
+    }
+  }
+  for (const doc of schemaInventoryDocs ?? []) {
+    const declarations = ['Schema 清单', 'schema 清单', 'schema（', 'schemas/`（'];
+    const declaredCounts: number[] = [];
+    for (const declaration of declarations) {
+      for (
+        let start = doc.content.indexOf(declaration);
+        start >= 0;
+        start = doc.content.indexOf(declaration, start + declaration.length)
+      ) {
+        const suffix = doc.content.slice(start + declaration.length, start + declaration.length + 32);
+        const countMatch = suffix.match(/[（\s]*(\d+)\s*份/i);
+        if (countMatch !== null) declaredCounts.push(Number(countMatch[1]));
+      }
+    }
+    if (declaredCounts.length === 0) {
+      violations.push({
+        check: 'schema-list',
+        message: `${doc.name} 缺 Schema 总数权威声明（应为 ${expectedCount} 份）`,
+      });
+      continue;
+    }
+    for (const declaredCount of declaredCounts) {
+      if (declaredCount !== expectedCount) {
+        violations.push({
+          check: 'schema-list',
+          message: `${doc.name} 声明 ${declaredCount} 份 Schema，实际 ${expectedCount} 份`,
+        });
+      }
     }
   }
   return violations;
