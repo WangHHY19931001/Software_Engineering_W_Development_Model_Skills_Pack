@@ -9,7 +9,7 @@
 
 | ID | 问题 | 复核证据 |
 |---|---|---|
-| P1-1 | CONTRIBUTING.md:96 写「40 files / 623 tests」（实际 47/717，且与同文件 :214 自相矛盾）；PR 模板:13 写「14 项通过」（实际 16 项，修复后为 17 项）；docs-consistency `REQUIRED_PATHS` 不覆盖两文件 | 行级取证 + `check-docs-consistency.ts:50-70` 白名单核实 |
+| P1-1 | CONTRIBUTING.md:96 写「40 files / 623 tests」（实际 47/717，且与同文件 :214 自相矛盾）；**docs/INSTALL.md:83/:248 同类漂移（40/623）**（复核补充）；PR 模板:13 写「14 项通过」（实际 16 项，修复后为 17 项）；docs-consistency `REQUIRED_PATHS` 不覆盖三文件 | 行级取证 + `check-docs-consistency.ts:50-70` 白名单核实 |
 | P1-2 | README:21 声称「tsc 0 错误」但 pre-push 16 项与 package.json 均无 tsc；SSoT §10H.5 V1 已列 `npx tsc -p config/tsconfig.json`（exit 0）为验证门 | pre-push 全文 + SSoT:1839 核实 |
 | P1-3 | `.trae-html-share-packages/docs/index.html.zip`（1.17 KB）被 git 跟踪（commit 55c2ad8），.gitignore 无对应条目 | `git ls-files` 核实 |
 | P1-4 | `.gitignore:45` 忽略 package-lock.json，devDeps 全 `^` 范围，audit 与门禁行为不可复现 | .gitignore + package.json 核实 |
@@ -33,7 +33,7 @@
 |---|---|---|
 | D1 | typecheck 以**第 17 项 append**（prettier 之后），不插入中间重排 | 避免 pre-push 内「第 13 项 npm audit」「第 14 项 docs-consistency 复用」等交叉引用注释连锁改号；命令与 SSoT §10H.5 V1 完全一致 |
 | D2 | docs-consistency 扩展用**可选输入字段 + 缺省跳过**既有模式（同 `linkDocs`/`skillPkgDocs`） | 存量 78 条单测零破坏；新规则由新增用例覆盖 |
-| D3 | CONTRIBUTING 计数检查**复用 `checkVitestTestCount` 的两套 stale 正则**（`N files / M tests`、`N 个 .test.ts / N 条`） | 正是本该拦住 :96 漂移的规则形态；逐处比对可同时盯住 :96 与 :214 |
+| D3 | CONTRIBUTING/INSTALL 计数检查 = **`checkVitestTestCount` docs 数组参数化**（新增可选 `vitestExtraDocs`，CLI 层注入 CONTRIBUTING.md / docs/INSTALL.md 原文，复用既有存在性 + 两套 stale 正则）；PR 模板项数检查 = 新增 `checkPrTemplatePrePushCount`（字面量正则） | 零重复代码；不新增 `new RegExp` → security baseline 免再生；**INSTALL.md 亦存在 40/623 漂移**（复核补充，:83/:248），同套规则一并防复发 |
 | D4 | SSoT 零改动 | 见 §2.1 |
 | D5 | 版本 41.19.0 单次 minor + CHANGELOG 单条目 | 沿用 16fixes 轮 D5 发布策略 |
 | D6 | PR 模板数字修正（批3）与结构重构（批4）**串行编辑同文件** | 遵循禁止并行修改文档约定 |
@@ -64,10 +64,10 @@
 | # | 文件 | 改动 |
 |---|---|---|
 | 1 | package.json | 工具类组加 `"typecheck": "tsc -p config/tsconfig.json"` |
-| 2 | .githooks/pre-push | :247 后 append 第 17 项（`run_expect "tsc 类型检查 0 错误" 0 npx tsc -p config/tsconfig.json`，注释标注「对齐 SSoT §10H.5 V1」）；:141「16 项检查」→「17 项检查」 |
+| 2 | .githooks/pre-push | :247 后 append 第 17 项（`run_expect "tsc 类型检查 0 错误" 0 npx tsc -p config/tsconfig.json`，注释标注「对齐 SSoT §10H.5 V1」）；:142「16 项检查」→「17 项检查」 |
 | 3 | w-model-dev/scripts/logic/docs-consistency-logic.ts:90 | `prePushCount: 16` → `17` |
 | 4 | w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts | 正向 fixture（:126 一处）16→17；负向 fixture（:324 的 13 项、:484 的 15 项）与 17 仍不等，天然有效不动 |
-| 5 | README.md | :23、:152-153、:158（枚举句补「tsc 类型检查」）、:343 共 4 处 16→17 |
+| 5 | README.md | :23、:153、:159（枚举句补「tsc 类型检查」）、:343 共 4 处 16→17 |
 | 6 | AGENTS.md | :45（§2 表）、:71（§3 注释）共 2 处 16→17 |
 | 7 | CONTRIBUTING.md | :81、:165、:182 共 3 处 16→17 + 门禁表（:83-100）追加第 17 行（`npx tsc -p config/tsconfig.json`，期望退出码 0） |
 | 8 | docs/troubleshooting.md | :28（FAQ 1.2）、:99（平台表）共 2 处 16→17 |
@@ -77,16 +77,17 @@
 ### 批3 · 数字修正 + 门禁扩展（P1-1）— `feat(gate)`
 
 1. **先改代码与测试**：
-   - `check-docs-consistency.ts`：`REQUIRED_PATHS` += `CONTRIBUTING.md`、`.github/PULL_REQUEST_TEMPLATE.md`；input 组装处 read 注入 `contributing` / `prTemplate`
-   - `docs-consistency-logic.ts`：`DocConsistencyInput` 加可选字段 `contributing?: string`、`prTemplate?: string`（注释：缺省跳过）；新增 `checkContributingVitestCount`（`vitestTestCount < 0` 或字段缺省跳过；存在性检查 + 两套 stale 正则逐处比对）与 `checkPrTemplatePrePushCount`（缺省跳过；模板内全部「(\d+) 项」表述须 == `EXPECTED.prePushCount`）；`runDocConsistencyChecks` 挂载两函数
-   - `docs-consistency-logic.test.ts` 新增 ≥4 用例：两字段合法注入无违规 / contributing 含 40/623 报 vitest-tests 违规 / prTemplate 含 14 项报 pre-push 违规 / 两字段缺省跳过
+   - `check-docs-consistency.ts`：`REQUIRED_PATHS` += `CONTRIBUTING.md`、`.github/PULL_REQUEST_TEMPLATE.md`；input 组装处注入 `vitestExtraDocs`（CONTRIBUTING.md + docs/INSTALL.md 原文）与 `prTemplate`
+   - `docs-consistency-logic.ts`：`DocConsistencyInput` 加可选字段 `vitestExtraDocs?: Array<{ name: string; content: string }>`、`prTemplate?: string`（注释：缺省跳过）；`checkVitestTestCount` 签名追加可选 `extraVitestDocs`（docs 数组展开注入，**不新增 `new RegExp`**）；新增 `checkPrTemplatePrePushCount`（缺省跳过；模板内全部「(\d+) 项」表述须 == `EXPECTED.prePushCount`，字面量正则）；`runDocConsistencyChecks` 挂载更新
+   - `docs-consistency-logic.test.ts` 新增 6 用例：CONTRIBUTING 合法注入无违规 / CONTRIBUTING 含 40/623 报 vitest-tests 违规 / INSTALL 含 40/623 报 vitest-tests 违规（覆盖 :83/:248 漂移形态）/ prTemplate 含 14 项报 pre-push 违规 / prTemplate 17 项零违规 / 两字段缺省跳过
 2. **跑 `npx vitest run` 取实测用例总数 N**（预期 717 + 新增数）
 3. **以 N 同步全部活体文档计数**（本仓活体文档机制：测试用例增删须同步文档）：
-   - CONTRIBUTING.md:96（40/623 → 47 files / N tests）与 :214（47 个 .test.ts / N 条）
-   - README.md:19、:158；AGENTS.md「47 个 .test.ts / 717 条」各处；pre-push:205 注释（47 test files / N tests）
+   - CONTRIBUTING.md:96（40/623 → 47 files / N tests）、:214（47 个 .test.ts / N 条）与 :57（47 个 test 文件 / N 条）；顺带 :258/:262「版本号五处」→「六处」（复核补充）
+   - **docs/INSTALL.md:83（40 个 .test.ts / 623 条）与 :248（40 个 test 文件 / 623 条）→ 47 / N**（复核补充）
+   - README.md:19、:159、:318；AGENTS.md「47 个 .test.ts / 717 条」各处；pre-push:206 注释（47 test files / N tests）
    - `.github/PULL_REQUEST_TEMPLATE.md:13`「14 项通过」→「17 项通过」
    - `__tests__/README.md` 若声明用例总数则同步
-4. 收尾验证：`npm run self-test` + `npx vitest run` + `npm run check:docs-consistency`
+4. 收尾验证：`npm run self-test` + `npx vitest run` + `npm run check:docs-consistency` + `npm run lint:security`（预期 exit 0——参数化方案不新增 `new RegExp`，免 baseline 再生；意外新增发现时按既有流程再生并汇报）
 
 ### 批4 · P2-1 警告强化 + P2-2 PR 模板强化 — `feat(hook)`（单 commit，含 PR 模板/troubleshooting 文档变更）
 
@@ -108,7 +109,7 @@
 - 批2/批3/批4 每批收尾：`npm run self-test`（256）+ `npx vitest run`
 - 批1 收尾：`git status` / `git ls-files` 复核（`.trae-html-share-packages` 为空、`package-lock.json` 已跟踪）+ npm audit 预检
 - 批5：`npm run prepush` 全量 17 项（Windows 下经 bash 执行）
-- 批3 附加：`npm run check:docs-consistency` 单跑确认
+- 批3 附加：`npm run check:docs-consistency` + `npm run lint:security`（exit 0 免再生）单跑确认
 
 ## 6. 提交与回滚策略
 
@@ -129,10 +130,10 @@
 ## 8. DoD（完成标准）
 
 1. `npx tsc -p config/tsconfig.json` 退出码 0，且作为 pre-push 第 17 项存在
-2. 活体文档（README / AGENTS / CONTRIBUTING / troubleshooting / pre-push / PR 模板）门禁语境「16 项」零残留（CHANGELOG.md 历史条目如 :12/:65/:91、CHANGELOG-archive、decision-log、superpowers 历史规格/计划等历史/归档记录不计、不修改）
-3. CONTRIBUTING.md 无「40 files / 623 tests」残留；PR 模板无「14 项」；全部活体文档 vitest 计数 == 实测 N
+2. 活体文档（README / AGENTS / CONTRIBUTING / troubleshooting / docs/INSTALL.md / pre-push / PR 模板）门禁语境「16 项」零残留（CHANGELOG.md 历史条目如 :12/:65/:91、CHANGELOG-archive、decision-log、superpowers 历史规格/计划等历史/归档记录不计、不修改）
+3. CONTRIBUTING.md / docs/INSTALL.md 无「40 files / 623 tests」残留（INSTALL :83/:248 同步）；PR 模板无「14 项」；全部活体文档 vitest 计数 == 实测 N
 4. `git ls-files .trae-html-share-packages` 为空；`git ls-files package-lock.json` 非空；.gitignore 无 package-lock.json 行、含 `.trae-html-share-packages/`
-5. docs-consistency 含 CONTRIBUTING/PR 模板两新检查 + ≥4 新单测；vitest 全绿
+5. docs-consistency 覆盖 CONTRIBUTING/INSTALL/PR 模板（checkVitestTestCount 参数化 + checkPrTemplatePrePushCount）+ 6 新单测；vitest 全绿；lint:security exit 0 免 baseline 再生
 6. `npm run prepush` 17 项全绿
 7. 版本六处一致 41.19.0；CHANGELOG 41.19.0 条目正文完整覆盖六项修复
 8. 实施共 5 个 commit（不含本规格文档自身提交），未 push

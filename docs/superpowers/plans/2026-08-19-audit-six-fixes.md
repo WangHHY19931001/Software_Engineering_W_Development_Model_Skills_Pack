@@ -13,7 +13,8 @@
 - `npx tsc -p config/tsconfig.json` 当前 **exit 0（0 错误）**——批2 步骤 0 前置检查预期直接通过（R1 已排雷）
 - self-test 256/256、vitest 47 files / 717 tests 当前全绿（2026-08-19 实跑确认）
 - vitest 6 个新增用例后用例总数 N 预期 = **723**（执行时以 vitest 实测输出为准）
-- `config/.eslintrc.cjs` 启用 `security/detect-non-literal-regexp: 'error'`：新增代码中的 `new RegExp(...)` 会产生新发现，须再生 baseline（Task 6 有专门步骤）
+- **复核补充发现**：`docs/INSTALL.md` :83/:248 亦存在 P1-1 同类漂移（「40 个 .test.ts / 623 条」/「40 个 test 文件 / 623 条」）——Task 7 已增同步步骤；`checkVitestTestCount` 现 docs 数组不含 INSTALL，参数化（Task 4）后经 `vitestExtraDocs` 注入一并检查
+- `config/.eslintrc.cjs` 启用 `security/detect-non-literal-regexp: 'error'`：Task 4 采用**参数化方案**（不新增 `new RegExp`，复用既有 pattern 行），`npm run lint:security` 预期保持 exit 0、**免 baseline 再生**（Task 6 Step 3 已按此重写；若意外出现新发现仍按该步兜底流程再生）
 - 测试 `docs-consistency-logic.test.ts:327` 断言 `includes('16')`，EXPECTED 改 17 后须同步改（Task 2 Step 6）
 
 ---
@@ -131,7 +132,7 @@ run_expect "prettier 格式一致性（--check）" 0 \
 log "全部门禁通过，允许推送 ✓"
 ```
 
-替换为：
+替换为（**保留 prettier 两行注释结构**，仅在其后追加第 17 项块，不压缩注释信息）：
 
 ```bash
 # 16. prettier --check：格式一致性门禁（config/prettier.config.cjs，endOfLine=auto 双平台行尾兼容）
@@ -296,71 +297,58 @@ git commit -m "feat(gate): pre-push 新增第 17 项 tsc 类型检查门禁（�
 
 ---
 
-## Task 4: 批3 logic 层扩展——contributing / prTemplate 输入与两项新检查（P1-1）
+## Task 4: 批3 logic 层扩展——checkVitestTestCount 参数化 + PR 模板项数检查（P1-1）
 
 **Files:**
-- Modify: `w-model-dev/scripts/logic/docs-consistency-logic.ts`（input 接口 / 新函数 / 挂载）
+- Modify: `w-model-dev/scripts/logic/docs-consistency-logic.ts`（input 接口 / checkVitestTestCount 参数化 / 新函数 / 挂载）
 
 - [ ] **Step 1: DocConsistencyInput 加两个可选字段**
 
 `prePush: string;` 行（:39）后追加：
 
 ```ts
-  /** CONTRIBUTING.md 原文（可选——缺省时跳过 contributing 计数检查，与 linkDocs 注入策略一致） */
-  contributing?: string;
+  /** vitest 计数检查的额外文档原文（可选——缺省跳过；CLI 层注入 CONTRIBUTING.md 与 docs/INSTALL.md，与 linkDocs 注入策略一致） */
+  vitestExtraDocs?: Array<{ name: string; content: string }>;
   /** .github/PULL_REQUEST_TEMPLATE.md 原文（可选——缺省时跳过 PR 模板门禁项数检查） */
   prTemplate?: string;
 ```
 
-- [ ] **Step 2: 新增两个检查函数**
+- [ ] **Step 2: checkVitestTestCount 参数化——docs 数组拼接 extraVitestDocs（复用既有存在性 + 两套 stale 正则，不新增 `new RegExp`）**
 
-在 `checkVitestTestCount` 函数结束（:770 `}` 后）与 `checkBaselineSync` 注释之间插入：
+函数签名追加可选参数，docs 数组构造改为拼接（`pattern` 行与其余循环逻辑**原样保留**）：
+
+```ts
+function checkVitestTestCount(
+  vitestTestCount: number,
+  testFileCount: number,
+  readme: string,
+  agents: string,
+  prePush: string,
+  extraVitestDocs?: Array<{ name: string; content: string }>,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (vitestTestCount < 0) return violations;
+  const pattern = new RegExp(`\\b${vitestTestCount}\\s*(?:tests?\\b|条)`);
+  const docs: Array<[string, string]> = [
+    ['README.md', readme],
+    ['AGENTS.md', agents],
+    ['.githooks/pre-push', prePush],
+    ...(extraVitestDocs?.map((d) => [d.name, d.content] as [string, string]) ?? []),
+  ];
+  // ……（既有存在性检查 + 两套 stale 正则循环逻辑完全不变）
+```
+
+> 说明：`installDoc`（必填字段，version-consistency 数据源）**不作为** vitest 检查触发条件——baseInput fixture 的 installDoc 是版本号文本、不含计数，以它为条件会打破存量正向用例。INSTALL.md 的 vitest 计数经 CLI 层注入的 `vitestExtraDocs` 检查；fixture 缺省不注入即跳过，存量 78 条单测零破坏。
+
+- [ ] **Step 3: 新增 checkPrTemplatePrePushCount**
+
+在 `checkVitestTestCount` 函数结束（:769 `}` 后）与 `checkBaselineSync` 注释之间插入：
 
 ```ts
 /**
- * CONTRIBUTING.md vitest 计数同步检查（P1-1 反哺）：与 checkVitestTestCount 同一套
- * 「存在性 + 过期计数」规则，数据源为贡献指南。历史盲区：CONTRIBUTING 门禁表曾停留
- * 「40 files / 623 tests」，与同文件「47 个 .test.ts / 717 条」自相矛盾而无人拦截。
- * contributing 未注入（缺省）或 vitestTestCount < 0（无法采集）时跳过。
- */
-function checkContributingVitestCount(
-  contributing: string | undefined,
-  vitestTestCount: number,
-  testFileCount: number,
-): DocCheckViolation[] {
-  const violations: DocCheckViolation[] = [];
-  if (contributing === undefined || vitestTestCount < 0) return violations;
-  const pattern = new RegExp(`\\b${vitestTestCount}\\s*(?:tests?\\b|条)`);
-  if (!pattern.test(contributing)) {
-    violations.push({
-      check: 'vitest-tests',
-      message: `CONTRIBUTING.md 应含 vitest 实测用例总数「${vitestTestCount} tests」或「${vitestTestCount} 条」（vitest run 实测 ${vitestTestCount} 条，测试用例增删须同步文档）`,
-    });
-  }
-  const staleFormats: RegExp[] = [
-    /(\d+)\s*files?\s*\/\s*(\d+)\s*tests?\b/g,
-    /(\d+)\s*个\s*\.test\.ts\s*\/\s*(\d+)\s*(?:tests?|条)/g,
-  ];
-  for (const re of staleFormats) {
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(contributing)) !== null) {
-      const fileN = Number(m[1]);
-      const testN = Number(m[2]);
-      if (testN !== vitestTestCount || (testFileCount >= 0 && fileN !== testFileCount)) {
-        violations.push({
-          check: 'vitest-tests',
-          message: `CONTRIBUTING.md 存在过期 vitest 计数「${m[0]}」（实测 ${testFileCount} 个 .test.ts / ${vitestTestCount} 条），须同步`,
-        });
-      }
-    }
-  }
-  return violations;
-}
-
-/**
  * PR 模板 pre-push 项数同步检查（P1-1 反哺）：模板内全部「N 项」表述须与
  * EXPECTED.prePushCount 一致。历史盲区：PR 模板曾长期停留「14 项通过」。
- * prTemplate 未注入（缺省）时跳过。
+ * prTemplate 未注入（缺省）时跳过。字面量正则 → 不触发 detect-non-literal-regexp。
  */
 function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
@@ -379,21 +367,23 @@ function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckVi
 }
 ```
 
-- [ ] **Step 3: runDocConsistencyChecks 挂载两函数**
+- [ ] **Step 4: runDocConsistencyChecks 挂载更新**
 
-在 `checkVitestTestCount` 的挂载调用（:151-153）之后追加：
+原 151-153 三行替换为：
 
 ```ts
   violations.push(
-    ...checkVitestTestCount(input.vitestTestCount, input.testFileCount, input.readme, input.agents, input.prePush),
-  );
-  violations.push(
-    ...checkContributingVitestCount(input.contributing, input.vitestTestCount, input.testFileCount),
+    ...checkVitestTestCount(
+      input.vitestTestCount,
+      input.testFileCount,
+      input.readme,
+      input.agents,
+      input.prePush,
+      input.vitestExtraDocs,
+    ),
   );
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
 ```
-
-（即把原 151-153 三行替换为上面七行。）
 
 ---
 
@@ -418,13 +408,16 @@ function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckVi
 
 ```ts
     prePush: read('.githooks/pre-push'),
-    contributing: read('CONTRIBUTING.md'),
+    vitestExtraDocs: [
+      { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
+      { name: 'docs/INSTALL.md', content: read('docs/INSTALL.md') },
+    ],
     prTemplate: read('.github/PULL_REQUEST_TEMPLATE.md'),
 ```
 
 ---
 
-## Task 6: 批3 新增单测 + security baseline 再生（P1-1）
+## Task 6: 批3 新增单测 + security 预检（P1-1）
 
 **Files:**
 - Modify: `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`（vitest-tests 用例块后追加 6 用例）
@@ -432,12 +425,12 @@ function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckVi
 
 - [ ] **Step 1: 追加 6 个新用例**
 
-在 `AGENTS 含过期 .test.ts 计数（文件数不符）→ vitest-tests 违规` 用例结束后追加：
+在 `AGENTS 含过期 .test.ts 计数（文件数不符）→ vitest-tests 违规` 用例结束后追加（vitestExtraDocs 注入 CONTRIBUTING / INSTALL，prTemplate 注入 PR 模板）：
 
 ```ts
   it('CONTRIBUTING 含过期 vitest 计数（40 files / 623 tests）→ vitest-tests 违规', () => {
     const input = baseInput({
-      contributing: '本地验证：npm run prepush。\n| 12 | vitest 全量（40 files / 623 tests） | 0 |',
+      vitestExtraDocs: [{ name: 'CONTRIBUTING.md', content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |' }],
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
     expect(
@@ -447,15 +440,21 @@ function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckVi
 
   it('CONTRIBUTING 计数与实测一致 → 零 vitest-tests 违规', () => {
     const input = baseInput({
-      contributing: '单元测试全量（40 files / 530 tests）。\n__tests__/（40 个 .test.ts / 530 条）',
+      vitestExtraDocs: [
+        { name: 'CONTRIBUTING.md', content: '单元测试全量（40 files / 530 tests）。\n（40 个 .test.ts / 530 条）' },
+      ],
     });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
-  it('CONTRIBUTING 缺省注入 → 跳过检查不产生违规', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.message.includes('CONTRIBUTING.md'))).toBe(
-      false,
-    );
+  it('INSTALL 含过期 vitest 计数（40 个 .test.ts / 623 条）→ vitest-tests 违规（P1-1 复核补充）', () => {
+    const input = baseInput({
+      vitestExtraDocs: [{ name: 'docs/INSTALL.md', content: '# vitest 单元测试（40 个 .test.ts / 623 条）' }],
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(
+      v.some((x) => x.message.includes('docs/INSTALL.md') && x.message.includes('40 个 .test.ts / 623 条')),
+    ).toBe(true);
   });
 
   it('PR 模板含过期门禁项数（14 项）→ pre-push 违规', () => {
@@ -475,10 +474,12 @@ function checkPrTemplatePrePushCount(prTemplate: string | undefined): DocCheckVi
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'pre-push')).toBe(false);
   });
 
-  it('PR 模板缺省注入 → 跳过检查不产生违规', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.message.includes('PULL_REQUEST_TEMPLATE'))).toBe(
-      false,
-    );
+  it('vitestExtraDocs / prTemplate 缺省注入 → 跳过检查不产生违规', () => {
+    expect(
+      runDocConsistencyChecks(baseInput()).some(
+        (x) => x.message.includes('CONTRIBUTING.md') || x.message.includes('PULL_REQUEST_TEMPLATE'),
+      ),
+    ).toBe(false);
   });
 ```
 
@@ -491,27 +492,29 @@ npx vitest run --config config/vitest.config.ts
 
 Expected: `47 files` / **N = 723**（717 + 6）全部通过。**将实测 N 记下来，Task 7 全程使用**；若 N ≠ 723（如 prettier 改行导致用例数不变或运行器差异），以实测值为准。
 
-- [ ] **Step 3: security-scan 预检 + baseline 再生**
+- [ ] **Step 3: security-scan 预检（参数化方案预期免再生）**
 
 ```bash
 npm run lint:security
 ```
 
-Expected: **exit 1**——新函数 `checkContributingVitestCount` 的 `new RegExp(...)` 触发 `detect-non-literal-regexp`（error 级，与本文件 :738 既有 baseline 条目同规则）。执行再生：
+Expected: **exit 0**——Task 4 参数化不新增 `new RegExp`（`pattern` 行原样保留；`checkPrTemplatePrePushCount` 用字面量正则），无新发现、**免 baseline 再生**。
+
+**兜底**：若意外 exit 1（如 prettier 对既有 `pattern` 行重排导致 baseline 指纹变化），执行再生并汇报：
 
 ```bash
 npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate
 npm run lint:security
 ```
 
-Expected: 再生后第二次运行 exit 0。若第一次就 exit 0（规则未触发）则跳过再生。
+Expected: 再生后第二次运行 exit 0。若第一次就 exit 0 则跳过再生。
 
 ---
 
 ## Task 7: 批3 活体文档计数同步（717/623/14 项 → N/17 项）+ 提交（P1-1）
 
 **Files:**
-- Modify: `README.md`（:19 / :159 / :318）、`AGENTS.md`（:34 / :48 / :153）、`CONTRIBUTING.md`（:57 / :96 / :214）、`.githooks/pre-push:206`、`.github/PULL_REQUEST_TEMPLATE.md:13`
+- Modify: `README.md`（:19 / :159 / :318）、`AGENTS.md`（:34 / :48 / :153）、`CONTRIBUTING.md`（:57 / :96 / :214 / :258 / :262）、`docs/INSTALL.md`（:83 / :248）、`.githooks/pre-push:206`、`.github/PULL_REQUEST_TEMPLATE.md:13`
 
 以下 N 均替换为 **Task 6 Step 2 实测值（预期 723）**。
 
@@ -527,30 +530,38 @@ Expected: 再生后第二次运行 exit 0。若第一次就 exit 0（规则未�
 - `:48`：`（vitest，47 个 .test.ts / 717 条）` → `47 个 .test.ts / N 条`
 - `:153`：`| self-test.ts | 回归基线（256 条样本）；vitest 717 条（47 test files） | - | 0=通过，1=失败 |` → `vitest N 条（47 test files）`
 
-- [ ] **Step 3: CONTRIBUTING.md 三处（:96 为 623 漂移修正）**
+- [ ] **Step 3: CONTRIBUTING.md 五处（:96 为 623 漂移修正；:258/:262 为版本机制「五处」→「六处」复核补充）**
 
 - `:57`：`# 3.1 单元测试（vitest，47 个 test 文件 / 717 条，…）` → `47 个 test 文件 / N 条`
 - `:96`（门禁表第 12 行）：`…阈值不达标 vitest exit 1；40 files / 623 tests） | 0 |` → `…；47 files / N tests） | 0 |`
 - `:214`：`│   ├── __tests__/                 # vitest 单元测试（47 个 .test.ts / 717 条 + README.md coverage 矩阵）` → `47 个 .test.ts / N 条`
+- `:258`：`2. 同步版本号五处：…` → `2. 同步版本号六处：…`（补 `CHANGELOG.md`；`version-bump.cjs` 实际同步六文件，与 `checkVersionConsistency` 六参比对一致；修正同文件 :191「六处一致性」自相矛盾）
+- `:262`：`> 本仓库版本号以 git tag + 五处一致为准（门禁校验五处…` → `六处一致为准（门禁校验六处…`
 
-- [ ] **Step 4: pre-push :206 注释同步**
+- [ ] **Step 4: docs/INSTALL.md 两处 40/623 → 47 files / N（复核补充：INSTALL 亦存在 P1-1 同类漂移，Task 4 vitestExtraDocs 已纳入检查）**
+
+- `:83`：`│   └── __tests__/      # vitest 单元测试（40 个 .test.ts / 623 条 + README.md coverage 矩阵）` → `（47 个 .test.ts / N 条 + …）`
+- `:248`：`…（`w-model-dev/scripts/__tests__/` 单元测试，40 个 test 文件 / 623 条）` → `…单元测试，47 个 test 文件 / N 条）`
+
+- [ ] **Step 5: pre-push :206 注释同步**
 
 `# 12. vitest 单元测试全量通过（47 test files / 717 tests）+ coverage 阈值门禁…` → `（47 test files / N tests）`
 
-- [ ] **Step 5: PR 模板 :13 项数修正**
+- [ ] **Step 6: PR 模板 :13 项数修正**
 
 `- [ ] \`npm run prepush\` 14 项通过` → `- [ ] \`npm run prepush\` 17 项通过`
 
-- [ ] **Step 6: 残留 grep 验证**
+- [ ] **Step 7: 残留 grep 验证**
 
 ```bash
 git grep -nE "717|623" -- ':!CHANGELOG.md' ':!CHANGELOG-archive.md' ':!docs/changes' ':!docs/superpowers' ':!.eslintsecurity-baseline.json' ':!w-model-dev/scripts/samples'
 git grep -n "14 项" -- ':!CHANGELOG.md' ':!CHANGELOG-archive.md' ':!docs/changes' ':!docs/superpowers'
+git grep -nE "版本号五处|门禁校验五处" -- CONTRIBUTING.md
 ```
 
-Expected: 两条均零输出（baseline 哈希与 samples fixture 内容中的 717 子串已排除）。
+Expected: 前两条零输出（baseline 哈希与 samples fixture 内容中的 717 子串已排除）；第三条零输出（CONTRIBUTING 版本机制已改六处）。
 
-- [ ] **Step 7: 三重验证**
+- [ ] **Step 8: 三重验证**
 
 ```bash
 npm run self-test
@@ -558,13 +569,13 @@ npx vitest run --config config/vitest.config.ts
 npm run check:docs-consistency
 ```
 
-Expected: 256/256；47 files / N 全绿；docs-consistency exit 0（新挂载的 CONTRIBUTING/PR 模板检查在文档同步后通过）。
+Expected: 256/256；47 files / N 全绿；docs-consistency exit 0（新挂载的 CONTRIBUTING/INSTALL/PR 模板检查在文档同步后通过）。
 
-- [ ] **Step 8: Commit（批3，含 Task 4-6 全部改动）**
+- [ ] **Step 9: Commit（批3，含 Task 4-6 全部改动）**
 
 ```bash
-git add w-model-dev/scripts/logic/docs-consistency-logic.ts w-model-dev/scripts/cli/check-docs-consistency.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts .eslintsecurity-baseline.json README.md AGENTS.md CONTRIBUTING.md .githooks/pre-push .github/PULL_REQUEST_TEMPLATE.md
-git commit -m "feat(gate): docs-consistency 扩展 CONTRIBUTING/PR 模板计数校验（审计 P1-1 反哺）"
+git add w-model-dev/scripts/logic/docs-consistency-logic.ts w-model-dev/scripts/cli/check-docs-consistency.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts README.md AGENTS.md CONTRIBUTING.md docs/INSTALL.md .githooks/pre-push .github/PULL_REQUEST_TEMPLATE.md
+git commit -m "feat(gate): docs-consistency 扩展 CONTRIBUTING/INSTALL/PR 模板计数校验（审计 P1-1 反哺）"
 ```
 
 ---
@@ -700,7 +711,7 @@ Expected: package.json / SKILL.md frontmatter / skill-metadata.json / README「�
 ```markdown
 ### 修复（核查报告 2026-08-19 六项问题）
 
-- **P1-1 文档数字漂移**：CONTRIBUTING 门禁表 vitest 计数 40/623 → 47/N（与同文件 :214 自相矛盾修复）；PR 模板「14 项」→「17 项」；docs-consistency 新增 `contributing` / `prTemplate` 可选输入与两项计数检查（复用 vitest-tests / pre-push 违规码），堵住 REQUIRED_PATHS 未覆盖两文件的盲区
+- **P1-1 文档数字漂移**：CONTRIBUTING 门禁表 vitest 计数 40/623 → 47/N（与同文件 :214 自相矛盾修复）；docs/INSTALL.md :83/:248 同类漂移一并修正（复核补充）；PR 模板「14 项」→「17 项」；docs-consistency 新增 `vitestExtraDocs` / `prTemplate` 可选输入（checkVitestTestCount 参数化 + checkPrTemplatePrePushCount），堵住 REQUIRED_PATHS 未覆盖 CONTRIBUTING/INSTALL/PR 模板的盲区；CONTRIBUTING 版本机制「五处」→「六处」同步
 - **P1-2 typecheck 门禁**：package.json 新增 `typecheck` script；pre-push 第 17 项 `npx tsc -p config/tsconfig.json`（对齐 SSoT §10H.5 V1）——README 健康指标「tsc 0 错误」由手动验证升级为自动化门禁
 - **P1-3 IDE 产物出库**：`.trae-html-share-packages/` 移出版本控制并加入 .gitignore（会话生成物，非仓库资产）
 - **P1-4 依赖可复现**：package-lock.json 入库（.gitignore 移除忽略行），不同环境 install 结果与 npm audit 行为可复现
@@ -735,7 +746,7 @@ git commit -m "chore(release): 41.19.0 — 核查报告六项修复全量同步"
 |---|---|---|
 | 批1 | `chore(repo)` | git status 复核 + npm audit 预检 |
 | 批2 | `feat(gate)` | bash -n + format + vitest 717 + grep 零残留 + docs-consistency |
-| 批3 | `feat(gate)` | format + vitest N=723 + lint:security（再生后 0）+ self-test 256 + docs-consistency + grep 零残留 |
+| 批3 | `feat(gate)` | format + vitest N=723 + lint:security（exit 0 免再生，意外才再生）+ self-test 256 + docs-consistency + grep 零残留 |
 | 批4 | `feat(hook)` | bash -n + docs-consistency |
 | 批5 | `chore(release)` | **npm run prepush 17 项全绿** |
 
