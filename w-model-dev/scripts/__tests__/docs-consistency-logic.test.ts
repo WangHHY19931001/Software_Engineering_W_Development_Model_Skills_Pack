@@ -1368,76 +1368,132 @@ async function assertSsotExternalBoundaryFile(): Promise<void> {
   expect(content).toContain('L1 随技能包交付的 `w-model-dev/tools/tla2tools.jar`');
 }
 
+type C3DocumentSet = { readme: string; install: string; contributing: string };
+
+function c3DocumentContractViolations(docs: C3DocumentSet): string[] {
+  const violations: string[] = [];
+  const validationHeading = '## 验证仓库';
+  const installHeading = '## 安装 Skill';
+  const readmeTldr = docs.readme.slice(0, docs.readme.indexOf(validationHeading));
+  const mixedTldrPattern = /开始：.*(?:拷贝|复制).*?(?:→|->).*?(?:npm install|self-test)/s;
+
+  for (const [name, content] of [
+    ['README.md', docs.readme],
+    ['docs/INSTALL.md', docs.install],
+  ] as const) {
+    const validationIndex = content.indexOf(validationHeading);
+    const installIndex = content.indexOf(installHeading);
+    if (validationIndex < 0 || installIndex <= validationIndex) violations.push(`${name}:入口标题顺序`);
+  }
+  if (!readmeTldr.includes('[验证仓库](#验证仓库)') || !readmeTldr.includes('[安装 Skill](#安装-skill)')) {
+    violations.push('README.md:TL;DR独立锚点');
+  }
+  if (mixedTldrPattern.test(readmeTldr)) violations.push('README.md:TL;DR混合流程');
+
+  for (const [name, content] of [
+    ['README.md', docs.readme],
+    ['docs/INSTALL.md', docs.install],
+    ['CONTRIBUTING.md', docs.contributing],
+  ] as const) {
+    const hasBashSave = /(?:^|> )git config --local --get core\.hooksPath\s+>\s+\.git[\\/]hooksPath\.previous/m.test(
+      content,
+    );
+    const hasBashStatus = /(?:^|> )status=\$\?\s*[\r\n]+(?:> )?if \[ "\$status" -eq 1 \]/m.test(content);
+    const hasBashRestore = /git config --local core\.hooksPath "\$\(cat \.git[\\/]hooksPath\.previous\)"/.test(content);
+    const hasPowerShellSave =
+      /(?:^|> )git config --local --get core\.hooksPath\s*>\s*\.git[\\/]hooksPath\.previous/m.test(content);
+    const hasPowerShellStatus = /\$readStatus\s*=\s*\$LASTEXITCODE[\s\S]*?\$readStatus\s*-eq\s*1/.test(content);
+    const hasPowerShellRestore =
+      /Get-Content -Raw \.git[\\/]hooksPath\.previous[\s\S]*git config --local core\.hooksPath \$previousHooksPath/.test(
+        content,
+      );
+    if (!hasBashSave || !hasBashStatus || !hasBashRestore) violations.push(`${name}:Bash hooksPath流程`);
+    if (!hasPowerShellSave || !hasPowerShellStatus || !hasPowerShellRestore) {
+      violations.push(`${name}:PowerShell hooksPath流程`);
+    }
+    if (!content.includes('git config --local --unset core.hooksPath')) violations.push(`${name}:hooksPath撤销`);
+    if (!/备份文件只保存在本地.*\.git.*不得提交/s.test(content)) violations.push(`${name}:备份文件边界`);
+    if (/<旧值>|<previous>/.test(content)) violations.push(`${name}:未替换回写占位符`);
+  }
+
+  const uninstallStart = docs.install.indexOf('## 6. 卸载');
+  const uninstallEnd = docs.install.indexOf('## 7. 目录速查');
+  const uninstall = docs.install.slice(uninstallStart, uninstallEnd);
+  if (uninstall.includes('.agent')) violations.push('docs/INSTALL.md:卸载使用通用.agent');
+  if (!uninstall.includes('<agent-specific-skills>')) violations.push('docs/INSTALL.md:卸载缺Agent-specific');
+  if (!/安装时.*目标|替换.*目标|按安装时/.test(uninstall)) violations.push('docs/INSTALL.md:卸载缺确认提示');
+
+  const platformStart = docs.install.indexOf('### 3.1 本地 pre-push 与平台依赖');
+  const platformEnd = docs.install.indexOf('## 4. 验证安装');
+  const platformSection = docs.install.slice(platformStart, platformEnd);
+  if (!/平台检查.*(?:必须在|需要).*Bash/s.test(platformSection)) violations.push('docs/INSTALL.md:Bash边界');
+  if (!platformSection.includes('self-test') || !platformSection.includes('doctor'))
+    violations.push('docs/INSTALL.md:PowerShell边界');
+
+  const installSection = docs.install.slice(
+    docs.install.indexOf('## 安装 Skill'),
+    docs.install.indexOf('---', docs.install.indexOf('## 安装 Skill')),
+  );
+  if (!installSection.includes('Agent-specific') || !installSection.includes('<agent-specific-skills>')) {
+    violations.push('docs/INSTALL.md:安装路径');
+  }
+  return violations;
+}
+
 describe('C3 文档入口契约', () => {
-  it('按文档路径验证入口语义，并拒绝局部旧文案负例', async () => {
+  it('统一契约接受当前文档，并拒绝真实旧文档局部 fixture', async () => {
     const readDoc = async (relativePath: string): Promise<string> => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled documentation paths
       return fs.readFile(path.join(REPO_ROOT, relativePath), 'utf-8');
     };
-    const readme = await readDoc('README.md');
-    const install = await readDoc('docs/INSTALL.md');
-    const contributing = await readDoc('CONTRIBUTING.md');
+    const current: C3DocumentSet = {
+      readme: await readDoc('README.md'),
+      install: await readDoc('docs/INSTALL.md'),
+      contributing: await readDoc('CONTRIBUTING.md'),
+    };
+    expect(c3DocumentContractViolations(current)).toEqual([]);
 
-    const validationHeading = '## 验证仓库';
-    const installHeading = '## 安装 Skill';
-    for (const [relativePath, content] of [
-      ['README.md', readme],
-      ['docs/INSTALL.md', install],
-    ] as const) {
-      const validationIndex = content.indexOf(validationHeading);
-      const installIndex = content.indexOf(installHeading);
-      expect(validationIndex, `${relativePath} 缺少验证仓库标题`).toBeGreaterThanOrEqual(0);
-      expect(installIndex, `${relativePath} 缺少安装 Skill 标题`).toBeGreaterThan(validationIndex);
-    }
+    const oldTldr = {
+      ...current,
+      readme: current.readme.replace(
+        /> 两个独立入口：[\s\S]*?两者不是同一条命令链。/,
+        '> 开始：拷贝 `w-model-dev/` 到 Agent skills 目录 → 仓库根 `npm install` → `npm run self-test`。',
+      ),
+    };
+    expect(c3DocumentContractViolations(oldTldr)).toContain('README.md:TL;DR独立锚点');
+    expect(c3DocumentContractViolations(oldTldr)).toContain('README.md:TL;DR混合流程');
 
-    const tldr = readme.slice(0, readme.indexOf(validationHeading));
-    const mixedTldrPattern = /开始：.*(?:拷贝|复制).*?(?:→|->).*?(?:npm install|self-test)/s;
-    expect(tldr).toContain('[验证仓库](#验证仓库)');
-    expect(tldr).toContain('[安装 Skill](#安装-skill)');
-    expect(tldr).not.toMatch(mixedTldrPattern);
-    const oldMixedTldr = `${tldr}\n开始：拷贝 w-model-dev/ → 仓库根 npm install → npm run self-test。`;
-    expect(oldMixedTldr).toMatch(mixedTldrPattern);
+    const oldUninstall = {
+      ...current,
+      install: current.install.replace(
+        'rm -rf "/path/to/<agent-specific-skills>/w-model-dev"',
+        'rm -rf "$env:USERPROFILE/.agent/skills/w-model-dev"',
+      ),
+    };
+    expect(c3DocumentContractViolations(oldUninstall)).toContain('docs/INSTALL.md:卸载使用通用.agent');
 
-    for (const [relativePath, content] of [
-      ['README.md', readme],
-      ['docs/INSTALL.md', install],
-      ['CONTRIBUTING.md', contributing],
-    ] as const) {
-      expect(content, `${relativePath} 缺少 hooksPath 恢复命令`).toContain('git config --unset core.hooksPath');
-      expect(content, `${relativePath} 未提示保存自定义 hooksPath`).toMatch(
-        /保存.*(?:自定义|旧).*hooksPath|旧值.*回写/s,
-      );
-      expect(content, `${relativePath} 未提供 hooksPath 回写说明`).toMatch(/git config core\.hooksPath|回写/);
-    }
+    const missingBashBoundary = {
+      ...current,
+      install: current.install
+        .replace('平台检查与显式修复入口都必须在 Bash（Git Bash / WSL / POSIX shell）中运行：', '平台检查入口：')
+        .replace('pre-push 与上述平台依赖命令需要 Bash', 'pre-push 与上述平台依赖命令可运行'),
+    };
+    expect(c3DocumentContractViolations(missingBashBoundary)).toContain('docs/INSTALL.md:Bash边界');
 
-    const uninstallStart = install.indexOf('## 6. 卸载');
-    const uninstallEnd = install.indexOf('## 7. 目录速查');
-    const uninstall = install.slice(uninstallStart, uninstallEnd);
-    expect(uninstall).not.toContain('.agent');
-    expect(uninstall).toContain('<agent-specific-skills>');
-    expect(uninstall).toMatch(/安装时.*目标|替换.*目标|按安装时/);
-    expect(uninstall).toContain('rm -rf "/path/to/<agent-specific-skills>/w-model-dev"');
-    expect(uninstall).toContain('Remove-Item -Recurse -Force "<agent-specific-skills>\\w-model-dev"');
-    const oldUninstall = uninstall.replace(/<agent-specific-skills>/g, '$env:USERPROFILE/.agent/skills');
-    expect(oldUninstall).toContain('.agent');
-
-    const platformStart = install.indexOf('### 3.1 本地 pre-push 与平台依赖');
-    const platformEnd = install.indexOf('## 4. 验证安装');
-    const platformSection = install.slice(platformStart, platformEnd);
-    expect(platformSection).toMatch(/平台检查.*(?:必须在|需要).*Bash/s);
-    expect(platformSection).toContain('self-test');
-    expect(platformSection).toContain('doctor');
-    const withoutBashBoundary = platformSection
-      .replace(/平台检查与显式修复入口都必须在 Bash（[^\r\n]+）中运行：/, '平台检查入口：')
-      .replace('pre-push 与上述平台依赖命令需要 Bash', 'pre-push 与上述平台依赖命令可运行');
-    expect(withoutBashBoundary).not.toMatch(/平台检查.*(?:必须在|需要).*Bash/s);
-
-    const installSection = install.slice(
-      install.indexOf('## 安装 Skill'),
-      install.indexOf('---', install.indexOf('## 安装 Skill')),
-    );
-    expect(installSection).toContain('Agent-specific');
-    expect(installSection).toContain('<agent-specific-skills>');
-    expect(installSection).not.toMatch(/\\.agent[\\/].*w-model-dev/);
+    const missingHookWorkflow = {
+      ...current,
+      contributing: current.contributing
+        .replace(
+          /git config --local --get core\.hooksPath[\s\S]*?hooksPath\.previous/g,
+          'git config core.hooksPath .githooks',
+        )
+        .replace(
+          /git config --local core\.hooksPath "\$\(cat \.git\/hooksPath\.previous\)"/g,
+          'git config core.hooksPath .githooks',
+        )
+        .replace(/\$readStatus\s*-eq\s*1/g, '$readStatus -eq 0'),
+    };
+    expect(c3DocumentContractViolations(missingHookWorkflow)).toContain('CONTRIBUTING.md:Bash hooksPath流程');
+    expect(c3DocumentContractViolations(missingHookWorkflow)).toContain('CONTRIBUTING.md:PowerShell hooksPath流程');
   });
 });

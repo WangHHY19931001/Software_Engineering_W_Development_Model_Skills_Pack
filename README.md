@@ -47,7 +47,41 @@ Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
 
 Bash 和 PowerShell 7 可以使用命令简写；`self-test` 与 `doctor` 可在 PowerShell 或 Windows Terminal 中运行，不要求 Git Bash。Git Bash 仅在运行 `pre-push` 或平台依赖检查时需要。
 
-> `npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，在本仓库本地 Git 配置中设置 `core.hooksPath=.githooks`。这是仓库验证的本地配置副作用，不是 Agent Skill 激活的必需步骤。若安装前已有自定义 `core.hooksPath`，请先保存旧值；撤销本地覆盖可执行 `git config --unset core.hooksPath`，需要恢复自定义路径时按保存的旧值执行 `git config core.hooksPath <旧值>`。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或运行当前 fail-closed 的 `npm run platform-deps:install` 获取人工 `npm install` 指引。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
+> `npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，在本仓库本地 Git 配置中设置 `core.hooksPath=.githooks`。这是仓库验证的本地配置副作用，不是 Agent Skill 激活的必需步骤。
+>
+> 若安装前已有自定义 `core.hooksPath`，请在仓库根目录先保存其本地值。下面的 Bash 和 PowerShell 流程会区分“原先未设值”和“原先已有值”；`git config --local --get` 返回码 `1` 表示原先未设值，其他非零码表示读取失败。备份文件只保存在本地 `.git/`，不得提交；请确认文件权限，并注意空文件表示原先未设值。
+>
+> Bash：
+>
+> ```bash
+> git config --local --get core.hooksPath > .git/hooksPath.previous
+> status=$?
+> if [ "$status" -eq 1 ]; then : > .git/hooksPath.previous; elif [ "$status" -ne 0 ]; then exit "$status"; fi
+> chmod 600 .git/hooksPath.previous
+> ```
+>
+> PowerShell 5.1：
+>
+> ```powershell
+> git config --local --get core.hooksPath > .git/hooksPath.previous
+> $readStatus = $LASTEXITCODE
+> if ($readStatus -eq 1) { Set-Content -Path .git/hooksPath.previous -Value '' } elseif ($readStatus -ne 0) { throw "无法读取 core.hooksPath，退出码 $readStatus" }
+> ```
+>
+> 完成备份后执行 `npm install`。需要撤销本地覆盖时，Bash 使用：
+>
+> ```bash
+> if [ -s .git/hooksPath.previous ]; then git config --local core.hooksPath "$(cat .git/hooksPath.previous)"; else git config --local --unset core.hooksPath; fi
+> ```
+>
+> PowerShell 5.1 使用：
+>
+> ```powershell
+> $previousHooksPath = (Get-Content -Raw .git/hooksPath.previous).Trim()
+> if ([string]::IsNullOrWhiteSpace($previousHooksPath)) { git config --local --unset core.hooksPath } else { git config --local core.hooksPath $previousHooksPath }
+> ```
+>
+> 只有备份文件为空（原先未设值）时才执行 `--unset`；不要把空值当作有效路径。恢复后可按需删除本地 `.git/hooksPath.previous`。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或运行当前 fail-closed 的 `npm run platform-deps:install` 获取人工 `npm install` 指引。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
 
 ## 安装 Skill
 

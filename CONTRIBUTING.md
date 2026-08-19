@@ -109,12 +109,39 @@ npm run setup:hooks
 # 等价于 git config core.hooksPath .githooks
 ```
 
-如果启用前已有自定义 `core.hooksPath`，请先保存旧值。撤销本地覆盖可执行：
+如果启用前已有自定义 `core.hooksPath`，请在仓库根目录先保存其本地值。`git config --local --get` 返回码 `1` 表示原先未设值，其他非零码表示读取失败；备份文件只保存在本地 `.git/`，不得提交，请确认文件权限并注意空文件表示原先未设值。
+
+Bash：
 
 ```bash
-git config --unset core.hooksPath
-# 如需恢复已保存的自定义路径：git config core.hooksPath <旧值>
+git config --local --get core.hooksPath > .git/hooksPath.previous
+status=$?
+if [ "$status" -eq 1 ]; then : > .git/hooksPath.previous; elif [ "$status" -ne 0 ]; then exit "$status"; fi
+chmod 600 .git/hooksPath.previous
 ```
+
+PowerShell 5.1：
+
+```powershell
+git config --local --get core.hooksPath > .git/hooksPath.previous
+$readStatus = $LASTEXITCODE
+if ($readStatus -eq 1) { Set-Content -Path .git/hooksPath.previous -Value '' } elseif ($readStatus -ne 0) { throw "无法读取 core.hooksPath，退出码 $readStatus" }
+```
+
+撤销或恢复：
+
+```bash
+if [ -s .git/hooksPath.previous ]; then git config --local core.hooksPath "$(cat .git/hooksPath.previous)"; else git config --local --unset core.hooksPath; fi
+```
+
+PowerShell 5.1：
+
+```powershell
+$previousHooksPath = (Get-Content -Raw .git/hooksPath.previous).Trim()
+if ([string]::IsNullOrWhiteSpace($previousHooksPath)) { git config --local --unset core.hooksPath } else { git config --local core.hooksPath $previousHooksPath }
+```
+
+只有备份文件为空（原先未设值）时才执行 `--unset`；恢复后可按需删除本地 `.git/hooksPath.previous`。
 
 **手动触发**（不实际推送，仅跑门禁验证）：
 

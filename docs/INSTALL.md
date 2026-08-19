@@ -128,7 +128,41 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 
 ### 3.1 本地 pre-push 与平台依赖
 
-仓库验证时，`npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，只在本仓库的本地 Git 配置中设置 `core.hooksPath=.githooks`；这是本地配置副作用，不是 Agent Skill 激活必需。若安装前已有自定义 `core.hooksPath`，请先保存旧值。撤销本地覆盖可执行 `git config --unset core.hooksPath`；需要恢复自定义路径时按保存的旧值执行 `git config core.hooksPath <旧值>`。pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
+仓库验证时，`npm install` 的 `postinstall` 会运行 `scripts/setup-hooks.cjs`，只在本仓库的本地 Git 配置中设置 `core.hooksPath=.githooks`；这是本地配置副作用，不是 Agent Skill 激活必需。
+
+若安装前已有自定义 `core.hooksPath`，请在仓库根目录先保存其本地值。下面的 Bash 和 PowerShell 流程会区分「原先未设值」和「原先已有值」；`git config --local --get` 返回码 `1` 表示原先未设值，其他非零码表示读取失败。备份文件只保存在本地 `.git/`，不得提交；请确认文件权限，并注意空文件表示原先未设值。
+
+Bash：
+
+```bash
+git config --local --get core.hooksPath > .git/hooksPath.previous
+status=$?
+if [ "$status" -eq 1 ]; then : > .git/hooksPath.previous; elif [ "$status" -ne 0 ]; then exit "$status"; fi
+chmod 600 .git/hooksPath.previous
+```
+
+PowerShell 5.1：
+
+```powershell
+git config --local --get core.hooksPath > .git/hooksPath.previous
+$readStatus = $LASTEXITCODE
+if ($readStatus -eq 1) { Set-Content -Path .git/hooksPath.previous -Value '' } elseif ($readStatus -ne 0) { throw "无法读取 core.hooksPath，退出码 $readStatus" }
+```
+
+完成备份后执行 `npm install`。需要撤销本地覆盖时，Bash 使用：
+
+```bash
+if [ -s .git/hooksPath.previous ]; then git config --local core.hooksPath "$(cat .git/hooksPath.previous)"; else git config --local --unset core.hooksPath; fi
+```
+
+PowerShell 5.1 使用：
+
+```powershell
+$previousHooksPath = (Get-Content -Raw .git/hooksPath.previous).Trim()
+if ([string]::IsNullOrWhiteSpace($previousHooksPath)) { git config --local --unset core.hooksPath } else { git config --local core.hooksPath $previousHooksPath }
+```
+
+只有备份文件为空（原先未设值）时才执行 `--unset`；不要把空值当作有效路径。恢复后可按需删除本地 `.git/hooksPath.previous`。pre-push 本身**不自动**执行 `npm install`。缺少 `node_modules` 时，hook 以 exit 1 拒绝推送并提示先运行 `npm install`。
 
 pre-push 仅运行 `bash .githooks/ensure-platform-deps.sh --check`。默认和 `--check` 均只检查当前平台所需原生包，**不自动**网络下载、`npm pack`、解包或覆盖 `node_modules`。平台检查与显式修复入口都必须在 Bash（Git Bash / WSL / POSIX shell）中运行：
 
@@ -240,7 +274,7 @@ PowerShell：
 Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 ```
 
-若需要撤销仓库验证期间的本地 Hook 配置，按需执行 `git config --unset core.hooksPath`；若此前保存了自定义旧值，则执行 `git config core.hooksPath <旧值>` 回写。
+若需要撤销仓库验证期间的本地 Hook 配置，请按上方 Bash 或 PowerShell 流程读取 `.git/hooksPath.previous`：备份为空时执行 `git config --local --unset core.hooksPath`，否则从备份文件回写保存的路径。
 ---
 
 ## 7. 目录速查

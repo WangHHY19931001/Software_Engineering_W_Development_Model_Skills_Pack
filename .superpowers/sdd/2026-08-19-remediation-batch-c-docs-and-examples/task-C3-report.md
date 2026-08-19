@@ -40,4 +40,13 @@
 
 ## 提交
 
-提交信息：`docs: harden onboarding path contracts`
+提交信息：`docs: make hooks path recovery executable`
+
+## 第 2/5 轮复审整改
+
+针对 `task-C3-rereview-round1.md` 的 2 个未解决项完成整改：
+
+- README、`docs/INSTALL.md`、`CONTRIBUTING.md` 均提供 Bash 和 PowerShell 5.1 的可执行 hooksPath 流程：`git config --local --get core.hooksPath > .git/hooksPath.previous`、保存 `$?` / `$LASTEXITCODE`，退出码 `1` 明确表示原先未设值，其他非零码停止；备份为空才 `git config --local --unset core.hooksPath`，非空则从备份文件读取并回写。文档明确备份只在本地 `.git/`、不得提交，并提示权限和空值注意。
+- 文档测试提取 `c3DocumentContractViolations` 统一契约 helper。当前 README/INSTALL/CONTRIBUTING 文本必须返回空违规；真实旧 TL;DR、`.agent` 卸载、缺 Bash 边界、缺 hooksPath 保存/回写的局部文本 fixture 传入同一 helper 并断言对应违规。hooksPath 断言验证命令结构、退出码分支和 Bash/PowerShell 回写结构，不再只检查关键词。
+
+本轮测试数量保持 `52 files / 853 tests`。
