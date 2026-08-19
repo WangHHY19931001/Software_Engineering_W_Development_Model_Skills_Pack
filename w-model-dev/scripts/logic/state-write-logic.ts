@@ -20,6 +20,8 @@ export interface StateWriteOptions {
   lockTimeoutMs?: number;
   staleLockTtlMs?: number;
   recoverStaleLock?: boolean;
+  /** Default true preserves direct-call automatic stale recovery; false returns STALE_LOCK unless recovery is explicit. */
+  allowImplicitStaleRecovery?: boolean;
   afterLockAcquired?: () => void | Promise<void>;
   beforeCommit?: () => void | Promise<void>;
   afterStaleMetadataRead?: () => void | Promise<void>;
@@ -88,9 +90,9 @@ async function readTransition(transitionDir: string): Promise<TransitionMetadata
   try { return JSON.parse(await fs.readFile(transitionPathFor(transitionDir), 'utf-8')) as TransitionMetadata; } catch { return undefined; }
 }
 
-async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions): Promise<boolean> {
+async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'recovered' | 'stale'> {
   let entries: string[];
-  try { entries = await fs.readdir(lockDir); } catch { return false; }
+  try { entries = await fs.readdir(lockDir); } catch { return 'none'; }
   let recovered = false;
   for (const entry of entries) {
     if (!entry.startsWith('.recovering-') && !entry.startsWith('.releasing-')) continue;
@@ -98,25 +100,30 @@ async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions
     const transition = await readTransition(transitionDir);
     if (!transition) continue;
     const expired = Date.now() - Date.parse(transition.operatorStartedAt) > (opts.staleLockTtlMs ?? 60_000);
-    if (!opts.recoverStaleLock && !(expired && !isPidRunning(transition.operatorPid))) continue;
+    const stale = expired && !isPidRunning(transition.operatorPid);
+    if (!opts.recoverStaleLock && !stale) continue;
+    if (stale && opts.recoverStaleLock !== true && opts.allowImplicitStaleRecovery === false) return 'stale';
     const auditDir = path.join(lockDir, `.stale-transition-${Date.now()}-${randomUUID()}`);
     try {
       await renameWithRetry(transitionDir, auditDir);
       recovered = true;
     } catch { /* a live owner may have completed its transition */ }
   }
-  return recovered;
+  return recovered ? 'recovered' : 'none';
 }
 
 async function hasTransition(lockDir: string): Promise<boolean> {
   try { return (await fs.readdir(lockDir)).some((entry) => entry.startsWith('.recovering-') || entry.startsWith('.releasing-')); } catch { return false; }
 }
 
-async function shouldAttemptRecovery(lockDir: string, opts: StateWriteOptions): Promise<boolean> {
+async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'stale' | 'recoverable'> {
   const metadata = await readMetadata(ownerPathFor(lockDir));
-  if (!metadata) return false;
+  if (!metadata) return 'none';
   const expired = Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
-  return opts.recoverStaleLock === true || (expired && !isPidRunning(metadata.pid));
+  const stale = expired && !isPidRunning(metadata.pid);
+  if (opts.recoverStaleLock === true) return 'recoverable';
+  if (!stale) return 'none';
+  return opts.allowImplicitStaleRecovery === false ? 'stale' : 'recoverable';
 }
 
 async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Promise<boolean> {
@@ -142,7 +149,10 @@ async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Pro
   return false;
 }
 
-async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<{ lockDir: string; ownerDir: string; metadata: StateLockMetadata } | undefined> {
+type AcquiredLock = { lockDir: string; ownerDir: string; metadata: StateLockMetadata };
+type AcquireLockResult = AcquiredLock | 'STALE_LOCK' | undefined;
+
+async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<AcquireLockResult> {
   const lockDir = `${absPath}.lock`;
   const ownerDir = ownerPathFor(lockDir);
   const deadline = Date.now() + (opts.lockTimeoutMs ?? 5_000);
@@ -150,14 +160,17 @@ async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<{ 
   while (Date.now() <= deadline) {
     const metadata: StateLockMetadata = { targetPath: absPath, pid: process.pid, token: randomUUID(), createdAt: new Date().toISOString(), operation: 'wm-write' };
     try {
-      await recoverOrphanTransitions(lockDir, opts);
+      const transitions = await recoverOrphanTransitions(lockDir, opts);
+      if (transitions === 'stale') return 'STALE_LOCK';
       if (await hasTransition(lockDir)) { await sleep(10); continue; }
       await fs.mkdir(ownerDir);
       await fs.writeFile(metadataPathFor(ownerDir), JSON.stringify(metadata), 'utf-8');
       return { lockDir, ownerDir, metadata };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      if (await shouldAttemptRecovery(lockDir, opts) && await recoverLockIfStale(lockDir, opts)) continue;
+      const owner = await staleOwnerState(lockDir, opts);
+      if (owner === 'stale') return 'STALE_LOCK';
+      if (owner === 'recoverable' && await recoverLockIfStale(lockDir, opts)) continue;
       await sleep(10);
     }
   }
@@ -208,6 +221,7 @@ async function restoreIfStillOwned(absPath: string, jsonText: string, backupPath
 export async function writeStateJson(absPath: string, jsonText: string, opts: StateWriteOptions = {}): Promise<StateWriteResult> {
   try { parseJsonSafe(jsonText); } catch { return { ok: false, writtenPath: absPath, reason: 'INVALID_JSON' }; }
   const acquired = await acquireLock(absPath, opts);
+  if (acquired === 'STALE_LOCK') return { ok: false, writtenPath: absPath, reason: 'STALE_LOCK' };
   if (!acquired) return { ok: false, writtenPath: absPath, reason: 'LOCK_TIMEOUT' };
   let tmpPath: string | undefined;
   try {

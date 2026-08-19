@@ -26,18 +26,26 @@ function target(name: string): string {
   return path.join(tmpDir, name);
 }
 
+function runArgs(
+  args: string[],
+  input?: string,
+  cwd = process.cwd(),
+): { code: number | null; stdout: string; stderr: string } {
+  const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {
+    cwd,
+    encoding: 'utf-8',
+    input,
+  });
+  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
 function run(
   targetPath: string,
   args: string[],
   input?: string,
   cwd = process.cwd(),
 ): { code: number | null; stdout: string; stderr: string } {
-  const result = spawnSync(process.execPath, [tsxCli, SCRIPT, targetPath, ...args], {
-    cwd,
-    encoding: 'utf-8',
-    input,
-  });
-  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  return runArgs([targetPath, ...args], input, cwd);
 }
 
 function wmwriteSummary(stdout: string): Record<string, unknown> {
@@ -52,7 +60,12 @@ async function writeLock(targetPath: string, metadata: Record<string, unknown>):
   await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify(metadata), 'utf-8');
 }
 
-async function holdLiveLock(targetPath: string, holdMs: number): Promise<ChildProcess> {
+async function holdLiveLock(
+  targetPath: string,
+  holdMs: number,
+  createdAt = new Date().toISOString(),
+  removeOnExit = true,
+): Promise<ChildProcess> {
   const holder = spawn(
     process.execPath,
     [
@@ -63,24 +76,27 @@ async function holdLiveLock(targetPath: string, holdMs: number): Promise<ChildPr
     const target = process.argv[1];
     const holdMs = Number(process.argv[2]);
     const owner = target + '.lock' + path.sep + 'owner';
+    const removeOnExit = process.argv[4] === 'true';
     (async () => {
       await fs.mkdir(owner, { recursive: true });
       await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify({
         targetPath: target,
         pid: process.pid,
         token: 'holder',
-        createdAt: new Date().toISOString(),
+        createdAt: process.argv[3],
         operation: 'wm-write',
       }));
       process.stdout.write('ready\\n');
       setTimeout(async () => {
-        await fs.rm(owner, { recursive: true, force: true });
+        if (removeOnExit) await fs.rm(owner, { recursive: true, force: true });
         process.exit(0);
       }, holdMs);
     })().catch((error) => { console.error(error); process.exit(1); });
   `,
       targetPath,
       String(holdMs),
+      createdAt,
+      String(removeOnExit),
     ],
     { stdio: ['ignore', 'pipe', 'pipe'] },
   );
@@ -168,25 +184,38 @@ describe('wm-write CLI lock controls', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"unchanged"}');
   });
 
-  it('--recover-stale-lock recovers a stale owner and writes successfully', async () => {
-    const p = target('stale-lock.json');
-    await writeLock(p, {
-      targetPath: p,
-      pid: process.pid,
-      token: 'old-live-owner',
-      createdAt: '2000-01-01T00:00:00.000Z',
-      operation: 'wm-write',
-    });
+  it('atomically rejects a lock that becomes stale during the CLI call, unless recovery is explicit', async () => {
+    const p = target('transitioned-stale-lock.json');
+    const holder = await holdLiveLock(p, 500, '2000-01-01T00:00:00.000Z', false);
 
-    const result = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"recovered"}');
+    try {
+      const rejected = run(p, ['--stdin', '--lock-timeout', '1000'], '{"value":"rejected"}');
+      expect(rejected.code).toBe(1);
+      expect(rejected.stderr).toContain('✗ [WRITE_REJECTED]');
+      expect(wmwriteSummary(rejected.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
+      await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
 
-    expect(result.code).toBe(0);
-    expect(wmwriteSummary(result.stdout)).toMatchObject({ script: 'wm-write.ts', ok: true, writtenPath: p });
-    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"recovered"}');
+      const recovered = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"recovered"}');
+      expect(recovered.code).toBe(0);
+      expect(wmwriteSummary(recovered.stdout)).toMatchObject({ script: 'wm-write.ts', ok: true, writtenPath: p });
+      await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"recovered"}');
+    } finally {
+      await waitForExit(holder);
+    }
   });
 });
 
 describe('wm-write CLI argument boundaries and existing contract', () => {
+  it('accepts the target after --stdin', async () => {
+    const p = target('target-after-option.json');
+
+    const result = runArgs(['--stdin', p], '{"source":"stdin"}');
+
+    expect(result.code).toBe(0);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: true, writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"source":"stdin"}');
+  });
+
   it('--from consumes a path named --lock-timeout instead of parsing it as a timeout flag', async () => {
     const source = path.join(tmpDir, '--lock-timeout');
     const p = target('from-option-looking-path.json');
@@ -230,6 +259,18 @@ describe('wm-write CLI argument boundaries and existing contract', () => {
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('✗ [ARG_INVALID]');
     expect(result.stdout).toContain('ERROR_JSON ');
+  });
+
+  it('--expect-mtime accepts a finite fractional value and floors it', async () => {
+    const p = target('mtime-fractional.json');
+    await fs.writeFile(p, '{"value":"old"}', 'utf-8');
+    const mtime = Math.floor((await fs.stat(p)).mtimeMs);
+
+    const result = run(p, ['--stdin', '--expect-mtime', `${mtime}.5`], '{"value":"new"}');
+
+    expect(result.code).toBe(0);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: true, writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"new"}');
   });
 
   it('returns MTIME_CONFLICT as a write rejection with exit 1', async () => {

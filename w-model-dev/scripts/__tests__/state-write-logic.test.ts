@@ -162,6 +162,21 @@ describe('writeStateJson', () => {
     expect(entries.some((entry) => entry.startsWith('.stale-'))).toBe(true);
   });
 
+  it('returns STALE_LOCK instead of implicitly recovering when policy disables recovery', async () => {
+    const p = target('stale-lock-rejected.json');
+    const lock = `${p}.lock`;
+    await fs.mkdir(path.join(lock, 'owner'), { recursive: true });
+    await fs.writeFile(path.join(lock, 'owner', 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: 999_999_999, token: 'stale-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
+    }), 'utf-8');
+
+    const result = await writeStateJson(p, '{"v":1}', { staleLockTtlMs: 1, allowImplicitStaleRecovery: false });
+
+    expect(result).toMatchObject({ ok: false, reason: 'STALE_LOCK' });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.access(path.join(lock, 'owner', 'metadata.json'))).resolves.toBeUndefined();
+  });
+
   it('does not let a readback rollback overwrite a later writer', async () => {
     const p = target('rollback-race.json');
     await fs.writeFile(p, '{"v":"original"}', 'utf-8');

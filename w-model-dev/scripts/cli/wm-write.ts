@@ -52,36 +52,6 @@ function exitArgInvalid(message: string, detail = USAGE): never {
   throw new HandledCliError();
 }
 
-function isPidRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-async function hasStaleLock(absTarget: string): Promise<boolean> {
-  try {
-    const metadata = JSON.parse(
-      await fs.readFile(path.join(`${absTarget}.lock`, 'owner', 'metadata.json'), 'utf-8'),
-    ) as {
-      pid?: unknown;
-      createdAt?: unknown;
-    };
-    const createdAt = typeof metadata.createdAt === 'string' ? Date.parse(metadata.createdAt) : NaN;
-    return (
-      typeof metadata.pid === 'number' &&
-      Number.isInteger(metadata.pid) &&
-      Number.isFinite(createdAt) &&
-      Date.now() - createdAt > 60_000 &&
-      !isPidRunning(metadata.pid)
-    );
-  } catch {
-    return false;
-  }
-}
-
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -90,10 +60,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const targetArg = args[0];
-  if (targetArg === undefined) exitArgInvalid('缺少 <target.json> 参数');
-  const absTarget = path.resolve(targetArg);
-
+  let targetArg: string | undefined;
   let useStdin = false;
   let fromArg: string | undefined;
   let expectMtimeMs: number | null = null;
@@ -101,7 +68,7 @@ async function main(): Promise<void> {
   let recoverStaleLock = false;
   let backup = true;
 
-  for (let index = 1; index < args.length; index++) {
+  for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
     switch (arg) {
       case '--stdin':
@@ -114,13 +81,13 @@ async function main(): Promise<void> {
       case '--expect-mtime': {
         const raw = args[++index];
         const parsed = raw === undefined ? NaN : Number(raw);
-        if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
+        if (!Number.isFinite(parsed) || parsed < 0) {
           exitArgInvalid(
-            '--expect-mtime 需为非负整数（毫秒时间戳）',
+            '--expect-mtime 需为有限非负数（毫秒时间戳）',
             raw === undefined ? '（缺少值）' : `收到: ${raw}`,
           );
         }
-        expectMtimeMs = parsed;
+        expectMtimeMs = Math.floor(parsed);
         break;
       }
       case '--lock-timeout': {
@@ -140,10 +107,14 @@ async function main(): Promise<void> {
         break;
       default:
         if (arg.startsWith('--')) exitArgInvalid(`未知选项: ${arg}`);
-        exitArgInvalid(`未知额外位置参数: ${arg}`);
+        if (targetArg !== undefined) exitArgInvalid(`未知额外位置参数: ${arg}`);
+        targetArg = arg;
+        break;
     }
   }
 
+  if (targetArg === undefined) exitArgInvalid('缺少 <target.json> 参数');
+  const absTarget = path.resolve(targetArg);
   if (useStdin && fromArg !== undefined) exitArgInvalid('--stdin 与 --from 互斥');
   if (!useStdin && fromArg === undefined) exitArgInvalid('必须指定内容来源：--stdin 或 --from <src.json>');
 
@@ -171,17 +142,10 @@ async function main(): Promise<void> {
     }
   }
 
-  if (!recoverStaleLock && (await hasStaleLock(absTarget))) {
-    const summary = { script: 'wm-write.ts', ok: false, reason: 'STALE_LOCK', writtenPath: absTarget };
-    console.log('WMWRITE_JSON ' + JSON.stringify(summary));
-    console.error(`✗ [WRITE_REJECTED] ${REASON_MESSAGES.STALE_LOCK}: ${absTarget}`);
-    process.exitCode = 1;
-    return;
-  }
-
   const result = await writeStateJson(absTarget, jsonText, {
     backup,
     expectMtimeMs,
+    allowImplicitStaleRecovery: false,
     ...(lockTimeoutMs !== undefined ? { lockTimeoutMs } : {}),
     ...(recoverStaleLock ? { recoverStaleLock: true } : {}),
   });
