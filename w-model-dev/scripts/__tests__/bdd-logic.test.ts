@@ -282,6 +282,34 @@ describe('checkBddModel', () => {
     expect(result.dimensions.stepBinding).toEqual(['[D5] required cucumber report evidence is missing']);
   });
 
+  it('D5: rejects required cucumber evidence without executed scenarios or steps', () => {
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
+      currentPhase: 5,
+      features: [],
+      stateMachines: [],
+      designCoverage: { totalSdNodes: 0, coveredSdNodes: [], uncoveredSdNodes: [], coverageRate: 1 },
+    } satisfies BddManifest;
+
+    const result = checkBddModel({
+      manifest,
+      phase: 5,
+      requireCucumberReport: true,
+      cucumberReport: {
+        undefinedCount: 0,
+        pendingCount: 0,
+        failedCount: 0,
+        executedScenarioCount: 0,
+        executedStepCount: 0,
+      },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.dimensions.stepBinding).toEqual(['[D5] required cucumber report has no executed scenarios or steps']);
+  });
+
   it('keeps D4 and D5 optional without explicit requirement flags', () => {
     const phaseOne = checkBddModel({
       manifest: {

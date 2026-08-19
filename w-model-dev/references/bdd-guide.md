@@ -414,7 +414,7 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
   [--rtm=<rtm.json>]
 ```
 
-> `--require-cucumber-report` 仅适用于 phase 5-8；缺少 `--cucumber-report` 产生 D5 violation / exitCode=1。两个 require flag 用在不对应 phase 均为 exitCode=2 ARG_INVALID。未使用 require flag 时保留原有兼容行为：缺少输入仅跳过对应 D4/D5 并说明原因，适用于技能包 fixture 回归，不得代替项目阶段门。
+> `--require-cucumber-report` 仅适用于 phase 5-8；缺少 `--cucumber-report`、报告不是 `{ elements: [...] }` 形状、或没有至少一个带 `result` 的 scenario/step 执行记录，均产生 D5 violation / exitCode=1。若 manifest 声明 features，零已执行 scenario 同样拒绝；门禁只要求最小执行证据，不声称未建模的 feature↔report 完全映射。两个 require flag 用在不对应 phase 均为 exitCode=2 ARG_INVALID。CLI 只接受文档列出的精确裸 require flag；`=true`、重复、拼写近似或任何未知 `--*` 均为 exitCode=2。未使用 require flag 时保留原有兼容行为：缺少输入仅跳过对应 D4/D5 并说明原因，适用于技能包 fixture 回归，不得代替项目阶段门。
 
 ### §5.4 退出码与 JSON 摘要
 

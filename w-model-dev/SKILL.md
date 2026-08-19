@@ -212,7 +212,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"   # 仅退出码 0 + qualityLevel A/B 才可进入阶段门确认
 ```
 
-阶段 1–4 额外执行 TLA+ 行为门禁（与图谱门禁正交叠加）：`check-tla-model.ts "<tla-manifest.json>" --graph=<graph.json> [--phase=1|2|3|4]`（`--graph` 在 phase>=2 时强制；`--skip-tlc` 已移除不得跳过 TLC）。**阶段 4 TLA+ 零违反 + 图谱零违反才放行进编码**（约束 #13）。阶段 1-8 BDD 行为门禁：`check-bdd-model.ts --phase=N`（D1-D8）；项目阶段门按成熟度要求真实行为证据：phase 1-4 传 `--require-tla-equivalence --tla-manifest=<path>`，phase 5-8 传 `--require-cucumber-report --cucumber-report=<path>`。缺证据是 exit 1 violation，flag 用于不对应 phase 是 exit 2；未传 flag 保留兼容跳过诊断。**本地 pre-push 仅直接运行 BDD fixture 回归，不直接运行 TLA、TLA↔BDD 同步或项目工件阶段门。**
+阶段 1–4 额外执行 TLA+ 行为门禁（与图谱门禁正交叠加）：`check-tla-model.ts "<tla-manifest.json>" --graph=<graph.json> [--phase=1|2|3|4]`（`--graph` 在 phase>=2 时强制；`--skip-tlc` 已移除不得跳过 TLC）。**阶段 4 TLA+ 零违反 + 图谱零违反才放行进编码**（约束 #13）。阶段 1-8 BDD 行为门禁：`check-bdd-model.ts --phase=N`（D1-D8）；项目阶段门按成熟度要求真实行为证据：phase 1-4 传精确裸 flag `--require-tla-equivalence --tla-manifest=<path>`，phase 5-8 传精确裸 flag `--require-cucumber-report --cucumber-report=<path>`。缺证据是 exit 1 violation；required Cucumber 报告须为合法 elements 数组且至少有一个实际 scenario/step 记录。任何 `=true`、重复、拼写近似或未知 `--*`，以及 flag 用于不对应 phase，均为 exit 2；未传 flag 才保留兼容跳过诊断。**本地 pre-push 仅直接运行 BDD fixture 回归，不直接运行 TLA、TLA↔BDD 同步或项目工件阶段门。**
 
 阶段 5/6/7 G 门禁推荐使用 `check-artifact-gate.ts --phase=N`（阶段级校验，不否决 pending 的后续测试层；反模式 #21 禁止直接跑终检跳过阶段级校验）：
 

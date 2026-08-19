@@ -821,8 +821,16 @@ export interface BddCheckInput {
     integrationTest: string | null;
     unitTest: string | null;
   }>;
-  /** 阶段 5-8 注入：cucumber 运行报告 */
-  cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+  /** 阶段 5-8 注入：cucumber 运行报告摘要（CLI 从真实报告解析）。 */
+  cucumberReport?: {
+    undefinedCount: number;
+    pendingCount: number;
+    failedCount: number;
+    /** 合法 Cucumber element 场景记录数（require 模式下必需）。 */
+    executedScenarioCount?: number;
+    /** 带 result 的实际 step 执行记录数（require 模式下必需）。 */
+    executedStepCount?: number;
+  };
   /** 阶段 1-4 项目门要求 D4 证据；默认 false 以保持 fixture 回归兼容。 */
   requireTlaEquivalence?: boolean;
   /** 阶段 5-8 项目门要求 D5 证据；默认 false 以保持 fixture 回归兼容。 */
@@ -942,6 +950,16 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   if (phase >= 5) {
     if (input.requireCucumberReport && !input.cucumberReport) {
       dims.stepBinding.push('[D5] required cucumber report evidence is missing');
+    }
+    if (input.requireCucumberReport && input.cucumberReport) {
+      const executedScenarioCount = input.cucumberReport.executedScenarioCount ?? 0;
+      const executedStepCount = input.cucumberReport.executedStepCount ?? 0;
+      if (executedScenarioCount === 0 || executedStepCount === 0) {
+        dims.stepBinding.push('[D5] required cucumber report has no executed scenarios or steps');
+      }
+      if (input.manifest.features.length > 0 && executedScenarioCount === 0) {
+        dims.stepBinding.push('[D5] required cucumber report has no executed scenarios for manifest features');
+      }
     }
     if (input.cucumberReport) {
       if (input.cucumberReport.undefinedCount > 0) {

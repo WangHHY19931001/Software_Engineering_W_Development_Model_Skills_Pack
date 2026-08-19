@@ -754,7 +754,7 @@ describe('runDocConsistencyChecks', () => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-        await fs.writeFile(docPath, docContent.replaceAll('833', '787'), 'utf-8');
+        await fs.writeFile(docPath, docContent.replaceAll('845', '787'), 'utf-8');
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, passing.stdout).toBe(0);

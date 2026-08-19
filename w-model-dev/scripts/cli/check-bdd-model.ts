@@ -77,10 +77,38 @@ interface ParsedArgs {
   graphFile: string | undefined;
   requireTlaEquivalence: boolean;
   requireCucumberReport: boolean;
+  argumentError: string | undefined;
+}
+
+const BARE_FLAGS = new Set(['--json', '--require-tla-equivalence', '--require-cucumber-report']);
+const VALUE_FLAG_PREFIXES = ['--phase=', '--tla-manifest=', '--rtm=', '--cucumber-report=', '--graph='] as const;
+
+/**
+ * 本 CLI 仅接受一个 manifest 位置参数、三个精确裸 flag 与五个 `--name=value` flag。
+ * 不允许近似/重复的 require 参数静默退化为兼容 skip 路径。
+ */
+function validateArgs(args: string[]): string | undefined {
+  const seen = new Map<string, number>();
+  let positionalCount = 0;
+  for (const arg of args) {
+    if (!arg.startsWith('--')) {
+      positionalCount++;
+      if (positionalCount > 1) return `多余位置参数「${arg}」`;
+      continue;
+    }
+    const valuePrefix = VALUE_FLAG_PREFIXES.find((prefix) => arg.startsWith(prefix));
+    const key = valuePrefix ? valuePrefix.slice(0, -1) : arg;
+    if (!BARE_FLAGS.has(arg) && !valuePrefix) return `未知或格式非法的参数「${arg}」`;
+    const count = (seen.get(key) ?? 0) + 1;
+    seen.set(key, count);
+    if (count > 1) return `参数重复「${key}」`;
+  }
+  return undefined;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
+  const argumentError = validateArgs(args);
   const manifestFile = args.find((a) => !a.startsWith('--'));
   const phaseArg = args.find((a) => a.startsWith('--phase='));
   const tlaArg = args.find((a) => a.startsWith('--tla-manifest='));
@@ -108,6 +136,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     graphFile,
     requireTlaEquivalence,
     requireCucumberReport,
+    argumentError,
   };
 }
 
@@ -116,6 +145,14 @@ function parseArgs(argv: string[]): ParsedArgs {
 async function readJson<T>(file: string): Promise<T> {
   const text = await fs.readFile(file, 'utf-8');
   return parseJsonSafe(text) as T;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCucumberReport(value: unknown): value is { elements: unknown[] } {
+  return isRecord(value) && Array.isArray(value.elements);
 }
 
 /**
@@ -154,6 +191,18 @@ async function main(): Promise<number> {
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = parseArgs(process.argv);
+
+  if (args.argumentError) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: args.argumentError,
+      detail:
+        '用法: check-bdd-model.ts <bdd-manifest.json> [--phase=N] [--tla-manifest=...] [--require-tla-equivalence] [--rtm=...] [--cucumber-report=...] [--require-cucumber-report] [--graph=...] [--json]',
+      exitCode: 2,
+    });
+    return 2;
+  }
 
   if (!args.manifestFile) {
     exitWithError({
@@ -315,24 +364,35 @@ async function main(): Promise<number> {
     }
   }
 
-  // 读取 cucumber 报告（阶段 5-8 用于 D5）
+  // 读取 cucumber 报告（阶段 5-8 用于 D5）。仅 require 模式要求最小真实执行证据。
   let cucumberReport: BddCheckInput['cucumberReport'] | undefined;
   if (phase >= 5 && args.cucumberReportFile) {
     try {
-      const report = await readJson<{ elements?: Array<{ steps?: Array<{ result?: { status?: string } }> }> }>(
-        args.cucumberReportFile,
-      );
-      let undefinedCount = 0,
-        pendingCount = 0,
-        failedCount = 0;
-      for (const el of report.elements ?? []) {
-        for (const step of el.steps ?? []) {
-          if (step.result?.status === 'undefined') undefinedCount++;
-          if (step.result?.status === 'pending') pendingCount++;
-          if (step.result?.status === 'failed') failedCount++;
+      const report = await readJson<unknown>(args.cucumberReportFile);
+      if (isCucumberReport(report)) {
+        let undefinedCount = 0,
+          pendingCount = 0,
+          failedCount = 0,
+          executedScenarioCount = 0,
+          executedStepCount = 0;
+        for (const element of report.elements) {
+          if (!isRecord(element) || !Array.isArray(element.steps)) continue;
+          const executedSteps = element.steps.filter(
+            (step) => isRecord(step) && isRecord(step.result) && typeof step.result.status === 'string',
+          );
+          if (executedSteps.length > 0) executedScenarioCount++;
+          executedStepCount += executedSteps.length;
+          for (const step of executedSteps) {
+            const status = step.result.status;
+            if (status === 'undefined') undefinedCount++;
+            if (status === 'pending') pendingCount++;
+            if (status === 'failed') failedCount++;
+          }
         }
+        cucumberReport = { undefinedCount, pendingCount, failedCount, executedScenarioCount, executedStepCount };
+      } else {
+        console.error('[D5] cucumber 报告不是包含 elements 数组的合法 Cucumber JSON');
       }
-      cucumberReport = { undefinedCount, pendingCount, failedCount };
     } catch (e) {
       console.error(`[D5] 无法读取 cucumber 报告: ${(e as Error).message}`);
     }

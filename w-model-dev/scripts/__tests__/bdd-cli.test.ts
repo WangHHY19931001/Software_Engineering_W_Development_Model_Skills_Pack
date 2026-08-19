@@ -151,6 +151,11 @@ Invariant == state = "B" => done
   it.each([
     ['phase 5 TLA requirement', 5, '--require-tla-equivalence'],
     ['phase 1 cucumber requirement', 1, '--require-cucumber-report'],
+    ['phase 5 TLA assignment form', 5, '--require-tla-equivalence=true'],
+    ['phase 1 cucumber assignment form', 1, '--require-cucumber-report=true'],
+    ['misspelled require flag', 5, '--require-cucumber-reports'],
+    ['unknown require-like flag', 1, '--require-tla-equivalences'],
+    ['unknown flag', 5, '--not-a-real-flag'],
   ])('rejects %s as an exit 2 argument combination', async (_caseName, phase, flag) => {
     const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(phase));
     const graph = phase >= 2 ? await writeJson('.w-model/graph.json', { nodes: [] }) : undefined;
@@ -160,6 +165,85 @@ Invariant == state = "B" => done
     expect(result.code).toBe(2);
     expect(result.stdout).toMatch(/^ERROR_JSON /);
     expect(result.stdout).toContain(flag);
+  });
+
+  it('rejects duplicate require flags as exit 2 instead of silently accepting a repeated option', async () => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
+    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
+
+    const result = run([
+      manifest,
+      '--phase=5',
+      `--graph=${graph}`,
+      '--require-cucumber-report',
+      '--require-cucumber-report',
+    ]);
+
+    expect(result.code).toBe(2);
+    expect(result.stdout).toMatch(/^ERROR_JSON /);
+    expect(result.stdout).toContain('--require-cucumber-report');
+  });
+
+  it.each([
+    ['empty object', {}],
+    ['top-level array', []],
+    ['empty elements', { elements: [] }],
+    ['a step result without an execution status', { elements: [{ steps: [{ result: {} }] }] }],
+  ])('fails D5 with exit 1 for a required cucumber report containing %s', async (_caseName, reportValue) => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
+    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
+    const report = await writeJson('.w-model/cucumber-report.json', reportValue);
+
+    const result = run([
+      manifest,
+      '--phase=5',
+      `--graph=${graph}`,
+      `--cucumber-report=${report}`,
+      '--require-cucumber-report',
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      exitCode: 1,
+      reasons: expect.arrayContaining([expect.stringContaining('[D5] required cucumber report')]),
+    });
+  });
+
+  it('fails D5 when manifest features exist but the required report has no executed scenarios', async () => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', {
+      ...baseManifest(5),
+      features: [
+        {
+          id: 'BDD-L4-example',
+          level: 4,
+          filePath: 'missing.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L4-example',
+          tlaSpecId: 'L4-example',
+          reqIds: [],
+          designIds: [],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+    });
+    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
+    const report = await writeJson('.w-model/cucumber-report.json', { elements: [] });
+
+    const result = run([
+      manifest,
+      '--phase=5',
+      `--graph=${graph}`,
+      `--cucumber-report=${report}`,
+      '--require-cucumber-report',
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      exitCode: 1,
+      reasons: expect.arrayContaining(['[D5] required cucumber report has no executed scenarios or steps']),
+    });
   });
 
   it('keeps omitted evidence optional and reports skipped D4/D5 checks', async () => {
@@ -187,7 +271,7 @@ Invariant == state = "B" => done
     expect(skill).toContain('--require-tla-equivalence --tla-manifest=<path>');
     expect(skill).toContain('--require-cucumber-report --cucumber-report=<path>');
     expect(bddGuide).toContain('缺少 `--tla-manifest` 产生 D4 violation / exitCode=1');
-    expect(bddGuide).toContain('缺少 `--cucumber-report` 产生 D5 violation / exitCode=1');
+    expect(bddGuide).toContain('缺少 `--cucumber-report`、报告不是 `{ elements: [...] }` 形状');
     expect(tlaGuide).toContain('本地 pre-push 的技能包 fixture 回归');
     expect(commandReference).toContain('它不直接运行 TLA、TLA↔BDD 同步或任何项目工件阶段门');
     expect(prePush).toContain('不直接运行 TLA、TLA↔BDD 同步或项目工件阶段门');
