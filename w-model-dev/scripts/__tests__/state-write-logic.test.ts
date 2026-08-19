@@ -262,4 +262,30 @@ describe('review round 1 ownership races', () => {
     await expect(second).resolves.toMatchObject({ ok: true });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"second"}');
   });
+
+  it.each(['.recovering-orphan', '.releasing-orphan'])('recovers stale orphan transition %s and writes', async (transition) => {
+    const p = target(`orphan-${transition.slice(1)}.json`);
+    const transitionDir = path.join(`${p}.lock`, transition);
+    await fs.mkdir(transitionDir, { recursive: true });
+    await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: 999_999_999, token: transition, createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
+    }));
+    const result = await writeStateJson(p, '{"v":"recovered"}', { staleLockTtlMs: 1 });
+    expect(result.ok).toBe(true);
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"recovered"}');
+    const entries = await fs.readdir(`${p}.lock`);
+    expect(entries.some((entry) => entry.startsWith('.stale-'))).toBe(true);
+  });
+
+  it('does not clean an active orphan transition', async () => {
+    const p = target('active-transition.json');
+    const transitionDir = path.join(`${p}.lock`, '.releasing-active');
+    await fs.mkdir(transitionDir, { recursive: true });
+    await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: process.pid, token: 'active', createdAt: new Date().toISOString(), operation: 'wm-write',
+    }));
+    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20, staleLockTtlMs: 1 });
+    expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
+    await expect(fs.readFile(path.join(transitionDir, 'metadata.json'), 'utf-8')).resolves.toContain('active');
+  });
 });
