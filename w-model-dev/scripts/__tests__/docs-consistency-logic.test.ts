@@ -123,7 +123,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     designDocs: [],
     testFileCount: 40,
     vitestTestCount: 530,
-    prePush: '# 16. prettier-check\n# 与原 CI 一致：16 项检查\n# vitest 全量（530 tests）',
+    prePush: '# 17. typecheck\n# 与原 CI 一致：17 项检查\n# vitest 全量（530 tests）',
     scriptsChanged: false,
     securityBaselineEntryCount: -1,
     ...overrides,
@@ -319,12 +319,12 @@ describe('runDocConsistencyChecks', () => {
     expect(vStale.some((x) => x.check === 'exit2-scripts' && x.message.includes('仍含过时「29 个脚本」'))).toBe(true);
   });
 
-  it('pre-push 编号最大值非 16 → 违规', () => {
+  it('pre-push 编号最大值非 17 → 违规', () => {
     const input = baseInput({
       prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查',
     });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('16'))).toBe(true);
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('17'))).toBe(true);
   });
 
   it('glossary action 含 verify → 违规', () => {

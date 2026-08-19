@@ -25,7 +25,7 @@
 
 **声明**：本仓库不集成云端 CI，本地 pre-push 门禁是**唯一质量屏障**。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负——`.githooks/pre-push` 头部有显式警告，README「CI 策略」节有同样声明。
 
-**正确姿势**：紧急绕过后，事后必须在 Git Bash / WSL 中补跑 `npm run prepush`，确认 16 项门禁全部通过后再合入；不得把 `--no-verify` 作为常规开发手段。
+**正确姿势**：紧急绕过后，事后必须在 Git Bash / WSL 中补跑 `npm run prepush`，确认 17 项门禁全部通过后再合入；不得把 `--no-verify` 作为常规开发手段。
 
 ### 1.3 node_modules 缺失
 
@@ -96,7 +96,7 @@ bash .githooks/ensure-platform-deps.sh
 | 环境 | 场景 | 行为 | 处置 |
 |---|---|---|---|
 | Windows 原生 cmd / PowerShell | `git push` / `npm run prepush` | pre-push 检测到无 bash 解释器 → 提示 + 放行（exit 0），门禁**未执行** | 改用 Git Bash / WSL 跑门禁（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)） |
-| Windows + Git Bash | `git push` / `npm run prepush` | 正常执行 16 项门禁 | — |
+| Windows + Git Bash | `git push` / `npm run prepush` | 正常执行 17 项门禁 | — |
 | WSL | `git push` / `npm run prepush` | 正常执行；自动补装 Linux 侧原生二进制 | 补装失败则中止，检查网络 |
 | Linux / macOS | `git push` / `npm run prepush` | 正常执行 | — |
 | 任意 | `npm audit` 网络不可达（ENOTFOUND / ETIMEDOUT / ECONNREFUSED） | pre-push 第 13 项 warn 并跳过（不阻断） | 网络恢复后手动补跑 `npm audit --audit-level=high` |

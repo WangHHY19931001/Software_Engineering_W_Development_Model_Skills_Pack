@@ -22,6 +22,7 @@
     "setup:hooks": "git config core.hooksPath .githooks",
     "format": "prettier --config config/prettier.config.cjs --write \"w-model-dev/scripts/**/*.ts\" \"config/**/*.{cjs,ts}\" \"scripts/*.cjs\"",
     "lint:security": "tsx w-model-dev/scripts/cli/security-scan.ts",
+    "typecheck": "tsc -p config/tsconfig.json",
     "wm:status": "tsx w-model-dev/scripts/cli/wm-status.ts",
     "wm:metrics": "tsx w-model-dev/scripts/cli/metrics-report.ts",
     "docs:build": "typedoc --tsconfig config/tsconfig.json --out docs/api w-model-dev/scripts/cli w-model-dev/scripts/logic --entryPointStrategy expand --excludeNotDocumented",

@@ -78,7 +78,7 @@ npm run format
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑 16 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑 17 项检查；任一退出码不符预期即中止推送：
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
@@ -98,6 +98,7 @@ npm run format
 | 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
 | 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
 | 16 | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断） | 0 |
+| 17 | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5） | 0 |
 
 **启用方式**：克隆后首次 `npm install` 即自动启用（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时，失败仅 warn 不阻断 install）。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -162,7 +163,7 @@ git push --no-verify
 **提交流程**：
 
 1. 创建分支（见上文「1. 创建分支」）
-2. 本地验证：`npm run prepush`（16 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
+2. 本地验证：`npm run prepush`（17 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
 3. 按上述格式提交
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
@@ -179,7 +180,7 @@ refactor(skill): /wm review 编排指引精简
 - PR 标题遵循 Conventional Commits 格式（同提交信息：`<type>(<scope>): <summary>`）
 - PR 描述使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板，说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
 - 关联相关 issue（如 `Closes #5`）
-- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（16 项门禁）验证，合入前请确保本地已通过
+- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（17 项门禁）验证，合入前请确保本地已通过
 
 ## 文档维护规则
 

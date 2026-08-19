@@ -42,7 +42,7 @@
 | `docs/changes/archive/2026-07-26-round15-end-to-end-test/` | 第 15 轮端到端调测归档摘要（9 文件） | 查阅历史调测结论时 |
 | `docs/` | 设计文档统一存放（SSoT / 集成设计 / 安装 / 排障 / 用户指南）；`docs/api/` 为 typedoc 生成物（`npm run docs:build`，gitignored 不入库）；`docs/superpowers/`（plans/ + specs/）为内部规划目录，不参与门禁、非面向用户 | 修改设计先改 SSoT，再改 `w-model-dev/` 资产 |
 | `eval/` | 外部工具（darwin-skill）评估产物归档 | 不属技能包，Agent 一般无需读取 |
-| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 16 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
+| `.githooks/pre-push` | **本地 CI**：`git push` 时自动跑 17 项门禁（self-test + 门禁脚本退出码 + vitest 全量 + security-scan + npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）+ samples 覆盖矩阵 + prettier 格式一致性 + tsc 类型检查），任一不符即中止推送；替代远程 CI（仓库无 `.github/workflows/`，历史原因见 CHANGELOG）；平台补装见 `.githooks/ensure-platform-deps.sh` | 修改 `w-model-dev/scripts/**` / `package.json` / `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh` 后会触发；Git Bash 与 WSL 下均正常执行门禁，仅纯 cmd/PowerShell 放行 |
 
 门禁脚本测试：
 - `w-model-dev/scripts/__tests__/`：门禁脚本单元测试（vitest，47 个 .test.ts / 717 条）
@@ -68,7 +68,7 @@ npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=<path> 
 # 一次性启用本地推送前门禁（写入本地 .git/config，不影响仓库内容）
 npm run setup:hooks
 
-# 手动跑推送前门禁（不实际推送，16 项门禁检查；Windows 请用 Git Bash，WSL 可直接跑）
+# 手动跑推送前门禁（不实际推送，17 项门禁检查；Windows 请用 Git Bash，WSL 可直接跑）
 npm run prepush
 
 npm run lint:security              # 跑 eslint-plugin-security + baseline 比对，退出码 0/1；npx tsx w-model-dev/scripts/cli/security-scan.ts --regenerate 可重生成 baseline

@@ -87,7 +87,7 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   runLogActionCount: 27,
   maxAntiPattern: 48,
-  prePushCount: 16,
+  prePushCount: 17,
   /** 硬约束条数（14 条） */
   hardConstraintCount: 14,
 } as const;
