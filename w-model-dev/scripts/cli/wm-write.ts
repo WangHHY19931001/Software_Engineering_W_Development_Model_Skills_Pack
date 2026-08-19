@@ -7,19 +7,21 @@
  *
  * 用法：
  *   echo '{"k":1}' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin
- *   npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --from <src.json> [--expect-mtime <ms>] [--no-backup]
+ *   npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --from <src.json> [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock]
  *
  * 参数：
- *   target.json           目标状态文件路径（不存在则直接创建）
- *   --stdin               从 stdin 读入完整 JSON 文本
- *   --from <src.json>     从源文件读入 JSON 文本
- *   --expect-mtime <ms>   乐观锁：期望目标当前 mtimeMs（不符则拒绝写入）
- *   --no-backup           跳过 .bak 备份（默认生成 <name>.bak.YYYYMMDD-HHMM，保留 5 份）
- *   --help                打印用法
+ *   target.json             目标状态文件路径（不存在则直接创建）
+ *   --stdin                 从 stdin 读入完整 JSON 文本
+ *   --from <src.json>       从源文件读入 JSON 文本
+ *   --expect-mtime <ms>     乐观锁：期望目标当前 mtimeMs（不符则拒绝写入）
+ *   --no-backup             跳过 .bak 备份（默认生成 <name>.bak.YYYYMMDD-HHMM，保留 5 份）
+ *   --lock-timeout <ms>     跨进程锁等待超时（非负整数毫秒）
+ *   --recover-stale-lock    显式恢复陈旧锁
+ *   --help                  打印用法
  *
  * 退出码：
  *   0  写入成功（stdout 单行 WMWRITE_JSON {ok:true,...}）
- *   1  写入拒绝（INVALID_JSON / MTIME_CONFLICT / TARGET_MISSING_FOR_MTIME / WRITE_VERIFY_FAILED；
+ *   1  写入拒绝（INVALID_JSON / MTIME_CONFLICT / TARGET_MISSING_FOR_MTIME / WRITE_VERIFY_FAILED / LOCK_TIMEOUT / STALE_LOCK；
  *      stdout 单行 WMWRITE_JSON {ok:false,reason,...}，stderr 人类可读消息；目标未被修改）
  *   2  输入错误（参数非法 / 源文件不存在 / IO 异常；stderr 人类可读，stdout ERROR_JSON）
  *
@@ -33,13 +35,15 @@ import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
 
-const USAGE = '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup]';
+const USAGE = '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock]';
 
 const REASON_MESSAGES: Record<string, string> = {
   INVALID_JSON: '写入内容不是合法 JSON，已拒绝（目标未修改）',
   MTIME_CONFLICT: '目标 mtime 与 --expect-mtime 不符（可能被并发修改），写入已拒绝；重读目标后按最新 mtime 重试',
   TARGET_MISSING_FOR_MTIME: '指定了 --expect-mtime 但目标文件不存在',
   WRITE_VERIFY_FAILED: '写后回读校验失败（内容不一致），请检查磁盘/杀软拦截后重试',
+  LOCK_TIMEOUT: '等待状态文件跨进程锁超时，写入已拒绝',
+  STALE_LOCK: '检测到陈旧状态文件锁，写入已拒绝；可使用 --recover-stale-lock 显式恢复',
 };
 
 async function main(): Promise<void> {
@@ -130,9 +134,28 @@ async function main(): Promise<void> {
     expectMtimeMs = Math.floor(parsed);
   }
 
+  const lockTimeoutIdx = args.indexOf('--lock-timeout');
+  let lockTimeoutMs: number | undefined;
+  if (lockTimeoutIdx >= 0) {
+    const raw = args[lockTimeoutIdx + 1];
+    if (raw === undefined || !/^\d+$/.test(raw)) {
+      exitWithError({
+        category: 'ARG_INVALID',
+        rule: 'P0-1',
+        message: '--lock-timeout 需为非负整数（毫秒）',
+        detail: raw === undefined ? '（缺少值）' : `收到: ${raw}`,
+        exitCode: 2,
+      });
+      return;
+    }
+    lockTimeoutMs = Number(raw);
+  }
+
   const result = await writeStateJson(absTarget, jsonText, {
     backup: !args.includes('--no-backup'),
     expectMtimeMs,
+    ...(lockTimeoutMs !== undefined ? { lockTimeoutMs } : {}),
+    ...(args.includes('--recover-stale-lock') ? { recoverStaleLock: true } : {}),
   });
 
   const summary = {
