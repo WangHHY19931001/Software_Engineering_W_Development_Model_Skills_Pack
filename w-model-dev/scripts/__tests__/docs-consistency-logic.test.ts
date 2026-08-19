@@ -802,6 +802,7 @@ describe('runDocConsistencyChecks', () => {
       expect(result.stdout).toContain('[internal-links]');
       expect(result.stdout).toContain('docs/skill-design-document_SSoT.md');
     });
+    await assertSsotExternalBoundaryFile();
   });
 
   it('README 含过期 vitest 计数（正确总数与旧数字并存）→ vitest-tests 违规', () => {
@@ -1301,7 +1302,6 @@ describe('内链存在性检查（internal-links，C3）', () => {
     expect(violations[0]!.message).toContain('../../CHANGELOG.md');
   });
 });
-
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const DOCS_CONSISTENCY_CLI = path.resolve(
@@ -1351,4 +1351,15 @@ async function writeVitestCount(fixtureRoot: string, count: number) {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
   await fs.writeFile(path.join(fixtureRoot, 'vitest-results.json'), JSON.stringify(coverage), 'utf-8');
   return coverage;
+}
+
+async function assertSsotExternalBoundaryFile(): Promise<void> {
+  const ssotPath = path.join(REPO_ROOT, 'docs', 'skill-design-document_SSoT.md');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled SSoT path
+  const content = await fs.readFile(ssotPath, 'utf-8');
+  expect(content).not.toContain('subgraph AI引擎层');
+  expect(content).not.toContain('核心AI引擎');
+  expect(content).toContain('宿主 Agent / 外部 LLM');
+  expect(content).toContain('W-Model Skill 技能包');
+  expect(content).toContain('可选外部工具');
 }

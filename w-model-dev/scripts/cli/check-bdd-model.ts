@@ -21,7 +21,7 @@
  *   --cucumber-report=<p>  cucumber 运行报告 JSON（阶段 5-8 用于 D5 step 绑定校验）
  *   --require-cucumber-report  phase 5-8 项目门要求 --cucumber-report；缺失作为 D5 violation / exit 1
  *   --graph=<p>          graph.json 路径（phase>=2 时强制必填，提取 type=SD 节点供 D8 SD Coverage 校验）
- *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节），不写 gate-logs
+ *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）。默认与 --json 均在输出摘要前尝试写 gate log；写失败通过 gateLogWriteError 反映，不改变主 passed / exitCode
  *
  * 退出码：
  *   0  校验通过（schema + 头标注 + 状态机 + 等价性 + step 绑定 + 路径 + RTM 全过）
@@ -29,8 +29,8 @@
  *   2  输入错误（文件不存在 / 非法 JSON / 参数非法 / schema 不合规）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 收尾 BDD_JSON 摘要，便于 Agent 正则截取）
- *   JSON 摘要同时写入 .w-model/gate-logs/<timestamp>-bdd.json（--json 模式不写）
+ *   stdout 打印结构化校验报告（人类可读 + 收尾 BDD_JSON 摘要，便于 Agent 正则截取）；默认与 --json 均先尝试写入 .w-model/gate-logs/<timestamp>-bdd.json
+ *   gate log 写入失败仅在摘要中增加 gateLogWriteError（并写 stderr 诊断），不改变主 gate result
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
@@ -187,7 +187,7 @@ async function readFeatureFile(filePath: string) {
 // ==================== 主流程 ====================
 
 async function main(): Promise<number> {
-  // --json：机器可读报告模式（不打印人类可读分隔线与统计、不写 gate-logs）
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计；gate log 已在摘要输出前尝试写入）
   const jsonMode = process.argv.slice(2).includes('--json');
   const startTime = Date.now();
   const args = parseArgs(process.argv);

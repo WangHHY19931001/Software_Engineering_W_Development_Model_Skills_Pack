@@ -68,48 +68,34 @@ W模型由Evolutif公司提出，是对V模型的扩展和演进。它由两个�
 ### 3.1 整体架构
 
 ```mermaid
-graph TD
-    subgraph W-Model AI Assistant Skill
-        subgraph 开发阶段
-            A[需求分析阶段] --> B[设计阶段]
-            B --> C[编码与测试阶段]
-        end
-        
-        subgraph AI引擎层
-            AE[核心AI引擎]
-            AE --> AE1[需求分析器]
-            AE --> AE2[设计生成器]
-            AE --> AE3[代码生成器]
-            AE --> AE4[测试生成器]
-        end
-        
-        subgraph 测试阶段
-            T1[验收测试执行]
-            T2[系统测试执行]
-            T3[单元/集成测试执行]
-        end
-        
-        A --> AE
-        B --> AE
-        C --> AE
-        
-        AE --> T1
-        AE --> T2
-        AE --> T3
+graph LR
+    subgraph SkillPackage[W-Model Skill 技能包]
+        Skill[SKILL.md、references、templates、schemas]
+        Gates[确定性 gate scripts]
+        Workflow[阶段编排规则与产物契约]
+        Skill --> Workflow
+        Skill --> Gates
     end
-    
-    style A fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
-    style B fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
-    style C fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
-    style AE fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    style T1 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style T2 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style T3 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+    subgraph Host[宿主 Agent / 外部 LLM]
+        Reasoning[推理、子代理调度、LLM-as-Verifier]
+    end
+
+    subgraph Tools[可选外部工具]
+        TLC[TLA+ TLC]
+        CG[CodeGraph]
+        OPSX[OpenSpec]
+    end
+
+    Host -. 使用技能包规则并执行 .-> SkillPackage
+    Host -. 可选调用 .-> Tools
 ```
+
+图中的边界是交付契约：技能包只交付 Markdown 资产、Schema 与确定性 gate scripts；宿主 Agent / 外部 LLM 负责推理、子代理调度和 LLM-as-Verifier；TLA+ TLC、CodeGraph、OpenSpec 由宿主 Agent 按需接入。外部 Agent 可以使用技能包和这些工具，但它们不属于技能包交付物，仓库也不包含内置模型调用、SDK、业务 `src/` 或编程式 AI 引擎。
 
 ### 3.2 核心模块设计
 
-> **去重约定**：本节只描述各核心模块的**设计层面边界**（功能、输入输出、AI 能力应用）。
+> **去重约定**：本节只描述各核心模块的**设计层面边界**（功能、输入输出、宿主 Agent 能力应用）。模块中的分析、生成、执行和评审动作由宿主 Agent / 外部工具完成，技能包只提供提示词、参考、模板、Schema 与确定性门禁。
 > 各模块的详细阶段产物、测试用例设计表、验收标准清单、RTM 登记规则、阶段门评审等内容
 > 由 [`w-model-dev/references/phase-N-*.md`](../w-model-dev/references/) 各阶段文档维护，
 > 本节不再重复，仅以指针引用。测试用例 ID 命名规则（`UT/IT/ST/UAT-NNN` 运行时用例 vs
@@ -128,7 +114,7 @@ graph TD
 - 验收测试用例设计文档
 - 需求风险评估报告
 
-**AI能力应用**：
+**宿主 Agent 能力应用**：
 - 自然语言理解与结构化提取
 - 需求完整性检查
 - 需求冲突检测
@@ -146,7 +132,7 @@ graph TD
 - **详细设计子模块**：生成类图、数据库设计、接口定义
 - **测试设计子模块**：同步生成系统测试用例和集成测试用例
 
-**AI能力应用**：
+**宿主 Agent 能力应用**：
 - 架构设计建议生成
 - UML图自动生成
 - 接口定义文档生成
@@ -170,7 +156,7 @@ graph TD
 - 单元测试用例
 - 测试覆盖率报告
 
-**AI能力应用**：
+**宿主 Agent 能力应用**：
 - 代码自动生成
 - 代码质量检查
 - 单元测试用例生成
@@ -191,7 +177,7 @@ graph TD
 - 集成测试执行结果
 - 接口兼容性报告
 
-**AI能力应用**：
+**宿主 Agent 能力应用**：
 - 集成测试用例执行
 - 接口调用验证
 - 测试结果分析
@@ -212,7 +198,7 @@ graph TD
 - 性能测试结果
 - 安全测试结果
 
-**AI能力应用**：
+**宿主 Agent 能力应用**：
 - 自动化测试执行
 - 性能测试脚本生成
 - 安全漏洞检测
@@ -232,7 +218,7 @@ graph TD
 - 验收测试报告
 - 用户确认结果
 
-**AI能力应用**：
+**宿主 Agent 能力应用**：
 - 验收测试用例执行
 - 用户需求匹配验证
 
@@ -1035,7 +1021,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **行为校验**（设计文档 §3）：SANY 语法检查 → TLC 模型检查（无死锁/不变式违反/状态爆炸）；编码调试顺序为硬约束（反模式 #14）。
 - **阶段 4 硬约束**：`--phase=4` TLA+ 零违反 + 图谱零违反才放行进阶段 5 编码。
 - **维护边界**：S 子代理产出（.tla + .cfg + manifest 实体）；G 子代理跑 `check-tla-model.ts` 校验；编排者不写。TLA+ 不接受占位/简化/错误实现（反模式 #16）；建模须符合需求和设计，符合后仍有问题须修正需求/设计并回退重跑（反模式 #17）。
-- **工具链**：Java ≥ 11（外部）+ `tla2tools.jar`（技能内置 `w-model-dev/tools/tla2tools.jar`，含 SANY + TLC + PlusCal）。
+- **工具链**：Java ≥ 11 与 `tla2tools.jar`（均由宿主环境提供的可选外部依赖，含 SANY + TLC + PlusCal）；技能包只负责调用门禁并报告确定性结果。
 - **checkRounds 语义**（与 [`w-model-dev/references/tla-plus-guide.md`](../w-model-dev/references/tla-plus-guide.md) 双向追溯）：记录每轮 `check-tla-model.ts` 校验结果（含 violations 摘要与 round 编号）；`violations` 跨轮须单调递减（设计文档 §3.4）；与 `run-log.jsonl` R3（返工动作完整性）交叉校验——每轮 checkRound 须对应 run-log 中一条返工记录；无返工（首次即收敛）填 `[]`。
 
 ### 7.9 signature-chain.jsonl schema（角色链式签名产物）
@@ -1365,7 +1351,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phas
 
 **校验算法**（确定性，无 LLM；设计文档 §3.1）：
 
-1. **环境就绪**：`java -version` ≥ 11（捕获 stderr，因 `java -version` 在退出码 0 时写 stderr）；技能内置 `w-model-dev/tools/tla2tools.jar` 存在。环境失败 → `environmentOk=false`，整体 `passed=false`，退出码 1。
+1. **环境就绪**：`java -version` ≥ 11（捕获 stderr，因 `java -version` 在退出码 0 时写 stderr）；宿主环境提供的可选外部依赖 `tla2tools.jar` 存在。环境失败 → `environmentOk=false`，整体 `passed=false`，退出码 1。
 2. **manifest 结构校验**：`version` / `currentPhase` / `tools` / `specs` 字段齐全；`tools.jarPath` / `tools.javaMinVersion` 合法。结构失败 → 退出码 2。
 3. **规格字段校验**：每个 spec 的 `id` / `level` / `phase` / `system` / `requirementIds` / `designRef` / `tlaPath` / `cfgPath` / `parent` / `siblings` / `children` / `variableCombination` / `decompositionDecision` / `syntaxChecked` / `tlcChecked` / `deadlockFree` / `invariantsHold` / `stateExplosion` 字段齐全且类型合法。
 4. **文件头校验**（每个 spec）：读取 `.tla` 文件内容，`parseTlaHeader()` 解析 8 个 `@` 字段，`validateHeader()` 比对 manifest 中 spec 声明——`@system` / `@requirement` / `@design` / `@parent` / `@sibling` / `@child` / `@level` / `@phase` 八字段须全部存在且与 manifest 一致（`null` ↔ `null` / 空数组；逗号列表集合须相等）。违反 → `headerViolations++`。

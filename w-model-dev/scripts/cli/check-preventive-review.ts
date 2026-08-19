@@ -16,7 +16,7 @@
  *                            ingest 为 S-ingest-tla / S-ingest-bdd 后 R3，须显式传参，auto-trigger 不推断）
  *   --auto-trigger           从 --run-log 读取当前阶段并推断 variant
  *   --run-log=<path>         run-log.jsonl 路径（--auto-trigger 模式必填）
- *   --json                   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   --json                   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）。默认与 --json 均在输出摘要前尝试写 gate log；写失败通过 gateLogWriteError 反映，不改变主 passed / exitCode
  *
  * 退出码：
  *   0  校验通过（各维度审查报告齐全且格式合规——存在性 + schema + phase/dimension 一致；报告内 passed 状态由 V 评审纳入 reworkHints）
@@ -24,7 +24,8 @@
  *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：
- *   stdout 打印单行 PREVENTIVE_REVIEW_JSON 摘要（便于 Agent 正则截取；非 --json 模式无人类可读正文）
+ *   stdout 打印单行 PREVENTIVE_REVIEW_JSON 摘要（便于 Agent 正则截取；非 --json 模式无人类可读正文）；默认与 --json 均先尝试写 gate log
+ *   gate log 写入失败仅在摘要中增加 gateLogWriteError（并写 stderr 诊断），不改变主 gate result
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：

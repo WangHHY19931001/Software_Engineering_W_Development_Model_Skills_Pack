@@ -298,6 +298,19 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
 
 describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {
   it('--json 有效样本 → stdout 为单行纯 JSON（passed=true，exitCode=0），不输出 ICEBERG_JSON 前缀', async () => {
+    for (const cliFile of [CHECK_BDD_MODEL_SCRIPT, CHECK_ICEBERG_SWEEP_SCRIPT, CHECK_PREVENTIVE_REVIEW_SCRIPT]) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- source paths are fixed repository test constants
+      const source = await fs.readFile(cliFile, 'utf-8');
+      const jsdocStart = source.indexOf('/**');
+      const jsdocEnd = source.indexOf('*/', jsdocStart);
+      const jsdoc = jsdocStart >= 0 && jsdocEnd >= 0 ? source.slice(jsdocStart, jsdocEnd + 2) : '';
+      expect(jsdoc).toContain('默认与 --json 均在输出摘要前尝试写');
+      expect(jsdoc).toContain('gateLogWriteError');
+      expect(jsdoc).toContain('不改变主 passed / exitCode');
+      expect(jsdoc).not.toContain('--json 不写 gate log');
+      expect(jsdoc).not.toContain('--json 模式不写');
+    }
+
     const r = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', ICEBERG_VALID_SAMPLE]);
     expect(r.status).toBe(0);
     const stdout = r.stdout ?? '';
