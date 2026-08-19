@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "design",
+    "target": "w-model-dev/references/agent-personas.md",
+    "reviewedAt": "2026-08-19T00:00:00Z",
+    "agent": "persona-performance-auditor",
+    "scoringMethod": "logits",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    { "name": "architecture-soundness", "weight": 0.25, "score": 0.9, "rawScores": [0.89, 0.9, 0.91], "variance": 0.0000667, "evidence": "w-model-dev/references/agent-personas.md:L402-443=Quick 与 Deep 模式边界" },
+    { "name": "requirement-coverage", "weight": 0.25, "score": 0.91, "rawScores": [0.9, 0.91, 0.92], "variance": 0.0000667, "evidence": "w-model-dev/references/agent-personas.md:L433-443=未测量不得伪装指标" },
+    { "name": "interface-consistency", "weight": 0.2, "score": 0.89, "rawScores": [0.88, 0.89, 0.9], "variance": 0.0000667, "evidence": "w-model-dev/references/agent-personas.md:L500-538=性能 Persona 输出格式与样例位置" },
+    { "name": "feasibility", "weight": 0.15, "score": 0.88, "rawScores": [0.87, 0.88, 0.89], "variance": 0.0000667, "evidence": "w-model-dev/references/agent-personas.md:L416-431=工具工件存在时才采用 Deep 模式" },
+    { "name": "testability", "weight": 0.15, "score": 0.9, "rawScores": [0.89, 0.9, 0.91], "variance": 0.0000667, "evidence": "w-model-dev/scripts/samples/verifier/persona-performance-auditor.json:§subCriteria=可执行 Schema 对齐样例" }
+  ],
+  "compositeScore": 0.8975,
+  "qualityLevel": "A",
+  "summary": "决定：性能审计样例可放行；核心结构：Quick/Deep 模式与指标诚实边界明确；遗留风险：没有工具工件时仅报告潜在影响，真实指标必须由性能测试采集。",
+  "passed": true
+}

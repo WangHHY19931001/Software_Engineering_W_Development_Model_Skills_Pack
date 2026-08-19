@@ -729,12 +729,12 @@ describe('runDocConsistencyChecks', () => {
     expect(violations.some((x) => x.check === 'vitest-tests')).toBe(true);
   });
 
-  it('coverage JSON 的 52/849 元数据与五处文档均同步 → 零 vitest-tests 违规；CLI 消费 JSON 注入计数', async () => {
+  it('coverage JSON 的 52/853 元数据与五处文档均同步 → 零 vitest-tests 违规；CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 849);
-      expect([coverage.testResults.length, coverage.numTotalTests]).toEqual([52, 849]);
+      const coverage = await writeVitestCount(fixtureRoot, 853);
+      expect([coverage.testResults.length, coverage.numTotalTests]).toEqual([52, 853]);
       const dataModels = path.join(fixtureRoot, 'w-model-dev', 'references', 'data-models.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const dataModelsContent = await fs.readFile(dataModels, 'utf-8');
@@ -754,21 +754,21 @@ describe('runDocConsistencyChecks', () => {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('849');
+        expect(docContent).toContain('853');
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, passing.stdout).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 849');
+      expect(passing.stdout).toContain('vitest 用例  : 853');
       expect(passing.stdout).not.toContain('[vitest-tests]');
 
       const readme = path.join(fixtureRoot, 'README.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('52 files / 849 tests', '52 files / 787 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('52 files / 853 tests', '52 files / 787 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 849');
+      expect(stale.stdout).toContain('vitest 用例  : 853');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
       expect(stale.stdout).toContain('52 files / 787 tests');

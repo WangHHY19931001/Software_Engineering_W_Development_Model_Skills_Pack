@@ -120,6 +120,26 @@ const VERIFIER_CASES: VerifierCase[] = [
     description: '完整、合规的 VerifierOutput，应通过所有校验',
   },
   {
+    file: 'persona-code-reviewer.json',
+    expectedPassed: true,
+    description: 'code-reviewer Persona 的当前 Schema 可执行样例，应通过全部校验',
+  },
+  {
+    file: 'persona-test-engineer.json',
+    expectedPassed: true,
+    description: 'test-engineer Persona 的当前 Schema 可执行样例，应通过全部校验',
+  },
+  {
+    file: 'persona-security-auditor.json',
+    expectedPassed: true,
+    description: 'security-auditor Persona 的当前 Schema 可执行样例，应通过全部校验',
+  },
+  {
+    file: 'persona-performance-auditor.json',
+    expectedPassed: true,
+    description: 'performance-auditor Persona 的当前 Schema 可执行样例，应通过全部校验',
+  },
+  {
     file: 'bad-ranking-k.json',
     expectedPassed: false,
     expectedReasonPatterns: [/\[schema\].*ranking/],

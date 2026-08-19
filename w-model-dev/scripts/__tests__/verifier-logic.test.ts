@@ -10,9 +10,32 @@
  *   - 任一子标准 < 0.70 → 违规列表含该子标准名
  */
 
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../logic/verifier-logic.js';
+
+const PERSONA_FIXTURES = [
+  'persona-code-reviewer.json',
+  'persona-test-engineer.json',
+  'persona-security-auditor.json',
+  'persona-performance-auditor.json',
+] as const;
+
+describe('Persona Verifier fixtures', () => {
+  it.each(PERSONA_FIXTURES)('%s 应满足当前 Schema 与 verifier logic', async (file) => {
+    const fixturePath = resolve('w-model-dev/scripts/samples/verifier', file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixed PERSONA_FIXTURES allowlist
+    const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as unknown;
+
+    const result = checkVerifierOutput(fixture);
+
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+});
 
 describe('evidence 格式校验', () => {
   it('合法 evidence（冒号格式）应通过', () => {

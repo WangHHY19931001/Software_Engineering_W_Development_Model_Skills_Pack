@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "test",
+    "target": "w-model-dev/scripts/__tests__/verifier-logic.test.ts",
+    "reviewedAt": "2026-08-19T00:00:00Z",
+    "agent": "persona-test-engineer",
+    "scoringMethod": "logits",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    { "name": "coverage", "weight": 0.3, "score": 0.9, "rawScores": [0.89, 0.9, 0.91], "variance": 0.0000667, "evidence": "w-model-dev/scripts/__tests__/verifier-logic.test.ts:L21-37=四个 Persona fixture 逐一执行 logic 校验" },
+    { "name": "correctness", "weight": 0.25, "score": 0.91, "rawScores": [0.9, 0.91, 0.92], "variance": 0.0000667, "evidence": "w-model-dev/scripts/__tests__/verifier-logic.test.ts:L94-225=evidence 扣分与 passed 重算断言" },
+    { "name": "independence", "weight": 0.2, "score": 0.88, "rawScores": [0.87, 0.88, 0.89], "variance": 0.0000667, "evidence": "w-model-dev/scripts/__tests__/verifier-logic.test.ts:L21-37=每个 fixture 独立读取并断言" },
+    { "name": "clarity", "weight": 0.15, "score": 0.87, "rawScores": [0.86, 0.87, 0.88], "variance": 0.0000667, "evidence": "w-model-dev/scripts/__tests__/verifier-logic.test.ts:L47-90=R13 单轴下限的命名场景" },
+    { "name": "priority-reasonableness", "weight": 0.1, "score": 0.89, "rawScores": [0.88, 0.89, 0.9], "variance": 0.0000667, "evidence": "w-model-dev/references/agent-personas.md:L171-277=测试策略与覆盖率分析优先级" }
+  ],
+  "compositeScore": 0.893,
+  "qualityLevel": "A",
+  "summary": "决定：测试评审样例可放行；核心结构：覆盖、正确性、独立性和可读性均有可追溯测试证据；遗留风险：真实测试评审必须针对被测行为和执行结果重新评分。",
+  "passed": true
+}

@@ -54,10 +54,10 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 单元测试（vitest，52 个 test 文件 / 849 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+# 3.1 单元测试（vitest，52 个 test 文件 / 853 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
-# 3.2 自检基线（samples/ 目录下 256 条样本，覆盖全部 check 脚本的通过 / 失败路径）
+# 3.2 自检基线（samples/ 目录下 260 条样本，覆盖全部 check 脚本的通过 / 失败路径）
 npm run self-test
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
 # 新增校验项时，必须同步增加 samples/ 下通过 / 失败各一条样本并在 self-test.ts 中声明期望
@@ -82,7 +82,7 @@ npm run format
 
 | # | 检查 | 期望退出码 |
 |---|---|---|
-| 1 | `npm run self-test`（256 条样本回归基线） | 0 |
+| 1 | `npm run self-test`（260 条样本回归基线） | 0 |
 | 2 | `npm run check:verifier`（无参数） | 2 |
 | 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
 | 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
@@ -93,7 +93,7 @@ npm run format
 | 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 | 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
-| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；52 files / 849 tests） | 0 |
+| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；52 files / 853 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 | 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
 | 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
@@ -213,8 +213,8 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── security-scan.ts           # eslint-plugin-security 扫描 + baseline v2 指纹豁免
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
-│   ├── self-test.ts               # 校验逻辑自检（256 条样本，samples/ 驱动）
-│   ├── __tests__/                 # vitest 单元测试（52 个 .test.ts / 849 条 + README.md coverage 矩阵）
+│   ├── self-test.ts               # 校验逻辑自检（260 条样本，samples/ 驱动）
+│   ├── __tests__/                 # vitest 单元测试（52 个 .test.ts / 853 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例

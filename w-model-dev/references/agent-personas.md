@@ -124,33 +124,13 @@
 
 ### 输出格式（JSON，满足 [verifier-spec.md §6](verifier-spec.md) Schema）
 
-```json
-{
-  "schemaVersion": "1.0",
-  "meta": {
-    "targetKind": "code",
-    "targetId": "<文件路径>",
-    "persona": "code-reviewer",
-    "scoringMethod": "logits-expected-value | text-parse-fallback",
-    "reviewTimestamp": "<ISO 8601>"
-  },
-  "subCriteria": [
-    { "name": "correctness", "score": 0.92, "evidence": "边界处理完整，但 line 42 缺 null 检查" },
-    { "name": "readability", "score": 0.88, "evidence": "命名清晰，但 helpers.ts 中函数过长（>80 行）" },
-    { "name": "maintainability", "score": 0.85, "evidence": "遵循既有 controller-service 模式" },
-    { "name": "security", "score": 0.95, "evidence": "输入校验完整，JWT 验证到位" },
-    { "name": "conformance", "score": 0.90, "evidence": "无 N+1，符合 ESLint 规则" }
-  ],
-  "compositeScore": 0.90,
-  "qualityLevel": "A",
-  "summary": "代码整体可放行；建议在合并前修复 1 个 Required 项（line 42 null 检查）。",
-  "passed": true,
-  "reworkHints": [
-    "[Required] userController.ts:42 — 缺 null 检查，建议 if (!user) throw new NotFoundError()",
-    "[Optional] helpers.ts:15 — 函数过长，建议拆分为 validateInput + transformOutput",
-    "[FYI] 整体架构遵循 controller-service 模式，与 phase-4-detailed-design.md 一致"
-  ]
-}
+使用当前 Schema 字段：`schemaVersion`、`meta.targetKind`、`meta.target`、`meta.reviewedAt`、`meta.agent`、`meta.scoringMethod`、`meta.repeatTimes`、`meta.varianceThreshold`、五项带 `weight` / `score` / `rawScores` / `variance` / 可追溯 `evidence` 的 `subCriteria`、`compositeScore`、`qualityLevel`、`summary`、`passed` 与可选 `reworkHints`。`targetId`、`persona`、`reviewTimestamp` 不是当前 Schema 字段。
+
+可执行的 Schema 对齐样例：[persona-code-reviewer.json](../scripts/samples/verifier/persona-code-reviewer.json)。真实评审必须按当前目标证据生成输出，不得复制固定评分或证据。
+
+```bash
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
+  w-model-dev/scripts/samples/verifier/persona-code-reviewer.json --json
 ```
 
 ### 评审规则
@@ -231,33 +211,13 @@
 
 ### 输出格式
 
-```json
-{
-  "schemaVersion": "1.0",
-  "meta": {
-    "targetKind": "test",
-    "targetId": "<UT-NNN | IT-NNN | ST-NNN | UAT-NNN>",
-    "persona": "test-engineer",
-    "scoringMethod": "logits-expected-value | text-parse-fallback",
-    "reviewTimestamp": "<ISO 8601>"
-  },
-  "subCriteria": [
-    { "name": "correctness", "score": 0.90, "evidence": "测试断言完整，覆盖 happy path + 边界" },
-    { "name": "readability", "score": 0.85, "evidence": "测试名读起来像规格，AA-AAA 模式清晰" },
-    { "name": "maintainability", "score": 0.80, "evidence": "无共享可变状态，但 mock 边界过深" },
-    { "name": "security", "score": 0.95, "evidence": "测试不引入新攻击面" },
-    { "name": "conformance", "score": 0.85, "evidence": "符合测试金字塔（80/15/5）" }
-  ],
-  "compositeScore": 0.87,
-  "qualityLevel": "B",
-  "summary": "测试覆盖良好，但缺 2 个 High 优先级场景（并发 + 网络超时）。",
-  "passed": true,
-  "reworkHints": [
-    "[High] UT-042 — 缺并发场景测试，建议加 'rapid repeated calls' 用例",
-    "[High] IT-003 — 缺网络超时错误路径，建议加 mock fetch reject 用例",
-    "[Low] UT-010 — 测试名可读但可更规格化，建议 'should return 404 when user not found'"
-  ]
-}
+`targetKind=test` 必须使用 test 子标准集合：`coverage`、`correctness`、`independence`、`clarity`、`priority-reasonableness`，并使用当前 `meta` 字段和可追溯 evidence 格式。若评审结论包含阻断性 `[Critical]`、`[Required]`、`[High]` 或 `[Medium]` 返工项，`passed` 必须为 `false` 并给出非空 `reworkHints`。
+
+可执行的 Schema 对齐样例：[persona-test-engineer.json](../scripts/samples/verifier/persona-test-engineer.json)。真实评审必须按当前测试目标、覆盖证据和执行结果生成输出，不得复制固定评分或证据。
+
+```bash
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
+  w-model-dev/scripts/samples/verifier/persona-test-engineer.json --json
 ```
 
 ### 评审规则
@@ -353,33 +313,13 @@
 
 ### 输出格式
 
-```json
-{
-  "schemaVersion": "1.0",
-  "meta": {
-    "targetKind": "code | design",
-    "targetId": "<文件路径 | DESIGN-NNN>",
-    "persona": "security-auditor",
-    "scoringMethod": "logits-expected-value | text-parse-fallback",
-    "reviewTimestamp": "<ISO 8601>"
-  },
-  "subCriteria": [
-    { "name": "correctness", "score": 0.90, "evidence": "认证逻辑正确，无 off-by-one" },
-    { "name": "readability", "score": 0.85, "evidence": "安全相关代码有显式注释" },
-    { "name": "maintainability", "score": 0.80, "evidence": "密钥管理抽象合理" },
-    { "name": "security", "score": 0.70, "evidence": "缺 rate limiting + 1 个 IDOR 风险" },
-    { "name": "conformance", "score": 0.85, "evidence": "符合 OWASP Top 10 基线" }
-  ],
-  "compositeScore": 0.82,
-  "qualityLevel": "B",
-  "summary": "1 个 Critical（IDOR）+ 1 个 High（缺限流），须在发布前修复。",
-  "passed": false,
-  "reworkHints": [
-    "[Critical] articleController.ts:78 — IDOR：用户可通过修改 :id 访问他人文章，建议加 ownerCheck 中间件",
-    "[High] auth-routes.ts — 缺登录端点限流，建议加 express-rate-limit（5 次/分钟）",
-    "[FYI] 整体密钥管理使用环境变量，符合 §3.3 边界约定"
-  ]
-}
+使用 `targetKind=code` 或 `targetKind=design` 的对应子标准集合与固定权重；每项 evidence 必须指向实际文件行号或章节。`[Critical]` / `[High]` / `[Required]` 发现是阻断项：不得同时声明 `passed=true`，并须在 `reworkHints` 给出具体修复建议。
+
+可执行的 Schema 对齐样例：[persona-security-auditor.json](../scripts/samples/verifier/persona-security-auditor.json)。真实审计必须按当前攻击面、信任边界与可利用性生成证据，不得复制固定评分或证据。
+
+```bash
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
+  w-model-dev/scripts/samples/verifier/persona-security-auditor.json --json
 ```
 
 ### 评审规则
@@ -499,43 +439,13 @@
 
 ### 输出格式
 
-```json
-{
-  "schemaVersion": "1.0",
-  "meta": {
-    "targetKind": "code | design",
-    "targetId": "<文件路径 | DESIGN-NNN>",
-    "persona": "performance-auditor",
-    "scoringMethod": "logits-expected-value | text-parse-fallback",
-    "reviewTimestamp": "<ISO 8601>",
-    "mode": "quick | deep",
-    "artifactsProvided": ["k6-result.json", "prometheus-query.json"]
-  },
-  "subCriteria": [
-    { "name": "correctness", "score": 0.95, "evidence": "性能相关逻辑正确" },
-    { "name": "readability", "score": 0.85, "evidence": "热点循环有注释" },
-    { "name": "maintainability", "score": 0.80, "evidence": "缓存抽象可替换" },
-    { "name": "security", "score": 0.95, "evidence": "性能优化不引入新攻击面" },
-    { "name": "conformance", "score": 0.75, "evidence": "1 个 N+1 + DB 查询无索引" }
-  ],
-  "compositeScore": 0.86,
-  "qualityLevel": "B",
-  "summary": "Quick 模式：1 个 High（N+1）+ 1 个 Medium（无索引），需修复后重测。",
-  "passed": true,
-  "reworkHints": [
-    "[High] articleService.ts:42 — N+1 查询：循环中调用 findById，建议改用 $in 批量查询",
-    "[Medium] userController.ts:78 — DB 查询无索引，建议加 { email: 1 } 索引",
-    "[FYI] 整体响应压缩已启用，符合 §3.3 边界约定"
-  ],
-  "scorecard": {
-    "p95": "not measured",
-    "p99": "not measured",
-    "throughput": "not measured",
-    "dbQueryTime": "not measured",
-    "mode": "quick",
-    "note": "无 k6 / JMeter 工件提供；所有发现为 potential impact，非测量值。建议阶段 7 系统测试前准备 k6 基线脚本（见 quality-standards.md）。"
-  }
-}
+使用 `targetKind=code` 或 `targetKind=design` 的对应子标准集合与固定权重。Quick/Deep mode、已提供工件与 scorecard 不得写入 Schema 未定义的根级或 `meta` 字段；在 `summary` 与 `reworkHints` 中表达模式和测量边界。无工具工件时，只陈述 potential impact 与 `not measured`，不得编造指标。
+
+可执行的 Schema 对齐样例：[persona-performance-auditor.json](../scripts/samples/verifier/persona-performance-auditor.json)。真实审计必须按当前性能工件与目标证据生成输出，不得复制固定评分或证据。
+
+```bash
+npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
+  w-model-dev/scripts/samples/verifier/persona-performance-auditor.json --json
 ```
 
 ### 评审规则
