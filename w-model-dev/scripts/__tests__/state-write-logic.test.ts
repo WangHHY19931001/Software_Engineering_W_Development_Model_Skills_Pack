@@ -21,7 +21,9 @@ function target(name: string): string {
 
 async function deferred(): Promise<{ promise: Promise<void>; resolve: () => void }> {
   let resolve!: () => void;
-  const promise = new Promise<void>((done) => { resolve = done; });
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
   return { promise, resolve };
 }
 
@@ -105,7 +107,10 @@ describe('writeStateJson', () => {
     const release = await deferred();
     const first = writeStateJson(p, '{"v":1}', {
       expectMtimeMs: oldMtime,
-      afterLockAcquired: async () => { entered.resolve(); await release.promise; },
+      afterLockAcquired: async () => {
+        entered.resolve();
+        await release.promise;
+      },
     });
     await entered.promise;
     const second = writeStateJson(p, '{"v":2}', { expectMtimeMs: oldMtime, lockTimeoutMs: 1_000 });
@@ -124,7 +129,10 @@ describe('writeStateJson', () => {
     const acquired = await deferred();
     const release = await deferred();
     const writer = writeStateJson(p, '{"v":1}', {
-      afterLockAcquired: async () => { acquired.resolve(); await release.promise; },
+      afterLockAcquired: async () => {
+        acquired.resolve();
+        await release.promise;
+      },
     });
     await acquired.promise;
     const metadataPath = path.join(lock, 'owner', 'metadata.json');
@@ -140,9 +148,17 @@ describe('writeStateJson', () => {
     const p = target('live-lock.json');
     const lock = `${p}.lock`;
     await fs.mkdir(path.join(lock, 'owner'), { recursive: true });
-    await fs.writeFile(path.join(lock, 'owner', 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: process.pid, token: 'live-owner', createdAt: new Date().toISOString(), operation: 'wm-write',
-    }), 'utf-8');
+    await fs.writeFile(
+      path.join(lock, 'owner', 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: process.pid,
+        token: 'live-owner',
+        createdAt: new Date().toISOString(),
+        operation: 'wm-write',
+      }),
+      'utf-8',
+    );
     const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20 });
     expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
     await expect(fs.access(lock)).resolves.toBeUndefined();
@@ -153,9 +169,17 @@ describe('writeStateJson', () => {
     const p = target('stale-lock.json');
     const lock = `${p}.lock`;
     await fs.mkdir(path.join(lock, 'owner'), { recursive: true });
-    await fs.writeFile(path.join(lock, 'owner', 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: 999_999_999, token: 'stale-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
-    }), 'utf-8');
+    await fs.writeFile(
+      path.join(lock, 'owner', 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: 999_999_999,
+        token: 'stale-owner',
+        createdAt: '2000-01-01T00:00:00.000Z',
+        operation: 'wm-write',
+      }),
+      'utf-8',
+    );
     const result = await writeStateJson(p, '{"v":1}', { staleLockTtlMs: 1 });
     expect(result.ok).toBe(true);
     const entries = await fs.readdir(lock);
@@ -166,9 +190,17 @@ describe('writeStateJson', () => {
     const p = target('stale-lock-rejected.json');
     const lock = `${p}.lock`;
     await fs.mkdir(path.join(lock, 'owner'), { recursive: true });
-    await fs.writeFile(path.join(lock, 'owner', 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: 999_999_999, token: 'stale-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
-    }), 'utf-8');
+    await fs.writeFile(
+      path.join(lock, 'owner', 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: 999_999_999,
+        token: 'stale-owner',
+        createdAt: '2000-01-01T00:00:00.000Z',
+        operation: 'wm-write',
+      }),
+      'utf-8',
+    );
 
     const result = await writeStateJson(p, '{"v":1}', { staleLockTtlMs: 1, allowImplicitStaleRecovery: false });
 
@@ -183,7 +215,10 @@ describe('writeStateJson', () => {
     const entered = await deferred();
     const release = await deferred();
     const first = writeStateJson(p, '{"v":"first"}', {
-      afterLockAcquired: async () => { entered.resolve(); await release.promise; },
+      afterLockAcquired: async () => {
+        entered.resolve();
+        await release.promise;
+      },
       readbackImpl: async () => 'not json',
     });
     await entered.promise;
@@ -219,20 +254,37 @@ describe('review round 1 ownership races', () => {
     const p = target('stale-owner-swap.json');
     const lockDir = `${p}.lock`;
     await fs.mkdir(path.join(lockDir, 'owner'), { recursive: true });
-    await fs.writeFile(path.join(lockDir, 'owner', 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: 999_999_999, token: 'old', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
-    }));
+    await fs.writeFile(
+      path.join(lockDir, 'owner', 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: 999_999_999,
+        token: 'old',
+        createdAt: '2000-01-01T00:00:00.000Z',
+        operation: 'wm-write',
+      }),
+    );
     const observed = await deferred();
     const continueRecovery = await deferred();
     const recovering = writeStateJson(p, '{"v":"recovered"}', {
       staleLockTtlMs: 1,
-      afterStaleMetadataRead: async () => { observed.resolve(); await continueRecovery.promise; },
+      afterStaleMetadataRead: async () => {
+        observed.resolve();
+        await continueRecovery.promise;
+      },
     } as never);
     await observed.promise;
     await fs.mkdir(path.join(lockDir, 'owner'), { recursive: true });
-    await fs.writeFile(path.join(lockDir, 'owner', 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: process.pid, token: 'replacement', createdAt: new Date().toISOString(), operation: 'wm-write',
-    }));
+    await fs.writeFile(
+      path.join(lockDir, 'owner', 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: process.pid,
+        token: 'replacement',
+        createdAt: new Date().toISOString(),
+        operation: 'wm-write',
+      }),
+    );
     continueRecovery.resolve();
     const result = await recovering;
     expect(result.reason).toBe('LOCK_TIMEOUT');
@@ -245,14 +297,24 @@ describe('review round 1 ownership races', () => {
     const p = target('active-recovery.json');
     const owner = path.join(`${p}.lock`, 'owner');
     await fs.mkdir(owner, { recursive: true });
-    await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: 999_999_999, token: 'dead-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
-    }));
+    await fs.writeFile(
+      path.join(owner, 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: 999_999_999,
+        token: 'dead-owner',
+        createdAt: '2000-01-01T00:00:00.000Z',
+        operation: 'wm-write',
+      }),
+    );
     const moved = await deferred();
     const continueRecovery = await deferred();
     const first = writeStateJson(p, '{"v":"first"}', {
       staleLockTtlMs: 1,
-      afterRecoveryOwnershipMoved: async () => { moved.resolve(); await continueRecovery.promise; },
+      afterRecoveryOwnershipMoved: async () => {
+        moved.resolve();
+        await continueRecovery.promise;
+      },
     } as never);
     await moved.promise;
     const second = await writeStateJson(p, '{"v":"second"}', { staleLockTtlMs: 1, lockTimeoutMs: 25 });
@@ -269,14 +331,24 @@ describe('review round 1 ownership races', () => {
     const moved = await deferred();
     const continueRelease = await deferred();
     const writer = writeStateJson(p, '{"v":1}', {
-      afterReleaseOwnershipMoved: async () => { moved.resolve(); await continueRelease.promise; },
+      afterReleaseOwnershipMoved: async () => {
+        moved.resolve();
+        await continueRelease.promise;
+      },
     } as never);
     await moved.promise;
     const lockDir = `${p}.lock`;
     await fs.mkdir(path.join(lockDir, 'owner'));
-    await fs.writeFile(path.join(lockDir, 'owner', 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: process.pid, token: 'replacement', createdAt: new Date().toISOString(), operation: 'wm-write',
-    }));
+    await fs.writeFile(
+      path.join(lockDir, 'owner', 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: process.pid,
+        token: 'replacement',
+        createdAt: new Date().toISOString(),
+        operation: 'wm-write',
+      }),
+    );
     continueRelease.resolve();
     await expect(writer).resolves.toMatchObject({ ok: true });
     await expect(fs.readFile(path.join(lockDir, 'owner', 'metadata.json'), 'utf-8')).resolves.toContain('replacement');
@@ -290,7 +362,10 @@ describe('review round 1 ownership races', () => {
     const continueRollback = await deferred();
     const first = writeStateJson(p, '{"v":"first"}', {
       readbackImpl: async () => 'invalid',
-      beforeRollback: async () => { beforeRollback.resolve(); await continueRollback.promise; },
+      beforeRollback: async () => {
+        beforeRollback.resolve();
+        await continueRollback.promise;
+      },
     } as never);
     await beforeRollback.promise;
     const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 1_000 });
@@ -301,30 +376,52 @@ describe('review round 1 ownership races', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"second"}');
   });
 
-  it.each(['.recovering-orphan', '.releasing-orphan'])('recovers stale orphan transition %s and writes', async (transition) => {
-    const p = target(`orphan-${transition.slice(1)}.json`);
-    const transitionDir = path.join(`${p}.lock`, transition);
-    await fs.mkdir(transitionDir, { recursive: true });
-    const origin = { targetPath: p, pid: 999_999_999, token: transition, createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write' };
-    await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify(origin));
-    await fs.writeFile(path.join(transitionDir, 'transition.json'), JSON.stringify({
-      kind: transition.includes('recovering') ? 'recovering' : 'releasing',
-      operatorPid: 999_999_999, operatorToken: 'dead-operator', operatorStartedAt: '2000-01-01T00:00:00.000Z', origin,
-    }));
-    const result = await writeStateJson(p, '{"v":"recovered"}', { staleLockTtlMs: 1 });
-    expect(result.ok).toBe(true);
-    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"recovered"}');
-    const entries = await fs.readdir(`${p}.lock`);
-    expect(entries.some((entry) => entry.startsWith('.stale-'))).toBe(true);
-  });
+  it.each(['.recovering-orphan', '.releasing-orphan'])(
+    'recovers stale orphan transition %s and writes',
+    async (transition) => {
+      const p = target(`orphan-${transition.slice(1)}.json`);
+      const transitionDir = path.join(`${p}.lock`, transition);
+      await fs.mkdir(transitionDir, { recursive: true });
+      const origin = {
+        targetPath: p,
+        pid: 999_999_999,
+        token: transition,
+        createdAt: '2000-01-01T00:00:00.000Z',
+        operation: 'wm-write',
+      };
+      await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify(origin));
+      await fs.writeFile(
+        path.join(transitionDir, 'transition.json'),
+        JSON.stringify({
+          kind: transition.includes('recovering') ? 'recovering' : 'releasing',
+          operatorPid: 999_999_999,
+          operatorToken: 'dead-operator',
+          operatorStartedAt: '2000-01-01T00:00:00.000Z',
+          origin,
+        }),
+      );
+      const result = await writeStateJson(p, '{"v":"recovered"}', { staleLockTtlMs: 1 });
+      expect(result.ok).toBe(true);
+      await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"recovered"}');
+      const entries = await fs.readdir(`${p}.lock`);
+      expect(entries.some((entry) => entry.startsWith('.stale-'))).toBe(true);
+    },
+  );
 
   it('does not clean an active orphan transition', async () => {
     const p = target('active-transition.json');
     const transitionDir = path.join(`${p}.lock`, '.releasing-active');
     await fs.mkdir(transitionDir, { recursive: true });
-    await fs.writeFile(path.join(transitionDir, 'metadata.json'), JSON.stringify({
-      targetPath: p, pid: process.pid, token: 'active', createdAt: new Date().toISOString(), operation: 'wm-write',
-    }));
+    await fs.writeFile(
+      path.join(transitionDir, 'metadata.json'),
+      JSON.stringify({
+        targetPath: p,
+        pid: process.pid,
+        token: 'active',
+        createdAt: new Date().toISOString(),
+        operation: 'wm-write',
+      }),
+    );
     const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20, staleLockTtlMs: 1 });
     expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
     await expect(fs.readFile(path.join(transitionDir, 'metadata.json'), 'utf-8')).resolves.toContain('active');

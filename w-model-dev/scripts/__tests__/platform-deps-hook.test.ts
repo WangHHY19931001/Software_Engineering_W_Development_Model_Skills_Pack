@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+
+import { afterEach, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
@@ -20,10 +21,20 @@ async function makeTempDir(prefix: string): Promise<string> {
 
 async function run(script: string, args: string[], environment: Record<string, string> = {}, cwd = repoRoot) {
   try {
-    const result = await execFileAsync('bash', ['-c', 'source "$BASH_ENV"; export -f git node npm tar cp rm mv mkdir 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"', '--', script, ...args], {
-      cwd,
-      env: { ...process.env, ...environment },
-    });
+    const result = await execFileAsync(
+      'bash',
+      [
+        '-c',
+        'source "$BASH_ENV"; export -f git node npm tar cp rm mv mkdir 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"',
+        '--',
+        script,
+        ...args,
+      ],
+      {
+        cwd,
+        env: { ...process.env, ...environment },
+      },
+    );
     return { code: 0, stdout: result.stdout, stderr: result.stderr };
   } catch (error: unknown) {
     const failure = error as { code?: number; stdout?: string; stderr?: string };
@@ -31,13 +42,18 @@ async function run(script: string, args: string[], environment: Record<string, s
   }
 }
 
-async function simulatedEnsure(args: string[], nodeBody: string): Promise<{ code: number; stdout: string; stderr: string; calls: string }> {
+async function simulatedEnsure(
+  args: string[],
+  nodeBody: string,
+): Promise<{ code: number; stdout: string; stderr: string; calls: string }> {
   const binDir = await makeTempDir('platform-deps-bin-');
   const workspace = await makeTempDir('platform-deps-workspace-');
   const callsPath = path.join(binDir, 'calls.log');
   await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
   const bashEnv = path.join(binDir, 'bash-env.sh');
-  await fs.writeFile(bashEnv, `
+  await fs.writeFile(
+    bashEnv,
+    `
 git() { printf '%s\\n' "$PWD"; }
 node() {
 ${nodeBody}
@@ -48,12 +64,19 @@ cp() { printf 'cp %s\\n' "$*" >> "$CALLS"; exit 99; }
 rm() { printf 'rm %s\\n' "$*" >> "$CALLS"; exit 99; }
 mv() { printf 'mv %s\\n' "$*" >> "$CALLS"; exit 99; }
 mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
-`, 'utf8');
-  const result = await run(ensureScript, args, {
-    PATH: `${binDir}:${process.env.PATH}`,
-    CALLS: callsPath,
-    BASH_ENV: bashEnv,
-  }, workspace);
+`,
+    'utf8',
+  );
+  const result = await run(
+    ensureScript,
+    args,
+    {
+      PATH: `${binDir}:${process.env.PATH}`,
+      CALLS: callsPath,
+      BASH_ENV: bashEnv,
+    },
+    workspace,
+  );
   return {
     ...result,
     calls: await fs.readFile(callsPath, 'utf8').catch(() => ''),
@@ -66,14 +89,17 @@ afterEach(async () => {
 
 describe('ensure-platform-deps supply-chain boundary', () => {
   it('defaults to check mode and reports the explicit install command without package download or extraction', async () => {
-    const result = await simulatedEnsure([], `
+    const result = await simulatedEnsure(
+      [],
+      `
 case "$*" in
   *process.platform*) printf 'linux\\n' ;;
   *process.arch*) printf 'x64\\n' ;;
   *esbuild/package.json*) printf '0.25.0\\n' ;;
   *rolldown/package.json*) printf '1.0.0\\n' ;;
   *) printf '\\n' ;;
-esac`);
+esac`,
+    );
 
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('npm run platform-deps:install');
@@ -81,14 +107,17 @@ esac`);
   });
 
   it('treats --check as a probe and fails closed when either primary package is missing', async () => {
-    const result = await simulatedEnsure(['--check'], `
+    const result = await simulatedEnsure(
+      ['--check'],
+      `
 case "$*" in
   *process.platform*) printf 'linux\\n' ;;
   *process.arch*) printf 'x64\\n' ;;
   *esbuild/package.json*) printf '0.25.0\\n' ;;
   *rolldown/package.json*) printf '\\n' ;;
   *) printf '\\n' ;;
-esac`);
+esac`,
+    );
 
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('esbuild / rolldown 主包缺失');
@@ -96,39 +125,44 @@ esac`);
   });
 
   it('fails closed for an uncovered platform without package download or extraction', async () => {
-    const result = await simulatedEnsure(['--check'], `
+    const result = await simulatedEnsure(
+      ['--check'],
+      `
 case "$*" in
   *process.platform*) printf 'darwin\\n' ;;
   *process.arch*) printf 'arm64\\n' ;;
   *) printf '\\n' ;;
-esac`);
+esac`,
+    );
 
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('未覆盖平台 darwin-arm64');
     expect(result.calls).toBe('');
   });
 
-  it.each([
-    { args: ['--unsupported'] },
-    { args: ['--check', 'unexpected'] },
-    { args: ['--install', 'unexpected'] },
-  ])('rejects unsupported arguments $args with usage error code 2', async ({ args }) => {
-    const result = await simulatedEnsure(args, 'printf "linux\\n"');
+  it.each([{ args: ['--unsupported'] }, { args: ['--check', 'unexpected'] }, { args: ['--install', 'unexpected'] }])(
+    'rejects unsupported arguments $args with usage error code 2',
+    async ({ args }) => {
+      const result = await simulatedEnsure(args, 'printf "linux\\n"');
 
-    expect(result.code).toBe(2);
-    expect(result.stdout).toContain('用法');
-    expect(result.calls).toBe('');
-  });
+      expect(result.code).toBe(2);
+      expect(result.stdout).toContain('用法');
+      expect(result.calls).toBe('');
+    },
+  );
 
   it('keeps --install fail-closed without package, archive, or filesystem side effects when native dependencies are missing', async () => {
-    const result = await simulatedEnsure(['--install'], `
+    const result = await simulatedEnsure(
+      ['--install'],
+      `
 case "$*" in
   *process.platform*) printf 'linux\\n' ;;
   *process.arch*) printf 'x64\\n' ;;
   *esbuild/package.json*) printf '0.25.0\\n' ;;
   *rolldown/package.json*) printf '1.0.0\\n' ;;
   *) printf '\\n' ;;
-esac`);
+esac`,
+    );
 
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('请手动运行 npm install');
@@ -144,7 +178,9 @@ esac`);
     await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
     await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
     await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
-    await fs.writeFile(bashEnv, `
+    await fs.writeFile(
+      bashEnv,
+      `
 git() { printf '%s\\n' "$PWD"; }
 node() {
   case "$*" in
@@ -161,12 +197,19 @@ cp() { printf 'cp %s\\n' "$*" >> "$CALLS"; exit 99; }
 rm() { printf 'rm %s\\n' "$*" >> "$CALLS"; exit 99; }
 mv() { printf 'mv %s\\n' "$*" >> "$CALLS"; exit 99; }
 mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
-`, 'utf8');
+`,
+      'utf8',
+    );
 
-    const result = await run(ensureScript, ['--install'], {
-      BASH_ENV: bashEnv,
-      CALLS: callsPath,
-    }, workspace);
+    const result = await run(
+      ensureScript,
+      ['--install'],
+      {
+        BASH_ENV: bashEnv,
+        CALLS: callsPath,
+      },
+      workspace,
+    );
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('平台依赖齐备');
@@ -176,13 +219,17 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
 });
 
 describe('pre-push dependency boundary and trigger paths', () => {
-  it.each(['config/probe.ts', 'scripts/probe.cjs', 'package-lock.json'])('runs the gate for %s', async (changedPath) => {
-    const binDir = await makeTempDir('pre-push-bin-');
-    const workspace = await makeTempDir('pre-push-workspace-');
-    const callsPath = path.join(binDir, 'calls.log');
-    await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
-    const bashEnv = path.join(binDir, 'bash-env.sh');
-    await fs.writeFile(bashEnv, `
+  it.each(['config/probe.ts', 'scripts/probe.cjs', 'package-lock.json'])(
+    'runs the gate for %s',
+    async (changedPath) => {
+      const binDir = await makeTempDir('pre-push-bin-');
+      const workspace = await makeTempDir('pre-push-workspace-');
+      const callsPath = path.join(binDir, 'calls.log');
+      await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+      const bashEnv = path.join(binDir, 'bash-env.sh');
+      await fs.writeFile(
+        bashEnv,
+        `
 git() {
   case "$*" in
     *'diff --name-only'*) printf '${changedPath}\\n' ;;
@@ -190,40 +237,57 @@ git() {
   esac
 }
 npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
-`, 'utf8');
-    const result = await run(prePushScript, [], {
-      PATH: `${binDir}:${process.env.PATH}`,
-      CALLS: callsPath,
-      BASH_ENV: bashEnv,
-      PREPUSH_FORCE: '0',
-      OSTYPE: 'linux-gnu',
-    }, workspace);
+`,
+        'utf8',
+      );
+      const result = await run(
+        prePushScript,
+        [],
+        {
+          PATH: `${binDir}:${process.env.PATH}`,
+          CALLS: callsPath,
+          BASH_ENV: bashEnv,
+          PREPUSH_FORCE: '0',
+          OSTYPE: 'linux-gnu',
+        },
+        workspace,
+      );
 
-    expect(result.code).toBe(1);
-    expect(result.stdout).toContain('node_modules 缺失');
-    expect(result.stdout).toContain('npm install');
-    expect(await fs.readFile(callsPath, 'utf8').catch(() => '')).toBe('');
-  });
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain('node_modules 缺失');
+      expect(result.stdout).toContain('npm install');
+      expect(await fs.readFile(callsPath, 'utf8').catch(() => '')).toBe('');
+    },
+  );
 
   it('skips the gate when changed paths are unrelated', async () => {
     const binDir = await makeTempDir('pre-push-skip-bin-');
     const workspace = await makeTempDir('pre-push-skip-workspace-');
     await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
     const bashEnv = path.join(binDir, 'bash-env.sh');
-    await fs.writeFile(bashEnv, `
+    await fs.writeFile(
+      bashEnv,
+      `
 git() {
   case "$*" in
     *'diff --name-only'*) printf 'eval/probe.json\\n' ;;
     *) exit 0 ;;
   esac
 }
-`, 'utf8');
-    const result = await run(prePushScript, [], {
-      PATH: `${binDir}:${process.env.PATH}`,
-      BASH_ENV: bashEnv,
-      PREPUSH_FORCE: '0',
-      OSTYPE: 'linux-gnu',
-    }, workspace);
+`,
+      'utf8',
+    );
+    const result = await run(
+      prePushScript,
+      [],
+      {
+        PATH: `${binDir}:${process.env.PATH}`,
+        BASH_ENV: bashEnv,
+        PREPUSH_FORCE: '0',
+        OSTYPE: 'linux-gnu',
+      },
+      workspace,
+    );
 
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('跳过门禁');
@@ -237,7 +301,9 @@ git() {
     await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
     await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
     await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
-    await fs.writeFile(bashEnv, `
+    await fs.writeFile(
+      bashEnv,
+      `
 git() {
   case "$*" in
     *'diff --name-only'*) printf 'config/probe.ts\\n' ;;
@@ -259,14 +325,21 @@ cp() { printf 'cp %s\\n' "$*" >> "$CALLS"; return 98; }
 rm() { printf 'rm %s\\n' "$*" >> "$CALLS"; return 98; }
 mv() { printf 'mv %s\\n' "$*" >> "$CALLS"; return 98; }
 mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
-`, 'utf8');
+`,
+      'utf8',
+    );
 
-    const result = await run(prePushScript, [], {
-      BASH_ENV: bashEnv,
-      CALLS: callsPath,
-      PREPUSH_FORCE: '0',
-      OSTYPE: 'linux-gnu',
-    }, workspace);
+    const result = await run(
+      prePushScript,
+      [],
+      {
+        BASH_ENV: bashEnv,
+        CALLS: callsPath,
+        PREPUSH_FORCE: '0',
+        OSTYPE: 'linux-gnu',
+      },
+      workspace,
+    );
     const calls = await fs.readFile(callsPath, 'utf8').catch(() => '');
 
     expect(result.code, `${result.stdout}\n${result.stderr}`).not.toBe(0);

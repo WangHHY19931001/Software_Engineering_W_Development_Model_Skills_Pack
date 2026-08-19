@@ -34,7 +34,13 @@ export interface StateWriteResult {
   ok: boolean;
   writtenPath: string;
   backupPath?: string;
-  reason?: 'INVALID_JSON' | 'MTIME_CONFLICT' | 'TARGET_MISSING_FOR_MTIME' | 'WRITE_VERIFY_FAILED' | 'LOCK_TIMEOUT' | 'STALE_LOCK';
+  reason?:
+    | 'INVALID_JSON'
+    | 'MTIME_CONFLICT'
+    | 'TARGET_MISSING_FOR_MTIME'
+    | 'WRITE_VERIFY_FAILED'
+    | 'LOCK_TIMEOUT'
+    | 'STALE_LOCK';
   rolledBack?: boolean;
 }
 
@@ -59,9 +65,15 @@ export function backupPathFor(absPath: string, now: Date = new Date()): string {
 
 async function renameWithRetry(src: string, dest: string): Promise<void> {
   for (let attempt = 1; ; attempt++) {
-    try { await fs.rename(src, dest); return; } catch (error) {
+    try {
+      await fs.rename(src, dest);
+      return;
+    } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
-      if ((code === 'EPERM' || code === 'EBUSY') && attempt < 8) { await sleep(10 * attempt); continue; }
+      if ((code === 'EPERM' || code === 'EBUSY') && attempt < 8) {
+        await sleep(10 * attempt);
+        continue;
+      }
       throw error;
     }
   }
@@ -72,27 +84,55 @@ async function rotateBackups(absPath: string, keep: number): Promise<void> {
     const prefix = `${path.basename(absPath)}.bak.`;
     const dir = path.dirname(absPath);
     const backups = (await fs.readdir(dir)).filter((entry) => entry.startsWith(prefix)).sort();
-    await Promise.all(backups.slice(0, Math.max(0, backups.length - keep)).map(async (entry) => {
-      try { await fs.unlink(path.join(dir, entry)); } catch { /* best effort */ }
-    }));
-  } catch { /* best effort */ }
+    await Promise.all(
+      backups.slice(0, Math.max(0, backups.length - keep)).map(async (entry) => {
+        try {
+          await fs.unlink(path.join(dir, entry));
+        } catch {
+          /* best effort */
+        }
+      }),
+    );
+  } catch {
+    /* best effort */
+  }
 }
 
 function isPidRunning(pid: number): boolean {
-  try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
 }
 
 async function readMetadata(ownerDir: string): Promise<StateLockMetadata | undefined> {
-  try { return JSON.parse(await fs.readFile(metadataPathFor(ownerDir), 'utf-8')) as StateLockMetadata; } catch { return undefined; }
+  try {
+    return JSON.parse(await fs.readFile(metadataPathFor(ownerDir), 'utf-8')) as StateLockMetadata;
+  } catch {
+    return undefined;
+  }
 }
 
 async function readTransition(transitionDir: string): Promise<TransitionMetadata | undefined> {
-  try { return JSON.parse(await fs.readFile(transitionPathFor(transitionDir), 'utf-8')) as TransitionMetadata; } catch { return undefined; }
+  try {
+    return JSON.parse(await fs.readFile(transitionPathFor(transitionDir), 'utf-8')) as TransitionMetadata;
+  } catch {
+    return undefined;
+  }
 }
 
-async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'recovered' | 'stale'> {
+async function recoverOrphanTransitions(
+  lockDir: string,
+  opts: StateWriteOptions,
+): Promise<'none' | 'recovered' | 'stale'> {
   let entries: string[];
-  try { entries = await fs.readdir(lockDir); } catch { return 'none'; }
+  try {
+    entries = await fs.readdir(lockDir);
+  } catch {
+    return 'none';
+  }
   let recovered = false;
   for (const entry of entries) {
     if (!entry.startsWith('.recovering-') && !entry.startsWith('.releasing-')) continue;
@@ -107,13 +147,21 @@ async function recoverOrphanTransitions(lockDir: string, opts: StateWriteOptions
     try {
       await renameWithRetry(transitionDir, auditDir);
       recovered = true;
-    } catch { /* a live owner may have completed its transition */ }
+    } catch {
+      /* a live owner may have completed its transition */
+    }
   }
   return recovered ? 'recovered' : 'none';
 }
 
 async function hasTransition(lockDir: string): Promise<boolean> {
-  try { return (await fs.readdir(lockDir)).some((entry) => entry.startsWith('.recovering-') || entry.startsWith('.releasing-')); } catch { return false; }
+  try {
+    return (await fs.readdir(lockDir)).some(
+      (entry) => entry.startsWith('.recovering-') || entry.startsWith('.releasing-'),
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'stale' | 'recoverable'> {
@@ -131,21 +179,34 @@ async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Pro
   const candidate = path.join(lockDir, `.recovering-${randomUUID()}`);
   const current = await readMetadata(ownerDir);
   if (!current) return false;
-  const transition: TransitionMetadata = { kind: 'recovering', operatorPid: process.pid, operatorToken: randomUUID(), operatorStartedAt: new Date().toISOString(), origin: current };
+  const transition: TransitionMetadata = {
+    kind: 'recovering',
+    operatorPid: process.pid,
+    operatorToken: randomUUID(),
+    operatorStartedAt: new Date().toISOString(),
+    origin: current,
+  };
   await fs.writeFile(transitionPathFor(ownerDir), JSON.stringify(transition), 'utf-8');
   try {
     await renameWithRetry(ownerDir, candidate);
     await opts.afterRecoveryOwnershipMoved?.();
-  } catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT'; }
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
+  }
   const metadata = await readMetadata(candidate);
   await opts.afterStaleMetadataRead?.();
-  const expired = metadata !== undefined && Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
+  const expired =
+    metadata !== undefined && Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
   const stale = metadata !== undefined && (opts.recoverStaleLock === true || (expired && !isPidRunning(metadata.pid)));
   if (stale) {
     await renameWithRetry(candidate, path.join(lockDir, `.stale-${Date.now()}-${randomUUID()}`));
     return true;
   }
-  try { await renameWithRetry(candidate, ownerDir); } catch { await fs.rm(candidate, { recursive: true, force: true }); }
+  try {
+    await renameWithRetry(candidate, ownerDir);
+  } catch {
+    await fs.rm(candidate, { recursive: true, force: true });
+  }
   return false;
 }
 
@@ -158,11 +219,20 @@ async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<Ac
   const deadline = Date.now() + (opts.lockTimeoutMs ?? 5_000);
   await fs.mkdir(lockDir, { recursive: true });
   while (Date.now() <= deadline) {
-    const metadata: StateLockMetadata = { targetPath: absPath, pid: process.pid, token: randomUUID(), createdAt: new Date().toISOString(), operation: 'wm-write' };
+    const metadata: StateLockMetadata = {
+      targetPath: absPath,
+      pid: process.pid,
+      token: randomUUID(),
+      createdAt: new Date().toISOString(),
+      operation: 'wm-write',
+    };
     try {
       const transitions = await recoverOrphanTransitions(lockDir, opts);
       if (transitions === 'stale') return 'STALE_LOCK';
-      if (await hasTransition(lockDir)) { await sleep(10); continue; }
+      if (await hasTransition(lockDir)) {
+        await sleep(10);
+        continue;
+      }
       await fs.mkdir(ownerDir);
       await fs.writeFile(metadataPathFor(ownerDir), JSON.stringify(metadata), 'utf-8');
       return { lockDir, ownerDir, metadata };
@@ -170,7 +240,7 @@ async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<Ac
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const owner = await staleOwnerState(lockDir, opts);
       if (owner === 'stale') return 'STALE_LOCK';
-      if (owner === 'recoverable' && await recoverLockIfStale(lockDir, opts)) continue;
+      if (owner === 'recoverable' && (await recoverLockIfStale(lockDir, opts))) continue;
       await sleep(10);
     }
   }
@@ -182,26 +252,45 @@ async function ownsLock(ownerDir: string, token: string): Promise<boolean> {
 }
 
 async function releaseLock(lockDir: string, ownerDir: string, token: string, opts: StateWriteOptions): Promise<void> {
-  if (!await ownsLock(ownerDir, token)) return;
+  if (!(await ownsLock(ownerDir, token))) return;
   const released = path.join(lockDir, `.releasing-${randomUUID()}`);
   const origin = await readMetadata(ownerDir);
   if (!origin) return;
-  const transition: TransitionMetadata = { kind: 'releasing', operatorPid: process.pid, operatorToken: randomUUID(), operatorStartedAt: new Date().toISOString(), origin };
+  const transition: TransitionMetadata = {
+    kind: 'releasing',
+    operatorPid: process.pid,
+    operatorToken: randomUUID(),
+    operatorStartedAt: new Date().toISOString(),
+    origin,
+  };
   try {
     await fs.writeFile(transitionPathFor(ownerDir), JSON.stringify(transition), 'utf-8');
     await renameWithRetry(ownerDir, released);
     await opts.afterReleaseOwnershipMoved?.();
-  } catch { return; }
+  } catch {
+    return;
+  }
   await fs.rm(released, { recursive: true, force: true });
 }
 
-async function restoreIfStillOwned(absPath: string, jsonText: string, backupPath: string | undefined, ownerDir: string, token: string, opts: StateWriteOptions): Promise<boolean> {
-  if (!await ownsLock(ownerDir, token)) return false;
+async function restoreIfStillOwned(
+  absPath: string,
+  jsonText: string,
+  backupPath: string | undefined,
+  ownerDir: string,
+  token: string,
+  opts: StateWriteOptions,
+): Promise<boolean> {
+  if (!(await ownsLock(ownerDir, token))) return false;
   let current: string;
-  try { current = await fs.readFile(absPath, 'utf-8'); } catch { return false; }
-  if (current !== jsonText || !await ownsLock(ownerDir, token)) return false;
+  try {
+    current = await fs.readFile(absPath, 'utf-8');
+  } catch {
+    return false;
+  }
+  if (current !== jsonText || !(await ownsLock(ownerDir, token))) return false;
   await opts.beforeRollback?.();
-  if (!await ownsLock(ownerDir, token) || await fs.readFile(absPath, 'utf-8') !== jsonText) return false;
+  if (!(await ownsLock(ownerDir, token)) || (await fs.readFile(absPath, 'utf-8')) !== jsonText) return false;
 
   let rollbackTmp: string | undefined;
   try {
@@ -215,11 +304,23 @@ async function restoreIfStillOwned(absPath: string, jsonText: string, backupPath
       await renameWithRetry(absPath, rollbackTmp);
     }
     return true;
-  } catch { return false; } finally { if (rollbackTmp) await fs.rm(rollbackTmp, { force: true }); }
+  } catch {
+    return false;
+  } finally {
+    if (rollbackTmp) await fs.rm(rollbackTmp, { force: true });
+  }
 }
 
-export async function writeStateJson(absPath: string, jsonText: string, opts: StateWriteOptions = {}): Promise<StateWriteResult> {
-  try { parseJsonSafe(jsonText); } catch { return { ok: false, writtenPath: absPath, reason: 'INVALID_JSON' }; }
+export async function writeStateJson(
+  absPath: string,
+  jsonText: string,
+  opts: StateWriteOptions = {},
+): Promise<StateWriteResult> {
+  try {
+    parseJsonSafe(jsonText);
+  } catch {
+    return { ok: false, writtenPath: absPath, reason: 'INVALID_JSON' };
+  }
   const acquired = await acquireLock(absPath, opts);
   if (acquired === 'STALE_LOCK') return { ok: false, writtenPath: absPath, reason: 'STALE_LOCK' };
   if (!acquired) return { ok: false, writtenPath: absPath, reason: 'LOCK_TIMEOUT' };
@@ -228,8 +329,13 @@ export async function writeStateJson(absPath: string, jsonText: string, opts: St
     await opts.afterLockAcquired?.();
     if (opts.expectMtimeMs != null) {
       let stat: Awaited<ReturnType<typeof fs.stat>>;
-      try { stat = await fs.stat(absPath); } catch { return { ok: false, writtenPath: absPath, reason: 'TARGET_MISSING_FOR_MTIME' }; }
-      if (Math.floor(stat.mtimeMs) !== Math.floor(opts.expectMtimeMs)) return { ok: false, writtenPath: absPath, reason: 'MTIME_CONFLICT' };
+      try {
+        stat = await fs.stat(absPath);
+      } catch {
+        return { ok: false, writtenPath: absPath, reason: 'TARGET_MISSING_FOR_MTIME' };
+      }
+      if (Math.floor(stat.mtimeMs) !== Math.floor(opts.expectMtimeMs))
+        return { ok: false, writtenPath: absPath, reason: 'MTIME_CONFLICT' };
     }
     let backupPath: string | undefined;
     if (opts.backup !== false) {
@@ -239,7 +345,9 @@ export async function writeStateJson(absPath: string, jsonText: string, opts: St
           await fs.copyFile(absPath, backupPath);
           await rotateBackups(absPath, opts.keepBackups ?? 5);
         }
-      } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
     }
     tmpPath = `${absPath}.tmp-${process.pid}-${randomUUID()}`;
     await fs.writeFile(tmpPath, jsonText, 'utf-8');
@@ -248,7 +356,14 @@ export async function writeStateJson(absPath: string, jsonText: string, opts: St
     tmpPath = undefined;
     const readBack = await (opts.readbackImpl ?? ((file: string) => fs.readFile(file, 'utf-8')))(absPath);
     if (readBack !== jsonText) {
-      const rolledBack = await restoreIfStillOwned(absPath, jsonText, backupPath, acquired.ownerDir, acquired.metadata.token, opts);
+      const rolledBack = await restoreIfStillOwned(
+        absPath,
+        jsonText,
+        backupPath,
+        acquired.ownerDir,
+        acquired.metadata.token,
+        opts,
+      );
       return { ok: false, writtenPath: absPath, reason: 'WRITE_VERIFY_FAILED', rolledBack };
     }
     return { ok: true, writtenPath: absPath, backupPath };

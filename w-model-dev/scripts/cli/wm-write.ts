@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   let backup = true;
 
   for (let index = 0; index < args.length; index++) {
-    const arg = args[index]!;
+    const arg = args.at(index)!;
     switch (arg) {
       case '--stdin':
         useStdin = true;

@@ -2360,6 +2360,482 @@
       "file": "w-model-dev/scripts/logic/wm-status-logic.ts",
       "line": 159,
       "reason": "Generic Object Injection Sink"
+    },
+    {
+      "hash": "20882d60b8c8d07f218ab456e5777d45fbb42f6dcb827c0692cc778310189414",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts",
+      "line": 140,
+      "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "fac13025f0d4e57541c002c531ec65d0e88a6856977f16ce298c939d7548dead",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 52,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "d69c631f4f1f95348c93c291cd1c51b7912a7181fb96537f0619a208d3ea3416",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 54,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "f1eecba854886543b0a017e01ac6b4435ad88d11b909fdce69571addbc40d33f",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 82,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "afcc982ef27a4d9239bbd7bae7397ff80d1181863a7e587259ab77eaf65b0ac3",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 179,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "eecc241ad844b66eecf7c6b99f1efae46ab4c338b1459d438b79898808bb45b5",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 180,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "81b879ff0250db73ec4733d7719c83cb92c13d7352067252500b98411362ea65",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 217,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "138f1ebbbfbfab480969a6139ff7072f621028c070924fb09ca388e908a8a6df",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 343,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "2ceafd132d1846a097dc8847aab4d595871dfe5e54b202a3e364670c876772fa",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/platform-deps-hook.test.ts",
+      "line": 354,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "ce10a901173540de42e60dd5e8bb55f2e0db57a54935edf10ec587b96e3a37d8",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 60,
+      "reason": "Found stat from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "5f318153b63dbc546bdba8155db17d8802dcdadb7e45998d0caae894e2d5b257",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 72,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "c277819c50be18ec8c9c66fab8d0fd0e73963e4bd67acdd0ea2088369a18c352",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 78,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "e95a0b8806b844c84f08710e53231465f599b9dbc8eb1feebc1b50a03ed2662f",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 79,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "b1ebcb0af8b24b3973839c708e7a18d1ce72715d5930787f3a4158da734e634d",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 83,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "75cd90034244d9c80c13881687f93af6526b831b9230420a5dd30f586f470791",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 99,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "2be626fd29f23fdab81b7a691f812d72cf6f8e607032fe0469cc91a3fd2ceae1",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 104,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "4a6df5e28527e73b060038ed06979e5eba7a5f3e09c1e3036aec1e0fee53f71b",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 105,
+      "reason": "Found stat from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "92372fbe3beefaae96823861b7d32a7eec289b40e91b8c5e1c54e2d469f93197",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 121,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "9483c308d7baf48cda6338941f6f3656cfab6d3211149e7b78db9971ab5e21c9",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 139,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "d81bfd7862e9796e40919cbfb10820bce49b4de9a064f56d7f14d0ded1e361dd",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 140,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "b9bf6c666347c6109c17c3763723d6a8cc001d70a407e8c4094b01fb1daf7b9c",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 150,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "a5eb2e50f48eb483da8e6797093038f178d6ffd0685d84975357bfccb9e207e0",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 151,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "3e36cbd4c2558bf236feb12c1df853260a2ec90e767688702c52c274e470660f",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 185,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "b783ba0aa2efe5f48e9bef1f752d3111b755dc5833aaca727b120ce3ce895a8d",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 214,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "4fdd4804148a08d0e43e50ac39cb85bd5fb9aa4111af4743406e7a2c7c0c7a5e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 229,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "c3cd3cba9e31e0b7a11e2d8a46bf8db96ee605d48753009ba21102e3c25efc16",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 239,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "abd22f3a3908e1bfe0cd14161c65ccae0f27894a9a2bad756547880b10fa68af",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 248,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "f2f05266676454ab107b78efda431ce894722a049b57d2beea9a8adc32858f57",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 256,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "8a2d5e8161598c4975f8b0fde256fd0942549db35b26153fbd75b93d2ab51165",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 291,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "83841166307ec1881d2748a88c43bba9b9b9816743d38811c695959995c2fc78",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 292,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "6831c1f562ef9916c83978130b1b8965c6c38a794403be406c3a90d4cdb9da2e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 299,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "899ddd1e42b8c841f8472d2d854b492eda0943571a59d7c7d2a4a5506503042d",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 322,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "36b52bfc042f14c20cb94c3f466c57a5458e45e32a3275fe3c60e85e81186dbf",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 326,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "796cdd66180fa4099a967ca25896a766987a936467bca05fc9435c3fcfc67c7e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 341,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "b12696fdb29dbd1fcf590fc255dbddbee44f3b932817f38dc1378d50527b09fa",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 360,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "df08310dbad372f7a689ead6a03d48c4836e7bf67667049dca1e5600cc100f2e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 384,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "9913402a08eb6cac7f5ae074934a291240da466b264c8558ddd1aa3ab662a421",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 392,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "1f8f3e8b266272eb68045f3b909d6c4851d1006fd8c61d1624f2854665d0b632",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 405,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "1e37968e1d314831d5ec0978547c341511a16f6f1e03ae4adb6536863eb60cb5",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 406,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "36efc80432b7659093bba4d17fc13438f004bb3124cc4f62feeb457d4b3c5735",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/state-write-logic.test.ts",
+      "line": 427,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "0735a73bb9644806ddf646a928e2c749f085427829d37ef28efd9aaa10f4d05b",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 59,
+      "reason": "Found mkdir from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "3f1ab46a491b0317a97c2b012d82019f3ebb48033f73a1964f5a2ca0e580f40c",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 60,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "c51dd372a357409e6ed4b0f0b4b72d7a20cd18e7581d77e3ccb7762d14900dc1",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 126,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "dd6c6acb7e238f9fc017e7860515b339e5420d580039c90b03f00cff9112232d",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 170,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "7d74e97aaa6cbfaaad1f0dece88c1b149aa5e857422a851f7be63ddb7151d7f7",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 184,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "d5b3bfb97897d610b2746b546f1e7f7d1e6cfa6e94269ff2756ace051063fe4d",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 201,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "482f0f6a4f95230277c0658de880136470c4ee4032c208ce5cc9feb2f9c2bdbc",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 216,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "82ee0ff8aab6e26ef6fc125add5cfd3aef7487a12614577938c8c692bc5d3eff",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 222,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "bdfd823b5d90271963c69d18cef49ecd69148a6ba832bd8057c551e41036c496",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 228,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "841d0949bff3d9ae4196f62213863a904eaa514ad2373c66365740415d618360",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 266,
+      "reason": "Found writeFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "e32329dda471d7caaf68199ec7f9f3a42fdf5305c09b67670b7de14a14290fda",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 267,
+      "reason": "Found stat from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "dc993a5fb967c567ee6eea0e87daa96ff185ec3dce5b31ac9107183ffc7485fa",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 273,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "efbb9816aaccf853a6a20366e9fab6249f03053811313eaa0da821152b6942f8",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/wm-write.test.ts",
+      "line": 286,
+      "reason": "Found readFile from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "4fc426f2a51fb15ff49893238bd43506ee0be2714ecb748fd34a120b99ebe468",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 86,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "29cfc68b1f3deba553177c1182cda068eb6d94cb96c4ac35680ac16e56d66572",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 90,
+      "reason": "Found unlink from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "522adb90f36e93394ce0d6a15eb53391f8d959d5553ea15b4f5d37cec263f681",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 112,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "1178d40e2cbc529a6bee57dc95b4fec5b3ffa6e92e5f3bbbde45ae38cd919697",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 120,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "1029f83690bf069b33d6b430f99b3001b28178f003a7fa742be4de7a48a1c132",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 132,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "1907a9e9774b3d9f100f2a5e82aeaa031c884363f8a50cb822a8dae29c30a2e4",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 159,
+      "reason": "Found readdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "9f43fbd3c1a9288bef080906a5a106585a697af6c8c18da565570855b0ad94eb",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 189,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "a8c99e60b80c4ec4a5e4c6db71eb3014305b915e6b01d831bc92205a4545eb2a",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 220,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "db2d6f1f542b4e5ed2b23992977c22f115028f48a75529c5f90cac3996d0fc5d",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 236,
+      "reason": "Found mkdir from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "66e31242a9c6f9818918fee4ad886c5328a41d06b9789194987ebf35111e6593",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 237,
+      "reason": "Found writeFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "fadc7fca0445b87d0bc56dfaa5f8333a27a2e142fa8e5059f36423aaa9dfb0e6",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 287,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "dcb0996be454757afbc593bfa52be720fc0d5c32ea6596e1107f735995275ef9",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 293,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "2138d1cffa4ae222df4fd40ff511affedc068d20033dc249d7afe5440d4c0b0e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 333,
+      "reason": "Found stat from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "74f754627cd23333c9589cf38a841e83d417f04a78c5414229c0fca073a5dc9e",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 343,
+      "reason": "Found stat from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "1149496cafe3e24791ec0b6f1f5bb1437475c89edbc0431803714db5425e1318",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 357,
+      "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
     }
   ]
 }
