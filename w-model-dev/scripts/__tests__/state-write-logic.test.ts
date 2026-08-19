@@ -127,36 +127,39 @@ describe('writeStateJson', () => {
       afterLockAcquired: async () => { acquired.resolve(); await release.promise; },
     });
     await acquired.promise;
-    const metadata = JSON.parse(await fs.readFile(lock, 'utf-8')) as Record<string, unknown>;
-    await fs.writeFile(lock, JSON.stringify({ ...metadata, token: 'other-token' }), 'utf-8');
+    const metadataPath = path.join(lock, 'owner', 'metadata.json');
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8')) as Record<string, unknown>;
+    await fs.writeFile(metadataPath, JSON.stringify({ ...metadata, token: 'other-token' }), 'utf-8');
     release.resolve();
     await expect(writer).resolves.toMatchObject({ ok: true });
     await expect(fs.access(lock)).resolves.toBeUndefined();
-    await fs.unlink(lock);
+    await fs.rm(lock, { recursive: true, force: true });
   });
 
   it('times out while a valid live lock remains held', async () => {
     const p = target('live-lock.json');
     const lock = `${p}.lock`;
-    await fs.writeFile(lock, JSON.stringify({
+    await fs.mkdir(path.join(lock, 'owner'), { recursive: true });
+    await fs.writeFile(path.join(lock, 'owner', 'metadata.json'), JSON.stringify({
       targetPath: p, pid: process.pid, token: 'live-owner', createdAt: new Date().toISOString(), operation: 'wm-write',
     }), 'utf-8');
     const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20 });
     expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
     await expect(fs.access(lock)).resolves.toBeUndefined();
-    await fs.unlink(lock);
+    await fs.rm(lock, { recursive: true, force: true });
   });
 
   it('recovers a stale lock by renaming it to an audit file', async () => {
     const p = target('stale-lock.json');
     const lock = `${p}.lock`;
-    await fs.writeFile(lock, JSON.stringify({
+    await fs.mkdir(path.join(lock, 'owner'), { recursive: true });
+    await fs.writeFile(path.join(lock, 'owner', 'metadata.json'), JSON.stringify({
       targetPath: p, pid: 999_999_999, token: 'stale-owner', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
     }), 'utf-8');
     const result = await writeStateJson(p, '{"v":1}', { staleLockTtlMs: 1 });
     expect(result.ok).toBe(true);
-    const entries = await fs.readdir(tmpDir);
-    expect(entries.some((entry) => entry.startsWith('stale-lock.json.lock.stale-'))).toBe(true);
+    const entries = await fs.readdir(lock);
+    expect(entries.some((entry) => entry.startsWith('.stale-'))).toBe(true);
   });
 
   it('does not let a readback rollback overwrite a later writer', async () => {
@@ -171,7 +174,7 @@ describe('writeStateJson', () => {
     await entered.promise;
     const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 1_000 });
     release.resolve();
-    await expect(first).resolves.toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(first).resolves.toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED' });
     await expect(second).resolves.toMatchObject({ ok: true });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"second"}');
   });
@@ -183,7 +186,8 @@ describe('writeStateJson', () => {
     expect(result.ok).toBe(true);
     const entries = await fs.readdir(tmpDir);
     expect(entries.filter((entry) => entry.includes('.tmp-'))).toEqual([]);
-    expect(entries).not.toContain('cleanup.json.lock');
+    const lockEntries = await fs.readdir(`${p}.lock`);
+    expect(lockEntries).toEqual([]);
   });
 
   it('rolls back a failed readback using an atomic replacement', async () => {
@@ -192,5 +196,70 @@ describe('writeStateJson', () => {
     const result = await writeStateJson(p, '{"v":"new"}', { readbackImpl: async () => 'garbage' });
     expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"original"}');
+  });
+});
+
+describe('review round 1 ownership races', () => {
+  it('does not audit a replacement owner after stale recovery observed the old owner', async () => {
+    const p = target('stale-owner-swap.json');
+    const lockDir = `${p}.lock`;
+    await fs.mkdir(path.join(lockDir, 'owner'), { recursive: true });
+    await fs.writeFile(path.join(lockDir, 'owner', 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: 999_999_999, token: 'old', createdAt: '2000-01-01T00:00:00.000Z', operation: 'wm-write',
+    }));
+    const observed = await deferred();
+    const continueRecovery = await deferred();
+    const recovering = writeStateJson(p, '{"v":"recovered"}', {
+      staleLockTtlMs: 1,
+      afterStaleMetadataRead: async () => { observed.resolve(); await continueRecovery.promise; },
+    } as never);
+    await observed.promise;
+    await fs.mkdir(path.join(lockDir, 'owner'), { recursive: true });
+    await fs.writeFile(path.join(lockDir, 'owner', 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: process.pid, token: 'replacement', createdAt: new Date().toISOString(), operation: 'wm-write',
+    }));
+    continueRecovery.resolve();
+    const result = await recovering;
+    expect(result.reason).toBe('LOCK_TIMEOUT');
+    await expect(fs.readFile(path.join(lockDir, 'owner', 'metadata.json'), 'utf-8')).resolves.toContain('replacement');
+    expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.stale-'))).toEqual([]);
+    await fs.rm(lockDir, { recursive: true, force: true });
+  });
+
+  it('does not delete a replacement owner after release ownership transfer', async () => {
+    const p = target('release-owner-swap.json');
+    const moved = await deferred();
+    const continueRelease = await deferred();
+    const writer = writeStateJson(p, '{"v":1}', {
+      afterReleaseOwnershipMoved: async () => { moved.resolve(); await continueRelease.promise; },
+    } as never);
+    await moved.promise;
+    const lockDir = `${p}.lock`;
+    await fs.mkdir(path.join(lockDir, 'owner'));
+    await fs.writeFile(path.join(lockDir, 'owner', 'metadata.json'), JSON.stringify({
+      targetPath: p, pid: process.pid, token: 'replacement', createdAt: new Date().toISOString(), operation: 'wm-write',
+    }));
+    continueRelease.resolve();
+    await expect(writer).resolves.toMatchObject({ ok: true });
+    await expect(fs.readFile(path.join(lockDir, 'owner', 'metadata.json'), 'utf-8')).resolves.toContain('replacement');
+    await fs.rm(lockDir, { recursive: true, force: true });
+  });
+
+  it('keeps a waiting successor from committing while rollback owns the lock', async () => {
+    const p = target('rollback-successor.json');
+    await fs.writeFile(p, '{"v":"old"}');
+    const beforeRollback = await deferred();
+    const continueRollback = await deferred();
+    const first = writeStateJson(p, '{"v":"first"}', {
+      readbackImpl: async () => 'invalid',
+      beforeRollback: async () => { beforeRollback.resolve(); await continueRollback.promise; },
+    } as never);
+    await beforeRollback.promise;
+    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 1_000 });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"first"}');
+    continueRollback.resolve();
+    await expect(first).resolves.toMatchObject({ ok: false, rolledBack: true });
+    await expect(second).resolves.toMatchObject({ ok: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"second"}');
   });
 });
