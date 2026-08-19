@@ -7,7 +7,7 @@
  *
  * 用法：
  *   echo '{"k":1}' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin
- *   npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --from <src.json> [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock]
+ *   npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --from <src.json> [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock] [--allow-untyped]
  *
  * 参数：
  *   target.json             目标状态文件路径（不存在则直接创建）
@@ -17,11 +17,12 @@
  *   --no-backup             跳过 .bak 备份（默认生成 <target>.bak.YYYYMMDD-HHMMSS-mmm-<UUID>，保留 5 份）
  *   --lock-timeout <ms>     跨进程锁等待超时（非负整数毫秒）
  *   --recover-stale-lock    显式恢复陈旧锁
+ *   --allow-untyped         仅允许未注册的 .w-model 目标写入（已注册目标仍强制 Schema）
  *   --help                  打印用法
  *
  * 退出码：
  *   0  写入成功（stdout 单行 WMWRITE_JSON {ok:true,...}）
- *   1  写入拒绝（INVALID_JSON / MTIME_CONFLICT / TARGET_MISSING_FOR_MTIME / WRITE_VERIFY_FAILED / LOCK_TIMEOUT / STALE_LOCK；
+ *   1  写入拒绝（INVALID_JSON / MTIME_CONFLICT / TARGET_MISSING_FOR_MTIME / WRITE_VERIFY_FAILED / LOCK_TIMEOUT / STALE_LOCK / UNREGISTERED_TARGET / SCHEMA_INVALID；
  *      stdout 单行 WMWRITE_JSON {ok:false,reason,...}，stderr 人类可读消息；目标未被修改）
  *   2  输入错误（参数非法 / 源文件不存在 / IO 异常；stderr 人类可读，stdout ERROR_JSON）
  *
@@ -36,7 +37,7 @@ import { runMain } from '../lib/run-main.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
 
 const USAGE =
-  '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock]';
+  '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock] [--allow-untyped]';
 
 const REASON_MESSAGES: Record<string, string> = {
   INVALID_JSON: '写入内容不是合法 JSON，已拒绝（目标未修改）',
@@ -45,6 +46,8 @@ const REASON_MESSAGES: Record<string, string> = {
   WRITE_VERIFY_FAILED: '写后回读校验失败（内容不一致），请检查磁盘/杀软拦截后重试',
   LOCK_TIMEOUT: '等待状态文件跨进程锁超时，写入已拒绝',
   STALE_LOCK: '检测到陈旧状态文件锁，写入已拒绝；可使用 --recover-stale-lock 显式恢复',
+  UNREGISTERED_TARGET: '目标 .w-model 状态路径未注册 Schema，写入已拒绝；仅可显式使用 --allow-untyped',
+  SCHEMA_INVALID: '写入内容不符合已注册状态 Schema，已拒绝（目标未修改）',
 };
 
 function exitArgInvalid(message: string, detail = USAGE): never {
@@ -66,6 +69,7 @@ async function main(): Promise<void> {
   let expectMtimeMs: number | null = null;
   let lockTimeoutMs: number | undefined;
   let recoverStaleLock = false;
+  let allowUntyped = false;
   let backup = true;
 
   for (let index = 0; index < args.length; index++) {
@@ -101,6 +105,9 @@ async function main(): Promise<void> {
       }
       case '--recover-stale-lock':
         recoverStaleLock = true;
+        break;
+      case '--allow-untyped':
+        allowUntyped = true;
         break;
       case '--no-backup':
         backup = false;
@@ -145,6 +152,7 @@ async function main(): Promise<void> {
   const result = await writeStateJson(absTarget, jsonText, {
     backup,
     expectMtimeMs,
+    allowUntyped,
     allowImplicitStaleRecovery: false,
     ...(lockTimeoutMs !== undefined ? { lockTimeoutMs } : {}),
     ...(recoverStaleLock ? { recoverStaleLock: true } : {}),
@@ -156,8 +164,14 @@ async function main(): Promise<void> {
     ...(result.reason !== undefined ? { reason: result.reason } : {}),
     writtenPath: result.writtenPath,
     ...(result.backupPath !== undefined ? { backupPath: result.backupPath } : {}),
+    ...(result.schemaInvalidLine !== undefined ? { schemaInvalidLine: result.schemaInvalidLine } : {}),
+    ...(result.untyped ? { untyped: true } : {}),
   };
   console.log('WMWRITE_JSON ' + JSON.stringify(summary));
+
+  if (result.ok && result.untyped) {
+    console.error(`⚠ 警告: 未注册 .w-model 目标按 --allow-untyped 写入，未执行 Schema 校验: ${absTarget}`);
+  }
 
   if (!result.ok) {
     const reason = result.reason ?? 'UNKNOWN';

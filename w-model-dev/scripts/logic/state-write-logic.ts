@@ -3,6 +3,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 import { parseJsonSafe } from '../lib/safe-json.js';
+import { inferProjectRoot, isProjectStateTarget, resolveStateSchema } from '../lib/state-schema-registry.js';
+
+import { validateBySchema } from './schema-loader.js';
 
 export interface StateLockMetadata {
   targetPath: string;
@@ -28,6 +31,10 @@ export interface StateWriteOptions {
   afterRecoveryOwnershipMoved?: () => void | Promise<void>;
   afterReleaseOwnershipMoved?: () => void | Promise<void>;
   beforeRollback?: () => void | Promise<void>;
+  /** Project root used to resolve .w-model target schema registrations. Defaults to the target's .w-model parent. */
+  projectRoot?: string;
+  /** Allows an otherwise unregistered .w-model target, never bypassing registered schema validation. */
+  allowUntyped?: boolean;
 }
 
 export interface StateWriteResult {
@@ -40,7 +47,11 @@ export interface StateWriteResult {
     | 'TARGET_MISSING_FOR_MTIME'
     | 'WRITE_VERIFY_FAILED'
     | 'LOCK_TIMEOUT'
-    | 'STALE_LOCK';
+    | 'STALE_LOCK'
+    | 'UNREGISTERED_TARGET'
+    | 'SCHEMA_INVALID';
+  schemaInvalidLine?: number;
+  untyped?: boolean;
   rolledBack?: boolean;
 }
 
@@ -272,6 +283,42 @@ async function releaseLock(lockDir: string, ownerDir: string, token: string, opt
   await fs.rm(released, { recursive: true, force: true });
 }
 
+function validateRegisteredStatePayload(
+  absPath: string,
+  jsonText: string,
+  projectRoot: string,
+  allowUntyped: boolean,
+): Pick<StateWriteResult, 'reason' | 'schemaInvalidLine' | 'untyped'> | undefined {
+  const registered = resolveStateSchema(absPath, projectRoot);
+  if (!registered) {
+    if (isProjectStateTarget(absPath, projectRoot) && !allowUntyped) return { reason: 'UNREGISTERED_TARGET' };
+    return isProjectStateTarget(absPath, projectRoot) ? { untyped: true } : undefined;
+  }
+
+  if (registered.format === 'json') {
+    try {
+      const result = validateBySchema(registered.schemaName, parseJsonSafe(jsonText));
+      return result.valid ? undefined : { reason: 'SCHEMA_INVALID' };
+    } catch {
+      return { reason: 'SCHEMA_INVALID' };
+    }
+  }
+
+  const lines = jsonText.split(/\r?\n/);
+  for (const [index, rawLine] of lines.entries()) {
+    const line = rawLine.trim();
+    if (line === '') continue;
+    try {
+      if (!validateBySchema(registered.schemaName, parseJsonSafe(line)).valid) {
+        return { reason: 'SCHEMA_INVALID', schemaInvalidLine: index + 1 };
+      }
+    } catch {
+      return { reason: 'SCHEMA_INVALID', schemaInvalidLine: index + 1 };
+    }
+  }
+  return undefined;
+}
+
 async function restoreIfStillOwned(
   absPath: string,
   jsonText: string,
@@ -315,10 +362,14 @@ export async function writeStateJson(
   jsonText: string,
   opts: StateWriteOptions = {},
 ): Promise<StateWriteResult> {
-  try {
-    parseJsonSafe(jsonText);
-  } catch {
-    return { ok: false, writtenPath: absPath, reason: 'INVALID_JSON' };
+  const projectRoot = opts.projectRoot ?? inferProjectRoot(absPath);
+  const registered = resolveStateSchema(absPath, projectRoot);
+  if (!registered || registered.format === 'json') {
+    try {
+      parseJsonSafe(jsonText);
+    } catch {
+      return { ok: false, writtenPath: absPath, reason: 'INVALID_JSON' };
+    }
   }
   const acquired = await acquireLock(absPath, opts);
   if (acquired === 'STALE_LOCK') return { ok: false, writtenPath: absPath, reason: 'STALE_LOCK' };
@@ -326,6 +377,8 @@ export async function writeStateJson(
   let tmpPath: string | undefined;
   try {
     await opts.afterLockAcquired?.();
+    const validation = validateRegisteredStatePayload(absPath, jsonText, projectRoot, opts.allowUntyped === true);
+    if (validation?.reason) return { ok: false, writtenPath: absPath, ...validation };
     if (opts.expectMtimeMs != null) {
       let stat: Awaited<ReturnType<typeof fs.stat>>;
       try {
@@ -365,7 +418,7 @@ export async function writeStateJson(
       );
       return { ok: false, writtenPath: absPath, reason: 'WRITE_VERIFY_FAILED', rolledBack };
     }
-    return { ok: true, writtenPath: absPath, backupPath };
+    return { ok: true, writtenPath: absPath, backupPath, ...(validation?.untyped ? { untyped: true } : {}) };
   } finally {
     if (tmpPath) await fs.rm(tmpPath, { force: true });
     await releaseLock(acquired.lockDir, acquired.ownerDir, acquired.metadata.token, opts);

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- B2 test paths are generated under a test-owned mkdtemp directory. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -18,6 +19,35 @@ afterAll(async () => {
 function target(name: string): string {
   return path.join(tmpDir, name);
 }
+
+function stateTarget(name: string): string {
+  return path.join(tmpDir, '.w-model', name);
+}
+
+const validProject = {
+  id: 'project-1',
+  name: 'Test project',
+  description: '',
+  status: '需求分析',
+  techStack: { frontend: [], backend: [], database: [], others: [] },
+  createdAt: '2026-08-19T00:00:00.000Z',
+  updatedAt: '2026-08-19T00:00:00.000Z',
+};
+
+const validRunLogEntry = {
+  runId: 'run-1',
+  timestamp: '2026-08-19T00:00:00.000Z',
+  phase: 1,
+  phaseName: '需求分析',
+  action: 'produce',
+  role: 'S',
+  duration_s: 0,
+  tokens: 0,
+  estimated: false,
+  subagentSpawns: 0,
+  gateExitCode: null,
+  outcome: 'success',
+};
 
 async function deferred(): Promise<{ promise: Promise<void>; resolve: () => void }> {
   let resolve!: () => void;
@@ -97,6 +127,70 @@ describe('writeStateJson', () => {
     const result = await writeStateJson(p, '\uFEFF{"a":1}');
     expect(result.ok).toBe(true);
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('\uFEFF{"a":1}');
+  });
+
+  it('rejects an invalid registered JSON payload inside the lock without side effects', async () => {
+    const p = stateTarget('project.json');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, JSON.stringify(validProject), 'utf-8');
+
+    const result = await writeStateJson(p, JSON.stringify({ ...validProject, unexpected: true }));
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID' });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe(JSON.stringify(validProject));
+    const entries = await fs.readdir(path.dirname(p));
+    expect(entries.filter((entry) => entry.includes('.tmp-') || entry.includes('.bak.'))).toEqual([]);
+    await expect(fs.readdir(`${p}.lock`)).resolves.toEqual([]);
+  });
+
+  it('writes a valid registered JSON payload', async () => {
+    const p = stateTarget('project.json');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+
+    const result = await writeStateJson(p, JSON.stringify(validProject), { projectRoot: tmpDir });
+
+    expect(result).toMatchObject({ ok: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe(JSON.stringify(validProject));
+  });
+
+  it('rejects an invalid registered JSONL line and reports only the line number', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, `${JSON.stringify(validRunLogEntry)}\n`, 'utf-8');
+
+    const result = await writeStateJson(
+      p,
+      `${JSON.stringify(validRunLogEntry)}\n${JSON.stringify({ ...validRunLogEntry, extra: true })}\n`,
+      { projectRoot: tmpDir },
+    );
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID', schemaInvalidLine: 2 });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe(`${JSON.stringify(validRunLogEntry)}\n`);
+  });
+
+  it('rejects unregistered .w-model targets unless untyped writes are explicitly allowed', async () => {
+    const p = stateTarget('custom.json');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+
+    const rejected = await writeStateJson(p, '{"custom":true}', { projectRoot: tmpDir });
+    expect(rejected).toMatchObject({ ok: false, reason: 'UNREGISTERED_TARGET' });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+
+    const allowed = await writeStateJson(p, '{"custom":true}', { projectRoot: tmpDir, allowUntyped: true });
+    expect(allowed).toMatchObject({ ok: true, untyped: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"custom":true}');
+  });
+
+  it('does not let allowUntyped bypass an invalid registered schema', async () => {
+    const p = stateTarget('project.json');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+
+    const result = await writeStateJson(p, JSON.stringify({ ...validProject, unexpected: true }), {
+      projectRoot: tmpDir,
+      allowUntyped: true,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID' });
   });
 
   it('serializes writers with the same old mtime so exactly one commits', async () => {

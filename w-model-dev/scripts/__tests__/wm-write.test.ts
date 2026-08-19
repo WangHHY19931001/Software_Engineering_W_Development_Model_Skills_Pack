@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- B2 test paths are generated under a test-owned mkdtemp directory. */
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { createRequire } from 'node:module';
@@ -226,6 +227,76 @@ describe('wm-write CLI lock controls', () => {
     } finally {
       await waitForExit(holder);
     }
+  });
+});
+
+describe('wm-write CLI schema validation', () => {
+  const validProject = {
+    id: 'project-1',
+    name: 'Test project',
+    description: '',
+    status: '需求分析',
+    techStack: { frontend: [], backend: [], database: [], others: [] },
+    createdAt: '2026-08-19T00:00:00.000Z',
+    updatedAt: '2026-08-19T00:00:00.000Z',
+  };
+
+  it('returns SCHEMA_INVALID with exit 1 without allowing --allow-untyped to bypass a registered target', async () => {
+    const stateDir = path.join(tmpDir, '.w-model');
+    const p = path.join(stateDir, 'project.json');
+    await fs.mkdir(stateDir, { recursive: true });
+
+    const result = run(
+      p,
+      ['--stdin', '--allow-untyped'],
+      JSON.stringify({ ...validProject, unexpected: true }),
+      tmpDir,
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('✗ [WRITE_REJECTED]');
+    expect(wmwriteSummary(result.stdout)).toMatchObject({
+      ok: false,
+      reason: 'SCHEMA_INVALID',
+      writtenPath: p,
+    });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('uses the target .w-model parent as project root when the CLI cwd differs', async () => {
+    const stateDir = path.join(tmpDir, '.w-model');
+    const p = path.join(stateDir, 'project.json');
+    await fs.mkdir(stateDir, { recursive: true });
+
+    const result = run(p, ['--stdin'], JSON.stringify({ ...validProject, unexpected: true }));
+
+    expect(result.code).toBe(1);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({
+      ok: false,
+      reason: 'SCHEMA_INVALID',
+      writtenPath: p,
+    });
+  });
+
+  it('returns UNREGISTERED_TARGET with exit 1, then writes with --allow-untyped and marks the JSON summary', async () => {
+    const stateDir = path.join(tmpDir, '.w-model');
+    const p = path.join(stateDir, 'custom.json');
+    await fs.mkdir(stateDir, { recursive: true });
+
+    const rejected = run(p, ['--stdin'], '{"custom":true}', tmpDir);
+    expect(rejected.code).toBe(1);
+    expect(rejected.stderr).toContain('✗ [WRITE_REJECTED]');
+    expect(wmwriteSummary(rejected.stdout)).toMatchObject({
+      ok: false,
+      reason: 'UNREGISTERED_TARGET',
+      writtenPath: p,
+    });
+
+    const allowed = run(p, ['--stdin', '--allow-untyped'], '{"custom":true}', tmpDir);
+    expect(allowed.code).toBe(0);
+    expect(allowed.stderr).toContain('警告');
+    expect(wmwriteSummary(allowed.stdout)).toMatchObject({ ok: true, untyped: true, writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"custom":true}');
   });
 });
 
