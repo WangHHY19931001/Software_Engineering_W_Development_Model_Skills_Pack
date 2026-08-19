@@ -823,6 +823,10 @@ export interface BddCheckInput {
   }>;
   /** 阶段 5-8 注入：cucumber 运行报告 */
   cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+  /** 阶段 1-4 项目门要求 D4 证据；默认 false 以保持 fixture 回归兼容。 */
+  requireTlaEquivalence?: boolean;
+  /** 阶段 5-8 项目门要求 D5 证据；默认 false 以保持 fixture 回归兼容。 */
+  requireCucumberReport?: boolean;
   /** 由 CLI 通过 --graph 提取的 SD 节点 ID 列表（phase>=2 时用于 D8 交叉校验） */
   graphSdNodes?: string[];
   /** 校验时间戳：纯函数测试可注入固定值以确保可重放；CLI 不传时回退到当前时间 */
@@ -914,6 +918,9 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   }
 
   // D4: BDD↔TLA+ 等价性（阶段 1-4 校验，阶段 5-8 跳过）
+  if (phase <= 4 && input.requireTlaEquivalence && !input.tlaSnapshots) {
+    dims.tlaEquivalence.push('[D4] required TLA+ equivalence evidence is missing');
+  }
   if (phase <= 4 && input.tlaSnapshots) {
     for (const sm of input.manifest.stateMachines) {
       // L1 系统级规格豁免 D4 自动等价：L1 是请求-响应抽象而非内部状态机，
@@ -933,6 +940,9 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
 
   // D5: step definitions 绑定完整性（阶段 5-8 强制；阶段 1-4 跳过）
   if (phase >= 5) {
+    if (input.requireCucumberReport && !input.cucumberReport) {
+      dims.stepBinding.push('[D5] required cucumber report evidence is missing');
+    }
     if (input.cucumberReport) {
       if (input.cucumberReport.undefinedCount > 0) {
         dims.stepBinding.push(`[D5] cucumber report has ${input.cucumberReport.undefinedCount} undefined steps`);

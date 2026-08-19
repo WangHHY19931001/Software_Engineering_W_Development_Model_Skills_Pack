@@ -21,6 +21,7 @@ import {
   validateScenarioPath,
   validateTlaEquivalence,
   checkBddModel,
+  type BddManifest,
   type BddStateMachine,
   type TlaSpecSnapshot,
 } from '../logic/bdd-logic.js';
@@ -246,6 +247,70 @@ describe('checkBddModel', () => {
     });
     expect(result.exitCode).toBe(2);
     expect(result.passed).toBe(false);
+  });
+
+  it('D4: requires TLA+ evidence when explicitly requested for phases 1-4', () => {
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
+      currentPhase: 1,
+      features: [],
+      stateMachines: [],
+    } satisfies BddManifest;
+
+    const result = checkBddModel({ manifest, phase: 1, requireTlaEquivalence: true });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.dimensions.tlaEquivalence).toEqual(['[D4] required TLA+ equivalence evidence is missing']);
+  });
+
+  it('D5: requires cucumber evidence when explicitly requested for phases 5-8', () => {
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
+      currentPhase: 5,
+      features: [],
+      stateMachines: [],
+      designCoverage: { totalSdNodes: 0, coveredSdNodes: [], uncoveredSdNodes: [], coverageRate: 1 },
+    } satisfies BddManifest;
+
+    const result = checkBddModel({ manifest, phase: 5, requireCucumberReport: true });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.dimensions.stepBinding).toEqual(['[D5] required cucumber report evidence is missing']);
+  });
+
+  it('keeps D4 and D5 optional without explicit requirement flags', () => {
+    const phaseOne = checkBddModel({
+      manifest: {
+        schemaVersion: '1.0',
+        projectId: 'test',
+        basePath: 'features/',
+        currentPhase: 1,
+        features: [],
+        stateMachines: [],
+      } satisfies BddManifest,
+      phase: 1,
+    });
+    const phaseFive = checkBddModel({
+      manifest: {
+        schemaVersion: '1.0',
+        projectId: 'test',
+        basePath: 'features/',
+        currentPhase: 5,
+        features: [],
+        stateMachines: [],
+        designCoverage: { totalSdNodes: 0, coveredSdNodes: [], uncoveredSdNodes: [], coverageRate: 1 },
+      } satisfies BddManifest,
+      phase: 5,
+    });
+
+    expect(phaseOne.dimensions.tlaEquivalence).toEqual([]);
+    expect(phaseFive.dimensions.stepBinding).toEqual([]);
+    expect(phaseOne.exitCode).toBe(0);
+    expect(phaseFive.exitCode).toBe(0);
   });
 
   it('D7: passes when rtmRows uses correct schema (rows + requirementId) and feature id is registered', () => {

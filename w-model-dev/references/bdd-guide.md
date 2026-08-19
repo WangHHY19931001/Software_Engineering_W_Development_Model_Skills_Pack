@@ -299,7 +299,7 @@ BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
 ### §4.2 等价性跨校验
 
-`check-bdd-model.ts` 在阶段 1-4 门禁时执行 BDD↔TLA+ 等价性校验：
+`check-bdd-model.ts` 在阶段 1-4 门禁时可执行 BDD↔TLA+ 等价性校验；项目阶段门须传 `--require-tla-equivalence --tla-manifest=<path>`，以缺证据时的 D4 violation / exit 1 fail-closed。未传 require flag 的 fixture/兼容调用仍跳过 D4 并输出跳过原因。
 
 | 校验维度 | 算法 |
 |---|---|
@@ -372,8 +372,8 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 | D1 | headerCompleteness | features 文件头标注完整性 | 阶段 1-8 |
 | D2 | gherkinSyntax | Gherkin 语法（cucumber 静态加载校验） | 阶段 1-8 |
 | D3 | stateMachineCompleteness | Background 状态机七要素 | 阶段 1-8 |
-| D4 | tlaEquivalence | BDD↔TLA+ 等价性 | 阶段 1-8 |
-| D5 | stepBinding | step definitions 绑定完整性 | 阶段 1-4 跳过；阶段 5-8 强制 |
+| D4 | tlaEquivalence | BDD↔TLA+ 等价性 | phase 1-4；项目阶段门传 `--require-tla-equivalence` 强制证据 |
+| D5 | stepBinding | step definitions 绑定完整性 | phase 5-8；项目阶段门传 `--require-cucumber-report` 强制证据 |
 | D6 | scenarioPathValidity | scenario Given→When→Then 是合法路径 | 阶段 1-8 |
 | D7 | rtmMapping | 与 RTM 映射 | 阶段 1-8 |
 | D8 | sdCoverage | SD Coverage（phase>=2 强制） | 阶段 2-8 |
@@ -394,23 +394,27 @@ designCoverage 字段由 S-ingest-bdd 子代理从 .feature 文件头部 @design
 ### §5.3 调用方式
 
 ```bash
-# 阶段 1-4 门禁（静态结构校验，不跑 cucumber）
+# phase 1-4 项目阶段门：必须提供 TLA+ 等价性证据
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
   --phase=1|2|3|4 \
-  [--tla-manifest=<tla-manifest.json>] \
+  --require-tla-equivalence \
+  --tla-manifest=<tla-manifest.json> \
   [--rtm=<rtm.json>] \
   [--graph=<graph.json>]
 ```
 
-> `--graph=<graph.json>` 在 phase>=2 时强制必填（D8 SD Coverage 校验数据源，缺失 → exitCode=2 ARG_INVALID）；phase=1 时可选。
+> `--require-tla-equivalence` 仅适用于 phase 1-4；缺少 `--tla-manifest` 产生 D4 violation / exitCode=1，而不是参数错误。`--graph=<graph.json>` 在 phase>=2 时仍强制必填（D8 数据源，缺失 → exitCode=2 ARG_INVALID）；phase=1 时可选。
 
-# 阶段 5-8 终检（含 cucumber 执行结果校验）
+# phase 5-8 项目阶段门：必须提供 cucumber 执行证据
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
   --phase=5|6|7|8 \
+  --require-cucumber-report \
   --cucumber-report=<.w-model/bdd/reports/report.json> \
-  [--tla-manifest=<tla-manifest.json>] \
+  --graph=<graph.json> \
   [--rtm=<rtm.json>]
 ```
+
+> `--require-cucumber-report` 仅适用于 phase 5-8；缺少 `--cucumber-report` 产生 D5 violation / exitCode=1。两个 require flag 用在不对应 phase 均为 exitCode=2 ARG_INVALID。未使用 require flag 时保留原有兼容行为：缺少输入仅跳过对应 D4/D5 并说明原因，适用于技能包 fixture 回归，不得代替项目阶段门。
 
 ### §5.4 退出码与 JSON 摘要
 

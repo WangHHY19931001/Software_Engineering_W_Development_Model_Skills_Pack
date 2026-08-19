@@ -9,14 +9,17 @@
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json>
- *     [--phase=N] [--tla-manifest=<path>] [--rtm=<path>] [--cucumber-report=<path>] [--graph=<graph.json>]
+ *     [--phase=N] [--tla-manifest=<path>] [--require-tla-equivalence] [--rtm=<path>]
+ *     [--cucumber-report=<path>] [--require-cucumber-report] [--graph=<graph.json>]
  *
  * 参数：
  *   bdd-manifest.json   manifest 文件路径
  *   --phase=N            校验阶段（1-8），默认从 manifest.currentPhase 读取
  *   --tla-manifest=<p>   TLA+ manifest 路径（阶段 1-4 用于 D4 等价性校验）
+ *   --require-tla-equivalence  phase 1-4 项目门要求 --tla-manifest；缺失作为 D4 violation / exit 1
  *   --rtm=<p>            RTM 文件路径（用于 D7 RTM 映射校验）
  *   --cucumber-report=<p>  cucumber 运行报告 JSON（阶段 5-8 用于 D5 step 绑定校验）
+ *   --require-cucumber-report  phase 5-8 项目门要求 --cucumber-report；缺失作为 D5 violation / exit 1
  *   --graph=<p>          graph.json 路径（phase>=2 时强制必填，提取 type=SD 节点供 D8 SD Coverage 校验）
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节），不写 gate-logs
  *
@@ -33,8 +36,8 @@
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
- * 命令行参数：支持 --json（机器可读输出）、--phase=N、--tla-manifest=、--rtm=、--cucumber-report=、--graph=
- * 退出码：0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
+ * 命令行参数：支持 --json（机器可读输出）、--phase=N、--tla-manifest=、--require-tla-equivalence、--rtm=、--cucumber-report=、--require-cucumber-report、--graph=
+ * 退出码：0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON；require flag 与 phase 不匹配）
  *
  * 注意：本脚本不调用任何 LLM。cucumber 是确定性运行器，features/step 是文本+代码。
  *
@@ -72,6 +75,8 @@ interface ParsedArgs {
   rtmFile: string | undefined;
   cucumberReportFile: string | undefined;
   graphFile: string | undefined;
+  requireTlaEquivalence: boolean;
+  requireCucumberReport: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -82,6 +87,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   const rtmArg = args.find((a) => a.startsWith('--rtm='));
   const cucumberArg = args.find((a) => a.startsWith('--cucumber-report='));
   const graphArg = args.find((a) => a.startsWith('--graph='));
+  const requireTlaEquivalence = args.includes('--require-tla-equivalence');
+  const requireCucumberReport = args.includes('--require-cucumber-report');
 
   // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
   const phase = phaseArg ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
@@ -91,7 +98,17 @@ function parseArgs(argv: string[]): ParsedArgs {
   const cucumberReportFile = cucumberArg ? cucumberArg.split('=')[1] : undefined;
   const graphFile = graphArg ? graphArg.split('=')[1] : undefined;
 
-  return { manifestFile, phase, phaseStr, tlaManifestFile, rtmFile, cucumberReportFile, graphFile };
+  return {
+    manifestFile,
+    phase,
+    phaseStr,
+    tlaManifestFile,
+    rtmFile,
+    cucumberReportFile,
+    graphFile,
+    requireTlaEquivalence,
+    requireCucumberReport,
+  };
 }
 
 // ==================== I/O 辅助 ====================
@@ -186,6 +203,27 @@ async function main(): Promise<number> {
     return 2;
   }
   const phase = phaseRaw as Phase;
+
+  if (args.requireTlaEquivalence && phase > 4) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--require-tla-equivalence 仅可用于 phase 1-4',
+      detail: 'phase 5-8 的 D4 TLA+ 等价性校验不适用；请移除此 flag',
+      exitCode: 2,
+    });
+    return 2;
+  }
+  if (args.requireCucumberReport && phase < 5) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--require-cucumber-report 仅可用于 phase 5-8',
+      detail: 'phase 1-4 的 D5 step 绑定校验不适用；请移除此 flag',
+      exitCode: 2,
+    });
+    return 2;
+  }
 
   // --graph phase>=2 强制（设计文档 §3.3.7）
   if (phase >= 2 && !args.graphFile) {
@@ -298,6 +336,8 @@ async function main(): Promise<number> {
     } catch (e) {
       console.error(`[D5] 无法读取 cucumber 报告: ${(e as Error).message}`);
     }
+  } else if (phase >= 5) {
+    console.error('提示：未提供 --cucumber-report，跳过 D5 step 绑定校验');
   }
 
   // 提取 graph SD 节点（供 D8 SD Coverage 交叉校验）
@@ -321,6 +361,8 @@ async function main(): Promise<number> {
     tlaSnapshots,
     rtmRows,
     cucumberReport,
+    requireTlaEquivalence: args.requireTlaEquivalence,
+    requireCucumberReport: args.requireCucumberReport,
     graphSdNodes,
   });
   const exitCode = result.exitCode;

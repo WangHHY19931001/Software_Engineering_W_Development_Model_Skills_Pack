@@ -503,11 +503,11 @@ TLA+ 建模必须符合需求和设计。TLC 发现违反时：
   G 跑 check-verifier-output.ts  ──┤
   G 跑 check-requirement-graph.ts ─┤  （静态结构）
   G 跑 check-tla-model.ts       ──┤  （动态行为 - TLA+）
-  G 跑 check-bdd-model.ts       ──┘  （动态行为 - BDD + BDD↔TLA+ 等价性）
+  G 跑 check-bdd-model.ts       ──┘  （动态行为 - BDD + BDD↔TLA+ 等价性；项目门传 --require-tla-equivalence）
   CHECKPOINT 阶段门放行
 ```
 
-图谱门禁管静态结构（节点/边/连通/信息流），TLA+ 门禁管动态行为（状态机/不变式/死锁），BDD 门禁管可执行规格（features/状态机七要素/BDD↔TLA+ 等价性）。三者正交：一个规格可结构完整却仍有死锁，或 TLA+ 通过但 BDD features 与 TLA+ 状态机不等价。BDD↔TLA+ 等价性校验（`check-bdd-model.ts` D4 维度）确保 BDD 状态机的 states/initialState/transitions/invariants 与同层 TLA+ spec 的 State/Init/Next/Invariants 一一对应。
+图谱门禁管静态结构（节点/边/连通/信息流），TLA+ 门禁管动态行为（状态机/不变式/死锁），BDD 门禁管可执行规格（features/状态机七要素/BDD↔TLA+ 等价性）。三者正交：一个规格可结构完整却仍有死锁，或 TLA+ 通过但 BDD features 与 TLA+ 状态机不等价。BDD↔TLA+ 等价性校验（`check-bdd-model.ts` D4 维度）确保 BDD 状态机的 states/initialState/transitions/invariants 与同层 TLA+ spec 的 State/Init/Next/Invariants 一一对应。项目阶段门在 phase 1-4 必须传 `--require-tla-equivalence --tla-manifest=<path>`；缺证据产生 exit 1 violation，错误 phase 组合为 exit 2。该项目工件门不同于本地 pre-push 的技能包 fixture 回归，后者不直接运行 TLA/TLA↔BDD 项目工件门。
 
 ## 10. SD 覆盖率规则
 

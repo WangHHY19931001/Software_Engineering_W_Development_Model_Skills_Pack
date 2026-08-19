@@ -10,6 +10,7 @@
 ## [41.19.0] - 2026-08-19
 
 ### 修复（审计整改批次 B）
+- **BDD 项目行为证据显式门**：`check-bdd-model.ts` 新增 phase 1-4 的 `--require-tla-equivalence` 与 phase 5-8 的 `--require-cucumber-report`；所需工件缺失均作为 D4/D5 violation / exit 1，错误 phase 组合为 exit 2，未带 flag 保持 fixture 兼容跳过。SKILL/指南/命令参考与 pre-push 注释明确区分：pre-push 只直接运行技能包 BDD fixture 回归，TLA、TLA↔BDD 同步和真实项目工件由项目阶段门按成熟度执行。
 - **同步子进程边界**：`runSync` 为 B4 受控调用提供 15 秒进程级 timeout、固定 `SIGKILL`、固定 UTF-8 编码和 64 MiB 输出缓冲；非有限/非正 timeout 或 maxBuffer 均回退默认值。artifact gate 的 TLA+/BDD 校验及 gate-report、metrics-report、wm-status 测试调用均迁移至 helper。全目录同步调用已通过 TypeScript AST 与集中清单审计：解析 `node:child_process` 的直接、别名、namespace、解构和静态属性绑定；每处调用均声明理由及现有 timeout 或后续整改状态，动态计算属性访问将阻断审计，未在 B4 范围内的无 timeout 调用不再被默默放过。
 
 ### 修复（审计整改批次 A）

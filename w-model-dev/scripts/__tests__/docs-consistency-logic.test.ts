@@ -754,7 +754,7 @@ describe('runDocConsistencyChecks', () => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-        await fs.writeFile(docPath, docContent.replaceAll('49', '50').replaceAll('809', '787'), 'utf-8');
+        await fs.writeFile(docPath, docContent.replaceAll('833', '787'), 'utf-8');
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, passing.stdout).toBe(0);
@@ -765,13 +765,13 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('50 files / 787 tests', '50 files / 766 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('52 files / 787 tests', '52 files / 766 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
       expect(stale.stdout).toContain('vitest 用例  : 787');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
-      expect(stale.stdout).toContain('50 files / 766 tests');
+      expect(stale.stdout).toContain('52 files / 766 tests');
     });
   });
 
