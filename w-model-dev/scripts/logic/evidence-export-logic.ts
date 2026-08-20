@@ -9,7 +9,38 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 export type EvidenceKind = 'gate-log' | 'verifier-output' | 'signature-chain' | 'codegraph-query' | 'run-log';
 
 type EvidenceFile = { path: string; sha256: string; kind: EvidenceKind };
-type EvidenceManifest = { schemaVersion: '1.0'; exportedAt: string; sourceProject: string; files: EvidenceFile[] };
+type EvidenceMeasurement = { count: number; contentHash: string };
+type EvidenceMeasurements = {
+  gateLogs: EvidenceMeasurement;
+  verifierOutputs: EvidenceMeasurement;
+  runLog: EvidenceMeasurement;
+};
+type SourceVerificationProvenance = {
+  format: 'w-model-evidence-verification';
+  version: 1;
+  runId: string;
+  commitSha: string;
+  artifactId: string;
+  verificationStatus: 'passed';
+  measurements: EvidenceMeasurements;
+};
+type EvidenceProvenance = {
+  format: 'w-model-evidence-provenance';
+  version: 1;
+  runId: string;
+  commitSha: string;
+  artifactId: string;
+  verificationStatus: 'passed';
+  measurements: EvidenceMeasurements;
+  contentHash: string;
+};
+type EvidenceManifest = {
+  schemaVersion: '1.0';
+  exportedAt: string;
+  sourceProject: string;
+  provenance: EvidenceProvenance;
+  files: EvidenceFile[];
+};
 type FailureReason =
   | 'INVALID_JSON_EVIDENCE'
   | 'INVALID_JSONL_EVIDENCE'
@@ -18,6 +49,8 @@ type FailureReason =
   | 'UNSAFE_EVIDENCE_CONTENT'
   | 'NONEMPTY_OUTPUT'
   | 'INVALID_MANIFEST'
+  | 'INVALID_PROVENANCE'
+  | 'UNSANITIZED_EVIDENCE'
   | 'UNMANIFESTED_OUTPUT'
   | 'HASH_MISMATCH'
   | 'EVIDENCE_EXPORT_FAILED';
@@ -35,8 +68,14 @@ export interface EvidenceExportResult {
 const MANIFEST_NAME = 'evidence-manifest.json';
 const REDACTED = '[REDACTED]';
 const REDACTED_ABSOLUTE_PATH = '<redacted-absolute-path>';
-const SENSITIVE_KEYS = new Set(['token', 'secret', 'password', 'apikey']);
+const SENSITIVE_KEYS = new Set(['token', 'secret', 'password', 'apikey', 'authorization', 'credential', 'accesstoken', 'privatekey']);
 const TEXT_EXTENSIONS = new Set(['.json', '.jsonl', '.log', '.txt', '.md']);
+const SOURCE_PROVENANCE_NAME = 'evidence-provenance.json';
+const MEASURED_KINDS: Array<[EvidenceKind, keyof EvidenceMeasurements]> = [
+  ['gate-log', 'gateLogs'],
+  ['verifier-output', 'verifierOutputs'],
+  ['run-log', 'runLog'],
+];
 const ABSOLUTE_PATH_PATTERN =
   /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
 const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
@@ -59,6 +98,12 @@ class EvidenceFailure extends Error {
 type Snapshot = { realPath: string; ino: number; size: number; mtimeMs: number; directory: boolean };
 function sha256(content: string | Buffer): string {
   return createHash('sha256').update(content).digest('hex');
+}
+function hashFileList(files: Array<Pick<EvidenceFile, 'path' | 'sha256'>>): string {
+  return sha256(JSON.stringify([...files].sort((left, right) => comparePaths(left.path, right.path))));
+}
+function normalizeSensitiveKey(key: string): string {
+  return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
 function isPathInside(candidate: string, parent: string): boolean {
   const relative = path.relative(parent, candidate);
@@ -168,7 +213,12 @@ async function collectDirectoryFiles(root: string, current: string, result: stri
   await assertStable(current, before, root);
 }
 function sanitizeString(value: string): string {
-  return value.replace(ABSOLUTE_PATH_PATTERN, REDACTED_ABSOLUTE_PATH);
+  return value
+    .replace(ABSOLUTE_PATH_PATTERN, REDACTED_ABSOLUTE_PATH)
+    .replace(
+      /^(\s*(?:token|secret|password|api[_-]?key|authorization|credential|access[_-]?token|private[_-]?key)\s*(?::|=)\s*).*$/gim,
+      `$1${REDACTED}`,
+    );
 }
 function redact(value: unknown): unknown {
   if (typeof value === 'string') return sanitizeString(value);
@@ -177,7 +227,7 @@ function redact(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
         key,
-        SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redact(nested),
+        SENSITIVE_KEYS.has(normalizeSensitiveKey(key)) ? REDACTED : redact(nested),
       ]),
     );
   }
@@ -209,6 +259,58 @@ function sanitizeContent(sourcePath: string, content: Buffer): Buffer {
   }
   return Buffer.from(sanitizeString(text), 'utf8');
 }
+function isEvidenceMeasurement(value: unknown): value is EvidenceMeasurement {
+  if (value === null || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    Number.isInteger(record.count) &&
+    typeof record.count === 'number' &&
+    record.count >= 1 &&
+    typeof record.contentHash === 'string' &&
+    /^[0-9a-f]{64}$/.test(record.contentHash)
+  );
+}
+function isEvidenceMeasurements(value: unknown): value is EvidenceMeasurements {
+  if (value === null || typeof value !== 'object') return false;
+  const measurements = value as Record<string, unknown>;
+  return (
+    Object.keys(measurements).length === 3 &&
+    isEvidenceMeasurement(measurements.gateLogs) &&
+    isEvidenceMeasurement(measurements.verifierOutputs) &&
+    isEvidenceMeasurement(measurements.runLog)
+  );
+}
+function parseSourceProvenance(value: unknown): SourceVerificationProvenance {
+  if (value === null || typeof value !== 'object') throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+  const source = value as Record<string, unknown>;
+  if (
+    source.format !== 'w-model-evidence-verification' ||
+    source.version !== 1 ||
+    typeof source.runId !== 'string' ||
+    source.runId.length === 0 ||
+    typeof source.commitSha !== 'string' ||
+    !/^[0-9a-f]{40}$/.test(source.commitSha) ||
+    typeof source.artifactId !== 'string' ||
+    source.artifactId.length === 0 ||
+    source.verificationStatus !== 'passed' ||
+    !isEvidenceMeasurements(source.measurements)
+  ) {
+    throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+  }
+  return source as SourceVerificationProvenance;
+}
+function toExportProvenance(source: SourceVerificationProvenance, files: EvidenceFile[]): EvidenceProvenance {
+  return {
+    format: 'w-model-evidence-provenance',
+    version: 1,
+    runId: source.runId,
+    commitSha: source.commitSha,
+    artifactId: source.artifactId,
+    verificationStatus: 'passed',
+    measurements: source.measurements,
+    contentHash: hashFileList(files),
+  };
+}
 async function atomicWrite(target: string, content: string | Buffer): Promise<void> {
   const temp = path.join(path.dirname(target), `.${path.basename(target)}.${randomUUID()}.tmp`);
   try {
@@ -239,6 +341,12 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
     const state = path.join(project, '.w-model');
     await assertRealDirectory(state);
     const sourceReal = await fs.realpath(state);
+    const sourceProvenancePath = path.join(state, SOURCE_PROVENANCE_NAME);
+    const sourceProvenanceBefore = await snapshot(sourceProvenancePath, false).catch(() => {
+      throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+    });
+    const sourceProvenance = parseSourceProvenance(JSON.parse(await fs.readFile(sourceProvenancePath, 'utf8')));
+    await assertStable(sourceProvenancePath, sourceProvenanceBefore, sourceReal);
     const output = path.resolve(outputDir);
     await ensureEmptyOutput(output, sourceReal);
     staging = `${output}.tmp-${randomUUID()}`;
@@ -256,6 +364,9 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
     if (await lstatOrNull(runLog)) sources.push({ sourceRelative: 'run-log.jsonl', kind: 'run-log' });
     const seen = new Set<string>();
     const files: EvidenceFile[] = [];
+    const sourceMeasurements = new Map<keyof EvidenceMeasurements, Array<{ path: string; sha256: string }>>(
+      MEASURED_KINDS.map(([, key]) => [key, []]),
+    );
     for (const source of sources.sort((a, b) => comparePaths(a.sourceRelative, b.sourceRelative))) {
       if (!isSafeRelativePath(source.sourceRelative) || seen.has(source.sourceRelative))
         throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
@@ -263,19 +374,33 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       const sourcePath = path.join(state, source.sourceRelative);
       const before = await snapshot(sourcePath, false);
       if (!isPathInside(before.realPath, sourceReal)) throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
-      const sanitized = sanitizeContent(sourcePath, await fs.readFile(sourcePath));
+      const sourceContent = await fs.readFile(sourcePath);
+      const sanitized = sanitizeContent(sourcePath, sourceContent);
       await assertStable(sourcePath, before, sourceReal);
+      const measurementKey = MEASURED_KINDS.find(([kind]) => kind === source.kind)?.[1];
+      if (measurementKey) sourceMeasurements.get(measurementKey)!.push({ path: source.sourceRelative, sha256: sha256(sourceContent) });
       const target = path.join(staging, source.sourceRelative);
       if (!isPathInside(target, staging)) throw new EvidenceFailure(1, 'UNSAFE_OUTPUT_PATH');
       await fs.mkdir(path.dirname(target), { recursive: true });
       await atomicWrite(target, sanitized);
       files.push({ path: source.sourceRelative, sha256: sha256(sanitized), kind: source.kind });
     }
+    const sortedFiles = files.sort((a, b) => comparePaths(a.path, b.path));
+    const expectedMeasurements: Array<[Array<{ path: string; sha256: string }>, EvidenceMeasurement]> = [
+      [sourceMeasurements.get('gateLogs')!, sourceProvenance.measurements.gateLogs],
+      [sourceMeasurements.get('verifierOutputs')!, sourceProvenance.measurements.verifierOutputs],
+      [sourceMeasurements.get('runLog')!, sourceProvenance.measurements.runLog],
+    ];
+    for (const [filesForKind, expected] of expectedMeasurements) {
+      if (filesForKind.length !== expected.count || hashFileList(filesForKind) !== expected.contentHash)
+        throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+    }
     const manifest: EvidenceManifest = {
       schemaVersion: '1.0',
       exportedAt: new Date().toISOString(),
       sourceProject: '<redacted-project>',
-      files: files.sort((a, b) => comparePaths(a.path, b.path)),
+      provenance: toExportProvenance(sourceProvenance, sortedFiles),
+      files: sortedFiles,
     };
     if (!validateBySchema('evidence-manifest', manifest).valid) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
     await atomicWrite(path.join(staging, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + '\n');
@@ -328,6 +453,15 @@ export async function verifyEvidence(manifestPath: string): Promise<EvidenceExpo
     for (const file of typed.files) {
       if (!isSafeRelativePath(file.path) || expected.has(file.path)) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
       expected.add(file.path);
+    }
+    if (
+      typed.provenance.verificationStatus !== 'passed' ||
+      !/^[0-9a-f]{40}$/.test(typed.provenance.commitSha) ||
+      typed.provenance.contentHash !== hashFileList(typed.files)
+    ) {
+      throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+    }
+    for (const file of typed.files) {
       const target = path.resolve(output, file.path);
       if (!isPathInside(target, output)) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
       const targetStat = await fs.lstat(target);
@@ -337,6 +471,13 @@ export async function verifyEvidence(manifestPath: string): Promise<EvidenceExpo
       const content = await fs.readFile(target);
       await assertStable(target, before, outputReal);
       if (sha256(content) !== file.sha256) throw new EvidenceFailure(1, 'HASH_MISMATCH');
+      let sanitized: Buffer;
+      try {
+        sanitized = sanitizeContent(target, content);
+      } catch {
+        throw new EvidenceFailure(1, 'UNSANITIZED_EVIDENCE');
+      }
+      if (Buffer.compare(content, sanitized) !== 0) throw new EvidenceFailure(1, 'UNSANITIZED_EVIDENCE');
     }
     const actual: string[] = [];
     await collectOutputFiles(outputReal, outputReal, actual);

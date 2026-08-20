@@ -1,5 +1,6 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- all paths are generated beneath a mkdtemp-owned fixture. */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
@@ -30,6 +31,14 @@ function projectPath(name = 'project'): string {
   return path.join(tmpDir, name);
 }
 
+function sha256(value: string | Buffer): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function evidenceContentHash(files: Array<{ path: string; sha256: string }>): string {
+  return sha256(JSON.stringify([...files].sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))));
+}
+
 async function createProject(name = 'project'): Promise<string> {
   const project = projectPath(name);
   const state = path.join(project, '.w-model');
@@ -39,12 +48,12 @@ async function createProject(name = 'project'): Promise<string> {
   await fs.mkdir(path.join(state, 'codegraph-queries'), { recursive: true });
   await fs.writeFile(
     path.join(state, 'gate-logs', 'gate.json'),
-    JSON.stringify({ token: 'gate-token', nested: { secret: 'gate-secret' } }),
+    JSON.stringify({ passed: true, token: 'gate-token', nested: { secret: 'gate-secret' } }),
     'utf8',
   );
   await fs.writeFile(
     path.join(state, 'verifier-outputs', 'verifier.json'),
-    JSON.stringify({ apiKey: 'verifier-key', rows: [{ password: 'verifier-password' }] }),
+    JSON.stringify({ passed: true, apiKey: 'verifier-key', rows: [{ password: 'verifier-password' }] }),
     'utf8',
   );
   await fs.writeFile(
@@ -57,19 +66,52 @@ async function createProject(name = 'project'): Promise<string> {
     JSON.stringify({
       sourcePath: '/private/source',
       path: 'D:/private/worktree',
-      nested: { paths: ['\\\\server\\share\\secret', '/home/alice/private'] },
+      nested: {
+        paths: ['\\\\server\\share\\secret', '/home/alice/private'],
+        ACCESS_TOKEN: 'query-access-token',
+        'private-key': 'query-private-key',
+      },
       token: 'query-token',
     }),
     'utf8',
   );
   await fs.writeFile(
     path.join(state, 'codegraph-queries', 'query.md'),
-    'source: D:/private/worktree with spaces\nresult: /home/alice/private\nnetwork: //host/private/share\nlink: https://example.test/relative\nrelative: docs/relative.md\n',
+    'source: D:/private/worktree with spaces\nresult: /home/alice/private\nnetwork: //host/private/share\nAuthorization: Bearer markdown-authorization\nprivate_key = markdown-private-key\nlink: https://example.test/relative\nrelative: docs/relative.md\n',
     'utf8',
   );
   await fs.writeFile(
     path.join(state, 'run-log.jsonl'),
-    '{"secret":"run-secret","nested":{"apiKey":"run-key"}}\n',
+    '{"runId":"verified-run-1","outcome":"success","secret":"run-secret","nested":{"apiKey":"run-key","credential":"run-credential"}}\n',
+    'utf8',
+  );
+  const provenanceInputs: Array<[string, string[]]> = [
+    ['gateLogs', ['gate-logs/gate.json']],
+    ['verifierOutputs', ['verifier-outputs/verifier.json']],
+    ['runLog', ['run-log.jsonl']],
+  ];
+  const measurements = await Promise.all(
+    provenanceInputs.map(async ([name, paths]) => {
+      const files = await Promise.all(
+        paths.map(async (relativePath) => ({
+          path: relativePath,
+          sha256: sha256(await fs.readFile(path.join(state, relativePath))),
+        })),
+      );
+      return [name, { count: files.length, contentHash: evidenceContentHash(files) }];
+    }),
+  );
+  await fs.writeFile(
+    path.join(state, 'evidence-provenance.json'),
+    JSON.stringify({
+      format: 'w-model-evidence-verification',
+      version: 1,
+      runId: 'verified-run-1',
+      commitSha: 'a'.repeat(40),
+      artifactId: 'verified-artifact-1',
+      verificationStatus: 'passed',
+      measurements: Object.fromEntries(measurements),
+    }),
     'utf8',
   );
   return project;
@@ -126,6 +168,48 @@ describe('evidence export logic', () => {
     expect(manifest.files.some((entry) => entry.path === 'evidence-manifest.json')).toBe(false);
   });
 
+  it('binds exported packages to a passed source verification provenance and rejects missing provenance through the real CLI', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'provenance-evidence');
+
+    const exported = runCli([project, output]);
+
+    expect(exported.code).toBe(0);
+    const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
+      provenance: Record<string, unknown>;
+      files: Array<{ path: string; sha256: string }>;
+    };
+    expect(manifest.provenance).toMatchObject({
+      format: 'w-model-evidence-provenance',
+      version: 1,
+      runId: 'verified-run-1',
+      commitSha: 'a'.repeat(40),
+      artifactId: 'verified-artifact-1',
+      verificationStatus: 'passed',
+      measurements: {
+        gateLogs: { count: 1, contentHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        verifierOutputs: { count: 1, contentHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        runLog: { count: 1, contentHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+      },
+      contentHash: evidenceContentHash(manifest.files),
+    });
+    expect(runCli(['--verify', path.join(output, 'evidence-manifest.json')]).code).toBe(0);
+
+    await fs.rm(path.join(project, '.w-model', 'evidence-provenance.json'));
+    const rejected = runCli([project, path.join(tmpDir, 'missing-provenance-evidence')]);
+    expect(rejected.code).toBe(1);
+    expect(cliSummary(rejected.stdout)).toMatchObject({ ok: false, reason: 'INVALID_PROVENANCE' });
+
+    const unverifiedProject = await createProject('unverified-project');
+    const sourceProvenance = path.join(unverifiedProject, '.w-model', 'evidence-provenance.json');
+    const unverified = JSON.parse(await fs.readFile(sourceProvenance, 'utf8')) as Record<string, unknown>;
+    unverified.verificationStatus = 'unverified';
+    await fs.writeFile(sourceProvenance, JSON.stringify(unverified), 'utf8');
+    const unverifiedResult = runCli([unverifiedProject, path.join(tmpDir, 'unverified-evidence')]);
+    expect(unverifiedResult.code).toBe(1);
+    expect(cliSummary(unverifiedResult.stdout)).toMatchObject({ ok: false, reason: 'INVALID_PROVENANCE' });
+  });
+
   it('recursively redacts sensitive JSON and JSONL field values without leaking source values', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');
@@ -150,8 +234,13 @@ describe('evidence export logic', () => {
       'verifier-password',
       'chain-token',
       'query-token',
+      'query-access-token',
+      'query-private-key',
       'run-secret',
       'run-key',
+      'run-credential',
+      'markdown-authorization',
+      'markdown-private-key',
       'D:/private/worktree with spaces',
       '\\\\server\\share\\secret',
       '/home/alice/private',
@@ -167,6 +256,9 @@ describe('evidence export logic', () => {
     expect(outputText).toContain('relative: docs/relative.md');
     expect(JSON.parse(combined[0]!)).toMatchObject({ token: '[REDACTED]', nested: { secret: '[REDACTED]' } });
     expect(JSON.parse(combined[2]!.trim())).toMatchObject({ token: '[REDACTED]' });
+    expect(JSON.parse(combined[3]!)).toMatchObject({ nested: { ACCESS_TOKEN: '[REDACTED]', 'private-key': '[REDACTED]' } });
+    expect(combined[4]).toContain('Authorization: [REDACTED]');
+    expect(combined[4]).toContain('private_key = [REDACTED]');
   });
 
   it('verifies a valid export and rejects a tampered exported file', async () => {
@@ -178,6 +270,31 @@ describe('evidence export logic', () => {
     await expect(verifyEvidence(manifest)).resolves.toMatchObject({ ok: true, exitCode: 0 });
     await fs.appendFile(path.join(output, 'gate-logs', 'gate.json'), 'tampered', 'utf8');
     await expect(verifyEvidence(manifest)).resolves.toMatchObject({ ok: false, exitCode: 1 });
+  });
+
+  it('rejects a hand-assembled hash-valid package that reintroduces an authorization secret through the real CLI', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'manually-unsanitized-evidence');
+    expect(runCli([project, output]).code).toBe(0);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string }>;
+      provenance: { contentHash: string };
+    };
+    const targetPath = path.join(output, 'gate-logs', 'gate.json');
+    const unsafeContent = JSON.stringify({ passed: true, authorization: 'Bearer manually-added-secret' }, null, 2) + '\n';
+    await fs.writeFile(targetPath, unsafeContent, 'utf8');
+    const target = manifest.files.find((file) => file.path === 'gate-logs/gate.json');
+    expect(target).toBeDefined();
+    target!.sha256 = sha256(unsafeContent);
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    const verified = runCli(['--verify', manifestPath]);
+
+    expect(verified.code).toBe(1);
+    expect(cliSummary(verified.stdout)).toMatchObject({ ok: false, reason: 'UNSANITIZED_EVIDENCE' });
+    expect(verified.stdout + verified.stderr).not.toContain('manually-added-secret');
   });
 
   it('rejects output within source, source escapes, symlink escapes, binaries, and mixed nonempty output', async () => {
@@ -249,6 +366,18 @@ describe('evidence export logic', () => {
     await fs.writeFile(path.join(logs, 'Z.json'), '{"ok":true}', 'utf8');
     await fs.writeFile(path.join(logs, 'a.json'), '{"ok":true}', 'utf8');
     await fs.writeFile(path.join(logs, 'é.json'), '{"ok":true}', 'utf8');
+    const provenancePath = path.join(project, '.w-model', 'evidence-provenance.json');
+    const provenance = JSON.parse(await fs.readFile(provenancePath, 'utf8')) as {
+      measurements: { gateLogs: { count: number; contentHash: string } };
+    };
+    const gateLogFiles = await Promise.all(
+      ['gate.json', 'Z.json', 'a.json', 'é.json'].map(async (name) => ({
+        path: `gate-logs/${name}`,
+        sha256: sha256(await fs.readFile(path.join(logs, name))),
+      })),
+    );
+    provenance.measurements.gateLogs = { count: gateLogFiles.length, contentHash: evidenceContentHash(gateLogFiles) };
+    await fs.writeFile(provenancePath, JSON.stringify(provenance), 'utf8');
     const output = path.join(tmpDir, 'unicode-evidence');
 
     await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
