@@ -133,12 +133,15 @@ interface Exit2Probe {
   args: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  outputPath?: string;
 }
 
 interface Exit2ProbeResult {
   script: string;
   status: number;
   errorExitCode: number | null;
+  outputPath?: string;
+  outputExistsAfter?: boolean;
 }
 
 /**
@@ -162,7 +165,7 @@ function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Exit
   }
   const probes = new Map<string, Exit2Probe>();
   for (const file of cliScriptFiles) {
-    if (file === 'self-test.ts' || file === 'security-scan.ts') continue;
+    if (file === 'self-test.ts' || file === 'security-scan.ts' || file === 'wm-export-evidence.ts') continue;
     probes.set(file, { script: file, args: ['--d4-invalid-argument'] });
   }
   probes.set('security-scan.ts', {
@@ -170,10 +173,30 @@ function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Exit
     args: [],
     env: { ...process.env, PATH: '', Path: '' },
   });
+  const exportProbeRoot = join(probeRoot, 'export-probes');
+  const exportProject = join(exportProbeRoot, 'project');
+  const exportOutput = join(exportProbeRoot, 'output');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
+  mkdirSync(join(exportProject, '.w-model'), { recursive: true });
+  probes.set('wm-export-evidence.ts#no-args', {
+    script: 'wm-export-evidence.ts',
+    args: [],
+    outputPath: exportOutput,
+  });
+  probes.set('wm-export-evidence.ts#unknown-option', {
+    script: 'wm-export-evidence.ts',
+    args: ['--d4-invalid-argument'],
+    outputPath: exportOutput,
+  });
+  probes.set('wm-export-evidence.ts#verify-missing-path', {
+    script: 'wm-export-evidence.ts',
+    args: ['--verify'],
+    outputPath: exportOutput,
+  });
   probes.set('wm-status.ts', { script: 'wm-status.ts', args: [invalidStatusProject] });
   const results: Exit2ProbeResult[] = [];
   try {
-    for (const probe of probes.values()) {
+    for (const [probeId, probe] of probes.entries()) {
       const scriptPath = join(root, 'w-model-dev', 'scripts', 'cli', probe.script);
       const result = spawnSync(process.execPath, [tsxCli, scriptPath, ...probe.args], {
         cwd: probe.cwd ?? root,
@@ -190,7 +213,19 @@ function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Exit
         const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as { exitCode?: unknown } | null;
         errorExitCode = typeof parsed?.exitCode === 'number' ? parsed.exitCode : null;
       }
-      results.push({ script: probe.script, status: result.status ?? -1, errorExitCode });
+      results.push({
+        script: probeId,
+        status: result.status ?? -1,
+        errorExitCode,
+        ...(probe.outputPath === undefined
+          ? {}
+          : {
+              outputPath: 'probe-output',
+              // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe output path
+              outputExistsAfter: existsSync(probe.outputPath),
+              emittedEvidenceExport: String(result.stdout ?? '').includes('EVIDENCE_EXPORT_JSON '),
+            }),
+      });
     }
   } finally {
     rmSync(probeRoot, { recursive: true, force: true });
@@ -449,7 +484,11 @@ async function main(): Promise<void> {
     .filter((f) => f.endsWith('.ts'))
     .sort();
   const exit2ProbeResults = collectExit2ScriptResults(root, cliScriptFiles);
-  const exit2ScriptCount = exit2ProbeResults.filter((probe) => probe.status === 2 && probe.errorExitCode === 2).length;
+  const exit2ScriptCount = new Set(
+    exit2ProbeResults
+      .filter((probe) => probe.status === 2 && probe.errorExitCode === 2)
+      .map((probe) => probe.script.replace(/#.*$/, '')),
+  ).size;
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   // 目录枚举仅用于 inventory 诊断；活体 Vitest 文件/用例计数必须来自同一份 JSON 事实包。
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled test inventory path

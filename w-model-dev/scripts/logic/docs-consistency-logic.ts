@@ -146,7 +146,13 @@ export interface DocConsistencyInput {
   vitestArtifactSha256?: string;
   vitestCommitSha?: string;
   /** 真实 exit-2 探针逐候选结果。 */
-  exit2ProbeResults?: Array<{ script: string; status: number; errorExitCode: number | null }>;
+  exit2ProbeResults?: Array<{
+    script: string;
+    status: number;
+    errorExitCode: number | null;
+    outputExistsAfter?: boolean;
+    emittedEvidenceExport?: boolean;
+  }>;
   /** A4 状态锁 / 平台修复 / batch B 边界的逐文档文本；缺省时跳过（fixture 兼容）。 */
   a4Docs?: A4DocumentationInput;
   /** w-model-dev/scripts 目录下 .ts 文件是否有变更（git diff + porcelain 判定，由 CLI 层注入） */
@@ -236,7 +242,13 @@ export interface DocConsistencyReport {
     vitestArtifactId?: string;
     vitestRunId?: string;
     vitestArtifactSha256?: string;
-    exit2ProbeResults?: Array<{ script: string; status: number; errorExitCode: number | null }>;
+    exit2ProbeResults?: Array<{
+      script: string;
+      status: number;
+      errorExitCode: number | null;
+      outputExistsAfter?: boolean;
+      emittedEvidenceExport?: boolean;
+    }>;
     [key: string]: unknown;
   };
 }
@@ -282,6 +294,10 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
       input.vitestExtraDocs,
       input.vitestMeasurementsValid,
       input.vitestMeasurementsReason,
+      input.vitestRunId,
+      input.vitestArtifactId,
+      input.vitestArtifactSha256,
+      input.vitestCommitSha,
     ),
   );
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
@@ -971,6 +987,10 @@ function checkVitestTestCount(
   extraVitestDocs?: Array<{ name: string; content: string }>,
   vitestMeasurementsValid?: boolean,
   vitestMeasurementsReason?: string,
+  vitestRunId?: string,
+  vitestArtifactId?: string,
+  vitestArtifactSha256?: string,
+  vitestCommitSha?: string,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (vitestMeasurementsValid === false) {
@@ -978,6 +998,31 @@ function checkVitestTestCount(
       check: 'vitest-results',
       message: `Vitest JSON 运行结果不可采信：${vitestMeasurementsReason ?? '缺失完整成功状态'}（fail-closed）`,
     });
+  }
+  if (vitestMeasurementsValid === true) {
+    const validArtifactId =
+      typeof vitestArtifactId === 'string' &&
+      vitestArtifactId.startsWith('vitest/') &&
+      vitestArtifactId.endsWith('.json') &&
+      vitestArtifactId
+        .split('/')
+        .every(
+          (segment) => segment.length > 0 && segment !== '.' && segment !== '..' && /^[A-Za-z0-9._-]+$/.test(segment),
+        );
+    const validArtifact =
+      typeof vitestRunId === 'string' &&
+      /^[0-9a-f]{16}$/i.test(vitestRunId) &&
+      validArtifactId &&
+      typeof vitestArtifactSha256 === 'string' &&
+      /^[0-9a-f]{64}$/i.test(vitestArtifactSha256) &&
+      typeof vitestCommitSha === 'string' &&
+      /^[0-9a-f]{40}$/i.test(vitestCommitSha);
+    if (!validArtifact) {
+      violations.push({
+        check: 'vitest-results',
+        message: '成功 Vitest artifact 缺少有效 runId、相对 artifactId、commit SHA 或内容 SHA-256（fail-closed）',
+      });
+    }
   }
   if (vitestTestCount < 0) {
     violations.push({

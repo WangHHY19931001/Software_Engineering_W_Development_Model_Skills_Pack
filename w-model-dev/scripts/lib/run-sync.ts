@@ -47,7 +47,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 178,
+    line: 201,
     symbol: 'collectExit2ScriptResults',
     reason: 'D4 runs each candidate invalid-input probe with a bounded child-process timeout.',
     timeout: { required: true, status: 'present' },
@@ -55,7 +55,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 341,
+    line: 376,
     symbol: 'currentCommitSha',
     reason: 'D4 binds the coverage artifact to the repository commit with a bounded git probe.',
     timeout: { required: true, status: 'present' },
@@ -63,7 +63,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 394,
+    line: 429,
     symbol: 'collectVitestTestCount',
     reason: 'B4 excludes docs-consistency; direct Node Vitest execution needs its 180-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -71,7 +71,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 401,
+    line: 436,
     symbol: 'collectVitestTestCount',
     reason: 'B4 excludes docs-consistency; shell fallback keeps its 180-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -191,7 +191,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1491,
+    line: 1541,
     symbol: 'runDocsConsistencyCli',
     reason: 'D4 keeps the real docs-consistency CLI boundary test with an explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },

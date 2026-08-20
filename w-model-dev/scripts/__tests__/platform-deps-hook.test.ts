@@ -349,6 +349,92 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
   });
 });
 
+describe('pre-push evidence lifecycle', () => {
+  it('consumes and removes coverage artifacts from a controlled OS temp directory after docs-consistency', async () => {
+    const binDir = await makeTempDir('pre-push-lifecycle-bin-');
+    const workspace = await makeTempDir('pre-push-lifecycle-workspace-');
+    const tempRoot = await makeTempDir('pre-push-lifecycle-tmp-');
+    const callsPath = path.join(binDir, 'calls.log');
+    const bashEnv = path.join(binDir, 'bash-env.sh');
+    const fakeNpx = path.join(binDir, 'npx');
+    await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+    await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
+    await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
+    await fs.writeFile(
+      bashEnv,
+      `
+git() { printf '%s\\n' "$PWD"; }
+node() {
+  case "$*" in
+    *process.platform*) printf 'linux\\n' ;;
+    *process.arch*) printf 'x64\\n' ;;
+    *esbuild/package.json*) printf '0.25.0\\n' ;;
+    *rolldown/package.json*) printf '1.0.0\\n' ;;
+    *) printf '\\n' ;;
+  esac
+}
+npm() {
+  case "$*" in
+    'run self-test') return 0 ;;
+    'run check:verifier') return 2 ;;
+    *'check:verifier -- w-model-dev/scripts/samples/verifier/valid.json'*) return 0 ;;
+    *'check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json'*) return 1 ;;
+    *'run check:gate -- /tmp/nonexistent'*) return 2 ;;
+    *'run check:coverage -- '*) return 0 ;;
+    *'run check:exemption -- '*) return 0 ;;
+    'audit --audit-level=high') return 0 ;;
+    'run check:docs-consistency')
+      test -s "$WM_VITEST_COUNT_FILE" || return 97
+      printf 'docs-consumed %s\\n' "$WM_VITEST_COUNT_FILE" >> "$CALLS"
+      return 0
+      ;;
+    'run typecheck') return 0 ;;
+    *) return 97 ;;
+  esac
+}
+`,
+      'utf8',
+    );
+    await fs.writeFile(
+      fakeNpx,
+      `#!/usr/bin/env bash
+for arg in "$@"; do
+  case "$arg" in
+    --outputFile=*) printf '{"testResults":[],"numTotalTests":0,"numPassedTests":0,"numFailedTests":0,"success":true}' > "\${arg#--outputFile=}" ;;
+  esac
+done
+case "$*" in
+  *bad-schema.manifest.json*) exit 2 ;;
+  prettier*) exit 1 ;;
+  *) exit 0 ;;
+esac
+`,
+      'utf8',
+    );
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp executable fixture
+    await fs.chmod(fakeNpx, 0o755);
+
+    const result = await run(
+      prePushScript,
+      ['--force'],
+      {
+        BASH_ENV: bashEnv,
+        CALLS: callsPath,
+        PATH: `${binDir}:${process.env.PATH}`,
+        TMPDIR: tempRoot,
+        OSTYPE: 'linux-gnu',
+      },
+      workspace,
+    );
+
+    expect(result.code).toBe(1);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp call log
+    expect(await fs.readFile(callsPath, 'utf8')).toContain('docs-consumed ');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp temp root
+    expect(await fs.readdir(tempRoot)).toEqual([]);
+  });
+});
+
 describe('package scripts', () => {
   it('exposes explicit check and install commands', async () => {
     const pkg = JSON.parse(await fs.readFile(packageJsonPath, 'utf8')) as { scripts: Record<string, string> };

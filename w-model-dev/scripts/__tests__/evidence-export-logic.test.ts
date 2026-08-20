@@ -337,6 +337,14 @@ describe('evidence export logic', () => {
 
 describe('wm-export-evidence CLI', () => {
   it('uses actual child-process exit codes and EVIDENCE_EXPORT_JSON for success, verification failure, and invalid arguments', async () => {
+    const invalidOutput = path.join(tmpDir, 'invalid-output');
+    for (const args of [[], ['--unknown-option'], ['--verify']]) {
+      const result = runCli(args);
+      expect(result.code).toBe(2);
+      expect(result.stdout).toContain('ERROR_JSON ');
+      expect(result.stdout).not.toContain('EVIDENCE_EXPORT_JSON ');
+      await expect(fs.access(invalidOutput)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');
 
