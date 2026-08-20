@@ -24,6 +24,7 @@
 - **SSoT 外部 Agent 边界**：重画 §3.1 架构图，明确技能包仅交付 Markdown 资产、Schema 与确定性 gate scripts；宿主 Agent / 外部 LLM 负责推理、子代理调度和 LLM-as-Verifier；TLA+ TLC、CodeGraph、OpenSpec 为可选外部工具，不属于技能包交付物。同步三项 CLI JSDoc：默认和 `--json` 均先尝试写 gate log，写入失败以 `gateLogWriteError` 报告且不改变主 gate 结果，并由静态测试守护。
 
 ### 新增（审计整改批次 D）
+- **D1 Schema loader 文档路径对齐**：将 `data-models.md`、`docs/INSTALL.md` 与 `docs/user-guide.md` 的 Schema loader 引用统一指向 `w-model-dev/scripts/infrastructure/schema-loader.ts`，并新增文档回归断言防止迁移后的旧 `scripts/logic/` 路径回归；不改变生产逻辑、Schema、hook、package、baseline 或计划/spec。
 - **D6 同步 D5A 后真实 Vitest 计数**：以当前 HEAD 受控 coverage/provenance artifact 实测的 54 test files / 895 tests / 895 passed / 0 failed / success=true 为唯一来源，同步活体文档、pre-push 第 12 项描述性计数与 docs-consistency fixture；不改变生产逻辑、门禁控制流或 evidence export。
 - **D3 可验证运行时审计证据导出**：新增 `wm:export-evidence`，仅导出 `.w-model` 白名单目录与 run-log 的常规文本记录；JSON/JSONL 递归脱敏 `token`、`secret`、`password`、`apiKey` 字段，使用临时目录+原子 rename 发布严格 Schema 的 SHA-256 manifest。`--verify` 会重新执行 manifest Schema、路径安全、文件存在性与哈希校验；输出目录冲突、符号链接/路径逃逸、二进制或未知扩展均 fail-closed，CLI 保持真实 exit 0/1/2 与 `EVIDENCE_EXPORT_JSON` 摘要。
 - **D4 动态元数据与本地证据治理**：docs-consistency 保持顶层 `violations` 兼容字段，并按 `staticViolations` / `dynamicViolations` 分组，输出真实 `dynamicMeasurements`。以 coverage JSON 的 `testResults.length` / `numTotalTests` 为事实源同步活体计数；登记 `evidence-manifest` Schema 与 `wm-export-evidence` CLI；README、Agent、安装、贡献、Skill 和命令参考明确 `coverage/` / `.zcode/` / `.w-model/` 是 Git 忽略的本地生成物，审计交付须显式导出脱敏 SHA-256 manifest 包，且与受控 `docs/changes/archive/` 区分。

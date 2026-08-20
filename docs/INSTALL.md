@@ -66,7 +66,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
   - Node.js ≥20
   - [tsx](https://tsx.is/)（项目安装或 `npx tsx` 按需拉取）
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
-    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/logic/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import（runtime 依赖）
+    - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/infrastructure/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import（runtime 依赖）
     - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` + `eslint-plugin-import` — 安全扫描 / 静态检查基线（`npm run lint:security` 时使用，devDep）；ESLint 配置集中于 `config/.eslintrc.cjs`（含 import/order 规则），security-scan 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 显式调用
     - `prettier` / `typedoc` / `docsify-cli` — 工程工具 devDep（`npm run format` / `npm run docs:build` / `npm run docs:site`）
     - （无 BDD 专属 devDep）— BDD features 场景解析为手写正则（`w-model-dev/scripts/logic/bdd-logic.ts` 的 `parseFeatureFile`），由 `w-model-dev/scripts/cli/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（纯 features 静态校验，无需 Cucumber 运行器）
@@ -112,11 +112,12 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 ├── skill-metadata.json # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 ├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + anti-patterns.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南 + 设计模式目录（design-patterns-catalog）（按需加载，详见 SKILL.md Bundled Resources 表）
 ├── subagent/           # 28 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）
-├── schemas/            # 22 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / gate-log / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep / evidence-manifest），由 schema-loader.ts 在 logic 层前置加载
+├── schemas/            # 22 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / gate-log / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep / evidence-manifest），由 infrastructure/schema-loader.ts 在 logic 层前置加载
 ├── tools/              # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
 │   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 8 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph-opsx / wm-write / doctor / plan-chunks / wm-export-evidence；exit-2 脚本口径 = 26 check + 8 工具 CLI = 34，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
-│   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + schema-loader.ts + plan-chunks-logic.ts；schema-loader 为 ajv 单例 + schemas/*.schema.json 自动加载）
+│   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + plan-chunks-logic.ts）
+│   ├── infrastructure/ # 基础设施适配（schema-loader.ts / schema-fs.ts；Ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
 │   └── __tests__/      # vitest 单元测试（54 个 .test.ts / 895 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
@@ -291,7 +292,7 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 | 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
 | 负面知识库（47 条反模式 + 教训） | [../w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md) |
 | JSON Schema 文件（draft-07，22 份，含 evidence-manifest） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
-| Schema 加载与校验工具 | [../w-model-dev/scripts/logic/schema-loader.ts](../w-model-dev/scripts/logic/schema-loader.ts) |
+| Schema 加载与校验工具 | [../w-model-dev/scripts/infrastructure/schema-loader.ts](../w-model-dev/scripts/infrastructure/schema-loader.ts) |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts) |
 | 回归基线脚本（260 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
 | 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
@@ -336,7 +337,7 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 
 **Q：为什么有 `package.json` + `npm install`？**
 Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本。仓库为**单根包**（`w-model-dev/` 无独立依赖与包名引用），在仓库根目录 `npm install` 一次即可，devDeps 装至根 `node_modules`：
-- **runtime devDep**：`ajv` + `ajv-formats`（由 `schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
+- **runtime devDep**：`ajv` + `ajv-formats`（由 `infrastructure/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）

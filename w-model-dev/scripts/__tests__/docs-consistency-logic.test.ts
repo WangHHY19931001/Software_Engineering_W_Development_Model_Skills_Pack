@@ -780,6 +780,15 @@ describe('runDocConsistencyChecks', () => {
         const docContent = await fs.readFile(docPath, 'utf-8');
         expect(docContent).toContain('895');
       }
+      const loaderDocs = ['w-model-dev/references/data-models.md', 'docs/INSTALL.md', 'docs/user-guide.md'];
+      const oldLoaderPath = ['scripts', 'logic', 'schema-loader.ts'].join('/');
+      for (const doc of loaderDocs) {
+        const docPath = path.join(fixtureRoot, doc);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
+        const docContent = await fs.readFile(docPath, 'utf-8');
+        expect(docContent).not.toContain(oldLoaderPath);
+        expect(docContent).toContain(['scripts', 'infrastructure', 'schema-loader.ts'].join('/'));
+      }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, `${passing.stdout}\n${passing.stderr}`).toBe(0);
       expect(passing.stdout).toContain('vitest 用例  : 895');

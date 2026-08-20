@@ -870,7 +870,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 
 > 借鉴点 2（Task 3）：所有 .w-model/*.json 在进入业务规则校验前，必须先过 JSON Schema 前置校验。
 > schema 用 draft-07 + `additionalProperties:false` 防字段漂移、`required` 防字段缺失、`type`/`enum`/`format` 防类型/枚举/格式错误。
-> schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/logic/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
+> schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/infrastructure/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
 ### Schema 清单（22 份）
