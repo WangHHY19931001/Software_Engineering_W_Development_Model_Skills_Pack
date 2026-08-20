@@ -1,5 +1,6 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- all paths are generated beneath a mkdtemp-owned fixture. */
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
@@ -12,7 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { evidenceFs } from '../infrastructure/evidence-fs.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { exportEvidence, verifyEvidence } from '../logic/evidence-export-logic.js';
+import { produceSourceProvenance } from '../logic/evidence-provenance-logic.js';
 
+const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-export-evidence.ts');
@@ -36,7 +39,9 @@ function sha256(value: string | Buffer): string {
 }
 
 function evidenceContentHash(files: Array<{ path: string; sha256: string }>): string {
-  return sha256(JSON.stringify([...files].sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))));
+  return sha256(
+    JSON.stringify([...files].sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))),
+  );
 }
 
 async function createProject(name = 'project'): Promise<string> {
@@ -48,18 +53,32 @@ async function createProject(name = 'project'): Promise<string> {
   await fs.mkdir(path.join(state, 'codegraph-queries'), { recursive: true });
   await fs.writeFile(
     path.join(state, 'gate-logs', 'gate.json'),
-    JSON.stringify({ passed: true, token: 'gate-token', nested: { secret: 'gate-secret' } }),
+    JSON.stringify({
+      script: 'check-bdd-model.ts',
+      exitCode: 0,
+      passed: true,
+      reasons: [],
+      reportSummary: {
+        phase: 1,
+        checkedAt: '2026-08-20T00:00:00.000Z',
+        summary: 'ok',
+        violationsCount: 0,
+      },
+    }),
     'utf8',
   );
   await fs.writeFile(
     path.join(state, 'verifier-outputs', 'verifier.json'),
-    JSON.stringify({ passed: true, apiKey: 'verifier-key', rows: [{ password: 'verifier-password' }] }),
+    JSON.stringify({
+      passed: true,
+      apiKey: 'verifier-key',
+      rows: [{ password: 'verifier-password' }],
+    }),
     'utf8',
   );
-  await fs.writeFile(
+  await fs.copyFile(
+    path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
     path.join(state, 'signature-chains', 'chain.jsonl'),
-    '{"value":"safe","token":"chain-token","nested":{"path":"/var/private/run"}}\n',
-    'utf8',
   );
   await fs.writeFile(
     path.join(state, 'codegraph-queries', 'query.json'),
@@ -80,46 +99,51 @@ async function createProject(name = 'project'): Promise<string> {
     'source: D:/private/worktree with spaces\nresult: /home/alice/private\nnetwork: //host/private/share\nAuthorization: Bearer markdown-authorization\nprivate_key = markdown-private-key\nlink: https://example.test/relative\nrelative: docs/relative.md\n',
     'utf8',
   );
-  await fs.writeFile(
+  await fs.copyFile(
+    path.resolve(process.cwd(), 'w-model-dev/scripts/samples/run-log/valid.jsonl'),
     path.join(state, 'run-log.jsonl'),
-    '{"runId":"verified-run-1","outcome":"success","secret":"run-secret","nested":{"apiKey":"run-key","credential":"run-credential"}}\n',
-    'utf8',
   );
-  const provenanceInputs: Array<[string, string[]]> = [
-    ['gateLogs', ['gate-logs/gate.json']],
-    ['verifierOutputs', ['verifier-outputs/verifier.json']],
-    ['runLog', ['run-log.jsonl']],
-  ];
-  const measurements = await Promise.all(
-    provenanceInputs.map(async ([name, paths]) => {
-      const files = await Promise.all(
-        paths.map(async (relativePath) => ({
-          path: relativePath,
-          sha256: sha256(await fs.readFile(path.join(state, relativePath))),
-        })),
-      );
-      return [name, { count: files.length, contentHash: evidenceContentHash(files) }];
-    }),
-  );
-  await fs.writeFile(
-    path.join(state, 'evidence-provenance.json'),
-    JSON.stringify({
-      format: 'w-model-evidence-verification',
-      version: 1,
-      runId: 'verified-run-1',
-      commitSha: 'a'.repeat(40),
-      artifactId: 'verified-artifact-1',
-      verificationStatus: 'passed',
-      measurements: Object.fromEntries(measurements),
-    }),
-    'utf8',
-  );
+  for (const args of [
+    ['init'],
+    ['add', '.'],
+    [
+      '-c',
+      'user.email=evidence@example.test',
+      '-c',
+      'user.name=Evidence Test',
+      '-c',
+      'commit.gpgSign=false',
+      'commit',
+      '--no-verify',
+      '-m',
+      'fixture',
+    ],
+  ]) {
+    try {
+      await execFileAsync('git', ['-C', project, ...args], { timeout: 5_000 });
+    } catch {
+      throw new Error('git fixture setup failed');
+    }
+  }
+  const provenance = await produceSourceProvenance(project);
+  if (!provenance.ok) throw new Error(`provenance fixture setup failed: ${provenance.reason}`);
   return project;
 }
 
-function runCli(args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], { encoding: 'utf8', timeout: 15_000 });
-  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+function runCli(args: string[]): {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+} {
+  const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {
+    encoding: 'utf8',
+    timeout: 15_000,
+  });
+  return {
+    code: result.status,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
 }
 
 function cliSummary(stdout: string): Record<string, unknown> {
@@ -136,7 +160,9 @@ describe('evidence export logic', () => {
       expect(result.code).toBe(2);
       const line = result.stdout.split(/\r?\n/).find((entry) => entry.startsWith('ERROR_JSON '));
       expect(line).toBeDefined();
-      expect(JSON.parse(line!.slice('ERROR_JSON '.length))).toMatchObject({ exitCode: 2 });
+      expect(JSON.parse(line!.slice('ERROR_JSON '.length))).toMatchObject({
+        exitCode: 2,
+      });
     },
   );
   it('exports allowlisted runtime records with stable kinds, sorted paths, and verifiable hashes', async () => {
@@ -145,7 +171,7 @@ describe('evidence export logic', () => {
 
     const result = await exportEvidence(project, output);
 
-    expect(result).toMatchObject({ ok: true, exitCode: 0 });
+    expect(result).toEqual(expect.objectContaining({ ok: true, exitCode: 0 }));
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
       schemaVersion: string;
       sourceProject: string;
@@ -182,23 +208,51 @@ describe('evidence export logic', () => {
     expect(manifest.provenance).toMatchObject({
       format: 'w-model-evidence-provenance',
       version: 1,
-      runId: 'verified-run-1',
-      commitSha: 'a'.repeat(40),
-      artifactId: 'verified-artifact-1',
+      runId: 'r12',
+      commitSha: expect.stringMatching(/^[0-9a-f]{40}$/),
+      artifactId: 'evidence-r12',
       verificationStatus: 'passed',
       measurements: {
-        gateLogs: { count: 1, contentHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
-        verifierOutputs: { count: 1, contentHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
-        runLog: { count: 1, contentHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        gateLogs: {
+          count: 1,
+          contentHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
+        verifierOutputs: {
+          count: 1,
+          contentHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
+        runLog: {
+          count: 1,
+          contentHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
+        signatureChain: {
+          count: 1,
+          contentHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
       },
       contentHash: evidenceContentHash(manifest.files),
     });
-    expect(runCli(['--verify', path.join(output, 'evidence-manifest.json')]).code).toBe(0);
+    const packageOnly = runCli(['--verify', path.join(output, 'evidence-manifest.json')]);
+    expect(packageOnly.code).toBe(0);
+    expect(cliSummary(packageOnly.stdout)).toMatchObject({
+      ok: true,
+      verificationLevel: 'package-only',
+    });
+    const sourceBound = runCli(['--verify', path.join(output, 'evidence-manifest.json'), '--source-project', project]);
+    expect(sourceBound.code).toBe(0);
+    expect(cliSummary(sourceBound.stdout)).toMatchObject({
+      ok: true,
+      verificationLevel: 'source-bound',
+      verificationStatus: 'passed',
+    });
 
     await fs.rm(path.join(project, '.w-model', 'evidence-provenance.json'));
     const rejected = runCli([project, path.join(tmpDir, 'missing-provenance-evidence')]);
     expect(rejected.code).toBe(1);
-    expect(cliSummary(rejected.stdout)).toMatchObject({ ok: false, reason: 'INVALID_PROVENANCE' });
+    expect(cliSummary(rejected.stdout)).toMatchObject({
+      ok: false,
+      reason: 'INVALID_PROVENANCE',
+    });
 
     const unverifiedProject = await createProject('unverified-project');
     const sourceProvenance = path.join(unverifiedProject, '.w-model', 'evidence-provenance.json');
@@ -207,7 +261,55 @@ describe('evidence export logic', () => {
     await fs.writeFile(sourceProvenance, JSON.stringify(unverified), 'utf8');
     const unverifiedResult = runCli([unverifiedProject, path.join(tmpDir, 'unverified-evidence')]);
     expect(unverifiedResult.code).toBe(1);
-    expect(cliSummary(unverifiedResult.stdout)).toMatchObject({ ok: false, reason: 'INVALID_PROVENANCE' });
+    expect(cliSummary(unverifiedResult.stdout)).toMatchObject({
+      ok: false,
+      reason: 'INVALID_PROVENANCE',
+    });
+
+    const sourceTamperedProject = await createProject('source-tampered-project');
+    const sourceTamperedOutput = path.join(tmpDir, 'source-tampered-evidence');
+    expect(runCli([sourceTamperedProject, sourceTamperedOutput]).code).toBe(0);
+    const sourceTamperedManifest = path.join(sourceTamperedOutput, 'evidence-manifest.json');
+    const sourceTamperedProvenancePath = path.join(sourceTamperedProject, '.w-model', 'evidence-provenance.json');
+    const sourceTamperedProvenance = JSON.parse(await fs.readFile(sourceTamperedProvenancePath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    sourceTamperedProvenance.artifactId = 'forged-artifact';
+    await fs.writeFile(sourceTamperedProvenancePath, JSON.stringify(sourceTamperedProvenance), 'utf8');
+    const sourceTampered = runCli(['--verify', sourceTamperedManifest, '--source-project', sourceTamperedProject]);
+    expect(sourceTampered.code).toBe(1);
+    expect(cliSummary(sourceTampered.stdout)).toMatchObject({
+      ok: false,
+      reason: 'INVALID_PROVENANCE',
+    });
+
+    const manifestTamperedProject = await createProject('manifest-tampered-project');
+    const manifestTamperedOutput = path.join(tmpDir, 'manifest-tampered-evidence');
+    expect(runCli([manifestTamperedProject, manifestTamperedOutput]).code).toBe(0);
+    const manifestTamperedPath = path.join(manifestTamperedOutput, 'evidence-manifest.json');
+    const manifestTampered = JSON.parse(await fs.readFile(manifestTamperedPath, 'utf8')) as {
+      provenance: {
+        runId: string;
+        artifactId: string;
+        producerVersion: string;
+      };
+    };
+    manifestTampered.provenance.runId = 'forged-run';
+    manifestTampered.provenance.artifactId = 'forged-artifact';
+    manifestTampered.provenance.producerVersion = 'forged-producer';
+    await fs.writeFile(manifestTamperedPath, JSON.stringify(manifestTampered), 'utf8');
+    const manifestTamperedResult = runCli([
+      '--verify',
+      manifestTamperedPath,
+      '--source-project',
+      manifestTamperedProject,
+    ]);
+    expect(manifestTamperedResult.code).toBe(1);
+    expect(cliSummary(manifestTamperedResult.stdout)).toMatchObject({
+      ok: false,
+      reason: 'INVALID_PROVENANCE',
+    });
   });
 
   it('recursively redacts sensitive JSON and JSONL field values without leaking source values', async () => {
@@ -254,9 +356,12 @@ describe('evidence export logic', () => {
     expect(outputText).toContain('network: <redacted-absolute-path>');
     expect(outputText).toContain('link: https://example.test/relative');
     expect(outputText).toContain('relative: docs/relative.md');
-    expect(JSON.parse(combined[0]!)).toMatchObject({ token: '[REDACTED]', nested: { secret: '[REDACTED]' } });
-    expect(JSON.parse(combined[2]!.trim())).toMatchObject({ token: '[REDACTED]' });
-    expect(JSON.parse(combined[3]!)).toMatchObject({ nested: { ACCESS_TOKEN: '[REDACTED]', 'private-key': '[REDACTED]' } });
+    expect(JSON.parse(combined[2]!.split(/\r?\n/).find((line) => line.trim())!)).toMatchObject({
+      sigId: expect.any(String),
+    });
+    expect(JSON.parse(combined[3]!)).toMatchObject({
+      nested: { ACCESS_TOKEN: '[REDACTED]', 'private-key': '[REDACTED]' },
+    });
     expect(combined[4]).toContain('Authorization: [REDACTED]');
     expect(combined[4]).toContain('private_key = [REDACTED]');
   });
@@ -287,7 +392,9 @@ describe('evidence export logic', () => {
     );
     const output = path.join(tmpDir, 'markdown-table-evidence');
 
-    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({
+      ok: true,
+    });
 
     const exported = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
     expect(exported).not.toContain('Bearer table-secret');
@@ -315,7 +422,9 @@ describe('evidence export logic', () => {
     );
     const output = path.join(tmpDir, 'empty-cell-markdown-evidence');
 
-    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({
+      ok: true,
+    });
 
     const exported = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
     expect(exported).not.toContain('Bearer empty-cell-secret');
@@ -380,9 +489,15 @@ describe('evidence export logic', () => {
     await exportEvidence(project, output);
     const manifest = path.join(output, 'evidence-manifest.json');
 
-    await expect(verifyEvidence(manifest)).resolves.toMatchObject({ ok: true, exitCode: 0 });
+    await expect(verifyEvidence(manifest)).resolves.toMatchObject({
+      ok: true,
+      exitCode: 0,
+    });
     await fs.appendFile(path.join(output, 'gate-logs', 'gate.json'), 'tampered', 'utf8');
-    await expect(verifyEvidence(manifest)).resolves.toMatchObject({ ok: false, exitCode: 1 });
+    await expect(verifyEvidence(manifest)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+    });
   });
 
   it('rejects a hand-assembled hash-valid package that reintroduces an authorization secret through the real CLI', async () => {
@@ -395,7 +510,8 @@ describe('evidence export logic', () => {
       provenance: { contentHash: string };
     };
     const targetPath = path.join(output, 'gate-logs', 'gate.json');
-    const unsafeContent = JSON.stringify({ passed: true, authorization: 'Bearer manually-added-secret' }, null, 2) + '\n';
+    const unsafeContent =
+      JSON.stringify({ passed: true, authorization: 'Bearer manually-added-secret' }, null, 2) + '\n';
     await fs.writeFile(targetPath, unsafeContent, 'utf8');
     const target = manifest.files.find((file) => file.path === 'gate-logs/gate.json');
     expect(target).toBeDefined();
@@ -406,7 +522,10 @@ describe('evidence export logic', () => {
     const verified = runCli(['--verify', manifestPath]);
 
     expect(verified.code).toBe(1);
-    expect(cliSummary(verified.stdout)).toMatchObject({ ok: false, reason: 'UNSANITIZED_EVIDENCE' });
+    expect(cliSummary(verified.stdout)).toMatchObject({
+      ok: false,
+      reason: 'UNSANITIZED_EVIDENCE',
+    });
     expect(verified.stdout + verified.stderr).not.toContain('manually-added-secret');
   });
 
@@ -441,7 +560,10 @@ describe('evidence export logic', () => {
     const nonempty = path.join(tmpDir, 'nonempty');
     await fs.mkdir(nonempty);
     await fs.writeFile(path.join(nonempty, 'leftover.txt'), 'old', 'utf8');
-    await expect(exportEvidence(project, nonempty)).resolves.toMatchObject({ ok: false, exitCode: 1 });
+    await expect(exportEvidence(project, nonempty)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+    });
   });
 
   it('rejects invalid strict manifests including extra fields and malformed hashes', async () => {
@@ -452,13 +574,22 @@ describe('evidence export logic', () => {
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as Record<string, unknown>;
 
     await fs.writeFile(manifestPath, JSON.stringify({ ...manifest, unexpected: true }), 'utf8');
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({ ok: false, exitCode: 1 });
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+    });
     await fs.writeFile(
       manifestPath,
-      JSON.stringify({ ...manifest, files: [{ ...(manifest.files as object[])[0], sha256: 'A'.repeat(64) }] }),
+      JSON.stringify({
+        ...manifest,
+        files: [{ ...(manifest.files as object[])[0], sha256: 'A'.repeat(64) }],
+      }),
       'utf8',
     );
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({ ok: false, exitCode: 1 });
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+    });
   });
 
   it('rejects a non-existent output below a symlink parent targeting source state without polluting source', async () => {
@@ -469,7 +600,11 @@ describe('evidence export logic', () => {
 
     const result = await exportEvidence(project, path.join(outputParent, 'evidence'));
 
-    expect(result).toMatchObject({ ok: false, exitCode: 1, reason: 'UNSAFE_OUTPUT_PATH' });
+    expect(result).toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_OUTPUT_PATH',
+    });
     await expect(fs.access(path.join(source, 'evidence'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -489,11 +624,16 @@ describe('evidence export logic', () => {
         sha256: sha256(await fs.readFile(path.join(logs, name))),
       })),
     );
-    provenance.measurements.gateLogs = { count: gateLogFiles.length, contentHash: evidenceContentHash(gateLogFiles) };
+    provenance.measurements.gateLogs = {
+      count: gateLogFiles.length,
+      contentHash: evidenceContentHash(gateLogFiles),
+    };
     await fs.writeFile(provenancePath, JSON.stringify(provenance), 'utf8');
     const output = path.join(tmpDir, 'unicode-evidence');
 
-    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({
+      ok: true,
+    });
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
       files: Array<{ path: string }>;
     };
@@ -512,21 +652,36 @@ describe('evidence export logic', () => {
 
     await fs.writeFile(
       manifestPath,
-      JSON.stringify({ ...manifest, files: [{ ...manifest.files[0], path: '../escape.json' }] }),
+      JSON.stringify({
+        ...manifest,
+        files: [{ ...manifest.files[0], path: '../escape.json' }],
+      }),
       'utf8',
     );
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({ ok: false, reason: 'INVALID_MANIFEST' });
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      reason: 'INVALID_MANIFEST',
+    });
 
     await fs.writeFile(
       manifestPath,
-      JSON.stringify({ ...manifest, files: [manifest.files[0], manifest.files[0]] }),
+      JSON.stringify({
+        ...manifest,
+        files: [manifest.files[0], manifest.files[0]],
+      }),
       'utf8',
     );
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({ ok: false, reason: 'INVALID_MANIFEST' });
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      reason: 'INVALID_MANIFEST',
+    });
 
     await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
     await fs.writeFile(path.join(output, 'extra.txt'), 'unexpected', 'utf8');
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({ ok: false, reason: 'UNMANIFESTED_OUTPUT' });
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      reason: 'UNMANIFESTED_OUTPUT',
+    });
     await fs.unlink(path.join(output, 'extra.txt'));
 
     const linkedFile = path.join(output, 'gate-logs', 'gate.json');
@@ -534,7 +689,10 @@ describe('evidence export logic', () => {
     await fs.writeFile(outside, '{"ok":true}', 'utf8');
     await fs.unlink(linkedFile);
     await fs.symlink(outside, linkedFile);
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({ ok: false, reason: 'UNSAFE_OUTPUT_PATH' });
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      reason: 'UNSAFE_OUTPUT_PATH',
+    });
   });
 
   it('returns stable non-sensitive failure categories for invalid JSON evidence', async () => {
@@ -544,7 +702,13 @@ describe('evidence export logic', () => {
 
     const result = await exportEvidence(project, path.join(tmpDir, 'invalid-json-output'));
 
-    expect(result).toEqual(expect.objectContaining({ ok: false, exitCode: 1, reason: 'INVALID_JSON_EVIDENCE' }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: false,
+        exitCode: 1,
+        reason: 'INVALID_JSON_EVIDENCE',
+      }),
+    );
     expect(JSON.stringify(result)).not.toContain('actual-secret');
     expect(JSON.stringify(result)).not.toContain(project);
   });
@@ -608,19 +772,29 @@ describe('wm-export-evidence CLI', () => {
       expect(result.code).toBe(2);
       expect(result.stdout).toContain('ERROR_JSON ');
       expect(result.stdout).not.toContain('EVIDENCE_EXPORT_JSON ');
-      await expect(fs.access(invalidOutput)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(fs.access(invalidOutput)).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
     }
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');
 
     const exported = runCli([project, output]);
     expect(exported.code).toBe(0);
-    expect(cliSummary(exported.stdout)).toMatchObject({ ok: true, exitCode: 0, mode: 'export' });
+    expect(cliSummary(exported.stdout)).toMatchObject({
+      ok: true,
+      exitCode: 0,
+      mode: 'export',
+    });
 
     await fs.appendFile(path.join(output, 'run-log.jsonl'), 'tampered', 'utf8');
     const invalid = runCli(['--verify', path.join(output, 'evidence-manifest.json')]);
     expect(invalid.code).toBe(1);
-    expect(cliSummary(invalid.stdout)).toMatchObject({ ok: false, exitCode: 1, mode: 'verify' });
+    expect(cliSummary(invalid.stdout)).toMatchObject({
+      ok: false,
+      exitCode: 1,
+      mode: 'verify',
+    });
     expect(invalid.stdout).toContain('ERROR_JSON ');
 
     const argumentError = runCli(['--verify']);
@@ -651,7 +825,11 @@ describe('wm-export-evidence CLI', () => {
     const result = runCli([project, path.join(outputParent, 'evidence')]);
 
     expect(result.code).toBe(1);
-    expect(cliSummary(result.stdout)).toMatchObject({ ok: false, exitCode: 1, reason: 'UNSAFE_OUTPUT_PATH' });
+    expect(cliSummary(result.stdout)).toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_OUTPUT_PATH',
+    });
     expect(result.stdout).toContain('ERROR_JSON ');
     await expect(fs.access(path.join(source, 'evidence'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
@@ -667,7 +845,10 @@ describe('wm-export-evidence CLI', () => {
 
     await fs.writeFile(
       manifestPath,
-      JSON.stringify({ ...manifest, files: [{ ...manifest.files[0], path: '../escape.json' }] }),
+      JSON.stringify({
+        ...manifest,
+        files: [{ ...manifest.files[0], path: '../escape.json' }],
+      }),
       'utf8',
     );
     const traversal = runCli(['--verify', manifestPath]);
@@ -676,7 +857,10 @@ describe('wm-export-evidence CLI', () => {
 
     await fs.writeFile(
       manifestPath,
-      JSON.stringify({ ...manifest, files: [manifest.files[0], manifest.files[0]] }),
+      JSON.stringify({
+        ...manifest,
+        files: [manifest.files[0], manifest.files[0]],
+      }),
       'utf8',
     );
     const duplicate = runCli(['--verify', manifestPath]);
@@ -707,7 +891,11 @@ describe('wm-export-evidence CLI', () => {
 
     const invalidJson = runCli([project, path.join(tmpDir, 'bad-json')]);
     expect(invalidJson.code).toBe(1);
-    expect(cliSummary(invalidJson.stdout)).toMatchObject({ ok: false, exitCode: 1, reason: 'INVALID_JSON_EVIDENCE' });
+    expect(cliSummary(invalidJson.stdout)).toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'INVALID_JSON_EVIDENCE',
+    });
     expect(invalidJson.stdout).toContain('ERROR_JSON ');
     expect(invalidJson.stdout + invalidJson.stderr).not.toContain(project);
     expect(invalidJson.stdout + invalidJson.stderr).not.toContain('actual-secret');

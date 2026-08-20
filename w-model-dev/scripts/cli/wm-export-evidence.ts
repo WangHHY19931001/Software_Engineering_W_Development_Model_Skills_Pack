@@ -4,7 +4,7 @@
  *
  * Usage:
  *   npx tsx w-model-dev/scripts/cli/wm-export-evidence.ts <project-dir> <output-dir>
- *   npx tsx w-model-dev/scripts/cli/wm-export-evidence.ts --verify <output-dir>/evidence-manifest.json
+ *   npx tsx w-model-dev/scripts/cli/wm-export-evidence.ts --verify <output-dir>/evidence-manifest.json [--source-project <project-dir>]
  */
 import * as path from 'node:path';
 
@@ -13,10 +13,16 @@ import { runMain } from '../lib/run-main.js';
 import { exportEvidence, verifyEvidence } from '../logic/evidence-export-logic.js';
 
 const USAGE =
-  '用法: wm-export-evidence.ts <project-dir> <output-dir> | wm-export-evidence.ts --verify <output-dir>/evidence-manifest.json';
+  '用法: wm-export-evidence.ts <project-dir> <output-dir> | wm-export-evidence.ts --verify <output-dir>/evidence-manifest.json [--source-project <project-dir>]';
 
 function argumentError(message: string): never {
-  exitWithError({ category: 'ARG_INVALID', rule: 'P0-1', message, detail: USAGE, exitCode: 2 });
+  exitWithError({
+    category: 'ARG_INVALID',
+    rule: 'P0-1',
+    message,
+    detail: USAGE,
+    exitCode: 2,
+  });
   throw new HandledCliError();
 }
 
@@ -29,9 +35,15 @@ async function main(): Promise<void> {
 
   let result;
   if (args[0] === '--verify') {
-    if (args.length !== 2)
-      argumentError(args.length < 2 ? '--verify 缺少 manifest 路径' : '--verify 只接受一个 manifest 路径');
-    result = await verifyEvidence(path.resolve(args[1]!));
+    const sourceFlag = args.indexOf('--source-project');
+    const sourceProject = sourceFlag === -1 ? undefined : args[sourceFlag + 1];
+    if (
+      args.length !== (sourceProject ? 4 : 2) ||
+      (sourceFlag !== -1 && sourceFlag !== 2) ||
+      (sourceFlag !== -1 && !sourceProject)
+    )
+      argumentError(args.length < 2 ? '--verify 缺少 manifest 路径' : '--verify 参数非法');
+    result = await verifyEvidence(path.resolve(args[1]!), sourceProject ? path.resolve(sourceProject) : undefined);
   } else {
     if (args.some((arg) => arg.startsWith('--'))) argumentError('存在未知选项');
     if (args.length !== 2)

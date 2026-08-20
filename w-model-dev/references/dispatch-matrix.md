@@ -288,10 +288,10 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 35 个 .ts
-> 一一对应（26 个 check-* + 8 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
+> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 36 个 .ts
+> 一一对应（26 个 check-* + 9 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
 > **新增 / 改名门禁脚本时只在本文件登记一处**——`check-docs-consistency.ts` 的 script-registry 检查
-> 核对全部 35 个 cli 脚本名均出现于本文件（漏登记即门禁失败，pre-push 第 14 项拦截）。
+> 核对全部 36 个 cli 脚本名均出现于本文件（其中 35 个为 exit-2 脚本；漏登记即门禁失败，pre-push 第 14 项拦截）。
 
 | 脚本 | 类别 | 用途 | 触发时机 |
 |---|---|---|---|
@@ -303,7 +303,8 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
 | wm-write | 工具 | 状态文件安全写：`<target>.lock` 持久目录和可转移 owner 对象保证跨进程竞争 writer 不会双成功；锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--lock-timeout` 为安全非负整数；CLI 陈旧锁须显式 `--recover-stale-lock`，否则 `STALE_LOCK` / exit 1（logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |
 | doctor | 工具 | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts） | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门 |
-| wm-export-evidence | 工具 | 将项目 `.w-model/` 白名单状态和文本 run-log 导出为脱敏、SHA-256 manifest 证据包；支持 `--verify` 复核 | 需要按项目安全策略交付本地审计证据时显式运行；不自动提交或发布 |
+| wm-export-evidence | 工具 | 将项目 `.w-model/` 白名单状态和文本 run-log 导出为脱敏、SHA-256 manifest 证据包；支持 `--verify` package-only 复核和 `--source-project` source-bound 重验 | 需要按项目安全策略交付本地审计证据时显式运行；不自动提交或发布 |
+| wm-verify-evidence-source | 工具 | 读取并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，生产并原子写入 `.w-model/evidence-provenance.json`；不是只读 verify | 导出证据前显式运行；成功才可产生 source-bound provenance，不自动提交或发布 |
 
 ## 7. 反模式 → check 脚本映射速查
 

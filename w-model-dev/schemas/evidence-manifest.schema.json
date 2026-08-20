@@ -25,26 +25,70 @@
       "description": "导出包绑定的已验证运行身份、三类源证据测量与导出内容哈希。",
       "type": "object",
       "additionalProperties": false,
-      "required": ["format", "version", "runId", "commitSha", "artifactId", "verificationStatus", "measurements", "contentHash"],
+      "required": [
+        "format",
+        "version",
+        "runId",
+        "commitSha",
+        "artifactId",
+        "verificationStatus",
+        "measurements",
+        "contentHash",
+        "sourceBundleSha256",
+        "producerVersion"
+      ],
       "properties": {
-        "format": { "description": "导出 provenance 格式标识。", "const": "w-model-evidence-provenance" },
+        "format": {
+          "description": "导出 provenance 格式标识。",
+          "const": "w-model-evidence-provenance"
+        },
         "version": { "description": "导出 provenance 格式版本。", "const": 1 },
-        "runId": { "description": "已验证运行的非空标识。", "type": "string", "minLength": 1 },
-        "commitSha": { "description": "验证运行对应的 Git 提交 SHA-1（40 位小写十六进制）。", "type": "string", "pattern": "^[0-9a-f]{40}$" },
-        "artifactId": { "description": "验证工件的非空标识。", "type": "string", "minLength": 1 },
-        "verificationStatus": { "description": "默认导出只能证明已通过验证的运行。", "const": "passed" },
+        "runId": {
+          "description": "已验证运行的非空标识。",
+          "type": "string",
+          "minLength": 1
+        },
+        "commitSha": {
+          "description": "验证运行对应的 Git 提交 SHA-1（40 位小写十六进制）。",
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "artifactId": {
+          "description": "验证工件的非空标识。",
+          "type": "string",
+          "minLength": 1
+        },
+        "verificationStatus": {
+          "description": "默认导出只能证明已通过验证的运行。",
+          "const": "passed"
+        },
         "measurements": {
           "description": "源 gate log、verifier output 与 run log 的数量和规范内容哈希。",
           "type": "object",
           "additionalProperties": false,
-          "required": ["gateLogs", "verifierOutputs", "runLog"],
+          "required": ["gateLogs", "verifierOutputs", "runLog", "signatureChain"],
           "properties": {
             "gateLogs": { "$ref": "#/definitions/measurement" },
             "verifierOutputs": { "$ref": "#/definitions/measurement" },
-            "runLog": { "$ref": "#/definitions/measurement" }
+            "runLog": { "$ref": "#/definitions/measurement" },
+            "signatureChain": { "$ref": "#/definitions/measurement" }
           }
         },
-        "contentHash": { "description": "按路径排序的导出 files 清单规范 SHA-256。", "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "contentHash": {
+          "description": "按路径排序的导出 files 清单规范 SHA-256。",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sourceBundleSha256": {
+          "description": "producer 验证的 source 文件 bundle SHA-256。",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "producerVersion": {
+          "description": "生成受控 source provenance 的 producer 版本。",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "files": {
@@ -81,8 +125,16 @@
       "additionalProperties": false,
       "required": ["count", "contentHash"],
       "properties": {
-        "count": { "description": "纳入本类别测量的文件数。", "type": "integer", "minimum": 1 },
-        "contentHash": { "description": "本类别规范文件清单的 SHA-256。", "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "count": {
+          "description": "纳入本类别测量的文件数。",
+          "type": "integer",
+          "minimum": 1
+        },
+        "contentHash": {
+          "description": "本类别规范文件清单的 SHA-256。",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
       }
     }
   }

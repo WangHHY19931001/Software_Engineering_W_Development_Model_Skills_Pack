@@ -262,9 +262,7 @@ const DYNAMIC_CHECKS = new Set([
   'vitest-tests',
 ]);
 
-function checkExit2ProbeResults(
-  probes: DocConsistencyInput['exit2ProbeResults'],
-): DocCheckViolation[] {
+function checkExit2ProbeResults(probes: DocConsistencyInput['exit2ProbeResults']): DocCheckViolation[] {
   if (probes === undefined) return [];
   const violations: DocCheckViolation[] = [];
   for (const probe of probes.filter((candidate) => candidate.script.startsWith('wm-export-evidence.ts#'))) {
@@ -290,9 +288,7 @@ function checkExit2ProbeResults(
   return violations;
 }
 
-function checkSchemaLoaderPaths(
-  docs: Array<{ name: string; content: string }> | undefined,
-): DocCheckViolation[] {
+function checkSchemaLoaderPaths(docs: Array<{ name: string; content: string }> | undefined): DocCheckViolation[] {
   if (docs === undefined) return [];
   const violations: DocCheckViolation[] = [];
   for (const doc of docs) {

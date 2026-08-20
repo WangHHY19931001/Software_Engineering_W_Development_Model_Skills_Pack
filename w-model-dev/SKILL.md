@@ -22,7 +22,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **本地 pre-push 依赖边界**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示 `npm install`，不自动安装；它只调用 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台检查与显式 fail-closed 指引入口是 `npm run platform-deps:check` 与 `npm run platform-deps:install`，必须在 Bash 中运行；`self-test` 与 `doctor` 可在 PowerShell 运行。
 
-> **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时运行 `npm run wm:export-evidence -- <project-dir> <output-dir>`，它生成脱敏、带 SHA-256 manifest 的证据包；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
+> **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 
 
 ## 触发决策
@@ -167,9 +167,9 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 资源目录 | 触发条件 |
 |---|---|
 | `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
-| `scripts/cli/`（35 个 .ts：26 个 check-* 门禁 + 8 个工具 CLI + self-test.ts 回归基线；其中 34 个为 exit-2 结构化错误脚本） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
+| `scripts/cli/`（36 个 .ts：26 个 check-* 门禁 + 9 个工具 CLI + self-test.ts 回归基线；其中 35 个为 exit-2 结构化错误脚本） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
 | `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
-| `schemas/`（22 份 JSON Schema draft-07，含 evidence-manifest） | 由 `scripts/infrastructure/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
+| `schemas/`（23 份 JSON Schema draft-07，含 evidence-manifest / evidence-provenance） | 由 `scripts/infrastructure/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
 | `tools/`（tla2tools.jar） | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝） |
 | `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget.template.json / run-log.template.jsonl） |
 
@@ -191,6 +191,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
 | `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进；报告存 `.w-model/hill-climbing/<timestamp>-report.json` | O 分析（状态读写+分析，非实施） |
 | `/wm metrics` | 流程度量 | 从 run-log/budget 生成流程度量报告；只读 | O 只读，不分派子代理 |
+| `wm-verify-evidence-source.ts` | source provenance 生产与重验 | 校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`；不是只读 verify | O/S 执行（导出证据前） |
 | `wm-write.ts` | 状态写入 | `<target>.lock` 跨进程锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`--expect-mtime` 为有限非负数向下取整，`--lock-timeout` 为安全非负整数，CLI 陈旧锁须显式 `--recover-stale-lock` | O/A/S 执行（仅状态文件操作） |
 | `doctor.ts` | 环境自检 | 首次启用 / 依赖报错时诊断环境（node/tsx/ajv/java/tla2tools/codegraph/openspec）；`--with-tla` 升级 TLA+ 项为阻断级 | O 执行（非阶段门） |
 

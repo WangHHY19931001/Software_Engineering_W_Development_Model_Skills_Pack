@@ -838,21 +838,21 @@ describe('runDocConsistencyChecks', () => {
       };
       expect(report.violations).toEqual([]);
       expect(report.dynamicMeasurements).toMatchObject({
-        schemaCount: 22,
-        cliScriptCount: 35,
-        exit2ScriptCount: 34,
+        schemaCount: 23,
+        cliScriptCount: 36,
+        exit2ScriptCount: 35,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 897,
         numPassedTests: 897,
         numFailedTests: 0,
         success: true,
-        testDirectoryInventoryCount: 54,
+        testDirectoryInventoryCount: 55,
       });
       expect(report.dynamicMeasurements.vitestArtifactId).toBe('vitest/results.json');
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(36);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(37);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);
@@ -1020,8 +1020,8 @@ describe('runDocConsistencyChecks', () => {
           }>;
         };
       };
-      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(34);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(36);
+      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(35);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(37);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);
@@ -1631,6 +1631,24 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
         );
       },
     });
+    // 这些场景故意注入 54/897 的合成 Vitest artifact；让复制的活体文档保持同一 fixture 口径。
+    for (const relativePath of ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push']) {
+      const documentPath = path.join(fixtureRoot, relativePath);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture document is inside the mkdtemp-owned root
+      const document = await fs.readFile(documentPath, 'utf8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture document is inside the mkdtemp-owned root
+      await fs.writeFile(
+        documentPath,
+        document
+          .replaceAll('55 files / 905 tests', '54 files / 897 tests')
+          .replaceAll('55 test files / 905 tests', '54 test files / 897 tests')
+          .replaceAll('55 个 .test.ts / 905 条', '54 个 .test.ts / 897 条')
+          .replaceAll('55 个 .test.ts / 905 tests', '54 个 .test.ts / 897 tests')
+          .replaceAll('55 个 test 文件 / 905 条', '54 个 test 文件 / 897 条')
+          .replaceAll('vitest 905 条（55 test files）', 'vitest 897 条（54 test files）'),
+        'utf8',
+      );
+    }
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(

@@ -35,7 +35,7 @@
 | 爬坡报告 | HarnessImprovementReport | 「爬坡循环改进报告模型」节 |
 | TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound） | 「TLA+ manifest 模型」节 |
 | BDD 模型 | BddManifest / BddStateMachine / BddFeature | 「BDD 数据模型」节 |
-| JSON Schema | 22 份 schema（含 evidence-manifest）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节 |
+| JSON Schema | 23 份 schema（含 evidence-manifest / evidence-provenance）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节 |
 
 **按场景只读 §X**：
 
@@ -873,7 +873,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/infrastructure/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（22 份）
+### Schema 清单（23 份）
 
 | Schema 名（注册键） | 文件 | 目标类型 | 关键约束 | 对应 logic.ts |
 | --- | --- | --- | --- | --- |
@@ -899,6 +899,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `signature-chain` | `signature-chain.schema.json` | SignatureChainEntry | additionalProperties:false；inputProvenance 来源证明；actorRole enum | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用） |
 | `iceberg-sweep` | `iceberg-sweep.schema.json` | IcebergSweepReport | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed | iceberg-sweep-logic.ts |
 | `evidence-manifest` | `evidence-manifest.schema.json` | EvidenceManifest | additionalProperties:false；脱敏导出文件的相对路径、SHA-256 与生成元数据 | evidence-export-logic.ts |
+| `evidence-provenance` | `evidence-provenance.schema.json` | EvidenceSourceProvenance | additionalProperties:false；source evidence 文件清单、四类测量、当前 HEAD 与 source bundle SHA-256；producer 必须由 `wm-verify-evidence-source` 生成并写入 | evidence-provenance-logic.ts |
 
 ### 设计原则
 
