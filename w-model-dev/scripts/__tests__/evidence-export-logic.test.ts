@@ -387,6 +387,19 @@ describe('wm-export-evidence CLI', () => {
     expect(argumentError.stdout).toContain('ERROR_JSON ');
   });
 
+  it('redacts values from unknown CLI options in stderr and ERROR_JSON', () => {
+    const option = '--unknown-option=D:/private/actual-secret';
+    const result = runCli([option]);
+    const output = result.stdout + result.stderr;
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('✗ [ARG_INVALID]');
+    expect(result.stdout).toContain('ERROR_JSON ');
+    expect(output).not.toContain('D:/private');
+    expect(output).not.toContain('actual-secret');
+    expect(output).not.toContain(option);
+  });
+
   it('rejects a source-targeting output-parent symlink through the real CLI without source pollution', async () => {
     const project = await createProject();
     const source = path.join(project, '.w-model');

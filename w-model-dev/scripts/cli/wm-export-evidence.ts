@@ -33,8 +33,7 @@ async function main(): Promise<void> {
       argumentError(args.length < 2 ? '--verify 缺少 manifest 路径' : '--verify 只接受一个 manifest 路径');
     result = await verifyEvidence(path.resolve(args[1]!));
   } else {
-    if (args.some((arg) => arg.startsWith('--')))
-      argumentError(`未知选项: ${args.find((arg) => arg.startsWith('--'))}`);
+    if (args.some((arg) => arg.startsWith('--'))) argumentError('存在未知选项');
     if (args.length !== 2)
       argumentError(args.length < 2 ? '导出模式需要 <project-dir> 与 <output-dir>' : '导出模式仅接受两个位置参数');
     result = await exportEvidence(path.resolve(args[0]!), path.resolve(args[1]!));
