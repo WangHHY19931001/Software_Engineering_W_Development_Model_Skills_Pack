@@ -1587,19 +1587,50 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(
-      spawnSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: fixtureRoot, timeout: 15_000 })
-        .status,
+      spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], {
+        cwd: fixtureRoot,
+        timeout: 15_000,
+      }).status,
     ).toBe(0);
-    expect(spawnSync('git', ['config', 'user.name', 'fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status).toBe(0);
+    expect(
+      spawnSync('git', ['config', '--local', 'user.name', 'fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,
+    ).toBe(0);
+    expect(
+      spawnSync('git', ['config', '--local', 'commit.gpgSign', 'false'], { cwd: fixtureRoot, timeout: 15_000 }).status,
+    ).toBe(0);
+    const fixtureHooksPath = path.join(fixtureRoot, '.fixture-hooks');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture hook path is inside the mkdtemp-owned test root
+    await fs.mkdir(fixtureHooksPath, { recursive: true });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture marker is inside the mkdtemp-owned test root
     await fs.writeFile(path.join(fixtureRoot, '.provenance-fixture'), 'fixture\n', 'utf8');
     expect(spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status).toBe(0);
-    const commit = spawnSync('git', ['commit', '-m', 'fixture'], {
-      cwd: fixtureRoot,
-      encoding: 'utf-8',
-      timeout: 15_000,
-    });
-    expect(commit.status, commit.stderr).toBe(0);
+    const commit = spawnSync(
+      'git',
+      [
+        '-c',
+        `core.hooksPath=${fixtureHooksPath}`,
+        '-c',
+        'commit.gpgSign=false',
+        'commit',
+        '--no-gpg-sign',
+        '--no-verify',
+        '--no-edit',
+        '-m',
+        'fixture',
+      ],
+      {
+        cwd: fixtureRoot,
+        encoding: 'utf-8',
+        timeout: 30_000,
+        env: {
+          ...process.env,
+          GIT_EDITOR: 'true',
+          GIT_SEQUENCE_EDITOR: 'true',
+          GIT_TERMINAL_PROMPT: '0',
+        },
+      },
+    );
+    expect(commit.status, `git commit failed: stdout=${commit.stdout ?? ''} stderr=${commit.stderr ?? ''}`).toBe(0);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture dependency junction has a repository-controlled source and mkdtemp-owned destination
     await fs.symlink(path.join(REPO_ROOT, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'junction');
     await assertResult(fixtureRoot);

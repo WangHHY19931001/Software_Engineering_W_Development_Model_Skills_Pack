@@ -30,3 +30,17 @@ Passed:
 ## Follow-up
 
 D5A or the integration owner should add the D5B verification-artifact provenance and cleanup entry to CHANGELOG. D5B intentionally did not modify CHANGELOG to avoid the parallel conflict.
+
+## Follow-up Stabilization
+
+The post-commit worktree exposed intermittent `withDocsConsistencyFixture` failures at the fixture `git commit` call (`status=null` after the 15-second synchronous timeout). The fixture inherited repository-level signing, hooks, and editor behavior while only setting local user identity; the failure did not provide a useful stderr before timeout.
+
+The fixture now creates an empty hooks directory, sets local user name/email and `commit.gpgSign=false`, and invokes commit with `core.hooksPath=<fixture-hooks>`, `commit.gpgSign=false`, `--no-gpg-sign`, `--no-verify`, `--no-edit`, `GIT_EDITOR=true`, `GIT_SEQUENCE_EDITOR=true`, and `GIT_TERMINAL_PROMPT=0`. The commit has a 30-second process timeout and failure assertions include both stdout and stderr. This is test-fixture-only and does not alter production pre-push behavior.
+
+Verification after stabilization:
+
+- Full `npm test`: 54 files / 894 tests passed.
+- Provenance, malformed coverage, and wm-export probe tests passed.
+- `run-sync` synchronous-process audit passed with updated fixture entries and line numbers.
+- `npm run typecheck`, `npm run lint:security`, and `npm run check:docs-consistency` passed; docs-consistency reported 894/894 and zero violations.
+- `npm run prepush` passed items 1-15 and reached item 16; it remained blocked by the pre-existing parallel D5A formatting issue in `w-model-dev/scripts/logic/evidence-export-logic.ts`. D5B did not modify that file.
