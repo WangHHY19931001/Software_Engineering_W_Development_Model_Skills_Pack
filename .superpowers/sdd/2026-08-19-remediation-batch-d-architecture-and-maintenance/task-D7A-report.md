@@ -1,37 +1,43 @@
-# Task D7A Report
+# D7A Report: Markdown table secret sanitization
 
 ## Scope
 
-D7A changes are limited to the evidence manifest schema, evidence export logic, its focused tests, and CHANGELOG. No D7B, docs-consistency, pre-push, state, gate-log, or unrelated schema files were changed by D7A.
+Changed only:
 
-CodeGraph impact analysis was performed before edits for `exportEvidence`, `verifyEvidence`, `EvidenceManifest`, `SENSITIVE_KEYS`, `sanitizeContent`, and the real CLI test helper. The affected call path is `wm-export-evidence.ts` to `exportEvidence` or `verifyEvidence`, with focused coverage in `evidence-export-logic.test.ts`.
+- `w-model-dev/scripts/logic/evidence-export-logic.ts`
+- `w-model-dev/scripts/__tests__/evidence-export-logic.test.ts`
+
+No provenance architecture, CLI, documentation, hooks, schema, package, baseline, plan, or spec files changed.
+
+## Implementation
+
+- Added a cell-aware Markdown table sanitizer for `.md` evidence.
+- Sensitive key/value rows redact values for normalized sensitive key variants, including case, hyphen, and underscore variants.
+- Standard Markdown table headers mark sensitive columns; subsequent data rows redact only those cells.
+- Escaped pipes are not used as cell delimiters, and row boundaries, leading/trailing pipes, and no-tail-pipe rows are retained.
+- Existing ordinary text handling, absolute-path redaction, relative paths, and HTTPS URLs remain intact.
+- `verifyEvidence` continues to use `sanitizeContent`, so hash-valid packages containing unsanitized Markdown table secrets return `UNSANITIZED_EVIDENCE`.
 
 ## TDD Evidence
 
-The focused suite was first run after adding D7A assertions and failed as expected:
+New tests were written before the implementation and initially failed as expected:
 
-- exported manifests had no provenance;
-- normalized sensitive keys and Markdown key/value secrets were not redacted;
-- a manually modified package with recalculated file hashes was accepted by `--verify`.
+- Markdown table secrets remained visible during export.
+- Hash-valid unsanitized Markdown passed verification.
 
-The implementation was then added and the focused suite passed with 21 tests.
-
-## Changes
-
-- Manifest provenance is now required and contains a fixed format/version, nonempty run and artifact identifiers, a 40-character lowercase commit SHA, `verificationStatus: "passed"`, measured hashes for source gate logs, verifier outputs, and run log, plus a content hash covering the sorted exported file manifest.
-- Default export requires `.w-model/evidence-provenance.json`; missing, malformed, unverified, or source-hash-mismatched provenance fails closed with `INVALID_PROVENANCE`.
-- Verify validates manifest provenance and the exported file-list content hash, then regenerates canonical sanitized content for every exported file. Hash-valid packages that reintroduce secrets or absolute paths are rejected as `UNSANITIZED_EVIDENCE`.
-- Redaction recognizes `authorization`, `credential`, `access_token`, and `private_key`, including case and separator variants, recursively in JSON/JSONL and as key/value lines in Markdown/text.
-- Real child-process CLI tests cover passed export/verify, missing or unverified provenance rejection, and rejection of a manually assembled hash-valid package containing an authorization secret.
+The final tests cover no-header sensitive rows, header-driven sensitive columns, sensitive key variants, escaped pipes, no-tail-pipe rows, ordinary values, relative paths, HTTPS URLs, and verify rejection after manually recomputing hashes.
 
 ## Verification
 
 Passed:
 
-- Focused `evidence-export-logic.test.ts`: 21 tests.
-- Full `npm test`: 54 files / 897 tests passed.
-- `npm run typecheck`.
-- `npm run lint:security`: zero new findings.
-- D7A scoped `git diff --check`.
+```text
+npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/evidence-export-logic.test.ts
+23 passed
 
-`npm run prepush` executed and passed through self-test, security scan, unit/coverage, and npm audit. It stopped at docs-consistency because the D7A test additions changed the live total from 895 to 897 while README, AGENTS, CONTRIBUTING, INSTALL, and pre-push still declare 895. Those documentation and hook paths are outside D7A's explicit allowlist and belong to the prohibited D7B/docs-consistency/prepush scope, so they were not changed here.
+npm run typecheck
+passed
+
+npm run lint:security
+passed; 0 new findings
+```

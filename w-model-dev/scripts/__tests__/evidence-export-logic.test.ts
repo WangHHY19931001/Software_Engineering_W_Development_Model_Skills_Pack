@@ -261,6 +261,75 @@ describe('evidence export logic', () => {
     expect(combined[4]).toContain('private_key = [REDACTED]');
   });
 
+  it('sanitizes Markdown table cells without changing ordinary values or pipe layout', async () => {
+    const project = await createProject();
+    const markdownPath = path.join(project, '.w-model', 'codegraph-queries', 'query.md');
+    await fs.appendFile(
+      markdownPath,
+      [
+        '| Authorization | Bearer table-secret |',
+        '| Name | Authorization |',
+        '|---|---|',
+        '| Alice | Bearer header-secret |',
+        '| private-key | key-secret |',
+        '| Access Token | token-secret |',
+        '',
+        '| Label | Value |',
+        '|---|---|',
+        '| ordinary | docs/relative.md |',
+        '| escaped | keep\\|this |',
+        '| authorization | Bearer no-tail-secret',
+        '| HTTPS | https://example.test/token |',
+        '| Relative | ./docs/readme.md |',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const output = path.join(tmpDir, 'markdown-table-evidence');
+
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+
+    const exported = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
+    expect(exported).not.toContain('Bearer table-secret');
+    expect(exported).not.toContain('Bearer header-secret');
+    expect(exported).not.toContain('key-secret');
+    expect(exported).not.toContain('token-secret');
+    expect(exported).not.toContain('Bearer no-tail-secret');
+    expect(exported).toContain('| Authorization | [REDACTED] |');
+    expect(exported).toContain('| Alice | [REDACTED] |');
+    expect(exported).toContain('| private-key | [REDACTED] |');
+    expect(exported).toContain('| Access Token | [REDACTED] |');
+    expect(exported).toContain('| ordinary | docs/relative.md |');
+    expect(exported).toContain('| escaped | keep\\|this |');
+    expect(exported).toContain('| HTTPS | https://example.test/token |');
+    expect(exported).toContain('| Relative | ./docs/readme.md |');
+  });
+
+  it('verifies exported Markdown with the same sanitizer and rejects hash-valid unsanitized content', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'markdown-verify-evidence');
+    await exportEvidence(project, output);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string }>;
+      provenance: { contentHash: string };
+    };
+    const targetPath = path.join(output, 'codegraph-queries', 'query.md');
+    const unsafeContent = '| Authorization | Bearer manually-added-secret |\n';
+    await fs.writeFile(targetPath, unsafeContent, 'utf8');
+    const target = manifest.files.find((file) => file.path === 'codegraph-queries/query.md');
+    expect(target).toBeDefined();
+    target!.sha256 = sha256(unsafeContent);
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSANITIZED_EVIDENCE',
+    });
+  });
+
   it('verifies a valid export and rejects a tampered exported file', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');

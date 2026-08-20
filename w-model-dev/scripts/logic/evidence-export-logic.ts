@@ -220,6 +220,83 @@ function sanitizeString(value: string): string {
       `$1${REDACTED}`,
     );
 }
+
+type MarkdownCell = { start: number; end: number; value: string };
+type MarkdownRow = { cells: MarkdownCell[] };
+
+function splitMarkdownRow(line: string): MarkdownRow | null {
+  const pipes: number[] = [];
+  const pipePattern = /\|/g;
+  let match: RegExpExecArray | null;
+  while ((match = pipePattern.exec(line)) !== null) {
+    const index = match.index;
+    let backslashes = 0;
+    for (let cursor = index - 1; cursor >= 0 && line.slice(cursor, cursor + 1) === '\\'; cursor -= 1) backslashes += 1;
+    if (backslashes % 2 === 0) pipes.push(index);
+  }
+  const firstPipe = pipes.at(0);
+  const lastPipe = pipes.at(-1);
+  if (firstPipe === undefined || lastPipe === undefined) return null;
+  const startsWithPipe = line.slice(0, firstPipe).trim() === '';
+  const endsWithPipe = line.slice(lastPipe + 1).trim() === '';
+  const cells: MarkdownCell[] = [];
+  let start = startsWithPipe ? firstPipe + 1 : 0;
+  for (const pipe of pipes) {
+    if (pipe > start) cells.push({ start, end: pipe, value: line.slice(start, pipe) });
+    start = pipe + 1;
+  }
+  if (!endsWithPipe && start < line.length) cells.push({ start, end: line.length, value: line.slice(start) });
+  return cells.length > 0 ? { cells } : null;
+}
+
+function isSensitiveCell(cell: MarkdownCell): boolean {
+  return SENSITIVE_KEYS.has(normalizeSensitiveKey(cell.value.trim()));
+}
+function isMarkdownSeparator(row: MarkdownRow): boolean {
+  return row.cells.length > 0 && row.cells.every(({ value }) => /^\s*:?-{3,}:?\s*$/.test(value));
+}
+function sanitizeMarkdownRow(line: string, row: MarkdownRow, sensitiveColumns: Set<number>): string {
+  const replacements = Array.from(row.cells.entries()).map(([cellIndex, cell]) => {
+    if (sensitiveColumns.has(cellIndex)) {
+      const leading = cell.value.match(/^\s*/)?.[0] ?? '';
+      const trailing = cell.value.match(/\s*$/)?.[0] ?? '';
+      return { start: cell.start, end: cell.end, value: `${leading}${REDACTED}${trailing}` };
+    }
+    return { start: cell.start, end: cell.end, value: sanitizeString(cell.value) };
+  });
+  return replacements
+    .sort((left, right) => right.start - left.start)
+    .reduce((output, replacement) => `${output.slice(0, replacement.start)}${replacement.value}${output.slice(replacement.end)}`, line);
+}
+function sanitizeMarkdown(text: string): string {
+  const lines = text.split(/(\r?\n)/);
+  let sensitiveColumns = new Set<number>();
+  const sanitizedLines = lines.map((line, index) => {
+    if (index % 2 === 1) return line;
+    const row = splitMarkdownRow(line);
+    if (!row) {
+      sensitiveColumns = new Set<number>();
+      return sanitizeString(line);
+    }
+    const nextRow = splitMarkdownRow(lines.slice(index + 2, index + 3).at(0) ?? '');
+    if (nextRow && isMarkdownSeparator(nextRow) && row.cells.some(isSensitiveCell)) {
+      sensitiveColumns = new Set(
+        Array.from(row.cells.entries())
+          .filter(([, cell]) => isSensitiveCell(cell))
+          .map(([cellIndex]) => cellIndex),
+      );
+      return line;
+    }
+    if (isMarkdownSeparator(row)) return line;
+    const firstCell = row.cells.at(0);
+    const noHeaderKeyValue = row.cells.length > 1 && firstCell !== undefined && isSensitiveCell(firstCell);
+    const indices = noHeaderKeyValue
+      ? new Set<number>(Array.from(row.cells.keys()).slice(1))
+      : sensitiveColumns;
+    return sanitizeMarkdownRow(line, row, indices);
+  });
+  return sanitizedLines.join('');
+}
 function redact(value: unknown): unknown {
   if (typeof value === 'string') return sanitizeString(value);
   if (Array.isArray(value)) return value.map(redact);
@@ -257,7 +334,7 @@ function sanitizeContent(sourcePath: string, content: Buffer): Buffer {
     }
     return Buffer.from(output.length > 0 ? output.join('\n') + '\n' : '', 'utf8');
   }
-  return Buffer.from(sanitizeString(text), 'utf8');
+  return Buffer.from(extension === '.md' ? sanitizeMarkdown(text) : sanitizeString(text), 'utf8');
 }
 function isEvidenceMeasurement(value: unknown): value is EvidenceMeasurement {
   if (value === null || typeof value !== 'object') return false;
