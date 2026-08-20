@@ -28,12 +28,14 @@
  *
  * @module
  */
+/* eslint-disable security/detect-non-literal-fs-filename -- Vitest artifacts are admitted only after controlled-root, sibling, provenance, current-HEAD, hash, and measurement checks. */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve as pathResolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve as pathResolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -144,11 +146,13 @@ interface Exit2ProbeResult {
   outputExistsAfter?: boolean;
 }
 
+const execFileAsync = promisify(execFile);
+
 /**
  * 唯一 exit-2 事实源：每个候选 CLI 的无副作用非法调用。登记只定义如何探测，
  * 最终计数仅来自真实子进程 status=2 且 ERROR_JSON.exitCode=2 的结果。
  */
-function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Exit2ProbeResult[] {
+async function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Promise<Exit2ProbeResult[]> {
   const probeRoot = join(tmpdir(), `w-model-exit2-probe-${process.pid}`);
   const invalidStatusProject = join(probeRoot, 'invalid-status-project');
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
@@ -194,43 +198,51 @@ function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Exit
     outputPath: exportOutput,
   });
   probes.set('wm-status.ts', { script: 'wm-status.ts', args: [invalidStatusProject] });
-  const results: Exit2ProbeResult[] = [];
   try {
-    for (const [probeId, probe] of probes.entries()) {
-      const scriptPath = join(root, 'w-model-dev', 'scripts', 'cli', probe.script);
-      const result = spawnSync(process.execPath, [tsxCli, scriptPath, ...probe.args], {
-        cwd: probe.cwd ?? root,
-        env: probe.env,
-        encoding: 'utf-8',
-        timeout: 30_000,
-        maxBuffer: 64 * 1024 * 1024,
-      });
-      const jsonLine = String(result.stdout ?? '')
-        .split(/\r?\n/)
-        .find((line) => line.startsWith('ERROR_JSON '));
-      let errorExitCode: number | null = null;
-      if (jsonLine !== undefined) {
-        const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as { exitCode?: unknown } | null;
-        errorExitCode = typeof parsed?.exitCode === 'number' ? parsed.exitCode : null;
-      }
-      results.push({
-        script: probeId,
-        status: result.status ?? -1,
-        errorExitCode,
-        ...(probe.outputPath === undefined
-          ? {}
-          : {
-              outputPath: 'probe-output',
-              // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe output path
-              outputExistsAfter: existsSync(probe.outputPath),
-              emittedEvidenceExport: String(result.stdout ?? '').includes('EVIDENCE_EXPORT_JSON '),
-            }),
-      });
-    }
+    const results = await Promise.all(
+      [...probes.entries()].map(async ([probeId, probe]): Promise<Exit2ProbeResult> => {
+        const scriptPath = join(root, 'w-model-dev', 'scripts', 'cli', probe.script);
+        let stdout = '';
+        let status = 0;
+        try {
+          const result = await execFileAsync(process.execPath, [tsxCli, scriptPath, ...probe.args], {
+            cwd: probe.cwd ?? root,
+            env: probe.env,
+            encoding: 'utf8',
+            timeout: 30_000,
+            maxBuffer: 64 * 1024 * 1024,
+          });
+          stdout = String(result.stdout ?? '');
+        } catch (error) {
+          const childError = error as NodeJS.ErrnoException & { stdout?: string; code?: number | string };
+          stdout = String(childError.stdout ?? '');
+          status = typeof childError.code === 'number' ? childError.code : -1;
+        }
+        const jsonLine = stdout.split(/\r?\n/).find((line) => line.startsWith('ERROR_JSON '));
+        let errorExitCode: number | null = null;
+        if (jsonLine !== undefined) {
+          const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as { exitCode?: unknown } | null;
+          errorExitCode = typeof parsed?.exitCode === 'number' ? parsed.exitCode : null;
+        }
+        return {
+          script: probeId,
+          status,
+          errorExitCode,
+          ...(probe.outputPath === undefined
+            ? {}
+            : {
+                outputPath: 'probe-output',
+                // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe output path
+                outputExistsAfter: existsSync(probe.outputPath),
+                emittedEvidenceExport: stdout.includes('EVIDENCE_EXPORT_JSON '),
+              }),
+        };
+      }),
+    );
+    return results;
   } finally {
     rmSync(probeRoot, { recursive: true, force: true });
   }
-  return results;
 }
 
 function readSecurityBaselineEntryCount(root: string): number {
@@ -283,6 +295,22 @@ function findVitestBin(root: string): string | null {
   } catch {
     return null;
   }
+}
+
+interface VitestProvenance {
+  format: 'w-model-vitest-provenance';
+  version: 1;
+  commitSha: string;
+  runId: string;
+  artifactRelativePath: string;
+  artifactSha256: string;
+  measurements: {
+    testResults: unknown[];
+    numTotalTests: number;
+    numPassedTests: number;
+    numFailedTests: number;
+    success: boolean;
+  };
 }
 
 interface VitestMeasurements {
@@ -367,8 +395,7 @@ function parseVitestMeasurements(
 }
 
 /**
- * 从 Vitest JSON outputFile 提取完整实测事实包（不 spawn）。
- * 来源：pre-push 第 12 项已全量跑过 vitest 并 `--reporter=json --outputFile=...`，
+ * 从 Vitest JSON outputFile 提取完整实测事实包（不 spawn）。来源：pre-push 第 12 项已全量跑过 vitest 并 `--reporter=json --outputFile=...`，
  * 通过环境变量 WM_VITEST_COUNT_FILE 传入本脚本，直接复用同一次成功运行的所有字段。
  */
 function currentCommitSha(root: string | undefined): string | undefined {
@@ -378,20 +405,91 @@ function currentCommitSha(root: string | undefined): string | undefined {
   return /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
 }
 
-function readVitestArtifact(filePath: string, artifactId: string, root?: string): VitestMeasurements {
+function isPathWithin(parent: string, candidate: string): boolean {
+  const rel = relative(parent, candidate);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+}
+
+function isSafeArtifactRelativePath(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    !isAbsolute(value) &&
+    !value.includes('\\\\') &&
+    !value.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
+  );
+}
+
+function readVitestArtifact(
+  filePath: string,
+  artifactId: string,
+  root?: string,
+  provenanceOverride?: string,
+): VitestMeasurements {
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- explicit external evidence path
-    const content = readFileSync(filePath, 'utf-8');
+    const provenanceFile = provenanceOverride ?? process.env.WM_VITEST_PROVENANCE_FILE;
+    if (provenanceFile === undefined || provenanceFile === '')
+      return invalidVitestMeasurements('缺少受控 provenance 文件');
+    const provenancePath = pathResolve(provenanceFile);
+    const artifactAbsolute = pathResolve(filePath);
+    const controlledRoot =
+      provenanceOverride === undefined ? process.env.WM_VITEST_PROVENANCE_ROOT : dirname(provenancePath);
+    if (controlledRoot === undefined || controlledRoot === '')
+      return invalidVitestMeasurements('缺少受控 artifact 目录');
+    const controlledAbsolute = pathResolve(controlledRoot!);
+    if (
+      !isPathWithin(controlledAbsolute, provenancePath) ||
+      !isPathWithin(controlledAbsolute, artifactAbsolute) ||
+      pathResolve(dirname(provenancePath)) !== pathResolve(dirname(artifactAbsolute))
+    )
+      return invalidVitestMeasurements('artifact 不在 provenance 受控目录');
+    const provenanceStat = lstatSync(provenancePath);
+    const artifactStat = lstatSync(artifactAbsolute);
+    if (!provenanceStat.isFile() || !artifactStat.isFile())
+      return invalidVitestMeasurements('artifact/provenance 必须为普通文件');
+    const provenance = parseJsonSafe(readFileSync(provenancePath, 'utf-8')) as Partial<VitestProvenance> | null;
+    const currentSha = currentCommitSha(root);
+    const provenanceValid =
+      provenance?.format === 'w-model-vitest-provenance' &&
+      provenance.version === 1 &&
+      isSafeArtifactRelativePath(provenance.artifactRelativePath) &&
+      pathResolve(dirname(provenancePath), provenance.artifactRelativePath) === artifactAbsolute &&
+      pathResolve(dirname(provenancePath)) === pathResolve(dirname(artifactAbsolute)) &&
+      typeof provenance.commitSha === 'string' &&
+      /^[0-9a-f]{40}$/i.test(provenance.commitSha) &&
+      provenance.commitSha.toLowerCase() === currentSha?.toLowerCase() &&
+      typeof provenance.runId === 'string' &&
+      /^[0-9a-f]{16}$/i.test(provenance.runId) &&
+      typeof provenance.artifactSha256 === 'string' &&
+      /^[0-9a-f]{64}$/i.test(provenance.artifactSha256);
+    if (!provenanceValid) {
+      return invalidVitestMeasurements('Vitest artifact provenance 不可信');
+    }
+    const content = readFileSync(artifactAbsolute, 'utf-8');
     const artifactSha256 = createHash('sha256').update(content, 'utf8').digest('hex');
-    const metadata = {
-      runId: process.env.WM_VITEST_RUN_ID ?? artifactSha256.slice(0, 16),
-      artifactId: process.env.WM_VITEST_ARTIFACT_ID ?? artifactId,
+    if (artifactSha256 !== provenance.artifactSha256)
+      return invalidVitestMeasurements('Vitest artifact hash 与 provenance 不一致');
+    const parsed = parseJsonSafe(content);
+    const record = parsed as Record<string, unknown> | null;
+    const measurements = provenance.measurements;
+    if (
+      measurements === null ||
+      typeof measurements !== 'object' ||
+      JSON.stringify(record) !== JSON.stringify(measurements)
+    )
+      return invalidVitestMeasurements('Vitest coverage measurements 与 provenance 不一致');
+    const runId = provenance.runId;
+    const commitSha = provenance.commitSha;
+    if (typeof runId !== 'string' || typeof commitSha !== 'string')
+      return invalidVitestMeasurements('Vitest artifact provenance 缺少身份字段');
+    return parseVitestMeasurements(parsed, {
+      runId,
+      artifactId,
       artifactSha256,
-      commitSha: process.env.WM_VITEST_COMMIT_SHA ?? currentCommitSha(root),
-    };
-    return parseVitestMeasurements(parseJsonSafe(content), metadata);
+      commitSha,
+    });
   } catch {
-    return invalidVitestMeasurements('无法读取或解析 Vitest JSON');
+    return invalidVitestMeasurements('无法读取或解析受控 Vitest JSON/provenance');
   }
 }
 
@@ -441,14 +539,34 @@ function collectVitestMeasurements(root: string): VitestMeasurements {
       shell: true,
     });
   }
-  // 无论 spawn 是否报错（含 maxBuffer 超限 / vitest 失败），先尝试读 JSON 落盘文件
+  // 无论 spawn 是否报错（含 maxBuffer 超限 / vitest 失败），先尝试读 JSON 落盘文件。
+  // 自采集路径在本次读取前生成同目录 provenance，避免外部环境变量伪造 passing artifact。
+  const selfProvenance = `${outFile}.provenance.json`;
   try {
-    return readVitestArtifact(outFile, 'vitest/generated-results.json', root);
+    if (existsSync(outFile)) {
+      const raw = readFileSync(outFile, 'utf-8');
+      const parsed = parseJsonSafe(raw) as Record<string, unknown>;
+      const commitSha = currentCommitSha(root);
+      const runId = createHash('sha256').update(raw, 'utf8').digest('hex').slice(0, 16);
+      const selfProvenanceValue = {
+        format: 'w-model-vitest-provenance',
+        version: 1,
+        commitSha,
+        runId,
+        artifactRelativePath: basename(outFile),
+        artifactSha256: createHash('sha256').update(raw, 'utf8').digest('hex'),
+        measurements: parsed,
+      };
+      writeFileSync(selfProvenance, JSON.stringify(selfProvenanceValue), 'utf-8');
+      return readVitestArtifact(outFile, 'vitest/generated-results.json', root, selfProvenance);
+    }
+    return invalidVitestMeasurements('Vitest JSON 未生成或不可解析');
   } catch {
     return invalidVitestMeasurements('Vitest JSON 未生成或不可解析');
   } finally {
     try {
       rmSync(outFile, { force: true });
+      rmSync(selfProvenance, { force: true });
     } catch {
       // 临时文件清理失败不影响结果
     }
@@ -483,7 +601,7 @@ async function main(): Promise<void> {
   const cliScriptFiles = readdirSync(join(root, 'w-model-dev/scripts/cli'))
     .filter((f) => f.endsWith('.ts'))
     .sort();
-  const exit2ProbeResults = collectExit2ScriptResults(root, cliScriptFiles);
+  const exit2ProbeResults = await collectExit2ScriptResults(root, cliScriptFiles);
   const exit2ScriptCount = new Set(
     exit2ProbeResults
       .filter((probe) => probe.status === 2 && probe.errorExitCode === 2)

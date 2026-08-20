@@ -171,11 +171,14 @@ describe('runSync', () => {
     expect(directCalls).not.toHaveLength(0);
     expect(audit.calls.filter((call) => call.file === RUN_SYNC_FILE && call.api === 'spawnSync')).toHaveLength(1);
 
+    const remainingExceptions = [...SYNC_PROCESS_EXCEPTIONS];
     for (const call of directCalls) {
-      const exception = SYNC_PROCESS_EXCEPTIONS.find(
-        (candidate) => candidate.api === call.api && candidate.file === call.file && candidate.line === call.line,
+      const exceptionIndex = remainingExceptions.findIndex(
+        (candidate) => candidate.api === call.api && candidate.file === call.file,
       );
-      expect(exception, `${call.file}:${call.line} ${call.api} must be reviewed`).toBeDefined();
+      expect(exceptionIndex, `${call.file}:${call.line} ${call.api} must be reviewed`).toBeGreaterThanOrEqual(0);
+      const [exception] = remainingExceptions.splice(exceptionIndex, 1);
+      expect(exception?.line).toBeGreaterThan(0);
       expect(exception?.symbol).not.toBe('');
       expect(exception?.reason).not.toBe('');
       expect(exception?.timeout.required).toBe(true);
@@ -187,9 +190,12 @@ describe('runSync', () => {
         .slice(call.line - 1, call.line + 20)
         .join('\n');
       const hasExplicitTimeout = /timeout\s*:/.test(optionBlock);
-      expect(exception?.timeout.status).toBe(hasExplicitTimeout ? 'present' : 'missing-followup');
+      expect(exception?.timeout.status, `${call.file}:${call.line} ${call.api}`).toBe(
+        hasExplicitTimeout ? 'present' : 'missing-followup',
+      );
     }
 
+    expect(remainingExceptions).toHaveLength(0);
     expect(SYNC_PROCESS_EXCEPTIONS).toHaveLength(directCalls.length);
   });
 

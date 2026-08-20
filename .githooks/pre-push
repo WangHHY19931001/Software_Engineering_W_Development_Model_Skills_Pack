@@ -137,8 +137,10 @@ fi
 # 全部门禁共 17 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
-tmp_vitest_json="$(mktemp)"
-trap 'rm -f "$tmp_log" "$tmp_vitest_json"' EXIT
+tmp_vitest_dir="$(mktemp -d)"
+tmp_vitest_json="$tmp_vitest_dir/results.json"
+tmp_vitest_provenance="$tmp_vitest_dir/provenance.json"
+trap 'rm -f "$tmp_log"; rm -rf "$tmp_vitest_dir"' EXIT
 
 # run_expect <描述> <期望退出码> <命令...>
 run_expect() {
@@ -198,12 +200,15 @@ run_expect "check:exemption 有效豁免样本退出 0" 0 \
 run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
 
-# 12. vitest 单元测试全量通过（54 test files / 893 tests）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
+# 12. vitest 单元测试全量通过（54 test files / 894 tests）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
 #     logic/ + lib/ 阈值 stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest 会 exit 1 阻断推送；
 #     基线见 config/vitest.config.ts coverage.thresholds 注释）
 #     --reporter=json --outputFile 落盘实测用例总数，供第 14 项 check-docs-consistency 复用（避免 vitest 双跑）
 run_expect "vitest 单元测试 + coverage 阈值通过" 0 \
   npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts || exit 1
+
+# 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
+node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
 
 # 13. npm audit：依赖漏洞扫描（high 以上阻断；仅当网络不可达或 registry 不支持 audit endpoint 时自动跳过）
 #     跳过条件 = 网络不可达（npm error/warn/ERR! network 错误行，或 code ENOTFOUND/ETIMEDOUT/ECONNREFUSED）
@@ -230,6 +235,8 @@ fi
 #     注意 2：Git Bash 的 mktemp 产出 MSYS 路径（/tmp/…），Node（Windows）无法直接解析——用 cygpath -w
 #     翻译成 Windows 路径；WSL / 无 cygpath 时保留原值（Node 在 POSIX 下能正确 resolve /tmp/…）。
 export WM_VITEST_COUNT_FILE="$(cygpath -w "$tmp_vitest_json" 2>/dev/null || printf '%s' "$tmp_vitest_json")"
+export WM_VITEST_PROVENANCE_FILE="$(cygpath -w "$tmp_vitest_provenance" 2>/dev/null || printf '%s' "$tmp_vitest_provenance")"
+export WM_VITEST_PROVENANCE_ROOT="$(cygpath -w "$tmp_vitest_dir" 2>/dev/null || printf '%s' "$tmp_vitest_dir")"
 run_expect "docs-consistency 活体文档一致" 0 npm run check:docs-consistency || exit 1
 
 # 15. check-samples-coverage：samples 覆盖矩阵门禁
