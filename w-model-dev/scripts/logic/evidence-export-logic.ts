@@ -34,8 +34,10 @@ export interface EvidenceExportResult {
 
 const MANIFEST_NAME = 'evidence-manifest.json';
 const REDACTED = '[REDACTED]';
+const REDACTED_ABSOLUTE_PATH = '<redacted-absolute-path>';
 const SENSITIVE_KEYS = new Set(['token', 'secret', 'password', 'apikey']);
-const TEXT_EXTENSIONS = new Set(['.json', '.jsonl', '.log', '.txt']);
+const TEXT_EXTENSIONS = new Set(['.json', '.jsonl', '.log', '.txt', '.md']);
+const ABSOLUTE_PATH_PATTERN = /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
 const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
   { directory: 'gate-logs', kind: 'gate-log' },
   { directory: 'verifier-outputs', kind: 'verifier-output' },
@@ -164,7 +166,11 @@ async function collectDirectoryFiles(root: string, current: string, result: stri
   }
   await assertStable(current, before, root);
 }
+function sanitizeString(value: string): string {
+  return value.replace(ABSOLUTE_PATH_PATTERN, REDACTED_ABSOLUTE_PATH);
+}
 function redact(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizeString(value);
   if (Array.isArray(value)) return value.map(redact);
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
@@ -200,7 +206,7 @@ function sanitizeContent(sourcePath: string, content: Buffer): Buffer {
     }
     return Buffer.from(output.length > 0 ? output.join('\n') + '\n' : '', 'utf8');
   }
-  return content;
+  return Buffer.from(sanitizeString(text), 'utf8');
 }
 async function atomicWrite(target: string, content: string | Buffer): Promise<void> {
   const temp = path.join(path.dirname(target), `.${path.basename(target)}.${randomUUID()}.tmp`);

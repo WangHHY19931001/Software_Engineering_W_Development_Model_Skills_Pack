@@ -49,12 +49,22 @@ async function createProject(name = 'project'): Promise<string> {
   );
   await fs.writeFile(
     path.join(state, 'signature-chains', 'chain.jsonl'),
-    '{"value":"safe","token":"chain-token"}\n',
+    '{"value":"safe","token":"chain-token","nested":{"path":"/var/private/run"}}\n',
     'utf8',
   );
   await fs.writeFile(
     path.join(state, 'codegraph-queries', 'query.json'),
-    JSON.stringify({ sourcePath: '/private/source', token: 'query-token' }),
+    JSON.stringify({
+      sourcePath: '/private/source',
+      path: 'D:/private/worktree',
+      nested: { paths: ['\\\\server\\share\\secret', '/home/alice/private'] },
+      token: 'query-token',
+    }),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(state, 'codegraph-queries', 'query.md'),
+    'source: D:/private/worktree with spaces\nresult: /home/alice/private\nnetwork: //host/private/share\nlink: https://example.test/relative\nrelative: docs/relative.md\n',
     'utf8',
   );
   await fs.writeFile(
@@ -105,11 +115,13 @@ describe('evidence export logic', () => {
     expect(manifest.files.map((entry) => entry.path)).toEqual([...manifest.files.map((entry) => entry.path)].sort());
     expect(manifest.files.map((entry) => entry.kind)).toEqual([
       'codegraph-query',
+      'codegraph-query',
       'gate-log',
       'run-log',
       'signature-chain',
       'verifier-output',
     ]);
+    expect(manifest.files.some((entry) => entry.path === 'codegraph-queries/query.md')).toBe(true);
     expect(manifest.files.every((entry) => /^[0-9a-f]{64}$/.test(entry.sha256))).toBe(true);
     expect(manifest.files.some((entry) => entry.path === 'evidence-manifest.json')).toBe(false);
   });
@@ -126,6 +138,7 @@ describe('evidence export logic', () => {
         'verifier-outputs/verifier.json',
         'signature-chains/chain.jsonl',
         'codegraph-queries/query.json',
+        'codegraph-queries/query.md',
         'run-log.jsonl',
       ].map(async (relativePath) => fs.readFile(path.join(output, relativePath), 'utf8')),
     );
@@ -139,9 +152,19 @@ describe('evidence export logic', () => {
       'query-token',
       'run-secret',
       'run-key',
+      'D:/private/worktree with spaces',
+      '\\\\server\\share\\secret',
+      '/home/alice/private',
+      '//host/private/share',
+      '/var/private/run',
     ]) {
       expect(outputText).not.toContain(secret);
     }
+    expect(outputText).toContain('<redacted-absolute-path>');
+    expect(outputText).not.toContain('<redacted-absolute-path> with spaces');
+    expect(outputText).toContain('network: <redacted-absolute-path>');
+    expect(outputText).toContain('link: https://example.test/relative');
+    expect(outputText).toContain('relative: docs/relative.md');
     expect(JSON.parse(combined[0]!)).toMatchObject({ token: '[REDACTED]', nested: { secret: '[REDACTED]' } });
     expect(JSON.parse(combined[2]!.trim())).toMatchObject({ token: '[REDACTED]' });
   });
