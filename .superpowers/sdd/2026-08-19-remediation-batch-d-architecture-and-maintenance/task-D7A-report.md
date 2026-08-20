@@ -41,3 +41,24 @@ passed
 npm run lint:security
 passed; 0 new findings
 ```
+
+## Round 2/5 Rework
+
+Addressed the Important finding from `task-D7A-rereview.md`:
+
+- `splitMarkdownRow` now preserves zero-length cells between valid Markdown pipes, including leading, middle, and trailing empty cells, while retaining escaped-pipe behavior.
+- Header, separator, and data rows now keep aligned column indexes for layouts such as `| Name || Authorization |`.
+- Added export and verify regressions for the empty-cell layout. Export redacts `Bearer empty-cell-secret`, and verify rejects a hash-valid unsanitized package with `UNSANITIZED_EVIDENCE`.
+
+Round 2/5 verification:
+
+```text
+npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/evidence-export-logic.test.ts
+25 passed
+
+npm run typecheck
+passed
+
+npm run lint:security
+passed; 0 new findings
+```

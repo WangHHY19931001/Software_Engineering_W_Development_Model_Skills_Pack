@@ -241,8 +241,10 @@ function splitMarkdownRow(line: string): MarkdownRow | null {
   const endsWithPipe = line.slice(lastPipe + 1).trim() === '';
   const cells: MarkdownCell[] = [];
   let start = startsWithPipe ? firstPipe + 1 : 0;
-  for (const pipe of pipes) {
-    if (pipe > start) cells.push({ start, end: pipe, value: line.slice(start, pipe) });
+  for (const [pipeIndex, pipe] of pipes.entries()) {
+    if (pipeIndex > 0 || !startsWithPipe) {
+      cells.push({ start, end: pipe, value: line.slice(start, pipe) });
+    }
     start = pipe + 1;
   }
   if (!endsWithPipe && start < line.length) cells.push({ start, end: line.length, value: line.slice(start) });
@@ -253,7 +255,7 @@ function isSensitiveCell(cell: MarkdownCell): boolean {
   return SENSITIVE_KEYS.has(normalizeSensitiveKey(cell.value.trim()));
 }
 function isMarkdownSeparator(row: MarkdownRow): boolean {
-  return row.cells.length > 0 && row.cells.every(({ value }) => /^\s*:?-{3,}:?\s*$/.test(value));
+  return row.cells.length > 0 && row.cells.every(({ value }) => value.trim() === '' || /^\s*:?-{3,}:?\s*$/.test(value));
 }
 function sanitizeMarkdownRow(line: string, row: MarkdownRow, sensitiveColumns: Set<number>): string {
   const replacements = Array.from(row.cells.entries()).map(([cellIndex, cell]) => {

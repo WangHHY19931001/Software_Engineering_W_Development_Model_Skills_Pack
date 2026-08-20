@@ -305,6 +305,50 @@ describe('evidence export logic', () => {
     expect(exported).toContain('| Relative | ./docs/readme.md |');
   });
 
+  it('preserves empty Markdown cells so sensitive header columns cannot leak secrets', async () => {
+    const project = await createProject();
+    const markdownPath = path.join(project, '.w-model', 'codegraph-queries', 'query.md');
+    await fs.appendFile(
+      markdownPath,
+      ['| Name || Authorization |', '|---||---|', '| Alice | ordinary | Bearer empty-cell-secret |', ''].join('\n'),
+      'utf8',
+    );
+    const output = path.join(tmpDir, 'empty-cell-markdown-evidence');
+
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+
+    const exported = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
+    expect(exported).not.toContain('Bearer empty-cell-secret');
+    expect(exported).toContain('| Name || Authorization |');
+    expect(exported).toContain('|---||---|');
+    expect(exported).toContain('| Alice | ordinary | [REDACTED] |');
+  });
+
+  it('rejects hash-valid unsanitized Markdown with an empty header cell after recomputing hashes', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'empty-cell-verify-evidence');
+    await exportEvidence(project, output);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string }>;
+      provenance: { contentHash: string };
+    };
+    const targetPath = path.join(output, 'codegraph-queries', 'query.md');
+    const unsafeContent = '| Name || Authorization |\n|---||---|\n| Alice | ordinary | Bearer empty-cell-secret |\n';
+    await fs.writeFile(targetPath, unsafeContent, 'utf8');
+    const target = manifest.files.find((file) => file.path === 'codegraph-queries/query.md');
+    expect(target).toBeDefined();
+    target!.sha256 = sha256(unsafeContent);
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSANITIZED_EVIDENCE',
+    });
+  });
+
   it('verifies exported Markdown with the same sanitizer and rejects hash-valid unsanitized content', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'markdown-verify-evidence');
