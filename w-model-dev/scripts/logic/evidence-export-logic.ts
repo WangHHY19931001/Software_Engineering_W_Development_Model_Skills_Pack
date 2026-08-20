@@ -37,7 +37,8 @@ const REDACTED = '[REDACTED]';
 const REDACTED_ABSOLUTE_PATH = '<redacted-absolute-path>';
 const SENSITIVE_KEYS = new Set(['token', 'secret', 'password', 'apikey']);
 const TEXT_EXTENSIONS = new Set(['.json', '.jsonl', '.log', '.txt', '.md']);
-const ABSOLUTE_PATH_PATTERN = /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
+const ABSOLUTE_PATH_PATTERN =
+  /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
 const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
   { directory: 'gate-logs', kind: 'gate-log' },
   { directory: 'verifier-outputs', kind: 'verifier-output' },
