@@ -1043,6 +1043,41 @@ describe('runDocConsistencyChecks', () => {
       ).toBe(true);
       expect(result.stdout).not.toContain('EVIDENCE_EXPORT_JSON');
       await assertPrePushArtifactCleanup();
+
+      const probeResults = report.dynamicMeasurements.exit2ProbeResults ?? [];
+      for (const field of ['status', 'errorExitCode', 'outputExistsAfter', 'emittedEvidenceExport'] as const) {
+        const invalidProbe = probeResults.map((probe) => ({ ...probe }));
+        const target = invalidProbe.find((probe) => probe.script === 'wm-export-evidence.ts#no-args');
+        expect(target).toBeDefined();
+        if (target === undefined) continue;
+        if (field === 'status') target.status = 1;
+        if (field === 'errorExitCode') target.errorExitCode = 1;
+        if (field === 'outputExistsAfter') target.outputExistsAfter = true;
+        if (field === 'emittedEvidenceExport') target.emittedEvidenceExport = true;
+        const invalidReport = buildDocConsistencyReport(baseInput({ exit2ProbeResults: invalidProbe }));
+        expect(invalidReport.dynamicViolations.some((violation) => violation.check === 'exit2-probe')).toBe(true);
+        expect(invalidReport.violations).toEqual([...invalidReport.staticViolations, ...invalidReport.dynamicViolations]);
+      }
+
+      for (const name of ['SKILL.md', 'references/data-models.md', 'references/command-reference.md']) {
+        const invalidReport = buildDocConsistencyReport(
+          baseInput({
+            skillPkgDocs: [
+              {
+                name: `w-model-dev/${name}`,
+                baseDir: name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '.',
+                content: 'scripts/logic/schema-loader.ts',
+              },
+            ],
+          }),
+        );
+        expect(
+          invalidReport.violations.some(
+            (violation) =>
+              violation.check === 'schema-loader-path' && violation.message.includes(`w-model-dev/${name}`),
+          ),
+        ).toBe(true);
+      }
     });
   });
 

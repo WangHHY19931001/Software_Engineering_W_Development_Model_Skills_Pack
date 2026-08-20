@@ -253,7 +253,58 @@ export interface DocConsistencyReport {
   };
 }
 
-const DYNAMIC_CHECKS = new Set(['exit2-scripts', 'references-count', 'asset-counts', 'vitest-files', 'vitest-tests']);
+const DYNAMIC_CHECKS = new Set([
+  'exit2-scripts',
+  'exit2-probe',
+  'references-count',
+  'asset-counts',
+  'vitest-files',
+  'vitest-tests',
+]);
+
+function checkExit2ProbeResults(
+  probes: DocConsistencyInput['exit2ProbeResults'],
+): DocCheckViolation[] {
+  if (probes === undefined) return [];
+  const violations: DocCheckViolation[] = [];
+  for (const probe of probes.filter((candidate) => candidate.script.startsWith('wm-export-evidence.ts#'))) {
+    if (probe.status !== 2 || probe.errorExitCode !== 2) {
+      violations.push({
+        check: 'exit2-probe',
+        message: `${probe.script} 应以 status=2 且 ERROR_JSON.exitCode=2 结束（实际 status=${probe.status}, errorCode=${String(probe.errorExitCode)}）`,
+      });
+    }
+    if (probe.outputExistsAfter !== false) {
+      violations.push({
+        check: 'exit2-probe',
+        message: `${probe.script} 失败后不得保留输出目录（outputExistsAfter 应为 false）`,
+      });
+    }
+    if (probe.emittedEvidenceExport !== false) {
+      violations.push({
+        check: 'exit2-probe',
+        message: `${probe.script} 失败时不得发出 EVIDENCE_EXPORT_JSON（emittedEvidenceExport 应为 false）`,
+      });
+    }
+  }
+  return violations;
+}
+
+function checkSchemaLoaderPaths(
+  docs: Array<{ name: string; content: string }> | undefined,
+): DocCheckViolation[] {
+  if (docs === undefined) return [];
+  const violations: DocCheckViolation[] = [];
+  for (const doc of docs) {
+    if (doc.content.includes('scripts/logic/schema-loader.ts')) {
+      violations.push({
+        check: 'schema-loader-path',
+        message: `${doc.name} 仍引用旧路径 scripts/logic/schema-loader.ts，应改为 scripts/infrastructure/schema-loader.ts`,
+      });
+    }
+  }
+  return violations;
+}
 
 function isDynamicViolation(violation: DocCheckViolation): boolean {
   if (DYNAMIC_CHECKS.has(violation.check)) return true;
@@ -326,7 +377,9 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   }
   if (input.skillPkgDocs !== undefined) {
     violations.push(...checkSkillOutboundLinks(input.skillPkgDocs));
+    violations.push(...checkSchemaLoaderPaths(input.skillPkgDocs));
   }
+  violations.push(...checkExit2ProbeResults(input.exit2ProbeResults));
   return {
     violations,
     staticViolations: violations.filter((v) => !isDynamicViolation(v)),

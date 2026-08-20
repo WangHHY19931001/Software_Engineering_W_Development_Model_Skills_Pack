@@ -144,6 +144,7 @@ interface Exit2ProbeResult {
   errorExitCode: number | null;
   outputPath?: string;
   outputExistsAfter?: boolean;
+  emittedEvidenceExport?: boolean;
 }
 
 const execFileAsync = promisify(execFile);
