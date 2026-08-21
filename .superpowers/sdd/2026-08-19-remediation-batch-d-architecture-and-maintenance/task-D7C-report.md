@@ -1,33 +1,35 @@
 # Task D7C Report
 
 - Task: document source-bound evidence verification and synchronize dynamic provenance/count facts.
-- Worktree: `D:\\w_skill_opt\\wmodel-audit-remediation`
-- Measurement HEAD: `6aa68c8bea3e425a7d1110256a5bab3903e918b2`
-- Requested commit: `docs: document source-bound evidence verification`
-- Scope respected: D7A/B logic and schema contents, package behavior, hook control flow, security baseline, plans, and specs were not changed.
+- Review scope: the single commit `git diff d659e82^ d659e82` only. Earlier D7A/B commits are not part of the D7C review scope.
+- Measurement HEAD: `d659e8239f47c90499066f87ba64731a114cca1a`.
+- Requested commit: `docs: anchor D7C verification evidence`.
+- Report path: `.superpowers/sdd/2026-08-19-remediation-batch-d-architecture-and-maintenance/task-D7C-report.md`.
 
-## Changes
+## Changes in the reviewed D7C commit
 
 - Added the source-bound provenance boundary to the six live documents covered by the local evidence contract: `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/INSTALL.md`, `w-model-dev/SKILL.md`, and `w-model-dev/references/command-reference.md`.
 - Documented `evidence-provenance.schema.json`, `wm-verify-evidence-source.ts`, and `npm run wm:verify-evidence-source -- <project-dir>` as the producer+verify path.
 - Documented that `wm-export-evidence --verify` is package-only without `--source-project`, and source-bound only with `--source-project <project-dir>`.
 - Explicitly bounded controlled-local provenance as process integrity based on HEAD/source hash/run/gate measurements, not a cryptographic signature or third-party non-repudiation proof; package-only is not verified-source evidence.
-- Updated the allowed live count declarations and the descriptive pre-push count to the current measured values.
-- Added a TDD contract regression that checks each live document independently; removing any Schema, CLI, source-bound/package-only, source-project, or non-cryptographic-boundary clause fails the contract.
-- Updated the D7C changelog entry with the measured schema/CLI/exit-2/test/self-test/samples inventory.
+- Updated the allowed live count declarations and the descriptive pre-push count to the measured values below.
+- Retained the D7C per-document contract regression, the dynamic provenance checks, and stale-count negative cases.
+
+This report uses only the reviewed single-commit scope above and does not use a broad diff to make claims about earlier production changes.
 
 ## TDD Evidence
 
-- Red: the new per-document contract failed before documentation synchronization because `README.md` lacked the newly required `evidence-provenance.schema.json` declaration.
-- Green: the focused D7C contract suite passed after the six documents were synchronized; the stale-count mutation still fails closed.
+- Red: a deliberate stale-count mutation changed the 55/910 assertion to 55/909; the focused test failed with exit 1 and reported `expected [ 55, 910 ] to deeply equal [ 55, 909 ]`.
+- Green: after restoring the test, the focused D7C suite passed; the stale-count negative case remains and fails closed when a live declaration is changed.
 
 ## Measured Provenance
 
-Artifact was generated outside the repository and bound to the measurement HEAD above:
+The coverage JSON and provenance JSON were generated outside the repository in one run from the measurement HEAD above. The previous parent-commit artifact was deleted and is not referenced by this report.
 
-- Artifact ID: `vitest-results.json`
-- Artifact SHA-256: `39e27c40a60e0011def25a2bdb768ea208c129a29a3ef9fcce555ec6c8b93d9c`
-- Provenance run ID: `39e27c40a60e0011`
+- Artifact relative ID: `vitest/results.json`
+- Artifact SHA-256: `9b4cd0412e95dfc1ec74a19746ebc9c6b4de7955bac224ac9476fe4be0b03af6`
+- Provenance run ID: `8f909dd7117df0ac`
+- Measurement commit SHA: `d659e8239f47c90499066f87ba64731a114cca1a`
 - `testResults.length`: 55
 - `numTotalTests`: 910
 - `numPassedTests`: 910
@@ -36,15 +38,13 @@ Artifact was generated outside the repository and bound to the measurement HEAD 
 - Schemas: 23
 - CLI scripts: 36
 - Exit-2 scripts confirmed by real probes: 35
-- Test files: 55
+- Current test files: 55
 - Self-test: 260/260
 - Samples coverage: 280 fixtures, 242 referenced files, 15 referenced directories, 0 unregistered, 0 undeclared directories
 
 ## Verification
 
-All required checks passed on the final worktree:
-
-- Focused D7C regressions: 8 passed, 122 skipped (the selected tests from the 130-test docs-consistency file).
+- Focused D7C regressions: 130 passed, 0 failed.
 - Full `npm test`: 55 files, 910 tests passed, 0 failed.
 - `npm run check:docs-consistency -- --json`: passed; 0 violations; all 37 exit-2 probes returned status 2 with `ERROR_JSON.exitCode=2`.
 - `npm run self-test`: 260 passed, 0 failed.
