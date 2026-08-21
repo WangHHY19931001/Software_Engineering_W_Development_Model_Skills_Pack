@@ -22,7 +22,7 @@
       "const": "<redacted-project>"
     },
     "provenance": {
-      "description": "导出包绑定的已验证运行身份、三类源证据测量与导出内容哈希。",
+      "description": "导出包绑定的已验证运行身份、五类源证据测量（含 codegraph-queries）与导出内容哈希。",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -66,12 +66,13 @@
           "description": "源 gate log、verifier output 与 run log 的数量和规范内容哈希。",
           "type": "object",
           "additionalProperties": false,
-          "required": ["gateLogs", "verifierOutputs", "runLog", "signatureChain"],
+          "required": ["gateLogs", "verifierOutputs", "runLog", "signatureChain", "codegraphQueries"],
           "properties": {
             "gateLogs": { "$ref": "#/definitions/measurement" },
             "verifierOutputs": { "$ref": "#/definitions/measurement" },
             "runLog": { "$ref": "#/definitions/measurement" },
-            "signatureChain": { "$ref": "#/definitions/measurement" }
+            "signatureChain": { "$ref": "#/definitions/measurement" },
+            "codegraphQueries": { "$ref": "#/definitions/measurement" }
           }
         },
         "contentHash": {
@@ -128,7 +129,7 @@
         "count": {
           "description": "纳入本类别测量的文件数。",
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         },
         "contentHash": {
           "description": "本类别规范文件清单的 SHA-256。",

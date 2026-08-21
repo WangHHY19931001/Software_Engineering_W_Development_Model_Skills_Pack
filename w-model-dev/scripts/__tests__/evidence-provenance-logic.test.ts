@@ -101,6 +101,26 @@ describe('source provenance', () => {
     });
   });
 
+  it('includes codegraph query files in sourceFiles and measurements', async () => {
+    const project = await makeProject();
+    const queryPath = path.join(project, '.w-model', 'codegraph-queries');
+    await fs.mkdir(queryPath, { recursive: true });
+    await fs.writeFile(path.join(queryPath, 'impact.json'), '{"querySymbol":"exportEvidence"}\n', 'utf8');
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: true });
+    expect(produced.provenance?.sourceFiles).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'codegraph-queries/impact.json', kind: 'codegraph-query' }),
+      ]),
+    );
+    expect(produced.provenance?.measurements).toHaveProperty('codegraphQueries', {
+      count: 1,
+      contentHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+  });
+
   it('supports a linked worktree .git file when resolving the source commit', async () => {
     const project = await makeProject();
     const gitDir = path.join(project, '.git');

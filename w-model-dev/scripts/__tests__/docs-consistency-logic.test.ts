@@ -1640,12 +1640,12 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
       await fs.writeFile(
         documentPath,
         document
-          .replaceAll('55 files / 905 tests', '54 files / 897 tests')
-          .replaceAll('55 test files / 905 tests', '54 test files / 897 tests')
-          .replaceAll('55 个 .test.ts / 905 条', '54 个 .test.ts / 897 条')
-          .replaceAll('55 个 .test.ts / 905 tests', '54 个 .test.ts / 897 tests')
-          .replaceAll('55 个 test 文件 / 905 条', '54 个 test 文件 / 897 条')
-          .replaceAll('vitest 905 条（55 test files）', 'vitest 897 条（54 test files）'),
+          .replaceAll('55 files / 908 tests', '54 files / 897 tests')
+          .replaceAll('55 test files / 908 tests', '54 test files / 897 tests')
+          .replaceAll('55 个 .test.ts / 908 条', '54 个 .test.ts / 897 条')
+          .replaceAll('55 个 .test.ts / 908 tests', '54 个 .test.ts / 897 tests')
+          .replaceAll('55 个 test 文件 / 908 条', '54 个 test 文件 / 897 条')
+          .replaceAll('vitest 908 条（55 test files）', 'vitest 897 条（54 test files）'),
         'utf8',
       );
     }

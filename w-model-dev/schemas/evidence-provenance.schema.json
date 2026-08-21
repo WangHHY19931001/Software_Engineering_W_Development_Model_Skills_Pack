@@ -28,12 +28,13 @@
     "measurements": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["gateLogs", "verifierOutputs", "runLog", "signatureChain"],
+      "required": ["gateLogs", "verifierOutputs", "runLog", "signatureChain", "codegraphQueries"],
       "properties": {
         "gateLogs": { "$ref": "#/definitions/measurement" },
         "verifierOutputs": { "$ref": "#/definitions/measurement" },
         "runLog": { "$ref": "#/definitions/measurement" },
-        "signatureChain": { "$ref": "#/definitions/measurement" }
+        "signatureChain": { "$ref": "#/definitions/measurement" },
+        "codegraphQueries": { "$ref": "#/definitions/measurement" }
       }
     },
     "sourceFiles": {
@@ -65,7 +66,7 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["gate-log", "verifier-output", "signature-chain", "run-log"]
+          "enum": ["gate-log", "verifier-output", "signature-chain", "codegraph-query", "run-log"]
         },
         "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }

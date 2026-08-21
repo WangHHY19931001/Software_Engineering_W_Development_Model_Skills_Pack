@@ -17,6 +17,7 @@ type EvidenceMeasurements = {
   verifierOutputs: EvidenceMeasurement;
   runLog: EvidenceMeasurement;
   signatureChain: EvidenceMeasurement;
+  codegraphQueries: EvidenceMeasurement;
 };
 type SourceVerificationProvenance = {
   format: 'w-model-evidence-verification' | 'w-model-evidence-source-provenance';
@@ -94,6 +95,7 @@ const MEASURED_KINDS: Array<[EvidenceKind, keyof EvidenceMeasurements]> = [
   ['verifier-output', 'verifierOutputs'],
   ['run-log', 'runLog'],
   ['signature-chain', 'signatureChain'],
+  ['codegraph-query', 'codegraphQueries'],
 ];
 const ABSOLUTE_PATH_PATTERN =
   /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
@@ -236,6 +238,59 @@ async function collectDirectoryFiles(root: string, current: string, result: stri
     result.push(relativePath);
   }
   await assertStable(current, before, root);
+}
+
+async function collectExportSources(
+  state: string,
+  sourceReal: string,
+): Promise<Array<{ sourceRelative: string; kind: EvidenceKind }>> {
+  const sources: Array<{ sourceRelative: string; kind: EvidenceKind }> = [];
+  for (const { directory, kind } of DIRECTORY_SOURCES) {
+    const directoryPath = path.join(state, directory);
+    if (!(await lstatOrNull(directoryPath))) continue;
+    const files: string[] = [];
+    await collectDirectoryFiles(sourceReal, directoryPath, files);
+    sources.push(...files.map((sourceRelative) => ({ sourceRelative, kind })));
+  }
+  const runLog = path.join(state, 'run-log.jsonl');
+  if (await lstatOrNull(runLog)) sources.push({ sourceRelative: 'run-log.jsonl', kind: 'run-log' });
+  return sources.sort((left, right) => comparePaths(left.sourceRelative, right.sourceRelative));
+}
+
+type ExportEntry = { file: EvidenceFile; content: Buffer };
+type ExportBuild = {
+  entries: ExportEntry[];
+  files: EvidenceFile[];
+  sourceMeasurements: Map<keyof EvidenceMeasurements, Array<{ path: string; sha256: string }>>;
+};
+
+async function buildExportFiles(state: string, sourceReal: string): Promise<ExportBuild> {
+  const sources = await collectExportSources(state, sourceReal);
+  const seen = new Set<string>();
+  const entries: ExportEntry[] = [];
+  const sourceMeasurements = new Map<keyof EvidenceMeasurements, Array<{ path: string; sha256: string }>>(
+    MEASURED_KINDS.map(([, key]) => [key, []]),
+  );
+  for (const source of sources) {
+    if (!isSafeRelativePath(source.sourceRelative) || seen.has(source.sourceRelative))
+      throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
+    seen.add(source.sourceRelative);
+    const sourcePath = path.join(state, source.sourceRelative);
+    const before = await snapshot(sourcePath, false);
+    if (!isPathInside(before.realPath, sourceReal)) throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
+    const sourceContent = await fs.readFile(sourcePath);
+    const sanitized = sanitizeContent(sourcePath, sourceContent);
+    await assertStable(sourcePath, before, sourceReal);
+    const measurementKey = MEASURED_KINDS.find(([kind]) => kind === source.kind)?.[1];
+    if (measurementKey)
+      sourceMeasurements.get(measurementKey)!.push({ path: source.sourceRelative, sha256: sha256(sourceContent) });
+    entries.push({
+      file: { path: source.sourceRelative, sha256: sha256(sanitized), kind: source.kind },
+      content: sanitized,
+    });
+  }
+  entries.sort((left, right) => comparePaths(left.file.path, right.file.path));
+  return { entries, files: entries.map(({ file }) => file), sourceMeasurements };
 }
 function sanitizeString(value: string): string {
   return value
@@ -388,11 +443,12 @@ function isEvidenceMeasurements(value: unknown): value is EvidenceMeasurements {
   if (value === null || typeof value !== 'object') return false;
   const measurements = value as Record<string, unknown>;
   return (
-    Object.keys(measurements).length === 4 &&
+    Object.keys(measurements).length === 5 &&
     isEvidenceMeasurement(measurements.gateLogs) &&
     isEvidenceMeasurement(measurements.verifierOutputs) &&
     isEvidenceMeasurement(measurements.runLog) &&
-    isEvidenceMeasurement(measurements.signatureChain)
+    isEvidenceMeasurement(measurements.signatureChain) &&
+    isEvidenceMeasurement(measurements.codegraphQueries)
   );
 }
 function parseSourceProvenance(value: unknown): SourceVerificationProvenance {
@@ -477,50 +533,19 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
     staging = `${output}.tmp-${randomUUID()}`;
     await assertSafeOutputPath(staging, sourceReal);
     await fs.mkdir(staging);
-    const sources: Array<{ sourceRelative: string; kind: EvidenceKind }> = [];
-    for (const { directory, kind } of DIRECTORY_SOURCES) {
-      const directoryPath = path.join(state, directory);
-      if (!(await lstatOrNull(directoryPath))) continue;
-      const files: string[] = [];
-      await collectDirectoryFiles(sourceReal, directoryPath, files);
-      sources.push(...files.map((sourceRelative) => ({ sourceRelative, kind })));
-    }
-    const runLog = path.join(state, 'run-log.jsonl');
-    if (await lstatOrNull(runLog)) sources.push({ sourceRelative: 'run-log.jsonl', kind: 'run-log' });
-    const seen = new Set<string>();
-    const files: EvidenceFile[] = [];
-    const sourceMeasurements = new Map<keyof EvidenceMeasurements, Array<{ path: string; sha256: string }>>(
-      MEASURED_KINDS.map(([, key]) => [key, []]),
-    );
-    for (const source of sources.sort((a, b) => comparePaths(a.sourceRelative, b.sourceRelative))) {
-      if (!isSafeRelativePath(source.sourceRelative) || seen.has(source.sourceRelative))
-        throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
-      seen.add(source.sourceRelative);
-      const sourcePath = path.join(state, source.sourceRelative);
-      const before = await snapshot(sourcePath, false);
-      if (!isPathInside(before.realPath, sourceReal)) throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
-      const sourceContent = await fs.readFile(sourcePath);
-      const sanitized = sanitizeContent(sourcePath, sourceContent);
-      await assertStable(sourcePath, before, sourceReal);
-      const measurementKey = MEASURED_KINDS.find(([kind]) => kind === source.kind)?.[1];
-      if (measurementKey)
-        sourceMeasurements.get(measurementKey)!.push({ path: source.sourceRelative, sha256: sha256(sourceContent) });
-      const target = path.join(staging, source.sourceRelative);
+    const { entries, files: sortedFiles, sourceMeasurements } = await buildExportFiles(state, sourceReal);
+    for (const { file, content } of entries) {
+      const target = path.join(staging, file.path);
       if (!isPathInside(target, staging)) throw new EvidenceFailure(1, 'UNSAFE_OUTPUT_PATH');
       await fs.mkdir(path.dirname(target), { recursive: true });
-      await atomicWrite(target, sanitized);
-      files.push({
-        path: source.sourceRelative,
-        sha256: sha256(sanitized),
-        kind: source.kind,
-      });
+      await atomicWrite(target, content);
     }
-    const sortedFiles = files.sort((a, b) => comparePaths(a.path, b.path));
     const expectedMeasurements: Array<[Array<{ path: string; sha256: string }>, EvidenceMeasurement]> = [
       [sourceMeasurements.get('gateLogs')!, sourceProvenance.measurements.gateLogs],
       [sourceMeasurements.get('verifierOutputs')!, sourceProvenance.measurements.verifierOutputs],
       [sourceMeasurements.get('runLog')!, sourceProvenance.measurements.runLog],
       [sourceMeasurements.get('signatureChain')!, sourceProvenance.measurements.signatureChain],
+      [sourceMeasurements.get('codegraphQueries')!, sourceProvenance.measurements.codegraphQueries],
     ];
     for (const [filesForKind, expected] of expectedMeasurements) {
       if (filesForKind.length !== expected.count || hashFileList(filesForKind) !== expected.contentHash)
@@ -545,7 +570,7 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       mode: 'export',
       outputDir: output,
       manifestPath: path.join(output, MANIFEST_NAME),
-      exportedFiles: files.length,
+      exportedFiles: sortedFiles.length,
     };
   } catch (error) {
     if (staging) await fs.rm(staging, { recursive: true, force: true }).catch(() => undefined);
@@ -632,6 +657,15 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
         source.provenance.producerVersion !== typed.provenance.producerVersion ||
         JSON.stringify(source.provenance.measurements) !== JSON.stringify(typed.provenance.measurements)
       ) {
+        throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+      }
+      const sourceRoot = path.resolve(sourceProject);
+      await assertRealDirectory(sourceRoot);
+      const sourceState = path.join(sourceRoot, '.w-model');
+      await assertRealDirectory(sourceState);
+      const sourceReal = await fs.realpath(sourceState);
+      const rebuilt = await buildExportFiles(sourceState, sourceReal);
+      if (JSON.stringify(rebuilt.files) !== JSON.stringify(typed.files)) {
         throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
       }
       return {

@@ -9,9 +9,11 @@ import { checkSignatureChain, type SignatureChainEntry } from './signature-chain
 
 const PROVENANCE_NAME = 'evidence-provenance.json';
 const PRODUCER_VERSION = 'D7B-1';
-type Kind = 'gate-log' | 'verifier-output' | 'signature-chain' | 'run-log';
+const TEXT_EXTENSIONS = new Set(['.json', '.jsonl', '.log', '.txt', '.md']);
+type Kind = 'gate-log' | 'verifier-output' | 'signature-chain' | 'codegraph-query' | 'run-log';
 type Measurement = { count: number; contentHash: string };
 export type SourceFile = { path: string; kind: Kind; sha256: string };
+type MeasurementKey = 'gateLogs' | 'verifierOutputs' | 'runLog' | 'signatureChain' | 'codegraphQueries';
 export type SourceProvenance = {
   format: 'w-model-evidence-source-provenance';
   version: 1;
@@ -20,7 +22,7 @@ export type SourceProvenance = {
   commitSha: string;
   verifiedAt: string;
   verificationStatus: 'passed';
-  measurements: Record<'gateLogs' | 'verifierOutputs' | 'runLog' | 'signatureChain', Measurement>;
+  measurements: Record<MeasurementKey, Measurement>;
   sourceFiles: SourceFile[];
   sourceBundleSha256: string;
   producerVersion: string;
@@ -115,25 +117,41 @@ async function collectDirectory(
   required: boolean,
 ): Promise<SourceFile[]> {
   const absolute = path.join(state, directory);
-  let entries: import('node:fs').Dirent[];
   try {
-    entries = (await fs.readdir(absolute, {
-      withFileTypes: true,
-    })) as import('node:fs').Dirent[];
+    await fs.access(absolute);
   } catch {
     if (required) throw new ProvenanceFailure(1, `MISSING_${directory.toUpperCase().replace('-', '_')}`);
     return [];
   }
   const files: SourceFile[] = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!entry.isFile() || entry.isSymbolicLink()) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
-    const relative = `${directory}/${entry.name}`;
-    files.push({
-      path: relative,
-      kind,
-      sha256: sha256(await fs.readFile(path.join(state, relative))),
-    });
+  async function walk(current: string, relativeDirectory: string): Promise<void> {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = (await fs.readdir(current, { withFileTypes: true })) as import('node:fs').Dirent[];
+    } catch {
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    }
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const entryPath = path.join(current, entry.name);
+      const relative = `${relativeDirectory}/${entry.name}`;
+      if (entry.isSymbolicLink()) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+      if (entry.isDirectory()) {
+        await walk(entryPath, relative);
+        continue;
+      }
+      if (!entry.isFile() || !TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+        throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+      const content = await fs.readFile(entryPath);
+      if (content.includes(0) || Buffer.from(content.toString('utf8'), 'utf8').compare(content) !== 0)
+        throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+      files.push({
+        path: relative,
+        kind,
+        sha256: sha256(content),
+      });
+    }
   }
+  await walk(absolute, directory);
   return files;
 }
 function measurements(files: SourceFile[]): SourceProvenance['measurements'] {
@@ -146,6 +164,7 @@ function measurements(files: SourceFile[]): SourceProvenance['measurements'] {
     verifierOutputs: of('verifier-output'),
     runLog: of('run-log'),
     signatureChain: of('signature-chain'),
+    codegraphQueries: of('codegraph-query'),
   };
 }
 async function buildSourceProvenance(projectDir: string): Promise<SourceProvenance> {
@@ -155,6 +174,7 @@ async function buildSourceProvenance(projectDir: string): Promise<SourceProvenan
   const gateFiles = await collectDirectory(state, 'gate-logs', 'gate-log', true);
   const verifierFiles = await collectDirectory(state, 'verifier-outputs', 'verifier-output', false);
   const signatureFiles = await collectDirectory(state, 'signature-chains', 'signature-chain', false);
+  const codegraphFiles = await collectDirectory(state, 'codegraph-queries', 'codegraph-query', false);
   const runLogPath = path.join(state, 'run-log.jsonl');
   const runLogEntries = await readJsonl(runLogPath, 'MISSING_RUN_LOG');
   const runFile: SourceFile = {
@@ -184,7 +204,7 @@ async function buildSourceProvenance(projectDir: string): Promise<SourceProvenan
   ).flat();
   if (!checkSignatureChain(signatureEntries as SignatureChainEntry[]).passed)
     throw new ProvenanceFailure(1, 'SIGNATURE_CHAIN_NOT_PASSED');
-  const files = [...gateFiles, ...verifierFiles, ...signatureFiles, runFile].sort((left, right) =>
+  const files = [...gateFiles, ...verifierFiles, ...signatureFiles, ...codegraphFiles, runFile].sort((left, right) =>
     left.path.localeCompare(right.path),
   );
   const runId = String((runLogEntries.at(-1) as { runId?: string } | undefined)?.runId ?? '');

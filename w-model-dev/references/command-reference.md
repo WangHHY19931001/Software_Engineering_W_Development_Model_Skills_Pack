@@ -30,7 +30,7 @@
 
 - **producer+verify**：`npm run wm:verify-evidence-source -- <project-dir>` 不是只读查询；它重建并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`。缺少或失败的真实运行证据时拒绝写入 `verificationStatus=passed`。
 - **package-only**：`npm run wm:export-evidence -- --verify <manifest>` 只验证包内 schema、文件清单、hash、路径和脱敏内容，返回 `verificationLevel=package-only`，不证明源项目仍匹配。
-- **source-bound**：追加 `--source-project <project-dir>` 后，verify 会重建 source provenance，并比较当前 HEAD、run/artifact 身份、四类 measurements、source bundle hash 与 producer 版本，返回 `verificationLevel=source-bound`。
+- **source-bound**：追加 `--source-project <project-dir>` 后，verify 会重建 source provenance，并比较当前 HEAD、run/artifact 身份、五类 measurements（含 codegraph-queries）、source bundle hash 与 producer 版本，返回 `verificationLevel=source-bound`。
 
 
 ## `/wm analyze <需求>`

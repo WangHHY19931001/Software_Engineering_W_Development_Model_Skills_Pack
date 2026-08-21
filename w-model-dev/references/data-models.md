@@ -899,7 +899,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `signature-chain` | `signature-chain.schema.json` | SignatureChainEntry | additionalProperties:false；inputProvenance 来源证明；actorRole enum | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用） |
 | `iceberg-sweep` | `iceberg-sweep.schema.json` | IcebergSweepReport | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed | iceberg-sweep-logic.ts |
 | `evidence-manifest` | `evidence-manifest.schema.json` | EvidenceManifest | additionalProperties:false；脱敏导出文件的相对路径、SHA-256 与生成元数据 | evidence-export-logic.ts |
-| `evidence-provenance` | `evidence-provenance.schema.json` | EvidenceSourceProvenance | additionalProperties:false；source evidence 文件清单、四类测量、当前 HEAD 与 source bundle SHA-256；producer 必须由 `wm-verify-evidence-source` 生成并写入 | evidence-provenance-logic.ts |
+| `evidence-provenance` | `evidence-provenance.schema.json` | EvidenceSourceProvenance | additionalProperties:false；source evidence 文件清单、五类测量（含 codegraph-queries）、当前 HEAD 与 source bundle SHA-256；producer 必须由 `wm-verify-evidence-source` 生成并写入 | evidence-provenance-logic.ts |
 
 ### 设计原则
 

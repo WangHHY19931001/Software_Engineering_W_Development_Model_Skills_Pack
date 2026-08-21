@@ -390,6 +390,7 @@ describe('evidence export logic', () => {
       ].join('\n'),
       'utf8',
     );
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
     const output = path.join(tmpDir, 'markdown-table-evidence');
 
     await expect(exportEvidence(project, output)).resolves.toMatchObject({
@@ -420,6 +421,7 @@ describe('evidence export logic', () => {
       ['| Name || Authorization |', '|---||---|', '| Alice | ordinary | Bearer empty-cell-secret |', ''].join('\n'),
       'utf8',
     );
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
     const output = path.join(tmpDir, 'empty-cell-markdown-evidence');
 
     await expect(exportEvidence(project, output)).resolves.toMatchObject({
@@ -497,6 +499,46 @@ describe('evidence export logic', () => {
     await expect(verifyEvidence(manifest)).resolves.toMatchObject({
       ok: false,
       exitCode: 1,
+    });
+  });
+
+  it('source-bound verification rejects ordinary exported content tampering even when package hashes are recomputed', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'source-bound-ordinary-tamper');
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string }>;
+      provenance: { contentHash: string };
+    };
+    const targetPath = path.join(output, 'codegraph-queries', 'query.json');
+    const exportedContent = await fs.readFile(targetPath, 'utf8');
+    const tamperedContent = exportedContent.replace('<redacted-absolute-path>', 'attacker-modified');
+    expect(tamperedContent).not.toBe(exportedContent);
+    await fs.writeFile(targetPath, tamperedContent, 'utf8');
+    const target = manifest.files.find((file) => file.path === 'codegraph-queries/query.json');
+    expect(target).toBeDefined();
+    target!.sha256 = sha256(tamperedContent);
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    await expect(verifyEvidence(manifestPath, project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'INVALID_PROVENANCE',
+    });
+  });
+
+  it('source-bound verification accepts an unchanged export after rebuilding source evidence', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'source-bound-valid');
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+
+    await expect(verifyEvidence(path.join(output, 'evidence-manifest.json'), project)).resolves.toMatchObject({
+      ok: true,
+      exitCode: 0,
+      verificationLevel: 'source-bound',
+      verificationStatus: 'passed',
     });
   });
 
