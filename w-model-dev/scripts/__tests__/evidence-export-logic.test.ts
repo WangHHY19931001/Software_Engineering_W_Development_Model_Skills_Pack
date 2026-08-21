@@ -312,6 +312,30 @@ describe('evidence export logic', () => {
     });
   });
 
+  it('rejects mutated source bundle and run provenance before creating a passed manifest', async () => {
+    const project = await createProject();
+    const sourceProvenancePath = path.join(project, '.w-model', 'evidence-provenance.json');
+    const sourceProvenance = JSON.parse(await fs.readFile(sourceProvenancePath, 'utf8')) as {
+      sourceBundleSha256: string;
+      runId: string;
+      measurements: unknown;
+    };
+    const unchangedMeasurements = sourceProvenance.measurements;
+    sourceProvenance.sourceBundleSha256 = 'f'.repeat(64);
+    sourceProvenance.runId = 'forged-run';
+    sourceProvenance.measurements = unchangedMeasurements;
+    await fs.writeFile(sourceProvenancePath, JSON.stringify(sourceProvenance), 'utf8');
+
+    const output = path.join(tmpDir, 'forged-provenance-evidence');
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'INVALID_PROVENANCE',
+    });
+    await expect(fs.access(output)).rejects.toThrow();
+    await expect(fs.access(path.join(output, 'evidence-manifest.json'))).rejects.toThrow();
+  });
+
   it('recursively redacts sensitive JSON and JSONL field values without leaking source values', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');
@@ -653,24 +677,10 @@ describe('evidence export logic', () => {
   it('uses bytewise path ordering for Unicode and mixed-case evidence paths', async () => {
     const project = await createProject();
     const logs = path.join(project, '.w-model', 'gate-logs');
-    await fs.writeFile(path.join(logs, 'Z.json'), '{"ok":true}', 'utf8');
-    await fs.writeFile(path.join(logs, 'a.json'), '{"ok":true}', 'utf8');
-    await fs.writeFile(path.join(logs, 'é.json'), '{"ok":true}', 'utf8');
-    const provenancePath = path.join(project, '.w-model', 'evidence-provenance.json');
-    const provenance = JSON.parse(await fs.readFile(provenancePath, 'utf8')) as {
-      measurements: { gateLogs: { count: number; contentHash: string } };
-    };
-    const gateLogFiles = await Promise.all(
-      ['gate.json', 'Z.json', 'a.json', 'é.json'].map(async (name) => ({
-        path: `gate-logs/${name}`,
-        sha256: sha256(await fs.readFile(path.join(logs, name))),
-      })),
-    );
-    provenance.measurements.gateLogs = {
-      count: gateLogFiles.length,
-      contentHash: evidenceContentHash(gateLogFiles),
-    };
-    await fs.writeFile(provenancePath, JSON.stringify(provenance), 'utf8');
+    for (const name of ['Z.json', 'a.json', 'é.json']) {
+      await fs.copyFile(path.join(logs, 'gate.json'), path.join(logs, name));
+    }
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
     const output = path.join(tmpDir, 'unicode-evidence');
 
     await expect(exportEvidence(project, output)).resolves.toMatchObject({

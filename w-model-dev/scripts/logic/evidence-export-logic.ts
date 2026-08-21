@@ -530,16 +530,7 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
     await assertStable(sourceProvenancePath, sourceProvenanceBefore, sourceReal);
     const output = path.resolve(outputDir);
     await ensureEmptyOutput(output, sourceReal);
-    staging = `${output}.tmp-${randomUUID()}`;
-    await assertSafeOutputPath(staging, sourceReal);
-    await fs.mkdir(staging);
     const { entries, files: sortedFiles, sourceMeasurements } = await buildExportFiles(state, sourceReal);
-    for (const { file, content } of entries) {
-      const target = path.join(staging, file.path);
-      if (!isPathInside(target, staging)) throw new EvidenceFailure(1, 'UNSAFE_OUTPUT_PATH');
-      await fs.mkdir(path.dirname(target), { recursive: true });
-      await atomicWrite(target, content);
-    }
     const expectedMeasurements: Array<[Array<{ path: string; sha256: string }>, EvidenceMeasurement]> = [
       [sourceMeasurements.get('gateLogs')!, sourceProvenance.measurements.gateLogs],
       [sourceMeasurements.get('verifierOutputs')!, sourceProvenance.measurements.verifierOutputs],
@@ -550,6 +541,17 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
     for (const [filesForKind, expected] of expectedMeasurements) {
       if (filesForKind.length !== expected.count || hashFileList(filesForKind) !== expected.contentHash)
         throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+    }
+    const sourceVerification = await verifySourceProvenance(project);
+    if (!sourceVerification.ok || !sourceVerification.provenance) throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
+    staging = `${output}.tmp-${randomUUID()}`;
+    await assertSafeOutputPath(staging, sourceReal);
+    await fs.mkdir(staging);
+    for (const { file, content } of entries) {
+      const target = path.join(staging, file.path);
+      if (!isPathInside(target, staging)) throw new EvidenceFailure(1, 'UNSAFE_OUTPUT_PATH');
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await atomicWrite(target, content);
     }
     const manifest: EvidenceManifest = {
       schemaVersion: '1.0',
