@@ -16,7 +16,7 @@
 | 指标 | 结果 |
 |---|---|
 | Self-test（samples 回归基线） | ✅ 260/260 |
-| Vitest（门禁脚本单元测试） | ✅ 55 files / 908 tests |
+| Vitest（门禁脚本单元测试） | ✅ 55 files / 910 tests |
 | Vitest coverage（logic/+lib/ 阈值） | ✅ stmts 75 / branch 65 / funcs 85 / lines 75 |
 | TypeScript strict（`tsc -p config/tsconfig.json`） | ✅ 0 错误 |
 | Security scan（eslint-plugin-security） | ✅ baseline 一致 |
@@ -25,6 +25,10 @@
 **CI 策略**：本项目**不集成云端 CI（GitHub Actions / GitLab CI）**，本地 git `pre-push` hook 为**唯一门禁**——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit（high 以上漏洞阻断；网络不可达或 registry 不支持 audit endpoint 时自动跳过），任一不符即中止推送。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负（`.githooks/pre-push` 头部有显式警告）。克隆后首次 `npm install` 自动启用钩子（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时；失败仅 warn 不阻断 install）；如需手动重置执行 `npm run setup:hooks`。Windows 用 Git Bash、WSL 直接跑均可。pre-push 不会自动执行 `npm install`：缺少 `node_modules` 即 exit 1 并提示安装；它只调用 `ensure-platform-deps.sh --check`，该默认检查无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台问题须由开发者显式执行 `npm run platform-deps:check` 或 `npm run platform-deps:install`（后者同样 fail-closed，仅输出人工 `npm install` 指引）。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
+
+### Source-bound provenance 边界
+
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。
 
 ## 验证仓库
 
@@ -225,7 +229,7 @@ npm run self-test
 npm run prepush
 ```
 
-等价于 `bash .githooks/pre-push --force`，强制跑 17 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（55 files / 908 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）、prettier 格式一致性、tsc 类型检查。任一失败即中止。
+等价于 `bash .githooks/pre-push --force`，强制跑 17 项门禁：self-test 回归、check:verifier / check:gate 退出码语义抽查、check-bdd-model 有效/无效样本、check:coverage、check:exemption、check-signature-chain、security-scan、vitest 全量（55 files / 910 tests）、npm audit（high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）、check-docs-consistency、samples 覆盖矩阵（check-samples-coverage）、prettier 格式一致性、tsc 类型检查。任一失败即中止。
 
 **步骤 5：跑通一次阶段门禁（以阶段 4 详细设计为例）**
 
@@ -384,7 +388,7 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── logic/                # 纯逻辑层：*-logic.ts + schema-loader/plan-chunks-logic（纯分块规划）
 │   │   ├── lib/                  # 通用工具与 IO 辅助：cli-error/gate-report/parse-phase/read-json-or-exit/safe-json/artifact-gate-assets/uat-path-mapping/tla-clean-trace 等
 │   │   ├── samples/              # 端到端样本（各门禁脚本 valid/bad 样本集 + README.md 覆盖矩阵，check-samples-coverage 门禁核对）
-│   │   └── __tests__/            # vitest 单元测试（55 个 .test.ts / 908 tests）
+│   │   └── __tests__/            # vitest 单元测试（55 个 .test.ts / 910 tests）
 │   ├── skill-metadata.json       # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 │   ├── templates/                # 文档模板（需求 / 设计 / 测试 / RTM 等）
 │   └── examples/                 # 交互示例（4 份伪示例对话 + 5 份 stage 编排示例 + real-run-evidence.md 真实命令证据）

@@ -32,6 +32,9 @@
 - **package-only**：`npm run wm:export-evidence -- --verify <manifest>` 只验证包内 schema、文件清单、hash、路径和脱敏内容，返回 `verificationLevel=package-only`，不证明源项目仍匹配。
 - **source-bound**：追加 `--source-project <project-dir>` 后，verify 会重建 source provenance，并比较当前 HEAD、run/artifact 身份、五类 measurements（含 codegraph-queries）、source bundle hash 与 producer 版本，返回 `verificationLevel=source-bound`。
 
+### Source-bound provenance 边界
+
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。
 
 ## `/wm analyze <需求>`
 

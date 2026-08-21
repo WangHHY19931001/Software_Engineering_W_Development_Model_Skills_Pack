@@ -10,6 +10,10 @@
 
 ---
 
+### Source-bound provenance 边界
+
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。
+
 ## 验证仓库
 
 该入口验证仓库本身，不安装 Skill。命令必须从仓库根目录执行，需要 Node.js ≥20、Git，以及可访问的 npm registry/网络。
@@ -119,7 +123,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + plan-chunks-logic.ts）
 │   ├── infrastructure/ # 基础设施适配（schema-loader.ts / schema-fs.ts；Ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
-│   └── __tests__/      # vitest 单元测试（55 个 .test.ts / 908 条 + README.md coverage 矩阵）
+│   └── __tests__/      # vitest 单元测试（55 个 .test.ts / 910 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -341,7 +345,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，55 个 test 文件 / 908 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，55 个 test 文件 / 910 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。Windows 与 WSL 不要在同一个 checkout 混用 `node_modules`；建议为每个平台使用独立 checkout，或切换平台后重新执行 `npm install`。

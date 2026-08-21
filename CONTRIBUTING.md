@@ -2,6 +2,10 @@
 
 感谢你对 W-Model AI Assistant Skill 项目的关注！本文档说明如何参与贡献。
 
+### Source-bound provenance 边界
+
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。
+
 ## 行为准则
 
 请保持尊重与专业。任何形式的骚扰或不友善行为都不被接受。
@@ -59,7 +63,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 单元测试（vitest，55 个 test 文件 / 908 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+# 3.1 单元测试（vitest，55 个 test 文件 / 910 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
 # 3.2 自检基线（samples/ 目录下 260 条样本，覆盖全部 check 脚本的通过 / 失败路径）
@@ -98,7 +102,7 @@ npm run format
 | 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
 | 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
 | 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
-| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；55 files / 908 tests） | 0 |
+| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；55 files / 910 tests） | 0 |
 | 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
 | 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
 | 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
@@ -253,7 +257,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
 │   ├── self-test.ts               # 校验逻辑自检（260 条样本，samples/ 驱动）
-│   ├── __tests__/                 # vitest 单元测试（55 个 .test.ts / 908 条 + README.md coverage 矩阵）
+│   ├── __tests__/                 # vitest 单元测试（55 个 .test.ts / 910 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例
