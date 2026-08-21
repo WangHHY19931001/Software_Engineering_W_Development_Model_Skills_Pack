@@ -9,6 +9,9 @@
 
 ## [41.19.0] - 2026-08-19
 
+### 修复（R10 persona 契约）
+- RootCauseReport R10 采用 canonical-first：接受规范 `testing-reality-checker`，为兼容已有合法归档保留 `reality-checker` legacy fallback；同 artifact 的 canonical+legacy 不虚增 persona 语义，跨 artifact 或异常重复/冲突 fail-closed。同步 rootcause schema、根因定位指南、Verifier 规范、SSoT 与命令参考，并新增 canonical-only、legacy-only、重复、冲突、缺失与 confidence 回归测试。保持 R1-R9、退出码 0/1/2 及 `ROOTCAUSE_JSON` / `ERROR_JSON` 合同不变。
+
 ### 修复（审计整改批次 B）
 - **samples 覆盖门 JSON 退出码对齐**：`check-samples-coverage.ts --json` 复用同一 `exitCode` 输出 JSON 并设置 `process.exitCode`，违规时真实 shell status 与 JSON `exitCode` 均为 1，成功时均为 0；新增真实子进程回归断言。
 - **BDD 项目行为证据显式门**：`check-bdd-model.ts` 新增 phase 1-4 的 `--require-tla-equivalence` 与 phase 5-8 的 `--require-cucumber-report`；所需工件缺失均作为 D4/D5 violation / exit 1，错误 phase 组合为 exit 2，未带 flag 保持 fixture 兼容跳过。第 1/5 轮审查修复将 CLI 收紧为参数 allowlist：`=true`、重复、近似拼写和未知 `--*` 统一 `ARG_INVALID` / exit 2，不得静默降级。required Cucumber 报告还必须是 `{ elements: [...] }` 且至少有非空 name scenario 的 `passed` step；failed 仅作诊断，skipped/pending/undefined/未知 status 与匿名 element 不构成执行证据且作为 D5 / exit 1 拒绝。SKILL/指南/命令参考与 pre-push 注释明确区分：pre-push 只直接运行技能包 BDD fixture 回归，TLA、TLA↔BDD 同步和真实项目工件由项目阶段门按成熟度执行。

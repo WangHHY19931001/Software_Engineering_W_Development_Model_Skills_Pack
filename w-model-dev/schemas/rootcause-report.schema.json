@@ -175,16 +175,16 @@
     "summary": { "description": "报告摘要（非空，概括根因与处置建议）", "type": "string", "minLength": 1 },
     "reviewNotes": { "description": "评审备注（可选，V 复审意见补充）", "type": "string" },
     "partialReports": {
-      "description": "多角度场景附录（method=combined 时 R9 校验非空；R10 校验含 personaSlice=reality-checker 且 confidence ≥0.5，防幻想根因）",
+      "description": "多角度场景附录（method=combined 时 R9 校验非空；R10 canonical-first 校验含 personaSlice=testing-reality-checker 且 confidence ≥0.5；legacy reality-checker 仅作兼容 fallback；同 artifact 的 canonical+legacy 不重复计数，跨 artifact 冲突 fail-closed，防幻想根因）",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["personaSlice", "path", "confidence"],
         "properties": {
-          "personaSlice": { "description": "角度切片标识（reality-checker=现实校验角度，R10 强制至少一条）", "type": "string", "minLength": 1 },
-          "path": { "description": "局部报告文件路径", "type": "string", "minLength": 1 },
-          "confidence": { "description": "该角度结论置信度（0-1 小数；reality-checker 须 ≥0.5，R10）", "type": "number", "minimum": 0, "maximum": 1 }
+          "personaSlice": { "description": "角度切片标识；规范 reality checker 为 testing-reality-checker，legacy reality-checker 仅作兼容 fallback，不新增 alias 字段（R10）", "type": "string", "minLength": 1 },
+          "path": { "description": "局部报告文件路径；canonical+legacy 仅在指向同一 artifact 时视为同一语义", "type": "string", "minLength": 1 },
+          "confidence": { "description": "该角度结论置信度（0-1 小数）；canonical testing-reality-checker（或 legacy reality-checker fallback）须 ≥0.5，R10", "type": "number", "minimum": 0, "maximum": 1 }
         }
       }
     }

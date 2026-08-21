@@ -122,7 +122,7 @@
 3. **证据合并**：合并所有 persona 的 evidence，去重
 4. **fixRecommendation 合并**：按根因收敛度排序
 5. **upstreamDefect 仲裁**：任一 persona 标记则 R-lead 须复核
-6. **reality-check 硬约束**：testing-reality-checker confidence < 0.5 → 最终 `passed=false`
+6. **reality-check 硬约束**：规范 persona 为 `testing-reality-checker`，其 confidence < 0.5 → 最终 `passed=false`；为兼容已有合法归档，`reality-checker` 仅作 legacy fallback。若两者同时出现，canonical 优先且同 artifact 不重复计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。
 
 ---
 

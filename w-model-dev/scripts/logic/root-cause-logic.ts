@@ -99,6 +99,8 @@ const SCHEMA_VERSION = '1.0';
 const MIN_CHAIN_LENGTH = 2;
 const MAX_CHAIN_LENGTH = 5;
 const MIN_REALITY_CONFIDENCE = 0.5;
+const CANONICAL_REALITY_CHECKER = 'testing-reality-checker';
+const LEGACY_REALITY_CHECKER = 'reality-checker';
 const REPORT_ID_PATTERN = /^RC-[a-z0-9]+-\d+-\d+$/;
 const FALSIFIABILITY_PATTERN = /若.*则/;
 
@@ -302,16 +304,40 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   }
 
   // R9 多角度场景 partialReports 非空
-  // R10 多角度场景 reality-checker personaSlice 强制（不限 method）：任一有效 partialReport 含 personaSlice==='reality-checker' 且 confidence ≥ 0.5
+  // R10 canonical-first：testing-reality-checker 为规范 persona，reality-checker 仅作 legacy fallback。
+  // 同 artifact 的 canonical+legacy 是同一语义，canonical 优先；跨 artifact 或异常重复一律 fail-closed。
   const hasPartialReports = Array.isArray(r.partialReports) && r.partialReports.length > 0;
   if (hasPartialReports) {
-    const realityChecker = r.partialReports!.find((p) => p.personaSlice === 'reality-checker');
-    if (!realityChecker) {
-      reasons.push('R10: 多角度场景缺失 reality-checker personaSlice（防幻想根因）');
-    } else if (typeof realityChecker.confidence === 'number' && realityChecker.confidence < MIN_REALITY_CONFIDENCE) {
+    const partialReports = r.partialReports!;
+    const canonicalReports = partialReports.filter((p) => p.personaSlice === CANONICAL_REALITY_CHECKER);
+    const legacyReports = partialReports.filter((p) => p.personaSlice === LEGACY_REALITY_CHECKER);
+
+    if (canonicalReports.length > 1 || legacyReports.length > 1) {
       reasons.push(
-        `R10: 多角度场景 reality-checker persona confidence=${realityChecker.confidence} < ${MIN_REALITY_CONFIDENCE}（防幻想根因）`,
+        `R10: reality checker persona 重复（canonical=${canonicalReports.length}，legacy=${legacyReports.length}），必须 fail-closed`,
       );
+    } else {
+      const canonicalReport = canonicalReports[0];
+      const legacyReport = legacyReports[0];
+      if (canonicalReport && legacyReport && canonicalReport.path !== legacyReport.path) {
+        reasons.push(
+          `R10: canonical ${CANONICAL_REALITY_CHECKER} 与 legacy ${LEGACY_REALITY_CHECKER} 指向不同 artifact，冲突时 fail-closed`,
+        );
+      } else {
+        const realityChecker = canonicalReport ?? legacyReport;
+        if (!realityChecker) {
+          reasons.push(
+            `R10: 多角度场景缺失 reality checker personaSlice（canonical ${CANONICAL_REALITY_CHECKER}；legacy fallback ${LEGACY_REALITY_CHECKER}；防幻想根因）`,
+          );
+        } else if (
+          typeof realityChecker.confidence === 'number' &&
+          realityChecker.confidence < MIN_REALITY_CONFIDENCE
+        ) {
+          reasons.push(
+            `R10: 多角度场景 ${realityChecker.personaSlice} persona confidence=${realityChecker.confidence} < ${MIN_REALITY_CONFIDENCE}（canonical-first，防幻想根因）`,
+          );
+        }
+      }
     }
   } else {
     // 无 partialReports 时 R9 不强制（非 combined 方法可能无 partialReports）

@@ -1334,8 +1334,9 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
   {
     file: 'bad-r10-no-reality-checker.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/R10.*缺失 reality-checker/],
-    description: 'R10 combined 方法 partialReports 缺失 reality-checker personaSlice（E16）',
+    expectedReasonPatterns: [/R10.*缺失 reality checker.*testing-reality-checker.*reality-checker/],
+    description:
+      'R10 combined 方法 partialReports 缺失 canonical testing-reality-checker（legacy reality-checker fallback）personaSlice（E16）',
   },
 ];
 

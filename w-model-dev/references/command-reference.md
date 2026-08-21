@@ -171,6 +171,16 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-as-verifier --s-output="<S产出路径>"
 ```
 
+### RootCauseReport R10 persona 合同
+
+G 子代理在 V 复审根因报告后运行确定性根因报告门禁：
+
+```bash
+npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.json>"
+```
+
+R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence >= 0.5`；已有合法归档中的 `reality-checker` 仅作 legacy fallback。canonical 与 legacy 同时出现时，canonical 优先；若两者指向同一 artifact，不重复计算 persona 语义；跨 artifact 或异常重复/冲突 fail-closed。该命令保持 `0=通过 / 1=校验失败 / 2=输入错误` 及既有 `ROOTCAUSE_JSON` / `ERROR_JSON` 输出合同。只有 G 返回 exit 0，且 R 报告已由 V 复审通过，才允许分派 S-fix；run-log 的中间态 exit 1 不得伪造为通过。
+
 ## `/wm status`
 
 - **速查行**：`/wm status [--json]`
