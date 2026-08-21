@@ -6,7 +6,7 @@ import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { produceSourceProvenance, verifySourceProvenance } from '../logic/evidence-provenance-logic.js';
 
@@ -140,6 +140,192 @@ describe('source provenance', () => {
     const produced = await produceSourceProvenance(project);
     expect(produced.reason).toBeUndefined();
     expect(produced).toEqual(expect.objectContaining({ ok: true, verificationLevel: 'source-bound' }));
+  });
+
+  it('rejects a project reached through a redirected lexical ancestor', async () => {
+    const project = await makeProject();
+    const realParent = path.join(tmpDir, 'real-parent');
+    const redirectedParent = path.join(tmpDir, 'redirected-parent');
+    const lexicalParent = path.join(tmpDir, 'lexical-parent');
+    await fs.mkdir(realParent);
+    await fs.rename(project, path.join(realParent, path.basename(project)));
+    await fs.rename(realParent, redirectedParent);
+    try {
+      await fs.symlink(redirectedParent, lexicalParent, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (error) {
+      await fs.rename(redirectedParent, realParent);
+      await fs.rename(path.join(realParent, path.basename(project)), project);
+      if (process.platform === 'win32') return;
+      throw error;
+    }
+
+    const lexicalProject = path.join(lexicalParent, path.basename(project));
+    await expect(produceSourceProvenance(lexicalProject)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_SOURCE_EVIDENCE',
+    });
+  });
+
+  it('rejects a recursive evidence directory symlink', async () => {
+    const project = await makeProject();
+    const state = path.join(project, '.w-model');
+    const redirected = path.join(tmpDir, 'redirected-gates');
+    await fs.rm(path.join(state, 'gate-logs'), { recursive: true, force: true });
+    await fs.mkdir(redirected);
+    await fs.writeFile(path.join(redirected, 'gate.json'), '{}', 'utf8');
+    try {
+      await fs.symlink(redirected, path.join(state, 'gate-logs'), process.platform === 'win32' ? 'junction' : 'dir');
+    } catch (error) {
+      if (process.platform === 'win32') return;
+      throw error;
+    }
+
+    await expect(produceSourceProvenance(project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_SOURCE_EVIDENCE',
+    });
+  });
+
+  it('rejects an evidence file symlink', async () => {
+    const project = await makeProject();
+    const state = path.join(project, '.w-model');
+    const redirected = path.join(tmpDir, 'redirected-gate.json');
+    await fs.writeFile(redirected, '{}', 'utf8');
+    try {
+      await fs.symlink(redirected, path.join(state, 'gate-logs', 'redirected.json'));
+    } catch (error) {
+      if (process.platform === 'win32') return;
+      throw error;
+    }
+
+    await expect(produceSourceProvenance(project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_SOURCE_EVIDENCE',
+    });
+  });
+
+  it('rejects a run-log symlink', async () => {
+    const project = await makeProject();
+    const state = path.join(project, '.w-model');
+    const redirected = path.join(tmpDir, 'redirected-run-log.jsonl');
+    const runLog = await fs.readFile(path.join(state, 'run-log.jsonl'));
+    await fs.writeFile(redirected, runLog);
+    await fs.rm(path.join(state, 'run-log.jsonl'));
+    try {
+      await fs.symlink(redirected, path.join(state, 'run-log.jsonl'));
+    } catch (error) {
+      if (process.platform === 'win32') return;
+      throw error;
+    }
+
+    await expect(produceSourceProvenance(project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_SOURCE_EVIDENCE',
+    });
+  });
+
+  it('fails closed when a source file is replaced after its final stable read', async () => {
+    const project = await makeProject();
+    const gatePath = path.join(project, '.w-model', 'gate-logs', 'gate.json');
+    const originalOpen = fs.open.bind(fs);
+    const openSpy = vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+      const handle = await originalOpen(...args);
+      if (String(args[0]) === gatePath) {
+        const originalHandleReadFile = handle.readFile.bind(handle);
+        handle.readFile = (async (...readArgs) => {
+          const content = await originalHandleReadFile(...readArgs);
+          await fs.writeFile(gatePath, `${content.toString()} `, 'utf8');
+          return content;
+        }) as typeof handle.readFile;
+      }
+      return handle;
+    });
+
+    const result = await produceSourceProvenance(project);
+
+    openSpy.mockRestore();
+    expect(result).toMatchObject({ ok: false, exitCode: 1, reason: 'UNSAFE_SOURCE_EVIDENCE' });
+  });
+
+  it('fails closed when a source file is replaced with a different inode during reading', async () => {
+    const project = await makeProject();
+    const gatePath = path.join(project, '.w-model', 'gate-logs', 'gate.json');
+    const replacementPath = path.join(project, '.w-model', 'gate-logs', 'gate-replacement.json');
+    const originalOpen = fs.open.bind(fs);
+    const openSpy = vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+      const handle = await originalOpen(...args);
+      if (String(args[0]) === gatePath) {
+        const originalHandleReadFile = handle.readFile.bind(handle);
+        handle.readFile = (async (...readArgs) => {
+          const content = await originalHandleReadFile(...readArgs);
+          await fs.rename(gatePath, replacementPath);
+          await fs.writeFile(gatePath, content, 'utf8');
+          return content;
+        }) as typeof handle.readFile;
+      }
+      return handle;
+    });
+
+    const result = await produceSourceProvenance(project);
+
+    openSpy.mockRestore();
+    expect(result).toMatchObject({ ok: false, exitCode: 1, reason: 'UNSAFE_SOURCE_EVIDENCE' });
+  });
+
+  it('fails closed when the provenance target is replaced during publication', async () => {
+    const project = await makeProject();
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    const state = path.join(project, '.w-model');
+    const target = path.join(state, 'evidence-provenance.json');
+    const redirected = path.join(tmpDir, 'target-secret');
+    await fs.writeFile(redirected, 'untouched', 'utf8');
+    const originalLink = fs.link.bind(fs);
+    const linkSpy = vi.spyOn(fs, 'link').mockImplementation(async (...args) => {
+      if (String(args[1]) === target) {
+        await fs.rm(target, { force: true });
+        await fs.symlink(redirected, target);
+      }
+      return originalLink(...args);
+    });
+
+    const result = await produceSourceProvenance(project);
+
+    linkSpy.mockRestore();
+    expect(result).toMatchObject({ ok: false, exitCode: 1, reason: 'UNSAFE_SOURCE_EVIDENCE' });
+    expect(await fs.readFile(redirected, 'utf8')).toBe('untouched');
+  });
+
+  it('fails closed without overwriting a target when its parent is replaced during publication', async () => {
+    const project = await makeProject();
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    const state = path.join(project, '.w-model');
+    const movedState = path.join(tmpDir, 'moved-state');
+    const redirectedState = path.join(tmpDir, 'redirected-state');
+    const redirectedTarget = path.join(redirectedState, 'evidence-provenance.json');
+    await fs.rename(state, movedState);
+    await fs.mkdir(redirectedState);
+    await fs.writeFile(redirectedTarget, 'untouched', 'utf8');
+    await fs.rename(movedState, state);
+    const originalLink = fs.link.bind(fs);
+    const linkSpy = vi.spyOn(fs, 'link').mockImplementation(async (...args) => {
+      if (String(args[1]) === path.join(state, 'evidence-provenance.json')) {
+        await fs.rename(state, movedState);
+        await fs.symlink(redirectedState, state, process.platform === 'win32' ? 'junction' : 'dir');
+      }
+      return originalLink(...args);
+    });
+
+    const result = await produceSourceProvenance(project);
+
+    linkSpy.mockRestore();
+    await fs.rm(state, { force: true, recursive: true });
+    await fs.rename(movedState, state).catch(() => undefined);
+    expect(result).toMatchObject({ ok: false, exitCode: 1, reason: 'UNSAFE_SOURCE_EVIDENCE' });
+    expect(await fs.readFile(redirectedTarget, 'utf8')).toBe('untouched');
   });
 
   it('rejects a symlinked state root instead of authenticating redirected evidence', async () => {

@@ -65,7 +65,46 @@ function canonicalProvenanceDigest(provenance: Omit<SourceProvenance, 'provenanc
   const { provenanceSha256: _ignored, ...canonical } = provenance as SourceProvenance;
   return sha256(JSON.stringify(canonical));
 }
+function isPathInside(candidate: string, parent: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+/**
+ * Walks the lexical path one component at a time. lstat prevents following a
+ * symlink/junction, while the realpath comparison catches other reparse-point
+ * redirections without rejecting ordinary case-normalized paths on Windows.
+ */
+async function assertLexicalPath(target: string, missingTailAllowed = false): Promise<void> {
+  const absolute = path.resolve(target);
+  const parsed = path.parse(absolute);
+  const relative = path.relative(parsed.root, absolute);
+  let lexical = parsed.root;
+  let canonical = await fs.realpath(parsed.root);
+  const parts = relative ? relative.split(path.sep).filter(Boolean) : [];
+  for (const [index, part] of parts.entries()) {
+    lexical = path.join(lexical, part);
+    let stat: import('node:fs').Stats;
+    try {
+      stat = await fs.lstat(lexical);
+    } catch (error) {
+      if (missingTailAllowed && (error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    }
+    if (stat.isSymbolicLink()) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const nextCanonical = await fs.realpath(lexical);
+    const canonicalRelative = path.relative(canonical, nextCanonical);
+    const canonicalParts = canonicalRelative.split(path.sep).filter(Boolean);
+    if (canonicalRelative.startsWith('..') || path.isAbsolute(canonicalRelative) || canonicalParts.length > 1)
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    canonical = nextCanonical;
+    if (index === parts.length - 1 && !stat.isDirectory() && !stat.isFile())
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+  }
+}
+
 async function assertCanonicalPath(target: string, root: string, missingAllowed = false): Promise<string> {
+  await assertLexicalPath(target, missingAllowed);
   let stat: import('node:fs').Stats;
   try {
     stat = await fs.lstat(target);
@@ -78,31 +117,20 @@ async function assertCanonicalPath(target: string, root: string, missingAllowed 
   if (!isPathInside(real, root)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
   return real;
 }
-function isPathInside(candidate: string, parent: string): boolean {
-  const relative = path.relative(parent, candidate);
-  return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
-}
+
 async function assertProjectRoot(project: string): Promise<string> {
-  let real: string;
   try {
+    await assertLexicalPath(project);
     const stat = await fs.lstat(project);
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('unsafe project');
-    real = await fs.realpath(project);
+    return await fs.realpath(project);
   } catch {
     throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
   }
-  return real;
 }
-async function failIfSymlinkedAncestor(target: string, stopAt: string): Promise<void> {
-  let cursor = path.resolve(target);
-  const stop = path.resolve(stopAt);
-  // eslint-disable-next-line no-constant-condition -- bounded ancestor walk returns at stop/root
-  while (true) {
-    const stat = await fs.lstat(cursor).catch(() => undefined);
-    if (stat?.isSymbolicLink()) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
-    if (cursor === stop || path.dirname(cursor) === cursor) return;
-    cursor = path.dirname(cursor);
-  }
+
+async function failIfSymlinkedAncestor(target: string, _stopAt: string): Promise<void> {
+  await assertLexicalPath(target);
 }
 function fail(error: unknown): ProvenanceResult {
   return error instanceof ProvenanceFailure
@@ -125,12 +153,16 @@ async function gitHead(project: string): Promise<string> {
     } else if (!gitStat.isDirectory() || gitStat.isSymbolicLink()) {
       throw new Error('invalid git metadata directory');
     }
+    const gitDirReal = await fs.realpath(gitDir);
     const headPath = path.join(gitDir, 'HEAD');
-    await failIfSymlinkedAncestor(headPath, gitDir);
-    const head = (await fs.readFile(headPath, 'utf8')).trim();
-    const value = head.startsWith('ref: ')
-      ? (await fs.readFile(path.join(gitDir, head.slice('ref: '.length)), 'utf8')).trim()
-      : head;
+    await assertCanonicalPath(headPath, gitDirReal);
+    const head = (await readStableFile(headPath, gitDirReal)).toString('utf8').trim();
+    let value = head;
+    if (head.startsWith('ref: ')) {
+      const refPath = path.join(gitDir, head.slice('ref: '.length));
+      await assertCanonicalPath(refPath, gitDirReal);
+      value = (await readStableFile(refPath, gitDirReal)).toString('utf8').trim();
+    }
     if (!/^[0-9a-f]{40}$/.test(value)) throw new Error('invalid HEAD');
     return value;
   } catch (error) {
@@ -138,15 +170,49 @@ async function gitHead(project: string): Promise<string> {
     throw new ProvenanceFailure(1, 'MISSING_GIT_HEAD');
   }
 }
-type FileSnapshot = { realPath: string; ino: number; size: number; mtimeMs: number };
+type FileSnapshot = {
+  realPath: string;
+  dev: number;
+  ino: number;
+  size: number;
+  mtimeMs: number;
+  ctimeMs: number;
+};
+function sameFileSnapshot(left: FileSnapshot, right: FileSnapshot): boolean {
+  return (
+    left.realPath === right.realPath &&
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs &&
+    left.ctimeMs === right.ctimeMs
+  );
+}
+function sameFileStat(snapshot: FileSnapshot, stat: import('node:fs').Stats): boolean {
+  return (
+    snapshot.dev === stat.dev &&
+    snapshot.ino === stat.ino &&
+    snapshot.size === stat.size &&
+    snapshot.mtimeMs === stat.mtimeMs &&
+    snapshot.ctimeMs === stat.ctimeMs
+  );
+}
 async function snapshotFile(file: string, root: string): Promise<FileSnapshot> {
+  await assertLexicalPath(file);
   const stat = await fs.lstat(file).catch(() => {
     throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
   });
   if (!stat.isFile() || stat.isSymbolicLink()) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
   const realPath = await fs.realpath(file);
   if (!isPathInside(realPath, root)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
-  return { realPath, ino: stat.ino, size: stat.size, mtimeMs: stat.mtimeMs };
+  return {
+    realPath,
+    dev: stat.dev,
+    ino: stat.ino,
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    ctimeMs: stat.ctimeMs,
+  };
 }
 async function readStableFile(file: string, root: string, missingReason?: string): Promise<Buffer> {
   let before: FileSnapshot;
@@ -157,19 +223,21 @@ async function readStableFile(file: string, root: string, missingReason?: string
       throw new ProvenanceFailure(1, missingReason);
     throw error;
   }
-  const content = await fs.readFile(file);
-  const after = await snapshotFile(file, root);
-  if (
-    before.realPath !== after.realPath ||
-    before.ino !== after.ino ||
-    before.size !== after.size ||
-    before.mtimeMs !== after.mtimeMs
-  ) {
-    throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+  const handle = await fs.open(file, 'r');
+  try {
+    const opened = await handle.stat();
+    if (!sameFileStat(before, opened)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const content = await handle.readFile();
+    const read = await handle.stat();
+    const after = await snapshotFile(file, root);
+    if (!sameFileStat(before, read) || !sameFileSnapshot(before, after))
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    if (content.includes(0) || Buffer.from(content.toString('utf8'), 'utf8').compare(content) !== 0)
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    return content;
+  } finally {
+    await handle.close();
   }
-  if (content.includes(0) || Buffer.from(content.toString('utf8'), 'utf8').compare(content) !== 0)
-    throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
-  return content;
 }
 async function readJson(file: string, root: string): Promise<unknown> {
   try {
@@ -212,11 +280,10 @@ async function collectDirectory(
   const files: SourceFile[] = [];
   async function walk(current: string, relativeDirectory: string): Promise<void> {
     const currentReal = await assertCanonicalPath(current, stateReal);
-    const before = await fs.lstat(current);
+    const before = await snapshotPath(current, stateReal, true);
     const entries = (await fs.readdir(current, { withFileTypes: true })) as import('node:fs').Dirent[];
-    const after = await fs.lstat(current);
-    if (before.ino !== after.ino || before.mtimeMs !== after.mtimeMs)
-      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const after = await snapshotPath(current, stateReal, true);
+    if (!before || !after || !samePathSnapshot(before, after)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       const entryPath = path.join(current, entry.name);
       const relative = `${relativeDirectory}/${entry.name}`;
@@ -234,9 +301,8 @@ async function collectDirectory(
       const content = await readStableFile(entryPath, stateReal);
       files.push({ path: relative, kind, sha256: sha256(content) });
     }
-    const final = await fs.lstat(current);
-    if (before.ino !== final.ino || before.mtimeMs !== final.mtimeMs)
-      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const final = await snapshotPath(current, stateReal, true);
+    if (!final || !samePathSnapshot(before, final)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
   }
   await walk(absolute, directory);
   return files;
@@ -339,13 +405,155 @@ async function buildSourceProvenance(projectDir: string, verifiedAt?: string): P
   };
   return { ...base, provenanceSha256: canonicalProvenanceDigest(base) };
 }
-async function atomicWrite(target: string, content: string): Promise<void> {
-  const temp = path.join(path.dirname(target), `.${path.basename(target)}.${randomUUID()}.tmp`);
+type PathSnapshot = FileSnapshot & { directory: boolean };
+
+function samePathIdentity(left: PathSnapshot, right: PathSnapshot): boolean {
+  return (
+    left.directory === right.directory &&
+    left.realPath === right.realPath &&
+    left.dev === right.dev &&
+    left.ino === right.ino
+  );
+}
+function samePathSnapshot(left: PathSnapshot, right: PathSnapshot): boolean {
+  return (
+    samePathIdentity(left, right) &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs &&
+    left.ctimeMs === right.ctimeMs
+  );
+}
+function samePathData(left: PathSnapshot, right: PathSnapshot): boolean {
+  return samePathIdentity(left, right) && left.size === right.size && left.mtimeMs === right.mtimeMs;
+}
+function sameMovedFile(left: PathSnapshot, right: PathSnapshot): boolean {
+  return (
+    left.directory === right.directory &&
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.size === right.size &&
+    left.mtimeMs === right.mtimeMs
+  );
+}
+
+async function snapshotPath(
+  target: string,
+  root: string,
+  expectedDirectory?: boolean,
+  missingAllowed = false,
+): Promise<PathSnapshot | null> {
+  await assertLexicalPath(target, missingAllowed);
+  const stat = await fs.lstat(target).catch((error: unknown) => {
+    if (missingAllowed && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+  });
+  if (!stat) return null;
+  if (
+    stat.isSymbolicLink() ||
+    (!stat.isFile() && !stat.isDirectory()) ||
+    (expectedDirectory !== undefined && stat.isDirectory() !== expectedDirectory)
+  )
+    throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+  const realPath = await fs.realpath(target);
+  if (!isPathInside(realPath, root)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+  return {
+    realPath,
+    dev: stat.dev,
+    ino: stat.ino,
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    ctimeMs: stat.ctimeMs,
+    directory: stat.isDirectory(),
+  };
+}
+
+async function atomicWrite(
+  target: string,
+  content: string,
+  parentBefore: PathSnapshot,
+  targetBefore: PathSnapshot | null,
+  parentReal: string,
+): Promise<void> {
+  const canonicalTarget = path.join(parentReal, path.basename(target));
+  const temp = path.join(parentReal, `.${path.basename(target)}.${randomUUID()}.tmp`);
+  const backup = path.join(parentReal, `.${path.basename(target)}.${randomUUID()}.bak`);
+  const guard = path.join(parentReal, `.${path.basename(target)}.${randomUUID()}.guard`);
+  let movedTarget = false;
+  let guardCreated = false;
+  let backupCreated = false;
   try {
-    await fs.writeFile(temp, content);
-    await fs.rename(temp, target);
+    const currentParent = await snapshotPath(path.dirname(target), parentReal, true);
+    if (!currentParent || !samePathIdentity(parentBefore, currentParent))
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const currentTarget = await snapshotPath(target, parentReal, undefined, true);
+    if (
+      (targetBefore === null && currentTarget !== null) ||
+      (targetBefore !== null && (currentTarget === null || !samePathData(targetBefore, currentTarget)))
+    )
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+
+    await fs.writeFile(temp, content, { encoding: 'utf8', flag: 'wx' });
+    const tempSnapshot = await snapshotPath(temp, parentReal, false);
+    if (!tempSnapshot) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+
+    // Recheck both names after creating the temp file, immediately before publication.
+    const parentBeforePublish = await snapshotPath(path.dirname(target), parentReal, true);
+    const targetBeforePublish = await snapshotPath(target, parentReal, undefined, true);
+    if (!parentBeforePublish || !samePathIdentity(parentBefore, parentBeforePublish))
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    if (
+      (targetBefore === null && targetBeforePublish !== null) ||
+      (targetBefore !== null && (targetBeforePublish === null || !samePathSnapshot(targetBefore, targetBeforePublish)))
+    )
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+
+    // Keep an inode guard while moving an existing destination away. The final
+    // hard link is exclusive, so a raced destination is never overwritten.
+    if (targetBefore !== null) {
+      await fs.link(canonicalTarget, guard);
+      guardCreated = true;
+      await fs.rename(canonicalTarget, backup);
+      backupCreated = true;
+      movedTarget = true;
+      const moved = await snapshotPath(backup, parentReal, false);
+      if (!moved || !sameMovedFile(targetBefore, moved)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    }
+
+    try {
+      await fs.link(temp, canonicalTarget);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+      throw error;
+    }
+    await fs.rm(temp, { force: true });
+
+    const published = await snapshotPath(target, parentReal, false);
+    const publishedBytes = await readStableFile(target, parentReal);
+    if (
+      !published ||
+      !isPathInside(published.realPath, parentReal) ||
+      publishedBytes.compare(Buffer.from(content, 'utf8')) !== 0
+    )
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const parentAfter = await snapshotPath(path.dirname(target), parentReal, true);
+    if (!parentAfter || !samePathIdentity(parentBefore, parentAfter))
+      throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+
+    if (backupCreated) await fs.rm(backup, { force: true });
+    if (guardCreated) await fs.rm(guard, { force: true });
+    movedTarget = false;
+    backupCreated = false;
+    guardCreated = false;
+  } catch (error) {
+    if (movedTarget && guardCreated) {
+      const current = await snapshotPath(canonicalTarget, parentReal, undefined, true).catch(() => null);
+      if (!current) await fs.link(guard, canonicalTarget).catch(() => undefined);
+    }
+    throw error instanceof ProvenanceFailure ? error : new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
   } finally {
     await fs.rm(temp, { force: true }).catch(() => undefined);
+    if (backupCreated) await fs.rm(backup, { force: true }).catch(() => undefined);
+    if (guardCreated) await fs.rm(guard, { force: true }).catch(() => undefined);
   }
 }
 export async function produceSourceProvenance(projectDir: string): Promise<ProvenanceResult> {
@@ -358,12 +566,21 @@ export async function produceSourceProvenance(projectDir: string): Promise<Prove
     if (!validateBySchema('evidence-provenance', provenance).valid)
       throw new ProvenanceFailure(1, 'INVALID_SOURCE_PROVENANCE');
     const target = path.join(state, PROVENANCE_NAME);
-    const existing = await fs.lstat(target).catch(() => null);
-    if (existing?.isSymbolicLink() || (existing && !existing.isFile()))
+    const parentBefore = await snapshotPath(state, projectReal, true);
+    if (!parentBefore) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
+    const targetBefore = await snapshotPath(target, stateReal, false, true);
+    const content = JSON.stringify(provenance, null, 2) + '\n';
+    await atomicWrite(target, content, parentBefore, targetBefore, stateReal);
+    const parentAfter = await snapshotPath(state, projectReal, true);
+    const published = await snapshotPath(target, stateReal, false);
+    if (
+      !parentAfter ||
+      !samePathIdentity(parentBefore, parentAfter) ||
+      !published ||
+      !isPathInside(published.realPath, stateReal) ||
+      (await readStableFile(target, stateReal)).compare(Buffer.from(content, 'utf8')) !== 0
+    )
       throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
-    await assertCanonicalPath(state, projectReal);
-    await atomicWrite(target, JSON.stringify(provenance, null, 2) + '\n');
-    await assertCanonicalPath(target, stateReal);
     return {
       ok: true,
       exitCode: 0,
