@@ -35,7 +35,9 @@
         "measurements",
         "contentHash",
         "sourceBundleSha256",
-        "producerVersion"
+        "producerVersion",
+        "verifiedAt",
+        "provenanceSha256"
       ],
       "properties": {
         "format": {
@@ -89,7 +91,9 @@
           "description": "生成受控 source provenance 的 producer 版本。",
           "type": "string",
           "minLength": 1
-        }
+        },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "provenanceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "files": {

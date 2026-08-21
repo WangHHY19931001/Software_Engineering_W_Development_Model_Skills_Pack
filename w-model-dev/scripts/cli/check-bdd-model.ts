@@ -471,7 +471,10 @@ async function main(): Promise<number> {
         checkedAt: result.checkedAt,
         summary: result.summary,
         violationsCount: result.violations.length,
+        exitCode: result.exitCode,
+        passed: result.passed,
       },
+      stdoutSummary: { exitCode: result.exitCode, passed: result.passed },
     },
     projectDir,
   );

@@ -28,13 +28,20 @@ async function makeProject(): Promise<string> {
   const project = path.join(tmpDir, 'project');
   const state = path.join(project, '.w-model');
   await fs.mkdir(path.join(state, 'gate-logs'), { recursive: true });
-  await fs.copyFile(
+  const runLog = await fs.readFile(
     path.resolve(process.cwd(), 'w-model-dev/scripts/samples/run-log/valid.jsonl'),
+    'utf8',
+  );
+  await fs.writeFile(
     path.join(state, 'run-log.jsonl'),
+    runLog
+      .split(/\r?\n/)
+      .map((line) => (line.includes('"action":"gate"') ? line.replace(/\}$/, ',"gateLogPath":"gate.json"}') : line))
+      .join('\n'),
   );
   await fs.writeFile(
     path.join(state, 'gate-logs', 'gate.json'),
-    '{"script":"check-bdd-model.ts","exitCode":0,"passed":true,"reasons":[],"reportSummary":{"phase":1,"checkedAt":"2026-08-20T00:00:00.000Z","summary":"ok","violationsCount":0}}',
+    '{"script":"check-bdd-model.ts","exitCode":0,"passed":true,"reasons":[],"reportSummary":{"phase":1,"checkedAt":"2026-08-20T00:00:00.000Z","summary":"ok","violationsCount":0,"exitCode":0,"passed":true},"stdoutSummary":{"exitCode":0,"passed":true}}',
   );
   await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
   await fs.copyFile(
@@ -133,6 +140,48 @@ describe('source provenance', () => {
     const produced = await produceSourceProvenance(project);
     expect(produced.reason).toBeUndefined();
     expect(produced).toEqual(expect.objectContaining({ ok: true, verificationLevel: 'source-bound' }));
+  });
+
+  it('rejects a symlinked state root instead of authenticating redirected evidence', async () => {
+    const project = await makeProject();
+    const state = path.join(project, '.w-model');
+    const redirected = path.join(tmpDir, 'redirected-state');
+    await fs.rename(state, redirected);
+    await fs.symlink(redirected, state, 'junction');
+
+    await expect(produceSourceProvenance(project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'UNSAFE_SOURCE_EVIDENCE',
+    });
+  });
+
+  it('rejects verifiedAt tampering through source-bound verification', async () => {
+    const project = await makeProject();
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    const provenancePath = path.join(project, '.w-model', 'evidence-provenance.json');
+    const provenance = JSON.parse(await fs.readFile(provenancePath, 'utf8')) as Record<string, unknown>;
+    provenance.verifiedAt = '2020-01-01T00:00:00.000Z';
+    await fs.writeFile(provenancePath, JSON.stringify(provenance), 'utf8');
+
+    await expect(verifySourceProvenance(project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'SOURCE_PROVENANCE_MISMATCH',
+    });
+  });
+
+  it('requires final HEAD binding when a reviewed HEAD is supplied', async () => {
+    const project = await makeProject();
+    const produced = await produceSourceProvenance(project);
+    expect(produced.ok).toBe(true);
+    const head = produced.provenance!.commitSha;
+    await expect(verifySourceProvenance(project, `${'f'.repeat(40)}`)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'FINAL_HEAD_MISMATCH',
+    });
+    await expect(verifySourceProvenance(project, head)).resolves.toMatchObject({ ok: true });
   });
 
   it('real CLI produces, writes, and reports source-bound provenance', async () => {

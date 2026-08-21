@@ -63,7 +63,10 @@ async function createProject(name = 'project'): Promise<string> {
         checkedAt: '2026-08-20T00:00:00.000Z',
         summary: 'ok',
         violationsCount: 0,
+        exitCode: 0,
+        passed: true,
       },
+      stdoutSummary: { exitCode: 0, passed: true },
     }),
     'utf8',
   );
@@ -99,9 +102,16 @@ async function createProject(name = 'project'): Promise<string> {
     'source: D:/private/worktree with spaces\nresult: /home/alice/private\nnetwork: //host/private/share\nAuthorization: Bearer markdown-authorization\nprivate_key = markdown-private-key\nlink: https://example.test/relative\nrelative: docs/relative.md\n',
     'utf8',
   );
-  await fs.copyFile(
+  const runLog = await fs.readFile(
     path.resolve(process.cwd(), 'w-model-dev/scripts/samples/run-log/valid.jsonl'),
+    'utf8',
+  );
+  await fs.writeFile(
     path.join(state, 'run-log.jsonl'),
+    runLog
+      .split(/\r?\n/)
+      .map((line) => (line.includes('"action":"gate"') ? line.replace(/\}$/, ',"gateLogPath":"gate.json"}') : line))
+      .join('\n'),
   );
   for (const args of [
     ['init'],
@@ -437,6 +447,34 @@ describe('evidence export logic', () => {
     expect(exported).toContain('| Relative | ./docs/readme.md |');
   });
 
+  it('conservatively redacts prefixed Markdown key/value lines without damaging URLs or relative paths', async () => {
+    const project = await createProject();
+    const markdownPath = path.join(project, '.w-model', 'codegraph-queries', 'query.md');
+    await fs.appendFile(
+      markdownPath,
+      [
+        '- Authorization: Bearer list-secret',
+        '> context | Authorization: Bearer quote-secret',
+        '[INFO] Authorization: Bearer log-secret',
+        '``` Authorization: Bearer code-secret',
+        'context | Authorization: Bearer embedded-secret',
+        'link: https://example.test/Authorization:Bearer-safe',
+        'relative: docs/Authorization:relative.md',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    const output = path.join(tmpDir, 'markdown-fallback-evidence');
+
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+    const exported = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
+    for (const secret of ['list-secret', 'quote-secret', 'log-secret', 'code-secret', 'embedded-secret'])
+      expect(exported).not.toContain(secret);
+    expect(exported).toContain('link: https://example.test/Authorization:Bearer-safe');
+    expect(exported).toContain('relative: docs/Authorization:relative.md');
+  });
+
   it('preserves empty Markdown cells so sensitive header columns cannot leak secrets', async () => {
     const project = await createProject();
     const markdownPath = path.join(project, '.w-model', 'codegraph-queries', 'query.md');
@@ -680,6 +718,26 @@ describe('evidence export logic', () => {
     for (const name of ['Z.json', 'a.json', 'é.json']) {
       await fs.copyFile(path.join(logs, 'gate.json'), path.join(logs, name));
     }
+    const runLogPath = path.join(project, '.w-model', 'run-log.jsonl');
+    const runLog = await fs.readFile(runLogPath, 'utf8');
+    const extraGateEntries = ['Z.json', 'a.json', 'é.json'].map((gateLogPath, index) =>
+      JSON.stringify({
+        runId: `unicode-gate-${index}`,
+        timestamp: `2026-07-10T03:0${index + 1}:30Z`,
+        phase: 1,
+        phaseName: '需求与范围',
+        action: 'gate',
+        role: 'G',
+        duration_s: 30,
+        tokens: 1000,
+        estimated: false,
+        subagentSpawns: 0,
+        gateExitCode: 0,
+        gateLogPath,
+        outcome: 'success',
+      }),
+    );
+    await fs.writeFile(runLogPath, runLog.replace(/(\{"runId":"r4")/, `${extraGateEntries.join('\n')}\n$1`));
     expect((await produceSourceProvenance(project)).ok).toBe(true);
     const output = path.join(tmpDir, 'unicode-evidence');
 

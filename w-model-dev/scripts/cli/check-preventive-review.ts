@@ -250,7 +250,10 @@ async function main(): Promise<void> {
         variant: output.variant,
         autoTrigger: output.autoTrigger,
         reviewCount: Object.values(output.reviews).filter((review) => review !== null).length,
+        exitCode: output.exitCode,
+        passed: output.passed,
       },
+      stdoutSummary: { exitCode: output.exitCode, passed: output.passed },
     },
     projectDir,
   );

@@ -15,7 +15,10 @@ const validPayload = {
     checkedAt: '2026-08-19T00:00:00.000Z',
     summary: 'BDD model check passed (phase 1)',
     violationsCount: 0,
+    exitCode: 0,
+    passed: true,
   },
+  stdoutSummary: { exitCode: 0, passed: true },
 };
 
 describe('writeGateLog（lib/gate-log-writer.ts）', () => {

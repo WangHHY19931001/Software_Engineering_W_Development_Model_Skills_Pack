@@ -9,6 +9,7 @@
  */
 
 import { promises as fs } from 'node:fs';
+import * as fsSync from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -473,6 +474,62 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('D8 I2 natural-exit contract', () => {
+  const scriptsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const cliRoot = path.join(scriptsRoot, 'cli');
+  const libRoot = path.join(scriptsRoot, 'lib');
+  const logicRoot = path.join(scriptsRoot, 'logic');
+  const contractDoc = path.resolve(scriptsRoot, '../../w-model-dev/references/command-reference.md');
+  const processLevelExitInventory: Record<string, string> = {
+    'ensure-codegraph-opsx.ts': '依赖检测可能执行外部 CLI，保留 process-level runner 的直接退出语义',
+    'metrics-report.ts': '只读报告 runner，保留既有成功退出语义',
+    'security-scan.ts': '安全扫描 runner，保留扫描结果的既有退出语义',
+    'self-test.ts': '回归基线 runner，保留最终汇总退出语义',
+    'wm-status.ts': '只读状态 runner，保留既有成功退出语义',
+  };
+
+  function sourceFiles(root: string): string[] {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- root is constrained to repository script layers
+    return fsSync.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+      const absolute = path.join(root, entry.name);
+      if (entry.isDirectory()) return sourceFiles(absolute);
+      return entry.isFile() && entry.name.endsWith('.ts') ? [absolute] : [];
+    });
+  }
+
+  it('keeps direct process.exit out of lib/logic and gate-report callers', () => {
+    const violations: string[] = [];
+    for (const file of [...sourceFiles(libRoot), ...sourceFiles(logicRoot)]) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is discovered only beneath repository script layers
+      const source = fsSync.readFileSync(file, 'utf8');
+      const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      if (/process\.exit\s*\(/.test(withoutComments)) violations.push(path.relative(scriptsRoot, file));
+    }
+
+    for (const file of sourceFiles(cliRoot)) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is discovered only beneath repository script layers
+      const source = fsSync.readFileSync(file, 'utf8');
+      if (!/printGateReport|printJsonReport/.test(source)) continue;
+      const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      if (/process\.exit\s*\(/.test(withoutComments)) violations.push(path.relative(scriptsRoot, file));
+      if (!/process\.exitCode\s*=/.test(withoutComments)) {
+        violations.push(`${path.relative(scriptsRoot, file)}: missing process.exitCode`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('documents every retained process-level direct exit with its reason', () => {
+    const doc = fsSync.readFileSync(contractDoc, 'utf8');
+    expect(doc).toContain('D2 自然退出契约边界');
+    for (const [script, reason] of Object.entries(processLevelExitInventory)) {
+      expect(doc).toContain(script);
+      expect(doc).toContain(reason);
     }
   });
 });

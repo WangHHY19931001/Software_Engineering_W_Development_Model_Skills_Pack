@@ -23,6 +23,20 @@
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 
+### D2 自然退出契约边界
+
+D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.exit()`；调用 `gate-report` 的 `check-*.ts` 只输出报告，由调用方设置 `process.exitCode` 后 `return`，保留 exit `0/1/2` 与 stdout/`ERROR_JSON` 协议。以下是明确登记的 process-level runner 例外，不属于 gate-report caller 的自然退出迁移范围：
+
+| 脚本 | 保留直接退出的理由 |
+|---|---|
+| `ensure-codegraph-opsx.ts` | 依赖检测可能执行外部 CLI，保留 process-level runner 的直接退出语义 |
+| `metrics-report.ts` | 只读报告 runner，保留既有成功退出语义 |
+| `security-scan.ts` | 安全扫描 runner，保留扫描结果的既有退出语义 |
+| `self-test.ts` | 回归基线 runner，保留最终汇总退出语义 |
+| `wm-status.ts` | 只读状态 runner，保留既有成功退出语义 |
+
+这些例外仍须保持既有 shell exit `0/1/2`（适用时）和输出协议；不得将 process-level runner 例外解读为 `logic/` 或 gate-report caller 可以直接退出。新增 gate-report caller 或新增 direct exit 时，须更新本表和契约测试。
+
 
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
 

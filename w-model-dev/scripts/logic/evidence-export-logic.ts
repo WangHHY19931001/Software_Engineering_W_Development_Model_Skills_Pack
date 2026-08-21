@@ -29,6 +29,8 @@ type SourceVerificationProvenance = {
   measurements: EvidenceMeasurements;
   sourceBundleSha256?: string;
   producerVersion?: string;
+  verifiedAt?: string;
+  provenanceSha256?: string;
 };
 type EvidenceProvenance = {
   format: 'w-model-evidence-provenance';
@@ -41,6 +43,8 @@ type EvidenceProvenance = {
   contentHash: string;
   sourceBundleSha256?: string;
   producerVersion?: string;
+  verifiedAt?: string;
+  provenanceSha256?: string;
 };
 type EvidenceManifest = {
   schemaVersion: '1.0';
@@ -292,13 +296,25 @@ async function buildExportFiles(state: string, sourceReal: string): Promise<Expo
   entries.sort((left, right) => comparePaths(left.file.path, right.file.path));
   return { entries, files: entries.map(({ file }) => file), sourceMeasurements };
 }
+const SENSITIVE_KEY_PATTERN =
+  '(?:token|secret|password|api[_-]?key|authorization|credential|access[_-]?token|private[_-]?key)';
+const SENSITIVE_VALUE_LINE_PATTERN = new RegExp(
+  `^(\\s*(?:[-*>+]\\s+|\\[[A-Z]+\\]\\s+|` +
+    '`+' +
+    `\\s*)?)(?:${SENSITIVE_KEY_PATTERN})\\s*(?::|=)\\s*(?!https?://|[./]).+$`,
+  'i',
+);
+const SENSITIVE_VALUE_CONTEXT_PATTERN = new RegExp(
+  `^(\\s*(?:[-*>+]\\s+|\\[[A-Z]+\\]\\s+|` +
+    '`+' +
+    `\\s*)?[^:\\n|]{1,40}\\|\\s*(?:${SENSITIVE_KEY_PATTERN})\\s*(?::|=)\\s*)(?!https?://|[./]).+$`,
+  'i',
+);
 function sanitizeString(value: string): string {
   return value
     .replace(ABSOLUTE_PATH_PATTERN, REDACTED_ABSOLUTE_PATH)
-    .replace(
-      /^(\s*(?:token|secret|password|api[_-]?key|authorization|credential|access[_-]?token|private[_-]?key)\s*(?::|=)\s*).*$/gim,
-      `$1${REDACTED}`,
-    );
+    .replace(SENSITIVE_VALUE_CONTEXT_PATTERN, `$1${REDACTED}`)
+    .replace(SENSITIVE_VALUE_LINE_PATTERN, (line) => line.replace(/([^:=]*[:=]\s*).+$/s, `$1${REDACTED}`));
 }
 
 type MarkdownCell = { start: number; end: number; value: string };
@@ -468,7 +484,11 @@ function parseSourceProvenance(value: unknown): SourceVerificationProvenance {
     typeof source.sourceBundleSha256 !== 'string' ||
     !/^[0-9a-f]{64}$/.test(source.sourceBundleSha256) ||
     typeof source.producerVersion !== 'string' ||
-    source.producerVersion.length === 0
+    source.producerVersion.length === 0 ||
+    typeof source.verifiedAt !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T/.test(source.verifiedAt) ||
+    typeof source.provenanceSha256 !== 'string' ||
+    !/^[0-9a-f]{64}$/.test(source.provenanceSha256)
   ) {
     throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
   }
@@ -488,6 +508,8 @@ function toExportProvenance(source: SourceVerificationProvenance, files: Evidenc
       ? {
           sourceBundleSha256: source.sourceBundleSha256,
           producerVersion: source.producerVersion,
+          verifiedAt: source.verifiedAt,
+          provenanceSha256: source.provenanceSha256,
         }
       : {}),
   };
@@ -617,6 +639,8 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
       !/^[0-9a-f]{40}$/.test(typed.provenance.commitSha) ||
       !/^[0-9a-f]{64}$/.test(typed.provenance.sourceBundleSha256 ?? '') ||
       !typed.provenance.producerVersion ||
+      typeof typed.provenance.verifiedAt !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(typed.provenance.provenanceSha256 ?? '') ||
       typed.provenance.contentHash !== hashFileList(typed.files)
     ) {
       throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
@@ -657,6 +681,8 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
         source.provenance.verificationStatus !== 'passed' ||
         source.provenance.sourceBundleSha256 !== typed.provenance.sourceBundleSha256 ||
         source.provenance.producerVersion !== typed.provenance.producerVersion ||
+        source.provenance.verifiedAt !== typed.provenance.verifiedAt ||
+        source.provenance.provenanceSha256 !== typed.provenance.provenanceSha256 ||
         JSON.stringify(source.provenance.measurements) !== JSON.stringify(typed.provenance.measurements)
       ) {
         throw new EvidenceFailure(1, 'INVALID_PROVENANCE');

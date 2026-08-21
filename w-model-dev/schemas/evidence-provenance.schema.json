@@ -15,7 +15,8 @@
     "measurements",
     "sourceFiles",
     "sourceBundleSha256",
-    "producerVersion"
+    "producerVersion",
+    "provenanceSha256"
   ],
   "properties": {
     "format": { "const": "w-model-evidence-source-provenance" },
@@ -43,7 +44,8 @@
       "items": { "$ref": "#/definitions/sourceFile" }
     },
     "sourceBundleSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "producerVersion": { "type": "string", "minLength": 1 }
+    "producerVersion": { "type": "string", "minLength": 1 },
+    "provenanceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   },
   "definitions": {
     "measurement": {

@@ -1,0 +1,29 @@
+{
+  "querySymbol": "D8 C1/I2/M1 final evidence and natural-exit contract",
+  "callers": [
+    "w-model-dev/scripts/cli/check-bdd-model.ts",
+    "w-model-dev/scripts/cli/check-iceberg-sweep.ts",
+    "w-model-dev/scripts/cli/check-preventive-review.ts",
+    "w-model-dev/scripts/cli/check-codegraph-queries.ts",
+    "w-model-dev/scripts/cli/check-artifact-gate.ts",
+    "w-model-dev/scripts/lib/gate-report.ts"
+  ],
+  "callees": [
+    "w-model-dev/scripts/logic/evidence-provenance-logic.ts:verifySourceProvenance",
+    "w-model-dev/scripts/logic/evidence-export-logic.ts:verifyEvidence",
+    "w-model-dev/scripts/logic/run-log-logic.ts:checkRunLog",
+    "w-model-dev/scripts/lib/gate-log-writer.ts:writeGateLog",
+    "w-model-dev/scripts/lib/cli-error.ts:exitWithError"
+  ],
+  "blastRadius": 14,
+  "queryTimestamp": "2026-08-21T14:00:00+08:00",
+  "phase": 8,
+  "projectPath": "D:/w_skill_opt/wmodel-audit-remediation",
+  "query": "阶段8 D8 C1/I2/M1：检查最终 HEAD 证据绑定、gate-report callers 的自然退出边界，以及 partial 修改的三个 gate CLI 影响面；保留 process-level runner 例外，不扩展 I1/I3/I4/I5。",
+  "findings": {
+    "C1": "最终验证必须用当前 reviewed/final HEAD 重新测量；历史 measurement commit 只能标为 historical evidence。",
+    "I2": "D2 的可执行边界是 lib/logic 不直接退出、gate-report callers 设置 process.exitCode 后 return；self-test/security-scan/wm-status/metrics-report/ensure-codegraph-opsx 等 process-level runner 保留 direct exit 并登记理由。",
+    "M1": "最终文档固定 reviewedHead、measurementCommit、artifactSha256、runId、provenance 与 evidenceStatus 字段，HEAD 不一致时禁止 final verification passed。"
+  },
+  "impactSummary": "C1/M1 由新鲜最终 HEAD 验证报告和显式历史标签闭合；I2 仅收窄 D2 契约并测试 gate-report caller/例外 inventory，不改 I1/I3/I4/I5 生产逻辑。"
+}

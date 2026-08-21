@@ -189,7 +189,12 @@ async function main(): Promise<void> {
     exitCode: output.exitCode,
     passed: output.passed,
     reasons: output.reasons,
-    reportSummary: output.reportSummary,
+    reportSummary: {
+      ...output.reportSummary,
+      exitCode: output.exitCode,
+      passed: output.passed,
+    },
+    stdoutSummary: { exitCode: output.exitCode, passed: output.passed },
   });
   const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
 
