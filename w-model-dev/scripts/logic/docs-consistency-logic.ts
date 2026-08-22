@@ -108,6 +108,20 @@ export interface DocConsistencyInput {
   operationBehaviors: string;
   /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版） */
   hardConstraints: string;
+  /** R10 authority spec 原文（独立于其他契约来源注入，禁止仅靠关键词计数） */
+  rootCauseAuthoritySpec: string;
+  /** R10 rootcause-report schema 原文（独立来源） */
+  rootCauseSchema: string;
+  /** R10 checker source/JSDoc 原文（独立来源） */
+  rootCauseCheckerSource: string;
+  /** R10 SSoT 原文（独立来源，虽与 ssot 同文件仍单独登记） */
+  rootCauseSsot: string;
+  /** R10 根因定位指南原文（独立来源） */
+  rootCauseLocator: string;
+  /** R10 verifier spec 原文（独立来源，虽与 verifierSpec 同文件仍单独登记） */
+  rootCauseVerifierSpec: string;
+  /** R10 command reference 原文（独立来源，虽与 commandReference 同文件仍单独登记） */
+  rootCauseCommandReference: string;
   /** 根 package.json 原文（version 一致性检查数据源） */
   pkgJson: string;
   /** w-model-dev/skill-metadata.json 原文（version 一致性检查数据源） */
@@ -147,9 +161,14 @@ export interface DocConsistencyInput {
   vitestCommitSha?: string;
   /** 真实 exit-2 探针逐候选结果。 */
   exit2ProbeResults?: Array<{
+    probeId: string;
     script: string;
+    args: string[];
+    cwd: string;
     status: number;
     errorExitCode: number | null;
+    category: string | null;
+    rule: string | null;
     outputExistsAfter?: boolean;
     emittedEvidenceExport?: boolean;
   }>;
@@ -243,9 +262,14 @@ export interface DocConsistencyReport {
     vitestRunId?: string;
     vitestArtifactSha256?: string;
     exit2ProbeResults?: Array<{
+      probeId: string;
       script: string;
+      args: string[];
+      cwd: string;
       status: number;
       errorExitCode: number | null;
+      category: string | null;
+      rule: string | null;
       outputExistsAfter?: boolean;
       emittedEvidenceExport?: boolean;
     }>;
@@ -265,24 +289,36 @@ const DYNAMIC_CHECKS = new Set([
 function checkExit2ProbeResults(probes: DocConsistencyInput['exit2ProbeResults']): DocCheckViolation[] {
   if (probes === undefined) return [];
   const violations: DocCheckViolation[] = [];
-  for (const probe of probes.filter((candidate) => candidate.script.startsWith('wm-export-evidence.ts#'))) {
-    if (probe.status !== 2 || probe.errorExitCode !== 2) {
+  const probeIds = new Set<string>();
+  for (const probe of probes) {
+    if (probeIds.has(probe.probeId)) {
+      violations.push({ check: 'exit2-probe', message: `probeId=${probe.probeId} 重复，探针身份必须稳定且唯一` });
+    }
+    probeIds.add(probe.probeId);
+    const metricsContractViolation =
+      probe.probeId === 'metrics-report.ts#invalid-phase' &&
+      (probe.category !== 'ARG_INVALID' || probe.rule !== 'P0-1');
+    if (probe.status !== 2 || probe.errorExitCode !== 2 || probe.category === null || metricsContractViolation) {
       violations.push({
         check: 'exit2-probe',
-        message: `${probe.script} 应以 status=2 且 ERROR_JSON.exitCode=2 结束（实际 status=${probe.status}, errorCode=${String(probe.errorExitCode)}）`,
+        message: `${probe.probeId} 应以 status=2、ERROR_JSON.exitCode=2、category/rule 稳定存在${
+          probe.probeId === 'metrics-report.ts#invalid-phase' ? ' 且 category=ARG_INVALID、rule=P0-1' : ''
+        } 结束（实际 status=${probe.status}, errorCode=${String(probe.errorExitCode)}, category=${String(probe.category)}, rule=${String(probe.rule)}）`,
       });
     }
-    if (probe.outputExistsAfter !== false) {
-      violations.push({
-        check: 'exit2-probe',
-        message: `${probe.script} 失败后不得保留输出目录（outputExistsAfter 应为 false）`,
-      });
-    }
-    if (probe.emittedEvidenceExport !== false) {
-      violations.push({
-        check: 'exit2-probe',
-        message: `${probe.script} 失败时不得发出 EVIDENCE_EXPORT_JSON（emittedEvidenceExport 应为 false）`,
-      });
+    if (probe.script === 'wm-export-evidence.ts') {
+      if (probe.outputExistsAfter !== false) {
+        violations.push({
+          check: 'exit2-probe',
+          message: `${probe.probeId} 失败后不得保留输出目录（outputExistsAfter 应为 false）`,
+        });
+      }
+      if (probe.emittedEvidenceExport !== false) {
+        violations.push({
+          check: 'exit2-probe',
+          message: `${probe.probeId} 失败时不得发出 EVIDENCE_EXPORT_JSON（emittedEvidenceExport 应为 false）`,
+        });
+      }
     }
   }
   return violations;
@@ -305,12 +341,104 @@ function checkSchemaLoaderPaths(docs: Array<{ name: string; content: string }> |
 function isDynamicViolation(violation: DocCheckViolation): boolean {
   if (DYNAMIC_CHECKS.has(violation.check)) return true;
   if (violation.check === 'schema-list') {
-    return /应含「### Schema 清单（\d+ 份）」|声明 \d+ 份 Schema，实际 \d+ 份/.test(violation.message);
+    return /应含「### Schema 清单（\d+ 份）」|声明 \d+ 份 Schema，实际 \d+/.test(violation.message);
   }
   if (violation.check === 'script-registry') {
     return /SKILL\.md 声明 \d+ 个 \.ts，实际 \d+/.test(violation.message);
   }
   return false;
+}
+
+export interface RootCauseR10ContractSources {
+  authoritySpec: string;
+  schema: string;
+  checkerSource: string;
+  ssot: string;
+  locator: string;
+  verifierSpec: string;
+  commandReference: string;
+}
+
+const R10_CONTRACT_CHECK = 'rootcause-r10-contract';
+const R10_CLAUSES = [
+  {
+    id: 'canonical-name',
+    valid: (text: string) =>
+      /R10-C1 canonical-name[^\r\n]*[:：]\s*canonical[^\r\n]*`?testing-reality-checker`?/i.test(text),
+  },
+  {
+    id: 'threshold',
+    valid: (text: string) =>
+      /R10-C2 threshold[^\r\n]*[:：]\s*`?testing-reality-checker`?[^\r\n]*confidence\s*(?:>=|≥)\s*0\.5/i.test(text),
+  },
+  {
+    id: 'legacy-fallback',
+    valid: (text: string) =>
+      /R10-C3 legacy-fallback[^\r\n]*[:：]\s*(?:legacy[^\r\n]*reality-checker|reality-checker[^\r\n]*legacy)[^\r\n]*fallback[^\r\n]*(?:canonical[^\r\n]*(?:absent|缺失)|(?:absent|缺失)[^\r\n]*canonical)/i.test(
+        text,
+      ),
+  },
+  {
+    id: 'same-artifact-dedupe',
+    valid: (text: string) =>
+      /R10-C4 same-artifact[^\r\n]*[:：]\s*(?:same artifact|同 artifact)[^\r\n]*(?:canonical-first|canonical 优先)[^\r\n]*(?:not counted twice|不重复计数)/i.test(
+        text,
+      ),
+  },
+  {
+    id: 'cross-artifact-conflict',
+    valid: (text: string) =>
+      /R10-C5 cross-artifact[^\r\n]*[:：]\s*(?:different artifact|不同 artifact)[^\r\n]*(?:conflict|冲突)[^\r\n]*fail-closed/i.test(
+        text,
+      ),
+  },
+  {
+    id: 'canonical-duplicate',
+    valid: (text: string) =>
+      /R10-C6 canonical-duplicate[^\r\n]*[:：]\s*canonical[^\r\n]*(?:> 1|duplicate|重复)[^\r\n]*fail-closed/i.test(
+        text,
+      ),
+  },
+  {
+    id: 'legacy-duplicate',
+    valid: (text: string) =>
+      /R10-C7 legacy-duplicate[^\r\n]*[:：]\s*legacy[^\r\n]*(?:> 1|duplicate|重复)[^\r\n]*fail-closed/i.test(text),
+  },
+] as const;
+
+/**
+ * R10 维护契约的唯一 checker。每个权威来源必须独立包含七个带关系约束的 clause；
+ * 只出现 persona/threshold 关键词但缺少关系、优先级或 fail-closed 语义时拒绝通过。
+ */
+export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources): DocCheckViolation[] {
+  const namedSources: Array<[string, string]> = [
+    ['authority-spec', sources.authoritySpec],
+    ['rootcause-schema', sources.schema],
+    ['rootcause-checker', sources.checkerSource],
+    ['SSoT', sources.ssot],
+    ['root-cause-locator', sources.locator],
+    ['verifier-spec', sources.verifierSpec],
+    ['command-reference', sources.commandReference],
+  ];
+  const violations: DocCheckViolation[] = [];
+  for (const [sourceName, content] of namedSources) {
+    if (typeof content !== 'string' || content.trim() === '') {
+      violations.push({
+        check: R10_CONTRACT_CHECK,
+        message: `${sourceName} 未被独立读取（R10 source 缺失，fail-closed）`,
+      });
+      continue;
+    }
+    for (const clause of R10_CLAUSES) {
+      if (!clause.valid(content)) {
+        violations.push({
+          check: R10_CONTRACT_CHECK,
+          message: `${sourceName} 缺少 R10 clause ${clause.id} 的语义关系（source×clause fail-closed）`,
+        });
+      }
+    }
+  }
+  return violations;
 }
 
 export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsistencyReport {
@@ -376,6 +504,17 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
     violations.push(...checkSchemaLoaderPaths(input.skillPkgDocs));
   }
   violations.push(...checkExit2ProbeResults(input.exit2ProbeResults));
+  violations.push(
+    ...checkRootCauseR10Contract({
+      authoritySpec: input.rootCauseAuthoritySpec,
+      schema: input.rootCauseSchema,
+      checkerSource: input.rootCauseCheckerSource,
+      ssot: input.rootCauseSsot,
+      locator: input.rootCauseLocator,
+      verifierSpec: input.rootCauseVerifierSpec,
+      commandReference: input.rootCauseCommandReference,
+    }),
+  );
   return {
     violations,
     staticViolations: violations.filter((v) => !isDynamicViolation(v)),

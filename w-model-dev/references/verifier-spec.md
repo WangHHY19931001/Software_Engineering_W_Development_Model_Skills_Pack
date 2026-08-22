@@ -759,7 +759,17 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 
 **多角度复审**：
 
-根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona；已有合法归档中的 `reality-checker` 仅作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
+根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
+
+R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
+R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
+R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
+R10-C4 same-artifact：same artifact canonical-first and not counted twice。
+R10-C5 cross-artifact：different artifact conflict is fail-closed。
+R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
+R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
+
+V-lead 聚合规则见 spec §9.7。
 
 ## 8. 评审提示词模板
 

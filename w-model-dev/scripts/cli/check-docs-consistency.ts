@@ -72,6 +72,10 @@ const REQUIRED_PATHS = [
   'CONTRIBUTING.md',
   '.github/PULL_REQUEST_TEMPLATE.md',
   'docs/skill-design-document_SSoT.md',
+  'docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md',
+  'w-model-dev/schemas/rootcause-report.schema.json',
+  'w-model-dev/scripts/logic/root-cause-logic.ts',
+  'w-model-dev/references/root-cause-locator.md',
   'docs/INSTALL.md',
   'docs/user-guide.md',
   'docs/troubleshooting.md',
@@ -139,9 +143,14 @@ interface Exit2Probe {
 }
 
 interface Exit2ProbeResult {
+  probeId: string;
   script: string;
+  args: string[];
+  cwd: string;
   status: number;
   errorExitCode: number | null;
+  category: string | null;
+  rule: string | null;
   outputPath?: string;
   outputExistsAfter?: boolean;
   emittedEvidenceExport?: boolean;
@@ -153,9 +162,19 @@ const execFileAsync = promisify(execFile);
  * 唯一 exit-2 事实源：每个候选 CLI 的无副作用非法调用。登记只定义如何探测，
  * 最终计数仅来自真实子进程 status=2 且 ERROR_JSON.exitCode=2 的结果。
  */
+function normalizeProbePath(value: string, probeRoot: string): string {
+  const absoluteValue = pathResolve(value);
+  const absoluteRoot = pathResolve(probeRoot);
+  const rel = relative(absoluteRoot, absoluteValue).split(sep).join('/');
+  if (rel === '') return '<probeRoot>';
+  if (!rel.startsWith('../') && rel !== '..' && !isAbsolute(rel)) return `<probeRoot>/${rel}`;
+  return value;
+}
+
 async function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Promise<Exit2ProbeResult[]> {
   const probeRoot = join(tmpdir(), `w-model-exit2-probe-${process.pid}`);
   const invalidStatusProject = join(probeRoot, 'invalid-status-project');
+  const metricsProbeProject = join(probeRoot, 'probe-project');
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
   mkdirSync(join(invalidStatusProject, '.w-model'), { recursive: true });
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
@@ -170,13 +189,26 @@ async function collectExit2ScriptResults(root: string, cliScriptFiles: string[])
   }
   const probes = new Map<string, Exit2Probe>();
   for (const file of cliScriptFiles) {
-    if (file === 'self-test.ts' || file === 'security-scan.ts' || file === 'wm-export-evidence.ts') continue;
-    probes.set(file, { script: file, args: ['--d4-invalid-argument'] });
+    if (
+      file === 'self-test.ts' ||
+      file === 'security-scan.ts' ||
+      file === 'wm-export-evidence.ts' ||
+      file === 'wm-status.ts' ||
+      file === 'metrics-report.ts'
+    )
+      continue;
+    const probeId = `${file}#invalid-argument`;
+    probes.set(probeId, { script: file, args: ['--d4-invalid-argument'] });
   }
-  probes.set('security-scan.ts', {
+  probes.set('security-scan.ts#missing-path', {
     script: 'security-scan.ts',
     args: [],
     env: { ...process.env, PATH: '', Path: '' },
+  });
+  probes.set('metrics-report.ts#invalid-phase', {
+    script: 'metrics-report.ts',
+    args: [metricsProbeProject, '--phase=0', '--json'],
+    cwd: probeRoot,
   });
   const exportProbeRoot = join(probeRoot, 'export-probes');
   const exportProject = join(exportProbeRoot, 'project');
@@ -198,7 +230,7 @@ async function collectExit2ScriptResults(root: string, cliScriptFiles: string[])
     args: ['--verify'],
     outputPath: exportOutput,
   });
-  probes.set('wm-status.ts', { script: 'wm-status.ts', args: [invalidStatusProject] });
+  probes.set('wm-status.ts#invalid-project', { script: 'wm-status.ts', args: [invalidStatusProject] });
   try {
     const results = await Promise.all(
       [...probes.entries()].map(async ([probeId, probe]): Promise<Exit2ProbeResult> => {
@@ -221,14 +253,27 @@ async function collectExit2ScriptResults(root: string, cliScriptFiles: string[])
         }
         const jsonLine = stdout.split(/\r?\n/).find((line) => line.startsWith('ERROR_JSON '));
         let errorExitCode: number | null = null;
+        let category: string | null = null;
+        let rule: string | null = null;
         if (jsonLine !== undefined) {
-          const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as { exitCode?: unknown } | null;
+          const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as {
+            exitCode?: unknown;
+            category?: unknown;
+            rule?: unknown;
+          } | null;
           errorExitCode = typeof parsed?.exitCode === 'number' ? parsed.exitCode : null;
+          category = typeof parsed?.category === 'string' ? parsed.category : null;
+          rule = typeof parsed?.rule === 'string' ? parsed.rule : null;
         }
         return {
-          script: probeId,
+          probeId,
+          script: probe.script,
+          args: probe.args.map((arg) => (isAbsolute(arg) ? normalizeProbePath(arg, probeRoot) : arg)),
+          cwd: probe.cwd === undefined ? '<repoRoot>' : normalizeProbePath(probe.cwd, probeRoot),
           status,
           errorExitCode,
+          category,
+          rule,
           ...(probe.outputPath === undefined
             ? {}
             : {
@@ -672,6 +717,13 @@ async function main(): Promise<void> {
     readme: read('README.md'),
     agents: read('AGENTS.md'),
     ssot: read('docs/skill-design-document_SSoT.md'),
+    rootCauseAuthoritySpec: read('docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md'),
+    rootCauseSchema: read('w-model-dev/schemas/rootcause-report.schema.json'),
+    rootCauseCheckerSource: read('w-model-dev/scripts/logic/root-cause-logic.ts'),
+    rootCauseSsot: read('docs/skill-design-document_SSoT.md'),
+    rootCauseLocator: read('w-model-dev/references/root-cause-locator.md'),
+    rootCauseVerifierSpec: read('w-model-dev/references/verifier-spec.md'),
+    rootCauseCommandReference: read('w-model-dev/references/command-reference.md'),
     prePush: read('.githooks/pre-push'),
     vitestExtraDocs: [
       { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },

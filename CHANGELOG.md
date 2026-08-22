@@ -10,7 +10,8 @@
 ## [41.19.0] - 2026-08-19
 
 ### 修复（R10 persona 契约）
-- RootCauseReport R10 采用 canonical-first：接受规范 `testing-reality-checker`，为兼容已有合法归档保留 `reality-checker` legacy fallback；同 artifact 的 canonical+legacy 不虚增 persona 语义，跨 artifact 或异常重复/冲突 fail-closed。同步 rootcause schema、根因定位指南、Verifier 规范、SSoT 与命令参考，并新增 canonical-only、legacy-only、重复、冲突、缺失与 confidence 回归测试。保持 R1-R9、退出码 0/1/2 及 `ROOTCAUSE_JSON` / `ERROR_JSON` 合同不变。
+- RootCauseReport R10 采用 canonical-first：接受规范 `testing-reality-checker`，为兼容已有合法归档保留 `reality-checker` legacy fallback；同 artifact 的 canonical+legacy 不虚增 persona 语义，跨 artifact 或异常重复/冲突 fail-closed。同步 rootcause schema、根因定位指南、Verifier 规范、SSoT 与命令参考；本条历史实现说明不把当时的 17 tests / 4 RED 记录表述为已覆盖两个专用 duplicate 分支。保持 R1-R9、退出码 0/1/2 及 `ROOTCAUSE_JSON` / `ERROR_JSON` 合同不变。
+- R10 S-fix 补测：新增两个 canonical duplicate 与两个 legacy duplicate 的精确 reason/count 断言，并补充同 artifact canonical 高、legacy 低的优先级用例；当前 root-cause focused 为 20/20，真实全量 Vitest 为 55 files / 942 tests / 942 passed / 0 failed。I1 deterministic metrics probe（显式 projectDir + `--phase=0` + 固定 probe cwd）与 I2 七来源 source×clause mutation 门禁同步完成。
 
 ### 修复（审计整改批次 B）
 - **samples 覆盖门 JSON 退出码对齐**：`check-samples-coverage.ts --json` 复用同一 `exitCode` 输出 JSON 并设置 `process.exitCode`，违规时真实 shell status 与 JSON `exitCode` 均为 1，成功时均为 0；新增真实子进程回归断言。

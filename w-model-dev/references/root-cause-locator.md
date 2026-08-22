@@ -122,7 +122,16 @@
 3. **证据合并**：合并所有 persona 的 evidence，去重
 4. **fixRecommendation 合并**：按根因收敛度排序
 5. **upstreamDefect 仲裁**：任一 persona 标记则 R-lead 须复核
-6. **reality-check 硬约束**：规范 persona 为 `testing-reality-checker`，其 confidence < 0.5 → 最终 `passed=false`；为兼容已有合法归档，`reality-checker` 仅作 legacy fallback。若两者同时出现，canonical 优先且同 artifact 不重复计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。
+6. **reality-check 硬约束**：规范 persona 为 `testing-reality-checker`，其 confidence < 0.5 → 最终 `passed=false`；为兼容已有合法归档，`reality-checker` 仅在 canonical 缺失时作 legacy fallback。若两者同时出现，canonical 优先且同 artifact 不重复计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。
+
+R10 维护契约：
+- R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
+- R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
+- R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
+- R10-C4 same-artifact：same artifact canonical-first and not counted twice。
+- R10-C5 cross-artifact：different artifact conflict is fail-closed。
+- R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
+- R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 
 ---
 

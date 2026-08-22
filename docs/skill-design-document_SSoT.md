@@ -1461,7 +1461,16 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 | R7 | `qualityLevel ∈ {A,B,C,D}`，`passed` 与 `qualityLevel` 一致（A/B→true，C/D→false） | 退出码 1 |
 | R8 | `meta.reportId` 格式 `^RC-[a-z0-9]+-\d+-\d+$` | 退出码 1 |
 | R9 | 多角度场景（dispatchMode ∈ {parallel, serial, degraded}）：附录 PartialReport 路径非空 | 退出码 1 |
-| R10 | 多角度场景：canonical `testing-reality-checker` persona 的 confidence ≥ 0.5；legacy `reality-checker` 仅作兼容 fallback。canonical 优先，同 artifact 不重复计数；跨 artifact 或异常重复/冲突 fail-closed | 退出码 1 |
+| R10 | 多角度场景：canonical `testing-reality-checker` persona 的 confidence ≥ 0.5；legacy `reality-checker` 仅在 canonical 缺失时作 fallback。canonical 优先，同 artifact 不重复计数；跨 artifact 或异常重复/冲突 fail-closed | 退出码 1 |
+
+R10 维护契约（docs-consistency source×clause 语义门）：
+- R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
+- R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
+- R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
+- R10-C4 same-artifact：same artifact canonical-first and not counted twice。
+- R10-C5 cross-artifact：different artifact conflict is fail-closed。
+- R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
+- R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 
 **退出码**：`0=通过 / 1=校验失败 / 2=输入错误`（与现有脚本约定一致）。
 

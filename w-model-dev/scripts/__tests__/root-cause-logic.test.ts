@@ -209,6 +209,66 @@ describe('R10 reality-checker confidence', () => {
     expect(result.passed).toBe(false);
     expect(result.reasons.some((r) => /testing-reality-checker.*confidence/.test(r))).toBe(true);
   });
+
+  it('两个 canonical testing-reality-checker 条目按 canonical duplicate fail-closed', async () => {
+    const report = await loadSample('bad-r10-reality-confidence.json');
+    report.partialReports = [
+      {
+        personaSlice: 'testing-reality-checker',
+        path: '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker-a.json',
+        confidence: 0.8,
+      },
+      {
+        personaSlice: 'testing-reality-checker',
+        path: '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker-b.json',
+        confidence: 0.9,
+      },
+    ];
+
+    const result = checkRootCauseReport(report);
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((reason) => /重复|duplicate/i.test(reason))).toBe(true);
+    expect(result.reasons.some((reason) => /canonical=2/.test(reason))).toBe(true);
+    expect(result.reasons.some((reason) => /legacy=0/.test(reason))).toBe(true);
+  });
+
+  it('两个 legacy reality-checker 条目按 legacy duplicate fail-closed', async () => {
+    const report = await loadSample('bad-r10-reality-confidence.json');
+    report.partialReports = [
+      {
+        personaSlice: 'reality-checker',
+        path: '.w-model/rootcause/partial/RC-phase5-1-01/reality-checker-a.json',
+        confidence: 0.8,
+      },
+      {
+        personaSlice: 'reality-checker',
+        path: '.w-model/rootcause/partial/RC-phase5-1-01/reality-checker-b.json',
+        confidence: 0.9,
+      },
+    ];
+
+    const result = checkRootCauseReport(report);
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((reason) => /重复|duplicate/i.test(reason))).toBe(true);
+    expect(result.reasons.some((reason) => /canonical=0/.test(reason))).toBe(true);
+    expect(result.reasons.some((reason) => /legacy=2/.test(reason))).toBe(true);
+  });
+
+  it('同 artifact canonical 高 confidence 优先于 legacy 低 confidence', async () => {
+    const report = await loadSample('bad-r10-reality-confidence.json');
+    const realityPath = '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json';
+    report.partialReports = [
+      { personaSlice: 'testing-reality-checker', path: realityPath, confidence: 0.8 },
+      { personaSlice: 'reality-checker', path: realityPath, confidence: 0.2 },
+    ];
+
+    const result = checkRootCauseReport(report);
+
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toHaveLength(0);
+  });
 });
 
 describe('valid 样本', () => {

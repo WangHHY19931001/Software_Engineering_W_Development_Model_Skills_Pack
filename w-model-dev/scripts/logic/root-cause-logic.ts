@@ -129,7 +129,15 @@ function isIso8601(value: unknown): value is string {
  *   R7 qualityLevel 与 passed 一致
  *   R8 reportId 格式
  *   R9 多角度场景 partialReports 非空
- *   R10 多角度场景 reality-checker confidence ≥ 0.5
+ *   R10 多角度场景 canonical testing-reality-checker confidence >= 0.5；legacy reality-checker 仅在 canonical 缺失时 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed
+ *
+ * R10-C1 canonical-name：canonical persona is testing-reality-checker。
+ * R10-C2 threshold：testing-reality-checker confidence >= 0.5。
+ * R10-C3 legacy-fallback：legacy reality-checker is fallback only when canonical is absent。
+ * R10-C4 same-artifact：same artifact canonical-first and not counted twice。
+ * R10-C5 cross-artifact：different artifact conflict is fail-closed。
+ * R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
+ * R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
  */
 export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   const reasons: string[] = [];

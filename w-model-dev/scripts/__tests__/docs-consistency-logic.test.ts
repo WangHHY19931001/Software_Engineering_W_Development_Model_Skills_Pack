@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS,
   A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS,
+  checkRootCauseR10Contract,
   runDocConsistencyChecks,
   buildDocConsistencyReport,
   extractMarkdownRelLinks,
@@ -52,6 +53,16 @@ const ACTION_ENUM_27 = [
 /** data-models.md RunLogEntry.action 联合类型（27 值，与 ACTION_ENUM_27 一致） */
 const ACTION_UNION_27 =
   "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
+
+const R10_CONTRACT_FIXTURE = [
+  'R10-C1 canonical-name: canonical persona is testing-reality-checker.',
+  'R10-C2 threshold: testing-reality-checker confidence >= 0.5.',
+  'R10-C3 legacy-fallback: legacy reality-checker is fallback only when canonical is absent.',
+  'R10-C4 same-artifact: same artifact canonical-first and not counted twice.',
+  'R10-C5 cross-artifact: different artifact conflict is fail-closed.',
+  'R10-C6 canonical-duplicate: canonical > 1 duplicate is fail-closed.',
+  'R10-C7 legacy-duplicate: legacy > 1 duplicate is fail-closed.',
+].join('\n');
 
 /** scripts/cli 当前 35 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
 const CLI_SCRIPT_NAMES = [
@@ -102,8 +113,15 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       'evidence-manifest.schema.json',
     ],
     personaCount: 28,
-    exit2ScriptCount: 31,
+    exit2ScriptCount: 35,
     referencesCount: 53,
+    rootCauseAuthoritySpec: R10_CONTRACT_FIXTURE,
+    rootCauseSchema: R10_CONTRACT_FIXTURE,
+    rootCauseCheckerSource: R10_CONTRACT_FIXTURE,
+    rootCauseSsot: R10_CONTRACT_FIXTURE,
+    rootCauseLocator: R10_CONTRACT_FIXTURE,
+    rootCauseVerifierSpec: R10_CONTRACT_FIXTURE,
+    rootCauseCommandReference: R10_CONTRACT_FIXTURE,
     dataModels: [
       '### Schema 清单（5 份）',
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
@@ -173,6 +191,95 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     ...overrides,
   };
 }
+
+describe('R10 七来源 source×clause 维护契约', () => {
+  const sourceNames = [
+    'authoritySpec',
+    'schema',
+    'checkerSource',
+    'ssot',
+    'locator',
+    'verifierSpec',
+    'commandReference',
+  ] as const;
+  const sourceLabels: Array<[(typeof sourceNames)[number], string]> = [
+    ['authoritySpec', 'authority-spec'],
+    ['schema', 'rootcause-schema'],
+    ['checkerSource', 'rootcause-checker'],
+    ['ssot', 'SSoT'],
+    ['locator', 'root-cause-locator'],
+    ['verifierSpec', 'verifier-spec'],
+    ['commandReference', 'command-reference'],
+  ];
+  const sourceLabel = (sourceName: (typeof sourceNames)[number]): string =>
+    sourceLabels.find(([name]) => name === sourceName)?.[1] ?? sourceName;
+  const replaceSource = (
+    sources: Record<(typeof sourceNames)[number], string>,
+    sourceName: (typeof sourceNames)[number],
+    value: string,
+  ): Record<(typeof sourceNames)[number], string> => {
+    switch (sourceName) {
+      case 'authoritySpec':
+        return { ...sources, authoritySpec: value };
+      case 'schema':
+        return { ...sources, schema: value };
+      case 'checkerSource':
+        return { ...sources, checkerSource: value };
+      case 'ssot':
+        return { ...sources, ssot: value };
+      case 'locator':
+        return { ...sources, locator: value };
+      case 'verifierSpec':
+        return { ...sources, verifierSpec: value };
+      case 'commandReference':
+        return { ...sources, commandReference: value };
+    }
+  };
+  it('完整七来源七条 clause 通过，缺失任一 source fail-closed', () => {
+    const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
+      (typeof sourceNames)[number],
+      string
+    >;
+    expect(checkRootCauseR10Contract(sources)).toEqual([]);
+    for (const sourceName of sourceNames) {
+      const missing = replaceSource(sources, sourceName, '');
+      const violations = checkRootCauseR10Contract(missing);
+      expect(
+        violations.some((violation) => violation.message.includes(`${sourceLabel(sourceName)} 未被独立读取`)),
+      ).toBe(true);
+    }
+  });
+
+  it.each(sourceNames)('%s 的每条 R10 clause mutation 均产生明确 violation', (sourceName) => {
+    const clauseMutations: Array<[string, RegExp]> = [
+      ['canonical-name', /R10-C\d+ canonical-name: [^\n]*\n?/],
+      ['threshold', /R10-C\d+ threshold: [^\n]*\n?/],
+      ['legacy-fallback', /R10-C\d+ legacy-fallback: [^\n]*\n?/],
+      ['same-artifact-dedupe', /R10-C\d+ same-artifact: [^\n]*\n?/],
+      ['cross-artifact-conflict', /R10-C\d+ cross-artifact: [^\n]*\n?/],
+      ['canonical-duplicate', /R10-C\d+ canonical-duplicate: [^\n]*\n?/],
+      ['legacy-duplicate', /R10-C\d+ legacy-duplicate: [^\n]*\n?/],
+    ];
+    for (const [clauseName, mutation] of clauseMutations) {
+      const mutated = R10_CONTRACT_FIXTURE.replace(mutation, '');
+      const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
+        (typeof sourceNames)[number],
+        string
+      >;
+      const mutatedSources = replaceSource(sources, sourceName, mutated);
+      const violations = checkRootCauseR10Contract(mutatedSources);
+      expect(
+        violations.some(
+          (violation) =>
+            violation.check === 'rootcause-r10-contract' &&
+            violation.message.includes(sourceLabel(sourceName)) &&
+            violation.message.includes(clauseName),
+        ),
+        `${sourceName} / ${clauseName} must fail closed`,
+      ).toBe(true);
+    }
+  });
+});
 
 describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
   it('逐文档拒绝旧语义、确认新增文档职责，并防止正确文本与旧文本共存绕过', () => {
@@ -767,18 +874,18 @@ describe('runDocConsistencyChecks', () => {
     }
   });
 
-  it('coverage JSON 的 55/929 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
+  it('coverage JSON 的 55/942 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 929);
-      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 929]);
+      const coverage = await writeVitestCount(fixtureRoot, 942);
+      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 942]);
       const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push'];
       for (const doc of docsWithLiveCount) {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('929');
+        expect(docContent).toContain('942');
       }
       const loaderDocs = ['w-model-dev/references/data-models.md', 'docs/INSTALL.md', 'docs/user-guide.md'];
       const oldLoaderPath = ['scripts', 'logic', 'schema-loader.ts'].join('/');
@@ -791,7 +898,7 @@ describe('runDocConsistencyChecks', () => {
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, `${passing.stdout}\n${passing.stderr}`).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 929');
+      expect(passing.stdout).toContain('vitest 用例  : 942');
       expect(passing.stdout).toContain('静态违规      : 0');
       expect(passing.stdout).toContain('动态违规      : 0');
       expect(passing.stdout).not.toContain('[vitest-tests]');
@@ -800,10 +907,10 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('55 files / 929 tests', '55 files / 928 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('55 files / 942 tests', '55 files / 928 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 929');
+      expect(stale.stdout).toContain('vitest 用例  : 942');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
       expect(stale.stdout).toContain('55 files / 928 tests');
@@ -812,7 +919,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('真实 CLI --json 输出 dynamicMeasurements 的完整五字段并保留兼容 violations', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 929);
+      const coverage = await writeVitestCount(fixtureRoot, 942);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -828,9 +935,14 @@ describe('runDocConsistencyChecks', () => {
           vitestArtifactSha256: string;
           vitestCommitSha: string;
           exit2ProbeResults: Array<{
+            probeId: string;
             script: string;
+            args: string[];
+            cwd: string;
             status: number;
             errorExitCode: number | null;
+            category: string | null;
+            rule: string | null;
             outputExistsAfter?: boolean;
             emittedEvidenceExport?: boolean;
           }>;
@@ -842,8 +954,8 @@ describe('runDocConsistencyChecks', () => {
         cliScriptCount: 36,
         exit2ScriptCount: 35,
         testFileCount: (coverage.testResults as unknown[]).length,
-        vitestTestCount: 929,
-        numPassedTests: 929,
+        vitestTestCount: 942,
+        numPassedTests: 942,
         numFailedTests: 0,
         success: true,
         testDirectoryInventoryCount: 55,
@@ -854,8 +966,102 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
       expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(37);
       expect(
-        report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
+        report.dynamicMeasurements.exit2ProbeResults?.every(
+          (probe) =>
+            typeof probe.probeId === 'string' &&
+            Array.isArray(probe.args) &&
+            typeof probe.cwd === 'string' &&
+            probe.status === 2 &&
+            probe.errorExitCode === 2 &&
+            typeof probe.category === 'string',
+        ),
       ).toBe(true);
+      const metricsProbe = report.dynamicMeasurements.exit2ProbeResults?.find(
+        (probe) => probe.probeId === 'metrics-report.ts#invalid-phase',
+      );
+      expect(metricsProbe).toMatchObject({
+        args: [expect.stringContaining('probe-project'), '--phase=0', '--json'],
+        status: 2,
+        errorExitCode: 2,
+        category: 'ARG_INVALID',
+        rule: 'P0-1',
+      });
+    });
+  });
+
+  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 35', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 942);
+      const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(withoutState.code).toBe(0);
+      const withoutStateReport = JSON.parse(withoutState.stdout) as {
+        dynamicMeasurements: { exit2ScriptCount: number; exit2ProbeResults: Array<Record<string, unknown>> };
+      };
+
+      const wmodelDir = path.join(fixtureRoot, '.w-model');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is an mkdtemp-owned test root
+      await fs.mkdir(wmodelDir, { recursive: true });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is an mkdtemp-owned test root
+      await fs.writeFile(
+        path.join(wmodelDir, 'run-log.jsonl'),
+        JSON.stringify({
+          runId: 'fixture-run',
+          timestamp: '2026-08-22T00:00:00.000Z',
+          phase: 8,
+          phaseName: '验收测试',
+          action: 'fix',
+          role: 'S',
+          duration_s: 0,
+          tokens: 0,
+          estimated: false,
+          subagentSpawns: 0,
+          gateExitCode: null,
+          outcome: 'success',
+        }) + '\n',
+        'utf8',
+      );
+      const withState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(withState.code).toBe(0);
+      const withStateReport = JSON.parse(withState.stdout) as {
+        dynamicMeasurements: { exit2ScriptCount: number; exit2ProbeResults: Array<Record<string, unknown>> };
+      };
+      const stable = (report: typeof withoutStateReport) =>
+        report.dynamicMeasurements.exit2ProbeResults.map((probe) => ({
+          probeId: probe.probeId,
+          script: probe.script,
+          status: probe.status,
+          errorExitCode: probe.errorExitCode,
+          category: probe.category,
+          rule: probe.rule,
+        }));
+      expect(stable(withStateReport)).toEqual(stable(withoutStateReport));
+      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(35);
+      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(35);
+    });
+  });
+
+  it('AGENTS=34 与 INSTALL=25+9 的旧资产声明在同一真实 fixture 中失败', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 942);
+      const agentsPath = path.join(fixtureRoot, 'AGENTS.md');
+      const installPath = path.join(fixtureRoot, 'docs', 'INSTALL.md');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
+      const agents = await fs.readFile(agentsPath, 'utf8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
+      const install = await fs.readFile(installPath, 'utf8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
+      await fs.writeFile(agentsPath, agents.replace('全仓 35 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
+      await fs.writeFile(
+        installPath,
+        install
+          .replace('26 个 check-*.ts', '25 个 check-*.ts')
+          .replace('26 个 check + 9 个工具', '25 个 check + 9 个工具'),
+        'utf8',
+      );
+      const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain('exit2-scripts');
     });
   });
 
@@ -886,7 +1092,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('成功 JSON 报告绑定同一相对 artifact identity/hash，且不暴露本机路径', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 929);
+      await writeVitestCount(fixtureRoot, 942);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(first.code).toBe(0);
@@ -1005,16 +1211,21 @@ describe('runDocConsistencyChecks', () => {
 
   it('真实 docs-consistency 探针报告候选 status/ERROR_JSON 证据及 export 三场景隔离', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 929);
+      await writeVitestCount(fixtureRoot, 942);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
         dynamicMeasurements: {
           exit2ScriptCount: number;
           exit2ProbeResults?: Array<{
+            probeId: string;
             script: string;
+            args: string[];
+            cwd: string;
             status: number;
             errorExitCode: number;
+            category: string | null;
+            rule: string | null;
             outputExistsAfter?: boolean;
             emittedEvidenceExport?: boolean;
           }>;
@@ -1027,12 +1238,12 @@ describe('runDocConsistencyChecks', () => {
       ).toBe(true);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.filter((probe) =>
-          probe.script.startsWith('wm-export-evidence.ts#'),
+          probe.probeId.startsWith('wm-export-evidence.ts#'),
         ),
       ).toHaveLength(3);
       expect(
         report.dynamicMeasurements.exit2ProbeResults
-          ?.filter((probe) => probe.script.startsWith('wm-export-evidence.ts#'))
+          ?.filter((probe) => probe.probeId.startsWith('wm-export-evidence.ts#'))
           .every(
             (probe) =>
               probe.status === 2 &&
@@ -1047,7 +1258,7 @@ describe('runDocConsistencyChecks', () => {
       const probeResults = report.dynamicMeasurements.exit2ProbeResults ?? [];
       for (const field of ['status', 'errorExitCode', 'outputExistsAfter', 'emittedEvidenceExport'] as const) {
         const invalidProbe = probeResults.map((probe) => ({ ...probe }));
-        const target = invalidProbe.find((probe) => probe.script === 'wm-export-evidence.ts#no-args');
+        const target = invalidProbe.find((probe) => probe.probeId === 'wm-export-evidence.ts#no-args');
         expect(target).toBeDefined();
         if (target === undefined) continue;
         if (field === 'status') target.status = 1;
@@ -1631,18 +1842,9 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
         );
       },
     });
-    // The fixture excludes .w-model, so metrics-report's invalid-argument probe exits 2 here.
-    // Keep its copied AGENTS.md declaration aligned with that isolated fixture's 35-script inventory.
-    const fixtureAgentsPath = path.join(fixtureRoot, 'AGENTS.md');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
-    const fixtureAgents = await fs.readFile(fixtureAgentsPath, 'utf8');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
-    await fs.writeFile(
-      fixtureAgentsPath,
-      fixtureAgents.replace('全仓 34 个脚本 exit 2', '全仓 35 个脚本 exit 2'),
-      'utf8',
-    );
-    // 复制的活体文档保留当前 HEAD 实测的 55/929 计数；各测试仅在需要时注入单独的旧值负例。
+    // 复制的活体文档保持原样；无 .w-model 与最小合法状态必须共享同一套确定性 probe 事实。
+    // 各测试仅在需要时注入单独的旧值负例，不通过改写活体文档自适配。
+    // 复制的活体文档保留当前 HEAD 实测的 55/942 计数；各测试仅在需要时注入单独的旧值负例。
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(
