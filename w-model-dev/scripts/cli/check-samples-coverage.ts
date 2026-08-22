@@ -226,6 +226,7 @@ function main(): void {
     const detail = err instanceof Error ? err.message : String(err);
     exitWithError({
       category: 'UNEXPECTED',
+      rule: 'P0-3',
       message: 'samples 覆盖矩阵核对失败（repo-root 缺必需文件或读取异常）',
       exitCode: 2,
       detail,

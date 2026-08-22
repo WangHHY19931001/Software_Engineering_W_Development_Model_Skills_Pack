@@ -175,6 +175,7 @@ async function main(): Promise<void> {
   if (r.status !== 0 && !r.stdout) {
     exitWithError({
       category: 'FILE_READ',
+      rule: 'P0-3',
       message: 'eslint 执行失败',
       detail: String(r.stderr).slice(0, 300),
       exitCode: 2,
@@ -187,6 +188,7 @@ async function main(): Promise<void> {
   } catch (err) {
     exitWithError({
       category: 'FILE_PARSE',
+      rule: 'P0-3',
       message: 'eslint 输出不是合法 JSON，无法解析',
       detail: `前 200 字符: ${String(r.stdout).slice(0, 200)}`,
       exitCode: 2,

@@ -286,24 +286,120 @@ const DYNAMIC_CHECKS = new Set([
   'vitest-tests',
 ]);
 
+const EXIT2_CATEGORIES = new Set([
+  'ARG_INVALID',
+  'FILE_NOT_FOUND',
+  'FILE_PARSE',
+  'FILE_READ',
+  'STRUCTURE_INVALID',
+  'UNEXPECTED',
+]);
+const EXIT2_RULE_PATTERN = /^P0-[1-9][0-9]*$/;
+
+type Exit2ProbeRecord = NonNullable<DocConsistencyInput['exit2ProbeResults']>[number];
+
+/** Exit-2 事实包的运行时类型与 ERROR_JSON 规则合同。无效记录不得进入 exit2ScriptCount。 */
+export function isValidExit2ProbeResult(probe: unknown): probe is Exit2ProbeRecord {
+  if (probe === null || typeof probe !== 'object') return false;
+  const record = probe as Record<string, unknown>;
+  return (
+    typeof record.probeId === 'string' &&
+    record.probeId.trim() !== '' &&
+    typeof record.script === 'string' &&
+    record.script.trim() !== '' &&
+    Array.isArray(record.args) &&
+    record.args.every((arg) => typeof arg === 'string' && arg.trim() !== '') &&
+    typeof record.cwd === 'string' &&
+    record.cwd.trim() !== '' &&
+    typeof record.status === 'number' &&
+    Number.isInteger(record.status) &&
+    typeof record.errorExitCode === 'number' &&
+    Number.isInteger(record.errorExitCode) &&
+    typeof record.category === 'string' &&
+    record.category.trim() !== '' &&
+    EXIT2_CATEGORIES.has(record.category) &&
+    typeof record.rule === 'string' &&
+    record.rule.trim() !== '' &&
+    EXIT2_RULE_PATTERN.test(record.rule)
+  );
+}
+
+/** 只统计完整且确实返回 exit=2 的探针；缺 rule/category 的事实包不计入脚本数。 */
+export function countValidExit2Scripts(probes: readonly unknown[]): number {
+  return new Set(
+    probes
+      .filter(
+        (probe): probe is Exit2ProbeRecord =>
+          isValidExit2ProbeResult(probe) && probe.status === 2 && probe.errorExitCode === 2,
+      )
+      .map((probe) => probe.script.replace(/#.*$/, '')),
+  ).size;
+}
+
+function canonicalizeProbePath(value: string): string {
+  const normalized = value.replace(/\\/g, '/').replace(/\/+/g, '/');
+  const drive = normalized.match(/^([A-Za-z]):(?:\/|$)/);
+  if (drive !== null) {
+    const rest = normalized.slice(2).replace(/^\/+/, '');
+    const segments: string[] = [];
+    for (const segment of rest.split('/')) {
+      if (segment === '' || segment === '.') continue;
+      if (segment === '..') {
+        segments.pop();
+      } else {
+        segments.push(segment);
+      }
+    }
+    return `${drive[1]!.toLowerCase()}:/${segments.join('/')}`.replace(/\/$/, '');
+  }
+  const segments: string[] = [];
+  for (const segment of normalized.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') segments.pop();
+    else segments.push(segment);
+  }
+  return `/${segments.join('/')}`.replace(/\/$/, '') || '/';
+}
+
+export function canonicalizeExit2ProbeIdentity(probe: Pick<Exit2ProbeRecord, 'args' | 'cwd'>): {
+  args: string[];
+  cwd: string;
+} {
+  const canonicalizeArg = (arg: string): string => {
+    if (/^<[^>]+>$/.test(arg)) return arg;
+    if (/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(arg)) return canonicalizeProbePath(arg);
+    return arg;
+  };
+  const canonicalCwd = /^<[^>]+>$/.test(probe.cwd) ? probe.cwd : canonicalizeProbePath(probe.cwd);
+  return { args: probe.args.map(canonicalizeArg), cwd: canonicalCwd };
+}
+
 function checkExit2ProbeResults(probes: DocConsistencyInput['exit2ProbeResults']): DocCheckViolation[] {
   if (probes === undefined) return [];
   const violations: DocCheckViolation[] = [];
   const probeIds = new Set<string>();
   for (const probe of probes) {
-    if (probeIds.has(probe.probeId)) {
-      violations.push({ check: 'exit2-probe', message: `probeId=${probe.probeId} 重复，探针身份必须稳定且唯一` });
+    const probeId = typeof probe?.probeId === 'string' ? probe.probeId : '<missing-probeId>';
+    if (probeIds.has(probeId)) {
+      violations.push({ check: 'exit2-probe', message: `probeId=${probeId} 重复，探针身份必须稳定且唯一` });
     }
-    probeIds.add(probe.probeId);
+    probeIds.add(probeId);
+    if (!isValidExit2ProbeResult(probe)) {
+      violations.push({
+        check: 'exit2-probe',
+        message: `${probeId} 的 Exit2ProbeResult 字段必须完整且类型正确（probeId/script/args/cwd/status/errorExitCode/category/rule；category 为已知 ERROR_JSON 类别，rule 符合 P0-N）`,
+      });
+      continue;
+    }
     const metricsContractViolation =
       probe.probeId === 'metrics-report.ts#invalid-phase' &&
       (probe.category !== 'ARG_INVALID' || probe.rule !== 'P0-1');
-    if (probe.status !== 2 || probe.errorExitCode !== 2 || probe.category === null || metricsContractViolation) {
+    if (probe.status !== 2 || probe.errorExitCode !== 2 || metricsContractViolation) {
       violations.push({
         check: 'exit2-probe',
         message: `${probe.probeId} 应以 status=2、ERROR_JSON.exitCode=2、category/rule 稳定存在${
           probe.probeId === 'metrics-report.ts#invalid-phase' ? ' 且 category=ARG_INVALID、rule=P0-1' : ''
-        } 结束（实际 status=${probe.status}, errorCode=${String(probe.errorExitCode)}, category=${String(probe.category)}, rule=${String(probe.rule)}）`,
+        }结束（实际 status=${probe.status}, errorCode=${String(probe.errorExitCode)}, category=${String(probe.category)}, rule=${String(probe.rule)}）`,
       });
     }
     if (probe.script === 'wm-export-evidence.ts') {
@@ -360,55 +456,141 @@ export interface RootCauseR10ContractSources {
 }
 
 const R10_CONTRACT_CHECK = 'rootcause-r10-contract';
-const R10_CLAUSES = [
+type R10ClauseId =
+  | 'canonical-name'
+  | 'threshold'
+  | 'legacy-fallback'
+  | 'same-artifact-dedupe'
+  | 'cross-artifact-conflict'
+  | 'canonical-duplicate'
+  | 'legacy-duplicate';
+type R10Relation = Record<string, string | number | boolean>;
+type R10Clause = {
+  id: R10ClauseId;
+  marker: string;
+  prose: string;
+  relation: R10Relation;
+};
+
+// R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"}
+// R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}
+// R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}
+// R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}
+// R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"}
+// R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}
+// R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}
+const R10_MACHINE_MARKER_PATTERN = /R10-CONTRACT-MARKER\s+(R10-C[1-7])\s+(\{.*?\})/gi;
+const R10_PROSE_CLAUSE_PATTERN = /R10-C([1-7])\s+[^:：\r\n]+[:：]\s*/gi;
+
+const R10_CLAUSES: ReadonlyArray<R10Clause> = [
   {
     id: 'canonical-name',
-    valid: (text: string) =>
-      /R10-C1 canonical-name[^\r\n]*[:：]\s*canonical[^\r\n]*`?testing-reality-checker`?/i.test(text),
+    marker: 'R10-C1',
+    prose: 'canonical persona is testing-reality-checker',
+    relation: { canonicalPersona: 'testing-reality-checker' },
   },
   {
     id: 'threshold',
-    valid: (text: string) =>
-      /R10-C2 threshold[^\r\n]*[:：]\s*`?testing-reality-checker`?[^\r\n]*confidence\s*(?:>=|≥)\s*0\.5/i.test(text),
+    marker: 'R10-C2',
+    prose: 'testing-reality-checker confidence >= 0.5',
+    relation: { canonicalPersona: 'testing-reality-checker', confidenceMinimum: 0.5 },
   },
   {
     id: 'legacy-fallback',
-    valid: (text: string) =>
-      /R10-C3 legacy-fallback[^\r\n]*[:：]\s*(?:legacy[^\r\n]*reality-checker|reality-checker[^\r\n]*legacy)[^\r\n]*fallback[^\r\n]*(?:canonical[^\r\n]*(?:absent|缺失)|(?:absent|缺失)[^\r\n]*canonical)/i.test(
-        text,
-      ),
+    marker: 'R10-C3',
+    prose: 'legacy reality-checker is fallback only when canonical is absent',
+    relation: { legacyPersona: 'reality-checker', fallbackWhen: 'canonical-absent' },
   },
   {
     id: 'same-artifact-dedupe',
-    valid: (text: string) =>
-      /R10-C4 same-artifact[^\r\n]*[:：]\s*(?:same artifact|同 artifact)[^\r\n]*(?:canonical-first|canonical 优先)[^\r\n]*(?:not counted twice|不重复计数)/i.test(
-        text,
-      ),
+    marker: 'R10-C4',
+    prose: 'same artifact canonical-first and not counted twice',
+    relation: { artifactRelation: 'same', precedence: 'canonical-first', duplicateCount: 'once' },
   },
   {
     id: 'cross-artifact-conflict',
-    valid: (text: string) =>
-      /R10-C5 cross-artifact[^\r\n]*[:：]\s*(?:different artifact|不同 artifact)[^\r\n]*(?:conflict|冲突)[^\r\n]*fail-closed/i.test(
-        text,
-      ),
+    marker: 'R10-C5',
+    prose: 'different artifact conflict is fail-closed',
+    relation: { artifactRelation: 'different', conflict: 'fail-closed' },
   },
   {
     id: 'canonical-duplicate',
-    valid: (text: string) =>
-      /R10-C6 canonical-duplicate[^\r\n]*[:：]\s*canonical[^\r\n]*(?:> 1|duplicate|重复)[^\r\n]*fail-closed/i.test(
-        text,
-      ),
+    marker: 'R10-C6',
+    prose: 'canonical > 1 duplicate is fail-closed',
+    relation: { persona: 'canonical', duplicateThreshold: 1, duplicatePolicy: 'fail-closed' },
   },
   {
     id: 'legacy-duplicate',
-    valid: (text: string) =>
-      /R10-C7 legacy-duplicate[^\r\n]*[:：]\s*legacy[^\r\n]*(?:> 1|duplicate|重复)[^\r\n]*fail-closed/i.test(text),
+    marker: 'R10-C7',
+    prose: 'legacy > 1 duplicate is fail-closed',
+    relation: { persona: 'legacy', duplicateThreshold: 1, duplicatePolicy: 'fail-closed' },
   },
-] as const;
+];
+
+function stableR10Relation(value: Record<string, unknown>): string {
+  return JSON.stringify(Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))));
+}
+
+function parseR10MachineMarker(content: string, clause: R10Clause): R10Relation | null | undefined {
+  R10_MACHINE_MARKER_PATTERN.lastIndex = 0;
+  const markers = [...content.matchAll(R10_MACHINE_MARKER_PATTERN)].filter(
+    (match) => match[1]!.toLowerCase() === clause.marker.toLowerCase(),
+  );
+  R10_MACHINE_MARKER_PATTERN.lastIndex = 0;
+  if (markers.length === 0) return undefined;
+  if (markers.length !== 1) return null;
+  try {
+    const parsed = JSON.parse(markers[0]![2]!.replace(/\\"/g, '"')) as unknown;
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const relation = parsed as Record<string, unknown>;
+    if (relation.id !== clause.id) return null;
+    delete relation.id;
+    return stableR10Relation(relation) === stableR10Relation(clause.relation) ? (relation as R10Relation) : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeR10Prose(value: string): string {
+  return value
+    .replace(/^\s*[-*]\s*/, '')
+    .replace(/[-*]\s*$/, '')
+    .replace(/[`'"。.!?,，；;：:]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function stripR10MachineMarkers(content: string): string {
+  return content.replace(/<!--\s*R10-CONTRACT-MARKER[\s\S]*?-->|\/\/\s*R10-CONTRACT-MARKER[^\r\n]*/gi, '');
+}
+
+/** 提取 marker 对应的单条 prose clause；marker 与 prose 必须同时为完整正向命题。 */
+function parseR10ProseClause(content: string, clause: R10Clause): R10Relation | null {
+  const proseContent = stripR10MachineMarkers(content);
+  R10_PROSE_CLAUSE_PATTERN.lastIndex = 0;
+  const clauses = [...proseContent.matchAll(R10_PROSE_CLAUSE_PATTERN)];
+  R10_PROSE_CLAUSE_PATTERN.lastIndex = 0;
+  const match = clauses.find((candidate) => `R10-C${candidate[1]}`.toLowerCase() === clause.marker.toLowerCase());
+  if (match === undefined || match.index === undefined) return null;
+  const matchEnd = match.index + match[0].length;
+  const next = clauses.find((candidate) => candidate.index !== undefined && candidate.index > match.index);
+  const body = proseContent.slice(matchEnd, next?.index ?? proseContent.length);
+  const sentence = body.match(/^[\s\S]*?(?:。|(?<!\d)\.(?!\d)(?=\s|$))/)?.[0] ?? body;
+  return normalizeR10Prose(sentence) === normalizeR10Prose(clause.prose) ? clause.relation : null;
+}
+
+function parseR10Clause(content: string, clause: R10Clause): R10Relation | null {
+  const machineRelation = parseR10MachineMarker(content, clause);
+  if (machineRelation === null || machineRelation === undefined) return null;
+  const proseRelation = parseR10ProseClause(content, clause);
+  if (proseRelation === null) return null;
+  return stableR10Relation(machineRelation) === stableR10Relation(proseRelation) ? clause.relation : null;
+}
 
 /**
- * R10 维护契约的唯一 checker。每个权威来源必须独立包含七个带关系约束的 clause；
- * 只出现 persona/threshold 关键词但缺少关系、优先级或 fail-closed 语义时拒绝通过。
+ * R10 维护契约的唯一 checker。每个权威来源必须独立包含七个结构化关系 clause；
+ * prose 仅接受完整正向命题，否定、引用、关系反转和缺字段均 fail-closed。
  */
 export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources): DocCheckViolation[] {
   const namedSources: Array<[string, string]> = [
@@ -430,10 +612,10 @@ export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources):
       continue;
     }
     for (const clause of R10_CLAUSES) {
-      if (!clause.valid(content)) {
+      if (parseR10Clause(content, clause) === null) {
         violations.push({
           check: R10_CONTRACT_CHECK,
-          message: `${sourceName} 缺少 R10 clause ${clause.id} 的语义关系（source×clause fail-closed）`,
+          message: `${sourceName} 缺少 R10 clause ${clause.id} 的正向结构化语义关系（source×clause fail-closed）`,
         });
       }
     }

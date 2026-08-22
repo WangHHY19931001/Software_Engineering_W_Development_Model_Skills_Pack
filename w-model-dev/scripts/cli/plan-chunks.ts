@@ -83,6 +83,7 @@ async function main(): Promise<void> {
   if (!inputPath) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '参数缺失 <path>',
       detail:
         '用法: npx tsx w-model-dev/scripts/cli/plan-chunks.ts <path> --phase=N --node-type=<TYPE> [--max-tokens=8000]',
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
   if (phaseParsed === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '--phase 必须为 1-4 整数',
       detail: `收到 ${phaseStr ?? '(未提供)'}`,
       exitCode: 2,
@@ -105,6 +107,7 @@ async function main(): Promise<void> {
   if (nodeTypeStr === undefined || !['REQ', 'SD', 'INTF', 'DD'].includes(nodeTypeStr)) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '--node-type 必须为 REQ|SD|INTF|DD',
       detail: `收到 ${nodeTypeStr ?? '(未提供)'}`,
       exitCode: 2,
@@ -115,6 +118,7 @@ async function main(): Promise<void> {
   if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
     exitWithError({
       category: 'ARG_INVALID',
+      rule: 'P0-1',
       message: '--max-tokens 必须为正整数',
       detail: `收到 ${maxTokensStr ?? '(未提供)'}`,
       exitCode: 2,
@@ -131,6 +135,7 @@ async function main(): Promise<void> {
     const e = err as NodeJS.ErrnoException;
     exitWithError({
       category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+      rule: e.code === 'ENOENT' ? 'P0-2' : 'P0-3',
       message: e.code === 'ENOENT' ? '路径不存在' : '路径读取失败',
       file: abs,
       detail: e.code ?? '未知错误',
@@ -146,6 +151,7 @@ async function main(): Promise<void> {
     const e = err as NodeJS.ErrnoException;
     exitWithError({
       category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+      rule: e.code === 'ENOENT' ? 'P0-2' : 'P0-3',
       message: e.code === 'ENOENT' ? '路径不存在' : '文件读取失败',
       file: abs,
       detail: e.code ?? '未知错误',

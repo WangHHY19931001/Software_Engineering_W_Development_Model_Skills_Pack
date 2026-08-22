@@ -65,6 +65,7 @@ async function main(): Promise<void> {
   } catch (err) {
     exitWithError({
       category: 'FILE_PARSE',
+      rule: 'P0-3',
       message: '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）',
       file: projectFile,
       exitCode: 2,
@@ -92,6 +93,7 @@ async function main(): Promise<void> {
     if (e.code !== 'ENOENT') {
       exitWithError({
         category: err instanceof SyntaxError ? 'FILE_PARSE' : 'FILE_READ',
+        rule: err instanceof SyntaxError ? 'P0-3' : 'P0-3',
         message:
           err instanceof SyntaxError
             ? '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）'

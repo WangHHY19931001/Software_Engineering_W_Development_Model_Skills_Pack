@@ -156,3 +156,19 @@
 | `testing-reality-checker` | 防幻想根因（R 自评根因准确但 S-fix 修复后 bug 仍存在 → 重新定位） | R 重派（round ≥ 2）时必含 |
 
 > 与反模式 #18（跳过 R 直接 S 返工）的关系：紧急修复虽由 S 直接执行（受时间压力），但前置 R3×3 + V 保证修复质量与根因对齐；事后复核机制已移除（见 [dispatch-matrix.md](dispatch-matrix.md) §4）。R3/V 不通过 → 仍须走标准 S-fix 流程。
+
+R10 维护契约：
+- R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
+- R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
+- R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
+- R10-C4 same-artifact：same artifact canonical-first and not counted twice。
+- R10-C5 cross-artifact：different artifact conflict is fail-closed。
+- R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
+- R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
+<!-- R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"} -->
+<!-- R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5} -->
+<!-- R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"} -->
+<!-- R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"} -->
+<!-- R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"} -->
+<!-- R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
+<!-- R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->

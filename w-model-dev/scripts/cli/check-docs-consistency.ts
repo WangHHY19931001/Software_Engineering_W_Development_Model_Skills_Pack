@@ -43,7 +43,11 @@ import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { buildDocConsistencyReport, type DocConsistencyInput } from '../logic/docs-consistency-logic.js';
+import {
+  buildDocConsistencyReport,
+  countValidExit2Scripts,
+  type DocConsistencyInput,
+} from '../logic/docs-consistency-logic.js';
 
 /**
  * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
@@ -648,11 +652,7 @@ async function main(): Promise<void> {
     .filter((f) => f.endsWith('.ts'))
     .sort();
   const exit2ProbeResults = await collectExit2ScriptResults(root, cliScriptFiles);
-  const exit2ScriptCount = new Set(
-    exit2ProbeResults
-      .filter((probe) => probe.status === 2 && probe.errorExitCode === 2)
-      .map((probe) => probe.script.replace(/#.*$/, '')),
-  ).size;
+  const exit2ScriptCount = countValidExit2Scripts(exit2ProbeResults);
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
   // 目录枚举仅用于 inventory 诊断；活体 Vitest 文件/用例计数必须来自同一份 JSON 事实包。
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled test inventory path
@@ -717,7 +717,7 @@ async function main(): Promise<void> {
     readme: read('README.md'),
     agents: read('AGENTS.md'),
     ssot: read('docs/skill-design-document_SSoT.md'),
-    rootCauseAuthoritySpec: read('docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md'),
+    rootCauseAuthoritySpec: read('w-model-dev/references/subagent-persona-matrix.md'),
     rootCauseSchema: read('w-model-dev/schemas/rootcause-report.schema.json'),
     rootCauseCheckerSource: read('w-model-dev/scripts/logic/root-cause-logic.ts'),
     rootCauseSsot: read('docs/skill-design-document_SSoT.md'),
