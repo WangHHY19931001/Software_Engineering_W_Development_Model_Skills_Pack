@@ -744,6 +744,7 @@ describe('D8 lifecycle identity reducer', () => {
       reportId,
       target: reportId,
       targetKind: 'rootcause',
+      basedOnReport: reportId,
       qualityLevel: 'A',
       reworkHints: [],
     });
@@ -760,10 +761,16 @@ describe('D8 lifecycle identity reducer', () => {
       reportId,
       target: reportId,
       targetKind: 'rootcause',
+      basedOnReport: reportId,
       script: 'check-rootcause-report.ts',
     });
 
-  const implementationReview = (runId: string, reportId: string, round = 1): RunLogEntry =>
+  const implementationReview = (
+    runId: string,
+    reportId: string,
+    round = 1,
+    target = `implementation-${reportId}`,
+  ): RunLogEntry =>
     makeEntry({
       runId,
       phase: 8,
@@ -773,14 +780,20 @@ describe('D8 lifecycle identity reducer', () => {
       outcome: 'success',
       passed: true,
       reportId,
-      target: `implementation-${reportId}`,
+      target,
       targetKind: 'code',
+      implementationTarget: target,
       qualityLevel: 'A',
       reworkHints: [],
       basedOnReport: reportId,
     });
 
-  const implementationGate = (runId: string, reportId: string, round = 1): RunLogEntry =>
+  const implementationGate = (
+    runId: string,
+    reportId: string,
+    round = 1,
+    target = `implementation-${reportId}`,
+  ): RunLogEntry =>
     makeEntry({
       runId,
       phase: 8,
@@ -790,13 +803,20 @@ describe('D8 lifecycle identity reducer', () => {
       outcome: 'success',
       gateExitCode: 0,
       reportId,
-      target: `implementation-${reportId}`,
+      target,
       targetKind: 'code',
+      implementationTarget: target,
       script: 'check-artifact-gate.ts',
       basedOnReport: reportId,
     });
 
-  const fix = (runId: string, reportId: string, round = 1): RunLogEntry =>
+  const fix = (
+    runId: string,
+    reportId: string,
+    round = 1,
+    target = `implementation-${reportId}`,
+    fixReportId = reportId,
+  ): RunLogEntry =>
     makeEntry({
       runId,
       phase: 8,
@@ -804,13 +824,19 @@ describe('D8 lifecycle identity reducer', () => {
       action: 'fix',
       role: 'S',
       outcome: 'success',
-      reportId,
+      reportId: fixReportId,
       basedOnReport: reportId,
       targetKind: 'code',
-      artifacts: [`implementation-${reportId}`],
+      implementationTarget: target,
+      artifacts: [target],
     });
 
-  const r3 = (runId: string, dimension: 'completeness' | 'reliability' | 'security', reportId?: string) =>
+  const r3 = (
+    runId: string,
+    dimension: 'completeness' | 'reliability' | 'security',
+    reportId?: string,
+    implementationTarget?: string,
+  ) =>
     makeEntry({
       runId,
       phase: 8,
@@ -821,6 +847,7 @@ describe('D8 lifecycle identity reducer', () => {
       reportId,
       basedOnReport: reportId,
       targetKind: reportId ? 'code' : undefined,
+      implementationTarget: reportId ? (implementationTarget ?? `implementation-${reportId}`) : undefined,
     });
 
   it('does not let a different reportId rootcause V/G or fix satisfy the target lifecycle', () => {
@@ -970,7 +997,7 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.violations.some((reason) => /RC-phase8-10-01.*implementation V|同身份 R3/.test(reason))).toBe(false);
     expect(
       diagnostics.some((diagnostic) =>
-        /LEGACY_UNSCOPED: fix RC-phase8-10-01-sfix-20260822033128000 identity missing targetKind; deferred/.test(
+        /LEGACY_UNSCOPED: fix RC-phase8-10-01-sfix-20260822033128000 identity missing targetKind, implementationTarget; deferred/.test(
           diagnostic,
         ),
       ),
@@ -991,5 +1018,192 @@ describe('D8 lifecycle identity reducer', () => {
     const after = await fs.readFile(rawPath);
     expect(entries).toHaveLength(18);
     expect(after.equals(before)).toBe(true);
+  });
+
+  it('rejects implementation evidence that targets a different implementationTarget', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-root', 'RC-A'),
+      rootCauseGate('g-root', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-c', 'completeness', 'RC-A', 'implementation-B'),
+      r3('r3-r', 'reliability', 'RC-A', 'implementation-B'),
+      r3('r3-s', 'security', 'RC-A', 'implementation-B'),
+      implementationReview('v-impl', 'RC-A', 1, 'implementation-B'),
+      implementationGate('g-impl', 'RC-A', 1, 'implementation-B'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(false);
+    expect(
+      result.violations.some((reason) => /same identity|implementationTarget|缺同身份 implementation V/i.test(reason)),
+    ).toBe(true);
+  });
+
+  it('rejects a rootcause-to-fix relation whose fix reportId differs from the root report', () => {
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-cross', 'RC-A', 1, 'implementation-A', 'RC-B'),
+    ]);
+    expect(result.violations.some((reason) => /R7.*RC-A.*exact.*fix|reportId/i.test(reason))).toBe(true);
+  });
+
+  it('does not approve a rootcause review with missing identity fields', () => {
+    const missingReportIdReview = rootCauseReview('v-a', 'RC-A');
+    delete missingReportIdReview.reportId;
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      missingReportIdReview,
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-c', 'completeness', 'RC-A'),
+      r3('r3-r', 'reliability', 'RC-A'),
+      r3('r3-s', 'security', 'RC-A'),
+      implementationReview('v-impl', 'RC-A'),
+      implementationGate('g-impl', 'RC-A'),
+    ]);
+    expect(result.violations.some((reason) => /open-approved-lifecycle/.test(reason))).toBe(false);
+    expect(result.diagnostics?.some((diagnostic) => /pending-pre-approval/.test(diagnostic))).toBe(true);
+  });
+
+  it('does not approve a rootcause gate with missing identity fields', () => {
+    const missingReportIdGate = rootCauseGate('g-a', 'RC-A');
+    delete missingReportIdGate.reportId;
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      missingReportIdGate,
+      fix('f-a', 'RC-A'),
+      r3('r3-c', 'completeness', 'RC-A'),
+      r3('r3-r', 'reliability', 'RC-A'),
+      r3('r3-s', 'security', 'RC-A'),
+      implementationReview('v-impl', 'RC-A'),
+      implementationGate('g-impl', 'RC-A'),
+    ]);
+    expect(result.violations.some((reason) => /open-approved-lifecycle/.test(reason))).toBe(false);
+    expect(result.diagnostics?.some((diagnostic) => /pending-pre-approval/.test(diagnostic))).toBe(true);
+  });
+
+  it('does not count an R3 record with missing implementation identity', () => {
+    const missingTargetR3 = r3('r3-c', 'completeness', 'RC-A');
+    delete missingTargetR3.implementationTarget;
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      missingTargetR3,
+      r3('r3-r', 'reliability', 'RC-A'),
+      r3('r3-s', 'security', 'RC-A'),
+      implementationReview('v-impl', 'RC-A'),
+      implementationGate('g-impl', 'RC-A'),
+    ]);
+    expect(result.passed).toBe(false);
+    expect(result.diagnostics?.some((diagnostic) => /implementationTarget/.test(diagnostic))).toBe(true);
+  });
+
+  it('rejects failed R3 evidence even when all three dimensions are present', () => {
+    const failedR3 = { ...r3('r3-c', 'completeness', 'RC-A'), outcome: 'fail' as const };
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      failedR3,
+      r3('r3-r', 'reliability', 'RC-A'),
+      r3('r3-s', 'security', 'RC-A'),
+      implementationReview('v-impl', 'RC-A'),
+      implementationGate('g-impl', 'RC-A'),
+    ]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((reason) => /R3 记录校验失败/.test(reason))).toBe(true);
+  });
+
+  it('rejects duplicate R3 dimensions instead of counting a Set of three names', () => {
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-c1', 'completeness', 'RC-A'),
+      r3('r3-c2', 'completeness', 'RC-A'),
+      r3('r3-r', 'reliability', 'RC-A'),
+      r3('r3-s', 'security', 'RC-A'),
+      implementationReview('v-impl', 'RC-A'),
+      implementationGate('g-impl', 'RC-A'),
+    ]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((reason) => /R3 记录校验失败|duplicate|恰好一条/i.test(reason))).toBe(true);
+  });
+
+  it('does not let a missing-identity legacy fix satisfy a strict phase 8 lifecycle', () => {
+    const legacyFix = makeEntry({
+      runId: 'f-legacy',
+      phase: 8,
+      round: 1,
+      action: 'fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-A',
+      artifacts: ['implementation-A'],
+    });
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      legacyFix,
+    ]);
+    expect(result.passed).toBe(true);
+    expect(result.violations.some((reason) => /open-approved-lifecycle|exact.*fix|identity/i.test(reason))).toBe(false);
+    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED/.test(diagnostic))).toBe(true);
+    expect(result.diagnostics?.some((diagnostic) => /deferred/.test(diagnostic))).toBe(true);
+  });
+
+  it('rejects an implementationTarget with the wrong schema type', () => {
+    const bad = makeEntry({
+      action: 'fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-A',
+      artifacts: ['implementation-A'],
+      targetKind: 'code',
+      implementationTarget: 42 as unknown as string,
+    });
+    const result = checkRunLog([bad]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((reason) => /implementationTarget/.test(reason))).toBe(true);
+  });
+
+  it('checks each fix window independently so a later checkpoint cannot hide an earlier inversion', () => {
+    const entries = [
+      makeEntry({ runId: 'p', phase: 8, action: 'produce', role: 'S', outcome: 'success' }),
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-root', 'RC-A'),
+      rootCauseGate('g-root', 'RC-A'),
+      fix('f-1', 'RC-A'),
+      r3('r3-1-c', 'completeness', 'RC-A'),
+      r3('r3-1-r', 'reliability', 'RC-A'),
+      r3('r3-1-s', 'security', 'RC-A'),
+      implementationGate('g-1', 'RC-A'),
+      implementationReview('v-1', 'RC-A'),
+      fix('f-2', 'RC-A', 1, 'implementation-A'),
+      r3('r3-2-c', 'completeness', 'RC-A'),
+      r3('r3-2-r', 'reliability', 'RC-A'),
+      r3('r3-2-s', 'security', 'RC-A'),
+      implementationReview('v-2', 'RC-A'),
+      implementationGate('g-2', 'RC-A'),
+      makeEntry({
+        runId: 'checkpoint',
+        phase: 8,
+        action: 'checkpoint',
+        role: 'O',
+        outcome: 'success',
+        acknowledgedDecisions: ['ok'],
+      }),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((reason) => /R8.*轨迹顺序倒置/.test(reason))).toBe(true);
   });
 });

@@ -69,6 +69,8 @@ export interface RunLogEntry {
   basedOnReport?: string;
   /** fix: RTM diff */
   rtmDiff?: Record<string, unknown>;
+  /** implementation fix/review/gate/R3 所针对的实现产物身份 */
+  implementationTarget?: string;
   /** review: 审查目标类型（'rootcause' 表示复审 R 报告） */
   targetKind?: string;
   /** review: 审查目标产物 */
@@ -107,6 +109,7 @@ interface LifecycleIdentity {
   reportId: string | null;
   targetKind: string | null;
   basedOnReport: string | null;
+  implementationTarget: string | null;
 }
 
 // ==================== 工具函数 ====================
@@ -124,41 +127,59 @@ function nullableNumber(value: unknown): number | null {
 }
 
 /**
- * Action-specific identity projection. Rootcause/gate semantics supply a
- * targetKind only when the action itself makes it unambiguous; no nearest
- * record, index, count, or report set is used as a substitute.
+ * Action-specific identity projection. Rootcause records use a rootcause
+ * projection; implementation evidence uses the complete fix projection.
+ * Missing fields never become wildcards for lifecycle credit.
  */
 function lifecycleIdentity(entry: RunLogEntry): LifecycleIdentity {
-  const rootcauseKind =
-    entry.action === 'rootcause' || (entry.action === 'gate' && entry.script === 'check-rootcause-report.ts')
-      ? 'rootcause'
-      : nullableString(entry.targetKind);
+  const isRootcauseAction = entry.action === 'rootcause';
+  const isRootcauseEvidence =
+    (entry.action === 'review' && entry.targetKind === 'rootcause') ||
+    (entry.action === 'gate' && entry.script === 'check-rootcause-report.ts');
+  const isRootcauseSegment = isRootcauseAction || isRootcauseEvidence;
   return {
     phase: nullableNumber(entry.phase),
     round: nullableNumber(entry.round),
     reportId: nullableString(entry.reportId),
-    targetKind: rootcauseKind,
-    basedOnReport: nullableString(entry.basedOnReport),
+    targetKind: isRootcauseSegment ? 'rootcause' : nullableString(entry.targetKind),
+    basedOnReport: isRootcauseAction ? null : nullableString(entry.basedOnReport),
+    implementationTarget: isRootcauseSegment ? null : nullableString(entry.implementationTarget),
   };
 }
 
 function lifecycleKey(identity: LifecycleIdentity): string {
-  return [identity.phase, identity.round, identity.reportId, identity.targetKind, identity.basedOnReport]
+  return [
+    identity.phase,
+    identity.round,
+    identity.reportId,
+    identity.targetKind,
+    identity.basedOnReport,
+    identity.implementationTarget,
+  ]
     .map((value) => value ?? 'unknown')
     .join('|');
 }
 
-function completeIdentity(identity: LifecycleIdentity): boolean {
-  // Rootcause segments intentionally use basedOnReport=null; the first four
-  // dimensions are the required discriminator for rootcause R/V/G records.
+function completeRootcauseIdentity(identity: LifecycleIdentity): boolean {
   return (
-    identity.phase !== null && identity.round !== null && identity.reportId !== null && identity.targetKind !== null
+    identity.phase !== null &&
+    identity.round !== null &&
+    identity.reportId !== null &&
+    identity.targetKind === 'rootcause'
   );
 }
 
 function completeImplementationIdentity(entry: RunLogEntry): boolean {
   const identity = lifecycleIdentity(entry);
-  return completeIdentity(identity) && identity.basedOnReport !== null;
+  return (
+    identity.phase !== null &&
+    identity.round !== null &&
+    identity.reportId !== null &&
+    identity.targetKind !== null &&
+    identity.targetKind !== 'rootcause' &&
+    identity.basedOnReport !== null &&
+    identity.implementationTarget !== null
+  );
 }
 
 function sameIdentity(a: LifecycleIdentity, b: LifecycleIdentity): boolean {
@@ -167,17 +188,8 @@ function sameIdentity(a: LifecycleIdentity, b: LifecycleIdentity): boolean {
     a.round === b.round &&
     a.reportId === b.reportId &&
     a.targetKind === b.targetKind &&
-    a.basedOnReport === b.basedOnReport
-  );
-}
-
-function sameKnownIdentity(a: LifecycleIdentity, b: LifecycleIdentity): boolean {
-  return (
-    (a.phase === null || b.phase === null || a.phase === b.phase) &&
-    (a.round === null || b.round === null || a.round === b.round) &&
-    (a.reportId === null || b.reportId === null || a.reportId === b.reportId) &&
-    (a.targetKind === null || b.targetKind === null || a.targetKind === b.targetKind) &&
-    (a.basedOnReport === null || b.basedOnReport === null || a.basedOnReport === b.basedOnReport)
+    a.basedOnReport === b.basedOnReport &&
+    a.implementationTarget === b.implementationTarget
   );
 }
 
@@ -193,33 +205,28 @@ function identityFieldValue(identity: LifecycleIdentity, field: string): unknown
       return identity.targetKind;
     case 'basedOnReport':
       return identity.basedOnReport;
+    case 'implementationTarget':
+      return identity.implementationTarget;
     default:
       return null;
   }
 }
 
 function identityMissingFields(identity: LifecycleIdentity): string[] {
-  const fields = ['phase', 'round', 'reportId', 'targetKind', 'basedOnReport'];
+  const fields = ['phase', 'round', 'reportId', 'targetKind', 'basedOnReport', 'implementationTarget'];
   return fields.filter((field) => identityFieldValue(identity, field) === null);
 }
 
 function entryIdentityMissingFields(entry: RunLogEntry): string[] {
   const identity = lifecycleIdentity(entry);
-  const fields = ['phase', 'round', 'reportId', 'targetKind', 'basedOnReport'];
-  // basedOnReport is intentionally null for rootcause lifecycle records.
-  if (
-    (entry.action === 'rootcause' ||
-      (entry.action === 'review' && entry.targetKind === 'rootcause') ||
-      (entry.action === 'gate' && entry.script === 'check-rootcause-report.ts')) &&
-    identity.basedOnReport === null
-  ) {
-    fields.splice(fields.indexOf('basedOnReport'), 1);
-  }
-  return fields.filter((field) => {
-    if (field === 'targetKind' && (entry.action === 'rootcause' || entry.script === 'check-rootcause-report.ts'))
-      return false;
-    return identityFieldValue(identity, field) === null;
-  });
+  const isRootcauseSegment =
+    entry.action === 'rootcause' ||
+    (entry.action === 'review' && entry.targetKind === 'rootcause') ||
+    (entry.action === 'gate' && entry.script === 'check-rootcause-report.ts');
+  const fields = isRootcauseSegment
+    ? ['phase', 'round', 'reportId']
+    : ['phase', 'round', 'reportId', 'targetKind', 'basedOnReport', 'implementationTarget'];
+  return fields.filter((field) => identityFieldValue(identity, field) === null);
 }
 
 function hasPassedReview(entry: RunLogEntry): boolean {
@@ -289,7 +296,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   for (const entry of valid) {
     if (!['rootcause', 'review', 'gate', 'fix', 'emergency-fix', ...R3_ACTIONS].includes(entry.action)) continue;
     const missing = entryIdentityMissingFields(entry);
-    if (missing.length > 0 && entry.action !== 'gate') {
+    if (missing.length > 0) {
       diagnostics.push(
         `LEGACY_UNSCOPED: ${entry.action} ${entry.runId} identity missing ${missing.join(', ')}; deferred`,
       );
@@ -372,22 +379,20 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R3 扩展：rootcause/fix 只按同身份 lifecycle segment 关联。
+  // R3 扩展：rootcause/fix 只按 action-specific lifecycle projection 关联。
   const rootcauseActions = valid.filter((e) => e.action === 'rootcause');
   const fixActions = valid.filter((e) => S_VARIANTS.includes(e.action) && e.action !== 'produce');
   const rootcauseReviews = valid.filter((e) => e.action === 'review' && e.role === 'V' && e.targetKind === 'rootcause');
-  // Phase 8 carries the revised lifecycle contract. Earlier samples without
-  // the five-dimensional contract stay on the legacy checker path.
   const strictLifecycleMode = rootcauseActions.some(
-    (entry) => entry.phase === 8 && completeIdentity(lifecycleIdentity(entry)),
+    (entry) => entry.phase === 8 && completeRootcauseIdentity(lifecycleIdentity(entry)),
   );
   const rootcauseReports = new Map<string, RunLogEntry>();
 
   for (const rootcause of rootcauseActions) {
     const identity = lifecycleIdentity(rootcause);
-    if (!completeIdentity(identity)) {
+    if (!completeRootcauseIdentity(identity)) {
       diagnostics.push(
-        `LEGACY_UNSCOPED: rootcause ${rootcause.runId} identity missing ${identityMissingFields(identity).join(', ') || 'unknown'}`,
+        `LEGACY_UNSCOPED: rootcause ${rootcause.runId} identity missing ${entryIdentityMissingFields(rootcause).join(', ') || 'unknown'}; deferred`,
       );
       continue;
     }
@@ -395,56 +400,65 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     if (!rootcauseReports.has(key)) rootcauseReports.set(key, rootcause);
   }
 
-  const reportStatus = new Map<string, { hasReview: boolean; hasGate: boolean; hasFix: boolean }>();
+  const reportStatus = new Map<
+    string,
+    { hasReview: boolean; hasGate: boolean; hasFix: boolean; hasDeferredFix: boolean }
+  >();
   for (const [key, rootcause] of rootcauseReports) {
     const identity = lifecycleIdentity(rootcause);
-    const sameSegment = valid.filter((entry) => {
+    const strictRootcause = strictLifecycleMode && rootcause.phase === 8;
+    const sameRootcause = (entry: RunLogEntry): boolean => {
       const candidate = lifecycleIdentity(entry);
+      const exactBase = entry.basedOnReport === identity.reportId;
       return (
-        sameKnownIdentity(identity, candidate) &&
-        (candidate.targetKind === 'rootcause' ||
-          (entry.action === 'gate' && entry.script === 'check-rootcause-report.ts'))
+        completeRootcauseIdentity(candidate) &&
+        candidate.phase === identity.phase &&
+        candidate.round === identity.round &&
+        candidate.reportId === identity.reportId &&
+        entry.target === identity.reportId &&
+        (!strictRootcause || exactBase)
       );
-    });
-    const hasReview = sameSegment.some(
-      (entry) =>
-        hasPassedReview(entry) &&
-        lifecycleIdentity(entry).targetKind === 'rootcause' &&
-        entry.target === identity.reportId,
+    };
+    const hasReview = valid.some(
+      (entry) => hasPassedReview(entry) && entry.targetKind === 'rootcause' && sameRootcause(entry),
     );
-    const hasGate = sameSegment.some(
+    const hasGate = valid.some(
       (entry) =>
         hasPassedGate(entry) &&
-        lifecycleIdentity(entry).targetKind === 'rootcause' &&
+        entry.action === 'gate' &&
         entry.script === 'check-rootcause-report.ts' &&
-        (entry.target === undefined || entry.target === identity.reportId),
+        sameRootcause(entry),
     );
     const exactFixes = fixActions.filter((entry) => {
       const candidate = lifecycleIdentity(entry);
       return (
+        entry.role === 'S' &&
+        entry.outcome === 'success' &&
         completeImplementationIdentity(entry) &&
         candidate.phase === identity.phase &&
         candidate.round === identity.round &&
         candidate.reportId === identity.reportId &&
-        candidate.basedOnReport === identity.reportId
+        candidate.basedOnReport === identity.reportId &&
+        (entry.target === undefined || entry.target === candidate.implementationTarget) &&
+        (entry.artifacts ?? []).includes(candidate.implementationTarget!)
       );
     });
-    // Legacy fixes with a missing targetKind remain observable, but cannot enter
-    // exact identity segments or provide R3/implementation V/G evidence.
     const legacyFixes = fixActions.filter((entry) => {
       const candidate = lifecycleIdentity(entry);
       return (
         !completeImplementationIdentity(entry) &&
         candidate.phase === identity.phase &&
         candidate.round === identity.round &&
-        candidate.reportId === identity.reportId &&
         candidate.basedOnReport === identity.reportId
       );
     });
-    const hasFix = exactFixes.length > 0 || legacyFixes.length > 0;
-    reportStatus.set(key, { hasReview, hasGate, hasFix });
+    // Legacy rows remain diagnostics only whenever a complete phase 8 identity
+    // exists. They never provide fix credit to a strict lifecycle.
+    const hasFix = strictRootcause ? exactFixes.length > 0 : exactFixes.length > 0 || legacyFixes.length > 0;
+    const hasDeferredFix = legacyFixes.length > 0;
+    reportStatus.set(key, { hasReview, hasGate, hasFix, hasDeferredFix });
 
-    if (hasReview && hasGate && !hasFix) {
+    if (strictRootcause && hasReview && hasGate && !hasFix && !hasDeferredFix) {
       violations.push(
         `R3: ${identity.reportId} open-approved-lifecycle：同身份 V/G 已通过但缺 exact basedOnReport fix`,
       );
@@ -455,18 +469,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  if (strictLifecycleMode) {
-    // Rootcause V/G approval is a prerequisite state. Missing approval is
-    // pending-pre-approval, not an exact-fix omission or implementation V.
-    for (const [key, status] of reportStatus) {
-      if (!status.hasReview || !status.hasGate) {
-        const report = rootcauseReports.get(key)!;
-        diagnostics.push(
-          `pending-pre-approval: ${report.reportId} 同身份 rootcause V/G 未全部通过；缺 review/gate 不进入 implementation lifecycle`,
-        );
-      }
-    }
-  } else {
+  if (!strictLifecycleMode) {
     // Legacy fixtures retain the historical one-fix/multi-report contract.
     const uniqueReportIds = new Set(
       rootcauseActions.map((r) => r.reportId).filter((id): id is string => isNonEmptyString(id)),
@@ -541,23 +544,37 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         const identity = lifecycleIdentity(entry);
         return (
           entry.role === 'R' &&
+          entry.outcome === 'success' &&
           R3_ACTIONS.includes(entry.action) &&
           R3_DIMENSIONS.some((dimension) => entry.action.includes(dimension)) &&
-          (strictLifecycleMode ? sameIdentity(identity, fixIdentity) : true)
+          (strictLifecycleMode ? completeImplementationIdentity(entry) && sameIdentity(identity, fixIdentity) : true)
         );
       });
-      const dimensions = new Set(
-        r3Records.flatMap(({ entry }) => R3_DIMENSIONS.filter((dimension) => entry.action.includes(dimension))),
-      );
-      if (dimensions.size < 3) {
+      const dimensionCounts = new Map<string, number>();
+      for (const { entry } of r3Records) {
+        const dimension = R3_DIMENSIONS.find((candidate) => entry.action === `r3-${candidate}`);
+        if (dimension) dimensionCounts.set(dimension, (dimensionCounts.get(dimension) ?? 0) + 1);
+      }
+      const invalidDimensions = R3_DIMENSIONS.filter((dimension) => dimensionCounts.get(dimension) !== 1);
+      if (invalidDimensions.length > 0) {
         violations.push(
           strictLifecycleMode
-            ? `R3 记录校验失败：阶段 ${phase} 的 fix ${fixSegment.entry.runId} (${fixIdentity.basedOnReport})→implementation V 之间仅有 ${dimensions.size} 条同身份 R3，须有 3 条（completeness/reliability/security)`
-            : `R3 记录校验失败：阶段 ${phase} 的 S(${fixSegment.entry.action})→V 之间仅有 ${dimensions.size} 条 R3 记录，须有 3 条（completeness/reliability/security）`,
+            ? `R3 记录校验失败：阶段 ${phase} 的 fix ${fixSegment.entry.runId} (${fixIdentity.basedOnReport})→implementation V 之间 R3 维度不满足恰一条：${invalidDimensions.join(', ')}`
+            : `R3 记录校验失败：阶段 ${phase} 的 S(${fixSegment.entry.action})→V 之间 R3 维度不满足恰一条：${invalidDimensions.join(', ')}`,
         );
       }
       if (strictLifecycleMode) {
-        const implementationGate = entryList.slice(vIndex + 1).find(({ entry }) => {
+        const nextFixIndex = entryList.findIndex(
+          ({ entry }, index) => index > i && entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action),
+        );
+        const terminalIndex = entryList.findIndex(
+          ({ entry }, index) => index > i && entry.action === 'checkpoint' && entry.outcome === 'success',
+        );
+        const gateEnd = Math.min(
+          nextFixIndex >= 0 ? nextFixIndex : entryList.length,
+          terminalIndex >= 0 ? terminalIndex + 1 : entryList.length,
+        );
+        const implementationGate = entryList.slice(vIndex + 1, gateEnd).find(({ entry }) => {
           const candidateIdentity = lifecycleIdentity(entry);
           return (
             hasPassedGate(entry) && entry.targetKind !== 'rootcause' && sameIdentity(candidateIdentity, fixIdentity)
@@ -659,12 +676,12 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     const curEntry = valid[i];
     if (!curEntry || curEntry.action !== 'rootcause') continue;
     const rootIdentity = lifecycleIdentity(curEntry);
-    if (strictLifecycleMode && completeIdentity(rootIdentity)) {
+    if (strictLifecycleMode && completeRootcauseIdentity(rootIdentity)) {
       const segmentKey = lifecycleKey(rootIdentity);
       if (checkedRootcauseSegments.has(segmentKey)) continue;
       checkedRootcauseSegments.add(segmentKey);
     }
-    if (strictLifecycleMode && completeIdentity(rootIdentity)) {
+    if (strictLifecycleMode && completeRootcauseIdentity(rootIdentity)) {
       const rootReviewIndex = valid.findIndex(
         (candidate, index) =>
           index > i &&
@@ -673,7 +690,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           lifecycleIdentity(candidate).phase === rootIdentity.phase &&
           lifecycleIdentity(candidate).round === rootIdentity.round &&
           lifecycleIdentity(candidate).reportId === rootIdentity.reportId &&
-          candidate.target === rootIdentity.reportId,
+          candidate.target === rootIdentity.reportId &&
+          candidate.basedOnReport === rootIdentity.reportId,
       );
       if (rootReviewIndex < 0) {
         diagnostics.push(
@@ -685,12 +703,32 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         if (index <= rootReviewIndex || !['fix', 'emergency-fix'].includes(candidate.action)) return false;
         const fixIdentity = lifecycleIdentity(candidate);
         return (
+          candidate.role === 'S' &&
+          candidate.outcome === 'success' &&
+          completeImplementationIdentity(candidate) &&
           fixIdentity.phase === rootIdentity.phase &&
           fixIdentity.round === rootIdentity.round &&
+          fixIdentity.reportId === rootIdentity.reportId &&
           fixIdentity.basedOnReport === rootIdentity.reportId
         );
       });
-      if (fixIndex < 0) violations.push(`R7: rootcause ${curEntry.reportId} 同身份缺 exact basedOnReport fix`);
+      if (fixIndex < 0) {
+        const hasDeferredFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
+          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
+          const candidateIdentity = lifecycleIdentity(candidate);
+          return (
+            candidateIdentity.phase === rootIdentity.phase &&
+            candidateIdentity.round === rootIdentity.round &&
+            candidateIdentity.basedOnReport === rootIdentity.reportId &&
+            !completeImplementationIdentity(candidate)
+          );
+        });
+        if (hasDeferredFix) {
+          diagnostics.push(`LEGACY_UNSCOPED: rootcause ${curEntry.reportId} exact fix identity incomplete; deferred`);
+        } else {
+          violations.push(`R7: rootcause ${curEntry.reportId} 同身份缺 exact basedOnReport fix`);
+        }
+      }
       continue;
     }
 
@@ -762,8 +800,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R8-4：严格生命周期按 fix identity segment 校验；legacy fixtures retain
-  // the historical phase-wide template until they can provide identity fields.
+  // R8-4：严格生命周期按每个 fix 的独立窗口校验。窗口在下一 fix 或
+  // 第一个成功 checkpoint（terminal event）处结束，后续记录不能掩盖前段顺序。
   if (strictLifecycleMode) {
     for (const [phase, phaseEntryList] of phaseEntries) {
       for (let start = 0; start < phaseEntryList.length; start++) {
@@ -771,34 +809,67 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         if (startEntry.role !== 'S' || !['fix', 'emergency-fix'].includes(startEntry.action)) continue;
         if (!completeImplementationIdentity(startEntry)) continue;
         const identity = lifecycleIdentity(startEntry);
-        const segment = phaseEntryList
-          .slice(start)
-          .filter(({ entry }) => sameIdentity(lifecycleIdentity(entry), identity));
-        const firstIndex = (pred: (e: RunLogEntry) => boolean): number => segment.findIndex(({ entry }) => pred(entry));
-        const lastIndex = (pred: (e: RunLogEntry) => boolean): number => {
-          for (let i = segment.length - 1; i >= 0; i--) if (pred(segment.at(i)!.entry)) return i;
-          return -1;
-        };
+        const nextFix = phaseEntryList.findIndex(
+          ({ entry }, index) => index > start && entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action),
+        );
+        const terminal = phaseEntryList.findIndex(
+          ({ entry }, index) => index > start && entry.action === 'checkpoint' && entry.outcome === 'success',
+        );
+        const boundaries = [phaseEntryList.length];
+        if (nextFix >= 0) boundaries.push(nextFix);
+        if (terminal >= 0) boundaries.push(terminal + 1);
+        const windowEnd = Math.min(...boundaries);
+        const window = phaseEntryList.slice(start, windowEnd);
+        const exactEntry = (entry: RunLogEntry): boolean => sameIdentity(lifecycleIdentity(entry), identity);
+        const firstIndex = (pred: (e: RunLogEntry) => boolean): number => window.findIndex(({ entry }) => pred(entry));
         const chain: Array<[string, number]> = [
-          ['S(fix|emergency-fix)', firstIndex((entry) => entry === startEntry)],
-          ['R3(r3-completeness|r3-reliability|r3-security)', firstIndex((entry) => R3_ACTIONS.includes(entry.action))],
+          ['S(fix|emergency-fix)', 0],
+          [
+            'R3(r3-completeness|r3-reliability|r3-security)',
+            firstIndex(
+              (entry) =>
+                exactEntry(entry) &&
+                entry.role === 'R' &&
+                entry.outcome === 'success' &&
+                R3_ACTIONS.includes(entry.action),
+            ),
+          ],
           [
             'V(implementation review)',
-            firstIndex((entry) => hasPassedReview(entry) && entry.targetKind !== 'rootcause'),
+            firstIndex((entry) => exactEntry(entry) && hasPassedReview(entry) && entry.targetKind !== 'rootcause'),
           ],
           [
             'G(implementation gate)',
-            lastIndex((entry) => GATE_ACTIONS.has(entry.action) && entry.targetKind !== 'rootcause'),
+            firstIndex(
+              (entry) =>
+                exactEntry(entry) &&
+                hasPassedGate(entry) &&
+                GATE_ACTIONS.has(entry.action) &&
+                entry.targetKind !== 'rootcause',
+            ),
           ],
-          ['checkpoint', lastIndex((entry) => entry.action === 'checkpoint' && entry.outcome === 'success')],
+          ['checkpoint', firstIndex((entry) => entry.action === 'checkpoint' && entry.outcome === 'success')],
         ];
+        const [, r3Index] = chain[1]!;
+        const [, reviewIndex] = chain[2]!;
+        const [, gateIndex] = chain[3]!;
+        if (gateIndex >= 0 && reviewIndex < 0) {
+          violations.push(
+            `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 在窗口内先出现 implementation G，但缺同窗口 implementation V；后续 fix/terminal event 不得回填前段`,
+          );
+        }
+        if (reviewIndex >= 0 && r3Index < 0) {
+          violations.push(
+            `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 在窗口内出现 implementation V，但缺同窗口 R3`,
+          );
+        }
         for (let a = 0; a < chain.length - 1; a++) {
           for (let b = a + 1; b < chain.length; b++) {
             const [nameA, idxA] = chain[a]!;
             const [nameB, idxB] = chain[b]!;
             if (idxA >= 0 && idxB >= 0 && idxA > idxB) {
               violations.push(
-                `R8: 阶段 ${phase} identity segment ${identity.reportId} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，理想链为 S → R3 → V → G → checkpoint`,
+                `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，窗口须按 S → R3 → V → G → checkpoint 独立闭合`,
               );
             }
           }

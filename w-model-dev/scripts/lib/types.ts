@@ -34,5 +34,9 @@ export interface JsonReport {
   dynamicMeasurements?: Record<string, unknown>;
   /** 非阻断生命周期诊断（例如 LEGACY_UNSCOPED/pending-pre-approval）。 */
   diagnostics?: string[];
+  /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
+  lifecycleStatus?: string;
+  /** run-log exit 0 的语义边界说明。 */
+  statusNote?: string;
   durationMs: number;
 }

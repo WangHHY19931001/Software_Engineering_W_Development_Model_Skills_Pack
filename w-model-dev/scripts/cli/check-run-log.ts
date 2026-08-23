@@ -176,6 +176,14 @@ async function main(): Promise<void> {
   // 构建 options 并调用纯逻辑校验
   const result = checkRunLog(entries, { tlaCheckRounds, gateLogs });
   const exitCode = result.passed ? 0 : 1;
+  const lifecycleStatus =
+    result.passed && (!result.diagnostics || result.diagnostics.length === 0)
+      ? 'CLOSED_UNDER_CURRENT_RULES'
+      : 'NOT_CLOSED_NOT_PROVEN';
+  const statusNote =
+    result.passed && result.diagnostics && result.diagnostics.length > 0
+      ? 'exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。'
+      : undefined;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
@@ -185,6 +193,8 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.violations,
         violations: buildViolationDistribution(result.violations.length),
+        lifecycleStatus,
+        ...(statusNote ? { statusNote } : {}),
         ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
@@ -205,6 +215,7 @@ async function main(): Promise<void> {
     `--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`,
   );
   console.log(`校验结果        : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
+  console.log(`生命周期状态    : ${lifecycleStatus}`);
   console.log('─'.repeat(60));
 
   if (result.passed) {
