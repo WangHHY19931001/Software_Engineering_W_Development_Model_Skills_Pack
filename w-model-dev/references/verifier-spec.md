@@ -761,20 +761,13 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 
 根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
 
-R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
-R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
-R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
-R10-C4 same-artifact：same artifact canonical-first and not counted twice。
-R10-C5 cross-artifact：different artifact conflict is fail-closed。
-R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
-R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
-<!-- R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"} -->
-<!-- R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5} -->
-<!-- R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"} -->
-<!-- R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"} -->
-<!-- R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
+<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
+<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
+<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
+<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
+<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
+<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
+<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
 
 V-lead 聚合规则见 spec §9.7。
 

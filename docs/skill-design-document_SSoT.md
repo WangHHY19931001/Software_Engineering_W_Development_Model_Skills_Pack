@@ -3,18 +3,22 @@
 ## 1. 项目概述
 
 ### 1.1 项目名称
+
 **W-Model AI Assistant Skill** - 基于AI辅助编码技术的W开发模型闭环工作技能
 
 ### 1.2 项目定位
+
 本技能旨在利用AI辅助编码技术，实现软件工程中W开发模型的全流程闭环管理，将开发与测试并行推进，提升软件开发效率和质量。
 
 ### 1.3 核心目标
+
 - 实现W模型中开发与测试的并行协作
 - 通过AI技术自动化各阶段的文档生成、代码编写和测试设计
 - 构建完整的软件开发生命周期闭环
 - 提升开发者的工作效率和软件产品质量
 
 ### 1.4 文档定位
+
 本文档为W-Model AI Assistant Skill的**单一事实来源（Single Source of Truth, SSoT）**，包含所有设计决策、需求定义、测试用例、集成规范和验收标准。所有相关团队和系统均应以本文档为准。
 
 > **参考实现**：本技能的设计经端到端调测验证（博客系统 8 阶段全流程），调测产物归档于
@@ -29,34 +33,41 @@
 ## 2. W模型理论基础
 
 ### 2.1 W模型定义
+
 W模型由Evolutif公司提出，是对V模型的扩展和演进。它由两个相互关联、同步进行的"V"字型结构组成：
+
 - **左V（开发侧）**：需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码
 - **右V（测试侧）**：验收测试设计 → 系统测试设计 → 集成测试设计 → 单元测试设计 → 测试执行
 
 ### 2.2 W模型核心特点
-| 特点 | 描述 |
-|------|------|
-| 开发与测试并行 | 测试活动在开发早期即启动，与开发同步推进 |
+
+| 特点           | 描述                                                   |
+| -------------- | ------------------------------------------------------ |
+| 开发与测试并行 | 测试活动在开发早期即启动，与开发同步推进               |
 | 全生命周期测试 | 覆盖需求测试、设计测试、单元测试、集成测试、系统测试等 |
-| 测试对象扩展 | 测试对象不仅是程序，还包括需求和设计文档 |
-| 缺陷早发现 | 尽早发现需求或设计缺陷，降低修复成本 |
+| 测试对象扩展   | 测试对象不仅是程序，还包括需求和设计文档               |
+| 缺陷早发现     | 尽早发现需求或设计缺陷，降低修复成本                   |
 
 ### 2.3 W模型与其他模型对比
-| 模型 | 核心特点 | 适用场景 |
-|------|----------|----------|
-| 瀑布模型 | 线性阶段式开发，测试后置 | 需求明确、稳定的项目 |
-| V模型 | 开发与测试对应，但测试在编码后执行 | 需求明确、变更较少的项目 |
-| W模型 | 开发与测试并行，测试前置 | 需求相对稳定、需保证质量的项目 |
-| 敏捷模型 | 快速迭代、持续交付 | 需求频繁变更的项目 |
+
+| 模型     | 核心特点                           | 适用场景                       |
+| -------- | ---------------------------------- | ------------------------------ |
+| 瀑布模型 | 线性阶段式开发，测试后置           | 需求明确、稳定的项目           |
+| V模型    | 开发与测试对应，但测试在编码后执行 | 需求明确、变更较少的项目       |
+| W模型    | 开发与测试并行，测试前置           | 需求相对稳定、需保证质量的项目 |
+| 敏捷模型 | 快速迭代、持续交付                 | 需求频繁变更的项目             |
 
 ### 2.4 W模型优势与局限性
+
 **优势**：
+
 - 测试提前介入，缺陷早发现，降低修复成本
 - 测试覆盖更全面，减少后期风险
 - 结构清晰，易于管理和跟踪
 - 全面提升团队质量意识
 
 **局限性**：
+
 - 灵活性差，难以应对需求频繁变更
 - 文档依赖重，文档质量直接决定项目成败
 - 初期投入大，需要前期设计和测试规划
@@ -106,15 +117,18 @@ graph LR
 **功能描述**：将自然语言需求转化为结构化的需求规格说明书，并同步设计验收测试用例
 
 **输入**：
+
 - 用户自然语言需求描述
 - 业务背景信息
 
 **输出**：
+
 - 《需求规格说明书》
 - 验收测试用例设计文档
 - 需求风险评估报告
 
 **宿主 Agent 能力应用**：
+
 - 自然语言理解与结构化提取
 - 需求完整性检查
 - 需求冲突检测
@@ -128,11 +142,13 @@ graph LR
 **功能描述**：基于需求文档进行系统架构设计和详细设计，并同步设计系统测试和集成测试用例
 
 **子模块**：
+
 - **系统设计子模块**：生成系统架构图、技术选型建议、模块划分方案
 - **详细设计子模块**：生成类图、数据库设计、接口定义
 - **测试设计子模块**：同步生成系统测试用例和集成测试用例
 
 **宿主 Agent 能力应用**：
+
 - 架构设计建议生成
 - UML图自动生成
 - 接口定义文档生成
@@ -148,15 +164,18 @@ graph LR
 **功能描述**：根据详细设计文档生成代码，并同步生成和执行单元测试
 
 **输入**：
+
 - 详细设计文档
 - 技术栈要求
 
 **输出**：
+
 - 完整代码实现
 - 单元测试用例
 - 测试覆盖率报告
 
 **宿主 Agent 能力应用**：
+
 - 代码自动生成
 - 代码质量检查
 - 单元测试用例生成
@@ -170,14 +189,17 @@ graph LR
 **功能描述**：验证模块间的交互正确性
 
 **输入**：
+
 - 集成测试设计文档
 - 已完成的模块代码
 
 **输出**：
+
 - 集成测试执行结果
 - 接口兼容性报告
 
 **宿主 Agent 能力应用**：
+
 - 集成测试用例执行
 - 接口调用验证
 - 测试结果分析
@@ -190,15 +212,18 @@ graph LR
 **功能描述**：在模拟真实环境下验证系统整体功能
 
 **输入**：
+
 - 系统测试设计文档
 - 完整系统代码
 
 **输出**：
+
 - 系统测试报告
 - 性能测试结果
 - 安全测试结果
 
 **宿主 Agent 能力应用**：
+
 - 自动化测试执行
 - 性能测试脚本生成
 - 安全漏洞检测
@@ -211,14 +236,17 @@ graph LR
 **功能描述**：确认软件是否满足最初的需求规格
 
 **输入**：
+
 - 验收测试设计文档
 - 完整系统
 
 **输出**：
+
 - 验收测试报告
 - 用户确认结果
 
 **宿主 Agent 能力应用**：
+
 - 验收测试用例执行
 - 用户需求匹配验证
 
@@ -229,25 +257,26 @@ graph LR
 
 本技能遵循「技能包只包含提示词、参考、模板，里面的脚本只做门禁，不涉及 LLM」的架构原则。该原则决定技能包内部与外部的明确边界：
 
-| 能力 | 归属 | 实现位置 |
-|---|---|---|
-| W 模型阶段编排、RTM 维护、状态管理 | 技能内 | `w-model-dev/SKILL.md`（编排逻辑，Agent 执行）+ `w-model-dev/references/*`（阶段细则） |
-| 阶段产物门禁（工件质量门） | 技能内（脚本只做门禁） | `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts` |
-| LLM-as-a-Verifier 评审（三维度验证 / 连续评分 / PPT / 子标准） | **技能内提供提示词与输出 Schema，外部 Agent 执行** | `w-model-dev/references/verifier-spec.md`（提示词）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（校验） |
-| LLM 推理本身 | **外部** | 由外部 Agent（Trae / Claude / Cursor 等）自行调用其 LLM 完成 |
-| 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估 / 轨迹分析） | **外部** | [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill) |
+| 能力                                                                | 归属                                               | 实现位置                                                                                                        |
+| ------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| W 模型阶段编排、RTM 维护、状态管理                                  | 技能内                                             | `w-model-dev/SKILL.md`（编排逻辑，Agent 执行）+ `w-model-dev/references/*`（阶段细则）                          |
+| 阶段产物门禁（工件质量门）                                          | 技能内（脚本只做门禁）                             | `w-model-dev/scripts/logic/gate-logic.ts` + `check-artifact-gate.ts`                                            |
+| LLM-as-a-Verifier 评审（三维度验证 / 连续评分 / PPT / 子标准）      | **技能内提供提示词与输出 Schema，外部 Agent 执行** | `w-model-dev/references/verifier-spec.md`（提示词）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（校验） |
+| LLM 推理本身                                                        | **外部**                                           | 由外部 Agent（Trae / Claude / Cursor 等）自行调用其 LLM 完成                                                    |
+| 技能自演化（Rollout / Reflect / Edit / Skill Lift 评估 / 轨迹分析） | **外部**                                           | [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)  |
 
 要点：
+
 - **技能本身不内置 LLM 调用**。阶段产物的 LLM-as-a-Verifier 评审通过提示词方式让外部 Agent 执行，技能只提供提示词 + 输出 Schema + 校验脚本（防外部 Agent 输出漂移）。`/wm review` 命令仅返回结构化评审指引，不直接调用 LLM。
 - **LLM-as-a-Verifier 属于技能内部各阶段产物校验流程的一部分**，是 W 模型阶段门评审的实现方式，并非独立的「LLM 引擎」模块。
 - **技能本身不包含演化机制与轨迹分析**。技能演化（Rollout / Reflect / Edit / Skill Lift 评估）由外部工具（SkillOpt / darwin-skill）完成，它们可消费本技能产出的 `VerifierOutput` JSON 作为训练信号。
 
 ### 3.3.1 外部工具集成
 
-| 工具 | 定位 | 集成方式 | 应用阶段 | 触发条件 |
-|---|---|---|---|---|
-| codegraph | 修改前影响分析（callers/callees/blast radius） | 宿主 Agent MCP（`codegraph_explore`）+ auto-sync | 5-8 | S-coding 任何 Edit/Write 前（约束 #14） |
-| OpenSpec | 规格级任务规划（opsx:explore/propose/apply/archive） | 宿主 Agent CLI/技能（`/opsx:*`） | 5-8 | S-explore/S-propose/S-coding 分派时 |
+| 工具      | 定位                                                 | 集成方式                                         | 应用阶段 | 触发条件                                |
+| --------- | ---------------------------------------------------- | ------------------------------------------------ | -------- | --------------------------------------- |
+| codegraph | 修改前影响分析（callers/callees/blast radius）       | 宿主 Agent MCP（`codegraph_explore`）+ auto-sync | 5-8      | S-coding 任何 Edit/Write 前（约束 #14） |
+| OpenSpec  | 规格级任务规划（opsx:explore/propose/apply/archive） | 宿主 Agent CLI/技能（`/opsx:*`）                 | 5-8      | S-explore/S-propose/S-coding 分派时     |
 
 技能包不内置调用上述工具，通过 CHECKPOINT 指令 + 子代理分派模板触发。依赖检测与自动安装由 `ensure-codegraph-opsx.ts` 承载。
 
@@ -270,14 +299,14 @@ graph LR
 
 #### 3.4.2 角色划分（五层子代理 + 编排者：O / A / S / V / G / R；F 由 S 兼任）
 
-| 角色 | 简称 | 职责 | 允许动作 | 禁止动作 |
-|---|---|---|---|---|
-| **编排者** | O | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化 | 读 `.w-model/*.json`、跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看退出码（只读）、`git status`、`ls`、向用户展示证据、离线进化场景下执行 reflect→bounded edit→validation gate（状态读写+分析，非实施；区别于运行时阶段产物生成，反模式 #10 约束运行时编排） | 写代码、改文档、产出 `VerifierOutput` JSON、生成测试用例、改 RTM 实体（产出 / 评审 / 门禁结果内容） |
-| **产出子代理** | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体 +（阶段 1–4）产出 TLA+ 层次化状态机规格（`.tla` + `.cfg` + `tla-manifest.json` 实体） | 写文件、跑测试运行器（仅产出阶段）、改 `.w-model/rtm.json` 实体、写 `tla/*.tla` / `tla/*.cfg` / `.w-model/tla-manifest.json` | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-tla-model.ts`、越阶段产出、产出占位/简化/错误 TLA+ 实现（反模式 #16） |
-| **评审子代理** | V | 按 [`agent-personas.md`](../w-model-dev/references/agent-personas.md) + [`verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 产出 `VerifierOutput` JSON；含 TLA+ 规格与需求/设计的语义一致性评审 | 读产物文件（含 `.tla`）、产出 JSON 评审 | 跑门禁脚本、改产物文件、改 RTM |
-| **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-tla-model.ts`（阶段 1–4） + 回填证据摘要 | 跑门禁脚本、读 GATE_JSON / Verifier JSON / TLA_JSON、产出证据摘要字符串 | 改产物文件、产出 `VerifierOutput` JSON、改 RTM 实体、改 `.tla` / `tla-manifest.json` 实体 |
-| **分析子代理** | A | 分块分析、交叉合并、图谱演进（阶段 1–4 活跃） | 读原始文档分块 / S 产出的正式文档、写 `.w-model/ingestion/<chunk-id>.{md,json}`、合并建图产出 `consolidated.json` + `cross-analysis-report.md` + `reworkHints`、通过晋升 `consolidated.json` 更新 `graph.json` | 跑 `check-requirement-graph.ts`（G 负责）、写正式阶段产物、改 `project.status`、越阶段产出、删除前阶段已通过的图谱节点 |
-| **根因定位子代理** | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施） | 读失败产物文件 + 上游产物、读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON、运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）、产出 `RootCauseReport` JSON + `.md` 报告文件、标记 `upstreamDefect`、作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出 | 改任何产物文件（由 S 修复）、跑门禁脚本（由 G 负责）、改 RTM 实体、改 `project.status`、跨阶段定位（仅当前阶段产物 + 上游回溯标记）、评审其他角色产出 |
+| 角色               | 简称 | 职责                                                                                                                                                                                                            | 允许动作                                                                                                                                                                                                                                                                   | 禁止动作                                                                                                                                              |
+| ------------------ | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **编排者**         | O    | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化                                                                                                                                                             | 读 `.w-model/*.json`、跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看退出码（只读）、`git status`、`ls`、向用户展示证据、离线进化场景下执行 reflect→bounded edit→validation gate（状态读写+分析，非实施；区别于运行时阶段产物生成，反模式 #10 约束运行时编排） | 写代码、改文档、产出 `VerifierOutput` JSON、生成测试用例、改 RTM 实体（产出 / 评审 / 门禁结果内容）                                                   |
+| **产出子代理**     | S    | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体 +（阶段 1–4）产出 TLA+ 层次化状态机规格（`.tla` + `.cfg` + `tla-manifest.json` 实体）                                                                           | 写文件、跑测试运行器（仅产出阶段）、改 `.w-model/rtm.json` 实体、写 `tla/*.tla` / `tla/*.cfg` / `.w-model/tla-manifest.json`                                                                                                                                               | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-tla-model.ts`、越阶段产出、产出占位/简化/错误 TLA+ 实现（反模式 #16）               |
+| **评审子代理**     | V    | 按 [`agent-personas.md`](../w-model-dev/references/agent-personas.md) + [`verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §8 产出 `VerifierOutput` JSON；含 TLA+ 规格与需求/设计的语义一致性评审 | 读产物文件（含 `.tla`）、产出 JSON 评审                                                                                                                                                                                                                                    | 跑门禁脚本、改产物文件、改 RTM                                                                                                                        |
+| **门禁子代理**     | G    | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` / `check-tla-model.ts`（阶段 1–4） + 回填证据摘要                                                                                                      | 跑门禁脚本、读 GATE_JSON / Verifier JSON / TLA_JSON、产出证据摘要字符串                                                                                                                                                                                                    | 改产物文件、产出 `VerifierOutput` JSON、改 RTM 实体、改 `.tla` / `tla-manifest.json` 实体                                                             |
+| **分析子代理**     | A    | 分块分析、交叉合并、图谱演进（阶段 1–4 活跃）                                                                                                                                                                   | 读原始文档分块 / S 产出的正式文档、写 `.w-model/ingestion/<chunk-id>.{md,json}`、合并建图产出 `consolidated.json` + `cross-analysis-report.md` + `reworkHints`、通过晋升 `consolidated.json` 更新 `graph.json`                                                             | 跑 `check-requirement-graph.ts`（G 负责）、写正式阶段产物、改 `project.status`、越阶段产出、删除前阶段已通过的图谱节点                                |
+| **根因定位子代理** | R    | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施）                                                           | 读失败产物文件 + 上游产物、读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON、运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）、产出 `RootCauseReport` JSON + `.md` 报告文件、标记 `upstreamDefect`、作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出  | 改任何产物文件（由 S 修复）、跑门禁脚本（由 G 负责）、改 RTM 实体、改 `project.status`、跨阶段定位（仅当前阶段产物 + 上游回溯标记）、评审其他角色产出 |
 
 > **修复者 F 由 S 兼任**：F 不是新角色，是 S 在返工场景下「携带 R 报告作为额外输入执行修复」的模式。S 首次产出时不带 R 报告；返工时必带已通过 V 复审 + G 门禁的 R 报告（见反模式 #18/#19）。
 >
@@ -323,6 +352,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 5. 跳过 S → V → G 顺序（如编排者自评自审）。
 
 编排者**允许**的动作：
+
 - 读 `.w-model/project.json` / `.w-model/rtm.json` / `.w-model/budget.json` / `.w-model/run-log.jsonl` / `.w-model/maturity.json`；
 - 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看**退出码**（用于向用户展示或路由判定，不替代 G 子代理的回填职责）；
 - `git status` / `ls` / `Read` 等只读核验；
@@ -334,48 +364,54 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 #### 3.4.6 门禁增强约束
 
-
 ##### P1.1 TLA+ manifest basePath 强制
+
 - `tla-manifest.json` 须包含 `basePath` 字段（强制必填，非可选）
 - `tools.jarPath` / `specs[].tlaPath` / `specs[].cfgPath` 全部相对 `basePath` 解析
 - 缺失/非字符串/空字符串 → `check-tla-model.ts` 退出码 1
 
 ##### P1.2 TLA+ SD 覆盖率（按成熟度分级，约束 #13）
+
 - L2/L3 项目：所有 spec 须含 `requirementIds` 且至少一个 SD-xxx 标识；每个 SD-xxx 须被至少一个 spec 的 requirementIds 包含
 - L1 教学/demo 项目：TLA+ 门禁可选，本条不强制（分级见 §3.4.3 阶段门说明）
 - 违反 → `check-tla-model.ts` 退出码 1
 
 ##### P1.3 Verifier passed↔qualityLevel 严格一致（无例外）
+
 - `passed` 必须严格等于 `(qualityLevel === 'A' || qualityLevel === 'B')`
 - 禁止通过 summary 或任何字段降级
 - P0 未解决时 `qualityLevel` 须实际降为 C/D，不得保持 B 级同时 `passed=false`
 - 不一致 → `check-verifier-output.ts` 退出码 1
 
 ##### P1.4 RTM codeModule 回填时机
+
 - 阶段5编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列
 - 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）
 - 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1
 
 ##### P2.5 UAT 路径映射表
+
 - 阶段1设计 UAT 时须产出 `docs/uat-path-mapping.md`
 - 阶段5编码后回填实际路径列
 - 阶段8验收测试编写时按映射表对应，禁止凭主观判断
 
 ##### P2.6 TLA+ 不变式业务语义对齐
+
 - 每个 TLA+ 不变式须在 .tla 文件注释中标注 `@designRef <doc>#<section>`
 - V 评审须校验业务语义对齐（非仅语法/模型检查通过）
 - 评审者须为每个不变式提供设计文档引用 + 业务语义解释
 
 ##### P2.7 phase-8 三段暂停点语义
+
 - A 段（用例执行）：自驱模式下连续执行不暂停
 - B 段（每 30% 暂停）：自驱模式下合并为单次中点检查（50% 时）
 - C 段（最终用户确认）：任何模式下强制暂停，须用户在 §9 确认
 
 ##### P2.8 TLA+ Next 分支命名约定
+
 - TLA+ Action 名：PascalCase（如 `PublishAnnouncement`）
 - 代码方法名：camelCase（如 `publishAnnouncement`）
 - `check-code-tla-consistency.ts` 维度3 支持 PascalCase→camelCase 自动映射
-
 
 #### 设计决策历史（历史信息由 CHANGELOG 体系承载）
 
@@ -399,54 +435,54 @@ flowchart TB
         R5 -->|通过| S1
         R5 -->|不通过| R1
     end
-    
+
     subgraph 系统设计阶段
         S1[AI生成系统架构设计] --> S2[AI同步设计系统测试用例]
         S2 --> S3[设计评审]
         S3 -->|通过| P1
         S3 -->|不通过| S1
     end
-    
+
     subgraph 概要设计阶段
         P1[AI生成模块接口设计] --> P2[AI同步设计集成测试用例]
         P2 --> P3[设计评审]
         P3 -->|通过| D1
         P3 -->|不通过| P1
     end
-    
+
     subgraph 详细设计阶段
         D1[AI生成类/方法级设计] --> D2[AI同步设计单元测试用例]
         D2 --> D3[设计评审]
         D3 -->|通过| C1
         D3 -->|不通过| D1
     end
-    
+
     subgraph 编码实现阶段
         C1[AI生成代码] --> C2[AI执行单元测试]
         C2 --> C3[代码审查]
         C3 -->|通过| I1
         C3 -->|不通过| C1
     end
-    
+
     subgraph 集成测试阶段
         I1[AI执行集成测试] --> I2[接口验证]
         I2 -->|通过| ST1
         I2 -->|不通过| C1
     end
-    
+
     subgraph 系统测试阶段
         ST1[AI执行系统测试] --> ST2[AI执行性能/安全测试]
         ST2 --> ST3[缺陷修复]
         ST3 -->|完成| U1
         ST3 -->|需修复| C1
     end
-    
+
     subgraph 验收测试阶段
         U1[AI执行验收测试] --> U2[用户确认]
         U2 -->|通过| FIN[项目完成]
         U2 -->|不通过| R1
     end
-    
+
     style R1 fill:#e3f2fd,stroke:#1976d2
     style FIN fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
 ```
@@ -463,17 +499,17 @@ graph TD
     F --> G[集成测试]
     G --> H[系统测试]
     H --> I[验收测试]
-    
+
     A -.-> AT[验收测试设计]
     B -.-> ST[系统测试设计]
     C -.-> IT[集成测试设计]
     D -.-> UT[单元测试设计]
-    
+
     AT --> I
     ST --> H
     IT --> G
     UT --> F
-    
+
     style A fill:#bbdefb,stroke:#1976d2
     style B fill:#bbdefb,stroke:#1976d2
     style C fill:#bbdefb,stroke:#1976d2
@@ -492,6 +528,7 @@ graph TD
 ### 4.3 核心交互模式
 
 #### 4.3.1 需求分析交互
+
 ```
 用户: 我需要一个在线商城系统，支持用户注册、商品浏览、购物车和订单功能
 AI: 正在分析需求...
@@ -504,6 +541,7 @@ AI: 已同步生成验收测试用例，涵盖50+测试场景
 ```
 
 #### 4.3.2 设计阶段交互
+
 ```
 用户: 请进行系统架构设计
 AI: 正在进行架构设计...
@@ -516,6 +554,7 @@ AI: 已同步生成系统测试用例，覆盖各模块集成场景
 ```
 
 #### 4.3.3 编码阶段交互
+
 ```
 用户: 请实现用户注册功能
 AI: 正在生成代码...
@@ -554,50 +593,50 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 以下行为在 W 模型 8 阶段全程适用，与「不可违反的约束」互补：约束是「不可越界」的红线，操作行为是「主动遵守」的准则。
 
-| # | 行为 | 在 W 模型中的具体表现 |
-|---|---|---|
-| 1 | **Surface Assumptions（显式声明假设）** | `/wm analyze` 进入阶段 1 前、`/wm design` 选型前、`/wm code` 生成前，显式列出对需求 / 架构 / 范围的假设；不得静默填补歧义需求 |
-| 2 | **Manage Confusion Actively（主动管理困惑）** | 遇到 RTM 不一致、上游产物缺失、跨阶段术语冲突时：STOP → 命名具体困惑 → 向用户提出澄清问题 → 等待解决；禁止「猜一个推进」 |
-| 3 | **Push Back When Warranted（必要时反驳）** | 当用户的选择与硬约束冲突（如要求跳过 CHECKPOINT / 估算覆盖率放行）时：直接指出问题 → 量化代价 → 提出替代方案 → 接受用户在完整信息下的覆盖决策 |
-| 4 | **Enforce Simplicity（强制简洁）** | 编码前自问「能否更少行？抽象是否物有所值？资深工程师是否会问『为何不直接……』」；1000 行能 100 行完成即失败 |
-| 5 | **Maintain Scope Discipline（保持范围纪律）** | 只动该动的；不删除看不懂的注释、不顺手清理无关代码、不重构相邻系统、不删除「看似无用」的代码除非显式批准、不加规格外「看似有用」的功能 |
-| 6 | **Verify, Don't Assume（验证而非假设）** | 每个阶段都必须有验证证据（测试通过 / 脚本退出码 / 运行时数据）；「看起来对了」永远不够；§10.5 工件质量门是验证的最后一道闸 |
-| 7 | **Choose Highest Seam（选择最高 seam）** | 阶段 2-4 测试设计前置时，优先选现有最高 seam（系统层 HTTP/CLI/进程边界，模块层公共导出，单元层公共 API）；理想零新 seam；禁止为"覆盖率"新建 seam；私有状态机转移由 TLA+ 不变式断言覆盖（与约束 13 协同） |
-| 8 | **Structure Over Persuasion（结构优于说服）** | 能焊进结构的约束（权限 / 只读 / 网络隔离 / schema 拦截）就不写进提示词；提示词约束是说服性的、每一步都要选择遵守，结构约束是确定性的 |
+| #   | 行为                                          | 在 W 模型中的具体表现                                                                                                                                                                                    |
+| --- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Surface Assumptions（显式声明假设）**       | `/wm analyze` 进入阶段 1 前、`/wm design` 选型前、`/wm code` 生成前，显式列出对需求 / 架构 / 范围的假设；不得静默填补歧义需求                                                                            |
+| 2   | **Manage Confusion Actively（主动管理困惑）** | 遇到 RTM 不一致、上游产物缺失、跨阶段术语冲突时：STOP → 命名具体困惑 → 向用户提出澄清问题 → 等待解决；禁止「猜一个推进」                                                                                 |
+| 3   | **Push Back When Warranted（必要时反驳）**    | 当用户的选择与硬约束冲突（如要求跳过 CHECKPOINT / 估算覆盖率放行）时：直接指出问题 → 量化代价 → 提出替代方案 → 接受用户在完整信息下的覆盖决策                                                            |
+| 4   | **Enforce Simplicity（强制简洁）**            | 编码前自问「能否更少行？抽象是否物有所值？资深工程师是否会问『为何不直接……』」；1000 行能 100 行完成即失败                                                                                               |
+| 5   | **Maintain Scope Discipline（保持范围纪律）** | 只动该动的；不删除看不懂的注释、不顺手清理无关代码、不重构相邻系统、不删除「看似无用」的代码除非显式批准、不加规格外「看似有用」的功能                                                                   |
+| 6   | **Verify, Don't Assume（验证而非假设）**      | 每个阶段都必须有验证证据（测试通过 / 脚本退出码 / 运行时数据）；「看起来对了」永远不够；§10.5 工件质量门是验证的最后一道闸                                                                               |
+| 7   | **Choose Highest Seam（选择最高 seam）**      | 阶段 2-4 测试设计前置时，优先选现有最高 seam（系统层 HTTP/CLI/进程边界，模块层公共导出，单元层公共 API）；理想零新 seam；禁止为"覆盖率"新建 seam；私有状态机转移由 TLA+ 不变式断言覆盖（与约束 13 协同） |
+| 8   | **Structure Over Persuasion（结构优于说服）** | 能焊进结构的约束（权限 / 只读 / 网络隔离 / schema 拦截）就不写进提示词；提示词约束是说服性的、每一步都要选择遵守，结构约束是确定性的                                                                     |
 
 ### 4A.2 失败模式清单
 
 以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 的 48 条流程反模式（#1~#48）互补：反模式是「流程破坏」，失败模式是「行为退化」。
 
-| # | 失败模式 | 与 W 模型反例的关系 |
-|---|---|---|
-| F1 | 静默假设未检查就推进 | 与 #9（谎报状态）互补：#9 是结果撒谎，F1 是过程撒谎 |
-| F2 | 困惑时不暂停、硬猜推进 | 与 #8（越过 CHECKPOINT）互补：#8 是显式节点越过，F2 是隐式困惑越过 |
-| F3 | 注意到不一致但不指出 | 与 #4（评审未通过悄悄小修）互补：#4 是评审后，F3 是评审中 |
-| F4 | 非显然决策不呈现 tradeoff | — |
-| F5 | 对明显有问题的方案 sycophantic「当然可以」 | 与 §4A.1 第 3 条直接对应 |
-| F6 | 过度复杂化代码与 API | 与 §4A.1 第 4 条直接对应 |
-| F7 | 修改任务外的代码或注释 | 与 §4A.1 第 5 条直接对应 |
-| F8 | 删除未完全理解的代码 | 与 §4A.1 第 5 条直接对应 |
-| F9 | 因「显而易见」而无规格就编码 | 与 W 模型「测试设计前置」冲突 |
-| F10 | 因「看起来对」跳过验证 | 与 #3（估算质量门）/ #6（估算 RTM 覆盖率）互补 |
+| #   | 失败模式                                   | 与 W 模型反例的关系                                                |
+| --- | ------------------------------------------ | ------------------------------------------------------------------ |
+| F1  | 静默假设未检查就推进                       | 与 #9（谎报状态）互补：#9 是结果撒谎，F1 是过程撒谎                |
+| F2  | 困惑时不暂停、硬猜推进                     | 与 #8（越过 CHECKPOINT）互补：#8 是显式节点越过，F2 是隐式困惑越过 |
+| F3  | 注意到不一致但不指出                       | 与 #4（评审未通过悄悄小修）互补：#4 是评审后，F3 是评审中          |
+| F4  | 非显然决策不呈现 tradeoff                  | —                                                                  |
+| F5  | 对明显有问题的方案 sycophantic「当然可以」 | 与 §4A.1 第 3 条直接对应                                           |
+| F6  | 过度复杂化代码与 API                       | 与 §4A.1 第 4 条直接对应                                           |
+| F7  | 修改任务外的代码或注释                     | 与 §4A.1 第 5 条直接对应                                           |
+| F8  | 删除未完全理解的代码                       | 与 §4A.1 第 5 条直接对应                                           |
+| F9  | 因「显而易见」而无规格就编码               | 与 W 模型「测试设计前置」冲突                                      |
+| F10 | 因「看起来对」跳过验证                     | 与 #3（估算质量门）/ #6（估算 RTM 覆盖率）互补                     |
 
 > F1~F10 命中时不触发门禁脚本回退（它们不是流程反模式），但应在阶段产物的「备注」节或评审报告的 `reworkHints` 中标注。Agent 重复命中同一失败模式 ≥2 次时，应在 CHANGELOG 体系（[`decision-log`](./changes/decision-log/README.md)）登记为新教训。
 
 ### 4A.2a 运维失败模式清单（O1~O6）
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
-> 与 48 条流程反模式（#1~#48）+ 10 条行为退化（F1~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
-> O 系列命中**不触发脚本回退**（与 F1~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
+> 与 48 条流程反模式（#1~#48）+ 10 条行为退化（F1~~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
+> O 系列命中**不触发脚本回退**（与 F1~~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
 
-| # | 失败模式 | 症状 | 与现有反模式/失败模式的关系 | 缓解措施 |
-|---|---|---|---|---|
-| O1 | Token Burn（子代理链对空/噪声 triage 全跑） | 单阶段 token 消耗异常高；ingestion 对低信息量输入仍全跑 A-chunk×N | 与 F10（跳过验证）互补：F10 是不验证，O1 是过度验证 | 预算检查（§10D）+ 早退：triage 发现空输入时 A-chunk 数=1；budgetBurnRate 触发 kill switch |
-| O2 | State Rot（状态文件引用已合并/已废弃产物） | rtm.json/graph.json 引用已删除文件或已废弃 ID | 与 #9（谎报状态）互补：#9 是状态造假，O2 是状态腐烂 | 每阶段门 G 子代理校验产物路径存活（`ls`/`git status`）；ID 失活 → 标记并 prune |
-| O3 | Verifier Theater（V 子代理"looks good"但 CI 挂） | V 评审 passed=true qualityLevel=A 但下游测试失败 | 与 #1（跳过评审）对立面：评审走了形式 | 强化 verifier-spec §1 设计原则：V 默认拒绝姿态（"find reasons to reject"）；V 须引用具体 evidence 非空泛；G 校验 evidence 非空 |
-| O4 | Comprehension Debt Spiral（用户橡皮图章 CHECKPOINT） | 用户对所有 CHECKPOINT 输入"确认"无修改意见；阶段产物无人理解 | 与 F5（sycophantic）互补：F5 是 Agent 奉承用户，O4 是用户奉承 Agent | 理解证据机制（§10.6 第六维度）：放行前须填 acknowledgedDecisions ≥1 关键决策；空确认视为 O4 命中 |
-| O5 | Cognitive Surrender（"循环处理了"无设计意见） | 用户放弃对设计/架构的意见；全权委托 Agent | 与 §4A.1 第 3 条（Push Back）对立面 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中 |
-| O6 | Escalation Failure（attempt cap 触发但无人被通知） | 返工达 maxReworkRounds 但用户未被告知；循环卡死 | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死 | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史 |
+| #   | 失败模式                                             | 症状                                                              | 与现有反模式/失败模式的关系                                         | 缓解措施                                                                                                                       |
+| --- | ---------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| O1  | Token Burn（子代理链对空/噪声 triage 全跑）          | 单阶段 token 消耗异常高；ingestion 对低信息量输入仍全跑 A-chunk×N | 与 F10（跳过验证）互补：F10 是不验证，O1 是过度验证                 | 预算检查（§10D）+ 早退：triage 发现空输入时 A-chunk 数=1；budgetBurnRate 触发 kill switch                                      |
+| O2  | State Rot（状态文件引用已合并/已废弃产物）           | rtm.json/graph.json 引用已删除文件或已废弃 ID                     | 与 #9（谎报状态）互补：#9 是状态造假，O2 是状态腐烂                 | 每阶段门 G 子代理校验产物路径存活（`ls`/`git status`）；ID 失活 → 标记并 prune                                                 |
+| O3  | Verifier Theater（V 子代理"looks good"但 CI 挂）     | V 评审 passed=true qualityLevel=A 但下游测试失败                  | 与 #1（跳过评审）对立面：评审走了形式                               | 强化 verifier-spec §1 设计原则：V 默认拒绝姿态（"find reasons to reject"）；V 须引用具体 evidence 非空泛；G 校验 evidence 非空 |
+| O4  | Comprehension Debt Spiral（用户橡皮图章 CHECKPOINT） | 用户对所有 CHECKPOINT 输入"确认"无修改意见；阶段产物无人理解      | 与 F5（sycophantic）互补：F5 是 Agent 奉承用户，O4 是用户奉承 Agent | 理解证据机制（§10.6 第六维度）：放行前须填 acknowledgedDecisions ≥1 关键决策；空确认视为 O4 命中                               |
+| O5  | Cognitive Surrender（"循环处理了"无设计意见）        | 用户放弃对设计/架构的意见；全权委托 Agent                         | 与 §4A.1 第 3 条（Push Back）对立面                                 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中                                                |
+| O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds 但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
 
 > O 系列命中不回退，但应在 run-log 的 note 字段标注（如 note="O1 Token Burn"），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
 
@@ -606,10 +645,10 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 > #18/#19 守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束（48 条流程反模式 #1~#48 之一族，权威定义见 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)）。命中即回退到当前阶段起点。
 > 权威定义见 [`w-model-dev/references/anti-patterns.md`](../w-model-dev/references/anti-patterns.md) + [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §7.1。
 
-| # | 反模式 | 危害 | 正确做法 |
-|---|---|---|---|
-| 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复 |
-| 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
+| #   | 反模式                                                            | 危害                                                                 | 正确做法                                                                             |
+| --- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 18  | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | V/G 不通过 → 必须先分派 R 定位 → V 复审根因 → G 门禁 → S-fix 携 R 报告修复           |
+| 19  | R 报告未经 V 复审直接交 S 修复                                    | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工               | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
 
 > #18/#19 命中即回退（与其余 46 条流程反模式同级）。R 方法论与多角度分析机制详见 §6.4.5 与 [`root-cause-locator.md`](../w-model-dev/references/root-cause-locator.md)；R 报告校验门禁详见 §10.9。
 
@@ -623,28 +662,32 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 三层互补架构：流程反模式（层 1，流程是否走对）→ 行为退化（层 2，Agent 行为是否健康）→ 运维失败模式（层 3，运行是否健康）。
 
-实现位置：[`w-model-dev/references/operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)「失败模式清单」节（F1~F10）+ 本节 §4A.2a「运维失败模式清单」节（O1~O6）+ [`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)「核心操作行为」节。
+实现位置：[`w-model-dev/references/operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)「失败模式清单」节（F1~~F10）+ 本节 §4A.2a「运维失败模式清单」节（O1~~O6）+ [`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)「核心操作行为」节。
 
 ---
 
 ## 5. AI能力集成策略
 
 ### 5.1 自然语言处理能力
+
 - **需求解析**：将非结构化自然语言转化为结构化需求
 - **意图识别**：理解用户开发意图和技术偏好
 - **文档生成**：自动生成各类技术文档
 
 ### 5.2 代码生成能力
+
 - **代码生成**：根据设计文档生成高质量代码
 - **代码补全**：智能补全代码片段
 - **代码重构**：优化现有代码结构
 
 ### 5.3 测试生成能力
+
 - **测试用例生成**：根据需求和设计自动生成测试用例
 - **测试执行**：自动执行测试并生成报告
 - **测试覆盖率分析**：分析测试覆盖情况
 
 ### 5.4 智能审查能力
+
 - **代码审查**：检查代码质量、安全漏洞
 - **文档审查**：验证文档完整性和一致性
 - **需求追踪**：确保代码实现与需求一致
@@ -665,24 +708,24 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 6.1 核心命令
 
-| 命令 | 功能描述 | 参数 | 产出 |
-|------|----------|------|--------|
-| `/wm analyze` | 需求分析 | `input`: 需求描述 | 需求规格说明书、验收测试用例 |
-| `/wm design` | 系统设计 | `type`: 设计类型(架构/概要/详细) | 设计文档、测试用例 |
-| `/wm code` | 代码生成 | `feature`: 功能描述 | 代码文件、单元测试 |
-| `/wm test` | 测试执行与回填 | `type`: 测试类型(单元/集成/系统/验收)；`result`: pass/fail（必填，真实回填） | 测试报告 |
-| `/wm review` | LLM 评审指引 | `target`: 需求/设计/测试用例 ID 或文件路径 | 结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`，不内置 LLM） |
-| `/wm status` | 项目状态（脚本化 `wm-status.ts`，O 只读） | 无 | 当前阶段、完成进度、RTM 覆盖率、确定性下一步建议（`--json` 输出 StatusReport） |
-| `/wm metrics` | 流程度量报告（`metrics-report.ts`，O 只读） | `--from`/`--to`/`--phase`/`--json`/`--out` | 7 区流程度量（阶段汇总 / 门禁通过率 / 返工率 / 预算 burn rate 与 killSwitch 预警） |
+| 命令          | 功能描述                                    | 参数                                                                         | 产出                                                                               |
+| ------------- | ------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `/wm analyze` | 需求分析                                    | `input`: 需求描述                                                            | 需求规格说明书、验收测试用例                                                       |
+| `/wm design`  | 系统设计                                    | `type`: 设计类型(架构/概要/详细)                                             | 设计文档、测试用例                                                                 |
+| `/wm code`    | 代码生成                                    | `feature`: 功能描述                                                          | 代码文件、单元测试                                                                 |
+| `/wm test`    | 测试执行与回填                              | `type`: 测试类型(单元/集成/系统/验收)；`result`: pass/fail（必填，真实回填） | 测试报告                                                                           |
+| `/wm review`  | LLM 评审指引                                | `target`: 需求/设计/测试用例 ID 或文件路径                                   | 结构化评审指引（指向 `verifier-spec.md` + `check-verifier-output.ts`，不内置 LLM） |
+| `/wm status`  | 项目状态（脚本化 `wm-status.ts`，O 只读）   | 无                                                                           | 当前阶段、完成进度、RTM 覆盖率、确定性下一步建议（`--json` 输出 StatusReport）     |
+| `/wm metrics` | 流程度量报告（`metrics-report.ts`，O 只读） | `--from`/`--to`/`--phase`/`--json`/`--out`                                   | 7 区流程度量（阶段汇总 / 门禁通过率 / 返工率 / 预算 burn rate 与 killSwitch 预警） |
 
 ### 6.2 辅助命令
 
-| 命令 | 功能描述 |
-|------|----------|
-| `/wm help` | 显示帮助信息 |
-| `/wm reset` | 重置当前项目状态 |
-| `/wm export` | 导出项目文档 |
-| `/wm import` | 导入现有项目 |
+| 命令         | 功能描述         |
+| ------------ | ---------------- |
+| `/wm help`   | 显示帮助信息     |
+| `/wm reset`  | 重置当前项目状态 |
+| `/wm export` | 导出项目文档     |
+| `/wm import` | 导入现有项目     |
 
 ### 6.3 接口调用流程
 
@@ -715,11 +758,11 @@ sequenceDiagram
 
 吸收 addyosmani `docs/agents.md` 的三层模型，适配 W 模型语境：
 
-| 层 | 是什么 | W 模型中的例子 | 组合角色 |
-|---|---|---|---|
-| **Skill**（技能） | 带步骤与退出标准的工作流 | `w-model-dev`（编排 + 8 阶段 + 阶段门 + 工件质量门） | 「如何做」——在 Persona 内部被引用 |
-| **Persona**（角色） | 单一角色 + 单一视角 + 单一输出格式 | `code-reviewer` / `test-engineer` / `security-auditor` / `performance-auditor` | 「谁来做」——采用一种视角产出报告 |
-| **Command**（命令） | 用户面向的入口 | `/wm review <target>` | 「何时做」——按 `targetKind` 路由到对应 Persona |
+| 层                  | 是什么                             | W 模型中的例子                                                                 | 组合角色                                       |
+| ------------------- | ---------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------- |
+| **Skill**（技能）   | 带步骤与退出标准的工作流           | `w-model-dev`（编排 + 8 阶段 + 阶段门 + 工件质量门）                           | 「如何做」——在 Persona 内部被引用              |
+| **Persona**（角色） | 单一角色 + 单一视角 + 单一输出格式 | `code-reviewer` / `test-engineer` / `security-auditor` / `performance-auditor` | 「谁来做」——采用一种视角产出报告               |
+| **Command**（命令） | 用户面向的入口                     | `/wm review <target>`                                                          | 「何时做」——按 `targetKind` 路由到对应 Persona |
 
 要点（吸收 addyosmani 规则并适配）：
 
@@ -729,23 +772,23 @@ sequenceDiagram
 
 #### 6.4.2 W 模型适配的 4 个 Persona
 
-| Persona | 角色定位 | W 模型阶段 | 主要 `targetKind` | 输出格式 |
-|---|---|---|---|---|
-| **code-reviewer** | 资深工程师，五轴代码审查 | 阶段 5 编码 | `code` | Critical / Required / Optional / Nit / FYI 分级发现项 + 复审结论 |
-| **test-engineer** | QA 工程师，测试策略与覆盖率分析 | 阶段 4 详细设计（单测设计）/ 阶段 6 集成测试 / 阶段 7 系统测试 | `test` | 覆盖率缺口清单 + Prove-It 测试 + 优先级（Critical / High / Medium / Low） |
-| **security-auditor** | 安全工程师，OWASP + STRIDE 威胁建模 | 阶段 7 系统测试（安全子项） | `code` / `design` | Critical / High / Medium / Low / Info 分级漏洞 + PoC + 修复建议 |
-| **performance-auditor** | 性能工程师，性能基线与回归 | 阶段 7 系统测试（性能子项） | `code` / `design` | Critical / High / Medium / Low / Info 分级瓶颈 + Metric-Honesty Rule（禁止编造指标） |
+| Persona                 | 角色定位                            | W 模型阶段                                                     | 主要 `targetKind` | 输出格式                                                                             |
+| ----------------------- | ----------------------------------- | -------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| **code-reviewer**       | 资深工程师，五轴代码审查            | 阶段 5 编码                                                    | `code`            | Critical / Required / Optional / Nit / FYI 分级发现项 + 复审结论                     |
+| **test-engineer**       | QA 工程师，测试策略与覆盖率分析     | 阶段 4 详细设计（单测设计）/ 阶段 6 集成测试 / 阶段 7 系统测试 | `test`            | 覆盖率缺口清单 + Prove-It 测试 + 优先级（Critical / High / Medium / Low）            |
+| **security-auditor**    | 安全工程师，OWASP + STRIDE 威胁建模 | 阶段 7 系统测试（安全子项）                                    | `code` / `design` | Critical / High / Medium / Low / Info 分级漏洞 + PoC + 修复建议                      |
+| **performance-auditor** | 性能工程师，性能基线与回归          | 阶段 7 系统测试（性能子项）                                    | `code` / `design` | Critical / High / Medium / Low / Info 分级瓶颈 + Metric-Honesty Rule（禁止编造指标） |
 
 > 性能 Persona 借鉴 addyosmani `web-performance-auditor`，但**适配 W 模型后端场景**：默认无 Lighthouse / CrUX 工件时退化为「源代码结构反模式扫描」，所有发现标注 `potential impact`；只有当用户提供 k6 / JMeter 等工具产出 JSON 时才填入 measured 值。这是 addyosmani「Metric-Honesty Rule」的直接吸收。
 
 #### 6.4.3 与 §7.6 LLM-as-a-Verifier 的关系
 
-| 维度 | §7.6 LLM-as-a-Verifier | §6.4 Agent Personas |
-|---|---|---|
-| 关注点 | 评审输出的「结构与有效性」 | 评审执行的「角色与视角」 |
+| 维度     | §7.6 LLM-as-a-Verifier                                                                                                                | §6.4 Agent Personas                            |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 关注点   | 评审输出的「结构与有效性」                                                                                                            | 评审执行的「角色与视角」                       |
 | 定义内容 | 输出 Schema（`subCriteria[]` / `compositeScore` / `qualityLevel` / `passed` / `reworkHints`）+ 校验脚本（`check-verifier-output.ts`） | 角色提示词（关注点清单 + 严重等级 + 输出模板） |
-| 强制性 | JSON Schema 强制（脚本校验） | 软性约定（提示词，不调用 LLM） |
-| 互补关系 | Persona 产出的 JSON 必须满足 §7.6 Schema | Persona 决定 JSON 中发现项的内容与质量 |
+| 强制性   | JSON Schema 强制（脚本校验）                                                                                                          | 软性约定（提示词，不调用 LLM）                 |
+| 互补关系 | Persona 产出的 JSON 必须满足 §7.6 Schema                                                                                              | Persona 决定 JSON 中发现项的内容与质量         |
 
 `/wm review <target>` 命令的路由逻辑：
 
@@ -765,22 +808,22 @@ sequenceDiagram
 
 **R（Root Cause Locator）角色定义**：
 
-| 维度 | 定义 |
-|---|---|
-| **简称** | R（Root Cause Locator） |
-| **职责** | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施） |
+| 维度         | 定义                                                                                                                                                                                                                                                                                                                                                      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **简称**     | R（Root Cause Locator）                                                                                                                                                                                                                                                                                                                                   |
+| **职责**     | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施）                                                                                                                                                                                                     |
 | **允许动作** | ① 读失败产物文件 + 上游产物（需求/设计/代码/测试/TLA+/graph.json）；② 读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON；③ 运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）；④ 产出 `RootCauseReport` JSON + `.md` 报告文件；⑤ 标记 `upstreamDefect`（若根因为上游需求/设计缺陷）；⑥ 作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出 |
-| **禁止动作** | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出 |
+| **禁止动作** | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出                                                                                                                                                                    |
 
 **F（Fixer）角色定义**（由 S 兼任，非新角色）：
 
-| 维度 | 定义 |
-|---|---|
-| **简称** | F（Fixer） |
-| **承担者** | **由现有 S 子代理兼任**（S 在返工场景下接受 R 报告作为额外输入，执行修复） |
-| **职责** | 接收 R 的 `RootCauseReport`（已经 V 复审通过），按 `fixRecommendation` 修复产物，同步更新 RTM 实体 |
+| 维度         | 定义                                                                                                                                    |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **简称**     | F（Fixer）                                                                                                                              |
+| **承担者**   | **由现有 S 子代理兼任**（S 在返工场景下接受 R 报告作为额外输入，执行修复）                                                              |
+| **职责**     | 接收 R 的 `RootCauseReport`（已经 V 复审通过），按 `fixRecommendation` 修复产物，同步更新 RTM 实体                                      |
 | **允许动作** | ① S 的全部允许动作；② 读 R 的 `RootCauseReport`；③ 按 `fixRecommendation` 修改产物；④ 在返工记录中标注「修复依据：R 报告 `<reportId>`」 |
-| **禁止动作** | ① 无视 R 报告自行修复（必须以 R 报告为依据）；② 跳过 R 直接返工（命中反模式 #18） |
+| **禁止动作** | ① 无视 R 报告自行修复（必须以 R 报告为依据）；② 跳过 R 直接返工（命中反模式 #18）                                                       |
 
 > R 与 V 的区别：V 评审「产物是否符合标准」（发现 what）；R 诊断「产物为何不符合标准」（追溯 why）。V 输出 `reworkHints`（现象）；R 输出 `RootCauseReport`（根因链）。
 > R 与 A 的区别：A 分析「原始文档→图谱」的结构化（阶段 1-4 ingestion）；R 分析「失败产物→根因」的诊断（全阶段返工）。两者活动领域不同。
@@ -805,7 +848,8 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  status: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试' | '项目完成';
+  status:
+    '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试' | '项目完成';
   techStack: {
     frontend: string[];
     backend: string[];
@@ -872,7 +916,7 @@ erDiagram
     PROJECT ||--o{ TEST_CASE : contains
     REQUIREMENT ||--|{ TEST_CASE : generates
     DESIGN ||--|{ TEST_CASE : generates
-    
+
     PROJECT {
         string id PK
         string name
@@ -881,7 +925,7 @@ erDiagram
         date createdAt
         date updatedAt
     }
-    
+
     REQUIREMENT {
         string id PK
         string projectId FK
@@ -891,7 +935,7 @@ erDiagram
         string priority
         string status
     }
-    
+
     DESIGN {
         string id PK
         string projectId FK
@@ -899,7 +943,7 @@ erDiagram
         string content
         date createdAt
     }
-    
+
     TEST_CASE {
         string id PK
         string projectId FK
@@ -966,6 +1010,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 ```
 
 要点：
+
 - **节点类型**（每阶段一种，设计文档 §2.1）：阶段 1 `REQ` / 阶段 2 `SD` / 阶段 3 `INTF` / 阶段 4 `DD`；另含边界节点 `EXT-IN`（合法外部信息源，DFD terminator）/ `EXT-OUT`（合法外部信息汇），二者豁免黑洞/奇迹判定且不参与 `parent` 单根树。节点 schema 统一含 `id` / `type` / `phase` / `sourcePath` / `summary` 等字段（设计文档 §2.2）。
 - **REQ level 自适应层级深度**：每个 REQ 节点须标注 level（正整数，从 1 开始单调递增，无上限）
   - 最小层级深度 = 2（domain → acceptance，适用极小项目）
@@ -990,31 +1035,34 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
   "project": "<project-id>",
   "currentPhase": 1,
   "tools": { "jarPath": "w-model-dev/tools/tla2tools.jar", "javaMinVersion": 11 },
-  "specs": [{
-    "id": "L1_blog_system",
-    "level": "L1",
-    "phase": 1,
-    "system": "blog-system",
-    "requirementIds": ["REQ-001"],
-    "designRef": "docs/requirement-spec.md#§3",
-    "tlaPath": "tla/L1_blog_system.tla",
-    "cfgPath": "tla/L1_blog_system.cfg",
-    "parent": null,
-    "siblings": [],
-    "children": ["tla/L2_auth_subsystem.tla"],
-    "variableCombination": 240,
-    "decompositionDecision": "kept-below-threshold",
-    "syntaxChecked": true,
-    "tlcChecked": true,
-    "deadlockFree": true,
-    "invariantsHold": true,
-    "stateExplosion": false
-  }],
+  "specs": [
+    {
+      "id": "L1_blog_system",
+      "level": "L1",
+      "phase": 1,
+      "system": "blog-system",
+      "requirementIds": ["REQ-001"],
+      "designRef": "docs/requirement-spec.md#§3",
+      "tlaPath": "tla/L1_blog_system.tla",
+      "cfgPath": "tla/L1_blog_system.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": ["tla/L2_auth_subsystem.tla"],
+      "variableCombination": 240,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
+    }
+  ],
   "checkRounds": []
 }
 ```
 
 要点：
+
 - **层级模型**（设计文档 §1.1）：L1 系统内外交互 / L2 子系统内部行为+同级交互 / L3 原子化子系统行为 / L4+ 递归拆解。每个下级子系统可视为独立系统继续拆解。
 - **拆解判定**（设计文档 §1.1）：变量组合数 >1k 考虑拆，>1w 必须拆（`decompositionDecision` 字段记录决策）。
 - **文件头规范**（设计文档 §1.2）：每个 `.tla` 文件须含 8 个 `@` 字段（`@system`/`@requirement`/`@design`/`@parent`/`@sibling`/`@child`/`@level`/`@phase`），`check-tla-model.ts` 校验完整性与双向一致性。
@@ -1047,8 +1095,8 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
   "inputProvenance": {
     "sourceSigIds": ["wm1-r001-O", "wm1-r002a-A"],
     "sourceArtifacts": [
-      {"path": ".w-model/graph.json", "sourceSigId": "wm1-r002a-A", "sourceRole": "A"},
-      {"path": ".w-model/project.json", "sourceSigId": "wm1-r001-O", "sourceRole": "O"}
+      { "path": ".w-model/graph.json", "sourceSigId": "wm1-r002a-A", "sourceRole": "A" },
+      { "path": ".w-model/project.json", "sourceSigId": "wm1-r001-O", "sourceRole": "O" }
     ],
     "transformDescription": "A 子代理合并 REQ 节点建图 → S 子代理产出需求规格"
   }
@@ -1056,6 +1104,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 ```
 
 要点：
+
 - **链式约束**：`prevSigId` 指向同阶段前一环签名；`sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)`；首环 `prevSigId = "genesis"`，`prevSigHash = "0"`。
 - **角色签名顺序**（强制链）：`genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(gate) → O(checkpoint-用户确认)`；阶段 5 无 A，阶段 6-8 视具体阶段调整。
 - **产出来源正确性**（`inputProvenance`）：各角色产出须声明上游签名 + 上游产物 + 变换描述；强制来源/禁止来源矩阵见 [`signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) §3。
@@ -1070,13 +1119,13 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
 本技能是单纯的编排 + 校验脚本技能，无运行时框架与数据库：
 
-| 层次 | 技术 | 理由 |
-|------|------|------|
-| 编排载体 | Markdown（`SKILL.md` + `references/`） | 人类与 Agent 双可读，按需加载 |
-| 校验脚本 | TypeScript（自包含，仅依赖 `tsx`） | 类型安全的纯函数门禁判定，不调用 LLM |
-| 文档模板 | Markdown（`templates/`） | 易于阅读和版本控制 |
-| LLM 推理 | 外部 Agent 自身的 LLM | 技能不内置 LLM 调用 |
-| 状态持久化 | JSON 文件（`.w-model/*.json`） | 跨多轮交互保持上下文，Agent 直接读写 |
+| 层次       | 技术                                   | 理由                                 |
+| ---------- | -------------------------------------- | ------------------------------------ |
+| 编排载体   | Markdown（`SKILL.md` + `references/`） | 人类与 Agent 双可读，按需加载        |
+| 校验脚本   | TypeScript（自包含，仅依赖 `tsx`）     | 类型安全的纯函数门禁判定，不调用 LLM |
+| 文档模板   | Markdown（`templates/`）               | 易于阅读和版本控制                   |
+| LLM 推理   | 外部 Agent 自身的 LLM                  | 技能不内置 LLM 调用                  |
+| 状态持久化 | JSON 文件（`.w-model/*.json`）         | 跨多轮交互保持上下文，Agent 直接读写 |
 
 ### 8.2 核心算法设计
 
@@ -1089,7 +1138,7 @@ flowchart TD
     C --> D[检测需求冲突和缺失]
     D --> E[生成验收标准]
     E --> F[输出: 结构化需求规格]
-    
+
     style A fill:#e8f5e9,stroke:#4caf50
     style F fill:#fff3e0,stroke:#ff9800
 ```
@@ -1105,7 +1154,7 @@ flowchart TD
     D --> F[评估测试用例覆盖率]
     E --> F
     F --> G[输出: 测试用例集合]
-    
+
     style A fill:#e8f5e9,stroke:#4caf50
     style G fill:#fff3e0,stroke:#ff9800
 ```
@@ -1120,7 +1169,7 @@ flowchart TD
     D --> E[生成单元测试代码]
     E --> F[代码质量检查和优化]
     F --> G[输出: 可运行代码]
-    
+
     style A fill:#e8f5e9,stroke:#4caf50
     style G fill:#fff3e0,stroke:#ff9800
 ```
@@ -1129,10 +1178,10 @@ flowchart TD
 
 除门禁校验脚本外，技能包另提供两个工具脚本，供编排者 O 与各角色在流程中调用（非阶段门，不参与放行判定）：
 
-| 脚本 | 用途 | 实现位置 |
-|------|------|----------|
+| 脚本          | 用途                                                                                                                                                                                                                                                                                                                                                                                             | 实现位置                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `wm-write.ts` | 状态文件安全写助手：以 `<target>.lock` 持久目录和可转移 owner 对象实现跨进程锁；锁内完成 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 支持 `--lock-timeout <ms>` 与 `--recover-stale-lock`，不带恢复标志的陈旧锁以 `STALE_LOCK` / exit 1 拒绝写入；直接 `writeStateJson` 调用保留隐式恢复兼容行为。`--expect-mtime` 接受有限非负数并向下取整，`--lock-timeout` 必须为安全非负整数 | [`w-model-dev/scripts/cli/wm-write.ts`](../w-model-dev/scripts/cli/wm-write.ts) + [`w-model-dev/scripts/logic/state-write-logic.ts`](../w-model-dev/scripts/logic/state-write-logic.ts) |
-| `doctor.ts` | 环境自检：node / tsx / ajv / java / tla2tools / codegraph / openspec 逐项检查并给出修复指引（`--with-tla` 将 TLA+ 项升级为阻断级）。首次启用或门禁报依赖错误时运行 | [`w-model-dev/scripts/cli/doctor.ts`](../w-model-dev/scripts/cli/doctor.ts) + [`w-model-dev/scripts/logic/doctor-logic.ts`](../w-model-dev/scripts/logic/doctor-logic.ts) |
+| `doctor.ts`   | 环境自检：node / tsx / ajv / java / tla2tools / codegraph / openspec 逐项检查并给出修复指引（`--with-tla` 将 TLA+ 项升级为阻断级）。首次启用或门禁报依赖错误时运行                                                                                                                                                                                                                               | [`w-model-dev/scripts/cli/doctor.ts`](../w-model-dev/scripts/cli/doctor.ts) + [`w-model-dev/scripts/logic/doctor-logic.ts`](../w-model-dev/scripts/logic/doctor-logic.ts)               |
 
 **本地 pre-push 平台依赖**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示开发者运行 `npm install`，不自动安装。它只调用 `ensure-platform-deps.sh --check`；默认/`--check` 不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。开发者可在 Bash 中显式运行 `npm run platform-deps:check` 或 `npm run platform-deps:install`；后者当前 fail-closed，仅输出人工 `npm install` 指引。`self-test` 与 `doctor` 可在 PowerShell 运行，pre-push 与平台依赖命令需要 Bash。
 
@@ -1142,13 +1191,13 @@ flowchart TD
 
 ### 9.1 RTM结构
 
-| 需求ID | 需求描述 | 设计文档 | 代码模块 | 单元测试 | 集成测试 | 系统测试 | 验收测试 | 覆盖状态 |
-|--------|----------|----------|----------|----------|----------|----------|----------|----------|
-| REQ-001 | 用户注册功能 | SD-3.2.1 | userController.ts | UT-001 | IT-001 | ST-001 | UAT-001 | 100% |
-| REQ-002 | 用户登录功能 | SD-3.2.2 | authService.ts | UT-002 | IT-002 | ST-002 | UAT-002 | 100% |
-| REQ-003 | 商品浏览功能 | SD-3.3.1 | productController.ts | UT-003 | IT-003 | ST-003 | UAT-003 | 100% |
-| REQ-004 | 购物车功能 | SD-3.3.2 | cartService.ts | UT-004 | IT-004 | ST-004 | UAT-004 | 100% |
-| REQ-005 | 订单管理功能 | SD-3.4.1 | orderController.ts | UT-005 | IT-005 | ST-005 | UAT-005 | 100% |
+| 需求ID  | 需求描述     | 设计文档 | 代码模块             | 单元测试 | 集成测试 | 系统测试 | 验收测试 | 覆盖状态 |
+| ------- | ------------ | -------- | -------------------- | -------- | -------- | -------- | -------- | -------- |
+| REQ-001 | 用户注册功能 | SD-3.2.1 | userController.ts    | UT-001   | IT-001   | ST-001   | UAT-001  | 100%     |
+| REQ-002 | 用户登录功能 | SD-3.2.2 | authService.ts       | UT-002   | IT-002   | ST-002   | UAT-002  | 100%     |
+| REQ-003 | 商品浏览功能 | SD-3.3.1 | productController.ts | UT-003   | IT-003   | ST-003   | UAT-003  | 100%     |
+| REQ-004 | 购物车功能   | SD-3.3.2 | cartService.ts       | UT-004   | IT-004   | ST-004   | UAT-004  | 100%     |
+| REQ-005 | 订单管理功能 | SD-3.4.1 | orderController.ts   | UT-005   | IT-005   | ST-005   | UAT-005  | 100%     |
 
 ### 9.2 RTM跟踪方向
 
@@ -1160,13 +1209,13 @@ graph LR
     D --> E[测试用例]
     E --> F[测试执行]
     F --> G[缺陷]
-    
+
     G --> E
     F --> D
     E --> C
     D --> B
     C --> A
-    
+
     style A fill:#e3f2fd,stroke:#1976d2
     style B fill:#e3f2fd,stroke:#1976d2
     style C fill:#fff3e0,stroke:#ff9800
@@ -1189,17 +1238,20 @@ graph LR
 ## 10. 质量保障体系
 
 ### 10.1 代码质量标准
+
 - 单元测试代码覆盖率 ≥ 80%
 - 代码规范检查（ESLint/Prettier）
 - 安全漏洞扫描
 - 性能指标监控
 
 ### 10.2 文档质量标准
+
 - 文档完整性检查
 - 文档一致性验证
 - 版本控制管理
 
 ### 10.3 测试质量标准
+
 - 测试用例评审机制
 - 测试覆盖率分析
 - 缺陷追踪管理
@@ -1219,7 +1271,7 @@ flowchart TD
     E -->|不通过| A
     F -->|通过| G[发布]
     F -->|不通过| A
-    
+
     style A fill:#e3f2fd
     style G fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
 ```
@@ -1233,15 +1285,15 @@ flowchart TD
 > `src/evolution/skill-optimizer.ts`、`src/eval/skill-lift.ts` 等均已删除。
 > 本节仅保留「工件质量门」。
 
-| 维度 | 工件质量门（Artifact Gate） |
-|---|---|
-| 评估对象 | W 模型产出物（需求 / 设计 / 代码 / 测试用例）对应的 RTM 覆盖与测试执行结果 |
-| 触发时机 | 验收测试阶段（`/wm test type=验收`） |
-| 判定逻辑 | RTM 覆盖率 100% 且四级测试（单元 / 集成 / 系统 / 验收）全部通过 |
-| 判定逻辑实现（单点事实源） | `w-model-dev/scripts/logic/gate-logic.ts` `checkArtifactGate()` |
-| Agent CLI 入口 | `w-model-dev/scripts/cli/check-artifact-gate.ts` |
-| 失败后果 | 返工回到编码阶段 |
-| 数据来源 | 真实测试执行结果（`/wm test result=pass\|fail` 回填） |
+| 维度                       | 工件质量门（Artifact Gate）                                                |
+| -------------------------- | -------------------------------------------------------------------------- |
+| 评估对象                   | W 模型产出物（需求 / 设计 / 代码 / 测试用例）对应的 RTM 覆盖与测试执行结果 |
+| 触发时机                   | 验收测试阶段（`/wm test type=验收`）                                       |
+| 判定逻辑                   | RTM 覆盖率 100% 且四级测试（单元 / 集成 / 系统 / 验收）全部通过            |
+| 判定逻辑实现（单点事实源） | `w-model-dev/scripts/logic/gate-logic.ts` `checkArtifactGate()`            |
+| Agent CLI 入口             | `w-model-dev/scripts/cli/check-artifact-gate.ts`                           |
+| 失败后果                   | 返工回到编码阶段                                                           |
+| 数据来源                   | 真实测试执行结果（`/wm test result=pass\|fail` 回填）                      |
 
 **门禁脚本与 Markdown 的配合**：门禁判定逻辑沉入技能包内 `w-model-dev/scripts/logic/gate-logic.ts`（纯函数、自包含、不依赖任何外部模块），保证技能包可独立分发给 TRAE / Claude 等 Agent。Agent 在质量门检查点直接执行脚本获取确定性判定，而非靠 LLM 自行估算：
 
@@ -1265,15 +1317,15 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
 
 DoD 不替代阶段产物的验收标准（见各 [`phase-N-*.md`](../w-model-dev/references/)），而是项目级跨阶段的标准：
 
-| 维度 | 标准 | 验证方式 | 不通过 → 动作 |
-|---|---|---|---|
-| 测试 | 全部测试通过，无回归 | 测试运行器退出码 0；新增/修改代码须配套测试 | 当场补测试或修复回归 |
-| 行为 | 运行时验证行为符合规格 | 手动或自动化验证关键路径，不得仅凭单测通过 | 补运行时验证 |
-| 文档 | 涉及 API / 接口 / 数据模型的变更须同步更新文档 | `git diff` 包含相关 `docs/` 与 `templates/` 更新 | 补文档更新 |
-| RTM | 需求 / 设计 / 代码 / 测试映射同步 | `.w-model/rtm.json` 字段无空缺；覆盖率不下降 | 补登记 RTM 字段 |
-| 状态 | `Project.status` / `Requirement.status` 如实反映 | 字段值与磁盘产物一致 | 修正 `status` 字段 |
-| **理解证据** | 阶段门放行须有用户理解证据 | run-log acknowledgedDecisions 非空且含 ≥1 关键决策摘要（非"确认"/"同意"） | 拒绝放行；要求用户填入理解证据（O4 命中） |
-| **签名链完整性** | 每阶段每角色动作完成后写入 `signature-chain.jsonl`；G 跑门禁前校验 R1-R10 全通过；断裂视为 #32 命中拒绝放行 | `check-signature-chain.ts` R1-R10 | 补齐缺失角色签名与来源证明 |
+| 维度             | 标准                                                                                                        | 验证方式                                                                  | 不通过 → 动作                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------- |
+| 测试             | 全部测试通过，无回归                                                                                        | 测试运行器退出码 0；新增/修改代码须配套测试                               | 当场补测试或修复回归                      |
+| 行为             | 运行时验证行为符合规格                                                                                      | 手动或自动化验证关键路径，不得仅凭单测通过                                | 补运行时验证                              |
+| 文档             | 涉及 API / 接口 / 数据模型的变更须同步更新文档                                                              | `git diff` 包含相关 `docs/` 与 `templates/` 更新                          | 补文档更新                                |
+| RTM              | 需求 / 设计 / 代码 / 测试映射同步                                                                           | `.w-model/rtm.json` 字段无空缺；覆盖率不下降                              | 补登记 RTM 字段                           |
+| 状态             | `Project.status` / `Requirement.status` 如实反映                                                            | 字段值与磁盘产物一致                                                      | 修正 `status` 字段                        |
+| **理解证据**     | 阶段门放行须有用户理解证据                                                                                  | run-log acknowledgedDecisions 非空且含 ≥1 关键决策摘要（非"确认"/"同意"） | 拒绝放行；要求用户填入理解证据（O4 命中） |
+| **签名链完整性** | 每阶段每角色动作完成后写入 `signature-chain.jsonl`；G 跑门禁前校验 R1-R10 全通过；断裂视为 #32 命中拒绝放行 | `check-signature-chain.ts` R1-R10                                         | 补齐缺失角色签名与来源证明                |
 
 > 第六维度「理解证据」吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念，对抗用户对阶段产物 rubber-stamp。放行 ≠ 理解；acknowledgedDecisions 非空才算放行。
 
@@ -1328,6 +1380,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 **信息流跨阶段收敛**：阶段 1 REQ 信息流闭合（严格，与结构连通同级）；阶段 2/3/4 SD/INTF/DD 各自无黑洞/奇迹/死模块；阶段 4 信息流零违反 + 结构零违反才放行进编码。
 
 **关键约束**：
+
 - **阶段 4 硬约束**：`--phase=4` 信息流零违反 ∧ 结构零违反（DD `realizes` 全覆盖）才放行进阶段 5 编码（见 §4.4）。
 - **收敛判定由 G 退出码决定，不由 A 的 LLM 输出决定**（约束 4，反模式 #12）；A 的 `reworkHints` 仅作指引。
 - **ingestion 收敛确认 CHECKPOINT 不可绕过**（约束 2，反模式 #11）。
@@ -1374,15 +1427,16 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phas
 
 **跨阶段收敛**（设计文档 §4，硬约束）：
 
-| 阶段 | TLA+ 建模范围 | 强度 |
-|---|---|---|
-| 1 | L1 系统内外交互抽象（单 L1 根规格） | 严格（SANY 通过 + TLC 通过 + 无死锁/不变式违反/状态爆炸） |
-| 2 | + L2 子系统内部行为 + 同级交互抽象 | 硬约束 |
-| 3 | + L3 原子化子系统行为抽象 | 硬约束 |
-| 4 | + L4+ 递归拆解；`--phase=4` TLA+ 零违反 ∧ 图谱零违反才放行进阶段 5 编码 | **硬约束零违反** |
-| 5–8 | `tla-manifest.json` 冻结只读；TLA+ 不变式作为测试 oracle（编码与测试须与不变式一致）；阶段5 须通过 check-code-tla-consistency.ts 代码-TLA+ 一致性回归 | 冻结只读 + 一致性回归 |
+| 阶段 | TLA+ 建模范围                                                                                                                                         | 强度                                                      |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 1    | L1 系统内外交互抽象（单 L1 根规格）                                                                                                                   | 严格（SANY 通过 + TLC 通过 + 无死锁/不变式违反/状态爆炸） |
+| 2    | + L2 子系统内部行为 + 同级交互抽象                                                                                                                    | 硬约束                                                    |
+| 3    | + L3 原子化子系统行为抽象                                                                                                                             | 硬约束                                                    |
+| 4    | + L4+ 递归拆解；`--phase=4` TLA+ 零违反 ∧ 图谱零违反才放行进阶段 5 编码                                                                               | **硬约束零违反**                                          |
+| 5–8  | `tla-manifest.json` 冻结只读；TLA+ 不变式作为测试 oracle（编码与测试须与不变式一致）；阶段5 须通过 check-code-tla-consistency.ts 代码-TLA+ 一致性回归 | 冻结只读 + 一致性回归                                     |
 
 **关键约束**：
+
 - **阶段 4 硬约束**：`--phase=4` TLA+ 零违反 ∧ 图谱零违反（结构 + 信息流）才放行进阶段 5 编码（见 §4.4）。
 - **编码调试顺序为硬约束**：SANY 语法检查未通过的 spec 不得跑 TLC（反模式 #14 守护）；CLI 在 SANY 失败时跳过该 spec 的 TLC。
 - **轨迹/状态文件须先清理**：每轮校验前删除 `*.dump` / `*.out` / `states/`（设计文档 §3.4）；TLC 命令行 `-cleanup` 标志提供双保险。
@@ -1430,6 +1484,7 @@ npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts \
 **触发时机**：阶段 5（编码）S 产出代码后，G 子代理额外分派跑 `check-code-tla-consistency.ts`，退出码 0 才放行进阶段 6（集成测试）。阶段 5-8 `tla-manifest.json` 冻结只读，TLA+ 不变式作为测试 oracle。
 
 **与其它门禁的协同**：
+
 - 维度1 与 `check-artifact-gate.ts` 终检的 SD→codeModule 校验双向守护（两处均校验，任一失败即阻断）。
 - 维度2/3/4 是 `check-code-tla-consistency.ts` 独有，补充行为层一致性校验。
 - `self-test.ts` 含 5 条 code-TLA+ 样本（3 合规 + 2 违规），纳入回归基线。
@@ -1450,38 +1505,32 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 
 **校验规则（R1-R10，确定性，无 LLM）**：
 
-| 规则 | 校验内容 | 失败动作 |
-|---|---|---|
-| R1 | Schema 完整性：所有必填字段非空 | 退出码 1 |
-| R2 | `rootCauseChain` 长度 ∈ [2, 5]，每步 `evidence` 非空 | 退出码 1 |
-| R3 | `rootCause.falsifiabilityCheck` 非空且含假设句式（「若...则...」） | 退出码 1 |
-| R4 | `fixRecommendation` 每条含 `target`/`location`/`action`/`rationale` 四字段 | 退出码 1 |
-| R5 | `prevention` 每条含 `scope`/`measure`/`owner` 三字段 | 退出码 1 |
-| R6 | `upstreamDefect.present=true` 时，`upstreamPhase`/`upstreamArtifactId`/`defectDescription` 非空 | 退出码 1 |
-| R7 | `qualityLevel ∈ {A,B,C,D}`，`passed` 与 `qualityLevel` 一致（A/B→true，C/D→false） | 退出码 1 |
-| R8 | `meta.reportId` 格式 `^RC-[a-z0-9]+-\d+-\d+$` | 退出码 1 |
-| R9 | 多角度场景（dispatchMode ∈ {parallel, serial, degraded}）：附录 PartialReport 路径非空 | 退出码 1 |
-| R10 | 多角度场景：canonical `testing-reality-checker` persona 的 confidence ≥ 0.5；legacy `reality-checker` 仅在 canonical 缺失时作 fallback。canonical 优先，同 artifact 不重复计数；跨 artifact 或异常重复/冲突 fail-closed | 退出码 1 |
+| 规则 | 校验内容                                                                                                                                                                                                                | 失败动作 |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| R1   | Schema 完整性：所有必填字段非空                                                                                                                                                                                         | 退出码 1 |
+| R2   | `rootCauseChain` 长度 ∈ [2, 5]，每步 `evidence` 非空                                                                                                                                                                    | 退出码 1 |
+| R3   | `rootCause.falsifiabilityCheck` 非空且含假设句式（「若...则...」）                                                                                                                                                      | 退出码 1 |
+| R4   | `fixRecommendation` 每条含 `target`/`location`/`action`/`rationale` 四字段                                                                                                                                              | 退出码 1 |
+| R5   | `prevention` 每条含 `scope`/`measure`/`owner` 三字段                                                                                                                                                                    | 退出码 1 |
+| R6   | `upstreamDefect.present=true` 时，`upstreamPhase`/`upstreamArtifactId`/`defectDescription` 非空                                                                                                                         | 退出码 1 |
+| R7   | `qualityLevel ∈ {A,B,C,D}`，`passed` 与 `qualityLevel` 一致（A/B→true，C/D→false）                                                                                                                                      | 退出码 1 |
+| R8   | `meta.reportId` 格式 `^RC-[a-z0-9]+-\d+-\d+$`                                                                                                                                                                           | 退出码 1 |
+| R9   | 多角度场景（dispatchMode ∈ {parallel, serial, degraded}）：附录 PartialReport 路径非空                                                                                                                                  | 退出码 1 |
+| R10  | 多角度场景：canonical `testing-reality-checker` persona 的 confidence ≥ 0.5；legacy `reality-checker` 仅在 canonical 缺失时作 fallback。canonical 优先，同 artifact 不重复计数；跨 artifact 或异常重复/冲突 fail-closed | 退出码 1 |
 
 R10 维护契约（docs-consistency source×clause 语义门）：
-- R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
-- R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
-- R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
-- R10-C4 same-artifact：same artifact canonical-first and not counted twice。
-- R10-C5 cross-artifact：different artifact conflict is fail-closed。
-- R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
-- R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
-<!-- R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"} -->
-<!-- R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5} -->
-<!-- R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"} -->
-<!-- R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"} -->
-<!-- R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
+<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
+<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
+<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
+<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
+<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
+<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
+<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
 
 **退出码**：`0=通过 / 1=校验失败 / 2=输入错误`（与现有脚本约定一致）。
 
 **关键约束**：
+
 - **G 子代理在 V 复审根因报告后跑此脚本，exitCode=0 才可分派 S-fix 修复**（反模式 #19 守护：R 报告未经 V 复审 + G 门禁直接交 S 修复）。
 - **校验纯逻辑，不含 LLM 调用**（约束 4 真实执行）；R 的 `qualityLevel`/`passed` 自评仅作指引，最终由 G 退出码 + V 复审决定。
 - **门禁确认 CHECKPOINT 不可绕过**（约束 2，反模式 #11 同源）。
@@ -1506,21 +1555,21 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 
 现有 🔴 CHECKPOINT 分为两类，按成熟度选择性激活：
 
-| CHECKPOINT 类型 | 示例 | L0 | L1 | L2 | L3 |
-|---|---|---|---|---|---|
-| **决策型**（设计方向/技术选型/范围变更） | 项目初始化、阶段进入确认、设计选型、ingestion 规划确认 | ✅ 等用户 | ✅ 等用户 | ✅ 等用户 | ✅ 等用户（高风险路径强制） |
-| **操作型**（已跑脚本/已执行测试/已产出产物） | 阶段门放行（V 评审通过 + G 退出码 0）、ingestion 收敛确认（G 退出码 0）、测试结果回填确认 | ✅ 等用户 | ⚡ 自动放行 | ⚡ 自动放行 | ⚡ 自动放行 |
+| CHECKPOINT 类型                              | 示例                                                                                      | L0        | L1          | L2          | L3                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- | --------- | ----------- | ----------- | --------------------------- |
+| **决策型**（设计方向/技术选型/范围变更）     | 项目初始化、阶段进入确认、设计选型、ingestion 规划确认                                    | ✅ 等用户 | ✅ 等用户   | ✅ 等用户   | ✅ 等用户（高风险路径强制） |
+| **操作型**（已跑脚本/已执行测试/已产出产物） | 阶段门放行（V 评审通过 + G 退出码 0）、ingestion 收敛确认（G 退出码 0）、测试结果回填确认 | ✅ 等用户 | ⚡ 自动放行 | ⚡ 自动放行 | ⚡ 自动放行                 |
 
 > 「决策型」始终等用户（L3 亦然）——设计方向不可自动决定。「操作型」在 L1+ 可自动放行——已有脚本退出码作为客观证据，人工确认是冗余。
 
 ### 10C.3 L0~L3 放行矩阵
 
-| 级别 | 决策型 CHECKPOINT | 操作型 CHECKPOINT | 返工循环 | 发布门 | 解锁条件 |
-|---|---|---|---|---|---|
-| **L0（默认，新项目/棕地）** | ✅ 等用户 | ✅ 等用户 | ✅ 每次返工都暂停询问 | ✅ 等用户 | 项目初始化即默认 L0 |
-| **L1（操作确认自动化）** | ✅ 等用户 | ⚡ 自动放行（脚本退出码=0 即放行，run-log 记录） | ✅ 每次返工都暂停询问 | ✅ 等用户 | L0 稳定运行 ≥1 个完整 8 阶段周期，无 O 系列失败模式命中 |
-| **L2（返工自主化）** | ✅ 等用户 | ⚡ 自动放行 | ⚡ 阶段 5-7 返工可自主（带 attempt cap=maxReworkRounds，超限升级） | ✅ 等用户 | L1 稳定运行 ≥2 周，attempt cap 达标率 ≥80%，无 Token Burn/O3 Verifier Theater |
-| **L3（高风险路径外的全自主）** | ✅ 等用户（仅高风险路径：auth/加密/发布/架构变更） | ⚡ 自动放行 | ⚡ 全阶段返工可自主（带 attempt cap） | ✅ 等用户（发布门始终 attended） | L2 稳定运行 ≥2 周，误判率 ≤10%，用户显式申请升级 |
+| 级别                           | 决策型 CHECKPOINT                                  | 操作型 CHECKPOINT                                | 返工循环                                                           | 发布门                           | 解锁条件                                                                      |
+| ------------------------------ | -------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------- |
+| **L0（默认，新项目/棕地）**    | ✅ 等用户                                          | ✅ 等用户                                        | ✅ 每次返工都暂停询问                                              | ✅ 等用户                        | 项目初始化即默认 L0                                                           |
+| **L1（操作确认自动化）**       | ✅ 等用户                                          | ⚡ 自动放行（脚本退出码=0 即放行，run-log 记录） | ✅ 每次返工都暂停询问                                              | ✅ 等用户                        | L0 稳定运行 ≥1 个完整 8 阶段周期，无 O 系列失败模式命中                       |
+| **L2（返工自主化）**           | ✅ 等用户                                          | ⚡ 自动放行                                      | ⚡ 阶段 5-7 返工可自主（带 attempt cap=maxReworkRounds，超限升级） | ✅ 等用户                        | L1 稳定运行 ≥2 周，attempt cap 达标率 ≥80%，无 Token Burn/O3 Verifier Theater |
+| **L3（高风险路径外的全自主）** | ✅ 等用户（仅高风险路径：auth/加密/发布/架构变更） | ⚡ 自动放行                                      | ⚡ 全阶段返工可自主（带 attempt cap）                              | ✅ 等用户（发布门始终 attended） | L2 稳定运行 ≥2 周，误判率 ≤10%，用户显式申请升级                              |
 
 > **L2+ 事件驱动激活**：成熟度达 L2 后，事件驱动循环（Loop 3，详见 §10F）激活。消费方自行实现触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段）。L0/L1 不支持事件驱动。
 
@@ -1528,13 +1577,13 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 
 ### 10C.4 L3 高风险路径定义（强制人工 gate，不可自动放行）
 
-| 高风险路径 | 触发条件 | 强制动作 |
-|---|---|---|
-| 认证/授权相关 | 阶段 4 详细设计涉及 auth 模块 / 阶段 5 编码涉及 auth 文件 | 决策型 CHECKPOINT 等用户 |
-| 加密/密钥相关 | 涉及 JWT_SECRET / 密码哈希 / 加密算法选型 | 决策型 CHECKPOINT 等用户 |
-| 发布放行 | 阶段 8 验收终检 + check-artifact-gate.ts | 始终 attended（L3 亦然） |
-| 架构变更 | 技术栈增删 / 模块边界变更 / 数据模型 schema 变更 | 决策型 CHECKPOINT 等用户 |
-| TLA+ 建模不符需求/设计（反模式 #17） | TLC 发现违反且规格忠实于需求/设计 | 决策型 CHECKPOINT 等用户（须回退修正需求/设计） |
+| 高风险路径                           | 触发条件                                                  | 强制动作                                        |
+| ------------------------------------ | --------------------------------------------------------- | ----------------------------------------------- |
+| 认证/授权相关                        | 阶段 4 详细设计涉及 auth 模块 / 阶段 5 编码涉及 auth 文件 | 决策型 CHECKPOINT 等用户                        |
+| 加密/密钥相关                        | 涉及 JWT_SECRET / 密码哈希 / 加密算法选型                 | 决策型 CHECKPOINT 等用户                        |
+| 发布放行                             | 阶段 8 验收终检 + check-artifact-gate.ts                  | 始终 attended（L3 亦然）                        |
+| 架构变更                             | 技术栈增删 / 模块边界变更 / 数据模型 schema 变更          | 决策型 CHECKPOINT 等用户                        |
+| TLA+ 建模不符需求/设计（反模式 #17） | TLC 发现违反且规格忠实于需求/设计                         | 决策型 CHECKPOINT 等用户（须回退修正需求/设计） |
 
 ### 10C.5 maturity.json Schema
 
@@ -1645,32 +1694,67 @@ interface RunLogEntry {
   timestamp: string;
   phase: number;
   phaseName: string;
-  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback';
-  role: 'O' | 'A' | 'S' | 'V' | 'G';
+  action:
+    | 'chunk'
+    | 'cross'
+    | 'evolve'
+    | 'produce'
+    | 'review'
+    | 'gate'
+    | 'tla-gate'
+    | 'graph-gate'
+    | 'test'
+    | 'checkpoint'
+    | 'rework'
+    | 'rollback'
+    | 'rootcause'
+    | 'fix'
+    | 'emergency-fix'
+    | 'r3-completeness'
+    | 'r3-reliability'
+    | 'r3-security'
+    | 'codegraph_query'
+    | 'opsx_explore'
+    | 'opsx_propose'
+    | 'opsx_apply'
+    | 'opsx_archive'
+    | 'ensure_deps'
+    | 'iceberg-sweep'
+    | 'iceberg-review';
+  role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
-  tokens: number;          // 由宿主 Agent 报告实际消耗；无值时填 0 并标注 estimated:false
-  estimated: boolean;      // true=LLM估算（违反约束4，应避免）；false=实际报告
+  tokens: number; // 由宿主 Agent 报告实际消耗；无值时填 0 并标注 estimated:false
+  estimated: boolean; // true=LLM估算（违反约束4，应避免）；false=实际报告
   subagentSpawns: number;
   gateExitCode: number | null;
   outcome: 'success' | 'fail' | 'rework' | 'escalate' | 'blocked' | 'cancelled';
-  acknowledgedDecisions?: string[];  // 阶段门放行时用户填写的理解证据（§10.6 第六维度）
+  acknowledgedDecisions?: string[]; // 阶段门放行时用户填写的理解证据（§10.6 第六维度）
   note?: string;
   artifacts?: string[];
+  reportId?: string;
+  basedOnReport?: string;
+  targetKind?: string;
+  target?: string;
+  round?: number;
+  implementationTarget?: string;
+  lifecycleStatus?: 'pending-pre-approval' | 'open-approved-lifecycle';
 }
 ```
+
+**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按 `(phase, round, reportId, targetKind, basedOnReport)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix 仅接受 exact `basedOnReport`。implementation V/G 必须显式 targetKind/implementationTarget 并同 fix identity 对齐；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics；同身份 V/G 未全部通过输出 `pending-pre-approval`，只有同身份 V/G 已通过仍缺 exact fix 才输出 `open-approved-lifecycle`。诊断不会修改 append-only raw JSONL。
 
 ### 10D.4 编排者维护职责（O 角色扩展，不改 S/V/G 边界）
 
 > 在 §3.4.5「编排者允许的动作」新增「预算与日志维护」项，与现有「读 .w-model/*.json」「跑只读脚本看退出码」并列。仍属"状态读写+持久化"允许动作，非实施。
 
-| 时机 | O 的动作 |
-|---|---|
-| 项目初始化（`/wm analyze` 首次） | 创建 `.w-model/budget.json`（默认值）+ 创建空 `.w-model/run-log.jsonl` |
-| 每次子代理分派返回后 | append 一条 RunLogEntry（action 对应角色动作） |
-| 每个门禁脚本执行后 | append 一条 RunLogEntry（gateExitCode 填实际退出码） |
-| 每个 🔴 CHECKPOINT 放行后 | append 一条 RunLogEntry（action=checkpoint，acknowledgedDecisions 填用户输入） |
-| 每次返工/回退后 | append 一条 RunLogEntry（action=rework/rollback，note 填原因） |
-| 预算检查点（每阶段门后） | 读 budget.json + 累计本阶段 run-log tokens，若超 maxTokens 或触发 killSwitch → 按 onExceed 处置 |
+| 时机                             | O 的动作                                                                                        |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 项目初始化（`/wm analyze` 首次） | 创建 `.w-model/budget.json`（默认值）+ 创建空 `.w-model/run-log.jsonl`                          |
+| 每次子代理分派返回后             | append 一条 RunLogEntry（action 对应角色动作）                                                  |
+| 每个门禁脚本执行后               | append 一条 RunLogEntry（gateExitCode 填实际退出码）                                            |
+| 每个 🔴 CHECKPOINT 放行后        | append 一条 RunLogEntry（action=checkpoint，acknowledgedDecisions 填用户输入）                  |
+| 每次返工/回退后                  | append 一条 RunLogEntry（action=rework/rollback，note 填原因）                                  |
+| 预算检查点（每阶段门后）         | 读 budget.json + 累计本阶段 run-log tokens，若超 maxTokens 或触发 killSwitch → 按 onExceed 处置 |
 
 ### 10D.5 预算检查逻辑（确定性，无 LLM）
 
@@ -1699,7 +1783,7 @@ interface RunLogEntry {
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
 - **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
-- **R8 相对顺序约束（同阶段内动作链序）**：`check-run-log.ts` 校验同阶段内关键动作类的相对顺序，理想链为 **S 动作（`produce`/`fix`/`emergency-fix`）→ R3（`r3-completeness`/`r3-reliability`/`r3-security`）→ V（`review`）→ G（gate 类）→ checkpoint**。S/R3/V 取首次出现位置（首轮次序），gate/checkpoint 取最后一次出现位置（与 R8-1/R8-2 的 lastCheckpoint 语义一致——中间 checkpoint 是进度标记，不参与链序）；仅当两类动作均出现且前者位置晚于后者才判违规，不新增存在性要求，多轮返工不受影响。违反 → `check-run-log.ts` 退出码 1（修法：按链序补录缺失动作或用 `/wm` 修正轨迹后重跑门禁）。
+- **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录输出 `LEGACY_UNSCOPED`/deferred，不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
 - **编排质量指标（orchestrationQuality，只读统计，不加门禁）**：`metrics-report.ts` 在 7 区度量基础上新增 `orchestration` 子区，统计编排质量信号——`r3`（R3 预防性审查套数 / 维度分布 / findings 严重度分布，数据源 `.w-model/preventive-reviews/`）、`iceberg`（冰山扫掠轮次分布 / 新发现计数 / 严重度分布，数据源 `.w-model/iceberg/`）、`reworkHints`（V 审查返工提示密度，数据源 run-log 本身）。`r3`/`iceberg` 数据源缺失时对应子区为 `null`（不告警、不阻断）；该指标仅供汇报与诊断，不参与任何门禁放行判定。
 - **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。
 
@@ -1712,7 +1796,7 @@ interface RunLogEntry {
 
 **强制校验项**（E.1~E.4，任一层失败 → exitCode=1，O 不得放行）：
 
-- **E.1 各 check-*.ts 的 JSON 摘要须含 exitCode 字段，与 process.exit() 强一致**：每个门禁脚本 stdout 末尾的证据摘要（`GATE_JSON` / `TLA_JSON` / `GRAPH_JSON` 等）须显式含 `exitCode` 字段，且与脚本最终 `process.exit(code)` 调用的码值完全一致；字段缺失或二者不一致 → 视为校验失败（exitCode=1）。**ERROR_JSON（exit 2 输入错误的结构化摘要）同属 stdout JSON 摘要家族，遵循本条约定的 exitCode 强一致**（其 `exitCode` 恒为 2，经 `run-log-logic.ts` `extractExitCode` 26 个标记解析，可被 gate-logs 存档后 R6 交叉校验）。
+- **E.1 各 check-\*.ts 的 JSON 摘要须含 exitCode 字段，与 process.exit() 强一致**：每个门禁脚本 stdout 末尾的证据摘要（`GATE_JSON` / `TLA_JSON` / `GRAPH_JSON` 等）须显式含 `exitCode` 字段，且与脚本最终 `process.exit(code)` 调用的码值完全一致；字段缺失或二者不一致 → 视为校验失败（exitCode=1）。**ERROR_JSON（exit 2 输入错误的结构化摘要）同属 stdout JSON 摘要家族，遵循本条约定的 exitCode 强一致**（其 `exitCode` 恒为 2，经 `run-log-logic.ts` `extractExitCode` 26 个标记解析，可被 gate-logs 存档后 R6 交叉校验）。
 - **E.2 G 子代理须将脚本 stdout 完整存档到 `.w-model/gate-logs/phaseN-<script>.log`**：G 子代理跑完每个 `check-*.ts` 后，须把脚本 stdout 原样（含证据摘要 JSON 行）落盘到 `.w-model/gate-logs/phaseN-<script>.log`（如 `phase1-check-tla-model.log`），作为不可篡改的执行凭证；编排者 O 不得放行无对应 gate-log 的阶段门。
 - **E.3 check-run-log.ts 交叉校验 run-log.gateExitCode 与 gate-logs 存档一致**：`check-run-log.ts` 须读取本阶段所有 `gate-logs/phaseN-*.log`，解析其中的 `exitCode`，与 run-log.jsonl 中对应 `action ∈ {gate, tla-gate, graph-gate}` 记录的 `gateExitCode` 逐一比对；任一不一致 → exitCode=1。
 - **E.4 任一层校验失败 → exitCode=1，O 不得放行**：E.1（脚本自身 exitCode 字段缺失/不一致）、E.2（gate-log 缺失）、E.3（run-log 与 gate-log 不一致）三层中任一失败，`check-run-log.ts` 须返回退出码 1，编排者 O 不得放行该阶段门（反模式 #9 谎报状态守护）。
@@ -1729,10 +1813,10 @@ interface RunLogEntry {
 
 ### 激活条件
 
-| 条件 | 要求 |
-|---|---|
-| 成熟度级别 | maturity.json.level ≥ L2（L0/L1 attended 不激活） |
-| 项目模式 | 棕地维护（greenfield 首次跑不激活） |
+| 条件       | 要求                                                             |
+| ---------- | ---------------------------------------------------------------- |
+| 成熟度级别 | maturity.json.level ≥ L2（L0/L1 attended 不激活）                |
+| 项目模式   | 棕地维护（greenfield 首次跑不激活）                              |
 | 高风险路径 | 即使 L3，涉及 auth/加密/发布/架构变更的事件强制决策型 CHECKPOINT |
 
 ### EventIngress Schema
@@ -1741,14 +1825,14 @@ interface RunLogEntry {
 
 ### 事件 → 阶段路由表
 
-| eventType | 目标阶段 | 触发条件 | 高风险路径 |
-|---|---|---|---|
-| `bug-report` | 阶段 5（编码修复） | L2+，bug 涉及已存在代码 | 涉及 auth/加密代码 → 强制 CHECKPOINT |
-| `requirement-change` | 阶段 1（需求重跑） | L2+，需求变更须回退到阶段 1 | 架构变更 → 强制 CHECKPOINT |
-| `acceptance-failure` | 阶段 8（验收重跑） | L2+，验收失败重跑验收 | 发布放行 → 始终 attended |
-| `regression-detected` | 阶段 6/7（集成/系统测试） | L2+，回归测试失败 | - |
-| `scheduled-review` | 阶段 8（验收回顾） | L3，定期回顾 | 发布放行 → 始终 attended |
-| `security-incident` | 阶段 4（详细设计重审） | L2+，安全事件须回退设计 | 强制 CHECKPOINT |
+| eventType             | 目标阶段                  | 触发条件                    | 高风险路径                           |
+| --------------------- | ------------------------- | --------------------------- | ------------------------------------ |
+| `bug-report`          | 阶段 5（编码修复）        | L2+，bug 涉及已存在代码     | 涉及 auth/加密代码 → 强制 CHECKPOINT |
+| `requirement-change`  | 阶段 1（需求重跑）        | L2+，需求变更须回退到阶段 1 | 架构变更 → 强制 CHECKPOINT           |
+| `acceptance-failure`  | 阶段 8（验收重跑）        | L2+，验收失败重跑验收       | 发布放行 → 始终 attended             |
+| `regression-detected` | 阶段 6/7（集成/系统测试） | L2+，回归测试失败           | -                                    |
+| `scheduled-review`    | 阶段 8（验收回顾）        | L3，定期回顾                | 发布放行 → 始终 attended             |
+| `security-incident`   | 阶段 4（详细设计重审）    | L2+，安全事件须回退设计     | 强制 CHECKPOINT                      |
 
 ### 编排者路由逻辑
 
@@ -1771,12 +1855,12 @@ interface RunLogEntry {
 
 ### 设计原则
 
-| 原则 | 遵守方式 |
-|---|---|
+| 原则                        | 遵守方式                                                            |
+| --------------------------- | ------------------------------------------------------------------- |
 | 技能不内置 LLM 调用（§3.3） | HarnessImprovementReport 由编排者 O 确定性分析 run-log 产出，无 LLM |
-| 技能自演化不在本仓库（§11） | 技能只产出改进信号，不自动改 harness |
-| 编排者最小化（§3.4） | O 分析 run-log 产出报告属"状态读写+分析"允许动作，非实施 |
-| 真实执行（约束4） | 分析基于 run-log 实际记录，不 LLM 估算 |
+| 技能自演化不在本仓库（§11） | 技能只产出改进信号，不自动改 harness                                |
+| 编排者最小化（§3.4）        | O 分析 run-log 产出报告属"状态读写+分析"允许动作，非实施            |
+| 真实执行（约束4）           | 分析基于 run-log 实际记录，不 LLM 估算                              |
 
 ### HarnessImprovementReport Schema
 
@@ -1788,20 +1872,20 @@ interface RunLogEntry {
 
 ### 触发时机
 
-| 触发方式 | 条件 | 动作 |
-|---|---|---|
-| 用户请求 | `/wm hill-climbing` 命令 | O 分析全量 run-log 产出报告 |
-| 阶段门后自动 | 每个阶段门放行后 | O 增量分析本阶段 run-log |
-| 定期触发（L3） | maturity.level=L3 且距上次报告 ≥ 7 天 | O 自动产出全量报告 |
-| 失败模式命中 | O 系列失败模式命中 ≥ 2 次 | O 强制产出专项报告 |
+| 触发方式       | 条件                                  | 动作                        |
+| -------------- | ------------------------------------- | --------------------------- |
+| 用户请求       | `/wm hill-climbing` 命令              | O 分析全量 run-log 产出报告 |
+| 阶段门后自动   | 每个阶段门放行后                      | O 增量分析本阶段 run-log    |
+| 定期触发（L3） | maturity.level=L3 且距上次报告 ≥ 7 天 | O 自动产出全量报告          |
+| 失败模式命中   | O 系列失败模式命中 ≥ 2 次             | O 强制产出专项报告          |
 
 ### 与外部 SkillOpt/darwin-skill 的边界
 
-| 角色 | 职责 | 边界 |
-|---|---|---|
-| w-model-dev Loop 4 | 产出 HarnessImprovementReport（信号） | 不自动改 harness；不调用 LLM |
-| 外部 SkillOpt/darwin-skill | 消费信号做技能自演化 | 重写 prompt/工具/验证规则；可能用 LLM |
-| 人 | 审查报告 + 决定应用哪些信号 | 低风险人审后手动改；高风险人审+回归测试 |
+| 角色                       | 职责                                  | 边界                                    |
+| -------------------------- | ------------------------------------- | --------------------------------------- |
+| w-model-dev Loop 4         | 产出 HarnessImprovementReport（信号） | 不自动改 harness；不调用 LLM            |
+| 外部 SkillOpt/darwin-skill | 消费信号做技能自演化                  | 重写 prompt/工具/验证规则；可能用 LLM   |
+| 人                         | 审查报告 + 决定应用哪些信号           | 低风险人审后手动改；高风险人审+回归测试 |
 
 > Loop 4 产出的 HarnessImprovementReport 信号消费流程详见 §10H（SkillOpt 方法论吸收）。
 
@@ -1821,14 +1905,14 @@ interface RunLogEntry {
 
 ### 10H.3 六段式循环类比映射
 
-| SkillOpt 训练循环 | w-model-dev 离线进化 | 说明 |
-|---|---|---|
-| rollout | （已完成）Loop 4 产出 HarnessImprovementReport | 信号源已就绪 |
-| reflect | 主代理审查信号 + 产出 edit proposal | 确定性，无 LLM |
-| aggregate | 多信号合并为 edit 批次（低风险/高风险） | 按风险分批 |
-| select | 按 bounded edit 边界裁剪 edit 数量 | 单文件≤3、单信号≤2 文件、全轮≤15 |
-| update | 应用 edit 到 4 类资产 | 技能/模板/参考/脚本 |
-| gate | self-test + vitest + tsc + fixture validation | 真实退出码 |
+| SkillOpt 训练循环 | w-model-dev 离线进化                           | 说明                             |
+| ----------------- | ---------------------------------------------- | -------------------------------- |
+| rollout           | （已完成）Loop 4 产出 HarnessImprovementReport | 信号源已就绪                     |
+| reflect           | 主代理审查信号 + 产出 edit proposal            | 确定性，无 LLM                   |
+| aggregate         | 多信号合并为 edit 批次（低风险/高风险）        | 按风险分批                       |
+| select            | 按 bounded edit 边界裁剪 edit 数量             | 单文件≤3、单信号≤2 文件、全轮≤15 |
+| update            | 应用 edit 到 4 类资产                          | 技能/模板/参考/脚本              |
+| gate              | self-test + vitest + tsc + fixture validation  | 真实退出码                       |
 
 ### 10H.4 bounded edit 边界规则
 
@@ -1838,20 +1922,20 @@ interface RunLogEntry {
 
 ### 10H.5 validation gate 标准
 
-| 阶段 | 命令 | 退出码 |
-|---|---|---|
-| V1 | `npx tsc -p config/tsconfig.json` | 0 |
-| V2 | `npm run self-test` | 0 |
-| V3 | `npx vitest run --config config/vitest.config.ts` | 0 |
-| V4 | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <fixture>` | 1（触发 R11/R12/R13） |
+| 阶段 | 命令                                                                 | 退出码                |
+| ---- | -------------------------------------------------------------------- | --------------------- |
+| V1   | `npx tsc -p config/tsconfig.json`                                    | 0                     |
+| V2   | `npm run self-test`                                                  | 0                     |
+| V3   | `npx vitest run --config config/vitest.config.ts`                    | 0                     |
+| V4   | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <fixture>` | 1（触发 R11/R12/R13） |
 
 ### 10H.6 与 Loop 4 的边界
 
-| 角色 | 职责 | 边界 |
-|---|---|---|
-| w-model-dev Loop 4 | 产出 HarnessImprovementReport 信号 | 不自动改 harness |
+| 角色                        | 职责                                                | 边界                             |
+| --------------------------- | --------------------------------------------------- | -------------------------------- |
+| w-model-dev Loop 4          | 产出 HarnessImprovementReport 信号                  | 不自动改 harness                 |
 | SkillOpt 方法论吸收（本节） | 消费信号 → reflect → bounded edit → validation gate | 不引入 SkillOpt 工具；不调用 LLM |
-| 外部 SkillOpt/darwin-skill | 真实 SkillOpt 工具运行 | 仍由外部完成（§11） |
+| 外部 SkillOpt/darwin-skill  | 真实 SkillOpt 工具运行                              | 仍由外部完成（§11）              |
 
 ### 10H.7 人审流程
 
@@ -1878,6 +1962,7 @@ interface RunLogEntry {
 - **D4 响应字段一致性**：验收测试断言字段须在实际响应体中存在
 
 **校验时机**：
+
 - 阶段 5 编码完成后（G 子代理执行，exitCode=0 才放行进阶段 6）
 - 阶段 8 终检时（与 `check-artifact-gate.ts` 并行执行）
 
@@ -1890,18 +1975,19 @@ interface RunLogEntry {
 > 本节修正 `PHASE_TRACE_FIELDS`，确保阶段 1-4 就校验 acceptanceTest。
 
 **修正内容**：
+
 - phase 1-4 `PHASE_TRACE_FIELDS` 增加 `acceptanceTest`（REQ/SD/INTF/DD 行强制非空）
 - NFR/CON 行允许 `acceptanceTest` 为 null（横切治理类豁免，已有 `isCrossCutting` 逻辑覆盖）
 - 判定规则：rowId 前缀 `REQ-`/`SD-`/`INTF-`/`DD-` 强制校验；`NFR-`/`CON-` 允许 null
 
 **校验阶段映射**：
 
-| Phase | 新增行类型 | acceptanceTest 校验要求 |
-|---|---|---|
-| 1 | REQ 行 | 须非空（UAT 用例在阶段 1 设计） |
-| 2 | SD 行 | 须非空（映射到已有 UAT 用例） |
-| 3 | INTF 行 | 须非空（映射到已有 UAT 用例） |
-| 4 | DD 行 | 须非空（映射到已有 UAT 用例） |
+| Phase | 新增行类型 | acceptanceTest 校验要求         |
+| ----- | ---------- | ------------------------------- |
+| 1     | REQ 行     | 须非空（UAT 用例在阶段 1 设计） |
+| 2     | SD 行      | 须非空（映射到已有 UAT 用例）   |
+| 3     | INTF 行    | 须非空（映射到已有 UAT 用例）   |
+| 4     | DD 行      | 须非空（映射到已有 UAT 用例）   |
 
 ---
 
@@ -1923,15 +2009,15 @@ interface RunLogEntry {
 
 在系统层级树之上叠加 7 层正交图谱，各层边类型独立校验：
 
-| # | 层 | 边类型 | 语义 | 校验要点 |
-|---|---|---|---|---|
-| 1 | 结构层 | `parent` | 系统层级树依附（见 §10.10.1） | 单根、父唯一、层级单调 |
-| 2 | 依赖层 | `depends-on` | 节点间依赖（SD→SD / INTF→INTF） | 禁止环依赖；依赖目标须存在 |
-| 3 | 追溯层 | `implements` / `defines` / `realizes` | 跨阶段追溯（SD→REQ / SD→INTF / DD→INTF or DD→SD） | 阶段递进追溯（见 §10.7 校验算法 4） |
-| 4 | 信息流层 | `produces` | 信息流向 | 黑洞/奇迹/死模块校验；**根节点豁免死模块**（系统根无入流合法） |
-| 5 | 治理层 | `governs` | 横切治理（如安全治理节点 governs 多个子系统） | 横切边不依附层级树（见 §10.10.3） |
-| 6 | 协作层 | `collaborates-with` | 对等协作（子系统间对等交互） | 无向语义；两端须对等层级 |
-| 7 | 派生层 | `derives` | 派生规格（如 TLA+ spec derives 自设计节点） | 派生源须存在；派生不替代追溯 |
+| #   | 层       | 边类型                                | 语义                                              | 校验要点                                                       |
+| --- | -------- | ------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+| 1   | 结构层   | `parent`                              | 系统层级树依附（见 §10.10.1）                     | 单根、父唯一、层级单调                                         |
+| 2   | 依赖层   | `depends-on`                          | 节点间依赖（SD→SD / INTF→INTF）                   | 禁止环依赖；依赖目标须存在                                     |
+| 3   | 追溯层   | `implements` / `defines` / `realizes` | 跨阶段追溯（SD→REQ / SD→INTF / DD→INTF or DD→SD） | 阶段递进追溯（见 §10.7 校验算法 4）                            |
+| 4   | 信息流层 | `produces`                            | 信息流向                                          | 黑洞/奇迹/死模块校验；**根节点豁免死模块**（系统根无入流合法） |
+| 5   | 治理层   | `governs`                             | 横切治理（如安全治理节点 governs 多个子系统）     | 横切边不依附层级树（见 §10.10.3）                              |
+| 6   | 协作层   | `collaborates-with`                   | 对等协作（子系统间对等交互）                      | 无向语义；两端须对等层级                                       |
+| 7   | 派生层   | `derives`                             | 派生规格（如 TLA+ spec derives 自设计节点）       | 派生源须存在；派生不替代追溯                                   |
 
 ### 10.10.3 横切设计承载
 
@@ -1957,20 +2043,21 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 
 **校验规则**（R1-R10）：
 
-| 规则 | 校验内容 | 失败后果 |
-|---|---|---|
-| R1 | 当前阶段所有强制角色签名齐全 | exitCode=1，标注缺失角色 |
-| R2 | 签名链连续（prevSigHash 匹配） | exitCode=1，标注断裂点 |
-| R3 | 时间戳单调递增 | exitCode=1，标注时序异常 |
-| R4 | 签名角色与阶段角色清单匹配 | exitCode=1，标注越权角色 |
-| R5 | O checkpoint 签名 signer 为用户 ID（非 O 角色） | exitCode=1，标注代签（O4 命中） |
-| R6 | sigHash 重算一致（防篡改） | exitCode=1，标注篡改签名 |
-| R7 | 各角色 sourceSigIds 均存在于签名链中 | exitCode=1，标注悬空来源 |
-| R8 | 各角色 sourceArtifacts 路径存在于磁盘（仅当解析到含 .w-model/project.json 的真实项目根时启用；独立链文件/夹具自动跳过） | exitCode=1，标注缺失产物 |
-| R9 | 各角色来源符合"强制来源/禁止来源"矩阵 | exitCode=1，标注越权消费 |
-| R10 | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录 | exitCode=1，标注绕过门禁 |
+| 规则 | 校验内容                                                                                                                | 失败后果                        |
+| ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| R1   | 当前阶段所有强制角色签名齐全                                                                                            | exitCode=1，标注缺失角色        |
+| R2   | 签名链连续（prevSigHash 匹配）                                                                                          | exitCode=1，标注断裂点          |
+| R3   | 时间戳单调递增                                                                                                          | exitCode=1，标注时序异常        |
+| R4   | 签名角色与阶段角色清单匹配                                                                                              | exitCode=1，标注越权角色        |
+| R5   | O checkpoint 签名 signer 为用户 ID（非 O 角色）                                                                         | exitCode=1，标注代签（O4 命中） |
+| R6   | sigHash 重算一致（防篡改）                                                                                              | exitCode=1，标注篡改签名        |
+| R7   | 各角色 sourceSigIds 均存在于签名链中                                                                                    | exitCode=1，标注悬空来源        |
+| R8   | 各角色 sourceArtifacts 路径存在于磁盘（仅当解析到含 .w-model/project.json 的真实项目根时启用；独立链文件/夹具自动跳过） | exitCode=1，标注缺失产物        |
+| R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                                                                   | exitCode=1，标注越权消费        |
+| R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                                                           | exitCode=1，标注绕过门禁        |
 
 **跨阶段消费者校验**（`--stage=archive` 时）：
+
 - 阶段 N+1 的 O chunk 签名 sourceSigIds 含阶段 N 的 O checkpoint 签名
 - 阶段 5 的 S produce 签名 sourceSigIds 含阶段 1-4 全部 G gate 签名
 - 阶段 8 的 G gate 签名 sourceSigIds 含阶段 1-7 全部签名链根 hash
@@ -1985,36 +2072,36 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 >
 > 本表只收录当前设计事实章节；轮次决策的落地追溯见 [decision-log/README.md](./changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射）。
 
-| SSoT 章节 | 设计内容 | 实现位置 | 一致性 |
-|---|---|---|---|
-| 3.2.1 需求分析模块 | 需求解析、验收测试生成 | `w-model-dev/SKILL.md` `/wm analyze` 编排 + `references/phase-1-requirements.md` | 编排完整（状态登记 + 测试用例设计由 Agent 执行；AI 解析由 Agent 自身 LLM 完成） |
-| 3.2.2 设计阶段模块 | 架构 / 概要 / 详细设计 + 对应测试设计 | `w-model-dev/SKILL.md` `/wm design` 编排 + `references/phase-2/3-*.md` | 编排完整（文档生成由 Agent 完成） |
-| 3.2.3 编码与单元测试 | 代码生成、单元测试用例生成 | `w-model-dev/SKILL.md` `/wm code` 编排 + `references/phase-4/5-*.md` | 编排完整（不自动标记通过，需 `result` 回填） |
-| 3.2.4-3.2.6 测试模块 | 集成 / 系统 / 验收测试执行 | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md` | 完整（支持 `result=pass\|fail` 回填） |
-| 3.3 架构原则与外部工具边界 | 技能不内置 LLM / 演化由外部完成、无编程式接入 | `w-model-dev/SKILL.md`「核心原则」节 + `w-model-dev/references/verifier-spec.md` | 完整 |
-| 3.4 编排者-子代理边界 | 编排者最小化（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体，A 为阶段 1–4 分析子代理，R 为返工循环根因定位，F 由 S 兼任）+ 反模式 #10/#11/#12/#18/#19 守护 | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10/#11/#12/#18/#19 + `ingestion-chunk.md` / `ingestion-cross.md` / `graph-guide.md` | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施 + A 子代理图谱演进 + G 跑 `check-requirement-graph.ts` 守护 #11/#12 + R 返工根因定位守护 #18/#19） |
-| 4A 核心操作行为与失败模式 | 8 条核心操作行为 + 10 条失败模式（F1~F10）+ 6 条运维失败模式（O1~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系 | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/operation-behaviors.md`「失败模式清单」节（F1~F10）+ SSoT §4A.2a「运维失败模式清单」节（O1~O6）+「返工循环反模式」节（#18/#19） | 完整（F1~F10 吸收自 addyosmani/agent-skills；O1~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位） |
-| 6 命令接口 | 12 个 `/wm` 命令（含 `/wm hill-climbing`，见 §10G） | `w-model-dev/SKILL.md`「命令速查」节（编排，Agent 执行） | 完整 |
-| 6.4 Agent Personas | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5） | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵） | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona） |
-| 7 数据模型 | Project / Requirement / Design / TestCase / RTM | `w-model-dev/references/data-models.md`（Agent 维护 `.w-model/*.json` 的 schema） | 完整 |
-| 7.6 LLM-as-a-Verifier 评审规范 | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 / 五轴评审 / Severity 标签 / Structural Remedies | `w-model-dev/references/verifier-spec.md`（规范，含 §7.4A 五轴+Severity+Remedies）+ `w-model-dev/scripts/logic/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（CLI 校验） | 完整（LLM 推理由外部 Agent 执行；五轴+Severity 吸收自 addyosmani/agent-skills `code-review-and-quality`） |
-| 7.6A self-as-verifier 模式（demo-only 例外） | 单 Agent 兼任 S/V/G/R 的例外模式：仅限 demo/教学（生产禁止）+ 各角色独立产物路径 + Persona 切换偏置缓解 | `w-model-dev/SKILL.md`「self-as-verifier 模式」节 + `w-model-dev/references/verifier-spec.md` §13 + `check-verifier-output.ts --self-as-verifier --s-output=<path>`（路径独立校验） | 完整（反模式 #35 守护产物混合；`check-role-dispatch.ts` S/V/G ≥1 + R ≥3 无条件；代签检测见 §10C O4） |
-| 7.7 graph.json schema | ingestion 子流程结构层图谱（节点/边/连通/单根/跨阶段追溯 + 信息流边与边界节点） | `docs/ingestion-graph-convergence-design.md` §2.4（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/references/graph-guide.md` + `w-model-dev/references/ingestion-chunk.md` / `ingestion-cross.md` | 完整（与 `rtm.json` 分工：结构层 vs 追溯层，各自独立校验；信息流边与边界节点用于黑洞/奇迹/死模块校验） |
-| 7.8 tla-manifest.json schema | TLA+ 层次化状态机建模行为层产物（specs/层级/拆解决策/文件头/SANY+TLC 结果） | `docs/tla-plus-modeling-design.md` §2（权威定义）+ `w-model-dev/references/tla-plus-guide.md` + `w-model-dev/templates/tla-spec-template.md` | 完整（与 `graph.json`/`rtm.json` 分工：行为层 vs 结构层 vs 追溯层，三者并存各自独立校验；S 产出 .tla+.cfg+manifest，G 跑 `check-tla-model.ts` 校验） |
-| 8 技术实现方案 | 需求解析 / 测试用例生成 / 代码生成算法 | 上游 AI 按提示词执行（`w-model-dev/references/phase-*.md`） | 完整（算法由提示词承载，技能不内置 LLM） |
-| 9 RTM | 需求跟踪矩阵 | `w-model-dev/references/rtm-guide.md` + `templates/rtm.md`（Agent 维护） | 完整 |
-| 10 质量保障 | 工件质量门 | 判定逻辑：`w-model-dev/scripts/logic/gate-logic.ts`（单点事实源）；CLI：`w-model-dev/scripts/cli/check-artifact-gate.ts` | 完整（见 10.5，门禁逻辑已沉入技能包） |
-| 10.6 项目级 Definition of Done | 每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性） | `w-model-dev/references/definition-of-done.md` | 完整（吸收自 addyosmani/agent-skills `references/definition-of-done.md`；第六维度「理解证据」吸收自 cobusgreyling/loop-engineering `docs/concepts.md` Comprehension Debt，与 §10.5 工件质量门互补） |
-| 10.7 图谱门禁 | 阶段 1–4 ingestion 子流程结构连通性门禁（连通/单根/父唯一/阶段递进追溯 + 信息流校验：黑洞/奇迹/死模块/边界完整性） | `docs/ingestion-graph-convergence-design.md` §3（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/scripts/logic/graph-logic.ts`（校验纯逻辑，含 `DataflowViolations`/`BoundaryInfo`）+ `w-model-dev/scripts/cli/check-requirement-graph.ts`（CLI）+ `w-model-dev/references/graph-guide.md` | 完整（与 §10.5 工件质量门互补：结构层阶段 1–4 vs 追溯层阶段 8 终检；信息流校验与结构校验正交；守护反模式 #11/#12/#13） |
-| 10.8 TLA+ 行为门禁 | 阶段 1–4 TLA+ 层次化状态机建模行为正确性门禁（环境/manifest/文件头/层次一致性/拆解决策/SANY 语法/TLC 模型检查） | `docs/tla-plus-modeling-design.md` §3（权威定义）+ `w-model-dev/scripts/logic/tla-logic.ts`（校验纯逻辑，含 `parseTlaHeader`/`validateHeader`/`checkHierarchy`/`checkDecomposition`）+ `w-model-dev/scripts/cli/check-tla-model.ts`（CLI）+ `w-model-dev/references/tla-plus-guide.md` | 完整（与 §10.7 图谱门禁正交：行为层 vs 结构层+信息流层；阶段 4 TLA+ 零违反 ∧ 图谱零违反才放行进编码；守护反模式 #14/#15/#16/#17） |
-| 10.8.1 代码-TLA+ 一致性回归 | 阶段 5 代码与 TLA+ 规格一致性回归门禁（四维度：SD→codeModule 映射 / 代码状态转移抽取 / Next 分支对应 / 断言覆盖不变式） | `w-model-dev/scripts/logic/code-tla-logic.ts`（校验纯逻辑，含 `checkSdToCodeModule`/`extractCodeStateTransfers`/`checkNextBranchCoverage`/`checkInvariantCoverage`）+ `w-model-dev/scripts/cli/check-code-tla-consistency.ts`（CLI，使用 TypeScript Compiler API 解析 AST） | 完整（与 §10.8 TLA+ 行为门禁互补：行为门禁校验 TLA+ 规格自身，一致性回归校验代码是否符合 TLA+ 规格；维度1 与 `check-artifact-gate.ts` 终检双向守护；`self-test.ts` 含 5 条样本） |
-| 10.9 根因报告门禁 | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R10：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / canonical `testing-reality-checker` confidence，legacy `reality-checker` fallback） | `w-model-dev/scripts/cli/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源） | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4） |
-| 10C 自主成熟度阶梯 | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型始终 attended，操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑 | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过；L3 高风险路径强制人工 gate） |
-| 10D 成本预算与运行日志 | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑 | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema） | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4） |
-| 10F 事件驱动循环（Loop 3） | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2） |
-| 10G 爬坡循环（Loop 4） | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程 | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「C1（候选，pending V 复审）」节 | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用） |
-| §10H SkillOpt 方法论吸收 | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调 | `w-model-dev/references/skillopt-adoption.md`（可执行细则） | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+） |
-| 11A 采用路径 | greenfield vs brownfield 引入 W 模型 | `docs/adoption-guide.md` | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`） |
+| SSoT 章节                                    | 设计内容                                                                                                                                                                                                                                                                           | 实现位置                                                                                                                                                                                                                                                                                                                      | 一致性                                                                                                                                                                                              |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.2.1 需求分析模块                           | 需求解析、验收测试生成                                                                                                                                                                                                                                                             | `w-model-dev/SKILL.md` `/wm analyze` 编排 + `references/phase-1-requirements.md`                                                                                                                                                                                                                                              | 编排完整（状态登记 + 测试用例设计由 Agent 执行；AI 解析由 Agent 自身 LLM 完成）                                                                                                                     |
+| 3.2.2 设计阶段模块                           | 架构 / 概要 / 详细设计 + 对应测试设计                                                                                                                                                                                                                                              | `w-model-dev/SKILL.md` `/wm design` 编排 + `references/phase-2/3-*.md`                                                                                                                                                                                                                                                        | 编排完整（文档生成由 Agent 完成）                                                                                                                                                                   |
+| 3.2.3 编码与单元测试                         | 代码生成、单元测试用例生成                                                                                                                                                                                                                                                         | `w-model-dev/SKILL.md` `/wm code` 编排 + `references/phase-4/5-*.md`                                                                                                                                                                                                                                                          | 编排完整（不自动标记通过，需 `result` 回填）                                                                                                                                                        |
+| 3.2.4-3.2.6 测试模块                         | 集成 / 系统 / 验收测试执行                                                                                                                                                                                                                                                         | `w-model-dev/SKILL.md` `/wm test` 编排 + `references/phase-6/7/8-*.md`                                                                                                                                                                                                                                                        | 完整（支持 `result=pass\|fail` 回填）                                                                                                                                                               |
+| 3.3 架构原则与外部工具边界                   | 技能不内置 LLM / 演化由外部完成、无编程式接入                                                                                                                                                                                                                                      | `w-model-dev/SKILL.md`「核心原则」节 + `w-model-dev/references/verifier-spec.md`                                                                                                                                                                                                                                              | 完整                                                                                                                                                                                                |
+| 3.4 编排者-子代理边界                        | 编排者最小化（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体，A 为阶段 1–4 分析子代理，R 为返工循环根因定位，F 由 S 兼任）+ 反模式 #10/#11/#12/#18/#19 守护                                                                                                                             | `w-model-dev/SKILL.md`「编排者-子代理边界」节 + `w-model-dev/references/subagent-delegation.md`（角色/分派/回填契约）+ `w-model-dev/references/anti-patterns.md` #10/#11/#12/#18/#19 + `ingestion-chunk.md` / `ingestion-cross.md` / `graph-guide.md`                                                                         | 完整（编排者只读例外 + G 子代理回填证据 + 编排者不得越权实施 + A 子代理图谱演进 + G 跑 `check-requirement-graph.ts` 守护 #11/#12 + R 返工根因定位守护 #18/#19）                                     |
+| 4A 核心操作行为与失败模式                    | 8 条核心操作行为 + 10 条失败模式（F1~~F10）+ 6 条运维失败模式（O1~~O6）+ 返工循环反模式 #18/#19（§4A.2b）+ 与约束/反例的关系                                                                                                                                                       | `w-model-dev/SKILL.md`「核心操作行为」节 + `w-model-dev/references/operation-behaviors.md`「失败模式清单」节（F1~~F10）+ SSoT §4A.2a「运维失败模式清单」节（O1~~O6）+「返工循环反模式」节（#18/#19）                                                                                                                          | 完整（F1~~F10 吸收自 addyosmani/agent-skills；O1~~O6 吸收自 cobusgreyling/loop-engineering `docs/failure-modes.md`，适配 W 模型语境；#18/#19 守护返工必经 R 根因定位）                              |
+| 6 命令接口                                   | 12 个 `/wm` 命令（含 `/wm hill-climbing`，见 §10G）                                                                                                                                                                                                                                | `w-model-dev/SKILL.md`「命令速查」节（编排，Agent 执行）                                                                                                                                                                                                                                                                      | 完整                                                                                                                                                                                                |
+| 6.4 Agent Personas                           | code-reviewer / test-engineer / security-auditor / performance-auditor 角色提示词 + R（根因定位者）角色定义（§6.4.4）+ R 方法论引用（§6.4.5）                                                                                                                                      | `w-model-dev/references/agent-personas.md`（提示词，不调用 LLM）+ `w-model-dev/references/root-cause-locator.md`（R 方法论）+ `w-model-dev/references/subagent-persona-matrix.md`（多角度矩阵）                                                                                                                               | 完整（吸收自 addyosmani/agent-skills `agents/`，由 `/wm review` 路由；R 为独立诊断子代理，不调用 Persona）                                                                                          |
+| 7 数据模型                                   | Project / Requirement / Design / TestCase / RTM                                                                                                                                                                                                                                    | `w-model-dev/references/data-models.md`（Agent 维护 `.w-model/*.json` 的 schema）                                                                                                                                                                                                                                             | 完整                                                                                                                                                                                                |
+| 7.6 LLM-as-a-Verifier 评审规范               | 三维度验证 / 连续评分 / PPT / 子标准 / 输出 Schema / 提示词模板 / 五轴评审 / Severity 标签 / Structural Remedies                                                                                                                                                                   | `w-model-dev/references/verifier-spec.md`（规范，含 §7.4A 五轴+Severity+Remedies）+ `w-model-dev/scripts/logic/verifier-logic.ts`（校验纯逻辑）+ `w-model-dev/scripts/cli/check-verifier-output.ts`（CLI 校验）                                                                                                               | 完整（LLM 推理由外部 Agent 执行；五轴+Severity 吸收自 addyosmani/agent-skills `code-review-and-quality`）                                                                                           |
+| 7.6A self-as-verifier 模式（demo-only 例外） | 单 Agent 兼任 S/V/G/R 的例外模式：仅限 demo/教学（生产禁止）+ 各角色独立产物路径 + Persona 切换偏置缓解                                                                                                                                                                            | `w-model-dev/SKILL.md`「self-as-verifier 模式」节 + `w-model-dev/references/verifier-spec.md` §13 + `check-verifier-output.ts --self-as-verifier --s-output=<path>`（路径独立校验）                                                                                                                                           | 完整（反模式 #35 守护产物混合；`check-role-dispatch.ts` S/V/G ≥1 + R ≥3 无条件；代签检测见 §10C O4）                                                                                                |
+| 7.7 graph.json schema                        | ingestion 子流程结构层图谱（节点/边/连通/单根/跨阶段追溯 + 信息流边与边界节点）                                                                                                                                                                                                    | `docs/ingestion-graph-convergence-design.md` §2.4（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/references/graph-guide.md` + `w-model-dev/references/ingestion-chunk.md` / `ingestion-cross.md`                                                                                         | 完整（与 `rtm.json` 分工：结构层 vs 追溯层，各自独立校验；信息流边与边界节点用于黑洞/奇迹/死模块校验）                                                                                              |
+| 7.8 tla-manifest.json schema                 | TLA+ 层次化状态机建模行为层产物（specs/层级/拆解决策/文件头/SANY+TLC 结果）                                                                                                                                                                                                        | `docs/tla-plus-modeling-design.md` §2（权威定义）+ `w-model-dev/references/tla-plus-guide.md` + `w-model-dev/templates/tla-spec-template.md`                                                                                                                                                                                  | 完整（与 `graph.json`/`rtm.json` 分工：行为层 vs 结构层 vs 追溯层，三者并存各自独立校验；S 产出 .tla+.cfg+manifest，G 跑 `check-tla-model.ts` 校验）                                                |
+| 8 技术实现方案                               | 需求解析 / 测试用例生成 / 代码生成算法                                                                                                                                                                                                                                             | 上游 AI 按提示词执行（`w-model-dev/references/phase-*.md`）                                                                                                                                                                                                                                                                   | 完整（算法由提示词承载，技能不内置 LLM）                                                                                                                                                            |
+| 9 RTM                                        | 需求跟踪矩阵                                                                                                                                                                                                                                                                       | `w-model-dev/references/rtm-guide.md` + `templates/rtm.md`（Agent 维护）                                                                                                                                                                                                                                                      | 完整                                                                                                                                                                                                |
+| 10 质量保障                                  | 工件质量门                                                                                                                                                                                                                                                                         | 判定逻辑：`w-model-dev/scripts/logic/gate-logic.ts`（单点事实源）；CLI：`w-model-dev/scripts/cli/check-artifact-gate.ts`                                                                                                                                                                                                      | 完整（见 10.5，门禁逻辑已沉入技能包）                                                                                                                                                               |
+| 10.6 项目级 Definition of Done               | 每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）                                                                                                                                                                                                    | `w-model-dev/references/definition-of-done.md`                                                                                                                                                                                                                                                                                | 完整（吸收自 addyosmani/agent-skills `references/definition-of-done.md`；第六维度「理解证据」吸收自 cobusgreyling/loop-engineering `docs/concepts.md` Comprehension Debt，与 §10.5 工件质量门互补） |
+| 10.7 图谱门禁                                | 阶段 1–4 ingestion 子流程结构连通性门禁（连通/单根/父唯一/阶段递进追溯 + 信息流校验：黑洞/奇迹/死模块/边界完整性）                                                                                                                                                                 | `docs/ingestion-graph-convergence-design.md` §3（权威定义）+ `docs/information-flow-validation-design.md`（信息流层）+ `w-model-dev/scripts/logic/graph-logic.ts`（校验纯逻辑，含 `DataflowViolations`/`BoundaryInfo`）+ `w-model-dev/scripts/cli/check-requirement-graph.ts`（CLI）+ `w-model-dev/references/graph-guide.md` | 完整（与 §10.5 工件质量门互补：结构层阶段 1–4 vs 追溯层阶段 8 终检；信息流校验与结构校验正交；守护反模式 #11/#12/#13）                                                                              |
+| 10.8 TLA+ 行为门禁                           | 阶段 1–4 TLA+ 层次化状态机建模行为正确性门禁（环境/manifest/文件头/层次一致性/拆解决策/SANY 语法/TLC 模型检查）                                                                                                                                                                    | `docs/tla-plus-modeling-design.md` §3（权威定义）+ `w-model-dev/scripts/logic/tla-logic.ts`（校验纯逻辑，含 `parseTlaHeader`/`validateHeader`/`checkHierarchy`/`checkDecomposition`）+ `w-model-dev/scripts/cli/check-tla-model.ts`（CLI）+ `w-model-dev/references/tla-plus-guide.md`                                        | 完整（与 §10.7 图谱门禁正交：行为层 vs 结构层+信息流层；阶段 4 TLA+ 零违反 ∧ 图谱零违反才放行进编码；守护反模式 #14/#15/#16/#17）                                                                   |
+| 10.8.1 代码-TLA+ 一致性回归                  | 阶段 5 代码与 TLA+ 规格一致性回归门禁（四维度：SD→codeModule 映射 / 代码状态转移抽取 / Next 分支对应 / 断言覆盖不变式）                                                                                                                                                            | `w-model-dev/scripts/logic/code-tla-logic.ts`（校验纯逻辑，含 `checkSdToCodeModule`/`extractCodeStateTransfers`/`checkNextBranchCoverage`/`checkInvariantCoverage`）+ `w-model-dev/scripts/cli/check-code-tla-consistency.ts`（CLI，使用 TypeScript Compiler API 解析 AST）                                                   | 完整（与 §10.8 TLA+ 行为门禁互补：行为门禁校验 TLA+ 规格自身，一致性回归校验代码是否符合 TLA+ 规格；维度1 与 `check-artifact-gate.ts` 终检双向守护；`self-test.ts` 含 5 条样本）                    |
+| 10.9 根因报告门禁                            | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R10：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / canonical `testing-reality-checker` confidence，legacy `reality-checker` fallback） | `w-model-dev/scripts/cli/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源）                                                                                                                                                                                                      | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4）    |
+| 10C 自主成熟度阶梯                           | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型始终 attended，操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑                                                                                                                                    | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）                                                                                                                        | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过；L3 高风险路径强制人工 gate）               |
+| 10D 成本预算与运行日志                       | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑                                                                                                                                    | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema）                                                                                                                      | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4）                       |
+| 10F 事件驱动循环（Loop 3）                   | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑                                                                                                                                                                          | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节                                | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2）                 |
+| 10G 爬坡循环（Loop 4）                       | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程                                                                                                                                                                    | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/anti-patterns.md`「C1（候选，pending V 复审）」节                   | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用）    |
+| §10H SkillOpt 方法论吸收                     | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调                                                                                                                | `w-model-dev/references/skillopt-adoption.md`（可执行细则）                                                                                                                                                                                                                                                                   | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+）                                                   |
+| 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                               | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                      | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---
 
@@ -2074,14 +2161,14 @@ graph TD
 
 ### 11A.1 路径选择信号
 
-| 信号 | Greenfield（绿地） | Brownfield（棕地） |
-|---|---|---|
-| 代码库年龄 | 数天至数周 | 数月至数年 |
-| 测试覆盖率 | Day 0 可控 | 不均匀，部分区域无测试 |
-| 约定 | 随开发定义 | 已存在，常未文档化 |
-| 团队习惯 | 形成中 | 已固化（好坏皆然） |
-| Agent 错误改动风险 | 影响面小 | 可能破坏无人记得如何修复的部分 |
-| **采用策略** | **Day 0 全流程启用** | **增量、验证优先** |
+| 信号               | Greenfield（绿地）   | Brownfield（棕地）             |
+| ------------------ | -------------------- | ------------------------------ |
+| 代码库年龄         | 数天至数周           | 数月至数年                     |
+| 测试覆盖率         | Day 0 可控           | 不均匀，部分区域无测试         |
+| 约定               | 随开发定义           | 已存在，常未文档化             |
+| 团队习惯           | 形成中               | 已固化（好坏皆然）             |
+| Agent 错误改动风险 | 影响面小             | 可能破坏无人记得如何修复的部分 |
+| **采用策略**       | **Day 0 全流程启用** | **增量、验证优先**             |
 
 > 处于两者之间（年轻项目但已上线）→ 按棕地路径起步并加速，最终收敛到同一稳态。
 
@@ -2118,13 +2205,13 @@ graph TD
 
 **项目成长后追加：**
 
-| 触发条件 | 追加动作 |
-|---|---|
-| 首个对外 API 或模块边界 | 调用 `code-reviewer` Persona 评审接口设计 |
-| 首次涉及认证 / 加密 / 输入校验 | 调用 `security-auditor` Persona 深审 |
+| 触发条件                       | 追加动作                                              |
+| ------------------------------ | ----------------------------------------------------- |
+| 首个对外 API 或模块边界        | 调用 `code-reviewer` Persona 评审接口设计             |
+| 首次涉及认证 / 加密 / 输入校验 | 调用 `security-auditor` Persona 深审                  |
 | 首次涉及性能热点循环 / DB 查询 | 调用 `performance-auditor` Persona + 准备 k6 基线脚本 |
-| 首次 CI 流水线 | 在 CI 中调用 `check-artifact-gate.ts` 作为质量门 |
-| 首次部署到生产 | 执行 §10.5 工件质量门 + 用户确认归档 |
+| 首次 CI 流水线                 | 在 CI 中调用 `check-artifact-gate.ts` 作为质量门      |
+| 首次部署到生产                 | 执行 §10.5 工件质量门 + 用户确认归档                  |
 
 **Greenfield 反模式：**
 
@@ -2179,25 +2266,27 @@ graph TD
 
 两条路径终态相同：新工作跑全 8 阶段、常开 RTM 维护与真实执行、阶段门评审在合并前、`references/` 按阶段加载而非批量。Greenfield 在数天内到达；Brownfield 在约一个季度内到达，差异正是老代码库从未有的安全网（上下文 / 特征化测试 / 边界）。
 
-| 维度 | Greenfield | Brownfield |
-|---|---|---|
-| 首次加载的技能 | `w-model-dev` + `/wm analyze` | 项目规则文件 + `/wm review` |
-| 首次交付的价值 | 规格化、测试先行的首个功能 | 零风险评审与更安全的 bug 修复 |
-| 测试设计前置姿态 | 从首次提交全启用 | 选择性：在计划改动处前置 |
-| 重构规则 | 罕见（无东西可重构） | 特征化测试先行，永远 |
-| 最高风险反模式 | 跳过 `/wm analyze` | 重构未测试代码 |
-| 到达全流程时间 | Day 0 | 约一个季度，中间双速 |
+| 维度             | Greenfield                    | Brownfield                    |
+| ---------------- | ----------------------------- | ----------------------------- |
+| 首次加载的技能   | `w-model-dev` + `/wm analyze` | 项目规则文件 + `/wm review`   |
+| 首次交付的价值   | 规格化、测试先行的首个功能    | 零风险评审与更安全的 bug 修复 |
+| 测试设计前置姿态 | 从首次提交全启用              | 选择性：在计划改动处前置      |
+| 重构规则         | 罕见（无东西可重构）          | 特征化测试先行，永远          |
+| 最高风险反模式   | 跳过 `/wm analyze`            | 重构未测试代码                |
+| 到达全流程时间   | Day 0                         | 约一个季度，中间双速          |
 
 ### 11A.5 Brownfield 阶段级适配
 
 > 吸收 OpenSpec brownfield 优先理念，对 §11A.3 路径 B 补充阶段级适配细则。权威定义见 [decision-log/absorptions.md](./changes/decision-log/absorptions.md)（Brownfield 阶段级适配节）。
 
 #### 适用场景
+
 - 已有代码库引入 W 模型管理后续迭代
 - 历史代码无 RTM/无 TLA+ 规格，需要补建追溯
 - OpenSpec 风格的 brownfield 项目迁移到 W 模型
 
 #### 阶段 1 Brownfield 入口
+
 S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
 
 1. **现状调查**：扫描 src/ 产出模块清单（controller/service/store/utils）
@@ -2207,17 +2296,20 @@ S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
 5. **Out of Scope 声明**：明确本轮 brownfield 迭代不动哪些历史模块
 
 #### 阶段 2-4 Brownfield 适配
+
 - 阶段 2 系统设计：优先复用现有架构，seam 决策优先选现有模块边界
 - 阶段 3 概要设计：模块交互 seam 优先选现有公共导出
 - 阶段 4 详细设计：新增 DD 仅针对本轮改动模块，历史模块不补 DD（避免范围蔓延）
 - TLA+ 规格：仅对本轮改动的 SD 子系统建模（历史模块不补 TLA+）
 
 #### 阶段 5 Brownfield 编码
+
 - 票据拆解时优先 prefactor（to-tickets 原则）：让本轮改动更容易
 - Wide refactor 场景（重命名共享符号/重类型）必走 expand-contract
 - 历史代码清理不在本轮范围（Out of Scope 声明）
 
 #### Brownfield 不做的事
+
 - 不全量补建历史 RTM（除非用户明确要求，作为独立项目）
 - 不全量补建历史 TLA+ 规格（同上）
 - 不重构无关历史代码（与 §4A.1 行为 5「Maintain Scope Discipline」协同）
@@ -2226,11 +2318,11 @@ S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
 
 > 采用路径（绿地/棕地）按代码库成熟度选；任务规模维度在其上叠加**门禁强度适配**。「轻量路径」是**门禁降载**（maturity L0/L1 免 TLA+/BDD、L0 交付层无脚本门禁、demo 可 self-as-verifier），**不是阶段裁剪**：阶段流程、RTM、CHECKPOINT 机制与生产项目完全一致，任何「以任务小为由跳过 S→V→G 顺序 / RTM 回填 / 用户确认」的行为命中反模式 #10 / #21 并回退。
 
-| 任务规模 | 适配形态 | 门禁强度 |
-|---|---|---|
-| 极小任务（原型 / demo / 教学演示） | L0 交付层（无脚本门禁，V 评审 + 用户确认把关）+ self-as-verifier（仅 demo，见 §7.6A）+ maturity L0/L1 | TLA+/BDD 可选 |
-| 生产小项目 / 小工具 | 完整 8 阶段 + maturity L2 | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
-| 常规生产功能 | 完整 8 阶段 + maturity L3 | 全必跑，无降载 |
+| 任务规模                           | 适配形态                                                                                              | 门禁强度                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 极小任务（原型 / demo / 教学演示） | L0 交付层（无脚本门禁，V 评审 + 用户确认把关）+ self-as-verifier（仅 demo，见 §7.6A）+ maturity L0/L1 | TLA+/BDD 可选                                     |
+| 生产小项目 / 小工具                | 完整 8 阶段 + maturity L2                                                                             | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
+| 常规生产功能                       | 完整 8 阶段 + maturity L3                                                                             | 全必跑，无降载                                    |
 
 > 实现位置：`SKILL.md`「触发决策 → 任务规模适配（轻量路径）」；maturity 分级权威定义见 §10C；L0/L1 交付层见 INSTALL §2。
 
@@ -2239,16 +2331,19 @@ S-doc 子代理在阶段 1 产出需求规格前，先执行 codebase survey：
 ## 12. 发展规划
 
 ### 12.1 第一阶段（基础版）
+
 - 实现需求分析和测试设计的AI辅助
 - 支持代码生成和单元测试生成
 - 提供基本的项目状态管理
 
 ### 12.2 第二阶段（进阶版）
+
 - 实现完整的W模型全流程闭环
 - 支持集成测试和系统测试自动化
 - 提供代码审查和质量分析功能
 
 ### 12.3 第三阶段（高级版）
+
 - 支持多项目并行管理
 - 提供团队协作功能
 - 集成DevOps流程
@@ -2317,6 +2412,7 @@ timeline
 ### 13.3 外部技能演化工具
 
 > 技能演化与评估已移出技能包（原第 14 章 / 第 15 章已移除）。下列工具 / 基准由外部消费本技能产出的 `VerifierOutput` JSON，不在技能内置：
+>
 > - 训练循环与 Skill Lift 评估 → SkillOpt / darwin-skill
 > - 技能评估基准 → ACES / SkillsBench / SkillLearnBench
 > - 多候选排序算法 → PPT（已纳入 `verifier-spec.md` 提示词，见 §13.2）
@@ -2334,32 +2430,32 @@ timeline
 
 ### A. 技能命令速查
 
-| 命令 | 功能 |
-|------|------|
-| `/wm analyze <需求>` | 分析需求并生成规格说明 |
-| `/wm design type=<架构\|概要\|详细>` | 生成对应类型设计文档 |
-| `/wm code <功能>` | 生成代码和单元测试 |
-| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 执行指定类型测试并真实回填结果 |
-| `/wm review <目标>` | 返回 LLM 评审指引（指向 verifier-spec.md，由外部 Agent 执行） |
-| `/wm status` | 查看项目状态（脚本化 `wm-status.ts`：当前阶段、完成进度、RTM 覆盖率、四级测试汇总、最近 3 条动作、确定性下一步建议；`--json` 输出 StatusReport） |
-| `/wm metrics` | 流程度量报告（`metrics-report.ts`：run-log + budget 汇总 7 区度量；支持 `--from/--to/--phase/--json/--out`） |
-| `/wm help` | 显示帮助 |
-| `/wm reset` | 重置当前项目状态（保留元信息，清空实体） |
-| `/wm export [输出目录]` | 导出项目 JSON + RTM Markdown |
-| `/wm import <文件路径>` | 从 JSON 导入项目 |
+| 命令                                                         | 功能                                                                                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/wm analyze <需求>`                                         | 分析需求并生成规格说明                                                                                                                           |
+| `/wm design type=<架构\|概要\|详细>`                         | 生成对应类型设计文档                                                                                                                             |
+| `/wm code <功能>`                                            | 生成代码和单元测试                                                                                                                               |
+| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 执行指定类型测试并真实回填结果                                                                                                                   |
+| `/wm review <目标>`                                          | 返回 LLM 评审指引（指向 verifier-spec.md，由外部 Agent 执行）                                                                                    |
+| `/wm status`                                                 | 查看项目状态（脚本化 `wm-status.ts`：当前阶段、完成进度、RTM 覆盖率、四级测试汇总、最近 3 条动作、确定性下一步建议；`--json` 输出 StatusReport） |
+| `/wm metrics`                                                | 流程度量报告（`metrics-report.ts`：run-log + budget 汇总 7 区度量；支持 `--from/--to/--phase/--json/--out`）                                     |
+| `/wm help`                                                   | 显示帮助                                                                                                                                         |
+| `/wm reset`                                                  | 重置当前项目状态（保留元信息，清空实体）                                                                                                         |
+| `/wm export [输出目录]`                                      | 导出项目 JSON + RTM Markdown                                                                                                                     |
+| `/wm import <文件路径>`                                      | 从 JSON 导入项目                                                                                                                                 |
 
 ### B. 测试类型对应关系
 
-| 开发阶段 | 对应测试类型 | 测试目的 |
-|----------|-------------|----------|
+| 开发阶段 | 对应测试类型 | 测试目的                 |
+| -------- | ------------ | ------------------------ |
 | 需求分析 | 验收测试设计 | 验证系统是否满足用户需求 |
-| 系统设计 | 系统测试设计 | 验证系统整体功能和性能 |
-| 概要设计 | 集成测试设计 | 验证模块间交互正确性 |
-| 详细设计 | 单元测试设计 | 验证单个模块功能正确性 |
-| 编码实现 | 单元测试执行 | 验证代码实现正确性 |
-| 集成阶段 | 集成测试执行 | 验证模块集成正确性 |
-| 系统阶段 | 系统测试执行 | 验证系统整体质量 |
-| 验收阶段 | 验收测试执行 | 用户确认系统满足需求 |
+| 系统设计 | 系统测试设计 | 验证系统整体功能和性能   |
+| 概要设计 | 集成测试设计 | 验证模块间交互正确性     |
+| 详细设计 | 单元测试设计 | 验证单个模块功能正确性   |
+| 编码实现 | 单元测试执行 | 验证代码实现正确性       |
+| 集成阶段 | 集成测试执行 | 验证模块集成正确性       |
+| 系统阶段 | 系统测试执行 | 验证系统整体质量         |
+| 验收阶段 | 验收测试执行 | 用户确认系统满足需求     |
 
 ### C. 验收检查清单
 

@@ -36,7 +36,6 @@ npm run setup:hooks
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 
-
 ## 开发工作流
 
 ### 1. 创建分支
@@ -63,7 +62,7 @@ git checkout -b fix/issue-xxx
 修改 `w-model-dev/scripts/cli/*.ts` 后，必须先跑回归测试，再跑自检基线：
 
 ```bash
-# 3.1 单元测试（vitest，55 个 test 文件 / 954 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
+# 3.1 单元测试（vitest，55 个 test 文件 / 970 条，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
 # 3.2 自检基线（samples/ 目录下 260 条样本，覆盖全部 check 脚本的通过 / 失败路径）
@@ -81,6 +80,7 @@ npm run format
 ```
 
 > 本仓库的校验正确性由两层保障：
+>
 > - **vitest 单元测试**（`w-model-dev/scripts/__tests__/`）覆盖纯逻辑边界路径，coverage 矩阵见 [`__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md)
 > - **self-test 回归基线**（`samples/` 端到端样本）覆盖各 CLI 的通过 / 失败 / 输入错误三态
 
@@ -89,25 +89,25 @@ npm run format
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
 在 `git push` 时自动跑 17 项检查；任一退出码不符预期即中止推送：
 
-| # | 检查 | 期望退出码 |
-|---|---|---|
-| 1 | `npm run self-test`（260 条样本回归基线） | 0 |
-| 2 | `npm run check:verifier`（无参数） | 2 |
-| 3 | `npm run check:gate -- /tmp/nonexistent`（输入错误） | 2 |
-| 4 | `npm run check:verifier -- samples/verifier/valid.json`（有效样本） | 0 |
-| 5 | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本） | 1 |
-| 6 | `npx tsx w-model-dev/scripts/cli/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成） | 0 |
-| 7 | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本） | 0 |
-| 8 | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本） | 2 |
-| 9 | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本） | 0 |
-| 10 | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本） | 0 |
-| 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本） | 0 |
-| 12 | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；55 files / 954 tests） | 0 |
-| 13 | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过） | — |
-| 14 | `npm run check:docs-consistency`（活体文档一致性门禁） | 0 |
-| 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明） | 0 |
-| 16 | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断） | 0 |
-| 17 | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5） | 0 |
+| #   | 检查                                                                                                                                                                                      | 期望退出码 |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 1   | `npm run self-test`（260 条样本回归基线）                                                                                                                                                 | 0          |
+| 2   | `npm run check:verifier`（无参数）                                                                                                                                                        | 2          |
+| 3   | `npm run check:gate -- /tmp/nonexistent`（输入错误）                                                                                                                                      | 2          |
+| 4   | `npm run check:verifier -- samples/verifier/valid.json`（有效样本）                                                                                                                       | 0          |
+| 5   | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本）                                                                                                               | 1          |
+| 6   | `npx tsx w-model-dev/scripts/cli/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成）                                                                                | 0          |
+| 7   | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本）                                                                           | 0          |
+| 8   | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本）                                                             | 2          |
+| 9   | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本）                                                                                                  | 0          |
+| 10  | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本）                                                                                                   | 0          |
+| 11  | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本）                                                      | 0          |
+| 12  | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；55 files / 970 tests） | 0          |
+| 13  | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）                                                                       | —          |
+| 14  | `npm run check:docs-consistency`（活体文档一致性门禁）                                                                                                                                    | 0          |
+| 15  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明）                                                 | 0          |
+| 16  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）       | 0          |
+| 17  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                  | 0          |
 
 **启用方式**：仓库验证期间首次 `npm install` 即自动启用（`postinstall` 运行 `scripts/setup-hooks.cjs`，在当前 checkout 的本地 `.git/config` 设置 `core.hooksPath=.githooks`；失败仅 warn，不阻断 install）。这是仓库验证的本地 Git 配置副作用，不是 Agent Skill 激活必需。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -187,6 +187,7 @@ git push --no-verify
 ```
 
 **类型（type）**：
+
 - `feat`: 新功能
 - `fix`: Bug 修复
 - `docs`: 文档变更
@@ -196,6 +197,7 @@ git push --no-verify
 - `ci`: 门禁 / 钩子相关（`.githooks/`、prepush）
 
 **Scope（可选，按实际模块取有意义的名称）**：
+
 - `scripts`：校验脚本 / 门禁逻辑（`w-model-dev/scripts/`）
 - `docs`：文档 / SSoT 同步
 - `gate`：阶段门禁规则
@@ -213,6 +215,7 @@ git push --no-verify
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
 示例：
+
 ```
 feat(verifier): 在 verifier-logic.ts 增加对 ranking.temperature 上界的校验
 fix(gate): 修复覆盖率统计未考虑待执行用例的问题
@@ -257,7 +260,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
 │   ├── self-test.ts               # 校验逻辑自检（260 条样本，samples/ 驱动）
-│   ├── __tests__/                 # vitest 单元测试（55 个 .test.ts / 954 条 + README.md coverage 矩阵）
+│   ├── __tests__/                 # vitest 单元测试（55 个 .test.ts / 970 条 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
 ├── examples/           # 交互示例

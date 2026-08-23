@@ -3,6 +3,7 @@
   "$id": "https://w-model-dev/schemas/rootcause-report.schema.json",
   "title": "RootCauseReport",
   "description": "根因分析报告结构 schema，对应 root-cause-logic.ts RootCauseReportShape（R 子代理产出）",
+  "$comment": "r10-contract nodes are declared in the standard JSON Schema annotation below: {\"r10-contract\":[{\"id\":\"canonical-name\",\"relation\":{\"canonicalPersona\":\"testing-reality-checker\"},\"prose\":\"canonical persona is testing-reality-checker\"},{\"id\":\"threshold\",\"relation\":{\"canonicalPersona\":\"testing-reality-checker\",\"confidenceMinimum\":0.5},\"prose\":\"testing-reality-checker confidence >= 0.5\"},{\"id\":\"legacy-fallback\",\"relation\":{\"legacyPersona\":\"reality-checker\",\"fallbackWhen\":\"canonical-absent\"},\"prose\":\"legacy reality-checker is fallback only when canonical is absent\"},{\"id\":\"same-artifact-dedupe\",\"relation\":{\"artifactRelation\":\"same\",\"precedence\":\"canonical-first\",\"duplicateCount\":\"once\"},\"prose\":\"same artifact canonical-first and not counted twice\"},{\"id\":\"cross-artifact-conflict\",\"relation\":{\"artifactRelation\":\"different\",\"conflict\":\"fail-closed\"},\"prose\":\"different artifact conflict is fail-closed\"},{\"id\":\"canonical-duplicate\",\"relation\":{\"persona\":\"canonical\",\"duplicateThreshold\":1,\"duplicatePolicy\":\"fail-closed\"},\"prose\":\"canonical > 1 duplicate is fail-closed\"},{\"id\":\"legacy-duplicate\",\"relation\":{\"persona\":\"legacy\",\"duplicateThreshold\":1,\"duplicatePolicy\":\"fail-closed\"},\"prose\":\"legacy > 1 duplicate is fail-closed\"}]}",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -37,18 +38,37 @@
         "analysisTimestamp"
       ],
       "properties": {
-        "reportId": { "description": "报告 ID（格式 RC-<阶段>-<轮次>-<序号>，如 RC-phase5-1-01；R8 校验格式 ^RC-[a-z0-9]+-\\d+-\\d+$）", "type": "string", "minLength": 1 },
+        "reportId": {
+          "description": "报告 ID（格式 RC-<阶段>-<轮次>-<序号>，如 RC-phase5-1-01；R8 校验格式 ^RC-[a-z0-9]+-\\d+-\\d+$）",
+          "type": "string",
+          "minLength": 1
+        },
         "targetKind": { "description": "报告类型，固定 \"rootcause\"（R1 校验）", "const": "rootcause" },
-        "targetArtifact": { "description": "被分析的目标产物路径或 ID（如 .w-model/rtm.json）", "type": "string", "minLength": 1 },
+        "targetArtifact": {
+          "description": "被分析的目标产物路径或 ID（如 .w-model/rtm.json）",
+          "type": "string",
+          "minLength": 1
+        },
         "targetPhase": { "description": "目标阶段（如 阶段 5 - 编码，对应样本值）", "type": "string", "minLength": 1 },
         "reworkRound": { "description": "返工轮次（从 1 起，≥1 整数）", "type": "integer", "minimum": 1 },
-        "reworkSource": { "description": "触发返工来源：verifier=V 评审失败 / gate=门禁失败", "enum": ["verifier", "gate"] },
-        "persona": { "description": "执行分析的角色切片标识（如 root-cause-locator）", "type": "string", "minLength": 1 },
+        "reworkSource": {
+          "description": "触发返工来源：verifier=V 评审失败 / gate=门禁失败",
+          "enum": ["verifier", "gate"]
+        },
+        "persona": {
+          "description": "执行分析的角色切片标识（如 root-cause-locator）",
+          "type": "string",
+          "minLength": 1
+        },
         "method": {
           "description": "根因分析方法枚举：5-why=连续追问 / fishbone=鱼骨图 / defect-chain=缺陷链 / upstream-trace=上游追溯 / combined=多角度组合（R9：combined 须带 partialReports）",
           "enum": ["5-why", "fishbone", "defect-chain", "upstream-trace", "combined"]
         },
-        "analysisTimestamp": { "description": "分析时间（ISO 8601 date-time）", "type": "string", "format": "date-time" }
+        "analysisTimestamp": {
+          "description": "分析时间（ISO 8601 date-time）",
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
     "input": {
@@ -99,7 +119,11 @@
           "step": { "description": "链步骤序号（从 1 起递增）", "type": "integer", "minimum": 1 },
           "why": { "description": "「为什么」追问问题（非空）", "type": "string", "minLength": 1 },
           "answer": { "description": "对「为什么」的回答（非空）", "type": "string", "minLength": 1 },
-          "evidence": { "description": "本环节的证据引用（R2 校验非空；具体产物/日志/代码位置）", "type": "string", "minLength": 1 }
+          "evidence": {
+            "description": "本环节的证据引用（R2 校验非空；具体产物/日志/代码位置）",
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -123,7 +147,11 @@
         },
         "description": { "description": "根因描述（非空）", "type": "string", "minLength": 1 },
         "evidence": { "description": "根因证据引用（非空；产物/日志/代码位置）", "type": "string", "minLength": 1 },
-        "falsifiabilityCheck": { "description": "可证伪性检查（须含「若…则」句式，R3 校验可证伪假设）", "type": "string", "minLength": 1 }
+        "falsifiabilityCheck": {
+          "description": "可证伪性检查（须含「若…则」句式，R3 校验可证伪假设）",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "upstreamDefect": {
@@ -132,7 +160,10 @@
       "additionalProperties": false,
       "required": ["present", "rollbackRecommended"],
       "properties": {
-        "present": { "description": "是否检测到上游缺陷（boolean；true 时触发阶段回退升级与 R6 校验）", "type": "boolean" },
+        "present": {
+          "description": "是否检测到上游缺陷（boolean；true 时触发阶段回退升级与 R6 校验）",
+          "type": "boolean"
+        },
         "upstreamPhase": { "description": "上游缺陷所在阶段（present=true 时必填且非空，R6）", "type": "string" },
         "upstreamArtifactId": { "description": "上游缺陷产物 ID（present=true 时必填且非空，R6）", "type": "string" },
         "defectDescription": { "description": "上游缺陷描述（present=true 时必填且非空，R6）", "type": "string" },
@@ -170,21 +201,37 @@
         }
       }
     },
-    "qualityLevel": { "description": "报告质量等级：A/B/C/D（R7：A/B 须 passed=true，C/D 须 passed=false）", "enum": ["A", "B", "C", "D"] },
+    "qualityLevel": {
+      "description": "报告质量等级：A/B/C/D（R7：A/B 须 passed=true，C/D 须 passed=false）",
+      "enum": ["A", "B", "C", "D"]
+    },
     "passed": { "description": "报告是否通过（R7 与 qualityLevel 一致：A/B→true，C/D→false）", "type": "boolean" },
     "summary": { "description": "报告摘要（非空，概括根因与处置建议）", "type": "string", "minLength": 1 },
     "reviewNotes": { "description": "评审备注（可选，V 复审意见补充）", "type": "string" },
     "partialReports": {
-      "description": "多角度场景附录（method=combined 时 R9 校验非空；R10 canonical-first 校验含 personaSlice=testing-reality-checker 且 confidence ≥0.5；legacy reality-checker 仅在 canonical 缺失时作 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed，防幻想根因）。R10-C1 canonical-name: canonical persona is testing-reality-checker。R10-C2 threshold: testing-reality-checker confidence >= 0.5。R10-C3 legacy-fallback: legacy reality-checker is fallback only when canonical is absent。R10-C4 same-artifact: same artifact canonical-first and not counted twice。R10-C5 cross-artifact: different artifact conflict is fail-closed。R10-C6 canonical-duplicate: canonical > 1 duplicate is fail-closed。R10-C7 legacy-duplicate: legacy > 1 duplicate is fail-closed。\n<!-- R10-CONTRACT-MARKER R10-C1 {\"id\":\"canonical-name\",\"canonicalPersona\":\"testing-reality-checker\"} -->\n<!-- R10-CONTRACT-MARKER R10-C2 {\"id\":\"threshold\",\"canonicalPersona\":\"testing-reality-checker\",\"confidenceMinimum\":0.5} -->\n<!-- R10-CONTRACT-MARKER R10-C3 {\"id\":\"legacy-fallback\",\"legacyPersona\":\"reality-checker\",\"fallbackWhen\":\"canonical-absent\"} -->\n<!-- R10-CONTRACT-MARKER R10-C4 {\"id\":\"same-artifact-dedupe\",\"artifactRelation\":\"same\",\"precedence\":\"canonical-first\",\"duplicateCount\":\"once\"} -->\n<!-- R10-CONTRACT-MARKER R10-C5 {\"id\":\"cross-artifact-conflict\",\"artifactRelation\":\"different\",\"conflict\":\"fail-closed\"} -->\n<!-- R10-CONTRACT-MARKER R10-C6 {\"id\":\"canonical-duplicate\",\"persona\":\"canonical\",\"duplicateThreshold\":1,\"duplicatePolicy\":\"fail-closed\"} -->\n<!-- R10-CONTRACT-MARKER R10-C7 {\"id\":\"legacy-duplicate\",\"persona\":\"legacy\",\"duplicateThreshold\":1,\"duplicatePolicy\":\"fail-closed\"} -->",
+      "description": "多角度场景附录（method=combined 时 R9 校验非空；R10 canonical-first 校验含 personaSlice=testing-reality-checker 且 confidence ≥0.5；legacy reality-checker 仅在 canonical 缺失时作 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed，防幻想根因）。R10 结构化契约关系见根 schema 的标准 $comment 节点。",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["personaSlice", "path", "confidence"],
         "properties": {
-          "personaSlice": { "description": "角度切片标识；规范 reality checker 为 testing-reality-checker，legacy reality-checker 仅作兼容 fallback，不新增 alias 字段（R10）", "type": "string", "minLength": 1 },
-          "path": { "description": "局部报告文件路径；canonical+legacy 仅在指向同一 artifact 时视为同一语义", "type": "string", "minLength": 1 },
-          "confidence": { "description": "该角度结论置信度（0-1 小数）；canonical testing-reality-checker（或 legacy reality-checker fallback）须 ≥0.5，R10", "type": "number", "minimum": 0, "maximum": 1 }
+          "personaSlice": {
+            "description": "角度切片标识；规范 reality checker 为 testing-reality-checker，legacy reality-checker 仅作兼容 fallback，不新增 alias 字段（R10）",
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "description": "局部报告文件路径；canonical+legacy 仅在指向同一 artifact 时视为同一语义",
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "description": "该角度结论置信度（0-1 小数）；canonical testing-reality-checker（或 legacy reality-checker fallback）须 ≥0.5，R10",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
         }
       }
     }

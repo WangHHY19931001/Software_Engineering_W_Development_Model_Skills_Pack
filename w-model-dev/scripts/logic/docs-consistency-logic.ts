@@ -5,7 +5,12 @@
  * 纯逻辑无 IO；IO（读文件 / 数目录）由 check-docs-consistency.ts 承担。
  * 设计：docs/superpowers/specs/2026-08-10-doc-consistency-correction-design.md §4
  */
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
+
+import type * as TsType from 'typescript';
+
+const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
 export interface DocCheckViolation {
   /** 检查项标识（如 schema-list / targetkind） */
@@ -73,6 +78,13 @@ export interface A4DocumentationInput {
   contributing: string;
   troubleshooting: string;
   changelog: string;
+}
+
+export interface Exit2RawErrorJson {
+  exitCode?: unknown;
+  category?: unknown;
+  rule?: unknown;
+  [key: string]: unknown;
 }
 
 export interface DocConsistencyInput {
@@ -169,6 +181,7 @@ export interface DocConsistencyInput {
     errorExitCode: number | null;
     category: string | null;
     rule: string | null;
+    rawErrorJson?: Exit2RawErrorJson | null;
     outputExistsAfter?: boolean;
     emittedEvidenceExport?: boolean;
   }>;
@@ -270,6 +283,7 @@ export interface DocConsistencyReport {
       errorExitCode: number | null;
       category: string | null;
       rule: string | null;
+      rawErrorJson?: Exit2RawErrorJson | null;
       outputExistsAfter?: boolean;
       emittedEvidenceExport?: boolean;
     }>;
@@ -320,7 +334,17 @@ export function isValidExit2ProbeResult(probe: unknown): probe is Exit2ProbeReco
     EXIT2_CATEGORIES.has(record.category) &&
     typeof record.rule === 'string' &&
     record.rule.trim() !== '' &&
-    EXIT2_RULE_PATTERN.test(record.rule)
+    EXIT2_RULE_PATTERN.test(record.rule) &&
+    isMatchingRawErrorJson(record)
+  );
+}
+
+function isMatchingRawErrorJson(record: Record<string, unknown>): boolean {
+  const raw = record.rawErrorJson;
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const payload = raw as Record<string, unknown>;
+  return (
+    payload.exitCode === record.errorExitCode && payload.category === record.category && payload.rule === record.rule
   );
 }
 
@@ -336,21 +360,24 @@ export function countValidExit2Scripts(probes: readonly unknown[]): number {
   ).size;
 }
 
-function canonicalizeProbePath(value: string): string {
+type ProbePathKind = 'sentinel' | 'windows-drive' | 'unc' | 'posix' | 'literal';
+
+type CanonicalProbePath = { value: string; kind: ProbePathKind };
+
+function canonicalizeProbePath(value: string): CanonicalProbePath {
+  const isUnc = /^\\\\|^\/\//.test(value);
   const normalized = value.replace(/\\/g, '/').replace(/\/+/g, '/');
   const drive = normalized.match(/^([A-Za-z]):(?:\/|$)/);
+  const kind: ProbePathKind = drive !== null ? 'windows-drive' : isUnc ? 'unc' : 'posix';
   if (drive !== null) {
     const rest = normalized.slice(2).replace(/^\/+/, '');
     const segments: string[] = [];
     for (const segment of rest.split('/')) {
       if (segment === '' || segment === '.') continue;
-      if (segment === '..') {
-        segments.pop();
-      } else {
-        segments.push(segment);
-      }
+      if (segment === '..') segments.pop();
+      else segments.push(segment);
     }
-    return `${drive[1]!.toLowerCase()}:/${segments.join('/')}`.replace(/\/$/, '');
+    return { value: `${drive[1]!.toLowerCase()}:/${segments.join('/')}`.replace(/\/$/, ''), kind };
   }
   const segments: string[] = [];
   for (const segment of normalized.split('/')) {
@@ -358,20 +385,30 @@ function canonicalizeProbePath(value: string): string {
     if (segment === '..') segments.pop();
     else segments.push(segment);
   }
-  return `/${segments.join('/')}`.replace(/\/$/, '') || '/';
+  return { value: `/${segments.join('/')}`.replace(/\/$/, '') || '/', kind };
 }
 
 export function canonicalizeExit2ProbeIdentity(probe: Pick<Exit2ProbeRecord, 'args' | 'cwd'>): {
   args: string[];
   cwd: string;
+  argsPathKinds: ProbePathKind[];
+  cwdPathKind: ProbePathKind;
 } {
-  const canonicalizeArg = (arg: string): string => {
-    if (/^<[^>]+>$/.test(arg)) return arg;
+  const canonicalizeArg = (arg: string): CanonicalProbePath => {
+    if (/^<[^>]+>$/.test(arg)) return { value: arg, kind: 'sentinel' };
     if (/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(arg)) return canonicalizeProbePath(arg);
-    return arg;
+    return { value: arg, kind: 'literal' };
   };
-  const canonicalCwd = /^<[^>]+>$/.test(probe.cwd) ? probe.cwd : canonicalizeProbePath(probe.cwd);
-  return { args: probe.args.map(canonicalizeArg), cwd: canonicalCwd };
+  const canonicalArgs = probe.args.map(canonicalizeArg);
+  const canonicalCwd = /^<[^>]+>$/.test(probe.cwd)
+    ? { value: probe.cwd, kind: 'sentinel' as const }
+    : canonicalizeProbePath(probe.cwd);
+  return {
+    args: canonicalArgs.map(({ value }) => value),
+    cwd: canonicalCwd.value,
+    argsPathKinds: canonicalArgs.map(({ kind }) => kind),
+    cwdPathKind: canonicalCwd.kind,
+  };
 }
 
 function checkExit2ProbeResults(probes: DocConsistencyInput['exit2ProbeResults']): DocCheckViolation[] {
@@ -387,7 +424,7 @@ function checkExit2ProbeResults(probes: DocConsistencyInput['exit2ProbeResults']
     if (!isValidExit2ProbeResult(probe)) {
       violations.push({
         check: 'exit2-probe',
-        message: `${probeId} 的 Exit2ProbeResult 字段必须完整且类型正确（probeId/script/args/cwd/status/errorExitCode/category/rule；category 为已知 ERROR_JSON 类别，rule 符合 P0-N）`,
+        message: `${probeId} 的 Exit2ProbeResult 字段必须完整且类型正确，并与原始 ERROR_JSON 逐字段一致（probeId/script/args/cwd/status/errorExitCode/category/rule/rawErrorJson；category 为已知 ERROR_JSON 类别，rule 符合 P0-N）`,
       });
       continue;
     }
@@ -479,9 +516,6 @@ type R10Clause = {
 // R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"}
 // R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}
 // R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}
-const R10_MACHINE_MARKER_PATTERN = /R10-CONTRACT-MARKER\s+(R10-C[1-7])\s+(\{.*?\})/gi;
-const R10_PROSE_CLAUSE_PATTERN = /R10-C([1-7])\s+[^:：\r\n]+[:：]\s*/gi;
-
 const R10_CLAUSES: ReadonlyArray<R10Clause> = [
   {
     id: 'canonical-name',
@@ -527,70 +561,157 @@ const R10_CLAUSES: ReadonlyArray<R10Clause> = [
   },
 ];
 
+type R10Node = { id: string; relation: R10Relation; prose: string };
+const R10_NODE_IDS = new Set(R10_CLAUSES.map((clause) => clause.id));
+const R10_TAG_PATTERN = /^<r10-contract id="([a-z-]+)" relation='(\{.*\})'>([^<\r\n]+)<\/r10-contract>$/;
+const R10_LEGACY_TOKEN_PATTERN = /R10-(?:CONTRACT-MARKER|C[1-7])\b/;
+
 function stableR10Relation(value: Record<string, unknown>): string {
   return JSON.stringify(Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))));
 }
 
-function parseR10MachineMarker(content: string, clause: R10Clause): R10Relation | null | undefined {
-  R10_MACHINE_MARKER_PATTERN.lastIndex = 0;
-  const markers = [...content.matchAll(R10_MACHINE_MARKER_PATTERN)].filter(
-    (match) => match[1]!.toLowerCase() === clause.marker.toLowerCase(),
-  );
-  R10_MACHINE_MARKER_PATTERN.lastIndex = 0;
-  if (markers.length === 0) return undefined;
-  if (markers.length !== 1) return null;
+function isR10Record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseR10NodeValue(value: unknown): R10Node | null {
+  if (
+    !isR10Record(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.prose !== 'string' ||
+    !isR10Record(value.relation)
+  )
+    return null;
+  const id = value.id as string;
+  if (!R10_NODE_IDS.has(id as R10ClauseId)) return null;
+  return { id, prose: value.prose as string, relation: value.relation as R10Relation };
+}
+
+function parseR10JsonNodes(content: string): R10Node[] | null {
   try {
-    const parsed = JSON.parse(markers[0]![2]!.replace(/\\"/g, '"')) as unknown;
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const relation = parsed as Record<string, unknown>;
-    if (relation.id !== clause.id) return null;
-    delete relation.id;
-    return stableR10Relation(relation) === stableR10Relation(clause.relation) ? (relation as R10Relation) : null;
+    const parsed = JSON.parse(content) as unknown;
+    if (!isR10Record(parsed)) return null;
+    let contract: unknown = parsed['x-r10-contract'];
+    if (typeof parsed.$comment === 'string') {
+      const start = parsed.$comment.indexOf('{');
+      if (start >= 0) {
+        try {
+          contract = (JSON.parse(parsed.$comment.slice(start)) as Record<string, unknown>)['r10-contract'];
+        } catch {
+          return null;
+        }
+      }
+    }
+    if (!Array.isArray(contract)) return null;
+    const nodes = contract.map(parseR10NodeValue);
+    return nodes.every((node): node is R10Node => node !== null) ? nodes : null;
   } catch {
     return null;
   }
 }
 
+function readR10TsValue(node: TsType.Node): unknown {
+  if (ts.isAsExpression(node) || ts.isParenthesizedExpression(node)) return readR10TsValue(node.expression);
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isNumericLiteral(node)) return Number(node.text);
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (ts.isArrayLiteralExpression(node)) return node.elements.map(readR10TsValue);
+  if (ts.isObjectLiteralExpression(node)) {
+    const entries: Array<[string, unknown]> = [];
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property)) return undefined;
+      const name = property.name;
+      const key = ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
+      if (key === undefined) return undefined;
+      const value = readR10TsValue(property.initializer);
+      if (value === undefined) return undefined;
+      entries.push([key, value]);
+    }
+    return Object.fromEntries(entries);
+  }
+  return undefined;
+}
+
+function parseR10TypeScriptNodes(content: string): R10Node[] | null {
+  const sourceFile = ts.createSourceFile('r10-contract.ts', content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const declarations: TsType.VariableDeclaration[] = [];
+  const visit = (node: TsType.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'R10_CONTRACT_NODES')
+      declarations.push(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  if (declarations.length !== 1 || declarations[0]!.initializer === undefined) return null;
+  const value = readR10TsValue(declarations[0]!.initializer);
+  if (!Array.isArray(value)) return null;
+  const nodes = value.map(parseR10NodeValue);
+  return nodes.every((node): node is R10Node => node !== null) ? nodes : null;
+}
+
+function parseR10MarkdownNodes(content: string): R10Node[] | null {
+  const nodes: R10Node[] = [];
+  let inFence = false;
+  for (const line of content.split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      if (line.includes('<r10-contract') || R10_LEGACY_TOKEN_PATTERN.test(line)) return null;
+      continue;
+    }
+    if (line.includes('<r10-contract')) {
+      if (!R10_TAG_PATTERN.test(line)) return null;
+      const match = line.match(R10_TAG_PATTERN);
+      if (match === null) return null;
+      let relation: unknown;
+      try {
+        relation = JSON.parse(match[2]!);
+      } catch {
+        return null;
+      }
+      if (!isR10Record(relation)) return null;
+      const node = parseR10NodeValue({ id: match[1], relation, prose: match[3] });
+      if (node === null) return null;
+      nodes.push(node);
+      continue;
+    }
+    if (R10_LEGACY_TOKEN_PATTERN.test(line)) return null;
+  }
+  return inFence ? null : nodes;
+}
+
+function parseR10SourceNodes(sourceName: string, content: string): R10Node[] | null {
+  if (content.trimStart().startsWith('<r10-contract')) return parseR10MarkdownNodes(content);
+  if (sourceName === 'rootcause-schema') return parseR10JsonNodes(content);
+  if (sourceName === 'rootcause-checker') return parseR10TypeScriptNodes(content);
+  return parseR10MarkdownNodes(content);
+}
+
+function parseR10Clause(sourceName: string, content: string, clause: R10Clause): R10Relation | null {
+  const nodes = parseR10SourceNodes(sourceName, content);
+  if (nodes === null) return null;
+  const matches = nodes.filter((node) => node.id === clause.id);
+  if (matches.length !== 1) return null;
+  const node = matches[0]!;
+  return normalizeR10Prose(node.prose) === normalizeR10Prose(clause.prose) &&
+    stableR10Relation(node.relation) === stableR10Relation(clause.relation)
+    ? clause.relation
+    : null;
+}
+
 function normalizeR10Prose(value: string): string {
   return value
-    .replace(/^\s*[-*]\s*/, '')
-    .replace(/[-*]\s*$/, '')
     .replace(/[`'"。.!?,，；;：:]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 }
 
-function stripR10MachineMarkers(content: string): string {
-  return content.replace(/<!--\s*R10-CONTRACT-MARKER[\s\S]*?-->|\/\/\s*R10-CONTRACT-MARKER[^\r\n]*/gi, '');
-}
-
-/** 提取 marker 对应的单条 prose clause；marker 与 prose 必须同时为完整正向命题。 */
-function parseR10ProseClause(content: string, clause: R10Clause): R10Relation | null {
-  const proseContent = stripR10MachineMarkers(content);
-  R10_PROSE_CLAUSE_PATTERN.lastIndex = 0;
-  const clauses = [...proseContent.matchAll(R10_PROSE_CLAUSE_PATTERN)];
-  R10_PROSE_CLAUSE_PATTERN.lastIndex = 0;
-  const match = clauses.find((candidate) => `R10-C${candidate[1]}`.toLowerCase() === clause.marker.toLowerCase());
-  if (match === undefined || match.index === undefined) return null;
-  const matchEnd = match.index + match[0].length;
-  const next = clauses.find((candidate) => candidate.index !== undefined && candidate.index > match.index);
-  const body = proseContent.slice(matchEnd, next?.index ?? proseContent.length);
-  const sentence = body.match(/^[\s\S]*?(?:。|(?<!\d)\.(?!\d)(?=\s|$))/)?.[0] ?? body;
-  return normalizeR10Prose(sentence) === normalizeR10Prose(clause.prose) ? clause.relation : null;
-}
-
-function parseR10Clause(content: string, clause: R10Clause): R10Relation | null {
-  const machineRelation = parseR10MachineMarker(content, clause);
-  if (machineRelation === null || machineRelation === undefined) return null;
-  const proseRelation = parseR10ProseClause(content, clause);
-  if (proseRelation === null) return null;
-  return stableR10Relation(machineRelation) === stableR10Relation(proseRelation) ? clause.relation : null;
-}
-
 /**
  * R10 维护契约的唯一 checker。每个权威来源必须独立包含七个结构化关系 clause；
- * prose 仅接受完整正向命题，否定、引用、关系反转和缺字段均 fail-closed。
+ * 节点必须由对应宿主语法解析，quoted/comment/fenced/example/未知上下文均 fail-closed。
  */
 export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources): DocCheckViolation[] {
   const namedSources: Array<[string, string]> = [
@@ -612,7 +733,7 @@ export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources):
       continue;
     }
     for (const clause of R10_CLAUSES) {
-      if (parseR10Clause(content, clause) === null) {
+      if (parseR10Clause(sourceName, content, clause) === null) {
         violations.push({
           check: R10_CONTRACT_CHECK,
           message: `${sourceName} 缺少 R10 clause ${clause.id} 的正向结构化语义关系（source×clause fail-closed）`,
@@ -992,9 +1113,15 @@ function checkRunLogActionEnum(runLogSchema: string, dataModels: string): DocChe
   // 语义级同步：data-models.md RunLogEntry interface 的 action 联合类型须与 schema enum 完全一致
   // （审计修复 P2：此前仅查计数文本，interface 漂移 12 值未被捕获）
   if (Array.isArray(actionEnum) && actionEnum.every((v) => typeof v === 'string')) {
-    const unionMatch = dataModels.match(/action:\s*'[^']+'(\s*\|\s*'[^']+')*;/);
-    if (unionMatch) {
-      const unionVals = Array.from(unionMatch[0].matchAll(/'([^']+)'/g), (m) => m[1] as string);
+    const actionStart = dataModels.indexOf('  action:');
+    const actionEnd = actionStart >= 0 ? dataModels.indexOf(';', actionStart) : -1;
+    if (actionStart >= 0 && actionEnd > actionStart) {
+      const unionBody = dataModels.slice(actionStart, actionEnd).slice('  action:'.length).trim();
+      const unionVals = unionBody
+        .split('|')
+        .map((value) => value.trim())
+        .filter((value) => value.length >= 2 && value.startsWith("'") && value.endsWith("'"))
+        .map((value) => value.slice(1, -1));
       const missing = (actionEnum as string[]).filter((v) => !unionVals.includes(v));
       const extra = unionVals.filter((v) => !(actionEnum as string[]).includes(v));
       if (missing.length > 0 || extra.length > 0) {

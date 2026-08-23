@@ -125,20 +125,13 @@
 6. **reality-check 硬约束**：规范 persona 为 `testing-reality-checker`，其 confidence < 0.5 → 最终 `passed=false`；为兼容已有合法归档，`reality-checker` 仅在 canonical 缺失时作 legacy fallback。若两者同时出现，canonical 优先且同 artifact 不重复计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。
 
 R10 维护契约：
-- R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
-- R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
-- R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
-- R10-C4 same-artifact：same artifact canonical-first and not counted twice。
-- R10-C5 cross-artifact：different artifact conflict is fail-closed。
-- R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
-- R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
-<!-- R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"} -->
-<!-- R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5} -->
-<!-- R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"} -->
-<!-- R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"} -->
-<!-- R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
+<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
+<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
+<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
+<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
+<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
+<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
+<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
 
 ---
 

@@ -27,16 +27,15 @@
 
 D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.exit()`；调用 `gate-report` 的 `check-*.ts` 只输出报告，由调用方设置 `process.exitCode` 后 `return`，保留 exit `0/1/2` 与 stdout/`ERROR_JSON` 协议。以下是明确登记的 process-level runner 例外，不属于 gate-report caller 的自然退出迁移范围：
 
-| 脚本 | 保留直接退出的理由 |
-|---|---|
+| 脚本                       | 保留直接退出的理由                                                 |
+| -------------------------- | ------------------------------------------------------------------ |
 | `ensure-codegraph-opsx.ts` | 依赖检测可能执行外部 CLI，保留 process-level runner 的直接退出语义 |
-| `metrics-report.ts` | 只读报告 runner，保留既有成功退出语义 |
-| `security-scan.ts` | 安全扫描 runner，保留扫描结果的既有退出语义 |
-| `self-test.ts` | 回归基线 runner，保留最终汇总退出语义 |
-| `wm-status.ts` | 只读状态 runner，保留既有成功退出语义 |
+| `metrics-report.ts`        | 只读报告 runner，保留既有成功退出语义                              |
+| `security-scan.ts`         | 安全扫描 runner，保留扫描结果的既有退出语义                        |
+| `self-test.ts`             | 回归基线 runner，保留最终汇总退出语义                              |
+| `wm-status.ts`             | 只读状态 runner，保留既有成功退出语义                              |
 
 这些例外仍须保持既有 shell exit `0/1/2`（适用时）和输出协议；不得将 process-level runner 例外解读为 `logic/` 或 gate-report caller 可以直接退出。新增 gate-report caller 或新增 direct exit 时，须更新本表和契约测试。
-
 
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
 
@@ -45,6 +44,12 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 - **producer+verify**：`npm run wm:verify-evidence-source -- <project-dir>` 不是只读查询；它重建并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`。缺少或失败的真实运行证据时拒绝写入 `verificationStatus=passed`。
 - **package-only**：`npm run wm:export-evidence -- --verify <manifest>` 只验证包内 schema、文件清单、hash、路径和脱敏内容，返回 `verificationLevel=package-only`，不证明源项目仍匹配。
 - **source-bound**：追加 `--source-project <project-dir>` 后，verify 会重建 source provenance，并比较当前 HEAD、run/artifact 身份、五类 measurements（含 codegraph-queries）、source bundle hash 与 producer 版本，返回 `verificationLevel=source-bound`。
+
+### `check-run-log.ts` lifecycle diagnostics
+
+`npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]` 保持 exit `0=通过`、`1=真实生命周期/门禁违规`、`2=输入错误`。phase 8 的 lifecycle reducer 以 `(phase, round, reportId, targetKind, basedOnReport)` 关联记录：rootcause V/G 仅匹配同 reportId/round/targetKind，fix 仅匹配 exact `basedOnReport`，rootcause review 不计 implementation V。R3 completeness/reliability/security 仅在同身份 `S-fix → R3×3 → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase-wide 首索引误关联。
+
+缺少 identity 字段的历史行不被推断或静默放行，`--json` 和人类输出都会展示 `LEGACY_UNSCOPED`/deferred diagnostics；rootcause 的 `basedOnReport` 可明确为 `null/unknown`。同身份 V/G 尚未全部通过时输出 `pending-pre-approval` 诊断，不报 exact-fix omission；同身份 V/G 已通过但缺 exact `basedOnReport` fix 时保留 exit 1 并输出 `open-approved-lifecycle`。checker 只读 raw append-only JSONL，不追加、删除、重排或编辑历史行。
 
 ### Source-bound provenance 边界
 
@@ -55,9 +60,9 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 - **速查行**：`/wm analyze <需求>`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `<需求>` | 是 | 需求描述文本 | — | 需求描述、业务背景；首次进入还需技术栈 |
+| 参数     | 必填 | 取值         | 默认 | 说明                                   |
+| -------- | ---- | ------------ | ---- | -------------------------------------- |
+| `<需求>` | 是   | 需求描述文本 | —    | 需求描述、业务背景；首次进入还需技术栈 |
 
 - **失败动作**：信息不足时列出缺失项并暂停，不得猜测关键业务规则；评审未通过由 O 分派 S 返工。
 - **guide 链接**：[phase-1-requirements.md](phase-1-requirements.md)（阶段 1 需求分析）、[rtm-guide.md](rtm-guide.md)（RTM 映射）、[ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)（ingestion 子流程）。
@@ -77,18 +82,18 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 - **速查行**：`/wm design type=<架构|概要|详细>`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `type` | 是 | `架构` \| `概要` \| `详细` | — | 设计类型；`架构`→阶段 2、`概要`→阶段 3、`详细`→阶段 4 |
+| 参数   | 必填 | 取值                       | 默认 | 说明                                                  |
+| ------ | ---- | -------------------------- | ---- | ----------------------------------------------------- |
+| `type` | 是   | `架构` \| `概要` \| `详细` | —    | 设计类型；`架构`→阶段 2、`概要`→阶段 3、`详细`→阶段 4 |
 
 - **失败动作**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段；评审未通过由 O 分派 S 返工。
 - **guide 链接**：[phase-2-system-design.md](phase-2-system-design.md) / [phase-3-outline-design.md](phase-3-outline-design.md) / [phase-4-detailed-design.md](phase-4-detailed-design.md)（对应设计阶段）、[graph-guide.md](graph-guide.md)（图谱演进）。
 
-| `type` | 路由 | 必需上游产物 | 同步测试设计 |
-|---|---|---|---|
-| `架构` | 阶段 2 系统设计 | 已放行需求规格 | 系统测试 |
-| `概要` | 阶段 3 概要设计 | 已放行系统设计 | 集成测试 |
-| `详细` | 阶段 4 详细设计 | 已放行概要设计 | 单元测试 |
+| `type` | 路由            | 必需上游产物   | 同步测试设计 |
+| ------ | --------------- | -------------- | ------------ |
+| `架构` | 阶段 2 系统设计 | 已放行需求规格 | 系统测试     |
+| `概要` | 阶段 3 概要设计 | 已放行系统设计 | 集成测试     |
+| `详细` | 阶段 4 详细设计 | 已放行概要设计 | 单元测试     |
 
 - **执行方**：O 路由 + CHECKPOINT → **S 产出** → **V 评审** → **G 门禁** → O 持久化。
 - **产出**（S 子代理）：对应设计文档 + 同步测试设计 + RTM 设计/接口/详细列。
@@ -102,9 +107,9 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 - **速查行**：`/wm code <功能>`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `<功能>` | 是 | 功能描述文本 | — | 待编码实现的功能 |
+| 参数     | 必填 | 取值         | 默认 | 说明             |
+| -------- | ---- | ------------ | ---- | ---------------- |
+| `<功能>` | 是   | 功能描述文本 | —    | 待编码实现的功能 |
 
 - **失败动作**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败时留在阶段 5；评审未通过由 O 分派 S 返工。
 - **guide 链接**：[phase-5-coding.md](phase-5-coding.md)（阶段 5 编码实现）、[rtm-guide.md](rtm-guide.md)（RTM 代码列）、[quality-standards.md](quality-standards.md)（质量检查）。
@@ -123,10 +128,10 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 - **速查行**：`/wm test type=<类型> result=<pass|fail>`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `type` | 是 | `单元` \| `集成` \| `系统` \| `验收` | — | 测试类型 |
-| `result` | 是 | `pass` \| `fail` | — | 测试结果，必须与测试输出一致 |
+| 参数     | 必填 | 取值                                 | 默认 | 说明                         |
+| -------- | ---- | ------------------------------------ | ---- | ---------------------------- |
+| `type`   | 是   | `单元` \| `集成` \| `系统` \| `验收` | —    | 测试类型                     |
+| `result` | 是   | `pass` \| `fail`                     | —    | 测试结果，必须与测试输出一致 |
 
 - **失败动作**：`result` 缺省或与测试输出冲突时拒绝回填；未执行即标通过、LLM 估算结果、把 pending 当 passed、**编排者越权回填 RTM 实体**（反模式 #10）均禁止。
 - **guide 链接**：[phase-6-integration-test.md](phase-6-integration-test.md) / [phase-7-system-test.md](phase-7-system-test.md) / [phase-8-acceptance-test.md](phase-8-acceptance-test.md)（对应测试阶段）、[rtm-guide.md](rtm-guide.md)（RTM 执行结果回填）。
@@ -145,9 +150,9 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 - **速查行**：`/wm review <target>`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `<target>` | 是 | `REQ-*` \| `DESIGN-*` \| `UAT-/ST-/IT-/UT-*` \| code | — | 评审目标；按前缀识别类型 |
+| 参数       | 必填 | 取值                                                 | 默认 | 说明                     |
+| ---------- | ---- | ---------------------------------------------------- | ---- | ------------------------ |
+| `<target>` | 是   | `REQ-*` \| `DESIGN-*` \| `UAT-/ST-/IT-/UT-*` \| code | —    | 评审目标；按前缀识别类型 |
 
 - **失败动作**：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；C/D 由 O 分派 S 子代理按 `reworkHints` 返工。
 - **guide 链接**：[verifier-spec.md](verifier-spec.md)（子标准与提示词占位符）、[subagent-delegation.md](subagent-delegation.md)（V 分派边界）。
@@ -181,29 +186,22 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 
 R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence >= 0.5`；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作 legacy fallback。canonical 与 legacy 同时出现时，canonical 优先；若两者指向同一 artifact，不重复计算 persona 语义；跨 artifact 或异常重复/冲突 fail-closed。该命令保持 `0=通过 / 1=校验失败 / 2=输入错误` 及既有 `ROOTCAUSE_JSON` / `ERROR_JSON` 输出合同。只有 G 返回 exit 0，且 R 报告已由 V 复审通过，才允许分派 S-fix；run-log 的中间态 exit 1 不得伪造为通过。
 
-R10-C1 canonical-name：canonical persona is `testing-reality-checker`。
-R10-C2 threshold：`testing-reality-checker` confidence >= 0.5。
-R10-C3 legacy-fallback：legacy `reality-checker` is fallback only when canonical is absent。
-R10-C4 same-artifact：same artifact canonical-first and not counted twice。
-R10-C5 cross-artifact：different artifact conflict is fail-closed。
-R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
-R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
-<!-- R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"} -->
-<!-- R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5} -->
-<!-- R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"} -->
-<!-- R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"} -->
-<!-- R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
-<!-- R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->
+<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
+<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
+<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
+<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
+<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
+<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
+<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
 
 ## `/wm status`
 
 - **速查行**：`/wm status [--json]`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `--json` | 否 | 标志 | 关闭 | 输出单行 `StatusReport` JSON（供展示证据或机器消费） |
+| 参数     | 必填 | 取值 | 默认 | 说明                                                 |
+| -------- | ---- | ---- | ---- | ---------------------------------------------------- |
+| `--json` | 否   | 标志 | 关闭 | 输出单行 `StatusReport` JSON（供展示证据或机器消费） |
 
 - **失败动作**：退出码 2 = project/rtm JSON 损坏（转 [operational-recovery.md](operational-recovery.md)，不得猜测状态）。
 - **guide 链接**：[operational-recovery.md](operational-recovery.md)（JSON 损坏恢复）。
@@ -224,13 +222,13 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`/wm metrics [--from=ISO] [--to=ISO] [--phase=N] [--json] [--out=<path>]`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `--from` | 否 | ISO 时间 | — | 起始时间窗口 |
-| `--to` | 否 | ISO 时间 | — | 结束时间窗口 |
-| `--phase` | 否 | 1-8 整数 | — | 阶段过滤 |
-| `--json` | 否 | 标志 | 关闭 | 输出完整报告 JSON |
-| `--out` | 否 | 文件路径 | — | 报告写入路径 |
+| 参数      | 必填 | 取值     | 默认 | 说明              |
+| --------- | ---- | -------- | ---- | ----------------- |
+| `--from`  | 否   | ISO 时间 | —    | 起始时间窗口      |
+| `--to`    | 否   | ISO 时间 | —    | 结束时间窗口      |
+| `--phase` | 否   | 1-8 整数 | —    | 阶段过滤          |
+| `--json`  | 否   | 标志     | 关闭 | 输出完整报告 JSON |
+| `--out`   | 否   | 文件路径 | —    | 报告写入路径      |
 
 - **失败动作**：退出码 2 = run-log 缺失 / `--phase` 非法 / JSON 损坏；纯报告无门禁语义——预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
 - **guide 链接**：[hill-climbing-guide.md](hill-climbing-guide.md)（run-log 分析伴侣，指标映射注记）。
@@ -247,11 +245,11 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`/wm hill-climbing [--from=ISO] [--to=ISO] [--phase=N]`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `--from` | 否 | ISO 时间 | — | 起始时间窗口 |
-| `--to` | 否 | ISO 时间 | — | 结束时间窗口 |
-| `--phase` | 否 | 1-8 整数 | — | 阶段过滤 |
+| 参数      | 必填 | 取值     | 默认 | 说明         |
+| --------- | ---- | -------- | ---- | ------------ |
+| `--from`  | 否   | ISO 时间 | —    | 起始时间窗口 |
+| `--to`    | 否   | ISO 时间 | —    | 结束时间窗口 |
+| `--phase` | 否   | 1-8 整数 | —    | 阶段过滤     |
 
 - **失败动作**：只产出改进信号，**不自动改 prompt/工具/验证规则**（反模式 #10）；外部 SkillOpt/darwin-skill 消费信号做演化，人审后手动应用。
 - **guide 链接**：[hill-climbing-guide.md](hill-climbing-guide.md)（信号产出与消费）。
@@ -270,9 +268,9 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`/wm help`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| （无） | — | — | — | 无参数 |
+| 参数   | 必填 | 取值 | 默认 | 说明   |
+| ------ | ---- | ---- | ---- | ------ |
+| （无） | —    | —    | —    | 无参数 |
 
 - **失败动作**：纯只读输出，不读取项目状态，无失败动作。
 - **guide 链接**：[anti-patterns.md](anti-patterns.md)（反模式 #10 越权实施）、[subagent-delegation.md](subagent-delegation.md)（编排者-子代理边界）。
@@ -285,14 +283,15 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`/wm reset`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| （无） | — | — | — | 无参数 |
+| 参数   | 必填 | 取值 | 默认 | 说明   |
+| ------ | ---- | ---- | ---- | ------ |
+| （无） | —    | —    | —    | 无参数 |
 
 - **失败动作**：用户拒绝时不修改文件，也不重复施压；执行前必须获得 CHECKPOINT 重置确认。
 - **guide 链接**：[data-models.md](data-models.md)（保留/清空字段定义）。
 
 - **执行方**：O 执行（仅状态文件操作，非阶段产物，不构成越权实施）。
+
 > 🔴 **CHECKPOINT · 重置确认**：执行前展示将删除的实体和将保留的项目元信息，必须获得确认。
 
 - **保留**：`id/name/description/techStack/createdAt`。
@@ -304,9 +303,9 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`/wm export [输出目录]`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `[输出目录]` | 否 | 目录路径 | `./w-model-export/` | 导出目录 |
+| 参数         | 必填 | 取值     | 默认                | 说明     |
+| ------------ | ---- | -------- | ------------------- | -------- |
+| `[输出目录]` | 否   | 目录路径 | `./w-model-export/` | 导出目录 |
 
 - **失败动作**：校验聚合文件与独立文件实体数不一致时导出失败并列出差异；路径含空格时命令参数加双引号。
 - **guide 链接**：[data-models.md](data-models.md)（导出文件 schema）。
@@ -322,14 +321,15 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`/wm import <project.json>`
 - **参数表**：
 
-| 参数 | 必填 | 取值 | 默认 | 说明 |
-|---|---|---|---|---|
-| `<project.json>` | 是 | 文件路径 | — | 待导入的 project.json |
+| 参数             | 必填 | 取值     | 默认 | 说明                  |
+| ---------------- | ---- | -------- | ---- | --------------------- |
+| `<project.json>` | 是   | 文件路径 | —    | 待导入的 project.json |
 
 - **失败动作**：校验失败列出字段路径和原因，退出码语义为 2，不写任何文件；`.w-model/` 已有数据时触发覆盖确认检查点，拒绝则不写入。
 - **guide 链接**：[data-models.md](data-models.md)（必填字段/阶段枚举/实体枚举/ID 唯一性校验）。
 
 - **执行方**：O 执行（仅状态文件操作）。
+
 1. 编排者（O）按 `data-models.md` 校验必填字段、阶段枚举、实体枚举和 ID 唯一性。
 2. 校验失败列出字段路径和原因，退出码语义为 2，不写任何文件。
 3. `.w-model/` 已有数据时触发覆盖确认检查点；拒绝则不写入。
@@ -341,11 +341,11 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> --phase=N [--require-tla-equivalence --tla-manifest=<path>] [--require-cucumber-report --cucumber-report=<path>] [--graph=<path>]`
 - **参数表**：
 
-| 参数 | 必填 | 适用 phase | 缺失/错误行为 |
-|---|---|---|---|
-| `--require-tla-equivalence` | 项目阶段门必填 | 1-4 | 缺少 `--tla-manifest` → D4 violation / exit 1；phase 5-8 使用 → exit 2 |
-| `--require-cucumber-report` | 项目阶段门必填 | 5-8 | 缺少、非法形状或零执行 Cucumber 证据 → D5 violation / exit 1；phase 1-4 使用 → exit 2 |
-| `--graph=<path>` | phase>=2 必填 | 2-8 | 缺少 → exit 2（D8 数据源） |
+| 参数                        | 必填           | 适用 phase | 缺失/错误行为                                                                         |
+| --------------------------- | -------------- | ---------- | ------------------------------------------------------------------------------------- |
+| `--require-tla-equivalence` | 项目阶段门必填 | 1-4        | 缺少 `--tla-manifest` → D4 violation / exit 1；phase 5-8 使用 → exit 2                |
+| `--require-cucumber-report` | 项目阶段门必填 | 5-8        | 缺少、非法形状或零执行 Cucumber 证据 → D5 violation / exit 1；phase 1-4 使用 → exit 2 |
+| `--graph=<path>`            | phase>=2 必填  | 2-8        | 缺少 → exit 2（D8 数据源）                                                            |
 
 - **参数完整性**：仅接受此速查行中的精确选项；require flags 必须是无赋值的裸 flag。`--require-…=true`、重复、拼写近似和未知 `--*` 均为 `ARG_INVALID` / exit 2，绝不降级为兼容 skip。
 - **失败动作**：exit 1 时由 S 修复/补齐项目工件后走 V→G；required Cucumber 报告必须为 `{ elements: [...] }`，且至少一个非空 `name` 的 scenario element 含 `result.status="passed"`。`failed` 只作失败诊断，`skipped` / `pending` / `undefined` / 未知 status 和匿名 element 都不能满足证据并产生 D5 violation；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
@@ -359,14 +359,14 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 - **stderr**（人类可读）：`✗ [CATEGORY] <message>: <file|detail>`（类别见下表）
 - **stdout**（机器可读，遵循 SSoT §10E E.1）：`ERROR_JSON {"category","message","exitCode","file"}`，`exitCode` 与 `process.exit()` 实参强一致
 
-| 类别 | 场景 | 示例 |
-|---|---|---|
-| `ARG_INVALID` | 参数值非法（phase/variant/mode/node-type/max-tokens 等） | `✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数` |
-| `FILE_NOT_FOUND` | 文件/目录不存在（ENOENT） | `✗ [FILE_NOT_FOUND] 文件不存在: C:\...\project.json` |
-| `FILE_PARSE` | JSON 解析失败（含 JSONL 坏行） | `✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: C:\...\rtm.json` |
-| `FILE_READ` | 读取异常非 ENOENT | `✗ [FILE_READ] 文件读取失败: C:\...\x.json（EACCES）` |
-| `STRUCTURE_INVALID` | 合法 JSON 形状不符（顶层非对象/缺字段/类型错） | `✗ [STRUCTURE_INVALID] 结构不符: C:\...\x.json（缺 rows 数组）` |
-| `UNEXPECTED` | 未预期异常（main().catch 兜底） | `✗ [UNEXPECTED] 脚本异常: <message>` |
+| 类别                | 场景                                                     | 示例                                                            |
+| ------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
+| `ARG_INVALID`       | 参数值非法（phase/variant/mode/node-type/max-tokens 等） | `✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数`            |
+| `FILE_NOT_FOUND`    | 文件/目录不存在（ENOENT）                                | `✗ [FILE_NOT_FOUND] 文件不存在: C:\...\project.json`            |
+| `FILE_PARSE`        | JSON 解析失败（含 JSONL 坏行）                           | `✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: C:\...\rtm.json`   |
+| `FILE_READ`         | 读取异常非 ENOENT                                        | `✗ [FILE_READ] 文件读取失败: C:\...\x.json（EACCES）`           |
+| `STRUCTURE_INVALID` | 合法 JSON 形状不符（顶层非对象/缺字段/类型错）           | `✗ [STRUCTURE_INVALID] 结构不符: C:\...\x.json（缺 rows 数组）` |
+| `UNEXPECTED`        | 未预期异常（main().catch 兜底）                          | `✗ [UNEXPECTED] 脚本异常: <message>`                            |
 
 - exit 1（校验失败）结构不变：violations 列表 + 既有 `XXX_JSON` 摘要（含 exitCode=1），不输出 ERROR_JSON。
 - 异常不变量：`ERROR_JSON.exitCode` 恒等于脚本 `process.exit()` 实参（§10E E.1 防伪三层机制）。
@@ -374,12 +374,12 @@ R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
 
 ## CHECKPOINT 统一清单
 
-| CHECKPOINT | 触发点 | 确认对象 |
-|---|---|---|
-| 项目初始化 | 首次进入阶段前（SKILL.md 执行工作流步骤 5） | 进入阶段 / 同步测试设计 / 预期产物清单 |
-| ingestion 规划确认 | 阶段 1-4 plan-chunks 产出后（步骤 5.5） | 分块计划与 A-chunk 分派 |
-| ingestion 收敛确认 | 收敛循环结束（MAX_ROUNDS=5 或通过） | 图谱收敛结果 |
-| 阶段门放行 | G 门禁通过后（步骤 9） | 质量等级 / 子标准分 / reworkHints → 放行或返工 |
-| 发布放行 | 阶段 8 终检 exitCode=0 后 | RTM 覆盖率 / 四级测试 / GATE_JSON → 发布或回退 |
-| 重置确认 | /wm reset | 清空实体不可逆操作 |
-| 导入覆盖确认 | /wm import 目标已有数据 | 覆盖现有数据 |
+| CHECKPOINT         | 触发点                                      | 确认对象                                       |
+| ------------------ | ------------------------------------------- | ---------------------------------------------- |
+| 项目初始化         | 首次进入阶段前（SKILL.md 执行工作流步骤 5） | 进入阶段 / 同步测试设计 / 预期产物清单         |
+| ingestion 规划确认 | 阶段 1-4 plan-chunks 产出后（步骤 5.5）     | 分块计划与 A-chunk 分派                        |
+| ingestion 收敛确认 | 收敛循环结束（MAX_ROUNDS=5 或通过）         | 图谱收敛结果                                   |
+| 阶段门放行         | G 门禁通过后（步骤 9）                      | 质量等级 / 子标准分 / reworkHints → 放行或返工 |
+| 发布放行           | 阶段 8 终检 exitCode=0 后                   | RTM 覆盖率 / 四级测试 / GATE_JSON → 发布或回退 |
+| 重置确认           | /wm reset                                   | 清空实体不可逆操作                             |
+| 导入覆盖确认       | /wm import 目标已有数据                     | 覆盖现有数据                                   |

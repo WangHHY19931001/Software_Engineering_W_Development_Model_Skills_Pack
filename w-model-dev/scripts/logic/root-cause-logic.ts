@@ -12,13 +12,43 @@
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
-// R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"}
-// R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}
-// R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}
-// R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}
-// R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"}
-// R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}
-// R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}
+export const R10_CONTRACT_NODES = [
+  {
+    id: 'canonical-name',
+    relation: { canonicalPersona: 'testing-reality-checker' },
+    prose: 'canonical persona is testing-reality-checker',
+  },
+  {
+    id: 'threshold',
+    relation: { canonicalPersona: 'testing-reality-checker', confidenceMinimum: 0.5 },
+    prose: 'testing-reality-checker confidence >= 0.5',
+  },
+  {
+    id: 'legacy-fallback',
+    relation: { legacyPersona: 'reality-checker', fallbackWhen: 'canonical-absent' },
+    prose: 'legacy reality-checker is fallback only when canonical is absent',
+  },
+  {
+    id: 'same-artifact-dedupe',
+    relation: { artifactRelation: 'same', precedence: 'canonical-first', duplicateCount: 'once' },
+    prose: 'same artifact canonical-first and not counted twice',
+  },
+  {
+    id: 'cross-artifact-conflict',
+    relation: { artifactRelation: 'different', conflict: 'fail-closed' },
+    prose: 'different artifact conflict is fail-closed',
+  },
+  {
+    id: 'canonical-duplicate',
+    relation: { persona: 'canonical', duplicateThreshold: 1, duplicatePolicy: 'fail-closed' },
+    prose: 'canonical > 1 duplicate is fail-closed',
+  },
+  {
+    id: 'legacy-duplicate',
+    relation: { persona: 'legacy', duplicateThreshold: 1, duplicatePolicy: 'fail-closed' },
+    prose: 'legacy > 1 duplicate is fail-closed',
+  },
+] as const;
 
 // ==================== 自包含类型形状 ====================
 
@@ -139,13 +169,7 @@ function isIso8601(value: unknown): value is string {
  *   R9 多角度场景 partialReports 非空
  *   R10 多角度场景 canonical testing-reality-checker confidence >= 0.5；legacy reality-checker 仅在 canonical 缺失时 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed
  *
- * R10-C1 canonical-name：canonical persona is testing-reality-checker。
- * R10-C2 threshold：testing-reality-checker confidence >= 0.5。
- * R10-C3 legacy-fallback：legacy reality-checker is fallback only when canonical is absent。
- * R10-C4 same-artifact：same artifact canonical-first and not counted twice。
- * R10-C5 cross-artifact：different artifact conflict is fail-closed。
- * R10-C6 canonical-duplicate：canonical > 1 duplicate is fail-closed。
- * R10-C7 legacy-duplicate：legacy > 1 duplicate is fail-closed。
+ * R10 结构化契约节点见模块顶部的 R10_CONTRACT_NODES；关系与 prose 必须同节点一致。
  */
 export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   const reasons: string[] = [];

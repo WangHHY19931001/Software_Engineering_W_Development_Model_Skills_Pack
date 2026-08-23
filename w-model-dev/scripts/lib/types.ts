@@ -32,5 +32,7 @@ export interface JsonReport {
   dynamicViolations?: unknown[];
   /** 当前运行时采集的数值事实，不是硬编码规范。 */
   dynamicMeasurements?: Record<string, unknown>;
+  /** 非阻断生命周期诊断（例如 LEGACY_UNSCOPED/pending-pre-approval）。 */
+  diagnostics?: string[];
   durationMs: number;
 }

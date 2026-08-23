@@ -713,3 +713,283 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
     expect(result.violations.filter((v) => v.startsWith('R8'))).toHaveLength(0);
   });
 });
+
+// ==================== D8 lifecycle identity / segmentation regressions ====================
+
+describe('D8 lifecycle identity reducer', () => {
+  const rootCause = (runId: string, reportId: string, round = 1): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round,
+      action: 'rootcause',
+      role: 'R',
+      outcome: 'success',
+      reportId,
+      targetKind: 'rootcause',
+      rootCauseCategory: 'checker-contract',
+      upstreamDefect: true,
+      rollbackRecommended: false,
+    });
+
+  const rootCauseReview = (runId: string, reportId: string, round = 1): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round,
+      action: 'review',
+      role: 'V',
+      outcome: 'success',
+      passed: true,
+      reportId,
+      target: reportId,
+      targetKind: 'rootcause',
+      qualityLevel: 'A',
+      reworkHints: [],
+    });
+
+  const rootCauseGate = (runId: string, reportId: string, round = 1): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round,
+      action: 'gate',
+      role: 'G',
+      outcome: 'success',
+      gateExitCode: 0,
+      reportId,
+      target: reportId,
+      targetKind: 'rootcause',
+      script: 'check-rootcause-report.ts',
+    });
+
+  const implementationReview = (runId: string, reportId: string, round = 1): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round,
+      action: 'review',
+      role: 'V',
+      outcome: 'success',
+      passed: true,
+      reportId,
+      target: `implementation-${reportId}`,
+      targetKind: 'code',
+      qualityLevel: 'A',
+      reworkHints: [],
+      basedOnReport: reportId,
+    });
+
+  const implementationGate = (runId: string, reportId: string, round = 1): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round,
+      action: 'gate',
+      role: 'G',
+      outcome: 'success',
+      gateExitCode: 0,
+      reportId,
+      target: `implementation-${reportId}`,
+      targetKind: 'code',
+      script: 'check-artifact-gate.ts',
+      basedOnReport: reportId,
+    });
+
+  const fix = (runId: string, reportId: string, round = 1): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round,
+      action: 'fix',
+      role: 'S',
+      outcome: 'success',
+      reportId,
+      basedOnReport: reportId,
+      targetKind: 'code',
+      artifacts: [`implementation-${reportId}`],
+    });
+
+  const r3 = (runId: string, dimension: 'completeness' | 'reliability' | 'security', reportId?: string) =>
+    makeEntry({
+      runId,
+      phase: 8,
+      round: 1,
+      action: `r3-${dimension}` as RunLogEntry['action'],
+      role: 'R',
+      outcome: 'success',
+      reportId,
+      basedOnReport: reportId,
+      targetKind: reportId ? 'code' : undefined,
+    });
+
+  it('does not let a different reportId rootcause V/G or fix satisfy the target lifecycle', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCause('r-b', 'RC-B'),
+      rootCauseReview('v-b', 'RC-B'),
+      rootCauseGate('g-b', 'RC-B'),
+      fix('f-a', 'RC-A'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((reason) => /RC-B.*open-approved-lifecycle/.test(reason))).toBe(true);
+    expect(result.violations.some((reason) => /RC-A.*pending-pre-approval/.test(reason))).toBe(false);
+  });
+
+  it('does not count rootcause V as implementation V', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      rootCauseReview('v-other', 'RC-OTHER', 2),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((reason) => /implementation.*V|缺.*implementation|缺.*实现.*V/i.test(reason))).toBe(
+      true,
+    );
+  });
+
+  it('classifies an unapproved report without exact fix as pending-pre-approval', () => {
+    const result = checkRunLog([rootCause('r-a', 'RC-A', 2)]);
+    expect(result.violations.some((reason) => /RC-A.*无对应 fix|exact-fix|open-approved-lifecycle/.test(reason))).toBe(
+      false,
+    );
+    expect(
+      (result as unknown as { diagnostics?: string[] }).diagnostics?.some((d) => /pending-pre-approval/.test(d)),
+    ).toBe(true);
+  });
+
+  it('reports open-approved-lifecycle when same-identity rootcause V/G passed but exact fix is absent', () => {
+    const result = checkRunLog([
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+    ]);
+    expect(result.violations.some((reason) => /open-approved-lifecycle/.test(reason))).toBe(true);
+    expect(result.violations.some((reason) => /RC-A.*无对应 fix/.test(reason))).toBe(false);
+  });
+
+  it('counts R3 only inside the same fix identity segment', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a', 'RC-A'),
+      rootCauseGate('g-a', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-a-c', 'completeness', 'RC-A'),
+      r3('r3-a-r', 'reliability', 'RC-A'),
+      r3('r3-a-s', 'security', 'RC-A'),
+      fix('f-b', 'RC-B', 2),
+      implementationReview('v-b', 'RC-B', 2),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((reason) => /RC-B|fix.*RC-B|implementation.*RC-B/i.test(reason))).toBe(true);
+  });
+
+  it('checks R8 ordering within an identity segment instead of phase-wide first indexes', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a-rootcause', 'RC-A'),
+      rootCauseGate('g-a-rootcause', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-a-c', 'completeness', 'RC-A'),
+      r3('r3-a-r', 'reliability', 'RC-A'),
+      r3('r3-a-s', 'security', 'RC-A'),
+      implementationReview('v-a-implementation', 'RC-A'),
+      implementationGate('g-a-implementation', 'RC-A'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((reason) => /R8.*轨迹顺序倒置/.test(reason))).toBe(false);
+    expect(result.violations.some((reason) => /R3 记录校验失败/.test(reason))).toBe(false);
+  });
+
+  it('keeps missing implementation V blocking after an exact fix', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a-rootcause', 'RC-A'),
+      rootCauseGate('g-a-rootcause', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-a-c', 'completeness', 'RC-A'),
+      r3('r3-a-r', 'reliability', 'RC-A'),
+      r3('r3-a-s', 'security', 'RC-A'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((reason) => /fix f-a.*缺同身份 implementation V/.test(reason))).toBe(true);
+  });
+
+  it('keeps missing implementation G blocking after same-identity R3 and V', () => {
+    const entries = [
+      rootCause('r-a', 'RC-A'),
+      rootCauseReview('v-a-rootcause', 'RC-A'),
+      rootCauseGate('g-a-rootcause', 'RC-A'),
+      fix('f-a', 'RC-A'),
+      r3('r3-a-c', 'completeness', 'RC-A'),
+      r3('r3-a-r', 'reliability', 'RC-A'),
+      r3('r3-a-s', 'security', 'RC-A'),
+      implementationReview('v-a-implementation', 'RC-A'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((reason) => /fix f-a.*缺同身份 implementation G/.test(reason))).toBe(true);
+  });
+
+  it('emits LEGACY_UNSCOPED diagnostics when lifecycle identity fields are missing', () => {
+    const entries = [
+      makeEntry({ action: 'fix', role: 'S', basedOnReport: 'RC-LEGACY', artifacts: ['artifact'], outcome: 'success' }),
+      r3('r3-legacy-c', 'completeness'),
+      r3('r3-legacy-r', 'reliability'),
+      r3('r3-legacy-s', 'security'),
+      makeEntry({
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        targetKind: 'code',
+        target: 'artifact',
+        passed: true,
+      }),
+    ];
+    const result = checkRunLog(entries);
+    expect(
+      (result as unknown as { diagnostics?: string[] }).diagnostics?.some((d) => /LEGACY_UNSCOPED|deferred/i.test(d)),
+    ).toBe(true);
+  });
+
+  it('defers the raw legacy fix without exact identity blocking or lifecycle credit', async () => {
+    const rawPath = path.resolve(here, '../../../.w-model/run-log.jsonl');
+    const entries = (await fs.readFile(rawPath, 'utf8'))
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line)) as RunLogEntry[];
+    const result = checkRunLog(entries);
+    const diagnostics = result.diagnostics ?? [];
+
+    expect(result.passed).toBe(true);
+    expect(result.violations.some((reason) => /exact fix identity incomplete/.test(reason))).toBe(false);
+    expect(result.violations.some((reason) => /RC-phase8-10-01.*implementation V|同身份 R3/.test(reason))).toBe(false);
+    expect(
+      diagnostics.some((diagnostic) =>
+        /LEGACY_UNSCOPED: fix RC-phase8-10-01-sfix-20260822033128000 identity missing targetKind; deferred/.test(
+          diagnostic,
+        ),
+      ),
+    ).toBe(true);
+    expect(diagnostics.some((diagnostic) => /pending-pre-approval: RC-phase8-2-02/.test(diagnostic))).toBe(true);
+  });
+
+  it('does not mutate the raw run-log JSONL bytes', async () => {
+    const rawPath = path.resolve(here, '../../../.w-model/run-log.jsonl');
+    const before = await fs.readFile(rawPath);
+    const entries = before
+      .toString('utf8')
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    checkRunLog(entries);
+    const after = await fs.readFile(rawPath);
+    expect(entries).toHaveLength(18);
+    expect(after.equals(before)).toBe(true);
+  });
+});

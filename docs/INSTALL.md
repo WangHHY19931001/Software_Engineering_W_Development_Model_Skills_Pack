@@ -47,7 +47,6 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 
-
 ---
 
 ## 1. 架构定位
@@ -81,10 +80,10 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
 
 技能包按两个交付层分发，按需取用：
 
-| 交付层 | 包含 | 激活条件 | 前置依赖 |
-|---|---|---|---|
-| **L0「纯 skill」**（默认） | `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` | 拷贝到 Agent skills 目录即可 | 无（纯 Markdown） |
-| **L1「带门禁」** | L0 + `scripts/` + `samples/` + `tools/`（tla2tools.jar，TLA+ 门禁运行时依赖） | 需要确定性门禁（阶段门 / 图谱 / TLA+ / BDD / 工件质量门等）时 | Node.js ≥20 + `npm install`（tsx + ajv 等 devDeps，见上） |
+| 交付层                     | 包含                                                                               | 激活条件                                                      | 前置依赖                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- |
+| **L0「纯 skill」**（默认） | `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` | 拷贝到 Agent skills 目录即可                                  | 无（纯 Markdown）                                         |
+| **L1「带门禁」**           | L0 + `scripts/` + `samples/` + `tools/`（tla2tools.jar，TLA+ 门禁运行时依赖）      | 需要确定性门禁（阶段门 / 图谱 / TLA+ / BDD / 工件质量门等）时 | Node.js ≥20 + `npm install`（tsx + ajv 等 devDeps，见上） |
 
 - **L0 用户**：拷贝时删除 `scripts/` 与 `samples/` 即可（或拷贝全部但只加载 Markdown 资产）；编排者以 L0 模式运行时跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并将 `project.status` 标记 `gateLevel: "l0"`。
 - **L1 用户**：完整拷贝 `w-model-dev/`，按 §3 标准安装 + 仓库根 `npm install` 跑门禁脚本。
@@ -123,7 +122,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + plan-chunks-logic.ts）
 │   ├── infrastructure/ # 基础设施适配（schema-loader.ts / schema-fs.ts；Ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
-│   └── __tests__/      # vitest 单元测试（55 个 .test.ts / 954 条 + README.md coverage 矩阵）
+│   └── __tests__/      # vitest 单元测试（55 个 .test.ts / 970 条 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
 ```
@@ -287,41 +286,41 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 
 ## 7. 目录速查
 
-| 你要找的东西 | 位置 |
-|---|---|
-| Skill 入口与触发条件 | [../w-model-dev/SKILL.md](../w-model-dev/SKILL.md) |
-| 各阶段执行细则 | [../w-model-dev/references/](../w-model-dev/references) |
-| 编排者-子代理边界（O/A/S/V/G/R） | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md) |
-| LLM-as-a-Verifier 评审规范 | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) |
-| 工具箱决策表（I have X → use Z） | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md) |
-| 负面知识库（47 条反模式 + 教训） | [../w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md) |
-| JSON Schema 文件（draft-07，23 份，含 evidence-manifest / evidence-provenance） | [../w-model-dev/schemas/](../w-model-dev/schemas) |
-| Schema 加载与校验工具 | [../w-model-dev/scripts/infrastructure/schema-loader.ts](../w-model-dev/scripts/infrastructure/schema-loader.ts) |
-| 安全扫描脚本（baseline v2 内容敏感指纹豁免） | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts) |
-| 回归基线脚本（260 条样本） | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts) |
-| 测试 coverage 矩阵 | [../w-model-dev/scripts/__tests__/README.md](../w-model-dev/scripts/__tests__/README.md) |
-| 28 个评审 persona 文件 | [../w-model-dev/subagent/](../w-model-dev/subagent) |
-| Verifier 输出校验逻辑 | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts) |
-| Verifier 输出校验 CLI | [../w-model-dev/scripts/cli/check-verifier-output.ts](../w-model-dev/scripts/cli/check-verifier-output.ts) |
-| 工件质量门逻辑 | [../w-model-dev/scripts/logic/gate-logic.ts](../w-model-dev/scripts/logic/gate-logic.ts) |
-| 工件质量门 CLI | [../w-model-dev/scripts/cli/check-artifact-gate.ts](../w-model-dev/scripts/cli/check-artifact-gate.ts) |
-| 图谱结构门禁逻辑 | [../w-model-dev/scripts/logic/graph-logic.ts](../w-model-dev/scripts/logic/graph-logic.ts) |
-| 图谱结构门禁 CLI | [../w-model-dev/scripts/cli/check-requirement-graph.ts](../w-model-dev/scripts/cli/check-requirement-graph.ts) |
-| TLA+ 行为门禁 CLI | [../w-model-dev/scripts/cli/check-tla-model.ts](../w-model-dev/scripts/cli/check-tla-model.ts) |
-| 代码-TLA+ 一致性回归 CLI | [../w-model-dev/scripts/cli/check-code-tla-consistency.ts](../w-model-dev/scripts/cli/check-code-tla-consistency.ts) |
-| BDD 模型门禁 CLI | [../w-model-dev/scripts/cli/check-bdd-model.ts](../w-model-dev/scripts/cli/check-bdd-model.ts) |
-| Budget / RunLog / Maturity / Checkpoint / RootCause / 签名链 / 归档 / R3 / 冰山扫掠 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts) |
-| /wm status 状态快照 CLI + 逻辑 | [../w-model-dev/scripts/cli/wm-status.ts](../w-model-dev/scripts/cli/wm-status.ts) + [../w-model-dev/scripts/logic/wm-status-logic.ts](../w-model-dev/scripts/logic/wm-status-logic.ts) |
-| 流程度量报告 CLI + 逻辑 | [../w-model-dev/scripts/cli/metrics-report.ts](../w-model-dev/scripts/cli/metrics-report.ts) + [../w-model-dev/scripts/logic/metrics-report-logic.ts](../w-model-dev/scripts/logic/metrics-report-logic.ts) |
-| exit 2 错误结构统一（6 类错误码 + ERROR_JSON） | [../w-model-dev/scripts/lib/cli-error.ts](../w-model-dev/scripts/lib/cli-error.ts) |
-| 图谱门禁与收敛准则 | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md) |
-| 冰山扫掠机制说明 | [../w-model-dev/references/iceberg-sweep-guide.md](../w-model-dev/references/iceberg-sweep-guide.md) |
-| 文档模板 | [../w-model-dev/templates/](../w-model-dev/templates) |
-| 交互示例 | [../w-model-dev/examples/](../w-model-dev/examples) |
-| 设计文档（SSoT） | [./skill-design-document_SSoT.md](./skill-design-document_SSoT.md) |
-| LLM Verifier 集成设计 | [./llm-verifier-integration-design.md](./llm-verifier-integration-design.md) |
-| 项目导航 | [../README.md](../README.md) |
-| Agent 仓库导航 | [../AGENTS.md](../AGENTS.md) |
+| 你要找的东西                                                                                 | 位置                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Skill 入口与触发条件                                                                         | [../w-model-dev/SKILL.md](../w-model-dev/SKILL.md)                                                                                                                                                          |
+| 各阶段执行细则                                                                               | [../w-model-dev/references/](../w-model-dev/references)                                                                                                                                                     |
+| 编排者-子代理边界（O/A/S/V/G/R）                                                             | [../w-model-dev/references/subagent-delegation.md](../w-model-dev/references/subagent-delegation.md)                                                                                                        |
+| LLM-as-a-Verifier 评审规范                                                                   | [../w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md)                                                                                                                    |
+| 工具箱决策表（I have X → use Z）                                                             | [../w-model-dev/references/toolbox.md](../w-model-dev/references/toolbox.md)                                                                                                                                |
+| 负面知识库（47 条反模式 + 教训）                                                             | [../w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md)                                                                                                                    |
+| JSON Schema 文件（draft-07，23 份，含 evidence-manifest / evidence-provenance）              | [../w-model-dev/schemas/](../w-model-dev/schemas)                                                                                                                                                           |
+| Schema 加载与校验工具                                                                        | [../w-model-dev/scripts/infrastructure/schema-loader.ts](../w-model-dev/scripts/infrastructure/schema-loader.ts)                                                                                            |
+| 安全扫描脚本（baseline v2 内容敏感指纹豁免）                                                 | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts)                                                                                                                  |
+| 回归基线脚本（260 条样本）                                                                   | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts)                                                                                                                          |
+| 测试 coverage 矩阵                                                                           | [../w-model-dev/scripts/**tests**/README.md](../w-model-dev/scripts/__tests__/README.md)                                                                                                                    |
+| 28 个评审 persona 文件                                                                       | [../w-model-dev/subagent/](../w-model-dev/subagent)                                                                                                                                                         |
+| Verifier 输出校验逻辑                                                                        | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts)                                                                                                            |
+| Verifier 输出校验 CLI                                                                        | [../w-model-dev/scripts/cli/check-verifier-output.ts](../w-model-dev/scripts/cli/check-verifier-output.ts)                                                                                                  |
+| 工件质量门逻辑                                                                               | [../w-model-dev/scripts/logic/gate-logic.ts](../w-model-dev/scripts/logic/gate-logic.ts)                                                                                                                    |
+| 工件质量门 CLI                                                                               | [../w-model-dev/scripts/cli/check-artifact-gate.ts](../w-model-dev/scripts/cli/check-artifact-gate.ts)                                                                                                      |
+| 图谱结构门禁逻辑                                                                             | [../w-model-dev/scripts/logic/graph-logic.ts](../w-model-dev/scripts/logic/graph-logic.ts)                                                                                                                  |
+| 图谱结构门禁 CLI                                                                             | [../w-model-dev/scripts/cli/check-requirement-graph.ts](../w-model-dev/scripts/cli/check-requirement-graph.ts)                                                                                              |
+| TLA+ 行为门禁 CLI                                                                            | [../w-model-dev/scripts/cli/check-tla-model.ts](../w-model-dev/scripts/cli/check-tla-model.ts)                                                                                                              |
+| 代码-TLA+ 一致性回归 CLI                                                                     | [../w-model-dev/scripts/cli/check-code-tla-consistency.ts](../w-model-dev/scripts/cli/check-code-tla-consistency.ts)                                                                                        |
+| BDD 模型门禁 CLI                                                                             | [../w-model-dev/scripts/cli/check-bdd-model.ts](../w-model-dev/scripts/cli/check-bdd-model.ts)                                                                                                              |
+| Budget / RunLog / Maturity / Checkpoint / RootCause / 签名链 / 归档 / R3 / 冰山扫掠 门禁 CLI | [../w-model-dev/scripts/](../w-model-dev/scripts)                                                                                                                                                           |
+| /wm status 状态快照 CLI + 逻辑                                                               | [../w-model-dev/scripts/cli/wm-status.ts](../w-model-dev/scripts/cli/wm-status.ts) + [../w-model-dev/scripts/logic/wm-status-logic.ts](../w-model-dev/scripts/logic/wm-status-logic.ts)                     |
+| 流程度量报告 CLI + 逻辑                                                                      | [../w-model-dev/scripts/cli/metrics-report.ts](../w-model-dev/scripts/cli/metrics-report.ts) + [../w-model-dev/scripts/logic/metrics-report-logic.ts](../w-model-dev/scripts/logic/metrics-report-logic.ts) |
+| exit 2 错误结构统一（6 类错误码 + ERROR_JSON）                                               | [../w-model-dev/scripts/lib/cli-error.ts](../w-model-dev/scripts/lib/cli-error.ts)                                                                                                                          |
+| 图谱门禁与收敛准则                                                                           | [../w-model-dev/references/graph-guide.md](../w-model-dev/references/graph-guide.md)                                                                                                                        |
+| 冰山扫掠机制说明                                                                             | [../w-model-dev/references/iceberg-sweep-guide.md](../w-model-dev/references/iceberg-sweep-guide.md)                                                                                                        |
+| 文档模板                                                                                     | [../w-model-dev/templates/](../w-model-dev/templates)                                                                                                                                                       |
+| 交互示例                                                                                     | [../w-model-dev/examples/](../w-model-dev/examples)                                                                                                                                                         |
+| 设计文档（SSoT）                                                                             | [./skill-design-document_SSoT.md](./skill-design-document_SSoT.md)                                                                                                                                          |
+| LLM Verifier 集成设计                                                                        | [./llm-verifier-integration-design.md](./llm-verifier-integration-design.md)                                                                                                                                |
+| 项目导航                                                                                     | [../README.md](../README.md)                                                                                                                                                                                |
+| Agent 仓库导航                                                                               | [../AGENTS.md](../AGENTS.md)                                                                                                                                                                                |
 
 > 技能演化与评估相关能力不在本仓库：参见外部工具
 > [SkillOpt](https://github.com/microsoft/SkillOpt) / [darwin-skill](https://github.com/alchaincyf/darwin-skill)。
@@ -331,21 +330,24 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 ## 8. 常见问题
 
 **Q：仓库验证和 Skill 安装是同一件事吗？**
+
 - 不是。仓库验证是从仓库根目录执行 `npm install`、`npm run self-test`、`npm run doctor`，用于确认脚本环境健康；Skill 安装只复制 `w-model-dev/` 到目标 Agent 的 Agent-specific skills 目录。
 - `npm install` 的 `postinstall` 只设置当前 checkout 的 `core.hooksPath=.githooks`，不负责激活 Agent Skill。
 
 **Q：安装需要联网或 API key 吗？**
+
 - **纯 Skill 资产**（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零联网，拷贝即可用。
 - **运行门禁脚本** 需联网一次 `npm install` 拉取 devDeps（`ajv` / `ajv-formats` / `eslint-plugin-security` 等，首次安装约 30MB）。之后离线可用。
 - Agent 在执行 LLM-as-a-Verifier 评审时需要调用其自身的 LLM，按 Agent 框架自身的鉴权方式处理（与技能无关）。
 
 **Q：为什么有 `package.json` + `npm install`？**
 Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支撑 `w-model-dev/scripts/cli/*.ts` 校验脚本。仓库为**单根包**（`w-model-dev/` 无独立依赖与包名引用），在仓库根目录 `npm install` 一次即可，devDeps 装至根 `node_modules`：
+
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `infrastructure/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
 - **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
 - **runtime**：`tsx`（运行 ESM TypeScript）
-- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，55 个 test 文件 / 954 条）
+- **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，55 个 test 文件 / 970 条）
 
 `/wm` 命令、状态持久化、RTM 维护仍由 Agent 按 `SKILL.md` 在项目内（`.w-model/*.json`）完成，无编程式 SDK。
 若只读 Markdown 资产不跑脚本，可跳过 `npm install`，但 schema 校验 + 安全扫描 + self-test 不可用。Windows 与 WSL 不要在同一个 checkout 混用 `node_modules`；建议为每个平台使用独立 checkout，或切换平台后重新执行 `npm install`。
@@ -361,6 +363,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 
 **Q：编排者-子代理边界如何工作？Agent 自身就是编排者吗？**
 是的。Agent 读取 `w-model-dev/SKILL.md` 后承担「编排者」（O）角色，只做路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本。任何实施动作由五类子代理执行（详见 SSoT [§3.4.2 角色划分](./skill-design-document_SSoT.md)）：
+
 - **A 分析子代理**：L2+ 项目事件接驳 / ingestion 分块分析（阶段 1–4）
 - **S 产出子代理**：生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体
 - **V 评审子代理**：按 `verifier-spec.md` 提示词产出 `VerifierOutput` JSON（即「外部 Agent 执行 LLM-as-a-Verifier」）；V-lead 可调用多 persona 多角度评审
@@ -374,6 +377,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 
 **Q：哪里可以看到 W 模型 8 阶段的完整端到端产出样本？**
 参考实现是博客系统后端（Express + TypeScript）的端到端调测，**已归档**（按时间倒序，源码不随仓库保留）：
+
 - [`docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/`](./changes/archive/2026-07-30-round23-w-model-8-phase-validation/)
 - [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)
 
@@ -386,11 +390,13 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 ### 自动安装
 
 技能包在阶段 5 进入 CHECKPOINT 时自动运行：
+
 ```bash
 npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase 5 --project-root . --mode full
 ```
 
 脚本执行三层检测+自动处置：
+
 1. **L1 CLI**：`codegraph --version` / `openspec --version` → 缺失则 `npm i -g`
 2. **L2 MCP 注册**：codegraph 探针查询 → 失败则 `codegraph install --yes`
 3. **L3 项目**：`.codegraph/` / `openspec/` 目录 → 缺失则 `codegraph init` / `openspec init`

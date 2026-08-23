@@ -155,6 +155,7 @@ interface Exit2ProbeResult {
   errorExitCode: number | null;
   category: string | null;
   rule: string | null;
+  rawErrorJson: Record<string, unknown> | null;
   outputPath?: string;
   outputExistsAfter?: boolean;
   emittedEvidenceExport?: boolean;
@@ -173,6 +174,24 @@ function normalizeProbePath(value: string, probeRoot: string): string {
   if (rel === '') return '<probeRoot>';
   if (!rel.startsWith('../') && rel !== '..' && !isAbsolute(rel)) return `<probeRoot>/${rel}`;
   return value;
+}
+
+function normalizeRawErrorJson(value: Record<string, unknown>, probeRoot: string): Record<string, unknown> {
+  const normalize = (entry: unknown): unknown => {
+    if (
+      typeof entry === 'string' &&
+      (isAbsolute(entry) || /^[A-Za-z]:[\\/]/.test(entry) || /^\\\\|^\/\//.test(entry))
+    ) {
+      const normalized = normalizeProbePath(entry, probeRoot);
+      return normalized === entry ? '<external-path>' : normalized;
+    }
+    if (Array.isArray(entry)) return entry.map(normalize);
+    if (entry !== null && typeof entry === 'object') {
+      return Object.fromEntries(Object.entries(entry).map(([key, child]) => [key, normalize(child)]));
+    }
+    return entry;
+  };
+  return normalize(value) as Record<string, unknown>;
 }
 
 async function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Promise<Exit2ProbeResult[]> {
@@ -259,15 +278,19 @@ async function collectExit2ScriptResults(root: string, cliScriptFiles: string[])
         let errorExitCode: number | null = null;
         let category: string | null = null;
         let rule: string | null = null;
+        let rawErrorJson: Record<string, unknown> | null = null;
         if (jsonLine !== undefined) {
-          const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as {
-            exitCode?: unknown;
-            category?: unknown;
-            rule?: unknown;
-          } | null;
-          errorExitCode = typeof parsed?.exitCode === 'number' ? parsed.exitCode : null;
-          category = typeof parsed?.category === 'string' ? parsed.category : null;
-          rule = typeof parsed?.rule === 'string' ? parsed.rule : null;
+          try {
+            const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as unknown;
+            if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              rawErrorJson = normalizeRawErrorJson(parsed as Record<string, unknown>, probeRoot);
+              errorExitCode = typeof rawErrorJson.exitCode === 'number' ? rawErrorJson.exitCode : null;
+              category = typeof rawErrorJson.category === 'string' ? rawErrorJson.category : null;
+              rule = typeof rawErrorJson.rule === 'string' ? rawErrorJson.rule : null;
+            }
+          } catch {
+            rawErrorJson = null;
+          }
         }
         return {
           probeId,
@@ -278,6 +301,7 @@ async function collectExit2ScriptResults(root: string, cliScriptFiles: string[])
           errorExitCode,
           category,
           rule,
+          rawErrorJson,
           ...(probe.outputPath === undefined
             ? {}
             : {

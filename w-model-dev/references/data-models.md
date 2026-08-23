@@ -2,16 +2,16 @@
 
 > **§0 按需分节加载导引**（约束 #6）：本文件较大，按下表只读所需节，禁止整文件载入上下文。
 >
-> | 触发场景 | 只读章节 |
-> |---|---|
-> | 维护项目/需求/设计/测试实体 | 「项目/需求/设计/测试用例数据模型」节 |
-> | 图谱节点/边类型 | 「图谱节点与边类型」节 |
-> | RTM 登记 / 阶段演进 | 「与 RTM 的映射」节 + 「RTM 字段阶段演进规则」节 |
-> | 数据损坏 / 并发写入 | 「数据迁移与异常处理」节 |
-> | 预算 / 成熟度配置 | 「成本预算模型」节 + 「自主成熟度模型」节 |
-> | 写 run-log / event-ingress | 「运行日志模型」节 + 「事件接驳模型」节 + 「Schema 边界对照表」节 |
-> | TLA+ / BDD manifest | 「TLA+ manifest 模型」节 + 「BDD 数据模型」节 |
-> | schema 前置校验 | 「JSON Schema 强约束」节 |
+> | 触发场景                    | 只读章节                                                          |
+> | --------------------------- | ----------------------------------------------------------------- |
+> | 维护项目/需求/设计/测试实体 | 「项目/需求/设计/测试用例数据模型」节                             |
+> | 图谱节点/边类型             | 「图谱节点与边类型」节                                            |
+> | RTM 登记 / 阶段演进         | 「与 RTM 的映射」节 + 「RTM 字段阶段演进规则」节                  |
+> | 数据损坏 / 并发写入         | 「数据迁移与异常处理」节                                          |
+> | 预算 / 成熟度配置           | 「成本预算模型」节 + 「自主成熟度模型」节                         |
+> | 写 run-log / event-ingress  | 「运行日志模型」节 + 「事件接驳模型」节 + 「Schema 边界对照表」节 |
+> | TLA+ / BDD manifest         | 「TLA+ manifest 模型」节 + 「BDD 数据模型」节                     |
+> | schema 前置校验             | 「JSON Schema 强约束」节                                          |
 >
 > 来源：SSoT 第 7 章。项目状态、需求、设计、测试用例的数据结构定义。
 > 技能执行时按需读取，用于在项目存储中维护结构化记录。
@@ -20,35 +20,35 @@
 
 > 一页速查：W 模型各状态文件的数据结构定义（来源 SSoT 第 7 章）。技能执行时按需读取，用于在项目存储中维护结构化记录。
 
-| 维度 | 核心锚点 | 详见 |
-|---|---|---|
-| 核心实体 | Project / Requirement / Design / TestCase + 实体关系 | 「项目/需求/设计/测试用例数据模型」节 + 「实体关系」节 |
-| 图谱模型 | GraphNode / EdgeType（governs/collaborates-with/derives + marker） | 「图谱节点与边类型」节 |
-| RTM 映射 | RTM 列 ↔ 数据模型 id + 登记阶段 | 「与 RTM 的映射」节 |
-| RTM 阶段演进 | 各字段首次填写阶段，禁止提前填晚期字段 | 「RTM 字段阶段演进规则」节 |
-| 数据迁移 | status 枚举 / techStack / JSON 损坏恢复 / 并发写入 | 「数据迁移与异常处理」节 |
-| 预算模型 | budget.json（perPhase/project/onExceed/killSwitch） | 「成本预算模型」节 |
-| 运行日志 | run-log.jsonl（RunLogEntry + R1 阶段动作完整性） | 「运行日志模型」节 |
-| 成熟度模型 | maturity.json（L0-L3 + 升级/降级触发） | 「自主成熟度模型」节 |
-| Schema 边界 | RunLogEntry vs EventIngress 字段对照（禁止混用） | 「RunLogEntry vs EventIngress Schema 边界对照表」节 |
-| 事件接驳 | event-ingress.jsonl（EventIngress） | 「事件接驳模型」节 |
-| 爬坡报告 | HarnessImprovementReport | 「爬坡循环改进报告模型」节 |
-| TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound） | 「TLA+ manifest 模型」节 |
-| BDD 模型 | BddManifest / BddStateMachine / BddFeature | 「BDD 数据模型」节 |
-| JSON Schema | 23 份 schema（含 evidence-manifest / evidence-provenance）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节 |
+| 维度          | 核心锚点                                                                                     | 详见                                                   |
+| ------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 核心实体      | Project / Requirement / Design / TestCase + 实体关系                                         | 「项目/需求/设计/测试用例数据模型」节 + 「实体关系」节 |
+| 图谱模型      | GraphNode / EdgeType（governs/collaborates-with/derives + marker）                           | 「图谱节点与边类型」节                                 |
+| RTM 映射      | RTM 列 ↔ 数据模型 id + 登记阶段                                                              | 「与 RTM 的映射」节                                    |
+| RTM 阶段演进  | 各字段首次填写阶段，禁止提前填晚期字段                                                       | 「RTM 字段阶段演进规则」节                             |
+| 数据迁移      | status 枚举 / techStack / JSON 损坏恢复 / 并发写入                                           | 「数据迁移与异常处理」节                               |
+| 预算模型      | budget.json（perPhase/project/onExceed/killSwitch）                                          | 「成本预算模型」节                                     |
+| 运行日志      | run-log.jsonl（RunLogEntry + R1 阶段动作完整性）                                             | 「运行日志模型」节                                     |
+| 成熟度模型    | maturity.json（L0-L3 + 升级/降级触发）                                                       | 「自主成熟度模型」节                                   |
+| Schema 边界   | RunLogEntry vs EventIngress 字段对照（禁止混用）                                             | 「RunLogEntry vs EventIngress Schema 边界对照表」节    |
+| 事件接驳      | event-ingress.jsonl（EventIngress）                                                          | 「事件接驳模型」节                                     |
+| 爬坡报告      | HarnessImprovementReport                                                                     | 「爬坡循环改进报告模型」节                             |
+| TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound）                                       | 「TLA+ manifest 模型」节                               |
+| BDD 模型      | BddManifest / BddStateMachine / BddFeature                                                   | 「BDD 数据模型」节                                     |
+| JSON Schema   | 23 份 schema（含 evidence-manifest / evidence-provenance）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
 
 **按场景只读 §X**：
 
-| 场景 | 应读章节 |
-|---|---|
-| 维护项目/需求/设计/测试实体 | 「项目/需求/设计/测试用例数据模型」节 |
-| 图谱节点/边类型 | 「图谱节点与边类型」节 |
-| RTM 登记 / 阶段演进 | 「与 RTM 的映射」节 + 「RTM 字段阶段演进规则」节 |
-| 数据损坏 / 并发写入 | 「数据迁移与异常处理」节 |
-| 预算 / 成熟度配置 | 「成本预算模型」节 + 「自主成熟度模型」节 |
-| 写 run-log / event-ingress | 「运行日志模型」节 + 「事件接驳模型」节 + 「Schema 边界对照表」节 |
-| TLA+ / BDD manifest | 「TLA+ manifest 模型」节 + 「BDD 数据模型」节 |
-| schema 前置校验 | 「JSON Schema 强约束」节 |
+| 场景                        | 应读章节                                                          |
+| --------------------------- | ----------------------------------------------------------------- |
+| 维护项目/需求/设计/测试实体 | 「项目/需求/设计/测试用例数据模型」节                             |
+| 图谱节点/边类型             | 「图谱节点与边类型」节                                            |
+| RTM 登记 / 阶段演进         | 「与 RTM 的映射」节 + 「RTM 字段阶段演进规则」节                  |
+| 数据损坏 / 并发写入         | 「数据迁移与异常处理」节                                          |
+| 预算 / 成熟度配置           | 「成本预算模型」节 + 「自主成熟度模型」节                         |
+| 写 run-log / event-ingress  | 「运行日志模型」节 + 「事件接驳模型」节 + 「Schema 边界对照表」节 |
+| TLA+ / BDD manifest         | 「TLA+ manifest 模型」节 + 「BDD 数据模型」节                     |
+| schema 前置校验             | 「JSON Schema 强约束」节                                          |
 
 ## 目录
 
@@ -70,7 +70,8 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  status: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试' | '项目完成';
+  status:
+    '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试' | '项目完成';
   techStack: {
     frontend: string[];
     backend: string[];
@@ -171,22 +172,26 @@ interface GraphNodeMarkers {
 
 ```typescript
 export type EdgeType =
-  | 'parent' | 'depends-on' | 'implements' | 'defines' | 'realizes'
+  | 'parent'
+  | 'depends-on'
+  | 'implements'
+  | 'defines'
+  | 'realizes'
   | 'produces'
   // 已移除：'consumes'（D21：信息流层统一用 produces，双向语义由 from/to 表达）
   // 新增（多层图谱横切层，见 graph-guide.md §7）
-  | 'governs'           // 治理层：治理类子系统 → 被治理子系统
+  | 'governs' // 治理层：治理类子系统 → 被治理子系统
   | 'collaborates-with' // 协作层：节点 ↔ 节点 对等协作
-  | 'derives';          // 派生层：派生规格节点 → 派生产物
+  | 'derives'; // 派生层：派生规格节点 → 派生产物
 ```
 
 **边类型与源节点 marker 对应**：
 
-| 边类型 | 源节点（from）要求 | 目标节点（to）要求 | 依附层级树 |
-|---|---|---|---|
-| `governs` | `governance === true`（治理类子系统） | 被治理子系统且存在 | 不依附 |
-| `collaborates-with` | 任意已登记节点（须存在） | 任意已登记节点（须存在） | 不依附 |
-| `derives` | `derivationProduct === true`（派生规格节点） | 派生产物且存在 | 不依附 |
+| 边类型              | 源节点（from）要求                           | 目标节点（to）要求       | 依附层级树 |
+| ------------------- | -------------------------------------------- | ------------------------ | ---------- |
+| `governs`           | `governance === true`（治理类子系统）        | 被治理子系统且存在       | 不依附     |
+| `collaborates-with` | 任意已登记节点（须存在）                     | 任意已登记节点（须存在） | 不依附     |
+| `derives`           | `derivationProduct === true`（派生规格节点） | 派生产物且存在           | 不依附     |
 
 > `consumes` 边类型已废弃（D21）：信息流层统一用 `produces`，双向语义由 `{from, to}` 表达。`graph-logic.ts` 已移除 `consumes` 兼容；历史 `graph.json` 中残留的 `consumes` 边将由 `check-requirement-graph.ts` 报为非法边类型。
 
@@ -194,15 +199,15 @@ export type EdgeType =
 
 RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm-guide.md)）：
 
-| RTM 列 | 数据模型 | ID 格式 | 登记阶段 |
-|---|---|---|---|
-| 需求 ID | `Requirement` | `REQ-NNN` | 阶段 1 |
-| 设计文档 | `Design` | `SD-N.N.N` | 阶段 2/3/4 |
-| 代码模块 | —（文件路径） | `<filename>.ts` | 阶段 5 |
-| 单元测试 | `TestCase` (type=单元测试) | `UT-NNN` | 阶段 4（设计）/ 阶段 5（执行） |
-| 集成测试 | `TestCase` (type=集成测试) | `IT-NNN` | 阶段 3（设计）/ 阶段 6（执行） |
-| 系统测试 | `TestCase` (type=系统测试) | `ST-NNN` | 阶段 2（设计）/ 阶段 7（执行） |
-| 验收测试 | `TestCase` (type=验收测试) | `UAT-NNN` | 阶段 1（设计）/ 阶段 8（执行） |
+| RTM 列   | 数据模型                   | ID 格式         | 登记阶段                       |
+| -------- | -------------------------- | --------------- | ------------------------------ |
+| 需求 ID  | `Requirement`              | `REQ-NNN`       | 阶段 1                         |
+| 设计文档 | `Design`                   | `SD-N.N.N`      | 阶段 2/3/4                     |
+| 代码模块 | —（文件路径）              | `<filename>.ts` | 阶段 5                         |
+| 单元测试 | `TestCase` (type=单元测试) | `UT-NNN`        | 阶段 4（设计）/ 阶段 5（执行） |
+| 集成测试 | `TestCase` (type=集成测试) | `IT-NNN`        | 阶段 3（设计）/ 阶段 6（执行） |
+| 系统测试 | `TestCase` (type=系统测试) | `ST-NNN`        | 阶段 2（设计）/ 阶段 7（执行） |
+| 验收测试 | `TestCase` (type=验收测试) | `UAT-NNN`       | 阶段 1（设计）/ 阶段 8（执行） |
 
 ## 使用约定
 
@@ -217,17 +222,17 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 **RTM 行字段阶段演进**（`RTMRowShape`）：
 
-| 字段 | 首次填写阶段 | 说明 |
-|---|---|---|
-| `requirementId` / `description` | 阶段 1 | 需求登记 |
-| `acceptanceTest` | 阶段 1（设计）/ 阶段 8（执行） | 验收测试用例 ID 在阶段 1 设计登记，执行状态在阶段 8 填 |
-| `designDoc`（系统设计） | 阶段 2 | 系统设计文档 SD-N.N.N |
-| `systemTest` | 阶段 2（设计）/ 阶段 7（执行） | 系统测试用例 ID 在阶段 2 设计登记，执行状态在阶段 7 填 |
-| `designDoc`（接口设计，即 interfaceDesign） | 阶段 3 | 接口设计文档在阶段 3 补加到 `designDoc` 列（[rtm-guide.md](rtm-guide.md)「接口设计列」） |
-| `integrationTest` | 阶段 3（设计）/ 阶段 6（执行） | 集成测试用例 ID 在阶段 3 设计登记，执行状态在阶段 6 填 |
-| `designDoc`（详细设计） | 阶段 4 | 详细设计文档在阶段 4 补加到 `designDoc` 列 |
-| `unitTest` | 阶段 4（设计）/ 阶段 5（执行） | 单元测试用例 ID 在阶段 4 设计登记，执行状态在阶段 5 填 |
-| `codeModule` | 阶段 5 | 代码模块文件路径 |
+| 字段                                        | 首次填写阶段                   | 说明                                                                                     |
+| ------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------- |
+| `requirementId` / `description`             | 阶段 1                         | 需求登记                                                                                 |
+| `acceptanceTest`                            | 阶段 1（设计）/ 阶段 8（执行） | 验收测试用例 ID 在阶段 1 设计登记，执行状态在阶段 8 填                                   |
+| `designDoc`（系统设计）                     | 阶段 2                         | 系统设计文档 SD-N.N.N                                                                    |
+| `systemTest`                                | 阶段 2（设计）/ 阶段 7（执行） | 系统测试用例 ID 在阶段 2 设计登记，执行状态在阶段 7 填                                   |
+| `designDoc`（接口设计，即 interfaceDesign） | 阶段 3                         | 接口设计文档在阶段 3 补加到 `designDoc` 列（[rtm-guide.md](rtm-guide.md)「接口设计列」） |
+| `integrationTest`                           | 阶段 3（设计）/ 阶段 6（执行） | 集成测试用例 ID 在阶段 3 设计登记，执行状态在阶段 6 填                                   |
+| `designDoc`（详细设计）                     | 阶段 4                         | 详细设计文档在阶段 4 补加到 `designDoc` 列                                               |
+| `unitTest`                                  | 阶段 4（设计）/ 阶段 5（执行） | 单元测试用例 ID 在阶段 4 设计登记，执行状态在阶段 5 填                                   |
+| `codeModule`                                | 阶段 5                         | 代码模块文件路径                                                                         |
 
 **演进约束**：
 
@@ -244,11 +249,11 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 当 `Project.status` / `Requirement.status` / `TestCase.status` 枚举集合扩展或重命名时：
 
-| 场景 | 迁移策略 | 校验 |
-|---|---|---|
-| 枚举值新增（如 `Project.status` 增加「灰度发布」） | 旧数据无需改动；新值仅在用户显式选择后写入 | 读取旧记录时新枚举值不存在 → 视为旧值集合内的值 |
-| 枚举值重命名（如 `待开发` → `待实现`） | 一次性脚本扫描 JSON 中所有 `status` 字段做字符串替换；替换前后保留 `.bak` 备份 | 替换后必须通过 `check-artifact-gate.ts` 校验，退出码 0 |
-| 枚举值废弃（如 `已废弃` 移除） | 已废弃状态记录须先迁移到「已归档」或「待开发」等保留值，再删除枚举项 | 不得保留无对应枚举的 status 值；退出码 0 才算迁移完成 |
+| 场景                                               | 迁移策略                                                                       | 校验                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 枚举值新增（如 `Project.status` 增加「灰度发布」） | 旧数据无需改动；新值仅在用户显式选择后写入                                     | 读取旧记录时新枚举值不存在 → 视为旧值集合内的值        |
+| 枚举值重命名（如 `待开发` → `待实现`）             | 一次性脚本扫描 JSON 中所有 `status` 字段做字符串替换；替换前后保留 `.bak` 备份 | 替换后必须通过 `check-artifact-gate.ts` 校验，退出码 0 |
+| 枚举值废弃（如 `已废弃` 移除）                     | 已废弃状态记录须先迁移到「已归档」或「待开发」等保留值，再删除枚举项           | 不得保留无对应枚举的 status 值；退出码 0 才算迁移完成  |
 
 迁移步骤：备份 `cp .w-model/rtm.json .w-model/rtm.json.bak.<ts>` → 执行迁移逐条更新 status → 跑 `check-artifact-gate.ts [project-dir]` 退出码 0 才算成功；失败则回滚 `.bak.<ts>`。
 
@@ -256,11 +261,11 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 `Project.techStack` 字段增删技术栈时：
 
-| 场景 | 迁移策略 | 风险 |
-|---|---|---|
-| 新增技术栈（如 `frontend` 加入 `Vue 3`） | 直接 append 到数组；不触发回滚 | 无 |
+| 场景                                      | 迁移策略                                                       | 风险                                                 |
+| ----------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| 新增技术栈（如 `frontend` 加入 `Vue 3`）  | 直接 append 到数组；不触发回滚                                 | 无                                                   |
 | 删除技术栈（如 `backend` 移除 `Express`） | 须先核验代码模块列无引用该栈的文件；若有引用须先回编码迁移代码 | 删除后代码仍引用 → `check-artifact-gate.ts` 退出码 1 |
-| 重命名技术栈 | 须同步更新 `techStack` 数组与所有引用文档；保留 `.bak` 备份 | 文档与 `rtm.json` 不一致 → 退出码 1 |
+| 重命名技术栈                              | 须同步更新 `techStack` 数组与所有引用文档；保留 `.bak` 备份    | 文档与 `rtm.json` 不一致 → 退出码 1                  |
 
 ### 3. JSON 文件损坏恢复
 
@@ -276,13 +281,13 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 多 Agent / 多会话同时写 `rtm.json` 时，必须统一通过 `wm-write.ts`，而非手写 `stat` 比较：
 
-| 情况 | `wm-write` 行为 | 后续处理 |
-|---|---|---|
-| 并发 writer 竞争 | `<target>.lock` 持久目录与可转移 owner 对象保证同一时刻仅一个 writer 在锁内执行；竞争 writer 不会双成功 | 被拒绝 writer 重读最新状态、重新合并后再调用 `wm-write` |
-| mtime 版本不符 | 锁内比较 `--expect-mtime`（有限非负数、向下取整）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1 | 重读目标，按最新 mtime 重试 |
-| 陈旧锁 | CLI 默认 fail-closed：`STALE_LOCK` / exit 1 | 经人工判断后显式使用 `--recover-stale-lock`；直接 `writeStateJson` 调用仅为兼容既有调用允许隐式恢复 |
-| 锁等待超时 | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1 | 保留原状态，稍后重试或协调 writer |
-| 测试状态冲突 | 应由业务合并逻辑判断 | 以「失败」为优先（保守原则），回阶段 5 返工 |
+| 情况             | `wm-write` 行为                                                                                         | 后续处理                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 并发 writer 竞争 | `<target>.lock` 持久目录与可转移 owner 对象保证同一时刻仅一个 writer 在锁内执行；竞争 writer 不会双成功 | 被拒绝 writer 重读最新状态、重新合并后再调用 `wm-write`                                             |
+| mtime 版本不符   | 锁内比较 `--expect-mtime`（有限非负数、向下取整）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1         | 重读目标，按最新 mtime 重试                                                                         |
+| 陈旧锁           | CLI 默认 fail-closed：`STALE_LOCK` / exit 1                                                             | 经人工判断后显式使用 `--recover-stale-lock`；直接 `writeStateJson` 调用仅为兼容既有调用允许隐式恢复 |
+| 锁等待超时       | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1                                | 保留原状态，稍后重试或协调 writer                                                                   |
+| 测试状态冲突     | 应由业务合并逻辑判断                                                                                    | 以「失败」为优先（保守原则），回阶段 5 返工                                                         |
 
 `mtime` 乐观锁只在 `<target>.lock` 持久目录与可转移 owner 对象建立的跨进程锁内用于版本冲突检测；它**不足以**单独保证并发安全、竞争写处理或并发处理。所有 writer 必须经 `wm-write` 的锁协议串行化。
 
@@ -405,7 +410,34 @@ interface RunLogEntry {
   /** 阶段名称 */
   phaseName: '需求分析' | '系统设计' | '概要设计' | '详细设计' | '编码' | '集成测试' | '系统测试' | '验收测试';
   /** 动作类型 */
-  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';
+  action:
+    | 'chunk'
+    | 'cross'
+    | 'evolve'
+    | 'produce'
+    | 'review'
+    | 'gate'
+    | 'tla-gate'
+    | 'graph-gate'
+    | 'test'
+    | 'checkpoint'
+    | 'rework'
+    | 'rollback'
+    | 'rootcause'
+    | 'fix'
+    | 'emergency-fix'
+    | 'escalate'
+    | 'r3-completeness'
+    | 'r3-reliability'
+    | 'r3-security'
+    | 'codegraph_query'
+    | 'opsx_explore'
+    | 'opsx_propose'
+    | 'opsx_apply'
+    | 'opsx_archive'
+    | 'ensure_deps'
+    | 'iceberg-sweep'
+    | 'iceberg-review';
   /** 子代理角色 */
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   /** 本次动作持续时间（秒） */
@@ -430,13 +462,33 @@ interface RunLogEntry {
   artifacts?: string[];
   /** 决策置信度（可选，0.0-1.0；agentic Ch18 结构化思维链日志，供 Loop 4 劣化分析） */
   decisionConfidence?: number;
+  /** implementation review/gate 所针对的实现目标；缺失时 reducer 输出 LEGACY_UNSCOPED */
+  implementationTarget?: string;
+  /** reducer/effective consumer 的生命周期诊断状态，不改写 raw JSONL */
+  lifecycleStatus?: 'pending-pre-approval' | 'open-approved-lifecycle';
 }
 ```
 
 **示例记录**（阶段门放行）：
 
 ```json
-{"runId":"2026-07-23T10-15-00Z","timestamp":"2026-07-23T10:22:13Z","phase":3,"phaseName":"概要设计","action":"checkpoint","role":"O","duration_s":420,"tokens":85000,"estimated":false,"subagentSpawns":4,"gateExitCode":0,"outcome":"success","acknowledgedDecisions":["采用 REST + JWT 认证方案而非 GraphQL","评论模块独立存储不共享 article 表"],"note":"阶段门放行，V 评审 qualityLevel=A compositeScore=0.91","artifacts":["docs/phase3-outline/{module}-interface-design.md"]}
+{
+  "runId": "2026-07-23T10-15-00Z",
+  "timestamp": "2026-07-23T10:22:13Z",
+  "phase": 3,
+  "phaseName": "概要设计",
+  "action": "checkpoint",
+  "role": "O",
+  "duration_s": 420,
+  "tokens": 85000,
+  "estimated": false,
+  "subagentSpawns": 4,
+  "gateExitCode": 0,
+  "outcome": "success",
+  "acknowledgedDecisions": ["采用 REST + JWT 认证方案而非 GraphQL", "评论模块独立存储不共享 article 表"],
+  "note": "阶段门放行，V 评审 qualityLevel=A compositeScore=0.91",
+  "artifacts": ["docs/phase3-outline/{module}-interface-design.md"]
+}
 ```
 
 **使用约定**：
@@ -452,10 +504,10 @@ interface RunLogEntry {
 
 > 由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。对每个已完成阶段（含 checkpoint success），按阶段编号分档检查必需动作：
 
-| 阶段范围 | 必需动作 | 说明 |
-|---|---|---|
-| 1-4（分析/设计阶段） | `chunk` / `cross` / gate 类（gate/tla-gate/graph-gate） / `checkpoint` | A 子代理的 ingestion chunk/cross 拆解 + G 门禁 + O CHECKPOINT |
-| 5-8（编码/测试/验证阶段） | `produce` / `review` / gate 类 / `checkpoint` | S 子代理的产出 + V 评审 + G 门禁 + O CHECKPOINT |
+| 阶段范围                  | 必需动作                                                               | 说明                                                          |
+| ------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1-4（分析/设计阶段）      | `chunk` / `cross` / gate 类（gate/tla-gate/graph-gate） / `checkpoint` | A 子代理的 ingestion chunk/cross 拆解 + G 门禁 + O CHECKPOINT |
+| 5-8（编码/测试/验证阶段） | `produce` / `review` / gate 类 / `checkpoint`                          | S 子代理的产出 + V 评审 + G 门禁 + O CHECKPOINT               |
 
 - gate 类动作包括 `gate`、`tla-gate`、`graph-gate`，任一存在即满足。
 - 阶段 1-4 不要求 `produce`/`review`；阶段 5-8 不要求 `chunk`/`cross`。
@@ -467,11 +519,11 @@ interface RunLogEntry {
 
 `action` 枚举新增 `rootcause` / `fix` 两个动作（返工循环 V/G→R→V→G→S-fix→V→G 专用）。各动作的额外必填字段约束：
 
-| action | 额外必填字段 | 说明 |
-|---|---|---|
+| action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
+| ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `rootcause` | `reportId` / `rootCauseCategory` / `upstreamDefect` / `rollbackRecommended` | R 子代理产出根因报告时记录；`reportId` 格式 `RC-<phase>-<round>-<seq>`；`rootCauseCategory` 见 RootCauseReport Schema；`upstreamDefect`(boolean) 标记是否检测到上游缺陷；`rollbackRecommended`(boolean) 标记是否建议阶段回退 |
-| `fix` | `basedOnReport` / `artifacts` | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组 |
-| `escalate` | 新增可选字段 `reportId`（仅 `upstreamDefect` 触发的升级） | 当 R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true` 触发场景 5 阶段回退升级时，`escalate` 动作记录 `reportId` 关联根因报告 |
+| `fix`       | `basedOnReport` / `artifacts`                                               | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组                                                                                      |
+| `escalate`  | 新增可选字段 `reportId`（仅 `upstreamDefect` 触发的升级）                   | 当 R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true` 触发场景 5 阶段回退升级时，`escalate` 动作记录 `reportId` 关联根因报告                                                                                 |
 
 **rootcause 动作示例**（spec §5.5）：
 
@@ -486,6 +538,8 @@ interface RunLogEntry {
 ```
 
 > 多角度场景（R-lead 分派 N 个 R-persona，并行/串行均可）时，每份 PartialReport 各记一条 `rootcause` 动作（`role:"R"`，`note` 标注 personaSlice），聚合记一条 `rootcause` 动作（`note:"R-lead aggregation"`）。
+>
+> **D8 lifecycle identity 约束（phase 8）：** reducer 使用 `(phase, round, reportId, targetKind, basedOnReport)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix 只接受 `basedOnReport` 精确匹配的 reportId。implementation V/G 必须与对应 fix 保持同一 phase/round/reportId/basedOnReport，并使用非 rootcause 的 `targetKind` 与 `implementationTarget`。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；同身份 V/G 尚未全部通过时为 `pending-pre-approval`，仅同身份 V/G 已通过且缺 exact fix 时为 `open-approved-lifecycle`。raw JSONL 始终 append-only，不由 checker 改写。
 
 ## 自主成熟度模型（maturity.json）
 
@@ -567,21 +621,22 @@ interface MaturityConfig {
 
 > 本对照表显式区分 RunLogEntry（`run-log.jsonl`）与 EventIngress（`event-ingress.jsonl`）字段边界。命中混用 → [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R1 动作完整性校验失败（run-log.jsonl）或 EventIngress schema 校验失败（event-ingress.jsonl）。
 
-| 用途 | RunLogEntry 字段 | EventIngress 字段 | 区别 |
-|---|---|---|---|
-| 标识 | `runId`（UUID 或时间戳） | `eventId`（UUID 或时间戳） | 不同 ID 命名空间，不可混用 |
-| 时间戳 | `timestamp` | `timestamp` | 相同（ISO 8601） |
-| 阶段 | `phase` + `phaseName` | 无（路由后才有阶段） | RunLogEntry 强制阶段，EventIngress 路由前无 |
-| 动作 | `action`（27 值枚举，与 run-log.schema.json 完全一致：chunk/cross/evolve/produce/review/gate/tla-gate/graph-gate/test/checkpoint/rework/rollback/rootcause/fix/emergency-fix/escalate/r3-completeness/r3-reliability/r3-security/codegraph_query/opsx_explore/opsx_propose/opsx_apply/opsx_archive/ensure_deps/iceberg-sweep/iceberg-review） | `eventType`（bug-report/requirement-change/...） | 不同枚举集，不可混用 |
-| 角色 | `role`（O/A/S/V/G/R） | `source`（webhook/cron/manual/external-ci/user-report） | 不同维度，不可混用 |
-| 结果 | `outcome`（success/fail/rework/escalate/blocked/cancelled） | `routedTo`（路由决策对象） | 不同语义，不可混用 |
-| 决策 | `acknowledgedDecisions`（数组） | 无 | 仅 RunLogEntry |
-| 耗时 | `duration_s` / `tokens` / `estimated` / `subagentSpawns` | 无 | 仅 RunLogEntry |
-| 影响范围 | `artifacts`（产物路径数组） | `affectedArtifacts` + `affectedRequirements` + `evidence` | EventIngress 更具体 |
-| 备注 | `note` | `summary` | 不同字段名，不可混用 |
-| 门禁归档 | `gateExitCode` / `gateLogPath` | 无 | 仅 RunLogEntry |
+| 用途     | RunLogEntry 字段                                                                                                                                                                                                                                                                                                                              | EventIngress 字段                                         | 区别                                        |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------- |
+| 标识     | `runId`（UUID 或时间戳）                                                                                                                                                                                                                                                                                                                      | `eventId`（UUID 或时间戳）                                | 不同 ID 命名空间，不可混用                  |
+| 时间戳   | `timestamp`                                                                                                                                                                                                                                                                                                                                   | `timestamp`                                               | 相同（ISO 8601）                            |
+| 阶段     | `phase` + `phaseName`                                                                                                                                                                                                                                                                                                                         | 无（路由后才有阶段）                                      | RunLogEntry 强制阶段，EventIngress 路由前无 |
+| 动作     | `action`（27 值枚举，与 run-log.schema.json 完全一致：chunk/cross/evolve/produce/review/gate/tla-gate/graph-gate/test/checkpoint/rework/rollback/rootcause/fix/emergency-fix/escalate/r3-completeness/r3-reliability/r3-security/codegraph_query/opsx_explore/opsx_propose/opsx_apply/opsx_archive/ensure_deps/iceberg-sweep/iceberg-review） | `eventType`（bug-report/requirement-change/...）          | 不同枚举集，不可混用                        |
+| 角色     | `role`（O/A/S/V/G/R）                                                                                                                                                                                                                                                                                                                         | `source`（webhook/cron/manual/external-ci/user-report）   | 不同维度，不可混用                          |
+| 结果     | `outcome`（success/fail/rework/escalate/blocked/cancelled）                                                                                                                                                                                                                                                                                   | `routedTo`（路由决策对象）                                | 不同语义，不可混用                          |
+| 决策     | `acknowledgedDecisions`（数组）                                                                                                                                                                                                                                                                                                               | 无                                                        | 仅 RunLogEntry                              |
+| 耗时     | `duration_s` / `tokens` / `estimated` / `subagentSpawns`                                                                                                                                                                                                                                                                                      | 无                                                        | 仅 RunLogEntry                              |
+| 影响范围 | `artifacts`（产物路径数组）                                                                                                                                                                                                                                                                                                                   | `affectedArtifacts` + `affectedRequirements` + `evidence` | EventIngress 更具体                         |
+| 备注     | `note`                                                                                                                                                                                                                                                                                                                                        | `summary`                                                 | 不同字段名，不可混用                        |
+| 门禁归档 | `gateExitCode` / `gateLogPath`                                                                                                                                                                                                                                                                                                                | 无                                                        | 仅 RunLogEntry                              |
 
 **禁止混用规则**：
+
 - `run-log.jsonl` 不得含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）
 - `event-ingress.jsonl` 不得含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`）
 
@@ -600,8 +655,13 @@ interface EventIngress {
   /** 事件来源（消费方自填，技能不内置触发器） */
   source: 'webhook' | 'cron' | 'manual' | 'external-ci' | 'user-report';
   /** 事件类型，决定路由到哪个阶段 */
-  eventType: 'bug-report' | 'requirement-change' | 'acceptance-failure'
-           | 'regression-detected' | 'scheduled-review' | 'security-incident';
+  eventType:
+    | 'bug-report'
+    | 'requirement-change'
+    | 'acceptance-failure'
+    | 'regression-detected'
+    | 'scheduled-review'
+    | 'security-incident';
   /** 事件摘要 */
   summary: string;
   /** 受影响的产物路径（如有） */
@@ -624,7 +684,16 @@ interface EventIngress {
 **示例记录**（webhook 触发的 bug 报告）：
 
 ```json
-{"eventId":"evt-2026-07-25-001","timestamp":"2026-07-25T10:15:00Z","source":"webhook","eventType":"bug-report","summary":"登录接口返回 500","affectedArtifacts":["src/services/identity/user-service.ts"],"affectedRequirements":["REQ-002"],"evidence":["https://ci.example.com/run/12345/log"]}
+{
+  "eventId": "evt-2026-07-25-001",
+  "timestamp": "2026-07-25T10:15:00Z",
+  "source": "webhook",
+  "eventType": "bug-report",
+  "summary": "登录接口返回 500",
+  "affectedArtifacts": ["src/services/identity/user-service.ts"],
+  "affectedRequirements": ["REQ-002"],
+  "evidence": ["https://ci.example.com/run/12345/log"]
+}
 ```
 
 ## 爬坡循环改进报告模型（HarnessImprovementReport / hill-climbing/<timestamp>-report.json）
@@ -784,20 +853,20 @@ interface TlaCheckRound {
 
 **字段说明**：
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `version` | `1` | 是 | Schema 版本 |
-| `project` | string | 是 | 项目 ID |
-| `currentPhase` | number | 是 | 当前阶段（1-8） |
-| `tools.jarPath` | string | 是 | jar 路径，相对 **basePath** 解析（P1.1 起统一基准，不再按 cwd 解析；见 [tla-plus-guide.md §2.1](tla-plus-guide.md#§21-路径解析基准)） |
-| `basePath` | string | 是 | 路径解析基准（强制必填，P1.1），相对 manifest 文件所在目录 |
-| `tools.javaMinVersion` | number | 是 | Java 最低版本 |
-| `specs[]` | TlaSpec[] | 是 | TLA+ 规格列表 |
-| `specs[].id` | string | 是 | 规格 ID，须符合 [§2.0 命名规范](tla-plus-guide.md#§20-命名规范)（禁止连字符） |
-| `specs[].tlaPath` / `cfgPath` | string | 是 | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus-guide.md#§21-路径解析基准)） |
-| `specs[].parent` / `siblings` / `children` | string / string[] | 是 | 相对 **该 .tla 文件所在目录**解析；L1 `parent=null`，叶子 `children=[]` |
-| `specs[].decompositionDecision` | enum | 是 | 拆解决策（组合数 >1w 必须 `split-done`） |
-| `checkRounds[]` | TlaCheckRound[] | 是 | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus-guide.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
+| 字段                                       | 类型              | 必填 | 说明                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------ | ----------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                                  | `1`               | 是   | Schema 版本                                                                                                                                                                                                                                                                                                                                                                                                |
+| `project`                                  | string            | 是   | 项目 ID                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `currentPhase`                             | number            | 是   | 当前阶段（1-8）                                                                                                                                                                                                                                                                                                                                                                                            |
+| `tools.jarPath`                            | string            | 是   | jar 路径，相对 **basePath** 解析（P1.1 起统一基准，不再按 cwd 解析；见 [tla-plus-guide.md §2.1](tla-plus-guide.md#§21-路径解析基准)）                                                                                                                                                                                                                                                                      |
+| `basePath`                                 | string            | 是   | 路径解析基准（强制必填，P1.1），相对 manifest 文件所在目录                                                                                                                                                                                                                                                                                                                                                 |
+| `tools.javaMinVersion`                     | number            | 是   | Java 最低版本                                                                                                                                                                                                                                                                                                                                                                                              |
+| `specs[]`                                  | TlaSpec[]         | 是   | TLA+ 规格列表                                                                                                                                                                                                                                                                                                                                                                                              |
+| `specs[].id`                               | string            | 是   | 规格 ID，须符合 [§2.0 命名规范](tla-plus-guide.md#§20-命名规范)（禁止连字符）                                                                                                                                                                                                                                                                                                                              |
+| `specs[].tlaPath` / `cfgPath`              | string            | 是   | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus-guide.md#§21-路径解析基准)）                                                                                                                                                                                                                                                                                                                        |
+| `specs[].parent` / `siblings` / `children` | string / string[] | 是   | 相对 **该 .tla 文件所在目录**解析；L1 `parent=null`，叶子 `children=[]`                                                                                                                                                                                                                                                                                                                                    |
+| `specs[].decompositionDecision`            | enum              | 是   | 拆解决策（组合数 >1w 必须 `split-done`）                                                                                                                                                                                                                                                                                                                                                                   |
+| `checkRounds[]`                            | TlaCheckRound[]   | 是   | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus-guide.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
 
 **使用约定**：
 
@@ -875,31 +944,31 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 
 ### Schema 清单（23 份）
 
-| Schema 名（注册键） | 文件 | 目标类型 | 关键约束 | 对应 logic.ts |
-| --- | --- | --- | --- | --- |
-| `verifier-output` | `verifier-output.schema.json` | VerifierOutput | additionalProperties:false；meta/subCriteria 嵌套严格；summary minLength:50 | verifier-logic.ts |
-| `rtm` | `rtm.schema.json` | RTMMatrixShape | additionalProperties:false；executionSummary 嵌套严格；coverage [0,100] | gate-logic.ts |
-| `graph` | `graph.schema.json` | GraphShape | additionalProperties:false；node.type enum（REQ/SD/INTF/DD/EXT-IN/EXT-OUT）；edge.type enum（9 类） | graph-logic.ts |
-| `tla-manifest` | `tla-manifest.schema.json` | TlaManifest | additionalProperties:false；spec.level enum（L1-L6）；decompositionDecision enum（4 类） | tla-logic.ts |
-| `code-tla-manifest` | `code-tla-manifest.schema.json` | CodeTlaConsistencyInput | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description） | code-tla-logic.ts |
-| `budget` | `budget.schema.json` | BudgetConfig | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1] | budget-logic.ts |
-| `gate-log` | `gate-log.schema.json` | GateLogEntry | gate-logs append-only 审计记录；gate/tla-gate/graph-gate 输出与退出码可追溯 | gate-log.ts |
-| `run-log` | `run-log.schema.json` | RunLogEntry | additionalProperties:false；action enum（27 类）；role enum（O/A/S/V/G/R） | run-log-logic.ts |
-| `checkpoint-log` | `checkpoint-log.schema.json` | CheckpointLogEntry | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R | （暂未集成到 logic.ts validateBySchema，仅 self-test SCHEMA_CASES 覆盖） |
-| `event-ingress` | `event-ingress.schema.json` | `EventIngressEntry` | additionalProperties:false；source enum（6 类）；eventType enum（9 类） | （暂未集成到 logic.ts，仅 self-test 覆盖） |
-| `maturity` | `maturity.schema.json` | MaturityConfig | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格 | maturity-logic.ts |
-| `project` | `project.schema.json` | `Project` | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格 | （暂未集成到 logic.ts，仅 self-test 覆盖） |
-| `hill-climbing-report` | `hill-climbing-report.schema.json` | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required | （暂未集成到 logic.ts，仅 self-test 覆盖） |
-| `rootcause-report` | `rootcause-report.schema.json` | RootCauseReport | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5 | root-cause-logic.ts |
-| `bdd-manifest` | `bdd-manifest.schema.json` | BddManifest | additionalProperties:false；features 嵌套严格；scenario 路径与 RTM 映射 | bdd-logic.ts（check-bdd-model.ts 亦调用） |
-| `coverage` | `coverage.schema.json` | CoverageAnalysis | additionalProperties:false；4 张覆盖矩阵（stakeholder/scenario/requirementType/crossCuts）+ coveragePercent [0,100] | coverage-logic.ts |
-| `design-contract` | `design-contract.schema.json` | DesignContractInput | additionalProperties:false；routes/assertions 契约字段 | design-contract-logic.ts |
-| `exemption` | `exemption.schema.json` | ExemptionRequest | additionalProperties:false；四阶段审批字段（justification/evidence/review/verification/humanDecision） | exemption-logic.ts |
-| `preventive-review` | `preventive-review.schema.json` | PreventiveReview | additionalProperties:false；dimension enum（completeness/reliability/security） | preventive-review-logic.ts |
-| `signature-chain` | `signature-chain.schema.json` | SignatureChainEntry | additionalProperties:false；inputProvenance 来源证明；actorRole enum | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用） |
-| `iceberg-sweep` | `iceberg-sweep.schema.json` | IcebergSweepReport | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed | iceberg-sweep-logic.ts |
-| `evidence-manifest` | `evidence-manifest.schema.json` | EvidenceManifest | additionalProperties:false；脱敏导出文件的相对路径、SHA-256 与生成元数据 | evidence-export-logic.ts |
-| `evidence-provenance` | `evidence-provenance.schema.json` | EvidenceSourceProvenance | additionalProperties:false；source evidence 文件清单、五类测量（含 codegraph-queries）、当前 HEAD 与 source bundle SHA-256；producer 必须由 `wm-verify-evidence-source` 生成并写入 | evidence-provenance-logic.ts |
+| Schema 名（注册键）    | 文件                               | 目标类型                   | 关键约束                                                                                                                                                                           | 对应 logic.ts                                                            |
+| ---------------------- | ---------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `verifier-output`      | `verifier-output.schema.json`      | VerifierOutput             | additionalProperties:false；meta/subCriteria 嵌套严格；summary minLength:50                                                                                                        | verifier-logic.ts                                                        |
+| `rtm`                  | `rtm.schema.json`                  | RTMMatrixShape             | additionalProperties:false；executionSummary 嵌套严格；coverage [0,100]                                                                                                            | gate-logic.ts                                                            |
+| `graph`                | `graph.schema.json`                | GraphShape                 | additionalProperties:false；node.type enum（REQ/SD/INTF/DD/EXT-IN/EXT-OUT）；edge.type enum（9 类）                                                                                | graph-logic.ts                                                           |
+| `tla-manifest`         | `tla-manifest.schema.json`         | TlaManifest                | additionalProperties:false；spec.level enum（L1-L6）；decompositionDecision enum（4 类）                                                                                           | tla-logic.ts                                                             |
+| `code-tla-manifest`    | `code-tla-manifest.schema.json`    | CodeTlaConsistencyInput    | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description）                                                              | code-tla-logic.ts                                                        |
+| `budget`               | `budget.schema.json`               | BudgetConfig               | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1]                                                                                                         | budget-logic.ts                                                          |
+| `gate-log`             | `gate-log.schema.json`             | GateLogEntry               | gate-logs append-only 审计记录；gate/tla-gate/graph-gate 输出与退出码可追溯                                                                                                        | gate-log.ts                                                              |
+| `run-log`              | `run-log.schema.json`              | RunLogEntry                | additionalProperties:false；action enum（27 类）；role enum（O/A/S/V/G/R）                                                                                                         | run-log-logic.ts                                                         |
+| `checkpoint-log`       | `checkpoint-log.schema.json`       | CheckpointLogEntry         | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R                                                                                                                      | （暂未集成到 logic.ts validateBySchema，仅 self-test SCHEMA_CASES 覆盖） |
+| `event-ingress`        | `event-ingress.schema.json`        | `EventIngressEntry`        | additionalProperties:false；source enum（6 类）；eventType enum（9 类）                                                                                                            | （暂未集成到 logic.ts，仅 self-test 覆盖）                               |
+| `maturity`             | `maturity.schema.json`             | MaturityConfig             | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格                                                                                                         | maturity-logic.ts                                                        |
+| `project`              | `project.schema.json`              | `Project`                  | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格                                                                                                              | （暂未集成到 logic.ts，仅 self-test 覆盖）                               |
+| `hill-climbing-report` | `hill-climbing-report.schema.json` | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required                                                                                               | （暂未集成到 logic.ts，仅 self-test 覆盖）                               |
+| `rootcause-report`     | `rootcause-report.schema.json`     | RootCauseReport            | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5                                                                                  | root-cause-logic.ts                                                      |
+| `bdd-manifest`         | `bdd-manifest.schema.json`         | BddManifest                | additionalProperties:false；features 嵌套严格；scenario 路径与 RTM 映射                                                                                                            | bdd-logic.ts（check-bdd-model.ts 亦调用）                                |
+| `coverage`             | `coverage.schema.json`             | CoverageAnalysis           | additionalProperties:false；4 张覆盖矩阵（stakeholder/scenario/requirementType/crossCuts）+ coveragePercent [0,100]                                                                | coverage-logic.ts                                                        |
+| `design-contract`      | `design-contract.schema.json`      | DesignContractInput        | additionalProperties:false；routes/assertions 契约字段                                                                                                                             | design-contract-logic.ts                                                 |
+| `exemption`            | `exemption.schema.json`            | ExemptionRequest           | additionalProperties:false；四阶段审批字段（justification/evidence/review/verification/humanDecision）                                                                             | exemption-logic.ts                                                       |
+| `preventive-review`    | `preventive-review.schema.json`    | PreventiveReview           | additionalProperties:false；dimension enum（completeness/reliability/security）                                                                                                    | preventive-review-logic.ts                                               |
+| `signature-chain`      | `signature-chain.schema.json`      | SignatureChainEntry        | additionalProperties:false；inputProvenance 来源证明；actorRole enum                                                                                                               | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用）           |
+| `iceberg-sweep`        | `iceberg-sweep.schema.json`        | IcebergSweepReport         | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed                                                              | iceberg-sweep-logic.ts                                                   |
+| `evidence-manifest`    | `evidence-manifest.schema.json`    | EvidenceManifest           | additionalProperties:false；脱敏导出文件的相对路径、SHA-256 与生成元数据                                                                                                           | evidence-export-logic.ts                                                 |
+| `evidence-provenance`  | `evidence-provenance.schema.json`  | EvidenceSourceProvenance   | additionalProperties:false；source evidence 文件清单、五类测量（含 codegraph-queries）、当前 HEAD 与 source bundle SHA-256；producer 必须由 `wm-verify-evidence-source` 生成并写入 | evidence-provenance-logic.ts                                             |
 
 ### 设计原则
 
@@ -937,4 +1006,3 @@ export function checkXxx(input: unknown): XxxResult {
 - `self-test.ts` SCHEMA_CASES：14 个 schema 名共 16 条用例（3 verifier-output 基线 + 13 其他各 1 条：budget / checkpoint-log / code-tla-manifest / event-ingress / graph / hill-climbing-report / maturity / project / rootcause-report / rtm / run-log / tla-manifest / coverage）。
 - `__tests__/schema-validation.test.ts`：5 条 validateBySchema 单元测试 + 4 条 checkVerifierOutput 集成测试。
 - self-test 基线：99 → 111（+12，对应 12 份新 schema 各 1 条样本用例）。
-

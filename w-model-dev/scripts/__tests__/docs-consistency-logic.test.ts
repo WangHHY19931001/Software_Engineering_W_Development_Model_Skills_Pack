@@ -57,20 +57,13 @@ const ACTION_UNION_27 =
   "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
 
 const R10_CONTRACT_FIXTURE = [
-  'R10-C1 canonical-name: canonical persona is testing-reality-checker.',
-  'R10-C2 threshold: testing-reality-checker confidence >= 0.5.',
-  'R10-C3 legacy-fallback: legacy reality-checker is fallback only when canonical is absent.',
-  'R10-C4 same-artifact: same artifact canonical-first and not counted twice.',
-  'R10-C5 cross-artifact: different artifact conflict is fail-closed.',
-  'R10-C6 canonical-duplicate: canonical > 1 duplicate is fail-closed.',
-  'R10-C7 legacy-duplicate: legacy > 1 duplicate is fail-closed.',
-  '<!-- R10-CONTRACT-MARKER R10-C1 {"id":"canonical-name","canonicalPersona":"testing-reality-checker"} -->',
-  '<!-- R10-CONTRACT-MARKER R10-C2 {"id":"threshold","canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5} -->',
-  '<!-- R10-CONTRACT-MARKER R10-C3 {"id":"legacy-fallback","legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"} -->',
-  '<!-- R10-CONTRACT-MARKER R10-C4 {"id":"same-artifact-dedupe","artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"} -->',
-  '<!-- R10-CONTRACT-MARKER R10-C5 {"id":"cross-artifact-conflict","artifactRelation":"different","conflict":"fail-closed"} -->',
-  '<!-- R10-CONTRACT-MARKER R10-C6 {"id":"canonical-duplicate","persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->',
-  '<!-- R10-CONTRACT-MARKER R10-C7 {"id":"legacy-duplicate","persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"} -->',
+  '<r10-contract id="canonical-name" relation=\'{"canonicalPersona":"testing-reality-checker"}\'>canonical persona is testing-reality-checker</r10-contract>',
+  '<r10-contract id="threshold" relation=\'{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}\'>testing-reality-checker confidence >= 0.5</r10-contract>',
+  '<r10-contract id="legacy-fallback" relation=\'{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}\'>legacy reality-checker is fallback only when canonical is absent</r10-contract>',
+  '<r10-contract id="same-artifact-dedupe" relation=\'{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}\'>same artifact canonical-first and not counted twice</r10-contract>',
+  '<r10-contract id="cross-artifact-conflict" relation=\'{"artifactRelation":"different","conflict":"fail-closed"}\'>different artifact conflict is fail-closed</r10-contract>',
+  '<r10-contract id="canonical-duplicate" relation=\'{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}\'>canonical > 1 duplicate is fail-closed</r10-contract>',
+  '<r10-contract id="legacy-duplicate" relation=\'{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}\'>legacy > 1 duplicate is fail-closed</r10-contract>',
 ].join('\n');
 
 /** scripts/cli 当前 35 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
@@ -261,13 +254,13 @@ describe('R10 七来源 source×clause 维护契约', () => {
 
   it.each(sourceNames)('%s 的每条 R10 clause mutation 均产生明确 violation', (sourceName) => {
     const clauseMutations: Array<[string, RegExp]> = [
-      ['canonical-name', /R10-C\d+ canonical-name: [^\n]*\n?/],
-      ['threshold', /R10-C\d+ threshold: [^\n]*\n?/],
-      ['legacy-fallback', /R10-C\d+ legacy-fallback: [^\n]*\n?/],
-      ['same-artifact-dedupe', /R10-C\d+ same-artifact: [^\n]*\n?/],
-      ['cross-artifact-conflict', /R10-C\d+ cross-artifact: [^\n]*\n?/],
-      ['canonical-duplicate', /R10-C\d+ canonical-duplicate: [^\n]*\n?/],
-      ['legacy-duplicate', /R10-C\d+ legacy-duplicate: [^\n]*\n?/],
+      ['canonical-name', /^<r10-contract id="canonical-name"[^\n]*\n?/m],
+      ['threshold', /^<r10-contract id="threshold"[^\n]*\n?/m],
+      ['legacy-fallback', /^<r10-contract id="legacy-fallback"[^\n]*\n?/m],
+      ['same-artifact-dedupe', /^<r10-contract id="same-artifact-dedupe"[^\n]*\n?/m],
+      ['cross-artifact-conflict', /^<r10-contract id="cross-artifact-conflict"[^\n]*\n?/m],
+      ['canonical-duplicate', /^<r10-contract id="canonical-duplicate"[^\n]*\n?/m],
+      ['legacy-duplicate', /^<r10-contract id="legacy-duplicate"[^\n]*\n?/m],
     ];
     for (const [clauseName, mutation] of clauseMutations) {
       const mutated = R10_CONTRACT_FIXTURE.replace(mutation, '');
@@ -290,25 +283,106 @@ describe('R10 七来源 source×clause 维护契约', () => {
   });
 
   it.each([
-    ['canonical-name', 'R10-C1 canonical-name: canonical is not testing-reality-checker.'],
-    ['threshold', 'R10-C2 threshold: testing-reality-checker confidence is not required to be >= 0.5.'],
-    ['legacy-fallback', 'R10-C3 legacy-fallback: legacy reality-checker is fallback, but canonical is not absent.'],
-    ['same-artifact-dedupe', 'R10-C4 same-artifact: same artifact legacy-first and counted twice.'],
-    ['cross-artifact-conflict', 'R10-C5 cross-artifact: different artifact conflict is allowed.'],
-    ['canonical-duplicate', 'R10-C6 canonical-duplicate: canonical > 1 duplicate is allowed.'],
-    ['legacy-duplicate', 'R10-C7 legacy-duplicate: legacy > 1 duplicate is allowed.'],
+    ['canonical-name', 'canonical is not testing-reality-checker'],
+    ['threshold', 'testing-reality-checker confidence is not required to be >= 0.5'],
+    ['legacy-fallback', 'legacy reality-checker is fallback, but canonical is not absent'],
+    ['same-artifact-dedupe', 'same artifact legacy-first and counted twice'],
+    ['cross-artifact-conflict', 'different artifact conflict is allowed'],
+    ['canonical-duplicate', 'canonical > 1 duplicate is allowed'],
+    ['legacy-duplicate', 'legacy > 1 duplicate is allowed'],
   ])('%s 的反向/否定语义 fail-closed', (clauseName, mutation) => {
     const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
       (typeof sourceNames)[number],
       string
     >;
-    const mutatedSources = replaceSource(sources, 'authoritySpec', mutation);
+    const mutatedFixture = R10_CONTRACT_FIXTURE.split('\n')
+      .map((line) =>
+        line.includes(`<r10-contract id="${clauseName}"`)
+          ? line.slice(0, line.indexOf('>') + 1) + mutation + '</r10-contract>'
+          : line,
+      )
+      .join('\n');
+    const mutatedSources = replaceSource(sources, 'authoritySpec', mutatedFixture);
     const violations = checkRootCauseR10Contract(mutatedSources);
     expect(
       violations.some(
         (violation) => violation.message.includes('authority-spec') && violation.message.includes(clauseName),
       ),
     ).toBe(true);
+  });
+
+  it('结构化宿主之外的 quoted/comment/fenced/example/context bypass 一律 fail-closed', () => {
+    const valid = R10_CONTRACT_FIXTURE;
+    const firstNode = valid.split('\n')[1];
+    const prefix = '### R10 结构化契约节点\n| id | relation | prose |\n| --- | --- | --- |\n';
+    const bypasses = [
+      prefix + '> ' + firstNode,
+      prefix + '```markdown\n' + valid + '\n```',
+      prefix + '<!-- ' + firstNode + ' -->',
+      prefix + '// ' + firstNode,
+      '示例（非规范契约节点）：' + valid,
+      JSON.stringify(valid.replace(/\n/g, ' ')),
+    ];
+    for (const content of bypasses) {
+      const violations = checkRootCauseR10Contract({
+        authoritySpec: content,
+        schema: valid,
+        checkerSource: valid,
+        ssot: valid,
+        locator: valid,
+        verifierSpec: valid,
+        commandReference: valid,
+      });
+      expect(violations.filter((violation) => violation.message.startsWith('authority-spec'))).toHaveLength(7);
+    }
+  });
+
+  it('marker/relation/prose 必须位于同一结构化契约节点，拆分节点 fail-closed', () => {
+    const rows = R10_CONTRACT_FIXTURE.split('\n');
+    const splitNode =
+      '<r10-contract id="canonical-name" relation=\'{"canonicalPersona":"testing-reality-checker"}\'></r10-contract>\n' +
+      'canonical persona is testing-reality-checker\n' +
+      rows.slice(1).join('\n');
+    const violations = checkRootCauseR10Contract({
+      authoritySpec: splitNode,
+      schema: R10_CONTRACT_FIXTURE,
+      checkerSource: R10_CONTRACT_FIXTURE,
+      ssot: R10_CONTRACT_FIXTURE,
+      locator: R10_CONTRACT_FIXTURE,
+      verifierSpec: R10_CONTRACT_FIXTURE,
+      commandReference: R10_CONTRACT_FIXTURE,
+    });
+    expect(
+      violations.some(
+        (violation) => violation.message.includes('authority-spec') && violation.message.includes('canonical-name'),
+      ),
+    ).toBe(true);
+  });
+
+  it('原始 ERROR_JSON 缺失、null 或逐字段 drift 不计入 exit2ScriptCount', () => {
+    const valid = {
+      probeId: 'check-budget.ts#invalid-argument',
+      script: 'check-budget.ts',
+      args: ['--d4-invalid-argument'],
+      cwd: '<repoRoot>',
+      status: 2,
+      errorExitCode: 2,
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      rawErrorJson: { exitCode: 2, category: 'ARG_INVALID', rule: 'P0-1' },
+    };
+    for (const mutation of [
+      { ...valid, rawErrorJson: undefined },
+      { ...valid, rawErrorJson: null },
+      { ...valid, rawErrorJson: { exitCode: 1, category: 'ARG_INVALID', rule: 'P0-1' } },
+      { ...valid, rawErrorJson: { exitCode: 2, category: 'FILE_READ', rule: 'P0-1' } },
+      { ...valid, rawErrorJson: { exitCode: 2, category: 'ARG_INVALID', rule: 'P0-99' } },
+      { ...valid, rawErrorJson: { exitCode: 2, category: 'UNKNOWN', rule: 'P0-1' } },
+    ]) {
+      const report = buildDocConsistencyReport(baseInput({ exit2ProbeResults: [mutation as never] }));
+      expect(report.dynamicViolations.some((violation) => violation.check === 'exit2-probe')).toBe(true);
+      expect(countValidExit2Scripts([mutation])).toBe(0);
+    }
   });
 
   it('七个真实 source 各自否定一条 R10 clause 时定位对应 source×clause violation', async () => {
@@ -403,51 +477,99 @@ describe('R10 七来源 source×clause 维护契约', () => {
         'fail-closed is not required for legacy > 1 duplicate',
       ],
     ];
-    const mutateProse = (source: string, clauseNumber: number, replacement?: string): string => {
-      const marker = `R10-C${clauseNumber}`;
-      const proseLabel = [
-        'canonical-name',
-        'threshold',
-        'legacy-fallback',
-        'same-artifact',
-        'cross-artifact',
-        'canonical-duplicate',
-        'legacy-duplicate',
-      ][clauseNumber - 1];
-      const label = `${marker} ${proseLabel}`;
-      const start = source.indexOf(label);
-      const asciiColon = start < 0 ? -1 : source.indexOf(':', start + label.length);
-      const fullColon = start < 0 ? -1 : source.indexOf('：', start + label.length);
-      const colon = asciiColon < 0 ? fullColon : fullColon < 0 ? asciiColon : Math.min(asciiColon, fullColon);
-      const nextClause =
-        clauseNumber < 7
-          ? source.indexOf(`R10-C${clauseNumber + 1}`, colon + 1)
-          : (() => {
-              const markerBoundary = source.indexOf('R10-CONTRACT-MARKER', colon + 1);
-              return markerBoundary < 0 ? source.length : markerBoundary;
-            })();
-      expect(start, `real source must contain prose ${marker}`).toBeGreaterThanOrEqual(0);
-      expect(colon, `real source must contain prose ${marker} label`).toBeGreaterThan(start);
-      expect(nextClause, `real source must contain prose ${marker} boundary`).toBeGreaterThan(colon);
-      return `${source.slice(0, colon + 1)}${replacement ?? ''}${source.slice(nextClause)}`;
+    const clauseIds = [
+      'canonical-name',
+      'threshold',
+      'legacy-fallback',
+      'same-artifact-dedupe',
+      'cross-artifact-conflict',
+      'canonical-duplicate',
+      'legacy-duplicate',
+    ];
+    const mutateRealSource = (
+      sourceKey: (typeof sourceKeys)[number],
+      source: string,
+      clauseNumber: number,
+      replacement?: string,
+      relationMutation = false,
+    ): string => {
+      const id = clauseIds[clauseNumber - 1]!;
+      if (sourceKey === 'schema') {
+        const parsed = JSON.parse(source) as { $comment?: string };
+        const comment = parsed.$comment ?? '';
+        const start = comment.indexOf('{');
+        expect(start).toBeGreaterThanOrEqual(0);
+        const annotation = JSON.parse(comment.slice(start)) as {
+          ['r10-contract']?: Array<{ id: string; relation: Record<string, unknown>; prose: string }>;
+        };
+        const nodes = annotation['r10-contract'] ?? [];
+        if (replacement === undefined) nodes.splice(clauseNumber - 1, 1);
+        else if (relationMutation) nodes[clauseNumber - 1]!.relation = {};
+        else nodes[clauseNumber - 1]!.prose = replacement;
+        parsed.$comment = 'r10-contract nodes: ' + JSON.stringify(annotation);
+        return JSON.stringify(parsed);
+      }
+      if (sourceKey === 'checkerSource') {
+        const lines = source.split(/\r?\n/);
+        const index = lines.findIndex((line) => line.includes(`id: '${id}',`));
+        expect(index, `real source must contain node ${id}`).toBeGreaterThanOrEqual(0);
+        if (index < 0) return source;
+        if (replacement === undefined) lines.splice(index, 1);
+        else {
+          const relationIndex = lines.findIndex((line, lineIndex) => lineIndex > index && line.includes('relation:'));
+          const proseIndex = lines.findIndex((line, lineIndex) => lineIndex > index && line.includes('prose:'));
+          if (relationMutation && relationIndex >= 0) {
+            let relationLine: string | undefined;
+            lines.forEach((line, lineIndex) => {
+              if (lineIndex === relationIndex) relationLine = line;
+            });
+            lines.splice(relationIndex, 1, relationLine!.replace(/relation: \{[^}]*\}/, 'relation: {}'));
+          } else if (!relationMutation && proseIndex >= 0) {
+            let proseLine: string | undefined;
+            lines.forEach((line, lineIndex) => {
+              if (lineIndex === proseIndex) proseLine = line;
+            });
+            lines.splice(proseIndex, 1, proseLine!.replace(/prose: '.*'/, `prose: '${replacement}'`));
+          }
+        }
+        return lines.join('\n');
+      }
+      const lines = source.split(/\r?\n/);
+      const index = lines.findIndex((line) => line.includes(`<r10-contract id="${id}"`));
+      expect(index, `real source must contain node ${id}`).toBeGreaterThanOrEqual(0);
+      if (index < 0) return source;
+      let currentLine: string | undefined;
+      lines.forEach((line, lineIndex) => {
+        if (lineIndex === index) currentLine = line;
+      });
+      if (replacement === undefined) lines.splice(index, 1);
+      else if (relationMutation) lines.splice(index, 1, currentLine!.replace(/relation='\{.*\}'/, "relation='{}'"));
+      else lines.splice(index, 1, currentLine!.replace(/>([^<]*)</, `>${replacement}<`));
+      return lines.join('\n');
     };
 
     for (const sourceKey of sourceKeys) {
       const sourceContent = await readRealSource(sourceKey);
-      expect(sourceContent).toContain('R10-CONTRACT-MARKER R10-C1');
+      expect(sourceContent).toMatch(
+        sourceKey === 'schema'
+          ? /r10-contract/
+          : sourceKey === 'checkerSource'
+            ? /R10_CONTRACT_NODES/
+            : /<r10-contract id="canonical-name"/,
+      );
       for (let clauseNumber = 1; clauseNumber <= clauseMutations.length; clauseNumber++) {
         const clauseName = clauseMutations[clauseNumber - 1]![0];
-        const deleted = mutateProse(sourceContent, clauseNumber);
+        const deleted = mutateRealSource(sourceKey, sourceContent, clauseNumber);
         const deletedViolations = checkRootCauseR10Contract(replaceSource(sources, sourceKey, deleted));
         expect(
           deletedViolations.some(
             (violation) => violation.message.includes(sourceLabel(sourceKey)) && violation.message.includes(clauseName),
           ),
-          `${sourceKey} ${clauseName} prose deletion must fail closed`,
+          `${sourceKey} ${clauseName} node deletion must fail closed`,
         ).toBe(true);
 
         for (const replacement of clauseMutations[clauseNumber - 1]!.slice(1)) {
-          const mutated = mutateProse(sourceContent, clauseNumber, replacement);
+          const mutated = mutateRealSource(sourceKey, sourceContent, clauseNumber, replacement);
           const violations = checkRootCauseR10Contract(replaceSource(sources, sourceKey, mutated));
           expect(
             violations.some(
@@ -457,6 +579,14 @@ describe('R10 七来源 source×clause 维护契约', () => {
             `${sourceKey} ${clauseName} negation/reversal must fail closed`,
           ).toBe(true);
         }
+        const relationMutated = mutateRealSource(sourceKey, sourceContent, clauseNumber, 'ignored', true);
+        const relationViolations = checkRootCauseR10Contract(replaceSource(sources, sourceKey, relationMutated));
+        expect(
+          relationViolations.some(
+            (violation) => violation.message.includes(sourceLabel(sourceKey)) && violation.message.includes(clauseName),
+          ),
+          `${sourceKey} ${clauseName} relation reversal must fail closed`,
+        ).toBe(true);
       }
     }
   });
@@ -1055,18 +1185,18 @@ describe('runDocConsistencyChecks', () => {
     }
   });
 
-  it('coverage JSON 的 55/954 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
+  it('coverage JSON 的 55/970 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 954);
-      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 954]);
+      const coverage = await writeVitestCount(fixtureRoot, 970);
+      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 970]);
       const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push'];
       for (const doc of docsWithLiveCount) {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('954');
+        expect(docContent).toContain('970');
       }
       const loaderDocs = ['w-model-dev/references/data-models.md', 'docs/INSTALL.md', 'docs/user-guide.md'];
       const oldLoaderPath = ['scripts', 'logic', 'schema-loader.ts'].join('/');
@@ -1079,7 +1209,7 @@ describe('runDocConsistencyChecks', () => {
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, `${passing.stdout}\n${passing.stderr}`).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 954');
+      expect(passing.stdout).toContain('vitest 用例  : 970');
       expect(passing.stdout).toContain('静态违规      : 0');
       expect(passing.stdout).toContain('动态违规      : 0');
       expect(passing.stdout).not.toContain('[vitest-tests]');
@@ -1088,10 +1218,10 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('55 files / 954 tests', '55 files / 928 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('55 files / 970 tests', '55 files / 928 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 954');
+      expect(stale.stdout).toContain('vitest 用例  : 970');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
       expect(stale.stdout).toContain('55 files / 928 tests');
@@ -1108,6 +1238,7 @@ describe('runDocConsistencyChecks', () => {
       errorExitCode: 2,
       category: 'ARG_INVALID',
       rule: 'P0-1',
+      rawErrorJson: { exitCode: 2, category: 'ARG_INVALID', rule: 'P0-1' },
     };
     for (const mutation of [
       { ...validProbe, probeId: undefined },
@@ -1139,6 +1270,7 @@ describe('runDocConsistencyChecks', () => {
       errorExitCode: 2,
       category: 'ARG_INVALID',
       rule: 'P0-1',
+      rawErrorJson: { exitCode: 2, category: 'ARG_INVALID', rule: 'P0-1' },
     };
     expect(
       countValidExit2Scripts([
@@ -1169,9 +1301,67 @@ describe('runDocConsistencyChecks', () => {
     );
   });
 
+  it('UNC 与 POSIX 同值路径保留 path-kind 区分，同义 spelling 仍相等', () => {
+    const uncA = canonicalizeExit2ProbeIdentity({ args: ['\\\\server\\share\\project'], cwd: '\\\\server\\share' });
+    const uncB = canonicalizeExit2ProbeIdentity({ args: ['//server/share/project'], cwd: '//server/share/' });
+    const posix = canonicalizeExit2ProbeIdentity({ args: ['/server/share/project'], cwd: '/server/share' });
+    expect(uncA).toEqual(uncB);
+    expect(uncA).not.toEqual(posix);
+    expect(uncA.argsPathKinds).toEqual(['unc']);
+    expect(uncA.cwdPathKind).toBe('unc');
+    expect(posix.argsPathKinds).toEqual(['posix']);
+    expect(posix.cwdPathKind).toBe('posix');
+  });
+
+  it('双环境 stable probe map 对单字段 args drift 与 cwd drift 分别失败', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 970);
+      const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(first.code).toBe(0);
+      expect(second.code).toBe(0);
+      const firstReport = JSON.parse(first.stdout) as {
+        dynamicMeasurements: { exit2ProbeResults: Array<Record<string, unknown>> };
+      };
+      const secondReport = JSON.parse(second.stdout) as {
+        dynamicMeasurements: { exit2ProbeResults: Array<Record<string, unknown>> };
+      };
+      const stable = (report: typeof firstReport) =>
+        report.dynamicMeasurements.exit2ProbeResults.map((probe) => ({
+          probeId: probe.probeId,
+          script: probe.script,
+          args: Array.isArray(probe.args)
+            ? canonicalizeExit2ProbeIdentity({ args: probe.args as string[], cwd: String(probe.cwd) }).args
+            : [],
+          cwd: canonicalizeExit2ProbeIdentity({ args: [], cwd: String(probe.cwd) }).cwd,
+          status: probe.status,
+          errorExitCode: probe.errorExitCode,
+          category: probe.category,
+          rule: probe.rule,
+        }));
+      const baseline = stable(firstReport);
+      const argsDrift = structuredClone(secondReport) as typeof secondReport;
+      const argsTarget = argsDrift.dynamicMeasurements.exit2ProbeResults.find(
+        (probe) => probe.probeId === 'metrics-report.ts#invalid-phase',
+      );
+      expect(argsTarget).toBeDefined();
+      if (argsTarget === undefined) return;
+      argsTarget.args = ['<probeRoot>/different-project', '--phase=0', '--json'];
+      expect(stable(argsDrift)).not.toEqual(baseline);
+      const cwdDrift = structuredClone(secondReport) as typeof secondReport;
+      const cwdTarget = cwdDrift.dynamicMeasurements.exit2ProbeResults.find(
+        (probe) => probe.probeId === 'metrics-report.ts#invalid-phase',
+      );
+      expect(cwdTarget).toBeDefined();
+      if (cwdTarget === undefined) return;
+      cwdTarget.cwd = '<differentRoot>';
+      expect(stable(cwdDrift)).not.toEqual(baseline);
+    });
+  });
+
   it('metrics invalid-phase probe 保留规范化 args/cwd 的完整 identity', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 954);
+      await writeVitestCount(fixtureRoot, 970);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -1189,13 +1379,14 @@ describe('runDocConsistencyChecks', () => {
         errorExitCode: 2,
         category: 'ARG_INVALID',
         rule: 'P0-1',
+        rawErrorJson: { category: 'ARG_INVALID', message: '--phase 参数非法', exitCode: 2, rule: 'P0-1' },
       });
     });
   });
 
   it('真实 CLI --json 输出 dynamicMeasurements 的完整五字段并保留兼容 violations', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 954);
+      const coverage = await writeVitestCount(fixtureRoot, 970);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -1230,8 +1421,8 @@ describe('runDocConsistencyChecks', () => {
         cliScriptCount: 36,
         exit2ScriptCount: 35,
         testFileCount: (coverage.testResults as unknown[]).length,
-        vitestTestCount: 954,
-        numPassedTests: 954,
+        vitestTestCount: 970,
+        numPassedTests: 970,
         numFailedTests: 0,
         success: true,
         testDirectoryInventoryCount: 55,
@@ -1267,7 +1458,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 35', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 954);
+      await writeVitestCount(fixtureRoot, 970);
       const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(withoutState.code).toBe(0);
       const withoutStateReport = JSON.parse(withoutState.stdout) as {
@@ -1326,7 +1517,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('AGENTS=34 与 INSTALL=25+9 的旧资产声明在同一真实 fixture 中失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 954);
+      await writeVitestCount(fixtureRoot, 970);
       const agentsPath = path.join(fixtureRoot, 'AGENTS.md');
       const installPath = path.join(fixtureRoot, 'docs', 'INSTALL.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
@@ -1376,7 +1567,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('成功 JSON 报告绑定同一相对 artifact identity/hash，且不暴露本机路径', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 954);
+      await writeVitestCount(fixtureRoot, 970);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(first.code).toBe(0);
@@ -1495,7 +1686,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('真实 docs-consistency 探针报告候选 status/ERROR_JSON 证据及 export 三场景隔离', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 954);
+      await writeVitestCount(fixtureRoot, 970);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -2128,7 +2319,7 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
     });
     // 复制的活体文档保持原样；无 .w-model 与最小合法状态必须共享同一套确定性 probe 事实。
     // 各测试仅在需要时注入单独的旧值负例，不通过改写活体文档自适配。
-    // 复制的活体文档保留当前 HEAD 实测的 55/954 计数；各测试仅在需要时注入单独的旧值负例。
+    // 复制的活体文档保留当前 HEAD 实测的 55/970 计数；各测试仅在需要时注入单独的旧值负例。
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(

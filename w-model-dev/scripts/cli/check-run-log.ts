@@ -185,6 +185,7 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.violations,
         violations: buildViolationDistribution(result.violations.length),
+        ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -220,6 +221,10 @@ async function main(): Promise<void> {
       'O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）',
     );
   }
+  if (result.diagnostics && result.diagnostics.length > 0) {
+    console.log('生命周期诊断（非阻断）：');
+    for (const diagnostic of result.diagnostics) console.log(`  - ${diagnostic}`);
+  }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
@@ -229,6 +234,7 @@ async function main(): Promise<void> {
       type: 'run-log',
       passed: result.passed,
       violations: result.violations,
+      ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
     },
     exitCode,
   );
