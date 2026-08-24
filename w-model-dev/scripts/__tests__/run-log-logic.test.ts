@@ -1272,9 +1272,9 @@ describe('D8 lifecycle identity reducer', () => {
       .map((line) => JSON.parse(line));
     checkRunLog(entries);
     expect(entries).toHaveLength(18);
-    expect(fixture.length).toBe(14107);
+    expect(fixture.length).toBe(14125);
     expect(createHash('sha256').update(fixture).digest('hex')).toBe(
-      '22c9081a86f0a195fdcc331a2ec11bd3afcad34a9c47959e27878d01fac5f3a1',
+      'e62583426efdde55d45bfa30ba1c5afffe597c2140f41b92400019023815007a',
     );
   });
 
