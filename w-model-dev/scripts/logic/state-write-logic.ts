@@ -227,7 +227,7 @@ type AcquireLockResult = AcquiredLock | 'STALE_LOCK' | undefined;
 async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<AcquireLockResult> {
   const lockDir = `${absPath}.lock`;
   const ownerDir = ownerPathFor(lockDir);
-  const deadline = Date.now() + (opts.lockTimeoutMs ?? 5_000);
+  const deadline = Date.now() + (opts.lockTimeoutMs === undefined ? 5_000 : opts.lockTimeoutMs);
   await fs.mkdir(lockDir, { recursive: true });
   while (Date.now() <= deadline) {
     const metadata: StateLockMetadata = {

@@ -78,6 +78,11 @@ async function holdLiveLock(
     const holdMs = Number(process.argv[2]);
     const owner = target + '.lock' + path.sep + 'owner';
     const removeOnExit = process.argv[4] === 'true';
+    const cleanup = async () => {
+      if (removeOnExit) await fs.rm(owner, { recursive: true, force: true });
+      process.exit(0);
+    };
+    process.stdin.on('data', cleanup);
     (async () => {
       await fs.mkdir(owner, { recursive: true });
       await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify({
@@ -88,10 +93,7 @@ async function holdLiveLock(
         operation: 'wm-write',
       }));
       process.stdout.write('ready\\n');
-      setTimeout(async () => {
-        if (removeOnExit) await fs.rm(owner, { recursive: true, force: true });
-        process.exit(0);
-      }, holdMs);
+      setTimeout(cleanup, holdMs);
     })().catch((error) => { console.error(error); process.exit(1); });
   `,
       targetPath,
@@ -99,7 +101,7 @@ async function holdLiveLock(
       createdAt,
       String(removeOnExit),
     ],
-    { stdio: ['ignore', 'pipe', 'pipe'] },
+    { stdio: ['pipe', 'pipe', 'pipe'] },
   );
   await once(holder.stdout!, 'data');
   return holder;
@@ -110,23 +112,33 @@ async function waitForExit(child: ChildProcess): Promise<void> {
   expect(code).toBe(0);
 }
 
+async function stopLiveLock(targetPath: string, child: ChildProcess): Promise<void> {
+  await fs.rm(path.join(`${targetPath}.lock`, 'owner'), { recursive: true, force: true });
+  if (child.exitCode === null) {
+    const exited = once(child, 'exit');
+    child.stdin?.write('\n');
+    await exited;
+  }
+}
+
 describe('wm-write CLI lock controls', () => {
   it('--lock-timeout 0 is distinguishable from the default timeout while a real child process holds the lock', async () => {
     const p = target('zero-timeout.json');
-    const holder = await holdLiveLock(p, 1500);
+    const holder = await holdLiveLock(p, 300_000, undefined, false);
 
     try {
       const explicitZero = run(p, ['--stdin', '--lock-timeout', '0'], '{"value":"zero"}');
       expect(explicitZero.code).toBe(1);
       expect(wmwriteSummary(explicitZero.stdout)).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT', writtenPath: p });
       await expect(fs.access(path.join(`${p}.lock`, 'owner'))).resolves.toBeUndefined();
+      await stopLiveLock(p, holder);
 
       const defaultTimeout = run(p, ['--stdin'], '{"value":"default"}');
       expect(defaultTimeout.code).toBe(0);
       expect(wmwriteSummary(defaultTimeout.stdout)).toMatchObject({ ok: true, writtenPath: p });
       await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"default"}');
     } finally {
-      await waitForExit(holder);
+      await stopLiveLock(p, holder);
     }
   });
 
@@ -146,7 +158,7 @@ describe('wm-write CLI lock controls', () => {
 
   it('--recover-stale-lock rejects an active external owner without removing it', async () => {
     const p = target('active-owner-explicit-recovery.json');
-    const holder = await holdLiveLock(p, 5_000);
+    const holder = await holdLiveLock(p, 300_000, undefined, false);
 
     try {
       const result = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"B"}');
@@ -164,7 +176,7 @@ describe('wm-write CLI lock controls', () => {
         '"token":"holder"',
       );
     } finally {
-      await waitForExit(holder);
+      await stopLiveLock(p, holder);
     }
   });
 
