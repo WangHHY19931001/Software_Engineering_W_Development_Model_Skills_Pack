@@ -172,6 +172,74 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     ).toBe(false);
   });
 
+  it('phase-8 targetKind=other is rejected and canonical implementation identity is action-complete', () => {
+    const base = {
+      runId: 'phase8-contract',
+      timestamp: '2026-08-24T00:00:00.000Z',
+      phase: 8,
+      phaseName: '验收测试',
+      duration_s: 1,
+      tokens: 1,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      round: 1,
+      reportId: 'RC-1',
+      targetKind: 'code',
+      basedOnReport: 'RC-1',
+      implementationTarget: 'src/app.ts',
+      target: 'src/app.ts',
+      artifacts: ['src/app.ts'],
+    };
+    expect(validateBySchema('run-log', { ...base, action: 'review', role: 'V', targetKind: 'other' }).valid).toBe(
+      false,
+    );
+    for (const action of [
+      'review',
+      'gate',
+      'r3-completeness',
+      'r3-reliability',
+      'r3-security',
+      'fix',
+      'emergency-fix',
+    ]) {
+      const candidate = {
+        ...base,
+        action,
+        role: action === 'gate' ? 'G' : action.startsWith('r3-') ? 'R' : action === 'review' ? 'V' : 'S',
+      };
+      expect(validateBySchema('run-log', { ...candidate, implementationTarget: undefined }).valid).toBe(false);
+      expect(validateBySchema('run-log', { ...candidate, target: undefined }).valid).toBe(false);
+      expect(validateBySchema('run-log', { ...candidate, artifacts: undefined }).valid).toBe(false);
+    }
+  });
+
+  it('rootcause action requires its complete action-specific fields', () => {
+    const rootcause = {
+      runId: 'rootcause-contract',
+      timestamp: '2026-08-24T00:00:00.000Z',
+      phase: 5,
+      phaseName: '编码',
+      action: 'rootcause',
+      role: 'R',
+      duration_s: 1,
+      tokens: 1,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      reportId: 'RC-1',
+      rootCauseCategory: 'coding-error',
+      upstreamDefect: false,
+      rollbackRecommended: false,
+    };
+    expect(validateBySchema('run-log', rootcause).valid).toBe(true);
+    for (const field of ['reportId', 'rootCauseCategory', 'upstreamDefect', 'rollbackRecommended']) {
+      expect(validateBySchema('run-log', { ...rootcause, [field]: undefined }).valid).toBe(false);
+    }
+  });
+
   it('未注册的 schema 返回明确错误，gate-log 使用独立 schema 拒绝无效结构', () => {
     const result = validateBySchema('nonexistent-schema', {});
     expect(result.valid).toBe(false);

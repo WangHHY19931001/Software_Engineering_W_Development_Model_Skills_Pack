@@ -19,6 +19,9 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 
 // ==================== 自包含类型形状 ====================
 
+/** Canonical target kinds plus historical phase<8 legacy spellings. */
+export type RunLogTargetKind = 'rootcause' | 'requirement' | 'design' | 'code' | 'test' | 'file' | 'testcase';
+
 export interface RunLogEntry {
   runId: string;
   timestamp: string;
@@ -82,8 +85,8 @@ export interface RunLogEntry {
   implementationTarget?: string;
   /** effective lifecycle status is emitted by the checker summary, never written back to raw JSONL. */
   lifecycleStatus?: RunLogLifecycleStatus;
-  /** review: 审查目标类型（'rootcause' 表示复审 R 报告） */
-  targetKind?: string;
+  /** review: 审查目标类型（'rootcause' 表示复审 R 报告；phase<8 保留 file/testcase legacy） */
+  targetKind?: RunLogTargetKind;
   /** review: 审查目标产物 */
   target?: string;
   /** review: 质量等级 */
@@ -533,6 +536,10 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
     return completeImplementationIdentity(entry) && strictLifecycleScopes.has(entryScopeKey(entry));
   };
+  const isPhase8IdentityIncomplete = (entry: RunLogEntry): boolean =>
+    entry.phase === 8 &&
+    ['rootcause', 'review', 'gate', 'fix', 'emergency-fix', ...R3_ACTIONS].includes(entry.action) &&
+    entryIdentityMissingFields(entry).length > 0;
 
   for (const [key, rootcause] of rootcauseReports) {
     const identity = lifecycleIdentity(rootcause);
@@ -595,35 +602,35 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // Legacy fixtures retain the historical one-fix/multi-report contract only for
-  // scopes without a complete phase-8 identity. Strict scopes are evaluated by
-  // their own exact predicates above and cannot change unrelated legacy scopes.
-  const legacyRootcauses = rootcauseActions.filter(
-    (rootcause) => !strictLifecycleScopes.has(lifecycleScopeKey(lifecycleIdentity(rootcause))),
-  );
-  const uniqueReportIds = new Set(
-    legacyRootcauses.map((r) => r.reportId).filter((id): id is string => isNonEmptyString(id)),
-  );
-  if (uniqueReportIds.size > 0) {
+  // Legacy compatibility is explicitly phase<8. A phase-8 entry with an
+  // incomplete identity is diagnostic-only and must never enter this aggregate,
+  // while complete phase-8 rootcause segments are handled by exact predicates.
+  const legacyRootcauses = rootcauseActions.filter((rootcause) => rootcause.phase < 8);
+  const legacyReportsByPhase = new Map<number, Set<string>>();
+  for (const rootcause of legacyRootcauses) {
+    if (!isNonEmptyString(rootcause.reportId)) continue;
+    if (!legacyReportsByPhase.has(rootcause.phase)) legacyReportsByPhase.set(rootcause.phase, new Set());
+    legacyReportsByPhase.get(rootcause.phase)!.add(rootcause.reportId);
+  }
+  for (const [legacyPhase, reportIds] of legacyReportsByPhase) {
     const coveredReportIds = new Set<string>();
     for (const f of fixActions) {
-      if (isSuccessfulFix(f) && isNonEmptyString(f.basedOnReport)) {
-        for (const rid of f.basedOnReport.split(/[;,]\s*/)) if (rid.trim()) coveredReportIds.add(rid.trim());
-      }
+      if (f.phase !== legacyPhase || !isSuccessfulFix(f) || !isNonEmptyString(f.basedOnReport)) continue;
+      for (const rid of f.basedOnReport.split(/[;,]\s*/)) if (rid.trim()) coveredReportIds.add(rid.trim());
     }
-    for (const rid of uniqueReportIds) {
+    for (const rid of reportIds) {
       if (!coveredReportIds.has(rid))
         violations.push(`R3: rootcause 报告 ${rid} 无对应 fix 记录（basedOnReport 缺失）`);
     }
     const reviewedReportIds = new Set(
       rootcauseReviews
-        .filter((review) => uniqueReportIds.has(review.target ?? ''))
+        .filter((review) => review.phase === legacyPhase && reportIds.has(review.target ?? ''))
         .map((r) => r.target)
         .filter((target): target is string => isNonEmptyString(target)),
     );
-    if (reviewedReportIds.size !== uniqueReportIds.size) {
+    if (reviewedReportIds.size !== reportIds.size) {
       violations.push(
-        `R3: V 复审 rootcause 记录数(${reviewedReportIds.size}) ≠ R 记录数(${uniqueReportIds.size})，每份 R 报告须有 V 复审`,
+        `R3: V 复审 rootcause 记录数(${reviewedReportIds.size}) ≠ R 记录数(${reportIds.size})，每份 R 报告须有 V 复审`,
       );
     }
   }
@@ -669,7 +676,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           vIndex = j;
           break;
         }
-        if (candidate.action === 'fix' || candidate.action === 'emergency-fix') break;
+        if (candidate.action === 'fix' || candidate.action === 'emergency-fix') {
+          if (!strictForFix || sameIdentity(candidateIdentity, fixIdentity)) break;
+        }
       }
       if (vIndex < 0) {
         if (strictForFix && completeImplementationIdentity(fixSegment.entry)) {
@@ -712,9 +721,10 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         );
       }
       if (strictForFix) {
-        const nextFixIndex = entryList.findIndex(
-          ({ entry }, index) => index > i && entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action),
-        );
+        const nextFixIndex = entryList.findIndex(({ entry }, index) => {
+          if (index <= i || entry.role !== 'S' || !['fix', 'emergency-fix'].includes(entry.action)) return false;
+          return sameIdentity(lifecycleIdentity(entry), fixIdentity);
+        });
         const terminalIndex = entryList.findIndex(
           ({ entry }, index) => index > i && entry.action === 'checkpoint' && entry.outcome === 'success',
         );
@@ -899,9 +909,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 review(targetKind=rootcause)`);
       continue;
     }
-    let k = j + 1;
-    while (k < valid.length && valid[k]?.action !== 'fix') k++;
-    if (k >= valid.length) violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 fix 记录`);
+    const successfulFix = valid.slice(j + 1).find(isSuccessfulFix);
+    if (!successfulFix) violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 successful fix 记录`);
   }
 
   // R8 轨迹模板校验（agentic Ch19 轨迹符合性）
@@ -945,13 +954,29 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     for (let i = 0; i < phaseEntries.length; i++) {
       const entry = phaseEntries[i];
       if (!entry || entry.action !== 'review' || entry.outcome !== 'fail') continue;
+      // Phase-8 incomplete identity is diagnostic-only: it must not consume
+      // legacy R8-3 credit or create a cross-segment violation.
+      if (isPhase8IdentityIncomplete(entry)) continue;
+      const failedIdentity = lifecycleIdentity(entry);
+      const strictReview = entry.phase === 8 && completeImplementationIdentity(entry);
       for (let j = i + 1; j < phaseEntries.length; j++) {
         const next = phaseEntries[j];
         if (!next) continue;
-        if (next.action === 'rootcause') break; // 正确路径：先 R 再 S-fix
+        if (next.action === 'rootcause') {
+          const rootIdentity = lifecycleIdentity(next);
+          const sameSegmentRootcause = strictReview
+            ? completeRootcauseIdentity(rootIdentity) &&
+              rootIdentity.phase === failedIdentity.phase &&
+              rootIdentity.round === failedIdentity.round &&
+              rootIdentity.reportId === failedIdentity.reportId &&
+              failedIdentity.basedOnReport === rootIdentity.reportId
+            : true;
+          if (sameSegmentRootcause) break; // 正确路径：同 segment 先 R 再 S-fix
+          continue;
+        }
         if (S_VARIANTS.includes(next.action)) {
           violations.push(
-            `R8: 阶段 ${entry.phase} V(review) 失败(${entry.runId})后直接 S(${next.action})(${next.runId})，理想轨迹须先 rootcause 再 S-fix（反模式 #18）`,
+            `R8: 阶段 ${entry.phase} V(review) 失败(${entry.runId})后直接 S(${next.action})(${next.runId})，理想轨迹须先同身份 rootcause 再 S-fix（反模式 #18）`,
           );
           break;
         }
@@ -1031,8 +1056,15 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   }
   {
     const legacyR3Actions = ['r3-completeness', 'r3-reliability', 'r3-security'];
-    for (const [, phaseEntries] of r8PhaseGroups) {
-      if (strictLifecycleScopes.size > 0 && phaseEntries.some(isStrictLifecycleEntry)) continue;
+    for (const [, allPhaseEntries] of r8PhaseGroups) {
+      // Never let one strict phase-8 segment suppress an unrelated legacy
+      // segment. Incomplete phase-8 identity rows stay diagnostic-only and
+      // therefore do not become legacy R8 credit or chain heads.
+      const phaseEntries =
+        allPhaseEntries[0]?.phase === 8
+          ? allPhaseEntries.filter((entry) => !isStrictLifecycleEntry(entry) && !isPhase8IdentityIncomplete(entry))
+          : allPhaseEntries;
+      if (phaseEntries.length === 0) continue;
       const firstIndex = (pred: (e: RunLogEntry) => boolean): number => phaseEntries.findIndex(pred);
       const lastIndex = (pred: (e: RunLogEntry) => boolean): number => {
         for (let i = phaseEntries.length - 1; i >= 0; i--) if (pred(phaseEntries.at(i)!)) return i;
@@ -1040,7 +1072,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       };
       const phaseNo = phaseEntries[0]?.phase;
       const chain: Array<[string, number]> = [
-        ['S(produce|fix|emergency-fix)', firstIndex((e) => S_VARIANTS.includes(e.action))],
+        ['S(produce|fix|emergency-fix)', firstIndex((e) => e.action === 'produce' || isSuccessfulFix(e))],
         ['R3(r3-completeness|r3-reliability|r3-security)', firstIndex((e) => legacyR3Actions.includes(e.action))],
         ['V(review)', firstIndex((e) => e.action === 'review')],
         ['G(gate 类)', lastIndex((e) => GATE_ACTIONS.has(e.action))],

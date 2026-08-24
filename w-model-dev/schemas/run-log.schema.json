@@ -22,6 +22,21 @@
   "allOf": [
     {
       "if": {
+        "properties": { "action": { "const": "rootcause" } },
+        "required": ["action"]
+      },
+      "then": {
+        "properties": {
+          "reportId": { "type": "string", "minLength": 1 },
+          "rootCauseCategory": { "type": "string", "minLength": 1 },
+          "upstreamDefect": { "type": "boolean" },
+          "rollbackRecommended": { "type": "boolean" }
+        },
+        "required": ["reportId", "rootCauseCategory", "upstreamDefect", "rollbackRecommended"]
+      }
+    },
+    {
+      "if": {
         "properties": { "action": { "enum": ["fix", "emergency-fix"] } },
         "required": ["action"]
       },
@@ -37,21 +52,36 @@
       "if": {
         "properties": {
           "phase": { "const": 8 },
-          "action": { "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security"] },
-          "targetKind": { "const": "code" }
+          "action": { "enum": ["rootcause", "review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"] }
+        },
+        "required": ["phase", "action"]
+      },
+      "then": {
+        "properties": {
+          "round": { "type": "integer", "minimum": 1 },
+          "reportId": { "type": "string", "minLength": 1 },
+          "targetKind": { "enum": ["rootcause", "requirement", "design", "code", "test"] }
+        },
+        "required": ["round", "reportId", "targetKind"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": { "const": 8 },
+          "action": { "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"] },
+          "targetKind": { "enum": ["requirement", "design", "code", "test"] }
         },
         "required": ["phase", "action", "targetKind"]
       },
       "then": {
         "properties": {
-          "round": {},
-          "reportId": {},
-          "basedOnReport": {},
-          "implementationTarget": {},
-          "target": {},
+          "basedOnReport": { "type": "string", "minLength": 1 },
+          "implementationTarget": { "type": "string", "minLength": 1 },
+          "target": { "type": "string", "minLength": 1 },
           "artifacts": { "type": "array", "minItems": 1 }
         },
-        "required": ["round", "reportId", "basedOnReport", "implementationTarget", "target", "artifacts"]
+        "required": ["basedOnReport", "implementationTarget", "target", "artifacts"]
       }
     },
     {

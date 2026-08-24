@@ -46,7 +46,9 @@ describe('run-log R1 扩展：rootcause/fix 动作字段', () => {
     ) as RunLogEntry[];
     const result = checkRunLog(bad);
     expect(result.passed).toBe(false);
-    expect(result.violations.some((r) => /R1.*rootcause.*rootCauseCategory/.test(r))).toBe(true);
+    expect(
+      result.violations.some((r) => /R1.*rootcause.*rootCauseCategory|\[schema\].*rootCauseCategory/.test(r)),
+    ).toBe(true);
   });
 
   it('fix 动作缺 basedOnReport 时失败', async () => {
@@ -479,6 +481,12 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
   if (['fix', 'emergency-fix'].includes(String(merged.action))) {
     if (merged.basedOnReport === undefined) merged.basedOnReport = 'RC-TEST';
     if (merged.artifacts === undefined) merged.artifacts = ['test-artifact'];
+  }
+  if (merged.action === 'rootcause') {
+    if (merged.reportId === undefined) merged.reportId = 'RC-TEST';
+    if (merged.rootCauseCategory === undefined) merged.rootCauseCategory = 'coding-error';
+    if (merged.upstreamDefect === undefined) merged.upstreamDefect = false;
+    if (merged.rollbackRecommended === undefined) merged.rollbackRecommended = false;
   }
   return merged as unknown as RunLogEntry;
 }
@@ -1532,6 +1540,41 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.violations.some((reason) => /identity segment/.test(reason))).toBe(false);
   });
 
+  it('does not treat a failed phase-5 fix as a legacy R7 chain head', () => {
+    const result = checkRunLog([
+      makeEntry({
+        runId: 'legacy-root',
+        phase: 5,
+        action: 'rootcause',
+        role: 'R',
+        outcome: 'success',
+        reportId: 'RC-LEGACY-FAILED',
+      }),
+      makeEntry({
+        runId: 'legacy-root-review',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        targetKind: 'rootcause',
+        target: 'RC-LEGACY-FAILED',
+        passed: true,
+      }),
+      makeEntry({
+        runId: 'legacy-failed-fix',
+        phase: 5,
+        action: 'fix',
+        role: 'S',
+        outcome: 'fail',
+        basedOnReport: 'RC-LEGACY-FAILED',
+        artifacts: ['legacy-artifact'],
+      }),
+    ]);
+    expect(result.violations.some((reason) => /R7.*rootcause.*fix/.test(reason))).toBe(true);
+    expect(result.diagnostics?.some((diagnostic) => /NON_CREDIT_FIX.*legacy-failed-fix/.test(diagnostic))).toBe(true);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  });
+
   it.each(['fail', 'blocked', 'cancelled'] as const)('does not open R3/R8 credit for a %s fix', (outcome) => {
     const entries = [
       rootCause('r-failed', 'RC-FAILED'),
@@ -1612,6 +1655,168 @@ describe('D8 lifecycle identity reducer', () => {
     expect(
       result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*legacy-fix-only.*credit deferred/.test(diagnostic)),
     ).toBe(true);
+  });
+
+  it('does not skip a complete phase-8 legacy segment when an unrelated strict segment shares phase 8', () => {
+    const legacyIdentity = {
+      phase: 8,
+      round: 99,
+      reportId: 'RC-LEGACY',
+      basedOnReport: 'RC-LEGACY',
+      targetKind: 'code' as const,
+      implementationTarget: 'implementation-LEGACY',
+      target: 'implementation-LEGACY',
+      artifacts: ['implementation-LEGACY'],
+    };
+    const result = checkRunLog([
+      rootCause('strict-root', 'RC-STRICT'),
+      makeEntry({
+        runId: 'legacy-review',
+        ...legacyIdentity,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        passed: true,
+      }),
+      makeEntry({
+        runId: 'legacy-r3',
+        ...legacyIdentity,
+        action: 'r3-completeness',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'legacy-produce',
+        phase: 8,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'legacy-gate',
+        ...legacyIdentity,
+        action: 'gate',
+        role: 'G',
+        outcome: 'success',
+        gateExitCode: 0,
+        script: 'check-artifact-gate.ts',
+      }),
+      makeEntry({
+        runId: 'legacy-checkpoint',
+        phase: 8,
+        action: 'checkpoint',
+        role: 'O',
+        outcome: 'success',
+        acknowledgedDecisions: ['legacy segment'],
+      }),
+    ]);
+    expect(result.violations.some((reason) => /R8.*阶段 8.*轨迹顺序倒置/.test(reason))).toBe(true);
+  });
+
+  it('does not let an unrelated strict fix truncate the current identity window', () => {
+    const entries = [
+      rootCause('root-a', 'RC-A'),
+      rootCauseReview('root-a-v', 'RC-A'),
+      rootCauseGate('root-a-g', 'RC-A'),
+      rootCause('root-b', 'RC-B'),
+      rootCauseReview('root-b-v', 'RC-B'),
+      rootCauseGate('root-b-g', 'RC-B'),
+      fix('fix-a', 'RC-A', 1, 'implementation-A'),
+      fix('fix-b', 'RC-B', 1, 'implementation-B'),
+      r3('a-c', 'completeness', 'RC-A', 'implementation-A'),
+      r3('a-r', 'reliability', 'RC-A', 'implementation-A'),
+      r3('a-s', 'security', 'RC-A', 'implementation-A'),
+      implementationReview('a-v', 'RC-A', 1, 'implementation-A'),
+      implementationGate('a-g', 'RC-A', 1, 'implementation-A'),
+      r3('b-c', 'completeness', 'RC-B', 'implementation-B'),
+      r3('b-r', 'reliability', 'RC-B', 'implementation-B'),
+      r3('b-s', 'security', 'RC-B', 'implementation-B'),
+      implementationReview('b-v', 'RC-B', 1, 'implementation-B'),
+      implementationGate('b-g', 'RC-B', 1, 'implementation-B'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((reason) => /R3 记录校验失败.*fix fix-a/.test(reason))).toBe(false);
+  });
+
+  it('requires a failed implementation review to be followed by a same-segment rootcause path', () => {
+    const result = checkRunLog([
+      rootCause('root-a', 'RC-A'),
+      rootCauseReview('root-a-v', 'RC-A'),
+      rootCauseGate('root-a-g', 'RC-A'),
+      makeEntry({
+        runId: 'implementation-v-fail-a',
+        phase: 8,
+        round: 1,
+        action: 'review',
+        role: 'V',
+        outcome: 'fail',
+        passed: false,
+        reworkHints: ['repair implementation A'],
+        reportId: 'RC-A',
+        basedOnReport: 'RC-A',
+        targetKind: 'code',
+        target: 'implementation-A',
+        implementationTarget: 'implementation-A',
+        artifacts: ['implementation-A'],
+      }),
+      rootCause('root-b', 'RC-B'),
+      fix('fix-b', 'RC-B', 1, 'implementation-B'),
+    ]);
+    expect(result.violations.some((reason) => /R8.*V\(review\) 失败.*直接 S/.test(reason))).toBe(true);
+  });
+
+  it('does not let phase-8 identity-incomplete evidence cover a legacy rootcause report', () => {
+    const legacyRoot = rootCause('legacy-root', 'RC-LEGACY');
+    delete legacyRoot.round;
+    const legacyRootReview = rootCauseReview('legacy-root-v', 'RC-LEGACY');
+    delete legacyRootReview.round;
+    const legacyRootGate = rootCauseGate('legacy-root-g', 'RC-LEGACY');
+    delete legacyRootGate.round;
+    const result = checkRunLog([
+      legacyRoot,
+      legacyRootReview,
+      legacyRootGate,
+      makeEntry({
+        runId: 'legacy-identity-missing-fix',
+        phase: 8,
+        action: 'fix',
+        role: 'S',
+        outcome: 'success',
+        basedOnReport: 'RC-LEGACY',
+        artifacts: ['implementation-LEGACY'],
+      }),
+      makeEntry({
+        runId: 'legacy-identity-missing-r3-c',
+        phase: 8,
+        action: 'r3-completeness',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'legacy-identity-missing-r3-r',
+        phase: 8,
+        action: 'r3-reliability',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'legacy-identity-missing-r3-s',
+        phase: 8,
+        action: 'r3-security',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'legacy-identity-missing-v',
+        phase: 8,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        passed: true,
+      }),
+    ]);
+    expect(result.violations.some((reason) => /RC-LEGACY.*无对应 fix/.test(reason))).toBe(false);
+    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*deferred/.test(diagnostic))).toBe(true);
   });
 });
 
