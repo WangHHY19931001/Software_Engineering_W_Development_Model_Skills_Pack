@@ -1185,18 +1185,18 @@ describe('runDocConsistencyChecks', () => {
     }
   });
 
-  it('coverage JSON 的 55/1000 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
+  it('coverage JSON 的 55/1002 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 1000);
-      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 1000]);
+      const coverage = await writeVitestCount(fixtureRoot, 1002);
+      expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 1002]);
       const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push'];
       for (const doc of docsWithLiveCount) {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('1000');
+        expect(docContent).toContain('1002');
       }
       const loaderDocs = ['w-model-dev/references/data-models.md', 'docs/INSTALL.md', 'docs/user-guide.md'];
       const oldLoaderPath = ['scripts', 'logic', 'schema-loader.ts'].join('/');
@@ -1209,7 +1209,7 @@ describe('runDocConsistencyChecks', () => {
       }
       const passing = runDocsConsistencyCli(fixtureRoot);
       expect(passing.code, `${passing.stdout}\n${passing.stderr}`).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 1000');
+      expect(passing.stdout).toContain('vitest 用例  : 1002');
       expect(passing.stdout).toContain('静态违规      : 0');
       expect(passing.stdout).toContain('动态违规      : 0');
       expect(passing.stdout).not.toContain('[vitest-tests]');
@@ -1218,10 +1218,10 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('55 files / 1000 tests', '55 files / 928 tests'), 'utf-8');
+      await fs.writeFile(readme, content.replace('55 files / 1002 tests', '55 files / 928 tests'), 'utf-8');
       const stale = runDocsConsistencyCli(fixtureRoot);
       expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 1000');
+      expect(stale.stdout).toContain('vitest 用例  : 1002');
       expect(stale.stdout).toContain('[vitest-tests]');
       expect(stale.stdout).toContain('README.md');
       expect(stale.stdout).toContain('55 files / 928 tests');
@@ -1315,7 +1315,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('双环境 stable probe map 对单字段 args drift 与 cwd drift 分别失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 1000);
+      await writeVitestCount(fixtureRoot, 1002);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(first.code).toBe(0);
@@ -1361,7 +1361,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('metrics invalid-phase probe 保留规范化 args/cwd 的完整 identity', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 1000);
+      await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -1386,7 +1386,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('真实 CLI --json 输出 dynamicMeasurements 的完整五字段并保留兼容 violations', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const coverage = await writeVitestCount(fixtureRoot, 1000);
+      const coverage = await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -1421,8 +1421,8 @@ describe('runDocConsistencyChecks', () => {
         cliScriptCount: 36,
         exit2ScriptCount: 35,
         testFileCount: (coverage.testResults as unknown[]).length,
-        vitestTestCount: 1000,
-        numPassedTests: 1000,
+        vitestTestCount: 1002,
+        numPassedTests: 1002,
         numFailedTests: 0,
         success: true,
         testDirectoryInventoryCount: 55,
@@ -1458,7 +1458,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 35', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 1000);
+      await writeVitestCount(fixtureRoot, 1002);
       const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(withoutState.code).toBe(0);
       const withoutStateReport = JSON.parse(withoutState.stdout) as {
@@ -1519,7 +1519,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('AGENTS=34 与 INSTALL=25+9 的旧资产声明在同一真实 fixture 中失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 1000);
+      await writeVitestCount(fixtureRoot, 1002);
       const agentsPath = path.join(fixtureRoot, 'AGENTS.md');
       const installPath = path.join(fixtureRoot, 'docs', 'INSTALL.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
@@ -1569,7 +1569,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('成功 JSON 报告绑定同一相对 artifact identity/hash，且不暴露本机路径', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 1000);
+      await writeVitestCount(fixtureRoot, 1002);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(first.code).toBe(0);
@@ -1688,7 +1688,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('真实 docs-consistency 探针报告候选 status/ERROR_JSON 证据及 export 三场景隔离', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
-      await writeVitestCount(fixtureRoot, 1000);
+      await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
@@ -2321,7 +2321,7 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
     });
     // 复制的活体文档保持原样；无 .w-model 与最小合法状态必须共享同一套确定性 probe 事实。
     // 各测试仅在需要时注入单独的旧值负例，不通过改写活体文档自适配。
-    // 复制的活体文档保留当前 HEAD 实测的 55/1000 计数；各测试仅在需要时注入单独的旧值负例。
+    // 复制的活体文档保留当前 HEAD 实测的 55/1002 计数；各测试仅在需要时注入单独的旧值负例。
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(
