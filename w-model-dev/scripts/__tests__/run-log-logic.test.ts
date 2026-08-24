@@ -8,6 +8,7 @@
  *   - R7 扩展：返工路径时序 rootcause → review(targetKind=rootcause) → fix
  */
 
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +19,7 @@ import { checkRunLog, extractExitCode, buildGateLogKeys, type RunLogEntry } from
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const samplesDir = path.join(here, '..', 'samples', 'run-log');
+const identity2FixturePath = path.join(here, 'fixtures', 'run-log-identity2-raw.jsonl');
 
 async function loadJsonl(file: string): Promise<RunLogEntry[]> {
   const raw = await fs.readFile(path.join(samplesDir, file), 'utf-8');
@@ -472,8 +474,20 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
 describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () => {
   it('已完成阶段 gate 在 checkpoint 之后 → 违规', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r3',
         phase: 5,
@@ -498,9 +512,28 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('V 失败后无 rootcause 直接 S-fix → 违规（反模式 #18 轨迹检测）', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'review', role: 'V', outcome: 'fail' }),
-      makeEntry({ runId: 'r3', phase: 5, action: 'fix', role: 'S', outcome: 'rework', basedOnReport: 'RC-1' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'fail',
+      }),
+      makeEntry({
+        runId: 'r3',
+        phase: 5,
+        action: 'fix',
+        role: 'S',
+        outcome: 'rework',
+        basedOnReport: 'RC-1',
+      }),
     ];
     const result = checkRunLog(lines);
     expect(result.violations.some((v) => /R8.*rootcause/.test(v))).toBe(true);
@@ -508,7 +541,13 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('checkpoint 非阶段最后记录 → 违规', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r2',
         phase: 5,
@@ -517,7 +556,13 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
         outcome: 'success',
         acknowledgedDecisions: ['ok'],
       }),
-      makeEntry({ runId: 'r3', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r3',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
     ];
     const result = checkRunLog(lines);
     expect(result.violations.some((v) => /R8.*checkpoint/.test(v))).toBe(true);
@@ -525,8 +570,20 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('理想轨迹 produce→V→G→checkpoint 通过', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r3',
         phase: 5,
@@ -551,9 +608,28 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('V 失败后先 rootcause 再 V 复审再 fix → R8 通过（不误报合法返工轨迹）', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'review', role: 'V', outcome: 'fail' }),
-      makeEntry({ runId: 'r3', phase: 5, action: 'rootcause', role: 'R', outcome: 'success', reportId: 'RC-1' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'fail',
+      }),
+      makeEntry({
+        runId: 'r3',
+        phase: 5,
+        action: 'rootcause',
+        role: 'R',
+        outcome: 'success',
+        reportId: 'RC-1',
+      }),
       makeEntry({
         runId: 'r4',
         phase: 5,
@@ -563,7 +639,14 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
         targetKind: 'rootcause',
         target: 'RC-1',
       }),
-      makeEntry({ runId: 'r5', phase: 5, action: 'fix', role: 'S', outcome: 'rework', basedOnReport: 'RC-1' }),
+      makeEntry({
+        runId: 'r5',
+        phase: 5,
+        action: 'fix',
+        role: 'S',
+        outcome: 'rework',
+        basedOnReport: 'RC-1',
+      }),
     ];
     const result = checkRunLog(lines);
     expect(result.violations.filter((v) => v.startsWith('R8'))).toHaveLength(0);
@@ -571,7 +654,13 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('gate 在中间 checkpoint 之后、最后一个 checkpoint 之前 → R8 通过', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r2',
         phase: 5,
@@ -606,8 +695,20 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('R8-4: V(review) 先于任何 S 变体 → 轨迹顺序倒置违规', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
     ];
     const result = checkRunLog(lines);
     expect(result.violations.some((v) => /R8.*轨迹顺序倒置.*V\(review\).*S/.test(v))).toBe(true);
@@ -615,8 +716,20 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('R8-4: R3 先于任何 S 变体 → 轨迹顺序倒置违规', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'r3-completeness',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
     ];
     const result = checkRunLog(lines);
     expect(result.violations.some((v) => /R8.*轨迹顺序倒置.*S.*R3/.test(v))).toBe(true);
@@ -624,7 +737,13 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('R8-4: gate 先于 V(review) → 轨迹顺序倒置违规', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r2',
         phase: 5,
@@ -634,7 +753,13 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
         gateExitCode: 0,
         script: 'check-artifact-gate.ts',
       }),
-      makeEntry({ runId: 'r3', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r3',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
     ];
     const result = checkRunLog(lines);
     expect(result.violations.some((v) => /R8.*轨迹顺序倒置.*V\(review\).*G/.test(v))).toBe(true);
@@ -642,11 +767,41 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('R8-4: 标准全链 S → R3×3 → V → G → checkpoint 通过', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r3', phase: 5, action: 'r3-reliability', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r4', phase: 5, action: 'r3-security', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r5', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'r3-completeness',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r3',
+        phase: 5,
+        action: 'r3-reliability',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r4',
+        phase: 5,
+        action: 'r3-security',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r5',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r6',
         phase: 5,
@@ -671,12 +826,49 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
 
   it('R8-4: 多轮返工轨迹（首轮 V 失败 → R → 复审 → fix → R3 → V → G → checkpoint）通过', () => {
     const lines = [
-      makeEntry({ runId: 'r1', phase: 5, action: 'produce', role: 'S', outcome: 'success' }),
-      makeEntry({ runId: 'r2', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r3', phase: 5, action: 'r3-reliability', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r4', phase: 5, action: 'r3-security', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r5', phase: 5, action: 'review', role: 'V', outcome: 'fail' }),
-      makeEntry({ runId: 'r6', phase: 5, action: 'rootcause', role: 'R', outcome: 'success', reportId: 'RC-1' }),
+      makeEntry({
+        runId: 'r1',
+        phase: 5,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r2',
+        phase: 5,
+        action: 'r3-completeness',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r3',
+        phase: 5,
+        action: 'r3-reliability',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r4',
+        phase: 5,
+        action: 'r3-security',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r5',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'fail',
+      }),
+      makeEntry({
+        runId: 'r6',
+        phase: 5,
+        action: 'rootcause',
+        role: 'R',
+        outcome: 'success',
+        reportId: 'RC-1',
+      }),
       makeEntry({
         runId: 'r7',
         phase: 5,
@@ -686,11 +878,42 @@ describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () =
         targetKind: 'rootcause',
         target: 'RC-1',
       }),
-      makeEntry({ runId: 'r8', phase: 5, action: 'fix', role: 'S', outcome: 'rework', basedOnReport: 'RC-1' }),
-      makeEntry({ runId: 'r9', phase: 5, action: 'r3-completeness', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r10', phase: 5, action: 'r3-reliability', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r11', phase: 5, action: 'r3-security', role: 'R', outcome: 'success' }),
-      makeEntry({ runId: 'r12', phase: 5, action: 'review', role: 'V', outcome: 'success' }),
+      makeEntry({
+        runId: 'r8',
+        phase: 5,
+        action: 'fix',
+        role: 'S',
+        outcome: 'rework',
+        basedOnReport: 'RC-1',
+      }),
+      makeEntry({
+        runId: 'r9',
+        phase: 5,
+        action: 'r3-completeness',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r10',
+        phase: 5,
+        action: 'r3-reliability',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r11',
+        phase: 5,
+        action: 'r3-security',
+        role: 'R',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'r12',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
       makeEntry({
         runId: 'r13',
         phase: 5,
@@ -816,6 +1039,7 @@ describe('D8 lifecycle identity reducer', () => {
     round = 1,
     target = `implementation-${reportId}`,
     fixReportId = reportId,
+    outcome: RunLogEntry['outcome'] = 'success',
   ): RunLogEntry =>
     makeEntry({
       runId,
@@ -823,9 +1047,10 @@ describe('D8 lifecycle identity reducer', () => {
       round,
       action: 'fix',
       role: 'S',
-      outcome: 'success',
+      outcome,
       reportId: fixReportId,
       basedOnReport: reportId,
+      target: target,
       targetKind: 'code',
       implementationTarget: target,
       artifacts: [target],
@@ -906,6 +1131,9 @@ describe('D8 lifecycle identity reducer', () => {
       r3('r3-a-c', 'completeness', 'RC-A'),
       r3('r3-a-r', 'reliability', 'RC-A'),
       r3('r3-a-s', 'security', 'RC-A'),
+      rootCause('r-b', 'RC-B', 2),
+      rootCauseReview('v-b-root', 'RC-B', 2),
+      rootCauseGate('g-b-root', 'RC-B', 2),
       fix('f-b', 'RC-B', 2),
       implementationReview('v-b', 'RC-B', 2),
     ];
@@ -963,7 +1191,13 @@ describe('D8 lifecycle identity reducer', () => {
 
   it('emits LEGACY_UNSCOPED diagnostics when lifecycle identity fields are missing', () => {
     const entries = [
-      makeEntry({ action: 'fix', role: 'S', basedOnReport: 'RC-LEGACY', artifacts: ['artifact'], outcome: 'success' }),
+      makeEntry({
+        action: 'fix',
+        role: 'S',
+        basedOnReport: 'RC-LEGACY',
+        artifacts: ['artifact'],
+        outcome: 'success',
+      }),
       r3('r3-legacy-c', 'completeness'),
       r3('r3-legacy-r', 'reliability'),
       r3('r3-legacy-s', 'security'),
@@ -983,8 +1217,7 @@ describe('D8 lifecycle identity reducer', () => {
   });
 
   it('defers the raw legacy fix without exact identity blocking or lifecycle credit', async () => {
-    const rawPath = path.resolve(here, '../../../.w-model/run-log.jsonl');
-    const entries = (await fs.readFile(rawPath, 'utf8'))
+    const entries = (await fs.readFile(identity2FixturePath, 'utf8'))
       .trim()
       .split(/\r?\n/)
       .filter(Boolean)
@@ -1005,18 +1238,34 @@ describe('D8 lifecycle identity reducer', () => {
     expect(diagnostics.some((diagnostic) => /pending-pre-approval: RC-phase8-2-02/.test(diagnostic))).toBe(true);
   });
 
-  it('does not mutate the raw run-log JSONL bytes', async () => {
-    const rawPath = path.resolve(here, '../../../.w-model/run-log.jsonl');
-    const before = await fs.readFile(rawPath);
-    const entries = before
+  it('keeps the committed fixture byte/hash contract independent of raw state', async () => {
+    const fixture = await fs.readFile(identity2FixturePath);
+    const entries = fixture
       .toString('utf8')
       .trim()
       .split(/\r?\n/)
       .filter(Boolean)
       .map((line) => JSON.parse(line));
     checkRunLog(entries);
-    const after = await fs.readFile(rawPath);
     expect(entries).toHaveLength(18);
+    expect(fixture.length).toBe(14107);
+    expect(createHash('sha256').update(fixture).digest('hex')).toBe(
+      '22c9081a86f0a195fdcc331a2ec11bd3afcad34a9c47959e27878d01fac5f3a1',
+    );
+  });
+
+  it('does not mutate the raw run-log JSONL bytes', async () => {
+    const rawPath = path.resolve(here, '../../../.w-model/run-log.jsonl');
+    const before = await fs.readFile(rawPath);
+    checkRunLog(
+      before
+        .toString('utf8')
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
+    );
+    const after = await fs.readFile(rawPath);
     expect(after.equals(before)).toBe(true);
   });
 
@@ -1104,7 +1353,10 @@ describe('D8 lifecycle identity reducer', () => {
   });
 
   it('rejects failed R3 evidence even when all three dimensions are present', () => {
-    const failedR3 = { ...r3('r3-c', 'completeness', 'RC-A'), outcome: 'fail' as const };
+    const failedR3 = {
+      ...r3('r3-c', 'completeness', 'RC-A'),
+      outcome: 'fail' as const,
+    };
     const result = checkRunLog([
       rootCause('r-a', 'RC-A'),
       rootCauseReview('v-a', 'RC-A'),
@@ -1177,7 +1429,13 @@ describe('D8 lifecycle identity reducer', () => {
 
   it('checks each fix window independently so a later checkpoint cannot hide an earlier inversion', () => {
     const entries = [
-      makeEntry({ runId: 'p', phase: 8, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({
+        runId: 'p',
+        phase: 8,
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
       rootCause('r-a', 'RC-A'),
       rootCauseReview('v-root', 'RC-A'),
       rootCauseGate('g-root', 'RC-A'),
@@ -1205,5 +1463,97 @@ describe('D8 lifecycle identity reducer', () => {
     const result = checkRunLog(entries);
     expect(result.passed).toBe(false);
     expect(result.violations.some((reason) => /R8.*轨迹顺序倒置/.test(reason))).toBe(true);
+  });
+
+  it('keeps a phase-5 legacy segment on legacy rules when phase 8 has a strict segment', () => {
+    const entries = [
+      rootCause('r-strict', 'RC-STRICT'),
+      makeEntry({
+        runId: 'r-legacy',
+        phase: 5,
+        action: 'rootcause',
+        role: 'R',
+        outcome: 'success',
+        reportId: 'RC-LEGACY',
+        targetKind: 'rootcause',
+        rootCauseCategory: 'process-gap',
+        upstreamDefect: false,
+        rollbackRecommended: false,
+      }),
+      makeEntry({
+        runId: 'v-legacy-root',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        targetKind: 'rootcause',
+        target: 'RC-LEGACY',
+        passed: true,
+      }),
+      makeEntry({
+        runId: 'f-legacy',
+        phase: 5,
+        action: 'fix',
+        role: 'S',
+        outcome: 'success',
+        basedOnReport: 'RC-LEGACY',
+        artifacts: ['implementation-legacy'],
+      }),
+      makeEntry({
+        runId: 'v-legacy-implementation',
+        phase: 5,
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+        targetKind: 'code',
+        target: 'implementation-legacy',
+        passed: true,
+      }),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((reason) => /R3 记录校验失败.*阶段 5/.test(reason))).toBe(true);
+    expect(result.violations.some((reason) => /identity segment/.test(reason))).toBe(false);
+  });
+
+  it.each(['fail', 'blocked', 'cancelled'] as const)('does not open R3/R8 credit for a %s fix', (outcome) => {
+    const entries = [
+      rootCause('r-failed', 'RC-FAILED'),
+      rootCauseReview('v-failed-root', 'RC-FAILED'),
+      rootCauseGate('g-failed-root', 'RC-FAILED'),
+      fix('f-failed', 'RC-FAILED', 1, 'implementation-FAILED', 'RC-FAILED', outcome),
+      r3('r3-failed-c', 'completeness', 'RC-FAILED'),
+      r3('r3-failed-r', 'reliability', 'RC-FAILED'),
+      r3('r3-failed-s', 'security', 'RC-FAILED'),
+      implementationReview('v-failed-implementation', 'RC-FAILED'),
+      implementationGate('g-failed-implementation', 'RC-FAILED'),
+    ];
+    const result = checkRunLog(entries);
+    expect(
+      result.diagnostics?.some((diagnostic) =>
+        diagnostic.includes(`NON_CREDIT_FIX: fix f-failed outcome=${outcome}; credit deferred`),
+      ),
+    ).toBe(true);
+  });
+
+  it('requires R7 fix target and artifacts to match the exact implementation target', () => {
+    const badFix = fix('f-target', 'RC-TARGET', 1, 'implementation-TARGET');
+    badFix.target = 'wrong-target';
+    badFix.artifacts = ['wrong-target'];
+    const result = checkRunLog([rootCause('r-target', 'RC-TARGET'), rootCauseReview('v-target', 'RC-TARGET'), badFix]);
+    expect(result.violations.some((reason) => /R7.*exact.*target|R7.*artifacts/.test(reason))).toBe(true);
+  });
+});
+
+describe('RunLogEntry schema/type contract', () => {
+  it('keeps the TypeScript action union and lifecycle fields aligned with the live schema', async () => {
+    const schema = JSON.parse(
+      await fs.readFile(path.join(here, '..', '..', 'schemas', 'run-log.schema.json'), 'utf8'),
+    ) as { properties: { action: { enum: string[] } } };
+    const source = await fs.readFile(path.join(here, '..', 'logic', 'run-log-logic.ts'), 'utf8');
+    const actionBody = source.match(/action:\r?\n([\s\S]*?)\r?\n\s+role:/)?.[1] ?? '';
+    const typeActions = [...actionBody.matchAll(/["']([^"']+)["']/g)].map((match) => match[1]);
+    expect(typeActions).toEqual(schema.properties.action.enum);
+    expect(source).toContain('implementationTarget?: string;');
+    expect(source).toMatch(/lifecycleStatus\?: ["']pending-pre-approval["'] \| ["']open-approved-lifecycle["'];/);
   });
 });

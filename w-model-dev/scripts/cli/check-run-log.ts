@@ -38,7 +38,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkRunLog, extractExitCode, buildGateLogKeys } from '../logic/run-log-logic.js';
-import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
+import { readJsonlOrExitDetailed } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -153,8 +153,9 @@ async function main(): Promise<void> {
 
   const runLogAbs = path.resolve(runLogFile);
 
-  // 读 run-log.jsonl（ENOENT → exit(2)；单行非法 JSON 仅警告不 exit）
-  const entries = await readJsonlOrExit(runLogAbs, 'run-log');
+  // 读 run-log.jsonl（ENOENT → exit(2)；坏行保留 parseErrors，避免部分历史被当成完整输入）
+  const parsedRunLog = await readJsonlOrExitDetailed(runLogAbs, 'run-log');
+  const entries = parsedRunLog.entries;
 
   // 可选输入：--gate-logs（读失败只警告不 exit）
   let gateLogs: Map<string, { exitCode?: number; content: string }> | undefined;
@@ -175,13 +176,15 @@ async function main(): Promise<void> {
 
   // 构建 options 并调用纯逻辑校验
   const result = checkRunLog(entries, { tlaCheckRounds, gateLogs });
+  const diagnostics = [
+    ...(result.diagnostics ?? []),
+    ...parsedRunLog.parseErrors.map((error) => `PARSE_INCOMPLETE: line ${error.line} ${error.message}; deferred`),
+  ];
   const exitCode = result.passed ? 0 : 1;
   const lifecycleStatus =
-    result.passed && (!result.diagnostics || result.diagnostics.length === 0)
-      ? 'CLOSED_UNDER_CURRENT_RULES'
-      : 'NOT_CLOSED_NOT_PROVEN';
+    result.passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN';
   const statusNote =
-    result.passed && result.diagnostics && result.diagnostics.length > 0
+    result.passed && diagnostics.length > 0
       ? 'exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。'
       : undefined;
 
@@ -195,7 +198,7 @@ async function main(): Promise<void> {
         violations: buildViolationDistribution(result.violations.length),
         lifecycleStatus,
         ...(statusNote ? { statusNote } : {}),
-        ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
+        ...(diagnostics.length > 0 ? { diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -232,9 +235,9 @@ async function main(): Promise<void> {
       'O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）',
     );
   }
-  if (result.diagnostics && result.diagnostics.length > 0) {
+  if (diagnostics.length > 0) {
     console.log('生命周期诊断（非阻断）：');
-    for (const diagnostic of result.diagnostics) console.log(`  - ${diagnostic}`);
+    for (const diagnostic of diagnostics) console.log(`  - ${diagnostic}`);
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）

@@ -16,7 +16,13 @@ import * as os from 'node:os';
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-import { readJsonOrExit, readJsonlOrExit, readJsonlOptional, readJsonClassified } from '../lib/read-json-or-exit.js';
+import {
+  readJsonOrExit,
+  readJsonlOrExit,
+  readJsonlOrExitDetailed,
+  readJsonlOptional,
+  readJsonClassified,
+} from '../lib/read-json-or-exit.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { HandledCliError } from '../lib/cli-error.js';
 
@@ -144,6 +150,17 @@ describe('readJsonlOrExit', () => {
     await fs.writeFile(file, '{"a":1}\r\n{"b":2}\r\n');
     const entries = await readJsonlOrExit(file);
     expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
+  });
+
+  it('detailed 读取结果暴露坏行行号，避免 warn+skip 被误当完整输入', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = path.join(tmpDir, 'detailed.jsonl');
+    await fs.writeFile(file, '{"ok":1}\n{bad}\n{"ok":2}\n');
+    const result = await readJsonlOrExitDetailed(file, 'run-log');
+    expect(result.entries).toEqual([{ ok: 1 }, { ok: 2 }]);
+    expect(result.parseErrors).toEqual([{ line: 2, message: expect.stringContaining('非合法 JSON') }]);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('第 2 行'));
+    errSpy.mockRestore();
   });
 
   it('文件不存在时抛 HandledCliError 并输出 ERROR_JSON（不再 process.exit）', async () => {

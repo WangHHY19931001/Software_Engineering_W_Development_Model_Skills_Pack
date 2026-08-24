@@ -59,7 +59,22 @@ export async function readJsonOrExit<T = unknown>(file: string): Promise<T> {
  * @param label 警告消息中的行类型描述（默认「行」），如「run-log」「checkpoint」
  * @returns 解析后的条目数组
  */
+export interface JsonlParseError {
+  line: number;
+  message: string;
+}
+
+export interface JsonlReadResult {
+  entries: unknown[];
+  parseErrors: JsonlParseError[];
+}
+
 export async function readJsonlOrExit(file: string, label = '行'): Promise<unknown[]> {
+  return (await readJsonlOrExitDetailed(file, label)).entries;
+}
+
+/** 读取 JSONL 并保留坏行事实，供需要完整性语义的消费者使用。 */
+export async function readJsonlOrExitDetailed(file: string, label = '行'): Promise<JsonlReadResult> {
   const abs = path.resolve(file);
   let raw: string;
   try {
@@ -72,23 +87,30 @@ export async function readJsonlOrExit(file: string, label = '行'): Promise<unkn
     }
     throw err;
   }
-  return parseJsonlLines(raw, label, abs);
+  return parseJsonlLinesDetailed(raw, label, abs);
 }
 
-/** 逐行解析 JSONL 文本（空行跳过；单行非法 JSON → warn+skip）。readJsonlOrExit / readJsonlOptional 共用 */
-function parseJsonlLines(raw: string, label: string, abs: string): unknown[] {
+/** 逐行解析 JSONL，坏行继续 warn+skip，但通过 parseErrors 保留行号。 */
+function parseJsonlLinesDetailed(raw: string, label: string, abs: string): JsonlReadResult {
   const lines = raw.split(/\r?\n/);
   const entries: unknown[] = [];
+  const parseErrors: JsonlParseError[] = [];
   for (const [i, line] of lines.entries()) {
     const trimmed = line.trim();
     if (trimmed === '') continue;
     try {
       entries.push(parseJsonSafe(trimmed));
     } catch {
-      console.error(`⚠ [FILE_PARSE] ${label} 第 ${i + 1} 行非合法 JSON，已跳过: ${abs}`);
+      const message = `${label} 第 ${i + 1} 行非合法 JSON`;
+      parseErrors.push({ line: i + 1, message });
+      console.error(`⚠ [FILE_PARSE] ${message}，已跳过: ${abs}`);
     }
   }
-  return entries;
+  return { entries, parseErrors };
+}
+
+function parseJsonlLines(raw: string, label: string, abs: string): unknown[] {
+  return parseJsonlLinesDetailed(raw, label, abs).entries;
 }
 
 /**

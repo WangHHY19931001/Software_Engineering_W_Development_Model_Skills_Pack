@@ -77,7 +77,11 @@
       "description": "执行角色：O=编排者 A=分析 S=产出 V=评审 G=门禁 R=根因定位/R3预防性审查。约束 #8：每阶段 run-log 须至少含 role=S/V/G 各 1 条记录；R3 无条件强制须含 role=R ≥3 条（completeness/reliability/security）",
       "enum": ["O", "A", "S", "V", "G", "R"]
     },
-    "duration_s": { "description": "本次动作持续时间，单位秒，非负数值", "type": "number", "minimum": 0 },
+    "duration_s": {
+      "description": "本次动作持续时间，单位秒，非负数值",
+      "type": "number",
+      "minimum": 0
+    },
     "tokens": {
       "description": "本次动作 token 消耗，非负数值；由宿主 Agent 报告实际消耗，无值时填 0 并标注 estimated=false（不得用 LLM 估算，约束 4）",
       "type": "number",
@@ -87,7 +91,11 @@
       "description": "tokens 是否为估算值：true=LLM 估算（违反约束 4，应避免）；false=实际报告",
       "type": "boolean"
     },
-    "subagentSpawns": { "description": "本条记录涉及的子代理分派次数，非负整数", "type": "integer", "minimum": 0 },
+    "subagentSpawns": {
+      "description": "本条记录涉及的子代理分派次数，非负整数",
+      "type": "integer",
+      "minimum": 0
+    },
     "gateExitCode": {
       "description": "门禁脚本退出码（0=通过/1=校验失败/2=输入错误）；仅 gate/tla-gate/graph-gate/checkpoint 类动作填写，其他为 null；须与 gate-logs/ 存档一致（约束 #9 防伪造）",
       "type": ["integer", "null"]
@@ -122,8 +130,14 @@
       "description": "rootcause 动作的根因分类（见 RootCauseReport schema，如 requirement-gap）",
       "type": "string"
     },
-    "upstreamDefect": { "description": "rootcause 动作标记是否检测到上游缺陷（boolean）", "type": "boolean" },
-    "rollbackRecommended": { "description": "rootcause 动作标记是否建议阶段回退（boolean）", "type": "boolean" },
+    "upstreamDefect": {
+      "description": "rootcause 动作标记是否检测到上游缺陷（boolean）",
+      "type": "boolean"
+    },
+    "rollbackRecommended": {
+      "description": "rootcause 动作标记是否建议阶段回退（boolean）",
+      "type": "boolean"
+    },
     "basedOnReport": {
       "description": "fix 动作所基于的 R 报告 ID（与 reportId 一一对应，由 run-log R3 扩展校验）；implementation V/G 与对应 fix 使用同一 exact 值",
       "type": "string"
@@ -144,18 +158,28 @@
       "description": "review 审查目标类型（'rootcause' 表示复审 R 报告；另见 verifier-output meta.targetKind）",
       "type": "string"
     },
-    "target": { "description": "review 审查目标产物路径或 ID", "type": "string" },
+    "target": {
+      "description": "review 审查目标产物路径或 ID",
+      "type": "string"
+    },
     "qualityLevel": {
       "description": "review 评审质量等级：A/B/C/D（与 VerifierOutput qualityLevel 一致）",
       "enum": ["A", "B", "C", "D"]
     },
-    "passed": { "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空）", "type": "boolean" },
+    "passed": {
+      "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空）",
+      "type": "boolean"
+    },
     "reworkHints": {
       "description": "review 返工提示数组（passed=false 时必须为非空数组）",
       "type": "array",
       "items": { "type": "string" }
     },
-    "round": { "description": "返工轮次（rootcause/fix 动作），从 1 起", "type": "integer", "minimum": 1 },
+    "round": {
+      "description": "返工轮次（rootcause/fix 动作），从 1 起",
+      "type": "integer",
+      "minimum": 1
+    },
     "script": {
       "description": "gate 类动作的门禁脚本名（如 check-artifact-gate.ts / check-tla-model.ts / check-requirement-graph.ts）",
       "type": "string"
