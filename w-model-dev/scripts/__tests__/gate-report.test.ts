@@ -269,6 +269,35 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it('默认 RUN_LOG_JSON 与 --json 合并 parse diagnostics 和 lifecycleStatus', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-summary-parity-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(
+        logFile,
+        '{"runId":"valid","timestamp":"2026-08-24T00:00:00.000Z","phase":1,"phaseName":"需求分析","action":"chunk","role":"A","duration_s":1,"tokens":1,"estimated":false,"subagentSpawns":0,"gateExitCode":null,"outcome":"success"}\nnot-json\n',
+        'utf-8',
+      );
+      const jsonResult = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
+      const defaultResult = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, logFile], {});
+      expect(jsonResult.status).toBe(0);
+      expect(defaultResult.status).toBe(0);
+      const jsonSummary = JSON.parse(jsonResult.stdout ?? '') as Record<string, unknown>;
+      const defaultLine = (defaultResult.stdout ?? '').split(/\r?\n/).find((line) => line.startsWith('RUN_LOG_JSON '));
+      expect(defaultLine).toBeDefined();
+      const defaultSummary = JSON.parse(defaultLine!.slice('RUN_LOG_JSON '.length)) as Record<string, unknown>;
+      expect(defaultSummary).toMatchObject({
+        lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+        statusNote: expect.any(String),
+        diagnostics: expect.arrayContaining([expect.stringContaining('PARSE_INCOMPLETE')]),
+      });
+      expect(defaultSummary.lifecycleStatus).toBe(jsonSummary.lifecycleStatus);
+      expect(defaultSummary.diagnostics).toEqual(jsonSummary.diagnostics);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations 按 rule 聚合、默认路径保留 TLA_BDD_SYNC_JSON 前缀）', () => {

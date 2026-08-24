@@ -80,8 +80,8 @@ export interface RunLogEntry {
   rtmDiff?: Record<string, unknown>;
   /** implementation fix/review/gate/R3 所针对的实现产物身份 */
   implementationTarget?: string;
-  /** lifecycle reducer 的有效状态（不写回 raw JSONL） */
-  lifecycleStatus?: 'pending-pre-approval' | 'open-approved-lifecycle';
+  /** effective lifecycle status is emitted by the checker summary, never written back to raw JSONL. */
+  lifecycleStatus?: RunLogLifecycleStatus;
   /** review: 审查目标类型（'rootcause' 表示复审 R 报告） */
   targetKind?: string;
   /** review: 审查目标产物 */
@@ -107,11 +107,15 @@ export interface RunLogCheckOptions {
   gateLogs?: Map<string, { exitCode?: number; content: string }>;
 }
 
+export type RunLogLifecycleStatus = 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
+
 export interface RunLogCheckResult {
   passed: boolean;
   violations: string[];
   /** 生命周期 reducer 的非阻断诊断（legacy/pending 等状态，不改写 raw log）。 */
   diagnostics?: string[];
+  /** 当前输入是否在无 blocking violation 且无 deferred diagnostic 的意义下闭合。 */
+  lifecycleStatus: RunLogLifecycleStatus;
 }
 
 interface LifecycleIdentity {
@@ -175,10 +179,6 @@ function lifecycleScopeKey(identity: LifecycleIdentity): string {
   return [identity.phase, identity.round, identity.reportId].map((value) => value ?? 'unknown').join('|');
 }
 
-function lifecycleBucketKey(identity: LifecycleIdentity): string {
-  return [identity.phase, identity.round].map((value) => value ?? 'unknown').join('|');
-}
-
 function entryScopeKey(entry: RunLogEntry): string {
   const identity = lifecycleIdentity(entry);
   const reportRef = ['fix', 'emergency-fix'].includes(entry.action)
@@ -224,14 +224,40 @@ function isSuccessfulFix(entry: RunLogEntry): boolean {
   return entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action) && entry.outcome === 'success';
 }
 
-function hasExactFixEvidence(entry: RunLogEntry): boolean {
+function hasExactImplementationTargetEvidence(entry: RunLogEntry): boolean {
   const identity = lifecycleIdentity(entry);
   return (
-    isSuccessfulFix(entry) &&
     completeImplementationIdentity(entry) &&
     entry.target === identity.implementationTarget &&
     Array.isArray(entry.artifacts) &&
     entry.artifacts.includes(identity.implementationTarget!)
+  );
+}
+
+function hasExactFixEvidence(entry: RunLogEntry): boolean {
+  const identity = lifecycleIdentity(entry);
+  return (
+    isSuccessfulFix(entry) &&
+    hasExactImplementationTargetEvidence(entry) &&
+    Array.isArray(entry.artifacts) &&
+    entry.artifacts.includes(identity.implementationTarget!)
+  );
+}
+
+function hasExactImplementationReviewEvidence(entry: RunLogEntry): boolean {
+  return hasPassedReview(entry) && entry.targetKind !== 'rootcause' && hasExactImplementationTargetEvidence(entry);
+}
+
+function hasExactImplementationGateEvidence(entry: RunLogEntry): boolean {
+  return hasPassedGate(entry) && entry.targetKind !== 'rootcause' && hasExactImplementationTargetEvidence(entry);
+}
+
+function hasExactR3Evidence(entry: RunLogEntry): boolean {
+  return (
+    entry.role === 'R' &&
+    entry.outcome === 'success' &&
+    R3_ACTIONS.includes(entry.action) &&
+    hasExactImplementationTargetEvidence(entry)
   );
 }
 
@@ -284,6 +310,32 @@ function hasPassedGate(entry: RunLogEntry): boolean {
   );
 }
 
+const LIFECYCLE_IDENTITY_FIELDS = new Set([
+  'round',
+  'reportId',
+  'targetKind',
+  'basedOnReport',
+  'implementationTarget',
+  'target',
+]);
+
+function isLegacyIdentitySchemaFailure(raw: unknown, errorMessages: string[]): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const action = (raw as { action?: unknown }).action;
+  if (typeof action !== 'string') return false;
+  const requiredFields = errorMessages
+    .map((message) => message.match(/required property '([^']+)'/)?.[1])
+    .filter((field): field is string => field !== undefined);
+  if (requiredFields.length === 0 || requiredFields.some((field) => !LIFECYCLE_IDENTITY_FIELDS.has(field)))
+    return false;
+  return errorMessages.every(
+    (message) =>
+      /required property '[^']+'/.test(message) ||
+      message.includes('must match "then" schema') ||
+      message.includes('must match "if" schema'),
+  );
+}
+
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
 const R3_ACTIONS = ['r3-completeness', 'r3-reliability', 'r3-security'];
 const S_VARIANTS = ['produce', 'fix', 'emergency-fix'];
@@ -297,7 +349,11 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
   if (!Array.isArray(entries)) {
-    return { passed: false, violations: ['run-log entries 必须为数组'] };
+    return {
+      passed: false,
+      violations: ['run-log entries 必须为数组'],
+      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+    };
   }
 
   // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则跳过并记录（容错，不 crash）
@@ -308,6 +364,16 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     // === Schema 前置校验 ===
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
+      if (isLegacyIdentitySchemaFailure(raw, schemaResult.errorMessages)) {
+        const missingFields = schemaResult.errorMessages
+          .map((message) => message.match(/required property '([^']+)'/)?.[1])
+          .filter((field): field is string => field !== undefined);
+        const withoutIdentity = Object.fromEntries(
+          Object.entries(raw as Record<string, unknown>).filter(([field]) => !missingFields.includes(field)),
+        );
+        valid.push(withoutIdentity as unknown as RunLogEntry);
+        continue;
+      }
       // schema 拒绝：记录 [schema] 前缀违规并跳过该条
       for (const m of schemaResult.errorMessages) {
         violations.push(`条目 ${i + 1} [schema] ${m}`);
@@ -383,10 +449,10 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       if (typeof e.rollbackRecommended !== 'boolean')
         violations.push(`R1: rootcause 动作 ${e.runId} 须含 rollbackRecommended(boolean)`);
     }
-    if (e.action === 'fix') {
-      if (!isNonEmptyString(e.basedOnReport)) violations.push(`R1: fix 动作 ${e.runId} 须含 basedOnReport`);
+    if (['fix', 'emergency-fix'].includes(e.action)) {
+      if (!isNonEmptyString(e.basedOnReport)) violations.push(`R1: ${e.action} 动作 ${e.runId} 须含 basedOnReport`);
       if (!Array.isArray(e.artifacts) || e.artifacts.length === 0)
-        violations.push(`R1: fix 动作 ${e.runId} 须含 artifacts(非空数组)`);
+        violations.push(`R1: ${e.action} 动作 ${e.runId} 须含 artifacts(非空数组)`);
     }
   }
 
@@ -454,21 +520,18 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       .filter((identity) => identity.phase === 8 && completeRootcauseIdentity(identity))
       .map(lifecycleScopeKey),
   );
-  const strictLifecycleBuckets = new Set(
-    [...strictLifecycleScopes].map((scope) => {
-      const [phase, round] = scope.split('|');
-      return `${phase}|${round}`;
-    }),
-  );
+  /** Strictness belongs to one complete phase/round/report segment, never to a phase bucket. */
   const isStrictLifecycleEntry = (entry: RunLogEntry): boolean => {
+    if (entry.phase !== 8) return false;
     const identity = lifecycleIdentity(entry);
-    return (
-      strictLifecycleScopes.has(entryScopeKey(entry)) ||
-      (entry.phase === 8 &&
-        (strictLifecycleBuckets.has(lifecycleBucketKey(identity)) ||
-          completeRootcauseIdentity(identity) ||
-          completeImplementationIdentity(entry)))
-    );
+    const isRootcauseEvidence =
+      entry.action === 'rootcause' ||
+      (entry.action === 'review' && entry.targetKind === 'rootcause') ||
+      (entry.action === 'gate' && entry.script === 'check-rootcause-report.ts');
+    if (isRootcauseEvidence) {
+      return completeRootcauseIdentity(identity) && strictLifecycleScopes.has(lifecycleScopeKey(identity));
+    }
+    return completeImplementationIdentity(entry) && strictLifecycleScopes.has(entryScopeKey(entry));
   };
 
   for (const [key, rootcause] of rootcauseReports) {
@@ -515,9 +578,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         candidate.basedOnReport === identity.reportId
       );
     });
-    // Legacy rows remain diagnostics only whenever a complete phase 8 identity
-    // exists. They never provide fix credit to a strict lifecycle.
-    const hasFix = strictRootcause ? exactFixes.length > 0 : exactFixes.length > 0 || legacyFixes.length > 0;
+    // Legacy rows are diagnostic-only for every lifecycle. They never provide
+    // R3/V/G/R7/R8 credit, even when no strict phase-8 report exists.
+    const hasFix = exactFixes.length > 0;
     const hasDeferredFix = legacyFixes.length > 0;
     reportStatus.set(key, { hasReview, hasGate, hasFix, hasDeferredFix });
 
@@ -586,16 +649,22 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         );
         continue;
       }
+      const legacyPhase8 = phase === 8 && !strictForFix;
+      if (legacyPhase8) {
+        diagnostics.push(
+          `LEGACY_UNSCOPED: ${fixSegment.entry.action} ${fixSegment.entry.runId} R3/implementation credit deferred`,
+        );
+        continue;
+      }
       let vIndex = -1;
       for (let j = i + 1; j < entryList.length; j++) {
         const candidate = entryList.at(j)!.entry;
         const candidateIdentity = lifecycleIdentity(candidate);
-        const implementationReview =
-          hasPassedReview(candidate) &&
-          candidate.targetKind !== 'rootcause' &&
-          (strictForFix
-            ? completeImplementationIdentity(fixSegment.entry) && sameIdentity(candidateIdentity, fixIdentity)
-            : candidate.action === 'review');
+        const implementationReview = strictForFix
+          ? completeImplementationIdentity(fixSegment.entry) &&
+            hasExactImplementationReviewEvidence(candidate) &&
+            sameIdentity(candidateIdentity, fixIdentity)
+          : hasPassedReview(candidate) && candidate.action === 'review';
         if (implementationReview) {
           vIndex = j;
           break;
@@ -620,13 +689,14 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       }
       const r3Records = entryList.slice(i + 1, vIndex).filter(({ entry }) => {
         const identity = lifecycleIdentity(entry);
-        return (
-          entry.role === 'R' &&
-          entry.outcome === 'success' &&
-          R3_ACTIONS.includes(entry.action) &&
-          R3_DIMENSIONS.some((dimension) => entry.action.includes(dimension)) &&
-          (strictForFix ? completeImplementationIdentity(entry) && sameIdentity(identity, fixIdentity) : true)
-        );
+        return strictForFix
+          ? hasExactR3Evidence(entry) &&
+              R3_DIMENSIONS.some((dimension) => entry.action.includes(dimension)) &&
+              sameIdentity(identity, fixIdentity)
+          : entry.role === 'R' &&
+              entry.outcome === 'success' &&
+              R3_ACTIONS.includes(entry.action) &&
+              R3_DIMENSIONS.some((dimension) => entry.action.includes(dimension));
       });
       const dimensionCounts = new Map<string, number>();
       for (const { entry } of r3Records) {
@@ -654,9 +724,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         );
         const implementationGate = entryList.slice(vIndex + 1, gateEnd).find(({ entry }) => {
           const candidateIdentity = lifecycleIdentity(entry);
-          return (
-            hasPassedGate(entry) && entry.targetKind !== 'rootcause' && sameIdentity(candidateIdentity, fixIdentity)
-          );
+          return hasExactImplementationGateEvidence(entry) && sameIdentity(candidateIdentity, fixIdentity);
         });
         if (!implementationGate) {
           violations.push(
@@ -919,26 +987,17 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           ['S(fix|emergency-fix)', 0],
           [
             'R3(r3-completeness|r3-reliability|r3-security)',
-            firstIndex(
-              (entry) =>
-                exactEntry(entry) &&
-                entry.role === 'R' &&
-                entry.outcome === 'success' &&
-                R3_ACTIONS.includes(entry.action),
-            ),
+            firstIndex((entry) => exactEntry(entry) && hasExactR3Evidence(entry)),
           ],
           [
             'V(implementation review)',
-            firstIndex((entry) => exactEntry(entry) && hasPassedReview(entry) && entry.targetKind !== 'rootcause'),
+            firstIndex((entry) => exactEntry(entry) && hasExactImplementationReviewEvidence(entry)),
           ],
           [
             'G(implementation gate)',
             firstIndex(
               (entry) =>
-                exactEntry(entry) &&
-                hasPassedGate(entry) &&
-                GATE_ACTIONS.has(entry.action) &&
-                entry.targetKind !== 'rootcause',
+                exactEntry(entry) && GATE_ACTIONS.has(entry.action) && hasExactImplementationGateEvidence(entry),
             ),
           ],
           ['checkpoint', firstIndex((entry) => entry.action === 'checkpoint' && entry.outcome === 'success')],
@@ -1001,10 +1060,12 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  const passed = violations.length === 0;
   return {
-    passed: violations.length === 0,
+    passed,
     violations,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    lifecycleStatus: passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN',
   };
 }
 

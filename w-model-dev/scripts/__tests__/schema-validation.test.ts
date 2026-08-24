@@ -73,6 +73,105 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     expect(result.errorMessages.some((m) => /type/.test(m))).toBe(true);
   });
 
+  it('fix 和 emergency-fix 缺少 basedOnReport 或空 artifacts 时被 action-specific schema 拒绝', () => {
+    const base = {
+      runId: 'fix-schema',
+      timestamp: '2026-08-24T00:00:00.000Z',
+      phase: 8,
+      phaseName: '验收测试',
+      role: 'S',
+      duration_s: 1,
+      tokens: 1,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+    };
+    for (const action of ['fix', 'emergency-fix']) {
+      expect(validateBySchema('run-log', { ...base, action, artifacts: ['src/app.ts'] }).valid).toBe(false);
+      expect(validateBySchema('run-log', { ...base, action, basedOnReport: 'RC-1', artifacts: [] }).valid).toBe(false);
+    }
+  });
+
+  it('phase-8 implementation review/gate/R3 缺 identity required 字段时被拒绝', () => {
+    const base = {
+      runId: 'implementation-schema',
+      timestamp: '2026-08-24T00:00:00.000Z',
+      phase: 8,
+      phaseName: '验收测试',
+      duration_s: 1,
+      tokens: 1,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      reportId: 'RC-1',
+      round: 1,
+      targetKind: 'code',
+      basedOnReport: 'RC-1',
+      target: 'src/app.ts',
+      implementationTarget: 'src/app.ts',
+      artifacts: ['src/app.ts'],
+    };
+    expect(
+      validateBySchema('run-log', {
+        ...base,
+        action: 'review',
+        role: 'V',
+        passed: true,
+        qualityLevel: 'A',
+        reworkHints: [],
+      }).valid,
+    ).toBe(true);
+    expect(
+      validateBySchema('run-log', {
+        ...base,
+        action: 'review',
+        role: 'V',
+        passed: true,
+        qualityLevel: 'A',
+        reworkHints: [],
+        implementationTarget: undefined,
+        reportId: undefined,
+        basedOnReport: undefined,
+      }).valid,
+    ).toBe(false);
+    expect(
+      validateBySchema('run-log', {
+        ...base,
+        action: 'gate',
+        role: 'G',
+        gateExitCode: 0,
+        script: 'check-artifact-gate.ts',
+      }).valid,
+    ).toBe(true);
+    expect(
+      validateBySchema('run-log', {
+        ...base,
+        action: 'gate',
+        role: 'G',
+        gateExitCode: 0,
+        script: 'check-artifact-gate.ts',
+        target: undefined,
+      }).valid,
+    ).toBe(false);
+    expect(
+      validateBySchema('run-log', {
+        ...base,
+        action: 'r3-completeness',
+        role: 'R',
+      }).valid,
+    ).toBe(true);
+    expect(
+      validateBySchema('run-log', {
+        ...base,
+        action: 'r3-completeness',
+        role: 'R',
+        artifacts: undefined,
+      }).valid,
+    ).toBe(false);
+  });
+
   it('未注册的 schema 返回明确错误，gate-log 使用独立 schema 拒绝无效结构', () => {
     const result = validateBySchema('nonexistent-schema', {});
     expect(result.valid).toBe(false);

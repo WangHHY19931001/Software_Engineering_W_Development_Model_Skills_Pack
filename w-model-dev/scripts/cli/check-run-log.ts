@@ -37,7 +37,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-import { checkRunLog, extractExitCode, buildGateLogKeys } from '../logic/run-log-logic.js';
+import { checkRunLog, extractExitCode, buildGateLogKeys, type RunLogLifecycleStatus } from '../logic/run-log-logic.js';
 import { readJsonlOrExitDetailed } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
@@ -181,28 +181,26 @@ async function main(): Promise<void> {
     ...parsedRunLog.parseErrors.map((error) => `PARSE_INCOMPLETE: line ${error.line} ${error.message}; deferred`),
   ];
   const exitCode = result.passed ? 0 : 1;
-  const lifecycleStatus =
+  const lifecycleStatus: RunLogLifecycleStatus =
     result.passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN';
   const statusNote =
     result.passed && diagnostics.length > 0
       ? 'exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。'
       : undefined;
+  const summary = {
+    type: 'run-log',
+    passed: result.passed,
+    reasons: result.violations,
+    violations: buildViolationDistribution(result.violations.length),
+    lifecycleStatus,
+    ...(statusNote ? { statusNote } : {}),
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    durationMs: Date.now() - startTime,
+  };
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport(
-      {
-        type: 'run-log',
-        passed: result.passed,
-        reasons: result.violations,
-        violations: buildViolationDistribution(result.violations.length),
-        lifecycleStatus,
-        ...(statusNote ? { statusNote } : {}),
-        ...(diagnostics.length > 0 ? { diagnostics } : {}),
-        durationMs: Date.now() - startTime,
-      },
-      exitCode,
-    );
+    printJsonReport(summary, exitCode);
     process.exitCode = exitCode;
     return;
   }
@@ -242,16 +240,7 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
-  printGateReport(
-    'RUN_LOG',
-    {
-      type: 'run-log',
-      passed: result.passed,
-      violations: result.violations,
-      ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
-    },
-    exitCode,
-  );
+  printGateReport('RUN_LOG', summary, exitCode);
   process.exitCode = exitCode;
   return;
 }

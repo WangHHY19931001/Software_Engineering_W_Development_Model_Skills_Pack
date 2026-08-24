@@ -54,7 +54,7 @@ describe('run-log R1 扩展：rootcause/fix 动作字段', () => {
     const bad = lines.map((l) => (l.action === 'fix' ? { ...l, basedOnReport: undefined } : l)) as RunLogEntry[];
     const result = checkRunLog(bad);
     expect(result.passed).toBe(false);
-    expect(result.violations.some((r) => /R1.*fix.*basedOnReport/.test(r))).toBe(true);
+    expect(result.diagnostics?.some((r) => /LEGACY_UNSCOPED.*basedOnReport/.test(r))).toBe(true);
   });
 
   it('完整 rootcause-valid 样本通过所有扩展校验', async () => {
@@ -157,6 +157,8 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         subagentSpawns: 0,
         gateExitCode: null,
         outcome: 'success',
+        basedOnReport: 'RC-R8',
+        artifacts: ['test-artifact'],
       },
       {
         runId: '2',
@@ -193,6 +195,8 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         subagentSpawns: 0,
         gateExitCode: null,
         outcome: 'success',
+        basedOnReport: 'RC-R8',
+        artifacts: ['test-artifact'],
       },
       {
         runId: '2',
@@ -229,6 +233,8 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         subagentSpawns: 0,
         gateExitCode: null,
         outcome: 'success',
+        basedOnReport: 'RC-R8',
+        artifacts: ['test-artifact'],
       },
       {
         runId: '2',
@@ -306,6 +312,8 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         subagentSpawns: 0,
         gateExitCode: null,
         outcome: 'success',
+        basedOnReport: 'RC-R8',
+        artifacts: ['test-artifact'],
       },
       {
         runId: '2',
@@ -467,6 +475,10 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
   const merged: Record<string, unknown> = { ...base };
   for (const [k, v] of Object.entries(overrides)) {
     if (v !== undefined) merged[k] = v;
+  }
+  if (['fix', 'emergency-fix'].includes(String(merged.action))) {
+    if (merged.basedOnReport === undefined) merged.basedOnReport = 'RC-TEST';
+    if (merged.artifacts === undefined) merged.artifacts = ['test-artifact'];
   }
   return merged as unknown as RunLogEntry;
 }
@@ -1006,6 +1018,7 @@ describe('D8 lifecycle identity reducer', () => {
       target,
       targetKind: 'code',
       implementationTarget: target,
+      artifacts: [target],
       qualityLevel: 'A',
       reworkHints: [],
       basedOnReport: reportId,
@@ -1029,6 +1042,7 @@ describe('D8 lifecycle identity reducer', () => {
       target,
       targetKind: 'code',
       implementationTarget: target,
+      artifacts: [target],
       script: 'check-artifact-gate.ts',
       basedOnReport: reportId,
     });
@@ -1073,6 +1087,8 @@ describe('D8 lifecycle identity reducer', () => {
       basedOnReport: reportId,
       targetKind: reportId ? 'code' : undefined,
       implementationTarget: reportId ? (implementationTarget ?? `implementation-${reportId}`) : undefined,
+      target: reportId ? (implementationTarget ?? `implementation-${reportId}`) : undefined,
+      artifacts: reportId ? [implementationTarget ?? `implementation-${reportId}`] : undefined,
     });
 
   it('does not let a different reportId rootcause V/G or fix satisfy the target lifecycle', () => {
@@ -1254,9 +1270,8 @@ describe('D8 lifecycle identity reducer', () => {
     );
   });
 
-  it('does not mutate the raw run-log JSONL bytes', async () => {
-    const rawPath = path.resolve(here, '../../../.w-model/run-log.jsonl');
-    const before = await fs.readFile(rawPath);
+  it('does not mutate the committed raw fixture JSONL bytes', async () => {
+    const before = await fs.readFile(identity2FixturePath);
     checkRunLog(
       before
         .toString('utf8')
@@ -1265,7 +1280,7 @@ describe('D8 lifecycle identity reducer', () => {
         .filter(Boolean)
         .map((line) => JSON.parse(line)),
     );
-    const after = await fs.readFile(rawPath);
+    const after = await fs.readFile(identity2FixturePath);
     expect(after.equals(before)).toBe(true);
   });
 
@@ -1349,7 +1364,9 @@ describe('D8 lifecycle identity reducer', () => {
       implementationGate('g-impl', 'RC-A'),
     ]);
     expect(result.passed).toBe(false);
-    expect(result.diagnostics?.some((diagnostic) => /implementationTarget/.test(diagnostic))).toBe(true);
+    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*implementationTarget/.test(diagnostic))).toBe(
+      true,
+    );
   });
 
   it('rejects failed R3 evidence even when all three dimensions are present', () => {
@@ -1542,6 +1559,60 @@ describe('D8 lifecycle identity reducer', () => {
     const result = checkRunLog([rootCause('r-target', 'RC-TARGET'), rootCauseReview('v-target', 'RC-TARGET'), badFix]);
     expect(result.violations.some((reason) => /R7.*exact.*target|R7.*artifacts/.test(reason))).toBe(true);
   });
+
+  it('does not let an unrelated phase-8 legacy segment hide its own bad ordering', () => {
+    const strictTarget = 'implementation-STRICT';
+    const strictEntries = [
+      rootCause('strict-root', 'RC-STRICT'),
+      rootCauseReview('strict-root-v', 'RC-STRICT'),
+      rootCauseGate('strict-root-g', 'RC-STRICT'),
+      fix('strict-fix', 'RC-STRICT', 1, strictTarget),
+      r3('strict-r3-c', 'completeness', 'RC-STRICT', strictTarget),
+      r3('strict-r3-r', 'reliability', 'RC-STRICT', strictTarget),
+      r3('strict-r3-s', 'security', 'RC-STRICT', strictTarget),
+      implementationReview('strict-v', 'RC-STRICT', 1, strictTarget),
+      implementationGate('strict-g', 'RC-STRICT', 1, strictTarget),
+    ];
+    const unrelatedLegacy = [
+      makeEntry({ runId: 'legacy-produce', phase: 7, action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: 'legacy-gate', phase: 7, action: 'gate', role: 'G', outcome: 'success', gateExitCode: 0 }),
+      makeEntry({ runId: 'legacy-review', phase: 7, action: 'review', role: 'V', outcome: 'success', passed: true }),
+      makeEntry({
+        runId: 'legacy-checkpoint',
+        phase: 7,
+        action: 'checkpoint',
+        role: 'O',
+        outcome: 'success',
+        acknowledgedDecisions: ['legacy-ordering'],
+      }),
+    ];
+    const result = checkRunLog([...strictEntries, ...unrelatedLegacy]);
+    expect(result.violations.some((reason) => /R8.*阶段 7.*轨迹顺序倒置/.test(reason))).toBe(true);
+  });
+
+  it('keeps an incomplete legacy fix diagnostic-only instead of granting lifecycle credit', () => {
+    const legacyFix = makeEntry({
+      runId: 'legacy-fix-only',
+      phase: 8,
+      action: 'fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-LEGACY',
+      artifacts: ['implementation-LEGACY'],
+    });
+    const result = checkRunLog([
+      legacyFix,
+      makeEntry({ runId: 'legacy-r3-c', phase: 8, action: 'r3-completeness', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'legacy-r3-r', phase: 8, action: 'r3-reliability', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'legacy-r3-s', phase: 8, action: 'r3-security', role: 'R', outcome: 'success' }),
+      makeEntry({ runId: 'legacy-v', phase: 8, action: 'review', role: 'V', outcome: 'success', passed: true }),
+    ]);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*legacy-fix-only/.test(diagnostic))).toBe(true);
+    expect(
+      result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*legacy-fix-only.*credit deferred/.test(diagnostic)),
+    ).toBe(true);
+  });
 });
 
 describe('RunLogEntry schema/type contract', () => {
@@ -1554,6 +1625,6 @@ describe('RunLogEntry schema/type contract', () => {
     const typeActions = [...actionBody.matchAll(/["']([^"']+)["']/g)].map((match) => match[1]);
     expect(typeActions).toEqual(schema.properties.action.enum);
     expect(source).toContain('implementationTarget?: string;');
-    expect(source).toMatch(/lifecycleStatus\?: ["']pending-pre-approval["'] \| ["']open-approved-lifecycle["'];/);
+    expect(source).toMatch(/lifecycleStatus\?: RunLogLifecycleStatus;/);
   });
 });

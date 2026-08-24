@@ -1737,11 +1737,11 @@ interface RunLogEntry {
   target?: string;
   round?: number;
   implementationTarget?: string;
-  lifecycleStatus?: 'pending-pre-approval' | 'open-approved-lifecycle';
+  lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
 ```
 
-**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按 `(phase, round, reportId, targetKind, basedOnReport)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix 仅接受 exact `basedOnReport`。implementation V/G 必须显式 targetKind/implementationTarget 并同 fix identity 对齐；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics；同身份 V/G 未全部通过输出 `pending-pre-approval`，只有同身份 V/G 已通过仍缺 exact fix 才输出 `open-approved-lifecycle`。诊断不会修改 append-only raw JSONL。
+**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix、emergency-fix、implementation V/G/R3 必须显式声明并 exact 对齐 `target===implementationTarget`，且 fix/R3/V/G artifacts 包含 exact target；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics，legacy 证据不进入 credit；生命周期机器状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 仍不单独证明 closed。诊断不会修改 append-only raw JSONL。
 
 ### 10D.4 编排者维护职责（O 角色扩展，不改 S/V/G 边界）
 

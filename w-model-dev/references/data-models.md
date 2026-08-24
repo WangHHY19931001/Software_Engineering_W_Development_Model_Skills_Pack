@@ -464,8 +464,8 @@ interface RunLogEntry {
   decisionConfidence?: number;
   /** implementation review/gate 所针对的实现目标；缺失时 reducer 输出 LEGACY_UNSCOPED */
   implementationTarget?: string;
-  /** reducer/effective consumer 的生命周期诊断状态，不改写 raw JSONL */
-  lifecycleStatus?: 'pending-pre-approval' | 'open-approved-lifecycle';
+  /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
+  lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
 ```
 
@@ -522,7 +522,8 @@ interface RunLogEntry {
 | action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
 | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `rootcause` | `reportId` / `rootCauseCategory` / `upstreamDefect` / `rollbackRecommended` | R 子代理产出根因报告时记录；`reportId` 格式 `RC-<phase>-<round>-<seq>`；`rootCauseCategory` 见 RootCauseReport Schema；`upstreamDefect`(boolean) 标记是否检测到上游缺陷；`rollbackRecommended`(boolean) 标记是否建议阶段回退 |
-| `fix`       | `basedOnReport` / `artifacts`                                               | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组                                                                                      |
+| `fix`       | `basedOnReport` / `artifacts`                                               | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组，implementation segment 还须 `target===implementationTarget` 且 artifacts 包含 exact target                                                                                      |
+| `emergency-fix` | `basedOnReport` / `artifacts`                                           | S 紧急修复变体，与 `fix` 使用相同的 identity、非空 artifacts 和 R3/V/G credit 约束                                                                                                                                        |
 | `escalate`  | 新增可选字段 `reportId`（仅 `upstreamDefect` 触发的升级）                   | 当 R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true` 触发场景 5 阶段回退升级时，`escalate` 动作记录 `reportId` 关联根因报告                                                                                 |
 
 **rootcause 动作示例**（spec §5.5）：
@@ -539,7 +540,7 @@ interface RunLogEntry {
 
 > 多角度场景（R-lead 分派 N 个 R-persona，并行/串行均可）时，每份 PartialReport 各记一条 `rootcause` 动作（`role:"R"`，`note` 标注 personaSlice），聚合记一条 `rootcause` 动作（`note:"R-lead aggregation"`）。
 >
-> **D8 lifecycle identity 约束（phase 8）：** reducer 使用 `(phase, round, reportId, targetKind, basedOnReport)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix 只接受 `basedOnReport` 精确匹配的 reportId。implementation V/G 必须与对应 fix 保持同一 phase/round/reportId/basedOnReport，并使用非 rootcause 的 `targetKind` 与 `implementationTarget`。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；同身份 V/G 尚未全部通过时为 `pending-pre-approval`，仅同身份 V/G 已通过且缺 exact fix 时为 `open-approved-lifecycle`。raw JSONL 始终 append-only，不由 checker 改写。
+> **D8 lifecycle identity 约束（phase 8）：** reducer 使用完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix/emergency-fix 只接受 `basedOnReport` 精确匹配的 reportId、`target===implementationTarget` 且非空 artifacts 包含 exact target。implementation V/G/R3 必须与对应 fix 保持同一 phase/round/reportId/targetKind/basedOnReport/implementationTarget，并满足 exact target/artifacts 关系。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；legacy evidence 不进入 R3/V/R8 credit；机器状态为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 不单独证明 closed。raw JSONL 始终 append-only，不由 checker 改写。
 
 ## 自主成熟度模型（maturity.json）
 

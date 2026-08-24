@@ -19,6 +19,48 @@
     "gateExitCode",
     "outcome"
   ],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action": { "enum": ["fix", "emergency-fix"] } },
+        "required": ["action"]
+      },
+      "then": {
+        "properties": {
+          "basedOnReport": {},
+          "artifacts": { "type": "array", "minItems": 1 }
+        },
+        "required": ["basedOnReport", "artifacts"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": { "const": 8 },
+          "action": { "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security"] },
+          "targetKind": { "const": "code" }
+        },
+        "required": ["phase", "action", "targetKind"]
+      },
+      "then": {
+        "properties": {
+          "round": {},
+          "reportId": {},
+          "basedOnReport": {},
+          "implementationTarget": {},
+          "target": {},
+          "artifacts": { "type": "array", "minItems": 1 }
+        },
+        "required": ["round", "reportId", "basedOnReport", "implementationTarget", "target", "artifacts"]
+      }
+    },
+    {
+      "if": { "properties": { "lifecycleStatus": {} }, "required": ["lifecycleStatus"] },
+      "then": {
+        "properties": { "lifecycleStatus": { "enum": ["CLOSED_UNDER_CURRENT_RULES", "NOT_CLOSED_NOT_PROVEN"] } }
+      }
+    }
+  ],
   "properties": {
     "runId": {
       "description": "运行 ID（UUID 或时间戳），run-log.jsonl 每条记录的唯一标识",
@@ -148,7 +190,7 @@
     },
     "lifecycleStatus": {
       "description": "生命周期诊断状态（仅 reducer/effective consumer 使用）：pending-pre-approval 或 open-approved-lifecycle；不改写 raw JSONL",
-      "enum": ["pending-pre-approval", "open-approved-lifecycle"]
+      "enum": ["CLOSED_UNDER_CURRENT_RULES", "NOT_CLOSED_NOT_PROVEN"]
     },
     "rtmDiff": {
       "description": "S 产出后 RTM 增量回填差异记录（约束 #3：RTM 实体每阶段必须回填），对象形态（如变更字段映射）",

@@ -47,9 +47,9 @@ D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.ex
 
 ### `check-run-log.ts` lifecycle diagnostics
 
-`npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]` 保持 exit `0=通过`、`1=真实生命周期/门禁违规`、`2=输入错误`。phase 8 的 lifecycle reducer 以 `(phase, round, reportId, targetKind, basedOnReport)` 关联记录：rootcause V/G 仅匹配同 reportId/round/targetKind，fix 仅匹配 exact `basedOnReport`，rootcause review 不计 implementation V。R3 completeness/reliability/security 仅在同身份 `S-fix → R3×3 → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase-wide 首索引误关联。
+`npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]` 保持 exit `0=通过`、`1=真实生命周期/门禁违规`、`2=输入错误`。phase 8 的 lifecycle reducer 以完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联记录：rootcause V/G 仅匹配同 reportId/round/targetKind，fix 与 implementation V/G/R3 只接受 exact target/artifacts 关系，rootcause review 不计 implementation V。R3 completeness/reliability/security 仅在同身份 `S-fix → R3×3 → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引误关联。
 
-缺少 identity 字段的历史行不被推断或静默放行，`--json` 和人类输出都会展示 `LEGACY_UNSCOPED`/deferred diagnostics；rootcause 的 `basedOnReport` 可明确为 `null/unknown`。同身份 V/G 尚未全部通过时输出 `pending-pre-approval` 诊断，不报 exact-fix omission；同身份 V/G 已通过但缺 exact `basedOnReport` fix 时保留 exit 1 并输出 `open-approved-lifecycle`。checker 只读 raw append-only JSONL，不追加、删除、重排或编辑历史行。
+缺少 identity 字段的历史行不被推断或静默放行，`--json` 和默认 `RUN_LOG_JSON` 都展示合并的 `LEGACY_UNSCOPED`/deferred diagnostics；legacy 证据只作诊断，不进入 R3/V/R8 credit。`fix` 与 `emergency-fix` 都要求 `basedOnReport` 和非空 `artifacts`。生命周期状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`；exit 0 仍可能是 `NOT_CLOSED_NOT_PROVEN`，不能单独证明 lifecycle closed。checker 只读 raw append-only JSONL，不追加、删除、重排或编辑历史行。
 
 ### Source-bound provenance 边界
 
