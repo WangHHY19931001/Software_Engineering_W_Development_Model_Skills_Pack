@@ -582,8 +582,10 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
  *   2. 未提供可用 JSON 时，一律显式 spawn Vitest 采集（不以 scriptsChanged 跳过）。
  * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
  * spawnSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
- * 落盘/解析失败回退 stdout 文本解析「Tests  N passed」；全部失败返回 -1，由逻辑层生成
- * `vitest-tests` 违规并 fail-closed。
+ * 落盘/解析失败（含 spawn 超时/错误）一律先尝试读取 JSON outputFile（vitest 若已完整跑完必落盘）；
+ * 仍读不到则返回 -1，由逻辑层生成 `vitest-tests` 违规并 fail-closed（不虚构计数）。
+ * 注：timeout 按本仓库全量 vitest 实测墙钟（约 198s）上调到 300s，避免健康仓库在
+ * standalone 自采集时因超时被误判 fail-closed；pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径。
  * 注：maxBuffer 必须放宽——vitest 全量进度输出可达数 MB，默认 1MB 会触发
  * ERR_CHILD_PROCESS_STDIO_MAXBUFFER（此时 spawn 报 error 但 JSON 文件已落盘，仍需继续读文件）。
  * 注：必须显式 --config 限定扫描范围（config/vitest.config.ts 的 include 仅
@@ -601,14 +603,14 @@ function collectVitestMeasurements(root: string): VitestMeasurements {
     spawnSync(process.execPath, [vitestBin, ...vitestArgs], {
       cwd: root,
       encoding: 'utf-8',
-      timeout: 180_000,
+      timeout: 300_000,
       maxBuffer: 64 * 1024 * 1024,
     });
   } else {
     spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
       cwd: root,
       encoding: 'utf-8',
-      timeout: 180_000,
+      timeout: 300_000,
       maxBuffer: 64 * 1024 * 1024,
       shell: true,
     });
