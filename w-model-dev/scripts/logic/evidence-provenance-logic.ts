@@ -137,6 +137,52 @@ function fail(error: unknown): ProvenanceResult {
     ? { ok: false, exitCode: error.exitCode, reason: error.reason }
     : { ok: false, exitCode: 1, reason: 'INVALID_SOURCE_PROVENANCE' };
 }
+/**
+ * Resolves the loose ref file that `HEAD` points to inside a single git dir.
+ * Git linked-worktree layout keeps worktree-private refs in the worktree
+ * gitdir and shared refs (refs/heads, refs/tags, refs/remotes) in the common
+ * git dir selected by `<gitDir>/commondir`; a missing ref here is therefore a
+ * layout signal, not a safety violation.
+ *
+ * @returns the resolved ref text, or `null` when the ref file is absent.
+ * @throws ProvenanceFailure(UNSAFE_SOURCE_EVIDENCE) for symlinks/escape/TOCTOU;
+ *         a plain Error for a non-file target (mapped to MISSING_GIT_HEAD).
+ */
+async function resolveGitFileRef(refRel: string, gitDir: string, rootReal: string): Promise<string | null> {
+  const candidate = path.join(gitDir, refRel);
+  // Lexically walk existing components: a symlinked or redirecting component
+  // throws UNSAFE_SOURCE_EVIDENCE; any missing component (e.g. `refs/heads`
+  // absent in a worktree gitdir) returns early and is treated as a miss.
+  await assertLexicalPath(candidate, true);
+  let stat: import('node:fs').Stats;
+  try {
+    stat = await fs.lstat(candidate);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('invalid HEAD ref file');
+  await assertCanonicalPath(candidate, rootReal);
+  return (await readStableFile(candidate, rootReal)).toString('utf8').trim();
+}
+
+/** Resolves the common git dir for a (possibly linked-worktree) git dir. */
+async function resolveCommonGitDir(gitDir: string, gitDirReal: string): Promise<{ dir: string; real: string }> {
+  const commondirPath = path.join(gitDir, 'commondir');
+  let stat: import('node:fs').Stats;
+  try {
+    stat = await fs.lstat(commondirPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { dir: gitDir, real: gitDirReal };
+    throw error;
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('invalid commondir');
+  const content = (await readStableFile(commondirPath, gitDirReal)).toString('utf8').trim();
+  if (!content) throw new Error('invalid commondir');
+  const dir = path.resolve(gitDir, content);
+  const real = await fs.realpath(dir);
+  return { dir, real };
+}
 async function gitHead(project: string): Promise<string> {
   try {
     const gitEntry = path.join(project, '.git');
@@ -157,11 +203,18 @@ async function gitHead(project: string): Promise<string> {
     const headPath = path.join(gitDir, 'HEAD');
     await assertCanonicalPath(headPath, gitDirReal);
     const head = (await readStableFile(headPath, gitDirReal)).toString('utf8').trim();
-    let value = head;
+    let value: string | null = head;
     if (head.startsWith('ref: ')) {
-      const refPath = path.join(gitDir, head.slice('ref: '.length));
-      await assertCanonicalPath(refPath, gitDirReal);
-      value = (await readStableFile(refPath, gitDirReal)).toString('utf8').trim();
+      const refRel = head.slice('ref: '.length);
+      // 1) worktree-private refs first (normal repos resolve here unchanged);
+      value = await resolveGitFileRef(refRel, gitDir, gitDirReal);
+      if (value === null) {
+        // 2) linked worktrees: shared refs live in the common git dir selected
+        //    by commondir; resolve it and re-probe with its own real root.
+        const { dir: commonGitDir, real: commonGitDirReal } = await resolveCommonGitDir(gitDir, gitDirReal);
+        value = await resolveGitFileRef(refRel, commonGitDir, commonGitDirReal);
+      }
+      if (value === null) throw new Error('missing HEAD ref');
     }
     if (!/^[0-9a-f]{40}$/.test(value)) throw new Error('invalid HEAD');
     return value;

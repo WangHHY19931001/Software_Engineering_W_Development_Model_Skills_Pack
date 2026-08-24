@@ -73,6 +73,40 @@ async function makeProject(): Promise<string> {
   return project;
 }
 
+type LinkedWorktreeFixture = {
+  project: string;
+  branch: string;
+  sha: string;
+  worktreeGitDir: string;
+  commonGitDir: string;
+};
+
+/**
+ * Builds a synthetic linked git worktree layout without invoking `git worktree`:
+ * - `.git` is a file pointer (`gitdir: <dir>`) to a worktree-private gitdir;
+ * - the worktree gitdir has HEAD=`ref: refs/heads/<branch>`, a `commondir` file
+ *   (relative path), a `gitdir` marker, and an empty `refs/` dir;
+ * - the common gitdir (commondir target) holds `refs/heads/<branch>=<40hex>`.
+ * Ref values are fixtures, not real objects; gitHead only reads the ref text.
+ */
+async function makeLinkedWorktreeProject(
+  branch = 'fix/worktree-synthetic',
+  sha = '3041c25d8171b38ced4ce3d029e2d6c452f531fa',
+): Promise<LinkedWorktreeFixture> {
+  const project = await makeProject();
+  const worktreeGitDir = path.join(project, 'gitdir-wt');
+  const commonGitDir = path.join(project, 'gitdir-common');
+  await fs.mkdir(path.join(worktreeGitDir, 'refs'), { recursive: true });
+  await fs.mkdir(path.join(commonGitDir, 'refs', 'heads', path.dirname(branch)), { recursive: true });
+  await fs.writeFile(path.join(worktreeGitDir, 'HEAD'), `ref: refs/heads/${branch}\n`, 'utf8');
+  await fs.writeFile(path.join(worktreeGitDir, 'commondir'), '../gitdir-common\n', 'utf8');
+  await fs.writeFile(path.join(worktreeGitDir, 'gitdir'), `gitdir: ${worktreeGitDir}\n`, 'utf8');
+  await fs.writeFile(path.join(commonGitDir, 'refs', 'heads', branch), `${sha}\n`, 'utf8');
+  await fs.rm(path.join(project, '.git'), { recursive: true, force: true });
+  await fs.writeFile(path.join(project, '.git'), 'gitdir: gitdir-wt\n', 'utf8');
+  return { project, branch, sha, worktreeGitDir, commonGitDir };
+}
+
 async function runSourceCli(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
     const result = await execFileAsync(process.execPath, [require.resolve('tsx/cli'), SOURCE_CLI, ...args], {
@@ -128,7 +162,7 @@ describe('source provenance', () => {
     });
   });
 
-  it('supports a linked worktree .git file when resolving the source commit', async () => {
+  it('relocated full gitdir via .git pointer', async () => {
     const project = await makeProject();
     const gitDir = path.join(project, '.git');
     const linkedGitDir = path.join(project, 'git-metadata');
@@ -140,6 +174,29 @@ describe('source provenance', () => {
     const produced = await produceSourceProvenance(project);
     expect(produced.reason).toBeUndefined();
     expect(produced).toEqual(expect.objectContaining({ ok: true, verificationLevel: 'source-bound' }));
+  });
+
+  it('resolves the source commit through a linked worktree commondir shared ref', async () => {
+    const { project, sha } = await makeLinkedWorktreeProject();
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced.reason).toBeUndefined();
+    expect(produced).toEqual(expect.objectContaining({ ok: true, verificationLevel: 'source-bound' }));
+    expect(produced.provenance?.commitSha).toBe('3041c25d8171b38ced4ce3d029e2d6c452f531fa');
+    expect(produced.provenance?.commitSha).toBe(sha);
+    const verified = await verifySourceProvenance(project);
+    expect(verified).toEqual(expect.objectContaining({ ok: true, verificationLevel: 'source-bound' }));
+  });
+
+  it('reports MISSING_GIT_HEAD when neither the worktree gitdir nor the common gitdir has the ref', async () => {
+    const { project, branch } = await makeLinkedWorktreeProject();
+    await fs.rm(path.join(project, 'gitdir-common', 'refs', 'heads', branch), { force: true });
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: false, exitCode: 1, reason: 'MISSING_GIT_HEAD' });
+    expect(String(produced.reason)).not.toContain('UNSAFE_SOURCE_EVIDENCE');
   });
 
   it('rejects a project reached through a redirected lexical ancestor', async () => {
