@@ -56,6 +56,7 @@ import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 interface ParsedArgs {
   runLogFile: string | undefined;
   gateLogsDir: string | undefined;
+  gateLogsExplicit: boolean;
   tlaManifestFile: string | undefined;
 }
 
@@ -63,8 +64,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const runLogFile = args.find((a) => !a.startsWith('--'));
   const gateLogsDir = parseFlagValue(args, 'gate-logs');
+  const gateLogsExplicit = args.some((a) => a === '--gate-logs' || a.startsWith('--gate-logs='));
   const tlaManifestFile = parseFlagValue(args, 'tla-manifest');
-  return { runLogFile, gateLogsDir, tlaManifestFile };
+  return { runLogFile, gateLogsDir, gateLogsExplicit, tlaManifestFile };
 }
 
 // ==================== gate-logs 加载 ====================
@@ -117,10 +119,12 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
         continue;
       }
       const inspected = inspectGateLogContent(content);
+      let schemaValid = false;
       if (!inspected.rootJson || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         violations.push(`R6: gate-log ${fileAbs} 根 JSON 必须为 object`);
       } else {
         const schemaResult = validateBySchema('gate-log', parsed);
+        schemaValid = schemaResult.valid;
         if (!schemaResult.valid) {
           for (const message of schemaResult.errorMessages) {
             violations.push(`R6: gate-log ${fileAbs} [schema] ${message}`);
@@ -131,9 +135,11 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
       if (inspected.exitCode === undefined) {
         violations.push(`R6: gate-log ${fileAbs} 未提取到合法 exitCode`);
       }
-      const data = { ...(inspected.exitCode !== undefined ? { exitCode: inspected.exitCode } : {}), content };
-      const keys = buildGateLogKeys(fileAbs, process.cwd());
-      for (const k of keys) map.set(k, data);
+      if (schemaValid && inspected.violations.length === 0 && inspected.exitCode !== undefined) {
+        const data = { exitCode: inspected.exitCode, content };
+        const keys = buildGateLogKeys(fileAbs, process.cwd());
+        for (const k of keys) map.set(k, data);
+      }
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       violations.push(`R6: gate-log 文件读取失败: ${fileAbs}（${e.code ?? e.message}）`);
@@ -172,7 +178,7 @@ async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
-  const { runLogFile, gateLogsDir, tlaManifestFile } = parseArgs(process.argv);
+  const { runLogFile, gateLogsDir, gateLogsExplicit, tlaManifestFile } = parseArgs(process.argv);
 
   if (!runLogFile) {
     exitWithError({
@@ -181,6 +187,17 @@ async function main(): Promise<void> {
       message: '参数缺失 <run-log.jsonl>',
       detail:
         '用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  if (gateLogsExplicit && !gateLogsDir) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-2',
+      message: '--gate-logs 需要非空目录路径（使用 --gate-logs=<dir>）',
+      detail: '收到空值或缺失值',
       exitCode: 2,
     });
     return;

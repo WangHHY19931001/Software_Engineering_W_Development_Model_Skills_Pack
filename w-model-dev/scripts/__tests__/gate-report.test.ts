@@ -311,6 +311,117 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   });
 
+  it.each(['--gate-logs=', '--gate-logs'])(
+    '显式 gate-logs 参数 %s 缺少目录值时返回结构化 exit 2',
+    async (gateLogsArg) => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+      try {
+        const runLog = path.join(tmpDir, 'run-log.jsonl');
+        await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
+        const result = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, gateLogsArg], {
+          cwd: tmpDir,
+        });
+        expect(result.status).toBe(2);
+        expect(result.stdout).toContain('ERROR_JSON');
+        expect(result.stdout).toContain('"exitCode":2');
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('协议无效的 gate-log 不得进入 R6 Map，R6 必须报告未找到合法证据', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+    try {
+      const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      await fs.mkdir(gateLogsDir);
+      const payload = makeGatePayload(0);
+      payload.stdoutSummary = { exitCode: 1, passed: false };
+      await fs.writeFile(path.join(gateLogsDir, 'tampered.json'), JSON.stringify(payload), 'utf8');
+      const runLog = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(runLog, makeRunLogEntry('tampered.json', 0) + '\n', 'utf8');
+      const result = runSync(
+        process.execPath,
+        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
+        { cwd: tmpDir },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('stdoutSummary');
+      expect(result.stdout).toContain('在 gate-logs 中未找到');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('Schema 无效的 gate-log 不得进入 R6 Map，R6 必须报告未找到合法证据', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+    try {
+      const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      await fs.mkdir(gateLogsDir);
+      await fs.writeFile(
+        path.join(gateLogsDir, 'schema-invalid.json'),
+        JSON.stringify({ exitCode: 0, passed: true }),
+        'utf8',
+      );
+      const runLog = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(runLog, makeRunLogEntry('schema-invalid.json', 0) + '\n', 'utf8');
+      const result = runSync(
+        process.execPath,
+        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
+        { cwd: tmpDir },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('[schema]');
+      expect(result.stdout).toContain('在 gate-logs 中未找到');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('显式 --gate-logs 下的子目录读取失败为 blocking violation', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+    try {
+      const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      const unreadableEntry = path.join(gateLogsDir, 'not-a-file');
+      await fs.mkdir(unreadableEntry, { recursive: true });
+      const runLog = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(runLog, makeRunLogEntry('not-a-file', 0) + '\n', 'utf8');
+      const result = runSync(
+        process.execPath,
+        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
+        { cwd: tmpDir },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('gate-log 文件读取失败');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('显式 --gate-logs 下缺根 exitCode 的 JSON 为 blocking violation', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+    try {
+      const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      await fs.mkdir(gateLogsDir);
+      const payload = makeGatePayload(0) as Record<string, unknown>;
+      delete payload.exitCode;
+      delete (payload.reportSummary as Record<string, unknown>).exitCode;
+      delete (payload.stdoutSummary as Record<string, unknown>).exitCode;
+      await fs.writeFile(path.join(gateLogsDir, 'missing-exit-code.json'), JSON.stringify(payload), 'utf8');
+      const runLog = path.join(tmpDir, 'run-log.jsonl');
+      await fs.writeFile(runLog, makeRunLogEntry('missing-exit-code.json', 0) + '\n', 'utf8');
+      const result = runSync(
+        process.execPath,
+        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
+        { cwd: tmpDir },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('未提取到合法 exitCode');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it('显式 --gate-logs 的损坏文件为 blocking violation，不静默跳过', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
