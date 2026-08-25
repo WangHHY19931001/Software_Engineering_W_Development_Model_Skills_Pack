@@ -146,9 +146,8 @@ const MIN_RANKING_ROUNDS = 1;
  *  阈值 = qualityLevel B 级分界（§6.1），语义自洽：passed 原判据为「加权平均 ≥ B」，
  *  收紧为「每个子标准自身 ≥ B」。防止加权平均掩盖单轴失败（反模式 #41）。 */
 const SINGLE_AXIS_MIN_SCORE = 0.7;
-/** Persona blocking severities cannot be reported as an approved A/B review. */
-const BLOCKING_REWORK_HINT_PATTERN =
-  /^\s*(?:\[(?:Critical|Required|High|Medium)\]|(?:Critical|Required|High|Medium):)/i;
+/** Only the verifier-spec's explicit Critical/Required prefixes block an otherwise valid review. */
+const BLOCKING_REWORK_HINT_PATTERN = /^\s*(?:\[(Critical|Required)\]|(Critical|Required):)/i;
 
 function isNumber(x: unknown): x is number {
   return typeof x === 'number' && !Number.isNaN(x);
@@ -564,16 +563,23 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   // passed 判定收紧为「加权平均 ≥ B 且每个子标准得分 ≥ 0.70（B 级分界）」。
   // 防止加权平均掩盖单轴失败（反模式 #41）。
   const suppliedReworkHints = o.reworkHints;
-  const hasBlockingReworkHint =
-    Array.isArray(suppliedReworkHints) &&
-    suppliedReworkHints.some((hint) => typeof hint === 'string' && BLOCKING_REWORK_HINT_PATTERN.test(hint));
-  if (hasBlockingReworkHint && (qualityLevel === 'A' || qualityLevel === 'B')) {
-    reasons.push('阻断性 reworkHints 必须将 passed 设为 false，并降级 qualityLevel 至 C/D');
-    qualityLevel = 'C';
+  let hasBlockingReworkHint = false;
+  if (Array.isArray(suppliedReworkHints)) {
+    suppliedReworkHints.forEach((hint, index) => {
+      if (typeof hint !== 'string') return;
+      const match = BLOCKING_REWORK_HINT_PATTERN.exec(hint);
+      if (!match) return;
+      hasBlockingReworkHint = true;
+      const severity = match[1] ?? match[2];
+      reasons.push(
+        `reworkHints[${index + 1}] 标记为 ${severity}，属于阻断性返工提示；不得与 passed=true 并存（verifier-spec.md §7.4A.2）`,
+      );
+    });
   }
   const passed = o.passed;
   const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
-  const expectedPassed = (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
+  const expectedPassed =
+    !hasBlockingReworkHint && (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
   if (typeof passed !== 'boolean') {
     reasons.push(`passed 必须为布尔值，实际为 ${JSON.stringify(passed)}`);
   } else if (passed !== expectedPassed) {

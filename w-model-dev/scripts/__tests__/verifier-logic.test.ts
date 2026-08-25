@@ -33,8 +33,14 @@ const PERSONA_FIXTURES = [
   'persona-performance-auditor.json',
 ] as const;
 
-function runVerifierCli(fixturePath: string): { code: number | null; stdout: string; stderr: string } {
-  const result = runSync(process.execPath, [TSX_CLI, VERIFIER_SCRIPT, '--json', fixturePath], {
+function runVerifierCli(
+  fixturePath: string,
+  options: { json?: boolean } = { json: true },
+): { code: number | null; stdout: string; stderr: string } {
+  const args = [TSX_CLI, VERIFIER_SCRIPT];
+  if (options.json) args.push('--json');
+  args.push(fixturePath);
+  const result = runSync(process.execPath, args, {
     cwd: ROOT,
     timeout: 15_000,
   });
@@ -71,10 +77,15 @@ describe('Persona Verifier CLI regressions', () => {
     });
   });
 
-  it('含阻断性 reworkHints 的 Schema 合法变体必须以 C 级/exit 1 拦截', async () => {
+  it.each([
+    '[Critical] 演示阻断性安全缺陷',
+    'Critical: 演示阻断性安全缺陷',
+    '[Required] 演示必修缺陷',
+    'Required: 演示必修缺陷',
+  ])('显式 %s reworkHint 必须拒绝放行但保留分数映射等级', async (hint) => {
     const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
     const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
-    fixture.reworkHints = ['[Critical] 演示阻断性安全缺陷，必须修复后才能放行'];
+    fixture.reworkHints = [hint];
     fixture.passed = true;
 
     const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
@@ -89,14 +100,111 @@ describe('Persona Verifier CLI regressions', () => {
       expect(report).toMatchObject({
         type: 'verifier-output',
         passed: false,
-        qualityLevel: 'C',
+        qualityLevel: 'A',
         exitCode: 1,
       });
-      expect(report.reasons).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('阻断性 reworkHints 必须将 passed 设为 false，并降级 qualityLevel 至 C/D'),
-        ]),
-      );
+      expect(report.reasons).toEqual(expect.arrayContaining([expect.stringContaining('reworkHints[1]')]));
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('Persona-specific Medium hint remains non-blocking for an otherwise passing A-level output', async () => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
+    const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
+    fixture.reworkHints = ['[Medium] 仅供该 Persona 排期的改进建议'];
+    fixture.passed = true;
+
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+    const positiveFixturePath = resolve(tempDir, 'persona-code-reviewer-medium.json');
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
+      await writeFile(positiveFixturePath, JSON.stringify(fixture), 'utf-8');
+      const result = runVerifierCli(positiveFixturePath);
+      const report = JSON.parse(result.stdout) as Record<string, unknown>;
+
+      expect(result.code).toBe(0);
+      expect(report).toMatchObject({
+        type: 'verifier-output',
+        passed: true,
+        qualityLevel: 'A',
+        reasons: [],
+        exitCode: 0,
+      });
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('原始 passed=false 携带阻断 hint 时仍保留分数映射等级并返回 exit 1', async () => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
+    const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
+    fixture.reworkHints = ['[Critical] 已确认的阻断性缺陷'];
+    fixture.passed = false;
+
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+    const negativeFixturePath = resolve(tempDir, 'persona-code-reviewer-already-failed.json');
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
+      await writeFile(negativeFixturePath, JSON.stringify(fixture), 'utf-8');
+      const result = runVerifierCli(negativeFixturePath);
+      const report = JSON.parse(result.stdout) as Record<string, unknown>;
+
+      expect(result.code).toBe(1);
+      expect(report).toMatchObject({ type: 'verifier-output', passed: false, qualityLevel: 'A', exitCode: 1 });
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('默认模式保持人类可读报告与 VERIFIER_JSON 摘要协议', () => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
+    const result = runVerifierCli(fixturePath, { json: false });
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('Verifier 输出校验');
+    expect(result.stdout).toContain('VERIFIER_JSON ');
+    expect(result.stdout).toContain('"qualityLevel":"A"');
+  });
+
+  it('缺失输入文件通过 --json 输出 ERROR_JSON 并退出 2', async () => {
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+    const missingFixturePath = resolve(tempDir, 'missing.json');
+    try {
+      const result = runVerifierCli(missingFixturePath);
+
+      expect(result.code).toBe(2);
+      expect(result.stdout).toMatch(/^ERROR_JSON /);
+      expect(JSON.parse(result.stdout.replace(/^ERROR_JSON /, ''))).toMatchObject({
+        category: 'FILE_NOT_FOUND',
+        exitCode: 2,
+      });
+      expect(result.stderr).toContain('[FILE_NOT_FOUND]');
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('malformed 输入文件通过 --json 输出 ERROR_JSON 并退出 2', async () => {
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+    const malformedFixturePath = resolve(tempDir, 'malformed.json');
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
+      await writeFile(malformedFixturePath, '{malformed', 'utf-8');
+      const result = runVerifierCli(malformedFixturePath);
+
+      expect(result.code).toBe(2);
+      expect(result.stdout).toMatch(/^ERROR_JSON /);
+      expect(JSON.parse(result.stdout.replace(/^ERROR_JSON /, ''))).toMatchObject({
+        category: 'FILE_PARSE',
+        exitCode: 2,
+      });
+      expect(result.stderr).toContain('[FILE_PARSE]');
     } finally {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
       await rm(tempDir, { recursive: true, force: true });

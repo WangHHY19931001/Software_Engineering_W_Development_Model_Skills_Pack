@@ -85,3 +85,44 @@ fallback 方法：读取 `verifier-logic.test.ts`、`check-verifier-output.ts`�
 ## 提交范围
 
 仅提交 C1 测试、verifier CLI/logic 为使真实回归成立所需的最小修复，以及本报告；不提交 `progress.md`、`.w-model` 或无关格式化变更。
+
+---
+
+# C1 修复轮 1（接管）
+
+日期：2026-08-25
+基线：`38aab70`
+提交消息：`fix(verifier): preserve severity and quality semantics`（最终 commit hash 以 `git log -1` 为准）
+
+## 根因与修复
+
+- **I1**：上一轮将 `[Medium]` / `Medium:` 与 `[High]` / `High:` 无条件视为通用阻断，混淆了不同 Persona 的局部严重度规则。按 `verifier-spec.md §7.4A.2` 的统一字符串契约，通用校验器现在只识别显式 `Critical` / `Required`（支持 `[Critical]`、`Critical:`、`[Required]`、`Required:`，大小写不敏感）；`Medium` 保持非阻断。
+- **I2**：阻断 hint 不再改写 `qualityLevel`。等级始终由 evidence 扣分后的 `compositeScore` 映射；阻断 hint 独立将 `expectedPassed` 置为 false，并追加包含 `reworkHints[index]`、严重度与规范引用的结构化原因。这样 A 分 + 阻断会 exit 1，A 分 + Medium 会保持通过，原 `passed=false` 仍不会被放行。
+- **I3**：真实子进程回归补齐默认模式协议，以及缺失文件 / malformed JSON 的 `ERROR_JSON` + exit 2；保留四个 Persona fixture 的真实 `--json` exit 0 覆盖。
+
+Persona 规则未修改。`agent-personas.md` 中 test/security/performance Persona 的 High/Medium 局部行动语义不被提升为全局 checker 规则；若需按特定 Persona 阻断，应由该 Persona 产出统一的 `Critical` / `Required` 前缀。
+
+## TDD 记录
+
+1. 先新增 I1/I2/I3 失败测试；红灯真实结果：`34 tests | 6 failed`。失败集中在四种显式阻断格式、Medium 非阻断和原 `passed=false` 的等级保留，证明测试命中了上一轮实现的真实缺陷；默认模式与 exit 2 测试当时已通过。
+2. 最小实现：收窄 `BLOCKING_REWORK_HINT_PATTERN` 到 `Critical|Required`；不再给 `qualityLevel` 赋值；以 `hasBlockingReworkHint` 独立参与 `expectedPassed` 并追加索引化原因。
+3. 绿灯结果：`1 passed` test file，`34 passed` tests，0 failed。
+
+## 真实验证记录
+
+- `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts`：exit 0；34/34 通过。
+- `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`：exit 0；`fixtureCount=280`、`unregistered=0`、`undeclaredDirs=0`。
+- `npm run check-samples-coverage`：exit 1，因为当前 `package.json` 未登记该 npm script；已使用仓库现有 CLI 入口执行等价检查并通过。
+- `npm run typecheck`：exit 0；`tsc -p config/tsconfig.json` 无错误。
+- `npx prettier --config config/prettier.config.cjs --check w-model-dev/scripts/__tests__/verifier-logic.test.ts w-model-dev/scripts/logic/verifier-logic.ts`：exit 0；`All matched files use Prettier code style!`。
+- `git diff --check`：exit 0；仅有既存 `progress.md` / 报告文件的 CRLF 提示，无 whitespace violation。
+
+## CodeGraph / fallback
+
+当前工作树仍无 `.codegraph/` 索引，未伪造 CodeGraph 结果；沿用上一轮已落盘但不提交的 fallback 记录：
+`D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.worktrees/w-model-reliability/.w-model/codegraph-queries/2026-08-25-C1-verifier-cli.md`。
+
+## Concerns
+
+- `qualityLevel` 在阻断 hint 场景仍可能为 A/B，这是有意保持的 score-derived 事实；`passed=false` 与 exit 1 才表达放行阻断，不伪造 C/D 等级。
+- 本轮不修改 Persona 文档、四个 fixture、samples 矩阵、`progress.md` 或 `.w-model`。
