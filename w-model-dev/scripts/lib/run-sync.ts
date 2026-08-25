@@ -80,7 +80,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 114,
+    line: 115,
     symbol: 'checkEnvironment',
     reason: 'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
     migratedToRunSync: true,
@@ -89,7 +89,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 284,
+    line: 285,
     symbol: 'main',
     reason: 'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
     migratedToRunSync: true,
@@ -107,7 +107,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 194,
+    line: 195,
     symbol: 'runTools',
     reason: 'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.',
     timeout: { required: true, status: 'present' },
@@ -115,7 +115,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 221,
+    line: 222,
     symbol: 'runTools',
     reason: 'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.',
     timeout: { required: true, status: 'present' },

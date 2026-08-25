@@ -144,7 +144,7 @@ export function buildBaselineEntries(findings: EslintResult[], resolveLine: Reso
   return entries;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const regenerate = args.includes('--regenerate');
 

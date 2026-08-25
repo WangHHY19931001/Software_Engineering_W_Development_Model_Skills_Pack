@@ -1,11 +1,12 @@
 import { promises as fs } from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
-vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
+const { execFileMock, spawnSyncMock } = vi.hoisted(() => ({ execFileMock: vi.fn(), spawnSyncMock: vi.fn() }));
+vi.mock('node:child_process', () => ({ execFile: execFileMock, spawnSync: spawnSyncMock }));
 
 import {
   auditSynchronousChildProcessSource,
@@ -15,6 +16,9 @@ import {
   SYNC_PROCESS_EXCEPTIONS,
   type RunSyncOptions,
 } from '../lib/run-sync.js';
+import { detectScriptsChanges } from '../cli/check-docs-consistency.js';
+import { checkEnvironment } from '../cli/check-tla-model.js';
+import { main as securityScanMain } from '../cli/security-scan.js';
 
 const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUN_SYNC_FILE = 'lib/run-sync.ts';
@@ -46,7 +50,37 @@ async function findDirectSyncCalls() {
   return { calls, violations };
 }
 
+type ConsoleSpy = {
+  mock: { calls: unknown[][] };
+  mockClear: () => void;
+  mockRestore: () => void;
+};
+
+function extractErrorJson(logSpy: ConsoleSpy): Record<string, unknown>[] {
+  return logSpy.mock.calls
+    .map(([value]) => String(value))
+    .filter((value: string) => value.startsWith('ERROR_JSON '))
+    .map((value: string) => JSON.parse(value.slice('ERROR_JSON '.length)) as Record<string, unknown>);
+}
+
 describe('runSync', () => {
+  let errorSpy: ConsoleSpy;
+  let logSpy: ConsoleSpy;
+  let previousExitCode: typeof process.exitCode;
+
+  beforeEach(() => {
+    spawnSyncMock.mockReset();
+    previousExitCode = process.exitCode;
+    process.exitCode = undefined;
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    logSpy.mockRestore();
+    process.exitCode = previousExitCode;
+  });
   it('passes default timeout, kill signal, encoding, and buffer bounds to spawnSync', () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: 'ready' });
 
@@ -154,6 +188,97 @@ describe('runSync', () => {
     expect(tlaSource).toMatch(/const major = res\.error \|\| res\.status !== 0 \? null : parseJavaMajor/);
     expect(securitySource).toMatch(/const r = runSync\([\s\S]*?timeout\s*:\s*300_000[\s\S]*?maxBuffer\s*:/);
     expect(securitySource).toMatch(/if \(r\.error \|\| \(r\.status !== 0 && !r\.stdout\)\)/);
+
+    for (const result of [
+      { status: null, error: Object.assign(new Error('git timed out'), { code: 'ETIMEDOUT' }) },
+      { status: 1, error: Object.assign(new Error('git unavailable'), { code: 'ENOENT' }) },
+    ]) {
+      spawnSyncMock.mockReset();
+      spawnSyncMock.mockReturnValue({ stdout: '', stderr: '', ...result });
+      expect(detectScriptsChanges('C:/fixture')).toBe(false);
+      expect(spawnSyncMock).toHaveBeenCalledTimes(2);
+      expect(spawnSyncMock).toHaveBeenNthCalledWith(
+        1,
+        'git',
+        ['diff', '--name-only', 'HEAD'],
+        expect.objectContaining({ cwd: 'C:/fixture', timeout: 15_000 }),
+      );
+      expect(spawnSyncMock).toHaveBeenNthCalledWith(
+        2,
+        'git',
+        ['status', '--porcelain'],
+        expect.objectContaining({ cwd: 'C:/fixture', timeout: 15_000 }),
+      );
+    }
+
+    spawnSyncMock.mockReset();
+    spawnSyncMock.mockReturnValue({ status: 128, stdout: 'w-model-dev/scripts/changed.ts\\n', stderr: 'fatal' });
+    expect(detectScriptsChanges('C:/fixture')).toBe(false);
+
+    const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-sync-runtime-'));
+    const jarPath = path.join(fixtureRoot, 'tla2tools.jar');
+    await fs.writeFile(jarPath, 'fixture');
+    try {
+      for (const result of [
+        {
+          status: null,
+          error: Object.assign(new Error('java timed out'), { code: 'ETIMEDOUT' }),
+          stdout: '',
+          stderr: '',
+        },
+        {
+          status: null,
+          error: Object.assign(new Error('java unavailable'), { code: 'ENOENT' }),
+          stdout: '',
+          stderr: '',
+        },
+        { status: 1, error: undefined, stdout: '', stderr: 'java -version failed' },
+      ]) {
+        spawnSyncMock.mockReset();
+        spawnSyncMock.mockReturnValue(result);
+        const environment = await checkEnvironment(jarPath, 17);
+        expect(environment.ok).toBe(false);
+        expect(environment.javaVersion).toBeNull();
+        expect(environment.errors.length).toBeGreaterThan(0);
+        if (result.error) expect(environment.errors.join('\\n')).toContain(result.error.message);
+        if (result.status !== null && result.status !== 0) expect(environment.errors.join('\\n')).toContain('退出码 1');
+        expect(spawnSyncMock).toHaveBeenCalledWith(
+          'java',
+          ['-version'],
+          expect.objectContaining({ timeout: 15_000, stdio: ['ignore', 'pipe', 'pipe'] }),
+        );
+      }
+    } finally {
+      await fs.rm(fixtureRoot, { recursive: true, force: true });
+    }
+
+    for (const result of [
+      {
+        status: null,
+        stdout: '',
+        stderr: 'eslint timed out',
+        error: Object.assign(new Error('eslint timed out'), { code: 'ETIMEDOUT' }),
+        category: 'FILE_READ',
+      },
+      { status: 1, stdout: '', stderr: 'eslint failed', error: undefined, category: 'FILE_READ' },
+      { status: 1, stdout: '{not-json', stderr: 'eslint warning', error: undefined, category: 'FILE_PARSE' },
+    ]) {
+      spawnSyncMock.mockReset();
+      spawnSyncMock.mockReturnValue(result);
+      logSpy.mockClear();
+      errorSpy.mockClear();
+      process.exitCode = undefined;
+      await securityScanMain();
+      expect(process.exitCode).toBe(2);
+      expect(extractErrorJson(logSpy)).toEqual([
+        expect.objectContaining({ category: result.category, rule: 'P0-3', exitCode: 2 }),
+      ]);
+      expect(spawnSyncMock).toHaveBeenCalledWith(
+        'npx',
+        expect.arrayContaining(['eslint', '--format', 'json']),
+        expect.objectContaining({ timeout: 300_000, maxBuffer: 10 * 1024 * 1024 }),
+      );
+    }
   });
 
   it('keeps production direct child-process calls fully bounded and observable', async () => {

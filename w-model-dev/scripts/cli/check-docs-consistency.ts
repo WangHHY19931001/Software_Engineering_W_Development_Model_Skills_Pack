@@ -113,7 +113,7 @@ const DESIGN_DOC_NAMES = [
  *   - git status --porcelain：含未跟踪（??）新文件，兜底 diff 未覆盖的部分
  * git 不可用（非 git 仓库 / 命令失败）时保守返回 false —— 无法判定变更时不阻断门禁。
  */
-function detectScriptsChanges(root: string): boolean {
+export function detectScriptsChanges(root: string): boolean {
   const paths: string[] = [];
   const diff = runSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, timeout: 15_000 });
   if (diff.error === undefined && diff.status === 0) {

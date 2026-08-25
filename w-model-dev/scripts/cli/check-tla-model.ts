@@ -42,6 +42,7 @@
 import { execFileSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { checkTlaModel, parseTlaHeader, validateHeader, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
@@ -585,4 +586,6 @@ async function main(): Promise<void> {
   return;
 }
 
-runMain(main);
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && path.resolve(entryArg) === path.resolve(fileURLToPath(import.meta.url));
+if (isMain) runMain(main);
