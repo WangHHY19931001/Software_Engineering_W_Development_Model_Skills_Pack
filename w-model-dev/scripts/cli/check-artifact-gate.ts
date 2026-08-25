@@ -7,7 +7,7 @@
  * 本文件仅保留编排。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--json]
  *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --validate-templates [--json]
  *
  * 参数：
@@ -44,8 +44,10 @@ import { fileURLToPath } from 'node:url';
 import {
   discoverGraphAsset,
   readBddManifest,
+  readCucumberReport,
   readTlaManifest,
   runModelChecks,
+  type TlaBddSyncPair,
 } from '../application/artifact-gate-assets.js';
 import { checkUatPathMappingContent, collectUatMappingViolations } from '../application/uat-path-mapping.js';
 import {
@@ -188,6 +190,11 @@ async function main(): Promise<void> {
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
   const specDir = parseFlagValue(process.argv, 'spec-dir');
   const projectDir = parseProjectDir(process.argv);
+  const cucumberReportArg = parseFlagValue(process.argv, 'cucumber-report');
+  const cucumberReportFile = path.resolve(
+    projectDir,
+    cucumberReportArg ?? path.join('.w-model', 'bdd', 'reports', 'report.json'),
+  );
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
 
   // RTM 读取（FILE_NOT_FOUND / FILE_READ / FILE_PARSE 统一走 readJsonClassified，哨兵由 runMain 兜底）
@@ -215,45 +222,102 @@ async function main(): Promise<void> {
 
   // 2. 检查 tla-manifest.json 存在性 + specs 非空
   const manifestFile = path.resolve(projectDir, ARTIFACT_PATHS.tlaManifest);
-  const manifestExists = await readTlaManifest(manifestFile);
+  const tlaAsset = await readTlaManifest(manifestFile);
+  const manifestExists = tlaAsset.exists;
 
   // ==================== BDD 资产读取（spec §13.2 #18） ====================
-  // 与 TLA+ manifest 校验对称：检查 bdd-manifest.json 存在性 + schema + features 文件存在性
-  // + stateMachines 七要素非空（states/acceptingStates/transitions/invariants）。
-  // 阶段 4 后才要求 bdd-manifest.json 存在（阶段 1-3 可能还未创建）。
+  // 项目阶段 1-8 均要求 manifest；fixture 回归不经过本入口，因此仍不启用 required flags。
   const bddManifestFile = path.resolve(projectDir, ARTIFACT_PATHS.bddManifest);
   const effectivePhase: PhaseOption = phaseOption ?? 8;
-  const { bddViolations, bddManifestExists } = await readBddManifest(bddManifestFile, projectDir, effectivePhase);
+  const { bddViolations, bddManifestExists, bddManifestValid, bddManifest } = await readBddManifest(
+    bddManifestFile,
+    projectDir,
+    effectivePhase,
+  );
+  const cucumberAsset =
+    effectivePhase >= 5 ? await readCucumberReport(cucumberReportFile, true) : { cucumberViolations: [] as string[] };
+
+  const syncPairs: TlaBddSyncPair[] = [];
+  const syncPairViolations: string[] = [];
+  if (tlaAsset.valid && bddManifestValid) {
+    const tlaManifest = tlaAsset.manifest as {
+      basePath?: string;
+      specs?: Array<{ id?: string; tlaPath?: string }>;
+    };
+    const bdd = bddManifest as {
+      basePath?: string;
+      features?: Array<{ id?: string; tlaSpecId?: string; filePath?: string }>;
+    };
+    const tlaBase = path.resolve(path.dirname(manifestFile), tlaManifest.basePath ?? '.');
+    const bddBase = path.resolve(projectDir, bdd.basePath ?? '.');
+    for (const feature of bdd.features ?? []) {
+      const spec = (tlaManifest.specs ?? []).find((candidate) => candidate.id === feature.tlaSpecId);
+      if (!spec) {
+        syncPairViolations.push(
+          `[artifact:tla-bdd-sync] BDD feature "${feature.id ?? feature.filePath ?? 'unknown'}" has no matching TLA+ spec`,
+        );
+        continue;
+      }
+      if (!spec.tlaPath || !feature.filePath) {
+        syncPairViolations.push(
+          `[artifact:tla-bdd-sync] BDD feature "${feature.id ?? feature.filePath ?? 'unknown'}" has incomplete TLA+/feature path mapping`,
+        );
+        continue;
+      }
+      syncPairs.push({
+        tlaFile: path.resolve(tlaBase, spec.tlaPath),
+        featureFile: path.resolve(bddBase, feature.filePath),
+      });
+    }
+  }
 
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
   const result = checkArtifactGate(matrix, {
     graph,
-    manifestExists,
+    // TLA+ is a required project asset only for phases 1-4; phase 5-8 uses Cucumber evidence.
+    manifestExists: effectivePhase <= 4 ? tlaAsset.valid : undefined,
     phaseOption,
     specDir,
   });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
-  // phase>=2 时，终检调用 check-tla-model.ts + check-bdd-model.ts，传递 --graph + --phase
+  // phase 1 不依赖 graph；phase 2-4 在已有 graph 时叠加 graph 参数；phase 5-8 强制 Cucumber 证据。
   const graphPath = graphSource ? path.join(ingestionDir, graphSource) : '';
   const modelCheckViolations = runModelChecks({
     manifestExists,
+    manifestValid: tlaAsset.valid,
     effectivePhase,
     graphPath,
     manifestFile,
     bddManifestExists,
+    bddManifestValid,
     bddManifestFile,
+    cucumberReportFile,
+    syncRequired: effectivePhase <= 4,
+    syncPairs,
+    syncPairViolations,
   });
+  // Phase 5-8 uses required Cucumber execution evidence; TLA manifest is not a phase-gate input there.
+  const tlaAssetViolations = effectivePhase <= 4 ? tlaAsset.violations : [];
 
   // uat-path-mapping 校验违反（计入终检结果；解析严格化 + 阶段 5/终检均校验）
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
 
-  // 合并 uat-path-mapping + BDD 资产校验违反到终检结果（BDD 校验在 CLI 层完成，gate-logic 不感知 BDD）
-  const allReasons = [...result.reasons, ...uatMappingViolations, ...bddViolations, ...modelCheckViolations];
+  // 合并 TLA/BDD 资产、UAT 映射与 model/sync 校验违反；畸形输入不得退化为“缺失快照”。
+  const allReasons = [
+    ...result.reasons,
+    ...tlaAssetViolations,
+    ...uatMappingViolations,
+    ...bddViolations,
+    ...cucumberAsset.cucumberViolations,
+    ...modelCheckViolations,
+  ];
   const overallPassed =
     result.passed &&
+    tlaAssetViolations.length === 0 &&
     uatMappingViolations.length === 0 &&
     bddViolations.length === 0 &&
+    cucumberAsset.cucumberViolations.length === 0 &&
     modelCheckViolations.length === 0;
   const exitCode = overallPassed ? 0 : 1;
 
@@ -282,9 +346,11 @@ async function main(): Promise<void> {
   console.log(`校验阶段      : phase=${phaseOption ?? 8}${phaseOption ? '（阶段级）' : '（终检，默认）'}`);
   console.log(`RTM 覆盖率    : ${result.coveragePercent}%`);
   console.log(`单元覆盖率    : ${result.unitCoveragePercent}%`);
-  console.log(`TLA+ 资产     : ${manifestExists ? '✓ manifest 存在且 specs 非空' : '✗ manifest 缺失或 specs 为空'}`);
   console.log(
-    `BDD 资产      : ${bddManifestExists ? '✓ bdd-manifest.json 存在且 schema 通过' : '✗ bdd-manifest.json 缺失或 schema 失败'}`,
+    `TLA+ 资产     : ${tlaAsset.valid ? '✓ manifest schema 通过且 specs 非空' : '✗ manifest 缺失、非法或 specs 为空'}`,
+  );
+  console.log(
+    `BDD 资产      : ${bddManifestValid ? '✓ bdd-manifest.json 存在且 schema 通过' : '✗ bdd-manifest.json 缺失、非法或 schema 失败'}`,
   );
   console.log(
     `Model 校验    : ${modelCheckViolations.length === 0 ? '✓ TLA+/BDD model 校验通过' : `✗ ${modelCheckViolations.length} 条违反`}`,

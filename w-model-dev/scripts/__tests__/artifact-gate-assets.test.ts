@@ -22,6 +22,7 @@ import {
   discoverGraphAsset,
   readTlaManifest,
   readBddManifest,
+  readCucumberReport,
   runModelChecks,
 } from '../application/artifact-gate-assets.js';
 
@@ -121,20 +122,69 @@ describe('discoverGraphAsset', () => {
 });
 
 describe('readTlaManifest', () => {
-  it('specs 非空 → true', async () => {
+  it('specs 非空且 schema 合法 → valid', async () => {
     const f = path.join(tmpDir, 'tla-manifest.json');
-    await fs.writeFile(f, JSON.stringify({ specs: [{ id: 'L1' }] }), 'utf-8');
-    expect(await readTlaManifest(f)).toBe(true);
+    await fs.writeFile(
+      f,
+      JSON.stringify({
+        version: 1,
+        currentPhase: 1,
+        basePath: '.',
+        tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+        specs: [
+          {
+            id: 'L1-test',
+            level: 'L1',
+            phase: 1,
+            system: 'test',
+            requirementIds: ['REQ-1'],
+            designRef: 'docs/design.md',
+            tlaPath: 'test.tla',
+            cfgPath: 'test.cfg',
+            parent: null,
+            siblings: [],
+            children: [],
+            variableCombination: 1,
+            decompositionDecision: 'kept-below-threshold',
+            syntaxChecked: true,
+            tlcChecked: true,
+            deadlockFree: true,
+            invariantsHold: true,
+            stateExplosion: false,
+          },
+        ],
+      }),
+      'utf-8',
+    );
+    expect(await readTlaManifest(f)).toMatchObject({ valid: true, exists: true });
   });
 
-  it('specs 空数组 → false', async () => {
+  it.each([
+    [
+      'empty specs',
+      JSON.stringify({
+        version: 1,
+        currentPhase: 1,
+        basePath: '.',
+        tools: { jarPath: 'j', javaMinVersion: 11 },
+        specs: [],
+      }),
+    ],
+    ['schema-invalid object', JSON.stringify({ specs: [{ id: 'L1' }] })],
+    ['invalid JSON', '{not json'],
+  ])('fails closed for %s', async (_label, value) => {
     const f = path.join(tmpDir, 'tla-manifest.json');
-    await fs.writeFile(f, JSON.stringify({ specs: [] }), 'utf-8');
-    expect(await readTlaManifest(f)).toBe(false);
+    await fs.writeFile(f, value, 'utf-8');
+    const result = await readTlaManifest(f);
+    expect(result.exists).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.violations.length).toBeGreaterThan(0);
   });
 
-  it('ENOENT → false（按不存在处理，不抛）', async () => {
-    expect(await readTlaManifest(path.join(tmpDir, 'nope.json'))).toBe(false);
+  it('ENOENT → missing invalid result', async () => {
+    const result = await readTlaManifest(path.join(tmpDir, 'nope.json'));
+    expect(result).toMatchObject({ exists: false, valid: false });
+    expect(result.violations.length).toBeGreaterThan(0);
   });
 });
 
@@ -162,60 +212,125 @@ describe('readBddManifest', () => {
     expect(r.bddViolations.some((v) => v.includes('feature file missing: exists.feature'))).toBe(true);
   });
 
-  it('ENOENT + phase>=4 → 强制缺失 violation；phase<4 → 不报', async () => {
+  it('BDD manifest 缺失在 phase 1-8 均产生 blocking violation', async () => {
     const missing = path.join(tmpDir, 'nope-bdd.json');
     const r4 = await readBddManifest(missing, tmpDir, 4);
     expect(r4.bddManifestExists).toBe(false);
-    expect(r4.bddViolations.some((v) => v.includes('bdd-manifest.json missing (required after phase 4)'))).toBe(true);
+    expect(r4.bddViolations.some((v) => v.includes('bdd-manifest.json missing'))).toBe(true);
+    expect(r4.bddViolations.some((v) => v.includes('required for project phases 1-8'))).toBe(true);
 
     const r1 = await readBddManifest(missing, tmpDir, 1);
-    expect(r1.bddViolations).toHaveLength(0);
+    expect(r1.bddViolations.length).toBeGreaterThan(0);
   });
 
-  it('JSON 非法 → 告警且按不存在处理', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('JSON 非法 → 保留存在性并产生 parse violation', async () => {
     const f = path.join(tmpDir, 'bdd-manifest.json');
     await fs.writeFile(f, '{not json', 'utf-8');
     const r = await readBddManifest(f, tmpDir, 4);
-    expect(r.bddManifestExists).toBe(false);
-    expect(r.bddViolations.some((v) => v.includes('missing (required after phase 4)'))).toBe(true);
-    errSpy.mockRestore();
+    expect(r.bddManifestExists).toBe(true);
+    expect(r.bddManifestValid).toBe(false);
+    expect(r.bddViolations.some((v) => v.includes('manifest JSON parse failed'))).toBe(true);
+  });
+});
+
+describe('readCucumberReport', () => {
+  it.each([
+    ['missing', undefined],
+    ['invalid JSON', '{not json'],
+    ['wrong shape', JSON.stringify({ scenarios: [] })],
+    ['empty execution', JSON.stringify({ elements: [] })],
+    ['skipped step', JSON.stringify({ elements: [{ name: 'scenario', steps: [{ result: { status: 'skipped' } }] }] })],
+    [
+      'unknown status',
+      JSON.stringify({ elements: [{ name: 'scenario', steps: [{ result: { status: 'unknown' } }] }] }),
+    ],
+    ['failed step', JSON.stringify({ elements: [{ name: 'scenario', steps: [{ result: { status: 'failed' } }] }] })],
+  ])('fails closed for %s Cucumber evidence', async (_label, value) => {
+    const report = path.join(tmpDir, 'cucumber-report.json');
+    if (value !== undefined) await fs.writeFile(report, value, 'utf-8');
+    const result = await readCucumberReport(report, true);
+    expect(result.cucumberReportValid).toBe(false);
+    expect(result.cucumberViolations.length).toBeGreaterThan(0);
+  });
+
+  it('accepts a named scenario with a passed step as execution evidence', async () => {
+    const report = path.join(tmpDir, 'cucumber-report.json');
+    await fs.writeFile(
+      report,
+      JSON.stringify({ elements: [{ name: 'scenario', steps: [{ result: { status: 'passed' } }] }] }),
+      'utf-8',
+    );
+    await expect(readCucumberReport(report, true)).resolves.toMatchObject({
+      cucumberReportExists: true,
+      cucumberReportValid: true,
+      cucumberViolations: [],
+    });
   });
 });
 
 describe('runModelChecks', () => {
-  it('manifest 不存在 / phase<2 / 无 graphPath → 不调用子进程', () => {
+  it('invalid or graph-less project evidence does not silently invoke model checks', () => {
     expect(
       runModelChecks({
         manifestExists: false,
+        manifestValid: false,
         effectivePhase: 2,
         graphPath: 'g',
         manifestFile: 'm',
         bddManifestExists: false,
+        bddManifestValid: false,
         bddManifestFile: 'b',
       }),
     ).toHaveLength(0);
     expect(
       runModelChecks({
         manifestExists: true,
-        effectivePhase: 1,
-        graphPath: 'g',
-        manifestFile: 'm',
-        bddManifestExists: false,
-        bddManifestFile: 'b',
-      }),
-    ).toHaveLength(0);
-    expect(
-      runModelChecks({
-        manifestExists: true,
+        manifestValid: true,
         effectivePhase: 2,
         graphPath: '',
         manifestFile: 'm',
         bddManifestExists: false,
         bddManifestFile: 'b',
       }),
-    ).toHaveLength(0);
+    ).toContain('[artifact:graph] graph asset is required for project phase 2-4');
     expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('phase 1 project gate passes required TLA evidence flags without graph', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    const v = runModelChecks({
+      manifestExists: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestFile: 'b.json',
+    });
+    expect(v).toHaveLength(0);
+    expect(spawnSyncMock).toHaveBeenCalledTimes(2);
+    const bddArgs = spawnSyncMock.mock.calls[1]?.[1] as string[];
+    expect(bddArgs).toEqual(expect.arrayContaining(['--require-tla-equivalence', '--tla-manifest=m.json']));
+    expect(bddArgs).not.toContain('--graph=');
+  });
+
+  it('phase 5 project gate passes required Cucumber evidence flags', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    const v = runModelChecks({
+      manifestExists: true,
+      effectivePhase: 5,
+      graphPath: 'g.json',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestFile: 'b.json',
+      cucumberReportFile: 'reports/cucumber.json',
+    });
+    expect(v).toHaveLength(0);
+    const bddArgs = spawnSyncMock.mock.calls.find(([, args]) =>
+      (args as string[])[2]?.endsWith('check-bdd-model.ts'),
+    )?.[1] as string[];
+    expect(bddArgs).toEqual(
+      expect.arrayContaining(['--require-cucumber-report', '--cucumber-report=reports/cucumber.json']),
+    );
   });
 
   it('TLA+ 与 BDD 子进程均退出 0 → 零 violation，并经受控 helper 传递实际 CLI 入口和进程级边界', async () => {
@@ -282,5 +397,49 @@ describe('runModelChecks', () => {
     });
     expect(v).toHaveLength(1);
     expect(v[0]).toContain('[artifact:bdd-model] check-bdd-model 退出码 2');
+  });
+
+  it('required TLA↔BDD sync mismatch blocks the project gate', () => {
+    spawnSyncMock
+      .mockReturnValueOnce({ status: 0, stdout: '' })
+      .mockReturnValueOnce({ status: 0, stdout: '' })
+      .mockReturnValueOnce({ status: 1, stdout: 'transition mismatch' });
+    const v = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestValid: true,
+      bddManifestFile: 'b.json',
+      syncRequired: true,
+      syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
+    });
+    expect(v).toEqual(
+      expect.arrayContaining([expect.stringContaining('[artifact:tla-bdd-sync] check-tla-bdd-sync 退出码 1')]),
+    );
+  });
+
+  it('required TLA↔BDD sync invocation failure blocks the project gate', () => {
+    spawnSyncMock
+      .mockReturnValueOnce({ status: 0, stdout: '' })
+      .mockReturnValueOnce({ status: 0, stdout: '' })
+      .mockReturnValueOnce(undefined);
+    const v = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestValid: true,
+      bddManifestFile: 'b.json',
+      syncRequired: true,
+      syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
+    });
+    expect(v).toEqual(
+      expect.arrayContaining([expect.stringContaining('[artifact:tla-bdd-sync] check-tla-bdd-sync 退出码 unknown')]),
+    );
   });
 });

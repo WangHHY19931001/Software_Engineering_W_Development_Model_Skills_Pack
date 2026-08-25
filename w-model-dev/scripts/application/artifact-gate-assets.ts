@@ -62,34 +62,95 @@ export async function discoverGraphAsset(ingestionDir: string): Promise<GraphAss
   return { graph, graphSource };
 }
 
-/** TLA+ 资产检查（spec §3.4.4）：tla-manifest.json 存在性 + specs 非空 */
-export async function readTlaManifest(manifestFile: string): Promise<boolean> {
-  let manifestExists = false;
+/** TLA+ 资产检查结果：区分缺失、解析失败、schema 失败和空 specs，避免 fail-open。 */
+export interface TlaManifestAssetResult {
+  exists: boolean;
+  valid: boolean;
+  manifest: Record<string, unknown> | undefined;
+  violations: string[];
+}
+
+/** TLA+ 资产检查（spec §3.4.4）：真实 tla-manifest schema + specs 非空检查。 */
+export async function readTlaManifest(manifestFile: string): Promise<TlaManifestAssetResult> {
+  let manifestRaw: string;
   try {
-    const manifestRaw = await fs.readFile(manifestFile, 'utf-8');
-    const manifestParsed = parseJsonSafe(manifestRaw) as { specs?: unknown[] };
-    if (manifestParsed && Array.isArray(manifestParsed.specs) && manifestParsed.specs.length > 0) {
-      manifestExists = true;
-    }
+    manifestRaw = await fs.readFile(manifestFile, 'utf-8');
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') {
-      console.error(`⚠ tla-manifest.json 读取失败（忽略，按不存在处理）: ${e.message}`);
+    if (e.code === 'ENOENT') {
+      return {
+        exists: false,
+        valid: false,
+        manifest: undefined,
+        violations: ['[artifact:tla] tla-manifest.json missing'],
+      };
     }
-    // ENOENT 或解析失败 → manifestExists 保持 false
+    return {
+      exists: true,
+      valid: false,
+      manifest: undefined,
+      violations: [`[artifact:tla] tla-manifest.json read failed: ${e.message}`],
+    };
   }
-  return manifestExists;
+
+  let manifestParsed: unknown;
+  try {
+    manifestParsed = parseJsonSafe(manifestRaw);
+  } catch (err) {
+    return {
+      exists: true,
+      valid: false,
+      manifest: undefined,
+      violations: [`[artifact:tla] tla-manifest.json JSON parse failed: ${(err as Error).message}`],
+    };
+  }
+
+  const schemaResult = validateBySchema('tla-manifest', manifestParsed);
+  const specs =
+    typeof manifestParsed === 'object' && manifestParsed !== null && !Array.isArray(manifestParsed)
+      ? (manifestParsed as { specs?: unknown }).specs
+      : undefined;
+  const schemaViolations = schemaResult.errorMessages.map((m) => `[artifact:tla] manifest schema failed: ${m}`);
+  const specsViolations = !Array.isArray(specs)
+    ? ['[artifact:tla] manifest specs must be a non-empty array']
+    : specs.length === 0
+      ? ['[artifact:tla] manifest specs must not be empty']
+      : [];
+  const violations = [...schemaViolations, ...specsViolations];
+  return {
+    exists: true,
+    valid: schemaResult.valid && Array.isArray(specs) && specs.length > 0,
+    manifest:
+      typeof manifestParsed === 'object' && manifestParsed !== null && !Array.isArray(manifestParsed)
+        ? (manifestParsed as Record<string, unknown>)
+        : undefined,
+    violations,
+  };
 }
 
 export interface BddAssetResult {
   bddViolations: string[];
+  /** 文件存在但内容畸形时仍为 true；使用 bddManifestValid 决定是否调用模型门禁。 */
   bddManifestExists: boolean;
+  bddManifestValid: boolean;
+  bddManifest: Record<string, unknown> | undefined;
+}
+
+export interface CucumberReportResult {
+  cucumberViolations: string[];
+  cucumberReportExists: boolean;
+  cucumberReportValid: boolean;
+}
+
+export interface TlaBddSyncPair {
+  tlaFile: string;
+  featureFile: string;
 }
 
 /**
  * BDD 资产读取（spec §13.2 #18）：bdd-manifest.json 存在性 + schema + features 文件存在性
  * + stateMachines 七要素非空（states/acceptingStates/transitions/invariants）。
- * 阶段 4 后才要求 bdd-manifest.json 存在（阶段 1-3 可能还未创建）。
+ * 项目阶段 1-8 均要求 bdd-manifest.json 存在；pre-push fixture 不经过此项目资产读取层。
  */
 export async function readBddManifest(
   bddManifestFile: string,
@@ -98,15 +159,25 @@ export async function readBddManifest(
 ): Promise<BddAssetResult> {
   const bddViolations: string[] = [];
   let bddManifestExists = false;
+  let bddManifestValid = false;
+  let bddManifest: Record<string, unknown> | undefined;
   try {
     const bddRaw = await fs.readFile(bddManifestFile, 'utf-8');
-    const bddManifestParsed = parseJsonSafe(bddRaw) as unknown;
     bddManifestExists = true;
+    let bddManifestParsed: unknown;
+    try {
+      bddManifestParsed = parseJsonSafe(bddRaw);
+    } catch (err) {
+      bddViolations.push(`[artifact:bdd] manifest JSON parse failed: ${(err as Error).message}`);
+      return { bddViolations, bddManifestExists, bddManifestValid, bddManifest };
+    }
     const bddSchemaResult = validateBySchema('bdd-manifest', bddManifestParsed);
     if (!bddSchemaResult.valid) {
       bddViolations.push(`[artifact:bdd] manifest schema failed: ${bddSchemaResult.errorMessages.join('; ')}`);
     } else {
-      const bddManifest = bddManifestParsed as {
+      bddManifestValid = true;
+      bddManifest = bddManifestParsed as Record<string, unknown>;
+      const typedManifest = bddManifestParsed as {
         basePath: string;
         features: Array<{ filePath: string }>;
         stateMachines: Array<{
@@ -117,9 +188,8 @@ export async function readBddManifest(
           invariants: string[];
         }>;
       };
-      // 检查 features 文件存在
-      const bddBasePath = path.resolve(projectDir, bddManifest.basePath);
-      for (const f of bddManifest.features ?? []) {
+      const bddBasePath = path.resolve(projectDir, typedManifest.basePath);
+      for (const f of typedManifest.features ?? []) {
         const fp = path.resolve(bddBasePath, f.filePath);
         try {
           await fs.access(fp);
@@ -127,8 +197,7 @@ export async function readBddManifest(
           bddViolations.push(`[artifact:bdd] feature file missing: ${f.filePath}`);
         }
       }
-      // 检查 stateMachines 七要素非空
-      for (const sm of bddManifest.stateMachines ?? []) {
+      for (const sm of typedManifest.stateMachines ?? []) {
         if (!sm.states?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no states`);
         if (!sm.acceptingStates?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no accepting states`);
         if (!sm.transitions?.length) bddViolations.push(`[artifact:bdd] SM "${sm.id}" has no transitions`);
@@ -137,76 +206,230 @@ export async function readBddManifest(
     }
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    if (e.code !== 'ENOENT') {
-      console.error(`⚠ bdd-manifest.json 读取失败（忽略，按不存在处理）: ${e.message}`);
+    if (e.code === 'ENOENT') {
+      bddViolations.push('[artifact:bdd] .w-model/bdd-manifest.json missing');
+    } else {
+      bddViolations.push(`[artifact:bdd] manifest read failed: ${e.message}`);
     }
-    // ENOENT 或解析失败 → bddManifestExists 保持 false
   }
-  if (!bddManifestExists && effectivePhase >= 4) {
-    // 阶段 4 后必须有 BDD manifest
-    bddViolations.push('[artifact:bdd] .w-model/bdd-manifest.json missing (required after phase 4)');
+  if (!bddManifestExists && effectivePhase >= 1) {
+    bddViolations.push('[artifact:bdd] bdd-manifest.json is required for project phases 1-8');
   }
-  return { bddViolations, bddManifestExists };
+  return { bddViolations, bddManifestExists, bddManifestValid, bddManifest };
+}
+
+/**
+ * Cucumber 报告读取/证据校验。required 项目门对所有畸形、非 passed 状态和零执行报告 fail-closed；
+ * fixture 调用方不使用此函数，因此不改变 pre-push 的轻量回归边界。
+ */
+export async function readCucumberReport(reportFile: string, required: boolean): Promise<CucumberReportResult> {
+  const cucumberViolations: string[] = [];
+  let cucumberReportExists = false;
+  let cucumberReportValid = false;
+  let raw: string;
+  try {
+    raw = await fs.readFile(reportFile, 'utf-8');
+    cucumberReportExists = true;
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (required) {
+      cucumberViolations.push(
+        e.code === 'ENOENT'
+          ? '[artifact:cucumber] report missing'
+          : `[artifact:cucumber] report read failed: ${e.message}`,
+      );
+    }
+    return { cucumberViolations, cucumberReportExists, cucumberReportValid };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = parseJsonSafe(raw);
+  } catch (err) {
+    cucumberViolations.push(`[artifact:cucumber] report JSON parse failed: ${(err as Error).message}`);
+    return { cucumberViolations, cucumberReportExists, cucumberReportValid };
+  }
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    !Array.isArray((parsed as { elements?: unknown }).elements)
+  ) {
+    cucumberViolations.push('[artifact:cucumber] report must be an object with an elements array');
+    return { cucumberViolations, cucumberReportExists, cucumberReportValid };
+  }
+
+  const elements = (parsed as { elements: unknown[] }).elements;
+  let executedScenarioCount = 0;
+  let executedStepCount = 0;
+  const allowedStatuses = new Set(['passed', 'failed', 'skipped', 'pending', 'undefined', 'ambiguous']);
+  for (const [elementIndex, element] of elements.entries()) {
+    if (typeof element !== 'object' || element === null || Array.isArray(element)) {
+      cucumberViolations.push(`[artifact:cucumber] elements[${elementIndex}] must be an object`);
+      continue;
+    }
+    const scenario = element as { name?: unknown; steps?: unknown };
+    const named = typeof scenario.name === 'string' && scenario.name.trim().length > 0;
+    if (!named || !Array.isArray(scenario.steps)) {
+      cucumberViolations.push(
+        `[artifact:cucumber] elements[${elementIndex}] must have a non-empty name and steps array`,
+      );
+      continue;
+    }
+    let passedStep = false;
+    for (const [stepIndex, step] of scenario.steps.entries()) {
+      if (typeof step !== 'object' || step === null || Array.isArray(step)) {
+        cucumberViolations.push(`[artifact:cucumber] elements[${elementIndex}].steps[${stepIndex}] must be an object`);
+        continue;
+      }
+      const result = (step as { result?: unknown }).result;
+      if (
+        typeof result !== 'object' ||
+        result === null ||
+        Array.isArray(result) ||
+        typeof (result as { status?: unknown }).status !== 'string'
+      ) {
+        cucumberViolations.push(
+          `[artifact:cucumber] elements[${elementIndex}].steps[${stepIndex}] result.status is required`,
+        );
+        continue;
+      }
+      const status = (result as { status: string }).status;
+      if (!allowedStatuses.has(status)) {
+        cucumberViolations.push(`[artifact:cucumber] unknown step status "${status}"`);
+      } else if (status !== 'passed') {
+        cucumberViolations.push(`[artifact:cucumber] step status "${status}" is not passed`);
+      } else {
+        passedStep = true;
+        executedStepCount++;
+      }
+    }
+    if (passedStep) executedScenarioCount++;
+  }
+  if (executedScenarioCount === 0 || executedStepCount === 0) {
+    cucumberViolations.push('[artifact:cucumber] report has no executed scenarios or steps');
+  }
+  cucumberReportValid = cucumberViolations.length === 0;
+  return { cucumberViolations, cucumberReportExists, cucumberReportValid };
 }
 
 export interface ModelCheckOptions {
   manifestExists: boolean;
+  manifestValid?: boolean;
   effectivePhase: PhaseOption;
   /** graph 资产绝对路径（graph.json / consolidated-phaseN.json），无则空串 */
   graphPath: string;
   manifestFile: string;
   bddManifestExists: boolean;
+  bddManifestValid?: boolean;
   bddManifestFile: string;
+  cucumberReportFile?: string;
+  /** Project contract enables TLA↔BDD synchronization for phases 1-4. */
+  syncRequired?: boolean;
+  syncPairs?: TlaBddSyncPair[];
+  syncPairViolations?: string[];
+}
+
+function appendProcessViolation(
+  violations: string[],
+  label: string,
+  script: string,
+  result: { status: number | null; stdout?: string | null; stderr?: string | null } | undefined,
+): void {
+  if (!result || result.status !== 0) {
+    const summary = result
+      ? `${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ')
+      : '未返回进程结果';
+    violations.push(`[artifact:${label}] ${script} 退出码 ${result?.status ?? 'unknown'}：${summary}`);
+  }
 }
 
 /**
- * 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8）：
- * phase>=2 且 graph 存在时，经子进程调用 check-tla-model.ts + check-bdd-model.ts
- * （传递 --graph + --phase），任一非 0 退出码即记一条违反（含 stdout 末尾 5 行摘要）。
+ * 终检调用 TLA+/BDD model 校验和项目 TLA↔BDD 同步校验。
+ * phase 1 不需要 graph；phase 2-8 仅在已有 graph 时传递 graph，所有子进程均经 runSync 安全边界。
  */
 export function runModelChecks(opts: ModelCheckOptions): string[] {
   const modelCheckViolations: string[] = [];
-  const { manifestExists, effectivePhase, graphPath, manifestFile, bddManifestExists, bddManifestFile } = opts;
+  const {
+    manifestExists,
+    manifestValid = manifestExists,
+    effectivePhase,
+    graphPath,
+    manifestFile,
+    bddManifestExists,
+    bddManifestValid = bddManifestExists,
+    bddManifestFile,
+    cucumberReportFile,
+    syncRequired = opts.syncPairs !== undefined,
+    syncPairs = [],
+    syncPairViolations = [],
+  } = opts;
+  const canRunTla =
+    manifestExists && manifestValid && effectivePhase <= 4 && (effectivePhase === 1 || Boolean(graphPath));
+  const canRunBdd = bddManifestExists && bddManifestValid;
+  if (effectivePhase >= 2 && effectivePhase <= 4 && manifestValid && !graphPath) {
+    modelCheckViolations.push('[artifact:graph] graph asset is required for project phase 2-4');
+  }
 
-  if (manifestExists && effectivePhase >= 2 && graphPath) {
-    // 调用 check-tla-model.ts
-    const tlaModelResult = runSync(
-      process.execPath,
-      [
-        '--import',
-        'tsx',
-        path.resolve(__dirname, '..', 'cli', 'check-tla-model.ts'),
-        manifestFile,
-        `--phase=${effectivePhase}`,
-        `--graph=${graphPath}`,
-      ],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+  if (canRunTla) {
+    const tlaArgs = [
+      '--import',
+      'tsx',
+      path.resolve(__dirname, '..', 'cli', 'check-tla-model.ts'),
+      manifestFile,
+      `--phase=${effectivePhase}`,
+    ];
+    if (effectivePhase >= 2 && graphPath) tlaArgs.push(`--graph=${graphPath}`);
+    appendProcessViolation(
+      modelCheckViolations,
+      'tla-model',
+      'check-tla-model',
+      runSync(process.execPath, tlaArgs, { stdio: ['ignore', 'pipe', 'pipe'] }),
     );
-    if (tlaModelResult.status !== 0) {
-      modelCheckViolations.push(
-        `[artifact:tla-model] check-tla-model 退出码 ${tlaModelResult.status}：${(tlaModelResult.stdout ?? '').split('\n').slice(-5).join(' | ')}`,
-      );
-    }
+  }
 
-    // 调用 check-bdd-model.ts
-    if (bddManifestExists) {
-      const bddModelResult = runSync(
+  if (canRunBdd) {
+    const bddArgs = [
+      '--import',
+      'tsx',
+      path.resolve(__dirname, '..', 'cli', 'check-bdd-model.ts'),
+      bddManifestFile,
+      `--phase=${effectivePhase}`,
+    ];
+    if (effectivePhase <= 4) {
+      bddArgs.push('--require-tla-equivalence', `--tla-manifest=${manifestFile}`);
+    } else {
+      bddArgs.push('--require-cucumber-report', `--cucumber-report=${cucumberReportFile ?? ''}`);
+    }
+    if (effectivePhase >= 2 && graphPath) bddArgs.push(`--graph=${graphPath}`);
+    appendProcessViolation(
+      modelCheckViolations,
+      'bdd-model',
+      'check-bdd-model',
+      runSync(process.execPath, bddArgs, { stdio: ['ignore', 'pipe', 'pipe'] }),
+    );
+  }
+
+  if (effectivePhase <= 4 && syncRequired) {
+    modelCheckViolations.push(...syncPairViolations);
+    if (!manifestValid || !bddManifestValid) {
+      modelCheckViolations.push('[artifact:tla-bdd-sync] required TLA+/BDD sync assets are invalid');
+    } else if (syncPairs.length === 0) {
+      modelCheckViolations.push('[artifact:tla-bdd-sync] no TLA+/BDD sync pair was found');
+    }
+    for (const pair of syncPairs) {
+      const syncResult = runSync(
         process.execPath,
         [
           '--import',
           'tsx',
-          path.resolve(__dirname, '..', 'cli', 'check-bdd-model.ts'),
-          bddManifestFile,
-          `--phase=${effectivePhase}`,
-          `--graph=${graphPath}`,
+          path.resolve(__dirname, '..', 'cli', 'check-tla-bdd-sync.ts'),
+          pair.tlaFile,
+          pair.featureFile,
         ],
         { stdio: ['ignore', 'pipe', 'pipe'] },
       );
-      if (bddModelResult.status !== 0) {
-        modelCheckViolations.push(
-          `[artifact:bdd-model] check-bdd-model 退出码 ${bddModelResult.status}：${(bddModelResult.stdout ?? '').split('\n').slice(-5).join(' | ')}`,
-        );
-      }
+      appendProcessViolation(modelCheckViolations, 'tla-bdd-sync', 'check-tla-bdd-sync', syncResult);
     }
   }
   return modelCheckViolations;
