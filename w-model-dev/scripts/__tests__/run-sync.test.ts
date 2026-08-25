@@ -121,6 +121,84 @@ describe('runSync', () => {
     );
   });
 
+  it('preserves nonzero exit status and child-process errors for callers to observe', () => {
+    const error = Object.assign(new Error('git unavailable'), { code: 'ENOENT' });
+    spawnSyncMock.mockReturnValue({ status: 1, stdout: '', stderr: 'failed', error });
+
+    const result = runSync('git', ['status']);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('failed');
+    expect(result.error).toBe(error);
+  });
+
+  it('requires affected production probes to use bounded runSync calls', async () => {
+    const sources = await Promise.all(
+      ['cli/check-docs-consistency.ts', 'cli/check-tla-model.ts', 'cli/security-scan.ts'].map(async (file) => {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed repository-relative audit target
+        return [file, await fs.readFile(path.join(SCRIPT_ROOT, file), 'utf-8')] as const;
+      }),
+    );
+    const sourceByFile = new Map(sources);
+    const docsSource = sourceByFile.get('cli/check-docs-consistency.ts')!;
+    const tlaSource = sourceByFile.get('cli/check-tla-model.ts')!;
+    const securitySource = sourceByFile.get('cli/security-scan.ts')!;
+
+    expect(docsSource).toMatch(/runSync\('git', \['diff', '--name-only', 'HEAD'\], \{[\s\S]*?timeout\s*:\s*15_000/);
+    expect(docsSource).toMatch(/runSync\('git', \['status', '--porcelain'\], \{[\s\S]*?timeout\s*:\s*15_000/);
+    expect(docsSource).toMatch(/diff\.error === undefined && diff\.status === 0/);
+    expect(docsSource).toMatch(/status\.error === undefined && status\.status === 0/);
+    expect(tlaSource).toMatch(/runSync\('java', \['-version'\], \{[\s\S]*?timeout\s*:\s*EXEC_LIMITS\.shortTimeoutMs/);
+    expect(tlaSource).toMatch(/if \(res\.error\)[\s\S]*?else if \(res\.status !== 0\)/);
+    expect(tlaSource).toMatch(/if \(res\.error \|\| res\.status !== 0 \|\| major === null\)/);
+    expect(tlaSource).toMatch(/const major = res\.error \|\| res\.status !== 0 \? null : parseJavaMajor/);
+    expect(securitySource).toMatch(/const r = runSync\([\s\S]*?timeout\s*:\s*300_000[\s\S]*?maxBuffer\s*:/);
+    expect(securitySource).toMatch(/if \(r\.error \|\| \(r\.status !== 0 && !r\.stdout\)\)/);
+  });
+
+  it('keeps production direct child-process calls fully bounded and observable', async () => {
+    const sources = new Map(
+      await Promise.all(
+        ['cli/check-tla-model.ts', 'cli/ensure-codegraph-opsx.ts'].map(async (file) => {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed repository-relative audit target
+          return [file, await fs.readFile(path.join(SCRIPT_ROOT, file), 'utf-8')] as const;
+        }),
+      ),
+    );
+    const audit = await findDirectSyncCalls();
+    const productionCalls = audit.calls.filter((call) => call.file.startsWith('cli/'));
+
+    for (const call of productionCalls) {
+      const source = sources.get(call.file);
+      expect(source, call.file).toBeDefined();
+      const optionBlock = source!
+        .split('\n')
+        .slice(call.line - 1, call.line + 20)
+        .join('\n');
+      expect(optionBlock, `${call.file}:${call.line} timeout`).toMatch(/timeout\s*:/);
+      expect(optionBlock, `${call.file}:${call.line} killSignal`).toMatch(/killSignal\s*:\s*['\"]SIGKILL['\"]/);
+      expect(optionBlock, `${call.file}:${call.line} encoding`).toMatch(/encoding\s*:\s*['\"]utf-8['\"]/);
+      expect(optionBlock, `${call.file}:${call.line} maxBuffer`).toMatch(/maxBuffer\s*:/);
+    }
+  });
+
+  it('keeps the centralized direct-call manifest free of unresolved timeout follow-ups', () => {
+    expect(SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.timeout.status === 'missing-followup')).toEqual([]);
+  });
+
+  it('retains line-accurate provenance for calls migrated through runSync', async () => {
+    const migratedEntries = SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync === true);
+    expect(migratedEntries).not.toHaveLength(0);
+
+    for (const entry of migratedEntries) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- manifest paths are repository-controlled
+      const source = await fs.readFile(path.join(SCRIPT_ROOT, entry.file), 'utf-8');
+      const sourceLine = source.split('\n')[entry.line - 1] ?? '';
+      expect(sourceLine, `${entry.file}:${entry.line}`).toContain('runSync');
+      expect(entry.timeout.status).toBe('present');
+    }
+  });
+
   it('resolves direct aliases, namespace properties, static element access, and destructured aliases with the TypeScript AST', () => {
     const source = [
       "import { spawnSync as runChild, execSync } from 'node:child_process';",
@@ -171,14 +249,15 @@ describe('runSync', () => {
     expect(directCalls).not.toHaveLength(0);
     expect(audit.calls.filter((call) => call.file === RUN_SYNC_FILE && call.api === 'spawnSync')).toHaveLength(1);
 
-    const remainingExceptions = [...SYNC_PROCESS_EXCEPTIONS];
+    const directExceptions = SYNC_PROCESS_EXCEPTIONS.filter((candidate) => candidate.migratedToRunSync !== true);
+    const remainingExceptions = [...directExceptions];
     for (const call of directCalls) {
       const exceptionIndex = remainingExceptions.findIndex(
         (candidate) => candidate.api === call.api && candidate.file === call.file,
       );
       expect(exceptionIndex, `${call.file}:${call.line} ${call.api} must be reviewed`).toBeGreaterThanOrEqual(0);
       const [exception] = remainingExceptions.splice(exceptionIndex, 1);
-      expect(exception?.line).toBeGreaterThan(0);
+      expect(exception?.line).toBe(call.line);
       expect(exception?.symbol).not.toBe('');
       expect(exception?.reason).not.toBe('');
       expect(exception?.timeout.required).toBe(true);
@@ -196,7 +275,15 @@ describe('runSync', () => {
     }
 
     expect(remainingExceptions).toHaveLength(0);
-    expect(SYNC_PROCESS_EXCEPTIONS).toHaveLength(directCalls.length);
+    expect(SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync !== true)).toHaveLength(
+      directCalls.length,
+    );
+    expect(SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync === true)).not.toHaveLength(0);
+    expect(
+      SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync === true).every(
+        (entry) => entry.timeout.status === 'present',
+      ),
+    ).toBe(true);
   });
 
   it('terminates a real slow child within an explicit short timeout', async () => {

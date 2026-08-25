@@ -39,7 +39,7 @@
  * @module
  */
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
@@ -53,6 +53,7 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { cleanTraceFiles } from '../lib/tla-clean-trace.js';
+import { runSync } from '../lib/run-sync.js';
 
 // ==================== 参数解析 ====================
 
@@ -103,16 +104,16 @@ interface EnvironmentStatus {
  *   - java -version 可执行且主版本 ≥ javaMinVersion
  *   - tla2tools.jar 文件存在（jarAbs 为按 basePath 基准解析后的绝对路径）
  */
-async function checkEnvironment(jarAbs: string, javaMinVersion: number): Promise<EnvironmentStatus> {
+export async function checkEnvironment(jarAbs: string, javaMinVersion: number): Promise<EnvironmentStatus> {
   const errors: string[] = [];
   let javaVersion: number | null = null;
 
-  // java -version（输出在 stderr；用 spawnSync 同时捕获 stdout/stderr，不抛异常）
+  // java -version（输出在 stderr；用 runSync 同时捕获 stdout/stderr，不抛异常）
   let javaStderr = '';
   try {
-    const res = spawnSync('java', ['-version'], {
-      encoding: 'utf-8',
+    const res = runSync('java', ['-version'], {
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: EXEC_LIMITS.shortTimeoutMs,
     });
     javaStderr = (res.stderr ?? '') + (res.stdout ?? '');
     if (res.error) {
@@ -280,14 +281,13 @@ async function main(): Promise<void> {
   // 唯一事实源 = manifest.tools.javaMinVersion，由 checkEnvironment 按声明值复核（P15 去硬编码 11）。
   // jar 路径依赖 manifest.tools 声明（basePath 相对），无法在本阶段预检，仍由后续 checkEnvironment 复核。
   {
-    const res = spawnSync('java', ['-version'], {
-      encoding: 'utf-8',
+    const res = runSync('java', ['-version'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: EXEC_LIMITS.shortTimeoutMs,
     });
     const out = `${res.stderr ?? ''}${res.stdout ?? ''}`;
-    const major = res.error ? null : parseJavaMajor(out);
-    if (res.error || major === null) {
+    const major = res.error || res.status !== 0 ? null : parseJavaMajor(out);
+    if (res.error || res.status !== 0 || major === null) {
       exitWithError({
         category: 'UNEXPECTED',
         rule: 'P0-2',

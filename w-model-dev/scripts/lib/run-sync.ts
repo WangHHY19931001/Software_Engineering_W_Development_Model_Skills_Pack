@@ -15,6 +15,8 @@ type SyncProcessException = {
   line: number;
   symbol: string;
   reason: string;
+  /** Retained audit provenance for a call migrated through the centralized runSync wrapper. */
+  migratedToRunSync?: true;
   timeout: {
     required: true;
     status: 'present' | 'missing-followup';
@@ -24,62 +26,88 @@ type SyncProcessException = {
 /**
  * Full scripts-directory inventory of direct synchronous child-process calls.
  * Direct calls are retained only where B4 scope prohibits migration or where their
- * command-specific implementation already needs a distinct API; each entry records
- * whether a process-level timeout is already present or requires follow-up work.
+ * command-specific implementation already needs a distinct API. Calls migrated to
+ * runSync retain their entries as audit provenance instead of being deleted.
  */
 export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 109,
-    symbol: 'detectScriptsChanges',
-    reason: 'B4 excludes docs-consistency; git diff probe has no timeout and needs a dedicated follow-up.',
-    timeout: { required: true, status: 'missing-followup' },
-  },
-  {
-    api: 'spawnSync',
-    file: 'cli/check-docs-consistency.ts',
     line: 118,
     symbol: 'detectScriptsChanges',
-    reason: 'B4 excludes docs-consistency; git status probe has no timeout and needs a dedicated follow-up.',
-    timeout: { required: true, status: 'missing-followup' },
+    reason: 'B3 migrated git diff probe through runSync; retained as audit provenance with a 15-second timeout.',
+    migratedToRunSync: true,
+    timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 403,
+    line: 127,
+    symbol: 'detectScriptsChanges',
+    reason: 'B3 migrated git status probe through runSync; retained as audit provenance with a 15-second timeout.',
+    migratedToRunSync: true,
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: 'cli/check-docs-consistency.ts',
+    line: 478,
     symbol: 'currentCommitSha',
-    reason: 'D4 binds the coverage artifact to the repository commit with a bounded git probe.',
+    reason: 'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 527,
+    line: 604,
     symbol: 'collectVitestMeasurements',
-    reason: 'B4 excludes docs-consistency; direct Node Vitest execution needs its 180-second timeout.',
+    reason:
+      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its 300-second timeout.',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 534,
+    line: 610,
     symbol: 'collectVitestMeasurements',
-    reason: 'B4 excludes docs-consistency; shell fallback keeps its 180-second timeout.',
+    reason:
+      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its 300-second timeout.',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 113,
+    line: 114,
     symbol: 'checkEnvironment',
-    reason: 'B4 excludes check-tla-model; Java environment probe has no timeout and needs a dedicated follow-up.',
-    timeout: { required: true, status: 'missing-followup' },
+    reason: 'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
+    migratedToRunSync: true,
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: 'cli/check-tla-model.ts',
+    line: 284,
+    symbol: 'main',
+    reason: 'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
+    migratedToRunSync: true,
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: 'cli/security-scan.ts',
+    line: 156,
+    symbol: 'main',
+    reason: 'B3 migrated ESLint execution through runSync with a 300-second timeout and existing 10 MiB maxBuffer.',
+    migratedToRunSync: true,
+    timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 193,
+    line: 194,
     symbol: 'runTools',
     reason: 'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.',
     timeout: { required: true, status: 'present' },
@@ -87,17 +115,9 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 220,
+    line: 221,
     symbol: 'runTools',
     reason: 'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'spawnSync',
-    file: 'cli/check-tla-model.ts',
-    line: 283,
-    symbol: 'main',
-    reason: 'B4 excludes check-tla-model; preflight Java probe uses EXEC_LIMITS.shortTimeoutMs.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -111,7 +131,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 60,
+    line: 66,
     symbol: 'installCli',
     reason: 'Existing npm installation command has an explicit 120-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -119,7 +139,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 78,
+    line: 90,
     symbol: 'checkMcpCodegraph',
     reason: 'Existing codegraph probe has an explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -127,7 +147,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 98,
+    line: 113,
     symbol: 'registerMcpCodegraph',
     reason: 'Existing codegraph registration has an explicit 60-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -135,7 +155,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 113,
+    line: 134,
     symbol: 'initCodegraph',
     reason: 'Existing codegraph initialization has an explicit 300-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -143,18 +163,10 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 128,
+    line: 156,
     symbol: 'initOpenspec',
     reason: 'Existing OpenSpec initialization has an explicit 60-second timeout.',
     timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'spawnSync',
-    file: 'cli/security-scan.ts',
-    line: 156,
-    symbol: 'main',
-    reason: 'B4 excludes security-scan; ESLint execution has maxBuffer but no timeout and needs a dedicated follow-up.',
-    timeout: { required: true, status: 'missing-followup' },
   },
   {
     api: 'execSync',
@@ -183,7 +195,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1587,
+    line: 2325,
     symbol: 'withDocsConsistencyFixture git init',
     reason: 'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.',
     timeout: { required: true, status: 'present' },
@@ -191,7 +203,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1590,
+    line: 2328,
     symbol: 'withDocsConsistencyFixture git config email',
     reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
@@ -199,7 +211,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1596,
+    line: 2334,
     symbol: 'withDocsConsistencyFixture git config name',
     reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
@@ -207,7 +219,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1599,
+    line: 2337,
     symbol: 'withDocsConsistencyFixture git config gpgSign',
     reason: 'D5 disables inherited signing for the isolated provenance fixture.',
     timeout: { required: true, status: 'present' },
@@ -215,7 +227,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1606,
+    line: 2344,
     symbol: 'withDocsConsistencyFixture git add',
     reason: 'D5 stages the copied fixture before creating its provenance-bound commit.',
     timeout: { required: true, status: 'present' },
@@ -223,7 +235,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1607,
+    line: 2345,
     symbol: 'withDocsConsistencyFixture git commit',
     reason: 'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.',
     timeout: { required: true, status: 'present' },
@@ -231,7 +243,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1643,
+    line: 2381,
     symbol: 'fixtureCommitSha',
     reason: 'D5 reads the isolated fixture HEAD for same-run provenance assertions.',
     timeout: { required: true, status: 'present' },
@@ -239,7 +251,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 1659,
+    line: 2397,
     symbol: 'runDocsConsistencyCli',
     reason: 'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.',
     timeout: { required: true, status: 'present' },
@@ -247,7 +259,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/evidence-export-logic.test.ts',
-    line: 79,
+    line: 148,
     symbol: 'runCli',
     reason:
       'D3 requires actual CLI child-process exit-code tests; execution uses the default 15-second process timeout.',

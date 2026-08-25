@@ -32,7 +32,7 @@
 
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { execFile, spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve as pathResolve, sep } from 'node:path';
@@ -41,6 +41,7 @@ import { createRequire } from 'node:module';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { runSync } from '../lib/run-sync.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import {
@@ -114,7 +115,7 @@ const DESIGN_DOC_NAMES = [
  */
 function detectScriptsChanges(root: string): boolean {
   const paths: string[] = [];
-  const diff = spawnSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, encoding: 'utf-8' });
+  const diff = runSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, timeout: 15_000 });
   if (diff.error === undefined && diff.status === 0) {
     paths.push(
       ...String(diff.stdout)
@@ -123,7 +124,7 @@ function detectScriptsChanges(root: string): boolean {
         .filter((l) => l.length > 0),
     );
   }
-  const status = spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf-8' });
+  const status = runSync('git', ['status', '--porcelain'], { cwd: root, timeout: 15_000 });
   if (status.error === undefined && status.status === 0) {
     for (const line of String(status.stdout).split(/\r?\n/)) {
       const t = line.trim();
@@ -474,7 +475,7 @@ function parseVitestMeasurements(
  */
 function currentCommitSha(root: string | undefined): string | undefined {
   if (root === undefined) return undefined;
-  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf-8', timeout: 15_000 });
+  const result = runSync('git', ['rev-parse', 'HEAD'], { cwd: root, timeout: 15_000 });
   const sha = String(result.stdout ?? '').trim();
   return /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
 }
@@ -581,7 +582,7 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
  *   1. 环境变量 WM_VITEST_COUNT_FILE 指向的 vitest JSON outputFile（pre-push 第 12 项复用）→ 直接读取，不 spawn；
  *   2. 未提供可用 JSON 时，一律显式 spawn Vitest 采集（不以 scriptsChanged 跳过）。
  * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
- * spawnSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
+ * runSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
  * 落盘/解析失败（含 spawn 超时/错误）一律先尝试读取 JSON outputFile（vitest 若已完整跑完必落盘）；
  * 仍读不到则返回 -1，由逻辑层生成 `vitest-tests` 违规并 fail-closed（不虚构计数）。
  * 注：timeout 按本仓库全量 vitest 实测墙钟（约 198s）上调到 300s，避免健康仓库在
@@ -600,16 +601,14 @@ function collectVitestMeasurements(root: string): VitestMeasurements {
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
   if (vitestBin !== null) {
-    spawnSync(process.execPath, [vitestBin, ...vitestArgs], {
+    runSync(process.execPath, [vitestBin, ...vitestArgs], {
       cwd: root,
-      encoding: 'utf-8',
       timeout: 300_000,
       maxBuffer: 64 * 1024 * 1024,
     });
   } else {
-    spawnSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, {
+    runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, [], {
       cwd: root,
-      encoding: 'utf-8',
       timeout: 300_000,
       maxBuffer: 64 * 1024 * 1024,
       shell: true,

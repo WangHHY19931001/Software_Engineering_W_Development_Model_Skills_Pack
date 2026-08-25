@@ -20,7 +20,6 @@
  *   2  输入错误（eslint 不可用 / baseline 文件损坏 / 旧版位置指纹格式需重生成）
  */
 
-import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -28,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { runSync } from '../lib/run-sync.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 interface EslintMessage {
@@ -149,11 +149,11 @@ async function main(): Promise<void> {
   const regenerate = args.includes('--regenerate');
 
   // maxBuffer：eslint --format json 输出约 1.1MB，超过 spawnSync 默认 1MB 会 ENOBUFS 导致 JSON.parse 失败，
-  // 故放宽至 10MB 确保全量输出可读。
+  // 故放宽至 10MB 确保全量输出可读；timeout 防止安全扫描进程永久等待。
   // .eslintrc.cjs 位于 config/，cwd 向上自动发现的机制失效，须显式 --config。
   // --no-eslintrc：关闭 eslintrc 级联查找，否则会向上找到仓库根之外的同名配置（git worktree
   // 场景下即主仓库的 .eslintrc.cjs），造成插件双路径冲突（"couldn't determine the plugin uniquely"）。
-  const r = spawnSync(
+  const r = runSync(
     'npx',
     [
       'eslint',
@@ -167,12 +167,12 @@ async function main(): Promise<void> {
       'json',
     ],
     {
-      encoding: 'utf-8',
       shell: process.platform === 'win32',
+      timeout: 300_000,
       maxBuffer: 10 * 1024 * 1024,
     },
   );
-  if (r.status !== 0 && !r.stdout) {
+  if (r.error || (r.status !== 0 && !r.stdout)) {
     exitWithError({
       category: 'FILE_READ',
       rule: 'P0-3',

@@ -42,7 +42,13 @@ interface CheckResult {
  */
 function checkCli(name: string): boolean {
   try {
-    execFileSync(name, ['--version'], { stdio: 'pipe', timeout: 10000 });
+    execFileSync(name, ['--version'], {
+      stdio: 'pipe',
+      timeout: 10_000,
+      killSignal: 'SIGKILL',
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
     return true;
   } catch (err) {
     console.error(
@@ -57,7 +63,13 @@ function checkCli(name: string): boolean {
  */
 function installCli(packageName: string): boolean {
   try {
-    execFileSync('npm', ['i', '-g', packageName], { stdio: 'pipe', timeout: 120000 });
+    execFileSync('npm', ['i', '-g', packageName], {
+      stdio: 'pipe',
+      timeout: 120_000,
+      killSignal: 'SIGKILL',
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
     return true;
   } catch (err) {
     console.error(
@@ -78,7 +90,10 @@ function checkMcpCodegraph(projectRoot: string): boolean {
     execFileSync('codegraph', ['query', 'main'], {
       cwd: projectRoot,
       stdio: 'pipe',
-      timeout: 15000,
+      timeout: 15_000,
+      killSignal: 'SIGKILL',
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
     });
     return true;
   } catch (err) {
@@ -95,7 +110,13 @@ function checkMcpCodegraph(projectRoot: string): boolean {
 function registerMcpCodegraph(): boolean {
   try {
     // 禁止 --yes：不得自动改写全局 opencode 配置
-    execFileSync('codegraph', ['install'], { stdio: 'pipe', timeout: 60000 });
+    execFileSync('codegraph', ['install'], {
+      stdio: 'pipe',
+      timeout: 60_000,
+      killSignal: 'SIGKILL',
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
     return true;
   } catch (err) {
     console.error(
@@ -110,7 +131,14 @@ function registerMcpCodegraph(): boolean {
  */
 function initCodegraph(projectRoot: string): boolean {
   try {
-    execFileSync('codegraph', ['init'], { cwd: projectRoot, stdio: 'pipe', timeout: 300000 });
+    execFileSync('codegraph', ['init'], {
+      cwd: projectRoot,
+      stdio: 'pipe',
+      timeout: 300_000,
+      killSignal: 'SIGKILL',
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
     return true;
   } catch (err) {
     console.error(
@@ -125,7 +153,14 @@ function initCodegraph(projectRoot: string): boolean {
  */
 function initOpenspec(projectRoot: string): boolean {
   try {
-    execFileSync('openspec', ['init'], { cwd: projectRoot, stdio: 'pipe', timeout: 60000 });
+    execFileSync('openspec', ['init'], {
+      cwd: projectRoot,
+      stdio: 'pipe',
+      timeout: 60_000,
+      killSignal: 'SIGKILL',
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
     return true;
   } catch (err) {
     console.error(
