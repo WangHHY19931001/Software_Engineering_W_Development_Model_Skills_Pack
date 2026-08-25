@@ -119,6 +119,7 @@ const RUN_LOG_JSONL =
   '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n';
 
 const PROJECT_JSON = '{"id":"natural-exit","status":"编码","updatedAt":"2026-08-05T01:00:00Z"}';
+const SELF_TEST_VERIFIER_FIXTURE = path.join(SCRIPTS_ROOT, 'samples', 'verifier', 'valid.json');
 
 async function makeSecurityNpx(directory: string): Promise<void> {
   await makeCommand(directory, 'npx', 'type findings.json\r\nexit /b 0', 'cat findings.json\nexit 0');
@@ -143,10 +144,18 @@ describe('production CLI static natural-exit contract', () => {
       expect(source, path.basename(file)).toMatch(/process\.exitCode\s*=/);
     }
   });
+
+  it('documents metrics-report and wm-status as 0/2-only result contracts', async () => {
+    for (const file of [METRICS_SCRIPT, STATUS_SCRIPT]) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed production CLI target
+      const source = await fs.readFile(file, 'utf8');
+      expect(source, path.basename(file)).not.toMatch(/process\.exitCode\s*=\s*1/);
+    }
+  });
 });
 
 describe('production CLI real subprocess exit semantics', () => {
-  it('metrics-report preserves exit 0 and structured input exit 2', async () => {
+  it('metrics-report has a 0/2 contract: success and input validation failure', async () => {
     const directory = await makeTempDirectory('wm-natural-metrics-');
     await writeWModel(directory, 'run-log.jsonl', RUN_LOG_JSONL);
 
@@ -196,7 +205,7 @@ describe('production CLI real subprocess exit semantics', () => {
     expect(invalid.stdout).toContain('ERROR_JSON');
   });
 
-  it('wm-status preserves exit 0 and structured input exit 2', async () => {
+  it('wm-status has a 0/2 contract: normal status and input validation failure', async () => {
     const directory = await makeTempDirectory('wm-natural-status-');
     await writeWModel(directory, 'project.json', PROJECT_JSON);
 
@@ -267,6 +276,21 @@ describe('production CLI real subprocess exit semantics', () => {
     expect(invalid.status).toBe(2);
     expect(invalid.stdout).toContain('ERROR_JSON');
   });
+
+  it('self-test preserves aggregate failure exit 1', async () => {
+    const original = await fs.readFile(SELF_TEST_VERIFIER_FIXTURE, 'utf8');
+    const valid = JSON.parse(original) as { passed: boolean };
+    valid.passed = false;
+    await fs.writeFile(SELF_TEST_VERIFIER_FIXTURE, JSON.stringify(valid), 'utf8');
+    try {
+      const result = runScript(SELF_TEST_SCRIPT);
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('失败');
+      expect(result.stdout).toContain('总计');
+    } finally {
+      await fs.writeFile(SELF_TEST_VERIFIER_FIXTURE, original, 'utf8');
+    }
+  }, 60_000);
 
   it('self-test preserves its successful aggregate exit 0', () => {
     const result = runScript(SELF_TEST_SCRIPT);

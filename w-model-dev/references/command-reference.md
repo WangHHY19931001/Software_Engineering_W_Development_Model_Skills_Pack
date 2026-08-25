@@ -29,15 +29,15 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 以下生产 CLI 均受自然退出契约约束：
 
-| 脚本                       | 退出实现                                                  |
-| -------------------------- | --------------------------------------------------------- |
-| `ensure-codegraph-opsx.ts` | 外部依赖检测结束后设置 `process.exitCode`，自然返回       |
-| `metrics-report.ts`        | 报告输出完成后设置 `process.exitCode=0`，自然返回         |
-| `security-scan.ts`         | 扫描/重生成结果设置 `process.exitCode`，自然返回          |
-| `self-test.ts`             | 汇总或未预期异常设置 `process.exitCode`，自然返回         |
-| `wm-status.ts`             | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回 |
+| 脚本                       | 适用结果状态 | 退出实现                                                  |
+| -------------------------- | ------------ | --------------------------------------------------------- |
+| `ensure-codegraph-opsx.ts` | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回       |
+| `metrics-report.ts`        | 0 / 2        | 报告输出完成后设置 `process.exitCode=0`，自然返回         |
+| `security-scan.ts`         | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回          |
+| `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回         |
+| `wm-status.ts`             | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回 |
 
-所有生产 CLI 仍须保持既有 shell exit `0/1/2`（适用时）和输出协议；测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
+生产 CLI 的 exit `1` 仅适用于具有校验失败/检查点结果的 runner；metrics-report 与 wm-status 没有 exit 1 结果分支，输入错误统一为 exit 2。测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
 
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
 
