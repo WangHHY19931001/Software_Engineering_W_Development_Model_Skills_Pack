@@ -157,6 +157,14 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.11.0\n```',
     lockJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.11.0' }),
     ssot: [
+      '### 3.1 整体架构',
+      'graph LR',
+      'subgraph SkillPackage[W-Model Skill 技能包]',
+      'subgraph Host[宿主 Agent / 外部 LLM]',
+      'subgraph Tools[可选外部工具]',
+      'Host -. 使用技能包规则并执行 .-> SkillPackage',
+      'Host -. 可选调用 .-> Tools',
+      '图中的边界是交付契约：技能包只交付 Markdown 资产、Schema 与确定性 gate scripts；宿主 Agent / 外部 LLM 负责推理；TLA+ TLC、CodeGraph、OpenSpec 由宿主 Agent 按需接入；它们不属于技能包交付物。',
       '### 4A.1 八条核心操作行为',
       '8 条核心操作行为',
       '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
@@ -742,6 +750,14 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
 });
 
 describe('runDocConsistencyChecks', () => {
+  it('SSoT 三边界架构契约缺失 → 违规', () => {
+    const input = baseInput({
+      ssot: baseInput().ssot.replace('subgraph Tools[可选外部工具]\n', ''),
+    });
+    const violations = runDocConsistencyChecks(input);
+    expect(violations.some((x) => x.check === 'architecture-boundaries' && x.message.includes('三边界'))).toBe(true);
+  });
+
   it('schema 清单缺行 → 违规', () => {
     const input = baseInput({
       dataModels: '### Schema 清单（21 份）\n| `verifier-output` | ... |',
@@ -2659,9 +2675,16 @@ async function assertSsotExternalBoundaryFile(): Promise<void> {
   const content = await fs.readFile(ssotPath, 'utf-8');
   expect(content).not.toContain('subgraph AI引擎层');
   expect(content).not.toContain('核心AI引擎');
-  expect(content).toContain('宿主 Agent / 外部 LLM');
-  expect(content).toContain('W-Model Skill 技能包');
-  expect(content).toContain('可选外部工具');
+  const start = content.indexOf('### 3.1 整体架构');
+  const end = content.indexOf('\n### 3.2 ', start);
+  const architecture = content.slice(start, end);
+  expect(architecture).toContain('宿主 Agent / 外部 LLM');
+  expect(architecture).toContain('W-Model Skill 技能包');
+  expect(architecture).toContain('可选外部工具');
+  expect(architecture).toContain('Host -. 使用技能包规则并执行 .-> SkillPackage');
+  expect(architecture).toContain('Host -. 可选调用 .-> Tools');
+  expect(architecture).toContain('图中的边界是交付契约');
+  expect(architecture).toContain('不属于技能包交付物');
   expect(content).toContain('TLA+/TLC 是外部工具能力');
   expect(content).toContain('Java ≥ 11 是宿主环境依赖');
   expect(content).toContain('w-model-dev/tools/tla2tools.jar` 是 L1 交付层随技能包携带的运行时资产');
@@ -2741,6 +2764,10 @@ function c3DocumentContractViolations(docs: C3DocumentSet): string[] {
 }
 
 describe('C3 文档入口契约', () => {
+  it('当前 SSoT 三边界架构图与边界说明保持在同一 3.1 契约区段', async () => {
+    await assertSsotExternalBoundaryFile();
+  });
+
   it('统一契约接受当前文档，并拒绝真实旧文档局部 fixture', async () => {
     const readDoc = async (relativePath: string): Promise<string> => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled documentation paths

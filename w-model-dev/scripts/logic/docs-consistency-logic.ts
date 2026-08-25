@@ -793,6 +793,7 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
       input.lockJson,
     ),
   );
+  violations.push(...checkSsotArchitectureBoundaries(input.ssot));
   violations.push(...checkSsotHeadings(input.ssot));
   violations.push(...checkScriptRegistry(input.cliScriptFiles, input.dispatchMatrix, input.skill));
   if (input.localEvidenceDocs !== undefined) {
@@ -968,6 +969,37 @@ function checkSsotHeadings(ssot: string): DocCheckViolation[] {
     }
   }
   return violations;
+}
+
+/**
+ * SSoT 三边界架构图契约：3.1 必须保留 SkillPackage / Host / Tools 三个 Mermaid
+ * 边界及宿主到技能包、外部工具的关系；图下文字必须明确交付边界，避免回到内置
+ * AI 引擎 / LLM SDK 的旧架构叙述。只检查 SSoT，不把 README 或历史计划当作事实源。
+ */
+function checkSsotArchitectureBoundaries(ssot: string): DocCheckViolation[] {
+  const heading = '### 3.1 整体架构';
+  const start = ssot.indexOf(heading);
+  const end = start < 0 ? -1 : ssot.indexOf('\n### ', start + heading.length);
+  const section = start < 0 ? '' : ssot.slice(start, end < 0 ? undefined : end);
+  const requiredTokens = [
+    heading,
+    'graph LR',
+    'subgraph SkillPackage',
+    'subgraph Host',
+    'subgraph Tools',
+    'Host -. 使用技能包规则并执行 .-> SkillPackage',
+    'Host -. 可选调用 .-> Tools',
+    '图中的边界是交付契约',
+    '不属于技能包交付物',
+  ];
+  const missing = requiredTokens.filter((token) => !section.includes(token));
+  if (missing.length === 0) return [];
+  return [
+    {
+      check: 'architecture-boundaries',
+      message: `SSoT 三边界架构契约缺失：${missing.join('、')}`,
+    },
+  ];
 }
 
 /**
