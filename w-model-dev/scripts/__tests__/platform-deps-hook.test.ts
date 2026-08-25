@@ -45,11 +45,27 @@ async function run(script: string, args: string[], environment: Record<string, s
 async function simulatedEnsure(
   args: string[],
   nodeBody: string,
-): Promise<{ code: number; stdout: string; stderr: string; calls: string }> {
+  cliBody?: string,
+): Promise<{ code: number; stdout: string; stderr: string; calls: string; cliCalls: string }> {
   const binDir = await makeTempDir('platform-deps-bin-');
   const workspace = await makeTempDir('platform-deps-workspace-');
   const callsPath = path.join(binDir, 'calls.log');
+  const cliCallsPath = path.join(binDir, 'cli-calls.log');
   await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+  await fs.writeFile(path.join(workspace, 'package-lock.json'), '{}\n', 'utf8');
+  if (cliBody !== undefined) {
+    const localBin = path.join(workspace, 'node_modules', '.bin');
+    await fs.mkdir(localBin, { recursive: true });
+    await fs.mkdir(path.join(workspace, 'w-model-dev', 'scripts', 'cli'), { recursive: true });
+    await fs.writeFile(
+      path.join(workspace, 'w-model-dev', 'scripts', 'cli', 'platform-deps-install.ts'),
+      '// offline fixture CLI entrypoint\n',
+      'utf8',
+    );
+    const cliPath = path.join(localBin, 'tsx');
+    await fs.writeFile(cliPath, `#!/usr/bin/env bash\nset -u\n${cliBody}\n`, 'utf8');
+    await fs.chmod(cliPath, 0o755);
+  }
   const bashEnv = path.join(binDir, 'bash-env.sh');
   await fs.writeFile(
     bashEnv,
@@ -73,6 +89,7 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
     {
       PATH: `${binDir}:${process.env.PATH}`,
       CALLS: callsPath,
+      CLI_CALLS: cliCallsPath,
       BASH_ENV: bashEnv,
     },
     workspace,
@@ -80,12 +97,92 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
   return {
     ...result,
     calls: await fs.readFile(callsPath, 'utf8').catch(() => ''),
+    cliCalls: await fs.readFile(cliCallsPath, 'utf8').catch(() => ''),
   };
 }
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
+
+async function simulatedPrePushAudit(
+  auditCase: 'network' | 'unsupported' | 'network-text' | 'vulnerability' | 'json' | 'permission',
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const binDir = await makeTempDir('pre-push-audit-bin-');
+  const workspace = await makeTempDir('pre-push-audit-workspace-');
+  await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\\n', 'utf8');
+  await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
+  await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
+  const fakeNpx = path.join(binDir, 'npx');
+  await fs.writeFile(
+    fakeNpx,
+    `#!/usr/bin/env bash
+for arg in "$@"; do
+  case "$arg" in
+    --outputFile=*) printf '{"testResults":[],"numTotalTests":0,"numPassedTests":0,"numFailedTests":0,"success":true}' > "\${arg#--outputFile=}" ;;
+  esac
+done
+case "$*" in
+  *bad-schema.manifest.json*) exit 2 ;;
+esac
+exit 0
+`,
+    'utf8',
+  );
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled temporary executable fixture
+  await fs.chmod(fakeNpx, 0o755);
+  const bashEnv = path.join(binDir, 'bash-env.sh');
+  await fs.writeFile(
+    bashEnv,
+    `
+git() { printf '%s\\n' "$PWD"; }
+node() {
+  case "$*" in
+    *process.platform*) printf 'linux\\n' ;;
+    *process.arch*) printf 'x64\\n' ;;
+    *esbuild/package.json*) printf '0.25.0\\n' ;;
+    *rolldown/package.json*) printf '1.0.0\\n' ;;
+    *) printf '\\n' ;;
+  esac
+}
+npm() {
+  case "$*" in
+    'run self-test') return 0 ;;
+    'run check:verifier') return 2 ;;
+    *'check:verifier -- w-model-dev/scripts/samples/verifier/valid.json'*) return 0 ;;
+    *'check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json'*) return 1 ;;
+    *'run check:gate -- /tmp/nonexistent'*) return 2 ;;
+    *'run check:coverage -- '*) return 0 ;;
+    *'run check:exemption -- '*) return 0 ;;
+    'audit --audit-level=high')
+      case "$AUDIT_CASE" in
+        network) printf 'npm error code ENOTFOUND\\n'; return 255 ;;
+        unsupported) printf 'npm error code ENOTSUP\\n'; return 1 ;;
+        network-text) printf 'npm audit report mentions network but is not an npm network error\\n'; return 1 ;;
+        vulnerability) printf 'npm audit report: high vulnerability\\n'; return 1 ;;
+        json) printf 'npm error Unexpected end of JSON input\\n'; return 1 ;;
+        permission) printf 'npm error code EACCES\\n'; return 1 ;;
+      esac
+      ;;
+    'run check:docs-consistency') test -s "$WM_VITEST_COUNT_FILE" || return 97; return 0 ;;
+    *) return 97 ;;
+  esac
+}
+`,
+    'utf8',
+  );
+  return run(
+    prePushScript,
+    ['--force'],
+    {
+      BASH_ENV: bashEnv,
+      PATH: `${binDir}:${process.env.PATH}`,
+      AUDIT_CASE: auditCase,
+      OSTYPE: 'linux-gnu',
+    },
+    workspace,
+  );
+}
 
 describe('ensure-platform-deps supply-chain boundary', () => {
   it('defaults to check mode and reports the explicit install command without package download or extraction', async () => {
@@ -124,6 +221,25 @@ esac`,
     expect(result.calls).toBe('');
   });
 
+  it('does not invoke the installer, npm, pack, tar, or extraction tools in --check mode', async () => {
+    const result = await simulatedEnsure(
+      ['--check'],
+      `
+case "$*" in
+  *process.platform*) printf 'linux\\n' ;;
+  *process.arch*) printf 'x64\\n' ;;
+  *esbuild/package.json*) printf '0.25.0\\n' ;;
+  *rolldown/package.json*) printf '1.0.0\\n' ;;
+  *) printf '\\n' ;;
+esac`,
+      `printf '%s\\n' "$*" >> "$CLI_CALLS"; exit 99`,
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.calls).toBe('');
+    expect(result.cliCalls).toBe('');
+  });
+
   it('fails closed for an uncovered platform without package download or extraction', async () => {
     const result = await simulatedEnsure(
       ['--check'],
@@ -151,7 +267,7 @@ esac`,
     },
   );
 
-  it('keeps --install fail-closed without package, archive, or filesystem side effects when native dependencies are missing', async () => {
+  it('passes the absolute lockfile and every missing package to the local installer, then rechecks', async () => {
     const result = await simulatedEnsure(
       ['--install'],
       `
@@ -162,11 +278,65 @@ case "$*" in
   *rolldown/package.json*) printf '1.0.0\\n' ;;
   *) printf '\\n' ;;
 esac`,
+      `
+printf '%s\\n' "$*" >> "$CLI_CALLS"
+command mkdir -p "$PWD/node_modules/@esbuild/linux-x64" "$PWD/node_modules/@rolldown/binding-linux-x64-gnu"
+exit 0`,
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('平台依赖补装完成');
+    expect(result.cliCalls).toContain('--lockfile=');
+    expect(result.cliCalls).toContain('--package=@esbuild/linux-x64');
+    expect(result.cliCalls).toContain('--package=@rolldown/binding-linux-x64-gnu');
+    expect(result.cliCalls).toContain(path.join('package-lock.json'));
+    expect(result.calls).toBe('');
+  });
+
+  it('fails closed when the explicit local installer succeeds but the recheck still finds a missing package', async () => {
+    const result = await simulatedEnsure(
+      ['--install'],
+      `
+case "$*" in
+  *process.platform*) printf 'linux\\n' ;;
+  *process.arch*) printf 'x64\\n' ;;
+  *esbuild/package.json*) printf '0.25.0\\n' ;;
+  *rolldown/package.json*) printf '1.0.0\\n' ;;
+  *) printf '\\n' ;;
+esac`,
+      `
+printf '%s\\n' "$*" >> "$CLI_CALLS"
+exit 0`,
     );
 
     expect(result.code).toBe(1);
-    expect(result.stdout).toContain('请手动运行 npm install');
+    expect(result.stdout).toContain('补装后仍缺失');
     expect(result.stdout).not.toContain('补装完成');
+    expect(result.cliCalls).toContain('--package=@esbuild/linux-x64');
+    expect(result.cliCalls).toContain('--package=@rolldown/binding-linux-x64-gnu');
+  });
+
+  it('fails closed when the explicit local installer fails and does not claim a recheck passed', async () => {
+    const result = await simulatedEnsure(
+      ['--install'],
+      `
+case "$*" in
+  *process.platform*) printf 'linux\\n' ;;
+  *process.arch*) printf 'x64\\n' ;;
+  *esbuild/package.json*) printf '0.25.0\\n' ;;
+  *rolldown/package.json*) printf '1.0.0\\n' ;;
+  *) printf '\\n' ;;
+esac`,
+      `
+printf '%s\\n' "$*" >> "$CLI_CALLS"
+exit 17`,
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('平台依赖补装失败');
+    expect(result.stdout).not.toContain('平台依赖补装完成');
+    expect(result.cliCalls).toContain('--package=@esbuild/linux-x64');
+    expect(result.cliCalls).toContain('--package=@rolldown/binding-linux-x64-gnu');
     expect(result.calls).toBe('');
   });
 
@@ -347,6 +517,34 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
     expect(calls, `${result.stdout}\n${result.stderr}`).toContain('npm run self-test');
     expect(calls).not.toMatch(/npm (install|pack)|\btar\b|\bcp\b|\bmv\b|\bmkdir\b|\brm\b.*node_modules/);
   });
+});
+
+describe('pre-push audit skip boundary', () => {
+  it('invokes ensure-platform-deps only with --check', async () => {
+    const source = await fs.readFile(prePushScript, 'utf8');
+    const ensureCalls = [...source.matchAll(/ensure-platform-deps\.sh[^\n]*/g)].map((match) => match[0]);
+
+    expect(ensureCalls).toEqual(['ensure-platform-deps.sh" --check; then']);
+    expect(source).not.toMatch(/ensure-platform-deps\.sh[^\n]*--install/);
+  });
+
+  it.each(['network', 'unsupported'] as const)('skips an explicit %s audit failure', async (auditCase) => {
+    const result = await simulatedPrePushAudit(auditCase);
+
+    expect(result.code, `${result.stdout}\\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('跳过（不阻断）');
+  });
+
+  it.each(['network-text', 'vulnerability', 'json', 'permission'] as const)(
+    'blocks an audit %s failure',
+    async (auditCase) => {
+      const result = await simulatedPrePushAudit(auditCase);
+
+      expect(result.code).toBe(1);
+      expect(result.stdout).not.toContain('跳过（不阻断）');
+      expect(result.stdout).toContain('npm audit');
+    },
+  );
 });
 
 describe('pre-push evidence lifecycle', () => {

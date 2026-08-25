@@ -210,10 +210,14 @@ run_expect "vitest 单元测试 + coverage 阈值通过" 0 \
 # 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
 node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
 
-# 13. npm audit：依赖漏洞扫描（high 以上阻断；仅当网络不可达或 registry 不支持 audit endpoint 时自动跳过）
-#     跳过条件 = 网络不可达（npm error/warn/ERR! network 错误行，或 code ENOTFOUND/ETIMEDOUT/ECONNREFUSED）
-#              或 registry 不支持 audit（NOT_IMPLEMENTED / code ENOTSUP/ENOAUDIT / does not support audit）。
-#     其余输出一律视为真实漏洞报告，阻断放行（fail-closed）。
+# 13. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
+#     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号。
+#     任意漏洞报告、JSON 解析、权限/配置错误都 fail-closed，不因文本中出现 network 而放行。
+audit_can_skip() {
+  grep -qiE \
+    '(^|[[:space:]])npm (error|warn|err!) (code (ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT)|network|problem related to network connectivity|audit endpoint returned an error|NOT_IMPLEMENTED|registry .*does not support audit|does not support audit endpoint)' \
+    "$tmp_log"
+}
 log "npm audit 依赖漏洞扫描（high 以上阻断）..."
 set +e
 npm audit --audit-level=high >"$tmp_log" 2>&1
@@ -221,7 +225,7 @@ local_audit_code=$?
 set -e
 if [ "$local_audit_code" -eq 0 ]; then
   ok "npm audit 未发现 high 以上漏洞"
-elif [ "$local_audit_code" -eq 255 ] || [ "$local_audit_code" -eq 1 ] && grep -qiE "npm (error|warn|err!) network|problem related to network connectivity|audit endpoint returned an error|code (ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ENOTSUP|ENOAUDIT)|NOT_IMPLEMENTED|does not support audit" "$tmp_log"; then
+elif { [ "$local_audit_code" -eq 255 ] || [ "$local_audit_code" -eq 1 ]; } && audit_can_skip; then
   warn "npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）"
   cat "$tmp_log" >&2
 else
