@@ -258,8 +258,8 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: '__tests__/wm-write.test.ts',
     line: 35,
     symbol: 'runArgs',
-    reason: 'B4 excludes state/wm-write; real CLI helper has no timeout and needs a dedicated follow-up.',
-    timeout: { required: true, status: 'missing-followup' },
+    reason: 'B4 excludes state/wm-write; real CLI helper uses an explicit 15-second timeout.',
+    timeout: { required: true, status: 'present' },
   },
 ];
 

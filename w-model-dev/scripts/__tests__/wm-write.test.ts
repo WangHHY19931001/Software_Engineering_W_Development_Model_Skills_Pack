@@ -36,6 +36,7 @@ function runArgs(
     cwd,
     encoding: 'utf-8',
     input,
+    timeout: 15_000,
   });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
@@ -47,6 +48,32 @@ function run(
   cwd = process.cwd(),
 ): { code: number | null; stdout: string; stderr: string } {
   return runArgs([targetPath, ...args], input, cwd);
+}
+
+function runChild(
+  targetPath: string,
+  args: string[],
+  input: string,
+  cwd = process.cwd(),
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [tsxCli, SCRIPT, targetPath, ...args], {
+      cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.setEncoding('utf-8');
+    child.stderr?.setEncoding('utf-8');
+    child.stdout?.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr?.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once('close', (code) => resolve({ code, stdout, stderr }));
+    child.stdin?.end(input);
+  });
 }
 
 function wmwriteSummary(stdout: string): Record<string, unknown> {
@@ -239,6 +266,52 @@ describe('wm-write CLI lock controls', () => {
     } finally {
       await waitForExit(holder);
     }
+  });
+
+  it.each(['', '{broken'])('rejects %j owner metadata without implicit recovery', async (metadata) => {
+    const p = target(`unknown-owner-${metadata === '' ? 'empty' : 'broken'}.json`);
+    const ownerMetadataPath = path.join(`${p}.lock`, 'owner', 'metadata.json');
+    await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
+    await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
+
+    const result = run(p, ['--stdin', '--lock-timeout', '1000'], '{"value":"new"}');
+
+    expect(result.code).toBe(1);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
+    await expect(fs.readFile(ownerMetadataPath, 'utf-8')).resolves.toBe(metadata);
+  });
+
+  it('audits and recovers corrupt owner metadata with explicit CLI recovery', async () => {
+    const p = target('unknown-owner-explicit-recovery.json');
+    const ownerMetadataPath = path.join(`${p}.lock`, 'owner', 'metadata.json');
+    await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
+    await fs.writeFile(ownerMetadataPath, '{broken', 'utf-8');
+
+    const result = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"recovered"}');
+
+    expect(result.code).toBe(0);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: true, writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"recovered"}');
+    expect((await fs.readdir(`${p}.lock`)).some((entry) => entry.startsWith('.stale-'))).toBe(true);
+  });
+
+  it('allows only one independent child writer to commit against the same old mtime', async () => {
+    const p = target('cross-process-mtime.json');
+    await fs.writeFile(p, '{"value":"old"}', 'utf-8');
+    const old = new Date('2000-01-01T00:00:00.000Z');
+    await fs.utimes(p, old, old);
+    const expectedMtime = Math.floor((await fs.stat(p)).mtimeMs);
+
+    const [first, second] = await Promise.all([
+      runChild(p, ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'], '{"writer":"A"}'),
+      runChild(p, ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'], '{"writer":"B"}'),
+    ]);
+    const summaries = [wmwriteSummary(first.stdout), wmwriteSummary(second.stdout)];
+
+    expect(summaries.filter((summary) => summary.ok === true)).toHaveLength(1);
+    expect(summaries.filter((summary) => summary.reason === 'MTIME_CONFLICT')).toHaveLength(1);
+    expect([first.code, second.code].sort()).toEqual([0, 1]);
+    await expect(fs.readFile(p, 'utf-8')).resolves.toMatch(/\{"writer":"[AB]"\}/);
   });
 });
 

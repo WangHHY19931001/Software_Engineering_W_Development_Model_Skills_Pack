@@ -66,7 +66,7 @@ interface TransitionMetadata {
   operatorPid: number;
   operatorToken: string;
   operatorStartedAt: string;
-  origin: StateLockMetadata;
+  origin?: StateLockMetadata;
 }
 
 export function backupPathFor(absPath: string, now: Date = new Date()): string {
@@ -119,9 +119,25 @@ function isPidRunning(pid: number): boolean {
   }
 }
 
+function isValidLockMetadata(value: unknown): value is StateLockMetadata {
+  if (typeof value !== 'object' || value === null) return false;
+  const metadata = value as Record<string, unknown>;
+  return (
+    typeof metadata.targetPath === 'string' &&
+    Number.isInteger(metadata.pid) &&
+    (metadata.pid as number) >= 0 &&
+    typeof metadata.token === 'string' &&
+    metadata.token.length > 0 &&
+    typeof metadata.createdAt === 'string' &&
+    Number.isFinite(Date.parse(metadata.createdAt)) &&
+    metadata.operation === 'wm-write'
+  );
+}
+
 async function readMetadata(ownerDir: string): Promise<StateLockMetadata | undefined> {
   try {
-    return JSON.parse(await fs.readFile(metadataPathFor(ownerDir), 'utf-8')) as StateLockMetadata;
+    const parsed: unknown = JSON.parse(await fs.readFile(metadataPathFor(ownerDir), 'utf-8'));
+    return isValidLockMetadata(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }
@@ -178,7 +194,7 @@ async function hasTransition(lockDir: string): Promise<boolean> {
 
 async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'stale' | 'recoverable'> {
   const metadata = await readMetadata(ownerPathFor(lockDir));
-  if (!metadata) return 'none';
+  if (!metadata) return opts.recoverStaleLock === true ? 'recoverable' : 'stale';
   const expired = Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
   const stale = expired && !isPidRunning(metadata.pid);
   if (!stale) return 'none';
@@ -189,16 +205,15 @@ async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Pro
   const ownerDir = ownerPathFor(lockDir);
   const candidate = path.join(lockDir, `.recovering-${randomUUID()}`);
   const current = await readMetadata(ownerDir);
-  if (!current) return false;
   const transition: TransitionMetadata = {
     kind: 'recovering',
     operatorPid: process.pid,
     operatorToken: randomUUID(),
     operatorStartedAt: new Date().toISOString(),
-    origin: current,
+    ...(current ? { origin: current } : {}),
   };
-  await fs.writeFile(transitionPathFor(ownerDir), JSON.stringify(transition), 'utf-8');
   try {
+    await fs.writeFile(transitionPathFor(ownerDir), JSON.stringify(transition), 'utf-8');
     await renameWithRetry(ownerDir, candidate);
     await opts.afterRecoveryOwnershipMoved?.();
   } catch (error) {
@@ -209,7 +224,8 @@ async function recoverLockIfStale(lockDir: string, opts: StateWriteOptions): Pro
   const expired =
     metadata !== undefined && Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
   const stale = metadata !== undefined && expired && !isPidRunning(metadata.pid);
-  if (stale) {
+  const unknownOwner = metadata === undefined;
+  if (stale || (unknownOwner && opts.recoverStaleLock === true)) {
     await renameWithRetry(candidate, path.join(lockDir, `.stale-${Date.now()}-${randomUUID()}`));
     return true;
   }
@@ -336,6 +352,8 @@ async function restoreIfStillOwned(
   absPath: string,
   jsonText: string,
   backupPath: string | undefined,
+  originalContent: string | undefined,
+  originalExisted: boolean,
   ownerDir: string,
   token: string,
   opts: StateWriteOptions,
@@ -356,12 +374,27 @@ async function restoreIfStillOwned(
     rollbackTmp = `${absPath}.tmp-${process.pid}-${randomUUID()}`;
     if (backupPath) {
       await fs.copyFile(backupPath, rollbackTmp);
+      if (!(await ownsLock(ownerDir, token)) || (await fs.readFile(absPath, 'utf-8')) !== jsonText) return false;
       await renameWithRetry(rollbackTmp, absPath);
       rollbackTmp = undefined;
-    } else {
-      // Move the payload away before cleanup, never unlink the target path directly.
-      await renameWithRetry(absPath, rollbackTmp);
+      return true;
     }
+
+    if (originalExisted) {
+      if (originalContent === undefined) return false;
+      await fs.writeFile(rollbackTmp, originalContent, 'utf-8');
+      if (!(await ownsLock(ownerDir, token)) || (await fs.readFile(absPath, 'utf-8')) !== jsonText) return false;
+      await renameWithRetry(rollbackTmp, absPath);
+      rollbackTmp = undefined;
+      return true;
+    }
+
+    // Restore an originally absent target by atomically moving the failed payload
+    // aside before cleanup, never unlinking the target path directly.
+    await renameWithRetry(absPath, rollbackTmp);
+    if (!(await ownsLock(ownerDir, token))) return false;
+    await fs.rm(rollbackTmp, { force: true });
+    rollbackTmp = undefined;
     return true;
   } catch {
     return false;
@@ -408,17 +441,20 @@ export async function writeStateJson(
       if (Math.floor(stat.mtimeMs) !== Math.floor(opts.expectMtimeMs))
         return { ok: false, writtenPath: absPath, reason: 'MTIME_CONFLICT' };
     }
+    let originalContent: string | undefined;
+    let originalExisted = false;
+    try {
+      originalContent = await fs.readFile(absPath, 'utf-8');
+      originalExisted = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+
     let backupPath: string | undefined;
-    if (opts.backup !== false) {
-      try {
-        if ((await fs.stat(absPath)).isFile()) {
-          backupPath = backupPathFor(absPath);
-          await fs.copyFile(absPath, backupPath);
-          await rotateBackups(absPath, opts.keepBackups ?? 5);
-        }
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      }
+    if (opts.backup !== false && originalExisted) {
+      backupPath = backupPathFor(absPath);
+      await fs.copyFile(absPath, backupPath);
+      await rotateBackups(absPath, opts.keepBackups ?? 5);
     }
     tmpPath = `${absPath}.tmp-${process.pid}-${randomUUID()}`;
     await fs.writeFile(tmpPath, jsonText, 'utf-8');
@@ -431,6 +467,8 @@ export async function writeStateJson(
         absPath,
         jsonText,
         backupPath,
+        originalContent,
+        originalExisted,
         acquired.ownerDir,
         acquired.metadata.token,
         opts,

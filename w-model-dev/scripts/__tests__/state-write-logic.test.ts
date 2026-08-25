@@ -369,6 +369,34 @@ describe('writeStateJson', () => {
     await expect(fs.access(path.join(lock, 'owner', 'metadata.json'))).resolves.toBeUndefined();
   });
 
+  it.each(['', '{broken'])('rejects an owner with %j metadata without deleting the unknown owner', async (metadata) => {
+    const p = target(`unknown-owner-${metadata === '' ? 'empty' : 'broken'}.json`);
+    const lock = `${p}.lock`;
+    const ownerMetadataPath = path.join(lock, 'owner', 'metadata.json');
+    await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
+    await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
+
+    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20 });
+
+    expect(result).toMatchObject({ ok: false, reason: 'STALE_LOCK' });
+    await expect(fs.readFile(ownerMetadataPath, 'utf-8')).resolves.toBe(metadata);
+    await fs.rm(lock, { recursive: true, force: true });
+  });
+
+  it('audits and recovers an owner with corrupt metadata only when explicitly requested', async () => {
+    const p = target('unknown-owner-explicit-recovery.json');
+    const lock = `${p}.lock`;
+    const ownerMetadataPath = path.join(lock, 'owner', 'metadata.json');
+    await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
+    await fs.writeFile(ownerMetadataPath, '{broken', 'utf-8');
+
+    const result = await writeStateJson(p, '{"v":1}', { recoverStaleLock: true, lockTimeoutMs: 1_000 });
+
+    expect(result).toMatchObject({ ok: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":1}');
+    expect((await fs.readdir(lock)).some((entry) => entry.startsWith('.stale-'))).toBe(true);
+  });
+
   it('does not let a readback rollback overwrite a later writer', async () => {
     const p = target('rollback-race.json');
     await fs.writeFile(p, '{"v":"original"}', 'utf-8');
@@ -406,6 +434,50 @@ describe('writeStateJson', () => {
     const result = await writeStateJson(p, '{"v":"new"}', { readbackImpl: async () => 'garbage' });
     expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"original"}');
+  });
+
+  it('preserves an existing target after a failed readback with backup disabled', async () => {
+    const p = target('rollback-no-backup.json');
+    await fs.writeFile(p, '{"v":"original"}', 'utf-8');
+    const result = await writeStateJson(p, '{"v":"new"}', {
+      backup: false,
+      readbackImpl: async () => 'garbage',
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"original"}');
+    expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+  });
+
+  it('restores a target that was originally absent after a failed readback without backup', async () => {
+    const p = target('rollback-missing-no-backup.json');
+    const result = await writeStateJson(p, '{"v":"new"}', {
+      backup: false,
+      readbackImpl: async () => 'garbage',
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+  });
+
+  it('does not report a rollback after its lock token changes', async () => {
+    const p = target('rollback-token-mismatch.json');
+    await fs.writeFile(p, '{"v":"original"}', 'utf-8');
+    const result = await writeStateJson(p, '{"v":"new"}', {
+      backup: false,
+      readbackImpl: async () => 'garbage',
+      beforeRollback: async () => {
+        const metadataPath = path.join(`${p}.lock`, 'owner', 'metadata.json');
+        const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8')) as Record<string, unknown>;
+        await fs.writeFile(metadataPath, JSON.stringify({ ...metadata, token: 'replacement-token' }), 'utf-8');
+      },
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: false });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"new"}');
+    expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+    await fs.rm(`${p}.lock`, { recursive: true, force: true });
   });
 });
 
