@@ -10,13 +10,22 @@
  *   - 任一子标准 < 0.70 → 违规列表含该子标准名
  */
 
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { runSync } from '../lib/run-sync.js';
 import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../logic/verifier-logic.js';
 
+const require = createRequire(import.meta.url);
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(TEST_DIR, '../../..');
+const VERIFIER_SCRIPT = resolve(TEST_DIR, '../cli/check-verifier-output.ts');
+const TSX_CLI = require.resolve('tsx/cli');
 const PERSONA_FIXTURES = [
   'persona-code-reviewer.json',
   'persona-test-engineer.json',
@@ -24,9 +33,17 @@ const PERSONA_FIXTURES = [
   'persona-performance-auditor.json',
 ] as const;
 
+function runVerifierCli(fixturePath: string): { code: number | null; stdout: string; stderr: string } {
+  const result = runSync(process.execPath, [TSX_CLI, VERIFIER_SCRIPT, '--json', fixturePath], {
+    cwd: ROOT,
+    timeout: 15_000,
+  });
+  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
 describe('Persona Verifier fixtures', () => {
   it.each(PERSONA_FIXTURES)('%s 应满足当前 Schema 与 verifier logic', async (file) => {
-    const fixturePath = resolve('w-model-dev/scripts/samples/verifier', file);
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier', file);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixed PERSONA_FIXTURES allowlist
     const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as unknown;
 
@@ -34,6 +51,56 @@ describe('Persona Verifier fixtures', () => {
 
     expect(result.passed).toBe(true);
     expect(result.reasons).toEqual([]);
+  });
+});
+
+describe('Persona Verifier CLI regressions', () => {
+  it.each(PERSONA_FIXTURES)('%s 应通过真实 --json CLI 子进程协议', (file) => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier', file);
+    const result = runVerifierCli(fixturePath);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(() => JSON.parse(result.stdout)).not.toThrow();
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      type: 'verifier-output',
+      passed: true,
+      qualityLevel: 'A',
+      reasons: [],
+      exitCode: 0,
+    });
+  });
+
+  it('含阻断性 reworkHints 的 Schema 合法变体必须以 C 级/exit 1 拦截', async () => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
+    const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
+    fixture.reworkHints = ['[Critical] 演示阻断性安全缺陷，必须修复后才能放行'];
+    fixture.passed = true;
+
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+    const negativeFixturePath = resolve(tempDir, 'persona-code-reviewer-blocking.json');
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
+      await writeFile(negativeFixturePath, JSON.stringify(fixture), 'utf-8');
+      const result = runVerifierCli(negativeFixturePath);
+      const report = JSON.parse(result.stdout) as Record<string, unknown>;
+
+      expect(result.code).toBe(1);
+      expect(report).toMatchObject({
+        type: 'verifier-output',
+        passed: false,
+        qualityLevel: 'C',
+        exitCode: 1,
+      });
+      expect(report.reasons).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('阻断性 reworkHints 必须将 passed 设为 false，并降级 qualityLevel 至 C/D'),
+        ]),
+      );
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

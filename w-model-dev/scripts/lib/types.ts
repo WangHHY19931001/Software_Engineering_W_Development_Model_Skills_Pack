@@ -27,6 +27,8 @@ export interface JsonReport {
   passed: boolean;
   reasons: string[];
   violations: { rule: string; count: number }[];
+  /** verifier --json 报告的质量等级（其他门禁不提供此字段）。 */
+  qualityLevel?: string;
   /** 可选的规则原始分组，供 docs-consistency 等报告保留兼容摘要同时暴露分类明细。 */
   staticViolations?: unknown[];
   dynamicViolations?: unknown[];

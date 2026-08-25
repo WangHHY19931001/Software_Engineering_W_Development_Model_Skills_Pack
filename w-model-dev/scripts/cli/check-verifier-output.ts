@@ -109,6 +109,7 @@ async function main(): Promise<void> {
       {
         type: 'verifier-output',
         passed,
+        qualityLevel: result.qualityLevel,
         reasons: allReasons,
         violations: buildViolationDistribution(allReasons.length),
         durationMs: Date.now() - startTime,

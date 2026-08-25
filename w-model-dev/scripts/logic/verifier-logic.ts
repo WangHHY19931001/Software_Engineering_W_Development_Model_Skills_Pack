@@ -146,6 +146,9 @@ const MIN_RANKING_ROUNDS = 1;
  *  阈值 = qualityLevel B 级分界（§6.1），语义自洽：passed 原判据为「加权平均 ≥ B」，
  *  收紧为「每个子标准自身 ≥ B」。防止加权平均掩盖单轴失败（反模式 #41）。 */
 const SINGLE_AXIS_MIN_SCORE = 0.7;
+/** Persona blocking severities cannot be reported as an approved A/B review. */
+const BLOCKING_REWORK_HINT_PATTERN =
+  /^\s*(?:\[(?:Critical|Required|High|Medium)\]|(?:Critical|Required|High|Medium):)/i;
 
 function isNumber(x: unknown): x is number {
   return typeof x === 'number' && !Number.isNaN(x);
@@ -560,6 +563,14 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   // R13：单轴下限。qualityLevel 由证据扣分后的 compositeScore 映射（§6.1），
   // passed 判定收紧为「加权平均 ≥ B 且每个子标准得分 ≥ 0.70（B 级分界）」。
   // 防止加权平均掩盖单轴失败（反模式 #41）。
+  const suppliedReworkHints = o.reworkHints;
+  const hasBlockingReworkHint =
+    Array.isArray(suppliedReworkHints) &&
+    suppliedReworkHints.some((hint) => typeof hint === 'string' && BLOCKING_REWORK_HINT_PATTERN.test(hint));
+  if (hasBlockingReworkHint && (qualityLevel === 'A' || qualityLevel === 'B')) {
+    reasons.push('阻断性 reworkHints 必须将 passed 设为 false，并降级 qualityLevel 至 C/D');
+    qualityLevel = 'C';
+  }
   const passed = o.passed;
   const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
   const expectedPassed = (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
