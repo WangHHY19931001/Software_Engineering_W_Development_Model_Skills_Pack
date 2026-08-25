@@ -48,7 +48,9 @@ import {
   readCucumberReport,
   readTlaManifest,
   runModelChecks,
-  TLA_BDD_SYNC_REQUIRED_PHASES,
+  isProjectCucumberEvidencePhase,
+  isProjectTlaBddEvidencePhase,
+  isTlaBddSyncContractPhase,
   type TlaBddSyncPair,
 } from '../application/artifact-gate-assets.js';
 import { checkUatPathMappingContent, collectUatMappingViolations } from '../application/uat-path-mapping.js';
@@ -231,21 +233,21 @@ async function main(): Promise<void> {
   // 项目阶段 1-8 均要求 manifest；fixture 回归不经过本入口，因此仍不启用 required flags。
   const bddManifestFile = path.resolve(projectDir, ARTIFACT_PATHS.bddManifest);
   const effectivePhase: PhaseOption = phaseOption ?? 8;
-  const { bddViolations, bddManifestExists, bddManifestValid, bddManifest } = await readBddManifest(
-    bddManifestFile,
-    projectDir,
-    effectivePhase,
-  );
-  const cucumberAsset =
-    effectivePhase >= 5 ? await readCucumberReport(cucumberReportFile, true) : { cucumberViolations: [] as string[] };
+  const { bddViolations, bddManifestExists, bddManifestSchemaValid, bddManifestValid, bddManifest } =
+    await readBddManifest(bddManifestFile, projectDir, effectivePhase);
+  const cucumberAsset = isProjectCucumberEvidencePhase(effectivePhase)
+    ? await readCucumberReport(cucumberReportFile, true)
+    : { cucumberViolations: [] as string[] };
 
   const syncPairs: TlaBddSyncPair[] = [];
   const syncPairViolations: string[] = [];
-  // SSoT contract: phases 1-4 always require D4 TLA equivalence through
-  // check-bdd-model; the standalone sync CLI is also enabled for those phases
-  // only after both manifests pass their own asset validation.
-  const syncRequired = TLA_BDD_SYNC_REQUIRED_PHASES.includes(effectivePhase) && tlaAsset.valid && bddManifestValid;
-  if (tlaAsset.valid && bddManifestValid) {
+  let syncPairCoverageValid = false;
+  // SSoT §10.5.1: phases 1-4 always require D4 through check-bdd-model;
+  // independent file sync is enabled only after both manifests pass their own
+  // schema/asset gates and their pair set has complete bidirectional coverage.
+  const independentSyncContractPhase = isTlaBddSyncContractPhase(effectivePhase);
+  const syncRequired = independentSyncContractPhase;
+  if (syncRequired && tlaAsset.valid && bddManifestValid) {
     const pairResult = buildTlaBddSyncPairs({
       tlaManifest: tlaAsset.manifest as { basePath?: string; specs?: Array<{ id?: string; tlaPath?: string }> },
       bddManifest: bddManifest as {
@@ -257,13 +259,14 @@ async function main(): Promise<void> {
     });
     syncPairs.push(...pairResult.syncPairs);
     syncPairViolations.push(...pairResult.syncPairViolations);
+    syncPairCoverageValid = pairResult.pairCoverageValid;
   }
 
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
   const result = checkArtifactGate(matrix, {
     graph,
     // TLA+ is a required project asset only for phases 1-4; phase 5-8 uses Cucumber evidence.
-    manifestExists: effectivePhase <= 4 ? tlaAsset.valid : undefined,
+    manifestExists: isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.valid : undefined,
     phaseOption,
     specDir,
   });
@@ -278,15 +281,17 @@ async function main(): Promise<void> {
     graphPath,
     manifestFile,
     bddManifestExists,
+    bddManifestSchemaValid,
     bddManifestValid,
     bddManifestFile,
     cucumberReportFile,
     syncRequired,
+    syncPairCoverageValid,
     syncPairs,
     syncPairViolations,
   });
   // Phase 5-8 uses required Cucumber execution evidence; TLA manifest is not a phase-gate input there.
-  const tlaAssetViolations = effectivePhase <= 4 ? tlaAsset.violations : [];
+  const tlaAssetViolations = isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.violations : [];
 
   // uat-path-mapping 校验违反（计入终检结果；解析严格化 + 阶段 5/终检均校验）
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);

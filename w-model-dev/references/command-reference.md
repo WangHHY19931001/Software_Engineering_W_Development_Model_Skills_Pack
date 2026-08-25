@@ -341,8 +341,9 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--json]`
 - phase 1-4 对项目 TLA/BDD 资产做 fail-closed 检查：`tla-manifest.json` 必须通过真实 schema 校验且 `specs` 非空；`bdd-manifest.json` 必须存在并通过 schema。调用 `check-bdd-model.ts` 时固定传递 `--require-tla-equivalence --tla-manifest=<项目路径>`。phase 1 不要求 graph，phase 2-4 在 TLA/BDD 证据基础上要求 graph。
 - phase 5-8 固定传递 `--require-cucumber-report --cucumber-report=<路径>`；默认路径为 `<project-dir>/.w-model/bdd/reports/report.json`，也可用 `--cucumber-report=<path>` 覆盖。报告必须为合法 `{ elements: [...] }`，至少有命名 scenario 的 passed step，skipped/pending/undefined/unknown/failed 或畸形报告均阻断。
-- 当 phase 1-4 的 TLA 与 BDD manifest 均通过各自 schema/结构校验时，阶段门按 manifest 的 `tlaSpecId`/`tlaPath`/`filePath` 配对调用 `check-tla-bdd-sync.ts`；转移、状态或不变式不一致、BDD/TLA 任一方向孤儿配对或子进程失败均为 blocking violation。资产非法时不调用 sync 子进程，但 TLA/BDD required evidence 仍由上游资产门和 `check-bdd-model --require-tla-equivalence` 阻断；独立 sync CLI 本身默认不因 `syncPairs` 存在而隐式启用。
-- 该项目阶段门与本地 pre-push fixture 回归分层：pre-push 不调用本 CLI，不启用这些 required flags，也不运行项目 TLA/TLA↔BDD/Cucumber 证据。
+- phase 1-4 的项目阶段门同时有两条不同证据路径：BDD D4 required equivalence 固定传 `--require-tla-equivalence --tla-manifest=<项目路径>`；独立文件级 pair sync 则仅在本阶段契约生效、TLA/BDD manifest 均通过真实 schema/资产校验、且 manifest 配对集合满足 TLA→BDD 与 BDD→TLA 双向覆盖时，按 pair 调用 `check-tla-bdd-sync.ts`。D4 不是 pair sync 的替代品，pair sync 也不是 D4 的替代品。
+- 缺失/非法 JSON/schema 畸形/空资产/关联 `.tla`、`.cfg` 或 `.feature` 文件缺失均由各自 evidence gate 产生 blocking violation；不得把缺资产转化为 sync skip。配对孤儿、路径映射不完整、无完整 pair、转移/状态/不变式不一致或 sync 子进程失败同样阻断。phase 5-8 不启用该 TLA↔BDD 文件同步，改用 required Cucumber 执行证据。
+- 该项目阶段门与本地 pre-push fixture 回归分层：pre-push 不调用本 CLI，不启用上述 project-only required flags，也不运行项目 TLA、TLA↔BDD pair sync 或 Cucumber 证据。
 
 ## BDD 项目行为证据门
 

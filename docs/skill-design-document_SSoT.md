@@ -1302,6 +1302,19 @@ flowchart TD
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
 ```
 
+#### 10.5.1 项目阶段的 TLA+/BDD 行为证据契约
+
+项目 Artifact Gate 的阶段级行为证据采用以下最小兼容契约：
+
+- **适用边界**：成熟度分级决定是否进入额外 TLA+/BDD 行为门；一旦调用项目 `check-artifact-gate.ts`，本节契约对对应 phase 强制生效，不得用 L1 的“额外行为门可选”解释为项目 Artifact Gate 的 fail-open。实现中的阶段矩阵单点事实为 `PROJECT_TLA_BDD_EVIDENCE_PHASES`、`PROJECT_CUCUMBER_EVIDENCE_PHASES`、`PROJECT_TLA_GRAPH_EVIDENCE_PHASES`、`PROJECT_BDD_GRAPH_EVIDENCE_PHASES` 及其谓词（`isProjectTlaBddEvidencePhase`、`isProjectCucumberEvidencePhase`、`requiresProjectTlaGraphEvidence`、`requiresProjectBddGraphEvidence`）。
+- **阶段 1–4**：`tla-manifest.json` 与 `bdd-manifest.json` 均必须通过各自真实 schema 与资产校验（包括非空规格/feature、关联文件存在且状态机结构有效）。缺失、非法 JSON、schema 畸形、空资产或关联文件缺失均产生 blocking violation；不得把缺失/畸形资产解释为“未启用同步”或 sync skip。
+- **required D4 与独立 pair sync 是两条证据**：项目阶段门调用 `check-bdd-model.ts` 时必须传裸参数 `--require-tla-equivalence --tla-manifest=<path>`，这是 BDD D4 required equivalence；在同一阶段范围内，只有两份 manifest 已通过资产门且 TLA spec ↔ BDD feature 配对集合双向完整覆盖时，才逐 pair 调用独立 `check-tla-bdd-sync.ts`。`isTlaBddSyncContractPhase` 只表达 phase 1–4 的适用矩阵，`syncRequired` 表达该阶段契约已启用；资产无效时由 evidence gate 和 sync blocking violation 双重 fail-closed。D4 通过不替代 pair sync，pair sync 失败也不得由 D4 通过降级。
+- **阶段矩阵**：独立 `check-tla-bdd-sync` pair sync 在 phase 1、2、3、4 启用；phase 1 不要求 graph，phase 2–4 另叠加 TLA+ graph 要求，BDD D8 graph 数据源在 phase 2–8 保持要求。配对任一方向存在孤儿、路径映射不完整、没有完整 pair 或子进程返回非 0，均为 blocking violation。
+- **阶段 5–8**：不启用 TLA↔BDD 文件 pair sync；TLA manifest 冻结为只读，项目阶段门使用 required Cucumber 执行证据 `--require-cucumber-report --cucumber-report=<path>`。BDD D5/Cucumber 证据不由独立 pair sync 替代。
+- **pre-push 边界**：技能包本地 pre-push fixture 回归不调用项目 Artifact Gate，不传上述 required flags，也不运行项目 TLA、TLA↔BDD pair sync 或 Cucumber 证据；该兼容边界不改变项目阶段门契约。
+
+该契约由 `check-artifact-gate.ts` 编排，资产 fail-closed 由 application 层与各自 evidence gate 共同保证；不得用裸 `phase <= 4` 判断替代契约函数。
+
 **`--validate-templates` 模式（模板漂移校验）**：`check-artifact-gate.ts` 支持 `--validate-templates` 独立模式，按 `gate-logic.ts` 的 `PHASE_SPEC_LAYOUT` 校验技能包自身 `templates/` 资产是否含必需结构标记（SSOT 头 / 引用块 / DoD 节），用于检出模板漂移。该模式校验对象是技能包自身 `templates/` 目录（相对脚本定位，与 project-dir 无关），独立分支：不读 RTM、不受 `--phase` 影响，violations 非空 → 退出码 1。支持 `--json` 输出机器可读报告（`type: 'templates'`）。
 
 `references/quality-standards.md` 以 Markdown 描述质量标准（人类可读），与脚本互为参照但不再承载判定逻辑。

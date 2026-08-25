@@ -647,7 +647,11 @@ npx tsx w-model-dev/scripts/cli/check-tla-bdd-sync.ts <tla-file> <feature-file>
 
 ### 与 check-bdd-model.ts D4 的关系
 
-`check-bdd-model.ts` D4 等价性校验在阶段门禁时执行；`check-tla-bdd-sync.ts` 作为独立开发工具，便于在编写 TLA+/BDD 时快速验证一致性。两者可互补使用。
+`check-bdd-model.ts` D4 是 BDD 门禁中的 required TLA equivalence：项目阶段 1–4 必须传裸参数 `--require-tla-equivalence --tla-manifest=<path>`，由 BDD 门禁校验状态、初始状态、转移和不变式等价；缺少或畸形 TLA evidence 不得静默跳过。
+
+独立 `check-tla-bdd-sync.ts` pair sync 是第二条文件级同步证据，语义不等同于 D4。项目 Artifact Gate 按 SSoT §10.5.1 在 phase 1–4 启用它，但前提是 TLA/BDD manifest 均已通过各自真实 schema/资产门，并且 manifest 中 TLA spec ↔ BDD feature 配对双向完整覆盖；实现以 `isTlaBddSyncContractPhase`、`syncRequired` 和 `pairCoverageValid` 表达这三个门槛。任一方向孤儿、映射缺失或 sync 子进程失败都阻断；资产缺失/畸形由 evidence gate fail-closed，不得当作 sync skip。phase 5–8 不执行该文件同步，改用 required Cucumber report。直接运行 sync CLI 仍可作为开发工具，但不能据此宣称项目阶段门已完成。
+
+项目门与 pre-push fixture 分层：pre-push 不传 required flags，也不调用项目 Artifact Gate、TLA↔BDD pair sync 或 Cucumber 证据。
 
 ## W 模型交叉引用
 

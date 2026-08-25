@@ -197,3 +197,100 @@
 - 独立 TLA↔BDD sync 的 phase 常量现按当前项目阶段门契约固定为 phase 1-4；如未来 maturity/项目配置要允许按 L1/L2/L3 细分，须先更新 SSoT 与该常量/测试，不能通过删除 required D4 参数降级。
 - 本轮没有改变 `check-tla-model.ts` 的 Java/SANY/TLC 执行机制，也没有在测试中启动这些重量级工具。
 - Artifact Gate 与 `check-bdd-model.ts` 仍可能对同一非法资产分别报告相关 violation；这是 fail-closed 的双层证据边界，不改变 exit 1 语义。
+
+---
+
+# B4 修复轮 2 追加报告：定义 TLA/BDD 独立同步契约
+
+日期：2026-08-25
+基线提交：`2f098e3`（`fix(gate): close tla bdd evidence gaps`）
+工作树：`D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.worktrees/w-model-reliability`
+
+## 修复内容
+
+### I1 根因与契约
+
+- 根因是 Artifact Gate 编排中的 phase 语义散落在裸比较和旧的“独立 sync 可选工具”表述中；SSoT 没有把项目阶段门的独立 TLA↔BDD pair sync 前置条件写成可执行契约。
+- 在 `docs/skill-design-document_SSoT.md` §10.5.1 明确最小契约：项目 Artifact Gate 在 phase 1–4 启用独立 pair sync；两份 manifest 必须通过真实 schema 和资产校验；TLA spec ↔ BDD feature 必须双向完整配对；任一资产/配对/sync 子进程失败均 blocking。phase 5–8 不执行文件 pair sync，使用 required Cucumber 证据。
+- 明确成熟度分级与项目 Artifact Gate 的边界：成熟度决定是否进入额外行为门；一旦调用项目 Artifact Gate，对应 phase 的本契约不允许 fail-open。
+
+### 实现
+
+- `w-model-dev/scripts/application/artifact-gate-assets.ts`
+  - 新增有名阶段矩阵常量和谓词：`PROJECT_TLA_BDD_EVIDENCE_PHASES`、`PROJECT_CUCUMBER_EVIDENCE_PHASES`、`PROJECT_TLA_GRAPH_EVIDENCE_PHASES`、`PROJECT_BDD_GRAPH_EVIDENCE_PHASES`，以及 `isProjectTlaBddEvidencePhase`、`isProjectCucumberEvidencePhase`、`requiresProjectTlaGraphEvidence`、`requiresProjectBddGraphEvidence`、`isTlaBddSyncContractPhase`。
+  - `runModelChecks` 移除 Artifact Gate 目标路径中的裸 `phase <= 4`；phase 1–4、phase 5–8、TLA graph 与 BDD graph 分支均按命名契约选择。
+  - `syncRequired` 表达阶段契约已启用；只有 `bddManifestValid`/`tlaAsset.valid` 且 `pairCoverageValid` 时才调用独立 sync CLI。缺失/畸形资产会显式产生 `[artifact:tla-bdd-sync] required TLA+/BDD sync assets are invalid`，不被当作 sync success。
+  - 区分 `bddManifestSchemaValid` 与完整 `bddManifestValid`：schema 可解析但空 features/stateMachines 的 manifest 仍进入 BDD model 检查以保留既有诊断；完整资产有效性仍严格阻断 pair sync。
+  - 保留 phase 5–8 BDD graph 参数传递，避免把 TLA graph 阶段约束误用于 BDD D8。
+
+- `w-model-dev/scripts/cli/check-artifact-gate.ts`
+  - 使用命名阶段契约编排 Cucumber/TLA 资产和 RTM 的 phase 行为。
+  - 在 phase 1–4 始终把契约启用状态传入 `runModelChecks`，即使资产无效也会输出 sync blocking violation；资产有效时构造双向 pair。
+
+### SSoT/Agent 文档
+
+- 更新 `docs/skill-design-document_SSoT.md` §10.5.1，登记实现常量/函数、双向 pair 前置条件、phase 5–8 Cucumber 边界和 pre-push 边界。
+- 更新 `w-model-dev/SKILL.md`、`w-model-dev/references/bdd-guide.md`、`w-model-dev/references/tla-plus-guide.md`、`w-model-dev/references/command-reference.md`、`w-model-dev/references/dispatch-matrix.md`，移除“项目阶段门 sync 可选”的歧义，并引用 SSoT 契约。
+
+## 测试/TDD 证据
+
+- 新增阶段矩阵测试：phase 1/2/3/4 使用 required TLA/BDD evidence；phase 5/6/7/8 使用 required Cucumber evidence；独立 pair sync phase 1/2/3/4 enabled，phase 5 disabled。
+- 新增真实临时 `.tla`/`.feature` 完整 pair 测试，phase 1/2/3/4 均通过既有 `checkTlaBddSync` 纯逻辑；已有真实 CLI mismatch/empty-input 测试继续保留。
+- 新增 schema-valid 但空 BDD features/stateMachines 的 fail-closed 测试；新增 phase 1–4 缺失 sync assets 测试，断言产生 blocking sync violation 且不调用 sync 子进程。
+- TDD 红灯记录：
+  - 新阶段函数/缺失资产测试首次运行：`12 failed, 44 passed`，失败为缺少命名契约函数和 invalid assets 没有 sync blocking violation。
+  - 空 BDD 资产测试首次运行：`1 failed, 60 passed`，失败为 reader 将空资产误报为 valid。
+  - 最小实现后，相关两文件验证为 `2 test files, 99 tests passed`。
+
+## CodeGraph / fallback
+
+- 已尝试 CodeGraph 查询：目标 worktree 向上没有 `.codegraph/`，服务返回 unavailable；没有伪造 callers/callees/blast-radius 结果。
+- fallback：读取目标符号并用 `rg` 扫描 `check-artifact-gate.ts → readTlaManifest/readBddManifest/runModelChecks → runSync(check-tla-model/check-bdd-model/check-tla-bdd-sync)` 调用链、manifest schema、BDD CLI 参数解析和相关测试；确认生产同步子进程仍走集中 `runSync` 安全边界。
+
+## 真实验证命令与结果
+
+以下命令均在工作树根目录执行；未运行 TLC、SANY 或无界全量测试。
+
+1. B4 定向 Vitest：
+
+   ```text
+   npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts w-model-dev/scripts/__tests__/bdd-cli.test.ts w-model-dev/scripts/__tests__/gate-report.test.ts w-model-dev/scripts/__tests__/tla-bdd-sync-logic.test.ts
+   ```
+
+   结果：exit 0；`4 passed` test files，`138 passed` tests，0 failed。
+
+2. TypeScript：
+
+   ```text
+   npm run typecheck
+   ```
+
+   结果：exit 0；`tsc -p config/tsconfig.json` 无错误。
+
+3. 目标文件 Prettier：
+
+   ```text
+   npx prettier --config config/prettier.config.cjs --check docs/skill-design-document_SSoT.md w-model-dev/references/command-reference.md w-model-dev/scripts/application/artifact-gate-assets.ts w-model-dev/scripts/cli/check-artifact-gate.ts w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts
+   ```
+
+   结果：exit 0；所有必要 SSoT/命令参考/代码/测试目标文件通过。
+
+   更宽的 Agent Markdown 检查对 `w-model-dev/SKILL.md`、`w-model-dev/references/bdd-guide.md`、`w-model-dev/references/dispatch-matrix.md`、`w-model-dev/references/tla-plus-guide.md` 返回 exit 1；对四份 `HEAD` 基线内容逐一执行同样检查也返回 exit 1。这些是既有全文件格式漂移，本轮没有做无关整文件重排。
+
+4. Diff 空白：
+
+   ```text
+   git diff --check -- . ':(exclude)progress.md' ':(exclude).w-model'
+   ```
+
+   结果：exit 0。仅出现既有 `progress.md` LF/CRLF warning；本轮未修改、未提交 `progress.md`，也未修改 `.w-model`。
+
+## Concerns / deferred
+
+- 未运行 TLC/SANY/Java 或无界全量测试，符合 B4 范围；生产阶段门仍由既有 TLA CLI 执行真实工具检查。
+- 4 份 Agent Markdown 的全文件 Prettier 告警在基线中已存在；本轮只验证必要变更目标文件，不提交无关格式化重排。
+- `check-artifact-gate.ts` 的 phase 5–8 仍依赖 required Cucumber 报告和 BDD CLI 的 D8 graph 约束；独立 TLA↔BDD 文件 sync 不在这些阶段执行。
+
+## 提交范围
+
+预期只提交 B4 代码、测试、必要 SSoT/Agent 文档和本报告；不提交 `.superpowers/sdd/w-model-reliability-optimization/progress.md`，不提交 `.w-model` 运行时状态或 CodeGraph 伪造证据。

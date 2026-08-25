@@ -90,16 +90,16 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | 阶段 | S 变体 | 产出物 | 加载的 reference | 触发的 check 脚本 |
 |---|---|---|---|---|
 | 1 需求 | S-doc | 需求规格 + 验收测试用例 + 风险评估 + uat-path-mapping.md + RTM | phase-1-requirements / ingestion-chunk / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=1) / check-requirement-coverage / check-verifier-output / check-exemption(豁免时) |
-| 1 需求 | S-tla | L1 TLA+ 规格（.tla + .cfg）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=1) / check-tla-bdd-sync |
+| 1 需求 | S-tla | L1 TLA+ 规格（.tla + .cfg）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=1) + project pair sync（两份 manifest 真实有效且双向配对后） |
 | 1 需求 | S-bdd | L1 BDD features + bdd-manifest.json + RTM acceptanceTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=1) |
 | 2 系统设计 | S-doc | 系统设计文档 + 系统测试用例（含性能/安全基线）+ RTM | phase-2-system-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=2) / check-verifier-output |
-| 2 系统设计 | S-tla | L2 TLA+ 规格（L1 细化 + L2）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=2, --graph 强制) / check-tla-bdd-sync |
+| 2 系统设计 | S-tla | L2 TLA+ 规格（L1 细化 + L2）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=2, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
 | 2 系统设计 | S-bdd | L2 BDD features（parent→L1）+ bdd-manifest.json + RTM systemTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=2, --graph 强制) |
 | 3 概要设计 | S-doc | 接口设计文档 + 集成测试用例 + RTM | phase-3-outline-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=3) / check-verifier-output |
-| 3 概要设计 | S-tla | L3 TLA+ 规格（L2 细化 + L3）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=3, --graph 强制) / check-tla-bdd-sync |
+| 3 概要设计 | S-tla | L3 TLA+ 规格（L2 细化 + L3）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=3, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
 | 3 概要设计 | S-bdd | L3 BDD features（parent→L2）+ bdd-manifest.json + RTM integrationTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=3, --graph 强制) |
 | 4 详细设计 | S-doc | 详细设计文档 + 单元测试用例 + RTM | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide / design-patterns-catalog | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output |
-| 4 详细设计 | S-tla | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=4, --graph 强制) / check-tla-bdd-sync |
+| 4 详细设计 | S-tla | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json | tla-plus-guide / tla-plus-patterns-examples / tla-plus-review-checklist / tla-plus-syntax-reference / tla-plus-tlc-configuration | check-tla-model(--phase=4, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
 | 4 详细设计 | S-bdd | L4 BDD features（parent→L3）+ bdd-manifest.json + RTM unitTest 列 | bdd-guide / bdd-syntax-reference / bdd-patterns-examples | check-bdd-model(--phase=4, --graph 强制) |
 
 ### 阶段 5-8（编码/测试执行阶段，S 三段式：S-explore / S-propose / S-coding）
@@ -273,10 +273,10 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 | 阶段门 | 必跑脚本（约束 #11 通用） | 阶段专属脚本 |
 |---|---|---|
-| 1 需求 | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1) / check-tla-bdd-sync / check-exemption(豁免时) |
-| 2 系统设计 | 同上 | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制) / check-tla-bdd-sync |
-| 3 概要设计 | 同上 | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制) / check-tla-bdd-sync |
-| 4 详细设计 | 同上 | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制) / check-tla-bdd-sync |
+| 1 需求 | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-exemption(豁免时) |
+| 2 系统设计 | 同上 | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） |
+| 3 概要设计 | 同上 | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） |
+| 4 详细设计 | 同上 | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） |
 | 5 编码 | 同上 | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
 | 6 集成测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6) |
 | 7 系统测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7) |

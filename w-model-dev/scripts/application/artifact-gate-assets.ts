@@ -106,32 +106,53 @@ export async function readTlaManifest(manifestFile: string): Promise<TlaManifest
   }
 
   const schemaResult = validateBySchema('tla-manifest', manifestParsed);
-  const specs =
+  const manifestObject =
     typeof manifestParsed === 'object' && manifestParsed !== null && !Array.isArray(manifestParsed)
-      ? (manifestParsed as { specs?: unknown }).specs
+      ? (manifestParsed as Record<string, unknown>)
       : undefined;
+  const specs = manifestObject?.specs;
   const schemaViolations = schemaResult.errorMessages.map((m) => `[artifact:tla] manifest schema failed: ${m}`);
   const specsViolations = !Array.isArray(specs)
     ? ['[artifact:tla] manifest specs must be a non-empty array']
     : specs.length === 0
       ? ['[artifact:tla] manifest specs must not be empty']
       : [];
-  const violations = [...schemaViolations, ...specsViolations];
+  const assetViolations: string[] = [];
+  if (typeof manifestObject?.basePath !== 'string' || manifestObject.basePath.length === 0) {
+    assetViolations.push('[artifact:tla] manifest basePath is required for asset resolution');
+  }
+  if (Array.isArray(specs) && typeof manifestObject?.basePath === 'string') {
+    const tlaBase = path.resolve(path.dirname(manifestFile), manifestObject.basePath);
+    for (const spec of specs as Array<{ id?: unknown; tlaPath?: unknown; cfgPath?: unknown }>) {
+      const id = typeof spec.id === 'string' ? spec.id : 'unknown';
+      for (const [kind, relativePath] of [
+        ['tla', spec.tlaPath],
+        ['cfg', spec.cfgPath],
+      ] as const) {
+        if (typeof relativePath !== 'string' || relativePath.length === 0) continue;
+        try {
+          await fs.access(path.resolve(tlaBase, relativePath));
+        } catch {
+          assetViolations.push(`[artifact:tla] ${kind} asset missing for spec "${id}": ${relativePath}`);
+        }
+      }
+    }
+  }
+  const violations = [...schemaViolations, ...specsViolations, ...assetViolations];
   return {
     exists: true,
-    valid: schemaResult.valid && Array.isArray(specs) && specs.length > 0,
-    manifest:
-      typeof manifestParsed === 'object' && manifestParsed !== null && !Array.isArray(manifestParsed)
-        ? (manifestParsed as Record<string, unknown>)
-        : undefined,
+    valid: schemaResult.valid && Array.isArray(specs) && specs.length > 0 && violations.length === 0,
+    manifest: manifestObject,
     violations,
   };
 }
 
 export interface BddAssetResult {
   bddViolations: string[];
-  /** 文件存在但内容畸形时仍为 true；使用 bddManifestValid 决定是否调用模型门禁。 */
   bddManifestExists: boolean;
+  /** 文件存在且通过 schema 解析；资产内容仍可能不完整并由 bddManifestValid fail-closed。 */
+  bddManifestSchemaValid: boolean;
+  /** schema、关联文件和状态机资产均有效时才允许 pair sync。 */
   bddManifestValid: boolean;
   bddManifest: Record<string, unknown> | undefined;
 }
@@ -148,10 +169,47 @@ export interface TlaBddSyncPair {
 }
 
 /**
- * 项目阶段 1-4 的 D4 契约要求 TLA↔BDD 等价性证据；独立 sync CLI 只在两类
- * manifest 均已通过资产校验后执行，避免把非法输入降级为“无配对”。
+ * SSoT §10.5.1：项目 Artifact Gate 的 TLA+/BDD 行为证据阶段。
+ * 这些阶段同时是独立 TLA↔BDD 文件同步契约的适用阶段。
  */
-export const TLA_BDD_SYNC_REQUIRED_PHASES: readonly PhaseOption[] = [1, 2, 3, 4];
+export const PROJECT_TLA_BDD_EVIDENCE_PHASES: readonly PhaseOption[] = [1, 2, 3, 4];
+
+/** SSoT §10.5.1：项目 Artifact Gate 的 required Cucumber 证据阶段。 */
+export const PROJECT_CUCUMBER_EVIDENCE_PHASES: readonly PhaseOption[] = [5, 6, 7, 8];
+
+/** SSoT §10.5.1：phase 2-4 在 TLA+ 证据上叠加 graph 资产要求。 */
+export const PROJECT_TLA_GRAPH_EVIDENCE_PHASES: readonly PhaseOption[] = [2, 3, 4];
+
+/** BDD CLI 的 D8 数据源契约：phase 2-8 均须传递 graph。 */
+export const PROJECT_BDD_GRAPH_EVIDENCE_PHASES: readonly PhaseOption[] = [2, 3, 4, 5, 6, 7, 8];
+
+/** SSoT §10.5.1：独立 TLA↔BDD 文件同步契约只适用于 phase 1-4。 */
+export const TLA_BDD_SYNC_CONTRACT_PHASES = PROJECT_TLA_BDD_EVIDENCE_PHASES;
+
+/** 判断当前阶段是否使用项目 required TLA+/BDD 行为证据。 */
+export function isProjectTlaBddEvidencePhase(phase: PhaseOption): boolean {
+  return PROJECT_TLA_BDD_EVIDENCE_PHASES.includes(phase);
+}
+
+/** 判断当前阶段是否使用项目 required Cucumber 执行证据。 */
+export function isProjectCucumberEvidencePhase(phase: PhaseOption): boolean {
+  return PROJECT_CUCUMBER_EVIDENCE_PHASES.includes(phase);
+}
+
+/** 判断当前阶段是否需要 TLA+ model 的项目 graph 证据。 */
+export function requiresProjectTlaGraphEvidence(phase: PhaseOption): boolean {
+  return PROJECT_TLA_GRAPH_EVIDENCE_PHASES.includes(phase);
+}
+
+/** 判断当前阶段是否需要 BDD model 的项目 graph 证据。 */
+export function requiresProjectBddGraphEvidence(phase: PhaseOption): boolean {
+  return PROJECT_BDD_GRAPH_EVIDENCE_PHASES.includes(phase);
+}
+
+/** 判断当前阶段是否进入独立 TLA↔BDD 文件同步契约。 */
+export function isTlaBddSyncContractPhase(phase: PhaseOption): boolean {
+  return TLA_BDD_SYNC_CONTRACT_PHASES.includes(phase);
+}
 
 export interface TlaBddSyncManifestInput {
   tlaManifest: {
@@ -169,6 +227,8 @@ export interface TlaBddSyncManifestInput {
 export interface TlaBddSyncPairResult {
   syncPairs: TlaBddSyncPair[];
   syncPairViolations: string[];
+  /** 双向覆盖成立时才允许调用独立 sync CLI。 */
+  pairCoverageValid: boolean;
 }
 
 /** 构造 TLA↔BDD 双向配对，并阻断 BDD/TLA 任一侧的孤儿资产。 */
@@ -208,7 +268,11 @@ export function buildTlaBddSyncPairs(opts: TlaBddSyncManifestInput): TlaBddSyncP
     }
   }
 
-  return { syncPairs, syncPairViolations };
+  return {
+    syncPairs,
+    syncPairViolations,
+    pairCoverageValid: syncPairs.length > 0 && syncPairViolations.length === 0,
+  };
 }
 
 /**
@@ -223,6 +287,7 @@ export async function readBddManifest(
 ): Promise<BddAssetResult> {
   const bddViolations: string[] = [];
   let bddManifestExists = false;
+  let bddManifestSchemaValid = false;
   let bddManifestValid = false;
   let bddManifest: Record<string, unknown> | undefined;
   try {
@@ -233,13 +298,13 @@ export async function readBddManifest(
       bddManifestParsed = parseJsonSafe(bddRaw);
     } catch (err) {
       bddViolations.push(`[artifact:bdd] manifest JSON parse failed: ${(err as Error).message}`);
-      return { bddViolations, bddManifestExists, bddManifestValid, bddManifest };
+      return { bddViolations, bddManifestExists, bddManifestSchemaValid, bddManifestValid, bddManifest };
     }
     const bddSchemaResult = validateBySchema('bdd-manifest', bddManifestParsed);
     if (!bddSchemaResult.valid) {
       bddViolations.push(`[artifact:bdd] manifest schema failed: ${bddSchemaResult.errorMessages.join('; ')}`);
     } else {
-      bddManifestValid = true;
+      bddManifestSchemaValid = true;
       bddManifest = bddManifestParsed as Record<string, unknown>;
       const typedManifest = bddManifestParsed as {
         basePath: string;
@@ -252,6 +317,12 @@ export async function readBddManifest(
           invariants: string[];
         }>;
       };
+      if (!typedManifest.features?.length) {
+        bddViolations.push('[artifact:bdd] manifest features must not be empty');
+      }
+      if (!typedManifest.stateMachines?.length) {
+        bddViolations.push('[artifact:bdd] manifest stateMachines must not be empty');
+      }
       const bddBasePath = path.resolve(projectDir, typedManifest.basePath);
       for (const f of typedManifest.features ?? []) {
         const fp = path.resolve(bddBasePath, f.filePath);
@@ -279,7 +350,13 @@ export async function readBddManifest(
   if (!bddManifestExists && effectivePhase >= 1) {
     bddViolations.push('[artifact:bdd] bdd-manifest.json is required for project phases 1-8');
   }
-  return { bddViolations, bddManifestExists, bddManifestValid, bddManifest };
+  return {
+    bddViolations,
+    bddManifestExists,
+    bddManifestSchemaValid,
+    bddManifestValid: bddManifestSchemaValid && bddViolations.length === 0,
+    bddManifest,
+  };
 }
 
 /**
@@ -385,11 +462,16 @@ export interface ModelCheckOptions {
   graphPath: string;
   manifestFile: string;
   bddManifestExists: boolean;
+  /** Schema-valid manifests still run BDD model checks for diagnostics. */
+  bddManifestSchemaValid?: boolean;
+  /** Complete asset validity gates independent TLA↔BDD pair sync. */
   bddManifestValid?: boolean;
   bddManifestFile: string;
   cucumberReportFile?: string;
-  /** Project contract enables TLA↔BDD synchronization for phases 1-4. */
+  /** Project contract enables independent TLA↔BDD file synchronization. */
   syncRequired?: boolean;
+  /** True only when every TLA spec and BDD feature has a valid reciprocal pair. */
+  syncPairCoverageValid?: boolean;
   syncPairs?: TlaBddSyncPair[];
   syncPairViolations?: string[];
 }
@@ -422,16 +504,22 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
     manifestFile,
     bddManifestExists,
     bddManifestValid = bddManifestExists,
+    bddManifestSchemaValid = bddManifestValid,
     bddManifestFile,
     cucumberReportFile,
     syncRequired = false,
+    syncPairCoverageValid = false,
     syncPairs = [],
     syncPairViolations = [],
   } = opts;
+  const usesProjectTlaBddEvidence = isProjectTlaBddEvidencePhase(effectivePhase);
   const canRunTla =
-    manifestExists && manifestValid && effectivePhase <= 4 && (effectivePhase === 1 || Boolean(graphPath));
-  const canRunBdd = bddManifestExists && bddManifestValid;
-  if (effectivePhase >= 2 && effectivePhase <= 4 && manifestValid && !graphPath) {
+    manifestExists &&
+    manifestValid &&
+    usesProjectTlaBddEvidence &&
+    (!requiresProjectTlaGraphEvidence(effectivePhase) || Boolean(graphPath));
+  const canRunBdd = bddManifestExists && bddManifestSchemaValid;
+  if (requiresProjectTlaGraphEvidence(effectivePhase) && manifestValid && !graphPath) {
     modelCheckViolations.push('[artifact:graph] graph asset is required for project phase 2-4');
   }
 
@@ -443,7 +531,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
       manifestFile,
       `--phase=${effectivePhase}`,
     ];
-    if (effectivePhase >= 2 && graphPath) tlaArgs.push(`--graph=${graphPath}`);
+    if (requiresProjectTlaGraphEvidence(effectivePhase) && graphPath) tlaArgs.push(`--graph=${graphPath}`);
     appendProcessViolation(
       modelCheckViolations,
       'tla-model',
@@ -460,12 +548,12 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
       bddManifestFile,
       `--phase=${effectivePhase}`,
     ];
-    if (effectivePhase <= 4) {
+    if (usesProjectTlaBddEvidence) {
       bddArgs.push('--require-tla-equivalence', `--tla-manifest=${manifestFile}`);
-    } else {
+    } else if (isProjectCucumberEvidencePhase(effectivePhase)) {
       bddArgs.push('--require-cucumber-report', `--cucumber-report=${cucumberReportFile ?? ''}`);
     }
-    if (effectivePhase >= 2 && graphPath) bddArgs.push(`--graph=${graphPath}`);
+    if (requiresProjectBddGraphEvidence(effectivePhase) && graphPath) bddArgs.push(`--graph=${graphPath}`);
     appendProcessViolation(
       modelCheckViolations,
       'bdd-model',
@@ -474,26 +562,28 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
     );
   }
 
-  if (effectivePhase <= 4 && syncRequired) {
+  const independentSyncEnabled = syncRequired && isTlaBddSyncContractPhase(effectivePhase);
+  if (independentSyncEnabled) {
     modelCheckViolations.push(...syncPairViolations);
     if (!manifestValid || !bddManifestValid) {
       modelCheckViolations.push('[artifact:tla-bdd-sync] required TLA+/BDD sync assets are invalid');
-    } else if (syncPairs.length === 0) {
-      modelCheckViolations.push('[artifact:tla-bdd-sync] no TLA+/BDD sync pair was found');
-    }
-    for (const pair of syncPairs) {
-      const syncResult = runSync(
-        process.execPath,
-        [
-          '--import',
-          'tsx',
-          path.resolve(__dirname, '..', 'cli', 'check-tla-bdd-sync.ts'),
-          pair.tlaFile,
-          pair.featureFile,
-        ],
-        { stdio: ['ignore', 'pipe', 'pipe'] },
-      );
-      appendProcessViolation(modelCheckViolations, 'tla-bdd-sync', 'check-tla-bdd-sync', syncResult);
+    } else if (!syncPairCoverageValid || syncPairs.length === 0) {
+      modelCheckViolations.push('[artifact:tla-bdd-sync] bidirectional TLA+/BDD pair coverage is incomplete');
+    } else {
+      for (const pair of syncPairs) {
+        const syncResult = runSync(
+          process.execPath,
+          [
+            '--import',
+            'tsx',
+            path.resolve(__dirname, '..', 'cli', 'check-tla-bdd-sync.ts'),
+            pair.tlaFile,
+            pair.featureFile,
+          ],
+          { stdio: ['ignore', 'pipe', 'pipe'] },
+        );
+        appendProcessViolation(modelCheckViolations, 'tla-bdd-sync', 'check-tla-bdd-sync', syncResult);
+      }
     }
   }
   return modelCheckViolations;

@@ -18,9 +18,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
 
+import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import {
   buildTlaBddSyncPairs,
   discoverGraphAsset,
+  isProjectTlaBddEvidencePhase,
+  isTlaBddSyncContractPhase,
   readTlaManifest,
   readBddManifest,
   readCucumberReport,
@@ -157,7 +160,53 @@ describe('readTlaManifest', () => {
       }),
       'utf-8',
     );
+    await fs.writeFile(path.join(tmpDir, 'test.tla'), '---- MODULE test ----', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'test.cfg'), 'SPECIFICATION Spec', 'utf-8');
     expect(await readTlaManifest(f)).toMatchObject({ valid: true, exists: true });
+  });
+
+  it('schema-valid manifest with missing TLA/Cfg assets fails closed', async () => {
+    const f = path.join(tmpDir, 'tla-manifest.json');
+    await fs.writeFile(
+      f,
+      JSON.stringify({
+        version: 1,
+        currentPhase: 1,
+        basePath: '.',
+        tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+        specs: [
+          {
+            id: 'L1-test',
+            level: 'L1',
+            phase: 1,
+            system: 'test',
+            requirementIds: ['REQ-1'],
+            designRef: 'docs/design.md',
+            tlaPath: 'missing.tla',
+            cfgPath: 'missing.cfg',
+            parent: null,
+            siblings: [],
+            children: [],
+            variableCombination: 1,
+            decompositionDecision: 'kept-below-threshold',
+            syntaxChecked: true,
+            tlcChecked: true,
+            deadlockFree: true,
+            invariantsHold: true,
+            stateExplosion: false,
+          },
+        ],
+      }),
+      'utf-8',
+    );
+    const result = await readTlaManifest(f);
+    expect(result.valid).toBe(false);
+    expect(result.violations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('[artifact:tla] tla asset missing'),
+        expect.stringContaining('[artifact:tla] cfg asset missing'),
+      ]),
+    );
   });
 
   it.each([
@@ -204,6 +253,19 @@ describe('readBddManifest', () => {
     await fs.writeFile(f, JSON.stringify({ schemaVersion: '1.0' }), 'utf-8');
     const r = await readBddManifest(f, tmpDir, 4);
     expect(r.bddViolations.some((v) => v.includes('[artifact:bdd] manifest schema failed'))).toBe(true);
+  });
+
+  it('schema-valid manifest with empty features or state machines fails closed', async () => {
+    const f = path.join(tmpDir, 'bdd-manifest.json');
+    await fs.writeFile(f, JSON.stringify(makeBddManifest({ features: [], stateMachines: [] })), 'utf-8');
+    const r = await readBddManifest(f, tmpDir, 1);
+    expect(r.bddManifestValid).toBe(false);
+    expect(r.bddViolations).toEqual(
+      expect.arrayContaining([
+        '[artifact:bdd] manifest features must not be empty',
+        '[artifact:bdd] manifest stateMachines must not be empty',
+      ]),
+    );
   });
 
   it('feature 文件缺失 → [artifact:bdd] feature file missing', async () => {
@@ -291,7 +353,145 @@ describe('buildTlaBddSyncPairs', () => {
     expect(result.syncPairViolations).toContain(
       '[artifact:tla-bdd-sync] TLA+ spec "orphan" has no matching BDD feature',
     );
+    expect(result.pairCoverageValid).toBe(false);
   });
+});
+
+describe('TLA↔BDD sync contract phase matrix', () => {
+  it.each([1, 2, 3, 4] as const)('uses required TLA/BDD project evidence for phase %s', (phase) => {
+    expect(isProjectTlaBddEvidencePhase(phase)).toBe(true);
+  });
+
+  it.each([5, 6, 7, 8] as const)('uses required Cucumber project evidence for phase %s', (phase) => {
+    expect(isProjectTlaBddEvidencePhase(phase)).toBe(false);
+  });
+
+  it.each([1, 2, 3, 4] as const)('enables independent sync for phase %s', (phase) => {
+    expect(isTlaBddSyncContractPhase(phase)).toBe(true);
+  });
+
+  it('disables independent sync for phase 5', () => {
+    expect(isTlaBddSyncContractPhase(5)).toBe(false);
+  });
+
+  it('does not invoke independent sync in phase 5 even when a pair is supplied', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    const violations = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 5,
+      graphPath: 'g.json',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestValid: true,
+      bddManifestFile: 'b.json',
+      syncRequired: true,
+      syncPairCoverageValid: true,
+      syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
+    });
+
+    expect(violations).toHaveLength(0);
+    expect(spawnSyncMock).toHaveBeenCalledTimes(1);
+    expect(spawnSyncMock.mock.calls[0]?.[1]).not.toEqual(
+      expect.arrayContaining([expect.stringContaining('check-tla-bdd-sync.ts')]),
+    );
+  });
+
+  it.each([1, 2, 3, 4] as const)('runs sync for phase %s only with complete pair coverage', (phase) => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    const violations = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: phase,
+      graphPath: phase === 1 ? '' : 'g.json',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestValid: true,
+      bddManifestFile: 'b.json',
+      syncRequired: true,
+      syncPairCoverageValid: true,
+      syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
+    });
+
+    expect(violations).toHaveLength(0);
+    expect(spawnSyncMock).toHaveBeenCalledTimes(3);
+    expect(spawnSyncMock.mock.calls[2]?.[1]).toEqual(
+      expect.arrayContaining([expect.stringContaining('check-tla-bdd-sync.ts'), 'spec.tla', 'feature.feature']),
+    );
+    spawnSyncMock.mockReset();
+  });
+
+  it.each([1, 2, 3, 4] as const)('accepts a real complete TLA/BDD pair for phase %s', async (phase) => {
+    const tlaFile = path.join(tmpDir, 'paired.tla');
+    const featureFile = path.join(tmpDir, 'paired.feature');
+    await fs.writeFile(
+      tlaFile,
+      `EXTENDS Naturals\nVARIABLES state\nInit == state = "idle"\nNext == \\/ Login \\/ Logout\nLogin == state = "idle" /\\ state' = "active"\nLogout == state = "active" /\\ state' = "idle"\nTypeInvariant == state \\in {"idle", "active"}`,
+      'utf-8',
+    );
+    await fs.writeFile(
+      featureFile,
+      `Feature: Test\nBackground:\n  Given initial state\n  When Login\n  When Logout\n  Then TypeInvariant`,
+      'utf-8',
+    );
+
+    const pairResult = buildTlaBddSyncPairs({
+      tlaManifest: { basePath: '.', specs: [{ id: 'paired', tlaPath: 'paired.tla' }] },
+      bddManifest: {
+        basePath: '.',
+        features: [{ id: 'feature-paired', tlaSpecId: 'paired', filePath: 'paired.feature' }],
+      },
+      manifestFile: path.join(tmpDir, 'tla-manifest.json'),
+      projectDir: tmpDir,
+    });
+    const syncResult = checkTlaBddSync(await fs.readFile(tlaFile, 'utf-8'), await fs.readFile(featureFile, 'utf-8'));
+
+    expect(isTlaBddSyncContractPhase(phase)).toBe(true);
+    expect(pairResult).toMatchObject({ pairCoverageValid: true, syncPairs: [{ tlaFile, featureFile }] });
+    expect(syncResult).toMatchObject({ passed: true, violations: [] });
+  });
+
+  it('does not treat incomplete pair coverage as sync success', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    const violations = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestValid: true,
+      bddManifestFile: 'b.json',
+      syncRequired: true,
+      syncPairCoverageValid: false,
+      syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
+      syncPairViolations: ['[artifact:tla-bdd-sync] incomplete bidirectional pair coverage'],
+    });
+
+    expect(violations).toContain('[artifact:tla-bdd-sync] incomplete bidirectional pair coverage');
+    expect(spawnSyncMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([1, 2, 3, 4] as const)(
+    'fails closed on missing phase %s sync assets instead of reporting sync success',
+    (phase) => {
+      spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+      const violations = runModelChecks({
+        manifestExists: false,
+        manifestValid: false,
+        effectivePhase: phase,
+        graphPath: phase === 1 ? '' : 'g.json',
+        manifestFile: 'missing-tla.json',
+        bddManifestExists: false,
+        bddManifestValid: false,
+        bddManifestFile: 'missing-bdd.json',
+        syncRequired: true,
+      });
+
+      expect(violations).toContain('[artifact:tla-bdd-sync] required TLA+/BDD sync assets are invalid');
+      expect(spawnSyncMock).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('runModelChecks', () => {
@@ -440,6 +640,7 @@ describe('runModelChecks', () => {
       bddManifestValid: true,
       bddManifestFile: 'b.json',
       syncRequired: true,
+      syncPairCoverageValid: true,
       syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
     });
     expect(v).toEqual(
@@ -462,6 +663,7 @@ describe('runModelChecks', () => {
       bddManifestValid: true,
       bddManifestFile: 'b.json',
       syncRequired: true,
+      syncPairCoverageValid: true,
       syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
     });
     expect(v).toEqual(

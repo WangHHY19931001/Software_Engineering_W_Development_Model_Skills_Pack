@@ -728,9 +728,11 @@ npx tsx w-model-dev/scripts/cli/check-tla-bdd-sync.ts <tla-file> <feature-file>
 
 退出码：0=一致 / 1=有差异 / 2=输入错误
 
-### 与 check-bdd-model.ts 的关系
+### 与 check-bdd-model.ts D4 及项目阶段门的关系
 
-`check-bdd-model.ts` D4 等价性校验可调用本脚本（可选，不强制）。本脚本作为独立工具，便于开发阶段快速验证 TLA+/BDD 一致性。
+`check-bdd-model.ts` 的 D4 是 BDD 门禁内的 required equivalence 维度；项目阶段 1–4 必须传 `--require-tla-equivalence --tla-manifest=<path>`，缺少或畸形证据由 D4 fail-closed。独立 `check-tla-bdd-sync.ts` 是另一条按文件 pair 执行的同步证据，不被 D4 替代。
+
+项目 Artifact Gate 的独立 pair sync 契约（SSoT §10.5.1）明确为：phase 1–4 且 TLA manifest 与 BDD manifest 均通过真实 schema/资产校验、TLA spec 与 BDD feature 配对集合满足双向完整覆盖时，逐 pair 必须执行本脚本；任一资产缺失/畸形由各自 evidence gate 阻断，不得作为 sync skip。实现以 `isTlaBddSyncContractPhase` 和 `syncRequired` 表达阶段契约，以 `pairCoverageValid` 表达双向配对前置条件。phase 5–8 不执行 TLA↔BDD 文件同步，使用 required Cucumber 执行证据。单独开发调试时仍可直接运行本脚本；该可选工具边界不适用于项目阶段门。
 
 ## 16. 设计文档 ↔ 代码状态机一致性
 
