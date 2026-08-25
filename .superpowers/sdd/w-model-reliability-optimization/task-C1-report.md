@@ -126,3 +126,67 @@ Persona 规则未修改。`agent-personas.md` 中 test/security/performance Pers
 
 - `qualityLevel` 在阻断 hint 场景仍可能为 A/B，这是有意保持的 score-derived 事实；`passed=false` 与 exit 1 才表达放行阻断，不伪造 C/D 等级。
 - 本轮不修改 Persona 文档、四个 fixture、samples 矩阵、`progress.md` 或 `.w-model`。
+
+---
+
+# C1 修复轮 2：隔离原始失败回归
+
+日期：2026-08-25
+基线：`87118d9`
+工作树：`D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.worktrees/w-model-reliability`
+提交消息：`test(verifier): isolate original failure regression`
+
+## 复审结论与变更
+
+- 定向复审发现原测试 `verifier-logic.test.ts:141-160` 从合法 A 分 fixture 注入 `[Critical]` 后再设置 `passed=false`。该样本的 exit 1 可由阻断 hint 触发，不能独立证明“无阻断 hint、A 分、原始 passed=false”路径被拒绝。
+- 将该用例改为删除 `reworkHints`、保留合法 A 分子标准与分数、仅设置 `passed=false`，并保留真实 `check-verifier-output.ts --json` 子进程断言：进程 exit 1、报告 `passed=false`、`qualityLevel=A`、`exitCode=1`。
+- 增加 reasons 精确约束：必须包含 `passed false 与 qualityLevel A 不一致`，且不得包含 `reworkHints`，从而证明失败来自原始 `passed=false` 契约，而非阻断 hint。
+- 更新 `w-model-dev/scripts/__tests__/README.md`：qualityLevel 仍 score-derived；阻断性 reworkHints 单独强制 `passed=false/exit 1` 且不改写等级；同时登记无阻断原始 `passed=false` 的 CLI 负样本。
+- 未修改 Persona 规则、生产 verifier 实现、四个 fixture、samples fixture 矩阵、`progress.md` 或 `.w-model`。
+
+## TDD 记录
+
+1. **红灯前基线**：在修改断言前，现有 34 个定向测试全通过；原用例仍使用 `[Critical]`，因此缺口未被暴露。
+2. **红灯**：先删除阻断 hint、保留 `passed=false`，并加入“reasons 为空”的临时诊断断言，执行：
+
+   ```text
+   npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts -t '合法 A 分、无阻断 hint 的原始 passed=false'
+   ```
+
+   结果：exit 1；`1 failed | 33 skipped`。真实 CLI 返回 reasons：`["passed false 与 qualityLevel A 不一致（应 = true）"]`。失败原因正是当前契约拒绝原始 `passed=false`，且没有 `reworkHints` 原因，证明测试覆盖了目标路径。
+
+3. **绿灯**：将临时断言改为要求该精确 passed/qualityLevel 原因，并断言 reasons 不含 `reworkHints`；未修改生产实现。
+
+## 真实验证命令与结果
+
+1. `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/verifier-logic.test.ts`
+
+   结果：exit 0；`1 passed` test file，`34 passed` tests，0 failed。输出包含四个 Persona 的真实 CLI exit 0 回归、阻断 hint exit 1 回归，以及本轮无阻断原始 `passed=false` 的 exit 1/reasons 回归。
+
+2. `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`
+
+   结果：exit 0；`SAMPLES_COVERAGE_JSON {"fixtureCount":280,"referencedFiles":242,"referencedDirs":15,"unregistered":0,"undeclaredDirs":0,"exitCode":0}`。
+
+3. `npm run typecheck`
+
+   结果：exit 0；执行 `tsc -p config/tsconfig.json`，无 TypeScript 错误。
+
+4. `npx prettier --config config/prettier.config.cjs --check w-model-dev/scripts/__tests__/verifier-logic.test.ts .superpowers/sdd/w-model-reliability-optimization/task-C1-report.md`
+
+   结果：exit 0；`All matched files use Prettier code style!`。README 仅做单行矩阵登记，未纳入目标格式化文件，避免无关重排。
+
+5. `git diff --check`
+
+   结果：exit 0；仅报告既有 `progress.md` 的换行转换提示，未发现 diff 空白错误。
+
+## CodeGraph / fallback
+
+当前工作树无 `.codegraph/` 索引；已尝试 `mcp__codegraph__codegraph_explore`，服务返回未找到索引，因此未伪造 CodeGraph 结果。本轮仅修改测试、测试矩阵与报告，不涉及阶段 5-8 代码修改前门禁要求；沿用既有 fallback 记录：
+`D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.w-model/codegraph-queries/2026-08-25-C1-verifier-cli.md`（不提交）。
+
+## Concerns
+
+- 本轮验证的 exit 1 由 `passed=false` 与 score-derived `qualityLevel=A` 不一致触发；`reworkHints` 未提供，故不会把阻断 hint 当作原因。
+- 原生产契约保持不变：A/B 且无 R13 单轴违规时，`passed` 必须为 true；显式 `Critical`/`Required` hint 则独立强制失败，但 qualityLevel 仍由分数映射。
+- `npx tsx ... check-samples-coverage.ts` 是本仓库现有 CLI 入口；此前 `npm run check-samples-coverage` 未登记脚本，故不作为本轮命令。
+- 不提交 `.w-model` fallback 查询、运行时状态或既有 `.superpowers/sdd/w-model-reliability-optimization/progress.md` 改动。

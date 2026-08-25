@@ -53,7 +53,7 @@
 | tla-clean-trace.test.ts | TLA-Clean | isTlcStatesDir 识别（时间戳子目录·.st 指纹·空·无关·不存在）/ cleanTraceFiles 守卫1 无 .tla 不删 / 守卫2 states 递归删除·无 TLC 特征跳过 / *.dump·*.out 仅在有 .tla 目录删 |
 | tla-logic.test.ts | TLA+ | 文件头 / 层次 / 拆解 / SANY / TLC / R13 checkRounds schema |
 | uat-path-mapping.test.ts | UAT Path Mapping | parseUatPathMappingFromContent 合法·畸形·空单元格·无有效行 / checkUatPathMappingContent 未回填·mappingType 非法 / collectUatMappingViolations phase=1 存在性·phase=5 回填·其他阶段不校验 |
-| verifier-logic.test.ts | Verifier | 4 个 Persona fixture 逐一通过当前 Schema/logic / 真实 `check-verifier-output.ts --json` 子进程协议（exit 0·passed·qualityLevel·reasons）/ 阻断性 reworkHints 负样本（exit 1·C 级）/ evidence 格式校验（key=value 通过·空泛声明 O3）/ R13 单轴下限（≥0.70·<0.70·边界 0.70·非数组）/ evidence 扣分后 passed 重算 / targetKind=rootcause（§7.5 合法通过·误用 test 集合拦截·权重改动拦截·非法值拦截） |
+| verifier-logic.test.ts | Verifier | 4 个 Persona fixture 逐一通过当前 Schema/logic / 真实 `check-verifier-output.ts --json` 子进程协议（exit 0·passed·qualityLevel·reasons）/ qualityLevel 仍 score-derived；阻断性 reworkHints 单独强制 passed=false/exit 1（不改写等级）/ 原始 passed=false 且无阻断 hint 的真实 CLI 负样本（exit 1·reasons）/ evidence 格式校验（key=value 通过·空泛声明 O3）/ R13 单轴下限（≥0.70·<0.70·边界 0.70·非数组）/ evidence 扣分后 passed 重算 / targetKind=rootcause（§7.5 合法通过·误用 test 集合拦截·权重改动拦截·非法值拦截） |
 | wm-status.test.ts | WmStatus CLI | 子进程：未初始化 exit 0 / project 非法·非对象·数组 exit 2 / rtm 非法 exit 2 / rtm·run-log 缺失降级 / run-log 坏行跳过 / status 非字符串归一化 / --json 结构 / 人类可读 6 项 |
 | wm-status-logic.test.ts | WmStatus | 9 态 → phase 映射 / completedPhases 与 progress / RTM 覆盖计数 / 四级测试透传 / recentActions 尾部 3 条精简字段 / rtm·runLog 缺失降级 / nextSteps 确定性 |
 

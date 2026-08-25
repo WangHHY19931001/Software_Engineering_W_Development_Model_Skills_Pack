@@ -138,10 +138,10 @@ describe('Persona Verifier CLI regressions', () => {
     }
   });
 
-  it('原始 passed=false 携带阻断 hint 时仍保留分数映射等级并返回 exit 1', async () => {
+  it('合法 A 分、无阻断 hint 的原始 passed=false 仍返回 exit 1', async () => {
     const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
     const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
-    fixture.reworkHints = ['[Critical] 已确认的阻断性缺陷'];
+    delete fixture.reworkHints;
     fixture.passed = false;
 
     const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
@@ -154,6 +154,8 @@ describe('Persona Verifier CLI regressions', () => {
 
       expect(result.code).toBe(1);
       expect(report).toMatchObject({ type: 'verifier-output', passed: false, qualityLevel: 'A', exitCode: 1 });
+      expect(report.reasons).toEqual([expect.stringContaining('passed false 与 qualityLevel A 不一致')]);
+      expect(report.reasons).not.toEqual(expect.arrayContaining([expect.stringContaining('reworkHints')]));
     } finally {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
       await rm(tempDir, { recursive: true, force: true });
