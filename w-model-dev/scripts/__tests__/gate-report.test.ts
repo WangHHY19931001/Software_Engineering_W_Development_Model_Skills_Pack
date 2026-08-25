@@ -330,6 +330,27 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     },
   );
 
+  it.each(['--gate-logs', '--gate-logs='])(
+    '有效 gate-logs 后重复出现空参数 %s 时仍返回结构化 exit 2',
+    async (emptyGateLogsArg) => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+      try {
+        const runLog = path.join(tmpDir, 'run-log.jsonl');
+        await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
+        const result = runSync(
+          process.execPath,
+          [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${tmpDir}`, emptyGateLogsArg],
+          { cwd: tmpDir },
+        );
+        expect(result.status).toBe(2);
+        expect(result.stdout).toContain('ERROR_JSON');
+        expect(result.stdout).toContain('"exitCode":2');
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    },
+  );
+
   it('协议无效的 gate-log 不得进入 R6 Map，R6 必须报告未找到合法证据', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {

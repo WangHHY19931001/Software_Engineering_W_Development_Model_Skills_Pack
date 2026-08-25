@@ -57,16 +57,29 @@ interface ParsedArgs {
   runLogFile: string | undefined;
   gateLogsDir: string | undefined;
   gateLogsExplicit: boolean;
+  gateLogsInvalid: boolean;
   tlaManifestFile: string | undefined;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const runLogFile = args.find((a) => !a.startsWith('--'));
-  const gateLogsDir = parseFlagValue(args, 'gate-logs');
-  const gateLogsExplicit = args.some((a) => a === '--gate-logs' || a.startsWith('--gate-logs='));
+  const gateLogsPrefix = '--gate-logs=';
+  let gateLogsDir: string | undefined;
+  let gateLogsExplicit = false;
+  let gateLogsInvalid = false;
+  for (const arg of args) {
+    if (arg !== '--gate-logs' && !arg.startsWith(gateLogsPrefix)) continue;
+    gateLogsExplicit = true;
+    const value = arg === '--gate-logs' ? '' : arg.slice(gateLogsPrefix.length);
+    if (value.trim() === '') {
+      gateLogsInvalid = true;
+    } else if (gateLogsDir === undefined) {
+      gateLogsDir = value;
+    }
+  }
   const tlaManifestFile = parseFlagValue(args, 'tla-manifest');
-  return { runLogFile, gateLogsDir, gateLogsExplicit, tlaManifestFile };
+  return { runLogFile, gateLogsDir, gateLogsExplicit, gateLogsInvalid, tlaManifestFile };
 }
 
 // ==================== gate-logs 加载 ====================
@@ -178,7 +191,7 @@ async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
-  const { runLogFile, gateLogsDir, gateLogsExplicit, tlaManifestFile } = parseArgs(process.argv);
+  const { runLogFile, gateLogsDir, gateLogsExplicit, gateLogsInvalid, tlaManifestFile } = parseArgs(process.argv);
 
   if (!runLogFile) {
     exitWithError({
@@ -192,7 +205,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (gateLogsExplicit && !gateLogsDir) {
+  if (gateLogsExplicit && (gateLogsInvalid || !gateLogsDir)) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-2',
