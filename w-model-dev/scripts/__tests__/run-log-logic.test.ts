@@ -15,7 +15,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { checkRunLog, extractExitCode, buildGateLogKeys, type RunLogEntry } from '../logic/run-log-logic.js';
+import {
+  checkRunLog,
+  extractExitCode,
+  inspectGateLogContent,
+  buildGateLogKeys,
+  type RunLogEntry,
+} from '../logic/run-log-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const samplesDir = path.join(here, '..', 'samples', 'run-log');
@@ -376,6 +382,57 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
     ];
     const result = checkRunLog(entries, { gateLogs: new Map() });
     expect(result.violations.some((v) => /R3 记录校验失败/.test(v))).toBe(false);
+  });
+});
+
+describe('B1 gate-log 根 JSON 协议', () => {
+  const rootPayload = (exitCode: number, passed = exitCode === 0): string =>
+    JSON.stringify({
+      script: 'check-bdd-model.ts',
+      exitCode,
+      passed,
+      reasons: [],
+      reportSummary: { exitCode, passed },
+      stdoutSummary: { exitCode, passed },
+    });
+
+  it.each([0, 1, 2])('extractExitCode 从根 JSON 提取 exitCode=%s', (exitCode) => {
+    expect(extractExitCode(rootPayload(exitCode))).toBe(exitCode);
+  });
+
+  it('根 JSON 优先于旧摘要标记', () => {
+    const payload = JSON.parse(rootPayload(0)) as Record<string, unknown>;
+    payload.note = 'GATE_JSON {"exitCode":1}';
+    expect(extractExitCode(JSON.stringify(payload))).toBe(0);
+  });
+
+  it('根 JSON 与 passed 不一致返回可追踪 violation，且不提取为合法 exitCode', () => {
+    const content = rootPayload(0, false);
+    const inspected = inspectGateLogContent(content);
+    expect(inspected.exitCode).toBe(0);
+    expect(inspected.violations.some((v) => /passed.*exitCode|exitCode.*passed/.test(v))).toBe(true);
+    expect(extractExitCode(content)).toBeUndefined();
+  });
+
+  it('stdoutSummary/reportSummary 与根字段不一致返回 violation', () => {
+    const payload = JSON.parse(rootPayload(0)) as Record<string, unknown>;
+    payload.stdoutSummary = { exitCode: 1, passed: false };
+    payload.reportSummary = { exitCode: 0, passed: false };
+    const inspected = inspectGateLogContent(JSON.stringify(payload));
+    expect(inspected.violations).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/stdoutSummary.*exitCode/),
+        expect.stringMatching(/stdoutSummary.*passed/),
+        expect.stringMatching(/reportSummary.*passed/),
+      ]),
+    );
+  });
+
+  it('根 JSON 缺字段或非法 exitCode 返回 violation，不回退旧摘要', () => {
+    expect(inspectGateLogContent('{"passed":true}').violations).toEqual(
+      expect.arrayContaining([expect.stringMatching(/root.*exitCode/)]),
+    );
+    expect(extractExitCode('{"exitCode":3,"passed":false}')).toBeUndefined();
   });
 });
 

@@ -1137,19 +1137,97 @@ const GATE_JSON_PATTERNS: RegExp[] = [
  * 从 gate-log 内容提取 exitCode（gate-log 是脚本 stdout 存档，含一行 `XXX_JSON {...}` 摘要）。
  * 纯函数、无 IO。
  */
-export function extractExitCode(content: string): number | undefined {
+export interface GateLogInspection {
+  /** Root JSON payloads expose the numeric exit code even when semantic checks fail. */
+  exitCode?: number;
+  /** Blocking semantic violations found in a root JSON gate-log. */
+  violations: string[];
+  /** True when the complete content parsed as a JSON object. */
+  rootJson: boolean;
+}
+
+const VALID_GATE_EXIT_CODES = new Set([0, 1, 2]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidGateExitCode(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && VALID_GATE_EXIT_CODES.has(value);
+}
+
+function inspectRootGateLog(root: Record<string, unknown>): GateLogInspection {
+  const violations: string[] = [];
+  const rawExitCode = root.exitCode;
+  const exitCode = isValidGateExitCode(rawExitCode) ? rawExitCode : undefined;
+
+  if (!isValidGateExitCode(rawExitCode)) {
+    violations.push('root exitCode 必须为 0、1 或 2');
+  }
+
+  if (typeof root.passed !== 'boolean') {
+    violations.push('root passed 必须为 boolean');
+  } else if (exitCode !== undefined && (exitCode === 0) !== root.passed) {
+    violations.push(`root passed 与 exitCode=${exitCode} 不一致`);
+  }
+
+  for (const summaryName of ['stdoutSummary', 'reportSummary'] as const) {
+    const summary = root[summaryName];
+    if (summary === undefined) continue;
+    if (!isRecord(summary)) {
+      violations.push(`${summaryName} 必须为 object`);
+      continue;
+    }
+    if (exitCode !== undefined && 'exitCode' in summary && summary.exitCode !== exitCode) {
+      violations.push(`${summaryName}.exitCode 与 root exitCode=${exitCode} 不一致`);
+    }
+    if (typeof root.passed === 'boolean' && 'passed' in summary && summary.passed !== root.passed) {
+      violations.push(`${summaryName}.passed 与 root passed=${root.passed} 不一致`);
+    }
+  }
+
+  return { ...(exitCode !== undefined ? { exitCode } : {}), violations, rootJson: true };
+}
+
+function extractLegacyExitCode(content: string): number | undefined {
   for (const pattern of GATE_JSON_PATTERNS) {
     const match = content.match(pattern);
-    if (match && match[1]) {
-      try {
-        const json = parseJsonSafe(match[1]) as { exitCode?: unknown };
-        if (typeof json.exitCode === 'number') return json.exitCode;
-      } catch {
-        /* 忽略解析失败 */
-      }
+    if (!match || !match[1]) continue;
+    try {
+      const json = parseJsonSafe(match[1]) as { exitCode?: unknown };
+      if (isValidGateExitCode(json.exitCode)) return json.exitCode;
+    } catch {
+      /* 继续扫描后续旧摘要标记 */
     }
   }
   return undefined;
+}
+
+/**
+ * Inspect a gate-log payload without I/O. A complete JSON object is always
+ * treated as a root gate-log candidate; malformed/missing root fields are not
+ * allowed to fall through to a legacy stdout marker. Non-root content keeps
+ * the historical `*_JSON {...}` extraction path.
+ */
+export function inspectGateLogContent(content: string): GateLogInspection {
+  try {
+    const parsed = parseJsonSafe(content);
+    if (isRecord(parsed)) return inspectRootGateLog(parsed);
+    return { violations: ['root gate-log 必须为 JSON object'], rootJson: true };
+  } catch {
+    /* Legacy stdout gate-log content is not itself a JSON document. */
+  }
+  const exitCode = extractLegacyExitCode(content);
+  return { ...(exitCode !== undefined ? { exitCode } : {}), violations: [], rootJson: false };
+}
+
+/**
+ * 从 gate-log 内容提取 exitCode。根 JSON 优先；根 JSON 一旦成功解析为
+ * object，即使字段缺失或非法也不再回退旧摘要，避免明确损坏的证据被吞掉。
+ */
+export function extractExitCode(content: string): number | undefined {
+  const inspection = inspectGateLogContent(content);
+  return inspection.violations.length === 0 ? inspection.exitCode : undefined;
 }
 
 /**

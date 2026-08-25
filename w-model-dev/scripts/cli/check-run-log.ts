@@ -37,7 +37,13 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-import { checkRunLog, extractExitCode, buildGateLogKeys, type RunLogLifecycleStatus } from '../logic/run-log-logic.js';
+import {
+  checkRunLog,
+  inspectGateLogContent,
+  buildGateLogKeys,
+  type RunLogLifecycleStatus,
+} from '../logic/run-log-logic.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { readJsonlOrExitDetailed } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
@@ -73,38 +79,67 @@ function parseArgs(argv: string[]): ParsedArgs {
 interface GateLogsResult {
   map: Map<string, { exitCode?: number; content: string }>;
   fileCount: number;
+  violations: string[];
 }
 
-async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult | undefined> {
+async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
   const dirAbs = path.resolve(gateLogsDir);
   let files: string[];
   try {
     files = await fs.readdir(dirAbs);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    console.error(`⚠ gate-logs 目录读取失败，跳过 R5/R6 交叉校验: ${dirAbs}（${e.code ?? e.message}）`);
-    return undefined;
+    const category = e.code === 'ENOENT' ? '输入错误' : '证据违规';
+    return {
+      map: new Map(),
+      fileCount: 0,
+      violations: [`R6: gate-logs 目录读取失败（${category}）: ${dirAbs}（${e.code ?? e.message}）`],
+    };
   }
 
   const map = new Map<string, { exitCode?: number; content: string }>();
+  const violations: string[] = [];
   let fileCount = 0;
   for (const file of files) {
     fileCount++;
     const fileAbs = path.join(dirAbs, file);
     try {
       const content = await fs.readFile(fileAbs, 'utf-8');
-      const exitCode = extractExitCode(content);
-      const data = { exitCode, content };
-      const keys = buildGateLogKeys(fileAbs, process.cwd());
-      for (const k of keys) {
-        map.set(k, data);
+      let parsed: unknown;
+      try {
+        parsed = parseJsonSafe(content);
+      } catch {
+        // Explicit --gate-logs is a schema-bound evidence input. Legacy
+        // *_JSON extraction remains available to direct logic consumers, but
+        // a non-JSON file must not silently pass the CLI reader.
+        violations.push(`R6: gate-log ${fileAbs} JSON 解析失败`);
+        violations.push(`R6: gate-log ${fileAbs} 未提取到合法 exitCode`);
+        continue;
       }
+      const inspected = inspectGateLogContent(content);
+      if (!inspected.rootJson || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        violations.push(`R6: gate-log ${fileAbs} 根 JSON 必须为 object`);
+      } else {
+        const schemaResult = validateBySchema('gate-log', parsed);
+        if (!schemaResult.valid) {
+          for (const message of schemaResult.errorMessages) {
+            violations.push(`R6: gate-log ${fileAbs} [schema] ${message}`);
+          }
+        }
+      }
+      for (const violation of inspected.violations) violations.push(`R6: gate-log ${fileAbs} ${violation}`);
+      if (inspected.exitCode === undefined) {
+        violations.push(`R6: gate-log ${fileAbs} 未提取到合法 exitCode`);
+      }
+      const data = { ...(inspected.exitCode !== undefined ? { exitCode: inspected.exitCode } : {}), content };
+      const keys = buildGateLogKeys(fileAbs, process.cwd());
+      for (const k of keys) map.set(k, data);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(`⚠ gate-log 文件读取失败，已跳过: ${fileAbs}（${e.code ?? e.message}）`);
+      violations.push(`R6: gate-log 文件读取失败: ${fileAbs}（${e.code ?? e.message}）`);
     }
   }
-  return { map, fileCount };
+  return { map, fileCount, violations };
 }
 
 // ==================== tla-manifest 加载 ====================
@@ -157,15 +192,15 @@ async function main(): Promise<void> {
   const parsedRunLog = await readJsonlOrExitDetailed(runLogAbs, 'run-log');
   const entries = parsedRunLog.entries;
 
-  // 可选输入：--gate-logs（读失败只警告不 exit）
+  // 可选输入：--gate-logs；一旦显式传入，读取/schema/协议错误均为 blocking violation。
   let gateLogs: Map<string, { exitCode?: number; content: string }> | undefined;
   let gateLogFileCount = 0;
+  let gateLogViolations: string[] = [];
   if (gateLogsDir) {
-    const result = await loadGateLogs(gateLogsDir);
-    if (result) {
-      gateLogs = result.map;
-      gateLogFileCount = result.fileCount;
-    }
+    const loaded = await loadGateLogs(gateLogsDir);
+    gateLogs = loaded.map;
+    gateLogFileCount = loaded.fileCount;
+    gateLogViolations = loaded.violations;
   }
 
   // 可选输入：--tla-manifest（读失败只警告不 exit）
@@ -176,22 +211,24 @@ async function main(): Promise<void> {
 
   // 构建 options 并调用纯逻辑校验
   const result = checkRunLog(entries, { tlaCheckRounds, gateLogs });
+  const allViolations = [...gateLogViolations, ...result.violations];
+  const passed = allViolations.length === 0;
   const diagnostics = [
     ...(result.diagnostics ?? []),
     ...parsedRunLog.parseErrors.map((error) => `PARSE_INCOMPLETE: line ${error.line} ${error.message}; deferred`),
   ];
-  const exitCode = result.passed ? 0 : 1;
+  const exitCode = passed ? 0 : 1;
   const lifecycleStatus: RunLogLifecycleStatus =
-    result.passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN';
+    passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN';
   const statusNote =
-    result.passed && diagnostics.length > 0
+    passed && diagnostics.length > 0
       ? 'exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。'
       : undefined;
   const summary = {
     type: 'run-log',
-    passed: result.passed,
-    reasons: result.violations,
-    violations: buildViolationDistribution(result.violations.length),
+    passed,
+    reasons: allViolations,
+    violations: buildViolationDistribution(allViolations.length),
     lifecycleStatus,
     ...(statusNote ? { statusNote } : {}),
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
@@ -215,17 +252,17 @@ async function main(): Promise<void> {
   console.log(
     `--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`,
   );
-  console.log(`校验结果        : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
+  console.log(`校验结果        : ${passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log(`生命周期状态    : ${lifecycleStatus}`);
   console.log('─'.repeat(60));
 
-  if (result.passed) {
+  if (passed) {
     console.log(
       '运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。',
     );
   } else {
     console.log('未通过原因：');
-    for (const r of result.violations) {
+    for (const r of allViolations) {
       console.log(`  - ${r}`);
     }
     console.log('');
