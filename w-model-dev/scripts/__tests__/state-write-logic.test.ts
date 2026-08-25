@@ -205,6 +205,91 @@ describe('writeStateJson', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe(`${JSON.stringify(validRunLogEntry)}\n`);
   });
 
+  it('reports the physical line number for a malformed JSONL payload after blank lines', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.rm(p, { force: true });
+
+    const result = await writeStateJson(p, `${JSON.stringify(validRunLogEntry)}\n\n{broken}\n`, {
+      projectRoot: tmpDir,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID', schemaInvalidLine: 3 });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('propagates JSONL schema validator exceptions and leaves no transaction artifacts', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.rm(p, { force: true });
+    const infrastructureError = new Error('run-log schema validator unavailable');
+
+    await expect(
+      writeStateJson(p, `${JSON.stringify(validRunLogEntry)}\n`, {
+        projectRoot: tmpDir,
+        schemaValidator: () => {
+          throw infrastructureError;
+        },
+      }),
+    ).rejects.toBe(infrastructureError);
+
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.readdir(`${p}.lock`)).resolves.toEqual([]);
+  });
+
+  it('rejects a registered JSONL payload when the validator returns invalid', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.rm(p, { force: true });
+
+    const result = await writeStateJson(p, `${JSON.stringify(validRunLogEntry)}\n`, {
+      projectRoot: tmpDir,
+      schemaValidator: () => ({ valid: false, errors: null, errorMessages: ['forced invalid'] }),
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID', schemaInvalidLine: 1 });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps an outside target untyped even when the project root is supplied', async () => {
+    const outsideRoot = path.join(tmpDir, 'outside');
+    const projectRoot = path.join(tmpDir, 'project');
+    const p = path.join(outsideRoot, '.w-model', 'custom.json');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+
+    const result = await writeStateJson(p, '{"outside":true}', { projectRoot, allowUntyped: false });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(result.untyped).toBeUndefined();
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"outside":true}');
+  });
+
+  it('writes valid runtime state fixtures through the registered schema contract', async () => {
+    const projectRoot = target('valid-fixtures-project');
+    const projectPath = path.join(projectRoot, '.w-model', 'project.json');
+    const budgetPath = path.join(projectRoot, '.w-model', 'budget.json');
+    const maturityPath = path.join(projectRoot, '.w-model', 'maturity.json');
+    const rtmPath = path.join(projectRoot, '.w-model', 'rtm.json');
+    const runLogPath = path.join(projectRoot, '.w-model', 'run-log.jsonl');
+    await fs.mkdir(path.dirname(projectPath), { recursive: true });
+
+    const fixtureDir = path.resolve('w-model-dev/scripts/samples');
+    const fixtures: Array<[string, string, string]> = [
+      ['project.json', projectPath, JSON.stringify(validProject)],
+      ['budget.json', budgetPath, await fs.readFile(path.join(fixtureDir, 'budget', 'valid.json'), 'utf-8')],
+      ['maturity.json', maturityPath, await fs.readFile(path.join(fixtureDir, 'maturity', 'valid.json'), 'utf-8')],
+      ['rtm.json', rtmPath, await fs.readFile(path.join(fixtureDir, 'gate', 'valid-rtm.json'), 'utf-8')],
+      ['run-log.jsonl', runLogPath, await fs.readFile(path.join(fixtureDir, 'run-log', 'valid.jsonl'), 'utf-8')],
+    ];
+
+    for (const [, targetPath, content] of fixtures) {
+      await expect(writeStateJson(targetPath, content, { projectRoot })).resolves.toMatchObject({ ok: true });
+    }
+
+    await expect(fs.readFile(rtmPath, 'utf-8')).resolves.toContain('REQ-001');
+    await expect(fs.readFile(runLogPath, 'utf-8')).resolves.toContain('"runId":"r1"');
+  });
+
   it('rejects unregistered .w-model targets unless untyped writes are explicitly allowed', async () => {
     const p = stateTarget('custom.json');
     await fs.mkdir(path.dirname(p), { recursive: true });

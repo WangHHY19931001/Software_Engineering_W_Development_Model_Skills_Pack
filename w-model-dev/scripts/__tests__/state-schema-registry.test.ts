@@ -20,6 +20,26 @@ describe('state schema registry', () => {
     });
   });
 
+  it('keeps fixture-only state schemas out of the runtime registration table', () => {
+    expect(
+      [
+        ['checkpoint-log.jsonl', 'jsonl'],
+        ['event-ingress.jsonl', 'jsonl'],
+        ['hill-climbing-report.json', 'json'],
+      ].map(([name]) => resolveStateSchema(path.join(projectRoot, '.w-model', name!), projectRoot, 'win32')),
+    ).toEqual([null, null, null]);
+  });
+
+  it('does not classify prefix-like or outside paths as project state targets', () => {
+    const prefixLike = path.join(projectRoot, '.w-model-backup', 'custom.json');
+    const outside = path.resolve('C:', 'workspace', 'other-project', '.w-model', 'custom.json');
+
+    expect(isProjectStateTarget(prefixLike, projectRoot)).toBe(false);
+    expect(isProjectStateTarget(outside, projectRoot)).toBe(false);
+    expect(resolveStateSchema(prefixLike, projectRoot)).toBeNull();
+    expect(resolveStateSchema(outside, projectRoot)).toBeNull();
+  });
+
   it('does not register a path outside the supplied project root', () => {
     expect(
       resolveStateSchema(path.resolve('C:', 'workspace', 'other-project', '.w-model', 'project.json'), projectRoot),
