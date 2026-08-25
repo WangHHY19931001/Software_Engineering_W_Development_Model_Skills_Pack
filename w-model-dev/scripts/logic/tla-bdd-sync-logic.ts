@@ -26,7 +26,7 @@
 import type { StructuredViolation } from '../lib/types.js';
 
 export interface TlaBddSyncViolation {
-  dimension: 'transition' | 'state' | 'invariant';
+  dimension: 'structure' | 'transition' | 'state' | 'invariant';
   tlaName: string;
   bddName: string | null;
   description: string;
@@ -43,6 +43,7 @@ export interface TlaBddSyncViolation {
  *   - INVARIANT：不变式归一化匹配（SSoT §3.4.14 第4点「不变式归一化匹配」）
  */
 const TLA_BDD_RULES = {
+  STRUCTURE: 'TLA_BDD_STRUCTURE',
   TRANSITION: 'TLA_BDD_TRANSITION',
   STATE: 'TLA_BDD_STATE',
   INVARIANT: 'TLA_BDD_INVARIANT',
@@ -59,6 +60,18 @@ export interface TlaBddSyncResult {
   bddStates: string[];
   tlaInvariants: string[];
   bddInvariants: string[];
+}
+
+function appendStructureViolation(
+  violations: TlaBddSyncViolation[],
+  structuredViolations: StructuredViolation[],
+  field: string,
+  description: string,
+  tlaName = '',
+  bddName: string | null = null,
+): void {
+  violations.push({ dimension: 'structure', tlaName, bddName, description });
+  structuredViolations.push({ rule: TLA_BDD_RULES.STRUCTURE, field, message: description });
 }
 
 /** TLA+ 关键字黑名单：抽取状态变量时排除（VARIABLES 声明中仅保留业务变量，不含语言关键字） */
@@ -273,6 +286,46 @@ export function checkTlaBddSync(tlaContent: string, featureContent: string): Tla
 
   const violations: TlaBddSyncViolation[] = [];
   const structuredViolations: StructuredViolation[] = [];
+
+  // 结构前置校验：同步 diff 不能把空白/畸形输入当成“集合一致”。
+  // TLA+ 的 VARIABLES/Init/Next/不变式和 BDD 的 Feature/状态/转移/不变式均为同步输入的最小结构。
+  if (typeof tlaContent !== 'string' || tlaContent.trim().length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'tlaContent', 'TLA+ 输入为空');
+  } else {
+    if (!/\bVARIABLES?\s+/m.test(tlaContent)) {
+      appendStructureViolation(violations, structuredViolations, 'tlaVariables', 'TLA+ 缺少 VARIABLES 声明');
+    }
+    if (!/^Init\s*==/m.test(tlaContent)) {
+      appendStructureViolation(violations, structuredViolations, 'tlaInit', 'TLA+ 缺少 Init 定义');
+    }
+    if (!/^Next\s*==/m.test(tlaContent)) {
+      appendStructureViolation(violations, structuredViolations, 'tlaNext', 'TLA+ 缺少 Next 定义');
+    }
+  }
+  if (tlaStates.length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'tlaStates', 'TLA+ 缺少可同步的状态变量');
+  }
+  if (tlaTransitions.length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'tlaTransitions', 'TLA+ 缺少可同步的 Next 转移');
+  }
+  if (tlaInvariants.length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'tlaInvariants', 'TLA+ 缺少可同步的不变式');
+  }
+
+  if (typeof featureContent !== 'string' || featureContent.trim().length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'featureContent', 'BDD feature 输入为空');
+  } else if (!/^\s*Feature\s*:/m.test(featureContent)) {
+    appendStructureViolation(violations, structuredViolations, 'feature', 'BDD feature 缺少 Feature 标题');
+  }
+  if (bdd.states.length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'bddStates', 'BDD feature 缺少可同步的 Given 状态');
+  }
+  if (bdd.transitions.length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'bddTransitions', 'BDD feature 缺少可同步的 When 转移');
+  }
+  if (bdd.invariants.length === 0) {
+    appendStructureViolation(violations, structuredViolations, 'bddInvariants', 'BDD feature 缺少可同步的 Then 不变式');
+  }
 
   // 转移比对（双向严格）：TLA+ Next 分支 ↔ BDD When 首 token 须一一对应
   // 任一方向缺失均违规（BDD feature 缺失 transition 时以 TLA+ 为基准判定；

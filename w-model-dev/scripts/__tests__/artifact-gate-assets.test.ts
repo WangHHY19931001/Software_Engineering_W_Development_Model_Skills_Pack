@@ -19,6 +19,7 @@ const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
 
 import {
+  buildTlaBddSyncPairs,
   discoverGraphAsset,
   readTlaManifest,
   readBddManifest,
@@ -268,6 +269,31 @@ describe('readCucumberReport', () => {
   });
 });
 
+describe('buildTlaBddSyncPairs', () => {
+  it('blocks an orphan TLA spec instead of checking only BDD-to-TLA mappings', () => {
+    const result = buildTlaBddSyncPairs({
+      tlaManifest: {
+        basePath: '.',
+        specs: [
+          { id: 'paired', tlaPath: 'paired.tla' },
+          { id: 'orphan', tlaPath: 'orphan.tla' },
+        ],
+      },
+      bddManifest: {
+        basePath: '.',
+        features: [{ id: 'feature-paired', tlaSpecId: 'paired', filePath: 'paired.feature' }],
+      },
+      manifestFile: path.join(tmpDir, '.w-model', 'tla-manifest.json'),
+      projectDir: tmpDir,
+    });
+
+    expect(result.syncPairs).toHaveLength(1);
+    expect(result.syncPairViolations).toContain(
+      '[artifact:tla-bdd-sync] TLA+ spec "orphan" has no matching BDD feature',
+    );
+  });
+});
+
 describe('runModelChecks', () => {
   it('invalid or graph-less project evidence does not silently invoke model checks', () => {
     expect(
@@ -441,5 +467,23 @@ describe('runModelChecks', () => {
     expect(v).toEqual(
       expect.arrayContaining([expect.stringContaining('[artifact:tla-bdd-sync] check-tla-bdd-sync 退出码 unknown')]),
     );
+  });
+
+  it('does not run optional sync when the project contract does not require it', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    const v = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: true,
+      bddManifestValid: true,
+      bddManifestFile: 'b.json',
+      syncRequired: false,
+      syncPairs: [{ tlaFile: 'spec.tla', featureFile: 'feature.feature' }],
+    });
+    expect(v).toHaveLength(0);
+    expect(spawnSyncMock).toHaveBeenCalledTimes(2);
   });
 });

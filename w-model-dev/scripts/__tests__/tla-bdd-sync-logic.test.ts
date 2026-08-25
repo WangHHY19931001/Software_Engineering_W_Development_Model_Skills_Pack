@@ -120,4 +120,17 @@ Background:
     expect(sm.transitions).toContain('ShutdownSystem');
     expect(sm.invariants).toContain('TypeOK');
   });
+
+  it.each([
+    ['both files empty', '', ''],
+    ['TLA empty', '', validFeature],
+    ['BDD empty', validTla, ''],
+    ['TLA has no invariant', validTla.replace('TypeInvariant == state \\in {"idle", "active"}', ''), validFeature],
+    ['BDD has no Feature structure', validTla, validFeature.replace('Feature: Test', '')],
+  ])('rejects %s as malformed synchronization input', (_label, tlaContent, featureContent) => {
+    const result = checkTlaBddSync(tlaContent, featureContent);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((violation) => violation.dimension === 'structure')).toBe(true);
+    expect(result.structuredViolations?.some((violation) => violation.rule === 'TLA_BDD_STRUCTURE')).toBe(true);
+  });
 });

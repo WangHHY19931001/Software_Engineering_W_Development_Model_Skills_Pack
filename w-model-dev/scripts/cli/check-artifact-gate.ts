@@ -42,11 +42,13 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  buildTlaBddSyncPairs,
   discoverGraphAsset,
   readBddManifest,
   readCucumberReport,
   readTlaManifest,
   runModelChecks,
+  TLA_BDD_SYNC_REQUIRED_PHASES,
   type TlaBddSyncPair,
 } from '../application/artifact-gate-assets.js';
 import { checkUatPathMappingContent, collectUatMappingViolations } from '../application/uat-path-mapping.js';
@@ -239,36 +241,22 @@ async function main(): Promise<void> {
 
   const syncPairs: TlaBddSyncPair[] = [];
   const syncPairViolations: string[] = [];
+  // SSoT contract: phases 1-4 always require D4 TLA equivalence through
+  // check-bdd-model; the standalone sync CLI is also enabled for those phases
+  // only after both manifests pass their own asset validation.
+  const syncRequired = TLA_BDD_SYNC_REQUIRED_PHASES.includes(effectivePhase) && tlaAsset.valid && bddManifestValid;
   if (tlaAsset.valid && bddManifestValid) {
-    const tlaManifest = tlaAsset.manifest as {
-      basePath?: string;
-      specs?: Array<{ id?: string; tlaPath?: string }>;
-    };
-    const bdd = bddManifest as {
-      basePath?: string;
-      features?: Array<{ id?: string; tlaSpecId?: string; filePath?: string }>;
-    };
-    const tlaBase = path.resolve(path.dirname(manifestFile), tlaManifest.basePath ?? '.');
-    const bddBase = path.resolve(projectDir, bdd.basePath ?? '.');
-    for (const feature of bdd.features ?? []) {
-      const spec = (tlaManifest.specs ?? []).find((candidate) => candidate.id === feature.tlaSpecId);
-      if (!spec) {
-        syncPairViolations.push(
-          `[artifact:tla-bdd-sync] BDD feature "${feature.id ?? feature.filePath ?? 'unknown'}" has no matching TLA+ spec`,
-        );
-        continue;
-      }
-      if (!spec.tlaPath || !feature.filePath) {
-        syncPairViolations.push(
-          `[artifact:tla-bdd-sync] BDD feature "${feature.id ?? feature.filePath ?? 'unknown'}" has incomplete TLA+/feature path mapping`,
-        );
-        continue;
-      }
-      syncPairs.push({
-        tlaFile: path.resolve(tlaBase, spec.tlaPath),
-        featureFile: path.resolve(bddBase, feature.filePath),
-      });
-    }
+    const pairResult = buildTlaBddSyncPairs({
+      tlaManifest: tlaAsset.manifest as { basePath?: string; specs?: Array<{ id?: string; tlaPath?: string }> },
+      bddManifest: bddManifest as {
+        basePath?: string;
+        features?: Array<{ id?: string; tlaSpecId?: string; filePath?: string }>;
+      },
+      manifestFile,
+      projectDir,
+    });
+    syncPairs.push(...pairResult.syncPairs);
+    syncPairViolations.push(...pairResult.syncPairViolations);
   }
 
   // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
@@ -293,7 +281,7 @@ async function main(): Promise<void> {
     bddManifestValid,
     bddManifestFile,
     cucumberReportFile,
-    syncRequired: effectivePhase <= 4,
+    syncRequired,
     syncPairs,
     syncPairViolations,
   });

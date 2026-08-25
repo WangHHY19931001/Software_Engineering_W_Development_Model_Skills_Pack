@@ -212,6 +212,12 @@ Invariant == state = "B" => done
   it.each([
     ['a fabricated status', { elements: [{ name: 'forged scenario', steps: [{ result: { status: 'fabricated' } }] }] }],
     ['a skipped status', { elements: [{ name: 'skipped scenario', steps: [{ result: { status: 'skipped' } }] }] }],
+    ['a pending status', { elements: [{ name: 'pending scenario', steps: [{ result: { status: 'pending' } }] }] }],
+    [
+      'an undefined status',
+      { elements: [{ name: 'undefined scenario', steps: [{ result: { status: 'undefined' } }] }] },
+    ],
+    ['a failed status', { elements: [{ name: 'failed scenario', steps: [{ result: { status: 'failed' } }] }] }],
     ['an anonymous element', { elements: [{ steps: [{ result: { status: 'passed' } }] }] }],
   ])('fails D5 with exit 1 for required cucumber evidence containing %s', async (_caseName, reportValue) => {
     const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));

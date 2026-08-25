@@ -37,6 +37,10 @@ const CHECK_TLA_BDD_SYNC_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../cli/check-tla-bdd-sync.ts',
 );
+const CHECK_ARTIFACT_GATE_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-artifact-gate.ts',
+);
 const ICEBERG_VALID_SAMPLE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../samples/iceberg/valid-full.json',
@@ -689,6 +693,91 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
       const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], {});
       expect(r.status).toBe(0);
       expect(r.stdout ?? '').toContain('TLA_BDD_SYNC_JSON ');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('真实 CLI 空输入 → exit 1 且 JSON 暴露 TLA_BDD_STRUCTURE violation', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-tla-bdd-empty-'));
+    try {
+      const tlaFile = path.join(tmpDir, 'empty.tla');
+      const featureFile = path.join(tmpDir, 'empty.feature');
+      await fs.writeFile(tlaFile, '', 'utf-8');
+      await fs.writeFile(featureFile, '', 'utf-8');
+      const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {});
+      expect(r.status).toBe(1);
+      expect(JSON.parse(r.stdout ?? '')).toMatchObject({
+        type: 'tla-bdd-sync',
+        exitCode: 1,
+        passed: false,
+        violations: expect.arrayContaining([{ rule: 'TLA_BDD_STRUCTURE', count: expect.any(Number) }]),
+      });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('真实 CLI mismatch → exit 1 且 JSON 暴露 TLA_BDD_TRANSITION violation', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-tla-bdd-mismatch-'));
+    try {
+      const tlaFile = path.join(tmpDir, 'model.tla');
+      const featureFile = path.join(tmpDir, 'model.feature');
+      await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
+      await fs.writeFile(
+        featureFile,
+        ['Feature: Test', 'Background:', '  Given initial state', '  When Login', '  Then TypeInvariant'].join('\n'),
+        'utf-8',
+      );
+      const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {});
+      expect(r.status).toBe(1);
+      expect(JSON.parse(r.stdout ?? '')).toMatchObject({
+        type: 'tla-bdd-sync',
+        exitCode: 1,
+        passed: false,
+        reasons: expect.arrayContaining([expect.stringContaining('Logout')]),
+        violations: expect.arrayContaining([{ rule: 'TLA_BDD_TRANSITION', count: expect.any(Number) }]),
+      });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
+  it('真实 phase 1 gate 在无 graph 时仍运行 TLA/BDD evidence checks，不把 graph 缺失当作跳过', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-phase1-'));
+    try {
+      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+      const rtm = await fs.readFile(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
+        'utf-8',
+      );
+      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+      await fs.writeFile(
+        path.join(tmpDir, '.w-model/bdd-manifest.json'),
+        JSON.stringify({
+          schemaVersion: '1.0',
+          projectId: 'phase1-evidence-test',
+          basePath: '.',
+          currentPhase: 1,
+          features: [],
+          stateMachines: [],
+        }),
+        'utf-8',
+      );
+
+      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
+      expect(r.status).toBe(1);
+      const report = JSON.parse(r.stdout ?? '') as { exitCode: number; passed: boolean; reasons: string[] };
+      expect(report).toMatchObject({ exitCode: 1, passed: false });
+      expect(report.reasons).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('[artifact:tla]'),
+          expect.stringContaining('[artifact:bdd-model]'),
+        ]),
+      );
+      expect(report.reasons).not.toContain('[artifact:graph] graph asset is required for project phase 2-4');
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

@@ -107,3 +107,93 @@
 ## 提交范围
 
 预期仅提交 B4 代码、测试、阶段门文档和本报告；不提交 `.superpowers/.../progress.md`，不提交 `.w-model` 运行时状态或 fallback 查询生成物。
+
+---
+
+# B4 修复轮 1 追加报告
+
+日期：2026-08-25
+基线提交：`47984cb`（`fix(gate): enforce project tla bdd evidence`）
+修复轮工作树：`D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.worktrees/w-model-reliability`
+
+## 审查发现闭环
+
+### C1：sync CLI 空/无法解析输入可能 exit 0
+
+根因是 `checkTlaBddSync` 直接对抽取结果做集合 diff；空 TLA 与空 feature 的抽取集合都为空时被误判为一致。修复为结构前置门：空输入、TLA 缺 `VARIABLES`/`Init`/`Next`/状态/转移/不变式、BDD 缺 `Feature`/状态/转移/不变式，均追加 `dimension=structure` 与结构化 `rule=TLA_BDD_STRUCTURE`，最终 `passed=false`/exit 1。合法样本的原有转移、状态和不变式比对保持通过。
+
+### I1：syncRequired 无条件 phase<=4
+
+核对结果：SSoT §3.4.3 规定 phase 1-4 的 TLA+ 与 BDD 行为门禁分级，`bdd-guide.md` §5.3 明确项目阶段门必须传 `--require-tla-equivalence --tla-manifest`；但 `tla-plus-guide.md` §15 将独立 `check-tla-bdd-sync` 描述为可选工具。故本轮不削弱 required D4：phase 1-4 始终调用 required BDD equivalence path；独立 sync 仅在 phase 属于显式常量 `TLA_BDD_SYNC_REQUIRED_PHASES = [1,2,3,4]` 且两份 manifest 均已通过 schema/结构校验时启用。资产缺失/非法时不会被“无配对”静默放行，TLA/BDD asset violations 与 required BDD model violation 仍阻断。
+
+测试覆盖 `runModelChecks(... syncRequired: false)` 的可选 sync 不调用路径，以及 phase 1 无 graph 的真实 artifact gate evidence 集成测试。
+
+### I2：只 BDD→TLA，遗漏 orphan TLA spec
+
+新增 `buildTlaBddSyncPairs`，先从每个 BDD feature 反查 `tlaSpecId`，再从 TLA specs 反向检查是否均被配对；TLA spec 无对应 BDD feature、BDD feature 无对应 TLA spec、路径映射不完整均生成 blocking `syncPairViolations`。新增单元测试覆盖 orphan TLA spec。
+
+### I3：只有 mock sync failure，缺真实 CLI mismatch/failure 集成测试
+
+新增 test-owned temporary fixture 的真实 `check-tla-bdd-sync.ts --json` mismatch 测试：退出码 1，JSON `exitCode=1`、`passed=false`，且含 `TLA_BDD_TRANSITION` violation。另加真实 CLI 空文件测试，确认不会 exit 0 且含 `TLA_BDD_STRUCTURE`。测试未运行 TLC/SANY。
+
+### I4：pending/undefined/failed Cucumber 状态
+
+保留上轮留下的 `bdd-cli.test.ts` 三个真实 required Cucumber CLI fixture；它们分别断言 pending、undefined、failed 状态均 exit 1 并产生 D5 violation。原有 skipped/unknown/匿名/合法 passed 断言也继续通过。
+
+### I5：phase 1 no-graph 只有 application mock
+
+新增真实 `check-artifact-gate.ts <temp-project> --phase=1 --json` 集成测试，使用 test-owned RTM 与 BDD manifest fixture，不创建 graph；断言 exit 1、报告包含 TLA asset 与 BDD model evidence violation，且不产生 phase 2-4 graph-required violation，证明 phase 1 的 TLA/BDD evidence path 未因无 graph 被整体跳过。
+
+## CodeGraph / fallback
+
+已按 brief 尝试 CodeGraph：工作树向上无 `.codegraph/` 索引，服务返回 unavailable。没有伪造 callers/callees/blast-radius 结果，也没有生成或提交伪造查询证据。采用 fallback：读取目标符号，扫描 `check-artifact-gate.ts → artifact-gate-assets.ts → runSync/check-*` 调用链、`bdd-manifest.schema.json`/`tla-manifest.schema.json`、相关 tests 和 SSoT/reference 文档；确认生产同步子进程仍统一走 `runSync` 的 timeout/killSignal/encoding/maxBuffer 边界。
+
+## 修复轮真实验证
+
+以下命令均在工作树根目录执行，未运行 TLC、SANY 或无界全量测试：
+
+1. 新增结构测试红灯：
+
+   ```text
+   npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/tla-bdd-sync-logic.test.ts w-model-dev/scripts/__tests__/bdd-cli.test.ts
+   ```
+
+   结果：`1 failed / 1 passed` test files，`5 failed / 34 passed` tests；失败集中于 5 个新增 malformed sync structure cases，原因符合预期（生产逻辑尚未产生 structure violation）。BDD pending/undefined/failed 三个测试已通过。
+
+2. 修复后 B4 定向 Vitest（含真实 CLI）：
+
+   ```text
+   npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts w-model-dev/scripts/__tests__/bdd-cli.test.ts w-model-dev/scripts/__tests__/gate-report.test.ts w-model-dev/scripts/__tests__/tla-bdd-sync-logic.test.ts
+   ```
+
+   结果：exit 0；`4 passed` test files，`109 passed` tests，0 failed。包含真实 sync mismatch、真实 sync empty input、真实 phase 1 no-graph artifact-gate，以及 pending/undefined/failed Cucumber cases。
+
+3. TypeScript：
+
+   ```text
+   npm run typecheck
+   ```
+
+   结果：exit 0；`tsc -p config/tsconfig.json` 无错误。中途一次修复前的类型检查曾发现 `TlaBddSyncPair` import 缺失，已补齐后重跑通过。
+
+4. 目标文件格式：
+
+   ```text
+   npx prettier --config config/prettier.config.cjs --check w-model-dev/scripts/logic/tla-bdd-sync-logic.ts w-model-dev/scripts/application/artifact-gate-assets.ts w-model-dev/scripts/cli/check-artifact-gate.ts w-model-dev/scripts/__tests__/tla-bdd-sync-logic.test.ts w-model-dev/scripts/__tests__/artifact-gate-assets.test.ts w-model-dev/scripts/__tests__/bdd-cli.test.ts w-model-dev/scripts/__tests__/gate-report.test.ts w-model-dev/references/command-reference.md
+   ```
+
+   结果：exit 0；`All matched files use Prettier code style!`。
+
+5. Diff 空白：
+
+   ```text
+   git diff --check
+   ```
+
+   结果：exit 0。仅有既存 `progress.md` 的 LF/CRLF warning；该文件未纳入提交。
+
+## Deferred concerns
+
+- 独立 TLA↔BDD sync 的 phase 常量现按当前项目阶段门契约固定为 phase 1-4；如未来 maturity/项目配置要允许按 L1/L2/L3 细分，须先更新 SSoT 与该常量/测试，不能通过删除 required D4 参数降级。
+- 本轮没有改变 `check-tla-model.ts` 的 Java/SANY/TLC 执行机制，也没有在测试中启动这些重量级工具。
+- Artifact Gate 与 `check-bdd-model.ts` 仍可能对同一非法资产分别报告相关 violation；这是 fail-closed 的双层证据边界，不改变 exit 1 语义。

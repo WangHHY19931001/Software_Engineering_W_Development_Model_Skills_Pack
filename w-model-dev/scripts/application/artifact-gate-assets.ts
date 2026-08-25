@@ -148,6 +148,70 @@ export interface TlaBddSyncPair {
 }
 
 /**
+ * 项目阶段 1-4 的 D4 契约要求 TLA↔BDD 等价性证据；独立 sync CLI 只在两类
+ * manifest 均已通过资产校验后执行，避免把非法输入降级为“无配对”。
+ */
+export const TLA_BDD_SYNC_REQUIRED_PHASES: readonly PhaseOption[] = [1, 2, 3, 4];
+
+export interface TlaBddSyncManifestInput {
+  tlaManifest: {
+    basePath?: string;
+    specs?: Array<{ id?: string; tlaPath?: string }>;
+  };
+  bddManifest: {
+    basePath?: string;
+    features?: Array<{ id?: string; tlaSpecId?: string; filePath?: string }>;
+  };
+  manifestFile: string;
+  projectDir: string;
+}
+
+export interface TlaBddSyncPairResult {
+  syncPairs: TlaBddSyncPair[];
+  syncPairViolations: string[];
+}
+
+/** 构造 TLA↔BDD 双向配对，并阻断 BDD/TLA 任一侧的孤儿资产。 */
+export function buildTlaBddSyncPairs(opts: TlaBddSyncManifestInput): TlaBddSyncPairResult {
+  const syncPairs: TlaBddSyncPair[] = [];
+  const syncPairViolations: string[] = [];
+  const tlaSpecs = opts.tlaManifest.specs ?? [];
+  const bddFeatures = opts.bddManifest.features ?? [];
+  const tlaBase = path.resolve(path.dirname(opts.manifestFile), opts.tlaManifest.basePath ?? '.');
+  const bddBase = path.resolve(opts.projectDir, opts.bddManifest.basePath ?? '.');
+  const pairedTlaSpecIds = new Set<string>();
+
+  for (const feature of bddFeatures) {
+    const spec = tlaSpecs.find((candidate) => candidate.id === feature.tlaSpecId);
+    if (!spec) {
+      syncPairViolations.push(
+        `[artifact:tla-bdd-sync] BDD feature "${feature.id ?? feature.filePath ?? 'unknown'}" has no matching TLA+ spec`,
+      );
+      continue;
+    }
+    if (spec.id) pairedTlaSpecIds.add(spec.id);
+    if (!spec.tlaPath || !feature.filePath) {
+      syncPairViolations.push(
+        `[artifact:tla-bdd-sync] BDD feature "${feature.id ?? feature.filePath ?? 'unknown'}" has incomplete TLA+/feature path mapping`,
+      );
+      continue;
+    }
+    syncPairs.push({
+      tlaFile: path.resolve(tlaBase, spec.tlaPath),
+      featureFile: path.resolve(bddBase, feature.filePath),
+    });
+  }
+
+  for (const spec of tlaSpecs) {
+    if (spec.id && !pairedTlaSpecIds.has(spec.id)) {
+      syncPairViolations.push(`[artifact:tla-bdd-sync] TLA+ spec "${spec.id}" has no matching BDD feature`);
+    }
+  }
+
+  return { syncPairs, syncPairViolations };
+}
+
+/**
  * BDD 资产读取（spec §13.2 #18）：bdd-manifest.json 存在性 + schema + features 文件存在性
  * + stateMachines 七要素非空（states/acceptingStates/transitions/invariants）。
  * 项目阶段 1-8 均要求 bdd-manifest.json 存在；pre-push fixture 不经过此项目资产读取层。
@@ -360,7 +424,7 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
     bddManifestValid = bddManifestExists,
     bddManifestFile,
     cucumberReportFile,
-    syncRequired = opts.syncPairs !== undefined,
+    syncRequired = false,
     syncPairs = [],
     syncPairViolations = [],
   } = opts;

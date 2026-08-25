@@ -341,7 +341,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--json]`
 - phase 1-4 对项目 TLA/BDD 资产做 fail-closed 检查：`tla-manifest.json` 必须通过真实 schema 校验且 `specs` 非空；`bdd-manifest.json` 必须存在并通过 schema。调用 `check-bdd-model.ts` 时固定传递 `--require-tla-equivalence --tla-manifest=<项目路径>`。phase 1 不要求 graph，phase 2-4 在 TLA/BDD 证据基础上要求 graph。
 - phase 5-8 固定传递 `--require-cucumber-report --cucumber-report=<路径>`；默认路径为 `<project-dir>/.w-model/bdd/reports/report.json`，也可用 `--cucumber-report=<path>` 覆盖。报告必须为合法 `{ elements: [...] }`，至少有命名 scenario 的 passed step，skipped/pending/undefined/unknown/failed 或畸形报告均阻断。
-- 当 phase 1-4 同时存在 TLA 与 BDD manifest 时，阶段门按 manifest 的 `tlaSpecId`/`tlaPath`/`filePath` 配对调用 `check-tla-bdd-sync.ts`；转移、状态或不变式不一致、配对缺失或子进程失败均为 blocking violation。
+- 当 phase 1-4 的 TLA 与 BDD manifest 均通过各自 schema/结构校验时，阶段门按 manifest 的 `tlaSpecId`/`tlaPath`/`filePath` 配对调用 `check-tla-bdd-sync.ts`；转移、状态或不变式不一致、BDD/TLA 任一方向孤儿配对或子进程失败均为 blocking violation。资产非法时不调用 sync 子进程，但 TLA/BDD required evidence 仍由上游资产门和 `check-bdd-model --require-tla-equivalence` 阻断；独立 sync CLI 本身默认不因 `syncPairs` 存在而隐式启用。
 - 该项目阶段门与本地 pre-push fixture 回归分层：pre-push 不调用本 CLI，不启用这些 required flags，也不运行项目 TLA/TLA↔BDD/Cucumber 证据。
 
 ## BDD 项目行为证据门
