@@ -30,6 +30,8 @@ export interface StateWriteOptions {
   afterRecoveryOwnershipMoved?: () => void | Promise<void>;
   afterReleaseOwnershipMoved?: () => void | Promise<void>;
   beforeRollback?: () => void | Promise<void>;
+  /** Injectable only for state-write tests; runs after a missing-target rollback moves the payload to its cleanup path. */
+  afterRollbackPayloadMoved?: (tmpPath: string) => void | Promise<void>;
   /** Project root used to resolve .w-model target schema registrations. Defaults to the target's .w-model parent. */
   projectRoot?: string;
   /** Allows an otherwise unregistered .w-model target, never bypassing registered schema validation. */
@@ -392,7 +394,40 @@ async function restoreIfStillOwned(
     // Restore an originally absent target by atomically moving the failed payload
     // aside before cleanup, never unlinking the target path directly.
     await renameWithRetry(absPath, rollbackTmp);
-    if (!(await ownsLock(ownerDir, token))) return false;
+    const preserveRollbackPayload = async (): Promise<void> => {
+      const preservedPath = `${absPath}.rollback-preserved-${process.pid}-${randomUUID()}`;
+      try {
+        await renameWithRetry(rollbackTmp!, preservedPath);
+      } finally {
+        // Once identity is uncertain, never let the outer cleanup unlink the path.
+        rollbackTmp = undefined;
+      }
+    };
+    try {
+      await opts.afterRollbackPayloadMoved?.(rollbackTmp);
+    } catch {
+      await preserveRollbackPayload();
+      return false;
+    }
+
+    let rollbackPayload: string;
+    try {
+      rollbackPayload = await fs.readFile(rollbackTmp, 'utf-8');
+    } catch {
+      await preserveRollbackPayload();
+      return false;
+    }
+    let targetStillAbsent = true;
+    try {
+      await fs.lstat(absPath);
+      targetStillAbsent = false;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') targetStillAbsent = false;
+    }
+    if (!(await ownsLock(ownerDir, token)) || rollbackPayload !== jsonText || !targetStillAbsent) {
+      await preserveRollbackPayload();
+      return false;
+    }
     await fs.rm(rollbackTmp, { force: true });
     rollbackTmp = undefined;
     return true;
@@ -461,18 +496,29 @@ export async function writeStateJson(
     await opts.beforeCommit?.();
     await renameWithRetry(tmpPath, absPath);
     tmpPath = undefined;
-    const readBack = await (opts.readbackImpl ?? ((file: string) => fs.readFile(file, 'utf-8')))(absPath);
-    if (readBack !== jsonText) {
-      const rolledBack = await restoreIfStillOwned(
-        absPath,
-        jsonText,
-        backupPath,
-        originalContent,
-        originalExisted,
-        acquired.ownerDir,
-        acquired.metadata.token,
-        opts,
-      );
+    let readbackFailed = false;
+    try {
+      const readBack = await (opts.readbackImpl ?? ((file: string) => fs.readFile(file, 'utf-8')))(absPath);
+      readbackFailed = readBack !== jsonText;
+    } catch {
+      readbackFailed = true;
+    }
+    if (readbackFailed) {
+      let rolledBack = false;
+      try {
+        rolledBack = await restoreIfStillOwned(
+          absPath,
+          jsonText,
+          backupPath,
+          originalContent,
+          originalExisted,
+          acquired.ownerDir,
+          acquired.metadata.token,
+          opts,
+        );
+      } catch {
+        rolledBack = false;
+      }
       return { ok: false, writtenPath: absPath, reason: 'WRITE_VERIFY_FAILED', rolledBack };
     }
     return { ok: true, writtenPath: absPath, backupPath, ...(validation?.untyped ? { untyped: true } : {}) };

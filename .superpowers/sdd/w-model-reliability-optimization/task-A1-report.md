@@ -45,3 +45,29 @@
 - Full-suite verification remains environment-blocked until the missing Windows platform dependencies are installed with the repository's explicit platform dependency workflow.
 - Rollback ownership checks are performed immediately before each atomic rename, as required by the existing lock protocol; an external filesystem actor that changes the owner or target in the narrow OS-level interval after the final check remains outside the process-level lock contract.
 - Unknown owner metadata is intentionally fail-closed by default and can require explicit operator recovery when a crashed writer left corrupt metadata.
+
+## A1 Review Follow-up
+
+### Findings Addressed
+
+- Readback content mismatch and readback exceptions now share one `WRITE_VERIFY_FAILED` path. The rollback attempt is guarded so a readback implementation or default `fs.readFile` error cannot escape the state-write result protocol; the result always contains `rolledBack: true|false`.
+- For an originally absent target, rollback now rechecks lock ownership, exact temporary payload content, and target absence before destructive cleanup. If any check fails, the temporary payload is atomically moved to a `.rollback-preserved-*` audit path instead of being deleted, preventing deletion of a possible successor payload.
+- Added a test-only `afterRollbackPayloadMoved` fault-injection hook to coordinate replacement of the rollback temporary payload without changing CLI behavior or the `WMWRITE_JSON` contract.
+
+### Follow-up Verification
+
+- Red phase:
+  - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/state-write-logic.test.ts w-model-dev/scripts/__tests__/wm-write.test.ts`
+  - 3 expected failures: readback exception normalization for existing/missing targets and preservation of a replaced missing-target payload.
+- Green phase:
+  - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/state-write-logic.test.ts w-model-dev/scripts/__tests__/wm-write.test.ts`
+  - Passed: 65/65 tests.
+- Required final focused verification:
+  - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/state-write-logic.test.ts w-model-dev/scripts/__tests__/wm-write.test.ts w-model-dev/scripts/__tests__/run-sync.test.ts`
+  - Passed: 78/78 tests.
+  - `npm run typecheck` passed with exit 0.
+  - `git diff --check` passed.
+
+### Follow-up Risk
+
+- A payload that fails identity checks is retained under `.rollback-preserved-*` for operator inspection rather than silently deleted. This intentionally favors preserving uncertain data; retention cleanup remains an operational responsibility.

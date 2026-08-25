@@ -479,6 +479,57 @@ describe('writeStateJson', () => {
     expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
     await fs.rm(`${p}.lock`, { recursive: true, force: true });
   });
+
+  it('normalizes a readback exception into WRITE_VERIFY_FAILED and rolls back an existing no-backup target', async () => {
+    const p = target('rollback-readback-error-existing.json');
+    await fs.writeFile(p, '{"v":"original"}', 'utf-8');
+    const result = await writeStateJson(p, '{"v":"new"}', {
+      backup: false,
+      readbackImpl: async () => {
+        throw new Error('readback failed');
+      },
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"original"}');
+  });
+
+  it('normalizes a readback exception and restores an originally absent target to absent', async () => {
+    const p = target('rollback-readback-error-missing.json');
+    const result = await writeStateJson(p, '{"v":"new"}', {
+      backup: false,
+      readbackImpl: async () => {
+        throw new Error('readback failed');
+      },
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: true });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+  });
+
+  it('preserves a replaced missing-target rollback payload instead of deleting it', async () => {
+    const p = target('rollback-preserve-successor-payload.json');
+    const successorPayload = '{"writer":"successor"}';
+    const result = await writeStateJson(p, '{"writer":"first"}', {
+      backup: false,
+      readbackImpl: async () => {
+        throw new Error('readback failed');
+      },
+      afterRollbackPayloadMoved: async (rollbackTmp) => {
+        await fs.writeFile(rollbackTmp, successorPayload, 'utf-8');
+      },
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED', rolledBack: false });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+    const preserved = (await fs.readdir(tmpDir)).filter((entry) =>
+      entry.startsWith('rollback-preserve-successor-payload.json.rollback-preserved-'),
+    );
+    expect(preserved).toHaveLength(1);
+    await expect(fs.readFile(path.join(tmpDir, preserved[0]!), 'utf-8')).resolves.toBe(successorPayload);
+    expect((await fs.readdir(tmpDir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+  });
 });
 
 describe('review round 1 ownership races', () => {
