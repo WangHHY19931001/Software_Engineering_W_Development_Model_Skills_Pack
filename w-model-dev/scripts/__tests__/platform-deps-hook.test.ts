@@ -106,7 +106,16 @@ afterEach(async () => {
 });
 
 async function simulatedPrePushAudit(
-  auditCase: 'network' | 'unsupported' | 'network-text' | 'vulnerability' | 'json' | 'permission',
+  auditCase:
+    | 'network'
+    | 'unsupported'
+    | 'network-text'
+    | 'networking'
+    | 'endpoint'
+    | 'mixed-error'
+    | 'vulnerability'
+    | 'json'
+    | 'permission',
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const binDir = await makeTempDir('pre-push-audit-bin-');
   const workspace = await makeTempDir('pre-push-audit-workspace-');
@@ -159,6 +168,12 @@ npm() {
         network) printf 'npm error code ENOTFOUND\\n'; return 255 ;;
         unsupported) printf 'npm error code ENOTSUP\\n'; return 1 ;;
         network-text) printf 'npm audit report mentions network but is not an npm network error\\n'; return 1 ;;
+        networking) printf 'npm error networking failure text\\n'; return 1 ;;
+        endpoint) printf 'npm error audit endpoint returned an error\\n'; return 1 ;;
+        mixed-error)
+          printf 'npm error code ENOTFOUND\\nnpm error code EACCES\\nnpm audit high vulnerability\\n'
+          return 255
+          ;;
         vulnerability) printf 'npm audit report: high vulnerability\\n'; return 1 ;;
         json) printf 'npm error Unexpected end of JSON input\\n'; return 1 ;;
         permission) printf 'npm error code EACCES\\n'; return 1 ;;
@@ -535,7 +550,7 @@ describe('pre-push audit skip boundary', () => {
     expect(result.stdout).toContain('跳过（不阻断）');
   });
 
-  it.each(['network-text', 'vulnerability', 'json', 'permission'] as const)(
+  it.each(['network-text', 'networking', 'endpoint', 'mixed-error', 'vulnerability', 'json', 'permission'] as const)(
     'blocks an audit %s failure',
     async (auditCase) => {
       const result = await simulatedPrePushAudit(auditCase);

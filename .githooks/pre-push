@@ -213,9 +213,18 @@ node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_proce
 # 13. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
 #     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号。
 #     任意漏洞报告、JSON 解析、权限/配置错误都 fail-closed，不因文本中出现 network 而放行。
-audit_can_skip() {
+audit_has_blocking_signal() {
   grep -qiE \
-    '(^|[[:space:]])npm (error|warn|err!) (code (ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT)|network|problem related to network connectivity|audit endpoint returned an error|NOT_IMPLEMENTED|registry .*does not support audit|does not support audit endpoint)' \
+    '(^|[[:space:]])(npm (error|warn|err!)[[:space:]]+)?(code[[:space:]]+(EACCES|EPERM|EJSONPARSE|ECONFIG)|.*(vulnerabilit(y|ies)|permission denied|JSON (parse|input|error)|config(uration)? (error|invalid|failed)))' \
+    "$tmp_log"
+}
+
+audit_can_skip() {
+  if audit_has_blocking_signal; then
+    return 1
+  fi
+  grep -qiE \
+    '^npm (error|warn|err!)[[:space:]]+(code[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT)|network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint)' \
     "$tmp_log"
 }
 log "npm audit 依赖漏洞扫描（high 以上阻断）..."
