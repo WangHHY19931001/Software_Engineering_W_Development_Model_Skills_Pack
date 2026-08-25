@@ -265,6 +265,7 @@ function manifestEntryCandidates(manifest: Record<string, unknown>): string[] {
  * 核心已校验 package/package.json 身份与 lockfile 一致；此处确认落盘身份字段完整、
  * 声明的主要制品（bin / 非 JS 入口候选）确实落盘、且至少存在一个非 package.json 的
  * 制品文件（证明 platform 二进制/资产被提取）。满足即视为通过，不硬失败。
+ * bin 声明额外校验可执行位（仅 POSIX 有意义；.githooks 运行在 Git Bash/WSL）。
  */
 async function verifyPackageArtifacts(
   packageRoot: string,
@@ -278,15 +279,17 @@ async function verifyPackageArtifacts(
     throw new Error('loadModule: 无 JS 入口的包缺少有效 version');
   }
 
-  const required: string[] = [...declaredArtifacts];
+  const binRelPaths: string[] = [];
   const bin = manifest.bin;
   if (typeof bin === 'string') {
-    required.push(bin);
+    if (bin !== '') binRelPaths.push(bin);
   } else if (typeof bin === 'object' && bin !== null) {
     for (const value of Object.values(bin as Record<string, unknown>)) {
-      if (typeof value === 'string') required.push(value);
+      if (typeof value === 'string' && value !== '') binRelPaths.push(value);
     }
   }
+
+  const required: string[] = [...declaredArtifacts, ...binRelPaths];
   for (const rel of required) {
     const target = path.resolve(packageRoot, rel);
     // 逃逸出包目录的声明不校验（不做硬失败），只校验包内落盘
@@ -295,9 +298,57 @@ async function verifyPackageArtifacts(
     }
   }
 
+  // bin 可执行位：POSIX 上有意义（提取时保留 tar 的 0755）；Windows chmod 语义不同，跳过
+  if (process.platform !== 'win32') {
+    for (const rel of binRelPaths) {
+      const target = path.resolve(packageRoot, rel);
+      if (!isWithin(packageRoot, target) || !(await isFile(target))) continue;
+      const stat = await fs.stat(target);
+      if ((stat.mode & 0o111) === 0) {
+        throw new Error(`loadModule: bin 制品缺少可执行位：${rel}`);
+      }
+    }
+  }
+
   if (!(await hasArtifactFile(packageRoot))) {
     throw new Error('loadModule: 纯二进制包未检出任何制品文件（缺少 platform 二进制/资产）');
   }
+}
+
+/**
+ * 把声明的入口候选归类为「可加载 JS」或「制品」，并加固：
+ * - 逃逸出包目录的候选一律忽略（不加载包外文件、不把包外路径计入制品）——保持
+ *   「隔离验证只加载本包」不变量，与制品分支的 isWithin 阻挡对称；
+ * - 无扩展名候选按 Node 解析语义做「补扩展名」isFile 探测（.js/.mjs/.cjs），命中即归为 JS；
+ * - 其余（.node、.exe 等）归为制品。
+ */
+async function classifyDeclaredEntries(
+  packageRoot: string,
+  declaredCandidates: readonly string[],
+): Promise<{ js: string[]; artifacts: string[] }> {
+  const js: string[] = [];
+  const artifacts: string[] = [];
+  for (const candidate of declaredCandidates) {
+    if (!isWithin(packageRoot, candidate)) continue;
+    if (LOADABLE_MODULE_EXTS.has(path.extname(candidate))) {
+      js.push(candidate);
+    } else if (path.extname(candidate) === '') {
+      // Node 解析语义：无扩展名入口做扩展名探测（extname('') === ''）
+      let resolvedJs: string | undefined;
+      for (const ext of ['.js', '.mjs', '.cjs'] as const) {
+        const probed = `${candidate}${ext}`;
+        if (await isFile(probed)) {
+          resolvedJs = probed;
+          break;
+        }
+      }
+      if (resolvedJs !== undefined) js.push(resolvedJs);
+      else artifacts.push(candidate);
+    } else {
+      artifacts.push(candidate);
+    }
+  }
+  return { js, artifacts };
 }
 
 /** 递归探测包目录是否有非 package.json 的普通文件 */
@@ -321,15 +372,16 @@ async function hasArtifactFile(packageRoot: string): Promise<boolean> {
 }
 
 /**
- * 弹性加载已提取包的入口模块（CLI 侧注入策略，A2b1 接管修复，不改 A2a 核心）。
+ * 弹性加载已提取包的入口模块（CLI 侧注入策略，不改 A2a 核心）。
  * 动态 import(<dir>/package) 的实际可运行等价：
- * 1. 包声明了可加载 JS 入口（main / module / exports["."] 解析到 .js/.mjs/.cjs 文件）
+ * 1. 包声明了可加载 JS 入口（main / module / exports["."]，含无扩展名补 .js/.mjs/.cjs 探测）
  *    → 动态 import 验证其可加载；声明了 JS 入口但文件缺失视为损坏包（硬失败）。
+ *    JS 入口候选一律先经 isWithin 守卫，逃逸包目录的声明被忽略（隔离验证只加载本包）。
  * 2. 无 JS 入口时回退 index.js/index.mjs/index.cjs fallback → 动态 import。
  * 3. 仍无 JS 入口（纯二进制 / .node binding，如 @esbuild/linux-x64、@rolldown/binding-*）
- *    → 降级为「制品校验」：身份字段 + 声明 bin/制品落盘 + 至少一个制品文件，视为通过，
- *    不因 MODULE_NOT_FOUND / ERR_UNKNOWN_FILE_EXTENSION 硬失败——否则安装器永远装不上
- *    它要修的目标包（前实现者疑虑 §7.1）。
+ *    → 降级为「制品校验」：身份字段 + 声明 bin/制品落盘 + 至少一个制品文件；bin 在
+ *    POSIX 上校验可执行位（提取保留 tar mode）。满足视为通过，不因 MODULE_NOT_FOUND /
+ *    ERR_UNKNOWN_FILE_EXTENSION 硬失败。
  */
 async function loadModule(packageRoot: string): Promise<unknown> {
   let manifest: Record<string, unknown>;
@@ -347,19 +399,16 @@ async function loadModule(packageRoot: string): Promise<unknown> {
   }
 
   const declaredCandidates = manifestEntryCandidates(manifest).map((candidate) => path.resolve(packageRoot, candidate));
-  const declaredJs = declaredCandidates.filter((candidate) => LOADABLE_MODULE_EXTS.has(path.extname(candidate)));
-  const declaredArtifacts = declaredCandidates.filter(
-    (candidate) => !LOADABLE_MODULE_EXTS.has(path.extname(candidate)),
-  );
+  const classified = await classifyDeclaredEntries(packageRoot, declaredCandidates);
 
-  for (const candidate of declaredJs) {
+  for (const candidate of classified.js) {
     if (await isFile(candidate)) {
       return import(pathToFileURL(candidate).href);
     }
   }
-  if (declaredJs.length > 0) {
+  if (classified.js.length > 0) {
     throw new Error(
-      `loadModule: 包声明了 JS 入口（${declaredJs.map((entry) => path.basename(entry)).join(', ')}）但文件缺失`,
+      `loadModule: 包声明了 JS 入口（${classified.js.map((entry) => path.basename(entry)).join(', ')}）但文件缺失`,
     );
   }
 
@@ -370,7 +419,7 @@ async function loadModule(packageRoot: string): Promise<unknown> {
     }
   }
 
-  await verifyPackageArtifacts(packageRoot, manifest, declaredArtifacts);
+  await verifyPackageArtifacts(packageRoot, manifest, classified.artifacts);
   return { __artifactVerified: true, packageName: manifest.name, version: manifest.version };
 }
 

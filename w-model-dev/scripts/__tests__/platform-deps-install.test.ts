@@ -1,6 +1,6 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- fixture 全部创建在测试自持的临时目录（mkdtemp）下 */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -48,10 +48,16 @@ interface TarFileEntry {
   /** 写进主 header 的短名（配合 pax/GNU 长名测试）；默认 = path */
   headerName?: string;
   typeflag?: string;
-  /** 经 pax 'x' 扩展头的真实路径 */
+  /** 真实路径经 pax 扩展头（typeflag 'x' 或传给 paxType，默认 'x'）写出 */
   paxPath?: string;
+  /** pax 扩展头 typeflag：'x'（默认）或 'g'（全局头） */
+  paxType?: 'x' | 'g';
+  /** 完整 pax 记录列表（多记录；有则覆盖 paxPath 的单记录构造） */
+  paxRecords?: ReadonlyArray<[string, string]>;
   /** 经 GNU long name 'L' 的真实路径 */
   gnuLongName?: boolean;
+  /** UStar mode（八进制字符串，默认 '644'） */
+  mode?: string;
 }
 
 type TarTestEntry =
@@ -68,10 +74,16 @@ function writeField(buffer: Buffer, offset: number, length: number, value: strin
   buffer.write(value, offset, 'ascii');
 }
 
-function tarHeader(options: { name: string; typeflag: string; size: number; linkname?: string }): Buffer {
+function tarHeader(options: {
+  name: string;
+  typeflag: string;
+  size: number;
+  linkname?: string;
+  mode?: string;
+}): Buffer {
   const block = Buffer.alloc(BLOCK);
   writeField(block, 0, 100, options.name);
-  writeField(block, 100, 8, '644');
+  writeField(block, 100, 8, options.mode ?? '644');
   writeField(block, 108, 8, '0');
   writeField(block, 116, 8, '0');
   writeField(block, 124, 12, options.size.toString(8));
@@ -105,15 +117,25 @@ function paxRecord(key: string, value: string): string {
   }
 }
 
+/** 把多条 pax 记录拼进同一个 pax 扩展头 blob */
+function paxRecordsBlob(records: ReadonlyArray<[string, string]>): Buffer {
+  return Buffer.from(records.map(([key, value]) => paxRecord(key, value)).join(''));
+}
+
 function makeTar(entries: readonly TarTestEntry[]): Buffer {
   const blocks: Buffer[] = [];
   for (const entry of entries) {
     if (entry.kind === 'file') {
       const content = Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content);
-      if (entry.paxPath !== undefined) {
-        const pax = Buffer.from(paxRecord('path', entry.paxPath));
-        blocks.push(tarHeader({ name: 'PaxHeaders/0', typeflag: 'x', size: pax.length }));
-        blocks.push(padded(pax));
+      if (entry.paxRecords !== undefined || entry.paxPath !== undefined) {
+        const pax =
+          entry.paxRecords !== undefined
+            ? paxRecordsBlob(entry.paxRecords)
+            : paxRecord('path', entry.paxPath as string);
+        const paxType = entry.paxType ?? 'x';
+        const paxName = paxType === 'g' ? 'GlobalHead.0.0' : 'PaxHeaders/0';
+        blocks.push(tarHeader({ name: paxName, typeflag: paxType, size: pax.length }));
+        blocks.push(padded(Buffer.from(pax)));
       }
       if (entry.gnuLongName === true) {
         const longName = Buffer.from(`${entry.path}\0`);
@@ -125,6 +147,7 @@ function makeTar(entries: readonly TarTestEntry[]): Buffer {
           name: entry.headerName ?? entry.path,
           typeflag: entry.typeflag ?? '0',
           size: content.length,
+          mode: entry.mode,
         }),
       );
       blocks.push(padded(content));
@@ -283,20 +306,71 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     expect(Buffer.from(longFile?.content as Buffer).toString()).toBe('pax');
   });
 
-  it("pax 'g' 全局扩展头 `path` 作用于其后条目", async () => {
-    const paxPath = 'package/glob/from-g.txt';
+  it("pax 'g' 全局扩展头（真实 typeflag 'g'）多记录作用于其后条目", async () => {
+    const globPath = 'package/glob/from-g.txt';
     const archive = makeTar([
       { kind: 'directory', path: 'package/' },
       {
         kind: 'file',
-        path: paxPath,
+        path: globPath,
         headerName: 'package/z',
-        paxPath,
-        content: 'g',
+        paxType: 'g',
+        paxRecords: [
+          ['comment', 'global-header'],
+          ['path', globPath],
+        ],
+        content: 'g-data',
       },
     ]);
     const entries = await readArchiveEntries(archive);
-    expect(entries.find((e) => e.path === paxPath)).toBeDefined();
+    const found = entries.find((e) => e.path === globPath);
+    expect(found).toBeDefined();
+    expect(Buffer.from(found?.content as Buffer).toString()).toBe('g-data');
+  });
+
+  it('同一 pax header 多条记录：path（位于第二条）按 record 内相对偏移解析生效', async () => {
+    // 复现 parsePaxRecords 用绝对 space 切相对 record 的 bug：第一条后的记录被静默丢弃
+    const pathInPax = 'package/second-record.txt';
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      {
+        kind: 'file',
+        path: pathInPax,
+        headerName: 'package/x',
+        paxRecords: [
+          ['comment', 'first'],
+          ['path', pathInPax],
+        ],
+        content: 'multi',
+      },
+    ]);
+    const entries = await readArchiveEntries(archive);
+    const found = entries.find((e) => e.path === pathInPax);
+    expect(found).toBeDefined();
+    expect(Buffer.from(found?.content as Buffer).toString()).toBe('multi');
+  });
+
+  it('解析 UStar mode（八进制）并在提取时保留可执行位', async () => {
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/package.json', content: '{"name":"x","version":"1.0.0"}' },
+      { kind: 'file', path: 'package/bin/tool.bin', content: 'BIN', mode: '755' },
+    ]);
+    const entries = await readArchiveEntries(archive);
+    const tool = entries.find((e) => e.path === 'package/bin/tool.bin');
+    // 跨平台：断言解析出的八进制 mode 值正确
+    expect(tool?.mode).toBe(0o755);
+    expect(tool?.type).toBe('file');
+
+    const dir = await makeTempDir('platform-deps-mode-');
+    await extractArchive(archive, dir);
+    const written = path.join(dir, 'package/bin/tool.bin');
+    expect(await fs.readFile(written, 'utf8')).toBe('BIN');
+    const stat = await fs.stat(written);
+    // 只在支持 chmod 语义的平台（POSIX）断言实际 mode；Windows 上跳过
+    if (process.platform !== 'win32') {
+      expect(stat.mode & 0o777).toBe(0o755);
+    }
   });
 
   it('解析 symlink 与 hardlink（类型 + linkname）', async () => {
@@ -560,6 +634,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
           kind: 'file' as const,
           path: 'package/bin/esbuild',
           content: Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]),
+          mode: '755',
         },
       ],
     });
@@ -604,6 +679,61 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     await expect(
       fs.access(path.join(fixture.repoDir, 'node_modules', rolldownName, nodeMain)),
     ).resolves.toBeUndefined();
+    await assertNoStagingLeftover(fixture.repoDir);
+  });
+
+  it('退出码 0：main 逃逸包目录的声明被忽略，不加载包外文件', async () => {
+    // 复现 loadModule 无 isWithin 守卫的 bug：main='../../x.js' 指向包外
+    // → 旧代码会 isFile 为真并 import() 包外文件（隔离验证被打破）；新代码忽略该声明。
+    const evilName = `escape-evil-${randomUUID()}.js`;
+    const evilPath = path.join(os.tmpdir(), evilName);
+    const fixture = await makeFixture({
+      entries: [
+        { kind: 'directory', path: 'package/' },
+        {
+          kind: 'file' as const,
+          path: 'package/package.json',
+          content: JSON.stringify({ name: 'x', version: '1.0.0', main: `../../${evilName}` }),
+        },
+        { kind: 'file' as const, path: 'package/data.txt', content: 'artifact' },
+      ],
+      packageName: 'x',
+      packageVersion: '1.0.0',
+    });
+    await fs.writeFile(evilPath, 'throw new Error("ESCAPED_LOAD");\n', 'utf8');
+    try {
+      const result = await runInstall(fixture);
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(result.stderr).not.toContain('ESCAPED_LOAD');
+      await expect(installedTargetExists(fixture)).resolves.toBe(true);
+      await assertNoStagingLeftover(fixture.repoDir);
+    } finally {
+      await fs.rm(evilPath, { force: true });
+    }
+  });
+
+  it('退出码 0：main 无扩展名按 Node 解析补 .js 命中，不再是制品硬拒', async () => {
+    // 复现 path.extname 误判的 bug：main:'./lib/entry'（缺扩展名）被归入制品，
+    // verifyPackageArtifacts 要求字面 ./lib/entry 存在 → 硬失败（exit 1）。
+    const fixture = await makeFixture({
+      entries: [
+        { kind: 'directory', path: 'package/' },
+        {
+          kind: 'file' as const,
+          path: 'package/package.json',
+          content: '{"name":"x","version":"1.0.0","main":"./lib/entry"}',
+        },
+        { kind: 'file' as const, path: 'package/lib/entry.js', content: 'module.exports = { entry: true };\n' },
+      ],
+      packageName: 'x',
+      packageVersion: '1.0.0',
+    });
+    const result = await runInstall(fixture);
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+    await expect(installedTargetExists(fixture)).resolves.toBe(true);
+    expect(await fs.readFile(path.join(fixture.repoDir, 'node_modules', 'x', 'lib', 'entry.js'), 'utf8')).toContain(
+      'entry',
+    );
     await assertNoStagingLeftover(fixture.repoDir);
   });
 

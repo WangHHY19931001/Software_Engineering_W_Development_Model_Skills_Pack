@@ -21,6 +21,9 @@ import { gunzipSync } from 'node:zlib';
 
 import type { ArchiveEntry } from './platform-deps-installer.js';
 
+/** 解析出的归档条目：ArchiveEntry + UStar mode（八进制，file/directory 条目携带） */
+export type TarArchiveEntry = ArchiveEntry & { mode?: number };
+
 const BLOCK_SIZE = 512;
 
 /** 读取 UStar 数值字段：octal（NUL/空格结尾）或 GNU base-256（首字节高位置位） */
@@ -51,6 +54,11 @@ function readStrField(buffer: Buffer, offset: number, length: number): string {
   return raw.replace(/ +$/, '');
 }
 
+/** 读取 UStar mode 字段（offset 100，八进制，如 '0000755'） */
+function readModeField(header: Buffer): number {
+  return readSizeField(header, 100, 8);
+}
+
 /** 组合 UStar prefix(155) + name(100) 为完整 tar 路径 */
 function decodeName(header: Buffer): string {
   const name = readStrField(header, 0, 100);
@@ -73,10 +81,12 @@ function parsePaxRecords(blob: string): Record<string, string> {
     const length = Number.parseInt(blob.slice(cursor, space), 10);
     if (!Number.isFinite(length) || length <= 0 || cursor + length > blob.length) break;
     const record = blob.slice(cursor, cursor + length);
+    // 注意：space 是相对整个 blob 的绝对偏移；切片必须换算成相对 record（从 cursor 起始）的偏移
+    const keyOffset = space - cursor;
     cursor += length;
     const equal = record.indexOf('=');
     if (equal < 0) continue;
-    const key = record.slice(space + 1, equal);
+    const key = record.slice(keyOffset + 1, equal);
     const value = record.slice(equal + 1).replace(/\n$/, '');
     if (key !== '') records[key] = value;
   }
@@ -88,8 +98,8 @@ function parsePaxRecords(blob: string): Record<string, string> {
  *   常规文件/目录、symlink/hardlink、pax 'x'/'g'、GNU long name/long link。
  * 长名解析后仍是原路径——解析结果忠实交给核心校验，不在此处引入穿越。
  */
-function parseArchive(archive: Buffer): ArchiveEntry[] {
-  const entries: ArchiveEntry[] = [];
+function parseArchive(archive: Buffer): TarArchiveEntry[] {
+  const entries: TarArchiveEntry[] = [];
   let offset = 0;
   let gnuLongName: string | undefined;
   let gnuLongLink: string | undefined;
@@ -130,6 +140,8 @@ function parseArchive(archive: Buffer): ArchiveEntry[] {
     const entryPath = (
       paxPending && paxRecords.path !== undefined ? paxRecords.path : (gnuLongName ?? headerName)
     ).replace(/\/+$/, '');
+    // UStar mode（八进制）——提取时用于保留可执行位（真实 platform 包 bin 为 0755）
+    const mode = readModeField(header);
     let linkname: string | undefined;
     if (paxPending && paxRecords.linkpath !== undefined) {
       linkname = paxRecords.linkpath;
@@ -144,10 +156,10 @@ function parseArchive(archive: Buffer): ArchiveEntry[] {
       case '0':
       case '\0':
       case '7':
-        entries.push({ path: entryPath, type: 'file', content: Buffer.from(data) });
+        entries.push({ path: entryPath, type: 'file', content: Buffer.from(data), mode });
         break;
       case '5':
-        entries.push({ path: entryPath, type: 'directory' });
+        entries.push({ path: entryPath, type: 'directory', mode });
         break;
       case '1':
         entries.push({ path: entryPath, type: 'hardlink', linkname });
@@ -157,7 +169,7 @@ function parseArchive(archive: Buffer): ArchiveEntry[] {
         break;
       default:
         // 未知类型按普通文件保留数据（npm tarball 不含设备/管道节点）
-        entries.push({ path: entryPath, type: 'file', content: Buffer.from(data) });
+        entries.push({ path: entryPath, type: 'file', content: Buffer.from(data), mode });
         break;
     }
 
@@ -170,14 +182,15 @@ function parseArchive(archive: Buffer): ArchiveEntry[] {
   return entries;
 }
 
-/** 解压并解析归档条目（供 verifyPlatformDependency 注入） */
-export async function readArchiveEntries(archive: Buffer): Promise<readonly ArchiveEntry[]> {
+/** 解压并解析归档条目（供 verifyPlatformDependency 注入）；条目含 UStar mode */
+export async function readArchiveEntries(archive: Buffer): Promise<readonly TarArchiveEntry[]> {
   return parseArchive(gunzipSync(archive));
 }
 
 /**
  * 把已由核心校验过安全（无绝对路径 / '..' / 空段 / NUL，无符号/硬链接）的条目按
- * package/... 写盘。链接条目兜底拒绝，不写符号/硬链接。
+ * package/... 写盘。链接条目兜底拒绝，不写符号/硬链接。文件按 tar 记录的 mode
+ * 创建（保留可执行位；无 mode 则用默认）。
  */
 export async function extractArchive(archive: Buffer, directory: string): Promise<void> {
   const entries = parseArchive(gunzipSync(archive));
@@ -191,6 +204,11 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
       continue;
     }
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, entry.content ?? Buffer.alloc(0));
+    const content = entry.content ?? Buffer.alloc(0);
+    if (entry.mode !== undefined) {
+      await fs.writeFile(target, content, { mode: entry.mode });
+    } else {
+      await fs.writeFile(target, content);
+    }
   }
 }
