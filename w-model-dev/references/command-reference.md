@@ -25,17 +25,19 @@
 
 ### D2 自然退出契约边界
 
-D2 的可执行范围分三层：`logic/` 与 `lib/` 不直接调用 `process.exit()`；调用 `gate-report` 的 `check-*.ts` 只输出报告，由调用方设置 `process.exitCode` 后 `return`，保留 exit `0/1/2` 与 stdout/`ERROR_JSON` 协议。以下是明确登记的 process-level runner 例外，不属于 gate-report caller 的自然退出迁移范围：
+D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直接调用 `process.exit()`；调用 `gate-report` 的 `check-*.ts` 以及 metrics/security/status/ensure/self-test 等 runner 只输出报告或诊断，由调用方设置 `process.exitCode` 后自然返回，保留 exit `0/1/2` 与 stdout/`ERROR_JSON` 协议。参数/输入错误仍通过 `exitWithError(...)` 设置 exit `2` 并输出结构化 `ERROR_JSON`，不通过直接退出截断输出。
 
-| 脚本                       | 保留直接退出的理由                                                 |
-| -------------------------- | ------------------------------------------------------------------ |
-| `ensure-codegraph-opsx.ts` | 依赖检测可能执行外部 CLI，保留 process-level runner 的直接退出语义 |
-| `metrics-report.ts`        | 只读报告 runner，保留既有成功退出语义                              |
-| `security-scan.ts`         | 安全扫描 runner，保留扫描结果的既有退出语义                        |
-| `self-test.ts`             | 回归基线 runner，保留最终汇总退出语义                              |
-| `wm-status.ts`             | 只读状态 runner，保留既有成功退出语义                              |
+以下生产 CLI 均受自然退出契约约束：
 
-这些例外仍须保持既有 shell exit `0/1/2`（适用时）和输出协议；不得将 process-level runner 例外解读为 `logic/` 或 gate-report caller 可以直接退出。新增 gate-report caller 或新增 direct exit 时，须更新本表和契约测试。
+| 脚本                       | 退出实现                                                  |
+| -------------------------- | --------------------------------------------------------- |
+| `ensure-codegraph-opsx.ts` | 外部依赖检测结束后设置 `process.exitCode`，自然返回       |
+| `metrics-report.ts`        | 报告输出完成后设置 `process.exitCode=0`，自然返回         |
+| `security-scan.ts`         | 扫描/重生成结果设置 `process.exitCode`，自然返回          |
+| `self-test.ts`             | 汇总或未预期异常设置 `process.exitCode`，自然返回         |
+| `wm-status.ts`             | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回 |
+
+所有生产 CLI 仍须保持既有 shell exit `0/1/2`（适用时）和输出协议；测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
 
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
 

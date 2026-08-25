@@ -234,7 +234,7 @@ async function main(): Promise<void> {
   if (!json && !out) {
     printHuman(report, runLogFile);
   }
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 runMain(main);

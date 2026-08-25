@@ -55,7 +55,8 @@ async function main(): Promise<void> {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
       console.error(`✗ 项目未初始化：未找到 ${projectFile}`);
-      process.exit(0);
+      process.exitCode = 0;
+      return;
     }
     throw err;
   }
@@ -121,7 +122,8 @@ async function main(): Promise<void> {
 
   if (json) {
     console.log(JSON.stringify(report));
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   }
 
   // 人类可读
@@ -167,7 +169,7 @@ async function main(): Promise<void> {
   }
   console.log('─'.repeat(60));
   console.log('STATUS_JSON ' + JSON.stringify(report));
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 runMain(main);

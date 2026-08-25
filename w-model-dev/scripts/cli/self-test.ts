@@ -3597,10 +3597,10 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
   console.log(`总计 ${all.length} 条用例：${passedCount} 通过，${failedCount} 失败`);
 
-  process.exit(failedCount === 0 ? 0 : 1);
+  process.exitCode = failedCount === 0 ? 0 : 1;
 }
 
 main().catch((err) => {
   console.error('Self-Test 异常:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });

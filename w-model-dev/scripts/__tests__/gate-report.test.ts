@@ -932,12 +932,12 @@ describe('D8 I2 natural-exit contract', () => {
   const libRoot = path.join(scriptsRoot, 'lib');
   const logicRoot = path.join(scriptsRoot, 'logic');
   const contractDoc = path.resolve(scriptsRoot, '../../w-model-dev/references/command-reference.md');
-  const processLevelExitInventory: Record<string, string> = {
-    'ensure-codegraph-opsx.ts': '依赖检测可能执行外部 CLI，保留 process-level runner 的直接退出语义',
-    'metrics-report.ts': '只读报告 runner，保留既有成功退出语义',
-    'security-scan.ts': '安全扫描 runner，保留扫描结果的既有退出语义',
-    'self-test.ts': '回归基线 runner，保留最终汇总退出语义',
-    'wm-status.ts': '只读状态 runner，保留既有成功退出语义',
+  const naturalExitTargets: Record<string, string> = {
+    'ensure-codegraph-opsx.ts': '外部依赖检测结束后设置 `process.exitCode`，自然返回',
+    'metrics-report.ts': '报告输出完成后设置 `process.exitCode=0`，自然返回',
+    'security-scan.ts': '扫描/重生成结果设置 `process.exitCode`，自然返回',
+    'self-test.ts': '汇总或未预期异常设置 `process.exitCode`，自然返回',
+    'wm-status.ts': '状态输出或未初始化提示设置 `process.exitCode=0`，自然返回',
   };
 
   function sourceFiles(root: string): string[] {
@@ -972,12 +972,12 @@ describe('D8 I2 natural-exit contract', () => {
     expect(violations).toEqual([]);
   });
 
-  it('documents every retained process-level direct exit with its reason', () => {
+  it('documents every migrated runner with its natural-exit contract', () => {
     const doc = fsSync.readFileSync(contractDoc, 'utf8');
     expect(doc).toContain('D2 自然退出契约边界');
-    for (const [script, reason] of Object.entries(processLevelExitInventory)) {
+    for (const [script, contract] of Object.entries(naturalExitTargets)) {
       expect(doc).toContain(script);
-      expect(doc).toContain(reason);
+      expect(doc).toContain(contract);
     }
   });
 });

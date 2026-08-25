@@ -394,7 +394,7 @@ async function main(): Promise<void> {
       }),
   );
 
-  process.exit(exitCode);
+  process.exitCode = exitCode;
 }
 
 const entryArg = process.argv[1];

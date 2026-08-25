@@ -207,7 +207,8 @@ export async function main(): Promise<void> {
     console.log(`version  : 2（内容敏感指纹：file + ruleId + 违规行内容）`);
     console.log(`条目数   : ${entries.length}`);
     console.log(`已写入   : ${BASELINE_PATH}`);
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   }
 
   // baseline 读取 + 解析合一（ENOENT → FILE_NOT_FOUND / SyntaxError → FILE_PARSE / 其他 → FILE_READ）
@@ -269,10 +270,11 @@ export async function main(): Promise<void> {
     console.log('\n修复方案：');
     console.log('  1. 修复代码消除风险');
     console.log('  2. 或运行 --regenerate 全量重生成 baseline 豁免');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   console.log('\n✓ 无新增安全风险');
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 // Windows 兼容的 main 模块判断：
