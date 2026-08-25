@@ -60,6 +60,24 @@ Parent baseline:
 2. C2 提交不得包含 `.superpowers/.../progress.md` 或 `.w-model/`。
 3. 受控验收记录位于 `docs/changes/2026-08-25-c2-documentation-acceptance.md`；上述 implementation reviewed HEAD 是此前已验证的实现提交，不随本次记录更新提交改变。
 
+## 修复轮 2：完整记录提交身份
+
+### 审查发现
+
+修复轮 1 已区分 implementation reviewed HEAD `feee9f01ed0ae7ddc46ecb00e5c7a4ceb23e6a6f` 与 parent baseline `f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`，但 `record update commit` 仍只有提交信息，缺少可核验的完整 SHA。
+
+### 修复内容
+
+- 明确记录：record update commit: bca0eb41433daf88691d10143cd0e5a5d488ec14 (docs(validation): pin reviewed head identity)。
+- 在验收记录顶部与 provenance/身份链段落同步同一完整 SHA。
+- 将报告中的“三类身份”自检描述收紧为明确包含该完整 SHA。
+- 本轮仅修改验收记录与本报告，未修改 `progress.md`、`.w-model/` 或生产代码。
+
+### 真实 diff-check 与内容自检
+
+- 内容自检：通过，6/6 项通过；验收记录包含完整的 record update commit: bca0eb41433daf88691d10143cd0e5a5d488ec14 (docs(validation): pin reviewed head identity)，顶部与 provenance/身份链均保留该 SHA，报告含修复轮 2 记录，且无延后确认 SHA 占位表述。
+- `git diff --check -- docs/changes/2026-08-25-c2-documentation-acceptance.md .superpowers/sdd/w-model-reliability-optimization/task-C2-report.md`：通过，退出码 0；仅输出工作树 LF→CRLF 转换 warning，无 whitespace error。
+
 ## 修复轮 1：受控验收身份链修复
 
 ### 审查发现
@@ -76,5 +94,5 @@ Parent baseline:
 ### 真实 diff-check 与内容自检
 
 - `git diff --check`：通过；仅保留预存在的 `progress.md` 行尾转换提示。
-- 内容自检：通过；验收记录包含且仅包含明确的 implementation reviewed HEAD、parent baseline、record update commit 三类身份说明；报告和验收记录均不含延后确认提交身份的占位表述。
+- 内容自检：通过；验收记录包含且仅包含明确的 implementation reviewed HEAD、parent baseline、record update commit 三类身份说明，其中 record update commit 已固定为完整 SHA `bca0eb41433daf88691d10143cd0e5a5d488ec14`；报告和验收记录均不含延后确认提交身份的占位表述。
 - 范围自检：通过；本次记录更新 diff 仅包含 `docs/changes/2026-08-25-c2-documentation-acceptance.md` 与 `.superpowers/sdd/w-model-reliability-optimization/task-C2-report.md`，预存在的 `progress.md` 未纳入。

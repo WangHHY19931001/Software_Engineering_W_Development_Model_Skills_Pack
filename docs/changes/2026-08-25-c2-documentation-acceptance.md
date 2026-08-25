@@ -3,7 +3,7 @@
 > **Implementation reviewed HEAD:** `feee9f01ed0ae7ddc46ecb00e5c7a4ceb23e6a6f`
 > 本记录中的全部 C2 测试与门禁证据，均针对上述 implementation reviewed HEAD。
 > **Parent baseline:** `f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`（`test(verifier): isolate original failure regression`）。
-> **record update commit:** 本次提交仅修复验收记录与报告中的身份链，提交信息为 `docs(validation): pin reviewed head identity`；该提交不属于上述 implementation reviewed HEAD，也不改写此前验证范围。
+> record update commit: bca0eb41433daf88691d10143cd0e5a5d488ec14 (docs(validation): pin reviewed head identity)；该提交仅修复验收记录与报告中的身份链，不属于上述 implementation reviewed HEAD，也不改写此前验证范围。
 > 本记录只收录本任务实际执行的命令和结果；未执行的全量门禁、pre-push 与证据导出不作通过声明。
 
 ## 变更范围
@@ -35,7 +35,7 @@
 
 - Implementation reviewed HEAD: `feee9f01ed0ae7ddc46ecb00e5c7a4ceb23e6a6f`；上述全部 C2 测试与门禁证据均针对该提交。
 - Parent baseline: `f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`。
-- record update commit：本次身份修复提交在记录中单独标记，不冒充已验证的 implementation reviewed HEAD。
+- record update commit: bca0eb41433daf88691d10143cd0e5a5d488ec14 (docs(validation): pin reviewed head identity)；本次身份修复提交在记录中单独标记，不冒充已验证的 implementation reviewed HEAD。
 - package-only provenance：未生成、未验证。
 - source-bound provenance：未生成、未验证；没有 `--source-project` 级别证据。
 - `.w-model/`、`.zcode/`、`coverage/` 及历史归档未作为本次当前 HEAD 验收证据；fallback 影响分析记录位于被忽略的 `.w-model/codegraph-queries/2026-08-25-C2-docs.md`，未提交运行期生成物。
@@ -45,3 +45,16 @@
 1. `check-docs-consistency` 当前动态门禁仍受基线漂移阻断：活体文档保留 `55 files / 1002 tests`，工作树真实测试库存为 57 个文件、约 1203 条；本 C2 不做跨文档计数刷新，避免把既有失败与入口收尾混在一起。
 2. `dispatch-matrix.md` / `SKILL.md` 对 `check-tla-bdd-sync`、`platform-deps-install.ts` 的登记与计数，以及 `platform-deps-install.ts` 的结构化 `rule` probe 仍需独立修复；该修复会触及更广的门禁事实源，未在 C2 越界实施。
 3. pre-push、全量自检、安全扫描、Persona CLI 和 provenance producer/verify 均没有本次执行证据。
+
+## 修复轮 2：完整记录提交身份
+
+### 审查发现
+
+修复轮 1 已区分 implementation reviewed HEAD `feee9f01ed0ae7ddc46ecb00e5c7a4ceb23e6a6f` 与 parent baseline `f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`，但 `record update commit` 仍只有提交信息，缺少可核验的完整 SHA。
+
+### 修复内容
+
+- 明确记录：`record update commit: bca0eb41433daf88691d10143cd0e5a5d488ec14 (docs(validation): pin reviewed head identity)`。
+- 在 provenance/身份链段落同步同一完整 SHA，保持三类身份的边界与验证范围不变。
+- 将报告中的“三类身份”自检描述收紧为明确包含该完整 SHA。
+- 本轮仅修改本验收记录与 `task-C2-report.md`，未修改 `progress.md`、`.w-model/` 或生产代码。
