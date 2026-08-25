@@ -1,6 +1,9 @@
 # C2 文档入口与 SSoT 收尾验收记录
 
-> Reviewed baseline HEAD：`f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`（`test(verifier): isolate original failure regression`）。
+> **Implementation reviewed HEAD:** `feee9f01ed0ae7ddc46ecb00e5c7a4ceb23e6a6f`
+> 本记录中的全部 C2 测试与门禁证据，均针对上述 implementation reviewed HEAD。
+> **Parent baseline:** `f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`（`test(verifier): isolate original failure regression`）。
+> **record update commit:** 本次提交仅修复验收记录与报告中的身份链，提交信息为 `docs(validation): pin reviewed head identity`；该提交不属于上述 implementation reviewed HEAD，也不改写此前验证范围。
 > 本记录只收录本任务实际执行的命令和结果；未执行的全量门禁、pre-push 与证据导出不作通过声明。
 
 ## 变更范围
@@ -30,8 +33,9 @@
 
 ## 证据与 provenance 级别
 
-- Reviewed baseline 身份：`f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`。
-- C2 产生的 Git 提交由任务提交后以 `git log` 输出为准；本记录不预填不可在提交前确定的自引用 SHA。
+- Implementation reviewed HEAD: `feee9f01ed0ae7ddc46ecb00e5c7a4ceb23e6a6f`；上述全部 C2 测试与门禁证据均针对该提交。
+- Parent baseline: `f7c13896305c6ea97731e9b1f2cfeb8d1b6690c8`。
+- record update commit：本次身份修复提交在记录中单独标记，不冒充已验证的 implementation reviewed HEAD。
 - package-only provenance：未生成、未验证。
 - source-bound provenance：未生成、未验证；没有 `--source-project` 级别证据。
 - `.w-model/`、`.zcode/`、`coverage/` 及历史归档未作为本次当前 HEAD 验收证据；fallback 影响分析记录位于被忽略的 `.w-model/codegraph-queries/2026-08-25-C2-docs.md`，未提交运行期生成物。
