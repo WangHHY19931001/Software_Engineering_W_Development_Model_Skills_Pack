@@ -51,11 +51,15 @@ async function simulatedEnsure(
   const workspace = await makeTempDir('platform-deps-workspace-');
   const callsPath = path.join(binDir, 'calls.log');
   const cliCallsPath = path.join(binDir, 'cli-calls.log');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
   await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
   await fs.writeFile(path.join(workspace, 'package-lock.json'), '{}\n', 'utf8');
   if (cliBody !== undefined) {
     const localBin = path.join(workspace, 'node_modules', '.bin');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- localBin is beneath the test-owned workspace
     await fs.mkdir(localBin, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture CLI path is beneath the test-owned workspace
     await fs.mkdir(path.join(workspace, 'w-model-dev', 'scripts', 'cli'), { recursive: true });
     await fs.writeFile(
       path.join(workspace, 'w-model-dev', 'scripts', 'cli', 'platform-deps-install.ts'),
@@ -63,7 +67,9 @@ async function simulatedEnsure(
       'utf8',
     );
     const cliPath = path.join(localBin, 'tsx');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- cliPath is beneath the test-owned workspace
     await fs.writeFile(cliPath, `#!/usr/bin/env bash\nset -u\n${cliBody}\n`, 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- cliPath is beneath the test-owned workspace
     await fs.chmod(cliPath, 0o755);
   }
   const bashEnv = path.join(binDir, 'bash-env.sh');
@@ -97,6 +103,7 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
   return {
     ...result,
     calls: await fs.readFile(callsPath, 'utf8').catch(() => ''),
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- cliCallsPath is beneath the test-owned command fixture
     cliCalls: await fs.readFile(cliCallsPath, 'utf8').catch(() => ''),
   };
 }
@@ -119,6 +126,7 @@ async function simulatedPrePushAudit(
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const binDir = await makeTempDir('pre-push-audit-bin-');
   const workspace = await makeTempDir('pre-push-audit-workspace-');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
   await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\\n', 'utf8');
   await fs.mkdir(path.join(workspace, 'node_modules', '@esbuild', 'linux-x64'), { recursive: true });
   await fs.mkdir(path.join(workspace, 'node_modules', '@rolldown', 'binding-linux-x64-gnu'), { recursive: true });
@@ -536,6 +544,7 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
 
 describe('pre-push audit skip boundary', () => {
   it('invokes ensure-platform-deps only with --check', async () => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- prePushScript is a fixed repository test asset
     const source = await fs.readFile(prePushScript, 'utf8');
     const ensureCalls = [...source.matchAll(/ensure-platform-deps\.sh[^\n]*/g)].map((match) => match[0]);
 

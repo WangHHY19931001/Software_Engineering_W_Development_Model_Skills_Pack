@@ -672,13 +672,17 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
     if (!validateBySchema('evidence-manifest', manifest).valid) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
     const typed = manifest as EvidenceManifest;
     const expected = new Set<string>();
-    const sortedPaths = typed.files.map(({ path: filePath }) => filePath).sort(comparePaths);
-    for (const [index, file] of typed.files.entries()) {
+    const sortedPaths = typed.files
+      .map(({ path: filePath }) => filePath)
+      .sort(comparePaths)
+      .values();
+    for (const file of typed.files) {
+      const sortedPath = sortedPaths.next().value;
       if (
         !isSafeManifestPath(file.path) ||
         expected.has(file.path) ||
         !isAllowlistedEvidenceFile(file) ||
-        file.path !== sortedPaths[index]
+        file.path !== sortedPath
       )
         throw new EvidenceFailure(1, 'INVALID_MANIFEST');
       expected.add(file.path);

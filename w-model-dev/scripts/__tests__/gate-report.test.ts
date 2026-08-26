@@ -190,6 +190,7 @@ describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JS
     await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli', 'self-test.ts'), '', 'utf-8');
     if (withViolation) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'unregistered.json'), '{}', 'utf-8');
     }
     return tmpDir;
@@ -268,6 +269,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       if (!written.ok) throw new Error('expected writer output');
       const gateLogPath = path.relative(tmpDir, written.path);
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry(gateLogPath, 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -298,6 +300,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       expect(second.ok).toBe(true);
       if (!first.ok || !second.ok) throw new Error('expected writer output');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         runLog,
         `${makeRunLogEntry(path.relative(tmpDir, first.path), 0)}\n${makeRunLogEntry(path.relative(tmpDir, second.path), 1)}\n`,
@@ -321,6 +324,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
       try {
         const runLog = path.join(tmpDir, 'run-log.jsonl');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
         await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
         const result = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, gateLogsArg], {
           cwd: tmpDir,
@@ -340,6 +344,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
       try {
         const runLog = path.join(tmpDir, 'run-log.jsonl');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
         await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
         const result = runSync(
           process.execPath,
@@ -359,11 +364,14 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
       await fs.mkdir(gateLogsDir);
       const payload = makeGatePayload(0);
       payload.stdoutSummary = { exitCode: 1, passed: false };
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(gateLogsDir, 'tampered.json'), JSON.stringify(payload), 'utf8');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('tampered.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -382,13 +390,16 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
       await fs.mkdir(gateLogsDir);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         path.join(gateLogsDir, 'schema-invalid.json'),
         JSON.stringify({ exitCode: 0, passed: true }),
         'utf8',
       );
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('schema-invalid.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -408,8 +419,10 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
       const unreadableEntry = path.join(gateLogsDir, 'not-a-file');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- unreadableEntry is beneath the test-owned mkdtemp fixture
       await fs.mkdir(unreadableEntry, { recursive: true });
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('not-a-file', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -427,13 +440,16 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
       await fs.mkdir(gateLogsDir);
       const payload = makeGatePayload(0) as Record<string, unknown>;
       delete payload.exitCode;
       delete (payload.reportSummary as Record<string, unknown>).exitCode;
       delete (payload.stdoutSummary as Record<string, unknown>).exitCode;
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(gateLogsDir, 'missing-exit-code.json'), JSON.stringify(payload), 'utf8');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('missing-exit-code.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -451,9 +467,12 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
       await fs.mkdir(gateLogsDir);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(gateLogsDir, 'broken.json'), '{not-json', 'utf8');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('broken.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -475,6 +494,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     try {
       const missingDir = path.join(tmpDir, 'missing-gate-logs');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -495,11 +515,14 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
       await fs.mkdir(gateLogsDir);
       const payload = makeGatePayload(0);
       payload.stdoutSummary = { exitCode: 1, passed: false };
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(gateLogsDir, 'mismatch.json'), JSON.stringify(payload), 'utf8');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('mismatch.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -520,9 +543,12 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const gateLogsDir = path.join(tmpDir, 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
       await fs.mkdir(gateLogsDir);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(gateLogsDir, 'invalid.json'), JSON.stringify({ exitCode: 0, passed: true }), 'utf8');
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('invalid.json', 0) + '\n', 'utf8');
       const result = runSync(
         process.execPath,
@@ -543,6 +569,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
       const result = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog], { cwd: tmpDir });
       expect(result.status).toBe(0);
@@ -556,6 +583,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         logFile,
         '{"phase":1,"action":"produce","role":"S","outcome":"success","timestamp":"2026-08-11T00:00:00Z"}\n',
@@ -589,6 +617,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         logFile,
         '{"phase":1,"action":"produce","role":"S","outcome":"success","timestamp":"2026-08-11T00:00:00Z"}\n',
@@ -608,6 +637,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-summary-parity-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         logFile,
         '{"runId":"valid","timestamp":"2026-08-24T00:00:00.000Z","phase":1,"phaseName":"需求分析","action":"chunk","role":"A","duration_s":1,"tokens":1,"estimated":false,"subagentSpawns":0,"gateExitCode":null,"outcome":"success"}\nnot-json\n',
@@ -658,7 +688,9 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
     try {
       const tlaFile = path.join(tmpDir, 'model.tla');
       const featureFile = path.join(tmpDir, 'model.feature');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
       const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {});
       expect(r.status).toBe(0);
@@ -688,7 +720,9 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
     try {
       const tlaFile = path.join(tmpDir, 'model.tla');
       const featureFile = path.join(tmpDir, 'model.feature');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(featureFile, FEATURE_CONTENT, 'utf-8');
       const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, tlaFile, featureFile], {});
       expect(r.status).toBe(0);
@@ -703,7 +737,9 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
     try {
       const tlaFile = path.join(tmpDir, 'empty.tla');
       const featureFile = path.join(tmpDir, 'empty.feature');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(tlaFile, '', 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(featureFile, '', 'utf-8');
       const r = runSync(process.execPath, [tsxCli, CHECK_TLA_BDD_SYNC_SCRIPT, '--json', tlaFile, featureFile], {});
       expect(r.status).toBe(1);
@@ -723,7 +759,9 @@ describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations
     try {
       const tlaFile = path.join(tmpDir, 'model.tla');
       const featureFile = path.join(tmpDir, 'model.feature');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(tlaFile, TLA_CONTENT, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         featureFile,
         ['Feature: Test', 'Background:', '  Given initial state', '  When Login', '  Then TypeInvariant'].join('\n'),
@@ -748,12 +786,15 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
   it('真实 phase 1 gate 在无 graph 时仍运行 TLA/BDD evidence checks，不把 graph 缺失当作跳过', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-phase1-'));
     try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- model directory is beneath the test-owned mkdtemp fixture
       await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
       const rtm = await fs.readFile(
         path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
         'utf-8',
       );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(
         path.join(tmpDir, '.w-model/bdd-manifest.json'),
         JSON.stringify({
@@ -829,6 +870,7 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
     const blockedLogRoot = path.join(tmpDir, '.w-model');
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(blockedLogRoot, 'not a directory', 'utf-8');
 
       const bddProject = path.join(tmpDir, 'bdd-project');
@@ -845,6 +887,7 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
         path.join(bddProject, 'samples', 'bdd', 'valid-l1.feature'),
       );
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(path.join(bddModelDir, 'gate-logs'), 'not a directory', 'utf-8');
 
       const iceberg = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, ICEBERG_VALID_SAMPLE], {

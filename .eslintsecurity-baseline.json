@@ -2836,6 +2836,41 @@
       "file": "w-model-dev/scripts/logic/state-write-logic.ts",
       "line": 357,
       "reason": "Found readFile from package \"node:fs/promises\" with non literal argument at index 0"
+    },
+    {
+      "hash": "92bac38fc0d1997fc98c2a0893ddf3abfb4b5e1dc87a6cd9f92ae4e845f01586",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 141,
+      "reason": "Lock metadata path is derived from the owned lock directory"
+    },
+    {
+      "hash": "59116765ed46d07cbdd34df08a97dda79fcdec3e89ea4b0f06629927c9d29707",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 387,
+      "reason": "Rollback payload is derived from the owned target path and lock token"
+    },
+    {
+      "hash": "6edbc4614bcf9d572f9d0b37f794cee7e4add4ae1f7a9ab956a6f6f4753db2ca",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 415,
+      "reason": "Rollback payload is read only after ownership and atomic-move checks"
+    },
+    {
+      "hash": "6558f4349f471263cfd0b607123dd4faf3690df0d7036141c5ee60f7ae857441",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 422,
+      "reason": "Target absence is checked only for the caller-selected state target under an owned lock"
+    },
+    {
+      "hash": "ab5c1380b6943b06b07edbb63defe06ac547b26110bd00336e5eec038f4bf35c",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/logic/state-write-logic.ts",
+      "line": 482,
+      "reason": "Original content is read only for the caller-selected state target under an owned lock"
     }
   ]
 }

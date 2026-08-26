@@ -1230,6 +1230,7 @@ describe('runDocConsistencyChecks', () => {
       /55\s*个\s*test\s*文件\s*\/\s*1002\s*(?:条|tests?\b)/i,
     ];
     for (const relativePath of liveDocs) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- relativePath is selected from the fixed repository documentation list above
       const content = await fs.readFile(path.join(REPO_ROOT, relativePath), 'utf8');
       for (const pattern of forbiddenCopies) expect(content, relativePath).not.toMatch(pattern);
     }
@@ -1841,6 +1842,7 @@ describe('runDocConsistencyChecks', () => {
   it('CLI 无 JSON 且 Vitest 不可用（显式清除外部 JSON 环境变量）→ vitest-tests 违规并 exit 1', async () => {
     await withDocsConsistencyFixture(
       async (fixtureRoot) => {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is a mkdtemp-owned isolated repository copy
         expect(existsSync(path.join(fixtureRoot, 'node_modules', 'vitest'))).toBe(false);
         const result = runDocsConsistencyCli(
           fixtureRoot,
@@ -2405,6 +2407,7 @@ async function withDocsConsistencyFixture(
     } else {
       // Keep the fixture's dependency boundary explicit: tests that simulate a missing package
       // must not discover the parent checkout's node_modules through a junction.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureNodeModules is beneath the mkdtemp-owned isolated repository copy
       await fs.mkdir(fixtureNodeModules);
       for (const packageName of options.availablePackages) {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- package source is repository-controlled and destination is mkdtemp-owned

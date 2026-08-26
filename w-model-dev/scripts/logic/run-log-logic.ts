@@ -1172,7 +1172,7 @@ function inspectRootGateLog(root: Record<string, unknown>): GateLogInspection {
   }
 
   for (const summaryName of ['stdoutSummary', 'reportSummary'] as const) {
-    const summary = root[summaryName];
+    const summary = summaryName === 'stdoutSummary' ? root.stdoutSummary : root.reportSummary;
     if (summary === undefined) continue;
     if (!isRecord(summary)) {
       violations.push(`${summaryName} 必须为 object`);

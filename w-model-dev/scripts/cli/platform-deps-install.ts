@@ -239,20 +239,21 @@ function isWithin(packageRoot: string, target: string): boolean {
 /** 从 package.json 提取可加载入口候选（main / module / exports["."]） */
 function manifestEntryCandidates(manifest: Record<string, unknown>): string[] {
   const out: string[] = [];
-  for (const key of ['main', 'module'] as const) {
-    if (typeof manifest[key] === 'string') out.push(manifest[key]);
-  }
+  if (typeof manifest.main === 'string') out.push(manifest.main);
+  if (typeof manifest.module === 'string') out.push(manifest.module);
   const exportsValue = manifest.exports;
   if (typeof exportsValue === 'string') {
     out.push(exportsValue);
   } else if (typeof exportsValue === 'object' && exportsValue !== null && !Array.isArray(exportsValue)) {
-    const dot = (exportsValue as Record<string, unknown>)['.'];
+    const dot = Object.getOwnPropertyDescriptor(exportsValue, '.')?.value;
     if (typeof dot === 'string') {
       out.push(dot);
     } else if (typeof dot === 'object' && dot !== null && !Array.isArray(dot)) {
-      const dotRecord = dot as Record<string, unknown>;
-      for (const condition of ['import', 'require', 'default'] as const) {
-        const value = dotRecord[condition];
+      for (const value of [
+        Object.getOwnPropertyDescriptor(dot, 'import')?.value,
+        Object.getOwnPropertyDescriptor(dot, 'require')?.value,
+        Object.getOwnPropertyDescriptor(dot, 'default')?.value,
+      ]) {
         if (typeof value === 'string') out.push(value);
       }
     }

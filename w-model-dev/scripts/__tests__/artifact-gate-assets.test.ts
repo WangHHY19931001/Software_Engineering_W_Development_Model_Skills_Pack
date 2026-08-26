@@ -160,7 +160,9 @@ describe('readTlaManifest', () => {
       }),
       'utf-8',
     );
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test assets are created beneath the mkdtemp-owned tmpDir
     await fs.writeFile(path.join(tmpDir, 'test.tla'), '---- MODULE test ----', 'utf-8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test assets are created beneath the mkdtemp-owned tmpDir
     await fs.writeFile(path.join(tmpDir, 'test.cfg'), 'SPECIFICATION Spec', 'utf-8');
     expect(await readTlaManifest(f)).toMatchObject({ valid: true, exists: true });
   });
@@ -224,6 +226,7 @@ describe('readTlaManifest', () => {
     ['invalid JSON', '{not json'],
   ])('fails closed for %s', async (_label, value) => {
     const f = path.join(tmpDir, 'tla-manifest.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- f is derived from the mkdtemp-owned tmpDir
     await fs.writeFile(f, value, 'utf-8');
     const result = await readTlaManifest(f);
     expect(result.exists).toBe(true);
@@ -257,6 +260,7 @@ describe('readBddManifest', () => {
 
   it('schema-valid manifest with empty features or state machines fails closed', async () => {
     const f = path.join(tmpDir, 'bdd-manifest.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- f is derived from the mkdtemp-owned tmpDir
     await fs.writeFile(f, JSON.stringify(makeBddManifest({ features: [], stateMachines: [] })), 'utf-8');
     const r = await readBddManifest(f, tmpDir, 1);
     expect(r.bddManifestValid).toBe(false);
@@ -310,6 +314,7 @@ describe('readCucumberReport', () => {
     ['failed step', JSON.stringify({ elements: [{ name: 'scenario', steps: [{ result: { status: 'failed' } }] }] })],
   ])('fails closed for %s Cucumber evidence', async (_label, value) => {
     const report = path.join(tmpDir, 'cucumber-report.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- report is derived from the mkdtemp-owned tmpDir
     if (value !== undefined) await fs.writeFile(report, value, 'utf-8');
     const result = await readCucumberReport(report, true);
     expect(result.cucumberReportValid).toBe(false);
@@ -444,6 +449,7 @@ describe('TLA↔BDD sync contract phase matrix', () => {
       manifestFile: path.join(tmpDir, 'tla-manifest.json'),
       projectDir: tmpDir,
     });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both files are created beneath the mkdtemp-owned tmpDir
     const syncResult = checkTlaBddSync(await fs.readFile(tlaFile, 'utf-8'), await fs.readFile(featureFile, 'utf-8'));
 
     expect(isTlaBddSyncContractPhase(phase)).toBe(true);

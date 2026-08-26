@@ -288,7 +288,7 @@ export async function readBddManifest(
   const bddViolations: string[] = [];
   let bddManifestExists = false;
   let bddManifestSchemaValid = false;
-  let bddManifestValid = false;
+  const bddManifestValid = false;
   let bddManifest: Record<string, unknown> | undefined;
   try {
     const bddRaw = await fs.readFile(bddManifestFile, 'utf-8');

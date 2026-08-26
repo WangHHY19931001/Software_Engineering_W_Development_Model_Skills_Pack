@@ -195,7 +195,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2354,
+    line: 2356,
     symbol: 'withDocsConsistencyFixture git init',
     reason: 'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.',
     timeout: { required: true, status: 'present' },
@@ -203,7 +203,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2357,
+    line: 2359,
     symbol: 'withDocsConsistencyFixture git config email',
     reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
@@ -211,7 +211,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2363,
+    line: 2365,
     symbol: 'withDocsConsistencyFixture git config name',
     reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
@@ -219,7 +219,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2366,
+    line: 2368,
     symbol: 'withDocsConsistencyFixture git config gpgSign',
     reason: 'D5 disables inherited signing for the isolated provenance fixture.',
     timeout: { required: true, status: 'present' },
@@ -227,7 +227,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2373,
+    line: 2375,
     symbol: 'withDocsConsistencyFixture git add',
     reason: 'D5 stages the copied fixture before creating its provenance-bound commit.',
     timeout: { required: true, status: 'present' },
@@ -235,7 +235,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2374,
+    line: 2376,
     symbol: 'withDocsConsistencyFixture git commit',
     reason: 'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.',
     timeout: { required: true, status: 'present' },
@@ -243,7 +243,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2425,
+    line: 2428,
     symbol: 'fixtureCommitSha',
     reason: 'D5 reads the isolated fixture HEAD for same-run provenance assertions.',
     timeout: { required: true, status: 'present' },
@@ -251,7 +251,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2448,
+    line: 2451,
     symbol: 'runDocsConsistencyCli',
     reason: 'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.',
     timeout: { required: true, status: 'present' },

@@ -84,8 +84,10 @@ function envWithPath(directory: string, preload?: string): NodeJS.ProcessEnv {
 
 async function makeEnsureBinary(directory: string, name: string): Promise<string | undefined> {
   if (process.platform !== 'win32') return undefined;
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is a test-owned temporary command root
   await fs.copyFile(process.execPath, path.join(directory, `${name}.exe`));
   const shim = path.join(directory, 'ensure-command-shim.cjs');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- shim is beneath the test-owned temporary command root
   await fs.writeFile(
     shim,
     `const fs = require('node:fs');\nconst path = require('node:path');\nconst command = path.basename(process.execPath).toLowerCase().replace('.exe', '');\nif (command !== 'node') {\n  const args = process.argv.slice(1);\n  const action = path.basename(args[0] ?? '').toLowerCase();\n  const checkpoint = process.env.WM_NATURAL_ENSURE_MODE === 'checkpoint' && command === 'codegraph' && action === 'install';\n  if (!checkpoint && action === 'init') fs.mkdirSync(path.join(process.cwd(), command === 'codegraph' ? '.codegraph' : 'openspec'), { recursive: true });\n  process.exit(checkpoint ? 1 : 0);\n}\n`,
@@ -96,11 +98,14 @@ async function makeEnsureBinary(directory: string, name: string): Promise<string
 
 async function makeCommand(directory: string, name: string, windowsBody: string, posixBody: string): Promise<void> {
   if (process.platform === 'win32') {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- command fixture is created beneath the test-owned temporary directory
     await fs.writeFile(path.join(directory, `${name}.cmd`), `@echo off\r\n${windowsBody}\r\n`, 'utf8');
     return;
   }
   const file = path.join(directory, name);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- command fixture is created beneath the test-owned temporary directory
   await fs.writeFile(file, `#!/bin/sh\n${posixBody}\n`, 'utf8');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- executable bit is set only on the test-owned command fixture
   await fs.chmod(file, 0o755);
 }
 
@@ -112,7 +117,9 @@ async function makeTempDirectory(prefix: string): Promise<string> {
 
 async function writeWModel(directory: string, relativePath: string, content: string): Promise<void> {
   const file = path.join(directory, '.w-model', relativePath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is built beneath the test-owned temporary project root
   await fs.mkdir(path.dirname(file), { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is built beneath the test-owned temporary project root
   await fs.writeFile(file, content, 'utf8');
 }
 
@@ -171,6 +178,7 @@ describe('production CLI real subprocess exit semantics', () => {
   it('security-scan preserves exit 0, new-finding exit 1, and input exit 2', async () => {
     const directory = await makeTempDirectory('wm-natural-security-');
     await makeSecurityNpx(directory);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- scanner baseline fixture is beneath the test-owned temporary directory
     await fs.writeFile(
       path.join(directory, '.eslintsecurity-baseline.json'),
       '{"version":2,"algo":"content-line","entries":[]}\n',
@@ -178,13 +186,16 @@ describe('production CLI real subprocess exit semantics', () => {
     );
     const env = envWithPath(directory);
 
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- scanner fixture file is beneath the test-owned temporary directory
     await fs.writeFile(path.join(directory, 'findings.json'), '[]\n', 'utf8');
     const passed = runScript(SECURITY_SCRIPT, [], { cwd: directory, env });
     expect(passed.status).toBe(0);
     expect(passed.stdout).toContain('无新增安全风险');
 
     const sourceFile = path.join(directory, 'source.ts');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- scanner fixture file is beneath the test-owned temporary directory
     await fs.writeFile(sourceFile, 'eval(input);\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- scanner fixture file is beneath the test-owned temporary directory
     await fs.writeFile(
       path.join(directory, 'findings.json'),
       JSON.stringify([
@@ -223,7 +234,9 @@ describe('production CLI real subprocess exit semantics', () => {
     const directory = await makeTempDirectory('wm-natural-ensure-');
     const binDirectory = path.join(directory, 'bin');
     const projectRoot = path.join(directory, 'project');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- command root is beneath the test-owned temporary directory
     await fs.mkdir(binDirectory, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- project root is beneath the test-owned temporary directory
     await fs.mkdir(projectRoot, { recursive: true });
     let env: NodeJS.ProcessEnv;
     if (process.platform === 'win32') {
@@ -263,7 +276,9 @@ describe('production CLI real subprocess exit semantics', () => {
         'case "$1" in --version|query) exit 0;; install) exit 1;; esac\nexit 0',
       );
     }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- project fixtures are created beneath the test-owned temporary directory
     await fs.mkdir(path.join(projectRoot, '.codegraph'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- project fixtures are created beneath the test-owned temporary directory
     await fs.mkdir(path.join(projectRoot, 'openspec'), { recursive: true });
     const checkpoint = runScript(ENSURE_SCRIPT, ['--phase', '5', '--project-root', projectRoot, '--mode', 'full'], {
       env,
@@ -286,8 +301,10 @@ describe('production CLI real subprocess exit semantics', () => {
     const sourceSamples = path.join(SCRIPTS_ROOT, 'samples');
     await fs.cp(sourceSamples, samplesDirectory, { recursive: true });
     const fixture = path.join(samplesDirectory, 'verifier', 'valid.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture is beneath the test-owned copied samples directory
     const valid = JSON.parse(await fs.readFile(fixture, 'utf8')) as { passed: boolean };
     valid.passed = false;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture is beneath the test-owned copied samples directory
     await fs.writeFile(fixture, JSON.stringify(valid), 'utf8');
 
     const env = { ...process.env, WM_SELF_TEST_SAMPLES_DIR: samplesDirectory };

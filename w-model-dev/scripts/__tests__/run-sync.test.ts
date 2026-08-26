@@ -217,6 +217,7 @@ describe('runSync', () => {
 
     const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-sync-runtime-'));
     const jarPath = path.join(fixtureRoot, 'tla2tools.jar');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- jarPath is beneath the test-owned mkdtemp fixture root
     await fs.writeFile(jarPath, 'fixture');
     try {
       for (const result of [
@@ -301,8 +302,8 @@ describe('runSync', () => {
         .slice(call.line - 1, call.line + 20)
         .join('\n');
       expect(optionBlock, `${call.file}:${call.line} timeout`).toMatch(/timeout\s*:/);
-      expect(optionBlock, `${call.file}:${call.line} killSignal`).toMatch(/killSignal\s*:\s*['\"]SIGKILL['\"]/);
-      expect(optionBlock, `${call.file}:${call.line} encoding`).toMatch(/encoding\s*:\s*['\"]utf-8['\"]/);
+      expect(optionBlock, `${call.file}:${call.line} killSignal`).toMatch(/killSignal\s*:\s*['"]SIGKILL['"]/);
+      expect(optionBlock, `${call.file}:${call.line} encoding`).toMatch(/encoding\s*:\s*['"]utf-8['"]/);
       expect(optionBlock, `${call.file}:${call.line} maxBuffer`).toMatch(/maxBuffer\s*:/);
     }
   });

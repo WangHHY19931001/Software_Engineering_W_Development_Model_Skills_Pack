@@ -789,7 +789,8 @@ describe('evidence export logic', () => {
         provenance: Record<string, unknown>;
         files: Array<{ path: string; sha256: string }>;
       };
-      manifest.provenance[field] = value;
+      if (field === 'runId') manifest.provenance.runId = value;
+      else manifest.provenance.artifactId = value;
       manifest.provenance.contentHash = evidenceContentHash(manifest.files);
       refreshManifestHash(manifest as unknown as Record<string, unknown>);
       await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');

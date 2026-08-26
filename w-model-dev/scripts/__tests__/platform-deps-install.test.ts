@@ -11,7 +11,7 @@ import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { installVerifiedPackage, parseArgs } from '../cli/platform-deps-install.js';
-import { extractArchive, readArchiveEntries } from '../lib/platform-deps-tar.js';
+import { extractArchive, parsePaxRecords, readArchiveEntries } from '../lib/platform-deps-tar.js';
 import { runSync } from '../lib/run-sync.js';
 
 const require = createRequire(import.meta.url);
@@ -48,6 +48,8 @@ interface TarFileEntry {
   /** 写进主 header 的短名（配合 pax/GNU 长名测试）；默认 = path */
   headerName?: string;
   typeflag?: string;
+  /** 写进主 header 的链接目标（配合 PAX linkpath 覆盖测试） */
+  linkname?: string;
   /** 真实路径经 pax 扩展头（typeflag 'x' 或传给 paxType，默认 'x'）写出 */
   paxPath?: string;
   /** pax 扩展头 typeflag：'x'（默认）或 'g'（全局头） */
@@ -94,7 +96,7 @@ function tarHeader(options: {
   block[156] = options.typeflag.charCodeAt(0);
   let checksum = 0;
   for (let i = 0; i < BLOCK; i += 1) {
-    checksum += i >= 148 && i < 156 ? 32 : (block[i] ?? 0);
+    checksum += i >= 148 && i < 156 ? 32 : block.readUInt8(i);
   }
   writeField(block, 148, 6, checksum.toString(8).padStart(6, '0'));
   block[154] = 0;
@@ -147,6 +149,7 @@ function makeTar(entries: readonly TarTestEntry[]): Buffer {
           name: entry.headerName ?? entry.path,
           typeflag: entry.typeflag ?? '0',
           size: content.length,
+          linkname: entry.linkname,
           mode: entry.mode,
         }),
       );
@@ -259,6 +262,35 @@ async function installedTargetExists(fixture: Fixture): Promise<boolean> {
 }
 
 describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => {
+  it('PAX 记录使用安全键容器保留 __proto__ 键而不写入对象原型', () => {
+    const records = parsePaxRecords(
+      paxRecordsBlob([
+        ['__proto__', 'pax-value'],
+        ['path', 'package/safe.js'],
+      ]),
+    );
+
+    expect(records.get('__proto__')).toBe('pax-value');
+    expect(records.get('path')).toBe('package/safe.js');
+  });
+
+  it('PAX linkpath 以 Map 条目覆盖 symlink header 的 linkname', async () => {
+    const archive = makeTar([
+      {
+        kind: 'file',
+        path: 'package/linked',
+        content: '',
+        typeflag: '2',
+        linkname: 'package/from-header',
+        paxRecords: [['linkpath', 'package/from-pax']],
+      },
+    ]);
+
+    await expect(readArchiveEntries(archive)).resolves.toMatchObject([
+      { path: 'package/linked', type: 'symlink', linkname: 'package/from-pax' },
+    ]);
+  });
+
   it('解析常规文件与目录（路径/类型/内容忠实）', async () => {
     const archive = makeTar([
       { kind: 'directory', path: 'package/' },
