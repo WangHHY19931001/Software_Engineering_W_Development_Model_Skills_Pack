@@ -65,7 +65,7 @@
 - Red phase: a temporary real file `w-model-dev/scripts/lib/.d2-production-gate-red.ts` importing `../logic/gate-logic.js` caused the new fixture-free production-graph assertion to fail with `lib → logic: lib/.d2-production-gate-red.ts → logic/gate-logic.ts`.
 - Green phase: after deleting the red-only file, the separate production-graph test requires `boundaryViolations(runtimeEdges) === []` and `cyclesIn(runtimeEdges) === []`; the independent temporary `logic/` bare-`fs` fixture test remains in place.
 - Review finding I-2: the local fallback record now consistently states initial D2 parent `0d8e305`, initial implementation `fecf259`, and repair round 1 `9b0c681`; it also records its D2 scope and local-only, uncommitted status.
-- Repair round 2 commit: `fix(architecture): restore production boundary gate`.
+- Repair round 2 commit: `f05298707d0681d9fd6d456213201468ca5459d0 (fix(architecture): restore production boundary gate)`.
 
 ## Repair round 2 verification output
 
