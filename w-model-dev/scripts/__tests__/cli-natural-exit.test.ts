@@ -5,6 +5,7 @@
  * 真实子进程覆盖目标 runner 的代表性 exit 0/1/2 路径。
  */
 
+import { createHash } from 'node:crypto';
 import * as fsSync from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -277,6 +278,10 @@ describe('production CLI real subprocess exit semantics', () => {
   });
 
   it('self-test preserves aggregate failure exit 1 with test-owned samples', async () => {
+    const sharedFixture = path.join(SCRIPTS_ROOT, 'samples', 'verifier', 'valid.json');
+    const originalHash = createHash('sha256')
+      .update(await fs.readFile(sharedFixture))
+      .digest('hex');
     const samplesDirectory = await makeTempDirectory('wm-natural-self-test-samples-');
     const sourceSamples = path.join(SCRIPTS_ROOT, 'samples');
     await fs.cp(sourceSamples, samplesDirectory, { recursive: true });
@@ -290,9 +295,11 @@ describe('production CLI real subprocess exit semantics', () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('失败');
     expect(result.stdout).toContain('总计');
-    expect(await fs.readFile(path.join(SCRIPTS_ROOT, 'samples', 'verifier', 'valid.json'), 'utf8')).toContain(
-      '"passed": true',
-    );
+    expect(
+      createHash('sha256')
+        .update(await fs.readFile(sharedFixture))
+        .digest('hex'),
+    ).toBe(originalHash);
   }, 60_000);
 
   it('self-test preserves its successful aggregate exit 0', () => {
