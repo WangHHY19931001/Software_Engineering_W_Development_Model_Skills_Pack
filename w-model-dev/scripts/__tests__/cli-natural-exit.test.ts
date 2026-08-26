@@ -119,7 +119,6 @@ const RUN_LOG_JSONL =
   '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n';
 
 const PROJECT_JSON = '{"id":"natural-exit","status":"编码","updatedAt":"2026-08-05T01:00:00Z"}';
-const SELF_TEST_VERIFIER_FIXTURE = path.join(SCRIPTS_ROOT, 'samples', 'verifier', 'valid.json');
 
 async function makeSecurityNpx(directory: string): Promise<void> {
   await makeCommand(directory, 'npx', 'type findings.json\r\nexit /b 0', 'cat findings.json\nexit 0');
@@ -277,19 +276,23 @@ describe('production CLI real subprocess exit semantics', () => {
     expect(invalid.stdout).toContain('ERROR_JSON');
   });
 
-  it('self-test preserves aggregate failure exit 1', async () => {
-    const original = await fs.readFile(SELF_TEST_VERIFIER_FIXTURE, 'utf8');
-    const valid = JSON.parse(original) as { passed: boolean };
+  it('self-test preserves aggregate failure exit 1 with test-owned samples', async () => {
+    const samplesDirectory = await makeTempDirectory('wm-natural-self-test-samples-');
+    const sourceSamples = path.join(SCRIPTS_ROOT, 'samples');
+    await fs.cp(sourceSamples, samplesDirectory, { recursive: true });
+    const fixture = path.join(samplesDirectory, 'verifier', 'valid.json');
+    const valid = JSON.parse(await fs.readFile(fixture, 'utf8')) as { passed: boolean };
     valid.passed = false;
-    await fs.writeFile(SELF_TEST_VERIFIER_FIXTURE, JSON.stringify(valid), 'utf8');
-    try {
-      const result = runScript(SELF_TEST_SCRIPT);
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain('失败');
-      expect(result.stdout).toContain('总计');
-    } finally {
-      await fs.writeFile(SELF_TEST_VERIFIER_FIXTURE, original, 'utf8');
-    }
+    await fs.writeFile(fixture, JSON.stringify(valid), 'utf8');
+
+    const env = { ...process.env, WM_SELF_TEST_SAMPLES_DIR: samplesDirectory };
+    const result = runScript(SELF_TEST_SCRIPT, [], { env });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('失败');
+    expect(result.stdout).toContain('总计');
+    expect(await fs.readFile(path.join(SCRIPTS_ROOT, 'samples', 'verifier', 'valid.json'), 'utf8')).toContain(
+      '"passed": true',
+    );
   }, 60_000);
 
   it('self-test preserves its successful aggregate exit 0', () => {

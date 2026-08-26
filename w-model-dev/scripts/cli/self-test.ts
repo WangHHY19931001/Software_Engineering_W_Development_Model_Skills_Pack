@@ -3429,7 +3429,8 @@ async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
 
 async function main(): Promise<void> {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const samplesDir = path.join(here, '..', 'samples');
+  // Tests may provide an isolated samples root; normal CLI use keeps the bundled default.
+  const samplesDir = process.env.WM_SELF_TEST_SAMPLES_DIR ?? path.join(here, '..', 'samples');
   const skillRoot = path.join(here, '..', '..');
 
   console.log('═'.repeat(60));
