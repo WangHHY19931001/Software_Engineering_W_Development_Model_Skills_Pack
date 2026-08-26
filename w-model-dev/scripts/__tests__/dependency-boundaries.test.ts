@@ -223,7 +223,7 @@ function cyclesIn(edges: ImportEdge[]): string[][] {
 }
 
 describe('scripts runtime dependency boundaries', () => {
-  it('recursively enforces one-way runtime imports and records only explicit logic IO exceptions', async () => {
+  it('recursively discovers a bare fs runtime import in a logic fixture', async () => {
     const fixturePath = path.join(scriptsDir, 'logic', `.d2-boundary-fixture-${process.pid}.ts`);
     await fs.writeFile(fixturePath, "import 'fs';\n");
     try {
@@ -236,6 +236,13 @@ describe('scripts runtime dependency boundaries', () => {
     } finally {
       await fs.rm(fixturePath, { force: true });
     }
+  });
+
+  it('keeps the fixture-free production runtime graph clean', async () => {
+    const runtimeEdges = (await runtimeImportGraph()).filter((edge) => !edge.typeOnly);
+
+    expect(boundaryViolations(runtimeEdges)).toEqual([]);
+    expect(cyclesIn(runtimeEdges)).toEqual([]);
   });
 
   it('classifies import, export, and literal dynamic import specifiers by runtime presence', () => {

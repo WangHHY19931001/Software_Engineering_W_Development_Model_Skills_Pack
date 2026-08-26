@@ -59,6 +59,21 @@
 - `npx prettier --config config/prettier.config.cjs --check w-model-dev/scripts/__tests__/dependency-boundaries.test.ts package.json` — PASS.
 - `git diff --check` — PASS; only reported existing ignored/unrelated working-tree line-ending warnings for `progress.md` and this report.
 
+## Repair round 2
+
+- Review finding I-1: repair round 1 replaced the fixture-free production clean-graph assertion with a temporary bare-`fs` fixture assertion, so the fixture proof could mask a newly introduced production `lib → logic`, `infrastructure → cli`, or logic I/O violation.
+- Red phase: a temporary real file `w-model-dev/scripts/lib/.d2-production-gate-red.ts` importing `../logic/gate-logic.js` caused the new fixture-free production-graph assertion to fail with `lib → logic: lib/.d2-production-gate-red.ts → logic/gate-logic.ts`.
+- Green phase: after deleting the red-only file, the separate production-graph test requires `boundaryViolations(runtimeEdges) === []` and `cyclesIn(runtimeEdges) === []`; the independent temporary `logic/` bare-`fs` fixture test remains in place.
+- Review finding I-2: the local fallback record now consistently states initial D2 parent `0d8e305`, initial implementation `fecf259`, and repair round 1 `9b0c681`; it also records its D2 scope and local-only, uncommitted status.
+- Repair round 2 commit: `fix(architecture): restore production boundary gate`.
+
+## Repair round 2 verification output
+
+- `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/dependency-boundaries.test.ts` — PASS, 1 file and 10 tests passed after removal of the red-only fixture.
+- `npm run typecheck` — PASS, `tsc -p config/tsconfig.json` exit 0.
+- `npx prettier --config config/prettier.config.cjs --check w-model-dev/scripts/__tests__/dependency-boundaries.test.ts package.json` — PASS.
+- `git diff --check` — PASS; only reported existing/unrelated working-tree line-ending warnings for `progress.md` and `cli-natural-exit.test.ts`, plus this report.
+
 ## Delivery
 
 - Original commit: `fecf259 test(architecture): enforce script layer boundaries`.
