@@ -2,7 +2,7 @@
 
 - 基线：`f69dae8`
 - 修复轮 2 代码提交：`45aa48ad8b56df22aa6f5be7b6125af2f568ce2b`（`test(cli): isolate self test fixtures`）
-- 修复轮 2 文档更正提交：待提交（本报告追加隔离方案与最终证据）
+- 修复轮 2 文档更正提交：`52dd499078ec8199ef64a216fb205ca535f6da4f`（`docs(cli): record fixture isolation`）
 - 修复轮 1 代码提交：`46667b28a4b3f9983047af6dc2d834453cf84878`（`test(cli): cover natural exit states`）
 - 修复轮 1 文档更正提交：`0d8e305a831d7a4c5b57c107d430e36c730e48c0`（`docs(cli): correct natural exit coverage report`）
 - 原始实现提交：`2c3ddd2cbb73ec382d161bdb9c7301a0a93fcec3`（`refactor(cli): use natural process exit`）
