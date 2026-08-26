@@ -1213,7 +1213,25 @@ describe('runDocConsistencyChecks', () => {
     });
   });
 
-  it('受控 Vitest facts/provenance 驱动动态测量，文档数字变化不再触发动态违规', async () => {
+  it('D4 修复轮1：活体文档无动态计数复制，新增数字仍不触发动态 facts 违规', async () => {
+    const liveDocs = [
+      'README.md',
+      'AGENTS.md',
+      'CONTRIBUTING.md',
+      'docs/INSTALL.md',
+      'w-model-dev/SKILL.md',
+      'w-model-dev/references/command-reference.md',
+    ];
+    const forbiddenCopies = [
+      /\b55\s+files?\s*\/\s*1002\s+tests?\b/i,
+      /55\s*个\s*\.test\.ts\s*\/\s*1002\s*(?:条|tests?\b)/i,
+      /55\s*个\s*test\s*文件\s*\/\s*1002\s*(?:条|tests?\b)/i,
+    ];
+    for (const relativePath of liveDocs) {
+      const content = await fs.readFile(path.join(REPO_ROOT, relativePath), 'utf8');
+      for (const pattern of forbiddenCopies) expect(content, relativePath).not.toMatch(pattern);
+    }
+
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
