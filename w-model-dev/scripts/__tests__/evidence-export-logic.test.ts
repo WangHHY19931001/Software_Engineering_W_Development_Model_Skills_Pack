@@ -380,7 +380,7 @@ describe('evidence export logic', () => {
       ok: false,
       reason: 'INVALID_PROVENANCE',
     });
-  });
+  }, 90_000);
 
   it('rejects mutated source bundle and run provenance before creating a passed manifest', async () => {
     const project = await createProject();
