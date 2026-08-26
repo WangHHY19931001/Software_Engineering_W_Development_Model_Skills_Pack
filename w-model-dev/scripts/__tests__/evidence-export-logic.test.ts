@@ -44,6 +44,28 @@ function evidenceContentHash(files: Array<{ path: string; sha256: string }>): st
   );
 }
 
+function evidenceManifestHash(manifest: {
+  schemaVersion: string;
+  exportedAt: string;
+  sourceProject: string;
+  provenance: unknown;
+  files: unknown;
+}): string {
+  return sha256(
+    JSON.stringify({
+      schemaVersion: manifest.schemaVersion,
+      exportedAt: manifest.exportedAt,
+      sourceProject: manifest.sourceProject,
+      provenance: manifest.provenance,
+      files: manifest.files,
+    }),
+  );
+}
+
+function refreshManifestHash(manifest: Record<string, unknown>): void {
+  manifest.manifestSha256 = evidenceManifestHash(manifest as Parameters<typeof evidenceManifestHash>[0]);
+}
+
 async function createProject(name = 'project'): Promise<string> {
   const project = projectPath(name);
   const state = path.join(project, '.w-model');
@@ -175,6 +197,39 @@ describe('evidence export logic', () => {
       });
     },
   );
+  it('exports only runtime evidence and excludes project source, local tools, coverage, and archive paths', async () => {
+    const project = await createProject();
+    await fs.mkdir(path.join(project, '.zcode'), { recursive: true });
+    await fs.mkdir(path.join(project, 'coverage'), { recursive: true });
+    await fs.mkdir(path.join(project, 'docs', 'changes', 'archive'), { recursive: true });
+    await fs.writeFile(path.join(project, 'src.ts'), 'const source = true;\\n', 'utf8');
+    await fs.writeFile(path.join(project, '.zcode', 'session.json'), '{"token":"local-secret"}\\n', 'utf8');
+    await fs.writeFile(path.join(project, 'coverage', 'coverage.json'), '{}\\n', 'utf8');
+    await fs.writeFile(path.join(project, 'docs', 'changes', 'archive', 'history.md'), 'history\\n', 'utf8');
+
+    const output = path.join(tmpDir, 'allowlist-evidence');
+    const result = runCli([project, output]);
+
+    expect(result.code).toBe(0);
+    const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
+      files: Array<{ path: string; kind: string }>;
+    };
+    expect(
+      manifest.files.every(
+        ({ path: filePath }) =>
+          filePath.startsWith('gate-logs/') ||
+          filePath.startsWith('verifier-outputs/') ||
+          filePath.startsWith('signature-chains/') ||
+          filePath.startsWith('codegraph-queries/') ||
+          filePath === 'run-log.jsonl',
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(manifest)).not.toContain('.zcode');
+    expect(JSON.stringify(manifest)).not.toContain('coverage');
+    expect(JSON.stringify(manifest)).not.toContain('docs/changes/archive');
+    expect(JSON.stringify(manifest)).not.toContain('src.ts');
+  });
+
   it('exports allowlisted runtime records with stable kinds, sorted paths, and verifiable hashes', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');
@@ -184,7 +239,10 @@ describe('evidence export logic', () => {
     expect(result).toEqual(expect.objectContaining({ ok: true, exitCode: 0 }));
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
       schemaVersion: string;
+      exportedAt: string;
       sourceProject: string;
+      provenance: unknown;
+      manifestSha256: string;
       files: Array<{ path: string; kind: string; sha256: string }>;
     };
     expect(validateBySchema('evidence-manifest', manifest).valid).toBe(true);
@@ -202,6 +260,8 @@ describe('evidence export logic', () => {
     expect(manifest.files.some((entry) => entry.path === 'codegraph-queries/query.md')).toBe(true);
     expect(manifest.files.every((entry) => /^[0-9a-f]{64}$/.test(entry.sha256))).toBe(true);
     expect(manifest.files.some((entry) => entry.path === 'evidence-manifest.json')).toBe(false);
+    expect(manifest.manifestSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.manifestSha256).toBe(evidenceManifestHash(manifest as Parameters<typeof evidenceManifestHash>[0]));
   });
 
   it('binds exported packages to a passed source verification provenance and rejects missing provenance through the real CLI', async () => {
@@ -513,6 +573,7 @@ describe('evidence export logic', () => {
     expect(target).toBeDefined();
     target!.sha256 = sha256(unsafeContent);
     manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    refreshManifestHash(manifest as unknown as Record<string, unknown>);
     await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
 
     await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
@@ -538,6 +599,7 @@ describe('evidence export logic', () => {
     expect(target).toBeDefined();
     target!.sha256 = sha256(unsafeContent);
     manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    refreshManifestHash(manifest as unknown as Record<string, unknown>);
     await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
 
     await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
@@ -561,6 +623,86 @@ describe('evidence export logic', () => {
     await expect(verifyEvidence(manifest)).resolves.toMatchObject({
       ok: false,
       exitCode: 1,
+    });
+  });
+
+  it('rejects a package-only manifest with an unallowlisted path', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'unallowlisted-package');
+    await exportEvidence(project, output);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string; kind: string }>;
+      provenance: { contentHash: string };
+    };
+    const content = 'source must not be accepted as runtime evidence\\n';
+    await fs.writeFile(path.join(output, 'source.ts'), content, 'utf8');
+    manifest.files.push({ path: 'source.ts', sha256: sha256(content), kind: 'gate-log' });
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'INVALID_MANIFEST',
+    });
+  });
+
+  it('rejects a package-only manifest whose evidence kind does not match its allowlisted path', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'kind-mismatch-package');
+    await exportEvidence(project, output);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string; kind: string }>;
+      provenance: { contentHash: string };
+    };
+    manifest.files[0]!.kind = manifest.files[0]!.kind === 'gate-log' ? 'run-log' : 'gate-log';
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'INVALID_MANIFEST',
+    });
+  });
+
+  it('rejects a package-only manifest whose files are not in stable path order', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'unsorted-package');
+    await exportEvidence(project, output);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      files: Array<{ path: string; sha256: string; kind: string }>;
+      provenance: { contentHash: string };
+    };
+    manifest.files.reverse();
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'INVALID_MANIFEST',
+    });
+  });
+
+  it('rejects package-only provenance metadata tampering without a source project', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'tampered-package-provenance');
+    await exportEvidence(project, output);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      provenance: { runId: string };
+    };
+    manifest.provenance.runId = 'forged-run';
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    const packageOnly = runCli(['--verify', manifestPath]);
+
+    expect(packageOnly.code).toBe(1);
+    expect(cliSummary(packageOnly.stdout)).toMatchObject({
+      ok: false,
+      reason: 'INVALID_PROVENANCE',
     });
   });
 
@@ -621,6 +763,7 @@ describe('evidence export logic', () => {
     expect(target).toBeDefined();
     target!.sha256 = sha256(unsafeContent);
     manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    refreshManifestHash(manifest as unknown as Record<string, unknown>);
     await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
 
     const verified = runCli(['--verify', manifestPath]);
@@ -875,6 +1018,18 @@ describe('evidence export logic', () => {
 });
 
 describe('wm-export-evidence CLI', () => {
+  it('does not expose absolute project or output paths in successful CLI output', async () => {
+    const project = await createProject();
+    const output = path.join(tmpDir, 'redacted-cli-output');
+
+    const result = runCli([project, output]);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).not.toContain(project);
+    expect(result.stdout).not.toContain(output);
+    expect(result.stdout).toContain('<redacted-output>');
+  });
+
   it('uses actual child-process exit codes and EVIDENCE_EXPORT_JSON for success, verification failure, and invalid arguments', async () => {
     const invalidOutput = path.join(tmpDir, 'invalid-output');
     for (const args of [[], ['--unknown-option'], ['--verify']]) {

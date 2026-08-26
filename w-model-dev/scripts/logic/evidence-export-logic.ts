@@ -52,6 +52,7 @@ type EvidenceManifest = {
   sourceProject: string;
   provenance: EvidenceProvenance;
   files: EvidenceFile[];
+  manifestSha256: string;
 };
 type FailureReason =
   | 'INVALID_JSON_EVIDENCE'
@@ -133,6 +134,17 @@ function sha256(content: string | Buffer): string {
 function hashFileList(files: Array<Pick<EvidenceFile, 'path' | 'sha256'>>): string {
   return sha256(JSON.stringify([...files].sort((left, right) => comparePaths(left.path, right.path))));
 }
+function hashManifest(manifest: Omit<EvidenceManifest, 'manifestSha256'>): string {
+  return sha256(
+    JSON.stringify({
+      schemaVersion: manifest.schemaVersion,
+      exportedAt: manifest.exportedAt,
+      sourceProject: manifest.sourceProject,
+      provenance: manifest.provenance,
+      files: manifest.files,
+    }),
+  );
+}
 function normalizeSensitiveKey(key: string): string {
   return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
@@ -150,6 +162,13 @@ function isSafeRelativePath(relativePath: string): boolean {
     !normalized.startsWith('../') &&
     !normalized.split('/').includes('..')
   );
+}
+function expectedEvidenceKind(relativePath: string): EvidenceKind | undefined {
+  if (relativePath === 'run-log.jsonl') return 'run-log';
+  return DIRECTORY_SOURCES.find(({ directory }) => relativePath.startsWith(`${directory}/`))?.kind;
+}
+function isAllowlistedEvidenceFile(file: EvidenceFile): boolean {
+  return expectedEvidenceKind(file.path) === file.kind;
 }
 async function lstatOrNull(target: string): Promise<Awaited<ReturnType<typeof fs.lstat>> | null> {
   try {
@@ -575,13 +594,14 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       await fs.mkdir(path.dirname(target), { recursive: true });
       await atomicWrite(target, content);
     }
-    const manifest: EvidenceManifest = {
+    const manifestBase: Omit<EvidenceManifest, 'manifestSha256'> = {
       schemaVersion: '1.0',
       exportedAt: new Date().toISOString(),
       sourceProject: '<redacted-project>',
       provenance: toExportProvenance(sourceProvenance, sortedFiles),
       files: sortedFiles,
     };
+    const manifest: EvidenceManifest = { ...manifestBase, manifestSha256: hashManifest(manifestBase) };
     if (!validateBySchema('evidence-manifest', manifest).valid) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
     await atomicWrite(path.join(staging, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + '\n');
     await assertSafeOutputPath(output, sourceReal);
@@ -630,8 +650,15 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
     if (!validateBySchema('evidence-manifest', manifest).valid) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
     const typed = manifest as EvidenceManifest;
     const expected = new Set<string>();
-    for (const file of typed.files) {
-      if (!isSafeRelativePath(file.path) || expected.has(file.path)) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
+    const sortedPaths = typed.files.map(({ path: filePath }) => filePath).sort(comparePaths);
+    for (const [index, file] of typed.files.entries()) {
+      if (
+        !isSafeRelativePath(file.path) ||
+        expected.has(file.path) ||
+        !isAllowlistedEvidenceFile(file) ||
+        file.path !== sortedPaths[index]
+      )
+        throw new EvidenceFailure(1, 'INVALID_MANIFEST');
       expected.add(file.path);
     }
     if (
@@ -641,7 +668,15 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
       !typed.provenance.producerVersion ||
       typeof typed.provenance.verifiedAt !== 'string' ||
       !/^[0-9a-f]{64}$/.test(typed.provenance.provenanceSha256 ?? '') ||
-      typed.provenance.contentHash !== hashFileList(typed.files)
+      typed.provenance.contentHash !== hashFileList(typed.files) ||
+      typed.manifestSha256 !==
+        hashManifest({
+          schemaVersion: typed.schemaVersion,
+          exportedAt: typed.exportedAt,
+          sourceProject: typed.sourceProject,
+          provenance: typed.provenance,
+          files: typed.files,
+        })
     ) {
       throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
     }

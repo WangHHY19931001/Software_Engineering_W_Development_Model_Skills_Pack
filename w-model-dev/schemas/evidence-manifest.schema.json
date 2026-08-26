@@ -5,7 +5,7 @@
   "description": "脱敏运行时审计证据导出清单；files 中每条记录导出相对路径、类别与 SHA-256，并绑定已验证运行 provenance。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "exportedAt", "sourceProject", "provenance", "files"],
+  "required": ["schemaVersion", "exportedAt", "sourceProject", "provenance", "files", "manifestSha256"],
   "properties": {
     "schemaVersion": {
       "description": "导出 manifest 格式版本。",
@@ -20,6 +20,11 @@
     "sourceProject": {
       "description": "固定脱敏源项目标识，不得包含原始绝对路径。",
       "const": "<redacted-project>"
+    },
+    "manifestSha256": {
+      "description": "清单主体（不含本字段）的规范 SHA-256，用于 package-only 完整性校验。",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     },
     "provenance": {
       "description": "导出包绑定的已验证运行身份、五类源证据测量（含 codegraph-queries）与导出内容哈希。",

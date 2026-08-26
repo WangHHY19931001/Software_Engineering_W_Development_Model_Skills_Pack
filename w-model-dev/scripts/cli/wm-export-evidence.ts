@@ -51,7 +51,12 @@ async function main(): Promise<void> {
     result = await exportEvidence(path.resolve(args[0]!), path.resolve(args[1]!));
   }
 
-  console.log('EVIDENCE_EXPORT_JSON ' + JSON.stringify({ script: 'wm-export-evidence.ts', ...result }));
+  const safeResult = {
+    ...result,
+    ...(result.outputDir ? { outputDir: '<redacted-output>' } : {}),
+    ...(result.manifestPath ? { manifestPath: '<redacted-output>/evidence-manifest.json' } : {}),
+  };
+  console.log('EVIDENCE_EXPORT_JSON ' + JSON.stringify({ script: 'wm-export-evidence.ts', ...safeResult }));
   if (!result.ok) {
     exitWithError({
       category: result.exitCode === 2 ? 'FILE_NOT_FOUND' : 'STRUCTURE_INVALID',
