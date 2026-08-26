@@ -104,6 +104,8 @@ const MEASURED_KINDS: Array<[EvidenceKind, keyof EvidenceMeasurements]> = [
 ];
 const ABSOLUTE_PATH_PATTERN =
   /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
+const ABSOLUTE_PATH_DETECTION_PATTERN =
+  /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/;
 const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
   { directory: 'gate-logs', kind: 'gate-log' },
   { directory: 'verifier-outputs', kind: 'verifier-output' },
@@ -152,6 +154,14 @@ function isPathInside(candidate: string, parent: string): boolean {
   const relative = path.relative(parent, candidate);
   return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
 }
+const SENSITIVE_METADATA_PATTERN =
+  /(?:^|[^a-z0-9])(?:token|secret|password|authorization|credential|api[\s_-]*key|access[\s_-]*token|private[\s_-]*key)\s*(?:[:=])\s*[^\s]*/i;
+function hasUnsafeMetadata(value: string): boolean {
+  return ABSOLUTE_PATH_DETECTION_PATTERN.test(value) || SENSITIVE_METADATA_PATTERN.test(value);
+}
+function isSafeManifestMetadata(value: string): boolean {
+  return value.length > 0 && !hasUnsafeMetadata(value);
+}
 function isSafeRelativePath(relativePath: string): boolean {
   if (!relativePath || path.isAbsolute(relativePath) || relativePath.includes('\\') || relativePath === MANIFEST_NAME)
     return false;
@@ -162,6 +172,9 @@ function isSafeRelativePath(relativePath: string): boolean {
     !normalized.startsWith('../') &&
     !normalized.split('/').includes('..')
   );
+}
+function isSafeManifestPath(relativePath: string): boolean {
+  return isSafeRelativePath(relativePath) && !hasUnsafeMetadata(relativePath);
 }
 function expectedEvidenceKind(relativePath: string): EvidenceKind | undefined {
   if (relativePath === 'run-log.jsonl') return 'run-log';
@@ -303,6 +316,7 @@ async function buildExportFiles(state: string, sourceReal: string): Promise<Expo
     if (!isPathInside(before.realPath, sourceReal)) throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
     const sourceContent = await fs.readFile(sourcePath);
     const sanitized = sanitizeContent(sourcePath, sourceContent);
+    if (hasUnsafeMetadata(source.sourceRelative)) throw new EvidenceFailure(1, 'UNSAFE_SOURCE_PATH');
     await assertStable(sourcePath, before, sourceReal);
     const measurementKey = MEASURED_KINDS.find(([kind]) => kind === source.kind)?.[1];
     if (measurementKey)
@@ -315,25 +329,26 @@ async function buildExportFiles(state: string, sourceReal: string): Promise<Expo
   entries.sort((left, right) => comparePaths(left.file.path, right.file.path));
   return { entries, files: entries.map(({ file }) => file), sourceMeasurements };
 }
-const SENSITIVE_KEY_PATTERN =
-  '(?:token|secret|password|api[_-]?key|authorization|credential|access[_-]?token|private[_-]?key)';
-const SENSITIVE_VALUE_LINE_PATTERN = new RegExp(
-  `^(\\s*(?:[-*>+]\\s+|\\[[A-Z]+\\]\\s+|` +
-    '`+' +
-    `\\s*)?)(?:${SENSITIVE_KEY_PATTERN})\\s*(?::|=)\\s*(?!https?://|[./]).+$`,
-  'i',
-);
-const SENSITIVE_VALUE_CONTEXT_PATTERN = new RegExp(
-  `^(\\s*(?:[-*>+]\\s+|\\[[A-Z]+\\]\\s+|` +
-    '`+' +
-    `\\s*)?[^:\\n|]{1,40}\\|\\s*(?:${SENSITIVE_KEY_PATTERN})\\s*(?::|=)\\s*)(?!https?://|[./]).+$`,
-  'i',
-);
+function sanitizeSensitiveAssignment(line: string): string {
+  const prefix = line.match(/^\s*(?:[-*>+]\s+|\[[A-Z]+\]\s+|`+\s*)/i)?.[0] ?? '';
+  const pipe = line.lastIndexOf('|');
+  const assignmentStart = pipe >= 0 ? pipe + 1 : prefix.length;
+  const assignment = line.slice(assignmentStart);
+  const match = /^(\s*)([^:=|]{1,80}?)(\s*[:=]\s*)(.*)$/.exec(assignment);
+  if (!match) return line;
+  const leading = match[1];
+  const key = match[2];
+  const separator = match[3];
+  if (leading === undefined || key === undefined || separator === undefined) return line;
+  if (!SENSITIVE_KEYS.has(normalizeSensitiveKey(key.trim()))) return line;
+  return `${line.slice(0, assignmentStart)}${leading}${key}${separator}${REDACTED}`;
+}
 function sanitizeString(value: string): string {
   return value
     .replace(ABSOLUTE_PATH_PATTERN, REDACTED_ABSOLUTE_PATH)
-    .replace(SENSITIVE_VALUE_CONTEXT_PATTERN, `$1${REDACTED}`)
-    .replace(SENSITIVE_VALUE_LINE_PATTERN, (line) => line.replace(/([^:=]*[:=]\s*).+$/s, `$1${REDACTED}`));
+    .split(/(\r?\n)/)
+    .map((line, index) => (index % 2 === 1 ? line : sanitizeSensitiveAssignment(line)))
+    .join('');
 }
 
 type MarkdownCell = { start: number; end: number; value: string };
@@ -497,7 +512,8 @@ function parseSourceProvenance(value: unknown): SourceVerificationProvenance {
     typeof source.commitSha !== 'string' ||
     !/^[0-9a-f]{40}$/.test(source.commitSha) ||
     typeof source.artifactId !== 'string' ||
-    source.artifactId.length === 0 ||
+    !isSafeManifestMetadata(source.runId) ||
+    !isSafeManifestMetadata(source.artifactId) ||
     source.verificationStatus !== 'passed' ||
     !isEvidenceMeasurements(source.measurements) ||
     typeof source.sourceBundleSha256 !== 'string' ||
@@ -653,7 +669,7 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
     const sortedPaths = typed.files.map(({ path: filePath }) => filePath).sort(comparePaths);
     for (const [index, file] of typed.files.entries()) {
       if (
-        !isSafeRelativePath(file.path) ||
+        !isSafeManifestPath(file.path) ||
         expected.has(file.path) ||
         !isAllowlistedEvidenceFile(file) ||
         file.path !== sortedPaths[index]

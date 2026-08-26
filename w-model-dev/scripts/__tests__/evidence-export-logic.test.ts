@@ -406,6 +406,55 @@ describe('evidence export logic', () => {
     await expect(fs.access(path.join(output, 'evidence-manifest.json'))).rejects.toThrow();
   });
 
+  it('redacts spaced sensitive keys in JSONL and Markdown even when values look like URLs or relative paths', async () => {
+    const project = await createProject();
+    const queryDirectory = path.join(project, '.w-model', 'codegraph-queries');
+    await fs.writeFile(
+      path.join(queryDirectory, 'sensitive.jsonl'),
+      [
+        JSON.stringify({ 'api key': 'https://example.test/api-key-secret' }),
+        JSON.stringify({ 'access token': './relative-token-secret' }),
+        JSON.stringify({ 'private key': 'private-key-secret' }),
+      ].join('\n') + '\n',
+      'utf8',
+    );
+    await fs.appendFile(
+      path.join(queryDirectory, 'query.md'),
+      [
+        'Authorization: https://example.test/authorization-secret',
+        'api key: ./api-key-secret',
+        'access token = https://example.test/access-token-secret',
+        'private key: ./private-key-secret',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    const output = path.join(tmpDir, 'spaced-sensitive-evidence');
+
+    const exported = runCli([project, output]);
+
+    expect(exported.code).toBe(0);
+    const markdown = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
+    const jsonl = await fs.readFile(path.join(output, 'codegraph-queries', 'sensitive.jsonl'), 'utf8');
+    for (const secret of [
+      'authorization-secret',
+      'api-key-secret',
+      'access-token-secret',
+      'private-key-secret',
+      'relative-token-secret',
+    ]) {
+      expect(markdown + jsonl).not.toContain(secret);
+    }
+    expect(markdown).toContain('Authorization: [REDACTED]');
+    expect(markdown).toContain('api key: [REDACTED]');
+    expect(markdown).toContain('access token = [REDACTED]');
+    expect(markdown).toContain('private key: [REDACTED]');
+    expect(jsonl).toContain('"api key":"[REDACTED]"');
+    expect(jsonl).toContain('"access token":"[REDACTED]"');
+    expect(jsonl).toContain('"private key":"[REDACTED]"');
+  });
+
   it('recursively redacts sensitive JSON and JSONL field values without leaking source values', async () => {
     const project = await createProject();
     const output = path.join(tmpDir, 'evidence');
@@ -624,6 +673,47 @@ describe('evidence export logic', () => {
       ok: false,
       exitCode: 1,
     });
+  });
+
+  it('rejects malicious runId-derived artifactId and filename metadata before creating a manifest', async () => {
+    const project = await createProject();
+    const state = path.join(project, '.w-model');
+    const runLogPath = path.join(state, 'run-log.jsonl');
+    const runLog = await fs.readFile(runLogPath, 'utf8');
+    await fs.writeFile(runLogPath, runLog.replace(/"runId":"r12"/, '"runId":"token=manifest-secret"'), 'utf8');
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    const output = path.join(tmpDir, 'malicious-id-evidence');
+
+    const idResult = runCli([project, output]);
+
+    expect(idResult.code).toBe(1);
+    expect(idResult.stdout + idResult.stderr).not.toContain('manifest-secret');
+    await expect(fs.access(path.join(output, 'evidence-manifest.json'))).rejects.toThrow();
+
+    const filenameProject = await createProject('malicious-filename-project');
+    const maliciousFile = path.join(filenameProject, '.w-model', 'codegraph-queries', 'token=filename-secret.json');
+    await fs.writeFile(maliciousFile, '{"safe":true}\n', 'utf8');
+    expect((await produceSourceProvenance(filenameProject)).ok).toBe(true);
+    const filenameOutput = path.join(tmpDir, 'malicious-filename-evidence');
+
+    const filenameResult = runCli([filenameProject, filenameOutput]);
+
+    expect(filenameResult.code).toBe(1);
+    expect(filenameResult.stdout + filenameResult.stderr).not.toContain('filename-secret');
+    await expect(fs.access(path.join(filenameOutput, 'evidence-manifest.json'))).rejects.toThrow();
+
+    const artifactProject = await createProject('malicious-artifact-project');
+    const artifactProvenancePath = path.join(artifactProject, '.w-model', 'evidence-provenance.json');
+    const artifactProvenance = JSON.parse(await fs.readFile(artifactProvenancePath, 'utf8')) as Record<string, unknown>;
+    artifactProvenance.artifactId = 'authorization=artifact-secret';
+    await fs.writeFile(artifactProvenancePath, JSON.stringify(artifactProvenance), 'utf8');
+    const artifactOutput = path.join(tmpDir, 'malicious-artifact-evidence');
+
+    const artifactResult = runCli([artifactProject, artifactOutput]);
+
+    expect(artifactResult.code).toBe(1);
+    expect(artifactResult.stdout + artifactResult.stderr).not.toContain('artifact-secret');
+    await expect(fs.access(path.join(artifactOutput, 'evidence-manifest.json'))).rejects.toThrow();
   });
 
   it('rejects a package-only manifest with an unallowlisted path', async () => {
