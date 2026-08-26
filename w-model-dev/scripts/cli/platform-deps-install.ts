@@ -27,8 +27,6 @@
  * 设计：docs/superpowers/ 任务 A2b1 brief；核心 `lib/platform-deps-installer.ts`。
  */
 
-/* eslint-disable security/detect-non-literal-fs-filename -- 安装目标路径由受控参数（repoRoot + 已验证包名）拼装，路径校验/链接拒绝由核心在解包前完成 */
-
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -40,6 +38,7 @@ import { promisify } from 'node:util';
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import {
   PlatformDependencyVerificationError,
+  isUnsafeArchivePath,
   resolveLockfileV3Package,
   verifyPlatformDependency,
   type ArchiveEntry,
@@ -123,7 +122,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
         lockfileValues.push(value);
         break;
       case '--package':
-        if (/\s/.test(value)) {
+        if (/\s/.test(value) || isUnsafeArchivePath(value)) {
           throw new CliUsageError(`非法包名：${value}`);
         }
         packages.push(value);
@@ -210,6 +209,7 @@ interface PackageOutcome {
 
 async function pathExists(target: string): Promise<boolean> {
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is assembled from the repository root and the lockfile/package-selected install name
     await fs.access(target);
     return true;
   } catch {
@@ -224,6 +224,7 @@ const INDEX_ENTRY_NAMES = ['index.js', 'index.mjs', 'index.cjs'] as const;
 
 async function isFile(target: string): Promise<boolean> {
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is a package entry derived from verified package metadata inside isolated staging
     const stat = await fs.stat(target);
     return stat.isFile();
   } catch {
@@ -304,6 +305,7 @@ async function verifyPackageArtifacts(
     for (const rel of binRelPaths) {
       const target = path.resolve(packageRoot, rel);
       if (!isWithin(packageRoot, target) || !(await isFile(target))) continue;
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is a package bin path derived from verified package metadata inside isolated staging
       const stat = await fs.stat(target);
       if ((stat.mode & 0o111) === 0) {
         throw new Error(`loadModule: bin 制品缺少可执行位：${rel}`);
@@ -357,9 +359,11 @@ async function hasArtifactFile(packageRoot: string): Promise<boolean> {
   const stack = [packageRoot];
   while (stack.length > 0) {
     const current = stack.pop() as string;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- current is reached only by descending from the verified isolated package root
     const names = await fs.readdir(current).catch(() => [] as string[]);
     for (const name of names) {
       const full = path.join(current, name);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- full is a child of the verified isolated package root while walking extracted package artifacts
       const stat = await fs.stat(full).catch(() => undefined);
       if (stat === undefined) continue;
       if (stat.isDirectory()) {
@@ -387,6 +391,7 @@ async function hasArtifactFile(packageRoot: string): Promise<boolean> {
 async function loadModule(packageRoot: string): Promise<unknown> {
   let manifest: Record<string, unknown>;
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- packageRoot is the isolated staging root produced after lockfile/package/archive validation
     const raw = await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8');
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -427,6 +432,7 @@ async function loadModule(packageRoot: string): Promise<unknown> {
 /** 读取已存在安装目录的 identity；非本包目录（无/坏 package.json）返回 null */
 async function readInstalledIdentity(target: string): Promise<{ name?: unknown; version?: unknown } | null> {
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is the existing install selected by the lockfile package and checked before replacement
     const raw = await fs.readFile(path.join(target, 'package.json'), 'utf8');
     const parsed: unknown = JSON.parse(raw);
     return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
@@ -461,6 +467,7 @@ export async function installVerifiedPackage(input: InstallVerifiedPackageInput)
   try {
     await input.extractArchive(input.archive, staging);
     const stagedPackageRoot = path.join(staging, 'package');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target parent is derived from the lockfile-selected repository root and validated package name
     await fs.mkdir(path.dirname(target), { recursive: true });
 
     if (await pathExists(target)) {
@@ -472,14 +479,17 @@ export async function installVerifiedPackage(input: InstallVerifiedPackageInput)
         );
       }
       backup = `${target}.wm-backup-${randomUUID()}`;
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are derived from the lockfile-selected package target and unique staging token
       await fs.rename(target, backup);
     }
 
     try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- stagedPackageRoot is the validated package directory under isolated staging and target is lockfile/package-derived
       await fs.rename(stagedPackageRoot, target);
     } catch (error) {
       if (backup !== undefined) {
         try {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- backup and target are lockfile/package-derived paths within the repository root
           await fs.rename(backup, target);
         } catch {
           // 保留原始移动错误；备份路径已尽量恢复
@@ -489,6 +499,7 @@ export async function installVerifiedPackage(input: InstallVerifiedPackageInput)
     }
 
     if (backup !== undefined) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- backup is a unique path derived from the lockfile/package-selected target
       await fs.rm(backup, { recursive: true, force: true });
     }
     return target;
@@ -511,6 +522,7 @@ async function resolveArchiveBytes(
   if (injected !== undefined) return injected;
 
   const locked = resolveLockfileV3Package(io.lockfile, packageName);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- staging prefix is fixed under the OS temporary directory and npm pack runs only inside it
   const packDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-npm-pack-'));
   try {
     const execFileAsync = promisify(execFile) as (
@@ -533,9 +545,10 @@ async function resolveArchiveBytes(
     const list = Array.isArray(parsed) ? parsed : [];
     const first = list[0] as { filename?: unknown } | undefined;
     const filename = typeof first?.filename === 'string' ? first.filename : undefined;
-    if (filename === undefined) {
-      throw new Error('npm pack 未返回 tarball 文件名');
+    if (filename === undefined || path.basename(filename) !== filename || filename.includes('\0')) {
+      throw new Error('npm pack 返回了不安全 tarball 文件名');
     }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- filename is returned by npm pack and constrained to a basename beneath its isolated staging directory
     return await fs.readFile(path.join(packDir, filename));
   } catch (error) {
     throw new Error(
@@ -544,6 +557,7 @@ async function resolveArchiveBytes(
         : `npm pack 失败：${error instanceof Error ? error.message : String(error)}`,
     );
   } finally {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- packDir is the fixed-prefix isolated staging directory created above
     await fs.rm(packDir, { recursive: true, force: true });
   }
 }
@@ -613,6 +627,7 @@ export async function main(): Promise<void> {
   let fallbackTarball: Buffer | undefined;
   try {
     for (const spec of parsed.tarballs) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- spec.path is an explicit user-selected offline tarball input, read only as the requested source artifact
       const data = await fs.readFile(spec.path);
       if (spec.name !== undefined) {
         explicitTarball.set(spec.name, data);
@@ -634,6 +649,7 @@ export async function main(): Promise<void> {
 
   let lockfile: Buffer;
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- parsed.lockfile is required to be an absolute caller-selected lockfile path and is read as the package source of truth
     lockfile = await fs.readFile(parsed.lockfile);
   } catch (error) {
     const e = error as NodeJS.ErrnoException;

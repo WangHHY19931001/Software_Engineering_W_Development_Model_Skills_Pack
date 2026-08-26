@@ -17,10 +17,11 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
+import { isUnsafeArchivePath } from './platform-deps-installer.js';
 import type { ArchiveEntry } from './platform-deps-installer.js';
 
 /** 解析出的归档条目：ArchiveEntry + UStar mode（八进制，file/directory 条目携带） */
-export type TarArchiveEntry = ArchiveEntry & { mode?: number };
+export type TarArchiveEntry = ArchiveEntry & { mode?: number; rawPath?: string };
 
 const BLOCK_SIZE = 512;
 
@@ -141,9 +142,9 @@ function parseArchive(archive: Buffer): TarArchiveEntry[] {
     }
 
     const headerName = decodeName(header);
-    const entryPath = (
-      paxPending && paxRecords.get('path') !== undefined ? paxRecords.get('path')! : (gnuLongName ?? headerName)
-    ).replace(/\/+$/, '');
+    const rawPath =
+      paxPending && paxRecords.get('path') !== undefined ? paxRecords.get('path')! : (gnuLongName ?? headerName);
+    const entryPath = rawPath.replace(/\/+$/, '');
     // UStar mode（八进制）——提取时用于保留可执行位（真实 platform 包 bin 为 0755）
     const mode = readModeField(header);
     let linkname: string | undefined;
@@ -160,20 +161,20 @@ function parseArchive(archive: Buffer): TarArchiveEntry[] {
       case '0':
       case '\0':
       case '7':
-        entries.push({ path: entryPath, type: 'file', content: Buffer.from(data), mode });
+        entries.push({ path: entryPath, rawPath, type: 'file', content: Buffer.from(data), mode, linkname });
         break;
       case '5':
-        entries.push({ path: entryPath, type: 'directory', mode });
+        entries.push({ path: entryPath, rawPath, type: 'directory', mode, linkname });
         break;
       case '1':
-        entries.push({ path: entryPath, type: 'hardlink', linkname });
+        entries.push({ path: entryPath, rawPath, type: 'hardlink', linkname });
         break;
       case '2':
-        entries.push({ path: entryPath, type: 'symlink', linkname });
+        entries.push({ path: entryPath, rawPath, type: 'symlink', linkname });
         break;
       default:
         // 未知类型按普通文件保留数据（npm tarball 不含设备/管道节点）
-        entries.push({ path: entryPath, type: 'file', content: Buffer.from(data), mode });
+        entries.push({ path: entryPath, rawPath, type: 'file', content: Buffer.from(data), mode, linkname });
         break;
     }
 
@@ -192,31 +193,117 @@ export async function readArchiveEntries(archive: Buffer): Promise<readonly TarA
 }
 
 /**
- * 把已由核心校验过安全（无绝对路径 / '..' / 空段 / NUL，无符号/硬链接）的条目按
- * package/... 写盘。链接条目兜底拒绝，不写符号/硬链接。文件按 tar 记录的 mode
- * 创建（保留可执行位；无 mode 则用默认）。
+ * Return whether a lexical target remains strictly below the extraction root.
+ * `path.resolve` alone is not sufficient: `../` must be rejected before any filesystem I/O.
+ */
+function isWithinExtractionRoot(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+/** Reject symlink components in the caller-selected root and every target ancestor. */
+async function assertNoSymlinkAncestors(target: string): Promise<void> {
+  const ancestors: string[] = [];
+  let current = path.resolve(target);
+  for (;;) {
+    ancestors.push(current);
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  for (const ancestor of ancestors) {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- ancestor is derived from the validated extraction root/entry path and is checked before each extraction filesystem operation
+      const stat = await fs.lstat(ancestor);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`extractArchive 拒绝符号链接 ancestor：${ancestor}`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('拒绝符号链接 ancestor')) throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') throw error;
+    }
+  }
+}
+
+/** Create one safe directory hierarchy without accepting an existing symlink component. */
+async function ensureSafeDirectory(root: string, target: string): Promise<void> {
+  if (target !== root && !isWithinExtractionRoot(root, target)) {
+    throw new Error(`extractArchive 拒绝 extraction root 外路径：${target}`);
+  }
+  const relative = path.relative(root, target);
+  let current = root;
+  for (const segment of relative === '' ? [] : relative.split(path.sep)) {
+    current = path.join(current, segment);
+    await assertNoSymlinkAncestors(current);
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- current is derived from the validated archive path and caller-selected isolated staging root; all ancestors are lstat-checked
+      await fs.mkdir(current);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+    await assertNoSymlinkAncestors(current);
+  }
+}
+
+/**
+ * Parse and independently enforce the extraction boundary before writing anything:
+ * - rejects absolute, drive-qualified, NUL, '.', '..', or empty-segment paths;
+ * - rejects symlink, hardlink, and any linkname-bearing entries;
+ * - checks the resolved target is strictly beneath the caller-selected root;
+ * - rejects pre-existing symlink ancestors in the root/target hierarchy.
+ *
+ * The caller-side `validateArchiveEntries` remains in place as defense in depth. Files use
+ * the tar mode when present, preserving executable bits for valid UStar/PAX/GNU entries.
  */
 export async function extractArchive(archive: Buffer, directory: string): Promise<void> {
+  if (directory.includes('\0')) {
+    throw new Error('extractArchive 拒绝包含 NUL 的 extraction root');
+  }
+  const root = path.resolve(directory);
   const entries = parseArchive(gunzipSync(archive));
-  for (const entry of entries) {
-    const target = path.resolve(directory, entry.path);
-    if (entry.type === 'symlink' || entry.type === 'hardlink') {
+  const targets = entries.map((entry) => {
+    const archivePath = entry.rawPath ?? entry.path;
+    if (isUnsafeArchivePath(archivePath)) {
+      throw new Error(`extractArchive 拒绝不安全路径：${archivePath}`);
+    }
+    if (entry.type === 'symlink' || entry.type === 'hardlink' || entry.linkname !== undefined) {
       throw new Error(`extractArchive 拒绝链接条目：${entry.path}`);
     }
+    const target = path.resolve(root, entry.path);
+    if (!isWithinExtractionRoot(root, target)) {
+      throw new Error(`extractArchive 拒绝 extraction root 外路径：${entry.path}`);
+    }
+    return { entry, target };
+  });
+
+  await assertNoSymlinkAncestors(root);
+  // Create the caller-selected root one component at a time instead of recursively following an ancestor.
+  await ensureSafeDirectory(path.parse(root).root, root);
+  await assertNoSymlinkAncestors(root);
+
+  // Preflight all existing ancestors so a malicious later entry cannot cause partial writes.
+  for (const { target } of targets) {
+    await assertNoSymlinkAncestors(target);
+  }
+
+  for (const { entry, target } of targets) {
     if (entry.type === 'directory') {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- entry.path passed no-absolute/no-NUL/no-empty/no-.. validation above and target is rooted at caller directory
-      await fs.mkdir(target, { recursive: true });
+      await ensureSafeDirectory(root, target);
       continue;
     }
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- validated entry path remains beneath caller-supplied extraction root
-    await fs.mkdir(path.dirname(target), { recursive: true });
+
+    await ensureSafeDirectory(root, path.dirname(target));
+    await assertNoSymlinkAncestors(target);
     const content = entry.content ?? Buffer.alloc(0);
     if (entry.mode !== undefined) {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- validated entry path remains beneath caller-supplied extraction root
-      await fs.writeFile(target, content, { mode: entry.mode });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is derived from a validated archive path under the isolated root and its ancestors were lstat-checked
+      await fs.writeFile(target, content, { mode: entry.mode, flag: 'wx' });
     } else {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- validated entry path remains beneath caller-supplied extraction root
-      await fs.writeFile(target, content);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is derived from a validated archive path under the isolated root and its ancestors were lstat-checked
+      await fs.writeFile(target, content, { flag: 'wx' });
     }
+    await assertNoSymlinkAncestors(target);
   }
 }

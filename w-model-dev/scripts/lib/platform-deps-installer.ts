@@ -152,13 +152,18 @@ function validateSha512Integrity(archive: Buffer, integrity: string): void {
   }
 }
 
-function isUnsafeArchivePath(entryPath: string): boolean {
-  if (!entryPath || entryPath.includes('\0') || path.posix.isAbsolute(entryPath) || path.win32.isAbsolute(entryPath)) {
+export function isUnsafeArchivePath(entryPath: string): boolean {
+  if (!entryPath || entryPath.includes('\0')) {
     return true;
   }
 
-  const normalized = entryPath.replaceAll('\\', '/').replace(/\/$/, '');
-  return normalized.split('/').some((segment) => segment === '..' || segment === '');
+  const normalized = entryPath.replaceAll('\\', '/');
+  if (path.posix.isAbsolute(normalized) || path.win32.isAbsolute(normalized) || /^[A-Za-z]:/.test(normalized)) {
+    return true;
+  }
+
+  const segments = normalized.endsWith('/') ? normalized.slice(0, -1).split('/') : normalized.split('/');
+  return segments.some((segment) => segment === '..' || segment === '.' || segment === '');
 }
 
 function validateArchiveEntries(entries: readonly ArchiveEntry[]): void {

@@ -422,7 +422,7 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     });
   });
 
-  it('extractArchive 按 package/... 写盘；symlink/hardlink 兜底拒绝', async () => {
+  it('extractArchive 按 package/... 写盘；symlink/hardlink 兜底拒绝且不部分写盘', async () => {
     const dir = await makeTempDir('platform-deps-extract-');
     const archive = makeTar([
       { kind: 'directory', path: 'package/' },
@@ -431,7 +431,85 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
       { kind: 'symlink', path: 'package/bad.node', linkname: '/etc/passwd' },
     ]);
     await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
-    expect(await fs.readFile(path.join(dir, 'package', 'package.json'), 'utf8')).toBe('{"a":1}');
+    await expect(fs.access(path.join(dir, 'package', 'package.json'))).rejects.toThrow();
+    await expect(fs.access(path.join(dir, 'package', 'lib', 'deep.txt'))).rejects.toThrow();
+  });
+
+  it('extractArchive 直接拒绝穿越路径且不会写出 extraction root', async () => {
+    const dir = await makeTempDir('platform-deps-extract-traversal-');
+    const escapedName = `escaped-${randomUUID()}.txt`;
+    const escaped = path.resolve(dir, '..', escapedName);
+    const archive = makeTar([{ kind: 'file', path: `package/../../${escapedName}`, content: 'outside' }]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+    await expect(fs.access(escaped)).rejects.toThrow();
+  });
+
+  it.each(['/absolute.txt', `C:\\absolute-${randomUUID()}.txt`])(
+    'extractArchive 直接拒绝绝对路径 %s',
+    async (archivePath) => {
+      const dir = await makeTempDir('platform-deps-extract-absolute-');
+      const archive = makeTar([{ kind: 'file', path: archivePath, content: 'blocked' }]);
+
+      await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+      await expect(fs.readdir(dir)).resolves.toEqual([]);
+    },
+  );
+
+  it('extractArchive 直接拒绝携带 linkname 的非链接条目', async () => {
+    const dir = await makeTempDir('platform-deps-extract-linkname-');
+    const archive = makeTar([
+      { kind: 'file', path: 'package/fake-link', typeflag: '0', linkname: '../outside', content: 'blocked' },
+    ]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it('extractArchive 直接拒绝 hardlink 且不会创建目标文件', async () => {
+    const dir = await makeTempDir('platform-deps-extract-hardlink-');
+    const archive = makeTar([{ kind: 'hardlink', path: 'package/escape.node', linkname: '../../outside.node' }]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
+    await expect(fs.access(path.resolve(dir, '..', 'outside.node'))).rejects.toThrow();
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it.each([
+    { archivePath: 'package//empty-segment', label: '空段' },
+    { archivePath: 'package/../dotdot', label: '..' },
+  ])('extractArchive 直接拒绝$label路径', async ({ archivePath }) => {
+    const dir = await makeTempDir('platform-deps-extract-path-');
+    const archive = makeTar([{ kind: 'file', path: archivePath, content: 'blocked' }]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it('extractArchive 直接拒绝 PAX NUL 路径', async () => {
+    const dir = await makeTempDir('platform-deps-extract-nul-');
+    const archive = makeTar([
+      {
+        kind: 'file',
+        path: 'package/safe-name',
+        paxRecords: [['path', `package/nul-${randomUUID()}\0outside`]],
+        content: 'blocked',
+      },
+    ]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it('extractArchive 拒绝既有 symlink ancestor 且不会写到链接目标', async () => {
+    if (process.platform === 'win32') return;
+    const dir = await makeTempDir('platform-deps-extract-ancestor-');
+    const outside = await makeTempDir('platform-deps-extract-outside-');
+    await fs.symlink(outside, path.join(dir, 'package'));
+    const archive = makeTar([{ kind: 'file', path: 'package/escaped.txt', content: 'outside' }]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/符号链接|symlink|ancestor/i);
+    await expect(fs.access(path.join(outside, 'escaped.txt'))).rejects.toThrow();
   });
 });
 
@@ -478,6 +556,7 @@ describe('parseArgs（CLI 参数契约）', () => {
     { args: ['--lockfile=C:\\a\\package-lock.json', '--package'], why: '--package 缺 = 取值' },
     { args: ['--lockfile=relative\\lock.json', '--package=x'], why: 'lockfile 非绝对路径' },
     { args: ['--lockfile=C:\\a\\lock.json', '--package='], why: '空包名' },
+    { args: ['--lockfile=C:\\a\\lock.json', '--package=../../escape'], why: '包名路径穿越' },
   ])('拒绝非法参数：$why', ({ args }) => {
     expect(() => parseArgs(asArgv(args))).toThrow();
   });
