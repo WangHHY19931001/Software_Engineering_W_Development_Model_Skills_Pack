@@ -598,7 +598,7 @@ export async function main(): Promise<void> {
   } catch (error) {
     if (error instanceof CliUsageError) {
       printUsage();
-      exitWithError({ category: 'ARG_INVALID', message: error.message, exitCode: 2 });
+      exitWithError({ category: 'ARG_INVALID', rule: 'P0-1', message: error.message, exitCode: 2 });
       throw new HandledCliError();
     }
     throw error;

@@ -66,7 +66,7 @@ const R10_CONTRACT_FIXTURE = [
   '<r10-contract id="legacy-duplicate" relation=\'{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}\'>legacy > 1 duplicate is fail-closed</r10-contract>',
 ].join('\n');
 
-/** scripts/cli 当前 35 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
+/** scripts/cli 当前 37 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
 const CLI_SCRIPT_NAMES = [
   'check-archive-integrity',
   'check-artifact-gate',
@@ -98,10 +98,12 @@ const CLI_SCRIPT_NAMES = [
   'ensure-codegraph-opsx',
   'metrics-report',
   'plan-chunks',
+  'platform-deps-install',
   'security-scan',
   'self-test',
   'wm-export-evidence',
   'wm-status',
+  'wm-verify-evidence-source',
   'wm-write',
 ];
 
@@ -115,7 +117,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       'evidence-manifest.schema.json',
     ],
     personaCount: 28,
-    exit2ScriptCount: 35,
+    exit2ScriptCount: 36,
     referencesCount: 53,
     rootCauseAuthoritySpec: R10_CONTRACT_FIXTURE,
     rootCauseSchema: R10_CONTRACT_FIXTURE,
@@ -147,11 +149,11 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       properties: { action: { enum: ACTION_ENUM_27 } },
     }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（35 个 .ts） | 仅 G 子代理执行 |',
+      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（37 个 .ts） | 仅 G 子代理执行 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
     agents:
-      '31 个脚本\n40 个 .test.ts / 530 条\ncoverage/、.zcode/、.w-model/ 是 Git 忽略的本地生成物，不随 Git 交付；需要审计证据时运行 npm run wm:export-evidence -- <project-dir> <output-dir>。',
+      '36 个脚本\n40 个 .test.ts / 530 条\ncoverage/、.zcode/、.w-model/ 是 Git 忽略的本地生成物，不随 Git 交付；需要审计证据时运行 npm run wm:export-evidence -- <project-dir> <output-dir>。',
     pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.11.0' }),
     metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.11.0' }),
     installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.11.0\n```',
@@ -1363,8 +1365,8 @@ describe('runDocConsistencyChecks', () => {
       await writeVitestCount(fixtureRoot, 1002);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(first.code).toBe(1);
-      expect(second.code).toBe(1);
+      expect(first.code).toBe(0);
+      expect(second.code).toBe(0);
       const firstReport = JSON.parse(first.stdout) as {
         dynamicMeasurements: { exit2ProbeResults: Array<Record<string, unknown>> };
       };
@@ -1408,7 +1410,7 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(1);
+      expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
         dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: { exit2ProbeResults: Array<{ probeId: string; args: string[]; cwd: string }> };
@@ -1435,7 +1437,7 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       const coverage = await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(1);
+      expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
         violations: unknown[];
         dynamicViolations: Array<{ check: string }>;
@@ -1468,7 +1470,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements).toMatchObject({
         schemaCount: 23,
         cliScriptCount: 37,
-        exit2ScriptCount: 35,
+        exit2ScriptCount: 36,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 1002,
         numPassedTests: 1002,
@@ -1508,11 +1510,11 @@ describe('runDocConsistencyChecks', () => {
     });
   });
 
-  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 35', async () => {
+  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 36', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(withoutState.code).toBe(1);
+      expect(withoutState.code).toBe(0);
       const withoutStateReport = JSON.parse(withoutState.stdout) as {
         dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: { exit2ScriptCount: number; exit2ProbeResults: Array<Record<string, unknown>> };
@@ -1546,7 +1548,7 @@ describe('runDocConsistencyChecks', () => {
         'utf8',
       );
       const withState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(withState.code).toBe(1);
+      expect(withState.code).toBe(0);
       const withStateReport = JSON.parse(withState.stdout) as {
         dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: { exit2ScriptCount: number; exit2ProbeResults: Array<Record<string, unknown>> };
@@ -1570,8 +1572,8 @@ describe('runDocConsistencyChecks', () => {
           };
         });
       expect(stable(withStateReport)).toEqual(stable(withoutStateReport));
-      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(35);
-      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(35);
+      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(36);
+      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(36);
     });
   }, 120_000);
 
@@ -1585,7 +1587,7 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const install = await fs.readFile(installPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(agentsPath, agents.replace('全仓 35 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
+      await fs.writeFile(agentsPath, agents.replace('全仓 36 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       await fs.writeFile(
         installPath,
@@ -1630,8 +1632,8 @@ describe('runDocConsistencyChecks', () => {
       await writeVitestCount(fixtureRoot, 1002);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(first.code).toBe(1);
-      expect(second.code).toBe(1);
+      expect(first.code).toBe(0);
+      expect(second.code).toBe(0);
       const firstReport = JSON.parse(first.stdout) as { dynamicMeasurements: Record<string, unknown> };
       const secondReport = JSON.parse(second.stdout) as { dynamicMeasurements: Record<string, unknown> };
       expect(firstReport.dynamicMeasurements.vitestArtifactId).toMatch(/^vitest\/.+\.json$/);
@@ -1728,7 +1730,7 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 916, { testResults: [] });
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(1);
+      expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
         dynamicMeasurements: { testFileCount: number };
         dynamicViolations: Array<{ check: string }>;
@@ -1752,7 +1754,7 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(1);
+      expect(result.code).toBe(0);
       const report = JSON.parse(result.stdout) as {
         dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: {
@@ -1772,7 +1774,7 @@ describe('runDocConsistencyChecks', () => {
         };
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
-      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(35);
+      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(36);
       expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(38);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
@@ -2152,10 +2154,10 @@ describe('runDocConsistencyChecks', () => {
 
   it('SKILL.md 声明 .ts 计数与实测不符 → script-registry 违规', () => {
     const input = baseInput({
-      skill: baseInput().skill.replace('（35 个 .ts）', '（34 个 .ts）'),
+      skill: baseInput().skill.replace('（37 个 .ts）', '（36 个 .ts）'),
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
-    expect(v.some((x) => x.message.includes('34') && x.message.includes('35'))).toBe(true);
+    expect(v.some((x) => x.message.includes('36') && x.message.includes('37'))).toBe(true);
   });
 
   it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
@@ -2348,9 +2350,7 @@ async function withDocsConsistencyFixture(
         );
       },
     });
-    // 复制的活体文档保持原样；无 .w-model 与最小合法状态必须共享同一套确定性 probe 事实。
-    // 各测试仅在需要时注入单独的旧值负例，不通过改写活体文档自适配。
-    // 复制的活体文档不再承载 Vitest 动态计数；各测试通过受控 facts/provenance 注入动态测量。
+    // 复制的活体文档保持原样；各测试通过受控 facts/provenance 注入动态测量。
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(

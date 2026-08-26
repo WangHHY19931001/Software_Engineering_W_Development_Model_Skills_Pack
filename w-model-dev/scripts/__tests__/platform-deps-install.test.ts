@@ -746,7 +746,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     const result = runCli(args);
     expect(result.code).toBe(2);
     expect(result.stdout).toContain('用法');
-    expect(result.stdout).toContain('exitCode');
+    expect(result.stdout).toMatch(/ERROR_JSON .*"rule":"P0-1"/);
   });
 
   it('退出码 2：--tarball 文件不可读（FILE_NOT_FOUND）', async () => {

@@ -288,15 +288,16 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 36 个 .ts
-> 一一对应（26 个 check-* + 9 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
+> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 37 个 .ts
+> 一一对应（26 个 check-* + 10 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
 > **新增 / 改名门禁脚本时只在本文件登记一处**——`check-docs-consistency.ts` 的 script-registry 检查
-> 核对全部 36 个 cli 脚本名均出现于本文件（其中 35 个为 exit-2 脚本；漏登记即门禁失败，pre-push 第 14 项拦截）。
+> 核对全部 37 个 cli 脚本名均出现于本文件（其中 36 个为 exit-2 脚本；漏登记即门禁失败，pre-push 第 14 项拦截）。
 
 | 脚本 | 类别 | 用途 | 触发时机 |
 |---|---|---|---|
 | check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本七处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
 | check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
+| check-tla-bdd-sync | 阶段工具 | TLA+ 与 BDD 配对文件的转移集 / 状态集 / 不变式等价同步校验 | 阶段 1-4 Artifact Gate pair sync |
 | security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
 | self-test | 工具 | 260 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
 | wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
@@ -305,6 +306,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | doctor | 工具 | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts） | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门 |
 | wm-export-evidence | 工具 | 将项目 `.w-model/` 白名单状态和文本 run-log 导出为脱敏、SHA-256 manifest 证据包；支持 `--verify` package-only 复核和 `--source-project` source-bound 重验 | 需要按项目安全策略交付本地审计证据时显式运行；不自动提交或发布 |
 | wm-verify-evidence-source | 工具 | 读取并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，生产并原子写入 `.w-model/evidence-provenance.json`；不是只读 verify | 导出证据前显式运行；成功才可产生 source-bound provenance，不自动提交或发布 |
+| platform-deps-install | 工具 | 在显式 `--install` 路径验证并原子安装 lockfile 指定的 platform 原生包 | 开发者显式执行，平台依赖缺失时按需运行，非阶段门 |
 
 ## 7. 反模式 → check 脚本映射速查
 

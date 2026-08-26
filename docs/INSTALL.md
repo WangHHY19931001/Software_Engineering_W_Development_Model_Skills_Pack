@@ -118,7 +118,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 ├── schemas/            # 23 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / gate-log / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep / evidence-manifest / evidence-provenance），由 infrastructure/schema-loader.ts 在 logic 层前置加载
 ├── tools/              # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 9 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph-opsx / wm-write / doctor / plan-chunks / wm-export-evidence / wm-verify-evidence-source；exit-2 脚本口径 = 26 check + 9 工具 CLI = 35，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
+│   ├── cli/            # CLI 入口层（26 个 check-*.ts 门禁入口 + 10 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph-opsx / wm-write / doctor / plan-chunks / wm-export-evidence / wm-verify-evidence-source / platform-deps-install；exit-2 脚本口径 = 26 check + 10 工具 CLI = 36，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（24 个 *-logic.ts + plan-chunks-logic.ts）
 │   ├── infrastructure/ # 基础设施适配（schema-loader.ts / schema-fs.ts；Ajv 单例 + schemas/*.schema.json 自动加载）
 │   ├── lib/            # 共享工具（12 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace）
