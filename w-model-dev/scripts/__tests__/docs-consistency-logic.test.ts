@@ -1837,17 +1837,27 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('CLI 无 JSON 且 Vitest 不可用（显式清除外部 JSON 环境变量）→ vitest-tests 违规并 exit 1', async () => {
-    await withDocsConsistencyFixture(async (fixtureRoot) => {
-      const result = runDocsConsistencyCli(fixtureRoot, {
-        ...process.env,
-        WM_VITEST_COUNT_FILE: '',
-        PATH: '',
-        Path: '',
-      });
-      expect(result.code).toBe(1);
-      expect(result.stdout).toContain('vitest 用例  : 无法采集（不一致）');
-      expect(result.stdout).toContain('[vitest-tests]');
-    });
+    await withDocsConsistencyFixture(
+      async (fixtureRoot) => {
+        expect(existsSync(path.join(fixtureRoot, 'node_modules', 'vitest'))).toBe(false);
+        const result = runDocsConsistencyCli(
+          fixtureRoot,
+          {
+            WM_VITEST_COUNT_FILE: '',
+            WM_VITEST_PROVENANCE_FILE: '',
+            WM_VITEST_PROVENANCE_ROOT: '',
+            PATH: '',
+            Path: '',
+          },
+          [],
+          { timeoutMs: 30_000 },
+        );
+        expect(result.code, JSON.stringify(result)).toBe(1);
+        expect(result.stdout).toContain('vitest 用例  : 无法采集（不一致）');
+        expect(result.stdout).toContain('[vitest-tests]');
+      },
+      { availablePackages: ['tsx', 'typescript', 'esbuild'] },
+    );
   }, 120_000);
 
   it('CLI 注入 SSoT 断链 → internal-links 违规并 exit 1', async () => {
@@ -2323,7 +2333,10 @@ const DOCS_CONSISTENCY_CLI = path.resolve(
 );
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
-async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) => Promise<void>): Promise<void> {
+async function withDocsConsistencyFixture(
+  assertResult: (fixtureRoot: string) => Promise<void>,
+  options: { availablePackages?: string[] } = {},
+): Promise<void> {
   const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-docs-consistency-cli-'));
   try {
     cpSync(REPO_ROOT, fixtureRoot, {
@@ -2385,8 +2398,23 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
       },
     );
     expect(commit.status, `git commit failed: stdout=${commit.stdout ?? ''} stderr=${commit.stderr ?? ''}`).toBe(0);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture dependency junction has a repository-controlled source and mkdtemp-owned destination
-    await fs.symlink(path.join(REPO_ROOT, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'junction');
+    const fixtureNodeModules = path.join(fixtureRoot, 'node_modules');
+    if (options.availablePackages === undefined) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture dependency junction has a repository-controlled source and mkdtemp-owned destination
+      await fs.symlink(path.join(REPO_ROOT, 'node_modules'), fixtureNodeModules, 'junction');
+    } else {
+      // Keep the fixture's dependency boundary explicit: tests that simulate a missing package
+      // must not discover the parent checkout's node_modules through a junction.
+      await fs.mkdir(fixtureNodeModules);
+      for (const packageName of options.availablePackages) {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- package source is repository-controlled and destination is mkdtemp-owned
+        await fs.symlink(
+          path.join(REPO_ROOT, 'node_modules', packageName),
+          path.join(fixtureNodeModules, packageName),
+          'junction',
+        );
+      }
+    }
     await assertResult(fixtureRoot);
   } finally {
     await fs.rm(fixtureRoot, { recursive: true, force: true });
@@ -2403,7 +2431,14 @@ function runDocsConsistencyCli(
   fixtureRoot: string,
   envOverrides: NodeJS.ProcessEnv = {},
   args: string[] = [],
-): { code: number | null; stdout: string; stderr: string } {
+  options: { timeoutMs?: number } = {},
+): {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  error?: { code?: number | string; message: string };
+  signal: NodeJS.Signals | null;
+} {
   const countFile = path.join(fixtureRoot, 'vitest-results.json');
   const provenanceFile = path.join(fixtureRoot, 'vitest-results.provenance.json');
   // Keep this real CLI probe aligned with the centralized synchronous-process audit.
@@ -2411,9 +2446,9 @@ function runDocsConsistencyCli(
   // Its timeout follow-up remains tracked by the existing exception manifest.
   // Do not replace this with a mocked call: the fixture test covers the CLI boundary.
   const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot, ...args], {
-    cwd: REPO_ROOT,
+    cwd: fixtureRoot,
     encoding: 'utf-8',
-    timeout: 90_000,
+    timeout: options.timeoutMs ?? 90_000,
     env: {
       ...process.env,
       WM_VITEST_COUNT_FILE: countFile,
@@ -2422,7 +2457,14 @@ function runDocsConsistencyCli(
       ...envOverrides,
     },
   });
-  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  const spawnError = result.error as (NodeJS.ErrnoException & { message: string }) | undefined;
+  return {
+    code: result.status,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    ...(spawnError === undefined ? {} : { error: { code: spawnError.code, message: spawnError.message } }),
+    signal: result.signal,
+  };
 }
 
 async function writeVitestCount(
