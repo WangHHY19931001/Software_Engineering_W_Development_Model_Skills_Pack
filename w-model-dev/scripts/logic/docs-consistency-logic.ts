@@ -1,7 +1,7 @@
 /**
  * 文档一致性纯逻辑（docs-consistency-logic.ts）
  *
- * 校验活体文档中的计数 / 枚举 / 清单与代码事实一致，防文档漂移。
+ * 校验活体文档中的静态计数 / 枚举 / 清单与代码事实一致，并校验动态 facts 的完整性，防文档漂移。
  * 纯逻辑无 IO；IO（读文件 / 数目录）由 check-docs-consistency.ts 承担。
  * 设计：docs/superpowers/specs/2026-08-10-doc-consistency-correction-design.md §4
  */
@@ -112,7 +112,7 @@ export interface DocConsistencyInput {
   agents: string;
   ssot: string;
   prePush: string;
-  /** vitest 计数检查的额外文档原文（可选——缺省跳过；CLI 层注入 CONTRIBUTING.md 与 docs/INSTALL.md，与 linkDocs 注入策略一致） */
+  /** 旧调用方兼容输入：Vitest 动态计数不再从文档文本校验，此字段不会被消费。 */
   vitestExtraDocs?: Array<{ name: string; content: string }>;
   /** .github/PULL_REQUEST_TEMPLATE.md 原文（可选——缺省时跳过 PR 模板门禁项数检查） */
   prTemplate?: string;
@@ -152,9 +152,9 @@ export interface DocConsistencyInput {
   localEvidenceDocs?: Array<{ name: string; content: string }>;
   /** docs/ 根 6 份设计文档（活体引用） */
   designDocs: Array<{ name: string; content: string }>;
-  /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数（实测；期望值由 README「N files」/ AGENTS「N 个 .test.ts」表述声明） */
+  /** w-model-dev/scripts/__tests__/ 下 *.test.ts 文件数；仅来自受控 Vitest facts，进入 dynamicMeasurements，不从文档反推。 */
   testFileCount: number;
-  /** vitest run 实际运行输出的用例总数；-1 = 无法采集（vitest 不可用 / 输出不可解析，此时不校验用例总数） */
+  /** Vitest facts 实际运行输出的用例总数；-1 = 无法采集，动态检查 fail-closed。 */
   vitestTestCount: number;
   /** 同一份 Vitest JSON 测量的运行结果完整性；false 时不可用动态计数支撑通过结论。 */
   vitestMeasurementsValid?: boolean;
@@ -209,8 +209,8 @@ export interface DocConsistencyInput {
 
 /**
  * 语义性常量（低频变更，无法从活体文档解析或解析成本过高）。
- * 文件计数类期望值（schema / references / persona / vitest 文件数 / exit-2 脚本数）与版本号
- * 一律从活体文档解析，不在此硬编码——消除「文件系统 ↔ 代码常量 ↔ 文档」三方同步。
+ * 静态计数类期望值（schema / references / persona / exit-2 脚本数）与版本号
+ * 一律从活体文档解析，不在此硬编码；Vitest 文件数/用例数属于受控动态 facts，不由文档声明。
  */
 export const EXPECTED = {
   runLogActionCount: 27,
@@ -296,7 +296,7 @@ const DYNAMIC_CHECKS = new Set([
   'exit2-probe',
   'references-count',
   'asset-counts',
-  'vitest-files',
+  'vitest-results',
   'vitest-tests',
 ]);
 
@@ -761,15 +761,11 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   violations.push(...checkAssetCounts(input.personaCount, input.readme));
   violations.push(...checkReferencesCount(input.referencesCount, input.skill));
   violations.push(...checkDesignDocs(input.designDocs));
-  violations.push(...checkVitestFileCount(input.testFileCount, input.readme, input.agents));
+  // Vitest 文件数与用例总数只作为受控事实包的动态测量输出，不再要求复制到活体文档。
+  // 仍校验 facts/provenance 的完整性、身份、hash 与成功状态，缺失或不可信时 fail-closed。
   violations.push(
-    ...checkVitestTestCount(
+    ...checkVitestMeasurements(
       input.vitestTestCount,
-      input.testFileCount,
-      input.readme,
-      input.agents,
-      input.prePush,
-      input.vitestExtraDocs,
       input.vitestMeasurementsValid,
       input.vitestMeasurementsReason,
       input.vitestRunId,
@@ -1472,48 +1468,13 @@ function checkDesignDocs(designDocs: Array<{ name: string; content: string }>): 
   return violations;
 }
 
-/** vitest 测试文件数：期望值从 README「N files」/ AGENTS「N 个 .test.ts」表述解析，实测须命中声明集。 */
-function checkVitestFileCount(testFileCount: number, readme: string, agents: string): DocCheckViolation[] {
-  const violations: DocCheckViolation[] = [];
-  const readmeDeclared = [...readme.matchAll(/(\d+)\s*files/g)].map((m) => Number(m[1]));
-  if (readmeDeclared.length === 0) {
-    violations.push({ check: 'vitest-files', message: 'README 缺「N files」vitest 文件数表述' });
-  } else if (!readmeDeclared.includes(testFileCount)) {
-    violations.push({
-      check: 'vitest-files',
-      message: `README 声明 ${readmeDeclared.join('/')} files，实际 ${testFileCount}（新增测试文件须同步文档）`,
-    });
-  }
-  const agentsDeclared = [...agents.matchAll(/(\d+)\s*个\s*\.test\.ts/g)].map((m) => Number(m[1]));
-  if (agentsDeclared.length === 0) {
-    violations.push({ check: 'vitest-files', message: 'AGENTS.md 缺「N 个 .test.ts」vitest 文件数表述' });
-  } else if (!agentsDeclared.includes(testFileCount)) {
-    violations.push({
-      check: 'vitest-files',
-      message: `AGENTS.md 声明 ${agentsDeclared.join('/')} 个 .test.ts，实际 ${testFileCount}（新增测试文件须同步文档）`,
-    });
-  }
-  return violations;
-}
-
 /**
- * vitest 用例总数一致性校验（堵住 checkVitestFileCount 只查文件数不查用例总数的盲区）：
- * CLI 层从 `npx vitest run` 输出采集实测用例总数并注入，此处要求 README / AGENTS / pre-push
- * 三处活体文档文本均出现该总数（「N tests」或「N 条」），测试用例增删但文档未同步即触发违规。
- * 无法采集（vitest 不可用 / 输出不可解析，vitestTestCount < 0）时 fail-closed：产生
- * `vitest-tests` 违规并阻断门禁。计数是活体文档的一致性证据，缺失证据不可放行。
- *
- * 过期计数检查（stale-count）：出现性检查只能保证实测总数「存在」于文档，无法拦截同一文档
- * 内并存的旧数字（如 README 一处写 686、另一处残留 663）。因此对 vitest 语境的两种计数
- * 格式逐处比对：文件数须等于 testFileCount、用例数须等于 vitestTestCount，任一不符即违规。
+ * Vitest 动态事实包完整性校验。
+ * 文件数和用例数只进入 dynamicMeasurements，不再从 README/AGENTS/pre-push 等文档反推或要求复制。
+ * 缺失/损坏 facts、身份、artifact 路径、hash 或 commit 绑定时保持 fail-closed。
  */
-function checkVitestTestCount(
+function checkVitestMeasurements(
   vitestTestCount: number,
-  testFileCount: number,
-  readme: string,
-  agents: string,
-  prePush: string,
-  extraVitestDocs?: Array<{ name: string; content: string }>,
   vitestMeasurementsValid?: boolean,
   vitestMeasurementsReason?: string,
   vitestRunId?: string,
@@ -1522,10 +1483,16 @@ function checkVitestTestCount(
   vitestCommitSha?: string,
 ): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  if (vitestMeasurementsValid === false) {
+  if (vitestMeasurementsValid !== true) {
     violations.push({
       check: 'vitest-results',
       message: `Vitest JSON 运行结果不可采信：${vitestMeasurementsReason ?? '缺失完整成功状态'}（fail-closed）`,
+    });
+  }
+  if (vitestTestCount < 0) {
+    violations.push({
+      check: 'vitest-tests',
+      message: 'Vitest 实测用例总数无法采集（Vitest 启动、JSON 或文本解析失败；fail-closed）',
     });
   }
   if (vitestMeasurementsValid === true) {
@@ -1551,50 +1518,6 @@ function checkVitestTestCount(
         check: 'vitest-results',
         message: '成功 Vitest artifact 缺少有效 runId、相对 artifactId、commit SHA 或内容 SHA-256（fail-closed）',
       });
-    }
-  }
-  if (vitestTestCount < 0) {
-    violations.push({
-      check: 'vitest-tests',
-      message: 'Vitest 实测用例总数无法采集（Vitest 启动、JSON 或文本解析失败；fail-closed）',
-    });
-    return violations;
-  }
-  const pattern = new RegExp(`\\b${vitestTestCount}\\s*(?:tests?\\b|条)`);
-  const docs: Array<[string, string]> = [
-    ['README.md', readme],
-    ['AGENTS.md', agents],
-    ['.githooks/pre-push', prePush],
-    ...(extraVitestDocs?.map((d) => [d.name, d.content] as [string, string]) ?? []),
-  ];
-  for (const [docName, content] of docs) {
-    if (!pattern.test(content)) {
-      violations.push({
-        check: 'vitest-tests',
-        message: `${docName} 应含 vitest 实测用例总数「${vitestTestCount} tests」或「${vitestTestCount} 条」（vitest run 实测 ${vitestTestCount} 条，测试用例增删须同步文档）`,
-      });
-    }
-    const reportStaleCount = (text: string, fileN: number, testN: number): void => {
-      if (testN !== vitestTestCount || (testFileCount >= 0 && fileN !== testFileCount)) {
-        violations.push({
-          check: 'vitest-tests',
-          message: `${docName} 存在过期 vitest 计数「${text}」（实测 ${testFileCount} 个 .test.ts / ${vitestTestCount} 条），须同步`,
-        });
-      }
-    };
-    const fileFirstFormats = [
-      /(\d+)\s*files?\s*\/\s*(\d+)\s*tests?\b/g,
-      /(\d+)\s*个\s*\.test\.ts\s*\/\s*(\d+)\s*(?:tests?|条)/g,
-      /(\d+)\s*个\s*test\s*文件\s*\/\s*(\d+)\s*(?:tests?|条)/g,
-    ];
-    for (const re of fileFirstFormats) {
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(content)) !== null) reportStaleCount(m[0], Number(m[1]), Number(m[2]));
-    }
-    const testFirstFormat = /vitest\s*(\d+)\s*(?:tests?|条)\s*（\s*(\d+)\s*test\s*files?\s*）/gi;
-    let testFirstMatch: RegExpExecArray | null;
-    while ((testFirstMatch = testFirstFormat.exec(content)) !== null) {
-      reportStaleCount(testFirstMatch[0], Number(testFirstMatch[2]), Number(testFirstMatch[1]));
     }
   }
   return violations;

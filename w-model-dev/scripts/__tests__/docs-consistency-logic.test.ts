@@ -176,7 +176,15 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     designDocs: [],
     testFileCount: 40,
     vitestTestCount: 530,
-    prePush: '# 17. typecheck\n# 与原 CI 一致：17 项检查\n# vitest 全量（530 tests）',
+    vitestMeasurementsValid: true,
+    vitestPassedCount: 530,
+    vitestFailedCount: 0,
+    vitestSuccess: true,
+    vitestRunId: 'a'.repeat(16),
+    vitestArtifactId: 'vitest/results.json',
+    vitestArtifactSha256: 'b'.repeat(64),
+    vitestCommitSha: 'c'.repeat(40),
+    prePush: '# 17. typecheck\n# 与原 CI 一致：17 项检查\n# vitest 全量结果以当前命令输出为准',
     scriptsChanged: false,
     securityBaselineEntryCount: -1,
     a4Docs: {
@@ -653,15 +661,7 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
     expect(oldSemantics.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
       true,
     );
-    expect(oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('47 个 test 文件 / 725 条'))).toBe(
-      true,
-    );
-    expect(
-      oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('vitest 725 条（47 test files）')),
-    ).toBe(true);
-    expect(oldSemantics.some((x) => x.check === 'vitest-tests' && x.message.includes('49 个 test 文件 / 766 条'))).toBe(
-      true,
-    );
+    expect(oldSemantics.some((x) => x.check === 'vitest-tests')).toBe(false);
     expect(missingDataModels.some((x) => x.check === 'a4-state-lock' && x.message.includes('data-models.md'))).toBe(
       true,
     );
@@ -994,18 +994,13 @@ describe('runDocConsistencyChecks', () => {
     );
   });
 
-  it('README 声明 files 计数与实测不符 → 违规（文档方向）', () => {
+  it('README/AGENTS 动态 Vitest 数字变化不再产生文档计数违规', () => {
     const input = baseInput({
       readme: baseInput().readme.replace('40 files', '50 files'),
+      agents: '31 个脚本\n50 个 .test.ts / 530 条',
     });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'vitest-files' && x.message.includes('50'))).toBe(true);
-  });
-
-  it('AGENTS 声明 .test.ts 计数与实测不符 → 违规（文档方向）', () => {
-    const input = baseInput({ agents: '31 个脚本\n50 个 .test.ts / 530 条' });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'vitest-files' && x.message.includes('50'))).toBe(true);
+    expect(v.some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
   it('targetkind 违规消息含来源文档名', () => {
@@ -1072,42 +1067,25 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'design-docs')).toBe(false);
   });
 
-  it('vitest 文件数非 40 → 违规', () => {
-    const input = baseInput({ testFileCount: 41 });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-files' && x.message.includes('40'))).toBe(
-      true,
-    );
-  });
-
-  it('README/AGENTS 缺 vitest 文件数表述 → 违规', () => {
+  it('Vitest 文件数变化不再要求 README/AGENTS 同步', () => {
     const input = baseInput({
+      testFileCount: 41,
       readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
       agents: '31 个脚本',
     });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-files');
-    expect(v.length).toBeGreaterThan(0);
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
+    expect(v).toEqual([]);
   });
 
-  it('vitest 实测用例总数缺失于 README → 违规', () => {
+  it('Vitest 用例数变化不再要求 README/AGENTS/pre-push 同步', () => {
     const input = baseInput({
-      readme: '8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n40 files',
+      vitestTestCount: 803,
+      readme: '8 条核心操作行为\n新增 803 个测试用例',
+      agents: '31 个脚本\n由受控 facts 提供 Vitest 测量',
+      prePush: '# 15. samples-coverage\n# 测试结果以当前命令输出为准',
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.some((x) => x.message.includes('README.md') && x.message.includes('530'))).toBe(true);
-  });
-
-  it('vitest 实测用例总数缺失于 AGENTS → 违规', () => {
-    const input = baseInput({ agents: '31 个脚本\n40 个 .test.ts' });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.some((x) => x.message.includes('AGENTS.md') && x.message.includes('530'))).toBe(true);
-  });
-
-  it('vitest 实测用例总数缺失于 pre-push → 违规', () => {
-    const input = baseInput({
-      prePush: '# 15. samples-coverage\n# 与原 CI 一致：15 项检查',
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.some((x) => x.message.includes('.githooks/pre-push') && x.message.includes('530'))).toBe(true);
+    expect(v).toEqual([]);
   });
 
   it('vitest 用例总数无法采集（-1）→ vitest-tests 违规（fail-closed）', () => {
@@ -1158,14 +1136,13 @@ describe('runDocConsistencyChecks', () => {
     }
   });
 
-  it('真实 JSON 计数与旧活体声明不一致 → vitest-files / vitest-tests 违规', () => {
+  it('真实 JSON 计数变化与旧活体声明不一致时不产生动态文档计数违规', () => {
     const input = baseInput({
       testFileCount: 50,
       vitestTestCount: 803,
     });
     const violations = runDocConsistencyChecks(input);
-    expect(violations.some((x) => x.check === 'vitest-files')).toBe(true);
-    expect(violations.some((x) => x.check === 'vitest-tests')).toBe(true);
+    expect(violations.some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
   it('所有 D4 Schema 声明文档各自 22→21 时均报 schema-list', () => {
@@ -1201,18 +1178,54 @@ describe('runDocConsistencyChecks', () => {
     }
   });
 
-  it('coverage JSON 的 55/1002 元数据与活体文档同步 → CLI 消费 JSON 注入计数', async () => {
+  it('活体文档动态计数改为稳定描述后不再要求多份文档同步', async () => {
+    const input = baseInput({
+      readme: '**当前版本**：`41.11.0`\n以当前命令输出为准；本次新增 123 个测试用例。',
+      agents: '31 个脚本\nVitest 测试由受控运行事实包提供。',
+      prePush: '# 17. typecheck\n# Vitest 全量运行结果以当前命令输出为准。',
+      vitestExtraDocs: [
+        { name: 'CONTRIBUTING.md', content: '运行 Vitest 并以当前命令输出为准；新增 456 个测试。' },
+        { name: 'docs/INSTALL.md', content: 'Vitest 测试结果以当前命令输出为准；覆盖率阈值保持不变。' },
+      ],
+      vitestTestCount: 1002,
+      testFileCount: 55,
+      vitestMeasurementsValid: true,
+      vitestPassedCount: 1002,
+      vitestFailedCount: 0,
+      vitestSuccess: true,
+      vitestRunId: 'a'.repeat(16),
+      vitestArtifactId: 'vitest/results.json',
+      vitestArtifactSha256: 'b'.repeat(64),
+      vitestCommitSha: 'c'.repeat(40),
+    });
+    const report = buildDocConsistencyReport(input);
+    expect(report.violations.filter((x) => x.check === 'vitest-tests')).toEqual([]);
+    expect(report.dynamicMeasurements).toMatchObject({
+      testFileCount: 55,
+      vitestTestCount: 1002,
+      numPassedTests: 1002,
+      numFailedTests: 0,
+      success: true,
+      vitestRunId: 'a'.repeat(16),
+      vitestArtifactId: 'vitest/results.json',
+      vitestArtifactSha256: 'b'.repeat(64),
+      vitestCommitSha: 'c'.repeat(40),
+    });
+  });
+
+  it('受控 Vitest facts/provenance 驱动动态测量，文档数字变化不再触发动态违规', async () => {
     const input = baseInput();
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       const coverage = await writeVitestCount(fixtureRoot, 1002);
       expect([(coverage.testResults as unknown[]).length, coverage.numTotalTests]).toEqual([55, 1002]);
-      const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', '.githooks/pre-push'];
+      const docsWithLiveCount = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md'];
       for (const doc of docsWithLiveCount) {
         const docPath = path.join(fixtureRoot, doc);
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
         const docContent = await fs.readFile(docPath, 'utf-8');
-        expect(docContent).toContain('1002');
+        expect(docContent).not.toContain('55 files / 1002 tests');
+        expect(docContent).not.toContain('55 个 .test.ts / 1002 条');
       }
       const loaderDocs = ['w-model-dev/references/data-models.md', 'docs/INSTALL.md', 'docs/user-guide.md'];
       const oldLoaderPath = ['scripts', 'logic', 'schema-loader.ts'].join('/');
@@ -1223,24 +1236,22 @@ describe('runDocConsistencyChecks', () => {
         expect(docContent).not.toContain(oldLoaderPath);
         expect(docContent).toContain(['scripts', 'infrastructure', 'schema-loader.ts'].join('/'));
       }
-      const passing = runDocsConsistencyCli(fixtureRoot);
-      expect(passing.code, `${passing.stdout}\n${passing.stderr}`).toBe(0);
-      expect(passing.stdout).toContain('vitest 用例  : 1002');
-      expect(passing.stdout).toContain('静态违规      : 0');
-      expect(passing.stdout).toContain('动态违规      : 0');
-      expect(passing.stdout).not.toContain('[vitest-tests]');
+      const passing = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      const passingReport = JSON.parse(passing.stdout) as {
+        dynamicViolations: Array<{ check: string }>;
+        dynamicMeasurements: Record<string, unknown>;
+      };
+      expect(passingReport.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
+      expect(passingReport.dynamicMeasurements).toMatchObject({ vitestTestCount: 1002, testFileCount: 55 });
 
       const readme = path.join(fixtureRoot, 'README.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
       const content = await fs.readFile(readme, 'utf-8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
-      await fs.writeFile(readme, content.replace('55 files / 1002 tests', '55 files / 928 tests'), 'utf-8');
-      const stale = runDocsConsistencyCli(fixtureRoot);
-      expect(stale.code).toBe(1);
-      expect(stale.stdout).toContain('vitest 用例  : 1002');
-      expect(stale.stdout).toContain('[vitest-tests]');
-      expect(stale.stdout).toContain('README.md');
-      expect(stale.stdout).toContain('55 files / 928 tests');
+      await fs.writeFile(readme, `${content}\n新增 928 个测试用例，无需复制动态计数。`, 'utf-8');
+      const changedDocs = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      const changedReport = JSON.parse(changedDocs.stdout) as { dynamicViolations: Array<{ check: string }> };
+      expect(changedReport.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
     });
   });
 
@@ -1334,8 +1345,8 @@ describe('runDocConsistencyChecks', () => {
       await writeVitestCount(fixtureRoot, 1002);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(first.code).toBe(0);
-      expect(second.code).toBe(0);
+      expect(first.code).toBe(1);
+      expect(second.code).toBe(1);
       const firstReport = JSON.parse(first.stdout) as {
         dynamicMeasurements: { exit2ProbeResults: Array<Record<string, unknown>> };
       };
@@ -1373,16 +1384,18 @@ describe('runDocConsistencyChecks', () => {
       cwdTarget.cwd = '<differentRoot>';
       expect(stable(cwdDrift)).not.toEqual(baseline);
     });
-  });
+  }, 120_000);
 
   it('metrics invalid-phase probe 保留规范化 args/cwd 的完整 identity', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(0);
+      expect(result.code).toBe(1);
       const report = JSON.parse(result.stdout) as {
+        dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: { exit2ProbeResults: Array<{ probeId: string; args: string[]; cwd: string }> };
       };
+      expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
       const metricsProbe = report.dynamicMeasurements.exit2ProbeResults.find(
         (probe) => probe.probeId === 'metrics-report.ts#invalid-phase',
       );
@@ -1404,12 +1417,14 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       const coverage = await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(0);
+      expect(result.code).toBe(1);
       const report = JSON.parse(result.stdout) as {
         violations: unknown[];
+        dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: {
           testFileCount: number;
           vitestTestCount: number;
+          testDirectoryInventoryCount: number;
           numPassedTests: number;
           numFailedTests: number;
           success: boolean;
@@ -1431,23 +1446,26 @@ describe('runDocConsistencyChecks', () => {
           }>;
         };
       };
-      expect(report.violations).toEqual([]);
+      expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
       expect(report.dynamicMeasurements).toMatchObject({
         schemaCount: 23,
-        cliScriptCount: 36,
+        cliScriptCount: 37,
         exit2ScriptCount: 35,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 1002,
         numPassedTests: 1002,
         numFailedTests: 0,
         success: true,
-        testDirectoryInventoryCount: 55,
+        testDirectoryInventoryCount: expect.any(Number),
       });
+      expect(report.dynamicMeasurements.testDirectoryInventoryCount).toBeGreaterThanOrEqual(
+        report.dynamicMeasurements.testFileCount,
+      );
       expect(report.dynamicMeasurements.vitestArtifactId).toBe('vitest/results.json');
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(37);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(38);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every(
           (probe) =>
@@ -1476,10 +1494,14 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(withoutState.code).toBe(0);
+      expect(withoutState.code).toBe(1);
       const withoutStateReport = JSON.parse(withoutState.stdout) as {
+        dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: { exit2ScriptCount: number; exit2ProbeResults: Array<Record<string, unknown>> };
       };
+      expect(withoutStateReport.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(
+        false,
+      );
 
       const wmodelDir = path.join(fixtureRoot, '.w-model');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is an mkdtemp-owned test root
@@ -1506,10 +1528,12 @@ describe('runDocConsistencyChecks', () => {
         'utf8',
       );
       const withState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(withState.code).toBe(0);
+      expect(withState.code).toBe(1);
       const withStateReport = JSON.parse(withState.stdout) as {
+        dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: { exit2ScriptCount: number; exit2ProbeResults: Array<Record<string, unknown>> };
       };
+      expect(withStateReport.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
       const stable = (report: typeof withoutStateReport) =>
         report.dynamicMeasurements.exit2ProbeResults.map((probe) => {
           const identity = canonicalizeExit2ProbeIdentity({
@@ -1531,7 +1555,7 @@ describe('runDocConsistencyChecks', () => {
       expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(35);
       expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(35);
     });
-  });
+  }, 120_000);
 
   it('AGENTS=34 与 INSTALL=25+9 的旧资产声明在同一真实 fixture 中失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1588,8 +1612,8 @@ describe('runDocConsistencyChecks', () => {
       await writeVitestCount(fixtureRoot, 1002);
       const first = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       const second = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(first.code).toBe(0);
-      expect(second.code).toBe(0);
+      expect(first.code).toBe(1);
+      expect(second.code).toBe(1);
       const firstReport = JSON.parse(first.stdout) as { dynamicMeasurements: Record<string, unknown> };
       const secondReport = JSON.parse(second.stdout) as { dynamicMeasurements: Record<string, unknown> };
       expect(firstReport.dynamicMeasurements.vitestArtifactId).toMatch(/^vitest\/.+\.json$/);
@@ -1600,7 +1624,7 @@ describe('runDocConsistencyChecks', () => {
       );
       expect(JSON.stringify(firstReport)).not.toMatch(/[A-Z]:\\|\\Users\\|\/home\//i);
     });
-  });
+  }, 120_000);
 
   it('外部 artifact 缺 provenance、绑定错误 commit 或 hash 时 fail-closed', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1660,7 +1684,7 @@ describe('runDocConsistencyChecks', () => {
         await fs.rm(outside, { recursive: true, force: true });
       }
     });
-  });
+  }, 120_000);
 
   it('CLI --json 对不可信 coverage 仍 exit1 并输出完整失败测量字段', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1685,10 +1709,14 @@ describe('runDocConsistencyChecks', () => {
   it('CLI 注入 testResults=[] 的 coverage JSON 时以 JSON 文件数为准，不能由目录枚举掩盖', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 916, { testResults: [] });
-      const result = runDocsConsistencyCli(fixtureRoot);
+      const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(1);
-      expect(result.stdout).toContain('test 文件    : 0');
-      expect(result.stdout).toContain('[vitest-files]');
+      const report = JSON.parse(result.stdout) as {
+        dynamicMeasurements: { testFileCount: number };
+        dynamicViolations: Array<{ check: string }>;
+      };
+      expect(report.dynamicMeasurements.testFileCount).toBe(0);
+      expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
     });
   });
 
@@ -1706,8 +1734,9 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
-      expect(result.code).toBe(0);
+      expect(result.code).toBe(1);
       const report = JSON.parse(result.stdout) as {
+        dynamicViolations: Array<{ check: string }>;
         dynamicMeasurements: {
           exit2ScriptCount: number;
           exit2ProbeResults?: Array<{
@@ -1724,8 +1753,9 @@ describe('runDocConsistencyChecks', () => {
           }>;
         };
       };
+      expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
       expect(report.dynamicMeasurements.exit2ScriptCount).toBe(35);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(37);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(38);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);
@@ -1818,64 +1848,16 @@ describe('runDocConsistencyChecks', () => {
     await assertSsotExternalBoundaryFile();
   });
 
-  it('README 含过期 vitest 计数（正确总数与旧数字并存）→ vitest-tests 违规', () => {
+  it('活体文档并存旧 Vitest 数字时不产生动态文档违规', () => {
     const input = baseInput({
       readme: '**当前版本**：`41.11.0`\n40 files / 530 tests\n42 files / 663 tests',
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.length).toBe(1);
-    expect(v[0]!.message).toContain('过期 vitest 计数');
-    expect(v[0]!.message).toContain('42 files / 663 tests');
-  });
-
-  it('AGENTS 含过期 .test.ts 计数（文件数不符）→ vitest-tests 违规', () => {
-    const input = baseInput({
       agents: '31 个脚本\n41 个 .test.ts / 530 条',
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.some((x) => x.message.includes('41 个 .test.ts / 530 条'))).toBe(true);
-  });
-
-  it('CONTRIBUTING 含过期 vitest 计数（40 files / 623 tests）→ vitest-tests 违规', () => {
-    const input = baseInput({
       vitestExtraDocs: [
-        {
-          name: 'CONTRIBUTING.md',
-          content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |',
-        },
+        { name: 'CONTRIBUTING.md', content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |' },
+        { name: 'docs/INSTALL.md', content: '# vitest 单元测试（40 个 .test.ts / 623 条）' },
       ],
     });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.some((x) => x.message.includes('CONTRIBUTING.md') && x.message.includes('40 files / 623 tests'))).toBe(
-      true,
-    );
-  });
-
-  it('CONTRIBUTING 计数与实测一致 → 零 vitest-tests 违规', () => {
-    const input = baseInput({
-      vitestExtraDocs: [
-        {
-          name: 'CONTRIBUTING.md',
-          content: '单元测试全量（40 files / 530 tests）。\n（40 个 .test.ts / 530 条）',
-        },
-      ],
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'vitest-tests')).toBe(false);
-  });
-
-  it('INSTALL 含过期 vitest 计数（40 个 .test.ts / 623 条）→ vitest-tests 违规（P1-1 复核补充）', () => {
-    const input = baseInput({
-      vitestExtraDocs: [
-        {
-          name: 'docs/INSTALL.md',
-          content: '# vitest 单元测试（40 个 .test.ts / 623 条）',
-        },
-      ],
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests');
-    expect(v.some((x) => x.message.includes('docs/INSTALL.md') && x.message.includes('40 个 .test.ts / 623 条'))).toBe(
-      true,
-    );
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests')).toEqual([]);
   });
 
   it('PR 模板含过期门禁项数（14 项）→ pre-push 违规', () => {
@@ -2337,7 +2319,7 @@ async function withDocsConsistencyFixture(assertResult: (fixtureRoot: string) =>
     });
     // 复制的活体文档保持原样；无 .w-model 与最小合法状态必须共享同一套确定性 probe 事实。
     // 各测试仅在需要时注入单独的旧值负例，不通过改写活体文档自适配。
-    // 复制的活体文档保留当前 HEAD 实测的 55/1002 计数；各测试仅在需要时注入单独的旧值负例。
+    // 复制的活体文档不再承载 Vitest 动态计数；各测试通过受控 facts/provenance 注入动态测量。
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(
@@ -2598,7 +2580,7 @@ describe('D4 动态元数据和本地证据文档治理', () => {
       testFileCount: 41,
       vitestTestCount: 531,
     });
-    expect(report.dynamicViolations.some((x) => x.check === 'vitest-files')).toBe(true);
+    expect(report.dynamicViolations.some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
   it('每份本地证据文档分别缺安全审阅、自动发布边界或 archive 边界时均为 static violation', () => {

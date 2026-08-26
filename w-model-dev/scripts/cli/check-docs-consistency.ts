@@ -2,7 +2,7 @@
 /**
  * 文档一致性门禁（Doc Consistency Checker）
  *
- * 校验活体文档中的计数 / 枚举 / 清单与代码事实一致，防文档漂移。
+ * 校验活体文档中的静态计数 / 枚举 / 清单与代码事实一致，并校验动态 facts 的完整性，防文档漂移。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root] [--json]
@@ -584,7 +584,7 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
  * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
  * runSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
  * 落盘/解析失败（含 spawn 超时/错误）一律先尝试读取 JSON outputFile（vitest 若已完整跑完必落盘）；
- * 仍读不到则返回 -1，由逻辑层生成 `vitest-tests` 违规并 fail-closed（不虚构计数）。
+ * 仍读不到则返回 -1，由逻辑层生成动态 facts 违规并 fail-closed（不虚构计数）。
  * 注：timeout 按本仓库全量 vitest 实测墙钟（约 198s）上调到 300s，避免健康仓库在
  * standalone 自采集时因超时被误判 fail-closed；pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径。
  * 注：maxBuffer 必须放宽——vitest 全量进度输出可达数 MB，默认 1MB 会触发
@@ -592,7 +592,7 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
  * 注：必须显式 --config 限定扫描范围（config/vitest.config.ts 的 include 仅
  * w-model-dev/scripts/__tests__）——vitest.config.ts 迁入 config/ 后 cwd 无默认配置，
  * 默认 include 会扫全树，嵌套 git worktree（.worktrees/**）下的测试文件将被重复计数
- * （实测根仓库 + worktree 双份 554 → 1108），导致 vitest-tests 门禁误报。
+ * （实测根仓库 + worktree 双份时会导致动态 facts 门禁误报）。
  */
 function collectVitestMeasurements(root: string): VitestMeasurements {
   const fromFile = readVitestCountFile(root);
@@ -709,7 +709,7 @@ async function main(): Promise<void> {
     },
   ];
 
-  // docs/INSTALL.md 被 installDoc 与 vitestExtraDocs 各消费一次——先读取复用到两处，避免重复 IO
+  // docs/INSTALL.md 被 installDoc 与局部文档契约各消费一次——先读取复用到两处，避免重复 IO
   const installDocText = read('docs/INSTALL.md');
 
   const input: DocConsistencyInput = {
@@ -750,10 +750,6 @@ async function main(): Promise<void> {
     rootCauseVerifierSpec: read('w-model-dev/references/verifier-spec.md'),
     rootCauseCommandReference: read('w-model-dev/references/command-reference.md'),
     prePush: read('.githooks/pre-push'),
-    vitestExtraDocs: [
-      { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
-      { name: 'docs/INSTALL.md', content: installDocText },
-    ],
     prTemplate: read('.github/PULL_REQUEST_TEMPLATE.md'),
     changelog: read('CHANGELOG.md'),
     pkgJson: read('package.json'),
