@@ -96,6 +96,8 @@ function importStatements(source: string): Array<{ specifier: string; typeOnly: 
     statements.push({ specifier: statement.moduleSpecifier.text, typeOnly });
   }
 
+  // Static analysis intentionally follows only literal dynamic imports; non-literal
+  // specifiers cannot be resolved without executing application code.
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
@@ -222,36 +224,21 @@ function cyclesIn(edges: ImportEdge[]): string[][] {
 
 describe('scripts runtime dependency boundaries', () => {
   it('recursively enforces one-way runtime imports and records only explicit logic IO exceptions', async () => {
-    const edges = await runtimeImportGraph();
-    const runtimeEdges = edges.filter((edge) => !edge.typeOnly);
-    const violations: string[] = [];
-
-    for (const edge of runtimeEdges) {
-      if (path.isAbsolute(edge.to)) {
-        const fromLayer = layerOf(edge.from);
-        const toLayer = layerOf(edge.to);
-        if (fromLayer === 'lib' && toLayer === 'logic') {
-          violations.push(`lib → logic: ${relative(edge.from)} → ${relative(edge.to)}`);
-        }
-        if (fromLayer === 'infrastructure' && toLayer === 'cli') {
-          violations.push(`infrastructure → cli: ${relative(edge.from)} → ${relative(edge.to)}`);
-        }
-      }
-      if (
-        layerOf(edge.from) === 'logic' &&
-        (edge.to === 'node:fs' || edge.to === 'node:fs/promises' || edge.to === 'node:child_process')
-      ) {
-        const key = `${relative(edge.from)}:${edge.to}`;
-        if (!ALLOWED_LOGIC_NODE_IO_IMPORTS.has(key)) violations.push(`logic direct IO: ${key}`);
-      }
+    const fixturePath = path.join(scriptsDir, 'logic', `.d2-boundary-fixture-${process.pid}.ts`);
+    await fs.writeFile(fixturePath, "import 'fs';\n");
+    try {
+      const edges = await runtimeImportGraph();
+      const runtimeEdges = edges.filter((edge) => !edge.typeOnly);
+      const violations = boundaryViolations(runtimeEdges);
+      const cycles = cyclesIn(runtimeEdges);
+      expect(violations).toContain(`logic direct IO: ${relative(fixturePath)}:fs`);
+      expect(cycles).toEqual([]);
+    } finally {
+      await fs.rm(fixturePath, { force: true });
     }
-
-    const cycles = cyclesIn(runtimeEdges);
-    expect(violations).toEqual([]);
-    expect(cycles).toEqual([]);
   });
 
-  it('classifies import and export specifiers by their runtime presence', () => {
+  it('classifies import, export, and literal dynamic import specifiers by runtime presence', () => {
     expect(
       importStatements(`
         import type { ModuleType } from '../logic/type-only.js';
@@ -259,6 +246,8 @@ describe('scripts runtime dependency boundaries', () => {
         import { value, type MixedType } from '../logic/mixed.js';
         export { type ExportedType } from '../logic/re-export-type-only.js';
         export { value as exportedValue, type ExportedMixedType } from '../logic/re-export-mixed.js';
+        const literal = import('../logic/dynamic.js');
+        const nonLiteral = import(dynamicSpecifier);
       `),
     ).toEqual([
       { specifier: '../logic/type-only.js', typeOnly: true },
@@ -266,6 +255,7 @@ describe('scripts runtime dependency boundaries', () => {
       { specifier: '../logic/mixed.js', typeOnly: false },
       { specifier: '../logic/re-export-type-only.js', typeOnly: true },
       { specifier: '../logic/re-export-mixed.js', typeOnly: false },
+      { specifier: '../logic/dynamic.js', typeOnly: false },
     ]);
   });
 
