@@ -776,15 +776,50 @@ describe('evidence export logic', () => {
     });
   });
 
-  it('rejects package-only provenance metadata tampering without a source project', async () => {
-    const project = await createProject();
-    const output = path.join(tmpDir, 'tampered-package-provenance');
-    await exportEvidence(project, output);
+  it('rejects hash-valid package-only manifests with sensitive provenance IDs and file paths', async () => {
+    for (const [field, value, secret] of [
+      ['runId', 'token=package-run-secret', 'package-run-secret'],
+      ['artifactId', 'authorization=package-artifact-secret', 'package-artifact-secret'],
+    ] as const) {
+      const project = await createProject(`sensitive-${field}-project`);
+      const output = path.join(tmpDir, `sensitive-${field}-output`);
+      expect(runCli([project, output]).code).toBe(0);
+      const manifestPath = path.join(output, 'evidence-manifest.json');
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        provenance: Record<string, unknown>;
+        files: Array<{ path: string; sha256: string }>;
+      };
+      manifest.provenance[field] = value;
+      manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+      refreshManifestHash(manifest as unknown as Record<string, unknown>);
+      await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+      const packageOnly = runCli(['--verify', manifestPath]);
+
+      expect(packageOnly.code).toBe(1);
+      expect(cliSummary(packageOnly.stdout)).toMatchObject({
+        ok: false,
+        reason: 'INVALID_PROVENANCE',
+      });
+      expect(packageOnly.stdout + packageOnly.stderr).not.toContain(secret);
+    }
+
+    const project = await createProject('sensitive-file-path-project');
+    const output = path.join(tmpDir, 'sensitive-file-path-output');
+    expect(runCli([project, output]).code).toBe(0);
     const manifestPath = path.join(output, 'evidence-manifest.json');
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
-      provenance: { runId: string };
+      provenance: { contentHash: string };
+      files: Array<{ path: string; sha256: string; kind: string }>;
     };
-    manifest.provenance.runId = 'forged-run';
+    const originalPath = path.join(output, 'gate-logs', 'gate.json');
+    const maliciousPath = path.join(output, 'gate-logs', 'token=package-file-secret.json');
+    await fs.rename(originalPath, maliciousPath);
+    const gate = manifest.files.find((file) => file.path === 'gate-logs/gate.json');
+    expect(gate).toBeDefined();
+    gate!.path = 'gate-logs/token=package-file-secret.json';
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    refreshManifestHash(manifest as unknown as Record<string, unknown>);
     await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
 
     const packageOnly = runCli(['--verify', manifestPath]);
@@ -792,8 +827,33 @@ describe('evidence export logic', () => {
     expect(packageOnly.code).toBe(1);
     expect(cliSummary(packageOnly.stdout)).toMatchObject({
       ok: false,
+      reason: 'INVALID_MANIFEST',
+    });
+    expect(packageOnly.stdout + packageOnly.stderr).not.toContain('package-file-secret');
+  });
+
+  it('rejects the same hash-valid sensitive provenance metadata in source-bound mode', async () => {
+    const project = await createProject('source-bound-sensitive-metadata-project');
+    const output = path.join(tmpDir, 'source-bound-sensitive-metadata-output');
+    expect(runCli([project, output]).code).toBe(0);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      provenance: Record<string, unknown>;
+      files: Array<{ path: string; sha256: string }>;
+    };
+    manifest.provenance.runId = 'token=source-bound-secret';
+    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+    refreshManifestHash(manifest as unknown as Record<string, unknown>);
+    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+
+    const sourceBound = runCli(['--verify', manifestPath, '--source-project', project]);
+
+    expect(sourceBound.code).toBe(1);
+    expect(cliSummary(sourceBound.stdout)).toMatchObject({
+      ok: false,
       reason: 'INVALID_PROVENANCE',
     });
+    expect(sourceBound.stdout + sourceBound.stderr).not.toContain('source-bound-secret');
   });
 
   it('source-bound verification rejects ordinary exported content tampering even when package hashes are recomputed', async () => {

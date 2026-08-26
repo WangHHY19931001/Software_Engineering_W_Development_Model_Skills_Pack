@@ -159,8 +159,14 @@ const SENSITIVE_METADATA_PATTERN =
 function hasUnsafeMetadata(value: string): boolean {
   return ABSOLUTE_PATH_DETECTION_PATTERN.test(value) || SENSITIVE_METADATA_PATTERN.test(value);
 }
-function isSafeManifestMetadata(value: string): boolean {
-  return value.length > 0 && !hasUnsafeMetadata(value);
+function isSafeManifestMetadata(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && !hasUnsafeMetadata(value);
+}
+function isSafeManifestProvenance(value: { runId: unknown; artifactId: unknown }): value is {
+  runId: string;
+  artifactId: string;
+} {
+  return isSafeManifestMetadata(value.runId) && isSafeManifestMetadata(value.artifactId);
 }
 function isSafeRelativePath(relativePath: string): boolean {
   if (!relativePath || path.isAbsolute(relativePath) || relativePath.includes('\\') || relativePath === MANIFEST_NAME)
@@ -678,6 +684,7 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
       expected.add(file.path);
     }
     if (
+      !isSafeManifestProvenance(typed.provenance) ||
       typed.provenance.verificationStatus !== 'passed' ||
       !/^[0-9a-f]{40}$/.test(typed.provenance.commitSha) ||
       !/^[0-9a-f]{64}$/.test(typed.provenance.sourceBundleSha256 ?? '') ||
