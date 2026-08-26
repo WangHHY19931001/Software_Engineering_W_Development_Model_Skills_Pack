@@ -268,7 +268,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/wm-write.test.ts',
-    line: 35,
+    line: 36,
     symbol: 'runArgs',
     reason: 'B4 excludes state/wm-write; real CLI helper uses an explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },
