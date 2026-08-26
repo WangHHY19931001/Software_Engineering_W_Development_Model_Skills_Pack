@@ -14,6 +14,7 @@ const tsxCli = require.resolve('tsx/cli');
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-write.ts');
 
 let tmpDir: string;
+const holderClosePromises = new WeakMap<ChildProcess, Promise<number | null>>();
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-write-cli-'));
@@ -88,6 +89,14 @@ async function writeLock(targetPath: string, metadata: Record<string, unknown>):
   await fs.writeFile(path.join(owner, 'metadata.json'), JSON.stringify(metadata), 'utf-8');
 }
 
+async function markOwnerStaleAfterExit(targetPath: string): Promise<void> {
+  const metadataPath = path.join(`${targetPath}.lock`, 'owner', 'metadata.json');
+  const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8')) as Record<string, unknown>;
+  // Full-suite child-process churn can reuse the holder PID after exit. Replace it
+  // only after the exit handshake with a deterministic, non-running PID.
+  await fs.writeFile(metadataPath, JSON.stringify({ ...metadata, pid: 999_999_999 }), 'utf-8');
+}
+
 async function holdLiveLock(
   targetPath: string,
   holdMs: number,
@@ -130,12 +139,18 @@ async function holdLiveLock(
     ],
     { stdio: ['pipe', 'pipe', 'pipe'] },
   );
+  const closePromise = new Promise<number | null>((resolve) => {
+    holder.once('close', (code) => resolve(code));
+  });
   await once(holder.stdout!, 'data');
+  holderClosePromises.set(holder, closePromise);
   return holder;
 }
 
 async function waitForExit(child: ChildProcess): Promise<void> {
-  const code = child.exitCode ?? ((await once(child, 'exit')) as [number | null])[0];
+  const closePromise = holderClosePromises.get(child);
+  expect(closePromise).toBeDefined();
+  const code = await closePromise!;
   expect(code).toBe(0);
 }
 
@@ -258,6 +273,12 @@ describe('wm-write CLI lock controls', () => {
       expect(rejected.stderr).toContain('✗ [WRITE_REJECTED]');
       expect(wmwriteSummary(rejected.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
       await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+      await waitForExit(holder);
+      await markOwnerStaleAfterExit(p);
+      const exitedOwnerMetadata = JSON.parse(
+        await fs.readFile(path.join(`${p}.lock`, 'owner', 'metadata.json'), 'utf-8'),
+      ) as { pid: number };
+      expect(exitedOwnerMetadata.pid).toBe(999_999_999);
 
       const recovered = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"recovered"}');
       expect(recovered.code).toBe(0);
@@ -303,8 +324,16 @@ describe('wm-write CLI lock controls', () => {
     const expectedMtime = Math.floor((await fs.stat(p)).mtimeMs);
 
     const [first, second] = await Promise.all([
-      runChild(p, ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'], '{"writer":"A"}'),
-      runChild(p, ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'], '{"writer":"B"}'),
+      runChild(
+        p,
+        ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'],
+        '{"writer":"A"}',
+      ),
+      runChild(
+        p,
+        ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'],
+        '{"writer":"B"}',
+      ),
     ]);
     const summaries = [wmwriteSummary(first.stdout), wmwriteSummary(second.stdout)];
 
