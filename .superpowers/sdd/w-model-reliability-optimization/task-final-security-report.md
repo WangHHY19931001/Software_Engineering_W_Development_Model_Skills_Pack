@@ -8,13 +8,13 @@ The requested baseline facts reported 82 new findings. Reproducing `npm run lint
 
 The initial 81 findings were classified before changing the baseline:
 
-| Class | Count | Disposition |
-| --- | ---: | --- |
-| Test-owned temporary/fixed fixture paths | 63 | Exact `eslint-disable-next-line` comments with the controlled root or fixed asset reason |
-| Test-only static findings | 6 | Code fixes, not baseline entries |
-| Production findings fixed in code | 7 | Safe access or syntax changes |
-| Stable production path exceptions | 5 | Exact content-sensitive baseline entries with ownership/path rationale |
-| Total | 81 | No bulk baseline regeneration |
+| Class                                    | Count | Disposition                                                                              |
+| ---------------------------------------- | ----: | ---------------------------------------------------------------------------------------- |
+| Test-owned temporary/fixed fixture paths |    63 | Exact `eslint-disable-next-line` comments with the controlled root or fixed asset reason |
+| Test-only static findings                |     6 | Code fixes, not baseline entries                                                         |
+| Production findings fixed in code        |     7 | Safe access or syntax changes                                                            |
+| Stable production path exceptions        |     5 | Exact content-sensitive baseline entries with ownership/path rationale                   |
+| Total                                    |    81 | No bulk baseline regeneration                                                            |
 
 ## Complete Finding Classification
 
@@ -22,32 +22,32 @@ The initial 81 findings were classified before changing the baseline:
 
 All entries below are test fixture paths produced below a `mkdtemp` root, a copied test fixture root, or a fixed repository test asset. Each is locally suppressed immediately before the relevant I/O statement; no file-wide suppression was added.
 
-| File | Findings | Classification |
-| --- | ---: | --- |
-| `__tests__/artifact-gate-assets.test.ts` | 7: 163, 164, 227, 260, 313, 447 twice | `detect-non-literal-fs-filename`; temporary TLA/BDD/Cucumber files below `tmpDir` |
-| `__tests__/cli-natural-exit.test.ts` | 16: 89, 99, 103, 104, 115, 116, 174, 181, 187, 188, 226, 227, 266, 267, 289, 291 | `detect-non-literal-fs-filename`; temporary command, project, scanner, and samples fixtures |
-| `__tests__/docs-consistency-logic.test.ts` | 3: 1233, 1844, 2408 | `detect-non-literal-fs-filename`; fixed documentation inventory or isolated copied repository fixture |
-| `__tests__/gate-report.test.ts` | 28: 271, 324, 343, 362, 365, 367, 385, 392, 411, 413, 430, 435, 437, 454, 455, 457, 478, 498, 501, 503, 523, 524, 526, 546, 706, 707, 751, 756 | `detect-non-literal-fs-filename`; gate-log and model files below each test's temporary root |
-| `__tests__/platform-deps-hook.test.ts` | 8: 55, 58, 59, 66, 67, 100, 122, 539 | `detect-non-literal-fs-filename`; temporary hook workspace/command fixture or fixed pre-push asset |
-| `__tests__/run-sync.test.ts` | 1: 220 | `detect-non-literal-fs-filename`; temporary `tla2tools.jar` fixture |
+| File                                       |                                                                                                                                       Findings | Classification                                                                                        |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------: | ----------------------------------------------------------------------------------------------------- |
+| `__tests__/artifact-gate-assets.test.ts`   |                                                                                                          7: 163, 164, 227, 260, 313, 447 twice | `detect-non-literal-fs-filename`; temporary TLA/BDD/Cucumber files below `tmpDir`                     |
+| `__tests__/cli-natural-exit.test.ts`       |                                                               16: 89, 99, 103, 104, 115, 116, 174, 181, 187, 188, 226, 227, 266, 267, 289, 291 | `detect-non-literal-fs-filename`; temporary command, project, scanner, and samples fixtures           |
+| `__tests__/docs-consistency-logic.test.ts` |                                                                                                                            3: 1233, 1844, 2408 | `detect-non-literal-fs-filename`; fixed documentation inventory or isolated copied repository fixture |
+| `__tests__/gate-report.test.ts`            | 28: 271, 324, 343, 362, 365, 367, 385, 392, 411, 413, 430, 435, 437, 454, 455, 457, 478, 498, 501, 503, 523, 524, 526, 546, 706, 707, 751, 756 | `detect-non-literal-fs-filename`; gate-log and model files below each test's temporary root           |
+| `__tests__/platform-deps-hook.test.ts`     |                                                                                                           8: 55, 58, 59, 66, 67, 100, 122, 539 | `detect-non-literal-fs-filename`; temporary hook workspace/command fixture or fixed pre-push asset    |
+| `__tests__/run-sync.test.ts`               |                                                                                                                                         1: 220 | `detect-non-literal-fs-filename`; temporary `tla2tools.jar` fixture                                   |
 
 ### Test-only static fixes: 6
 
-| File | Findings | Resolution |
-| --- | ---: | --- |
-| `__tests__/evidence-export-logic.test.ts` | 792 `detect-object-injection` | Replaced a loop-selected provenance assignment with the two fixed allowed field assignments. |
-| `__tests__/platform-deps-install.test.ts` | 97 `detect-object-injection` | Replaced test tar-buffer bracket indexing with `Buffer.readUInt8`. |
-| `__tests__/run-sync.test.ts` | 304 twice and 305 twice `no-useless-escape` | Removed the unnecessary quote escapes inside regex character classes. |
+| File                                      |                                    Findings | Resolution                                                                                   |
+| ----------------------------------------- | ------------------------------------------: | -------------------------------------------------------------------------------------------- |
+| `__tests__/evidence-export-logic.test.ts` |               792 `detect-object-injection` | Replaced a loop-selected provenance assignment with the two fixed allowed field assignments. |
+| `__tests__/platform-deps-install.test.ts` |                97 `detect-object-injection` | Replaced test tar-buffer bracket indexing with `Buffer.readUInt8`.                           |
+| `__tests__/run-sync.test.ts`              | 304 twice and 305 twice `no-useless-escape` | Removed the unnecessary quote escapes inside regex character classes.                        |
 
 ### Production findings fixed in code: 7
 
-| File | Findings | Resolution |
-| --- | ---: | --- |
-| `application/artifact-gate-assets.ts` | 291 `prefer-const` | Changed immutable `bddManifestValid` to `const`. |
-| `cli/platform-deps-install.ts` | 243 twice and 255 `detect-object-injection` | Replaced dynamic manifest property indexing with fixed `main`/`module` access and `Object.getOwnPropertyDescriptor` for `exports["."]` conditions. This keeps package entry candidate semantics while preventing prototype-chain lookup. |
-| `lib/platform-deps-tar.ts` | 31 `detect-object-injection` | Replaced unchecked Buffer bracket access with bounds-checked `readUInt8`. Completed the existing uncommitted PAX `Map` migration: PAX parsing accepts Buffer/string input, all PAX reads use `Map.get`, reset remains a `Map`, and `linkpath` now correctly overrides the header value. |
-| `logic/evidence-export-logic.ts` | 681 `detect-object-injection` | Replaced sorted-array dynamic indexing with iterator consumption during manifest order validation. |
-| `logic/run-log-logic.ts` | 1175 `detect-object-injection` | Replaced fixed-name dynamic record indexing with explicit `stdoutSummary`/`reportSummary` property access. |
+| File                                  |                                    Findings | Resolution                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ------------------------------------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `application/artifact-gate-assets.ts` |                          291 `prefer-const` | Changed immutable `bddManifestValid` to `const`.                                                                                                                                                                                                                                        |
+| `cli/platform-deps-install.ts`        | 243 twice and 255 `detect-object-injection` | Replaced dynamic manifest property indexing with fixed `main`/`module` access and `Object.getOwnPropertyDescriptor` for `exports["."]` conditions. This keeps package entry candidate semantics while preventing prototype-chain lookup.                                                |
+| `lib/platform-deps-tar.ts`            |                31 `detect-object-injection` | Replaced unchecked Buffer bracket access with bounds-checked `readUInt8`. Completed the existing uncommitted PAX `Map` migration: PAX parsing accepts Buffer/string input, all PAX reads use `Map.get`, reset remains a `Map`, and `linkpath` now correctly overrides the header value. |
+| `logic/evidence-export-logic.ts`      |               681 `detect-object-injection` | Replaced sorted-array dynamic indexing with iterator consumption during manifest order validation.                                                                                                                                                                                      |
+| `logic/run-log-logic.ts`              |              1175 `detect-object-injection` | Replaced fixed-name dynamic record indexing with explicit `stdoutSummary`/`reportSummary` property access.                                                                                                                                                                              |
 
 The PAX work has an added behavioral regression: a PAX `linkpath` must override the symlink header `linkname`. The initial test run failed against the incomplete Map migration, including PAX state reset and linkpath access; after the fix, the full platform dependency test file passed.
 
@@ -55,13 +55,13 @@ The PAX work has an added behavioral regression: a PAX `linkpath` must override 
 
 These are the only baseline additions. They are all in `logic/state-write-logic.ts`, operate on the explicit caller-selected `absPath` or paths derived from it, and execute under the module's owned lock/atomic rollback protocol. They remain scanner-visible and carry narrow content-sensitive hashes:
 
-| Original line | Hash prefix | Operation | Baseline rationale |
-| ---: | --- | --- | --- |
-| 141 | `92bac38f` | Read lock metadata | Metadata path is derived from the owned lock directory. |
-| 387 | `59116765` | Write rollback payload | Path is derived from the owned target and lock token. |
-| 415 | `6edbc461` | Read rollback payload | Read occurs after ownership and atomic-move checks. |
-| 422 | `6558f434` | Check target absence | Only the caller-selected target is inspected while the lock is owned. |
-| 482 | `ab5c1380` | Read original target content | Only the caller-selected target is read while the lock is owned. |
+| Original line | Hash prefix | Operation                    | Baseline rationale                                                    |
+| ------------: | ----------- | ---------------------------- | --------------------------------------------------------------------- |
+|           141 | `92bac38f`  | Read lock metadata           | Metadata path is derived from the owned lock directory.               |
+|           387 | `59116765`  | Write rollback payload       | Path is derived from the owned target and lock token.                 |
+|           415 | `6edbc461`  | Read rollback payload        | Read occurs after ownership and atomic-move checks.                   |
+|           422 | `6558f434`  | Check target absence         | Only the caller-selected target is inspected while the lock is owned. |
+|           482 | `ab5c1380`  | Read original target content | Only the caller-selected target is read while the lock is owned.      |
 
 Baseline entry count changed **405 to 410**. `--regenerate` was not run. No ESLint rule, configuration, or global ignore pattern was weakened. A future code-line change produces a different v2 content hash and must be reviewed again.
 
@@ -78,18 +78,18 @@ They were formatted without semantic edits solely to remove the pre-push blocker
 
 ## Verification Evidence
 
-| Command | Result |
-| --- | --- |
-| Initial `npm run lint:security` | Failed as expected: 81 new findings. |
-| PAX red test run | Failed as expected on incomplete Map migration and missing PAX `linkpath` behavior. |
-| `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/platform-deps-install.test.ts` | Passed: 45 tests. |
-| Related targeted tests (`artifact-gate-assets`, `evidence-export-logic`, `run-log-logic`) | Passed: 182 tests. |
-| Final affected-suite run | Initially 478/479 passed; line-audit provenance was corrected. Final `run-sync.test.ts`: 18/18 passed. |
-| `npm run lint:security` | Passed: baseline entries 410, baseline-hit messages 410, new findings 0. |
-| `npm run typecheck` | Passed: `tsc -p config/tsconfig.json`. |
-| `npx prettier --check` over modified files | Passed. |
-| `git diff --check` | Passed. |
-| `npm run prepush` | Passed on the second run: all 17 pre-push gates passed, including full Vitest coverage, audit, security scan, docs/samples consistency, Prettier, and typecheck. |
+| Command                                                                                                       | Result                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initial `npm run lint:security`                                                                               | Failed as expected: 81 new findings.                                                                                                                             |
+| PAX red test run                                                                                              | Failed as expected on incomplete Map migration and missing PAX `linkpath` behavior.                                                                              |
+| `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/platform-deps-install.test.ts` | Passed: 45 tests.                                                                                                                                                |
+| Related targeted tests (`artifact-gate-assets`, `evidence-export-logic`, `run-log-logic`)                     | Passed: 182 tests.                                                                                                                                               |
+| Final affected-suite run                                                                                      | Initially 478/479 passed; line-audit provenance was corrected. Final `run-sync.test.ts`: 18/18 passed.                                                           |
+| `npm run lint:security`                                                                                       | Passed: baseline entries 410, baseline-hit messages 410, new findings 0.                                                                                         |
+| `npm run typecheck`                                                                                           | Passed: `tsc -p config/tsconfig.json`.                                                                                                                           |
+| `npx prettier --check` over modified files                                                                    | Passed.                                                                                                                                                          |
+| `git diff --check`                                                                                            | Passed.                                                                                                                                                          |
+| `npm run prepush`                                                                                             | Passed on the second run: all 17 pre-push gates passed, including full Vitest coverage, audit, security scan, docs/samples consistency, Prettier, and typecheck. |
 
 ## Final Result
 
@@ -118,15 +118,25 @@ TDD evidence for this round: the new direct extraction tests failed against the 
 
 ### Final verification for this round
 
-| Command | Result |
-| --- | --- |
-| Latest directed Vitest (`platform-deps-install`, `platform-deps-repair-core`, `evidence-export-logic`, `evidence-provenance-logic`, `run-sync`) | Passed: 5 files / 156 tests. |
-| Full `npm test` | Passed: 58 files / 1234 tests. |
-| Coverage run (`npx vitest run --coverage`) | Passed: 58 files / 1234 tests; aggregate 77.57% statements, 72.09% branches, 86.03% functions, 79.41% lines. Final prepush coverage also passed. |
-| `npm run lint:security` | Passed: baseline 410, baseline hits 410, new findings 0. No baseline file change. |
-| `npm run typecheck` | Passed: `tsc -p config/tsconfig.json`, exit 0. |
-| Targeted `npx prettier --check` | Passed for all 4 changed source/test files. |
-| `git diff --check` | Passed, exit 0. Git emitted only expected LF→CRLF normalization warnings for two edited TypeScript files. |
-| `npm run prepush` | Final run passed all 17 gates, including full coverage Vitest, npm audit, docs/samples consistency, Prettier, and typecheck. An earlier concurrent run transiently returned 1 at the Vitest gate with no captured failure output; exact command and final sequential run both passed. |
+| Command                                                                                                                                         | Result                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Latest directed Vitest (`platform-deps-install`, `platform-deps-repair-core`, `evidence-export-logic`, `evidence-provenance-logic`, `run-sync`) | Passed: 5 files / 156 tests.                                                                                                                                                                                                                                                          |
+| Full `npm test`                                                                                                                                 | Passed: 58 files / 1234 tests.                                                                                                                                                                                                                                                        |
+| Coverage run (`npx vitest run --coverage`)                                                                                                      | Passed: 58 files / 1234 tests; aggregate 77.57% statements, 72.09% branches, 86.03% functions, 79.41% lines. Final prepush coverage also passed.                                                                                                                                      |
+| `npm run lint:security`                                                                                                                         | Passed: baseline 410, baseline hits 410, new findings 0. No baseline file change.                                                                                                                                                                                                     |
+| `npm run typecheck`                                                                                                                             | Passed: `tsc -p config/tsconfig.json`, exit 0.                                                                                                                                                                                                                                        |
+| Targeted `npx prettier --check`                                                                                                                 | Passed for all 4 changed source/test files.                                                                                                                                                                                                                                           |
+| `git diff --check`                                                                                                                              | Passed, exit 0. Git emitted only expected LF→CRLF normalization warnings for two edited TypeScript files.                                                                                                                                                                             |
+| `npm run prepush`                                                                                                                               | Final run passed all 17 gates, including full coverage Vitest, npm audit, docs/samples consistency, Prettier, and typecheck. An earlier concurrent run transiently returned 1 at the Vitest gate with no captured failure output; exact command and final sequential run both passed. |
 
 No `.eslintsecurity-baseline.json` change was needed in this round. The ignored local fallback CodeGraph record was written to `.w-model/codegraph-queries/2026-08-26-final-security-boundary.md`; it is intentionally not part of the commit. `progress.md`, `.w-model`, logs, and unrelated reports remain uncommitted.
+
+## Archive extraction race-boundary follow-up (2026-08-27)
+
+The final uncommitted `extractArchive` implementation was reviewed against an attacker who can alter the selected extraction tree concurrently (including replacing a checked directory with a POSIX symlink or Windows junction) while the process is between archive validation and filesystem I/O. The underlying TOCTOU defect was that lexical path checks and `lstat` checks do not pin the directory object used by a later path-based write; a replacement can therefore redirect a write after validation.
+
+The implementation now stages all archive output in a private `mkdtemp` workspace below the validated extraction root, creates directories component-by-component, rejects symlink/non-directory components, pins each component through `realpath`, and uses exclusive file creation. Where Node exposes POSIX directory descriptors, file creation is addressed through `/proc/self/fd/<fd>` (or `/dev/fd/<fd>`) with `O_NOFOLLOW`/`O_DIRECTORY` when available; the parent directory identity is checked around the open. Windows has no equivalent portable no-follow directory-descriptor API in this Node path, so the implementation uses `O_EXCL`, post-open parent identity verification, immediate ancestor/link and `realpath` checks, and fail-closed cleanup. This is a best-effort boundary, not a claim of kernel-level no-TOCTOU semantics on Windows.
+
+Before any extraction I/O, canonical archive paths are checked for traversal, NUL/empty/dot segments, links, duplicate canonical names, and file-versus-descendant conflicts. Canonical comparison normalizes slash direction and, on Windows, case; trailing directory separators are retained in `rawPath` for validation but removed for the staged target. Duplicate entries are rejected rather than last-entry-wins. UStar, PAX, GNU long-name/long-link parsing and mode propagation remain covered by the existing tests.
+
+The required full platform dependency test file produced **59/59 passed** in the final run. This includes the duplicate/conflict/race coverage already present in the uncommitted worktree diff; no race assertion was weakened or removed. `npm run typecheck`, `npx prettier --check` over the three allowed files, `npm run lint:security` (baseline 410, hits 410, new findings 0), and `git diff --check` all passed. No `.eslintsecurity-baseline.json` update was made. `npm run prepush` reached the Vitest + coverage gate after all preceding gates passed, but exited 1 there; the hook emitted only its temporary JSON report path, which was removed by the hook cleanup before inspection. The targeted required suite remains green; this pre-push full-suite result is recorded as an unresolved verification concern rather than claimed as passed. No baseline update was authorized.

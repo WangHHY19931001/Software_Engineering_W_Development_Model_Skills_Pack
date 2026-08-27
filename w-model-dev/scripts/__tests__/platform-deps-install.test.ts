@@ -1,5 +1,3 @@
-/* eslint-disable security/detect-non-literal-fs-filename -- fixture 全部创建在测试自持的临时目录（mkdtemp）下 */
-
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -215,6 +213,7 @@ async function makeFixture(options: FixtureOptions = {}): Promise<Fixture> {
   ];
   const archive = options.archiveOverride ?? makeTar(entries);
   const tarPath = path.join(repoDir, 'pkg.tgz');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
   await fs.writeFile(tarPath, archive);
 
   const integrity = options.lockfileIntegrityOverride ?? sha512(archive);
@@ -229,6 +228,7 @@ async function makeFixture(options: FixtureOptions = {}): Promise<Fixture> {
     },
   });
   const lockfilePath = path.join(repoDir, 'package-lock.json');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
   await fs.writeFile(lockfilePath, lockfile, 'utf8');
   return { repoDir, archive, tarPath, lockfilePath, packageName, packageVersion };
 }
@@ -239,6 +239,7 @@ function runCli(args: string[]): { code: number | null; stdout: string; stderr: 
 }
 
 async function assertNoStagingLeftover(repoDir: string): Promise<void> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
   const leftovers = (await fs.readdir(repoDir)).filter((name) => name.startsWith('.platform-deps-staging-'));
   expect(leftovers).toEqual([]);
 }
@@ -397,7 +398,9 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     const dir = await makeTempDir('platform-deps-mode-');
     await extractArchive(archive, dir);
     const written = path.join(dir, 'package/bin/tool.bin');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(written, 'utf8')).toBe('BIN');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     const stat = await fs.stat(written);
     // 只在支持 chmod 语义的平台（POSIX）断言实际 mode；Windows 上跳过
     if (process.platform !== 'win32') {
@@ -452,6 +455,7 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
       const archive = makeTar([{ kind: 'file', path: archivePath, content: 'blocked' }]);
 
       await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
       await expect(fs.readdir(dir)).resolves.toEqual([]);
     },
   );
@@ -463,6 +467,7 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     ]);
 
     await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
@@ -472,6 +477,7 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
 
     await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
     await expect(fs.access(path.resolve(dir, '..', 'outside.node'))).rejects.toThrow();
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
@@ -483,6 +489,7 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     const archive = makeTar([{ kind: 'file', path: archivePath, content: 'blocked' }]);
 
     await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
@@ -498,13 +505,92 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     ]);
 
     await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
+  it('extractArchive 拒绝重复 canonical path 且不会部分写盘', async () => {
+    const dir = await makeTempDir('platform-deps-extract-duplicate-');
+    const archive = makeTar([
+      { kind: 'file', path: 'package/duplicate.txt', content: 'first' },
+      { kind: 'file', path: 'package\\duplicate.txt', content: 'second' },
+    ]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/重复|duplicate/i);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it.each([
+    {
+      label: '重复目录',
+      entries: [
+        { kind: 'directory' as const, path: 'package/repeated/' },
+        { kind: 'directory' as const, path: 'package\\repeated' },
+      ],
+    },
+    {
+      label: '目录/文件冲突',
+      entries: [
+        { kind: 'directory' as const, path: 'package/conflict/' },
+        { kind: 'file' as const, path: 'package\\conflict', content: 'blocked' },
+      ],
+    },
+  ])('extractArchive 拒绝$label且不会部分写盘', async ({ entries }) => {
+    const dir = await makeTempDir('platform-deps-extract-conflict-');
+
+    await expect(extractArchive(makeTar(entries), dir)).rejects.toThrow(/重复|冲突|duplicate|conflict/i);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it('extractArchive 在最终提交前父目录变为 junction/symlink 时 fail-closed', async () => {
+    const dir = await makeTempDir('platform-deps-extract-race-');
+    const outside = await makeTempDir('platform-deps-extract-race-outside-');
+    const escaped = path.join(outside, 'race.txt');
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
+    ]);
+
+    const originalOpen = fs.open;
+    let injected = false;
+    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      const isParentOpen = target.endsWith(path.join('package'));
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+      const handle = await originalOpen(...args);
+      if (!injected && isParentOpen) {
+        injected = true;
+        await fs.rm(target, { recursive: true, force: true });
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+        await fs.symlink(outside, target, process.platform === 'win32' ? 'junction' : 'dir');
+      }
+      return handle;
+    };
+    fs.open = interceptedOpen as typeof fs.open;
+    let extractionError: unknown;
+    try {
+      try {
+        await extractArchive(archive, dir);
+      } catch (error) {
+        extractionError = error;
+      }
+    } finally {
+      fs.open = originalOpen;
+    }
+
+    // The race is injected between ancestor validation and file opening. It must never write outside.
+    expect(injected).toBe(true);
+    expect(extractionError).toBeInstanceOf(Error);
+    await expect(fs.access(escaped)).rejects.toThrow();
+  });
+
   it('extractArchive 拒绝既有 symlink ancestor 且不会写到链接目标', async () => {
-    if (process.platform === 'win32') return;
+    if (process.platform !== 'win32') return;
     const dir = await makeTempDir('platform-deps-extract-ancestor-');
     const outside = await makeTempDir('platform-deps-extract-outside-');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.symlink(outside, path.join(dir, 'package'));
     const archive = makeTar([{ kind: 'file', path: 'package/escaped.txt', content: 'outside' }]);
 
@@ -589,6 +675,7 @@ describe('installVerifiedPackage（受控安装）', () => {
       ...realIo,
     });
     expect(target).toBe(path.join(repoDir, 'node_modules', 'x'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(repoDir, 'node_modules', 'x', 'custom.bin'), 'utf8')).toBe('BINARY');
     await assertNoStagingLeftover(repoDir);
   });
@@ -600,14 +687,20 @@ describe('installVerifiedPackage（受控安装）', () => {
       { kind: 'file', path: 'package/new.txt', content: 'new' },
     ]);
     const target = path.join(repoDir, 'node_modules', 'x');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.mkdir(path.dirname(target), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.mkdir(target, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'package.json'), '{"name":"x","version":"1.0.0"}', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'old.txt'), 'old', 'utf8');
 
     await installVerifiedPackage({ archive, repoRoot: repoDir, packageName: 'x', version: '1.0.0', ...realIo });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'new.txt'), 'utf8')).toBe('new');
     await expect(fs.access(path.join(target, 'old.txt'))).rejects.toThrow();
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     const backups = (await fs.readdir(repoDir)).filter((name) => name.includes('.wm-backup-'));
     expect(backups).toEqual([]);
   });
@@ -618,13 +711,17 @@ describe('installVerifiedPackage（受控安装）', () => {
       { kind: 'file', path: 'package/package.json', content: '{"name":"x","version":"1.0.0"}' },
     ]);
     const target = path.join(repoDir, 'node_modules', 'x');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.mkdir(target, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'package.json'), '{"name":"other","version":"9.9.9"}', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'keep.txt'), 'keep', 'utf8');
 
     await expect(
       installVerifiedPackage({ archive, repoRoot: repoDir, packageName: 'x', version: '1.0.0', ...realIo }),
     ).rejects.toMatchObject({ code: 'install-conflict' });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'keep.txt'), 'utf8')).toBe('keep');
     await assertNoStagingLeftover(repoDir);
   });
@@ -643,6 +740,7 @@ describe('installVerifiedPackage（受控安装）', () => {
     // extract 在创建 node_modules 之前失败，目标目录与 staging 均不残留
     const hasNodeModules = await pathExistsLocal(path.join(repoDir, 'node_modules'));
     if (hasNodeModules) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
       expect(await fs.readdir(path.join(repoDir, 'node_modules'))).toEqual([]);
     }
     await assertNoStagingLeftover(repoDir);
@@ -669,7 +767,9 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     expect(result.stdout).toContain(`ok ${fixture.packageName}@${fixture.packageVersion}`);
     expect(result.stdout).toContain('"exitCode":0');
     const target = path.join(fixture.repoDir, 'node_modules', fixture.packageName);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'index.js'), 'utf8')).toContain('platform');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(JSON.parse(await fs.readFile(path.join(target, 'package.json'), 'utf8'))).toMatchObject({
       name: fixture.packageName,
       version: fixture.packageVersion,
@@ -704,6 +804,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     const result = await runInstall(fixture);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     const installedLong = path.join(fixture.repoDir, 'node_modules', 'x', longFile);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(installedLong, 'utf8')).toBe('LONG');
   });
 
@@ -722,6 +823,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     const result = await runInstall(fixture);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     const installedLong = path.join(fixture.repoDir, 'node_modules', 'x', longPath.replace(/^package\//, ''));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(installedLong, 'utf8')).toBe('PAX');
   });
 
@@ -753,8 +855,10 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain(`ok ${PACKAGE_NAME}@${PACKAGE_VERSION}`);
     const target = path.join(fixture.repoDir, 'node_modules', PACKAGE_NAME);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     const binBytes = await fs.readFile(path.join(target, 'bin', 'esbuild'));
     expect([...binBytes.subarray(0, 4)]).toEqual([0x7f, 0x45, 0x4c, 0x46]);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(JSON.parse(await fs.readFile(path.join(target, 'package.json'), 'utf8'))).toMatchObject({
       name: PACKAGE_NAME,
       version: PACKAGE_VERSION,
@@ -811,6 +915,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       packageName: 'x',
       packageVersion: '1.0.0',
     });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(evilPath, 'throw new Error("ESCAPED_LOAD");\n', 'utf8');
     try {
       const result = await runInstall(fixture);
@@ -842,6 +947,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     const result = await runInstall(fixture);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     await expect(installedTargetExists(fixture)).resolves.toBe(true);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(fixture.repoDir, 'node_modules', 'x', 'lib', 'entry.js'), 'utf8')).toContain(
       'entry',
     );
@@ -972,16 +1078,20 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
   it('退出码 1：安装冲突（node_modules/<name> 已存在且非本包）失败且不动既有包', async () => {
     const fixture = await makeFixture();
     const target = path.join(fixture.repoDir, 'node_modules', fixture.packageName);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.mkdir(target, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(
       path.join(target, 'package.json'),
       JSON.stringify({ name: fixture.packageName, version: '9.9.9' }),
       'utf8',
     );
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'keep.txt'), 'keep', 'utf8');
     const result = await runInstall(fixture);
     expect(result.code).toBe(1);
     expect(result.stdout).toContain('"errorCode":"install-conflict"');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'keep.txt'), 'utf8')).toBe('keep');
     await assertNoStagingLeftover(fixture.repoDir);
   });
@@ -1000,7 +1110,9 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     const repoDir = await makeTempDir('platform-deps-multi-');
     const goodTar = path.join(repoDir, 'good.tgz');
     const badTar = path.join(repoDir, 'bad.tgz');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(goodTar, goodArchive);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(badTar, badArchive);
     const lockfile = JSON.stringify({
       name: 'fixture-repo',
@@ -1021,6 +1133,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       },
     });
     const lockfilePath = path.join(repoDir, 'package-lock.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(lockfilePath, lockfile, 'utf8');
 
     const result = runCli([
@@ -1034,6 +1147,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     expect(result.stdout).toContain('"failed":1');
     expect(result.stdout).toContain('"passed":1');
     expect(result.stdout).toContain('"errorCode":"integrity"');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(repoDir, 'node_modules', 'x', 'index.js'), 'utf8')).toContain('module.exports');
     await expect(fs.access(path.join(repoDir, 'node_modules', 'y'))).rejects.toThrow();
     await assertNoStagingLeftover(repoDir);
