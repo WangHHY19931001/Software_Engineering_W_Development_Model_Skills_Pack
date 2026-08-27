@@ -13,7 +13,7 @@
  * node:zlib）。仅供上述 CLI 与该 CLI 的测试消费，不参与 /wm 编排。
  */
 
-import { constants as fsConstants, promises as fs, type Stats } from 'node:fs';
+import { constants as fsConstants, promises as fs, type BigIntStats } from 'node:fs';
 import * as path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
@@ -77,23 +77,24 @@ function decodeMetaString(data: Buffer): string {
 
 /** 解析 pax 记录 blob：`<len> <key>=<value>\n`，len 含整条记录含换行 */
 export function parsePaxRecords(blob: string | Buffer): Map<string, string> {
-  const source = Buffer.isBuffer(blob) ? blob.toString('utf8') : blob;
+  const source = Buffer.isBuffer(blob) ? blob : Buffer.from(blob, 'utf8');
   const records = new Map<string, string>();
   let cursor = 0;
   while (cursor < source.length) {
-    const space = source.indexOf(' ', cursor);
+    const space = source.indexOf(0x20, cursor);
     if (space < 0) break;
-    const length = Number.parseInt(source.slice(cursor, space), 10);
-    if (!Number.isFinite(length) || length <= 0 || cursor + length > source.length) break;
-    const record = source.slice(cursor, cursor + length);
-    // 注意：space 是相对整个 blob 的绝对偏移；切片必须换算成相对 record（从 cursor 起始）的偏移
-    const keyOffset = space - cursor;
+    const length = Number.parseInt(source.subarray(cursor, space).toString('ascii'), 10);
+    if (!Number.isSafeInteger(length) || length <= 0 || cursor + length > source.length) break;
+    const recordStart = cursor;
+    const record = source.subarray(recordStart, recordStart + length);
+    const equal = record.indexOf(0x3d);
+    const keyOffset = space - recordStart + 1;
     cursor += length;
-    const equal = record.indexOf('=');
-    if (equal < 0) continue;
-    const key = record.slice(keyOffset + 1, equal);
-    const value = record.slice(equal + 1).replace(/\n$/, '');
-    if (key !== '') records.set(key, value);
+    if (equal < keyOffset) continue;
+    const key = record.subarray(keyOffset, equal).toString('utf8');
+    let value = record.subarray(equal + 1);
+    if (value[value.length - 1] === 0x0a) value = value.subarray(0, value.length - 1);
+    if (key !== '') records.set(key, value.toString('utf8'));
   }
   return records;
 }
@@ -108,7 +109,8 @@ function parseArchive(archive: Buffer): TarArchiveEntry[] {
   let offset = 0;
   let gnuLongName: string | undefined;
   let gnuLongLink: string | undefined;
-  let paxRecords = new Map<string, string>();
+  const globalPaxRecords = new Map<string, string>();
+  let localPaxRecords = new Map<string, string>();
   let paxPending = false;
 
   while (offset + BLOCK_SIZE <= archive.length) {
@@ -125,8 +127,13 @@ function parseArchive(archive: Buffer): TarArchiveEntry[] {
     const nextOffset = dataStart + Math.ceil(size / BLOCK_SIZE) * BLOCK_SIZE;
 
     if (typeflag === 'x' || typeflag === 'g') {
-      for (const [key, value] of parsePaxRecords(data.toString('utf8'))) paxRecords.set(key, value);
-      paxPending = true;
+      const parsed = parsePaxRecords(data);
+      if (typeflag === 'g') {
+        for (const [key, value] of parsed) globalPaxRecords.set(key, value);
+      } else {
+        localPaxRecords = parsed;
+        paxPending = true;
+      }
       offset = nextOffset;
       continue;
     }
@@ -142,14 +149,17 @@ function parseArchive(archive: Buffer): TarArchiveEntry[] {
     }
 
     const headerName = decodeName(header);
-    const rawPath =
-      paxPending && paxRecords.get('path') !== undefined ? paxRecords.get('path')! : (gnuLongName ?? headerName);
+    const effectivePax = new Map(globalPaxRecords);
+    if (paxPending) {
+      for (const [key, value] of localPaxRecords) effectivePax.set(key, value);
+    }
+    const rawPath = effectivePax.get('path') ?? gnuLongName ?? headerName;
     const entryPath = rawPath.replace(/\/+$/, '');
     // UStar mode（八进制）——提取时用于保留可执行位（真实 platform 包 bin 为 0755）
     const mode = readModeField(header);
     let linkname: string | undefined;
-    if (paxPending && paxRecords.get('linkpath') !== undefined) {
-      linkname = paxRecords.get('linkpath');
+    if (effectivePax.get('linkpath') !== undefined) {
+      linkname = effectivePax.get('linkpath');
     } else if (gnuLongLink !== undefined) {
       linkname = gnuLongLink;
     } else {
@@ -181,7 +191,7 @@ function parseArchive(archive: Buffer): TarArchiveEntry[] {
     gnuLongName = undefined;
     gnuLongLink = undefined;
     paxPending = false;
-    paxRecords = new Map<string, string>();
+    localPaxRecords = new Map<string, string>();
     offset = nextOffset;
   }
   return entries;
@@ -232,7 +242,12 @@ async function assertNoSymlinkAncestors(target: string): Promise<void> {
  * Each next operation uses the real path returned by the previous component, so a
  * component replaced by a junction/symlink after lstat cannot redirect a later mkdir.
  */
-async function ensureSafeDirectory(root: string, target: string): Promise<string> {
+async function ensureSafeDirectory(
+  root: string,
+  target: string,
+  mode?: number,
+  boundaryRoot?: string,
+): Promise<string> {
   if (target !== root && !isWithinExtractionRoot(root, target)) {
     throw new Error(`extractArchive 拒绝 extraction root 外路径：${target}`);
   }
@@ -245,7 +260,7 @@ async function ensureSafeDirectory(root: string, target: string): Promise<string
     // The caller-selected root may not exist yet; its parent is created and pinned by
     // the caller before this helper is used for the extraction workspace.
     const parent = path.dirname(root);
-    const parentReal = await ensureSafeDirectory(path.parse(parent).root, parent);
+    const parentReal = await ensureSafeDirectory(path.parse(parent).root, parent, undefined, boundaryRoot);
     const rootName = path.basename(root);
     const rootPath = path.join(parentReal, rootName);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- rootPath is derived from the pinned caller-selected parent
@@ -259,7 +274,7 @@ async function ensureSafeDirectory(root: string, target: string): Promise<string
     const next = path.join(current, segment);
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- next is derived from a validated archive path and the pinned real parent
-      const existing = await fs.lstat(next);
+      const existing = await fs.lstat(next, { bigint: true });
       if (existing.isSymbolicLink()) {
         throw new Error(`extractArchive 拒绝符号链接 directory：${next}`);
       }
@@ -268,8 +283,13 @@ async function ensureSafeDirectory(root: string, target: string): Promise<string
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      // The archive mode belongs to the directory entry being created, not to
+      // intermediate ancestors that merely happen to be missing.
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- next is derived from a validated archive path and the pinned real parent
-      await fs.mkdir(next);
+      await fs.mkdir(next, { mode: 0o777 });
+    }
+    if (mode !== undefined && segment === relative.split(path.sep).at(-1)) {
+      await chmodEntrySafely(next, mode, 'directory');
     }
     // Pin the real directory before constructing the next path or opening a file.
     // If a raced replacement redirects it outside canonicalRoot, fail before writing.
@@ -278,9 +298,31 @@ async function ensureSafeDirectory(root: string, target: string): Promise<string
     if (!isWithinExtractionRoot(canonicalRoot, resolved) && resolved !== canonicalRoot) {
       throw new Error(`extractArchive 拒绝 directory 逃逸 extraction root：${next}`);
     }
+    if (boundaryRoot !== undefined && !isWithinExtractionRoot(boundaryRoot, resolved)) {
+      throw new Error(`extractArchive 拒绝 directory 逃逸 pinned root：${next}`);
+    }
     current = resolved;
   }
   return current;
+}
+
+async function chmodEntrySafely(target: string, mode: number, kind: 'file' | 'directory'): Promise<void> {
+  // Modes are applied only to the entry itself. Verify the object again after
+  // chmod so a replacement is never treated as success.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is a validated entry below the private extraction workspace
+  const before = await fs.lstat(target, { bigint: true });
+  const valid = kind === 'directory' ? before.isDirectory() : before.isFile();
+  if (before.isSymbolicLink() || !valid || !hasUsableFileIdentity(before)) {
+    throw new Error(`extractArchive 拒绝设置${kind === 'directory' ? '目录' : '文件'} mode：${target}`);
+  }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is the identity-checked entry created below the private extraction workspace
+  await fs.chmod(target, mode);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target remains the identity-checked private entry
+  const after = await fs.lstat(target, { bigint: true });
+  const remainsValid = kind === 'directory' ? after.isDirectory() : after.isFile();
+  if (after.isSymbolicLink() || !remainsValid || !hasSameFileIdentity(before, after)) {
+    throw new Error(`extractArchive 拒绝设置 mode 后身份变化：${target}`);
+  }
 }
 
 function normalizeArchivePath(rawPath: string): string {
@@ -334,19 +376,180 @@ function validateCanonicalPaths(
 async function lstatIfPresent(target: string): Promise<Awaited<ReturnType<typeof fs.lstat>> | undefined> {
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is derived from the caller-selected extraction root and validated archive top-level path
-    return await fs.lstat(target);
+    return await fs.lstat(target, { bigint: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw error;
   }
 }
 
-async function removeExtractionWorkspace(workspace: string): Promise<void> {
+async function removeExtractionWorkspace(
+  workspace: string,
+  expectedIdentity: FileIdentityStats,
+  boundaryRoot: string,
+): Promise<void> {
   try {
+    await assertPathInside(boundaryRoot, workspace, 'workspace');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is an exclusive mkdtemp directory owned by this extraction call
+    const current = await fs.lstat(workspace, { bigint: true });
+    if (current.isSymbolicLink() || !hasSameFileIdentity(expectedIdentity, current)) {
+      throw new Error(`extractArchive 拒绝清理时 workspace 身份变化：${workspace}`);
+    }
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is an exclusive mkdtemp directory owned by this extraction call
     await fs.rm(workspace, { recursive: true, force: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is the exclusive temporary directory just removed
+    if ((await lstatIfPresent(workspace)) !== undefined) {
+      throw new Error(`extractArchive 清理后 workspace 仍存在：${workspace}`);
+    }
   } catch (error) {
-    throw new Error(`extractArchive 清理失败：${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`extractArchive 清理失败：${describeError(error)}`);
+  }
+}
+
+async function removeOwnedDirectory(
+  target: string,
+  expectedIdentity: FileIdentityStats,
+  boundaryRoot: string,
+): Promise<void> {
+  // This operation is deliberately identity-gated. If the destination was replaced,
+  // do not follow or remove the replacement: leave it for explicit fail-closed handling.
+  await assertPathInside(boundaryRoot, target, 'destination');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is the atomically claimed extraction destination
+  const current = await fs.lstat(target, { bigint: true });
+  if (current.isSymbolicLink() || !current.isDirectory() || !hasSameFileIdentity(expectedIdentity, current)) {
+    throw new Error(`extractArchive 拒绝回滚时 destination 身份变化：${target}`);
+  }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target remains the identity-verified claimed destination
+  await fs.rmdir(target);
+  if ((await lstatIfPresent(target)) !== undefined) {
+    throw new Error(`extractArchive 回滚后 destination 仍存在：${target}`);
+  }
+}
+
+type OwnedEntry = { path: string; identity: FileIdentityStats; type: 'file' | 'directory' };
+
+async function claimDirectoryNoReplace(
+  destination: string,
+  boundaryRoot: string,
+  mode: number,
+  owned: OwnedEntry[],
+): Promise<FileIdentityStats> {
+  await assertPathInside(boundaryRoot, path.dirname(destination), 'destination parent', true);
+  const parentHandle = await openDirectory(path.dirname(destination));
+  let claimed: FileIdentityStats | undefined;
+  let primaryError: unknown;
+  try {
+    await assertDirectoryHandleIdentity(parentHandle, path.dirname(destination));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- destination is a validated child of the claimed extraction root
+    await fs.mkdir(destination, { mode });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- destination was just exclusively claimed below the validated root
+    claimed = await fs.lstat(destination, { bigint: true });
+    if (claimed.isSymbolicLink() || !claimed.isDirectory() || !hasUsableFileIdentity(claimed)) {
+      throw new Error(`extractArchive 拒绝新建目录身份：${destination}`);
+    }
+    // Register ownership before the second parent-boundary check. If that check
+    // observes a race, rollback can remove this newly claimed directory only when
+    // its identity still matches; an unregistered claim would leak an empty target.
+    owned.push({ path: destination, identity: claimed, type: 'directory' });
+    await assertDirectoryHandleIdentity(parentHandle, path.dirname(destination));
+  } catch (error) {
+    primaryError = error;
+  }
+  const closeError = await closeHandleOrThrow(parentHandle, 'destination 父目录');
+  if (primaryError !== undefined && closeError !== undefined) {
+    throw new Error(`${describeError(primaryError)}；${closeError.message}`);
+  }
+  if (primaryError !== undefined) throw primaryError;
+  if (closeError !== undefined) throw closeError;
+  if (claimed === undefined) throw new Error(`extractArchive 无法确认新建目录身份：${destination}`);
+  return claimed;
+}
+
+async function transferTreeNoReplace(
+  source: string,
+  destination: string,
+  boundaryRoot: string,
+  owned: OwnedEntry[],
+): Promise<void> {
+  // Source is private staging output; reject any unexpected reparse/link object.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- source is beneath the private extraction workspace
+  const sourceStat = await fs.lstat(source, { bigint: true });
+  if (sourceStat.isSymbolicLink() || !sourceStat.isDirectory()) {
+    throw new Error(`extractArchive 拒绝 transfer source 非目录或链接：${source}`);
+  }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- source is beneath the private extraction workspace
+  const children = await fs.readdir(source);
+  for (const name of children) {
+    const sourceChild = path.join(source, name);
+    const destinationChild = path.join(destination, name);
+    if (!isWithinExtractionRoot(boundaryRoot, destinationChild)) {
+      throw new Error(`extractArchive 拒绝 destination 越界：${destinationChild}`);
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- sourceChild is beneath private staging and destinationChild is beneath the claimed destination
+    const sourceChildStat = await fs.lstat(sourceChild, { bigint: true });
+    if (sourceChildStat.isSymbolicLink()) {
+      throw new Error(`extractArchive 拒绝 transfer source 链接：${sourceChild}`);
+    }
+    if (sourceChildStat.isDirectory()) {
+      await claimDirectoryNoReplace(destinationChild, boundaryRoot, Number(sourceChildStat.mode & 0o7777n), owned);
+      await transferTreeNoReplace(sourceChild, destinationChild, boundaryRoot, owned);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- sourceChild is private staging and was emptied by the recursive transfer
+      await fs.rmdir(sourceChild);
+      continue;
+    }
+    if (!sourceChildStat.isFile()) {
+      throw new Error(`extractArchive 拒绝 transfer source 特殊文件：${sourceChild}`);
+    }
+    // Verify the claimed parent immediately before and after the no-replace copy.
+    const destinationParent = path.dirname(destinationChild);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- destinationParent is beneath the claimed destination
+    const destinationParentHandle = await openDirectory(destinationParent);
+    let transferError: unknown;
+    try {
+      await assertDirectoryHandleIdentity(destinationParentHandle, destinationParent);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- destinationChild is beneath the claimed destination and COPYFILE_EXCL is no-replace
+      await fs.copyFile(sourceChild, destinationChild, fsConstants.COPYFILE_EXCL);
+      await assertDirectoryHandleIdentity(destinationParentHandle, destinationParent);
+    } catch (error) {
+      transferError = error;
+    }
+    const closeError = await closeHandleOrThrow(destinationParentHandle, 'destination 父目录');
+    if (transferError !== undefined && closeError !== undefined) {
+      throw new Error(`${describeError(transferError)}；${closeError.message}`);
+    }
+    if (transferError !== undefined) throw transferError;
+    if (closeError !== undefined) throw closeError;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- destinationChild was just created by this call
+    const destinationStat = await fs.lstat(destinationChild, { bigint: true });
+    if (destinationStat.isSymbolicLink() || !destinationStat.isFile() || !hasUsableFileIdentity(destinationStat)) {
+      throw new Error(`extractArchive 拒绝新建文件身份：${destinationChild}`);
+    }
+    owned.push({ path: destinationChild, identity: destinationStat, type: 'file' });
+    const fileMode = Number(sourceChildStat.mode & 0o7777n);
+    if (fileMode !== 0) {
+      await chmodEntrySafely(destinationChild, fileMode, 'file');
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- sourceChild remains private staging and its identity is checked before unlink
+    const sourceAfterCopy = await fs.lstat(sourceChild, { bigint: true });
+    if (!hasSameFileIdentity(sourceChildStat, sourceAfterCopy) || !sourceAfterCopy.isFile()) {
+      throw new Error(`extractArchive 拒绝 transfer source 身份变化：${sourceChild}`);
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- sourceChild is private staging and identity-checked above
+    await fs.unlink(sourceChild);
+  }
+}
+
+async function rollbackOwnedEntries(owned: readonly OwnedEntry[], boundaryRoot: string): Promise<void> {
+  for (const item of [...owned].reverse()) {
+    await assertPathInside(boundaryRoot, item.path, 'rollback target');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- item.path was created by this extraction call and remains identity-gated
+    const current = await fs.lstat(item.path, { bigint: true });
+    if (current.isSymbolicLink() || !hasSameFileIdentity(item.identity, current)) {
+      throw new Error(`extractArchive 拒绝 rollback 条目身份变化：${item.path}`);
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- item.path remains identity-verified and owned by this extraction call
+    if (item.type === 'file') await fs.unlink(item.path);
+    else await removeOwnedDirectory(item.path, item.identity, boundaryRoot);
   }
 }
 
@@ -371,31 +574,104 @@ async function assertPinnedDirectory(selected: string, pinned: string): Promise<
   }
 }
 
-function hasSameFileIdentity(left: Stats, right: Stats): boolean {
+type FileIdentityStats = BigIntStats;
+
+function hasSameFileIdentity(left: FileIdentityStats, right: FileIdentityStats): boolean {
   return left.dev === right.dev && left.ino === right.ino;
+}
+
+function hasUsableFileIdentity(stat: FileIdentityStats): boolean {
+  return stat.dev !== 0n && stat.ino !== 0n;
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function assertPathInside(root: string, target: string, label: string, allowRoot = false): Promise<string> {
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is derived from the validated extraction root and archive path
+    const resolved = await fs.realpath(target);
+    if (
+      !isSamePath(resolved, target) ||
+      (!allowRoot && !isWithinExtractionRoot(root, resolved)) ||
+      (allowRoot && !isWithinExtractionRoot(root, resolved) && !isSamePath(root, resolved))
+    ) {
+      throw new Error(`extractArchive 拒绝${label}逃逸 extraction root：${target}`);
+    }
+    return resolved;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('拒绝')) throw error;
+    throw new Error(`extractArchive 无法确认${label}边界：${target}`);
+  }
 }
 
 async function assertDirectoryHandleIdentity(
   handle: Awaited<ReturnType<typeof fs.open>>,
   directory: string,
-): Promise<void> {
-  const opened = await handle.stat();
+): Promise<BigIntStats> {
+  const opened = await handle.stat({ bigint: true });
+  if (!hasUsableFileIdentity(opened) || !opened.isDirectory()) {
+    throw new Error(`extractArchive 无法确认父目录句柄身份：${directory}`);
+  }
   try {
+    // lstat is required in addition to stat: a junction/symlink may otherwise resolve
+    // to the same object as the handle and appear valid while changing the path boundary.
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is a validated extraction parent and is compared with its already-opened handle
-    const current = await fs.stat(directory);
+    const lexical = await fs.lstat(directory, { bigint: true });
+    if (lexical.isSymbolicLink() || !lexical.isDirectory()) {
+      throw new Error(`extractArchive 拒绝父目录链接或非目录：${directory}`);
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is a validated extraction parent and is compared with its already-opened handle
+    const current = await fs.stat(directory, { bigint: true });
     if (!hasSameFileIdentity(opened, current)) {
       throw new Error(`extractArchive 拒绝父目录身份变化：${directory}`);
     }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is a validated extraction parent whose lexical identity was checked above
+    const resolved = await fs.realpath(directory);
+    if (!isSamePath(resolved, directory)) {
+      throw new Error(`extractArchive 拒绝父目录 realpath 变化：${directory}`);
+    }
+    return opened;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('拒绝父目录身份变化')) throw error;
+    if (error instanceof Error && error.message.includes('拒绝')) throw error;
     throw new Error(`extractArchive 无法确认父目录身份：${directory}`);
   }
 }
 
+const DIRECTORY_FLAG = (fsConstants as { O_DIRECTORY?: number }).O_DIRECTORY;
+const NO_FOLLOW_FLAG = (fsConstants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+
+function descriptorChildPath(handle: Awaited<ReturnType<typeof fs.open>>, child: string): string {
+  if (process.platform === 'win32' || DIRECTORY_FLAG === undefined || NO_FOLLOW_FLAG === 0) {
+    throw new Error('extractArchive 无法在当前平台提供安全原子 parent/file 绑定，拒绝提取');
+  }
+  const fdRoot = process.platform === 'darwin' ? '/dev/fd' : '/proc/self/fd';
+  return path.join(fdRoot, String(handle.fd), path.basename(child));
+}
+
+async function openDirectory(directory: string): Promise<Awaited<ReturnType<typeof fs.open>>> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is the caller-selected or private extraction directory
+  return fs.open(directory, fsConstants.O_RDONLY | (DIRECTORY_FLAG ?? 0) | NO_FOLLOW_FLAG);
+}
+
+async function closeHandleOrThrow(
+  handle: Awaited<ReturnType<typeof fs.open>> | undefined,
+  label: string,
+): Promise<Error | undefined> {
+  if (handle === undefined) return undefined;
+  try {
+    await handle.close();
+    return undefined;
+  } catch (error) {
+    return new Error(`extractArchive ${label}关闭失败：${describeError(error)}`);
+  }
+}
+
 /**
- * Open a file without following a raced parent directory where the platform exposes
- * directory file descriptors. Windows lacks O_NOFOLLOW/O_DIRECTORY in Node, so it
- * uses the strongest available O_EXCL open plus an immediate real-path verification.
+ * Open a file relative to an already-opened parent directory descriptor. There is no
+ * path-based fallback: a platform without the required descriptor/no-follow support
+ * must reject extraction before it writes anything.
  */
 async function writeFileSafely(
   workspace: string,
@@ -403,75 +679,110 @@ async function writeFileSafely(
   basename: string,
   content: Buffer,
   mode: number | undefined,
-): Promise<void> {
-  const noFollow = (fsConstants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
-  const directoryFlag = (fsConstants as { O_DIRECTORY?: number }).O_DIRECTORY;
-  const flags = fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | noFollow;
+): Promise<FileIdentityStats> {
+  const flags = fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | NO_FOLLOW_FLAG;
   let parentHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   let fileHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   let openedTarget: string | undefined;
+  let fileCreated = false;
+  let createdIdentity: FileIdentityStats | undefined;
+  let verifiedCreatedPath: string | undefined;
+  let primaryError: unknown;
   try {
-    // Windows does not expose a portable no-follow open flag, but opening the parent
-    // first still lets us compare its identity immediately before and after file open.
-    // POSIX additionally uses the descriptor path so the parent cannot be swapped out.
-    const parentFlags = fsConstants.O_RDONLY | (directoryFlag ?? 0) | noFollow;
+    const parentFlags = fsConstants.O_RDONLY | (DIRECTORY_FLAG ?? 0) | NO_FOLLOW_FLAG;
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- parent is a validated directory below the private extraction workspace
     parentHandle = await fs.open(parent, parentFlags);
     await assertDirectoryHandleIdentity(parentHandle, parent);
-    if (process.platform !== 'win32' && directoryFlag !== undefined) {
-      const fdRoot = process.platform === 'darwin' ? '/dev/fd' : '/proc/self/fd';
-      openedTarget = path.join(fdRoot, String(parentHandle.fd), basename);
-    } else {
-      openedTarget = path.join(parent, basename);
-    }
+    openedTarget = descriptorChildPath(parentHandle, basename);
 
+    // O_EXCL success is the only point at which this call owns a newly-created file.
+    // Do not infer ownership from the path string before this operation succeeds.
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- openedTarget is derived from a validated private extraction directory and basename
     fileHandle = await fs.open(openedTarget, flags, mode ?? 0o666);
+    fileCreated = true;
+    createdIdentity = await fileHandle.stat({ bigint: true });
+    if (!hasUsableFileIdentity(createdIdentity) || !createdIdentity.isFile()) {
+      throw new Error(`extractArchive 无法确认新建文件身份：${basename}`);
+    }
+
+    // Windows has no portable Node no-follow open flag. First bind cleanup to the
+    // exact object that O_EXCL created. This is intentionally done before any later
+    // boundary check: a junction race may resolve the opened path outside the
+    // workspace, but an identity-checked cleanup can still remove only this call's
+    // newly-created file. A failed identity check is never treated as success.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- openedTarget is the validated private extraction path
+    const realTarget = await fs.realpath(openedTarget);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- realTarget is obtained from the just-opened file handle path
+    const realStat = await fs.stat(realTarget, { bigint: true });
+    if (!hasSameFileIdentity(createdIdentity, realStat)) {
+      throw new Error(`extractArchive 拒绝新建文件身份变化：${basename}`);
+    }
+    verifiedCreatedPath = realTarget;
+    if (!isWithinExtractionRoot(workspace, realTarget)) {
+      throw new Error(`extractArchive 拒绝文件路径逃逸 extraction root：${basename}`);
+    }
+
+    // Verify the parent both before and immediately before the write. On Windows
+    // these checks are not a kernel-level no-follow guarantee; any observed
+    // replacement therefore fails closed and the operation never reports success.
     await assertDirectoryHandleIdentity(parentHandle, parent);
-
-    if (process.platform === 'win32') {
-      // Windows has no usable O_NOFOLLOW flag in Node. Reject a junction/symlink
-      // replacement before writing and verify that the opened path remains inside.
-      await assertNoSymlinkAncestors(path.join(parent, basename));
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is the validated private extraction path
-      const realTarget = await fs.realpath(path.join(parent, basename));
-      if (!isSamePath(realTarget, path.join(parent, basename)) || !isWithinExtractionRoot(workspace, realTarget)) {
-        throw new Error(`extractArchive 拒绝文件路径逃逸 extraction root：${basename}`);
-      }
+    await assertDirectoryHandleIdentity(parentHandle, parent);
+    const beforeWrite = await fileHandle.stat({ bigint: true });
+    if (!hasSameFileIdentity(createdIdentity, beforeWrite)) {
+      throw new Error(`extractArchive 拒绝写入前文件身份变化：${basename}`);
     }
-
     await fileHandle.writeFile(content);
+    const afterWrite = await fileHandle.stat({ bigint: true });
+    if (!hasSameFileIdentity(createdIdentity, afterWrite)) {
+      throw new Error(`extractArchive 拒绝写入后文件身份变化：${basename}`);
+    }
   } catch (error) {
-    if (fileHandle !== undefined) {
-      try {
-        await fileHandle.close();
-      } catch (closeError) {
-        throw new Error(
-          `extractArchive 文件关闭失败：${closeError instanceof Error ? closeError.message : String(closeError)}；原始错误：${error instanceof Error ? error.message : String(error)}`,
-        );
+    primaryError = error;
+  }
+
+  const fileCloseError = await closeHandleOrThrow(fileHandle, '文件');
+  fileHandle = undefined;
+  if (fileCloseError !== undefined) {
+    primaryError =
+      primaryError === undefined
+        ? fileCloseError
+        : new Error(`${describeError(primaryError)}；${fileCloseError.message}`);
+  }
+
+  const parentCloseError = await closeHandleOrThrow(parentHandle, '父目录');
+  parentHandle = undefined;
+  if (parentCloseError !== undefined) {
+    primaryError =
+      primaryError === undefined
+        ? parentCloseError
+        : new Error(`${describeError(primaryError)}；${parentCloseError.message}`);
+  }
+
+  if (primaryError !== undefined && fileCreated && verifiedCreatedPath !== undefined && createdIdentity !== undefined) {
+    try {
+      // Re-verify the exact real path and identity before removing the file created by
+      // this call. Never remove openedTarget: it may now resolve through a junction.
+      // This runs after both handles close so a parent-close failure cannot leave an
+      // identity-verified file behind while still reporting a failed extraction.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- verifiedCreatedPath was realpath- and identity-verified while the file handle was open
+      const cleanupStat = await fs.lstat(verifiedCreatedPath, { bigint: true });
+      if (!hasSameFileIdentity(createdIdentity, cleanupStat) || cleanupStat.isSymbolicLink()) {
+        throw new Error(`extractArchive 清理前文件身份变化：${verifiedCreatedPath}`);
       }
-    }
-    if (process.platform === 'win32' && openedTarget !== undefined) {
-      try {
-        // `openedTarget` is only removed after O_EXCL created it. On a junction
-        // race this removes the escaped file, leaving the junction for workspace cleanup.
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- openedTarget is derived from the validated private extraction directory
-        await fs.rm(openedTarget, { force: true });
-      } catch (cleanupError) {
-        throw new Error(
-          `extractArchive 写入失败：${error instanceof Error ? error.message : String(error)}；清理失败：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
-      }
-    }
-    throw error;
-  } finally {
-    if (fileHandle !== undefined) {
-      await fileHandle.close().catch(() => undefined);
-    }
-    if (parentHandle !== undefined) {
-      await parentHandle.close().catch(() => undefined);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- verifiedCreatedPath remains identity-verified and names the file created by this call
+      await fs.unlink(verifiedCreatedPath);
+    } catch (cleanupError) {
+      primaryError = new Error(
+        `extractArchive 写入失败：${describeError(primaryError)}；清理失败：${describeError(cleanupError)}`,
+      );
     }
   }
+
+  if (primaryError !== undefined) throw primaryError;
+  if (createdIdentity === undefined) {
+    throw new Error(`extractArchive 无法确认新建文件身份：${basename}`);
+  }
+  return createdIdentity;
 }
 
 /**
@@ -491,6 +802,10 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
   const entries = parseArchive(gunzipSync(archive));
   const planned = validateCanonicalPaths(entries);
 
+  if (process.platform === 'win32') {
+    throw new Error('extractArchive 无法在 Windows 提供安全原子 parent/file 绑定，拒绝提取');
+  }
+
   await assertNoSymlinkAncestors(root);
   // Create the caller-selected root only after every archive-only preflight has passed.
   await ensureSafeDirectory(path.parse(root).root, root);
@@ -499,9 +814,20 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
   const pinnedRoot = await fs.realpath(root);
 
   let workspace: string | undefined;
+  let workspaceIdentity: BigIntStats | undefined;
+  const owned: OwnedEntry[] = [];
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- root is caller-selected and validated as a non-symlink extraction directory
     workspace = await fs.mkdtemp(path.join(pinnedRoot, '.platform-deps-extract-'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is the exclusive temporary directory just created below the pinned root
+    workspaceIdentity = await fs.lstat(workspace, { bigint: true });
+    if (
+      workspaceIdentity.isSymbolicLink() ||
+      !workspaceIdentity.isDirectory() ||
+      !hasUsableFileIdentity(workspaceIdentity)
+    ) {
+      throw new Error(`extractArchive 无法确认 workspace 身份：${workspace}`);
+    }
     await assertNoSymlinkAncestors(workspace);
 
     for (const { entry, archivePath } of planned) {
@@ -510,10 +836,9 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
         throw new Error(`extractArchive 拒绝 extraction root 外路径：${entry.path}`);
       }
       if (entry.type === 'directory') {
-        await ensureSafeDirectory(workspace, target);
+        await ensureSafeDirectory(workspace, target, entry.mode);
         continue;
       }
-
       const parent = await ensureSafeDirectory(workspace, path.dirname(target));
       const content = Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content ?? '');
       await writeFileSafely(workspace, parent, path.basename(target), content, entry.mode);
@@ -533,25 +858,52 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
       if (existing !== undefined) {
         throw new Error(`extractArchive 拒绝覆盖既有目标：${destination}`);
       }
-      // Rename replaces a raced destination link itself; it does not open or write through it.
-      // The immediate ancestor checks above make a raced root junction/symlink fail closed.
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are derived from the validated root and archive top-level path
-      await fs.rename(staged, destination);
+      // Claim a destination directory without replacement, then transfer every staged child
+      // with COPYFILE_EXCL. A failure rolls back only identity-verified entries owned by us.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- staged is beneath the private extraction workspace and destination is beneath the pinned root
+      const stagedStat = await fs.lstat(staged, { bigint: true });
+      if (stagedStat.isDirectory()) {
+        await claimDirectoryNoReplace(destination, root, Number(stagedStat.mode & 0o7777n), owned);
+        await transferTreeNoReplace(staged, destination, root, owned);
+      } else if (stagedStat.isFile()) {
+        const parent = path.dirname(destination);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- staged is an identity-checked file below the private extraction workspace
+        const stagedContent = await fs.readFile(staged);
+        const identity = await writeFileSafely(
+          root,
+          parent,
+          path.basename(destination),
+          stagedContent,
+          Number(stagedStat.mode & 0o7777n),
+        );
+        owned.push({ path: destination, identity, type: 'file' });
+      } else {
+        throw new Error(`extractArchive 拒绝 staging 顶层特殊文件：${staged}`);
+      }
     }
   } catch (error) {
-    if (workspace !== undefined) {
+    let rollbackError: unknown;
+    try {
+      await rollbackOwnedEntries(owned, root);
+    } catch (candidate) {
+      rollbackError = candidate;
+    }
+    if (workspace !== undefined && workspaceIdentity !== undefined) {
       try {
-        await removeExtractionWorkspace(workspace);
+        await removeExtractionWorkspace(workspace, workspaceIdentity, pinnedRoot);
       } catch (cleanupError) {
-        throw new Error(
-          `extractArchive 提取失败：${error instanceof Error ? error.message : String(error)}；清理失败：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
+        rollbackError = rollbackError ?? cleanupError;
       }
+    }
+    if (rollbackError !== undefined) {
+      throw new Error(
+        `extractArchive 提取失败：${describeError(error)}；回滚/清理失败：${describeError(rollbackError)}`,
+      );
     }
     throw error;
   }
 
-  if (workspace !== undefined) {
-    await removeExtractionWorkspace(workspace);
+  if (workspace !== undefined && workspaceIdentity !== undefined) {
+    await removeExtractionWorkspace(workspace, workspaceIdentity, pinnedRoot);
   }
 }
