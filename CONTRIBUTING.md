@@ -89,25 +89,25 @@ npm run format
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
 在 `git push` 时自动跑 17 项检查；任一退出码不符预期即中止推送：
 
-| #   | 检查                                                                                                                                                                                      | 期望退出码 |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1   | `npm run self-test`（260 条样本回归基线）                                                                                                                                                 | 0          |
-| 2   | `npm run check:verifier`（无参数）                                                                                                                                                        | 2          |
-| 3   | `npm run check:gate -- /tmp/nonexistent`（输入错误）                                                                                                                                      | 2          |
-| 4   | `npm run check:verifier -- samples/verifier/valid.json`（有效样本）                                                                                                                       | 0          |
-| 5   | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本）                                                                                                               | 1          |
-| 6   | `npx tsx w-model-dev/scripts/cli/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成）                                                                                | 0          |
-| 7   | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本）                                                                           | 0          |
-| 8   | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本）                                                             | 2          |
-| 9   | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本）                                                                                                  | 0          |
-| 10  | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本）                                                                                                   | 0          |
-| 11  | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本）                                                      | 0          |
+| #   | 检查                                                                                                                                                                                                                       | 期望退出码 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 1   | `npm run self-test`（260 条样本回归基线）                                                                                                                                                                                  | 0          |
+| 2   | `npm run check:verifier`（无参数）                                                                                                                                                                                         | 2          |
+| 3   | `npm run check:gate -- /tmp/nonexistent`（输入错误）                                                                                                                                                                       | 2          |
+| 4   | `npm run check:verifier -- samples/verifier/valid.json`（有效样本）                                                                                                                                                        | 0          |
+| 5   | `npm run check:verifier -- samples/verifier/bad-ranking-k.json`（无效样本）                                                                                                                                                | 1          |
+| 6   | `npx tsx w-model-dev/scripts/cli/security-scan.ts`（安全扫描 + baseline v2 内容比对；--regenerate 重生成）                                                                                                                 | 0          |
+| 7   | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/valid-manifest.json --phase=1`（有效 BDD 样本）                                                                                                            | 0          |
+| 8   | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts samples/bdd/bad-schema.manifest.json --phase=1`（schema 不合规 BDD 样本）                                                                                              | 2          |
+| 9   | `npm run check:coverage -- samples/coverage/valid-minimal-coverage.json`（有效覆盖样本）                                                                                                                                   | 0          |
+| 10  | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本）                                                                                                                                    | 0          |
+| 11  | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本）                                                                                       | 0          |
 | 12  | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；文件数/用例数以同次受控 JSON facts 与 provenance 为准） | 0          |
-| 13  | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）                                                                       | —          |
-| 14  | `npm run check:docs-consistency`（活体文档一致性门禁）                                                                                                                                    | 0          |
-| 15  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明）                                                 | 0          |
-| 16  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）       | 0          |
-| 17  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                  | 0          |
+| 13  | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络不可达或 registry 不支持 audit endpoint 自动跳过）                                                                                                        | —          |
+| 14  | `npm run check:docs-consistency`（活体文档一致性门禁）                                                                                                                                                                     | 0          |
+| 15  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明）                                                                                  | 0          |
+| 16  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）                                        | 0          |
+| 17  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                                                   | 0          |
 
 **启用方式**：仓库验证期间首次 `npm install` 即自动启用（`postinstall` 运行 `scripts/setup-hooks.cjs`，在当前 checkout 的本地 `.git/config` 设置 `core.hooksPath=.githooks`；失败仅 warn，不阻断 install）。这是仓库验证的本地 Git 配置副作用，不是 Agent Skill 激活必需。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -158,11 +158,11 @@ npm run prepush
 
 **触发条件**：hook 会先判断本次推送的提交里是否包含以下路径的变更，命中才跑门禁；`w-model-dev/**`、活体根文档、`docs/*.md`、`config/**`、根 `scripts/**`、`package.json`、`package-lock.json` 与 `.githooks/**` 均在范围内，纯归档/规划目录改动才直接放行。
 
-**依赖与平台边界**：pre-push 缺少 `node_modules` 时 exit 1 并提示开发者运行 `npm install`，绝不自动安装。它仅调用 `ensure-platform-deps.sh --check`；默认/`--check` 不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。使用以下 Bash 命令显式检查或获得 fail-closed 指引：
+**依赖与平台边界**：pre-push 缺少 `node_modules` 时 exit 1 并提示开发者运行 `npm install`，绝不自动安装。它仅调用 `ensure-platform-deps.sh --check`；默认/`--check` 不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。缺平台依赖时在 Bash 中显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中校验 lockfile SRI 并安装当前平台缺失包（Windows x64 / Linux x64）；pre-push 不会自动修复：
 
 ```bash
 npm run platform-deps:check
-npm run platform-deps:install  # 当前只提示人工 npm install，不自动修复
+npm run platform-deps:install  # 用户显式调用：受控验证并安装当前平台缺失包
 ```
 
 **临时跳过**（仅紧急情况，勿用于常规开发）：
@@ -172,7 +172,7 @@ git push --no-verify
 ```
 
 > Windows 注意：pre-push 依赖 Bash。Git Bash（Git for Windows 自带）下会执行门禁；纯 cmd/PowerShell 不能执行 `pre-push`，但 `self-test` 与 `doctor` 可在 PowerShell / Windows Terminal 运行。请仅在 Git Bash 中运行 `npm run prepush`。
-> **WSL / 双平台**：不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`。建议每个平台使用独立 checkout，或切换平台后重新执行 `npm install`。平台检查失败时使用 Git Bash/WSL 显式运行 `npm run platform-deps:check`，并按 `npm run platform-deps:install` 给出的人工 `npm install` 指引修复。
+> **WSL / 双平台**：不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`。建议每个平台使用独立 checkout，或切换平台后重新执行 `npm install`。平台检查失败时使用 Git Bash/WSL 显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中校验并安装缺失包。
 
 ### 4. 提交规范
 
