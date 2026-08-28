@@ -6,7 +6,7 @@
 - Starting HEAD: `20ab06d2c3cb48b62a1dac3b721b652267fd8770` (SSoT trust-boundary definition already committed)
 - Delivery subject: `fix(security): align archive extraction with trust boundary`
 - Tracked delivery files: this report, `w-model-dev/scripts/lib/platform-deps-tar.ts`, `w-model-dev/scripts/cli/platform-deps-install.ts`, and `w-model-dev/scripts/__tests__/platform-deps-install.test.ts`.
-- Implementation commit SHA: 提交后见 git log（由 follow-up 提交 `docs(security): bind extraction evidence` 绑定完整 SHA）。
+- Implementation commit SHA: `657f2e971b1b334fe3de51401691ce5a80aaec9e`（`fix(security): align archive extraction with trust boundary`；由 follow-up 提交 `docs(security): bind extraction evidence` 绑定——Git 提交无法在自身内容中如实包含自己的对象 ID）。
 
 ## Threat Model（对齐 SSoT `docs/skill-design-document_SSoT.md`，commit `20ab06d`）
 
