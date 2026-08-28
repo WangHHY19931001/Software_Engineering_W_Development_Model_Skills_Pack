@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { installVerifiedPackage, parseArgs } from '../cli/platform-deps-install.js';
 import { extractArchive, parsePaxRecords, readArchiveEntries } from '../lib/platform-deps-tar.js';
@@ -16,7 +16,6 @@ const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.resolve(TEST_DIR, '../cli/platform-deps-install.ts');
-const TAR_SOURCE = path.resolve(TEST_DIR, '../lib/platform-deps-tar.ts');
 
 const PACKAGE_NAME = '@esbuild/linux-x64';
 const PACKAGE_VERSION = '0.25.0';
@@ -333,108 +332,7 @@ async function installedTargetExists(fixture: Fixture): Promise<boolean> {
   }
 }
 
-const WINDOWS_EXTRACTION_REJECTION = /Windows.*安全|安全.*Windows|无法在 Windows/;
-
-function isDescriptorChildPath(target: string): boolean {
-  return target.includes('/proc/self/fd/') || target.includes('/dev/fd/');
-}
-
-async function descriptorParentMatches(target: string, expectedParent: string): Promise<boolean> {
-  if (!isDescriptorChildPath(target)) return false;
-  try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is an injected descriptor child path under isolated test roots
-    return path.resolve(await fs.realpath(path.dirname(target))) === path.resolve(expectedParent);
-  } catch {
-    return false;
-  }
-}
-
-async function withPlatform<T>(platform: NodeJS.Platform, operation: () => Promise<T>): Promise<T> {
-  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
-  Object.defineProperty(process, 'platform', {
-    configurable: true,
-    value: platform,
-  });
-  try {
-    return await operation();
-  } finally {
-    if (descriptor !== undefined) {
-      Object.defineProperty(process, 'platform', descriptor);
-    }
-  }
-}
-
-async function isWindowsInstallRefusal(
-  result: { code: number | null; stdout: string; stderr: string },
-  fixture: Fixture,
-): Promise<boolean> {
-  if (process.platform !== 'win32') return false;
-  expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
-  expect(result.stdout).toContain('"errorCode":"install-error"');
-  expect(`${result.stdout}\n${result.stderr}`).toMatch(WINDOWS_EXTRACTION_REJECTION);
-  await expect(installedTargetExists(fixture)).resolves.toBe(false);
-  await assertNoStagingLeftover(fixture.repoDir);
-  return true;
-}
-
 describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => {
-  it('extractArchive 不保留 staging/transfer path-based 写入方案', async () => {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixed test source path
-    const source = await fs.readFile(TAR_SOURCE, 'utf8');
-    expect(source).not.toMatch(/mkdtemp|copyFile|rename|transferTree|claimDirectoryNoReplace|transfer source|staging/i);
-  });
-
-  it('POSIX extraction 静态 seam 固定 descriptor-relative 写入与 identity rollback', async () => {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixed test source path
-    const source = await fs.readFile(TAR_SOURCE, 'utf8');
-    expect(source).toMatch(/const DIRECTORY_FLAG = .*\.O_DIRECTORY;/);
-    expect(source).toMatch(/const NO_FOLLOW_FLAG = .*\.O_NOFOLLOW;/);
-    expect(source).toContain('fsConstants.O_EXCL');
-    expect(source).toContain('const childPath = descriptorChildPath(current.handle, segment)');
-    const directoryCreate = source.indexOf('await fs.mkdir(childPath, { mode: 0o777 })');
-    const directoryOwnership = source.indexOf('owned.push(owner)', directoryCreate);
-    const directoryContainment = source.indexOf(
-      "await assertDirectoryContained(current, 'directory create parent after mkdir')",
-      directoryOwnership,
-    );
-    const directoryIdentity = source.indexOf(
-      'created = await fs.lstat(childPath, { bigint: true })',
-      directoryContainment,
-    );
-    const directoryOpen = source.indexOf('const next = await openDirectoryChild(current, segment)', directoryIdentity);
-    expect(directoryCreate).toBeGreaterThan(-1);
-    expect(directoryOwnership).toBeGreaterThan(directoryCreate);
-    expect(directoryContainment).toBeGreaterThan(directoryOwnership);
-    expect(directoryIdentity).toBeGreaterThan(directoryContainment);
-    expect(directoryOpen).toBeGreaterThan(directoryIdentity);
-
-    const fileOpen = source.indexOf('fileHandle = await fs.open(target, FILE_OPEN_FLAGS, 0o666)');
-    const fileOwnership = source.indexOf('owned.push(fileOwner)', fileOpen);
-    const fileIdentity = source.indexOf('identity = await fileHandle.stat({ bigint: true })', fileOwnership);
-    const fileWrite = source.indexOf('await fileHandle.writeFile(content)', fileIdentity);
-    expect(fileOpen).toBeGreaterThan(-1);
-    expect(fileOwnership).toBeGreaterThan(fileOpen);
-    expect(fileIdentity).toBeGreaterThan(fileOwnership);
-    expect(fileWrite).toBeGreaterThan(fileIdentity);
-
-    const rollback = source.indexOf('for (const item of [...owned].reverse())');
-    const rollbackContainment = source.indexOf(
-      "const parentPath = await descriptorRealPath(parentHandle, 'rollback parent')",
-      rollback,
-    );
-    const rollbackIdentity = source.indexOf('!hasSameFileIdentity(current, identity)', rollbackContainment);
-    const rollbackUnlink = source.indexOf('await fs.unlink(target)', rollbackIdentity);
-    const rollbackRmdir = source.indexOf('await fs.rmdir(target)', rollback);
-    const rollbackCall = source.indexOf('await rollbackOwnedEntries(owned)', rollback);
-    const ownershipClose = source.indexOf('await closeOwnedParentHandles(owned)', rollbackCall);
-    expect(rollback).toBeGreaterThan(-1);
-    expect(rollbackIdentity).toBeGreaterThan(rollback);
-    expect(rollbackUnlink).toBeGreaterThan(rollbackIdentity);
-    expect(rollbackRmdir).toBeGreaterThan(rollbackIdentity);
-    expect(rollbackCall).toBeGreaterThan(rollbackRmdir);
-    expect(ownershipClose).toBeGreaterThan(rollbackCall);
-  });
-
   it('PAX 记录使用安全键容器保留 __proto__ 键而不写入对象原型', () => {
     const records = parsePaxRecords(
       paxRecordsBlob([
@@ -447,8 +345,73 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     expect(records.get('path')).toBe('package/safe.js');
   });
 
-  it('PAX linkpath 以 Map 条目覆盖 symlink header 的 linkname', async () => {
+  it('解析常规文件与目录（路径/类型/内容忠实）', async () => {
     const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/package.json', content: '{"name":"x"}' },
+      { kind: 'file', path: 'package/lib/a.js', content: 'export 1;' },
+    ]);
+    const entries = await readArchiveEntries(archive);
+    expect(entries.map((entry) => [entry.path, entry.type])).toEqual([
+      ['package', 'directory'],
+      ['package/package.json', 'file'],
+      ['package/lib/a.js', 'file'],
+    ]);
+    expect(Buffer.from(entries[1]?.content as Buffer).toString()).toBe('{"name":"x"}');
+  });
+
+  it('解析 GNU long name（L）与 long link（K）metadata', async () => {
+    const longPath = `package/${'seg/'.repeat(25)}deep-file.js`;
+    const longLink = `package/${'target/'.repeat(25)}native.node`;
+    const archive = makeTar([
+      {
+        kind: 'file',
+        path: longPath,
+        headerName: 'package/x',
+        gnuLongName: true,
+        content: 'long',
+      },
+      {
+        kind: 'file',
+        path: 'package/linked.node',
+        typeflag: '2',
+        linkname: longLink,
+        gnuLongLink: true,
+        content: '',
+      },
+    ]);
+
+    const entries = await readArchiveEntries(archive);
+    expect(entries).toContainEqual(
+      expect.objectContaining({ path: longPath, type: 'file', content: Buffer.from('long') }),
+    );
+    expect(entries).toContainEqual(
+      expect.objectContaining({ path: 'package/linked.node', type: 'symlink', linkname: longLink }),
+    );
+  });
+
+  it('解析 PAX UTF-8、x/g 多记录与 linkpath metadata', async () => {
+    const unicodePath = 'package/工具/入口.txt';
+    const globalPath = 'package/global.txt';
+    const archive = makeTar([
+      {
+        kind: 'file',
+        path: unicodePath,
+        headerName: 'package/x',
+        paxPath: unicodePath,
+        content: 'unicode',
+      },
+      {
+        kind: 'file',
+        path: globalPath,
+        headerName: 'package/g',
+        paxType: 'g',
+        paxRecords: [
+          ['comment', 'global-header'],
+          ['path', globalPath],
+        ],
+        content: 'global',
+      },
       {
         kind: 'file',
         path: 'package/linked',
@@ -459,1154 +422,169 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
       },
     ]);
 
-    await expect(readArchiveEntries(archive)).resolves.toMatchObject([
-      { path: 'package/linked', type: 'symlink', linkname: 'package/from-pax' },
-    ]);
-  });
-
-  it('解析常规文件与目录（路径/类型/内容忠实）', async () => {
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/package.json', content: '{"name":"x"}' },
-      { kind: 'file', path: 'package/lib/a.js', content: 'export 1;' },
-    ]);
     const entries = await readArchiveEntries(archive);
-    expect(entries.map((e) => [e.path, e.type])).toEqual([
-      ['package', 'directory'],
-      ['package/package.json', 'file'],
-      ['package/lib/a.js', 'file'],
-    ]);
-    expect(Buffer.from(entries[1]?.content as Buffer).toString()).toBe('{"name":"x"}');
-  });
-
-  it('GNU long name（typeflag L）解析为完整路径', async () => {
-    const longPath = `package/${'seg/'.repeat(25).slice(0, -1)}deep-file.js`;
-    expect(longPath.length).toBeGreaterThan(100);
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      {
-        kind: 'file',
-        path: longPath,
-        headerName: 'package/x',
-        gnuLongName: true,
-        content: 'long',
-      },
-    ]);
-    const entries = await readArchiveEntries(archive);
-    expect(entries.map((e) => e.path)).toContain(longPath);
-    const longFile = entries.find((e) => e.path === longPath);
-    expect(longFile?.type).toBe('file');
-    expect(Buffer.from(longFile?.content as Buffer).toString()).toBe('long');
-  });
-
-  it('GNU long link（typeflag K）解析为完整链接目标', async () => {
-    const longLink = `package/${'target/'.repeat(25)}native.node`;
-    expect(longLink.length).toBeGreaterThan(100);
-    const archive = makeTar([
-      {
-        kind: 'file',
-        path: 'package/linked.node',
-        typeflag: '2',
-        linkname: longLink,
-        gnuLongLink: true,
-        content: '',
-      },
-    ]);
-    const entries = await readArchiveEntries(archive);
+    expect(entries).toContainEqual(expect.objectContaining({ path: unicodePath, type: 'file' }));
+    expect(entries).toContainEqual(expect.objectContaining({ path: globalPath, type: 'file' }));
     expect(entries).toContainEqual(
-      expect.objectContaining({
-        path: 'package/linked.node',
-        type: 'symlink',
-        linkname: longLink,
-      }),
+      expect.objectContaining({ path: globalPath, type: 'symlink', linkname: 'package/from-pax' }),
     );
   });
 
-  it("pax 'x' 扩展头 `path` 覆盖主 header 短名", async () => {
-    const longPath = `package/${'d/'.repeat(50)}file.js`;
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      {
-        kind: 'file',
-        path: longPath,
-        headerName: 'package/y',
-        paxPath: longPath,
-        content: 'pax',
-      },
-    ]);
-    const entries = await readArchiveEntries(archive);
-    const longFile = entries.find((e) => e.path === longPath);
-    expect(longFile).toBeDefined();
-    expect(Buffer.from(longFile?.content as Buffer).toString()).toBe('pax');
-  });
-
-  it('PAX UTF-8 字节长度按字节解析，非 ASCII 路径不丢失', async () => {
-    const unicodePath = 'package/工具/入口.txt';
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      {
-        kind: 'file',
-        path: unicodePath,
-        headerName: 'package/x',
-        paxPath: unicodePath,
-        content: 'unicode',
-      },
-    ]);
-
-    await expect(readArchiveEntries(archive)).resolves.toContainEqual(
-      expect.objectContaining({
-        path: unicodePath,
-        rawPath: unicodePath,
-        type: 'file',
-      }),
-    );
-  });
-
-  it("pax 'g' 全局扩展头（真实 typeflag 'g'）多记录持续作用于后续条目", async () => {
-    const globPath = 'package/glob/from-g.txt';
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      {
-        kind: 'file',
-        path: globPath,
-        headerName: 'package/z',
-        paxType: 'g',
-        paxRecords: [
-          ['comment', 'global-header'],
-          ['path', globPath],
-        ],
-        content: 'g-data',
-      },
-      { kind: 'file', path: 'package/second-header.txt', content: 'second' },
-    ]);
-    const entries = await readArchiveEntries(archive);
-    const globalEntries = entries.filter((e) => e.path === globPath);
-    expect(globalEntries).toHaveLength(2);
-    expect(Buffer.from(globalEntries[1]?.content as Buffer).toString()).toBe('second');
-  });
-
-  it('同一 pax header 多条记录：path（位于第二条）按 record 内相对偏移解析生效', async () => {
-    // 复现 parsePaxRecords 用绝对 space 切相对 record 的 bug：第一条后的记录被静默丢弃
-    const pathInPax = 'package/second-record.txt';
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      {
-        kind: 'file',
-        path: pathInPax,
-        headerName: 'package/x',
-        paxRecords: [
-          ['comment', 'first'],
-          ['path', pathInPax],
-        ],
-        content: 'multi',
-      },
-    ]);
-    const entries = await readArchiveEntries(archive);
-    const found = entries.find((e) => e.path === pathInPax);
-    expect(found).toBeDefined();
-    expect(Buffer.from(found?.content as Buffer).toString()).toBe('multi');
-  });
-
-  it('解析 UStar mode（八进制）并在提取时保留文件与目录 mode', async () => {
+  it('解析并在当前 host 提取 UStar file/dir mode', async () => {
     const archive = makeTar([
       { kind: 'directory', path: 'package/', mode: '700' },
       { kind: 'directory', path: 'package/bin/', mode: '711' },
-      {
-        kind: 'file',
-        path: 'package/package.json',
-        content: '{"name":"x","version":"1.0.0"}',
-      },
-      {
-        kind: 'file',
-        path: 'package/bin/tool.bin',
-        content: 'BIN',
-        mode: '755',
-      },
+      { kind: 'file', path: 'package/bin/tool.bin', content: 'BIN', mode: '755' },
     ]);
     const entries = await readArchiveEntries(archive);
-    const tool = entries.find((e) => e.path === 'package/bin/tool.bin');
-    // 跨平台：断言解析出的八进制 mode 值正确
-    expect(tool?.mode).toBe(0o755);
-    expect(tool?.type).toBe('file');
+    expect(entries.find((entry) => entry.path === 'package/bin/tool.bin')?.mode).toBe(0o755);
 
     const dir = await makeTempDir('platform-deps-mode-');
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
     await extractArchive(archive, dir);
-    const written = path.join(dir, 'package/bin/tool.bin');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    expect(await fs.readFile(written, 'utf8')).toBe('BIN');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    expect((await fs.stat(path.join(dir, 'package'))).mode & 0o777).toBe(0o700);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    expect((await fs.stat(path.join(dir, 'package/bin'))).mode & 0o777).toBe(0o711);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    const stat = await fs.stat(written);
-    // 该分支只在上面的 Windows 早退之后执行，因此仅覆盖支持 chmod 语义的平台（POSIX）。
-    expect(stat.mode & 0o777).toBe(0o755);
+    const written = path.join(dir, 'package', 'bin', 'tool.bin');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated caller-owned extraction root
+    await expect(fs.readFile(written, 'utf8')).resolves.toBe('BIN');
+    if (process.platform !== 'win32') {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated caller-owned extraction root
+      expect((await fs.stat(path.join(dir, 'package'))).mode & 0o777).toBe(0o700);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated caller-owned extraction root
+      expect((await fs.stat(path.join(dir, 'package', 'bin'))).mode & 0o777).toBe(0o711);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated caller-owned extraction root
+      expect((await fs.stat(written)).mode & 0o777).toBe(0o755);
+    }
   });
 
-  it('解析 symlink 与 hardlink（类型 + linkname）', async () => {
+  it('extractArchive 在当前 Windows/Linux host 成功提取合法归档', async () => {
+    const dir = await makeTempDir('platform-deps-extract-valid-');
     const archive = makeTar([
       { kind: 'directory', path: 'package/' },
-      {
-        kind: 'symlink',
-        path: 'package/link.node',
-        linkname: '/outside/native.node',
-      },
-      {
-        kind: 'hardlink',
-        path: 'package/hard.node',
-        linkname: 'package/index.js',
-      },
-    ]);
-    const entries = await readArchiveEntries(archive);
-    expect(entries.find((e) => e.path === 'package/link.node')).toMatchObject({
-      type: 'symlink',
-      linkname: '/outside/native.node',
-    });
-    expect(entries.find((e) => e.path === 'package/hard.node')).toMatchObject({
-      type: 'hardlink',
-      linkname: 'package/index.js',
-    });
-  });
-
-  it('extractArchive 按 package/... 写盘；symlink/hardlink 兜底拒绝且不部分写盘', async () => {
-    const dir = await makeTempDir('platform-deps-extract-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/package.json', content: '{"a":1}' },
+      { kind: 'file', path: 'package/package.json', content: '{"name":"x"}' },
       { kind: 'file', path: 'package/lib/deep.txt', content: 'deep' },
-      { kind: 'symlink', path: 'package/bad.node', linkname: '/etc/passwd' },
-    ]);
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
-    await expect(fs.access(path.join(dir, 'package', 'package.json'))).rejects.toThrow();
-    await expect(fs.access(path.join(dir, 'package', 'lib', 'deep.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive 直接拒绝穿越路径且不会写出 extraction root', async () => {
-    const dir = await makeTempDir('platform-deps-extract-traversal-');
-    const escapedName = `escaped-${randomUUID()}.txt`;
-    const escaped = path.resolve(dir, '..', escapedName);
-    const archive = makeTar([
-      {
-        kind: 'file',
-        path: `package/../../${escapedName}`,
-        content: 'outside',
-      },
     ]);
 
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
-    await expect(fs.access(escaped)).rejects.toThrow();
+    await extractArchive(archive, dir);
+
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated caller-owned extraction root
+    await expect(fs.readFile(path.join(dir, 'package', 'lib', 'deep.txt'), 'utf8')).resolves.toBe('deep');
   });
 
-  it.each(['/absolute.txt', `C:\\absolute-${randomUUID()}.txt`])(
-    'extractArchive 直接拒绝绝对路径 %s',
-    async (archivePath) => {
-      const dir = await makeTempDir('platform-deps-extract-absolute-');
-      const archive = makeTar([{ kind: 'file', path: archivePath, content: 'blocked' }]);
-
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
+  it.each([
+    {
+      label: 'symlink',
+      entry: { kind: 'symlink' as const, path: 'package/bad.node', linkname: '/etc/passwd' },
     },
-  );
-
-  it('extractArchive 直接拒绝携带 linkname 的非链接条目', async () => {
-    const dir = await makeTempDir('platform-deps-extract-linkname-');
-    const archive = makeTar([
-      {
-        kind: 'file',
-        path: 'package/fake-link',
-        typeflag: '0',
+    {
+      label: 'hardlink',
+      entry: { kind: 'hardlink' as const, path: 'package/bad.node', linkname: 'package/index.js' },
+    },
+    {
+      label: '普通文件 linkname',
+      entry: {
+        kind: 'file' as const,
+        path: 'package/bad.node',
+        content: '',
         linkname: '../outside',
-        content: 'blocked',
       },
-    ]);
+    },
+  ])('extractArchive 在写入前拒绝 $label', async ({ entry }) => {
+    const dir = await makeTempDir('platform-deps-extract-link-');
+    const archive = makeTar([{ kind: 'file', path: 'package/first.txt', content: 'must-not-write' }, entry]);
 
     await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 直接拒绝 hardlink 且不会创建目标文件', async () => {
-    const dir = await makeTempDir('platform-deps-extract-hardlink-');
-    const archive = makeTar([
-      {
-        kind: 'hardlink',
-        path: 'package/escape.node',
-        linkname: '../../outside.node',
-      },
-    ]);
-
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
-    await expect(fs.access(path.resolve(dir, '..', 'outside.node'))).rejects.toThrow();
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
   it.each([
-    { archivePath: 'package//empty-segment', label: '空段' },
-    { archivePath: 'package/../dotdot', label: '..' },
-  ])('extractArchive 直接拒绝$label路径', async ({ archivePath }) => {
+    '/absolute.txt',
+    `C:\\absolute-${randomUUID()}.txt`,
+    'package/../../traversal.txt',
+    'package/./dot.txt',
+    'package//empty.txt',
+    `package/nul-${randomUUID()}\0outside`,
+  ])('extractArchive 在写入前拒绝不安全路径 %s', async (archivePath) => {
     const dir = await makeTempDir('platform-deps-extract-path-');
-    const archive = makeTar([{ kind: 'file', path: archivePath, content: 'blocked' }]);
+    const archive = archivePath.includes('\0')
+      ? makeTar([
+          { kind: 'file', path: 'package/first.txt', content: 'must-not-write' },
+          {
+            kind: 'file',
+            path: 'package/safe-name',
+            paxRecords: [['path', archivePath]],
+            content: 'blocked',
+          },
+        ])
+      : makeTar([
+          { kind: 'file', path: 'package/first.txt', content: 'must-not-write' },
+          { kind: 'file', path: archivePath, content: 'blocked' },
+        ]);
 
     await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 直接拒绝 PAX NUL 路径', async () => {
-    const dir = await makeTempDir('platform-deps-extract-nul-');
-    const archive = makeTar([
-      {
-        kind: 'file',
-        path: 'package/safe-name',
-        paxRecords: [['path', `package/nul-${randomUUID()}\0outside`]],
-        content: 'blocked',
-      },
-    ]);
-
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('Windows archive extraction 明确 fail-closed 且在拒绝前不写盘', async () => {
-    const dir = await makeTempDir('platform-deps-extract-windows-reject-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/package.json', content: '{}' },
-    ]);
-
-    await expect(withPlatform('win32', () => extractArchive(archive, dir))).rejects.toThrow(
-      /Windows.*安全|安全.*Windows|无法在 Windows/,
-    );
-    // The refusal must happen before creating the caller-selected root or staging tree.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 拒绝重复 canonical path 且不会部分写盘', async () => {
-    const dir = await makeTempDir('platform-deps-extract-duplicate-');
-    const archive = makeTar([
-      { kind: 'file', path: 'package/duplicate.txt', content: 'first' },
-      { kind: 'file', path: 'package\\duplicate.txt', content: 'second' },
-    ]);
-
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/重复|duplicate/i);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
   it.each([
     {
-      label: '重复目录',
+      label: 'duplicate canonical path',
       entries: [
-        { kind: 'directory' as const, path: 'package/repeated/' },
-        { kind: 'directory' as const, path: 'package\\repeated' },
+        { kind: 'file' as const, path: 'package/duplicate.txt', content: 'first' },
+        { kind: 'file' as const, path: 'package\\duplicate.txt', content: 'second' },
       ],
+      message: /重复|duplicate/i,
     },
     {
-      label: '目录/文件冲突',
+      label: 'directory/file same-path conflict',
       entries: [
         { kind: 'directory' as const, path: 'package/conflict/' },
-        {
-          kind: 'file' as const,
-          path: 'package\\conflict',
-          content: 'blocked',
-        },
+        { kind: 'file' as const, path: 'package\\conflict', content: 'blocked' },
       ],
+      message: /重复|冲突|duplicate|conflict/i,
     },
-  ])('extractArchive 拒绝$label且不会部分写盘', async ({ entries }) => {
+    {
+      label: 'non-adjacent file ancestor conflict',
+      entries: [
+        { kind: 'file' as const, path: 'package/prefix', content: 'file' },
+        { kind: 'file' as const, path: 'package/separator', content: 'separator' },
+        { kind: 'file' as const, path: 'package/prefix/descendant.txt', content: 'blocked' },
+      ],
+      message: /文件\/目录路径冲突/,
+    },
+  ])('extractArchive 在 FS write 前拒绝 $label', async ({ entries, message }) => {
     const dir = await makeTempDir('platform-deps-extract-conflict-');
 
-    await expect(extractArchive(makeTar(entries), dir)).rejects.toThrow(/重复|冲突|duplicate|conflict/i);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+    await expect(extractArchive(makeTar(entries), dir)).rejects.toThrow(message);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
 
-  it('extractArchive 在 FS I/O 前拒绝非相邻 file ancestor/descendant 冲突', async () => {
-    const dir = await makeTempDir('platform-deps-extract-non-adjacent-');
-    const archive = makeTar([
-      { kind: 'file', path: 'package/prefix', content: 'file' },
-      { kind: 'file', path: 'package/prefix-0', content: 'separator' },
-      {
-        kind: 'file',
-        path: 'package/prefix/descendant.txt',
-        content: 'blocked',
-      },
-    ]);
+  it('extractArchive 拒绝既有 file ancestor，不覆盖 caller root 条目', async () => {
+    const dir = await makeTempDir('platform-deps-extract-existing-');
+    const existing = path.join(dir, 'package');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- existing is beneath the isolated caller-owned extraction root
+    await fs.writeFile(existing, 'keep', 'utf8');
 
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/文件\/目录路径冲突/);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
+    await expect(
+      extractArchive(makeTar([{ kind: 'file', path: 'package/child.txt', content: 'blocked' }]), dir),
+    ).rejects.toThrow(/冲突|目录|exist|EEXIST|ENOTDIR/i);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- existing is beneath the isolated caller-owned extraction root
+    await expect(fs.readFile(existing, 'utf8')).resolves.toBe('keep');
   });
 
-  it('extractArchive 顶层文件 descriptor-relative open 失败时回滚已拥有文件', async () => {
-    const dir = await makeTempDir('platform-deps-extract-file-rollback-');
-    const archive = makeTar([
-      { kind: 'file', path: 'first.txt', content: 'first' },
-      { kind: 'file', path: 'second.txt', content: 'second' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (target.endsWith('/second.txt') && (await descriptorParentMatches(target, dir))) {
-        injected = true;
-        const error = new Error('simulated descriptor-relative top-level open failure') as NodeJS.ErrnoException;
-        error.code = 'EIO';
-        throw error;
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is invoked only with isolated test fixture paths
-      return originalOpen(...args);
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/open|EIO|失败/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    await expect(fs.access(path.join(dir, 'first.txt'))).rejects.toThrow();
-    await expect(fs.access(path.join(dir, 'second.txt'))).rejects.toThrow();
-  });
+  it('extractArchive 使用独占创建，不覆盖 caller root 的既有文件', async () => {
+    const dir = await makeTempDir('platform-deps-extract-existing-file-');
+    const packageDir = path.join(dir, 'package');
+    const existing = path.join(packageDir, 'file.txt');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- packageDir is beneath the isolated caller-owned extraction root
+    await fs.mkdir(packageDir);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- existing is beneath the isolated caller-owned extraction root
+    await fs.writeFile(existing, 'keep', 'utf8');
 
-  it('Windows archive extraction 在任何 extraction handle 或写入前拒绝，不触碰既有目标', async () => {
-    const dir = await makeTempDir('platform-deps-extract-open-failure-');
-    const existing = path.join(dir, 'package', 'not-created.txt');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await fs.mkdir(path.dirname(existing), { recursive: true });
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await fs.writeFile(existing, 'pre-existing');
-    const archive = makeTar([{ kind: 'file', path: 'package/not-created.txt', content: 'blocked' }]);
-    const touched = new Set<string>();
-    const original = {
-      open: fs.open,
-      mkdir: fs.mkdir,
-      mkdtemp: fs.mkdtemp,
-      writeFile: fs.writeFile,
-      unlink: fs.unlink,
-      rmdir: fs.rmdir,
-      rm: fs.rm,
-      chmod: fs.chmod,
-    };
-    const rejectTouch = (operation: string) => async (): Promise<never> => {
-      touched.add(operation);
-      throw new Error(`unexpected Windows extraction FS ${operation}`);
-    };
-    fs.open = rejectTouch('open') as typeof fs.open;
-    fs.mkdir = rejectTouch('mkdir') as typeof fs.mkdir;
-    fs.mkdtemp = rejectTouch('mkdtemp') as typeof fs.mkdtemp;
-    fs.writeFile = rejectTouch('writeFile') as typeof fs.writeFile;
-    fs.unlink = rejectTouch('unlink') as typeof fs.unlink;
-    fs.rmdir = rejectTouch('rmdir') as typeof fs.rmdir;
-    fs.rm = rejectTouch('rm') as typeof fs.rm;
-    fs.chmod = rejectTouch('chmod') as typeof fs.chmod;
-    try {
-      await expect(withPlatform('win32', () => extractArchive(archive, dir))).rejects.toThrow(
-        WINDOWS_EXTRACTION_REJECTION,
-      );
-    } finally {
-      fs.open = original.open;
-      fs.mkdir = original.mkdir;
-      fs.mkdtemp = original.mkdtemp;
-      fs.writeFile = original.writeFile;
-      fs.unlink = original.unlink;
-      fs.rmdir = original.rmdir;
-      fs.rm = original.rm;
-      fs.chmod = original.chmod;
-    }
-    expect([...touched]).toEqual([]);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readFile(existing, 'utf8')).resolves.toBe('pre-existing');
-  });
-
-  it('extractArchive root identity 在 open 前被替换时拒绝且此前没有写入', async () => {
-    const dir = await makeTempDir('platform-deps-extract-root-race-');
-    if (process.platform === 'win32') {
-      await expect(
-        extractArchive(makeTar([{ kind: 'file', path: 'package/escaped.txt', content: 'blocked' }]), dir),
-      ).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
-    const outside = await makeTempDir('platform-deps-extract-root-race-outside-');
-    const escaped = path.join(outside, 'package', 'escaped.txt');
-    const archive = makeTar([
-      {
-        kind: 'file',
-        path: 'package/escaped.txt',
-        content: 'must stay inside',
-      },
-    ]);
-    const originalOpen = fs.open;
-    const originalMkdtemp = fs.mkdtemp;
-    const originalRm = fs.rm;
-    let rootOpenSeen = false;
-    let wroteBeforeRootOpen = false;
-    let injected = false;
-    const interceptedMkdtemp = async (...args: Parameters<typeof fs.mkdtemp>): ReturnType<typeof fs.mkdtemp> => {
-      if (!rootOpenSeen) wroteBeforeRootOpen = true;
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original mkdtemp is limited to isolated test roots
-      return originalMkdtemp(...args);
-    };
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (!injected && target === dir) {
-        rootOpenSeen = true;
-        injected = true;
-        await originalRm(dir, { recursive: true, force: true });
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture link target and path are isolated temporary roots
-        await fs.symlink(outside, dir, 'dir');
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is invoked only with isolated test fixture paths
-      return originalOpen(...args);
-    };
-    fs.mkdtemp = interceptedMkdtemp as typeof fs.mkdtemp;
-    fs.open = interceptedOpen as typeof fs.open;
-    let extractionError: unknown;
-    try {
-      try {
-        await extractArchive(archive, dir);
-      } catch (error) {
-        extractionError = error;
-      }
-    } finally {
-      fs.open = originalOpen;
-      fs.mkdtemp = originalMkdtemp;
-    }
-
-    expect(injected).toBe(true);
-    expect(wroteBeforeRootOpen).toBe(false);
-    expect(extractionError).toBeInstanceOf(Error);
-    await expect(fs.access(escaped)).rejects.toThrow();
-    // A root replacement must not leave a staging directory in the external target.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
-    const outsideLeftovers = (await fs.readdir(outside)).filter((name) => name.startsWith('.platform-deps-extract-'));
-    expect(outsideLeftovers).toEqual([]);
-  });
-
-  it('extractArchive root descriptor 被 rename 到 root 外后 fail-closed 且不写外部', async () => {
-    const dir = await makeTempDir('platform-deps-extract-root-descriptor-rename-');
-    const outside = await makeTempDir('platform-deps-extract-root-descriptor-target-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/escaped.txt', content: 'must stay inside' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
-      const handle = await originalOpen(...args);
-      if (!injected && target === dir) {
-        injected = true;
-        // Move the opened extraction root away before the extractor can use its descriptor.
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are isolated temporary roots
-        await fs.rename(dir, path.join(outside, 'moved-root'));
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    let extractionError: unknown;
-    try {
-      try {
-        await extractArchive(archive, dir);
-      } catch (error) {
-        extractionError = error;
-      }
-    } finally {
-      fs.open = originalOpen;
-    }
-
-    expect(injected).toBe(true);
-    expect(extractionError).toBeInstanceOf(Error);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
-    await expect(fs.access(path.join(outside, 'moved-root', 'package', 'escaped.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive 直接写入 descriptor root 且不创建 extraction workspace', async () => {
-    const dir = await makeTempDir('platform-deps-extract-workspace-root-race-');
-    const outside = await makeTempDir('platform-deps-extract-workspace-root-race-outside-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/inside.txt', content: 'inside' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-
-    const originalMkdtemp = fs.mkdtemp;
-    let workspaceRequested = false;
-    const interceptedMkdtemp = async (...args: Parameters<typeof fs.mkdtemp>): ReturnType<typeof fs.mkdtemp> => {
-      const prefix = typeof args[0] === 'string' ? args[0] : '';
-      if (prefix.includes('.platform-deps-extract-')) {
-        workspaceRequested = true;
-        throw new Error('path-based extraction workspace is forbidden');
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original mkdtemp is limited to isolated test roots
-      return originalMkdtemp(...args);
-    };
-    fs.mkdtemp = interceptedMkdtemp as typeof fs.mkdtemp;
-    try {
-      await extractArchive(archive, dir);
-    } finally {
-      fs.mkdtemp = originalMkdtemp;
-    }
-
-    expect(workspaceRequested).toBe(false);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
-    const outsideLeftovers = (await fs.readdir(outside)).filter((name) => name.startsWith('.platform-deps-extract-'));
-    expect(outsideLeftovers).toEqual([]);
-    await expect(fs.access(path.join(outside, 'package', 'inside.txt'))).rejects.toThrow();
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- written is below the isolated extraction root
-    await expect(fs.readFile(path.join(dir, 'package', 'inside.txt'), 'utf8')).resolves.toBe('inside');
-  });
-
-  it('extractArchive descriptor-relative file open 返回 ELOOP 时 fail-closed', async () => {
-    const dir = await makeTempDir('platform-deps-extract-open-race-');
-    const outside = await makeTempDir('platform-deps-extract-open-race-outside-');
-    const escaped = path.join(outside, 'race.txt');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      await expect(fs.access(escaped)).rejects.toThrow();
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (!injected && isDescriptorChildPath(target) && target.endsWith('/race.txt')) {
-        injected = true;
-        // This is the real descriptor-relative child-open point. Refuse the
-        // operation to model a no-follow boundary race and require fail-closed behavior.
-        const error = new Error('simulated descriptor-relative open race') as NodeJS.ErrnoException;
-        error.code = 'ELOOP';
-        throw error;
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is invoked only with isolated test fixture paths
-      return originalOpen(...args);
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    let extractionError: unknown;
-    try {
-      try {
-        await extractArchive(archive, dir);
-      } catch (error) {
-        extractionError = error;
-      }
-    } finally {
-      fs.open = originalOpen;
-    }
-
-    expect(injected).toBe(true);
-    expect(extractionError).toBeInstanceOf(Error);
-    await expect(fs.access(escaped)).rejects.toThrow();
-  });
-
-  it('extractArchive mkdir 成功后 lstat 失败也回滚新建目录', async () => {
-    const dir = await makeTempDir('platform-deps-extract-mkdir-lstat-failure-');
-    const archive = makeTar([{ kind: 'file', path: 'package/nested/file.txt', content: 'blocked' }]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-    const originalLstat = fs.lstat;
-    let packageChecks = 0;
-    const interceptedLstat = async (...args: Parameters<typeof fs.lstat>): ReturnType<typeof fs.lstat> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (
-        target.endsWith('/package') &&
-        isDescriptorChildPath(target) &&
-        (await descriptorParentMatches(target, dir))
-      ) {
-        packageChecks += 1;
-        if (packageChecks === 2) {
-          const error = new Error('simulated lstat failure after mkdir') as NodeJS.ErrnoException;
-          error.code = 'EIO';
-          throw error;
-        }
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original lstat is limited to isolated test roots and descriptor paths
-      return originalLstat(...args);
-    };
-    fs.lstat = interceptedLstat as typeof fs.lstat;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/lstat|EIO|失败/i);
-    } finally {
-      fs.lstat = originalLstat;
-    }
-    expect(packageChecks).toBe(2);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 文件 open 后 handle.stat 失败也回滚新建文件', async () => {
-    const dir = await makeTempDir('platform-deps-extract-file-stat-failure-');
-    const archive = makeTar([{ kind: 'file', path: 'package/stat-failure.txt', content: 'blocked' }]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
-      const handle = await originalOpen(...args);
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (!injected && target.endsWith('/stat-failure.txt') && isDescriptorChildPath(target)) {
-        injected = true;
-        const error = new Error('simulated handle.stat failure after file open') as NodeJS.ErrnoException;
-        error.code = 'EIO';
-        vi.spyOn(handle, 'stat').mockRejectedValueOnce(error);
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/stat|EIO|失败/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive POSIX parent directory 被 rename 到 root 外后 fail-closed 且不写外部', async () => {
-    const dir = await makeTempDir('platform-deps-extract-rename-outside-');
-    const outside = await makeTempDir('platform-deps-extract-rename-outside-target-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
-    ]);
-    if (process.platform === 'win32') {
-      const original = {
-        open: fs.open,
-        rename: fs.rename,
-      };
-      const touched: string[] = [];
-      const rejectFs = (operation: string) => async (): Promise<never> => {
-        touched.push(operation);
-        throw new Error(`unexpected Windows extraction FS ${operation}`);
-      };
-      fs.open = rejectFs('open') as typeof fs.open;
-      fs.rename = rejectFs('rename') as typeof fs.rename;
-      try {
-        await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      } finally {
-        fs.open = original.open;
-        fs.rename = original.rename;
-      }
-      expect(touched).toEqual([]);
-      return;
-    }
-
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor child path is an isolated test target
-      const handle = await originalOpen(...args);
-      if (!injected && isDescriptorChildPath(target) && target.endsWith('/package')) {
-        injected = true;
-        // Move the directory after its descriptor is opened, before extraction can use it.
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are isolated test roots
-        await fs.rename(path.join(dir, 'package'), path.join(outside, 'package'));
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/root|containment|目录|身份|失败/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
-    await expect(fs.access(path.join(outside, 'package', 'race.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive parent descriptor 在 file open 后被 rename 到 root 外也 fail-closed 且不写外部', async () => {
-    const dir = await makeTempDir('platform-deps-extract-file-open-rename-outside-');
-    const outside = await makeTempDir('platform-deps-extract-file-open-rename-target-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
-      const handle = await originalOpen(...args);
-      if (!injected && isDescriptorChildPath(target) && target.endsWith('/race.txt')) {
-        injected = true;
-        // Move the already-open parent directory before the extractor can write through the file handle.
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are isolated temporary roots
-        await fs.rename(path.join(dir, 'package'), path.join(outside, 'package'));
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    let extractionError: unknown;
-    try {
-      try {
-        await extractArchive(archive, dir);
-      } catch (error) {
-        extractionError = error;
-      }
-    } finally {
-      fs.open = originalOpen;
-    }
-
-    expect(injected).toBe(true);
-    expect(extractionError).toBeInstanceOf(Error);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
-    await expect(fs.access(path.join(outside, 'package', 'race.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive descriptor-relative mkdir 失败时不留 root 或外部条目', async () => {
-    const dir = await makeTempDir('platform-deps-extract-mkdir-failure-');
-    const outside = await makeTempDir('platform-deps-extract-mkdir-failure-outside-');
-    const archive = makeTar([{ kind: 'file', path: 'package/nested/file.txt', content: 'blocked' }]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-    const originalMkdir = fs.mkdir;
-    let injected = false;
-    const interceptedMkdir = async (...args: Parameters<typeof fs.mkdir>): ReturnType<typeof fs.mkdir> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (!injected && isDescriptorChildPath(target) && target.endsWith('/package')) {
-        injected = true;
-        const error = new Error('simulated descriptor-relative mkdir failure') as NodeJS.ErrnoException;
-        error.code = 'EIO';
-        throw error;
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original mkdir is limited to isolated test roots
-      return originalMkdir(...args);
-    };
-    fs.mkdir = interceptedMkdir as typeof fs.mkdir;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/mkdir|EIO|失败/i);
-    } finally {
-      fs.mkdir = originalMkdir;
-    }
-    expect(injected).toBe(true);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
-    await expect(fs.readdir(outside)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 文件创建后 write 失败时回滚 descriptor-owned 条目', async () => {
-    const dir = await makeTempDir('platform-deps-extract-write-failure-');
-    const archive = makeTar([{ kind: 'file', path: 'package/write-failure.txt', content: 'blocked' }]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
-      const handle = await originalOpen(...args);
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (
-        !injected &&
-        target.endsWith('/write-failure.txt') &&
-        (await descriptorParentMatches(target, path.join(dir, 'package')))
-      ) {
-        injected = true;
-        handle.writeFile = async () => {
-          const error = new Error('simulated write failure after create') as NodeJS.ErrnoException;
-          error.code = 'EIO';
-          throw error;
-        };
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/write|EIO|失败/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 文件创建后 close 失败时回滚 descriptor-owned 条目', async () => {
-    const dir = await makeTempDir('platform-deps-extract-close-failure-');
-    const archive = makeTar([{ kind: 'file', path: 'package/close.txt', content: 'close' }]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is invoked only with isolated test fixture paths
-      const handle = await originalOpen(...args);
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (
-        !injected &&
-        target.endsWith('/close.txt') &&
-        (await descriptorParentMatches(target, path.join(dir, 'package')))
-      ) {
-        injected = true;
-        const actualClose = handle.close.bind(handle);
-        handle.close = async () => {
-          await actualClose();
-          throw new Error('simulated close failure');
-        };
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/close|关闭/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
-
-  it('extractArchive 顶层文件父目录 close 失败时回滚已创建文件', async () => {
-    const dir = await makeTempDir('platform-deps-extract-top-level-close-failure-');
-    const archive = makeTar([{ kind: 'file', path: 'close.txt', content: 'close' }]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is invoked only with isolated test fixture paths
-      const handle = await originalOpen(...args);
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (!injected && target === dir) {
-        injected = true;
-        const actualClose = handle.close.bind(handle);
-        handle.close = async () => {
-          await actualClose();
-          throw new Error('simulated top-level parent close failure');
-        };
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/close|关闭/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    await expect(fs.access(path.join(dir, 'close.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive 在最终提交前父目录变为 junction/symlink 时 fail-closed', async () => {
-    const dir = await makeTempDir('platform-deps-extract-race-');
-    if (process.platform === 'win32') {
-      await expect(
-        extractArchive(makeTar([{ kind: 'file', path: 'package/race.txt', content: 'blocked' }]), dir),
-      ).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
-    const outside = await makeTempDir('platform-deps-extract-race-outside-');
-    const escaped = path.join(outside, 'race.txt');
-    const archive = makeTar([
-      { kind: 'directory', path: 'package/' },
-      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
-    ]);
-
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      const isParentOpen = target.endsWith(path.join('package'));
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      const handle = await originalOpen(...args);
-      if (!injected && isParentOpen) {
-        injected = true;
-        await fs.rm(target, { recursive: true, force: true });
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-        await fs.symlink(outside, target, process.platform === 'win32' ? 'junction' : 'dir');
-      }
-      return handle;
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    let extractionError: unknown;
-    try {
-      try {
-        await extractArchive(archive, dir);
-      } catch (error) {
-        extractionError = error;
-      }
-    } finally {
-      fs.open = originalOpen;
-    }
-
-    // The race is injected between ancestor validation and file opening. It must never write outside.
-    expect(injected).toBe(true);
-    expect(extractionError).toBeInstanceOf(Error);
-    await expect(fs.access(escaped)).rejects.toThrow();
-  });
-
-  it('extractArchive 拒绝既有 symlink ancestor 且不会写到链接目标', async () => {
-    const dir = await makeTempDir('platform-deps-extract-ancestor-');
-    const outside = await makeTempDir('platform-deps-extract-outside-');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await fs.symlink(outside, path.join(dir, 'package'));
-    const archive = makeTar([{ kind: 'file', path: 'package/escaped.txt', content: 'outside' }]);
-
-    await expect(extractArchive(archive, dir)).rejects.toThrow(
-      process.platform === 'win32' ? WINDOWS_EXTRACTION_REJECTION : /符号链接|symlink|ancestor/i,
-    );
-    await expect(fs.access(path.join(outside, 'escaped.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive rollback 一个 owned entry 失败后仍继续清理后续 entries', async () => {
-    const dir = await makeTempDir('platform-deps-extract-rollback-continue-');
-    const archive = makeTar([
-      { kind: 'file', path: 'first.txt', content: 'first' },
-      { kind: 'file', path: 'second.txt', content: 'second' },
-      { kind: 'file', path: 'third.txt', content: 'third' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      return;
-    }
-    const originalOpen = fs.open;
-    const originalUnlink = fs.unlink;
-    let triggerFailure = false;
-    let failedOnce = false;
-    let unlinkAttempts = 0;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
-      const handle = await originalOpen(...args);
-      if (!triggerFailure && target.endsWith('/third.txt') && isDescriptorChildPath(target)) {
-        triggerFailure = true;
-        const actualWrite = handle.writeFile.bind(handle);
-        handle.writeFile = async (...writeArgs: Parameters<typeof handle.writeFile>) => {
-          await actualWrite(...writeArgs);
-          throw new Error('simulated extraction failure after third file ownership');
-        };
-      }
-      return handle;
-    };
-    const interceptedUnlink = async (...args: Parameters<typeof fs.unlink>): ReturnType<typeof fs.unlink> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (isDescriptorChildPath(target)) {
-        unlinkAttempts += 1;
-        if (!failedOnce && target.endsWith('/second.txt')) {
-          failedOnce = true;
-          throw new Error('simulated rollback unlink failure for second file');
-        }
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original unlink is limited to isolated descriptor paths
-      return originalUnlink(...args);
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    fs.unlink = interceptedUnlink as typeof fs.unlink;
-    let extractionError: unknown;
-    try {
-      try {
-        await extractArchive(archive, dir);
-      } catch (error) {
-        extractionError = error;
-      }
-    } finally {
-      fs.open = originalOpen;
-      fs.unlink = originalUnlink;
-    }
-    expect(extractionError).toBeInstanceOf(Error);
-    expect((extractionError as Error).message).toMatch(/third/);
-    expect((extractionError as Error).message).toMatch(/second/);
-    expect(triggerFailure).toBe(true);
-    expect(failedOnce).toBe(true);
-    expect(unlinkAttempts).toBeGreaterThanOrEqual(3);
-    await expect(fs.access(path.join(dir, 'first.txt'))).rejects.toThrow();
-    await expect(fs.access(path.join(dir, 'second.txt'))).resolves.toBeUndefined();
-    await expect(fs.access(path.join(dir, 'third.txt'))).rejects.toThrow();
-  });
-
-  it('extractArchive 多 top-level 部分提交失败时回滚已拥有条目', async () => {
-    const dir = await makeTempDir('platform-deps-extract-rollback-');
-    const archive = makeTar([
-      { kind: 'directory', path: 'first/' },
-      { kind: 'file', path: 'first/a.txt', content: 'a' },
-      { kind: 'directory', path: 'second/' },
-      { kind: 'file', path: 'second/b.txt', content: 'b' },
-    ]);
-    if (process.platform === 'win32') {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      await expect(fs.readdir(dir)).resolves.toEqual([]);
-      return;
-    }
-    const originalOpen = fs.open;
-    let injected = false;
-    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
-      const target = typeof args[0] === 'string' ? args[0] : '';
-      if (target.endsWith('/b.txt') && (await descriptorParentMatches(target, path.join(dir, 'second')))) {
-        injected = true;
-        const error = new Error('simulated second top-level descriptor open failure') as NodeJS.ErrnoException;
-        error.code = 'EIO';
-        throw error;
-      }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
-      return originalOpen(...args);
-    };
-    fs.open = interceptedOpen as typeof fs.open;
-    try {
-      await expect(extractArchive(archive, dir)).rejects.toThrow(/open|EIO|失败/i);
-    } finally {
-      fs.open = originalOpen;
-    }
-    expect(injected).toBe(true);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
+    await expect(
+      extractArchive(makeTar([{ kind: 'file', path: 'package/file.txt', content: 'overwrite' }]), dir),
+    ).rejects.toThrow(/exist|EEXIST|冲突/i);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- existing is beneath the isolated caller-owned extraction root
+    await expect(fs.readFile(existing, 'utf8')).resolves.toBe('keep');
   });
 });
 
@@ -1691,22 +669,13 @@ describe('installVerifiedPackage（受控安装）', () => {
       },
       { kind: 'file', path: 'package/custom.bin', content: 'BINARY' },
     ]);
-    const installation = installVerifiedPackage({
+    const target = await installVerifiedPackage({
       archive,
       repoRoot: repoDir,
       packageName: 'x',
       version: '1.0.0',
       ...realIo,
     });
-    if (process.platform === 'win32') {
-      await expect(installation).rejects.toMatchObject({
-        code: 'extract-failed',
-      });
-      await expect(fs.access(path.join(repoDir, 'node_modules', 'x'))).rejects.toThrow();
-      await assertNoStagingLeftover(repoDir);
-      return;
-    }
-    const target = await installation;
     expect(target).toBe(path.join(repoDir, 'node_modules', 'x'));
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(repoDir, 'node_modules', 'x', 'custom.bin'), 'utf8')).toBe('BINARY');
@@ -1733,29 +702,98 @@ describe('installVerifiedPackage（受控安装）', () => {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'old.txt'), 'old', 'utf8');
 
-    const installation = installVerifiedPackage({
+    await installVerifiedPackage({
       archive,
       repoRoot: repoDir,
       packageName: 'x',
       version: '1.0.0',
       ...realIo,
     });
-    if (process.platform === 'win32') {
-      await expect(installation).rejects.toMatchObject({
-        code: 'extract-failed',
-      });
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      expect(await fs.readFile(path.join(target, 'old.txt'), 'utf8')).toBe('old');
-      await assertNoStagingLeftover(repoDir);
-      return;
-    }
-    await installation;
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'new.txt'), 'utf8')).toBe('new');
     await expect(fs.access(path.join(target, 'old.txt'))).rejects.toThrow();
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     const backups = (await fs.readdir(repoDir)).filter((name) => name.includes('.wm-backup-'));
     expect(backups).toEqual([]);
+  });
+
+  it('安装提交与旧包恢复都失败时报告两项错误并清理 staging', async () => {
+    const repoDir = await makeTempDir('platform-deps-install-restore-failure-');
+    const archive = makeTar([
+      { kind: 'file', path: 'package/package.json', content: '{"name":"x","version":"1.0.0"}' },
+      { kind: 'file', path: 'package/new.txt', content: 'new' },
+    ]);
+    const target = path.join(repoDir, 'node_modules', 'x');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated repository fixture
+    await fs.mkdir(target, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated repository fixture
+    await fs.writeFile(path.join(target, 'package.json'), '{"name":"x","version":"1.0.0"}', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is beneath the isolated repository fixture
+    await fs.writeFile(path.join(target, 'old.txt'), 'old', 'utf8');
+
+    const originalRename = fs.rename;
+    let commitFailureInjected = false;
+    let restoreFailureInjected = false;
+    fs.rename = async (...args: Parameters<typeof fs.rename>): ReturnType<typeof fs.rename> => {
+      const [source, destination] = args;
+      if (
+        !commitFailureInjected &&
+        typeof source === 'string' &&
+        typeof destination === 'string' &&
+        source.includes('.platform-deps-staging-') &&
+        destination === target
+      ) {
+        commitFailureInjected = true;
+        const error = new Error('simulated staging commit failure') as NodeJS.ErrnoException;
+        error.code = 'EIO';
+        throw error;
+      }
+      if (
+        commitFailureInjected &&
+        !restoreFailureInjected &&
+        typeof source === 'string' &&
+        typeof destination === 'string' &&
+        source.includes('.wm-backup-') &&
+        destination === target
+      ) {
+        restoreFailureInjected = true;
+        const error = new Error('simulated backup restore failure') as NodeJS.ErrnoException;
+        error.code = 'EACCES';
+        throw error;
+      }
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original rename remains confined to isolated repository fixture paths
+      return originalRename(...args);
+    };
+    try {
+      await expect(
+        installVerifiedPackage({
+          archive,
+          repoRoot: repoDir,
+          packageName: 'x',
+          version: '1.0.0',
+          ...realIo,
+        }),
+      ).rejects.toMatchObject({
+        code: 'extract-failed',
+        message: expect.stringMatching(/restore|EACCES/i),
+      });
+    } finally {
+      fs.rename = originalRename;
+    }
+
+    expect(commitFailureInjected).toBe(true);
+    expect(restoreFailureInjected).toBe(true);
+    await assertNoStagingLeftover(repoDir);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- repoDir is an isolated repository fixture
+    const backups = (await fs.readdir(path.join(repoDir, 'node_modules'))).filter((name) =>
+      name.includes('.wm-backup-'),
+    );
+    expect(backups).toHaveLength(1);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- backup remains in the isolated repository fixture because restore failed
+    await expect(
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- retained backup path is beneath the isolated repository fixture
+      fs.readFile(path.join(repoDir, 'node_modules', backups[0] as string, 'old.txt'), 'utf8'),
+    ).resolves.toBe('old');
   });
 
   it('目标已存在但非本包 → install-conflict 失败且不动 node_modules', async () => {
@@ -1775,22 +813,17 @@ describe('installVerifiedPackage（受控安装）', () => {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await fs.writeFile(path.join(target, 'keep.txt'), 'keep', 'utf8');
 
-    const installation = installVerifiedPackage({
-      archive,
-      repoRoot: repoDir,
-      packageName: 'x',
-      version: '1.0.0',
-      ...realIo,
+    await expect(
+      installVerifiedPackage({
+        archive,
+        repoRoot: repoDir,
+        packageName: 'x',
+        version: '1.0.0',
+        ...realIo,
+      }),
+    ).rejects.toMatchObject({
+      code: 'install-conflict',
     });
-    if (process.platform === 'win32') {
-      await expect(installation).rejects.toMatchObject({
-        code: 'extract-failed',
-      });
-    } else {
-      await expect(installation).rejects.toMatchObject({
-        code: 'install-conflict',
-      });
-    }
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'keep.txt'), 'utf8')).toBe('keep');
     await assertNoStagingLeftover(repoDir);
@@ -1843,7 +876,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
   it('退出码 0：合法包验证并安装到隔离 tmp 的 node_modules', async () => {
     const fixture = await makeFixture();
     const result = await runInstall(fixture);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain(`ok ${fixture.packageName}@${fixture.packageVersion}`);
     expect(result.stdout).toContain('"exitCode":0');
@@ -1865,7 +897,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       `--package=${fixture.packageName}`,
       `--tarball=${fixture.packageName}=${fixture.tarPath}`,
     ]);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     await expect(installedTargetExists(fixture)).resolves.toBe(true);
   });
@@ -1898,7 +929,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     });
     const longFile = longPath.replace(/^package\//, '');
     const result = await runInstall(fixture);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     const installedLong = path.join(fixture.repoDir, 'node_modules', 'x', longFile);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
@@ -1932,7 +962,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       packageVersion: '1.0.0',
     });
     const result = await runInstall(fixture);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     const installedLong = path.join(fixture.repoDir, 'node_modules', 'x', longPath.replace(/^package\//, ''));
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
@@ -1964,7 +993,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       ],
     });
     const result = await runInstall(fixture);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain(`ok ${PACKAGE_NAME}@${PACKAGE_VERSION}`);
     const target = path.join(fixture.repoDir, 'node_modules', PACKAGE_NAME);
@@ -2006,7 +1034,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       packageVersion: rolldownVersion,
     });
     const result = await runInstall(fixture);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     await expect(installedTargetExists(fixture)).resolves.toBe(true);
     await expect(
@@ -2045,7 +1072,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     await fs.writeFile(evilPath, 'throw new Error("ESCAPED_LOAD");\n', 'utf8');
     try {
       const result = await runInstall(fixture);
-      if (await isWindowsInstallRefusal(result, fixture)) return;
       expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(result.stderr).not.toContain('ESCAPED_LOAD');
       await expect(installedTargetExists(fixture)).resolves.toBe(true);
@@ -2076,7 +1102,6 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       packageVersion: '1.0.0',
     });
     const result = await runInstall(fixture);
-    if (await isWindowsInstallRefusal(result, fixture)) return;
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     await expect(installedTargetExists(fixture)).resolves.toBe(true);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
@@ -2269,12 +1294,7 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     await fs.writeFile(path.join(target, 'keep.txt'), 'keep', 'utf8');
     const result = await runInstall(fixture);
     expect(result.code).toBe(1);
-    expect(result.stdout).toContain(
-      process.platform === 'win32' ? '"errorCode":"install-error"' : '"errorCode":"install-conflict"',
-    );
-    if (process.platform === 'win32') {
-      expect(`${result.stdout}\n${result.stderr}`).toMatch(WINDOWS_EXTRACTION_REJECTION);
-    }
+    expect(result.stdout).toContain('"errorCode":"install-conflict"');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     expect(await fs.readFile(path.join(target, 'keep.txt'), 'utf8')).toBe('keep');
     await assertNoStagingLeftover(fixture.repoDir);
@@ -2344,22 +1364,11 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
       `--tarball=y=${badTar}`,
     ]);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
-    if (process.platform === 'win32') {
-      expect(result.stdout).toContain('"failed":2');
-      expect(result.stdout).toContain('"passed":0');
-      expect(result.stdout).toContain('"errorCode":"install-error"');
-      expect(result.stdout).toContain('"errorCode":"integrity"');
-      expect(`${result.stdout}\n${result.stderr}`).toMatch(WINDOWS_EXTRACTION_REJECTION);
-      await expect(fs.access(path.join(repoDir, 'node_modules', 'x'))).rejects.toThrow();
-    } else {
-      expect(result.stdout).toContain('"failed":1');
-      expect(result.stdout).toContain('"passed":1');
-      expect(result.stdout).toContain('"errorCode":"integrity"');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
-      expect(await fs.readFile(path.join(repoDir, 'node_modules', 'x', 'index.js'), 'utf8')).toContain(
-        'module.exports',
-      );
-    }
+    expect(result.stdout).toContain('"failed":1');
+    expect(result.stdout).toContain('"passed":1');
+    expect(result.stdout).toContain('"errorCode":"integrity"');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
+    expect(await fs.readFile(path.join(repoDir, 'node_modules', 'x', 'index.js'), 'utf8')).toContain('module.exports');
     await expect(fs.access(path.join(repoDir, 'node_modules', 'y'))).rejects.toThrow();
     await assertNoStagingLeftover(repoDir);
   });

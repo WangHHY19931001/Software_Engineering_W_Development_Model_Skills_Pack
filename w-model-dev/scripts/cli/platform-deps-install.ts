@@ -457,7 +457,7 @@ export interface InstallVerifiedPackageInput {
  * - staging 建在 repo 根同卷（保证 rename 原子、无跨设备），finally 必清理。
  * - 目标已存在且非本包 → install-conflict 失败，不动 node_modules。
  * - 目标已存在且是本包 → 移旧到备份、移新到位；最终移动失败则还原备份；成功后删备份。
- * - 任何失败都不污染既有 node_modules。返回安装目标路径。
+ * - 非本包冲突绝不覆盖；若旧包恢复本身失败，保留备份并报告两个失败。返回安装目标路径。
  */
 export async function installVerifiedPackage(input: InstallVerifiedPackageInput): Promise<string> {
   const nodeModulesRoot = path.join(input.repoRoot, 'node_modules');
@@ -491,8 +491,12 @@ export async function installVerifiedPackage(input: InstallVerifiedPackageInput)
         try {
           // eslint-disable-next-line security/detect-non-literal-fs-filename -- backup and target are lockfile/package-derived paths within the repository root
           await fs.rename(backup, target);
-        } catch {
-          // 保留原始移动错误；备份路径已尽量恢复
+        } catch (restoreError) {
+          const commitMessage = error instanceof Error ? error.message : String(error);
+          const restoreMessage = restoreError instanceof Error ? restoreError.message : String(restoreError);
+          throw new Error(
+            `安装 staging 提交失败：${commitMessage}；既有包恢复失败，备份保留在 ${backup}：${restoreMessage}`,
+          );
         }
       }
       throw error;
