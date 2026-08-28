@@ -3,6 +3,20 @@
 > 面向 AI Agent（Trae / Claude Code / Cursor 等）的仓库导航。
 > 与 [README.md](./README.md) 互补：README 面向人类读者，本文件聚焦 Agent 在仓库内行动所需的最小事实集。
 
+## 0. 进行中的工作（会话交接，2026-08-28）
+
+> 跨会话交接信息；三维度优化全部批次完成合并后应删除本节。
+
+**进行中**：`w-model-dev` 技能三维度优化（有效性 → 可靠性 → 易用性），SDD 子代理驱动执行，当前处于批次 1（有效性）。
+
+- 设计文档：[docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md](./docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md)
+- 实施计划：[docs/superpowers/plans/2026-08-28-w-model-dev-3dim-optimization.md](./docs/superpowers/plans/2026-08-28-w-model-dev-3dim-optimization.md)（3 批次串行 / 17 任务，含逐任务验收步骤）
+- 工作区：worktree `.worktrees/b1-3dim`，分支 `batch1-3dim`。Task 1.0-1.4 已完成并经任务审查：仓内评估资产 `eval/mappings.json`（25 条提示词→资产锚点）+ `eval/runner.ts`（断言引擎）+ `npm run eval`，基线断言得分 25/25（见 `eval/w-model-dev-results.tsv`）。
+- 进度账本：`.superpowers/sdd/2026-08-28-w-model-dev-3dim-optimization/progress.md`（git-ignored，含逐任务审查结论与 deferred 次要发现，接手后先读此文件）。
+- 当前任务：Task 1.5 e2e 基线评估（**主会话执行任务**，控制器扮演 O 按 SKILL.md 走 8 阶段，分派 S/V/G/R 子代理）。阶段 1（需求）产物已生成并通过门禁；**阶段 2 S（系统设计）子代理中断，从阶段 2 恢复**。demo 项目位于 `.worktrees/b1-3dim/eval/e2e/demo/`（gitignored 瞬态工作区；计划原文为仓库外 `wm-e2e-demo/`，因写入受限移入仓内，偏差已在账本记录）；e2e 过程记录须落 `eval/e2e/2026-08-28-baseline.md` 并向 `eval/w-model-dev-results.tsv` 追加 1 行。
+- 后续路径：Task 1.5 完成 → Task 1.6 合并回 main + 用户审查点 → 批次 2（可靠性红灯清零，Git Bash 显式解析已修）→ 批次 3（易用性大重构 + 终值评估 + 版本 42.0.0）。批次间用户审查点为设计文档明文要求。
+- Windows 执行注意：① SDD bash 脚本须用 Git Bash 显式路径执行（`& "C:\Program Files\Git\bin\bash.exe" ...`；PATH 中 WSL bash 优先会导致退出码异常）；② PowerShell 无 heredoc，`git commit` 用单行 `-m`；③ e2e 中 CHECKPOINT 的用户确认角色由计划预设通过判据代行（账本有裁定记录）；④ `batch1-3dim` 合并回 main 后，本文件 §1「`eval/` 边界」与 §2 `eval/` 行描述需同步更新（eval/ 届时含仓内评估资产，不再是纯外部产物）。
+
 ## 1. 仓库定位
 
 **W-Model AI Assistant Skill** — 单纯的编排 + 校验脚本技能包：
