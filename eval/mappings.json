@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "description": "25 条评估提示词 → 技能资产锚点映射。断言三层：L1 触发词断言（id 1-7）、L2 机制存在性断言（id 8-25）、L3 行为证据映射（evidence 字段）。锚点在批次 3 重构后须同步更新（见 Task 3.5）。",
+  "mappings": [
+    { "id": 1, "scenario": "自然语言触发 W 模型开发", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "W 模型" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "CHECKPOINT · 项目初始化" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-checkpoint.ts" } },
+    { "id": 2, "scenario": "/wm analyze 命令触发", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "/wm analyze" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "valid-phase1.json" } },
+    { "id": 3, "scenario": "用户说完整流程但未提 W 模型（歧义先询问）", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "确认前不初始化" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 4, "scenario": "RTM 关键词触发", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "RTM" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-coverage.json" } },
+    { "id": 5, "scenario": "英文 W-model / stage gates 触发", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "W-model" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "stage gates" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 6, "scenario": "普通开发任务不误触发", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "不启用" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 7, "scenario": "单纯技术解释类问题不误触发", "layer": "L1",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "不启用" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 8, "scenario": "无详细设计产物时拒绝直接编码", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "前置产物" },
+        { "type": "contains", "target": "w-model-dev/references/phase-5-coding.md", "substring": "详细设计" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-artifact-gate.ts" } },
+    { "id": 9, "scenario": "伪造测试通过被拒绝", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "真实测试输出" },
+        { "type": "contains", "target": "w-model-dev/references/command-reference.md", "substring": "result" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-test-failed.json" } },
+    { "id": 10, "scenario": "阶段门拒绝自动推进", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "CHECKPOINT · 阶段门放行" },
+        { "type": "contains", "target": "w-model-dev/references/workflow.md", "substring": "CHECKPOINT" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-checkpoint.ts" } },
+    { "id": 11, "scenario": "RTM JSON 损坏可恢复", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/operational-recovery.md", "substring": "rtm.json" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/wm-write.ts" } },
+    { "id": 12, "scenario": "Windows 空格路径处理", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/operational-recovery.md", "substring": "空格" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 13, "scenario": "验收 reject 不归档", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/phase-8-acceptance-test.md", "substring": "reject" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "uat-path-mapping" } },
+    { "id": 14, "scenario": "退出码 2 语义（输入错误不视为门禁失败）", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "退出码" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/__tests__/cli-error.test.ts" } },
+    { "id": 15, "scenario": "Verifier 输出结构校验", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "check-verifier-output.ts" },
+        { "type": "contains", "target": "w-model-dev/references/verifier-spec.md", "substring": "R13" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-verifier-output.ts" } },
+    { "id": 16, "scenario": "R3 预防性审查缺失被拦截", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "R3" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-missing-evidence" } },
+    { "id": 17, "scenario": "冰山扫掠缺口拦截", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/iceberg-sweep-guide.md", "substring": "ICEBERG" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-round-out-of-range" } },
+    { "id": 18, "scenario": "TLA+ 规格与 TLC 校验", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/tla-plus-guide.md", "substring": "TLC" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-tla-model.ts" } },
+    { "id": 19, "scenario": "BDD 场景头标注校验", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/bdd-guide.md", "substring": "Feature" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-bdd-model.ts" } },
+    { "id": 20, "scenario": "需求摄入轮次上限 5 轮", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/scripts/lib/constants.ts", "substring": "MAX_GRAPH_ROUNDS = 5" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "MAX_ROUNDS" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-round-exceeded" } },
+    { "id": 21, "scenario": "opsx 三段式产物完整性", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "opsx" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-missing-tickets" } },
+    { "id": 22, "scenario": "代码改动前 codegraph 影响分析", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "codegraph" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-missing-blastradius" } },
+    { "id": 23, "scenario": "self-as-verifier 同路径自评拦截", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "self-as-verifier" },
+        { "type": "contains", "target": "w-model-dev/scripts/cli/check-verifier-output.ts", "substring": "self-as-verifier" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/__tests__/verifier-logic.test.ts" } },
+    { "id": 24, "scenario": "编排者越权实施（反模式 #10）", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/anti-patterns.md", "substring": "越权" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/__tests__/role-dispatch-logic.test.ts" } },
+    { "id": 25, "scenario": "gate-logs 与 run-log 交叉校验", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "交叉校验" }
+      ],
+      "evidence": { "type": "selfTestSource", "substring": "bad-missing-G-role" } }
+  ]
+}
