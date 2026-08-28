@@ -152,6 +152,27 @@ function validateSha512Integrity(archive: Buffer, integrity: string): void {
   }
 }
 
+/** win32 保留设备名（大小写不敏感，可带任意扩展名）；经典语义为 COM/LPT 1-9 */
+const WIN32_RESERVED_DEVICE_NAMES: ReadonlySet<string> = new Set([
+  'CON',
+  'PRN',
+  'AUX',
+  'NUL',
+  ...Array.from({ length: 9 }, (_, index) => `COM${index + 1}`),
+  ...Array.from({ length: 9 }, (_, index) => `LPT${index + 1}`),
+]);
+
+/**
+ * win32 目标语义下的不安全 segment：NTFS ADS 冒号（`file:stream`）、被 Win32 剥离的
+ * 尾点/尾空格（`foo.` / `foo ` 可劫持既有目标）、以及任意目录下保留设备名的精确 stem。
+ */
+function isUnsafeWin32Segment(segment: string): boolean {
+  if (segment.includes(':')) return true;
+  if (segment.endsWith('.') || segment.endsWith(' ')) return true;
+  const stem = segment.split('.', 1)[0] ?? segment;
+  return WIN32_RESERVED_DEVICE_NAMES.has(stem.toUpperCase());
+}
+
 export function isUnsafeArchivePath(entryPath: string): boolean {
   if (!entryPath || entryPath.includes('\0')) {
     return true;
@@ -163,7 +184,13 @@ export function isUnsafeArchivePath(entryPath: string): boolean {
   }
 
   const segments = normalized.endsWith('/') ? normalized.slice(0, -1).split('/') : normalized.split('/');
-  return segments.some((segment) => segment === '..' || segment === '.' || segment === '');
+  return segments.some(
+    (segment) =>
+      segment === '..' ||
+      segment === '.' ||
+      segment === '' ||
+      (process.platform === 'win32' && isUnsafeWin32Segment(segment)),
+  );
 }
 
 function validateArchiveEntries(entries: readonly ArchiveEntry[]): void {

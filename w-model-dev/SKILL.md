@@ -24,21 +24,20 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **设计哲学**：主刀与修正权 / 人机分工线 / 白箱 vs 黑箱 / 受控的失控 / clockware vs swarmware 五条方法论取向见 [references/design-philosophy.md](references/design-philosophy.md)，按需加载。
 
-**本地 pre-push 依赖边界**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示 `npm install`，不自动安装；它只调用 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台检查与显式 fail-closed 指引入口是 `npm run platform-deps:check` 与 `npm run platform-deps:install`，必须在 Bash 中运行；`self-test` 与 `doctor` 可在 PowerShell 运行。
+**本地 pre-push 依赖边界**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示 `npm install`，不自动安装；它只调用 `ensure-platform-deps.sh --check`，默认/`--check` 无网络下载、`npm pack`、解包或 `node_modules` 覆盖。缺平台依赖时须显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中验证并安装 Windows x64 / Linux x64 缺失包；pre-push 不会自动修复。平台依赖命令必须在 Bash 中运行；`self-test` 与 `doctor` 可在 PowerShell 运行。
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
-
 
 ## 触发决策
 
 按以下优先级判断，不要把普通软件任务升级为 W 模型流程：
 
-| 用户信号 | 行为 |
-|---|---|
-| `/wm ...`、W-model、W 模型、W 开发模型 | 立即启用 |
-| 明确要求 RTM、阶段门/质量门、开发与测试并行 | 立即启用 |
+| 用户信号                                     | 行为                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------- |
+| `/wm ...`、W-model、W 模型、W 开发模型       | 立即启用                                                                  |
+| 明确要求 RTM、阶段门/质量门、开发与测试并行  | 立即启用                                                                  |
 | 只说“完整流程”“从需求到交付”“全生命周期开发” | 先询问“是否采用 W 模型（含并行测试设计、RTM 和阶段门）？”；确认前不初始化 |
-| 普通需求、设计、编码、测试、修复或技术解释 | 不启用，按普通任务处理 |
+| 普通需求、设计、编码、测试、修复或技术解释   | 不启用，按普通任务处理                                                    |
 
 **边界示例**：“用 W 模型开发登录功能” → 启用；“从需求开始走完整流程” → 先询问；“修复 `src/auth.ts` 并运行测试” → 不启用。
 
@@ -46,11 +45,11 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 启用 W 模型后，按任务规模选择适配形态。**轻量 = 降载门禁强度，不是跳过阶段**：阶段流程、RTM、CHECKPOINT 机制一律不变；禁止以「任务小」为由跳过 S→V→G 顺序、RTM 回填或用户确认（命中反模式 #10 / #21）。
 
-| 任务规模 | 适配形态 | 门禁强度 |
-|---|---|---|
-| 极小任务（原型 / demo / 教学演示） | L0 交付层（无脚本门禁，V 评审 + 用户确认把关）+ self-as-verifier（仅 demo，见下文「self-as-verifier 模式」节）+ maturity L0/L1 | TLA+/BDD 可选，其余门禁照跑 |
-| 生产小项目 / 小工具 | 完整 8 阶段 + maturity L2 | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
-| 常规生产功能 | 完整 8 阶段 + maturity L3 | 全必跑，无降载 |
+| 任务规模                           | 适配形态                                                                                                                       | 门禁强度                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| 极小任务（原型 / demo / 教学演示） | L0 交付层（无脚本门禁，V 评审 + 用户确认把关）+ self-as-verifier（仅 demo，见下文「self-as-verifier 模式」节）+ maturity L0/L1 | TLA+/BDD 可选，其余门禁照跑                       |
+| 生产小项目 / 小工具                | 完整 8 阶段 + maturity L2                                                                                                      | TLA+ L1 + BDD L1 必跑（L2-L4 可选），其余门禁照跑 |
+| 常规生产功能                       | 完整 8 阶段 + maturity L3                                                                                                      | 全必跑，无降载                                    |
 
 判据与细则：成熟度分级见上方约束 #13 与 [references/operational-recovery.md](references/operational-recovery.md)「成熟度与行为门禁」；L0/L1 交付层见 `docs/INSTALL.md` §2；REQ 最小层级深度 = 2（适用极小项目）见 [references/phase-1-requirements.md](references/phase-1-requirements.md)。
 
@@ -58,22 +57,22 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 > 14 条硬红线：**命中即回退**（回到当前阶段起点）。完整版（含违反回退、脚本、反模式链接）见 [references/hard-constraints.md](references/hard-constraints.md)，**执行前必读**。
 
-| # | 约束 | 核心语义（完整版见 hard-constraints.md） |
-|---|---|---|
-| 1 | 测试设计前置 | 阶段 1–4 开发产物完成后立即产出对应测试设计，不得推迟到编码后 |
-| 2 | 阶段门放行 | 评审通过 + 🔴 CHECKPOINT 用户确认才推进；豁免审批走 S→R→V→人类四阶段（E1-E9） |
-| 3 | RTM 为事实源 | `.w-model/rtm.json` 唯一事实源；实体每阶段回填，coverageStatus 与 coveragePercent 强一致 |
-| 4 | 真实执行 | 不得估算覆盖率/测试结果/门禁结果；必须执行真实测试并记录输出 |
-| 5 | 失败即回退 | 评审 C/D、测试失败、门禁退出码 1/2 均不得放行 |
-| 6 | 按需加载 | 只读当前命令和阶段需要的参考；禁止一次加载整个 `references/` |
-| 7 | 如实状态 | 未完成、未评审或未确认的阶段不得标为完成 |
-| 8 | 编排者最小化 | O 只做编排；实施动作必须由子代理执行（反模式 #10 回退）；每阶段 S/V/G 各 ≥1 + R ≥3（反模式 #34） |
-| 9 | 门禁退出码不可伪 | JSON 摘要含 `exitCode` 与 `process.exit()` 强一致；G 存档 stdout；run-log 交叉校验（SSoT §10E） |
-| 10 | 系统层级树 + REQ 层级 | 7 层图谱；REQ `level` 1-4 必填、`level≥2` 须 `reqGroup` 指向 `level=1` 祖先 |
-| 11 | 闭环机制 + R3 审查 | 5 脚本（含 check-preventive-review 无条件）每阶段门 exitCode=0；S 产出后 R3 三报告强制（反模式 #33/#42） |
-| 12 | 返工必经根因定位 | V/G 不通过先 R 报告 → V 复审 → G 门禁 → S-fix（反模式 #18/#19） |
-| 13 | 行为门禁按成熟度分级 | 阶段 1-4 TLA+（L1-L3 + 按需 L4）+ BDD（L1-L4）按项目成熟度强制（L1 可选 / L2 部分 / L3 全必跑） |
-| 14 | 代码改动前后门禁 | 阶段 5-8 修改前 codegraph 影响分析落盘（反模式 #38）+ 改动后回归测试 |
+| #   | 约束                  | 核心语义（完整版见 hard-constraints.md）                                                                 |
+| --- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| 1   | 测试设计前置          | 阶段 1–4 开发产物完成后立即产出对应测试设计，不得推迟到编码后                                            |
+| 2   | 阶段门放行            | 评审通过 + 🔴 CHECKPOINT 用户确认才推进；豁免审批走 S→R→V→人类四阶段（E1-E9）                            |
+| 3   | RTM 为事实源          | `.w-model/rtm.json` 唯一事实源；实体每阶段回填，coverageStatus 与 coveragePercent 强一致                 |
+| 4   | 真实执行              | 不得估算覆盖率/测试结果/门禁结果；必须执行真实测试并记录输出                                             |
+| 5   | 失败即回退            | 评审 C/D、测试失败、门禁退出码 1/2 均不得放行                                                            |
+| 6   | 按需加载              | 只读当前命令和阶段需要的参考；禁止一次加载整个 `references/`                                             |
+| 7   | 如实状态              | 未完成、未评审或未确认的阶段不得标为完成                                                                 |
+| 8   | 编排者最小化          | O 只做编排；实施动作必须由子代理执行（反模式 #10 回退）；每阶段 S/V/G 各 ≥1 + R ≥3（反模式 #34）         |
+| 9   | 门禁退出码不可伪      | JSON 摘要含 `exitCode` 与 `process.exit()` 强一致；G 存档 stdout；run-log 交叉校验（SSoT §10E）          |
+| 10  | 系统层级树 + REQ 层级 | 7 层图谱；REQ `level` 1-4 必填、`level≥2` 须 `reqGroup` 指向 `level=1` 祖先                              |
+| 11  | 闭环机制 + R3 审查    | 5 脚本（含 check-preventive-review 无条件）每阶段门 exitCode=0；S 产出后 R3 三报告强制（反模式 #33/#42） |
+| 12  | 返工必经根因定位      | V/G 不通过先 R 报告 → V 复审 → G 门禁 → S-fix（反模式 #18/#19）                                          |
+| 13  | 行为门禁按成熟度分级  | 阶段 1-4 TLA+（L1-L3 + 按需 L4）+ BDD（L1-L4）按项目成熟度强制（L1 可选 / L2 部分 / L3 全必跑）          |
+| 14  | 代码改动前后门禁      | 阶段 5-8 修改前 codegraph 影响分析落盘（反模式 #38）+ 改动后回归测试                                     |
 
 完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
 
@@ -85,14 +84,14 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **角色划分（O / S / V / G / A / R）**：
 
-| 角色 | 简称 | 职责 | 关键职责 + 脚本不变式 |
-|---|---|---|---|
-| 编排者 | O | 路由 / 状态读写 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本 | 只做编排，不实施任何产物动作。不变式：`check-role-dispatch.ts` 强制每阶段 S/V/G 各 ≥1 条（约束 #8）；越权实施命中反模式 #10（回退当前阶段起点） |
-| 产出子代理 | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体；**F（修复者）由 S 兼任**——返工时携带 R 报告执行修复 | 产出阶段产物 + 回填 RTM（约束 #3）+ 签名链 `inputProvenance` 来源证明。不变式：`check-signature-chain.ts` R3 校验来源（反模式 #32）；`check-run-log.ts` R7 校验时序；越界跑门禁/改 status 命中反模式 #48 |
-| 评审子代理 | V | 按 [references/agent-personas.md](references/agent-personas.md) + [references/verifier-spec.md](references/verifier-spec.md) §6（输出 Schema）+ §8（提示词模板）产出 `VerifierOutput` JSON | 独立评审 + 产出 VerifierOutput（evidence 须具体引用）。不变式：`check-verifier-output.ts` R1-R13（含 R13 单轴下限 <0.70 判失败，反模式 #41）；越界跑门禁/改产物命中反模式 #48 |
-| 门禁子代理 | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | 独立跑门禁 + 回填 exitCode 证据。不变式：`check-run-log.ts` R6 用 gate-logs 交叉校验 exitCode；越界改产物/产出评审 JSON 命中反模式 #48 |
-| 分析子代理 | A | 分块分析、交叉合并、图谱演进（阶段 1–4）；产出 `.w-model/ingestion/*` 与 `consolidated.json` | 只产出 ingestion 分析中间产物。不变式：`check-requirement-graph.ts` 由 G 独立跑（A 跑命中反模式 #48）；越界写正式阶段产物/改 status 命中反模式 #48 |
-| 根因定位子代理 | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`；可作为 R-lead 分派 R-persona 子代理并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 只产出根因定位报告，不实施修复。不变式：`check-rootcause-report.ts` R1-R10 由 G 校验 + V 复审后才可派 S-fix（反模式 #18/#19）；越界实施修复/跑门禁/跨阶段定位命中反模式 #48 |
+| 角色           | 简称 | 职责                                                                                                                                                                                                                                                                  | 关键职责 + 脚本不变式                                                                                                                                                                                    |
+| -------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 编排者         | O    | 路由 / 状态读写 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本                                                                                                                                                                                                         | 只做编排，不实施任何产物动作。不变式：`check-role-dispatch.ts` 强制每阶段 S/V/G 各 ≥1 条（约束 #8）；越权实施命中反模式 #10（回退当前阶段起点）                                                          |
+| 产出子代理     | S    | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体；**F（修复者）由 S 兼任**——返工时携带 R 报告执行修复                                                                                                                                                                  | 产出阶段产物 + 回填 RTM（约束 #3）+ 签名链 `inputProvenance` 来源证明。不变式：`check-signature-chain.ts` R3 校验来源（反模式 #32）；`check-run-log.ts` R7 校验时序；越界跑门禁/改 status 命中反模式 #48 |
+| 评审子代理     | V    | 按 [references/agent-personas.md](references/agent-personas.md) + [references/verifier-spec.md](references/verifier-spec.md) §6（输出 Schema）+ §8（提示词模板）产出 `VerifierOutput` JSON                                                                            | 独立评审 + 产出 VerifierOutput（evidence 须具体引用）。不变式：`check-verifier-output.ts` R1-R13（含 R13 单轴下限 <0.70 判失败，反模式 #41）；越界跑门禁/改产物命中反模式 #48                            |
+| 门禁子代理     | G    | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要                                                                                                                                                                                               | 独立跑门禁 + 回填 exitCode 证据。不变式：`check-run-log.ts` R6 用 gate-logs 交叉校验 exitCode；越界改产物/产出评审 JSON 命中反模式 #48                                                                   |
+| 分析子代理     | A    | 分块分析、交叉合并、图谱演进（阶段 1–4）；产出 `.w-model/ingestion/*` 与 `consolidated.json`                                                                                                                                                                          | 只产出 ingestion 分析中间产物。不变式：`check-requirement-graph.ts` 由 G 独立跑（A 跑命中反模式 #48）；越界写正式阶段产物/改 status 命中反模式 #48                                                       |
+| 根因定位子代理 | R    | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）定位根因，产出 `RootCauseReport`；可作为 R-lead 分派 R-persona 子代理并聚合产出。详见 [references/root-cause-locator.md](references/root-cause-locator.md) | 只产出根因定位报告，不实施修复。不变式：`check-rootcause-report.ts` R1-R10 由 G 校验 + V 复审后才可派 S-fix（反模式 #18/#19）；越界实施修复/跑门禁/跨阶段定位命中反模式 #48                              |
 
 **每阶段分派时序**：O 路由 → 🔴 CHECKPOINT 进入确认 → **分派 S 产出** → **分派 V 评审** → **分派 G 门禁** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新 `project.status`。阶段 8 终检额外分派 G 跑 `check-artifact-gate.ts`。
 
@@ -125,18 +124,18 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 每次启用技能后按顺序执行。**编排者只做编排**——所有实施动作（产出 / 评审 / 门禁）必须分派子代理执行（见「编排者-子代理边界」节与 [references/subagent-delegation.md](references/subagent-delegation.md)）。
 
 1. **路由任务**（O）：识别命令、当前阶段和用户意图；歧义触发先确认。
-1.5. **环境自检 doctor**（O）：首次启用或门禁报依赖错误时，运行 `npx tsx w-model-dev/scripts/cli/doctor.ts [--with-tla]` 逐项自检环境（node/tsx/ajv/java/tla2tools/codegraph/openspec），按输出修复缺失项后再继续；`--with-tla` 将 TLA+ 相关项升级为阻断级校验。非阶段门，仅诊断。
+   1.5. **环境自检 doctor**（O）：首次启用或门禁报依赖错误时，运行 `npx tsx w-model-dev/scripts/cli/doctor.ts [--with-tla]` 逐项自检环境（node/tsx/ajv/java/tla2tools/codegraph/openspec），按输出修复缺失项后再继续；`--with-tla` 将 TLA+ 相关项升级为阻断级校验。非阶段门，仅诊断。
 2. **读取状态**（O）：若 `.w-model/` 存在，读取 `project.json` 与 `rtm.json`；状态损坏时先恢复，不得继续推进。
 3. **检查前置产物**（O）：缺少上游阶段产物时拒绝跳阶段，并指出应返回的命令。
 4. **加载最小引用集**（O）：只加载 `SKILL.md` + 当前阶段 `phase-N-*.md` 摘要 + 所需状态文件；阶段细则由 S 子代理按需加载。
 5. **初始化确认**（O）：首次进入项目前确认技术栈、当前阶段、同步测试设计和产物清单。
-5.5. **ingestion 子流程**（O → A → G，阶段 1–4）：O 跑 `plan-chunks.ts` → 🔴 CHECKPOINT · ingestion 规划确认 → 并行分派 A-chunk → 分派 A-cross（阶段1）/A-evolve（阶段2-4）合并建图产出 `consolidated.json` → 分派 G 跑 `check-requirement-graph.ts` → 收敛循环（MAX_ROUNDS=5）→ 🔴 CHECKPOINT · ingestion 收敛确认。详见 [references/ingestion-chunk.md](references/ingestion-chunk.md) 与 [references/ingestion-cross.md](references/ingestion-cross.md)。
+   5.5. **ingestion 子流程**（O → A → G，阶段 1–4）：O 跑 `plan-chunks.ts` → 🔴 CHECKPOINT · ingestion 规划确认 → 并行分派 A-chunk → 分派 A-cross（阶段1）/A-evolve（阶段2-4）合并建图产出 `consolidated.json` → 分派 G 跑 `check-requirement-graph.ts` → 收敛循环（MAX_ROUNDS=5）→ 🔴 CHECKPOINT · ingestion 收敛确认。详见 [references/ingestion-chunk.md](references/ingestion-chunk.md) 与 [references/ingestion-cross.md](references/ingestion-cross.md)。
 6. **分派 S 子代理产出**（O → S）：生成开发产物 + 同步测试设计 + 更新 RTM 实体；**阶段 1–4 额外产出对应层级 TLA+ 规格（`.tla` + `.cfg` + `tla-manifest.json`）与 BDD features（`.feature` + `bdd-manifest.json`）**（约束 #13，按成熟度分级）；S 返回 `{产物路径, RTM diff, selfCheck}`。**编排者不得直接产出**。S 任务过重时可拆为 S-doc / S-tla / S-bdd 三次分派，时序：S-doc → S-tla → S-bdd → V → G（详见 [references/subagent-delegation.md](references/subagent-delegation.md)「S 拆分机制」节）。
-6.5. **分派 R3 预防性审查**（O → R3）：S 产出后、V 评审前，分派 R 子代理执行三阶段预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`（约束 #11）。R3 三阶段可并行分派。
+   6.5. **分派 R3 预防性审查**（O → R3）：S 产出后、V 评审前，分派 R 子代理执行三阶段预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`（约束 #11）。R3 三阶段可并行分派。
 7. **分派 V 子代理评审**（O → V）：按 `targetKind` 路由 Persona，产出 `VerifierOutput` JSON。**编排者不得自评**。
 8. **分派 G 子代理门禁**（O → G）：跑 `check-verifier-output.ts`，返回 `{exitCode, qualityLevel, passed, reworkHints}`。**阶段 1–4 额外分派 G 跑 `check-tla-model.ts` + `check-bdd-model.ts`**（约束 #13）；**阶段 5 额外跑 `check-code-tla-consistency.ts`**（代码-TLA+ 一致性回归，四维度校验）。编排者**可同步跑一次只读脚本看退出码**用于展示，但 G 子代理的回填不可省略。
 9. **验证与暂停**（O）：若 G 返回 `exitCode=1` 或 `qualityLevel ∈ {C,D}` → **分派 R 子代理定位根因**（产出 RootCauseReport）→ **分派 V 复审根因报告** → **分派 G 门禁**（check-rootcause-report.ts）→ **分派 S-fix 修复**（携带 R 报告）→ 重走 V → G；若通过 → 🔴 CHECKPOINT 等待用户决定。跳过 R 直接分派 S 返工命中反模式 #18。**阶段 1–4 TLA+ 门禁退出码 1 亦不得放行**（反模式 #15）。
-9.5. **冰山扫掠**（O → R-iceberg）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）；G 跑 `check-iceberg-sweep.ts`（R1-R5）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
+   9.5. **冰山扫掠**（O → R-iceberg）：**ICEBERG-A**（S-fix 返工通过后）与 **ICEBERG-B**（阶段门放行前）分派 R-iceberg 子代理做三维度×六类别深挖扫掠，产出 `.w-model/iceberg/<reportId>.json`（IcebergSweepReport）；G 跑 `check-iceberg-sweep.ts`（R1-R5）。`newFindings=[]` 即终止；达 maxIcebergRounds=5 时 CHECKPOINT 升级由用户裁定。新发现须经 V 复审后走标准 R→V→G→S-fix（跳过命中反模式 #44）。详见 [references/iceberg-sweep-guide.md](references/iceberg-sweep-guide.md)。
 10. **持久化状态**（O）：只有用户放行后才更新 `project.status`；取消时保留产物但不推进状态。状态文件写入统一经 `wm-write.ts`：使用 `<target>.lock` 持久目录与可转移 owner 对象实施跨进程锁，锁内完成 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。CLI 用 `--lock-timeout <ms>` 控制等待；陈旧锁必须显式传 `--recover-stale-lock`，否则以 `STALE_LOCK` / exit 1 拒绝写入；不得手写。
 
 > 🔴 **CHECKPOINT · 项目初始化**：复述"进入阶段 / 同步测试设计 / 预期产物"，获得确认后才能分派 S 子代理。
@@ -149,16 +148,16 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 ## 阶段路由
 
-| # | 开发阶段 | 同步/执行测试 | 外部技能吸收标记 | 必读参考 |
-|---|---|---|---|---|
-| 1 | 需求分析 | 验收测试设计 | User Stories + Out of Scope + Implementation/Testing Decisions | [references/phase-1-requirements.md](references/phase-1-requirements.md) |
-| 2 | 系统设计 | 系统测试设计 | seam 决策 | [references/phase-2-system-design.md](references/phase-2-system-design.md) |
-| 3 | 概要设计 | 集成测试设计 | seam 决策 | [references/phase-3-outline-design.md](references/phase-3-outline-design.md) |
-| 4 | 详细设计 | 单元测试设计 | seam 决策 | [references/phase-4-detailed-design.md](references/phase-4-detailed-design.md) |
-| 5 | 编码实现 | 单元测试执行 | Tracer-bullet 票据拆解 + opsx 三段式 + codegraph 修改前查询 | [references/phase-5-coding.md](references/phase-5-coding.md) |
-| 6 | 集成测试 | 集成测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
-| 7 | 系统测试 | 系统测试执行 | opsx 三段式 + codegraph 修改前查询 | [references/phase-7-system-test.md](references/phase-7-system-test.md) |
-| 8 | 验收测试 | 验收测试执行 | archive 机制 + opsx 三段式 + codegraph 修改前查询 | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md) |
+| #   | 开发阶段 | 同步/执行测试 | 外部技能吸收标记                                               | 必读参考                                                                         |
+| --- | -------- | ------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1   | 需求分析 | 验收测试设计  | User Stories + Out of Scope + Implementation/Testing Decisions | [references/phase-1-requirements.md](references/phase-1-requirements.md)         |
+| 2   | 系统设计 | 系统测试设计  | seam 决策                                                      | [references/phase-2-system-design.md](references/phase-2-system-design.md)       |
+| 3   | 概要设计 | 集成测试设计  | seam 决策                                                      | [references/phase-3-outline-design.md](references/phase-3-outline-design.md)     |
+| 4   | 详细设计 | 单元测试设计  | seam 决策                                                      | [references/phase-4-detailed-design.md](references/phase-4-detailed-design.md)   |
+| 5   | 编码实现 | 单元测试执行  | Tracer-bullet 票据拆解 + opsx 三段式 + codegraph 修改前查询    | [references/phase-5-coding.md](references/phase-5-coding.md)                     |
+| 6   | 集成测试 | 集成测试执行  | opsx 三段式 + codegraph 修改前查询                             | [references/phase-6-integration-test.md](references/phase-6-integration-test.md) |
+| 7   | 系统测试 | 系统测试执行  | opsx 三段式 + codegraph 修改前查询                             | [references/phase-7-system-test.md](references/phase-7-system-test.md)           |
+| 8   | 验收测试 | 验收测试执行  | archive 机制 + opsx 三段式 + codegraph 修改前查询              | [references/phase-8-acceptance-test.md](references/phase-8-acceptance-test.md)   |
 
 **设计级别增强**：阶段 1-4 产出升级为主模板（§0 SSOT 头 + 引用块）+ 每阶段 6 独立子模板（跨阶段去重后共 10 种：system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），产出目录 `docs/phase<N>-*/`；G 门禁 `check-requirement-graph.ts --phase=N --spec-dir=<dir>`（R7-R14）+ `check-artifact-gate.ts --phase=N --spec-dir=<dir>`（引用块/SSOT/DoD 结构校验）。
 
@@ -168,36 +167,36 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 > 借鉴 drawio-skill 的 Bundled Resources 设计：明示每个资源的触发条件，**none of them need to be in context up front**。约束 #6「按需加载」的可执行清单。目录级索引——完整逐文件表见 [references/dispatch-matrix.md](references/dispatch-matrix.md)（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）与 [references/command-reference.md](references/command-reference.md)（/wm 命令细节）。
 
-| 资源目录 | 触发条件 |
-|---|---|
-| `references/`（53 个 .md） | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
-| `scripts/cli/`（37 个 .ts：26 个 check-* 门禁 + 10 个工具 CLI + self-test.ts 回归基线；其中 36 个为 exit-2 结构化错误脚本） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节 |
-| `subagent/`（28 个 persona） | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用 |
-| `schemas/`（23 份 JSON Schema draft-07，含 evidence-manifest / evidence-provenance） | 由 `scripts/infrastructure/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取） |
-| `tools/`（tla2tools.jar） | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝） |
-| `templates/` | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget.template.json / run-log.template.jsonl） |
+| 资源目录                                                                                                                    | 触发条件                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `references/`（53 个 .md）                                                                                                  | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
+| `scripts/cli/`（37 个 .ts：26 个 check-* 门禁 + 10 个工具 CLI + self-test.ts 回归基线；其中 36 个为 exit-2 结构化错误脚本） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节                                                                                                                                         |
+| `subagent/`（28 个 persona）                                                                                                | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用                                                                                                                                                                                                                                       |
+| `schemas/`（23 份 JSON Schema draft-07，含 evidence-manifest / evidence-provenance）                                        | 由 `scripts/infrastructure/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取）                                                                                                                                                                                                                                     |
+| `tools/`（tla2tools.jar）                                                                                                   | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝）                                                                                                                                                                                                                                                                            |
+| `templates/`                                                                                                                | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget.template.json / run-log.template.jsonl）                                 |
 
 ## 命令速查
 
 > 编排者（O）只路由 + CHECKPOINT + 状态持久化；产出（S）、评审（V）、门禁（G）均由子代理执行。详见 [references/subagent-delegation.md](references/subagent-delegation.md)。
 
-| 命令 | 路由 | 关键前置/行为 | 子代理分派 |
-|---|---|---|---|
-| `/wm analyze <需求>` | 阶段 1 | 首次初始化并同步验收测试设计；触发 ingestion 子流程（A 角色 + 图谱校验） | O 路由 → S 产出 → V 评审 → G 门禁 |
-| `/wm design type=<架构\|概要\|详细>` | 阶段 2/3/4 | 必须存在上一阶段已放行产物；触发 ingestion 子流程（A 角色 + 图谱校验，S→A 路径） | O 路由 → S 产出 → V 评审 → G 门禁 |
-| `/wm code <功能>` | 阶段 5 | 必须存在已放行详细设计；生成并真实执行单元测试 | O 路由 → S 产出代码+单测+RTM → V 评审 → G 门禁 |
-| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 阶段 5–8 | `result` 必填且必须来自真实测试输出 | O 路由 → S 执行测试+回填 RTM → V 评审报告 → G 门禁 |
-| `/wm review <目标>` | 阶段门 | 返回评审指引；外部 Agent 执行评审 | O 路由 → V 评审 → G 门禁（不由 O 自评） |
-| `/wm status` | 状态查询 | 读取状态与 RTM，不修改数据；由 wm-status.ts 脚本化输出 | O 只读，不分派子代理 |
-| `/wm help` | 帮助 | 不读项目状态 | O 只读，不分派子代理 |
-| `/wm reset` | 重置 | 🔴 CHECKPOINT 后清空实体，保留项目元信息 | O 执行（仅状态文件操作，非阶段产物） |
-| `/wm export [目录]` | 导出 | 输出 JSON 与 RTM Markdown | O 只读导出，不分派子代理 |
-| `/wm import <文件>` | 导入 | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT | O 执行（仅状态文件操作） |
-| `/wm hill-climbing` | 改进信号 | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进；报告存 `.w-model/hill-climbing/<timestamp>-report.json` | O 分析（状态读写+分析，非实施） |
-| `/wm metrics` | 流程度量 | 从 run-log/budget 生成流程度量报告；只读 | O 只读，不分派子代理 |
-| `wm-verify-evidence-source.ts` | source provenance 生产与重验 | 校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`；不是只读 verify | O/S 执行（导出证据前） |
-| `wm-write.ts` | 状态写入 | `<target>.lock` 跨进程锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`--expect-mtime` 为有限非负数向下取整，`--lock-timeout` 为安全非负整数，CLI 陈旧锁须显式 `--recover-stale-lock` | O/A/S 执行（仅状态文件操作） |
-| `doctor.ts` | 环境自检 | 首次启用 / 依赖报错时诊断环境（node/tsx/ajv/java/tla2tools/codegraph/openspec）；`--with-tla` 升级 TLA+ 项为阻断级 | O 执行（非阶段门） |
+| 命令                                                         | 路由                         | 关键前置/行为                                                                                                                                                                                          | 子代理分派                                         |
+| ------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `/wm analyze <需求>`                                         | 阶段 1                       | 首次初始化并同步验收测试设计；触发 ingestion 子流程（A 角色 + 图谱校验）                                                                                                                               | O 路由 → S 产出 → V 评审 → G 门禁                  |
+| `/wm design type=<架构\|概要\|详细>`                         | 阶段 2/3/4                   | 必须存在上一阶段已放行产物；触发 ingestion 子流程（A 角色 + 图谱校验，S→A 路径）                                                                                                                       | O 路由 → S 产出 → V 评审 → G 门禁                  |
+| `/wm code <功能>`                                            | 阶段 5                       | 必须存在已放行详细设计；生成并真实执行单元测试                                                                                                                                                         | O 路由 → S 产出代码+单测+RTM → V 评审 → G 门禁     |
+| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 阶段 5–8                     | `result` 必填且必须来自真实测试输出                                                                                                                                                                    | O 路由 → S 执行测试+回填 RTM → V 评审报告 → G 门禁 |
+| `/wm review <目标>`                                          | 阶段门                       | 返回评审指引；外部 Agent 执行评审                                                                                                                                                                      | O 路由 → V 评审 → G 门禁（不由 O 自评）            |
+| `/wm status`                                                 | 状态查询                     | 读取状态与 RTM，不修改数据；由 wm-status.ts 脚本化输出                                                                                                                                                 | O 只读，不分派子代理                               |
+| `/wm help`                                                   | 帮助                         | 不读项目状态                                                                                                                                                                                           | O 只读，不分派子代理                               |
+| `/wm reset`                                                  | 重置                         | 🔴 CHECKPOINT 后清空实体，保留项目元信息                                                                                                                                                               | O 执行（仅状态文件操作，非阶段产物）               |
+| `/wm export [目录]`                                          | 导出                         | 输出 JSON 与 RTM Markdown                                                                                                                                                                              | O 只读导出，不分派子代理                           |
+| `/wm import <文件>`                                          | 导入                         | 校验后写入；覆盖现有数据前 🔴 CHECKPOINT                                                                                                                                                               | O 执行（仅状态文件操作）                           |
+| `/wm hill-climbing`                                          | 改进信号                     | L2+ 项目：分析 run-log 产出 HarnessImprovementReport；人审后手动应用改进；报告存 `.w-model/hill-climbing/<timestamp>-report.json`                                                                      | O 分析（状态读写+分析，非实施）                    |
+| `/wm metrics`                                                | 流程度量                     | 从 run-log/budget 生成流程度量报告；只读                                                                                                                                                               | O 只读，不分派子代理                               |
+| `wm-verify-evidence-source.ts`                               | source provenance 生产与重验 | 校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`；不是只读 verify                                                         | O/S 执行（导出证据前）                             |
+| `wm-write.ts`                                                | 状态写入                     | `<target>.lock` 跨进程锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`--expect-mtime` 为有限非负数向下取整，`--lock-timeout` 为安全非负整数，CLI 陈旧锁须显式 `--recover-stale-lock` | O/A/S 执行（仅状态文件操作）                       |
+| `doctor.ts`                                                  | 环境自检                     | 首次启用 / 依赖报错时诊断环境（node/tsx/ajv/java/tla2tools/codegraph/openspec）；`--with-tla` 升级 TLA+ 项为阻断级                                                                                     | O 执行（非阶段门）                                 |
 
 每个命令的输入、输出、失败动作和状态更新规则见 [references/command-reference.md](references/command-reference.md)。
 
@@ -230,7 +229,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"   # 仅
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --phase=5|6|7|8 [project-dir]   # 默认 phase=8 终检（向后兼容）
 ```
 
-**NFR/CON 横切行特殊规则**：阶段 1~4 仅校验 `designDoc` 非空（横切登记）；阶段 5~8 校验 `designDoc` + `codeModule` 非空（横切回填）；不校验 NFR/CON 行的四级测试字段。
+**NFR/CON 横切行特殊规则**：阶段 1~~4 仅校验 `designDoc` 非空（横切登记）；阶段 5~~8 校验 `designDoc` + `codeModule` 非空（横切回填）；不校验 NFR/CON 行的四级测试字段。
 
 **graph 自动发现**：`check-artifact-gate.ts` 按 `graph.json` → `consolidated-phase4.json` → … → `consolidated-phase1.json` 优先级自动查找。
 

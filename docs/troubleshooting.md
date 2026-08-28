@@ -97,29 +97,29 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 ## 2. 环境问题矩阵
 
-| 环境 | 场景 | 行为 | 处置 |
-|---|---|---|---|
-| Windows 原生 cmd / PowerShell | `git push` / `npm run prepush` | pre-push 检测到无 bash 解释器 → 提示 + 放行（exit 0），门禁**未执行** | 改用 Git Bash / WSL 跑门禁（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)） |
-| Windows + Git Bash | `git push` / `npm run prepush` | 正常执行 17 项门禁 | — |
-| WSL | `git push` / `npm run prepush` | 正常执行；仅检查 Linux 侧原生二进制 | 缺失则中止；在 Bash 中显式运行 `npm run platform-deps:check`，按 `platform-deps:install` 的人工 `npm install` 指引修复 |
-| Linux / macOS | `git push` / `npm run prepush` | 正常执行 | — |
-| 任意 | `npm audit` 网络不可达（ENOTFOUND / ETIMEDOUT / ECONNREFUSED） | pre-push 第 13 项 warn 并跳过（不阻断） | 网络恢复后手动补跑 `npm audit --audit-level=high` |
-| 任意 | registry 不支持 audit endpoint（ENOTSUP / ENOAUDIT / NOT_IMPLEMENTED） | 同上，跳过不阻断 | 换 registry 后重跑 |
-| 任意 | `npm audit` 检出 high 以上漏洞 | pre-push **阻断**（fail-closed，其余输出一律视为真实漏洞） | 升级依赖修复后重跑；见 [user-guide.md §6](./user-guide.md) 依赖巡检流程 |
-| 任意 | `node_modules` 缺失 | pre-push exit 1，提示先运行 `npm install` | 开发者手动执行 `npm install` 后重跑；hook 不自动安装 |
-| 任意 | 钩子未启用 | push 不触发门禁 | `npm run setup:hooks`（见 [1.5](#15-postinstall-未自动启用钩子)） |
+| 环境                          | 场景                                                                   | 行为                                                                  | 处置                                                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Windows 原生 cmd / PowerShell | `git push` / `npm run prepush`                                         | pre-push 检测到无 bash 解释器 → 提示 + 放行（exit 0），门禁**未执行** | 改用 Git Bash / WSL 跑门禁（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）                                                           |
+| Windows + Git Bash            | `git push` / `npm run prepush`                                         | 正常执行 17 项门禁                                                    | —                                                                                                                                                |
+| WSL                           | `git push` / `npm run prepush`                                         | 正常执行；仅检查 Linux 侧原生二进制                                   | 缺失则中止；在 Bash 中显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中校验并安装缺失包 |
+| Linux / macOS                 | `git push` / `npm run prepush`                                         | 正常执行                                                              | —                                                                                                                                                |
+| 任意                          | `npm audit` 网络不可达（ENOTFOUND / ETIMEDOUT / ECONNREFUSED）         | pre-push 第 13 项 warn 并跳过（不阻断）                               | 网络恢复后手动补跑 `npm audit --audit-level=high`                                                                                                |
+| 任意                          | registry 不支持 audit endpoint（ENOTSUP / ENOAUDIT / NOT_IMPLEMENTED） | 同上，跳过不阻断                                                      | 换 registry 后重跑                                                                                                                               |
+| 任意                          | `npm audit` 检出 high 以上漏洞                                         | pre-push **阻断**（fail-closed，其余输出一律视为真实漏洞）            | 升级依赖修复后重跑；见 [user-guide.md §6](./user-guide.md) 依赖巡检流程                                                                          |
+| 任意                          | `node_modules` 缺失                                                    | pre-push exit 1，提示先运行 `npm install`                             | 开发者手动执行 `npm install` 后重跑；hook 不自动安装                                                                                             |
+| 任意                          | 钩子未启用                                                             | push 不触发门禁                                                       | `npm run setup:hooks`（见 [1.5](#15-postinstall-未自动启用钩子)）                                                                                |
 
 ## 3. 快速排查路径
 
-| 现象 | 可能原因 | 处置 |
-|---|---|---|
-| push 无任何 `[pre-push]` 输出 | 钩子未启用 / 路径过滤未命中 | `npm run setup:hooks`；确认变更触及 `docs/*.md`、`w-model-dev/**` 等触发路径 |
-| push 提示「纯 Windows cmd/PowerShell」 | 在 cmd/PowerShell 而非 Git Bash 中操作 | 换 Git Bash / WSL（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)） |
-| `npm run prepush` 报 `'bash' 不是内部或外部命令` | 无 bash 解释器 | 安装 Git for Windows 用 Git Bash 运行 |
-| `npm run lint:security` 退出 1 / 2 | baseline 指纹失效 | 人工确认风险后 `--regenerate`（见 [1.4](#14-eslint-security-baseline-指纹失效--需重生成)） |
-| 门禁脚本退出 2（`ERROR_JSON`） | 参数 / 文件路径 / JSON 格式问题 | 按 6 类错误类别排查，见 [user-guide.md §3.3](./user-guide.md) |
-| `check-docs-consistency` 退出 1 | 文档计数与代码事实漂移 | 按 violations 文本同步文档（见 [1.7](#17-docs-consistency-报-vitest-用例数--文件数不匹配)） |
-| 依赖升级后门禁失败 | 依赖行为变化影响校验逻辑 | 回到当批起点修正，跑全量回归；勿用 `--no-verify` 绕过（见 [1.2](#12-git-push---no-verify契约声明)） |
+| 现象                                             | 可能原因                               | 处置                                                                                                |
+| ------------------------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| push 无任何 `[pre-push]` 输出                    | 钩子未启用 / 路径过滤未命中            | `npm run setup:hooks`；确认变更触及 `docs/*.md`、`w-model-dev/**` 等触发路径                        |
+| push 提示「纯 Windows cmd/PowerShell」           | 在 cmd/PowerShell 而非 Git Bash 中操作 | 换 Git Bash / WSL（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）                       |
+| `npm run prepush` 报 `'bash' 不是内部或外部命令` | 无 bash 解释器                         | 安装 Git for Windows 用 Git Bash 运行                                                               |
+| `npm run lint:security` 退出 1 / 2               | baseline 指纹失效                      | 人工确认风险后 `--regenerate`（见 [1.4](#14-eslint-security-baseline-指纹失效--需重生成)）          |
+| 门禁脚本退出 2（`ERROR_JSON`）                   | 参数 / 文件路径 / JSON 格式问题        | 按 6 类错误类别排查，见 [user-guide.md §3.3](./user-guide.md)                                       |
+| `check-docs-consistency` 退出 1                  | 文档计数与代码事实漂移                 | 按 violations 文本同步文档（见 [1.7](#17-docs-consistency-报-vitest-用例数--文件数不匹配)）         |
+| 依赖升级后门禁失败                               | 依赖行为变化影响校验逻辑               | 回到当批起点修正，跑全量回归；勿用 `--no-verify` 绕过（见 [1.2](#12-git-push---no-verify契约声明)） |
 
 ## 4. 相关文档
 

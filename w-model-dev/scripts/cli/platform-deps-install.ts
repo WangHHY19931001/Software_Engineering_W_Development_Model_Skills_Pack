@@ -56,10 +56,10 @@ export class CliUsageError extends Error {
   }
 }
 
-/** 受控安装失败（安装阶段，验证已通过） */
+/** 受控安装失败（安装阶段，验证已通过）：extract=提取，commit=staging 提交/备份还原 */
 export class PlatformDepsInstallError extends Error {
   constructor(
-    readonly code: 'install-conflict' | 'extract-failed',
+    readonly code: 'install-conflict' | 'extract-failed' | 'install-commit-failed',
     message: string,
   ) {
     super(message);
@@ -458,14 +458,17 @@ export interface InstallVerifiedPackageInput {
  * - 目标已存在且非本包 → install-conflict 失败，不动 node_modules。
  * - 目标已存在且是本包 → 移旧到备份、移新到位；最终移动失败则还原备份；成功后删备份。
  * - 非本包冲突绝不覆盖；若旧包恢复本身失败，保留备份并报告两个失败。返回安装目标路径。
+ * - errorCode 分诊：提取阶段失败 `extract-failed`；备份/提交/还原阶段失败 `install-commit-failed`。
  */
 export async function installVerifiedPackage(input: InstallVerifiedPackageInput): Promise<string> {
   const nodeModulesRoot = path.join(input.repoRoot, 'node_modules');
   const target = path.join(nodeModulesRoot, input.packageName);
   const staging = await fs.mkdtemp(path.join(input.repoRoot, '.platform-deps-staging-'));
   let backup: string | undefined;
+  let phase: 'extract' | 'commit' = 'extract';
   try {
     await input.extractArchive(input.archive, staging);
+    phase = 'commit';
     const stagedPackageRoot = path.join(staging, 'package');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- target parent is derived from the lockfile-selected repository root and validated package name
     await fs.mkdir(path.dirname(target), { recursive: true });
@@ -509,7 +512,10 @@ export async function installVerifiedPackage(input: InstallVerifiedPackageInput)
     return target;
   } catch (error) {
     if (error instanceof PlatformDepsInstallError) throw error;
-    throw new PlatformDepsInstallError('extract-failed', error instanceof Error ? error.message : String(error));
+    throw new PlatformDepsInstallError(
+      phase === 'commit' ? 'install-commit-failed' : 'extract-failed',
+      error instanceof Error ? error.message : String(error),
+    );
   } finally {
     await input.removeTemporaryDirectory(staging);
   }

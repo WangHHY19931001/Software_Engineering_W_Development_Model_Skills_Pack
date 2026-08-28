@@ -9,6 +9,7 @@ import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { installVerifiedPackage, parseArgs } from '../cli/platform-deps-install.js';
+import { isUnsafeArchivePath } from '../lib/platform-deps-installer.js';
 import { extractArchive, parsePaxRecords, readArchiveEntries } from '../lib/platform-deps-tar.js';
 import { runSync } from '../lib/run-sync.js';
 
@@ -588,6 +589,54 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
   });
 });
 
+describe('win32 归档路径加固（保留设备名 / ADS / 尾点尾空格）', () => {
+  // 保留名/ADS/尾点尾空格仅按 win32 目标语义拒绝；POSIX host 语义不变，跳过本组
+  const isWin32 = process.platform === 'win32';
+
+  it.runIf(isWin32)('isUnsafeArchivePath 拒绝保留设备名及其扩展名形式（大小写不敏感）', () => {
+    expect(isUnsafeArchivePath('con')).toBe(true);
+    expect(isUnsafeArchivePath('package/CON')).toBe(true);
+    expect(isUnsafeArchivePath('package/Con.txt')).toBe(true);
+    expect(isUnsafeArchivePath('nul.tar.gz')).toBe(true);
+    expect(isUnsafeArchivePath('package/PRN')).toBe(true);
+    expect(isUnsafeArchivePath('package/aux')).toBe(true);
+    expect(isUnsafeArchivePath('package/COM1')).toBe(true);
+    expect(isUnsafeArchivePath('package/lpt9.ini')).toBe(true);
+    // 非精确 stem 匹配与超出 1-9 的编号不受影响
+    expect(isUnsafeArchivePath('package/concourse.txt')).toBe(false);
+    expect(isUnsafeArchivePath('package/com10.txt')).toBe(false);
+    expect(isUnsafeArchivePath('package/normal.txt')).toBe(false);
+  });
+
+  it.runIf(isWin32)('isUnsafeArchivePath 拒绝 NTFS ADS 冒号段与尾点/尾空格段', () => {
+    expect(isUnsafeArchivePath('package/x.txt:ads')).toBe(true);
+    expect(isUnsafeArchivePath('package/stream:x')).toBe(true);
+    expect(isUnsafeArchivePath('package/trailing.')).toBe(true);
+    expect(isUnsafeArchivePath('package/trailing ')).toBe(true);
+    expect(isUnsafeArchivePath('package/a./b')).toBe(true);
+    expect(isUnsafeArchivePath('package/a /b')).toBe(true);
+    expect(isUnsafeArchivePath('package/a.b.txt')).toBe(false);
+    expect(isUnsafeArchivePath('package/a b.txt')).toBe(false);
+  });
+
+  it.runIf(isWin32)('extractArchive 在任何写盘前拒绝保留名/ADS/尾点尾空格路径', async () => {
+    const dir = await makeTempDir('platform-deps-extract-win32-reserved-');
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/ok.txt', content: 'ok' },
+      { kind: 'file', path: 'package/con', content: 'device' },
+      { kind: 'file', path: 'package/x.txt:ads', content: 'stream' },
+      { kind: 'file', path: 'package/trailing.', content: 'dot' },
+      { kind: 'file', path: 'package/trailing ', content: 'space' },
+    ]);
+
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
+    // canonical preflight 先于任何 extraction write：staging 内不产生任何条目
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root fixture
+    expect(await fs.readdir(dir)).toEqual([]);
+  });
+});
+
 describe('parseArgs（CLI 参数契约）', () => {
   /** parseArgs 按真实 process.argv 语义（argv[0]=node、argv[1]=脚本）解析，测试补前缀 */
   const asArgv = (args: string[]): string[] => ['node', SCRIPT, ...args];
@@ -774,8 +823,8 @@ describe('installVerifiedPackage（受控安装）', () => {
           ...realIo,
         }),
       ).rejects.toMatchObject({
-        code: 'extract-failed',
-        message: expect.stringMatching(/restore|EACCES/i),
+        code: 'install-commit-failed',
+        message: expect.stringMatching(/restore|EACCES|恢复失败/i),
       });
     } finally {
       fs.rename = originalRename;

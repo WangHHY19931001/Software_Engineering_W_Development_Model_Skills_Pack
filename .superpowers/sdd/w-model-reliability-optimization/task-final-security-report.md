@@ -31,7 +31,8 @@
 
 - 提交到 `node_modules` 前的验证门：lockfile SRI、registry allowlist、package name/version 身份一致性、隔离 `loadModule`（入口逃逸声明被忽略，降级为制品校验）。
 - 受控提交：install staging 建在 repo 根同卷保证 rename 原子；既有 `node_modules/<name>` 若不是同一 lockfile 包身份则 `install-conflict` 失败、绝不覆盖；同身份则备份旧目录后换入，最终移动失败时还原备份——本轮改进：还原本身失败时保留备份并聚合报告两个错误（`platform-deps-install.ts`）。
-- 任何失败都不污染既有 `node_modules`；普通 I/O 或部分提取失败只允许污染本次私有 staging，由 caller 的 `finally` 整体删除。
+- errorCode 分诊：提取阶段失败为 `extract-failed`，staging 提交/备份还原阶段失败为 `install-commit-failed`（本轮新增），目标冲突为 `install-conflict`；ERROR_JSON 按阶段区分，不再把提交失败误导为提取失败。
+- 不覆盖既有包；失败仅污染本次私有 staging（由 caller 的 `finally` 整体删除）或在提交失败后遗留备份（还原失败时 `<target>.wm-backup-*` 保留在 `node_modules` 内等待人工处理）。
 
 ## Platform Availability
 
