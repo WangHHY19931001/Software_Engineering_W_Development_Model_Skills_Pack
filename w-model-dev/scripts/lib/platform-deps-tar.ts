@@ -282,6 +282,7 @@ const FILE_OPEN_FLAGS = fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants
 type DirectoryContext = {
   handle: FileHandle;
   identity: FileIdentityStats;
+  rootRealPath: string;
   segments: readonly string[];
 };
 
@@ -293,9 +294,10 @@ type DirectoryPath = {
 type OwnedEntry = {
   canonicalPath: string;
   name: string;
-  parentSegments: readonly string[];
   parentIdentity: FileIdentityStats;
-  identity: FileIdentityStats;
+  parentHandle: FileHandle;
+  rootRealPath: string;
+  identity?: FileIdentityStats;
   segments: readonly string[];
   type: 'file' | 'directory';
 };
@@ -334,8 +336,90 @@ function descriptorRoot(): string {
   return process.platform === 'darwin' ? '/dev/fd' : '/proc/self/fd';
 }
 
+function descriptorPath(handle: FileHandle): string {
+  return path.join(descriptorRoot(), String(handle.fd));
+}
+
 function descriptorChildPath(parent: FileHandle, name: string): string {
-  return path.join(descriptorRoot(), String(parent.fd), name);
+  return path.join(descriptorPath(parent), name);
+}
+
+function isSamePath(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === 'win32'
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
+}
+
+function isPathWithin(root: string, target: string): boolean {
+  const resolvedRoot = path.resolve(root);
+  const resolvedTarget = path.resolve(target);
+  return isSamePath(resolvedRoot, resolvedTarget) || resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`);
+}
+
+async function descriptorRealPath(handle: FileHandle, label: string): Promise<string> {
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor path is generated from an open kernel handle
+    return await fs.realpath(descriptorPath(handle));
+  } catch (error) {
+    throw new Error(`extractArchive 无法确认${label} descriptor containment：${describeError(error)}`);
+  }
+}
+
+async function recoverHandleIdentity(handle: FileHandle): Promise<FileIdentityStats> {
+  try {
+    // The descriptor path follows the already-open kernel object, avoiding a path lookup race.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor path is generated from an open kernel handle
+    const recovered = await fs.stat(descriptorPath(handle), { bigint: true });
+    if (!hasUsableFileIdentity(recovered)) {
+      throw new Error('descriptor identity is unavailable');
+    }
+    return recovered;
+  } catch (error) {
+    throw new Error(`extractArchive 无法恢复已创建对象 identity：${describeError(error)}`);
+  }
+}
+
+async function assertDescriptorContained(context: DirectoryContext, handle: FileHandle, label: string): Promise<void> {
+  const parentPath = await descriptorRealPath(context.handle, `${label} parent`);
+  if (!isPathWithin(context.rootRealPath, parentPath)) {
+    throw new Error(`extractArchive 拒绝${label} parent 越界：${parentPath}`);
+  }
+  const targetPath = await descriptorRealPath(handle, label);
+  if (!isPathWithin(context.rootRealPath, targetPath)) {
+    throw new Error(`extractArchive 拒绝${label} descriptor 越界：${targetPath}`);
+  }
+}
+
+async function assertDirectoryContained(context: DirectoryContext, label: string): Promise<void> {
+  await assertDescriptorContained(context, context.handle, label);
+}
+
+async function duplicateDirectoryHandle(context: DirectoryContext, label: string): Promise<FileHandle> {
+  await assertDirectoryContained(context, label);
+  let duplicate: FileHandle | undefined;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor path is generated from an open kernel handle
+    duplicate = await fs.open(descriptorPath(context.handle), fsConstants.O_RDONLY | (DIRECTORY_FLAG ?? 0));
+    const identity = await duplicate.stat({ bigint: true });
+    if (
+      !identity.isDirectory() ||
+      !hasUsableFileIdentity(identity) ||
+      !hasSameFileIdentity(identity, context.identity)
+    ) {
+      throw new Error(`extractArchive 拒绝${label} parent identity 变化`);
+    }
+    const realPath = await descriptorRealPath(duplicate, label);
+    if (!isPathWithin(context.rootRealPath, realPath)) {
+      throw new Error(`extractArchive 拒绝${label} parent descriptor 越界：${realPath}`);
+    }
+    return duplicate;
+  } catch (error) {
+    const closeError = await closeHandleOrThrow(duplicate, `${label} duplicate`);
+    if (closeError !== undefined) throw combineErrors(error, closeError);
+    throw error;
+  }
 }
 
 async function assertExtractionCapabilities(): Promise<void> {
@@ -374,6 +458,7 @@ async function closeContexts(contexts: readonly DirectoryContext[], label: strin
 }
 
 async function lstatChild(parent: DirectoryContext, name: string): Promise<FileIdentityStats | undefined> {
+  await assertDirectoryContained(parent, 'directory child');
   try {
     // descriptorChildPath is anchored at the already-open parent descriptor.
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- child is resolved through an already-opened, identity-checked parent descriptor
@@ -395,7 +480,11 @@ async function assertRootIdentity(root: string, expected: FileIdentityStats): Pr
   }
 }
 
-async function openRootContext(root: string, expected: FileIdentityStats): Promise<DirectoryContext> {
+async function openRootContext(
+  root: string,
+  expected: FileIdentityStats,
+  rootRealPath: string,
+): Promise<DirectoryContext> {
   await assertRootIdentity(root, expected);
   let handle: FileHandle | undefined;
   try {
@@ -405,7 +494,16 @@ async function openRootContext(root: string, expected: FileIdentityStats): Promi
     if (!opened.isDirectory() || !hasUsableFileIdentity(opened) || !hasSameFileIdentity(opened, expected)) {
       throw new Error(`extractArchive 拒绝 extraction root 句柄身份变化：${root}`);
     }
-    return { handle, identity: opened, segments: [] };
+    const openedRealPath = await descriptorRealPath(handle, 'extraction root');
+    if (!isSamePath(openedRealPath, rootRealPath)) {
+      throw new Error(`extractArchive 拒绝 extraction root descriptor 越界：${openedRealPath}`);
+    }
+    return {
+      handle,
+      identity: opened,
+      rootRealPath,
+      segments: [],
+    };
   } catch (error) {
     const closeError = await closeHandleOrThrow(handle, 'extraction root');
     if (closeError !== undefined) throw combineErrors(error, closeError);
@@ -413,25 +511,38 @@ async function openRootContext(root: string, expected: FileIdentityStats): Promi
   }
 }
 
-async function openDirectoryChild(parent: DirectoryContext, name: string): Promise<DirectoryContext> {
+async function openDirectoryChild(
+  parent: DirectoryContext,
+  name: string,
+  verifyLexical = true,
+): Promise<DirectoryContext> {
+  await assertDirectoryContained(parent, 'directory child');
   const childPath = descriptorChildPath(parent.handle, name);
   let handle: FileHandle | undefined;
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- childPath is descriptor-relative and opened with O_DIRECTORY plus O_NOFOLLOW
     handle = await fs.open(childPath, DIRECTORY_OPEN_FLAGS);
     const opened = await handle.stat({ bigint: true });
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor-relative child is compared with the just-opened directory handle identity
-    const lexical = await fs.lstat(childPath, { bigint: true });
-    if (
-      lexical.isSymbolicLink() ||
-      !lexical.isDirectory() ||
-      !opened.isDirectory() ||
-      !hasUsableFileIdentity(opened) ||
-      !hasSameFileIdentity(opened, lexical)
-    ) {
+    if (!opened.isDirectory() || !hasUsableFileIdentity(opened)) {
       throw new Error(`extractArchive 拒绝目录身份变化：${childPath}`);
     }
-    return { handle, identity: opened, segments: [...parent.segments, name] };
+    const openedRealPath = await descriptorRealPath(handle, 'directory child');
+    if (!isPathWithin(parent.rootRealPath, openedRealPath)) {
+      throw new Error(`extractArchive 拒绝目录 child descriptor 越界：${openedRealPath}`);
+    }
+    if (verifyLexical) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor-relative child is compared with the just-opened directory handle identity
+      const lexical = await fs.lstat(childPath, { bigint: true });
+      if (lexical.isSymbolicLink() || !lexical.isDirectory() || !hasSameFileIdentity(opened, lexical)) {
+        throw new Error(`extractArchive 拒绝目录身份变化：${childPath}`);
+      }
+    }
+    return {
+      handle,
+      identity: opened,
+      rootRealPath: parent.rootRealPath,
+      segments: [...parent.segments, name],
+    };
   } catch (error) {
     const closeError = await closeHandleOrThrow(handle, 'directory');
     if (closeError !== undefined) throw combineErrors(error, closeError);
@@ -443,11 +554,12 @@ async function openDirectoryChild(parent: DirectoryContext, name: string): Promi
 async function openDirectoryPath(
   root: string,
   rootIdentity: FileIdentityStats,
+  rootRealPath: string,
   segments: readonly string[],
 ): Promise<DirectoryPath> {
   const contexts: DirectoryContext[] = [];
   try {
-    const rootContext = await openRootContext(root, rootIdentity);
+    const rootContext = await openRootContext(root, rootIdentity, rootRealPath);
     contexts.push(rootContext);
     let current = rootContext;
     for (const segment of segments) {
@@ -466,44 +578,73 @@ async function openDirectoryPath(
 async function ensureDirectoryPath(
   root: string,
   rootIdentity: FileIdentityStats,
+  rootRealPath: string,
   segments: readonly string[],
   owned: OwnedEntry[],
 ): Promise<DirectoryPath> {
   const contexts: DirectoryContext[] = [];
   try {
-    const rootContext = await openRootContext(root, rootIdentity);
+    const rootContext = await openRootContext(root, rootIdentity, rootRealPath);
     contexts.push(rootContext);
     let current = rootContext;
     for (const segment of segments) {
       const childPath = descriptorChildPath(current.handle, segment);
       const existing = await lstatChild(current, segment);
+      let owner: OwnedEntry | undefined;
       let created: FileIdentityStats | undefined;
       if (existing === undefined) {
-        // The parent descriptor and O_NOFOLLOW boundary are the only path used for mkdir.
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- childPath is a validated single segment anchored to the open parent descriptor
-        await fs.mkdir(childPath, { mode: 0o777 });
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- the descriptor-relative child just created is identity-checked before ownership registration
-        created = await fs.lstat(childPath, { bigint: true });
+        await assertDirectoryContained(current, 'directory create parent');
+        const parentHandle = await duplicateDirectoryHandle(current, 'directory create');
+        let mkdirError: unknown;
+        try {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- childPath is a validated single segment anchored to the open parent descriptor
+          await fs.mkdir(childPath, { mode: 0o777 });
+        } catch (error) {
+          mkdirError = error;
+        }
+        if (mkdirError !== undefined) {
+          const closeError = await closeHandleOrThrow(parentHandle, 'directory create parent');
+          if (closeError !== undefined) throw combineErrors(mkdirError, closeError);
+          throw mkdirError;
+        }
+        owner = {
+          canonicalPath: [...current.segments, segment].join('/'),
+          name: segment,
+          parentIdentity: current.identity,
+          parentHandle,
+          rootRealPath,
+          segments: [...current.segments, segment],
+          type: 'directory',
+        };
+        // mkdir success is the ownership boundary: register before any follow-up inspection or open.
+        owned.push(owner);
+        await assertDirectoryContained(current, 'directory create parent after mkdir');
+        try {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- the descriptor-relative child is checked immediately after creation
+          created = await fs.lstat(childPath, { bigint: true });
+        } catch (error) {
+          // Recover identity from the still-open directory handle so rollback can remain identity-gated.
+          const recovered = await openDirectoryChild(current, segment, false);
+          contexts.push(recovered);
+          owner.identity = recovered.identity;
+          throw error;
+        }
         if (created.isSymbolicLink() || !created.isDirectory() || !hasUsableFileIdentity(created)) {
           throw new Error(`extractArchive 拒绝新建目录身份：${childPath}`);
         }
-        owned.push({
-          canonicalPath: [...current.segments, segment].join('/'),
-          name: segment,
-          parentSegments: [...current.segments],
-          parentIdentity: current.identity,
-          identity: created,
-          segments: [...current.segments, segment],
-          type: 'directory',
-        });
+        owner.identity = created;
       } else if (existing.isSymbolicLink() || !existing.isDirectory()) {
         throw new Error(`extractArchive 拒绝目录位置上的链接或非目录：${childPath}`);
       }
       const next = await openDirectoryChild(current, segment);
+      // Register the opened child before comparing identities so a failed comparison still closes it.
+      contexts.push(next);
       if (created !== undefined && !hasSameFileIdentity(created, next.identity)) {
         throw new Error(`extractArchive 拒绝新建目录身份变化：${childPath}`);
       }
-      contexts.push(next);
+      if (owner !== undefined && owner.identity !== undefined && !hasSameFileIdentity(owner.identity, next.identity)) {
+        throw new Error(`extractArchive 拒绝新建目录句柄身份变化：${childPath}`);
+      }
       current = next;
     }
     return { current, contexts };
@@ -526,33 +667,54 @@ async function writeFileAt(
   let fileHandle: FileHandle | undefined;
   let primaryError: unknown;
   try {
-    const parentIdentity = await directoryPath.current.handle.stat({
+    const fileParent = directoryPath.current;
+    const parentIdentity = await fileParent.handle.stat({
       bigint: true,
     });
     if (
       !parentIdentity.isDirectory() ||
       !hasUsableFileIdentity(parentIdentity) ||
-      !hasSameFileIdentity(parentIdentity, directoryPath.current.identity)
+      !hasSameFileIdentity(parentIdentity, fileParent.identity)
     ) {
       throw new Error(`extractArchive 拒绝文件父目录身份变化：${target}`);
     }
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is descriptor-relative and created with O_EXCL plus O_NOFOLLOW under the verified parent
-    fileHandle = await fs.open(target, FILE_OPEN_FLAGS, 0o666);
-    const identity = await fileHandle.stat({ bigint: true });
-    if (!identity.isFile() || !hasUsableFileIdentity(identity)) {
-      throw new Error(`extractArchive 拒绝新建文件身份：${target}`);
+    const parentHandle = await duplicateDirectoryHandle(fileParent, 'file create');
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is descriptor-relative and created with O_EXCL plus O_NOFOLLOW under the verified parent
+      fileHandle = await fs.open(target, FILE_OPEN_FLAGS, 0o666);
+    } catch (error) {
+      const closeError = await closeHandleOrThrow(parentHandle, 'file create parent');
+      if (closeError !== undefined) throw combineErrors(error, closeError);
+      throw error;
     }
-    // Ownership is recorded before write/chmod/close so every later failure can roll it back.
-    owned.push({
+    const fileOwner: OwnedEntry = {
       canonicalPath,
       name,
-      parentSegments: [...directoryPath.current.segments],
-      parentIdentity: directoryPath.current.identity,
-      identity,
-      segments: [...directoryPath.current.segments, name],
+      parentIdentity: fileParent.identity,
+      parentHandle,
+      rootRealPath: fileParent.rootRealPath,
+      segments: [...fileParent.segments, name],
       type: 'file',
-    });
+    };
+    // open success is the ownership boundary: register before stat, write, chmod, or close.
+    owned.push(fileOwner);
+    let identity: FileIdentityStats;
+    try {
+      identity = await fileHandle.stat({ bigint: true });
+    } catch (error) {
+      fileOwner.identity = await recoverHandleIdentity(fileHandle);
+      throw error;
+    }
+    if (!hasUsableFileIdentity(identity)) {
+      throw new Error(`extractArchive 拒绝新建文件 identity：${target}`);
+    }
+    fileOwner.identity = identity;
+    if (!identity.isFile()) {
+      throw new Error(`extractArchive 拒绝新建文件类型：${target}`);
+    }
+    await assertDescriptorContained(fileParent, fileHandle, 'file before write');
     await fileHandle.writeFile(content);
+    await assertDescriptorContained(fileParent, fileHandle, 'file after write');
     const afterWrite = await fileHandle.stat({ bigint: true });
     if (!hasSameFileIdentity(identity, afterWrite) || !afterWrite.isFile()) {
       throw new Error(`extractArchive 拒绝写入后文件身份变化：${target}`);
@@ -578,19 +740,24 @@ async function writeFileAt(
 async function applyDirectoryMode(
   root: string,
   rootIdentity: FileIdentityStats,
+  rootRealPath: string,
   item: OwnedEntry,
   mode: number,
 ): Promise<void> {
-  const directoryPath = await openDirectoryPath(root, rootIdentity, item.segments);
+  const directoryPath = await openDirectoryPath(root, rootIdentity, rootRealPath, item.segments);
   let primaryError: unknown;
   try {
+    const identity = item.identity;
+    if (identity === undefined) {
+      throw new Error(`extractArchive 拒绝设置目录 mode 前未登记 identity：${item.canonicalPath}`);
+    }
     const current = await directoryPath.current.handle.stat({ bigint: true });
-    if (!current.isDirectory() || !hasSameFileIdentity(current, item.identity)) {
+    if (!current.isDirectory() || !hasSameFileIdentity(current, identity)) {
       throw new Error(`extractArchive 拒绝设置目录 mode 前身份变化：${item.canonicalPath}`);
     }
     await directoryPath.current.handle.chmod(mode & 0o7777);
     const after = await directoryPath.current.handle.stat({ bigint: true });
-    if (!after.isDirectory() || !hasSameFileIdentity(after, item.identity)) {
+    if (!after.isDirectory() || !hasSameFileIdentity(after, identity)) {
       throw new Error(`extractArchive 拒绝设置目录 mode 后身份变化：${item.canonicalPath}`);
     }
   } catch (error) {
@@ -603,47 +770,69 @@ async function applyDirectoryMode(
   if (primaryError !== undefined) throw primaryError;
 }
 
-async function rollbackOwnedEntries(
-  root: string,
-  rootIdentity: FileIdentityStats,
-  owned: readonly OwnedEntry[],
-): Promise<void> {
+async function closeOwnedParentHandles(owned: readonly OwnedEntry[]): Promise<Error | undefined> {
+  let failure: Error | undefined;
   for (const item of [...owned].reverse()) {
-    const directoryPath = await openDirectoryPath(root, rootIdentity, item.parentSegments);
-    let primaryError: unknown;
+    const closeError = await closeHandleOrThrow(item.parentHandle, 'owned parent');
+    if (closeError !== undefined) failure = failure === undefined ? closeError : combineErrors(failure, closeError);
+  }
+  return failure;
+}
+
+async function rollbackOwnedEntries(owned: readonly OwnedEntry[]): Promise<void> {
+  let rollbackError: Error | undefined;
+  for (const item of [...owned].reverse()) {
+    let itemError: Error | undefined;
+    const parentHandle = item.parentHandle;
     try {
-      if (!hasSameFileIdentity(directoryPath.current.identity, item.parentIdentity)) {
+      const identity = item.identity;
+      if (identity === undefined) {
+        throw new Error(`extractArchive 拒绝 rollback 未登记身份：${item.canonicalPath}`);
+      }
+      const parent = await parentHandle.stat({ bigint: true });
+      if (
+        !parent.isDirectory() ||
+        !hasUsableFileIdentity(parent) ||
+        !hasSameFileIdentity(parent, item.parentIdentity)
+      ) {
         throw new Error(`extractArchive 拒绝 rollback 父目录身份变化：${item.canonicalPath}`);
       }
-      const target = descriptorChildPath(directoryPath.current.handle, item.name);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- rollback target is descriptor-relative and checked against the recorded owned identity before removal
+      const parentPath = await descriptorRealPath(parentHandle, 'rollback parent');
+      if (!isPathWithin(item.rootRealPath, parentPath)) {
+        throw new Error(`extractArchive 拒绝 rollback 父目录越界：${item.canonicalPath}`);
+      }
+      const target = descriptorChildPath(parentHandle, item.name);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- rollback target is anchored at the retained identity-checked parent descriptor
       const current = await fs.lstat(target, { bigint: true });
       if (
         current.isSymbolicLink() ||
-        !hasSameFileIdentity(current, item.identity) ||
+        !hasSameFileIdentity(current, identity) ||
         (item.type === 'file' ? !current.isFile() : !current.isDirectory())
       ) {
         throw new Error(`extractArchive 拒绝 rollback 条目身份变化：${item.canonicalPath}`);
       }
       if (item.type === 'file') {
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor-relative rollback target still matches the recorded owned file identity
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- rollback target remains anchored at the retained identity-checked parent descriptor
         await fs.unlink(target);
       } else {
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor-relative rollback target still matches the recorded owned directory identity
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- rollback target remains anchored at the retained identity-checked parent descriptor
         await fs.rmdir(target);
       }
     } catch (error) {
-      primaryError = error;
+      itemError = error instanceof Error ? error : new Error(String(error));
     }
-    const closeError = await closeContexts(directoryPath.contexts, 'rollback directory');
+    const closeError = await closeHandleOrThrow(item.parentHandle, 'rollback owned parent');
     if (closeError !== undefined) {
-      primaryError = primaryError === undefined ? closeError : combineErrors(primaryError, closeError);
+      itemError = itemError === undefined ? closeError : combineErrors(itemError, closeError);
     }
-    if (primaryError !== undefined) throw primaryError;
+    if (itemError !== undefined) {
+      rollbackError = rollbackError === undefined ? itemError : combineErrors(rollbackError, itemError);
+    }
   }
+  if (rollbackError !== undefined) throw rollbackError;
 }
 
-async function openAndVerifyRoot(root: string): Promise<FileIdentityStats> {
+async function openAndVerifyRoot(root: string): Promise<{ identity: FileIdentityStats; realPath: string }> {
   let lexical: FileIdentityStats;
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- caller-selected extraction root is inspected before any descriptor-relative write
@@ -663,10 +852,11 @@ async function openAndVerifyRoot(root: string): Promise<FileIdentityStats> {
     if (!opened.isDirectory() || !hasUsableFileIdentity(opened) || !hasSameFileIdentity(lexical, opened)) {
       throw new Error(`extractArchive 拒绝 extraction root 身份变化：${root}`);
     }
+    const realPath = await descriptorRealPath(handle, 'extraction root');
     const closeError = await closeHandleOrThrow(handle, 'extraction root');
     handle = undefined;
     if (closeError !== undefined) throw closeError;
-    return opened;
+    return { identity: opened, realPath };
   } catch (error) {
     const closeError = await closeHandleOrThrow(handle, 'extraction root');
     if (closeError !== undefined) throw combineErrors(error, closeError);
@@ -690,7 +880,9 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
 
   // This refusal is deliberately after parse/canonical preflight and before any FS write.
   await assertExtractionCapabilities();
-  const rootIdentity = await openAndVerifyRoot(root);
+  const rootInfo = await openAndVerifyRoot(root);
+  const rootIdentity = rootInfo.identity;
+  const rootRealPath = rootInfo.realPath;
   const owned: OwnedEntry[] = [];
   const directoryModes = new Map<string, DirectoryMode>();
   let primaryError: unknown;
@@ -699,7 +891,7 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
     for (const { entry, archivePath, canonicalPath } of planned) {
       const segments = archivePath.split('/');
       if (entry.type === 'directory') {
-        const ensured = await ensureDirectoryPath(root, rootIdentity, segments, owned);
+        const ensured = await ensureDirectoryPath(root, rootIdentity, rootRealPath, segments, owned);
         const closeError = await closeContexts(ensured.contexts, 'directory path');
         if (closeError !== undefined) throw closeError;
         if (entry.mode !== undefined) {
@@ -713,7 +905,7 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
       }
 
       const parentSegments = segments.slice(0, -1);
-      const parent = await ensureDirectoryPath(root, rootIdentity, parentSegments, owned);
+      const parent = await ensureDirectoryPath(root, rootIdentity, rootRealPath, parentSegments, owned);
       const content = Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content ?? '');
       let entryError: unknown;
       try {
@@ -731,7 +923,7 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
 
     for (const mode of directoryModes.values()) {
       const owner = owned.find((item) => item.type === 'directory' && item.canonicalPath === mode.canonicalPath);
-      if (owner !== undefined) await applyDirectoryMode(root, rootIdentity, owner, mode.mode);
+      if (owner !== undefined) await applyDirectoryMode(root, rootIdentity, rootRealPath, owner, mode.mode);
     }
   } catch (error) {
     primaryError = error;
@@ -739,7 +931,7 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
 
   if (primaryError !== undefined) {
     try {
-      await rollbackOwnedEntries(root, rootIdentity, owned);
+      await rollbackOwnedEntries(owned);
     } catch (rollbackError) {
       throw new Error(
         `extractArchive 提取失败：${describeError(primaryError)}；rollback 失败：${describeError(rollbackError)}`,
@@ -747,4 +939,7 @@ export async function extractArchive(archive: Buffer, directory: string): Promis
     }
     throw primaryError;
   }
+
+  const closeError = await closeOwnedParentHandles(owned);
+  if (closeError !== undefined) throw closeError;
 }

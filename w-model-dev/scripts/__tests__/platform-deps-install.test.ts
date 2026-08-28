@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { installVerifiedPackage, parseArgs } from '../cli/platform-deps-install.js';
 import { extractArchive, parsePaxRecords, readArchiveEntries } from '../lib/platform-deps-tar.js';
@@ -57,6 +57,8 @@ interface TarFileEntry {
   paxRecords?: ReadonlyArray<[string, string]>;
   /** 经 GNU long name 'L' 的真实路径 */
   gnuLongName?: boolean;
+  /** 经 GNU long link 'K' 的真实链接目标 */
+  gnuLongLink?: boolean;
   /** UStar mode（八进制字符串，默认 '644'） */
   mode?: string;
 }
@@ -156,12 +158,23 @@ function makeTar(entries: readonly TarTestEntry[]): Buffer {
         );
         blocks.push(padded(longName));
       }
+      if (entry.gnuLongLink === true) {
+        const longLink = Buffer.from(`${entry.linkname ?? ''}\0`);
+        blocks.push(
+          tarHeader({
+            name: '././@LongLink',
+            typeflag: 'K',
+            size: longLink.length,
+          }),
+        );
+        blocks.push(padded(longLink));
+      }
       blocks.push(
         tarHeader({
           name: entry.headerName ?? entry.path,
           typeflag: entry.typeflag ?? '0',
           size: content.length,
-          linkname: entry.linkname,
+          linkname: entry.gnuLongLink === true ? 'x' : entry.linkname,
           mode: entry.mode,
         }),
       );
@@ -379,29 +392,47 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     expect(source).toContain('fsConstants.O_EXCL');
     expect(source).toContain('const childPath = descriptorChildPath(current.handle, segment)');
     const directoryCreate = source.indexOf('await fs.mkdir(childPath, { mode: 0o777 })');
-    const directoryIdentity = source.indexOf('created = await fs.lstat(childPath, { bigint: true })', directoryCreate);
-    const directoryOwnership = source.indexOf('owned.push({', directoryIdentity);
-    const directoryOpen = source.indexOf('const next = await openDirectoryChild(current, segment)', directoryOwnership);
+    const directoryOwnership = source.indexOf('owned.push(owner)', directoryCreate);
+    const directoryContainment = source.indexOf(
+      "await assertDirectoryContained(current, 'directory create parent after mkdir')",
+      directoryOwnership,
+    );
+    const directoryIdentity = source.indexOf(
+      'created = await fs.lstat(childPath, { bigint: true })',
+      directoryContainment,
+    );
+    const directoryOpen = source.indexOf('const next = await openDirectoryChild(current, segment)', directoryIdentity);
     expect(directoryCreate).toBeGreaterThan(-1);
-    expect(directoryIdentity).toBeGreaterThan(directoryCreate);
-    expect(directoryOwnership).toBeGreaterThan(directoryIdentity);
-    expect(directoryOpen).toBeGreaterThan(directoryOwnership);
+    expect(directoryOwnership).toBeGreaterThan(directoryCreate);
+    expect(directoryContainment).toBeGreaterThan(directoryOwnership);
+    expect(directoryIdentity).toBeGreaterThan(directoryContainment);
+    expect(directoryOpen).toBeGreaterThan(directoryIdentity);
 
     const fileOpen = source.indexOf('fileHandle = await fs.open(target, FILE_OPEN_FLAGS, 0o666)');
-    const fileOwnership = source.indexOf('owned.push({', fileOpen);
-    const fileWrite = source.indexOf('await fileHandle.writeFile(content)', fileOwnership);
+    const fileOwnership = source.indexOf('owned.push(fileOwner)', fileOpen);
+    const fileIdentity = source.indexOf('identity = await fileHandle.stat({ bigint: true })', fileOwnership);
+    const fileWrite = source.indexOf('await fileHandle.writeFile(content)', fileIdentity);
     expect(fileOpen).toBeGreaterThan(-1);
     expect(fileOwnership).toBeGreaterThan(fileOpen);
-    expect(fileWrite).toBeGreaterThan(fileOwnership);
+    expect(fileIdentity).toBeGreaterThan(fileOwnership);
+    expect(fileWrite).toBeGreaterThan(fileIdentity);
 
     const rollback = source.indexOf('for (const item of [...owned].reverse())');
-    const rollbackIdentity = source.indexOf('!hasSameFileIdentity(current, item.identity)', rollback);
-    const rollbackUnlink = source.indexOf('await fs.unlink(target)', rollback);
+    const rollbackContainment = source.indexOf(
+      "const parentPath = await descriptorRealPath(parentHandle, 'rollback parent')",
+      rollback,
+    );
+    const rollbackIdentity = source.indexOf('!hasSameFileIdentity(current, identity)', rollbackContainment);
+    const rollbackUnlink = source.indexOf('await fs.unlink(target)', rollbackIdentity);
     const rollbackRmdir = source.indexOf('await fs.rmdir(target)', rollback);
+    const rollbackCall = source.indexOf('await rollbackOwnedEntries(owned)', rollback);
+    const ownershipClose = source.indexOf('await closeOwnedParentHandles(owned)', rollbackCall);
     expect(rollback).toBeGreaterThan(-1);
     expect(rollbackIdentity).toBeGreaterThan(rollback);
     expect(rollbackUnlink).toBeGreaterThan(rollbackIdentity);
     expect(rollbackRmdir).toBeGreaterThan(rollbackIdentity);
+    expect(rollbackCall).toBeGreaterThan(rollbackRmdir);
+    expect(ownershipClose).toBeGreaterThan(rollbackCall);
   });
 
   it('PAX 记录使用安全键容器保留 __proto__ 键而不写入对象原型', () => {
@@ -466,6 +497,29 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     const longFile = entries.find((e) => e.path === longPath);
     expect(longFile?.type).toBe('file');
     expect(Buffer.from(longFile?.content as Buffer).toString()).toBe('long');
+  });
+
+  it('GNU long link（typeflag K）解析为完整链接目标', async () => {
+    const longLink = `package/${'target/'.repeat(25)}native.node`;
+    expect(longLink.length).toBeGreaterThan(100);
+    const archive = makeTar([
+      {
+        kind: 'file',
+        path: 'package/linked.node',
+        typeflag: '2',
+        linkname: longLink,
+        gnuLongLink: true,
+        content: '',
+      },
+    ]);
+    const entries = await readArchiveEntries(archive);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        path: 'package/linked.node',
+        type: 'symlink',
+        linkname: longLink,
+      }),
+    );
   });
 
   it("pax 'x' 扩展头 `path` 覆盖主 header 短名", async () => {
@@ -789,7 +843,7 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
       },
     ]);
 
-    await expect(withPlatform('linux', () => extractArchive(archive, dir))).rejects.toThrow(/文件\/目录路径冲突/);
+    await expect(extractArchive(archive, dir)).rejects.toThrow(/文件\/目录路径冲突/);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is derived from an isolated mkdtemp workspace
     await expect(fs.readdir(dir)).resolves.toEqual([]);
   });
@@ -946,6 +1000,50 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     expect(outsideLeftovers).toEqual([]);
   });
 
+  it('extractArchive root descriptor 被 rename 到 root 外后 fail-closed 且不写外部', async () => {
+    const dir = await makeTempDir('platform-deps-extract-root-descriptor-rename-');
+    const outside = await makeTempDir('platform-deps-extract-root-descriptor-target-');
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/escaped.txt', content: 'must stay inside' },
+    ]);
+    if (process.platform === 'win32') {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
+      return;
+    }
+
+    const originalOpen = fs.open;
+    let injected = false;
+    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
+      const handle = await originalOpen(...args);
+      if (!injected && target === dir) {
+        injected = true;
+        // Move the opened extraction root away before the extractor can use its descriptor.
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are isolated temporary roots
+        await fs.rename(dir, path.join(outside, 'moved-root'));
+      }
+      return handle;
+    };
+    fs.open = interceptedOpen as typeof fs.open;
+    let extractionError: unknown;
+    try {
+      try {
+        await extractArchive(archive, dir);
+      } catch (error) {
+        extractionError = error;
+      }
+    } finally {
+      fs.open = originalOpen;
+    }
+
+    expect(injected).toBe(true);
+    expect(extractionError).toBeInstanceOf(Error);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
+    await expect(fs.access(path.join(outside, 'moved-root', 'package', 'escaped.txt'))).rejects.toThrow();
+  });
+
   it('extractArchive 直接写入 descriptor root 且不创建 extraction workspace', async () => {
     const dir = await makeTempDir('platform-deps-extract-workspace-root-race-');
     const outside = await makeTempDir('platform-deps-extract-workspace-root-race-outside-');
@@ -1028,6 +1126,173 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     expect(injected).toBe(true);
     expect(extractionError).toBeInstanceOf(Error);
     await expect(fs.access(escaped)).rejects.toThrow();
+  });
+
+  it('extractArchive mkdir 成功后 lstat 失败也回滚新建目录', async () => {
+    const dir = await makeTempDir('platform-deps-extract-mkdir-lstat-failure-');
+    const archive = makeTar([{ kind: 'file', path: 'package/nested/file.txt', content: 'blocked' }]);
+    if (process.platform === 'win32') {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
+      return;
+    }
+    const originalLstat = fs.lstat;
+    let packageChecks = 0;
+    const interceptedLstat = async (...args: Parameters<typeof fs.lstat>): ReturnType<typeof fs.lstat> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      if (
+        target.endsWith('/package') &&
+        isDescriptorChildPath(target) &&
+        (await descriptorParentMatches(target, dir))
+      ) {
+        packageChecks += 1;
+        if (packageChecks === 2) {
+          const error = new Error('simulated lstat failure after mkdir') as NodeJS.ErrnoException;
+          error.code = 'EIO';
+          throw error;
+        }
+      }
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original lstat is limited to isolated test roots and descriptor paths
+      return originalLstat(...args);
+    };
+    fs.lstat = interceptedLstat as typeof fs.lstat;
+    try {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(/lstat|EIO|失败/i);
+    } finally {
+      fs.lstat = originalLstat;
+    }
+    expect(packageChecks).toBe(2);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it('extractArchive 文件 open 后 handle.stat 失败也回滚新建文件', async () => {
+    const dir = await makeTempDir('platform-deps-extract-file-stat-failure-');
+    const archive = makeTar([{ kind: 'file', path: 'package/stat-failure.txt', content: 'blocked' }]);
+    if (process.platform === 'win32') {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
+      return;
+    }
+    const originalOpen = fs.open;
+    let injected = false;
+    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
+      const handle = await originalOpen(...args);
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      if (!injected && target.endsWith('/stat-failure.txt') && isDescriptorChildPath(target)) {
+        injected = true;
+        const error = new Error('simulated handle.stat failure after file open') as NodeJS.ErrnoException;
+        error.code = 'EIO';
+        vi.spyOn(handle, 'stat').mockRejectedValueOnce(error);
+      }
+      return handle;
+    };
+    fs.open = interceptedOpen as typeof fs.open;
+    try {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(/stat|EIO|失败/i);
+    } finally {
+      fs.open = originalOpen;
+    }
+    expect(injected).toBe(true);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is an isolated extraction root
+    await expect(fs.readdir(dir)).resolves.toEqual([]);
+  });
+
+  it('extractArchive POSIX parent directory 被 rename 到 root 外后 fail-closed 且不写外部', async () => {
+    const dir = await makeTempDir('platform-deps-extract-rename-outside-');
+    const outside = await makeTempDir('platform-deps-extract-rename-outside-target-');
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
+    ]);
+    if (process.platform === 'win32') {
+      const original = {
+        open: fs.open,
+        rename: fs.rename,
+      };
+      const touched: string[] = [];
+      const rejectFs = (operation: string) => async (): Promise<never> => {
+        touched.push(operation);
+        throw new Error(`unexpected Windows extraction FS ${operation}`);
+      };
+      fs.open = rejectFs('open') as typeof fs.open;
+      fs.rename = rejectFs('rename') as typeof fs.rename;
+      try {
+        await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
+      } finally {
+        fs.open = original.open;
+        fs.rename = original.rename;
+      }
+      expect(touched).toEqual([]);
+      return;
+    }
+
+    const originalOpen = fs.open;
+    let injected = false;
+    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- descriptor child path is an isolated test target
+      const handle = await originalOpen(...args);
+      if (!injected && isDescriptorChildPath(target) && target.endsWith('/package')) {
+        injected = true;
+        // Move the directory after its descriptor is opened, before extraction can use it.
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are isolated test roots
+        await fs.rename(path.join(dir, 'package'), path.join(outside, 'package'));
+      }
+      return handle;
+    };
+    fs.open = interceptedOpen as typeof fs.open;
+    try {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(/root|containment|目录|身份|失败/i);
+    } finally {
+      fs.open = originalOpen;
+    }
+    expect(injected).toBe(true);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
+    await expect(fs.access(path.join(outside, 'package', 'race.txt'))).rejects.toThrow();
+  });
+
+  it('extractArchive parent descriptor 在 file open 后被 rename 到 root 外也 fail-closed 且不写外部', async () => {
+    const dir = await makeTempDir('platform-deps-extract-file-open-rename-outside-');
+    const outside = await makeTempDir('platform-deps-extract-file-open-rename-target-');
+    const archive = makeTar([
+      { kind: 'directory', path: 'package/' },
+      { kind: 'file', path: 'package/race.txt', content: 'must stay inside' },
+    ]);
+    if (process.platform === 'win32') {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
+      return;
+    }
+
+    const originalOpen = fs.open;
+    let injected = false;
+    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
+      const handle = await originalOpen(...args);
+      if (!injected && isDescriptorChildPath(target) && target.endsWith('/race.txt')) {
+        injected = true;
+        // Move the already-open parent directory before the extractor can write through the file handle.
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are isolated temporary roots
+        await fs.rename(path.join(dir, 'package'), path.join(outside, 'package'));
+      }
+      return handle;
+    };
+    fs.open = interceptedOpen as typeof fs.open;
+    let extractionError: unknown;
+    try {
+      try {
+        await extractArchive(archive, dir);
+      } catch (error) {
+        extractionError = error;
+      }
+    } finally {
+      fs.open = originalOpen;
+    }
+
+    expect(injected).toBe(true);
+    expect(extractionError).toBeInstanceOf(Error);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outside is an isolated temporary root
+    await expect(fs.access(path.join(outside, 'package', 'race.txt'))).rejects.toThrow();
   });
 
   it('extractArchive descriptor-relative mkdir 失败时不留 root 或外部条目', async () => {
@@ -1238,6 +1503,72 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
       process.platform === 'win32' ? WINDOWS_EXTRACTION_REJECTION : /符号链接|symlink|ancestor/i,
     );
     await expect(fs.access(path.join(outside, 'escaped.txt'))).rejects.toThrow();
+  });
+
+  it('extractArchive rollback 一个 owned entry 失败后仍继续清理后续 entries', async () => {
+    const dir = await makeTempDir('platform-deps-extract-rollback-continue-');
+    const archive = makeTar([
+      { kind: 'file', path: 'first.txt', content: 'first' },
+      { kind: 'file', path: 'second.txt', content: 'second' },
+      { kind: 'file', path: 'third.txt', content: 'third' },
+    ]);
+    if (process.platform === 'win32') {
+      await expect(extractArchive(archive, dir)).rejects.toThrow(WINDOWS_EXTRACTION_REJECTION);
+      return;
+    }
+    const originalOpen = fs.open;
+    const originalUnlink = fs.unlink;
+    let triggerFailure = false;
+    let failedOnce = false;
+    let unlinkAttempts = 0;
+    const interceptedOpen = async (...args: Parameters<typeof fs.open>): ReturnType<typeof fs.open> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original open is limited to isolated test roots and descriptor paths
+      const handle = await originalOpen(...args);
+      if (!triggerFailure && target.endsWith('/third.txt') && isDescriptorChildPath(target)) {
+        triggerFailure = true;
+        const actualWrite = handle.writeFile.bind(handle);
+        handle.writeFile = async (...writeArgs: Parameters<typeof handle.writeFile>) => {
+          await actualWrite(...writeArgs);
+          throw new Error('simulated extraction failure after third file ownership');
+        };
+      }
+      return handle;
+    };
+    const interceptedUnlink = async (...args: Parameters<typeof fs.unlink>): ReturnType<typeof fs.unlink> => {
+      const target = typeof args[0] === 'string' ? args[0] : '';
+      if (isDescriptorChildPath(target)) {
+        unlinkAttempts += 1;
+        if (!failedOnce && target.endsWith('/second.txt')) {
+          failedOnce = true;
+          throw new Error('simulated rollback unlink failure for second file');
+        }
+      }
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- original unlink is limited to isolated descriptor paths
+      return originalUnlink(...args);
+    };
+    fs.open = interceptedOpen as typeof fs.open;
+    fs.unlink = interceptedUnlink as typeof fs.unlink;
+    let extractionError: unknown;
+    try {
+      try {
+        await extractArchive(archive, dir);
+      } catch (error) {
+        extractionError = error;
+      }
+    } finally {
+      fs.open = originalOpen;
+      fs.unlink = originalUnlink;
+    }
+    expect(extractionError).toBeInstanceOf(Error);
+    expect((extractionError as Error).message).toMatch(/third/);
+    expect((extractionError as Error).message).toMatch(/second/);
+    expect(triggerFailure).toBe(true);
+    expect(failedOnce).toBe(true);
+    expect(unlinkAttempts).toBeGreaterThanOrEqual(3);
+    await expect(fs.access(path.join(dir, 'first.txt'))).rejects.toThrow();
+    await expect(fs.access(path.join(dir, 'second.txt'))).resolves.toBeUndefined();
+    await expect(fs.access(path.join(dir, 'third.txt'))).rejects.toThrow();
   });
 
   it('extractArchive 多 top-level 部分提交失败时回滚已拥有条目', async () => {
