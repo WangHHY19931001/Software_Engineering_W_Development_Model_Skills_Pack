@@ -30,6 +30,9 @@
 .DS_Store
 Thumbs.db
 
+# 仓内评估 runner 的瞬态结果（TSV 为持久证据，results.json 每次运行变化）
+eval/results.json
+
 # 日志
 *.log
 
