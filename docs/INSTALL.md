@@ -175,9 +175,11 @@ pre-push 仅运行 `bash .githooks/ensure-platform-deps.sh --check`。默认和 
 
 ```bash
 npm run platform-deps:check    # 只检查，不修改 node_modules
-npm run platform-deps:install  # 显式 fail-closed 入口；当前仅提示人工 npm install
-npm install                    # 开发者执行的实际安装/修复命令
+npm run platform-deps:install  # 用户显式调用；在 Windows x64 / Linux x64 校验并安装缺失的平台包
+npm install                    # 完整重装/修复仍可由开发者显式执行
 ```
+
+显式安装只信任 caller-owned 的私有 verification/install staging 生命周期，不信任 tarball bytes、路径、PAX/GNU metadata 或链接信息。CLI 在任何提取写入前完成整包路径/冲突预检，验证 lockfile SRI、registry、包身份和隔离加载后才提交到 `node_modules`；任一失败都会由 caller 的 `finally` 删除本次 staging，既有非本包目标以冲突失败且不覆盖。该边界不承诺抵御同 UID/同访问令牌进程主动 rename 或篡改 staging、repo root、lockfile、tarball、`node_modules`；这类主体本就可直接修改这些对象。
 
 `self-test` 与 `doctor` 可在 PowerShell 中运行；pre-push 与上述平台依赖命令需要 Bash。
 

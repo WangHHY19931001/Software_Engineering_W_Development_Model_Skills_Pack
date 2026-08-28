@@ -18,7 +18,7 @@
 3. 编排者（O）只加载 `SKILL.md` + 当前阶段 `phase-N-*.md` 摘要 + `rtm-guide.md`；阶段细则由 S 子代理按需加载。
 4. 编排者（O）所有状态写操作完成后同步 `updatedAt`；只有阶段放行后才更新 `status`。
 5. 编排者（O）所有 `.w-model/*.json` 写入统一经 `wm-write.ts`：`<target>.lock` 持久目录与可转移 owner 对象在跨进程锁内保护 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`mtime` 乐观锁只在该锁内做版本冲突检测，**不足以**单独保证并发安全、竞争写处理或并发处理。`--expect-mtime` 接受有限非负数并向下取整；`--lock-timeout <ms>` 必须为安全非负整数；CLI 检出陈旧锁时，未显式传 `--recover-stale-lock` 即以 `STALE_LOCK` / exit 1 拒绝写入。直接调用 `writeStateJson` 为兼容既有调用仍允许隐式 stale recovery。
-6. **docs-consistency 的明确句式契约边界**：门禁仅拒绝集中维护、逐条测试的禁止句式（限 pre-push / 平台检查 / 平台依赖修复的自动安装主张，以及已列明的 mtime 错误安全主张），不声称理解所有自然语言；清单外的复杂语义矛盾由 V review 评审。该边界不限制人工或手动执行 `npm install` 的明确指引。
+6. **docs-consistency 的明确句式契约边界**：门禁仅拒绝集中维护、逐条测试的禁止句式（限 pre-push / 平台检查的自动安装主张，以及已列明的 mtime 错误安全主张），不声称理解所有自然语言；清单外的复杂语义矛盾由 V review 评审。默认/`platform-deps:check` 始终只读；`platform-deps:install` 仅由用户显式调用，在 Windows x64 / Linux x64 的 caller-owned 私有 staging 内校验并安装缺失包。归档 bytes/路径/PAX/GNU/link metadata 不可信，完整 canonical preflight 必须先于 extraction write；同 UID/同访问令牌进程主动 rename 或篡改 staging/repo/lockfile/tarball/`node_modules` 属于受信运行主体之外的边界，不提供原子 namespace 保证。
 7. **实施动作分派**：产出由 S 子代理执行；评审由 V 子代理执行；门禁由 G 子代理执行。编排者越权实施命中反模式 #10（见 [anti-patterns.md](anti-patterns.md) #10）。
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。

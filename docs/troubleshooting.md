@@ -75,9 +75,11 @@ git config core.hooksPath   # 确认输出 .githooks
 
 ```bash
 npm run platform-deps:check
-npm run platform-deps:install  # fail-closed：仅输出人工 npm install 指引
-npm install                    # 开发者实际执行的安装/修复
+npm run platform-deps:install  # 用户显式调用：受控验证并安装当前平台缺失包
+npm install                    # 完整重装/修复仍可由开发者显式执行
 ```
+
+显式安装支持 Windows x64 / Linux x64；失败只污染随后由 caller `finally` 删除的私有 staging，不覆盖既有非本包目标。同 UID/同访问令牌进程主动 rename 或篡改 staging、repo、lockfile、tarball、`node_modules` 不在该归档输入威胁模型内。
 
 ### 1.7 docs-consistency 报 vitest 用例数 / 文件数不匹配
 

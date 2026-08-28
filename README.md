@@ -22,7 +22,7 @@
 | Security scan（eslint-plugin-security）            | ✅ baseline 一致                              |
 | Pre-push 门禁（本地 CI）                           | ✅ 17 项全通过（Git Bash 与 WSL 双平台实测）  |
 
-**CI 策略**：本项目**不集成云端 CI（GitHub Actions / GitLab CI）**，本地 git `pre-push` hook 为**唯一门禁**——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit（high 以上漏洞阻断；网络不可达或 registry 不支持 audit endpoint 时自动跳过），任一不符即中止推送。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负（`.githooks/pre-push` 头部有显式警告）。克隆后首次 `npm install` 自动启用钩子（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时；失败仅 warn 不阻断 install）；如需手动重置执行 `npm run setup:hooks`。Windows 用 Git Bash、WSL 直接跑均可。pre-push 不会自动执行 `npm install`：缺少 `node_modules` 即 exit 1 并提示安装；它只调用 `ensure-platform-deps.sh --check`，该默认检查无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台问题须由开发者显式执行 `npm run platform-deps:check` 或 `npm run platform-deps:install`（后者同样 fail-closed，仅输出人工 `npm install` 指引）。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
+**CI 策略**：本项目**不集成云端 CI（GitHub Actions / GitLab CI）**，本地 git `pre-push` hook 为**唯一门禁**——`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit（high 以上漏洞阻断；网络不可达或 registry 不支持 audit endpoint 时自动跳过），任一不符即中止推送。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负（`.githooks/pre-push` 头部有显式警告）。克隆后首次 `npm install` 自动启用钩子（`postinstall` 自动执行 `git config core.hooksPath .githooks`，仅当 `.githooks/` 存在时；失败仅 warn 不阻断 install）；如需手动重置执行 `npm run setup:hooks`。Windows 用 Git Bash、WSL 直接跑均可。pre-push 不会自动执行 `npm install`：缺少 `node_modules` 即 exit 1 并提示安装；它只调用 `ensure-platform-deps.sh --check`，该默认检查无网络下载、`npm pack`、解包或 `node_modules` 覆盖。平台问题须由开发者显式执行 `npm run platform-deps:check` 或 `npm run platform-deps:install`；后者仅在用户显式调用时，才在受控 staging 中验证并安装 Windows x64 / Linux x64 的缺失平台包。历史原因见 [CHANGELOG.md](./CHANGELOG.md)「CI 改为本地推送前门禁」节（远程 runner 无法分配）。
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 
@@ -87,7 +87,7 @@ Bash 和 PowerShell 7 可以使用命令简写；`self-test` 与 `doctor` 可在
 > if ([string]::IsNullOrWhiteSpace($previousHooksPath)) { git config --local --unset core.hooksPath } else { git config --local core.hooksPath $previousHooksPath }
 > ```
 >
-> 只有备份文件为空（原先未设值）时才执行 `--unset`；不要把空值当作有效路径。恢复后可按需删除本地 `.git/hooksPath.previous`。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或运行当前 fail-closed 的 `npm run platform-deps:install` 获取人工 `npm install` 指引。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
+> 只有备份文件为空（原先未设值）时才执行 `--unset`；不要把空值当作有效路径。恢复后可按需删除本地 `.git/hooksPath.previous`。缺少平台依赖时，`pre-push` 不会自动安装；请在 Bash 中显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install`，在受控 staging 中验证并安装缺失包。Windows 与 WSL 不要在同一个 checkout 混用 Windows/WSL 的 `node_modules`，请为每个平台使用独立 checkout 或重新安装依赖。
 
 ## 安装 Skill
 
