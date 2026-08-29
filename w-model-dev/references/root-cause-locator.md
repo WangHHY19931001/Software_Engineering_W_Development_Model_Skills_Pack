@@ -113,7 +113,7 @@
 
 ### 4.3 persona 选择矩阵
 
-详见 [subagent-persona-matrix.md](subagent-persona-matrix.md)。
+详见 [agent-personas.md](agent-personas.md)。
 
 ### 4.4 R-lead 聚合规则
 

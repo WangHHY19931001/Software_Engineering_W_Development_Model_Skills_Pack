@@ -1,12 +1,12 @@
 # TLA+ 规格模板（TLA+ Spec Template）
 
 > 本模板定义 `.tla` 文件与 `.cfg` 文件的标准结构。S 子代理产出 TLA+ 规格时套用本模板。
-> 权威设计见 `docs/tla-plus-modeling-design.md`；可执行细则见 [references/tla-plus-guide.md](../references/tla-plus-guide.md)。
+> 权威设计见 `docs/tla-plus-modeling-design.md`；可执行细则见 [references/tla-plus.md](../references/tla-plus.md)。
 
 ## .tla 文件模板
 
 > 文件名：`<L级别>_<系统名>.tla`（如 `L1_blog_system.tla`、`L2_auth_subsystem.tla`）。
-> MODULE 名须与文件名一致（不含 `.tla` 后缀）；命名规范见 [tla-plus-guide.md §2.0](../references/tla-plus-guide.md#§20-命名规范)（禁止连字符/中文/特殊符号）。
+> MODULE 名须与文件名一致（不含 `.tla` 后缀）；命名规范见 [tla-plus.md §2.0](../references/tla-plus.md#§20-命名规范)（禁止连字符/中文/特殊符号）。
 
 ```tla
 (*
@@ -42,7 +42,7 @@ TypeInvariant ==
 
 (* ==================== 业务不变式聚合（BusinessInvariant） ==================== *)
 (* 须聚合所有子不变式（含 TypeInvariant）；.cfg 的 INVARIANTS 列表须与此展开集合一致 *)
-(* 见 tla-plus-guide.md §11 cfg-tla 一致性规则；check-tla-model.ts 强制校验集合相等 *)
+(* 见 tla-plus.md §11 cfg-tla 一致性规则；check-tla-model.ts 强制校验集合相等 *)
 (* 示例：*)
 BusinessInvariant ==
     /\ TypeInvariant
@@ -93,7 +93,7 @@ CONSTANTS
 (* VIEW viewFunc *)
 ```
 
-> `INVARIANTS` 关键字后跟不变式名列表（每行一个，缩进可选）；列表须与 `.tla` 中 `BusinessInvariant` 展开的子不变式集合**完全相等**（见 [tla-plus-guide.md §11](../references/tla-plus-guide.md#11-cfg-tla-一致性规则)）。
+> `INVARIANTS` 关键字后跟不变式名列表（每行一个，缩进可选）；列表须与 `.tla` 中 `BusinessInvariant` 展开的子不变式集合**完全相等**（见 [tla-plus.md §11](../references/tla-plus.md#11-cfg-tla-一致性规则)）。
 > 等价写法：`INVARIANT <单名>` 重复多行（每行一个不变式）。**禁止** `INVARIANT` 单数关键字后跟多名（非法 TLC 语法，见下方反例5）。
 
 ### `.cfg` 模式选择（实测 2026-07-23）
@@ -202,7 +202,7 @@ CONSTANTS
 
 `.cfg` 是 TLC 配置文件，不得含 `---- MODULE ----` 声明（这是 `.tla` 头部语法）。
 
-**错误**（命中 `cfgStructureViolation`，见 [tla-plus-guide.md §12](../references/tla-plus-guide.md#12-cfg-结构规则)）：
+**错误**（命中 `cfgStructureViolation`，见 [tla-plus.md §12](../references/tla-plus.md#12-cfg-结构规则)）：
 
 ```cfg
 ---- MODULE L3_token_store ----
@@ -215,7 +215,7 @@ INVARIANTS
 
 ### 反例2：INVARIANTS 漏列 TypeInvariant
 
-`.tla` 中 `BusinessInvariant` 聚合了 `TypeInvariant`，但 `.cfg` 的 `INVARIANTS` 列表漏列 `TypeInvariant` → 集合不一致（命中 `cfgTlaMismatch`，见 [tla-plus-guide.md §11](../references/tla-plus-guide.md#11-cfg-tla-一致性规则)）。
+`.tla` 中 `BusinessInvariant` 聚合了 `TypeInvariant`，但 `.cfg` 的 `INVARIANTS` 列表漏列 `TypeInvariant` → 集合不一致（命中 `cfgTlaMismatch`，见 [tla-plus.md §11](../references/tla-plus.md#11-cfg-tla-一致性规则)）。
 
 **错误**：
 
@@ -261,7 +261,7 @@ BusinessInvariant ==
 
 ### 反例4：MODULE 名含连字符
 
-MODULE 名含连字符 `-` 违反命名规范（见 [tla-plus-guide.md §2.0](../references/tla-plus-guide.md#§20-命名规范)），SANY 报 `Fatal errors while parsing`（退出码 11）。
+MODULE 名含连字符 `-` 违反命名规范（见 [tla-plus.md §2.0](../references/tla-plus.md#§20-命名规范)），SANY 报 `Fatal errors while parsing`（退出码 11）。
 
 **错误**：
 
@@ -277,7 +277,7 @@ MODULE 名含连字符 `-` 违反命名规范（见 [tla-plus-guide.md §2.0](..
 
 ### 反例5：INVARIANT 单数后跟多名
 
-`INVARIANT` 是单数关键字，后只能跟**一个**不变式名。多名须用 `INVARIANTS` 关键字 + 列表，或 `INVARIANT <单名>` 重复多行（命中 `cfgStructureViolation`，见 [tla-plus-guide.md §12](../references/tla-plus-guide.md#12-cfg-结构规则)）。
+`INVARIANT` 是单数关键字，后只能跟**一个**不变式名。多名须用 `INVARIANTS` 关键字 + 列表，或 `INVARIANT <单名>` 重复多行（命中 `cfgStructureViolation`，见 [tla-plus.md §12](../references/tla-plus.md#12-cfg-结构规则)）。
 
 **错误**（`INVARIANT` 后跟三名，TLC 解析报错）：
 

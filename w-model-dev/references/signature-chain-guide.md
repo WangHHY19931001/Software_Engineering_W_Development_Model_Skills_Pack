@@ -113,7 +113,7 @@ R6 校验规则：对每条签名记录，用上述公式重算 sigHash，与记
 
 ## 7. 与反模式 #32 的对应关系
 
-反模式 #32（签名链断裂）检测信号：`check-signature-chain.ts` R1-R10 任一失败。详见 [`anti-patterns.md`](./anti-patterns.md) #32。
+反模式 #32（签名链断裂）检测信号：`check-signature-chain.ts` R1-R10 任一失败。详见 [`hard-constraints.md`](./hard-constraints.md) #32。
 
 ## 8. 与归档完整性清单的协同
 

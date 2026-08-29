@@ -233,7 +233,7 @@ S-bdd 子代理在 S-doc 产出需求规格后：
 3. 更新 `.w-model/bdd-manifest.json`（features + stateMachines）
 4. 在 RTM `acceptanceTest` 列登记 `UAT-NNN | BDD-L1-<system>-<num>.feature`
 
-V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md) 7 项清单）。
+V 子代理评审 features（targetKind=test + [bdd.md](bdd.md) 7 项清单）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=1` 校验 D1-D8（D5 step 绑定阶段 1-4 跳过）。
 
 ### 验收测试前置条件分析（强制）
@@ -386,7 +386,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 
 豁免生效前须通过 `check-exemption` E1-E9 全部校验（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实 / 时间戳时序）。
 
-> 与反模式 #30（豁免审批跳步）的关系：任何豁免未按四阶段流程执行即命中 #30，见 [anti-patterns.md](anti-patterns.md)。
+> 与反模式 #30（豁免审批跳步）的关系：任何豁免未按四阶段流程执行即命中 #30，见 [hard-constraints.md](hard-constraints.md)。
 
 ## 禁止行为
 

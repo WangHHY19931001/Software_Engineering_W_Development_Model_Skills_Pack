@@ -165,7 +165,7 @@ S-bdd 子代理在 S-doc 产出详细设计后：
 3. 更新 `.w-model/bdd-manifest.json`（追加 features + stateMachines）
 4. 在 RTM `unitTest` 列登记 `UT-NNN | BDD-L4-<system>_<subsystem>_<atom>-<num>.feature`
 
-V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
+V 子代理评审 features（targetKind=test + [bdd.md](bdd.md)）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=4` 校验 D1-D8。
 
 ## 设计项→装配点→测试 seam 三者一致性
@@ -221,7 +221,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - store 选择须与 phase-3 接口设计一致（**不得在详细设计阶段变更 store 选择**）
 - 如需变更 → 回 phase-3 返工接口设计，再回 phase-4 同步详细设计
 
-**违反后果**：编码阶段按错误 store 实现触发跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 + phase-4 双返工。关联反模式 [#23 跨模块 store 误用](anti-patterns.md)。
+**违反后果**：编码阶段按错误 store 实现触发跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 + phase-4 双返工。关联反模式 [#23 跨模块 store 误用](hard-constraints.md)。
 
 ## ingestion 子流程（S→A 路径，阶段 4）
 

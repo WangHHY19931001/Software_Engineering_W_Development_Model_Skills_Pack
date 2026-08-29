@@ -144,7 +144,7 @@ export interface DocConsistencyInput {
   changelog: string;
   /** package-lock.json 原文（version 一致性检查数据源：顶层「根 version」；可选——缺省跳过 lock 版本检查；CLI 层注入） */
   lockJson?: string;
-  /** w-model-dev/references/dispatch-matrix.md 原文（script-registry 检查数据源：门禁脚本权威登记表） */
+  /** w-model-dev/references/subagent-delegation.md 原文（script-registry 检查数据源：门禁脚本权威登记表，dispatch-matrix 节） */
   dispatchMatrix: string;
   /** w-model-dev/scripts/cli/ 下全部 .ts 文件名（实测；script-registry 检查数据源） */
   cliScriptFiles: string[];
@@ -1000,7 +1000,7 @@ function checkSsotArchitectureBoundaries(ssot: string): DocCheckViolation[] {
 
 /**
  * script-registry 检查：堵住「新增门禁脚本但漏登记导航表」——任何脚本改名 / 增删后，若
- * dispatch-matrix.md（权威登记表，阶段 × S 变体 × check 脚本总览，SKILL.md「完整逐文件表」）漏同步
+ * subagent-delegation.md（dispatch-matrix 节，权威登记表，阶段 × S 变体 × check 脚本总览，SKILL.md「完整逐文件表」）漏同步
  * 即报违规。SKILL.md「N 个 .ts」计数表述也须与实测一致（计数动态化：期望值从 SKILL.md 文本解析，
  * 不硬编码）。守卫：cliScriptFiles 为空时返回空（目录不可读 / fixture 未注入时不误报）。
  */
@@ -1012,7 +1012,7 @@ function checkScriptRegistry(cliScriptFiles: string[], dispatchMatrix: string, s
     if (!dispatchMatrix.includes(name)) {
       violations.push({
         check: 'script-registry',
-        message: `dispatch-matrix.md 未登记脚本「${name}」（新增/改名门禁脚本须同步权威登记表）`,
+        message: `subagent-delegation.md（dispatch-matrix 节）未登记脚本「${name}」（新增/改名门禁脚本须同步权威登记表）`,
       });
     }
   }
@@ -1277,14 +1277,14 @@ function checkHardConstraints(skill: string, hardConstraints: string): DocCheckV
     });
   }
   for (let i = 1; i <= EXPECTED.hardConstraintCount; i++) {
-    if (!hardConstraints.includes(`## #${i} `)) {
+    if (!new RegExp(`^## #${i} `, 'm').test(hardConstraints)) {
       violations.push({
         check: 'hard-constraints',
         message: `hard-constraints.md 缺「## #${i}」标题（应有 ${EXPECTED.hardConstraintCount} 条）`,
       });
     }
   }
-  if (hardConstraints.includes(`## #${EXPECTED.hardConstraintCount + 1} `)) {
+  if (new RegExp(`^## #${EXPECTED.hardConstraintCount + 1} `, 'm').test(hardConstraints)) {
     violations.push({
       check: 'hard-constraints',
       message: `hard-constraints.md 出现超出 ${EXPECTED.hardConstraintCount} 条的「## #${EXPECTED.hardConstraintCount + 1}」标题`,
@@ -1310,19 +1310,19 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
       check: 'anti-patterns',
       message:
         headerIdx < 0
-          ? `anti-patterns.md 缺反模式清单表头「${ANTI_PATTERN_MAIN_TABLE_HEADER}」（主清单表最大编号应为 ${EXPECTED.maxAntiPattern}）`
-          : `anti-patterns.md 反模式清单表内应含最大编号 ${EXPECTED.maxAntiPattern} 行（「| ${EXPECTED.maxAntiPattern} |」出现在主清单表区间之外不计数）`,
+          ? `hard-constraints.md（反模式节）缺反模式清单表头「${ANTI_PATTERN_MAIN_TABLE_HEADER}」（主清单表最大编号应为 ${EXPECTED.maxAntiPattern}）`
+          : `hard-constraints.md（反模式节）反模式清单表内应含最大编号 ${EXPECTED.maxAntiPattern} 行（「| ${EXPECTED.maxAntiPattern} |」出现在主清单表区间之外不计数）`,
     });
   }
   if (!antiPatterns.includes(`#1~#${EXPECTED.maxAntiPattern}`)) {
     violations.push({
       check: 'anti-patterns',
-      message: `anti-patterns.md 应含连续区间「#1~#${EXPECTED.maxAntiPattern}」`,
+      message: `hard-constraints.md（反模式节）应含连续区间「#1~#${EXPECTED.maxAntiPattern}」`,
     });
   }
   for (const stale of STALE_RANGES) {
     if (antiPatterns.includes(stale)) {
-      violations.push({ check: 'anti-patterns', message: `anti-patterns.md 仍含过时区间「${stale}」` });
+      violations.push({ check: 'anti-patterns', message: `hard-constraints.md（反模式节）仍含过时区间「${stale}」` });
     }
   }
   return violations;
@@ -1532,7 +1532,7 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
   const stateLockDocs: Array<[string, string]> = [
     ['SSoT', docs.ssot],
     ['SKILL.md', docs.skill],
-    ['dispatch-matrix.md', docs.dispatchMatrix],
+    ['subagent-delegation.md（dispatch-matrix 节）', docs.dispatchMatrix],
     ['operational-recovery.md', docs.operationalRecovery],
     ['data-models.md', docs.dataModels],
     ['command-reference.md', docs.commandReference],

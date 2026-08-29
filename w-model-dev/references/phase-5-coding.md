@@ -362,7 +362,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「跨角色越权」场景（如 `reader` 调用 `blogger-only` 端点应返回 403）
 - [ ] 系统测试须覆盖「越权用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#22 角色越权](anti-patterns.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#22 角色越权](hard-constraints.md)。
 
 ## 副作用时序一致性清单
 
@@ -373,7 +373,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态）
 - [ ] 系统测试须覆盖「时序用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](anti-patterns.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](hard-constraints.md)。
 
 ## 断言规范
 

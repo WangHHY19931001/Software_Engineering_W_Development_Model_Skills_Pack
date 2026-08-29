@@ -416,7 +416,7 @@ describe('R10 七来源 source×clause 维护契约', () => {
     const readRealSource = async (sourceKey: (typeof sourceKeys)[number]): Promise<string> => {
       switch (sourceKey) {
         case 'authoritySpec':
-          return fs.readFile(path.join(REPO_ROOT, 'w-model-dev/references/subagent-persona-matrix.md'), 'utf8');
+          return fs.readFile(path.join(REPO_ROOT, 'w-model-dev/references/agent-personas.md'), 'utf8');
         case 'schema':
           return fs.readFile(path.join(REPO_ROOT, 'w-model-dev/schemas/rootcause-report.schema.json'), 'utf8');
         case 'checkerSource':
@@ -657,9 +657,9 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
       }),
     );
 
-    expect(oldSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('dispatch-matrix.md'))).toBe(
-      true,
-    );
+    expect(
+      oldSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('subagent-delegation.md')),
+    ).toBe(true);
     expect(oldSemantics.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
       true,
     );
@@ -1118,8 +1118,8 @@ describe('runDocConsistencyChecks', () => {
       schemaInventoryDocs: [
         { name: 'SSoT', content: 'Schema 清单（20 份）' },
         { name: 'SKILL.md', content: 'schemas/（20 份 JSON Schema draft-07）' },
-        { name: 'anti-patterns.md #28', content: 'schema 清单 20 份' },
-        { name: 'anti-patterns.md #28 检测信号', content: 'schema 清单（20 份）' },
+        { name: 'hard-constraints.md（反模式节）#28', content: 'schema 清单 20 份' },
+        { name: 'hard-constraints.md（反模式节）#28 检测信号', content: 'schema 清单（20 份）' },
         { name: 'docs/user-guide.md', content: 'schema（20 份清单）' },
       ],
     } as DocConsistencyInput;
@@ -1128,8 +1128,8 @@ describe('runDocConsistencyChecks', () => {
     for (const name of [
       'SSoT',
       'SKILL.md',
-      'anti-patterns.md #28',
-      'anti-patterns.md #28 检测信号',
+      'hard-constraints.md（反模式节）#28',
+      'hard-constraints.md（反模式节）#28 检测信号',
       'docs/user-guide.md',
     ]) {
       expect(
@@ -1157,8 +1157,8 @@ describe('runDocConsistencyChecks', () => {
       'SSoT',
       'docs/user-guide.md',
       'SKILL.md',
-      'anti-patterns.md #28',
-      'anti-patterns.md #28 检测信号',
+      'hard-constraints.md（反模式节）#28',
+      'hard-constraints.md（反模式节）#28 检测信号',
     ];
     for (const staleName of inventoryDocs) {
       const report = buildDocConsistencyReport(
@@ -1939,7 +1939,7 @@ describe('runDocConsistencyChecks', () => {
     const docs = [
       {
         name: 'w-model-dev/references/verifier-spec.md',
-        content: '见 [SKILL.md](../SKILL.md) 与 [反模式](anti-patterns.md)；外部 [spec](https://example.com/x.md)。',
+        content: '见 [SKILL.md](../SKILL.md) 与 [反模式](hard-constraints.md)；外部 [spec](https://example.com/x.md)。',
         baseDir: 'references',
       },
       {

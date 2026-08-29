@@ -182,7 +182,7 @@ if (subCriteria.length !== expected.length) {
 
 > 8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）；subCriteria 标准按 targetKind × 5 项组织（`rootcause` 按 §7.5 集合）。
 
-> 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
+> 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [agent-personas.md](agent-personas.md) §3）。
 
 ### 2.4 常见违规示例
 
@@ -273,7 +273,7 @@ if (subCriteria.length !== expected.length) {
 - **多子代理协作评审维度（R14-R17）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、opsx 三段式产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
   - **R14 交接完整性**：角色间交接的信息是否传对/传全（对照 signature-chain inputProvenance）。
   - **R15 计划坚持度**：产出是否偏离既定计划/票据（对照 tickets.md frontier / opsx propose）。
-  - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 subagent-persona-matrix）。
+  - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 agent-personas.md「Persona 矩阵」节）。
   - **R17 增量价值**：新增角色/子代理是否带来增量价值（无价值则提示精简）。
   - 实现：R14-R17 为评审附加检查项，四问结论记录于 VerifierOutput 的 `summary` 字段（如 `collaborationReview: { handoff, planAdherence, roleFit, incrementalValue }`），**不进入 `subCriteria` 数组**——§2.3 与 verifier-logic.ts 强制 subCriteria 数量固定为 5（不允许子集/超集），追加会破坏 `check-verifier-output.ts` 校验。R14-R17 仅当 `VerifierOutput.targetKind ∈ {design, code}` 且产物含多角色来源时启用；不破坏既有 R1-R13。
 
@@ -598,7 +598,7 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-**TLA+ 审查参考清单**：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
+**TLA+ 审查参考清单**：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus.md](./tla-plus.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
 
 - **备选方案对比检查**：设计文档是否含关键接口/类的 ≥2 个备选方案对比？无对比的"一次做对"设计 → feasibility 降分。
 - **复杂性下沉提问（APoSD ch8）**：暴露的配置参数/异常是否"用户能比我们确定更好的值"？把决策负担推给用户 = 降分。
@@ -616,8 +616,8 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-> BDD features 评审额外参考 [bdd-review-checklist.md](bdd-review-checklist.md)（7 项清单）。
-> 不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + 附加清单（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）。
+> BDD features 评审额外参考 [bdd.md](bdd.md)（7 项清单）。
+> 不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + 附加清单（仿 TLA+ 用 `design` + `tla-plus.md`）。
 
 ### 7.4 代码（targetKind = `code`）
 
@@ -759,7 +759,7 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 
 **多角度复审**：
 
-根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
+根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [agent-personas.md](agent-personas.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
 
 <r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
 <r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>

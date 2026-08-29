@@ -641,7 +641,7 @@ interface MaturityConfig {
 - `run-log.jsonl` 不得含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）
 - `event-ingress.jsonl` 不得含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`）
 
-详见 [anti-patterns.md #26](anti-patterns.md) 「RunLogEntry 与 EventIngress 字段混用」。
+详见 [hard-constraints.md #26](hard-constraints.md) 「RunLogEntry 与 EventIngress 字段混用」。
 
 ## 事件接驳模型（EventIngress / event-ingress.jsonl）
 
@@ -766,7 +766,7 @@ interface HarnessImprovementReport {
 ## TLA+ manifest 模型（tla-manifest.json）
 
 > TLA+ 行为层事实源。S 子代理产出 .tla/.cfg 后同步更新此文件；G 子代理跑 `check-tla-model.ts` 校验。
-> 权威语义与操作细则见 [tla-plus-guide.md](tla-plus-guide.md)（manifest schema 节 + §2.0 命名规范 + §2.1 路径解析基准 + checkRounds 字段语义节）。
+> 权威语义与操作细则见 [tla-plus.md](tla-plus.md)（manifest schema 节 + §2.0 命名规范 + §2.1 路径解析基准 + checkRounds 字段语义节）。
 
 ### tla-manifest.json
 
@@ -778,23 +778,23 @@ interface TlaManifest {
   project: string;
   /** 当前所处阶段（1-8） */
   currentPhase: number;
-  /** 路径解析基准（强制必填，P1.1）：相对 manifest 文件所在目录，jarPath/tlaPath/cfgPath 都基于此解析（见 tla-plus-guide.md §2.1） */
+  /** 路径解析基准（强制必填，P1.1）：相对 manifest 文件所在目录，jarPath/tlaPath/cfgPath 都基于此解析（见 tla-plus.md §2.1） */
   basePath: string;
   /** TLA+ 工具链配置 */
   tools: {
-    /** tla2tools.jar 路径，相对 basePath 解析（P1.1 起统一基准，不再按 cwd 解析；见 tla-plus-guide.md §2.1） */
+    /** tla2tools.jar 路径，相对 basePath 解析（P1.1 起统一基准，不再按 cwd 解析；见 tla-plus.md §2.1） */
     jarPath: string;
     /** Java 最低版本（默认 11） */
     javaMinVersion: number;
   };
   /** TLA+ 规格列表 */
   specs: TlaSpec[];
-  /** TLA+ 校验轮次记录数组，语义见 tla-plus-guide.md「checkRounds 字段语义」节 */
+  /** TLA+ 校验轮次记录数组，语义见 tla-plus.md「checkRounds 字段语义」节 */
   checkRounds: TlaCheckRound[];
 }
 
 interface TlaSpec {
-  /** 规格 ID，须符合命名规范（MODULE 名格式 L<level>_<system>[_<subsystem>]，见 tla-plus-guide.md §2.0） */
+  /** 规格 ID，须符合命名规范（MODULE 名格式 L<level>_<system>[_<subsystem>]，见 tla-plus.md §2.0） */
   id: string;
   /** 层级（L1 / L2 / L3 / L4 ...） */
   level: 'L1' | 'L2' | 'L3' | 'L4';
@@ -806,7 +806,7 @@ interface TlaSpec {
   requirementIds: string[];
   /** 关联设计文档相对路径（可带锚点 #§） */
   designRef: string;
-  /** .tla 文件路径，相对 manifest 文件所在目录解析（见 tla-plus-guide.md §2.1） */
+  /** .tla 文件路径，相对 manifest 文件所在目录解析（见 tla-plus.md §2.1） */
   tlaPath: string;
   /** .cfg 文件路径，相对 manifest 文件所在目录解析 */
   cfgPath: string;
@@ -859,15 +859,15 @@ interface TlaCheckRound {
 | `version`                                  | `1`               | 是   | Schema 版本                                                                                                                                                                                                                                                                                                                                                                                                |
 | `project`                                  | string            | 是   | 项目 ID                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `currentPhase`                             | number            | 是   | 当前阶段（1-8）                                                                                                                                                                                                                                                                                                                                                                                            |
-| `tools.jarPath`                            | string            | 是   | jar 路径，相对 **basePath** 解析（P1.1 起统一基准，不再按 cwd 解析；见 [tla-plus-guide.md §2.1](tla-plus-guide.md#§21-路径解析基准)）                                                                                                                                                                                                                                                                      |
+| `tools.jarPath`                            | string            | 是   | jar 路径，相对 **basePath** 解析（P1.1 起统一基准，不再按 cwd 解析；见 [tla-plus.md §2.1](tla-plus.md#§21-路径解析基准)）                                                                                                                                                                                                                                                                      |
 | `basePath`                                 | string            | 是   | 路径解析基准（强制必填，P1.1），相对 manifest 文件所在目录                                                                                                                                                                                                                                                                                                                                                 |
 | `tools.javaMinVersion`                     | number            | 是   | Java 最低版本                                                                                                                                                                                                                                                                                                                                                                                              |
 | `specs[]`                                  | TlaSpec[]         | 是   | TLA+ 规格列表                                                                                                                                                                                                                                                                                                                                                                                              |
-| `specs[].id`                               | string            | 是   | 规格 ID，须符合 [§2.0 命名规范](tla-plus-guide.md#§20-命名规范)（禁止连字符）                                                                                                                                                                                                                                                                                                                              |
-| `specs[].tlaPath` / `cfgPath`              | string            | 是   | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus-guide.md#§21-路径解析基准)）                                                                                                                                                                                                                                                                                                                        |
+| `specs[].id`                               | string            | 是   | 规格 ID，须符合 [§2.0 命名规范](tla-plus.md#§20-命名规范)（禁止连字符）                                                                                                                                                                                                                                                                                                                              |
+| `specs[].tlaPath` / `cfgPath`              | string            | 是   | 相对 **manifest 文件所在目录**解析（见 [§2.1](tla-plus.md#§21-路径解析基准)）                                                                                                                                                                                                                                                                                                                        |
 | `specs[].parent` / `siblings` / `children` | string / string[] | 是   | 相对 **该 .tla 文件所在目录**解析；L1 `parent=null`，叶子 `children=[]`                                                                                                                                                                                                                                                                                                                                    |
 | `specs[].decompositionDecision`            | enum              | 是   | 拆解决策（组合数 >1w 必须 `split-done`）                                                                                                                                                                                                                                                                                                                                                                   |
-| `checkRounds[]`                            | TlaCheckRound[]   | 是   | 校验轮次记录；**语义详见 [tla-plus-guide.md「checkRounds 字段语义」](tla-plus-guide.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus-guide.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
+| `checkRounds[]`                            | TlaCheckRound[]   | 是   | 校验轮次记录；**语义详见 [tla-plus.md「checkRounds 字段语义」](tla-plus.md#checkrounds-字段语义)**（含 spec 级语义、记录时机、单调递减规则、与 run-log R3 交叉校验、空值约定、[禁止字段](tla-plus.md#禁止字段phase-级摘要)节）。元素 `violations` 类型为 `string[]`（与 `tla-logic.ts` 一致）；含禁止字段（`phaseSummary`/`summary`/`phaseDecisions`/`phaseLevelSummary`）→ R13 校验拦截 |
 
 **使用约定**：
 
@@ -934,7 +934,7 @@ interface BddFeature {
 
 ### 与 TLA+ 数据模型的关系
 
-BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同层 TLA+ spec 的 `State` / `Init` / `Next` / `Invariants` 一一对应，由 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) D4 校验等价性（见 [bdd-guide.md](bdd-guide.md)「BDD↔TLA+ 协作」节）。
+BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同层 TLA+ spec 的 `State` / `Init` / `Next` / `Invariants` 一一对应，由 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) D4 校验等价性（见 [bdd.md](bdd.md)「BDD↔TLA+ 协作」节）。
 
 ## JSON Schema 强约束（借鉴 drawio-skill/styles/schema.json）
 

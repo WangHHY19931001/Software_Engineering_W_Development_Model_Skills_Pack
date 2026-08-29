@@ -74,11 +74,11 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 13  | 行为门禁按成熟度分级  | 阶段 1-4 TLA+（L1-L3 + 按需 L4）+ BDD（L1-L4）按项目成熟度强制（L1 可选 / L2 部分 / L3 全必跑）          |
 | 14  | 代码改动前后门禁      | 阶段 5-8 修改前 codegraph 影响分析落盘（反模式 #38）+ 改动后回归测试                                     |
 
-完整反模式、检测信号和回退动作见 [references/anti-patterns.md](references/anti-patterns.md)。
+完整反模式、检测信号和回退动作见 [references/hard-constraints.md](references/hard-constraints.md)（反模式节）。
 
 ## 编排者-子代理边界
 
-> SSoT §3.4 为权威定义；[references/subagent-delegation.md](references/subagent-delegation.md) 为可执行细则；[references/dispatch-matrix.md](references/dispatch-matrix.md) 为分派总览矩阵（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本）。本节为编排摘要。
+> SSoT §3.4 为权威定义；[references/subagent-delegation.md](references/subagent-delegation.md) 为可执行细则；[references/subagent-delegation.md](references/subagent-delegation.md)（dispatch-matrix 节）为分派总览矩阵（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本）。本节为编排摘要。
 
 **原则**：编排者工作最小化。编排者（O）只负责路由、状态读写、CHECKPOINT 等待、分派子代理、持久化、只读脚本；任何修改、编码、调测、分析、修正、验证产出的实施动作必须由子代理执行。
 
@@ -99,7 +99,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **只读脚本例外**：编排者可跑 `check-*.ts` 看退出码（用于展示/路由判定），但**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
-**违反处置**：命中反模式 #10「编排者越权实施」一律回到当前阶段起点，已越权产出的实体作废重做。检测信号与回退动作详见 [references/anti-patterns.md](references/anti-patterns.md) #10 与 [references/subagent-delegation.md](references/subagent-delegation.md)「强制约束」节。
+**违反处置**：命中反模式 #10「编排者越权实施」一律回到当前阶段起点，已越权产出的实体作废重做。检测信号与回退动作详见 [references/hard-constraints.md](references/hard-constraints.md)（反模式节）#10 与 [references/subagent-delegation.md](references/subagent-delegation.md)「强制约束」节。
 
 ## self-as-verifier 模式
 
@@ -161,17 +161,17 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **设计级别增强**：阶段 1-4 产出升级为主模板（§0 SSOT 头 + 引用块）+ 每阶段 6 独立子模板（跨阶段去重后共 10 种：system-context / system-architecture / interface-contract / class-design / data-model / glossary / traceability-matrix / behavior-spec / discipline-dod / uml-modeling，按阶段裁剪），产出目录 `docs/phase<N>-*/`；G 门禁 `check-requirement-graph.ts --phase=N --spec-dir=<dir>`（R7-R14）+ `check-artifact-gate.ts --phase=N --spec-dir=<dir>`（引用块/SSOT/DoD 结构校验）。
 
-所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。TLA+（阶段 1-4）→ [references/tla-plus-guide.md](references/tla-plus-guide.md)；BDD（阶段 1-8）→ [references/bdd-guide.md](references/bdd-guide.md)；阶段门评审 → [references/verifier-spec.md](references/verifier-spec.md)；编码后质量检查 → [references/quality-standards.md](references/quality-standards.md)；状态 Schema → [references/data-models.md](references/data-models.md)；异常/跨平台/大项目 → [references/operational-recovery.md](references/operational-recovery.md)；子代理分派 → [references/subagent-delegation.md](references/subagent-delegation.md)。
+所有阶段另读 [references/rtm-guide.md](references/rtm-guide.md)。TLA+（阶段 1-4）→ [references/tla-plus.md](references/tla-plus.md)；BDD（阶段 1-8）→ [references/bdd.md](references/bdd.md)；阶段门评审 → [references/verifier-spec.md](references/verifier-spec.md)；编码后质量检查 → [references/quality-standards.md](references/quality-standards.md)；状态 Schema → [references/data-models.md](references/data-models.md)；异常/跨平台/大项目 → [references/operational-recovery.md](references/operational-recovery.md)；子代理分派 → [references/subagent-delegation.md](references/subagent-delegation.md)。
 
 ## Bundled Resources（按需加载契约）
 
-> 借鉴 drawio-skill 的 Bundled Resources 设计：明示每个资源的触发条件，**none of them need to be in context up front**。约束 #6「按需加载」的可执行清单。目录级索引——完整逐文件表见 [references/dispatch-matrix.md](references/dispatch-matrix.md)（阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）与 [references/command-reference.md](references/command-reference.md)（/wm 命令细节）。
+> 借鉴 drawio-skill 的 Bundled Resources 设计：明示每个资源的触发条件，**none of them need to be in context up front**。约束 #6「按需加载」的可执行清单。目录级索引——完整逐文件表见 [references/subagent-delegation.md](references/subagent-delegation.md)（dispatch-matrix 节：阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵，编排者分派前必读）与 [references/command-reference.md](references/command-reference.md)（/wm 命令细节）。
 
 | 资源目录                                                                                                                    | 触发条件                                                                                                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `references/`（53 个 .md）                                                                                                  | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`、分派 `subagent-delegation.md` + `dispatch-matrix.md`、返工 `root-cause-locator.md`、门禁 `hard-constraints.md` + `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
+| `references/`（55 个 .md）                                                                                                  | 按阶段/角色触发读取——阶段细则 `phase-N-*.md`、评审 `verifier-spec.md` + `agent-personas.md`（含 Persona 矩阵节）、分派 `subagent-delegation.md`（含 dispatch-matrix 节）、返工 `root-cause-locator.md`、门禁 `hard-constraints.md`（含反模式节）+ `definition-of-done.md`、行为 `operation-behaviors.md`、自检 `quick-self-check.md`、工具/命令速查 `toolbox.md`、其余见 dispatch-matrix 逐文件表 |
 | `scripts/cli/`（37 个 .ts：26 个 check-* 门禁 + 10 个工具 CLI + self-test.ts 回归基线；其中 36 个为 exit-2 结构化错误脚本） | 仅供 G 子代理执行（阶段门 / 质量门 / 图谱门禁 / TLA+ 行为门禁 / 代码-TLA+ 一致性回归 / 签名链 / 归档完整性 / R3 / TLA+/BDD 同步 / 角色分派 / 状态机一致性 / 冰山扫掠检查点）；编排者只读例外见「编排者-子代理边界」节                                                                                                                                         |
-| `subagent/`（28 个 persona）                                                                                                | 仅供 V-lead / R-lead 多角度分析，按 [references/subagent-persona-matrix.md](references/subagent-persona-matrix.md) 选用                                                                                                                                                                                                                                       |
+| `subagent/`（28 个 persona）                                                                                                | 仅供 V-lead / R-lead 多角度分析，按 [references/agent-personas.md](references/agent-personas.md)「Persona 矩阵」节选用                                                                                                                                                                                                                                       |
 | `schemas/`（23 份 JSON Schema draft-07，含 evidence-manifest / evidence-provenance）                                        | 由 `scripts/infrastructure/schema-loader.ts` 自动加载校验；新增 `.w-model/*.json` 字段须先改 schema（Agent 无需直接读取）                                                                                                                                                                                                                                     |
 | `tools/`（tla2tools.jar）                                                                                                   | `check-tla-model.ts` 执行 SANY/TLC 时加载（TLA+ 门禁运行时依赖，随 L1 交付层拷贝）                                                                                                                                                                                                                                                                            |
 | `templates/`                                                                                                                | 产出时按对应阶段读取（requirement-spec / system-design / interface-design / detailed-design / coding / integration-test / system-test / acceptance-test / test-case / test-report / rtm / review-report / tla-spec-template / feature.template / bdd-manifest.template.json / budget.template.json / run-log.template.jsonl）                                 |

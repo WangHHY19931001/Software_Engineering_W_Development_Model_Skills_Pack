@@ -207,7 +207,7 @@ async function main(): Promise<void> {
     console.log('');
     console.log('G/O 子代理须按上述原因处置（补签名 / 补来源 / 修链 / 用户确认），详见：');
     console.log('  w-model-dev/references/signature-chain-guide.md');
-    console.log('  w-model-dev/references/anti-patterns.md #32');
+    console.log('  w-model-dev/references/hard-constraints.md（反模式节）#32');
   }
 
   printGateReport(

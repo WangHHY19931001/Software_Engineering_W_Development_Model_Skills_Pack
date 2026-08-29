@@ -50,7 +50,7 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 **与返工R的区别**：返工R在V/G不通过后触发，定位根因；R3在S产出后主动触发，预防性审查。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
-> **编排者越权实施**（如 O 直接产出 / 评审 / 跑门禁并替代 G 回填）命中反模式 #10，回到当前阶段起点（见 [anti-patterns.md](anti-patterns.md) #10）。
+> **编排者越权实施**（如 O 直接产出 / 评审 / 跑门禁并替代 G 回填）命中反模式 #10，回到当前阶段起点（见 [hard-constraints.md](hard-constraints.md) #10）。
 
 ## 阶段与测试并行对应表
 
@@ -116,7 +116,7 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 ## 阶段门评审（每个阶段统一）
 
-> 🔴 **CHECKPOINT · 每个阶段门**：流程图中每个「评审」节点都是暂停点。Agent 必须按 [verifier-spec.md](verifier-spec.md) §8 提示词执行 LLM-as-a-Verifier 评审，调用 `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>` 防漂移，向用户展示「质量等级 / 各子标准分 / reworkHints」由用户确认放行或返工。**禁止越过评审节点自动推进**（见 [anti-patterns.md](anti-patterns.md) #1/#8）。
+> 🔴 **CHECKPOINT · 每个阶段门**：流程图中每个「评审」节点都是暂停点。Agent 必须按 [verifier-spec.md](verifier-spec.md) §8 提示词执行 LLM-as-a-Verifier 评审，调用 `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>` 防漂移，向用户展示「质量等级 / 各子标准分 / reworkHints」由用户确认放行或返工。**禁止越过评审节点自动推进**（见 [hard-constraints.md](hard-constraints.md) #1/#8）。
 
 每个开发阶段产出后必须经过 LLM-as-a-Verifier 评审：
 
@@ -190,7 +190,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 
 ## 质量门（编码及之后阶段强制）
 
-> 🔴 **CHECKPOINT · 质量门放行**：流程图中「质量门」节点是发布前最后暂停点。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定（退出码 0=通过 / 1=未通过 / 2=输入错误），向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布或返工。**退出码 1/2 一律回编码，不得放行**（见 [anti-patterns.md](anti-patterns.md) #7）。
+> 🔴 **CHECKPOINT · 质量门放行**：流程图中「质量门」节点是发布前最后暂停点。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定（退出码 0=通过 / 1=未通过 / 2=输入错误），向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布或返工。**退出码 1/2 一律回编码，不得放行**（见 [hard-constraints.md](hard-constraints.md) #7）。
 
 执行顺序：代码提交 → 自动化代码审查 → 单元测试 → 集成测试 → 系统测试 → 质量门检查 → 发布。
 任一环节不通过回到编码实现。
@@ -212,7 +212,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 
 ## 工作流常见反模式
 
-> 与 [anti-patterns.md](anti-patterns.md) 互引：以下是工作流执行中的高发陷阱，命中即回退到对应阶段起点。
+> 与 [hard-constraints.md](hard-constraints.md) 互引：以下是工作流执行中的高发陷阱，命中即回退到对应阶段起点。
 
 | # | 反模式 | 对应 anti-patterns | 正确做法 |
 |---|---|---|---|

@@ -1,7 +1,7 @@
 # 快速自检（Quick Self-Check）
 
 > 在任何推进或完成声明前核验的清单。
-> 编排者（O）在阶段门 / 发布放行前对照本清单逐项确认；与 [anti-patterns.md](anti-patterns.md) 反模式库互补（清单是检查点，反模式是负面知识库）。
+> 编排者（O）在阶段门 / 发布放行前对照本清单逐项确认；与 [hard-constraints.md](hard-constraints.md) 反模式库互补（清单是检查点，反模式是负面知识库）。
 
 - [ ] 触发边界已正确判断，歧义请求已经确认
 - [ ] 上游产物与项目状态一致
@@ -27,7 +27,7 @@
 - [ ] `check-checkpoint.ts` 是否 exitCode=0
 - [ ] `check-preventive-review.ts` 是否 exitCode=0（R3 三份报告齐全，V 评审前，约束 #11 无条件第 5 脚本）
 - [ ] **上下文窗口已清理**：阶段切换时 S 子代理是新会话，不继承前阶段上下文（OpenSpec context hygiene）
-- [ ] **TLA+ 资料按需加载**：S-tla/V-tla 子代理按 [tla-plus-guide.md §13 加载矩阵](tla-plus-guide.md) 加载 4 份参考文件，禁止一次加载全部
+- [ ] **TLA+ 资料按需加载**：S-tla/V-tla 子代理按 [tla-plus.md §13 加载矩阵](tla-plus.md) 加载 4 份参考文件，禁止一次加载全部
 - [ ] 反模式 #20（只规划不执行）：确认所有规划都有对应执行动作，未停留在规划阶段
 - [ ] 反模式 #21（阶段级门禁跳过）：确认阶段 6/7/8 都跑了 `--phase=N` 门禁，未跳过阶段级校验
 - [ ] **JSON 文件写入工具**（反模式 #25）：所有 JSON 文件写入用 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`（BOM + 深度 + 中文乱码）。详见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节

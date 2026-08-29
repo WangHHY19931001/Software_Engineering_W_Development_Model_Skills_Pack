@@ -513,7 +513,7 @@ export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; wa
 // ==================== SD 覆盖率 / cfg 一致性 / cfg 结构校验 ====================
 
 /**
- * SD 覆盖率校验（tla-plus-guide.md §3 / §10）：
+ * SD 覆盖率校验（tla-plus.md §3 / §10）：
  *   - P1.2 spec 方向校验（全规格强制，无例外）：每个 spec 须满足
  *       1. requirementIds 非空数组
  *       2. requirementIds 含至少一个 SD-xxx 标识（正则 `/^SD-/`）
@@ -568,7 +568,7 @@ export function checkCoverage(specs: TlaSpec[], graphSdNodes: string[]): { passe
 }
 
 /**
- * cfg-tla 不变式一致性校验（tla-plus-guide.md §11）：
+ * cfg-tla 不变式一致性校验（tla-plus.md §11）：
  *   - .cfg 的 INVARIANTS 列表须与 .tla 中 BusinessInvariant 展开的子不变式集合**完全相等**
  *   - .tla 中 `BusinessInvariant == /\ Inv1 /\ Inv2` → 展开集合 {Inv1, Inv2}
  *   - 解析前剥离 `\*` 行注释与 `(* *)` 块注释及多余空白，再做集合比较
@@ -611,7 +611,7 @@ export function checkCfgInvariantsConsistency(
 }
 
 /**
- * cfg 结构校验（tla-plus-guide.md §12）：
+ * cfg 结构校验（tla-plus.md §12）：
  *   - .cfg 禁止含 `---- MODULE <Name> ----`（.tla 头部语法，混入 .cfg 触发 TLC 解析错误）
  *   - INVARIANT 行格式：`INVARIANT <Name>`（单行单不变式）或 `INVARIANTS` 关键字后跟列表
  *   - 返回不变式数量计数供跨产物交叉校验
@@ -755,7 +755,7 @@ function validateSpec(raw: unknown, index: number): string[] {
 /**
  * R13 checkRounds schema 校验。
  *
- * 语义权威定义见 tla-plus-guide.md §checkRounds 字段语义：
+ * 语义权威定义见 tla-plus.md §checkRounds 字段语义：
  * checkRounds 数组记录每次 TLA+ 校验轮次的结果（spec 级返工记录），
  * 用于追踪返工收敛趋势。每条元素对应一次 spec 的 TLA+ 校验轮次（specId 标识），
  * 不是 phase 级摘要（phase 级摘要应写在 run-log.jsonl 的 note 字段）。
@@ -775,8 +775,8 @@ function validateSpec(raw: unknown, index: number): string[] {
  *     phase 级摘要字段（命中 → R13 违反）
  *
  * 关联：
- *   - tla-plus-guide.md §checkRounds（语义权威）
- *   - data-models.md tla-manifest.json 节字段表（指向 tla-plus-guide.md）
+ *   - tla-plus.md §checkRounds（语义权威）
+ *   - data-models.md tla-manifest.json 节字段表（指向 tla-plus.md）
  */
 export function checkRoundsSchema(manifest: Partial<TlaManifest>): string[] {
   const violations: string[] = [];

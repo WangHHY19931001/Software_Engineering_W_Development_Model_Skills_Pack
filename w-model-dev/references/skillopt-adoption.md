@@ -98,7 +98,7 @@
 
 - **§11 原意**：技能**自动演化**（LLM 驱动 rollout/reflect）不在本仓库
 - **本指南吸收**：**方法论**（bounded edit + validation gate 流程范式），不是工具运行
-- **类比**：TLA+「时间推进建模模式」（tla-plus-guide.md §14）是方法论吸收，非 TLA+ 工具内置——本指南同构
+- **类比**：TLA+「时间推进建模模式」（tla-plus.md §14）是方法论吸收，非 TLA+ 工具内置——本指南同构
 
 ## 与反模式 #10「编排者越权实施」的协调
 
@@ -122,7 +122,7 @@ SSoT §3.4.2 角色表已扩展明确限定「离线进化场景下主代理执�
 | 机制 | 关系 |
 |---|---|
 | [hill-climbing-guide.md](hill-climbing-guide.md) | 上游，产出 HarnessImprovementReport 信号 |
-| [anti-patterns.md](anti-patterns.md) | 下游，候选反模式入清单（pending V 复审） |
+| [hard-constraints.md](hard-constraints.md) | 下游，候选反模式入清单（pending V 复审） |
 | `scripts/cli/self-test.ts` | validation gate V2 |
 | `scripts/__tests__/` | validation gate V3 |
 | [verifier-spec.md](verifier-spec.md) | 信号消费对象 + 规则收紧对象（R11/R12） |

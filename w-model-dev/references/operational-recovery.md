@@ -104,7 +104,7 @@ Agent 应依据项目已有脚本和声明选择真实工具链，不默认伪�
 
 ## JSON 文件写入工具选择
 
-> PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` 在阶段 5/6/7/8 易引发返工（BOM + 深度 + 中文乱码），强制改用 Node.js 工具，关联反模式 [#25 JSON 文件 PowerShell 写入](anti-patterns.md)。
+> PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` 在阶段 5/6/7/8 易引发返工（BOM + 深度 + 中文乱码），强制改用 Node.js 工具，关联反模式 [#25 JSON 文件 PowerShell 写入](hard-constraints.md)。
 
 ### 强制工具
 
@@ -171,7 +171,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - [ ] BDD↔TLA+ 等价性是否校验通过（不接受「BDD 写完就跳过等价性校验」）？
 - [ ] cucumber 报告是否有 undefined/pending step（不接受「step 没写也放行」）？
 
-命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [anti-patterns.md](anti-patterns.md) #27 检测信号行。
+命中任一简化倾向 → 回当前阶段起点，按自检清单逐条核验。详见 [hard-constraints.md](hard-constraints.md) #27 检测信号行。
 
 ## 集成初期混沌预期管理
 
@@ -185,7 +185,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 > 吸收自《失控》第 11 章「网络经济学」：早期错误预示后期错误（early errors predict late errors）——错误密度超阈值的模块应丢弃重写（换不同开发者），而非原地修补。
 
-- **错误超过阈值 → 丢弃重写**：失败模块错误密度超阈值（见 anti-patterns.md「错误聚集与超标丢弃」）时，丢弃重写（换不同开发者/视角），而非原地修补——早期错误预示后期错误，修补只是延长劣质模块生命周期。
+- **错误超过阈值 → 丢弃重写**：失败模块错误密度超阈值（见 hard-constraints.md「错误聚集与超标丢弃」）时，丢弃重写（换不同开发者/视角），而非原地修补——早期错误预示后期错误，修补只是延长劣质模块生命周期。
 - **重写前先建测试基线**：与 phase-5「改动前测试基线」节联动——重写前用既有测试/覆盖率锁定行为契约，重写后回归。
 - **与返工循环的关系**：超标重写不绕过 R→V→G→S-fix；重写本身是 S-fix 的一种形式，仍须 R 报告 + V 复审 + G 门禁。
 
@@ -417,7 +417,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ## O 越权检测（编排者越权实施守护）
 
-> SSoT §3.4.5（`docs/skill-design-document_SSoT.md`）「编排者允许的动作」为权威边界；命中反模式 [#10 编排者越权实施](anti-patterns.md)。历史缺陷 D18：O 用 `node -e` 直接添加 22 条 produces 边、自己写 chunk-001.json，绕过 A 子代理承担实施职责。
+> SSoT §3.4.5（`docs/skill-design-document_SSoT.md`）「编排者允许的动作」为权威边界；命中反模式 [#10 编排者越权实施](hard-constraints.md)。历史缺陷 D18：O 用 `node -e` 直接添加 22 条 produces 边、自己写 chunk-001.json，绕过 A 子代理承担实施职责。
 
 ### 禁止动作
 
@@ -436,7 +436,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 - 检测 O 是否绕过 A/S 子代理直接操作产物 JSON（`node -e` 命令痕迹、`Write`/`Edit` 落盘产物文件、产物 JSON 的 mtime 与某条 O 动作时间戳吻合但无对应 A/S 子代理分派记录）
 - 命中 → exitCode=1，O 不得放行（反模式 #10 守护）；已越权产出的实体作废重做，重新分派 A/S 子代理产出后重走 V → G
 
-检测信号亦可在编排者会话工具调用日志中自查（`Write`/`Edit`/`node -e` 不应出现在 O 会话对产物 JSON 的操作上），详见 [anti-patterns.md](anti-patterns.md) #10 检测信号行。
+检测信号亦可在编排者会话工具调用日志中自查（`Write`/`Edit`/`node -e` 不应出现在 O 会话对产物 JSON 的操作上），详见 [hard-constraints.md](hard-constraints.md) #10 检测信号行。
 
 ## 闭环校验脚本调用约定
 

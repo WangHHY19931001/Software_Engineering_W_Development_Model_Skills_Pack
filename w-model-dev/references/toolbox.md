@@ -28,7 +28,7 @@
 
 ## subagent 决策表
 
-完整 persona 矩阵见 [subagent-persona-matrix.md](subagent-persona-matrix.md)，下表为常用入口：
+完整 persona 矩阵见 [agent-personas.md](agent-personas.md)，下表为常用入口：
 
 | I have | I want | Use persona |
 |---|---|---|
@@ -37,7 +37,7 @@
 | 阶段 6/7 测试评审 | 测试视角 | testing-api-tester + testing-test-results-analyzer |
 | 性能验证 | 性能视角 | testing-performance-benchmarker |
 | 安全验证 | 安全视角 | engineering-threat-detection-engineer |
-| V/G 不通过 | 根因定位 | R-lead 按 subagent-persona-matrix 选用 |
+| V/G 不通过 | 根因定位 | R-lead 按 agent-personas.md「Persona 矩阵」节选用 |
 | 评审结果需要质疑 | reality check | testing-reality-checker |
 | 工具选型评估 | 工具视角 | testing-tool-evaluator |
 
