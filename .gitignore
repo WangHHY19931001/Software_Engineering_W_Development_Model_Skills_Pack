@@ -1,6 +1,9 @@
 # W-Model 运行时状态（项目状态 / RTM 数据）
 .w-model/
 
+# e2e 评估 demo 项目（批次1/3 基线与终值评估的瞬态工作区，记录文件在 eval/e2e/*.md）
+eval/e2e/demo/
+
 # TLC 模型检查运行产物（states/<时间戳子目录>，不入库；覆盖 2/4 位年份）
 **/tla/specs/*/states/
 **/samples/tla-e2e/states/
@@ -29,6 +32,9 @@
 # 系统
 .DS_Store
 Thumbs.db
+
+# 仓内评估 runner 的瞬态结果（TSV 为持久证据，results.json 每次运行变化）
+eval/results.json
 
 # 日志
 *.log

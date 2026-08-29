@@ -16,6 +16,7 @@
     "//2 测试类": "单元测试与回归",
     "test": "vitest run --config config/vitest.config.ts",
     "self-test": "tsx w-model-dev/scripts/cli/self-test.ts",
+    "eval": "tsx eval/runner.ts",
     "coverage": "vitest run --coverage --config config/vitest.config.ts",
     "//3 工具类": "工程工具",
     "postinstall": "node scripts/setup-hooks.cjs",
