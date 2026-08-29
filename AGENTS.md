@@ -7,15 +7,17 @@
 
 > 跨会话交接信息；三维度优化全部批次完成合并后应删除本节。
 
-**进行中**：`w-model-dev` 技能三维度优化（有效性 → 可靠性 → 易用性），SDD 子代理驱动执行。**批次 1（有效性）已完成并合并回 main（7c6320d，2026-08-29）**，当前处于批次间用户审查点，批次 2（可靠性）待启动。
+**进行中**：`w-model-dev` 技能三维度优化（有效性 → 可靠性 → 易用性），SDD 子代理驱动执行。批次 1（有效性）与批次 2（可靠性）均已合并回 main（7c6320d / 23a05dd，2026-08-29），当前处于**批次间用户审查点**，等待确认后启动批次 3（易用性大重构）。
 
 - 设计文档：[docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md](./docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md)
 - 实施计划：[docs/superpowers/plans/2026-08-28-w-model-dev-3dim-optimization.md](./docs/superpowers/plans/2026-08-28-w-model-dev-3dim-optimization.md)（3 批次串行 / 17 任务，含逐任务验收步骤）
-- 批次 1 完成内容：① Task 1.0-1.4 仓内评估资产 `eval/mappings.json`（25 条提示词→资产锚点）+ `eval/runner.ts`（断言引擎）+ `npm run eval`，基线断言 25/25；② Task 1.5 e2e 基线重建（todo-rest-demo，L2，八阶段全 A：0.8675→0.916，四级测试 74/74 真实执行，交付 `eval/e2e/2026-08-28-baseline.md` + TSV 1 行）；③ 全部 CHECKPOINT 由计划预设判据代行，偏差 D1-D11 如实登记（D9=artifact-gate 阶段 5-8 Cucumber 证据不可满足的已知红灯，D11=归档机制偏差）；④ 技能可观测发现 9 条（含 Cucumber off-ramp、coverageStatus 单一事实源、evidence 首定位正则隐性契约等）供批次 2/3 消化。
-- 工作区：批次 2 新建 worktree `.worktrees/b2-*`、分支 `batch2-3dim`（基于 main 7c6320d）。demo 瞬态工作区 `eval/e2e/demo/`（gitignored）已随批次 1 完成留存为 e2e 记录依据。
 - 进度账本：`.superpowers/sdd/2026-08-28-w-model-dev-3dim-optimization/progress.md`（git-ignored，含逐任务审查结论与 deferred 次要发现，接手后先读此文件）。
-- 批次 2 待办：Task 2.0-2.5 可靠性红灯清零（含 e2e 暴露的 D5⑤⑥ 类契约张力候选处置：coverageStatus 阶段字段集单一事实源、Cucumber 证据 off-ramp 或文档化豁免、sync 大小写口径指引补充）。
-- Windows 执行注意：① SDD bash 脚本须用 Git Bash 显式路径执行（`& "C:\Program Files\Git\bin\bash.exe" ...`；PATH 中 WSL bash 优先会导致退出码异常）；② PowerShell 无 heredoc，`git commit` 用单行 `-m`；③ e2e 中 CHECKPOINT 的用户确认角色由计划预设通过判据代行（账本有裁定记录）。
+- **批次 1（已合并 7c6320d）**：仓内评估资产 `eval/mappings.json`（25 条提示词→资产锚点）+ `eval/runner.ts` + `npm run eval`（25/25）；e2e 基线重建（todo-rest-demo L2，八阶段全 A，74/74 测试，3 轮 R-loop，偏差 D1-D11 如实登记），记录 `eval/e2e/2026-08-28-baseline.md` + TSV 1 行。
+- **批次 2（已合并 23a05dd）**：可靠性红灯清零（按设计 §3.2 以真实红灯为准，计划预测的 F3/F4 bash 127 未复现）——① Task 2.1 run-sync 集中异常清单补登（`eval-runner.test.ts` 两个 execSync，补显式 timeout:15000 + `status:'present'` 条目，行号与 AST 一致）；② Task 2.2 EBUSY 未复现 → N/A；③ Task 2.3 负载敏感真实执行探针加固（D4 修复轮1 per-test 90s 超时、wm-write 锁预算 20/1000→5000，断言不变）。门禁矩阵全绿：npm test 1241 / self-test 260 / typecheck / lint:security / check:docs-consistency（动态违规 0）/ check:gate --validate-templates / samples-coverage 280 / prepush 17 项 / persona CLI 4/4 / eval 25/25。验收记录 [docs/changes/2026-08-28-b2-reliability-acceptance.md](./docs/changes/2026-08-28-b2-reliability-acceptance.md)，含残余负载 flake 诚实登记（隔离全绿、全量极限负载偶发，非确定性红灯）+ run-sync ENOENT 竞态观察。
+- e2e 暴露的 D5⑤⑥ 契约张力候选处置（coverageStatus 阶段字段集单一事实源、Cucumber 阶段 5-8 证据 off-ramp、sync 大小写口径指引）**未在批次 2 实施**（计划未列为批次 2 任务，属候选），由批次 3 或后续消化——接手时勿假设已完成。
+- 当前卡点：**批次间用户审查点**（设计文档明文要求）——批次 2 验收记录已就绪，等待用户确认后进入批次 3。
+- 后续路径：批次 3（易用性大重构 + 终值评估 + 版本 42.0.0），Task 3.0-3.7 按计划执行（Task 3.0 建 b3-3dim worktree + 被合并文件入链引用图）→ 合并回 main + 终值评估 + 全批次完成清理本节。
+- Windows 执行注意：① SDD bash 脚本须用 Git Bash 显式路径执行（`& "C:\Program Files\Git\bin\bash.exe" ...`；PATH 中 WSL bash 优先会导致退出码异常）；② PowerShell 无 heredoc，`git commit` 用单行 `-m`；③ e2e 中 CHECKPOINT 的用户确认角色由计划预设通过判据代行（账本有裁定记录）；④ 批次 1/2 均已合并回 main，本文件 §1「`eval/` 边界」与 §2 `eval/` 行描述已同步（eval/ 含仓内评估资产 + e2e 记录，不再是纯外部产物）。
 
 ## 1. 仓库定位
 
