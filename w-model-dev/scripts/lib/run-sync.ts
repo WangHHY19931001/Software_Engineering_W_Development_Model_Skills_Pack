@@ -273,6 +273,22 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     reason: 'B4 excludes state/wm-write; real CLI helper uses an explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },
   },
+  {
+    api: 'execSync',
+    file: '__tests__/eval-runner.test.ts',
+    line: 10,
+    symbol: 'eval runner --self-check 退出码 0 断言',
+    reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'execSync',
+    file: '__tests__/eval-runner.test.ts',
+    line: 19,
+    symbol: 'eval runner --self-check JSON 可解析断言',
+    reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
+    timeout: { required: true, status: 'present' },
+  },
 ];
 
 export interface SynchronousChildProcessCall {
