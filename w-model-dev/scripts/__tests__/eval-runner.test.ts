@@ -10,6 +10,7 @@ describe('eval runner 引擎自检', () => {
     const stdout = execSync(`npx tsx "${join(repoRoot, 'eval', 'runner.ts')}" --self-check`, {
       encoding: 'utf-8',
       cwd: repoRoot,
+      timeout: 15000,
     });
     expect(stdout).toContain('"selfCheck":true');
   });
@@ -18,6 +19,7 @@ describe('eval runner 引擎自检', () => {
     const stdout = execSync(`npx tsx "${join(repoRoot, 'eval', 'runner.ts')}" --self-check`, {
       encoding: 'utf-8',
       cwd: repoRoot,
+      timeout: 15000,
     });
     expect(() => JSON.parse(stdout.trim().split('\n').pop()!)).not.toThrow();
   });

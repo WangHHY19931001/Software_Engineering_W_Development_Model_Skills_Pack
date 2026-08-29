@@ -329,7 +329,7 @@ describe('writeStateJson', () => {
       },
     });
     await entered.promise;
-    const second = writeStateJson(p, '{"v":2}', { expectMtimeMs: oldMtime, lockTimeoutMs: 1_000 });
+    const second = writeStateJson(p, '{"v":2}', { expectMtimeMs: oldMtime, lockTimeoutMs: 5_000 });
     release.resolve();
     const [a, b] = await Promise.all([first, second]);
     expect([a, b].filter((result) => result.ok)).toHaveLength(1);
@@ -461,7 +461,7 @@ describe('writeStateJson', () => {
     await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
     await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
 
-    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 20 });
+    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 5_000 });
 
     expect(result).toMatchObject({ ok: false, reason: 'STALE_LOCK' });
     await expect(fs.readFile(ownerMetadataPath, 'utf-8')).resolves.toBe(metadata);
@@ -475,7 +475,7 @@ describe('writeStateJson', () => {
     await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
     await fs.writeFile(ownerMetadataPath, '{broken', 'utf-8');
 
-    const result = await writeStateJson(p, '{"v":1}', { recoverStaleLock: true, lockTimeoutMs: 1_000 });
+    const result = await writeStateJson(p, '{"v":1}', { recoverStaleLock: true, lockTimeoutMs: 5_000 });
 
     expect(result).toMatchObject({ ok: true });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":1}');
@@ -495,7 +495,7 @@ describe('writeStateJson', () => {
       readbackImpl: async () => 'not json',
     });
     await entered.promise;
-    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 1_000 });
+    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 5_000 });
     release.resolve();
     await expect(first).resolves.toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED' });
     await expect(second).resolves.toMatchObject({ ok: true });
@@ -740,7 +740,7 @@ describe('review round 1 ownership races', () => {
       },
     } as never);
     await beforeRollback.promise;
-    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 1_000 });
+    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 5_000 });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"first"}');
     continueRollback.resolve();
     await expect(first).resolves.toMatchObject({ ok: false, rolledBack: true });

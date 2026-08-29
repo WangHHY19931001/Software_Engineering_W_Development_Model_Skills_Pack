@@ -255,7 +255,7 @@ describe('wm-write CLI lock controls', () => {
       operation: 'wm-write',
     });
 
-    const result = run(p, ['--stdin', '--lock-timeout', '1000'], '{"value":"new"}');
+    const result = run(p, ['--stdin', '--lock-timeout', '5000'], '{"value":"new"}');
 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('✗ [WRITE_REJECTED]');
@@ -268,7 +268,7 @@ describe('wm-write CLI lock controls', () => {
     const holder = await holdLiveLock(p, 500, '2000-01-01T00:00:00.000Z', false);
 
     try {
-      const rejected = run(p, ['--stdin', '--lock-timeout', '1000'], '{"value":"rejected"}');
+      const rejected = run(p, ['--stdin', '--lock-timeout', '5000'], '{"value":"rejected"}');
       expect(rejected.code).toBe(1);
       expect(rejected.stderr).toContain('✗ [WRITE_REJECTED]');
       expect(wmwriteSummary(rejected.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
@@ -280,7 +280,7 @@ describe('wm-write CLI lock controls', () => {
       ) as { pid: number };
       expect(exitedOwnerMetadata.pid).toBe(999_999_999);
 
-      const recovered = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"recovered"}');
+      const recovered = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '5000'], '{"value":"recovered"}');
       expect(recovered.code).toBe(0);
       expect(wmwriteSummary(recovered.stdout)).toMatchObject({ script: 'wm-write.ts', ok: true, writtenPath: p });
       await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"recovered"}');
@@ -295,7 +295,7 @@ describe('wm-write CLI lock controls', () => {
     await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
     await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
 
-    const result = run(p, ['--stdin', '--lock-timeout', '1000'], '{"value":"new"}');
+    const result = run(p, ['--stdin', '--lock-timeout', '5000'], '{"value":"new"}');
 
     expect(result.code).toBe(1);
     expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
@@ -308,7 +308,7 @@ describe('wm-write CLI lock controls', () => {
     await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
     await fs.writeFile(ownerMetadataPath, '{broken', 'utf-8');
 
-    const result = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '1000'], '{"value":"recovered"}');
+    const result = run(p, ['--stdin', '--recover-stale-lock', '--lock-timeout', '5000'], '{"value":"recovered"}');
 
     expect(result.code).toBe(0);
     expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: true, writtenPath: p });

@@ -1274,7 +1274,7 @@ describe('runDocConsistencyChecks', () => {
       const changedReport = JSON.parse(changedDocs.stdout) as { dynamicViolations: Array<{ check: string }> };
       expect(changedReport.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
     });
-  });
+  }, 90_000); // real-execution probe: ~18s alone, ~30s+ under full-suite load (Task 2.3); per-test budget instead of raising global testTimeout
 
   it('Exit2ProbeResult 通用字段缺失、null、空值和错误 rule 均 fail-closed', () => {
     const validProbe = {
