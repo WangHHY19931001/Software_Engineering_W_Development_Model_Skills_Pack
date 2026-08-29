@@ -814,7 +814,7 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('5 维度'))).toBe(true);
   });
 
-  it('definition-of-done 缺七维度标题 → 违规', () => {
+  it('quick-self-check 缺七维度标题 → 违规', () => {
     const input = baseInput({ definitionOfDone: '## 五维度标准' });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('七维度标准'))).toBe(
       true,

@@ -50,6 +50,6 @@ Scenario: <scenario name>
   And 不变式 "<State2> => <condition>" 应成立
 
 # 引用约定：
-#   路径约定见 references/directory-conventions.md
-#   格式约定见 references/format-conventions.md
+#   路径约定见 references/conventions.md（目录约定）
+#   格式约定见 references/conventions.md（格式约定）
 #   @designIds 须列出本 feature 覆盖的所有 SD 节点 ID，S-ingest-bdd 据此回填 manifest designCoverage

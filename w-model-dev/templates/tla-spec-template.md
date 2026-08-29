@@ -307,6 +307,6 @@ INVARIANT ArticlePublishedRequiresRegisteredUser
 
 ## 引用约定
 
-- 路径约定见 [directory-conventions.md](../references/directory-conventions.md)
-- 格式约定见 [format-conventions.md](../references/format-conventions.md)
+- 路径约定见 [conventions.md](../references/conventions.md#目录约定)
+- 格式约定见 [conventions.md](../references/conventions.md#格式约定)
 - @designIds 字段须列出本规格覆盖的所有 SD 节点 ID，S-ingest-tla 据此回填 manifest sdCoverage

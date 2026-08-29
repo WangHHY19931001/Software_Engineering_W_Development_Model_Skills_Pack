@@ -1,7 +1,7 @@
 /**
  * 阶段文档路径映射（lib/phase-doc-map.ts）
  *
- * directory-conventions.md §7 SSoT 的代码侧单点事实源。
+ * conventions.md（目录约定）§7 SSoT 的代码侧单点事实源。
  * 禁止在门禁脚本中硬编码 docs/uat-path-mapping.md 等路径，统一走 resolvePhaseDoc。
  */
 
@@ -33,7 +33,7 @@ export const PHASE_DOC_MAP: Record<number, Record<string, string>> = {
 };
 
 /**
- * 阶段文档路径解析（directory-conventions.md §7 SSoT）。
+ * 阶段文档路径解析（conventions.md（目录约定）§7 SSoT）。
  *
  * @param phase 阶段号 1-8
  * @param type  文档类型：'requirement-spec' | 'acceptance-test-design' | 'uat-path-mapping'
@@ -41,16 +41,16 @@ export const PHASE_DOC_MAP: Record<number, Record<string, string>> = {
  *              | 'detailed-design' | 'unit-test' | 'integration-test-phase6'
  *              | 'system-test-phase7' | 'acceptance-test-phase8'
  * @returns 相对项目根的路径（如 'docs/phase1-requirements/requirement-spec.md'）
- * @throws 未支持的 phase / type 时抛错（消息含 directory-conventions.md §1 引用）
+ * @throws 未支持的 phase / type 时抛错（消息含 conventions.md（目录约定）§1 引用）
  */
 export function resolvePhaseDoc(phase: number, type: string): string {
   const phaseMap = PHASE_DOC_MAP[phase];
   if (!phaseMap) {
-    throw new Error(`resolvePhaseDoc: 未支持的 phase=${phase}（directory-conventions.md §1）`);
+    throw new Error(`resolvePhaseDoc: 未支持的 phase=${phase}（conventions.md 目录约定 §1）`);
   }
   const docPath = phaseMap[type];
   if (!docPath) {
-    throw new Error(`resolvePhaseDoc: phase=${phase} 无 type="${type}" 映射（directory-conventions.md §1）`);
+    throw new Error(`resolvePhaseDoc: phase=${phase} 无 type="${type}" 映射（conventions.md 目录约定 §1）`);
   }
   return docPath;
 }

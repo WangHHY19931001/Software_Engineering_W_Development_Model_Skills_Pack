@@ -491,7 +491,7 @@ interface VerifierOutput {
 
 ### 6.2 summary 字段内容要求（阶段 digest 三要素）
 
-> 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念。`summary` 不仅是主结论，更是**阶段 digest**——供用户在 CHECKPOINT 放行时对照理解，填写 `acknowledgedDecisions`（见 [definition-of-done.md](definition-of-done.md) 第六维度）。
+> 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念。`summary` 不仅是主结论，更是**阶段 digest**——供用户在 CHECKPOINT 放行时对照理解，填写 `acknowledgedDecisions`（见 [quick-self-check.md](quick-self-check.md)「完成定义（DoD）」节 第六维度）。
 
 V 子代理须在 `summary` 中包含：
 
@@ -518,7 +518,7 @@ V 子代理须在 `summary` 中包含：
 - 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
 - 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `C1-C10 全通过` / `质量良好` / `评审通过`
 - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
-- 格式约定见 [format-conventions.md](format-conventions.md) §2.1
+- 格式约定见 [conventions.md](conventions.md#格式约定) §2.1
 
 ### 6.2.1 evidence 字段可追溯约束
 
@@ -632,7 +632,7 @@ V 子代理须在 `summary` 中包含：
 权重和 = 1.00。
 
 - **三信息来源检查**：评审时对目标代码依次问：① 抽象是否减少信息量（深接口掩盖实现细节）？② 是否复用约定/已有知识（相似事物相似处理）？③ 好名称/注释是否补充信息（而非复述）？三来源皆弱 → readability 降分。
-- **复杂三症状提问（APoSD ch2）**：评审顶层提问"这份代码的复杂性来自哪个症状"——变更放大 / 认知负荷 / 未知的未知（对照 code-smells-checklist 组 X）。
+- **复杂三症状提问（APoSD ch2）**：评审顶层提问"这份代码的复杂性来自哪个症状"——变更放大 / 认知负荷 / 未知的未知（对照 coding-quality「代码坏味道清单」组 X）。
 
 ### 7.4A 五轴评审维度与 Severity 标签（吸收自 addyosmani/agent-skills）
 
@@ -659,7 +659,7 @@ V 子代理须在 `summary` 中包含：
 - **来源时效/权威性校验**：评审中引用的依据/参考来源（规范文档、需求行、外部资料）须校验时效性与权威性——过期来源（如 2020 博客 vs 2025 政策）与冲突来源须显式标注；知识缺口（无来源支撑的断言）须记录为证据缺失。落点：R3 preventive review 的 reliability 维度检查项。
 - **最小权限与数据暴露最小化**：子代理简报/评审输入不得包含任务无关的凭据、密钥、敏感上下文；权限授予遵循最小权限原则（agent 只获得任务所需最小权限）。落点：R3 preventive review 的 security 维度检查项。
 - **prompt 注入防护提示**：对子代理输入（外部资料/用户内容拼入提示词时）做注入风险标注；不构建完整守卫体系，仅作为 R3 security 提示项。
-- **8 类重新设计原因检查**：逐条问"当前设计是否因 ① 显式指定类 ② 依赖特定操作 ③ 平台依赖 ④ 依赖对象表示/实现 ⑤ 算法依赖 ⑥ 紧耦合 ⑦ 子类化扩展爆炸 ⑧ 无法方便改类 而被迫重构"，命中即要求补对应模式的权衡声明（对照 design-patterns-catalog「8 类原因→模式」表）。
+- **8 类重新设计原因检查**：逐条问"当前设计是否因 ① 显式指定类 ② 依赖特定操作 ③ 平台依赖 ④ 依赖对象表示/实现 ⑤ 算法依赖 ⑥ 紧耦合 ⑦ 子类化扩展爆炸 ⑧ 无法方便改类 而被迫重构"，命中即要求补对应模式的权衡声明（对照 coding-quality「设计模式目录」「8 类原因→模式」表）。
 - **"哪个类层次最常变化"（GoF Visitor 判据）**：结构稳定而操作多变用 Visitor，反之用其他——评审问"设计声称封装的变化点是否与最常变化的层次一致"。
 - **接口交集 vs 并集**（GoF ch2）：抽象接口取功能交集则只强如最弱实现，取并集则庞大且漂移——评审问"此抽象接口取交集还是并集、为何"。
 - **网关/编排层职责是否轻量**（凤凰架构 service-routing）：网关=路由器+过滤器；过度增加网关职责是危险的——与编排者最小化同构，评审问"中间层是否承载了过多业务职责"。

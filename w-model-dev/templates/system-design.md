@@ -78,7 +78,7 @@ graph TD
 ## 6. 核心概念与术语
 
 > 术语表详见 [{{module}}-glossary.md](./{{module}}-glossary.md)
-> （系统设计域术语子集，引用 references/glossary.md 权威表）。
+> （系统设计域术语子集，引用 references/conventions.md 术语表权威表）。
 
 ## 7. 系统设计追踪矩阵
 

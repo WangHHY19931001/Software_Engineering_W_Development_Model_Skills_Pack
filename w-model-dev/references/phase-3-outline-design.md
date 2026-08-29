@@ -66,7 +66,7 @@
   - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
   - `{module}-uml-modeling.md`：UML 模块级建模（包图/序列图/通信图）
 
-> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+> 路径约定见 [conventions.md](conventions.md#目录约定)。
 
 ## AI 能力应用
 

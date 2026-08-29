@@ -8,7 +8,7 @@
 
 ## #2 阶段门放行（含豁免审批）
 
-产物评审通过且用户在 🔴 CHECKPOINT 明确确认后，才能推进。L1+ 自主成熟度下的操作型 CHECKPOINT 自动放行是选择性激活（见 [operational-recovery.md](operational-recovery.md)「成熟度与 CHECKPOINT 放行」节），非绕过；决策型 CHECKPOINT 在所有级别均等用户；阶段门放行须填 `acknowledgedDecisions` 理解证据（见 [definition-of-done.md](definition-of-done.md) 第六维度）。
+产物评审通过且用户在 🔴 CHECKPOINT 明确确认后，才能推进。L1+ 自主成熟度下的操作型 CHECKPOINT 自动放行是选择性激活（见 [operational-recovery.md](operational-recovery.md)「成熟度与 CHECKPOINT 放行」节），非绕过；决策型 CHECKPOINT 在所有级别均等用户；阶段门放行须填 `acknowledgedDecisions` 理解证据（见 [quick-self-check.md](quick-self-check.md)「完成定义（DoD）」节 第六维度）。
 
 **豁免审批强制四阶段**（原约束 #16 并入）：任何豁免须 S→R→V→人类四阶段流程，禁止跳步。S 提出 → R 审查 → V 校验 → 人类 CHECKPOINT 确认 → [`check-exemption.ts`](../scripts/cli/check-exemption.ts) E1-E9 全通过。跳过任一阶段命中反模式 #30。
 
@@ -781,7 +781,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：`check-verifier-output.ts` R13 单轴下限（exitCode=1 命中本反模式）。
 
-**关联**：[verifier-spec.md](verifier-spec.md) §3.3 / §6.3；[glossary.md](glossary.md)「单轴下限（R13）」；外部原则「评审各轴独立成环，永不合并计分」
+**关联**：[verifier-spec.md](verifier-spec.md) §3.3 / §6.3；[conventions.md](conventions.md) 术语表「单轴下限（R13）」；外部原则「评审各轴独立成环，永不合并计分」
 
 ### #42 S-fix / emergency-fix 后跳过 R3+V
 
@@ -874,7 +874,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **门禁脚本**：无专用脚本（流程设计属性——由 CHECKPOINT 介入路径标注保证）
 
-**关联**：「主刀职责映射表」见 [subagent-delegation.md](subagent-delegation.md)；「修正权验收测试」见 [definition-of-done.md](definition-of-done.md)
+**关联**：「主刀职责映射表」见 [subagent-delegation.md](subagent-delegation.md)；「修正权验收测试」见 [quick-self-check.md](quick-self-check.md)（完成定义（DoD）节）
 
 ### #47 大规模重构式改动
 

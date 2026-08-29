@@ -78,7 +78,7 @@
      └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
   7. 系统上下文与术语建模
      ├─ 识别外部实体（用户/外部系统/外部存储），产出 docs/phase1-requirements/system-context.md（外部实体清单 + 上下文边界原则）
-     ├─ 提取需求域术语，对照 references/glossary.md 权威表，产出 docs/phase1-requirements/glossary.md（需求域术语子集）
+     ├─ 提取需求域术语，对照 references/conventions.md（术语表）权威表，产出 docs/phase1-requirements/glossary.md（需求域术语子集）
      ├─ 主规格 §13/§14 引用块指向上述独立文件
      ├─ 失败: 外部实体边界模糊 → 标注待澄清，向用户确认
      └─ 成功: system-context.md + glossary.md 产出，主规格引用块成立

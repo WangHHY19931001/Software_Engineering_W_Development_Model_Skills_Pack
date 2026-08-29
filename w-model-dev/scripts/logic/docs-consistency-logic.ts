@@ -1197,7 +1197,7 @@ function checkTargetKindLiveDocs(
 function checkDoDDimensions(definitionOfDone: string, readme: string, ssot: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (!definitionOfDone.includes('## 七维度标准')) {
-    violations.push({ check: 'dod', message: 'definition-of-done.md 应含「## 七维度标准」标题' });
+    violations.push({ check: 'dod', message: 'quick-self-check.md（完成定义（DoD）节）应含「## 七维度标准」标题' });
   }
   if (!readme.includes(DOD_README)) {
     violations.push({ check: 'dod', message: 'README 应含 7 维度 DoD 表述' });
@@ -1378,10 +1378,10 @@ function checkGlossaryAction(glossary: string): DocCheckViolation[] {
   const end = start >= 0 ? glossary.indexOf('### ', start + 1) : -1;
   const section = start < 0 ? '' : glossary.slice(start, end === -1 ? undefined : end);
   if (!section.includes('`review`')) {
-    violations.push({ check: 'glossary-action', message: 'glossary.md action 枚举应含 `review`（V 评审）' });
+    violations.push({ check: 'glossary-action', message: 'conventions.md 术语表 action 枚举应含 `review`（V 评审）' });
   }
   if (section.includes('`verify`')) {
-    violations.push({ check: 'glossary-action', message: 'glossary.md action 枚举不应含 `verify`' });
+    violations.push({ check: 'glossary-action', message: 'conventions.md 术语表 action 枚举不应含 `verify`' });
   }
   return violations;
 }

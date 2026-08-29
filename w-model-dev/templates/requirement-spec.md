@@ -322,7 +322,7 @@ graph TD
 
 ## 14. 核心概念与术语
 
-> 术语表详见 [glossary.md](./glossary.md)（需求域术语子集，引用 references/glossary.md 权威表）。
+> 术语表详见 [glossary.md](./glossary.md)（需求域术语子集，引用 references/conventions.md 术语表权威表）。
 
 ## 15. 需求追踪矩阵
 

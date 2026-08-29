@@ -59,7 +59,7 @@
   - `{module}-behavior-spec.md`：行为规格模型（L4 .feature 引用关系）
   - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
 
-> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+> 路径约定见 [conventions.md](conventions.md#目录约定)。
 
 ## AI 能力应用
 
@@ -124,7 +124,7 @@
 
 ## 类设计规则引用
 
-详细设计阶段的类划分须遵循 [quality-standards.md](quality-standards.md)「类设计规则」小节：25 词职责测试、SRP/OCP/DIP、类名警报、内聚性。类设计不满足时回改设计再进入编码。模式选用（命名后讨论 + 权衡声明）见 [design-patterns-catalog.md](design-patterns-catalog.md)。
+详细设计阶段的类划分须遵循 [quality-standards.md](quality-standards.md)「类设计规则」小节：25 词职责测试、SRP/OCP/DIP、类名警报、内聚性。类设计不满足时回改设计再进入编码。模式选用（命名后讨论 + 权衡声明）见 [coding-quality.md](coding-quality.md)「设计模式目录」。
 
 ### 信息隐藏检查
 

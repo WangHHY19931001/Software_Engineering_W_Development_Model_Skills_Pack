@@ -229,7 +229,7 @@ export function determineQualityLevel(score: number): QualityLevel {
 // ==================== evidence 格式校验 ====================
 
 /**
- * evidence 格式正则（format-conventions.md §2.1）：
+ * evidence 格式正则（conventions.md「格式约定」§2.1）：
  *   合法格式：path:§section=statement 或 path:L42=statement 或 path:L42-58=statement
  *   非法格式：path.field=value（点号，已废弃）/ 纯文件名无定位 / 空泛声明
  */

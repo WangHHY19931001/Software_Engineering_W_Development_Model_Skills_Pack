@@ -15,7 +15,7 @@
 
 > **文档版本**：{{v1.0}}（{{YYYY-MM-DD}} 首版）
 > **SSOT 声明**：本集成测试文档 + `.w-model/rtm.json` 的集成测试列为阶段 6 的唯一事实来源；接口契约以 [templates/interface-design/interface-contract.md](./interface-design/interface-contract.md) 为准。
-> **DoD 引用**：阶段 6 完成度按 [definition-of-done.md](../references/definition-of-done.md) 七维度标准 + [phase-6-integration-test.md](../references/phase-6-integration-test.md)「验收标准」判定；放行前逐项勾选。
+> **DoD 引用**：阶段 6 完成度按 [quick-self-check.md](../references/quick-self-check.md)「完成定义（DoD）」节七维度标准 + [phase-6-integration-test.md](../references/phase-6-integration-test.md)「验收标准」判定；放行前逐项勾选。
 > **自身校验**：`check-artifact-gate.ts --phase=6` 校验集成测试列回填与门禁放行；`check-bdd-model.ts --phase=6` 校验 L3 features（如启用）。
 > **禁止占位词**：TBD/TODO/undefined 不得进入正式交付。
 

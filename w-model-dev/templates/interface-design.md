@@ -93,7 +93,7 @@ graph LR
 ## 4. 核心概念与术语
 
 > 术语表详见 [{{module}}-glossary.md](./{{module}}-glossary.md)
-> （接口域术语子集，引用 references/glossary.md 权威表）。
+> （接口域术语子集，引用 references/conventions.md 术语表权威表）。
 
 ## 5. 概要设计追踪矩阵
 

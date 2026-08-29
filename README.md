@@ -375,11 +375,10 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   │   ├── workflow.md           # 完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      # LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审）
 │   │   ├── subagent-delegation.md # 编排者-子代理边界（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约）
-│   │   ├── subagent-delegation.md    # 阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵
 │   │   ├── command-reference.md  # /wm 命令参考
-│   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
+│   │   ├── conventions.md        # 术语表 + 格式约定 + 目录约定（42.0.0 三合一）
 │   │   ├── toolbox.md            # 工具箱决策表（I have X → use Z）
-│   │   └── …（graph-guide / tla-plus / bdd / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / estimation-guide / context-management-guide / code-smells-checklist / concurrency-guide / design-patterns-catalog / refactoring-catalog）
+│   │   └── …（graph-guide / tla-plus / bdd / rtm-guide / data-models / quality-standards / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / estimation-guide / context-management-guide / coding-quality / concurrency-guide / quick-self-check（含完成定义（DoD））
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 23 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / gate-log / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep / evidence-manifest / evidence-provenance）
 │   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
@@ -457,8 +456,8 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - [图谱门禁与收敛准则](./w-model-dev/references/graph-guide.md) - check-requirement-graph.ts 用法 + 收敛判定
 - [TLA+ 层次化状态机建模](./w-model-dev/references/tla-plus.md) - check-tla-model.ts 用法 + 层级模型 + SANY/TLC 门禁
 - [BDD 建模指南](./w-model-dev/references/bdd.md) - L1-L4 分层 features + 状态机七要素 + BDD↔TLA+ 协作
-- [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（7 维度）
-- [术语权威表](./w-model-dev/references/glossary.md) - 15+ 术语 + `_Avoid_` 别名治理
+- [项目级 DoD](./w-model-dev/references/quick-self-check.md)（完成定义（DoD）节） - 每次变更的日常标准（7 维度）
+- [术语权威表](./w-model-dev/references/conventions.md)（术语表节） - 15+ 术语 + `_Avoid_` 别名治理
 - [工具箱决策表](./w-model-dev/references/toolbox.md) - I have X → use Z
 - [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
 - [用户指南](./docs/user-guide.md) - 校验失败排查思路（退出码 0/1/2）/ 规则依据 / 修复建议 / 依赖巡检流程（人工 npm audit + npm outdated）

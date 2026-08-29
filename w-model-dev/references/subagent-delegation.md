@@ -100,7 +100,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | 3 概要设计 | S-doc | 接口设计文档 + 集成测试用例 + RTM | phase-3-outline-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=3) / check-verifier-output |
 | 3 概要设计 | S-tla | L3 TLA+ 规格（L2 细化 + L3）+ tla-manifest.json | tla-plus | check-tla-model(--phase=3, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
 | 3 概要设计 | S-bdd | L3 BDD features（parent→L2）+ bdd-manifest.json + RTM integrationTest 列 | bdd | check-bdd-model(--phase=3, --graph 强制) |
-| 4 详细设计 | S-doc | 详细设计文档 + 单元测试用例 + RTM | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide / design-patterns-catalog | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output |
+| 4 详细设计 | S-doc | 详细设计文档 + 单元测试用例 + RTM | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide / coding-quality | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output |
 | 4 详细设计 | S-tla | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json | tla-plus | check-tla-model(--phase=4, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
 | 4 详细设计 | S-bdd | L4 BDD features（parent→L3）+ bdd-manifest.json + RTM unitTest 列 | bdd | check-bdd-model(--phase=4, --graph 强制) |
 
@@ -123,13 +123,13 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > A 子代理（阶段 1-4 ingestion）：A-chunk 加载 ingestion-chunk / graph-guide；A-cross 加载 ingestion-cross / graph-guide；A-evolve 加载 ingestion-cross / graph-guide。A 不跑 check 脚本（G 负责）。
 
-> V 子代理通用加载：agent-personas / verifier-spec / definition-of-done（阶段门时）；评审 BDD 时加 bdd（评审清单节）；评审代码时加 quality-standards。
+> V 子代理通用加载：agent-personas / verifier-spec / quick-self-check（完成定义（DoD）节，阶段门时）；评审 BDD 时加 bdd（评审清单节）；评审代码时加 quality-standards。
 
 > O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）/ estimation-guide（工期/预算估算时）/ context-management-guide（长会话上下文管理时）。
 
-### 3.1 全 references 触发条件表（53 文件，含 12 个 42.0.0 重定向 stub）
+### 3.1 全 references 触发条件表（38 非 stub 文件，含 19 个 42.0.0 重定向 stub）
 
-> `references/` 目录恰 53 份 .md。下表按「触发条件」组织，供编排者判断何时加载某文件。
+> `references/` 目录共 58 份 .md（38 个非 stub 资源 + 19 个 42.0.0 重定向 stub，另含 quickstart.md 入门速查不入下表）。下表按「触发条件」组织，供编排者判断何时加载某文件。
 > 标注 **2 跳** 的文件不直接出现在 §3 各阶段 reference 列，需经其上游文件（如 hard-constraints / phase-N / subagent-delegation）间接引用才可达——编排者按需显式加载，勿遗漏。
 
 | 文件 | 触发条件 | 可达性 |
@@ -137,19 +137,15 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | agent-personas | V 子代理评审时选用 Persona（code-reviewer/test-engineer/security-auditor/performance-auditor）+ R-lead/V-lead 多角度 persona 选择矩阵（「Persona 矩阵」节） | 1 跳 |
 | bdd | BDD 建模指南 + 语法速查 + 模式示例 + 评审清单（42.0.0 合并） | 1 跳 |
 | tla-plus | TLA+ 层次化建模指南 + 语法速查 + 模式示例 + 评审清单 + TLC 配置（42.0.0 合并） | 1 跳 |
-| code-smells-checklist | 阶段 5 代码评审 / 重构时识别坏味道（组 C/N 等） | 2 跳 |
+| coding-quality | 设计模式目录（阶段 3/4 设计套用）/ 重构手法与代码坏味道清单（阶段 5 评审 / 重构识别） | 1 跳 |
 | command-reference | 全命令 / 错误码 / ERROR_JSON 约定速查；O 分派脚本前 | 2 跳 |
 | concurrency-guide | 阶段 5 并发专项检查 / 并发代码评审时 | 2 跳 |
 | context-management-guide | 长会话上下文管理时（O 通用加载） | 1 跳 |
+| conventions | 术语表权威定义 + 格式约定 + 目录约定（42.0.0 三合一） | 2 跳 |
 | data-models | `.w-model/*.json` 数据模型 / schema 强约束 / RunLogEntry vs EventIngress 边界 | 2 跳 |
-| definition-of-done | 项目级 DoD 七维度；V 阶段门评审时 | 1 跳 |
-| design-patterns-catalog | 阶段 4 详细设计套用设计模式时 | 1 跳 |
 | design-philosophy | 五条设计哲学（主刀与修正权等）；O 通用加载 | 1 跳 |
-| directory-conventions | 产出路径约定（阶段 1-4 产物落盘路径） | 2 跳 |
 | estimation-guide | 工期 / 预算估算时（O 通用加载） | 1 跳 |
 | event-ingress-guide | Loop 3 事件接驳；L2+ 成熟度激活时 | 2 跳 |
-| format-conventions | 文档格式 / 命名 / 分隔符约定 | 2 跳 |
-| glossary | 术语表权威定义；阶段 1-4 产出 glossary 子集时 | 2 跳 |
 | graph-guide | 阶段 1-4 图谱门禁与收敛准则（A 子代理 + G） | 1 跳 |
 | hard-constraints | 14 条硬约束 + 反模式（48 条，#1~#48）完整版；执行前必读（O 通用加载；42.0.0 吸收反模式清单） | 1 跳 |
 | hill-climbing-guide | Loop 4 爬坡循环；run-log 分析伴侣 | 2 跳 |
@@ -167,8 +163,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | phase-7-system-test | 阶段 7 系统测试细则 | 1 跳 |
 | phase-8-acceptance-test | 阶段 8 验收测试细则 | 1 跳 |
 | quality-standards | 阶段 5/7 代码质量 / 评审代码时 | 1 跳 |
-| quick-self-check | 推进前自检清单；O 通用加载 | 1 跳 |
-| refactoring-catalog | 阶段 5 重构手法速查（与 code-smells-checklist 互引） | 2 跳 |
+| quick-self-check | 推进前自检清单 + 完成定义（DoD）七维度；O 通用加载 | 1 跳 |
 | root-cause-locator | R 子代理根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯） | 2 跳 |
 | rtm-guide | RTM 维护 / 回填规则 | 1 跳 |
 | signature-chain-guide | 角色链式签名 + 产出来源正确性（反模式 #32） | 2 跳 |
@@ -178,8 +173,8 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | verifier-spec | V 子代理评审提示词 + 五轴评审 §7.4A + self-as-verifier 模式 | 1 跳 |
 | workflow | 完整工作流程（初始化项目 / 阶段切换 / 向用户解释整体流程时） | 2 跳 |
 
-> 2 跳文件共 15 个：code-smells-checklist / command-reference / concurrency-guide / data-models / directory-conventions / event-ingress-guide / format-conventions / glossary / hill-climbing-guide / iceberg-sweep-guide / refactoring-catalog / root-cause-locator / signature-chain-guide / skillopt-adoption / workflow。
-> 其余 28 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
+> 2 跳文件共 11 个：command-reference / concurrency-guide / conventions / data-models / event-ingress-guide / hill-climbing-guide / iceberg-sweep-guide / root-cause-locator / signature-chain-guide / skillopt-adoption / workflow。
+> 其余 27 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
 
 ### 4. 返工循环分派
 
@@ -625,7 +620,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - references/agent-personas.md（按 targetKind 选用 Persona）
   - references/verifier-spec.md §6（输出 Schema）+ §8（提示词模板）+ §7.4A（五轴 + Severity）
   - references/quality-standards.md（如评审代码 / 测试）
-  - references/definition-of-done.md（如评审阶段门）
+  - references/quick-self-check.md（完成定义（DoD）节；如评审阶段门）
 产出契约：
   1. VerifierOutput JSON 文件路径：<约定路径>
   2. 必须满足 verifier-spec.md §6 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
@@ -794,7 +789,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 角色：产出子代理-TLA+ 图谱导入变体（S-ingest-tla）
 当前 W 模型阶段：<阶段 N - 名称>
 任务：从 .tla 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 tla-manifest.json sdCoverage
-依据：references/directory-conventions.md + references/format-conventions.md + references/tla-plus.md §10
+依据：references/conventions.md + references/tla-plus.md §10
 输入：
   - .tla 文件路径列表（S-tla 已产出）
   - tla-manifest.json 路径
@@ -818,7 +813,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 角色：产出子代理-BDD 图谱导入变体（S-ingest-bdd）
 当前 W 模型阶段：<阶段 N - 名称>
 任务：从 .feature 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 bdd-manifest.json designCoverage
-依据：references/directory-conventions.md + references/format-conventions.md + references/bdd.md D8
+依据：references/conventions.md + references/bdd.md D8
 输入：
   - .feature 文件路径列表（S-bdd 已产出）
   - bdd-manifest.json 路径
@@ -997,7 +992,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 必读：
   - references/iceberg-sweep-guide.md（冰山扫掠方法论）
-  - references/format-conventions.md（location 格式）
+  - references/conventions.md「格式约定」（location 格式）
   - references/hard-constraints.md（避免误判流程问题为产物问题）
 
 扫掠方法：
