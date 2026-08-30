@@ -2,7 +2,7 @@
  * 成熟度校验纯逻辑（Maturity Logic）—— 防止成熟度模型漂移与降级失灵
  *
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema（§自主成熟度模型）
- * 与 w-model-dev/references/anti-patterns.md §运维失败模式清单 O1~O6。
+ * 与 w-model-dev/references/hard-constraints.md（反模式节）§运维失败模式清单 O1~O6。
  * 校验：schema 完整（R1）+ level 合法（R2）+ 成功阶段更新一致（R3）
  *       + history 时序一致（R4）+ 降级触发检测（R5）。
  *

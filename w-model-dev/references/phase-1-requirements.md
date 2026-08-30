@@ -78,7 +78,7 @@
      └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
   7. 系统上下文与术语建模
      ├─ 识别外部实体（用户/外部系统/外部存储），产出 docs/phase1-requirements/system-context.md（外部实体清单 + 上下文边界原则）
-     ├─ 提取需求域术语，对照 references/glossary.md 权威表，产出 docs/phase1-requirements/glossary.md（需求域术语子集）
+     ├─ 提取需求域术语，对照 references/conventions.md（术语表）权威表，产出 docs/phase1-requirements/glossary.md（需求域术语子集）
      ├─ 主规格 §13/§14 引用块指向上述独立文件
      ├─ 失败: 外部实体边界模糊 → 标注待澄清，向用户确认
      └─ 成功: system-context.md + glossary.md 产出，主规格引用块成立
@@ -233,7 +233,7 @@ S-bdd 子代理在 S-doc 产出需求规格后：
 3. 更新 `.w-model/bdd-manifest.json`（features + stateMachines）
 4. 在 RTM `acceptanceTest` 列登记 `UAT-NNN | BDD-L1-<system>-<num>.feature`
 
-V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md) 7 项清单）。
+V 子代理评审 features（targetKind=test + [bdd.md](bdd.md) 7 项清单）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=1` 校验 D1-D8（D5 step 绑定阶段 1-4 跳过）。
 
 ### 验收测试前置条件分析（强制）
@@ -386,7 +386,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 
 豁免生效前须通过 `check-exemption` E1-E9 全部校验（豁免请求完整 / R 审查方法论齐全 / V 校验通过 / 人类确认记录存在 / 豁免理由非掩盖遗漏 / 影响范围已评估 / 替代方案已考虑 / 条件可落实 / 时间戳时序）。
 
-> 与反模式 #30（豁免审批跳步）的关系：任何豁免未按四阶段流程执行即命中 #30，见 [anti-patterns.md](anti-patterns.md)。
+> 与反模式 #30（豁免审批跳步）的关系：任何豁免未按四阶段流程执行即命中 #30，见 [hard-constraints.md](hard-constraints.md)。
 
 ## 禁止行为
 

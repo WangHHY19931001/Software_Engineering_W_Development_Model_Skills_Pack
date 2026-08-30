@@ -64,7 +64,7 @@
   - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
   - `{module}-uml-modeling.md`：UML 系统级建模（部署图/组件图/包图/用例图）
 
-> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+> 路径约定见 [conventions.md](conventions.md#目录约定)。
 
 ## AI 能力应用
 
@@ -196,7 +196,7 @@ S-bdd 子代理在 S-doc 产出系统设计后：
 3. 更新 `.w-model/bdd-manifest.json`（追加 features + stateMachines）
 4. 在 RTM `systemTest` 列登记 `ST-NNN | BDD-L2-<system>_<subsystem>-<num>.feature`
 
-V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
+V 子代理评审 features（targetKind=test + [bdd.md](bdd.md)）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=2` 校验 D1-D8。
 
 ## RTM 登记

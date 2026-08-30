@@ -29,7 +29,7 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
  *   - 'code'        : phase 5 源代码（原 'file' 已废弃）
  *   - 'test'        : phase 6/7/8 集成/系统/验收测试（原 'testcase' 已废弃）
  *   - 'rootcause'   : 返工循环 V 复审根因报告（§7.5 子标准集合，
- *                     与 verifier-spec §2.2 / §7.5、dispatch-matrix §4、反模式 #19 检测信号对齐）
+ *                     与 verifier-spec §2.2 / §7.5、subagent-delegation.md（dispatch-matrix 节）§4、反模式 #19 检测信号对齐）
  */
 export type TargetKind = 'requirement' | 'design' | 'code' | 'test' | 'rootcause';
 export type ScoringMethod = 'logits' | 'text-parse';
@@ -229,7 +229,7 @@ export function determineQualityLevel(score: number): QualityLevel {
 // ==================== evidence 格式校验 ====================
 
 /**
- * evidence 格式正则（format-conventions.md §2.1）：
+ * evidence 格式正则（conventions.md「格式约定」§2.1）：
  *   合法格式：path:§section=statement 或 path:L42=statement 或 path:L42-58=statement
  *   非法格式：path.field=value（点号，已废弃）/ 纯文件名无定位 / 空泛声明
  */

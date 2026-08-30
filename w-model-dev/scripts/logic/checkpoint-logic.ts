@@ -71,7 +71,7 @@ const BLACKLIST = new Set<string>(['确认放行', '继续', '通过', 'OK', 'ye
  *
  * 扩展规则（重要）：
  *   - ID_PATTERNS 新增需求/设计/测试 ID 模式时，须同步更新：
- *     - w-model-dev/references/tla-plus-guide.md（如 TLA+ 相关 ID 模式）
+ *     - w-model-dev/references/tla-plus.md（如 TLA+ 相关 ID 模式）
  *     - w-model-dev/references/data-models.md（如数据模型相关 ID 模式）
  *     - w-model-dev/references/rtm-guide.md（如 RTM 相关 ID 模式）
  *   - TECH_KEYWORDS 新增技术关键词时，须与 project.json techStack 字段对齐；

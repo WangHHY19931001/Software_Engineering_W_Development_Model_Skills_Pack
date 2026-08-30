@@ -66,4 +66,4 @@ npx tsx ../../cli/check-tla-model.ts tla-manifest-syntax-error-fail.json
 
 ## .tla 文件头注解
 
-每个 `.tla` 文件均含 `@system` / `@requirement` / `@design` / `@parent` / `@sibling` / `@child` / `@level` / `@phase` 头部注解，用于 `validateHeader` 校验 manifest 与 .tla 头部的一致性。详见 `docs/tla-plus-guide.md` §文件头注解。
+每个 `.tla` 文件均含 `@system` / `@requirement` / `@design` / `@parent` / `@sibling` / `@child` / `@level` / `@phase` 头部注解，用于 `validateHeader` 校验 manifest 与 .tla 头部的一致性。详见 `references/tla-plus.md` §文件头注解。

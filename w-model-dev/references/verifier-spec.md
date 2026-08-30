@@ -182,7 +182,7 @@ if (subCriteria.length !== expected.length) {
 
 > 8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）；subCriteria 标准按 targetKind × 5 项组织（`rootcause` 按 §7.5 集合）。
 
-> 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）。
+> 多角度评审（V-lead 加载 N 个 V-persona）不影响 subCriteria 标准：每个 V-persona 仍按本表标准集合评估，V-lead 聚合产出最终 VerifierOutput（详见 [agent-personas.md](agent-personas.md) §3）。
 
 ### 2.4 常见违规示例
 
@@ -273,7 +273,7 @@ if (subCriteria.length !== expected.length) {
 - **多子代理协作评审维度（R14-R17）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、opsx 三段式产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
   - **R14 交接完整性**：角色间交接的信息是否传对/传全（对照 signature-chain inputProvenance）。
   - **R15 计划坚持度**：产出是否偏离既定计划/票据（对照 tickets.md frontier / opsx propose）。
-  - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 subagent-persona-matrix）。
+  - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 agent-personas.md「Persona 矩阵」节）。
   - **R17 增量价值**：新增角色/子代理是否带来增量价值（无价值则提示精简）。
   - 实现：R14-R17 为评审附加检查项，四问结论记录于 VerifierOutput 的 `summary` 字段（如 `collaborationReview: { handoff, planAdherence, roleFit, incrementalValue }`），**不进入 `subCriteria` 数组**——§2.3 与 verifier-logic.ts 强制 subCriteria 数量固定为 5（不允许子集/超集），追加会破坏 `check-verifier-output.ts` 校验。R14-R17 仅当 `VerifierOutput.targetKind ∈ {design, code}` 且产物含多角色来源时启用；不破坏既有 R1-R13。
 
@@ -491,7 +491,7 @@ interface VerifierOutput {
 
 ### 6.2 summary 字段内容要求（阶段 digest 三要素）
 
-> 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念。`summary` 不仅是主结论，更是**阶段 digest**——供用户在 CHECKPOINT 放行时对照理解，填写 `acknowledgedDecisions`（见 [definition-of-done.md](definition-of-done.md) 第六维度）。
+> 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念。`summary` 不仅是主结论，更是**阶段 digest**——供用户在 CHECKPOINT 放行时对照理解，填写 `acknowledgedDecisions`（见 [quick-self-check.md](quick-self-check.md)「完成定义（DoD）」节 第六维度）。
 
 V 子代理须在 `summary` 中包含：
 
@@ -518,7 +518,7 @@ V 子代理须在 `summary` 中包含：
 - 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
 - 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `C1-C10 全通过` / `质量良好` / `评审通过`
 - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
-- 格式约定见 [format-conventions.md](format-conventions.md) §2.1
+- 格式约定见 [conventions.md](conventions.md#格式约定) §2.1
 
 ### 6.2.1 evidence 字段可追溯约束
 
@@ -598,7 +598,7 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-**TLA+ 审查参考清单**：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus-review-checklist.md](./tla-plus-review-checklist.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
+**TLA+ 审查参考清单**：评审 `targetKind=design` 且产物为 TLA+ 规格（.tla/.cfg）时，V-tla 子代理须额外参考 [tla-plus.md](./tla-plus.md) 的 7 项清单。该清单与上述 5 维度的映射见 review-checklist 文档「与 verifier-spec.md 5 维度的映射」节。不新增 targetKind 枚举值（仍为 `design`）。
 
 - **备选方案对比检查**：设计文档是否含关键接口/类的 ≥2 个备选方案对比？无对比的"一次做对"设计 → feasibility 降分。
 - **复杂性下沉提问（APoSD ch8）**：暴露的配置参数/异常是否"用户能比我们确定更好的值"？把决策负担推给用户 = 降分。
@@ -616,8 +616,8 @@ V 子代理须在 `summary` 中包含：
 
 权重和 = 1.00。
 
-> BDD features 评审额外参考 [bdd-review-checklist.md](bdd-review-checklist.md)（7 项清单）。
-> 不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + 附加清单（仿 TLA+ 用 `design` + `tla-plus-review-checklist.md`）。
+> BDD features 评审额外参考 [bdd.md](bdd.md)（7 项清单）。
+> 不新增 targetKind 枚举值，BDD features 评审用 `targetKind=test` + 附加清单（仿 TLA+ 用 `design` + `tla-plus.md`）。
 
 ### 7.4 代码（targetKind = `code`）
 
@@ -632,7 +632,7 @@ V 子代理须在 `summary` 中包含：
 权重和 = 1.00。
 
 - **三信息来源检查**：评审时对目标代码依次问：① 抽象是否减少信息量（深接口掩盖实现细节）？② 是否复用约定/已有知识（相似事物相似处理）？③ 好名称/注释是否补充信息（而非复述）？三来源皆弱 → readability 降分。
-- **复杂三症状提问（APoSD ch2）**：评审顶层提问"这份代码的复杂性来自哪个症状"——变更放大 / 认知负荷 / 未知的未知（对照 code-smells-checklist 组 X）。
+- **复杂三症状提问（APoSD ch2）**：评审顶层提问"这份代码的复杂性来自哪个症状"——变更放大 / 认知负荷 / 未知的未知（对照 coding-quality「代码坏味道清单」组 X）。
 
 ### 7.4A 五轴评审维度与 Severity 标签（吸收自 addyosmani/agent-skills）
 
@@ -659,7 +659,7 @@ V 子代理须在 `summary` 中包含：
 - **来源时效/权威性校验**：评审中引用的依据/参考来源（规范文档、需求行、外部资料）须校验时效性与权威性——过期来源（如 2020 博客 vs 2025 政策）与冲突来源须显式标注；知识缺口（无来源支撑的断言）须记录为证据缺失。落点：R3 preventive review 的 reliability 维度检查项。
 - **最小权限与数据暴露最小化**：子代理简报/评审输入不得包含任务无关的凭据、密钥、敏感上下文；权限授予遵循最小权限原则（agent 只获得任务所需最小权限）。落点：R3 preventive review 的 security 维度检查项。
 - **prompt 注入防护提示**：对子代理输入（外部资料/用户内容拼入提示词时）做注入风险标注；不构建完整守卫体系，仅作为 R3 security 提示项。
-- **8 类重新设计原因检查**：逐条问"当前设计是否因 ① 显式指定类 ② 依赖特定操作 ③ 平台依赖 ④ 依赖对象表示/实现 ⑤ 算法依赖 ⑥ 紧耦合 ⑦ 子类化扩展爆炸 ⑧ 无法方便改类 而被迫重构"，命中即要求补对应模式的权衡声明（对照 design-patterns-catalog「8 类原因→模式」表）。
+- **8 类重新设计原因检查**：逐条问"当前设计是否因 ① 显式指定类 ② 依赖特定操作 ③ 平台依赖 ④ 依赖对象表示/实现 ⑤ 算法依赖 ⑥ 紧耦合 ⑦ 子类化扩展爆炸 ⑧ 无法方便改类 而被迫重构"，命中即要求补对应模式的权衡声明（对照 coding-quality「设计模式目录」「8 类原因→模式」表）。
 - **"哪个类层次最常变化"（GoF Visitor 判据）**：结构稳定而操作多变用 Visitor，反之用其他——评审问"设计声称封装的变化点是否与最常变化的层次一致"。
 - **接口交集 vs 并集**（GoF ch2）：抽象接口取功能交集则只强如最弱实现，取并集则庞大且漂移——评审问"此抽象接口取交集还是并集、为何"。
 - **网关/编排层职责是否轻量**（凤凰架构 service-routing）：网关=路由器+过滤器；过度增加网关职责是危险的——与编排者最小化同构，评审问"中间层是否承载了过多业务职责"。
@@ -759,7 +759,7 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 
 **多角度复审**：
 
-根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [subagent-persona-matrix.md](subagent-persona-matrix.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
+根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [agent-personas.md](agent-personas.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
 
 <r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
 <r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>

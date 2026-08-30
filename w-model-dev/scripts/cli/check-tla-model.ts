@@ -237,7 +237,7 @@ function runTools(jarAbs: string, tlaAbs: string, cfgAbs: string): ToolRunResult
     const e = err as { stdout?: string; stderr?: string; killed?: boolean };
     out.tlcTimedOut = e.killed === true;
     if (out.tlcTimedOut) {
-      out.tlcOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}\nTLC 执行超时（>${EXEC_LIMITS.tlcTimeoutMs / 1000}s），已终止。排查：缩小状态空间 / 调整 .cfg 约束（references/tla-plus-tlc-configuration.md）`;
+      out.tlcOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}\nTLC 执行超时（>${EXEC_LIMITS.tlcTimeoutMs / 1000}s），已终止。排查：缩小状态空间 / 调整 .cfg 约束（references/tla-plus.md「TLC 配置」节）`;
     } else {
       out.tlcOutput = `${e.stdout ?? ''}\n${e.stderr ?? ''}`;
     }
@@ -295,7 +295,7 @@ async function main(): Promise<void> {
         message:
           'Java 环境缺失：未找到可用的 java 可执行文件（TLA+ 门禁需要 Java，最低版本以 manifest.tools.javaMinVersion 声明为准）',
         detail:
-          '修法：安装 JDK/JRE 并确保 java 在 PATH 后重试；可先运行 npx tsx w-model-dev/scripts/cli/doctor.ts --with-tla 自检（详见 references/tla-plus-guide.md「环境准备」）',
+          '修法：安装 JDK/JRE 并确保 java 在 PATH 后重试；可先运行 npx tsx w-model-dev/scripts/cli/doctor.ts --with-tla 自检（详见 references/tla-plus.md「环境准备」）',
         exitCode: 2,
       });
       return;

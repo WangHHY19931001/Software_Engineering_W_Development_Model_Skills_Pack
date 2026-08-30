@@ -4,7 +4,7 @@
 > **状态**：待评审
 > **作用范围**：w-model-dev 技能包全阶段（运维层、成熟度、失败模式、理解债务）
 > **创建日期**：2026-07-23
-> **依赖**：[skill-design-document_SSoT.md](./skill-design-document_SSoT.md) §3.3 / §3.4 / §4 / §4A / §10.5 / §10.6 / §10A；[w-model-dev/SKILL.md](../w-model-dev/SKILL.md)「不可违反的约束」/「编排者-子代理边界」/「核心操作行为」；[w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md)（47 反模式 + F1~F10）；[w-model-dev/references/operational-recovery.md](../w-model-dev/references/operational-recovery.md)；[w-model-dev/references/data-models.md](../w-model-dev/references/data-models.md)；[w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) §6
+> **依赖**：[skill-design-document_SSoT.md](./skill-design-document_SSoT.md) §3.3 / §3.4 / §4 / §4A / §10.5 / §10.6 / §10A；[w-model-dev/SKILL.md](../w-model-dev/SKILL.md)「不可违反的约束」/「编排者-子代理边界」/「核心操作行为」；[w-model-dev/references/hard-constraints.md](../w-model-dev/references/hard-constraints.md)（47 反模式 + F1~F10）；[w-model-dev/references/operational-recovery.md](../w-model-dev/references/operational-recovery.md)；[w-model-dev/references/data-models.md](../w-model-dev/references/data-models.md)；[w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) §6
 >
 > **参考来源**：[cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering)（MIT，调研于 2026-07-23）—— `docs/primitives.md` / `docs/failure-modes.md` / `docs/anti-patterns.md` / `docs/loop-design-checklist.md` / `docs/concepts.md` / `docs/operating-loops.md`
 >
@@ -412,7 +412,7 @@ interface MaturityConfig {
 
 ### 3.3 检测信号与处理流程
 
-> 与现有 anti-patterns.md「检测信号与回退命令」节同构。O 系列命中不回退，但应在 run-log 的 note 字段标注，并在阶段产物的「备注」节或评审报告的 reworkHints 中记录。
+> 与现有 hard-constraints.md「检测信号与回退命令」节同构。O 系列命中不回退，但应在 run-log 的 note 字段标注，并在阶段产物的「备注」节或评审报告的 reworkHints 中记录。
 
 | # | 检测信号（Agent 自查） | 命中后动作 | 关联机制 |
 |---|---|---|---|
@@ -437,7 +437,7 @@ interface MaturityConfig {
 - **层 2** 是"Agent 行为是否退化"——由 Agent 自检或 V 评审标注。
 - **层 3** 是"运行是否健康"——由预算检查（O1/O6）、路径存活校验（O2）、V-G 矛盾检测（O3）、理解证据机制（O4/O5）协同检测。
 
-### 3.5 anti-patterns.md 扩展
+### 3.5 hard-constraints.md 扩展
 
 在现有「反模式清单（47 条）」+「失败模式清单（F1~F10）」基础上，新增第三类：
 
@@ -455,7 +455,7 @@ interface MaturityConfig {
 
 - SSoT §4A.2「失败模式清单」扩展为「失败模式清单（F1~F10 + O1~O6）」：新增运维失败模式定义。
 - SSoT §4A.3「与现有约束的关系」新增第四层：「运维失败模式（O1~O6）」是运行健康问题，由预算检查/路径校验/V-G 矛盾检测/理解证据机制协同检测。
-- SSoT §10A 追溯表更新 §4A 行：实现位置新增 anti-patterns.md「运维失败模式清单」节。
+- SSoT §10A 追溯表更新 §4A 行：实现位置新增 hard-constraints.md「运维失败模式清单」节。
 
 ---
 
@@ -515,7 +515,7 @@ interface MaturityConfig {
 
 ### 4.4 DoD 理解证据维度扩展
 
-> 在 definition-of-done.md「七维度标准」表新增第六维度「理解证据」，与现有测试/行为/文档/RTM/状态并列。
+> 在 quick-self-check.md「七维度标准」表新增第六维度「理解证据」，与现有测试/行为/文档/RTM/状态并列。
 
 ```markdown
 ## 七维度标准（更新）
@@ -550,7 +550,7 @@ interface MaturityConfig {
 - SSoT §10.6「项目级 Definition of Done」：五维度扩展为七维度，新增「理解证据」「签名链完整性」。
 - SSoT §7.6 LLM-as-a-Verifier 评审规范：summary 字段内容要求强化（阶段 digest 三要素）。
 - verifier-spec.md §6 summary 字段说明：新增内容要求三要素 + 示例。
-- definition-of-done.md：五维度 → 七维度 + 自检清单新增条目。
+- quick-self-check.md：五维度 → 七维度 + 自检清单新增条目。
 - SSoT §10A 追溯表更新 §10.6 行：实现位置新增「理解证据维度」。
 
 ---
@@ -588,8 +588,8 @@ interface MaturityConfig {
 | `docs/skill-design-document_SSoT.md` | 新增 §10C 成熟度阶梯 / §10D 成本预算与运行日志；§4A.2 扩展 O1~O6；§10.6 七维度；§3.4.2 角色表 O 允许动作扩展；§10A 追溯表新增行 | 优化1~4 |
 | `w-model-dev/references/operational-recovery.md` | 新增「成本预算与运行日志」节 + 「成熟度与 CHECKPOINT 放行」节 | 优化1~2 |
 | `w-model-dev/references/data-models.md` | 新增 budget.json / run-log.jsonl / maturity.json schema | 优化1~2 |
-| `w-model-dev/references/anti-patterns.md` | 新增「运维失败模式清单（O1~O6）」节 | 优化3 |
-| `w-model-dev/references/definition-of-done.md` | 五维度 → 七维度 + 自检清单新增 | 优化4 |
+| `w-model-dev/references/hard-constraints.md` | 新增「运维失败模式清单（O1~O6）」节 | 优化3 |
+| `w-model-dev/references/quick-self-check.md` | 五维度 → 七维度 + 自检清单新增 | 优化4 |
 | `w-model-dev/references/verifier-spec.md` | §6 summary 字段内容要求强化 | 优化4 |
 | `w-model-dev/references/subagent-delegation.md` | O 角色允许动作新增「预算与日志维护」+ 「成熟度判定」 | 优化1~2 |
 | `w-model-dev/SKILL.md` | 约束2 补充（L1+ 自动放行非绕过）；快速自检新增理解证据项 | 优化2~4 |
@@ -610,11 +610,11 @@ interface MaturityConfig {
 本设计文档实现完成后，须满足：
 
 - [ ] SSoT 新增 §10C / §10D，与本文档双向追溯
-- [ ] SSoT §4A.2 扩展 O1~O6，与 anti-patterns.md 一致
-- [ ] SSoT §10.6 七维度，definition-of-done.md 一致
+- [ ] SSoT §4A.2 扩展 O1~O6，与 hard-constraints.md 一致
+- [ ] SSoT §10.6 七维度，quick-self-check.md 一致
 - [ ] data-models.md 含 budget / run-log / maturity schema
 - [ ] operational-recovery.md 含成本预算 + 成熟度两节
-- [ ] anti-patterns.md 含 O1~O6 节
+- [ ] hard-constraints.md 含 O1~O6 节
 - [ ] verifier-spec.md summary 字段内容要求强化
 - [ ] subagent-delegation.md O 角色允许动作扩展
 - [ ] SKILL.md 约束2 补充 + 自检新增
@@ -679,7 +679,7 @@ interface MaturityConfig {
    - [docs/concepts.md](https://github.com/cobusgreyling/loop-engineering/blob/main/docs/concepts.md) — Comprehension Debt / Cognitive Surrender / Intent Debt
    - [docs/operating-loops.md](https://github.com/cobusgreyling/loop-engineering/blob/main/docs/operating-loops.md) — 成本预算/运行日志/kill switch
 2. [skill-design-document_SSoT.md](./skill-design-document_SSoT.md) — w-model-dev 单一事实来源
-3. [w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md) — 17 流程反模式 + F1~F10 失败模式
+3. [w-model-dev/references/hard-constraints.md](../w-model-dev/references/hard-constraints.md) — 17 流程反模式 + F1~F10 失败模式
 4. [w-model-dev/references/operational-recovery.md](../w-model-dev/references/operational-recovery.md) — 运维与恢复参考
 5. [w-model-dev/references/data-models.md](../w-model-dev/references/data-models.md) — 数据模型 schema
 6. [w-model-dev/references/verifier-spec.md](../w-model-dev/references/verifier-spec.md) — LLM-as-a-Verifier 评审规范

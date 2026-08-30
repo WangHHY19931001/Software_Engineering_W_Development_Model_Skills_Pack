@@ -121,7 +121,7 @@ interface HarnessImprovementReport {
     toolImprovements: string[];
     /** 验证规则收紧建议 */
     verificationRuleTightening: string[];
-    /** 候选新增反模式（待人审后加入 anti-patterns.md） */
+    /** 候选新增反模式（待人审后加入 hard-constraints.md） */
     candidateAntiPatterns: string[];
     /** 成熟度阶梯调整建议 */
     maturityAdjustments: string[];
@@ -213,5 +213,5 @@ interface HarnessImprovementReport {
 | V 评审报告 | Loop 4 的次要分析输入（summary 信息质量） |
 | budget.json | Loop 4 检测预算信号（O1 Token Burn） |
 | maturity.json | Loop 4 检测成熟度信号（O4/O5）；报告触发时机受 level 影响 |
-| anti-patterns.md | Loop 4 产出候选反模式 → 人审后加入清单 |
+| hard-constraints.md | Loop 4 产出候选反模式 → 人审后加入清单 |
 | 反模式 #10（编排者越权） | O 产出报告是允许动作；不产出实施内容 |

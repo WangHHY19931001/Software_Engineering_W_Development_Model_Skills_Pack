@@ -40,4 +40,4 @@
 
 ## 参考
 
-- 坏味道通用清单见 [code-smells-checklist.md](code-smells-checklist.md)（组 G 可变数据条目）。
+- 坏味道通用清单见 [coding-quality.md](coding-quality.md)「代码坏味道清单」（组 G 可变数据条目）。

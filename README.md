@@ -9,7 +9,7 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 两个独立入口：选择 [验证仓库](#验证仓库) 检查仓库脚本健康，或选择 [安装 Skill](#安装-skill) 将资产复制到 Agent-specific skills 目录；两者不是同一条命令链。
 
-**当前版本**：`41.19.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`42.0.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-19 实测）：
 
@@ -147,7 +147,7 @@ flowchart TB
 | 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM `systemTest` 回填                           | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7`                                                                           | 0/1/2                             |
 | 8 验收测试 | 验收测试执行结果、归档产物、RTM `acceptanceTest` 回填                            | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`                                                             | 0/1/2                             |
 
-> 每个阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`；阶段 8 终检另含 `check-openspec-archive.ts`。完整分派矩阵见 [dispatch-matrix.md](./w-model-dev/references/dispatch-matrix.md)。
+> 每个阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`；阶段 8 终检另含 `check-openspec-archive.ts`。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
 
 ## 快速上手
 
@@ -301,9 +301,9 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - **W 模型 8 阶段编排**：需求分析 → 系统设计 → 概要设计 → 详细设计 → 编码实现 → 集成测试 → 系统测试 → 验收测试
 - **编排者最小化（Orchestrator Minimization）**：编排者（O）只做编排（路由 / 状态读写 / CHECKPOINT 等待 / 分派子代理 / 持久化 / 只读脚本）；任何实施动作必须由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位）执行。详见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)
 - **LLM-as-a-Verifier（V 子代理执行）**：基于 [arXiv:2607.05391](https://arxiv.org/abs/2607.05391) 的连续评分 [0,1]（4 位小数）+ 三维度验证（粒度 / 重复 / 分解）+ PPT 排序；技能提供提示词与输出 Schema，V 子代理执行 LLM 调用（即「外部 Agent」），技能用校验脚本防漂移；编排者不得自评。详见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)
-- **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [subagent-persona-matrix.md](./w-model-dev/references/subagent-persona-matrix.md)）；Persona 文件本身是 Markdown，不调用 LLM
+- **Agent Personas（评审角色提示词）**：4 个 W 模型适配 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）+ 28 个人格文件（engineering / testing / design / product / project 5 类，选型矩阵见 [agent-personas.md](./w-model-dev/references/agent-personas.md)）；Persona 文件本身是 Markdown，不调用 LLM
 - **五轴评审 + Severity 标签**：Correctness / Readability / Architecture / Security / Performance 五轴评审 + Severity 标签（Critical / Required / Optional / Nit / FYI）
-- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~~F10（行为退化，命中不回退但登记，见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)）+ 48 条流程反模式（流程破坏，命中即回退）+ 运维失败模式 O1~~O6（见 SSoT §4A.2a）。完整清单见 [anti-patterns.md](./w-model-dev/references/anti-patterns.md)
+- **负面知识库**：8 条核心操作行为 + 10 条失败模式 F1~~F10（行为退化，命中不回退但登记，见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)）+ 48 条流程反模式（流程破坏，命中即回退）+ 运维失败模式 O1~~O6（见 SSoT §4A.2a）。完整清单见 [hard-constraints.md](./w-model-dev/references/hard-constraints.md)
 - **项目级 Definition of Done**：7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）的每次变更日常标准，与阶段门质量门互补
 - **RTM 自动维护**：从项目状态自动重建需求跟踪矩阵，双向追溯需求 ↔ 设计 ↔ 代码 ↔ 四级测试
 - **状态持久化**：JSON 文件存储（`.w-model/*.json`），跨多轮交互保持上下文；JSON Schema (draft-07) 强约束
@@ -371,15 +371,14 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 │   ├── SKILL.md                  # Skill 定义（YAML frontmatter + 编排 + 架构定位 + 核心操作行为）
 │   ├── references/               # 阶段细则与规范（按需加载；完整列表见 references/ 目录）
 │   │   ├── phase-1-requirements.md … phase-8-acceptance-test.md  # 8 阶段细则
-│   │   ├── anti-patterns.md      # 负面知识库：48 条流程反模式（F1~F10 失败模式见 operation-behaviors.md；O1~O6 运维失败模式见 SSoT §4A.2a）
+│   │   ├── hard-constraints.md      # 负面知识库：48 条流程反模式（F1~F10 失败模式见 operation-behaviors.md；O1~O6 运维失败模式见 SSoT §4A.2a）
 │   │   ├── workflow.md           # 完整工作流程（流程图 + 阶段并行表 + 阶段门评审）
 │   │   ├── verifier-spec.md      # LLM-as-a-Verifier 评审规范（提示词 + Schema + 子标准 + 五轴评审）
 │   │   ├── subagent-delegation.md # 编排者-子代理边界（O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约）
-│   │   ├── dispatch-matrix.md    # 阶段 × 角色 × S 变体 × 产物 × reference × check 脚本总览矩阵
 │   │   ├── command-reference.md  # /wm 命令参考
-│   │   ├── glossary.md           # 术语权威表（15+ 术语 + _Avoid_ 别名治理）
+│   │   ├── conventions.md        # 术语表 + 格式约定 + 目录约定（42.0.0 三合一）
 │   │   ├── toolbox.md            # 工具箱决策表（I have X → use Z）
-│   │   └── …（graph-guide / tla-plus-guide / bdd-guide / rtm-guide / data-models / quality-standards / definition-of-done / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / subagent-persona-matrix / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / bdd-review-checklist / bdd-syntax-reference / bdd-patterns-examples / estimation-guide / context-management-guide / code-smells-checklist / concurrency-guide / design-patterns-catalog / refactoring-catalog）
+│   │   └── …（graph-guide / tla-plus / bdd / rtm-guide / data-models / quality-standards / operational-recovery / event-ingress-guide / hill-climbing-guide / skillopt-adoption / signature-chain-guide / root-cause-locator / ingestion-chunk / ingestion-cross / agent-personas / estimation-guide / context-management-guide / coding-quality / concurrency-guide / quick-self-check（含完成定义（DoD））
 │   ├── subagent/                 # 28 个评审 persona Markdown 文件（engineering / testing / design / product / project 5 类，按需读取，不调用 LLM）
 │   ├── schemas/                  # 23 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / gate-log / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep / evidence-manifest / evidence-provenance）
 │   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
@@ -447,18 +446,18 @@ ERROR_JSON {"category":"ARG_INVALID","message":"参数非法 --phase=99","exitCo
 - [Skill 定义](./w-model-dev/SKILL.md) - AI 助理触发命令与阶段流
 - [LLM-as-a-Verifier 评审规范](./w-model-dev/references/verifier-spec.md) - 提示词 + Schema + 子标准 + 五轴评审
 - [Agent Personas](./w-model-dev/references/agent-personas.md) - 4 个评审角色提示词（code-reviewer / test-engineer / security-auditor / performance-auditor）
-- [反例与失败模式](./w-model-dev/references/anti-patterns.md) - 48 条流程反模式（F1~~F10 失败模式见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)，O1~~O6 运维失败模式见 SSoT §4A.2a）
+- [反例与失败模式](./w-model-dev/references/hard-constraints.md) - 48 条流程反模式（F1~~F10 失败模式见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)，O1~~O6 运维失败模式见 SSoT §4A.2a）
 - [编排者-子代理边界](./w-model-dev/references/subagent-delegation.md) - O/A/S/V/G/R 六类核心角色 + R-iceberg 变体 + 分派模板 + 回填契约
 - [根因定位者方法论](./w-model-dev/references/root-cause-locator.md) - R 角色 4 种根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）
-- [Persona 选型矩阵](./w-model-dev/references/subagent-persona-matrix.md) - R-lead / V-lead 多角度 persona 选择矩阵
-- [阶段 × 角色 × 脚本总览](./w-model-dev/references/dispatch-matrix.md) - 编排者分派前必读矩阵
+- [Persona 选型矩阵](./w-model-dev/references/agent-personas.md) - R-lead / V-lead 多角度 persona 选择矩阵
+- [阶段 × 角色 × 脚本总览](./w-model-dev/references/subagent-delegation.md) - 编排者分派前必读矩阵
 - [ingestion 子流程：分块分析](./w-model-dev/references/ingestion-chunk.md) - A 子代理分块分析细则（阶段 1–4）
 - [ingestion 子流程：交叉合并与图谱演进](./w-model-dev/references/ingestion-cross.md) - A 子代理合并建图 + 收敛循环（阶段 1–4）
 - [图谱门禁与收敛准则](./w-model-dev/references/graph-guide.md) - check-requirement-graph.ts 用法 + 收敛判定
-- [TLA+ 层次化状态机建模](./w-model-dev/references/tla-plus-guide.md) - check-tla-model.ts 用法 + 层级模型 + SANY/TLC 门禁
-- [BDD 建模指南](./w-model-dev/references/bdd-guide.md) - L1-L4 分层 features + 状态机七要素 + BDD↔TLA+ 协作
-- [项目级 DoD](./w-model-dev/references/definition-of-done.md) - 每次变更的日常标准（7 维度）
-- [术语权威表](./w-model-dev/references/glossary.md) - 15+ 术语 + `_Avoid_` 别名治理
+- [TLA+ 层次化状态机建模](./w-model-dev/references/tla-plus.md) - check-tla-model.ts 用法 + 层级模型 + SANY/TLC 门禁
+- [BDD 建模指南](./w-model-dev/references/bdd.md) - L1-L4 分层 features + 状态机七要素 + BDD↔TLA+ 协作
+- [项目级 DoD](./w-model-dev/references/quick-self-check.md)（完成定义（DoD）节） - 每次变更的日常标准（7 维度）
+- [术语权威表](./w-model-dev/references/conventions.md)（术语表节） - 15+ 术语 + `_Avoid_` 别名治理
 - [工具箱决策表](./w-model-dev/references/toolbox.md) - I have X → use Z
 - [采用路径指南](./docs/adoption-guide.md) - Greenfield vs Brownfield（SSoT §11A 为权威定义）
 - [用户指南](./docs/user-guide.md) - 校验失败排查思路（退出码 0/1/2）/ 规则依据 / 修复建议 / 依赖巡检流程（人工 npm audit + npm outdated）

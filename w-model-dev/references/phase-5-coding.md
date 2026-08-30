@@ -32,7 +32,7 @@
 
 - **产品化类任务**（判据住代码内，agent 擅长）：补文档、测试、类型注解、错误处理、边界情况、重构 → 优先分派 S 子代理。
 - **系统集成类判断**（判据住大系统处境里，agent 不擅长）：对接外部系统、生产环境适配、跨模块契约裁决、版本兼容决策 → 必须由人/主刀持有，不得外包给 agent。
-- 完成度判定："agent 跑通了"只证明左下角（1x 一次性脚本）；交付到右上角（可依赖构件产品）须产品化轴与系统集成轴逐项自检（见 [definition-of-done.md](definition-of-done.md)「完成度矩阵自检」）。
+- 完成度判定："agent 跑通了"只证明左下角（1x 一次性脚本）；交付到右上角（可依赖构件产品）须产品化轴与系统集成轴逐项自检（见 [quick-self-check.md](quick-self-check.md)「完成定义（DoD）」节「完成度矩阵自检」）。
 
 ## 增量集成纪律
 
@@ -165,7 +165,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - **票据主体 = 符号级契约**：目标行为的接口签名 / 类型约束 / 状态转移（与 TLA+ 状态机 Action 对齐），如「实现 `ArticleService.create` 契约：入参 `{title, content}`，返回 `Article`，触发状态 `draft → published`」——而非「改 `src/services/article-service.ts:42`」
 - **位置信息交给 codegraph**（约束 #14）：文件路径由 `codegraph_explore` 查询获得，票据不预设路径。票据只写「实现 `XX` 符号契约」，位置由查询结果落盘的 `.w-model/codegraph-queries/` 决定
 - **与评审 evidence 的边界**：评审 evidence 须路径 + 行号（[verifier-spec.md](verifier-spec.md) §6.2.1，可追溯性）；实施票据**不**须——二者定位不同：evidence 是「评审时证明我看过哪」，票据是「实现时做什么契约」
-- 票据引用术语统一用 [glossary.md](glossary.md) 规范名（如 `codeModule` / `mappingType`），不得自造别名
+- 票据引用术语统一用 [conventions.md](conventions.md) 术语表规范名（如 `codeModule` / `mappingType`），不得自造别名
 
 ### Blocking edges 依赖图
 - blocking edges 形成有向无环图（DAG）
@@ -362,7 +362,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「跨角色越权」场景（如 `reader` 调用 `blogger-only` 端点应返回 403）
 - [ ] 系统测试须覆盖「越权用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#22 角色越权](anti-patterns.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#22 角色越权](hard-constraints.md)。
 
 ## 副作用时序一致性清单
 
@@ -373,7 +373,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态）
 - [ ] 系统测试须覆盖「时序用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](anti-patterns.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](hard-constraints.md)。
 
 ## 断言规范
 
@@ -415,7 +415,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - **机械规则 → 语言静态工具**：编码后须运行项目语言的静态检查工具 + 相关规则集，结果落盘为门禁证据：
   - TypeScript/JS：`eslint`（`max-lines-per-function` / `max-params` / `no-duplicate-imports` 等）+ `tsc --noEmit`
   - Python：`pylint` / `ruff`；Java：`spotbugs` / `PMD`；Go：`golangci-lint`
-- **语义坏味道 → LLM 评审**：V-code 评审子代理按 [code-smells-checklist.md](code-smells-checklist.md) 清单执行语义层检查（依恋情结/霰弹式修改/副作用混合/竞态等），命中项标注分级并写入 reworkHints。
+- **语义坏味道 → LLM 评审**：V-code 评审子代理按 [coding-quality.md](coding-quality.md)「代码坏味道清单」清单执行语义层检查（依恋情结/霰弹式修改/副作用混合/竞态等），命中项标注分级并写入 reworkHints。
 - **静态工具结果须真实落盘**：禁止估算"应该没违规"；工具退出码/报告须由 G 子代理核验（约束 #4 真实执行）。
 - **工具缺失降级**：项目语言标准工具缺失时，参照 [quality-standards.md](quality-standards.md)「工具缺失与降级处理」节——尝试等价工具，仍缺失则 LLM 评审承担全部检查并在评审中注明。
 

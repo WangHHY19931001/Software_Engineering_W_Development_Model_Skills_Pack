@@ -311,8 +311,8 @@ Invariant == state = "B" => done
   it('documents the pre-push fixture regression boundary separately from project evidence gates', async () => {
     const [skill, bddGuide, tlaGuide, commandReference, prePush] = await Promise.all([
       fs.readFile(path.join(ROOT, 'w-model-dev/SKILL.md'), 'utf-8'),
-      fs.readFile(path.join(ROOT, 'w-model-dev/references/bdd-guide.md'), 'utf-8'),
-      fs.readFile(path.join(ROOT, 'w-model-dev/references/tla-plus-guide.md'), 'utf-8'),
+      fs.readFile(path.join(ROOT, 'w-model-dev/references/bdd.md'), 'utf-8'),
+      fs.readFile(path.join(ROOT, 'w-model-dev/references/tla-plus.md'), 'utf-8'),
       fs.readFile(path.join(ROOT, 'w-model-dev/references/command-reference.md'), 'utf-8'),
       fs.readFile(path.join(ROOT, '.githooks/pre-push'), 'utf-8'),
     ]);

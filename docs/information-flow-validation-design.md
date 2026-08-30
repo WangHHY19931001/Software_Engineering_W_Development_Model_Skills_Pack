@@ -217,7 +217,7 @@
 | `w-model-dev/references/graph-guide.md` | 新增「信息流模型」节：三不变量、边界节点、与结构边的正交性、跨阶段收敛 |
 | `w-model-dev/references/ingestion-chunk.md` | A-chunk 任务指引加：信息流边提取规则、边界节点识别规则 |
 | `w-model-dev/references/ingestion-cross.md` | A-cross/A-evolve 任务指引加：跨块信息流边确认、信息流 `reworkHints` 产出格式 |
-| `w-model-dev/references/anti-patterns.md` | 新增 #13「信息流黑洞/奇迹放行」；F1-F10 失败模式补充信息流相关信号 |
+| `w-model-dev/references/hard-constraints.md` | 新增 #13「信息流黑洞/奇迹放行」；F1-F10 失败模式补充信息流相关信号 |
 | `w-model-dev/scripts/logic/graph-logic.ts` | 新增信息流校验纯函数（黑洞/奇迹/死模块/边界完整性） |
 | `w-model-dev/scripts/cli/check-requirement-graph.ts` | 输出 JSON 加 `dataflowViolations` / `boundary` 字段 |
 | `w-model-dev/scripts/cli/self-test.ts` | 新增信息流样本测试用例 |

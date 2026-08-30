@@ -33,7 +33,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 118,
+    line: 117,
     symbol: 'detectScriptsChanges',
     reason: 'B3 migrated git diff probe through runSync; retained as audit provenance with a 15-second timeout.',
     migratedToRunSync: true,
@@ -42,7 +42,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 127,
+    line: 126,
     symbol: 'detectScriptsChanges',
     reason: 'B3 migrated git status probe through runSync; retained as audit provenance with a 15-second timeout.',
     migratedToRunSync: true,
@@ -51,7 +51,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 478,
+    line: 477,
     symbol: 'currentCommitSha',
     reason: 'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.',
     migratedToRunSync: true,
@@ -60,7 +60,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 604,
+    line: 603,
     symbol: 'collectVitestMeasurements',
     reason:
       'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its 300-second timeout.',
@@ -70,7 +70,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 610,
+    line: 609,
     symbol: 'collectVitestMeasurements',
     reason:
       'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its 300-second timeout.',

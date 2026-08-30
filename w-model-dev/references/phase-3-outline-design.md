@@ -66,7 +66,7 @@
   - `{module}-discipline-dod.md`：工程纪律与 DoD 可勾选清单
   - `{module}-uml-modeling.md`：UML 模块级建模（包图/序列图/通信图）
 
-> 路径约定见 [directory-conventions.md](directory-conventions.md)。
+> 路径约定见 [conventions.md](conventions.md#目录约定)。
 
 ## AI 能力应用
 
@@ -141,7 +141,7 @@
 - **schema 一致**：store 选择须与 schema 中的实体定义一致。如 `follower` 是 `user` 实体的子集 → 须在 `user store` 校验，不应在 `blogger store`；如 `comment.bloggerId` 引用 `blogger` 实体主键 → 须在 `blogger store` 校验，不应在 `user store`。
 - **token sub 对齐**：如调用方携带 token，`token.sub` 须与所选 store 的主键一致。如 `blogger token sub=bloggerId` → 不应在 `user store` 校验 `follower`；如 `user token sub=userId` → 不应在 `blogger store` 校验 `blogger` 实体。
 
-**违反后果**：集成测试阶段发现跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 返工接口设计。关联反模式 [#23 跨模块 store 误用](anti-patterns.md)。phase-4 详细设计同步此约束（见 [phase-4-detailed-design.md「跨模块数据源选择约束（同步 phase-3）」](phase-4-detailed-design.md)）。
+**违反后果**：集成测试阶段发现跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 返工接口设计。关联反模式 [#23 跨模块 store 误用](hard-constraints.md)。phase-4 详细设计同步此约束（见 [phase-4-detailed-design.md「跨模块数据源选择约束（同步 phase-3）」](phase-4-detailed-design.md)）。
 
 ## 错误码分层约定
 
@@ -225,7 +225,7 @@ S-bdd 子代理在 S-doc 产出接口设计后：
 3. 更新 `.w-model/bdd-manifest.json`（追加 features + stateMachines）
 4. 在 RTM `integrationTest` 列登记 `IT-NNN | BDD-L3-<system>_<subsystem>-<num>.feature`
 
-V 子代理评审 features（targetKind=test + [bdd-review-checklist.md](bdd-review-checklist.md)）。
+V 子代理评审 features（targetKind=test + [bdd.md](bdd.md)）。
 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=3` 校验 D1-D8。
 
 ## RTM 登记

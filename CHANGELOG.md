@@ -7,6 +7,29 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.0.0] - 2026-08-30
+
+### 优化（三维度优化批次 3：易用性大重构 + 终值评估）——版本 42.0.0 发布
+
+三维度优化收官：批次 1（有效性，评估闭环重建）与批次 2（可靠性，红灯清零）后，本批次聚焦**易用性**——技能资产大重构（w-model-dev/），并以同一固定规格重新执行完整 8 阶段 e2e 终值评估对照基线。
+
+**易用性重构（wave-1 + wave-2 合并重链）**
+
+- **去重合并**：TLA+ 指南 5 文件 → `tla-plus.md` 单文件；BDD 指南 4 文件 → `bdd.md` 单文件；anti-patterns 48 条并入 `hard-constraints.md`；角色细则 4 文件 → 2 文件；`conventions.md`（术语表 + 格式 + 目录约定）+ `coding-quality.md` + `quick-self-check.md`（+ DoD）三合一。`references/` 收敛为 58 个 .md，重链 19 文件共 384+ 处交叉引用（跳转 stub 引导旧路径）。
+- **SKILL.md 整文件重写**：由约 300 行收敛为 **106 非空行**——「三问」触发决策、14 条硬红线压缩表、编排者-子代理边界表、8 步执行工作流、命令速查、阶段路由表与新「门禁契约与资源清单」节（操作行为指针 / 资源计数 / 状态写锁协议 / 行为门禁 flag / 证据与审计 7 条款）。
+- **新增 `references/quickstart.md`**：5 分钟上手（交付层 L0/L1、触发决策、首个任务路径）。
+- 门禁契约与评估锚点同步：docs-consistency 13 项契约闭合（单提交内不留隔夜红灯）；`eval/mappings.json` 4 处锚点随文件改名更新（`npm run eval` 保持 25/25）。
+
+**终值评估（Task 3.6，新 SKILL.md 引擎）**
+
+- 同一 todo-rest-demo SPEC（与基线逐字共用）下完整 8 阶段从零重建：**8 阶段 Verifier 全 A**（0.9295 / 0.8770 / 0.886 / 0.894 / 0.8757 / 0.8942 / 0.9028 / 0.9057）；四级测试 **74/74**（UT 35 + IT 17 + ST 11 + UAT 11，coverage 97.56 / 98.00 / 95.45 / 97.67）。
+- 易用性收益可量化：**分派 ≈52 vs 基线 ≈74（↓约 30%）**；返工 8 项（1 完整 R 循环 + 7 R3-Required S-fix；基线 R 循环 3）；CHECKPOINT 18（判据代行）。
+- **解决基线常驻红灯 D9**：SSoT §10.5.1 阶段 5-8 Cucumber 执行证据 × CON-001 零依赖 × 成熟度 L2 的不可满足，由 S-coding 自建真实 cucumber 报告通道（`.w-model/bdd/generate-bdd-report.ts`，真实 HTTP 往返）消除——阶段 5-8 artifact-gate 全部零常驻红灯。
+- 终结偏离登记：阶段 1 R 循环根因为新指南对 TLA↔BDD 同步契约只有「名称完全一致」而无工作示例（基线 D5① 同型未修，本报告登记为 skill-side upstreamDefect，收尾留档）；验收 UAT-002 设计对冻结规格过度收紧（仅空白 title，O 裁定冻结规格权威，D7 谱系）；超限体大客户端 ECONNRESET（R3 security Required 在最终验收门升格，`src/server.ts` 拒绝路径排空 + `Connection: close` 修复，≥1MB 用例防回潮）。
+- 评估记录：`eval/w-model-dev-results.tsv` 新增 dry_run（25/25 baseline）与 e2e 终值共 2 行；终值记录 `eval/e2e/2026-08-28-final.md`；`eval/README.md` §4 更新为「评估已恢复（2026-08-28 起）」。
+
+> 本版本累积批次 1（评估闭环：`npm run eval` 25/25 + e2e 基线）与批次 2（可靠性红灯清零：run-sync 清单补登 + 负载敏感探针加固）的变更；完整三维度优化设计与实施计划见 `docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md` 与 `docs/superpowers/plans/2026-08-28-w-model-dev-3dim-optimization.md`。
+
 ## [41.19.0] - 2026-08-19
 
 ### 修复（D8 run-log lifecycle checker）

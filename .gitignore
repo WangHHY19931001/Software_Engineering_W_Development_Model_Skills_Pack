@@ -64,3 +64,4 @@ docs/api/
 
 # Git worktrees（本地隔离工作区，不入库）
 .worktrees/
+eval/e2e/demo-final/

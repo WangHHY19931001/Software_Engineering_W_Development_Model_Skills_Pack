@@ -26,7 +26,7 @@
 > **与需求规格关系**：本文档承接阶段 1《需求规格说明书》（外部实体/边界见
 >   phase1-requirements 的 system-context.md），系统内部架构由本文档承载；
 >   接口/类级设计事实由阶段 3/4 产出的设计文档承载，不在本文档描述。
-> **行为规格承接**：L2 行为规格由独立 `.feature` 文件承载（bdd-guide.md §2 头规范管），
+> **行为规格承接**：L2 行为规格由独立 `.feature` 文件承载（bdd.md §2 头规范管），
 >   本文档 §8 引用块指向的 behavior-spec.md 定义引用关系，不内联 feature 块。
 
 ## 1. 系统架构
@@ -78,7 +78,7 @@ graph TD
 ## 6. 核心概念与术语
 
 > 术语表详见 [{{module}}-glossary.md](./{{module}}-glossary.md)
-> （系统设计域术语子集，引用 references/glossary.md 权威表）。
+> （系统设计域术语子集，引用 references/conventions.md 术语表权威表）。
 
 ## 7. 系统设计追踪矩阵
 

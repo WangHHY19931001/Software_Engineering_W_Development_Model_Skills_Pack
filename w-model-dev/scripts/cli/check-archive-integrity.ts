@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     }
     console.log('');
     console.log('O 子代理须按上述清单补齐缺失文件后重跑，详见：');
-    console.log('  w-model-dev/references/anti-patterns.md #31');
+    console.log('  w-model-dev/references/hard-constraints.md（反模式节）#31');
   }
 
   printGateReport(

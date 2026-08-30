@@ -17,7 +17,7 @@
 
 > **文档版本**：{{v1.0}}（{{YYYY-MM-DD}} 首版）
 > **SSOT 声明**：本验收测试文档为阶段 8 验收结果的记录载体；`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown RTM 仅用于导出或展示。
-> **DoD 引用**：项目完成度按 [definition-of-done.md](../references/definition-of-done.md) 七维度标准 + [phase-8-acceptance-test.md](../references/phase-8-acceptance-test.md)「项目级验收检查清单」判定；RTM 需求覆盖率须 100%。
+> **DoD 引用**：项目完成度按 [quick-self-check.md](../references/quick-self-check.md)「完成定义（DoD）」节七维度标准 + [phase-8-acceptance-test.md](../references/phase-8-acceptance-test.md)「项目级验收检查清单」判定；RTM 需求覆盖率须 100%。
 > **自身校验**：`check-artifact-gate.ts` 终检（RTM 100% + 四级测试全通过，退出码 0）；`check-bdd-model.ts --phase=8` 校验 L1 features（如启用）。
 > **禁止占位词**：TBD/TODO/undefined 不得进入正式交付；`待定` 仅允许出现在阶段 1 Out of Scope 的显式标注中。
 

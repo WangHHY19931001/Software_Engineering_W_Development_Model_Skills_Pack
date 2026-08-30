@@ -19,7 +19,7 @@
 4. 编排者（O）所有状态写操作完成后同步 `updatedAt`；只有阶段放行后才更新 `status`。
 5. 编排者（O）所有 `.w-model/*.json` 写入统一经 `wm-write.ts`：`<target>.lock` 持久目录与可转移 owner 对象在跨进程锁内保护 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`mtime` 乐观锁只在该锁内做版本冲突检测，**不足以**单独保证并发安全、竞争写处理或并发处理。`--expect-mtime` 接受有限非负数并向下取整；`--lock-timeout <ms>` 必须为安全非负整数；CLI 检出陈旧锁时，未显式传 `--recover-stale-lock` 即以 `STALE_LOCK` / exit 1 拒绝写入。直接调用 `writeStateJson` 为兼容既有调用仍允许隐式 stale recovery。
 6. **docs-consistency 的明确句式契约边界**：门禁仅拒绝集中维护、逐条测试的禁止句式（限 pre-push / 平台检查的自动安装主张，以及已列明的 mtime 错误安全主张），不声称理解所有自然语言；清单外的复杂语义矛盾由 V review 评审。默认/`platform-deps:check` 始终只读；`platform-deps:install` 仅由用户显式调用，在 Windows x64 / Linux x64 的 caller-owned 私有 staging 内校验并安装缺失包。归档 bytes/路径/PAX/GNU/link metadata 不可信，完整 canonical preflight 必须先于 extraction write；同 UID/同访问令牌进程主动 rename 或篡改 staging/repo/lockfile/tarball/`node_modules` 属于受信运行主体之外的边界，不提供原子 namespace 保证。
-7. **实施动作分派**：产出由 S 子代理执行；评审由 V 子代理执行；门禁由 G 子代理执行。编排者越权实施命中反模式 #10（见 [anti-patterns.md](anti-patterns.md) #10）。
+7. **实施动作分派**：产出由 S 子代理执行；评审由 V 子代理执行；门禁由 G 子代理执行。编排者越权实施命中反模式 #10（见 [hard-constraints.md](hard-constraints.md) #10）。
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 
@@ -275,7 +275,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 | （无） | —    | —    | —    | 无参数 |
 
 - **失败动作**：纯只读输出，不读取项目状态，无失败动作。
-- **guide 链接**：[anti-patterns.md](anti-patterns.md)（反模式 #10 越权实施）、[subagent-delegation.md](subagent-delegation.md)（编排者-子代理边界）。
+- **guide 链接**：[hard-constraints.md](hard-constraints.md)（反模式 #10 越权实施）、[subagent-delegation.md](subagent-delegation.md)（编排者-子代理边界）。
 
 - **执行方**：O 只读，不分派子代理。
 - 输出命令速查、阶段与测试对应关系，以及以下五条：测试设计前置、阶段门不可跳过、测试结果必须真实、退出码 1/2 不得放行、**编排者不得越权实施（反模式 #10）**。不读取项目状态。
@@ -361,7 +361,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **参数完整性**：仅接受此速查行中的精确选项；require flags 必须是无赋值的裸 flag。`--require-…=true`、重复、拼写近似和未知 `--*` 均为 `ARG_INVALID` / exit 2，绝不降级为兼容 skip。
 - **失败动作**：exit 1 时由 S 修复/补齐项目工件后走 V→G；required Cucumber 报告必须为 `{ elements: [...] }`，且至少一个非空 `name` 的 scenario element 含 `result.status="passed"`。`failed` 只作失败诊断，`skipped` / `pending` / `undefined` / 未知 status 和匿名 element 都不能满足证据并产生 D5 violation；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
 - **边界**：本地 pre-push 直接运行的是技能包 `check-bdd-model` fixture 回归；它不直接运行 TLA、TLA↔BDD 同步或任何项目工件阶段门。项目阶段门才按成熟度传入上述 require flags 和真实工件。
-- **guide 链接**：[bdd-guide.md](bdd-guide.md)（BDD 门禁调用）与 [tla-plus-guide.md](tla-plus-guide.md)（TLA+ / BDD 协作）。
+- **guide 链接**：[bdd.md](bdd.md)（BDD 门禁调用）与 [tla-plus.md](tla-plus.md)（TLA+ / BDD 协作）。
 
 ## 错误码与 ERROR_JSON 约定
 

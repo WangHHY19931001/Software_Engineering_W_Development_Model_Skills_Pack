@@ -4,7 +4,7 @@
  * 覆盖：
  *   - PHASE_DOC_MAP 键为 1-8（缺 5：阶段 5 无独立文档目录）
  *   - phase 1 的 uat-path-mapping 特殊映射（resolvePhaseDoc(1, 'uat-path-mapping')）
- *   - resolvePhaseDoc 支持/不支持分支（未支持 phase / 未知 type 抛错消息含 directory-conventions.md §1）
+ *   - resolvePhaseDoc 支持/不支持分支（未支持 phase / 未知 type 抛错消息含 conventions.md（目录约定）§1）
  */
 
 import { describe, expect, it } from 'vitest';
@@ -42,10 +42,10 @@ describe('resolvePhaseDoc', () => {
     expect(resolvePhaseDoc(8, 'acceptance-test-phase8')).toBe('docs/phase8-acceptance-test/acceptance-test.md');
   });
 
-  it('未支持的 phase（含 5）抛错且消息含 directory-conventions.md §1', () => {
+  it('未支持的 phase（含 5）抛错且消息含 conventions.md（目录约定）§1', () => {
     expect(() => resolvePhaseDoc(5, 'system-design')).toThrow(/未支持的 phase=5/);
     expect(() => resolvePhaseDoc(9, 'system-design')).toThrow(/未支持的 phase=9/);
-    expect(() => resolvePhaseDoc(5, 'any')).toThrow(/directory-conventions\.md §1/);
+    expect(() => resolvePhaseDoc(5, 'any')).toThrow(/conventions\.md.*§1/);
   });
 
   it('未知 type 抛错且消息含映射信息', () => {

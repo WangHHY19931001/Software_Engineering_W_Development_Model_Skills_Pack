@@ -322,7 +322,7 @@ async function main(): Promise<number> {
           tlaManifestPath,
         );
         tlaSnapshots = [];
-        // tlaPath 相对 basePath（相对 manifest 所在目录）解析，与 check-tla-model.ts P1.1 路径基准一致（tla-plus-guide §2.1）
+        // tlaPath 相对 basePath（相对 manifest 所在目录）解析，与 check-tla-model.ts P1.1 路径基准一致（tla-plus §2.1）
         const tlaBase = path.resolve(path.dirname(tlaManifestPath), tlaManifest.basePath ?? '');
         for (const spec of tlaManifest.specs) {
           const tlaPath = path.resolve(tlaBase, spec.tlaPath);
