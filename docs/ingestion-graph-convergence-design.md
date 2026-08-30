@@ -366,7 +366,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 | `references/phase-1-requirements.md` | 「需求解析算法」前插入 ingestion 子流程引用；「执行方法论」表加 graph.json 行；「验收标准」加"图谱连通+单根通过" |
 | `references/phase-2-system-design.md` `phase-3-outline-design.md` `phase-4-detailed-design.md` | 各加「ingestion 子流程（S→A 路径）」节；阶段4加"图谱零违反硬约束" |
 | `references/workflow.md` | 流程图阶段1-4节点加 ingestion 子流程标注；阶段产物清单表加 graph.json 列 |
-| `references/anti-patterns.md` | 新增 #11「ingestion 跳过图谱校验」、#12「A 自评收敛」；F1-F10 失败模式补充 ingestion 相关信号 |
+| `references/hard-constraints.md` | 新增 #11「ingestion 跳过图谱校验」、#12「A 自评收敛」；F1-F10 失败模式补充 ingestion 相关信号 |
 | `references/command-reference.md` | `/wm analyze` 与 `/wm design` 命令条目加 ingestion 字段说明 |
 | `scripts/cli/self-test.ts` | 新增 plan-chunks + check-requirement-graph 的样本测试用例（与现有 17 条同构追加） |
 | `scripts/samples/graph/` | 新增样本目录：`valid-graph.json`、`bad-isolated.json`、`bad-multi-root.json`、`bad-orphan.json`、`bad-sd-no-implements.json` 等 |

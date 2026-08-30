@@ -318,7 +318,7 @@ TLA+ 层次树须与 graph 系统层级树（SSoT §10.10.1）同构覆盖——
 **覆盖要求**：
 - 每个 SD 须有 TLA+ 覆盖——L2 子系统规格或 L3 接口行为规格（任一即可）。
 - 覆盖判定：`tla-manifest.json.specs[]` 中存在某 spec 的 `requirementIds` 含该 SD 关联的 REQ，或 `designRef` 引用该 SD 对应设计文档。
-- 强制校验：`check-tla-model.ts --graph=<graph.json>` 提取 SD 节点做覆盖率校验，未覆盖 SD 列表 → `sdCoverageViolation`，exitCode=1。可执行细则见 [tla-plus-guide.md](../w-model-dev/references/tla-plus-guide.md) §10。
+- 强制校验：`check-tla-model.ts --graph=<graph.json>` 提取 SD 节点做覆盖率校验，未覆盖 SD 列表 → `sdCoverageViolation`，exitCode=1。可执行细则见 [tla-plus.md](../w-model-dev/references/tla-plus.md) §10。
 
 **横切设计承载**：
 - 横切设计（如 S08 治理子系统）可建独立 L2 规格，其 `@sibling` 指向被治理的子系统规格（而非通过 `@parent`/`@child` 依附）。
@@ -354,7 +354,7 @@ TLA+ 门禁与 ingestion 图谱门禁**正交叠加**：
 
 ## 7. 新增反模式（#14–#17）
 
-详见 [w-model-dev/references/anti-patterns.md](../w-model-dev/references/anti-patterns.md)。
+详见 [w-model-dev/references/hard-constraints.md](../w-model-dev/references/hard-constraints.md)。
 
 | # | 反模式 | 危害 | 守护 |
 |---|---|---|---|
@@ -368,7 +368,7 @@ TLA+ 门禁与 ingestion 图谱门禁**正交叠加**：
 | 产物 | 路径 | 说明 |
 |---|---|---|
 | 设计文档 | `docs/tla-plus-modeling-design.md` | 本文件 |
-| 参考指南 | `w-model-dev/references/tla-plus-guide.md` | A/S/V/G 子代理可执行细则 |
+| 参考指南 | `w-model-dev/references/tla-plus.md` | A/S/V/G 子代理可执行细则 |
 | 纯逻辑 | `w-model-dev/scripts/logic/tla-logic.ts` | 校验纯逻辑（单点事实源） |
 | CLI 脚本 | `w-model-dev/scripts/cli/check-tla-model.ts` | G 子代理调用入口 |
 | 模板 | `w-model-dev/templates/tla-spec-template.md` | .tla 文件头模板 |
@@ -377,4 +377,4 @@ TLA+ 门禁与 ingestion 图谱门禁**正交叠加**：
 | 端到端 fixture | `w-model-dev/scripts/samples/tla-e2e/` | 4 场景（Counter 通过 / DeadlockDemo 死锁 / InvViolation 不变式违反 / SyntaxError 语法错误）的 `.tla` + `.cfg` + manifest，需 Java + tla2tools.jar，手动 `npx tsx check-tla-model.ts <manifest>` 驱动（详见该目录 README.md） |
 | SSoT 更新 | `docs/skill-design-document_SSoT.md` | 新增 §7.8 / §10.8 / §3.4.2 更新 |
 | SKILL 更新 | `w-model-dev/SKILL.md` | 工作流 + 自检清单 |
-| 反模式更新 | `w-model-dev/references/anti-patterns.md` | 新增 #14–#17 |
+| 反模式更新 | `w-model-dev/references/hard-constraints.md` | 新增 #14–#17 |

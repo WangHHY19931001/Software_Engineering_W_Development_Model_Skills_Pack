@@ -14,7 +14,7 @@
 
 ## 2. 校验脚本总览
 
-全部门禁脚本位于 `w-model-dev/scripts/cli/`（`check-*.ts`），由外部 Agent 或手工以 `npx tsx` 直接执行，**不调用任何 LLM**，仅做结构化门禁判定。各阶段应跑哪些脚本见 README「W 模型 8 阶段 × 门禁对应」表与 [`dispatch-matrix.md`](../w-model-dev/references/dispatch-matrix.md)。
+全部门禁脚本位于 `w-model-dev/scripts/cli/`（`check-*.ts`），由外部 Agent 或手工以 `npx tsx` 直接执行，**不调用任何 LLM**，仅做结构化门禁判定。各阶段应跑哪些脚本见 README「W 模型 8 阶段 × 门禁对应」表与 [`subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)。
 
 所有脚本统一三态退出码与输出通道（SSoT §10E）：
 
@@ -35,7 +35,7 @@
 排查步骤：
 
 1. **读 violations 列表**：每条违规含规则链前缀，如 `[D7:feature-001] req "REQ-001" not in RTM`、`R1: 阶段 4 缺 gate 类动作`。先按前缀在 第 4 节速查表定位规则归属。
-2. **对照规则依据**：反模式编号 `#N` → 查 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) 对应行的「正确做法」列；维度编号（R1-R5 / D1-D8 / C1-C10 / E1-E9）→ 查 第 5 节指向的 reference 细则。
+2. **对照规则依据**：反模式编号 `#N` → 查 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) 对应行的「正确做法」列；维度编号（R1-R5 / D1-D8 / C1-C10 / E1-E9）→ 查 第 5 节指向的 reference 细则。
 3. **走标准返工路径**：V/G 不通过后**不得悄悄小修后继续**（反模式 #4），必须先分派 R 根因定位 → V 复审 → G 门禁 → S-fix 携报告修复（反模式 #18/#19）。
 4. **重跑门禁**直到 exit 0；退出码 1/2 一律不得放行（反模式 #7）。
 
@@ -68,9 +68,9 @@
 
 ## 4. 规则依据
 
-### 4.1 负面知识库（anti-patterns.md）
+### 4.1 负面知识库（hard-constraints.md）
 
-规则依据的权威清单在 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md)：
+规则依据的权威清单在 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md)：
 
 - **47 条流程反模式** `#1~#47`（命中即视为流程破坏、必须回退）
 - **失败模式** `F1~F10`（行为退化，命中不回退但登记，见 [`operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)）、**运维失败模式** `O1~O6`（见 SSoT §4A.2a）
@@ -97,8 +97,8 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 | 门禁 | 常见失败信号 | 规则依据 | 修复建议 |
 |---|---|---|---|
 | 图谱门禁 `check-requirement-graph.ts` | 连通性 / 多根 / 父唯一 / 信息流黑洞·奇迹·死模块 | 反模式 #11/#12/#13 | 修正 ingestion 分块或合并结果后重跑；信息流校验详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) |
-| TLA+ 门禁 `check-tla-model.ts` | SANY 语法失败 / TLC 死锁 / 不变式违反 | 反模式 #14/#15/#16/#17 | 先修语法再跑 TLC（顺序强制）；规格与需求/设计不符须回退修正；详见 [`tla-plus-guide.md`](../w-model-dev/references/tla-plus-guide.md) |
-| BDD 门禁 `check-bdd-model.ts` | D1 头标注不一致 / D4 不等价 / D7 RTM 无映射 | 反模式 #29 | feature 忠实需求/设计；D4 不等价须走 R→V→G→S-fix，实质不一致上报人类；详见 [`bdd-guide.md`](../w-model-dev/references/bdd-guide.md)「不符处理流程」节 |
+| TLA+ 门禁 `check-tla-model.ts` | SANY 语法失败 / TLC 死锁 / 不变式违反 | 反模式 #14/#15/#16/#17 | 先修语法再跑 TLC（顺序强制）；规格与需求/设计不符须回退修正；详见 [`tla-plus.md`](../w-model-dev/references/tla-plus.md) |
+| BDD 门禁 `check-bdd-model.ts` | D1 头标注不一致 / D4 不等价 / D7 RTM 无映射 | 反模式 #29 | feature 忠实需求/设计；D4 不等价须走 R→V→G→S-fix，实质不一致上报人类；详见 [`bdd.md`](../w-model-dev/references/bdd.md)「不符处理流程」节 |
 | Verifier 输出 `check-verifier-output.ts` | R13 单轴 score < 0.70 | 反模式 #41 | 补强该维度评审，不得以总分掩盖；详见 [`verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §3.3 / §6.3 |
 | 工件质量门 `check-artifact-gate.ts` | RTM 覆盖率 < 100% / `designDoc` 未回填 | 反模式 #3/#6/#7 | 实际核验 RTM 登记项并回填真实结果；详见 [`quality-standards.md`](../w-model-dev/references/quality-standards.md)「质量门检查清单」 |
 | run-log 门禁 `check-run-log.ts` | R1 缺动作 / R5 O 越权 / R6 exitCode 不一致 | 反模式 #10/#25/#26/#27 | 补记真实动作（勿伪造）；字段按 [`data-models.md`](../w-model-dev/references/data-models.md) 对照表修正 |
@@ -149,5 +149,5 @@ npm run prepush
 - [排障手册（FAQ + 环境问题矩阵）](./troubleshooting.md)
 - [README（快速上手 / 门禁对应 / CI 策略）](../README.md)
 - [command-reference.md（/wm 命令 + 错误码与 ERROR_JSON 约定）](../w-model-dev/references/command-reference.md)
-- [anti-patterns.md（规则依据权威清单）](../w-model-dev/references/anti-patterns.md)
+- [hard-constraints.md（反模式规则依据权威清单）](../w-model-dev/references/hard-constraints.md)
 - [安装指南](./INSTALL.md) / [采用路径指南](./adoption-guide.md)

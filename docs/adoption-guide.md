@@ -71,8 +71,8 @@
 - **跳过 `/wm analyze` 因为「只是个原型」**：原型会变成产品。需求规格是此代码库最便宜的产物，跳过它就是为后续所有阶段埋下假设地雷。
 - **一次性加载全部 `references/`**：违反 硬约束 #6「按需加载」，污染上下文，使 Agent 失去阶段聚焦。按阶段加载，由 [`SKILL.md`](../w-model-dev/SKILL.md) 路由。
 - **推迟性能基线到「有东西可测」**：阶段 7 系统测试前必须准备 k6 脚本，否则违反 SSoT [§10.5](./skill-design-document_SSoT.md) 工件质量门「性能指标达标」要求。
-- **跳过 🔴 CHECKPOINT 因为「自己心里有数」**：违反 硬约束 #2 + #8，命中 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) #8。
-- **估算覆盖率放行**：违反 硬约束 #4，命中 [`anti-patterns.md`](../w-model-dev/references/anti-patterns.md) #3 / #6。
+- **跳过 🔴 CHECKPOINT 因为「自己心里有数」**：违反 硬约束 #2 + #8，命中 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) #8。
+- **估算覆盖率放行**：违反 硬约束 #4，命中 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) #3 / #6。
 
 ---
 
