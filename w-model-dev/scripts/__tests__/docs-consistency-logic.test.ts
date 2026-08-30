@@ -2347,7 +2347,7 @@ async function withDocsConsistencyFixture(
       recursive: true,
       filter: (source) => {
         const relative = path.relative(REPO_ROOT, source);
-        return !['node_modules', '.git', '.w-model', '.codegraph'].some(
+        return !['node_modules', '.git', '.w-model', '.codegraph', '.worktrees'].some(
           (excluded) => relative === excluded || relative.startsWith(`${excluded}${path.sep}`),
         );
       },
