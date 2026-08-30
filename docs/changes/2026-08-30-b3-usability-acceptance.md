@@ -96,6 +96,17 @@
 - package-only provenance / source-bound provenance：未生成、未验证（本批次不改 `.w-model/` 证据协议，与 b2 对齐）。
 - `.githooks/pre-push --force` 以控制台方式执行并通过，未实际 `git push`。
 
+## 合并后 main 收尾（merge 2b8743e + ffd5164）
+
+批次 3 全部提交链（44b8bee..32fe35b + 本验收记录 67e2d6d）合并回 main 后，main 上追加两个 commit 方达最终全绿状态：
+
+| commit | 说明 |
+|---|---|
+| `2b8743e` | `merge(batch3): merge 3dim batch-3 (usability rewrite + final eval + v42.0.0) into main`（--no-ff；AGENTS.md §0 删除与 main 的 batch-3 handoff §0 冲突，按批次 3 最终版解决——§0 删除、§1/§2 eval 终值引用保留） |
+| `ffd5164` | `fix(scripts): exclude .worktrees from docs-consistency fixture copy`——**合并后在 main（而非 worktree）终值验证首次暴露的测试基础设施缺陷**：`withDocsConsistencyFixture` 的 `cpSync` 深度复制仓库根，filter 未排除 `.worktrees/**`，而 main 根含 b1-3dim/b3-3dim 两个完整观望 checkout（含 node_modules），导致 docs-consistency CLI 真实探针测试在主仓根下 30s 超时（隔离 37s+ vs worktree 内 14s）。S-fix 排除 `.worktrees` 后探针降回 13-15s，单文件 152/152 全绿。终值 main prepush 17 项全绿。 |
+
+最终 main 验收：`npm run eval` 25/25、`npm run self-test` 260/260、`npm run prepush` 17 项全绿（含 vitest+coverage 1241、npm audit、prettier、tsc、docs-consistency）。
+
 ## Deferred concerns
 
 1. **残余负载敏感 flake（环境容量问题）**：state-write-logic 锁并发测试与 docs-consistency R10 真实执行探针在全量 16 worker + coverage 插桩极限负载下偶发单条超时（本批次验收中出现 4+ 次失败运行，失败测试随机不固定、隔离全绿、末轮经 per-test 90s 预算加固后 prepush 全绿）。延续批次 2 Deferred 1，非技能代码缺陷；R10 探针已加 per-test budget 显著降频，暴露原因是批次 3 wave 合并使真实源文件变大。此处如实记录，不作「零偶发」声明。
