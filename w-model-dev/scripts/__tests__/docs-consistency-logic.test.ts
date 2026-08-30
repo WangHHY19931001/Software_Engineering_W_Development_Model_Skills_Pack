@@ -607,7 +607,7 @@ describe('R10 七来源 source×clause 维护契约', () => {
         ).toBe(true);
       }
     }
-  });
+  }, 90_000); // real-execution probe: ~15-19s alone, >30s under full-suite+coverage load (batch 3 wave merged larger real sources); per-test budget instead of raising global testTimeout
 });
 
 describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
@@ -657,9 +657,9 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
       }),
     );
 
-    expect(
-      oldSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('subagent-delegation.md')),
-    ).toBe(true);
+    expect(oldSemantics.some((x) => x.check === 'a4-state-lock' && x.message.includes('subagent-delegation.md'))).toBe(
+      true,
+    );
     expect(oldSemantics.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
       true,
     );

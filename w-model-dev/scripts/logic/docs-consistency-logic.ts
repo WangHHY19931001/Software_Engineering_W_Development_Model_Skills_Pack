@@ -1276,15 +1276,16 @@ function checkHardConstraints(skill: string, hardConstraints: string): DocCheckV
       message: 'SKILL.md 应含「不可违反的约束」指针（指向 references/hard-constraints.md）',
     });
   }
+  const headingLines = hardConstraints.split('\n').filter((l) => l.startsWith('## #'));
   for (let i = 1; i <= EXPECTED.hardConstraintCount; i++) {
-    if (!new RegExp(`^## #${i} `, 'm').test(hardConstraints)) {
+    if (!headingLines.some((l) => l.startsWith(`## #${i} `))) {
       violations.push({
         check: 'hard-constraints',
         message: `hard-constraints.md 缺「## #${i}」标题（应有 ${EXPECTED.hardConstraintCount} 条）`,
       });
     }
   }
-  if (new RegExp(`^## #${EXPECTED.hardConstraintCount + 1} `, 'm').test(hardConstraints)) {
+  if (headingLines.some((l) => l.startsWith(`## #${EXPECTED.hardConstraintCount + 1} `))) {
     violations.push({
       check: 'hard-constraints',
       message: `hard-constraints.md 出现超出 ${EXPECTED.hardConstraintCount} 条的「## #${EXPECTED.hardConstraintCount + 1}」标题`,
