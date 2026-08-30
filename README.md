@@ -9,7 +9,7 @@
 > 与普通 skill 的区别：脚本只做结构化门禁、**不调用 LLM**；LLM 评审由外部 Agent 按提示词执行。
 > 两个独立入口：选择 [验证仓库](#验证仓库) 检查仓库脚本健康，或选择 [安装 Skill](#安装-skill) 将资产复制到 Agent-specific skills 目录；两者不是同一条命令链。
 
-**当前版本**：`41.19.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`42.0.0`（活跃迭代中，版本演进与历史变更见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前历史见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（2026-08-19 实测）：
 
