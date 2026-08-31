@@ -28,6 +28,9 @@ async function collectTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await fs.readdir(directory, { withFileTypes: true });
   const files = await Promise.all(
     entries.map(async (entry) => {
+      // Skip transient fixtures written by parallel tests (e.g. dependency-boundaries'
+      // .d2-boundary-fixture-<pid>.ts) to avoid racing their write/remove lifecycle.
+      if (entry.name.startsWith('.d2-')) return [];
       const entryPath = path.join(directory, entry.name);
       if (entry.isDirectory()) return collectTypeScriptFiles(entryPath);
       return entry.isFile() && entry.name.endsWith('.ts') ? [entryPath] : [];
@@ -49,6 +52,17 @@ async function findDirectSyncCalls() {
   }
   return { calls, violations };
 }
+
+it('skips dot-prefixed transient fixtures created by parallel tests', async () => {
+  const transient = path.join(SCRIPT_ROOT, 'logic', `.d2-boundary-fixture-${process.pid}-probe.ts`);
+  await fs.writeFile(transient, "import 'fs';\n");
+  try {
+    const files = await collectTypeScriptFiles(SCRIPT_ROOT);
+    expect(files.some((file) => file === transient)).toBe(false);
+  } finally {
+    await fs.rm(transient, { force: true });
+  }
+});
 
 type ConsoleSpy = {
   mock: { calls: unknown[][] };
