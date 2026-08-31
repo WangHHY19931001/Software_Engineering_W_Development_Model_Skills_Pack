@@ -10,7 +10,7 @@
  * 约定：REQ→REQ parent 边方向 from=parent → to=child（与 R2 parentInCount / R3 toLevel=fromLevel+1 一致）。
  */
 
-import { describe, it, expect, test } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 import {
   checkRequirementGraph,
@@ -1174,7 +1174,7 @@ describe('R15 evidenceAnchor 格式校验', () => {
     };
   }
 
-  test('合法锚点通过（path:§section=statement）', () => {
+  it('合法锚点通过（path:§section=statement）', () => {
     const r = checkRequirementGraph(
       makeReqGraph('docs/phase1-requirements/requirement-spec.md:§4.2=登录需密码策略（用户原话）'),
       1,
@@ -1183,19 +1183,19 @@ describe('R15 evidenceAnchor 格式校验', () => {
     expect(r.violations.some((v) => v.includes('R15'))).toBe(false);
   });
 
-  test('合法锚点通过（path:L42=statement）', () => {
+  it('合法锚点通过（path:L42=statement）', () => {
     const r = checkRequirementGraph(makeReqGraph('src/auth.ts:L42-58=JWT 签发逻辑'), 1);
     expect(r.passed).toBe(true);
     expect(r.violations.some((v) => v.includes('R15'))).toBe(false);
   });
 
-  test('非法锚点（无定位）R15 拦截', () => {
+  it('非法锚点（无定位）R15 拦截', () => {
     const r = checkRequirementGraph(makeReqGraph('登录需要密码'), 1);
     expect(r.violations.some((v) => v.includes('R15 evidenceAnchor 格式校验失败'))).toBe(true);
     expect(r.passed).toBe(false);
   });
 
-  test('省略／空串锚点向后兼容（省略通过；空串由 schema minLength=1 拦截而非 R15）', () => {
+  it('省略／空串锚点向后兼容（省略通过；空串由 schema minLength=1 拦截而非 R15）', () => {
     expect(checkRequirementGraph(makeReqGraph(undefined), 1).passed).toBe(true);
     // 空串触发 schema minLength=1 校验失败（task 1 schema 语义：省略即不声明，而非空串）
     const r = checkRequirementGraph(makeReqGraph(''), 1);

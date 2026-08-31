@@ -145,6 +145,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | data-models | `.w-model/*.json` 数据模型 / schema 强约束 / RunLogEntry vs EventIngress 边界 | 2 跳 |
 | design-philosophy | 五条设计哲学（主刀与修正权等）；O 通用加载 | 1 跳 |
 | estimation-guide | 工期 / 预算估算时（O 通用加载） | 1 跳 |
+| evidence-anchored-tree | 路径不确定 / 需求模糊项目的方法论参照（证据支撑树 × W 模型映射，42.1.0 新增） | 1 跳 |
 | event-ingress-guide | Loop 3 事件接驳；L2+ 成熟度激活时 | 2 跳 |
 | graph-guide | 阶段 1-4 图谱门禁与收敛准则（A 子代理 + G） | 1 跳 |
 | hard-constraints | 14 条硬约束 + 反模式（48 条，#1~#48）完整版；执行前必读（O 通用加载；42.0.0 吸收反模式清单） | 1 跳 |
@@ -174,7 +175,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | workflow | 完整工作流程（初始化项目 / 阶段切换 / 向用户解释整体流程时） | 2 跳 |
 
 > 2 跳文件共 11 个：command-reference / concurrency-guide / conventions / data-models / event-ingress-guide / hill-climbing-guide / iceberg-sweep-guide / root-cause-locator / signature-chain-guide / skillopt-adoption / workflow。
-> 其余 27 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
+> 其余 28 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
 
 ### 4. 返工循环分派
 

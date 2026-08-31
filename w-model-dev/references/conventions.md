@@ -148,6 +148,8 @@ path:§3.2,L42       （章节+行号混合）
 
 ### 2.1 VerifierOutput evidence
 
+> 本格式同时是 `graph.json` 节点可选字段 `evidenceAnchor`（产出期证据锚点）的格式权威（见术语表 evidenceAnchor 条目）。
+
 格式：`path:§section=statement` 或 `path:L42=statement`
 
 ```
