@@ -72,6 +72,12 @@
 {"target":"<疑似关联的chunk-id>","reason":"<为什么认为存在跨块迷雾关联>","edgeType":"fog"}
 ```
 
+### evidenceAnchor 可选声明（A-chunk）
+
+- 提取 REQ 节点时，若该节点结论来自明确事实（用户原话 / 指定文档段落 / 外部依赖版本 / 已读代码），在节点上填写 `evidenceAnchor`（格式见 conventions.md 列定位约定）。
+- 无法定位到具体事实时**省略**该字段（不强制、不填空串）；可选字段不影响图谱通过。
+- 示例：`"evidenceAnchor": "docs/phase1-requirements/requirement-spec.md:§4.2=登录需密码策略（用户原话）"`
+
 ## 边提取规则
 
 1. 仅提取本块内部的边（parent/depends-on/implements/defines/realizes）

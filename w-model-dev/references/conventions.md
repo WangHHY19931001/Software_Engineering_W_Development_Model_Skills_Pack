@@ -100,6 +100,15 @@
 - **规范定义**：S 产出后强制触发的三阶段审查（completeness / reliability / security），产物落盘 `.w-model/preventive-reviews/<phase>-<dimension>.json`（约束 #11，反模式 #33）。
 - **_Avoid_**：预防性检查/预防审查/R3 评审（固定称呼「R3 预防性审查」，三份报告维度名固定为 completeness / reliability / security）。
 
+### evidenceAnchor
+
+- **规范定义**：图谱节点（graph.json nodes[]）结论的事实锚点，由 **A 子代理 ingestion 时**声明"该节点结论依据什么事实"（A-chunk 提取 REQ 节点时对来源声明，A-cross 合并保留），
+  格式遵循本文件「格式约定」§2.1（`path:§section=statement` / `path:L42=statement`）；未声明时省略该字段（可选，R15 不强制）。
+  S 子代理产出需求规格 §4.2 时**只读 graph.json 同步呈现**，不改图谱节点（S 改图谱命中反模式 #11）。
+  与 VerifierOutput.subCriteria[].evidence 的区别：evidence 是**评审者**证明"我核验过"的证据；
+  evidenceAnchor 是**产出者（A）**声明"我依据这个"的前提，二者互补不互相替代。
+- **_Avoid_**：证据锚点/sourceRef/proof（字段名固定「evidenceAnchor」；「证据」在 VerifierOutput 语境指评审证据）
+
 ### 反模式（Anti-Pattern）
 
 - **规范定义**：流程级负面知识库条目（#1-#48），命中即回退到当前阶段起点。规范用词为「反模式」；「反例」为弃用别名（_Avoid_）。与「失败模式 F1-F10」（行为退化，登记不回退）、「运维失败模式 O1-O6」三库互补。

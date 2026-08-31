@@ -19,6 +19,11 @@
 8. **交叉逻辑矩阵汇总**【维度3】：汇总四类交叉边（depends-on / precedes / conflicts-with / cross-cuts）的数量与端点；识别异常项写入 reworkHints（conflicts-with 边无处置记录 → FM-3D-06；depends-on/precedes 形成环 → FM-3D-05；cross-cuts 端点缺失 → FM-4D-04）；产出交叉逻辑矩阵写入 `cross-analysis-report.md` §6（§6.1-§6.4 四类边分表）
 9. **迷雾登记册汇总**：读取各 chunk `.md` 叙事文件中的「迷雾项」节，跨块去重；汇总每项疑似 REQ-group 归属（fogGroupHint）与疑似毕业方向（REQ / Out of Scope / 待澄清）供 S 参考，写入 `cross-analysis-report.md` §7。**A-cross 不代 S 决定毕业**（毕业是 S 产出 + R/V 核验职责，见 [phase-1-requirements.md](phase-1-requirements.md)「迷雾登记册（Fog of War）」节）；疑似方向仅作指引，不建图节点。
 
+### evidenceAnchor 保留与取舍（A-cross）
+
+- 合并时保留各节点 `evidenceAnchor`；同节点多来源冲突时取来源最具体的，并在 `cross-analysis-report.md` 记录取舍理由。
+- 不因合并歧义而删除既有合法锚点（除非来源确实失效，此时省略并记录）。
+
 ## A-evolve（阶段2-4）演进算法
 
 1. 读取现有 graph.json（前阶段已通过的图谱）
