@@ -7,6 +7,12 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.1.0] - 2026-08-31
+
+### 优化（证据支撑树方法论集成）——版本 42.1.0 发布
+
+在 42.0.0 基础上集成「证据支撑树」方法论：图谱节点新增可选 `evidenceAnchor` 字段并以 R15 结构校验（schema 增量 + graph-logic 检查 + 8 条 fixture，self-test 基线 260→262）；requirement-spec 模板 §4.2 增 evidenceAnchor 列、glossary 登记术语；新增 `references/evidence-anchored-tree.md`（57 行）方法论参考，SKILL.md「按需加载」表追加路径不确定/需求模糊参照，`references/` 资源计数 58→59。版本号七处镜像同步至 42.1.0（SKILL.md / skill-metadata.json / package.json / package-lock.json / README / INSTALL.md / CHANGELOG）。
+
 ## [42.0.0] - 2026-08-30
 
 ### 优化（三维度优化批次 3：易用性大重构 + 终值评估）——版本 42.0.0 发布

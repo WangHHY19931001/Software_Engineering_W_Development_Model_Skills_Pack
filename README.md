@@ -18,7 +18,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 - **全程可追溯**：需求跟踪矩阵（RTM）自动维护，需求 ↔ 设计 ↔ 代码 ↔ 四级测试双向可查；
 - **管流程的人不亲自动手**：编排者（O）只负责调度、记录和等待确认，实际产出与把关全部由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位 / A 分析）承担。
 
-**当前版本**：`42.0.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`42.1.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（全部门禁实测通过，怎么验证见下方「CI 策略」与「快速上手」）：
 
@@ -189,7 +189,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 .
 ├── w-model-dev/                  # Skill 资产本体（纯 Markdown，可整目录拷贝分发）
 │   ├── SKILL.md                  # 技能定义：触发条件 + /wm 编排规则 + 版本号
-│   ├── references/               # 58 份阶段细则与规范（按需加载，禁止一次性全读）
+│   ├── references/               # 59 份阶段细则与规范（按需加载，禁止一次性全读）
 │   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例
