@@ -54,6 +54,8 @@ export interface GraphNode {
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   /** 所属 REQ-group ID（level=1 REQ 自身为 group 无此字段；level≥2 须指向 level=1 祖先） */
   reqGroup?: string;
+  /** 节点结论的前提事实锚点（可选；格式见 conventions.md 列定位约定；由 A 子代理 ingestion 时声明） */
+  evidenceAnchor?: string;
 }
 
 export interface GraphEdge {
@@ -791,6 +793,20 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
         .join(
           ', ',
         )}）（应暂停机械重跑，转人工根因分析或走豁免流程；示例：定位不收敛的违规类别后重构图谱，而非继续累加轮次）`,
+    );
+  }
+
+  // R15: evidenceAnchor 仅声明则须格式合法（可选字段；格式复用 verifier-logic EVIDENCE_PATTERN 语义）
+  const EVIDENCE_ANCHOR_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
+  const badEvidenceAnchors: string[] = [];
+  for (const n of g.nodes) {
+    if (n.evidenceAnchor !== undefined && n.evidenceAnchor !== '' && !EVIDENCE_ANCHOR_PATTERN.test(n.evidenceAnchor)) {
+      badEvidenceAnchors.push(`${n.id}（${n.evidenceAnchor}）`);
+    }
+  }
+  if (badEvidenceAnchors.length > 0) {
+    result.violations.push(
+      `R15 evidenceAnchor 格式校验失败：${badEvidenceAnchors.join('；')}（格式须为 path:§section=statement 或 path:L42=statement）`,
     );
   }
 
