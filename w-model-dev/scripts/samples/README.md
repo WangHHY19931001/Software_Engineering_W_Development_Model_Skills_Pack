@@ -1,6 +1,6 @@
 # samples/ 覆盖矩阵
 
-> 本目录为 `self-test.ts`（260 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
+> 本目录为 `self-test.ts`（262 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
 > **每个 fixture 必须被 `w-model-dev/scripts/cli/self-test.ts` 用例数组引用**（`file` / `sampleDir` 字段），
 > 未登记的 fixture 不参与任何检查——由 `check-samples-coverage.ts` 门禁自动核对（新增样本后运行
 > `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` 确认全绿）。
@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | `verifier` | check-verifier-output | VERIFIER_CASES（25） | Verifier 输出校验（含 4 个可执行 Persona 样例、R13 单轴下限 / self-as-verifier / targetKind=rootcause §7.5） | 平铺 JSON |
 | `gate` | check-artifact-gate | GATE_CASES（20）+ SPEC_STRUCTURE×4（16） | RTM 矩阵 / DoD / 阶段 1-6 门禁 + spec-structure 校验 | 平铺 JSON |
-| `graph` | check-requirement-graph | GRAPH_CASES（28）+ ENHANCE×4（16） | 图谱 R1-R14 + 规格/大纲/详细设计增强 | 平铺 JSON |
+| `graph` | check-requirement-graph | GRAPH_CASES（31）+ ENHANCE×4（16） | 图谱 R1-R14 + 规格/大纲/详细设计增强 | 平铺 JSON |
 | `tla` | check-tla-model | TLA_CASES（15） | TLA+ manifest 纯逻辑校验（self-test 驱动，不跑 SANY/TLC） | 平铺 JSON |
 | `tla-e2e` | check-tla-model（SANY/TLC 全链路） | —（豁免，手动 / CI 执行） | 端到端 fixture（Counter / DeadlockDemo / InvViolation / SyntaxError） | `.tla` + `.cfg` + manifest + states/（TLC 残留，勿提交） |
 | `tla-bdd-sync` | check-tla-bdd-sync | TLA_BDD_SYNC_CASES（2） | TLA+↔BDD 转移集 / 状态集 / 不变式等价 | 平铺 JSON |
@@ -36,7 +36,7 @@
 | `openspec-archive` | check-openspec-archive | OPENSPEC_ARCHIVE_CASES（3，sampleDir 形态） | opsx:archive 归档完整性 | 嵌套 `openspec/changes/archive/` |
 | `uat-path-mapping` | check-artifact-gate（B4/B5） | UAT_PATH_MAPPING_CASES（5，sampleDir 形态） | uat-path-mapping.md 解析与回填校验 | 嵌套 `docs/uat-path-mapping.md` |
 
-合计 259 条用例 + 1 条 metadata 用例 = **260 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
+合计 261 条用例 + 1 条 metadata 用例 = **262 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
 
 ## 排除项
 

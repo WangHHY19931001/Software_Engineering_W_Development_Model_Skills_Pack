@@ -607,6 +607,19 @@ const GRAPH_CASES: GraphCase[] = [
     expectedWarningPatterns: [/边数下限警告/],
     description: '4 REQ 节点 3 parent 边（边数 < 节点×3），应通过但触发边数下限警告',
   },
+  {
+    file: 'valid-evidence-anchor.json',
+    phase: 1,
+    expectedPassed: true,
+    description: 'REQ 节点带合法 evidenceAnchor（path:§section=statement），应通过 R15',
+  },
+  {
+    file: 'bad-evidence-anchor.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R15 evidenceAnchor 格式校验失败/],
+    description: 'REQ 节点 evidenceAnchor 无定位（"登录需要密码"），应被 R15 拦截',
+  },
 ];
 
 // ==================== R7/R8 需求规格产物校验 ====================
