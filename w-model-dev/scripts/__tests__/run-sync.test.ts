@@ -55,6 +55,7 @@ async function findDirectSyncCalls() {
 
 it('skips dot-prefixed transient fixtures created by parallel tests', async () => {
   const transient = path.join(SCRIPT_ROOT, 'logic', `.d2-boundary-fixture-${process.pid}-probe.ts`);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is repository-controlled
   await fs.writeFile(transient, "import 'fs';\n");
   try {
     const files = await collectTypeScriptFiles(SCRIPT_ROOT);
