@@ -127,9 +127,9 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）/ estimation-guide（工期/预算估算时）/ context-management-guide（长会话上下文管理时）。
 
-### 3.1 全 references 触发条件表（38 非 stub 文件，含 19 个 42.0.0 重定向 stub）
+### 3.1 全 references 触发条件表（39 非 stub 文件，含 19 个 42.0.0 重定向 stub）
 
-> `references/` 目录共 58 份 .md（38 个非 stub 资源 + 19 个 42.0.0 重定向 stub，另含 quickstart.md 入门速查不入下表）。下表按「触发条件」组织，供编排者判断何时加载某文件。
+> `references/` 目录共 59 份 .md（39 个非 stub 资源 + 19 个 42.0.0 重定向 stub，另含 quickstart.md 入门速查不入下表）。下表按「触发条件」组织，供编排者判断何时加载某文件。
 > 标注 **2 跳** 的文件不直接出现在 §3 各阶段 reference 列，需经其上游文件（如 hard-constraints / phase-N / subagent-delegation）间接引用才可达——编排者按需显式加载，勿遗漏。
 
 | 文件 | 触发条件 | 可达性 |
@@ -286,7 +286,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 | check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
 | check-tla-bdd-sync | 阶段工具 | TLA+ 与 BDD 配对文件的转移集 / 状态集 / 不变式等价同步校验 | 阶段 1-4 Artifact Gate pair sync |
 | security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
-| self-test | 工具 | 260 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
+| self-test | 工具 | 262 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
 | wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
 | metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
 | wm-write | 工具 | 状态文件安全写：`<target>.lock` 持久目录和可转移 owner 对象保证跨进程竞争 writer 不会双成功；锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--lock-timeout` 为安全非负整数；CLI 陈旧锁须显式 `--recover-stale-lock`，否则 `STALE_LOCK` / exit 1（logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |

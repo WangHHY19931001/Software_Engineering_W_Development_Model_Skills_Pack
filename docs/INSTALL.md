@@ -214,7 +214,7 @@ npm install
 npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 # 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
 
-# 验证回归基线（self-test 260 条样本全部通过）：
+# 验证回归基线（self-test 262 条样本全部通过）：
 npm run self-test
 
 # 环境自检（doctor：node/tsx/ajv 等就绪性，exit 0 = 环境就绪）：
@@ -299,7 +299,7 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 | JSON Schema 文件（draft-07，23 份，含 evidence-manifest / evidence-provenance）              | [../w-model-dev/schemas/](../w-model-dev/schemas)                                                                                                                                                           |
 | Schema 加载与校验工具                                                                        | [../w-model-dev/scripts/infrastructure/schema-loader.ts](../w-model-dev/scripts/infrastructure/schema-loader.ts)                                                                                            |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免）                                                 | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts)                                                                                                                  |
-| 回归基线脚本（260 条样本）                                                                   | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts)                                                                                                                          |
+| 回归基线脚本（262 条样本）                                                                   | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts)                                                                                                                          |
 | 测试 coverage 矩阵                                                                           | [../w-model-dev/scripts/**tests**/README.md](../w-model-dev/scripts/__tests__/README.md)                                                                                                                    |
 | 28 个评审 persona 文件                                                                       | [../w-model-dev/subagent/](../w-model-dev/subagent)                                                                                                                                                         |
 | Verifier 输出校验逻辑                                                                        | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts)                                                                                                            |

@@ -91,7 +91,7 @@ if (badEvidenceAnchors.length > 0) {
 | 节点 evidenceAnchor 值 | 结果 |
 |---|---|
 | `undefined` / 缺字段 | 通过（N1） |
-| `""`（空串） | 通过（视为未声明，N2 允许空串特殊处理） |
+| `""`（空串） | **schema 拦截**（`minLength:1` → `[schema]` violation → passed=false），不进入 R15（schema 前置校验在业务规则前） |
 | `docs/phase1-requirements/requirement-spec.md:§4.2=登录需密码策略（用户原话）` | 通过 |
 | `src/auth.ts:L42-58=JWT 签发逻辑` | 通过 |
 | `登录需要密码`（无定位） | R15 violation → passed=false |
@@ -287,7 +287,7 @@ if (badEvidenceAnchors.length > 0) {
 |---|---|---|
 | GRAPH-R15-1 | 节点带合法 evidenceAnchor `docs/phase1-requirements/requirement-spec.md:§4.2=登录需密码策略` | passed=true，无 R15 violation |
 | GRAPH-R15-2 | 节点带非法 evidenceAnchor `登录需要密码`（无定位） | passed=false，violations 含 `R15 evidenceAnchor 格式校验失败` |
-| GRAPH-R15-3 | 节点缺 evidenceAnchor / 空串 | passed=true（向后兼容，R15 不触发） |
+| GRAPH-R15-3 | 节点缺 evidenceAnchor | passed=true（向后兼容，R15 不触发）；空串由 schema `minLength:1` 拦截（`[schema]` violation，非 R15 路径） |
 | GRAPH-R15-4 | 多个节点含非法锚点 | violations 列出全部违规节点 id |
 
 > 建议放入 `graph-logic.test.ts`（vitest 直接调 `checkRequirementGraph`），并同时以 samples fixture 走 self-test 集成路径（见 7.2）。

@@ -139,9 +139,11 @@ describe('R15 evidenceAnchor 格式校验', () => {
     expect(r.passed).toBe(false);
   });
 
-  test('省略／空串锚点向后兼容', () => {
+  test('省略锚点向后兼容（空串由 schema minLength:1 拦截，非 R15 路径）', () => {
     expect(checkRequirementGraph(makeReqGraph(undefined), 1).passed).toBe(true);
-    expect(checkRequirementGraph(makeReqGraph(''), 1).passed).toBe(true);
+    const rEmpty = checkRequirementGraph(makeReqGraph(''), 1);
+    expect(rEmpty.violations.some((v) => v.includes('R15 evidenceAnchor 格式校验失败'))).toBe(false);
+    expect(rEmpty.violations.some((v) => v.startsWith('[schema]'))).toBe(true);
   });
 });
 ```

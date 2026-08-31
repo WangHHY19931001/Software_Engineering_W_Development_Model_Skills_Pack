@@ -17,7 +17,7 @@ npm install          # 同时装配 git hooks（core.hooksPath .githooks）
 ## 3. 验证安装
 
 ```powershell
-npm run self-test    # 期望：260/260 通过
+npm run self-test    # 期望：262/262 通过
 npx tsx w-model-dev/scripts/cli/doctor.ts   # 依赖体检（含 TLA 用 --with-tla）
 ```
 
