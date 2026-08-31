@@ -9,9 +9,12 @@
 
 ## [42.1.0] - 2026-08-31
 
-### 优化（证据支撑树方法论集成）——版本 42.1.0 发布
+### 新增（证据支撑树方法论集成）
 
-在 42.0.0 基础上集成「证据支撑树」方法论：图谱节点新增可选 `evidenceAnchor` 字段并以 R15 结构校验（schema 增量 + graph-logic 检查 + 8 条 fixture，self-test 基线 260→262）；requirement-spec 模板 §4.2 增 evidenceAnchor 列、glossary 登记术语；新增 `references/evidence-anchored-tree.md`（57 行）方法论参考，SKILL.md「按需加载」表追加路径不确定/需求模糊参照，`references/` 资源计数 58→59。版本号七处镜像同步至 42.1.0（SKILL.md / skill-metadata.json / package.json / package-lock.json / README / INSTALL.md / CHANGELOG）。
+- **产出期证据锚点（evidenceAnchor）**：图谱节点可选声明结论事实锚点（由 A 子代理 ingestion 时声明、S 规格 §4.2 只读同步、V 评审可核验、G 门禁 R15 格式校验）；复用现有 EVIDENCE_PATTERN 格式，向后兼容存量 graph.json（未声明不阻断）。graph.schema.json / graph-logic.ts / conventions.md / requirement-spec.md 同步。
+- **方法论参照文档**：新增 `references/evidence-anchored-tree.md`（证据支撑树 × W 模型映射 + 唯一增量 + 明确拒绝照搬点）。references 58→59。
+- **自我纳入机制**：A 子代理 ingestion 指引（ingestion-chunk/cross）注明 evidenceAnchor 可选声明时机；SSoT §4A.1b / §7.7 / §10A 同步；self-test 基线 260→262。
+- 设计/SSoT 变更草案与详细设计见 `docs/superpowers/specs/2026-08-31-evidence-anchored-tree-*.md`，实施计划见 `docs/superpowers/plans/2026-08-31-evidence-anchored-tree-integration.md`。
 
 ## [42.0.0] - 2026-08-30
 
