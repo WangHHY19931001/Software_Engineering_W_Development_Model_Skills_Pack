@@ -2257,6 +2257,13 @@
       "reason": "Found unlink from package \"node:fs/promises\" with non literal argument at index 0"
     },
     {
+      "hash": "73626b24846e1a609e2cebf378147b2c1a5b568697c0b5f4b27b30110a8868db",
+      "rule_id": "security/detect-unsafe-regex",
+      "file": "w-model-dev/scripts/logic/graph-logic.ts",
+      "line": 800,
+      "reason": "Unsafe Regular Expression"
+    },
+    {
       "hash": "302160046ffe268a82e3639fa19bc39a9c9bc3d9432bdaee8a0fd6fd83b2443f",
       "rule_id": "security/detect-unsafe-regex",
       "file": "w-model-dev/scripts/logic/tla-bdd-sync-logic.ts",
