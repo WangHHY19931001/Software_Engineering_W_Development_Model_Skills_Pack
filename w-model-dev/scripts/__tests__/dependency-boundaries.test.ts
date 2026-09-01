@@ -43,6 +43,10 @@ const LOGIC_DIRECT_IO_MODULES = new Set([
  */
 const ALLOWED_LOGIC_NODE_IO_IMPORTS = new Map([
   ['logic/gate-logic.ts:node:fs', 'gate-logic uses the injected filesystem adapter implementation.'],
+  [
+    'logic/l0-link-audit-logic.ts:node:fs',
+    'l0-link-audit-logic reads the distributed skill package to enforce L0/L1 link boundaries.',
+  ],
   ['logic/state-write-logic.ts:node:fs/promises', 'state-write-logic is the state persistence implementation.'],
 ]);
 
@@ -282,6 +286,10 @@ describe('scripts runtime dependency boundaries', () => {
   it('requires every logic direct-I/O exception to remain explicit and documented', async () => {
     expect([...ALLOWED_LOGIC_NODE_IO_IMPORTS.entries()]).toEqual([
       ['logic/gate-logic.ts:node:fs', 'gate-logic uses the injected filesystem adapter implementation.'],
+      [
+        'logic/l0-link-audit-logic.ts:node:fs',
+        'l0-link-audit-logic reads the distributed skill package to enforce L0/L1 link boundaries.',
+      ],
       ['logic/state-write-logic.ts:node:fs/promises', 'state-write-logic is the state persistence implementation.'],
     ]);
 
