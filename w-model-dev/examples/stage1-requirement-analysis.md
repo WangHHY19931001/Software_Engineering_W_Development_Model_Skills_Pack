@@ -27,7 +27,7 @@
 
 ## 门禁脚本与命令行
 
-阶段 1 完成时，G 子代理依次运行（均为 `npx tsx w-model-dev/scripts/cli/` 下脚本）：
+G 先在 A-ingestion 专用收敛中运行图谱门禁；exit 0 后由 O 在 🔴 CHECKPOINT 等待用户确认收敛，再分派 S 产出正式工件。S 产出后依次经过 R3×3、G 的预防审查门禁、V 评审和 G 的阶段常规门禁（均为 `npx tsx w-model-dev/scripts/cli/` 下脚本）：
 
 ```bash
 # 1) 需求图谱门禁：连通性 + 单根 + 父唯一 + 阶段追溯（A→G 收敛后必跑）
@@ -43,32 +43,29 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts .w-model/tla-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=1
 ```
 
-> 附加：阶段门放行前 G 还须跑 5 项闭环脚本（`check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-preventive-review`）+ `check-role-dispatch` + `check-signature-chain`；评审证据回填经 `check-verifier-output.ts`。完整分派见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
+> 附加：S 产出后，R 先生成 R3×3，G 运行 `check-preventive-review.ts` 且 exit 0 后才分派 V；V 产出评审后，G 运行 `check-verifier-output.ts` 与阶段常规门禁。阶段门放行前 G 还须完成 `check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-role-dispatch` / `check-signature-chain`；完整分派见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
 ## 预期输出（示例输出）
 
-### 退出码 0（全部通过）
+### 退出码 0（图谱收敛示例）
+
+以下 `GRAPH_JSON` 字段来自当前 valid fixture 的真实契约；数值仅对应该 fixture：
 
 ```
-GRAPH_JSON {"type":"requirement-graph","phase":1,"passed":true,"nodes":87,"edges":115,"connectedComponents":1,"singleRoot":"REQ-ROOT","reasons":[]}
-
-COVERAGE_JSON {"type":"coverage","passed":true,"coveredReqs":87,"totalReqs":87,"coveragePercent":100,"violations":[]}
-
-TLA_JSON {"type":"tla-model","phase":1,"passed":true,"specs":1,"sanyOk":true,"tlcOk":true,"violations":[]}
-
-BDD_JSON {"type":"bdd-model","phase":1,"passed":true,"features":5,"scenarios":12,"violations":[]}
+GRAPH_JSON {"type":"requirement-graph","passed":true,"phase":1,"totalNodes":5,"totalEdges":4,"connectedComponents":1,"isolatedNodes":[],"roots":["REQ-001"],"orphans":[],"multiParent":[],"violations":[],"warnings":["边数下限警告：当前边数 4 < 节点数 × 3 = 15（可能存在孤立节点或边缺失）","语义来源占比警告：语义来源边占比 0.0% < 80%（可能存在过多人工补丁边）"],"converged":true,"exitCode":0}
 ```
 
-→ 四脚本全部退出码 0，`passed=true` → 🔴 CHECKPOINT · 阶段门放行，进入阶段 2 系统设计。
+→ 图谱门禁 exit 0 且 `converged=true` 后，O 在 🔴 CHECKPOINT 等待用户确认 ingestion 收敛；用户确认后才分派 S。随后覆盖/TLA+/BDD、R3 预防审查门禁、V 评审和 G 常规门禁全部通过，O 展示真实证据并在第二个 🔴 CHECKPOINT 等待阶段门放行；用户放行后才进入阶段 2。
 
-### 退出码 1（校验失败示例）
+### 退出码 1（图谱未收敛示例）
+
+以下字段来自当前 bad-orphan fixture 的真实契约，命令 exit 1：
 
 ```
-✗ [C2] 孤立节点 REQ-041 缺少父/子关系（reworkHints: chunk-007 补 REQ-041 关系）
-GRAPH_JSON {"type":"requirement-graph","phase":1,"passed":false,"nodes":87,"edges":102,"connectedComponents":2,"singleRoot":"REQ-ROOT","reasons":["C2 孤立节点:REQ-041"]}
+GRAPH_JSON {"type":"requirement-graph","passed":false,"phase":1,"totalNodes":5,"totalEdges":4,"connectedComponents":1,"isolatedNodes":[],"roots":["REQ-001"],"orphans":["SD-002"],"multiParent":[],"violations":["单根校验失败：根候选含非 REQ 节点: SD-002（根必须是系统 REQ 节点）","orphan 校验失败：以下节点无法从根 REQ-001 经 parent 边追溯: SD-002","R1-R4 层级校验失败：REQ 节点缺 level 字段（强制必填，无降级）：REQ-001"],"converged":false,"exitCode":1}
 ```
 
-→ 退出码 1：G 将 `reworkHints` 回填 run-log，O 分派 A/S 返工补漏后重跑收敛循环（MAX_ROUNDS=5）。
+→ 图谱门禁 exit 1：`GRAPH_JSON.violations[]` 是 G 的确定性失败证据；阶段 1 的 `reworkHints[]` 由 A-cross 写入 `consolidated.json` 与 `cross-analysis-report.md`，不属于 `GRAPH_JSON`。O 按提示重新分派 A-chunk/A-cross，G 重跑图谱门禁，最多 `MAX_ROUNDS=5`；不得分派 S 修改正式产物，也不得把普通 V/G 失败的 R 链套到 ingestion 专用收敛。
 
 ### 退出码 2（输入错误示例）
 
@@ -80,8 +77,9 @@ ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 <cove
 
 ## 编排说明
 
-- 阶段 1 进入时先走 ingestion 子流程（`plan-chunks` → A-chunk → A-cross → G 图谱校验 → 收敛循环），图谱收敛（连通 + 单根）后才放行 S 产出需求规格。
-- 四脚本全部退出码 0 且 V 评审通过，才可放行进入阶段 2。
+- 阶段 1 进入时先走 ingestion 子流程（`plan-chunks` → A-chunk → A-cross → G 图谱校验 → 收敛循环）；图谱收敛（连通 + 单根）并经用户在 🔴 CHECKPOINT 确认后，才分派 S 产出需求规格。
+- S 产出后完整顺序为 `R3×3 → G(check-preventive-review, exit 0) → V → G(阶段常规门禁) → O 展示证据 → 🔴 CHECKPOINT`；只有用户放行才进入阶段 2。
+- 普通 V/G 失败走 `R → V 复审 R 报告 → G(check-rootcause-report) → S-fix → R3×3(fix) → G(check-preventive-review) → V → G`，与 ingestion 的 A→G 收敛分开处理。
 - RTM 本阶段仅登记需求列与验收测试列，其余列留待后续阶段逐列补登。
 
 ## 要点
