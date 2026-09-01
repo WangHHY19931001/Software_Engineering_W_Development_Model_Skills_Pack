@@ -7,6 +7,14 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.1.1] - 2026-09-01
+
+### 修复（42.1.0 deferred 项修正收口）
+
+- **run-sync ↔ dependency-boundaries 全量并行竞态**：`collectTypeScriptFiles` 跳过 `.d2-` 瞬态 fixture（dependency-boundaries 并行测试写入的 `scripts/logic/.d2-boundary-fixture-<pid>.ts` 生命周期窗口曾触发 ENOENT），新增回归测试；run-sync × dependency-boundaries 组合 5 连跑全绿（`e20e579` + `0d03b4a`）。
+- **security baseline v2 全量对账**：`--regenerate` 消除 49 提交累计卫生债——删除 116 条孤儿条目并修正 line 漂移，411 → 295 条（`7e97baa`）。
+- **活体文档/风格微修**：samples/README graph 行 R1-R15、conventions §2.1 evidenceAnchor 复用说明、ingestion-chunk A-chunk L42 代码来源示例、SSoT §10A 4A.1b 表行对齐、subagent-delegation §3.1 触发表补 evidence-anchored-tree 行、graph-logic R15 块 `test()`→`it()` 风格统一（`93f6f3a`）。
+
 ## [42.1.0] - 2026-08-31
 
 ### 新增（证据支撑树方法论集成）
