@@ -189,7 +189,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 .
 ├── w-model-dev/                  # Skill 资产本体（纯 Markdown，可整目录拷贝分发）
 │   ├── SKILL.md                  # 技能定义：触发条件 + /wm 编排规则 + 版本号
-│   ├── references/               # 59 份阶段细则与规范（按需加载，禁止一次性全读）
+│   ├── references/               # 40 份阶段细则与规范（按需加载，禁止一次性全读）
 │   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例

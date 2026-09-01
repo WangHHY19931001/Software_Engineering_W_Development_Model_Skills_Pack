@@ -129,7 +129,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 ## 门禁契约与资源清单
 
 - **核心操作行为**：完整的八条操作行为与失败模式 F1-F10 见 [references/operation-behaviors.md](references/operation-behaviors.md)，按需加载。
-- **资源计数**：`references/`（59 个 .md）、`schemas/`（23 份 JSON Schema draft-07，含 evidence-manifest / evidence-provenance）、门禁脚本 37 个 .ts。
+- **资源计数**：`references/`（40 个 .md）、`schemas/`（23 份 JSON Schema draft-07，含 evidence-manifest / evidence-provenance）、门禁脚本 37 个 .ts。
 - **状态写锁协议**：状态写入统一经 `wm-write.ts` 使用 `<target>.lock` 持久目录与可转移 `owner` 对象实施跨进程锁，锁内校验 mtime 并毫秒+UUID 备份、tmp+rename 原子替换与回读恢复；CLI 用 `--lock-timeout` 控制等待，陈旧锁必须显式 `--recover-stale-lock`，否则以退出码 1 拒绝写入。
 - **行为门禁**：阶段 1-4 传 `--require-tla-equivalence --tla-manifest=<path>`，阶段 5-8 传 `--require-cucumber-report --cucumber-report=<path>`。
 - **证据与审计**：`coverage/`、`.zcode/` 与 `.w-model/` 是 Git 忽略的本地生成物，默认不随 Git 交付；需要交付审计证据时先运行 `npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts` producer+verify 命令，写入 source-bound provenance，登记 `evidence-provenance.schema.json`），再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；受控本机 provenance 提供流程完整性，不是密码学签名，也不是第三方不可抵赖证明；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
