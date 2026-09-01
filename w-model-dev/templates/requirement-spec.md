@@ -319,24 +319,24 @@ graph TD
 
 ## 13. 系统上下文
 
-> 系统上下文详见 [system-context.md](./system-context.md)（外部实体清单 + 上下文边界原则，仅外部实体，不画内部架构）。
+> 系统上下文详见 [system-context.md](./requirement-spec/system-context.md)（外部实体清单 + 上下文边界原则，仅外部实体，不画内部架构）。
 
 ## 14. 核心概念与术语
 
-> 术语表详见 [glossary.md](./glossary.md)（需求域术语子集，引用 references/conventions.md 术语表权威表）。
+> 术语表详见 [glossary.md](./requirement-spec/glossary.md)（需求域术语子集，引用 references/conventions.md 术语表权威表）。
 
 ## 15. 需求追踪矩阵
 
-> 需求追踪矩阵详见 [traceability-matrix.md](./traceability-matrix.md)（§1 REQ/NFR 8 字段表 + §2 需求×测试层级承接矩阵，仅验收列填实）。
+> 需求追踪矩阵详见 [traceability-matrix.md](./requirement-spec/traceability-matrix.md)（§1 REQ/NFR 8 字段表 + §2 需求×测试层级承接矩阵，仅验收列填实）。
 
 ## 16. 行为规格模型
 
-> 行为规格模型详见 [behavior-spec.md](./behavior-spec.md)（引用 .feature 文件关系，不内联 feature 块）。
+> 行为规格模型详见 [behavior-spec.md](./requirement-spec/behavior-spec.md)（引用 .feature 文件关系，不内联 feature 块）。
 
 ## 17. Phase 1 工程纪律与 DoD
 
-> Phase 1 工程纪律与 DoD 详见 [discipline-dod.md](./discipline-dod.md)（§1 需求阶段纪律 + §2 DoD 可勾选清单）。
+> Phase 1 工程纪律与 DoD 详见 [discipline-dod.md](./requirement-spec/discipline-dod.md)（§1 需求阶段纪律 + §2 DoD 可勾选清单）。
 
 ## 附录 A. UML 需求建模
 
-> UML 需求建模详见 [uml-modeling.md](./uml-modeling.md)（A.1 用例图 / A.2 领域类图 / A.3 活动图，mermaid）。
+> UML 需求建模详见 [uml-modeling.md](./requirement-spec/uml-modeling.md)（A.1 用例图 / A.2 领域类图 / A.3 活动图，mermaid）。
