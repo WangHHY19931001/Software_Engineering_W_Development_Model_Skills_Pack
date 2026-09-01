@@ -1,7 +1,7 @@
 # 阶段 6：集成测试（执行）
 
 > W 模型右 V 测试执行阶段。设计来源：阶段 3（概要设计）产出的集成测试用例。
-> 命令入口：`/wm test type=集成`
+> 命令入口：`/wm test type=集成 result=<pass|fail>`；`result` 只能由真实测试运行器输出回填。
 
 ## 功能描述
 
@@ -60,13 +60,15 @@
 | IT-006 补偿路径 | `npx vitest run tests/integration/ --grep "补偿"` | 幂等断言（重复执行收敛）+ 终态断言 |
 | IT-007 容错 | `npx vitest run tests/integration/ --grep "容错"` 或故障注入框架（chaos 实验） | 断路器三态转移 + 重试终止 |
 
-**失败分支**：
-- IT-001/002 状态码不符 → 定位到具体 controller + 路由，回编码修复后重跑
-- IT-003 数据传递错误 → 检查模块间接口契约（回 phase-3 概要设计核对），回编码修复
-- IT-004 P95 超阈 → 用 k6 tracing 定位慢查询/慢模块，回编码优化
-- IT-005 不兼容 → 评估是否需 v2 版本迁移脚本，回 phase-2 系统设计决策
-- IT-006 补偿失败 → 检查 TCC/SAGA 状态机实现（回编码），核对补偿操作幂等性（回 phase-2 事务模式决策）
-- IT-007 断路器不触发 → 检查阈值配置（回 quality-standards 容错设计检查清单 / phase-2 系统设计决策），重跑故障注入
+**R 定位线索（测试失败时）**：
+- IT-001/002 状态码不符：定位具体 controller + 路由
+- IT-003 数据传递错误：核对模块间接口契约与阶段 3 设计
+- IT-004 P95 超阈：用 k6 tracing 定位慢查询/慢模块
+- IT-005 不兼容：评估 v2 版本迁移脚本与阶段 2 系统设计决策
+- IT-006 补偿失败：检查 TCC/SAGA 状态机实现与补偿操作幂等性
+- IT-007 断路器不触发：检查阈值配置、quality-standards 容错清单与阶段 2 决策
+
+以上只是 R 的输入线索。普通 V/G 失败必须先经 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
 
 ## RTM 登记
 
@@ -100,20 +102,22 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 |---|---|---|
 | 1 | 用 mock 替代真实模块间调用 | 集成测试必须验证真实模块交互，mock 仅用于外部依赖边界 |
 | 2 | 伪造 `result=pass` 跳过失败用例 | 必须跑真实测试运行器，通过 `/wm test type=集成 result=pass\|fail` 回填 |
-| 3 | 跳过失败用例直接推进 | 失败用例必须定位根因 + 关联模块 + 回编码 |
+| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，先走 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链 |
 | 4 | 性能用例只跑单次请求 | IT-004 必须按负载模型（100 并发 × 30s）采样 ≥ 1000 请求 |
 | 5 | 兼容性用例只测当前版本 | IT-005 必须 v1/v2 双版本对照 |
 
-## 返工路径
+## 返工定位表
 
-| 失败用例 | 根因定位 | 返工目标 | 修复后重跑 |
+| 失败用例 | R 定位线索 | 候选影响阶段（仅 R 建议） | 修复后真实重跑 |
 |---|---|---|---|
-| IT-001/002 状态码不符 | 具体 controller + 路由 | 编码实现 | `npx vitest run tests/integration/` |
-| IT-003 数据传递错误 | 模块间接口契约（回 phase-3 核对） | 编码实现 | 同上 |
-| IT-004 P95 超阈 | k6 tracing 定位慢查询/慢模块 | 编码优化 | `k6 run --vus 100 --duration 30s load-test.js` |
-| IT-005 不兼容 | 评估是否需 v2 版本迁移脚本 | 系统设计(phase-2) | v1/v2 路由测试套件 |
-| IT-006 补偿失败 | 检查 TCC/SAGA 状态机实现（回编码） | 编码实现（TCC/SAGA 状态机） | `npx vitest run tests/integration/ --grep "补偿"` |
-| IT-007 断路器不触发 | 检查阈值配置（回 phase-2 容错设计） | 编码实现（阈值配置） | `npx vitest run tests/integration/ --grep "容错"` 重跑 |
+| IT-001/002 状态码不符 | controller + 路由 | 阶段 5 编码 | `npx vitest run tests/integration/` |
+| IT-003 数据传递错误 | 模块间接口契约 | 阶段 3 或 5 | 同上 |
+| IT-004 P95 超阈 | k6 tracing 慢查询/慢模块 | 阶段 5 | `k6 run --vus 100 --duration 30s load-test.js` |
+| IT-005 不兼容 | v2 版本迁移与兼容策略 | 阶段 2 或 5 | v1/v2 路由测试套件 |
+| IT-006 补偿失败 | TCC/SAGA 状态机与幂等性 | 阶段 2 或 5 | `npx vitest run tests/integration/ --grep "补偿"` |
+| IT-007 断路器不触发 | 阈值配置与容错设计 | 阶段 2 或 5 | `npx vitest run tests/integration/ --grep "容错"` |
+
+表中候选阶段不授权直接回退。O 仅在完整 RootCauseReport 复审、G 根因门禁、S-fix 后 R3/preventive/V/G 证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 退出状态
 

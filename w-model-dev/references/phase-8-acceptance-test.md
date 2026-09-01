@@ -1,7 +1,7 @@
 # 阶段 8：验收测试（执行）
 
 > W 模型右 V 测试执行阶段（终点）。设计来源：阶段 1（需求分析）产出的验收测试用例。
-> 命令入口：`/wm test type=验收`
+> 命令入口：`/wm test type=验收 result=<pass|fail>`；`result` 只能由真实测试运行器输出回填。
 
 ## 功能描述
 
@@ -165,11 +165,11 @@
 > - 失败用例的根因初判（需求偏差 / 实现缺陷 / 环境问题）
 > - 是否继续执行下一批 / 暂停排查
 >
-> 任一批次失败率 > 20% → 强制暂停，回到编码或需求阶段返工。
+> 任一批次失败率 > 20% → 强制暂停并将失败分布交给 R 定位；不得直接回到编码或需求阶段。后续必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，由 R 的上游缺陷结论和用户 CHECKPOINT 决定候选回退阶段。
 >
 > **🔴 CHECKPOINT-C · 执行后（项目级放行）**
 >
-> 验收测试全部执行完成后暂停。Agent 必须逐条展示项目级检查清单、RTM 覆盖率、四级测试汇总，并请求真实用户在验收测试报告的「用户确认」区记录 `confirm` 或 `confirm-with-comments`。RTM 覆盖率 < 100% 或四级测试任一未通过时不得请求确认，必须回对应阶段返工。`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown 仅用于导出或展示。Agent 不得代签，也不得通过未定义的 `/wm sign` 命令代替用户确认。
+> 验收测试全部执行完成后暂停。Agent 必须逐条展示项目级检查清单、RTM 覆盖率、四级测试汇总，并请求真实用户在验收测试报告的「用户确认」区记录 `confirm` 或 `confirm-with-comments`。RTM 覆盖率 < 100% 或四级测试任一未通过时不得请求确认，失败事实先作为 R 定位线索并走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链；R 与用户才决定对应阶段回退。`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown 仅用于导出或展示。Agent 不得代签，也不得通过未定义的 `/wm sign` 命令代替用户确认。
 
 ## 阶段门评审
 
@@ -211,14 +211,16 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 
 泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/logic/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释）。
 
-## 返工路径
+## 返工定位表
 
-| 失败场景 | 根因定位 | 返工目标 |
+| 失败场景 | R 定位线索 | 候选影响阶段（仅 R 建议） |
 |---|---|---|
-| 验收测试用例失败 | 逐条比对原始需求与系统功能，定位偏差 | 回编码修复后重跑验收测试 |
-| RTM 覆盖率 < 100% | 核验 RTM 登记项，定位未覆盖需求 | 回对应阶段补齐测试映射 |
-| 用户 reject | 收集用户反馈，定位不满点 | 回需求分析，重新走 W 模型流程 |
-| 文档不完整 | 对照 templates/ 8 模板核验 | 回对应阶段补齐文档 |
+| 验收测试用例失败 | 原始需求与系统功能的偏差 | 阶段 5 或上游需求/设计 |
+| RTM 覆盖率 < 100% | 未覆盖需求与缺失映射 | 对应产出/测试设计阶段 |
+| 用户 reject | 用户反馈与不满意点 | 阶段 1、设计或编码，由 R 分类 |
+| 文档不完整 | 与 templates 的结构差异 | 对应文档产出阶段 |
+
+表中候选阶段不授权直接回退。普通 V/G 失败先走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；O 只在 R/V/G 证据齐全且用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 异常场景处理
 

@@ -1,7 +1,7 @@
 # 阶段 7：系统测试（执行）
 
 > W 模型右 V 测试执行阶段。设计来源：阶段 2（系统设计）产出的系统测试用例。
-> 命令入口：`/wm test type=系统`
+> 命令入口：`/wm test type=系统 result=<pass|fail>`；`result` 只能由真实测试运行器输出回填。
 
 ## 功能描述
 
@@ -55,12 +55,14 @@
 | ST-004 兼容性 | BrowserStack / Sauce Labs 跨浏览器矩阵 | 主流浏览器 + 主流分辨率全通过 |
 | ST-005 可靠性 | 长稳脚本 + `node --inspect` 内存监控 | 24h 错误率 < 0.1%，内存增长 < 10% |
 
-**失败分支**：
-- ST-001 端到端失败 → 定位失败步骤，回编码修复后重跑
-- ST-002 P95 超阈 → k6 tracing 定位慢接口/慢查询，回编码优化
-- ST-003 发现高危漏洞 → 阻断发布，回编码修复后重扫，禁止降级为"已知风险"
-- ST-004 兼容性问题 → 定位 CSS/JS 兼容根因，回编码加 polyfill 或修复
-- ST-005 内存泄漏 → `node --inspect` heap snapshot 定位泄漏点，回编码修复
+**R 定位线索（测试失败时）**：
+- ST-001 端到端失败：定位失败步骤与关联模块
+- ST-002 P95 超阈：用 k6 tracing 定位慢接口/慢查询
+- ST-003 发现高危漏洞：阻断发布，定位漏洞来源，禁止降级为"已知风险"
+- ST-004 兼容性问题：定位 CSS/JS 兼容根因和所需 polyfill
+- ST-005 内存泄漏：用 `node --inspect` heap snapshot 定位泄漏点
+
+以上只是 R 的输入线索。普通 V/G 失败必须先经 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
 
 ## 质量门检查
 
@@ -81,7 +83,7 @@
 | 度量 | 关键指标暴露（Counter/Gauge/Histogram 类，如请求量/P95/错误率）；指标可被采集（Pull/Push 端点） | 指标端点探测 + 采样验证 |
 | 追踪 | 核心链路可追踪（Trace/Span 树）；跨模块调用有 TraceID 传递 | 分布式调用链采样验证 |
 
-**不通过 → 动作**：回编码补可观测性（日志 TraceID / 指标暴露 / 追踪埋点），重跑系统测试。
+**不通过 → R 定位线索**：日志 TraceID / 指标暴露 / 追踪埋点可能缺失。实际返工先走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链，再按 R 结论补可观测性并重跑系统测试。
 
 ## 验收标准
 
@@ -93,7 +95,7 @@
 - [ ] 缺陷已修复或已记录遗留
 - [ ] 可观测性达标（日志含 TraceID、关键指标暴露、调用链可追踪）
 
-> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定，向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 → 一律回编码，不得放行。
+> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=7` 获取确定性判定，向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 是 R 定位线索，必须先走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链，不得直接回编码或放行。
 
 ## 阶段门评审
 
@@ -116,18 +118,20 @@ S-test 子代理执行 `npx cucumber-js features/L2/` 运行所有 scenarios：
 | 3 | 用 LLM 估算质量门结果 | 必须执行 `check-artifact-gate.ts` 获取退出码 |
 | 4 | 跳过兼容性测试矩阵 | ST-004 必须覆盖 Chrome/Firefox/Safari/Edge + 移动端 |
 | 5 | 可靠性测试只跑 1 小时 | ST-005 必须持续 ≥ 24h 才能判定内存泄漏 |
-| 6 | 把质量门退出码 1/2 当警告忽略 | 退出码 1/2 一律回编码，禁止放行 |
+| 6 | 把质量门退出码 1/2 当警告忽略 | 退出码 1/2 是 R 定位线索，必须先走 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链，禁止放行 |
 | 7 | 系统测试未覆盖跨模块数据流校验 / 角色越权检测 / 副作用时序一致性检测 | 系统测试用例须包含：(1) **跨模块数据流用例**（验证 store 选择与 schema 一致，详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节）；(2) **角色越权用例**（验证 `reader` 不能调用 `blogger-only` 端点，应返回 403，详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节）；(3) **副作用时序用例**（验证响应体字段反映已生效状态，详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节）。（预防 P7-001~P7-004 类缺陷） |
 
-## 返工路径
+## 返工定位表
 
-| 失败用例 | 根因定位 | 返工目标 | 修复后重跑 |
+| 失败用例 | R 定位线索 | 候选影响阶段（仅 R 建议） | 修复后真实重跑 |
 |---|---|---|---|
-| ST-001 端到端失败 | 定位失败步骤 | 编码修复 | Playwright/Cypress 业务流程脚本 |
-| ST-002 P95 超阈 | k6 tracing 定位慢接口/慢查询 | 编码优化 | `k6 run --stage 5m,10m,5m --vus 100 perf.js` |
-| ST-003 高危漏洞 | 阻断发布 | 编码修复后重扫 | `zap-cli quick-scan` + `npm audit` |
-| ST-004 兼容性问题 | CSS/JS 兼容根因 | 编码加 polyfill/修复 | BrowserStack 跨浏览器矩阵 |
-| ST-005 内存泄漏 | `node --inspect` heap snapshot 定位泄漏点 | 编码修复 | 长稳脚本 + 内存监控 |
+| ST-001 端到端失败 | 失败步骤与关联模块 | 阶段 5 | Playwright/Cypress 业务流程脚本 |
+| ST-002 P95 超阈 | k6 tracing 慢接口/慢查询 | 阶段 5 | `k6 run --stage 5m,10m,5m --vus 100 perf.js` |
+| ST-003 高危漏洞 | 漏洞来源与防御缺口 | 阶段 5 或上游设计 | `zap-cli quick-scan` + `npm audit` |
+| ST-004 兼容性问题 | CSS/JS 兼容根因 | 阶段 5 | BrowserStack 跨浏览器矩阵 |
+| ST-005 内存泄漏 | `node --inspect` heap snapshot | 阶段 5 | 长稳脚本 + 内存监控 |
+
+表中候选阶段不授权直接回退。O 仅在完整 RootCauseReport 复审、G 根因门禁、S-fix 后 R3/preventive/V/G 证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 退出状态
 

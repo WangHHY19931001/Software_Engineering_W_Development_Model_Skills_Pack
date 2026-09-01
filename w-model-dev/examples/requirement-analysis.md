@@ -45,6 +45,19 @@ O: 🔴 CHECKPOINT · 阶段 1 放行
    请确认是否放行进入【系统设计】（/wm design type=架构）；未确认不得跨阶段。
 ```
 
+## 普通 V/G 失败分支
+
+```text
+G: 阶段 1 的 V/G 证据未通过，不能按 reworkHints 直接修改需求规格。
+O: 分派 R 定位根因；R 报告经 V 复审与 G 的 check-rootcause-report exit 0 后，才分派 S-fix。
+S-fix: 修复产物后完成 R3×3 → G(check-preventive-review exit 0) → V → G。
+O: 展示最新证据并进入 🔴 CHECKPOINT；只有用户确认，才执行 R 建议的阶段内重做或上游回退。
+
+完整链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
+```
+
+> 阶段 1 ingestion 图谱失败是唯一例外：保持 A-chunk/A-cross→G 的专用收敛循环，收敛后仍经用户 CHECKPOINT 才分派 S。
+
 ## 要点
 
 - 阶段开始即声明"将同步产出验收测试设计"，体现 W 模型并行原则。

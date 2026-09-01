@@ -1,7 +1,7 @@
 # 阶段 5：编码实现（执行单元测试）
 
 > W 模型左 V 第 5 阶段（编码），对应右 V 测试执行：**单元测试执行**。
-> 命令入口：`/wm code <功能描述>`（生成代码 + 单元测试）+ `/wm test type=单元`
+> 命令入口：`/wm code <功能描述>`（生成代码 + 单元测试）+ `/wm test type=单元 result=<pass|fail>`；`result` 只能由真实测试运行器输出回填。
 
 ## 功能描述
 
@@ -56,7 +56,7 @@
      ├─ 失败: 依赖外部服务未定义 → 标注缺失依赖并暂停，不得伪造实现
      └─ 成功: 产出可编译的实现代码
   4. 生成单元测试代码（套用阶段 4 用例设计）
-     ├─ 失败: 用例无明确断言 → 回 phase-4 补断言格式，禁止生成无断言占位用例
+     ├─ 失败: 用例无明确断言 → 记为 R 定位线索；普通 V/G 失败先走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链，R 才可建议回阶段 4 补断言格式
      └─ 成功: 产出可执行测试文件
   5. 代码质量检查和优化
      ├─ 失败: ESLint/Prettier 报 error → 列出具体违规项并修复，禁止 // eslint-disable 绕过
@@ -212,7 +212,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 ## 并行任务（强制）
 
-生成代码后，**立即**生成并执行单元测试。单元测试代码覆盖率不达标时回到编码返工，补充测试或修正实现。
+生成代码后，**立即**生成并执行单元测试。单元测试代码覆盖率不达标时，覆盖率缺口是 **R 定位线索**；实际返工先走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链，再补充测试或修正实现。
 
 ## 代码审查（`/wm review`）
 
@@ -316,7 +316,7 @@ import 'dotenv/config';
 
 G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-design-contract-consistency.ts) 校验，exitCode=0 才放行。
 
-违反任一条 → 回编码修正，禁止「以代码为准」忽略设计。
+违反任一条 → 记录为 **R 定位线索**，禁止「以代码为准」忽略设计。若 V/G 因此不通过，O 必须分派 R，随后走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；不得直接命令 S 回编码。
 
 ## 验收标准
 
@@ -362,7 +362,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「跨角色越权」场景（如 `reader` 调用 `blogger-only` 端点应返回 403）
 - [ ] 系统测试须覆盖「越权用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#22 角色越权](hard-constraints.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，作为 **R 定位线索**；实际返工走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链。关联反模式 [#22 角色越权](hard-constraints.md)。
 
 ## 副作用时序一致性清单
 
@@ -373,7 +373,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态）
 - [ ] 系统测试须覆盖「时序用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，回 phase-5 返工。关联反模式 [#24 副作用时序不一致](hard-constraints.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，作为 **R 定位线索**；实际返工走完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链。关联反模式 [#24 副作用时序不一致](hard-constraints.md)。
 
 ## 断言规范
 
@@ -431,13 +431,15 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 ## 返工路径
 
-阶段门评审不通过时，按以下路径返工：
-- 设计文档字段缺失/类型不明 → 回 phase-4 补充详细设计
-- 技术栈未登记 → 暂停向用户确认技术栈
-- 依赖未定义 → 标注缺失依赖并暂停，不得伪造实现
-- 单元测试无断言 → 回 phase-4 补断言格式
-- ESLint/Prettier 报 error → 列出违规项并修复，禁止 // eslint-disable 绕过
-- 覆盖率 < 80% → 补充测试用例，禁止调低阈值
+阶段门评审不通过时，以下内容仅作为 **R 定位线索**，不能直接触发 S 或跨阶段回退：
+- 设计文档字段缺失/类型不明：R 核验是否为阶段 4 上游缺陷
+- 技术栈未登记：暂停并由用户确认技术栈
+- 依赖未定义：标注缺失依赖并暂停，不得伪造实现
+- 单元测试无断言：R 核验是否为阶段 4 测试设计缺陷
+- ESLint/Prettier 报 error：作为实现缺陷证据，禁止 // eslint-disable 绕过
+- 覆盖率 < 80%：作为测试/实现缺口证据，禁止调低阈值
+
+任何普通 V/G 失败均先走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 `upstreamDefect` 才能建议回阶段 1-4；O 只在展示证据后的用户 CHECKPOINT 执行获批准的阶段切换。
 
 ## 退出状态
 

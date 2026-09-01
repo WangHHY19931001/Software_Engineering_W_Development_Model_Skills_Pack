@@ -38,6 +38,17 @@ O: 🔴 CHECKPOINT · 阶段 2 放行
    请确认是否放行进入【概要设计】（/wm design type=概要）；未确认不得跨阶段。
 ```
 
+## 普通 V/G 失败分支
+
+```text
+V/G: 阶段 2-4 的评审或门禁失败不能直接命令 S 重写设计，也不能自动跳到上游阶段。
+O: 分派 R；R 报告经 V 复审与 G 的 check-rootcause-report exit 0 后，才分派 S-fix。
+S-fix: 完成 R3×3 → G(check-preventive-review exit 0) → V → G。
+O: 展示 R/V/G 证据并进入 🔴 CHECKPOINT；只有用户确认，才执行 R 推荐的阶段内重做或上游回退。
+
+完整链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
+```
+
 ## 示例对话（概要设计 → 详细设计）
 
 ```

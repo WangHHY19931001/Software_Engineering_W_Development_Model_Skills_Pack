@@ -59,6 +59,28 @@ describe('examples workflow contract', () => {
     }
   });
 
+  it('shows the ordinary failure chain in legacy requirement and design interactions', () => {
+    for (const file of ['requirement-analysis.md', 'system-design.md']) {
+      expect(read(`w-model-dev/examples/${file}`), file).toContain(FAILURE_CHAIN);
+    }
+  });
+
+  it('requires result handoff and treats phase 5-8 failure branches as R investigation inputs', () => {
+    for (const [phase, type] of [
+      [5, '单元'],
+      [6, '集成'],
+      [7, '系统'],
+      [8, '验收'],
+    ] as const) {
+      const content = read(
+        `w-model-dev/references/phase-${phase === 5 ? '5-coding' : phase === 6 ? '6-integration-test' : phase === 7 ? '7-system-test' : '8-acceptance-test'}.md`,
+      );
+      expect(content, `phase ${phase} command entry`).toContain(`/wm test type=${type} result=<pass|fail>`);
+      expect(content, `phase ${phase} failure flow`).toContain(FAILURE_CHAIN);
+      expect(content, `phase ${phase} failure branches`).toContain('R 定位线索');
+    }
+  });
+
   it('does not retain abbreviated ordinary rework chains in live references', () => {
     const references = [
       'w-model-dev/references/bdd.md',
