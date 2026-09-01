@@ -123,7 +123,8 @@ yarn add your-package
 
 ## 参与贡献
 
-查看 [CONTRIBUTING.md](CONTRIBUTING.md)
+<!-- Skill L0 不携带仓库根 CONTRIBUTING.md；发布前替换为消费项目真实的贡献指南 URL。 -->
+查看消费项目的贡献指南：{{CONTRIBUTING_URL}}
 
 ## 许可证
 

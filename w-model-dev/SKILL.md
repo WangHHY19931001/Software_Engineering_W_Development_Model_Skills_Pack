@@ -16,7 +16,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 技能只提供编排、参考、模板和确定性门禁脚本；LLM-as-a-Verifier 由外部 Agent 按提示词执行，技能脚本不调用 LLM。设计决策以 `docs/skill-design-document_SSoT.md` 为准。
 
-**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即激活；L1「带门禁」= L0 + `scripts/` + `samples/` + `tools/`（需项目根 `npm install`）。5 分钟上手见 [references/quickstart.md](references/quickstart.md)；安装细节见 `docs/INSTALL.md` §2。
+**交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即激活；L1「带门禁」= L0 + `scripts/` + `samples/` + `tools/`（需项目根 `npm install`）。L0 文档中指向 `scripts/`、`samples/`、`tools/` 的链接统一为 **L1-only 导航**：L0 副本预期不含目标，链接检查须将其分类为分层边界且不得报告“L0 全链接通过”；取得 L1 后才校验这些目标。5 分钟上手见 [references/quickstart.md](references/quickstart.md)；安装细节见 `docs/INSTALL.md` §2。
 
 ## 触发决策
 
