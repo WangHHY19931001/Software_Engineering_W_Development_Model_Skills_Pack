@@ -66,15 +66,18 @@
 
 IO 调用必须在 `check-*.ts` 入口层完成，传纯数据给 logic 层。
 
-唯一例外：`gate-logic.ts` —— `checkRequirementSpecStructure` 经注入的 `nodeFsAdapter` 适配器（gate-logic.ts:240-248）对 spec 目录做 IO，默认回退真实 node:fs，依赖注入保持可测试性；其余规则不变。
+受控例外：
+- `gate-logic.ts`：`checkRequirementSpecStructure` 经注入的 `nodeFsAdapter` 适配器（gate-logic.ts:240-248）对 spec 目录做 IO，默认回退真实 node:fs，依赖注入保持可测试性。
+- `l0-link-audit-logic.ts`：只读扫描分发 skill 包，严格核验 L0/L1 相对链接、模板占位和目标存在性；其 `node:fs` 依赖由 `dependency-boundaries.test.ts` 的显式登记表守护。
+- `state-write-logic.ts`：状态持久化实现使用 `node:fs/promises`；同一显式登记表守护。
 
 违反检测：
 
 ```bash
-cd w-model-dev/scripts/logic && grep -nE "from 'node:fs'|from 'node:path'|from 'node:child_process'|process\.(exit|argv|env|stdout|stderr)" *-logic.ts | grep -v '^gate-logic\.ts'
+cd w-model-dev/scripts/logic && grep -nE "from 'node:fs'|from 'node:path'|from 'node:child_process'|process\.(exit|argv|env|stdout|stderr)" *-logic.ts | grep -vE '^(gate-logic|l0-link-audit-logic|state-write-logic)\.ts'
 ```
 
-应无输出（`gate-logic.ts` 为唯一例外）。
+除上述显式例外外应无输出；新增例外必须先在 `dependency-boundaries.test.ts` 注册具体理由。
 
 ## 新增测试时
 
