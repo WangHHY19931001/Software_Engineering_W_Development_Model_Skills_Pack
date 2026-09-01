@@ -84,14 +84,14 @@
 
 ## 阶段门评审
 
-集成测试全部通过 → 进入阶段 7（系统测试）。
-不通过 → 回到编码实现返工，按失败分支定位根因，修复后重跑集成测试。
+集成测试全部通过后，O 展示真实 IT 结果、R3/V/G 证据与 RTM 回填，并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入阶段 7（系统测试）。
+普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 upstreamDefect 判定可推荐回到阶段 1-5；不得跳过 R/V/G 直接修复。
 
 ## L3 BDD features 执行
 
 S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
-- 失败走 R→V→G→S-fix 循环（反模式 #29）
-- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=6 --cucumber-report=<report.json>` 门禁
+- 普通失败走 `R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得省略根因报告复审或 fix 后预防审查
+- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json` 门禁
 - cucumber 报告不得有 undefined/pending/failed step（D5 校验）
 
 ## 禁止行为

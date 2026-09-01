@@ -17,7 +17,7 @@
 > **文档版本**：{{v1.0}}（{{YYYY-MM-DD}} 首版）
 > **SSOT 声明**：本编码文档 + `.w-model/rtm.json` 的 `codeModule` 列为阶段 5 代码实现的唯一事实来源；代码模块↔需求/设计映射以 RTM 为准，本文档不重复维护映射。
 > **DoD 引用**：阶段 5 完成度按 [quick-self-check.md](../references/quick-self-check.md)「完成定义（DoD）」节七维度标准 + [phase-5-coding.md](../references/phase-5-coding.md)「验收标准」判定；放行前逐项勾选。
-> **自身校验**：`check-code-tla-consistency.ts` 校验 codeModule↔TLA+ 一致性（维度 1）；`check-artifact-gate.ts --phase=5` 校验 NFR/CON codeModule 回填与 `codeModule` 格式。
+> **自身校验**：`check-code-tla-consistency.ts` 校验 codeModule↔TLA+ 一致性（维度 1）；L4 features 项目门使用 `check-bdd-model.ts --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json`，真实报告缺失即阻断；`check-artifact-gate.ts --phase=5` 校验 NFR/CON codeModule 回填与 `codeModule` 格式。
 > **禁止占位词**：TBD/TODO/undefined 不得进入正式交付。
 
 ## 1. 实现清单
@@ -75,6 +75,7 @@
 ## 7. 校验
 
 - `check-code-tla-consistency.ts`：codeModule↔TLA+ 一致性回归，退出码 0
+- `check-bdd-model.ts --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json`（L4 features 时）：退出码 0
 - `check-artifact-gate.ts --phase=5`：阶段级校验（codeModule 格式 + NFR/CON 回填），退出码 0
 - `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`（启用 opsx 三段式时）：退出码 0
 - 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9）

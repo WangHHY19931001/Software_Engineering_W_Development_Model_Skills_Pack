@@ -21,5 +21,5 @@
 - [ ] 无越界：不回溯重定义接口契约（FM-DD-06 闭合）
 - [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=4` 退出码 0
-- [ ] BDD/TLA+ 门禁通过：`check-bdd-model.ts --phase=4` + `check-tla-model.ts` 退出码 0
+- [ ] BDD/TLA+ 项目门通过：`check-bdd-model.ts --phase=4 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` + `check-tla-model.ts` 退出码 0
 - [ ] 记录与审计：变更在文末变更记录留痕

@@ -21,5 +21,5 @@
 - [ ] 无循环依赖：调用关系 DFS 三色染色无环（FM-OD-03 闭合）
 - [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=3` 退出码 0
-- [ ] BDD/TLA+ 门禁通过：`check-bdd-model.ts --phase=3` + `check-tla-model.ts` 退出码 0
+- [ ] BDD/TLA+ 项目门通过：`check-bdd-model.ts --phase=3 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` + `check-tla-model.ts` 退出码 0
 - [ ] 记录与审计：变更在文末变更记录留痕

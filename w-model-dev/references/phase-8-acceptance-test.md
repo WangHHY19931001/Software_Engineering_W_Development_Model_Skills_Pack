@@ -173,14 +173,14 @@
 
 ## 阶段门评审
 
-验收测试通过 + 用户确认（`confirm` / `confirm-with-comments`） → **项目完成**，归档全部文档与 RTM。
-不通过（`reject` 或 RTM 未达 100%） → 回到需求分析，重新走 W 模型流程（缺陷溯源到对应阶段）。
+验收测试、终检与归档门禁通过后，O 展示真实 UAT 结果、R3/V/G 证据、RTM 与归档清单，并在 🔴 CHECKPOINT-C 等待真实用户 `confirm` / `confirm-with-comments`；用户确认后才**项目完成**并归档全部文档与 RTM。
+普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。用户 `reject` 或 R 的 upstreamDefect 判定再按根因推荐回到对应需求/设计/编码阶段，不能直接跳过根因闭环。
 
 ## L1 BDD features 执行
 
 S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
-- 失败走 R→V→G→S-fix 循环（反模式 #29）
-- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=8 --cucumber-report=<report.json>` 门禁
+- 普通失败走 `R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得省略根因报告复审或 fix 后预防审查
+- 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json` 门禁
 - cucumber 报告不得有 undefined/pending/failed step（D5 校验）
 
 ## 禁止行为

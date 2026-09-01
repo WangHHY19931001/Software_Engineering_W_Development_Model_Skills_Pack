@@ -292,7 +292,7 @@ BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
 - BDD 门禁失败（check-bdd-model.ts exitCode != 0）→ 回退 BDD 子流程，不影响 TLA+
 - TLA+ 门禁失败（check-tla-model.ts exitCode != 0）→ 回退 TLA+ 子流程，不影响 BDD
-- 两者各自走 V→G→R→V→G→S-fix 循环
+- 两者各自走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环
 
 ### §4.2 等价性跨校验
 
@@ -435,14 +435,14 @@ JSON 摘要写入 `.w-model/gate-logs/<timestamp>-bdd.json`，含 `exitCode` 字
 
 | 阶段 | BDD 产出 | 执行场景 | 子代理 | 门禁 |
 |---|---|---|---|---|
-| 1 需求分析 | L1 features + manifest | — | S-doc + S-bdd | check-bdd-model.ts --phase=1 |
-| 2 系统设计 | L2 features + manifest 更新 | — | S-doc + S-bdd | check-bdd-model.ts --phase=2 |
-| 3 概要设计 | L3 features + manifest 更新 | — | S-doc + S-bdd | check-bdd-model.ts --phase=3 |
-| 4 详细设计 | L4 features + manifest 更新 | — | S-doc + S-bdd | check-bdd-model.ts --phase=4 |
-| 5 编码实现 | step definitions + 业务代码 | L4 features TDD 夹具 | S-code | check-bdd-model.ts --phase=5 |
-| 6 集成测试 | — | L3 features 执行 | S-test | check-bdd-model.ts --phase=6 |
-| 7 系统测试 | — | L2 features 执行 | S-test | check-bdd-model.ts --phase=7 |
-| 8 验收测试 | — | L1 features 执行 | S-test + G | check-bdd-model.ts --phase=8 终检 |
+| 1 需求分析 | L1 features + manifest | — | S-doc + S-bdd | `--phase=1 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json` |
+| 2 系统设计 | L2 features + manifest 更新 | — | S-doc + S-bdd | `--phase=2 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` |
+| 3 概要设计 | L3 features + manifest 更新 | — | S-doc + S-bdd | `--phase=3 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` |
+| 4 详细设计 | L4 features + manifest 更新 | — | S-doc + S-bdd | `--phase=4 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` |
+| 5 编码实现 | step definitions + 业务代码 | L4 features TDD 夹具 | S-code | `--phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json` |
+| 6 集成测试 | — | L3 features 执行 | S-test | `--phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json` |
+| 7 系统测试 | — | L2 features 执行 | S-test | `--phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json` |
+| 8 验收测试 | — | L1 features 执行 | S-test + G | `--phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json` |
 
 ### §6.2 阶段 1（L1 features 设计）步骤
 
@@ -454,7 +454,7 @@ JSON 摘要写入 `.w-model/gate-logs/<timestamp>-bdd.json`，含 `exitCode` 字
 | 4 | S-bdd | 更新 `.w-model/bdd-manifest.json`（features + stateMachines） |
 | 5 | S-bdd | 在 RTM `acceptanceTest` 列登记 `UAT-NNN \| BDD-L1-<system>-<num>.feature` |
 | 6 | V | 评审 features（targetKind=test + 评审清单） |
-| 7 | G | 跑 `check-bdd-model.ts --phase=1` 校验 D1-D8（D5 step 绑定可暂缺，由 D6/D7 替代校验） |
+| 7 | G | 跑 `check-bdd-model.ts --phase=1 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json` 校验 D1-D8（D5 step 绑定可暂缺，由 D6/D7 替代校验） |
 | 8 | O | CHECKPOINT 用户确认 → 放行 |
 
 ### §6.3 阶段 5（L4 features 作为 TDD 夹具）步骤
@@ -466,7 +466,7 @@ JSON 摘要写入 `.w-model/gate-logs/<timestamp>-bdd.json`，含 `exitCode` 字
 | 3 | S-code | 重跑 cucumber 直到 all scenarios pass（绿） |
 | 4 | S-code | 重构代码（保持 scenarios 绿） |
 | 5 | V | 评审代码（targetKind=code + 五轴评审） |
-| 6 | G | 跑 `check-bdd-model.ts --phase=5 --cucumber-report=<report.json>` 校验 D5（step 绑定）+ D6（scenario 路径）+ cucumber 报告无失败 |
+| 6 | G | 跑 `check-bdd-model.ts --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json` 校验 D5（step 绑定）+ D6（scenario 路径）+ D8 SD Coverage + 真实 cucumber 报告 |
 | 7 | O | CHECKPOINT → 放行 |
 
 > 阶段 2/3/4 同阶段 1 流程，产出对应层级 features；阶段 6/7/8 同阶段 5 执行流程，跑对应层级 cucumber。
@@ -581,7 +581,7 @@ check-bdd-model.ts D5（step 绑定）扩展校验：
 
 **正确做法**：
 - BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）
-- BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环（§4.3），不得直接放行
+- BDD↔TLA+ 不等价时必须走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链（§4.3），不得直接放行
 - 接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）
 - 实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项
 
@@ -1606,7 +1606,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 缺失字段或值不合法 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D3（stateMachineCompleteness）退出码 1
-- 走 V→G→R→V→G→S-fix 循环修正
+- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环修正
 
 ### 2. scenario 路径合法性
 
@@ -1622,7 +1622,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 路径非法（如 `Given Unauthenticated + When logout + Then LoggedOut`，但转移表中无此 From+Event 组合）→ 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D6（scenarioPathValidity）退出码 1
-- 走 V→G→R→V→G→S-fix 循环修正
+- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环修正
 
 ### 3. TLA+ 等价性
 
@@ -1640,7 +1640,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
   - 实质一致：放行，R 报告记录判定依据
   - 实质不一致：上报人类决策（修正 BDD / 修正 TLA+ / 修正需求设计三选项）
 - 触发 `check-bdd-model.ts` D4（tlaEquivalence）退出码 1
-- 走 V→G→R→V→G→S-fix 循环
+- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环
 
 ### 4. step 绑定完整性
 
@@ -1676,7 +1676,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 追溯缺失或不一致 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D1（headerCompleteness）+ D7（rtmMapping）退出码 1
-- 走 V→G→R→V→G→S-fix 循环修正
+- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环修正
 
 ### 6. 夹具完备性
 

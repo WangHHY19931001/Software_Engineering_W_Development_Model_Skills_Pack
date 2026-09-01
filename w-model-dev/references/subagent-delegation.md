@@ -202,7 +202,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 
 > 约束 #11：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
 
-> 冰山扫掠（反模式 #44）：S-fix 返工通过后跑 ICEBERG-A、阶段门放行前跑 ICEBERG-B（`check-iceberg-sweep.ts` R1-R5）；`newFindings=[]` 或达 maxIcebergRounds=5 才放行，新发现须经 V 复审后走标准 R→V→G→S-fix。
+> 冰山扫掠（反模式 #44）：S-fix 完成 R3×3 / 预防审查 / V / G 后跑 ICEBERG-A、阶段门放行前跑 ICEBERG-B（`check-iceberg-sweep.ts` R1-R5）；`newFindings=[]` 或达 maxIcebergRounds=5 才放行，新发现须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链。
 
 > 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。
 
@@ -554,14 +554,15 @@ O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D}
    → 分派 V 复审根因报告（targetKind=rootcause）→ V 返回 {qualityLevel, passed, reworkHints}
    → 分派 G 门禁（check-rootcause-report.ts）→ G 返回 {exitCode, evidence}
    → 分派 S-fix 修复（输入：R 报告 + fixRecommendation）→ S-fix 返回 {artifacts, rtmDiff, fixBasedOn, selfCheck}
-   → 重走 V → G（评审修复产物）
+   → 分派 R3×3(fix) → G(check-preventive-review exit 0) → V 评审修复产物 → G 门禁
+   → O 展示最新证据，在 🔴 CHECKPOINT 等待用户决定
 O: 若 S-fix 返工通过 → 分派 R-iceberg（ICEBERG-A，输入：reworkHints + fixedPoints + 全阶段产物）
    → R-iceberg 产出 IcebergSweepReport
-   → 若 newFindings 非空 → 分派 V 复审冰山报告 → 每个有效发现走 R→V→G→S-fix → 回到 R-iceberg（ICEBERG-A）
+   → 若 newFindings 非空 → 分派 V 复审冰山报告 → 每个有效发现走完整 R 报告复审、根因门禁、S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链 → 回到 R-iceberg（ICEBERG-A）
    → 若 newFindings=[] → 继续
 O: 若通过（首次或返工最终）
    → 分派 R-iceberg（ICEBERG-B，全局扫掠：reworkHints 历史 + fixedPoints + 全阶段产物 + RTM + graph.json）
-   → 若 newFindings 非空 → 分派 V 复审 → 每个有效发现走 R→V→G→S-fix → 回到 R-iceberg（ICEBERG-A）
+   → 若 newFindings 非空 → 分派 V 复审 → 每个有效发现走完整 R 报告复审、根因门禁、S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链 → 回到 R-iceberg（ICEBERG-A）
    → 若 newFindings=[] → 🔴 CHECKPOINT · 阶段门放行（编排者展示 G 子代理返回的证据给用户）
 O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 ```
@@ -642,13 +643,22 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 上下文：
   - 待校验文件路径：<V 子代理产出的 VerifierOutput JSON / project-dir>
 执行：
-  - 阶段 1~7 门：
+  - 阶段 1 门：
+    1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
+    2. npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" --phase=1
+    3. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=1 --require-tla-equivalence --tla-manifest=<tla-manifest.json>
+    4. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=1
+  - 阶段 2~4 门：
     1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
     2. npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
-    3. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json
+    3. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --require-tla-equivalence --tla-manifest=<tla-manifest.json> --graph=.w-model/ingestion/graph.json
     4. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
-    5. 其余闭环脚本（按 phase-N 定义）
-  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]（内部已调用 check-tla-model + check-bdd-model 并传 --graph）
+  - 阶段 5~7 门：
+    1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
+    2. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=<真实报告路径>
+    3. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
+  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]（终检后另运行 `check-bdd-model.ts` 的 phase 8 graph + required Cucumber report 组合）
+  - 各阶段还须运行 `check-preventive-review.ts`、其余闭环脚本和 phase-N 定义的专属门禁
 产出契约：
   1. 退出码（0 / 1 / 2）
   2. 证据摘要：

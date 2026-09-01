@@ -19,5 +19,5 @@
 - [ ] RTM 同步：主规格 §12 RTM 登记与 §15 追踪矩阵一致、NFR/CON 横切字段已登记
 - [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=1` 退出码 0
-- [ ] BDD/TLA+ 门禁通过：`check-bdd-model.ts --phase=1` + `check-tla-model.ts` 退出码 0
+- [ ] BDD/TLA+ 项目门通过：`check-bdd-model.ts --phase=1 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json` + `check-tla-model.ts` 退出码 0
 - [ ] 记录与审计：变更在文末变更记录留痕

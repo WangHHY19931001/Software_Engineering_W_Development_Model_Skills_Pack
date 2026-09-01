@@ -331,8 +331,8 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 
 ## 阶段门评审
 
-代码审查 + 单元测试通过 → 进入阶段 6（集成测试）。
-不通过 → 回到编码实现返工，按审查报告 reworkHints 修复后重跑单元测试与规范检查。
+代码审查 + 单元测试通过后，O 展示真实测试、R3/V/G 证据并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入阶段 6（集成测试）。
+普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 upstreamDefect 判定可推荐回到阶段 1-4；不得只按 reworkHints 直接分派 S。
 
 ## 禁止行为
 
@@ -427,7 +427,7 @@ S-code 子代理在编码时遵循 TDD 红-绿-重构循环，以 L4 BDD feature
 3. 重跑 cucumber 直到 all scenarios pass（绿）
 4. 重构代码（保持 scenarios 绿）
 
-G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=5 --cucumber-report=<report.json>` 校验 D5（step 绑定）+ D6（scenario 路径）+ cucumber 报告无失败。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json` 校验 D5（step 绑定）+ D6（scenario 路径）+ D8 SD Coverage；项目门缺真实 Cucumber 报告时为 D5 violation / exit 1。
 
 ## 返工路径
 

@@ -16,7 +16,7 @@
 > **文档版本**：{{v1.0}}（{{YYYY-MM-DD}} 首版）
 > **SSOT 声明**：本集成测试文档 + `.w-model/rtm.json` 的集成测试列为阶段 6 的唯一事实来源；接口契约以 [templates/interface-design/interface-contract.md](./interface-design/interface-contract.md) 为准。
 > **DoD 引用**：阶段 6 完成度按 [quick-self-check.md](../references/quick-self-check.md)「完成定义（DoD）」节七维度标准 + [phase-6-integration-test.md](../references/phase-6-integration-test.md)「验收标准」判定；放行前逐项勾选。
-> **自身校验**：`check-artifact-gate.ts --phase=6` 校验集成测试列回填与门禁放行；`check-bdd-model.ts --phase=6` 校验 L3 features（如启用）。
+> **自身校验**：`check-artifact-gate.ts --phase=6` 校验集成测试列回填与门禁放行；L3 features 项目门使用 `check-bdd-model.ts --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json`，真实报告缺失即阻断。
 > **禁止占位词**：TBD/TODO/undefined 不得进入正式交付。
 
 ## 1. 测试范围
@@ -51,7 +51,7 @@
 ## 5. 校验
 
 - `check-artifact-gate.ts --phase=6`：集成测试列回填校验，退出码 0
-- `check-bdd-model.ts --phase=6 --cucumber-report=<report.json>`（L3 features 时）：退出码 0
+- `check-bdd-model.ts --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json`（L3 features 时）：退出码 0
 - 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9）
 
 ## 6. 结论

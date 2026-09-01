@@ -197,7 +197,7 @@ S-bdd 子代理在 S-doc 产出系统设计后：
 4. 在 RTM `systemTest` 列登记 `ST-NNN | BDD-L2-<system>_<subsystem>-<num>.feature`
 
 V 子代理评审 features（targetKind=test + [bdd.md](bdd.md)）。
-G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=2` 校验 D1-D8。
+G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=2 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` 校验 D1-D8；phase>=2 的 graph 缺失为 D8 输入错误。
 
 ## RTM 登记
 

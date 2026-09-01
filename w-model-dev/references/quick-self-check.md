@@ -14,7 +14,7 @@
 - [ ] **图谱校验通过**：阶段 1–4 的 `check-requirement-graph.ts` 退出码 0；阶段 4 零违反硬约束达成才放行进编码
 - [ ] 图谱信息流无黑洞/奇迹/死模块，且边界（EXT-IN/EXT-OUT）完整（`check-requirement-graph.ts` 退出码 0，`GRAPH_JSON.dataflowViolations` 全空）
 - [ ] **TLA+ 行为门禁通过**（约束 #13，L2+ 必跑）：阶段 1–4 的 `check-tla-model.ts` 退出码 0（`TLA_JSON.passed=true`）；phase>=2 时强制 `--graph=<graph.json>`，manifest 须含 sdCoverage 且 `uncoveredSdNodes` 为空（由 S-ingest-tla 回填）；阶段 4 TLA+ 零违反（无死锁/不变式违反/状态爆炸/拆解决策合规）+ 图谱零违反才放行进编码；TLA+ 规格无占位/简化/错误实现（反模式 #16）；建模与需求/设计一致（反模式 #17）
-- [ ] **BDD 行为门禁通过**（约束 #13，L2+ 必跑）：阶段 1–4 的 `check-bdd-model.ts --phase=N` 退出码 0（8 维度 D1-D8 全通过：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage——phase>=2 强制，designCoverage.uncoveredSdNodes 须为空，由 S-ingest-bdd 回填）；BDD features 无占位/简化/错误实现；建模与需求/设计/TLA+ 一致（反模式 #29）
+- [ ] **BDD 行为门禁通过**（约束 #13，L2+ 必跑）：项目阶段门使用 [bdd.md §5.3](bdd.md#53-调用方式) 的完整参数组合：阶段 1-4 均传 `--require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json`，阶段 2-4 额外传 `--graph=.w-model/ingestion/graph.json`；阶段 5-8 均传 `--graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=<真实报告路径>`。D1-D8 全通过（D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage）；BDD features 无占位/简化/错误实现，建模与需求/设计/TLA+ 一致（反模式 #29）
 - [ ] **Phase 2 系统设计**：6 独立产物文件齐全、引用块成立、DoD 清单 ≥ 8 项
 - [ ] **Phase 3 概要设计**：6 独立产物文件齐全、引用块成立、DoD 清单 ≥ 8 项
 - [ ] **Phase 4 详细设计**：6 独立产物文件齐全、引用块成立、DoD 清单 ≥ 8 项
@@ -90,7 +90,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 
 - [ ] 测试套件全过（退出码 0），新增/修改代码有配套测试
 - [ ] 关键路径已运行时验证（不仅单测）
-- [ ] 阶段 1-4 产出对应层级 BDD features 且 `check-bdd-model.ts --phase=N` 退出码 0（BDD↔TLA+ 等价性通过）
+- [ ] 阶段 1-4 产出对应层级 BDD features 且按 [bdd.md §5.3](bdd.md#53-调用方式) 传 `--require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json`；阶段 2-4 同时传 `--graph=.w-model/ingestion/graph.json`，退出码 0（BDD↔TLA+ 等价性通过）
 - [ ] 涉及 API / 接口 / 数据模型的变更已同步 `docs/` 与 `templates/`
 - [ ] `.w-model/rtm.json` 字段无空缺，覆盖率未下降；BDD features 引用按 `<Type>-NNN | BDD-L<level>-<system>-<num>.feature` 格式登记
 - [ ] `Project.status` / `Requirement.status` 与磁盘产物一致
