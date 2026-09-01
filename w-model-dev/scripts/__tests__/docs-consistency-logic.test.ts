@@ -2527,6 +2527,7 @@ async function assertPrePushArtifactCleanup(): Promise<void> {
     // /usr/bin 压制（type -a mktemp 实测假件排第 3），函数导出不受影响。
     // 假 mktemp 语义不变：-d 输出受控 $WM_PREPUSH_ARTIFACT_DIR，其余转发真 /usr/bin/mktemp；
     // 独立脚本版 exit N 对应函数版 return N（exit 会终止被测 pre-push shell）。
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- bash-env script is inside the mkdtemp-owned tool root
     await fs.writeFile(
       bashEnv,
       `npm() {
