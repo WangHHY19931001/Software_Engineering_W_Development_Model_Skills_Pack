@@ -19,7 +19,7 @@
     "version": { "description": "TLA+ manifest schema 版本，当前固定为 1", "type": "number" },
     "project": { "description": "项目 ID（与 project.json 一致）", "type": "string" },
     "currentPhase": { "description": "当前所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
-    "basePath": { "description": "路径解析基准（强制必填，P1.1）：相对 manifest 文件所在目录，jarPath/tlaPath/cfgPath 均基于此解析（tla-plus-guide §2.1）", "type": "string", "minLength": 1 },
+    "basePath": { "description": "路径解析基准（强制必填，P1.1）：相对 manifest 文件所在目录，jarPath/tlaPath/cfgPath 均基于此解析（tla-plus.md §2.1）", "type": "string", "minLength": 1 },
     "tools": {
       "description": "TLA+ 工具链配置（SANY/TLC 依赖 Java 运行时 + tla2tools.jar）",
       "type": "object",
@@ -99,7 +99,7 @@
       }
     },
     "checkRounds": {
-      "description": "TLA+ 校验轮次记录数组（spec 级记录，语义见 tla-plus-guide「checkRounds 字段语义」；首次产出 TLA+ 前填 []；禁止 phase 级摘要字段，违反 R13 拦截）",
+      "description": "TLA+ 校验轮次记录数组（spec 级记录，语义见 tla-plus.md「checkRounds 字段语义」；首次产出 TLA+ 前填 []；禁止 phase 级摘要字段，违反 R13 拦截）",
       "type": "array",
       "items": {
         "type": "object",

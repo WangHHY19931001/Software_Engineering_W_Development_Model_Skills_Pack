@@ -152,7 +152,7 @@
           "items": { "type": "string" }
         },
         "candidateAntiPatterns": {
-          "description": "候选新增反模式数组（待人审后加入 anti-patterns.md）",
+          "description": "候选新增反模式数组（待人审后加入 hard-constraints.md 反模式节）",
           "type": "array",
           "items": { "type": "string" }
         },

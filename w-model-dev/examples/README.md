@@ -34,7 +34,7 @@ W 模型 8 阶段**串行**推进，每阶段由确定性门禁脚本守住边�
 | 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7` | [stage7-system-test.md](stage7-system-test.md) |
 | 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8`、`check-design-contract-consistency.ts`、`check-openspec-archive.ts` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
 
-> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [dispatch-matrix.md](../references/dispatch-matrix.md)。
+> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
 ## 串联执行顺序
 
@@ -81,4 +81,4 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase 8
 ```
 
-> 各命令的预期输出（退出码 0/1/2 示例）见对应阶段示例文件；阶段 2/3/4 门禁命令详见 [dispatch-matrix.md](../references/dispatch-matrix.md) 与 `README.md`（仓库根）「W 模型 8 阶段 × 门禁对应」。
+> 各命令的预期输出（退出码 0/1/2 示例）见对应阶段示例文件；阶段 2/3/4 门禁命令详见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）与 `README.md`（仓库根）「W 模型 8 阶段 × 门禁对应」。

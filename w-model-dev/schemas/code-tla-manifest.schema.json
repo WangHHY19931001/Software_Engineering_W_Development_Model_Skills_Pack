@@ -31,7 +31,7 @@
               "children"
             ],
             "properties": {
-              "id": { "description": "规格 ID（MODULE 名格式 L<level>_<system>[_<subsystem>]，须符合 tla-plus-guide §2.0 命名规范，禁止连字符）", "type": "string", "minLength": 1 },
+              "id": { "description": "规格 ID（MODULE 名格式 L<level>_<system>[_<subsystem>]，须符合 tla-plus.md §2.0 命名规范，禁止连字符）", "type": "string", "minLength": 1 },
               "level": { "description": "规格层级：L1=系统内外交互 / L2=子系统 / L3=原子行为 / L4-L6=更深层次分解（维度3/4 遍历全部层级 specs 的 tlaContent）", "type": "string", "minLength": 1 },
               "phase": { "description": "产出阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
               "system": { "description": "所属系统名称（层次路径用 :: 分隔，如 blog-system::auth-subsystem）", "type": "string", "minLength": 1 },
@@ -40,8 +40,8 @@
                 "type": "array",
                 "items": { "type": "string", "minLength": 1 }
               },
-              "tlaPath": { "description": ".tla 文件路径（相对 manifest 文件所在目录解析，见 tla-plus-guide §2.1）", "type": "string", "minLength": 1 },
-              "cfgPath": { "description": ".cfg 文件路径（相对 manifest 文件所在目录解析，见 tla-plus-guide §2.1）", "type": "string", "minLength": 1 },
+              "tlaPath": { "description": ".tla 文件路径（相对 manifest 文件所在目录解析，见 tla-plus.md §2.1）", "type": "string", "minLength": 1 },
+              "cfgPath": { "description": ".cfg 文件路径（相对 manifest 文件所在目录解析，见 tla-plus.md §2.1）", "type": "string", "minLength": 1 },
               "parent": { "description": "上级 TLA 文件相对路径（相对该 .tla 文件所在目录解析；L1 填 null）", "type": ["string", "null"] },
               "children": {
                 "description": "下级 TLA 文件相对路径列表（叶子填 []；与文件头 @child 双向一致）",

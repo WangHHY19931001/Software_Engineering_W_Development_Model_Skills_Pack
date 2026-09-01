@@ -55,7 +55,7 @@
         "fixedPoints": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "已修复的缺陷位置列表（文件:行号/节点ID，遵循 format-conventions.md）"
+          "description": "已修复的缺陷位置列表（文件:行号/节点ID，遵循 conventions.md 格式约定）"
         },
         "previousFindings": {
           "type": "array",
@@ -90,7 +90,7 @@
           "location": {
             "type": "string",
             "minLength": 1,
-            "description": "缺陷位置，格式 path:§section 或 path:L42（遵循 format-conventions.md 冒号分隔）"
+            "description": "缺陷位置，格式 path:§section 或 path:L42（遵循 conventions.md 格式约定冒号分隔）"
           },
           "description": {
             "type": "string",

@@ -43,7 +43,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts .w-model/tla-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=1
 ```
 
-> 附加：阶段门放行前 G 还须跑 5 项闭环脚本（`check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-preventive-review`）+ `check-role-dispatch` + `check-signature-chain`；评审证据回填经 `check-verifier-output.ts`。完整分派见 [dispatch-matrix.md](../references/dispatch-matrix.md)。
+> 附加：阶段门放行前 G 还须跑 5 项闭环脚本（`check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-preventive-review`）+ `check-role-dispatch` + `check-signature-chain`；评审证据回填经 `check-verifier-output.ts`。完整分派见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
 ## 预期输出（示例输出）
 
