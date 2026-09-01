@@ -2520,65 +2520,68 @@ async function assertPrePushArtifactCleanup(): Promise<void> {
   const toolRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-prepush-tools-'));
   const capturedEnv = path.join(toolRoot, 'docs-consistency-env.txt');
   const artifactDir = path.join(toolRoot, 'vitest-artifact');
+  const bashEnv = path.join(toolRoot, 'bash-env.sh');
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test tool is created inside the mkdtemp-owned tool root
+    // 劫持机制：BASH_ENV 函数导出（参照 platform-deps-hook.test.ts run() 先例），bash 函数
+    // 优先于 PATH 查找——PATH 前置假可执行文件会被 Git Bash/MSYS 启动时自动前置的
+    // /usr/bin 压制（type -a mktemp 实测假件排第 3），函数导出不受影响。
+    // 假 mktemp 语义不变：-d 输出受控 $WM_PREPUSH_ARTIFACT_DIR，其余转发真 /usr/bin/mktemp；
+    // 独立脚本版 exit N 对应函数版 return N（exit 会终止被测 pre-push shell）。
     await fs.writeFile(
-      path.join(toolRoot, 'npm'),
-      `#!/usr/bin/env bash
-case "$*" in
-  *"check:docs-consistency"*)
-    test -f "$WM_VITEST_COUNT_FILE" && test -f "$WM_VITEST_PROVENANCE_FILE"
-    printf '%s|%s|%s\\n' "$WM_VITEST_COUNT_FILE" "$WM_VITEST_PROVENANCE_FILE" "$WM_VITEST_PROVENANCE_ROOT" > "$WM_PREPUSH_CAPTURE"
-    ;;
-  *"bad-ranking-k.json"*) exit 1 ;;
-  *"check:verifier"*) [[ "$*" == *"valid.json"* ]] || exit 2 ;;
-  *"check:gate"*) exit 2 ;;
-esac
-exit 0
+      bashEnv,
+      `npm() {
+  case "$*" in
+    *"check:docs-consistency"*)
+      test -f "$WM_VITEST_COUNT_FILE" && test -f "$WM_VITEST_PROVENANCE_FILE"
+      printf '%s|%s|%s\\n' "$WM_VITEST_COUNT_FILE" "$WM_VITEST_PROVENANCE_FILE" "$WM_VITEST_PROVENANCE_ROOT" > "$WM_PREPUSH_CAPTURE"
+      ;;
+    *"bad-ranking-k.json"*) return 1 ;;
+    *"check:verifier"*) [[ "$*" == *"valid.json"* ]] || return 2 ;;
+    *"check:gate"*) return 2 ;;
+  esac
+  return 0
+}
+npx() {
+  local output arg
+  for arg in "$@"; do
+    case "$arg" in --outputFile=*) output="\${arg#--outputFile=}" ;; esac
+  done
+  if [[ "$*" == *"bad-schema.manifest.json"* ]]; then return 2; fi
+  if [ -n "\${output:-}" ]; then
+    mkdir -p "$(dirname "$output")"
+    printf '%s' '{"testResults":[],"numTotalTests":0,"numPassedTests":0,"numFailedTests":0,"success":true}' > "$output"
+  fi
+  return 0
+}
+mktemp() {
+  if [ "\${1:-}" = "-d" ]; then
+    mkdir -p "$WM_PREPUSH_ARTIFACT_DIR"
+    printf '%s\\n' "$WM_PREPUSH_ARTIFACT_DIR"
+  else
+    /usr/bin/mktemp "$@"
+  fi
+}
 `,
-      { encoding: 'utf8', mode: 0o755 },
-    );
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test tool is created inside the mkdtemp-owned tool root
-    await fs.writeFile(
-      path.join(toolRoot, 'npx'),
-      `#!/usr/bin/env bash
-for arg in "$@"; do
-  case "$arg" in --outputFile=*) output="\${arg#--outputFile=}" ;; esac
-done
-if [[ "$*" == *"bad-schema.manifest.json"* ]]; then exit 2; fi
-if [ -n "\${output:-}" ]; then
-  mkdir -p "$(dirname "$output")"
-  printf '%s' '{"testResults":[],"numTotalTests":0,"numPassedTests":0,"numFailedTests":0,"success":true}' > "$output"
-fi
-exit 0
-`,
-      { encoding: 'utf8', mode: 0o755 },
-    );
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- test tool is created inside the mkdtemp-owned tool root
-    await fs.writeFile(
-      path.join(toolRoot, 'mktemp'),
-      `#!/usr/bin/env bash
-if [ "\${1:-}" = "-d" ]; then
-  mkdir -p "$WM_PREPUSH_ARTIFACT_DIR"
-  printf '%s\\n' "$WM_PREPUSH_ARTIFACT_DIR"
-else
-  /usr/bin/mktemp "$@"
-fi
-`,
-      { encoding: 'utf8', mode: 0o755 },
+      'utf8',
     );
 
     const result = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
       execFile(
         'bash',
-        ['.githooks/pre-push', '--force'],
+        [
+          '-c',
+          'source "$BASH_ENV"; export -f npm npx mktemp 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"',
+          '--',
+          '.githooks/pre-push',
+          '--force',
+        ],
         {
           cwd: REPO_ROOT,
           encoding: 'utf8',
           timeout: 30_000,
           env: {
             ...process.env,
-            PATH: `${toolRoot}${path.delimiter}${process.env.PATH ?? ''}`,
+            BASH_ENV: bashEnv,
             WM_PREPUSH_CAPTURE: capturedEnv,
             WM_PREPUSH_ARTIFACT_DIR: artifactDir,
           },
