@@ -19,6 +19,7 @@
     "eval": "tsx eval/runner.ts",
     "coverage": "vitest run --coverage --config config/vitest.config.ts",
     "//3 工具类": "工程工具",
+    "doctor": "tsx w-model-dev/scripts/cli/doctor.ts",
     "postinstall": "node scripts/setup-hooks.cjs",
     "setup:hooks": "git config core.hooksPath .githooks",
     "platform-deps:check": "bash .githooks/ensure-platform-deps.sh --check",

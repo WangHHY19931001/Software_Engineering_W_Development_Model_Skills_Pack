@@ -42,6 +42,11 @@ describe('skill-metadata 双写一致性', () => {
     expect(pkg.version).toBe(parseFrontmatter(skill).version);
   });
 
+  it('package.json doctor script 指向正式 doctor CLI', () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
+    expect(pkg.scripts.doctor).toBe('tsx w-model-dev/scripts/cli/doctor.ts');
+  });
+
   it('README / INSTALL.md 版本与 package.json 一致（五处镜像）', () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
     const readme = readFileSync(join(ROOT, '..', 'README.md'), 'utf-8');
