@@ -87,6 +87,13 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toEqual([]);
   });
 
+  it('normalizes a relative skill root before classifying ../SKILL.md links', async () => {
+    const relativeRoot = path.relative(process.cwd(), SKILL_ROOT);
+    const result = await auditL0RelativeLinks(relativeRoot);
+
+    expect(result.violations).toEqual([]);
+  });
+
   it('requires the consumer-project contribution guide placeholder and rejects the old relative link', async () => {
     const content = await fs.readFile(path.join(SKILL_ROOT, 'subagent', 'engineering-technical-writer.md'), 'utf8');
 

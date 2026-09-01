@@ -83,9 +83,10 @@ function parseRelativeLinks(content: string): string[] {
  * 链接可以分类为模板占位。其余相对目标必须在 L0 内存在，否则作为 violation 返回。
  */
 export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditResult> {
+  const absoluteRoot = path.resolve(root);
   const l0Files = ['SKILL.md'];
   for (const directory of L0_DIRECTORIES) {
-    l0Files.push(...(await collectFiles(root, directory)));
+    l0Files.push(...(await collectFiles(absoluteRoot, directory)));
   }
 
   const result: L0LinkAuditResult = {
@@ -96,7 +97,7 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
   };
 
   for (const source of l0Files.filter((file) => file.endsWith('.md'))) {
-    const sourcePath = path.join(root, source);
+    const sourcePath = path.join(absoluteRoot, source);
     const content = await fs.readFile(sourcePath, 'utf8');
 
     for (const rawTarget of parseRelativeLinks(content)) {
@@ -114,7 +115,7 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
 
       const targetWithoutFragment = decodeURI(rawTarget.split('#')[0]!);
       const targetPath = path.resolve(path.dirname(sourcePath), targetWithoutFragment);
-      const l1Directory = l1Boundary(targetPath, root);
+      const l1Directory = l1Boundary(targetPath, absoluteRoot);
       if (l1Directory) {
         try {
           await fs.access(targetPath);
@@ -125,8 +126,8 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
         continue;
       }
 
-      const isSkillRoot = targetPath === path.join(root, 'SKILL.md');
-      if (!isInside(root, targetPath) || (!isSkillRoot && !l0Boundary(targetPath, root))) {
+      const isSkillRoot = targetPath === path.join(absoluteRoot, 'SKILL.md');
+      if (!isInside(absoluteRoot, targetPath) || (!isSkillRoot && !l0Boundary(targetPath, absoluteRoot))) {
         result.violations.push(`${sourceEntry.source}: 不允许的分发边界 → ${rawTarget}`);
         continue;
       }
