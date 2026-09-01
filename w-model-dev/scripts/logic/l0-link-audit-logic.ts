@@ -16,22 +16,34 @@ export interface L0LinkAuditResult {
   violations: string[];
 }
 
-async function collectFiles(root: string, directory: string): Promise<string[]> {
+async function collectFiles(
+  root: string,
+  directory: string,
+  rootRealPath: string,
+  violations: string[],
+): Promise<string[]> {
   const absolute = path.join(root, directory);
+  let realDirectory: string;
   let entries: import('node:fs').Dirent[];
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolute remains within the caller-provided skill root during recursive audit
-    entries = await fs.readdir(absolute, { withFileTypes: true });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw error;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolute remains beneath the resolved skill root during recursive audit
+    realDirectory = await fs.realpath(absolute);
+    if (!isInside(rootRealPath, realDirectory)) {
+      violations.push(`L0 目录越出 skill 根 ${normalizeRelative(directory)}`);
+      return [];
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- realDirectory was resolved beneath the verified skill root
+    entries = await fs.readdir(realDirectory, { withFileTypes: true });
+  } catch {
+    violations.push(`必需 L0 目录不存在或不可读 ${normalizeRelative(directory)}`);
+    return [];
   }
   const files: string[] = [];
 
   for (const entry of entries) {
     const relative = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await collectFiles(root, relative)));
+      files.push(...(await collectFiles(root, relative, rootRealPath, violations)));
     } else {
       files.push(relative);
     }
@@ -85,22 +97,51 @@ function parseRelativeLinks(content: string): string[] {
  */
 export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditResult> {
   const absoluteRoot = path.resolve(root);
-  const l0Files = ['SKILL.md'];
-  for (const directory of L0_DIRECTORIES) {
-    l0Files.push(...(await collectFiles(absoluteRoot, directory)));
-  }
-
   const result: L0LinkAuditResult = {
     relativeLinkCount: 0,
     l1Only: [],
     templatePlaceholders: [],
     violations: [],
   };
+  let rootRealPath: string;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absoluteRoot is the caller-supplied skill package root
+    rootRealPath = await fs.realpath(absoluteRoot);
+  } catch {
+    result.violations.push('skill 根目录不存在或不可读');
+    return result;
+  }
+
+  const skillPath = path.join(absoluteRoot, 'SKILL.md');
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- skillPath is the required root file beneath the resolved skill root
+    const skillRealPath = await fs.realpath(skillPath);
+    if (!isInside(rootRealPath, skillRealPath)) result.violations.push('必需 L0 文件越出 skill 根 SKILL.md');
+  } catch {
+    result.violations.push('必需 L0 文件不存在或不可读 SKILL.md');
+  }
+
+  const l0Files = ['SKILL.md'];
+  for (const directory of L0_DIRECTORIES) {
+    l0Files.push(...(await collectFiles(absoluteRoot, directory, rootRealPath, result.violations)));
+  }
 
   for (const source of l0Files.filter((file) => file.endsWith('.md'))) {
     const sourcePath = path.join(absoluteRoot, source);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- source is enumerated from the L0 directories beneath the resolved skill root
-    const content = await fs.readFile(sourcePath, 'utf8');
+    let content: string;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- source is the verified SKILL.md or is enumerated beneath a verified L0 directory
+      const realSource = await fs.realpath(sourcePath);
+      if (!isInside(rootRealPath, realSource)) {
+        result.violations.push(`L0 源文件越出 skill 根 ${normalizeRelative(source)}`);
+        continue;
+      }
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- source real path was verified beneath the skill root
+      content = await fs.readFile(sourcePath, 'utf8');
+    } catch {
+      result.violations.push(`${normalizeRelative(source)}: L0 源文件不可读`);
+      continue;
+    }
 
     for (const rawTarget of parseRelativeLinks(content)) {
       result.relativeLinkCount++;
@@ -120,8 +161,13 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
       const l1Directory = l1Boundary(targetPath, absoluteRoot);
       if (l1Directory) {
         try {
-          await fs.access(targetPath);
-          result.l1Only.push(sourceEntry);
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- targetPath is resolved from an L0 markdown link beneath the verified skill root
+          const realTarget = await fs.realpath(targetPath);
+          if (!isInside(rootRealPath, realTarget)) {
+            result.violations.push(`${sourceEntry.source}: L1-only 目标越出 skill 根 → ${rawTarget}`);
+          } else {
+            result.l1Only.push(sourceEntry);
+          }
         } catch {
           result.violations.push(`${sourceEntry.source}: L1-only 目标不存在 → ${rawTarget}`);
         }
@@ -135,7 +181,11 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
       }
 
       try {
-        await fs.access(targetPath);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- targetPath is resolved from an L0 markdown link beneath the verified skill root
+        const realTarget = await fs.realpath(targetPath);
+        if (!isInside(rootRealPath, realTarget)) {
+          result.violations.push(`${sourceEntry.source}: L0 目标越出 skill 根 → ${rawTarget}`);
+        }
       } catch {
         result.violations.push(`${sourceEntry.source}: 相对链接目标不存在 → ${rawTarget}`);
       }

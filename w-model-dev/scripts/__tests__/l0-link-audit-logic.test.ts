@@ -9,7 +9,9 @@ import { auditL0RelativeLinks } from '../logic/l0-link-audit-logic.js';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SKILL_ROOT = path.join(REPO_ROOT, 'w-model-dev');
+const L0_DIRECTORIES = ['references', 'templates', 'examples', 'subagent', 'schemas'];
 let fixtureRoot: string;
+let outsideRoot: string;
 
 async function write(relativePath: string, content = ''): Promise<void> {
   const target = path.join(fixtureRoot, relativePath);
@@ -21,11 +23,16 @@ async function write(relativePath: string, content = ''): Promise<void> {
 
 beforeEach(async () => {
   fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'l0-link-audit-'));
+  outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'l0-link-audit-outside-'));
   await write('SKILL.md');
+  await Promise.all(
+    L0_DIRECTORIES.map((directory) => fs.mkdir(path.join(fixtureRoot, directory), { recursive: true })),
+  );
 });
 
 afterEach(async () => {
   await fs.rm(fixtureRoot, { recursive: true, force: true });
+  await fs.rm(outsideRoot, { recursive: true, force: true });
 });
 
 describe('auditL0RelativeLinks', () => {
@@ -51,6 +58,47 @@ describe('auditL0RelativeLinks', () => {
 
     expect(result.l1Only).toEqual([]);
     expect(result.violations).toContainEqual(expect.stringContaining('L1-only 目标不存在'));
+  });
+
+  it('fails closed when a required L0 directory is missing', async () => {
+    await fs.rm(path.join(fixtureRoot, 'templates'), { recursive: true, force: true });
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('必需 L0 目录不存在或不可读 templates'));
+  });
+
+  it('fails closed when the required L0 SKILL.md file is missing', async () => {
+    await fs.rm(path.join(fixtureRoot, 'SKILL.md'), { force: true });
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('必需 L0 文件不存在或不可读 SKILL.md'));
+  });
+
+  it('rejects an L1-only target whose real path escapes the skill root', async () => {
+    const outsideTarget = path.join(outsideRoot, 'escape.ts');
+    const symlinkTarget = path.join(fixtureRoot, 'scripts', 'cli', 'escape.ts');
+    await fs.writeFile(outsideTarget, 'export {};', 'utf8');
+    await fs.mkdir(path.dirname(symlinkTarget), { recursive: true });
+    await fs.symlink(outsideTarget, symlinkTarget, 'file');
+    await write('references/guide.md', '[escape](../scripts/cli/escape.ts)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.l1Only).toEqual([]);
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 目标越出 skill 根'));
+  });
+
+  it('rejects an L0 source file whose real path escapes the skill root', async () => {
+    const outsideSource = path.join(outsideRoot, 'outside.md');
+    const sourceLink = path.join(fixtureRoot, 'references', 'outside.md');
+    await fs.writeFile(outsideSource, '[inside](../SKILL.md)', 'utf8');
+    await fs.symlink(outsideSource, sourceLink, 'file');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('L0 源文件越出 skill 根 references/outside.md'));
   });
 
   it('rejects missing non-L1 relative targets', async () => {
