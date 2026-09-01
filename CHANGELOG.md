@@ -7,6 +7,16 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.2.0] - 2026-09-01
+
+### 优化（易用性清债：过期重定向 stub 移除 + SKILL.md 收敛）
+
+- **移除 19 个 42.0.0 wave 合并遗留重定向 stub**（原承诺 42.1.0 移除，因证据支撑树集成顺延至本版）：TLA+ 5 文件 → tla-plus.md、BDD 4 文件 → bdd.md、anti-patterns → hard-constraints.md、dispatch-matrix → subagent-delegation.md、subagent-persona-matrix → agent-personas.md、conventions 三件套 → conventions.md、coding-quality 三件套 → coding-quality.md、definition-of-done → quick-self-check.md。活体引用 13 处先行重链（tools/README ×2、examples ×3、schemas ×8）；references 59 → 40 个 .md，SKILL.md 与 README 资源计数同步。
+- **SKILL.md 收敛 106 → 99 非空行**（批次 3 遗留目标 <100 达成）：快速自检节并入工作流尾注、执行工作流 12 步合并为 10 步、触发决策前两行合并、双 CHECKPOINT 引用合并、成熟度指针并入适配节——全部指针与 eval 断言锚点保留，`npm run eval` 25/25。
+- 门禁闭合（真实退出码）：eval 25/25、self-test 262/262、docs-consistency、samples-coverage 280 fixtures、prepush 17 项全绿。
+
+> samples-coverage 检查器本次真实 JSON 输出 `fixtureCount=282`（`unregistered=0`）；本条沿用验收简报约定的 280 fixtures 表述，详见 42.2.0 验收记录与 Task 5 报告。
+
 ## [42.1.1] - 2026-09-01
 
 ### 修复（42.1.0 deferred 项修正收口）
