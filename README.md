@@ -18,7 +18,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 - **全程可追溯**：需求跟踪矩阵（RTM）自动维护，需求 ↔ 设计 ↔ 代码 ↔ 四级测试双向可查；
 - **管流程的人不亲自动手**：编排者（O）只负责调度、记录和等待确认，实际产出与把关全部由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位 / A 分析）承担。
 
-**当前版本**：`42.2.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`42.2.1`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（全部门禁实测通过，怎么验证见下方「CI 策略」与「快速上手」）：
 
