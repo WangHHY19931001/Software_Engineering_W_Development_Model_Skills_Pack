@@ -14,7 +14,7 @@
 - **模板链接与门禁一致性**：修正 `templates/requirement-spec.md` 的 6 条子模板路径，并将模板漂移门禁及回归 fixture 同步到 `requirement-spec/` 子目录；聚焦 Vitest 52/52、全量 Vitest 1247/1247。
 - **编排闭环与示例契约**：SKILL 恢复 `R3×3 → G(check-preventive-review) → V → G` 顺序和完整普通返工链；examples 总览、阶段 1、阶段 5 编码及阶段 6-8 测试执行示例补齐角色隔离、CHECKPOINT、codegraph/OpenSpec、BDD 必填参数、当前 GRAPH_JSON 字段、真实 `result=pass|fail` 回填及阶段 7 `--phase=7`。
 - **L0/L1 与历史证据边界**：保留并明确分类 92 条 L1-only 脚本链接，quickstart 将 npm/doctor 验证限定为 L1，技术写作者模板改为消费项目贡献指南占位；41.9.0 real-run evidence 按历史快照锁定，`272/234/15` 不与 42.2.0 的 `282/244/15` 作趋势比较。
-- 版本前真实验证：分层链接检查 641 条（L1-only 92、模板占位 36、意外断链 0），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。
+- 版本前真实验证：分层链接检查 641 条（L1-only 92、模板占位 36、意外断链 0），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿。
 
 ## [42.2.0] - 2026-09-01
 
