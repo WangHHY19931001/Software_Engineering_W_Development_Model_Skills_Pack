@@ -21,18 +21,18 @@
 
 ## 8 阶段编排导览
 
-W 模型 8 阶段**串行**推进，每阶段由确定性门禁脚本守住边界：**门禁通过（退出码 0）才放行进入下一阶段**，任一阶段门禁失败（退出码 1）回到对应阶段返工，输入错误（退出码 2）修正后重跑。
+W 模型 8 阶段**串行**推进。每阶段先经 🔴 CHECKPOINT 进入确认，再由 S 产出、R 完成 R3×3、G 运行 `check-preventive-review.ts`（exit 0）、V 评审、G 执行常规门禁；全部通过后由 O 展示证据并在 🔴 CHECKPOINT 等待用户放行。G 的退出码 0 是必要条件，不是单独的跨阶段授权；输入错误（exit 2）修正后重跑。
 
 | 阶段 | 关键产物 | 门禁脚本（`w-model-dev/scripts/cli/`） | 示例文件 |
 |---|---|---|---|
 | 1 需求分析 | 需求规格（主模板 + 6 子模板）、验收测试设计、RTM、图谱 REQ、TLA+ L1、BDD L1 | `check-requirement-graph.ts --phase=1`、`check-requirement-coverage.ts`、`check-tla-model.ts --phase=1`、`check-bdd-model.ts --phase=1` | [stage1-requirement-analysis.md](stage1-requirement-analysis.md) |
-| 2 系统设计 | 系统设计文档、系统测试设计、RTM、图谱 SD、TLA+ L2、BDD L2 | `check-requirement-graph.ts --phase=2`、`check-tla-model.ts --phase=2 --graph=`、`check-bdd-model.ts --phase=2 --graph=` | [system-design.md](system-design.md) |
-| 3 概要设计 | 接口设计文档、集成测试设计、RTM、图谱 INTF、TLA+ L3、BDD L3 | `check-requirement-graph.ts --phase=3`、`check-tla-model.ts --phase=3 --graph=`、`check-bdd-model.ts --phase=3 --graph=` | [system-design.md](system-design.md) |
-| 4 详细设计 | 详细设计文档、单元测试设计、RTM、图谱 DD、TLA+ L3/L4、BDD L4 | `check-requirement-graph.ts --phase=4`（零违反硬约束）、`check-tla-model.ts --phase=4 --graph=`、`check-bdd-model.ts --phase=4 --graph=`、`check-artifact-gate.ts --phase=4 --spec-dir=` | [system-design.md](system-design.md) |
+| 2 系统设计 | 系统设计文档、系统测试设计、RTM、图谱 SD、TLA+ L2、BDD L2 | `check-requirement-graph.ts --phase=2`、`check-tla-model.ts --phase=2 --graph=.w-model/ingestion/graph.json`、`check-bdd-model.ts --phase=2 --graph=.w-model/ingestion/graph.json` | [system-design.md](system-design.md) |
+| 3 概要设计 | 接口设计文档、集成测试设计、RTM、图谱 INTF、TLA+ L3、BDD L3 | `check-requirement-graph.ts --phase=3`、`check-tla-model.ts --phase=3 --graph=.w-model/ingestion/graph.json`、`check-bdd-model.ts --phase=3 --graph=.w-model/ingestion/graph.json` | [system-design.md](system-design.md) |
+| 4 详细设计 | 详细设计文档、单元测试设计、RTM、图谱 DD、TLA+ L3/L4、BDD L4 | `check-requirement-graph.ts --phase=4`（零违反硬约束）、`check-tla-model.ts --phase=4 --graph=.w-model/ingestion/graph.json`、`check-bdd-model.ts --phase=4 --graph=.w-model/ingestion/graph.json`、`check-artifact-gate.ts --phase=4 --spec-dir=<path>` | [system-design.md](system-design.md) |
 | 5 编码实现 | 实现代码、单元测试执行结果、RTM codeModule、codegraph 落盘、opsx 制品 | `check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-artifact-gate.ts --phase=5` | [stage5-coding.md](stage5-coding.md) |
-| 6 集成测试 | 集成测试执行结果、测试报告、RTM integrationTest | `check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6` | [stage6-integration-test.md](stage6-integration-test.md) |
-| 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7` | [stage7-system-test.md](stage7-system-test.md) |
-| 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8`、`check-design-contract-consistency.ts`、`check-openspec-archive.ts` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
+| 6 集成测试 | 集成测试执行结果、测试报告、RTM integrationTest | `check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report` | [stage6-integration-test.md](stage6-integration-test.md) |
+| 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report` | [stage7-system-test.md](stage7-system-test.md) |
+| 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report`、`check-design-contract-consistency.ts`、`check-openspec-archive.ts --phase=8` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
 
 > 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
@@ -43,14 +43,14 @@ W 模型 8 阶段**串行**推进，每阶段由确定性门禁脚本守住边�
   │门禁①      │门禁②      │门禁③      │门禁④      │门禁⑤      │门禁⑥      │门禁⑦      │终检+归档
 ```
 
-1. **阶段 1 → 2**：需求图谱连通 + 单根、覆盖 100%、TLA+ L1 / BDD L1 通过，才放行系统设计。
-2. **阶段 2 → 3 → 4**：设计阶段逐级演进图谱（SD → INTF → DD），TLA+/BDD 逐级细化（L2 → L3 → L4），阶段 4 零违反硬约束。
-3. **阶段 4 → 5**：详细设计放行后编码，单元测试覆盖率 ≥ 80%，codeModule 回填。
-4. **阶段 5 → 6 → 7**：三级测试逐层执行回填 RTM，每层质量门 `--phase=N` 通过才放行。
-5. **阶段 7 → 8**：系统测试通过（中间检查）后，用户确认进入验收测试。
-6. **阶段 8 交付**：终检（RTM 100% + 四级测试全通过）+ 归档完整性 + 用户确认 → 项目完成。
+1. **阶段 1 → 2**：ingestion A→G 专用收敛完成后，经收敛 CHECKPOINT 进入 S；需求图谱、覆盖、TLA+ L1 / BDD L1 通过，R3/V/G 闭环完成，再经阶段门 CHECKPOINT 才放行系统设计。
+2. **阶段 2 → 3 → 4**：设计阶段逐级演进图谱（SD → INTF → DD），TLA+/BDD 逐级细化（L2 → L3 → L4）；每阶段都完整执行 R3×3→G(`check-preventive-review`)→V→G 和阶段门 CHECKPOINT。
+3. **阶段 4 → 5**：详细设计经用户放行后进入编码；阶段 5 还须完成 codegraph 影响分析、OpenSpec 三段式、真实单元测试和 codeModule 回填。
+4. **阶段 5 → 6 → 7**：三级测试逐层执行并按真实运行器结果回填 RTM；每层 `--phase=N` 门禁通过、V 通过且用户在阶段门 CHECKPOINT 放行后才推进。
+5. **阶段 7 → 8**：系统测试真实结果回填、阶段 7 R3/V/G 闭环通过后，用户在 CHECKPOINT 确认进入验收测试。
+6. **阶段 8 交付**：终检（RTM 100% + 四级测试真实结果全通过）+ 归档完整性 + V/G 通过 + 用户在发布 CHECKPOINT 确认，项目才完成。
 
-失败回退路径：任一阶段门禁退出码 1 → 按 `reworkHints` 回到对应产出阶段返工（如阶段 6 集成测试失败回阶段 5 编码）；退出码 2 → 修正命令行/输入后重跑。
+普通 V/G 失败路径：`V/G 失败 → R 根因报告 → V 复审报告 → G(check-rootcause-report, exit 0) → S-fix → R3×3(fix) → G(check-preventive-review, exit 0) → V → G`；O 展示最新证据后仍须等待阶段门 CHECKPOINT。不得直接按 `reworkHints` 跳过 R/V/G 分派。阶段 1 ingestion 图谱失败是 A→G 专用收敛，按 A-cross/A-evolve 重跑，最多 `MAX_ROUNDS=5`；exit 2 只修正命令行/输入后重跑。
 
 ## 典型总调用序列（一次完整项目）
 
@@ -67,18 +67,18 @@ npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
 
 # 阶段 6（集成测试）
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=6 --cucumber-report=reports/cucumber/integration.json
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=6
 
 # 阶段 7（系统测试）
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=7 --cucumber-report=reports/cucumber/system.json
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
 
 # 阶段 8（验收测试 + 终检 + 归档）
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts .
 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --cucumber-report=reports/cucumber/acceptance.json
-npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase 8
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
+npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8
 ```
 
 > 各命令的预期输出（退出码 0/1/2 示例）见对应阶段示例文件；阶段 2/3/4 门禁命令详见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）与 `README.md`（仓库根）「W 模型 8 阶段 × 门禁对应」。
