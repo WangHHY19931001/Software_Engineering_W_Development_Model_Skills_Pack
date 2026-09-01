@@ -1354,8 +1354,10 @@ describe('模板漂移校验（--validate-templates，C9）', () => {
     const ssot = '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
     for (const phase of [1, 2, 3, 4]) {
       const { main, dir, refs, prefixed } = TPL_LAYOUT[phase]!;
-      // 引用块：phase=1 直接文件名；phase≥2 {{module}} 占位符
-      const links = refs.map((r) => `> 详见 [x](./${prefixed ? `{{module}}-${r}` : r})`).join('\n');
+      // 引用块：phase=1 指向 requirement-spec/ 子目录；phase≥2 使用 {{module}} 占位符
+      const links = refs
+        .map((r) => `> 详见 [x](./${prefixed ? `{{module}}-${r}` : `requirement-spec/${r}`})`)
+        .join('\n');
       files[`templates/${main}`] = links + ssot;
       for (const r of refs) files[`templates/${dir}/${r}`] = '';
       files[`templates/${dir}/discipline-dod.md`] = Array(8).fill('- [ ] x').join('\n');

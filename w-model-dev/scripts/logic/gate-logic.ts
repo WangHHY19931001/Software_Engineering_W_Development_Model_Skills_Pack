@@ -419,8 +419,8 @@ export function checkTemplatesStructure(
 
     for (const ref of layout.refs) {
       const refFile = ref.endsWith('.md') ? ref : `${ref}.md`;
-      // 2. 引用块存在（phase=1 直接文件名；phase≥2 {{module}} 占位符形式）
-      const refLink = phase === 1 ? `](./${refFile})` : `](./{{module}}-${refFile})`;
+      // 2. 引用块存在（phase=1 指向 requirement-spec/ 子目录；phase≥2 使用 {{module}} 占位符）
+      const refLink = phase === 1 ? `](./requirement-spec/${refFile})` : `](./{{module}}-${refFile})`;
       if (!main.includes(refLink)) {
         violations.push(`${prefix} 阶段 ${phase} 主模板 ${tdir.main} 缺引用块 → ${refLink}`);
       }
