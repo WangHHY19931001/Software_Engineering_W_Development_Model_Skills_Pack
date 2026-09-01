@@ -1,161 +1,119 @@
 # 交互示例：测试执行阶段（集成 / 系统 / 验收）
 
 > 对应 W 模型阶段 6 / 7 / 8（右 V 测试执行）。命令：`/wm test type=<集成|系统|验收> result=<pass|fail>`。
-> 本阶段执行前置阶段已设计的测试用例，**必须由真实测试运行器执行后通过 `result` 参数回填**，不得由 LLM 估算。
+> `result` 必须由 S 在真实测试运行器结束后按输出回填；命令缺少 `result`、预设 `pass` 或由 LLM 估算均非法。
+>
+> **伪示例（仅供 LLM 行为对齐）**：本文件中的用例、路径和结果为流程示意，不代表真实执行。真实门禁输出见 [real-run-evidence.md](./real-run-evidence.md)，每次运行仍须以当次退出码为准。
 
-> **⚠️ 伪示例（仅供 LLM 行为对齐）**：本文件为「示例对话」风格的编排演示，对话中的产物字段、数字
-> 与输出均为示意，不代表真实校验结果。**真实命令输出以 [real-run-evidence.md](./real-run-evidence.md) 为准**；
-> 任何门禁结论必须以脚本退出码为准（反模式 #6/#7/#12），不得用对话内容替代。
+## 共用角色闭环
 
-## 示例对话（阶段 6：集成测试执行）
+阶段 6-8 均先由 O 检查上游放行状态和 codegraph/OpenSpec 依赖，再在 🔴 CHECKPOINT 等待用户确认进入阶段。需要新增或修改测试代码时，按以下顺序分派：
 
-```
-用户: /wm test type=集成
-
-AI: 正在执行【集成测试】阶段，将调用真实测试运行器执行阶段 3 设计的集成测试用例...
-
-AI: 已识别集成测试用例（来自阶段 3 概要设计）：
-    - IT-001 接口合法调用（POST /api/users）
-    - IT-002 非法参数校验（缺字段 / 类型错误）
-    - IT-003 跨模块数据传递（订单 → 库存扣减）
-    - IT-004 接口性能（100 QPS 持续 30s）
-    - IT-005 接口兼容性（v1 / v2 并存）
-
-AI: 调用真实测试运行器（如 Jest / Pytest / curl + jq）执行中...
-    ✅ IT-001 通过（200，返回用户 ID）
-    ❌ IT-002 部分失败（4 个用例中 1 个未返回 400：缺 email 字段时返回 500）
-    ✅ IT-003 通过
-    ✅ IT-004 通过（P95 = 180ms < 500ms）
-    ✅ IT-005 通过
-
-AI: 失败用例根因分析：
-    - IT-002 失败根因：userService.register 的参数校验未覆盖 email 缺失场景，直接抛数据库异常
-    - 关联模块：src/services/userService.ts:42
-    - 修复建议：在 register 入口增加 email 必填校验
-
-AI: 因存在失败用例，本次执行 result=fail，将回到编码实现返工。
-
-用户: /wm test type=集成 result=fail
-
-AI: 已回填集成测试结果到 .w-model/rtm.json：
-    - executionSummary.integrationTest: { total: 5, passed: 4, failed: 1, pending: 0 }
-    - RTM 集成测试列：IT-001~005 状态更新（4 ✅ / 1 ❌）
-
-AI: 已生成《集成测试报告》（套用 templates/test-report.md），含失败用例分析、根因、修复建议。
-
-阶段完成摘要：
-  产出清单：集成测试报告、接口兼容性报告
-  RTM 状态：集成测试列 4/5 通过（1 失败需返工）
-  下一步：回到【编码实现】修复 IT-002 → 重新执行 /wm test type=集成 result=pass 后进入【系统测试】
+```text
+S-explore(OpenSpec explore + codegraph 查询)
+→ R3×3 → G(check-preventive-review, exit 0) → V → G
+→ S-propose(OpenSpec propose + tickets)
+→ R3×3 → G(check-preventive-review, exit 0) → V → G
+→ S-coding(OpenSpec apply；改测试前 codegraph 查询；真实运行器执行)
+→ 按真实输出回填 result=pass 或 result=fail
+→ R3×3 → G(check-preventive-review, exit 0) → V → G(阶段专属门禁)
+→ O 展示证据 → 🔴 CHECKPOINT
 ```
 
-## 示例对话（阶段 7：系统测试执行 + 质量门）
+测试失败或普通 V/G 失败不得直接回编码。完整返工链为：
 
-```
-用户: /wm test type=系统
-
-AI: 正在执行【系统测试】阶段，将调用真实测试运行器执行阶段 2 设计的系统测试用例...
-
-AI: 已识别系统测试用例（来自阶段 2 系统设计）：
-    - ST-001 端到端下单流程
-    - ST-002 高并发浏览性能基线（1000 QPS）
-    - ST-003 支付安全基线（OWASP Top 10 扫描）
-    - ST-004 兼容性（Chrome / Firefox / Safari / Edge）
-    - ST-005 可靠性（72h 长时运行）
-
-AI: 调用真实测试运行器（如 k6 / OWASP ZAP / BrowserStack）执行中...
-    ✅ ST-001 通过
-    ✅ ST-002 通过（P95 = 1.2s < 2s）
-    ✅ ST-003 通过（无高危漏洞）
-    ✅ ST-004 通过
-    ✅ ST-005 通过（无内存泄漏）
-
-用户: /wm test type=系统 result=pass
-
-AI: 已回填系统测试结果到 .w-model/rtm.json：
-    - executionSummary.systemTest: { total: 5, passed: 5, failed: 0, pending: 0 }
-    - RTM 系统测试列：ST-001~005 全部 ✅
-
-AI: 触发工件质量门检查（系统测试通过后强制执行）：
-
-    npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts
-
-    ════════════════════════════════════════════════════════════
-    工件质量门校验（Artifact Gate）
-    ════════════════════════════════════════════════════════════
-    RTM 覆盖率    : 100%
-    校验结果      : ✓ 通过
-    ─────────────────────────────────────────────────────────────
-    所有放行条件均满足：RTM 需求覆盖率 100% 且四级测试全部通过。
-    ─────────────────────────────────────────────────────────────
-    GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"reasons":[]}
-
-AI: 🔴 CHECKPOINT · 发布放行
-    质量门脚本退出码 0（通过）。
-    - RTM 覆盖率：100%
-    - 四级测试：单元 18/18 ✅、集成 5/5 ✅、系统 5/5 ✅、验收 待执行
-    - GATE_JSON 摘要：{"passed":true,"coveragePercent":100}
-
-    请确认是否进入【验收测试】（/wm test type=验收）。
-
-阶段完成摘要：
-  产出清单：系统测试报告、性能结果、安全结果
-  质量门：当前已通过 RTM 覆盖率与三级测试（单元 / 集成 / 系统）
-  下一步：用户确认后执行 /wm test type=验收 result=pass 完成项目交付
+```text
+R 根因报告 → V 复审报告 → G(check-rootcause-report, exit 0) → S-fix
+→ R3×3(fix) → G(check-preventive-review, exit 0) → V → G
+→ 真实测试运行器重跑 → 按新输出回填 result
 ```
 
-> 注意：`check-artifact-gate.ts` 校验四级测试全部通过，本示例中验收测试尚未执行，
-> 严格意义上质量门应在验收测试通过后才完整放行。这里展示的是系统测试后的中间检查
-> （真实门禁语义以脚本退出码为准，见 [real-run-evidence.md](./real-run-evidence.md)）。
+返工闭环完成后，O 仍须展示最新证据并等待用户在阶段门 CHECKPOINT 放行。
 
-## 示例对话（阶段 8：验收测试执行 + 项目交付）
+## 阶段 6：集成测试
 
+```text
+O: 已确认阶段 5 经用户放行。
+O: 🔴 CHECKPOINT · 进入阶段 6
+   展示阶段 3 设计的 IT 用例、测试环境和预期产物，等待用户确认。
+
+S-coding: 运行真实集成测试套件。示例：IT-001、IT-003~005 通过，IT-002 失败；
+          原始输出与退出码存档，不把本段示意数字当作真实结果。
+
+S-coding: 因当次真实运行器存在失败，执行：
+          /wm test type=集成 result=fail
+          回填 RTM integrationTest 与 executionSummary，保留失败用例证据。
+
+O: 分派 R 定位根因；R 报告经 V 复审和 G 的 check-rootcause-report exit 0 后，
+   才分派 S-fix。S-fix 后完成 R3/G/V/G，并重新运行真实集成测试。
+
+S-coding: 重跑结束后只能按新输出二选一：
+          /wm test type=集成 result=pass
+          /wm test type=集成 result=fail
+          不得因“已经修复”自动选择 pass。
+
+O: 展示真实测试、R3、V、G 与 RTM 证据。
+O: 🔴 CHECKPOINT · 阶段 6 放行
+   等待用户选择进入阶段 7 或继续返工。
 ```
-用户: /wm test type=验收
 
-AI: 正在执行【验收测试】阶段，将按用户场景验证阶段 1 设计的验收测试用例...
+## 阶段 7：系统测试与中间质量门
 
-AI: 已识别验收测试用例（来自阶段 1 需求分析，ID 为示意）：
-    - UAT-001~012 用户注册 / 登录
-    - UAT-013~024 商品浏览
-    - UAT-025~038 购物车
-    - UAT-039~050 订单管理
+```text
+O: 已确认阶段 6 经用户放行。
+O: 🔴 CHECKPOINT · 进入阶段 7
+   展示 ST 用例、性能/安全/兼容性阈值和测试环境，等待用户确认。
 
-AI: 调用真实测试运行器（端到端 UI 自动化 / 用户场景脚本）执行中...
-    ✅ 全部通过（通过/失败数以真实运行器输出为准）
+S-coding: 运行真实系统测试、性能测试、安全扫描、兼容性与可靠性测试；
+          尚未获得运行器输出前不生成结果回填命令，不写通过数，不更新 RTM 为 pass。
 
-用户: /wm test type=验收 result=pass
+S-coding: 真实运行结束后只能按输出二选一：
+          /wm test type=系统 result=pass
+          /wm test type=系统 result=fail
 
-AI: 已回填验收测试结果到 .w-model/rtm.json：
-    - executionSummary.acceptanceTest: { total: 50, passed: 50, failed: 0, pending: 0 }（示意，以真实回填值为准）
-    - RTM 验收测试列：UAT-001~050 全部 ✅
+G: 在 R3 预防审查门禁和 V 评审通过后，运行阶段 7 中间质量门：
+   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
 
-AI: RTM 终检：所有需求 → 设计 → 代码 → 单元 / 集成 / 系统 / 验收测试均建立映射，RTM 需求覆盖率 100%。
+O: 仅展示该命令当次真实 stdout、GATE_JSON 和退出码。
+   `--phase=7` 只检查到系统测试层；不得使用默认 phase 8，也不得宣称尚未执行的验收测试通过。
+O: 🔴 CHECKPOINT · 阶段 7 放行
+   只有真实系统测试 result=pass、V/G 通过且用户确认，才进入阶段 8。
+```
 
-AI: 触发工件质量门最终检查：
+阶段 7 的 BDD 执行门禁同样使用真实 Cucumber 报告：
 
-    npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts
+```bash
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json
+```
 
-    GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"reasons":[],"exitCode":0}（字段为示意，以脚本实际输出为准）
+## 阶段 8：验收测试与项目放行
 
-AI: 🔴 CHECKPOINT · 发布放行
-    质量门脚本退出码 0（通过）。
-    - RTM 覆盖率：100%（以真实 GATE_JSON 为准）
-    - 四级测试全部通过：单元 / 集成 / 系统 / 验收（各自通过数以真实运行器为准）
-    - 项目级验收检查清单：✅ 需求规格 / 设计文档 / 代码 / 各级测试 / RTM 全部满足
+```text
+O: 已确认阶段 7 经用户放行。
+O: 🔴 CHECKPOINT-A · 验收执行前
+   展示阶段 1 设计的 UAT、环境差异、执行人与前置数据；等待用户确认开始。
 
-    请确认是否完成项目交付（用户签字）。
+S-coding: 分批运行真实验收测试。每批只展示实际通过/失败/阻塞清单；
+          到达批次同步点时进入 🟡 CHECKPOINT-B，由用户决定继续或暂停排查；
+          失败率触发强制暂停时先走根因返工链，不继续假设后续用例通过。
 
-阶段完成摘要：
-  产出清单：验收测试报告、用户确认结果、归档 RTM
-  项目状态：验收测试通过 + 用户确认 → 项目完成
-  下一步：归档全部文档与 RTM，可选 /wm export 导出项目快照
+S-coding: 全部真实运行结束后只能按输出二选一：
+          /wm test type=验收 result=pass
+          /wm test type=验收 result=fail
+
+G: 运行 BDD 验收门禁、阶段 8 终检与归档门禁。终检命令为：
+   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts .
+   该命令无 `--phase`，只有真实 exit 0 才能作为四级测试与 RTM 终检证据。
+
+O: 🔴 CHECKPOINT-C · 项目级放行
+   逐条展示真实 UAT、RTM、四级测试、V/G 和归档证据；
+   由真实用户在验收报告记录 confirm / confirm-with-comments / reject，O 不得代签。
 ```
 
 ## 要点
 
-- `/wm test` 必须由真实测试运行器执行后通过 `result=pass|fail` 回填，**禁止 LLM 估算**或自动标记通过。
-- `result=fail` 时必须给出根因分析、关联模块、修复建议，回到编码实现返工后重跑。
-- 系统测试通过后触发工件质量门（`check-artifact-gate.ts`），验收测试通过后再次终检。
-- RTM 在每阶段测试执行后同步更新对应列与 `executionSummary`。
-- 🔴 CHECKPOINT · 发布放行：质量门通过 + 用户确认后才能完成项目交付。
+- 每条 `/wm test` 执行命令都必须含 `result=pass|fail`，值与当次真实运行器输出一致。
+- `result=fail` 先回填失败事实，再走 R→V→G→S-fix→R3×3→G→V→G；修复不自动把结果改为 pass。
+- 阶段 7 显式使用 `check-artifact-gate.ts . --phase=7`；阶段 8 终检才使用无 `--phase` 的默认终检。
+- G exit 0、V 通过和真实测试 pass 都只是必要条件；跨阶段或项目完成仍须用户 CHECKPOINT 确认。
+- RTM 由 S 在每次真实测试执行后更新对应列与 `executionSummary`，O/V/G 不代填测试结果。
