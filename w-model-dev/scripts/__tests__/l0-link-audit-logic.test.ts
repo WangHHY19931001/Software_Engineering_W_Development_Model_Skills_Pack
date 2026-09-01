@@ -13,7 +13,9 @@ let fixtureRoot: string;
 
 async function write(relativePath: string, content = ''): Promise<void> {
   const target = path.join(fixtureRoot, relativePath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is built beneath the mkdtemp-owned fixture root
   await fs.mkdir(path.dirname(target), { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- target is built beneath the mkdtemp-owned fixture root
   await fs.writeFile(target, content, 'utf8');
 }
 

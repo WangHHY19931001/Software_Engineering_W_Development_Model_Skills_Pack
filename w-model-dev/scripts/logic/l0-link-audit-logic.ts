@@ -20,6 +20,7 @@ async function collectFiles(root: string, directory: string): Promise<string[]> 
   const absolute = path.join(root, directory);
   let entries: import('node:fs').Dirent[];
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolute remains within the caller-provided skill root during recursive audit
     entries = await fs.readdir(absolute, { withFileTypes: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
@@ -98,6 +99,7 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
 
   for (const source of l0Files.filter((file) => file.endsWith('.md'))) {
     const sourcePath = path.join(absoluteRoot, source);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- source is enumerated from the L0 directories beneath the resolved skill root
     const content = await fs.readFile(sourcePath, 'utf8');
 
     for (const rawTarget of parseRelativeLinks(content)) {

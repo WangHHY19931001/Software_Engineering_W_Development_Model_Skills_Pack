@@ -5,14 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const EXAMPLES_ROOT = path.join(REPO_ROOT, 'w-model-dev', 'examples');
-const REFERENCES_ROOT = path.join(REPO_ROOT, 'w-model-dev', 'references');
-const TEMPLATES_ROOT = path.join(REPO_ROOT, 'w-model-dev', 'templates');
-
 const FAILURE_CHAIN =
   'V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT';
 
 function read(relativePath: string): string {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- relativePath is selected from this fixed repository contract test inventory
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
@@ -24,7 +21,7 @@ describe('examples workflow contract', () => {
       'stage7-system-test.md',
       'stage8-acceptance-test.md',
     ]) {
-      const content = readFileSync(path.join(EXAMPLES_ROOT, file), 'utf8');
+      const content = read(`w-model-dev/examples/${file}`);
       expect(content, file).toContain(FAILURE_CHAIN);
       expect(content, file).toContain('🔴 CHECKPOINT');
     }
@@ -40,7 +37,7 @@ describe('examples workflow contract', () => {
       'test-execution.md',
     ];
     for (const file of files) {
-      const content = readFileSync(path.join(EXAMPLES_ROOT, file), 'utf8');
+      const content = read(`w-model-dev/examples/${file}`);
       const commands = content.match(/^.*\/wm test type=.*$/gm) ?? [];
       for (const command of commands) {
         expect(command, `${file}: ${command}`).toMatch(/result=(?:<pass\|fail>|pass|fail)/);
@@ -57,7 +54,7 @@ describe('examples workflow contract', () => {
       'stage7-system-test.md',
       'stage8-acceptance-test.md',
     ]) {
-      const content = readFileSync(path.join(EXAMPLES_ROOT, file), 'utf8');
+      const content = read(`w-model-dev/examples/${file}`);
       expect(content, file).toContain('🔴 CHECKPOINT');
     }
   });
@@ -88,7 +85,7 @@ describe('BDD project-gate command contract', () => {
   const graphFlag = '--graph=.w-model/ingestion/graph.json';
 
   it('makes examples README phase 1-8 commands complete', () => {
-    const content = readFileSync(path.join(EXAMPLES_ROOT, 'README.md'), 'utf8');
+    const content = read('w-model-dev/examples/README.md');
     expect(content).toContain(`--phase=1 ${tlaFlags}`);
     for (const phase of [2, 3, 4]) {
       expect(content).toContain(`--phase=${phase} ${tlaFlags} ${graphFlag}`);
@@ -105,7 +102,7 @@ describe('BDD project-gate command contract', () => {
       ['stage7-system-test.md', 7, 'system.json'],
       ['stage8-acceptance-test.md', 8, 'acceptance.json'],
     ] as const) {
-      const content = readFileSync(path.join(EXAMPLES_ROOT, file), 'utf8');
+      const content = read(`w-model-dev/examples/${file}`);
       expect(content, file).toContain(
         `--phase=${phase} ${graphFlag} --require-cucumber-report --cucumber-report=reports/cucumber/${report}`,
       );
@@ -137,24 +134,20 @@ describe('BDD project-gate command contract', () => {
   });
 
   it('uses canonical --phase=8 OpenSpec archive syntax', () => {
-    expect(readFileSync(path.join(EXAMPLES_ROOT, 'stage8-acceptance-test.md'), 'utf8')).toContain(
-      'check-openspec-archive.ts . --phase=8',
-    );
+    expect(read('w-model-dev/examples/stage8-acceptance-test.md')).toContain('check-openspec-archive.ts . --phase=8');
   });
 
   it('does not describe valid phase 6 or 7 as an invalid argument', () => {
     for (const file of ['stage6-integration-test.md', 'stage7-system-test.md']) {
-      expect(readFileSync(path.join(EXAMPLES_ROOT, file), 'utf8'), file).not.toContain('参数非法 --phase=');
+      expect(read(`w-model-dev/examples/${file}`), file).not.toContain('参数非法 --phase=');
     }
   });
 
   it('documents the authoritative BDD call patterns in bdd.md', () => {
-    const content = readFileSync(path.join(REFERENCES_ROOT, 'bdd.md'), 'utf8');
+    const content = read('w-model-dev/references/bdd.md');
     expect(content).toContain('--require-tla-equivalence');
     expect(content).toContain('--require-cucumber-report');
     expect(content).toContain('--graph=<graph.json>');
-    expect(readFileSync(path.join(TEMPLATES_ROOT, 'requirement-spec', 'discipline-dod.md'), 'utf8')).toContain(
-      '--require-tla-equivalence',
-    );
+    expect(read('w-model-dev/templates/requirement-spec/discipline-dod.md')).toContain('--require-tla-equivalence');
   });
 });
