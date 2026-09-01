@@ -30,7 +30,7 @@
 | 代码事实核对 | codegraph_explore 强制（约束 #14）+ check-code-tla-consistency.ts | 复用 |
 | **产出期证据锚点** | **graph.json nodes[].evidenceAnchor（新增，可选）+ R15 轻量格式校验** | **新增（唯一增量）** |
 | EVIDENCE_GRAPH.md 血缘视图 | graph.json + run-log 决策摘要（人类可读视图可选用模板） | 轻量映射 |
-| 熔断判定树 Q1-Q4 | 反模式 #18/#19 + R→V→G→S-fix 循环 | 复用（更强） |
+| 熔断判定树 Q1-Q4 | 反模式 #18/#19 + R 报告复审 / 根因门禁 / S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链 | 复用（更强） |
 | 每 3 个叶子周期校验 | R3 预防性审查 ×3 + ICEBERG-A/B + 阶段门 | 复用（节奏更强） |
 
 ## 3. 唯一增量：evidenceAnchor

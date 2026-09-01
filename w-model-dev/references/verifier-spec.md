@@ -99,7 +99,7 @@
 | `design` | 阶段 2 系统设计 / 阶段 3 概要设计 / 阶段 4 详细设计 | 系统设计/接口设计/详细设计文档 |
 | `test` | 阶段 1~4（设计）/ 阶段 5~8（执行） | 验收/系统/集成/单元测试用例 |
 | `code` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
-| `rootcause` | 全阶段（返工循环 V/G→R→V→G→S-fix→V→G） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
+| `rootcause` | 全阶段（返工链：V/G 失败 → R → V 复审 RootCauseReport → G rootcause 门禁 → S-fix → R3×3 → preventive 门禁 → V → G → CHECKPOINT） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
 
 ### 2.2 targetKind 枚举规范
 

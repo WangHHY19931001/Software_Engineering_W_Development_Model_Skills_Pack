@@ -61,6 +61,26 @@ describe('examples workflow contract', () => {
       expect(content, file).toContain('🔴 CHECKPOINT');
     }
   });
+
+  it('does not retain abbreviated ordinary rework chains in live references', () => {
+    const references = [
+      'w-model-dev/references/bdd.md',
+      'w-model-dev/references/data-models.md',
+      'w-model-dev/references/evidence-anchored-tree.md',
+      'w-model-dev/references/hard-constraints.md',
+      'w-model-dev/references/iceberg-sweep-guide.md',
+      'w-model-dev/references/operational-recovery.md',
+      'w-model-dev/references/root-cause-locator.md',
+      'w-model-dev/references/subagent-delegation.md',
+      'w-model-dev/references/verifier-spec.md',
+      'w-model-dev/references/workflow.md',
+    ];
+    const abbreviated = /(?:V\/G→R→V→G→S-fix|V→G→R→V→G→S-fix|R→V→G→S-fix)/;
+
+    for (const relativePath of references) {
+      expect(read(relativePath), relativePath).not.toMatch(abbreviated);
+    }
+  });
 });
 
 describe('BDD project-gate command contract', () => {

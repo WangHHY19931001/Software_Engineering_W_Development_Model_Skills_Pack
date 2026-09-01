@@ -39,8 +39,9 @@ npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts .w-model/coverage.
 # 3) TLA+ L1 行为门禁：SANY 语法 + TLC 模型检查（阶段 1 无需 --graph）
 npx tsx w-model-dev/scripts/cli/check-tla-model.ts .w-model/tla-manifest.json --phase=1
 
-# 4) BDD L1 行为门禁：D1~D4 语义等价性 + D8 覆盖（阶段 1 无需 --graph）
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=1
+# 4) BDD L1 项目门：D4 强制真实 TLA+ 等价性证据（阶段 1 无需 --graph）
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json \
+  --phase=1 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json
 ```
 
 > 附加：S 产出后，R 先生成 R3×3，G 运行 `check-preventive-review.ts` 且 exit 0 后才分派 V；V 产出评审后，G 运行 `check-verifier-output.ts` 与阶段常规门禁。阶段门放行前 G 还须完成 `check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-role-dispatch` / `check-signature-chain`；完整分派见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。

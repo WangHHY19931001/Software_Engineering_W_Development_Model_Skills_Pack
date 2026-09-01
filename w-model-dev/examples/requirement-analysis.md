@@ -34,11 +34,15 @@ AI: 需求风险评估：
     - RISK-001（高）：支付环节安全性 → 缓解：接入合规支付网关 + HTTPS
     - RISK-002（中）：高并发库存超卖 → 缓解：库存扣减加锁 / 预扣
 
-AI: RTM 已登记：REQ-001~005 → UAT-001~050（覆盖状态：部分，待后续阶段填充）。
+S: RTM 已登记：REQ-001~005 → UAT-001~050（覆盖状态：部分，待后续阶段填充）。
 
-阶段完成摘要：
-  产出清单：需求规格说明书、验收测试用例、需求风险评估、RTM（部分）
-  下一步：进入【系统设计】阶段（/wm design type=架构），将同步产出系统测试设计
+R/G/V/G: S 产出后，R 完成 completeness/reliability/security 三份预防审查；
+         G 运行 check-preventive-review.ts 且 exit 0 后，V 评审需求产物；
+         G 再运行阶段 1 常规门禁并回填真实退出码、质量等级和 reworkHints。
+
+O: 展示需求规格、验收测试设计、RTM、R3/V/G 证据与 reworkHints。
+O: 🔴 CHECKPOINT · 阶段 1 放行
+   请确认是否放行进入【系统设计】（/wm design type=架构）；未确认不得跨阶段。
 ```
 
 ## 要点
@@ -76,5 +80,5 @@ AI: 并行分派 23 个 A-chunk 提取 REQ 节点...
 
 用户: 放行
 
-AI: S 子代理读 graph.json 产出需求规格说明书 + 98 个验收测试用例 + RTM 登记...
+O: 图谱收敛 CHECKPOINT 已获用户确认，分派 S 子代理读取 graph.json 产出需求规格、验收测试用例与 RTM；随后仍须走 R3×3 → G(check-preventive-review exit 0) → V → G → 🔴 CHECKPOINT，用户放行后才进入阶段 2。
 ```

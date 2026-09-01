@@ -517,7 +517,7 @@ interface RunLogEntry {
 
 > 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §7.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
-`action` 枚举新增 `rootcause` / `fix` 两个动作（返工循环 V/G→R→V→G→S-fix→V→G 专用）。各动作的额外必填字段约束：
+`action` 枚举新增 `rootcause` / `fix` 两个动作（普通返工链 `V/G 失败 → R → V 复审 RootCauseReport → G rootcause 门禁 → S-fix → R3×3 → preventive 门禁 → V → G → CHECKPOINT` 专用）。各动作的额外必填字段约束：
 
 | action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
 | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

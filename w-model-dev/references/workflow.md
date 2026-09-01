@@ -16,22 +16,19 @@
 > 角色标注：**O** = 编排者（路由 / 状态 / CHECKPOINT / 持久化）；**S** = 产出子代理；**V** = 评审子代理；**G** = 门禁子代理；**A** = 分析子代理（阶段 1–4 活跃，ingestion 子流程 + 图谱演进，详见 [ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)）；**R** = 根因定位子代理（返工时活跃，详见 [root-cause-locator.md](root-cause-locator.md)）。详见 [subagent-delegation.md](subagent-delegation.md)。
 
 ```
-[O 路由] 需求分析 ──(S 同步验收测试设计)+(A 图谱: REQ 节点+连通单根校验)──► [V 评审] ──[G 门禁通过]──► 系统设计
-                                                    │不通过► 回到需求分析（见返工循环节，O 分派 R 定位）
-[O 路由] 系统设计 ──(S 同步系统测试设计)+(A 图谱: SD 节点+implements 校验)──► [V 评审] ──[G 门禁通过]──► 概要设计
-                                                    │不通过► 回到系统设计
-[O 路由] 概要设计 ──(S 同步集成测试设计)+(A 图谱: INTF 节点+defines 校验)──► [V 评审] ──[G 门禁通过]──► 详细设计
-                                                    │不通过► 回到概要设计
-[O 路由] 详细设计 ──(S 同步单元测试设计)+(A 图谱: DD 节点+realizes 校验, 零违反硬约束)──► [V 评审] ──[G 门禁通过]──► 编码实现
-                                                    │不通过► 回到详细设计
-[O 路由] 编码实现 ──(S 执行单元测试)──────► [V 代码审查] ──[G 门禁通过]──► 集成测试
-                                                    │不通过► 回到编码实现
-[O 路由] 集成测试 ──(S 接口验证)──────────► [G 门禁通过]──► 系统测试
-                              │不通过► 回到编码实现
-[O 路由] 系统测试 ──(S 性能/安全测试)─────► [S 缺陷修复] ──[G 门禁完成]──► 验收测试
-                              │需修复► 回到编码实现
-[O 路由] 验收测试 ──(S 执行)──► [G 终检 check-artifact-gate.ts] ──[O CHECKPOINT 用户确认]──► 项目完成
-                              │不通过► 回到需求分析 / 编码
+阶段 1-4：O 路由 → A-ingestion 专用收敛（仅图谱失败时 A-chunk/A-cross→G）→ CHECKPOINT
+           → S 同步产出测试设计 → R3×3 → G(preventive) → V → G → O 展示证据 → CHECKPOINT
+           → 用户放行后才进入下一阶段
+
+阶段 5-7：O 路由 → CHECKPOINT → S-explore/S-propose/S-coding 或 S-test → R3×3
+           → G(preventive) → V → G(阶段专属门禁) → O 展示证据 → CHECKPOINT
+           → 用户放行后才进入下一阶段
+
+阶段 8：O 路由 → CHECKPOINT-A/B → S 执行验收 → R3×3 → G(preventive) → V → G 终检
+           → O 展示 RTM/四级测试/归档证据 → CHECKPOINT-C → 用户确认后项目完成
+
+任一普通 V/G 失败：R → V 复审 RootCauseReport → G(rootcause exit 0) → S-fix
+                     → R3×3 → G(preventive exit 0) → V → G → CHECKPOINT
 ```
 
 ### R3 预防性审查流程
@@ -73,10 +70,10 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 | 阶段 | 输入 | 产物（artifact） | 子代理分派 | 切换到下一阶段判定 | 回退阶段编号 |
 |---|---|---|---|---|---|
-| 1 需求分析 | 用户需求陈述 / 业务背景 | 需求规格说明书（`*-requirement-spec.md`）、RTM 需求列 + 验收测试列、graph.json（REQ 节点）、L1 TLA+ 规格（`.tla`+`.cfg`）+ `tla-manifest.json`、L1 BDD features（`.feature`）+ `bdd-manifest.json` | O 路由 → S 产出 → V 评审 → G 门禁 | `check-verifier-output.ts` 退出码 0 且 `VerifierOutput.passed=true` 且 `qualityLevel ∈ {A,B}` 且 `check-tla-model.ts` 退出码 0 且 `check-bdd-model.ts --phase=1` 退出码 0 | — |
-| 2 系统设计 | 阶段 1 全部产物 | 系统设计文档（`SD-N.N.N`）、RTM 设计文档列 + 系统测试列、graph.json（SD 节点）、L2 TLA+ 规格 + `tla-manifest.json` 更新、L2 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=2`） | 阶段 1 |
-| 3 概要设计 | 阶段 2 全部产物 | 接口设计文档（`INTF-N.N.N`）、RTM 接口列 + 集成测试列、graph.json（INTF 节点）、L3 TLA+ 规格 + `tla-manifest.json` 更新、L3 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=3`） | 阶段 2 |
-| 4 详细设计 | 阶段 3 全部产物 | 详细设计文档（`DD-N.N.N`）、RTM 详细列 + 单元测试列、graph.json（DD 节点）、L4 TLA+ 规格（按需）+ `tla-manifest.json` 更新、L4 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=4`） | 阶段 3 |
+| 1 需求分析 | 用户需求陈述 / 业务背景 | 需求规格说明书（`*-requirement-spec.md`）、RTM 需求列 + 验收测试列、graph.json（REQ 节点）、L1 TLA+ 规格（`.tla`+`.cfg`）+ `tla-manifest.json`、L1 BDD features（`.feature`）+ `bdd-manifest.json` | O 路由 → S 产出 → R3×3 → G(preventive) → V 评审 → G 门禁 | `check-verifier-output.ts` 退出码 0 且 `VerifierOutput.passed=true` 且 `qualityLevel ∈ {A,B}` 且 `check-tla-model.ts` 退出码 0 且 `check-bdd-model.ts --phase=1 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json` 退出码 0，随后用户 CHECKPOINT | — |
+| 2 系统设计 | 阶段 1 全部产物 | 系统设计文档（`SD-N.N.N`）、RTM 设计文档列 + 系统测试列、graph.json（SD 节点）、L2 TLA+ 规格 + `tla-manifest.json` 更新、L2 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → R3×3 → G(preventive) → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=2 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json`），随后用户 CHECKPOINT | 阶段 1 |
+| 3 概要设计 | 阶段 2 全部产物 | 接口设计文档（`INTF-N.N.N`）、RTM 接口列 + 集成测试列、graph.json（INTF 节点）、L3 TLA+ 规格 + `tla-manifest.json` 更新、L3 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → R3×3 → G(preventive) → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=3 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json`），随后用户 CHECKPOINT | 阶段 2 |
+| 4 详细设计 | 阶段 3 全部产物 | 详细设计文档（`DD-N.N.N`）、RTM 详细列 + 单元测试列、graph.json（DD 节点）、L4 TLA+ 规格（按需）+ `tla-manifest.json` 更新、L4 BDD features + `bdd-manifest.json` 更新 | O 路由 → S 产出 → R3×3 → G(preventive) → V 评审 → G 门禁 | 同上（`check-bdd-model.ts --phase=4 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json`），随后用户 CHECKPOINT | 阶段 3 |
 | 5 编码实现 | 阶段 4 全部产物 | 源代码文件、RTM 代码模块列、step_definitions + cucumber L4 报告 | O 路由 → S 产出代码+单测 → V 代码审查 → G 门禁 | `check-verifier-output.ts` 退出码 0 + 单元测试退出码 0 + 覆盖率 ≥ 80% | 阶段 4 |
 | 6 集成测试 | 阶段 5 全部产物 + 集成测试设计 | 集成测试报告、RTM 集成测试状态列、cucumber L3 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 集成测试退出码 0，`rtm.json.executionSummary.failed=0` | 阶段 5 |
 | 7 系统测试 | 阶段 6 全部产物 + 系统测试设计 | 系统测试报告、RTM 系统测试状态列、cucumber L2 报告 | O 路由 → S 执行测试+回填 → V 评审报告 → G 门禁 | 系统测试退出码 0，性能 P95 < 2s，高危漏洞数 = 0 | 阶段 5 |
@@ -120,8 +117,8 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 每个开发阶段产出后必须经过 LLM-as-a-Verifier 评审：
 
-- 评审通过（`passed=true`，质量等级 A/B） → 进入下一阶段，更新项目状态。
-- 评审不通过（`passed=false`，质量等级 C/D） → 回到本阶段起点返工，**必须经 R 根因定位 → V 复审 → G 门禁 → S-fix 修复 → V → G 循环**（见下方返工循环流程图），禁止直接分派 S 返工（命中反模式 #18）。
+- 评审通过（`passed=true`，质量等级 A/B）后，O 展示证据并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入下一阶段并更新项目状态。
+- 评审不通过（`passed=false`，质量等级 C/D）时，普通 V/G 失败**必须经 `R 根因定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`** 返工，禁止直接分派 S（反模式 #18）；阶段 1 ingestion 图谱失败仅走 A-chunk/A-cross→G 专用收敛。
 - 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与 SKILL.md「阶段门与质量门」节。
 
 **R3 预防性审查强制**：V 评审前须先完成 R3 三阶段审查（completeness/reliability/security），产出三份 PreventiveReport JSON。V 子代理须读取 R3 报告并将发现纳入 reworkHints。跳过 R3 直接进入 V 评审命中反模式 #33。G 子代理须跑 `check-preventive-review.ts` 校验三份报告完整性。
@@ -132,57 +129,57 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 - `check-requirement-graph.ts`：图谱门禁（结构连通 + 信息流闭合），退出码 0 才放行
 - `check-tla-model.ts`：TLA+ 行为门禁（文件头 + 层次一致性 + SANY 语法 + TLC 模型检查，无死锁/不变式违反/状态爆炸），退出码 0 才放行（反模式 #15）
-- `check-bdd-model.ts --phase=N`：BDD 行为门禁（8 维度：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage），退出码 0 才放行（反模式 #29）
+- `check-bdd-model.ts`：BDD 行为门禁（8 维度：D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage）。项目阶段门参数以 [bdd.md §5.3](bdd.md#53-调用方式) 为准：阶段 1-4 必传 TLA evidence，阶段 2-4 额外传 graph，阶段 5-8 必传 graph 与真实 Cucumber report；退出码 0 后仍须用户 CHECKPOINT 才放行（反模式 #29）。
 
 阶段 5 额外跑 `check-code-tla-consistency.ts`（代码-TLA+ 一致性回归，四维度校验）。
 返工时额外跑 `check-rootcause-report.ts`（R 报告 schema 校验）。
 闭环校验脚本（每阶段门均跑）：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件，约束 #11），详见 [operational-recovery.md](operational-recovery.md)「闭环校验脚本调用约定」节。
 
-### 返工循环（V/G→R→V→G→S-fix→V→G）
+### 返工循环（普通 V/G 失败的完整闭环）
 
 ```
-S 产出 → V 评审 → G 门禁 ──通过──► 阶段门放行
-                       │不通过（exitCode≠0 或 qualityLevel∈{C,D}）
-                       ▼
-                  O 分派 R 定位（输入：reworkHints + 失败产物 + 上游产物）
-                       │
-                       ▼
-                  R 产出 RootCauseReport（含根因链 + fixRecommendation + upstreamDefect?）
-                       │
-                       ▼
-                  O 分派 V 复审根因报告（targetKind=rootcause）
-                       │
-            ┌──────────┴──────────┐
-            ▼                     ▼
-       V 复审不通过            V 复审通过
-            │                     │
-            ▼                     ▼
-       O 重派 R（带 V 的        O 分派 G 门禁（check-rootcause-report.ts）
-       rootcause reworkHints）       │
-       → R 重定位 ──循环──    ┌──────┴──────┐
-                              ▼             ▼
-                          G 门禁不通过   G 门禁通过
-                              │             │
-                              ▼             ▼
-                          O 重派 R     O 分派 S 兼 F 修复
-                                      （输入：R 报告 + fixRecommendation）
-                                           │
-                                           ▼
-                                      S 修复产物 + 更新 RTM
-                                           │
-                                           ▼
-                                      O 分派 V 评审修复产物
-                                           │
-                                           ▼
-                                      O 分派 G 门禁
-                                           │
-                                 ┌─────────┴─────────┐
-                                 ▼                   ▼
-                            G 通过               G 不通过
-                                 │                   ▼
-                                 ▼            新一轮 R 定位
-                            阶段门放行           （round++）
+S 产出 → R3×3 → G(check-preventive-review exit 0) → V 评审 → G 门禁
+                                                        │不通过（exitCode≠0 或 qualityLevel∈{C,D}）
+                                                        ▼
+                   O 分派 R 定位（输入：reworkHints + 失败产物 + 上游产物）
+                                                        │
+                                                        ▼
+                       R 产出 RootCauseReport（根因链 + fixRecommendation + upstreamDefect?）
+                                                        │
+                                                        ▼
+                                   O 分派 V 复审 RootCauseReport（targetKind=rootcause）
+                                                        │
+                                  ┌─────────────────────┴─────────────────────┐
+                                  ▼                                           ▼
+                             V 复审不通过                                  V 复审通过
+                                  │                                           │
+                                  ▼                                           ▼
+                     O 重派 R（带 rootcause reworkHints）       O 分派 G(check-rootcause-report exit 0)
+                                  │                                           │
+                                  └───────────────────────────┐               │
+                                                              ▼               ▼
+                                                     新一轮 R 定位      G 通过 → S-fix
+                                                                                │
+                                                                                ▼
+                                                       S-fix 修复产物 + 真实测试 + 更新 RTM
+                                                                                │
+                                                                                ▼
+                                                R3×3(fix) → G(check-preventive-review exit 0)
+                                                                                │
+                                                                                ▼
+                                                                     V 评审修复产物 → G 门禁
+                                                                                │
+                                                            ┌───────────────────┴───────────────────┐
+                                                            ▼                                       ▼
+                                                        G 不通过                                 G 通过
+                                                            │                                       │
+                                                            ▼                                       ▼
+                                                        新一轮 R 定位             O 展示证据 → 🔴 CHECKPOINT
+                                                                                                            │
+                                                                                               用户放行后才跨阶段
 ```
+
+阶段 1 ingestion 图谱失败不进入此链，仍是 `A-chunk/A-cross → G(check-requirement-graph) → 收敛循环` 的专用路径。
 
 ### R 介入说明
 

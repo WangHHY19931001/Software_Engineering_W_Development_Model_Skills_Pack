@@ -23,8 +23,8 @@ S-explore(OpenSpec explore + codegraph 查询)
 测试失败或普通 V/G 失败不得直接回编码。完整返工链为：
 
 ```text
-R 根因报告 → V 复审报告 → G(check-rootcause-report, exit 0) → S-fix
-→ R3×3(fix) → G(check-preventive-review, exit 0) → V → G
+V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix
+→ R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
 → 真实测试运行器重跑 → 按新输出回填 result
 ```
 
@@ -113,7 +113,7 @@ O: 🔴 CHECKPOINT-C · 项目级放行
 ## 要点
 
 - 每条 `/wm test` 执行命令都必须含 `result=pass|fail`，值与当次真实运行器输出一致。
-- `result=fail` 先回填失败事实，再走 R→V→G→S-fix→R3×3→G→V→G；修复不自动把结果改为 pass。
+- `result=fail` 先回填失败事实，再走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；修复不自动把结果改为 pass。
 - 阶段 7 显式使用 `check-artifact-gate.ts . --phase=7`；阶段 8 终检才使用无 `--phase` 的默认终检。
 - G exit 0、V 通过和真实测试 pass 都只是必要条件；跨阶段或项目完成仍须用户 CHECKPOINT 确认。
 - RTM 由 S 在每次真实测试执行后更新对应列与 `executionSummary`，O/V/G 不代填测试结果。

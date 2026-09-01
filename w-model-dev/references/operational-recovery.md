@@ -178,7 +178,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 > 吸收自《失控》第 8 章：密封生态需 60-100 天初始混沌期，之后「很少有什么能颠覆它」；「适度多样性的封闭生态几乎从不失败」。
 
 - **系统集成初期的混沌/不稳定是常态而非故障**：多模块首次集成时接口漂移、环境差异、偶发失败属预期，须管理重试预算与预期，而非每次失败都判定为根本缺陷。
-- **重试预算**：集成初期的失败重试有预算上限（与「止损与弃线规则」联动）；预算内重试仅限瞬态/环境性失败（指数退避），产物/门禁失败仍走 R→V→G→S-fix（约束 #12），超预算走 R 根因定位。
+- **重试预算**：集成初期的失败重试有预算上限（与「止损与弃线规则」联动）；预算内重试仅限瞬态/环境性失败（指数退避），产物/门禁失败仍走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链（约束 #12），超预算走 R 根因定位。
 - **适度多样性 = 鲁棒性**：容忍小失败/冗余（而非追求完美纯净）是系统长期稳定的前提（失控 ch5：一点点随机性/错误反而创造长期稳定）——与「受控的失控」边界一致（容忍发生在硬约束包络内）。
 
 ## 超标模块重写
@@ -187,7 +187,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 - **错误超过阈值 → 丢弃重写**：失败模块错误密度超阈值（见 hard-constraints.md「错误聚集与超标丢弃」）时，丢弃重写（换不同开发者/视角），而非原地修补——早期错误预示后期错误，修补只是延长劣质模块生命周期。
 - **重写前先建测试基线**：与 phase-5「改动前测试基线」节联动——重写前用既有测试/覆盖率锁定行为契约，重写后回归。
-- **与返工循环的关系**：超标重写不绕过 R→V→G→S-fix；重写本身是 S-fix 的一种形式，仍须 R 报告 + V 复审 + G 门禁。
+- **与返工循环的关系**：超标重写不绕过完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链；重写本身是 S-fix 的一种形式。
 
 ## 止损与弃线规则
 
@@ -229,7 +229,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### rootcause / fix 动作 token 计量
 
-> 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §9.9（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） Token 预算扩展。返工循环 V/G→R→V→G→S-fix→V→G 中的 token 计量约定。
+> 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §9.9（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） Token 预算扩展。返工循环 `V/G 失败 → R → V 复审 RootCauseReport → G rootcause 门禁 → S-fix → R3×3 → preventive 门禁 → V → G → CHECKPOINT` 中的 token 计量约定。
 
 | 动作 | 计量方式 | 预算校验 |
 |---|---|---|
@@ -285,7 +285,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### 场景 5：阶段回退
 
-> 对应 spec §6.3 场景 5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 阶段回退 + §6.4（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 回退路径阶段编号映射。返工循环 V/G→R→V→G→S-fix→V→G 中，R 定位根因为上游缺陷时的阶段回退决策。
+> 对应 spec §6.3 场景 5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 阶段回退 + §6.4（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 回退路径阶段编号映射。普通返工完整链中，R 定位根因为上游缺陷时的阶段回退决策；回退建议仍须经 V 复审与 G rootcause 门禁，S-fix 后仍重走 R3×3/预防审查/V/G/CHECKPOINT。
 
 **触发条件**（三者全部满足）：
 

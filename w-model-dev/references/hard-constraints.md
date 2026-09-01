@@ -72,7 +72,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | L2 | 生产小项目 | TLA+ L1 + BDD L1 必跑，其余可选 |
 | L3 | 生产中大型 | 全必跑 |
 
-阶段 4 TLA+ 零违反 + 图谱零违反才放行进编码。TLA+ 不接受占位/简化/错误实现（反模式 #16）；建模须符合需求和设计，符合后仍有问题须修正需求/设计并回退重跑（反模式 #17）；BDD↔TLA+ 不等价必须走 R→V→G→S-fix 循环（反模式 #29）。详见 [tla-plus.md](tla-plus.md) 与 [bdd.md](bdd.md)。
+阶段 4 TLA+ 零违反 + 图谱零违反才放行进编码。TLA+ 不接受占位/简化/错误实现（反模式 #16）；建模须符合需求和设计，符合后仍有问题须修正需求/设计并回退重跑（反模式 #17）；BDD↔TLA+ 不等价必须走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`（反模式 #29）。详见 [tla-plus.md](tla-plus.md) 与 [bdd.md](bdd.md)。
 
 ## #14 代码改动前后门禁（codegraph + 回归）
 
@@ -168,7 +168,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 SKILL.md「阶段门与质量门」节走完评审 + 🔴 CHECKPOINT 放行 |
 | 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
 | 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
-| 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评。V/G 不通过后，未经 R 定位直接小修也命中 #4。修复路径必须经 R→V→G→S-fix |
+| 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 回到本阶段起点返工，重新产出并重评。普通 V/G 失败必须经 R、V 复审 RootCauseReport、G(check-rootcause-report exit 0)、S-fix、R3×3、G(check-preventive-review exit 0)、V、G 和 CHECKPOINT |
 | 5 | 一次性载入全部 `references/` 或违反 Bundled Resources 表 | 上下文污染，阶段聚焦丢失 | 按 [SKILL.md](../SKILL.md)「Bundled Resources」表按需加载 |
 | 6 | 用 LLM 估算 RTM 覆盖率 | RTM 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，RTM 覆盖率必须 100% |
 | 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 一律回到编码实现，附 GATE_JSON 详情 |
@@ -193,7 +193,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败 | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
 | 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
 | 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 23 份（含 evidence-manifest / evidence-provenance）） |
-| 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd.md](bdd.md)「不符处理流程」节） |
+| 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd.md](bdd.md)「不符处理流程」节） |
 | 30 | 豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E9 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
 | 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，由 `check-archive-integrity.ts` 校验归档完整性清单（退出码 0） |
 | 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
@@ -208,7 +208,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
 | 42 | S-fix / emergency-fix 后跳过 R3+V | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
 | 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描 |
-| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走标准 R→V→G→S-fix；`newFindings=[]` 或达 maxIcebergRounds=5 才放行 |
+| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 完成 R3×3/预防审查/V/G 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链；`newFindings=[]` 或达 maxIcebergRounds=5 才放行 |
 | 45 | subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏） | "通过"失去与需求的对应关系，覆盖率与断言语义脱节，Goodhart 击穿判据 | 测试断言修改必须先行报告；断言与需求不符走 R→V→G 归因，禁止擅自改断言凑通过 |
 | 46 | 只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径 |
 | 47 | 大规模重构式改动（单次 diff 重写整个模块） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
@@ -541,7 +541,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **正确做法**：
 - BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）。
-- BDD↔TLA+ 不等价时必须走 R→V→G→S-fix 循环，不得直接放行。
+- BDD↔TLA+ 不等价时必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接放行。
 - 接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）。
 - 实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项。
 
@@ -557,7 +557,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 3. 实质不一致：上报人类决策，三选一（修正 BDD / 修正 TLA+ / 修正需求设计），修正后回退到对应阶段起点重跑。
 4. BDD 与需求/设计脱节：必须修正需求/设计并回退重跑（仿反模式 #17 流程）。
 
-**与反模式 #17 的关系**：#17 是 "TLA+ 建模与需求/设计不符未回退"，#29 是 "BDD 建模与需求/设计/TLA+ 不符未回退"。前者关注 TLA+ 单一规格，后者关注 BDD 与 TLA+ 的等价性以及 BDD 与需求/设计的一致性。两者复用同一回退流程（R→V→G→S-fix）。
+**与反模式 #17 的关系**：#17 是 "TLA+ 建模与需求/设计不符未回退"，#29 是 "BDD 建模与需求/设计/TLA+ 不符未回退"。前者关注 TLA+ 单一规格，后者关注 BDD 与 TLA+ 的等价性以及 BDD 与需求/设计的一致性。两者复用同一完整返工流程（R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT）。
 
 **与反模式 #16 的关系**：#16 是 "TLA+ 占位实现/简化实现/错误实现"，#29 不直接覆盖占位实现，但若 BDD 状态机七要素缺失（如 `@accepting-states: ()`）则可能同时命中 #16（TLA+ 端）和 #29（BDD 端等价性失败）。
 

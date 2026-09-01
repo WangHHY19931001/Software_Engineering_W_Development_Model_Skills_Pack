@@ -81,7 +81,7 @@ describe('auditL0RelativeLinks', () => {
   it('audits the real skill package without hiding L0 boundaries', async () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 
-    expect(result.relativeLinkCount).toBe(641);
+    expect(result.relativeLinkCount).toBe(645);
     expect(result.l1Only).toHaveLength(92);
     expect(result.templatePlaceholders).toHaveLength(36);
     expect(result.violations).toEqual([]);
