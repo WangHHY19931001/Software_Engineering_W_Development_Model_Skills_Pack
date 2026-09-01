@@ -28,8 +28,7 @@
 
 ```bash
 # 1) BDD 系统测试层校验：D5 step 绑定（cucumber 报告驱动）+ D1~D4 语义等价性
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json \
-  --phase=7 --cucumber-report=reports/cucumber/system.json
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json
 
 # 2) 阶段 7 工件质量门：systemTest 回填 + 单元/集成/系统三级测试通过
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
@@ -42,12 +41,12 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
 ### 退出码 0（全部通过）
 
 ```
-BDD_JSON {"type":"bdd-model","phase":7,"passed":true,"features":3,"scenarios":5,"stepBindings":22,"undefinedSteps":0,"violations":[]}
+BDD_JSON {"type":"bdd","passed":true,"exitCode":0,"summary":"BDD 模型校验通过"}
 
 GATE_JSON {"type":"artifact","phase":7,"passed":true,"coveragePercent":100,"reasons":[]}
 ```
 
-→ 退出码 0 → 🔴 CHECKPOINT · 发布放行（中间检查）：RTM 覆盖率 100% + 单元 / 集成 / 系统三级测试通过，等待进入阶段 8 验收测试。
+→ G 的 exit 0 是阶段 7 中间检查的必要证据，不单独授权推进。O 展示真实系统测试 `result`、R3/V/G 结论、三级 RTM 状态与 reworkHints 后进入 🔴 CHECKPOINT · 阶段门放行；只有用户确认，才进入阶段 8 验收测试。
 
 ### 退出码 1（校验失败示例）
 
@@ -56,20 +55,20 @@ GATE_JSON {"type":"artifact","phase":7,"passed":true,"coveragePercent":100,"reas
 GATE_JSON {"type":"artifact","phase":7,"passed":false,"coveragePercent":100,"reasons":["systemTest 未回填"]}
 ```
 
-→ 退出码 1：若因测试执行失败（ST 用例 ❌），按 `/wm test type=系统 result=fail` 回到阶段 5 编码返工；若因回填缺失，S 补回填后重跑。
+→ 退出码 1：普通 V/G 失败必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。若真实 ST 用例失败，S 先按运行器输出回填 `/wm test type=系统 result=fail`；R 报告经 V/G 通过后才由 S-fix 修改。回填缺失也由 S 基于真实运行结果修正。O 展示最新证据后等待用户在 🔴 CHECKPOINT 决定是否跨阶段。
 
 ### 退出码 2（输入错误示例）
 
 ```
-ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数非法 --phase=7","exitCode":2}
+ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 --graph=<graph.json>（phase>=2 强制）","exitCode":2}
 ```
 
-→ 退出码 2：project-dir 不存在 / `--phase` 越界，修正后重跑。
+→ 退出码 2：本示例中的 `--phase=7` 合法；实际输入错误是缺少 phase>=2 强制的 `--graph`，或 manifest / project-dir 不存在、JSON 非法。修正真实参数或输入后重跑。
 
 ## 编排说明
 
 - 系统测试通过后触发工件质量门（本阶段为三级测试中间检查）；严格意义的完整放行在阶段 8 验收通过后。
-- 阶段 7 质量门通过 + 用户确认后才进入阶段 8（`/wm test type=验收`）。
+- 阶段 7 质量门通过 + 用户确认后才进入阶段 8；阶段 8 真实运行器完成后才按输出回填 `/wm test type=验收 result=pass|fail`。
 - 性能（P95 基线）、安全（无高危漏洞）、兼容性（多浏览器）任一不达标均视为系统测试失败。
 
 ## 要点

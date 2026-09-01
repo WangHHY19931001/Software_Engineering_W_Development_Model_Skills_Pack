@@ -37,11 +37,10 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts .
 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
 
 # 3) BDD 验收层校验（D5 step 绑定，cucumber 报告驱动）
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json \
-  --phase=8 --cucumber-report=reports/cucumber/acceptance.json
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
 
 # 4) openspec 归档校验（阶段 8 终检另含）
-npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase 8
+npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8
 ```
 
 > 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-opsx-artifacts.ts`；评审证据经 `check-verifier-output.ts` 回填。
@@ -57,12 +56,14 @@ RTM 覆盖率    : 100%
 四级测试      : 单元 18/18、集成 5/5、系统 5/5、验收 50/50
 校验结果      : ✓ 通过
 ════════════════════════════════════════════════════════════
+BDD_JSON {"type":"bdd","passed":true,"exitCode":0,"summary":"BDD 模型校验通过"}
+
 GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"reasons":[]}
 
 ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":true,"checkedFiles":14,"missingFiles":[]}
 ```
 
-→ 全部退出码 0 → 🔴 CHECKPOINT · 交付放行（用户签字确认后项目完成）。
+→ 全部 G 退出码 0 是必要证据，不单独授权交付。O 展示真实验收测试 `result`、R3/V/G 结论、RTM 四级测试和归档证据后进入 🔴 CHECKPOINT · 交付放行；只有真实用户确认，项目才完成。
 
 ### 退出码 1（校验失败示例）
 
@@ -74,7 +75,7 @@ GATE_JSON {"type":"artifact","passed":false,"coveragePercent":100,"reasons":["ac
 ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":false,"checkedFiles":14,"missingFiles":["docs/archive/phase1-requirement-spec.md"]}
 ```
 
-→ 退出码 1：测试失败（UAT 用例 ❌）→ `/wm test type=验收 result=fail` 回到阶段 5 返工；归档缺失 → 补齐归档快照后重跑。
+→ 退出码 1：普通 V/G 失败必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。若真实 UAT 用例失败，S 先按运行器输出回填 `/wm test type=验收 result=fail`；R 报告经 V/G 通过后才由 S-fix 修改。归档缺失也由 S-fix 补齐后重走 R3/G/V/G。O 展示最新证据后等待用户在 🔴 CHECKPOINT 决定返工或交付。
 
 ### 退出码 2（输入错误示例）
 

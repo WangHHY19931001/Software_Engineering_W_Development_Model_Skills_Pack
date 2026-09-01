@@ -29,8 +29,7 @@
 
 ```bash
 # 1) BDD 集成测试层校验：D5 step 绑定（cucumber 报告驱动）+ D1~D4 语义等价性
-npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json \
-  --phase=6 --cucumber-report=reports/cucumber/integration.json
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json
 
 # 2) 阶段 6 工件质量门：integrationTest 回填 + 已通过测试层级无回归
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=6
@@ -43,29 +42,29 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=6
 ### 退出码 0（全部通过）
 
 ```
-BDD_JSON {"type":"bdd-model","phase":6,"passed":true,"features":4,"scenarios":6,"stepBindings":18,"undefinedSteps":0,"violations":[]}
+BDD_JSON {"type":"bdd","passed":true,"exitCode":0,"summary":"BDD 模型校验通过"}
 
 GATE_JSON {"type":"artifact","phase":6,"passed":true,"coveragePercent":100,"reasons":[]}
 ```
 
-→ 退出码 0 → 🔴 CHECKPOINT · 阶段门放行，进入阶段 7 系统测试。
+→ G 的 exit 0 是必要证据，不单独授权推进。O 展示真实集成测试 `result`、R3/V/G 结论、RTM 与 reworkHints 后进入 🔴 CHECKPOINT · 阶段门放行；只有用户确认，才进入阶段 7 系统测试。
 
 ### 退出码 1（校验失败示例）
 
 ```
 ✗ [D5] 2 个 step 未绑定实现（IT-002 非法参数校验场景：features/integration/checkout.feature:14 "提交缺失 email 的订单"）
-BDD_JSON {"type":"bdd-model","phase":6,"passed":false,"features":4,"scenarios":6,"stepBindings":16,"undefinedSteps":2,"violations":[{"rule":"D5","feature":"features/integration/checkout.feature"}]}
+BDD_JSON {"type":"bdd","passed":false,"exitCode":1,"summary":"D5 step 绑定校验失败"}
 ```
 
-→ 退出码 1：G 回填 run-log，O 分派 S 补写 step 实现后重跑；若为测试执行失败（IT 用例 ❌），按 `/wm test type=集成 result=fail` 回到阶段 5 编码返工。
+→ 退出码 1：普通 V/G 失败必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。若真实 IT 用例失败，S 先按运行器输出回填 `/wm test type=集成 result=fail`；R 报告经 V/G 通过后才由 S-fix 修改测试或编码。O 展示最新证据后等待用户在 🔴 CHECKPOINT 决定是否跨阶段。
 
 ### 退出码 2（输入错误示例）
 
 ```
-ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数非法 --phase=6","exitCode":2}
+ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 --graph=<graph.json>（phase>=2 强制）","exitCode":2}
 ```
 
-→ 退出码 2：manifest 缺失 / 非法 JSON / `--phase` 越界，修正后重跑。
+→ 退出码 2：本示例中的 `--phase=6` 合法；实际输入错误是缺少 phase>=2 强制的 `--graph`，或 manifest 缺失 / JSON 非法。修正真实参数或输入后重跑。
 
 ## 编排说明
 

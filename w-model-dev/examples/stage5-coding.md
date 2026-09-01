@@ -1,6 +1,6 @@
 # 阶段编排示例：阶段 5 编码实现（含单元测试执行）
 
-> 对应 W 模型阶段 5（左 V 第 5 阶段，同步右 V 单元测试执行）。命令入口：`/wm code <功能描述>` + `/wm test type=单元`。
+> 对应 W 模型阶段 5（左 V 第 5 阶段，同步右 V 单元测试执行）。命令入口：`/wm code <功能描述>` + `/wm test type=单元 result=<pass|fail>`。
 > 本示例聚焦编排流程中的 check 脚本调用、命令行与预期输出；交互对话示例见 [coding.md](coding.md)。
 
 ## 阶段目标
@@ -38,7 +38,10 @@ npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts \
 # 2) 设计契约一致性：D1 路径 / D2 参数 / D3 状态码 / D4 响应字段 与验收设计对齐
 npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 
-# 3) 阶段 5 工件质量门：单元测试通过 + 覆盖率 ≥ 80% + codeModule 回填
+# 3) BDD 单元测试层校验：phase 5 强制真实 Cucumber 执行证据 + SD Coverage
+npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json
+
+# 4) 阶段 5 工件质量门：单元测试通过 + 覆盖率 ≥ 80% + codeModule 回填
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
 ```
 
@@ -60,7 +63,7 @@ RTM 覆盖率    : 100%
 GATE_JSON {"type":"artifact","phase":5,"passed":true,"coveragePercent":100,"reasons":[]}
 ```
 
-→ 退出码 0 → 🔴 CHECKPOINT · 阶段门放行，进入阶段 6 集成测试。
+→ G 的 exit 0 是必要证据，不单独授权推进。O 展示真实单元测试 `result`、R3/V/G 结论、RTM 与 reworkHints 后进入 🔴 CHECKPOINT · 阶段门放行；只有用户确认，才进入阶段 6 集成测试。
 
 ### 退出码 1（校验失败示例）
 
@@ -69,7 +72,7 @@ GATE_JSON {"type":"artifact","phase":5,"passed":true,"coveragePercent":100,"reas
 CODE_TLA_JSON {"type":"code-tla-consistency","passed":false,"checkedSymbols":12,"violations":[{"file":"src/services/userService.ts","rule":"C1-3"}],"reasons":["C1-3 状态转移不一致"]}
 ```
 
-→ 退出码 1：O 按 `reworkHints` 分派 S 返工（回阶段 5 编码），修复后重跑全部门禁；回归测试强制钩子（约束 #14）同时触发。
+→ 退出码 1：普通 V/G 失败必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。S-fix 按 R 报告与真实回归测试修复，G 通过本身不授权跨阶段；O 展示最新证据后等待用户在 🔴 CHECKPOINT 决定留在阶段 5 继续返工或放行。
 
 ### 退出码 2（输入错误示例）
 
