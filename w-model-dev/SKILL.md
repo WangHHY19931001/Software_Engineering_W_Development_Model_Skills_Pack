@@ -22,22 +22,19 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 | 用户信号 | 行为 |
 | --- | --- |
-| `/wm ...`、W-model、W 模型、W 开发模型 | 立即启用 |
-| 明确要求 RTM、阶段门/质量门、开发与测试并行 | 立即启用 |
+| `/wm ...`、W-model、W 模型、W 开发模型，或明确要求 RTM、阶段门/质量门、开发与测试并行 | 立即启用 |
 | 只说"完整流程""从需求到交付""全生命周期开发" | 先询问"是否采用 W 模型（含并行测试设计、RTM 和阶段门）？"；确认前不初始化 |
 | 普通需求、设计、编码、测试、修复或技术解释 | 不启用，按普通任务处理 |
 
 ## 任务规模适配
 
-**轻量 = 降载门禁强度，不是跳过阶段**：阶段流程、RTM、CHECKPOINT 一律不变；禁止以「任务小」为由跳过 S→V→G 顺序、RTM 回填或用户确认（反模式 #10/#21）。
+**轻量 = 降载门禁强度，不是跳过阶段**：阶段流程、RTM、CHECKPOINT 一律不变；禁止以「任务小」为由跳过 S→V→G 顺序、RTM 回填或用户确认（反模式 #10/#21）。成熟度分级细则见 [references/operational-recovery.md](references/operational-recovery.md)。
 
 | 任务规模 | 适配形态 | 门禁强度 |
 | --- | --- | --- |
 | 极小任务（demo/教学） | L0 交付层 + self-as-verifier（仅限 demo，模式细则见 subagent-delegation.md） | TLA+/BDD 可选，其余照跑 |
 | 生产小项目 | 完整 8 阶段 + maturity L2 | TLA+ L1 + BDD L1 必跑，其余照跑 |
 | 常规生产功能 | 完整 8 阶段 + maturity L3 | 全必跑 |
-
-成熟度分级细则见 [references/operational-recovery.md](references/operational-recovery.md)。
 
 ## 不可违反的约束（14 条硬红线）
 
@@ -79,22 +76,19 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 ## 执行工作流
 
 1. **路由任务**（O）：识别命令、阶段和用户意图；歧义触发先确认。
-2. **环境自检**（O）：首次启用或门禁报依赖错误时跑 `npx tsx w-model-dev/scripts/cli/doctor.ts [--with-tla]`。
-3. **读取状态**（O）：读 `.w-model/project.json` 与 `rtm.json`；损坏先恢复（operational-recovery.md）。
-4. **检查前置产物**（O）：缺上游产物拒绝跳阶段，指出应返回的命令。
-5. **加载最小引用集**（O）：只加载 SKILL.md + 当前阶段 phase-N 摘要 + 状态文件。
-6. **初始化确认**（O）：🔴 CHECKPOINT · 项目初始化（复述阶段/同步测试设计/预期产物）。
-7. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
-8. **R3 预防性审查**（O→R）：S 产出后、V 评审前三阶段审查（completeness/reliability/security）。
-9. **评审**（O→V）：按 targetKind 路由 Persona 产出 VerifierOutput。**编排者不得自评**。
-10. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。
-11. **验证与暂停**（O）：失败 → R 根因 → V 复审 → G 门禁 → S-fix → 重走 V→G（跳过 R 命中反模式 #18）；S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）。
-12. **持久化**（O）：用户放行后才更新 `project.status`；状态写入统一经 wm-write.ts（锁 + 备份 + 原子写）。
+2. **读取状态与环境自检**（O）：读 `.w-model/project.json` 与 `rtm.json`（损坏先恢复，见 operational-recovery.md）；首次启用或门禁报依赖错误时跑 `npx tsx w-model-dev/scripts/cli/doctor.ts [--with-tla]`。
+3. **前置产物与最小引用集**（O）：缺上游产物拒绝跳阶段并指出应返回的命令；只加载 SKILL.md + 当前阶段 phase-N 摘要 + 状态文件。
+4. **初始化确认**（O）：🔴 CHECKPOINT · 项目初始化（复述阶段/同步测试设计/预期产物）。
+5. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
+6. **R3 预防性审查**（O→R）：S 产出后、V 评审前三阶段审查（completeness/reliability/security）。
+7. **评审**（O→V）：按 targetKind 路由 Persona 产出 VerifierOutput。**编排者不得自评**。
+8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。
+9. **验证与暂停**（O）：失败 → R 根因 → V 复审 → G 门禁 → S-fix → 重走 V→G（跳过 R 命中反模式 #18）；S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）。
+10. **持久化**（O）：用户放行后才更新 `project.status`；状态写入统一经 wm-write.ts（锁 + 备份 + 原子写）。
 
-> 🔴 **CHECKPOINT · 阶段门放行**：展示 G 的「质量等级 / 各子标准分 / reworkHints」，等待用户选择放行或返工。
-> 🔴 **CHECKPOINT · 发布放行**：阶段 8 终检跑 check-artifact-gate.ts，退出码 0 后展示 RTM 覆盖率、四级测试结果，等待用户选择发布或回退。
+> 🔴 **CHECKPOINT · 阶段门放行**：展示 G 的「质量等级 / 各子标准分 / reworkHints」，等待用户选择放行或返工；阶段 8 终检跑 check-artifact-gate.ts，退出码 0 后展示 RTM 覆盖率与四级测试结果，等待用户选择发布或回退。
 
-完整阶段切换与回退流程见 [references/workflow.md](references/workflow.md)。
+完整阶段切换与回退流程见 [references/workflow.md](references/workflow.md)；推进或完成声明前按 [references/quick-self-check.md](references/quick-self-check.md) 逐项核验；交互样例按需读 [examples/](examples/)。
 
 ## 命令速查
 
@@ -133,7 +127,3 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 - **状态写锁协议**：状态写入统一经 `wm-write.ts` 使用 `<target>.lock` 持久目录与可转移 `owner` 对象实施跨进程锁，锁内校验 mtime 并毫秒+UUID 备份、tmp+rename 原子替换与回读恢复；CLI 用 `--lock-timeout` 控制等待，陈旧锁必须显式 `--recover-stale-lock`，否则以退出码 1 拒绝写入。
 - **行为门禁**：阶段 1-4 传 `--require-tla-equivalence --tla-manifest=<path>`，阶段 5-8 传 `--require-cucumber-report --cucumber-report=<path>`。
 - **证据与审计**：`coverage/`、`.zcode/` 与 `.w-model/` 是 Git 忽略的本地生成物，默认不随 Git 交付；需要交付审计证据时先运行 `npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts` producer+verify 命令，写入 source-bound provenance，登记 `evidence-provenance.schema.json`），再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；受控本机 provenance 提供流程完整性，不是密码学签名，也不是第三方不可抵赖证明；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
-
-## 快速自检
-
-推进或完成声明前按 [references/quick-self-check.md](references/quick-self-check.md) 逐项核验；交互样例按需读 [examples/](examples/)。
