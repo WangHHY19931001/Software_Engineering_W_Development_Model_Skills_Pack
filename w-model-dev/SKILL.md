@@ -71,7 +71,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | A 分析 | 阶段 1–4 分块分析、合并建图 | 只产出 ingestion 中间产物 |
 | R 根因 | 定位根因产出 RootCauseReport；R3 预防性审查 | 只产出报告，不实施修复 |
 
-每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → R3 预防性审查 → V 评审 → G 门禁 → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。
+每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。
 
 ## 执行工作流
 
@@ -80,10 +80,10 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 3. **前置产物与最小引用集**（O）：缺上游产物拒绝跳阶段并指出应返回的命令；只加载 SKILL.md + 当前阶段 phase-N 摘要 + 状态文件。
 4. **初始化确认**（O）：🔴 CHECKPOINT · 项目初始化（复述阶段/同步测试设计/预期产物）。
 5. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
-6. **R3 预防性审查**（O→R）：S 产出后、V 评审前三阶段审查（completeness/reliability/security）。
+6. **R3 预防性审查**（O→R→G）：S 产出后分派 R 完成 completeness/reliability/security 三份报告，再由 G 运行 check-preventive-review.ts；exitCode=0 后才可进入 V。
 7. **评审**（O→V）：按 targetKind 路由 Persona 产出 VerifierOutput。**编排者不得自评**。
 8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。
-9. **验证与暂停**（O）：失败 → R 根因 → V 复审 → G 门禁 → S-fix → 重走 V→G（跳过 R 命中反模式 #18）；S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）。
+9. **验证与暂停**（O）：普通 V/G 失败 → R 根因报告 → V 复审 R 报告 → G 跑 check-rootcause-report.ts（exitCode=0）→ S-fix → R3×3(fix) → G 跑 check-preventive-review.ts（exitCode=0）→ V → G；跳过 R 或 R 报告复审/门禁分别命中反模式 #18/#19。S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）；阶段 1 ingestion 图谱失败仍走 A→G 专用收敛循环。
 10. **持久化**（O）：用户放行后才更新 `project.status`；状态写入统一经 wm-write.ts（锁 + 备份 + 原子写）。
 
 > 🔴 **CHECKPOINT · 阶段门放行**：展示 G 的「质量等级 / 各子标准分 / reworkHints」，等待用户选择放行或返工；阶段 8 终检跑 check-artifact-gate.ts，退出码 0 后展示 RTM 覆盖率与四级测试结果，等待用户选择发布或回退。
