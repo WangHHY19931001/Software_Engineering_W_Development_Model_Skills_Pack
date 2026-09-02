@@ -36,6 +36,8 @@
 - `2e3cee897c6ce883468b0d3e53fd1c6453f56c38` — `test(security): avoid unsafe bypass scan regex`
 - `e3396e5c47226c47e7257c3b0101d4f2a7c0789e` — `docs(changes): record review rounds three and four`
 - `b22191490b9c3d9d56bc47de2d9d33462fc308b5` — `docs(changes): record final audit verification scope`
+- `2e78319f8f9a0e25b327aae1509ec1004dcc8a9f` — `docs(changes): register prior audit commit identity`
+- `0eee1f48436b1643f14eb449452255e88f4b9418` — `docs(changes): record final audit gate`
 
 最终记录提交不在 CHANGELOG 的本表中自引用；外部 `git rev-parse HEAD` 核验最终 SHA，最终 prepush 结果见验收记录。
 
