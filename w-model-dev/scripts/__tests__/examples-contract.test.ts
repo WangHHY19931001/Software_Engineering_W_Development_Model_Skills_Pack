@@ -81,6 +81,14 @@ describe('examples workflow contract', () => {
     }
   });
 
+  it('does not allow phase 5 ticket exceptions to bypass the ordinary failure chain', () => {
+    const content = read('w-model-dev/references/phase-5-coding.md');
+
+    expect(content).not.toContain('直接走 R→S-fix');
+    expect(content).toContain(FAILURE_CHAIN);
+    expect(content).toContain('候选影响阶段由 R 给出');
+  });
+
   it('does not retain abbreviated ordinary rework chains in live references', () => {
     const references = [
       'w-model-dev/references/bdd.md',

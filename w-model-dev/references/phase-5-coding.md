@@ -185,10 +185,11 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - **与需求变更的关系**：重排不替代需求变更流程——新需求须先进阶段 1（或 Loop 3 事件接驳），不得直接插队改票。
 
 ### Out of 票据化的例外
-- 单一 bug 修复（直接走 R→S-fix 返工循环）
-- 单一 TLA+ 不变式违反修复（同上）
-- 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时（直接编码，不拆票据）
+- 单一 bug 修复：可免除票据拆解，但**不得**绕过普通失败链；仍走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
+- 单一 TLA+ 不变式违反修复：同样可免除票据拆解，但不得直接 R→S-fix，仍走同一完整失败链。
+- 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时：可直接编码而不拆票据；若出现普通 V/G 失败，仍走同一完整失败链。
 - 不需要票据化时产出 `tickets.md` 仅含一行声明「本阶段改动范围小，不票据化，直接编码」
+- 候选影响阶段由 R 给出；O 只在完整 R/V/G 证据和用户 CHECKPOINT 后执行阶段切换。
 - V 子代理评审时检查该声明是否合理（避免漏拆）
 
 ## 执行方法论
