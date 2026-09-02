@@ -22,7 +22,7 @@
 - **第 5 轮后续收尾**：以 TDD 补齐 Windows drive-letter 正斜杠与反斜杠路径回归；显式识别 `C:/...` 与 `C:\\...`，不依赖 POSIX 上的 `path.isAbsolute`，两类路径均结构化 violation/exit 1。正常 `https:`、`mailto:` 与 fragment URI 继续位于相对链接审计范围之外，畸形 URI 保持 fail-closed。删除 `phase-5-coding.md:262` 尾随 ASCII 空格，并同步验收记录的第 1～5 轮范围与父链提交主题。后续定向测试为 4 files / 68 tests，完整 Vitest 为 62 files / 1303 tests / 1303 passed，串行 docs-consistency 为静态/动态违规 0、provenance 1303/1303；最终 Git Bash prepush 与最终 HEAD 由外部命令核验。
 
 - **最终契约收口**：递归扫描全部 `references/**/*.md`、`templates/**/*.md`、`examples/**/*.md` 的普通失败动作，明确禁止语境与 phase 1 ingestion A-chunk/A-cross→G 专用收敛例外；普通失败均要求完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 链，`/wm test` 值按边界断言。补充 L0 根目录 symlink/junction 与 CLI stderr `ERROR_JSON` 回归；README、toolbox、command-reference、subagent registry、dependency-boundaries/security 契约保持登记，版本 42.2.1 与 fast-uri 3.1.7 保持不变。
-- **本轮定向验证**：4 files / 70 tests / exit 0（examples-contract 20/20、L0 logic 29/29、CLI 11/11、dependency-boundaries 10/10）；完整 Vitest 62/1307、串行 docs-consistency 重跑 0（1307/1307）、eval/self-test/doctor/samples/security/typecheck/npm audit 均已实测通过；Git Bash prepush 首次在第 13 项因 registry `ENOTFOUND` / audit endpoint 不可达 exit 1，最终 prepush 需按真实重跑结果核验，不能将网络失败冒充为代码通过。
+- **本轮定向验证**：4 files / 70 tests / exit 0（examples-contract 20/20、L0 logic 29/29、CLI 11/11、dependency-boundaries 10/10）；完整 Vitest 62/1307、串行 docs-consistency 重跑 0（1307/1307）、eval/self-test/doctor/samples/security/typecheck/npm audit 均已实测通过；Git Bash prepush 首次在第 13 项因 registry `ENOTFOUND` / audit endpoint 不可达 exit 1，格式化修复后重跑真实 exit 0、17 项全绿；最终证据提交后的 prepush 仍以外部命令核验，不能将网络失败冒充为代码通过。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
