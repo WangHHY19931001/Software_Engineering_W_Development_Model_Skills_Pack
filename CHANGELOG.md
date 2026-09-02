@@ -33,6 +33,7 @@
 - `5ce123a5bd9e2dc2c7d355d7dc31a25a0758cd69` — `test(docs): scan all phase references for fix bypasses`
 - `b9958574bbd4be40da2c68da4f5b3beafb9a8ae0` — `fix(audit): reject top-level L0 directory links`
 - `43bd922d0db673c875b9fd72b1e407299742bd76` — `test(docs): include templates in bypass scan`
+- `2e3cee897c6ce883468b0d3e53fd1c6453f56c38` — `test(security): avoid unsafe bypass scan regex`
 
 ## [42.2.0] - 2026-09-01
 
