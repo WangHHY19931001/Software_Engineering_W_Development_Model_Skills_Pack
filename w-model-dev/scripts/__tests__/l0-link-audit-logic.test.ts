@@ -357,6 +357,21 @@ describe('auditL0RelativeLinks', () => {
     );
   });
 
+  it('rejects an internal non-Markdown L0 directory symlink or junction', async () => {
+    const targetDirectory = path.join(fixtureRoot, 'schema-target');
+    const directoryLink = path.join(fixtureRoot, 'schemas', 'linked-data');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- targetDirectory is beneath the mkdtemp-owned skill root
+    await fs.mkdir(targetDirectory, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- directoryLink is a controlled mkdtemp fixture path
+    await fs.symlink(targetDirectory, directoryLink, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(
+      expect.stringContaining('L0 目录 symlink/junction 不允许 schemas/linked-data'),
+    );
+  });
+
   it('rejects missing non-L1 relative targets', async () => {
     await write('references/guide.md', '[missing](./missing.md)');
 
