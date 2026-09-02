@@ -174,7 +174,8 @@ async function collectFiles(
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- realDirectory was resolved beneath the verified skill root
     entries = await fs.readdir(realDirectory, { withFileTypes: true });
   } catch {
-    violations.push(`必需 L0 目录不存在或不可读 ${normalizeRelative(directory)}`);
+    if (scope === 'L0') violations.push(`必需 L0 目录不存在或不可读 ${normalizeRelative(directory)}`);
+    else violations.push(`L1-only 目录不可读 ${normalizeRelative(directory)}`);
     return [];
   }
 
