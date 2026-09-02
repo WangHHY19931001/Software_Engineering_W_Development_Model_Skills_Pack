@@ -339,7 +339,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 | FM-3D-04 | REQ-group 边界模糊 | level=1 REQ 对应的 group 范围不清；reqGroup 指向非 level=1 节点 | 普通 V/G 失败走完整普通失败链后，按 R 结论在步骤 5 向用户确认 group 归属 |
 | FM-3D-05 | 依赖时序环 | depends-on / precedes 边形成环 | 普通 V/G 失败走完整普通失败链后，按 R 结论在步骤 3 拆解环或申请豁免 |
 | FM-3D-06 | conflicts-with 未解决 | conflicts-with 边存在但无处置记录 | 启动豁免审批（S→R→V→人类） |
-| FM-3D-07 | 迷雾滥用 | 检测信号 A：把本应正式的 REQ 塞入迷雾册逃避覆盖（R/V 发现迷雾项实为可精确陈述需求）；检测信号 B：CHECKPOINT 前迷雾册存在未终结项 | 处置 A：作废迷雾项，按普通失败链完成后补步骤 2-4 正式 REQ；处置 B：回 CHECKPOINT 前补毕业处置（毕业 / 判范围 / 豁免） |
+| FM-3D-07 | 迷雾滥用 | 检测信号 A：把本应正式的 REQ 塞入迷雾册逃避覆盖（R/V 发现迷雾项实为可精确陈述需求）；检测信号 B：CHECKPOINT 前迷雾册存在未终结项 | 处置 A：作废迷雾项，按普通失败链完成后补步骤 2-4 正式 REQ；处置 B：按普通失败链完成后，在 CHECKPOINT 前补毕业处置（毕业 / 判范围 / 豁免） |
 | FM-3D-08 | 追踪矩阵字段不一致 | traceability-matrix.md §1 的「候选落点§」与主规格 §4 层级树节点 § 不一致；「验收关联」与主规格 §7 覆盖矩阵不一致；§2 矩阵验收列与主规格 §12 RTM 不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 9 追踪矩阵字段 |
 | FM-3D-09 | UML 建模与层级树脱节 | uml-modeling.md A.1 用例图参与者/用例与主规格 §3 stakeholder/§4 REQ 不对应；A.2 领域类图实体与 §4 REQ 名词性概念不对应；A.3 活动图与 §3 User Stories 正常场景不对应 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 8 UML 建模 |
 
@@ -380,7 +380,7 @@ R 按 root-cause-locator.md 方法论审查 → 产出 exemption-review.json（5
   ↓ 不得直接批准豁免生效
 V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions → 产出 exemption-verification.json
   ↓
-人类 CHECKPOINT 确认 → approve 写入 granted.json / reject 回到原规则
+人类 CHECKPOINT 确认 → approve 写入 granted.json / reject 按普通失败链完成后回到原规则
 ```
 
 ### 角色边界
@@ -388,7 +388,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 - **S 角色**：识别需豁免项，产出 `exemption-request.json`；**禁止 S 自行决定豁免生效**。
 - **R 角色**：按 [root-cause-locator.md](root-cause-locator.md) 方法论审查（5-Why / 上游回溯 / 可证伪性），产出 `exemption-review.json`；**不得直接批准豁免生效**。
 - **V 角色**：校验 `reviewDecision` / `rootCauseAnalysis` / `falsifiabilityCheck` / `conditions`，产出 `exemption-verification.json`。
-- **人类**：CHECKPOINT 确认，approve 写入 `granted.json`，reject 回到原规则。
+- **人类**：CHECKPOINT 确认，approve 写入 `granted.json`，reject 按普通失败链完成后回到原规则。
 
 ### check-exemption 校验（E1-E9）
 
@@ -419,16 +419,16 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 
 阶段门评审不通过时，按以下路径返工：
 
-- 需求歧义 / 置信度低 → 回到步骤 1，要求用户重述或拆解
-- 需求冲突未解决 → 回到步骤 3，向用户决策冲突对（conflicts-with 启动豁免审批）
-- 缺失项未补充 → 回到步骤 3，向用户提示补充
-- 验收标准不可验证 → 回到步骤 4，改写为可量化标准
-- 层级缺根 / orphan / multiParent（FM-3D-01/02/03）→ 回到步骤 2，补 level=1 根或 parent 边
-- REQ-group 边界模糊（FM-3D-04）→ 回到步骤 5，向用户确认 group 归属
-- 依赖时序环 / conflicts-with 未解决（FM-3D-05/06）→ 回到步骤 3，拆解环或启动豁免审批
-- 覆盖缺失（FM-4D-01/02/03/05）→ 回到步骤 6，补覆盖或申请豁免审批
-- cross-cuts 不一致（FM-4D-04）→ 回到步骤 3，对齐横切边
-- 豁免审批跳步（FM-EXEMPT-01/02/03/04/05）→ 回到豁免审批对应阶段（S/R/V/人类）
+- 需求歧义 / 置信度低 → 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 1，要求用户重述或拆解
+- 需求冲突未解决 → 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 3，向用户决策冲突对（conflicts-with 启动豁免审批）
+- 缺失项未补充 → 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 3，向用户提示补充
+- 验收标准不可验证 → 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 4，改写为可量化标准
+- 层级缺根 / orphan / multiParent（FM-3D-01/02/03）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 2，补 level=1 根或 parent 边
+- REQ-group 边界模糊（FM-3D-04）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 5，向用户确认 group 归属
+- 依赖时序环 / conflicts-with 未解决（FM-3D-05/06）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 3，拆解环或启动豁免审批
+- 覆盖缺失（FM-4D-01/02/03/05）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 6，补覆盖或申请豁免审批
+- cross-cuts 不一致（FM-4D-04）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 3，对齐横切边
+- 豁免审批跳步（FM-EXEMPT-01/02/03/04/05）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回豁免审批对应阶段（S/R/V/人类）
 - 迷雾项未终结（FM-3D-07）→ 按普通失败链完成后回 CHECKPOINT 前补毕业处置：毕业成 REQ → 步骤 2-4；判 Out of Scope → 补 §8；豁免 → 回豁免审批流程
 - 迷雾滥用逃避覆盖（FM-3D-07）→ 作废迷雾项，普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2-4 正式 REQ
 - 验收测试未覆盖全部功能点 → 普通 V/G 失败走完整普通失败链后，按 R 结论回到并行任务补充用例
