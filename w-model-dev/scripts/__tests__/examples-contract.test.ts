@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +11,21 @@ const FAILURE_CHAIN =
 function read(relativePath: string): string {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- relativePath is selected from this fixed repository contract test inventory
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
+
+function markdownFiles(relativeDirectory: string): string[] {
+  const directory = path.join(REPO_ROOT, relativeDirectory);
+  const files: string[] = [];
+  const visit = (absoluteDirectory: string): void => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory stays within the fixed repository contract-test inventory
+    for (const entry of readdirSync(absoluteDirectory, { withFileTypes: true })) {
+      const absolutePath = path.join(absoluteDirectory, entry.name);
+      if (entry.isDirectory()) visit(absolutePath);
+      else if (entry.isFile() && entry.name.endsWith('.md')) files.push(path.relative(REPO_ROOT, absolutePath));
+    }
+  };
+  visit(directory);
+  return files.sort();
 }
 
 describe('examples workflow contract', () => {
@@ -87,6 +102,19 @@ describe('examples workflow contract', () => {
     expect(content).not.toContain('直接走 R→S-fix');
     expect(content).toContain(FAILURE_CHAIN);
     expect(content).toContain('候选影响阶段由 R 给出');
+  });
+
+  it('scans every phase reference and legacy example for direct R-to-S-fix bypass language', () => {
+    const files = [...markdownFiles('w-model-dev/references'), ...markdownFiles('w-model-dev/examples')];
+    const directBypass = /(?:直接|direct(?:ly)?)(?:\s*走)?\s*R\s*(?:→|->)\s*S-fix/i;
+    const prohibition = /(?:不得|禁止|不可|must\s+not|not\s+allowed|cannot)/i;
+
+    for (const relativePath of files) {
+      const lines = read(relativePath).split(/\r?\n/);
+      for (const line of lines) {
+        if (directBypass.test(line)) expect(line, `${relativePath}: ${line}`).toMatch(prohibition);
+      }
+    }
   });
 
   it('does not retain abbreviated ordinary rework chains in live references', () => {
