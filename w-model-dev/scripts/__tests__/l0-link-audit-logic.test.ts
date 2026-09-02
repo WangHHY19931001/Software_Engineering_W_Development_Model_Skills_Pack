@@ -272,6 +272,18 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
   });
 
+  it('treats Windows drive-letter paths as package links, not external URIs', async () => {
+    await write('references/guide.md', '[forward slash](C:/outside.md) [backslash](C:\\outside.md)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.l1Only).toEqual([]);
+    expect(result.violations).toHaveLength(2);
+    expect(result.violations).toEqual(
+      expect.arrayContaining([expect.stringContaining('C:/outside.md'), expect.stringContaining('C:\\outside.md')]),
+    );
+  });
+
   it('rejects malformed percent encoding in an anchor-only URI instead of skipping it', async () => {
     await write('references/guide.md', '[malformed anchor](#section%2)');
 

@@ -137,6 +137,29 @@ describe('audit-l0-links application entrypoint', () => {
     );
   });
 
+  it('returns structured exit 1 for Windows drive-letter paths instead of skipping them as URIs', async () => {
+    const root = path.join(tmpDir, 'windows-drive-path-skill');
+    await createMinimalL0(root);
+    await fs.writeFile(
+      path.join(root, 'references', 'guide.md'),
+      '[forward slash](C:/outside.md) [backslash](C:\\outside.md)\n',
+      'utf8',
+    );
+
+    const result = run([`--root=${root}`]);
+    const payload = JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', ''));
+
+    expect(result.code).toBe(1);
+    expect(payload).toMatchObject({
+      type: 'l0-link-audit',
+      passed: false,
+      exitCode: 1,
+    });
+    expect(payload.violations).toEqual(
+      expect.arrayContaining([expect.stringContaining('C:/outside.md'), expect.stringContaining('C:\\outside.md')]),
+    );
+  });
+
   it('returns a structured exit 1 for a missing required SKILL.md file', async () => {
     const root = path.join(tmpDir, 'missing-skill-file');
     await createMinimalL0(root);

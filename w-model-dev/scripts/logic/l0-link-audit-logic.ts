@@ -27,10 +27,15 @@ function normalizeRelative(value: string): string {
   return value.replaceAll(path.sep, '/');
 }
 
+function isWindowsDrivePath(target: string): boolean {
+  // Do not rely on path.isAbsolute: this must classify Windows paths on POSIX too.
+  return /^[a-z]:[\\/]/i.test(target);
+}
+
 function isExternalOrAnchor(target: string): boolean {
   // Root-relative paths are package paths, not external URLs: they must pass the
   // L0/L1 containment check and fail closed when they escape the skill package.
-  return target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('//');
+  return target.startsWith('#') || hasUriScheme(target) || target.startsWith('//');
 }
 
 function isInside(root: string, candidate: string): boolean {
@@ -61,7 +66,7 @@ function parseRelativeLinks(content: string): string[] {
 }
 
 function hasUriScheme(target: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(target);
+  return !isWindowsDrivePath(target) && /^[a-z][a-z0-9+.-]*:/i.test(target);
 }
 
 function validateExternalUri(target: string): string | undefined {
