@@ -15,7 +15,8 @@
 - **编排闭环与示例契约**：SKILL 恢复 `R3×3 → G(check-preventive-review) → V → G` 顺序和完整普通返工链；examples 总览、阶段 1、阶段 5 编码及阶段 6-8 测试执行示例补齐角色隔离、CHECKPOINT、codegraph/OpenSpec、BDD 必填参数、当前 GRAPH_JSON 字段、真实 `result=pass|fail` 回填及阶段 7 `--phase=7`。
 - **L0/L1 与历史证据边界**：保留并明确分类 92 条 L1-only 脚本链接，quickstart 将 npm/doctor 验证限定为 L1，技术写作者模板改为消费项目贡献指南占位；41.9.0 real-run evidence 按历史快照锁定，`272/234/15` 不与 42.2.0 的 `282/244/15` 作趋势比较。
 - **独立审查第 1 轮闭合**：补齐此前遗漏的 stage 5-8 独立示例、phase references、BDD 指南、workflow、DoD、分派模板和测试模板。普通 V/G 失败统一为 RootCauseReport 的 V 复审、G 根因门禁、S-fix 后 R3×3/预防审查/V/G/用户 CHECKPOINT；所有可复制 `/wm test` 含真实 `result`，所有项目阶段 BDD 调用按 phase 强制 TLA/graph/Cucumber 参数，stage 6/7 BDD_JSON 采用当前摘要形状。新增严格 L0/L1 审计与 8 条 TDD 回归，仅现存 `scripts/samples/tools` 可归 L1-only，其他断链/越界 fail-closed；当前测量为 645 条、L1-only 92、模板占位 36、意外断链 0。
-- 版本前真实验证：初版分层链接检查为 641 条（后续文档链接新增导致当前严格审计为 645 条），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿；独立审查第 1 轮后完整 Vitest 为 61 files / 1265 tests / 1265 passed，docs-consistency 静态/动态违规 0，最终 prepush 在验收记录更新后重跑。
+- **独立审查第 2 轮闭合**：phase 5-8 references 的 `/wm test` 入口统一要求真实 `result=<pass|fail>`，诊断表降级为 R 定位线索，实际返工和跨阶段动作只能经 RootCauseReport 的 V 复审、G 根因门禁、S-fix 后 R3/preventive/V/G/用户 CHECKPOINT。旧需求/设计交互示例补普通失败分支。L0/L1 审计对缺失必需 L0 目录/`SKILL.md` 和包外 L0/L1 symlink fail-closed，新增相应 TDD 回归。
+- 版本前真实验证：初版分层链接检查为 641 条（后续文档链接新增导致当前严格审计为 645 条），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿；独立审查第 1 轮完整 Vitest 为 61 files / 1265 tests / 1265 passed，独立审查第 2 轮完整 Vitest 为 61 files / 1271 tests / 1271 passed，docs-consistency 静态/动态违规 0，最终 prepush 在验收记录更新后重跑。
 
 ## [42.2.0] - 2026-09-01
 
