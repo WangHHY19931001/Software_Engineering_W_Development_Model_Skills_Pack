@@ -105,7 +105,11 @@ describe('examples workflow contract', () => {
   });
 
   it('scans every phase reference and legacy example for direct R-to-S-fix bypass language', () => {
-    const files = [...markdownFiles('w-model-dev/references'), ...markdownFiles('w-model-dev/examples')];
+    const files = [
+      ...markdownFiles('w-model-dev/references'),
+      ...markdownFiles('w-model-dev/examples'),
+      ...markdownFiles('w-model-dev/templates'),
+    ];
     const directBypass = /(?:直接|direct(?:ly)?)(?:\s*走)?\s*R\s*(?:→|->)\s*S-fix/i;
     const prohibition = /(?:不得|禁止|不可|must\s+not|not\s+allowed|cannot)/i;
 
