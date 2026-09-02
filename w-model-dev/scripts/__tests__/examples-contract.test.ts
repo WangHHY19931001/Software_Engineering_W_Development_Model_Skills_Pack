@@ -17,6 +17,34 @@ function containsFailureChain(content: string): boolean {
   return content.replace(/\s+/g, ' ').includes(FAILURE_CHAIN);
 }
 
+function isResultBoundary(value: string): boolean {
+  return value.length === 0 || /[\s`.,;，。；]/.test(value[0]!);
+}
+
+function hasValidResult(command: string): boolean {
+  const marker = command.indexOf('result=');
+  if (marker < 0) return false;
+  const value = command.slice(marker + 'result='.length);
+  if (value.startsWith('<pass|fail>')) return isResultBoundary(value.slice('<pass|fail>'.length));
+  if (value.startsWith('pass')) return isResultBoundary(value.slice('pass'.length));
+  if (value.startsWith('fail')) return isResultBoundary(value.slice('fail'.length));
+  return false;
+}
+
+function testCommands(content: string): string[] {
+  const commands: string[] = [];
+  for (const line of content.split(/\r?\n/)) {
+    let start = line.indexOf('/wm test');
+    while (start >= 0) {
+      const end = line.indexOf('`', start);
+      const command = line.slice(start, end >= 0 ? end : line.length);
+      if (command.includes('type=')) commands.push(command);
+      start = line.indexOf('/wm test', start + '/wm test'.length);
+    }
+  }
+  return commands;
+}
+
 function markdownFiles(relativeDirectory: string): string[] {
   const directory = path.join(REPO_ROOT, relativeDirectory);
   const files: string[] = [];
@@ -101,12 +129,18 @@ describe('examples workflow contract', () => {
   });
 
   it('requires every ordinary failure guidance document to publish the complete rework chain', () => {
+    const phaseReferences = [
+      'w-model-dev/references/phase-1-requirements.md',
+      'w-model-dev/references/phase-2-system-design.md',
+      'w-model-dev/references/phase-3-outline-design.md',
+      'w-model-dev/references/phase-4-detailed-design.md',
+      'w-model-dev/references/phase-5-coding.md',
+      'w-model-dev/references/phase-6-integration-test.md',
+      'w-model-dev/references/phase-7-system-test.md',
+      'w-model-dev/references/phase-8-acceptance-test.md',
+    ];
     const required = [
-      ...Array.from({ length: 8 }, (_, index) =>
-        `w-model-dev/references/phase-${index + 1}-${
-          ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
-        }.md`,
-      ),
+      ...phaseReferences,
       'w-model-dev/templates/acceptance-test.md',
       'w-model-dev/templates/review-report.md',
       'w-model-dev/templates/test-report.md',
@@ -131,26 +165,41 @@ describe('examples workflow contract', () => {
 
   it('requires every copyable test command to use a bounded real result or explicit placeholder', () => {
     const files = [
+      'w-model-dev/references/phase-1-requirements.md',
+      'w-model-dev/references/phase-2-system-design.md',
+      'w-model-dev/references/phase-3-outline-design.md',
+      'w-model-dev/references/phase-4-detailed-design.md',
+      'w-model-dev/references/phase-5-coding.md',
+      'w-model-dev/references/phase-6-integration-test.md',
+      'w-model-dev/references/phase-7-system-test.md',
+      'w-model-dev/references/phase-8-acceptance-test.md',
+      ...markdownFiles('w-model-dev/examples'),
+      ...markdownFiles('w-model-dev/templates'),
+    ];
+
+    for (const relativePath of files) {
+      for (const command of testCommands(read(relativePath))) {
+        expect(hasValidResult(command), `${relativePath}: ${command}`).toBe(true);
+      }
+    }
+  });
+
+  it('rejects abbreviated ordinary failure chains in every required guidance document', () => {
+    const files = [
       ...Array.from({ length: 8 }, (_, index) =>
         `w-model-dev/references/phase-${index + 1}-${
           ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
         }.md`,
       ),
-      ...markdownFiles('w-model-dev/examples'),
       ...markdownFiles('w-model-dev/templates'),
+      ...markdownFiles('w-model-dev/examples'),
     ];
-    const inlineCommand = /`(\/wm test\b[^`\r\n]*)`/g;
-    const commandLine = /^\s*(?:[-*]\s*)?`?(\/wm test\b[^`\r\n]*)`?\s*$/;
-    const validResult = /(?:^|\s)result=(?:<pass\|fail>|pass|fail)(?=\s|$|[`.,;，。；])/;
+    const abbreviatedChain =
+      /V\/G 失败 → R → V 复审 RootCauseReport → G\(check-rootcause-report exit 0\) → S-fix(?!\s*→\s*R3×3\s*→\s*G\(check-preventive-review exit 0\)\s*→\s*V\s*→\s*G\s*→\s*CHECKPOINT)/g;
 
     for (const relativePath of files) {
-      const content = read(relativePath);
-      const commands = [...content.matchAll(inlineCommand)].map((match) => match[1]!);
-      commands.push(...content.split(/\r?\n/).filter((line) => commandLine.test(line)));
-      for (const command of commands) {
-        if (!/\btype=/.test(command)) continue;
-        expect(command, `${relativePath}: ${command}`).toMatch(validResult);
-      }
+      const abbreviated = [...read(relativePath).matchAll(abbreviatedChain)].map((match) => match[0]);
+      expect(abbreviated, relativePath).toEqual([]);
     }
   });
 
@@ -163,20 +212,46 @@ describe('examples workflow contract', () => {
   });
 
   it('rejects direct ordinary-failure bypass instructions while allowing explicit prohibitions', () => {
-    const phaseReferences = Array.from({ length: 8 }, (_, index) =>
-      `w-model-dev/references/phase-${index + 1}-${
-        ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
-      }.md`,
-    );
-    const files = [...phaseReferences, ...markdownFiles('w-model-dev/examples'), ...markdownFiles('w-model-dev/templates')];
-    const hasDirectBypass = (line: string): boolean =>
-      /(?:直接\s*(?:返工|回到?\s*(?:阶段|phase|编码|需求|概要|系统|详细|步骤)|走|修改|重写|分派|命令\s*S|R\s*(?:→|->)\s*S-fix)|(?:评审不通过|测试(?:未通过|失败)|质量门(?:失败|不通过)|失败率)[^。；\n]{0,40}(?:回到?\s*(?:阶段|phase|编码|需求|概要|系统|详细|步骤)|直接返工|直接修复)|回到?\s*(?:阶段|phase|编码|需求|概要|系统|详细|步骤)\s*(?:起点|返工|补登记|补全|对齐|重新划分))/i.test(
-        line,
-      );
+    const phaseReferences = [
+      'w-model-dev/references/phase-1-requirements.md',
+      'w-model-dev/references/phase-2-system-design.md',
+      'w-model-dev/references/phase-3-outline-design.md',
+      'w-model-dev/references/phase-4-detailed-design.md',
+      'w-model-dev/references/phase-5-coding.md',
+      'w-model-dev/references/phase-6-integration-test.md',
+      'w-model-dev/references/phase-7-system-test.md',
+      'w-model-dev/references/phase-8-acceptance-test.md',
+    ];
+    const files = [
+      ...phaseReferences,
+      ...markdownFiles('w-model-dev/examples'),
+      ...markdownFiles('w-model-dev/templates'),
+    ];
+    const hasDirectBypass = (line: string): boolean => {
+      const hasDirect = line.includes('直接') || line.toLowerCase().includes('direct');
+      const hasReturn =
+        line.includes('回到') || line.includes('回步骤') || line.includes('回 phase') || line.includes('回编码');
+      const hasUngatedHintRouting = line.includes('reworkHints') && (line.includes('分流') || line.includes('返工'));
+      const hasFailure =
+        line.includes('失败') || line.includes('不通过') || line.includes('质量门') || line.includes('返工');
+      return hasFailure && (hasDirect || hasReturn || hasUngatedHintRouting);
+    };
     const hasProhibition = (line: string): boolean =>
-      /(?:不得|禁止|不可|不能|不允许|不应|不授权|must\s*not|not\s*allowed|cannot)/i.test(line);
+      ['不得', '禁止', '不可', '不能', '不允许', '不应', '不授权', '跳过', 'must not', 'not allowed', 'cannot'].some(
+        (token) => line.toLowerCase().includes(token.toLowerCase()),
+      );
     const hasChainGuard = (line: string): boolean =>
-      line.includes(FAILURE_CHAIN) || /(?:完整(?:普通)?(?:失败|返工)链|先走(?:完整)?(?:普通)?(?:失败|返工)链|按 R(?: 的)?(?: upstreamDefect|结论)|链条完成)/i.test(line);
+      line.includes(FAILURE_CHAIN) ||
+      [
+        '完整普通失败链',
+        '完整失败链',
+        '按普通失败链',
+        '先走完整',
+        '按 R 结论',
+        '按 R 的 upstreamDefect',
+        '完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链',
+        '链条完成',
+      ].some((token) => line.includes(token));
 
     for (const relativePath of files) {
       for (const line of read(relativePath).split(/\r?\n/)) {

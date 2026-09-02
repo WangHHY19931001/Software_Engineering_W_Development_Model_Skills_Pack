@@ -74,4 +74,4 @@ ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 --gra
 ## 要点
 
 - `check-artifact-gate --phase=7` 只校验到系统测试层，验收列仍为待执行——这是设计行为，不是缺陷。
-- BDD D5 校验失败（未绑定 step）与系统测试执行失败同样导致退出码 1，需按 `reworkHints` 分流处理。
+- BDD D5 校验失败（未绑定 step）与系统测试执行失败同样导致退出码 1；`reworkHints` 仅是 R 的定位线索，必须走完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
