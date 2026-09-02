@@ -109,6 +109,23 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('L0 源文件越出 skill 根 references/outside.md'));
   });
 
+  it('rejects an L0 directory symlink or junction whose real path escapes the skill root', async () => {
+    const outsideDirectory = path.join(outsideRoot, 'nested');
+    const directoryLink = path.join(fixtureRoot, 'references', 'escaped-directory');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideDirectory is beneath the mkdtemp-owned escape fixture root
+    await fs.mkdir(outsideDirectory, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideDirectory is beneath the mkdtemp-owned escape fixture root
+    await fs.writeFile(path.join(outsideDirectory, 'outside.md'), '# outside\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(outsideDirectory, directoryLink, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(
+      expect.stringContaining('L0 目录越出 skill 根 references/escaped-directory'),
+    );
+  });
+
   it('rejects missing non-L1 relative targets', async () => {
     await write('references/guide.md', '[missing](./missing.md)');
 
@@ -139,7 +156,7 @@ describe('auditL0RelativeLinks', () => {
   it('audits the real skill package without hiding L0 boundaries', async () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 
-    expect(result.relativeLinkCount).toBe(645);
+    expect(result.relativeLinkCount).toBe(647);
     expect(result.l1Only).toHaveLength(92);
     expect(result.templatePlaceholders).toHaveLength(36);
     expect(result.violations).toEqual([]);

@@ -42,10 +42,31 @@ async function collectFiles(
 
   for (const entry of entries) {
     const relative = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(root, relative, rootRealPath, violations)));
-    } else {
-      files.push(relative);
+    const candidate = path.join(absolute, entry.name);
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- candidate is enumerated beneath the verified L0 directory
+      const metadata = await fs.lstat(candidate);
+      if (metadata.isSymbolicLink()) {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- candidate is an enumerated L0 directory entry checked for containment
+        const realCandidate = await fs.realpath(candidate);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- realCandidate was resolved from an enumerated L0 directory entry
+        const resolvedMetadata = await fs.stat(realCandidate);
+        if (resolvedMetadata.isDirectory()) {
+          if (!isInside(rootRealPath, realCandidate)) {
+            violations.push(`L0 目录越出 skill 根 ${normalizeRelative(relative)}`);
+          } else {
+            violations.push(`L0 目录 symlink/junction 不允许 ${normalizeRelative(relative)}`);
+          }
+          continue;
+        }
+      }
+      if (metadata.isDirectory()) {
+        files.push(...(await collectFiles(root, relative, rootRealPath, violations)));
+      } else {
+        files.push(relative);
+      }
+    } catch {
+      violations.push(`L0 条目不可读 ${normalizeRelative(relative)}`);
     }
   }
 
