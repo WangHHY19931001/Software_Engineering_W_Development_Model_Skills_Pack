@@ -12,18 +12,18 @@
   1. 系统架构建模
      ├─ 基于需求规格，产出 docs/phase2-design/{module}-system-architecture.md（顶层组件图 + 子系统清单 + 系统树）
      ├─ 主模板 §1 引用块指向 system-architecture.md
-     ├─ 失败: 架构图无数据流标注 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补全组件间数据流向（FM-SD-01）
+     ├─ 失败: 架构图无数据流标注 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补全组件间数据流向（FM-SD-01）
      └─ 成功: 子系统清单与模块划分候选对应
   2. 技术选型与 ADR
      ├─ 按技术选型决策矩阵 5 维度评分（适用性/成熟度/可维护性/引入成本/风险敞口）
      ├─ 架构决策记录 ADR 写入 system-architecture.md §5
-     ├─ 失败: 选型无评分依据 / ADR 无上下文-后果 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2（FM-SD-02）
+     ├─ 失败: 选型无评分依据 / ADR 无上下文-后果 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 2（FM-SD-02）
      └─ 成功: 选型理由成立，主模板 §2 技术选型表填实
   3. 模块划分与部署架构
      ├─ 基于子系统清单，产出主模板 §3 模块划分表（模块 ID 与子系统清单对应）
      ├─ 产出主模板 §4 部署架构
-     ├─ 失败: 模块循环依赖 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论重新划分（FM-SD-03）
-     ├─ 失败: 子系统清单与模块划分不对应 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论处理
+     ├─ 失败: 模块循环依赖 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论重新划分（FM-SD-03）
+     ├─ 失败: 子系统清单与模块划分不对应 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论处理
      └─ 成功: 模块划分无环且与子系统清单一致
   4. 系统上下文与术语建模
      ├─ 承接 phase1 system-context.md 外部边界，产出 docs/phase2-design/{module}-glossary.md（系统设计域术语子集）
@@ -32,13 +32,13 @@
   5. UML 系统级建模
      ├─ 产出 docs/phase2-design/{module}-uml-modeling.md（部署图/顶层组件图/包图/用例图）
      ├─ 主模板附录 A 引用块指向 uml-modeling.md
-     ├─ 失败: 图与主模板 §1/§3 不对应 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 5（FM-SD-04）
+     ├─ 失败: 图与主模板 §1/§3 不对应 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论对齐步骤 5（FM-SD-04）
      └─ 成功: 四图产出，mermaid 块配平
   6. 追踪矩阵与行为规格引用
      ├─ 产出 docs/phase2-design/{module}-traceability-matrix.md（SD×需求 8 字段 + 测试层级矩阵）
      ├─ 产出 docs/phase2-design/{module}-behavior-spec.md（L2 .feature 引用关系）
      ├─ 主模板 §7/§8 引用块指向上述独立文件
-     ├─ 失败: 追踪矩阵字段与步骤 1/3 不一致 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 6（FM-SD-05）
+     ├─ 失败: 追踪矩阵字段与步骤 1/3 不一致 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论对齐步骤 6（FM-SD-05）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
   7. Phase 2 工程纪律与 DoD
      ├─ 产出 docs/phase2-design/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
@@ -128,8 +128,8 @@
 |---|---|---|
 | Mermaid 语法错误（C4 图渲染失败） | `npx -y @mermaid-js/mermaid-cli -i <file> -o /tmp/check.svg` 退出码 ≠ 0 | 降级为 ASCII 框图（用 `+---+` / `-->` 手绘），并在文档头部标注「Mermaid 渲染失败，已降级 ASCII」 |
 | 技术选型冲突（用户偏好与最佳实践冲突） | 决策矩阵评分差距 ≥3 分且用户偏好得分较低 | 列出冲突点 + 评分依据 + 风险，请用户显式「接受风险」或「采纳建议」，记录到 `decisions/` |
-| 模块循环依赖 | `npx -y madge --circular --extensions ts,js <module-root>` 或 `npx -y dependency-cruiser -c .dependency-cruiser.cjs <src>` 退出码 ≠ 0 | 列出环路径，普通 V/G 失败走完整普通失败链后，按 R 结论重新拆分模块边界（引入接口层 / 倒置依赖），禁止带环放行 |
-| C4 组件图缺数据流标注 | 图中无 `-.->` 或 `>>` 数据流箭头 | 普通 V/G 失败走完整普通失败链后，按 R 结论补全架构图的组件间数据流向（输入/输出/同步异步） |
+| 模块循环依赖 | `npx -y madge --circular --extensions ts,js <module-root>` 或 `npx -y dependency-cruiser -c .dependency-cruiser.cjs <src>` 退出码 ≠ 0 | 列出环路径，普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论重新拆分模块边界（引入接口层 / 倒置依赖），禁止带环放行 |
+| C4 组件图缺数据流标注 | 图中无 `-.->` 或 `>>` 数据流箭头 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补全架构图的组件间数据流向（输入/输出/同步异步） |
 | 强一致数据被拆到多服务 | 跨服务强一致操作（原可单库事务） | 聚合数据到单一服务，或显式采用柔性事务（TCC/SAGA）并登记失败路径 |
 | 分区/网络异常下的可用性声明 | 系统无分区处理策略 | 按 CAP 三选一显式声明取舍（AP/CP），写入 ADR |
 
@@ -139,11 +139,11 @@
 
 | 编号 | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|
-| FM-SD-01 | 架构图缺数据流标注 | system-architecture.md 组件图无 `-.->`/`>>` 数据流箭头 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 1 的数据流向 |
-| FM-SD-02 | 选型无评分依据 / ADR 缺上下文后果 | 技术选型表无 5 维度评分；ADR 缺 context/consequences | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2 的评分与 ADR 结构 |
-| FM-SD-03 | 模块循环依赖 | 模块划分 DFS 三色染色检测到环 | 普通 V/G 失败走完整普通失败链后，按 R 结论重新划分步骤 3 的边界 |
-| FM-SD-04 | UML 建模与架构/模块划分脱节 | uml-modeling.md 图与主模板 §1/§3 不对应 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 5 UML 建模 |
-| FM-SD-05 | 追踪矩阵字段不一致 | traceability-matrix.md 与主模板 §3/phase1 追踪矩阵不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 6 追踪矩阵字段 |
+| FM-SD-01 | 架构图缺数据流标注 | system-architecture.md 组件图无 `-.->`/`>>` 数据流箭头 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 1 的数据流向 |
+| FM-SD-02 | 选型无评分依据 / ADR 缺上下文后果 | 技术选型表无 5 维度评分；ADR 缺 context/consequences | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 2 的评分与 ADR 结构 |
+| FM-SD-03 | 模块循环依赖 | 模块划分 DFS 三色染色检测到环 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论重新划分步骤 3 的边界 |
+| FM-SD-04 | UML 建模与架构/模块划分脱节 | uml-modeling.md 图与主模板 §1/§3 不对应 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论对齐步骤 5 UML 建模 |
+| FM-SD-05 | 追踪矩阵字段不一致 | traceability-matrix.md 与主模板 §3/phase1 追踪矩阵不一致 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论对齐步骤 6 追踪矩阵字段 |
 
 > 注：FM-SD-06（越过阶段边界落接口/类级）为越界检测信号，见禁止行为 #8 与返工路径，不单列于上表。
 
@@ -226,7 +226,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 ## 阶段门评审
 
 评审通过 → 进入阶段 3（概要设计）。
-评审不通过 → 先执行完整普通 V/G 失败链；只有用户在 CHECKPOINT 确认后，才可按 R 的 upstreamDefect 结论回到系统设计对应步骤。
+评审不通过 → 必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有用户在 CHECKPOINT 确认后，才可按 R 的 upstreamDefect 结论回到系统设计对应步骤。
 
 ### 普通 V/G 失败链
 
@@ -251,17 +251,17 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 阶段门评审不通过时，按以下路径返工：
 
-- 架构不清晰 → 普通 V/G 失败走完整普通失败链后，按 R 结论补充功能描述中的分层 / 部署 / 数据流
-- 模块划分有循环依赖 → 普通 V/G 失败走完整普通失败链后，按 R 结论重新划分模块边界
-- 系统测试缺性能 / 安全基线 → 普通 V/G 失败走完整普通失败链后，按 R 结论补充并行任务中的 TC-DES-008/009
-- 技术选型无原则依据 → 普通 V/G 失败走完整普通失败链后，按 R 结论按「技术选型决策矩阵」5 维度评分补全理由
-- 端到端用例缺失 → 普通 V/G 失败走完整普通失败链后，按 R 结论补全并行任务中的 TC-DES-007
-- 架构图缺数据流（FM-SD-01）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 1 补全
-- 选型无依据（FM-SD-02）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 2 补全评分/ADR
-- 循环依赖（FM-SD-03）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 3 重新划分
-- UML 脱节（FM-SD-04）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 5 对齐
-- 追踪矩阵不一致（FM-SD-05）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 6 对齐
-- 越界落接口/类级（FM-SD-06）→ 普通 V/G 失败走完整普通失败链后，按 R 结论移除越界内容，并在用户 CHECKPOINT 后移交阶段 3/4
+- 架构不清晰 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补充功能描述中的分层 / 部署 / 数据流
+- 模块划分有循环依赖 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论重新划分模块边界
+- 系统测试缺性能 / 安全基线 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补充并行任务中的 TC-DES-008/009
+- 技术选型无原则依据 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论按「技术选型决策矩阵」5 维度评分补全理由
+- 端到端用例缺失 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补全并行任务中的 TC-DES-007
+- 架构图缺数据流（FM-SD-01）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 1 补全
+- 选型无依据（FM-SD-02）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 2 补全评分/ADR
+- 循环依赖（FM-SD-03）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 3 重新划分
+- UML 脱节（FM-SD-04）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 5 对齐
+- 追踪矩阵不一致（FM-SD-05）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 6 对齐
+- 越界落接口/类级（FM-SD-06）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论移除越界内容，并在用户 CHECKPOINT 后移交阶段 3/4
 
 ## 退出状态
 

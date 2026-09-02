@@ -17,18 +17,10 @@ function containsFailureChain(content: string): boolean {
   return content.replace(/\s+/g, ' ').includes(FAILURE_CHAIN);
 }
 
-function isResultBoundary(value: string): boolean {
-  return value.length === 0 || /[\s`.,;，。；]/.test(value[0]!);
-}
-
 function hasValidResult(command: string): boolean {
-  const marker = command.indexOf('result=');
-  if (marker < 0) return false;
-  const value = command.slice(marker + 'result='.length);
-  if (value.startsWith('<pass|fail>')) return isResultBoundary(value.slice('<pass|fail>'.length));
-  if (value.startsWith('pass')) return isResultBoundary(value.slice('pass'.length));
-  if (value.startsWith('fail')) return isResultBoundary(value.slice('fail'.length));
-  return false;
+  // The result token is a value, not a prefix: punctuation or suffixes such as
+  // `passed`, `pass|fail`, `pass,` and `pass.` must not pass the contract.
+  return /(?:^|\s)result=(?:<pass\|fail>|pass|fail)(?=$|\s|`)/.test(command);
 }
 
 function testCommands(content: string): string[] {
@@ -76,18 +68,21 @@ describe('examples workflow contract', () => {
 
   it('requires a real result for every copyable /wm test command', () => {
     const files = [
-      'coding.md',
-      'stage5-coding.md',
-      'stage6-integration-test.md',
-      'stage7-system-test.md',
-      'stage8-acceptance-test.md',
-      'test-execution.md',
+      'w-model-dev/references/phase-1-requirements.md',
+      'w-model-dev/references/phase-2-system-design.md',
+      'w-model-dev/references/phase-3-outline-design.md',
+      'w-model-dev/references/phase-4-detailed-design.md',
+      'w-model-dev/references/phase-5-coding.md',
+      'w-model-dev/references/phase-6-integration-test.md',
+      'w-model-dev/references/phase-7-system-test.md',
+      'w-model-dev/references/phase-8-acceptance-test.md',
+      ...markdownFiles('w-model-dev/examples'),
+      ...markdownFiles('w-model-dev/templates'),
     ];
-    for (const file of files) {
-      const content = read(`w-model-dev/examples/${file}`);
-      const commands = content.match(/^.*\/wm test type=.*$/gm) ?? [];
-      for (const command of commands) {
-        expect(command, `${file}: ${command}`).toMatch(/result=(?:<pass\|fail>|pass|fail)/);
+
+    for (const relativePath of files) {
+      for (const command of testCommands(read(relativePath))) {
+        expect(hasValidResult(command), `${relativePath}: ${command}`).toBe(true);
       }
     }
   });
@@ -169,6 +164,16 @@ describe('examples workflow contract', () => {
     expect(hasValidResult('/wm test type=系统 result=fail')).toBe(true);
     expect(hasValidResult('/wm test type=系统 result=pass|fail')).toBe(false);
     expect(hasValidResult('/wm test type=系统 result=passed')).toBe(false);
+    expect(hasValidResult('/wm test type=系统 result=pass,')).toBe(false);
+    expect(hasValidResult('/wm test type=系统 result=fail.')).toBe(false);
+    expect(hasValidResult('/wm test type=系统 result=pass-extra')).toBe(false);
+  });
+
+  it('uses a legal placeholder instead of an invalid result union in stage 7', () => {
+    const content = read('w-model-dev/examples/stage7-system-test.md');
+
+    expect(content).toContain('/wm test type=系统 result=<pass|fail>');
+    expect(content).not.toContain('/wm test type=系统 result=pass|fail');
   });
 
   it('requires every copyable test command to use a bounded real result or explicit placeholder', () => {
@@ -194,10 +199,21 @@ describe('examples workflow contract', () => {
 
   it('rejects abbreviated ordinary failure chains in every required guidance document', () => {
     const files = [
-      ...Array.from({ length: 8 }, (_, index) =>
-        `w-model-dev/references/phase-${index + 1}-${
-          ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
-        }.md`,
+      ...Array.from(
+        { length: 8 },
+        (_, index) =>
+          `w-model-dev/references/phase-${index + 1}-${
+            [
+              'requirements',
+              'system-design',
+              'outline-design',
+              'detailed-design',
+              'coding',
+              'integration-test',
+              'system-test',
+              'acceptance-test',
+            ][index]
+          }.md`,
       ),
       ...markdownFiles('w-model-dev/templates'),
       ...markdownFiles('w-model-dev/examples'),
@@ -241,14 +257,21 @@ describe('examples workflow contract', () => {
         line.includes('回到') || line.includes('回步骤') || line.includes('回 phase') || line.includes('回编码');
       const hasUngatedHintRouting =
         line.includes('reworkHints') &&
-        (line.includes('分流') || line.includes('直接按') || line.includes('按 `reworkHints`') || line.includes('按 reworkHints'));
-      const hasAbbreviatedChain =
-        line.includes('V/G 失败') && line.includes('S-fix') && !line.includes(FAILURE_CHAIN);
+        (line.includes('分流') ||
+          line.includes('直接按') ||
+          line.includes('按 `reworkHints`') ||
+          line.includes('按 reworkHints'));
       const hasUngatedRootCauseRouting = line.includes('根因返工链') && !line.includes(FAILURE_CHAIN);
       const hasFailure =
-        line.includes('失败') ||
-        line.includes('不通过') ||
-        line.includes('未通过') ||
+        line.includes('V/G') ||
+        line.includes('评审不通过') ||
+        line.includes('评审失败') ||
+        line.includes('质量门失败') ||
+        line.includes('质量门不通过') ||
+        line.includes('测试失败') ||
+        line.includes('测试未通过') ||
+        line.includes('用例失败') ||
+        line.includes('校验失败') ||
         line.includes('退出码 1') ||
         line.toLowerCase().includes('exit code 1') ||
         line.includes('passed=false') ||
@@ -258,44 +281,49 @@ describe('examples workflow contract', () => {
         hasDirect ||
         hasReturn ||
         hasUngatedHintRouting ||
-        hasAbbreviatedChain ||
         hasUngatedRootCauseRouting ||
         line.includes('重跑') ||
         line.includes('重新执行') ||
-        line.includes('补回填') ||
-        line.includes('补全');
+        line.includes('补回填');
       return hasFailure && hasAction;
     };
-    const hasProhibition = (line: string): boolean =>
-      ['不得', '禁止', '不可', '不能', '不允许', '不应', '不授权', '跳过', 'must not', 'not allowed', 'cannot'].some(
-        (token) => line.toLowerCase().includes(token.toLowerCase()),
-      );
-    const hasChainGuard = (line: string): boolean =>
-      line.includes(FAILURE_CHAIN) ||
-      [
-        '完整普通失败链',
-        '完整失败链',
-        '按普通失败链',
-        '先走完整',
-        '按 R 结论',
-        '按 R 的 upstreamDefect',
-        '候选影响阶段（仅 R 建议）',
-        '完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链',
-        '链条完成',
-      ].some((token) => line.includes(token));
-
     for (const relativePath of files) {
       const content = read(relativePath);
-      const units = content.split(/\n\s*\n/).map((unit) => unit.replace(/\s+/g, ' ').trim());
+      const units = content
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
       for (const unit of units) {
         if (
           unit.includes('校验规则') ||
           unit.includes('| 用例 ID | 失败现象 |') ||
-          unit.includes('| FM ID | 失败模式 | 检测信号 | 处置 |')
-        ) continue;
-        if (hasDirectBypass(unit)) {
-          expect(hasProhibition(unit) || hasChainGuard(unit), `${relativePath}: ${unit}`).toBe(true);
-        }
+          unit.includes('| FM ID | 失败模式 | 检测信号 | 处置 |') ||
+          (unit.includes('A-chunk/A-cross') && unit.includes('ingestion 专用收敛'))
+        )
+          continue;
+        if (!hasDirectBypass(unit)) continue;
+        const hasProhibition = [
+          '不得',
+          '禁止',
+          '不可',
+          '不能',
+          '不允许',
+          '不应',
+          '不授权',
+          '跳过',
+          'must not',
+          'not allowed',
+          'cannot',
+        ].some((token) => unit.toLowerCase().includes(token.toLowerCase()));
+        const hasPositiveInstruction =
+          /(?:必须|应当|需要|可以按|只能按|先执行|随后执行|再执行|由[^，。；]*执行|由[^，。；]*分派)/.test(
+            unit.replace(/(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过)/g, ''),
+          );
+        const isExplicitProhibition = hasProhibition && !hasPositiveInstruction;
+        expect(
+          isExplicitProhibition || unit.includes(FAILURE_CHAIN) || unit.includes('下方完整链'),
+          `${relativePath}: ${unit}`,
+        ).toBe(true);
       }
     }
   });

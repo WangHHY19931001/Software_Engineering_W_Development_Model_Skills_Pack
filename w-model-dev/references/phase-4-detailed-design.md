@@ -13,16 +13,16 @@
      ├─ **备选方案对比**：每个关键类/接口先产出 ≥2 个差异较大的备选签名草案 + 一行优缺点，写入 class-design.md「方案权衡」列；"聪明人一次做对"是幻觉
      ├─ 基于概要设计接口契约，产出 docs/phase4-detailed/{module}-class-design.md（类图 + 类定义 + 方法级定义 + 类状态机 + 方案权衡）
      ├─ 主文档 §1 引用块指向 class-design.md
-     ├─ 失败: 方法定义缺前置/后置/异常 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 1（FM-DD-02）
+     ├─ 失败: 方法定义缺前置/后置/异常 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 1（FM-DD-02）
      └─ 成功: 类设计完整，主文档 §1 类定义与之对应
   2. 数据模型设计
      ├─ 产出 docs/phase4-detailed/{module}-data-model.md（ER 图 + 表结构 + 索引 + store 归属）
      ├─ 主文档 §2 引用块指向 data-model.md
-     ├─ 失败: 表结构缺索引/关系 / store 归属与 phase3 不一致 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2（FM-DD-03）
+     ├─ 失败: 表结构缺索引/关系 / store 归属与 phase3 不一致 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 2（FM-DD-03）
      └─ 成功: 数据模型完整，store 归属与 phase3 一致
   3. 装配点与测试 seam 声明
      ├─ 每个设计项声明装配点（中间件链位置等）与测试 seam（HTTP 层/独立实例/白盒）
-     ├─ 失败: 装配点空但 seam 为 HTTP 层 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 3（FM-DD-05）
+     ├─ 失败: 装配点空但 seam 为 HTTP 层 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 3（FM-DD-05）
      └─ 成功: 装配点与 seam 一致性成立
   4. 术语建模
      ├─ 产出 docs/phase4-detailed/{module}-glossary.md（详细设计域术语子集）
@@ -32,7 +32,7 @@
      ├─ 产出 docs/phase4-detailed/{module}-traceability-matrix.md（DD×INTF 8 字段 + 测试层级矩阵）
      ├─ 产出 docs/phase4-detailed/{module}-behavior-spec.md（L4 .feature 引用关系）
      ├─ 主模板 §5/§6 引用块指向上述独立文件
-     ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 5（FM-DD-04）
+     ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论对齐步骤 5（FM-DD-04）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
   6. Phase 4 工程纪律与 DoD
      ├─ 产出 docs/phase4-detailed/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
@@ -202,10 +202,10 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 | 编号 | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|
 | FM-DD-01 | 无断言占位用例 | 单元测试用例无 `expect()` 或等价断言 | 回测试用例生成，补全断言（禁止 // TODO: assert） |
-| FM-DD-02 | 方法定义缺前置/后置/异常 | 类方法定义缺前置条件/后置条件/异常任一 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 1 方法契约 |
-| FM-DD-03 | 表结构缺索引/关系 / store 误用 | 表结构缺索引或关系；store 归属与 phase3 不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2 表结构或回 phase3 返工 |
-| FM-DD-04 | 追踪矩阵字段不一致 | traceability-matrix.md 与主文档 §1/§2/phase3 追踪矩阵不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 5 追踪矩阵字段 |
-| FM-DD-05 | 装配点与测试 seam 不一致 | 设计项装配点为空但测试 seam 为 HTTP 层 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 3 装配点或调整 seam |
+| FM-DD-02 | 方法定义缺前置/后置/异常 | 类方法定义缺前置条件/后置条件/异常任一 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 1 方法契约 |
+| FM-DD-03 | 表结构缺索引/关系 / store 误用 | 表结构缺索引或关系；store 归属与 phase3 不一致 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 2 表结构或回 phase3 返工 |
+| FM-DD-04 | 追踪矩阵字段不一致 | traceability-matrix.md 与主文档 §1/§2/phase3 追踪矩阵不一致 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论对齐步骤 5 追踪矩阵字段 |
+| FM-DD-05 | 装配点与测试 seam 不一致 | 设计项装配点为空但测试 seam 为 HTTP 层 | 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论补步骤 3 装配点或调整 seam |
 
 > 注：FM-DD-06（越过阶段边界回溯重定义接口契约/落编码实现）为越界检测信号，见禁止行为 #9 与返工路径，不单列于上表。
 
@@ -219,9 +219,9 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 - 每个跨模块调用须在详细设计中显式声明所用 store（写入类图/方法定义的「依赖」或「数据源」字段）
 - store 选择须与 phase-3 接口设计一致（**不得在详细设计阶段变更 store 选择**）
-- 如需变更 → 按普通失败链完成后回 phase-3 返工接口设计，再回 phase-4 同步详细设计
+- 如需变更 → 按完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 完成后回 phase-3 返工接口设计，再回 phase-4 同步详细设计
 
-**违反后果**：编码阶段按错误 store 实现触发跨模块数据流缺陷（如 P7-002/P7-003 类），按普通失败链完成后回 phase-3 + phase-4 双返工。关联反模式 [#23 跨模块 store 误用](hard-constraints.md)。
+**违反后果**：编码阶段按错误 store 实现触发跨模块数据流缺陷（如 P7-002/P7-003 类），按完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 完成后回 phase-3 + phase-4 双返工。关联反模式 [#23 跨模块 store 误用](hard-constraints.md)。
 
 ## ingestion 子流程（S→A 路径，阶段 4）
 
@@ -248,7 +248,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 ## 阶段门评审
 
 评审通过 → 进入阶段 5（编码实现）。
-评审不通过 → 先执行完整普通 V/G 失败链；只有用户在 CHECKPOINT 确认后，才可按 R 的 upstreamDefect 结论回到详细设计对应步骤。
+评审不通过 → 必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有用户在 CHECKPOINT 确认后，才可按 R 的 upstreamDefect 结论回到详细设计对应步骤。
 
 ### 普通 V/G 失败链
 
@@ -274,18 +274,18 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 阶段门评审不通过时，按以下路径返工：
 
-- 方法签名缺前置 / 后置条件 → 普通 V/G 失败走完整普通失败链后，按 R 结论回方法级定义补全前置 + 后置 + 异常
-- 单元测试用例无断言 → 普通 V/G 失败走完整普通失败链后，按 R 结论回并行任务补全 `expect()` 或等价断言，禁止 `// TODO: assert` 占位
-- 边界条件未覆盖 → 普通 V/G 失败走完整普通失败链后，按 R 结论回并行任务按边界必覆盖清单补全（空 / null / 极值 / 越界 / 类型不符 / 并发竞态）
-- ER 图缺索引设计 → 普通 V/G 失败走完整普通失败链后，按 R 结论回数据库设计补全字段 + 索引 + 关系
-- 覆盖率评估无阈值 → 普通 V/G 失败走完整普通失败链后，按 R 结论回测试用例生成算法给出分支覆盖 ≥ 80% 目标
-- 单元测试依赖外部服务 → 普通 V/G 失败走完整普通失败链后，按 R 结论回并行任务补全 mock / stub 隔离方案
-- 无断言占位（FM-DD-01）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回测试用例生成补全断言
-- 方法契约缺失（FM-DD-02）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 1 补全前置/后置/异常
-- 表结构/store 问题（FM-DD-03）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 2 补全或回 phase3 返工
-- 追踪矩阵不一致（FM-DD-04）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 5 对齐
-- 装配点不一致（FM-DD-05）→ 普通 V/G 失败走完整普通失败链后，按 R 结论回步骤 3 补全装配点
-- 越界回溯接口/落编码（FM-DD-06）→ 普通 V/G 失败走完整普通失败链后，按 R 结论移除越界内容，并在用户 CHECKPOINT 后将接口契约移交阶段 3、编码移交阶段 5
+- 方法签名缺前置 / 后置条件 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回方法级定义补全前置 + 后置 + 异常
+- 单元测试用例无断言 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回并行任务补全 `expect()` 或等价断言，禁止 `// TODO: assert` 占位
+- 边界条件未覆盖 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回并行任务按边界必覆盖清单补全（空 / null / 极值 / 越界 / 类型不符 / 并发竞态）
+- ER 图缺索引设计 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回数据库设计补全字段 + 索引 + 关系
+- 覆盖率评估无阈值 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回测试用例生成算法给出分支覆盖 ≥ 80% 目标
+- 单元测试依赖外部服务 → 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回并行任务补全 mock / stub 隔离方案
+- 无断言占位（FM-DD-01）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回测试用例生成补全断言
+- 方法契约缺失（FM-DD-02）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 1 补全前置/后置/异常
+- 表结构/store 问题（FM-DD-03）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 2 补全或回 phase3 返工
+- 追踪矩阵不一致（FM-DD-04）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 5 对齐
+- 装配点不一致（FM-DD-05）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回步骤 3 补全装配点
+- 越界回溯接口/落编码（FM-DD-06）→ 普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论移除越界内容，并在用户 CHECKPOINT 后将接口契约移交阶段 3、编码移交阶段 5
 
 ## 退出状态
 

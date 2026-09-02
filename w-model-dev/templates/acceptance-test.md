@@ -90,7 +90,7 @@
 
 - [ ] `confirm`（验收通过，项目完成）
 - [ ] `confirm-with-comments`（通过但附意见：{{}}）
-- [ ] `reject`（拒绝，回需求分析重新走 W 模型流程）
+- [ ] `reject`（拒绝；先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再由 R 结论和用户 CHECKPOINT 决定阶段切换）
 
 确认人：{{用户 / 代理人（须提前在 RTM 备案）}}
 确认日期：{{YYYY-MM-DD}}

@@ -104,7 +104,7 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 |---|---|---|
 | 1 | 用 mock 替代真实模块间调用 | 集成测试必须验证真实模块交互，mock 仅用于外部依赖边界 |
 | 2 | 伪造 `result=pass` 跳过失败用例 | 必须跑真实测试运行器，通过 `/wm test type=集成 result=<pass|fail>` 回填；实际值只能是 `pass` 或 `fail` |
-| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，先走 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链 |
+| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
 | 4 | 性能用例只跑单次请求 | IT-004 必须按负载模型（100 并发 × 30s）采样 ≥ 1000 请求 |
 | 5 | 兼容性用例只测当前版本 | IT-005 必须 v1/v2 双版本对照 |
 
@@ -119,7 +119,7 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 | IT-006 补偿失败 | TCC/SAGA 状态机与幂等性 | 阶段 2 或 5 | `npx vitest run tests/integration/ --grep "补偿"` |
 | IT-007 断路器不触发 | 阈值配置与容错设计 | 阶段 2 或 5 | `npx vitest run tests/integration/ --grep "容错"` |
 
-表中候选阶段不授权直接回退。O 仅在完整 RootCauseReport 复审、G 根因门禁、S-fix 后 R3/preventive/V/G 证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
+表中候选阶段不授权直接回退。O 仅在完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 完成、证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 退出状态
 
