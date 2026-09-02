@@ -161,25 +161,27 @@
 代码提交
    │
    ▼
-自动化代码审查 ──不通过──► 回到编码
-   │通过
-   ▼
-单元测试 ──不通过──► 回到编码
-   │通过
-   ▼
-集成测试 ──不通过──► 回到编码
-   │通过
-   ▼
-系统测试 ──不通过──► 回到编码
-   │通过
-   ▼
-质量门检查 ──不通过──► 回到编码
-   │通过
-   ▼
-发布
+自动化代码审查 ──失败──┐
+   │通过               │
+   ▼                   │
+单元测试 ──失败────────┤
+   │通过               │
+   ▼                   │
+集成测试 ──失败────────┤
+   │通过               │
+   ▼                   │
+系统测试 ──失败────────┤
+   │通过               │
+   ▼                   │
+质量门检查 ──失败──────┤
+   │通过               │
+   ▼                   ▼
+发布        完整普通失败链（V/G 失败 → R → V 复审 RootCauseReport
+                      → G(check-rootcause-report exit 0) → S-fix → R3×3
+                      → G(check-preventive-review exit 0) → V → G → CHECKPOINT）
 ```
 
-> 🔴 **CHECKPOINT · 质量门放行**：到达"质量门检查"节点时，Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定（不得用 LLM 估算）。退出码 0 → 暂停向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布；退出码 1/2 → 一律回到编码，禁止放行。详见 [SKILL.md](../SKILL.md)「阶段门与质量门」节与 [hard-constraints.md](hard-constraints.md) #3/#6/#7。
+> 🔴 **CHECKPOINT · 质量门放行**：到达“质量门检查”节点时，Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定（不得用 LLM 估算）。退出码 0 → 暂停向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布；退出码 1 → 作为 R 定位线索执行上述完整普通失败链；退出码 2 → 修正输入后重跑；任一非 0 均不得放行。详见 [SKILL.md](../SKILL.md)「阶段门与质量门」节与 [hard-constraints.md](hard-constraints.md) #3/#6/#7。
 
 ## 质量门检查清单（放行条件）
 
@@ -193,7 +195,7 @@
 - [ ] 单元测试汇总计数守恒（`passed + failed + pending = total`）且代码覆盖率 ≥ 80%
 - [ ] 交付文档齐全且一致（对照 templates/ 12 个模板）
 
-任一条件不满足，回到编码实现返工。
+任一条件不满足均视为普通质量门失败：先交给 R 形成定位线索，执行完整普通失败链并经用户 CHECKPOINT 后，才可按 R 结论进行修复或阶段切换。
 
 ## 工具缺失与降级处理（边界条件）
 

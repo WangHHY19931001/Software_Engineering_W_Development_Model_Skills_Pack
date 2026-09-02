@@ -76,7 +76,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | -------- | ---- | ------------ | ---- | -------------------------------------- |
 | `<需求>` | 是   | 需求描述文本 | —    | 需求描述、业务背景；首次进入还需技术栈 |
 
-- **失败动作**：信息不足时列出缺失项并暂停，不得猜测关键业务规则；评审未通过由 O 分派 S 返工。
+- **失败动作**：信息不足时列出缺失项并暂停，不得猜测关键业务规则；普通评审失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S。
 - **guide 链接**：[phase-1-requirements.md](phase-1-requirements.md)（阶段 1 需求分析）、[rtm-guide.md](rtm-guide.md)（RTM 映射）、[ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)（ingestion 子流程）。
 
 - **路由**：阶段 1 需求分析。
@@ -98,7 +98,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | ------ | ---- | -------------------------- | ---- | ----------------------------------------------------- |
 | `type` | 是   | `架构` \| `概要` \| `详细` | —    | 设计类型；`架构`→阶段 2、`概要`→阶段 3、`详细`→阶段 4 |
 
-- **失败动作**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段；评审未通过由 O 分派 S 返工。
+- **失败动作**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段；普通评审失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S。
 - **guide 链接**：[phase-2-system-design.md](phase-2-system-design.md) / [phase-3-outline-design.md](phase-3-outline-design.md) / [phase-4-detailed-design.md](phase-4-detailed-design.md)（对应设计阶段）、[graph-guide.md](graph-guide.md)（图谱演进）。
 
 | `type` | 路由            | 必需上游产物   | 同步测试设计 |
@@ -123,7 +123,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | -------- | ---- | ------------ | ---- | ---------------- |
 | `<功能>` | 是   | 功能描述文本 | —    | 待编码实现的功能 |
 
-- **失败动作**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败时留在阶段 5；评审未通过由 O 分派 S 返工。
+- **失败动作**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败作为 R 定位线索，普通 V/G 失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S 或回编码。
 - **guide 链接**：[phase-5-coding.md](phase-5-coding.md)（阶段 5 编码实现）、[rtm-guide.md](rtm-guide.md)（RTM 代码列）、[quality-standards.md](quality-standards.md)（质量检查）。
 
 - **路由**：阶段 5 编码实现。

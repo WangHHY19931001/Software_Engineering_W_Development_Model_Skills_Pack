@@ -163,6 +163,14 @@ describe('examples workflow contract', () => {
     }
   });
 
+  it('does not treat result=pass as a prefix of an invalid result value', () => {
+    expect(hasValidResult('/wm test type=系统 result=<pass|fail>')).toBe(true);
+    expect(hasValidResult('/wm test type=系统 result=pass')).toBe(true);
+    expect(hasValidResult('/wm test type=系统 result=fail')).toBe(true);
+    expect(hasValidResult('/wm test type=系统 result=pass|fail')).toBe(false);
+    expect(hasValidResult('/wm test type=系统 result=passed')).toBe(false);
+  });
+
   it('requires every copyable test command to use a bounded real result or explicit placeholder', () => {
     const files = [
       'w-model-dev/references/phase-1-requirements.md',
@@ -231,10 +239,32 @@ describe('examples workflow contract', () => {
       const hasDirect = line.includes('直接') || line.toLowerCase().includes('direct');
       const hasReturn =
         line.includes('回到') || line.includes('回步骤') || line.includes('回 phase') || line.includes('回编码');
-      const hasUngatedHintRouting = line.includes('reworkHints') && (line.includes('分流') || line.includes('返工'));
+      const hasUngatedHintRouting =
+        line.includes('reworkHints') &&
+        (line.includes('分流') || line.includes('直接按') || line.includes('按 `reworkHints`') || line.includes('按 reworkHints'));
+      const hasAbbreviatedChain =
+        line.includes('V/G 失败') && line.includes('S-fix') && !line.includes(FAILURE_CHAIN);
+      const hasUngatedRootCauseRouting = line.includes('根因返工链') && !line.includes(FAILURE_CHAIN);
       const hasFailure =
-        line.includes('失败') || line.includes('不通过') || line.includes('质量门') || line.includes('返工');
-      return hasFailure && (hasDirect || hasReturn || hasUngatedHintRouting);
+        line.includes('失败') ||
+        line.includes('不通过') ||
+        line.includes('未通过') ||
+        line.includes('退出码 1') ||
+        line.toLowerCase().includes('exit code 1') ||
+        line.includes('passed=false') ||
+        line.includes('reworkHints');
+      if (line.includes('退出码 2') || line.toLowerCase().includes('exit code 2')) return false;
+      const hasAction =
+        hasDirect ||
+        hasReturn ||
+        hasUngatedHintRouting ||
+        hasAbbreviatedChain ||
+        hasUngatedRootCauseRouting ||
+        line.includes('重跑') ||
+        line.includes('重新执行') ||
+        line.includes('补回填') ||
+        line.includes('补全');
+      return hasFailure && hasAction;
     };
     const hasProhibition = (line: string): boolean =>
       ['不得', '禁止', '不可', '不能', '不允许', '不应', '不授权', '跳过', 'must not', 'not allowed', 'cannot'].some(
@@ -249,14 +279,22 @@ describe('examples workflow contract', () => {
         '先走完整',
         '按 R 结论',
         '按 R 的 upstreamDefect',
+        '候选影响阶段（仅 R 建议）',
         '完整 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链',
         '链条完成',
       ].some((token) => line.includes(token));
 
     for (const relativePath of files) {
-      for (const line of read(relativePath).split(/\r?\n/)) {
-        if (hasDirectBypass(line)) {
-          expect(hasProhibition(line) || hasChainGuard(line), `${relativePath}: ${line}`).toBe(true);
+      const content = read(relativePath);
+      const units = content.split(/\n\s*\n/).map((unit) => unit.replace(/\s+/g, ' ').trim());
+      for (const unit of units) {
+        if (
+          unit.includes('校验规则') ||
+          unit.includes('| 用例 ID | 失败现象 |') ||
+          unit.includes('| FM ID | 失败模式 | 检测信号 | 处置 |')
+        ) continue;
+        if (hasDirectBypass(unit)) {
+          expect(hasProhibition(unit) || hasChainGuard(unit), `${relativePath}: ${unit}`).toBe(true);
         }
       }
     }

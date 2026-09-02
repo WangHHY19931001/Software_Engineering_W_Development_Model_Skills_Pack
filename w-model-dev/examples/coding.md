@@ -76,8 +76,7 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
 阶段门还须包含 `check-preventive-review.ts`、`check-verifier-output.ts`、闭环 5 脚本、`check-role-dispatch.ts` 和 `check-signature-chain.ts`。任一普通 V/G、评审或真实测试失败时，必须走完整链：
 
 ```text
-V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix
-→ R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
+V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
 ```
 
 R 的报告未通过 V 复审和 G 根因门禁前不得 S-fix；S-fix 后未通过 R3×3 与预防审查门禁前不得重新 V/G。

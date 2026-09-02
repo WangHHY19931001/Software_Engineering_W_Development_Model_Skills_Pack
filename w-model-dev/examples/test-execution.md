@@ -95,7 +95,9 @@ O: 🔴 CHECKPOINT-A · 验收执行前
 
 S-coding: 分批运行真实验收测试。每批只展示实际通过/失败/阻塞清单；
           到达批次同步点时进入 🟡 CHECKPOINT-B，由用户决定继续或暂停排查；
-          失败率触发强制暂停时先走根因返工链，不继续假设后续用例通过。
+          失败率触发强制暂停时，先按完整普通失败链
+          `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，
+          不继续假设后续用例通过。
 
 S-coding: 全部真实运行结束后只能按输出二选一：
           /wm test type=验收 result=pass

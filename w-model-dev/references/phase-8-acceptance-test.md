@@ -226,9 +226,12 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 
 | 场景 | 处理路径 |
 |---|---|
-| 用户 `reject` | 1. 触发反馈收集模板（见下）；2. 按回退决策树回退到对应阶段；3. 在 RTM 标注 `reject` + 根因阶段 + 重启时间 |
-| 部分用例通过 | 通过项归档为「阶段性验收通过」；未通过项按 reject 路径处理；用户须显式选择「接受部分通过 + 缺陷追溯」或「整体 reject」 |
-| 用户无法参会 | 启用异步确认协议：1. Agent 输出完整 UAT 报告（含截图/日志）；2. 用户在 3 个工作日内在验收测试报告「用户确认」区异步追加 `confirm` / `confirm-with-comments` / `reject`；3. 代理人制度：用户可指定代理人（需提前在 RTM 备案），代理人签字等同用户签字 |
+| 用户 `reject` | 1. 触发反馈收集模板（见下）；2. 将反馈与真实失败证据交给 R，执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；3. 仅在用户 CHECKPOINT 确认后，按 R 结论标注候选阶段，并在 RTM 标注 `reject` + 根因阶段 + 重启时间 |
+| 部分用例通过 | 通过项归档为「阶段性验收通过」；未通过项按 reject 路径进入上述完整普通失败链；用户须显式选择「接受部分通过 + 缺陷追溯」或「整体 reject」 |
+@@
+-**回退决策树**：
++**回退决策树（仅供完整普通失败链完成后的 R 分类与用户 CHECKPOINT 决策使用，不是直接回退授权）**：
+*** End Patch 񟿿| 用户无法参会 | 启用异步确认协议：1. Agent 输出完整 UAT 报告（含截图/日志）；2. 用户在 3 个工作日内在验收测试报告「用户确认」区异步追加 `confirm` / `confirm-with-comments` / `reject`；3. 代理人制度：用户可指定代理人（需提前在 RTM 备案），代理人签字等同用户签字 |
 
 **reject 反馈收集模板**（必填）：
 

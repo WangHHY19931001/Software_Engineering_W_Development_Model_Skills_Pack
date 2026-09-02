@@ -313,7 +313,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 ## 阶段门评审
 
 评审通过 → 进入阶段 2（系统设计）。
-评审不通过 → 先按下方普通 V/G 失败链生成和复审根因报告；只有链条完成且用户在 CHECKPOINT 确认后，才可按 R 结论回到需求分析对应步骤。
+评审不通过 → 必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有链条完成且用户在 CHECKPOINT 确认后，才可按 R 结论回到需求分析对应步骤。
 
 ### 普通 V/G 失败链（阶段 1 非 ingestion）
 

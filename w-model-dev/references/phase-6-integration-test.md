@@ -70,6 +70,8 @@
 
 以上只是 R 的输入线索。普通 V/G 失败必须先经 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
 
+**失败用例返工表的执行前提**：表中“候选影响阶段”与“修复后真实重跑”均只能在上述完整普通失败链完成、R 的结论经 V 复审和 G 根因门禁通过、S-fix 后 R3×3 与预防审查门禁 exit 0，并经用户 CHECKPOINT 确认后执行；不得把表格中的线索或重跑命令当作直接返工授权。
+
 ## RTM 登记
 
 在 [templates/rtm.md](../templates/rtm.md) 中更新：集成测试列的状态（通过 / 失败）。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
