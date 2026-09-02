@@ -61,6 +61,16 @@
 - `b030f8087567355147391f4b10203e57d3f5384a` — `fix(audit): close L0 URI and dependency boundaries`
 - `b023dc798916169840d83b2e5411f028d4eb3192` — `fix(test): keep examples contract security-clean`
 - `5f3311f` — `fix(deps): patch fast-uri audit vulnerability`
+- `60694d336a27c52926eec2d1dc2dcfbd3c6441ae` — `fix(audit): reject Windows drive-letter link paths`
+- `56b7d83d4f3d98497ea00d57902afc4533cbda9c` — `style(references): remove trailing whitespace`
+- `982d051d7804dab1ecc9ef13e7a65cbf37ce04a6` — `test(audit): preserve valid external URI scope`
+- `c74d38ecb4faea1efe20d0b1a47919c16d1c154d` — `test(audit): scan all guidance contracts`
+- `1963406c3ae56ed0e796ffc517f9555fc4b495c2` — `docs(contract): close all ordinary failure routes`
+- `41ebcb6485c7d5aea78745fe853735a6dd18c702` — `test(audit): verify l0 cli error routing`
+- `0e9f1ce3f21f84b73be40017321768a5e5232666` — `test(security): document controlled audit fixtures`
+- `9567415cb861b0fa461540317a8df2b956360827` — `style(test): format workflow contract scanner`
+- `bee1a634d62ac5fce7998cf17ff6c25daa3cc708` — `docs(changes): close task8 audit evidence`
+- `6c6ee22d4e36c93f0a8206449409faee42996f68` — `docs(changes): record final task8 gate`
 
 最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
 
