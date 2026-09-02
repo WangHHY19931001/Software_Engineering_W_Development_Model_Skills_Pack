@@ -212,6 +212,7 @@ describe('audit-l0-links application entrypoint', () => {
     const result = run(['--unknown']);
 
     expect(result.code).toBe(2);
+    expect(result.stderr).toContain('✗ [ARG_INVALID]');
     expect(result.stdout).toContain('ERROR_JSON');
     expect(JSON.parse(result.stdout.replace('ERROR_JSON ', ''))).toMatchObject({
       category: 'ARG_INVALID',
