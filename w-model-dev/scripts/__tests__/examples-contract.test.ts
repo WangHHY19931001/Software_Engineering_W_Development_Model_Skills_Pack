@@ -28,13 +28,27 @@ function hasValidResult(command: string): boolean {
 
 function testCommands(content: string): string[] {
   const commands: string[] = [];
-  for (const line of content.split(/\r?\n/)) {
-    let start = line.indexOf('/wm test');
+  const lines = content.split(/\r?\n/);
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    let start = lines[lineIndex]!.indexOf("/wm test");
     while (start >= 0) {
-      const end = line.indexOf('`', start);
-      const command = line.slice(start, end >= 0 ? end : line.length);
-      if (command.includes('type=')) commands.push(command);
-      start = line.indexOf('/wm test', start + '/wm test'.length);
+      const parts = [lines[lineIndex]!.slice(start)];
+      let nextLine = lineIndex + 1;
+      while (
+        nextLine < lines.length &&
+        !lines[nextLine]!.includes("`") &&
+        !/^(?:\s*[-*]|\s*\d+\.)\s+/.test(lines[nextLine]!)
+      ) {
+        parts.push(lines[nextLine]!.trim());
+        nextLine++;
+      }
+      const command = parts
+        .join(" ")
+        .replace(/[`]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (command.includes("type=")) commands.push(command);
+      start = lines[lineIndex]!.indexOf("/wm test", start + "/wm test".length);
     }
   }
   return commands;
@@ -59,6 +73,17 @@ function markdownFiles(relativeDirectory: string): string[] {
 }
 
 describe("examples workflow contract", () => {
+  it("captures a multiline /wm test command as one bounded command", () => {
+    const commands = testCommands(
+      "```text\n/wm test type=系统\n  result=pass\n```\n\n`/wm test type=集成 result=fail`",
+    );
+
+    expect(commands).toEqual([
+      "/wm test type=系统 result=pass",
+      "/wm test type=集成 result=fail",
+    ]);
+  });
+
   it("uses the complete ordinary V/G failure chain in independent stages 5-8", () => {
     for (const file of [
       "stage5-coding.md",
