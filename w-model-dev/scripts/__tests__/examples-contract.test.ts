@@ -29,28 +29,37 @@ function hasValidResult(command: string): boolean {
 function testCommands(content: string): string[] {
   const commands: string[] = [];
   const lines = content.split(/\r?\n/);
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    let start = lines[lineIndex]!.indexOf("/wm test");
-    while (start >= 0) {
-      const parts = [lines[lineIndex]!.slice(start)];
-      let nextLine = lineIndex + 1;
-      while (
-        nextLine < lines.length &&
-        !lines[nextLine]!.includes("`") &&
-        !/^(?:\s*[-*]|\s*\d+\.)\s+/.test(lines[nextLine]!)
-      ) {
-        parts.push(lines[nextLine]!.trim());
-        nextLine++;
+  let inFence = false;
+  let active: string | undefined;
+  const flush = (): void => {
+    if (active?.includes("type=")) commands.push(active.replace(/\s+/g, " ").trim());
+    active = undefined;
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      if (inFence) flush();
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      const start = line.indexOf("/wm test");
+      if (start >= 0) {
+        flush();
+        active = line.slice(start);
+      } else if (active && trimmed) {
+        active += ` ${trimmed}`;
       }
-      const command = parts
-        .join(" ")
-        .replace(/[`]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (command.includes("type=")) commands.push(command);
-      start = lines[lineIndex]!.indexOf("/wm test", start + "/wm test".length);
+      continue;
+    }
+
+    for (const match of line.matchAll(/`([^`]+)`/g)) {
+      const value = match[1]!;
+      if (value.includes("/wm test") && value.includes("type=")) commands.push(value.trim());
     }
   }
+  flush();
   return commands;
 }
 
