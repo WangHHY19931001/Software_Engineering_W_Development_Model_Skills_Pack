@@ -26,7 +26,10 @@ beforeEach(async () => {
   outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'l0-link-audit-outside-'));
   await write('SKILL.md');
   await Promise.all(
-    L0_DIRECTORIES.map((directory) => fs.mkdir(path.join(fixtureRoot, directory), { recursive: true })),
+    L0_DIRECTORIES.map((directory) => {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- every directory is created beneath the mkdtemp-owned fixture root
+      return fs.mkdir(path.join(fixtureRoot, directory), { recursive: true });
+    }),
   );
 });
 
@@ -79,8 +82,11 @@ describe('auditL0RelativeLinks', () => {
   it('rejects an L1-only target whose real path escapes the skill root', async () => {
     const outsideTarget = path.join(outsideRoot, 'escape.ts');
     const symlinkTarget = path.join(fixtureRoot, 'scripts', 'cli', 'escape.ts');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideTarget is beneath the mkdtemp-owned escape fixture root
     await fs.writeFile(outsideTarget, 'export {};', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlinkTarget is beneath the mkdtemp-owned skill fixture root
     await fs.mkdir(path.dirname(symlinkTarget), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
     await fs.symlink(outsideTarget, symlinkTarget, 'file');
     await write('references/guide.md', '[escape](../scripts/cli/escape.ts)');
 
@@ -93,7 +99,9 @@ describe('auditL0RelativeLinks', () => {
   it('rejects an L0 source file whose real path escapes the skill root', async () => {
     const outsideSource = path.join(outsideRoot, 'outside.md');
     const sourceLink = path.join(fixtureRoot, 'references', 'outside.md');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideSource is beneath the mkdtemp-owned escape fixture root
     await fs.writeFile(outsideSource, '[inside](../SKILL.md)', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
     await fs.symlink(outsideSource, sourceLink, 'file');
 
     const result = await auditL0RelativeLinks(fixtureRoot);
