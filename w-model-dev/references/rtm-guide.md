@@ -114,7 +114,7 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 
 ### 3. 缺失项检测算法
 
-阶段 8 终检前必须执行（实际由 `check-artifact-gate.ts` 实现，此处仅作流程透明化）：遍历 `rtm.json` 的 `requirements[]`，对每个 REQ 检查 7 个必需字段（`desc` / `designDoc` / `codeModule` / `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`）是否非空；任一字段为空即记入 `missingItems`。`missingItems` 非空 → 退出码 1，Agent 须将缺失明细透传给用户并回阶段 5 补齐；为空 → 退出码 0 可发布。
+阶段 8 终检前必须执行（实际由 `check-artifact-gate.ts` 实现，此处仅作流程透明化）：遍历 `rtm.json` 的 `requirements[]`，对每个 REQ 检查 7 个必需字段（`desc` / `designDoc` / `codeModule` / `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`）是否非空；任一字段为空即记入 `missingItems`。`missingItems` 非空 → 退出码 1，Agent 须将缺失明细透传给用户并记录为 R 定位线索；完成完整普通失败链后，再按 R 结论由 S-fix 补齐并重新执行：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；为空 → 退出码 0 可发布。
 
 > 缺失项明细由 `check-artifact-gate.ts` 输出到 stdout，Agent 须将其透传给用户。
 

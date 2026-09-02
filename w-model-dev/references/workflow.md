@@ -218,7 +218,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 | 1 | 跳过阶段门评审直接进下一阶段 | #1 | 每个评审节点必须暂停，禁止越过 🔴 CHECKPOINT 自动推进 |
 | 2 | 将测试设计后置到编码之后 | #2 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
 | 3 | 用 LLM 估算质量门结果 | #3 / #6 | 必须执行 `check-artifact-gate.ts` 获取退出码 |
-| 4 | 评审未通过时悄悄小修后继续 | #4 | 评审不通过必须回到阶段起点返工，按 reworkHints 修复 |
+| 4 | 评审未通过时悄悄小修后继续 | #4 | `reworkHints` 仅作 R 定位线索；普通失败必须执行完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接回到阶段起点修复 |
 | 5 | 一次性载入全部 references/ | #5 | 仅加载当前阶段对应的 `phase-N-*.md` |
 | 6 | 越过 🔴 CHECKPOINT 自动推进 | #8 | CHECKPOINT 标记的暂停点必须等用户确认 |
 | 7 | 谎报阶段状态（未完成标为完成） | #9 | 状态字段必须如实反映实际进度 |

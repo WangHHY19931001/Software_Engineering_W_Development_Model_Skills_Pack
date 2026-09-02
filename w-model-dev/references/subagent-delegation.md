@@ -1501,10 +1501,10 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 | 失败场景 | 处理 |
 |---|---|
-| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`） | 编排者不分派 V，直接分派 S 返工 |
+| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`） | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
 | V 子代理产出 JSON 不满足 Schema | G 子代理 `check-verifier-output.ts` 退出码 2 → 编排者分派 V 重新产出 |
-| G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过） | 编排者分派 S 返工（带 `reworkHints`），重走 V → G |
-| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过） | 编排者分派 S 回阶段 5 返工 |
+| G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过） | `reworkHints` 仅作 R 定位线索；必须执行完整普通失败链后再由 S-fix 返工 |
+| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过） | 记录为 R 定位线索；必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后再由 S-fix 回阶段 5 返工 |
 | 编排者自身越权实施（命中反模式 #10） | 回到当前阶段起点，已越权产出的实体作废重做 |
 | 子代理无法独立完成（如 BLOCKED 状态） | 子代理返回 `{"status": "BLOCKED", "reason": "..."}`；编排者向用户澄清后重新分派 |
 | R 自评不通过（`passed=false` 或 `qualityLevel∈{C,D}`） | 编排者重派 R（同一 round，不递增）；同一 round 内 R 重派 ≥2 次仍不通过 → 🔴 CHECKPOINT 介入（人工根因分析或调整 maxReworkRounds） |

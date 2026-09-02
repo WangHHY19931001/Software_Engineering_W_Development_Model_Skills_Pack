@@ -41,6 +41,7 @@ async function createMinimalL0(root: string): Promise<void> {
 describe('audit-l0-links application entrypoint', () => {
   it('registers the public npm delivery command and documentation entrypoints', async () => {
     const packageJson = JSON.parse(await fs.readFile(PACKAGE_JSON, 'utf8')) as { scripts?: Record<string, string> };
+    const readme = await fs.readFile(path.join(REPO_ROOT, 'README.md'), 'utf8');
     const commandReference = await fs.readFile(
       path.join(REPO_ROOT, 'w-model-dev', 'references', 'command-reference.md'),
       'utf8',
@@ -52,6 +53,7 @@ describe('audit-l0-links application entrypoint', () => {
     );
 
     expect(packageJson.scripts?.['audit:l0-links']).toBe('tsx w-model-dev/scripts/application/audit-l0-links.ts');
+    expect(readme).toContain('npm run audit:l0-links');
     expect(commandReference).toContain('npm run audit:l0-links [-- --root=<skill-root>]');
     expect(toolbox).toContain('npm run audit:l0-links [-- --root=<skill-root>]');
     expect(delegation).toContain('audit-l0-links（application）');

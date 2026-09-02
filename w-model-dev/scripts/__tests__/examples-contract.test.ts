@@ -231,6 +231,40 @@ describe('examples workflow contract', () => {
     }
   });
 
+  it('rejects ordinary failure routes that return or rework without the complete chain', () => {
+    const files = [
+      ...markdownFiles('w-model-dev/references'),
+      ...markdownFiles('w-model-dev/examples'),
+      ...markdownFiles('w-model-dev/templates'),
+    ];
+    const failure =
+      /V\/G\s*(?:失败|不通过)|评审不通过|评审失败|质量门失败|质量门不通过|测试失败|测试未通过|用例失败|校验失败|passed=false|退出码 1|exit code 1/i;
+    const bypass =
+      /直接(?:回到|回|分派|返工|修复|按|放行|推进)|回到|回步骤|回 phase|回阶段|回编码|回需求|按 `?reworkHints`?(?:修复|返工)|重跑|重新执行|补回填|(?:R\s*(?:→|->)\s*S-fix)/i;
+    const prohibition = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
+
+    for (const relativePath of files) {
+      for (const rawLine of read(relativePath).split(/\r?\n/)) {
+        const line = rawLine.replace(/\s+/g, ' ').trim();
+        if (!line || !failure.test(line) || !bypass.test(line)) continue;
+        if (line.includes(FAILURE_CHAIN) || line.includes('下方完整链')) continue;
+        if (line.includes('phase 1') && line.includes('ingestion') && line.includes('A-chunk')) continue;
+
+        const withoutProhibition = line.replace(
+          /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/gi,
+          '',
+        );
+        const positiveBypass = /(?:必须|应当|需要|可以按|只能按|先执行|随后执行|再执行|由[^，。；]*执行|由[^，。；]*分派)\s*(?:直接|回到|回步骤|回 phase|回编码|回需求|返工|重跑|重新执行|补回填|按 `?reworkHints`?)/i.test(
+          withoutProhibition,
+        );
+        expect(
+          prohibition.test(line) && !positiveBypass,
+          `${relativePath}: ${line}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it('does not retain abbreviated ordinary rework chains in live references', () => {
     const references = [
       'w-model-dev/references/bdd.md',
