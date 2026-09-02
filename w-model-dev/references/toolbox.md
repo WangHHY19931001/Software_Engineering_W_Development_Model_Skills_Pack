@@ -21,6 +21,7 @@
 | RootCauseReport.json | 根因报告 schema 校验 | `npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts <report.json>` |
 | 任意 .w-model/*.json | schema 强约束校验（被 logic 层自动调用，无需手动） | `schema-loader.ts` 内置 |
 | scripts 改动 | 推送前安全扫描 | `npm run lint:security` 或 `npx tsx w-model-dev/scripts/cli/security-scan.ts`（支持 --regenerate 重生成 baseline） |
+| L0 skill 包 | 审计 L0/L1 相对链接分层、目标存在性、占位与 symlink 边界 | `npm run audit:l0-links [-- --root=<skill-root>]`（`0=通过 / 1=校验失败 / 2=输入错误`） |
 | scripts 改动 | 回归基线 | `npm run self-test` |
 | ingestion 阶段 | 分块计划 | `npx tsx w-model-dev/scripts/cli/plan-chunks.ts`（O 只读 stdout） |
 | wm-status.ts（状态快照） | 查看当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步 | `npx tsx w-model-dev/scripts/cli/wm-status.ts <project-dir> [--json]` |

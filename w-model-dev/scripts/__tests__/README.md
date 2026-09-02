@@ -7,6 +7,7 @@
 | File | Area | What's locked in |
 |---|---|---|
 | archive-integrity-logic.test.ts | Archive | valid-full 通过 / bad-missing-phase1-docs 失败 / bad-missing-signature-chain 失败 / bad-missing-gate-logs 失败 / ARCHIVE_INTEGRITY_CHECKLIST 完整性 / 非归档根同名文件不满足 verifier-output- 前缀匹配 |
+| l0-link-audit-cli.test.ts | L0 Audit Delivery | npm `audit:l0-links` 公开入口 / 当前 skill 结构化 exit 0 / 缺必需 L0 目录 exit 1 / 未知参数 ERROR_JSON exit 2 |
 | artifact-gate-assets.test.ts | Gate Assets | discoverGraphAsset 优先级回退（graph.json→consolidated-phaseN）/ 非法 JSON 告警回退 / readTlaManifest 三态 / readBddManifest 合法·schema 失败·feature 缺失·ENOENT+phase≥4 / runModelChecks mock spawnSync 双子进程退出码违反 |
 | bdd-cli.test.ts | BDD CLI | phase 1-4 `--require-tla-equivalence` 缺证据 D4 exit 1 / 真实 TLA+ 快照等价路径 / phase 5-8 `--require-cucumber-report` 缺证据 D5 exit 1 / 最小真实 cucumber 执行记录 / 空或畸形报告 D5 exit 1 / 错误 phase、`=true`、重复、拼写近似与未知参数 exit 2 / 兼容跳过诊断 / pre-push fixture 与项目阶段门文档边界 |
 | bdd-logic.test.ts | BDD | parseFeatureHeader 头标注解析 / parseBackgroundStateMachine 七要素解析 / validateStateMachineCompleteness 状态机完整性 / validateScenarioPath 路径合法性 / validateTlaEquivalence BDD↔TLA+ 等价性 / checkBddModel schema 失败 exitCode=2 / required TLA+/cucumber 证据缺失 violation |

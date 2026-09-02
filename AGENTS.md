@@ -75,6 +75,7 @@ npm install
 
 # 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
 npm run self-test                           # 262 条样本回归基线，退出码 0/1
+npm run audit:l0-links                       # L0/L1 链接边界审计，结构化退出码 0/1/2
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
 npm run check:graph -- <graph.json> [--phase=1|2|3|4]  # 阶段 1–4 图谱结构门禁，退出码 0/1/2
