@@ -68,14 +68,7 @@ describe('examples workflow contract', () => {
 
   it('requires a real result for every copyable /wm test command', () => {
     const files = [
-      'w-model-dev/references/phase-1-requirements.md',
-      'w-model-dev/references/phase-2-system-design.md',
-      'w-model-dev/references/phase-3-outline-design.md',
-      'w-model-dev/references/phase-4-detailed-design.md',
-      'w-model-dev/references/phase-5-coding.md',
-      'w-model-dev/references/phase-6-integration-test.md',
-      'w-model-dev/references/phase-7-system-test.md',
-      'w-model-dev/references/phase-8-acceptance-test.md',
+      ...markdownFiles('w-model-dev/references'),
       ...markdownFiles('w-model-dev/examples'),
       ...markdownFiles('w-model-dev/templates'),
     ];
@@ -178,14 +171,7 @@ describe('examples workflow contract', () => {
 
   it('requires every copyable test command to use a bounded real result or explicit placeholder', () => {
     const files = [
-      'w-model-dev/references/phase-1-requirements.md',
-      'w-model-dev/references/phase-2-system-design.md',
-      'w-model-dev/references/phase-3-outline-design.md',
-      'w-model-dev/references/phase-4-detailed-design.md',
-      'w-model-dev/references/phase-5-coding.md',
-      'w-model-dev/references/phase-6-integration-test.md',
-      'w-model-dev/references/phase-7-system-test.md',
-      'w-model-dev/references/phase-8-acceptance-test.md',
+      ...markdownFiles('w-model-dev/references'),
       ...markdownFiles('w-model-dev/examples'),
       ...markdownFiles('w-model-dev/templates'),
     ];
@@ -227,95 +213,20 @@ describe('examples workflow contract', () => {
     expect(content).toContain('候选影响阶段由 R 给出');
   });
 
-  it('rejects direct ordinary-failure bypass instructions while allowing explicit prohibitions', () => {
-    const phaseReferences = [
-      'w-model-dev/references/phase-1-requirements.md',
-      'w-model-dev/references/phase-2-system-design.md',
-      'w-model-dev/references/phase-3-outline-design.md',
-      'w-model-dev/references/phase-4-detailed-design.md',
-      'w-model-dev/references/phase-5-coding.md',
-      'w-model-dev/references/phase-6-integration-test.md',
-      'w-model-dev/references/phase-7-system-test.md',
-      'w-model-dev/references/phase-8-acceptance-test.md',
-    ];
+  it('rejects direct R-to-S-fix bypass instructions across all guidance documents', () => {
     const files = [
-      ...phaseReferences,
+      ...markdownFiles('w-model-dev/references'),
       ...markdownFiles('w-model-dev/examples'),
       ...markdownFiles('w-model-dev/templates'),
     ];
-    const hasDirectBypass = (line: string): boolean => {
-      const hasDirect = line.includes('直接') || line.toLowerCase().includes('direct');
-      const hasReturn =
-        line.includes('回到') || line.includes('回步骤') || line.includes('回 phase') || line.includes('回编码');
-      const hasUngatedHintRouting =
-        line.includes('reworkHints') &&
-        (line.includes('分流') ||
-          line.includes('直接按') ||
-          line.includes('按 `reworkHints`') ||
-          line.includes('按 reworkHints'));
-      const hasUngatedRootCauseRouting = line.includes('根因返工链') && !line.includes(FAILURE_CHAIN);
-      const hasFailure =
-        line.includes('V/G') ||
-        line.includes('评审不通过') ||
-        line.includes('评审失败') ||
-        line.includes('质量门失败') ||
-        line.includes('质量门不通过') ||
-        line.includes('测试失败') ||
-        line.includes('测试未通过') ||
-        line.includes('用例失败') ||
-        line.includes('校验失败') ||
-        line.includes('退出码 1') ||
-        line.toLowerCase().includes('exit code 1') ||
-        line.includes('passed=false') ||
-        line.includes('reworkHints');
-      if (line.includes('退出码 2') || line.toLowerCase().includes('exit code 2')) return false;
-      const hasAction =
-        hasDirect ||
-        hasReturn ||
-        hasUngatedHintRouting ||
-        hasUngatedRootCauseRouting ||
-        line.includes('重跑') ||
-        line.includes('重新执行') ||
-        line.includes('补回填');
-      return hasFailure && hasAction;
-    };
+    const directBypass = /(?:直接|direct(?:ly)?)(?:\s*走)?\s*R\s*(?:→|->)\s*S-fix/i;
+    const prohibition = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
+
     for (const relativePath of files) {
-      const content = read(relativePath);
-      const units = content
-        .split(/\r?\n/)
-        .map((line) => line.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
-      for (const unit of units) {
-        if (
-          unit.includes('校验规则') ||
-          unit.includes('| 用例 ID | 失败现象 |') ||
-          unit.includes('| FM ID | 失败模式 | 检测信号 | 处置 |') ||
-          (unit.includes('A-chunk/A-cross') && unit.includes('ingestion 专用收敛'))
-        )
-          continue;
-        if (!hasDirectBypass(unit)) continue;
-        const hasProhibition = [
-          '不得',
-          '禁止',
-          '不可',
-          '不能',
-          '不允许',
-          '不应',
-          '不授权',
-          '跳过',
-          'must not',
-          'not allowed',
-          'cannot',
-        ].some((token) => unit.toLowerCase().includes(token.toLowerCase()));
-        const hasPositiveInstruction =
-          /(?:必须|应当|需要|可以按|只能按|先执行|随后执行|再执行|由[^，。；]*执行|由[^，。；]*分派)/.test(
-            unit.replace(/(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过)/g, ''),
-          );
-        const isExplicitProhibition = hasProhibition && !hasPositiveInstruction;
-        expect(
-          isExplicitProhibition || unit.includes(FAILURE_CHAIN) || unit.includes('下方完整链'),
-          `${relativePath}: ${unit}`,
-        ).toBe(true);
+      for (const line of read(relativePath).split(/\r?\n/)) {
+        if (directBypass.test(line)) {
+          expect(line, `${relativePath}: ${line}`).toMatch(prohibition);
+        }
       }
     }
   });

@@ -304,6 +304,18 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
   });
 
+  it('rejects a skill root symlink or junction without traversing its target', async () => {
+    const rootTarget = path.join(outsideRoot, 'skill-root-target');
+    await fs.mkdir(rootTarget, { recursive: true });
+    await fs.writeFile(path.join(rootTarget, 'SKILL.md'), '# outside\n', 'utf8');
+    await fs.rm(fixtureRoot, { recursive: true, force: true });
+    await fs.symlink(rootTarget, fixtureRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('skill 根目录 symlink/junction 不允许'));
+  });
+
   it('rejects a required L0 SKILL.md symlink whose target escapes the skill root', async () => {
     const outsideSkill = path.join(outsideRoot, 'outside-skill.md');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideSkill is beneath the mkdtemp-owned escape fixture root
