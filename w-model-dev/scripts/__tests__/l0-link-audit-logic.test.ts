@@ -264,12 +264,73 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
   });
 
+  it('rejects malformed percent encoding in an external URI instead of skipping it', async () => {
+    await write('references/guide.md', '[malformed external](https://example.test/%2)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
+  });
+
+  it('rejects malformed percent encoding in an anchor-only URI instead of skipping it', async () => {
+    await write('references/guide.md', '[malformed anchor](#section%2)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
+  });
+
+  it('rejects a required L0 SKILL.md symlink whose target escapes the skill root', async () => {
+    const outsideSkill = path.join(outsideRoot, 'outside-skill.md');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideSkill is beneath the mkdtemp-owned escape fixture root
+    await fs.writeFile(outsideSkill, '# outside skill\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- the symlink endpoint is a controlled mkdtemp fixture path
+    await fs.rm(path.join(fixtureRoot, 'SKILL.md'), { force: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(outsideSkill, path.join(fixtureRoot, 'SKILL.md'), 'file');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('必需 L0 文件越出 skill 根 SKILL.md'));
+  });
+
+  it('rejects non-Markdown L0 and L1 directory symlinks whose targets escape the skill root', async () => {
+    const outsideDirectory = path.join(outsideRoot, 'outside-directory');
+    const l0Link = path.join(fixtureRoot, 'schemas', 'outside-directory');
+    const l1Link = path.join(fixtureRoot, 'tools', 'outside-directory');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideDirectory is beneath the mkdtemp-owned escape fixture root
+    await fs.mkdir(outsideDirectory, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both L0/L1 parents are controlled mkdtemp fixture paths
+    await fs.mkdir(path.dirname(l0Link), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both L0/L1 parents are controlled mkdtemp fixture paths
+    await fs.mkdir(path.dirname(l1Link), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(outsideDirectory, l0Link, process.platform === 'win32' ? 'junction' : 'dir');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(outsideDirectory, l1Link, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('L0 目录越出 skill 根 schemas/outside-directory'));
+    expect(result.violations).toContainEqual(
+      expect.stringContaining('L1-only 目录越出 skill 根 tools/outside-directory'),
+    );
+  });
+
   it('rejects missing non-L1 relative targets', async () => {
     await write('references/guide.md', '[missing](./missing.md)');
 
     const result = await auditL0RelativeLinks(fixtureRoot);
 
     expect(result.violations).toContainEqual(expect.stringContaining('相对链接目标不存在'));
+  });
+
+  it('rejects a root-relative target outside the skill package boundary', async () => {
+    await write('references/guide.md', '[outside](/outside/readme.md)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('不允许的分发边界'));
   });
 
   it('rejects a relative target outside the L0 roots when it is not an L1-only boundary', async () => {

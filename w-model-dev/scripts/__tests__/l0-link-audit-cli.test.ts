@@ -124,6 +124,43 @@ describe('audit-l0-links application entrypoint', () => {
     );
   });
 
+  it('returns structured exit 1 for malformed external URI encoding', async () => {
+    const root = path.join(tmpDir, 'malformed-external-uri-skill');
+    await createMinimalL0(root);
+    await fs.writeFile(path.join(root, 'references', 'guide.md'), '[bad external](https://example.test/%2)\n', 'utf8');
+
+    const result = run([`--root=${root}`]);
+
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', '')).violations).toContainEqual(
+      expect.stringContaining('链接 URI 编码无效'),
+    );
+  });
+
+  it('returns a structured exit 1 for a missing required SKILL.md file', async () => {
+    const root = path.join(tmpDir, 'missing-skill-file');
+    await createMinimalL0(root);
+    await fs.rm(path.join(root, 'SKILL.md'), { force: true });
+
+    const result = run([`--root=${root}`]);
+
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', '')).violations).toContainEqual(
+      expect.stringContaining('必需 L0 文件不存在或不可读 SKILL.md'),
+    );
+  });
+
+  it('returns a structured exit 1 for a missing explicit skill root', async () => {
+    const root = path.join(tmpDir, 'missing-skill-root');
+
+    const result = run([`--root=${root}`]);
+
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', '')).violations).toContainEqual(
+      expect.stringContaining('skill 根目录不存在或不可读'),
+    );
+  });
+
   it('returns structured exit 2 for an unknown argument', () => {
     const result = run(['--unknown']);
 

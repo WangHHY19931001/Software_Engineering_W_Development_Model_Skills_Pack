@@ -27,27 +27,38 @@ interface ImportEdge {
 const scriptsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageJsonPath = path.resolve(scriptsDir, '../..', 'package.json');
 const scriptLayers: readonly ScriptLayer[] = ['cli', 'application', 'logic', 'lib', 'infrastructure'];
-const LOGIC_DIRECT_IO_MODULES = new Set([
+const LOGIC_DIRECT_BOUNDARY_MODULES = new Set([
   'child_process',
   'fs',
   'fs/promises',
   'node:child_process',
   'node:fs',
   'node:fs/promises',
+  'path',
+  'node:path',
 ]);
 
 /**
  * Existing transitional exceptions must be named here rather than silently
  * weakening the scan. Each exception is documented at file level so a new
- * logic I/O dependency cannot be added by merely extending a Set.
+ * logic boundary dependency cannot be added by merely extending a Set.
  */
-const ALLOWED_LOGIC_NODE_IO_IMPORTS = new Map([
+const ALLOWED_LOGIC_NODE_BOUNDARY_IMPORTS = new Map([
   ['logic/gate-logic.ts:node:fs', 'gate-logic uses the injected filesystem adapter implementation.'],
   [
     'logic/l0-link-audit-logic.ts:node:fs',
     'l0-link-audit-logic reads the distributed skill package to enforce L0/L1 link boundaries.',
   ],
+  ['logic/docs-consistency-logic.ts:node:path', 'docs-consistency-logic normalizes repository documentation paths.'],
+  ['logic/evidence-export-logic.ts:node:path', 'evidence-export-logic normalizes and contains evidence paths.'],
+  ['logic/evidence-provenance-logic.ts:node:path', 'evidence-provenance-logic normalizes source bundle paths.'],
+  ['logic/gate-logic.ts:node:path', 'gate-logic normalizes project artifact paths.'],
+  [
+    'logic/l0-link-audit-logic.ts:node:path',
+    'l0-link-audit-logic normalizes and contains distributed skill package paths.',
+  ],
   ['logic/state-write-logic.ts:node:fs/promises', 'state-write-logic is the state persistence implementation.'],
+  ['logic/state-write-logic.ts:node:path', 'state-write-logic normalizes state persistence paths.'],
 ]);
 
 async function findTypeScriptFiles(dir: string): Promise<string[]> {
@@ -182,9 +193,9 @@ function boundaryViolations(edges: ImportEdge[]): string[] {
         violations.push(`infrastructure → cli: ${relative(edge.from)} → ${relative(edge.to)}`);
       }
     }
-    if (layerOf(edge.from) === 'logic' && LOGIC_DIRECT_IO_MODULES.has(edge.to)) {
+    if (layerOf(edge.from) === 'logic' && LOGIC_DIRECT_BOUNDARY_MODULES.has(edge.to)) {
       const key = `${relative(edge.from)}:${edge.to}`;
-      if (!ALLOWED_LOGIC_NODE_IO_IMPORTS.has(key)) violations.push(`logic direct IO: ${key}`);
+      if (!ALLOWED_LOGIC_NODE_BOUNDARY_IMPORTS.has(key)) violations.push(`logic direct boundary: ${key}`);
     }
   }
   return violations;
@@ -235,7 +246,7 @@ describe('scripts runtime dependency boundaries', () => {
       const runtimeEdges = edges.filter((edge) => !edge.typeOnly);
       const violations = boundaryViolations(runtimeEdges);
       const cycles = cyclesIn(runtimeEdges);
-      expect(violations).toContain(`logic direct IO: ${relative(fixturePath)}:fs`);
+      expect(violations).toContain(`logic direct boundary: ${relative(fixturePath)}:fs`);
       expect(cycles).toEqual([]);
     } finally {
       await fs.rm(fixturePath, { force: true });
@@ -283,40 +294,56 @@ describe('scripts runtime dependency boundaries', () => {
     expect(docsBuild).toContain('--exclude "w-model-dev/scripts/application/**"');
   });
 
-  it('requires every logic direct-I/O exception to remain explicit and documented', async () => {
-    expect([...ALLOWED_LOGIC_NODE_IO_IMPORTS.entries()]).toEqual([
+  it('requires every logic boundary exception to remain explicit and documented', async () => {
+    expect([...ALLOWED_LOGIC_NODE_BOUNDARY_IMPORTS.entries()]).toEqual([
       ['logic/gate-logic.ts:node:fs', 'gate-logic uses the injected filesystem adapter implementation.'],
       [
         'logic/l0-link-audit-logic.ts:node:fs',
         'l0-link-audit-logic reads the distributed skill package to enforce L0/L1 link boundaries.',
       ],
+      [
+        'logic/docs-consistency-logic.ts:node:path',
+        'docs-consistency-logic normalizes repository documentation paths.',
+      ],
+      ['logic/evidence-export-logic.ts:node:path', 'evidence-export-logic normalizes and contains evidence paths.'],
+      ['logic/evidence-provenance-logic.ts:node:path', 'evidence-provenance-logic normalizes source bundle paths.'],
+      ['logic/gate-logic.ts:node:path', 'gate-logic normalizes project artifact paths.'],
+      [
+        'logic/l0-link-audit-logic.ts:node:path',
+        'l0-link-audit-logic normalizes and contains distributed skill package paths.',
+      ],
       ['logic/state-write-logic.ts:node:fs/promises', 'state-write-logic is the state persistence implementation.'],
+      ['logic/state-write-logic.ts:node:path', 'state-write-logic normalizes state persistence paths.'],
     ]);
 
-    for (const [key, reason] of ALLOWED_LOGIC_NODE_IO_IMPORTS) {
+    for (const [key, reason] of ALLOWED_LOGIC_NODE_BOUNDARY_IMPORTS) {
       const separator = key.indexOf(':node:');
       const file = key.slice(0, separator);
       const moduleName = key.slice(separator + 1);
       expect(file.startsWith('logic/')).toBe(true);
-      expect(LOGIC_DIRECT_IO_MODULES.has(moduleName)).toBe(true);
+      expect(LOGIC_DIRECT_BOUNDARY_MODULES.has(moduleName)).toBe(true);
       expect(reason.trim()).not.toBe('');
       await expect(fs.access(path.join(scriptsDir, file))).resolves.toBeUndefined();
     }
   });
 
-  it('detects unregistered child_process and other direct logic I/O imports', () => {
+  it('detects unregistered child_process, path, and other direct logic boundary imports', () => {
     const logicFile = path.join(scriptsDir, 'logic', 'new-logic.ts');
     expect(
       boundaryViolations([
         { from: logicFile, to: 'node:child_process', typeOnly: false },
         { from: logicFile, to: 'child_process', typeOnly: false },
         { from: logicFile, to: 'node:fs', typeOnly: false },
+        { from: logicFile, to: 'path', typeOnly: false },
+        { from: logicFile, to: 'node:path', typeOnly: false },
         { from: logicFile, to: 'node:fs', typeOnly: true },
       ]),
     ).toEqual([
-      'logic direct IO: logic/new-logic.ts:node:child_process',
-      'logic direct IO: logic/new-logic.ts:child_process',
-      'logic direct IO: logic/new-logic.ts:node:fs',
+      'logic direct boundary: logic/new-logic.ts:node:child_process',
+      'logic direct boundary: logic/new-logic.ts:child_process',
+      'logic direct boundary: logic/new-logic.ts:node:fs',
+      'logic direct boundary: logic/new-logic.ts:path',
+      'logic direct boundary: logic/new-logic.ts:node:path',
     ]);
   });
 

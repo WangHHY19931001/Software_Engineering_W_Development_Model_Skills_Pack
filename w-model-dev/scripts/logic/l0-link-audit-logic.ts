@@ -28,7 +28,9 @@ function normalizeRelative(value: string): string {
 }
 
 function isExternalOrAnchor(target: string): boolean {
-  return target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('/');
+  // Root-relative paths are package paths, not external URLs: they must pass the
+  // L0/L1 containment check and fail closed when they escape the skill package.
+  return target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('//');
 }
 
 function isInside(root: string, candidate: string): boolean {
@@ -53,10 +55,32 @@ function parseRelativeLinks(content: string): string[] {
       .trim()
       .replace(/^<|>$/g, '')
       .split(/\s+["']/)[0]!;
-    if (!raw || isExternalOrAnchor(raw)) continue;
-    links.push(raw);
+    if (raw) links.push(raw);
   }
   return links;
+}
+
+function hasUriScheme(target: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(target);
+}
+
+function validateExternalUri(target: string): string | undefined {
+  if (target.startsWith('//')) {
+    try {
+      new URL(`https:${target}`);
+    } catch {
+      return '链接 URI 格式无效';
+    }
+    return undefined;
+  }
+  if (hasUriScheme(target)) {
+    try {
+      new URL(target);
+    } catch {
+      return '链接 URI 格式无效';
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -321,18 +345,26 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
     }
 
     for (const rawTarget of parseRelativeLinks(content)) {
-      result.relativeLinkCount++;
       const sourceEntry = { source: normalizeRelative(source), target: rawTarget };
 
       let decodedTarget: string;
       try {
-        // Validate the complete URI before removing its fragment so malformed percent
-        // sequences cannot bypass the fail-closed audit in the ignored fragment text.
+        // Validate every URI, including external and anchor-only links, before
+        // classifying it so malformed percent sequences cannot be skipped.
         decodedTarget = decodeURI(rawTarget);
       } catch {
         result.violations.push(`${sourceEntry.source}: 链接 URI 编码无效 → ${rawTarget}`);
         continue;
       }
+
+      const uriError = validateExternalUri(decodedTarget);
+      if (uriError) {
+        result.violations.push(`${sourceEntry.source}: ${uriError} → ${rawTarget}`);
+        continue;
+      }
+      if (isExternalOrAnchor(decodedTarget)) continue;
+
+      result.relativeLinkCount++;
 
       if (rawTarget.includes('{{module}}')) {
         if (normalizeRelative(source).startsWith('templates/')) {
