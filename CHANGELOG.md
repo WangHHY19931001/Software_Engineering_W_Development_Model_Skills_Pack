@@ -38,6 +38,7 @@
 - `b22191490b9c3d9d56bc47de2d9d33462fc308b5` — `docs(changes): record final audit verification scope`
 - `2e78319f8f9a0e25b327aae1509ec1004dcc8a9f` — `docs(changes): register prior audit commit identity`
 - `0eee1f48436b1643f14eb449452255e88f4b9418` — `docs(changes): record final audit gate`
+- `0974bc0c6b105d7c486fa30f79f2642a2c9ed7d1` — `docs(changes): register audit history before final gate`
 
 最终记录提交不在 CHANGELOG 的本表中自引用；外部 `git rev-parse HEAD` 核验最终 SHA，最终 prepush 结果见验收记录。
 
