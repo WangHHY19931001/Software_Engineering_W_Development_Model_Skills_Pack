@@ -13,6 +13,10 @@ function read(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
+function containsFailureChain(content: string): boolean {
+  return content.replace(/\s+/g, ' ').includes(FAILURE_CHAIN);
+}
+
 function markdownFiles(relativeDirectory: string): string[] {
   const directory = path.join(REPO_ROOT, relativeDirectory);
   const files: string[] = [];
@@ -96,6 +100,60 @@ describe('examples workflow contract', () => {
     }
   });
 
+  it('requires every ordinary failure guidance document to publish the complete rework chain', () => {
+    const required = [
+      ...Array.from({ length: 8 }, (_, index) =>
+        `w-model-dev/references/phase-${index + 1}-${
+          ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
+        }.md`,
+      ),
+      'w-model-dev/templates/acceptance-test.md',
+      'w-model-dev/templates/review-report.md',
+      'w-model-dev/templates/test-report.md',
+      'w-model-dev/templates/coding.md',
+      'w-model-dev/templates/integration-test.md',
+      'w-model-dev/examples/README.md',
+      'w-model-dev/examples/requirement-analysis.md',
+      'w-model-dev/examples/system-design.md',
+      'w-model-dev/examples/coding.md',
+      'w-model-dev/examples/test-execution.md',
+      'w-model-dev/examples/stage1-requirement-analysis.md',
+      'w-model-dev/examples/stage5-coding.md',
+      'w-model-dev/examples/stage6-integration-test.md',
+      'w-model-dev/examples/stage7-system-test.md',
+      'w-model-dev/examples/stage8-acceptance-test.md',
+    ];
+
+    for (const relativePath of required) {
+      expect(containsFailureChain(read(relativePath)), relativePath).toBe(true);
+    }
+  });
+
+  it('requires every copyable test command to use a bounded real result or explicit placeholder', () => {
+    const files = [
+      ...Array.from({ length: 8 }, (_, index) =>
+        `w-model-dev/references/phase-${index + 1}-${
+          ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
+        }.md`,
+      ),
+      ...markdownFiles('w-model-dev/examples'),
+      ...markdownFiles('w-model-dev/templates'),
+    ];
+    const inlineCommand = /`(\/wm test\b[^`\r\n]*)`/g;
+    const commandLine = /^\s*(?:[-*]\s*)?`?(\/wm test\b[^`\r\n]*)`?\s*$/;
+    const validResult = /(?:^|\s)result=(?:<pass\|fail>|pass|fail)(?=\s|$|[`.,;，。；])/;
+
+    for (const relativePath of files) {
+      const content = read(relativePath);
+      const commands = [...content.matchAll(inlineCommand)].map((match) => match[1]!);
+      commands.push(...content.split(/\r?\n/).filter((line) => commandLine.test(line)));
+      for (const command of commands) {
+        if (!/\btype=/.test(command)) continue;
+        expect(command, `${relativePath}: ${command}`).toMatch(validResult);
+      }
+    }
+  });
+
   it('does not allow phase 5 ticket exceptions to bypass the ordinary failure chain', () => {
     const content = read('w-model-dev/references/phase-5-coding.md');
 
@@ -104,27 +162,27 @@ describe('examples workflow contract', () => {
     expect(content).toContain('候选影响阶段由 R 给出');
   });
 
-  it('scans every phase reference and legacy example for direct R-to-S-fix bypass language', () => {
-    const files = [
-      ...markdownFiles('w-model-dev/references'),
-      ...markdownFiles('w-model-dev/examples'),
-      ...markdownFiles('w-model-dev/templates'),
-    ];
-    const hasDirectBypass = (line: string): boolean => {
-      const compact = line.toLowerCase().replace(/\s/g, '');
-      const hasDirectWord = compact.includes('直接') || compact.includes('direct');
-      const hasTransition = compact.includes('r→s-fix') || compact.includes('r->s-fix');
-      return hasDirectWord && hasTransition;
-    };
-    const hasProhibition = (line: string): boolean => {
-      const compact = line.toLowerCase().replace(/\s/g, '');
-      return ['不得', '禁止', '不可', 'mustnot', 'notallowed', 'cannot'].some((token) => compact.includes(token));
-    };
+  it('rejects direct ordinary-failure bypass instructions while allowing explicit prohibitions', () => {
+    const phaseReferences = Array.from({ length: 8 }, (_, index) =>
+      `w-model-dev/references/phase-${index + 1}-${
+        ['requirements', 'system-design', 'outline-design', 'detailed-design', 'coding', 'integration-test', 'system-test', 'acceptance-test'][index]
+      }.md`,
+    );
+    const files = [...phaseReferences, ...markdownFiles('w-model-dev/examples'), ...markdownFiles('w-model-dev/templates')];
+    const hasDirectBypass = (line: string): boolean =>
+      /(?:直接\s*(?:返工|回到?\s*(?:阶段|phase|编码|需求|概要|系统|详细|步骤)|走|修改|重写|分派|命令\s*S|R\s*(?:→|->)\s*S-fix)|(?:评审不通过|测试(?:未通过|失败)|质量门(?:失败|不通过)|失败率)[^。；\n]{0,40}(?:回到?\s*(?:阶段|phase|编码|需求|概要|系统|详细|步骤)|直接返工|直接修复)|回到?\s*(?:阶段|phase|编码|需求|概要|系统|详细|步骤)\s*(?:起点|返工|补登记|补全|对齐|重新划分))/i.test(
+        line,
+      );
+    const hasProhibition = (line: string): boolean =>
+      /(?:不得|禁止|不可|不能|不允许|不应|不授权|must\s*not|not\s*allowed|cannot)/i.test(line);
+    const hasChainGuard = (line: string): boolean =>
+      line.includes(FAILURE_CHAIN) || /(?:完整(?:普通)?(?:失败|返工)链|先走(?:完整)?(?:普通)?(?:失败|返工)链|按 R(?: 的)?(?: upstreamDefect|结论)|链条完成)/i.test(line);
 
     for (const relativePath of files) {
-      const lines = read(relativePath).split(/\r?\n/);
-      for (const line of lines) {
-        if (hasDirectBypass(line)) expect(hasProhibition(line), `${relativePath}: ${line}`).toBe(true);
+      for (const line of read(relativePath).split(/\r?\n/)) {
+        if (hasDirectBypass(line)) {
+          expect(hasProhibition(line) || hasChainGuard(line), `${relativePath}: ${line}`).toBe(true);
+        }
       }
     }
   });

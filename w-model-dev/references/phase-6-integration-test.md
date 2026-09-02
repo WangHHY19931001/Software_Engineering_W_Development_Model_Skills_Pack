@@ -101,7 +101,7 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 | # | 禁止行为 | 正确做法 |
 |---|---|---|
 | 1 | 用 mock 替代真实模块间调用 | 集成测试必须验证真实模块交互，mock 仅用于外部依赖边界 |
-| 2 | 伪造 `result=pass` 跳过失败用例 | 必须跑真实测试运行器，通过 `/wm test type=集成 result=pass\|fail` 回填 |
+| 2 | 伪造 `result=pass` 跳过失败用例 | 必须跑真实测试运行器，通过 `/wm test type=集成 result=<pass|fail>` 回填；实际值只能是 `pass` 或 `fail` |
 | 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，先走 RootCauseReport 复审、根因门禁、S-fix 后 R3/preventive/V/G/CHECKPOINT 链 |
 | 4 | 性能用例只跑单次请求 | IT-004 必须按负载模型（100 并发 × 30s）采样 ≥ 1000 请求 |
 | 5 | 兼容性用例只测当前版本 | IT-005 必须 v1/v2 双版本对照 |

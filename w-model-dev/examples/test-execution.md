@@ -112,7 +112,7 @@ O: 🔴 CHECKPOINT-C · 项目级放行
 
 ## 要点
 
-- 每条 `/wm test` 执行命令都必须含 `result=pass|fail`，值与当次真实运行器输出一致。
+- 每条 `/wm test` 执行命令都必须含 `result=pass` 或 `result=fail`，值与当次真实运行器输出一致；`result=pass|fail` 仅是说明占位，不是可复制命令值。
 - `result=fail` 先回填失败事实，再走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；修复不自动把结果改为 pass。
 - 阶段 7 显式使用 `check-artifact-gate.ts . --phase=7`；阶段 8 终检才使用无 `--phase` 的默认终检。
 - G exit 0、V 通过和真实测试 pass 都只是必要条件；跨阶段或项目完成仍须用户 CHECKPOINT 确认。

@@ -14,17 +14,17 @@
      ├─ **接口交集 vs 并集自检**：抽象接口取"所有实现的功能交集"则只强如最弱实现，取"并集"则庞大——明确取舍并记录理由
      ├─ 基于系统设计模块划分，产出 docs/phase3-outline/{module}-interface-contract.md（接口清单 + Schema 10 字段 + 错误码分层 + 备选方案）
      ├─ 主文档 §2 引用块指向 interface-contract.md
-     ├─ 失败: 接口契约缺 Schema 字段 / 错误码缺段位 → 回步骤 1（FM-OD-01）
+     ├─ 失败: 接口契约缺 Schema 字段 / 错误码缺段位 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 1（FM-OD-01）
      └─ 成功: 接口契约完整，主文档 §2 接口定义与之对应
   2. 调用关系建模
      ├─ 产出 interface-contract.md 调用关系图（模块间调用 + 数据流标注）
      ├─ 主文档 §1 模块调用关系与之对应
-     ├─ 失败: 循环依赖 → 列出环路径重新划分（FM-OD-03）
+     ├─ 失败: 循环依赖 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论重新划分边界（FM-OD-03）
      └─ 成功: 调用关系无环，主文档 §1 对应
   3. 字段语义对齐与数据源选择
      ├─ 字段命名与业务语义对齐（followerId/followeeId 而非 userId/bloggerId）
      ├─ 跨模块调用显式声明 store 选择
-     ├─ 失败: 字段语义模糊且无 Implementation Decisions 说明 → 回步骤 3（FM-OD-02）
+     ├─ 失败: 字段语义模糊且无 Implementation Decisions 说明 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 3（FM-OD-02）
      └─ 成功: 字段语义清晰，store 选择与 schema 一致
   4. 术语建模
      ├─ 产出 docs/phase3-outline/{module}-glossary.md（接口域术语子集）
@@ -33,13 +33,13 @@
   5. UML 模块级建模
      ├─ 产出 docs/phase3-outline/{module}-uml-modeling.md（包图/序列图/通信图）
      ├─ 主模板附录 A 引用块指向 uml-modeling.md
-     ├─ 失败: 图与主文档 §1/§2 不对应 → 回步骤 5 对齐（FM-OD-04）
+     ├─ 失败: 图与主文档 §1/§2 不对应 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 5（FM-OD-04）
      └─ 成功: 三图产出，mermaid 块配平
   6. 追踪矩阵与行为规格引用
      ├─ 产出 docs/phase3-outline/{module}-traceability-matrix.md（INTF×SD 8 字段 + 测试层级矩阵）
      ├─ 产出 docs/phase3-outline/{module}-behavior-spec.md（L3 .feature 引用关系）
      ├─ 主模板 §5/§6 引用块指向上述独立文件
-     ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 回步骤 6 对齐（FM-OD-05）
+     ├─ 失败: 追踪矩阵字段与步骤 1/2 不一致 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 6（FM-OD-05）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，引用块成立
   7. Phase 3 工程纪律与 DoD
      ├─ 产出 docs/phase3-outline/{module}-discipline-dod.md（DoD 清单 ≥ 8 项）
@@ -141,7 +141,7 @@
 - **schema 一致**：store 选择须与 schema 中的实体定义一致。如 `follower` 是 `user` 实体的子集 → 须在 `user store` 校验，不应在 `blogger store`；如 `comment.bloggerId` 引用 `blogger` 实体主键 → 须在 `blogger store` 校验，不应在 `user store`。
 - **token sub 对齐**：如调用方携带 token，`token.sub` 须与所选 store 的主键一致。如 `blogger token sub=bloggerId` → 不应在 `user store` 校验 `follower`；如 `user token sub=userId` → 不应在 `blogger store` 校验 `blogger` 实体。
 
-**违反后果**：集成测试阶段发现跨模块数据流缺陷（如 P7-002/P7-003 类），回 phase-3 返工接口设计。关联反模式 [#23 跨模块 store 误用](hard-constraints.md)。phase-4 详细设计同步此约束（见 [phase-4-detailed-design.md「跨模块数据源选择约束（同步 phase-3）」](phase-4-detailed-design.md)）。
+**违反后果**：集成测试阶段发现跨模块数据流缺陷（如 P7-002/P7-003 类），按普通失败链完成后回 phase-3 返工接口设计。关联反模式 [#23 跨模块 store 误用](hard-constraints.md)。phase-4 详细设计同步此约束（见 [phase-4-detailed-design.md「跨模块数据源选择约束（同步 phase-3）」](phase-4-detailed-design.md)）。
 
 ## 错误码分层约定
 
@@ -159,20 +159,20 @@
 |---|---|---|
 | 模块循环依赖 | DFS 三色染色（白=未访问 / 灰=栈中 / 黑=已完成）；遇灰节点即环 | 列出环路径，引入接口层或倒置依赖方向，重新检测直至无环 |
 | 模块职责重叠（单一职责违反） | 检查每个模块的「职责描述」关键词重叠率 > 30% | 将重叠职责抽为新模块，或合并到主模块；更新模块划分表 |
-| 接口签名缺类型约束 | 静态扫描参数 / 返回值类型注解缺失（TS 项目用 `tsc --noEmit`） | 回到接口定义补全类型；类型不明确时用 `unknown` + 显式类型守卫 |
-| 错误码集合不完整 | 接口契约缺 4xx/5xx/业务三类之一 | 回到接口定义按「错误码分层约定」补全三段位 |
+| 接口签名缺类型约束 | 静态扫描参数 / 返回值类型注解缺失（TS 项目用 `tsc --noEmit`） | 按普通失败链完成后回接口定义补全类型；类型不明确时用 `unknown` + 显式类型守卫 |
+| 错误码集合不完整 | 接口契约缺 4xx/5xx/业务三类之一 | 按普通失败链完成后回接口定义按「错误码分层约定」补全三段位 |
 
-检测顺序：先静态扫描（签名/错误码）→ 再图算法（循环依赖）→ 最后语义检查（职责重叠）。
+检测顺序：先静态扫描（签名/错误码）→ 再图算法（循环依赖）→ 最后语义检查（职责重叠）；任一失败先记为 R 定位线索，普通 V/G 失败必须走完整普通失败链后再重新检测。
 
 ## 失败模式矩阵
 
 | 编号 | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|
-| FM-OD-01 | 接口契约缺 Schema 字段 / 错误码缺段位 | interface-contract.md 接口缺 Schema 10 字段之一；错误码缺 4xx/5xx/业务之一 | 回步骤 1 补全契约字段与错误码 |
-| FM-OD-02 | 字段语义模糊 / ADR 缺上下文后果 | 字段命名与业务语义不对应且无 Implementation Decisions 说明 | 回步骤 3 补全字段映射或对齐命名 |
-| FM-OD-03 | 模块循环依赖 | 调用关系 DFS 三色染色检测到环 | 回步骤 2 重新划分边界 |
-| FM-OD-04 | UML 建模与接口/调用关系脱节 | uml-modeling.md 图与主文档 §1/§2 不对应 | 回步骤 5 对齐 UML 建模 |
-| FM-OD-05 | 追踪矩阵字段不一致 | traceability-matrix.md 与主文档 §2/phase2 追踪矩阵不一致 | 回步骤 6 对齐追踪矩阵字段 |
+| FM-OD-01 | 接口契约缺 Schema 字段 / 错误码缺段位 | interface-contract.md 接口缺 Schema 10 字段之一；错误码缺 4xx/5xx/业务之一 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 1 契约字段与错误码 |
+| FM-OD-02 | 字段语义模糊 / ADR 缺上下文后果 | 字段命名与业务语义不对应且无 Implementation Decisions 说明 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 3 字段映射或对齐命名 |
+| FM-OD-03 | 模块循环依赖 | 调用关系 DFS 三色染色检测到环 | 普通 V/G 失败走完整普通失败链后，按 R 结论重新划分步骤 2 边界 |
+| FM-OD-04 | UML 建模与接口/调用关系脱节 | uml-modeling.md 图与主文档 §1/§2 不对应 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 5 UML 建模 |
+| FM-OD-05 | 追踪矩阵字段不一致 | traceability-matrix.md 与主文档 §2/phase2 追踪矩阵不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 6 追踪矩阵字段 |
 
 > 注：FM-OD-06（越过阶段边界落类/方法级）为越界检测信号，见禁止行为 #8 与返工路径，不单列于上表。
 
@@ -255,7 +255,13 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 ## 阶段门评审
 
 评审通过 → 进入阶段 4（详细设计）。
-评审不通过 → 回到概要设计起点返工（如接口契约不全、循环依赖、测试用例缺异常路径）。
+评审不通过 → 先执行完整普通 V/G 失败链；只有用户在 CHECKPOINT 确认后，才可按 R 的 upstreamDefect 结论回到概要设计对应步骤。
+
+### 普通 V/G 失败链
+
+`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+
+该链适用于阶段 3 的评审、测试设计和门禁失败；不得按 reworkHints 直接返工或自动回到上游阶段。
 
 ## 禁止行为
 
@@ -274,11 +280,11 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 
 阶段门评审不通过时，按以下路径返工：
 
-- 接口契约缺错误码 → 回到接口定义，补全成功 + 错误码集合
-- 调用关系图存在循环依赖 → 回到模块划分，重新划分边界
-- 集成测试缺异常路径 → 回到并行任务，补全超时 / 错误码 fallback 用例
+- 接口契约缺错误码 → 普通 V/G 失败走完整普通失败链后，按 R 结论回接口定义补全成功 + 错误码集合
+- 调用关系图存在循环依赖 → 普通 V/G 失败走完整普通失败链后，按 R 结论回模块划分重新划分边界
+- 集成测试缺异常路径 → 普通 V/G 失败走完整普通失败链后，按 R 结论回并行任务补全超时 / 错误码 fallback 用例
 - 接口签名无类型约束 → 回到接口定义，补全参数与返回值类型
-- 越界深入类 / 方法内部 → 回到功能描述，将类 / 方法级设计移交阶段 4
+- 越界深入类 / 方法内部 → 普通 V/G 失败走完整普通失败链后，按 R 结论移除越界内容并将类 / 方法级设计移交阶段 4
 - 接口契约缺字段/错误码（FM-OD-01）→ 回步骤 1 补全
 - 字段语义模糊（FM-OD-02）→ 回步骤 3 补全映射
 - 循环依赖（FM-OD-03）→ 回步骤 2 重新划分

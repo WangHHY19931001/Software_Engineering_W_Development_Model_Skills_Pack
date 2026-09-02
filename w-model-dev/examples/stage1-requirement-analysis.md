@@ -80,7 +80,7 @@ ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 <cove
 
 - 阶段 1 进入时先走 ingestion 子流程（`plan-chunks` → A-chunk → A-cross → G 图谱校验 → 收敛循环）；图谱收敛（连通 + 单根）并经用户在 🔴 CHECKPOINT 确认后，才分派 S 产出需求规格。
 - S 产出后完整顺序为 `R3×3 → G(check-preventive-review, exit 0) → V → G(阶段常规门禁) → O 展示证据 → 🔴 CHECKPOINT`；只有用户放行才进入阶段 2。
-- 普通 V/G 失败走 `R → V 复审 R 报告 → G(check-rootcause-report) → S-fix → R3×3(fix) → G(check-preventive-review) → V → G`，与 ingestion 的 A→G 收敛分开处理。
+- 普通 V/G 失败（非 ingestion 图谱失败）必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，与 ingestion 的 A→G 收敛分开处理；不得直接分派 S-fix 或回需求阶段。
 - RTM 本阶段仅登记需求列与验收测试列，其余列留待后续阶段逐列补登。
 
 ## 要点

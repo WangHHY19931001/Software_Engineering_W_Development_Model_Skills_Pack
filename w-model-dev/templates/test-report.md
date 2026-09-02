@@ -51,9 +51,11 @@
 
 ## 6. 结论
 
-- [ ] 测试通过，可进入下一阶段
-- [ ] 测试未通过，需回到编码实现返工
-- [ ] 部分通过，遗留项：{{}}
+- [ ] 测试通过，可在 V/G 通过并经用户 CHECKPOINT 后进入下一阶段
+- [ ] 测试未通过，先记录真实结果并执行完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+- [ ] 部分通过，遗留项：{{}}；不得按遗留项直接回编码或上游阶段
+
+`result=<pass|fail>` 是文档入口的合法占位；实际 `/wm test` 必须使用 `result=pass` 或 `result=fail`，且只能由真实测试运行器输出决定。
 
 **量化指标**（sig-006，禁止模糊结论）：
 - 测试通过率：`<通过数>/<总数>` （如 250/250）

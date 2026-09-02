@@ -44,6 +44,8 @@
 
 ## 4. 失败用例分析
 
+> 测试失败或 V/G 失败不得直接命令 S 修复、回到编码或回到上游设计。先保留真实运行器证据，执行完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。只有用户在 CHECKPOINT 确认后，才可按 R 的 `upstreamDefect` 结论选择后续阶段。
+
 | 用例 ID | 失败现象 | 根因 | 关联模块 | 修复后重跑 |
 |---|---|---|---|---|
 | {{}} | {{}} | {{}} | {{}} | {{}} |

@@ -49,7 +49,7 @@
 DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见各 [`phase-N-*.md`](./)）。Agent 在以下场景必须自检 DoD：
 
 - 每次 `/wm code` 完成代码生成后
-- 每次 `/wm test result=pass|fail` 回填后
+- 每次 `/wm test type=<单元|集成|系统|验收> result=<pass|fail>` 回填后
 - 每次阶段门评审通过前
 - 每次发布检查点（🔴 CHECKPOINT · 发布放行）前
 

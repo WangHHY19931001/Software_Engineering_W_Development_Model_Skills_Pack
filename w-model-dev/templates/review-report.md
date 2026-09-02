@@ -40,7 +40,7 @@
 
 - [ ] 审查通过，可进入单元测试 / 下一阶段
 - [ ] 需修复后复审，必修问题：{{CR-001}}
-- [ ] 不通过，回到编码实现返工
+- [ ] 不通过，先走完整普通失败链并在用户 CHECKPOINT 后按 R 结论返工
 
 <!-- summary 三要素结构提示（sig-005）：
 1. ≥1 关键决策摘要（如「采用 RBAC 权限模型」）
@@ -50,6 +50,12 @@
 -->
 
 ## 6. 返工追踪
+
+评审或门禁不通过时，不得直接命令 S 返工或回到编码/上游阶段。必须执行完整普通失败链：
+
+`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+
+R 报告的 `upstreamDefect` 只能作为候选回退依据；O 展示完整证据后，须等待用户 CHECKPOINT 批准阶段切换。
 
 | 问题 ID | 修复状态 | 复审结果 |
 |---|---|---|

@@ -465,7 +465,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 - **直接调用场景**：用户请求对 Web 应用 / 具体组件 / 路由 / 实时 URL 的性能评审。
 - **经 `/wm review` 调用**：`targetKind=code` 且文件涉及性能热点（热点循环 / DB 查询）时，由 `code-reviewer` 在 `reworkHints` 中建议深审。
 - **禁止从其他 Persona 调用**：见 SSoT §6.4.3（`docs/skill-design-document_SSoT.md`）。
-- **不纳入 `/wm test type=验收` 自动 fan-out**：性能审计仅适用于有性能 SLA 的场景，对工具库或 CLI 不适用。在阶段 7 系统测试时由用户显式触发。
+- **不纳入 `/wm test type=验收 result=<pass|fail>` 自动 fan-out**：性能审计仅适用于有性能 SLA 的场景，对工具库或 CLI 不适用。在阶段 7 系统测试时由用户显式触发；实际 `result` 只能由真实测试运行器回填为 `pass` 或 `fail`。
 
 ## 与 addyosmani/agent-skills 的差异
 

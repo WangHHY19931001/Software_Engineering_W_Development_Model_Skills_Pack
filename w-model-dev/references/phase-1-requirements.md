@@ -74,7 +74,7 @@
      ├─ 覆盖率 < 100%（stakeholder/场景/需求类型）→ FM-4D-03，须经豁免审批
      ├─ cross-cuts 横切不一致 → FM-4D-04
      ├─ partial 覆盖未补齐 → FM-4D-05，须经豁免审批
-     ├─ 失败: 覆盖率不达标且未走豁免审批 → 回步骤 6，补覆盖或申请豁免
+     ├─ 失败: 覆盖率不达标且未走豁免审批 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 6 或申请豁免
      └─ 成功: 四张矩阵完整，每维度覆盖率 100%（含豁免审批处置的缺失项）
   7. 系统上下文与术语建模
      ├─ 识别外部实体（用户/外部系统/外部存储），产出 docs/phase1-requirements/system-context.md（外部实体清单 + 上下文边界原则）
@@ -93,7 +93,7 @@
      ├─ 基于步骤 2 层级树 + 步骤 5 REQ-group + 步骤 4 覆盖矩阵，产出 docs/phase1-requirements/traceability-matrix.md（§1 REQ/NFR 8 字段表 + §2 测试层级承接矩阵，仅验收列填实）
      ├─ 产出 docs/phase1-requirements/behavior-spec.md（列出本模块对应 .feature 文件清单 + 引用关系，不内联 feature 块）
      ├─ 主规格 §15/§16 引用块指向上述独立文件
-     ├─ 失败: 追踪矩阵字段与步骤 2/5/4 不一致 → 回步骤 9 对齐（FM-3D-08）
+     ├─ 失败: 追踪矩阵字段与步骤 2/5/4 不一致 → 记为 R 定位线索；普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 9（FM-3D-08）
      └─ 成功: traceability-matrix.md + behavior-spec.md 产出，主规格引用块成立
 输出: 结构化需求规格（§1-§12）+ 验收测试用例 + 风险评估报告 + 豁免审批记录
 ```
@@ -291,7 +291,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - `codeModule`：阶段 1 留空，由阶段 5 回填（详见 [phase-5-coding.md](phase-5-coding.md)「NFR/CON codeModule 回填」节）。
 - `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`：NFR/CON 行可填对应测试用例 ID 或 `null`（横切测试在阶段 5–8 补充）。
 
-**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，回到阶段 1 补登记。
+**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，先作为 R 定位线索并走完整普通失败链；只有用户 CHECKPOINT 确认后，才可按 R 结论回阶段 1 补登记。
 
 > 与 REQ 行的差别：REQ 行在阶段 1 登记时 `designDoc` 可暂留空（待阶段 2 系统设计后映射到 SD-xxx）；NFR/CON 行**必须在阶段 1 完成横切登记**，因为 NFR/CON 是横切治理类需求，不挂在具体 SD 上会丢失治理关系。
 
@@ -313,7 +313,15 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 ## 阶段门评审
 
 评审通过 → 进入阶段 2（系统设计）。
-评审不通过 → 回到需求分析起点返工（如需求不明确、验收标准缺失、冲突未解决）。
+评审不通过 → 先按下方普通 V/G 失败链生成和复审根因报告；只有链条完成且用户在 CHECKPOINT 确认后，才可按 R 结论回到需求分析对应步骤。
+
+### 普通 V/G 失败链（阶段 1 非 ingestion）
+
+普通评审或阶段门禁失败的唯一执行链为：
+
+`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+
+阶段 1 ingestion 图谱失败是唯一例外：仅允许 `A-chunk/A-cross → G(check-requirement-graph)` 的专用收敛循环（最多 `MAX_ROUNDS=5`），收敛后仍须用户 CHECKPOINT，再分派 S；不得将该例外套用于普通 V/G 失败。
 
 ## 失败模式矩阵（FM）
 
@@ -325,15 +333,15 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 
 | FM ID | 失败模式 | 检测信号 | 处置 |
 |---|---|---|---|
-| FM-3D-01 | 层级缺根 | 无 level=1 REQ；graph.json 无 REQ-group 根 | 回步骤 2 补 level=1 domain REQ |
-| FM-3D-02 | orphan 节点 | level≥2 REQ 无 parent 指向 level-1 祖先 | 回步骤 2 补 parent 边 |
-| FM-3D-03 | multiParent | 一个 REQ 有多个 parent | 回步骤 2 拆分或确认唯一 parent |
-| FM-3D-04 | REQ-group 边界模糊 | level=1 REQ 对应的 group 范围不清；reqGroup 指向非 level=1 节点 | 回步骤 5 向用户确认 group 归属 |
-| FM-3D-05 | 依赖时序环 | depends-on / precedes 边形成环 | 回步骤 3 拆解环或申请豁免 |
+| FM-3D-01 | 层级缺根 | 无 level=1 REQ；graph.json 无 REQ-group 根 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2 的 level=1 domain REQ |
+| FM-3D-02 | orphan 节点 | level≥2 REQ 无 parent 指向 level-1 祖先 | 普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2 的 parent 边 |
+| FM-3D-03 | multiParent | 一个 REQ 有多个 parent | 普通 V/G 失败走完整普通失败链后，按 R 结论处理步骤 2 的拆分或唯一 parent 确认 |
+| FM-3D-04 | REQ-group 边界模糊 | level=1 REQ 对应的 group 范围不清；reqGroup 指向非 level=1 节点 | 普通 V/G 失败走完整普通失败链后，按 R 结论在步骤 5 向用户确认 group 归属 |
+| FM-3D-05 | 依赖时序环 | depends-on / precedes 边形成环 | 普通 V/G 失败走完整普通失败链后，按 R 结论在步骤 3 拆解环或申请豁免 |
 | FM-3D-06 | conflicts-with 未解决 | conflicts-with 边存在但无处置记录 | 启动豁免审批（S→R→V→人类） |
-| FM-3D-07 | 迷雾滥用 | 检测信号 A：把本应正式的 REQ 塞入迷雾册逃避覆盖（R/V 发现迷雾项实为可精确陈述需求）；检测信号 B：CHECKPOINT 前迷雾册存在未终结项 | 处置 A：作废迷雾项，回步骤 2-4 补正式 REQ；处置 B：回 CHECKPOINT 前补毕业处置（毕业 / 判范围 / 豁免） |
-| FM-3D-08 | 追踪矩阵字段不一致 | traceability-matrix.md §1 的「候选落点§」与主规格 §4 层级树节点 § 不一致；「验收关联」与主规格 §7 覆盖矩阵不一致；§2 矩阵验收列与主规格 §12 RTM 不一致 | 回步骤 9 对齐追踪矩阵字段 |
-| FM-3D-09 | UML 建模与层级树脱节 | uml-modeling.md A.1 用例图参与者/用例与主规格 §3 stakeholder/§4 REQ 不对应；A.2 领域类图实体与 §4 REQ 名词性概念不对应；A.3 活动图与 §3 User Stories 正常场景不对应 | 回步骤 8 对齐 UML 建模 |
+| FM-3D-07 | 迷雾滥用 | 检测信号 A：把本应正式的 REQ 塞入迷雾册逃避覆盖（R/V 发现迷雾项实为可精确陈述需求）；检测信号 B：CHECKPOINT 前迷雾册存在未终结项 | 处置 A：作废迷雾项，按普通失败链完成后补步骤 2-4 正式 REQ；处置 B：回 CHECKPOINT 前补毕业处置（毕业 / 判范围 / 豁免） |
+| FM-3D-08 | 追踪矩阵字段不一致 | traceability-matrix.md §1 的「候选落点§」与主规格 §4 层级树节点 § 不一致；「验收关联」与主规格 §7 覆盖矩阵不一致；§2 矩阵验收列与主规格 §12 RTM 不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 9 追踪矩阵字段 |
+| FM-3D-09 | UML 建模与层级树脱节 | uml-modeling.md A.1 用例图参与者/用例与主规格 §3 stakeholder/§4 REQ 不对应；A.2 领域类图实体与 §4 REQ 名词性概念不对应；A.3 活动图与 §3 User Stories 正常场景不对应 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 8 UML 建模 |
 
 ### FM-4D（四维覆盖失败模式）
 
@@ -344,7 +352,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 | FM-4D-01 | stakeholder 未关联 REQ | stakeholder 识别后无关联 REQ | 补 REQ 或申请豁免审批 |
 | FM-4D-02 | 场景类型缺失 | 正常/异常/边界/NFR/CON 场景未全覆盖 | 补场景或申请豁免审批 |
 | FM-4D-03 | 覆盖率不达标 | stakeholder/场景/需求类型覆盖率 < 100% | 补覆盖或申请豁免审批 |
-| FM-4D-04 | cross-cuts 不一致 | 横切边在 graph.json 与覆盖矩阵不一致 | 回步骤 3 对齐 cross-cuts 边 |
+| FM-4D-04 | cross-cuts 不一致 | 横切边在 graph.json 与覆盖矩阵不一致 | 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 3 cross-cuts 边 |
 | FM-4D-05 | partial 未补齐 | 覆盖矩阵标 partial 但未补齐 | 补齐或申请豁免审批 |
 
 ### FM-EXEMPT（豁免审批失败模式）
@@ -357,7 +365,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 | FM-EXEMPT-02 | R 模板化审查 | R 的 exemption-review.json 缺 5-Why/上游回溯/可证伪性 | 重派 R 补审查 |
 | FM-EXEMPT-03 | V 未通过即放行 | exemption-verification.json passed=false 但豁免已生效 | 作废豁免，回 V 复审 |
 | FM-EXEMPT-04 | 人类未确认 | 无 CHECKPOINT 人类确认记录，豁免已生效 | 暂停，回 CHECKPOINT 等人类确认 |
-| FM-EXEMPT-05 | 掩盖需求遗漏 | 用豁免审批掩盖本应补充的需求 | 作废豁免，回步骤 1 补需求 |
+| FM-EXEMPT-05 | 掩盖需求遗漏 | 用豁免审批掩盖本应补充的需求 | 作废豁免，普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 1 需求 |
 
 ## 豁免审批治理（S→R→V→人类四阶段）
 
@@ -421,11 +429,11 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 - 覆盖缺失（FM-4D-01/02/03/05）→ 回到步骤 6，补覆盖或申请豁免审批
 - cross-cuts 不一致（FM-4D-04）→ 回到步骤 3，对齐横切边
 - 豁免审批跳步（FM-EXEMPT-01/02/03/04/05）→ 回到豁免审批对应阶段（S/R/V/人类）
-- 迷雾项未终结（FM-3D-07）→ 回 CHECKPOINT 前补毕业处置：毕业成 REQ → 回步骤 2-4；判 Out of Scope → 补 §8；豁免 → 回豁免审批流程
-- 迷雾滥用逃避覆盖（FM-3D-07）→ 作废迷雾项，回步骤 2-4 补正式 REQ
-- 验收测试未覆盖全部功能点 → 回到并行任务，补充用例
-- 追踪矩阵不一致（FM-3D-08）→ 回步骤 9，对齐 traceability-matrix.md 字段
-- UML 脱节（FM-3D-09）→ 回步骤 8，对齐 uml-modeling.md 三图
+- 迷雾项未终结（FM-3D-07）→ 按普通失败链完成后回 CHECKPOINT 前补毕业处置：毕业成 REQ → 步骤 2-4；判 Out of Scope → 补 §8；豁免 → 回豁免审批流程
+- 迷雾滥用逃避覆盖（FM-3D-07）→ 作废迷雾项，普通 V/G 失败走完整普通失败链后，按 R 结论补步骤 2-4 正式 REQ
+- 验收测试未覆盖全部功能点 → 普通 V/G 失败走完整普通失败链后，按 R 结论回到并行任务补充用例
+- 追踪矩阵不一致（FM-3D-08）→ 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 9 的 traceability-matrix.md 字段
+- UML 脱节（FM-3D-09）→ 普通 V/G 失败走完整普通失败链后，按 R 结论对齐步骤 8 的 uml-modeling.md 三图
 
 ## 退出状态
 
