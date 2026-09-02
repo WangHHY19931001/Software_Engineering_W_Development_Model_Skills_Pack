@@ -219,6 +219,7 @@ describe('examples workflow contract', () => {
       ...markdownFiles('w-model-dev/examples'),
       ...markdownFiles('w-model-dev/templates'),
     ];
+    // eslint-disable-next-line security/detect-unsafe-regex -- bounded alternation scans fixed workflow tokens without nested quantifiers
     const directBypass = /(?:直接|direct(?:ly)?)(?:\s*走)?\s*R\s*(?:→|->)\s*S-fix/i;
     const prohibition = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
 

@@ -306,9 +306,13 @@ describe('auditL0RelativeLinks', () => {
 
   it('rejects a skill root symlink or junction without traversing its target', async () => {
     const rootTarget = path.join(outsideRoot, 'skill-root-target');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- rootTarget is a controlled mkdtemp fixture path
     await fs.mkdir(rootTarget, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- rootTarget is a controlled mkdtemp fixture path
     await fs.writeFile(path.join(rootTarget, 'SKILL.md'), '# outside\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is a controlled mkdtemp fixture path
     await fs.rm(fixtureRoot, { recursive: true, force: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both symlink endpoints are controlled mkdtemp fixture paths
     await fs.symlink(rootTarget, fixtureRoot, process.platform === 'win32' ? 'junction' : 'dir');
 
     const result = await auditL0RelativeLinks(fixtureRoot);
