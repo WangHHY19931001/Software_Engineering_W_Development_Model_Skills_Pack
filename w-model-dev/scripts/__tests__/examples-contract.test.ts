@@ -110,13 +110,21 @@ describe('examples workflow contract', () => {
       ...markdownFiles('w-model-dev/examples'),
       ...markdownFiles('w-model-dev/templates'),
     ];
-    const directBypass = /(?:直接|direct(?:ly)?)(?:\s*走)?\s*R\s*(?:→|->)\s*S-fix/i;
-    const prohibition = /(?:不得|禁止|不可|must\s+not|not\s+allowed|cannot)/i;
+    const hasDirectBypass = (line: string): boolean => {
+      const compact = line.toLowerCase().replace(/\s/g, '');
+      const hasDirectWord = compact.includes('直接') || compact.includes('direct');
+      const hasTransition = compact.includes('r→s-fix') || compact.includes('r->s-fix');
+      return hasDirectWord && hasTransition;
+    };
+    const hasProhibition = (line: string): boolean => {
+      const compact = line.toLowerCase().replace(/\s/g, '');
+      return ['不得', '禁止', '不可', 'mustnot', 'notallowed', 'cannot'].some((token) => compact.includes(token));
+    };
 
     for (const relativePath of files) {
       const lines = read(relativePath).split(/\r?\n/);
       for (const line of lines) {
-        if (directBypass.test(line)) expect(line, `${relativePath}: ${line}`).toMatch(prohibition);
+        if (hasDirectBypass(line)) expect(hasProhibition(line), `${relativePath}: ${line}`).toBe(true);
       }
     }
   });
