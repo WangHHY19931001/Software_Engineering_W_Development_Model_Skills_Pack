@@ -124,6 +124,28 @@ describe('audit-l0-links application entrypoint', () => {
     );
   });
 
+  it('keeps valid external and anchor URIs outside relative-link auditing', async () => {
+    const root = path.join(tmpDir, 'valid-external-uri-skill');
+    await createMinimalL0(root);
+    await fs.writeFile(
+      path.join(root, 'references', 'guide.md'),
+      '[web](https://example.test/guide) [email](mailto:owner@example.test) [anchor](#section)\n',
+      'utf8',
+    );
+
+    const result = run([`--root=${root}`]);
+    const payload = JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', ''));
+
+    expect(result.code).toBe(0);
+    expect(payload).toMatchObject({
+      type: 'l0-link-audit',
+      passed: true,
+      relativeLinkCount: 0,
+      violations: [],
+      exitCode: 0,
+    });
+  });
+
   it('returns structured exit 1 for malformed external URI encoding', async () => {
     const root = path.join(tmpDir, 'malformed-external-uri-skill');
     await createMinimalL0(root);

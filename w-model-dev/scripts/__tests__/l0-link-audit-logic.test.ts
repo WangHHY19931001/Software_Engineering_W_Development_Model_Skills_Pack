@@ -284,6 +284,18 @@ describe('auditL0RelativeLinks', () => {
     );
   });
 
+  it('keeps valid external and anchor URIs outside relative-link auditing', async () => {
+    await write(
+      'references/guide.md',
+      '[web](https://example.test/guide) [email](mailto:owner@example.test) [anchor](#section)',
+    );
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(0);
+    expect(result.violations).toEqual([]);
+  });
+
   it('rejects malformed percent encoding in an anchor-only URI instead of skipping it', async () => {
     await write('references/guide.md', '[malformed anchor](#section%2)');
 
