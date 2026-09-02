@@ -34,6 +34,10 @@
 - `b9958574bbd4be40da2c68da4f5b3beafb9a8ae0` — `fix(audit): reject top-level L0 directory links`
 - `43bd922d0db673c875b9fd72b1e407299742bd76` — `test(docs): include templates in bypass scan`
 - `2e3cee897c6ce883468b0d3e53fd1c6453f56c38` — `test(security): avoid unsafe bypass scan regex`
+- `e3396e5c47226c47e7257c3b0101d4f2a7c0789e` — `docs(changes): record review rounds three and four`
+- `b22191490b9c3d9d56bc47de2d9d33462fc308b5` — `docs(changes): record final audit verification scope`
+
+最终记录提交不在 CHANGELOG 的本表中自引用；外部 `git rev-parse HEAD` 核验最终 SHA，最终 prepush 结果见验收记录。
 
 ## [42.2.0] - 2026-09-01
 
