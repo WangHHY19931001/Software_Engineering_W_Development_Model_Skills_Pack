@@ -141,6 +141,107 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('L0 目录 symlink/junction 不允许 references'));
   });
 
+  it('rejects L0 Markdown, non-Markdown, and required SKILL.md symlinks even when targets stay inside the package', async () => {
+    const markdownTarget = path.join(fixtureRoot, 'markdown-target.md');
+    const binaryTarget = path.join(fixtureRoot, 'binary-target.bin');
+    const skillTarget = path.join(fixtureRoot, 'skill-target.md');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.writeFile(markdownTarget, '# target\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.writeFile(binaryTarget, 'binary\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.writeFile(skillTarget, '# target skill\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(markdownTarget, path.join(fixtureRoot, 'references', 'guide.md'), 'file');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(binaryTarget, path.join(fixtureRoot, 'schemas', 'schema.bin'), 'file');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- replace the required root file with a controlled symlink
+    await fs.rm(path.join(fixtureRoot, 'SKILL.md'), { force: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(skillTarget, path.join(fixtureRoot, 'SKILL.md'), 'file');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('L0 源文件 symlink/junction 不允许 SKILL.md'));
+    expect(result.violations).toContainEqual(
+      expect.stringContaining('L0 文件 symlink/junction 不允许 references/guide.md'),
+    );
+    expect(result.violations).toContainEqual(
+      expect.stringContaining('L0 文件 symlink/junction 不允许 schemas/schema.bin'),
+    );
+  });
+
+  it('rejects L1 file and directory symlinks instead of classifying them as L1-only', async () => {
+    const fileTarget = path.join(fixtureRoot, 'l1-file-target.ts');
+    const directoryTarget = path.join(fixtureRoot, 'l1-directory-target');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.writeFile(fileTarget, 'export {};\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.mkdir(directoryTarget, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.mkdir(path.join(fixtureRoot, 'scripts', 'cli'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(fileTarget, path.join(fixtureRoot, 'scripts', 'cli', 'linked.ts'), 'file');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.symlink(
+      directoryTarget,
+      path.join(fixtureRoot, 'scripts', 'linked-directory'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    await write(
+      'references/guide.md',
+      '[file](../scripts/cli/linked.ts) [directory](../scripts/linked-directory/readme.md)',
+    );
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.l1Only).toEqual([]);
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 文件 symlink/junction'));
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 目录 symlink/junction'));
+  });
+
+  it('rejects unreferenced L1 symlinks and broken symlinks without traversing them', async () => {
+    const outsideTarget = path.join(outsideRoot, 'outside.ts');
+    const l1Directory = path.join(fixtureRoot, 'scripts', 'unreferenced-dir');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outsideTarget is beneath the mkdtemp-owned escape fixture root
+    await fs.writeFile(outsideTarget, 'export {};\n', 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- l1Directory is beneath the mkdtemp-owned skill fixture root
+    await fs.mkdir(l1Directory, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- L1 fixture parents are beneath the mkdtemp-owned skill root
+    await fs.mkdir(path.join(fixtureRoot, 'samples'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- L1 fixture parents are beneath the mkdtemp-owned skill root
+    await fs.mkdir(path.join(fixtureRoot, 'tools'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
+    await fs.symlink(outsideTarget, path.join(fixtureRoot, 'scripts', 'unreferenced.ts'), 'file');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlink endpoints are controlled mkdtemp fixture paths
+    await fs.symlink(
+      l1Directory,
+      path.join(fixtureRoot, 'samples', 'unreferenced-dir'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- broken symlink endpoint is a controlled mkdtemp fixture path
+    await fs.symlink(
+      path.join(fixtureRoot, 'scripts', 'does-not-exist.ts'),
+      path.join(fixtureRoot, 'tools', 'broken.ts'),
+      'file',
+    );
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.l1Only).toEqual([]);
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 文件越出 skill 根'));
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 目录 symlink/junction 不允许'));
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 条目 symlink/junction 目标不存在'));
+  });
+
+  it('turns malformed percent encoding into a structured violation', async () => {
+    await write('references/guide.md', '[malformed](./bad%2)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
+  });
+
   it('rejects missing non-L1 relative targets', async () => {
     await write('references/guide.md', '[missing](./missing.md)');
 
