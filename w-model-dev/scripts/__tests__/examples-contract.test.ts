@@ -199,22 +199,14 @@ describe('examples workflow contract', () => {
 
   it('rejects abbreviated ordinary failure chains in every required guidance document', () => {
     const files = [
-      ...Array.from(
-        { length: 8 },
-        (_, index) =>
-          `w-model-dev/references/phase-${index + 1}-${
-            [
-              'requirements',
-              'system-design',
-              'outline-design',
-              'detailed-design',
-              'coding',
-              'integration-test',
-              'system-test',
-              'acceptance-test',
-            ][index]
-          }.md`,
-      ),
+      'w-model-dev/references/phase-1-requirements.md',
+      'w-model-dev/references/phase-2-system-design.md',
+      'w-model-dev/references/phase-3-outline-design.md',
+      'w-model-dev/references/phase-4-detailed-design.md',
+      'w-model-dev/references/phase-5-coding.md',
+      'w-model-dev/references/phase-6-integration-test.md',
+      'w-model-dev/references/phase-7-system-test.md',
+      'w-model-dev/references/phase-8-acceptance-test.md',
       ...markdownFiles('w-model-dev/templates'),
       ...markdownFiles('w-model-dev/examples'),
     ];
