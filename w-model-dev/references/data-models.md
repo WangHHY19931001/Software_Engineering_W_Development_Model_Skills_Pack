@@ -287,7 +287,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | mtime 版本不符   | 锁内比较 `--expect-mtime`（有限非负数、向下取整）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1         | 重读目标，按最新 mtime 重试                                                                         |
 | 陈旧锁           | CLI 默认 fail-closed：`STALE_LOCK` / exit 1                                                             | 经人工判断后显式使用 `--recover-stale-lock`；直接 `writeStateJson` 调用仅为兼容既有调用允许隐式恢复 |
 | 锁等待超时       | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1                                | 保留原状态，稍后重试或协调 writer                                                                   |
-| 测试状态冲突     | 应由业务合并逻辑判断                                                                                    | 以「失败」为优先（保守原则），回阶段 5 返工                                                         |
+| 测试状态冲突     | 应由业务合并逻辑判断                                                                                    | 以「失败」为优先（保守原则），先执行完整普通失败链，再按 R 结论由 S-fix 修复并回到阶段 5                                                         |
 
 `mtime` 乐观锁只在 `<target>.lock` 持久目录与可转移 owner 对象建立的跨进程锁内用于版本冲突检测；它**不足以**单独保证并发安全、竞争写处理或并发处理。所有 writer 必须经 `wm-write` 的锁协议串行化。
 
@@ -517,7 +517,7 @@ interface RunLogEntry {
 
 > 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §7.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
-`action` 枚举新增 `rootcause` / `fix` 两个动作（普通返工链 `V/G 失败 → R → V 复审 RootCauseReport → G rootcause 门禁 → S-fix → R3×3 → preventive 门禁 → V → G → CHECKPOINT` 专用）。各动作的额外必填字段约束：
+`action` 枚举新增 `rootcause` / `fix` 两个动作。普通返工链固定为 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；各动作的额外必填字段约束：
 
 | action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
 | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

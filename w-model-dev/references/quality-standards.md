@@ -67,9 +67,9 @@
 
 | 标准项 | 检查方法 | 通过阈值 | 不通过 → 动作 |
 |---|---|---|---|
-| 测试用例评审 | 按 [verifier-spec.md](verifier-spec.md) 子标准评审 | 质量等级 A/B（`passed=true`） | 按 reworkHints 返工，禁止 C/D 等级放行 |
-| 测试覆盖率分析 | 四级测试用例状态统计 | 单元 / 集成 / 系统 / 验收全部 `passed` | 补跑失败类型测试，禁止跳过任一级 |
-| 缺陷追踪管理 | `.w-model/rtm.json` 的 `executionSummary` | `failed=0` 且 `pending=0` | 定位根因回编码，禁止 `pending` 状态进质量门 |
+| 测试用例评审 | 按 [verifier-spec.md](verifier-spec.md) 子标准评审 | 质量等级 A/B（`passed=true`） | 失败只作为 R 定位线索；完成完整普通失败链后由 S-fix 返工，禁止 C/D 等级放行 |
+| 测试覆盖率分析 | 四级测试用例状态统计 | 单元 / 集成 / 系统 / 验收全部 `passed` | 失败只作为 R 定位线索；完成完整普通失败链后由 S-fix 补测，禁止跳过任一级 |
+| 缺陷追踪管理 | `.w-model/rtm.json` 的 `executionSummary` | `failed=0` 且 `pending=0` | 先执行完整普通失败链，再按 R 结论由 S-fix 修复；禁止 `pending` 状态进质量门 |
 
 ### 测试代码整洁标准
 
@@ -225,7 +225,7 @@
 | # | 禁止行为 | 对应反模式 | 正确做法 |
 |---|---|---|---|
 | 1 | 用 LLM 估算覆盖率 / 测试结果 | anti-patterns #3 / #6 | 必须跑真实测试运行器 + `check-artifact-gate.ts` |
-| 2 | 把退出码 1/2 当警告忽略 | anti-patterns #7 | 退出码 1/2 一律回到编码，不得放行 |
+| 2 | 把退出码 1/2 当警告忽略 | anti-patterns #7 | 退出码 1/2 一律不得放行；退出码 1 先走完整普通失败链，再按 R 结论由 S-fix 修复并回到对应阶段；退出码 2 仅修正输入后重跑 |
 | 3 | 用 `// eslint-disable` 绕过规范检查 | — | 修复违规源，禁止整文件 disable |
 | 4 | 把安全高危降级为"已知风险"放行 | — | 高危必须修复后重扫，不得降级 |
 | 5 | 仅跑 happy path 判定性能通过 | — | 必须按负载模型（ramp-up → sustain → ramp-down）压测 |

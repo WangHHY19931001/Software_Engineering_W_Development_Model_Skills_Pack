@@ -99,7 +99,7 @@
 | `design` | 阶段 2 系统设计 / 阶段 3 概要设计 / 阶段 4 详细设计 | 系统设计/接口设计/详细设计文档 |
 | `test` | 阶段 1~4（设计）/ 阶段 5~8（执行） | 验收/系统/集成/单元测试用例 |
 | `code` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
-| `rootcause` | 全阶段（返工链：V/G 失败 → R → V 复审 RootCauseReport → G rootcause 门禁 → S-fix → R3×3 → preventive 门禁 → V → G → CHECKPOINT） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
+| `rootcause` | 全阶段（完整普通返工链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT） | RootCauseReport（`.w-model/rootcause/<reportId>.json`） |
 
 ### 2.2 targetKind 枚举规范
 
@@ -875,7 +875,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>
 | 响应截断（max_tokens） | `finish_reason='length'` | 提升 `max_tokens` 至 2 倍后重试；仍失败则拆分子标准分批评估 | 2 次 |
 | 子标准缺失 | `subCriteria` 数量 < §7 定义数 | 在提示词中显式列出缺失子标准 name 后重试 | 2 次 |
 
-重试失败处理：所有重试用尽后仍失败 → 该目标 `passed=false`，`reworkHints=['LLM 评审不可用，须人工评审或更换模型']`，回阶段起点返工。
+重试失败处理：所有重试用尽后仍失败 → 该目标 `passed=false`，`reworkHints=['LLM 评审不可用，须人工评审或更换模型']`；普通失败先走完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再按 R 结论返工。
 
 ### 11.2 logits 不可用 → text-parse 降级
 

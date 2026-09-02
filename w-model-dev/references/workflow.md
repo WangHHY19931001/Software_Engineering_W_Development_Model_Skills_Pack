@@ -81,20 +81,20 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 ### 阶段切换判定字段（精确对应）
 
 - **VerifierOutput.passed**：阶段 1~4 的主判定字段，`true` 才可推进。
-- **VerifierOutput.qualityLevel**：必须 ∈ {A, B}；C/D 一律回退到对应阶段起点。
-- **rtm.json.executionSummary**：阶段 5~8 的状态字段，`failed=0` 且 `pending=0` 才可推进。
-- **check-artifact-gate.ts 退出码**：阶段 8 终检，0 才可发布；1/2 一律回阶段 5。
-- **覆盖率 / 性能 / 安全阈值**：阶段 5~7 的硬阈值（覆盖率 ≥ 80%、P95 < 2s、高危漏洞数 = 0），不达标回阶段 5。
+- **VerifierOutput.qualityLevel**：必须 ∈ {A, B}；C/D 仅形成 R 定位线索，完成完整普通失败链后按 R 结论由 S-fix 处理，再由用户 CHECKPOINT 决定阶段动作。
+- **rtm.json.executionSummary**：阶段 5~8 的状态字段，`failed=0` 且 `pending=0` 才可推进；失败先走完整普通失败链。
+- **check-artifact-gate.ts 退出码**：阶段 8 终检，0 才可发布；退出码 1 先走完整普通失败链，退出码 2 仅修正输入后重跑，两者均不得直接回阶段 5 或放行。
+- **覆盖率 / 性能 / 安全阈值**：阶段 5~7 的硬阈值（覆盖率 ≥ 80%、P95 < 2s、高危漏洞数 = 0）；不达标先走完整普通失败链，再按 R 结论处理。
 
 ### 回退路径阶段编号映射
 
 | 当前阶段 | 触发回退的判定 | 回退到 |
 |---|---|---|
-| 阶段 1~4 | `VerifierOutput.passed=false` / `qualityLevel ∈ {C,D}` | 当前阶段起点（重产出 + 重评） |
-| 阶段 5 | 单元测试退出码 ≠ 0 / 覆盖率 < 80% / Verifier `passed=false` | 阶段 5 编码返工 |
-| 阶段 6 | 集成测试退出码 ≠ 0 / `executionSummary.failed>0` | 阶段 5 编码实现 |
-| 阶段 7 | 系统测试退出码 ≠ 0 / 性能不达标 / 高危漏洞 > 0 | 阶段 5 编码实现 |
-| 阶段 8 | `check-artifact-gate.ts` 退出码 1/2 | 阶段 5（一般缺陷）/ 阶段 1（需求级缺陷，罕见） |
+| 阶段 1~4 | `VerifierOutput.passed=false` / `qualityLevel ∈ {C,D}` | 先走完整普通失败链；经用户 CHECKPOINT 后按 R 结论回当前阶段或上游 |
+| 阶段 5 | 单元测试退出码 ≠ 0 / 覆盖率 < 80% / Verifier `passed=false` | 先走完整普通失败链，再按 R 结论由 S-fix 处理 |
+| 阶段 6 | 集成测试退出码 ≠ 0 / `executionSummary.failed>0` | 先走完整普通失败链，再按 R 结论由 S-fix 回阶段 5 或上游 |
+| 阶段 7 | 系统测试退出码 ≠ 0 / 性能不达标 / 高危漏洞 > 0 | 先走完整普通失败链，再按 R 结论由 S-fix 处理 |
+| 阶段 8 | `check-artifact-gate.ts` 退出码 1 | 先走完整普通失败链，再按 R 结论由 S-fix 处理；退出码 2 仅修正输入后重跑 |
 
 ### 回退路径阶段编号映射（R 根因分类扩展）
 

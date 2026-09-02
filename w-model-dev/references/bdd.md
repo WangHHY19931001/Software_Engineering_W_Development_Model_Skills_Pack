@@ -103,8 +103,8 @@ BDD 分层与 TLA+ 分层对称（L1/L2/L3/L4），最细粒度都到原子方�
 - **同层对应**：L1 BDD features ↔ L1 TLA+ spec；L2 ↔ L2；L3 ↔ L3；L4 ↔ L4
 - **最细粒度对齐**：BDD L4 与 TLA+ L4 都到原子方法（如 `TokenStore.issue()` / `ArticleStore.getById()`）
 - **独立维护**：BDD features 与 TLA+ spec 独立产出与维护，依靠 `check-bdd-model.ts` 等价性校验保证一致
-- **独立门禁回退**：BDD 门禁失败回退 BDD，TLA+ 门禁失败回退 TLA+，不互相牵连
-- **不一致走 R→V**：BDD↔TLA+ 不一致由 R 子代理定位根因，V 子代理验证分析
+- **独立门禁回退**：BDD 门禁失败或 TLA+ 门禁失败只标记对应行为门的 R 定位线索；普通失败仍统一执行完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不互相牵连
+- **不一致走 R→V**：BDD↔TLA+ 不一致由 R 子代理定位根因，V 子代理复审 RootCauseReport，G 根因门禁通过后才可 S-fix
 
 ---
 
@@ -1657,7 +1657,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 存在 undefined/pending step → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D5（stepBinding）退出码 1
-- 阶段 5：S-code 补全 step definition；阶段 6/7/8：S-test 修正 step 或 scenario
+- 该失败只形成 R 定位线索；按完整普通失败链完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition 或修正 step/scenario
 
 ### 5. 追溯完整性
 
@@ -1694,7 +1694,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 引用不存在的 fixture → 标注 `Important:` reworkHint
 - 触发 `check-bdd-model.ts` D5（stepBinding）扩展校验退出码 1
-- S-code / S-test 补全缺失 fixture 或修正引用
+- 该失败只形成 R 定位线索；完成完整普通失败链后，才由 S-fix 补全缺失 fixture 或修正引用
 
 ### 7. 不变式覆盖
 
@@ -1709,7 +1709,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - 不变式未被任何 scenario 验证 → 标注 `Important:` reworkHint
 - scenario 引用未声明的不变式 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D3（stateMachineCompleteness）+ D6（scenarioPathValidity）退出码 1
-- S-bdd 补充 scenario 或修正不变式引用
+- 该失败只形成 R 定位线索；完成完整普通失败链后，才由 S-fix 补充 scenario 或修正不变式引用
 
 ---
 

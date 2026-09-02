@@ -229,7 +229,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### rootcause / fix 动作 token 计量
 
-> 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §9.9（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） Token 预算扩展。返工循环 `V/G 失败 → R → V 复审 RootCauseReport → G rootcause 门禁 → S-fix → R3×3 → preventive 门禁 → V → G → CHECKPOINT` 中的 token 计量约定。
+> 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §9.9（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） Token 预算扩展。普通返工循环固定为 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，以下为该链中各动作的 token 计量约定。
 
 | 动作 | 计量方式 | 预算校验 |
 |---|---|---|

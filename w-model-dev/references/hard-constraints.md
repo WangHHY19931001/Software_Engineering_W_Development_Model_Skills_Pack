@@ -329,7 +329,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 |---|---|---|---|
 | #1 | 阶段产物已产出但无 `VerifierOutput` JSON 文件 / 未调用 `check-verifier-output.ts` | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>`；JSON 不存在则重新执行评审 | `check-verifier-output.ts` 退出码 0 才算评审闭环 |
 | #2 | 阶段 1~4 产物存在但对应测试设计文档缺失（如阶段 3 无 `interface-test-design.md`） | 回到阶段 N 起点，按 `phase-N-*.md`「并行任务（强制）」节补产出测试设计 | 无脚本；Agent 比对 `templates/` 模板核验 |
-| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]`，退出码非 0 一律回阶段 5 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
+| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]`；退出码 1 先走完整普通失败链，再按 R 结论由 S-fix 回阶段 5；退出码 2 仅修正输入后重跑 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
 | #4 | `VerifierOutput.passed=false` 但 `Project.status` 已推进到下一阶段 | 将 `reworkHints` 仅作为 R 定位线索；完成完整普通失败链后，按 R 的结论回到对应阶段并重置 `status` 字段 | `check-verifier-output.ts` 退出码 0 + `passed=true`；完整链为 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
 | #5 | Agent 上下文同时加载 ≥3 个 `references/phase-N-*.md` 文件 | 卸载无关 phase 文档，仅保留当前阶段 + `SKILL.md` + 必要 references | 无脚本；Agent 自检加载列表 |
 | #6 | RTM 覆盖率字段为 LLM 估算（无 `check-artifact-gate.ts` 输出佐证） | 执行 `check-artifact-gate.ts` 重新计算覆盖率；估算值不得写入 `rtm.json` | `check-artifact-gate.ts` 退出码 0 + `GATE_JSON.coverage=100%` |
@@ -373,7 +373,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | `check-tla-model.ts` | 2 | 输入错误（`tla-manifest.json` 缺失 / Java 未找到 / jar 缺失） | #14 | 修复环境或 manifest 后重跑 |
 | `check-iceberg-sweep.ts` | 0 | 冰山扫掠报告校验通过（R1-R5 全过） | — | 可放行（newFindings=[] 或 V 复审后返工闭环） |
 | `check-iceberg-sweep.ts` | 1 | 校验失败（schema / round 越界 / 去重 / 可证伪 / passed 不一致） | #44 | 先将问题记录为 R-iceberg 定位线索；完成完整普通失败链后，按 R 结论由 S-fix 修复，再补跑 ICEBERG-A/B 与 V 复审：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
-| `check-iceberg-sweep.ts` | 2 | 输入错误（报告 JSON 缺失 / 路径错误） | #44 | 重新执行 R-iceberg 产出报告 |
+| `check-iceberg-sweep.ts` | 2 | 输入错误（报告 JSON 缺失 / 路径错误） | #44 | 仅修正输入后重新执行 R-iceberg 产出报告，不进入普通 S-fix 链 |
 
 > 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
 
@@ -777,7 +777,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - `passed` 为 true 但存在 `subCriterion.score < 0.70` 的子标准（旧的加权平均误判）
 - 评审时用「总体不错 / 平均分达标」措辞回避具体子标准失败
 
-**回退动作**：V 按 R13 将对应子标准标记为 violation，`passed=false`，产出 `reworkHints` 交 S 返工（须走 R→V→G 循环）；qualityLevel 不变（仍由 compositeScore 映射），仅 passed 增加单轴条件。
+**回退动作**：V 按 R13 将对应子标准标记为 violation，`passed=false`，产出 `reworkHints` 交 R 形成定位线索；完成完整普通失败链后才由 S-fix 返工：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；qualityLevel 不变（仍由 compositeScore 映射），仅 passed 增加单轴条件。
 
 **门禁脚本**：`check-verifier-output.ts` R13 单轴下限（exitCode=1 命中本反模式）。
 

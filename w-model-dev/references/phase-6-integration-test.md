@@ -84,7 +84,7 @@
 - [ ] 接口性能满足要求（响应时间 < 500ms）
 - [ ] 失败用例已定位根因并回归
 
-> 🔴 **CHECKPOINT · 阶段门放行**：集成测试执行完成后暂停。Agent 必须向用户展示「IT-001~007 执行结果 / P95 响应时间 / 失败用例根因（若有）」，由用户确认「放行进入阶段 7」或「返工」。任一高优先级用例失败 → 一律返工，不得放行。
+> 🔴 **CHECKPOINT · 阶段门放行**：集成测试执行完成后暂停。Agent 必须向用户展示「IT-001~007 执行结果 / P95 响应时间 / 失败用例根因（若有）」，由用户确认「放行进入阶段 7」或「返工」。任一高优先级用例失败 → 先执行完整普通失败链，再由用户 CHECKPOINT 决定是否返工或放行，不得直接返工。
 
 ## 阶段门评审
 
@@ -94,7 +94,7 @@
 ## L3 BDD features 执行
 
 S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
-- 普通失败走 `R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得省略根因报告复审或 fix 后预防审查
+- 普通失败走完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得省略根因报告复审或 fix 后预防审查
 - 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json` 门禁
 - cucumber 报告不得有 undefined/pending/failed step（D5 校验）
 
@@ -104,7 +104,7 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 |---|---|---|
 | 1 | 用 mock 替代真实模块间调用 | 集成测试必须验证真实模块交互，mock 仅用于外部依赖边界 |
 | 2 | 伪造 `result=pass` 跳过失败用例 | 必须跑真实测试运行器，通过 `/wm test type=集成 result=<pass|fail>` 回填；实际值只能是 `pass` 或 `fail` |
-| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
+| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后才可推进 |
 | 4 | 性能用例只跑单次请求 | IT-004 必须按负载模型（100 并发 × 30s）采样 ≥ 1000 请求 |
 | 5 | 兼容性用例只测当前版本 | IT-005 必须 v1/v2 双版本对照 |
 

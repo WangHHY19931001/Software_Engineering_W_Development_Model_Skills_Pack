@@ -180,7 +180,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 ```
 
 4. 编排者（O）分派 V 子代理按 Persona 产出 `VerifierOutput` JSON，再分派 G 子代理跑上述命令。
-5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 由 O 分派 S 子代理按 `reworkHints` 返工。
+5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 仅作为 R 定位线索，普通失败必须执行完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S。
 
 **self-as-verifier 模式**（仅限 demo / 非生产 / 教学演示项目，生产项目禁止；前置：`project.status` 标记 `selfAsVerifier: true`，V 评审须切换 Persona 视角并在 `summary` 注明，详见 SKILL.md「self-as-verifier 模式」节与 verifier-spec §13）：单 Agent 兼任 S/V 时，V 评审后用 `--self-as-verifier --s-output=<S产出路径>` 校验 VerifierOutput 路径与 S 产出路径不同（反模式 #35）：
 
@@ -242,7 +242,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 | `--json`  | 否   | 标志     | 关闭 | 输出完整报告 JSON |
 | `--out`   | 否   | 文件路径 | —    | 报告写入路径      |
 
-- **失败动作**：退出码 2 = run-log 缺失 / `--phase` 非法 / JSON 损坏；纯报告无门禁语义——预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
+- **输入错误处理**：退出码 2 = run-log 缺失 / `--phase` 非法 / JSON 损坏；先修正输入后重跑本命令。该纯报告无门禁语义，预算超限/返工超阈仅预警，拦截仍由 `check-budget.ts` 与门禁流程承担（反模式 #3/#6）。
 - **guide 链接**：[hill-climbing-guide.md](hill-climbing-guide.md)（run-log 分析伴侣，指标映射注记）。
 
 - **执行方**：O 只读，不分派子代理。
