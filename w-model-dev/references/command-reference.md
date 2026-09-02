@@ -45,7 +45,8 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **执行方**：仓库维护者只读执行；不写入 skill 包、项目状态或证据目录。
 - **参数**：`--root=<skill-root>` 可选，默认 `w-model-dev`；仅接受该参数，未知/重复/空值为 `ARG_INVALID` / exit 2。
 - **通过语义**：仅现存 `scripts/`、`samples/`、`tools/` 目标可归类为 L1-only；仅 `templates/` 源文件中的 `{{module}}` 链接可归类为模板占位；必需 L0 根/目录缺失、包外真实路径或 symlink/junction、其他断链和分发边界均为 violation / exit 1。
-- **输出**：exit 0/1 的 stdout 为单行 `L0_LINK_AUDIT_JSON {type,passed,skillRoot,relativeLinkCount,l1OnlyCount,templatePlaceholderCount,violations,exitCode}`；exit 2 遵循 `ERROR_JSON` 约定。
+- **输出**：exit 0/1 的 stdout 为单行 `L0_LINK_AUDIT_JSON {type,passed,skillRoot,relativeLinkCount,l1OnlyCount,templatePlaceholderCount,violations,exitCode}`；exit 2 同时在 stderr 输出人类消息、stdout 输出带 `category`/`message`/`exitCode` 的 `ERROR_JSON` 单行摘要。
+- **可执行示例**：默认当前 `w-model-dev` 使用 `npm run audit:l0-links`；显式 skill 根使用 `npm run audit:l0-links -- --root=<skill-root>`。缺少 `SKILL.md` 或任一 L0 根目录、任何 L0/L1 symlink/junction、包外 realpath、非法 URI 编码和未允许 broken link 均为 exit 1；未知参数为结构化 `ERROR_JSON` / exit 2。
 - **guide 链接**：[toolbox.md](toolbox.md)（审计入口）与 [quickstart.md](quickstart.md)（L0/L1 分层语义）。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
 
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。

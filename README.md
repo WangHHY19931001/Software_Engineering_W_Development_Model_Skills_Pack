@@ -164,7 +164,8 @@ npm run check:gate -- [项目目录]              # 工件质量门（退出码 
 npm run check:graph -- <graph.json> --phase=1 # 图谱结构门禁
 npm run check:tla -- <manifest.json>          # TLA+ 行为门禁
 npm run doctor                                # 环境自检
-npm run audit:l0-links                        # L0/L1 相对链接边界审计（结构化 0/1/2）
+npm run audit:l0-links                        # 默认审计 w-model-dev（结构化 0/1/2）
+npm run audit:l0-links -- --root=<skill-root>  # 显式审计 skill 包根目录
 npm run format                                # 按 prettier 格式化脚本代码
 ```
 

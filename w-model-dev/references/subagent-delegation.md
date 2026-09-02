@@ -285,6 +285,7 @@ V/G 不通过 → R 定位 → V 复审 → G 门禁 → S-fix 修复 → R3×3 
 |---|---|---|---|
 | check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本七处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
 | check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
+| audit-l0-links（application） | 工具 | L0/L1 分发边界只读审计（Markdown 相对链接、模板占位、目标存在性、包外路径和 symlink/junction fail-closed） | 仓库维护者显式执行 `npm run audit:l0-links [-- --root=<skill-root>]`，非项目阶段门 |
 | check-tla-bdd-sync | 阶段工具 | TLA+ 与 BDD 配对文件的转移集 / 状态集 / 不变式等价同步校验 | 阶段 1-4 Artifact Gate pair sync |
 | security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
 | self-test | 工具 | 262 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |

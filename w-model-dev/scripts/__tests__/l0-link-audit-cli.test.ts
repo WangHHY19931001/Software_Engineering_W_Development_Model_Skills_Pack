@@ -39,10 +39,22 @@ async function createMinimalL0(root: string): Promise<void> {
 }
 
 describe('audit-l0-links application entrypoint', () => {
-  it('registers the public npm delivery command', async () => {
+  it('registers the public npm delivery command and documentation entrypoints', async () => {
     const packageJson = JSON.parse(await fs.readFile(PACKAGE_JSON, 'utf8')) as { scripts?: Record<string, string> };
+    const commandReference = await fs.readFile(
+      path.join(REPO_ROOT, 'w-model-dev', 'references', 'command-reference.md'),
+      'utf8',
+    );
+    const toolbox = await fs.readFile(path.join(REPO_ROOT, 'w-model-dev', 'references', 'toolbox.md'), 'utf8');
+    const delegation = await fs.readFile(
+      path.join(REPO_ROOT, 'w-model-dev', 'references', 'subagent-delegation.md'),
+      'utf8',
+    );
 
     expect(packageJson.scripts?.['audit:l0-links']).toBe('tsx w-model-dev/scripts/application/audit-l0-links.ts');
+    expect(commandReference).toContain('npm run audit:l0-links [-- --root=<skill-root>]');
+    expect(toolbox).toContain('npm run audit:l0-links [-- --root=<skill-root>]');
+    expect(delegation).toContain('audit-l0-links（application）');
   });
 
   it('returns a structured exit 0 audit for the distributed skill package', () => {
@@ -55,6 +67,23 @@ describe('audit-l0-links application entrypoint', () => {
       passed: true,
       l1OnlyCount: 92,
       templatePlaceholderCount: 36,
+      violations: [],
+      exitCode: 0,
+    });
+  });
+
+  it('audits an explicit --root skill package successfully', async () => {
+    const root = path.join(tmpDir, 'explicit skill root');
+    await createMinimalL0(root);
+
+    const result = run([`--root=${root}`]);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('L0_LINK_AUDIT_JSON');
+    expect(JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', ''))).toMatchObject({
+      type: 'l0-link-audit',
+      passed: true,
+      relativeLinkCount: 0,
       violations: [],
       exitCode: 0,
     });
