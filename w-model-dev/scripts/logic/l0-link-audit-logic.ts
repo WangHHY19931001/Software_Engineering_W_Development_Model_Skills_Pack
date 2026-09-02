@@ -214,7 +214,10 @@ async function auditL1Directories(root: string, rootRealPath: string, violations
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is selected from the fixed L1 boundary inventory
       metadata = await fs.lstat(absolute);
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        violations.push(`L1-only 目录不可读 ${normalizeRelative(directory)}`);
+      }
       continue;
     }
     if (metadata.isSymbolicLink()) {
