@@ -200,6 +200,19 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('L1-only 目录 symlink/junction'));
   });
 
+  it('rejects a top-level L1 directory symlink without traversing its target', async () => {
+    const scriptsTarget = path.join(fixtureRoot, 'scripts-target');
+    const scriptsDirectory = path.join(fixtureRoot, 'scripts');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- scriptsTarget is beneath the mkdtemp-owned skill root
+    await fs.mkdir(scriptsTarget, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- scriptsDirectory is a controlled mkdtemp fixture path
+    await fs.symlink(scriptsTarget, scriptsDirectory, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('L1-only 目录 symlink/junction 不允许 scripts'));
+  });
+
   it('rejects unreferenced L1 symlinks and broken symlinks without traversing them', async () => {
     const outsideTarget = path.join(outsideRoot, 'outside.ts');
     const l1Directory = path.join(fixtureRoot, 'scripts', 'unreferenced-dir');
@@ -236,6 +249,15 @@ describe('auditL0RelativeLinks', () => {
 
   it('turns malformed percent encoding into a structured violation', async () => {
     await write('references/guide.md', '[malformed](./bad%2)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
+  });
+
+  it('rejects malformed percent encoding in a link fragment without throwing', async () => {
+    await write('references/guide.md', '[malformed fragment](./valid.md#bad%2)');
+    await write('references/valid.md', '# valid\n');
 
     const result = await auditL0RelativeLinks(fixtureRoot);
 

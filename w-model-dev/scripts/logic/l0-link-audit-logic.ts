@@ -335,7 +335,9 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
 
       let targetWithoutFragment: string;
       try {
-        targetWithoutFragment = decodeURI(rawTarget.split('#')[0]!);
+        // Validate the complete URI before removing its fragment so malformed percent
+        // sequences cannot bypass the fail-closed audit in the ignored fragment text.
+        targetWithoutFragment = decodeURI(rawTarget).split('#')[0]!;
       } catch {
         result.violations.push(`${sourceEntry.source}: 链接 URI 编码无效 → ${rawTarget}`);
         continue;

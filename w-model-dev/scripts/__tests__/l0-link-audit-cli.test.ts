@@ -108,6 +108,22 @@ describe('audit-l0-links application entrypoint', () => {
     );
   });
 
+  it('returns a structured exit 1 instead of an unexpected error for malformed URI encoding', async () => {
+    const root = path.join(tmpDir, 'malformed-uri-skill');
+    await createMinimalL0(root);
+    await fs.writeFile(path.join(root, 'references', 'guide.md'), '[bad fragment](./valid.md#bad%2)\n', 'utf8');
+    await fs.writeFile(path.join(root, 'references', 'valid.md'), '# valid\n', 'utf8');
+
+    const result = run([`--root=${root}`]);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('L0_LINK_AUDIT_JSON');
+    expect(result.stdout).not.toContain('ERROR_JSON');
+    expect(JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', '')).violations).toContainEqual(
+      expect.stringContaining('链接 URI 编码无效'),
+    );
+  });
+
   it('returns structured exit 2 for an unknown argument', () => {
     const result = run(['--unknown']);
 
