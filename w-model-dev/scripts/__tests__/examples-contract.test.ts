@@ -255,13 +255,11 @@ describe('examples workflow contract', () => {
           /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/gi,
           '',
         );
-        const positiveBypass = /(?:必须|应当|需要|可以按|只能按|先执行|随后执行|再执行|由[^，。；]*执行|由[^，。；]*分派)\s*(?:直接|回到|回步骤|回 phase|回编码|回需求|返工|重跑|重新执行|补回填|按 `?reworkHints`?)/i.test(
-          withoutProhibition,
-        );
-        expect(
-          prohibition.test(line) && !positiveBypass,
-          `${relativePath}: ${line}`,
-        ).toBe(true);
+        const positiveBypass =
+          /(?:必须|应当|需要|可以按|只能按|先执行|随后执行|再执行|由[^，。；]*执行|由[^，。；]*分派)\s*(?:直接|回到|回步骤|回 phase|回编码|回需求|返工|重跑|重新执行|补回填|按 `?reworkHints`?)/i.test(
+            withoutProhibition,
+          );
+        expect(prohibition.test(line) && !positiveBypass, `${relativePath}: ${line}`).toBe(true);
       }
     }
   });
