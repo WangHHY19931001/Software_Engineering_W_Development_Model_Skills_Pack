@@ -27,6 +27,26 @@ async function collectFiles(
   let entries: import('node:fs').Dirent[];
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolute remains beneath the resolved skill root during recursive audit
+    const metadata = await fs.lstat(absolute);
+    if (metadata.isSymbolicLink()) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolute is the required L0 directory entry under the skill root
+      realDirectory = await fs.realpath(absolute);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- realDirectory was resolved from the required L0 directory entry
+      const resolvedMetadata = await fs.stat(realDirectory);
+      if (!resolvedMetadata.isDirectory()) {
+        violations.push(`必需 L0 目录不存在或不可读 ${normalizeRelative(directory)}`);
+      } else if (!isInside(rootRealPath, realDirectory)) {
+        violations.push(`L0 目录越出 skill 根 ${normalizeRelative(directory)}`);
+      } else {
+        violations.push(`L0 目录 symlink/junction 不允许 ${normalizeRelative(directory)}`);
+      }
+      return [];
+    }
+    if (!metadata.isDirectory()) {
+      violations.push(`必需 L0 目录不存在或不可读 ${normalizeRelative(directory)}`);
+      return [];
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolute remains beneath the resolved skill root during recursive audit
     realDirectory = await fs.realpath(absolute);
     if (!isInside(rootRealPath, realDirectory)) {
       violations.push(`L0 目录越出 skill 根 ${normalizeRelative(directory)}`);
