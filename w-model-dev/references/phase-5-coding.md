@@ -259,7 +259,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - REQ 行 `codeModule` 格式严格为 `SD-xxx:src/path/to/file.ts`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
 - NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，直接填文件路径或 `"横切"` 标识。
 
-**阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；仅在用户 CHECKPOINT 确认后，按 R 结论补回填。 
+**阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；仅在用户 CHECKPOINT 确认后，按 R 结论补回填。
 
 > 与阶段 1 的衔接：阶段 1 已登记 `NFR/CON.designDoc`（横切 SD 清单或 `"横切"`），阶段 5 须保证 `codeModule` 与 `designDoc` 横切关系一致——若 `designDoc="横切"` 而 `codeModule` 只指向单个文件，V 子代理评审时应提示「横切范围与代码实现不匹配」（可选 reworkHint，非阻断）。
 
