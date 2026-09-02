@@ -16,7 +16,23 @@
 - **L0/L1 与历史证据边界**：保留并明确分类 92 条 L1-only 脚本链接，quickstart 将 npm/doctor 验证限定为 L1，技术写作者模板改为消费项目贡献指南占位；41.9.0 real-run evidence 按历史快照锁定，`272/234/15` 不与 42.2.0 的 `282/244/15` 作趋势比较。
 - **独立审查第 1 轮闭合**：补齐此前遗漏的 stage 5-8 独立示例、phase references、BDD 指南、workflow、DoD、分派模板和测试模板。普通 V/G 失败统一为 RootCauseReport 的 V 复审、G 根因门禁、S-fix 后 R3×3/预防审查/V/G/用户 CHECKPOINT；所有可复制 `/wm test` 含真实 `result`，所有项目阶段 BDD 调用按 phase 强制 TLA/graph/Cucumber 参数，stage 6/7 BDD_JSON 采用当前摘要形状。新增严格 L0/L1 审计与 8 条 TDD 回归，仅现存 `scripts/samples/tools` 可归 L1-only，其他断链/越界 fail-closed；当前测量为 645 条、L1-only 92、模板占位 36、意外断链 0。
 - **独立审查第 2 轮闭合**：phase 5-8 references 的 `/wm test` 入口统一要求真实 `result=<pass|fail>`，诊断表降级为 R 定位线索，实际返工和跨阶段动作只能经 RootCauseReport 的 V 复审、G 根因门禁、S-fix 后 R3/preventive/V/G/用户 CHECKPOINT。旧需求/设计交互示例补普通失败分支。L0/L1 审计对缺失必需 L0 目录/`SKILL.md` 和包外 L0/L1 symlink fail-closed，新增相应 TDD 回归。
-- 版本前真实验证：初版分层链接检查为 641 条（后续文档链接新增导致当前严格审计为 645 条），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿；独立审查第 1 轮完整 Vitest 为 61 files / 1265 tests / 1265 passed，独立审查第 2 轮完整 Vitest 为 61 files / 1271 tests / 1271 passed，docs-consistency 静态/动态违规 0，最终 prepush 在验收记录更新后重跑。
+- **独立审查第 3/4 轮闭合**：phase 5 的票据化例外不再允许直接 `R→S-fix`，且新增全量 references/examples/templates 文件扫描契约，单一 bug/TLA+ 不变式违反仍走完整普通失败链；L0 审计对顶层及嵌套 L0 目录 symlink/junction、缺失必需 L0 资产和包外 L0/L1 真实路径 fail-closed。新增公开 `npm run audit:l0-links [-- --root=<skill-root>]` 入口，输出结构化 `L0_LINK_AUDIT_JSON` 与真实 exit 0/1/2，不改变 prepush 17 项或 cli 脚本计数。
+- 历史/中间验证：初版分层链接检查为 641 条（后续文档链接新增导致当前严格审计为 647 条），L0 CLI 当前审计 `647/92/36/0`（relativeLinkCount/l1OnlyCount/templatePlaceholderCount/violations），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿；独立审查第 1 轮完整 Vitest 为 61 files / 1265 tests / 1265 passed，第 2 轮为 61 files / 1271 tests / 1271 passed，第 3 轮为 62 files / 1277 tests / 1277 passed，第 4 轮为 62 files / 1279 tests / 1279 passed；最终 HEAD 的终验结果由下方外部报告与验收记录对应命令回填。
+
+### 本轮提交身份（最终 SHA 由外部命令核验）
+
+以下为本轮已存在、可由 `git rev-parse` / `git log` 核验的提交；本 CHANGELOG 不自引用最终记录提交自身 SHA：
+
+- `3fae86e127757027ed40c5e653ca0e0d47083444` — `docs(references): close phase failure routing`
+- `fa30fb982ad080c4ffc11685d9c9411592b20a32` — `fix(audit): fail closed on missing or escaped L0 paths`
+- `00f513e6343175fab2db5e3a5360c5b49afc4144` — `test(security): document escaped symlink fixtures`
+- `7319bb716851ceed085c0a13e355df22d8eb6dbb` — `docs(changes): record second review remediation`
+- `b1e364a81a1f877b3fab6e44dea5d46de0279160` — `docs(references): remove direct phase five fix bypass`
+- `46a2961937e58a24cc2dc6644dfc39573838c186` — `fix(audit): reject nested L0 directory links`
+- `778ec87fdd2892f1a8c7d68cf5055366c79175f2` — `feat(audit): expose L0 link boundary command`
+- `5ce123a5bd9e2dc2c7d355d7dc31a25a0758cd69` — `test(docs): scan all phase references for fix bypasses`
+- `b9958574bbd4be40da2c68da4f5b3beafb9a8ae0` — `fix(audit): reject top-level L0 directory links`
+- `43bd922d0db673c875b9fd72b1e407299742bd76` — `test(docs): include templates in bypass scan`
 
 ## [42.2.0] - 2026-09-01
 
