@@ -291,6 +291,15 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('非模板文件不得使用 {{module}} 占位链接'));
   });
 
+  it('rejects malformed URI encoding even when a template placeholder is present', async () => {
+    await write('templates/template.md', '[malformed](./{{module}}-contract%2)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.templatePlaceholders).toEqual([]);
+    expect(result.violations).toContainEqual(expect.stringContaining('链接 URI 编码无效'));
+  });
+
   it('audits the real skill package without hiding L0 boundaries', async () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 

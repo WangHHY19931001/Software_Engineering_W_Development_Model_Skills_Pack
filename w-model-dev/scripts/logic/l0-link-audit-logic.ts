@@ -324,6 +324,16 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
       result.relativeLinkCount++;
       const sourceEntry = { source: normalizeRelative(source), target: rawTarget };
 
+      let decodedTarget: string;
+      try {
+        // Validate the complete URI before removing its fragment so malformed percent
+        // sequences cannot bypass the fail-closed audit in the ignored fragment text.
+        decodedTarget = decodeURI(rawTarget);
+      } catch {
+        result.violations.push(`${sourceEntry.source}: 链接 URI 编码无效 → ${rawTarget}`);
+        continue;
+      }
+
       if (rawTarget.includes('{{module}}')) {
         if (normalizeRelative(source).startsWith('templates/')) {
           result.templatePlaceholders.push(sourceEntry);
@@ -333,15 +343,7 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
         continue;
       }
 
-      let targetWithoutFragment: string;
-      try {
-        // Validate the complete URI before removing its fragment so malformed percent
-        // sequences cannot bypass the fail-closed audit in the ignored fragment text.
-        targetWithoutFragment = decodeURI(rawTarget).split('#')[0]!;
-      } catch {
-        result.violations.push(`${sourceEntry.source}: 链接 URI 编码无效 → ${rawTarget}`);
-        continue;
-      }
+      const targetWithoutFragment = decodedTarget.split('#')[0]!;
 
       const targetPath = path.resolve(path.dirname(sourcePath), targetWithoutFragment);
       const l1Directory = l1Boundary(targetPath, absoluteRoot);
