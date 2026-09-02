@@ -17,7 +17,8 @@
 - **独立审查第 1 轮闭合**：补齐此前遗漏的 stage 5-8 独立示例、phase references、BDD 指南、workflow、DoD、分派模板和测试模板。普通 V/G 失败统一为 RootCauseReport 的 V 复审、G 根因门禁、S-fix 后 R3×3/预防审查/V/G/用户 CHECKPOINT；所有可复制 `/wm test` 含真实 `result`，所有项目阶段 BDD 调用按 phase 强制 TLA/graph/Cucumber 参数，stage 6/7 BDD_JSON 采用当前摘要形状。新增严格 L0/L1 审计与 8 条 TDD 回归，仅现存 `scripts/samples/tools` 可归 L1-only，其他断链/越界 fail-closed；当前测量为 645 条、L1-only 92、模板占位 36、意外断链 0。
 - **独立审查第 2 轮闭合**：phase 5-8 references 的 `/wm test` 入口统一要求真实 `result=<pass|fail>`，诊断表降级为 R 定位线索，实际返工和跨阶段动作只能经 RootCauseReport 的 V 复审、G 根因门禁、S-fix 后 R3/preventive/V/G/用户 CHECKPOINT。旧需求/设计交互示例补普通失败分支。L0/L1 审计对缺失必需 L0 目录/`SKILL.md` 和包外 L0/L1 symlink fail-closed，新增相应 TDD 回归。
 - **独立审查第 3/4 轮闭合**：phase 5 的票据化例外不再允许直接 `R→S-fix`，且新增全量 references/examples/templates 文件扫描契约，单一 bug/TLA+ 不变式违反仍走完整普通失败链；L0 审计对顶层及嵌套 L0 目录 symlink/junction、缺失必需 L0 资产和包外 L0/L1 真实路径 fail-closed。新增公开 `npm run audit:l0-links [-- --root=<skill-root>]` 入口，输出结构化 `L0_LINK_AUDIT_JSON` 与真实 exit 0/1/2，不改变 prepush 17 项或 cli 脚本计数。
-- 历史/中间验证：初版分层链接检查为 641 条（后续文档链接新增导致当前严格审计为 647 条），L0 CLI 当前审计 `647/92/36/0`（relativeLinkCount/l1OnlyCount/templatePlaceholderCount/violations），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿；独立审查第 1 轮完整 Vitest 为 61 files / 1265 tests / 1265 passed，第 2 轮为 61 files / 1271 tests / 1271 passed，第 3 轮为 62 files / 1277 tests / 1277 passed，第 4 轮为 62 files / 1279 tests / 1279 passed；最终 HEAD 的终验结果由下方外部报告与验收记录对应命令回填。
+- 历史/中间验证：初版分层链接检查为 641 条（后续文档链接新增导致当前严格审计为 647 条），L0 CLI 当前审计 `647/92/36/0`（relativeLinkCount/l1OnlyCount/templatePlaceholderCount/violations），eval 25/25，self-test 262/262，samples coverage 282 fixtures / 244 referenced files / 15 dirs，docs-consistency 静态/动态违规 0，doctor exit 0（0 阻断 / 3 可选提示）。版本同步后 Git Bash `bash -c "npm run prepush"` 真实 exit 0，17 项全绿；独立审查第 1 轮完整 Vitest 为 61 files / 1265 tests / 1265 passed，第 2 轮为 61 files / 1271 tests / 1271 passed，第 3 轮为 62 files / 1277 tests / 1277 passed，第 4 轮为 62 files / 1279 tests / 1279 passed；这些是历史/中间测量，不冒充当前最终 HEAD。
+- **独立审查第 5 轮最终修复**：完整 phase references、templates、legacy examples 的普通失败指引均要求 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；`/wm test` 只接受真实 `result=pass|fail` 占位或运行器实际值 `result=pass`/`result=fail`，非法占位有边界断言。L0 审计以 lstat/realpath fail-closed 拒绝 L0/L1 文件与目录 symlink/junction、包外路径、未允许 broken link 和 malformed percent-encoding，并对未被引用的 L1 链接做不跟随目录扫描；CLI 默认 root、显式 `--root`、exit 0/1/2 和注册表均有契约测试。当前 L0 CLI 实测 `647/92/36/0`；本轮新增测试后完整 Vitest 实测为 62 files / 1301 tests / 1301 passed，四簇定向测试为 64/64，版本保持 42.2.1，最终 prepush 与最终 HEAD 由外部命令核验。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
@@ -40,8 +41,24 @@
 - `0eee1f48436b1643f14eb449452255e88f4b9418` — `docs(changes): record final audit gate`
 - `0974bc0c6b105d7c486fa30f79f2642a2c9ed7d1` — `docs(changes): register audit history before final gate`
 - `15762dde1b62e98d85fb1e5aa2b88ad893446d45` — `docs(changes): record final clean tree gate`
+- `e8f6a5b2c6108b1f31061284551492a79fbc62d1` — `docs(changes): finalize audit acceptance records (historical gate)`（旧最终 HEAD，非本轮最终）
+- `424b91fe57f2ca50dec4f373614c7f0430c2f5b6` — `test(docs): enforce complete ordinary failure routing`
+- `1aa684c7226ac1dafdd45b5f05e439e95fb24f1d` — `fix(audit): reject all L0 and L1 symlink boundaries`
+- `2a9930a37f91e12dcc3c09d18fb79bb5ab864f34` — `test(audit): close L0 CLI registration contract`
+- `08b80c10916178f8f83d8b5a520dfef290977d9d` — `docs(references): close phase failure fallback paths`
+- `88bd58374e17eb737493ae7f75074bd269c48c19` — `fix(audit): report unreadable L1 boundary entries`
+- `46db5fcfd702c3bb8837b0bbfab51ca51105ff4d` — `docs(references): route coding input failures through R`
+- `f8ffe0f7b88313af188cdb247586999d447af10f` — `fix(audit): classify L1 directory read failures`
+- `43e60df2fb6582ca8e533f1a7d1fa8781a7475c9` — `test(docs): close ordinary failure routing contract`
+- `75d211e8270c16cc8fcb76b4ada70910e6accc4b` — `fix(audit): validate complete link URI encoding`
+- `347f43e796fed39570164b9282e6534afdbd1e1b` — `docs(workflow): enforce complete ordinary failure routing`
+- `c6500ed47e36c8d87fc687875af9213ff95bd7ca` — `fix(audit): validate placeholder URI encoding`
+- `d4e0e6788ef362a07edd4be7751893ede0021f07` — `fix(docs): close ordinary failure routing contracts`
+- `b030f8087567355147391f4b10203e57d3f5384a` — `fix(audit): close L0 URI and dependency boundaries`
+- `b023dc798916169840d83b2e5411f028d4eb3192` — `fix(test): keep examples contract security-clean`
+- `5f3311f` — `fix(deps): patch fast-uri audit vulnerability`
 
-最终记录提交不在 CHANGELOG 的本表中自引用；外部 `git rev-parse HEAD` 核验最终 SHA，最终 prepush 结果见验收记录。
+最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
 
 ## [42.2.0] - 2026-09-01
 
