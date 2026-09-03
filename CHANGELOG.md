@@ -110,6 +110,9 @@
 | `07832d7b8596ecc93ef49b290ceb4415d2e4dbdf` | `fix(docs): close /wm review C/D and BDD-gate exit-1 routing bypasses` |
 | `7f994e3d1191b671f371e713034ef26b22148b0a` | `fix(docs): route exit-code table rows 363/366 through the full chain` |
 | `44c057a3e342234e9e9faa0cad4744b161659305` | `fix(docs): remove End Patch residue and restore UAT table row` |
+| `afd99c611b15b5ceb6cb68dac650a7b7fe87cc64` | `docs(changes): record scanner closure round in 42.2.1 changelog` |
+| `fbfd3363d6961b76dfa8029712e2fc36c5544c73` | `docs(changes): record scanner closure round acceptance` |
+| `051c688ecb2ddd361ce19bce560664f456355da1` | `style(test): format whole-row failure scanner` |
 
 最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
 
