@@ -7,12 +7,18 @@
  * 本文件仅保留编排。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--scope=<change-scope.json>] [--json]
  *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --validate-templates [--json]
  *
  * 参数：
  *   project-dir   项目根目录（默认：当前工作目录）
  *   --phase=N     校验阶段 1-8（默认终检 phase=8，向后兼容；兼容历史短参数 -p）
+ *   --scope=FILE  阶段 5-8 变更上下文 manifest（schemas/change-scope.schema.json；与
+ *                 --change/--base/--head 互斥）：聚合 codegraph/opsx strict 校验，
+ *                 violations 并入 reasons/exitCode（不被 RTM 通过掩盖）；
+ *                 缺失 → fail-closed（exit 1）；文件/JSON/schema 非法 → exit 2。
+ *                 archive（check-openspec-archive.ts）是 phase 8 opsx:archive 后置门，
+ *                 不在本 pre-archive gate 内强制
  *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *   --validate-templates  模板漂移校验（C9）：按 PHASE_SPEC_LAYOUT 校验技能包 templates/ 资产
  *                         含必需结构标记（引用块 / §0 SSOT 头 / DoD 清单 ≥8 项）。
@@ -67,6 +73,10 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified } from '../lib/read-json-or-exit.js';
+import { gitRunnerFor, resolveCliScope, type ChangeScope } from '../lib/change-scope.js';
+
+import { checkCodegraphQueriesStrict } from './check-codegraph-queries.js';
+import { checkOpsxArtifactsStrict } from './check-opsx-artifacts.js';
 export { checkUatPathMappingContent }; // self-test 兼容：UAT 映射内容校验保持从本入口导出
 
 // ==================== --phase 参数解析（P1.1） ====================
@@ -143,6 +153,96 @@ function parseProjectDir(argv: string[]): string {
   return process.cwd();
 }
 
+// ==================== 外部校验聚合（Slice B：codegraph/opsx violations 并入 artifact gate） ====================
+
+/** GATE_JSON external summary 的单个 checker 计数（含相对路径计数） */
+export interface ExternalCheckerSummary {
+  passed: boolean;
+  /** violations 计数 */
+  violationCount: number;
+  changeId: string;
+}
+
+export interface ExternalCodegraphSummary extends ExternalCheckerSummary {
+  /** scope 变更中须覆盖的 code/test 文件数（相对路径计数） */
+  requiredFileCount: number;
+  /** 已被查询覆盖的 code/test 文件数 */
+  coveredFileCount: number;
+}
+
+export interface ExternalSummary {
+  codegraph: ExternalCodegraphSummary;
+  opsx: ExternalCheckerSummary & { changesNames: string[] };
+}
+
+export interface ExternalChecksAggregate {
+  passed: boolean;
+  reasons: string[];
+  summary: ExternalSummary;
+}
+
+/**
+ * 聚合 codegraph + opsx strict 校验（阶段 5-8 artifact gate 用）：
+ *   - scope 为 null（CLI 未提供）→ 两 checker 各自 fail-closed（须提供变更上下文）
+ *   - scopeViolations（ChangeScope Git 绑定失败等）并入 reasons
+ *   - 两 checker violations 并入 reasons（codegraph/opsx 失败不得被 RTM 通过掩盖）
+ * openspecArchived 不作为本 gate 输入：archive 是 phase 8 opsx:archive 后置门，
+ * 单独跑 check-openspec-archive.ts。
+ */
+export function aggregateExternalChecks(
+  projectRoot: string,
+  phase: number,
+  ctx: { scope: ChangeScope | null; scopeViolations: string[] },
+): ExternalChecksAggregate {
+  const reasons: string[] = [...ctx.scopeViolations.map((v) => `[scope] ${v}`)];
+
+  if (ctx.scope === null) {
+    const summary: ExternalSummary = {
+      codegraph: {
+        passed: false,
+        violationCount: 0,
+        changeId: '',
+        requiredFileCount: 0,
+        coveredFileCount: 0,
+      },
+      opsx: { passed: false, violationCount: 0, changeId: '', changesNames: [] },
+    };
+    reasons.push(
+      `[codegraph] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
+        `（codegraph 覆盖绑定 fail-closed，反模式 #38）`,
+    );
+    reasons.push(
+      `[opsx] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
+        `（opsx 制品校验须绑定变更目录，反模式 #39/#40）`,
+    );
+    return { passed: false, reasons, summary };
+  }
+
+  const codegraph = checkCodegraphQueriesStrict(projectRoot, ctx.scope);
+  const opsx = checkOpsxArtifactsStrict(projectRoot, ctx.scope.phase, ctx.scope.changeId);
+  for (const v of codegraph.violations) reasons.push(`[codegraph] ${v}`);
+  for (const v of opsx.violations) reasons.push(`[opsx] ${v}`);
+  return {
+    passed: reasons.length === 0,
+    reasons,
+    summary: {
+      codegraph: {
+        passed: codegraph.passed,
+        violationCount: codegraph.violations.length,
+        changeId: ctx.scope.changeId,
+        requiredFileCount: codegraph.requiredFileCount,
+        coveredFileCount: codegraph.coveredFileCount,
+      },
+      opsx: {
+        passed: opsx.passed,
+        violationCount: opsx.violations.length,
+        changeId: ctx.scope.changeId,
+        changesNames: opsx.changesNames,
+      },
+    },
+  };
+}
+
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
@@ -200,7 +300,6 @@ async function main(): Promise<void> {
     cucumberReportArg ?? path.join('.w-model', 'bdd', 'reports', 'report.json'),
   );
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
-
   // RTM 读取（FILE_NOT_FOUND / FILE_READ / FILE_PARSE 统一走 readJsonClassified，哨兵由 runMain 兜底）
   // ENOENT 预探测：readJsonClassified 对缺失文件只报通用「文件不存在」，此处补回原「请先执行 /wm」引导语（非 ENOENT 交回统一分类）
   try {
@@ -296,7 +395,53 @@ async function main(): Promise<void> {
   // uat-path-mapping 校验违反（计入终检结果；解析严格化 + 阶段 5/终检均校验）
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
 
+  // ==================== 外部校验聚合（Slice B：codegraph/opsx strict，阶段 5-8） ====================
+  // scope 解析：--scope=<file> 或 --change/--base/--head 薄封装；缺失 → aggregate 内
+  // fail-closed violations；scope 文件/JSON/schema 非法 → exit 2（输入错误）；
+  // Git 绑定失败 → violations（与两 checker violations 一并并入 reasons，不被 RTM 通过掩盖）。
+  // openspecArchived 不作为本 gate 输入（archive 是 phase 8 opsx:archive 后置门，单独跑
+  // check-openspec-archive.ts）。
+  // 阶段 5-8 外部校验聚合（Slice B）：复用前面已定的 effectivePhase（phaseOption ?? 8）
+  const externalPhase: number = phaseOption ?? 8;
+  let externalAggregate: ExternalChecksAggregate | undefined;
+  if (externalPhase >= 5) {
+    const resolved = resolveCliScope({
+      projectRoot: projectDir,
+      phase: externalPhase,
+      scopePath: parseFlagValue(process.argv, 'scope'),
+      changeArg: parseFlagValue(process.argv, 'change'),
+      baseArg: parseFlagValue(process.argv, 'base'),
+      headArg: parseFlagValue(process.argv, 'head'),
+      git: gitRunnerFor(projectDir),
+    });
+    if (resolved.kind === 'invalid') {
+      exitWithError({
+        category: resolved.category,
+        rule: 'P0-1',
+        message: resolved.message,
+        detail: resolved.detail,
+        file: resolved.file,
+        exitCode: 2,
+      });
+      return;
+    }
+    if (resolved.kind === 'missing') {
+      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: null, scopeViolations: [] });
+    } else if (resolved.kind === 'violations') {
+      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
+        scope: null,
+        scopeViolations: resolved.violations,
+      });
+    } else {
+      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
+        scope: resolved.scope,
+        scopeViolations: [],
+      });
+    }
+  }
+
   // 合并 TLA/BDD 资产、UAT 映射与 model/sync 校验违反；畸形输入不得退化为“缺失快照”。
+  const externalReasons = externalAggregate?.reasons ?? [];
   const allReasons = [
     ...result.reasons,
     ...tlaAssetViolations,
@@ -304,6 +449,7 @@ async function main(): Promise<void> {
     ...bddViolations,
     ...cucumberAsset.cucumberViolations,
     ...modelCheckViolations,
+    ...externalReasons,
   ];
   const overallPassed =
     result.passed &&
@@ -311,7 +457,8 @@ async function main(): Promise<void> {
     uatMappingViolations.length === 0 &&
     bddViolations.length === 0 &&
     cucumberAsset.cucumberViolations.length === 0 &&
-    modelCheckViolations.length === 0;
+    modelCheckViolations.length === 0 &&
+    (externalAggregate?.passed ?? true);
   const exitCode = overallPassed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
@@ -351,6 +498,15 @@ async function main(): Promise<void> {
   console.log(
     `graph 资产    : ${graph ? `✓ ${graphSource}（${graph.nodes.length} 节点）` : '⚠ 未发现任何 graph 资产'}`,
   );
+  if (externalAggregate !== undefined) {
+    const ext = externalAggregate.summary;
+    console.log(
+      `codegraph 外部 : ${ext.codegraph.passed ? '✓' : '✗'} 覆盖 ${ext.codegraph.coveredFileCount}/${ext.codegraph.requiredFileCount} 须覆盖文件（${ext.codegraph.violationCount} 条违规）`,
+    );
+    console.log(
+      `opsx 外部     : ${ext.opsx.passed ? '✓' : '✗'} 制品目录 ${ext.opsx.changesNames.join(', ') || '（无）'}（${ext.opsx.violationCount} 条违规）`,
+    );
+  }
   console.log(`校验结果      : ${overallPassed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -375,6 +531,8 @@ async function main(): Promise<void> {
       missingItems: result.missingItems,
       reasons: allReasons,
       bddManifestExists,
+      // 阶段 5-8 外部校验 summary（两个 checker 的 passed/violations 计数与相对路径计数）
+      external: externalAggregate?.summary,
     },
     exitCode,
   );
