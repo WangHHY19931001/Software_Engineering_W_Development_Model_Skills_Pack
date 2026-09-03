@@ -148,6 +148,26 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.reasons.some((v) => v.includes('headRef 过期'))).toBe(true);
   });
 
+  it('E3b: scope 已提供但 Git 绑定失败（scopeProvidedButFailed）不得输出"未提供 --scope"误导消息', () => {
+    const { root } = fullPassProject();
+    const r = aggregateExternalChecks(root, 5, {
+      scope: null,
+      scopeViolations: ['change-scope: headRef 过期（scope.headRef 不等于当前 HEAD）'],
+      scopeProvidedButFailed: true,
+    });
+    expect(r.passed).toBe(false);
+    // 真实原因（scopeViolations）在
+    expect(r.reasons.some((v) => v.includes('headRef 过期'))).toBe(true);
+    // 不得出现与事实不符的"未提供 --scope"文案（纠正动作应指向更新过期 scope 而非补 scope 文件）
+    expect(r.reasons.some((v) => v.includes('未提供 --scope'))).toBe(false);
+    // summary 计数归零（未进入 strict 校验）
+    expect(r.summary.codegraph.violationCount).toBe(0);
+    expect(r.summary.opsx.violationCount).toBe(0);
+    // 控制组：未提供 scope 且未给 scopeProvidedButFailed 标志时仍输出"未提供"消息（既有语义）
+    const r2 = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
+    expect(r2.reasons.some((v) => v.includes('未提供 --scope'))).toBe(true);
+  });
+
   it('E4: summary 携带 changeId 与相对路径计数', () => {
     const { root } = fullPassProject();
     const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });

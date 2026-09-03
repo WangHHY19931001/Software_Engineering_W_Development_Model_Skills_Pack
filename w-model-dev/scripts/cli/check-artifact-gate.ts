@@ -183,7 +183,9 @@ export interface ExternalChecksAggregate {
 
 /**
  * 聚合 codegraph + opsx strict 校验（阶段 5-8 artifact gate 用）：
- *   - scope 为 null（CLI 未提供）→ 两 checker 各自 fail-closed（须提供变更上下文）
+ *   - scope 为 null（CLI 未提供）→ 两 checker 各自 fail-closed（须提供变更上下文）；
+ *     若 scopeProvidedButFailed=true（scope 已提供但 Git 绑定失败），则不输出
+ *     "未提供 --scope" 误导文案（真实原因在 scopeViolations，纠正动作是更新过期 scope）
  *   - scopeViolations（ChangeScope Git 绑定失败等）并入 reasons
  *   - 两 checker violations 并入 reasons（codegraph/opsx 失败不得被 RTM 通过掩盖）
  * openspecArchived 不作为本 gate 输入：archive 是 phase 8 opsx:archive 后置门，
@@ -192,7 +194,7 @@ export interface ExternalChecksAggregate {
 export function aggregateExternalChecks(
   projectRoot: string,
   phase: number,
-  ctx: { scope: ChangeScope | null; scopeViolations: string[] },
+  ctx: { scope: ChangeScope | null; scopeViolations: string[]; scopeProvidedButFailed?: boolean },
 ): ExternalChecksAggregate {
   const reasons: string[] = [...ctx.scopeViolations.map((v) => `[scope] ${v}`)];
 
@@ -207,14 +209,16 @@ export function aggregateExternalChecks(
       },
       opsx: { passed: false, violationCount: 0, changeId: '', changesNames: [] },
     };
-    reasons.push(
-      `[codegraph] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
-        `（codegraph 覆盖绑定 fail-closed，反模式 #38）`,
-    );
-    reasons.push(
-      `[opsx] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
-        `（opsx 制品校验须绑定变更目录，反模式 #39/#40）`,
-    );
+    if (ctx.scopeProvidedButFailed !== true) {
+      reasons.push(
+        `[codegraph] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
+          `（codegraph 覆盖绑定 fail-closed，反模式 #38）`,
+      );
+      reasons.push(
+        `[opsx] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
+          `（opsx 制品校验须绑定变更目录，反模式 #39/#40）`,
+      );
+    }
     return { passed: false, reasons, summary };
   }
 
@@ -428,9 +432,12 @@ async function main(): Promise<void> {
     if (resolved.kind === 'missing') {
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: null, scopeViolations: [] });
     } else if (resolved.kind === 'violations') {
+      // scope 已提供但绑定失败（headRef 过期/变更集合不符等）：不输出"未提供 --scope"误导文案，
+      // 真实原因以 [scope] 前缀进 reasons（agent 纠正应指向更新过期 scope）
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
         scope: null,
         scopeViolations: resolved.violations,
+        scopeProvidedButFailed: true,
       });
     } else {
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
