@@ -1,12 +1,10 @@
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const ensureScript = path.join(repoRoot, '.githooks', 'ensure-platform-deps.sh');
 const prePushScript = path.join(repoRoot, '.githooks', 'pre-push');
@@ -19,9 +17,21 @@ async function makeTempDir(prefix: string): Promise<string> {
   return dir;
 }
 
-async function run(script: string, args: string[], environment: Record<string, string> = {}, cwd = repoRoot) {
-  try {
-    const result = await execFileAsync(
+/**
+ * 运行被测 bash 脚本。stdin 缺省时不提供内容——但必须显式关闭子进程 stdin：
+ * execFile 的 input 选项对 execFile 无效（子进程 stdin 是永不关闭的管道），
+ * hook 一旦读取 stdin 即永久阻塞；spawn + stdin.end() 保证无内容时立即 EOF。
+ * stdin 有内容时写入后关闭（模拟 git pre-push 写入 ref 行后关闭管道）。
+ */
+async function run(
+  script: string,
+  args: string[],
+  environment: Record<string, string> = {},
+  cwd = repoRoot,
+  stdin?: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+    const child = spawn(
       'bash',
       [
         '-c',
@@ -30,16 +40,23 @@ async function run(script: string, args: string[], environment: Record<string, s
         script,
         ...args,
       ],
-      {
-        cwd,
-        env: { ...process.env, ...environment },
-      },
+      { cwd, env: { ...process.env, ...environment }, stdio: ['pipe', 'pipe', 'pipe'] },
     );
-    return { code: 0, stdout: result.stdout, stderr: result.stderr };
-  } catch (error: unknown) {
-    const failure = error as { code?: number; stdout?: string; stderr?: string };
-    return { code: failure.code ?? 1, stdout: failure.stdout ?? '', stderr: failure.stderr ?? '' };
-  }
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => (stdout += chunk));
+    child.stderr.on('data', (chunk: string) => (stderr += chunk));
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      resolve({ code: typeof error.code === 'number' ? error.code : 1, stdout, stderr });
+    });
+    child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
+    if (stdin !== undefined) {
+      child.stdin.write(stdin);
+    }
+    child.stdin.end();
+  });
 }
 
 async function simulatedEnsure(
@@ -539,6 +556,260 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
     expect(result.stdout).toContain('平台依赖齐备（linux-x64）');
     expect(calls, `${result.stdout}\n${result.stderr}`).toContain('npm run self-test');
     expect(calls).not.toMatch(/npm (install|pack)|\btar\b|\bcp\b|\bmv\b|\bmkdir\b|\brm\b.*node_modules/);
+  });
+});
+
+describe('pre-push stdin ref scope filtering', () => {
+  // 40 位假 sha（互不包含、不与 ZERO 冲突）。git() mock 以参数子串分派行为。
+  const ZERO = '0'.repeat(40);
+  const LOCAL_UNRELATED = 'a'.repeat(40);
+  const REMOTE_UNRELATED = '1'.repeat(40);
+  const LOCAL_RELATED = 'b'.repeat(40);
+  const REMOTE_RELATED = '2'.repeat(40);
+  const LOCAL_NEW_BRANCH = 'c'.repeat(40);
+  const MERGE_BASE = '3'.repeat(40);
+  const REMOTE_DELETED = '4'.repeat(40);
+
+  // mock git 骨架：fallback（HEAD@{push}/origin/HEAD）默认空输出；merge-base / log /
+  // diff 行为由各用例 gitBody 覆盖。缺省：无匹配 → exit 0（无输出）。
+  // 注：ZERO 入参的 diff（旧实现处理删除行时会以全零 sha 调 git diff）→ 模拟 bad object。
+  const gitBody = (lines: string[]): string => [`case "$*" in`, ...lines, `*) exit 0 ;;`, `esac`].join('\n');
+
+  const fallbackEmpty = `*'HEAD@{push}'*|*'origin/HEAD'*) : ;;`;
+  const fallbackUnrelated = `*'HEAD@{push}'*|*'origin/HEAD'*) printf 'eval/probe.json\\n' ;;`;
+  const fallbackFail = `*'HEAD@{push}'*|*'origin/HEAD'*) exit 1 ;;`;
+  const logEmpty = `*'log --name-only'*) : ;;`;
+  const mergeBaseOk = `*'merge-base'*) printf '${MERGE_BASE}\\n' ;;`;
+  const mergeBaseFail = `*'merge-base'*) exit 1 ;;`;
+  const zeroDiffBadObject = `*'${ZERO}'*) exit 128 ;;`;
+
+  const workspaceFiles = {
+    '.git': 'gitdir: irrelevant\n',
+  };
+
+  async function runFilteredPush(opts: {
+    gitBody: string;
+    stdin?: string;
+    env?: Record<string, string>;
+    args?: string[];
+  }): Promise<{ code: number; stdout: string; stderr: string }> {
+    const binDir = await makeTempDir('pre-push-stdin-bin-');
+    const workspace = await makeTempDir('pre-push-stdin-workspace-');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
+    await fs.writeFile(path.join(workspace, '.git'), workspaceFiles['.git'], 'utf8');
+    const bashEnv = path.join(binDir, 'bash-env.sh');
+    await fs.writeFile(
+      bashEnv,
+      `git() {
+${opts.gitBody}
+}
+npm() { return 98; }
+`,
+      'utf8',
+    );
+    return run(
+      prePushScript,
+      opts.args ?? [],
+      {
+        PATH: `${binDir}:${process.env.PATH}`,
+        BASH_ENV: bashEnv,
+        PREPUSH_FORCE: '0',
+        OSTYPE: 'linux-gnu',
+        ...opts.env,
+      },
+      workspace,
+      opts.stdin,
+    );
+  }
+
+  const gateRan = (result: { code: number; stdout: string; stderr: string }, why: string) => {
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('node_modules 缺失');
+    expect(result.stdout, `${why}: 不应跳过门禁`).not.toContain('跳过门禁');
+  };
+
+  it('多 ref 推送：首行不相关 + 第二行相关（w-model-dev/**）→ 门禁运行（不短路）', async () => {
+    const stdin =
+      `refs/heads/topic-a ${LOCAL_UNRELATED} refs/heads/topic-a ${REMOTE_UNRELATED}\n` +
+      `refs/heads/topic-b ${LOCAL_RELATED} refs/heads/topic-b ${REMOTE_RELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([
+        fallbackEmpty,
+        `*'${LOCAL_UNRELATED}'*) printf 'eval/probe.json\\n' ;;`,
+        `*'${LOCAL_RELATED}'*) printf 'w-model-dev/SKILL.md\\n' ;;`,
+      ]),
+    });
+    gateRan(result, '相关 ref 在第二行仍须触发门禁');
+  });
+
+  it('非空 fallback diff 不相关 + stdin 含相关 ref → 以 stdin 为准，门禁运行', async () => {
+    const stdin = `refs/heads/topic-b ${LOCAL_RELATED} refs/heads/topic-b ${REMOTE_RELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([
+        fallbackUnrelated, // 全局 diff 非空但不相关——旧实现据此跳过 stdin，漏检
+        `*'${LOCAL_RELATED}'*) printf 'w-model-dev/SKILL.md\\n' ;;`,
+      ]),
+    });
+    gateRan(result, 'stdin 有 ref 时不得以非空 fallback 短路');
+  });
+
+  it('existing update ref（两非零 sha，diff 含相关路径）→ 门禁运行', async () => {
+    const stdin = `refs/heads/topic-b ${LOCAL_RELATED} refs/heads/topic-b ${REMOTE_RELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty, `*'${LOCAL_RELATED}'*) printf 'w-model-dev/SKILL.md\\n' ;;`]),
+    });
+    gateRan(result, 'existing update 且 diff 含相关路径');
+  });
+
+  it('new branch 且 merge-base 可建立（diff 含相关路径）→ 门禁运行', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([
+        fallbackEmpty,
+        logEmpty, // 旧实现以 git log -n 20 截断——新实现不得调用
+        mergeBaseOk,
+        `*'${LOCAL_NEW_BRANCH}'*) printf 'w-model-dev/SKILL.md\\n' ;;`,
+      ]),
+    });
+    gateRan(result, 'new branch 经 merge-base 证明基线后命中相关路径');
+  });
+
+  it('new branch 且 merge-base 不可建立 → fail-closed 门禁运行（绝不 -n 20 截断放行）', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty, logEmpty, mergeBaseFail]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, '不可证明基线不得跳过门禁').not.toContain('跳过门禁');
+  });
+
+  it('new branch 且 merge-base 退化为推送尖本身（同名本地 ref）→ 非可证明基线，fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      // merge-base 返回 local_sha 本身（实测 fork-point/merge-base 对同名 ref 均如此）
+      gitBody: gitBody([fallbackEmpty, logEmpty, `*'merge-base'*) printf '${LOCAL_NEW_BRANCH}\\n' ;;`]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, '退化为本尖的 merge-base 不得当作可证明基线').not.toContain('跳过门禁');
+  });
+
+  it('delete-only ref（local sha 全零）→ 跳过门禁（exit 0 + 说明）', async () => {
+    const stdin = `refs/heads/old-topic ${ZERO} refs/heads/old-topic ${REMOTE_DELETED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty, zeroDiffBadObject]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('删除');
+    expect(result.stdout).toContain('跳过门禁');
+  });
+
+  it('delete + 相关 update 混合 → 删除行跳过收集、update 行命中 → 门禁运行', async () => {
+    const stdin =
+      `refs/heads/topic-b ${LOCAL_RELATED} refs/heads/topic-b ${REMOTE_RELATED}\n` +
+      `refs/heads/old-topic ${ZERO} refs/heads/old-topic ${REMOTE_DELETED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty, zeroDiffBadObject, `*'${LOCAL_RELATED}'*) printf 'w-model-dev/SKILL.md\\n' ;;`]),
+    });
+    gateRan(result, 'delete + update 混合推送');
+  });
+
+  it('坏行（字段缺失）→ fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/topic-a ${LOCAL_UNRELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+  });
+
+  it('非法 sha（非 40 位十六进制）→ fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/topic-a not-a-sha refs/heads/topic-a ${REMOTE_UNRELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+  });
+
+  it('坏行 + 合法相关行混合 → 不信任部分合法行，fail-closed 门禁运行', async () => {
+    const stdin = `garbage-line\n` + `refs/heads/topic-b ${LOCAL_RELATED} refs/heads/topic-b ${REMOTE_RELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty, `*'${LOCAL_RELATED}'*) printf 'w-model-dev/SKILL.md\\n' ;;`]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+  });
+
+  it('合法行但 git diff 失败（对象缺失）→ fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/topic-a ${LOCAL_UNRELATED} refs/heads/topic-a ${REMOTE_UNRELATED}\n`;
+    const result = await runFilteredPush({
+      stdin,
+      gitBody: gitBody([fallbackEmpty, `*'${LOCAL_UNRELATED}'*) exit 128 ;;`]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+  });
+
+  it('stdin 为空：fallback diff 含相关路径 → 门禁运行', async () => {
+    const result = await runFilteredPush({
+      gitBody: gitBody([`*'HEAD@{push}'*|*'origin/HEAD'*) printf 'w-model-dev/SKILL.md\\n' ;;`]),
+    });
+    gateRan(result, 'stdin 为空时回退 HEAD@{push}/origin/HEAD');
+  });
+
+  it('stdin 为空：fallback 全部失败 → fail-closed 门禁运行（空 changed_files 不放行）', async () => {
+    const result = await runFilteredPush({
+      gitBody: gitBody([fallbackFail]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, 'fallback 失败不得跳过门禁').not.toContain('跳过门禁');
+  });
+
+  it('stdin 为空：fallback diff 不相关 → 跳过门禁（既有手动语义）', async () => {
+    const result = await runFilteredPush({
+      gitBody: gitBody([fallbackUnrelated]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('跳过门禁');
+  });
+
+  it('--force 绕过路径过滤直接跑门禁，即使 stdin 是垃圾行', async () => {
+    const result = await runFilteredPush({
+      args: ['--force'],
+      stdin: `garbage-no-sha\n`,
+      gitBody: gitBody([fallbackEmpty]),
+    });
+    gateRan(result, '--force 不读 stdin、不做 ref 语义判断');
+  });
+
+  it('PREPUSH_FORCE=1 同样绕过过滤；PREPUSH_FORCE=0 且 stdin 不相关 → 跳过', async () => {
+    const forced = await runFilteredPush({
+      stdin: `refs/heads/topic-a ${LOCAL_UNRELATED} refs/heads/topic-a ${REMOTE_UNRELATED}\n`,
+      env: { PREPUSH_FORCE: '1' },
+      gitBody: gitBody([fallbackEmpty]),
+    });
+    gateRan(forced, 'PREPUSH_FORCE=1 强制跑门禁');
+
+    const skipped = await runFilteredPush({
+      stdin: `refs/heads/topic-a ${LOCAL_UNRELATED} refs/heads/topic-a ${REMOTE_UNRELATED}\n`,
+      gitBody: gitBody([fallbackEmpty, `*'${LOCAL_UNRELATED}'*) printf 'eval/probe.json\\n' ;;`]),
+    });
+    expect(skipped.code, `${skipped.stdout}\n${skipped.stderr}`).toBe(0);
+    expect(skipped.stdout).toContain('跳过门禁');
   });
 });
 

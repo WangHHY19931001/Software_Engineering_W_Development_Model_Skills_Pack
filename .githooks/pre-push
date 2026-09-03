@@ -10,12 +10,12 @@
 # 临时跳过（仅紧急情况，勿用于常规开发）：
 #   git push --no-verify
 #
-# 触发条件：仅当本次推送的提交里包含以下路径的变更时才跑门禁，
-#           纯配置/纯目录（docs/superpowers、docs/changes）改动直接放行：
-#   - w-model-dev/**
+# 触发条件：仅当本次推送范围内含以下路径的变更时才跑门禁，其余（eval/、纯目录等）放行。
+#   - w-model-dev/**：case 模式 w-model-dev/*（bash case 模式中 * 可跨 /，命中任意层级文件）
 #   - 根级活体文档/配置：README.md / AGENTS.md / CONTRIBUTING.md / .gitignore / .eslintsecurity-baseline.json / package.json / package-lock.json
-#   - config/** / scripts/** / .githooks/**
-#   - docs/*.md（docs/ 根级 .md，子目录归档不触发）
+#   - config/** / scripts/** / .githooks/**（同上，* 跨 /）
+#   - docs/*.md（* 跨 /：实际命中 docs/ 任意层级 *.md，含 docs/changes、docs/superpowers
+#     归档——保持历史触发语义，不做收窄）
 
 set -euo pipefail
 
@@ -74,41 +74,152 @@ warn() { printf '[pre-push] \033[33m⚠\033[0m %s\n' "$*" 2>/dev/null || true; }
 #
 # --force（或历史环境变量 PREPUSH_FORCE=1）时强制跑全部门禁，便于手动验证
 # （npm run prepush 默认 --force）。实际 git push 触发时不带，仍按变更路径过滤。
+# FORCE 分支在读取 stdin 之前即结束（bash 只在显式读取时才触碰 stdin，不消费不阻塞），
+# --force 不改变下方 stdin ref 解析 / 删除处理 / fallback / fail-closed 任何语义。
 
 if [ "$FORCE" != "1" ] && [ "${PREPUSH_FORCE:-0}" != "1" ]; then
-  # pre-push hook stdin 格式：<local ref> <local sha> <remote ref> <remote sha>
-  # 读取所有待推送的 ref 行，聚合后判断变更范围。
-  changed_files="$(git diff --name-only HEAD@{push} HEAD 2>/dev/null || git diff --name-only origin/HEAD HEAD 2>/dev/null)"
+  # =====================================================================
+  # pre-push hook stdin ref 解析：git 推送时 stdin 必有 ≥1 行，因此**先读 stdin**
+  # 再做范围判断，不再用全局 diff（HEAD@{push}/origin/HEAD）先行短路——全局 diff 非空但
+  # 不相关时旧实现会跳过 stdin，多 ref 推送漏检。每行严格四字段（IFS 空白分隔，
+  # 行内多余空白容忍）：
+  #   <local ref> <local sha> <remote ref> <remote sha>
+  #   - ref 非空；sha 必须 40 位十六进制（全零 sha 合法：第 2 字段全零 = 删除远端 ref，
+  #     第 4 字段全零 = 全新分支）
+  #   - 任一解析失败 → fail-closed：无法证明变更范围就不缩小范围，直接运行全部门禁
+  # 有 stdin 行时以 stdin 为准（逐行聚合变更文件）。
+  # =====================================================================
 
-  # 兜底：上面的 diff 失败（首次推送、无 upstream 等），改为扫描本次待推送的提交列表
-  if [ -z "$changed_files" ]; then
-    while read -r local_ref local_sha remote_ref remote_sha; do
-      # 全新的远程分支（remote_sha 全 0）→ 取本地最近 20 条提交里的变更
-      if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-        changed_files="${changed_files}$(git log --name-only --pretty=format: -n 20 "$local_sha" 2>/dev/null)"
+  ZERO_SHA="0000000000000000000000000000000000000000"
+
+  # 路径匹配（共享）：$1 为换行分隔的变更文件列表。命中任一前缀 → 返回 0（需跑门禁，
+  # grep 式语义），否则返回 1。
+  # 注意：bash case 的模式匹配与文件通配不同，* 可跨 /，因此 w-model-dev/* 命中任意层级
+  # 文件、docs/*.md 命中 docs/ 任意层级 *.md——历史触发语义如此，不做收窄。
+  files_need_gate() {
+    local files="$1"
+    local f
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      case "$f" in
+        w-model-dev/*)                          return 0 ;;
+        README.md|AGENTS.md|CONTRIBUTING.md|.gitignore|.eslintsecurity-baseline.json|package.json|package-lock.json) return 0 ;;
+        config/*|scripts/*|.githooks/*)         return 0 ;;
+        docs/*.md)                              return 0 ;;
+      esac
+    done <<EOF
+$files
+EOF
+    return 1
+  }
+
+  # 终端（交互手动执行）不读取 stdin，避免阻塞在交互输入；管道/重定向（git push、
+  # CI、文件重定向）正常读取（git 写完 ref 行即关闭管道 → EOF）。
+  stdin_saw_line=0
+  parse_failed=0
+  parse_reason=""
+  delete_only=1
+  changed_files=""
+  if [ ! -t 0 ]; then
+    # ===== git push 场景：单次遍历 stdin，逐行严格校验并聚合变更文件 =====
+    while IFS= read -r stdin_line || [ -n "$stdin_line" ]; do
+      stdin_saw_line=1
+      if [ -z "$stdin_line" ]; then
+        parse_failed=1
+        parse_reason="ref 行为空"
+        break
+      fi
+      local_ref="" local_sha="" remote_ref="" remote_sha="" extra=""
+      IFS=' ' read -r local_ref local_sha remote_ref remote_sha extra <<< "$stdin_line"
+      if [ -z "$local_ref" ] || [ -z "$local_sha" ] || [ -z "$remote_ref" ] || [ -z "$remote_sha" ] || [ -n "$extra" ]; then
+        parse_failed=1
+        parse_reason="ref 行字段不齐（应为 <local ref> <local sha> <remote ref> <remote sha> 四字段）：${stdin_line}"
+        break
+      fi
+      if ! [[ "$local_sha" =~ ^[0-9a-fA-F]{40}$ ]] || ! [[ "$remote_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        parse_failed=1
+        parse_reason="sha 非 40 位十六进制：${stdin_line}"
+        break
+      fi
+
+      if [ "$local_sha" = "$ZERO_SHA" ]; then
+        # 删除远端 ref：本地无内容可检，跳过该行的文件收集，继续处理其他行
+        log "远端 ref 删除 ${local_ref}：本地无内容可检，跳过该行"
+        continue
+      fi
+      delete_only=0
+      line_diff=""
+      if [ "$remote_sha" = "$ZERO_SHA" ]; then
+        # 全新分支（远端对象不存在）：先尝试建立可证明基线（--fork-point 优先，
+        # 退化为普通 merge-base）；无法证明 → fail-closed。绝不使用 `git log -n N`
+        # 截断（>N 提交的新分支会漏检）。
+        # 注意退化情形：同名本地 ref 会让 merge-base 解到推送尖本身（base == local_sha，
+        # 实测 fork-point 对自身 reflog 亦如此）——那不是可证明的祖先基线，同样 fail-closed。
+        base=""
+        base="$(git merge-base --fork-point "$remote_ref" "$local_sha" 2>/dev/null)" || true
+        if [ -z "$base" ]; then
+          base="$(git merge-base "$remote_ref" "$local_sha" 2>/dev/null)" || true
+        fi
+        if [ -z "$base" ] || [ "$base" = "$local_sha" ]; then
+          parse_failed=1
+          parse_reason="新分支 ${local_ref} 无法建立可证明基线（merge-base 为空或退化到推送尖端本身，远端对象可能不存在）"
+          break
+        fi
+        if ! line_diff="$(git diff --name-only "$base" "$local_sha" -- 2>/dev/null)"; then
+          parse_failed=1
+          parse_reason="git diff 失败（${local_ref} ${base}..${local_sha}）"
+          break
+        fi
       else
-        changed_files="${changed_files}$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)"
+        # 常规更新：远端对象本地可达。`--` 必须置于两 sha 之后——git diff 在 `--`
+        # 之后只解析 pathspec，把 `--` 前移会把 sha 当路径致空输出（静默漏检）。
+        if ! line_diff="$(git diff --name-only "$remote_sha" "$local_sha" -- 2>/dev/null)"; then
+          parse_failed=1
+          parse_reason="git diff 失败（${local_ref} ${remote_sha}..${local_sha}）"
+          break
+        fi
+      fi
+      if [ -n "$line_diff" ]; then
+        changed_files="${changed_files}${line_diff}"$'\n'
       fi
     done
   fi
 
-  # 命中任一前缀即需要跑门禁
-  needs_gate=0
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    case "$f" in
-      w-model-dev/*)                             needs_gate=1; break ;;
-      README.md|AGENTS.md|CONTRIBUTING.md|.gitignore|.eslintsecurity-baseline.json|package.json|package-lock.json) needs_gate=1; break ;;
-      config/*|scripts/*|.githooks/*)            needs_gate=1; break ;;
-      docs/*.md)                                 needs_gate=1; break ;;
-    esac
-  done <<EOF
-$changed_files
-EOF
-
-  if [ "$needs_gate" -eq 0 ]; then
-    ok "本次推送未触及门禁相关文件（scripts/ 文档 / schema / 配置），跳过门禁"
-    exit 0
+  if [ "$stdin_saw_line" -eq 1 ]; then
+    if [ "$parse_failed" -eq 1 ]; then
+      fail "pre-push stdin ref 解析失败：${parse_reason}（fail-closed：无法证明变更范围，运行全部门禁）"
+    elif [ "$delete_only" -eq 1 ]; then
+      # 全部行均为删除（delete-only push）：无本地提交内容，说明后放行
+      ok "本次推送仅删除远端 ref（本地无提交内容可检），跳过门禁"
+      exit 0
+    elif files_need_gate "$changed_files"; then
+      : # 命中门禁相关路径 → fall through 到下方门禁
+    else
+      ok "本次推送未触及门禁相关文件（scripts/ 文档 / schema / 配置），跳过门禁"
+      exit 0
+    fi
+  else
+    # ===== stdin 为空：非 git push 触发（手动执行 / EOF 重定向 / 终端交互）=====
+    # 保留历史兜底语义：HEAD@{push} 相对 HEAD 的变更；HEAD@{push} 不可用时回退
+    # origin/HEAD。注意这只是「当前分支相对上游」的近似——git 实际推送必有 stdin，
+    # 多 ref / 新分支 / 删除场景全部由上方 stdin 路径处理。
+    log "stdin 无 ref 行（非 git push 触发），回退 HEAD@{push}/origin/HEAD 范围判断"
+    if changed_files="$(git diff --name-only HEAD@{push} HEAD 2>/dev/null || git diff --name-only origin/HEAD HEAD 2>/dev/null)"; then
+      if [ -n "$changed_files" ]; then
+        if files_need_gate "$changed_files"; then
+          : # 命中门禁相关路径 → fall through 到下方门禁
+        else
+          ok "本次推送未触及门禁相关文件（scripts/ 文档 / schema / 配置），跳过门禁"
+          exit 0
+        fi
+      else
+        # diff 成功但无输出 = 可证明相对上游无任何变更（手动执行、仓库已同步），放行
+        ok "回退范围判断无待推送变更（相对上游无差异），跳过门禁"
+        exit 0
+      fi
+    else
+      fail "回退范围判断失败（HEAD@{push} 与 origin/HEAD 均不可用）：无法证明无相关变更（fail-closed），运行全部门禁"
+    fi
   fi
 fi
 

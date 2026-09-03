@@ -2874,3 +2874,54 @@ describe('C3 文档入口契约', () => {
     expect(c3DocumentContractViolations(missingHookWorkflow)).toContain('CONTRIBUTING.md:PowerShell hooksPath流程');
   });
 });
+
+describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', () => {
+  // 直接读取 .githooks/pre-push 源文本断言契约（hook 是 bash，不由 docs-consistency
+  // logic 校验；此处守住与 17 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
+  // -n 20 截断 / 空 changed_files 放行」实现）。
+  const prePushSource = () => fs.readFile(path.join(REPO_ROOT, '.githooks', 'pre-push'), 'utf8');
+
+  it('先读 stdin 四字段解析，fallback（HEAD@{push}/origin/HEAD）只作空 stdin 回退', async () => {
+    const source = await prePushSource();
+    // 四字段解析（含多余字段捕获变量）
+    expect(source).toContain('read -r local_ref local_sha remote_ref remote_sha extra');
+    // 40 位十六进制 sha 校验（含全零）
+    expect(source).toContain('=~ ^[0-9a-fA-F]{40}$');
+    // stdin 解析出现在 fallback diff 之前（顺序 = 语义：有 stdin 行时以 stdin 为准）
+    const stdinParse = source.indexOf('local_ref local_sha remote_ref remote_sha extra');
+    const fallbackDiff = source.indexOf('git diff --name-only HEAD@{push} HEAD');
+    expect(stdinParse).toBeGreaterThanOrEqual(0);
+    expect(fallbackDiff).toBeGreaterThan(stdinParse);
+    // fallback 结构仍在（手动/非 push 场景）
+    expect(source).toContain('origin/HEAD HEAD');
+    // stdin 读取位于 --force 门内（force 分支不读 stdin、不触碰 ref 语义）
+    const forceGuard = source.indexOf('PREPUSH_FORCE:-0');
+    const stdinRead = source.indexOf('[ ! -t 0 ]');
+    expect(forceGuard).toBeGreaterThanOrEqual(0);
+    expect(stdinRead).toBeGreaterThan(forceGuard);
+  });
+
+  it('全零 sha 双分支：删除（local 全零跳过收集）与新分支（remote 全零走 merge-base），无 -n 20 截断', async () => {
+    const source = await prePushSource();
+    expect(source).toContain('ZERO_SHA=');
+    // 删除 ref：本地 sha 全零 → 无本地内容可检
+    expect(source).toContain('[ "$local_sha" = "$ZERO_SHA" ]');
+    // 新分支：remote sha 全零 → merge-base/fork-point 建立可证明基线
+    expect(source).toContain('[ "$remote_sha" = "$ZERO_SHA" ]');
+    expect(source).toContain('git merge-base --fork-point');
+    expect(source).toContain('git merge-base "$remote_ref" "$local_sha"');
+    // merge-base 退化为推送尖本身（同名本地 ref）不构成可证明基线 → fail-closed
+    expect(source).toContain('[ "$base" = "$local_sha" ]');
+    // 绝无截断式扫描：>20 commits 的新分支不得漏检
+    expect(source).not.toContain('-n 20');
+    expect(source).not.toContain('git log --name-only');
+  });
+
+  it('diff 调用把 -- 置于两 sha 之后（-- 前移会把 sha 当 pathspec 致空输出），并带 fail-closed 标记', async () => {
+    const source = await prePushSource();
+    expect(source).toContain('git diff --name-only "$remote_sha" "$local_sha" --');
+    expect(source).toContain('git diff --name-only "$base" "$local_sha" --');
+    expect(source).not.toContain('diff --name-only -- "$');
+    expect(source).toContain('fail-closed');
+  });
+});
