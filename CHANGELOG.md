@@ -23,6 +23,8 @@
 
 - **最终契约收口**：递归扫描全部 `references/**/*.md`、`templates/**/*.md`、`examples/**/*.md` 的普通失败动作，明确禁止语境与 phase 1 ingestion A-chunk/A-cross→G 专用收敛例外；普通失败均要求完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 链，`/wm test` 值按边界断言。补充 L0 根目录 symlink/junction 与 CLI stderr `ERROR_JSON` 回归；README、toolbox、command-reference、subagent registry、dependency-boundaries/security 契约保持登记，版本 42.2.1 与 fast-uri 3.1.7 保持不变。
 - **本轮定向验证**：4 files / 70 tests / exit 0（examples-contract 20/20、L0 logic 29/29、CLI 11/11、dependency-boundaries 10/10）；完整 Vitest 62/1307、串行 docs-consistency 重跑 0（1307/1307）、eval/self-test/doctor/samples/security/typecheck/npm audit 均已实测通过；Git Bash prepush 首次在第 13 项因 registry `ENOTFOUND` / audit endpoint 不可达 exit 1，格式化修复后及最终证据同步后均真实 exit 0、17 项全绿；网络失败作为瞬时 concern 留档，未冒充代码通过。
+- **Task 8 最终修复轮（2026-09-03）**：`examples-contract.test.ts` 递归覆盖全部 `references/**/*.md`、`templates/**/*.md`、`examples/**/*.md` 的普通失败动作与多行 `/wm test` 命令；普通失败统一走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，phase 1 ingestion 保持 A-chunk/A-cross→G 专用收敛。L0 审计既有 fail-closed 边界补内部非 Markdown 目录 symlink/junction 回归；版本 42.2.1、fast-uri 3.1.7、pre-push 17 项和 CLI 37 项统计均保持不变。
+- **最终修复轮验证**：examples-contract 21/21、L0 logic 30/30、L0 CLI 11/11、全量 Vitest 62 files / 1309 tests / 1309 passed；L0 CLI 默认/显式 root 均为 `647/92/36/0`，eval 25/25，self-test 262/262，doctor 0 阻断/3 提示，samples 282/244/15，security 新增 0，typecheck、npm audit high 均 exit 0。最终 Git Bash `bash -c "npm run prepush"` 须在最终提交后重跑并以外部 HEAD/date/status 记录为准。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 

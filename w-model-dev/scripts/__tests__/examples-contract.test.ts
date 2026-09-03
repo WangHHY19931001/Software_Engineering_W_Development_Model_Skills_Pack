@@ -32,7 +32,8 @@ function testCommands(content: string): string[] {
   let inFence = false;
   let active: string | undefined;
   const flush = (): void => {
-    if (active?.includes("type=")) commands.push(active.replace(/\s+/g, " ").trim());
+    if (active?.includes("type="))
+      commands.push(active.replace(/\s+/g, " ").trim());
     active = undefined;
   };
 
@@ -56,7 +57,8 @@ function testCommands(content: string): string[] {
 
     for (const match of line.matchAll(/`([^`]+)`/g)) {
       const value = match[1]!;
-      if (value.includes("/wm test") && value.includes("type=")) commands.push(value.trim());
+      if (value.includes("/wm test") && value.includes("type="))
+        commands.push(value.trim());
     }
   }
   flush();
@@ -81,7 +83,65 @@ function markdownFiles(relativeDirectory: string): string[] {
   return files.sort();
 }
 
+const ORDINARY_FAILURE_CHAIN =
+  "V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT";
+
+function normalizeGuidance(value: string): string {
+  return value.replace(/[`*_]/g, "").replace(/\s+/g, " ");
+}
+
+function hasCompleteOrdinaryFailureChain(value: string): boolean {
+  const normalized = normalizeGuidance(value);
+  const variants = [
+    ORDINARY_FAILURE_CHAIN,
+    ORDINARY_FAILURE_CHAIN.replace(" → R → ", " → R 定位 → "),
+    ORDINARY_FAILURE_CHAIN.replace(" → S-fix → ", " → S-fix 修复 → "),
+    ORDINARY_FAILURE_CHAIN.replace(
+      " → S-fix → ",
+      " → S-fix 携 R 报告执行修复 → ",
+    ),
+    ORDINARY_FAILURE_CHAIN.replace(
+      "G(check-preventive-review exit 0)",
+      "preventive 门禁",
+    ),
+  ];
+  if (
+    variants.some((variant) => normalized.includes(normalizeGuidance(variant)))
+  )
+    return true;
+  const stages = [
+    "V/G 失败",
+    "R",
+    "V 复审 RootCauseReport",
+    "G(check-rootcause-report exit 0)",
+    "S-fix",
+    "R3×3",
+    "G(check-preventive-review exit 0)",
+    "V",
+    "G",
+    "CHECKPOINT",
+  ];
+  let cursor = 0;
+  for (const stage of stages) {
+    const index = normalized.indexOf(stage, cursor);
+    if (index < 0) return false;
+    cursor = index + stage.length;
+  }
+  return true;
+}
+
+function matchesAny(patterns: RegExp[], value: string): boolean {
+  return patterns.some((pattern) => pattern.test(value));
+}
+
 describe("examples workflow contract", () => {
+  it("normalizes whitespace in the canonical ordinary failure chain", () => {
+    expect(
+      hasCompleteOrdinaryFailureChain(
+        ORDINARY_FAILURE_CHAIN.replaceAll(" → ", "\n→\n"),
+      ),
+    ).toBe(true);
+  });
   it("captures a multiline /wm test command as one bounded command", () => {
     const commands = testCommands(
       "```text\n/wm test type=系统\n  result=pass\n```\n\n`/wm test type=集成 result=fail`",
@@ -162,6 +222,96 @@ describe("examples workflow contract", () => {
         "R 定位线索",
       );
     }
+  });
+
+  it("requires executable failure guidance to carry the complete chain across all Markdown assets", () => {
+    const files = [
+      ...markdownFiles("w-model-dev/references"),
+      ...markdownFiles("w-model-dev/templates"),
+      ...markdownFiles("w-model-dev/examples"),
+    ];
+    const failureSignals = [
+      /V\/G\s*(?:失败|不通过)/i,
+      /评审(?:失败|不通过)/i,
+      /质量门(?:失败|不通过)/i,
+      /(?:BDD|TLA\+)\s*(?:门禁)?失败/i,
+      /(?:测试|用例)(?:失败|未通过)/i,
+      /passed\s*=\s*false/i,
+      /qualityLevel\s*[=:]?\s*[CD]/i,
+      /exitCode\s*(?:=|:)?\s*[1-9]/i,
+      /exitCode\s*(?:!=|≠|!==|非)\s*0/i,
+      /退出码\s*[12]/i,
+      /exit code\s*[12]/i,
+    ];
+    const executableRoutes = [
+      // eslint-disable-next-line security/detect-unsafe-regex -- fixed-size workflow token alternation in test-owned guidance
+      /(?:→|->)\s*(?:回退|回到|回阶段|回编码|返工|修正|修复|重跑|分派|交给|S-fix)/i,
+      /(?:必须|须|应当|需要|只能|一律)\s*(?:回退|回到|回阶段|回编码|返工|修正|修复|重跑|分派\s*S|交给\s*S|执行)/i,
+      // eslint-disable-next-line security/detect-unsafe-regex -- fixed-size workflow token alternation in test-owned guidance
+      /(?:分派|交给)\s*S(?:-fix)?(?:\s*子代理)?/i,
+      /S-(?:code|test|bdd)\s*(?:补全|补充|修正|修复)/i,
+      /按\s*`?reworkHints`?\s*(?:返工|修复)/i,
+    ];
+    const prohibition =
+      /(?:不得|禁止|不可|不能|不允许|不应|不授权|不要|避免|跳过|未经|命中反模式|must\s+not|not\s+allowed|cannot)/i;
+    const isInputCorrection = (value: string): boolean =>
+      /(?:退出码\s*2|exitCode\s*=\s*2|exit code\s*2)/i.test(value) &&
+      /(?:输入|参数|文件|目录|JSON|manifest|project-dir|命令).*(?:修正|补齐|恢复|重跑|重新执行)|(?:修正|补齐|恢复).*(?:输入|参数|文件|目录|JSON|manifest|project-dir|命令)/i.test(
+        value,
+      );
+    const violations: string[] = [];
+
+    for (const relativePath of files) {
+      // eslint-disable-next-line security/detect-object-injection -- paragraph index is an integer over the local array
+      const paragraphs = read(relativePath).split(/\r?\n\s*\r?\n/);
+      for (
+        let paragraphIndex = 0;
+        paragraphIndex < paragraphs.length;
+        paragraphIndex++
+      ) {
+        // eslint-disable-next-line security/detect-object-injection -- integer index from the local paragraph loop
+        const paragraph = paragraphs[paragraphIndex]!;
+        const context = normalizeGuidance(paragraph);
+        const adjacentContext = normalizeGuidance(
+          paragraphs
+            .slice(
+              Math.max(0, paragraphIndex - 1),
+              Math.min(paragraphs.length, paragraphIndex + 2),
+            )
+            .join(" "),
+        );
+        if (
+          hasCompleteOrdinaryFailureChain(context) ||
+          hasCompleteOrdinaryFailureChain(adjacentContext)
+        )
+          continue;
+
+        // eslint-disable-next-line security/detect-object-injection -- line index is an integer over the local paragraph array
+        const lines = paragraph.split(/\r?\n/);
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          // eslint-disable-next-line security/detect-object-injection -- integer index from the local line loop
+          const line = lines[lineIndex]!.trim();
+          if (!line || /^#{1,6}\s/.test(line)) continue;
+          // eslint-disable-next-line security/detect-object-injection -- bounded look-ahead over the local line array
+          const candidate = normalizeGuidance(
+            [line, lines[lineIndex + 1] ?? "", lines[lineIndex + 2] ?? ""].join(
+              " ",
+            ),
+          );
+          if (
+            !matchesAny(failureSignals, line) ||
+            !matchesAny(executableRoutes, candidate)
+          )
+            continue;
+          if (hasCompleteOrdinaryFailureChain(candidate)) continue;
+          if (isInputCorrection(candidate)) continue;
+          if (prohibition.test(candidate)) continue;
+          violations.push(`${relativePath}: ${line}`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 
   it("requires every ordinary failure guidance document to publish the complete rework chain", () => {
@@ -271,15 +421,20 @@ describe("examples workflow contract", () => {
       ...markdownFiles("w-model-dev/examples"),
       ...markdownFiles("w-model-dev/templates"),
     ];
-    // eslint-disable-next-line security/detect-unsafe-regex -- bounded alternation scans fixed workflow tokens without nested quantifiers
-    const directBypass =
-      /(?:直接|direct(?:ly)?)(?:\s*走)?\s*R\s*(?:→|->)\s*S-fix/i;
+    const directBypass = (line: string): boolean => {
+      const normalized = line.toLowerCase().replace(/\s+/g, " ");
+      return (
+        (normalized.includes("直接") || normalized.includes("direct")) &&
+        normalized.includes("r") &&
+        (normalized.includes("r→s-fix") || normalized.includes("r->s-fix"))
+      );
+    };
     const prohibition =
       /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
 
     for (const relativePath of files) {
       for (const line of read(relativePath).split(/\r?\n/)) {
-        if (directBypass.test(line)) {
+        if (directBypass(line)) {
           expect(line, `${relativePath}: ${line}`).toMatch(prohibition);
         }
       }

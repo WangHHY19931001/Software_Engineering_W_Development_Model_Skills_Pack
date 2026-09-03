@@ -76,7 +76,7 @@ G: check-preventive-review.ts 证据
 V: VerifierOutput JSON
   ↓ 分派 G 门禁
 G: check-verifier-output.ts + 阶段专属 check 脚本 → {exitCode, qualityLevel, passed, reworkHints}
-O: 若 exitCode≠0 或 qualityLevel∈{C,D} → 按完整普通失败链执行（V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT，见 §4）
+O: 若 exitCode≠0 或 qualityLevel∈{C,D} → 按完整普通失败链执行：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT（见 §4）
 O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（展示 G 证据 + RTM coverage）
 O: 用户放行 → 更新 project.status → 进入下一阶段
 ```
@@ -179,7 +179,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 4. 返工循环分派
 
-V/G 失败 → R 定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix 修复 → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT（约束 #12 + #11 + #8）
+V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix 修复 → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT（约束 #12 + #11 + #8）
 
 | 步骤 | 角色 | 产物 | check 脚本 | R3 报告路径前缀 |
 |---|---|---|---|---|
@@ -550,7 +550,7 @@ V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
   ↓ 分派 G
 G: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>"
    → 返回 {exitCode, qualityLevel, passed, reworkHints}
-O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D}
+O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D} → 视为 V/G 失败，必须执行完整普通失败链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
    → 分派 R 定位（输入：reworkHints + 失败产物 + 上游产物）→ R 产出 RootCauseReport
    → 分派 V 复审根因报告（targetKind=rootcause）→ V 返回 {qualityLevel, passed, reworkHints}
    → 分派 G 门禁（check-rootcause-report.ts）→ G 返回 {exitCode, evidence}
@@ -575,7 +575,7 @@ O: 阶段 8 验收测试产物已放行
   ↓ 分派 G
 G: npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
    → 返回 {exitCode, GATE_JSON 摘要（RTM 覆盖率 / 四级测试结果）}
-O: 若 exitCode = 1 → 先执行完整普通失败链：R 定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT，再按 R 结论处理
+O: 若 exitCode = 1 → 视为 V/G 失败，先执行完整普通失败链：V/G 失败 → R 定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT，再按 R 结论处理
 O: 若 exitCode = 2 → 仅修正输入并重跑，不得当作失败修复或放行
 O: 若通过 → 🔴 CHECKPOINT · 发布放行（展示 GATE_JSON 给用户）
 O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完成
@@ -1374,7 +1374,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 | 子代理 | 产物动作 | 典型场景 |
 |---|---|---|
 | **S 子代理**（标准变体） | **新增**产物（新文件、新测试用例、新文档章节、新 RTM 实体） | 阶段首次产出：按 phase-N 定义产出本阶段开发产物 + 同步测试设计 |
-| **S-fix 子代理**（返工变体） | **修复**既有产物的 bug（覆盖原文件） | V/G 失败 → R 定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix 携 R 报告执行修复 → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT |
+| **S-fix 子代理**（返工变体） | **修复**既有产物的 bug（覆盖原文件） | 完整普通失败链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix 携 R 报告执行修复 → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT |
 | **R 子代理** | **不修改任何产物**，仅产出 `RootCauseReport` | 定位根因，输出 fixRecommendation 给 S-fix |
 
 > S 子代理**不得**在标准产出阶段直接修复既有产物 bug；发现既有产物 bug 时按下方流程处理。
