@@ -134,6 +134,13 @@ async function main(): Promise<void> {
       .join(', ');
     const missingStr = p.missing.length > 0 ? ` [缺失: ${p.missing.join('/')}]` : '';
     console.log(`  阶段 ${p.phase}: ${roleStr}${missingStr}`);
+    // R3 维度缺失明细（审计修复 task 3）：人类可读输出直接列出缺失维度
+    const dims = result.r3Missing.find((entry) => entry.phase === p.phase);
+    if (dims && dims.missingDimensions.length > 0) {
+      console.log(
+        `        R3 缺失维度: ${dims.missingDimensions.join('/')}（须 role=R 的 r3-completeness/r3-reliability/r3-security 各 1 条 success）`,
+      );
+    }
   }
 
   if (!result.passed) {

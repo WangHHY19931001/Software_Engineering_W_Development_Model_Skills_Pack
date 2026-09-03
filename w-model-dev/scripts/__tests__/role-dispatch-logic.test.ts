@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
+import { checkRoleDispatch, type RoleDispatchEntry } from '../logic/role-dispatch-logic.js';
 
 /**
  * role-dispatch-logic.ts 单元测试 —— R3 无条件强制
@@ -140,5 +140,169 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
     expect(r.phaseSummary[0]!.missing).toContain('V');
     expect(r.phaseSummary[0]!.missing).toContain('G');
     expect(r.phaseSummary[0]!.missing).toContain('R');
+  });
+});
+
+/**
+ * 审计修复（audit-gate-closure task 3）：空输入 fail-closed + R3 维度精确语义。
+ *
+ * 覆盖：
+ *   - 空数组 / 全无效条目（phaseMap 空）→ blocking，phaseSummary=[]
+ *   - R3 只计 role=R + outcome=success + r3-* action，三维度各 ≥1；
+ *     rootcause/iceberg-sweep/非 success/非 R3 action 一律不计入
+ *   - 缺失维度消息指明具体维度；r3Missing 结构
+ *   - 重复维度作为真实重工记录不报错（三维度各 ≥1 即通过）
+ */
+describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义', () => {
+  const svg = (phase: number, role: 'S' | 'V' | 'G') => ({
+    phase,
+    role,
+    action: role === 'S' ? 'produce' : role === 'V' ? 'review' : 'gate',
+    outcome: 'success',
+  });
+
+  it('空数组 → blocking（fail-closed），phaseSummary 为空', () => {
+    const r = checkRoleDispatch([]);
+    expect(r.passed).toBe(false);
+    expect(r.phaseSummary).toHaveLength(0);
+    expect(r.violations.join(' ')).toMatch(/无任何可校验阶段/);
+  });
+
+  it('全部条目缺 phase/role（无任何可校验阶段）→ blocking（fail-closed）', () => {
+    const entries: RoleDispatchEntry[] = [
+      null as unknown as RoleDispatchEntry,
+      { action: 'produce', outcome: 'success' } as unknown as RoleDispatchEntry,
+      { phase: 'x', role: 'S' } as unknown as RoleDispatchEntry, // 非法 phase
+      { phase: 1, outcome: 'success' } as RoleDispatchEntry, // 缺 role
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.phaseSummary).toHaveLength(0);
+    expect(r.violations.join(' ')).toMatch(/无任何可校验阶段/);
+  });
+
+  it('role=R 但 action=rootcause×3 不计入 R3 → 失败且消息指明三维度缺失', () => {
+    const entries = [
+      svg(1, 'S'),
+      svg(1, 'V'),
+      svg(1, 'G'),
+      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.violations.join(' ')).toMatch(/缺失 role=R 记录/);
+    expect(r.violations.join(' ')).toMatch(/缺 completeness\/reliability\/security/);
+    expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['completeness', 'reliability', 'security'] }]);
+    // roles 计数保留全部 role=R 记录（含 rootcause）
+    expect(r.phaseSummary[0]!.roles.R).toBe(3);
+  });
+
+  it('重复单维（r3-completeness×3）缺 reliability/security → 失败且指明缺失维度', () => {
+    const entries = [
+      svg(1, 'S'),
+      svg(1, 'V'),
+      svg(1, 'G'),
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.violations.join(' ')).toMatch(/缺 reliability\/security/);
+    expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['reliability', 'security'] }]);
+  });
+
+  it('R3 outcome=fail/blocked 不计入 → 失败（三维度全缺）', () => {
+    const entries = [
+      svg(1, 'S'),
+      svg(1, 'V'),
+      svg(1, 'G'),
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'fail' },
+      { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'blocked' },
+      { phase: 1, role: 'R', action: 'r3-security', outcome: 'fail' },
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.violations.join(' ')).toMatch(/缺 completeness\/reliability\/security/);
+  });
+
+  it('非 R3 action（iceberg-sweep 等 role=R success）不计入 R3 → 失败', () => {
+    const entries = [
+      svg(1, 'S'),
+      svg(1, 'V'),
+      svg(1, 'G'),
+      { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.violations.join(' ')).toMatch(/缺 completeness\/reliability\/security/);
+  });
+
+  it('三维度各 1 条 success（含重复维度重工记录）→ 通过且无 r3Missing', () => {
+    const entries = [
+      svg(1, 'S'),
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' }, // 返工再审（重复维度）
+      { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
+      svg(1, 'V'),
+      svg(1, 'G'),
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toHaveLength(0);
+    expect(r.r3Missing).toEqual([]);
+  });
+
+  it('rootcause/iceberg 等 role=R 非 R3 记录可与合法三维度共存 → 通过', () => {
+    const entries = [
+      svg(1, 'S'),
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
+      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' }, // 真实 R 定位，不充数也不干扰
+      svg(1, 'V'),
+      svg(1, 'G'),
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(true);
+    expect(r.phaseSummary[0]!.roles.R).toBe(4);
+  });
+
+  it('多阶段：r3Missing 只列缺失维度的 phase，完整 phase 不出现', () => {
+    const entries = [
+      svg(1, 'S'),
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' }, // 阶段1缺 reliability/security
+      svg(1, 'V'),
+      svg(1, 'G'),
+      svg(2, 'S'),
+      { phase: 2, role: 'R', action: 'r3-completeness', outcome: 'success' },
+      { phase: 2, role: 'R', action: 'r3-reliability', outcome: 'success' },
+      { phase: 2, role: 'R', action: 'r3-security', outcome: 'success' },
+      svg(2, 'V'),
+      svg(2, 'G'),
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['reliability', 'security'] }]);
+    expect(r.phaseSummary[1]!.missing).not.toContain('R');
+    expect(r.phaseSummary[1]!.roles.R).toBe(3);
+  });
+
+  it('缺失维度消息含"当前缺 <维度>"可读措辞（供 CLI 直接展示）', () => {
+    const entries = [
+      svg(1, 'S'),
+      svg(1, 'V'),
+      svg(1, 'G'),
+      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.violations.join(' ')).toMatch(
+      /r3-completeness\/r3-reliability\/r3-security 各 1 条 success，当前缺 reliability\/security/,
+    );
   });
 });
