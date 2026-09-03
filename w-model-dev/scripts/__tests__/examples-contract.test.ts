@@ -119,7 +119,121 @@ function matchesAny(patterns: RegExp[], value: string): boolean {
   return patterns.some((pattern) => pattern.test(value));
 }
 
+// Failure-routing scan across the whole Markdown asset corpus. Each analysis
+// unit keeps its scope: a table row is analysed whole (a signal in one cell and
+// a bypass action in another cell of the same row must not escape), while plain
+// lines are analysed as sentence units. A unit is a violation only when all of
+// the following hold:
+//   - it carries an ordinary-failure signal (review/gate/BDD/TLA+/test failure,
+//     exit code 1, passed=false, or a C/D verdict routed to an action);
+//   - it contains an executable direct-action clause (dispatch S(-fix), return
+//     to a stage, rework by reworkHints, ...) whose own clause is not a
+//     prohibition restatement;
+//   - it does not already publish the canonical chain marker
+//     (「完整普通失败链」 or the full arrow chain in the same unit);
+//   - it is not the phase-1 ingestion A-chunk/A-cross→G exception;
+//   - it does not route through R first (a legal 分派 R → ... → 才分派 S-fix
+//     description is the essence of the authoritative chain, not a bypass).
+// Exit-2 input-correction routes need no exemption: 修正输入/重跑 verbs are
+// not direct actions, so an exit-2 clause never triggers a violation on its
+// own, and it must not rescue an exit-1 bypass clause in the same unit.
+const FAILURE_SIGNALS = [
+  /(?:V\/G|评审|质量门|门禁|BDD|TLA\+|测试|用例|校验|签核)\s*(?:失败|不通过|未通过)/i,
+  /(?:失败|不通过|未通过)\s*(?:评审|质量门|门禁|测试|用例|校验)/i,
+  /passed\s*=\s*false/i,
+  // A C/D verdict is not a failure signal by itself; it only marks failure
+  // routing context when the verdict is followed by an executable route.
+  /C\/D(?=[^。；|]{0,80}(?:由|分派|返工|修复|回到|回阶段|走|执行|直接|须|应))/i,
+  /exitCode\s*(?:≠|!=|!==|非|不是)\s*0/i,
+  /(?:退出码|exit\s*code|exitCode)\s*(?:=)?\s*1\b/i,
+  /exit\s*1\b/i,
+];
+const DIRECT_ACTIONS = [
+  /回退\s*(?:BDD|TLA\+)\s*子流程/i,
+  /直接(?:回到|回|分派|返工|修复|推进)/i,
+  /回到(?:编码|当前阶段|阶段|需求|上游|对应阶段|规格)/i,
+  /回阶段\s*\d/i,
+  /回编码/i,
+  /按 `?reworkHints`?(?:修复|返工)/i,
+  /(?:由|分派)\s+S(?:-fix)?(?![A-Za-z0-9_])/i,
+];
+const PROHIBITION = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|未经|命中反模式|must\s+not|not\s+allowed|cannot)/i;
+
+function hasExecutableDirectAction(value: string): boolean {
+  return value
+    .split(/(?<=[。；|])/)
+    .map((clause) => clause.trim())
+    .some((clause) => clause.length > 0 && matchesAny(DIRECT_ACTIONS, clause) && !PROHIBITION.test(clause));
+}
+
+function hasChainMarker(value: string): boolean {
+  const normalized = normalizeGuidance(value);
+  if (normalized.includes('完整普通失败链')) return true;
+  return hasCompleteOrdinaryFailureChain(value);
+}
+
+function hasRFirstRouting(value: string): boolean {
+  const normalized = normalizeGuidance(value);
+  // eslint-disable-next-line security/detect-unsafe-regex -- fixed-size workflow token match in test-owned guidance
+  const dispatch = /(?:分派|由)\s*S(?:-fix)?(?![A-Za-z0-9_])/i.exec(normalized);
+  if (!dispatch) return false;
+  const head = normalized.slice(0, dispatch.index);
+  return /(?:分派\s*R|R\s*子代理|R\s*定位|R\s*根因|RootCauseReport|R\s*报告)/i.test(head);
+}
+
+function isIngestionException(value: string): boolean {
+  return /阶段\s*1.*ingestion.*A(?:-chunk)?\s*[→>-].*A-cross.*[→>-].*G/i.test(normalizeGuidance(value));
+}
+
+function failureRoutingReason(unit: string): string | undefined {
+  const normalized = normalizeGuidance(unit);
+  if (!matchesAny(FAILURE_SIGNALS, normalized)) return undefined;
+  if (!hasExecutableDirectAction(normalized)) return undefined;
+  if (hasChainMarker(unit)) return undefined;
+  if (isIngestionException(unit)) return undefined;
+  if (hasRFirstRouting(unit)) return undefined;
+  return 'ordinary failure routes to a direct action without the complete chain';
+}
+
+function corpusFailureUnits(relativeDirectory: string): string[] {
+  const units: string[] = [];
+  for (const relativePath of markdownFiles(relativeDirectory)) {
+    const lines = read(relativePath).split(/\r?\n/);
+    let inFence = false;
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      // eslint-disable-next-line security/detect-object-injection -- integer index over the local line array
+      const rawLine = lines[lineIndex]!;
+      const trimmed = rawLine.trim();
+      if (trimmed.startsWith('```')) {
+        inFence = !inFence;
+        continue;
+      }
+      if (inFence || !trimmed || /^#{1,6}\s/.test(trimmed) || /^\|?\s*-{3,}/.test(trimmed)) continue;
+      // A table row keeps its scope: cells are rejoined so that a failure
+      // signal in one cell and the bypass action in another cell of the same
+      // row are analysed together.
+      const unit = trimmed.startsWith('|')
+        ? trimmed
+            .replace(/^\|/, '')
+            .replace(/\|$/, '')
+            .split('|')
+            .map((cell) => cell.trim())
+            .filter(Boolean)
+            .join('；')
+        : trimmed;
+      const reason = failureRoutingReason(unit);
+      if (reason) units.push(`${relativePath}:${lineIndex + 1}: ${trimmed}`);
+    }
+  }
+  return units;
+}
+
 describe('examples workflow contract', () => {
+  it('does not confuse SSoT with S-fix or a prohibition with executable guidance', () => {
+    expect(hasExecutableDirectAction('由 SSoT §10.8 定义，check-tla-model.ts 强制执行。')).toBe(false);
+    expect(hasExecutableDirectAction('不得直接回到编码修正。')).toBe(false);
+    expect(hasExecutableDirectAction('失败后由 S-fix 修复。')).toBe(true);
+  });
   it('normalizes whitespace in the canonical ordinary failure chain', () => {
     expect(hasCompleteOrdinaryFailureChain(ORDINARY_FAILURE_CHAIN.replaceAll(' → ', '\n→\n'))).toBe(true);
   });
@@ -435,6 +549,52 @@ describe('examples workflow contract', () => {
     for (const relativePath of references) {
       expect(read(relativePath), relativePath).not.toMatch(abbreviated);
     }
+  });
+
+  it('keeps a table-row failure signal and bypass action in one analysis scope', () => {
+    // hard-constraints.md「门禁脚本退出码精确对应表」row 1 cells: the signal
+    // 「评审未通过」 lives in the third cell while the bypass 「回到当前阶段
+    // 起点返工」 lives in the last cell; splitting cells would miss it.
+    expect(failureRoutingReason('`check-verifier-output.ts`；1；评审未通过（schema / 方差 / 分数不达标）；#1 / #4；回到当前阶段起点返工')).toBe(
+      'ordinary failure routes to a direct action without the complete chain',
+    );
+    expect(failureRoutingReason('`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；回阶段 5 编码返工')).toBe(
+      'ordinary failure routes to a direct action without the complete chain',
+    );
+    // The same row once the canonical chain marker is present is satisfied.
+    expect(failureRoutingReason('`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；先走完整普通失败链，再按 R 结论由 S-fix 返工')).toBe(
+      undefined,
+    );
+  });
+
+  it('treats a C/D verdict routed to an action as failure context, not C/D alone', () => {
+    // C/D alone (schema enum, quality-level definition) is not a failure
+    // signal ...
+    expect(failureRoutingReason('qualityLevel: A | B | C | D；仅 check-verifier-output.ts')).toBe(undefined);
+    expect(failureRoutingReason('C/D 仅作为 R 定位线索，完成完整普通失败链后由 S-fix 处理')).toBe(undefined);
+    // ... but a C/D routing clause that skips R and dispatches S by reworkHints
+    // is an ordinary-failure bypass (command-reference.md /wm review 失败动作).
+    expect(
+      failureRoutingReason('失败动作：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；C/D 由 O 分派 S 子代理按 reworkHints 返工。'),
+    ).toBe('ordinary failure routes to a direct action without the complete chain');
+  });
+
+  it('accepts a legal R-first description without repeating the literal chain', () => {
+    expect(
+      failureRoutingReason('V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V 复审 + G 门禁通过，才可分派 S-fix 修复。'),
+    ).toBe(undefined);
+    expect(
+      failureRoutingReason('该失败只形成 R 定位线索；按完整普通失败链完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition'),
+    ).toBe(undefined);
+    expect(failureRoutingReason('exit 1 时由 S 修复/补齐项目工件后走 V→G；exit 2 时修正 CLI 参数组合后重跑')).toBe(
+      'ordinary failure routes to a direct action without the complete chain',
+    );
+  });
+
+  it('reports ordinary failure bypass routes across the whole Markdown corpus', () => {
+    expect(
+      corpusFailureUnits('w-model-dev/references').concat(corpusFailureUnits('w-model-dev/templates')).concat(corpusFailureUnits('w-model-dev/examples')),
+    ).toEqual([]);
   });
 });
 
