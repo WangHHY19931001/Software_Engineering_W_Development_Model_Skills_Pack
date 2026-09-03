@@ -555,16 +555,22 @@ describe('examples workflow contract', () => {
     // hard-constraints.md「门禁脚本退出码精确对应表」row 1 cells: the signal
     // 「评审未通过」 lives in the third cell while the bypass 「回到当前阶段
     // 起点返工」 lives in the last cell; splitting cells would miss it.
-    expect(failureRoutingReason('`check-verifier-output.ts`；1；评审未通过（schema / 方差 / 分数不达标）；#1 / #4；回到当前阶段起点返工')).toBe(
-      'ordinary failure routes to a direct action without the complete chain',
-    );
-    expect(failureRoutingReason('`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；回阶段 5 编码返工')).toBe(
-      'ordinary failure routes to a direct action without the complete chain',
-    );
+    expect(
+      failureRoutingReason(
+        '`check-verifier-output.ts`；1；评审未通过（schema / 方差 / 分数不达标）；#1 / #4；回到当前阶段起点返工',
+      ),
+    ).toBe('ordinary failure routes to a direct action without the complete chain');
+    expect(
+      failureRoutingReason(
+        '`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；回阶段 5 编码返工',
+      ),
+    ).toBe('ordinary failure routes to a direct action without the complete chain');
     // The same row once the canonical chain marker is present is satisfied.
-    expect(failureRoutingReason('`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；先走完整普通失败链，再按 R 结论由 S-fix 返工')).toBe(
-      undefined,
-    );
+    expect(
+      failureRoutingReason(
+        '`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；先走完整普通失败链，再按 R 结论由 S-fix 返工',
+      ),
+    ).toBe(undefined);
   });
 
   it('treats a C/D verdict routed to an action as failure context, not C/D alone', () => {
@@ -575,16 +581,22 @@ describe('examples workflow contract', () => {
     // ... but a C/D routing clause that skips R and dispatches S by reworkHints
     // is an ordinary-failure bypass (command-reference.md /wm review 失败动作).
     expect(
-      failureRoutingReason('失败动作：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；C/D 由 O 分派 S 子代理按 reworkHints 返工。'),
+      failureRoutingReason(
+        '失败动作：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；C/D 由 O 分派 S 子代理按 reworkHints 返工。',
+      ),
     ).toBe('ordinary failure routes to a direct action without the complete chain');
   });
 
   it('accepts a legal R-first description without repeating the literal chain', () => {
     expect(
-      failureRoutingReason('V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V 复审 + G 门禁通过，才可分派 S-fix 修复。'),
+      failureRoutingReason(
+        'V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V 复审 + G 门禁通过，才可分派 S-fix 修复。',
+      ),
     ).toBe(undefined);
     expect(
-      failureRoutingReason('该失败只形成 R 定位线索；按完整普通失败链完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition'),
+      failureRoutingReason(
+        '该失败只形成 R 定位线索；按完整普通失败链完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition',
+      ),
     ).toBe(undefined);
     expect(failureRoutingReason('exit 1 时由 S 修复/补齐项目工件后走 V→G；exit 2 时修正 CLI 参数组合后重跑')).toBe(
       'ordinary failure routes to a direct action without the complete chain',
@@ -593,7 +605,9 @@ describe('examples workflow contract', () => {
 
   it('reports ordinary failure bypass routes across the whole Markdown corpus', () => {
     expect(
-      corpusFailureUnits('w-model-dev/references').concat(corpusFailureUnits('w-model-dev/templates')).concat(corpusFailureUnits('w-model-dev/examples')),
+      corpusFailureUnits('w-model-dev/references')
+        .concat(corpusFailureUnits('w-model-dev/templates'))
+        .concat(corpusFailureUnits('w-model-dev/examples')),
     ).toEqual([]);
   });
 });
