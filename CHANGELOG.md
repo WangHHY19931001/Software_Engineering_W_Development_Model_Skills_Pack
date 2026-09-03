@@ -115,6 +115,9 @@
 | `051c688ecb2ddd361ce19bce560664f456355da1` | `style(test): format whole-row failure scanner` |
 | `c4e3359176a32e2c623f140c48a352349e8b635c` | `docs(changes): refresh complete final parent ledger` |
 | `ac91849b7aa27bb605c3fb2f4ac235ac9645129b` | `docs(changelog): expand 2 short SHAs and append c4e3359 to 42.2.1 parent ledger` |
+| `97b91badfc7fe945ab830b5ea4a594d3c25db877` | `docs(changes): expand short SHAs in acceptance records and append ac91849 to 42.2.1 parent ledger` |
+
+注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 
 最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b2c6108b1f31061284551492a79fbc62d1` 保留为历史中间最终记录。
 
