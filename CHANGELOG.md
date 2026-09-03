@@ -27,6 +27,17 @@
 - **最终修复轮验证**：examples-contract 23/23、L0 logic 30/30、L0 CLI 11/11、全量 Vitest 62 files / 1311 tests / 1311 passed；L0 CLI 默认/显式 root 均为 `647/92/36/0`，eval 25/25，self-test 262/262，doctor 0 阻断/3 提示，samples 282/244/15，security 新增 0，typecheck、npm audit high、docs-consistency 均 exit 0。Git Bash `bash -c "npm run prepush"`：证据提交后首次因格式检查发现 1 个文件 exit 1；按 prepush 配置格式化后，在最终记录提交后真实 exit 0、17 项全绿。
 - **扫描器收口修复轮（2026-09-03）**：`examples-contract.test.ts` 扫描器改为保留作用域的分析单元——表格行按整行分析（失败信号在「质量门未通过」单元、旁路动作在「回阶段 5 编码返工」单元时不再漏报），普通行按句/单元分析，fenced 代码块跳过；同一单元出现「完整普通失败链」字样或完整箭头链即视为满足，合法 R-first 描述（先分派 R → V 复审 → 才可分派 S-fix）与禁令复述不误报，C/D 仅在路由到动作时构成失败上下文，phase 1 ingestion A-chunk/A-cross→G 专用收敛例外保留。红灯实测定位 6 处真旁路后逐文件闭合：`bdd.md` §4.1 两条独立门禁回退（BDD/TLA+ 门禁失败先走完整普通失败链，S-fix 修复范围限于对应子流程资产、对侧不受影响）、`command-reference.md` `/wm review` 失败动作行（qualityLevel C/D 视为 V/G 失败 → 完整链，`reworkHints` 仅交 R 作定位线索）与 BDD 项目证据门 exit 1 行（扫掠发现同类旁路：先走完整链再按 R 结论由 S-fix 修复/补齐工件）、`hard-constraints.md` 门禁脚本退出码精确对应表 exit-1 两行（改为先走完整普通失败链再按 R 结论返工）。版本保持 42.2.1。
 
+### 审查问题修复（gate-closure，2026-09-04，doc sync）
+
+任务 1/3/4 引入的代码契约在本轮同步进 SSoT、references、活体文档、测试矩阵与验收记录（实现文件为事实源，文档编辑未改任何 `.ts` 校验逻辑；任务 1/3/4 提交的完整 40 字符身份见下表父链追加行）：
+
+- **ChangeScope + codegraph/opsx/archive strict 绑定**：SSoT §3.3.1 补 ChangeScope 段落（`change-scope.schema.json` / `codegraph-query.schema.json`、headRef=当前 HEAD、changedFiles 与实际 Git 变更集合精确一致、缺 scope exit 1 fail-closed）；SSoT §10.5 新增 §10.5.2（阶段 5-8 门禁顺序 codegraph/opsx strict → artifact gate 聚合 → opsx:archive → archive checker 后置门 → CHECKPOINT；GATE_JSON external summary；`scopeProvidedButFailed` 抑制误导文案；gate-logic externalChecks 透传已删除）；phase-5-coding「codegraph 修改前影响分析」节与 phase-6/7/8、hard-constraints #14/#38、command-reference「阶段 5-8 codegraph/opsx/archive 门禁 CLI」节、subagent-delegation G 模板与阶段 8 终检命令同步 `--scope=` 调用与 fail-closed 语义；examples（coding/stage5/stage8/test-execution/README）与 templates/coding.md 的阶段 5-8 门禁命令补齐 `--scope=.w-model/change-scope.json`。
+- **artifact gate 聚合与 R3/run-log 语义**：SSoT 新增 §10D.8（R3 三种证明路径矩阵：standard 阶段级 role-dispatch+preventive-review / fix-emergency run-log identity window+preventive-review / opsx stage 9 份 R3+3 份 V；role-dispatch 空/全 invalid fail-closed、R3 只计 role=R+success 的 r3-* 三维度各 ≥1、r3Missing 明细、`--r3-enabled` no-op）；SSoT §10D.3 补 variant/blocker/fixedLocation/fixBasedOn 字段与坏行语义；data-models RunLogEntry 接口与动作字段表、subagent-delegation 检测脚本措辞（fix variant 可选向后兼容、emergency-fix 强制 variant+blocker、双 legacy 行经合并 legacy 谓词吸收为 LEGACY_VARIANT/LEGACY_UNSCOPED 非阻断）、hard-constraints #34 处置行、preventive-review `passed=false ⇒ findings ≥1` 同步至 schema 清单行与 #11 节。
+- **pre-push 真实 push stdin 行为**：SSoT §8.2.4、README CI 策略、AGENTS 目录表、INSTALL §3.1、CONTRIBUTING 钩子节、troubleshooting 新增 1.7b 同步四字段 ref 行解析 / 多 ref 聚合 / 新分支 fork-point/merge-base 可证明基线 / delete-only 放行 / 空 stdin 回退 HEAD@{push} / 解析失败与基线不可建一律 fail-closed 全门禁；`docs/*.md` case 跨目录匹配按实测行为表述。
+- **活体文档修正**：troubleshooting 1.7 重写为 docs-consistency 现逻辑（vitest 文件数/用例数是受控动态 facts + provenance 绑定实际提交，不再要求复制到 README/AGENTS/pre-push 文本）；CONTRIBUTING/user-guide/pre-push 注释的 self-test 样本数 260→262（实测 `npm run self-test` = 262/262）；新增测试文件登记进 `__tests__/README.md` 矩阵（artifact-gate-external / change-scope / check-codegraph-queries / check-openspec-archive / check-opsx-artifacts），docs-consistency/role-dispatch/run-log/schema-validation 行描述同步新契约；`l0-link-audit-logic.test.ts` 实包审计链接数 647→649（workflow.md 新增 2 条指向 command-reference/subagent-delegation 的引用链接，violations 仍为 0）。
+- **本同步的完整普通失败链锚点**：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 在 8 份 phase references、5 份模板、全部 examples 与相关 references 中逐字保留（grep 核对无删除/改写），examples-contract 28/28 通过。
+- 版本保持 42.2.1，不 bump；pre-push 17 项、CLI 37 项、schema 25 份统计口径不变。门禁实测与父链追加见下表及验收记录 `docs/changes/2026-09-01-42.2.1-audit-remediation-acceptance.md`。
+
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
 以下为从 42.2.1 整改起点 `bc48824894ae076ff0e80d87cebd6c9de4437833` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
@@ -116,6 +127,14 @@
 | `c4e3359176a32e2c623f140c48a352349e8b635c` | `docs(changes): refresh complete final parent ledger` |
 | `ac91849b7aa27bb605c3fb2f4ac235ac9645129b` | `docs(changelog): expand 2 short SHAs and append c4e3359 to 42.2.1 parent ledger` |
 | `97b91badfc7fe945ab830b5ea4a594d3c25db877` | `docs(changes): expand short SHAs in acceptance records and append ac91849 to 42.2.1 parent ledger` |
+| `689e51bd114831a209af92c99e82afea2e97f512` | `feat(gate): add change-scope and codegraph-query JSON Schemas with inventory sync` |
+| `ac90a78b800e5c163944900d7473136d863136b5` | `feat(gate): bind codegraph/opsx/archive checkers to ChangeScope with strict coverage` |
+| `a0f86bbb4c5001f56a3b04143b13834f800b0922` | `refactor(gate): drop dead externalChecks passthrough; aggregate strict codegraph/opsx into artifact gate` |
+| `5197b21cb97002def958de0f33591ba2f1c73a73` | `fix(gate): suppress misleading no-scope reasons when ChangeScope binding fails` |
+| `ed55ff5b80cc81775c82349648dca81cc17a96bf` | `fix(gate): count R3 by success r3-* dimensions and fail closed on empty role logs` |
+| `ce72badd4373cf99ed236bea816ad3cef90076d6` | `fix(run-log): fail closed on empty and malformed input; block action-role mismatch; align fix variant and preventive schemas` |
+| `36c66581b632571e9bb728edcf3f911776aec280` | `fix(run-log): absorb double-legacy emergency-fix rows via merged legacy predicates` |
+| `6adc3215815cff0d355c13a15a6e00278e393812` | `fix(hooks): consume pre-push stdin refs per-line with fail-closed scope` |
 
 注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 
