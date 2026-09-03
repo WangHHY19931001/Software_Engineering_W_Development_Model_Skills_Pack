@@ -7,11 +7,17 @@
  * + R3×3 + V 审查产物齐全。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8> [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8> \
+ *       --scope=<change-scope.json> [--json]
  *
  * 参数：
  *   project-root   项目根目录
  *   --phase        校验阶段 5|6|7|8（支持 --phase N 与 --phase=N）
+ *   --scope=FILE   变更上下文 manifest（schemas/change-scope.schema.json）；与
+ *                  --change/--base/--head 互斥；阶段 5-8 必选（缺失 → exit 1）。
+ *                  strict 模式只校验 openspec/changes/<changeId>/（changeId=scope.changeId），
+ *                  不再全扫描 phaseN-* 无 change 选择
+ *   --change/--base/--head  薄封装：以实际 Git 变更集合生成等价 scope（免维护 manifest）
  *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -38,9 +44,10 @@ import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { hasFlag } from '../lib/parse-args.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
+import { gitRunnerFor, resolveCliScope } from '../lib/change-scope.js';
 
 interface CheckResult {
   passed: boolean;
@@ -54,62 +61,44 @@ const REQUIRED_OPSX_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md', 'ticket
 const REQUIRED_R3_DIMENSIONS = ['completeness', 'reliability', 'security'] as const;
 const REQUIRED_STAGES = ['explore', 'propose', 'coding'] as const;
 
-/**
- * 校验 opsx 制品与审查产物纯逻辑（可被 self-test import）
- */
-export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckResult {
-  const violations: string[] = [];
-  const artifactsFound: string[] = [];
-  const reviewsFound: string[] = [];
-
-  const changesDir = path.join(projectRoot, 'openspec', 'changes');
-  if (!existsSync(changesDir)) {
-    violations.push(`openspec/changes/ 目录不存在（阶段 ${phase} 须有 opsx 变更）`);
-    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
-  }
-
-  // 找该阶段所有变更目录 phase<N>-*（精确前缀匹配，排除 archive）
+/** active 阶段变更目录候选（phase<N>-*，排除 archive） */
+function activeChangeDirs(changesDir: string, phase: number): string[] {
   const prefixRegex = new RegExp(`^phase${phase}-`);
-  const entries = readdirSync(changesDir, { withFileTypes: true }).filter(
-    (e) => e.isDirectory() && prefixRegex.test(e.name) && e.name !== 'archive',
-  );
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- active 变更目录来自项目受控 openspec/changes/ 目录枚举
+  return readdirSync(changesDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && prefixRegex.test(e.name) && e.name !== 'archive')
+    .map((e) => e.name)
+    .sort((a, b) => a.localeCompare(b));
+}
 
-  if (entries.length === 0) {
-    violations.push(`阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`);
-    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
-  }
-
-  // 按名称排序后逐个校验所有变更目录
-  const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
-  const changesNames = sorted.map((e) => e.name);
-
-  for (const entry of sorted) {
-    const changeDir = path.join(changesDir, entry.name);
-    const changeName = entry.name;
-
-    // 校验 opsx 制品 + tickets（反模式 #40）
-    for (const art of REQUIRED_OPSX_ARTIFACTS) {
-      const artPath = path.join(changeDir, art);
-      if (existsSync(artPath)) {
-        artifactsFound.push(`${changeName}/${art}`);
-      } else {
-        violations.push(`${changeName}/${art} 缺失（反模式 #40：opsx/S-tickets 职责混淆）`);
-      }
-    }
-
-    // 校验 specs/ 目录存在
-    const specsDir = path.join(changeDir, 'specs');
-    if (!existsSync(specsDir)) {
-      violations.push(`${changeName}/specs/ 目录缺失`);
+/** 校验单个变更目录制品齐全（proposal/design/tasks/tickets + specs/，反模式 #40） */
+function validateChangeDirArtifacts(
+  changesDir: string,
+  changeName: string,
+  violations: string[],
+  artifactsFound: string[],
+): void {
+  const changeDir = path.join(changesDir, changeName);
+  for (const art of REQUIRED_OPSX_ARTIFACTS) {
+    const artPath = path.join(changeDir, art);
+    if (existsSync(artPath)) {
+      artifactsFound.push(`${changeName}/${art}`);
     } else {
-      artifactsFound.push(`${changeName}/specs/`);
+      violations.push(`${changeName}/${art} 缺失（反模式 #40：opsx/S-tickets 职责混淆）`);
     }
   }
+  const specsDir = path.join(changeDir, 'specs');
+  if (!existsSync(specsDir)) {
+    violations.push(`${changeName}/specs/ 目录缺失`);
+  } else {
+    artifactsFound.push(`${changeName}/specs/`);
+  }
+}
 
-  // 校验 R3×3 + V 审查产物（反模式 #39）—— 项目级 stage 审查
+/** 校验 R3×9 + V×3（项目级 stage 审查，反模式 #39） */
+function validateStageReviews(projectRoot: string, phase: number, violations: string[], reviewsFound: string[]): void {
   const r3Dir = path.join(projectRoot, '.w-model', 'r3-reviews');
   const vDir = path.join(projectRoot, '.w-model', 'v-reviews');
-
   for (const stage of REQUIRED_STAGES) {
     for (const dim of REQUIRED_R3_DIMENSIONS) {
       const r3File = path.join(r3Dir, `phase${phase}-${stage}-${dim}.md`);
@@ -126,6 +115,90 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
       violations.push(`.w-model/v-reviews/phase${phase}-${stage}.md 缺失（反模式 #39）`);
     }
   }
+}
+
+/**
+ * 校验 opsx 制品与审查产物纯逻辑（legacy 兼容层，全扫描所有 active 变更目录，
+ * 可被 self-test import）。CLI 阶段 5-8 一律走 checkOpsxArtifactsStrict。
+ */
+export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckResult {
+  const violations: string[] = [];
+  const artifactsFound: string[] = [];
+  const reviewsFound: string[] = [];
+
+  const changesDir = path.join(projectRoot, 'openspec', 'changes');
+  if (!existsSync(changesDir)) {
+    violations.push(`openspec/changes/ 目录不存在（阶段 ${phase} 须有 opsx 变更）`);
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
+  }
+
+  // 找该阶段所有变更目录 phase<N>-*（精确前缀匹配，排除 archive）
+  const sorted = activeChangeDirs(changesDir, phase);
+
+  if (sorted.length === 0) {
+    violations.push(`阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`);
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
+  }
+
+  const changesNames = sorted;
+
+  for (const entryName of sorted) {
+    validateChangeDirArtifacts(changesDir, entryName, violations, artifactsFound);
+  }
+
+  // 校验 R3×3 + V 审查产物（反模式 #39）—— 项目级 stage 审查
+  validateStageReviews(projectRoot, phase, violations, reviewsFound);
+
+  return {
+    passed: violations.length === 0,
+    violations,
+    changesNames,
+    artifactsFound,
+    reviewsFound,
+  };
+}
+
+/**
+ * strict 模式（2026-09-04 audit-gate-closure，Slice A）：给定 changeId 时只校验
+ * `openspec/changes/<changeId>/` 这一个变更目录（不再全扫描 phaseN-* 无 change 选择）；
+ * changeId 不在 active 候选内（单候选或多候选）→ violations 失败而非任意取一/跳换；
+ * changeId 须含阶段前缀 phase<phase>-（phase 归属一致性）。制品/R3×9/V×3 校验逻辑保留。
+ */
+export function checkOpsxArtifactsStrict(projectRoot: string, phase: number, changeId: string): CheckResult {
+  const violations: string[] = [];
+  const artifactsFound: string[] = [];
+  const reviewsFound: string[] = [];
+
+  const changesDir = path.join(projectRoot, 'openspec', 'changes');
+  if (!existsSync(changesDir)) {
+    violations.push(`openspec/changes/ 目录不存在（阶段 ${phase} 须有 opsx 变更）`);
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
+  }
+
+  // phase 归属一致性：changeId 须含 phase<phase>- 前缀（先于候选存在性检查，便于定位归属错误）
+  if (!changeId.startsWith(`phase${phase}-`)) {
+    violations.push(`${changeId} 不含阶段前缀 phase${phase}-（scope.changeId 与当前阶段不符）`);
+  }
+
+  const candidates = activeChangeDirs(changesDir, phase);
+  if (candidates.length === 0) {
+    violations.push(`阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`);
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
+  }
+
+  const matched = candidates.includes(changeId);
+  if (!matched) {
+    violations.push(
+      `${changeId} 不在阶段 ${phase} active 变更目录中（候选：${candidates.join(', ')}；` +
+        `scope.changeId 须与 opsx 变更目录名精确一致，不允许任取其一或跳换）`,
+    );
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
+  }
+
+  const changesNames = [changeId];
+  // 只校验 scope 对应这一个变更目录
+  validateChangeDirArtifacts(changesDir, changeId, violations, artifactsFound);
+  validateStageReviews(projectRoot, phase, violations, reviewsFound);
 
   return {
     passed: violations.length === 0,
@@ -182,7 +255,38 @@ async function main(): Promise<void> {
   const phase = phaseParsed.phase;
 
   const abs = path.resolve(file);
-  const result = checkOpsxArtifacts(abs, phase);
+
+  // ==================== ChangeScope 装载（strict changeId 绑定；阶段 5-8 必选） ====================
+  const resolved = resolveCliScope({
+    projectRoot: abs,
+    phase,
+    scopePath: parseFlagValue(process.argv, 'scope'),
+    changeArg: parseFlagValue(process.argv, 'change'),
+    baseArg: parseFlagValue(process.argv, 'base'),
+    headArg: parseFlagValue(process.argv, 'head'),
+    git: gitRunnerFor(abs),
+  });
+  if (resolved.kind === 'invalid') {
+    exitWithError({
+      category: resolved.category,
+      rule: 'P0-1',
+      message: resolved.message,
+      detail: resolved.detail,
+      file: resolved.file,
+      exitCode: 2,
+    });
+    return;
+  }
+  let result: CheckResult;
+  let scopeLabel = '（未提供）';
+  if (resolved.kind === 'missing') {
+    result = { passed: false, violations: resolved.reasons, changesNames: [], artifactsFound: [], reviewsFound: [] };
+  } else if (resolved.kind === 'violations') {
+    result = { passed: false, violations: resolved.violations, changesNames: [], artifactsFound: [], reviewsFound: [] };
+  } else {
+    scopeLabel = `${resolved.scope.changeId}（base=${resolved.scope.baseRef}..head=${resolved.scope.headRef}，声明 ${resolved.scope.changedFiles.length} 个变更文件）`;
+    result = checkOpsxArtifactsStrict(abs, phase, resolved.scope.changeId);
+  }
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
@@ -202,10 +306,11 @@ async function main(): Promise<void> {
   }
 
   console.log('═'.repeat(60));
-  console.log('opsx 制品与审查产物校验（Opsx Artifacts Checker）');
+  console.log('opsx 制品与审查产物校验（Opsx Artifacts Checker，strict changeId 绑定）');
   console.log('═'.repeat(60));
   console.log(`项目根        : ${abs}`);
   console.log(`阶段          : ${phase}`);
+  console.log(`变更上下文    : ${scopeLabel}`);
   console.log(`变更目录      : ${result.changesNames.join(', ') || '（未找到）'}`);
   console.log(`制品          : ${result.artifactsFound.join(', ') || '（无）'}`);
   console.log(`审查产物      : ${result.reviewsFound.join(', ') || '（无）'}`);
@@ -225,6 +330,7 @@ async function main(): Promise<void> {
       type: 'opsx-artifacts',
       passed: result.passed,
       phase,
+      changeId: resolved.kind === 'ok' ? resolved.scope.changeId : undefined,
       changesNames: result.changesNames,
       artifactsFound: result.artifactsFound,
       reviewsFound: result.reviewsFound,

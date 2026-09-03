@@ -289,6 +289,38 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
     timeout: { required: true, status: 'present' },
   },
+  {
+    api: 'execSync',
+    file: '__tests__/change-scope.test.ts',
+    line: 502,
+    symbol: 'CLI 端到端冒烟（git 环境自检）',
+    reason: '2026-09-04 audit-gate-closure task 1 新增：git 环境自检冒烟，显式 15 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'execSync',
+    file: '__tests__/check-codegraph-queries.test.ts',
+    line: 292,
+    symbol: 'runCli',
+    reason: '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'execSync',
+    file: '__tests__/check-opsx-artifacts.test.ts',
+    line: 152,
+    symbol: 'runCli',
+    reason: '2026-09-04 audit-gate-closure task 1 新增：opsx checker CLI 边界测试，显式 90 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'execSync',
+    file: '__tests__/check-openspec-archive.test.ts',
+    line: 152,
+    symbol: 'runCli',
+    reason: '2026-09-04 audit-gate-closure task 1 新增：archive checker CLI 边界测试，显式 90 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
 ];
 
 export interface SynchronousChildProcessCall {

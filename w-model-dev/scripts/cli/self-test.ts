@@ -1509,28 +1509,29 @@ const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
     sampleDir: 'codegraph-queries/valid-phase5',
     phase: 5,
     expectedPassed: true,
-    description: '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp），应通过',
+    description:
+      '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp），应通过（legacy 无 scope 兼容层样本；strict 覆盖绑定见 check-codegraph-queries.test.ts）',
   },
   {
     sampleDir: 'codegraph-queries/bad-empty',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/无 phase5-\*\.json 查询文件/],
-    description: 'codegraph-queries 目录存在但无 phase5-*.json 文件，应未通过',
+    description: 'codegraph-queries 目录存在但无 phase5-*.json 文件，应未通过（legacy 无 scope 兼容层样本）',
   },
   {
     sampleDir: 'codegraph-queries/bad-missing-field',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/缺 callers\[\] 字段|缺 callees\[\] 字段/],
-    description: '查询文件缺 callers/callees 字段，应未通过',
+    description: '查询文件缺 callers/callees 字段，应未通过（legacy 无 scope 兼容层样本）',
   },
   {
     sampleDir: 'codegraph-queries/bad-missing-blastradius',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/缺 blastRadius 字段/],
-    description: '查询文件有 callers/callees 但缺 blastRadius 字段，应未通过',
+    description: '查询文件有 callers/callees 但缺 blastRadius 字段，应未通过（legacy 无 scope 兼容层样本）',
   },
 ];
 
@@ -1547,21 +1548,23 @@ const OPSX_ARTIFACT_CASES: OpsxArtifactCase[] = [
     sampleDir: 'opsx-artifacts/valid-phase5',
     phase: 5,
     expectedPassed: true,
-    description: 'opsx 制品齐全（proposal/design/tasks/tickets/specs）+ R3×9 + V×3，应通过',
+    description:
+      'opsx 制品齐全（proposal/design/tasks/tickets/specs）+ R3×9 + V×3，应通过（legacy 全扫描兼容层样本；strict changeId 见 check-opsx-artifacts.test.ts）',
   },
   {
     sampleDir: 'opsx-artifacts/bad-missing-tickets',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/tickets\.md 缺失/],
-    description: 'opsx 变更目录缺 tickets.md（反模式 #40），应未通过',
+    description: 'opsx 变更目录缺 tickets.md（反模式 #40），应未通过（legacy 全扫描兼容层样本）',
   },
   {
     sampleDir: 'opsx-artifacts/bad-multi-dir-missing',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/phase5-extra\/tickets\.md 缺失/],
-    description: '多变更目录（phase5-demo + phase5-extra）中 phase5-extra 缺 tickets.md，列出全部缺失',
+    description:
+      '多变更目录（phase5-demo + phase5-extra）中 phase5-extra 缺 tickets.md，列出全部缺失（legacy 全扫描兼容层样本）',
   },
 ];
 
@@ -1578,21 +1581,22 @@ const OPENSPEC_ARCHIVE_CASES: OpenspecArchiveCase[] = [
     sampleDir: 'openspec-archive/valid',
     phase: 5,
     expectedPassed: true,
-    description: 'openspec 归档目录含完整制品（proposal/design/tasks/tickets/specs），应通过',
+    description:
+      'openspec 归档目录含完整制品（proposal/design/tasks/tickets/specs），应通过（legacy 未锚定 entries[0] 兼容层样本；strict 锚定见 check-openspec-archive.test.ts）',
   },
   {
     sampleDir: 'openspec-archive/bad-no-archive',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/archive\/ 目录不存在/],
-    description: 'openspec/changes/archive/ 不存在（opsx:archive 未执行），应未通过',
+    description: 'openspec/changes/archive/ 不存在（opsx:archive 未执行），应未通过（legacy 兼容层样本）',
   },
   {
     sampleDir: 'openspec-archive/bad-missing-tickets',
     phase: 5,
     expectedPassed: false,
     expectedViolationPatterns: [/tickets\.md 缺失/],
-    description: '归档目录含 proposal/design/tasks 但缺 tickets.md，应未通过',
+    description: '归档目录含 proposal/design/tasks 但缺 tickets.md，应未通过（legacy 兼容层样本）',
   },
 ];
 

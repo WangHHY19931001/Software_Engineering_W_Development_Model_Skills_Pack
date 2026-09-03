@@ -6,17 +6,29 @@
  * S-coding 须先调用 codegraph_explore 查询并落盘到
  * `.w-model/codegraph-queries/<phase>-<ticket>-<symbol>.json`。
  *
+ * strict 绑定（2026-09-04 audit-gate-closure，Slice A）：阶段 5-8 CLI 必须提供
+ * `--scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`），
+ * 把查询与实际变更绑定——scope.changedFiles 与实际 Git 变更集合精确一致
+ * （headRef 须等于当前 HEAD），每个查询的 changeId 精确等于 scope.changeId、
+ * targetFiles 全属于 scope.changedFiles，且全部须覆盖的 code/test 变更文件
+ * 至少被一个查询覆盖。无 scope → exit 1（不是 0）。原两参
+ * `checkCodegraphQueries(projectRoot, phase)` 保留为 legacy 兼容层（self-test 用）。
+ *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> \
+ *       --scope=<change-scope.json> [--json]
  *
  * 参数：
  *   project-root   项目根目录
  *   --phase        校验阶段 5|6|7|8（支持 --phase N 与 --phase=N）
+ *   --scope=FILE   变更上下文 manifest（schemas/change-scope.schema.json）；与
+ *                  --change/--base/--head 互斥；阶段 5-8 必选（缺失 → exit 1）
+ *   --change/--base/--head  薄封装：以实际 Git 变更集合生成等价 scope（免维护 manifest）
  *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
- *   0  所有修改都有对应 codegraph 查询落盘
- *   1  存在未查询的修改（命中反模式 #38）
+ *   0  所有修改都有对应 codegraph 查询落盘（strict 覆盖绑定通过）
+ *   1  存在未查询/未绑定变更（反模式 #38）或无 scope（变更上下文缺失）
  *   2  输入错误（stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：
@@ -26,7 +38,6 @@
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
- * 命令行参数：支持 --json（机器可读输出）、--phase 5|6|7|8
  * 退出码：0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
  *
  * @module
@@ -38,11 +49,21 @@ import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { hasFlag } from '../lib/parse-args.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
+import {
+  changedFilePathViolation,
+  gitRunnerFor,
+  isCodeOrTestFile,
+  isIsoDateTimeString,
+  resolveCliScope,
+  type ChangeScope,
+} from '../lib/change-scope.js';
 
+/** legacy 兼容层查询形状（strict 模式在其上叠加 changeId/targetFiles） */
 interface CodegraphQuery {
   querySymbol: string;
   callers?: unknown[];
@@ -57,8 +78,50 @@ interface CheckResult {
   queryCount: number;
 }
 
+/** strict 覆盖校验结果（在原结构上加覆盖计数，供报告与聚合消费） */
+export interface CodegraphStrictResult {
+  passed: boolean;
+  violations: string[];
+  queryCount: number;
+  /** scope 变更中须覆盖的 code/test 文件数（相对路径计数） */
+  requiredFileCount: number;
+  /** 已被至少一个查询 targetFiles 覆盖的 code/test 文件数 */
+  coveredFileCount: number;
+}
+
+/** 查询目录名：phase<N>-*.json（strict 只认 scope.phase 对应文件，异 phase 同 changeId 属违规） */
+function phaseQueryFiles(queriesDir: string, phase: number): { own: string[]; foreign: string[] } {
+  const own: string[] = [];
+  const foreign: string[] = [];
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 查询文件来自项目受控 .w-model/codegraph-queries/ 目录枚举
+  for (const f of readdirSync(queriesDir)) {
+    const m = /^phase(\d+)-.*\.json$/.exec(f);
+    if (!m) continue;
+    if (Number(m[1]) === phase) own.push(f);
+    else foreign.push(f);
+  }
+  return { own, foreign };
+}
+
+/** schema 失败时优先给出精确路径/时间违规消息（值级定位），否则退回通用结构消息 */
+function schemaFailViolation(fileName: string, schemaMessages: string[], q: unknown): string {
+  const query = q as { targetFiles?: unknown; queryTimestamp?: unknown };
+  if (Array.isArray(query.targetFiles)) {
+    for (const tf of query.targetFiles) {
+      const reason = changedFilePathViolation(tf);
+      if (reason !== null) return `${fileName}：targetFiles 目标 ${String(tf)} 非法：${reason}`;
+    }
+  }
+  if (query.queryTimestamp !== undefined && !isIsoDateTimeString(query.queryTimestamp)) {
+    return `${fileName}：queryTimestamp 非合法 ISO date-time（${String(query.queryTimestamp)}）`;
+  }
+  return `${fileName}：结构校验失败：${schemaMessages.slice(0, 3).join('；')}`;
+}
+
 /**
- * 校验 codegraph 查询落盘纯逻辑（可被 self-test import）
+ * 校验 codegraph 查询落盘纯逻辑（legacy 兼容层，可被 self-test import）。
+ * 仅校验目录存在 + phase 文件字段完整性，不绑定实际变更——strict 绑定请用
+ * checkCodegraphQueriesStrict（CLI 阶段 5-8 一律 strict）。
  * @param projectRoot 项目根目录
  * @param phase 阶段号 5-8
  */
@@ -133,6 +196,160 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
   };
 }
 
+/**
+ * strict 覆盖绑定校验（阶段 5-8 + ChangeScope）：
+ *   - 查询文件 phase 前缀 = scope.phase（同 changeId 但异 phase 前缀 → 违规）
+ *   - 每个 phase 查询文件先过 codegraph-query.schema（结构校验保留）
+ *   - changeId 精确等于 scope.changeId（无关查询不得放行）
+ *   - targetFiles 为规范化相对路径且全部属于 scope.changedFiles（越界/绝对/`..`/反斜杠 → 违规）
+ *   - queryTimestamp 合法 ISO date-time 且不晚于 scopeCreatedAt
+ *   - scope 中每个须覆盖的 code/test 变更文件至少被一个查询的 targetFiles 覆盖
+ * 缺 changeId/targetFiles 的既有查询：strict 下逐文件 violation（不允许 silent skip）。
+ * @param projectRoot 项目根目录
+ * @param scope 已通过 Git 绑定校验的 ChangeScope（changeId/phase/changedFiles/scopeCreatedAt）
+ */
+export function checkCodegraphQueriesStrict(projectRoot: string, scope: ChangeScope): CodegraphStrictResult {
+  const violations: string[] = [];
+  const queriesDir = path.join(projectRoot, '.w-model', 'codegraph-queries');
+
+  if (!existsSync(queriesDir)) {
+    violations.push(
+      `阶段 ${scope.phase}（changeId=${scope.changeId}）：.w-model/codegraph-queries/ 目录不存在` +
+        `（约束 #14：阶段 5-8 代码修改须先落盘 codegraph 查询）`,
+    );
+    return { passed: false, violations, queryCount: 0, requiredFileCount: 0, coveredFileCount: 0 };
+  }
+
+  const { own: files, foreign } = phaseQueryFiles(queriesDir, scope.phase);
+  // 同 changeId 但文件前缀为其它 phase：属 scope 查询，但 phase 前缀不匹配 → 违规
+  for (const f of foreign) {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 查询文件来自项目受控 .w-model/codegraph-queries/ 目录枚举
+      const q = parseJsonSafe(readFileSync(path.join(queriesDir, f), 'utf-8')) as { changeId?: unknown };
+      if (q.changeId === scope.changeId) {
+        violations.push(
+          `${f}：查询文件 phase 前缀与 scope.phase=${scope.phase} 不匹配（同 changeId=${scope.changeId}）`,
+        );
+      }
+    } catch {
+      // 异 phase 且不可解析的文件不属于本 scope，忽略（不阻断）
+    }
+  }
+
+  if (files.length === 0) {
+    violations.push(
+      `阶段 ${scope.phase}（changeId=${scope.changeId}）：.w-model/codegraph-queries/ 下无 phase${scope.phase}-*.json 查询文件`,
+    );
+    return { passed: false, violations, queryCount: 0, requiredFileCount: 0, coveredFileCount: 0 };
+  }
+
+  let validCount = 0;
+  let fileValid: boolean;
+  const covered = new Set<string>();
+  for (const f of files) {
+    const fp = path.join(queriesDir, f);
+    let raw: string;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 查询文件来自项目受控 .w-model/codegraph-queries/ 目录枚举
+      raw = readFileSync(fp, 'utf-8');
+    } catch {
+      violations.push(`${f}：文件读取失败或为空`);
+      continue;
+    }
+    if (!raw) {
+      violations.push(`${f}：文件读取失败或为空`);
+      continue;
+    }
+    fileValid = true;
+    let q: unknown;
+    try {
+      q = parseJsonSafe(raw);
+    } catch {
+      violations.push(`${f}：非合法 JSON`);
+      continue;
+    }
+    // 结构完整性校验保留：codegraph-query.schema（querySymbol/callers/callees/blastRadius/queryTimestamp 必填 + 类型）
+    const schemaResult = validateBySchema('codegraph-query', q);
+    if (!schemaResult.valid) {
+      // schema 命中路径/时间格式时给出精确到值的 violation（否则只报结构失败，Agent 难定位）
+      violations.push(schemaFailViolation(f, schemaResult.errorMessages, q));
+      continue;
+    }
+    const query = q as { changeId?: unknown; targetFiles?: unknown; queryTimestamp?: unknown };
+    if (query.changeId === undefined || query.changeId === null || typeof query.changeId !== 'string') {
+      violations.push(
+        `${f}：缺 changeId 字段（strict 模式必填，须等于 scope.changeId=${scope.changeId}；不允许 silent skip）`,
+      );
+      fileValid = false;
+    } else if (query.changeId !== scope.changeId) {
+      violations.push(
+        `${f}：changeId=${query.changeId} 与 scope.changeId=${scope.changeId} 不一致（无关查询不得放行）`,
+      );
+      fileValid = false;
+    }
+    if (!Array.isArray(query.targetFiles) || query.targetFiles.length === 0) {
+      if (!Array.isArray(query.targetFiles)) {
+        violations.push(
+          `${f}：缺 targetFiles[] 字段（strict 模式必填；目标文件须全属于 scope.changedFiles；不允许 silent skip）`,
+        );
+      } else {
+        violations.push(`${f}：targetFiles[] 为空（每个查询须声明至少一个目标变更文件）`);
+      }
+      fileValid = false;
+    } else {
+      for (const tf of query.targetFiles) {
+        const reason = changedFilePathViolation(tf);
+        if (reason !== null) {
+          violations.push(`${f}：targetFiles 目标 ${String(tf)} 非法：${reason}`);
+          fileValid = false;
+          continue;
+        }
+        if (!scope.changedFiles.includes(tf as string)) {
+          violations.push(`${f}：targetFiles 目标 ${String(tf)} 不在 scope.changedFiles 声明内`);
+          fileValid = false;
+        }
+      }
+    }
+    if (query.queryTimestamp === undefined || !isIsoDateTimeString(query.queryTimestamp)) {
+      violations.push(`${f}：queryTimestamp 非合法 ISO date-time（${String(query.queryTimestamp)}）`);
+      fileValid = false;
+    } else if (Date.parse(query.queryTimestamp) > Date.parse(scope.scopeCreatedAt)) {
+      violations.push(
+        `${f}：queryTimestamp=${query.queryTimestamp} 晚于 scopeCreatedAt=${scope.scopeCreatedAt}` +
+          `（查询须不晚于 scope 创建时刻）`,
+      );
+      fileValid = false;
+    }
+    if (fileValid) {
+      validCount++;
+      for (const tf of (query.targetFiles as string[]) ?? []) covered.add(tf);
+    }
+  }
+
+  // 覆盖判定：scope 中每个须覆盖的 code/test 变更文件至少被一个合法查询覆盖
+  const required = scope.changedFiles.filter((f) => isCodeOrTestFile(f));
+  let coveredCount = 0;
+  for (const f of required) {
+    if (covered.has(f)) coveredCount++;
+    else {
+      violations.push(`${f}：变更代码/测试文件未被任何查询的 targetFiles 覆盖（查询须与实际变更绑定）`);
+    }
+  }
+
+  return {
+    passed: violations.length === 0,
+    violations,
+    queryCount: validCount,
+    requiredFileCount: required.length,
+    coveredFileCount: coveredCount,
+  };
+}
+
+/** 报告阶段（缺 scope 或 scope 无效时仍输出变更上下文缺失行） */
+function resultWithScopeReasons(reasons: string[]): CodegraphStrictResult {
+  return { passed: false, violations: reasons, queryCount: 0, requiredFileCount: 0, coveredFileCount: 0 };
+}
+
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
@@ -148,7 +365,7 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <project-root> 或 --phase',
-      detail: '用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>',
+      detail: '用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8> [--scope=<change-scope.json>]',
       exitCode: 2,
     });
     return;
@@ -181,7 +398,7 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <project-root> 或 --phase',
-      detail: '用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8>',
+      detail: '用法: npx tsx check-codegraph-queries.ts <project-root> --phase <5|6|7|8> [--scope=<change-scope.json>]',
       exitCode: 2,
     });
     return;
@@ -189,7 +406,38 @@ async function main(): Promise<void> {
   const phase = phaseParsed.phase;
 
   const abs = path.resolve(file);
-  const result = checkCodegraphQueries(abs, phase);
+
+  // ==================== ChangeScope 装载（strict 绑定；阶段 5-8 必选） ====================
+  const resolved = resolveCliScope({
+    projectRoot: abs,
+    phase,
+    scopePath: parseFlagValue(process.argv, 'scope'),
+    changeArg: parseFlagValue(process.argv, 'change'),
+    baseArg: parseFlagValue(process.argv, 'base'),
+    headArg: parseFlagValue(process.argv, 'head'),
+    git: gitRunnerFor(abs),
+  });
+  if (resolved.kind === 'invalid') {
+    exitWithError({
+      category: resolved.category,
+      rule: 'P0-1',
+      message: resolved.message,
+      detail: resolved.detail,
+      file: resolved.file,
+      exitCode: 2,
+    });
+    return;
+  }
+  let result: CodegraphStrictResult;
+  let scopeLabel = '（未提供）';
+  if (resolved.kind === 'missing') {
+    result = resultWithScopeReasons(resolved.reasons);
+  } else if (resolved.kind === 'violations') {
+    result = resultWithScopeReasons(resolved.violations);
+  } else {
+    scopeLabel = `${resolved.scope.changeId}（base=${resolved.scope.baseRef}..head=${resolved.scope.headRef}，声明 ${resolved.scope.changedFiles.length} 个变更文件）`;
+    result = checkCodegraphQueriesStrict(abs, resolved.scope);
+  }
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
@@ -209,11 +457,14 @@ async function main(): Promise<void> {
   }
 
   console.log('═'.repeat(60));
-  console.log('codegraph 查询落盘校验（Codegraph Queries Checker）');
+  console.log('codegraph 查询落盘校验（Codegraph Queries Checker，strict 绑定）');
   console.log('═'.repeat(60));
   console.log(`项目根        : ${abs}`);
   console.log(`阶段          : ${phase}`);
+  console.log(`变更上下文    : ${scopeLabel}`);
   console.log(`有效查询数    : ${result.queryCount}`);
+  console.log(`须覆盖文件数  : ${result.requiredFileCount}`);
+  console.log(`已覆盖文件数  : ${result.coveredFileCount}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -230,7 +481,10 @@ async function main(): Promise<void> {
       type: 'codegraph-queries',
       passed: result.passed,
       phase,
+      changeId: resolved.kind === 'ok' ? resolved.scope.changeId : undefined,
       queryCount: result.queryCount,
+      requiredFileCount: result.requiredFileCount,
+      coveredFileCount: result.coveredFileCount,
       violations: result.violations,
     },
     exitCode,
