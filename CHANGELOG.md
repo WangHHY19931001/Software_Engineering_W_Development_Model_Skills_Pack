@@ -28,7 +28,7 @@
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
-以下为从 42.2.1 整改起点 `bc488248` 至当前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用未来的最终记录提交。
+以下为从 42.2.1 整改起点 `bc488248` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
 
 | 完整 SHA | 提交身份 |
 |---|---|
@@ -98,9 +98,11 @@
 | `6ac25be195d3c841360f6ea0ce0c3c7a1399c377` | `test(audit): cover internal non-markdown l0 links` |
 | `d1c61732184af15ff563c0d923a316d65caa2397` | `test(docs): harden multiline test command extraction` |
 | `ebcc2a678362775675972e65a030fa37ccefceec` | `docs(changes): record Task 8 final repair round` |
-| `7c70e70` | `style(test): align guidance scanner with prepush format` |
+| `54cdf07e1d178062af02d7146661349231658a10` | `docs(changes): synchronize final parent evidence ledger` |
+| `7c70e70c0e1f64f22ca6030844ebd7ce524da6ab` | `style(test): align guidance scanner with prepush format` |
 | `e9062857043ce2e50e2d2ff99b31b0d585b0a397` | `docs(changes): update final verification ledger` |
 | `f832febd5f41a831a4e4cce7e9562f1407b31722` | `docs(changes): finalize Task 8 verification evidence` |
+| `1d148a8a296e159e72f662e2a3b8eaeaa32fa32f` | `docs(changes): record final prepush result` |
 
 最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
 
