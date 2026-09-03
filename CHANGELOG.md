@@ -25,6 +25,7 @@
 - **本轮定向验证**：4 files / 70 tests / exit 0（examples-contract 20/20、L0 logic 29/29、CLI 11/11、dependency-boundaries 10/10）；完整 Vitest 62/1307、串行 docs-consistency 重跑 0（1307/1307）、eval/self-test/doctor/samples/security/typecheck/npm audit 均已实测通过；Git Bash prepush 首次在第 13 项因 registry `ENOTFOUND` / audit endpoint 不可达 exit 1，格式化修复后及最终证据同步后均真实 exit 0、17 项全绿；网络失败作为瞬时 concern 留档，未冒充代码通过。
 - **Task 8 最终修复轮（2026-09-03）**：`examples-contract.test.ts` 递归覆盖全部 `references/**/*.md`、`templates/**/*.md`、`examples/**/*.md` 的普通失败动作与多行 `/wm test` 命令；普通失败统一走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，phase 1 ingestion 保持 A-chunk/A-cross→G 专用收敛。L0 审计既有 fail-closed 边界补内部非 Markdown 目录 symlink/junction 回归；版本 42.2.1、fast-uri 3.1.7、pre-push 17 项和 CLI 37 项统计均保持不变。
 - **最终修复轮验证**：examples-contract 23/23、L0 logic 30/30、L0 CLI 11/11、全量 Vitest 62 files / 1311 tests / 1311 passed；L0 CLI 默认/显式 root 均为 `647/92/36/0`，eval 25/25，self-test 262/262，doctor 0 阻断/3 提示，samples 282/244/15，security 新增 0，typecheck、npm audit high、docs-consistency 均 exit 0。Git Bash `bash -c "npm run prepush"`：证据提交后首次因格式检查发现 1 个文件 exit 1；按 prepush 配置格式化后，在最终记录提交后真实 exit 0、17 项全绿。
+- **扫描器收口修复轮（2026-09-03）**：`examples-contract.test.ts` 扫描器改为保留作用域的分析单元——表格行按整行分析（失败信号在「质量门未通过」单元、旁路动作在「回阶段 5 编码返工」单元时不再漏报），普通行按句/单元分析，fenced 代码块跳过；同一单元出现「完整普通失败链」字样或完整箭头链即视为满足，合法 R-first 描述（先分派 R → V 复审 → 才可分派 S-fix）与禁令复述不误报，C/D 仅在路由到动作时构成失败上下文，phase 1 ingestion A-chunk/A-cross→G 专用收敛例外保留。红灯实测定位 6 处真旁路后逐文件闭合：`bdd.md` §4.1 两条独立门禁回退（BDD/TLA+ 门禁失败先走完整普通失败链，S-fix 修复范围限于对应子流程资产、对侧不受影响）、`command-reference.md` `/wm review` 失败动作行（qualityLevel C/D 视为 V/G 失败 → 完整链，`reworkHints` 仅交 R 作定位线索）与 BDD 项目证据门 exit 1 行（扫掠发现同类旁路：先走完整链再按 R 结论由 S-fix 修复/补齐工件）、`hard-constraints.md` 门禁脚本退出码精确对应表 exit-1 两行（改为先走完整普通失败链再按 R 结论返工）。版本保持 42.2.1。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
@@ -103,6 +104,12 @@
 | `e9062857043ce2e50e2d2ff99b31b0d585b0a397` | `docs(changes): update final verification ledger` |
 | `f832febd5f41a831a4e4cce7e9562f1407b31722` | `docs(changes): finalize Task 8 verification evidence` |
 | `1d148a8a296e159e72f662e2a3b8eaeaa32fa32f` | `docs(changes): record final prepush result` |
+| `c24b2442150f65331e98f6ada1862e4d8bfdb968` | `docs(changes): refresh complete final parent ledger` |
+| `6ddb1978ffc51d790479c25fa9ccb8b9dfb4e81d` | `test(audit): scan whole-row failure routes with chain markers` |
+| `f63989d12bb7bfe7813b93a6706c3438f82fa69f` | `fix(docs): route BDD/TLA+ gate failures through the complete chain` |
+| `07832d7b8596ecc93ef49b290ceb4415d2e4dbdf` | `fix(docs): close /wm review C/D and BDD-gate exit-1 routing bypasses` |
+| `7f994e3d1191b671f371e713034ef26b22148b0a` | `fix(docs): route exit-code table rows 363/366 through the full chain` |
+| `44c057a3e342234e9e9faa0cad4744b161659305` | `fix(docs): remove End Patch residue and restore UAT table row` |
 
 最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
 
