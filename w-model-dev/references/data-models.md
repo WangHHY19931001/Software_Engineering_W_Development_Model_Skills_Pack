@@ -35,7 +35,7 @@
 | 爬坡报告      | HarnessImprovementReport                                                                     | 「爬坡循环改进报告模型」节                             |
 | TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound）                                       | 「TLA+ manifest 模型」节                               |
 | BDD 模型      | BddManifest / BddStateMachine / BddFeature                                                   | 「BDD 数据模型」节                                     |
-| JSON Schema   | 23 份 schema（含 evidence-manifest / evidence-provenance）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
+| JSON Schema   | 25 份 schema（含 change-scope / codegraph-query / evidence-manifest / evidence-provenance）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
 
 **按场景只读 §X**：
 
@@ -943,7 +943,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/infrastructure/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（23 份）
+### Schema 清单（25 份）
 
 | Schema 名（注册键）    | 文件                               | 目标类型                   | 关键约束                                                                                                                                                                           | 对应 logic.ts                                                            |
 | ---------------------- | ---------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -957,6 +957,8 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `run-log`              | `run-log.schema.json`              | RunLogEntry                | additionalProperties:false；action enum（27 类）；role enum（O/A/S/V/G/R）                                                                                                         | run-log-logic.ts                                                         |
 | `checkpoint-log`       | `checkpoint-log.schema.json`       | CheckpointLogEntry         | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R                                                                                                                      | （暂未集成到 logic.ts validateBySchema，仅 self-test SCHEMA_CASES 覆盖） |
 | `event-ingress`        | `event-ingress.schema.json`        | `EventIngressEntry`        | additionalProperties:false；source enum（6 类）；eventType enum（9 类）                                                                                                            | （暂未集成到 logic.ts，仅 self-test 覆盖）                               |
+| `change-scope`        | `change-scope.schema.json`        | ChangeScope             | additionalProperties:false；phase 1-8；changedFiles 相对路径 pattern（绝对/`..`/反斜杠拒绝）；headRef 须等于当前 HEAD                 | lib/change-scope.ts（resolveCliScope / verifyScopeGitBinding）          |
+| `codegraph-query`     | `codegraph-query.schema.json`     | CodegraphQueryRecord    | additionalProperties:false；blastRadius minimum 0；queryTimestamp format date-time；changeId/targetFiles strict 模式必填（ChangeScope 绑定） | cli/check-codegraph-queries.ts（checkCodegraphQueriesStrict）           |
 | `maturity`             | `maturity.schema.json`             | MaturityConfig             | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格                                                                                                         | maturity-logic.ts                                                        |
 | `project`              | `project.schema.json`              | `Project`                  | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格                                                                                                              | （暂未集成到 logic.ts，仅 self-test 覆盖）                               |
 | `hill-climbing-report` | `hill-climbing-report.schema.json` | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required                                                                                               | （暂未集成到 logic.ts，仅 self-test 覆盖）                               |

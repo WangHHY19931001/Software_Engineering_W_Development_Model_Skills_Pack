@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/change-scope.schema.json",
+  "title": "ChangeScope",
+  "description": "变更上下文 manifest（2026-09-04 audit-gate-closure）：把 codegraph/opsx/archive 门禁与实际变更绑定。scope 由 S-coding 产出并落盘（如 .w-model/change-scope.json），CLI 以 --scope=<file> 传入；strict 门禁只认 scope.changedFiles 与实际 Git 变更集合（baseRef..headRef + worktree）精确一致的 scope（headRef 必须等于当前 HEAD，否则 fail-closed）。对应 lib/change-scope.ts 与三个 strict checker。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "changeId",
+    "phase",
+    "baseRef",
+    "headRef",
+    "scopeCreatedAt",
+    "changedFiles"
+  ],
+  "properties": {
+    "changeId": {
+      "description": "变更唯一标识（与 opsx 变更目录/查询记录一致，如 phase5-demo；须含 phaseN- 前缀以表达阶段归属）",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "phase": {
+      "description": "当前校验阶段编号，取值 1-8；与 CLI --phase 须一致，否则 fail-closed",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "baseRef": {
+      "description": "变更基线 Git 引用（commit SHA / tag / branch），须能解析为 Git 对象",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "headRef": {
+      "description": "变更末端 Git 引用，必须等于当前 HEAD（过期 scope fail-closed）",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "scopeCreatedAt": {
+      "description": "scope 创建时刻（ISO date-time）；查询记录 queryTimestamp 不得晚于它",
+      "type": "string",
+      "format": "date-time"
+    },
+    "changedFiles": {
+      "description": "声明变更文件：项目根相对路径、正斜杠分隔、非绝对、不含 .. /空段/反斜杠；与实际 Git 变更集合（baseRef..headRef tracked + worktree staged/unstaged/untracked）须精确一致",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[^/]+(?:/[^/]+)*$"
+      }
+    }
+  }
+}

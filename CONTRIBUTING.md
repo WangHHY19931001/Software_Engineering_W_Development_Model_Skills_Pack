@@ -252,7 +252,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 ├── SKILL.md            # 编排逻辑 + 命令接口 + 架构定位（frontmatter version 与 package.json 镜像）
 ├── references/         # 阶段细则 + verifier-spec + 数据模型 + 负面知识库 + 各指南（按需加载）
 ├── subagent/           # 人格库（28 个 Markdown 文件，分 engineering/testing/design/product/project 5 类）
-├── schemas/            # JSON Schema (draft-07) 文件（23 份，含 evidence-manifest / evidence-provenance）
+├── schemas/            # JSON Schema (draft-07) 文件（25 份，含 change-scope / codegraph-query 等）
 ├── scripts/            # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
 │   ├── *-logic.ts / check-*.ts    # 纯逻辑层 + CLI 入口层（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / iceberg-sweep / tla-bdd-sync / role-dispatch / design-contract / coverage / exemption / bdd / state-machine）
 │   ├── schema-loader.ts           # ajv 单例 + schemas/ 自动加载

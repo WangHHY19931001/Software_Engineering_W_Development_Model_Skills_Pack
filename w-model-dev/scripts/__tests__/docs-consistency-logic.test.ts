@@ -1469,7 +1469,8 @@ describe('runDocConsistencyChecks', () => {
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
       expect(report.dynamicMeasurements).toMatchObject({
-        schemaCount: 23,
+        // 25 = 23 原清单 + change-scope + codegraph-query（2026-09-04 audit-gate-closure task 1）
+        schemaCount: 25,
         cliScriptCount: 37,
         exit2ScriptCount: 36,
         testFileCount: (coverage.testResults as unknown[]).length,

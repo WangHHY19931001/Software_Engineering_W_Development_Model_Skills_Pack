@@ -501,7 +501,10 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('infrastructure/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
     const dir = path.resolve(here, '../../schemas');
     const map = await readSchemasDir(dir);
-    expect(Object.keys(map).length).toBe(23);
+    // 25 = 23 原清单 + change-scope + codegraph-query（2026-09-04 audit-gate-closure task 1）
+    expect(Object.keys(map).length).toBe(25);
     expect(map['rtm.schema.json']).toBeDefined();
+    expect(map['change-scope.schema.json']).toBeDefined();
+    expect(map['codegraph-query.schema.json']).toBeDefined();
   });
 });

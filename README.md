@@ -182,7 +182,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 - **负面知识库**：48 条流程反模式 + 8 条核心操作行为 + 失败模式，把踩过的坑变成纪律。
 - **评审人格库**：内置 28 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审。
 - **采用路径**：新项目从 Day 0 跑全流程，存量项目增量验证优先（见 [docs/adoption-guide.md](./docs/adoption-guide.md)）。
-- **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，23 份 JSON Schema 约束文件保证格式一致。
+- **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，25 份 JSON Schema 约束文件保证格式一致。
 - **外部工具集成**：codegraph 修改前影响分析、OpenSpec 规格驱动变更、SkillOpt 方法论吸收（详见 [SSoT](./docs/skill-design-document_SSoT.md)）。
 
 ## 项目结构
@@ -195,7 +195,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 │   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例
-│   ├── schemas/                  # 23 份 JSON Schema 约束文件
+│   ├── schemas/                  # 25 份 JSON Schema 约束文件
 │   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖）
 │   ├── scripts/                  # 门禁脚本（只做校验，不调用 LLM）
 │   │   ├── cli/                  #   命令入口：check-*.ts + self-test / doctor / wm-status 等

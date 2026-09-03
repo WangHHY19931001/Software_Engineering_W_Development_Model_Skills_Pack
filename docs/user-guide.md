@@ -51,7 +51,7 @@
 | `FILE_NOT_FOUND` | 指定文件不存在 | 核对路径大小写 / 相对路径起点（默认 cwd） |
 | `FILE_PARSE` | JSON 解析失败 | 用 Node `JSON.parse` 校验文件格式（避免 PowerShell `ConvertTo-Json` 写入，见反模式 #25） |
 | `FILE_READ` | 文件读取失败（权限 / 编码） | 检查文件权限与编码（UTF-8 无 BOM） |
-| `STRUCTURE_INVALID` | 通过解析但不符合 JSON Schema | 对照 `w-model-dev/schemas/` 下对应 schema（由 [`schema-loader.ts`](../w-model-dev/scripts/infrastructure/schema-loader.ts) 加载；23 份清单见 [`data-models.md`](../w-model-dev/references/data-models.md)） |
+| `STRUCTURE_INVALID` | 通过解析但不符合 JSON Schema | 对照 `w-model-dev/schemas/` 下对应 schema（由 [`schema-loader.ts`](../w-model-dev/scripts/infrastructure/schema-loader.ts) 加载；25 份清单见 [`data-models.md`](../w-model-dev/references/data-models.md)） |
 | `UNEXPECTED` | 脚本内部异常 | 按错误详情上报 / 查看 stderr detail |
 
 `ERROR_JSON` 字段：`category` / `message` / `exitCode` / `file` / `rule` / `field`（后三个仅在有值时输出）。**不变量：`ERROR_JSON.exitCode` 恒等于进程实际退出码**（防伪三层机制，SSoT §10E E.1），可被 `check-run-log.ts` R6 交叉校验存档。

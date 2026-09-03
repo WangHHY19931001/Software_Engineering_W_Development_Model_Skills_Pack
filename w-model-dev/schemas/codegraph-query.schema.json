@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/codegraph-query.schema.json",
+  "title": "CodegraphQueryRecord",
+  "description": "codegraph 查询落盘记录 schema（对应约束 #14 / 反模式 #38）。基础字段（querySymbol/queryTimestamp/callers/callees/blastRadius）为原 5 字段完整性要求；strict 覆盖模式（阶段 5-8 + ChangeScope）额外要求 changeId/targetFiles 必填（changeId 精确等于 scope.changeId，targetFiles 全部属于 scope.changedFiles 且覆盖全部须覆盖的 code/test 变更文件）。strict 模式字段缺省不阻断 legacy 校验，但 strict 判定视为不满足。对应 cli/check-codegraph-queries.ts checkCodegraphQueriesStrict。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "querySymbol",
+    "callers",
+    "callees",
+    "blastRadius",
+    "queryTimestamp"
+  ],
+  "properties": {
+    "querySymbol": {
+      "description": "codegraph_explore 查询目标符号（如 ArticleService.create）",
+      "type": "string",
+      "minLength": 1
+    },
+    "changeId": {
+      "description": "变更标识（strict 模式必填）：须精确等于 ChangeScope.changeId",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "targetFiles": {
+      "description": "本次查询服务的变更文件（strict 模式必填）：项目根相对、正斜杠、非绝对、不含 .. /空段/反斜杠；须全部属于 scope.changedFiles",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[^/]+(?:/[^/]+)*$"
+      }
+    },
+    "callers": {
+      "description": "查询结果的调用方符号数组（可能为空）",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "callees": {
+      "description": "查询结果的被调用符号数组（可能为空）",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blastRadius": {
+      "description": "查询结果影响半径：有限非负数",
+      "type": "number",
+      "minimum": 0
+    },
+    "queryTimestamp": {
+      "description": "查询执行时刻（ISO date-time），不得晚于 ChangeScope.scopeCreatedAt",
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
