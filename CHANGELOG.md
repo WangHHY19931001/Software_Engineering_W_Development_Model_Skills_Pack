@@ -98,6 +98,8 @@
 | `6ac25be195d3c841360f6ea0ce0c3c7a1399c377` | `test(audit): cover internal non-markdown l0 links` |
 | `d1c61732184af15ff563c0d923a316d65caa2397` | `test(docs): harden multiline test command extraction` |
 | `ebcc2a678362775675972e65a030fa37ccefceec` | `docs(changes): record Task 8 final repair round` |
+| `7c70e70` | `style(test): align guidance scanner with prepush format` |
+| `e9062857043ce2e50e2d2ff99b31b0d585b0a397` | `docs(changes): update final verification ledger` |
 
 最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
 
