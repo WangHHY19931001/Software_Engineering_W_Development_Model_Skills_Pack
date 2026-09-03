@@ -50,6 +50,38 @@
     },
     {
       "if": {
+        "properties": { "action": { "const": "emergency-fix" } },
+        "required": ["action"]
+      },
+      "then": {
+        "properties": {
+          "variant": { "const": "emergency-fix" },
+          "blocker": { "type": "string", "minLength": 1 }
+        },
+        "required": ["variant", "blocker"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "fix" } },
+        "required": ["action"]
+      },
+      "then": {
+        "properties": { "variant": { "const": "fix" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "variant": { "const": "emergency-fix" } },
+        "required": ["variant"]
+      },
+      "then": {
+        "properties": { "blocker": { "type": "string", "minLength": 1 } },
+        "required": ["blocker"]
+      }
+    },
+    {
+      "if": {
         "properties": {
           "phase": { "const": 8 },
           "action": { "enum": ["rootcause", "review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"] }
@@ -212,6 +244,23 @@
     },
     "basedOnReport": {
       "description": "fix 动作所基于的 R 报告 ID（与 reportId 一一对应，由 run-log R3 扩展校验）；implementation V/G 与对应 fix 使用同一 exact 值",
+      "type": "string"
+    },
+    "variant": {
+      "description": "fix/emergency-fix 动作的变体标注（subagent-delegation.md「S 子代理修改既有产物的边界」）：fix=S-fix 返工变体；emergency-fix=紧急修复通道（blocker 说明阻塞原因）。action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时若出现必须为 fix（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；动作-角色配对（r3-*/produce/fix/emergency-fix/review/gate 类）由 check-run-log.ts logic 层强制",
+      "enum": ["fix", "emergency-fix"]
+    },
+    "blocker": {
+      "description": "emergency-fix 的阻塞原因描述（非空字符串，仅作为「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查）；variant=emergency-fix 或 action=emergency-fix 时必填",
+      "type": "string",
+      "minLength": 1
+    },
+    "fixedLocation": {
+      "description": "fix/emergency-fix 修复位置（文件路径/区域），紧急修复条目审计用（subagent-delegation.md 紧急修复条目格式字段）",
+      "type": "string"
+    },
+    "fixBasedOn": {
+      "description": "fix/emergency-fix 修复依据（如 S-self-assessment 或 R 报告 ID），紧急修复条目审计用（subagent-delegation.md 紧急修复条目格式字段）",
       "type": "string"
     },
     "implementationTarget": {

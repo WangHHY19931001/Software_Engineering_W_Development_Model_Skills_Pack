@@ -508,3 +508,101 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
     expect(map['codegraph-query.schema.json']).toBeDefined();
   });
 });
+
+/**
+ * 审计修复（audit-gate-closure task 3）：run-log fix variant/blocker conditional
+ * + preventive-review passed=false 时 findings 须 ≥1。
+ */
+describe('run-log schema fix/emergency-fix variant conditional', () => {
+  const fixBase = {
+    runId: 'variant-contract',
+    timestamp: '2026-09-03T00:00:00.000Z',
+    phase: 5,
+    phaseName: '编码',
+    role: 'S',
+    duration_s: 1,
+    tokens: 1,
+    estimated: false,
+    subagentSpawns: 0,
+    gateExitCode: null,
+    outcome: 'success',
+    basedOnReport: 'RC-1',
+    artifacts: ['src/app.ts'],
+  };
+
+  it('action=fix 无 variant → valid（向后兼容旧样本）', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'fix' }).valid).toBe(true);
+  });
+
+  it('action=fix + variant=fix → valid', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'fix', variant: 'fix' }).valid).toBe(true);
+  });
+
+  it('action=fix + variant=emergency-fix → invalid（variant 与 action 不符）', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'fix', variant: 'emergency-fix' }).valid).toBe(false);
+  });
+
+  it('action=emergency-fix 无 variant → invalid（schema 强制 variant+blocker）', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'emergency-fix' }).valid).toBe(false);
+  });
+
+  it('action=emergency-fix + variant=emergency-fix + blocker → valid', () => {
+    expect(
+      validateBySchema('run-log', {
+        ...fixBase,
+        action: 'emergency-fix',
+        variant: 'emergency-fix',
+        blocker: '构建失败阻塞推进',
+        fixedLocation: 'w-model-dev/scripts/cli/check-run-log.ts',
+        fixBasedOn: 'S-self-assessment',
+      }).valid,
+    ).toBe(true);
+  });
+
+  it('action=emergency-fix + variant=emergency-fix 但缺 blocker → invalid', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'emergency-fix', variant: 'emergency-fix' }).valid).toBe(
+      false,
+    );
+  });
+
+  it('action=emergency-fix + variant=fix → invalid（const 不符）', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'emergency-fix', variant: 'fix' }).valid).toBe(false);
+  });
+
+  it('variant 非法枚举值 → invalid', () => {
+    expect(validateBySchema('run-log', { ...fixBase, action: 'fix', variant: 'hotfix' }).valid).toBe(false);
+  });
+});
+
+describe('preventive-review schema passed=false 与 findings 约束', () => {
+  const reviewBase = {
+    reviewedAt: '2026-09-03T00:00:00.000Z',
+    reviewer: 'R3-completeness-bot',
+    phase: 5,
+    dimension: 'completeness',
+  };
+
+  it('passed=false + findings=[] → invalid', () => {
+    expect(validateBySchema('preventive-review', { ...reviewBase, passed: false, findings: [] }).valid).toBe(false);
+  });
+
+  it('passed=true + findings=[] → valid（无问题可空发现通过）', () => {
+    expect(validateBySchema('preventive-review', { ...reviewBase, passed: true, findings: [] }).valid).toBe(true);
+  });
+
+  it('passed=false + findings 含一条有效发现 → valid', () => {
+    expect(
+      validateBySchema('preventive-review', {
+        ...reviewBase,
+        passed: false,
+        findings: [
+          {
+            severity: 'Required',
+            description: '缺字段',
+            evidence: 'requirement-spec.md §3',
+          },
+        ],
+      }).valid,
+    ).toBe(true);
+  });
+});

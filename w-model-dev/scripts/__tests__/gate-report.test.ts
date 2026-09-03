@@ -24,6 +24,10 @@ import { writeGateLog } from '../lib/gate-log-writer.js';
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const CHECK_RUN_LOG_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-run-log.ts');
+const CHECK_ROLE_DISPATCH_SCRIPT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../cli/check-role-dispatch.ts',
+);
 const CHECK_ICEBERG_SWEEP_SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../cli/check-iceberg-sweep.ts',
@@ -633,7 +637,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   });
 
-  it('默认 RUN_LOG_JSON 与 --json 合并 parse diagnostics 和 lifecycleStatus', async () => {
+  it('默认 RUN_LOG_JSON 与 --json 一致：malformed 行并入 blocking violations（exit 1，非纯 diagnostics）', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-summary-parity-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
@@ -645,19 +649,178 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       );
       const jsonResult = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
       const defaultResult = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, logFile], {});
-      expect(jsonResult.status).toBe(0);
-      expect(defaultResult.status).toBe(0);
+      expect(jsonResult.status).toBe(1); // malformed 行是 blocking → exit 1
+      expect(defaultResult.status).toBe(1);
       const jsonSummary = JSON.parse(jsonResult.stdout ?? '') as Record<string, unknown>;
+      expect(jsonSummary).toMatchObject({ passed: false, lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN' });
+      const reasons = jsonSummary.reasons as string[];
+      expect(reasons.some((r) => r.startsWith('PARSE_INCOMPLETE: line 2') && r.includes('run-log'))).toBe(true);
       const defaultLine = (defaultResult.stdout ?? '').split(/\r?\n/).find((line) => line.startsWith('RUN_LOG_JSON '));
       expect(defaultLine).toBeDefined();
       const defaultSummary = JSON.parse(defaultLine!.slice('RUN_LOG_JSON '.length)) as Record<string, unknown>;
-      expect(defaultSummary).toMatchObject({
-        lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
-        statusNote: expect.any(String),
-        diagnostics: expect.arrayContaining([expect.stringContaining('PARSE_INCOMPLETE')]),
-      });
       expect(defaultSummary.lifecycleStatus).toBe(jsonSummary.lifecycleStatus);
+      expect(defaultSummary.reasons).toEqual(jsonSummary.reasons);
       expect(defaultSummary.diagnostics).toEqual(jsonSummary.diagnostics);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('空文件 → exit 1（fail-closed：无任何 run-log 证据）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-empty-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(logFile, '', 'utf-8');
+      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
+      expect(parsed.passed).toBe(false);
+      expect(parsed.reasons.join(' ')).toMatch(/fail-closed/);
+      expect(parsed.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('空白文件（仅空行）→ exit 1（fail-closed）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-blank-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(logFile, '\n  \n\r\n', 'utf-8');
+      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
+      expect(parsed.passed).toBe(false);
+      expect(parsed.reasons.join(' ')).toMatch(/fail-closed/);
+      expect(parsed.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('malformed-only 文件 → exit 1（PARSE_INCOMPLETE blocking）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-malformed-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(logFile, 'not-json\n{also bad}\n', 'utf-8');
+      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
+      expect(parsed.passed).toBe(false);
+      expect(parsed.reasons.filter((reason) => reason.startsWith('PARSE_INCOMPLETE')).length).toBeGreaterThanOrEqual(2);
+      expect(parsed.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-closed 与 R3 维度明细）', () => {
+  it('空文件 → exit 1（fail-closed），reasons 含"无任何可校验阶段"语义', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-role-dispatch-empty-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(logFile, '', 'utf-8');
+      const r = runSync(process.execPath, [tsxCli, CHECK_ROLE_DISPATCH_SCRIPT, '--json', logFile], {});
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout ?? '') as {
+        type: string;
+        passed: boolean;
+        reasons: string[];
+        exitCode: number;
+      };
+      expect(parsed.type).toBe('role-dispatch');
+      expect(parsed.passed).toBe(false);
+      expect(parsed.exitCode).toBe(1);
+      expect(parsed.reasons.join(' ')).toMatch(/无任何可校验阶段/);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('重复单维缺他维的 run-log → exit 1 且 reasons 指明缺失维度（可机器读取）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-role-dispatch-dims-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      const entry = (runId: string, action: string, role: string): string =>
+        JSON.stringify({
+          runId,
+          timestamp: `2026-09-03T00:0${runId.slice(1)}:00Z`,
+          phase: 1,
+          phaseName: '需求与范围',
+          action,
+          role,
+          duration_s: 1,
+          tokens: 1,
+          estimated: false,
+          subagentSpawns: 0,
+          gateExitCode: null,
+          outcome: 'success',
+        });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(
+        logFile,
+        [
+          entry('r1', 'produce', 'S'),
+          entry('r2', 'review', 'V'),
+          entry('r3', 'gate', 'G'),
+          entry('r4', 'r3-completeness', 'R'),
+        ].join('\n') + '\n',
+        'utf-8',
+      );
+      const r = runSync(process.execPath, [tsxCli, CHECK_ROLE_DISPATCH_SCRIPT, '--json', logFile], {});
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; exitCode: number };
+      expect(parsed.passed).toBe(false);
+      expect(parsed.exitCode).toBe(1);
+      expect(parsed.reasons.join(' ')).toMatch(/缺失 role=R 记录/);
+      expect(parsed.reasons.join(' ')).toMatch(/缺 reliability\/security/);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('合法三维度 run-log → exit 0', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-role-dispatch-valid-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      const entry = (runId: string, action: string, role: string): string =>
+        JSON.stringify({
+          runId,
+          timestamp: `2026-09-03T00:0${runId.slice(1)}:00Z`,
+          phase: 1,
+          phaseName: '需求与范围',
+          action,
+          role,
+          duration_s: 1,
+          tokens: 1,
+          estimated: false,
+          subagentSpawns: 0,
+          gateExitCode: null,
+          outcome: 'success',
+        });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(
+        logFile,
+        [
+          entry('r1', 'produce', 'S'),
+          entry('r2', 'review', 'V'),
+          entry('r3', 'gate', 'G'),
+          entry('r4', 'r3-completeness', 'R'),
+          entry('r5', 'r3-reliability', 'R'),
+          entry('r6', 'r3-security', 'R'),
+        ].join('\n') + '\n',
+        'utf-8',
+      );
+      const r = runSync(process.execPath, [tsxCli, CHECK_ROLE_DISPATCH_SCRIPT, '--json', logFile], {});
+      expect(r.status).toBe(0);
+      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; exitCode: number };
+      expect(parsed.passed).toBe(true);
+      expect(parsed.exitCode).toBe(0);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

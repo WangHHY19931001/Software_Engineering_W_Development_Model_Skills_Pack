@@ -241,12 +241,21 @@ async function main(): Promise<void> {
 
   // 构建 options 并调用纯逻辑校验
   const result = checkRunLog(entries, { tlaCheckRounds, gateLogs });
-  const allViolations = [...gateLogViolations, ...result.violations];
-  const passed = allViolations.length === 0;
-  const diagnostics = [
-    ...(result.diagnostics ?? []),
-    ...parsedRunLog.parseErrors.map((error) => `PARSE_INCOMPLETE: line ${error.line} ${error.message}; deferred`),
+  // 审计修复（task 3）：parseErrors 从纯 diagnostics 并入 blocking violations——
+  // 坏行使输入不完整（可能丢失证据），空/空白/malformed-only/valid+malformed 一律 exit 1。
+  // 消息保留 PARSE_INCOMPLETE 前缀以便与 lifecycle diagnostics 区分。
+  const allViolations = [
+    ...gateLogViolations,
+    ...result.violations,
+    ...parsedRunLog.parseErrors.map(
+      (error) =>
+        `PARSE_INCOMPLETE: line ${error.line} ${error.message}; blocking（坏行使 run-log 输入不完整，fail-closed）`,
+    ),
   ];
+  const passed = allViolations.length === 0;
+  // parseErrors 已作为 blocking violations 列出（展示于 reasons / 人类可读原因）；
+  // diagnostics 仅保留纯逻辑层的非阻断诊断（LEGACY_UNSCOPED / pending-pre-approval 等）
+  const diagnostics = [...(result.diagnostics ?? [])];
   const exitCode = passed ? 0 : 1;
   const lifecycleStatus: RunLogLifecycleStatus =
     passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN';

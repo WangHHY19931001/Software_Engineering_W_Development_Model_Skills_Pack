@@ -205,6 +205,8 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         outcome: 'success',
         basedOnReport: 'RC-R8',
         artifacts: ['test-artifact'],
+        variant: 'emergency-fix',
+        blocker: '构建失败阻塞当前阶段推进',
       },
       {
         runId: '2',
@@ -322,6 +324,8 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         outcome: 'success',
         basedOnReport: 'RC-R8',
         artifacts: ['test-artifact'],
+        variant: 'emergency-fix',
+        blocker: '构建失败阻塞当前阶段推进',
       },
       {
         runId: '2',
@@ -1888,5 +1892,135 @@ describe('RunLogEntry schema/type contract', () => {
     expect(typeActions).toEqual(schema.properties.action.enum);
     expect(source).toContain('implementationTarget?: string;');
     expect(source).toMatch(/lifecycleStatus\?: RunLogLifecycleStatus;/);
+  });
+});
+
+/**
+ * 审计修复（audit-gate-closure task 3）：空输入 fail-closed + action-role 配对 blocking。
+ */
+describe('run-log fail-closed: 空输入', () => {
+  it('空数组 → passed=false + NOT_CLOSED_NOT_PROVEN + fail-closed 消息', () => {
+    const result = checkRunLog([]);
+    expect(result.passed).toBe(false);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    expect(result.violations.join(' ')).toMatch(/为空/);
+    expect(result.violations.join(' ')).toMatch(/fail-closed/);
+  });
+});
+
+describe('run-log action-role 配对（blocking，logic 层强制）', () => {
+  const baseEntry = (action: RunLogEntry['action'], role: RunLogEntry['role'], runId = 'pair-run'): RunLogEntry =>
+    makeEntry({ runId, phase: 5, action, role, outcome: 'success', gateExitCode: null });
+
+  const pairingViolation = (result: { violations: string[] }, action: string): string | undefined =>
+    result.violations.find(
+      (v) => v.startsWith('action-role 配对') && v.includes(`action=${action}`) && v.includes(`runId=`),
+    );
+
+  it('r3-* action 由非 R 角色执行 → blocking violation（含 runId/action/role）', () => {
+    const result = checkRunLog([baseEntry('r3-completeness', 'V')]);
+    expect(result.passed).toBe(false);
+    const v = pairingViolation(result, 'r3-completeness');
+    expect(v).toBeDefined();
+    expect(v).toMatch(/role=R/);
+    expect(v).toMatch(/role=V/);
+  });
+
+  it('produce/fix 由非 S 角色执行 → blocking violation', () => {
+    const produce = checkRunLog([baseEntry('produce', 'A', 'run-produce')]);
+    expect(produce.passed).toBe(false);
+    expect(pairingViolation(produce, 'produce')).toBeDefined();
+    const fix = checkRunLog([baseEntry('fix', 'R', 'run-fix')]);
+    expect(fix.passed).toBe(false);
+    expect(pairingViolation(fix, 'fix')).toBeDefined();
+  });
+
+  it('emergency-fix 由非 S 角色执行 → blocking violation', () => {
+    const result = checkRunLog([baseEntry('emergency-fix', 'O', 'run-emergency')]);
+    expect(result.passed).toBe(false);
+    expect(pairingViolation(result, 'emergency-fix')).toBeDefined();
+  });
+
+  it('review 由非 V 角色执行 → blocking violation', () => {
+    const result = checkRunLog([baseEntry('review', 'G', 'run-review')]);
+    expect(result.passed).toBe(false);
+    expect(pairingViolation(result, 'review')).toBeDefined();
+  });
+
+  it('gate/tla-gate/graph-gate 由非 G 角色执行 → blocking violation', () => {
+    for (const action of ['gate', 'tla-gate', 'graph-gate'] as const) {
+      const result = checkRunLog([baseEntry(action, 'S', `run-${action}`)]);
+      expect(result.passed).toBe(false);
+      expect(pairingViolation(result, action)).toBeDefined();
+    }
+  });
+
+  it('合法 action-role 配对不产生 action-role violation', () => {
+    const entries = [
+      baseEntry('produce', 'S', 'p1'),
+      baseEntry('review', 'V', 'v1'),
+      baseEntry('gate', 'G', 'g1'),
+      baseEntry('r3-completeness', 'R', 'r1'),
+      baseEntry('r3-reliability', 'R', 'r2'),
+      baseEntry('r3-security', 'R', 'r3'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
+  });
+});
+
+/**
+ * 审计修复（audit-gate-closure task 3）：schema 对 emergency-fix 强制
+ * variant=emergency-fix + blocker；旧记录（无 variant）经 LEGACY 吸收为 diagnostic。
+ */
+describe('run-log emergency-fix variant 语义', () => {
+  it('带 variant=emergency-fix + blocker 的 emergency-fix 记录 schema-valid 且无 [schema] violation', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'em-valid',
+      phase: 5,
+      action: 'emergency-fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-TEST',
+      artifacts: ['test-artifact'],
+      variant: 'emergency-fix',
+      blocker: '构建阻塞当前阶段推进',
+      fixedLocation: 'w-model-dev/scripts/cli/check-run-log.ts',
+      fixBasedOn: 'S-self-assessment',
+    });
+    const result = checkRunLog([entry]);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
+  });
+
+  it('无 variant 的旧 emergency-fix 记录 → LEGACY diagnostic 而非 blocking [schema]', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'em-legacy',
+      phase: 5,
+      action: 'emergency-fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-TEST',
+      artifacts: ['test-artifact'],
+    });
+    const result = checkRunLog([entry]);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
+    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(true);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  });
+
+  it('带 variant=emergency-fix 但缺 blocker → blocking（声明了紧急通道却无阻塞原因）', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'em-no-blocker',
+      phase: 5,
+      action: 'emergency-fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-TEST',
+      artifacts: ['test-artifact'],
+      variant: 'emergency-fix',
+    });
+    const result = checkRunLog([entry]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
   });
 });

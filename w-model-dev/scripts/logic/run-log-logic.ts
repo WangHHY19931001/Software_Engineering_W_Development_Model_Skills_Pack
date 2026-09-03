@@ -83,6 +83,15 @@ export interface RunLogEntry {
   rtmDiff?: Record<string, unknown>;
   /** implementation fix/review/gate/R3 所针对的实现产物身份 */
   implementationTarget?: string;
+  // ---- fix/emergency-fix 变体标注（subagent-delegation.md「S 子代理修改既有产物的边界」）----
+  /** fix 变体标注：S-fix 用 "fix"，紧急修复通道用 "emergency-fix"（role=S 时建议必填，schema 仅对 emergency-fix 强制） */
+  variant?: 'fix' | 'emergency-fix';
+  /** emergency-fix 的阻塞原因描述（"为何走紧急通道"的审计说明，variant=emergency-fix 时必填） */
+  blocker?: string;
+  /** fix/emergency-fix 修复位置（文件/区域），审计用 */
+  fixedLocation?: string;
+  /** fix/emergency-fix 依据（如 S-self-assessment 或 R 报告 ID），审计用 */
+  fixBasedOn?: string;
   /** effective lifecycle status is emitted by the checker summary, never written back to raw JSONL. */
   lifecycleStatus?: RunLogLifecycleStatus;
   /** review: 审查目标类型（'rootcause' 表示复审 R 报告；phase<8 保留 file/testcase legacy） */
@@ -339,10 +348,56 @@ function isLegacyIdentitySchemaFailure(raw: unknown, errorMessages: string[]): b
   );
 }
 
+/**
+ * 审计修复（audit-gate-closure task 3）：emergency-fix variant 规则引入前
+ * 的旧记录（action=emergency-fix 但完全缺失 variant/blocker 字段）按 LEGACY
+ * 处理——吸收为 diagnostic 而非 blocking，与 phase-8 身份 legacy 处理一致。
+ *
+ * 仅容忍「缺 required variant/blocker」这类 required 缺失；一旦 variant
+ * 已出现（含值不符）或声明 emergency-fix 却缺 blocker，属真实不一致，
+ * 一律走 blocking [schema]（不在本函数吸收范围内）。
+ */
+function isLegacyVariantSchemaFailure(raw: unknown, errorMessages: string[]): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const action = (raw as { action?: unknown }).action;
+  if (action !== 'emergency-fix') return false;
+  const record = raw as Record<string, unknown>;
+  if ('variant' in record) return false;
+  const requiredFields = errorMessages
+    .map((message) => message.match(/required property '([^']+)'/)?.[1])
+    .filter((field): field is string => field !== undefined);
+  if (requiredFields.length === 0 || !requiredFields.every((field) => field === 'variant' || field === 'blocker'))
+    return false;
+  return errorMessages.every(
+    (message) =>
+      /required property '[^']+'/.test(message) ||
+      message.includes('must match "then" schema') ||
+      message.includes('must match "if" schema'),
+  );
+}
+
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
 const R3_ACTIONS = ['r3-completeness', 'r3-reliability', 'r3-security'];
 const S_VARIANTS = ['produce', 'fix', 'emergency-fix'];
 const R3_DIMENSIONS = ['completeness', 'reliability', 'security'];
+
+/**
+ * 动作→执行角色强制配对表（约束 #8 角色分派完整性 / 反模式 #10 O 越权）。
+ * 由 checkRunLog logic 层强制（blocking violation），不放 schema 强制以避免
+ * 破坏既有历史样本；schema 的 action/role description 已注明由 checkRunLog 强制。
+ */
+const ACTION_ROLE_PAIRING: Record<string, 'S' | 'V' | 'G' | 'R'> = {
+  produce: 'S',
+  fix: 'S',
+  'emergency-fix': 'S',
+  review: 'V',
+  gate: 'G',
+  'tla-gate': 'G',
+  'graph-gate': 'G',
+  'r3-completeness': 'R',
+  'r3-reliability': 'R',
+  'r3-security': 'R',
+};
 
 // ==================== 校验入口 ====================
 
@@ -359,6 +414,17 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     };
   }
 
+  // 空输入 fail-closed（审计修复 task 3）：[] 此前会走完全流程并在无任何
+  // checkpoint 时静默 passed=true + CLOSED_UNDER_CURRENT_RULES——空日志无
+  // 阶段/角色/门禁/CHECKPOINT 证据，不得视为「闭合通过」。
+  if (entries.length === 0) {
+    return {
+      passed: false,
+      violations: ['run-log 为空：无任何阶段/角色/门禁/CHECKPOINT 证据（fail-closed）'],
+      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+    };
+  }
+
   // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则跳过并记录（容错，不 crash）
   // 必需字段为 R1-R8 实际访问的核心字段：runId / timestamp / phase / action / outcome
   const valid: RunLogEntry[] = [];
@@ -367,7 +433,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     // === Schema 前置校验 ===
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
-      if (isLegacyIdentitySchemaFailure(raw, schemaResult.errorMessages)) {
+      const legacyIdentityFailure = isLegacyIdentitySchemaFailure(raw, schemaResult.errorMessages);
+      const legacyVariantFailure = isLegacyVariantSchemaFailure(raw, schemaResult.errorMessages);
+      if (legacyIdentityFailure || legacyVariantFailure) {
         const missingFields = schemaResult.errorMessages
           .map((message) => message.match(/required property '([^']+)'/)?.[1])
           .filter((field): field is string => field !== undefined);
@@ -375,6 +443,11 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           Object.entries(raw as Record<string, unknown>).filter(([field]) => !missingFields.includes(field)),
         );
         valid.push(withoutIdentity as unknown as RunLogEntry);
+        if (legacyVariantFailure) {
+          diagnostics.push(
+            `LEGACY_VARIANT: emergency-fix 条目 ${i + 1} 缺 required variant/blocker（variant 规则引入前的旧记录）; deferred`,
+          );
+        }
         continue;
       }
       // schema 拒绝：记录 [schema] 前缀违规并跳过该条
@@ -410,6 +483,18 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     if (missing.length > 0) {
       diagnostics.push(
         `LEGACY_UNSCOPED: ${entry.action} ${entry.runId} identity missing ${missing.join(', ')}; deferred`,
+      );
+    }
+  }
+
+  // action-role 配对强制（审计修复 task 3）：对每条 schema-valid 记录，
+  // action∈{r3-*} 须 role=R；{fix,emergency-fix,produce} 须 role=S；{review} 须
+  // role=V；{gate,tla-gate,graph-gate} 须 role=G。违反即 blocking（含 runId/action/role）。
+  for (const e of valid) {
+    const requiredRole = ACTION_ROLE_PAIRING[e.action];
+    if (requiredRole !== undefined && e.role !== requiredRole) {
+      violations.push(
+        `action-role 配对：条目 runId=${e.runId} action=${e.action} 要求 role=${requiredRole}，实际 role=${e.role}`,
       );
     }
   }
