@@ -290,8 +290,8 @@ Then 状态 C          # 终态断言
 
 BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
-- BDD 门禁失败（check-bdd-model.ts exitCode != 0）→ 回退 BDD 子流程，不影响 TLA+
-- TLA+ 门禁失败（check-tla-model.ts exitCode != 0）→ 回退 TLA+ 子流程，不影响 BDD
+- BDD 门禁失败（check-bdd-model.ts exitCode != 0）→ 先走完整普通失败链（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 BDD 子流程资产、对侧 TLA+ 不受影响
+- TLA+ 门禁失败（check-tla-model.ts exitCode != 0）→ 先走完整普通失败链（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 TLA+ 子流程资产、对侧 BDD 不受影响
 - 两者各自走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环
 
 ### §4.2 等价性跨校验
