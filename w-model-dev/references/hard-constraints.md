@@ -299,7 +299,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #31（归档完整性缺失） | [`check-archive-integrity.ts`](../scripts/cli/check-archive-integrity.ts)（缺失任一阶段强制快照清单文件 → exitCode=1） |
 | #32（签名链断裂） | [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts)（R1-R10 任一失败） |
 | #33（跳过 R3 预防性审查） | [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（always-on）+ [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S→V 间 R3 记录数） |
-| #34（编排者漏派角色） | [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts)（每阶段 S/V/G ≥1、R ≥3 无条件） |
+| #34（编排者漏派角色） | [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts)（每阶段 S/V/G ≥1 + R3 三维度（role=R 的 r3-* success）各 ≥1 无条件，`--r3-enabled` no-op） |
 | #35（self-as-verifier 产物混合） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) `--self-as-verifier`（V 产物与 S 产出路径不同）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
 | #36（路由顺序错误） | 无自动脚本（V 评审 + G 门禁人工校验路由注册顺序表） |
 | #37（产物膨胀核心决策稀疏） | 无自动脚本（V 评审人工校验信息密度） |
@@ -663,12 +663,12 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - run-log 中某阶段缺 role=V 记录（V 评审被跳过）
 - run-log 中某阶段缺 role=G 记录（门禁被跳过）
 - run-log 中某阶段缺 role=S 记录（产出环节被跳过或由 O 越权产出）
-- 缺 role=R 记录（completeness/reliability/security 三阶段任一缺失）—— **无条件**强制，无启用 flag
+- 缺有效 R3 记录：每阶段须 `role=R` + `outcome=success` 的 `r3-completeness` / `r3-reliability` / `r3-security` 各 ≥1（rootcause / iceberg-sweep / failed 不充数，重复维度不充数）—— **无条件**强制，无启用 flag
 - self-as-verifier 模式下兼任时未产出独立产物文件（VerifierOutput JSON 与 S 产出同路径）
 
 **回退动作**：回到当前阶段起点，补派缺失角色（S/V/G/R），重跑对应环节并补记 run-log，再进入 CHECKPOINT。
 
-**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录；**无条件**含 R ≥3 条记录。
+**门禁脚本**：`check-role-dispatch.ts` 校验 run-log 中每阶段含 S/V/G 各 ≥1 条记录，**无条件**校验 R3 三维度各 ≥1（role=R + success 的 r3-* 记录；空或全无效输入 fail-closed，`--r3-enabled` no-op）。
 
 **关联**：约束 #8 
 
@@ -799,7 +799,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：回到 S-fix / emergency-fix 产出后起点，补跑 R3×3（completeness/reliability/security）+ V 评审，V 通过后才可 G 门禁。若 emergency-fix 误用事后 R 复核机制（`emergencyFixReview` 字段），须移除该字段并改走前置 R3+V+G。
 
-**门禁脚本**：`check-run-log.ts` R8 无条件校验 S(任意变体，含 fix/emergency-fix)→V 间 R3 记录数；`check-role-dispatch.ts` 校验 R≥3 无条件；`check-preventive-review.ts --variant=fix|emergency` 校验对应路径三份报告完整性。
+**门禁脚本**：`check-run-log.ts` R8 无条件校验 S(任意变体，含 fix/emergency-fix)→V 间 R3 记录数；`check-role-dispatch.ts` 校验 R3 三维度（role=R + success 的 r3-*）各 ≥1 无条件；`check-preventive-review.ts --variant=fix|emergency` 校验对应路径三份报告完整性。
 
 **关联**：约束 #11 + #8 ；反模式 #33（跳过 R3 预防性审查）的 S 变体特化
 
