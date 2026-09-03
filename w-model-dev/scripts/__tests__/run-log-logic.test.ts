@@ -2023,4 +2023,72 @@ describe('run-log emergency-fix variant 语义', () => {
     expect(result.passed).toBe(false);
     expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
   });
+
+  it('双 legacy（phase-8 缺 identity + 缺 variant/blocker）→ LEGACY 吸收：非 blocking + NOT_CLOSED + LEGACY_VARIANT/LEGACY_UNSCOPED', () => {
+    // review Important-1 修正：两条 legacy 谓词并集吸收——此类行在任务前是
+    // identity-legacy 吸收（LEGACY_UNSCOPED、exit 0 + NOT_CLOSED），
+    // 不得因 variant 规则引入而翻转为 [schema] blocking。
+    const entry: RunLogEntry = makeEntry({
+      runId: 'em-double-legacy',
+      phase: 8,
+      action: 'emergency-fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-TEST',
+      artifacts: ['test-artifact'],
+      // 故意缺 round/reportId/targetKind（identity）+ variant/blocker
+    });
+    const result = checkRunLog([entry]);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
+    expect(result.passed).toBe(true); // logic 无 blocking → CLI exit 0
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    // LEGACY_VARIANT 明示缺 variant/blocker（含 identity 缺失字段清单）
+    const variantDiag = result.diagnostics?.find((d) => /LEGACY_VARIANT/.test(d));
+    expect(variantDiag).toBeDefined();
+    expect(variantDiag).toMatch(/variant/);
+    // identity 缺失部分由 LEGACY_UNSCOPED 循环补充说明
+    expect(result.diagnostics?.some((d) => /LEGACY_UNSCOPED/.test(d) && d.includes('identity missing'))).toBe(true);
+  });
+
+  it('已声明 variant=emergency-fix + blocker 但缺 identity（phase-8）→ 仍按 identity-legacy 吸收，不翻转 blocking', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'em-declared-no-identity',
+      phase: 8,
+      action: 'emergency-fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-TEST',
+      artifacts: ['test-artifact'],
+      variant: 'emergency-fix',
+      blocker: '构建失败阻塞当前阶段推进',
+      // 故意缺 round/reportId/targetKind
+    });
+    const result = checkRunLog([entry]);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    expect(result.diagnostics?.some((d) => /LEGACY_UNSCOPED/.test(d) && d.includes('identity missing'))).toBe(true);
+    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(false);
+  });
+
+  it('已声明 variant 却缺 blocker 仍 blocking（fail-closed 方向不变）', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'em-declared-no-blocker2',
+      phase: 8,
+      action: 'emergency-fix',
+      role: 'S',
+      outcome: 'success',
+      basedOnReport: 'RC-TEST',
+      artifacts: ['test-artifact'],
+      variant: 'emergency-fix',
+      round: 1,
+      reportId: 'RC-TEST',
+      targetKind: 'code',
+      implementationTarget: 'test-artifact',
+      target: 'test-artifact',
+    });
+    const result = checkRunLog([entry]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
+  });
 });

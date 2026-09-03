@@ -331,15 +331,32 @@ const LIFECYCLE_IDENTITY_FIELDS = new Set([
   'target',
 ]);
 
-function isLegacyIdentitySchemaFailure(raw: unknown, errorMessages: string[]): boolean {
+/**
+ * 统一 legacy schema 吸收谓词（审计修复 task 3 + review Important-1 修正）：
+ *
+ * variant 规则引入前的旧记录（未声明 variant 字段）按 LEGACY 吸收——缺失的
+ * required 字段若 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}，则吸收为
+ * diagnostic（LEGACY_VARIANT / LEGACY_UNSCOPED）而非 blocking。该并集使
+ * 「双 legacy」行（phase-8 旧 emergency-fix 同时缺 identity 与 variant/blocker）
+ * 也落入吸收，不再因两条谓词互斥而翻转为 blocking。
+ *
+ * 一旦 variant 已声明（'variant' in record）则仅容忍 identity 字段缺失
+ * （与引入 variant 前的 isLegacyIdentitySchemaFailure 行为一致）；已声明
+ * emergency-fix 却缺 blocker、或 variant 值不符 const，属真实不一致，
+ * 一律走 blocking [schema]（吸收不覆盖，fail-closed 方向不变）。
+ */
+function isLegacySchemaFailure(raw: unknown, errorMessages: string[]): boolean {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
   const action = (raw as { action?: unknown }).action;
   if (typeof action !== 'string') return false;
   const requiredFields = errorMessages
     .map((message) => message.match(/required property '([^']+)'/)?.[1])
     .filter((field): field is string => field !== undefined);
-  if (requiredFields.length === 0 || requiredFields.some((field) => !LIFECYCLE_IDENTITY_FIELDS.has(field)))
-    return false;
+  if (requiredFields.length === 0) return false;
+  const record = raw as Record<string, unknown>;
+  const tolerated =
+    'variant' in record ? LIFECYCLE_IDENTITY_FIELDS : new Set([...LIFECYCLE_IDENTITY_FIELDS, 'variant', 'blocker']);
+  if (requiredFields.some((field) => !tolerated.has(field))) return false;
   return errorMessages.every(
     (message) =>
       /required property '[^']+'/.test(message) ||
@@ -348,32 +365,10 @@ function isLegacyIdentitySchemaFailure(raw: unknown, errorMessages: string[]): b
   );
 }
 
-/**
- * 审计修复（audit-gate-closure task 3）：emergency-fix variant 规则引入前
- * 的旧记录（action=emergency-fix 但完全缺失 variant/blocker 字段）按 LEGACY
- * 处理——吸收为 diagnostic 而非 blocking，与 phase-8 身份 legacy 处理一致。
- *
- * 仅容忍「缺 required variant/blocker」这类 required 缺失；一旦 variant
- * 已出现（含值不符）或声明 emergency-fix 却缺 blocker，属真实不一致，
- * 一律走 blocking [schema]（不在本函数吸收范围内）。
- */
-function isLegacyVariantSchemaFailure(raw: unknown, errorMessages: string[]): boolean {
+/** 记录是否为未声明 variant 的 emergency-fix（variant 规则引入前形态） */
+function isUndeclaredVariantEmergencyFix(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
-  const action = (raw as { action?: unknown }).action;
-  if (action !== 'emergency-fix') return false;
-  const record = raw as Record<string, unknown>;
-  if ('variant' in record) return false;
-  const requiredFields = errorMessages
-    .map((message) => message.match(/required property '([^']+)'/)?.[1])
-    .filter((field): field is string => field !== undefined);
-  if (requiredFields.length === 0 || !requiredFields.every((field) => field === 'variant' || field === 'blocker'))
-    return false;
-  return errorMessages.every(
-    (message) =>
-      /required property '[^']+'/.test(message) ||
-      message.includes('must match "then" schema') ||
-      message.includes('must match "if" schema'),
-  );
+  return (raw as { action?: unknown }).action === 'emergency-fix' && !('variant' in (raw as Record<string, unknown>));
 }
 
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
@@ -433,9 +428,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     // === Schema 前置校验 ===
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
-      const legacyIdentityFailure = isLegacyIdentitySchemaFailure(raw, schemaResult.errorMessages);
-      const legacyVariantFailure = isLegacyVariantSchemaFailure(raw, schemaResult.errorMessages);
-      if (legacyIdentityFailure || legacyVariantFailure) {
+      if (isLegacySchemaFailure(raw, schemaResult.errorMessages)) {
         const missingFields = schemaResult.errorMessages
           .map((message) => message.match(/required property '([^']+)'/)?.[1])
           .filter((field): field is string => field !== undefined);
@@ -443,9 +436,15 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           Object.entries(raw as Record<string, unknown>).filter(([field]) => !missingFields.includes(field)),
         );
         valid.push(withoutIdentity as unknown as RunLogEntry);
-        if (legacyVariantFailure) {
+        // variant 规则引入前形态（未声明 variant）的 emergency-fix：缺失的
+        // variant/blocker（可能连同 identity 字段）以 LEGACY_VARIANT 明示；
+        // identity 缺失部分随后由 LEGACY_UNSCOPED 循环补充说明。
+        if (
+          isUndeclaredVariantEmergencyFix(raw) &&
+          (missingFields.includes('variant') || missingFields.includes('blocker'))
+        ) {
           diagnostics.push(
-            `LEGACY_VARIANT: emergency-fix 条目 ${i + 1} 缺 required variant/blocker（variant 规则引入前的旧记录）; deferred`,
+            `LEGACY_VARIANT: emergency-fix 条目 ${i + 1} 缺 required ${missingFields.join(', ')}（variant 规则引入前的旧记录）; deferred`,
           );
         }
         continue;
