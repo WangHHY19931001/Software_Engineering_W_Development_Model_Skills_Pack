@@ -464,6 +464,14 @@ interface RunLogEntry {
   decisionConfidence?: number;
   /** implementation review/gate 所针对的实现目标；缺失时 reducer 输出 LEGACY_UNSCOPED */
   implementationTarget?: string;
+  /** fix/emergency-fix 变体标注：fix=S-fix 返工变体；emergency-fix=紧急修复通道（action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时可选，出现则必须为 "fix"） */
+  variant?: 'fix' | 'emergency-fix';
+  /** emergency-fix 的阻塞原因（非空字符串；仅作「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查） */
+  blocker?: string;
+  /** fix/emergency-fix 修复位置（文件/区域），紧急修复条目审计用 */
+  fixedLocation?: string;
+  /** fix/emergency-fix 修复依据（S-self-assessment 或 R 报告 ID），紧急修复条目审计用 */
+  fixBasedOn?: string;
   /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
@@ -493,7 +501,7 @@ interface RunLogEntry {
 
 **使用约定**：
 
-- `run-log.jsonl` 是 append-only：不得修改历史记录；损坏行跳过并记录 note，不停止流程。
+- `run-log.jsonl` 是 append-only：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但 `check-run-log.ts` 门禁对空/坏行 **fail-closed**（空/空白/malformed-only/valid+malformed 一律 exit 1，parseErrors 并入 blocking，消息保留 `PARSE_INCOMPLETE` 前缀），不得把坏行当作可放行的证据缺失。
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
@@ -522,8 +530,8 @@ interface RunLogEntry {
 | action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
 | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `rootcause` | `reportId` / `rootCauseCategory` / `upstreamDefect` / `rollbackRecommended` | R 子代理产出根因报告时记录；`reportId` 格式 `RC-<phase>-<round>-<seq>`；`rootCauseCategory` 见 RootCauseReport Schema；`upstreamDefect`(boolean) 标记是否检测到上游缺陷；`rollbackRecommended`(boolean) 标记是否建议阶段回退 |
-| `fix`       | `basedOnReport` / `artifacts`                                               | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组，implementation segment 还须 `target===implementationTarget` 且 artifacts 包含 exact target                                                                                      |
-| `emergency-fix` | `basedOnReport` / `artifacts`                                           | S 紧急修复变体，与 `fix` 使用相同的 identity、非空 artifacts 和 R3/V/G credit 约束                                                                                                                                        |
+| `fix`       | `basedOnReport` / `artifacts`（`variant` 可选，出现则必须为 `"fix"`）                                               | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组，implementation segment 还须 `target===implementationTarget` 且 artifacts 包含 exact target                                                                                      |
+| `emergency-fix` | `basedOnReport` / `artifacts` + schema 强制 `variant=emergency-fix` / `blocker`（非空）                          | S 紧急修复变体，与 `fix` 使用相同的 identity、非空 artifacts 和 R3/V/G credit 约束；`variant`/`blocker` 仅作「为何走紧急通道」审计说明                                                                                                                            |
 | `escalate`  | 新增可选字段 `reportId`（仅 `upstreamDefect` 触发的升级）                   | 当 R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true` 触发场景 5 阶段回退升级时，`escalate` 动作记录 `reportId` 关联根因报告                                                                                 |
 
 **rootcause 动作示例**（spec §5.5）：
@@ -541,6 +549,8 @@ interface RunLogEntry {
 > 多角度场景（R-lead 分派 N 个 R-persona，并行/串行均可）时，每份 PartialReport 各记一条 `rootcause` 动作（`role:"R"`，`note` 标注 personaSlice），聚合记一条 `rootcause` 动作（`note:"R-lead aggregation"`）。
 >
 > **D8 lifecycle identity 约束（phase 8）：** reducer 使用完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix/emergency-fix 只接受 `basedOnReport` 精确匹配的 reportId、`target===implementationTarget` 且非空 artifacts 包含 exact target。implementation V/G/R3 必须与对应 fix 保持同一 phase/round/reportId/targetKind/basedOnReport/implementationTarget，并满足 exact target/artifacts 关系。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；legacy evidence 不进入 R3/V/R8 credit；机器状态为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 不单独证明 closed。raw JSONL 始终 append-only，不由 checker 改写。
+
+**variant / blocker 与 legacy 吸收（2026-09-04 audit-gate-closure）**：schema（`run-log.schema.json`）新增 `variant`（enum `fix`/`emergency-fix`）/ `blocker` / `fixedLocation` / `fixBasedOn` 字段与条件约束——`action=emergency-fix` ⇒ `variant=emergency-fix` 且 `blocker` 非空；`variant=emergency-fix` ⇒ `blocker` 非空；`action=fix` 的 `variant` 若出现必须为 `"fix"`（不强制出现）。variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的「双 legacy」旧 emergency-fix 行）经合并 legacy 谓词（`isLegacySchemaFailure`：可容忍缺失 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}）吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**；已声明 variant 却缺 blocker 或 variant 值不符 const 属真实不一致 → blocking `[schema]`（吸收不覆盖）。动作-角色配对（`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）由 `checkRunLog` logic 层 blocking 强制（schema 的 description 注明，不在 schema 强制以兼容历史样本）。`check-run-log.ts` CLI 的 parseErrors 并入 blocking violations（坏行使输入不完整，fail-closed）；`checkRunLog([])` → `passed=false` + `NOT_CLOSED_NOT_PROVEN`。
 
 ## 自主成熟度模型（maturity.json）
 
@@ -967,7 +977,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `coverage`             | `coverage.schema.json`             | CoverageAnalysis           | additionalProperties:false；4 张覆盖矩阵（stakeholder/scenario/requirementType/crossCuts）+ coveragePercent [0,100]                                                                | coverage-logic.ts                                                        |
 | `design-contract`      | `design-contract.schema.json`      | DesignContractInput        | additionalProperties:false；routes/assertions 契约字段                                                                                                                             | design-contract-logic.ts                                                 |
 | `exemption`            | `exemption.schema.json`            | ExemptionRequest           | additionalProperties:false；四阶段审批字段（justification/evidence/review/verification/humanDecision）                                                                             | exemption-logic.ts                                                       |
-| `preventive-review`    | `preventive-review.schema.json`    | PreventiveReview           | additionalProperties:false；dimension enum（completeness/reliability/security）                                                                                                    | preventive-review-logic.ts                                               |
+| `preventive-review`    | `preventive-review.schema.json`    | PreventiveReview           | additionalProperties:false；dimension enum（completeness/reliability/security）；条件约束 `passed=false ⇒ findings.minItems=1`（schema 强制，无发现的失败审查不得通过）                                    | preventive-review-logic.ts                                               |
 | `signature-chain`      | `signature-chain.schema.json`      | SignatureChainEntry        | additionalProperties:false；inputProvenance 来源证明；actorRole enum                                                                                                               | （暂未接入 validateBySchema，经 readJsonlOrExit 标签间接使用）           |
 | `iceberg-sweep`        | `iceberg-sweep.schema.json`        | IcebergSweepReport         | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed                                                              | iceberg-sweep-logic.ts                                                   |
 | `evidence-manifest`    | `evidence-manifest.schema.json`    | EvidenceManifest           | additionalProperties:false；脱敏导出文件的相对路径、SHA-256 与生成元数据                                                                                                           | evidence-export-logic.ts                                                 |

@@ -207,6 +207,8 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 质量门由 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 守护：
 退出码 0 = 通过（RTM 需求覆盖率 100% + 四级测试全部通过）；退出码 1 = 普通失败，必须先执行完整普通失败链；退出码 2 = 输入错误，修正输入后重跑。任一非 0 结果都不授权发布。
 
+**阶段 5-8 调用须绑定变更上下文（2026-09-04 audit-gate-closure）**：`check-artifact-gate.ts --phase=5..8`（含默认终检 phase=8）与 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts` 均须传 `--scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`），缺失 → exit 1（fail-closed）。artifact gate 先跑 codegraph/opsx strict 校验并把 violations 并入 reasons/exitCode（`GATE_JSON` 含 external summary）；archive 是阶段 8 `opsx:archive` 后置门，由 `check-openspec-archive.ts` 归档后单独跑。详见 [command-reference.md](command-reference.md)「Artifact Gate 项目阶段证据门」节与 [subagent-delegation.md](subagent-delegation.md)「阶段 5-8 门禁顺序与 ChangeScope」。
+
 质量标准详见 [`quality-standards.md`](quality-standards.md)。
 
 ## 工作流常见反模式

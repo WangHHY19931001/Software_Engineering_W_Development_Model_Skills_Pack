@@ -64,13 +64,13 @@ O: 🔴 CHECKPOINT · 阶段 5 放行
 以下命令为最小示例，路径必须替换为目标项目的真实产物；不得把示例文本当成已执行结果。
 
 ```bash
-npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts . --phase=5
-npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts . --phase=5
+npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts . --phase=5 --scope=.w-model/change-scope.json
+npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts . --phase=5 --scope=.w-model/change-scope.json
 npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json --rtm=.w-model/rtm.json --src=src/
 npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 npx tsx w-model-dev/scripts/cli/check-state-machine-consistency.ts .w-model/state-machine-consistency.json
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5 --scope=.w-model/change-scope.json
 ```
 
 阶段门还须包含 `check-preventive-review.ts`、`check-verifier-output.ts`、闭环 5 脚本、`check-role-dispatch.ts` 和 `check-signature-chain.ts`。任一普通 V/G、评审或真实测试失败时，必须走完整链：

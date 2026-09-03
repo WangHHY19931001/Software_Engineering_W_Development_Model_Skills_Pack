@@ -21,7 +21,7 @@
 | RTM | `.w-model/rtm.json` | `codeModule` 列待回填 |
 | 技术栈要求 | `.w-model/project.json` | 已登记技术栈 |
 
-产出：实现代码（`src/`）、单元测试（`tests/unit/`）、覆盖率报告、codegraph 查询落盘（`docs/codegraph/`）、opsx 制品（`opsx/`）、RTM codeModule 回填。
+产出：实现代码（`src/`）、单元测试（`tests/unit/`）、覆盖率报告、codegraph 查询落盘（`.w-model/codegraph-queries/`，含 changeId/targetFiles 绑定）、opsx 制品（`opsx/`）、RTM codeModule 回填。
 
 ## 门禁脚本与命令行
 
@@ -41,11 +41,11 @@ npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 # 3) BDD 单元测试层校验：phase 5 强制真实 Cucumber 执行证据 + SD Coverage
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json
 
-# 4) 阶段 5 工件质量门：单元测试通过 + 覆盖率 ≥ 80% + codeModule 回填
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
+# 4) 阶段 5 工件质量门：单元测试通过 + 覆盖率 ≥ 80% + codeModule 回填 + codegraph/opsx strict 聚合（--scope 绑定实际变更）
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须 codegraph 查询）与 `check-opsx-artifacts.ts`（opsx 三段式制品完整）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须 codegraph 查询）与 `check-opsx-artifacts.ts`（opsx 三段式制品完整）——两个 checker 与 artifact gate 均须带 `--scope=.w-model/change-scope.json`（或 `--change/--base/--head` 薄封装）绑定实际变更，缺 scope 即 fail-closed（exit 1）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 

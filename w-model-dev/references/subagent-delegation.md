@@ -253,7 +253,7 @@ V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 
 |---|---|---|
 | check-verifier-output | V 评审 JSON 校验（R1-R13，含 R13 单轴下限） | V 产出后 G 跑 |
 | check-rootcause-report | RootCauseReport 校验（R1-R10：根因链 / 可证伪 / 修复建议 / 预防 / 上游缺陷 / 质量等级 / 报告 ID / 多角度 / reality-checker 置信度） | 返工循环：R 定位后 G 校验（见 §4 步骤 1/3） |
-| check-role-dispatch | 角色 S/V/G 各 ≥1 + R ≥3 无条件校验（约束 #8） | 每阶段门放行前 |
+| check-role-dispatch | 角色 S/V/G 各 ≥1 + R3 三维度（role=R 且 outcome=success 的 r3-completeness/r3-reliability/r3-security 各 ≥1）无条件校验（约束 #8/#11）；空或全无效输入 fail-closed；结果含 r3Missing 维度明细 | 每阶段门放行前 |
 | check-signature-chain | 签名链 R1-R10（含 O 越权 / 代签检测） | 每阶段门放行前 |
 | check-iceberg-sweep | 冰山扫掠报告校验（R1-R5，反模式 #44） | S-fix 通过后（ICEBERG-A）+ 阶段门放行前（ICEBERG-B） |
 
@@ -315,7 +315,7 @@ V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 
 | #29 BDD 不符未回退 | check-bdd-model D4 等价性 |
 | #30 豁免审批跳步 | check-exemption E1-E9 |
 | #33 跳过 R3 | check-preventive-review（--variant=standard|fix|emergency|ingest）+ check-run-log R8 |
-| #34 漏派角色 | check-role-dispatch（R≥3 无条件） |
+| #34 漏派角色 | check-role-dispatch（S/V/G 各 ≥1 + R3 三维度无条件，`--r3-enabled` no-op） |
 | #38 codegraph 未查询 | check-codegraph-queries |
 | #39 跳过 opsx 审查 | check-opsx-artifacts |
 | #41 单轴失败掩盖 | check-verifier-output R13 |
@@ -581,6 +581,8 @@ O: 若通过 → 🔴 CHECKPOINT · 发布放行（展示 GATE_JSON 给用户）
 O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完成
 ```
 
+> **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/opsx strict 校验 → artifact gate（聚合）→（阶段 8）opsx:archive → check-openspec-archive.ts（归档后置门）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖），`GATE_JSON` 含 external summary；archive checker 是 `opsx:archive` 后置门，不在 pre-archive 的 artifact gate 内强制。
+
 ## 子代理分派模板
 
 > 编排者分派子代理时必须使用宿主 Agent 的子代理机制（如 Trae 的 Task 工具 / Claude Code 的 Task 工具 / Cursor 的子代理）。分派指令须包含完整上下文，子代理不得继承编排者会话历史。
@@ -658,8 +660,11 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 阶段 5~7 门：
     1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
     2. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=<真实报告路径>
-    3. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
-  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]（终检后另运行 `check-bdd-model.ts` 的 phase 8 graph + required Cucumber report 组合）
+    3. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N> --scope=<change-scope.json>（内部先跑 codegraph/opsx strict 校验并聚合 violations；scope 亦可 --change=<id> --base=<ref> --head=<ref>）
+    4. npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位 codegraph 覆盖问题时单独跑）
+    5. npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位 opsx 制品问题时单独跑）
+  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>（默认 phase=8，同样聚合 codegraph/opsx strict；终检后另运行 `check-bdd-model.ts` 的 phase 8 graph + required Cucumber report 组合）
+  - 阶段 8 opsx:archive 后置门：S-coding 执行 opsx:archive 归档后，G 单独跑 npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts [project-dir] --phase=8 --scope=<change-scope.json>（严格锚定 <changeId> 或 <日期>-<changeId> 归档目录）
   - 各阶段还须运行 `check-preventive-review.ts`、其余闭环脚本和 phase-N 定义的专属门禁
 产出契约：
   1. 退出码（0 / 1 / 2）
@@ -1386,7 +1391,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 2. **转交 R 子代理**：非紧急修复一律转 R 子代理正式定位，S 子代理不得越权修改既有产物。R 子代理产出 `RootCauseReport` → V 复审 → G 门禁 → S-fix 修复（标准返工流程）
 3. **紧急修复通道**（仅当 bug 阻塞当前阶段推进时启用，前置 R3+V+G）：
    - S 子代理可执行**最小修复**（仅修复阻塞点，不扩展功能、不重构）
-   - 必须在 `.w-model/run-log.jsonl` 追加 `fix` 条目，标注 `"紧急修复": true` 和阻塞原因
+   - 必须在 `.w-model/run-log.jsonl` 追加 `action=emergency-fix` 条目（见下格式）并填写阻塞原因
    - 紧急修复条目格式：`{role:"S", action:"emergency-fix", variant:"emergency-fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment"}`
    - emergency-fix 与其他 S 变体一视同仁，产出后须前置 **R3×3（completeness/reliability/security）→ V → G**，不得跳过。R3 报告路径走 `<phase>-emergency-{completeness,reliability,security}.json`（与 `check-preventive-review.ts --variant=emergency` 一致）。跳过 R3+V 命中反模式 #42。`variant=emergency-fix` + `blocker` 字段保留用于 run-log 审计，仅作为「为何走紧急通道」的说明，不再意味跳过审查。
    - **移除机制**：原「阶段完成后由 R 子代理复核紧急修复的完整性（R 复核产出追加到 `RootCauseReport` 的 `emergencyFixReview` 字段）」事后复核机制已移除。紧急修复的完整性由前置 R3×3 + V 兜底。
@@ -1397,7 +1402,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
   - `variant="emergency-fix"` + `blocker` 非空 → 合法紧急修复通道
   - 无 `variant` 或 `variant` 非 `emergency-fix` / `fix`（S-fix 变体） → 视为越权修复，命中反模式 #10 变体
 - 非紧急修复的 `fix` 条目视为越权，需回滚并由 R + S-fix 重做
-- 检测脚本：`check-run-log.ts` 校验 `role=S` 的 `action=fix` 条目必须含 `variant` 字段，且 `variant=emergency-fix` 时必须含 `blocker` 字段
+- 检测脚本（精确语义，2026-09-04 与 run-log.schema.json / run-log-logic.ts 对齐）：`check-run-log.ts` 对 `action=fix` / `action=emergency-fix` 条目按以下规则判定——`action=emergency-fix` 强制 `variant=emergency-fix` 且 `blocker` 非空（schema 强制）；`action=fix` 的 `variant` **可选**，出现则必须为 `"fix"`（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；已声明 `variant=emergency-fix` 却缺 `blocker`、或 variant 值不符 const 属真实不一致 → blocking `[schema]`；variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的双 legacy 行）经合并 legacy 谓词吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**，不进 blocking。动作-角色配对（`fix`/`emergency-fix`/`produce`→role=S 等）由 logic 层 blocking 强制。`preventive-review.schema.json` 另强制 `passed=false ⇒ findings ≥1`。
 
 > 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是「与其他 S 变体一视同仁的前置 R3+V+G 通道」——emergency-fix 产出后仍须 R3×3 + V + G，命中反模式 #42 一律回退。
 
@@ -1536,7 +1541,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 | S（产出） | 每阶段必须（产出开发产物 + 测试设计 + RTM 更新） | check-role-dispatch.ts |
 | V（评审） | 每阶段必须（按 verifier-spec.md §6（输出 Schema）+ §8（提示词模板）产出 VerifierOutput JSON） | check-role-dispatch.ts |
 | G（门禁） | 每阶段必须（跑 check-*.ts + 回填证据摘要） | check-role-dispatch.ts |
-| R（根因/R3） | **无条件必须**（completeness/reliability/security 三阶段各 1 次，共 ≥3 条，无条件强制，覆盖所有 S 变体含 S-fix / S-emergency-fix） | check-role-dispatch.ts（`--r3-enabled` flag 保留为 no-op 向后兼容） |
+| R（根因/R3） | **无条件必须**（每阶段须有 `role=R` 且 `outcome=success` 的 `r3-completeness` / `r3-reliability` / `r3-security` 记录各 ≥1，覆盖所有 S 变体含 S-fix / S-emergency-fix；rootcause / iceberg-sweep / 失败记录不充数，重复维度不充数） | check-role-dispatch.ts（`--r3-enabled` flag 保留为 no-op 向后兼容；结果含 r3Missing 维度明细） |
 
 ### 可选条件
 
@@ -1561,4 +1566,4 @@ npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl
 npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts .w-model/run-log.jsonl --r3-enabled
 ```
 
-退出码：0=通过，1=缺角色（违反约束 #8，R≥3 无条件校验），2=输入错误。
+退出码：0=通过，1=缺角色或 R3 维度（违反约束 #8/#11：每阶段 S/V/G 各 ≥1，R3 三维度各 ≥1；run-log 为空或全无效输入同样 exit 1——无记录不等于完整），2=输入错误。

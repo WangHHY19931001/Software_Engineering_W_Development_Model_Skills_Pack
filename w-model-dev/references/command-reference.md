@@ -61,7 +61,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 `npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]` 保持 exit `0=通过`、`1=真实生命周期/门禁违规`、`2=输入错误`。phase 8 的 lifecycle reducer 以完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联记录：rootcause V/G 仅匹配同 reportId/round/targetKind，fix 与 implementation V/G/R3 只接受 exact target/artifacts 关系，rootcause review 不计 implementation V。R3 completeness/reliability/security 仅在同身份 `S-fix → R3×3 → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引误关联。
 
-缺少 identity 字段的历史行不被推断或静默放行，`--json` 和默认 `RUN_LOG_JSON` 都展示合并的 `LEGACY_UNSCOPED`/deferred diagnostics；legacy 证据只作诊断，不进入 R3/V/R8 credit。`fix` 与 `emergency-fix` 都要求 `basedOnReport` 和非空 `artifacts`。生命周期状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`；exit 0 仍可能是 `NOT_CLOSED_NOT_PROVEN`，不能单独证明 lifecycle closed。checker 只读 raw append-only JSONL，不追加、删除、重排或编辑历史行。
+**输入 fail-closed 与坏行语义（2026-09-04 audit-gate-closure）**：run-log 为空、空白、malformed-only 或 valid+malformed → exit 1——parseErrors 从纯 diagnostics 并入 **blocking violations**（消息保留 `PARSE_INCOMPLETE` 前缀：`PARSE_INCOMPLETE: line N ...; blocking（坏行使 run-log 输入不完整，fail-closed）`）；`checkRunLog([])` 直接返回 `passed=false` + `NOT_CLOSED_NOT_PROVEN`。动作-角色配对（`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）blocking 强制；`action=emergency-fix` 强制 `variant=emergency-fix` + `blocker` 非空（schema），`action=fix` 的 `variant` 可选（出现必须为 `"fix"`）。缺 identity 字段的历史行（含双 legacy 缺 identity+variant 的旧 emergency-fix 行）经合并 legacy 谓词吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED** 非阻断 diagnostic（`--json` 与默认 `RUN_LOG_JSON` 均展示合并的 deferred diagnostics）；legacy 证据只作诊断，不进入 R3/V/R8 credit。`fix` 与 `emergency-fix` 都要求 `basedOnReport` 和非空 `artifacts`。生命周期状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`；exit 0 仍可能是 `NOT_CLOSED_NOT_PROVEN`，不能单独证明 lifecycle closed。checker 只读 raw append-only JSONL，不追加、删除、重排或编辑历史行。
 
 ### Source-bound provenance 边界
 
@@ -350,9 +350,10 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 ## Artifact Gate 项目阶段证据门
 
-- **速查行**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--json]`
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--scope=<change-scope.json>|--change=<id> --base=<ref> --head=<ref>] [--json]`
 - phase 1-4 对项目 TLA/BDD 资产做 fail-closed 检查：`tla-manifest.json` 必须通过真实 schema 校验且 `specs` 非空；`bdd-manifest.json` 必须存在并通过 schema。调用 `check-bdd-model.ts` 时固定传递 `--require-tla-equivalence --tla-manifest=<项目路径>`。phase 1 不要求 graph，phase 2-4 在 TLA/BDD 证据基础上要求 graph。
 - phase 5-8 固定传递 `--require-cucumber-report --cucumber-report=<路径>`；默认路径为 `<project-dir>/.w-model/bdd/reports/report.json`，也可用 `--cucumber-report=<path>` 覆盖。报告必须为合法 `{ elements: [...] }`，至少有命名 scenario 的 passed step，skipped/pending/undefined/unknown/failed 或畸形报告均阻断。
+- **phase 5-8 变更上下文绑定（2026-09-04 audit-gate-closure）**：`--scope=<file>`（`schemas/change-scope.schema.json`）或薄封装 `--change/--base/--head` 必选——缺失 → **exit 1**（fail-closed，无变更上下文的相关查询/制品不放行）；scope 文件不存在/非 JSON/schema 违反 → exit 2；scope 已提供但 Git 绑定失败（headRef 不等于当前 HEAD、changedFiles 与实际变更集合不符、git 不可用）→ exit 1（以 `[scope]` 前缀并入 reasons，**不输出「未提供 --scope」误导文案**）。scope 通过后先跑 codegraph/opsx strict 校验，violations 并入 reasons/exitCode（不被 RTM 通过掩盖），`GATE_JSON` 含 `external` summary（codegraph `passed/violationCount/changeId/requiredFileCount/coveredFileCount` + opsx `passed/violationCount/changeId/changesNames`）。`--scope` 与 `--change/--base/--head` 互斥，同给 → ARG_INVALID / exit 2；薄封装须三者同时给出。archive（`check-openspec-archive.ts`）是 phase 8 `opsx:archive` 后置门，不在本 pre-archive gate 内强制（G 在归档后单独跑，见下节）。
 - phase 1-4 的项目阶段门同时有两条不同证据路径：BDD D4 required equivalence 固定传 `--require-tla-equivalence --tla-manifest=<项目路径>`；独立文件级 pair sync 则仅在本阶段契约生效、TLA/BDD manifest 均通过真实 schema/资产校验、且 manifest 配对集合满足 TLA→BDD 与 BDD→TLA 双向覆盖时，按 pair 调用 `check-tla-bdd-sync.ts`。D4 不是 pair sync 的替代品，pair sync 也不是 D4 的替代品。
 - 缺失/非法 JSON/schema 畸形/空资产/关联 `.tla`、`.cfg` 或 `.feature` 文件缺失均由各自 evidence gate 产生 blocking violation；不得把缺资产转化为 sync skip。配对孤儿、路径映射不完整、无完整 pair、转移/状态/不变式不一致或 sync 子进程失败同样阻断。phase 5-8 不启用该 TLA↔BDD 文件同步，改用 required Cucumber 执行证据。
 - 该项目阶段门与本地 pre-push fixture 回归分层：pre-push 不调用本 CLI，不启用上述 project-only required flags，也不运行项目 TLA、TLA↔BDD pair sync 或 Cucumber 证据。
@@ -372,6 +373,21 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **失败动作**：exit 1 视为普通 V/G 失败 → 先走完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再按 R 结论由 S-fix 修复/补齐项目工件后重跑门禁；required Cucumber 报告必须为 `{ elements: [...] }`，且至少一个非空 `name` 的 scenario element 含 `result.status="passed"`。`failed` 只作失败诊断，`skipped` / `pending` / `undefined` / 未知 status 和匿名 element 都不能满足证据并产生 D5 violation；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
 - **边界**：本地 pre-push 直接运行的是技能包 `check-bdd-model` fixture 回归；它不直接运行 TLA、TLA↔BDD 同步或任何项目工件阶段门。项目阶段门才按成熟度传入上述 require flags 和真实工件。
 - **guide 链接**：[bdd.md](bdd.md)（BDD 门禁调用）与 [tla-plus.md](tla-plus.md)（TLA+ / BDD 协作）。
+
+## 阶段 5-8 codegraph/opsx/archive 门禁 CLI（ChangeScope 绑定）
+
+三个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39/#40 与归档后置门）：
+
+- **速查行**（阶段 5-8 均必选 scope，缺失 → exit 1；文件/JSON/schema/参数冲突 → exit 2）：
+  - `npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
+  - `npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
+  - `npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
+  - 薄封装：`--change=<changeId> --base=<ref> --head=<ref>`（须三者同时给出，与 `--scope` 互斥）以实际 Git 变更集合生成等价 scope，免维护 manifest。
+- **codegraph checker**：校验 `.w-model/codegraph-queries/` 下 phase 前缀 = scope.phase 的查询记录（`codegraph-query.schema.json` 结构前置校验）——`changeId` 精确等于 scope.changeId（同 changeId 异 phase 前缀文件违规）、`targetFiles` 全部属于 scope.changedFiles 且非空、`queryTimestamp` 合法 ISO date-time 且不晚于 `scopeCreatedAt`；scope 中每个须覆盖的 code/test 变更文件至少被一个合法查询覆盖（未覆盖逐文件 violation）。缺 changeId/targetFiles 的既有查询逐文件 violation（不允许 silent skip）。
+- **opsx checker**：strict 只校验 `openspec/changes/<changeId>/` 一个变更目录（制品 proposal/design/tasks/tickets + specs/）+ `.w-model/r3-reviews/phase<N>-<stage>-<dim>.md` ×9 + `.w-model/v-reviews/phase<N>-<stage>.md` ×3（stage ∈ explore/propose/coding）；changeId 不在 active 候选（`phase<N>-*` 排除 archive）或候选多于一 → violation（不允许任取其一/跳换）；changeId 须含 `phase<phase>-` 前缀。
+- **archive checker**：`openspec/changes/archive/` 下精确匹配 `<changeId>` 或 `<日期>-<changeId>`（日期前缀锚定 `<YYYY-MM-DD>-`，不再用未锚定正则），多匹配 → violation；制品 `proposal.md`/`design.md`/`tasks.md`/`tickets.md` + `specs/` 齐全；changeId 须含阶段前缀。archive 为阶段 8 `opsx:archive` 后置门（在归档完成后由 G 单独跑，不在 `check-artifact-gate.ts` pre-archive gate 内强制）。
+- **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、opsx 收尾 `OPSX_ARTIFACTS_JSON`、archive 收尾 `OPENSPEC_ARCHIVE_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）。
+- **legacy 兼容层**：三脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts` / `checkOpenspecArchive`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
 
 ## 错误码与 ERROR_JSON 约定
 

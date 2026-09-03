@@ -66,14 +66,19 @@
 
 ## codegraph 修改前影响分析
 
-> 对应约束 #14 + 反模式 #38。阶段 5 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
+> 对应约束 #14 + 反模式 #38。阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
 
-**修改前流程**：
-1. `codegraph_explore(目标符号)` → 查询 callers / callees / blast radius
-2. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）
-3. 评估：修改是否波及 callers？是否需同步改 callees？
-4. 安全确认后 `Edit`/`Write` 代码
-5. （可选）修改后再查一次确认影响未意外扩大
+**修改前流程**（ChangeScope 绑定，2026-09-04 audit-gate-closure）：
+1. **变更上下文**：阶段 5-8 门禁要求 codegraph 查询与实际变更绑定——S-coding 须维护 ChangeScope manifest（`schemas/change-scope.schema.json`，落盘如 `.w-model/change-scope.json`：`changeId` 含 `phaseN-` 前缀 / `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`），保证 `headRef=当前 HEAD`、`changedFiles` 与实际 Git 变更集合精确一致（门禁重算比对，不符 fail-closed）
+2. `codegraph_explore(目标符号)` → 查询 callers / callees / blast radius
+3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt。记录结构见 `schemas/codegraph-query.schema.json`
+4. 评估：修改是否波及 callers？是否需同步改 callees？
+5. 安全确认后 `Edit`/`Write` 代码
+6. （可选）修改后再查一次确认影响未意外扩大
+
+**覆盖义务**：scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定，分类函数 `lib/change-scope.ts` `isCodeOrTestFile`）至少被一个合法查询的 `targetFiles` 覆盖——门禁校验的是**实际覆盖**而非目录存在；未查询/未绑定的变更文件逐文件 violation。
+
+**门禁调用**：G 侧 `check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`；缺 scope → exit 1 fail-closed；文件/JSON/schema 非法 → exit 2）；阶段 5-8 artifact gate（`check-artifact-gate.ts --phase=N --scope=<file>`）把本 checker 与 opsx strict 校验聚合进 reasons/exitCode。
 
 **与 code-TLA+ 一致性校验的关系**：codegraph = 修改前预防，code-TLA+ = 修改后回归，互补不冲突。
 

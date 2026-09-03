@@ -34,6 +34,8 @@
 
 **约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
 
+> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts --phase=6`、`check-codegraph-queries.ts` 与 `check-opsx-artifacts.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致），artifact gate 聚合两个 strict checker 的 violations，`GATE_JSON` 含 external summary。
+
 ## 测试用例设计（执行）
 
 | 用例 ID | 测试场景 | 输入 | 预期输出 | 优先级 |

@@ -35,6 +35,8 @@
 
 **约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
 
+> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts --phase=7`、`check-codegraph-queries.ts` 与 `check-opsx-artifacts.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致），artifact gate 聚合两个 strict checker 的 violations，`GATE_JSON` 含 external summary。
+
 ## 测试用例设计（执行）
 
 | 用例 ID | 测试场景 | 输入 | 预期输出 | 优先级 |
@@ -95,7 +97,7 @@
 - [ ] 缺陷已修复或已记录遗留
 - [ ] 可观测性达标（日志含 TraceID、关键指标暴露、调用链可追踪）
 
-> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=7` 获取确定性判定，向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 是 R 定位线索，必须先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接回编码或放行。
+> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=7 --scope=<change-scope.json>` 获取确定性判定（阶段 5-8 artifact gate 聚合 codegraph/opsx strict 校验，scope 缺失/过期即 fail-closed exit 1），向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 是 R 定位线索，必须先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接回编码或放行。
 
 ## 阶段门评审
 

@@ -30,8 +30,9 @@
 阶段 8 完成时，G 子代理依次运行：
 
 ```bash
-# 1) 工件质量门终检（不传 --phase，默认 --phase=8）：RTM 覆盖率 100% + 四级测试全部通过
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts .
+# 1) 工件质量门终检（不传 --phase，默认 --phase=8）：RTM 覆盖率 100% + 四级测试全部通过；
+#    --scope 绑定变更上下文（缺失 → exit 1，fail-closed）
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --scope=.w-model/change-scope.json
 
 # 2) 归档完整性：校验归档目录包含各阶段强制快照文件
 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
@@ -39,11 +40,11 @@ npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
 # 3) BDD 验收层校验（D5 step 绑定，cucumber 报告驱动）
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
 
-# 4) openspec 归档校验（阶段 8 终检另含）
-npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8
+# 4) openspec 归档校验（阶段 8 opsx:archive 后置门：S-coding 执行 opsx:archive 后由 G 单独跑）
+npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-opsx-artifacts.ts`；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-opsx-artifacts.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 

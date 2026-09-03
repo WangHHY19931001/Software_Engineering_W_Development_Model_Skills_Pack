@@ -81,13 +81,21 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 显式安装支持 Windows x64 / Linux x64；失败只污染随后由 caller `finally` 删除的私有 staging，不覆盖既有非本包目标。同 UID/同访问令牌进程主动 rename 或篡改 staging、repo、lockfile、tarball、`node_modules` 不在该归档输入威胁模型内。
 
-### 1.7 docs-consistency 报 vitest 用例数 / 文件数不匹配
+### 1.7 docs-consistency 报动态测量缺失 / provenance 不可信
 
-**现象**：`npm run check:docs-consistency` 退出码 1，提示 README / AGENTS.md / `.githooks/pre-push` 应含实测用例总数「N tests」或「N 条」，或提示 README 声明「N files」/ AGENTS 声明「N 个 .test.ts」与实测文件数不符。
+**现象**：`npm run check:docs-consistency` 退出码 1，提示动态测量缺失或不可信（如「无法读取受控 vitest facts/provenance」「provenance 与当前 HEAD 不一致」），或静态清单计数与实际不符（schema / references / persona / exit-2 脚本数等）。
 
-**原因**：docs-consistency 门禁强制活体文档中的计数与实测一致——实测 vitest 文件数须命中 README「N files」/ AGENTS「N 个 .test.ts」声明集，实测用例总数须出现在 README / AGENTS / pre-push 三处文本；**新增 / 删除 `.test.ts` 文件或增删测试用例**后未同步文档。期望值从文档解析（无代码常量），无需同步 `docs-consistency-logic.ts`。
+**原因**：docs-consistency 的 vitest **文件数与用例数是受控动态 facts**——由同次受控运行产出 `generated-results.json` + provenance（commitSha / runId / artifactSha256）绑定实际提交，**不再要求复制到 README / AGENTS / pre-push 等活体文档**（README / AGENTS 对 vitest 的表述为「以当前命令输出为准」）；静态计数类（schema 清单 25 份等）仍从代码事实核验文档声明。动态侧失败通常是 provenance 缺失、hash/commitSha 不匹配或自采集运行不完整（负载敏感瞬时失败），不是文档复制遗漏。
 
-**处置**：文件数同步 README「N files」+ AGENTS「N 个 .test.ts」；用例总数（vitest 实测）同步 README / AGENTS / pre-push 三处文本（「N tests」/「N 条」表述）。
+**处置**：动态侧先按 CLI 提示重跑（`npm run prepush` 会先跑 vitest 再以同次 JSON + provenance 调 docs-consistency；手动验证用 `npx vitest run --reporter=json --outputFile=...` + 环境变量 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT` 传入同次受控运行），确认 1300+ 用例全过且 provenance 指向当前 HEAD 后重跑；若为负载敏感瞬时失败（读取数 < 全量）须隔离重跑，不得把失败 provenance 写成通过。静态侧按 violations 文本同步文档声明（新增 schema 文件须同步 `data-models.md`「Schema 清单」与 README/AGENTS/CONTRIBUTING/INSTALL 的 schema 计数表述）。
+
+### 1.7b pre-push 未跑门禁或误放行（stdin ref 判定）
+
+**现象**：`git push` 未输出 `[pre-push]` 门禁日志（但钩子已启用），或提示「本次推送仅删除远端 ref」「无法证明变更范围」。
+
+**原因**：pre-push 以 git push 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段）判定范围，并支持多 ref 聚合；delete-only 推送（local sha 全零）放行跳过；新分支（remote sha 全零）须经 `git merge-base --fork-point`（退化为 merge-base）建立可证明基线。变更未触及 `w-model-dev/**`、根级 README/AGENTS/CONTRIBUTING/配置、`config/**`、`scripts/**`、`.githooks/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，实测命中 `docs/` 任意层级）时放行；**任一 ref 行解析失败或新分支无法建立可证明基线 → fail-closed（运行全部门禁）**，空 stdin 回退 `HEAD@{push}`/`origin/HEAD` 失败同样 fail-closed——不存在「静默跳过门禁」路径（纯 Windows shell 提示放行除外，见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）。
+
+**处置**：确认变更确实触及上述路径（含 `docs/changes`、`docs/superpowers` 下 md）；触及却未跑门禁时用 `bash .githooks/pre-push --force` 或 `npm run prepush` 手动补跑全部门禁。
 
 ### 1.8 self-test 新增校验项但未加样本
 
@@ -118,7 +126,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 | `npm run prepush` 报 `'bash' 不是内部或外部命令` | 无 bash 解释器                         | 安装 Git for Windows 用 Git Bash 运行                                                               |
 | `npm run lint:security` 退出 1 / 2               | baseline 指纹失效                      | 人工确认风险后 `--regenerate`（见 [1.4](#14-eslint-security-baseline-指纹失效--需重生成)）          |
 | 门禁脚本退出 2（`ERROR_JSON`）                   | 参数 / 文件路径 / JSON 格式问题        | 按 6 类错误类别排查，见 [user-guide.md §3.3](./user-guide.md)                                       |
-| `check-docs-consistency` 退出 1                  | 文档计数与代码事实漂移                 | 按 violations 文本同步文档（见 [1.7](#17-docs-consistency-报-vitest-用例数--文件数不匹配)）         |
+| `check-docs-consistency` 退出 1                  | 动态 provenance 缺失/不可信或静态计数漂移        | 按 violations 文本同步文档；动态侧重跑 vitest + 同次 provenance（见 [1.7](#17-docs-consistency-报动态测量缺失--provenance-不可信)） |
 | 依赖升级后门禁失败                               | 依赖行为变化影响校验逻辑               | 回到当批起点修正，跑全量回归；勿用 `--no-verify` 绕过（见 [1.2](#12-git-push---no-verify契约声明)） |
 
 ## 4. 相关文档

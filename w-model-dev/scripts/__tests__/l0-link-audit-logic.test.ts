@@ -419,7 +419,9 @@ describe('auditL0RelativeLinks', () => {
   it('audits the real skill package without hiding L0 boundaries', async () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 
-    expect(result.relativeLinkCount).toBe(647);
+    // 649 = 647（42.2.1 基线）+ 2 条新引用（workflow.md「阶段 5-8 门禁顺序与 ChangeScope」
+    // 注记链接到 command-reference.md 与 subagent-delegation.md，2026-09-04 gate-closure doc sync）
+    expect(result.relativeLinkCount).toBe(649);
     expect(result.l1Only).toHaveLength(92);
     expect(result.templatePlaceholders).toHaveLength(36);
     expect(result.violations).toEqual([]);

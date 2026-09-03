@@ -54,7 +54,7 @@
 
 `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
 
-**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
+**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
 ## #12 返工必经根因定位
 
@@ -76,7 +76,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ## #14 代码改动前后门禁（codegraph + 回归）
 
-**codegraph 修改前强制查询**（原约束 #20 并入）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 子代理须先调用宿主 Agent 的 `codegraph_explore` MCP 工具查询目标符号影响半径（callers/callees/blast radius），并将查询结果落盘到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）。未查询直接修改命中反模式 #38，回到当前阶段起点。codegraph 与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。
+**codegraph 修改前强制查询**（原约束 #20 并入）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 子代理须先调用宿主 Agent 的 `codegraph_explore` MCP 工具查询目标符号影响半径（callers/callees/blast radius），并将查询结果落盘到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）。**门禁校验实际覆盖而非目录存在**（2026-09-04 audit-gate-closure）：阶段 5-8 CLI 以 `--scope=<change-scope.json>`（或薄封装 `--change/--base/--head`）绑定查询与实际变更——查询记录须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（属于 scope.changedFiles），scope 中每个须覆盖的 code/test 变更文件至少被一个查询覆盖，`queryTimestamp` 不得晚于 scopeCreatedAt；缺 scope → exit 1（fail-closed），查询与实际 Git 变更集合不符同样 fail-closed。`check-artifact-gate.ts --phase=5..8` 聚合该 strict 校验进 reasons/exitCode。未查询直接修改命中反模式 #38，回到当前阶段起点。codegraph 与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。
 
 **回归测试强制钩子**（原约束 #21 并入）：任何 agent 改动代码后必须跑回归测试（修复引入新 bug 概率 20-50%）；禁止"改动代码但不跑回归"的工作流。
 
@@ -198,11 +198,11 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，由 `check-archive-integrity.ts` 校验归档完整性清单（退出码 0） |
 | 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
 | 33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
-| 34 | 编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次、R ≥3 次；`check-role-dispatch.ts` 校验（见约束 #8） |
+| 34 | 编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次，R3 须有 `role=R` + `outcome=success` 的 r3-completeness/r3-reliability/r3-security 各 ≥1 条（rootcause/iceberg/失败记录不充数）；`check-role-dispatch.ts` 校验（见约束 #8/#11；空或全无效输入 fail-closed，`--r3-enabled` no-op） |
 | 35 | self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
 | 36 | 路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
 | 37 | 产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没） | 稀释产物语义价值，评审难以聚焦 | 精简扩展点/附录，实体引用密度 ≥ 2/章节（V 评审人工校验信息密度） |
-| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先 `codegraph_explore` 查询影响半径并落盘 `.w-model/codegraph-queries/`；`check-codegraph-queries.ts` 校验（约束 #14） |
+| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先 `codegraph_explore` 查询影响半径并落盘 `.w-model/codegraph-queries/`（记录须含 changeId/targetFiles 与实际变更绑定，覆盖全部须覆盖 code/test 文件）；`check-codegraph-queries.ts --scope=` 校验实际覆盖（约束 #14） |
 | 39 | 跳过 opsx 产物审查（opsx 三段式任一 stage 产物未 R3×3 + V 即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-opsx-artifacts.ts` 校验（约束 #11） |
 | 40 | opsx/S-tickets 职责混淆（tasks.md 与 tickets.md 互相替代或内容错位） | 破坏规格级规划（what/why）与代码级切片（how）职责边界 | tasks.md（opsx:propose）与 tickets.md（S-tickets vertical-slice）职责分离；`check-opsx-artifacts.ts` 校验 |
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |

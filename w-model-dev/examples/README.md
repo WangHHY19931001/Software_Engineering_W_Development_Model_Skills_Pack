@@ -29,12 +29,12 @@ W 模型 8 阶段**串行**推进。每阶段先经 🔴 CHECKPOINT 进入确认
 | 2 系统设计 | 系统设计文档、系统测试设计、RTM、图谱 SD、TLA+ L2、BDD L2 | `check-requirement-graph.ts --phase=2`、`check-tla-model.ts --phase=2 --graph=.w-model/ingestion/graph.json`、`check-bdd-model.ts --phase=2 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` | [system-design.md](system-design.md) |
 | 3 概要设计 | 接口设计文档、集成测试设计、RTM、图谱 INTF、TLA+ L3、BDD L3 | `check-requirement-graph.ts --phase=3`、`check-tla-model.ts --phase=3 --graph=.w-model/ingestion/graph.json`、`check-bdd-model.ts --phase=3 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` | [system-design.md](system-design.md) |
 | 4 详细设计 | 详细设计文档、单元测试设计、RTM、图谱 DD、TLA+ L3/L4、BDD L4 | `check-requirement-graph.ts --phase=4`（零违反硬约束）、`check-tla-model.ts --phase=4 --graph=.w-model/ingestion/graph.json`、`check-bdd-model.ts --phase=4 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json`、`check-artifact-gate.ts --phase=4 --spec-dir=<path>` | [system-design.md](system-design.md) |
-| 5 编码实现 | 实现代码、单元测试执行结果、RTM codeModule、codegraph 落盘、opsx 制品 | `check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-bdd-model.ts --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json`、`check-artifact-gate.ts --phase=5` | [stage5-coding.md](stage5-coding.md) |
-| 6 集成测试 | 集成测试执行结果、测试报告、RTM integrationTest | `check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json` | [stage6-integration-test.md](stage6-integration-test.md) |
-| 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json` | [stage7-system-test.md](stage7-system-test.md) |
-| 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json`、`check-design-contract-consistency.ts`、`check-openspec-archive.ts --phase=8` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
+| 5 编码实现 | 实现代码、单元测试执行结果、RTM codeModule、codegraph 落盘、opsx 制品 | `check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-bdd-model.ts --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json`、`check-artifact-gate.ts --phase=5 --scope=.w-model/change-scope.json` | [stage5-coding.md](stage5-coding.md) |
+| 6 集成测试 | 集成测试执行结果、测试报告、RTM integrationTest | `check-artifact-gate.ts --phase=6 --scope=.w-model/change-scope.json`、`check-bdd-model.ts --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json` | [stage6-integration-test.md](stage6-integration-test.md) |
+| 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7 --scope=.w-model/change-scope.json`、`check-bdd-model.ts --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json` | [stage7-system-test.md](stage7-system-test.md) |
+| 8 验收测试 | 验收测试执行结果、归档产物、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`，须 `--scope=.w-model/change-scope.json`）、`check-archive-integrity.ts`、`check-bdd-model.ts --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json`、`check-design-contract-consistency.ts`、`check-openspec-archive.ts --phase=8 --scope=.w-model/change-scope.json`（归档后置门） | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
 
-> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
+> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`（与 artifact gate 一样以 `--scope` 绑定变更上下文；`check-openspec-archive.ts` 为 opsx:archive 后置门，归档后单独跑）。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
 ## 串联执行顺序
 
@@ -74,21 +74,21 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json --rtm=.w-model/rtm.json --src=src/
 npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5 --scope=.w-model/change-scope.json
 
 # 阶段 6（集成测试）
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=6
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=6 --scope=.w-model/change-scope.json
 
 # 阶段 7（系统测试）
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7 --scope=.w-model/change-scope.json
 
 # 阶段 8（验收测试 + 终检 + 归档）
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts .
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --scope=.w-model/change-scope.json
 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
-npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8
+npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8 --scope=.w-model/change-scope.json
 ```
 
 > 各命令的预期输出（退出码 0/1/2 示例）见对应阶段示例文件；阶段 2/3/4 门禁命令详见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）与 `README.md`（仓库根）「W 模型 8 阶段 × 门禁对应」。

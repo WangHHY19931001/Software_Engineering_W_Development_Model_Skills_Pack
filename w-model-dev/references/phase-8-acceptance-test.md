@@ -34,13 +34,15 @@
 
 **约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
 
+> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts`（终检默认 `--phase=8`）、`check-codegraph-queries.ts`、`check-opsx-artifacts.ts` 与归档后置门 `check-openspec-archive.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致）。
+
 ## 执行方法论
 
 | 步骤 | 工具 / 命令 | 参数 / 阈值 |
 |---|---|---|
 | UAT-001~003 验收测试 | 按阶段 1 产出验收测试用例手动/半自动执行 | 每条验收标准通过 |
 | UAT-004 文档完整性 | 对照 `templates/` 13 个模板逐一核验 | 文件存在 + 内容与模板结构匹配 |
-| RTM 终检 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` | 退出码 0（RTM 100% + 四级测试全通过） |
+| RTM 终检 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>` | 退出码 0（RTM 100% + 四级测试全通过 + codegraph/opsx strict 聚合通过；终检默认 `--phase=8`，scope 缺失/过期 fail-closed exit 1） |
 | 用户确认 | 在验收测试报告「用户确认」区记录 | `confirm` / `confirm-with-comments` / `reject` |
 
 ## 测试用例设计（执行）
@@ -274,6 +276,8 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - archive 完成后 S 子代理回填 `project.json.status = "项目完成 + 已归档"`
 - archive 路径写入 `project.json.archivePath` 字段（可选字段，默认空字符串，向后兼容）
 - check-artifact-gate.ts 不校验 archivePath（保持纯文档吸收，不新增脚本校验）
+
+> **opsx:archive 后置门（2026-09-04 audit-gate-closure）**：OpenSpec 集成语境下归档动作 = `opsx:archive`（`openspec/changes/<changeId>/` 迁至 `openspec/changes/archive/<日期>-<changeId>/`，日期前缀锚定 `<YYYY-MM-DD>-`）。归档完成后 G **单独**跑 `npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase=8 --scope=<change-scope.json>`（缺 scope exit 1；严格锚定恰一个 `<changeId>` 或 `<日期>-<changeId>` 目录、多匹配失败，制品 proposal.md/design.md/tasks.md/tickets.md + specs/ 齐全）；它不在 `check-artifact-gate.ts` pre-archive gate 内强制。本节的 changes/archive 文档产物清单（specs.md / tla-summary.md / rtm-snapshot.json 等）与 `check-archive-integrity.ts` 归档完整性门禁是既有文档归档约定，两者并存、互不替代。
 
 ## 退出状态
 

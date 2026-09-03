@@ -65,7 +65,7 @@ git checkout -b fix/issue-xxx
 # 3.1 单元测试（vitest，文件数与用例数以当前命令输出为准，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
-# 3.2 自检基线（samples/ 目录下 260 条样本，覆盖全部 check 脚本的通过 / 失败路径）
+# 3.2 自检基线（samples/ 目录下 262 条样本，覆盖全部 check 脚本的通过 / 失败路径）
 npm run self-test
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
 # 新增校验项时，必须同步增加 samples/ 下通过 / 失败各一条样本并在 self-test.ts 中声明期望
@@ -89,9 +89,11 @@ npm run format
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
 在 `git push` 时自动跑 17 项检查；任一退出码不符预期即中止推送：
 
+**触发范围判定**：真实 push 以 git 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，多 ref 逐行聚合）为准——local sha 全零（删除远端 ref）跳过该行、remote sha 全零（新分支）经 `git merge-base --fork-point` / merge-base 建立可证明基线（基线为空或退化到推送尖本身 → fail-closed 跑全部门禁）；任一 ref 行解析失败 → fail-closed；delete-only 推送放行；stdin 为空时回退 `HEAD@{push}`/`origin/HEAD` 范围判断，回退失败同样 fail-closed。变更命中 `w-model-dev/**`、根级活体文档/配置、`config/**`、`scripts/**`、`.githooks/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，含 `docs/` 任意层级归档）才跑门禁，未命中放行。
+
 | #   | 检查                                                                                                                                                                                                                       | 期望退出码 |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1   | `npm run self-test`（260 条样本回归基线）                                                                                                                                                                                  | 0          |
+| 1   | `npm run self-test`（262 条样本回归基线）                                                                                                                                                                                  | 0          |
 | 2   | `npm run check:verifier`（无参数）                                                                                                                                                                                         | 2          |
 | 3   | `npm run check:gate -- /tmp/nonexistent`（输入错误）                                                                                                                                                                       | 2          |
 | 4   | `npm run check:verifier -- samples/verifier/valid.json`（有效样本）                                                                                                                                                        | 0          |
@@ -259,7 +261,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── security-scan.ts           # eslint-plugin-security 扫描 + baseline v2 指纹豁免
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
-│   ├── self-test.ts               # 校验逻辑自检（260 条样本，samples/ 驱动）
+│   ├── self-test.ts               # 校验逻辑自检（262 条样本，samples/ 驱动）
 │   ├── __tests__/                 # vitest 单元测试（文件数与用例数以当前命令输出为准 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）

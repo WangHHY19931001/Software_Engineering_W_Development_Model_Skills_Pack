@@ -72,10 +72,11 @@ S-coding: 真实运行结束后只能按输出二选一：
           /wm test type=系统 result=fail
 
 G: 在 R3 预防审查门禁和 V 评审通过后，运行阶段 7 中间质量门：
-   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
+   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7 --scope=.w-model/change-scope.json
 
 O: 仅展示该命令当次真实 stdout、GATE_JSON 和退出码。
    `--phase=7` 只检查到系统测试层；不得使用默认 phase 8，也不得宣称尚未执行的验收测试通过。
+   （阶段 5-8 的 artifact gate 与 codegraph/opsx checker 均须绑定 --scope，缺失即 exit 1。）
 O: 🔴 CHECKPOINT · 阶段 7 放行
    只有真实系统测试 result=pass、V/G 通过且用户确认，才进入阶段 8。
 ```
@@ -104,8 +105,9 @@ S-coding: 全部真实运行结束后只能按输出二选一：
           /wm test type=验收 result=fail
 
 G: 运行 BDD 验收门禁、阶段 8 终检与归档门禁。终检命令为：
-   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts .
-   该命令无 `--phase`，只有真实 exit 0 才能作为四级测试与 RTM 终检证据。
+   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --scope=.w-model/change-scope.json
+   该命令无 `--phase`（默认终检 phase=8），只有真实 exit 0 才能作为四级测试与 RTM 终检证据；
+   --scope 缺失或与当前 HEAD/实际变更不符时 fail-closed（exit 1），须先更新 scope 再重跑。
 
 O: 🔴 CHECKPOINT-C · 项目级放行
    逐条展示真实 UAT、RTM、四级测试、V/G 和归档证据；
@@ -116,6 +118,6 @@ O: 🔴 CHECKPOINT-C · 项目级放行
 
 - 每条 `/wm test` 执行命令都必须含 `result=pass` 或 `result=fail`，值与当次真实运行器输出一致；`result=<pass|fail>` 仅是说明占位，不是可复制命令值。
 - `result=fail` 先回填失败事实，再走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；修复不自动把结果改为 pass。
-- 阶段 7 显式使用 `check-artifact-gate.ts . --phase=7`；阶段 8 终检才使用无 `--phase` 的默认终检。
+- 阶段 7 显式使用 `check-artifact-gate.ts . --phase=7 --scope=<change-scope.json>`；阶段 8 终检才使用无 `--phase` 的默认终检（同样须 `--scope`）。
 - G exit 0、V 通过和真实测试 pass 都只是必要条件；跨阶段或项目完成仍须用户 CHECKPOINT 确认。
 - RTM 由 S 在每次真实测试执行后更新对应列与 `executionSummary`，O/V/G 不代填测试结果。
