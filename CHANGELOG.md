@@ -29,7 +29,7 @@
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
-以下为从 42.2.1 整改起点 `bc488248` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
+以下为从 42.2.1 整改起点 `bc48824894ae076ff0e80d87cebd6c9de4437833` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
 
 | 完整 SHA | 提交身份 |
 |---|---|
@@ -113,8 +113,9 @@
 | `afd99c611b15b5ceb6cb68dac650a7b7fe87cc64` | `docs(changes): record scanner closure round in 42.2.1 changelog` |
 | `fbfd3363d6961b76dfa8029712e2fc36c5544c73` | `docs(changes): record scanner closure round acceptance` |
 | `051c688ecb2ddd361ce19bce560664f456355da1` | `style(test): format whole-row failure scanner` |
+| `c4e3359176a32e2c623f140c48a352349e8b635c` | `docs(changes): refresh complete final parent ledger` |
 
-最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b` 保留为历史中间最终记录。
+最终记录提交不在 CHANGELOG 的本表中自引用；最终 SHA 与最终 prepush 由外部 `git rev-parse HEAD` / `git status --short --branch` 和 Git Bash 命令核验，`e8f6a5b2c6108b1f31061284551492a79fbc62d1` 保留为历史中间最终记录。
 
 ## [42.2.0] - 2026-09-01
 
