@@ -294,19 +294,11 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   },
   {
     api: 'execSync',
-    file: '__tests__/change-scope.test.ts',
-    line: 629,
-    symbol: 'CLI 运行环境自检（非端到端）',
-    reason:
-      '2026-09-04 audit-gate-closure task 1 新增：git 环境自检冒烟，显式 15 秒超时。（行号 2026-09-04 review-fixes 随 quotePath/changeId 前缀/`.` 段用例上移；task 3 更名「CLI 运行环境自检（非端到端）」并把内部注释扩为两行，execSync 下移至 610；2026-09-04 archival-fixes-2 新增薄封装 violations attemptedChangeId 透传断言用例后下移至 629）',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execSync',
     file: '__tests__/check-codegraph-queries.test.ts',
-    line: 314,
+    line: 317,
     symbol: 'runCli',
-    reason: '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。',
+    reason:
+      '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-05 review2-fixes 随 C10b/C10c 固定 queryTimestamp/scopeCreatedAt 常量下移 3 行）',
     timeout: { required: true, status: 'present' },
   },
   {

@@ -19,7 +19,6 @@
  * logic 层直连 child_process；测试内直连 spawnSync 属 __tests__ 既有模式）。
  */
 
-import { execSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,8 +42,6 @@ import { runSync } from '../lib/run-sync.js';
 
 /** 绑定 cwd 的单参 Git 命令函数（readonly 参数与 GitRunner 兼容） */
 type GitFn = (args: readonly string[]) => GitOutcome;
-
-const HERE = join(__dirname, '..', '..', '..'); // 仓库根（vitest cwd 即仓库根）
 
 const tmpDirs: string[] = [];
 function makeTmpDir(prefix = 'wmodel-change-scope-'): string {
@@ -630,13 +627,19 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
     }
   });
 
-  it('CLI 运行环境自检（非端到端）：验证 execSync 能跑 git', async () => {
-    const repo = makeGitProject();
-    writeFileSync(join(repo.root, 'scope.json'), VALID_SCOPE_JSON());
-    // 直接跑 resolveCliScope 已被上面用例覆盖；本用例仅做 CLI 运行环境自检，
-    // 验证 execSync 能启动 git 子进程，不端到端校验 scope（非端到端）。
-    const out = execSync('git --version', { encoding: 'utf-8', timeout: 15_000 });
-    expect(out).toMatch(/git version/i);
-    expect(HERE).toBeTruthy();
+  it('resolveCliScope fail-closes when project root is not a Git repository', async () => {
+    const nonGitRoot = makeTmpDir('review2fix-nongit-');
+    writeFileSync(join(nonGitRoot, 'scope.json'), VALID_SCOPE_JSON());
+    const r = resolveCliScope({
+      projectRoot: nonGitRoot,
+      phase: 5,
+      scopePath: join(nonGitRoot, 'scope.json'),
+      git: realGit(nonGitRoot),
+    });
+    expect(r.kind).toBe('violations');
+    if (r.kind === 'violations') {
+      expect(r.violations.join('\n')).toMatch(/HEAD|Git/i);
+      expect(r.attemptedChangeId ?? null).not.toBeNull();
+    }
   });
 });

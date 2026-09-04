@@ -2876,6 +2876,9 @@ describe('C3 文档入口契约', () => {
 });
 
 describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', () => {
+  // 定位说明：pre-push 行为级覆盖位于 platform-deps-hook.test.ts（stdin 多 ref / 基线 /
+  // fail-closed 真实断言）；本组是对 hook 源码的文本级补充防线——变量重命名即红属预期，
+  // 用于防语义漂移的第二道闸，不承担行为验证职责。
   // 直接读取 .githooks/pre-push 源文本断言契约（hook 是 bash，不由 docs-consistency
   // logic 校验；此处守住与 17 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
   // -n 20 截断 / 空 changed_files 放行」实现）。

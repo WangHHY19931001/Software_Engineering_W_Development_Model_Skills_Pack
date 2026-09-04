@@ -263,8 +263,14 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
         acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
       },
     };
-    const options = { phaseOption: 5 as const } as { phaseOption: 5 };
+    const options = {
+      phaseOption: 5 as const,
+      externalChecks: { codegraphQueriesValid: true, opsxArtifactsValid: true, openspecArchived: true },
+    } as unknown as Parameters<typeof checkArtifactGate>[1];
     const result = checkArtifactGate(matrix, options);
     expect(result.passed).toBe(true);
+    for (const dead of ['codegraphQueriesValid', 'opsxArtifactsValid', 'openspecArchived']) {
+      expect(Object.prototype.hasOwnProperty.call(result, dead), dead).toBe(false);
+    }
   });
 });

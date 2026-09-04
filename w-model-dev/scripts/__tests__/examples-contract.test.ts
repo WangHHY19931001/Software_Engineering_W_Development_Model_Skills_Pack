@@ -80,6 +80,17 @@ function markdownFiles(relativeDirectory: string): string[] {
 const ORDINARY_FAILURE_CHAIN =
   'V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT';
 
+// Shared guidance-corpus inventory for the failure-routing /wm-test scans: every
+// Markdown asset under references/examples/templates (each directory sorted by
+// markdownFiles). Consumers assert set-valued outcomes (empty violation lists or
+// per-file expectations), so the normalized directory order keeps coverage and
+// assertion semantics unchanged.
+const GUIDANCE_CORPUS_FILES = [
+  ...markdownFiles('w-model-dev/references'),
+  ...markdownFiles('w-model-dev/examples'),
+  ...markdownFiles('w-model-dev/templates'),
+];
+
 function normalizeGuidance(value: string): string {
   return value.replace(/[`*_]/g, '').replace(/\s+/g, ' ');
 }
@@ -158,6 +169,12 @@ const DIRECT_ACTIONS = [
   /(?:由|分派)\s+S(?:-fix)?(?![A-Za-z0-9_])/i,
 ];
 const PROHIBITION = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|未经|命中反模式|must\s+not|not\s+allowed|cannot)/i;
+
+// Verbatim-shared by the two line-level failure-routing scanners below (direct
+// R→S-fix bypass and ordinary failure routes). Deliberately narrower than
+// PROHIBITION above (no 未经 / 命中反模式) and than the paragraph-level scanner's
+// local prohibition (no 不要 / 避免): the three scanners keep their own semantics.
+const LINE_PROHIBITION = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
 
 function hasExecutableDirectAction(value: string): boolean {
   return value
@@ -258,20 +275,6 @@ describe('examples workflow contract', () => {
     }
   });
 
-  it('requires a real result for every copyable /wm test command', () => {
-    const files = [
-      ...markdownFiles('w-model-dev/references'),
-      ...markdownFiles('w-model-dev/examples'),
-      ...markdownFiles('w-model-dev/templates'),
-    ];
-
-    for (const relativePath of files) {
-      for (const command of testCommands(read(relativePath))) {
-        expect(hasValidResult(command), `${relativePath}: ${command}`).toBe(true);
-      }
-    }
-  });
-
   it('requires user CHECKPOINT before every documented cross-stage transition', () => {
     for (const file of [
       'requirement-analysis.md',
@@ -309,11 +312,7 @@ describe('examples workflow contract', () => {
   });
 
   it('requires executable failure guidance to carry the complete chain across all Markdown assets', () => {
-    const files = [
-      ...markdownFiles('w-model-dev/references'),
-      ...markdownFiles('w-model-dev/templates'),
-      ...markdownFiles('w-model-dev/examples'),
-    ];
+    const files = GUIDANCE_CORPUS_FILES;
     const failureSignals = [
       /V\/G\s*(?:失败|不通过)/i,
       /评审(?:失败|不通过)/i,
@@ -431,11 +430,7 @@ describe('examples workflow contract', () => {
   });
 
   it('requires every copyable test command to use a bounded real result or explicit placeholder', () => {
-    const files = [
-      ...markdownFiles('w-model-dev/references'),
-      ...markdownFiles('w-model-dev/examples'),
-      ...markdownFiles('w-model-dev/templates'),
-    ];
+    const files = GUIDANCE_CORPUS_FILES;
 
     for (const relativePath of files) {
       for (const command of testCommands(read(relativePath))) {
@@ -475,20 +470,15 @@ describe('examples workflow contract', () => {
   });
 
   it('rejects direct R-to-S-fix bypass instructions across all guidance documents', () => {
-    const files = [
-      ...markdownFiles('w-model-dev/references'),
-      ...markdownFiles('w-model-dev/examples'),
-      ...markdownFiles('w-model-dev/templates'),
-    ];
+    const files = GUIDANCE_CORPUS_FILES;
     const directBypass = (line: string): boolean => {
       const normalized = line.toLowerCase().replace(/\s+/g, ' ');
       return (
         (normalized.includes('直接') || normalized.includes('direct')) &&
-        normalized.includes('r') &&
         (normalized.includes('r→s-fix') || normalized.includes('r->s-fix'))
       );
     };
-    const prohibition = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
+    const prohibition = LINE_PROHIBITION;
 
     for (const relativePath of files) {
       for (const line of read(relativePath).split(/\r?\n/)) {
@@ -500,16 +490,12 @@ describe('examples workflow contract', () => {
   });
 
   it('rejects ordinary failure routes that return or rework without the complete chain', () => {
-    const files = [
-      ...markdownFiles('w-model-dev/references'),
-      ...markdownFiles('w-model-dev/examples'),
-      ...markdownFiles('w-model-dev/templates'),
-    ];
+    const files = GUIDANCE_CORPUS_FILES;
     const failure =
       /V\/G\s*(?:失败|不通过)|评审不通过|评审失败|质量门失败|质量门不通过|测试失败|测试未通过|用例失败|校验失败|passed=false|退出码 1|exit code 1/i;
     const bypass =
       /直接(?:回到|回|分派|返工|修复|按|放行|推进)|回到|回步骤|回 phase|回阶段|回编码|回需求|按 `?reworkHints`?(?:修复|返工)|重跑|重新执行|补回填|(?:R\s*(?:→|->)\s*S-fix)/i;
-    const prohibition = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
+    const prohibition = LINE_PROHIBITION;
 
     for (const relativePath of files) {
       for (const rawLine of read(relativePath).split(/\r?\n/)) {

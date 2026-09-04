@@ -279,6 +279,9 @@ describe('checkCodegraphQueries（legacy 两参兼容层）', () => {
 });
 
 describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
+  const QUERY_TS = '2026-09-05T00:00:01.000Z';
+  const SCOPE_TS = '2026-09-05T00:00:02.000Z'; // queryTimestamp ≤ scopeCreatedAt 方向保持
+
   /** 构造带真实 HEAD 的迷你仓库 + scope + 查询落盘 */
   function makeScopedProject(files: Record<string, string>): { root: string; baseSha: string; headSha: string } {
     const root = makeTmpDir('wmodel-cgq-cli-');
@@ -343,7 +346,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         callers: ['x'],
         callees: ['y'],
         blastRadius: 2,
-        queryTimestamp: new Date().toISOString(),
+        queryTimestamp: QUERY_TS,
         changeId: 'phase5-cgq-cli',
         targetFiles: ['src/main.ts', 'src/forgotten.ts'],
       }),
@@ -355,7 +358,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         phase: 5,
         baseRef: baseSha,
         headRef: headSha,
-        scopeCreatedAt: new Date().toISOString(),
+        scopeCreatedAt: SCOPE_TS,
         changedFiles: ['src/main.ts', 'src/forgotten.ts'],
       }),
     );
@@ -373,7 +376,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         callers: ['x'],
         callees: ['y'],
         blastRadius: 2,
-        queryTimestamp: new Date().toISOString(),
+        queryTimestamp: QUERY_TS,
         changeId: 'phase5-cgq-cli',
         targetFiles: ['src/main.ts'],
       }),
@@ -385,7 +388,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         phase: 5,
         baseRef: baseSha,
         headRef: headSha,
-        scopeCreatedAt: new Date().toISOString(),
+        scopeCreatedAt: SCOPE_TS,
         changedFiles: ['src/main.ts', 'src/forgotten.ts'],
       }),
     );
