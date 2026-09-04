@@ -160,9 +160,9 @@ export interface ExternalCheckerSummary {
   passed: boolean;
   /** violations 计数 */
   violationCount: number;
-  /** scope 是否已提供（false = 未提供 scope，fail-closed 且计数归零） */
+  /** scope 是否已提供（false = 未提供 scope，fail-closed 且计数归零；true 含提供后被 Git 绑定拒绝） */
   provided: boolean;
-  /** scope.changeId；scope 未提供时为 null（不用空串占位，便于机器判定） */
+  /** scope.changeId；未提供 scope 时为 null；scopeProvidedButFailed 时为尝试绑定的 change（不用空串占位，便于机器判定） */
   changeId: string | null;
 }
 
@@ -197,21 +197,34 @@ export interface ExternalChecksAggregate {
 export function aggregateExternalChecks(
   projectRoot: string,
   phase: number,
-  ctx: { scope: ChangeScope | null; scopeViolations: string[]; scopeProvidedButFailed?: boolean },
+  ctx: {
+    scope: ChangeScope | null;
+    scopeViolations: string[];
+    scopeProvidedButFailed?: boolean;
+    /** 尝试绑定的 changeId（scopeProvidedButFailed 时由调用方传入；未提供 scope 场景不用） */
+    attemptedChangeId?: string | null;
+  },
 ): ExternalChecksAggregate {
   const reasons: string[] = [...ctx.scopeViolations.map((v) => `[scope] ${v}`)];
 
   if (ctx.scope === null) {
+    const boundProvided = ctx.scopeProvidedButFailed === true;
     const summary: ExternalSummary = {
       codegraph: {
         passed: false,
         violationCount: 0,
-        provided: false,
-        changeId: null,
+        provided: boundProvided,
+        changeId: boundProvided ? (ctx.attemptedChangeId ?? null) : null,
         requiredFileCount: 0,
         coveredFileCount: 0,
       },
-      opsx: { passed: false, violationCount: 0, provided: false, changeId: null, changesNames: [] },
+      opsx: {
+        passed: false,
+        violationCount: 0,
+        provided: boundProvided,
+        changeId: boundProvided ? (ctx.attemptedChangeId ?? null) : null,
+        changesNames: [],
+      },
     };
     if (ctx.scopeProvidedButFailed !== true) {
       reasons.push(
@@ -439,11 +452,13 @@ async function main(): Promise<void> {
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: null, scopeViolations: [] });
     } else if (resolved.kind === 'violations') {
       // scope 已提供但绑定失败（headRef 过期/变更集合不符等）：不输出"未提供 --scope"误导文案，
-      // 真实原因以 [scope] 前缀进 reasons（agent 纠正应指向更新过期 scope）
+      // 真实原因以 [scope] 前缀进 reasons（agent 纠正应指向更新过期 scope）；
+      // summary 标注 provided=true + 尝试绑定的 changeId（D1：区分「未提供」与「已提供但被拒」）
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
         scope: null,
         scopeViolations: resolved.violations,
         scopeProvidedButFailed: true,
+        attemptedChangeId: resolved.attemptedChangeId ?? null,
       });
     } else {
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {

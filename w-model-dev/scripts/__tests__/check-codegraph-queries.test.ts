@@ -402,4 +402,33 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(parsed.category).toBe('ARG_INVALID');
     expect(parsed.exitCode).toBe(2);
   });
+
+  it('C10e: 薄封装 changeId 缺 phase5- 前缀 → exit 2 + ERROR_JSON(ARG_INVALID)（覆盖性断言）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    const r = runCli([`"${root}"`, '--phase', '5', `--change=reviewfix`, `--base=${baseSha}`, `--head=${headSha}`]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+    const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as {
+      category: string;
+      exitCode: number;
+      message?: string;
+    };
+    expect(parsed.category).toBe('ARG_INVALID');
+    expect(parsed.exitCode).toBe(2);
+  });
+
+  it('C10f: 对照——合法 phase5- 前缀薄封装走正常路径（无查询目录 fail-closed exit 1，非 ARG_INVALID）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    const r = runCli([
+      `"${root}"`,
+      '--phase',
+      '5',
+      `--change=phase5-reviewfix`,
+      `--base=${baseSha}`,
+      `--head=${headSha}`,
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toMatch(/codegraph-queries/);
+    expect(r.stdout).not.toMatch(/^ERROR_JSON \{/);
+  });
 });

@@ -173,6 +173,32 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r2.reasons.some((v) => v.includes('未提供 --scope'))).toBe(true);
   });
 
+  it('E3c: scope 已提供但 Git 绑定失败 → summary 标记 provided=true + 尝试绑定的 changeId（D1 语义）', () => {
+    const { root } = fullPassProject();
+    const attemptedChangeId = 'phase5-reviewfix';
+    const r = aggregateExternalChecks(root, 5, {
+      scope: null,
+      scopeViolations: ['change-scope: headRef 过期（scope.headRef 不等于当前 HEAD）'],
+      scopeProvidedButFailed: true,
+      attemptedChangeId,
+    });
+    expect(r.passed).toBe(false);
+    // 真实原因（scopeViolations）以 [scope] 前缀进 reasons
+    expect(r.reasons.some((v) => v.startsWith('[scope]') && v.includes('headRef 过期'))).toBe(true);
+    // 不得出现与事实不符的"未提供 --scope"误导文案（纠正动作应指向更新过期 scope）
+    expect(r.reasons.some((v) => v.includes('未提供 --scope'))).toBe(false);
+    // D1 语义：provided=true 含「提供后被 Git 绑定拒绝」；changeId 为尝试绑定的 change
+    expect(r.summary.codegraph.provided).toBe(true);
+    expect(r.summary.codegraph.changeId).toBe(attemptedChangeId);
+    expect(r.summary.codegraph.passed).toBe(false);
+    expect(r.summary.opsx.provided).toBe(true);
+    expect(r.summary.opsx.changeId).toBe(attemptedChangeId);
+    expect(r.summary.opsx.passed).toBe(false);
+    // violationCount 保持既有 [scope] 语义：计数归零（未进入 strict 校验）
+    expect(r.summary.codegraph.violationCount).toBe(0);
+    expect(r.summary.opsx.violationCount).toBe(0);
+  });
+
   it('E4: summary 携带 changeId 与相对路径计数', () => {
     const { root } = fullPassProject();
     const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });

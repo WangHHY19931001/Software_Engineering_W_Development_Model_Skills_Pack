@@ -305,8 +305,12 @@ export type ResolvedCliScope =
   | { kind: 'ok'; scope: ChangeScope }
   /** 未提供任何 scope 来源：调用方按校验失败（exit 1）处理，violations 说明变更上下文缺失 */
   | { kind: 'missing'; reasons: string[] }
-  /** scope 语义/绑定失败（phase 不一致、refs/HEAD/变更集合不符、git 失败）：exit 1 */
-  | { kind: 'violations'; violations: string[] }
+  /**
+   * scope 语义/绑定失败（phase 不一致、refs/HEAD/变更集合不符、git 失败）：exit 1。
+   * attemptedChangeId = 尝试绑定的 changeId（manifest 模式=scope.changeId；薄封装=--change 值），
+   * 供调用方在 summary 标注「已提供但 Git 绑定失败」而非「未提供」。
+   */
+  | { kind: 'violations'; violations: string[]; attemptedChangeId?: string | null }
   /** 输入错误（文件/JSON/schema/参数冲突）：exit 2（category 供 ERROR_JSON 使用） */
   | { kind: 'invalid'; category: ErrorCategory; message: string; detail?: string; file?: string };
 
@@ -394,7 +398,7 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
     }
     const binding = verifyScopeGitBinding(scope, git, projectRoot);
     violations.push(...binding.violations);
-    if (violations.length > 0) return { kind: 'violations', violations };
+    if (violations.length > 0) return { kind: 'violations', violations, attemptedChangeId: scope.changeId };
     return { kind: 'ok', scope };
   }
 
@@ -423,7 +427,7 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
     const head = currentHeadSha(git, projectRoot);
     if (head === null) {
       violations.push('无法读取当前 HEAD（git 不可用或项目根不在 Git 仓库内）：薄封装 scope fail-closed');
-      return { kind: 'violations', violations };
+      return { kind: 'violations', violations, attemptedChangeId: args.changeArg };
     }
     const baseSha = resolveGitObject(git, projectRoot, args.baseArg as string);
     if (baseSha === null) violations.push(`baseRef 无法解析为 Git 对象（baseRef=${args.baseArg}）`);
@@ -433,12 +437,13 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
     } else if (headSha !== head) {
       violations.push(`headRef 过期：headRef=${args.headArg} 不等于当前 HEAD=${head}`);
     }
-    if (violations.length > 0) return { kind: 'violations', violations };
+    if (violations.length > 0) return { kind: 'violations', violations, attemptedChangeId: args.changeArg };
     const computed = computeGitChangedFiles(git, projectRoot, args.baseArg as string, args.headArg as string);
     if (!computed.ok) {
       return {
         kind: 'violations',
         violations: [`实际变更集合无法计算（fail-closed）：${computed.error}`],
+        attemptedChangeId: args.changeArg,
       };
     }
     const scope: ChangeScope = {

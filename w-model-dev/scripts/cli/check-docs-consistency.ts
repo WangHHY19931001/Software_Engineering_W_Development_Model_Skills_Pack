@@ -114,7 +114,10 @@ const DESIGN_DOC_NAMES = [
  */
 export function detectScriptsChanges(root: string): boolean {
   const paths: string[] = [];
-  const diff = runSync('git', ['diff', '--name-only', 'HEAD'], { cwd: root, timeout: 15_000 });
+  const diff = runSync('git', ['-c', 'core.quotePath=false', 'diff', '--name-only', 'HEAD'], {
+    cwd: root,
+    timeout: 15_000,
+  });
   if (diff.error === undefined && diff.status === 0) {
     paths.push(
       ...String(diff.stdout)

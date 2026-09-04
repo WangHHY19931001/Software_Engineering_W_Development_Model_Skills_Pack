@@ -193,7 +193,9 @@ describe('runSync', () => {
     const tlaSource = sourceByFile.get('cli/check-tla-model.ts')!;
     const securitySource = sourceByFile.get('cli/security-scan.ts')!;
 
-    expect(docsSource).toMatch(/runSync\('git', \['diff', '--name-only', 'HEAD'\], \{[\s\S]*?timeout\s*:\s*15_000/);
+    expect(docsSource).toMatch(
+      /runSync\(\s*'git',\s*\['-c',\s*'core\.quotePath=false',\s*'diff',\s*'--name-only',\s*'HEAD'\],\s*\{[\s\S]*?timeout\s*:\s*15_000/,
+    );
     expect(docsSource).toMatch(/runSync\('git', \['status', '--porcelain'\], \{[\s\S]*?timeout\s*:\s*15_000/);
     expect(docsSource).toMatch(/diff\.error === undefined && diff\.status === 0/);
     expect(docsSource).toMatch(/status\.error === undefined && status\.status === 0/);
@@ -215,7 +217,7 @@ describe('runSync', () => {
       expect(spawnSyncMock).toHaveBeenNthCalledWith(
         1,
         'git',
-        ['diff', '--name-only', 'HEAD'],
+        ['-c', 'core.quotePath=false', 'diff', '--name-only', 'HEAD'],
         expect.objectContaining({ cwd: 'C:/fixture', timeout: 15_000 }),
       );
       expect(spawnSyncMock).toHaveBeenNthCalledWith(
