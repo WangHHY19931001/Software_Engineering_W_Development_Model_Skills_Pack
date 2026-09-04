@@ -2910,11 +2910,16 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
     expect(source).toContain('[ "$remote_sha" = "$ZERO_SHA" ]');
     expect(source).toContain('git merge-base --fork-point');
     expect(source).toContain('git merge-base "$remote_ref" "$local_sha"');
-    // merge-base 退化为推送尖本身（同名本地 ref）不构成可证明基线 → fail-closed
+    // merge-base 退化为推送尖本身（同名本地 ref）不构成可证明基线 → 降级 remote-tracking 排除集
     expect(source).toContain('[ "$base" = "$local_sha" ]');
-    // 绝无截断式扫描：>20 commits 的新分支不得漏检
+    // 绝无截断式扫描：>20 commits 的新分支不得漏检（-n 截断形态禁止）
     expect(source).not.toContain('-n 20');
-    expect(source).not.toContain('git log --name-only');
+    expect(source).not.toMatch(/git log -n [0-9]/);
+    // merge-base 不可证明时的可证明降级：remote-tracking 排除集枚举（--not --remotes=<remote>，
+    // 无 -n 截断；remote 经白名单 + git remote get-url 核验，无 tracking refs / 失败仍 fail-closed）
+    expect(source).toContain('git log --name-only --pretty=format:');
+    expect(source).toContain('--not "--remotes=$remote_name"');
+    expect(source).toContain('remote_enum_new_branch_files');
   });
 
   it('diff 调用把 -- 置于两 sha 之后（-- 前移会把 sha 当 pathspec 致空输出），并带 fail-closed 标记', async () => {

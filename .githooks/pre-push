@@ -27,6 +27,10 @@ if [ "${1:-}" = "--force" ]; then
   FORCE=1
 fi
 
+# git push 调用 hook 时第一个参数是 remote 名（$2 为 URL）——新分支 remote-tracking
+# 排除集枚举（下方 A6 降级路径）要用它核验远端；--force / 手动执行时为 --force 或空。
+PUSH_REMOTE="${1:-}"
+
 # ---------- Windows 兼容入口 ----------
 # pre-push 依赖 bash（package.json prepush 用 `bash .githooks/pre-push`）。
 # Git Bash / MSYS / MINGW / CYGWIN 环境自带 bash，可正常执行本脚本，**必须跑门禁**；
@@ -113,6 +117,37 @@ EOF
     return 1
   }
 
+  # 新分支 remote-tracking 排除集枚举（merge-base 无法证明 / 退化到推送尖本身时的
+  # 降级尝试）：`git log --name-only <local_sha> --not --remotes=<remote>` 枚举本次推送
+  # 真正新增提交（远端已跟踪 refs 覆盖之外）涉及的变更文件。
+  # 安全边界（任一不满足 → 返回非 0，调用方 fail-closed 跑全部门禁，绝不缩小范围）：
+  #   1. remote 名必须来自 hook 第一个参数且经白名单核验（仅字母数字 . _ -，
+  #      防注入：拒绝空白/换行/引号等）
+  #   2. `git remote get-url` 核验 remote 确实配置
+  #   3. remote 须存在 ≥1 个 remote-tracking ref（无排除集 = 无证据，不得空放行）
+  #   4. 枚举命令本身失败同样 fail-closed
+  remote_enum_new_branch_files() {
+    local local_sha="$1"
+    local remote_name="${2:-}"
+    local tracking out
+    case "$remote_name" in
+      ''|*[!A-Za-z0-9._-]*)
+        return 1 ;;   # remote 名非法/缺失（防注入）
+    esac
+    if ! git remote get-url "$remote_name" >/dev/null 2>&1; then
+      return 1        # remote 未配置
+    fi
+    if ! tracking="$(git for-each-ref "refs/remotes/$remote_name" 2>/dev/null)"; then
+      return 1        # for-each-ref 失败
+    fi
+    [ -n "$tracking" ] || return 1   # 无任何 remote-tracking ref
+    if ! out="$(git log --name-only --pretty=format: "$local_sha" --not "--remotes=$remote_name" 2>/dev/null)"; then
+      return 1        # 排除集枚举失败
+    fi
+    printf '%s\n' "$out"
+    return 0
+  }
+
   # 终端（交互手动执行）不读取 stdin，避免阻塞在交互输入；管道/重定向（git push、
   # CI、文件重定向）正常读取（git 写完 ref 行即关闭管道 → EOF）。
   stdin_saw_line=0
@@ -151,24 +186,30 @@ EOF
       line_diff=""
       if [ "$remote_sha" = "$ZERO_SHA" ]; then
         # 全新分支（远端对象不存在）：先尝试建立可证明基线（--fork-point 优先，
-        # 退化为普通 merge-base）；无法证明 → fail-closed。绝不使用 `git log -n N`
-        # 截断（>N 提交的新分支会漏检）。
+        # 退化为普通 merge-base）。绝不使用 `git log -n N` 截断（>N 提交的新分支会漏检）。
         # 注意退化情形：同名本地 ref 会让 merge-base 解到推送尖本身（base == local_sha，
-        # 实测 fork-point 对自身 reflog 亦如此）——那不是可证明的祖先基线，同样 fail-closed。
+        # 实测 fork-point 对自身 reflog 亦如此）——那不是可证明的祖先基线。
+        # 退化/无法证明时降级尝试远端 remote-tracking 排除集枚举（remote_enum_new_branch_files，
+        # 用 hook $1 的 remote 核验）；排除集亦不可证明 → fail-closed 全量门禁（不改 fail-closed 方向，
+        # 只降常见路径成本：基于已 fetch 远端状态的新分支首推可用 tracking refs 证明范围）。
         base=""
         base="$(git merge-base --fork-point "$remote_ref" "$local_sha" 2>/dev/null)" || true
         if [ -z "$base" ]; then
           base="$(git merge-base "$remote_ref" "$local_sha" 2>/dev/null)" || true
         fi
         if [ -z "$base" ] || [ "$base" = "$local_sha" ]; then
-          parse_failed=1
-          parse_reason="新分支 ${local_ref} 无法建立可证明基线（merge-base 为空或退化到推送尖端本身，远端对象可能不存在）"
-          break
-        fi
-        if ! line_diff="$(git diff --name-only "$base" "$local_sha" -- 2>/dev/null)"; then
-          parse_failed=1
-          parse_reason="git diff 失败（${local_ref} ${base}..${local_sha}）"
-          break
+          if ! line_diff="$(remote_enum_new_branch_files "$local_sha" "$PUSH_REMOTE")"; then
+            parse_failed=1
+            parse_reason="新分支 ${local_ref} 无法建立可证明基线（merge-base 为空/退化到推送尖端本身，remote-tracking 排除集亦不可用：remote 名非法/未配置/无 tracking refs/枚举失败）；fail-closed 运行全部门禁"
+            break
+          fi
+          log "新分支 ${local_ref}：merge-base 不可证明，经 remote-tracking 排除集（--not --remotes=${PUSH_REMOTE}）枚举本次推送新增变更"
+        else
+          if ! line_diff="$(git diff --name-only "$base" "$local_sha" -- 2>/dev/null)"; then
+            parse_failed=1
+            parse_reason="git diff 失败（${local_ref} ${base}..${local_sha}）"
+            break
+          fi
         fi
       else
         # 常规更新：远端对象本地可达。`--` 必须置于两 sha 之后——git diff 在 `--`
@@ -322,8 +363,9 @@ run_expect "vitest 单元测试 + coverage 阈值通过" 0 \
 node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
 
 # 13. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
-#     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号。
-#     任意漏洞报告、JSON 解析、权限/配置错误都 fail-closed，不因文本中出现 network 而放行。
+#     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号；
+#     瞬态网络错误信号扩展（registry 服务端瞬态：socket hang up / 5xx / errno 形态网络错误码）
+#     同样可跳过。任意漏洞报告、JSON 解析、权限/配置错误都 fail-closed，不因文本中出现 network 而放行。
 audit_has_blocking_signal() {
   grep -qiE \
     '(^|[[:space:]])(npm (error|warn|err!)[[:space:]]+)?(code[[:space:]]+(EACCES|EPERM|EJSONPARSE|ECONFIG)|.*(vulnerabilit(y|ies)|permission denied|JSON (parse|input|error)|config(uration)? (error|invalid|failed)))' \
@@ -334,8 +376,12 @@ audit_can_skip() {
   if audit_has_blocking_signal; then
     return 1
   fi
+  # 判定锚定在 npm 自身的 error/warn/err! 前缀行；词面 network 仍只识别行首紧邻前缀处
+  # （防 network-text/networking 等无关文本放宽）。可确证的网络层信号允许出现在该行
+  # 任意位置：网络错误码（code/errno 形态，含 HTTP 5xx/429 码）、socket hang up、
+  # 'reason: getaddrinfo/connect <E码>'、5xx/429 响应文本与状态词。
   grep -qiE \
-    '^npm (error|warn|err!)[[:space:]]+(code[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT)|network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint)' \
+    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429|E5[0-9]{2})|network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint|.*(socket hang up|reason: (getaddrinfo|connect)[[:space:]]+E[A-Z0-9]+|(429|5[0-9]{2})([[:space:]]+|-)(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error|Too Many Requests)|(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)))' \
     "$tmp_log"
 }
 log "npm audit 依赖漏洞扫描（high 以上阻断）..."

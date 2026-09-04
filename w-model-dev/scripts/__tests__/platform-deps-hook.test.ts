@@ -139,7 +139,11 @@ async function simulatedPrePushAudit(
     | 'mixed-error'
     | 'vulnerability'
     | 'json'
-    | 'permission',
+    | 'permission'
+    | 'socket-hangup'
+    | 'http-503'
+    | 'errno-network'
+    | 'e5xx-code',
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const binDir = await makeTempDir('pre-push-audit-bin-');
   const workspace = await makeTempDir('pre-push-audit-workspace-');
@@ -202,6 +206,19 @@ npm() {
         vulnerability) printf 'npm audit report: high vulnerability\\n'; return 1 ;;
         json) printf 'npm error Unexpected end of JSON input\\n'; return 1 ;;
         permission) printf 'npm error code EACCES\\n'; return 1 ;;
+        socket-hangup)
+          printf 'npm error request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: socket hang up\\n'
+          return 1
+          ;;
+        http-503)
+          printf 'npm error 503 Service Unavailable - GET https://registry.npmjs.org/-/npm/v1/security/advisories/bulk\\n'
+          return 1
+          ;;
+        errno-network)
+          printf 'npm error errno ENOTFOUND\\nnpm error syscall getaddrinfo\\nnpm error request to https://registry.npmjs.org/x failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\\n'
+          return 1
+          ;;
+        e5xx-code) printf 'npm error code E503\\n'; return 1 ;;
       esac
       ;;
     'run check:docs-consistency') test -s "$WM_VITEST_COUNT_FILE" || return 97; return 0 ;;
@@ -582,6 +599,13 @@ describe('pre-push stdin ref scope filtering', () => {
   const mergeBaseOk = `*'merge-base'*) printf '${MERGE_BASE}\\n' ;;`;
   const mergeBaseFail = `*'merge-base'*) exit 1 ;;`;
   const zeroDiffBadObject = `*'${ZERO}'*) exit 128 ;;`;
+  // A6 remote-tracking 排除集模拟（remote 名 = pre-push hook 第一个参数 origin）
+  const remoteGetUrlOk = `*'remote get-url origin'*) printf 'git@example.com:repo.git\\n' ;;`;
+  const remoteGetUrlFail = `*'remote get-url origin'*) exit 1 ;;`;
+  const trackingRefsPresent = `*'for-each-ref refs/remotes/origin'*) printf 'refs/remotes/origin/main\\n' ;;`;
+  const trackingRefsNone = `*'for-each-ref refs/remotes/origin'*) : ;;`;
+  const remoteLogRelated = `*'log --name-only'*) printf 'w-model-dev/SKILL.md\\n' ;;`;
+  const remoteLogUnrelated = `*'log --name-only'*) printf 'eval/probe.json\\n' ;;`;
 
   const workspaceFiles = {
     '.git': 'gitdir: irrelevant\n',
@@ -701,6 +725,97 @@ npm() { return 98; }
     expect(result.stdout, '退化为本尖的 merge-base 不得当作可证明基线').not.toContain('跳过门禁');
   });
 
+  it('new branch + merge-base 退化但 remote-tracking 排除集可用（相关路径）→ 门禁运行（不再 fail-closed）', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['origin'],
+      stdin,
+      gitBody: gitBody([
+        fallbackEmpty,
+        mergeBaseFail,
+        remoteGetUrlOk,
+        trackingRefsPresent,
+        remoteLogRelated,
+      ]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('node_modules 缺失');
+    expect(result.stdout, 'remote-tracking 排除集已证明相关变更，不应再报 fail-closed').not.toContain('fail-closed');
+    expect(result.stdout, '命中相关路径不得跳过门禁').not.toContain('跳过门禁');
+  });
+
+  it('new branch + merge-base 退化但 remote-tracking 排除集可用（纯无关路径）→ 跳过门禁', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['origin'],
+      stdin,
+      gitBody: gitBody([
+        fallbackEmpty,
+        mergeBaseFail,
+        remoteGetUrlOk,
+        trackingRefsPresent,
+        remoteLogUnrelated,
+      ]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('跳过门禁');
+    expect(result.stdout).not.toContain('fail-closed');
+  });
+
+  it('new branch + merge-base 退化 + remote 未配置（get-url 失败）→ fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['origin'],
+      stdin,
+      gitBody: gitBody([fallbackEmpty, mergeBaseFail, remoteGetUrlFail]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, 'remote 不可证明不得跳过门禁').not.toContain('跳过门禁');
+  });
+
+  it('new branch + merge-base 退化 + remote 无任何 tracking refs → fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['origin'],
+      stdin,
+      gitBody: gitBody([fallbackEmpty, mergeBaseFail, remoteGetUrlOk, trackingRefsNone]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, '无排除集不得缩小范围跳过门禁').not.toContain('跳过门禁');
+  });
+
+  it('new branch + merge-base 退化 + remote 名非法（含空白，防注入）→ fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['bad remote'],
+      stdin,
+      gitBody: gitBody([fallbackEmpty, mergeBaseFail, remoteGetUrlOk]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, '非法 remote 名不得参与排除集').not.toContain('跳过门禁');
+  });
+
+  it('new branch + merge-base 退化 + remote-tracking log 失败 → fail-closed 门禁运行', async () => {
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['origin'],
+      stdin,
+      gitBody: gitBody([
+        fallbackEmpty,
+        mergeBaseFail,
+        remoteGetUrlOk,
+        trackingRefsPresent,
+        `*'log --name-only'*) exit 128 ;;`,
+      ]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, '枚举命令失败不得跳过门禁').not.toContain('跳过门禁');
+  });
+
   it('delete-only ref（local sha 全零）→ 跳过门禁（exit 0 + 说明）', async () => {
     const stdin = `refs/heads/old-topic ${ZERO} refs/heads/old-topic ${REMOTE_DELETED}\n`;
     const result = await runFilteredPush({
@@ -787,6 +902,16 @@ npm() { return 98; }
     expect(result.stdout).toContain('跳过门禁');
   });
 
+  it('stdin 为空：fallback diff 成功但输出为空（可证明相对上游无差异）→ exit 0 + 回退放行说明', async () => {
+    const result = await runFilteredPush({
+      gitBody: gitBody([fallbackEmpty]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('回退范围判断无待推送变更');
+    expect(result.stdout).toContain('跳过门禁');
+    expect(result.stdout).not.toContain('fail-closed');
+  });
+
   it('--force 绕过路径过滤直接跑门禁，即使 stdin 是垃圾行', async () => {
     const result = await runFilteredPush({
       args: ['--force'],
@@ -823,12 +948,15 @@ describe('pre-push audit skip boundary', () => {
     expect(source).not.toMatch(/ensure-platform-deps\.sh[^\n]*--install/);
   });
 
-  it.each(['network', 'unsupported'] as const)('skips an explicit %s audit failure', async (auditCase) => {
-    const result = await simulatedPrePushAudit(auditCase);
+  it.each(['network', 'unsupported', 'socket-hangup', 'http-503', 'errno-network', 'e5xx-code'] as const)(
+    'skips an explicit %s audit failure',
+    async (auditCase) => {
+      const result = await simulatedPrePushAudit(auditCase);
 
-    expect(result.code, `${result.stdout}\\n${result.stderr}`).toBe(0);
-    expect(result.stdout).toContain('跳过（不阻断）');
-  });
+      expect(result.code, `${result.stdout}\\n${result.stderr}`).toBe(0);
+      expect(result.stdout).toContain('跳过（不阻断）');
+    },
+  );
 
   it.each(['network-text', 'networking', 'endpoint', 'mixed-error', 'vulnerability', 'json', 'permission'] as const)(
     'blocks an audit %s failure',
