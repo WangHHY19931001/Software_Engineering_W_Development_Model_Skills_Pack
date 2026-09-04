@@ -49,17 +49,16 @@ import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { hasFlag } from '../lib/parse-args.js';
+import { loadCliScope } from '../lib/load-cli-scope.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   changedFilePathViolation,
-  gitRunnerFor,
   isCodeOrTestFile,
   isIsoDateTimeString,
-  resolveCliScope,
   type ChangeScope,
 } from '../lib/change-scope.js';
 
@@ -408,35 +407,16 @@ async function main(): Promise<void> {
   const abs = path.resolve(file);
 
   // ==================== ChangeScope 装载（strict 绑定；阶段 5-8 必选） ====================
-  const resolved = resolveCliScope({
-    projectRoot: abs,
-    phase,
-    scopePath: parseFlagValue(process.argv, 'scope'),
-    changeArg: parseFlagValue(process.argv, 'change'),
-    baseArg: parseFlagValue(process.argv, 'base'),
-    headArg: parseFlagValue(process.argv, 'head'),
-    git: gitRunnerFor(abs),
-  });
-  if (resolved.kind === 'invalid') {
-    exitWithError({
-      category: resolved.category,
-      rule: 'P0-1',
-      message: resolved.message,
-      detail: resolved.detail,
-      file: resolved.file,
-      exitCode: 2,
-    });
-    return;
-  }
+  const loaded = loadCliScope(process.argv, abs, phase);
   let result: CodegraphStrictResult;
   let scopeLabel = '（未提供）';
-  if (resolved.kind === 'missing') {
-    result = resultWithScopeReasons(resolved.reasons);
-  } else if (resolved.kind === 'violations') {
-    result = resultWithScopeReasons(resolved.violations);
+  if (loaded.kind === 'missing') {
+    result = resultWithScopeReasons(loaded.reasons);
+  } else if (loaded.kind === 'violations') {
+    result = resultWithScopeReasons(loaded.violations);
   } else {
-    scopeLabel = `${resolved.scope.changeId}（base=${resolved.scope.baseRef}..head=${resolved.scope.headRef}，声明 ${resolved.scope.changedFiles.length} 个变更文件）`;
-    result = checkCodegraphQueriesStrict(abs, resolved.scope);
+    scopeLabel = loaded.scopeLabel;
+    result = checkCodegraphQueriesStrict(abs, loaded.scope);
   }
   const exitCode = result.passed ? 0 : 1;
 
@@ -481,7 +461,7 @@ async function main(): Promise<void> {
       type: 'codegraph-queries',
       passed: result.passed,
       phase,
-      changeId: resolved.kind === 'ok' ? resolved.scope.changeId : undefined,
+      changeId: loaded.kind === 'ok' ? loaded.scope.changeId : undefined,
       queryCount: result.queryCount,
       requiredFileCount: result.requiredFileCount,
       coveredFileCount: result.coveredFileCount,

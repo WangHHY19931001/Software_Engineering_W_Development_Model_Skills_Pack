@@ -44,10 +44,10 @@ import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { hasFlag } from '../lib/parse-args.js';
+import { loadCliScope } from '../lib/load-cli-scope.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
-import { gitRunnerFor, resolveCliScope } from '../lib/change-scope.js';
 
 interface CheckResult {
   passed: boolean;
@@ -257,35 +257,16 @@ async function main(): Promise<void> {
   const abs = path.resolve(file);
 
   // ==================== ChangeScope 装载（strict changeId 绑定；阶段 5-8 必选） ====================
-  const resolved = resolveCliScope({
-    projectRoot: abs,
-    phase,
-    scopePath: parseFlagValue(process.argv, 'scope'),
-    changeArg: parseFlagValue(process.argv, 'change'),
-    baseArg: parseFlagValue(process.argv, 'base'),
-    headArg: parseFlagValue(process.argv, 'head'),
-    git: gitRunnerFor(abs),
-  });
-  if (resolved.kind === 'invalid') {
-    exitWithError({
-      category: resolved.category,
-      rule: 'P0-1',
-      message: resolved.message,
-      detail: resolved.detail,
-      file: resolved.file,
-      exitCode: 2,
-    });
-    return;
-  }
+  const loaded = loadCliScope(process.argv, abs, phase);
   let result: CheckResult;
   let scopeLabel = '（未提供）';
-  if (resolved.kind === 'missing') {
-    result = { passed: false, violations: resolved.reasons, changesNames: [], artifactsFound: [], reviewsFound: [] };
-  } else if (resolved.kind === 'violations') {
-    result = { passed: false, violations: resolved.violations, changesNames: [], artifactsFound: [], reviewsFound: [] };
+  if (loaded.kind === 'missing') {
+    result = { passed: false, violations: loaded.reasons, changesNames: [], artifactsFound: [], reviewsFound: [] };
+  } else if (loaded.kind === 'violations') {
+    result = { passed: false, violations: loaded.violations, changesNames: [], artifactsFound: [], reviewsFound: [] };
   } else {
-    scopeLabel = `${resolved.scope.changeId}（base=${resolved.scope.baseRef}..head=${resolved.scope.headRef}，声明 ${resolved.scope.changedFiles.length} 个变更文件）`;
-    result = checkOpsxArtifactsStrict(abs, phase, resolved.scope.changeId);
+    scopeLabel = loaded.scopeLabel;
+    result = checkOpsxArtifactsStrict(abs, phase, loaded.scope.changeId);
   }
   const exitCode = result.passed ? 0 : 1;
 
@@ -330,7 +311,7 @@ async function main(): Promise<void> {
       type: 'opsx-artifacts',
       passed: result.passed,
       phase,
-      changeId: resolved.kind === 'ok' ? resolved.scope.changeId : undefined,
+      changeId: loaded.kind === 'ok' ? loaded.scope.changeId : undefined,
       changesNames: result.changesNames,
       artifactsFound: result.artifactsFound,
       reviewsFound: result.reviewsFound,
