@@ -124,8 +124,8 @@ EOF
   # 静默消失（其余路径全无关时门禁被跳过）；-m 对 merge 的每个父输出文件清单，宁可多列
   # 远端已知内容触发门禁（过包含方向安全，偶发成本与既有 fail-closed 全门禁同级）。
   # 安全边界（任一不满足 → 返回非 0，调用方 fail-closed 跑全部门禁，绝不缩小范围）：
-  #   1. remote 名必须来自 hook 第一个参数且经白名单核验（仅字母数字 . _ -，
-  #      防注入：拒绝空白/换行/引号等）
+  #   1. remote 名必须来自 hook 第一个参数且经白名单核验（仅字母数字 . _ -，且不得以
+  #      - 开头——前导 - 会被 git 子命令解析为选项，防选项注入面；防注入：拒绝空白/换行/引号等）
   #   2. `git remote get-url` 核验 remote 确实配置
   #   3. remote 须存在 ≥1 个 remote-tracking ref（无排除集 = 无证据，不得空放行）
   #   4. 枚举命令本身失败同样 fail-closed
@@ -134,8 +134,8 @@ EOF
     local remote_name="${2:-}"
     local tracking out
     case "$remote_name" in
-      ''|*[!A-Za-z0-9._-]*)
-        return 1 ;;   # remote 名非法/缺失（防注入）
+      ''|-*|*[!A-Za-z0-9._-]*)
+        return 1 ;;   # remote 名非法/缺失/前导 -（防注入；前导 - 防选项注入面）
     esac
     if ! git remote get-url "$remote_name" >/dev/null 2>&1; then
       return 1        # remote 未配置

@@ -606,6 +606,10 @@ describe('pre-push stdin ref scope filtering', () => {
   const remoteGetUrlFail = `*'remote get-url origin'*) exit 1 ;;`;
   const trackingRefsPresent = `*'for-each-ref refs/remotes/origin'*) printf 'refs/remotes/origin/main\\n' ;;`;
   const trackingRefsNone = `*'for-each-ref refs/remotes/origin'*) : ;;`;
+  // 前导 - remote 名（--push）的 mock 分派：仅当 hook 信任该 remote 走到 get-url /
+  // for-each-ref 时才会命中（选项注入面）；白名单拒绝后不得触达这两支。
+  const remoteGetUrlDashPush = `*'remote get-url --push'*) printf 'git@example.com:repo.git\\n' ;;`;
+  const trackingRefsDashPush = `*'for-each-ref refs/remotes/--push'*) printf 'refs/remotes/--push/main\\n' ;;`;
   const remoteLogRelated = `*'log -m --name-only'*) printf 'w-model-dev/SKILL.md\\n' ;;`;
   const remoteLogUnrelated = `*'log -m --name-only'*) printf 'eval/probe.json\\n' ;;`;
 
@@ -786,6 +790,22 @@ npm() { return 98; }
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
     expect(result.stdout).toContain('fail-closed');
     expect(result.stdout, '非法 remote 名不得参与排除集').not.toContain('跳过门禁');
+  });
+
+  it('new branch + merge-base 退化 + remote 名前导 -（--push，选项注入面）→ fail-closed 门禁运行', async () => {
+    // D4 回归防护（review D4）：remote 名以 - 开头会被 git 子命令解析为选项（选项注入面）。
+    // mock 完整模拟「若被信任则枚举成功」：get-url 命中、tracking refs 存在、log 输出纯无关
+    // 路径——旧白名单（- 在字符类内）会放行并走到「跳过门禁」危险路径；hook 必须在白名单
+    // 即拒绝（前导 -），让本用例翻转为 fail-closed 全量门禁才绿。
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['--push'],
+      stdin,
+      gitBody: gitBody([fallbackEmpty, mergeBaseFail, remoteGetUrlDashPush, trackingRefsDashPush, remoteLogUnrelated]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('fail-closed');
+    expect(result.stdout, '前导 - 的 remote 名不得参与排除集').not.toContain('跳过门禁');
   });
 
   it('new branch + merge-base 退化 + remote-tracking log 失败 → fail-closed 门禁运行', async () => {
