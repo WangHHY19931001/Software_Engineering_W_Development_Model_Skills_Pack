@@ -36,7 +36,7 @@
 
 **反模式**：测试环境阈值直接套用于生产；未声明测试环境类型与放宽倍数。
 
-**校验**：`check-artifact-gate.ts` 在 NFR 类型 RTM 行校验双字段存在性（警告级）。
+**校验**：`check-artifact-gate.ts` 在 NFR 类型 RTM 行校验 `targetValue` + `testThreshold` 双字段存在性（双字段均缺失 → blocking violation / exit 1；单缺其一不阻断）。
 
 ## 文档质量标准
 

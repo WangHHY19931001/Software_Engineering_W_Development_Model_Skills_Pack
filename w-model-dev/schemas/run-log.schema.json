@@ -49,6 +49,7 @@
       }
     },
     {
+      "description": "action=emergency-fix 时强制 variant=emergency-fix 且 blocker 非空。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN）；新记录必须声明 variant 且 emergency-fix 须附 blocker。",
       "if": {
         "properties": { "action": { "const": "emergency-fix" } },
         "required": ["action"]
@@ -247,11 +248,11 @@
       "type": "string"
     },
     "variant": {
-      "description": "fix/emergency-fix 动作的变体标注（subagent-delegation.md「S 子代理修改既有产物的边界」）：fix=S-fix 返工变体；emergency-fix=紧急修复通道（blocker 说明阻塞原因）。action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时若出现必须为 fix（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；动作-角色配对（r3-*/produce/fix/emergency-fix/review/gate 类）由 check-run-log.ts logic 层强制",
+      "description": "fix/emergency-fix 动作的变体标注（subagent-delegation.md「S 子代理修改既有产物的边界」）：fix=S-fix 返工变体；emergency-fix=紧急修复通道（blocker 说明阻塞原因）。action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时若出现必须为 fix（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；动作-角色配对（r3-*/produce/fix/emergency-fix/review/gate 类）由 check-run-log.ts logic 层强制。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN）；新记录必须声明 variant 且 emergency-fix 须附 blocker",
       "enum": ["fix", "emergency-fix"]
     },
     "blocker": {
-      "description": "emergency-fix 的阻塞原因描述（非空字符串，仅作为「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查）；variant=emergency-fix 或 action=emergency-fix 时必填",
+      "description": "emergency-fix 的阻塞原因描述（非空字符串，仅作为「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查）；variant=emergency-fix 或 action=emergency-fix 时必填。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN）；新记录必须声明 variant 且 emergency-fix 须附 blocker.",
       "type": "string",
       "minLength": 1
     },

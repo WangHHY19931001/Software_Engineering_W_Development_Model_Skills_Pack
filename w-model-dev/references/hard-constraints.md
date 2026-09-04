@@ -909,7 +909,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：S-fix 产物作废；对 RootCauseReport 补走 V 复审 + G 门禁（`check-rootcause-report.ts`），通过后携带报告重新分派 S-fix。
 
-**完整返工循环**：V/G → R → V → G → S-fix → V → G（SKILL.md「执行工作流」步骤 9）。
+**完整返工循环**：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
 
 ### #48 子代理越界实施
 
