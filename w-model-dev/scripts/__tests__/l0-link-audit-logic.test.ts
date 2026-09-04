@@ -383,7 +383,7 @@ describe('auditL0RelativeLinks', () => {
   });
 
   it('collects a reference-style definition whose target does not exist as a violation', async () => {
-    await write('references/readme.md', '[text][docs] [empty][docs]\n\n[docs]: ./guide.md');
+    await write('references/readme.md', '[text][docs] [docs][]\n\n[docs]: ./guide.md');
 
     const result = await auditL0RelativeLinks(fixtureRoot);
 
@@ -392,7 +392,7 @@ describe('auditL0RelativeLinks', () => {
   });
 
   it('counts an existing reference-style definition target in relativeLinkCount', async () => {
-    await write('references/readme.md', '[text][docs] [empty][docs]\n\n[docs]: ./guide.md');
+    await write('references/readme.md', '[text][docs] [docs][]\n\n[docs]: ./guide.md');
     await write('references/guide.md', '# guide\n');
 
     const result = await auditL0RelativeLinks(fixtureRoot);
