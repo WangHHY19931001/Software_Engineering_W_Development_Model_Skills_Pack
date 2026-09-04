@@ -171,6 +171,7 @@ const ENGINEERING_CODE_EXTENSIONS = new Set([
  * 文件分类纯函数：某 changed file 是否须 codegraph 覆盖的 code/test 文件。
  * 规则（集中于此，正反例见 change-scope.test.ts）：
  *   1. 顶层段 ∈ EXCLUDED_ROOT_SEGMENTS（docs/ schemas/ config/ eval/ .w-model/ openspec/ 等）→ false
+ *   1.5. `.githooks/` 前缀 → true（无扩展名 shell 如 pre-push 是可执行工程文件）
  *   2. dotfile（.eslintrc.cjs 等配置）/ *.md / *.markdown → false（文档与配置类不强制）
  *   3. 其余按扩展名 ∈ ENGINEERING_CODE_EXTENSIONS → true
  * 注意：tests/__tests__ 内的测试文件本身是 .ts/.py 等代码扩展名，已被规则 3 覆盖；
@@ -179,6 +180,8 @@ const ENGINEERING_CODE_EXTENSIONS = new Set([
 export function isCodeOrTestFile(relPath: string): boolean {
   const first = relPath.split('/')[0] ?? '';
   if (EXCLUDED_ROOT_SEGMENTS.has(first)) return false;
+  // .githooks/ 下的无扩展名 shell（pre-push 等）是可执行工程文件，改动须 codegraph 覆盖
+  if (relPath.startsWith('.githooks/')) return true;
   const base = relPath.split('/').pop() ?? '';
   if (base.startsWith('.')) return false;
   if (/\.md$/i.test(base) || /\.markdown$/i.test(base)) return false;

@@ -76,7 +76,7 @@
 5. 安全确认后 `Edit`/`Write` 代码
 6. （可选）修改后再查一次确认影响未意外扩大
 
-**覆盖义务**：scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定，分类函数 `lib/change-scope.ts` `isCodeOrTestFile`）至少被一个合法查询的 `targetFiles` 覆盖——门禁校验的是**实际覆盖**而非目录存在；未查询/未绑定的变更文件逐文件 violation。
+**覆盖义务**：scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定，分类函数 `lib/change-scope.ts` `isCodeOrTestFile`）至少被一个合法查询的 `targetFiles` 覆盖——门禁校验的是**实际覆盖**而非目录存在；未查询/未绑定的变更文件逐文件 violation。`.githooks/` 下无扩展名脚本（如 pre-push）按 code 文件计，改动须被查询覆盖。
 
 **门禁调用**：G 侧 `check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`；缺 scope → exit 1 fail-closed；文件/JSON/schema 非法 → exit 2）；阶段 5-8 artifact gate（`check-artifact-gate.ts --phase=N --scope=<file>`）把本 checker 与 opsx strict 校验聚合进 reasons/exitCode。
 

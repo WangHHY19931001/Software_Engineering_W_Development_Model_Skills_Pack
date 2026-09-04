@@ -286,6 +286,15 @@ describe('isCodeOrTestFile（文件分类纯函数）', () => {
       expect(isCodeOrTestFile(p), p).toBe(false);
     }
   });
+
+  it('classifies extensionless executable scripts under .githooks/ as code', () => {
+    expect(isCodeOrTestFile('.githooks/pre-push')).toBe(true);
+  });
+
+  it('keeps dotfile roots excluded and md non-code', () => {
+    expect(isCodeOrTestFile('.gitignore')).toBe(false);
+    expect(isCodeOrTestFile('docs/x.md')).toBe(false);
+  });
 });
 
 describe('isIsoDateTimeString', () => {

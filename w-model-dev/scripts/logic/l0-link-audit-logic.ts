@@ -53,17 +53,21 @@ function l0Boundary(target: string, root: string): string | undefined {
   return L0_DIRECTORIES.find((directory) => relative === directory || relative.startsWith(`${directory}/`));
 }
 
-const REFERENCE_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]+<?([^)> \t]+)>?/gm;
+const REFERENCE_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]*<?([^)> \t]+)>?/gm;
+// CommonMark 允许冒号后无空白（[a]:./x.md）与目标位于下一行；下一行形态仅接受
+// 以 `<`、`/`、`./`、`../` 起始的目标（保守近似：避免把普通散文行误当目标）
+const REFERENCE_DEFINITION_CONTINUATION = /^ {0,3}\[([^\]]+)\]:[ \t]*\r?\n[ \t]+(<?(?:\.{0,2}\/)[^)> \t]*>?)/gm;
 
 function parseRelativeLinks(content: string): string[] {
   const links: string[] = [];
   // 内联链接正则：`[..](target)` 行内非 title 形态捕获可含空白（非 CommonMark 级解析的已知近似）；
   // title 形态遇引号或空白截断；URL 含 ) 即终止
   for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+    // 内联链接：先按 title 切分、再对剩余 target 整对剥离尖括号（修复 `<./x.md> "t"` 的 `>` 残留）
     const raw = match[1]!
       .trim()
-      .replace(/^<|>$/g, '')
-      .split(/\s+["']/)[0]!;
+      .split(/\s+["']/)[0]!
+      .replace(/^<(.*)>$/, '$1');
     if (raw) links.push(raw);
   }
   // Reference-style link definitions (`[label]: <target>` at a line start, up to 3
@@ -75,11 +79,19 @@ function parseRelativeLinks(content: string): string[] {
     const raw = match[2]!.replace(/^<|>$/g, '').trim();
     if (raw) links.push(raw);
   }
+  // Second pass: destination on the line after the label (`[label]:` newline
+  // indented target). Only conservative prefixes (< / ./ ../) are accepted, see
+  // REFERENCE_DEFINITION_CONTINUATION; strip optional angle brackets the same way.
+  for (const match of content.matchAll(REFERENCE_DEFINITION_CONTINUATION)) {
+    const raw = match[2]!.replace(/^<|>$/g, '').trim();
+    if (raw) links.push(raw);
+  }
   return links;
 }
 
 function hasUriScheme(target: string): boolean {
-  return !isWindowsDrivePath(target) && /^[a-z][a-z0-9+.-]*:/i.test(target);
+  // scheme 至少 2 字符：单字母「scheme」（如 C:temp）不是 URI，按包内相对路径处理
+  return !isWindowsDrivePath(target) && /^[a-z][a-z0-9+.-]+:/i.test(target);
 }
 
 function validateExternalUri(target: string): string | undefined {
@@ -278,6 +290,9 @@ async function auditL1Directories(root: string, rootRealPath: string, violations
  * L0 仅包括 SKILL.md 与 references/templates/examples/subagent/schemas。只有实际存在的
  * scripts/samples/tools 目标可以分类为 L1-only；只有 templates/ 源文件中的 {{module}}
  * 链接可以分类为模板占位。其余相对目标必须在 L0 内存在，否则作为 violation 返回。
+ * 链接采集覆盖内联（含 <target> "title" 形态）与 reference-style 定义（含冒号后无空白
+ * 与目标位于下一行两种形态，下一行目标仅接受 < / ./ ../ 起始）；单字母「scheme」
+ * （如 C:temp）按包内相对路径处理而非外部 URI 放行。
  */
 export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditResult> {
   const absoluteRoot = path.resolve(root);

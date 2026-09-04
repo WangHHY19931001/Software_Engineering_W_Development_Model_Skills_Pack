@@ -401,6 +401,43 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toEqual([]);
   });
 
+  it('parses inline angle-bracket target with title without trailing ">"', async () => {
+    await write('references/guide.md', '[a](<./x.md> "title")');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toEqual(['references/guide.md: 相对链接目标不存在 → ./x.md']);
+  });
+
+  it('parses reference definitions without whitespace after colon', async () => {
+    await write('references/readme.md', '[a]:./x.md');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toEqual(['references/readme.md: 相对链接目标不存在 → ./x.md']);
+  });
+
+  it('parses reference definitions with destination on the next line', async () => {
+    await write('references/readme.md', '[a]:\n  ./x.md');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toEqual(['references/readme.md: 相对链接目标不存在 → ./x.md']);
+  });
+
+  it('classifies single-letter scheme (C:temp) as package-relative, not URI', async () => {
+    await write('references/guide.md', '[a](C:temp)');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('C:temp');
+  });
+
   it('rejects a root-relative target outside the skill package boundary', async () => {
     await write('references/guide.md', '[outside](/outside/readme.md)');
 
