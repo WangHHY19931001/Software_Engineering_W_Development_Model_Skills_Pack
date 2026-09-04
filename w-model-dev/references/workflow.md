@@ -186,7 +186,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 
 ## 质量门（编码及之后阶段强制）
 
-> 🔴 **CHECKPOINT · 质量门放行**：流程图中「质量门」节点是发布前最后暂停点。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]` 获取确定性判定（退出码 0=通过 / 1=未通过 / 2=输入错误），向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布或返工。退出码 1 的普通失败必须执行完整链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；退出码 2 仅修正输入后重跑；两者均不得放行（见 [hard-constraints.md](hard-constraints.md) #7）。
+> 🔴 **CHECKPOINT · 质量门放行**：流程图中「质量门」节点是发布前最后暂停点。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>` 获取确定性判定（退出码 0=通过 / 1=未通过 / 2=输入错误）；阶段 5-8 另须 `--scope=<change-scope.json>`，scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计），向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布或返工。退出码 1 的普通失败必须执行完整链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；退出码 2 仅修正输入后重跑；两者均不得放行（见 [hard-constraints.md](hard-constraints.md) #7）。
 
 执行顺序：代码提交 → 自动化代码审查 → 单元测试 → 集成测试 → 系统测试 → 质量门检查 → 发布。
 任一普通 V/G、评审、测试或质量门失败均执行上述完整普通失败链，不得直接回编码；只有链条完成并经用户 CHECKPOINT 才能按 R 结论处理。

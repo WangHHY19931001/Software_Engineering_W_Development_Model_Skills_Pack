@@ -329,7 +329,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 |---|---|---|---|
 | #1 | 阶段产物已产出但无 `VerifierOutput` JSON 文件 / 未调用 `check-verifier-output.ts` | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>`；JSON 不存在则重新执行评审 | `check-verifier-output.ts` 退出码 0 才算评审闭环 |
 | #2 | 阶段 1~4 产物存在但对应测试设计文档缺失（如阶段 3 无 `interface-test-design.md`） | 回到阶段 N 起点，按 `phase-N-*.md`「并行任务（强制）」节补产出测试设计 | 无脚本；Agent 比对 `templates/` 模板核验 |
-| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]`；退出码 1 先走完整普通失败链，再按 R 结论由 S-fix 回阶段 5；退出码 2 仅修正输入后重跑 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
+| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>`；阶段 5-8 另须 `--scope=<change-scope.json>`，scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计）；退出码 1 先走完整普通失败链，再按 R 结论由 S-fix 回阶段 5；退出码 2 仅修正输入后重跑 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
 | #4 | `VerifierOutput.passed=false` 但 `Project.status` 已推进到下一阶段 | 将 `reworkHints` 仅作为 R 定位线索；完成完整普通失败链后，按 R 的结论回到对应阶段并重置 `status` 字段 | `check-verifier-output.ts` 退出码 0 + `passed=true`；完整链为 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
 | #5 | Agent 上下文同时加载 ≥3 个 `references/phase-N-*.md` 文件 | 卸载无关 phase 文档，仅保留当前阶段 + `SKILL.md` + 必要 references | 无脚本；Agent 自检加载列表 |
 | #6 | RTM 覆盖率字段为 LLM 估算（无 `check-artifact-gate.ts` 输出佐证） | 执行 `check-artifact-gate.ts` 重新计算覆盖率；估算值不得写入 `rtm.json` | `check-artifact-gate.ts` 退出码 0 + `GATE_JSON.coverage=100%` |

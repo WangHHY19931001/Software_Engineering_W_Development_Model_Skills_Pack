@@ -255,7 +255,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | 枚举值重命名（如 `待开发` → `待实现`）             | 一次性脚本扫描 JSON 中所有 `status` 字段做字符串替换；替换前后保留 `.bak` 备份 | 替换后必须通过 `check-artifact-gate.ts` 校验，退出码 0 |
 | 枚举值废弃（如 `已废弃` 移除）                     | 已废弃状态记录须先迁移到「已归档」或「待开发」等保留值，再删除枚举项           | 不得保留无对应枚举的 status 值；退出码 0 才算迁移完成  |
 
-迁移步骤：备份 `cp .w-model/rtm.json .w-model/rtm.json.bak.<ts>` → 执行迁移逐条更新 status → 跑 `check-artifact-gate.ts [project-dir]` 退出码 0 才算成功；失败则回滚 `.bak.<ts>`。
+迁移步骤：备份 `cp .w-model/rtm.json .w-model/rtm.json.bak.<ts>` → 执行迁移逐条更新 status → 跑 `check-artifact-gate.ts [project-dir] --phase=<N>`（N=当前阶段）退出码 0 才算成功；失败则回滚 `.bak.<ts>`。
 
 ### 2. techStack 增删迁移
 

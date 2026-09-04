@@ -93,7 +93,10 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 **现象**：`git push` 未输出 `[pre-push]` 门禁日志（但钩子已启用），或提示「本次推送仅删除远端 ref」「无法证明变更范围」。
 
-**原因**：pre-push 以 git push 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段）判定范围，并支持多 ref 聚合；delete-only 推送（local sha 全零）放行跳过；新分支（remote sha 全零）须经 `git merge-base --fork-point`（退化为 merge-base）建立可证明基线。变更未触及 `w-model-dev/**`、根级 README/AGENTS/CONTRIBUTING/配置、`config/**`、`scripts/**`、`.githooks/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，实测命中 `docs/` 任意层级）时放行；**任一 ref 行解析失败或新分支无法建立可证明基线 → fail-closed（运行全部门禁）**，空 stdin 回退 `HEAD@{push}`/`origin/HEAD` 失败同样 fail-closed——不存在「静默跳过门禁」路径（纯 Windows shell 提示放行除外，见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）。
+**原因**：
+- pre-push 以 git push 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段）判定范围，并支持多 ref 聚合；delete-only 推送（local sha 全零）放行跳过；
+- 新分支（remote sha 全零）基线按序解析：`git merge-base --fork-point` → 普通 merge-base → remote-tracking 排除集枚举（remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检）；
+- 变更未触及 `w-model-dev/**`、根级 README/AGENTS/CONTRIBUTING/配置、`config/**`、`scripts/**`、`.githooks/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，实测命中 `docs/` 任意层级）时放行；**任一 ref 行解析失败或新分支三级基线全部失败 → fail-closed（运行全部门禁）**，空 stdin 回退 `HEAD@{push}`/`origin/HEAD` 失败同样 fail-closed——不存在「静默跳过门禁」路径（纯 Windows shell 提示放行除外，见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）。
 
 **处置**：确认变更确实触及上述路径（含 `docs/changes`、`docs/superpowers` 下 md）；触及却未跑门禁时用 `bash .githooks/pre-push --force` 或 `npm run prepush` 手动补跑全部门禁。
 

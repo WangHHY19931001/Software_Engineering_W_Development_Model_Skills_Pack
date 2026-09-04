@@ -1195,7 +1195,7 @@ flowchart TD
 
 **本地 pre-push 平台依赖与显式安装安全边界**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示开发者运行 `npm install`，不自动安装。它只调用 `ensure-platform-deps.sh --check`；默认/`--check` 始终只读，不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。开发者可在 Bash 中显式运行 `npm run platform-deps:check` 或 `npm run platform-deps:install`；显式 `--install` 在受支持的 Windows x64 / Linux x64 上使用当前 checkout 的 Node 标准库 CLI，在受控 staging 中校验并安装 lockfile 固定的平台包。
 
-**本地 pre-push 推送范围判定（真实 push stdin 语义）**：hook 触发范围判定以 **git push 写入 stdin 的 ref 行为准**（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，40 位十六进制 sha；全零 sha 合法——第 2 字段全零 = 删除远端 ref，第 4 字段全零 = 全新分支）。逐行聚合变更文件后再做路径命中判断，不再用全局 diff 先行短路（多 ref 推送逐行覆盖，不漏检）。删除 ref 行跳过收集；全新分支先用 `git merge-base --fork-point`、退化为普通 `merge-base` 建立可证明基线（基线为空或退化到推送尖本身 → fail-closed，绝不使用 `git log -n N` 截断）；常规更新按 `remote_sha..local_sha` 做 `git diff --name-only`（`--` 置于两 sha 之后，避免被当 pathspec 致空输出）。任一 ref 行解析失败 → fail-closed（无法证明变更范围就运行全部门禁）；全部行均为删除（delete-only）→ 放行跳过门禁；stdin 无 ref 行（非 git push 触发）→ 回退 `HEAD@{push}` 相对 HEAD 的 diff（不可用时回退 `origin/HEAD`），回退失败同样 fail-closed。路径命中保持 bash case 模式语义（`*` 可跨 `/`）：`w-model-dev/*`、根级 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `.gitignore` / `.eslintsecurity-baseline.json` / `package.json` / `package-lock.json`、`config/*` / `scripts/*` / `.githooks/*`、`docs/*.md`（实测命中 `docs/` 任意层级 `*.md`，含 `docs/changes` 归档与 `docs/superpowers` 规划）。`npm run prepush` 以 `--force` 强制跑全部门禁，不读 stdin。
+**本地 pre-push 推送范围判定（真实 push stdin 语义）**：hook 触发范围判定以 **git push 写入 stdin 的 ref 行为准**（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，40 位十六进制 sha；全零 sha 合法——第 2 字段全零 = 删除远端 ref，第 4 字段全零 = 全新分支）。逐行聚合变更文件后再做路径命中判断，不再用全局 diff 先行短路（多 ref 推送逐行覆盖，不漏检）。删除 ref 行跳过收集；全新分支先用 `git merge-base --fork-point`、退化为普通 `merge-base` 建立可证明基线（基线为空或退化到推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败 → fail-closed 跑全量门禁，绝不使用 `git log -n N` 截断）；常规更新按 `remote_sha..local_sha` 做 `git diff --name-only`（`--` 置于两 sha 之后，避免被当 pathspec 致空输出）。任一 ref 行解析失败 → fail-closed（无法证明变更范围就运行全部门禁）；全部行均为删除（delete-only）→ 放行跳过门禁；stdin 无 ref 行（非 git push 触发）→ 回退 `HEAD@{push}` 相对 HEAD 的 diff（不可用时回退 `origin/HEAD`），回退失败同样 fail-closed。路径命中保持 bash case 模式语义（`*` 可跨 `/`）：`w-model-dev/*`、根级 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `.gitignore` / `.eslintsecurity-baseline.json` / `package.json` / `package-lock.json`、`config/*` / `scripts/*` / `.githooks/*`、`docs/*.md`（实测命中 `docs/` 任意层级 `*.md`，含 `docs/changes` 归档与 `docs/superpowers` 规划）。`npm run prepush` 以 `--force` 强制跑全部门禁，不读 stdin。
 
 显式安装把 tarball 字节及 UStar、PAX `x`/`g`、GNU `L`/`K` metadata 视为不可信输入。提取器在任何 extraction write 前完成整包解析与 canonical preflight，拒绝 absolute/drive-qualified、traversal、dot/empty/NUL 路径，拒绝 symlink、hardlink 和任何 `linkname`，拒绝重复 canonical path、file ancestor/descendant 冲突及既有类型/名称冲突；普通文件以独占创建写入，并按单一 path component 逐层建目录。SRI、registry allowlist、package name/version 和隔离加载全部验证成功后，安装器才从 repo 同卷 staging 受控提交；既有 `node_modules/<name>` 若不是同一 lockfile 包身份则以冲突失败，不覆盖。verification 临时目录、install staging 与 `npm pack` 临时目录均由调用者在 success/failure 的 `finally` 中整体清理，因此普通 I/O 或部分提取失败只允许污染本次私有 staging，不得污染既有 `node_modules`。
 
@@ -1315,7 +1315,8 @@ flowchart TD
 
 ```bash
 # 退出码 0=通过 / 1=未通过 / 2=输入错误；stdout 末尾输出 GATE_JSON {...} 供 Agent 解析
-npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir]
+npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
+# 阶段 5-8 另须 --scope=<change-scope.json>（缺失或与 Git 实际变更不符即 exit 1，fail-closed；详见 §10.5.2）
 ```
 
 #### 10.5.1 项目阶段的 TLA+/BDD 行为证据契约
