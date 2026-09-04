@@ -29,7 +29,7 @@
 
 ### 审查问题修复（gate-closure，2026-09-04，doc sync）
 
-任务 1/3/4 引入的代码契约在本轮同步进 SSoT、references、活体文档、测试矩阵与验收记录（实现文件为事实源，文档编辑未改任何 `.ts` 校验逻辑；父链现已连续覆盖至合并前 tip 的父提交，完整身份见下表父链追加行——`689e51bd114831a209af92c99e82afea2e97f512` 起至 `09b47e428f3c5ee759d05bd0e8da35c4f9b959d8`，逐 commit、40 字符完整 SHA、按时间顺序；本追加提交自身按规则不入链）：
+任务 1/3/4 引入的代码契约在本轮同步进 SSoT、references、活体文档、测试矩阵与验收记录（实现文件为事实源，文档编辑未改任何 `.ts` 校验逻辑；父链现已连续覆盖至合并前 tip 的父提交，完整身份见下表父链追加行——`689e51bd114831a209af92c99e82afea2e97f512` 起至 `7b52d4cd2559abac09abc1c3bb7a04619037ad29`，逐 commit、40 字符完整 SHA、按时间顺序；本追加提交自身按规则不入链）：
 
 - **ChangeScope + codegraph/opsx/archive strict 绑定**：SSoT §3.3.1 补 ChangeScope 段落（`change-scope.schema.json` / `codegraph-query.schema.json`、headRef=当前 HEAD、changedFiles 与实际 Git 变更集合精确一致、缺 scope exit 1 fail-closed）；SSoT §10.5 新增 §10.5.2（阶段 5-8 门禁顺序 codegraph/opsx strict → artifact gate 聚合 → opsx:archive → archive checker 后置门 → CHECKPOINT；GATE_JSON external summary；`scopeProvidedButFailed` 抑制误导文案；gate-logic externalChecks 透传已删除）；phase-5-coding「codegraph 修改前影响分析」节与 phase-6/7/8、hard-constraints #14/#38、command-reference「阶段 5-8 codegraph/opsx/archive 门禁 CLI」节、subagent-delegation G 模板与阶段 8 终检命令同步 `--scope=` 调用与 fail-closed 语义；examples（coding/stage5/stage8/test-execution/README）与 templates/coding.md 的阶段 5-8 门禁命令补齐 `--scope=.w-model/change-scope.json`。
 - **artifact gate 聚合与 R3/run-log 语义**：SSoT 新增 §10D.8（R3 三种证明路径矩阵：standard 阶段级 role-dispatch+preventive-review / fix-emergency run-log identity window+preventive-review / opsx stage 9 份 R3+3 份 V；role-dispatch 空/全 invalid fail-closed、R3 只计 role=R+success 的 r3-* 三维度各 ≥1、r3Missing 明细、`--r3-enabled` no-op）；SSoT §10D.3 补 variant/blocker/fixedLocation/fixBasedOn 字段与坏行语义；data-models RunLogEntry 接口与动作字段表、subagent-delegation 检测脚本措辞（fix variant 可选向后兼容、emergency-fix 强制 variant+blocker、双 legacy 行经合并 legacy 谓词吸收为 LEGACY_VARIANT/LEGACY_UNSCOPED 非阻断）、hard-constraints #34 处置行、preventive-review `passed=false ⇒ findings ≥1` 同步至 schema 清单行与 #11 节。
@@ -45,6 +45,10 @@
 ### 留档项 13 项处置索引（archival-fixes，2026-09-04）
 
 2026-09-04 对 42.2.1 域 13 条留档项（最终独立审查 2 条 parked Minor P1/P2 + 账本 11 条延后 Minor D1-D11）逐条处置、全部可追溯：P1/P2 与 D1-D10 已修复；D11（台账收尾）即本段——父链追加行覆盖 `548e43a3553fc1109349e461458a288d0e48e383`..`09b47e428f3c5ee759d05bd0e8da35c4f9b959d8` 全部 first-parent 提交（4 行，含战役前规格与计划提交）、前注与范围句刷新至合并前 tip 的父提交，本追加提交自身按规则不入链。详细设计与逐条处置见规格 `docs/superpowers/specs/2026-09-04-archival-fixes-design.md`；版本保持 42.2.1，不 bump。
+
+### 留档项 4 项处置索引（archival-fixes-2，2026-09-04）
+
+2026-09-04 对 archival-fixes 最终审查留档的 4 条 Minor（A `ResolvedCliScope` violations 变体 `attemptedChangeId` 必填化 + 薄封装透传断言、B 归档日期前缀注释 0-99 精度、C 上节散文句如实覆盖表述、D L0 内联链接正则注释精度）逐条处置、全部可追溯：4 条全部修复；台账收尾即本段——父链追加行覆盖 `ccad270ca42706af54ab5911afef6e8c191368b8`..`7b52d4cd2559abac09abc1c3bb7a04619037ad29` 全部 first-parent 提交（3 行，含战役前计划提交），上文「审查问题修复（gate-closure）」与验收记录两处范围句终点顺延至 `7b52d4cd2559abac09abc1c3bb7a04619037ad29`，本追加提交自身按规则不入链。处置计划见 `docs/superpowers/plans/2026-09-04-archival-fixes-2.md`；版本保持 42.2.1，不 bump。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
@@ -164,6 +168,9 @@
 | `73b3f600f282bc76bb3a6142f12a844b661aeb86` | `docs(superpowers): add archival-fixes implementation plan (3 tasks, SDD)` |
 | `1c861082066c710847dcd5fac0cd28e8d0f83eaa` | `fix(scripts): close archival items (summary shape, CLI exit-2 coverage, quotePath in docs-consistency, comment precision)` |
 | `09b47e428f3c5ee759d05bd0e8da35c4f9b959d8` | `docs: close archival docs items (GATE_JSON provided, l0 fixture form, AGENTS pretty-format, data-models scope note, run-log punctuation, user-guide audit wording, changelog typo)` |
+| `ccad270ca42706af54ab5911afef6e8c191368b8` | `docs(superpowers): add archival-fixes-2 plan (4 filed minors, single task)` |
+| `34aad9663f5e5cb5c99a8e315e000ad8edc5fbe6` | `fix(scripts): require attemptedChangeId on scope violations; sharpen two comments` |
+| `7b52d4cd2559abac09abc1c3bb7a04619037ad29` | `docs(changes): correct archival index prose to actual ledger coverage` |
 
 注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 
