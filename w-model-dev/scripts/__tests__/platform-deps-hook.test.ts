@@ -595,17 +595,19 @@ describe('pre-push stdin ref scope filtering', () => {
   const fallbackEmpty = `*'HEAD@{push}'*|*'origin/HEAD'*) : ;;`;
   const fallbackUnrelated = `*'HEAD@{push}'*|*'origin/HEAD'*) printf 'eval/probe.json\\n' ;;`;
   const fallbackFail = `*'HEAD@{push}'*|*'origin/HEAD'*) exit 1 ;;`;
-  const logEmpty = `*'log --name-only'*) : ;;`;
+  const logEmpty = `*'log -m --name-only'*) : ;;`;
   const mergeBaseOk = `*'merge-base'*) printf '${MERGE_BASE}\\n' ;;`;
   const mergeBaseFail = `*'merge-base'*) exit 1 ;;`;
   const zeroDiffBadObject = `*'${ZERO}'*) exit 128 ;;`;
   // A6 remote-tracking 排除集模拟（remote 名 = pre-push hook 第一个参数 origin）
+  // git log 必须带 -m（merge commit 默认空 diff，-m 对每个父输出清单——防 merge 冲突
+  // 解决产物在排除集中静默漏检）；mock 以 'log -m --name-only' 形态分派。
   const remoteGetUrlOk = `*'remote get-url origin'*) printf 'git@example.com:repo.git\\n' ;;`;
   const remoteGetUrlFail = `*'remote get-url origin'*) exit 1 ;;`;
   const trackingRefsPresent = `*'for-each-ref refs/remotes/origin'*) printf 'refs/remotes/origin/main\\n' ;;`;
   const trackingRefsNone = `*'for-each-ref refs/remotes/origin'*) : ;;`;
-  const remoteLogRelated = `*'log --name-only'*) printf 'w-model-dev/SKILL.md\\n' ;;`;
-  const remoteLogUnrelated = `*'log --name-only'*) printf 'eval/probe.json\\n' ;;`;
+  const remoteLogRelated = `*'log -m --name-only'*) printf 'w-model-dev/SKILL.md\\n' ;;`;
+  const remoteLogUnrelated = `*'log -m --name-only'*) printf 'eval/probe.json\\n' ;;`;
 
   const workspaceFiles = {
     '.git': 'gitdir: irrelevant\n',
@@ -796,12 +798,36 @@ npm() { return 98; }
         mergeBaseFail,
         remoteGetUrlOk,
         trackingRefsPresent,
-        `*'log --name-only'*) exit 128 ;;`,
+        `*'log -m --name-only'*) exit 128 ;;`,
       ]),
     });
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
     expect(result.stdout).toContain('fail-closed');
     expect(result.stdout, '枚举命令失败不得跳过门禁').not.toContain('跳过门禁');
+  });
+
+  it('merge 形状枚举：-m 使 merge 父 diff 的文件进入排除集（含受保护路径）→ 门禁运行，不静默跳过', async () => {
+    // 回归防护（review Important 1）：排除集枚举必须带 -m——merge commit 默认空 diff，
+    // merge 冲突解决引入的受保护路径若不出现在输出中，其余路径全无关时门禁会被静默跳过。
+    // mock 以 'log -m --name-only' 形态分派做绊线：hook 若去掉 -m，mock 不命中 → 输出为空
+    // → 本用例由「门禁运行」翻转为「跳过」即红。
+    const stdin = `refs/heads/new-topic ${LOCAL_NEW_BRANCH} refs/heads/new-topic ${ZERO}\n`;
+    const result = await runFilteredPush({
+      args: ['origin'],
+      stdin,
+      gitBody: gitBody([
+        fallbackEmpty,
+        mergeBaseFail,
+        remoteGetUrlOk,
+        trackingRefsPresent,
+        // -m 输出形态：非 merge 提交路径块 + 空行分隔的 merge 每父 diff 路径块
+        `*'log -m --name-only'*) printf 'eval/probe.json\\n\\nw-model-dev/SKILL.md\\n' ;;`,
+      ]),
+    });
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stdout).toContain('node_modules 缺失');
+    expect(result.stdout, 'merge 父 diff 的受保护路径被枚举后不得报 fail-closed').not.toContain('fail-closed');
+    expect(result.stdout, 'merge 冲突解决产物含受保护路径时不得跳过门禁').not.toContain('跳过门禁');
   });
 
   it('delete-only ref（local sha 全零）→ 跳过门禁（exit 0 + 说明）', async () => {

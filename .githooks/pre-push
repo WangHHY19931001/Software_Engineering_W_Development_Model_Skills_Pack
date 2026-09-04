@@ -118,8 +118,11 @@ EOF
   }
 
   # 新分支 remote-tracking 排除集枚举（merge-base 无法证明 / 退化到推送尖本身时的
-  # 降级尝试）：`git log --name-only <local_sha> --not --remotes=<remote>` 枚举本次推送
-  # 真正新增提交（远端已跟踪 refs 覆盖之外）涉及的变更文件。
+  # 降级尝试）：`git log -m --name-only <local_sha> --not --remotes=<remote>` 枚举本次
+  # 推送真正新增提交（远端已跟踪 refs 覆盖之外）涉及的变更文件。
+  # -m 必须保留：merge commit 默认只显示空 diff，merge 冲突解决中引入的文件会从排除集
+  # 静默消失（其余路径全无关时门禁被跳过）；-m 对 merge 的每个父输出文件清单，宁可多列
+  # 远端已知内容触发门禁（过包含方向安全，偶发成本与既有 fail-closed 全门禁同级）。
   # 安全边界（任一不满足 → 返回非 0，调用方 fail-closed 跑全部门禁，绝不缩小范围）：
   #   1. remote 名必须来自 hook 第一个参数且经白名单核验（仅字母数字 . _ -，
   #      防注入：拒绝空白/换行/引号等）
@@ -141,7 +144,7 @@ EOF
       return 1        # for-each-ref 失败
     fi
     [ -n "$tracking" ] || return 1   # 无任何 remote-tracking ref
-    if ! out="$(git log --name-only --pretty=format: "$local_sha" --not "--remotes=$remote_name" 2>/dev/null)"; then
+    if ! out="$(git log -m --name-only --pretty=format: "$local_sha" --not "--remotes=$remote_name" 2>/dev/null)"; then
       return 1        # 排除集枚举失败
     fi
     printf '%s\n' "$out"

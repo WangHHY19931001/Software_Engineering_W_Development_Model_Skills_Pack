@@ -2917,7 +2917,7 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
     expect(source).not.toMatch(/git log -n [0-9]/);
     // merge-base 不可证明时的可证明降级：remote-tracking 排除集枚举（--not --remotes=<remote>，
     // 无 -n 截断；remote 经白名单 + git remote get-url 核验，无 tracking refs / 失败仍 fail-closed）
-    expect(source).toContain('git log --name-only --pretty=format:');
+    expect(source).toContain('git log -m --name-only --pretty=format:');
     expect(source).toContain('--not "--remotes=$remote_name"');
     expect(source).toContain('remote_enum_new_branch_files');
   });
