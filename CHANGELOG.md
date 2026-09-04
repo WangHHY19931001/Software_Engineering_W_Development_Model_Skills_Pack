@@ -29,7 +29,7 @@
 
 ### 审查问题修复（gate-closure，2026-09-04，doc sync）
 
-任务 1/3/4 引入的代码契约在本轮同步进 SSoT、references、活体文档、测试矩阵与验收记录（实现文件为事实源，文档编辑未改任何 `.ts` 校验逻辑；任务 1/3/4 提交的完整 40 字符身份见下表父链追加行）：
+任务 1/3/4 引入的代码契约在本轮同步进 SSoT、references、活体文档、测试矩阵与验收记录（实现文件为事实源，文档编辑未改任何 `.ts` 校验逻辑；父链表现连续覆盖本轮全部提交，完整身份见下表父链追加行——`689e51bd114831a209af92c99e82afea2e97f512` 起至 `f0add116c98b8f4ab109a01aa6f1543312e19bdc`，逐 commit、40 字符完整 SHA、按时间顺序；本追加提交自身按规则不入链）：
 
 - **ChangeScope + codegraph/opsx/archive strict 绑定**：SSoT §3.3.1 补 ChangeScope 段落（`change-scope.schema.json` / `codegraph-query.schema.json`、headRef=当前 HEAD、changedFiles 与实际 Git 变更集合精确一致、缺 scope exit 1 fail-closed）；SSoT §10.5 新增 §10.5.2（阶段 5-8 门禁顺序 codegraph/opsx strict → artifact gate 聚合 → opsx:archive → archive checker 后置门 → CHECKPOINT；GATE_JSON external summary；`scopeProvidedButFailed` 抑制误导文案；gate-logic externalChecks 透传已删除）；phase-5-coding「codegraph 修改前影响分析」节与 phase-6/7/8、hard-constraints #14/#38、command-reference「阶段 5-8 codegraph/opsx/archive 门禁 CLI」节、subagent-delegation G 模板与阶段 8 终检命令同步 `--scope=` 调用与 fail-closed 语义；examples（coding/stage5/stage8/test-execution/README）与 templates/coding.md 的阶段 5-8 门禁命令补齐 `--scope=.w-model/change-scope.json`。
 - **artifact gate 聚合与 R3/run-log 语义**：SSoT 新增 §10D.8（R3 三种证明路径矩阵：standard 阶段级 role-dispatch+preventive-review / fix-emergency run-log identity window+preventive-review / opsx stage 9 份 R3+3 份 V；role-dispatch 空/全 invalid fail-closed、R3 只计 role=R+success 的 r3-* 三维度各 ≥1、r3Missing 明细、`--r3-enabled` no-op）；SSoT §10D.3 补 variant/blocker/fixedLocation/fixBasedOn 字段与坏行语义；data-models RunLogEntry 接口与动作字段表、subagent-delegation 检测脚本措辞（fix variant 可选向后兼容、emergency-fix 强制 variant+blocker、双 legacy 行经合并 legacy 谓词吸收为 LEGACY_VARIANT/LEGACY_UNSCOPED 非阻断）、hard-constraints #34 处置行、preventive-review `passed=false ⇒ findings ≥1` 同步至 schema 清单行与 #11 节。
@@ -37,6 +37,10 @@
 - **活体文档修正**：troubleshooting 1.7 重写为 docs-consistency 现逻辑（vitest 文件数/用例数是受控动态 facts + provenance 绑定实际提交，不再要求复制到 README/AGENTS/pre-push 文本）；CONTRIBUTING/user-guide/pre-push 注释的 self-test 样本数 260→262（实测 `npm run self-test` = 262/262）；新增测试文件登记进 `__tests__/README.md` 矩阵（artifact-gate-external / change-scope / check-codegraph-queries / check-openspec-archive / check-opsx-artifacts），docs-consistency/role-dispatch/run-log/schema-validation 行描述同步新契约；`l0-link-audit-logic.test.ts` 实包审计链接数 647→649（workflow.md 新增 2 条指向 command-reference/subagent-delegation 的引用链接，violations 仍为 0）。
 - **本同步的完整普通失败链锚点**：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 在 8 份 phase references、5 份模板、全部 examples 与相关 references 中逐字保留（grep 核对无删除/改写），examples-contract 28/28 通过。
 - 版本保持 42.2.1，不 bump；pre-push 17 项、CLI 37 项、schema 25 份统计口径不变。门禁实测与父链追加见下表及验收记录 `docs/changes/2026-09-01-42.2.1-audit-remediation-acceptance.md`。
+
+### 审查 26 条处置索引（review-fixes，2026-09-03）
+
+2026-09-03 对 `origin/main`（93f6f3a）→ `f0add11` 的 129 提交完成四独立只读审查，共 26 条发现（4 Important + 22 Minor），逐条处置、全部可追溯：4 Important 与 21 Minor 已修复；B7（`docs-consistency-logic.test.ts:2877-2931` 文本级契约测试脆性）裁定 wontfix——in-file 注释已声明为刻意防线（防 hook 语义漂移），保留现状、不归为缺陷。详细设计与逐条处置见规格 `docs/superpowers/specs/2026-09-03-review-fixes-design.md`；版本保持 42.2.1，不 bump。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
@@ -127,6 +131,7 @@
 | `c4e3359176a32e2c623f140c48a352349e8b635c` | `docs(changes): refresh complete final parent ledger` |
 | `ac91849b7aa27bb605c3fb2f4ac235ac9645129b` | `docs(changelog): expand 2 short SHAs and append c4e3359 to 42.2.1 parent ledger` |
 | `97b91badfc7fe945ab830b5ea4a594d3c25db877` | `docs(changes): expand short SHAs in acceptance records and append ac91849 to 42.2.1 parent ledger` |
+| `965095e049bf0688e1b343c5adcdd70407642228` | `docs(changes): annotate verbatim subject citations in parent ledgers` |
 | `689e51bd114831a209af92c99e82afea2e97f512` | `feat(gate): add change-scope and codegraph-query JSON Schemas with inventory sync` |
 | `ac90a78b800e5c163944900d7473136d863136b5` | `feat(gate): bind codegraph/opsx/archive checkers to ChangeScope with strict coverage` |
 | `a0f86bbb4c5001f56a3b04143b13834f800b0922` | `refactor(gate): drop dead externalChecks passthrough; aggregate strict codegraph/opsx into artifact gate` |
@@ -135,6 +140,22 @@
 | `ce72badd4373cf99ed236bea816ad3cef90076d6` | `fix(run-log): fail closed on empty and malformed input; block action-role mismatch; align fix variant and preventive schemas` |
 | `36c66581b632571e9bb728edcf3f911776aec280` | `fix(run-log): absorb double-legacy emergency-fix rows via merged legacy predicates` |
 | `6adc3215815cff0d355c13a15a6e00278e393812` | `fix(hooks): consume pre-push stdin refs per-line with fail-closed scope` |
+| `13b942f1c36ae9e92c6d9f8ea22d4854340e117f` | `docs(sot): document ChangeScope gate binding and stage 5-8 aggregation` |
+| `c691023e344864e7262b6776b974fec1f56cc4bc` | `docs(references): sync scope and run-log fail-closed semantics across guidance` |
+| `3da9efa8a2ac4b889af8974029d902743eacc126` | `docs(changes): record gate-closure doc sync in 42.2.1 changelog and acceptance` |
+| `0ee78ea23b21325d186fed0b38be2b554c3d1dfc` | `docs(superpowers): add audit-gate-closure fix plan` |
+| `1a032bfab1ae0f224b903024dd3624dfdbfb9733` | `docs(references): state precise R3 dimension counting in summary tables` |
+| `827ebceeb4497a69716a42dd540020b3ae8398c2` | `docs(references): reconcile fix-variant wording and template gate qualifier` |
+| `1a0ed09c460bd42ad1cd964f6b11e35dc1725958` | `fix(gate): report R3 dimension gaps instead of missing R role records` |
+| `25e5bf01a976e234e225bc2bb0397cf5071e2433` | `fix(gate): validate change id in thin scope wrapper` |
+| `e425642d019d3b2d8d55a4471a867eb81d9661fe` | `refactor(gate): share scope-resolution helper across checkers` |
+| `f2570709982f458beb2d9bfb4a8e1754d22deb2d` | `docs(schema): align run-log descriptions with enforced pairing` |
+| `f828b2776a486d674f44d66726d1ab6fa770ed44` | `fix(hooks): skip transient audit network errors and baseline new branches remotely` |
+| `f76dc43fc9571b85964cdefa68bd51df4ccd0e0c` | `docs(references): tighten fix-review wording in violation checks` |
+| `d17594feb65c9b994a0e637d752355822e1abc84` | `docs(changes): make anchor-grep tally reproducible and date the 647 measurement` |
+| `8a7b503fe6077e36b97d02b24f1a1b3e04130759` | `test(gate): sync direct-call manifest line after change-scope case addition` |
+| `0644a0b740325a2e7eedf9860cfd700ede9b7a99` | `style(test): prettier formatting for hook test additions` |
+| `f0add116c98b8f4ab109a01aa6f1543312e19bdc` | `fix(hooks): list merge diffs in remote-tracking enumeration with -m` |
 
 注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 
