@@ -164,6 +164,14 @@
 | `8a7b503fe6077e36b97d02b24f1a1b3e04130759` | `test(gate): sync direct-call manifest line after change-scope case addition` |
 | `0644a0b740325a2e7eedf9860cfd700ede9b7a99` | `style(test): prettier formatting for hook test additions` |
 | `f0add116c98b8f4ab109a01aa6f1543312e19bdc` | `fix(hooks): list merge diffs in remote-tracking enumeration with -m` |
+| `6780e109010835df967159ca52796a40f8970730` | `docs(superpowers): add review-fixes design spec (26 findings, 5 slices)` |
+| `a2cab37592f2e622f18eb4a824ea881eb9bd7304` | `docs(superpowers): add review-fixes implementation plan (6 tasks, SDD)` |
+| `de7152224ff2eab6c7be81807b023f05b1692b50` | `fix(scripts): harden change-scope binding (quotePath, shell whitelist, changeId prefix, dot-segment, archive date, phase filenames, external summary)` |
+| `7076692f9f9aaed021e1a67b8bd155a7658406cf` | `fix(hooks): reject leading-dash remote names in pre-push enumeration (fail-closed)` |
+| `7cd5fcf8e2807db03383c366e010fb931e232afc` | `fix(scripts): parse reference-style links in L0 audit; consolidate pinned baselines; anchor hook failure-source assertion` |
+| `ae73586407c344e1aa2736696414a8808b6f9658` | `docs: require --phase/--scope in gate command examples; document remote-tracking new-branch baseline path` |
+| `dabbe6bc4f3fd5fa267c7f194121844712c20e57` | `docs: reconcile gate/opsx/run-log/NFR/audit/exit-2-count wording with implementations` |
+| `548e43a3553fc1109349e461458a288d0e48e383` | `docs(changes): restore parent-chain continuity (insert 965095e0, append 16 rows through f0add11)` |
 | `558075dacc76756ba9909263723950b0f9f70aeb` | `docs(superpowers): add archival-fixes design spec (13 filed items, 3 slices)` |
 | `73b3f600f282bc76bb3a6142f12a844b661aeb86` | `docs(superpowers): add archival-fixes implementation plan (3 tasks, SDD)` |
 | `1c861082066c710847dcd5fac0cd28e8d0f83eaa` | `fix(scripts): close archival items (summary shape, CLI exit-2 coverage, quotePath in docs-consistency, comment precision)` |
