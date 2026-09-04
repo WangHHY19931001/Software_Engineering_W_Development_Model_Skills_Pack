@@ -2092,3 +2092,44 @@ describe('run-log emergency-fix variant 语义', () => {
     expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
   });
 });
+
+/**
+ * review2-fixes task 3（A5）：LEGACY_VARIANT 吸收以 LEGACY_VARIANT_CUTOFF
+ * （2026-09-01T00:00:00Z，variant 规则随 42.2.1 发布）为分界——此后写入的
+ * emergency-fix 缺 variant 属真实不一致，blocking [schema]，不再按 legacy 吸收。
+ */
+describe('run-log LEGACY_VARIANT cutoff 分界', () => {
+  const baseEmergencyFix: Partial<RunLogEntry> = {
+    phase: 5,
+    action: 'emergency-fix',
+    role: 'S',
+    outcome: 'success',
+    basedOnReport: 'RC-TEST',
+    artifacts: ['test-artifact'],
+    // 缺 variant/blocker（两条用例同形，仅 timestamp 跨 cutoff）
+  };
+
+  it('blocks post-cutoff emergency-fix missing variant instead of absorbing as LEGACY_VARIANT', () => {
+    const entry: RunLogEntry = makeEntry({
+      ...baseEmergencyFix,
+      runId: 'em-post-cutoff',
+      timestamp: '2026-09-02T00:00:00.000Z',
+    });
+    const result = checkRunLog([entry]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(true);
+    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d)) ?? false).toBe(false);
+  });
+
+  it('still absorbs pre-cutoff undeclared-variant emergency-fix as LEGACY_VARIANT', () => {
+    const entry: RunLogEntry = makeEntry({
+      ...baseEmergencyFix,
+      runId: 'em-pre-cutoff',
+      timestamp: '2026-08-31T00:00:00.000Z',
+    });
+    const result = checkRunLog([entry]);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
+    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(true);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  });
+});

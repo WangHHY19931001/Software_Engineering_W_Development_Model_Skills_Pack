@@ -39,7 +39,7 @@
       "pattern": "\\S"
     },
     "scopeCreatedAt": {
-      "description": "scope 创建时刻（ISO date-time）；查询记录 queryTimestamp 不得晚于它",
+      "description": "scope 创建时刻（ISO date-time）；查询记录 queryTimestamp 不得晚于它。TS 层（isIsoDateTimeString）较 ajv-formats date-time 更严（拒小写 t/z），以 TS 层为准。",
       "type": "string",
       "format": "date-time"
     },

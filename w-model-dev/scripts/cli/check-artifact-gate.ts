@@ -73,7 +73,8 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified } from '../lib/read-json-or-exit.js';
-import { gitRunnerFor, resolveCliScope, type ChangeScope } from '../lib/change-scope.js';
+import { type ChangeScope } from '../lib/change-scope.js';
+import { loadCliScope } from '../lib/load-cli-scope.js';
 
 import { checkCodegraphQueriesStrict } from './check-codegraph-queries.js';
 import { checkOpsxArtifactsStrict } from './check-opsx-artifacts.js';
@@ -419,52 +420,30 @@ async function main(): Promise<void> {
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
 
   // ==================== 外部校验聚合（Slice B：codegraph/opsx strict，阶段 5-8） ====================
-  // scope 解析：--scope=<file> 或 --change/--base/--head 薄封装；缺失 → aggregate 内
-  // fail-closed violations；scope 文件/JSON/schema 非法 → exit 2（输入错误）；
-  // Git 绑定失败 → violations（与两 checker violations 一并并入 reasons，不被 RTM 通过掩盖）。
+  // scope 解析统一走 loadCliScope（与三 checker 同一装载路径）：--scope=<file> 或
+  // --change/--base/--head 薄封装；缺失 → aggregate 内 fail-closed violations；
+  // scope 文件/JSON/schema 非法 → exit 2（输入错误，helper 内部处理）；Git 绑定失败 →
+  // violations（与两 checker violations 一并并入 reasons，不被 RTM 通过掩盖）。
   // openspecArchived 不作为本 gate 输入（archive 是 phase 8 opsx:archive 后置门，单独跑
   // check-openspec-archive.ts）。
   // 阶段 5-8 外部校验聚合（Slice B）：复用前面已定的 effectivePhase（phaseOption ?? 8）
   const externalPhase: number = phaseOption ?? 8;
   let externalAggregate: ExternalChecksAggregate | undefined;
   if (externalPhase >= 5) {
-    const resolved = resolveCliScope({
-      projectRoot: projectDir,
-      phase: externalPhase,
-      scopePath: parseFlagValue(process.argv, 'scope'),
-      changeArg: parseFlagValue(process.argv, 'change'),
-      baseArg: parseFlagValue(process.argv, 'base'),
-      headArg: parseFlagValue(process.argv, 'head'),
-      git: gitRunnerFor(projectDir),
-    });
-    if (resolved.kind === 'invalid') {
-      exitWithError({
-        category: resolved.category,
-        rule: 'P0-1',
-        message: resolved.message,
-        detail: resolved.detail,
-        file: resolved.file,
-        exitCode: 2,
-      });
-      return;
-    }
-    if (resolved.kind === 'missing') {
+    const loaded = loadCliScope(process.argv, projectDir, externalPhase);
+    if (loaded.kind === 'missing') {
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: null, scopeViolations: [] });
-    } else if (resolved.kind === 'violations') {
-      // scope 已提供但绑定失败（headRef 过期/变更集合不符等）：不输出"未提供 --scope"误导文案，
-      // 真实原因以 [scope] 前缀进 reasons（agent 纠正应指向更新过期 scope）；
+    } else if (loaded.kind === 'violations') {
+      // scope 已提供但绑定失败：不输出"未提供 --scope"误导文案，真实原因以 [scope] 前缀进 reasons；
       // summary 标注 provided=true + 尝试绑定的 changeId（D1：区分「未提供」与「已提供但被拒」）
       externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
         scope: null,
-        scopeViolations: resolved.violations,
+        scopeViolations: loaded.violations,
         scopeProvidedButFailed: true,
-        attemptedChangeId: resolved.attemptedChangeId ?? null,
+        attemptedChangeId: loaded.attemptedChangeId,
       });
     } else {
-      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
-        scope: resolved.scope,
-        scopeViolations: [],
-      });
+      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: loaded.scope, scopeViolations: [] });
     }
   }
 

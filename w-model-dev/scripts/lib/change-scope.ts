@@ -79,7 +79,10 @@ export function gitRunnerFor(projectRoot: string): GitRunner {
 const ISO_DATE_TIME_SEC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/;
 const ISO_DATE_TIME_MS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:Z|[+-]\d{2}:\d{2})$/;
 
-/** ISO date-time 判定（regex + Date.parse 语义双保险，拒绝 2026-09-04 / 25:00 等） */
+/**
+ * ISO date-time 判定（regex + Date.parse 语义双保险，拒绝 2026-09-04 / 25:00 等）
+ * 较 ajv-formats date-time 更严：拒绝小写 t/z 与无毫秒/时区形态；同一字段族以本 TS 层为准（schema 层为宽松前置）
+ */
 export function isIsoDateTimeString(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   if (!ISO_DATE_TIME_SEC_RE.test(value) && !ISO_DATE_TIME_MS_RE.test(value)) return false;
@@ -396,6 +399,8 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
     }
     const scope = parsed as ChangeScope;
     const violations: string[] = [];
+    // 退出码口径：scope 文件内容（phase 字段）与 CLI flag 冲突 = violations/exit 1（非 ARG_INVALID；
+    // 判别规则见 command-reference「阶段 5-8 codegraph/opsx/archive 门禁 CLI」节）
     if (scope.phase !== phase) {
       violations.push(`scope.phase=${scope.phase} 与 CLI --phase=${phase} 不一致（变更上下文须与当前校验阶段一致）`);
     }
@@ -418,6 +423,8 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
       };
     }
     // changeId 阶段前缀前置校验：须含 phase<phase>-（与 manifest 模式 validateChangeScope 同一约定）
+    // 退出码口径：CLI 参数互斥矛盾（--change 前缀与 --phase 同行不一致）= ARG_INVALID/exit 2
+    //（判别规则见 command-reference「阶段 5-8 codegraph/opsx/archive 门禁 CLI」节）
     if (typeof args.changeArg === 'string' && !args.changeArg.startsWith(`phase${phase}-`)) {
       return {
         kind: 'invalid',

@@ -464,7 +464,7 @@ interface RunLogEntry {
   decisionConfidence?: number;
   /** implementation review/gate 所针对的实现目标；缺失时 reducer 输出 LEGACY_UNSCOPED */
   implementationTarget?: string;
-  /** fix/emergency-fix 变体标注：fix=S-fix 返工变体；emergency-fix=紧急修复通道（action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时可选，出现则必须为 "fix"） */
+  /** fix/emergency-fix 变体标注：fix=S-fix 返工变体；emergency-fix=紧急修复通道（action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时可选，出现则必须为 "fix"）。2026-09-01（LEGACY_VARIANT_CUTOFF）起写入的 emergency-fix 缺 variant 属 blocking，不再按 LEGACY_VARIANT 吸收 */
   variant?: 'fix' | 'emergency-fix';
   /** emergency-fix 的阻塞原因（非空字符串；仅作「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查） */
   blocker?: string;

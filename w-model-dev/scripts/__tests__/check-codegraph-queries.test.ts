@@ -309,18 +309,19 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     return { root, baseSha, headSha };
   }
 
-  function runCli(args: string[]): { status: number; stdout: string } {
+  function runCli(args: string[]): { status: number; stdout: string; stderr: string } {
     try {
       const stdout = execSync(`npx tsx "${CLI}" ${args.join(' ')}`, {
         cwd: REPO_ROOT,
         encoding: 'utf-8',
         timeout: 90_000,
         windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
-      return { status: 0, stdout };
+      return { status: 0, stdout, stderr: '' };
     } catch (err) {
-      const e = err as { status?: number; stdout?: string; message: string };
-      return { status: e.status ?? 1, stdout: String(e.stdout ?? '') };
+      const e = err as { status?: number; stdout?: string; stderr?: string; message: string };
+      return { status: e.status ?? 1, stdout: String(e.stdout ?? ''), stderr: String(e.stderr ?? '') };
     }
   }
 
@@ -430,5 +431,13 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/codegraph-queries/);
     expect(r.stdout).not.toMatch(/^ERROR_JSON \{/);
+  });
+
+  it('rejects duplicated --scope flags with ARG_INVALID exit 2', () => {
+    const { root } = makeScopedProject({});
+    const r = runCli([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json', '--scope=.w-model/other.json']);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/ERROR_JSON/);
+    expect(r.stdout + r.stderr).toMatch(/重复的命令行参数 --scope/);
   });
 });

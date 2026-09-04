@@ -390,6 +390,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **archive checker**：`openspec/changes/archive/` 下精确匹配 `<changeId>` 或 `<日期>-<changeId>`（日期前缀锚定 `<YYYY-MM-DD>-`，不再用未锚定正则），多匹配 → violation；制品 `proposal.md`/`design.md`/`tasks.md`/`tickets.md` + `specs/` 齐全；changeId 须含阶段前缀。archive 为阶段 8 `opsx:archive` 后置门（在归档完成后由 G 单独跑，不在 `check-artifact-gate.ts` pre-archive gate 内强制）。
 - **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、opsx 收尾 `OPSX_ARTIFACTS_JSON`、archive 收尾 `OPENSPEC_ARCHIVE_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）。
 - **legacy 兼容层**：三脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts` / `checkOpenspecArchive`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
+- **退出码判别**：CLI 参数互斥矛盾（如 `--change` 前缀与 `--phase` 不符）为 `ARG_INVALID`/exit 2；scope 文件内容与 Git 实际/CLI flag 冲突为校验失败 exit 1。重复值 flag（如 `--scope` 两次）为 `ARG_INVALID`/exit 2（值 flag 只允许出现一次，旧「取第一个」语义已废除）。
 
 ## 错误码与 ERROR_JSON 约定
 

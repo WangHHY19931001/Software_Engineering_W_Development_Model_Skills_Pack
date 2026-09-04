@@ -17,6 +17,11 @@
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
+// ==================== 常量 ====================
+
+/** variant 规则引入时刻（42.2.1 发布日）：此后写入的 emergency-fix 缺 variant 不再按 legacy 吸收 */
+export const LEGACY_VARIANT_CUTOFF = '2026-09-01T00:00:00Z';
+
 // ==================== 自包含类型形状 ====================
 
 /** Canonical target kinds plus historical phase<8 legacy spellings. */
@@ -371,6 +376,18 @@ function isUndeclaredVariantEmergencyFix(raw: unknown): boolean {
   return (raw as { action?: unknown }).action === 'emergency-fix' && !('variant' in (raw as Record<string, unknown>));
 }
 
+/**
+ * cutoff 分界（review2-fixes task 3 / A5）：未声明 variant 的 emergency-fix 且
+ * timestamp 不早于 LEGACY_VARIANT_CUTOFF（variant 规则随 42.2.1 引入之后写入）
+ * → 不再按 legacy 吸收，落入 blocking [schema]。timestamp 缺失/非法时视为
+ * 非 post-cutoff（保守：维持既有吸收，不因分界引入新的误阻断）。
+ */
+function isPostCutoffUndeclaredVariantEmergencyFix(raw: unknown): boolean {
+  if (!isUndeclaredVariantEmergencyFix(raw)) return false;
+  const ts = (raw as { timestamp?: unknown }).timestamp;
+  return typeof ts === 'string' && !Number.isNaN(Date.parse(ts)) && Date.parse(ts) >= Date.parse(LEGACY_VARIANT_CUTOFF);
+}
+
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
 const R3_ACTIONS = ['r3-completeness', 'r3-reliability', 'r3-security'];
 const S_VARIANTS = ['produce', 'fix', 'emergency-fix'];
@@ -428,7 +445,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     // === Schema 前置校验 ===
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
-      if (isLegacySchemaFailure(raw, schemaResult.errorMessages)) {
+      if (isLegacySchemaFailure(raw, schemaResult.errorMessages) && !isPostCutoffUndeclaredVariantEmergencyFix(raw)) {
         const missingFields = schemaResult.errorMessages
           .map((message) => message.match(/required property '([^']+)'/)?.[1])
           .filter((field): field is string => field !== undefined);
