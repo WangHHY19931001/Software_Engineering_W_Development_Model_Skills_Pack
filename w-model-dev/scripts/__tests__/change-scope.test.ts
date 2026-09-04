@@ -164,8 +164,20 @@ describe('change-scope 字段级校验（validateChangeScope / schema）', () =>
     expect(validateChangeScope(scope).length).toBeGreaterThan(0);
   });
 
+  it('changeId 须含 scope.phase 对应的 phase<N>- 前缀（跨字段一致性）', () => {
+    // 缺前缀 / 异阶段前缀 → violation，消息给出期望前缀
+    const missing = validateChangeScope(makeScope({ changeId: 'reviewfix' }));
+    expect(missing.length).toBeGreaterThan(0);
+    expect(missing.join('；')).toMatch(/phase5-/);
+    const foreign = validateChangeScope(makeScope({ changeId: 'phase6-reviewfix' }));
+    expect(foreign.length).toBeGreaterThan(0);
+    expect(foreign.join('；')).toMatch(/phase5-/);
+    // 前缀与 phase 一致 → 通过
+    expect(validateChangeScope(makeScope({ changeId: 'phase5-reviewfix' }))).toEqual([]);
+  });
+
   it('changedFiles 项含非法路径被拒', () => {
-    const badPaths = ['a/../b.txt', '/abs/x.ts', 'C:/win/x.ts', 'a\\b.ts', 'a//b.ts', 'a/', '', '..'];
+    const badPaths = ['a/../b.txt', '/abs/x.ts', 'C:/win/x.ts', 'a\\b.ts', 'a//b.ts', 'a/', '', '..', './x.ts', '.'];
     for (const p of badPaths) {
       const scope = makeScope({ changedFiles: [p] });
       const violations = validateChangeScope(scope);
@@ -202,6 +214,16 @@ describe('changedFilePathViolation（单路径规则）', () => {
     for (const p of ['a\\b.ts', 'a/../b', 'a//b', 'a/', '', '../x']) {
       expect(changedFilePathViolation(p)).not.toBeNull();
     }
+  });
+
+  it('`.` 段（./x.ts / . / a/./b）返回违规（路径未规范化）', () => {
+    for (const p of ['./x.ts', '.', 'a/./b.ts']) {
+      const v = changedFilePathViolation(p);
+      expect(v, p).not.toBeNull();
+      expect(v as string).toMatch(/`\.`|未规范化/);
+    }
+    // 正常相对路径（含 dotfile 形态段名）不受影响
+    expect(changedFilePathViolation('src/.eslintrc.cjs')).toBeNull();
   });
 });
 
@@ -252,6 +274,15 @@ describe('isCodeOrTestFile（文件分类纯函数）', () => {
       'w-model-dev/SKILL.md',
       'src/data.json',
     ]) {
+      expect(isCodeOrTestFile(p), p).toBe(false);
+    }
+  });
+  it('shell/PowerShell/批处理扩展名判为 code/test（白名单扩集）', () => {
+    for (const p of ['hooks/pre-push.sh', 'scripts/x.ps1', 'a.bat', 'a.cmd', 'tools/setup.sh']) {
+      expect(isCodeOrTestFile(p), p).toBe(true);
+    }
+    // .sql/.tla/.feature 不强制：分别由 BDD/TLA+/数据迁移门禁兜底（理由见 lib/change-scope.ts 注释）；.md 文档不强制
+    for (const p of ['a.tla', 'a.feature', 'a.sql', 'a.md']) {
       expect(isCodeOrTestFile(p), p).toBe(false);
     }
   });
@@ -369,6 +400,24 @@ describe('verifyScopeGitBinding（真实 Git 精确比对）', () => {
     expect(r.ok).toBe(false);
     expect(r.error).toContain('fatal');
   });
+
+  it('quotePath：非 ASCII 文件名按字面 UTF-8 收集，exact-set 绑定通过（I-1，strict 绑定路径）', () => {
+    const repo = makeGitProject();
+    // untracked 非 ASCII 文件：git 默认 core.quotePath=true 会输出 "docs/\350..." 八进制转义
+    mkdirSync(join(repo.root, 'docs'), { recursive: true });
+    writeFileSync(join(repo.root, 'docs', '设计文档.md'), '# 设计文档\n');
+    const scope = makeScope({
+      baseRef: repo.baseSha,
+      headRef: repo.headSha,
+      changedFiles: ['a.txt', 'b.txt', 'docs/设计文档.md'],
+    });
+    const r = verifyScopeGitBinding(scope, repo.git, repo.root);
+    // 修复前：收集名与声明名不一致 → 双违规（实际未声明 + 声明非实际）
+    expect(r.violations, r.violations.join('；')).toEqual([]);
+    expect(r.passed).toBe(true);
+    expect(r.actualChangedFiles).toContain('docs/设计文档.md');
+    expect(r.actualChangedFiles?.join('\n')).not.toMatch(/\\\d{3}/); // 不含八进制转义
+  });
 });
 
 describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
@@ -447,10 +496,12 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
   it('scope.phase 与 CLI phase 不一致 → violations', () => {
     const repo = makeGitProject();
     mkdirSync(join(repo.root, '.w-model'));
+    // fixture 内部一致（changeId 前缀跟随 scope.phase=6，schema 跨字段校验强制）：
+    // 不一致点只在 scope.phase vs CLI --phase → violations（exit 1）
     writeFileSync(
       join(repo.root, '.w-model', 'scope.json'),
       JSON.stringify({
-        changeId: 'phase5-demo',
+        changeId: 'phase6-demo',
         phase: 6,
         baseRef: repo.baseSha,
         headRef: repo.headSha,
@@ -478,6 +529,43 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
       expect(r.scope.changeId).toBe('phase5-demo');
       expect(r.scope.changedFiles).toEqual(['a.txt', 'b.txt']);
       expect(isIsoDateTimeString(r.scope.scopeCreatedAt)).toBe(true);
+    }
+  });
+
+  it('薄封装路径同样按字面 UTF-8 收集非 ASCII 文件名（quotePath，I-1）', () => {
+    const repo = makeGitProject();
+    mkdirSync(join(repo.root, 'docs'), { recursive: true });
+    writeFileSync(join(repo.root, 'docs', '设计文档.md'), '# 设计文档\n');
+    const r = resolveCliScope({
+      projectRoot: repo.root,
+      ...baseArgs,
+      git: repo.git,
+      changeArg: 'phase5-reviewfix',
+      baseArg: repo.baseSha,
+      headArg: repo.headSha,
+    });
+    expect(r.kind).toBe('ok');
+    if (r.kind === 'ok') {
+      expect(r.scope.changedFiles).toEqual(['a.txt', 'b.txt', 'docs/设计文档.md']);
+    }
+  });
+
+  it('薄封装 changeId 缺 phase<N>- 前缀 → invalid(ARG_INVALID)（exit 2 语义，A2）', () => {
+    const repo = makeGitProject();
+    for (const badChange of ['reviewfix', 'phase6-reviewfix']) {
+      const r = resolveCliScope({
+        projectRoot: repo.root,
+        phase: 5,
+        git: repo.git,
+        changeArg: badChange,
+        baseArg: repo.baseSha,
+        headArg: repo.headSha,
+      });
+      expect(r.kind, `changeId=${badChange}`).toBe('invalid');
+      if (r.kind === 'invalid') {
+        expect(r.category).toBe('ARG_INVALID');
+        expect(r.message).toMatch(/phase5-/); // 消息给出期望前缀
+      }
     }
   });
 

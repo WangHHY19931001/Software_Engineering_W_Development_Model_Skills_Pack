@@ -92,11 +92,14 @@ export interface CodegraphStrictResult {
 function phaseQueryFiles(queriesDir: string, phase: number): { own: string[]; foreign: string[] } {
   const own: string[] = [];
   const foreign: string[] = [];
+  // 文件名 phase 前缀须为精确单数字（phase5-*）：phase05-/phase55- 等形近名不归属本阶段
+  // （\d+ 只做形状识别，归属判定用 phase<phase>- 精确前缀）
+  const shapeRe = /^phase\d+-.*\.json$/;
+  const ownPrefix = `phase${phase}-`;
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 查询文件来自项目受控 .w-model/codegraph-queries/ 目录枚举
   for (const f of readdirSync(queriesDir)) {
-    const m = /^phase(\d+)-.*\.json$/.exec(f);
-    if (!m) continue;
-    if (Number(m[1]) === phase) own.push(f);
+    if (!shapeRe.test(f)) continue;
+    if (f.startsWith(ownPrefix)) own.push(f);
     else foreign.push(f);
   }
   return { own, foreign };

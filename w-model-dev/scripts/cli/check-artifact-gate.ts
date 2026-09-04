@@ -155,12 +155,15 @@ function parseProjectDir(argv: string[]): string {
 
 // ==================== 外部校验聚合（Slice B：codegraph/opsx violations 并入 artifact gate） ====================
 
-/** GATE_JSON external summary 的单个 checker 计数（含相对路径计数） */
+/** GATE_JSON external summary 的单个 checker 计数（含相对路径计数；字段稳定，始终输出） */
 export interface ExternalCheckerSummary {
   passed: boolean;
   /** violations 计数 */
   violationCount: number;
-  changeId: string;
+  /** scope 是否已提供（false = 未提供 scope，fail-closed 且计数归零） */
+  provided: boolean;
+  /** scope.changeId；scope 未提供时为 null（不用空串占位，便于机器判定） */
+  changeId: string | null;
 }
 
 export interface ExternalCodegraphSummary extends ExternalCheckerSummary {
@@ -203,11 +206,12 @@ export function aggregateExternalChecks(
       codegraph: {
         passed: false,
         violationCount: 0,
-        changeId: '',
+        provided: false,
+        changeId: null,
         requiredFileCount: 0,
         coveredFileCount: 0,
       },
-      opsx: { passed: false, violationCount: 0, changeId: '', changesNames: [] },
+      opsx: { passed: false, violationCount: 0, provided: false, changeId: null, changesNames: [] },
     };
     if (ctx.scopeProvidedButFailed !== true) {
       reasons.push(
@@ -233,6 +237,7 @@ export function aggregateExternalChecks(
       codegraph: {
         passed: codegraph.passed,
         violationCount: codegraph.violations.length,
+        provided: true,
         changeId: ctx.scope.changeId,
         requiredFileCount: codegraph.requiredFileCount,
         coveredFileCount: codegraph.coveredFileCount,
@@ -240,6 +245,7 @@ export function aggregateExternalChecks(
       opsx: {
         passed: opsx.passed,
         violationCount: opsx.violations.length,
+        provided: true,
         changeId: ctx.scope.changeId,
         changesNames: opsx.changesNames,
       },

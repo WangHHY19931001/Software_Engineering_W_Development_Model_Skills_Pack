@@ -44,11 +44,11 @@
       "format": "date-time"
     },
     "changedFiles": {
-      "description": "声明变更文件：项目根相对路径、正斜杠分隔、非绝对、不含 .. /空段/反斜杠；与实际 Git 变更集合（baseRef..headRef tracked + worktree staged/unstaged/untracked）须精确一致",
+      "description": "声明变更文件：项目根相对路径、正斜杠分隔、非绝对、不含 .. / . /空段/反斜杠；与实际 Git 变更集合（baseRef..headRef tracked + worktree staged/unstaged/untracked）须精确一致",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[^/]+(?:/[^/]+)*$"
+        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))[^/]+(?:/[^/]+)*$"
       }
     }
   }

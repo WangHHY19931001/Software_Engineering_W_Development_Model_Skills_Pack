@@ -11,6 +11,7 @@
  *   A6  phase 归属一致性（changeId 前缀 phaseN 与 scope phase 一致）
  *   A7  legacy 函数行为不变（self-test 兼容层）
  *   A8  CLI：无 --scope → exit 1；合法 scope → exit 0；归档缺失 → exit 1
+ *   A9  日期前缀须为真实日历日（2026-13-45-<changeId> → violation；2026-09-03- 与无日期前缀通过）
  */
 
 import { execSync } from 'node:child_process';
@@ -87,6 +88,15 @@ describe('checkOpenspecArchiveStrict', () => {
     const r = checkOpenspecArchiveStrict(root, 5, CHANGE_ID);
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => /多个.*匹配|多匹配/.test(v))).toBe(true);
+  });
+
+  it('A9: 日期前缀非真实日历日（2026-13-45-）→ violation（日期段须为有效 YYYY-MM-DD）', () => {
+    const root = makeTmpDir();
+    writeArchiveDir(join(root, 'openspec', 'changes', 'archive'), `2026-13-45-${CHANGE_ID}`);
+    const r = checkOpenspecArchiveStrict(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => /2026-13-45|日期/.test(v))).toBe(true);
+    // 对照组：真实日期前缀（2026-09-03，A2 已覆盖）与无日期前缀（A1 已覆盖）均匹配通过
   });
 
   it('A5: archive 无匹配 / archive 目录缺失 → violation', () => {

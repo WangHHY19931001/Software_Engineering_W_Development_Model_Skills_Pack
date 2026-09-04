@@ -16,6 +16,7 @@
  *   C9  原两参 legacy 纯函数行为不变（self-test 兼容层）
  *   C10 CLI：阶段 5-8 无 --scope → exit 1（不是 0）；有合法 scope → exit 0；
  *       覆盖缺失 → exit 1
+ *   C11 文件名 phase 前缀精确单数字（phase05-* 不计入 phase 5；phase5-* 正常计入）
  */
 
 import { execSync } from 'node:child_process';
@@ -233,6 +234,27 @@ describe('checkCodegraphQueriesStrict（覆盖绑定校验）', () => {
     });
     const r = readResult(root, makeScope());
     expect(r.passed).toBe(false);
+  });
+
+  it('C11: 文件名 phase 前缀须为精确单数字（phase05-a.json 不计入 phase 5）', () => {
+    // phase05-* 是 phase 5 的形近名而非本阶段查询：不计入 own → phase 5 无任何查询 → fail-closed
+    const root = writeProject({
+      '.w-model/codegraph-queries/phase05-a.json': queryFile('phase5-demo', ['src/main.ts']),
+    });
+    const r = readResult(root, makeScope());
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => /无 phase5-\*\.json 查询文件/.test(v))).toBe(true);
+    // 同 changeId 但前缀形近：报告为异 phase 前缀文件（而非静默计入或静默忽略）
+    expect(r.violations.some((v) => v.includes('phase05-a.json') && /phase 前缀/.test(v))).toBe(true);
+    // 对照组：精确单数字前缀 phase5-a.json 正常计入（查询生效、全覆盖 → 通过）
+    const root2 = writeProject({
+      '.w-model/codegraph-queries/phase5-a.json': queryFile('phase5-demo', [
+        'src/main.ts',
+        'src/util.ts',
+        'docs/note.md',
+      ]),
+    });
+    expect(readResult(root2, makeScope()).passed).toBe(true);
   });
 });
 

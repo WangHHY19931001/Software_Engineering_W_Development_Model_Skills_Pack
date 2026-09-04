@@ -60,6 +60,20 @@ const REQUIRED_ARCHIVED_ARTIFACTS = ['proposal.md', 'design.md', 'tasks.md', 'ti
 /** 归档日期前缀：<YYYY-MM-DD>- */
 const ARCHIVE_DATE_PREFIX_RE = /^\d{4}-\d{2}-\d{2}-/;
 
+/**
+ * 日期前缀段日历校验：解析 YYYY-MM-DD 并用 Date.UTC 回读核对
+ * （拒绝 2026-13-45 / 2026-02-30 等形状合法但非真实日历日的前缀）。
+ */
+function isValidArchiveDatePrefix(datePrefix: string): boolean {
+  const year = Number(datePrefix.slice(0, 4));
+  const month = Number(datePrefix.slice(5, 7));
+  const day = Number(datePrefix.slice(8, 10));
+  if (!Number.isInteger(year) || year < 1 || year > 9999) return false;
+  if (month < 1 || month > 12 || day < 1) return false;
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  return utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day;
+}
+
 /** 校验归档目录制品齐全（proposal/design/tasks/tickets + specs/） */
 function validateArchivedArtifacts(
   archiveDir: string,
@@ -124,7 +138,8 @@ export function checkOpenspecArchive(projectRoot: string, phase: number): CheckR
  * strict 模式（2026-09-04 audit-gate-closure，Slice A）：锚定匹配 scope.changeId——
  * archive/ 下精确匹配 `<changeId>` 或 `<date>-<changeId>`（date 前缀为锚定 <YYYY-MM-DD>-，
  * 不再用未锚定正则，`<changeId>-extra` 等相似名不匹配）；多匹配 → violations 失败
- * （不允许 entries[0] 任取其一）；changeId 须含阶段前缀 phase<phase>-（phase 归属一致性）。
+ * （不允许 entries[0] 任取其一）；changeId 须含阶段前缀 phase<phase>-（phase 归属一致性）；
+ * 日期前缀段须为真实日历日（Date.UTC 回读核对，拒绝 2026-13-45 等）。
  * 制品齐全校验逻辑保留。archive 为 opsx:archive 后置门（阶段 8 末），不在
  * pre-archive artifact gate 内强制（见 check-artifact-gate.ts）。
  */
@@ -172,6 +187,18 @@ export function checkOpenspecArchiveStrict(projectRoot: string, phase: number, c
   }
 
   const archivedChange = matches[0]!;
+
+  // 日期前缀段须为真实日历日（形状合法但非法日历日如 2026-13-45-<changeId> → violation）
+  if (archivedChange.length > 11 && ARCHIVE_DATE_PREFIX_RE.test(archivedChange.slice(0, 11))) {
+    const datePrefix = archivedChange.slice(0, 11);
+    if (!isValidArchiveDatePrefix(datePrefix)) {
+      violations.push(
+        `${archivedChange} 归档日期前缀 ${datePrefix} 非真实日历日` +
+          `（须为有效 YYYY-MM-DD：年 1-9999 / 月 1-12 / 日不超当月天数）`,
+      );
+    }
+  }
+
   validateArchivedArtifacts(archiveDir, archivedChange, violations, artifactsFound);
 
   return {

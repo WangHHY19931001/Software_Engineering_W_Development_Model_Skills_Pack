@@ -129,12 +129,17 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.summary.opsx.violationCount).toBeGreaterThan(0);
   });
 
-  it('E2: scope 为 null → 两 checker fail-closed（须提供变更上下文）', () => {
+  it('E2: scope 为 null → 两 checker fail-closed（须提供变更上下文）且 summary 标记未提供', () => {
     const { root } = fullPassProject();
     const r = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
     expect(r.passed).toBe(false);
     expect(r.summary.codegraph.passed).toBe(false);
     expect(r.summary.opsx.passed).toBe(false);
+    // scope 缺失分支：provided=false、changeId=null（不再用空串占位）
+    expect(r.summary.codegraph.provided).toBe(false);
+    expect(r.summary.opsx.provided).toBe(false);
+    expect(r.summary.codegraph.changeId).toBeNull();
+    expect(r.summary.opsx.changeId).toBeNull();
     expect(r.reasons.some((v) => /--scope|ChangeScope/.test(v))).toBe(true);
   });
 
@@ -173,6 +178,9 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });
     expect(r.summary.codegraph.changeId).toBe('phase5-demo');
     expect(r.summary.opsx.changeId).toBe('phase5-demo');
+    // scope 已提供分支：provided=true
+    expect(r.summary.codegraph.provided).toBe(true);
+    expect(r.summary.opsx.provided).toBe(true);
     expect(typeof r.summary.codegraph.coveredFileCount).toBe('number');
   });
 

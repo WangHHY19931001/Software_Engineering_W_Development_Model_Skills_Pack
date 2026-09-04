@@ -42,7 +42,7 @@ export interface ChangeScope {
   headRef: string;
   /** scope 创建时刻（ISO date-time） */
   scopeCreatedAt: string;
-  /** 声明变更文件：项目根相对 / 正斜杠 / 非绝对 / 不含 `..`、空段、反斜杠 */
+  /** 声明变更文件：项目根相对 / 正斜杠 / 非绝对 / 不含 `..`、`.`、空段、反斜杠 */
   changedFiles: string[];
 }
 
@@ -87,7 +87,7 @@ export function isIsoDateTimeString(value: unknown): value is string {
 }
 
 /**
- * 变更文件路径单条规则：项目根相对、正斜杠、非绝对路径、不含 `..`/空段/反斜杠。
+ * 变更文件路径单条规则：项目根相对、正斜杠、非绝对路径、不含 `..`/`.`/空段/反斜杠。
  * 合法返回 null；违规返回人类可读原因（violations 组装用）。
  * 同时供 scope.changedFiles 与查询 targetFiles 复用（规则集中、可测）。
  */
@@ -99,17 +99,25 @@ export function changedFilePathViolation(value: unknown): string | null {
   if (isAbsolute) return '绝对路径不被允许（须为项目根相对路径）';
   if (value.includes('\\')) return '含反斜杠（须用正斜杠分隔）';
   const segments = value.split('/');
-  if (segments.some((s) => s === '' || s === '..')) {
-    return '含空段或 `..` 段（路径未规范化，不允许越出项目根）';
+  if (segments.some((s) => s === '' || s === '..' || s === '.')) {
+    return '含空段、`.` 段或 `..` 段（路径未规范化，不允许越出项目根）';
   }
   return null;
 }
 
-/** scope schema 前置校验（structural-first）：违规返回 '[schema] ...' 消息列表 */
+/** scope schema 前置校验（structural-first + 跨字段）：违规返回 '[schema] ...' 消息列表 */
 export function validateChangeScope(scope: unknown): string[] {
   const result = validateBySchema('change-scope', scope);
-  if (result.valid) return [];
-  return result.errorMessages.map((m) => `[schema] ${m}`);
+  if (!result.valid) return result.errorMessages.map((m) => `[schema] ${m}`);
+  // 跨字段一致性：changeId 须含 scope.phase 对应前缀 phase<N>-（与 opsx 变更目录/查询文件前缀同一约定）
+  const s = scope as ChangeScope;
+  const expectedPrefix = `phase${s.phase}-`;
+  if (!s.changeId.startsWith(expectedPrefix)) {
+    return [
+      `[schema] changeId='${s.changeId}' 须含 scope.phase=${s.phase} 对应前缀 ${expectedPrefix}（scope.changeId 与 scope.phase 不符）`,
+    ];
+  }
+  return [];
 }
 
 // ==================== 文件分类（须 codegraph 覆盖判定） ====================
@@ -128,7 +136,7 @@ const EXCLUDED_ROOT_SEGMENTS = new Set([
   '.git',
 ]);
 
-/** 工程源码/测试扩展名（*.ts|*.js|*.py|*.java 等；shell/配置等不在此列） */
+/** 工程源码/测试扩展名（*.ts|*.js|*.py|*.java 与 *.sh|*.ps1|*.bat|*.cmd 脚本等） */
 const ENGINEERING_CODE_EXTENSIONS = new Set([
   'ts',
   'tsx',
@@ -150,6 +158,13 @@ const ENGINEERING_CODE_EXTENSIONS = new Set([
   'hpp',
   'swift',
   'kt',
+  // shell/PowerShell/批处理脚本同为可执行工程文件，改动须 codegraph 覆盖
+  'sh',
+  'ps1',
+  'bat',
+  'cmd',
+  // .sql/.tla/.feature 刻意不纳入：分别由数据迁移审查 / TLA+ 行为门禁 / BDD 门禁兜底，
+  // 纳入会迫使 S-coding 对模型与规格文件补无意义的符号查询
 ]);
 
 /**
@@ -199,6 +214,8 @@ export function currentHeadSha(runner: GitRunner, projectRoot: string): string |
  * 实际变更集合重算：`git diff --name-only base..head`（tracked）
  * + staged（--cached）+ unstaged + untracked（ls-files --others --exclude-standard），
  * 去重排序。任一 git 命令失败 → { ok:false, error }（调用方 fail-closed）。
+ * 所有命令统一前插 `-c core.quotePath=false`：非 ASCII 文件名（如 docs/设计文档.md）
+ * 按字面 UTF-8 收集而非八进制转义（quotePath 默认 true 会破坏与 changedFiles 的精确集合比对）。
  */
 export function computeGitChangedFiles(
   runner: GitRunner,
@@ -206,11 +223,18 @@ export function computeGitChangedFiles(
   baseRef: string,
   headRef: string,
 ): { ok: boolean; files: string[]; error: string | null } {
+  const quotePathArg = ['-c', 'core.quotePath=false'] as const;
   const commands: Array<{ args: string[]; label: string }> = [
-    { args: ['diff', '--name-only', `${baseRef}..${headRef}`], label: `git diff --name-only ${baseRef}..${headRef}` },
-    { args: ['diff', '--cached', '--name-only'], label: 'git diff --cached --name-only' },
-    { args: ['diff', '--name-only'], label: 'git diff --name-only' },
-    { args: ['ls-files', '--others', '--exclude-standard'], label: 'git ls-files --others --exclude-standard' },
+    {
+      args: [...quotePathArg, 'diff', '--name-only', `${baseRef}..${headRef}`],
+      label: `git diff --name-only ${baseRef}..${headRef}`,
+    },
+    { args: [...quotePathArg, 'diff', '--cached', '--name-only'], label: 'git diff --cached --name-only' },
+    { args: [...quotePathArg, 'diff', '--name-only'], label: 'git diff --name-only' },
+    {
+      args: [...quotePathArg, 'ls-files', '--others', '--exclude-standard'],
+      label: 'git ls-files --others --exclude-standard',
+    },
   ];
   const names = new Set<string>();
   for (const { args, label } of commands) {
@@ -384,6 +408,15 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
         category: 'ARG_INVALID',
         message: '--change=<changeId> 不得为空串或全空白（薄封装须声明非空 changeId）',
         detail: 'changeId 须与下游 opsx/archive 变更目录精确绑定，空值属输入错误（exit 2），显式拒绝',
+      };
+    }
+    // changeId 阶段前缀前置校验：须含 phase<phase>-（与 manifest 模式 validateChangeScope 同一约定）
+    if (typeof args.changeArg === 'string' && !args.changeArg.startsWith(`phase${phase}-`)) {
+      return {
+        kind: 'invalid',
+        category: 'ARG_INVALID',
+        message: `--change=${args.changeArg} 缺当前阶段前缀 phase${phase}-（薄封装 changeId 与 CLI --phase 不符）`,
+        detail: `changeId 须为 phase${phase}-<名称> 形态（跨阶段/无前缀 changeId 属输入错误，exit 2）`,
       };
     }
     const violations: string[] = [];
