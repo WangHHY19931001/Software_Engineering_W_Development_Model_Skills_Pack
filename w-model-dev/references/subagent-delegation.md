@@ -1400,7 +1400,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 - `run-log.jsonl` 中 S 子代理（`role=S`）的 `action=fix` 条目需特别审查：
   - `variant="emergency-fix"` + `blocker` 非空 → 合法紧急修复通道
-  - 无 `variant` 或 `variant` 非 `emergency-fix` / `fix`（S-fix 变体） → 视为越权修复，命中反模式 #10 变体
+  - `variant` 若出现须为 `fix` 或 `emergency-fix` 且与 action 一致（`action=fix` 声明 `variant=emergency-fix`、或 `action=emergency-fix` 声明 `variant=fix` 均属 variant 与 action 不符 → schema blocking）；**未声明 variant 的旧 fix 记录按向后兼容处理，不视为越权**——精确语义见本节紧急修复通道规则：仅 `emergency-fix` 强制 `variant=emergency-fix` + `blocker`（缺失即 blocking `[schema]`），`fix` 的 variant 可选（不强制出现）
 - 非紧急修复的 `fix` 条目视为越权，需回滚并由 R + S-fix 重做
 - 检测脚本（精确语义，2026-09-04 与 run-log.schema.json / run-log-logic.ts 对齐）：`check-run-log.ts` 对 `action=fix` / `action=emergency-fix` 条目按以下规则判定——`action=emergency-fix` 强制 `variant=emergency-fix` 且 `blocker` 非空（schema 强制）；`action=fix` 的 `variant` **可选**，出现则必须为 `"fix"`（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；已声明 `variant=emergency-fix` 却缺 `blocker`、或 variant 值不符 const 属真实不一致 → blocking `[schema]`；variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的双 legacy 行）经合并 legacy 谓词吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**，不进 blocking。动作-角色配对（`fix`/`emergency-fix`/`produce`→role=S 等）由 logic 层 blocking 强制。`preventive-review.schema.json` 另强制 `passed=false ⇒ findings ≥1`。
 
