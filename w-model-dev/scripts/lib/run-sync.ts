@@ -292,9 +292,10 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/change-scope.test.ts',
-    line: 502,
+    line: 521,
     symbol: 'CLI 端到端冒烟（git 环境自检）',
-    reason: '2026-09-04 audit-gate-closure task 1 新增：git 环境自检冒烟，显式 15 秒超时。',
+    reason:
+      '2026-09-04 audit-gate-closure task 1 新增：git 环境自检冒烟，显式 15 秒超时。（行号 2026-09-04 close-outstanding 随新增薄封装 changeId 空值用例上移）',
     timeout: { required: true, status: 'present' },
   },
   {
