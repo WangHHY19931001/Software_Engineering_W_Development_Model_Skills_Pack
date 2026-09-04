@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
 
+import { L0_BASELINE } from './helpers/l0-baseline.js';
+
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -67,8 +69,10 @@ describe('audit-l0-links application entrypoint', () => {
     expect(JSON.parse(result.stdout.replace('L0_LINK_AUDIT_JSON ', ''))).toMatchObject({
       type: 'l0-link-audit',
       passed: true,
-      l1OnlyCount: 92,
-      templatePlaceholderCount: 36,
+      // 基线三数单一事实来源见 helpers/l0-baseline.ts（npm run audit:l0-links 实测）。
+      relativeLinkCount: L0_BASELINE.relativeLinkCount,
+      l1OnlyCount: L0_BASELINE.l1Only,
+      templatePlaceholderCount: L0_BASELINE.placeholders,
       violations: [],
       exitCode: 0,
     });

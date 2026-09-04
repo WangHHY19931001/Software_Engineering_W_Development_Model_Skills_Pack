@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { auditL0RelativeLinks } from '../logic/l0-link-audit-logic.js';
 
+import { L0_BASELINE } from './helpers/l0-baseline.js';
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SKILL_ROOT = path.join(REPO_ROOT, 'w-model-dev');
 const L0_DIRECTORIES = ['references', 'templates', 'examples', 'subagent', 'schemas'];
@@ -380,6 +382,25 @@ describe('auditL0RelativeLinks', () => {
     expect(result.violations).toContainEqual(expect.stringContaining('相对链接目标不存在'));
   });
 
+  it('collects a reference-style definition whose target does not exist as a violation', async () => {
+    await write('references/readme.md', '[text][docs] [empty][docs]\n\n[docs]: ./guide.md');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toContainEqual(expect.stringContaining('相对链接目标不存在'));
+  });
+
+  it('counts an existing reference-style definition target in relativeLinkCount', async () => {
+    await write('references/readme.md', '[text][docs] [empty][docs]\n\n[docs]: ./guide.md');
+    await write('references/guide.md', '# guide\n');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toEqual([]);
+  });
+
   it('rejects a root-relative target outside the skill package boundary', async () => {
     await write('references/guide.md', '[outside](/outside/readme.md)');
 
@@ -419,11 +440,13 @@ describe('auditL0RelativeLinks', () => {
   it('audits the real skill package without hiding L0 boundaries', async () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 
-    // 649 = 647（42.2.1 基线）+ 2 条新引用（workflow.md「阶段 5-8 门禁顺序与 ChangeScope」
-    // 注记链接到 command-reference.md 与 subagent-delegation.md，2026-09-04 gate-closure doc sync）
-    expect(result.relativeLinkCount).toBe(649);
-    expect(result.l1Only).toHaveLength(92);
-    expect(result.templatePlaceholders).toHaveLength(36);
+    // 基线三数单一事实来源见 helpers/l0-baseline.ts（npm run audit:l0-links 实测）。
+    // 当前解析值说明：647（42.2.1 基线）+ 2 条新引用（workflow.md「阶段 5-8 门禁顺序与
+    // ChangeScope」注记链接到 command-reference.md 与 subagent-delegation.md，
+    // 2026-09-04 gate-closure doc sync）= 649。
+    expect(result.relativeLinkCount).toBe(L0_BASELINE.relativeLinkCount);
+    expect(result.l1Only).toHaveLength(L0_BASELINE.l1Only);
+    expect(result.templatePlaceholders).toHaveLength(L0_BASELINE.placeholders);
     expect(result.violations).toEqual([]);
   });
 

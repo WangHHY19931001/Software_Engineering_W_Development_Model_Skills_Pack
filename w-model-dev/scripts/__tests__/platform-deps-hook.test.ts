@@ -1083,6 +1083,11 @@ esac
     );
 
     expect(result.code).toBe(1);
+    // 失败来源锚定（2026-09-04 实测 run_expect 失败行真实格式）：该行以
+    // `[pre-push] <ANSI 红叉> prettier 格式一致性（--check）（期望 exit 0，实际 1）` 呈现；
+    // 唯一失败项是 prettier 格式门禁（fake npx 对其返回 1），断言 exit 1 来自该行而非其他门禁。
+    // ANSI 控制码用 `[^\n]*`（同行任意字节）表达，安全扫描 no-control-regex 不豁免 \xNN/\u00NN 转义。
+    expect(result.stdout).toMatch(/\[pre-push\] [^\n]*prettier 格式一致性（--check）（期望 exit 0，实际 1）/);
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp call log
     expect(await fs.readFile(callsPath, 'utf8')).toContain('docs-consumed ');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp temp root

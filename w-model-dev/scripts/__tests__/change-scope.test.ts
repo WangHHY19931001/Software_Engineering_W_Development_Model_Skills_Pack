@@ -602,10 +602,11 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
     }
   });
 
-  it('CLI 端到端冒烟：scope 校验失败时 violations 非空（防伪通过）', async () => {
+  it('CLI 运行环境自检（非端到端）：验证 execSync 能跑 git', async () => {
     const repo = makeGitProject();
     writeFileSync(join(repo.root, 'scope.json'), VALID_SCOPE_JSON());
-    // 直接跑 resolveCliScope 已被上面用例覆盖；这里验证 execSync 能跑 git（环境自检）
+    // 直接跑 resolveCliScope 已被上面用例覆盖；本用例仅做 CLI 运行环境自检，
+    // 验证 execSync 能启动 git 子进程，不端到端校验 scope（非端到端）。
     const out = execSync('git --version', { encoding: 'utf-8', timeout: 15_000 });
     expect(out).toMatch(/git version/i);
     expect(HERE).toBeTruthy();

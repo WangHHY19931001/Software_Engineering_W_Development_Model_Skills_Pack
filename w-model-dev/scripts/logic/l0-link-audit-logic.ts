@@ -53,6 +53,8 @@ function l0Boundary(target: string, root: string): string | undefined {
   return L0_DIRECTORIES.find((directory) => relative === directory || relative.startsWith(`${directory}/`));
 }
 
+const REFERENCE_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]+<?([^)> \t]+)>?/gm;
+
 function parseRelativeLinks(content: string): string[] {
   const links: string[] = [];
   for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
@@ -60,6 +62,15 @@ function parseRelativeLinks(content: string): string[] {
       .trim()
       .replace(/^<|>$/g, '')
       .split(/\s+["']/)[0]!;
+    if (raw) links.push(raw);
+  }
+  // Reference-style link definitions (`[label]: <target>` at a line start, up to 3
+  // leading spaces per CommonMark) are also relative-link sources, even when no
+  // inline usage appears in the same file. Absolute URLs and anchors are still
+  // filtered downstream by isExternalOrAnchor; the target keeps any angle brackets
+  // stripped so `<./guide.md>` and `./guide.md` normalize identically.
+  for (const match of content.matchAll(REFERENCE_DEFINITION)) {
+    const raw = match[2]!.replace(/^<|>$/g, '').trim();
     if (raw) links.push(raw);
   }
   return links;
@@ -356,6 +367,10 @@ export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditRes
       try {
         // Validate every URI, including external and anchor-only links, before
         // classifying it so malformed percent sequences cannot be skipped.
+        // Known approximation (kept intentionally): decodeURI decodes the whole
+        // target as one component rather than per URL component, and leaves
+        // encoded reserved sequences (%2F/%23/...) intact; classification runs on
+        // the partially-decoded string. Changing it would alter existing audits.
         decodedTarget = decodeURI(rawTarget);
       } catch {
         result.violations.push(`${sourceEntry.source}: 链接 URI 编码无效 → ${rawTarget}`);
