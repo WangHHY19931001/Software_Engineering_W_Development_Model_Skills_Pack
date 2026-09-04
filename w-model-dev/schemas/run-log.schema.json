@@ -146,7 +146,7 @@
       "minLength": 1
     },
     "action": {
-      "description": "动作类型枚举（共 27 值）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；evolve=A 子代理图谱演进增量更新（A-evolve，阶段2-4 在现有 graph.json 上追加节点/边）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；test=S 测试执行；checkpoint=O 阶段门 CHECKPOINT 放行；rework=返工；rollback=阶段回退；rootcause=R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended）；fix=S 兼 F 修复（须含 basedOnReport/artifacts）；emergency-fix=S 紧急修复变体；escalate=升级（upstreamDefect 触发阶段回退升级时记录 reportId）；r3-completeness/r3-reliability/r3-security=R 预防性审查三报告（约束 #11 无条件强制）；codegraph_query=S-coding 修改前符号级影响分析查询（约束 #14）；opsx_explore/opsx_propose/opsx_apply/opsx_archive=OpenSpec 规格驱动变更四动作；ensure_deps=O 编排者 codegraph+OpenSpec 依赖检测/安装；iceberg-sweep=R-iceberg 冰山扫掠分派（须含 triggerType/icebergRound/reportPath/newFindingsCount/passed）；iceberg-review=V 复审冰山报告（须含 reportId/passed/validFindings/reworkHints）。动作与角色配对：gate 类由 G 执行、review 由 V 执行、produce/fix/emergency-fix/test 由 S 执行、rootcause/r3-*/iceberg-sweep 由 R 执行、checkpoint/ensure_deps 由 O 执行、chunk/cross/evolve 由 A 执行、codegraph_query 由 S-coding 执行、iceberg-review 由 V 执行、opsx_explore/opsx_propose/opsx_apply/opsx_archive 由 S 或编排者按 opsx 流程执行（约束 #8 角色分派完整性）",
+      "description": "动作类型枚举（共 27 值）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；evolve=A 子代理图谱演进增量更新（A-evolve，阶段2-4 在现有 graph.json 上追加节点/边）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；test=S 测试执行；checkpoint=O 阶段门 CHECKPOINT 放行；rework=返工；rollback=阶段回退；rootcause=R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended）；fix=S 兼 F 修复（须含 basedOnReport/artifacts）；emergency-fix=S 紧急修复变体；escalate=升级（upstreamDefect 触发阶段回退升级时记录 reportId）；r3-completeness/r3-reliability/r3-security=R 预防性审查三报告（约束 #11 无条件强制）；codegraph_query=S-coding 修改前符号级影响分析查询（约束 #14）；opsx_explore/opsx_propose/opsx_apply/opsx_archive=OpenSpec 规格驱动变更四动作；ensure_deps=O 编排者 codegraph+OpenSpec 依赖检测/安装；iceberg-sweep=R-iceberg 冰山扫掠分派（须含 triggerType/icebergRound/reportPath/newFindingsCount/passed）；iceberg-review=V 复审冰山报告（须含 reportId/passed/validFindings/reworkHints）。动作与角色配对：配对强制子集由 check-run-log.ts logic 层 blocking 执行（r3-completeness/r3-reliability/r3-security→R、fix/emergency-fix/produce→S、review→V、gate/tla-gate/graph-gate→G）；其余动作（test/rootcause/iceberg-sweep/checkpoint/ensure_deps/chunk/cross/evolve/codegraph_query/iceberg-review/opsx_* 等）与角色的配对语义见本 description 上文逐动作罗列，非强制子集违反时按 R5/role-action 审计处理（约束 #8 角色分派完整性）",
       "enum": [
         "chunk",
         "cross",
@@ -178,7 +178,7 @@
       ]
     },
     "role": {
-      "description": "执行角色：O=编排者 A=分析 S=产出 V=评审 G=门禁 R=根因定位/R3预防性审查。约束 #8：每阶段 run-log 须至少含 role=S/V/G 各 1 条记录；R3 无条件强制须含 role=R ≥3 条（completeness/reliability/security）",
+      "description": "执行角色：O=编排者 A=分析 S=产出 V=评审 G=门禁 R=根因定位/R3预防性审查。约束 #8：每阶段 run-log 须至少含 role=S/V/G 各 1 条记录；R3 无条件强制：每阶段须含 role=R 且 outcome=success 的 r3-completeness/r3-reliability/r3-security 各 ≥1 条（维度缺口由 check-role-dispatch.ts 报 r3Missing）",
       "enum": ["O", "A", "S", "V", "G", "R"]
     },
     "duration_s": {
@@ -268,7 +268,7 @@
       "type": "string"
     },
     "lifecycleStatus": {
-      "description": "生命周期诊断状态（仅 reducer/effective consumer 使用）：pending-pre-approval 或 open-approved-lifecycle；不改写 raw JSONL",
+      "description": "生命周期诊断状态（仅 reducer/effective consumer 的机器状态使用，不改写 raw JSONL）：CLOSED_UNDER_CURRENT_RULES=校验 passed 且无 deferred 诊断；NOT_CLOSED_NOT_PROVEN=存在非阻断诊断/历史遗留或未达证明条件——exit 0 仍可能为 NOT_CLOSED_NOT_PROVEN，不能单独证明 lifecycle closed",
       "enum": ["CLOSED_UNDER_CURRENT_RULES", "NOT_CLOSED_NOT_PROVEN"]
     },
     "rtmDiff": {
