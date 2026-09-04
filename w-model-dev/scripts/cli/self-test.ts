@@ -1460,7 +1460,7 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
   {
     file: 'bad-missing-R-role.jsonl',
     expectedPassed: false,
-    expectedReasonPatterns: [/缺失 role=R/],
+    expectedReasonPatterns: [/有效 R3 维度记录不足.*缺：reliability\/security/],
     description: '阶段 1 仅有 1 条 R3 记录（缺 reliability/security），R3 无条件强制应被拦截',
   },
 ];

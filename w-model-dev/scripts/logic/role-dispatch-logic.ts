@@ -127,8 +127,14 @@ export function checkRoleDispatch(entries: RoleDispatchEntry[]): RoleDispatchRes
     if (missingDimensions.length > 0) {
       missing.push('R');
       r3Missing.push({ phase, missingDimensions });
+      const rTotal = roleCounts.get('R') ?? 0;
+      // R 总数为 0（无任何 role=R 记录）→ 保留「缺失 role=R 记录」消息；
+      // R 记录存在（rootcause/iceberg/重复维度等）但三维度未齐 → 报维度不足，
+      // 避免「缺失 role=R 记录」与 phaseSummary 的 R=N 展示并存误导。
       violations.push(
-        `阶段 ${phase} 缺失 role=R 记录（约束 #8：R3 无条件强制，须 role=R 的 r3-completeness/r3-reliability/r3-security 各 1 条 success，当前缺 ${missingDimensions.join('/')}）`,
+        rTotal === 0
+          ? `阶段 ${phase} 缺失 role=R 记录（约束 #8：R3 无条件强制，须 role=R 的 r3-completeness/r3-reliability/r3-security 各 1 条 success，当前缺 ${missingDimensions.join('/')}）`
+          : `阶段 ${phase} 有效 R3 维度记录不足：须 role=R 且 outcome=success 的 r3-completeness/r3-reliability/r3-security 各 ≥1，当前缺：${missingDimensions.join('/')}`,
       );
     }
 

@@ -777,8 +777,8 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
       const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; exitCode: number };
       expect(parsed.passed).toBe(false);
       expect(parsed.exitCode).toBe(1);
-      expect(parsed.reasons.join(' ')).toMatch(/缺失 role=R 记录/);
-      expect(parsed.reasons.join(' ')).toMatch(/缺 reliability\/security/);
+      expect(parsed.reasons.join(' ')).toMatch(/有效 R3 维度记录不足/);
+      expect(parsed.reasons.join(' ')).toMatch(/缺：reliability\/security/);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

@@ -21,7 +21,9 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => /缺失 role=R/.test(v))).toBe(true);
+    // 已有 role=R 记录（r3-completeness）但维度不齐：不得报「缺失 role=R 记录」，须报维度不足
+    expect(r.violations.some((v) => /有效 R3 维度记录不足/.test(v))).toBe(true);
+    expect(r.violations.join(' ')).toMatch(/当前缺：reliability\/security/);
   });
 
   it('S/V/G/R≥3 齐全应通过', () => {
@@ -192,8 +194,9 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺失 role=R 记录/);
-    expect(r.violations.join(' ')).toMatch(/缺 completeness\/reliability\/security/);
+    // R 记录存在（rootcause×3）但三维度未齐：消息须为维度不足表述，不再与 phaseSummary R=3 并存误导
+    expect(r.violations.join(' ')).toMatch(/有效 R3 维度记录不足/);
+    expect(r.violations.join(' ')).toMatch(/缺：completeness\/reliability\/security/);
     expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['completeness', 'reliability', 'security'] }]);
     // roles 计数保留全部 role=R 记录（含 rootcause）
     expect(r.phaseSummary[0]!.roles.R).toBe(3);
@@ -210,7 +213,7 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺 reliability\/security/);
+    expect(r.violations.join(' ')).toMatch(/缺：reliability\/security/);
     expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['reliability', 'security'] }]);
   });
 
@@ -225,7 +228,7 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺 completeness\/reliability\/security/);
+    expect(r.violations.join(' ')).toMatch(/缺：completeness\/reliability\/security/);
   });
 
   it('非 R3 action（iceberg-sweep 等 role=R success）不计入 R3 → 失败', () => {
@@ -239,7 +242,7 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     ];
     const r = checkRoleDispatch(entries);
     expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺 completeness\/reliability\/security/);
+    expect(r.violations.join(' ')).toMatch(/缺：completeness\/reliability\/security/);
   });
 
   it('三维度各 1 条 success（含重复维度重工记录）→ 通过且无 r3Missing', () => {
@@ -293,7 +296,7 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     expect(r.phaseSummary[1]!.roles.R).toBe(3);
   });
 
-  it('缺失维度消息含"当前缺 <维度>"可读措辞（供 CLI 直接展示）', () => {
+  it('维度不足消息为「有效 R3 维度记录不足」措辞并含缺失维度明细（供 CLI 直接展示）', () => {
     const entries = [
       svg(1, 'S'),
       svg(1, 'V'),
@@ -301,8 +304,17 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
     ];
     const r = checkRoleDispatch(entries);
+    expect(r.violations.join(' ')).toMatch(/阶段 1 有效 R3 维度记录不足/);
     expect(r.violations.join(' ')).toMatch(
-      /r3-completeness\/r3-reliability\/r3-security 各 1 条 success，当前缺 reliability\/security/,
+      /须 role=R 且 outcome=success 的 r3-completeness\/r3-reliability\/r3-security 各 ≥1，当前缺：reliability\/security/,
     );
+  });
+
+  it('R 总数 0（无任何 role=R 记录）时保留「缺失 role=R 记录」消息', () => {
+    const entries = [svg(1, 'S'), svg(1, 'V'), svg(1, 'G')];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.violations.join(' ')).toMatch(/阶段 1 缺失 role=R 记录/);
+    expect(r.violations.join(' ')).not.toMatch(/有效 R3 维度记录不足/);
   });
 });
