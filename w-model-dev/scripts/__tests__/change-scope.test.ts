@@ -569,6 +569,25 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
     }
   });
 
+  it('薄封装 violations 透传 attemptedChangeId（--change 值原样带出；必填字段断言锁）', () => {
+    const repo = makeGitProject();
+    // changeId 须含 phase5- 前缀方可进入薄封装 violations 路径（缺前缀属 invalid(ARG_INVALID)，见上例）；
+    // baseRef 不可解析 → violations（fail-closed），断言锁住 resolveCliScope 层 attemptedChangeId 透传
+    const r = resolveCliScope({
+      projectRoot: repo.root,
+      ...baseArgs,
+      git: repo.git,
+      changeArg: 'phase5-reviewfix',
+      baseArg: 'no-such-ref',
+      headArg: repo.headSha,
+    });
+    expect(r.kind).toBe('violations');
+    if (r.kind === 'violations') {
+      expect(r.attemptedChangeId).toBe('phase5-reviewfix');
+      expect(r.violations[0]).toMatch(/baseRef/);
+    }
+  });
+
   it('--scope 与薄封装参数同时给出 → invalid(ARG_INVALID)（不许静默取一）', () => {
     const repo = makeGitProject();
     const r = resolveCliScope({

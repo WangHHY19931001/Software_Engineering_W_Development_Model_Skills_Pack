@@ -57,7 +57,8 @@ const REFERENCE_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]+<?([^)> \t]+)>?/gm;
 
 function parseRelativeLinks(content: string): string[] {
   const links: string[] = [];
-  // 内联链接正则：`[..](target)` 的目标遇 ) 或空白即终止；与行内链接同属已知近似（非 CommonMark 级解析）
+  // 内联链接正则：`[..](target)` 行内非 title 形态捕获可含空白（非 CommonMark 级解析的已知近似）；
+  // title 形态遇引号或空白截断；URL 含 ) 即终止
   for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
     const raw = match[1]!
       .trim()

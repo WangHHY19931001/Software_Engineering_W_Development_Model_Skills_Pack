@@ -194,7 +194,7 @@ export function checkOpenspecArchiveStrict(projectRoot: string, phase: number, c
     if (!isValidArchiveDatePrefix(datePrefix)) {
       violations.push(
         `${archivedChange} 归档日期前缀 ${datePrefix} 非真实日历日` +
-          `（须为有效 YYYY-MM-DD：年 100-9999（Date.UTC 对 0-99 年按 1900+ 处理，回读校验使 1-99 实际判非法） / 月 1-12 / 日不超当月天数）`,
+          `（须为有效 YYYY-MM-DD：年 100-9999（Date.UTC 对 0-99 年按 1900+ 处理，回读校验使 0-99 实际判非法（年份 0000 同样被拒）） / 月 1-12 / 日不超当月天数）`,
       );
     }
   }

@@ -310,7 +310,7 @@ export type ResolvedCliScope =
    * attemptedChangeId = 尝试绑定的 changeId（manifest 模式=scope.changeId；薄封装=--change 值），
    * 供调用方在 summary 标注「已提供但 Git 绑定失败」而非「未提供」。
    */
-  | { kind: 'violations'; violations: string[]; attemptedChangeId?: string | null }
+  | { kind: 'violations'; violations: string[]; attemptedChangeId: string | null }
   /** 输入错误（文件/JSON/schema/参数冲突）：exit 2（category 供 ERROR_JSON 使用） */
   | { kind: 'invalid'; category: ErrorCategory; message: string; detail?: string; file?: string };
 
@@ -427,7 +427,7 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
     const head = currentHeadSha(git, projectRoot);
     if (head === null) {
       violations.push('无法读取当前 HEAD（git 不可用或项目根不在 Git 仓库内）：薄封装 scope fail-closed');
-      return { kind: 'violations', violations, attemptedChangeId: args.changeArg };
+      return { kind: 'violations', violations, attemptedChangeId: args.changeArg as string };
     }
     const baseSha = resolveGitObject(git, projectRoot, args.baseArg as string);
     if (baseSha === null) violations.push(`baseRef 无法解析为 Git 对象（baseRef=${args.baseArg}）`);
@@ -437,13 +437,13 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
     } else if (headSha !== head) {
       violations.push(`headRef 过期：headRef=${args.headArg} 不等于当前 HEAD=${head}`);
     }
-    if (violations.length > 0) return { kind: 'violations', violations, attemptedChangeId: args.changeArg };
+    if (violations.length > 0) return { kind: 'violations', violations, attemptedChangeId: args.changeArg as string };
     const computed = computeGitChangedFiles(git, projectRoot, args.baseArg as string, args.headArg as string);
     if (!computed.ok) {
       return {
         kind: 'violations',
         violations: [`实际变更集合无法计算（fail-closed）：${computed.error}`],
-        attemptedChangeId: args.changeArg,
+        attemptedChangeId: args.changeArg as string,
       };
     }
     const scope: ChangeScope = {
