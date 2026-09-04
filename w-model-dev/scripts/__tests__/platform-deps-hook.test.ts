@@ -730,13 +730,7 @@ npm() { return 98; }
     const result = await runFilteredPush({
       args: ['origin'],
       stdin,
-      gitBody: gitBody([
-        fallbackEmpty,
-        mergeBaseFail,
-        remoteGetUrlOk,
-        trackingRefsPresent,
-        remoteLogRelated,
-      ]),
+      gitBody: gitBody([fallbackEmpty, mergeBaseFail, remoteGetUrlOk, trackingRefsPresent, remoteLogRelated]),
     });
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
     expect(result.stdout).toContain('node_modules 缺失');
@@ -749,13 +743,7 @@ npm() { return 98; }
     const result = await runFilteredPush({
       args: ['origin'],
       stdin,
-      gitBody: gitBody([
-        fallbackEmpty,
-        mergeBaseFail,
-        remoteGetUrlOk,
-        trackingRefsPresent,
-        remoteLogUnrelated,
-      ]),
+      gitBody: gitBody([fallbackEmpty, mergeBaseFail, remoteGetUrlOk, trackingRefsPresent, remoteLogUnrelated]),
     });
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('跳过门禁');
