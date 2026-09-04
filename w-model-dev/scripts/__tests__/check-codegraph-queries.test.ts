@@ -370,4 +370,14 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/src\/forgotten\.ts/);
   });
+
+  it('C10d: 薄封装 --change 为空串 → exit 2 + ERROR_JSON(ARG_INVALID)（显式拒绝，非下游 fail-closed 兜底）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    const r = runCli([`"${root}"`, '--phase', '5', `--change=`, `--base=${baseSha}`, `--head=${headSha}`]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+    const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as { category: string; exitCode: number };
+    expect(parsed.category).toBe('ARG_INVALID');
+    expect(parsed.exitCode).toBe(2);
+  });
 });

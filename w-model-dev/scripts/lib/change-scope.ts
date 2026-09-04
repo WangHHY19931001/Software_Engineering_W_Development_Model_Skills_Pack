@@ -376,6 +376,16 @@ export function resolveCliScope(args: ResolveCliScopeArgs): ResolvedCliScope {
 
   // ---- 薄封装模式 ----
   if (thinProvided) {
+    // changeId 非空校验前置：空串/全空白属输入错误（exit 2 语义），
+    // 不在下游 opsx/archive 前缀检查 fail-closed 兜底——显式拒绝更快且语义更准。
+    if (typeof args.changeArg === 'string' && args.changeArg.trim() === '') {
+      return {
+        kind: 'invalid',
+        category: 'ARG_INVALID',
+        message: '--change=<changeId> 不得为空串或全空白（薄封装须声明非空 changeId）',
+        detail: 'changeId 须与下游 opsx/archive 变更目录精确绑定，空值属输入错误（exit 2），显式拒绝',
+      };
+    }
     const violations: string[] = [];
     const head = currentHeadSha(git, projectRoot);
     if (head === null) {

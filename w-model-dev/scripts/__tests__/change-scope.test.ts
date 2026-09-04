@@ -495,6 +495,25 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
     expect(r.kind).toBe('invalid');
   });
 
+  it('薄封装 changeId 为空串 / 全空白 → invalid(ARG_INVALID)（exit 2 语义，不在下游兜底）', () => {
+    const repo = makeGitProject();
+    for (const badChange of ['', '   ', '\t']) {
+      const r = resolveCliScope({
+        projectRoot: repo.root,
+        ...baseArgs,
+        git: repo.git,
+        changeArg: badChange,
+        baseArg: repo.baseSha,
+        headArg: repo.headSha,
+      });
+      expect(r.kind, `changeId=${JSON.stringify(badChange)}`).toBe('invalid');
+      if (r.kind === 'invalid') {
+        expect(r.category).toBe('ARG_INVALID');
+        expect(r.message).toMatch(/changeId/);
+      }
+    }
+  });
+
   it('CLI 端到端冒烟：scope 校验失败时 violations 非空（防伪通过）', async () => {
     const repo = makeGitProject();
     writeFileSync(join(repo.root, 'scope.json'), VALID_SCOPE_JSON());
