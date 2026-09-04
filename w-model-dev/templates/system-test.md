@@ -54,6 +54,6 @@
 
 ### 校验
 
-- `check-artifact-gate.ts --phase=7`：系统测试列回填、已通过测试层级与 NFR 字段校验，退出码 0。
+- `check-artifact-gate.ts --phase=7 --scope=<change-scope.json>`：系统测试列回填、已通过测试层级与 NFR 字段校验，退出码 0。
 - `check-bdd-model.ts --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json`（L2 features 时）：退出码 0；真实 Cucumber 报告缺失即阻断。
 - `check-artifact-gate.ts` 在 NFR 类型 RTM 行校验 `targetValue` + `testThreshold` 字段存在性（双字段均缺失 → blocking violation / exit 1；单缺其一不阻断）。

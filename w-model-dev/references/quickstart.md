@@ -12,7 +12,7 @@ git clone <本仓库> && cd <仓库目录>
 npm install          # 同时装配 git hooks（core.hooksPath .githooks）
 ```
 
-只要纯提示词/模板（L0）？把 `w-model-dev/` 下 `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` 拷贝到宿主技能目录即可，无需 npm。L0 直接由 Agent 读取 `SKILL.md` 并按需加载 references/templates/examples；其中指向 `scripts/`、`samples/`、`tools/` 的链接是 L1-only 导航，在 L0 副本中目标预期不存在，不能据此宣称 L0 全链接通过。
+只要纯提示词/模板（L0）？把 `w-model-dev/` 下 `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` 拷贝到宿主技能目录即可，无需 npm。L0 直接由 Agent 读取 `SKILL.md` 并按需加载 references/templates/examples；其中指向 `scripts/`、`samples/`、`tools/` 的链接是 L1-only 导航（权威定义见仓库 SSoT §3.5），在 L0 副本中目标预期不存在，不能据此宣称 L0 全链接通过。
 
 ## 3. 验证安装（仅 L1）
 

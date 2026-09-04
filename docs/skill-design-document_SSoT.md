@@ -423,6 +423,10 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 > 轮次详细决策记录（原文）归档于 [docs/changes/decision-log/](./changes/decision-log/README.md)；
 > 轮次 → 版本 → CHANGELOG 条目映射见 decision-log README。
 
+### 3.5 L0/L1 链接边界（交付分层导航规则）
+
+L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/` / `schemas/`）中指向 `scripts/`、`samples/`、`tools/` 的相对链接统一为 **L1-only 导航**：L0 副本预期不含这些目标，链接检查必须将其分类为分层边界，不得据此报告「L0 全链接通过」；取得 L1 交付（L0 + `scripts/` + `samples/` + `tools/`）后才校验这些目标。仓库侧审计入口为 `npm run audit:l0-links [-- --root=<skill-root>]`（`w-model-dev/scripts/application/audit-l0-links.ts`，只读，exit 0/1/2；实现与已知近似见 `w-model-dev/references/command-reference.md`「L0/L1 链接边界审计」节）。本节是该边界的权威定义；INSTALL §2 与 w-model-dev 侧描述均以本节为准。
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程

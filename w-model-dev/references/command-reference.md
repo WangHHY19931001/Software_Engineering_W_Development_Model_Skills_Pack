@@ -41,6 +41,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 ### L0/L1 链接边界审计
 
+- **权威定义**：分层语义与审计边界的权威定义见仓库 `docs/skill-design-document_SSoT.md` §3.5；本节为实现与用法说明。
 - **速查行**：`npm run audit:l0-links [-- --root=<skill-root>]`
 - **执行方**：仓库维护者只读执行；不写入 skill 包、项目状态或证据目录。
 - **参数**：`--root=<skill-root>` 可选，默认 `w-model-dev`；仅接受该参数，未知/重复/空值为 `ARG_INVALID` / exit 2。

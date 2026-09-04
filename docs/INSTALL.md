@@ -87,6 +87,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
 
 - **L0 用户**：拷贝时删除 `scripts/` 与 `samples/` 即可（或拷贝全部但只加载 Markdown 资产）；编排者以 L0 模式运行时跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并将 `project.status` 标记 `gateLevel: "l0"`。
 - **L1 用户**：完整拷贝 `w-model-dev/`，按 §3 标准安装 + 仓库根 `npm install` 跑门禁脚本。
+- **L0/L1 链接边界**：L0 文档中指向 `scripts/`、`samples/`、`tools/` 的链接是 L1-only 导航，L0 副本预期不含目标、不得宣称 L0 全链接通过（权威定义见 `docs/skill-design-document_SSoT.md` §3.5；仓库侧审计 `npm run audit:l0-links`）。
 - 两种交付层的编排差异仅在于 G 角色是否执行脚本门禁；阶段流程、RTM、CHECKPOINT 机制完全相同。
 
 ---
