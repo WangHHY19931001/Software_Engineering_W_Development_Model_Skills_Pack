@@ -376,6 +376,11 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **边界**：本地 pre-push 直接运行的是技能包 `check-bdd-model` fixture 回归；它不直接运行 TLA、TLA↔BDD 同步或任何项目工件阶段门。项目阶段门才按成熟度传入上述 require flags 和真实工件。
 - **guide 链接**：[bdd.md](bdd.md)（BDD 门禁调用）与 [tla-plus.md](tla-plus.md)（TLA+ / BDD 协作）。
 
+## 需求覆盖分析门禁 CLI（check-requirement-coverage）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>] [--json]`
+- **C7 降级语义**：不传 `--graph` 时：crossCuts 空 → C7b blocking；非空 → C7 降级 warning 并在 JSON `skippedRules` 标记。
+
 ## 阶段 5-8 codegraph/opsx/archive 门禁 CLI（ChangeScope 绑定）
 
 三个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39/#40 与归档后置门）：

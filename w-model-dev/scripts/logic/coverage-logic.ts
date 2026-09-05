@@ -9,7 +9,8 @@
  *   C3  scenarios 数组非空
  *   C4  scenarios 含 happy/error/boundary 三类
  *   C5  requirementTypes 含 REQ/NFR/CON 三类
- *   C7  crossCuts 与 graph.json cross-cuts 边集一致（双向校验）
+ *   C7  crossCuts 与 graph.json cross-cuts 边集一致（双向校验，须提供 --graph）
+ *   C7b 未提供 --graph 时 crossCuts 为空 → blocking（fail-closed）；非空 → 降级 warning + skippedRules 标记
  *   C8  metrics 4 项均 = 100%
  *   C9  status=missing 须在 Out of Scope 显式声明（提供 outOfScope 时 fail，否则 warning）
  *   C10 metrics 重算一致性
@@ -73,6 +74,8 @@ export interface CoverageCheckResult {
   passed: boolean;
   violations: string[];
   warnings: string[];
+  /** 因输入不足被降级为非阻断（warning）的规则 ID（如未提供 --graph 时跳过 C7） */
+  skippedRules?: string[];
   metrics: CoverageMetrics;
   exemptionsApplied: string[];
 }
@@ -90,7 +93,7 @@ function recalcRate<T extends { status: CoverageStatus }>(entries: T[]): number 
 // ==================== 主校验函数 ====================
 
 export interface CoverageCheckOptions {
-  /** graph.json 的 cross-cuts 边集（用于 C7 双向校验），不提供则跳过 C7 */
+  /** graph.json 的 cross-cuts 边集（用于 C7 双向校验）；不提供时——crossCuts 空 → C7b blocking（fail-closed），非空 → C7 降级 warning 并记入 skippedRules */
   graphCrossCuts?: Array<{ from: string; to: string }>;
   /** Out of Scope 声明的项（用于 C9），不提供则 C9 降级为 warning */
   outOfScope?: string[];
@@ -103,6 +106,7 @@ export function checkRequirementCoverage(coverage: unknown, options: CoverageChe
     passed: false,
     violations: [],
     warnings: [],
+    skippedRules: [],
     metrics: { stakeholder: 0, scenario: 0, requirementType: 0, crossCut: 0 },
     exemptionsApplied: [],
   };
@@ -148,17 +152,28 @@ export function checkRequirementCoverage(coverage: unknown, options: CoverageChe
     }
   }
 
-  // C7: crossCuts 与 graph.json cross-cuts 边集一致（双向校验）
-  if (!exempt.has('C7') && options.graphCrossCuts) {
-    const coverageEdges = new Set(c.crossCuts.flatMap((cc) => cc.governedReqs.map((req) => `${cc.nfrConId}→${req}`)));
-    const graphEdges = new Set(options.graphCrossCuts.map((e) => `${e.from}→${e.to}`));
-    const inCoverageNotGraph = [...coverageEdges].filter((e) => !graphEdges.has(e));
-    const inGraphNotCoverage = [...graphEdges].filter((e) => !coverageEdges.has(e));
-    if (inCoverageNotGraph.length > 0) {
-      result.violations.push(`C7 coverage 有但 graph.json 无的 cross-cuts 边：${inCoverageNotGraph.join('；')}`);
-    }
-    if (inGraphNotCoverage.length > 0) {
-      result.violations.push(`C7 graph.json 有但 coverage 无的 cross-cuts 边：${inGraphNotCoverage.join('；')}`);
+  // C7: crossCuts 与 graph.json cross-cuts 边集一致（双向校验，须提供 --graph）
+  // C7b: 未提供 --graph 时不得静默放行——crossCuts 空 → blocking（fail-closed）；非空 → 降级 warning + skippedRules 标记
+  if (!exempt.has('C7')) {
+    if (options.graphCrossCuts) {
+      const coverageEdges = new Set(c.crossCuts.flatMap((cc) => cc.governedReqs.map((req) => `${cc.nfrConId}→${req}`)));
+      const graphEdges = new Set(options.graphCrossCuts.map((e) => `${e.from}→${e.to}`));
+      const inCoverageNotGraph = [...coverageEdges].filter((e) => !graphEdges.has(e));
+      const inGraphNotCoverage = [...graphEdges].filter((e) => !coverageEdges.has(e));
+      if (inCoverageNotGraph.length > 0) {
+        result.violations.push(`C7 coverage 有但 graph.json 无的 cross-cuts 边：${inCoverageNotGraph.join('；')}`);
+      }
+      if (inGraphNotCoverage.length > 0) {
+        result.violations.push(`C7 graph.json 有但 coverage 无的 cross-cuts 边：${inGraphNotCoverage.join('；')}`);
+      }
+    } else {
+      const cuts = c.crossCuts ?? [];
+      if (cuts.length === 0) {
+        result.violations.push('C7b crossCuts 为空且未提供 --graph，无法证明横切一致性（fail-closed）');
+      } else {
+        result.warnings.push('C7 未校验：未提供 --graph');
+        result.skippedRules?.push('C7');
+      }
     }
   }
 

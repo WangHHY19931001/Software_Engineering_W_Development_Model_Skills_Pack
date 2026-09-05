@@ -13,7 +13,9 @@
     {"type": "NFR", "reqIds": [], "status": "covered", "gapDescription": "NFR 不适用，已在 §8 声明"},
     {"type": "CON", "reqIds": [], "status": "covered", "gapDescription": "CON 不适用，已在 §8 声明"}
   ],
-  "crossCuts": [],
+  "crossCuts": [
+    {"nfrConId": "NFR-001", "governedReqs": ["REQ-001"], "status": "covered"}
+  ],
   "metrics": {
     "stakeholder": 100,
     "scenario": 100,

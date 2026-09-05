@@ -174,7 +174,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    line: 377,
+    line: 397,
     symbol: 'C7 invalid out-of-scope fixture',
     reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
     timeout: { required: true, status: 'present' },
@@ -182,7 +182,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    line: 395,
+    line: 415,
     symbol: 'C7 non-array items fixture',
     reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
     timeout: { required: true, status: 'present' },
@@ -190,7 +190,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    line: 413,
+    line: 433,
     symbol: 'C7 valid out-of-scope fixture',
     reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
     timeout: { required: true, status: 'present' },

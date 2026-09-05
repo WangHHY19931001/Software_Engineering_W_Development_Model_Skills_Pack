@@ -36,6 +36,10 @@ export interface JsonReport {
   dynamicMeasurements?: Record<string, unknown>;
   /** 非阻断生命周期诊断（例如 LEGACY_UNSCOPED/pending-pre-approval）。 */
   diagnostics?: string[];
+  /** 非阻断警告（如 check-requirement-coverage 未提供 --graph 时 C7 降级）。 */
+  warnings?: string[];
+  /** 因输入不足降级为非阻断的规则 ID（如 check-requirement-coverage 未提供 --graph 时的 C7）。 */
+  skippedRules?: string[];
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */

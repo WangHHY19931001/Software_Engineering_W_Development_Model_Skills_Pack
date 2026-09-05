@@ -161,6 +161,26 @@ describe('C1-C10 覆盖分析校验', () => {
     });
   });
 
+  // ==================== C7b: 无 --graph 时空矩阵 fail-closed / 非空降级 ====================
+  describe('C7b: 未提供 --graph 时的 fail-closed 语义', () => {
+    it('C7b：crossCuts 为空且未提供 --graph → blocking', () => {
+      const r = checkRequirementCoverage({ ...makeValidCoverage(), crossCuts: [] }, {}); // 无 graphCrossCuts
+      expect(r.violations.some((v) => v.startsWith('C7b'))).toBe(true);
+      expect(r.passed).toBe(false);
+    });
+
+    it('crossCuts 非空且无 --graph → warning + skippedRules 标记，不 blocking', () => {
+      // crossCuts 条目形状对照 samples/coverage/valid-cross-cuts-consistent.json 既有条目
+      const r = checkRequirementCoverage(
+        { ...makeValidCoverage(), crossCuts: [{ nfrConId: 'NFR-001', governedReqs: ['REQ-001'], status: 'covered' }] },
+        {},
+      );
+      expect(r.violations).toEqual([]);
+      expect(r.warnings.some((w) => w.includes('C7'))).toBe(true);
+      expect(r.skippedRules).toContain('C7');
+    });
+  });
+
   // ==================== C8: metrics 4 项均 = 100% ====================
   describe('C8: metrics 4 项均 = 100%', () => {
     it('C8: metrics.stakeholder < 100 应 fail', () => {
