@@ -81,20 +81,20 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 ### 阶段切换判定字段（精确对应）
 
 - **VerifierOutput.passed**：阶段 1~4 的主判定字段，`true` 才可推进。
-- **VerifierOutput.qualityLevel**：必须 ∈ {A, B}；C/D 仅形成 R 定位线索，完成完整普通失败链后按 R 结论由 S-fix 处理，再由用户 CHECKPOINT 决定阶段动作。
-- **rtm.json.executionSummary**：阶段 5~8 的状态字段，`failed=0` 且 `pending=0` 才可推进；失败先走完整普通失败链。
-- **check-artifact-gate.ts 退出码**：阶段 8 终检，0 才可发布；退出码 1 先走完整普通失败链，退出码 2 仅修正输入后重跑，两者均不得直接回阶段 5 或放行。
-- **覆盖率 / 性能 / 安全阈值**：阶段 5~7 的硬阈值（覆盖率 ≥ 80%、P95 < 2s、高危漏洞数 = 0）；不达标先走完整普通失败链，再按 R 结论处理。
+- **VerifierOutput.qualityLevel**：必须 ∈ {A, B}；C/D 仅形成 R 定位线索，完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后按 R 结论由 S-fix 处理，再由用户 CHECKPOINT 决定阶段动作。
+- **rtm.json.executionSummary**：阶段 5~8 的状态字段，`failed=0` 且 `pending=0` 才可推进；失败先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
+- **check-artifact-gate.ts 退出码**：阶段 8 终检，0 才可发布；退出码 1 先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），退出码 2 仅修正输入后重跑，两者均不得直接回阶段 5 或放行。
+- **覆盖率 / 性能 / 安全阈值**：阶段 5~7 的硬阈值（覆盖率 ≥ 80%、P95 < 2s、高危漏洞数 = 0）；不达标先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再按 R 结论处理。
 
 ### 回退路径阶段编号映射
 
 | 当前阶段 | 触发回退的判定 | 回退到 |
 |---|---|---|
-| 阶段 1~4 | `VerifierOutput.passed=false` / `qualityLevel ∈ {C,D}` | 先走完整普通失败链；经用户 CHECKPOINT 后按 R 结论回当前阶段或上游 |
-| 阶段 5 | 单元测试退出码 ≠ 0 / 覆盖率 < 80% / Verifier `passed=false` | 先走完整普通失败链，再按 R 结论由 S-fix 处理 |
-| 阶段 6 | 集成测试退出码 ≠ 0 / `executionSummary.failed>0` | 先走完整普通失败链，再按 R 结论由 S-fix 回阶段 5 或上游 |
-| 阶段 7 | 系统测试退出码 ≠ 0 / 性能不达标 / 高危漏洞 > 0 | 先走完整普通失败链，再按 R 结论由 S-fix 处理 |
-| 阶段 8 | `check-artifact-gate.ts` 退出码 1 | 先走完整普通失败链，再按 R 结论由 S-fix 处理；退出码 2 仅修正输入后重跑 |
+| 阶段 1~4 | `VerifierOutput.passed=false` / `qualityLevel ∈ {C,D}` | 先走普通 V/G 失败链（hard-constraints）；经用户 CHECKPOINT 后按 R 结论回当前阶段或上游 |
+| 阶段 5 | 单元测试退出码 ≠ 0 / 覆盖率 < 80% / Verifier `passed=false` | 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 处理 |
+| 阶段 6 | 集成测试退出码 ≠ 0 / `executionSummary.failed>0` | 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 回阶段 5 或上游 |
+| 阶段 7 | 系统测试退出码 ≠ 0 / 性能不达标 / 高危漏洞 > 0 | 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 处理 |
+| 阶段 8 | `check-artifact-gate.ts` 退出码 1 | 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 处理；退出码 2 仅修正输入后重跑 |
 
 ### 回退路径阶段编号映射（R 根因分类扩展）
 
@@ -189,7 +189,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 > 🔴 **CHECKPOINT · 质量门放行**：流程图中「质量门」节点是发布前最后暂停点。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>` 获取确定性判定（退出码 0=通过 / 1=未通过 / 2=输入错误）；阶段 5-8 另须 `--scope=<change-scope.json>`，scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计），向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布或返工。退出码 1 的普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；退出码 2 仅修正输入后重跑；两者均不得放行（见 [hard-constraints.md](hard-constraints.md) #7）。
 
 执行顺序：代码提交 → 自动化代码审查 → 单元测试 → 集成测试 → 系统测试 → 质量门检查 → 发布。
-任一普通 V/G、评审、测试或质量门失败均执行上述完整普通失败链，不得直接回编码；只有链条完成并经用户 CHECKPOINT 才能按 R 结论处理。
+任一普通 V/G、评审、测试或质量门失败均执行上述普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接回编码；只有链条完成并经用户 CHECKPOINT 才能按 R 结论处理。
 
 ```
 代码提交 → 自动化代码审查 ──通过──► 单元测试 ──通过──► 集成测试
@@ -203,7 +203,7 @@ V/G 不通过（exitCode≠0 或 qualityLevel∈{C,D}）时，编排者必须分
 ```
 
 质量门由 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 守护：
-退出码 0 = 通过（RTM 需求覆盖率 100% + 四级测试全部通过）；退出码 1 = 普通失败，必须先执行完整普通失败链；退出码 2 = 输入错误，修正输入后重跑。任一非 0 结果都不授权发布。
+退出码 0 = 通过（RTM 需求覆盖率 100% + 四级测试全部通过）；退出码 1 = 普通失败，必须先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；退出码 2 = 输入错误，修正输入后重跑。任一非 0 结果都不授权发布。
 
 **阶段 5-8 调用须绑定变更上下文（2026-09-04 audit-gate-closure）**：`check-artifact-gate.ts --phase=5..8`（含默认终检 phase=8）与 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts` 均须传 `--scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`），缺失 → exit 1（fail-closed）。artifact gate 先跑 codegraph/opsx strict 校验并把 violations 并入 reasons/exitCode（`GATE_JSON` 含 external summary）；archive 是阶段 8 `opsx:archive` 后置门，由 `check-openspec-archive.ts` 归档后单独跑。详见 [command-reference.md](command-reference.md)「Artifact Gate 项目阶段证据门」节与 [subagent-delegation.md](subagent-delegation.md)「阶段 5-8 门禁顺序与 ChangeScope」。
 

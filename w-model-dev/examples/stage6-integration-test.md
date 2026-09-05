@@ -68,7 +68,7 @@ ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 --gra
 
 ## 编排说明
 
-- 阶段 6 必须由真实测试运行器执行后，实际使用 `result=pass` 或 `result=fail` 回填；`result=fail` 时仅形成 R 定位线索，必须按完整普通失败链完成根因复审、S-fix、R3×3、V/G 和用户 CHECKPOINT 后，才可按 R 结论处理阶段 5。
+- 阶段 6 必须由真实测试运行器执行后，实际使用 `result=pass` 或 `result=fail` 回填；`result=fail` 时仅形成 R 定位线索，必须按普通 V/G 失败链完成根因复审、S-fix、R3×3、V/G 和用户 CHECKPOINT 后，才可按 R 结论处理阶段 5。
 - 阶段 6/7/8 完成时必须跑对应 `--phase=N` 质量门，不得跳过直接跑 `--phase=8` 终检（反模式 #21）。
 - 集成测试通过后，RTM 四级测试列已有 单元 + 集成 两列通过。
 

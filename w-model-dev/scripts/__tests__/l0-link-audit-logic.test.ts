@@ -66,7 +66,10 @@ describe('auditL0RelativeLinks', () => {
   });
 
   it('fails closed when a required L0 directory is missing', async () => {
-    await fs.rm(path.join(fixtureRoot, 'templates'), { recursive: true, force: true });
+    await fs.rm(path.join(fixtureRoot, 'templates'), {
+      recursive: true,
+      force: true,
+    });
 
     const result = await auditL0RelativeLinks(fixtureRoot);
 
@@ -181,7 +184,9 @@ describe('auditL0RelativeLinks', () => {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
     await fs.mkdir(directoryTarget, { recursive: true });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
-    await fs.mkdir(path.join(fixtureRoot, 'scripts', 'cli'), { recursive: true });
+    await fs.mkdir(path.join(fixtureRoot, 'scripts', 'cli'), {
+      recursive: true,
+    });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- symlink endpoints are controlled mkdtemp fixture paths
     await fs.symlink(fileTarget, path.join(fixtureRoot, 'scripts', 'cli', 'linked.ts'), 'file');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture targets are beneath the mkdtemp-owned skill root
@@ -426,6 +431,30 @@ describe('auditL0RelativeLinks', () => {
 
     expect(result.relativeLinkCount).toBe(1);
     expect(result.violations).toEqual(['references/readme.md: 相对链接目标不存在 → ./x.md']);
+  });
+
+  it('reference definition target 不得吞并后续行', async () => {
+    await write('references/guide.md', '[b]:./y.md\n[c]:\n  ./z.md\n[d](./w.md)\n');
+    await write('references/y.md');
+    await write('references/z.md');
+    await write('references/w.md');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    // 期望仅采集 [b]→./y.md、[c]→./z.md、[d]→./w.md 三条相对链接；target 不含换行
+    expect(result.relativeLinkCount).toBe(3);
+    expect(result.violations).toEqual([]);
+  });
+
+  it('平衡括号 bare destination 归一', async () => {
+    await write('references/guide.md', '[f]: (./x2.md)\n');
+    await write('references/x2.md');
+
+    const result = await auditL0RelativeLinks(fixtureRoot);
+
+    // 期望 target 归一为 ./x2.md（x2.md 存在 → 无 violation）
+    expect(result.relativeLinkCount).toBe(1);
+    expect(result.violations).toEqual([]);
   });
 
   it('classifies single-letter scheme (C:temp) as package-relative, not URI', async () => {

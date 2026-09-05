@@ -190,7 +190,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - **与需求变更的关系**：重排不替代需求变更流程——新需求须先进阶段 1（或 Loop 3 事件接驳），不得直接插队改票。
 
 ### Out of 票据化的例外
-- 单一 bug 修复：可免除票据拆解，但**不得**绕过普通失败链；仍走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
+- 单一 bug 修复：可免除票据拆解，但**不得**绕过 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
 - 单一 TLA+ 不变式违反修复：同样可免除票据拆解，但不得直接 R→S-fix；普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
 - 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时：可直接编码而不拆票据；若出现普通 V/G 失败，必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
 - 不需要票据化时产出 `tickets.md` 仅含一行声明「本阶段改动范围小，不票据化，直接编码」

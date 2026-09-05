@@ -53,10 +53,21 @@ function l0Boundary(target: string, root: string): string | undefined {
   return L0_DIRECTORIES.find((directory) => relative === directory || relative.startsWith(`${directory}/`));
 }
 
-const REFERENCE_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]*<?([^)> \t]+)>?/gm;
+// target 捕获两分支：平衡括号 bare destination（捕获含首尾括号，交由
+// normalizeRefDefTarget 剥离）或不含 `)`/换行的普通字符序列；`\r\n` 必须排除，
+// 否则 target 吞并后续行（CommonMark 目标不跨行）
+const REFERENCE_DEFINITION = /^ {0,3}\[([^\]]+)\]:[ \t]*<?(\((?:[^)\r\n> \t]*)\)|[^)\r\n> \t]+)>?/gm;
 // CommonMark 允许冒号后无空白（[a]:./x.md）与目标位于下一行；下一行形态仅接受
 // 以 `<`、`/`、`./`、`../` 起始的目标（保守近似：避免把普通散文行误当目标）
-const REFERENCE_DEFINITION_CONTINUATION = /^ {0,3}\[([^\]]+)\]:[ \t]*\r?\n[ \t]+(<?(?:\.{0,2}\/)[^)> \t]*>?)/gm;
+const REFERENCE_DEFINITION_CONTINUATION = /^ {0,3}\[([^\]]+)\]:[ \t]*\r?\n[ \t]+(<?(?:\.{0,2}\/)[^)\r\n> \t]*>?)/gm;
+
+// 引用定义 target 归一：CommonMark 合法的平衡括号 bare destination（`[f]: (./x.md)`）
+// 剥去配平的首尾括号；未配平或内嵌 `(` 保持原样（fail-closed，交由存在性校验报违规）
+function normalizeRefDefTarget(raw: string): string {
+  const t = raw.trim();
+  if (t.startsWith('(') && t.endsWith(')') && !t.slice(1, -1).includes('(')) return t.slice(1, -1);
+  return t;
+}
 
 function parseRelativeLinks(content: string): string[] {
   const links: string[] = [];
@@ -76,14 +87,14 @@ function parseRelativeLinks(content: string): string[] {
   // filtered downstream by isExternalOrAnchor; the target keeps any angle brackets
   // stripped so `<./guide.md>` and `./guide.md` normalize identically.
   for (const match of content.matchAll(REFERENCE_DEFINITION)) {
-    const raw = match[2]!.replace(/^<|>$/g, '').trim();
+    const raw = normalizeRefDefTarget(match[2]!.replace(/^<|>$/g, ''));
     if (raw) links.push(raw);
   }
   // Second pass: destination on the line after the label (`[label]:` newline
   // indented target). Only conservative prefixes (< / ./ ../) are accepted, see
   // REFERENCE_DEFINITION_CONTINUATION; strip optional angle brackets the same way.
   for (const match of content.matchAll(REFERENCE_DEFINITION_CONTINUATION)) {
-    const raw = match[2]!.replace(/^<|>$/g, '').trim();
+    const raw = normalizeRefDefTarget(match[2]!.replace(/^<|>$/g, ''));
     if (raw) links.push(raw);
   }
   return links;
@@ -291,7 +302,8 @@ async function auditL1Directories(root: string, rootRealPath: string, violations
  * scripts/samples/tools 目标可以分类为 L1-only；只有 templates/ 源文件中的 {{module}}
  * 链接可以分类为模板占位。其余相对目标必须在 L0 内存在，否则作为 violation 返回。
  * 链接采集覆盖内联（含 <target> "title" 形态）与 reference-style 定义（含冒号后无空白
- * 与目标位于下一行两种形态，下一行目标仅接受 < / ./ ../ 起始）；单字母「scheme」
+ * 与目标位于下一行两种形态，下一行目标仅接受 < / ./ ../ 起始；target 不跨行，平衡
+ * 括号 bare destination 归一剥离配平括号）；单字母「scheme」
  * （如 C:temp）按包内相对路径处理而非外部 URI 放行。
  */
 export async function auditL0RelativeLinks(root: string): Promise<L0LinkAuditResult> {

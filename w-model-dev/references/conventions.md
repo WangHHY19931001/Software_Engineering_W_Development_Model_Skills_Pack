@@ -121,8 +121,8 @@
 
 ### 普通 V/G 失败链
 
-- **规范定义**：V/G 任一门禁不通过后的标准返工链（V/G 失败 → R 根因定位 → V 复审 RootCauseReport → G 根因报告门禁 → S-fix → R3×3 预防性审查 → V/G 复验 → CHECKPOINT），权威全句定义见 [hard-constraints.md](hard-constraints.md)「普通 V/G 失败链」节：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。全包其余文档以短名引用本节：正文用 `普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）`，表格用 `普通 V/G 失败链（hard-constraints）`，不再内联全句（examples/ 教学示例除外）。
-- **_Avoid_**：完整失败链/标准返工链/失败处理链（非规范叫法；统一短名「普通 V/G 失败链」并指向 hard-constraints 权威节）。
+- **规范定义**：V/G 任一门禁不通过后的返工链（V/G 失败 → R 根因定位 → V 复审 RootCauseReport → G 根因报告门禁 → S-fix → R3×3 预防性审查 → V/G 复验 → CHECKPOINT），权威全句定义见 [hard-constraints.md](hard-constraints.md)「普通 V/G 失败链」节：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。全包其余文档以短名引用本节：正文用 `普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）`，表格用 `普通 V/G 失败链（hard-constraints）`，不再内联全句（examples/ 教学示例除外）。
+- **_Avoid_**：完整失败链/标准返工链/失败处理链/完整普通失败链/普通失败链/普通失败返工链/普通失败完整链/完整返工链/普通返工链（非规范叫法；统一短名「普通 V/G 失败链」并指向 hard-constraints 权威节）。
 
 ---
 

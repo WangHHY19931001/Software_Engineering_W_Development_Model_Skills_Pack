@@ -290,8 +290,8 @@ Then 状态 C          # 终态断言
 
 BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
-- BDD 门禁失败（check-bdd-model.ts exitCode != 0）→ 先走完整普通失败链（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 BDD 子流程资产、对侧 TLA+ 不受影响
-- TLA+ 门禁失败（check-tla-model.ts exitCode != 0）→ 先走完整普通失败链（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 TLA+ 子流程资产、对侧 BDD 不受影响
+- BDD 门禁失败（check-bdd-model.ts exitCode != 0）→ 先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 BDD 子流程资产、对侧 TLA+ 不受影响
+- TLA+ 门禁失败（check-tla-model.ts exitCode != 0）→ 先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 TLA+ 子流程资产、对侧 BDD 不受影响
 - 两者各自走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环
 
 ### §4.2 等价性跨校验
@@ -1657,7 +1657,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 存在 undefined/pending step → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D5（stepBinding）退出码 1
-- 该失败只形成 R 定位线索；按完整普通失败链完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition 或修正 step/scenario
+- 该失败只形成 R 定位线索；按普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition 或修正 step/scenario
 
 ### 5. 追溯完整性
 
@@ -1694,7 +1694,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 引用不存在的 fixture → 标注 `Important:` reworkHint
 - 触发 `check-bdd-model.ts` D5（stepBinding）扩展校验退出码 1
-- 该失败只形成 R 定位线索；完成完整普通失败链后，才由 S-fix 补全缺失 fixture 或修正引用
+- 该失败只形成 R 定位线索；完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，才由 S-fix 补全缺失 fixture 或修正引用
 
 ### 7. 不变式覆盖
 
@@ -1709,7 +1709,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - 不变式未被任何 scenario 验证 → 标注 `Important:` reworkHint
 - scenario 引用未声明的不变式 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D3（stateMachineCompleteness）+ D6（scenarioPathValidity）退出码 1
-- 该失败只形成 R 定位线索；完成完整普通失败链后，才由 S-fix 补充 scenario 或修正不变式引用
+- 该失败只形成 R 定位线索；完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，才由 S-fix 补充 scenario 或修正不变式引用
 
 ---
 

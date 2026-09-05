@@ -264,7 +264,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | 场景                                      | 迁移策略                                                       | 风险                                                 |
 | ----------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
 | 新增技术栈（如 `frontend` 加入 `Vue 3`）  | 直接 append 到数组；不触发回滚                                 | 无                                                   |
-| 删除技术栈（如 `backend` 移除 `Express`） | 须先核验代码模块列无引用该栈的文件；若有引用，先记录为 R 定位线索并完成完整普通失败链，再由 S-fix 执行编码迁移 | 删除后代码仍引用 → `check-artifact-gate.ts` 退出码 1；完整链为 普通 V/G 失败链（hard-constraints） |
+| 删除技术栈（如 `backend` 移除 `Express`） | 须先核验代码模块列无引用该栈的文件；若有引用，先记录为 R 定位线索并完成普通 V/G 失败链，再由 S-fix 执行编码迁移 | 删除后代码仍引用 → `check-artifact-gate.ts` 退出码 1；完整链为 普通 V/G 失败链（hard-constraints） |
 | 重命名技术栈                              | 须同步更新 `techStack` 数组与所有引用文档；保留 `.bak` 备份    | 文档与 `rtm.json` 不一致 → 退出码 1                  |
 
 ### 3. JSON 文件损坏恢复
@@ -287,7 +287,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | mtime 版本不符   | 锁内比较 `--expect-mtime`（有限非负数、向下取整）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1         | 重读目标，按最新 mtime 重试                                                                         |
 | 陈旧锁           | CLI 默认 fail-closed：`STALE_LOCK` / exit 1                                                             | 经人工判断后显式使用 `--recover-stale-lock`；直接 `writeStateJson` 调用仅为兼容既有调用允许隐式恢复 |
 | 锁等待超时       | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1                                | 保留原状态，稍后重试或协调 writer                                                                   |
-| 测试状态冲突     | 应由业务合并逻辑判断                                                                                    | 以「失败」为优先（保守原则），先执行完整普通失败链，再按 R 结论由 S-fix 修复并回到阶段 5                                                         |
+| 测试状态冲突     | 应由业务合并逻辑判断                                                                                    | 以「失败」为优先（保守原则），先执行普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 修复并回到阶段 5                                                         |
 
 `mtime` 乐观锁只在 `<target>.lock` 持久目录与可转移 owner 对象建立的跨进程锁内用于版本冲突检测；它**不足以**单独保证并发安全、竞争写处理或并发处理。所有 writer 必须经 `wm-write` 的锁协议串行化。
 
@@ -525,7 +525,7 @@ interface RunLogEntry {
 
 > 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §7.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
-`action` 枚举新增 `rootcause` / `fix` 两个动作。普通返工链固定为 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；各动作的额外必填字段约束：
+`action` 枚举新增 `rootcause` / `fix` 两个动作。返工链固定为 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；各动作的额外必填字段约束：
 
 | action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
 | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

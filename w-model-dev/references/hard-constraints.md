@@ -82,7 +82,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 详见 [phase-5-coding.md](phase-5-coding.md)「codegraph 修改前影响分析」+「增量集成纪律」节。
 
-## 普通 V/G 失败链（标准返工链）
+## 普通 V/G 失败链
 
 **完整链（权威定义，全包唯一全句落点）**：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
 
@@ -335,11 +335,11 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 |---|---|---|---|
 | #1 | 阶段产物已产出但无 `VerifierOutput` JSON 文件 / 未调用 `check-verifier-output.ts` | `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts <output.json>`；JSON 不存在则重新执行评审 | `check-verifier-output.ts` 退出码 0 才算评审闭环 |
 | #2 | 阶段 1~4 产物存在但对应测试设计文档缺失（如阶段 3 无 `interface-test-design.md`） | 回到阶段 N 起点，按 `phase-N-*.md`「并行任务（强制）」节补产出测试设计 | 无脚本；Agent 比对 `templates/` 模板核验 |
-| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>`；阶段 5-8 另须 `--scope=<change-scope.json>`，scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计）；退出码 1 先走完整普通失败链，再按 R 结论由 S-fix 回阶段 5；退出码 2 仅修正输入后重跑 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
-| #4 | `VerifierOutput.passed=false` 但 `Project.status` 已推进到下一阶段 | 将 `reworkHints` 仅作为 R 定位线索；完成完整普通失败链后，按 R 的结论回到对应阶段并重置 `status` 字段 | `check-verifier-output.ts` 退出码 0 + `passed=true`；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
+| #3 | 质量门节点未执行 `check-artifact-gate.ts` / 仅 LLM 文本说「通过」 | 立即执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>`；阶段 5-8 另须 `--scope=<change-scope.json>`，scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计）；退出码 1 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 回阶段 5；退出码 2 仅修正输入后重跑 | `check-artifact-gate.ts` 退出码 0=通过 / 1=未通过 / 2=输入错误 |
+| #4 | `VerifierOutput.passed=false` 但 `Project.status` 已推进到下一阶段 | 将 `reworkHints` 仅作为 R 定位线索；完成普通 V/G 失败链后，按 R 的结论回到对应阶段并重置 `status` 字段 | `check-verifier-output.ts` 退出码 0 + `passed=true`；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
 | #5 | Agent 上下文同时加载 ≥3 个 `references/phase-N-*.md` 文件 | 卸载无关 phase 文档，仅保留当前阶段 + `SKILL.md` + 必要 references | 无脚本；Agent 自检加载列表 |
 | #6 | RTM 覆盖率字段为 LLM 估算（无 `check-artifact-gate.ts` 输出佐证） | 执行 `check-artifact-gate.ts` 重新计算覆盖率；估算值不得写入 `rtm.json` | `check-artifact-gate.ts` 退出码 0 + `GATE_JSON.coverage=100%` |
-| #7 | `check-artifact-gate.ts` 退出码 1/2 但 `Project.status` 已标「验收通过」 | 先将退出码 1 记录为 R 定位线索，完成完整普通失败链后按 R 结论由 S-fix 修复；退出码 2 仅先修正输入再重新执行，不得将输入错误当作放行依据；随后重置 `status` 为「编码」并由用户在 CHECKPOINT 确认 | 退出码 1/2 → 一律不得放行；普通失败完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
+| #7 | `check-artifact-gate.ts` 退出码 1/2 但 `Project.status` 已标「验收通过」 | 先将退出码 1 记录为 R 定位线索，完成普通 V/G 失败链后按 R 结论由 S-fix 修复；退出码 2 仅先修正输入再重新执行，不得将输入错误当作放行依据；随后重置 `status` 为「编码」并由用户在 CHECKPOINT 确认 | 退出码 1/2 → 一律不得放行；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
 | #8 | 到达 🔴 CHECKPOINT 节点后无「等待用户确认」记录直接推进 | 回到 CHECKPOINT 节点重新暂停，向用户展示放行判定并由用户确认 | 无脚本；Agent 自检对话流 |
 | #9 | `Project.status` / `Requirement.status` 字段值与实际产物不符（如标「已完成」但无代码） | 按实际进度修正 `status` 字段；未完成不得推进到下一阶段 | 无脚本；Agent 比对 `rtm.json` 与磁盘产物 |
 | #10 | 编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者 `git diff` 含非 `.w-model/*.json` 状态文件改动；或编排者会话出现代码 / 测试用例 / 评审 JSON 的生成内容；或编排者使用 `node -e` 操作 `.w-model/*.json`（含 graph.json 边 / consolidated.json / chunk-*.json / tla-manifest.json / rtm.json 实体字段 / verifier-output-*.json 等产物 JSON）；或编排者直接 `Write` `.w-model/*.json` 产物文件（不通过 A/S 子代理）；或编排者自行填写 `acknowledgedDecisions`（用户未明确说出技术决策，O 代填视为越权实施 + O4 Comprehension Debt） | 回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ 编排者会话内仅保留路由 / 状态 / CHECKPOINT / 只读脚本记录；⑤ `acknowledgedDecisions` 清空并要求用户重新陈述决策 | 无脚本；编排者自检动作清单 + 宿主 Agent 工具调用日志（`Write`/`Edit`/`node -e` 不得出现在编排者会话对产物 JSON 的操作上，详见 [operational-recovery.md](operational-recovery.md)「O 越权检测」节） |
@@ -347,8 +347,8 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #12 | A-cross/A-evolve 的 LLM 输出被直接用作收敛判定，未经 G 跑 `check-requirement-graph.ts` | 作废 A 的收敛声明，分派 G 跑脚本，按退出码重新判定 | `check-requirement-graph.ts` 退出码 0=通过 / 1=校验失败 / 2=输入错误 |
 | #13 | `GRAPH_JSON.dataflowViolations` 存在非空数组（blackHoles/miracles/deadModules）或 `boundary.complete=false` | 回到当前阶段起点，分派 A-chunk 补信息流边（produces）与边界节点（EXT-IN/EXT-OUT），重跑 A→G 收敛循环 | `check-requirement-graph.ts` 退出码 0 才算信息流闭合 |
 | #14 | TLA+ 规格未经 SANY 语法检查直接跑 TLC；或 `check-tla-model.ts` 步骤 6（SANY）未通过即执行步骤 7（TLC） | 回到当前规格，先修语法错误使 SANY 退出码 0，再重跑 TLC | `check-tla-model.ts` 退出码 0（SANY + TLC 均通过） |
-| #15 | `TLA_JSON.passed=false`（deadlockViolations/invariantViolations/stateExplosionSpecs 非空）但阶段已推进 | 先将问题记录为 R 定位线索；完成完整普通失败链后，按 R 结论由 S-fix 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），再重跑 `check-tla-model.ts` | `check-tla-model.ts` 退出码 0 才算行为门禁通过；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
-| #16 | TLA+ 规格含 `Next = []` 空下一步 / `\* TODO` 未实现分支 / 刻意遗漏需求关键状态 / 不变式与设计文档矛盾 | 先将问题记录为 R 定位线索；完成完整普通失败链后，按 R 结论由 S-fix 重写 TLA+ 规格（补全状态分支、对齐需求/设计），再重跑 V→G | V 评审 `passed=false` + `check-tla-model.ts` 退出码 0；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
+| #15 | `TLA_JSON.passed=false`（deadlockViolations/invariantViolations/stateExplosionSpecs 非空）但阶段已推进 | 先将问题记录为 R 定位线索；完成普通 V/G 失败链后，按 R 结论由 S-fix 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），再重跑 `check-tla-model.ts` | `check-tla-model.ts` 退出码 0 才算行为门禁通过；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
+| #16 | TLA+ 规格含 `Next = []` 空下一步 / `\* TODO` 未实现分支 / 刻意遗漏需求关键状态 / 不变式与设计文档矛盾 | 先将问题记录为 R 定位线索；完成普通 V/G 失败链后，按 R 结论由 S-fix 重写 TLA+ 规格（补全状态分支、对齐需求/设计），再重跑 V→G | V 评审 `passed=false` + `check-tla-model.ts` 退出码 0；完整链为普通 V/G 失败链（见「普通 V/G 失败链」节） |
 | #17 | TLC 发现违反，S 核查后确认规格忠实于需求/设计，但未回退修正需求/设计 | 回退到对应阶段：修正需求规格或设计文档 → 重写 TLA+ 规格 → 重跑 TLC | `check-tla-model.ts` 退出码 0（修正后重跑通过） |
 | #18 | V/G 不通过后编排者直接分派 S 返工（无 R 报告作为 S-fix 输入） | 禁止直接分派 S；必须执行普通 V/G 失败链（见「普通 V/G 失败链」节） | `check-rootcause-report.ts` 退出码 0 + run-log R3 扩展（R+S-fix 一一对应） |
 | #19 | R 报告产出后无 V 复审记录（targetKind=rootcause）直接分派 S-fix | 回到 R 产出节点，分派 V 复审 → G 门禁后才可 S-fix | `check-verifier-output.ts`（targetKind=rootcause）退出码 0 + run-log R3 扩展（V 复审数=R 数） |

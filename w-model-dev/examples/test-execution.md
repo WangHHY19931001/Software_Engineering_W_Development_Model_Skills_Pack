@@ -20,7 +20,7 @@ S-explore(OpenSpec explore + codegraph 查询)
 → O 展示证据 → 🔴 CHECKPOINT
 ```
 
-测试失败或普通 V/G 失败不得直接回编码。完整返工链为：
+测试失败或普通 V/G 失败不得直接回编码。普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）为：
 
 ```text
 V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix
@@ -96,7 +96,7 @@ O: 🔴 CHECKPOINT-A · 验收执行前
 
 S-coding: 分批运行真实验收测试。每批只展示实际通过/失败/阻塞清单；
           到达批次同步点时进入 🟡 CHECKPOINT-B，由用户决定继续或暂停排查；
-          失败率触发强制暂停时，先按完整普通失败链
+          失败率触发强制暂停时，先按普通 V/G 失败链
           `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，
           不继续假设后续用例通过。
 

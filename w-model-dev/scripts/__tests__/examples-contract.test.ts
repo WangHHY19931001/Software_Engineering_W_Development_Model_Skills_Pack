@@ -144,7 +144,8 @@ function matchesAny(patterns: RegExp[], value: string): boolean {
 //     to a stage, rework by reworkHints, ...) whose own clause is not a
 //     prohibition restatement;
 //   - it does not already publish the canonical chain marker
-//     (「完整普通失败链」 or the full arrow chain in the same unit);
+//     (canonical marker = the canonical short name in non-mention use,
+//     or the full arrow chain, in the same unit);
 //   - it is not the phase-1 ingestion A-chunk/A-cross→G exception;
 //   - it does not route through R first (a legal 分派 R → ... → 才分派 S-fix
 //     description is the essence of the authoritative chain, not a bypass).
@@ -186,11 +187,12 @@ function hasExecutableDirectAction(value: string): boolean {
     .some((clause) => clause.length > 0 && matchesAny(DIRECT_ACTIONS, clause) && !PROHIBITION.test(clause));
 }
 
-function hasChainMarker(value: string): boolean {
-  const normalized = normalizeGuidance(value);
-  if (normalized.includes('普通 V/G 失败链')) return true;
-  if (normalized.includes('完整普通失败链')) return true;
-  return hasCompleteOrdinaryFailureChain(value);
+// Mention-style references (详见/参见/… the chain without executing it) do not
+// count as publishing the marker: only a non-mention canonical short name does.
+const CHAIN_MARKER_MENTION = /(无需|不必|无须|详见|参见|另见)[^。；;]{0,12}普通 V\/G 失败链/;
+function hasChainMarker(normalized: string): boolean {
+  if (!normalized.includes('普通 V/G 失败链')) return false;
+  return !CHAIN_MARKER_MENTION.test(normalized);
 }
 
 function hasRFirstRouting(value: string): boolean {
@@ -210,7 +212,7 @@ function failureRoutingReason(unit: string): string | undefined {
   const normalized = normalizeGuidance(unit);
   if (!matchesAny(FAILURE_SIGNALS, normalized)) return undefined;
   if (!hasExecutableDirectAction(normalized)) return undefined;
-  if (hasChainMarker(unit)) return undefined;
+  if (hasChainMarker(normalized)) return undefined;
   if (isIngestionException(unit)) return undefined;
   if (hasRFirstRouting(unit)) return undefined;
   return 'ordinary failure routes to a direct action without the complete chain';
@@ -513,13 +515,7 @@ describe('examples workflow contract', () => {
       for (const rawLine of read(relativePath).split(/\r?\n/)) {
         const line = rawLine.replace(/\s+/g, ' ').trim();
         if (!line || !failure.test(line) || !bypass.test(line)) continue;
-        if (
-          line.includes(FAILURE_CHAIN) ||
-          line.includes('下方完整链') ||
-          line.includes('完整普通失败链') ||
-          line.includes('普通 V/G 失败链')
-        )
-          continue;
+        if (line.includes(FAILURE_CHAIN) || line.includes('下方完整链') || line.includes('普通 V/G 失败链')) continue;
         if (line.includes('phase 1') && line.includes('ingestion') && line.includes('A-chunk')) continue;
 
         const withoutProhibition = line.replace(
@@ -572,7 +568,7 @@ describe('examples workflow contract', () => {
     // The same row once the canonical chain marker is present is satisfied.
     expect(
       failureRoutingReason(
-        '`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；先走完整普通失败链，再按 R 结论由 S-fix 返工',
+        '`check-artifact-gate.ts`；1；质量门未通过（覆盖率 / 测试状态不达标）；#3 / #6 / #7；先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 返工',
       ),
     ).toBe(undefined);
   });
@@ -581,7 +577,11 @@ describe('examples workflow contract', () => {
     // C/D alone (schema enum, quality-level definition) is not a failure
     // signal ...
     expect(failureRoutingReason('qualityLevel: A | B | C | D；仅 check-verifier-output.ts')).toBe(undefined);
-    expect(failureRoutingReason('C/D 仅作为 R 定位线索，完成完整普通失败链后由 S-fix 处理')).toBe(undefined);
+    expect(
+      failureRoutingReason(
+        'C/D 仅作为 R 定位线索，完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后由 S-fix 处理',
+      ),
+    ).toBe(undefined);
     // ... but a C/D routing clause that skips R and dispatches S by reworkHints
     // is an ordinary-failure bypass (command-reference.md /wm review 失败动作).
     expect(
@@ -599,12 +599,25 @@ describe('examples workflow contract', () => {
     ).toBe(undefined);
     expect(
       failureRoutingReason(
-        '该失败只形成 R 定位线索；按完整普通失败链完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition',
+        '该失败只形成 R 定位线索；按普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition',
       ),
     ).toBe(undefined);
     expect(failureRoutingReason('exit 1 时由 S 修复/补齐项目工件后走 V→G；exit 2 时修正 CLI 参数组合后重跑')).toBe(
       'ordinary failure routes to a direct action without the complete chain',
     );
+  });
+
+  it('非规范名不再是合规 marker（r1 因果闭环样本）', () => {
+    const line = '质量门不通过；先走完整普通失败链，再回阶段 3 由 S-fix 返工';
+    expect(failureRoutingReason(line)).not.toBe(undefined); // 必须被判违规
+  });
+  it('否定/提及式引用不算 marker（F-G8-02）', () => {
+    expect(failureRoutingReason('质量门不通过；详见普通 V/G 失败链，先回阶段 3 由 S-fix 返工')).not.toBe(undefined);
+    expect(
+      failureRoutingReason(
+        '质量门不通过；先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再按 R 结论由 S-fix 返工',
+      ),
+    ).toBe(undefined);
   });
 
   it('reports ordinary failure bypass routes across the whole Markdown corpus', () => {

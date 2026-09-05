@@ -69,9 +69,9 @@ ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 --gra
 
 - 系统测试通过后触发工件质量门（本阶段为三级测试中间检查）；严格意义的完整放行在阶段 8 验收通过后。
 - 阶段 7 质量门通过 + 用户确认后才进入阶段 8；阶段 8 真实运行器完成后，按输出实际回填 `/wm test type=验收 result=pass` 或 `/wm test type=验收 result=fail`。
-- 性能（P95 基线）、安全（无高危漏洞）、兼容性（多浏览器）任一不达标均视为系统测试失败；失败只作为 R 定位线索，必须完成完整普通失败链后才可处理编码或上游阶段。
+- 性能（P95 基线）、安全（无高危漏洞）、兼容性（多浏览器）任一不达标均视为系统测试失败；失败只作为 R 定位线索，必须完成普通 V/G 失败链后才可处理编码或上游阶段。
 
 ## 要点
 
 - `check-artifact-gate --phase=7` 只校验到系统测试层，验收列仍为待执行——这是设计行为，不是缺陷。
-- BDD D5 校验失败（未绑定 step）与系统测试执行失败同样导致退出码 1；`reworkHints` 仅是 R 的定位线索，必须走完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
+- BDD D5 校验失败（未绑定 step）与系统测试执行失败同样导致退出码 1；`reworkHints` 仅是 R 的定位线索，必须走普通 V/G 失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
