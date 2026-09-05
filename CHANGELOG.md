@@ -52,7 +52,7 @@
 
 ### 审查 27 条处置索引（review2-fixes，2026-09-05）
 
-2026-09-05 对本战役独立审查的 27 条发现（2 Important + 25 Minor）逐条处置、全部可追溯：27 条全部修复，零豁免延续。其中 8 项为脚本/钩子行为变更，方向全部为收紧（A1-A3：l0 内联链接先 title 切分再剥尖括号、reference 定义补冒号后无空白与目标换行两形态且单字母 scheme 不再按 URI 放行、`.githooks/` 前缀判 code；A4：parse-args 重复 flag → `ARG_INVALID`/exit 2；A5：LEGACY_VARIANT 吸收加 `2026-09-01T00:00:00Z` 截止；H2-H4：pre-push npm audit 瞬态 skip 加 registry/advisories 同行上下文锚定与 npm 7 `npm warn audit network` 形态、纯 E404 不再跳过）。失败链锚点化（D2）：references/templates/SKILL.md 全句内联由 194 处（193 行）收敛为短名引用「普通 V/G 失败链」，全句仅存 2 处权威落点（hard-constraints.md 新增「普通 V/G 失败链（标准返工链）」节 + conventions.md 术语表新增词条），examples/ 教学示例保留全句，examples-contract 扫描器同步接受锚点短名（27/27 通过）。措辞与流程收尾：D1 三处 graph 缺失归因改为「phase>=2 缺 --graph 为 ARG_INVALID/exit 2（进入 D1-D8 前即拒绝；graph 为 D8 的数据源）」、D3 phase-1 豁免 reject 场景改朴素表述、D4 自然退出契约测试句归位生产 CLI 段、P2 acceptance 轮次子表加父链子集注记。l0 基线 relativeLinkCount 649→650（conventions 词条新增 1 条相对链接，violations 仍 0）。I1/I2 两项 Important（templates 6 处 phase 5-8 `check-artifact-gate.ts` 调用补 `--scope`、SSoT L0/L1 链接边界权威节 + INSTALL 同步）随任务 1 先行落地。规格见 `docs/superpowers/specs/2026-09-05-review2-fixes-design.md`、实施计划见 `docs/superpowers/plans/2026-09-05-review2-fixes.md`；版本保持 42.2.1，不 bump。父链追加行覆盖 `11944cd6130b6f3faa1df497fabae3cea6c8385f` 起至 `84fe7cb2be83a4451688575b899f74ab1b4ff382` 共 11 行（含上一战役三个台账收口提交与本战役全部 8 个提交，逐 commit、40 字符完整 SHA、按时间顺序），本台账收口提交自身按规则不入链。
+2026-09-05 对本战役独立审查的 27 条发现（2 Important + 25 Minor）逐条处置、全部可追溯：27 条全部修复，零豁免延续。其中 8 项为脚本/钩子行为变更，方向全部为收紧（A1-A3：l0 内联链接先 title 切分再剥尖括号、reference 定义补冒号后无空白与目标换行两形态且单字母 scheme 不再按 URI 放行、`.githooks/` 前缀判 code；A4：parse-args 重复 flag → `ARG_INVALID`/exit 2；A5：LEGACY_VARIANT 吸收加 `2026-09-01T00:00:00Z` 截止；H2-H4：pre-push npm audit 瞬态 skip 加 registry/advisories 同行上下文锚定与 npm 7 `npm warn audit network` 形态、纯 E404 不再跳过）。失败链锚点化（D2）：references/templates/SKILL.md 全句内联由 194 处（193 行）收敛为短名引用「普通 V/G 失败链」，全句仅存 2 处权威落点（hard-constraints.md 新增「普通 V/G 失败链（标准返工链）」节 + conventions.md 术语表新增词条），examples/ 教学示例保留全句，examples-contract 扫描器同步接受锚点短名（27/27 通过）。措辞与流程收尾：D1 三处 graph 缺失归因改为「phase>=2 缺 --graph 为 ARG_INVALID/exit 2（进入 D1-D8 前即拒绝；graph 为 D8 的数据源）」、D3 phase-1 豁免 reject 场景改朴素表述、D4 自然退出契约测试句归位生产 CLI 段、P2 acceptance 轮次子表加父链子集注记。l0 基线 relativeLinkCount 649→650（conventions 词条新增 1 条相对链接，violations 仍 0）。I1/I2 两项 Important（templates 6 处 phase 5-8 `check-artifact-gate.ts` 调用补 `--scope`、SSoT L0/L1 链接边界权威节 + INSTALL 同步）随任务 1 先行落地。规格见 `docs/superpowers/specs/2026-09-05-review2-fixes-design.md`、实施计划见 `docs/superpowers/plans/2026-09-05-review2-fixes.md`；版本保持 42.2.1，不 bump。父链追加行覆盖 `11944cd6130b6f3faa1df497fabae3cea6c8385f` 起至 `a5e2c2723a42eb4e17c5ddc7d10cf1453b2b8f6f` 共 13 行（含上一战役三个台账收口提交与本战役全部 10 个提交，逐 commit、40 字符完整 SHA、按时间顺序），本台账收口提交自身按规则不入链。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
@@ -195,6 +195,8 @@
 | `f79087a6e21c444ebf244e8a0210e30910f6c17f` | `test: close quality minors (dead probe, E5b shape, dedupe scanners, fixed timestamps)` |
 | `35f132ee342fbfa5fc359b7768b8d5d430e0757b` | `fix(hooks): quotePath in pre-push git calls and bound audit skip to anchored transient signals` |
 | `84fe7cb2be83a4451688575b899f74ab1b4ff382` | `docs: anchor ordinary failure chain and close wording minors (review2-fixes)` |
+| `c38fc88f800281f1e27704f57c718c2b7db8bbb6` | `docs(changes): append review2-fixes ledger rows (close 27 findings)` |
+| `a5e2c2723a42eb4e17c5ddc7d10cf1453b2b8f6f` | `style(scripts): prettier formatting for gate scope files` |
 
 注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 
