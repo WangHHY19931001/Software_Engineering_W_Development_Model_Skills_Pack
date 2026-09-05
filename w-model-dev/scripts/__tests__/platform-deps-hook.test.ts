@@ -129,22 +129,45 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
-async function simulatedPrePushAudit(
-  auditCase:
-    | 'network'
-    | 'unsupported'
-    | 'network-text'
-    | 'networking'
-    | 'endpoint'
-    | 'mixed-error'
-    | 'vulnerability'
-    | 'json'
-    | 'permission'
-    | 'socket-hangup'
-    | 'http-503'
-    | 'errno-network'
-    | 'e5xx-code',
-): Promise<{ code: number; stdout: string; stderr: string }> {
+type SimulatedAuditCase =
+  | 'network'
+  | 'unsupported'
+  | 'network-text'
+  | 'networking'
+  | 'endpoint'
+  | 'mixed-error'
+  | 'vulnerability'
+  | 'json'
+  | 'permission'
+  | 'socket-hangup'
+  | 'http-503'
+  | 'errno-network'
+  | 'e5xx-code'
+  // review2-fixes task 5：audit skip 边界表驱动样例（H2 / H3 / H4 + 防回归守卫）
+  | 'zero-vulns'
+  | 'vulns-high-moderate'
+  | 'enotfound-plus-network'
+  | 'etimedout'
+  | 'errno-econnreset'
+  | 'plain-socket-hangup'
+  | 'e429'
+  | 'network-request-failed'
+  | 'npm7-warn-audit-network'
+  | 'e404-registry-advisories'
+  | 'bare-e404'
+  | 'status-word-unanchored'
+  | 'request-failed-503'
+  | 'registry-502-bad-gateway'
+  | 'vulns-with-5xx'
+  | 'eacces'
+  | 'ejsonparse'
+  | 'permission-denied';
+
+async function simulatedPrePushAudit(auditCase: SimulatedAuditCase): Promise<{
+  code: number;
+  stdout: string;
+  stderr: string;
+}> {
   const binDir = await makeTempDir('pre-push-audit-bin-');
   const workspace = await makeTempDir('pre-push-audit-workspace-');
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
@@ -219,6 +242,24 @@ npm() {
           return 1
           ;;
         e5xx-code) printf 'npm error code E503\\n'; return 1 ;;
+        zero-vulns) printf 'found 0 vulnerabilities\\n'; return 1 ;;
+        vulns-high-moderate) printf '3 vulnerabilities (1 high 2 moderate)\\n'; return 1 ;;
+        enotfound-plus-network) printf 'npm error code ENOTFOUND\\nnpm error network request failed\\n'; return 1 ;;
+        etimedout) printf 'npm error code ETIMEDOUT\\n'; return 1 ;;
+        errno-econnreset) printf 'npm error errno ECONNRESET\\n'; return 1 ;;
+        plain-socket-hangup) printf 'npm error socket hang up\\n'; return 1 ;;
+        e429) printf 'npm error code E429\\n'; return 1 ;;
+        network-request-failed) printf 'npm error network request failed\\n'; return 1 ;;
+        npm7-warn-audit-network) printf 'npm warn audit network request failed\\n'; return 1 ;;
+        e404-registry-advisories) printf 'npm error 404 Not Found - GET https://registry.npmjs.org/-/npm/v1/security/advisories\\n'; return 1 ;;
+        bare-e404) printf 'npm error code E404\\n'; return 1 ;;
+        status-word-unanchored) printf 'npm error Service Unavailable (503)\\n'; return 1 ;;
+        request-failed-503) printf 'npm error request failed: 503 Service Unavailable\\n'; return 1 ;;
+        registry-502-bad-gateway) printf 'npm error registry request failed: 502 Bad Gateway\\n'; return 1 ;;
+        vulns-with-5xx) printf 'found 2 vulnerabilities\\nnpm error 503 Service Unavailable\\n'; return 1 ;;
+        eacces) printf 'npm error code EACCES\\n'; return 1 ;;
+        ejsonparse) printf 'npm error code EJSONPARSE\\n'; return 1 ;;
+        permission-denied) printf 'permission denied\\n'; return 1 ;;
       esac
       ;;
     'run check:docs-consistency') test -s "$WM_VITEST_COUNT_FILE" || return 97; return 0 ;;
@@ -1002,6 +1043,85 @@ describe('pre-push audit skip boundary', () => {
       expect(result.stdout).toContain('npm audit');
     },
   );
+
+  // 18 行表驱动边界样例（review2-fixes task 5）：每行 = 一段假想 npm audit 输出 + 期望
+  // can_skip。skip 行与 blocking 行 mock 退出码同为 1——只有 audit_can_skip 的正则判定
+  // 决定走「跳过（不阻断）」还是阻断，端到端经 pre-push 全 hook 验证（复用既有 mock 通道）。
+  interface AuditBoundaryRow {
+    label: string;
+    auditCase: SimulatedAuditCase;
+    expectSkip: boolean;
+  }
+  const auditBoundaryRows: AuditBoundaryRow[] = [
+    { label: 'found 0 vulnerabilities → blocking', auditCase: 'zero-vulns', expectSkip: false },
+    { label: '3 vulnerabilities (1 high 2 moderate) → blocking', auditCase: 'vulns-high-moderate', expectSkip: false },
+    {
+      label: 'npm error code ENOTFOUND + npm error network line → skip',
+      auditCase: 'enotfound-plus-network',
+      expectSkip: true,
+    },
+    { label: 'npm error code ETIMEDOUT → skip', auditCase: 'etimedout', expectSkip: true },
+    { label: 'npm error errno ECONNRESET → skip', auditCase: 'errno-econnreset', expectSkip: true },
+    { label: 'socket hang up in an npm error line → skip', auditCase: 'plain-socket-hangup', expectSkip: true },
+    { label: 'npm error code E429 → skip', auditCase: 'e429', expectSkip: true },
+    { label: 'npm error network request failed → skip', auditCase: 'network-request-failed', expectSkip: true },
+    // H4：npm7 形态 `npm warn audit network` —— network 词面前允许 audit 前缀
+    {
+      label: 'npm warn audit network request failed → skip (H4)',
+      auditCase: 'npm7-warn-audit-network',
+      expectSkip: true,
+    },
+    // H2：E404 仅在 registry/advisories 上下文跳过
+    {
+      label: 'npm error 404 Not Found - GET .../security/advisories → skip (H2)',
+      auditCase: 'e404-registry-advisories',
+      expectSkip: true,
+    },
+    // H2 保守面：裸 code E404（无 registry/advisories 上下文）保持阻断
+    {
+      label: 'npm error code E404 without registry/advisories context → blocking',
+      auditCase: 'bare-e404',
+      expectSkip: false,
+    },
+    // H3：状态词无 network/registry/request 同行锚定 → 保持阻断
+    {
+      label: 'Service Unavailable status word, unanchored → blocking (H3)',
+      auditCase: 'status-word-unanchored',
+      expectSkip: false,
+    },
+    {
+      label: 'npm error request failed: 503 Service Unavailable → skip',
+      auditCase: 'request-failed-503',
+      expectSkip: true,
+    },
+    {
+      label: 'npm error registry request failed: 502 Bad Gateway → skip',
+      auditCase: 'registry-502-bad-gateway',
+      expectSkip: true,
+    },
+    // blocking 优先不变量：漏洞信号在场时永不 skip
+    {
+      label: 'found 2 vulnerabilities + 503 mixed → blocking (blocking-priority invariant)',
+      auditCase: 'vulns-with-5xx',
+      expectSkip: false,
+    },
+    { label: 'npm error code EACCES → blocking', auditCase: 'eacces', expectSkip: false },
+    { label: 'npm error code EJSONPARSE → blocking', auditCase: 'ejsonparse', expectSkip: false },
+    { label: 'permission denied → blocking', auditCase: 'permission-denied', expectSkip: false },
+  ];
+
+  it.each(auditBoundaryRows)('audit skip boundary: $label', async ({ auditCase, expectSkip }) => {
+    const result = await simulatedPrePushAudit(auditCase);
+
+    if (expectSkip) {
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(result.stdout).toContain('跳过（不阻断）');
+    } else {
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stdout).not.toContain('跳过（不阻断）');
+      expect(result.stdout).toContain('npm audit');
+    }
+  });
 });
 
 describe('pre-push evidence lifecycle', () => {

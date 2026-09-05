@@ -65,7 +65,7 @@ git checkout -b fix/issue-xxx
 # 3.1 单元测试（vitest，文件数与用例数以当前命令输出为准，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
-# 3.2 自检基线（samples/ 目录下 262 条样本，覆盖全部 check 脚本的通过 / 失败路径）
+# 3.2 自检基线（262 条 self-test 运行用例，覆盖全部 check 脚本的通过 / 失败路径；samples/ 为 fixture 载体）
 npm run self-test
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
 # 新增校验项时，必须同步增加 samples/ 下通过 / 失败各一条样本并在 self-test.ts 中声明期望
@@ -158,7 +158,7 @@ if ([string]::IsNullOrWhiteSpace($previousHooksPath)) { git config --local --uns
 npm run prepush
 ```
 
-**触发条件**：hook 会先判断本次推送的提交里是否包含以下路径的变更，命中才跑门禁；`w-model-dev/**`、活体根文档、`docs/*.md`、`config/**`、根 `scripts/**`、`package.json`、`package-lock.json` 与 `.githooks/**` 均在范围内，纯归档/规划目录改动才直接放行。
+**触发条件**：hook 会先判断本次推送的提交里是否包含以下路径的变更，命中才跑门禁；`w-model-dev/**`、活体根文档、`docs/*.md`、`config/**`、根 `scripts/**`、`package.json`、`package-lock.json` 与 `.githooks/**` 均在范围内，未命中上述模式才直接放行；`docs/*.md` 的 `*` 在 shell case 中跨 `/` 匹配，`docs/changes/`、`docs/superpowers/` 等 .md 变更同样触发门禁（过包含方向，安全优先）。
 
 **依赖与平台边界**：pre-push 缺少 `node_modules` 时 exit 1 并提示开发者运行 `npm install`，绝不自动安装。它仅调用 `ensure-platform-deps.sh --check`；默认/`--check` 不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。缺平台依赖时在 Bash 中显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中校验 lockfile SRI 并安装当前平台缺失包（Windows x64 / Linux x64）；pre-push 不会自动修复：
 

@@ -2892,7 +2892,7 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
     expect(source).toContain('=~ ^[0-9a-fA-F]{40}$');
     // stdin 解析出现在 fallback diff 之前（顺序 = 语义：有 stdin 行时以 stdin 为准）
     const stdinParse = source.indexOf('local_ref local_sha remote_ref remote_sha extra');
-    const fallbackDiff = source.indexOf('git diff --name-only HEAD@{push} HEAD');
+    const fallbackDiff = source.indexOf('git -c core.quotePath=false diff --name-only HEAD@{push} HEAD');
     expect(stdinParse).toBeGreaterThanOrEqual(0);
     expect(fallbackDiff).toBeGreaterThan(stdinParse);
     // fallback 结构仍在（手动/非 push 场景）
@@ -2920,16 +2920,28 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
     expect(source).not.toMatch(/git log -n [0-9]/);
     // merge-base 不可证明时的可证明降级：remote-tracking 排除集枚举（--not --remotes=<remote>，
     // 无 -n 截断；remote 经白名单 + git remote get-url 核验，无 tracking refs / 失败仍 fail-closed）
-    expect(source).toContain('git log -m --name-only --pretty=format:');
+    expect(source).toContain('git -c core.quotePath=false log -m --name-only --pretty=format:');
     expect(source).toContain('--not "--remotes=$remote_name"');
     expect(source).toContain('remote_enum_new_branch_files');
   });
 
   it('diff 调用把 -- 置于两 sha 之后（-- 前移会把 sha 当 pathspec 致空输出），并带 fail-closed 标记', async () => {
     const source = await prePushSource();
-    expect(source).toContain('git diff --name-only "$remote_sha" "$local_sha" --');
-    expect(source).toContain('git diff --name-only "$base" "$local_sha" --');
+    expect(source).toContain('git -c core.quotePath=false diff --name-only "$remote_sha" "$local_sha" --');
+    expect(source).toContain('git -c core.quotePath=false diff --name-only "$base" "$local_sha" --');
     expect(source).not.toContain('diff --name-only -- "$');
+    // H1（review2-fixes）：全部 5 个 git log/diff 调用点（排除集枚举 log + 4 个 diff，
+    // fallback 行 || 两侧各一）统一前插 -c core.quotePath=false——非 ASCII 文件名必须按
+    // 字面（非转义八进制）进入触发面判定，否则带中文/Unicode 文件名的推送会逃过路径过滤。
+    const nonCommentSource = source
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('#'))
+      .join('\n');
+    // 匹配限定真实调用形态（log -m / diff --name-only），排除 parse_reason 提示串中的「git diff 失败」字样
+    const gitLogDiffCalls =
+      nonCommentSource.match(/git (?:-c core\.quotePath=false )?(?:log -m|diff --name-only) /g) ?? [];
+    expect(gitLogDiffCalls).toHaveLength(5);
+    expect(gitLogDiffCalls.every((call) => call.startsWith('git -c core.quotePath=false '))).toBe(true);
     expect(source).toContain('fail-closed');
   });
 });
