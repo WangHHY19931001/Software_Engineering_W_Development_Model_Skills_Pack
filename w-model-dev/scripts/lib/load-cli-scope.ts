@@ -59,7 +59,11 @@ export function loadCliScope(argv: readonly string[], projectRoot: string, phase
   }
   if (resolved.kind === 'missing') return { kind: 'missing', reasons: resolved.reasons };
   if (resolved.kind === 'violations')
-    return { kind: 'violations', violations: resolved.violations, attemptedChangeId: resolved.attemptedChangeId ?? null };
+    return {
+      kind: 'violations',
+      violations: resolved.violations,
+      attemptedChangeId: resolved.attemptedChangeId ?? null,
+    };
   const scopeLabel = `${resolved.scope.changeId}（base=${resolved.scope.baseRef}..head=${resolved.scope.headRef}，声明 ${resolved.scope.changedFiles.length} 个变更文件）`;
   return { kind: 'ok', scope: resolved.scope, scopeLabel };
 }

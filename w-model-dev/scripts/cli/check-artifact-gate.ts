@@ -443,7 +443,10 @@ async function main(): Promise<void> {
         attemptedChangeId: loaded.attemptedChangeId,
       });
     } else {
-      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: loaded.scope, scopeViolations: [] });
+      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
+        scope: loaded.scope,
+        scopeViolations: [],
+      });
     }
   }
 
