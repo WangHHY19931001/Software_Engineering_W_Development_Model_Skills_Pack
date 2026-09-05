@@ -50,6 +50,10 @@
 
 2026-09-04 对 archival-fixes 最终审查留档的 4 条 Minor（A `ResolvedCliScope` violations 变体 `attemptedChangeId` 必填化 + 薄封装透传断言、B 归档日期前缀注释 0-99 精度、C 上节散文句如实覆盖表述、D L0 内联链接正则注释精度）逐条处置、全部可追溯：4 条全部修复；台账收尾即本段——父链追加行覆盖 `c3636a3b70901f706d15f83bf5daba27ca64fa6a`..`7b52d4cd2559abac09abc1c3bb7a04619037ad29` 全部 first-parent 提交（4 行，含上一战役台账收尾提交与战役前计划提交），上文「审查问题修复（gate-closure）」与验收记录两处范围句终点顺延至 `7b52d4cd2559abac09abc1c3bb7a04619037ad29`，本追加提交自身按规则不入链。处置计划见 `docs/superpowers/plans/2026-09-04-archival-fixes-2.md`；版本保持 42.2.1，不 bump。
 
+### 审查 27 条处置索引（review2-fixes，2026-09-05）
+
+2026-09-05 对本战役独立审查的 27 条发现（2 Important + 25 Minor）逐条处置、全部可追溯：27 条全部修复，零豁免延续。其中 8 项为脚本/钩子行为变更，方向全部为收紧（A1-A3：l0 内联链接先 title 切分再剥尖括号、reference 定义补冒号后无空白与目标换行两形态且单字母 scheme 不再按 URI 放行、`.githooks/` 前缀判 code；A4：parse-args 重复 flag → `ARG_INVALID`/exit 2；A5：LEGACY_VARIANT 吸收加 `2026-09-01T00:00:00Z` 截止；H2-H4：pre-push npm audit 瞬态 skip 加 registry/advisories 同行上下文锚定与 npm 7 `npm warn audit network` 形态、纯 E404 不再跳过）。失败链锚点化（D2）：references/templates/SKILL.md 全句内联由 194 处（193 行）收敛为短名引用「普通 V/G 失败链」，全句仅存 2 处权威落点（hard-constraints.md 新增「普通 V/G 失败链（标准返工链）」节 + conventions.md 术语表新增词条），examples/ 教学示例保留全句，examples-contract 扫描器同步接受锚点短名（27/27 通过）。措辞与流程收尾：D1 三处 graph 缺失归因改为「phase>=2 缺 --graph 为 ARG_INVALID/exit 2（进入 D1-D8 前即拒绝；graph 为 D8 的数据源）」、D3 phase-1 豁免 reject 场景改朴素表述、D4 自然退出契约测试句归位生产 CLI 段、P2 acceptance 轮次子表加父链子集注记。l0 基线 relativeLinkCount 649→650（conventions 词条新增 1 条相对链接，violations 仍 0）。I1/I2 两项 Important（templates 6 处 phase 5-8 `check-artifact-gate.ts` 调用补 `--scope`、SSoT L0/L1 链接边界权威节 + INSTALL 同步）随任务 1 先行落地。规格见 `docs/superpowers/specs/2026-09-05-review2-fixes-design.md`、实施计划见 `docs/superpowers/plans/2026-09-05-review2-fixes.md`；版本保持 42.2.1，不 bump。父链追加行覆盖 `11944cd6130b6f3faa1df497fabae3cea6c8385f` 起至 `84fe7cb2be83a4451688575b899f74ab1b4ff382` 共 11 行（含上一战役三个台账收口提交与本战役全部 8 个提交，逐 commit、40 字符完整 SHA、按时间顺序），本台账收口提交自身按规则不入链。
+
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
 以下为从 42.2.1 整改起点 `bc48824894ae076ff0e80d87cebd6c9de4437833` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
@@ -180,6 +184,17 @@
 | `ccad270ca42706af54ab5911afef6e8c191368b8` | `docs(superpowers): add archival-fixes-2 plan (4 filed minors, single task)` |
 | `34aad9663f5e5cb5c99a8e315e000ad8edc5fbe6` | `fix(scripts): require attemptedChangeId on scope violations; sharpen two comments` |
 | `7b52d4cd2559abac09abc1c3bb7a04619037ad29` | `docs(changes): correct archival index prose to actual ledger coverage` |
+| `11944cd6130b6f3faa1df497fabae3cea6c8385f` | `docs(changes): append archival-fixes-2 ledger rows (close 4 filed minors)` |
+| `e6de501d655406560a91f2f0a69b60f368812fb8` | `docs(changes): backfill review-fixes campaign rows to restore ledger continuity` |
+| `f7f0bba84fce8f780ce7d983785e5caabb4b6ccc` | `docs(changes): chain previous ledger-closing commit c3636a3 (zero-exemption continuity)` |
+| `14ccc5f33ee671a67db4d4425a57922ca866ad89` | `docs(superpowers): add review2-fixes design spec (27 findings, 6 tasks)` |
+| `5d7046a0a9737fc3714490cc2703408c63bc9ab9` | `docs(superpowers): add review2-fixes implementation plan (6 tasks, SDD)` |
+| `86162def2f56556bf341a82410cce37bea05dfcd` | `docs: close review2 Importants (template --scope, SSoT L0/L1 boundary anchor)` |
+| `0f9986c25fee563305ca3e4f1b2b7cdba9845708` | `fix(scripts): close l0 parser edge forms and classify .githooks as code` |
+| `63687d42d3b40e937ca95f5f6ab500c8a50cf988` | `fix(scripts): reject duplicate flags, bound legacy variant absorption, unify scope loading` |
+| `f79087a6e21c444ebf244e8a0210e30910f6c17f` | `test: close quality minors (dead probe, E5b shape, dedupe scanners, fixed timestamps)` |
+| `35f132ee342fbfa5fc359b7768b8d5d430e0757b` | `fix(hooks): quotePath in pre-push git calls and bound audit skip to anchored transient signals` |
+| `84fe7cb2be83a4451688575b899f74ab1b4ff382` | `docs: anchor ordinary failure chain and close wording minors (review2-fixes)` |
 
 注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 
