@@ -326,3 +326,14 @@ Invariant == state = "B" => done
     expect(prePush).toContain('不直接运行 TLA、TLA↔BDD 同步或项目工件阶段门');
   });
 });
+
+describe('check-bdd-model --phase 形态契约（D3/I-4：仅等号形态）', () => {
+  it('裸 --phase（无等号）→ exit 2 且提示「--phase 仅支持等号形态 --phase=N」', async () => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(1));
+
+    const result = run([manifest, '--phase']);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('ARG_INVALID');
+    expect(result.stderr).toContain('--phase 仅支持等号形态 --phase=N');
+  });
+});

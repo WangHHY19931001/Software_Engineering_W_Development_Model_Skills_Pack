@@ -651,9 +651,24 @@ function collectVitestMeasurements(root: string): VitestMeasurements {
 }
 
 async function main(): Promise<void> {
+  // S22：未知 `--*` flag 不再静默丢弃（避免被当作位置参数 repo-root 误读）——已知集合校验，
+  // 未知即 ARG_INVALID / exit 2（与 l0-link-audit「未知 → ARG_INVALID」口径一致）
+  const rawArgs = process.argv.slice(2);
+  const knownFlags = new Set(['--json']);
+  const unknownFlags = rawArgs.filter((a) => a.startsWith('--') && !knownFlags.has(a.split('=')[0]!));
+  if (unknownFlags.length > 0) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: `未知参数：${unknownFlags.join(' ')}`,
+      detail: '用法: check-docs-consistency.ts [repo-root] [--json]',
+      exitCode: 2,
+    });
+    return;
+  }
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
-  const args = process.argv.slice(2).filter((a) => a !== '--json');
-  const jsonMode = args.length !== process.argv.slice(2).length;
+  const args = rawArgs.filter((a) => a !== '--json');
+  const jsonMode = args.length !== rawArgs.length;
   const startTime = Date.now();
   const root = pathResolve(args[0] ?? '.');
   const missing = REQUIRED_PATHS.filter((p) => !existsSync(join(root, p)));

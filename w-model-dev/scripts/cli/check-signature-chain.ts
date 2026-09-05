@@ -47,7 +47,7 @@ import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
-import { parsePhaseArg } from '../lib/parse-phase.js';
+import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 // ==================== 参数解析 ====================
@@ -63,14 +63,11 @@ function parseArgs(argv: string[]): ParsedArgs {
   const chainFromFlag = parseFlagValue(args, 'chain');
   const chainFromPos = args.find((a) => !a.startsWith('--'));
   const chainFile = chainFromFlag ?? chainFromPos;
-  const phaseArg = parseFlagValue(args, 'phase');
   const stageArg = parseFlagValue(args, 'stage');
   // 统一 --phase 校验（lib/parse-phase.ts，范围 1-8；行为收紧：原无范围校验，
-  // 非法值在 main 中统一 ARG_INVALID 拒绝，与 check-artifact-gate 一致）
-  let phase: number | undefined;
-  if (phaseArg) {
-    phase = parsePhaseArg(argv, { min: 1, max: 8 })?.phase;
-  }
+  // 非法值在 main 中统一 ARG_INVALID 拒绝，与 check-artifact-gate 一致）。
+  // D3/I-4：空格/等号两形态生效，重复 → DuplicateFlagError（runMain 统一转 ARG_INVALID）
+  const phase = phaseFlagPresent(args) ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
   let stage: ParsedArgs['stage'];
   if (stageArg) {
     const stageStr = stageArg;
@@ -101,15 +98,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  // 行为收紧（spec §3.2）：显式传了 --phase 但非法（非 1-8）→ ARG_INVALID。
+  // 行为收紧（spec §3.2）：显式传了 --phase（空格或等号形态）但非法（非 1-8）→ ARG_INVALID。
   // 原实现无范围校验（parseInt 后直接传给 logic，非法值静默降级为全量校验）。
-  const phaseArg = parseFlagValue(process.argv, 'phase');
-  if (phaseArg !== undefined && phase === undefined) {
+  // D3/I-4：门控改 phaseFlagPresent（形态无关），空格形态非法值同样报错。
+  if (phaseFlagPresent(process.argv) && phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
-      message: `参数非法 --phase=${phaseArg ?? ''}`,
-      detail: '须为 1-8 的整数',
+      message: '--phase 参数非法',
+      detail: '须为 1-8 的整数（支持 --phase=N 与 --phase N 两形态，重复传参即错）',
       exitCode: 2,
     });
     return;

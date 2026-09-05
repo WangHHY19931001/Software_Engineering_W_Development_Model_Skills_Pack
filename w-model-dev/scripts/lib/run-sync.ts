@@ -83,18 +83,20 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 115,
+    line: 109,
     symbol: 'checkEnvironment',
-    reason: 'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
+    reason:
+      'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 285,
+    line: 292,
     symbol: 'main',
-    reason: 'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
+    reason:
+      'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧下移 7 行）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -110,65 +112,73 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 195,
+    line: 189,
     symbol: 'runTools',
-    reason: 'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.',
+    reason:
+      'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 222,
+    line: 216,
     symbol: 'runTools',
-    reason: 'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.',
+    reason:
+      'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 45,
+    line: 46,
     symbol: 'checkCli',
-    reason: 'Existing CLI version probe has an explicit 10-second timeout.',
+    reason:
+      'Existing CLI version probe has an explicit 10-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 66,
+    line: 67,
     symbol: 'installCli',
-    reason: 'Existing npm installation command has an explicit 120-second timeout.',
+    reason:
+      'Existing npm installation command has an explicit 120-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 90,
+    line: 91,
     symbol: 'checkMcpCodegraph',
-    reason: 'Existing codegraph probe has an explicit 15-second timeout.',
+    reason:
+      'Existing codegraph probe has an explicit 15-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 113,
+    line: 114,
     symbol: 'registerMcpCodegraph',
-    reason: 'Existing codegraph registration has an explicit 60-second timeout.',
+    reason:
+      'Existing codegraph registration has an explicit 60-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 134,
+    line: 135,
     symbol: 'initCodegraph',
-    reason: 'Existing codegraph initialization has an explicit 300-second timeout.',
+    reason:
+      'Existing codegraph initialization has an explicit 300-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 156,
+    line: 157,
     symbol: 'initOpenspec',
-    reason: 'Existing OpenSpec initialization has an explicit 60-second timeout.',
+    reason:
+      'Existing OpenSpec initialization has an explicit 60-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
     timeout: { required: true, status: 'present' },
   },
   {

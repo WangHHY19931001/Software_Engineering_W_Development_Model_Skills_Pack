@@ -15,6 +15,8 @@
  *     "designStates": ["draft", "published", "archived"],
  *     "codeStates": ["draft", "published", "archived"]
  *   }
+ * 结构门（fail-closed）：顶层必须为对象且四字段均为数组——顶层非对象（数组/标量）或
+ * 任一字段缺失/类型不符 → STRUCTURE_INVALID / exit 2（不得按「全空合法图」放行）。
  *
  * 退出码：0=一致 1=不一致（violations 列出具体原因） 2=输入错误（stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
@@ -64,6 +66,32 @@ async function main(): Promise<void> {
 
   const abs = path.resolve(file);
   const parsed = await readJsonOrExit<StateMachineConsistencyInput>(file);
+
+  // D3/I-5 结构门（fail-closed）：顶层非对象（数组 / 标量）或四数组字段形状不符时，
+  // 不得按「全空合法图」exit 0 放行 → STRUCTURE_INVALID / exit 2
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
+      message: '输入必须是对象（含 designStates/designTransitions/codeStates/codeTransitions 四数组字段）',
+      file: abs,
+      exitCode: 2,
+    });
+    return;
+  }
+  for (const k of ['designStates', 'designTransitions', 'codeStates', 'codeTransitions'] as const) {
+    // eslint-disable-next-line security/detect-object-injection -- k 为上方 const 字面量数组成员（四字段名），非外部输入
+    if (!Array.isArray((parsed as Record<string, unknown>)[k])) {
+      exitWithError({
+        category: 'STRUCTURE_INVALID',
+        rule: 'P0-3',
+        message: `字段 ${k} 必须为数组`,
+        file: abs,
+        exitCode: 2,
+      });
+      return;
+    }
+  }
 
   const result = checkStateMachineConsistency(parsed);
   const exitCode = result.passed ? 0 : 1;

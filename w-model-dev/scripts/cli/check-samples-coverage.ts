@@ -29,10 +29,11 @@
  * @module
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve as pathResolve } from 'node:path';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 
 /**
@@ -162,7 +163,7 @@ function findUndeclaredDirs(samplesRoot: string, readmeContent: string): string[
   return undeclared;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const jsonMode = argv.includes('--json');
   const root = pathResolve(argv.filter((a) => a !== '--json')[0] ?? process.cwd());
@@ -171,67 +172,69 @@ function main(): void {
   const selfTestPath = join(root, 'w-model-dev/scripts/cli/self-test.ts');
   const readmePath = join(samplesRoot, 'README.md');
 
-  try {
-    const refs = extractReferences(readFileSync(selfTestPath, 'utf-8'));
-    const uncovered = findUncovered(samplesRoot, refs);
-    const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
-
-    const violations: Array<{ check: string; message: string }> = [
-      ...uncovered.map((rel) => ({
-        check: 'fixture-unregistered',
-        message: `fixture 未被 self-test.ts 引用：samples/${rel}（新增样本须在 self-test.ts 用例数组登记）`,
-      })),
-      ...undeclared.map((dir) => ({
-        check: 'matrix-undeclared',
-        message: `samples/${dir}/ 未在 samples/README.md 覆盖矩阵声明`,
-      })),
-    ];
-
-    if (jsonMode) {
-      const dist = new Map<string, number>();
-      for (const v of violations) dist.set(v.check, (dist.get(v.check) ?? 0) + 1);
-      const exitCode = violations.length === 0 ? 0 : 1;
-      printJsonReport(
-        {
-          type: 'samples-coverage',
-          passed: violations.length === 0,
-          reasons: violations.map((v) => `${v.check}: ${v.message}`),
-          violations: [...dist.entries()].map(([rule, count]) => ({ rule, count })),
-          durationMs: 0,
-        },
-        exitCode,
-      );
-      process.exitCode = exitCode;
-      return;
-    }
-    console.log('─'.repeat(60));
-    console.log('Samples Coverage Checker');
-    console.log('─'.repeat(60));
-    for (const v of violations) console.log(`✗ [${v.check}] ${v.message}`);
-    if (violations.length === 0) console.log('✓ 全部 fixture 已被 self-test.ts 引用，矩阵声明齐全');
-    printGateReport(
-      'SAMPLES_COVERAGE',
-      {
-        fixtureCount: countFixtures(samplesRoot),
-        referencedFiles: refs.files.size,
-        referencedDirs: refs.dirs.size,
-        unregistered: uncovered.length,
-        undeclaredDirs: undeclared.length,
-      },
-      violations.length === 0 ? 0 : 1,
-    );
-    process.exitCode = violations.length === 0 ? 0 : 1;
-    return;
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
+  // S20：repo-root 缺必需文件属输入错误（ARG_INVALID / exit 2，与 check-docs-consistency 同口径）；
+  // 其余读取异常冒泡交由 runMain 的 UNEXPECTED 兜底（ERROR_JSON + exit 2），不再自吞堆栈
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（repo-root 下 samples/ 与 self-test.ts），仅作存在性探测
+  const missingRequired = [samplesRoot, selfTestPath, readmePath].filter((p) => !existsSync(p));
+  if (missingRequired.length > 0) {
     exitWithError({
-      category: 'UNEXPECTED',
-      rule: 'P0-3',
-      message: 'samples 覆盖矩阵核对失败（repo-root 缺必需文件或读取异常）',
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: 'repo-root 缺少必需文件',
+      detail: `[${missingRequired.join(', ')}]（用法: check-samples-coverage.ts [repo-root] [--json]）`,
       exitCode: 2,
-      detail,
     });
+    return;
   }
+  const refs = extractReferences(readFileSync(selfTestPath, 'utf-8'));
+  const uncovered = findUncovered(samplesRoot, refs);
+  const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
+
+  const violations: Array<{ check: string; message: string }> = [
+    ...uncovered.map((rel) => ({
+      check: 'fixture-unregistered',
+      message: `fixture 未被 self-test.ts 引用：samples/${rel}（新增样本须在 self-test.ts 用例数组登记）`,
+    })),
+    ...undeclared.map((dir) => ({
+      check: 'matrix-undeclared',
+      message: `samples/${dir}/ 未在 samples/README.md 覆盖矩阵声明`,
+    })),
+  ];
+
+  if (jsonMode) {
+    const dist = new Map<string, number>();
+    for (const v of violations) dist.set(v.check, (dist.get(v.check) ?? 0) + 1);
+    const exitCode = violations.length === 0 ? 0 : 1;
+    printJsonReport(
+      {
+        type: 'samples-coverage',
+        passed: violations.length === 0,
+        reasons: violations.map((v) => `${v.check}: ${v.message}`),
+        violations: [...dist.entries()].map(([rule, count]) => ({ rule, count })),
+        durationMs: 0,
+      },
+      exitCode,
+    );
+    process.exitCode = exitCode;
+    return;
+  }
+  console.log('─'.repeat(60));
+  console.log('Samples Coverage Checker');
+  console.log('─'.repeat(60));
+  for (const v of violations) console.log(`✗ [${v.check}] ${v.message}`);
+  if (violations.length === 0) console.log('✓ 全部 fixture 已被 self-test.ts 引用，矩阵声明齐全');
+  printGateReport(
+    'SAMPLES_COVERAGE',
+    {
+      fixtureCount: countFixtures(samplesRoot),
+      referencedFiles: refs.files.size,
+      referencedDirs: refs.dirs.size,
+      unregistered: uncovered.length,
+      undeclaredDirs: undeclared.length,
+    },
+    violations.length === 0 ? 0 : 1,
+  );
+  process.exitCode = violations.length === 0 ? 0 : 1;
 }
 
 /** 统计 samples/ 下可核对条目数（排除隐藏 / 运行时产物 / 文档） */
@@ -252,4 +255,5 @@ function countFixtures(samplesRoot: string): number {
   return count;
 }
 
-main();
+// 统一入口（lib/run-main.ts）：main() 异常统一为 UNEXPECTED + ERROR_JSON + exit 2（S20 兜底）
+runMain(main);

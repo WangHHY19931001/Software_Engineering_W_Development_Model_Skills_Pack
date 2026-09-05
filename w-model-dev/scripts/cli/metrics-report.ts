@@ -37,13 +37,14 @@ import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { parsePhaseArg } from '../lib/parse-phase.js';
+import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
+import { parseFlagValue } from '../lib/parse-args.js';
 
 interface ParsedArgs {
   projectDir: string;
   from?: string;
   to?: string;
-  phaseStr?: string;
+  phase: number | undefined;
   json: boolean;
   out?: string;
 }
@@ -52,15 +53,18 @@ function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const json = args.includes('--json');
   const positional = args.filter((a) => !a.startsWith('--'));
-  const from = args.find((a) => a.startsWith('--from='))?.split('=')[1];
-  const to = args.find((a) => a.startsWith('--to='))?.split('=')[1];
-  const phaseStr = args.find((a) => a.startsWith('--phase='))?.split('=')[1];
-  const out = args.find((a) => a.startsWith('--out='))?.split('=')[1];
+  // D3/I-3：值 flag 统一 parseFlagValue（等号形态；重复 → DuplicateFlagError），杜绝 last-wins
+  const from = parseFlagValue(args, 'from');
+  const to = parseFlagValue(args, 'to');
+  const out = parseFlagValue(args, 'out');
+  // D3/I-4：--phase 两形态生效（空格/等号），重复 → DuplicateFlagError；
+  // 显式传了但非法由 main 的 phaseFlagPresent 门统一 ARG_INVALID
+  const phase = phaseFlagPresent(args) ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
   return {
     projectDir: positional[0] ?? process.cwd(),
     from,
     to,
-    phaseStr,
+    phase,
     json,
     out,
   };
@@ -176,21 +180,20 @@ function printHuman(r: MetricsReport, runLogFile: string): void {
 }
 
 async function main(): Promise<void> {
-  const { projectDir, from, to, phaseStr, json, out } = parseArgs(process.argv);
+  const { projectDir, from, to, phase, json, out } = parseArgs(process.argv);
 
-  // --phase 校验（统一 lib/parse-phase.ts：非数字 / 非整数 / 越界均 exit 2）
-  const phaseParsed = phaseStr !== undefined ? parsePhaseArg(process.argv, { min: 1, max: 8 }) : undefined;
-  if (phaseStr !== undefined && phaseParsed === undefined) {
+  // --phase 校验（D3/I-4：形态无关）：显式传了 --phase（空格或等号形态）但非法
+  // （非数字 / 非整数 / 越界）→ exit 2 ARG_INVALID
+  if (phaseFlagPresent(process.argv) && phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '--phase 参数非法',
-      detail: `收到 ${phaseStr}（须为 1-8 整数）`,
+      detail: '须为 1-8 整数（支持 --phase=N 与 --phase N 两形态，重复传参即错）',
       exitCode: 2,
     });
     return;
   }
-  const phase = phaseParsed?.phase;
 
   const wmodelDir = path.join(projectDir, '.w-model');
   const runLogFile = path.join(wmodelDir, 'run-log.jsonl');

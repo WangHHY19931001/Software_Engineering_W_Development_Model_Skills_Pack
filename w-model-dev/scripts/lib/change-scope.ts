@@ -337,7 +337,7 @@ export interface ResolveCliScopeArgs {
 }
 
 const MISSING_SCOPE_REASON = (phase: number): string =>
-  `阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change=<id> --base=<ref> --head=<ref>，无法绑定变更上下文（无变更上下文的相关查询/制品不得放行）`;
+  `阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change=<id> --base=<ref> --head=<ref>，无法绑定变更上下文（无变更上下文的相关查询/制品不得放行；--scope 仅支持等号形态 --scope=<file>，空格形态按未提供处理）`;
 
 /**
  * CLI 参数 → ChangeScope。--scope=<file>：schema + 语义 + Git 绑定全链路校验；

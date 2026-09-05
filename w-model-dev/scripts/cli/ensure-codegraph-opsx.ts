@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
+import { DuplicateFlagError } from '../lib/parse-args.js';
 
 type Mode = 'full' | 'quick' | 'light';
 
@@ -299,12 +300,17 @@ export function ensureDeps(_phase: number, projectRoot: string, mode: Mode): Che
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  // D3/I-3：--name=<v> 与 --name <v> 两形态均支持（docs/INSTALL.md 契约），但单值 flag
+  // 只允许出现一次——重复即抛 DuplicateFlagError（runMain 统一转 ARG_INVALID / exit 2），
+  // 杜绝旧 getArg 的 last-wins。
   const getArg = (name: string): string | undefined => {
     const prefix = `--${name}`;
-    const eqArg = args.find((a) => a.startsWith(`${prefix}=`));
-    if (eqArg) return eqArg.slice(prefix.length + 1);
-    const i = args.indexOf(prefix);
-    return i >= 0 ? args[i + 1] : undefined;
+    const eqArgs = args.filter((a) => a.startsWith(`${prefix}=`));
+    const spaceArgs = args.filter((a) => a === prefix);
+    const occurrences = eqArgs.length + spaceArgs.length;
+    if (occurrences > 1) throw new DuplicateFlagError(name);
+    if (eqArgs.length === 1) return eqArgs[0]!.slice(prefix.length + 1);
+    return spaceArgs.length === 1 ? args[args.indexOf(prefix) + 1] : undefined;
   };
 
   const phaseStr = getArg('phase');
@@ -323,8 +329,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  // 统一 --phase 校验（lib/parse-phase.ts，5-8）：getArg 保留 argv 循环外壳，仅校验逻辑收敛
-  const phaseParsed = parsePhaseArg([`--phase=${phaseStr}`], { min: 5, max: 8 });
+  // 统一 --phase 校验（lib/parse-phase.ts，5-8）：值与重复检测同源（--phase=N / --phase N）
+  const phaseParsed = parsePhaseArg(process.argv, { min: 5, max: 8 });
   if (phaseParsed === undefined) {
     exitWithError({
       category: 'ARG_INVALID',

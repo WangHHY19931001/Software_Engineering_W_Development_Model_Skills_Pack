@@ -96,6 +96,8 @@ function validateArgs(args: string[]): string | undefined {
       if (positionalCount > 1) return `多余位置参数「${arg}」`;
       continue;
     }
+    // D3/I-4：裸 --phase（空格形态）不受支持，给出形态自查提示（区别于一般未知参数）
+    if (arg === '--phase') return '--phase 仅支持等号形态 --phase=N';
     const valuePrefix = VALUE_FLAG_PREFIXES.find((prefix) => arg.startsWith(prefix));
     const key = valuePrefix ? valuePrefix.slice(0, -1) : arg;
     if (!BARE_FLAGS.has(arg) && !valuePrefix) return `未知或格式非法的参数「${arg}」`;

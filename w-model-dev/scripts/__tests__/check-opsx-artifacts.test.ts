@@ -162,11 +162,12 @@ describe('check-opsx-artifacts.ts CLI', () => {
     }
   }
 
-  it('O7a: 无 --scope → exit 1', () => {
+  it('O7a: 无 --scope → exit 1（消息附等号形态提示，F-G3-05）', () => {
     const { root } = makeOpsxRepo(() => undefined);
     const r = runCli([`"${root}"`, '--phase', '5']);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/--scope/);
+    expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
   });
 
   it('O7b: 合法 scope + 完整制品 → exit 0', () => {

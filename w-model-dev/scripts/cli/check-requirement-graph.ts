@@ -68,7 +68,7 @@ import { readJsonOrExit, readJsonClassified } from '../lib/read-json-or-exit.js'
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
-import { parsePhaseArg } from '../lib/parse-phase.js';
+import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 async function main(): Promise<void> {
@@ -87,19 +87,22 @@ async function main(): Promise<void> {
     return;
   }
 
-  // 解析 --phase（lib/parse-phase.ts 统一校验：--phase=N / --phase N，范围 1-4）
+  // 解析 --phase（lib/parse-phase.ts 统一校验：--phase=N / --phase N，范围 1-4；重复即错）
+  // D3/I-4：门控改 phaseFlagPresent（形态无关）——空格形态非法值同样 ARG_INVALID，不再静默降级
   let phase: number | undefined;
-  const phaseArg = parseFlagValue(process.argv.slice(3), 'phase');
+  const hasPhaseFlag = phaseFlagPresent(process.argv);
   const phaseParsed = parsePhaseArg(process.argv, { min: 1, max: 4 });
   if (phaseParsed !== undefined) {
     phase = phaseParsed.phase;
-  } else if (phaseArg !== undefined) {
-    // 显式传了 --phase 但非法（非数字 / 越界）→ 保留原 ARG_INVALID 消息与退出码
-    const phaseStr = phaseArg;
+  } else if (hasPhaseFlag) {
+    // 显式传了 --phase 但非法（非数字 / 越界 / 缺值）→ 保留原 ARG_INVALID 消息与退出码
+    const eqRaw = parseFlagValue(process.argv, 'phase');
+    const spaceIdx = process.argv.indexOf('--phase');
+    const phaseRaw = eqRaw ?? (spaceIdx >= 0 ? process.argv[spaceIdx + 1] : undefined);
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
-      message: `参数非法 --phase=${phaseStr ?? ''}`,
+      message: `参数非法 --phase=${phaseRaw ?? ''}`,
       detail: '须为 1-4 的整数',
       exitCode: 2,
     });

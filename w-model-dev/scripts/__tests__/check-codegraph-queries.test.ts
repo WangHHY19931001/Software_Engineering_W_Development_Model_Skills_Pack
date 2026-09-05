@@ -334,6 +334,8 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/--scope/);
     expect(r.stdout).toMatch(/变更上下文|ChangeScope/);
+    // F-G3-05：失败消息附形态自查提示（空格形态按未提供处理）
+    expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
   });
 
   it('C10b: 合法 scope + 全覆盖查询 → exit 0', () => {

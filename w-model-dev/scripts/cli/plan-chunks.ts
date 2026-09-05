@@ -28,6 +28,7 @@ import * as path from 'node:path';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
+import { parseFlagValue } from '../lib/parse-args.js';
 import { planChunksFromContent, type Chunk, type PlanOutput } from '../logic/plan-chunks-logic.js';
 
 const MAX_TOKENS_DEFAULT = 8000;
@@ -38,18 +39,17 @@ function parseArgs(argv: string[]): {
   nodeTypeStr: string | undefined;
   maxTokensStr: string | undefined;
 } {
-  const inputPath = argv[2];
-  let phaseStr: string | undefined;
-  let nodeTypeStr: string | undefined;
-  let maxTokensStr: string | undefined;
-  for (const a of argv.slice(3)) {
-    if (a.startsWith('--phase=')) {
-      phaseStr = a.split('=')[1];
-    } else if (a.startsWith('--node-type=')) {
-      nodeTypeStr = a.split('=')[1];
-    } else if (a.startsWith('--max-tokens=')) {
-      maxTokensStr = a.split('=')[1];
-    }
+  const args = argv.slice(2);
+  // D3/I-3：值 flag 统一 parseFlagValue（等号形态；重复 → DuplicateFlagError → runMain ARG_INVALID），
+  // 杜绝内联循环的 last-wins；--phase 的重复检测统一由 parsePhaseArg（main 内）抛出
+  const inputPath = args.find((a) => !a.startsWith('--'));
+  const nodeTypeStr = parseFlagValue(args, 'node-type');
+  const maxTokensStr = parseFlagValue(args, 'max-tokens');
+  // 报错 detail 与生效值同源：raw 提取与 parsePhaseArg 同序（等号优先，其次空格形态取下一参数）
+  let phaseStr: string | undefined = parseFlagValue(args, 'phase');
+  if (phaseStr === undefined) {
+    const i = args.indexOf('--phase');
+    phaseStr = i >= 0 ? args[i + 1] : undefined;
   }
   return { inputPath, phaseStr, nodeTypeStr, maxTokensStr };
 }

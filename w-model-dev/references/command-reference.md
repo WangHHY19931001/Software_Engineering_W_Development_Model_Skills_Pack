@@ -385,7 +385,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 三个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39/#40 与归档后置门）：
 
-- **速查行**（阶段 5-8 均必选 scope，缺失 → exit 1；文件/JSON/schema/参数冲突 → exit 2）：
+- **速查行**（阶段 5-8 均必选 scope，缺失 → exit 1；文件/JSON/schema/参数冲突 → exit 2；`--scope` 仅支持等号形态 `--scope=<file>`，空格形态按未提供处理）：
   - `npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
   - `npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
   - `npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
@@ -395,7 +395,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **archive checker**：`openspec/changes/archive/` 下精确匹配 `<changeId>` 或 `<日期>-<changeId>`（日期前缀锚定 `<YYYY-MM-DD>-`，不再用未锚定正则），多匹配 → violation；制品 `proposal.md`/`design.md`/`tasks.md`/`tickets.md` + `specs/` 齐全；changeId 须含阶段前缀。archive 为阶段 8 `opsx:archive` 后置门（在归档完成后由 G 单独跑，不在 `check-artifact-gate.ts` pre-archive gate 内强制）。
 - **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、opsx 收尾 `OPSX_ARTIFACTS_JSON`、archive 收尾 `OPENSPEC_ARCHIVE_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）。
 - **legacy 兼容层**：三脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts` / `checkOpenspecArchive`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
-- **退出码判别**：CLI 参数互斥矛盾（如 `--change` 前缀与 `--phase` 不符）为 `ARG_INVALID`/exit 2；scope 文件内容与 Git 实际/CLI flag 冲突为校验失败 exit 1。重复值 flag（如 `--scope` 两次）为 `ARG_INVALID`/exit 2（值 flag 只允许出现一次，旧「取第一个」语义已废除）。
+- **退出码判别**：CLI 参数互斥矛盾（如 `--change` 前缀与 `--phase` 不符）为 `ARG_INVALID`/exit 2；scope 文件内容与 Git 实际/CLI flag 冲突为校验失败 exit 1。重复值 flag（如 `--scope` 两次）为 `ARG_INVALID`/exit 2（值 flag 只允许出现一次，旧「取第一个/最后一个」语义已废除）；该语义 2026-09-06（D3/I-3）起全 CLI 生效——`--phase` 的重复与两形态（`--phase=N` / `--phase N`）校验由 `lib/parse-phase.ts` 统一检测，重复即错、非法值 ARG_INVALID，`check-bdd-model` / `check-preventive-review` 仍仅接受等号形态（裸 `--phase` → ARG_INVALID 并提示「--phase 仅支持等号形态 --phase=N」）。
 
 ## 错误码与 ERROR_JSON 约定
 
@@ -410,7 +410,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 | `FILE_NOT_FOUND`    | 文件/目录不存在（ENOENT）                                | `✗ [FILE_NOT_FOUND] 文件不存在: C:\...\project.json`            |
 | `FILE_PARSE`        | JSON 解析失败（含 JSONL 坏行）                           | `✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: C:\...\rtm.json`   |
 | `FILE_READ`         | 读取异常非 ENOENT                                        | `✗ [FILE_READ] 文件读取失败: C:\...\x.json（EACCES）`           |
-| `STRUCTURE_INVALID` | 合法 JSON 形状不符（顶层非对象/缺字段/类型错）           | `✗ [STRUCTURE_INVALID] 结构不符: C:\...\x.json（缺 rows 数组）` |
+| `STRUCTURE_INVALID` | 合法 JSON 形状不符（顶层非对象/字段形状不符/类型错；如 state-machine 输入顶层必须为对象且四数组字段齐全、tla-manifest 顶层必须为对象） | `✗ [STRUCTURE_INVALID] 结构不符: C:\...\x.json（缺 rows 数组）` |
 | `UNEXPECTED`        | 未预期异常（main().catch 兜底）                          | `✗ [UNEXPECTED] 脚本异常: <message>`                            |
 
 - exit 1（校验失败）结构不变：violations 列表 + 既有 `XXX_JSON` 摘要（含 exitCode=1），不输出 ERROR_JSON。

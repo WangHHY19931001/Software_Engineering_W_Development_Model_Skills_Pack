@@ -2,16 +2,19 @@
  * lib/parse-phase.ts 单元测试
  *
  * 统一 --phase 校验。
- * 覆盖（spec §3.2）：
+ * 覆盖（spec §3.2 + 2026-09-06 audit-fixes D3）：
  *   - --phase=N 与 --phase N（空格分离）与位置参数三种形态
  *   - 非法值（abc / 0 / 9 / -1 / 空串 / 无值）→ undefined
  *   - min/max 自定义（如 min:5,max:8）
  *   - 无 --phase → undefined
+ *   - 重复 --phase（任意形态合并计数）→ DuplicateFlagError（D3/I-3）
+ *   - phaseFlagPresent 形态无关存在性判定（D3/I-4）
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { parsePhaseArg } from '../lib/parse-phase.js';
+import { DuplicateFlagError } from '../lib/parse-args.js';
+import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 
 describe('parsePhaseArg', () => {
   describe('--phase=N 形态', () => {
@@ -92,6 +95,33 @@ describe('parsePhaseArg', () => {
     it('argv 无 --phase → undefined', () => {
       expect(parsePhaseArg(['node', 'script.ts', 'data.json'])).toBeUndefined();
       expect(parsePhaseArg(['node', 'script.ts', '--spec=a'])).toBeUndefined();
+    });
+  });
+
+  describe('重复检测与形态识别（D3/I-3、I-4）', () => {
+    it('重复 --phase（任意形态合并计数）→ DuplicateFlagError', () => {
+      expect(() => parsePhaseArg(['--phase=1', '--phase', '2'])).toThrow(DuplicateFlagError);
+      expect(() => parsePhaseArg(['--phase=1', '--phase=2'])).toThrow(DuplicateFlagError);
+      expect(() => parsePhaseArg(['--phase', '1', '--phase', '2'])).toThrow(DuplicateFlagError);
+      expect(() => parsePhaseArg(['--phase', '1', '--phase=2'])).toThrow(DuplicateFlagError);
+    });
+
+    it('单个 --phase（任一形态）不抛错', () => {
+      expect(() => parsePhaseArg(['--phase=3'])).not.toThrow();
+      expect(() => parsePhaseArg(['--phase', '3'])).not.toThrow();
+      expect(() => parsePhaseArg(['data.json', '--spec=a'])).not.toThrow();
+    });
+
+    it('近似前缀 --phoenix 不计入重复/存在性', () => {
+      expect(() => parsePhaseArg(['--phoenix=1', '--phoenix', '2'])).not.toThrow();
+      expect(phaseFlagPresent(['--phoenix'])).toBe(false);
+    });
+
+    it('phaseFlagPresent 识别两形态', () => {
+      expect(phaseFlagPresent(['--phase', '3'])).toBe(true);
+      expect(phaseFlagPresent(['--phase=3'])).toBe(true);
+      expect(phaseFlagPresent(['data.json'])).toBe(false);
+      expect(phaseFlagPresent([])).toBe(false);
     });
   });
 });

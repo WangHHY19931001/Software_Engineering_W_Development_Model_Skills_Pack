@@ -187,11 +187,12 @@ describe('check-openspec-archive.ts CLI', () => {
     );
   }
 
-  it('A8a: 无 --scope → exit 1', () => {
+  it('A8a: 无 --scope → exit 1（消息附等号形态提示，F-G3-05）', () => {
     const { root } = makeArchiveRepo(() => undefined);
     const r = runCli([`"${root}"`, '--phase', '5']);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/--scope/);
+    expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
   });
 
   it('A8b: 合法 scope + 已归档完整制品 → exit 0', () => {

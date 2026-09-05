@@ -20,6 +20,9 @@
  *   --allow-untyped         仅允许未注册的 .w-model 目标写入（已注册目标仍强制 Schema）
  *   --help                  打印用法
  *
+ * 重复传参：同一 flag 只允许出现一次（含 --stdin / --from / --expect-mtime / --lock-timeout 等），
+ * 重复 → ARG_INVALID / exit 2（旧 last-wins 语义已废除，2026-09-06 audit-fixes D3）。
+ *
  * 退出码：
  *   0  写入成功（stdout 单行 WMWRITE_JSON {ok:true,...}）
  *   1  写入拒绝（INVALID_JSON / MTIME_CONFLICT / TARGET_MISSING_FOR_MTIME / WRITE_VERIFY_FAILED / LOCK_TIMEOUT / STALE_LOCK / UNREGISTERED_TARGET / SCHEMA_INVALID；
@@ -34,6 +37,7 @@ import * as path from 'node:path';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { DuplicateFlagError } from '../lib/parse-args.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
 
 const USAGE =
@@ -72,17 +76,28 @@ async function main(): Promise<void> {
   let allowUntyped = false;
   let backup = true;
 
+  // D3/I-3：单值 flag 只允许出现一次——重复即 DuplicateFlagError（runMain 统一转
+  // ARG_INVALID / exit 2），杜绝旧循环的 last-wins（值 flag 语义见 lib/parse-args.ts）
+  const seenFlags = new Set<string>();
+  const countFlag = (name: string): void => {
+    if (seenFlags.has(name)) throw new DuplicateFlagError(name);
+    seenFlags.add(name);
+  };
+
   for (let index = 0; index < args.length; index++) {
     const arg = args.at(index)!;
     switch (arg) {
       case '--stdin':
+        countFlag('stdin');
         useStdin = true;
         break;
       case '--from':
+        countFlag('from');
         fromArg = args[++index];
         if (fromArg === undefined) exitArgInvalid('--from 缺少 <src.json>');
         break;
       case '--expect-mtime': {
+        countFlag('expect-mtime');
         const raw = args[++index];
         const parsed = raw === undefined ? NaN : Number(raw);
         if (!Number.isFinite(parsed) || parsed < 0) {
@@ -95,6 +110,7 @@ async function main(): Promise<void> {
         break;
       }
       case '--lock-timeout': {
+        countFlag('lock-timeout');
         const raw = args[++index];
         const parsed = raw === undefined ? NaN : Number(raw);
         if (raw === undefined || !/^\d+$/.test(raw) || !Number.isSafeInteger(parsed) || parsed < 0) {
@@ -104,12 +120,15 @@ async function main(): Promise<void> {
         break;
       }
       case '--recover-stale-lock':
+        countFlag('recover-stale-lock');
         recoverStaleLock = true;
         break;
       case '--allow-untyped':
+        countFlag('allow-untyped');
         allowUntyped = true;
         break;
       case '--no-backup':
+        countFlag('no-backup');
         backup = false;
         break;
       default:

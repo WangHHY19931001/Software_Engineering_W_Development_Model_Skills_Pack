@@ -93,6 +93,19 @@ async function main(): Promise<void> {
   const autoTrigger = hasFlag(args, 'auto-trigger');
   const runLogFile = parseFlagValue(args, 'run-log');
 
+  // D3/I-4：裸 --phase（空格形态）不受支持 → ARG_INVALID 并给出形态自查提示
+  if (args.includes('--phase')) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--phase 仅支持等号形态 --phase=N',
+      detail:
+        '用法: check-preventive-review.ts <project-dir> --phase=<1-8> [--variant=...] | --auto-trigger --run-log=<run-log.jsonl>',
+      exitCode: 2,
+    });
+    return;
+  }
+
   // 统一 --phase 校验（lib/parse-phase.ts，1-8）；非法/缺失由下方 !phase 检查统一拦截
   let phase: number | undefined = phaseArg ? parsePhaseArg(process.argv, { min: 1, max: 8 })?.phase : undefined;
   let variant: PreventiveReviewOptions['variant'] = 'standard';

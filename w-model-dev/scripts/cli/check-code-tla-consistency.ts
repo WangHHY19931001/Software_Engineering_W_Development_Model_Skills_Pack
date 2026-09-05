@@ -60,7 +60,7 @@ import {
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { hasFlag } from '../lib/parse-args.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
@@ -76,15 +76,13 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const get = (key: string): string | undefined => {
-    const a = args.find((x) => x.startsWith(`--${key}=`));
-    return a ? a.split('=').slice(1).join('=') : undefined;
-  };
+  // D3/I-3：统一 parseFlagValue（等号形态；重复 → DuplicateFlagError → runMain ARG_INVALID），
+  // 杜绝内联 find 的 first-wins
   return {
-    manifestFile: get('manifest'),
-    graphFile: get('graph'),
-    rtmFile: get('rtm'),
-    srcDir: get('src'),
+    manifestFile: parseFlagValue(args, 'manifest'),
+    graphFile: parseFlagValue(args, 'graph'),
+    rtmFile: parseFlagValue(args, 'rtm'),
+    srcDir: parseFlagValue(args, 'src'),
   };
 }
 

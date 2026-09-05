@@ -527,3 +527,34 @@ describe('wm-write CLI argument boundaries and existing contract', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"old"}');
   });
 });
+
+describe('wm-write duplicate single-value flags（D3/I-3：重复即错）', () => {
+  it('重复 --expect-mtime → exit 2 ARG_INVALID（不再 last-wins）', async () => {
+    const p = target('mtime-duplicate.json');
+    await fs.writeFile(p, '{"value":"old"}', 'utf-8');
+    const mtime = Math.floor((await fs.stat(p)).mtimeMs);
+
+    const result = run(
+      p,
+      ['--stdin', '--expect-mtime', String(mtime), '--expect-mtime', String(mtime)],
+      '{"value":"new"}',
+    );
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('✗ [ARG_INVALID]');
+    expect(result.stdout).toContain('ERROR_JSON ');
+  });
+
+  it('重复 --from → exit 2 ARG_INVALID', async () => {
+    const sourceA = target('source-a.json');
+    await fs.writeFile(sourceA, '{"source":"a"}', 'utf-8');
+    const sourceB = target('source-b.json');
+    await fs.writeFile(sourceB, '{"source":"b"}', 'utf-8');
+
+    const result = run(target('from-duplicate.json'), ['--from', sourceA, '--from', sourceB]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('✗ [ARG_INVALID]');
+    expect(result.stdout).toContain('ERROR_JSON ');
+  });
+});

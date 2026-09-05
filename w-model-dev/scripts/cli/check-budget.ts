@@ -14,7 +14,7 @@
  *   budget.json           budget.json 文件路径
  *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验）
  *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测）
- *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工记录）
+ *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -46,6 +46,7 @@ import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { phaseFlagPresent } from '../lib/parse-phase.js';
 
 // ==================== 参数解析 ====================
 
@@ -61,13 +62,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   const budgetFile = args.find((a) => !a.startsWith('--'));
   const projectFile = parseFlagValue(args, 'project');
   const runLogFile = parseFlagValue(args, 'run-log');
-  const phaseArg = parseFlagValue(args, 'phase');
-
-  let phase: number | undefined;
-  if (phaseArg) {
-    // 统一 --phase 校验（lib/parse-phase.ts，1-8）；显式传了但非法由 main 统一 ARG_INVALID
-    phase = parsePhaseArg(argv, { min: 1, max: 8 })?.phase;
-  }
+  // 统一 --phase 解析（lib/parse-phase.ts，1-8）：空格/等号两形态生效，重复 → DuplicateFlagError
+  // （runMain 统一转 ARG_INVALID / exit 2）；显式传了但非法由 main 的 phaseFlagPresent 门统一 ARG_INVALID
+  const phase = phaseFlagPresent(args) ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
 
   return { budgetFile, projectFile, runLogFile, phase };
 }
@@ -113,17 +110,15 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   const { budgetFile, projectFile, runLogFile, phase } = parseArgs(process.argv);
 
-  // --phase 合法性校验：显式传了但非法（非数字 / NaN / 越界）→ exit(2)，避免 countReworks 中
-  // `NaN !== NaN` 恒为 true 导致所有 run-log 记录被过滤、reworkCount 静默归零
-  const phaseArg = parseFlagValue(process.argv, 'phase');
-  if (phaseArg !== undefined && phase === undefined) {
-    // 复刻原消息值（parseInt 结果，非数字时为 NaN）
-    const phaseVal = Number.parseInt(phaseArg ?? '', 10);
+  // --phase 合法性校验（D3/I-4：形态无关）：显式传了 --phase（空格或等号形态）但非法
+  // （非数字 / 非整数 / 越界）→ exit(2)，避免 countReworks 中 `NaN !== NaN` 恒为 true
+  // 导致所有 run-log 记录被过滤、reworkCount 静默归零
+  if (phaseFlagPresent(process.argv) && phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
-      message: `参数非法 --phase=${phaseVal}`,
-      detail: '须为 1-8 的整数',
+      message: '--phase 参数非法',
+      detail: '须为 1-8 的整数（支持 --phase=N 与 --phase N 两形态，重复传参即错）',
       exitCode: 2,
     });
     return;

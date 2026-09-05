@@ -1,22 +1,32 @@
 /**
  * 统一 --phase 参数解析（lib/parse-phase.ts）
  *
- * 13 个 cli/*.ts 脚本（含 cli/plan-chunks.ts）的 --phase 解析/校验统一由本模块实现（spec §3.2）。
- * 支持三种形态：
- *   - `--phase=N`（等号内联）
- *   - `--phase N`（空格分离）
- *   - 位置参数（opts.positional 指定下标；目前仅测试使用，plan-chunks 为 --phase= 形态不启用）
+ * 13 个 cli/*.ts 脚本（含 cli/plan-chunks.ts）的 --phase 解析/校验统一由本模块实现（spec §3.2；
+ * 2026-09-06 audit-fixes D3 收敛为准确契约）：
+ *   - 消费方（13 个 CLI）：check-artifact-gate / check-bdd-model / check-budget /
+ *     check-codegraph-queries / check-openspec-archive / check-opsx-artifacts /
+ *     check-preventive-review / check-requirement-graph / check-signature-chain /
+ *     check-tla-model / ensure-codegraph-opsx / metrics-report / plan-chunks
+ *   - 支持两种形态：`--phase=N`（等号内联）与 `--phase N`（空格分离）；另有位置参数
+ *     （opts.positional 指定下标；目前仅测试使用，plan-chunks 为 --phase= 形态不启用）。
  *
  * 语义：
  *   - 严格整数校验：字符串须全为数字（/^\d+$/）+ Number.isInteger + [min, max] 范围，拒绝
  *     "5abc" / "3.7" / "-1" / 空串 这类 parseInt 会部分解析或误接受的输入。
  *   - 默认 min=1, max=8；未传 --phase（或传入值非法）返回 undefined，由调用方决定
- *     是静默降级（如按 manifest.currentPhase / 终检 8）还是报错退出。
- *   - 顺序语义：从 argv[0] 起按出现顺序取第一个 --phase 相关参数，合法即返回，非法即
- *     undefined（先到先得，不继续向后找）。
+ *     是静默降级（如按 manifest.currentPhase / 终检 8）还是报错退出。显式传了但非法时，
+ *     调用方应以 phaseFlagPresent(argv) 为门输出 ARG_INVALID（requirement-graph /
+ *     budget / signature-chain / tla-model / metrics-report 等入口非法值必须报错，不得静默）。
+ *   - 重复即错（2026-09-06 D3/I-3）：--phase 与 --phase= 合并计数，出现 >1 次抛
+ *     DuplicateFlagError('phase')（runMain 统一转 ARG_INVALID / exit 2），
+ *     旧「先到先得取第一个」语义废除。
+ *   - phaseFlagPresent(argv)：形态无关存在性判定（空格与等号两形态均识别；
+ *     `--phoenix` 等近似前缀不误判），供调用方做「显式传了但非法 → ARG_INVALID」门控。
  *
  * 纯函数：无 I/O、无 process 访问，可安全用于 lib 层与单测。
  */
+
+import { DuplicateFlagError } from './parse-args.js';
 
 export interface PhaseParseResult {
   /** 解析出的阶段号（已通过 min/max 校验） */
@@ -32,9 +42,18 @@ export interface ParsePhaseOptions {
   positional?: number;
 }
 
+/** 形态无关的 --phase 存在性判定（空格与等号两形态均识别；近似前缀不误判） */
+export function phaseFlagPresent(argv: readonly string[]): boolean {
+  return argv.some((a) => a === '--phase' || a.startsWith('--phase='));
+}
+
 export function parsePhaseArg(argv: string[], opts?: ParsePhaseOptions): PhaseParseResult | undefined {
   const min = opts?.min ?? 1;
   const max = opts?.max ?? 8;
+
+  // 重复检测（D3/I-3）：--phase 与 --phase= 合并计数，>1 即 DuplicateFlagError
+  const phaseHits = argv.filter((a) => a === '--phase' || a.startsWith('--phase=')).length;
+  if (phaseHits > 1) throw new DuplicateFlagError('phase');
 
   const check = (s: string | undefined): PhaseParseResult | undefined => {
     if (s === undefined || !/^\d+$/.test(s)) return undefined;

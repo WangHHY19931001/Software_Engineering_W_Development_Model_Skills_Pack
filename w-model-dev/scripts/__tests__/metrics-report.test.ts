@@ -197,3 +197,31 @@ describe('metrics-report CLI（边界与降级）', () => {
     expect(parsed.byPhase[0]!.phase).toBe(1);
   });
 });
+
+describe('metrics-report CLI（D3 参数统一：--phase 两形态 + 重复即错）', () => {
+  it('--phase=1 --phase=99 重复 → exit 2 ARG_INVALID（D3/I-3）', async () => {
+    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
+    const r = run('--json', '--phase=1', '--phase=99');
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('ARG_INVALID');
+    expect(r.stdout).toContain('ERROR_JSON ');
+  });
+
+  it('--phase 1（空格形态）生效：仅含阶段 1 记录（D3/I-4）', async () => {
+    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
+    const r = run('--json', '--phase', '1');
+    expect(r.code).toBe(0);
+    const parsed = JSON.parse(r.stdout) as { overall: { totalRecords: number }; byPhase: Array<{ phase: number }> };
+    expect(parsed.overall.totalRecords).toBe(2);
+    expect(parsed.byPhase).toHaveLength(1);
+    expect(parsed.byPhase[0]!.phase).toBe(1);
+  });
+
+  it('--phase 99（空格形态非法值）→ exit 2 ARG_INVALID（D3/I-4）', async () => {
+    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
+    const r = run('--json', '--phase', '99');
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('ARG_INVALID');
+    expect(r.stderr).toContain('--phase');
+  });
+});

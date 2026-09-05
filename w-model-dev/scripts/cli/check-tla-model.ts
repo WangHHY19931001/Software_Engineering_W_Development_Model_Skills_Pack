@@ -51,7 +51,7 @@ import { runMain } from '../lib/run-main.js';
 import { EXEC_LIMITS, PHASES, type Phase } from '../lib/constants.js';
 import { parseJavaMajor } from '../lib/java-version.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
-import { parsePhaseArg } from '../lib/parse-phase.js';
+import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { cleanTraceFiles } from '../lib/tla-clean-trace.js';
 import { runSync } from '../lib/run-sync.js';
@@ -61,6 +61,8 @@ import { runSync } from '../lib/run-sync.js';
 interface ParsedArgs {
   manifestFile: string | undefined;
   phase: number | undefined;
+  /** 形态无关的 --phase 存在性（空格与等号均计入；供「显式传了但非法」门使用） */
+  hasPhaseFlag: boolean;
   specId: string | undefined;
   graphFile: string | undefined;
   /** P3.8 --keep-states：保留 states 目录用于调试 */
@@ -70,26 +72,18 @@ interface ParsedArgs {
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   const manifestFile = args.find((a) => !a.startsWith('--'));
-  const phaseArg = parseFlagValue(args, 'phase');
   const specId = parseFlagValue(args, 'spec');
   // P3.8 --keep-states / -k：调试模式下保留 TLC 产物
   const keepStates = hasFlag(args, 'keep-states') || args.includes('-k');
   const graphFile = parseFlagValue(args, 'graph');
 
-  let phase: number | undefined;
-  if (phaseArg) {
-    // 统一 --phase 校验（lib/parse-phase.ts，1-8）；非法时回退原 parseInt 语义，
-    // 由 main 的 [1-8] 检查统一拦截（行为等价：非法值原样走 '无法确定 phase' 退出）
-    const parsed = parsePhaseArg(argv, { min: 1, max: 8 });
-    if (parsed !== undefined) {
-      phase = parsed.phase;
-    } else {
-      const phaseStr = phaseArg;
-      phase = phaseStr !== undefined ? Number.parseInt(phaseStr, 10) : undefined;
-    }
-  }
+  // 统一 --phase 校验（lib/parse-phase.ts，1-8）：空格/等号两形态生效，重复 → DuplicateFlagError；
+  // 显式传了但非法（phaseFlagPresent 门 + parsePhaseArg undefined）由 main 统一 ARG_INVALID，
+  // 不再回退 manifest.currentPhase（D3/I-4：非法显式输入不得被静默忽略）
+  const hasPhaseFlag = phaseFlagPresent(args);
+  const phase = hasPhaseFlag ? parsePhaseArg(argv, { min: 1, max: 8 })?.phase : undefined;
 
-  return { manifestFile, phase, specId, graphFile, keepStates };
+  return { manifestFile, phase, hasPhaseFlag, specId, graphFile, keepStates };
 }
 
 // ==================== 环境检查 ====================
@@ -263,7 +257,7 @@ async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
-  const { manifestFile, phase: phaseArg, specId, graphFile, keepStates } = parseArgs(process.argv);
+  const { manifestFile, phase: phaseArg, hasPhaseFlag, specId, graphFile, keepStates } = parseArgs(process.argv);
 
   if (!manifestFile) {
     exitWithError({
@@ -272,6 +266,19 @@ async function main(): Promise<void> {
       message: '参数缺失 <tla-manifest.json>',
       detail:
         '用法: npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=1|2|3|4|5|6|7|8] [--spec=<id>] [--graph=<graph.json>（phase>=2 强制）] [--keep-states]',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  // D3/I-4：显式传了 --phase（空格或等号形态）但非法（非数字 / 非整数 / 越界）→ ARG_INVALID，
+  // 不再回退 manifest.currentPhase（非法显式输入不得被静默忽略）
+  if (hasPhaseFlag && phaseArg === undefined) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--phase 参数非法',
+      detail: '须为 1-8 的整数（支持 --phase=N 与 --phase N 两形态，重复传参即错）',
       exitCode: 2,
     });
     return;
@@ -304,6 +311,19 @@ async function main(): Promise<void> {
 
   const abs = path.resolve(manifestFile);
   const parsed = await readJsonOrExit<unknown>(manifestFile);
+
+  // D3/F-G3-04：顶层非对象（数组 / 标量）是输入形状错误，分类 STRUCTURE_INVALID，
+  // 不再误判为「无法确定 phase」的 ARG_INVALID（:339-347 manifest.tools 结构检查行为不变）
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    exitWithError({
+      category: 'STRUCTURE_INVALID',
+      rule: 'P0-3',
+      message: '顶层必须为对象（tla-manifest）',
+      file: abs,
+      exitCode: 2,
+    });
+    return;
+  }
 
   const manifest = parsed as Partial<TlaManifest>;
 
