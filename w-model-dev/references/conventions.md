@@ -119,6 +119,11 @@
 - **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：26 个 check-* + 9 个工具 CLI（含 wm-export-evidence.ts / wm-verify-evidence-source.ts）= 35；计数由 docs-consistency 的真实输入错误契约探针得出，不维护固定补数。
 - **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
 
+### 普通 V/G 失败链
+
+- **规范定义**：V/G 任一门禁不通过后的标准返工链（V/G 失败 → R 根因定位 → V 复审 RootCauseReport → G 根因报告门禁 → S-fix → R3×3 预防性审查 → V/G 复验 → CHECKPOINT），权威全句定义见 [hard-constraints.md](hard-constraints.md)「普通 V/G 失败链」节：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。全包其余文档以短名引用本节：正文用 `普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）`，表格用 `普通 V/G 失败链（hard-constraints）`，不再内联全句（examples/ 教学示例除外）。
+- **_Avoid_**：完整失败链/标准返工链/失败处理链（非规范叫法；统一短名「普通 V/G 失败链」并指向 hard-constraints 权威节）。
+
 ---
 
 > **维护规则**：新增 `.w-model/*.json` 字段或脚本 violation 消息前，先在本表登记术语，再改 schema / 文档（反模式 #28 schema 前置校验缺失同类纪律）。首版 12+ 条。

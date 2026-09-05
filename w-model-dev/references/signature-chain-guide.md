@@ -48,7 +48,7 @@ genesis → O(chunk) → S(produce) → V(review-acceptance) → G(check-artifac
 
 ### 返工场景签名链子流程
 ```
-... → V/G 失败 → R(locate) → S(fix) → V(review-fix) → G(re-gate) → ...
+... → V/G 不通过 → R(locate) → S(fix) → V(review-fix) → G(re-gate) → ...
 ```
 
 R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作为来源证明（反模式 #18 守护）。

@@ -7,7 +7,10 @@
  * `npm run audit:l0-links` 取真实三数更新本模块，两测试文件自动跟随。
  */
 export const L0_BASELINE = {
-  relativeLinkCount: 649,
+  // 650 = 649（2026-09-04 gate-closure doc sync）+ 1（2026-09-05 review2-fixes
+  // D2 失败链锚点化：conventions.md「普通 V/G 失败链」词条新增指向
+  // hard-constraints.md 的 1 条相对链接）。
+  relativeLinkCount: 650,
   l1Only: 92,
   placeholders: 36,
 } as const;

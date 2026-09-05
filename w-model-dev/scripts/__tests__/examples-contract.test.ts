@@ -97,6 +97,9 @@ function normalizeGuidance(value: string): string {
 
 function hasCompleteOrdinaryFailureChain(value: string): boolean {
   const normalized = normalizeGuidance(value);
+  // Anchor short name: documents may reference the chain by its canonical short
+  // name (hard-constraints.md「普通 V/G 失败链」节) instead of inlining the chain.
+  if (normalized.includes('普通 V/G 失败链')) return true;
   const variants = [
     ORDINARY_FAILURE_CHAIN,
     ORDINARY_FAILURE_CHAIN.replace(' → R → ', ' → R 定位 → '),
@@ -185,6 +188,7 @@ function hasExecutableDirectAction(value: string): boolean {
 
 function hasChainMarker(value: string): boolean {
   const normalized = normalizeGuidance(value);
+  if (normalized.includes('普通 V/G 失败链')) return true;
   if (normalized.includes('完整普通失败链')) return true;
   return hasCompleteOrdinaryFailureChain(value);
 }
@@ -306,7 +310,7 @@ describe('examples workflow contract', () => {
         `w-model-dev/references/phase-${phase === 5 ? '5-coding' : phase === 6 ? '6-integration-test' : phase === 7 ? '7-system-test' : '8-acceptance-test'}.md`,
       );
       expect(content, `phase ${phase} command entry`).toContain(`/wm test type=${type} result=<pass|fail>`);
-      expect(content, `phase ${phase} failure flow`).toContain(FAILURE_CHAIN);
+      expect(content, `phase ${phase} failure flow`).toContain('普通 V/G 失败链');
       expect(content, `phase ${phase} failure branches`).toContain('R 定位线索');
     }
   });
@@ -376,7 +380,7 @@ describe('examples workflow contract', () => {
     expect(violations).toEqual([]);
   });
 
-  it('requires every ordinary failure guidance document to publish the complete rework chain', () => {
+  it('requires every ordinary failure guidance document to publish the chain or its anchor', () => {
     const phaseReferences = [
       'w-model-dev/references/phase-1-requirements.md',
       'w-model-dev/references/phase-2-system-design.md',
@@ -387,13 +391,17 @@ describe('examples workflow contract', () => {
       'w-model-dev/references/phase-7-system-test.md',
       'w-model-dev/references/phase-8-acceptance-test.md',
     ];
-    const required = [
+    // References and templates may anchor the chain via its canonical short
+    // name; examples/ keep the verbatim full chain for teaching interactions.
+    const anchored = [
       ...phaseReferences,
       'w-model-dev/templates/acceptance-test.md',
       'w-model-dev/templates/review-report.md',
       'w-model-dev/templates/test-report.md',
       'w-model-dev/templates/coding.md',
       'w-model-dev/templates/integration-test.md',
+    ];
+    const verbatimExamples = [
       'w-model-dev/examples/README.md',
       'w-model-dev/examples/requirement-analysis.md',
       'w-model-dev/examples/system-design.md',
@@ -406,7 +414,11 @@ describe('examples workflow contract', () => {
       'w-model-dev/examples/stage8-acceptance-test.md',
     ];
 
-    for (const relativePath of required) {
+    for (const relativePath of anchored) {
+      const content = read(relativePath);
+      expect(containsFailureChain(content) || content.includes('普通 V/G 失败链'), relativePath).toBe(true);
+    }
+    for (const relativePath of verbatimExamples) {
       expect(containsFailureChain(read(relativePath)), relativePath).toBe(true);
     }
   });
@@ -465,7 +477,7 @@ describe('examples workflow contract', () => {
     const content = read('w-model-dev/references/phase-5-coding.md');
 
     expect(content).not.toContain('直接走 R→S-fix');
-    expect(content).toContain(FAILURE_CHAIN);
+    expect(content).toContain('普通 V/G 失败链');
     expect(content).toContain('候选影响阶段由 R 给出');
   });
 
@@ -501,7 +513,13 @@ describe('examples workflow contract', () => {
       for (const rawLine of read(relativePath).split(/\r?\n/)) {
         const line = rawLine.replace(/\s+/g, ' ').trim();
         if (!line || !failure.test(line) || !bypass.test(line)) continue;
-        if (line.includes(FAILURE_CHAIN) || line.includes('下方完整链') || line.includes('完整普通失败链')) continue;
+        if (
+          line.includes(FAILURE_CHAIN) ||
+          line.includes('下方完整链') ||
+          line.includes('完整普通失败链') ||
+          line.includes('普通 V/G 失败链')
+        )
+          continue;
         if (line.includes('phase 1') && line.includes('ingestion') && line.includes('A-chunk')) continue;
 
         const withoutProhibition = line.replace(

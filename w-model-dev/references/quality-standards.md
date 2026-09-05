@@ -176,12 +176,10 @@
 质量门检查 ──失败──────┤
    │通过               │
    ▼                   ▼
-发布        完整普通失败链（V/G 失败 → R → V 复审 RootCauseReport
-                      → G(check-rootcause-report exit 0) → S-fix → R3×3
-                      → G(check-preventive-review exit 0) → V → G → CHECKPOINT）
+发布        普通 V/G 失败链（hard-constraints）
 ```
 
-> 🔴 **CHECKPOINT · 质量门放行**：到达“质量门检查”节点时，Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>` 获取确定性判定（不得用 LLM 估算）。阶段 5-8 另须 `--scope=<change-scope.json>`；scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计）。退出码 0 → 暂停向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布；退出码 1 → 作为 R 定位线索执行上述完整普通失败链；退出码 2 → 修正输入后重跑；任一非 0 均不得放行。详见 [SKILL.md](../SKILL.md)「阶段门与质量门」节与 [hard-constraints.md](hard-constraints.md) #3/#6/#7。
+> 🔴 **CHECKPOINT · 质量门放行**：到达“质量门检查”节点时，Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>` 获取确定性判定（不得用 LLM 估算）。阶段 5-8 另须 `--scope=<change-scope.json>`；scope 缺失或与 Git 实际变更不符即 exit 1（fail-closed 设计）。退出码 0 → 暂停向用户展示「RTM 覆盖率 / 四级测试结果 / GATE_JSON 摘要」由用户确认发布；退出码 1 → 作为 R 定位线索执行上述普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；退出码 2 → 修正输入后重跑；任一非 0 均不得放行。详见 [SKILL.md](../SKILL.md)「阶段门与质量门」节与 [hard-constraints.md](hard-constraints.md) #3/#6/#7。
 
 ## 质量门检查清单（放行条件）
 

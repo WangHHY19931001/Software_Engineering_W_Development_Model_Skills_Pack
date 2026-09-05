@@ -264,7 +264,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | 场景                                      | 迁移策略                                                       | 风险                                                 |
 | ----------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
 | 新增技术栈（如 `frontend` 加入 `Vue 3`）  | 直接 append 到数组；不触发回滚                                 | 无                                                   |
-| 删除技术栈（如 `backend` 移除 `Express`） | 须先核验代码模块列无引用该栈的文件；若有引用，先记录为 R 定位线索并完成完整普通失败链，再由 S-fix 执行编码迁移 | 删除后代码仍引用 → `check-artifact-gate.ts` 退出码 1；完整链为 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
+| 删除技术栈（如 `backend` 移除 `Express`） | 须先核验代码模块列无引用该栈的文件；若有引用，先记录为 R 定位线索并完成完整普通失败链，再由 S-fix 执行编码迁移 | 删除后代码仍引用 → `check-artifact-gate.ts` 退出码 1；完整链为 普通 V/G 失败链（hard-constraints） |
 | 重命名技术栈                              | 须同步更新 `techStack` 数组与所有引用文档；保留 `.bak` 备份    | 文档与 `rtm.json` 不一致 → 退出码 1                  |
 
 ### 3. JSON 文件损坏恢复
@@ -525,7 +525,7 @@ interface RunLogEntry {
 
 > 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §7.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
-`action` 枚举新增 `rootcause` / `fix` 两个动作。普通返工链固定为 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；各动作的额外必填字段约束：
+`action` 枚举新增 `rootcause` / `fix` 两个动作。普通返工链固定为 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；各动作的额外必填字段约束：
 
 | action      | 额外必填字段                                                                | 说明                                                                                                                                                                                                                         |
 | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

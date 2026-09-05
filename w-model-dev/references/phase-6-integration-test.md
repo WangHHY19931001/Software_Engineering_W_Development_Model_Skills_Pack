@@ -70,7 +70,7 @@
 - IT-006 补偿失败：检查 TCC/SAGA 状态机实现与补偿操作幂等性
 - IT-007 断路器不触发：检查阈值配置、quality-standards 容错清单与阶段 2 决策
 
-以上只是 R 的输入线索。普通 V/G 失败必须先经 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
+以上只是 R 的输入线索。普通 V/G 失败必须先经 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
 
 **失败用例返工表的执行前提**：表中“候选影响阶段”与“修复后真实重跑”均只能在上述完整普通失败链完成、R 的结论经 V 复审和 G 根因门禁通过、S-fix 后 R3×3 与预防审查门禁 exit 0，并经用户 CHECKPOINT 确认后执行；不得把表格中的线索或重跑命令当作直接返工授权。
 
@@ -91,12 +91,12 @@
 ## 阶段门评审
 
 集成测试全部通过后，O 展示真实 IT 结果、R3/V/G 证据与 RTM 回填，并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入阶段 7（系统测试）。
-普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 upstreamDefect 判定可推荐回到阶段 1-5；不得跳过 R/V/G 直接修复。
+普通 V/G 不通过 → 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。R 的 upstreamDefect 判定可推荐回到阶段 1-5；不得跳过 R/V/G 直接修复。
 
 ## L3 BDD features 执行
 
 S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
-- 普通失败走完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得省略根因报告复审或 fix 后预防审查
+- 普通失败走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得省略根因报告复审或 fix 后预防审查
 - 通过后 G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phase=6 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/integration.json` 门禁
 - cucumber 报告不得有 undefined/pending/failed step（D5 校验）
 
@@ -106,7 +106,7 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 |---|---|---|
 | 1 | 用 mock 替代真实模块间调用 | 集成测试必须验证真实模块交互，mock 仅用于外部依赖边界 |
 | 2 | 伪造 `result=pass` 跳过失败用例 | 必须跑真实测试运行器，通过 `/wm test type=集成 result=<pass|fail>` 回填；实际值只能是 `pass` 或 `fail` |
-| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后才可推进 |
+| 3 | 跳过失败用例直接推进 | 失败用例必须作为 R 定位线索，执行普通 V/G 失败链（hard-constraints）后才可推进 |
 | 4 | 性能用例只跑单次请求 | IT-004 必须按负载模型（100 并发 × 30s）采样 ≥ 1000 请求 |
 | 5 | 兼容性用例只测当前版本 | IT-005 必须 v1/v2 双版本对照 |
 
@@ -121,7 +121,7 @@ S-test 子代理执行 `npx cucumber-js features/L3/` 运行所有 scenarios：
 | IT-006 补偿失败 | TCC/SAGA 状态机与幂等性 | 阶段 2 或 5 | `npx vitest run tests/integration/ --grep "补偿"` |
 | IT-007 断路器不触发 | 阈值配置与容错设计 | 阶段 2 或 5 | `npx vitest run tests/integration/ --grep "容错"` |
 
-表中候选阶段不授权直接回退。O 仅在完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 完成、证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
+表中候选阶段不授权直接回退。O 仅在普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 完成、证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 退出状态
 

@@ -75,7 +75,7 @@
 
 ### 普通失败返工链
 
-`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）
 
 `result` 只能由真实测试运行器回填；失败、pending 或未执行的用例不得改写为通过。
 ## 7. 校验
@@ -90,7 +90,7 @@
 
 - [ ] `confirm`（验收通过，项目完成）
 - [ ] `confirm-with-comments`（通过但附意见：{{}}）
-- [ ] `reject`（拒绝；先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再由 R 结论和用户 CHECKPOINT 决定阶段切换）
+- [ ] `reject`（拒绝；先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再由 R 结论和用户 CHECKPOINT 决定阶段切换）
 
 确认人：{{用户 / 代理人（须提前在 RTM 备案）}}
 确认日期：{{YYYY-MM-DD}}

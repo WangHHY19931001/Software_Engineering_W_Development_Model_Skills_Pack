@@ -47,7 +47,7 @@
 ```
 输入: 详细设计文档
   1. 解析类和方法定义
-     ├─ 失败: 设计文档字段缺失/类型不明 → 暂停并记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，按 R 结论回 phase-4 补充详细设计
+     ├─ 失败: 设计文档字段缺失/类型不明 → 暂停并记为 R 定位线索；普通 V/G 失败先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，按 R 结论回 phase-4 补充详细设计
      └─ 成功: 产出结构化的类/方法/字段清单
   2. 根据技术栈生成代码模板
      ├─ 失败: 技术栈未在 project.json 登记 → 暂停向用户确认技术栈
@@ -56,7 +56,7 @@
      ├─ 失败: 依赖外部服务未定义 → 标注缺失依赖并暂停，不得伪造实现
      └─ 成功: 产出可编译的实现代码
   4. 生成单元测试代码（套用阶段 4 用例设计）
-     ├─ 失败: 用例无明确断言 → 记为 R 定位线索；普通 V/G 失败先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，R 才可建议回阶段 4 补断言格式
+     ├─ 失败: 用例无明确断言 → 记为 R 定位线索；普通 V/G 失败先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），R 才可建议回阶段 4 补断言格式
      └─ 成功: 产出可执行测试文件
   5. 代码质量检查和优化
      ├─ 失败: ESLint/Prettier 报 error → 列出具体违规项并修复，禁止 // eslint-disable 绕过
@@ -190,9 +190,9 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - **与需求变更的关系**：重排不替代需求变更流程——新需求须先进阶段 1（或 Loop 3 事件接驳），不得直接插队改票。
 
 ### Out of 票据化的例外
-- 单一 bug 修复：可免除票据拆解，但**不得**绕过普通失败链；仍走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
-- 单一 TLA+ 不变式违反修复：同样可免除票据拆解，但不得直接 R→S-fix；普通失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
-- 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时：可直接编码而不拆票据；若出现普通 V/G 失败，必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。
+- 单一 bug 修复：可免除票据拆解，但**不得**绕过普通失败链；仍走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
+- 单一 TLA+ 不变式违反修复：同样可免除票据拆解，但不得直接 R→S-fix；普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
+- 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时：可直接编码而不拆票据；若出现普通 V/G 失败，必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
 - 不需要票据化时产出 `tickets.md` 仅含一行声明「本阶段改动范围小，不票据化，直接编码」
 - 候选影响阶段由 R 给出；O 只在完整 R/V/G 证据和用户 CHECKPOINT 后执行阶段切换。
 - V 子代理评审时检查该声明是否合理（避免漏拆）
@@ -218,7 +218,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 ## 并行任务（强制）
 
-生成代码后，**立即**生成并执行单元测试。单元测试代码覆盖率不达标时，覆盖率缺口是 **R 定位线索**；实际返工先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再补充测试或修正实现。
+生成代码后，**立即**生成并执行单元测试。单元测试代码覆盖率不达标时，覆盖率缺口是 **R 定位线索**；实际返工先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再补充测试或修正实现。
 
 ## 代码审查（`/wm review`）
 
@@ -264,7 +264,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - REQ 行 `codeModule` 格式严格为 `SD-xxx:src/path/to/file.ts`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
 - NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，直接填文件路径或 `"横切"` 标识。
 
-**阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行完整普通失败链：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；仅在用户 CHECKPOINT 确认后，按 R 结论补回填。
+**阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；仅在用户 CHECKPOINT 确认后，按 R 结论补回填。
 
 > 与阶段 1 的衔接：阶段 1 已登记 `NFR/CON.designDoc`（横切 SD 清单或 `"横切"`），阶段 5 须保证 `codeModule` 与 `designDoc` 横切关系一致——若 `designDoc="横切"` 而 `codeModule` 只指向单个文件，V 子代理评审时应提示「横切范围与代码实现不匹配」（可选 reworkHint，非阻断）。
 
@@ -322,7 +322,7 @@ import 'dotenv/config';
 
 G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-design-contract-consistency.ts) 校验，exitCode=0 才放行。
 
-违反任一条 → 记录为 **R 定位线索**，禁止「以代码为准」忽略设计。若 V/G 因此不通过，O 必须分派 R，随后走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；不得直接命令 S 回编码。
+违反任一条 → 记录为 **R 定位线索**，禁止「以代码为准」忽略设计。若 V/G 因此不通过，O 必须分派 R，随后走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；不得直接命令 S 回编码。
 
 ## 验收标准
 
@@ -338,7 +338,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 ## 阶段门评审
 
 代码审查 + 单元测试通过后，O 展示真实测试、R3/V/G 证据并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入阶段 6（集成测试）。
-普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 upstreamDefect 判定可推荐回到阶段 1-4；不得只按 reworkHints 直接分派 S。
+普通 V/G 不通过 → 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。R 的 upstreamDefect 判定可推荐回到阶段 1-4；不得只按 reworkHints 直接分派 S。
 
 ## 禁止行为
 
@@ -368,7 +368,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「跨角色越权」场景（如 `reader` 调用 `blogger-only` 端点应返回 403）
 - [ ] 系统测试须覆盖「越权用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，作为 **R 定位线索**；实际返工先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。关联反模式 [#22 角色越权](hard-constraints.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，作为 **R 定位线索**；实际返工先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。关联反模式 [#22 角色越权](hard-constraints.md)。
 
 ## 副作用时序一致性清单
 
@@ -379,7 +379,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 - [ ] 单元测试须覆盖「副作用与响应体一致性」场景（断言响应体字段 = 已生效状态）
 - [ ] 系统测试须覆盖「时序用例」（详见 [phase-7-system-test.md](phase-7-system-test.md) 禁止行为 #7）
 
-违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，作为 **R 定位线索**；实际返工先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。关联反模式 [#24 副作用时序不一致](hard-constraints.md)。
+违反任一条 → V-code 评审标注 `reworkHints` + 系统测试用例失败，作为 **R 定位线索**；实际返工先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。关联反模式 [#24 副作用时序不一致](hard-constraints.md)。
 
 ## 断言规范
 
@@ -445,7 +445,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - ESLint/Prettier 报 error：作为实现缺陷证据，禁止 // eslint-disable 绕过
 - 覆盖率 < 80%：作为测试/实现缺口证据，禁止调低阈值
 
-任何普通 V/G 失败均先走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 `upstreamDefect` 才能建议回阶段 1-4；O 只在展示证据后的用户 CHECKPOINT 执行获批准的阶段切换。
+任何普通 V/G 失败均先走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。R 的 `upstreamDefect` 才能建议回阶段 1-4；O 只在展示证据后的用户 CHECKPOINT 执行获批准的阶段切换。
 
 ## 退出状态
 

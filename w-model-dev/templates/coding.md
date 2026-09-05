@@ -92,6 +92,6 @@
 
 任一普通 V/G、评审或真实测试失败，均按以下完整链执行：
 
-`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）
 
 只有用户在 CHECKPOINT 确认且 R 的 `upstreamDefect` 支持时，O 才可按证据回到上游阶段。`result` 只能由真实测试运行器回填。

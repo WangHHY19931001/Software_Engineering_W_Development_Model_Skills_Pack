@@ -76,7 +76,7 @@ G: check-preventive-review.ts 证据
 V: VerifierOutput JSON
   ↓ 分派 G 门禁
 G: check-verifier-output.ts + 阶段专属 check 脚本 → {exitCode, qualityLevel, passed, reworkHints}
-O: 若 exitCode≠0 或 qualityLevel∈{C,D} → 按完整普通失败链执行：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT（见 §4）
+O: 若 exitCode≠0 或 qualityLevel∈{C,D} → 按普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）执行（见 §4）
 O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（展示 G 证据 + RTM coverage）
 O: 用户放行 → 更新 project.status → 进入下一阶段
 ```
@@ -179,7 +179,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 4. 返工循环分派
 
-V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix 修复 → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT（约束 #12 + #11 + #8）
+普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）（约束 #12 + #11 + #8）
 
 | 步骤 | 角色 | 产物 | check 脚本 | R3 报告路径前缀 |
 |---|---|---|---|---|
@@ -550,7 +550,7 @@ V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
   ↓ 分派 G
 G: npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>"
    → 返回 {exitCode, qualityLevel, passed, reworkHints}
-O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D} → 视为 V/G 失败，必须执行完整普通失败链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT
+O: 若 exitCode ≠ 0 或 qualityLevel ∈ {C,D} → 视为 V/G 失败，必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）
    → 分派 R 定位（输入：reworkHints + 失败产物 + 上游产物）→ R 产出 RootCauseReport
    → 分派 V 复审根因报告（targetKind=rootcause）→ V 返回 {qualityLevel, passed, reworkHints}
    → 分派 G 门禁（check-rootcause-report.ts）→ G 返回 {exitCode, evidence}
@@ -575,7 +575,7 @@ O: 阶段 8 验收测试产物已放行
   ↓ 分派 G
 G: npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>（阶段 8 终检，默认 phase=8）
    → 返回 {exitCode, GATE_JSON 摘要（RTM 覆盖率 / 四级测试结果）}
-O: 若 exitCode = 1 → 视为 V/G 失败，先执行完整普通失败链：V/G 失败 → R 定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT，再按 R 结论处理
+O: 若 exitCode = 1 → 视为 V/G 失败，先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再按 R 结论处理
 O: 若 exitCode = 2 → 仅修正输入并重跑，不得当作失败修复或放行
 O: 若通过 → 🔴 CHECKPOINT · 发布放行（展示 GATE_JSON 给用户）
 O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完成
@@ -1229,7 +1229,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 编排者收到 G 子代理返回后：
 - `exitCode=0` 且 `qualityLevel ∈ {A,B}` 且 `passed=true` → 进入 🔴 CHECKPOINT · 阶段门放行；
-- `exitCode=1` 视为 V/G 失败 → `reworkHints` 只交 R 形成定位线索；必须完成完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后，才可按 R 结论返工；
+- `exitCode=1` 视为 V/G 失败 → `reworkHints` 只交 R 形成定位线索；必须完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，才可按 R 结论返工；
 - `exitCode=2` → 输入错误，仅修正输入并重新运行对应命令（阶段门重新产出/终检修复输入），不进入 S-fix 旁路。
 
 ### A 子代理返回
@@ -1379,7 +1379,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 | 子代理 | 产物动作 | 典型场景 |
 |---|---|---|
 | **S 子代理**（标准变体） | **新增**产物（新文件、新测试用例、新文档章节、新 RTM 实体） | 阶段首次产出：按 phase-N 定义产出本阶段开发产物 + 同步测试设计 |
-| **S-fix 子代理**（返工变体） | **修复**既有产物的 bug（覆盖原文件） | 完整普通失败链：V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix 携 R 报告执行修复 → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT |
+| **S-fix 子代理**（返工变体） | **修复**既有产物的 bug（覆盖原文件） | 普通 V/G 失败链（hard-constraints） |
 | **R 子代理** | **不修改任何产物**，仅产出 `RootCauseReport` | 定位根因，输出 fixRecommendation 给 S-fix |
 
 > S 子代理**不得**在标准产出阶段直接修复既有产物 bug；发现既有产物 bug 时按下方流程处理。
@@ -1507,10 +1507,10 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 | 失败场景 | 处理 |
 |---|---|
-| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`） | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` |
+| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`） | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：普通 V/G 失败链（hard-constraints） |
 | V 子代理产出 JSON 不满足 Schema | G 子代理 `check-verifier-output.ts` 退出码 2 → 编排者分派 V 重新产出 |
 | G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过） | `reworkHints` 仅作 R 定位线索；必须执行完整普通失败链后再由 S-fix 返工 |
-| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过） | 记录为 R 定位线索；必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 后再由 S-fix 回阶段 5 返工 |
+| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过） | 记录为 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 回阶段 5 返工 |
 | 编排者自身越权实施（命中反模式 #10） | 回到当前阶段起点，已越权产出的实体作废重做 |
 | 子代理无法独立完成（如 BLOCKED 状态） | 子代理返回 `{"status": "BLOCKED", "reason": "..."}`；编排者向用户澄清后重新分派 |
 | R 自评不通过（`passed=false` 或 `qualityLevel∈{C,D}`） | 编排者重派 R（同一 round，不递增）；同一 round 内 R 重派 ≥2 次仍不通过 → 🔴 CHECKPOINT 介入（人工根因分析或调整 maxReworkRounds） |

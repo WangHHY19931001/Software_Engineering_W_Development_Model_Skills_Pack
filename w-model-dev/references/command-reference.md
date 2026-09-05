@@ -37,7 +37,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回         |
 | `wm-status.ts`             | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回 |
 
-生产 CLI 的 exit `1` 仅适用于具有校验失败/检查点结果的 runner；metrics-report 与 wm-status 没有 exit 1 结果分支，输入错误统一为 exit 2。测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。
+生产 CLI 的 exit `1` 仅适用于具有校验失败/检查点结果的 runner；metrics-report 与 wm-status 没有 exit 1 结果分支，输入错误统一为 exit 2。测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
 
 ### L0/L1 链接边界审计
 
@@ -49,7 +49,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **输出**：exit 0/1 的 stdout 为单行 `L0_LINK_AUDIT_JSON {type,passed,skillRoot,relativeLinkCount,l1OnlyCount,templatePlaceholderCount,violations,exitCode}`；exit 2 同时在 stderr 输出人类消息、stdout 输出带 `category`/`message`/`exitCode` 的 `ERROR_JSON` 单行摘要。
 - **可执行示例**：默认当前 `w-model-dev` 使用 `npm run audit:l0-links`；显式 skill 根使用 `npm run audit:l0-links -- --root=<skill-root>`。缺少 `SKILL.md` 或任一 L0 根目录、任何 L0/L1 symlink/junction、包外 realpath、非法 URI 编码和未允许 broken link 均为 exit 1；未知参数为结构化 `ERROR_JSON` / exit 2。
 - **已知近似**：URL 内含 `)` 的行内链接与 `%23`/`%2F` 转义不解码；reference-style 定义已采集（含冒号后无空白与下一行目标两种形态，下一行目标仅接受 / ./ ../ < 起始）。
-- **guide 链接**：[toolbox.md](toolbox.md)（审计入口）与 [quickstart.md](quickstart.md)（L0/L1 分层语义）。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
+- **guide 链接**：[toolbox.md](toolbox.md)（审计入口）与 [quickstart.md](quickstart.md)（L0/L1 分层语义）。
 
 > 每个命令统一为「四件套」：**速查行**（一行用法）→ **参数表**（参数/必填/取值/默认/说明）→ **失败动作**（失败时的处理）→ **guide 链接**（相关 references/*.md 指南）。
 
@@ -78,7 +78,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | -------- | ---- | ------------ | ---- | -------------------------------------- |
 | `<需求>` | 是   | 需求描述文本 | —    | 需求描述、业务背景；首次进入还需技术栈 |
 
-- **失败动作**：信息不足时列出缺失项并暂停，不得猜测关键业务规则；普通评审失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S。
+- **失败动作**：信息不足时列出缺失项并暂停，不得猜测关键业务规则；普通评审失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S。
 - **guide 链接**：[phase-1-requirements.md](phase-1-requirements.md)（阶段 1 需求分析）、[rtm-guide.md](rtm-guide.md)（RTM 映射）、[ingestion-chunk.md](ingestion-chunk.md) / [ingestion-cross.md](ingestion-cross.md) / [graph-guide.md](graph-guide.md)（ingestion 子流程）。
 
 - **路由**：阶段 1 需求分析。
@@ -100,7 +100,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | ------ | ---- | -------------------------- | ---- | ----------------------------------------------------- |
 | `type` | 是   | `架构` \| `概要` \| `详细` | —    | 设计类型；`架构`→阶段 2、`概要`→阶段 3、`详细`→阶段 4 |
 
-- **失败动作**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段；普通评审失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S。
+- **失败动作**：`type` 缺失/非法返回合法值；上游产物缺失则拒绝跳阶段；普通评审失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S。
 - **guide 链接**：[phase-2-system-design.md](phase-2-system-design.md) / [phase-3-outline-design.md](phase-3-outline-design.md) / [phase-4-detailed-design.md](phase-4-detailed-design.md)（对应设计阶段）、[graph-guide.md](graph-guide.md)（图谱演进）。
 
 | `type` | 路由            | 必需上游产物   | 同步测试设计 |
@@ -125,7 +125,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | -------- | ---- | ------------ | ---- | ---------------- |
 | `<功能>` | 是   | 功能描述文本 | —    | 待编码实现的功能 |
 
-- **失败动作**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败作为 R 定位线索，普通 V/G 失败必须执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S 或回编码。
+- **失败动作**：没有详细设计时拒绝编码并引导 `/wm design type=详细`；测试/编译/lint 失败作为 R 定位线索，普通 V/G 失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S 或回编码。
 - **guide 链接**：[phase-5-coding.md](phase-5-coding.md)（阶段 5 编码实现）、[rtm-guide.md](rtm-guide.md)（RTM 代码列）、[quality-standards.md](quality-standards.md)（质量检查）。
 
 - **路由**：阶段 5 编码实现。
@@ -168,7 +168,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | ---------- | ---- | ---------------------------------------------------- | ---- | ------------------------ |
 | `<target>` | 是   | `REQ-*` \| `DESIGN-*` \| `UAT-/ST-/IT-/UT-*` \| code | —    | 评审目标；按前缀识别类型 |
 
-- **失败动作**：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；qualityLevel C/D 视为 V/G 失败 → 走完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，`reworkHints` 仅交 R 作定位线索，S-fix 按 R 报告执行修复，不得直接分派 S。
+- **失败动作**：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；qualityLevel C/D 视为 V/G 失败 → 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），`reworkHints` 仅交 R 作定位线索，S-fix 按 R 报告执行修复，不得直接分派 S。
 - **guide 链接**：[verifier-spec.md](verifier-spec.md)（子标准与提示词占位符）、[subagent-delegation.md](subagent-delegation.md)（V 分派边界）。
 
 返回评审指引，不由命令本身调用 LLM。**编排者不得自评**——评审必须分派 V 子代理执行（反模式 #10）：
@@ -182,7 +182,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 ```
 
 4. 编排者（O）分派 V 子代理按 Persona 产出 `VerifierOutput` JSON，再分派 G 子代理跑上述命令。
-5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 仅作为 R 定位线索，普通失败必须执行完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接分派 S。
+5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 仅作为 R 定位线索，普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S。
 
 **self-as-verifier 模式**（仅限 demo / 非生产 / 教学演示项目，生产项目禁止；前置：`project.status` 标记 `selfAsVerifier: true`，V 评审须切换 Persona 视角并在 `summary` 注明，详见 SKILL.md「self-as-verifier 模式」节与 verifier-spec §13）：单 Agent 兼任 S/V 时，V 评审后用 `--self-as-verifier --s-output=<S产出路径>` 校验 VerifierOutput 路径与 S 产出路径不同（反模式 #35）：
 
@@ -372,7 +372,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 | `--graph=<path>`            | phase>=2 必填  | 2-8        | 缺少 → exit 2（D8 数据源）                                                            |
 
 - **参数完整性**：仅接受此速查行中的精确选项；require flags 必须是无赋值的裸 flag。`--require-…=true`、重复、拼写近似和未知 `--*` 均为 `ARG_INVALID` / exit 2，绝不降级为兼容 skip。
-- **失败动作**：exit 1 视为普通 V/G 失败 → 先走完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再按 R 结论由 S-fix 修复/补齐项目工件后重跑门禁；required Cucumber 报告必须为 `{ elements: [...] }`，且至少一个非空 `name` 的 scenario element 含 `result.status="passed"`。`failed` 只作失败诊断，`skipped` / `pending` / `undefined` / 未知 status 和匿名 element 都不能满足证据并产生 D5 violation；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
+- **失败动作**：exit 1 视为普通 V/G 失败 → 先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再按 R 结论由 S-fix 修复/补齐项目工件后重跑门禁；required Cucumber 报告必须为 `{ elements: [...] }`，且至少一个非空 `name` 的 scenario element 含 `result.status="passed"`。`failed` 只作失败诊断，`skipped` / `pending` / `undefined` / 未知 status 和匿名 element 都不能满足证据并产生 D5 violation；manifest 有 features 时不能是零已执行 scenario。exit 2 时修正 CLI 参数组合后重跑。未传 require flag 时 D4/D5 保持兼容跳过并输出原因，只限技能包 fixture 回归或未启用阶段强制的调用。
 - **边界**：本地 pre-push 直接运行的是技能包 `check-bdd-model` fixture 回归；它不直接运行 TLA、TLA↔BDD 同步或任何项目工件阶段门。项目阶段门才按成熟度传入上述 require flags 和真实工件。
 - **guide 链接**：[bdd.md](bdd.md)（BDD 门禁调用）与 [tla-plus.md](tla-plus.md)（TLA+ / BDD 协作）。
 

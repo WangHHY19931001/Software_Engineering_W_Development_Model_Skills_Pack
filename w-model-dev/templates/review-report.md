@@ -51,9 +51,7 @@
 
 ## 6. 返工追踪
 
-评审或门禁不通过时，不得直接命令 S 返工或回到编码/上游阶段。必须执行完整普通失败链：
-
-`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`
+评审或门禁不通过时，不得直接命令 S 返工或回到编码/上游阶段。必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）
 
 R 报告的 `upstreamDefect` 只能作为候选回退依据；O 展示完整证据后，须等待用户 CHECKPOINT 批准阶段切换。
 

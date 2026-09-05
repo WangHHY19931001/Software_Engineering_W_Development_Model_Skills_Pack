@@ -167,16 +167,16 @@
 > - 失败用例的根因初判（需求偏差 / 实现缺陷 / 环境问题）
 > - 是否继续执行下一批 / 暂停排查
 >
-> 任一批次失败率 > 20% → 强制暂停并将失败分布交给 R 定位；不得直接回到编码或需求阶段。后续必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，由 R 的上游缺陷结论和用户 CHECKPOINT 决定候选回退阶段。
+> 任一批次失败率 > 20% → 强制暂停并将失败分布交给 R 定位；不得直接回到编码或需求阶段。后续必须走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），由 R 的上游缺陷结论和用户 CHECKPOINT 决定候选回退阶段。
 >
 > **🔴 CHECKPOINT-C · 执行后（项目级放行）**
 >
-> 验收测试全部执行完成后暂停。Agent 必须逐条展示项目级检查清单、RTM 覆盖率、四级测试汇总，并请求真实用户在验收测试报告的「用户确认」区记录 `confirm` 或 `confirm-with-comments`。RTM 覆盖率 < 100% 或四级测试任一未通过时不得请求确认，失败事实先作为 R 定位线索并执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；R 与用户才决定对应阶段回退。`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown 仅用于导出或展示。Agent 不得代签，也不得通过未定义的 `/wm sign` 命令代替用户确认。
+> 验收测试全部执行完成后暂停。Agent 必须逐条展示项目级检查清单、RTM 覆盖率、四级测试汇总，并请求真实用户在验收测试报告的「用户确认」区记录 `confirm` 或 `confirm-with-comments`。RTM 覆盖率 < 100% 或四级测试任一未通过时不得请求确认，失败事实先作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；R 与用户才决定对应阶段回退。`.w-model/rtm.json` 是 RTM 唯一事实源，Markdown 仅用于导出或展示。Agent 不得代签，也不得通过未定义的 `/wm sign` 命令代替用户确认。
 
 ## 阶段门评审
 
 验收测试、终检与归档门禁通过后，O 展示真实 UAT 结果、R3/V/G 证据、RTM 与归档清单，并在 🔴 CHECKPOINT-C 等待真实用户 `confirm` / `confirm-with-comments`；用户确认后才**项目完成**并归档全部文档与 RTM。
-普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。用户 `reject` 或 R 的 upstreamDefect 判定再按根因推荐回到对应需求/设计/编码阶段，不能直接跳过根因闭环。
+普通 V/G 不通过 → 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。用户 `reject` 或 R 的 upstreamDefect 判定再按根因推荐回到对应需求/设计/编码阶段，不能直接跳过根因闭环。
 
 ## L1 BDD features 执行
 
@@ -222,13 +222,13 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 | 用户 reject | 用户反馈与不满意点 | 阶段 1、设计或编码，由 R 分类 |
 | 文档不完整 | 与 templates 的结构差异 | 对应文档产出阶段 |
 
-表中候选阶段不授权直接回退。普通 V/G 失败先走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；O 只在 R/V/G 证据齐全且用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
+表中候选阶段不授权直接回退。普通 V/G 失败先走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；O 只在 R/V/G 证据齐全且用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 异常场景处理
 
 | 场景 | 处理路径 |
 |---|---|
-| 用户 `reject` | 1. 触发反馈收集模板（见下）；2. 将反馈与真实失败证据交给 R，执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；3. 仅在用户 CHECKPOINT 确认后，按 R 结论标注候选阶段，并在 RTM 标注 `reject` + 根因阶段 + 重启时间 |
+| 用户 `reject` | 1. 触发反馈收集模板（见下）；2. 将反馈与真实失败证据交给 R，执行普通 V/G 失败链（hard-constraints）；3. 仅在用户 CHECKPOINT 确认后，按 R 结论标注候选阶段，并在 RTM 标注 `reject` + 根因阶段 + 重启时间 |
 | 部分用例通过 | 通过项归档为「阶段性验收通过」；未通过项按 reject 路径进入上述完整普通失败链；用户须显式选择「接受部分通过 + 缺陷追溯」或「整体 reject」 |
 | 用户无法参会 | 启用异步确认协议：1. Agent 输出完整 UAT 报告（含截图/日志）；2. 用户在 3 个工作日内在验收测试报告「用户确认」区异步追加 `confirm` / `confirm-with-comments` / `reject`；3. 代理人制度：用户可指定代理人（需提前在 RTM 备案），代理人签字等同用户签字 |
 

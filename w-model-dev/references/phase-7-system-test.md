@@ -64,7 +64,7 @@
 - ST-004 兼容性问题：定位 CSS/JS 兼容根因和所需 polyfill
 - ST-005 内存泄漏：用 `node --inspect` heap snapshot 定位泄漏点
 
-以上只是 R 的输入线索。普通 V/G 失败必须先经 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
+以上只是 R 的输入线索。普通 V/G 失败必须先经 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；只有 R 的上游缺陷结论、V/G 证据及用户 CHECKPOINT 才决定回到编码或上游设计阶段。
 
 ## 质量门检查
 
@@ -85,7 +85,7 @@
 | 度量 | 关键指标暴露（Counter/Gauge/Histogram 类，如请求量/P95/错误率）；指标可被采集（Pull/Push 端点） | 指标端点探测 + 采样验证 |
 | 追踪 | 核心链路可追踪（Trace/Span 树）；跨模块调用有 TraceID 传递 | 分布式调用链采样验证 |
 
-**不通过 → R 定位线索**：日志 TraceID / 指标暴露 / 追踪埋点可能缺失。实际返工先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，再按 R 结论补可观测性并重跑系统测试。
+**不通过 → R 定位线索**：日志 TraceID / 指标暴露 / 追踪埋点可能缺失。实际返工先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再按 R 结论补可观测性并重跑系统测试。
 
 ## 验收标准
 
@@ -97,12 +97,12 @@
 - [ ] 缺陷已修复或已记录遗留
 - [ ] 可观测性达标（日志含 TraceID、关键指标暴露、调用链可追踪）
 
-> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=7 --scope=<change-scope.json>` 获取确定性判定（阶段 5-8 artifact gate 聚合 codegraph/opsx strict 校验，scope 缺失/过期即 fail-closed exit 1），向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 是 R 定位线索，必须先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不得直接回编码或放行。
+> 🔴 **CHECKPOINT · 阶段门放行**：系统测试 + 质量门检查完成后暂停。Agent 必须执行 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=7 --scope=<change-scope.json>` 获取确定性判定（阶段 5-8 artifact gate 聚合 codegraph/opsx strict 校验，scope 缺失/过期即 fail-closed exit 1），向用户展示「ST-001~005 结果 / P95 响应 / 安全扫描结果 / GATE_JSON 摘要」，由用户确认「放行进入阶段 8」或「返工」。质量门退出码 1/2 是 R 定位线索，必须先执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接回编码或放行。
 
 ## 阶段门评审
 
 系统测试 + 阶段 7 质量门通过后，O 展示真实 ST 结果、R3/V/G 证据与 RTM 回填，并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入阶段 8（验收测试）。
-普通 V/G 不通过 → `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。R 的 upstreamDefect 判定可推荐回到阶段 1-5；不得直接回编码。
+普通 V/G 不通过 → 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。R 的 upstreamDefect 判定可推荐回到阶段 1-5；不得直接回编码。
 
 ## L2 BDD features 执行
 
@@ -120,7 +120,7 @@ S-test 子代理执行 `npx cucumber-js features/L2/` 运行所有 scenarios：
 | 3 | 用 LLM 估算质量门结果 | 必须执行 `check-artifact-gate.ts` 获取退出码 |
 | 4 | 跳过兼容性测试矩阵 | ST-004 必须覆盖 Chrome/Firefox/Safari/Edge + 移动端 |
 | 5 | 可靠性测试只跑 1 小时 | ST-005 必须持续 ≥ 24h 才能判定内存泄漏 |
-| 6 | 把质量门退出码 1/2 当警告忽略 | 退出码 1/2 是 R 定位线索，必须先执行完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，禁止放行 |
+| 6 | 把质量门退出码 1/2 当警告忽略 | 退出码 1/2 是 R 定位线索，必须先执行普通 V/G 失败链（hard-constraints），禁止放行 |
 | 7 | 系统测试未覆盖跨模块数据流校验 / 角色越权检测 / 副作用时序一致性检测 | 系统测试用例须包含：(1) **跨模块数据流用例**（验证 store 选择与 schema 一致，详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节）；(2) **角色越权用例**（验证 `reader` 不能调用 `blogger-only` 端点，应返回 403，详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节）；(3) **副作用时序用例**（验证响应体字段反映已生效状态，详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节）。（预防 P7-001~P7-004 类缺陷） |
 
 ## 返工定位表
@@ -133,7 +133,7 @@ S-test 子代理执行 `npx cucumber-js features/L2/` 运行所有 scenarios：
 | ST-004 兼容性问题 | CSS/JS 兼容根因 | 阶段 5 | BrowserStack 跨浏览器矩阵 |
 | ST-005 内存泄漏 | `node --inspect` heap snapshot | 阶段 5 | 长稳脚本 + 内存监控 |
 
-表中候选阶段不授权直接回退。O 仅在完整普通失败链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 完成、证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
+表中候选阶段不授权直接回退。O 仅在普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 完成、证据齐全并经用户 CHECKPOINT 确认后，执行 R 推荐的阶段切换。
 
 ## 退出状态
 

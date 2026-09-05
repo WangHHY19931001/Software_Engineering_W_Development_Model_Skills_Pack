@@ -103,7 +103,7 @@ BDD 分层与 TLA+ 分层对称（L1/L2/L3/L4），最细粒度都到原子方�
 - **同层对应**：L1 BDD features ↔ L1 TLA+ spec；L2 ↔ L2；L3 ↔ L3；L4 ↔ L4
 - **最细粒度对齐**：BDD L4 与 TLA+ L4 都到原子方法（如 `TokenStore.issue()` / `ArticleStore.getById()`）
 - **独立维护**：BDD features 与 TLA+ spec 独立产出与维护，依靠 `check-bdd-model.ts` 等价性校验保证一致
-- **独立门禁回退**：BDD 门禁失败或 TLA+ 门禁失败只标记对应行为门的 R 定位线索；普通失败仍统一执行完整链 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`，不互相牵连
+- **独立门禁回退**：BDD 门禁失败或 TLA+ 门禁失败只标记对应行为门的 R 定位线索；普通失败仍统一执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不互相牵连
 - **不一致走 R→V**：BDD↔TLA+ 不一致由 R 子代理定位根因，V 子代理复审 RootCauseReport，G 根因门禁通过后才可 S-fix
 
 ---
@@ -292,7 +292,7 @@ BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
 - BDD 门禁失败（check-bdd-model.ts exitCode != 0）→ 先走完整普通失败链（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 BDD 子流程资产、对侧 TLA+ 不受影响
 - TLA+ 门禁失败（check-tla-model.ts exitCode != 0）→ 先走完整普通失败链（R 定位根因 → V 复审 → G 门禁放行），S-fix 修复范围限于 TLA+ 子流程资产、对侧 BDD 不受影响
-- 两者各自走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环
+- 两者各自走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环
 
 ### §4.2 等价性跨校验
 
@@ -1606,7 +1606,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 缺失字段或值不合法 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D3（stateMachineCompleteness）退出码 1
-- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环修正
+- 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环修正
 
 ### 2. scenario 路径合法性
 
@@ -1622,7 +1622,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 路径非法（如 `Given Unauthenticated + When logout + Then LoggedOut`，但转移表中无此 From+Event 组合）→ 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D6（scenarioPathValidity）退出码 1
-- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环修正
+- 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环修正
 
 ### 3. TLA+ 等价性
 
@@ -1640,7 +1640,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
   - 实质一致：放行，R 报告记录判定依据
   - 实质不一致：上报人类决策（修正 BDD / 修正 TLA+ / 修正需求设计三选项）
 - 触发 `check-bdd-model.ts` D4（tlaEquivalence）退出码 1
-- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环
+- 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环
 
 ### 4. step 绑定完整性
 
@@ -1676,7 +1676,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **失败处理**：
 - 追溯缺失或不一致 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D1（headerCompleteness）+ D7（rtmMapping）退出码 1
-- 走完整 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT` 循环修正
+- 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环修正
 
 ### 6. 夹具完备性
 
