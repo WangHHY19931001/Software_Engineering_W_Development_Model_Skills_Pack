@@ -126,7 +126,9 @@ async function writeWModel(directory: string, relativePath: string, content: str
 const RUN_LOG_JSONL =
   '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n';
 
-const PROJECT_JSON = '{"id":"natural-exit","status":"编码","updatedAt":"2026-08-05T01:00:00Z"}';
+// F-G4-14：project.json 读取侧经 project.schema.json 校验——夹具须为 schema 合法形状（全 required 字段）
+const PROJECT_JSON =
+  '{"id":"natural-exit","name":"Natural Exit","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}';
 
 async function makeSecurityNpx(directory: string): Promise<void> {
   await makeCommand(directory, 'npx', 'type findings.json\r\nexit /b 0', 'cat findings.json\nexit 0');

@@ -19,7 +19,7 @@
         "reviewedAt": { "description": "评审时间，ISO 8601 字符串", "type": "string", "format": "date-time" },
         "agent": { "description": "评审 Agent 标识（V 子代理），非空字符串", "type": "string", "minLength": 1 },
         "scoringMethod": { "description": "评分方法：logits（模型概率输出，豁免扰动范围校验）/ text-parse（文本解析，扰动范围须 ∈[0.01,0.10]）", "enum": ["logits", "text-parse"] },
-        "repeatTimes": { "description": "同一目标独立重复评估次数，整数 ≥3（默认 3；rawScores 长度须等于此值）", "type": "integer", "minimum": 1 },
+        "repeatTimes": { "description": "同一目标独立重复评估次数，整数 ≥3（默认 3；rawScores 长度须等于此值；schema 下限与 verifier-logic MIN_REPEAT_TIMES 对齐）", "type": "integer", "minimum": 3 },
         "varianceThreshold": { "description": "子标准方差阈值，取值 [0,0.1]（默认 0.10）；防漂移校验阈值，子标准 variance 超出即视为不可重复需重评", "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
@@ -28,6 +28,7 @@
       "type": "array",
       "minItems": 1,
       "items": {
+        "description": "单个子标准评估对象（SubCriterion：名称 + 权重 + 得分 + 原始分数 + 方差 + 证据）",
         "type": "object",
         "additionalProperties": false,
         "required": ["name", "weight", "score", "rawScores", "variance", "evidence"],

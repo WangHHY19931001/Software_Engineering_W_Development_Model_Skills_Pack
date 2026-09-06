@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/evidence-provenance.schema.json",
   "title": "EvidenceSourceProvenance",
+  "description": "受控本机 source provenance 记录：由 `wm-verify-evidence-source` producer+verify 生产并原子写入 `.w-model/evidence-provenance.json`，登记当前 HEAD、run 身份与五类源证据测量（F-G4-08 补全：全字段 description 自描述，受 docs-consistency checkSchemaFieldDescriptions 门禁强制）",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,58 +20,64 @@
     "provenanceSha256"
   ],
   "properties": {
-    "format": { "const": "w-model-evidence-source-provenance" },
-    "version": { "const": 1 },
-    "runId": { "type": "string", "minLength": 1 },
-    "artifactId": { "type": "string", "minLength": 1 },
-    "commitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "verifiedAt": { "type": "string", "format": "date-time" },
-    "verificationStatus": { "const": "passed" },
+    "format": { "description": "格式标识常量，固定为 w-model-evidence-source-provenance（区分导出包内 provenance 的 w-model-evidence-provenance）", "const": "w-model-evidence-source-provenance" },
+    "version": { "description": "source provenance 格式版本，当前固定为 1", "const": 1 },
+    "runId": { "description": "被验证运行的非空唯一标识（与 run-log/gate-logs 同源）", "type": "string", "minLength": 1 },
+    "artifactId": { "description": "被验证工件的非空唯一标识（与受控 Vitest facts/artifact 同源）", "type": "string", "minLength": 1 },
+    "commitSha": { "description": "验证时的 Git 提交 SHA-1（40 位小写十六进制；wm-verify-evidence-source 校验须等于当前 HEAD）", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "verifiedAt": { "description": "producer+verify 执行时间（ISO-8601 日期时间）", "type": "string", "format": "date-time" },
+    "verificationStatus": { "description": "验证结论常量，固定为 passed——仅记录已通过验证的运行（失败不落 provenance）", "const": "passed" },
     "measurements": {
+      "description": "五类源证据的测量（各类文件数 + 按路径排序的规范内容 SHA-256；gate-logs/verifier-outputs/run-log/signature-chain/codegraph-queries）",
       "type": "object",
       "additionalProperties": false,
       "required": ["gateLogs", "verifierOutputs", "runLog", "signatureChain", "codegraphQueries"],
       "properties": {
-        "gateLogs": { "$ref": "#/definitions/measurement" },
-        "verifierOutputs": { "$ref": "#/definitions/measurement" },
-        "runLog": { "$ref": "#/definitions/measurement" },
-        "signatureChain": { "$ref": "#/definitions/measurement" },
-        "codegraphQueries": { "$ref": "#/definitions/measurement" }
+        "gateLogs": { "description": "gate-logs/ 类测量（数量 + 内容哈希）", "$ref": "#/definitions/measurement" },
+        "verifierOutputs": { "description": "verifier-outputs/ 类测量（数量 + 内容哈希）", "$ref": "#/definitions/measurement" },
+        "runLog": { "description": "run-log.jsonl 测量（数量 + 内容哈希）", "$ref": "#/definitions/measurement" },
+        "signatureChain": { "description": "signature-chains/ 类测量（数量 + 内容哈希）", "$ref": "#/definitions/measurement" },
+        "codegraphQueries": { "description": "codegraph-queries/ 类测量（数量 + 内容哈希）", "$ref": "#/definitions/measurement" }
       }
     },
     "sourceFiles": {
+      "description": "纳入 source bundle 的源文件清单（至少 1 条；每条含相对路径、证据类别与 SHA-256）",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/definitions/sourceFile" }
     },
-    "sourceBundleSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "producerVersion": { "type": "string", "minLength": 1 },
-    "provenanceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "sourceBundleSha256": { "description": "sourceFiles 清单按路径排序后的规范 bundle SHA-256（64 位小写十六进制；导出 --source-project 重验比对依据）", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "producerVersion": { "description": "生成该 provenance 的 producer（wm-verify-evidence-source）版本，非空字符串", "type": "string", "minLength": 1 },
+    "provenanceSha256": { "description": "provenance 主体（不含本字段）的规范 SHA-256（64 位小写十六进制；防 provenance 自身被篡改）", "type": "string", "pattern": "^[0-9a-f]{64}$" }
   },
   "definitions": {
     "measurement": {
+      "description": "一类证据的测量单元：文件计数 + 按路径排序的规范内容哈希",
       "type": "object",
       "additionalProperties": false,
       "required": ["count", "contentHash"],
       "properties": {
-        "count": { "type": "integer", "minimum": 0 },
-        "contentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "count": { "description": "纳入本类测量的文件数（非负整数；允许 0=该类暂无证据）", "type": "integer", "minimum": 0 },
+        "contentHash": { "description": "本类文件按路径排序拼接后的规范 SHA-256（64 位小写十六进制）", "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "sourceFile": {
+      "description": "单条源文件登记：相对路径 + 证据类别 + 内容 SHA-256",
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "kind", "sha256"],
       "properties": {
         "path": {
+          "description": "源文件相对项目根的安全 POSIX 路径（禁止绝对路径、反斜杠与 .. 段）",
           "type": "string",
           "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
         },
         "kind": {
+          "description": "源文件所属运行时证据类别（与导出白名单五类一致）",
           "type": "string",
           "enum": ["gate-log", "verifier-output", "signature-chain", "codegraph-query", "run-log"]
         },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "sha256": { "description": "源文件内容 SHA-256（64 位小写十六进制）", "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     }
   }

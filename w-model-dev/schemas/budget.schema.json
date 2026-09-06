@@ -59,6 +59,7 @@
       "description": "多角度 R 实际执行轮次记录数组（check-budget R4-A 规则校验：每轮 persona 数/每 persona tokens/每轮总 tokens 均不超上限）",
       "type": "array",
       "items": {
+        "description": "单轮 R 多角度并行预算记录（RootcauseRound：轮次 + persona 明细 + 总 tokens）",
         "type": "object",
         "additionalProperties": false,
         "required": ["round", "personas", "totalTokens"],
@@ -69,6 +70,7 @@
             "type": "array",
             "minItems": 1,
             "items": {
+              "description": "单个 R persona 的 token 消耗记录（personaSlice + tokens）",
               "type": "object",
               "additionalProperties": false,
               "required": ["personaSlice", "tokens"],

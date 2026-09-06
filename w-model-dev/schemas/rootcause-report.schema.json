@@ -112,6 +112,7 @@
       "minItems": 2,
       "maxItems": 5,
       "items": {
+        "description": "根因链单环节（RootCauseStep：step + why + answer + evidence）",
         "type": "object",
         "additionalProperties": false,
         "required": ["step", "why", "answer", "evidence"],
@@ -175,6 +176,7 @@
       "type": "array",
       "minItems": 1,
       "items": {
+        "description": "单条修复建议（target + location + action + rationale）",
         "type": "object",
         "additionalProperties": false,
         "required": ["target", "location", "action", "rationale"],
@@ -191,6 +193,7 @@
       "type": "array",
       "minItems": 1,
       "items": {
+        "description": "单条预防措施（scope + measure + owner，防根因复发）",
         "type": "object",
         "additionalProperties": false,
         "required": ["scope", "measure", "owner"],
@@ -212,6 +215,7 @@
       "description": "多角度场景附录（method=combined 时 R9 校验非空；R10 canonical-first 校验含 personaSlice=testing-reality-checker 且 confidence ≥0.5；legacy reality-checker 仅在 canonical 缺失时作 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed，防幻想根因）。R10 结构化契约关系见根 schema 的标准 $comment 节点。",
       "type": "array",
       "items": {
+        "description": "单份多角度并行产出的部分根因报告登记（personaSlice + path + confidence）",
         "type": "object",
         "additionalProperties": false,
         "required": ["personaSlice", "path", "confidence"],

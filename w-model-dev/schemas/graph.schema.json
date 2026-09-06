@@ -15,6 +15,7 @@
       "description": "图谱节点数组（类型：REQ/SD/INTF/DD/EXT-IN/EXT-OUT）",
       "type": "array",
       "items": {
+        "description": "单个图谱节点（GraphNode：id + type + phase + title + summary）",
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "type", "phase", "title", "summary"],
@@ -40,6 +41,7 @@
       "description": "图谱边数组（12 种类型；from/to 引用 nodes[].id，两端节点须存在）",
       "type": "array",
       "items": {
+        "description": "单条图谱边（GraphEdge：from + to + type）",
         "type": "object",
         "additionalProperties": false,
         "required": ["from", "to", "type"],
@@ -58,6 +60,7 @@
       "description": "图谱门禁校验轮次记录数组（每轮 check-requirement-graph.ts 执行后追加）",
       "type": "array",
       "items": {
+        "description": "单轮 ingestion 收敛分析记录（phase + round + violations + converged）",
         "type": "object",
         "additionalProperties": false,
         "required": ["phase", "round", "violations", "converged"],

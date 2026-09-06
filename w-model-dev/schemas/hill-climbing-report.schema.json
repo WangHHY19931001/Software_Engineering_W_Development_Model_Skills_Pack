@@ -29,6 +29,7 @@
       "description": "检测到的改进信号数组（prompt/tool/verification-rule/anti-pattern/maturity/budget 类，编排者 O 确定性分析 run-log 产出，无 LLM）",
       "type": "array",
       "items": {
+        "description": "单条改进信号（Signal：signalId + 类别 + 严重度 + 证据 + 建议 + 优先级）",
         "type": "object",
         "additionalProperties": false,
         "required": [

@@ -5,7 +5,9 @@
  * 核对 w-model-dev/scripts/samples/ 下每个 fixture（文件 / 嵌套目录）都被 self-test.ts
  * 用例数组引用（file / sampleDir 字段），且每个子目录在 samples/README.md 覆盖矩阵中有声明——
  * 堵住「新增 fixture 后遗忘在 self-test.ts 登记」的缺口（未登记的 fixture 不参与任何检查，
- * self-test 基线依然全绿）。
+ * self-test 基线依然全绿）。双向闭环（F-G7-06/07，audit-fixes task 6）：
+ *   - 引用 → 在盘：self-test.ts 引用的 file / sampleDir 路径必须真实存在（悬空 → reference-dangling / exit 1）；
+ *   - 声明 → 矩阵行：README 覆盖矩阵按表行首列解析（正文反引号提及不算声明）。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts [repo-root] [--json]
@@ -15,8 +17,8 @@
  *   --json   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
- *   0  全部覆盖（无未登记 fixture，矩阵声明齐全）
- *   1  存在未登记 fixture / 矩阵声明缺失（violations 列出）
+ *   0  全部覆盖（无未登记 fixture，矩阵声明齐全，引用无悬空）
+ *   1  存在未登记 fixture / 引用悬空（dangling）/ 矩阵声明缺失（violations 列出）
  *   2  输入错误（repo-root 缺必需文件）
  *
  * 输出：
@@ -152,13 +154,45 @@ function findUncovered(samplesRoot: string, refs: ReferenceSets): string[] {
   return uncovered;
 }
 
-/** 核对每个顶层子目录在 samples/README.md 覆盖矩阵中有声明 */
+/**
+ * 反向校验（F-G7-06，audit-fixes task 6）：self-test.ts 引用的 fixture 路径（file / sampleDir）
+ * 必须真实存在于盘——引用指向缺失文件（dangling）时旧门禁单向放行 exit 0，self-test 运行期才爆。
+ * 返回悬空引用列表（相对 samples/ 的 POSIX 路径）。
+ */
+function findDanglingRefs(samplesRoot: string, refs: ReferenceSets): string[] {
+  const dangling: string[] = [];
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（samplesRoot 下引用条目），仅作存在性探测
+  const exists = (rel: string): boolean => existsSync(join(samplesRoot, rel));
+  for (const f of refs.files) {
+    if (!exists(f)) dangling.push(f);
+  }
+  for (const d of refs.dirs) {
+    if (!exists(d)) dangling.push(d);
+  }
+  return dangling.sort();
+}
+
+/**
+ * 核对每个顶层子目录在 samples/README.md 覆盖矩阵中有声明（F-G7-07，audit-fixes task 6）：
+ * 判据为「矩阵表行首列出现 `<dir>`」——解析 README 表格行（`^\s*\|` 开头）取首列并剥反引号，
+ * 替代旧的「README 全文 includes(`dir`)」弱校验（正文提及/排除项提及即绕过）。
+ */
 function findUndeclaredDirs(samplesRoot: string, readmeContent: string): string[] {
+  const declared = new Set<string>();
+  for (const line of readmeContent.split('\n')) {
+    if (!/^\s*\|/.test(line)) continue;
+    const firstCell = line
+      .slice(line.indexOf('|') + 1)
+      .split('|')[0]
+      ?.trim();
+    if (firstCell === undefined || firstCell === '') continue;
+    declared.add(firstCell.replace(/^`/, '').replace(/`$/, ''));
+  }
   const undeclared: string[] = [];
   for (const entry of readdirSync(samplesRoot)) {
     if (entry.startsWith('.') || SKIP_NAMES.has(entry)) continue;
     if (!statSync(join(samplesRoot, entry)).isDirectory()) continue;
-    if (!readmeContent.includes(`\`${entry}\``)) undeclared.push(entry);
+    if (!declared.has(entry)) undeclared.push(entry);
   }
   return undeclared;
 }
@@ -188,12 +222,17 @@ async function main(): Promise<void> {
   }
   const refs = extractReferences(readFileSync(selfTestPath, 'utf-8'));
   const uncovered = findUncovered(samplesRoot, refs);
+  const dangling = findDanglingRefs(samplesRoot, refs);
   const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
 
   const violations: Array<{ check: string; message: string }> = [
     ...uncovered.map((rel) => ({
       check: 'fixture-unregistered',
       message: `fixture 未被 self-test.ts 引用：samples/${rel}（新增样本须在 self-test.ts 用例数组登记）`,
+    })),
+    ...dangling.map((rel) => ({
+      check: 'reference-dangling',
+      message: `self-test.ts 引用指向不存在的 fixture：samples/${rel}（引用与在盘文件必须双向闭环，F-G7-06）`,
     })),
     ...undeclared.map((dir) => ({
       check: 'matrix-undeclared',
@@ -230,6 +269,7 @@ async function main(): Promise<void> {
       referencedFiles: refs.files.size,
       referencedDirs: refs.dirs.size,
       unregistered: uncovered.length,
+      danglingRefs: dangling.length,
       undeclaredDirs: undeclared.length,
     },
     violations.length === 0 ? 0 : 1,

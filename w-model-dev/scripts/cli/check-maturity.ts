@@ -12,14 +12,14 @@
  *
  * 参数：
  *   maturity.json        maturity.json 文件路径
- *   --project=<path>     project.json 路径（可选，R3/R4 交叉校验）
+ *   --project=<path>     project.json 路径（可选，R3/R4 交叉校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>     run-log.jsonl 路径（可选，R5 O 失败模式统计）
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
  *   1  校验失败（violations 列出具体原因）
- *   2  输入错误（文件不存在 / 非法 JSON / 参数非法）
+ *   2  输入错误（文件不存在 / 非法 JSON / schema 不符 / 参数非法；含 --project 读取侧 schema 校验失败）
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 MATURITY_JSON 摘要，便于 Agent 正则截取）
@@ -41,7 +41,7 @@ import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
+import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
@@ -126,29 +126,21 @@ async function main(): Promise<void> {
 
   const maturity = parsed as Partial<MaturityConfig>;
 
-  // 可选输入：--project（读失败只警告不 exit）
+  // 可选输入：--project（F-G4-14：读取侧经 project.schema.json 校验，fail-closed）——
+  // 文件缺失/非法 JSON/schema 不符（含缺 status/createdAt 等必填字段）→ STRUCTURE_INVALID exit 2，
+  // 不再 warn-and-skip；schema 校验后 status 必为 9 态枚举（均在 STATUS_TO_PHASES 内）、createdAt 必为
+  // date-time 字符串，「status 非法/缺失」与「未含 createdAt」warn 分支不可达
   let completedPhases: number | undefined;
   let projectCreatedAt: string | undefined;
   if (projectFile) {
     const projectAbs = path.resolve(projectFile);
     try {
-      const projectRaw = await fs.readFile(projectAbs, 'utf-8');
-      const projectParsed = parseJsonSafe(projectRaw) as { status?: string; createdAt?: string };
-      if (typeof projectParsed.status === 'string' && projectParsed.status in STATUS_TO_PHASES) {
-        completedPhases = STATUS_TO_PHASES[projectParsed.status];
-      } else {
-        console.error(
-          `⚠ --project 文件 status 字段非法或缺失，跳过 R3 校验: ${projectAbs}（status=${projectParsed.status ?? '未设置'}）`,
-        );
-      }
-      if (typeof projectParsed.createdAt === 'string') {
-        projectCreatedAt = projectParsed.createdAt;
-      } else {
-        console.error(`⚠ --project 文件未含 createdAt 字段，跳过 R4 时序校验: ${projectAbs}`);
-      }
+      const project = await loadAndValidate<{ status: string; createdAt: string }>(projectAbs, 'project');
+      completedPhases = STATUS_TO_PHASES[project.status];
+      projectCreatedAt = project.createdAt;
     } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      console.error(`⚠ --project 文件读取失败，跳过 R3/R4 交叉校验: ${projectAbs}（${e.code ?? e.message}）`);
+      if (err instanceof Error && err.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return;
+      throw err;
     }
   }
 
@@ -206,7 +198,7 @@ async function main(): Promise<void> {
   console.log(`schemaVersion : ${maturity.schemaVersion ?? '未设置'}`);
   console.log(`level         : ${maturity.level ?? '未设置'}`);
   console.log(
-    `--project     : ${projectFile ? (completedPhases !== undefined ? `已读取（status→completedPhases=${completedPhases}, createdAt=${projectCreatedAt ?? 'N/A'}）` : '已读取但无有效 status') : '未提供'}`,
+    `--project     : ${projectFile ? (completedPhases !== undefined ? `已读取（status→completedPhases=${completedPhases}, createdAt=${projectCreatedAt ?? 'N/A'}）` : '已读取（status 无对应阶段映射）') : '未提供'}`,
   );
   console.log(
     `--run-log     : ${runLogFile ? `${runLogFile}（O 系列命中=${operationalFailureCount ?? 'N/A'}）` : '未提供'}`,

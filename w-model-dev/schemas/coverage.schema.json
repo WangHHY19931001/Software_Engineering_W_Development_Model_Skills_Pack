@@ -11,6 +11,7 @@
       "description": "干系人覆盖矩阵数组（C1 校验非空；status=partial/missing 须填 gapDescription，C8 100% 阈值不允许 partial/missing）",
       "type": "array",
       "items": {
+        "description": "单条干系人覆盖矩阵行（stakeholder：id + role + 关联需求 + status）",
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "role", "relatedReqs", "status"],
@@ -27,6 +28,7 @@
       "description": "场景覆盖矩阵数组（C3 校验非空；C4 校验 happy/error/boundary 三类须齐全）",
       "type": "array",
       "items": {
+        "description": "单条场景覆盖矩阵行（scenario：id + 步骤 + 关联需求 + status）",
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "description", "steps", "relatedReqs", "status", "scenarioType"],
@@ -45,6 +47,7 @@
       "description": "需求类型覆盖矩阵数组（C5 校验 REQ/NFR/CON 三类须齐全）",
       "type": "array",
       "items": {
+        "description": "单条需求类型覆盖矩阵行（requirementType：type + 需求集合 + status）",
         "type": "object",
         "additionalProperties": false,
         "required": ["type", "reqIds", "status"],
@@ -60,6 +63,7 @@
       "description": "横切覆盖矩阵数组（C7 校验与 graph.json cross-cuts 边集双向一致：coverage 有 graph 无、或 graph 有 coverage 无均报违反）",
       "type": "array",
       "items": {
+        "description": "单条横切关注点覆盖矩阵行（crossCut：NFR/CON + 治理需求集合 + status）",
         "type": "object",
         "additionalProperties": false,
         "required": ["nfrConId", "governedReqs", "status"],

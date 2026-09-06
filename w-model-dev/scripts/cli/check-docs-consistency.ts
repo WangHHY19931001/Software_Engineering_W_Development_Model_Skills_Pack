@@ -705,6 +705,16 @@ async function main(): Promise<void> {
   const schemaFiles = readdirSync(join(root, 'w-model-dev/schemas'))
     .filter((f) => f.endsWith('.schema.json'))
     .sort();
+  // F-G4-08：解析全部 schema 供属性级 description 全覆盖检查（checkSchemaFieldDescriptions）
+  const schemas: Record<string, unknown> = {};
+  const schemaParseFailures: string[] = [];
+  for (const f of schemaFiles) {
+    try {
+      schemas[f] = JSON.parse(read(join('w-model-dev/schemas', f)));
+    } catch {
+      schemaParseFailures.push(f);
+    }
+  }
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
   const referencesCount = readdirSync(join(root, 'w-model-dev/references')).filter((f) => f.endsWith('.md')).length;
   const cliScriptFiles = readdirSync(join(root, 'w-model-dev/scripts/cli'))
@@ -748,6 +758,7 @@ async function main(): Promise<void> {
 
   const input: DocConsistencyInput = {
     schemaFiles,
+    schemas,
     personaCount,
     referencesCount,
     exit2ScriptCount,
@@ -836,6 +847,13 @@ async function main(): Promise<void> {
 
   const report = buildDocConsistencyReport(input);
   const { violations } = report;
+  // schema 文件解析失败 fail-closed（无法执行 description 全覆盖检查即视为违规；
+  // schema-descriptions 属静态检查，同步计入 staticViolations 保持分组计数一致）
+  for (const f of schemaParseFailures) {
+    const v = { check: 'schema-descriptions', message: `${f}: JSON 解析失败（description 全覆盖检查无法执行）` };
+    violations.push(v);
+    report.staticViolations.push(v);
+  }
   const exitCode = violations.length === 0 ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置

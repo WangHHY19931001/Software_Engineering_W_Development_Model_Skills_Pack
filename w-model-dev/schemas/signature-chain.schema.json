@@ -32,6 +32,7 @@
           "description": "上游产物数组（每条声明来源路径 + 来源签名 + 来源角色；R8 产物存在性校验）",
           "type": "array",
           "items": {
+            "description": "单条输入来源证明（SourceArtifact：path + sourceSigId + sourceRole）",
             "type": "object",
             "additionalProperties": false,
             "required": ["path", "sourceSigId", "sourceRole"],

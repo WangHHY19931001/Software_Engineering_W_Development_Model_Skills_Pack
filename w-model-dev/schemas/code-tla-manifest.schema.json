@@ -17,6 +17,7 @@
           "description": "TLA+ 规格列表（TlaSpec[]，S 子代理产出 .tla/.cfg 后同步维护）",
           "type": "array",
           "items": {
+            "description": "TLA+ spec 兼容形态条目（TlaSpec 子集，维度 3/4 一致性校验输入）",
             "type": "object",
             "additionalProperties": true,
             "required": [
@@ -69,6 +70,7 @@
           "description": "图谱节点数组（GraphNode[]，结构层；维度1 提取 type=SD 节点做映射校验）",
           "type": "array",
           "items": {
+            "description": "图谱节点兼容形态条目（GraphNode 子集：id + type，维度 1 取 type=SD 做映射）",
             "type": "object",
             "additionalProperties": true,
             "required": ["id", "type"],
@@ -82,6 +84,7 @@
           "description": "图谱边数组（GraphEdge[]，结构层；from/to 引用 nodes[].id）",
           "type": "array",
           "items": {
+            "description": "图谱边兼容形态条目（GraphEdge 子集：from + to + type）",
             "type": "object",
             "additionalProperties": true,
             "required": ["from", "to", "type"],
@@ -104,6 +107,7 @@
           "description": "RTM 行数组（RtmRow[]，追溯层；维度1 读取 codeModule 字段做映射判定）",
           "type": "array",
           "items": {
+            "description": "RTM 行兼容形态条目（RtmRow 子集：requirementId + codeModule）",
             "type": "object",
             "additionalProperties": true,
             "required": ["requirementId"],
@@ -119,6 +123,7 @@
       "description": "代码源文件列表（CLI/test 形态，供注入代码文本；函数运行时接收 codeFiles（含 AST，不可 JSON 序列化）由 codeSources 派生，本 schema 兼容两种形态，codeSources 可选）",
       "type": "array",
       "items": {
+        "description": "单个代码源文件条目（CodeSource：路径 + 注入的文本内容）",
         "type": "object",
         "additionalProperties": false,
         "required": ["path", "content"],

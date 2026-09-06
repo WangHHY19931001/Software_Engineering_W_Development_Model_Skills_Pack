@@ -14,9 +14,12 @@
  *
  * 退出码：
  *   0  正常（含「项目未初始化」——查询命令语义）
- *   2  输入错误（project.json / rtm.json 非法 JSON，转 operational-recovery）
+ *   2  输入错误（project.json 非法 JSON / project.schema.json 校验不符（STRUCTURE_INVALID）/ rtm.json 非法 JSON，转 operational-recovery）
  *
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.1
+ * project.json 读取校验（F-G4-14）：只读查询同样 fail-closed——合法 JSON 但缺必填字段 /
+ * 枚举越界 / 多未知字段（project.schema.json additionalProperties:false）→ exit 2，
+ * 不猜测状态；ENOENT 仍视为「未初始化」exit 0。
  */
 
 import { promises as fs } from 'node:fs';
@@ -27,6 +30,7 @@ import { readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
+import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 
 interface ParsedArgs {
   projectDir: string;
@@ -47,10 +51,10 @@ async function main(): Promise<void> {
   const rtmFile = path.join(wmodelDir, 'rtm.json');
   const runLogFile = path.join(wmodelDir, 'run-log.jsonl');
 
-  // 未初始化 → exit 0（查询命令语义；保留原样：不加类别前缀、不输出 ERROR_JSON）
-  let projectRaw: string;
+  // 未初始化 → exit 0（查询命令语义；保留原样：不加类别前缀、不输出 ERROR_JSON）。
+  // 先用 access 预探测 ENOENT（loadAndValidate 对 ENOENT 走 FILE_NOT_FOUND exit 2，语义不同）
   try {
-    projectRaw = await fs.readFile(projectFile, 'utf-8');
+    await fs.access(projectFile);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
@@ -60,28 +64,15 @@ async function main(): Promise<void> {
     }
     throw err;
   }
+  // F-G4-14：读取侧经 project.schema.json 校验（只读查询同样 fail-closed，输出 ERROR_JSON）。
+  // 非法 JSON → FILE_PARSE / schema 不符（缺必填字段、枚举越界、未知字段、非对象）→ STRUCTURE_INVALID，
+  // 均 exit 2（原「非对象守卫」「status 非字符串归一化」分支被 schema required/enum/type 前置排除）
   let project: { status: string; updatedAt?: string };
   try {
-    project = parseJsonSafe(projectRaw) as { status: string; updatedAt?: string };
+    project = await loadAndValidate<{ status: string; updatedAt?: string }>(projectFile, 'project');
   } catch (err) {
-    exitWithError({
-      category: 'FILE_PARSE',
-      rule: 'P0-3',
-      message: '文件解析失败（非合法 JSON）（转 operational-recovery，不猜测状态）',
-      file: projectFile,
-      exitCode: 2,
-    });
-    return;
-  }
-  if (project === null || typeof project !== 'object' || Array.isArray(project)) {
-    exitWithError({
-      category: 'STRUCTURE_INVALID',
-      rule: 'P0-3',
-      message: '文件解析失败（非对象）（转 operational-recovery，不猜测状态）',
-      file: projectFile,
-      exitCode: 2,
-    });
-    return;
+    if (err instanceof Error && err.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return;
+    throw err;
   }
 
   // rtm.json 可选：缺失降级 null；损坏 → exit 2（输入错误）
@@ -110,11 +101,11 @@ async function main(): Promise<void> {
   // run-log.jsonl 可选：缺失降级空数组（readJsonlOptional ENOENT→[]，坏行 warn+skip 同 readJsonlOrExit）
   const runLog = (await readJsonlOptional(runLogFile, 'run-log')) as RunLogLike[];
 
-  // 归一化 status（JSON 来源可能为任意类型，防 StatusReport.status 类型承诺破坏）
+  // 归一化 status（schema 校验后 status 必为 9 态枚举字符串；此处仅透传）
   const report: StatusReport = buildStatusReport(
     {
-      status: typeof project.status === 'string' ? project.status : '',
-      updatedAt: typeof project.updatedAt === 'string' ? project.updatedAt : undefined,
+      status: project.status,
+      updatedAt: project.updatedAt,
     },
     rtm,
     runLog,

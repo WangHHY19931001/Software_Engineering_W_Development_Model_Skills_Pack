@@ -15,6 +15,7 @@
       "description": "需求追溯行数组，每行对应一个需求（REQ-NNN / NFR-NNN / CON-NNN）的追溯记录；约束 #3：S 子代理产出后每阶段必须回填",
       "type": "array",
       "items": {
+        "description": "单条需求追溯行（RtmRow：需求 ID + 各阶段产物引用 + 覆盖状态）",
         "type": "object",
         "additionalProperties": false,
         "required": ["requirementId", "description", "designDoc", "codeModule", "unitTest", "integrationTest", "systemTest", "acceptanceTest"],
@@ -39,15 +40,16 @@
       "additionalProperties": false,
       "required": ["unitTest", "integrationTest", "systemTest", "acceptanceTest"],
       "properties": {
-        "unitTest": { "description": "单元测试执行汇总（阶段 5 起校验；覆盖率须 ≥80%）", "$ref": "#/$defs/testSummary" },
-        "integrationTest": { "description": "集成测试执行汇总（阶段 6 起校验）", "$ref": "#/$defs/testSummary" },
-        "systemTest": { "description": "系统测试执行汇总（阶段 7 起校验）", "$ref": "#/$defs/testSummary" },
-        "acceptanceTest": { "description": "验收测试执行汇总（阶段 8 终检校验）", "$ref": "#/$defs/testSummary" }
+        "unitTest": { "description": "单元测试执行汇总（阶段 5 起校验；覆盖率须 ≥80%）", "$ref": "#/definitions/testSummary" },
+        "integrationTest": { "description": "集成测试执行汇总（阶段 6 起校验）", "$ref": "#/definitions/testSummary" },
+        "systemTest": { "description": "系统测试执行汇总（阶段 7 起校验）", "$ref": "#/definitions/testSummary" },
+        "acceptanceTest": { "description": "验收测试执行汇总（阶段 8 终检校验）", "$ref": "#/definitions/testSummary" }
       }
     }
   },
-  "$defs": {
+  "definitions": {
     "testSummary": {
+      "description": "单级测试执行汇总对象（RTM 四级测试共用的结构单元）",
       "type": "object",
       "additionalProperties": false,
       "required": ["total", "passed", "failed", "pending", "coverage"],

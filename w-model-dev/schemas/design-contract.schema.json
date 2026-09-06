@@ -11,6 +11,7 @@
       "description": "UAT 路径映射数组（阶段1 验收测试设计与阶段5 实际实现路径对照表，对应 uat-path-mapping.md）；D1 路径一致性校验：actualPath 须在 routeDefinitions 中存在",
       "type": "array",
       "items": {
+        "description": "单条 UAT 路径映射记录（uatId + 设计路径 + 实际路径，B4/B5 回填校验）",
         "type": "object",
         "required": ["uatId", "designPath", "actualPath"],
         "additionalProperties": false,
@@ -26,6 +27,7 @@
       "description": "路由定义数组（编码侧事实源，取自代码路由定义；D1 路径 / D2 参数 / D3 状态码 / D4 响应字段 校验基准）",
       "type": "array",
       "items": {
+        "description": "单条路由契约定义（D1：method + path + params + 成功状态码 + 响应字段）",
         "type": "object",
         "required": ["method", "path", "params", "successStatus", "responseFields"],
         "additionalProperties": false,
@@ -42,6 +44,7 @@
       "description": "验收测试断言数组（阶段1 验收设计侧声明）；D2 参数 / D3 状态码 / D4 响应字段 与 routeDefinitions 做一致性校验",
       "type": "array",
       "items": {
+        "description": "单条验收断言契约（D2-D4：uatId + 请求形状 + 期望状态码 + 断言字段）",
         "type": "object",
         "required": ["uatId", "method", "path", "params", "expectedStatus", "assertedFields"],
         "additionalProperties": false,

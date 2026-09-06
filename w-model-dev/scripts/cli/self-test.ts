@@ -1001,8 +1001,9 @@ const TLA_CASES: TlaCase[] = [
     file: 'bad-checkrounds-phase-summary.json',
     phase: 2,
     expectedPassed: false,
-    expectedReasonPatterns: [/R13.*checkRounds\[0\] 含禁止字段 phaseSummary.*phase 级摘要字段/],
-    description: 'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 R13 schema 校验拦截',
+    expectedReasonPatterns: [/\[schema\].*checkRounds\/0.*additionalProperties/],
+    description:
+      'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 schema additionalProperties:false 前置拦截（F-G4-13 收紧；此前由 R13 拦截）',
   },
   // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {

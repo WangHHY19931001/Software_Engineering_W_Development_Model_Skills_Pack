@@ -97,14 +97,15 @@
           "type": "string",
           "minLength": 1
         },
-        "verifiedAt": { "type": "string", "format": "date-time" },
-        "provenanceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "verifiedAt": { "description": "provenance 验证执行时间（ISO-8601 UTC）。", "type": "string", "format": "date-time" },
+        "provenanceSha256": { "description": "导出 provenance 主体（不含本字段）的规范 SHA-256。", "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "files": {
       "description": "导出文件清单（不包含 manifest 本身）。",
       "type": "array",
       "items": {
+        "description": "单条导出文件登记：导出相对路径 + 内容 SHA-256 + 证据类别。",
         "type": "object",
         "additionalProperties": false,
         "required": ["path", "sha256", "kind"],

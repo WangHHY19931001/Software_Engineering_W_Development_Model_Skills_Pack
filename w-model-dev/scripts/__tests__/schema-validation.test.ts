@@ -73,6 +73,14 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     expect(result.errorMessages.some((m) => /type/.test(m))).toBe(true);
   });
 
+  it('repeatTimes=2 被 schema minimum:3 拒绝（F-G4-11：schema 与「整数 >=3」自述及 verifier-logic MIN_REPEAT_TIMES 对齐）', async () => {
+    const data = await loadJson(verifierSamplesDir, 'valid.json');
+    (data as { meta: { repeatTimes: number } }).meta.repeatTimes = 2;
+    const result = validateBySchema('verifier-output', data);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessages.some((m) => /repeatTimes/.test(m) && /minimum/.test(m))).toBe(true);
+  });
+
   it('fix 和 emergency-fix 缺少 basedOnReport 或空 artifacts 时被 action-specific schema 拒绝', () => {
     const base = {
       runId: 'fix-schema',

@@ -34,6 +34,7 @@
       "description": "TLA+ 规格列表（层次化状态机建模规格清单，S 子代理产出 .tla/.cfg 后同步更新）",
       "type": "array",
       "items": {
+        "description": "单个 TLA+ spec 条目（TlaSpec：模块 ID + 层级 + 文件引用 + 真实检查结果旗标）",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -102,8 +103,9 @@
       "description": "TLA+ 校验轮次记录数组（spec 级记录，语义见 tla-plus.md「checkRounds 字段语义」；首次产出 TLA+ 前填 []；禁止 phase 级摘要字段，违反 R13 拦截）",
       "type": "array",
       "items": {
+        "description": "单轮 TLA+ 校验记录（CheckRound：spec 级返工记录项，字段语义见 tla-plus.md「checkRounds 字段语义」；未知字段一律拒绝，phase 级摘要字段另受 tla-logic R13 禁止）",
         "type": "object",
-        "additionalProperties": true,
+        "additionalProperties": false,
         "required": ["phase", "round", "specId", "syntaxCheck", "tlcCheck", "violations", "converged"],
         "properties": {
           "phase": { "description": "校验时所处阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },

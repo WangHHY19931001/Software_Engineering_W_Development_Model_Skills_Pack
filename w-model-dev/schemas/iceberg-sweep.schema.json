@@ -68,6 +68,7 @@
       "type": "array",
       "description": "新发现的隐藏问题列表，空数组=无新问题=终止条件①满足",
       "items": {
+        "description": "单条本轮新发现（IcebergFinding：findingId 唯一，重复由 R3 去重拦截）",
         "type": "object",
         "additionalProperties": false,
         "required": ["findingId", "severity", "category", "location", "description", "evidence", "hypothesis", "relatedFixedPoint"],

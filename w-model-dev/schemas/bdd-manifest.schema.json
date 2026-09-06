@@ -31,6 +31,7 @@
       "description": "BDD features 清单数组（每项含分层特征 + 关联状态机/TLA+ spec，D1 头标注完整性校验）",
       "type": "array",
       "items": {
+        "description": "单个 BDD feature 条目（Feature：id + level + filePath + 场景数 + TLA+/RTM/特性族关联）",
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "level", "filePath", "scenarioCount", "stateMachineId", "tlaSpecId", "reqIds", "designIds", "parentFeatureIds", "siblingFeatureIds", "childFeatureIds"],
@@ -53,6 +54,7 @@
       "description": "状态机清单数组（每项含七要素：states/initialState/terminalStates/acceptingStates/rejectingStates/transitions/invariants，D3 完整性校验）",
       "type": "array",
       "items": {
+        "description": "单个 BDD 状态机条目（StateMachine：states/initialState/transitions/invariants 七要素）",
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "level", "states", "initialState", "terminalStates", "acceptingStates", "rejectingStates", "transitions", "invariants"],
@@ -69,6 +71,7 @@
             "type": "array",
             "minItems": 1,
             "items": {
+              "description": "单条状态转移（Transition：from + event + to）",
               "type": "object",
               "additionalProperties": false,
               "required": ["from", "event", "to"],
@@ -101,6 +104,7 @@
       "description": "BDD 门禁校验轮次记录数组（每轮 check-bdd-model.ts 执行后追加）",
       "type": "array",
       "items": {
+        "description": "单轮 BDD 校验记录（spec 级返工记录项：phase + round + violations + converged）",
         "type": "object",
         "additionalProperties": false,
         "required": ["phase", "round", "timestamp", "violations", "converged"],

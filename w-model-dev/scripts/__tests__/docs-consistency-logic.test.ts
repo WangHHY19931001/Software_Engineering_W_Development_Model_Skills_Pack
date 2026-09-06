@@ -18,6 +18,7 @@ import {
   buildDocConsistencyReport,
   extractMarkdownRelLinks,
   checkSkillOutboundLinks,
+  checkSchemaFieldDescriptions,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 
@@ -55,6 +56,21 @@ const ACTION_ENUM_27 = [
 /** data-models.md RunLogEntry.action 联合类型（27 值，与 ACTION_ENUM_27 一致） */
 const ACTION_UNION_27 =
   "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
+
+/** 合法 pre-push 文本（连续 #1..#17 检查块 + 「17 项检查」声明，F-G7-08 强校验基线） */
+const VALID_PRE_PUSH = [
+  ...Array.from({ length: 17 }, (_, i) => `# ${i + 1}. 第 ${i + 1} 项门禁检查`),
+  '# 全部门禁共 17 项检查',
+].join('\n');
+
+/** 合法 conventions.md 术语表 fixture（action 27 值逐值列表 + exit-2 计数句，F-G7-04/05 基线） */
+const CONVENTIONS_GLOSSARY = [
+  '### action（RunLogEntry）',
+  `- **规范定义**：run-log 动作类型枚举（共 27 值，以 \`run-log.schema.json\` 为准）：${ACTION_ENUM_27.map((v) => `\`${v}\``).join(' / ')}。`,
+  '- **_Avoid_**：operation/op/行为/事件。',
+  '### exit-2 脚本口径',
+  '- **规范定义**：scripts/cli/ 下除 self-test 外均为 exit 2 脚本：= 36（26 个 check-* + 10 个工具 CLI，不含 self-test）；计数由探针得出。',
+].join('\n');
 
 const R10_CONTRACT_FIXTURE = [
   '<r10-contract id="canonical-name" relation=\'{"canonicalPersona":"testing-reality-checker"}\'>canonical persona is testing-reality-checker</r10-contract>',
@@ -144,7 +160,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests\ncoverage/、.zcode/、.w-model/ 为 Git 忽略的本地生成物；使用 npm run wm:export-evidence -- <project-dir> <output-dir> 导出脱敏 SHA-256 manifest 证据包。docs/changes/archive/ 是受控归档。',
     antiPatterns:
       '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 1 | 跳过阶段门评审 | 缺陷后移 | 走完评审 |\n| 48 | 大规模重构式改动 | 变更量子无穷大 | 小步重构 |',
-    glossary: '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值）：`review` / `gate` / ...',
+    glossary: CONVENTIONS_GLOSSARY,
     runLogSchema: JSON.stringify({
       properties: { action: { enum: ACTION_ENUM_27 } },
     }),
@@ -186,7 +202,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     vitestArtifactId: 'vitest/results.json',
     vitestArtifactSha256: 'b'.repeat(64),
     vitestCommitSha: 'c'.repeat(40),
-    prePush: '# 17. typecheck\n# 与原 CI 一致：17 项检查\n# vitest 全量结果以当前命令输出为准',
+    prePush: VALID_PRE_PUSH,
     scriptsChanged: false,
     securityBaselineEntryCount: -1,
     a4Docs: {
@@ -950,6 +966,113 @@ describe('runDocConsistencyChecks', () => {
     });
     const v = runDocConsistencyChecks(input);
     expect(v.some((x) => x.check === 'pre-push' && x.message.includes('17'))).toBe(true);
+  });
+
+  it('pre-push 伪造 3 块检查（# 1./# 2./# 17.）→ 违规（F-G7-08：连续块断言，非仅最大编号）', () => {
+    const forged = ['# 1. self-test', '# 2. check:verifier', '# 17. typecheck', '# 全部门禁共 17 项检查'].join('\n');
+    const v = runDocConsistencyChecks(baseInput({ prePush: forged }));
+    const hit = v.filter((x) => x.check === 'pre-push');
+    expect(hit.length).toBeGreaterThan(0);
+    expect(hit.some((x) => x.message.includes('连续 #1..#17') && x.message.includes('实测 3 块'))).toBe(true);
+  });
+
+  it('pre-push 中间删除一块（编号断档）→ 违规', () => {
+    const ids = Array.from({ length: 17 }, (_, i) => i + 1).filter((n) => n !== 9);
+    const text = [...ids.map((n) => `# ${n}. 第 ${n} 项`), '# 全部门禁共 17 项检查'].join('\n');
+    const v = runDocConsistencyChecks(baseInput({ prePush: text }));
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('实测 16 块'))).toBe(true);
+  });
+
+  it('glossary action 列表与 schema enum 漂移（缺值/多值）→ 违规（F-G7-05 逐值断言）', () => {
+    const drift = CONVENTIONS_GLOSSARY.replace('`gate` / `tla-gate`', '`gate`').replace(
+      '`iceberg-review`。',
+      '`iceberg-review` / `ghost-action`。',
+    );
+    const v = runDocConsistencyChecks(baseInput({ glossary: drift }));
+    const hit = v.find((x) => x.check === 'glossary-action' && x.message.includes('漂移'));
+    expect(hit).toBeDefined();
+    expect(hit?.message).toContain('tla-gate');
+    expect(hit?.message).toContain('ghost-action');
+  });
+
+  it('glossary 缺逐值列表行 → 违规（F-G7-05）', () => {
+    const noList =
+      '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值，以 `run-log.schema.json` 为准）\n其余文本';
+    const v = runDocConsistencyChecks(baseInput({ glossary: noList }));
+    expect(v.some((x) => x.check === 'glossary-action' && x.message.includes('逐值列表行'))).toBe(true);
+  });
+
+  it('conventions exit-2 计数句：算术不符 / 与实测不符 / 缺计数句 → 违规（F-G7-04）', () => {
+    // 算术不符：26 + 10 ≠ 37
+    const badArithmetic = CONVENTIONS_GLOSSARY.replace(
+      '= 36（26 个 check-* + 10 个工具 CLI',
+      '= 37（26 个 check-* + 10 个工具 CLI',
+    );
+    let v = runDocConsistencyChecks(baseInput({ glossary: badArithmetic }));
+    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('算术不符'))).toBe(true);
+
+    // 声明总数与实测不符（baseInput 实测 36，声明 35）
+    const stale = CONVENTIONS_GLOSSARY.replace(
+      '= 36（26 个 check-* + 10 个工具 CLI',
+      '= 35（26 个 check-* + 9 个工具 CLI',
+    );
+    v = runDocConsistencyChecks(baseInput({ glossary: stale }));
+    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('实际 36 个'))).toBe(true);
+
+    // 缺计数句
+    v = runDocConsistencyChecks(baseInput({ glossary: '### action（RunLogEntry）\n- **规范定义**：枚举列表省略。' }));
+    expect(
+      v.some((x) => x.check === 'exit2-scripts' && x.message.includes('缺「= N（N 个 check-* + N 个工具 CLI')),
+    ).toBe(true);
+  });
+
+  it('checkSchemaFieldDescriptions：带 properties 节点缺 description → 违规；补全后零违规（F-G4-08）', () => {
+    const schema = {
+      type: 'object',
+      description: '根 schema（带 properties 的根节点须有 description）',
+      properties: {
+        a: { description: '字段 a', type: 'string' },
+        b: {
+          description: '嵌套对象 b（带 properties 的嵌套节点也须有 description）',
+          type: 'object',
+          properties: { c: { description: '字段 c', type: 'number' } },
+        },
+        arr: {
+          description: '数组 arr',
+          type: 'array',
+          items: {
+            description: '数组元素对象（items 节点带 properties 须有 description）',
+            type: 'object',
+            properties: { d: { description: '字段 d', type: 'string' } },
+          },
+        },
+      },
+      definitions: {
+        def1: {
+          description: '定义 def1',
+          type: 'object',
+          properties: { e: { description: '字段 e', type: 'string' } },
+        },
+      },
+    };
+    expect(checkSchemaFieldDescriptions({ 'x.schema.json': schema })).toEqual([]);
+
+    // 篡改：删除 b 的 description → 违规指向 #/properties/b；删除 items 的 description → 指向 items 路径
+    const tampered = JSON.parse(JSON.stringify(schema)) as typeof schema;
+    delete (tampered.properties.b as { description?: string }).description;
+    delete ((tampered.properties.arr as { items: { description?: string } }).items as { description?: string })
+      .description;
+    const v = checkSchemaFieldDescriptions({ 'x.schema.json': tampered });
+    expect(v.some((x) => x.message.includes('x.schema.json: #/properties/b 缺 description'))).toBe(true);
+    expect(v.some((x) => x.message.includes('#/properties/arr/items 缺 description'))).toBe(true);
+    // $defs 兼容（draft-2019-09 关键字混入也能遍历到）
+    const withDefs = {
+      type: 'object',
+      properties: { f: { type: 'string' } },
+      $defs: { g: { type: 'object', properties: { h: { type: 'string' } } } },
+    };
+    const vDefs = checkSchemaFieldDescriptions({ 'y.schema.json': withDefs });
+    expect(vDefs.some((x) => x.message.includes('#/definitions/g 缺 description'))).toBe(true);
   });
 
   it('glossary action 含 verify → 违规', () => {

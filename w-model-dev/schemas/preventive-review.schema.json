@@ -26,6 +26,7 @@
       "description": "审查发现数组（可为空数组表示无问题；passed=false 时须含至少一条发现，schema 强制 findings.minItems=1——V 评审须读取本报告将发现纳入 reworkHints，否则命中反模式 #33）",
       "type": "array",
       "items": {
+        "description": "单条审查发现（Finding：severity + description + evidence；passed=false 时须非空）",
         "type": "object",
         "additionalProperties": false,
         "required": ["severity", "description", "evidence"],

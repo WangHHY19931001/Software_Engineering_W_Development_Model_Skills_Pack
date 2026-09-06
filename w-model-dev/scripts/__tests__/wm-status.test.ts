@@ -1,9 +1,8 @@
 /**
  * wm-status.ts CLI 层单元测试（子进程模式）
  *
- * 覆盖：正常人类可读 / --json 结构 / 未初始化(exit 0) / project.json 非法·非对象·数组(exit 2) /
- *       rtm.json 非法(exit 2) / rtm 缺失降级 / run-log 缺失降级 / run-log 坏行跳过 /
- *       status 非字符串归一化 / 仅 project 的降级组合。
+ * 覆盖：正常人类可读 / --json 结构 / 未初始化(exit 0) / project.json 非法·缺必填字段·非对象·数组·枚举越界(exit 2，F-G4-14 读取侧 schema 校验) /
+ *       rtm.json 非法(exit 2) / rtm 缺失降级 / run-log 缺失降级 / run-log 坏行跳过 / 仅 project 的降级组合。
  *
  * 子进程说明：CLI 脚本 main() 顶层执行并调用 process.exit，无法直接 import 测试；
  * 采用 runSync(process.execPath, [tsx/cli, 脚本, ...]) 运行真实进程断言退出码与输出。
@@ -109,26 +108,37 @@ describe('wm-status CLI（异常分支）', () => {
     expect(r.stderr).toContain('项目未初始化');
   });
 
-  it('project.json 非法 JSON → exit 2', async () => {
+  it('project.json 非法 JSON → exit 2（FILE_PARSE）', async () => {
     await writeWModel('project.json', '{bad json');
     const r = run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('文件解析失败');
-    expect(r.stderr).toContain('operational-recovery');
+    expect(r.stdout).toContain('ERROR_JSON ');
   });
 
-  it('project.json 为 null（合法 JSON 非对象）→ exit 2', async () => {
+  it('project.json 为 null（合法 JSON 非对象）→ exit 2（schema STRUCTURE_INVALID，F-G4-14）', async () => {
     await writeWModel('project.json', 'null');
     const r = run();
     expect(r.code).toBe(2);
-    expect(r.stderr).toContain('非对象');
+    expect(r.stderr).toContain('STRUCTURE_INVALID');
+    expect(r.stderr).toContain('文件结构不符');
+    expect(r.stdout).toContain('ERROR_JSON ');
   });
 
-  it('project.json 为数组 → exit 2（非对象守卫拦截）', async () => {
+  it('project.json 为数组 → exit 2（schema STRUCTURE_INVALID，F-G4-14）', async () => {
     await writeWModel('project.json', '[1,2,3]');
     const r = run();
     expect(r.code).toBe(2);
-    expect(r.stderr).toContain('非对象');
+    expect(r.stderr).toContain('STRUCTURE_INVALID');
+    expect(r.stdout).toContain('ERROR_JSON ');
+  });
+
+  it('project.json 缺必填字段（F-G4-14 RED：schema 不符 → exit 2，不再降级猜测）', async () => {
+    await writeWModel('project.json', '{"id":"x"}');
+    const r = run();
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('STRUCTURE_INVALID');
+    expect(r.stdout).toContain('ERROR_JSON ');
   });
 
   it('rtm.json 非法 JSON → exit 2（可读输入损坏不得猜测状态）', async () => {
@@ -169,13 +179,12 @@ describe('wm-status CLI（边界与降级）', () => {
     expect(r.stdout).toContain('最近动作');
   });
 
-  it('status 为数字（非字符串）→ exit 0，归一化为未知状态 fallback', async () => {
+  it('status 为数字（schema 枚举越界）→ exit 2（F-G4-14 翻转：原「归一化为未知状态」场景被 schema required/enum 前置排除）', async () => {
     await writeWModel('project.json', '{"id":"x","status":123,"updatedAt":"t"}');
     const r = run('--json');
-    expect(r.code).toBe(0);
-    const parsed = JSON.parse(r.stdout) as { status: string; nextSteps: string[] };
-    expect(parsed.status).toBe('');
-    expect(parsed.nextSteps[0]).toContain('状态未知');
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('STRUCTURE_INVALID');
+    expect(r.stdout).toContain('ERROR_JSON ');
   });
 
   it('仅 project.json（rtm 与 run-log 全缺）→ exit 0，全降级组合不崩溃', async () => {

@@ -28,6 +28,7 @@
       "description": "升级历史数组（每次升级 append 一条；R4 校验每条 at 不得早于 project.createdAt）",
       "type": "array",
       "items": {
+        "description": "单条成熟度升级历史（LevelHistory：from + to + at + reason）",
         "type": "object",
         "additionalProperties": false,
         "required": ["from", "to", "at", "reason"],

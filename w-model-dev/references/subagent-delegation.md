@@ -277,9 +277,9 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
 > 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 37 个 .ts
-> 一一对应（26 个 check-* + 10 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表）。
-> **新增 / 改名门禁脚本时只在本文件登记一处**——`check-docs-consistency.ts` 的 script-registry 检查
-> 核对全部 37 个 cli 脚本名均出现于本文件（其中 36 个为 exit-2 脚本；漏登记即门禁失败，pre-push 第 14 项拦截）。
+> 一一对应（26 个 check-* + 11 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表；其中 36 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 36（26 个 check-* + 10 个工具 CLI，不含 self-test）」口径互补）。
+> **新增 / 改名门禁脚本时登记点为本表 + SKILL.md/AGENTS.md 计数句（由 checkScriptRegistry 与计数检查双向兜底）**——`check-docs-consistency.ts` 的 checkScriptRegistry
+> 核对全部 37 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 14 项拦截）。
 
 | 脚本 | 类别 | 用途 | 触发时机 |
 |---|---|---|---|
@@ -291,6 +291,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | self-test | 工具 | 262 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
 | wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
 | metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
+| plan-chunks | 工具 | ingestion 分块规划（O 只读 stdout 输出分块建议） | 阶段 1-4 ingestion 子流程入口（O 执行，见 §5） |
 | wm-write | 工具 | 状态文件安全写：`<target>.lock` 持久目录和可转移 owner 对象保证跨进程竞争 writer 不会双成功；锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--lock-timeout` 为安全非负整数；CLI 陈旧锁须显式 `--recover-stale-lock`，否则 `STALE_LOCK` / exit 1（logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |
 | doctor | 工具 | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts） | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门 |
 | wm-export-evidence | 工具 | 将项目 `.w-model/` 白名单状态和文本 run-log 导出为脱敏、SHA-256 manifest 证据包；支持 `--verify` package-only 复核和 `--source-project` source-bound 重验 | 需要按项目安全策略交付本地审计证据时显式运行；不自动提交或发布 |

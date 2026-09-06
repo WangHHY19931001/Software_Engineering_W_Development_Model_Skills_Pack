@@ -35,8 +35,8 @@
       "additionalProperties": false,
       "required": ["exitCode", "passed"],
       "properties": {
-        "exitCode": { "type": "integer", "enum": [0, 1, 2] },
-        "passed": { "type": "boolean" }
+        "exitCode": { "type": "integer", "enum": [0, 1, 2], "description": "与 stdout 机器摘要同源的退出码；必须与 payload 主结论一致。" },
+        "passed": { "type": "boolean", "description": "与 stdout 机器摘要同源的通过旗标；必须与 payload 主结论一致。" }
       },
       "description": "与 stdout 机器摘要同源的受约束事实；必须与 payload 主结论一致。"
     }
@@ -57,6 +57,7 @@
   ],
   "definitions": {
     "bddSummary": {
+      "description": "check-bdd-model.ts 的显式阶段报告摘要形状（script=check-bdd-model.ts 时绑定）。",
       "type": "object",
       "additionalProperties": false,
       "required": ["phase", "checkedAt", "summary", "violationsCount", "exitCode", "passed"],
@@ -65,11 +66,12 @@
         "checkedAt": { "type": "string", "format": "date-time", "description": "BDD 校验执行时间。" },
         "summary": { "type": "string", "description": "BDD 校验结论摘要。" },
         "violationsCount": { "type": "integer", "minimum": 0, "description": "BDD 违规数量。" },
-        "exitCode": { "type": "integer", "enum": [0, 1, 2] },
-        "passed": { "type": "boolean" }
+        "exitCode": { "type": "integer", "enum": [0, 1, 2], "description": "BDD 主门禁退出码（与顶层 exitCode 一致）。" },
+        "passed": { "type": "boolean", "description": "BDD 主门禁是否通过（与顶层 passed 一致）。" }
       }
     },
     "icebergSummary": {
+      "description": "check-iceberg-sweep.ts 的显式阶段报告摘要形状（script=check-iceberg-sweep.ts 时绑定）。",
       "type": "object",
       "additionalProperties": false,
       "required": ["reportId", "triggerType", "icebergRound", "newFindingsCount", "passed", "exitCode"],
@@ -83,6 +85,7 @@
       }
     },
     "preventiveReviewSummary": {
+      "description": "check-preventive-review.ts 的显式阶段报告摘要形状（script=check-preventive-review.ts 时绑定）。",
       "type": "object",
       "additionalProperties": false,
       "required": ["phase", "variant", "autoTrigger", "reviewCount", "exitCode", "passed"],
@@ -91,8 +94,8 @@
         "variant": { "type": "string", "enum": ["standard", "fix", "emergency", "ingest"], "description": "预防性审查变体。" },
         "autoTrigger": { "type": "boolean", "description": "是否由 run-log 自动触发。" },
         "reviewCount": { "type": "integer", "minimum": 0, "maximum": 3, "description": "成功读取的审查报告数量。" },
-        "exitCode": { "type": "integer", "enum": [0, 1, 2] },
-        "passed": { "type": "boolean" }
+        "exitCode": { "type": "integer", "enum": [0, 1, 2], "description": "R3 审查门禁退出码（与顶层 exitCode 一致）。" },
+        "passed": { "type": "boolean", "description": "R3 审查门禁是否通过（与顶层 passed 一致）。" }
       }
     }
   }

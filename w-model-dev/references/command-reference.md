@@ -217,7 +217,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 | -------- | ---- | ---- | ---- | ---------------------------------------------------- |
 | `--json` | 否   | 标志 | 关闭 | 输出单行 `StatusReport` JSON（供展示证据或机器消费） |
 
-- **失败动作**：退出码 2 = project/rtm JSON 损坏（转 [operational-recovery.md](operational-recovery.md)，不得猜测状态）。
+- **失败动作**：退出码 2 = project/rtm JSON 损坏或 project.json 不符 `project.schema.json`（转 [operational-recovery.md](operational-recovery.md)，不得猜测状态）。
 - **guide 链接**：[operational-recovery.md](operational-recovery.md)（JSON 损坏恢复）。
 
 - **执行方**：O 只读，不分派子代理。
@@ -229,7 +229,9 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
     4. 四级测试 `total/passed/failed/pending`；
     5. 最近 3 条动作；
     6. 确定性下一步建议。
-- 退出码：0 = 正常（含未初始化提示「项目未初始化」）；2 = project/rtm JSON 损坏（转 `operational-recovery.md`，不得猜测状态）。
+- 退出码：0 = 正常（含未初始化提示「项目未初始化」）；2 = project/rtm JSON 损坏或 project.json 不符 `project.schema.json`（转 `operational-recovery.md`，不得猜测状态）。
+
+> **project.json 读取口径（F-G4-14）**：全部读取侧（本命令 + 阶段门 `check-budget.ts --project=` / `check-maturity.ts --project=`）统一经 `project.schema.json` 校验（`loadAndValidate(file, 'project')`）——文件缺失（wm-status 的 ENOENT 视为「未初始化」exit 0 除外）、非法 JSON 或缺必填字段 / 枚举越界 / 多未知字段（`additionalProperties:false`）一律 `STRUCTURE_INVALID` / exit 2，不再 warn-and-skip；「合法 project 缺 updatedAt」场景已被 schema required 前置排除。
 
 ## `/wm metrics`
 

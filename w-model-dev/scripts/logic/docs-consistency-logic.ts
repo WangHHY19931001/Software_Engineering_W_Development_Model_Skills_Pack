@@ -146,6 +146,8 @@ export interface DocConsistencyInput {
   lockJson?: string;
   /** w-model-dev/references/subagent-delegation.md 原文（script-registry 检查数据源：门禁脚本权威登记表，dispatch-matrix 节） */
   dispatchMatrix: string;
+  /** schemas/*.schema.json 解析后的对象表（键=文件名；F-G4-08 属性级 description 全覆盖检查数据源；可选——缺省时跳过） */
+  schemas?: Record<string, unknown>;
   /** w-model-dev/scripts/cli/ 下全部 .ts 文件名（实测；script-registry 检查数据源） */
   cliScriptFiles: string[];
   /** 本地生成物与证据导出契约的逐文档输入；缺省时跳过，以保持旧调用方与 fixture 兼容。 */
@@ -756,11 +758,15 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   violations.push(...checkHardConstraints(input.skill, input.hardConstraints));
   violations.push(...checkAntiPatterns(input.antiPatterns));
   violations.push(...checkExit2ScriptCount(input.exit2ScriptCount, input.agents));
+  violations.push(...checkConventionsExit2Count(input.glossary, input.exit2ScriptCount));
   violations.push(...checkPrePushCount(input.prePush));
-  violations.push(...checkGlossaryAction(input.glossary));
+  violations.push(...checkGlossaryAction(input.glossary, input.runLogSchema));
   violations.push(...checkAssetCounts(input.personaCount, input.readme));
   violations.push(...checkReferencesCount(input.referencesCount, input.skill));
   violations.push(...checkDesignDocs(input.designDocs));
+  if (input.schemas !== undefined) {
+    violations.push(...checkSchemaFieldDescriptions(input.schemas));
+  }
   // Vitest 文件数与用例总数只作为受控事实包的动态测量输出，不再要求复制到活体文档。
   // 仍校验 facts/provenance 的完整性、身份、hash 与成功状态，缺失或不可信时 fail-closed。
   violations.push(
@@ -1355,25 +1361,32 @@ function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation
   return violations;
 }
 
-function checkPrePushCount(prePush: string): DocCheckViolation[] {
+/**
+ * pre-push 17 项强校验（F-G7-08，audit-fixes task 6）：解析真实编号检查块并断言连续
+ * #1..#17 且恰 17 块——旧实现仅取「最大编号」+「17 项检查」文本，伪造 3 块检查的
+ * pre-push（`# 1.` `# 2.` `# 17.`）可全绿；重写后中间删除任一块（编号断档）或减少
+ * 块数均触发违规，再叠加「17 项检查」声明文本兜底。
+ */
+export function checkPrePushCount(prePush: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
-  let max = 0;
-  for (const m of prePush.matchAll(/^# (\d+)\./gm)) {
-    max = Math.max(max, Number(m[1]));
-  }
-  if (max !== EXPECTED.prePushCount) {
+  const ids = Array.from(prePush.matchAll(/^# (\d+)\./gm), (m) => Number(m[1]));
+  const expected = Array.from({ length: EXPECTED.prePushCount }, (_, i) => i + 1);
+  if (ids.length !== expected.length || !ids.every((n, i) => n === expected[i])) {
     violations.push({
       check: 'pre-push',
-      message: `pre-push 编号注释最大值应为 ${EXPECTED.prePushCount}，实际 ${max}`,
+      message: `pre-push 检查块须连续 #1..#${EXPECTED.prePushCount} 且恰 ${EXPECTED.prePushCount} 块，实测 ${ids.length} 块 [${ids.join(',')}]`,
     });
   }
   if (!prePush.includes(`${EXPECTED.prePushCount} 项检查`)) {
-    violations.push({ check: 'pre-push', message: `pre-push 注释应含「${EXPECTED.prePushCount} 项检查」` });
+    violations.push({
+      check: 'pre-push',
+      message: `pre-push 注释应含「${EXPECTED.prePushCount} 项检查」声明文本`,
+    });
   }
   return violations;
 }
 
-function checkGlossaryAction(glossary: string): DocCheckViolation[] {
+function checkGlossaryAction(glossary: string, runLogSchema?: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const start = glossary.indexOf('### action（RunLogEntry）');
   const end = start >= 0 ? glossary.indexOf('### ', start + 1) : -1;
@@ -1384,6 +1397,112 @@ function checkGlossaryAction(glossary: string): DocCheckViolation[] {
   if (section.includes('`verify`')) {
     violations.push({ check: 'glossary-action', message: 'conventions.md 术语表 action 枚举不应含 `verify`' });
   }
+  // F-G7-05（audit-fixes task 6）：逐值断言——conventions.md 规范定义行的 action 列表
+  // 必须与 run-log.schema.json action.enum 完全一致（缺值 / 多值均违规），堵住
+  // 「schema 演进时术语表静默漂移」缺口（旧实现仅两点 review/verify 探针）。
+  if (runLogSchema !== undefined) {
+    let actionEnum: unknown[] | undefined;
+    try {
+      const schema = JSON.parse(runLogSchema) as { properties?: { action?: { enum?: unknown[] } } };
+      actionEnum = schema.properties?.action?.enum;
+    } catch {
+      violations.push({
+        check: 'glossary-action',
+        message: 'run-log.schema.json 解析失败（glossary action 逐值断言无法执行）',
+      });
+    }
+    if (Array.isArray(actionEnum) && actionEnum.every((v) => typeof v === 'string')) {
+      // 按 /\r?\n/ 切行（CRLF 文件中 \r 为行终止符，行内 $ 锚点会失配）
+      const defLine = section.split(/\r?\n/).find((l) => l.includes('规范定义') && l.includes('run-log 动作类型枚举'));
+      const afterColon = defLine?.match(/为准）[：:]\s*(.*)/)?.[1];
+      if (defLine === undefined || afterColon === undefined) {
+        violations.push({
+          check: 'glossary-action',
+          message:
+            'conventions.md 术语表 action 节缺「规范定义：run-log 动作类型枚举（共 N 值，以 `run-log.schema.json` 为准）：`值` / …」逐值列表行',
+        });
+      } else {
+        const declared = Array.from(afterColon.matchAll(/`([^`]+)`/g), (m) => m[1]!);
+        const enumVals = actionEnum as string[];
+        const missing = enumVals.filter((v) => !declared.includes(v));
+        const extra = declared.filter((v) => !enumVals.includes(v));
+        if (missing.length > 0 || extra.length > 0) {
+          violations.push({
+            check: 'glossary-action',
+            message: `conventions.md action 列表与 run-log.schema.json action.enum 漂移（缺 ${missing.join(',')}；多 ${extra.join(',')}）`,
+          });
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * conventions.md exit-2 脚本计数句检查（F-G7-04，audit-fixes task 6）：
+ * 「= N（N 个 check-* + N 个工具 CLI，不含 self-test）」声明须算术自洽且等于
+ * 真实输入错误契约探针实测数——conventions.md 不在旧 checkExit2ScriptCount 的
+ * AGENTS.md 检查源内，计数漂移此前在门禁上不可见。
+ */
+export function checkConventionsExit2Count(conventions: string, actualCount: number): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const m = conventions.match(/=\s*(\d+)（(\d+)\s*个 check-\*\s*\+\s*(\d+)\s*个工具 CLI/);
+  if (m === null) {
+    violations.push({
+      check: 'exit2-scripts',
+      message: `conventions.md 缺「= N（N 个 check-* + N 个工具 CLI，不含 self-test）」exit-2 计数句（实测 ${actualCount} 个）`,
+    });
+    return violations;
+  }
+  const total = Number(m[1]);
+  const checks = Number(m[2]);
+  const tools = Number(m[3]);
+  if (checks + tools !== total) {
+    violations.push({
+      check: 'exit2-scripts',
+      message: `conventions.md exit-2 计数算术不符：${checks} 个 check-* + ${tools} 个工具 CLI ≠ ${total}`,
+    });
+  }
+  if (total !== actualCount) {
+    violations.push({
+      check: 'exit2-scripts',
+      message: `conventions.md 声明 exit-2 脚本 ${total} 个，实际 ${actualCount} 个`,
+    });
+  }
+  if (!/不含\s*self-test/.test(conventions)) {
+    violations.push({
+      check: 'exit2-scripts',
+      message: 'conventions.md exit-2 计数句须注明「不含 self-test」（回归基线 exit 0/1，非 exit-2 脚本）',
+    });
+  }
+  return violations;
+}
+
+/**
+ * schema 属性级 description 全覆盖检查（F-G4-08，audit-fixes task 6）：
+ * 任何含 properties 的 schema 节点（根 / 嵌套对象 / definitions|$defs / 数组 items）
+ * 必须自带 description，使 AGENTS.md「25 份全字段 description 自描述」声明受门禁强制。
+ * 遍历覆盖 properties 子节点、definitions（含 draft-2019-09+ 的 $defs 兼容）与 items
+ * （数组形态逐项、单例形态整体）；标量属性节点由其所在 properties 持有者的子节点遍历到达。
+ */
+export function checkSchemaFieldDescriptions(schemas: Record<string, unknown>): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const visit = (node: unknown, path: string, file: string): void => {
+    if (typeof node !== 'object' || node === null) return;
+    const n = node as Record<string, unknown>;
+    if (n.properties !== undefined && n.description === undefined) {
+      violations.push({
+        check: 'schema-descriptions',
+        message: `${file}: ${path} 缺 description（AGENTS.md「全字段 description 自描述」契约）`,
+      });
+    }
+    for (const [k, v] of Object.entries(n.properties ?? {})) visit(v, `${path}/properties/${k}`, file);
+    const defs = (n.definitions ?? n.$defs) as Record<string, unknown> | undefined;
+    for (const [k, v] of Object.entries(defs ?? {})) visit(v, `${path}/definitions/${k}`, file);
+    if (Array.isArray(n.items)) (n.items as unknown[]).forEach((v, i) => visit(v, `${path}/items/${i}`, file));
+    else visit(n.items, `${path}/items`, file);
+  };
+  for (const [file, schema] of Object.entries(schemas)) visit(schema, '#', file);
   return violations;
 }
 

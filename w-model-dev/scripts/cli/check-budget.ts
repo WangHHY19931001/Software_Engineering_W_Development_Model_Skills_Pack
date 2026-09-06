@@ -12,7 +12,7 @@
  *
  * 参数：
  *   budget.json           budget.json 文件路径
- *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验）
+ *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测）
  *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
@@ -20,7 +20,7 @@
  * 退出码：
  *   0  校验通过
  *   1  校验失败（violations 列出具体原因）
- *   2  输入错误（文件不存在 / 非法 JSON / 参数非法）
+ *   2  输入错误（文件不存在 / 非法 JSON / schema 不符 / 参数非法；含 --project 读取侧 schema 校验失败）
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 BUDGET_JSON 摘要，便于 Agent 正则截取）
@@ -43,7 +43,7 @@ import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
+import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { phaseFlagPresent } from '../lib/parse-phase.js';
@@ -142,21 +142,18 @@ async function main(): Promise<void> {
   const parsed = await readJsonOrExit(budgetAbs);
   const budget = parsed as Partial<BudgetConfig>;
 
-  // 可选输入：--project（读失败只警告不 exit）
+  // 可选输入：--project（F-G4-14：读取侧经 project.schema.json 校验，fail-closed）——
+  // 文件缺失/非法 JSON/schema 不符（含缺 updatedAt 等必填字段）→ STRUCTURE_INVALID exit 2，
+  // 不再 warn-and-skip（「合法 project 缺 updatedAt」场景已被 schema required 前置排除）
   let projectUpdatedAt: string | undefined;
   if (projectFile) {
     const projectAbs = path.resolve(projectFile);
     try {
-      const projectRaw = await fs.readFile(projectAbs, 'utf-8');
-      const projectParsed = parseJsonSafe(projectRaw) as { updatedAt?: string };
-      projectUpdatedAt = projectParsed.updatedAt;
-      if (typeof projectUpdatedAt !== 'string') {
-        console.error(`⚠ --project 文件未含 updatedAt 字段，跳过 R1 时效性校验: ${projectAbs}`);
-        projectUpdatedAt = undefined;
-      }
+      const project = await loadAndValidate<{ updatedAt: string }>(projectAbs, 'project');
+      projectUpdatedAt = project.updatedAt;
     } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      console.error(`⚠ --project 文件读取失败，跳过 R1 时效性校验: ${projectAbs}（${e.code ?? e.message}）`);
+      if (err instanceof Error && err.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return;
+      throw err;
     }
   }
 

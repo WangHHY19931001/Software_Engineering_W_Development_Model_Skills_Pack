@@ -78,7 +78,14 @@ export async function loadAndValidate<T = unknown>(filePath: string, schemaKey: 
   try {
     parsed = parseJsonSafe<T>(raw);
   } catch {
-    exitWithError({ category: 'FILE_PARSE', message: '文件解析失败（非合法 JSON）', exitCode: 2, file: abs });
+    // rule P0-3 与 STRUCTURE_INVALID 同链：exit-2 契约探针要求 ERROR_JSON.rule 符合 P0-N
+    exitWithError({
+      category: 'FILE_PARSE',
+      message: '文件解析失败（非合法 JSON）',
+      exitCode: 2,
+      rule: 'P0-3',
+      file: abs,
+    });
     throw new Error(`${LOAD_AND_VALIDATE_SENTINEL_PREFIX}输入错误已通过 exitWithError 处理`);
   }
   const schemaResult = validateBySchema(schemaKey, parsed);

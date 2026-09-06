@@ -87,7 +87,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 **原因**：docs-consistency 的 vitest **文件数与用例数是受控动态 facts**——由同次受控运行产出 `generated-results.json` + provenance（commitSha / runId / artifactSha256）绑定实际提交，**不再要求复制到 README / AGENTS / pre-push 等活体文档**（README / AGENTS 对 vitest 的表述为「以当前命令输出为准」）；静态计数类（schema 清单 25 份等）仍从代码事实核验文档声明。动态侧失败通常是 provenance 缺失、hash/commitSha 不匹配或自采集运行不完整（负载敏感瞬时失败），不是文档复制遗漏。
 
-**处置**：动态侧先按 CLI 提示重跑（`npm run prepush` 会先跑 vitest 再以同次 JSON + provenance 调 docs-consistency；手动验证用 `npx vitest run --reporter=json --outputFile=...` + 环境变量 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT` 传入同次受控运行），确认 1300+ 用例全过且 provenance 指向当前 HEAD 后重跑；若为负载敏感瞬时失败（读取数 < 全量）须隔离重跑，不得把失败 provenance 写成通过。静态侧按 violations 文本同步文档声明（新增 schema 文件须同步 `data-models.md`「Schema 清单」与 README/AGENTS/CONTRIBUTING/INSTALL 的 schema 计数表述）。
+**处置**：动态侧先按 CLI 提示重跑（`npm run prepush` 会先跑 vitest 再以同次 JSON + provenance 调 docs-consistency；手动验证用 `npx vitest run --reporter=json --outputFile=...` + 环境变量 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT` 传入同次受控运行），确认全部用例通过（用例数以当前命令输出为准）且 provenance 指向当前 HEAD 后重跑；若为负载敏感瞬时失败（读取数 < 全量）须隔离重跑，不得把失败 provenance 写成通过。静态侧按 violations 文本同步文档声明（新增 schema 文件须同步 `data-models.md`「Schema 清单」与 README/AGENTS/CONTRIBUTING/INSTALL 的 schema 计数表述）。
 
 ### 1.7b pre-push 未跑门禁或误放行（stdin ref 判定）
 
