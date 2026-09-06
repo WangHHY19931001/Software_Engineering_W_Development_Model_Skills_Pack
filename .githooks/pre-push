@@ -35,7 +35,7 @@ PUSH_REMOTE="${1:-}"
 # pre-push 依赖 bash（package.json prepush 用 `bash .githooks/pre-push`）。
 # Git Bash / MSYS / MINGW / CYGWIN 环境自带 bash，可正常执行本脚本，**必须跑门禁**；
 # 仅原生 cmd/PowerShell（无 bash 解释器，无法执行本脚本）时给出指引并放行（exit 0），
-# 避免误报失败。Linux/macOS 不受影响。
+# 避免误报失败。Linux/macOS 不受影响。本脚本 grep 正则仅用 POSIX ERE，无 GNU `\b` 等专有语法。
 is_pure_windows_shell() {
   # Git Bash / MSYS / MINGW 环境：可运行 bash，不视为纯 Windows
   if [ -n "${MSYSTEM:-}" ]; then
@@ -376,7 +376,7 @@ node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_proce
 #     错误都 fail-closed，不因文本中出现 network 而放行。
 audit_has_blocking_signal() {
   grep -qiE \
-    '(^|[[:space:]])(npm (error|warn|err!)[[:space:]]+)?(code[[:space:]]+(EACCES|EPERM|EJSONPARSE|ECONFIG)|.*(vulnerabilit(y|ies)|permission denied|JSON (parse|input|error)|config(uration)? (error|invalid|failed)))' \
+    '(^|[[:space:]])(npm (error|warn|err!)[[:space:]]+)?(code[[:space:]]+(EACCES|EPERM|EJSONPARSE|ECONFIG)|.*(vulnerab[a-z]*|permission denied|JSON (parse|input|error)|config(uration)? (error|invalid|failed)))' \
     "$tmp_log"
 }
 
@@ -391,7 +391,7 @@ audit_can_skip() {
   # registry/advisories 上下文中的 404（裸 E404 不跳），以及带 network/registry/request
   # 同行锚定的状态词（裸状态词不跳，防 HTML 错误页正文误放行）。
   grep -qiE \
-    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429|E5[0-9]{2})|404[[:space:]]+Not[[:space:]]+Found[[:space:]]+-[[:space:]]+GET[[:space:]]+[^[:space:]]*(registry|advisories)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint|.*(socket hang up|reason: (getaddrinfo|connect)[[:space:]]+E[A-Z0-9]+|(429|5[0-9]{2})([[:space:]]+|-)(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error|Too Many Requests)|((network|registry|request).*\b(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)\b|\b(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)\b.*(network|registry|request))))' \
+    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429|E5[0-9]{2})|404[[:space:]]+Not[[:space:]]+Found[[:space:]]+-[[:space:]]+GET[[:space:]]+[^[:space:]]*(registry|advisories)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint|.*(socket hang up|reason: (getaddrinfo|connect)[[:space:]]+E[A-Z0-9]+|(429|5[0-9]{2})([[:space:]]+|-)(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error|Too Many Requests)|((network|registry|request).*[^[:alnum:]_](Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$)|(.*[^[:alnum:]_])?(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$).*(network|registry|request))))' \
     "$tmp_log"
 }
 log "npm audit 依赖漏洞扫描（high 以上阻断）..."

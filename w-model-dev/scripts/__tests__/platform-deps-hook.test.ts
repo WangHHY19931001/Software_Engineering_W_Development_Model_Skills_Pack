@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -161,7 +162,10 @@ type SimulatedAuditCase =
   | 'vulns-with-5xx'
   | 'eacces'
   | 'ejsonparse'
-  | 'permission-denied';
+  | 'permission-denied'
+  // audit-fixes task 7（F-G5-01）：blocking 语料扩为 vulnerab[a-z]* 的样例
+  | 'npm-warn-vulnerable'
+  | 'vulnerable-mixed-5xx';
 
 async function simulatedPrePushAudit(auditCase: SimulatedAuditCase): Promise<{
   code: number;
@@ -260,6 +264,11 @@ npm() {
         eacces) printf 'npm error code EACCES\\n'; return 1 ;;
         ejsonparse) printf 'npm error code EJSONPARSE\\n'; return 1 ;;
         permission-denied) printf 'permission denied\\n'; return 1 ;;
+        npm-warn-vulnerable) printf 'npm warn vulnerable packages found\\n'; return 1 ;;
+        vulnerable-mixed-5xx)
+          printf 'npm error 503 Service Unavailable\\nfound 27 vulnerable packages\\n'
+          return 1
+          ;;
       esac
       ;;
     'run check:docs-consistency') test -s "$WM_VITEST_COUNT_FILE" || return 97; return 0 ;;
@@ -559,6 +568,81 @@ git() {
 
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('跳过门禁');
+  });
+
+  // F-G5-03/04（audit-fixes task 7）：路径过滤包含口径防回归。bash case 的 * 可跨 /，
+  // docs/*.md 命中 docs/ 任意层级的 *.md（含 docs/changes、docs/superpowers 深层，
+  // 历史触发语义见 files_need_gate 注释，不做收窄）；根级清单文件、.githooks/**、
+  // 深层 w-model-dev/** 命中；eval/** 与 docs 非 .md 不触发。
+  it.each([
+    { changedPath: 'docs/changes/2026-09-06.md', expectGate: true },
+    { changedPath: 'docs/superpowers/deep/sub.md', expectGate: true },
+    { changedPath: '.githooks/pre-push', expectGate: true },
+    { changedPath: 'w-model-dev/scripts/a/b/c.ts', expectGate: true },
+    { changedPath: 'README.md', expectGate: true },
+    { changedPath: 'package.json', expectGate: true },
+    { changedPath: 'eval/x.json', expectGate: false },
+    { changedPath: 'docs/notes.txt', expectGate: false },
+  ])('path filter: $changedPath → $expectGate', async ({ changedPath, expectGate }) => {
+    const binDir = await makeTempDir('pre-push-pathfilter-bin-');
+    const workspace = await makeTempDir('pre-push-pathfilter-workspace-');
+    const callsPath = path.join(binDir, 'calls.log');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
+    await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+    const bashEnv = path.join(binDir, 'bash-env.sh');
+    await fs.writeFile(
+      bashEnv,
+      `
+git() {
+  case "$*" in
+    *'diff --name-only'*) printf '${changedPath}\\n' ;;
+    *) exit 0 ;;
+  esac
+}
+npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
+`,
+      'utf8',
+    );
+    const result = await run(
+      prePushScript,
+      [],
+      {
+        PATH: `${binDir}:${process.env.PATH}`,
+        CALLS: callsPath,
+        BASH_ENV: bashEnv,
+        PREPUSH_FORCE: '0',
+        OSTYPE: 'linux-gnu',
+      },
+      workspace,
+    );
+
+    if (expectGate) {
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stdout).toContain('node_modules 缺失');
+      expect(result.stdout, `${changedPath}: 应触发门禁，不得跳过`).not.toContain('跳过门禁');
+    } else {
+      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(result.stdout, `${changedPath}: 不在触发面，应跳过门禁`).toContain('跳过门禁');
+    }
+  });
+
+  // F-G5-05（audit-fixes task 7）：quotePath flag 源级断言。git mock 按参数子串分派，
+  // flag 丢失不会被任何行为断言发现，故直接对 hook 源码断言（源级模式参照 audit skip
+  // describe 内 ensure-platform-deps --check 断言）。真实调用形态为 `git -c
+  // core.quotePath=false diff|log`（flag 前插于 git 之后）：:148 log -m 排除集枚举
+  // 1 处；:212/:221 stdin ref 行 diff 各 1 处；:252 fallback 双 diff（|| 两侧各 1 处，
+  // 同一语句行）——合计 4 条语句 5 处调用，与 docs-consistency-logic.test.ts H1 守卫
+  // 「5 个 git log/diff 调用点」口径一致；:121 注释含同形示例，须先剥离注释行。
+  it('quotePath=false 覆盖全部 git diff/log 变更枚举调用（4 条语句 5 处）', () => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- prePushScript is a fixed repository test asset
+    const src = readFileSync(prePushScript, 'utf8');
+    const code = src
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('#'))
+      .join('\n');
+    expect(code.match(/git -c core\.quotePath=false (diff|log)/g)).toHaveLength(5);
+    expect(code.match(/git -c core\.quotePath=false diff/g)).toHaveLength(4);
+    expect(code.match(/git -c core\.quotePath=false log/g)).toHaveLength(1);
   });
 
   it('executes only a read-only platform check before the ordinary gate commands', async () => {
@@ -1044,7 +1128,8 @@ describe('pre-push audit skip boundary', () => {
     },
   );
 
-  // 18 行表驱动边界样例（review2-fixes task 5）：每行 = 一段假想 npm audit 输出 + 期望
+  // 20 行表驱动边界样例（review2-fixes task 5 建库 18 行 + audit-fixes task 7
+  // F-G5-01 增 2 行）：每行 = 一段假想 npm audit 输出 + 期望
   // can_skip。skip 行与 blocking 行 mock 退出码同为 1——只有 audit_can_skip 的正则判定
   // 决定走「跳过（不阻断）」还是阻断，端到端经 pre-push 全 hook 验证（复用既有 mock 通道）。
   interface AuditBoundaryRow {
@@ -1108,6 +1193,20 @@ describe('pre-push audit skip boundary', () => {
     { label: 'npm error code EACCES → blocking', auditCase: 'eacces', expectSkip: false },
     { label: 'npm error code EJSONPARSE → blocking', auditCase: 'ejsonparse', expectSkip: false },
     { label: 'permission denied → blocking', auditCase: 'permission-denied', expectSkip: false },
+    // F-G5-01（audit-fixes task 7）：blocking 语料扩为 vulnerab[a-z]*——「vulnerable」
+    // 形容词形态（npm 新措辞）必须 blocking。
+    {
+      label: 'npm warn vulnerable packages found → blocking (F-G5-01)',
+      auditCase: 'npm-warn-vulnerable',
+      expectSkip: false,
+    },
+    // F-G5-01 漏报洞端到端钉死：瞬态 5xx 信号在场时，「vulnerable packages」漏洞行
+    // 使 blocking 优先成立（改前此混排形态被整单 skip）。
+    {
+      label: '503 + found 27 vulnerable packages mixed → blocking (F-G5-01 skip-hole)',
+      auditCase: 'vulnerable-mixed-5xx',
+      expectSkip: false,
+    },
   ];
 
   it.each(auditBoundaryRows)('audit skip boundary: $label', async ({ auditCase, expectSkip }) => {
