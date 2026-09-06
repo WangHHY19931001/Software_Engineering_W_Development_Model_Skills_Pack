@@ -346,7 +346,7 @@ const LIFECYCLE_IDENTITY_FIELDS = new Set([
  * 也落入吸收，不再因两条谓词互斥而翻转为 blocking。
  *
  * 一旦 variant 已声明（'variant' in record）则仅容忍 identity 字段缺失
- * （与引入 variant 前的 isLegacyIdentitySchemaFailure 行为一致）；已声明
+ * （与引入 variant 前的 isLegacySchemaFailure 行为一致）；已声明
  * emergency-fix 却缺 blocker、或 variant 值不符 const，属真实不一致，
  * 一律走 blocking [schema]（吸收不覆盖，fail-closed 方向不变）。
  */
@@ -386,6 +386,33 @@ function isPostCutoffUndeclaredVariantEmergencyFix(raw: unknown): boolean {
   if (!isUndeclaredVariantEmergencyFix(raw)) return false;
   const ts = (raw as { timestamp?: unknown }).timestamp;
   return typeof ts === 'string' && !Number.isNaN(Date.parse(ts)) && Date.parse(ts) >= Date.parse(LEGACY_VARIANT_CUTOFF);
+}
+
+/**
+ * reworkHints 规则（audit-fixes task 4 / I-6）：review 族（review/iceberg-review）
+ * passed=false 须带非空 reworkHints（schema allOf 同步强制）。判定含缺失与
+ * present-but-empty 两种形态，与 schema `required` + `minItems: 1` 对齐。
+ */
+function isFailedReviewMissingReworkHints(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const record = raw as Record<string, unknown>;
+  const isReviewFamily = record.action === 'review' || record.action === 'iceberg-review';
+  const hints = record.reworkHints;
+  const missingHints = !Array.isArray(hints) || hints.length === 0;
+  return isReviewFamily && record.passed === false && missingHints;
+}
+
+/**
+ * cutoff 分界（与 isPostCutoffUndeclaredVariantEmergencyFix 同型，复用
+ * LEGACY_VARIANT_CUTOFF）：reworkHints 规则与 variant 规则同窗引入——cutoff
+ * 前写入的失败 review 旧行按 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收；
+ * cutoff 后属真实不一致，blocking。timestamp 缺失/非法时视为非 legacy
+ * （保守：不吸收，宁可 blocking；passed=false 却无时间戳的行不构成可信旧证据）。
+ */
+function isLegacyMissingReworkHints(raw: RunLogEntry): boolean {
+  if (!isFailedReviewMissingReworkHints(raw)) return false;
+  const ts = Date.parse(raw.timestamp ?? '');
+  return Number.isFinite(ts) && ts < Date.parse(LEGACY_VARIANT_CUTOFF);
 }
 
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
@@ -445,6 +472,35 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     // === Schema 前置校验 ===
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
+      // reworkHints 规则（audit-fixes task 4 / I-6）：review 族 passed=false 缺非空
+      // reworkHints 按 LEGACY_VARIANT_CUTOFF 分界——cutoff 前旧行 LEGACY_REWORK_HINTS
+      // 诊断吸收，cutoff 后 [rework-hints] blocking。仅当其余 schema 错误为空或全部
+      // 为 identity/variant legacy 可容忍时才分派；存在真实类型错误则回退通用
+      // [schema] blocking（不吞错，fail-closed 方向不变）。
+      if (isFailedReviewMissingReworkHints(raw)) {
+        const otherMessages = schemaResult.errorMessages.filter(
+          (message) =>
+            !message.includes('reworkHints') &&
+            !message.includes('must match "then" schema') &&
+            !message.includes('must match "if" schema'),
+        );
+        if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
+          if (isLegacyMissingReworkHints(raw as RunLogEntry)) {
+            const withoutHints = Object.fromEntries(
+              Object.entries(raw as Record<string, unknown>).filter(([field]) => field !== 'reworkHints'),
+            );
+            valid.push(withoutHints as unknown as RunLogEntry);
+            diagnostics.push(
+              `LEGACY_REWORK_HINTS: ${(raw as { action?: string }).action} 条目 ${i + 1} passed=false 缺非空 reworkHints（variant 规则同窗前的旧记录）; deferred`,
+            );
+            continue;
+          }
+          violations.push(
+            `[rework-hints] 条目 ${i + 1} ${(raw as { action?: string }).action} passed=false 须带非空 reworkHints`,
+          );
+          continue;
+        }
+      }
       if (isLegacySchemaFailure(raw, schemaResult.errorMessages) && !isPostCutoffUndeclaredVariantEmergencyFix(raw)) {
         const missingFields = schemaResult.errorMessages
           .map((message) => message.match(/required property '([^']+)'/)?.[1])

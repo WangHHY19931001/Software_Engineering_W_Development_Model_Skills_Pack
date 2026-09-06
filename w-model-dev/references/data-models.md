@@ -472,6 +472,10 @@ interface RunLogEntry {
   fixedLocation?: string;
   /** fix/emergency-fix 修复依据（S-self-assessment 或 R 报告 ID），紧急修复条目审计用 */
   fixBasedOn?: string;
+  /** review: 是否通过（passed=false 时 reworkHints 须非空——schema 强制 + logic 按 cutoff 分界） */
+  passed?: boolean;
+  /** review: 返工提示数组（passed=false 时必须为非空数组；reworkHints 规则与 variant 规则同窗引入，LEGACY_VARIANT_CUTOFF 前旧行经 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收，此后 blocking） */
+  reworkHints?: string[];
   /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
@@ -550,7 +554,11 @@ interface RunLogEntry {
 >
 > **D8 lifecycle identity 约束（phase 8）：** reducer 使用完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix/emergency-fix 只接受 `basedOnReport` 精确匹配的 reportId、`target===implementationTarget` 且非空 artifacts 包含 exact target。implementation V/G/R3 必须与对应 fix 保持同一 phase/round/reportId/targetKind/basedOnReport/implementationTarget，并满足 exact target/artifacts 关系。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；legacy evidence 不进入 R3/V/R8 credit；机器状态为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 不单独证明 closed。raw JSONL 始终 append-only，不由 checker 改写。
 
-**variant / blocker 与 legacy 吸收（2026-09-04 audit-gate-closure）**：schema（`run-log.schema.json`）新增 `variant`（enum `fix`/`emergency-fix`）/ `blocker` / `fixedLocation` / `fixBasedOn` 字段与条件约束——`action=emergency-fix` ⇒ `variant=emergency-fix` 且 `blocker` 非空；`variant=emergency-fix` ⇒ `blocker` 非空；`action=fix` 的 `variant` 若出现必须为 `"fix"`（不强制出现）。variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的「双 legacy」旧 emergency-fix 行）经合并 legacy 谓词（`isLegacySchemaFailure`：可容忍缺失 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}）吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**；已声明 variant 却缺 blocker 或 variant 值不符 const 属真实不一致 → blocking `[schema]`（吸收不覆盖）。动作-角色配对（`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）由 `checkRunLog` logic 层 blocking 强制（schema 的 description 注明，不在 schema 强制以兼容历史样本）。`check-run-log.ts` CLI 的 parseErrors 并入 blocking violations（坏行使输入不完整，fail-closed）；`checkRunLog([])` → `passed=false` + `NOT_CLOSED_NOT_PROVEN`。
+**variant / blocker 与 legacy 吸收（2026-09-04 audit-gate-closure）**：schema（`run-log.schema.json`）新增 `variant`（enum `fix`/`emergency-fix`）/ `blocker` / `fixedLocation` / `fixBasedOn` 字段与条件约束——`action=emergency-fix` ⇒ `variant=emergency-fix` 且 `blocker` 非空；`variant=emergency-fix` ⇒ `blocker` 非空；`action=fix` 的 `variant` 若出现必须为 `"fix"`（不强制出现）。variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的「双 legacy」旧 emergency-fix 行）经合并 legacy 谓词（`isLegacySchemaFailure`：可容忍缺失 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}）吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**；已声明 variant 却缺 blocker 或 variant 值不符 const 属真实不一致 → blocking `[schema]`（吸收不覆盖）。
+
+**reworkHints 强制与 cutoff 分界（2026-09-06 audit-fixes）**：schema allOf 新增条件约束——`action ∈ {review, iceberg-review}` 且 `passed=false` ⇒ `reworkHints` 非空（`minItems: 1`，缺失或空数组均拦截）。reworkHints 规则与 variant 规则同窗引入，复用同一分界 `LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'`（`run-log-logic.ts:23`）：cutoff 前写入的失败 review 旧行（缺 hints 或 hints 为空数组）经 `LEGACY_REWORK_HINTS` 非阻断 diagnostic 吸收（含与缺 identity 字段叠加的双 legacy 行，identity 缺失部分由 LEGACY_UNSCOPED 循环补充说明）；cutoff 后属真实不一致 → blocking `[rework-hints] 条目 N <action> passed=false 须带非空 reworkHints`。timestamp 缺失/非法时视为非 legacy（保守不吸收）。其余 schema 错误（如字段类型错误）非 legacy 可容忍时不经此吸收，回退通用 `[schema]` blocking。
+
+动作-角色配对（`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）由 `checkRunLog` logic 层 blocking 强制（schema 的 description 注明，不在 schema 强制以兼容历史样本）。`check-run-log.ts` CLI 的 parseErrors 并入 blocking violations（坏行使输入不完整，fail-closed）；`checkRunLog([])` → `passed=false` + `NOT_CLOSED_NOT_PROVEN`。
 
 ## 自主成熟度模型（maturity.json）
 

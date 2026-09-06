@@ -2133,3 +2133,40 @@ describe('run-log LEGACY_VARIANT cutoff 分界', () => {
     expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
   });
 });
+
+/**
+ * audit-fixes task 4（I-6 / F-G4-01）：review 族（review/iceberg-review）passed=false
+ * 强制非空 reworkHints。schema allOf 强制 + logic 按 LEGACY_VARIANT_CUTOFF
+ * （2026-09-01T00:00:00Z，与 variant 规则同窗）分界：cutoff 前失败 review 旧行按
+ * LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收，cutoff 后属真实不一致 blocking。
+ */
+describe('run-log reworkHints 强制（LEGACY_REWORK_HINTS cutoff 分界）', () => {
+  const failedReview = (overrides: Partial<RunLogEntry>): RunLogEntry =>
+    makeEntry({ runId: 'review-fail', phase: 5, action: 'review', role: 'V', outcome: 'fail', ...overrides });
+
+  it('cutoff 后 review passed=false 无 reworkHints → blocking', () => {
+    const result = checkRunLog([failedReview({ timestamp: '2026-09-02T00:00:00.000Z', passed: false })]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => /\[rework-hints\].*passed=false.*reworkHints/.test(v))).toBe(true);
+    expect(result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d)) ?? false).toBe(false);
+  });
+
+  it('cutoff 前 review passed=false 无 reworkHints → LEGACY_REWORK_HINTS 诊断放行', () => {
+    const result = checkRunLog([failedReview({ timestamp: '2026-08-01T00:00:00.000Z', passed: false })]);
+    expect(result.passed).toBe(true);
+    expect(result.violations.some((v) => v.includes('[schema]') || v.includes('[rework-hints]'))).toBe(false);
+    expect(result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d))).toBe(true);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  });
+
+  it('passed=false 且 reworkHints 非空 → 正常（无该规则违规）', () => {
+    const result = checkRunLog([
+      failedReview({
+        timestamp: '2026-09-02T00:00:00.000Z',
+        passed: false,
+        reworkHints: ['补齐 X 模块错误分支的测试'],
+      }),
+    ]);
+    expect(result.violations.some((v) => /\[rework-hints\]|\[schema\].*reworkHints/.test(v))).toBe(false);
+  });
+});

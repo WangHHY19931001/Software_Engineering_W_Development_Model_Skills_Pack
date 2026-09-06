@@ -49,7 +49,7 @@
       }
     },
     {
-      "description": "action=emergency-fix 时强制 variant=emergency-fix 且 blocker 非空。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN）；新记录必须声明 variant 且 emergency-fix 须附 blocker。",
+      "description": "action=emergency-fix 时强制 variant=emergency-fix 且 blocker 非空。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN），以 LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'（run-log-logic.ts）为吸收/阻断分界，cutoff 后写入的此类记录不再吸收、落入 blocking [schema]；新记录必须声明 variant 且 emergency-fix 须附 blocker。",
       "if": {
         "properties": { "action": { "const": "emergency-fix" } },
         "required": ["action"]
@@ -121,6 +121,17 @@
       "if": { "properties": { "lifecycleStatus": {} }, "required": ["lifecycleStatus"] },
       "then": {
         "properties": { "lifecycleStatus": { "enum": ["CLOSED_UNDER_CURRENT_RULES", "NOT_CLOSED_NOT_PROVEN"] } }
+      }
+    },
+    {
+      "description": "action=review/iceberg-review 且 passed=false 时强制 reworkHints 非空（≥1 条返工提示）。历史兼容：reworkHints 规则与 variant 规则同窗引入，以 LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'（run-log-logic.ts）为吸收/阻断分界——cutoff 前写入的失败 review 旧行由 check-run-log 以 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收；cutoff 后 passed=false 无非空 reworkHints 属真实不一致，blocking。",
+      "if": {
+        "properties": { "action": { "enum": ["review", "iceberg-review"] }, "passed": { "const": false } },
+        "required": ["action", "passed"]
+      },
+      "then": {
+        "properties": { "reworkHints": { "type": "array", "minItems": 1 } },
+        "required": ["reworkHints"]
       }
     }
   ],
@@ -289,7 +300,7 @@
       "enum": ["A", "B", "C", "D"]
     },
     "passed": {
-      "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空）",
+      "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空——schema 强制 + logic 按 cutoff 分界）",
       "type": "boolean"
     },
     "reworkHints": {

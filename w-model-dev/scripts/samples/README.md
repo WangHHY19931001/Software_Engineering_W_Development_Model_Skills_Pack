@@ -17,7 +17,7 @@
 | `tla-bdd-sync` | check-tla-bdd-sync | TLA_BDD_SYNC_CASES（2） | TLA+↔BDD 转移集 / 状态集 / 不变式等价 | 平铺 JSON |
 | `bdd` | check-bdd-model | BDD_CASES（11） | BDD manifest + .feature 解析 / 状态机七要素 / RTM 映射 | 平铺 JSON + .feature |
 | `budget` | check-budget | BUDGET_CASES（5） | BudgetConfig R1-R5（时效性 / onExceed / killSwitch） | 平铺 JSON |
-| `run-log` | check-run-log + check-role-dispatch | RUN_LOG_CASES（14）+ ROLE_DISPATCH_CASES（3，复用本目录） | RunLog R1-R8（含 R8-4 轨迹顺序链）+ 角色分派完整性 | 平铺 JSONL |
+| `run-log` | check-run-log + check-role-dispatch | RUN_LOG_CASES（15）+ ROLE_DISPATCH_CASES（3，复用本目录） | RunLog R1-R8（含 R8-4 轨迹顺序链、reworkHints cutoff 分界）+ 角色分派完整性 | 平铺 JSONL |
 | `maturity` | check-maturity | MATURITY_CASES（3） | 成熟度 R1-R5 | 平铺 JSON |
 | `checkpoint` | check-checkpoint | CHECKPOINT_CASES（2） | Checkpoint R1-R5（决策非空 / 拒绝代签） | 平铺 JSONL |
 | `code-tla` | check-code-tla-consistency | CODE_TLA_CASES（5） | 代码-TLA+ 四维度一致性（SD→codeModule / Next / 不变式） | 平铺 JSON |
@@ -28,7 +28,7 @@
 | `iceberg` | check-iceberg-sweep | ICEBERG_CASES（4） | IcebergSweepReport R1-R5 | 平铺 JSON |
 | `coverage` | check-requirement-coverage | COVERAGE_CASES（10） | 需求覆盖 C1-C10（4 矩阵 + cross-cuts） | 平铺 JSON |
 | `exemption` | check-exemption | EXEMPTION_CASES（7） | 豁免审批 E1-E9（S→R→V→人类四阶段） | 平铺 JSON |
-| `signature-chain` | check-signature-chain | SIGNATURE_CHAIN_CASES（15） | 签名链 R1-R10（防篡改 / 跨阶段） | 平铺 JSONL |
+| `signature-chain` | check-signature-chain | SIGNATURE_CHAIN_CASES（14） | 签名链 R1-R10（防篡改 / 跨阶段） | 平铺 JSONL |
 | `archive-integrity` | check-archive-integrity | ARCHIVE_INTEGRITY_CASES（4） | 归档完整性（清单 + 文件存在性） | 平铺 JSON |
 | `schema` | 各 check 共享的 schema 校验 | SCHEMA_CASES（16） | JSON Schema 反例（required / type / additionalProperties） | 平铺 JSON |
 | `codegraph-queries` | check-codegraph-queries | CODEGRAPH_QUERY_CASES（4，sampleDir 形态） | codegraph 查询落盘校验（反模式 #38） | 嵌套 `.w-model/codegraph-queries/` |

@@ -1161,6 +1161,14 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedReasonPatterns: [/R3.*rootcause.*RC-phase5-1-02.*无对应 fix/],
     description: '2 份 R 报告但仅 1 份有 fix，RC-phase5-1-02 未覆盖应被 R3 拦截',
   },
+  // ---- audit-fixes task 4（I-6）: review 族 passed=false 强制非空 reworkHints ----
+  {
+    file: 'review-false-no-hints-post-cutoff.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/\[rework-hints\].*passed=false.*reworkHints/],
+    description:
+      'cutoff 后 review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（LEGACY_VARIANT_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REWORK_HINTS 诊断吸收）',
+  },
 ];
 
 // -------------------- Maturity --------------------
@@ -2064,16 +2072,13 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
     description: '签名链：O checkpoint 绕过 G，R10 失败',
   },
   // E1: 跨阶段连续链
+  // audit-fixes task 4（262 口径等量合并）：本用例与下一用例原为同 fixture 双正例
+  // （默认档 + --phase=2 档）；--phase=2 选项路径由 bad-broken-cross-phase.jsonl
+  // （phase: 2 → R2 rulesFailed）覆盖，保留默认档正例，删除重复正例条目。
   {
     file: 'valid-continuous-chain.jsonl',
     expectedPassed: true,
-    description: '签名链：2 阶段连续链存档模式（R2 跨阶段连续链语义）',
-  },
-  {
-    file: 'valid-continuous-chain.jsonl',
-    expectedPassed: true,
-    phase: 2,
-    description: '签名链：--phase=2 跨阶段连续链（首条 prevSigId 指向上阶段末条）',
+    description: '签名链：2 阶段连续链存档模式（R2 跨阶段连续链语义；含 --phase=2 档位由跨阶段断链负例覆盖）',
   },
   {
     file: 'bad-broken-cross-phase.jsonl',
