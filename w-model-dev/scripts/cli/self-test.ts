@@ -14,7 +14,7 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，26 个用例数组，详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/，26 个样本子目录（34+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
@@ -3490,6 +3490,7 @@ async function main(): Promise<void> {
   console.log(`TlaBddSync 用例: ${TLA_BDD_SYNC_CASES.length}`);
   console.log(`RoleDispatch 用例 : ${ROLE_DISPATCH_CASES.length}`);
   console.log(`StateMachine 用例 : ${STATE_MACHINE_CASES.length}`);
+  console.log(`DesignContract 用例 : ${DESIGN_CONTRACT_CASES.length} 条`);
   console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
   console.log(`OpsxArtifact 用例 : ${OPSX_ARTIFACT_CASES.length}`);
   console.log(`OpenspecArchive 用例 : ${OPENSPEC_ARCHIVE_CASES.length}`);

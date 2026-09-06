@@ -322,26 +322,42 @@ describe('wm-write CLI lock controls', () => {
     const old = new Date('2000-01-01T00:00:00.000Z');
     await fs.utimes(p, old, old);
     const expectedMtime = Math.floor((await fs.stat(p)).mtimeMs);
+    const writerArgs = ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'];
 
-    const [first, second] = await Promise.all([
-      runChild(
-        p,
-        ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'],
-        '{"writer":"A"}',
-      ),
-      runChild(
-        p,
-        ['--stdin', '--no-backup', '--expect-mtime', String(expectedMtime), '--lock-timeout', '5000'],
-        '{"writer":"B"}',
-      ),
-    ]);
-    const summaries = [wmwriteSummary(first.stdout), wmwriteSummary(second.stdout)];
+    // Controlled interleaving (F-G8-05): writer A starts first and the test
+    // waits until `<target>.lock` exists (writer A is on its lock path) before
+    // writer B is spawned. This removes the scheduler race of two freely
+    // competing children while still exercising two real child processes
+    // against one lock directory.
+    const first = runChild(p, writerArgs, '{"writer":"A"}');
+    const lockDir = `${p}.lock`;
+    // Generous bound: under full-suite parallelism a cold tsx child boot can
+    // take multiple seconds; the deadline only guards against a writer that
+    // never reaches its lock path, it does not bound scheduling speed.
+    const lockVisibleDeadline = Date.now() + 20_000;
+    for (;;) {
+      try {
+        await fs.access(lockDir);
+        break;
+      } catch {
+        if (Date.now() > lockVisibleDeadline) throw new Error(`writer A never created ${lockDir} within 20s`);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
 
-    expect(summaries.filter((summary) => summary.ok === true)).toHaveLength(1);
-    expect(summaries.filter((summary) => summary.reason === 'MTIME_CONFLICT')).toHaveLength(1);
-    expect([first.code, second.code].sort()).toEqual([0, 1]);
-    await expect(fs.readFile(p, 'utf-8')).resolves.toMatch(/\{"writer":"[AB]"\}/);
-  });
+    const second = runChild(p, writerArgs, '{"writer":"B"}');
+    const [a, b] = await Promise.all([first, second]);
+
+    // Two decidable terminal states, no scheduling dependence: A owned the
+    // lock first, so A must commit; B must fail either with MTIME_CONFLICT
+    // (A committed and released the lock before B acquired it) or with a lock
+    // occupancy rejection (B timed out waiting for A's live lock).
+    expect(a.code).toBe(0);
+    expect(wmwriteSummary(a.stdout)).toMatchObject({ script: 'wm-write.ts', ok: true, writtenPath: p });
+    expect(b.code).toBe(1);
+    expect(['MTIME_CONFLICT', 'LOCK_TIMEOUT']).toContain(wmwriteSummary(b.stdout).reason);
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"writer":"A"}');
+  }, 30_000);
 });
 
 describe('wm-write CLI schema validation', () => {

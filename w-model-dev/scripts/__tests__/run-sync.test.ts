@@ -433,11 +433,15 @@ describe('runSync', () => {
     vi.doUnmock('node:child_process');
     vi.resetModules();
     const { runSync: runRealSync } = await import('../lib/run-sync.js');
+    const timeoutMs = 250;
     const startedAt = Date.now();
-    const result = runRealSync(process.execPath, ['-e', 'setTimeout(() => {}, 5_000)'], { timeout: 250 });
+    const result = runRealSync(process.execPath, ['-e', 'setTimeout(() => {}, 5_000)'], { timeout: timeoutMs });
     const elapsedMs = Date.now() - startedAt;
 
     expect((result.error as NodeJS.ErrnoException | undefined)?.code).toBe('ETIMEDOUT');
-    expect(elapsedMs).toBeLessThan(2_000);
+    // Relative window instead of a hard wall-clock bound (F-G8-06): slow or
+    // loaded CI only widens the elapsed time, it must not flip the verdict.
+    expect(elapsedMs).toBeGreaterThanOrEqual(timeoutMs - 20); // timeout:250 → 下限 230
+    expect(elapsedMs).toBeLessThan(timeoutMs + 2_000);
   });
 });

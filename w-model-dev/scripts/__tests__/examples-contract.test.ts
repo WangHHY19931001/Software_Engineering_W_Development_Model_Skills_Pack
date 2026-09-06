@@ -77,8 +77,11 @@ function markdownFiles(relativeDirectory: string): string[] {
   return files.sort();
 }
 
-const ORDINARY_FAILURE_CHAIN =
-  'V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT';
+// Canonical short name only (the hard-constraints.md「普通 V/G 失败链」节 anchor).
+// Deliberately distinct from the verbatim full chain in FAILURE_CHAIN: the two
+// constants describe two contract layers (full-chain inline vs short-name
+// anchor) and must not collapse into one string again (F-G8-01).
+const ORDINARY_FAILURE_CHAIN = '普通 V/G 失败链';
 
 // Shared guidance-corpus inventory for the failure-routing /wm-test scans: every
 // Markdown asset under references/examples/templates (each directory sorted by
@@ -101,11 +104,11 @@ function hasCompleteOrdinaryFailureChain(value: string): boolean {
   // name (hard-constraints.md「普通 V/G 失败链」节) instead of inlining the chain.
   if (normalized.includes('普通 V/G 失败链')) return true;
   const variants = [
-    ORDINARY_FAILURE_CHAIN,
-    ORDINARY_FAILURE_CHAIN.replace(' → R → ', ' → R 定位 → '),
-    ORDINARY_FAILURE_CHAIN.replace(' → S-fix → ', ' → S-fix 修复 → '),
-    ORDINARY_FAILURE_CHAIN.replace(' → S-fix → ', ' → S-fix 携 R 报告执行修复 → '),
-    ORDINARY_FAILURE_CHAIN.replace('G(check-preventive-review exit 0)', 'preventive 门禁'),
+    FAILURE_CHAIN,
+    FAILURE_CHAIN.replace(' → R → ', ' → R 定位 → '),
+    FAILURE_CHAIN.replace(' → S-fix → ', ' → S-fix 修复 → '),
+    FAILURE_CHAIN.replace(' → S-fix → ', ' → S-fix 携 R 报告执行修复 → '),
+    FAILURE_CHAIN.replace('G(check-preventive-review exit 0)', 'preventive 门禁'),
   ];
   if (variants.some((variant) => normalized.includes(normalizeGuidance(variant)))) return true;
   const stages = [
@@ -144,8 +147,11 @@ function matchesAny(patterns: RegExp[], value: string): boolean {
 //     to a stage, rework by reworkHints, ...) whose own clause is not a
 //     prohibition restatement;
 //   - it does not already publish the canonical chain marker
-//     (canonical marker = the canonical short name in non-mention use,
-//     or the full arrow chain, in the same unit);
+//     (canonical marker = the canonical short name in non-mention use, in the
+//     same unit — hasChainMarker is short-name-only and has no arrow-chain
+//     fallback; the full arrow chain exemption is carried separately by the
+//     paragraph-level hasCompleteOrdinaryFailureChain checks below and the
+//     line-level FAILURE_CHAIN / 下方完整链 includes in the corpus scanners);
 //   - it is not the phase-1 ingestion A-chunk/A-cross→G exception;
 //   - it does not route through R first (a legal 分派 R → ... → 才分派 S-fix
 //     description is the essence of the authoritative chain, not a bypass).
@@ -172,13 +178,17 @@ const DIRECT_ACTIONS = [
   /按 `?reworkHints`?(?:修复|返工)/i,
   /(?:由|分派)\s+S(?:-fix)?(?![A-Za-z0-9_])/i,
 ];
-const PROHIBITION = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|未经|命中反模式|must\s+not|not\s+allowed|cannot)/i;
-
-// Verbatim-shared by the two line-level failure-routing scanners below (direct
-// R→S-fix bypass and ordinary failure routes). Deliberately narrower than
-// PROHIBITION above (no 未经 / 命中反模式) and than the paragraph-level scanner's
-// local prohibition (no 不要 / 避免): the three scanners keep their own semantics.
+// Single source for the prohibition charset of the line-level failure-routing
+// scanners (S56): shared verbatim by the two line-level scanners and the
+// withoutProhibition strip in the ordinary-failure corpus scan. The scanners
+// keep their own documented supersets instead of verbatim copies:
+// hasExecutableDirectAction extends it with 未经 / 命中反模式 (deterrent
+// restatements such as 「未查询直接修改命中反模式 #38，回到当前阶段起点」 must stay
+// non-executable), and the paragraph-level whole-corpus scan's local
+// prohibition additionally carries 不要 / 避免.
 const LINE_PROHIBITION = /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/i;
+// eslint-disable-next-line security/detect-non-literal-regexp -- derived verbatim from the fixed LINE_PROHIBITION.source above, never user input
+const PROHIBITION = new RegExp(`(?:未经|命中反模式|${LINE_PROHIBITION.source})`, 'i');
 
 function hasExecutableDirectAction(value: string): boolean {
   return value
@@ -258,7 +268,15 @@ describe('examples workflow contract', () => {
     expect(hasExecutableDirectAction('失败后由 S-fix 修复。')).toBe(true);
   });
   it('normalizes whitespace in the canonical ordinary failure chain', () => {
-    expect(hasCompleteOrdinaryFailureChain(ORDINARY_FAILURE_CHAIN.replaceAll(' → ', '\n→\n'))).toBe(true);
+    expect(hasCompleteOrdinaryFailureChain(FAILURE_CHAIN.replaceAll(' → ', '\n→\n'))).toBe(true);
+  });
+  it('keeps the full-chain constant and the ordinary-chain short name distinct (F-G8-01)', () => {
+    expect(FAILURE_CHAIN).not.toBe(ORDINARY_FAILURE_CHAIN);
+    expect(ORDINARY_FAILURE_CHAIN).toBe('普通 V/G 失败链');
+    // Both contract layers stay recognized by the ordinary-chain scanner: the
+    // verbatim full chain and the canonical short-name anchor.
+    expect(hasCompleteOrdinaryFailureChain(FAILURE_CHAIN)).toBe(true);
+    expect(hasCompleteOrdinaryFailureChain(ORDINARY_FAILURE_CHAIN)).toBe(true);
   });
   it('captures a multiline /wm test command as one bounded command', () => {
     const commands = testCommands(
@@ -518,10 +536,8 @@ describe('examples workflow contract', () => {
         if (line.includes(FAILURE_CHAIN) || line.includes('下方完整链') || line.includes('普通 V/G 失败链')) continue;
         if (line.includes('phase 1') && line.includes('ingestion') && line.includes('A-chunk')) continue;
 
-        const withoutProhibition = line.replace(
-          /(?:不得|禁止|不可|不能|不允许|不应|不授权|跳过|must\s+not|not\s+allowed|cannot)/gi,
-          '',
-        );
+        // eslint-disable-next-line security/detect-non-literal-regexp -- derived verbatim from the fixed LINE_PROHIBITION source, never user input
+        const withoutProhibition = line.replace(new RegExp(LINE_PROHIBITION.source, 'gi'), '');
         const positiveBypass =
           /(?:必须|应当|需要|可以按|只能按|先执行|随后执行|再执行|由[^，。；]*执行|由[^，。；]*分派)\s*(?:直接|回到|回步骤|回 phase|回编码|回需求|返工|重跑|重新执行|补回填|按 `?reworkHints`?)/i.test(
             withoutProhibition,
@@ -552,9 +568,12 @@ describe('examples workflow contract', () => {
   });
 
   it('keeps a table-row failure signal and bypass action in one analysis scope', () => {
-    // hard-constraints.md「门禁脚本退出码精确对应表」row 1 cells: the signal
+    // Constructed samples, not corpus quotes: they mimic the shape of a
+    // hard-constraints.md「门禁脚本退出码精确对应表」row (script；exit code；
+    // failure signal cells；anti-pattern refs；action cell) where the signal
     // 「评审未通过」 lives in the third cell while the bypass 「回到当前阶段
-    // 起点返工」 lives in the last cell; splitting cells would miss it.
+    // 起点返工」 lives in the last cell; splitting cells would miss it. The
+    // live corpus rows themselves already publish the canonical chain.
     expect(
       failureRoutingReason(
         '`check-verifier-output.ts`；1；评审未通过（schema / 方差 / 分数不达标）；#1 / #4；回到当前阶段起点返工',
@@ -583,7 +602,10 @@ describe('examples workflow contract', () => {
       ),
     ).toBe(undefined);
     // ... but a C/D routing clause that skips R and dispatches S by reworkHints
-    // is an ordinary-failure bypass (command-reference.md /wm review 失败动作).
+    // is an ordinary-failure bypass. Constructed sample, not a corpus quote:
+    // command-reference.md /wm review 失败动作 now routes C/D through the
+    // ordinary V/G failure chain, so the stale direct-S wording below is kept
+    // only as a negative scanner input.
     expect(
       failureRoutingReason(
         '失败动作：编排者不得自评（反模式 #10）——评审必须分派 V 子代理执行；C/D 由 O 分派 S 子代理按 reworkHints 返工。',
