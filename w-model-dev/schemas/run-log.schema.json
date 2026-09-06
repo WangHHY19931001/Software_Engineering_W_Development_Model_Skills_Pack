@@ -217,7 +217,7 @@
       "type": ["integer", "null"]
     },
     "gateLogPath": {
-      "description": "门禁脚本 stdout 存档路径（gate/tla-gate/graph-gate 类动作必填；供 check-run-log.ts R6 交叉校验 exitCode 防伪造）",
+      "description": "可选审计字段：gate/tla-gate/graph-gate 类动作落盘的 gate-log 存档路径（schema 不做条件强制，省略不阻断校验）。填写后受 R6 约束：gateExitCode 须回填为数值（回填检查始终执行）；check-run-log 以 --gate-logs=<dir> 提供存档时，按 basename/绝对/相对路径多索引匹配并与 gate-log exitCode 交叉校验一致（SSoT §10E 防伪造）",
       "type": "string"
     },
     "outcome": {
