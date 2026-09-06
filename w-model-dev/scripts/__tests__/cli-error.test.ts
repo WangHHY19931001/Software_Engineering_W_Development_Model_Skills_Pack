@@ -52,6 +52,20 @@ describe('formatCliError', () => {
       formatCliError({ category: 'FILE_NOT_FOUND', message: 'm', exitCode: 2, rule: 'P0-2', file: '/x/rtm.json' }),
     ).toBe('✗ [FILE_NOT_FOUND] m [rule=P0-2]: /x/rtm.json');
   });
+
+  it('file 与 detail 同有 → detail 附于括号，不再被 file 吞并（F-G6-02）', () => {
+    expect(
+      formatCliError({
+        category: 'STRUCTURE_INVALID',
+        message: 'ChangeScope 违反 change-scope.schema.json',
+        exitCode: 2,
+        file: '/x/scope.json',
+        detail: '/changedFiles/0: must match pattern [pattern]',
+      }),
+    ).toBe(
+      '✗ [STRUCTURE_INVALID] ChangeScope 违反 change-scope.schema.json: /x/scope.json（/changedFiles/0: must match pattern [pattern]）',
+    );
+  });
 });
 
 describe('printError / printErrorJson', () => {
@@ -103,6 +117,23 @@ describe('printError / printErrorJson', () => {
     spy.mockRestore();
     expect(calls[0]).not.toContain('"rule"');
     expect(calls[0]).not.toContain('"field"');
+    expect(calls[0]).not.toContain('"detail"');
+  });
+
+  it('有 detail 时 ERROR_JSON 含 detail 字段（F-G6-02：schema 定位信息可机器读取）', () => {
+    const calls: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => {
+      calls.push(s);
+    });
+    printErrorJson({
+      category: 'STRUCTURE_INVALID',
+      message: 'ChangeScope 违反 change-scope.schema.json',
+      exitCode: 2,
+      file: '/x/scope.json',
+      detail: '/changedFiles/0: must match pattern [pattern]',
+    });
+    spy.mockRestore();
+    expect(calls[0]).toContain('"detail":"/changedFiles/0: must match pattern [pattern]"');
   });
 });
 

@@ -66,3 +66,30 @@ describe('checkMaturity', () => {
     expect(r.violations.some((v) => v.includes('R5') && v.includes('降级评估'))).toBe(true);
   });
 });
+
+/**
+ * 可见性与死分支清理（F-G2-04/05，audit-fixes task 5）：
+ *   - R3 依赖可选 --project context（completedPhases），缺失时降级为非阻断 warning，不再静默
+ *   - R1 死分支删除：schema required 前置拦截缺失字段，逻辑层不再重复报「schema 不完整」
+ */
+describe('checkMaturity 可见性与死分支清理', () => {
+  it('R3 context 缺失（未提供 completedPhases）→ 非阻断 warning（F-G2-04）', () => {
+    const r = checkMaturity(validMaturity());
+    expect(r.passed).toBe(true);
+    expect(r.warnings).toEqual(['R3 未校验：未提供 --project']);
+  });
+
+  it('R3 context 提供时无 warning', () => {
+    const r = checkMaturity(validMaturity(), { completedPhases: 8 });
+    expect(r.warnings).toHaveLength(0);
+    expect(r.passed).toBe(true);
+  });
+
+  it('R1 死分支已删除：缺 level 由 schema required 前置拦截 → [schema]（F-G2-05）', () => {
+    const m = validMaturity() as unknown as Record<string, unknown>;
+    delete m['level'];
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.startsWith('[schema]'))).toBe(true);
+  });
+});

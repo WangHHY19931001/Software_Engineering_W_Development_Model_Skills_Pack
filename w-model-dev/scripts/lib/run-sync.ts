@@ -53,30 +53,30 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 480,
+    line: 497,
     symbol: 'currentCommitSha',
     reason:
-      'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.（行号 2026-09-04 archival-fixes 随 detectScriptsChanges 多行化下移 3 行）',
+      'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.（行号 2026-09-06 audit-fixes task 5 随 ERROR_JSON detail 脱敏 helper 新增下移 17 行）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 606,
+    line: 623,
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its 300-second timeout.（行号 2026-09-04 archival-fixes 随 detectScriptsChanges 多行化下移 3 行）',
+      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its 300-second timeout.（行号 2026-09-06 audit-fixes task 5 同上顺延）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 612,
+    line: 629,
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its 300-second timeout.（行号 2026-09-04 archival-fixes 随 detectScriptsChanges 多行化下移 3 行）',
+      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its 300-second timeout.（行号 2026-09-06 audit-fixes task 5 同上顺延）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -208,23 +208,23 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2357,
+    line: 2364,
     symbol: 'withDocsConsistencyFixture git init',
-    reason: 'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.',
+    reason: 'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.（行号 2026-09-06 audit-fixes task 5 随 metrics 探针 rawErrorJson.detail 断言扩展下移 7 行）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2360,
+    line: 2367,
     symbol: 'withDocsConsistencyFixture git config email',
-    reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
+    reason: 'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-06 audit-fixes task 5 同上顺延）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2366,
+    line: 2373,
     symbol: 'withDocsConsistencyFixture git config name',
     reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
@@ -232,7 +232,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2369,
+    line: 2376,
     symbol: 'withDocsConsistencyFixture git config gpgSign',
     reason: 'D5 disables inherited signing for the isolated provenance fixture.',
     timeout: { required: true, status: 'present' },
@@ -240,7 +240,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2376,
+    line: 2383,
     symbol: 'withDocsConsistencyFixture git add',
     reason: 'D5 stages the copied fixture before creating its provenance-bound commit.',
     timeout: { required: true, status: 'present' },
@@ -248,7 +248,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2377,
+    line: 2384,
     symbol: 'withDocsConsistencyFixture git commit',
     reason: 'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.',
     timeout: { required: true, status: 'present' },
@@ -256,7 +256,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2429,
+    line: 2436,
     symbol: 'fixtureCommitSha',
     reason: 'D5 reads the isolated fixture HEAD for same-run provenance assertions.',
     timeout: { required: true, status: 'present' },
@@ -264,7 +264,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2452,
+    line: 2459,
     symbol: 'runDocsConsistencyCli',
     reason: 'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.',
     timeout: { required: true, status: 'present' },
@@ -305,10 +305,10 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/check-codegraph-queries.test.ts',
-    line: 317,
+    line: 359,
     symbol: 'runCli',
     reason:
-      '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-05 review2-fixes 随 C10b/C10c 固定 queryTimestamp/scopeCreatedAt 常量下移 3 行）',
+      '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-06 audit-fixes task 5 随 C12/C13/C10g 新用例下移 42 行）',
     timeout: { required: true, status: 'present' },
   },
   {

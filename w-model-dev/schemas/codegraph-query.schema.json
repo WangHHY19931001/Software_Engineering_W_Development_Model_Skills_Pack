@@ -25,12 +25,12 @@
       "pattern": "\\S"
     },
     "targetFiles": {
-      "description": "本次查询服务的变更文件（strict 模式必填）：项目根相对、正斜杠、非绝对、不含 .. /空段/反斜杠；须全部属于 scope.changedFiles",
+      "description": "本次查询服务的变更文件（strict 模式必填）：项目根相对、正斜杠、非绝对、不含 .. / . /空段/反斜杠；须全部属于 scope.changedFiles（pattern 与 change-scope.schema.json changedFiles 同构）",
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "string",
-        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[^/]+(?:/[^/]+)*$"
+        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))[^/]+(?:/[^/]+)*$"
       }
     },
     "callers": {

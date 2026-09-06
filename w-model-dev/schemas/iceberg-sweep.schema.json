@@ -60,7 +60,7 @@
         "previousFindings": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "上一轮 IcebergSweepReport 的 findingId 列表（去重依据，本轮不得重复发现）"
+          "description": "上一轮 IcebergSweepReport 的 findingId 列表（去重依据，本轮不得重复发现；newFindings 内部 findingId 亦不得重复，重复为 blocking violation）"
         }
       }
     },
@@ -75,7 +75,7 @@
           "findingId": {
             "type": "string",
             "pattern": "^IF-phase[1-8]-[1-5]-[0-9]+$",
-            "description": "冰山发现 ID，格式 IF-phase<N>-<round>-<seq>，如 IF-phase3-2-01"
+            "description": "冰山发现 ID，格式 IF-phase<N>-<round>-<seq>，如 IF-phase3-2-01；须在本轮 newFindings 内唯一（内部重复由 checkIcebergSweep R3 拒绝）且不在上一轮 previousFindings 中"
           },
           "severity": {
             "type": "string",

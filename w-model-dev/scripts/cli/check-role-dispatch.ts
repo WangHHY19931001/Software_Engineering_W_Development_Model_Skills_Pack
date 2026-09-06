@@ -15,12 +15,12 @@
  *
  * 退出码：
  *   0  所有阶段角色分派完整
- *   1  缺失角色（violations 列出具体阶段与缺失角色）
- *   2  输入错误（文件不存在 / 非法 JSON）
+ *   1  缺失角色 / 坏行 blocking（PARSE_INCOMPLETE 并入 violations；口径与 check-run-log 一致）
+ *   2  输入错误（文件不存在 / 参数缺失）
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 ROLE_DISPATCH_JSON 摘要，便于 Agent 正则截取）
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -31,14 +31,13 @@
  * @module
  */
 
-import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { checkRoleDispatch, type RoleDispatchEntry } from '../logic/role-dispatch-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
-import { parseJsonSafe } from '../lib/safe-json.js';
+import { readJsonlOrExitDetailed } from '../lib/read-json-or-exit.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 async function main(): Promise<void> {
@@ -62,54 +61,32 @@ async function main(): Promise<void> {
   }
 
   const abs = path.resolve(file);
-  let raw: string;
-  try {
-    raw = await fs.readFile(abs, 'utf-8');
-  } catch (err) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'ENOENT') {
-      exitWithError({
-        category: 'FILE_NOT_FOUND',
-        rule: 'P0-2',
-        message: '文件不存在',
-        file: abs,
-        exitCode: 2,
-      });
-      return;
-    }
-    throw err;
-  }
-
-  const entries: RoleDispatchEntry[] = [];
-  const lines = raw.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!.trim();
-    if (!line) continue;
-    try {
-      entries.push(parseJsonSafe(line) as RoleDispatchEntry);
-    } catch {
-      // 坏行 exit 2（不复用 readJsonlOrExit 的 warn+skip，行为不等价）
-      exitWithError({
-        category: 'FILE_PARSE',
-        message: `第 ${i + 1} 行非合法 JSON`,
-        detail: line.slice(0, 80),
-        exitCode: 2,
-      });
-      return;
-    }
-  }
+  // 坏行 warn+skip + parseErrors 保留（readJsonlOrExitDetailed），由下方并入 blocking violations——
+  // 与 check-run-log 同一 JSONL 输入同口径：坏行 = 校验失败 exit 1，非输入错误 exit 2（F-G2-03）
+  const parsedRunLog = await readJsonlOrExitDetailed(abs, 'run-log');
+  const entries = parsedRunLog.entries as RoleDispatchEntry[];
 
   const result = checkRoleDispatch(entries);
-  const exitCode = result.passed ? 0 : 1;
+  // 坏行使输入不完整（可能丢失 S/V/G 证据），并入 blocking（fail-closed）；
+  // 消息保留 PARSE_INCOMPLETE 前缀（文案对齐 check-run-log）
+  const allViolations = [
+    ...result.violations,
+    ...parsedRunLog.parseErrors.map(
+      (error) =>
+        `PARSE_INCOMPLETE: line ${error.line} ${error.message}; blocking（坏行使 run-log 输入不完整，fail-closed）`,
+    ),
+  ];
+  const passed = allViolations.length === 0;
+  const exitCode = passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     printJsonReport(
       {
         type: 'role-dispatch',
-        passed: result.passed,
-        reasons: result.violations,
-        violations: buildViolationDistribution(result.violations.length),
+        passed,
+        reasons: allViolations,
+        violations: buildViolationDistribution(allViolations.length),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -125,7 +102,7 @@ async function main(): Promise<void> {
   console.log(`输入文件      : ${abs}`);
   console.log(`R3 强制       : 是（无条件）${r3EnabledFlagPassed ? ' [--r3-enabled flag 已视为 no-op]' : ''}`);
   console.log(`阶段数        : ${result.phaseSummary.length}`);
-  console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
+  console.log(`校验结果      : ${passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
   for (const p of result.phaseSummary) {
@@ -143,10 +120,10 @@ async function main(): Promise<void> {
     }
   }
 
-  if (!result.passed) {
+  if (!passed) {
     console.log('─'.repeat(60));
     console.log('未通过原因：');
-    for (const v of result.violations) {
+    for (const v of allViolations) {
       console.log(`  - ${v}`);
     }
   }
@@ -156,10 +133,10 @@ async function main(): Promise<void> {
     'ROLE_DISPATCH',
     {
       type: 'role-dispatch',
-      passed: result.passed,
+      passed,
       r3Enabled: true,
       phaseCount: result.phaseSummary.length,
-      violations: result.violations,
+      violations: allViolations,
     },
     exitCode,
   );

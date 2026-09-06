@@ -51,6 +51,12 @@ export interface RunLogEntry {
 export interface CheckpointCheckOptions {
   /** R3: checkpoint-log 用户确认数据，key = phase（如 "1"/"2"/"3"），value = 用户确认原文 */
   checkpointLog?: Map<string, string>;
+  /**
+   * R3 语义补充（S18）：--checkpoint-log 目录已提供但加载失败时的原因，
+   * 使 R3 违规 reason 区分「目录已提供但无匹配记录/不可读」与「目录未提供」，
+   * 避免误导排查方向。未提供目录时省略本字段（保持原文案）。
+   */
+  checkpointLogMissingReason?: 'dir-unreadable' | 'no-phase-match';
 }
 
 export interface CheckpointCheckResult {
@@ -244,9 +250,16 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
 
   // R3 用户确认存在（强制校验，拒绝代签）
   if (!options?.checkpointLog) {
-    // 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规
+    // 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规；
+    // 目录已提供但加载失败（空目录/无 phase-N 匹配/不可读）时按实际语义表述，不误导排查方向（S18）
+    const providedReason =
+      options?.checkpointLogMissingReason === 'no-phase-match'
+        ? 'checkpoint-log 无 phase-N 匹配记录（目录已提供）'
+        : options?.checkpointLogMissingReason === 'dir-unreadable'
+          ? 'checkpoint-log 目录不可读（目录已提供）'
+          : '未提供 --checkpoint-log，强制';
     for (const e of checkpoints) {
-      violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（未提供 --checkpoint-log，强制）`);
+      violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（${providedReason}）`);
     }
   } else {
     for (const e of checkpoints) {

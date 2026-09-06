@@ -1429,7 +1429,14 @@ describe('runDocConsistencyChecks', () => {
         errorExitCode: 2,
         category: 'ARG_INVALID',
         rule: 'P0-1',
-        rawErrorJson: { category: 'ARG_INVALID', message: '--phase 参数非法', exitCode: 2, rule: 'P0-1' },
+        // F-G6-02：printErrorJson 有值即输出 detail（可选字段），探测归一化保留该键
+        rawErrorJson: {
+          category: 'ARG_INVALID',
+          message: '--phase 参数非法',
+          exitCode: 2,
+          rule: 'P0-1',
+          detail: '须为 1-8 整数（支持 --phase=N 与 --phase N 两形态，重复传参即错）',
+        },
       });
     });
   });

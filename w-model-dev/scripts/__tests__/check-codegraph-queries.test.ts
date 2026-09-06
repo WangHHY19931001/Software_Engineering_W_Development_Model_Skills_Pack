@@ -26,6 +26,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   checkCodegraphQueries,
   checkCodegraphQueriesStrict,
@@ -160,6 +161,22 @@ describe('checkCodegraphQueriesStrict（覆盖绑定校验）', () => {
     expect(r2.passed).toBe(false);
   });
 
+  it('C13: docs-only scope（无 code/test 变更）→ required==0 直接 passed，不因目录/查询缺失被阻断（F-G6-01）', () => {
+    // 项目内不存在 codegraph-queries 目录：required>0 时会 fail-closed（对照 C4b）；
+    // docs-only scope 须 exit 0 并附注记
+    const root = writeProject({});
+    const scope = makeScope({ changedFiles: ['docs/guide.md', 'docs/api/reference.md'] });
+    const r = readResult(root, scope);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.requiredFileCount).toBe(0);
+    expect(r.note).toContain('scope 无 code/test 变更');
+    expect(r.note).toContain('codegraph 不适用');
+    // 对照组：同项目、scope 含 code 文件 → 仍 fail-closed（目录缺失）
+    const rCode = readResult(root, makeScope({ changedFiles: ['docs/guide.md', 'src/main.ts'] }));
+    expect(rCode.passed).toBe(false);
+  });
+
   it('C5: 既有查询 JSON 缺 changeId/targetFiles → strict violation（不允许 silent skip）', () => {
     const root = writeProject({
       '.w-model/codegraph-queries/phase5-a.json': JSON.stringify({
@@ -256,6 +273,31 @@ describe('checkCodegraphQueriesStrict（覆盖绑定校验）', () => {
     });
     expect(readResult(root2, makeScope()).passed).toBe(true);
   });
+
+  it('C12: targetFiles pattern 补 `.` 段排除——`src/./test.ts` 在 schema 层拒绝（F-G4-05，与 change-scope 同构）', () => {
+    const schemaResult = validateBySchema('codegraph-query', {
+      querySymbol: 'TargetSymbol',
+      callers: [],
+      callees: [],
+      blastRadius: 1,
+      queryTimestamp: '2026-09-03T00:00:00Z',
+      changeId: 'phase5-demo',
+      targetFiles: ['src/./test.ts'],
+    });
+    expect(schemaResult.valid).toBe(false);
+    expect(schemaResult.errorMessages.some((m) => m.includes('targetFiles'))).toBe(true);
+    // 对照：合法相对路径 schema 层通过
+    const ok = validateBySchema('codegraph-query', {
+      querySymbol: 'TargetSymbol',
+      callers: [],
+      callees: [],
+      blastRadius: 1,
+      queryTimestamp: '2026-09-03T00:00:00Z',
+      changeId: 'phase5-demo',
+      targetFiles: ['src/test.ts'],
+    });
+    expect(ok.valid).toBe(true);
+  });
 });
 
 describe('checkCodegraphQueries（legacy 两参兼容层）', () => {
@@ -336,6 +378,38 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.stdout).toMatch(/变更上下文|ChangeScope/);
     // F-G3-05：失败消息附形态自查提示（空格形态按未提供处理）
     expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
+  });
+
+  it('C10g: scope 违反 schema → exit 2 ERROR_JSON(STRUCTURE_INVALID) 且 detail 含 pattern 定位（F-G6-02）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    mkdirSync(join(root, '.w-model'), { recursive: true });
+    writeFileSync(
+      join(root, '.w-model', 'scope-bad.json'),
+      JSON.stringify({
+        changeId: 'phase5-cgq-cli',
+        phase: 5,
+        baseRef: baseSha,
+        headRef: headSha,
+        scopeCreatedAt: SCOPE_TS,
+        changedFiles: ['src/./main.ts', 'src/forgotten.ts'],
+      }),
+    );
+    const r = runCli([`"${root}"`, '--phase', '5', `--scope=${join(root, '.w-model', 'scope-bad.json')}`]);
+    expect(r.status).toBe(2);
+    const line = r.stdout.split(/\r?\n/).find((l) => l.startsWith('ERROR_JSON '));
+    expect(line).toBeDefined();
+    const parsed = JSON.parse(line!.slice('ERROR_JSON '.length)) as {
+      category: string;
+      exitCode: number;
+      detail?: string;
+      file?: string;
+    };
+    expect(parsed.category).toBe('STRUCTURE_INVALID');
+    expect(parsed.exitCode).toBe(2);
+    // F-G6-02：detail 携带 schema pattern 定位（changedFiles/0），不再被 file 吞并
+    expect(parsed.detail).toContain('/changedFiles/0');
+    expect(parsed.detail).toContain('must match pattern');
+    expect(parsed.file).toContain('scope-bad.json');
   });
 
   it('C10b: 合法 scope + 全覆盖查询 → exit 0', () => {

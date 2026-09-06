@@ -26,7 +26,7 @@
  * 输出：
  *   stdout 打印单行 PREVENTIVE_REVIEW_JSON 摘要（便于 Agent 正则截取；非 --json 模式无人类可读正文）；默认与 --json 均先尝试写 gate log
  *   gate log 写入失败仅在摘要中增加 gateLogWriteError（并写 stderr 诊断），不改变主 gate result
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）

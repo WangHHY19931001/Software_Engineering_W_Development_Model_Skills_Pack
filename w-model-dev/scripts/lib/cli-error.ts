@@ -2,10 +2,13 @@
  * CLI 脚本错误结构工具（lib/cli-error.ts）
  *
  * 统一全仓脚本 exit 2 输入错误的输出：
- *   - 人类可读消息 → stderr（`✗ [CATEGORY] <message>: <file|detail>`）
- *   - 机器可读摘要 → stdout（`ERROR_JSON {category,message,exitCode,file,rule,field}`）
+ *   - 人类可读消息 → stderr（`✗ [CATEGORY] <message>: <file|detail>[（detail）]`）
+ *   - 机器可读摘要 → stdout（`ERROR_JSON {category,message,exitCode,file?,rule?,field?,detail?}`，
+ *     可选字段仅有值时输出）
  * 遵循 SSoT §10E E.1「JSON 摘要含 exitCode 字段且输出到 stdout」约定。
  * 设计：docs/superpowers/specs/2026-08-05-round32-error-structure-normalization-design.md §3.1
+ * （audit-fixes task 5 / F-G6-02：detail 同时进入 stderr 与 ERROR_JSON，
+ * STRUCTURE_INVALID 的 schema 定位信息不再被 file 吞并）
  */
 
 /** 错误类别（exit 1 校验失败走 violations + XXX_JSON，不使用本表） */
@@ -28,12 +31,13 @@ export interface CliError {
   detail?: string;
 }
 
-/** 组装人类可读消息：`✗ [CATEGORY] <message> [rule=...]: <file|detail>`（file 优先，其次 detail，均无则省略冒号段；rule 可选） */
+/** 组装人类可读消息：`✗ [CATEGORY] <message> [rule=...]: <file|detail>[（detail）]`（file 优先，其次 detail，均无则省略冒号段；rule 可选；file 与 detail 同有则 detail 附于括号，F-G6-02） */
 export function formatCliError(e: CliError): string {
   const head = `✗ [${e.category}] ${e.message}`;
   const rule = e.rule ? ` [rule=${e.rule}]` : '';
   const tail = e.file || e.detail;
-  return tail ? `${head}${rule}: ${tail}` : `${head}${rule}`;
+  const detailSuffix = e.file && e.detail ? `（${e.detail}）` : '';
+  return tail ? `${head}${rule}: ${tail}${detailSuffix}` : `${head}${rule}`;
 }
 
 /** stderr 输出人类可读错误消息 */
@@ -41,12 +45,13 @@ export function printError(e: CliError): void {
   console.error(formatCliError(e));
 }
 
-/** stdout 输出结构化错误摘要（ERROR_JSON 前缀 + JSON，遵循 §10E E.1；file/rule/field 仅在有值时输出，向后兼容） */
+/** stdout 输出结构化错误摘要（ERROR_JSON 前缀 + JSON，遵循 §10E E.1；file/rule/field/detail 仅在有值时输出，向后兼容） */
 export function printErrorJson(e: CliError): void {
   const json: Record<string, unknown> = { category: e.category, message: e.message, exitCode: e.exitCode };
   if (e.file !== undefined) json.file = e.file;
   if (e.rule !== undefined) json.rule = e.rule;
   if (e.field !== undefined) json.field = e.field;
+  if (e.detail !== undefined) json.detail = e.detail;
   console.log(`ERROR_JSON ${JSON.stringify(json)}`);
 }
 

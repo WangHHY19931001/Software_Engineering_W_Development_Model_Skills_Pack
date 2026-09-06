@@ -24,7 +24,7 @@
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 CHECKPOINT_JSON 摘要，便于 Agent 正则截取）
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -68,10 +68,14 @@ function parseArgs(argv: string[]): ParsedArgs {
  * 文件命名约定：匹配 phase-N 模式（phase-1.txt / checkpoint-1.md / 1.log 等），
  *              提取 N 作为 phase key。
  *
- * 容错：目录读取失败只警告不 exit；单文件读取失败只警告；
- *       未匹配到任何 phase 文件则返回 undefined（跳过 R3）。
+ * 返回值区分加载结果（S18）：loaded / dir-unreadable / no-phase-match，
+ * 供 R3 违规 reason 表述实际语义（不再一律误导为「未提供 --checkpoint-log」）。
+ * 容错：目录读取失败/无匹配只警告不 exit。
  */
-async function loadCheckpointLog(checkpointLogDir: string): Promise<Map<string, string> | undefined> {
+type CheckpointLogOutcome =
+  { kind: 'loaded'; map: Map<string, string> } | { kind: 'dir-unreadable' } | { kind: 'no-phase-match' };
+
+async function loadCheckpointLog(checkpointLogDir: string): Promise<CheckpointLogOutcome> {
   const dirAbs = path.resolve(checkpointLogDir);
   let files: string[];
   try {
@@ -79,7 +83,7 @@ async function loadCheckpointLog(checkpointLogDir: string): Promise<Map<string, 
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     console.error(`⚠ checkpoint-log 目录读取失败，跳过 R3 用户确认校验: ${dirAbs}（${e.code ?? e.message}）`);
-    return undefined;
+    return { kind: 'dir-unreadable' };
   }
 
   const map = new Map<string, string>();
@@ -102,9 +106,9 @@ async function loadCheckpointLog(checkpointLogDir: string): Promise<Map<string, 
   }
   if (map.size === 0) {
     console.error(`⚠ checkpoint-log 目录未匹配到 phase-N 文件，跳过 R3 用户确认校验: ${dirAbs}`);
-    return undefined;
+    return { kind: 'no-phase-match' };
   }
-  return map;
+  return { kind: 'loaded', map };
 }
 
 // ==================== 主流程 ====================
@@ -144,17 +148,21 @@ async function main(): Promise<void> {
 
   // 强制输入：--checkpoint-log（读失败只警告不 exit，但 R3 逻辑会报违规）
   let checkpointLog: Map<string, string> | undefined;
+  let checkpointLogMissingReason: 'dir-unreadable' | 'no-phase-match' | undefined;
   let checkpointLogFileCount = 0;
   if (checkpointLogDir) {
-    const result = await loadCheckpointLog(checkpointLogDir);
-    if (result) {
-      checkpointLog = result;
-      checkpointLogFileCount = result.size;
+    const loaded = await loadCheckpointLog(checkpointLogDir);
+    if (loaded.kind === 'loaded') {
+      checkpointLog = loaded.map;
+      checkpointLogFileCount = loaded.map.size;
+    } else {
+      // S18：目录已提供但加载失败，R3 违规 reason 按实际语义表述
+      checkpointLogMissingReason = loaded.kind;
     }
   }
 
   // 构建 options 并调用纯逻辑校验
-  const result = checkCheckpoint(entries, { checkpointLog });
+  const result = checkCheckpoint(entries, { checkpointLog, checkpointLogMissingReason });
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置

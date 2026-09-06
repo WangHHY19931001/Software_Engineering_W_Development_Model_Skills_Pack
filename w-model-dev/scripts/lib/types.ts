@@ -40,6 +40,8 @@ export interface JsonReport {
   warnings?: string[];
   /** 因输入不足降级为非阻断的规则 ID（如 check-requirement-coverage 未提供 --graph 时的 C7）。 */
   skippedRules?: string[];
+  /** 阶段 5-8 外部校验 summary（check-artifact-gate --json，与 GATE_JSON external 同构；非 5-8 阶段为 null）。 */
+  external?: unknown;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */

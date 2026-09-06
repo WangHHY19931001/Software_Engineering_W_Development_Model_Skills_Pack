@@ -3,8 +3,9 @@
  *
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema（§自主成熟度模型）
  * 与 w-model-dev/references/hard-constraints.md（反模式节）§运维失败模式清单 O1~O6。
- * 校验：schema 完整（R1）+ level 合法（R2）+ 成功阶段更新一致（R3）
- *       + history 时序一致（R4）+ 降级触发检测（R5）。
+ * 校验：level 合法（R2）+ 成功阶段更新一致（R3）+ history 时序一致（R4）+ 降级触发检测（R5）。
+ * schema 完整（R1，level/unlockConditions/history/downgradeTriggers required）由
+ * maturity.schema.json 前置拦截，逻辑层不再重复校验（audit-fixes task 5，F-G2-05 死分支清理）。
  *
  * 设计原则（与 budget-logic.ts / graph-logic.ts / verifier-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
@@ -66,6 +67,8 @@ export interface MaturityCheckOptions {
 export interface MaturityCheckResult {
   passed: boolean;
   violations: string[];
+  /** 非阻断警告：可选 context 缺失导致某规则未校验时的可见性提示（F-G2-04） */
+  warnings: string[];
 }
 
 // ==================== 校验入口 ====================
@@ -77,29 +80,29 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
     return {
       passed: false,
       violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+      warnings: [],
     };
   }
 
   const violations: string[] = [];
+  // 非阻断警告（F-G2-04）：R3 周期一致依赖可选 --project context（completedPhases），
+  // 未提供时显式降级为警告，不再静默跳过（exit 0 须可解释）
+  const warnings: string[] = [];
+  if (options?.completedPhases === undefined) {
+    warnings.push('R3 未校验：未提供 --project');
+  }
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
-  // 注意：typeof [] === 'object' 且 ![] 为 false，数组须显式排除，否则落到 R1 报"schema 不完整"有误导
+  // 注意：typeof [] === 'object' 且 ![] 为 false，数组须显式排除，否则误报"maturity 必须为对象"有误导
   if (!maturity || typeof maturity !== 'object' || Array.isArray(maturity)) {
-    return { passed: false, violations: ['maturity 必须为对象'] };
+    return { passed: false, violations: ['maturity 必须为对象'], warnings };
   }
   // narrow 为 Partial<MaturityConfig> 用于后续字段访问
   const m = maturity as Partial<MaturityConfig>;
   const uc = m.unlockConditions;
   const dt = m.downgradeTriggers;
 
-  // R1 schema 完整
-  // 注意：history 须为数组；非数组（含 null/对象）等同缺失，避免后续 R4 for-of 在非数组上报错
-  const historyMissing = !m.history || !Array.isArray(m.history);
-  if (!m.level || !m.unlockConditions || historyMissing || !m.downgradeTriggers) {
-    violations.push('R1: maturity schema 不完整（缺 level/unlockConditions/history/downgradeTriggers）');
-  }
-
-  // R2 level 合法（先检查存在，避免 includes(undefined) 误报；R1 已报缺失）
+  // R2 level 合法（schema enum 为前置拦截，此处为纵深防御；存在性检查避免 includes(undefined) 误报）
   if (m.level && !['L0', 'L1', 'L2', 'L3'].includes(m.level)) {
     violations.push(`R2: level 非法值: ${m.level}（须为 L0/L1/L2/L3）`);
   }
@@ -147,5 +150,5 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
     );
   }
 
-  return { passed: violations.length === 0, violations };
+  return { passed: violations.length === 0, violations, warnings };
 }

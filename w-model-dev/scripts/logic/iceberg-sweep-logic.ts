@@ -78,9 +78,15 @@ export function checkIcebergSweep(report: IcebergSweepReport): IcebergSweepCheck
   if (report.icebergRound < 1 || report.icebergRound > MAX_ICEBERG_ROUNDS) {
     reasons.push(`icebergRound 越界：${report.icebergRound}，须 1-${MAX_ICEBERG_ROUNDS}`);
   }
-  // R3: newFindings 去重
+  // R3: newFindings 去重（内部 Set 去重 + 与上一轮 previousFindings 比对，双口径；
+  // 内部重复使 newFindingsCount 虚高、破坏去重语义，同为 blocking）
   const prevSet = new Set(report.线索来源.previousFindings);
+  const seen = new Set<string>();
   for (const f of report.newFindings) {
+    if (seen.has(f.findingId)) {
+      reasons.push(`findingId 重复：${f.findingId} 在 newFindings 内部重复`);
+    }
+    seen.add(f.findingId);
     if (prevSet.has(f.findingId)) {
       reasons.push(`findingId 重复：${f.findingId} 已在上一轮发现`);
     }

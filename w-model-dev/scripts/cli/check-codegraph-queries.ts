@@ -33,7 +33,7 @@
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 CODEGRAPH_QUERIES_JSON 摘要，便于 Agent 正则截取）
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -86,6 +86,8 @@ export interface CodegraphStrictResult {
   requiredFileCount: number;
   /** 已被至少一个查询 targetFiles 覆盖的 code/test 文件数 */
   coveredFileCount: number;
+  /** docs-only 解阻断注记（F-G6-01）：scope 无 code/test 变更时 codegraph 不适用 */
+  note?: string;
 }
 
 /** 查询目录名：phase<N>-*.json（strict 只认 scope.phase 对应文件，异 phase 同 changeId 属违规） */
@@ -212,6 +214,21 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
  */
 export function checkCodegraphQueriesStrict(projectRoot: string, scope: ChangeScope): CodegraphStrictResult {
   const violations: string[] = [];
+  // 覆盖判定基准前置（F-G6-01）：strict 入口先按 scope 计算须覆盖 code/test 文件数。
+  // docs-only 变更（required==0）时 codegraph 不适用——直接放行并附注记，跳过目录存在性/
+  // 查询文件数检查；不再逼 S 为 docs 文件伪造查询落盘（与 hard-constraints.md 约束 #14
+  // 「校验实际覆盖而非目录存在」一致）。存在性检查仅在 required>0 时执行。
+  const required = scope.changedFiles.filter((f) => isCodeOrTestFile(f));
+  if (required.length === 0) {
+    return {
+      passed: true,
+      violations: [],
+      queryCount: 0,
+      requiredFileCount: 0,
+      coveredFileCount: 0,
+      note: 'scope 无 code/test 变更，codegraph 不适用（docs-only 变更不强制查询落盘）',
+    };
+  }
   const queriesDir = path.join(projectRoot, '.w-model', 'codegraph-queries');
 
   if (!existsSync(queriesDir)) {
@@ -329,7 +346,7 @@ export function checkCodegraphQueriesStrict(projectRoot: string, scope: ChangeSc
   }
 
   // 覆盖判定：scope 中每个须覆盖的 code/test 变更文件至少被一个合法查询覆盖
-  const required = scope.changedFiles.filter((f) => isCodeOrTestFile(f));
+  // （required 已在函数入口前置计算；此处 required>0）
   let coveredCount = 0;
   for (const f of required) {
     if (covered.has(f)) coveredCount++;
@@ -445,6 +462,9 @@ async function main(): Promise<void> {
   console.log(`项目根        : ${abs}`);
   console.log(`阶段          : ${phase}`);
   console.log(`变更上下文    : ${scopeLabel}`);
+  if (result.note) {
+    console.log(`注记          : ${result.note}`);
+  }
   console.log(`有效查询数    : ${result.queryCount}`);
   console.log(`须覆盖文件数  : ${result.requiredFileCount}`);
   console.log(`已覆盖文件数  : ${result.coveredFileCount}`);

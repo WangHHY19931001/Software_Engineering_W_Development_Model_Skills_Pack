@@ -18,7 +18,7 @@
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 DOCS_CONSISTENCY_JSON 摘要，便于 Agent 正则截取）
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -179,6 +179,21 @@ function normalizeProbePath(value: string, probeRoot: string): string {
   return value;
 }
 
+/**
+ * 长文本字段（如 detail「（用法: …）」）内嵌的绝对路径 token。
+ * F-G6-02 后 detail 进入 ERROR_JSON（rawErrorJson.detail），与 file 同规则脱敏：
+ * 非 ASCII 边界与空白/常见标点截断；字符类无嵌套量词（线性，规避 unsafe-regex）。
+ */
+const EMBEDDED_ABSOLUTE_PATH_RE = /[A-Za-z]:[\\/][^\s,，;；）)】"']*|\/home\/[^\s,，;；）)】"']*/g;
+
+function normalizeEmbeddedPaths(value: string, probeRoot: string): string {
+  if (!/[A-Za-z]:[\\/]|\/home\//.test(value)) return value;
+  return value.replace(EMBEDDED_ABSOLUTE_PATH_RE, (token) => {
+    const normalized = normalizeProbePath(token, probeRoot);
+    return normalized === token ? '<external-path>' : normalized;
+  });
+}
+
 function normalizeRawErrorJson(value: Record<string, unknown>, probeRoot: string): Record<string, unknown> {
   const normalize = (entry: unknown): unknown => {
     if (
@@ -192,6 +207,8 @@ function normalizeRawErrorJson(value: Record<string, unknown>, probeRoot: string
     if (entry !== null && typeof entry === 'object') {
       return Object.fromEntries(Object.entries(entry).map(([key, child]) => [key, normalize(child)]));
     }
+    // detail 等自由文本可能内嵌绝对路径（check-samples-coverage 缺文件清单等），同样脱敏
+    if (typeof entry === 'string') return normalizeEmbeddedPaths(entry, probeRoot);
     return entry;
   };
   return normalize(value) as Record<string, unknown>;

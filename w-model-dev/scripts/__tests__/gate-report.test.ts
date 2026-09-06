@@ -825,6 +825,31 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it('坏行并入 blocking violations → exit 1 且 reasons 含 PARSE_INCOMPLETE（与 check-run-log 同 fixture 同 exit）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-role-dispatch-malformed-'));
+    try {
+      const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // 同一 fixture：1 条合法 entry + 1 条坏行（F-G2-03 口径对齐：两 checker 同 exit）
+      const entry =
+        '{"runId":"r1","timestamp":"2026-09-03T00:01:00Z","phase":1,"phaseName":"需求与范围","action":"produce","role":"S","duration_s":1,"tokens":1,"estimated":false,"subagentSpawns":0,"gateExitCode":null,"outcome":"success"}';
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(logFile, `${entry}\nnot-json\n`, 'utf-8');
+      const roleDispatch = runSync(process.execPath, [tsxCli, CHECK_ROLE_DISPATCH_SCRIPT, '--json', logFile], {});
+      const runLog = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
+      // 实跑对照：同 fixture 同 exit 1（坏行 blocking，非 exit 2 输入错误）
+      expect(roleDispatch.status).toBe(1);
+      expect(runLog.status).toBe(1);
+      const parsed = JSON.parse(roleDispatch.stdout ?? '') as { passed: boolean; reasons: string[]; exitCode: number };
+      expect(parsed.passed).toBe(false);
+      expect(parsed.exitCode).toBe(1);
+      const parseReasons = parsed.reasons.filter((r) => r.startsWith('PARSE_INCOMPLETE: line 2'));
+      expect(parseReasons.length).toBeGreaterThanOrEqual(1);
+      expect(parseReasons[0]).toContain('; blocking');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('check-tla-bdd-sync.ts --json（子进程冒烟：纯 JSON、violations 按 rule 聚合、默认路径保留 TLA_BDD_SYNC_JSON 前缀）', () => {
@@ -973,7 +998,12 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
 
       const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
       expect(r.status).toBe(1);
-      const report = JSON.parse(r.stdout ?? '') as { exitCode: number; passed: boolean; reasons: string[] };
+      const report = JSON.parse(r.stdout ?? '') as {
+        exitCode: number;
+        passed: boolean;
+        reasons: string[];
+        external?: unknown;
+      };
       expect(report).toMatchObject({ exitCode: 1, passed: false });
       expect(report.reasons).toEqual(
         expect.arrayContaining([
@@ -982,6 +1012,27 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
         ]),
       );
       expect(report.reasons).not.toContain('[artifact:graph] graph asset is required for project phase 2-4');
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('--json 输出含 external 字段（S46：与 GATE_JSON 同构；phase 1 无外部校验时为 null）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-json-external-'));
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- model directory is beneath the test-owned mkdtemp fixture
+      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+      const rtm = await fs.readFile(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
+        'utf-8',
+      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
+      const report = JSON.parse(r.stdout ?? '') as Record<string, unknown>;
+      // S46：--json 与 GATE_JSON 同构，external 键恒存在（非 5-8 阶段为 null）
+      expect('external' in report).toBe(true);
+      expect(report['external']).toBeNull();
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -1126,6 +1177,47 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
         exitCode: 0,
         gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
       });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('报告结构违规 → gate-log 审计写入降级 stderr 诊断，stdout 摘要无 GATE_LOG_SCHEMA_INVALID 噪音（S10）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-iceberg-gatelog-degrade-'));
+    try {
+      // 合法样本改坏 triggerType：logic R1 schema 拦截（exit 1），同时 reportSummary
+      // 不满足 gate-log schema（triggerType enum）→ 写入注定 GATE_LOG_SCHEMA_INVALID
+      const base = JSON.parse(await fs.readFile(ICEBERG_VALID_SAMPLE, 'utf-8')) as Record<string, unknown>;
+      base.triggerType = 'BOGUS';
+      const badReport = path.join(tmpDir, 'bad-report.json');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(badReport, JSON.stringify(base), 'utf-8');
+
+      const r = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, '--json', badReport], {
+        cwd: tmpDir,
+      });
+      expect(r.status).toBe(1);
+      const parsed = JSON.parse(r.stdout ?? '') as {
+        passed: boolean;
+        exitCode: number;
+        gateLogWriteError?: unknown;
+        reasons: string[];
+      };
+      expect(parsed.passed).toBe(false);
+      expect(parsed.exitCode).toBe(1);
+      expect(parsed.reasons.some((m) => m.startsWith('[schema]'))).toBe(true);
+      // 降级：schema-invalid 噪音不进入 stdout 摘要，诊断走 stderr
+      expect('gateLogWriteError' in parsed).toBe(false);
+      expect(r.stderr ?? '').toContain('GATE_LOG_SCHEMA_INVALID');
+
+      // 默认（非 --json）路径同样降级：ICEBERG_JSON 摘要不含 gateLogWriteError
+      const rDefault = runSync(process.execPath, [tsxCli, CHECK_ICEBERG_SWEEP_SCRIPT, badReport], { cwd: tmpDir });
+      expect(rDefault.status).toBe(1);
+      const summaryDefault = JSON.parse((rDefault.stdout ?? '').replace('ICEBERG_JSON ', '')) as Record<
+        string,
+        unknown
+      >;
+      expect('gateLogWriteError' in summaryDefault).toBe(false);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

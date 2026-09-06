@@ -14,7 +14,7 @@
  *   maturity.json        maturity.json 文件路径
  *   --project=<path>     project.json 路径（可选，R3/R4 交叉校验）
  *   --run-log=<path>     run-log.jsonl 路径（可选，R5 O 失败模式统计）
- *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
@@ -23,7 +23,7 @@
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 MATURITY_JSON 摘要，便于 Agent 正则截取）
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
   });
   const exitCode = result.passed ? 0 : 1;
 
-  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置；warnings 透传（F-G2-04 可见性）
   if (jsonMode) {
     printJsonReport(
       {
@@ -188,6 +188,7 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.violations,
         violations: buildViolationDistribution(result.violations.length),
+        warnings: result.warnings,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -229,6 +230,11 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/data-models.md §自主成熟度模型');
   }
 
+  // 非阻断警告（如 R3 未校验：未提供 --project）：不影响 exit code，但须可见
+  for (const w of result.warnings) {
+    console.error(`⚠ ${w}`);
+  }
+
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
   printGateReport(
@@ -237,6 +243,7 @@ async function main(): Promise<void> {
       type: 'maturity',
       passed: result.passed,
       violations: result.violations,
+      warnings: result.warnings,
     },
     exitCode,
   );

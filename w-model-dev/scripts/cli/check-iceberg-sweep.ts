@@ -13,7 +13,7 @@
  *   report.json            IcebergSweepReport JSON 文件路径
  *   --auto-trigger         交叉核对模式：从 run-log 推断最近 checkpoint 成功阶段
  *   --run-log=<path>       run-log.jsonl 路径（--auto-trigger 模式必填）
- *   --json                 机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）。默认与 --json 均在输出摘要前尝试写 gate log；写失败通过 gateLogWriteError 反映，不改变主 passed / exitCode
+ *   --json                 机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）。默认与 --json 均在输出摘要前尝试写 gate log；写失败通过 gateLogWriteError 反映，不改变主 passed / exitCode；报告结构违规时审计写入降级为 stderr 诊断（gateLogWriteError 不进入摘要，不再产出 GATE_LOG_SCHEMA_INVALID 噪音）
  *
  * 退出码：
  *   0  校验通过（无遗漏 / 回归 / 新增遗留项）
@@ -23,7 +23,7 @@
  * 输出：
  *   stdout 打印单行 ICEBERG_JSON 摘要（便于 Agent 正则截取；非 --json 模式无人类可读正文）；默认与 --json 均先尝试写 gate log
  *   gate log 写入失败仅在摘要中增加 gateLogWriteError（并写 stderr 诊断），不改变主 gate result
- *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field 仅在有值时输出进 ERROR_JSON；detail 仅出现在 stderr 人类可读消息 `✗ [CATEGORY] msg: <file|detail>`，不进入 ERROR_JSON）
+ *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -38,7 +38,7 @@ import * as path from 'node:path';
 
 import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
-import { writeGateLog } from '../lib/gate-log-writer.js';
+import { writeGateLog, type GateLogWriteError } from '../lib/gate-log-writer.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified, readJsonlOrExit } from '../lib/read-json-or-exit.js';
@@ -196,7 +196,16 @@ async function main(): Promise<void> {
     },
     stdoutSummary: { exitCode: output.exitCode, passed: output.passed },
   });
-  const gateLogWriteError = gateLog.ok ? undefined : gateLog.error;
+  let gateLogWriteError: GateLogWriteError | undefined = gateLog.ok ? undefined : gateLog.error;
+  // S10 降级：报告结构违规时 reportSummary 本身不满足 gate-log schema（如非法 triggerType /
+  // 越界 icebergRound），审计写入注定失败——不再向 stdout 摘要输出 GATE_LOG_SCHEMA_INVALID 噪音，
+  // 改为 stderr 诊断；报告结构合法的运行（含校验失败 exit 1）仍照常写 gate-log 审计足迹。
+  if (gateLogWriteError?.code === 'GATE_LOG_SCHEMA_INVALID') {
+    console.error(
+      '⚠ [gate-log] 报告结构违规（reportSummary 不满足 gate-log schema），跳过审计写入并降级为 stderr 诊断（GATE_LOG_SCHEMA_INVALID 不进入摘要）',
+    );
+    gateLogWriteError = undefined;
+  }
 
   // --json：写入审计日志后输出机器可读报告，主门禁结果保持不变
   if (jsonMode) {

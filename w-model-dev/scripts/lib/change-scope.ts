@@ -81,7 +81,20 @@ const ISO_DATE_TIME_MS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:Z|[+-]\
 
 /**
  * ISO date-time 判定（regex + Date.parse 语义双保险，拒绝 2026-09-04 / 25:00 等）
- * 较 ajv-formats date-time 更严：拒绝小写 t/z 与无毫秒/时区形态；同一字段族以本 TS 层为准（schema 层为宽松前置）
+ *
+ * 精确口径（F-G4-06 JSDoc 列明；同一字段族 scopeCreatedAt / queryTimestamp 均以本 TS 层为准，
+ * schema 层 ajv-formats date-time 为宽松前置）：
+ *   接受（全部形态）：
+ *     - `YYYY-MM-DDTHH:MM:SSZ`（UTC，秒级）
+ *     - `YYYY-MM-DDTHH:MM:SS±HH:MM`（数字时区偏移，秒级）
+ *     - `YYYY-MM-DDTHH:MM:SS.fffZ` / `...±HH:MM`（小数秒，1 位及以上）
+ *   拒绝：
+ *     - 小写 `t` / `z` 分隔符（仅接受大写 `T` / `Z` 字面）
+ *     - 空格分隔（`2026-09-04 10:00:00Z`）
+ *     - 缺时区形态（`2026-09-04T10:00:00`）
+ *     - 日期缺时间（`2026-09-04`）与非日期串
+ *     - 非法日历值（2026-13-04 / 25:00 等，由 Date.parse 兜底）
+ *     - 非字符串输入
  */
 export function isIsoDateTimeString(value: unknown): value is string {
   if (typeof value !== 'string') return false;
@@ -112,15 +125,23 @@ export function changedFilePathViolation(value: unknown): string | null {
 export function validateChangeScope(scope: unknown): string[] {
   const result = validateBySchema('change-scope', scope);
   if (!result.valid) return result.errorMessages.map((m) => `[schema] ${m}`);
-  // 跨字段一致性：changeId 须含 scope.phase 对应前缀 phase<N>-（与 opsx 变更目录/查询文件前缀同一约定）
   const s = scope as ChangeScope;
+  const violations: string[] = [];
+  // scopeCreatedAt TS 层复核（F-G4-04：A8 同步句落实）——ajv-formats date-time 接受小写 t/z
+  // 与空格分隔，isIsoDateTimeString 拒绝之（同 queryTimestamp 口径，见 isIsoDateTimeString JSDoc）
+  if (!isIsoDateTimeString(s.scopeCreatedAt)) {
+    violations.push(
+      `[schema] scopeCreatedAt='${String(s.scopeCreatedAt)}' 非合法 ISO date-time（须 YYYY-MM-DDTHH:MM:SS(.fff)?(Z|±HH:MM)，大写 T/Z，拒小写 t/z 与空格分隔）`,
+    );
+  }
+  // 跨字段一致性：changeId 须含 scope.phase 对应前缀 phase<N>-（与 opsx 变更目录/查询文件前缀同一约定）
   const expectedPrefix = `phase${s.phase}-`;
   if (!s.changeId.startsWith(expectedPrefix)) {
-    return [
+    violations.push(
       `[schema] changeId='${s.changeId}' 须含 scope.phase=${s.phase} 对应前缀 ${expectedPrefix}（scope.changeId 与 scope.phase 不符）`,
-    ];
+    );
   }
-  return [];
+  return violations;
 }
 
 // ==================== 文件分类（须 codegraph 覆盖判定） ====================
@@ -174,7 +195,8 @@ const ENGINEERING_CODE_EXTENSIONS = new Set([
  * 文件分类纯函数：某 changed file 是否须 codegraph 覆盖的 code/test 文件。
  * 规则（集中于此，正反例见 change-scope.test.ts）：
  *   1. 顶层段 ∈ EXCLUDED_ROOT_SEGMENTS（docs/ schemas/ config/ eval/ .w-model/ openspec/ 等）→ false
- *   1.5. `.githooks/` 前缀 → true（无扩展名 shell 如 pre-push 是可执行工程文件）
+ *   1.5. `.githooks/` 前缀全部文件 → true（实现为 startsWith 前缀匹配：无扩展名 shell 如
+ *        pre-push，以及 .md/.txt 等，一律按 code 处理；口径见 F-G4-07 注释与实现对齐）
  *   2. dotfile（.eslintrc.cjs 等配置）/ *.md / *.markdown → false（文档与配置类不强制）
  *   3. 其余按扩展名 ∈ ENGINEERING_CODE_EXTENSIONS → true
  * 注意：tests/__tests__ 内的测试文件本身是 .ts/.py 等代码扩展名，已被规则 3 覆盖；
@@ -183,7 +205,8 @@ const ENGINEERING_CODE_EXTENSIONS = new Set([
 export function isCodeOrTestFile(relPath: string): boolean {
   const first = relPath.split('/')[0] ?? '';
   if (EXCLUDED_ROOT_SEGMENTS.has(first)) return false;
-  // .githooks/ 下的无扩展名 shell（pre-push 等）是可执行工程文件，改动须 codegraph 覆盖
+  // `.githooks/` 前缀全部文件按 code 处理（pre-push 等可执行工程文件，改动须 codegraph 覆盖；
+  // 前缀 startsWith 匹配：.githooks/*.md / *.txt 亦为 true——与规则 2 的 md/dotfile 判定相比本规则优先）
   if (relPath.startsWith('.githooks/')) return true;
   const base = relPath.split('/').pop() ?? '';
   if (base.startsWith('.')) return false;

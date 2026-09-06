@@ -401,8 +401,8 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 所有 check-*.ts 与工具脚本的 **输入错误（exit 2）** 输出统一结构：
 
-- **stderr**（人类可读）：`✗ [CATEGORY] <message>: <file|detail>`（类别见下表）
-- **stdout**（机器可读，遵循 SSoT §10E E.1）：`ERROR_JSON {"category","message","exitCode","file"}`，`exitCode` 与 `process.exit()` 实参强一致
+- **stderr**（人类可读）：`✗ [CATEGORY] <message>: <file|detail>`（类别见下表；file 与 detail 同有则 detail 附于括号 `（detail）`，如 `✗ [STRUCTURE_INVALID] ...: C:\...\scope.json（/changedFiles/0: must match pattern [pattern]）`）
+- **stdout**（机器可读，遵循 SSoT §10E E.1）：`ERROR_JSON {"category","message","exitCode","file?","rule?","field?","detail?"}`，`exitCode` 与 `process.exit()` 实参强一致；`file`/`rule`/`field`/`detail` 为可选字段，仅有值时输出（F-G6-02：detail——如 schema pattern 违规定位 `/changedFiles/0: must match pattern`——同时进入 stderr 与 ERROR_JSON，不再被 file 吞并）
 
 | 类别                | 场景                                                     | 示例                                                            |
 | ------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |

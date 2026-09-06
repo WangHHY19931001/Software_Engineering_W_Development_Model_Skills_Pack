@@ -305,6 +305,27 @@ describe('isIsoDateTimeString', () => {
       expect(isIsoDateTimeString(s), String(s)).toBe(false);
     }
   });
+  it('小写 t / z 分隔符拒绝（A8/F-G4-04：仅接受大写 T/Z 字面）', () => {
+    for (const s of [
+      '2026-09-04t10:00:00z',
+      '2026-09-04t10:00:00Z',
+      '2026-09-04T10:00:00z',
+      '2026-09-04t10:00:00+08:00',
+      '2026-09-04 10:00:00Z',
+    ]) {
+      expect(isIsoDateTimeString(s), String(s)).toBe(false);
+    }
+  });
+
+  it('validateChangeScope 对 scopeCreatedAt 补同一校验：小写 t fixture 被拒（F-G4-04）', () => {
+    const violations = validateChangeScope(makeScope({ scopeCreatedAt: '2026-09-04t00:00:00z' }));
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.some((v) => v.includes('scopeCreatedAt'))).toBe(true);
+  });
+
+  it('validateChangeScope：秒级 + 时区（无毫秒）scopeCreatedAt 合法（JSDoc 口径）', () => {
+    expect(validateChangeScope(makeScope({ scopeCreatedAt: '2026-09-04T00:00:00+08:00' }))).toEqual([]);
+  });
 });
 
 describe('verifyScopeGitBinding（真实 Git 精确比对）', () => {
