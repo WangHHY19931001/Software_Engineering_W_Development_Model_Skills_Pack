@@ -596,6 +596,13 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
 }
 
 /**
+ * Vitest standalone 自采集的 spawn 墙钟上限（毫秒）。随套件规模调整；快路径（WM_VITEST_COUNT_FILE）不受影响。
+ * 当前 600s：全量套件实测墙钟约 302s（1600 用例规模），取约一倍余量，避免健康仓库在
+ * standalone 自采集时因超时被误判 fail-closed；pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径。
+ */
+const VITEST_SPAWN_TIMEOUT_MS = 600_000;
+
+/**
  * 采集 Vitest 完整运行事实包（堵住只查文件数或用例总数的盲区）。
  * 优先级（快路径优先，避免重复全量 vitest）：
  *   1. 环境变量 WM_VITEST_COUNT_FILE 指向的 vitest JSON outputFile（pre-push 第 12 项复用）→ 直接读取，不 spawn；
@@ -604,8 +611,8 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
  * runSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
  * 落盘/解析失败（含 spawn 超时/错误）一律先尝试读取 JSON outputFile（vitest 若已完整跑完必落盘）；
  * 仍读不到则返回 -1，由逻辑层生成动态 facts 违规并 fail-closed（不虚构计数）。
- * 注：timeout 按本仓库全量 vitest 实测墙钟（约 198s）上调到 300s，避免健康仓库在
- * standalone 自采集时因超时被误判 fail-closed；pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径。
+ * 注：timeout 取 VITEST_SPAWN_TIMEOUT_MS（随套件规模调整的基建常量，非门禁放宽；
+ * fail-closed 语义不变）；pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径。
  * 注：maxBuffer 必须放宽——vitest 全量进度输出可达数 MB，默认 1MB 会触发
  * ERR_CHILD_PROCESS_STDIO_MAXBUFFER（此时 spawn 报 error 但 JSON 文件已落盘，仍需继续读文件）。
  * 注：必须显式 --config 限定扫描范围（config/vitest.config.ts 的 include 仅
@@ -622,13 +629,13 @@ function collectVitestMeasurements(root: string): VitestMeasurements {
   if (vitestBin !== null) {
     runSync(process.execPath, [vitestBin, ...vitestArgs], {
       cwd: root,
-      timeout: 300_000,
+      timeout: VITEST_SPAWN_TIMEOUT_MS,
       maxBuffer: 64 * 1024 * 1024,
     });
   } else {
     runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, [], {
       cwd: root,
-      timeout: 300_000,
+      timeout: VITEST_SPAWN_TIMEOUT_MS,
       maxBuffer: 64 * 1024 * 1024,
       shell: true,
     });
@@ -710,6 +717,7 @@ async function main(): Promise<void> {
   const schemaParseFailures: string[] = [];
   for (const f of schemaFiles) {
     try {
+      // eslint-disable-next-line security/detect-object-injection -- f 为仓库受控 schemas/ 目录 readdir 条目且经 .schema.json 过滤（不可能为 __proto__ 等危险键），非外部输入
       schemas[f] = JSON.parse(read(join('w-model-dev/schemas', f)));
     } catch {
       schemaParseFailures.push(f);

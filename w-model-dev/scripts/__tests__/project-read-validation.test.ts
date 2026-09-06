@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 构造 mkdtemp 临时项目树（join(tmpDir, ...) 路径由测试自生成，非用户输入） */
 /**
  * project.json 读取侧 schema 校验统一测试（F-G4-14，audit-fixes task 6）
  *

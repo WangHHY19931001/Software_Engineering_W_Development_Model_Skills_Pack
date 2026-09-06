@@ -1371,6 +1371,7 @@ export function checkPrePushCount(prePush: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const ids = Array.from(prePush.matchAll(/^# (\d+)\./gm), (m) => Number(m[1]));
   const expected = Array.from({ length: EXPECTED.prePushCount }, (_, i) => i + 1);
+  // eslint-disable-next-line security/detect-object-injection -- i 为本地数组的整数下标（examples-contract.test.ts 同型先例），两侧均为本地派生数据
   if (ids.length !== expected.length || !ids.every((n, i) => n === expected[i])) {
     violations.push({
       check: 'pre-push',
