@@ -47,8 +47,25 @@ interface Mapping {
   id: number;
   scenario: string;
   layer: 'L1' | 'L2';
+  category?: string;
+  route?: 'enable' | 'ask' | 'skip';
   assertions: Assertion[];
   evidence: Evidence;
+}
+
+export interface CorpusEntry {
+  id: number;
+  scenario: string;
+  prompt: string;
+  expected: string;
+  category?: string;
+  route?: 'enable' | 'ask' | 'skip';
+}
+
+export interface MatrixDeclaration {
+  routeTotals: { enable: number; ask: number; skip: number };
+  minPerCategory: number;
+  guidePath: string;
 }
 
 interface AssertionResult {
@@ -141,6 +158,71 @@ export function crossCheckIds(mappings: Mapping[], promptIds: number[]): string[
   return problems;
 }
 
+/** 覆盖矩阵五项校验：①语料↔映射 route/category 对齐 ②route 总数符合声明 ③每类别 ≥ minPerCategory ④guide 节示例数==语料条数（双向）⑤每负向类别 ≥1 组「立即启用」行 notContains 守卫 */
+export function coverageMatrix(
+  corpus: CorpusEntry[],
+  mappings: Mapping[],
+  decl: MatrixDeclaration,
+  io: FileSystemAdapter,
+): string[] {
+  const problems: string[] = [];
+  const routed = corpus.filter((c) => c.route !== undefined);
+  const byId = new Map(mappings.map((m) => [m.id, m]));
+  for (const c of routed) {
+    const m = byId.get(c.id);
+    if (!m) continue; // 1:1 缺失由 crossCheckIds 报告
+    if (m.route !== c.route) problems.push(`id=${c.id} route 不一致：语料=${c.route} 映射=${m.route ?? '无'}`);
+    if (m.category !== c.category) problems.push(`id=${c.id} category 不一致：语料=${c.category} 映射=${m.category ?? '无'}`);
+  }
+  for (const [route, expected] of Object.entries(decl.routeTotals) as Array<[keyof MatrixDeclaration['routeTotals'], number]>) {
+    const actual = routed.filter((c) => c.route === route).length;
+    if (actual !== expected) problems.push(`route=${route} 总数 ${actual} ≠ 声明 ${expected}`);
+  }
+  const catCounts = new Map<string, number>();
+  for (const c of routed) if (c.category) catCounts.set(c.category, (catCounts.get(c.category) ?? 0) + 1);
+  const isRegistryCat = (cat: string) => /^(N|A)\d+$/.test(cat);
+  for (const [cat, n] of catCounts) {
+    if (isRegistryCat(cat) && n < decl.minPerCategory) {
+      problems.push(`类别 ${cat} 条数 ${n} < 下限 ${decl.minPerCategory}`);
+    }
+  }
+  let guide: string;
+  try {
+    guide = io.read(decl.guidePath);
+  } catch {
+    return [...problems, `无法读取：${decl.guidePath}`];
+  }
+  const sections = new Map<string, number>();
+  let current: string | null = null;
+  for (const line of guide.split(/\r?\n/)) {
+    const h = line.match(/^## ((?:N|A)\d+) /);
+    if (h) {
+      current = h[1];
+      sections.set(current, 0);
+      continue;
+    }
+    if (current && /^\s*- id=\d+:/.test(line)) sections.set(current, (sections.get(current) ?? 0) + 1);
+  }
+  for (const [cat, n] of catCounts) {
+    if (!isRegistryCat(cat)) continue;
+    if (!sections.has(cat)) problems.push(`guide 缺少类别节：${cat}`);
+    else if (sections.get(cat) !== n) problems.push(`类别 ${cat}：guide 示例 ${sections.get(cat)} 条 ≠ 语料 ${n} 条`);
+  }
+  for (const [cat] of sections) {
+    if (!catCounts.has(cat)) problems.push(`guide 类别节 ${cat} 无对应语料`);
+  }
+  for (const [cat] of catCounts) {
+    if (!/^N\d+$/.test(cat)) continue;
+    const guarded = mappings.some(
+      (m) =>
+        m.category === cat &&
+        m.assertions.some((a) => a.type === 'notContains' && a.scopeAnchor === '立即启用'),
+    );
+    if (!guarded) problems.push(`负向类别 ${cat} 缺少「立即启用」行 notContains 守卫`);
+  }
+  return problems;
+}
+
 function selfCheck(io: FileSystemAdapter): boolean {
   const passCases: Assertion[] = [
     { type: 'fileExists', target: 'package.json' },
@@ -164,16 +246,49 @@ function selfCheck(io: FileSystemAdapter): boolean {
   return ok;
 }
 
+function selfCheckMatrix(): boolean {
+  const guide = ['## N1 测试类别', '- id=1: 示例一', '- id=2: 示例二'].join('\n');
+  const io: FileSystemAdapter = {
+    read: (p: string) => {
+      if (p === 'guide.md') return guide;
+      throw new Error(`意外读取：${p}`);
+    },
+    exists: (p: string) => p === 'guide.md',
+  };
+  const corpus: CorpusEntry[] = [
+    { id: 1, scenario: '', prompt: '', expected: '', category: 'N1', route: 'skip' },
+    { id: 2, scenario: '', prompt: '', expected: '', category: 'N1', route: 'skip' },
+  ];
+  const mappings: Mapping[] = [
+    { id: 1, category: 'N1', route: 'skip', layer: 'L1N', scenario: '',
+      assertions: [{ type: 'notContains', target: 's.md', substring: '测试类别', scopeAnchor: '立即启用' }],
+      evidence: { type: 'assertion' } },
+    { id: 2, category: 'N1', route: 'skip', layer: 'L1N', scenario: '', assertions: [], evidence: { type: 'assertion' } },
+  ];
+  const decl: MatrixDeclaration = { routeTotals: { enable: 0, ask: 0, skip: 2 }, minPerCategory: 2, guidePath: 'guide.md' };
+  const okCase = coverageMatrix(corpus, mappings, decl, io);
+  const badDecl: MatrixDeclaration = { ...decl, routeTotals: { enable: 0, ask: 0, skip: 3 } };
+  const badCase = coverageMatrix(corpus, mappings, badDecl, io);
+  const ok = okCase.length === 0 && badCase.length > 0;
+  console.log(JSON.stringify({ selfCheckMatrix: ok }));
+  return ok;
+}
+
 function main(): void {
   const io = createRealFs();
   if (process.argv.includes('--self-check')) {
-    process.exitCode = selfCheck(io) ? 0 : 1;
+    const ok = selfCheck(io) && selfCheckMatrix();
+    process.exitCode = ok ? 0 : 1;
     return;
   }
-  const mappings = JSON.parse(io.read('eval/mappings.json')) as { mappings: Mapping[] };
-  const prompts = JSON.parse(io.read('eval/w-model-dev-test-prompts.json')) as Array<{ id: number }>;
-  const problems = crossCheckIds(mappings.mappings, prompts.map((p) => p.id));
-  const results = mappings.mappings.map((m) => evaluateMapping(m, io));
+  const mappingsDoc = JSON.parse(io.read('eval/mappings.json')) as {
+    mappings: Mapping[];
+    matrix: MatrixDeclaration;
+  };
+  const corpus = JSON.parse(io.read('eval/w-model-dev-test-prompts.json')) as CorpusEntry[];
+  const problems = crossCheckIds(mappingsDoc.mappings, corpus.map((p) => p.id));
+  const matrixProblems = coverageMatrix(corpus, mappingsDoc.mappings, mappingsDoc.matrix, io);
+  const results = mappingsDoc.mappings.map((m) => evaluateMapping(m, io));
   const passed = results.filter((r) => r.passed).length;
   const report = {
     timestamp: new Date().toISOString(),
@@ -181,6 +296,7 @@ function main(): void {
     passed,
     failed: results.length - passed,
     coverageProblems: problems,
+    matrixProblems,
     results,
   };
   fs.writeFileSync(path.join(repoRoot, 'eval', 'results.json'), JSON.stringify(report, null, 2), 'utf-8');
@@ -189,8 +305,8 @@ function main(): void {
     console.log(`  ✗ id=${r.id} [${r.layer}] ${r.scenario}`);
     for (const f of r.failures) console.log(`      - ${f}`);
   }
-  for (const p of problems) console.log(`  ✗ ${p}`);
-  process.exitCode = passed === results.length && problems.length === 0 ? 0 : 1;
+  for (const p of [...problems, ...matrixProblems]) console.log(`  ✗ ${p}`);
+  process.exitCode = passed === results.length && problems.length === 0 && matrixProblems.length === 0 ? 0 : 1;
 }
 
 main();

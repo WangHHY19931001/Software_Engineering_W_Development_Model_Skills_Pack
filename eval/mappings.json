@@ -1,43 +1,54 @@
 {
-  "version": 1,
-  "description": "25 条评估提示词 → 技能资产锚点映射。断言三层：L1 触发词断言（id 1-7）、L2 机制存在性断言（id 8-25）、L3 行为证据映射（evidence 字段）。锚点在批次 3 重构后须同步更新（见 Task 3.5）。",
+  "version": 2,
+  "description": "60 条评估提示词 → 技能资产锚点映射。断言三层：L1 触发词断言（正向 enable）、L1N 负向触发断言（skip/ask，锚定 activation-guide 类别节 + notContains 守卫）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 五项校验强制。",
+  "matrix": {
+    "routeTotals": { "enable": 12, "ask": 8, "skip": 22 },
+    "minPerCategory": 2,
+    "guidePath": "w-model-dev/references/activation-guide.md"
+  },
   "mappings": [
-    { "id": 1, "scenario": "自然语言触发 W 模型开发", "layer": "L1",
+    { "id": 1, "scenario": "自然语言触发 W 模型开发", "layer": "L1", "route": "enable",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "W 模型" },
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "CHECKPOINT · 项目初始化" }
       ],
       "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-checkpoint.ts" } },
-    { "id": 2, "scenario": "/wm analyze 命令触发", "layer": "L1",
+    { "id": 2, "scenario": "/wm analyze 命令触发", "layer": "L1", "route": "enable",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "/wm analyze" }
       ],
       "evidence": { "type": "selfTestSource", "substring": "valid-phase1.json" } },
-    { "id": 3, "scenario": "用户说完整流程但未提 W 模型（歧义先询问）", "layer": "L1",
+    { "id": 3, "scenario": "用户说完整流程但未提 W 模型（歧义先询问）", "layer": "L1", "category": "A1", "route": "ask",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
-        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "确认前不初始化" }
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "确认前不初始化" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A1 完整流程未提 W 模型" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "从需求开始走完整流程" }
       ],
       "evidence": { "type": "assertion" } },
-    { "id": 4, "scenario": "RTM 关键词触发", "layer": "L1",
+    { "id": 4, "scenario": "RTM 关键词触发", "layer": "L1", "route": "enable",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "RTM" }
       ],
       "evidence": { "type": "selfTestSource", "substring": "bad-coverage.json" } },
-    { "id": 5, "scenario": "英文 W-model / stage gates 触发", "layer": "L1",
+    { "id": 5, "scenario": "英文 W-model / stage gates 触发", "layer": "L1", "route": "enable",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "W-model" },
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "stage gates" }
       ],
       "evidence": { "type": "assertion" } },
-    { "id": 6, "scenario": "普通开发任务不误触发", "layer": "L1",
+    { "id": 6, "scenario": "普通开发任务不误触发", "layer": "L1N", "category": "N2", "route": "skip",
       "assertions": [
-        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "不启用" }
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "不启用" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N2 样式与小 bug 修复" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "src/auth.ts 中的登录错误" }
       ],
       "evidence": { "type": "assertion" } },
-    { "id": 7, "scenario": "单纯技术解释类问题不误触发", "layer": "L1",
+    { "id": 7, "scenario": "单纯技术解释类问题不误触发", "layer": "L1N", "category": "N3", "route": "skip",
       "assertions": [
-        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "不启用" }
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "不启用" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N3 纯问答与技术解释" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "OAuth2 授权码模式" }
       ],
       "evidence": { "type": "assertion" } },
     { "id": 8, "scenario": "无详细设计产物时拒绝直接编码", "layer": "L2",
@@ -135,6 +146,200 @@
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "交叉校验" }
       ],
-      "evidence": { "type": "selfTestSource", "substring": "bad-missing-G-role" } }
+      "evidence": { "type": "selfTestSource", "substring": "bad-missing-G-role" } },
+    { "id": 26, "scenario": "反误触发 N1：一次性脚本批量重命名", "layer": "L1N", "category": "N1", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N1 一次性数据/文件脚本" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "批量重命名当前目录下的图片文件" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "一次性数据/文件脚本", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "批量重命名" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 27, "scenario": "反误触发 N1：CSV 清洗转换", "layer": "L1N", "category": "N1", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N1 一次性数据/文件脚本" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "CSV 里的空行清掉" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 28, "scenario": "反误触发 N2：CSS 样式调整", "layer": "L1N", "category": "N2", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N2 样式与小 bug 修复" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "这个按钮没居中" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "样式与小 bug 修复", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "错别字" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 29, "scenario": "反误触发 N2：文案错别字修正", "layer": "L1N", "category": "N2", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N2 样式与小 bug 修复" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "页面上有个错别字" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 30, "scenario": "反误触发 N3：概念解释（事件循环）", "layer": "L1N", "category": "N3", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N3 纯问答与技术解释" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "JavaScript 的事件循环" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "纯问答与技术解释", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "事件循环" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 31, "scenario": "反误触发 N3：原理对比问答（WAL vs binlog）", "layer": "L1N", "category": "N3", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N3 纯问答与技术解释" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "WAL 日志" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 32, "scenario": "反误触发 N4：tsconfig 与依赖安装", "layer": "L1N", "category": "N4", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N4 环境与配置变更" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "tsconfig 的 strict 打开" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "环境与配置变更", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "GitHub Actions" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 33, "scenario": "反误触发 N4：CI workflow 新增", "layer": "L1N", "category": "N4", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N4 环境与配置变更" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "跑 lint 的 workflow" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 34, "scenario": "反误触发 N5：笔记整理成 README", "layer": "L1N", "category": "N5", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N5 纯文档撰写与排版" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "调研笔记整理成一篇 README" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "纯文档撰写与排版", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "中英文排版" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 35, "scenario": "反误触发 N5：中英文排版规范", "layer": "L1N", "category": "N5", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N5 纯文档撰写与排版" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "把空格规范一下" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 36, "scenario": "反误触发 N6：SQL 数据查询", "layer": "L1N", "category": "N6", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N6 数据查询与正则提取" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "下单超过 10 单的用户列表" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "数据查询与正则提取", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "nginx 访问日志" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 37, "scenario": "反误触发 N6：日志正则提取", "layer": "L1N", "category": "N6", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N6 数据查询与正则提取" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "返回 5xx 的 IP" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 38, "scenario": "反误触发 N7：框架版本升级", "layer": "L1N", "category": "N7", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N7 依赖升级与小重构" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "React 从 18 升级到 19" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "依赖升级与小重构", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "升级到 19" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 39, "scenario": "反误触发 N7：行为不变的小重构", "layer": "L1N", "category": "N7", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N7 依赖升级与小重构" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "800 行的工具函数文件" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 40, "scenario": "反误触发 N8：工作周报撰写", "layer": "L1N", "category": "N8", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N8 非软件开发任务" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "本周的工作周报" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "非软件开发任务", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "工作周报" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 41, "scenario": "反误触发 N8：技术方案 PPT", "layer": "L1N", "category": "N8", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N8 非软件开发任务" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "做成 10 页 PPT" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 42, "scenario": "反误触发 N9：单点函数修改指令", "layer": "L1N", "category": "N9", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N9 单点执行指令" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "返回类型改成 Promise" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "单点执行指令", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "别走流程了" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 43, "scenario": "反误触发 N9：常量提取配置", "layer": "L1N", "category": "N9", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N9 单点执行指令" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "硬编码常量提到配置文件" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 44, "scenario": "反误触发 N10：格式化工具执行", "layer": "L1N", "category": "N10", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N10 已由其他工具接管的请求" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "prettier 把整个仓库的格式" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "已由其他工具接管的请求", "scopeAnchor": "立即启用" },
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "跑一下 prettier" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 45, "scenario": "反误触发 N10：构建执行", "layer": "L1N", "category": "N10", "route": "skip",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N10 已由其他工具接管的请求" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "npm run build，把产物路径发我" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 46, "scenario": "歧义 A1：新模块全流程", "layer": "L1", "category": "A1", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A1 完整流程未提 W 模型" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "从需求梳理到上线全流程走一遍" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 47, "scenario": "歧义 A1：需求与测试用例先行", "layer": "L1", "category": "A1", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A1 完整流程未提 W 模型" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "需求和测试用例都定清楚" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 48, "scenario": "歧义 A2：大型新项目（审批系统）", "layer": "L1", "category": "A2", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A2 大型新项目仅说\"开始做\"" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "内部审批系统" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 49, "scenario": "歧义 A2：数据平台项目规划", "layer": "L1", "category": "A2", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A2 大型新项目仅说\"开始做\"" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "数据平台的项目" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 50, "scenario": "歧义 A2：老系统重写分期", "layer": "L1", "category": "A2", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A2 大型新项目仅说\"开始做\"" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "把老系统重写" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 51, "scenario": "歧义 A3：模糊合规表述（正规一点）", "layer": "L1", "category": "A3", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A3 模糊合规表述" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "做得正规一点" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 52, "scenario": "歧义 A3：模糊合规表述（最规范流程）", "layer": "L1", "category": "A3", "route": "ask",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "先询问" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## A3 模糊合规表述" },
+        { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "最规范的开发流程" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 53, "scenario": "正向变体：中文 W 模型需求分析", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "W 模型" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 54, "scenario": "正向变体：/wm status 只读命令", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "/wm status" }
+      ], "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/wm-status.ts" } },
+    { "id": 55, "scenario": "正向变体：英文并行测试设计与追溯", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "W-model" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 56, "scenario": "正向变体：按阶段门续推进", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "阶段门" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 57, "scenario": "正向变体：高可靠性 TLA+ 信号", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "TLA+" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 58, "scenario": "正向变体：返工根因定位", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "根因" }
+      ], "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-rootcause-report.ts" } },
+    { "id": 59, "scenario": "正向变体：brownfield RTM 补齐", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "RTM" }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 60, "scenario": "正向变体：英文阶段门评审", "layer": "L1", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "stage gates" }
+      ], "evidence": { "type": "assertion" } }
   ]
 }
