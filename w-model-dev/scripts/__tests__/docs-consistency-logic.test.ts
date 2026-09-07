@@ -2505,7 +2505,7 @@ async function withDocsConsistencyFixture(
       recursive: true,
       filter: (source) => {
         const relative = path.relative(REPO_ROOT, source);
-        return !['node_modules', '.git', '.w-model', '.codegraph', '.worktrees'].some(
+        /* prettier-ignore */ return !isD2Transient(source) && !['node_modules', '.git', '.w-model', '.codegraph', '.worktrees'].some(
           (excluded) => relative === excluded || relative.startsWith(`${excluded}${path.sep}`),
         );
       },
@@ -3200,3 +3200,25 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
     expect(v).toHaveLength(2);
   });
 });
+
+it('docs-consistency fixture copy excludes transient .d2-* files', async () => {
+  const transientRelativePath = path.join(
+    'w-model-dev',
+    'scripts',
+    'logic',
+    `.d2-docs-consistency-fixture-${process.pid}.ts`,
+  );
+  const transientSourcePath = path.join(REPO_ROOT, transientRelativePath);
+  await fs.writeFile(transientSourcePath, 'transient fixture\n', 'utf8');
+  try {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      expect(existsSync(path.join(fixtureRoot, transientRelativePath))).toBe(false);
+    });
+  } finally {
+    await fs.rm(transientSourcePath, { force: true });
+  }
+});
+
+function isD2Transient(source: string): boolean {
+  return path.basename(source).startsWith('.d2-');
+}
