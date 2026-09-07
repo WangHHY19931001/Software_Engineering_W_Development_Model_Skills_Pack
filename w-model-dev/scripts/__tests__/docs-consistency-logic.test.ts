@@ -3107,6 +3107,29 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
     expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
   });
 
+  it('index-exclusion：无空格「第13项」也不误报', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第13项 npm audit（门禁不阻断）' }],
+    });
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('project-suffix：含门禁标记的「3 项目」不作为计数', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'AGENTS.md', content: '门禁说明：3 项目目录不计数' }],
+    });
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('mixed-line：同一行跳过序数但捕获过期计数', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'README.md', content: '第 13 项 npm audit（门禁稳定）且 17 项门禁未同步' }],
+    });
+    const violations = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.message).toContain('17 项');
+  });
+
   it('marker-gate：无「门禁/检查」标记的行（5 项闭环脚本）不误报', () => {
     const input = baseInput({
       gateCountDocs: [
