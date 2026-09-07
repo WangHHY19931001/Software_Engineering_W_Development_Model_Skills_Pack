@@ -73,6 +73,12 @@
 - 实施计划见 `docs/superpowers/plans/2026-09-07-trigger-boundary-fastfollow.md`（本快追无独立规格文件，计划即需求；最终审查发现来源：主 campaign 宽范围审查）。
 - 版本保持 42.2.1，不 bump。
 
+## 门禁项数 STALE 扫描（gate-count-stale-scan，2026-09-07）
+
+- **docs-consistency 新增 `gate-count-docs` 白名单扫描**：README/AGENTS/CONTRIBUTING/troubleshooting 四份活体文档的门禁项数引用绑定 `EXPECTED.prePushCount`（行含「门禁/检查」标记时全部「N 项」须一致），防门禁项数 N→N+1 后未测试 docs 文件漏改（trigger-boundary-fastfollow 终审 F1 的结构性 follow-up）。
+- 源码位置：`docs/superpowers/specs/2026-09-07-gate-count-stale-scan-design.md` + `docs/superpowers/plans/2026-09-07-gate-count-stale-scan.md`；SSoT 门禁项数扫描一句见 §pre-push 边界。
+- 版本保持 42.2.1，不 bump。
+
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
 以下为从 42.2.1 整改起点 `bc48824894ae076ff0e80d87cebd6c9de4437833` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
