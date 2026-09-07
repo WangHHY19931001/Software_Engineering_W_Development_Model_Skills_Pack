@@ -1729,9 +1729,10 @@ const GATE_COUNT_DOC_NAMES = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs
  * 活体文档门禁项数引用扫描（gate-count-docs）：泛化自 checkPrTemplatePrePushCount（先例 :1724）。
  * 行含「门禁/检查」标记时，全部「N 项」计数引用须 == EXPECTED.prePushCount，防止门禁项数
  * N→N+1 后未测试 docs 文件（如 docs/troubleshooting.md）漏改。逐行 fresh 正则（无共享 lastIndex）：
- * 可选 `(第\s*)?` 前缀捕获 → 匹配「第 N 项」序数引用（带/不带空格均覆盖，如「第 13 项 npm audit」）
- * 时跳过（m[1] 非 undefined）；`(?!目)` 排除「N 项目」误匹配；仅 ASCII 数字（中文数字如「五项校验」
- * 天然不命中）。gateCountDocs 未注入（缺省）时跳过。
+ * 前缀捕获组 `((?:第)?\s*)`（m[1] 恒有值，裸「17 项」为 ''）——m[1] 含「第」即「第 N 项」序数
+ * 引用（带/不带空格均覆盖，如「第 13 项 npm audit」）跳过，m[2] 为计数值；`(?!目)` 排除
+ * 「N 项目」误匹配；仅 ASCII 数字（中文数字如「五项校验」天然不命中）。gateCountDocs 未注入
+ * （缺省）时跳过。
  */
 export function checkGateCountLiveDocs(
   docs: Array<{ name: string; content: string }> | undefined,
@@ -1745,9 +1746,8 @@ export function checkGateCountLiveDocs(
       // eslint-disable-next-line security/detect-object-injection -- i 为本地数组的整数下标（docs-consistency-logic.ts:1377 同型先例），两侧均为本地派生数据
       const line = lines[i]!;
       if (!line.includes('门禁') && !line.includes('检查')) continue;
-      // eslint-disable-next-line security/detect-unsafe-regex -- 字面量正则；(第\s*)? 输入为活体文档单行、行长受限，无 ReDoS 面；逐行 fresh 无共享 lastIndex
-      for (const m of line.matchAll(/(第\s*)?(\d+)\s*项(?!目)/g)) {
-        if (m[1] !== undefined) continue; // 「第 N 项」序数引用，跳过
+      for (const m of line.matchAll(/((?:第)?\s*)(\d+)\s*项(?!目)/g)) {
+        if (m[1]!.includes('第')) continue; // 「第 N 项」序数引用，跳过
         if (Number(m[2]!) !== EXPECTED.prePushCount) {
           violations.push({
             check: 'gate-count-docs',
