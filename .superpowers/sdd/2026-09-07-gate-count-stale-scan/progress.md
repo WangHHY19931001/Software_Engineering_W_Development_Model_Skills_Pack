@@ -21,3 +21,9 @@ Verification:
 - `npx prettier --check --config config/prettier.config.cjs docs/superpowers/plans/2026-09-07-gate-count-stale-scan.md docs/superpowers/specs/2026-09-07-gate-count-stale-scan-design.md`: `All matched files use Prettier code style!` (npm emitted the existing `Unknown user config "home"` warning).
 - `git diff --check`: passed.
 Full prepush was not rerun because runtime code, allowlists, governance, and version were unchanged; the prior 18/18 evidence remains valid. Repair commit: `9676892` (`docs: align gate-count regex contract across spec and plan`). Re-review pending.
+Final review: 修完再合 — Important ×1（计划/规格仍残留旧正则契约）；Minor ×2（边界测试补强；负向 CLI 验证应改用隔离 fixture）；环境观察（无 .codegraph 索引）可延后；Task 4 报告元数据已在前轮修复。
+Final fix wave: commits 9676892 + 0cbec15 — spec/plan 唯一推荐契约统一为 `/((?:第)?\s*)(\d+)\s*项(?!目)/g` + `m[1].includes('第')`，旧形式明确标为废弃历史。
+Final re-review: 3/3 contract findings ADDRESSED, no new Critical/Important breakage; Minor remain deferred by final reviewer.
+Campaign implementation state: COMPLETE pending final verification and workspace cleanup.
+Final verification (fresh after final review fix): `npm run format` exit 0; `npm run prepush` exit 0 with all 18 gates passed (including npm audit real pass, docs-consistency, samples, prettier, tsc, eval gate); `npx tsx eval/runner.ts` exit 0, `eval: 60/60 通过`; `git diff --check` passed.
+Final state: implementation + final review fix complete; remaining Minor items explicitly deferred by final reviewer (boundary test expansion; isolate negative CLI fixture); no Critical/Important findings open.
