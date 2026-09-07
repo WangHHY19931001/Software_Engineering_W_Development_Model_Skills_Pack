@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  EXPECTED,
   A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS,
   A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS,
   checkRootCauseR10Contract,
@@ -57,10 +58,10 @@ const ACTION_ENUM_27 = [
 const ACTION_UNION_27 =
   "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
 
-/** 合法 pre-push 文本（连续 #1..#18 检查块 + 「18 项检查」声明，F-G7-08 强校验基线） */
+/** 合法 pre-push 文本（连续 #1..#N 检查块 + 「N 项检查」声明，F-G7-08 强校验基线；N 派生自 EXPECTED.prePushCount） */
 const VALID_PRE_PUSH = [
-  ...Array.from({ length: 18 }, (_, i) => `# ${i + 1}. 第 ${i + 1} 项门禁检查`),
-  '# 全部门禁共 18 项检查',
+  ...Array.from({ length: EXPECTED.prePushCount }, (_, i) => `# ${i + 1}. 第 ${i + 1} 项门禁检查`),
+  `# 全部门禁共 ${EXPECTED.prePushCount} 项检查`,
 ].join('\n');
 
 /** 合法 conventions.md 术语表 fixture（action 27 值逐值列表 + exit-2 计数句，F-G7-04/05 基线） */

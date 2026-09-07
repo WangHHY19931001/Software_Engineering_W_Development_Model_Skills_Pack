@@ -1366,7 +1366,7 @@ function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation
 
 /**
  * pre-push 18 项强校验（F-G7-08，audit-fixes task 6）：解析真实编号检查块并断言连续
- * #1..#18 且恰 18 块——旧实现仅取「最大编号」+「18 项检查」文本，伪造 3 块检查的
+ * #1..#18 且恰 18 块——旧实现仅取「最大编号」+「N 项检查」声明文本（N 为当时 prePushCount），伪造 3 块检查的
  * pre-push（`# 1.` `# 2.` `# 18.`）可全绿；重写后中间删除任一块（编号断档）或减少
  * 块数均触发违规，再叠加「18 项检查」声明文本兜底。
  */
