@@ -61,6 +61,8 @@
 ### 触发边界可度量性 campaign（trigger-boundary-campaign，2026-09-07）
 
 - **触发边界可度量性 campaign**：eval 语料库 25→60 条（负向 22/歧义 8/正向 12，L1N 负向层 + notContains 守卫 + coverageMatrix 五项校验）；新增 `references/activation-guide.md`（第 41 份，13 类反例登记册，与语料双向锚定）；SKILL.md 触发面增反例信号（frontmatter 一句 + 不启用行十类速览）；INSTALL.md 增「子能力单独复用」L0 分级指南；SSoT 新增 §3.6 权威定义。
+- 规格见 `docs/superpowers/specs/2026-09-07-trigger-boundary-campaign-design.md`、实施计划见 `docs/superpowers/plans/2026-09-07-trigger-boundary-campaign.md`。
+- 版本保持 42.2.1，不 bump。
 
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 

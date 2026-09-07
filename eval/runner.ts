@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 仓内评估断言 runner：验证「25 条评估提示词要求的技能行为支撑资产」是否完备。
+ * 仓内评估断言 runner：验证「60 条评估提示词要求的技能行为支撑资产」是否完备。
  *
  * 三层断言（设计见 docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md §2.2）：
  *   L1 触发词断言 —— 触发/歧义/反误触发契约在 SKILL.md 中可命中；

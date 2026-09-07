@@ -442,7 +442,7 @@ L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/
 
 **触发面分层**：SKILL.md frontmatter description 保留一句英文反例信号（作用于技能加载器的匹配面）；触发决策表"不启用"行含十类速览并链接 activation-guide.md；完整判定细则只在 activation-guide.md 按需加载——常驻面增量 ≤15 行。
 
-**L0 复用分级**：references 分「可单独拷贝」（方法论自包含：root-cause-locator / iceberg-sweep-guide / agent-personas+subagent / conventions / estimation-guide / context-management-guide / coding-quality / toolbox）与「不可单独拷贝」（依赖编排/状态/门禁：phase-N-* / subagent-delegation / signature-chain-guide / rtm-guide / graph-guide / hard-constraints）；权威清单与版本对齐义务见 docs/INSTALL.md「子能力单独复用」节。
+**L0 复用分级**：references 分「可单独拷贝」（方法论自包含：root-cause-locator / iceberg-sweep-guide / agent-personas+subagent / conventions / estimation-guide / context-management-guide / coding-quality / activation-guide / toolbox）与「不可单独拷贝」（依赖编排/状态/门禁：phase-N-* / subagent-delegation / signature-chain-guide / rtm-guide / graph-guide / hard-constraints）；权威清单与版本对齐义务见 docs/INSTALL.md「子能力单独复用」节。
 
 ## 4. 技能工作流程
 
