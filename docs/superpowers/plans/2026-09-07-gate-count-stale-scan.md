@@ -234,16 +234,9 @@ git commit -m "feat(gate): add gate-count-docs stale gate-count scan for living 
 
 预期：exit 0，输出 `✓ 全部一致`（当前语料四文档全为 18 项引用，规格 §3.2 已验证 11/11 零违规）。
 
-- [ ] **步骤 3：负向验证（临时伪造过期项数 → 拦截 → 还原）**
+- [ ] **步骤 3：负向验证（隔离 fixture 伪造过期项数 → 拦截）**
 
-```bash
-sed -i 's/本次推送未执行 18 项门禁/本次推送未执行 17 项门禁/' docs/troubleshooting.md
-npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts; echo "exit=$?"
-git checkout -- docs/troubleshooting.md
-git status --short
-```
-
-预期：`check-docs-consistency` 输出含 `gate-count-docs` 违规（消息含 `docs/troubleshooting.md:13`），exit=1（fail-closed）；`git checkout` 后 `git status --short` 干净。
+使用 `withDocsConsistencyFixture` 复制临时仓库，由 `writeVitestCount(fixtureRoot, 1002)` 写入 facts/provenance；仅修改临时 `docs/troubleshooting.md`，先确认存在 `本次推送未执行 18 项门禁`，再替换为 `本次推送未执行 17 项门禁`，并通过 `runDocsConsistencyCli(fixtureRoot, {}, ['--json'])` 运行真实 CLI。断言 exit 1，JSON reasons 同时包含 `[gate-count-docs]`、`docs/troubleshooting.md:13` 与 `17 项`。`withDocsConsistencyFixture` 的 `finally` 负责清理临时目录；不得调用 `git checkout`、修改真实 `docs/troubleshooting.md` 或全局 `process.env`，真实工作树保持不变。
 
 - [ ] **步骤 4：格式化与 Commit**
 
@@ -394,14 +387,14 @@ npx tsx eval/runner.ts
 
 - `npm run prepush` 全 18 项检查通过（含 vitest 全量、docs-consistency、security-scan、prettier、tsc、npm audit）；
 - `npx tsx eval/runner.ts` 输出 `eval: 60/60 通过`（本 campaign 未改动 eval/ 逻辑，确认无回归）；
-- `git status --short` 干净（Task 2 负向验证的临时改动已在彼处还原）。
+- `git status --short` 干净（Task 2 负向验证仅修改隔离 fixture，helper `finally` 已清理临时目录）。
 
 ---
 
 ## 验收标准（对照规格 §6）
 
 1. vitest 全绿，新增 `gate-count-docs` 用例 8 个（Task 1）。
-2. `npm run check:docs-consistency` exit 0；临时「17 项门禁」→ exit 1 并报 `gate-count-docs`（Task 2 负向验证）。
+2. `npm run check:docs-consistency` exit 0；隔离 fixture 负向 CLI 将「17 项门禁」→ exit 1 并报 `gate-count-docs`（Task 2 负向验证）。
 3. `npm run prepush` 18 项全绿（Task 4）。
 4. `npx tsx eval/runner.ts` 60/60 不受影响（Task 4）。
 5. 三处遗留全部处理：扫描机制 / :1366 注释 / fixture 派生（Task 1-3）。

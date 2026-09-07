@@ -1400,6 +1400,32 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 90_000); // real-execution probe: ~18s alone, ~30s+ under full-suite load (Task 2.3); per-test budget instead of raising global testTimeout
 
+  it('真实 CLI 隔离 fixture：过期门禁项数 exit 1 且不污染真实 checkout', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 1002);
+      const troubleshootingPath = path.join(fixtureRoot, 'docs', 'troubleshooting.md');
+      const content = await fs.readFile(troubleshootingPath, 'utf8');
+      const current = '本次推送未执行 18 项门禁';
+      const stale = '本次推送未执行 17 项门禁';
+      expect(content).toContain(current);
+      const mutated = content.replace(current, stale);
+      expect(mutated).not.toBe(content);
+      await fs.writeFile(troubleshootingPath, mutated, 'utf8');
+
+      const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(result.code).toBe(1);
+      const report = JSON.parse(result.stdout) as { reasons: string[] };
+      expect(
+        report.reasons.some(
+          (reason) =>
+            reason.includes('[gate-count-docs]') &&
+            reason.includes('docs/troubleshooting.md:13') &&
+            reason.includes('17 项'),
+        ),
+      ).toBe(true);
+    });
+  });
+
   it('Exit2ProbeResult 通用字段缺失、null、空值和错误 rule 均 fail-closed', () => {
     const validProbe = {
       probeId: 'check-budget.ts#invalid-argument',
