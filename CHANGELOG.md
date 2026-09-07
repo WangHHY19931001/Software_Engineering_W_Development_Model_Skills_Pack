@@ -64,6 +64,15 @@
 - 规格见 `docs/superpowers/specs/2026-09-07-trigger-boundary-campaign-design.md`、实施计划见 `docs/superpowers/plans/2026-09-07-trigger-boundary-campaign.md`。
 - 版本保持 42.2.1，不 bump。
 
+### 触发边界快追（trigger-boundary-fastfollow，2026-09-07）
+
+- **eval 纳入 pre-push 第 18 项门禁**：路径过滤纳入 `eval/**`（此前 eval/ 变更不触发本地 CI），`EXPECTED.prePushCount` 17→18，编号块/声明文本/CONTRIBUTING 门禁表/README/AGENTS/PR 模板计数全量同步。
+- **常驻面速览成员资格钉死**：10 条 `scopeAnchor:"不启用"` contains 断言将十类反例名钉在 SKILL.md「不启用」行——速览删名/改名即 eval 红。
+- **selfCheckMatrix 负例扩展**：coverageMatrix 校验①③④⑤各增已知假 fixture（route 失配 / 类别下限 / guide 计数 / 缺守卫），自检从单一 routeTotals 负例扩到五项全覆盖。
+- **术语统一**：L1（正向 enable 与歧义 ask）/ L1N（skip 反例）/ L2（机制存在性）口径在 runner 头注释、mappings description、eval/README 三处归一，evidence 明确为字段而非层；eval/README「共 42 条」消歧（category 30 / route 42）。
+- 实施计划见 `docs/superpowers/plans/2026-09-07-trigger-boundary-fastfollow.md`（本快追无独立规格文件，计划即需求；最终审查发现来源：主 campaign 宽范围审查）。
+- 版本保持 42.2.1，不 bump。
+
 ### 本轮提交身份（最终 SHA 由外部命令核验）
 
 以下为从 42.2.1 整改起点 `bc48824894ae076ff0e80d87cebd6c9de4437833` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
