@@ -547,7 +547,7 @@ npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
       `
 git() {
   case "$*" in
-    *'diff --name-only'*) printf 'eval/probe.json\\n' ;;
+    *'diff --name-only'*) printf 'misc/probe.json\\n' ;;
     *) exit 0 ;;
   esac
 }
@@ -573,7 +573,8 @@ git() {
   // F-G5-03/04（audit-fixes task 7）：路径过滤包含口径防回归。bash case 的 * 可跨 /，
   // docs/*.md 命中 docs/ 任意层级的 *.md（含 docs/changes、docs/superpowers 深层，
   // 历史触发语义见 files_need_gate 注释，不做收窄）；根级清单文件、.githooks/**、
-  // 深层 w-model-dev/** 命中；eval/** 与 docs 非 .md 不触发。
+  // 深层 w-model-dev/** 命中；eval/** 触发（评估资产是活体门禁第 18 项的触发面）；
+  // docs 非 .md 不触发。
   it.each([
     { changedPath: 'docs/changes/2026-09-06.md', expectGate: true },
     { changedPath: 'docs/superpowers/deep/sub.md', expectGate: true },
@@ -581,7 +582,7 @@ git() {
     { changedPath: 'w-model-dev/scripts/a/b/c.ts', expectGate: true },
     { changedPath: 'README.md', expectGate: true },
     { changedPath: 'package.json', expectGate: true },
-    { changedPath: 'eval/x.json', expectGate: false },
+    { changedPath: 'eval/x.json', expectGate: true },
     { changedPath: 'docs/notes.txt', expectGate: false },
   ])('path filter: $changedPath → $expectGate', async ({ changedPath, expectGate }) => {
     const binDir = await makeTempDir('pre-push-pathfilter-bin-');
@@ -718,7 +719,7 @@ describe('pre-push stdin ref scope filtering', () => {
   const gitBody = (lines: string[]): string => [`case "$*" in`, ...lines, `*) exit 0 ;;`, `esac`].join('\n');
 
   const fallbackEmpty = `*'HEAD@{push}'*|*'origin/HEAD'*) : ;;`;
-  const fallbackUnrelated = `*'HEAD@{push}'*|*'origin/HEAD'*) printf 'eval/probe.json\\n' ;;`;
+  const fallbackUnrelated = `*'HEAD@{push}'*|*'origin/HEAD'*) printf 'misc/probe.json\\n' ;;`;
   const fallbackFail = `*'HEAD@{push}'*|*'origin/HEAD'*) exit 1 ;;`;
   const logEmpty = `*'log -m --name-only'*) : ;;`;
   const mergeBaseOk = `*'merge-base'*) printf '${MERGE_BASE}\\n' ;;`;
@@ -736,7 +737,7 @@ describe('pre-push stdin ref scope filtering', () => {
   const remoteGetUrlDashPush = `*'remote get-url --push'*) printf 'git@example.com:repo.git\\n' ;;`;
   const trackingRefsDashPush = `*'for-each-ref refs/remotes/--push'*) printf 'refs/remotes/--push/main\\n' ;;`;
   const remoteLogRelated = `*'log -m --name-only'*) printf 'w-model-dev/SKILL.md\\n' ;;`;
-  const remoteLogUnrelated = `*'log -m --name-only'*) printf 'eval/probe.json\\n' ;;`;
+  const remoteLogUnrelated = `*'log -m --name-only'*) printf 'misc/probe.json\\n' ;;`;
 
   const workspaceFiles = {
     '.git': 'gitdir: irrelevant\n',
@@ -791,7 +792,7 @@ npm() { return 98; }
       stdin,
       gitBody: gitBody([
         fallbackEmpty,
-        `*'${LOCAL_UNRELATED}'*) printf 'eval/probe.json\\n' ;;`,
+        `*'${LOCAL_UNRELATED}'*) printf 'misc/probe.json\\n' ;;`,
         `*'${LOCAL_RELATED}'*) printf 'w-model-dev/SKILL.md\\n' ;;`,
       ]),
     });
@@ -966,7 +967,7 @@ npm() { return 98; }
         remoteGetUrlOk,
         trackingRefsPresent,
         // -m 输出形态：非 merge 提交路径块 + 空行分隔的 merge 每父 diff 路径块
-        `*'log -m --name-only'*) printf 'eval/probe.json\\n\\nw-model-dev/SKILL.md\\n' ;;`,
+        `*'log -m --name-only'*) printf 'misc/probe.json\\n\\nw-model-dev/SKILL.md\\n' ;;`,
       ]),
     });
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
@@ -1090,7 +1091,7 @@ npm() { return 98; }
 
     const skipped = await runFilteredPush({
       stdin: `refs/heads/topic-a ${LOCAL_UNRELATED} refs/heads/topic-a ${REMOTE_UNRELATED}\n`,
-      gitBody: gitBody([fallbackEmpty, `*'${LOCAL_UNRELATED}'*) printf 'eval/probe.json\\n' ;;`]),
+      gitBody: gitBody([fallbackEmpty, `*'${LOCAL_UNRELATED}'*) printf 'misc/probe.json\\n' ;;`]),
     });
     expect(skipped.code, `${skipped.stdout}\n${skipped.stderr}`).toBe(0);
     expect(skipped.stdout).toContain('跳过门禁');

@@ -28,7 +28,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 | 门禁脚本单元测试（vitest） | ✅ 以当前命令输出为准 |
 | TypeScript 类型检查（strict） | ✅ 0 错误 |
 | 安全扫描（eslint-plugin-security） | ✅ baseline 一致 |
-| 推送前门禁（本地 CI，17 项） | ✅ 全通过 |
+| 推送前门禁（本地 CI，18 项） | ✅ 全通过 |
 
 ## 两条上手路径
 
@@ -206,7 +206,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 ├── config/                       # prettier / vitest / tsconfig / eslint 配置
 ├── scripts/setup-hooks.cjs       # 一次性启用本地推送门禁（npm run setup:hooks）
-├── .githooks/pre-push            # 本地 CI：17 项门禁，git push 时自动执行
+├── .githooks/pre-push            # 本地 CI：18 项门禁（含 eval 语料断言），git push 时自动执行
 ├── AGENTS.md                     # 面向 AI Agent 的仓库导航（与 README 互补）
 ├── package.json                  # tsx + devDeps 声明 + npm run 快捷脚本
 ├── CHANGELOG.md                  # 变更日志

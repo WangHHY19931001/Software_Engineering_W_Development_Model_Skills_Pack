@@ -57,10 +57,10 @@ const ACTION_ENUM_27 = [
 const ACTION_UNION_27 =
   "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
 
-/** 合法 pre-push 文本（连续 #1..#17 检查块 + 「17 项检查」声明，F-G7-08 强校验基线） */
+/** 合法 pre-push 文本（连续 #1..#18 检查块 + 「18 项检查」声明，F-G7-08 强校验基线） */
 const VALID_PRE_PUSH = [
-  ...Array.from({ length: 17 }, (_, i) => `# ${i + 1}. 第 ${i + 1} 项门禁检查`),
-  '# 全部门禁共 17 项检查',
+  ...Array.from({ length: 18 }, (_, i) => `# ${i + 1}. 第 ${i + 1} 项门禁检查`),
+  '# 全部门禁共 18 项检查',
 ].join('\n');
 
 /** 合法 conventions.md 术语表 fixture（action 27 值逐值列表 + exit-2 计数句，F-G7-04/05 基线） */
@@ -960,27 +960,27 @@ describe('runDocConsistencyChecks', () => {
     expect(vStale.some((x) => x.check === 'exit2-scripts' && x.message.includes('仍含过时「29 个脚本」'))).toBe(true);
   });
 
-  it('pre-push 编号最大值非 17 → 违规', () => {
+  it('pre-push 编号最大值非 18 → 违规', () => {
     const input = baseInput({
       prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查',
     });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('17'))).toBe(true);
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('18'))).toBe(true);
   });
 
-  it('pre-push 伪造 3 块检查（# 1./# 2./# 17.）→ 违规（F-G7-08：连续块断言，非仅最大编号）', () => {
-    const forged = ['# 1. self-test', '# 2. check:verifier', '# 17. typecheck', '# 全部门禁共 17 项检查'].join('\n');
+  it('pre-push 伪造 3 块检查（# 1./# 2./# 18.）→ 违规（F-G7-08：连续块断言，非仅最大编号）', () => {
+    const forged = ['# 1. self-test', '# 2. check:verifier', '# 18. typecheck', '# 全部门禁共 18 项检查'].join('\n');
     const v = runDocConsistencyChecks(baseInput({ prePush: forged }));
     const hit = v.filter((x) => x.check === 'pre-push');
     expect(hit.length).toBeGreaterThan(0);
-    expect(hit.some((x) => x.message.includes('连续 #1..#17') && x.message.includes('实测 3 块'))).toBe(true);
+    expect(hit.some((x) => x.message.includes('连续 #1..#18') && x.message.includes('实测 3 块'))).toBe(true);
   });
 
   it('pre-push 中间删除一块（编号断档）→ 违规', () => {
-    const ids = Array.from({ length: 17 }, (_, i) => i + 1).filter((n) => n !== 9);
-    const text = [...ids.map((n) => `# ${n}. 第 ${n} 项`), '# 全部门禁共 17 项检查'].join('\n');
+    const ids = Array.from({ length: 18 }, (_, i) => i + 1).filter((n) => n !== 9);
+    const text = [...ids.map((n) => `# ${n}. 第 ${n} 项`), '# 全部门禁共 18 项检查'].join('\n');
     const v = runDocConsistencyChecks(baseInput({ prePush: text }));
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('实测 16 块'))).toBe(true);
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('实测 17 块'))).toBe(true);
   });
 
   it('glossary action 列表与 schema enum 漂移（缺值/多值）→ 违规（F-G7-05 逐值断言）', () => {
@@ -1307,7 +1307,7 @@ describe('runDocConsistencyChecks', () => {
     const input = baseInput({
       readme: '**当前版本**：`41.11.0`\n以当前命令输出为准；本次新增 123 个测试用例。',
       agents: '31 个脚本\nVitest 测试由受控运行事实包提供。',
-      prePush: '# 17. typecheck\n# Vitest 全量运行结果以当前命令输出为准。',
+      prePush: '# 18. typecheck\n# Vitest 全量运行结果以当前命令输出为准。',
       vitestExtraDocs: [
         { name: 'CONTRIBUTING.md', content: '运行 Vitest 并以当前命令输出为准；新增 456 个测试。' },
         { name: 'docs/INSTALL.md', content: 'Vitest 测试结果以当前命令输出为准；覆盖率阈值保持不变。' },
@@ -2033,7 +2033,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('PR 模板项数与 EXPECTED 一致 → 零 pre-push 违规', () => {
     const input = baseInput({
-      prTemplate: '- [ ] `npm run prepush` 17 项通过',
+      prTemplate: '- [ ] `npm run prepush` 18 项通过',
     });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'pre-push')).toBe(false);
   });
@@ -3010,7 +3010,7 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
   // fail-closed 真实断言）；本组是对 hook 源码的文本级补充防线——变量重命名即红属预期，
   // 用于防语义漂移的第二道闸，不承担行为验证职责。
   // 直接读取 .githooks/pre-push 源文本断言契约（hook 是 bash，不由 docs-consistency
-  // logic 校验；此处守住与 17 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
+  // logic 校验；此处守住与 18 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
   // -n 20 截断 / 空 changed_files 放行」实现）。
   const prePushSource = () => fs.readFile(path.join(REPO_ROOT, '.githooks', 'pre-push'), 'utf8');
 

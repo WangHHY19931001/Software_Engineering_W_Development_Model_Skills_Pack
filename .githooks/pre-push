@@ -10,10 +10,11 @@
 # 临时跳过（仅紧急情况，勿用于常规开发）：
 #   git push --no-verify
 #
-# 触发条件：仅当本次推送范围内含以下路径的变更时才跑门禁，其余（eval/、纯目录等）放行。
+# 触发条件：仅当本次推送范围内含以下路径的变更时才跑门禁，其余（纯目录等非内容变更）放行。
 #   - w-model-dev/**：case 模式 w-model-dev/*（bash case 模式中 * 可跨 /，命中任意层级文件）
 #   - 根级活体文档/配置：README.md / AGENTS.md / CONTRIBUTING.md / .gitignore / .eslintsecurity-baseline.json / package.json / package-lock.json
 #   - config/** / scripts/** / .githooks/**（同上，* 跨 /）
+#   - eval/**：评估资产（语料 / mappings / runner）——触发边界断言是活体门禁（第 18 项）
 #   - docs/*.md（* 跨 /：实际命中 docs/ 任意层级 *.md，含 docs/changes、docs/superpowers
 #     归档——保持历史触发语义，不做收窄）
 
@@ -59,8 +60,8 @@ is_pure_windows_shell() {
 
 if is_pure_windows_shell; then
   printf '[pre-push] \033[31m✗\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n' 2>/dev/null || true
-  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 17 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
-  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 17 项\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 18 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 18 项\n' 2>/dev/null || true
   printf '[pre-push] \033[31m✗\033[0m 请安装 Git for Windows 并在 Git Bash 补跑：npm run prepush（全绿后再合入）\n' 2>/dev/null || true
   exit 0
 fi
@@ -109,6 +110,7 @@ if [ "$FORCE" != "1" ] && [ "${PREPUSH_FORCE:-0}" != "1" ]; then
         w-model-dev/*)                          return 0 ;;
         README.md|AGENTS.md|CONTRIBUTING.md|.gitignore|.eslintsecurity-baseline.json|package.json|package-lock.json) return 0 ;;
         config/*|scripts/*|.githooks/*)         return 0 ;;
+        eval/*)                                 return 0 ;;
         docs/*.md)                              return 0 ;;
       esac
     done <<EOF
@@ -290,7 +292,7 @@ if ! bash "$(dirname "$0")/ensure-platform-deps.sh" --check; then
 fi
 
 # ---------- 门禁用例 ----------
-# 全部门禁共 17 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
+# 全部门禁共 18 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 tmp_vitest_dir="$(mktemp -d)"
@@ -433,6 +435,10 @@ run_expect "prettier 格式一致性（--check）" 0 \
 #     README 健康指标「tsc 0 错误」由手动验证升级为自动化门禁
 run_expect "tsc 类型检查 0 错误" 0 \
   npx tsc -p config/tsconfig.json || exit 1
+
+# 18. eval 语料断言：60 条触发边界语料 + coverageMatrix 五项校验全绿（触发边界 campaign 快追；
+#     断言引擎 --self-check 由 eval/ 自身维护，此处跑全量断言）
+run_expect "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts || exit 1
 
 log "全部门禁通过，允许推送 ✓"
 exit 0

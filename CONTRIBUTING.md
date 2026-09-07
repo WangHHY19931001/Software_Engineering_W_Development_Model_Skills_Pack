@@ -87,9 +87,9 @@ npm run format
 ### 本地推送前门禁
 
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
-在 `git push` 时自动跑 17 项检查；任一退出码不符预期即中止推送：
+在 `git push` 时自动跑 18 项检查；任一退出码不符预期即中止推送：
 
-**触发范围判定**：真实 push 以 git 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，多 ref 逐行聚合）为准——local sha 全零（删除远端 ref）跳过该行、remote sha 全零（新分支）经 `git merge-base --fork-point` / merge-base 建立可证明基线（基线为空或退化到推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败才 → fail-closed 跑全部门禁）；任一 ref 行解析失败 → fail-closed；delete-only 推送放行；stdin 为空时回退 `HEAD@{push}`/`origin/HEAD` 范围判断，回退失败同样 fail-closed。变更命中 `w-model-dev/**`、根级活体文档/配置、`config/**`、`scripts/**`、`.githooks/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，含 `docs/` 任意层级归档）才跑门禁，未命中放行。
+**触发范围判定**：真实 push 以 git 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，多 ref 逐行聚合）为准——local sha 全零（删除远端 ref）跳过该行、remote sha 全零（新分支）经 `git merge-base --fork-point` / merge-base 建立可证明基线（基线为空或退化到推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败才 → fail-closed 跑全部门禁）；任一 ref 行解析失败 → fail-closed；delete-only 推送放行；stdin 为空时回退 `HEAD@{push}`/`origin/HEAD` 范围判断，回退失败同样 fail-closed。变更命中 `w-model-dev/**`、根级活体文档/配置、`config/**`、`scripts/**`、`.githooks/**`、`eval/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，含 `docs/` 任意层级归档）才跑门禁，未命中放行。
 
 | #   | 检查                                                                                                                                                                                                                       | 期望退出码 |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
@@ -110,6 +110,7 @@ npm run format
 | 15  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁：每个 fixture 被 self-test.ts 引用 + 子目录在矩阵声明）                                                                                  | 0          |
 | 16  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）                                        | 0          |
 | 17  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                                                   | 0          |
+| 18  | `npx tsx eval/runner.ts`（触发边界语料断言 + coverageMatrix 五项校验）                                                                                                                                                     | 0          |
 
 **启用方式**：仓库验证期间首次 `npm install` 即自动启用（`postinstall` 运行 `scripts/setup-hooks.cjs`，在当前 checkout 的本地 `.git/config` 设置 `core.hooksPath=.githooks`；失败仅 warn，不阻断 install）。这是仓库验证的本地 Git 配置副作用，不是 Agent Skill 激活必需。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -212,7 +213,7 @@ git push --no-verify
 **提交流程**：
 
 1. 创建分支（见上文「1. 创建分支」）
-2. 本地验证：`npm run prepush`（17 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
+2. 本地验证：`npm run prepush`（18 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
 3. 按上述格式提交
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
@@ -230,7 +231,7 @@ refactor(skill): /wm review 编排指引精简
 - PR 标题遵循 Conventional Commits 格式（同提交信息：`<type>(<scope>): <summary>`）
 - PR 描述使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板，说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
 - 关联相关 issue（如 `Closes #5`）
-- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（17 项门禁）验证，合入前请确保本地已通过
+- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（18 项门禁）验证，合入前请确保本地已通过
 
 ## 文档维护规则
 
