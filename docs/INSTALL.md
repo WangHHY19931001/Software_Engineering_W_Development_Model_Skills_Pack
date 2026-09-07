@@ -245,6 +245,30 @@ Bash 和 PowerShell 7 可使用命令简写；`self-test` / `doctor` 不要求 G
 
 ---
 
+## 子能力单独复用（L0 子集拷贝）
+
+W-Model 的方法论参考类文件可脱离编排单独拷贝到其他 Agent 的 skills 目录复用。权威分级定义见 `docs/skill-design-document_SSoT.md` §3.6。
+
+**可单独拷贝**（方法论自包含，不依赖编排/状态/门禁脚本）：
+
+| 文件 | 可复用能力 |
+| --- | --- |
+| `references/root-cause-locator.md` | 根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯） |
+| `references/iceberg-sweep-guide.md` | 隐藏问题深挖扫掠方法 |
+| `references/agent-personas.md` + `subagent/`（28 个人格） | 评审角色提示词与多角度分析 |
+| `references/conventions.md` | 术语表 / 格式 / 目录约定 |
+| `references/estimation-guide.md` | 工作量估算方法 |
+| `references/context-management-guide.md` | 上下文分层与修剪纪律 |
+| `references/coding-quality.md` | 设计模式 / 重构 / 坏味道 |
+| `references/toolbox.md` | 工具箱 |
+| `references/activation-guide.md` | 触发边界判定（作为其他技能编写反例登记册的参考模板） |
+
+**不可单独拷贝**（依赖编排状态机 / `.w-model/` 状态 / 门禁脚本，离开技能整体无意义）：`references/phase-N-*.md`、`subagent-delegation.md`、`signature-chain-guide.md`、`rtm-guide.md`、`graph-guide.md`、`hard-constraints.md`。
+
+**版本对齐义务**：拷贝时记录上游 `SKILL.md` 的 version；上游更新后须手工对齐（技能包不做自动同步）；单独拷贝的子能力不带门禁脚本语义，相关校验不生效。
+
+---
+
 ## 5. 激活机制（来自 `SKILL.md` frontmatter）
 
 Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能：
