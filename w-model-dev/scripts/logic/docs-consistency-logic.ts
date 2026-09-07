@@ -116,6 +116,8 @@ export interface DocConsistencyInput {
   vitestExtraDocs?: Array<{ name: string; content: string }>;
   /** .github/PULL_REQUEST_TEMPLATE.md 原文（可选——缺省时跳过 PR 模板门禁项数检查） */
   prTemplate?: string;
+  /** 门禁项数引用的活体文档白名单（name + 原文）；缺省时跳过 gate-count-docs 检查（fixture 兼容）。 */
+  gateCountDocs?: Array<{ name: string; content: string }>;
   /** w-model-dev/references/operation-behaviors.md 原文（八条操作行为 + F1-F10） */
   operationBehaviors: string;
   /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版） */
@@ -781,6 +783,7 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
     ),
   );
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
+  violations.push(...checkGateCountLiveDocs(input.gateCountDocs));
   if (input.a4Docs !== undefined) {
     violations.push(...checkA4DocumentationContracts(input.a4Docs));
   }
@@ -1713,6 +1716,47 @@ function checkA4DocumentationContracts(docs: A4DocumentationInput): DocCheckViol
     }
   }
 
+  return violations;
+}
+
+/** pre-push 门禁项数引用的活体文档白名单（gate-count-docs，F1 反哺）：
+ * 仅扫承载「N 项门禁/检查」计数引用的四份活体文档。SSoT 用「第 N 项门禁」下标形式且含日期
+ * 陈述（下标不随总数必变），CHANGELOG.md / CHANGELOG-archive.md / docs/changes/**（历史不可改）
+ * 与 docs/superpowers/**（内部规划）不入白名单——靠白名单而非全仓扫描规避假阳性。 */
+const GATE_COUNT_DOC_NAMES = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/troubleshooting.md'];
+
+/**
+ * 活体文档门禁项数引用扫描（gate-count-docs）：泛化自 checkPrTemplatePrePushCount（先例 :1724）。
+ * 行含「门禁/检查」标记时，全部「N 项」计数引用须 == EXPECTED.prePushCount，防止门禁项数
+ * N→N+1 后未测试 docs 文件（如 docs/troubleshooting.md）漏改。逐行 fresh 正则（无共享 lastIndex）：
+ * 可选 `(第\s*)?` 前缀捕获 → 匹配「第 N 项」序数引用（带/不带空格均覆盖，如「第 13 项 npm audit」）
+ * 时跳过（m[1] 非 undefined）；`(?!目)` 排除「N 项目」误匹配；仅 ASCII 数字（中文数字如「五项校验」
+ * 天然不命中）。gateCountDocs 未注入（缺省）时跳过。
+ */
+export function checkGateCountLiveDocs(
+  docs: Array<{ name: string; content: string }> | undefined,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (docs === undefined) return violations;
+  for (const doc of docs) {
+    if (!GATE_COUNT_DOC_NAMES.includes(doc.name)) continue;
+    const lines = doc.content.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection -- i 为本地数组的整数下标（docs-consistency-logic.ts:1377 同型先例），两侧均为本地派生数据
+      const line = lines[i]!;
+      if (!line.includes('门禁') && !line.includes('检查')) continue;
+      // eslint-disable-next-line security/detect-unsafe-regex -- 字面量正则；(第\s*)? 输入为活体文档单行、行长受限，无 ReDoS 面；逐行 fresh 无共享 lastIndex
+      for (const m of line.matchAll(/(第\s*)?(\d+)\s*项(?!目)/g)) {
+        if (m[1] !== undefined) continue; // 「第 N 项」序数引用，跳过
+        if (Number(m[2]!) !== EXPECTED.prePushCount) {
+          violations.push({
+            check: 'gate-count-docs',
+            message: `${doc.name}:${i + 1} 存在过期门禁项数「${m[0]}」（当前 ${EXPECTED.prePushCount} 项），须同步`,
+          });
+        }
+      }
+    }
+  }
   return violations;
 }
 

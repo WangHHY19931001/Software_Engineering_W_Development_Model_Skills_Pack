@@ -3075,3 +3075,78 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
     expect(source).toContain('fail-closed');
   });
 });
+
+describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）', () => {
+  it('clean：四份白名单文档全 18 项 → 0 违规', () => {
+    const input = baseInput({
+      gateCountDocs: [
+        { name: 'README.md', content: '本地 CI：18 项门禁（含 eval 语料断言）' },
+        { name: 'AGENTS.md', content: '手动跑推送前门禁（不实际推送，18 项门禁检查；' },
+        { name: 'CONTRIBUTING.md', content: '在 `git push` 时自动跑 18 项检查；' },
+        { name: 'docs/troubleshooting.md', content: '未执行 18 项门禁（exit 0 放行）' },
+      ],
+    });
+    expect(runDocConsistencyChecks(input).filter((v) => v.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('stale：任一文档「17 项门禁」→ 违规，消息含文件名与行号', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'docs/troubleshooting.md', content: '未执行 17 项门禁（exit 0 放行）' }],
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('docs/troubleshooting.md:1');
+    expect(v[0]!.message).toContain('17 项');
+  });
+
+  it('index-exclusion：行含门禁标记的「第 13 项」下标引用不误报', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第 13 项 npm audit warn 并跳过（门禁不阻断）' }],
+    });
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('marker-gate：无「门禁/检查」标记的行（5 项闭环脚本）不误报', () => {
+    const input = baseInput({
+      gateCountDocs: [
+        {
+          name: 'README.md',
+          content: 'G 还须跑 5 项闭环脚本（check-budget.ts / check-run-log.ts / check-maturity.ts）',
+        },
+      ],
+    });
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('bare-form：行内含 `门禁` 标记的裸「N 项」（README:31 形态）→ 违规', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'README.md', content: '| 推送前门禁（本地 CI，17 项） |' }],
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('17 项');
+  });
+
+  it('非白名单文档名（CHANGELOG.md）传入 → 不扫描（白名单函数内过滤）', () => {
+    const input = baseInput({
+      gateCountDocs: [{ name: 'CHANGELOG.md', content: '本次推送未执行 17 项门禁（历史记录，不可改）' }],
+    });
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('undefined 注入 → 跳过（fixture 兼容）', () => {
+    const input = baseInput({ gateCountDocs: undefined });
+    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  });
+
+  it('多文档多违规聚合', () => {
+    const input = baseInput({
+      gateCountDocs: [
+        { name: 'AGENTS.md', content: '自动跑 17 项门禁' },
+        { name: 'CONTRIBUTING.md', content: '自动跑 16 项检查' },
+      ],
+    });
+    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
+    expect(v).toHaveLength(2);
+  });
+});
