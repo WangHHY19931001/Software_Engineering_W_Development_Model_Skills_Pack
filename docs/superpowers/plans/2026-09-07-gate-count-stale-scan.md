@@ -63,7 +63,7 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
     expect(v).toHaveLength(1);
     expect(v[0]!.message).toContain('docs/troubleshooting.md:1');
-    expect(v[0]!.message).toContain('17 项门禁');
+    expect(v[0]!.message).toContain('17 项');
   });
 
   it('index-exclusion：行含门禁标记的「第 13 项」下标引用不误报', () => {
@@ -149,8 +149,9 @@ const GATE_COUNT_DOC_NAMES = [
  * 活体文档门禁项数引用扫描（gate-count-docs）：泛化自 checkPrTemplatePrePushCount（先例 :1724）。
  * 行含「门禁/检查」标记时，全部「N 项」计数引用须 == EXPECTED.prePushCount，防止门禁项数
  * N→N+1 后未测试 docs 文件（如 docs/troubleshooting.md）漏改。逐行 fresh 正则（无共享 lastIndex）：
- * `(?<!第)` 排除「第 N 项」下标引用（如「第 13 项 npm audit」）；`(?!目)` 排除「N 项目」误匹配；
- * 仅 ASCII 数字（中文数字如「五项校验」天然不命中）。gateCountDocs 未注入（缺省）时跳过。
+ * 可选 `(第\s*)?` 前缀捕获 → 匹配「第 N 项」序数引用（带/不带空格均覆盖，如「第 13 项 npm audit」）
+ * 时跳过（m[1] 非 undefined）；`(?!目)` 排除「N 项目」误匹配；仅 ASCII 数字（中文数字如「五项校验」
+ * 天然不命中）。gateCountDocs 未注入（缺省）时跳过。
  */
 export function checkGateCountLiveDocs(
   docs: Array<{ name: string; content: string }> | undefined,
@@ -163,8 +164,9 @@ export function checkGateCountLiveDocs(
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
       if (!line.includes('门禁') && !line.includes('检查')) continue;
-      for (const m of line.matchAll(/(?<!第)(\d+)\s*项(?!目)/g)) {
-        if (m[1] !== undefined && Number(m[1]) !== EXPECTED.prePushCount) {
+      for (const m of line.matchAll(/(第\s*)?(\d+)\s*项(?!目)/g)) {
+        if (m[1] !== undefined) continue; // 「第 N 项」序数引用，跳过
+        if (Number(m[2]!) !== EXPECTED.prePushCount) {
           violations.push({
             check: 'gate-count-docs',
             message: `${doc.name}:${i + 1} 存在过期门禁项数「${m[0]}」（当前 ${EXPECTED.prePushCount} 项），须同步`,
@@ -176,6 +178,8 @@ export function checkGateCountLiveDocs(
   return violations;
 }
 ```
+
+> **计划修正记录（2026-09-07，控制者裁定，账本 Task 1 裁决行）：** 原计划正则 `(?<!第)(\d+)\s*项(?!目)` 对「第 13 项」（带空格）失效——`(?<!第)` 只看紧邻前一字符，空格通过；「第13项」无空格时更会在数字中间匹配出「3项」误报。修订为 `(第\s*)?` 前缀捕获（m[1] 非 undefined 即序数，跳过），m[2] 为计数。stale 测试断言 `toContain('17 项门禁')` 改为 `toContain('17 项')`（消息为「17 项」（当前 18 项））。
 
 (b) 在 `DocConsistencyInput` 接口中、`prTemplate` 字段（:117-118）之后新增：
 
