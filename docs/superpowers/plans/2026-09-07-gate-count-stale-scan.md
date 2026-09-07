@@ -9,6 +9,7 @@
 **技术栈：** Node + TypeScript 门禁脚本（`tsx` runtime），vitest（`config/vitest.config.ts`），零新增 devDeps。
 
 **全局约束：**
+
 - **SSoT 优先**：设计已由 `docs/superpowers/specs/2026-09-07-gate-count-stale-scan-design.md`（已批准）承载；本计划按「代码 → 治理同步」执行，SSoT 句子在 Task 4 落（沿用 trigger-boundary 先例）。
 - **脚本自包含**：仅 Node 标准库 + 已声明 devDeps；不引入 LLM 调用。
 - **退出码约定**：0=通过 / 1=校验失败 / 2=输入错误；以脚本退出码为准。
@@ -21,21 +22,22 @@
 
 ## 文件结构
 
-| 文件 | 职责 | 改动 |
-| --- | --- | --- |
-| `w-model-dev/scripts/logic/docs-consistency-logic.ts` | 门禁项数扫描逻辑 + 白名单常量 + 输入字段 + 报告接线 | 修改（Task 1、Task 3） |
-| `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts` | 单元测试（vitest） | 修改（Task 1、Task 3） |
-| `w-model-dev/scripts/cli/check-docs-consistency.ts` | CLI 注入 `gateCountDocs` | 修改（Task 2） |
-| `docs/skill-design-document_SSoT.md` | 治理同步一句 | 修改（Task 4） |
-| `CHANGELOG.md` | campaign 小节 | 修改（Task 4） |
-| `eval/w-model-dev-results.tsv` | 记录一行 | 修改（Task 4） |
-| `w-model-dev/scripts/lib/run-sync.ts` | 直接同步调用审计异常清单（必要终验修复） | 修改（Task 4 终验修复，经用户批准） |
+| 文件                                                           | 职责                                                | 改动                                |
+| -------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------- |
+| `w-model-dev/scripts/logic/docs-consistency-logic.ts`          | 门禁项数扫描逻辑 + 白名单常量 + 输入字段 + 报告接线 | 修改（Task 1、Task 3）              |
+| `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts` | 单元测试（vitest）                                  | 修改（Task 1、Task 3）              |
+| `w-model-dev/scripts/cli/check-docs-consistency.ts`            | CLI 注入 `gateCountDocs`                            | 修改（Task 2）                      |
+| `docs/skill-design-document_SSoT.md`                           | 治理同步一句                                        | 修改（Task 4）                      |
+| `CHANGELOG.md`                                                 | campaign 小节                                       | 修改（Task 4）                      |
+| `eval/w-model-dev-results.tsv`                                 | 记录一行                                            | 修改（Task 4）                      |
+| `w-model-dev/scripts/lib/run-sync.ts`                          | 直接同步调用审计异常清单（必要终验修复）            | 修改（Task 4 终验修复，经用户批准） |
 
 ---
 
 ### 任务 1：逻辑检查 `checkGateCountLiveDocs` + 单元测试
 
 **文件：**
+
 - 修改：`w-model-dev/scripts/logic/docs-consistency-logic.ts`（新增 `GATE_COUNT_DOC_NAMES` 常量 + `checkGateCountLiveDocs` 函数 + `DocConsistencyInput.gateCountDocs` 字段 + `buildDocConsistencyReport` 接线）
 - 测试：`w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts`
 
@@ -69,9 +71,7 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
 
   it('index-exclusion：行含门禁标记的「第 13 项」下标引用不误报', () => {
     const input = baseInput({
-      gateCountDocs: [
-        { name: 'CONTRIBUTING.md', content: 'pre-push 第 13 项 npm audit warn 并跳过（门禁不阻断）' },
-      ],
+      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第 13 项 npm audit warn 并跳过（门禁不阻断）' }],
     });
     expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
   });
@@ -139,20 +139,15 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
  * 仅扫承载「N 项门禁/检查」计数引用的四份活体文档。SSoT 用「第 N 项门禁」下标形式且含日期
  * 陈述（下标不随总数必变），CHANGELOG.md / CHANGELOG-archive.md / docs/changes/**（历史不可改）
  * 与 docs/superpowers/**（内部规划）不入白名单——靠白名单而非全仓扫描规避假阳性。 */
-const GATE_COUNT_DOC_NAMES = [
-  'README.md',
-  'AGENTS.md',
-  'CONTRIBUTING.md',
-  'docs/troubleshooting.md',
-];
+const GATE_COUNT_DOC_NAMES = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/troubleshooting.md'];
 
 /**
  * 活体文档门禁项数引用扫描（gate-count-docs）：泛化自 checkPrTemplatePrePushCount（先例 :1724）。
  * 行含「门禁/检查」标记时，全部「N 项」计数引用须 == EXPECTED.prePushCount，防止门禁项数
  * N→N+1 后未测试 docs 文件（如 docs/troubleshooting.md）漏改。逐行 fresh 正则（无共享 lastIndex）：
- * 可选 `(第\s*)?` 前缀捕获 → 匹配「第 N 项」序数引用（带/不带空格均覆盖，如「第 13 项 npm audit」）
- * 时跳过（m[1] 非 undefined）；`(?!目)` 排除「N 项目」误匹配；仅 ASCII 数字（中文数字如「五项校验」
- * 天然不命中）。gateCountDocs 未注入（缺省）时跳过。
+ * `((?:第)?\s*)(\d+)\s*项(?!目)` 的前缀捕获组覆盖「第 N 项」与「第N项」序数引用；
+ * `m[1]!.includes('第')` 时跳过序数引用（如「第 13 项 npm audit」）；`(?!目)` 排除「N 项目」误匹配；
+ * 仅 ASCII 数字（中文数字如「五项校验」天然不命中）。gateCountDocs 未注入（缺省）时跳过。
  */
 export function checkGateCountLiveDocs(
   docs: Array<{ name: string; content: string }> | undefined,
@@ -165,8 +160,8 @@ export function checkGateCountLiveDocs(
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
       if (!line.includes('门禁') && !line.includes('检查')) continue;
-      for (const m of line.matchAll(/(第\s*)?(\d+)\s*项(?!目)/g)) {
-        if (m[1] !== undefined) continue; // 「第 N 项」序数引用，跳过
+      for (const m of line.matchAll(/((?:第)?\s*)(\d+)\s*项(?!目)/g)) {
+        if (m[1]!.includes('第')) continue; // 「第 N 项」序数引用，跳过
         if (Number(m[2]!) !== EXPECTED.prePushCount) {
           violations.push({
             check: 'gate-count-docs',
@@ -180,7 +175,7 @@ export function checkGateCountLiveDocs(
 }
 ```
 
-> **计划修正记录（2026-09-07，控制者裁定，账本 Task 1 裁决行）：** 原计划正则 `(?<!第)(\d+)\s*项(?!目)` 对「第 13 项」（带空格）失效——`(?<!第)` 只看紧邻前一字符，空格通过；「第13项」无空格时更会在数字中间匹配出「3项」误报。修订为 `(第\s*)?` 前缀捕获（m[1] 非 undefined 即序数，跳过），m[2] 为计数。stale 测试断言 `toContain('17 项门禁')` 改为 `toContain('17 项')`（消息为「17 项」（当前 18 项））。
+> **计划修正记录（2026-09-07，控制者裁定，账本 Task 1 裁决行）：** 原计划正则 `(?<!第)(\d+)\s*项(?!目)` 对「第 13 项」（带空格）失效——`(?<!第)` 只看紧邻前一字符，空格通过；「第13项」无空格时更会在数字中间匹配出「3项」误报。中间尝试的 `(第\s*)?` 因 `security/detect-unsafe-regex` 放行问题废弃，不是推荐实现；最终修订为 `((?:第)?\s*)(\d+)\s*项(?!目)`，以 `m[1]!.includes('第')` 判断序数并跳过，m[2] 为计数。stale 测试断言 `toContain('17 项门禁')` 改为 `toContain('17 项')`（消息为「17 项」（当前 18 项））。
 
 (b) 在 `DocConsistencyInput` 接口中、`prTemplate` 字段（:117-118）之后新增：
 
@@ -192,7 +187,7 @@ export function checkGateCountLiveDocs(
 (c) 在 `buildDocConsistencyReport`（:749）中、`violations.push(...checkPrTemplatePrePushCount(input.prTemplate));`（:783）之后新增：
 
 ```ts
-  violations.push(...checkGateCountLiveDocs(input.gateCountDocs));
+violations.push(...checkGateCountLiveDocs(input.gateCountDocs));
 ```
 
 - [ ] **步骤 4：运行测试确认通过**
@@ -217,6 +212,7 @@ git commit -m "feat(gate): add gate-count-docs stale gate-count scan for living 
 ### 任务 2：CLI 接线 + 负向验证
 
 **文件：**
+
 - 修改：`w-model-dev/scripts/cli/check-docs-consistency.ts`
 
 - [ ] **步骤 1：在 input 注入 gateCountDocs**
@@ -262,6 +258,7 @@ git commit -m "feat(cli): inject gateCountDocs living docs into docs-consistency
 ### 任务 3：遗留 minor 两项（注释写实 + fixture 派生）
 
 **文件：**
+
 - 修改：`w-model-dev/scripts/logic/docs-consistency-logic.ts:1366-1368`（JSDoc 注释）
 - 修改：`w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:11-23`（import）与 `:60-64`（VALID_PRE_PUSH）
 
@@ -323,6 +320,7 @@ git commit -m "test(docs-consistency): make F-G7-08 comment count-agnostic and d
 ### 任务 4：治理收口与终验
 
 **文件：**
+
 - 修改：`docs/skill-design-document_SSoT.md`
 - 修改：`CHANGELOG.md`
 - 修改：`eval/w-model-dev-results.tsv`
@@ -393,6 +391,7 @@ npx tsx eval/runner.ts
 ```
 
 预期：
+
 - `npm run prepush` 全 18 项检查通过（含 vitest 全量、docs-consistency、security-scan、prettier、tsc、npm audit）；
 - `npx tsx eval/runner.ts` 输出 `eval: 60/60 通过`（本 campaign 未改动 eval/ 逻辑，确认无回归）；
 - `git status --short` 干净（Task 2 负向验证的临时改动已在彼处还原）。

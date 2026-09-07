@@ -11,11 +11,11 @@ trigger-boundary-fastfollow 终审发现 F1：pre-push 门禁项数 17→18 后�
 
 现状覆盖缺口：
 
-| 承载门禁项数引用的位置 | 现有覆盖 |
-| --- | --- |
-| `.githooks/pre-push`（编号块 + 声明文本） | ✅ `checkPrePushCount`（F-G7-08 强校验） |
-| `.github/PULL_REQUEST_TEMPLATE.md` | ✅ `checkPrTemplatePrePushCount` |
-| README.md / AGENTS.md / CONTRIBUTING.md / docs/troubleshooting.md | ❌ **无覆盖（F1 缺口）** |
+| 承载门禁项数引用的位置                                            | 现有覆盖                                 |
+| ----------------------------------------------------------------- | ---------------------------------------- |
+| `.githooks/pre-push`（编号块 + 声明文本）                         | ✅ `checkPrePushCount`（F-G7-08 强校验） |
+| `.github/PULL_REQUEST_TEMPLATE.md`                                | ✅ `checkPrTemplatePrePushCount`         |
+| README.md / AGENTS.md / CONTRIBUTING.md / docs/troubleshooting.md | ❌ **无覆盖（F1 缺口）**                 |
 
 本设计关闭该缺口：新增 docs-consistency 内部检查，将四份活体文档的门禁项数引用绑定 `EXPECTED.prePushCount`，使未来的 N→N+1 漂移在 `npm run prepush` / `npm run check:docs-consistency` 时 fail-closed 拦截。
 
@@ -53,14 +53,14 @@ trigger-boundary-fastfollow 终审发现 F1：pre-push 门禁项数 17→18 后�
 1. 按 `/\r?\n/` 切行，记录 1-based 行号。
 2. **行门槛**：行不含「门禁」且不含「检查」→ 跳过该行。这是「5 项闭环脚本」（README.md:141）、「3 项目目录」（AGENTS.md:173）等非门禁项数不乱报的机制。
 3. **命中模式**：`/((?:第)?\s*)(\d+)\s*项(?!目)/g`：
-   - `((?:第)?\s*)` 为前缀捕获组：m[1] 含「第」即序数引用（「第 13 项」「第13项」带/不带空格均覆盖，如 troubleshooting.md:117「第 13 项 npm audit」）→ 跳过。
+   - `((?:第)?\s*)` 为前缀捕获组；以 `m[1]!.includes('第')` 判断序数引用（「第 13 项」「第13项」带/不带空格均覆盖，如 troubleshooting.md:117「第 13 项 npm audit」）→ 跳过。
    - `(?!目)` 排除「N 项目」误匹配（如「3 项目目录」）。
    - 仅 ASCII 数字：中文数字（如「五项校验」）天然不命中。
-   - 注：实现初稿用 `(?<!第)(\d+)\s*项(?!目)` 存在缺陷——`(?<!第)` 只看紧邻前一字符，对带空格的「第 13 项」失效，且对「第13项」会在数字中间误匹配「3项」；且 `(第\s*)?` 形式触发 `security/detect-unsafe-regex`（需禁用注释，仓内无先例）。统一修订为 `((?:第)?\s*)(\d+)\s*项(?!目)`：语义等价、无嵌套量词、不触发安全规则（2026-09-07 控制者裁定）。
+   - 注：实现初稿用 `(?<!第)(\d+)\s*项(?!目)` 存在缺陷——`(?<!第)` 只看紧邻前一字符，对带空格的「第 13 项」失效，且对「第13项」会在数字中间误匹配「3项」；中间尝试的 `(第\s*)?` 因 `security/detect-unsafe-regex` 放行问题废弃，不是当前方案。最终修订为 `((?:第)?\s*)(\d+)\s*项(?!目)`：语义等价、无嵌套量词、不触发安全规则（2026-09-07 控制者裁定）。
 4. **断言**：每个命中数字必须 == `EXPECTED.prePushCount`。否则违规：
    `{检查名 gate-count-docs}`：`{docName}:{lineNo} 存在过期门禁项数「{hit}」（当前 {EXPECTED.prePushCount} 项），须同步`。
 
-对当前语料 11 处引用的验证（全部应为 0 违规）：README:31（裸「18 项」）、README:209、AGENTS:51、AGENTS:92、CONTRIBUTING:90、CONTRIBUTING:216（「18 项本地门禁」）、CONTRIBUTING:234、troubleshooting:13/:28/:114；无标记行 README:141 / AGENTS:173 被行门槛跳过；troubleshooting:117「第 13 项」被 `(?<!第)` 排除。
+对当前语料 11 处引用的验证（全部应为 0 违规）：README:31（裸「18 项」）、README:209、AGENTS:51、AGENTS:92、CONTRIBUTING:90、CONTRIBUTING:216（「18 项本地门禁」）、CONTRIBUTING:234、troubleshooting:13/:28/:114；无标记行 README:141 / AGENTS:173 被行门槛跳过；troubleshooting:117「第 13 项」被前缀捕获组 m[1] 含「第」的判断排除。
 
 ### 3.3 数据流与错误处理
 
