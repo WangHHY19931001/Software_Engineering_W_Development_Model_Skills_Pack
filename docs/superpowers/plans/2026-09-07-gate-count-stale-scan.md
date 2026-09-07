@@ -29,6 +29,7 @@
 | `docs/skill-design-document_SSoT.md` | 治理同步一句 | 修改（Task 4） |
 | `CHANGELOG.md` | campaign 小节 | 修改（Task 4） |
 | `eval/w-model-dev-results.tsv` | 记录一行 | 修改（Task 4） |
+| `w-model-dev/scripts/lib/run-sync.ts` | 直接同步调用审计异常清单（必要终验修复） | 修改（Task 4 终验修复，经用户批准） |
 
 ---
 
@@ -367,7 +368,21 @@ git add eval/w-model-dev-results.tsv
 git commit -m "docs(eval): record gate-count stale scan round in results tsv"
 ```
 
-- [ ] **步骤 4：终验（全量门禁）**
+- [ ] **步骤 4：修复终验暴露的审计清单行号漂移（用户已批准的必要范围扩展）**
+
+Task 3 在 `docs-consistency-logic.test.ts` 顶部新增 `EXPECTED` import，使该文件中 8 个直接同步调用整体下移 1 行；`SYNC_PROCESS_EXCEPTIONS` 的集中审计清单仍登记旧行号，导致 pre-push Vitest 失败（`expected 2487 to be 2488`）。这是清单与真实源码的契约漂移，必须在继续终验前同步，不能伪造或跳过失败。
+
+在 `w-model-dev/scripts/lib/run-sync.ts` 的 `SYNC_PROCESS_EXCEPTIONS` 中，仅更新 `file: '__tests__/docs-consistency-logic.test.ts'` 的 8 个 `line` 值（当前登记 2487/2490/2496/2499/2506/2507/2559/2582）为真实源码对应值 2488/2491/2497/2500/2507/2508/2560/2583；不要改 `api`、`symbol`、`reason` 或其他文件的登记。修改前先阅读目标清单与测试调用，确认每个登记点逐一对应。
+
+采用 TDD 验证：先运行聚焦审计测试确认当前 RED：
+
+```bash
+npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/run-sync.test.ts -t "audits every direct synchronous child-process call against the centralized exception manifest"
+```
+
+预期：失败，报告 `expected 2487 to be 2488`（以及后续同类行号漂移）。然后只更新上述 8 个 `line` 值，重跑同一聚焦测试，预期该测试通过；再由步骤 5 的全量 prepush 验证全部调用点。
+
+- [ ] **步骤 5：终验（全量门禁）**
 
 从 Git Bash（仓库既定执行环境）运行：
 
