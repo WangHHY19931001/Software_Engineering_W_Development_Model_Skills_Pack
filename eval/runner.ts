@@ -18,8 +18,17 @@ import * as path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
-interface ContainsAssertion {
+interface ScopeFields {
+  /** 行域限定：只在本文件内包含该锚文本的行上判定；锚行不存在视为失败 */
+  scopeAnchor?: string;
+}
+interface ContainsAssertion extends ScopeFields {
   type: 'contains';
+  target: string;
+  substring: string;
+}
+interface NotContainsAssertion extends ScopeFields {
+  type: 'notContains';
   target: string;
   substring: string;
 }
@@ -27,7 +36,7 @@ interface FileExistsAssertion {
   type: 'fileExists';
   target: string;
 }
-type Assertion = ContainsAssertion | FileExistsAssertion;
+type Assertion = ContainsAssertion | NotContainsAssertion | FileExistsAssertion;
 
 type Evidence =
   | { type: 'assertion' }
@@ -66,14 +75,35 @@ function createRealFs(): FileSystemAdapter {
   };
 }
 
+function anchoredLines(io: FileSystemAdapter, target: string, anchor: string): string[] {
+  const lines = io
+    .read(target)
+    .split(/\r?\n/)
+    .filter((l) => l.includes(anchor));
+  if (lines.length === 0) throw new Error(`锚定行不存在（target=${target}, anchor=${anchor}）`);
+  return lines;
+}
+
 export function evaluateAssertion(a: Assertion, io: FileSystemAdapter): string | null {
   if (a.type === 'fileExists') {
     return io.exists(a.target) ? null : `文件不存在：${a.target}`;
   }
   try {
-    return io.read(a.target).includes(a.substring) ? null : `${a.target} 未包含「${a.substring}」`;
-  } catch {
-    return `无法读取：${a.target}`;
+    if (a.scopeAnchor !== undefined) {
+      const lines = anchoredLines(io, a.target, a.scopeAnchor);
+      const hit = lines.some((l) => l.includes(a.substring));
+      if (a.type === 'notContains') {
+        return hit ? `${a.target} 锚定「${a.scopeAnchor}」的行包含不该出现的「${a.substring}」` : null;
+      }
+      return hit ? null : `${a.target} 锚定「${a.scopeAnchor}」的行未包含「${a.substring}」`;
+    }
+    const includes = io.read(a.target).includes(a.substring);
+    if (a.type === 'notContains') {
+      return includes ? `${a.target} 不应包含「${a.substring}」却包含` : null;
+    }
+    return includes ? null : `${a.target} 未包含「${a.substring}」`;
+  } catch (e) {
+    return `无法判定：${(e as Error).message}`;
   }
 }
 
@@ -115,10 +145,17 @@ function selfCheck(io: FileSystemAdapter): boolean {
   const passCases: Assertion[] = [
     { type: 'fileExists', target: 'package.json' },
     { type: 'contains', target: 'package.json', substring: '"name"' },
+    { type: 'notContains', target: 'package.json', substring: '__no_such_substring__' },
+    { type: 'notContains', target: 'package.json', substring: 'name', scopeAnchor: '"version"' },
+    { type: 'contains', target: 'package.json', substring: '"name"', scopeAnchor: '"name"' },
   ];
   const failCases: Assertion[] = [
     { type: 'fileExists', target: '__no_such_file__.nomatch' },
     { type: 'contains', target: 'package.json', substring: '__no_such_substring__' },
+    { type: 'notContains', target: 'package.json', substring: '"name"' },
+    { type: 'notContains', target: 'package.json', substring: '"name"', scopeAnchor: '"name"' },
+    { type: 'contains', target: 'package.json', substring: '"name"', scopeAnchor: '__no_such_anchor__' },
+    { type: 'notContains', target: '__no_such_file__.nomatch', substring: 'x' },
   ];
   const ok =
     passCases.every((c) => evaluateAssertion(c, io) === null) &&
