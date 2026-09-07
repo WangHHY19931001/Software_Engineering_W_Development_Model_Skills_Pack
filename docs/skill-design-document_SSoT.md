@@ -427,6 +427,23 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/` / `schemas/`）中指向 `scripts/`、`samples/`、`tools/` 的相对链接统一为 **L1-only 导航**：L0 副本预期不含这些目标，链接检查必须将其分类为分层边界，不得据此报告「L0 全链接通过」；取得 L1 交付（L0 + `scripts/` + `samples/` + `tools/`）后才校验这些目标。仓库侧审计入口为 `npm run audit:l0-links [-- --root=<skill-root>]`（`w-model-dev/scripts/application/audit-l0-links.ts`，只读，exit 0/1/2；实现与已知近似见 `w-model-dev/references/command-reference.md`「L0/L1 链接边界审计」节）。本节是该边界的权威定义；INSTALL §2 与 w-model-dev 侧描述均以本节为准。
 
+### 3.6 触发边界与反例登记册（Trigger Boundary & Anti-Scenario Registry）
+
+技能触发边界由三层资产共同度量，本节为权威定义（规格：docs/superpowers/specs/2026-09-07-trigger-boundary-campaign-design.md）。
+
+**route 三值语义**：每条评估语料归属 `enable`（立即启用）/ `ask`（先询问，确认前不初始化）/ `skip`（不启用，按普通任务处理）之一；L2 机制存在性条目不带 route。
+
+**类别全集（13 类）**：负向 N1-N10（一次性数据/文件脚本、样式与小 bug 修复、纯问答与技术解释、环境与配置变更、纯文档撰写与排版、数据查询与正则提取、依赖升级与小重构、非软件开发任务、单点执行指令、已由其他工具接管的请求）与歧义 A1-A3（完整流程未提 W 模型、大型新项目仅说"开始做"、模糊合规表述）。类别增删须先改本节，再同步 activation-guide / prompts / mappings。
+
+**三层资产契约**：
+- 数据源 = `eval/w-model-dev-test-prompts.json`（60 条，含 category/route 字段）；
+- 视图 = `w-model-dev/references/activation-guide.md`（13 个 `## <code> <canonical 名>` 节，示例行 `- id=N: <prompt 原文>`，每节另含判定理由与边界说明——何时升级为 ask/enable）；
+- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 五项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫）。
+
+**触发面分层**：SKILL.md frontmatter description 保留一句英文反例信号（作用于技能加载器的匹配面）；触发决策表"不启用"行含十类速览并链接 activation-guide.md；完整判定细则只在 activation-guide.md 按需加载——常驻面增量 ≤15 行。
+
+**L0 复用分级**：references 分「可单独拷贝」（方法论自包含：root-cause-locator / iceberg-sweep-guide / agent-personas+subagent / conventions / estimation-guide / context-management-guide / coding-quality / toolbox）与「不可单独拷贝」（依赖编排/状态/门禁：phase-N-* / subagent-delegation / signature-chain-guide / rtm-guide / graph-guide / hard-constraints）；权威清单与版本对齐义务见 docs/INSTALL.md「子能力单独复用」节。
+
 ## 4. 技能工作流程
 
 ### 4.1 完整工作流程
