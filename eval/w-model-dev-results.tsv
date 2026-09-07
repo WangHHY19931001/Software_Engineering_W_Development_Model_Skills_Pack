@@ -37,3 +37,4 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-08-30T10:30:00+08:00	6a2d6bd	w-model-dev	-	-	keep	e2e_rebuild	8阶段从零重建第4轮终值（todo-rest-demo L2，仓内 eval/e2e/demo-final）；真实执行74/74(UT35+IT17+ST11+UAT11，coverage 97.56/98.00/95.45/97.67)；8阶段 verifier 全 A(0.9295/0.8770/0.886/0.894/0.8757/0.8942/0.9028/0.9057)；门禁全绿零常驻红灯（基线 D9 cucumber 红灯由真实报告通道消除）；返工8项（1 R循环 tla-bdd-sync + 7 R3-Required S-fix）；偏差 UAT-002 过度收紧裁定(D7谱系)+超限体 ECONNRESET src 修复；新 SKILL.md(106行) 易用性收益：分派≈52 vs 基线≈74、CHECKPOINT 18；记录 eval/e2e/2026-08-28-final.md	e2e
 2026-09-07T09:48	9e755b4	w-model-dev	-	-	keep	触发边界/反例登记册	语料25→60;负向22条L1N;notContains守卫+coverageMatrix;activation-guide第41份reference	dry_run
 2026-09-07T14:17	8238e7f	w-model-dev	-	-	keep	触发边界快追	pre-push第18项eval;不启用行锚点10条;selfCheckMatrix负例×5;术语L1/L1N/L2归一	dry_run
+2026-09-07T18:04	140f795	w-model-dev	-	-	keep	门禁项数STALE扫描	docs-consistency 新增 gate-count-docs 白名单扫描（绑定 prePushCount=18），防 N→N+1 活体文档漏改；版本保持 42.2.1	dry_run
