@@ -803,6 +803,12 @@ async function main(): Promise<void> {
     rootCauseVerifierSpec: read('w-model-dev/references/verifier-spec.md'),
     rootCauseCommandReference: read('w-model-dev/references/command-reference.md'),
     prePush: read('.githooks/pre-push'),
+    gateCountDocs: [
+      { name: 'README.md', content: read('README.md') },
+      { name: 'AGENTS.md', content: read('AGENTS.md') },
+      { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
+      { name: 'docs/troubleshooting.md', content: read('docs/troubleshooting.md') },
+    ],
     prTemplate: read('.github/PULL_REQUEST_TEMPLATE.md'),
     changelog: read('CHANGELOG.md'),
     pkgJson: read('package.json'),
