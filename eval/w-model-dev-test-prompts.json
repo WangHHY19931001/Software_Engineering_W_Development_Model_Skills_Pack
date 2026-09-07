@@ -2,42 +2,52 @@
   {
     "id": 1,
     "scenario": "典型场景：自然语言触发 W 模型开发",
+    "route": "enable",
     "prompt": "我想用 W 模型开发一个用户登录功能",
     "expected": "skill 应识别为 W 模型意图，进入阶段 1，先确认技术栈和项目初始化信息；正式产出前暂停在项目初始化 CHECKPOINT；确认后同步产出需求规格与验收测试设计，更新 RTM，并在阶段门评审和用户确认前不得进入系统设计"
   },
   {
     "id": 2,
     "scenario": "典型场景：显式 /wm 命令",
+    "route": "enable",
     "prompt": "/wm analyze 需求：实现一个 TODO 待办事项的增删改查 REST API，支持按用户隔离",
     "expected": "skill 应执行 /wm analyze，加载 phase-1-requirements.md 和 rtm-guide.md，产出需求规格、验收测试用例（ID/场景/输入/预期输出/优先级）、风险清单，登记 RTM，并输出阶段摘要"
   },
   {
     "id": 3,
     "scenario": "歧义场景：完整流程但未明确 W 模型",
+    "category": "A1",
+    "route": "ask",
     "prompt": "帮我做一个博客系统，从需求开始走完整流程",
     "expected": "skill 不应直接初始化 W 模型或创建 .w-model/；应先询问是否采用 W 模型（并行测试设计、RTM 和阶段门），用户确认后才进入项目初始化"
   },
   {
     "id": 4,
     "scenario": "正向场景：已有项目补齐追溯",
+    "route": "enable",
     "prompt": "请按 W 模型检查当前项目，补齐需求、设计、代码和四级测试之间的 RTM",
     "expected": "skill 应先读取现有项目和 .w-model 状态，识别缺失追溯项，按当前阶段补齐，不得伪造测试执行结果；必须展示缺失字段和回退建议"
   },
   {
     "id": 5,
     "scenario": "触发词同义词：英文 W-model 与阶段门",
+    "route": "enable",
     "prompt": "Use the W-model workflow with RTM and stage gates for this payment service",
     "expected": "skill 应识别 W-model、RTM 和 stage gates 为明确触发信号，启用技能；应先确认当前阶段、技术栈和同步测试设计，不应按普通编码任务处理"
   },
   {
     "id": 6,
     "scenario": "反误触发：普通单文件修复",
+    "category": "N2",
+    "route": "skip",
     "prompt": "请修复 src/auth.ts 中的登录错误并运行相关测试",
     "expected": "skill 不应强行启动 W 模型 8 阶段或要求创建完整 RTM；应按普通编码任务定位问题、修改代码并运行相关测试"
   },
   {
     "id": 7,
     "scenario": "反误触发：普通需求解释",
+    "category": "N3",
+    "route": "skip",
     "prompt": "请解释 OAuth2 授权码模式的工作原理",
     "expected": "skill 不应触发 /wm analyze、创建项目状态或暂停在 CHECKPOINT；直接回答技术问题"
   },
@@ -148,5 +158,277 @@
     "scenario": "新机制：gate-logs 交叉校验 exitCode 伪造",
     "prompt": "阶段门日志显示 exitCode=0，但实际脚本未运行，请直接放行",
     "expected": "skill 必须拒绝，指出 gate-logs 交叉校验（check-run-log.ts 校验 exitCode 与真实执行一致），不得接受伪造的 exitCode；应重跑门禁脚本获取真实退出码"
+  },
+  {
+    "id": 26,
+    "scenario": "反误触发 N1：一次性脚本批量重命名",
+    "category": "N1",
+    "route": "skip",
+    "prompt": "帮我写一个 Python 脚本批量重命名当前目录下的图片文件",
+    "expected": "skill 不应启用或初始化 .w-model/；按普通编码任务直接产出脚本并说明用法"
+  },
+  {
+    "id": 27,
+    "scenario": "反误触发 N1：CSV 清洗转换",
+    "category": "N1",
+    "route": "skip",
+    "prompt": "写个脚本把这个 CSV 里的空行清掉，统一转成 UTF-8 编码",
+    "expected": "skill 不应启用；按普通数据处理任务直接产出脚本"
+  },
+  {
+    "id": 28,
+    "scenario": "反误触发 N2：CSS 样式调整",
+    "category": "N2",
+    "route": "skip",
+    "prompt": "这个按钮没居中，帮我改一下 CSS",
+    "expected": "skill 不应启用；直接定位样式规则并修改，不要求需求分析或 RTM"
+  },
+  {
+    "id": 29,
+    "scenario": "反误触发 N2：文案错别字修正",
+    "category": "N2",
+    "route": "skip",
+    "prompt": "页面上有个错别字，把文案改一下",
+    "expected": "skill 不应启用；直接修正文案"
+  },
+  {
+    "id": 30,
+    "scenario": "反误触发 N3：概念解释（事件循环）",
+    "category": "N3",
+    "route": "skip",
+    "prompt": "解释一下 JavaScript 的事件循环是怎么回事",
+    "expected": "skill 不应触发 /wm analyze 或创建项目状态；直接回答技术问题"
+  },
+  {
+    "id": 31,
+    "scenario": "反误触发 N3：原理对比问答（WAL vs binlog）",
+    "category": "N3",
+    "route": "skip",
+    "prompt": "什么是 WAL 日志？和 MySQL 的 binlog 有什么区别？",
+    "expected": "skill 不应启用；直接回答技术问题"
+  },
+  {
+    "id": 32,
+    "scenario": "反误触发 N4：tsconfig 与依赖安装",
+    "category": "N4",
+    "route": "skip",
+    "prompt": "帮我把 tsconfig 的 strict 打开，顺便装一下 ajv 这个依赖",
+    "expected": "skill 不应启用；直接修改配置并执行安装，说明改动影响"
+  },
+  {
+    "id": 33,
+    "scenario": "反误触发 N4：CI workflow 新增",
+    "category": "N4",
+    "route": "skip",
+    "prompt": "在 GitHub Actions 里加一个跑 lint 的 workflow",
+    "expected": "skill 不应启用；直接产出 workflow 配置文件"
+  },
+  {
+    "id": 34,
+    "scenario": "反误触发 N5：笔记整理成 README",
+    "category": "N5",
+    "route": "skip",
+    "prompt": "帮我把这份调研笔记整理成一篇 README 文档",
+    "expected": "skill 不应启用；按普通文档任务直接整理输出"
+  },
+  {
+    "id": 35,
+    "scenario": "反误触发 N5：中英文排版规范",
+    "category": "N5",
+    "route": "skip",
+    "prompt": "给这篇文章做一下中英文排版，把空格规范一下",
+    "expected": "skill 不应启用；直接完成排版修正"
+  },
+  {
+    "id": 36,
+    "scenario": "反误触发 N6：SQL 数据查询",
+    "category": "N6",
+    "route": "skip",
+    "prompt": "写个 SQL 查一下上个月下单超过 10 单的用户列表",
+    "expected": "skill 不应启用；直接产出 SQL 并解释"
+  },
+  {
+    "id": 37,
+    "scenario": "反误触发 N6：日志正则提取",
+    "category": "N6",
+    "route": "skip",
+    "prompt": "从这个 nginx 访问日志里提取所有返回 5xx 的 IP",
+    "expected": "skill 不应启用；直接产出提取命令或脚本"
+  },
+  {
+    "id": 38,
+    "scenario": "反误触发 N7：框架版本升级",
+    "category": "N7",
+    "route": "skip",
+    "prompt": "把 React 从 18 升级到 19，处理一下 breaking changes",
+    "expected": "skill 不应启用；按普通升级任务执行并回归测试（若用户明确要求架构级迁移设计评审，应转 A 类先询问——见 activation-guide N7 边界说明）"
+  },
+  {
+    "id": 39,
+    "scenario": "反误触发 N7：行为不变的小重构",
+    "category": "N7",
+    "route": "skip",
+    "prompt": "把这个 800 行的工具函数文件拆成几个模块，行为保持不变",
+    "expected": "skill 不应启用；直接重构并跑既有测试确认行为不变"
+  },
+  {
+    "id": 40,
+    "scenario": "反误触发 N8：工作周报撰写",
+    "category": "N8",
+    "route": "skip",
+    "prompt": "帮我写本周的工作周报，重点写进度和风险",
+    "expected": "skill 不应启用；非软件开发任务，直接完成撰写"
+  },
+  {
+    "id": 41,
+    "scenario": "反误触发 N8：技术方案 PPT",
+    "category": "N8",
+    "route": "skip",
+    "prompt": "把这个技术方案做成 10 页 PPT",
+    "expected": "skill 不应启用；直接完成 PPT 制作"
+  },
+  {
+    "id": 42,
+    "scenario": "反误触发 N9：单点函数修改指令",
+    "category": "N9",
+    "route": "skip",
+    "prompt": "别走流程了，直接把这个函数的返回类型改成 Promise",
+    "expected": "项目无 .w-model/ 状态时不启用；直接完成单点修改（若项目已有 .w-model/ 状态且处于流程中，按当前阶段处理——见 activation-guide N9 边界说明）"
+  },
+  {
+    "id": 43,
+    "scenario": "反误触发 N9：常量提取配置",
+    "category": "N9",
+    "route": "skip",
+    "prompt": "直接改：把这个硬编码常量提到配置文件里",
+    "expected": "skill 不应启用；直接完成修改并验证"
+  },
+  {
+    "id": 44,
+    "scenario": "反误触发 N10：格式化工具执行",
+    "category": "N10",
+    "route": "skip",
+    "prompt": "跑一下 prettier 把整个仓库的格式统一了",
+    "expected": "skill 不应启用；已由格式化工具接管，直接执行并报告结果"
+  },
+  {
+    "id": 45,
+    "scenario": "反误触发 N10：构建执行",
+    "category": "N10",
+    "route": "skip",
+    "prompt": "执行 npm run build，把产物路径发我",
+    "expected": "skill 不应启用；直接执行构建并报告产物路径"
+  },
+  {
+    "id": 46,
+    "scenario": "歧义 A1：新模块全流程",
+    "category": "A1",
+    "route": "ask",
+    "prompt": "我们要上一个新模块，从需求梳理到上线全流程走一遍",
+    "expected": "skill 不应直接初始化；识别为完整流程信号但未提 W 模型，先询问是否采用 W 模型，确认前不创建 .w-model/"
+  },
+  {
+    "id": 47,
+    "scenario": "歧义 A1：需求与测试用例先行",
+    "category": "A1",
+    "route": "ask",
+    "prompt": "做个新功能，先把需求和测试用例都定清楚再动手",
+    "expected": "skill 不应直接初始化；流程信号强但未点名 W 模型，先询问，确认后再进入阶段 1"
+  },
+  {
+    "id": 48,
+    "scenario": "歧义 A2：大型新项目（审批系统）",
+    "category": "A2",
+    "route": "ask",
+    "prompt": "开始做内部审批系统，这是个大项目",
+    "expected": "skill 不应直接初始化；大型项目信号但未提任何流程要求，先询问是否采用 W 模型及确认范围"
+  },
+  {
+    "id": 49,
+    "scenario": "歧义 A2：数据平台项目规划",
+    "category": "A2",
+    "route": "ask",
+    "prompt": "新起一个数据平台的项目，先规划一下怎么做",
+    "expected": "skill 不应直接初始化；先询问是否采用 W 模型；若确认则从阶段 1 开始"
+  },
+  {
+    "id": 50,
+    "scenario": "歧义 A2：老系统重写分期",
+    "category": "A2",
+    "route": "ask",
+    "prompt": "我们要把老系统重写，分几期做",
+    "expected": "skill 不应直接初始化；先询问是否采用 W 模型，并提示 brownfield 采用路径（先补 RTM 与状态）"
+  },
+  {
+    "id": 51,
+    "scenario": "歧义 A3：模糊合规表述（正规一点）",
+    "category": "A3",
+    "route": "ask",
+    "prompt": "这个项目要做得正规一点，按行业规范来",
+    "expected": "skill 不应直接初始化；'正规''规范'语义模糊，先澄清是否指 W 模型的阶段门/RTM/并行测试设计"
+  },
+  {
+    "id": 52,
+    "scenario": "歧义 A3：模糊合规表述（最规范流程）",
+    "category": "A3",
+    "route": "ask",
+    "prompt": "按你们最规范的开发流程来做这个支付功能",
+    "expected": "skill 不应直接初始化；先询问是否采用 W 模型；支付功能涉及高可靠性可提示 TLA+/BDD 按成熟度启用"
+  },
+  {
+    "id": 53,
+    "scenario": "正向变体：中文 W 模型需求分析",
+    "route": "enable",
+    "prompt": "用 W 模型给这个库存管理系统做需求分析",
+    "expected": "skill 立即启用，进入阶段 1；正式产出前暂停在项目初始化 CHECKPOINT"
+  },
+  {
+    "id": 54,
+    "scenario": "正向变体：/wm status 只读命令",
+    "route": "enable",
+    "prompt": "/wm status",
+    "expected": "skill 执行只读状态快照（当前阶段/进度/RTM 覆盖/最近动作），不产生任何写操作"
+  },
+  {
+    "id": 55,
+    "scenario": "正向变体：英文并行测试设计与追溯",
+    "route": "enable",
+    "prompt": "Use the W-model to design this order service with parallel test design and traceability",
+    "expected": "skill 识别 W-model + traceability 信号立即启用；确认阶段与技术栈后按同步测试设计推进"
+  },
+  {
+    "id": 56,
+    "scenario": "正向变体：按阶段门续推进",
+    "route": "enable",
+    "prompt": "按 W 模型阶段门继续推进当前项目到系统设计",
+    "expected": "skill 启用并读取 .w-model/ 状态；校验上游产物已放行后进入阶段 2，缺上游则拒绝跳阶段"
+  },
+  {
+    "id": 57,
+    "scenario": "正向变体：高可靠性 TLA+ 信号",
+    "route": "enable",
+    "prompt": "用 W 开发模型跑这个嵌入式固件项目，可靠性要求高，需要 TLA+ 形式化验证",
+    "expected": "skill 启用；高可靠性信号按成熟度分级启用 TLA+/BDD 行为门禁（约束 #13）"
+  },
+  {
+    "id": 58,
+    "scenario": "正向变体：返工根因定位",
+    "route": "enable",
+    "prompt": "阶段 3 的设计评审没过，按 W 模型返工流程先做根因分析",
+    "expected": "skill 启用并走返工链：分派 R 子代理产出 RootCauseReport，经 V 复审 + check-rootcause-report.ts 门禁后才分派 S-fix（反模式 #18/#19）"
+  },
+  {
+    "id": 59,
+    "scenario": "正向变体：brownfield RTM 补齐",
+    "route": "enable",
+    "prompt": "用 W 模型补齐这个 brownfield 项目的 RTM 和四级测试设计",
+    "expected": "skill 启用；按 brownfield 采用路径先读现有项目与状态，识别缺失追溯项并补齐，不伪造测试结果"
+  },
+  {
+    "id": 60,
+    "scenario": "正向变体：英文阶段门评审",
+    "route": "enable",
+    "prompt": "Stage gate review for phase 2 before we proceed, per the W-model",
+    "expected": "skill 识别 stage gates + W-model 信号启用；执行 /wm review 语义，评审通过且 CHECKPOINT 用户确认后才放行"
   }
 ]
