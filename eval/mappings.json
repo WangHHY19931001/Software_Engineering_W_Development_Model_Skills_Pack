@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "description": "60 条评估提示词 → 技能资产锚点映射。断言三层：L1 触发词断言（正向 enable）、L1N 负向触发断言（skip/ask，锚定 activation-guide 类别节 + notContains 守卫）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 五项校验强制。",
+  "description": "60 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 五项校验强制。每条映射另以 evidence 字段做行为证据映射。",
   "matrix": {
     "routeTotals": { "enable": 12, "ask": 8, "skip": 22 },
     "minPerCategory": 2,
@@ -152,7 +152,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N1 一次性数据/文件脚本" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "批量重命名当前目录下的图片文件" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "一次性数据/文件脚本", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "批量重命名" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "批量重命名" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "一次性数据/文件脚本", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 27, "scenario": "反误触发 N1：CSV 清洗转换", "layer": "L1N", "category": "N1", "route": "skip",
       "assertions": [
@@ -164,7 +165,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N2 样式与小 bug 修复" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "这个按钮没居中" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "样式与小 bug 修复", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "错别字" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "错别字" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "样式与小 bug 修复", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 29, "scenario": "反误触发 N2：文案错别字修正", "layer": "L1N", "category": "N2", "route": "skip",
       "assertions": [
@@ -176,7 +178,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N3 纯问答与技术解释" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "JavaScript 的事件循环" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "纯问答与技术解释", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "事件循环" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "事件循环" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "纯问答与技术解释", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 31, "scenario": "反误触发 N3：原理对比问答（WAL vs binlog）", "layer": "L1N", "category": "N3", "route": "skip",
       "assertions": [
@@ -188,7 +191,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N4 环境与配置变更" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "tsconfig 的 strict 打开" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "环境与配置变更", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "GitHub Actions" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "GitHub Actions" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "环境与配置变更", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 33, "scenario": "反误触发 N4：CI workflow 新增", "layer": "L1N", "category": "N4", "route": "skip",
       "assertions": [
@@ -200,7 +204,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N5 纯文档撰写与排版" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "调研笔记整理成一篇 README" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "纯文档撰写与排版", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "中英文排版" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "中英文排版" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "纯文档撰写与排版", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 35, "scenario": "反误触发 N5：中英文排版规范", "layer": "L1N", "category": "N5", "route": "skip",
       "assertions": [
@@ -212,7 +217,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N6 数据查询与正则提取" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "下单超过 10 单的用户列表" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "数据查询与正则提取", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "nginx 访问日志" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "nginx 访问日志" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "数据查询与正则提取", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 37, "scenario": "反误触发 N6：日志正则提取", "layer": "L1N", "category": "N6", "route": "skip",
       "assertions": [
@@ -224,7 +230,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N7 依赖升级与小重构" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "React 从 18 升级到 19" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "依赖升级与小重构", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "升级到 19" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "升级到 19" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "依赖升级与小重构", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 39, "scenario": "反误触发 N7：行为不变的小重构", "layer": "L1N", "category": "N7", "route": "skip",
       "assertions": [
@@ -236,7 +243,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N8 非软件开发任务" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "本周的工作周报" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "非软件开发任务", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "工作周报" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "工作周报" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "非软件开发任务", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 41, "scenario": "反误触发 N8：技术方案 PPT", "layer": "L1N", "category": "N8", "route": "skip",
       "assertions": [
@@ -248,7 +256,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N9 单点执行指令" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "返回类型改成 Promise" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "单点执行指令", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "别走流程了" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "别走流程了" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "单点执行指令", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 43, "scenario": "反误触发 N9：常量提取配置", "layer": "L1N", "category": "N9", "route": "skip",
       "assertions": [
@@ -260,7 +269,8 @@
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "## N10 已由其他工具接管的请求" },
         { "type": "contains", "target": "w-model-dev/references/activation-guide.md", "substring": "prettier 把整个仓库的格式" },
         { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "已由其他工具接管的请求", "scopeAnchor": "立即启用" },
-        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "跑一下 prettier" }
+        { "type": "notContains", "target": "w-model-dev/SKILL.md", "substring": "跑一下 prettier" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "已由其他工具接管的请求", "scopeAnchor": "不启用" }
       ], "evidence": { "type": "assertion" } },
     { "id": 45, "scenario": "反误触发 N10：构建执行", "layer": "L1N", "category": "N10", "route": "skip",
       "assertions": [

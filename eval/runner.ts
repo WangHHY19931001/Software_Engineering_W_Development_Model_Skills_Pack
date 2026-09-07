@@ -2,10 +2,12 @@
 /**
  * 仓内评估断言 runner：验证「60 条评估提示词要求的技能行为支撑资产」是否完备。
  *
- * 三层断言（设计见 docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md §2.2）：
- *   L1 触发词断言 —— 触发/歧义/反误触发契约在 SKILL.md 中可命中；
+ * 断言分层（设计见 docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md §2.2 与
+ * docs/superpowers/specs/2026-09-07-trigger-boundary-campaign-design.md §5）：
+ *   L1 触发词断言 —— 正向 enable 与歧义 ask 的触发契约在 SKILL.md / activation-guide.md 中可命中；
+ *   L1N 负向触发断言 —— skip 反例：activation-guide 类别节锚点 + notContains 守卫（「立即启用」行域 + 文件域）+ 「不启用」行锚点；
  *   L2 机制存在性断言 —— expected 引用的机制在「脚本 + 逻辑常量 + references 锚点」有实体；
- *   L3 行为证据映射 —— 每条 expected 映射到已存在的 self-test fixture / 测试文件 / eval 断言。
+ *   行为证据映射 —— 每条映射的 evidence 字段指向已存在的 self-test fixture / 测试文件 / 既有断言。
  *
  * 用法：
  *   npm run eval                          # 全量断言，写 eval/results.json，失败 exit 1
@@ -39,9 +41,7 @@ interface FileExistsAssertion {
 type Assertion = ContainsAssertion | NotContainsAssertion | FileExistsAssertion;
 
 type Evidence =
-  | { type: 'assertion' }
-  | { type: 'fileExists'; target: string }
-  | { type: 'selfTestSource'; substring: string };
+  { type: 'assertion' } | { type: 'fileExists'; target: string } | { type: 'selfTestSource'; substring: string };
 
 interface Mapping {
   id: number;
@@ -139,10 +139,9 @@ export function evaluateEvidence(e: Evidence, io: FileSystemAdapter): string | n
 }
 
 export function evaluateMapping(m: Mapping, io: FileSystemAdapter): AssertionResult {
-  const failures = [
-    ...m.assertions.map((a) => evaluateAssertion(a, io)),
-    evaluateEvidence(m.evidence, io),
-  ].filter((x): x is string => x !== null);
+  const failures = [...m.assertions.map((a) => evaluateAssertion(a, io)), evaluateEvidence(m.evidence, io)].filter(
+    (x): x is string => x !== null,
+  );
   return { id: m.id, layer: m.layer, scenario: m.scenario, passed: failures.length === 0, failures };
 }
 
@@ -172,9 +171,12 @@ export function coverageMatrix(
     const m = byId.get(c.id);
     if (!m) continue; // 1:1 缺失由 crossCheckIds 报告
     if (m.route !== c.route) problems.push(`id=${c.id} route 不一致：语料=${c.route} 映射=${m.route ?? '无'}`);
-    if (m.category !== c.category) problems.push(`id=${c.id} category 不一致：语料=${c.category} 映射=${m.category ?? '无'}`);
+    if (m.category !== c.category)
+      problems.push(`id=${c.id} category 不一致：语料=${c.category} 映射=${m.category ?? '无'}`);
   }
-  for (const [route, expected] of Object.entries(decl.routeTotals) as Array<[keyof MatrixDeclaration['routeTotals'], number]>) {
+  for (const [route, expected] of Object.entries(decl.routeTotals) as Array<
+    [keyof MatrixDeclaration['routeTotals'], number]
+  >) {
     const actual = routed.filter((c) => c.route === route).length;
     if (actual !== expected) problems.push(`route=${route} 总数 ${actual} ≠ 声明 ${expected}`);
   }
@@ -214,9 +216,7 @@ export function coverageMatrix(
   for (const [cat] of catCounts) {
     if (!/^N\d+$/.test(cat)) continue;
     const guarded = mappings.some(
-      (m) =>
-        m.category === cat &&
-        m.assertions.some((a) => a.type === 'notContains' && a.scopeAnchor === '立即启用'),
+      (m) => m.category === cat && m.assertions.some((a) => a.type === 'notContains' && a.scopeAnchor === '立即启用'),
     );
     if (!guarded) problems.push(`负向类别 ${cat} 缺少「立即启用」行 notContains 守卫`);
   }
@@ -247,29 +247,73 @@ function selfCheck(io: FileSystemAdapter): boolean {
 }
 
 function selfCheckMatrix(): boolean {
-  const guide = ['## N1 测试类别', '- id=1: 示例一', '- id=2: 示例二'].join('\n');
-  const io: FileSystemAdapter = {
+  const mkIo = (guide: string): FileSystemAdapter => ({
     read: (p: string) => {
       if (p === 'guide.md') return guide;
       throw new Error(`意外读取：${p}`);
     },
     exists: (p: string) => p === 'guide.md',
-  };
-  const corpus: CorpusEntry[] = [
+  });
+  const guideTwo = ['## N1 测试类别', '- id=1: 示例一', '- id=2: 示例二'].join('\n');
+  const guideOne = ['## N1 测试类别', '- id=1: 示例一'].join('\n');
+  const guard: Assertion = { type: 'notContains', target: 's.md', substring: '测试类别', scopeAnchor: '立即启用' };
+  const corpusA: CorpusEntry[] = [
     { id: 1, scenario: '', prompt: '', expected: '', category: 'N1', route: 'skip' },
     { id: 2, scenario: '', prompt: '', expected: '', category: 'N1', route: 'skip' },
   ];
-  const mappings: Mapping[] = [
-    { id: 1, category: 'N1', route: 'skip', layer: 'L1N', scenario: '',
-      assertions: [{ type: 'notContains', target: 's.md', substring: '测试类别', scopeAnchor: '立即启用' }],
-      evidence: { type: 'assertion' } },
-    { id: 2, category: 'N1', route: 'skip', layer: 'L1N', scenario: '', assertions: [], evidence: { type: 'assertion' } },
-  ];
-  const decl: MatrixDeclaration = { routeTotals: { enable: 0, ask: 0, skip: 2 }, minPerCategory: 2, guidePath: 'guide.md' };
-  const okCase = coverageMatrix(corpus, mappings, decl, io);
-  const badDecl: MatrixDeclaration = { ...decl, routeTotals: { enable: 0, ask: 0, skip: 3 } };
-  const badCase = coverageMatrix(corpus, mappings, badDecl, io);
-  const ok = okCase.length === 0 && badCase.length > 0;
+  const corpusOne: CorpusEntry[] = [{ id: 1, scenario: '', prompt: '', expected: '', category: 'N1', route: 'skip' }];
+  const guarded: Mapping = {
+    id: 1,
+    category: 'N1',
+    route: 'skip',
+    layer: 'L1N',
+    scenario: '',
+    assertions: [guard],
+    evidence: { type: 'assertion' },
+  };
+  // unguarded 用 id=2：coverageMatrix 的 byId 以 id 建映射，与 guarded/misrouted（id=1）同 id 会被覆盖，route 不一致负例将失效
+  const unguarded: Mapping = {
+    id: 2,
+    category: 'N1',
+    route: 'skip',
+    layer: 'L1N',
+    scenario: '',
+    assertions: [],
+    evidence: { type: 'assertion' },
+  };
+  const misrouted: Mapping = { ...guarded, route: 'enable' };
+  const declSkip2: MatrixDeclaration = {
+    routeTotals: { enable: 0, ask: 0, skip: 2 },
+    minPerCategory: 2,
+    guidePath: 'guide.md',
+  };
+  const declSkip1: MatrixDeclaration = {
+    routeTotals: { enable: 0, ask: 0, skip: 1 },
+    minPerCategory: 2,
+    guidePath: 'guide.md',
+  };
+
+  const results = {
+    ok: coverageMatrix(corpusA, [guarded, unguarded], declSkip2, mkIo(guideTwo)).length === 0,
+    badTotals:
+      coverageMatrix(
+        corpusA,
+        [guarded, unguarded],
+        { ...declSkip2, routeTotals: { enable: 0, ask: 0, skip: 3 } },
+        mkIo(guideTwo),
+      ).length > 0,
+    badRouteAlign: coverageMatrix(corpusA, [misrouted, unguarded], declSkip2, mkIo(guideTwo)).some((p) =>
+      p.includes('route 不一致'),
+    ),
+    badMinPerCat: coverageMatrix(corpusOne, [guarded], declSkip1, mkIo(guideOne)).some((p) => p.includes('下限')),
+    badGuideCount: coverageMatrix(corpusA, [guarded, unguarded], declSkip2, mkIo(guideOne)).some((p) =>
+      p.includes('≠ 语料'),
+    ),
+    badMissingGuard: coverageMatrix(corpusA, [unguarded, unguarded], declSkip2, mkIo(guideTwo)).some((p) =>
+      p.includes('notContains 守卫'),
+    ),
+  };
+  const ok = Object.values(results).every(Boolean);
   console.log(JSON.stringify({ selfCheckMatrix: ok }));
   return ok;
 }
@@ -286,7 +330,10 @@ function main(): void {
     matrix: MatrixDeclaration;
   };
   const corpus = JSON.parse(io.read('eval/w-model-dev-test-prompts.json')) as CorpusEntry[];
-  const problems = crossCheckIds(mappingsDoc.mappings, corpus.map((p) => p.id));
+  const problems = crossCheckIds(
+    mappingsDoc.mappings,
+    corpus.map((p) => p.id),
+  );
   const matrixProblems = coverageMatrix(corpus, mappingsDoc.mappings, mappingsDoc.matrix, io);
   const results = mappingsDoc.mappings.map((m) => evaluateMapping(m, io));
   const passed = results.filter((r) => r.passed).length;

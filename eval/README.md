@@ -36,7 +36,7 @@
 
 ## 2. 测试提示词集（w-model-dev-test-prompts.json）
 
-**v2（触发边界可度量性 campaign，2026-09-07 起）：语料扩至 60 条**（id 1-60）。每条含 4 个基础字段：`id` / `scenario`（场景名）/ `prompt`（输入提示词）/ `expected`（期望行为断言）；另按条目类型增补 `category`（负向 N1-N10 十类 / 歧义 A1-A3 三类，共 42 条）与 `route`（`enable` 立即启用 / `ask` 先询问、确认前不初始化 / `skip` 不启用）字段——正向语料 12 条仅含 `route=enable`，L2 机制存在性条目 18 条不带 category/route。类别全集与 route 三值语义的权威定义见 SSoT §3.6；逐类判定细则见 `w-model-dev/references/activation-guide.md`。
+**v2（触发边界可度量性 campaign，2026-09-07 起）：语料扩至 60 条**（id 1-60）。每条含 4 个基础字段：`id` / `scenario`（场景名）/ `prompt`（输入提示词）/ `expected`（期望行为断言）；另按条目类型增补 `category`（负向 N1-N10 十类 22 条 / 歧义 A1-A3 三类 8 条，共 30 条）与 `route`（`enable` 立即启用 12 条 / `ask` 先询问、确认前不初始化 8 条 / `skip` 不启用 22 条，共 42 条）字段——带增补字段者合计 42 条（30 条类目化 + 12 条正向仅 route）——正向语料 12 条仅含 `route=enable`，L2 机制存在性条目 18 条不带 category/route。类别全集与 route 三值语义的权威定义见 SSoT §3.6；逐类判定细则见 `w-model-dev/references/activation-guide.md`。
 
 批次 1 的 25 条测试提示词（id 1-25）按场景字段归为五类。以下五类划分仅覆盖批次 1 的 id 1-25；60 条全量分布见 §6 覆盖矩阵与 `mappings.json`：
 
