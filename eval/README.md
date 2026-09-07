@@ -1,11 +1,15 @@
 # eval/ — W-Model 技能评估数据
 
-本目录存放 W-Model 技能（`w-model-dev/`）的评估产物，共两个文件：
+本目录存放 W-Model 技能（`w-model-dev/`）的评估资产与记录：
 
 | 文件 | 用途 |
-|---|---|
-| `w-model-dev-results.tsv` | 评估结果表（TSV，tab 分隔），逐轮记录评估时间、评估对象、得分与变更摘要 |
-| `w-model-dev-test-prompts.json` | 25 条测试提示词（id 1-25），作为技能回归测试与外部评估的标准化输入 |
+| --- | --- |
+| `w-model-dev-test-prompts.json` | 60 条测试提示词（id 1-60），含 category（N1-N10/A1-A3）与 route（enable/ask/skip）字段，作为技能回归测试与外部评估的标准化输入 |
+| `mappings.json` | 60 条提示词 → 技能资产锚点映射（version 2），含顶层 matrix 覆盖矩阵声明 |
+| `runner.ts` | 断言引擎（`npm run eval`）：L1/L1N/L2 三层断言 + notContains 守卫 + coverageMatrix 五项校验 |
+| `results.json` | 最近一次全量运行结果（含 matrixProblems） |
+| `w-model-dev-results.tsv` | 评估结果表（TSV，逐轮记录） |
+| `e2e/` | e2e 基线与终值记录（`e2e/demo/` 为 gitignored 瞬态工作区） |
 
 按仓库约定（AGENTS.md 目录速查表），`eval/` 是**外部工具（darwin-skill）评估产物归档，不属技能包**，Agent 一般无需读取；`w-model-dev/` 技能资产本身不含本目录。
 
@@ -83,3 +87,7 @@
 - dry_run 普通记录：`old_score` 取上一轮 `new_score`、`status` 填 `keep`；
 - e2e 记录：`old_score`/`new_score` 均填 `-`、`dimension` 填 `e2e_rebuild`、`eval_mode` 填 `e2e`，评估结果写入 `note`；
 - 追加后 `git add eval/w-model-dev-results.tsv` 并提交。
+
+## 6. 覆盖矩阵（coverageMatrix）
+
+`mappings.json` 顶层 `matrix` 声明 `routeTotals` / `minPerCategory` / `guidePath`；`npm run eval` 据此校验：① 语料与映射 route/category 对齐 ② 各 route 总数符合声明 ③ 每类别条数 ≥ 下限 ④ `activation-guide.md` 每类别节示例数 == 该类语料条数（双向锚定，防双份维护漏改）⑤ 每负向类别 ≥1 组「立即启用」行 notContains 守卫。任一不符即 exit 1。
