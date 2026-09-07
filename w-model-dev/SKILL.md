@@ -6,6 +6,7 @@ description: >-
   requests requirements traceability (RTM), stage gates, quality gates, or development
   and testing in parallel. When the user only asks for an end-to-end or complete
   development process without these signals, ask whether to use the W-model first.
+  Do NOT use for one-off scripts, styling fixes or small bug fixes, pure explanations, config changes, document writing, data queries, dependency upgrades, non-development tasks, or single-point edit instructions — see references/activation-guide.md.
 ---
 
 # W-Model Development
@@ -24,7 +25,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | --- | --- |
 | `/wm ...`、W-model、W 模型、W 开发模型，或明确要求 RTM、阶段门/质量门、开发与测试并行 | 立即启用 |
 | 只说"完整流程""从需求到交付""全生命周期开发" | 先询问"是否采用 W 模型（含并行测试设计、RTM 和阶段门）？"；确认前不初始化 |
-| 普通需求、设计、编码、测试、修复或技术解释 | 不启用，按普通任务处理 |
+| 普通需求、设计、编码、测试、修复或技术解释 | 不启用，按普通任务处理。反例十类速览：一次性数据/文件脚本、样式与小 bug 修复、纯问答与技术解释、环境与配置变更、纯文档撰写与排版、数据查询与正则提取、依赖升级与小重构、非软件开发任务、单点执行指令、已由其他工具接管——判定细则与边界见 [references/activation-guide.md](references/activation-guide.md) |
 
 ## 任务规模适配
 
