@@ -46,7 +46,7 @@ type Evidence =
 interface Mapping {
   id: number;
   scenario: string;
-  layer: 'L1' | 'L2';
+  layer: 'L1' | 'L1N' | 'L2';
   category?: string;
   route?: 'enable' | 'ask' | 'skip';
   assertions: Assertion[];
