@@ -10,7 +10,7 @@
 **现象**：
 
 - `npm run prepush` 报 `'bash' 不是内部或外部命令` 或类似找不到 bash；
-- `git push` 时终端出现红色 `[pre-push] ✗ 检测到纯 Windows cmd/PowerShell 环境` 与「本次推送未执行 17 项门禁（exit 0 放行）」提示。
+- `git push` 时终端出现红色 `[pre-push] ✗ 检测到纯 Windows cmd/PowerShell 环境` 与「本次推送未执行 18 项门禁（exit 0 放行）」提示。
 
 **原因**：`.githooks/pre-push` 是 bash 脚本（`package.json` 的 `prepush` 用 `bash .githooks/pre-push` 调用），依赖 bash 解释器；原生 cmd/PowerShell 没有 bash。
 
@@ -25,7 +25,7 @@
 
 **声明**：本仓库不集成云端 CI，本地 pre-push 门禁是**唯一质量屏障**。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负——`.githooks/pre-push` 头部有显式警告，README「CI 策略」节有同样声明。
 
-**正确姿势**：紧急绕过后，事后必须在 Git Bash / WSL 中补跑 `npm run prepush`，确认 17 项门禁全部通过后再合入；不得把 `--no-verify` 作为常规开发手段。
+**正确姿势**：紧急绕过后，事后必须在 Git Bash / WSL 中补跑 `npm run prepush`，确认 18 项门禁全部通过后再合入；不得把 `--no-verify` 作为常规开发手段。
 
 ### 1.3 node_modules 缺失
 
@@ -111,7 +111,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 | 环境                          | 场景                                                                   | 行为                                                                  | 处置                                                                                                                                             |
 | ----------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Windows 原生 cmd / PowerShell | `git push` / `npm run prepush`                                         | pre-push 检测到无 bash 解释器 → 提示 + 放行（exit 0），门禁**未执行** | 改用 Git Bash / WSL 跑门禁（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）                                                           |
-| Windows + Git Bash            | `git push` / `npm run prepush`                                         | 正常执行 17 项门禁                                                    | —                                                                                                                                                |
+| Windows + Git Bash            | `git push` / `npm run prepush`                                         | 正常执行 18 项门禁                                                    | —                                                                                                                                                |
 | WSL                           | `git push` / `npm run prepush`                                         | 正常执行；仅检查 Linux 侧原生二进制                                   | 缺失则中止；在 Bash 中显式运行 `npm run platform-deps:check`，或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中校验并安装缺失包 |
 | Linux / macOS                 | `git push` / `npm run prepush`                                         | 正常执行                                                              | —                                                                                                                                                |
 | 任意                          | `npm audit` 网络不可达（ENOTFOUND / ETIMEDOUT / ECONNREFUSED）         | pre-push 第 13 项 warn 并跳过（不阻断）                               | 网络恢复后手动补跑 `npm audit --audit-level=high`                                                                                                |

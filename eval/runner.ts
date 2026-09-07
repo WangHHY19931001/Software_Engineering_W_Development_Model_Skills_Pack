@@ -125,7 +125,7 @@ export function evaluateAssertion(a: Assertion, io: FileSystemAdapter): string |
 }
 
 export function evaluateEvidence(e: Evidence, io: FileSystemAdapter): string | null {
-  if (e.type === 'assertion') return null; // L3 由本映射自身的 L1/L2 断言覆盖
+  if (e.type === 'assertion') return null; // evidence=assertion 由本映射自身的断言覆盖
   if (e.type === 'fileExists') {
     return io.exists(e.target) ? null : `证据文件不存在：${e.target}`;
   }
