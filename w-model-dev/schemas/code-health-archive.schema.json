@@ -1,0 +1,186 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-archive.schema.json",
+  "title": "CodeHealthArchive",
+  "description": "Terminal archive index retaining source-bound review, gate, signature, diff, rollback, and redaction evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "archiveId",
+    "candidateId",
+    "status",
+    "ledgerEventRef",
+    "diffPath",
+    "diffSha256",
+    "rollback",
+    "manifestPath",
+    "contentHash",
+    "reviewRefs",
+    "gateRefs",
+    "signatureRefs",
+    "redaction",
+    "retention",
+    "verificationLevel",
+    "sourceRevision",
+    "archivedAt"
+  ],
+  "properties": {
+    "archiveId": { "description": "Stable archive record identifier.", "type": "string", "minLength": 1 },
+    "candidateId": {
+      "description": "Candidate identifier represented by this terminal archive record.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "status": {
+      "description": "Terminal candidate state captured by the archive.",
+      "enum": ["archived", "deferred", "rejected", "blocked", "rolled-back"]
+    },
+    "ledgerEventRef": {
+      "description": "Repository-relative ledger event reference proving the terminal transition.",
+      "$ref": "#/definitions/relativePath"
+    },
+    "diffPath": {
+      "description": "Repository-relative diff or patch path, or null when no code change occurred.",
+      "type": ["string", "null"],
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "diffSha256": {
+      "description": "SHA-256 of the retained diff or null when no diff exists.",
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rollback": {
+      "description": "Direct executable rollback procedure retained with the archive.",
+      "$ref": "#/definitions/rollback"
+    },
+    "manifestPath": {
+      "description": "Repository-relative archive manifest path.",
+      "$ref": "#/definitions/relativePath"
+    },
+    "contentHash": {
+      "description": "SHA-256 digest of the complete redacted archive content.",
+      "$ref": "#/definitions/sha256"
+    },
+    "reviewRefs": {
+      "description": "Repository-relative references to independent review outputs.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One review reference.", "$ref": "#/definitions/relativePath" }
+    },
+    "gateRefs": {
+      "description": "Repository-relative references to real gate outputs.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One gate output reference.", "$ref": "#/definitions/relativePath" }
+    },
+    "signatureRefs": {
+      "description": "Repository-relative role signature and human decision references.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One signature reference.", "$ref": "#/definitions/relativePath" }
+    },
+    "redaction": {
+      "description": "Final archive redaction decision; unsafe artifacts are blocked.",
+      "$ref": "#/definitions/redaction"
+    },
+    "retention": {
+      "description": "Controlled archive retention location and expiry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "until"],
+      "properties": {
+        "location": { "description": "Repository-relative retention location.", "$ref": "#/definitions/relativePath" },
+        "until": { "description": "UTC retention expiry timestamp.", "type": "string", "format": "date-time" }
+      }
+    },
+    "verificationLevel": {
+      "description": "Whether archive verification is package-only or source-bound.",
+      "enum": ["package-only", "source-bound"]
+    },
+    "sourceRevision": {
+      "description": "Source revision bound to the archived evidence.",
+      "$ref": "#/definitions/revision"
+    },
+    "archivedAt": {
+      "description": "UTC time at which this terminal archive record was created.",
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "definitions": {
+    "relativePath": {
+      "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "revision": {
+      "description": "Source-bound repository revision identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "sourceBundleSha256", "analyzedAt"],
+      "properties": {
+        "commitSha": { "description": "Commit SHA-1.", "$ref": "#/definitions/sha1" },
+        "treeSha": { "description": "Tree SHA-1.", "$ref": "#/definitions/sha1" },
+        "sourceBundleSha256": { "description": "Source bundle SHA-256.", "$ref": "#/definitions/sha256" },
+        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+      }
+    },
+    "rollback": {
+      "description": "Direct executable rollback procedure.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preChangeRevision", "command", "patchPath", "owner", "executable"],
+      "properties": {
+        "preChangeRevision": { "description": "Pre-change commit SHA-1.", "$ref": "#/definitions/sha1" },
+        "command": {
+          "description": "Exact rollback command or procedure without an uncontrolled shell pipeline.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+        },
+        "patchPath": {
+          "description": "Repository-relative rollback patch path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "owner": { "description": "Rollback owner.", "type": "string", "minLength": 1 },
+        "executable": { "description": "Whether rollback is directly executable.", "const": true }
+      }
+    },
+    "redaction": {
+      "description": "Final redaction status and reasons.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasons"],
+      "properties": {
+        "status": { "description": "Whether the archive is safe to export.", "enum": ["clean", "blocked"] },
+        "reasons": {
+          "description": "Redaction actions or blocking reasons.",
+          "type": "array",
+          "items": { "description": "One redaction reason.", "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "An archived terminal record requires clean redaction.",
+      "if": { "type": "object", "properties": { "status": { "const": "archived" } }, "required": ["status"] },
+      "then": {
+        "type": "object",
+        "properties": {
+          "redaction": {
+            "description": "Archived redaction status.",
+            "type": "object",
+            "properties": { "status": { "description": "Archived artifacts must be clean.", "const": "clean" } }
+          },
+          "verificationLevel": {
+            "description": "Archive verification level.",
+            "enum": ["package-only", "source-bound"]
+          }
+        }
+      }
+    }
+  ]
+}

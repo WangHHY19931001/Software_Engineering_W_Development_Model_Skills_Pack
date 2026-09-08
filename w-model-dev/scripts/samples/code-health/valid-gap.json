@@ -1,0 +1,25 @@
+{
+  "gapId": "GAP-CHG-P2-20260907-001",
+  "candidateId": "CHG-P2-20260907-001",
+  "kind": "security",
+  "testLevels": ["unit", "integration"],
+  "existingTestIds": ["test-auth-happy"],
+  "missingScenario": "invalid token is rejected without exposing secret material",
+  "evidenceSources": ["reports/gaps.json", "REQ-SEC-001"],
+  "risk": {
+    "severity": "high",
+    "behavior": "medium",
+    "security": "high",
+    "concurrency": "none",
+    "platform": "low",
+    "lifecycle": "low",
+    "governance": "medium",
+    "rationale": "An untested rejection path can expose an authorization boundary."
+  },
+  "priority": "high",
+  "owner": "S-agent",
+  "rtmIds": ["REQ-SEC-001"],
+  "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 },
+  "coverageIsSignalOnly": true,
+  "status": "discovered"
+}

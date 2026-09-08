@@ -1,0 +1,16 @@
+{
+  "eventId": "EV-CHG-P1-20260907-001-discovered-evidenced",
+  "candidateId": "CHG-P1-20260907-001",
+  "from": "discovered",
+  "to": "evidenced",
+  "actorRole": "A",
+  "at": "2026-09-07T00:02:00.000Z",
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "evidenceRefs": ["evidence/CHG-P1-20260907-001.json"],
+  "signatureRef": "evidence/signature-a.json"
+}

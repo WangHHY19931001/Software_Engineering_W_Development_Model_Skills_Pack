@@ -1,0 +1,17 @@
+{
+  "clusterId": "DUP-CHG-P4-20260907-001",
+  "candidateId": "CHG-P4-20260907-001",
+  "implementations": [
+    { "file": "src/cache-a.ts", "symbol": "readCacheA", "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "file": "src/cache-b.ts", "symbol": "readCacheB", "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+  ],
+  "views": {
+    "ast": ["normalized conditional shape"],
+    "dataFlow": ["same input/output and side effects"],
+    "callGraph": ["shared cache lifecycle"],
+    "signatures": ["same error and retry signatures"],
+    "tests": ["tests/cache-contract.test.ts"]
+  },
+  "stableProductionCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
+  "status": "under-review"
+}

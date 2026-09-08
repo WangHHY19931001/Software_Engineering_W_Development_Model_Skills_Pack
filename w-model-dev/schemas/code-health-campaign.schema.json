@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-campaign.schema.json",
+  "title": "CodeHealthCampaign",
+  "description": "Code-health campaign manifest binding candidates, evidence indexes, revisions, environments, and append-only ledger policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "campaignId",
+    "createdAt",
+    "baseline",
+    "environmentMatrix",
+    "candidateIds",
+    "ledgerPath",
+    "evidencePath",
+    "approvalPath",
+    "archivePath",
+    "appendOnly",
+    "redaction"
+  ],
+  "properties": {
+    "schemaVersion": { "description": "Campaign manifest schema version.", "const": "1.0" },
+    "campaignId": { "description": "Stable campaign identifier.", "type": "string", "pattern": "^CHC-[0-9]{8}$" },
+    "createdAt": {
+      "description": "UTC time at which the campaign manifest was created.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "baseline": {
+      "description": "Source revision against which campaign evidence is interpreted.",
+      "$ref": "#/definitions/revision"
+    },
+    "environmentMatrix": {
+      "description": "Supported environments and their observed status; unavailable required environments do not pass.",
+      "type": "array",
+      "items": {
+        "description": "One supported or explicitly unsupported environment observation.",
+        "$ref": "#/definitions/environment"
+      }
+    },
+    "candidateIds": {
+      "description": "Stable candidate identifiers included in this campaign.",
+      "type": "array",
+      "items": {
+        "description": "A code-health candidate identifier.",
+        "type": "string",
+        "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+      }
+    },
+    "ledgerPath": {
+      "description": "Repository-relative JSONL path for append-only ledger events.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "evidencePath": {
+      "description": "Repository-relative JSONL path for evidence records.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "approvalPath": {
+      "description": "Repository-relative JSONL path for human approval records.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "archivePath": {
+      "description": "Repository-relative JSONL path for terminal archive records.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "appendOnly": { "description": "Whether ledger and index records are append-only.", "const": true },
+    "redaction": { "description": "Campaign-level redaction status and rules.", "$ref": "#/definitions/redaction" }
+  },
+  "definitions": {
+    "revision": {
+      "description": "Source-bound repository revision identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "sourceBundleSha256", "analyzedAt"],
+      "properties": {
+        "commitSha": { "description": "Lowercase Git commit SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "treeSha": { "description": "Lowercase Git tree SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "sourceBundleSha256": {
+          "description": "SHA-256 of the analyzed source bundle.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analyzedAt": {
+          "description": "UTC time at which this revision was analyzed.",
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "environment": {
+      "description": "One platform, shell, and runtime observation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "shell", "runtime", "supported", "observed", "reason"],
+      "properties": {
+        "platform": { "description": "Platform identifier such as win32 or linux.", "type": "string", "minLength": 1 },
+        "shell": { "description": "Shell identifier used for the observation.", "type": "string", "minLength": 1 },
+        "runtime": { "description": "Runtime identifier and version.", "type": "string", "minLength": 1 },
+        "supported": { "description": "Whether the campaign requires this environment.", "type": "boolean" },
+        "observed": {
+          "description": "Observed status of the environment.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "reason": { "description": "Specific reason for the observed status.", "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "description": "A required environment cannot be represented as a passing observation when unavailable.",
+          "if": {
+            "description": "Required environment condition.",
+            "type": "object",
+            "properties": { "supported": { "const": true } },
+            "required": ["supported"]
+          },
+          "then": {
+            "description": "Required environments must have an observed command result.",
+            "type": "object",
+            "properties": { "observed": { "const": "observed" } }
+          }
+        }
+      ]
+    },
+    "redaction": {
+      "description": "Redaction result for a campaign artifact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "rules", "blockedReasons"],
+      "properties": {
+        "status": {
+          "description": "Whether the artifact is safe to export.",
+          "enum": ["not_reviewed", "clean", "blocked"]
+        },
+        "rules": {
+          "description": "Redaction rules applied or required.",
+          "type": "array",
+          "items": { "description": "One redaction rule.", "type": "string" }
+        },
+        "blockedReasons": {
+          "description": "Reasons export is blocked, if any.",
+          "type": "array",
+          "items": { "description": "One blocking reason.", "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "Every required environment in a campaign must have an observed result; unavailable is never a pass.",
+      "if": {
+        "description": "Campaign contains a required environment that is not observed.",
+        "type": "object",
+        "properties": {
+          "environmentMatrix": {
+            "type": "array",
+            "contains": {
+              "description": "A required environment with a non-observed result.",
+              "type": "object",
+              "properties": {
+                "supported": { "const": true },
+                "observed": { "enum": ["not_run", "unavailable", "unverified"] }
+              },
+              "required": ["supported", "observed"]
+            }
+          }
+        },
+        "required": ["environmentMatrix"]
+      },
+      "then": {
+        "description": "A required non-observed environment invalidates the campaign manifest.",
+        "not": {}
+      }
+    }
+  ]
+}

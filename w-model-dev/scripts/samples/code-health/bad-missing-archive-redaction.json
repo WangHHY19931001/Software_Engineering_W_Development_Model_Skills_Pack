@@ -1,0 +1,19 @@
+{
+  "archiveId": "ARC-CHG-P1-20260907-001",
+  "candidateId": "CHG-P1-20260907-001",
+  "status": "archived",
+  "ledgerEventRef": "ledger/EV-001.json",
+  "diffPath": "archive/CHG-P1-20260907-001.patch",
+  "diffSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rollback": { "preChangeRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "command": "git revert commit", "patchPath": "archive/rollback.patch", "owner": "S-agent", "executable": true },
+  "manifestPath": "archive/CHG-P1-20260907-001.json",
+  "contentHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "reviewRefs": ["reviews/verifier.json"],
+  "gateRefs": ["gate-logs/check.json"],
+  "signatureRefs": ["signatures/human.json"],
+  "redaction": { "status": "blocked", "reasons": ["absolute path retained"] },
+  "retention": { "location": "archive/CHG-P1-20260907-001", "until": "2027-09-07T00:00:00.000Z" },
+  "verificationLevel": "source-bound",
+  "sourceRevision": { "commitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "treeSha": "dddddddddddddddddddddddddddddddddddddddd", "sourceBundleSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "analyzedAt": "2026-09-07T00:00:00.000Z" },
+  "archivedAt": "2026-09-07T00:05:00.000Z"
+}

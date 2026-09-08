@@ -1,0 +1,43 @@
+{
+  "inventoryId": "INV-CHG-P3-20260907-001",
+  "candidateId": "CHG-P3-20260907-001",
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "tests": [{
+    "testId": "test-auth-negative",
+    "file": "src/auth.test.ts",
+    "symbol": "rejectsInvalidToken",
+    "author": "human-author",
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "lastChangedAt": "2026-09-01T00:00:00.000Z",
+    "level": "unit",
+    "setup": "valid session fixture",
+    "stimulus": "invalid bearer token",
+    "oracle": "returns unauthorized without secret",
+    "failureSensitivity": "detects authorization bypass",
+    "rtmIds": ["REQ-SEC-001"],
+    "scenarioClass": "unique-negative",
+    "governanceFacts": ["redaction"]
+  }],
+  "protectedFacts": [],
+  "preRegression": {
+    "command": { "command": "npm test -- auth", "cwd": ".", "environment": { "NODE_ENV": "test" }, "platform": "win32", "toolVersions": { "node": "20.0.0" }, "startedAt": "2026-09-07T00:01:00.000Z", "endedAt": "2026-09-07T00:01:02.000Z", "exitCode": 0, "observation": "observed", "rawOutputPath": ".w-model/code-health/raw/pre.log", "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" },
+    "testCount": 10,
+    "passed": true,
+    "coverageProvenance": "coverage/pre.json",
+    "governanceFacts": ["pre-push-order-18"]
+  },
+  "postRegression": {
+    "command": { "command": "npm test -- auth", "cwd": ".", "environment": { "NODE_ENV": "test" }, "platform": "win32", "toolVersions": { "node": "20.0.0" }, "startedAt": "2026-09-07T00:03:00.000Z", "endedAt": "2026-09-07T00:03:02.000Z", "exitCode": 0, "observation": "observed", "rawOutputPath": ".w-model/code-health/raw/post.log", "rawOutputSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
+    "testCount": 10,
+    "passed": true,
+    "coverageProvenance": "coverage/post.json",
+    "governanceFacts": ["pre-push-order-18"]
+  },
+  "coverageProvenance": { "path": "coverage/coverage-final.json", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "measuredAt": "2026-09-07T00:03:02.000Z", "signalOnly": true },
+  "redaction": { "status": "clean", "reasons": ["secrets removed"] }
+}

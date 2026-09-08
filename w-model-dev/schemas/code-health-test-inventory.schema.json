@@ -1,0 +1,353 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-test-inventory.schema.json",
+  "title": "CodeHealthTestInventory",
+  "description": "Phase 3 test inventory and guarded removal proof, including protected governance facts and real pre/post results.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "inventoryId",
+    "candidateId",
+    "revision",
+    "tests",
+    "protectedFacts",
+    "preRegression",
+    "postRegression",
+    "coverageProvenance",
+    "redaction"
+  ],
+  "properties": {
+    "inventoryId": { "description": "Stable test inventory identifier.", "type": "string", "minLength": 1 },
+    "candidateId": {
+      "description": "Candidate identifier for the proposed test change.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "revision": {
+      "description": "Repository revision from which the inventory was collected.",
+      "$ref": "#/definitions/revision"
+    },
+    "tests": {
+      "description": "Tests and their behavior, provenance, RTM, and governance facts.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One test inventory record.", "$ref": "#/definitions/testRecord" }
+    },
+    "protectedFacts": {
+      "description": "Protected negative, boundary, security, concurrency, platform, migration, and governance facts that cannot be silently removed.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "description": "One protected fact classification and rationale.",
+        "$ref": "#/definitions/protectedFact"
+      }
+    },
+    "removalProof": {
+      "description": "Optional proof for a specific proposed test removal or redundancy claim.",
+      "$ref": "#/definitions/removalProof"
+    },
+    "preRegression": {
+      "description": "Real pre-change regression command observation and measured facts.",
+      "$ref": "#/definitions/regression"
+    },
+    "postRegression": {
+      "description": "Real post-change regression command observation and measured facts.",
+      "$ref": "#/definitions/regression"
+    },
+    "coverageProvenance": {
+      "description": "Source-bound coverage measurement identity, not an authorization criterion.",
+      "$ref": "#/definitions/coverageProvenance"
+    },
+    "redaction": {
+      "description": "Redaction status for the inventory and removal evidence.",
+      "$ref": "#/definitions/redaction"
+    }
+  },
+  "definitions": {
+    "relativePath": {
+      "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "revision": {
+      "description": "Source-bound repository revision identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "sourceBundleSha256", "analyzedAt"],
+      "properties": {
+        "commitSha": { "description": "Commit SHA-1.", "$ref": "#/definitions/sha1" },
+        "treeSha": { "description": "Tree SHA-1.", "$ref": "#/definitions/sha1" },
+        "sourceBundleSha256": { "description": "Source bundle SHA-256.", "$ref": "#/definitions/sha256" },
+        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+      }
+    },
+    "testRecord": {
+      "description": "One test's executable contract and provenance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "testId",
+        "file",
+        "symbol",
+        "author",
+        "createdAt",
+        "lastChangedAt",
+        "level",
+        "setup",
+        "stimulus",
+        "oracle",
+        "failureSensitivity",
+        "rtmIds",
+        "scenarioClass",
+        "governanceFacts"
+      ],
+      "properties": {
+        "testId": { "description": "Stable test identifier.", "type": "string", "minLength": 1 },
+        "file": { "description": "Repository-relative test file path.", "$ref": "#/definitions/relativePath" },
+        "symbol": { "description": "Test function or case symbol.", "type": "string", "minLength": 1 },
+        "author": {
+          "description": "Test author provenance; never a deletion rationale.",
+          "type": "string",
+          "minLength": 1
+        },
+        "createdAt": { "description": "UTC creation timestamp.", "type": "string", "format": "date-time" },
+        "lastChangedAt": { "description": "UTC last-change timestamp.", "type": "string", "format": "date-time" },
+        "level": { "description": "Executable test level.", "enum": ["unit", "integration", "system", "acceptance"] },
+        "setup": { "description": "Setup and fixture contract.", "type": "string", "minLength": 1 },
+        "stimulus": { "description": "Input or event stimulus.", "type": "string", "minLength": 1 },
+        "oracle": { "description": "Expected result and assertion oracle.", "type": "string", "minLength": 1 },
+        "failureSensitivity": {
+          "description": "Failure mode the test is sensitive to.",
+          "type": "string",
+          "minLength": 1
+        },
+        "rtmIds": {
+          "description": "RTM identifiers exercised by the test.",
+          "type": "array",
+          "items": { "description": "One RTM identifier.", "type": "string", "minLength": 1 }
+        },
+        "scenarioClass": {
+          "description": "Scenario classification such as negative, boundary, security, or governance.",
+          "type": "string",
+          "minLength": 1
+        },
+        "governanceFacts": {
+          "description": "Governance facts protected by this test.",
+          "type": "array",
+          "items": { "description": "One governance fact identifier.", "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "protectedFact": {
+      "description": "A protected behavior or repository governance fact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["testId", "class", "reason"],
+      "properties": {
+        "testId": { "description": "Test identifier carrying the protected fact.", "type": "string", "minLength": 1 },
+        "class": {
+          "description": "Protected test class.",
+          "enum": [
+            "unique-negative",
+            "boundary",
+            "security",
+            "concurrency",
+            "platform",
+            "migration-rollback",
+            "pre-push",
+            "self-test",
+            "docs-consistency"
+          ]
+        },
+        "reason": { "description": "Why the behavior or fact must remain protected.", "type": "string", "minLength": 1 }
+      }
+    },
+    "command": {
+      "description": "Real command evidence for a regression run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cwd",
+        "environment",
+        "platform",
+        "toolVersions",
+        "startedAt",
+        "endedAt",
+        "exitCode",
+        "observation",
+        "rawOutputPath",
+        "rawOutputSha256"
+      ],
+      "properties": {
+        "command": {
+          "description": "Executable and arguments without shell pipeline syntax.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+        },
+        "cwd": { "description": "Repository-relative working directory.", "$ref": "#/definitions/relativePath" },
+        "environment": {
+          "description": "Redacted environment map.",
+          "type": "object",
+          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+        },
+        "platform": { "description": "Observed platform.", "type": "string", "minLength": 1 },
+        "toolVersions": {
+          "description": "Observed tool versions.",
+          "type": "object",
+          "additionalProperties": { "description": "Tool version.", "type": "string" }
+        },
+        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
+        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "exitCode": {
+          "description": "Real exit code, or null when no process result exists.",
+          "type": ["integer", "null"]
+        },
+        "observation": {
+          "description": "Observed, not run, unavailable, or unverified state.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "rawOutputPath": {
+          "description": "Controlled repository-relative raw output path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "rawOutputSha256": { "description": "SHA-256 of raw command output.", "$ref": "#/definitions/sha256" }
+      },
+      "allOf": [
+        {
+          "description": "Observed regression requires an integer exit code.",
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "const": "observed" } },
+            "required": ["observation"]
+          },
+          "then": { "type": "object", "properties": { "exitCode": { "type": "integer" } } }
+        },
+        {
+          "description": "Unknown regression requires a null exit code.",
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "enum": ["not_run", "unavailable", "unverified"] } },
+            "required": ["observation"]
+          },
+          "then": { "type": "object", "properties": { "exitCode": { "type": "null" } } }
+        }
+      ]
+    },
+    "regression": {
+      "description": "Regression result and source-bound measured facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "testCount", "passed", "coverageProvenance", "governanceFacts"],
+      "properties": {
+        "command": { "description": "Real regression command evidence.", "$ref": "#/definitions/command" },
+        "testCount": {
+          "description": "Observed number of tests in the regression run.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": { "description": "Whether the real regression passed.", "const": true },
+        "coverageProvenance": {
+          "description": "Source-bound coverage artifact identity.",
+          "type": "string",
+          "minLength": 1
+        },
+        "governanceFacts": {
+          "description": "Observed governance facts after the regression.",
+          "type": "array",
+          "items": { "description": "One governance fact.", "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "coverageProvenance": {
+      "description": "Source-bound coverage measurement identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "revision", "measuredAt", "signalOnly"],
+      "properties": {
+        "path": { "description": "Repository-relative coverage artifact path.", "$ref": "#/definitions/relativePath" },
+        "sha256": { "description": "Coverage artifact SHA-256.", "$ref": "#/definitions/sha256" },
+        "revision": { "description": "Revision measured by the coverage artifact.", "$ref": "#/definitions/sha1" },
+        "measuredAt": { "description": "UTC coverage measurement time.", "type": "string", "format": "date-time" },
+        "signalOnly": { "description": "Fixed guard that coverage is a signal only.", "const": true }
+      }
+    },
+    "removalProof": {
+      "description": "Evidence that a candidate test is invalid or redundantly protected by an equivalent survivor.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateTestId",
+        "survivorTestId",
+        "reason",
+        "setupEquivalent",
+        "stimulusEquivalent",
+        "oracleEquivalent",
+        "failureSensitivityEquivalent",
+        "levelEquivalent",
+        "rtmRehomed",
+        "governanceRehomed"
+      ],
+      "properties": {
+        "candidateTestId": { "description": "Test proposed for removal.", "type": "string", "minLength": 1 },
+        "survivorTestId": {
+          "description": "Equivalent survivor test, or null when the contract is retired.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "reason": {
+          "description": "Evidence-based invalidity or redundancy reason, excluding author and age.",
+          "type": "string",
+          "minLength": 20
+        },
+        "setupEquivalent": { "description": "Whether setup and fixtures are equivalent.", "type": "boolean" },
+        "stimulusEquivalent": { "description": "Whether input and stimulus are equivalent.", "type": "boolean" },
+        "oracleEquivalent": { "description": "Whether the assertion oracle is equivalent.", "type": "boolean" },
+        "failureSensitivityEquivalent": {
+          "description": "Whether failure sensitivity is equivalent.",
+          "type": "boolean"
+        },
+        "levelEquivalent": { "description": "Whether the test level is equivalent.", "type": "boolean" },
+        "rtmRehomed": { "description": "Whether RTM mappings were rehomed and recomputed.", "type": "boolean" },
+        "governanceRehomed": {
+          "description": "Whether docs, samples, gate, and governance facts were rehomed.",
+          "type": "boolean"
+        }
+      }
+    },
+    "redaction": {
+      "description": "Redaction status and reasons.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasons"],
+      "properties": {
+        "status": {
+          "description": "Whether inventory evidence is safe to export.",
+          "enum": ["not_reviewed", "clean", "blocked"]
+        },
+        "reasons": {
+          "description": "Redaction actions or blocking reasons.",
+          "type": "array",
+          "items": { "description": "One redaction reason.", "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "A post-change inventory must retain a real passing regression and source-bound coverage facts.",
+      "if": {
+        "type": "object",
+        "properties": { "postRegression": { "type": "object" } },
+        "required": ["postRegression"]
+      },
+      "then": {
+        "type": "object",
+        "properties": { "postRegression": { "type": "object", "properties": { "passed": { "const": true } } } }
+      }
+    }
+  ]
+}

@@ -14,6 +14,15 @@ const REGISTERED_STATE_SCHEMAS: readonly RegisteredStateSchema[] = [
   { relativePath: '.w-model/budget.json', schemaName: 'budget', format: 'json' },
   { relativePath: '.w-model/maturity.json', schemaName: 'maturity', format: 'json' },
   { relativePath: '.w-model/run-log.jsonl', schemaName: 'run-log', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/campaign.json', schemaName: 'code-health-campaign', format: 'json' },
+  { relativePath: '.w-model/code-health/candidates.jsonl', schemaName: 'code-health-candidate', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/evidence.jsonl', schemaName: 'code-health-evidence', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/approvals.jsonl', schemaName: 'code-health-approval', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/archive.jsonl', schemaName: 'code-health-archive', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/gaps.jsonl', schemaName: 'code-health-gap', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/test-inventory.jsonl', schemaName: 'code-health-test-inventory', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/duplicate-clusters.jsonl', schemaName: 'code-health-duplicate-cluster', format: 'jsonl' },
+  { relativePath: '.w-model/code-health/ledger.jsonl', schemaName: 'code-health-ledger-event', format: 'jsonl' },
 ];
 
 /**

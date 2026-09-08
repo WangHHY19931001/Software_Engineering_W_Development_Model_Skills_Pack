@@ -1,0 +1,365 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-evidence.schema.json",
+  "title": "CodeHealthEvidence",
+  "description": "Source-bound evidence package for one code-health candidate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidenceId",
+    "candidateId",
+    "revision",
+    "staticReferences",
+    "dynamicScenarios",
+    "commands",
+    "environment",
+    "toolVersions",
+    "unknowns",
+    "falsePositiveChecks",
+    "redaction"
+  ],
+  "properties": {
+    "evidenceId": { "description": "Stable evidence package identifier.", "type": "string", "minLength": 1 },
+    "candidateId": {
+      "description": "Candidate identifier bound to this evidence package.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "revision": {
+      "description": "Repository revision analyzed by the evidence package.",
+      "$ref": "#/definitions/revision"
+    },
+    "staticReferences": {
+      "description": "Static references and consumers considered by analysis.",
+      "type": "array",
+      "items": { "description": "One static reference record.", "$ref": "#/definitions/staticReference" }
+    },
+    "dynamicScenarios": {
+      "description": "Runtime scenarios and their observed reachability.",
+      "type": "array",
+      "items": { "description": "One dynamic scenario observation.", "$ref": "#/definitions/dynamicScenario" }
+    },
+    "commands": {
+      "description": "Reproducible commands with actual observation states and raw output hashes.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One command evidence record.", "$ref": "#/definitions/command" }
+    },
+    "environment": {
+      "description": "Redacted environment variables used by the evidence collection.",
+      "type": "object",
+      "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+    },
+    "toolVersions": {
+      "description": "Tool name to observed version map.",
+      "type": "object",
+      "additionalProperties": { "description": "Observed tool version.", "type": "string" }
+    },
+    "unknowns": {
+      "description": "Unresolved or unexercised facts that prevent optimistic conclusions.",
+      "type": "array",
+      "items": { "description": "One explicit unknown.", "type": "string", "minLength": 1 }
+    },
+    "falsePositiveChecks": {
+      "description": "Checks for dynamic, generated, platform, schema, template, RTM, and test-only references.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One false-positive guard result.", "type": "string", "minLength": 1 }
+    },
+    "rtmImpact": {
+      "description": "Optional RTM impact record for the evidence package.",
+      "$ref": "#/definitions/impact"
+    },
+    "coverageImpact": {
+      "description": "Optional coverage signal record; coverage cannot authorize a change.",
+      "$ref": "#/definitions/impact"
+    },
+    "redaction": { "description": "Redaction result for the evidence package.", "$ref": "#/definitions/redaction" }
+  },
+  "definitions": {
+    "relativePath": {
+      "description": "Repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "revision": {
+      "description": "Source-bound repository revision identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "sourceBundleSha256", "analyzedAt"],
+      "properties": {
+        "commitSha": { "description": "Commit SHA-1 of the analyzed revision.", "$ref": "#/definitions/sha1" },
+        "treeSha": { "description": "Tree SHA-1 of the analyzed revision.", "$ref": "#/definitions/sha1" },
+        "sourceBundleSha256": {
+          "description": "SHA-256 of the analyzed source bundle.",
+          "$ref": "#/definitions/sha256"
+        },
+        "analyzedAt": {
+          "description": "UTC time at which the revision was analyzed.",
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "staticReference": {
+      "description": "One repository-relative static reference and its source hash.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "symbol", "consumer", "kind", "line", "sourceHash"],
+      "properties": {
+        "path": {
+          "description": "Repository-relative defining or consuming path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "symbol": { "description": "Referenced symbol or serialized identifier.", "type": "string", "minLength": 1 },
+        "consumer": {
+          "description": "Consumer symbol, module, route, or registration.",
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "description": "Reference category used by the false-positive analysis.",
+          "enum": [
+            "import",
+            "export",
+            "call",
+            "route",
+            "cli-registration",
+            "string-symbol",
+            "generated-input",
+            "schema",
+            "template",
+            "rtm",
+            "test-helper",
+            "dynamic-import",
+            "reflection",
+            "shell-platform"
+          ]
+        },
+        "line": {
+          "description": "One-based source line when a source line is available.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "sourceHash": {
+          "description": "SHA-256 of the source input containing the reference.",
+          "$ref": "#/definitions/sha256"
+        }
+      }
+    },
+    "command": {
+      "description": "One command result with raw output hash and explicit observation status.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cwd",
+        "environment",
+        "platform",
+        "toolVersions",
+        "startedAt",
+        "endedAt",
+        "exitCode",
+        "observation",
+        "rawOutputPath",
+        "rawOutputSha256"
+      ],
+      "properties": {
+        "command": {
+          "description": "Executable and arguments represented without shell pipeline syntax.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+        },
+        "cwd": { "description": "Repository-relative working directory.", "$ref": "#/definitions/relativePath" },
+        "environment": {
+          "description": "Redacted command environment map.",
+          "type": "object",
+          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+        },
+        "platform": { "description": "Observed operating-system platform.", "type": "string", "minLength": 1 },
+        "toolVersions": {
+          "description": "Tools and versions observed for this command.",
+          "type": "object",
+          "additionalProperties": { "description": "Observed tool version.", "type": "string" }
+        },
+        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
+        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "exitCode": {
+          "description": "Real process exit code, or null when no process result exists.",
+          "type": ["integer", "null"]
+        },
+        "observation": {
+          "description": "Observed, not run, unavailable, or not independently verified result.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "rawOutputPath": {
+          "description": "Controlled repository-relative raw output path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "rawOutputSha256": { "description": "SHA-256 of the controlled raw output.", "$ref": "#/definitions/sha256" }
+      },
+      "allOf": [
+        {
+          "description": "Observed commands must carry an integer exit code.",
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "const": "observed" } },
+            "required": ["observation"]
+          },
+          "then": {
+            "type": "object",
+            "properties": { "exitCode": { "description": "Observed process exit code.", "type": "integer" } }
+          }
+        },
+        {
+          "description": "Commands that did not produce a process result must carry a null exit code.",
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "enum": ["not_run", "unavailable", "unverified"] } },
+            "required": ["observation"]
+          },
+          "then": {
+            "type": "object",
+            "properties": { "exitCode": { "description": "Unknown process exit code.", "type": "null" } }
+          }
+        }
+      ]
+    },
+    "dynamicScenario": {
+      "description": "One runtime scenario with explicit unknown and unavailable semantics.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "environment", "reached", "observation", "command"],
+      "properties": {
+        "id": { "description": "Stable scenario identifier.", "type": "string", "minLength": 1 },
+        "environment": { "description": "Environment identifier for the scenario.", "type": "string", "minLength": 1 },
+        "reached": {
+          "description": "Whether the candidate was reached, or null when unknown.",
+          "type": ["boolean", "null"]
+        },
+        "observation": {
+          "description": "Observation status for the scenario command.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "command": {
+          "description": "Command evidence supporting the scenario observation.",
+          "$ref": "#/definitions/command"
+        }
+      },
+      "allOf": [
+        {
+          "description": "Unknown scenario reachability is required for non-observed execution.",
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "enum": ["not_run", "unavailable", "unverified"] } },
+            "required": ["observation"]
+          },
+          "then": {
+            "type": "object",
+            "properties": { "reached": { "description": "Non-observed reachability is unknown.", "const": null } }
+          }
+        }
+      ]
+    },
+    "coverage": {
+      "description": "Coverage signal with nullable metrics.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements", "branches", "functions", "lines"],
+      "properties": {
+        "statements": {
+          "description": "Statement coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "branches": {
+          "description": "Branch coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "functions": {
+          "description": "Function coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lines": {
+          "description": "Line coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "impact": {
+      "description": "RTM and coverage impact signal.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rtmBefore",
+        "rtmAfter",
+        "coverageBefore",
+        "coverageAfter",
+        "testLevels",
+        "unmappedScenarios",
+        "coverageIsSignalOnly"
+      ],
+      "properties": {
+        "rtmBefore": {
+          "description": "RTM identifiers before the proposed change.",
+          "type": "array",
+          "items": { "description": "One RTM identifier.", "type": "string" }
+        },
+        "rtmAfter": {
+          "description": "RTM identifiers after the proposed change.",
+          "type": "array",
+          "items": { "description": "One RTM identifier.", "type": "string" }
+        },
+        "coverageBefore": {
+          "description": "Coverage signal before the proposed change.",
+          "$ref": "#/definitions/coverage"
+        },
+        "coverageAfter": {
+          "description": "Coverage signal after the proposed change.",
+          "$ref": "#/definitions/coverage"
+        },
+        "testLevels": {
+          "description": "Affected test levels.",
+          "type": "array",
+          "items": {
+            "description": "One affected test level.",
+            "enum": ["unit", "integration", "system", "acceptance"]
+          }
+        },
+        "unmappedScenarios": {
+          "description": "Scenarios not mapped to an RTM or test record.",
+          "type": "array",
+          "items": { "description": "One unmapped scenario.", "type": "string" }
+        },
+        "coverageIsSignalOnly": { "description": "Fixed guard that coverage cannot authorize a change.", "const": true }
+      }
+    },
+    "redaction": {
+      "description": "Redaction status and reasons for this evidence package.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasons"],
+      "properties": {
+        "status": {
+          "description": "Whether the evidence is safe to export.",
+          "enum": ["not_reviewed", "clean", "blocked"]
+        },
+        "reasons": {
+          "description": "Redaction actions or blocking reasons.",
+          "type": "array",
+          "items": { "description": "One redaction reason.", "type": "string" }
+        }
+      }
+    }
+  }
+}

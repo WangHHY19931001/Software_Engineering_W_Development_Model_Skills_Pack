@@ -30,6 +30,7 @@ const nodeRequire = createRequire(import.meta.url);
 const samplesDir = path.join(here, '..', 'samples');
 const schemaSamplesDir = path.join(samplesDir, 'schema');
 const verifierSamplesDir = path.join(samplesDir, 'verifier');
+const codeHealthSamplesDir = path.join(samplesDir, 'code-health');
 
 async function loadJson(dir: string, file: string): Promise<unknown> {
   const raw = await fs.readFile(path.join(dir, file), 'utf-8');
@@ -245,6 +246,178 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     expect(validateBySchema('run-log', rootcause).valid).toBe(true);
     for (const field of ['reportId', 'rootCauseCategory', 'upstreamDefect', 'rollbackRecommended']) {
       expect(validateBySchema('run-log', { ...rootcause, [field]: undefined }).valid).toBe(false);
+    }
+  });
+
+  it('code-health schema registry exposes all nine contracts', () => {
+    const schemaNames = [
+      'code-health-campaign',
+      'code-health-ledger-event',
+      'code-health-candidate',
+      'code-health-evidence',
+      'code-health-approval',
+      'code-health-archive',
+      'code-health-gap',
+      'code-health-test-inventory',
+      'code-health-duplicate-cluster',
+    ];
+    for (const schemaName of schemaNames) {
+      expect(validateBySchema(schemaName, {}).errorMessages).not.toContain(`schema 未注册: ${schemaName}`);
+    }
+  });
+
+  it('code-health candidate schema rejects missing ID and unknown fields', () => {
+    expect(validateBySchema('code-health-candidate', { status: 'discovered' }).valid).toBe(false);
+    expect(validateBySchema('code-health-candidate', { unknown: true }).errorMessages).toEqual(
+      expect.arrayContaining([expect.stringContaining('additionalProperties')]),
+    );
+  });
+
+  it('code-health candidate schema accepts the complete contract and rejects structural drift', () => {
+    const validCandidate = {
+      candidateId: 'CHG-P1-20260907-001',
+      phase: 'P1',
+      action: 'delete-code',
+      status: 'discovered',
+      files: ['src/unused.ts'],
+      symbols: ['unusedFunction'],
+      tests: ['w-model-dev/scripts/__tests__/unused.test.ts'],
+      callSites: ['src/app.ts:useUnused'],
+      sources: ['static-inventory.json'],
+      revision: {
+        commitSha: 'a'.repeat(40),
+        treeSha: 'b'.repeat(40),
+        sourceBundleSha256: 'c'.repeat(64),
+        analyzedAt: '2026-09-07T00:00:00.000Z',
+      },
+      confidence: {
+        level: 'medium',
+        score: 0.8,
+        rationale: 'static evidence is recorded for review',
+        uncertainties: ['dynamic import requires runtime confirmation'],
+      },
+      risk: {
+        severity: 'low',
+        behavior: 'low',
+        security: 'none',
+        concurrency: 'none',
+        platform: 'low',
+        lifecycle: 'low',
+        governance: 'low',
+        rationale: 'isolated helper with a direct rollback path',
+      },
+      rtmImpact: {
+        rtmBefore: ['REQ-001'],
+        rtmAfter: ['REQ-001'],
+        coverageBefore: { statements: 0.8, branches: null, functions: 0.7, lines: 0.8 },
+        coverageAfter: { statements: 0.8, branches: null, functions: 0.7, lines: 0.8 },
+        testLevels: ['unit'],
+        unmappedScenarios: [],
+        coverageIsSignalOnly: true,
+      },
+      coverageImpact: {
+        rtmBefore: ['REQ-001'],
+        rtmAfter: ['REQ-001'],
+        coverageBefore: { statements: 0.8, branches: null, functions: 0.7, lines: 0.8 },
+        coverageAfter: { statements: 0.8, branches: null, functions: 0.7, lines: 0.8 },
+        testLevels: ['unit'],
+        unmappedScenarios: [],
+        coverageIsSignalOnly: true,
+      },
+      commands: [
+        {
+          command: 'npm test -- --runInBand',
+          cwd: '.',
+          environment: { NODE_ENV: 'test' },
+          platform: 'win32',
+          toolVersions: { node: '20.0.0' },
+          startedAt: '2026-09-07T00:01:00.000Z',
+          endedAt: '2026-09-07T00:01:01.000Z',
+          exitCode: 0,
+          observation: 'observed',
+          rawOutputPath: '.w-model/code-health/raw/command-001.txt',
+          rawOutputSha256: 'd'.repeat(64),
+        },
+      ],
+      rollback: {
+        preChangeRevision: 'a'.repeat(40),
+        command: 'git revert <commit>',
+        patchPath: 'evidence/rollback.patch',
+        owner: 'S-agent',
+        executable: true,
+      },
+      review: {
+        findings: [],
+        unresolvedQuestions: [],
+        decision: null,
+        humanDecision: null,
+      },
+      signatures: [
+        {
+          role: 'A',
+          actor: 'analyst',
+          event: 'discovered',
+          scopeHash: `sha256:${'e'.repeat(64)}`,
+          provenanceRef: 'evidence/signature-a.json',
+          signedAt: '2026-09-07T00:02:00.000Z',
+        },
+      ],
+      changeScope: {
+        files: ['src/unused.ts'],
+        symbols: ['unusedFunction'],
+        scopeHash: `sha256:${'f'.repeat(64)}`,
+      },
+      evidenceRef: 'evidence/CHG-P1-20260907-001.json',
+      archive: {
+        state: 'not_archived',
+        manifestPath: null,
+        contentHash: null,
+        redactionStatus: 'not_reviewed',
+      },
+    };
+
+    expect(validateBySchema('code-health-candidate', validCandidate).valid).toBe(true);
+    const invalidCandidate = structuredClone(validCandidate) as { rollback: { command?: string } };
+    delete invalidCandidate.rollback.command;
+    expect(validateBySchema('code-health-candidate', invalidCandidate).errorMessages).toEqual(
+      expect.arrayContaining([expect.stringContaining('required')]),
+    );
+  });
+
+  it('code-health valid fixtures satisfy each of the nine registered contracts', async () => {
+    const cases = [
+      ['code-health-campaign', 'valid-campaign.json'],
+      ['code-health-ledger-event', 'valid-ledger-event.json'],
+      ['code-health-candidate', 'valid-candidate.json'],
+      ['code-health-evidence', 'valid-evidence.json'],
+      ['code-health-approval', 'valid-approval.json'],
+      ['code-health-archive', 'valid-archive.json'],
+      ['code-health-gap', 'valid-gap.json'],
+      ['code-health-test-inventory', 'valid-test-inventory.json'],
+      ['code-health-duplicate-cluster', 'valid-duplicate-cluster.json'],
+    ] as const;
+
+    for (const [schemaName, file] of cases) {
+      const result = validateBySchema(schemaName, await loadJson(codeHealthSamplesDir, file));
+      expect(result.valid, `${schemaName} fixture should validate: ${result.errorMessages.join('; ')}`).toBe(true);
+    }
+  });
+
+  it('code-health negative fixtures fail closed for missing identity, provenance, scope, protection, and redaction', async () => {
+    const cases = [
+      ['code-health-candidate', 'bad-missing-candidate-id.json'],
+      ['code-health-candidate', 'bad-candidate-conclusion.json'],
+      ['code-health-evidence', 'bad-no-command-hash.json'],
+      ['code-health-candidate', 'bad-stale-revision.json'],
+      ['code-health-approval', 'bad-approval-scope-mismatch.json'],
+      ['code-health-test-inventory', 'bad-protected-omission.json'],
+      ['code-health-archive', 'bad-missing-archive-redaction.json'],
+      ['code-health-campaign', 'bad-unavailable-environment-pass.json'],
+    ] as const;
+
+    for (const [schemaName, file] of cases) {
+      const result = validateBySchema(schemaName, await loadJson(codeHealthSamplesDir, file));
+      expect(result.valid, `${file} should be rejected`).toBe(false);
     }
   });
 
@@ -509,8 +682,8 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('infrastructure/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
     const dir = path.resolve(here, '../../schemas');
     const map = await readSchemasDir(dir);
-    // 25 = 23 原清单 + change-scope + codegraph-query（2026-09-04 audit-gate-closure task 1）
-    expect(Object.keys(map).length).toBe(25);
+    // 34 = 25 existing schemas + 9 code-health campaign schemas
+    expect(Object.keys(map).length).toBe(34);
     expect(map['rtm.schema.json']).toBeDefined();
     expect(map['change-scope.schema.json']).toBeDefined();
     expect(map['codegraph-query.schema.json']).toBeDefined();

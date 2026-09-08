@@ -14,11 +14,11 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，26 个样本子目录（34+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/，27 个样本子目录（35+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
- *   archive-integrity / schema / codegraph-queries / opsx-artifacts /
+ *   archive-integrity / schema / code-health / codegraph-queries / opsx-artifacts /
  *   openspec-archive / uat-path-mapping（tla-e2e 为需 Java 的手动 fixture，豁免）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
@@ -2258,6 +2258,122 @@ const SCHEMA_CASES: SchemaCase[] = [
   },
 ];
 
+interface CodeHealthCase {
+  file: string;
+  schema: string;
+  expectedValid: boolean;
+  expectedErrorPatterns?: RegExp[];
+  description: string;
+}
+
+const CODE_HEALTH_CASES: CodeHealthCase[] = [
+  {
+    file: 'valid-campaign.json',
+    schema: 'code-health-campaign',
+    expectedValid: true,
+    description: '合法 campaign manifest',
+  },
+  {
+    file: 'valid-ledger-event.json',
+    schema: 'code-health-ledger-event',
+    expectedValid: true,
+    description: '合法 append-only ledger event',
+  },
+  {
+    file: 'valid-candidate.json',
+    schema: 'code-health-candidate',
+    expectedValid: true,
+    description: 'discovered candidate remains undecided',
+  },
+  {
+    file: 'valid-evidence.json',
+    schema: 'code-health-evidence',
+    expectedValid: true,
+    description: '合法 source-bound evidence package',
+  },
+  {
+    file: 'valid-approval.json',
+    schema: 'code-health-approval',
+    expectedValid: true,
+    description: '合法 human approval scope',
+  },
+  {
+    file: 'valid-archive.json',
+    schema: 'code-health-archive',
+    expectedValid: true,
+    description: '合法 redacted archive record',
+  },
+  { file: 'valid-gap.json', schema: 'code-health-gap', expectedValid: true, description: '合法 test-gap row' },
+  {
+    file: 'valid-test-inventory.json',
+    schema: 'code-health-test-inventory',
+    expectedValid: true,
+    description: '合法 protected test inventory',
+  },
+  {
+    file: 'valid-duplicate-cluster.json',
+    schema: 'code-health-duplicate-cluster',
+    expectedValid: true,
+    description: '合法 duplicate cluster review',
+  },
+  {
+    file: 'bad-missing-candidate-id.json',
+    schema: 'code-health-candidate',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'candidate identity is required',
+  },
+  {
+    file: 'bad-candidate-conclusion.json',
+    schema: 'code-health-candidate',
+    expectedValid: false,
+    expectedErrorPatterns: [/const/],
+    description: 'discovery cannot carry a conclusion',
+  },
+  {
+    file: 'bad-no-command-hash.json',
+    schema: 'code-health-evidence',
+    expectedValid: false,
+    expectedErrorPatterns: [/required/],
+    description: 'command evidence requires a raw output hash',
+  },
+  {
+    file: 'bad-stale-revision.json',
+    schema: 'code-health-candidate',
+    expectedValid: false,
+    expectedErrorPatterns: [/pattern/],
+    description: 'stale or malformed revision identity is rejected',
+  },
+  {
+    file: 'bad-approval-scope-mismatch.json',
+    schema: 'code-health-approval',
+    expectedValid: false,
+    expectedErrorPatterns: [/pattern/],
+    description: 'approval scope hash must be structurally valid',
+  },
+  {
+    file: 'bad-protected-omission.json',
+    schema: 'code-health-test-inventory',
+    expectedValid: false,
+    expectedErrorPatterns: [/minItems/],
+    description: 'protected facts cannot be omitted',
+  },
+  {
+    file: 'bad-missing-archive-redaction.json',
+    schema: 'code-health-archive',
+    expectedValid: false,
+    expectedErrorPatterns: [/const/],
+    description: 'archived evidence must be redaction-clean',
+  },
+  {
+    file: 'bad-unavailable-environment-pass.json',
+    schema: 'code-health-campaign',
+    expectedValid: false,
+    expectedErrorPatterns: [/not/],
+    description: 'unavailable required environments cannot pass',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -3423,6 +3539,30 @@ async function runSchemaCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+async function runCodeHealthCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_CASES) {
+    const abs = path.join(samplesDir, 'code-health', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = parseJsonSafe(raw);
+    const r = validateBySchema(c.schema, parsed);
+    const details: string[] = [];
+    if (r.valid !== c.expectedValid) {
+      details.push(`  - 期望 valid=${c.expectedValid}，实际 valid=${r.valid}`);
+    }
+    if (!c.expectedValid && c.expectedErrorPatterns) {
+      details.push(...matchReasonPatterns(r.errorMessages, c.expectedErrorPatterns));
+    }
+    results.push({
+      name: `code-health/${c.schema}/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -3479,6 +3619,7 @@ async function main(): Promise<void> {
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
+  console.log(`CodeHealth 用例: ${CODE_HEALTH_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -3570,6 +3711,7 @@ async function main(): Promise<void> {
     runUatPathMappingCases(samplesDir),
     runIcebergCases(samplesDir),
   ]);
+  const codeHealthResults = await runCodeHealthCases(samplesDir);
   const all = [
     ...verifierResults,
     ...gateResults,
@@ -3582,6 +3724,7 @@ async function main(): Promise<void> {
     ...codeTlaResults,
     ...rootcauseResults,
     ...schemaResults,
+    ...codeHealthResults,
     ...bddResults,
     ...coverageResults,
     ...exemptionResults,

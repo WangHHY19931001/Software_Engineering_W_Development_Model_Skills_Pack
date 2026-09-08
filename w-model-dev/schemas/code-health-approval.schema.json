@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-approval.schema.json",
+  "title": "CodeHealthApproval",
+  "description": "Human checkpoint decision bound to one candidate and its exact approved scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidateId",
+    "decision",
+    "approvedAction",
+    "approvedFiles",
+    "approvedSymbols",
+    "scopeHash",
+    "rationale",
+    "actor",
+    "decidedAt",
+    "signatureRef"
+  ],
+  "properties": {
+    "candidateId": {
+      "description": "Stable candidate identifier receiving the checkpoint decision.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "decision": {
+      "description": "Human decision for the exact candidate scope.",
+      "enum": ["approve", "reject", "defer"]
+    },
+    "approvedAction": {
+      "description": "Action approved, rejected, or deferred for this candidate.",
+      "enum": ["delete-code", "add-test", "delete-test", "abstract"]
+    },
+    "approvedFiles": {
+      "description": "Exact repository-relative files covered by the decision.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One repository-relative approved file.", "$ref": "#/definitions/relativePath" }
+    },
+    "approvedSymbols": {
+      "description": "Exact symbols, tests, or call sites covered by the decision.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One approved symbol or identifier.", "type": "string", "minLength": 1 }
+    },
+    "scopeHash": {
+      "description": "SHA-256 digest of the exact candidate scope with a sha256 prefix.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rationale": { "description": "Specific human rationale for the decision.", "type": "string", "minLength": 20 },
+    "actor": {
+      "description": "Human decision-maker identity; agent identities cannot substitute for a human checkpoint.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*(?:^|[-_ ])(?:agent|bot|system)(?:$|[-_ ]))[^\\r\\n]+$"
+    },
+    "decidedAt": {
+      "description": "UTC timestamp of the human checkpoint decision.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "signatureRef": {
+      "description": "Repository-relative signature or provenance reference for the human decision.",
+      "$ref": "#/definitions/relativePath"
+    }
+  },
+  "definitions": {
+    "relativePath": {
+      "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    }
+  }
+}

@@ -1,0 +1,288 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-gap.schema.json",
+  "title": "CodeHealthGap",
+  "description": "One Phase 2 test-gap matrix row covering an executable scenario and its evidence-bound risk.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "gapId",
+    "candidateId",
+    "kind",
+    "testLevels",
+    "existingTestIds",
+    "missingScenario",
+    "evidenceSources",
+    "risk",
+    "priority",
+    "owner",
+    "rtmIds",
+    "coverageSignal",
+    "coverageIsSignalOnly",
+    "status"
+  ],
+  "properties": {
+    "gapId": { "description": "Stable never-reused gap identifier.", "type": "string", "minLength": 1 },
+    "candidateId": {
+      "description": "Candidate identifier owning this gap.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "kind": {
+      "description": "Behavioral dimension represented by the gap.",
+      "enum": ["requirement", "public-contract", "branch", "error", "security", "concurrency", "platform"]
+    },
+    "testLevels": {
+      "description": "Test levels applicable to the missing scenario.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One applicable test level.", "enum": ["unit", "integration", "system", "acceptance"] }
+    },
+    "existingTestIds": {
+      "description": "Existing test identifiers reviewed for this gap.",
+      "type": "array",
+      "items": { "description": "One existing test identifier.", "type": "string", "minLength": 1 }
+    },
+    "missingScenario": {
+      "description": "Concrete scenario that is not currently protected by an executable assertion.",
+      "type": "string",
+      "minLength": 1
+    },
+    "evidenceSources": {
+      "description": "Repository-relative reports, commands, RTM rows, or stable identifiers supporting the gap.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "description": "One repository-relative evidence source or stable identifier.",
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      }
+    },
+    "risk": {
+      "description": "Behavior, security, concurrency, platform, lifecycle, and governance risk dimensions.",
+      "$ref": "#/definitions/risk"
+    },
+    "priority": { "description": "Priority for addressing the gap.", "enum": ["low", "medium", "high", "critical"] },
+    "owner": { "description": "Named producer or team responsible for the gap.", "type": "string", "minLength": 1 },
+    "rtmIds": {
+      "description": "RTM requirement or contract identifiers affected by the gap.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One RTM identifier.", "type": "string", "minLength": 1 }
+    },
+    "coverageSignal": {
+      "description": "Coverage signal used to locate or measure the gap, never as authorization.",
+      "$ref": "#/definitions/coverage"
+    },
+    "coverageIsSignalOnly": {
+      "description": "Fixed guard that coverage cannot replace an executable assertion or authorize a change.",
+      "const": true
+    },
+    "status": {
+      "description": "Gap lifecycle state.",
+      "enum": ["discovered", "approved", "implemented", "verified", "blocked"]
+    },
+    "redEvidence": {
+      "description": "Optional real RED command observation for the approved gap.",
+      "$ref": "#/definitions/command"
+    },
+    "greenEvidence": {
+      "description": "Optional real GREEN command observation for the approved gap.",
+      "$ref": "#/definitions/command"
+    },
+    "assertionHash": {
+      "description": "SHA-256 digest of the test assertion bound to this gap.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "implementationHash": {
+      "description": "SHA-256 digest of the implementation used for GREEN, or null before implementation.",
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "definitions": {
+    "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "coverage": {
+      "description": "Coverage signal with nullable metrics.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements", "branches", "functions", "lines"],
+      "properties": {
+        "statements": {
+          "description": "Statement coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "branches": {
+          "description": "Branch coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "functions": {
+          "description": "Function coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lines": {
+          "description": "Line coverage ratio or null when unmeasured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "risk": {
+      "description": "Risk profile attached to a gap.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "behavior",
+        "security",
+        "concurrency",
+        "platform",
+        "lifecycle",
+        "governance",
+        "rationale"
+      ],
+      "properties": {
+        "severity": { "description": "Overall severity.", "enum": ["low", "medium", "high", "critical"] },
+        "behavior": { "description": "Behavioral risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "security": { "description": "Security risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "concurrency": { "description": "Concurrency risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "platform": { "description": "Platform risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "lifecycle": { "description": "Lifecycle risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "governance": { "description": "Governance risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "rationale": { "description": "Specific risk rationale.", "type": "string", "minLength": 1 }
+      }
+    },
+    "command": {
+      "description": "Real command evidence with an explicit observation state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cwd",
+        "environment",
+        "platform",
+        "toolVersions",
+        "startedAt",
+        "endedAt",
+        "exitCode",
+        "observation",
+        "rawOutputPath",
+        "rawOutputSha256"
+      ],
+      "properties": {
+        "command": {
+          "description": "Executable and arguments without an uncontrolled shell pipeline.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+        },
+        "cwd": {
+          "description": "Repository-relative working directory.",
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+        },
+        "environment": {
+          "description": "Redacted environment map.",
+          "type": "object",
+          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+        },
+        "platform": { "description": "Observed operating-system platform.", "type": "string", "minLength": 1 },
+        "toolVersions": {
+          "description": "Tool name to observed version map.",
+          "type": "object",
+          "additionalProperties": { "description": "Observed tool version.", "type": "string" }
+        },
+        "startedAt": { "description": "UTC command start timestamp.", "type": "string", "format": "date-time" },
+        "endedAt": { "description": "UTC command end timestamp.", "type": "string", "format": "date-time" },
+        "exitCode": {
+          "description": "Real process exit code, or null when no process result exists.",
+          "type": ["integer", "null"]
+        },
+        "observation": {
+          "description": "Observed, not run, unavailable, or unverified result.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "rawOutputPath": {
+          "description": "Controlled repository-relative raw output path.",
+          "type": "string",
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+        },
+        "rawOutputSha256": { "description": "SHA-256 of the raw command output.", "$ref": "#/definitions/sha256" }
+      },
+      "allOf": [
+        {
+          "description": "Observed command results require an integer exit code.",
+          "if": { "properties": { "observation": { "const": "observed" } }, "required": ["observation"] },
+          "then": { "properties": { "exitCode": { "type": "integer" } } }
+        },
+        {
+          "description": "Unknown command results require a null exit code.",
+          "if": {
+            "properties": { "observation": { "enum": ["not_run", "unavailable", "unverified"] } },
+            "required": ["observation"]
+          },
+          "then": { "properties": { "exitCode": { "type": "null" } } }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "description": "A GREEN result cannot be claimed without the same gap's RED evidence and a real observed pass.",
+      "if": { "properties": { "status": { "enum": ["implemented", "verified"] } }, "required": ["status"] },
+      "then": {
+        "type": "object",
+        "required": ["redEvidence", "greenEvidence", "assertionHash"],
+        "properties": {
+          "redEvidence": { "description": "Required RED evidence.", "$ref": "#/definitions/command" },
+          "greenEvidence": { "description": "Required GREEN evidence.", "$ref": "#/definitions/command" },
+          "assertionHash": { "description": "Required assertion hash.", "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    {
+      "description": "A recorded GREEN command must be an observed zero-exit result.",
+      "if": { "required": ["greenEvidence"] },
+      "then": {
+        "type": "object",
+        "properties": {
+          "greenEvidence": {
+            "description": "Recorded GREEN evidence.",
+            "type": "object",
+            "properties": {
+              "observation": { "description": "GREEN must be observed.", "const": "observed" },
+              "exitCode": { "description": "GREEN must exit successfully.", "const": 0 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "A recorded RED command must be an observed non-zero result.",
+      "if": { "required": ["redEvidence"] },
+      "then": {
+        "type": "object",
+        "properties": {
+          "redEvidence": {
+            "description": "Recorded RED evidence.",
+            "type": "object",
+            "properties": {
+              "observation": { "description": "RED must be observed.", "const": "observed" },
+              "exitCode": { "description": "RED must fail with a non-zero exit code.", "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

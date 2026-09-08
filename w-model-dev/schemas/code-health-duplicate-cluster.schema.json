@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-duplicate-cluster.schema.json",
+  "title": "CodeHealthDuplicateCluster",
+  "description": "Phase 4 structural duplicate cluster and guarded abstraction proof.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["clusterId", "candidateId", "implementations", "views", "stableProductionCallSites", "status"],
+  "properties": {
+    "clusterId": { "description": "Stable duplicate cluster identifier.", "type": "string", "minLength": 1 },
+    "candidateId": {
+      "description": "Candidate identifier for the proposed abstraction, or the cluster review.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "implementations": {
+      "description": "Independent production implementations in the cluster.",
+      "type": "array",
+      "minItems": 2,
+      "items": { "description": "One implementation identity and source hash.", "$ref": "#/definitions/implementation" }
+    },
+    "views": {
+      "description": "Independent structural, data-flow, call-graph, signature, and test evidence views.",
+      "$ref": "#/definitions/views"
+    },
+    "stableProductionCallSites": {
+      "description": "Stable supported production call sites with contracts and regression signals.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One stable production call-site identifier.", "type": "string", "minLength": 1 }
+    },
+    "status": {
+      "description": "Review lifecycle state; only approved may authorize a later change.",
+      "enum": ["under-review", "deferred", "rejected", "approved"]
+    },
+    "equivalenceProof": {
+      "description": "Optional proof covering all semantic dimensions required before abstraction.",
+      "$ref": "#/definitions/equivalenceProof"
+    },
+    "maintenanceBenefit": {
+      "description": "Optional concrete maintenance benefit; a shorter diff alone is insufficient.",
+      "type": "string",
+      "minLength": 20
+    },
+    "rollback": {
+      "description": "Optional direct executable rollback plan for an approved abstraction.",
+      "$ref": "#/definitions/rollback"
+    },
+    "redaction": { "description": "Optional redaction status for cluster evidence.", "$ref": "#/definitions/redaction" }
+  },
+  "definitions": {
+    "relativePath": {
+      "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "implementation": {
+      "description": "One production implementation identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "symbol", "sourceHash"],
+      "properties": {
+        "file": { "description": "Repository-relative implementation file.", "$ref": "#/definitions/relativePath" },
+        "symbol": { "description": "Implementation symbol.", "type": "string", "minLength": 1 },
+        "sourceHash": {
+          "description": "SHA-256 source hash for the implementation.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "views": {
+      "description": "Evidence views used to support a duplicate-cluster review.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ast", "dataFlow", "callGraph", "signatures", "tests"],
+      "properties": {
+        "ast": {
+          "description": "Normalized AST or control-flow evidence.",
+          "type": "array",
+          "items": { "description": "One AST evidence item.", "type": "string", "minLength": 1 }
+        },
+        "dataFlow": {
+          "description": "Structural data-flow and side-effect evidence.",
+          "type": "array",
+          "items": { "description": "One data-flow evidence item.", "type": "string", "minLength": 1 }
+        },
+        "callGraph": {
+          "description": "Call-graph neighborhoods and lifecycle ownership evidence.",
+          "type": "array",
+          "items": { "description": "One call-graph evidence item.", "type": "string", "minLength": 1 }
+        },
+        "signatures": {
+          "description": "Normalized signatures, branches, and error-path evidence.",
+          "type": "array",
+          "items": { "description": "One normalized signature evidence item.", "type": "string", "minLength": 1 }
+        },
+        "tests": {
+          "description": "Semantic and regression test evidence for the implementations.",
+          "type": "array",
+          "items": { "description": "One test evidence item.", "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "equivalenceProof": {
+      "description": "Complete semantic equivalence proof required before abstraction.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputsOutputs",
+        "orderingMutationsSideEffects",
+        "errorsRetries",
+        "lifecycleResources",
+        "security",
+        "concurrencyPlatforms",
+        "allDimensionsProven"
+      ],
+      "properties": {
+        "inputsOutputs": {
+          "description": "Accepted inputs and produced outputs are equivalent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "orderingMutationsSideEffects": {
+          "description": "Ordering, mutations, and observable side effects are equivalent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "errorsRetries": {
+          "description": "Error types/status/messages, retry behavior, and failure timing are equivalent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "lifecycleResources": {
+          "description": "Initialization, cleanup, cancellation, transactions, and resource ownership are equivalent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "security": {
+          "description": "Validation order, authorization, privilege, and secret handling are equivalent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "concurrencyPlatforms": {
+          "description": "Locking, atomicity, idempotency, and platform behavior are equivalent.",
+          "type": "string",
+          "minLength": 1
+        },
+        "allDimensionsProven": {
+          "description": "Fixed guard that every semantic dimension has been independently proven.",
+          "const": true
+        }
+      }
+    },
+    "rollback": {
+      "description": "Direct executable rollback plan.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preChangeRevision", "command", "patchPath", "owner", "executable"],
+      "properties": {
+        "preChangeRevision": { "description": "Pre-change commit SHA-1.", "$ref": "#/definitions/sha1" },
+        "command": {
+          "description": "Exact rollback command without uncontrolled shell syntax.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+        },
+        "patchPath": {
+          "description": "Repository-relative rollback patch path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "owner": { "description": "Rollback owner.", "type": "string", "minLength": 1 },
+        "executable": { "description": "Whether rollback is directly executable.", "const": true }
+      }
+    },
+    "redaction": {
+      "description": "Redaction status and reasons.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasons"],
+      "properties": {
+        "status": {
+          "description": "Whether cluster evidence is safe to export.",
+          "enum": ["not_reviewed", "clean", "blocked"]
+        },
+        "reasons": {
+          "description": "Redaction actions or blocking reasons.",
+          "type": "array",
+          "items": { "description": "One redaction reason.", "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "An approved duplicate cluster requires at least two stable production call sites and a complete equivalence proof.",
+      "if": {
+        "description": "Approved cluster condition.",
+        "properties": { "status": { "const": "approved" } },
+        "required": ["status"]
+      },
+      "then": {
+        "description": "Approval prerequisites.",
+        "type": "object",
+        "required": ["equivalenceProof", "maintenanceBenefit", "rollback"],
+        "properties": {
+          "equivalenceProof": {
+            "description": "Complete semantic proof.",
+            "type": "object",
+            "properties": {
+              "allDimensionsProven": { "description": "All semantic dimensions must be proven.", "const": true }
+            }
+          },
+          "maintenanceBenefit": {
+            "description": "Concrete maintenance benefit required for approval.",
+            "type": "string",
+            "minLength": 20
+          },
+          "rollback": {
+            "description": "Direct executable rollback plan required for approval.",
+            "$ref": "#/definitions/rollback"
+          },
+          "stableProductionCallSites": {
+            "description": "Approved cluster call-site threshold.",
+            "type": "array",
+            "minItems": 2
+          }
+        }
+      }
+    }
+  ]
+}

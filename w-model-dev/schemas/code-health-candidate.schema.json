@@ -1,0 +1,514 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w-model-dev/schemas/code-health-candidate.schema.json",
+  "title": "CodeHealthCandidate",
+  "description": "A complete code-health candidate package; discovery remains a candidate and is never an approval conclusion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidateId",
+    "phase",
+    "action",
+    "status",
+    "files",
+    "symbols",
+    "tests",
+    "callSites",
+    "sources",
+    "commands",
+    "revision",
+    "confidence",
+    "risk",
+    "rtmImpact",
+    "coverageImpact",
+    "rollback",
+    "review",
+    "signatures",
+    "changeScope",
+    "evidenceRef",
+    "archive"
+  ],
+  "properties": {
+    "candidateId": {
+      "description": "Stable never-reused candidate identifier including phase.",
+      "type": "string",
+      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "phase": { "description": "Code-health campaign phase.", "enum": ["P1", "P2", "P3", "P4"] },
+    "action": {
+      "description": "Proposed code-health action.",
+      "enum": ["delete-code", "add-test", "delete-test", "abstract"]
+    },
+    "status": {
+      "description": "Candidate lifecycle state; a discovered candidate is not a conclusion.",
+      "enum": [
+        "discovered",
+        "evidenced",
+        "under-review",
+        "approved",
+        "implemented",
+        "verified",
+        "archived",
+        "rejected",
+        "deferred",
+        "blocked",
+        "rolled-back"
+      ]
+    },
+    "files": {
+      "description": "Repository-relative files in the candidate evidence scope.",
+      "type": "array",
+      "items": {
+        "description": "One repository-relative file path.",
+        "type": "string",
+        "$ref": "#/definitions/relativePath"
+      }
+    },
+    "symbols": {
+      "description": "Exact symbols or identifiers in scope.",
+      "type": "array",
+      "items": { "description": "One symbol or identifier.", "type": "string", "minLength": 1 }
+    },
+    "tests": {
+      "description": "Repository-relative tests or test identifiers considered by the candidate.",
+      "type": "array",
+      "items": {
+        "description": "One repository-relative test path or identifier.",
+        "type": "string",
+        "$ref": "#/definitions/relativePath"
+      }
+    },
+    "callSites": {
+      "description": "Known repository-relative production call sites or consumers.",
+      "type": "array",
+      "items": {
+        "description": "One repository-relative call-site identifier.",
+        "type": "string",
+        "$ref": "#/definitions/relativePath"
+      }
+    },
+    "sources": {
+      "description": "Repository-relative evidence sources that produced or corroborate the candidate.",
+      "type": "array",
+      "items": {
+        "description": "One repository-relative source reference or stable identifier.",
+        "type": "string",
+        "$ref": "#/definitions/relativePath"
+      }
+    },
+    "commands": {
+      "description": "Source-bound commands and their real observations.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "description": "One command evidence record.", "$ref": "#/definitions/command" }
+    },
+    "revision": { "description": "Revision analyzed for this candidate.", "$ref": "#/definitions/revision" },
+    "confidence": {
+      "description": "Bounded confidence with rationale and explicit uncertainty.",
+      "$ref": "#/definitions/confidence"
+    },
+    "risk": {
+      "description": "Behavior, security, concurrency, platform, lifecycle, and governance risk dimensions.",
+      "$ref": "#/definitions/risk"
+    },
+    "rtmImpact": { "description": "Before/after RTM impact and affected test levels.", "$ref": "#/definitions/impact" },
+    "coverageImpact": {
+      "description": "Before/after coverage signal; coverage cannot authorize a change.",
+      "$ref": "#/definitions/impact"
+    },
+    "rollback": { "description": "Executable direct rollback procedure and owner.", "$ref": "#/definitions/rollback" },
+    "review": { "description": "Verifier findings and human checkpoint decision.", "$ref": "#/definitions/review" },
+    "signatures": {
+      "description": "Role signatures and provenance references for candidate events.",
+      "type": "array",
+      "items": { "description": "One role signature.", "$ref": "#/definitions/signature" }
+    },
+    "changeScope": {
+      "description": "Exact repository-relative files and symbols that may change.",
+      "$ref": "#/definitions/changeScope"
+    },
+    "evidenceRef": {
+      "description": "Repository-relative evidence package reference.",
+      "type": "string",
+      "$ref": "#/definitions/relativePath"
+    },
+    "archive": { "description": "Archive status and redaction metadata.", "$ref": "#/definitions/archive" }
+  },
+  "definitions": {
+    "relativePath": {
+      "description": "Safe repository-relative POSIX path or identifier without absolute or parent traversal segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "sha1": { "description": "Lowercase Git SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "revision": {
+      "description": "Source-bound repository revision identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "sourceBundleSha256", "analyzedAt"],
+      "properties": {
+        "commitSha": { "description": "Commit SHA-1.", "$ref": "#/definitions/sha1" },
+        "treeSha": { "description": "Tree SHA-1.", "$ref": "#/definitions/sha1" },
+        "sourceBundleSha256": { "description": "Analyzed source bundle SHA-256.", "$ref": "#/definitions/sha256" },
+        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+      }
+    },
+    "command": {
+      "description": "One command result with raw output hash and an explicit observation status.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cwd",
+        "environment",
+        "platform",
+        "toolVersions",
+        "startedAt",
+        "endedAt",
+        "exitCode",
+        "observation",
+        "rawOutputPath",
+        "rawOutputSha256"
+      ],
+      "properties": {
+        "command": {
+          "description": "Reproducible command representation with arguments, never a shell pipeline.",
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "description": "Repository-relative working directory.",
+          "type": "string",
+          "$ref": "#/definitions/relativePath"
+        },
+        "environment": {
+          "description": "Redacted environment string map.",
+          "type": "object",
+          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+        },
+        "platform": { "description": "Observed operating-system platform.", "type": "string", "minLength": 1 },
+        "toolVersions": {
+          "description": "Tool name to version map.",
+          "type": "object",
+          "additionalProperties": { "description": "Tool version string.", "type": "string" }
+        },
+        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
+        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "exitCode": {
+          "description": "Observed process exit code, or null when no process result exists.",
+          "type": ["integer", "null"]
+        },
+        "observation": {
+          "description": "Whether the command was observed, not run, unavailable, or unverified.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "rawOutputPath": {
+          "description": "Controlled repository-relative raw output path.",
+          "type": "string",
+          "$ref": "#/definitions/relativePath"
+        },
+        "rawOutputSha256": { "description": "Raw output SHA-256 digest.", "$ref": "#/definitions/sha256" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "const": "observed" } },
+            "required": ["observation"]
+          },
+          "then": { "type": "object", "properties": { "exitCode": { "type": "integer" } } }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "observation": { "enum": ["not_run", "unavailable", "unverified"] } },
+            "required": ["observation"]
+          },
+          "then": { "type": "object", "properties": { "exitCode": { "type": "null" } } }
+        }
+      ]
+    },
+    "confidence": {
+      "description": "Bounded confidence record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "score", "rationale", "uncertainties"],
+      "properties": {
+        "level": { "description": "Confidence level.", "enum": ["low", "medium", "high"] },
+        "score": {
+          "description": "Confidence score from zero through one.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rationale": { "description": "Reason supporting the score.", "type": "string", "minLength": 1 },
+        "uncertainties": {
+          "description": "Known uncertainties that remain unresolved.",
+          "type": "array",
+          "items": { "description": "One uncertainty.", "type": "string" }
+        }
+      }
+    },
+    "risk": {
+      "description": "Risk dimensions for the proposed action.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "behavior",
+        "security",
+        "concurrency",
+        "platform",
+        "lifecycle",
+        "governance",
+        "rationale"
+      ],
+      "properties": {
+        "severity": { "description": "Overall severity.", "enum": ["low", "medium", "high", "critical"] },
+        "behavior": { "description": "Behavioral risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "security": { "description": "Security risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "concurrency": { "description": "Concurrency risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "platform": { "description": "Platform risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "lifecycle": { "description": "Lifecycle risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "governance": { "description": "Governance risk.", "enum": ["none", "low", "medium", "high", "unknown"] },
+        "rationale": { "description": "Risk assessment rationale.", "type": "string", "minLength": 1 }
+      }
+    },
+    "coverage": {
+      "description": "Coverage signal with nullable metrics.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements", "branches", "functions", "lines"],
+      "properties": {
+        "statements": {
+          "description": "Statement coverage ratio or null when not measured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "branches": {
+          "description": "Branch coverage ratio or null when not measured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "functions": {
+          "description": "Function coverage ratio or null when not measured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lines": {
+          "description": "Line coverage ratio or null when not measured.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "impact": {
+      "description": "RTM and coverage impact record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rtmBefore",
+        "rtmAfter",
+        "coverageBefore",
+        "coverageAfter",
+        "testLevels",
+        "unmappedScenarios",
+        "coverageIsSignalOnly"
+      ],
+      "properties": {
+        "rtmBefore": {
+          "description": "RTM IDs before the proposed change.",
+          "type": "array",
+          "items": { "description": "One RTM ID.", "type": "string" }
+        },
+        "rtmAfter": {
+          "description": "RTM IDs after the proposed change.",
+          "type": "array",
+          "items": { "description": "One RTM ID.", "type": "string" }
+        },
+        "coverageBefore": { "description": "Coverage before the change.", "$ref": "#/definitions/coverage" },
+        "coverageAfter": {
+          "description": "Coverage after the change; missing values are not accepted.",
+          "$ref": "#/definitions/coverage"
+        },
+        "testLevels": {
+          "description": "Affected test levels.",
+          "type": "array",
+          "items": { "description": "One test level.", "enum": ["unit", "integration", "system", "acceptance"] }
+        },
+        "unmappedScenarios": {
+          "description": "Scenarios not mapped by the impact record.",
+          "type": "array",
+          "items": { "description": "One unmapped scenario.", "type": "string" }
+        },
+        "coverageIsSignalOnly": { "description": "Fixed guard that coverage cannot authorize a change.", "const": true }
+      }
+    },
+    "rollback": {
+      "description": "Direct executable rollback plan.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preChangeRevision", "command", "patchPath", "owner", "executable"],
+      "properties": {
+        "preChangeRevision": { "description": "Pre-change commit SHA-1.", "$ref": "#/definitions/sha1" },
+        "command": { "description": "Exact rollback command or procedure.", "type": "string", "minLength": 1 },
+        "patchPath": {
+          "description": "Repository-relative rollback patch path.",
+          "type": "string",
+          "$ref": "#/definitions/relativePath"
+        },
+        "owner": { "description": "Rollback owner.", "type": "string", "minLength": 1 },
+        "executable": { "description": "Whether rollback is directly executable.", "type": "boolean" }
+      }
+    },
+    "review": {
+      "description": "Independent review and human checkpoint record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["findings", "unresolvedQuestions", "decision", "humanDecision"],
+      "properties": {
+        "findings": {
+          "description": "Verifier findings.",
+          "type": "array",
+          "items": { "description": "One finding.", "type": "string" }
+        },
+        "unresolvedQuestions": {
+          "description": "Unresolved material questions.",
+          "type": "array",
+          "items": { "description": "One unresolved question.", "type": "string" }
+        },
+        "decision": {
+          "description": "Verifier decision or null before review.",
+          "type": ["string", "null"],
+          "enum": ["approve", "reject", "defer", "block", "rollback", null]
+        },
+        "humanDecision": {
+          "description": "Human checkpoint decision or null before checkpoint.",
+          "type": ["string", "null"],
+          "enum": ["approve", "reject", "defer", null]
+        }
+      }
+    },
+    "signature": {
+      "description": "One role signature with scope and provenance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "actor", "event", "scopeHash", "provenanceRef", "signedAt"],
+      "properties": {
+        "role": { "description": "Signing role.", "enum": ["A", "S", "V", "G", "R", "human"] },
+        "actor": { "description": "Actor identity.", "type": "string", "minLength": 1 },
+        "event": { "description": "Event represented by the signature.", "type": "string", "minLength": 1 },
+        "scopeHash": {
+          "description": "SHA-256 scope digest with sha256 prefix.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "provenanceRef": {
+          "description": "Repository-relative signature provenance reference.",
+          "type": "string",
+          "$ref": "#/definitions/relativePath"
+        },
+        "signedAt": { "description": "UTC signature time.", "type": "string", "format": "date-time" }
+      }
+    },
+    "changeScope": {
+      "description": "Exact approved boundary.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "symbols", "scopeHash"],
+      "properties": {
+        "files": {
+          "description": "Non-empty repository-relative files.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One scoped file.", "type": "string", "$ref": "#/definitions/relativePath" }
+        },
+        "symbols": {
+          "description": "Non-empty exact symbols.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One scoped symbol.", "type": "string", "minLength": 1 }
+        },
+        "scopeHash": {
+          "description": "SHA-256 digest of the exact scope.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "archive": {
+      "description": "Candidate archive metadata.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "manifestPath", "contentHash", "redactionStatus"],
+      "properties": {
+        "state": { "description": "Whether this candidate has been archived.", "enum": ["not_archived", "archived"] },
+        "manifestPath": {
+          "description": "Repository-relative archive manifest path or null.",
+          "type": ["string", "null"]
+        },
+        "contentHash": {
+          "description": "Archive content SHA-256 or null before archive.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "redactionStatus": { "description": "Redaction review state.", "enum": ["not_reviewed", "clean", "blocked"] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "A discovered candidate remains a lead and cannot carry a review or human approval conclusion.",
+      "if": {
+        "description": "Discovered candidate condition.",
+        "type": "object",
+        "properties": { "status": { "const": "discovered" } },
+        "required": ["status"]
+      },
+      "then": {
+        "description": "Discovery review fields must remain undecided.",
+        "type": "object",
+        "properties": {
+          "review": {
+            "description": "Undecided review record for discovery.",
+            "type": "object",
+            "properties": {
+              "decision": { "description": "No verifier conclusion at discovery.", "const": null },
+              "humanDecision": { "description": "No human decision at discovery.", "const": null }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "An archived candidate must carry a complete clean archive record.",
+      "if": {
+        "description": "Archived candidate condition.",
+        "type": "object",
+        "properties": { "status": { "const": "archived" } },
+        "required": ["status"]
+      },
+      "then": {
+        "description": "Archived candidate metadata is terminal and export-safe.",
+        "type": "object",
+        "properties": {
+          "archive": {
+            "description": "Terminal archive metadata.",
+            "type": "object",
+            "properties": {
+              "state": { "description": "Terminal archive state.", "const": "archived" },
+              "manifestPath": { "description": "Required archive manifest path.", "type": "string" },
+              "contentHash": { "description": "Required archive content hash.", "type": "string" },
+              "redactionStatus": { "description": "Archived artifacts must be redaction-clean.", "const": "clean" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

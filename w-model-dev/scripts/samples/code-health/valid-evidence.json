@@ -1,0 +1,55 @@
+{
+  "evidenceId": "EVD-CHG-P1-20260907-001",
+  "candidateId": "CHG-P1-20260907-001",
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "staticReferences": [{
+    "path": "src/unused.ts",
+    "symbol": "unusedFunction",
+    "consumer": "src/app.ts:useUnused",
+    "kind": "call",
+    "line": 12,
+    "sourceHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }],
+  "dynamicScenarios": [{
+    "id": "smoke-win",
+    "environment": "win32-git-bash",
+    "reached": false,
+    "observation": "observed",
+    "command": {
+      "command": "node --version",
+      "cwd": ".",
+      "environment": { "NODE_ENV": "test" },
+      "platform": "win32",
+      "toolVersions": { "node": "20.0.0" },
+      "startedAt": "2026-09-07T00:01:00.000Z",
+      "endedAt": "2026-09-07T00:01:01.000Z",
+      "exitCode": 0,
+      "observation": "observed",
+      "rawOutputPath": ".w-model/code-health/raw/node-version.log",
+      "rawOutputSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  }],
+  "commands": [{
+    "command": "node --version",
+    "cwd": ".",
+    "environment": { "NODE_ENV": "test" },
+    "platform": "win32",
+    "toolVersions": { "node": "20.0.0" },
+    "startedAt": "2026-09-07T00:01:00.000Z",
+    "endedAt": "2026-09-07T00:01:01.000Z",
+    "exitCode": 0,
+    "observation": "observed",
+    "rawOutputPath": ".w-model/code-health/raw/node-version.log",
+    "rawOutputSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  }],
+  "environment": { "NODE_ENV": "test" },
+  "toolVersions": { "node": "20.0.0" },
+  "unknowns": ["dynamic plugin loading not exercised"],
+  "falsePositiveChecks": ["checked dynamic imports", "checked schema and template references"],
+  "redaction": { "status": "clean", "reasons": ["repository-relative paths retained"] }
+}
