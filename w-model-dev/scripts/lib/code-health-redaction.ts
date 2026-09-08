@@ -24,7 +24,36 @@ const SECRET_KEY_PARTS = [
 const SECRET_VALUE_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./+=-';
 
 function isAbsolutePath(value: string): boolean {
-  return path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
+  return path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function redactEmbeddedAbsolutePaths(value: string, reasons: Set<string>): string {
+  let sanitized = value;
+  const windowsPattern = /[A-Za-z]:[\\/](?:[^\\s/\\]+[\\/]?)+/g;
+  const posixPattern = /\/(?:[^\s/]+\/)+[^\s/]*/g;
+  sanitized = sanitized.replace(windowsPattern, () => {
+    reasons.add('embedded Windows absolute path redacted');
+    return '[REPO_PATH_REDACTED]';
+  });
+  sanitized = sanitized.replace(posixPattern, () => {
+    reasons.add('embedded POSIX absolute path redacted');
+    return '[REPO_PATH_REDACTED]';
+  });
+  return sanitized;
+}
+
+export function containsSensitiveCodeHealthContent(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return (
+      /(?:password|passwd|secret|token|api[_-]?key|authorization)\s*=/i.test(value) ||
+      /^(?:Bearer|Basic)\s+/i.test(value)
+    );
+  }
+  if (Array.isArray(value)) return value.some((item) => containsSensitiveCodeHealthContent(item));
+  if (value !== null && typeof value === 'object') {
+    return Object.entries(value).some(([key, item]) => hasSecretFieldName(key) || containsSensitiveCodeHealthContent(item));
+  }
+  return false;
 }
 
 function hasUnsafeControlCharacter(value: string): boolean {
@@ -62,11 +91,19 @@ function redactString(value: string, fieldName: string, reasons: Set<string>): s
     reasons.add(`absolute path redacted: ${fieldName || 'value'}`);
     return '[REPO_PATH_REDACTED]';
   }
-  if (hasSecretLikeValue(value)) {
+  let sanitized = redactEmbeddedAbsolutePaths(value, reasons);
+  sanitized = sanitized.replace(
+    /((?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization)\s*[=:]\s*)[^\s,;)]*/gi,
+    (_match, prefix: string) => {
+      reasons.add(`sensitive output redacted: ${fieldName || 'value'}`);
+      return `${prefix}[REDACTED]`;
+    },
+  );
+  if (hasSecretLikeValue(sanitized)) {
     reasons.add(`secret-like value redacted: ${fieldName || 'value'}`);
     return '[REDACTED]';
   }
-  return value;
+  return sanitized;
 }
 
 function redact(value: unknown, fieldName: string, reasons: Set<string>): unknown {

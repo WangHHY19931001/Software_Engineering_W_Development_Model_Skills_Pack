@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
@@ -9,7 +9,7 @@ import type {
   EvidenceObservationStatus,
 } from '../logic/code-health-ledger-logic.js';
 
-import { redactCodeHealthArtifact } from './code-health-redaction.js';
+import { containsSensitiveCodeHealthContent, redactCodeHealthArtifact } from './code-health-redaction.js';
 
 export interface CodeHealthCommandRunnerOptions {
   rawOutputDir: string;
@@ -28,11 +28,18 @@ function validateInvocation(command: string, args: string[]): void {
   if (/\s|["'`;&|<>\r\n]/.test(command)) {
     throw new TypeError('argv must carry arguments separately; command must not be a shell string');
   }
+  if (containsSensitiveCodeHealthContent({ command, args })) {
+    throw new Error('redaction blocked: sensitive command argv must not be executed or persisted');
+  }
 }
 
 function relativeOutputPath(file: string): string {
   const relative = path.relative(process.cwd(), file).replace(/\\/g, '/');
-  return relative && !relative.startsWith('../') && relative !== '..' ? relative : path.basename(file);
+  if (relative === '') return '.';
+  if (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error('redaction blocked: raw output path must remain repository-relative');
+  }
+  return relative;
 }
 
 function observationFor(error: unknown): EvidenceObservationStatus {
@@ -40,24 +47,51 @@ function observationFor(error: unknown): EvidenceObservationStatus {
   return code === 'ENOENT' || code === 'EACCES' ? 'unavailable' : 'not_run';
 }
 
+function boundedExitCode(code: number | null): 0 | 1 | 2 | null {
+  if (code === null) return null;
+  if (code === 0) return 0;
+  if (code === 1) return 1;
+  if (code === 2) return 2;
+  return 1;
+}
+
+function redactedText(value: unknown): string {
+  const result = redactCodeHealthArtifact(value);
+  if (result.status === 'blocked') throw new Error(`redaction blocked: ${result.reasons.join('; ')}`);
+  return JSON.stringify(result.value);
+}
+
 export function createCodeHealthCommandRunner(options: CodeHealthCommandRunnerOptions): CodeHealthCommandRunner {
   const now = options.now ?? (() => new Date());
+  const rawOutputDir = path.resolve(options.rawOutputDir);
+  const rawOutputRelative = path.relative(process.cwd(), rawOutputDir);
+  if (
+    rawOutputRelative === '..' ||
+    rawOutputRelative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rawOutputRelative)
+  ) {
+    throw new TypeError('rawOutputDir must be beneath the current repository root');
+  }
+
   return {
     async run(command, args, runOptions): Promise<CommandEvidence> {
       validateInvocation(command, args);
       if (!Number.isFinite(runOptions.timeoutMs) || runOptions.timeoutMs < 0)
         throw new TypeError('timeoutMs must be non-negative');
+      if (containsSensitiveCodeHealthContent(runOptions.env)) {
+        throw new Error('redaction blocked: sensitive environment must not be passed to a child process');
+      }
+      const sanitizedEnvironment = redactCodeHealthArtifact(runOptions.env);
+      if (sanitizedEnvironment.status === 'blocked') {
+        throw new Error(`redaction blocked: ${sanitizedEnvironment.reasons.join('; ')}`);
+      }
+      const environment = (sanitizedEnvironment.value ?? {}) as Record<string, string>;
       const started = now();
-      const sanitizedEnvironment = redactCodeHealthArtifact(runOptions.env).value;
-      const environment = (
-        sanitizedEnvironment && typeof sanitizedEnvironment === 'object' ? sanitizedEnvironment : {}
-      ) as Record<string, string>;
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- rawOutputDir is caller-owned controlled evidence storage.
-      await fs.mkdir(options.rawOutputDir, { recursive: true });
-      const outputName = `${started.toISOString().replace(/[^0-9]/g, '')}-${sha256(`${command}\u0000${args.join('\u0000')}`).slice(0, 16)}.log`;
-      const outputFile = path.join(options.rawOutputDir, outputName);
+      const outputName = `${started.toISOString().replace(/[^0-9]/g, '')}-${randomUUID()}.log`;
+      const outputFile = path.join(rawOutputDir, outputName);
+      await fs.mkdir(rawOutputDir, { recursive: true });
       let output = '';
-      let exitCode: number | null = null;
+      let exitCode: 0 | 1 | 2 | null = null;
       let observation: EvidenceObservationStatus = 'not_run';
       try {
         const result = await new Promise<{ code: number | null; output: string }>((resolve, reject) => {
@@ -96,18 +130,19 @@ export function createCodeHealthCommandRunner(options: CodeHealthCommandRunnerOp
             finish(() => resolve({ code, output: `${stdout}${stderr}` }));
           });
         });
-        output = result.output;
-        exitCode = result.code;
+        output = redactedText({ output: result.output });
+        exitCode = boundedExitCode(result.code);
         observation = result.code === null ? 'not_run' : 'observed';
       } catch (error) {
-        output = error instanceof Error ? error.message : String(error);
+        if (error instanceof Error && error.message.startsWith('redaction blocked:')) throw error;
+        output = redactedText({ output: error instanceof Error ? error.message : String(error) });
         observation = observationFor(error);
       }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- outputFile is derived from caller-owned rawOutputDir and a generated filename.
       await fs.writeFile(outputFile, output, 'utf8');
       const ended = now();
+      const safeCommand = redactedText({ command, args });
       return {
-        command: [command, ...args].join(' '),
+        command: safeCommand,
         cwd: relativeOutputPath(path.resolve(runOptions.cwd)),
         environment,
         platform: process.platform,

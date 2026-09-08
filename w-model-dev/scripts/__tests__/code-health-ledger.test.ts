@@ -1,7 +1,6 @@
 /** Task 1 contract tests for the code-health ledger and evidence boundary. */
 
 import { promises as fs } from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +20,7 @@ import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
 import { redactCodeHealthArtifact } from '../lib/code-health-redaction.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const testOutputRoot = path.join(repoRoot, '.tmp-code-health-test-output');
 
 const revision = {
   commitSha: 'a'.repeat(40),
@@ -146,10 +146,14 @@ export function validLedger(candidate: CodeHealthCandidate): CodeHealthLedger {
   };
 }
 
-export function event(from: CodeHealthCandidate['status'], to: CodeHealthCandidate['status']): LedgerEvent {
+export function event(
+  from: CodeHealthCandidate['status'],
+  to: CodeHealthCandidate['status'],
+  candidateId = 'CHG-P1-20260907-001',
+): LedgerEvent {
   return {
-    eventId: `EV-${from}-${to}`,
-    candidateId: 'CHG-P1-20260907-001',
+    eventId: `EV-${candidateId}-${from}-${to}`,
+    candidateId,
     from,
     to,
     actorRole: 'A',
@@ -190,7 +194,7 @@ describe('code-health ledger contract', () => {
       confidence: { level: 'high', score: 0.99, rationale: 'no grep hit', uncertainties: ['dynamic import'] },
     });
     expect(validateCodeHealthCandidate(candidate)).toEqual([]);
-    expect(canArchiveCandidate(candidate, validLedger(candidate))).toContain('candidate is not verified');
+    expect(canArchiveCandidate(candidate, validLedger(candidate), validApproval(candidate))).toContain('candidate is not verified');
   });
 
   it('不合法状态跳转、scope 扩展、伪造命令结果和不安全 redaction 都被拒绝', () => {
@@ -210,7 +214,8 @@ describe('code-health ledger contract', () => {
   });
 
   it('command runner 契约保留真实 exitCode/unknown 状态和 raw output hash，禁止 shell 拼接', async () => {
-    const rawOutputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'code-health-output-'));
+    await fs.mkdir(testOutputRoot, { recursive: true });
+    const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-output-'));
     try {
       const runner = createCodeHealthCommandRunner({ rawOutputDir });
       const result = await runner.run(process.execPath, ['--version'], { cwd: repoRoot, env: {}, timeoutMs: 5000 });
@@ -224,5 +229,120 @@ describe('code-health ledger contract', () => {
     } finally {
       await fs.rm(rawOutputDir, { recursive: true, force: true });
     }
+  });
+
+  it('argv/env secrets and sensitive output fail closed before execution and evidence persistence', async () => {
+    await fs.mkdir(testOutputRoot, { recursive: true });
+    const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-secret-output-'));
+    try {
+      const runner = createCodeHealthCommandRunner({ rawOutputDir });
+      await expect(
+        runner.run(process.execPath, ['-e', 'console.log("password=super-secret")'], {
+          cwd: repoRoot,
+          env: { API_TOKEN: 'token-value-that-must-not-run' },
+          timeoutMs: 5000,
+        }),
+      ).rejects.toThrow(/redaction|unsafe|secret/i);
+      expect((await fs.readdir(rawOutputDir)).length).toBe(0);
+    } finally {
+      await fs.rm(rawOutputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('records nonzero, unavailable, and timeout commands with bounded exit codes and redacted output', async () => {
+    await fs.mkdir(testOutputRoot, { recursive: true });
+    const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-outcomes-'));
+    try {
+      const runner = createCodeHealthCommandRunner({ rawOutputDir });
+      const failed = await runner.run(process.execPath, ['-e', 'console.error("failure output") ; process.exit(1)'], {
+        cwd: repoRoot,
+        env: {},
+        timeoutMs: 5000,
+      });
+      expect(failed.exitCode).toBe(1);
+      expect(failed.observation).toBe('observed');
+      const unavailable = await runner.run('definitely-not-a-real-code-health-command', [], {
+        cwd: repoRoot,
+        env: {},
+        timeoutMs: 5000,
+      });
+      expect(unavailable.exitCode).toBeNull();
+      expect(unavailable.observation).toBe('unavailable');
+      const timeout = await runner.run(process.execPath, ['-e', 'setTimeout(() => {}, 1000)'], {
+        cwd: repoRoot,
+        env: {},
+        timeoutMs: 10,
+      });
+      expect(timeout.exitCode).toBeNull();
+      expect(timeout.observation).toBe('not_run');
+      const rawOutput = await fs.readFile(path.resolve(repoRoot, failed.rawOutputPath), 'utf8');
+      expect(rawOutput).not.toMatch(/password|secret|token/i);
+    } finally {
+      await fs.rm(rawOutputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('redacts embedded POSIX and Windows absolute paths and preserves unique concurrent raw outputs', async () => {
+    const redacted = redactCodeHealthArtifact({
+      stdout: 'trace C:\\Users\\alice\\secret.txt /home/alice/secret.txt',
+    });
+    expect(redacted.status).toBe('clean');
+    expect(JSON.stringify(redacted.value)).not.toContain('C:\\Users\\alice');
+    expect(JSON.stringify(redacted.value)).not.toContain('/home/alice');
+
+    await fs.mkdir(testOutputRoot, { recursive: true });
+    const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-concurrent-output-'));
+    try {
+      const runner = createCodeHealthCommandRunner({ rawOutputDir, now: () => new Date('2026-09-07T00:00:00.000Z') });
+      const results = await Promise.all(
+        Array.from({ length: 8 }, () => runner.run(process.execPath, ['-e', 'process.stdout.write("ok")'], {
+          cwd: repoRoot,
+          env: {},
+          timeoutMs: 5000,
+        })),
+      );
+      expect(new Set(results.map((result) => result.rawOutputPath)).size).toBe(8);
+      expect((await fs.readdir(rawOutputDir)).length).toBe(8);
+    } finally {
+      await fs.rm(rawOutputDir, { recursive: true, force: true });
+    }
+  });
+
+  it('archive rejects failed evidence, approval mismatch, unauthorized transitions, and unverifiable rollback', () => {
+    const candidate = validCandidate('CHG-P1-20260907-004', {
+      status: 'verified',
+      review: { findings: [], unresolvedQuestions: [], decision: 'approve', humanDecision: 'approve' },
+      signatures: [
+        { role: 'A', actor: 'analyst', event: 'discovered', scopeHash: 'sha256:' + 'd'.repeat(64), provenanceRef: 'evidence/a.json', signedAt: '2026-09-07T00:01:00.000Z' },
+        { role: 'V', actor: 'verifier', event: 'verified', scopeHash: 'sha256:' + 'd'.repeat(64), provenanceRef: 'evidence/v.json', signedAt: '2026-09-07T00:02:00.000Z' },
+        { role: 'G', actor: 'gate', event: 'gate', scopeHash: 'sha256:' + 'd'.repeat(64), provenanceRef: 'evidence/g.json', signedAt: '2026-09-07T00:03:00.000Z' },
+        { role: 'human', actor: 'human-decision-maker', event: 'approve', scopeHash: 'sha256:' + 'e'.repeat(64), provenanceRef: 'evidence/human.json', signedAt: '2026-09-07T00:04:00.000Z' },
+      ],
+      archive: { state: 'not_archived', manifestPath: null, contentHash: null, redactionStatus: 'clean' },
+    });
+    const ledger = validLedger(candidate);
+    ledger.redaction = { status: 'clean', rules: ['remove secrets'], blockedReasons: [] };
+    candidate.commands[0]!.exitCode = 1;
+    const approval = validApproval(candidate);
+    approval.approvedFiles = ['unknown.ts'];
+    expect(canArchiveCandidate(candidate, ledger, approval)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/exit|pass|failure/i)]),
+    );
+    expect(canArchiveCandidate(candidate, ledger, approval)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/approval|scope/i)]),
+    );
+
+    expect(() => transitionCandidate(validLedger(validCandidate('CHG-P1-20260907-005', { status: 'evidenced' })), 'CHG-P1-20260907-005', {
+      ...event('evidenced', 'under-review', 'CHG-P1-20260907-005'),
+      actorRole: 'V',
+    })).not.toThrow();
+    expect(() => transitionCandidate(validLedger(validCandidate('CHG-P1-20260907-006', { status: 'under-review' })), 'CHG-P1-20260907-006', {
+      ...event('under-review', 'approved', 'CHG-P1-20260907-006'),
+      actorRole: 'A',
+    })).toThrow(/human|approval/);
+    expect(() => transitionCandidate(validLedger(validCandidate('CHG-P1-20260907-007', { status: 'blocked' })), 'CHG-P1-20260907-007', {
+      ...event('blocked', 'rolled-back', 'CHG-P1-20260907-007'),
+      evidenceRefs: ['evidence/rollback.json'],
+    })).toThrow(/rollback|verified|real/i);
   });
 });

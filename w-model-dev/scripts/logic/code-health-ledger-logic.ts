@@ -33,7 +33,7 @@ export interface CommandEvidence {
   toolVersions: Record<string, string>;
   startedAt: string;
   endedAt: string;
-  exitCode: number | null;
+  exitCode: 0 | 1 | 2 | null;
   observation: EvidenceObservationStatus;
   rawOutputPath: string;
   rawOutputSha256: string;
@@ -105,7 +105,7 @@ export interface CodeHealthCandidate {
     findings: string[];
     unresolvedQuestions: string[];
     decision: ReviewDecision | null;
-    humanDecision: 'approve' | 'reject' | 'defer' | null;
+    humanDecision: ReviewDecision | null;
   };
   signatures: SignatureRecord[];
   changeScope: { files: string[]; symbols: string[]; scopeHash: string };
@@ -128,6 +128,7 @@ export interface LedgerEvent {
   revision: RevisionIdentity;
   evidenceRefs: string[];
   signatureRef: string;
+  rollbackEvidence?: CommandEvidence;
 }
 
 export interface EnvironmentObservation {
@@ -355,6 +356,26 @@ export interface CodeHealthCommandRunner {
     args: string[],
     options: { cwd: string; env: Record<string, string>; timeoutMs: number },
   ): Promise<CommandEvidence>;
+}
+
+export interface Phase1RunResult {
+  exitCode: 0 | 1 | 2;
+  report: { candidates: CodeHealthCandidate[]; commands: CommandEvidence[]; unexercisedScenarios: string[] };
+  changedFiles: string[];
+}
+
+export interface ArchiveResult {
+  exitCode: 0 | 1 | 2;
+  path: string;
+  manifest: { files: Array<{ path: string }> };
+  verificationLevel: 'package-only' | 'source-bound';
+  reason?: string;
+}
+
+export interface EvalDiffInput {
+  changedBehavior: boolean;
+  prompts: unknown[];
+  mappings: unknown;
 }
 
 const ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
@@ -660,6 +681,7 @@ export function transitionCandidate(
   ledger: CodeHealthLedger,
   candidateId: string,
   event: LedgerEvent,
+  approval?: ApprovalDecision,
 ): CodeHealthLedger {
   const current = ledger.candidates.find((candidate) => candidate.candidateId === candidateId);
   if (!current) throw new Error(`transition candidate not found: ${candidateId}`);
@@ -676,11 +698,32 @@ export function transitionCandidate(
     throw new Error('transition evidence is incomplete');
   if (!NORMAL_TRANSITIONS[current.status].includes(event.to))
     throw new Error(`transition ${current.status} -> ${event.to} is not allowed`);
-  if (event.to === 'rolled-back' && !event.evidenceRefs.some((ref) => /rollback|revert|patch/i.test(ref))) {
-    throw new Error('transition rollback requires real evidence');
+  if (event.to === 'rolled-back') {
+    if (event.actorRole !== 'S' && event.actorRole !== 'human') throw new Error('rollback transition requires S or human authorization');
+    if (!event.rollbackEvidence || event.rollbackEvidence.observation !== 'observed' || event.rollbackEvidence.exitCode !== 0) {
+      throw new Error('transition rollback requires observed zero-exit rollback evidence');
+    }
+    if (!event.evidenceRefs.some((ref) => /rollback|revert|patch/i.test(ref))) {
+      throw new Error('transition rollback evidence reference is incomplete');
+    }
   }
-  if (event.to === 'approved' && event.actorRole !== 'human') {
-    throw new Error('transition approval requires a human actor');
+  const roleForTransition: Partial<Record<CodeHealthStatus, LedgerEvent['actorRole'][]>> = {
+    evidenced: ['A', 'S'],
+    'under-review': ['V'],
+    approved: ['human'],
+    implemented: ['S'],
+    verified: ['V', 'G'],
+    archived: ['G', 'human'],
+    blocked: ['G', 'V', 'S', 'R', 'human'],
+  };
+  if (roleForTransition[event.to] && !roleForTransition[event.to]!.includes(event.actorRole)) {
+    throw new Error(`transition ${event.to} requires an authorized human role`);
+  }
+  if (event.to === 'approved') {
+    if (event.actorRole !== 'human') throw new Error('transition approval requires a human actor');
+    if (!approval || validateApprovalScope(current, approval).length > 0 || approval.decision !== 'approve') {
+      throw new Error('transition approval requires a matching human ApprovalDecision');
+    }
   }
 
   const candidates = ledger.candidates.map((candidate) =>
@@ -723,23 +766,91 @@ export function validateApprovalScope(candidate: CodeHealthCandidate, approval: 
   return reasons;
 }
 
-export function canArchiveCandidate(candidate: CodeHealthCandidate, ledger: CodeHealthLedger): string[] {
+export function canArchiveCandidate(
+  candidate: CodeHealthCandidate,
+  ledger: CodeHealthLedger,
+  approval?: ApprovalDecision,
+): string[] {
   const reasons = validateCodeHealthCandidate(candidate);
   const ledgerCandidate = ledger.candidates.find((entry) => entry.candidateId === candidate.candidateId);
   if (!ledgerCandidate) reasons.push('candidate is not present in ledger');
-  if (ledgerCandidate && !sameRevision(candidate.revision, ledger.baseline))
-    reasons.push('candidate revision is stale');
+  if (ledgerCandidate) {
+    if (ledgerCandidate.status !== candidate.status) reasons.push('candidate and ledger status are inconsistent');
+    if (ledgerCandidate.action !== candidate.action) reasons.push('candidate and ledger action are inconsistent');
+    if (!sortedEqual(ledgerCandidate.changeScope.files, candidate.changeScope.files)) reasons.push('candidate and ledger files are inconsistent');
+    if (!sortedEqual(ledgerCandidate.changeScope.symbols, candidate.changeScope.symbols)) reasons.push('candidate and ledger symbols are inconsistent');
+    if (ledgerCandidate.changeScope.scopeHash !== candidate.changeScope.scopeHash) reasons.push('candidate and ledger scopeHash are inconsistent');
+  }
+  if (!sameRevision(candidate.revision, ledger.baseline)) reasons.push('candidate revision is stale');
   if (candidate.status !== 'verified') reasons.push('candidate is not verified');
   if (candidate.archive.redactionStatus !== 'clean' || ledger.redaction.status !== 'clean')
     reasons.push('archive redaction is not clean');
-  if (!candidate.rollback.executable) reasons.push('rollback is not executable');
+  if (!candidate.rollback.executable || !isRelativePath(candidate.rollback.patchPath)) reasons.push('rollback is not executable or path is unsafe');
+  if (!candidate.rollback.command || /[;&|<>\r\n]/.test(candidate.rollback.command)) reasons.push('rollback command is unsafe');
   if (candidate.review.decision !== 'approve' || candidate.review.humanDecision !== 'approve')
     reasons.push('human approval is missing');
+  if (!approval) reasons.push('ApprovalDecision is missing');
+  else reasons.push(...validateApprovalScope(candidate, approval));
+  for (const command of candidate.commands) {
+    if (command.observation !== 'observed' || command.exitCode !== 0) reasons.push('required command evidence did not pass');
+    if (!isRelativePath(command.rawOutputPath)) reasons.push('command raw output path is unsafe');
+  }
   const roles = new Set(candidate.signatures.map((signature) => signature.role));
   for (const role of ['V', 'G', 'human'] as const) if (!roles.has(role)) reasons.push(`signature is missing: ${role}`);
+  if (approval && !candidate.signatures.some((signature) => signature.role === 'human' && signature.event === 'approve' && signature.scopeHash === approval.scopeHash)) {
+    reasons.push('human approval signature is not bound to approval scope');
+  }
   if (ledger.environmentMatrix.some((environment) => environment.supported && environment.observed !== 'observed'))
     reasons.push('required environment is not observed');
   if (ledger.events.some((event) => event.candidateId === candidate.candidateId && event.to === 'blocked'))
     reasons.push('candidate has a blocking event');
   return [...new Set(reasons)];
+}
+
+export function recordGateFailure(ledger: CodeHealthLedger, evidence: CommandEvidence): CodeHealthLedger {
+  const candidate = ledger.candidates.find((entry) => entry.status !== 'archived' && entry.status !== 'rejected' && entry.status !== 'deferred');
+  if (!candidate) return ledger;
+  const event: LedgerEvent = {
+    eventId: `EV-GATE-FAIL-${candidate.candidateId}-${ledger.events.length + 1}`,
+    candidateId: candidate.candidateId,
+    from: candidate.status,
+    to: 'blocked',
+    actorRole: 'G',
+    at: evidence.endedAt,
+    revision: candidate.revision,
+    evidenceRefs: [evidence.rawOutputPath],
+    signatureRef: 'evidence/signature-gate-failure.json',
+  };
+  return transitionCandidate(ledger, candidate.candidateId, event);
+}
+
+export function nextRequiredRoles(ledger: CodeHealthLedger): Array<'R' | 'V' | 'G' | 'S'> {
+  const blocked = ledger.candidates.some((candidate) => candidate.status === 'blocked') || ledger.events.some((event) => event.to === 'blocked');
+  return blocked ? ['R', 'V', 'G', 'S'] : [];
+}
+
+export function validateEvalDiff(input: EvalDiffInput): string[] {
+  if (input.changedBehavior) return [];
+  if (!Array.isArray(input.prompts)) return ['prompts must be an array'];
+  if (!isRecord(input.mappings) && !Array.isArray(input.mappings)) return ['mappings must be an object or array'];
+  return [];
+}
+
+export async function archiveCampaign(campaign: CodeHealthLedger): Promise<ArchiveResult> {
+  const candidate = campaign.candidates[0];
+  if (!candidate) return { exitCode: 1, path: '', manifest: { files: [] }, verificationLevel: 'package-only', reason: 'candidate is missing' };
+  const reasons = canArchiveCandidate(candidate, campaign);
+  if (reasons.length > 0) return { exitCode: 1, path: '', manifest: { files: [] }, verificationLevel: 'package-only', reason: reasons.join('; ') };
+  return {
+    exitCode: 0,
+    path: candidate.archive.manifestPath ?? `archive/${candidate.candidateId}.json`,
+    manifest: { files: [{ path: candidate.evidenceRef }] },
+    verificationLevel: 'source-bound',
+  };
+}
+
+export async function verifyArchive(archivePath: string): Promise<{ ok: boolean; verificationLevel: 'package-only' | 'source-bound' }> {
+  return isRelativePath(archivePath) && archivePath.length > 0
+    ? { ok: true, verificationLevel: 'package-only' }
+    : { ok: false, verificationLevel: 'package-only' };
 }
