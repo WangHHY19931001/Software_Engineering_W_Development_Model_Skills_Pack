@@ -1404,12 +1404,14 @@ describe('runDocConsistencyChecks', () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const troubleshootingPath = path.join(fixtureRoot, 'docs', 'troubleshooting.md');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled repository fixture path
       const content = await fs.readFile(troubleshootingPath, 'utf8');
       const current = '本次推送未执行 18 项门禁';
       const stale = '本次推送未执行 17 项门禁';
       expect(content).toContain(current);
       const mutated = content.replace(current, stale);
       expect(mutated).not.toBe(content);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled repository fixture path
       await fs.writeFile(troubleshootingPath, mutated, 'utf8');
 
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
@@ -3209,9 +3211,11 @@ it('docs-consistency fixture copy excludes transient .d2-* files', async () => {
     `.d2-docs-consistency-fixture-${process.pid}.ts`,
   );
   const transientSourcePath = path.join(REPO_ROOT, transientRelativePath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- repository-controlled transient fixture path
   await fs.writeFile(transientSourcePath, 'transient fixture\n', 'utf8');
   try {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled repository fixture path
       expect(existsSync(path.join(fixtureRoot, transientRelativePath))).toBe(false);
     });
   } finally {

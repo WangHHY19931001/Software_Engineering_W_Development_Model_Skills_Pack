@@ -192,4 +192,4 @@ npm run prepush
 npx tsx eval/runner.ts
 ```
 
-验收：完整测试 70 个文件 / 1608 个既有用例加 4 个新用例（共 1612 个）全部通过；pre-push 18/18 exit 0；eval 60/60；真实 `docs/troubleshooting.md` 从未被负向测试修改；`git status --short` 干净。
+验收：完整测试 70 个文件 / 1608 个既有用例加 4 个新用例（共 1613 个）全部通过；pre-push 18/18 exit 0；eval 60/60；真实 `docs/troubleshooting.md` 从未被负向测试修改；`git status --short` 干净。
