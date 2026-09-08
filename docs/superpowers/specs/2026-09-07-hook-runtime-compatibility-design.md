@@ -13,11 +13,11 @@
 当前本地 hook 的事实如下：
 
 1. `.githooks/pre-push` 在 Git Bash / WSL 中执行；纯 cmd / PowerShell 没有 Bash 时保留现有提示并以 `exit 0` 放行，提醒用户改用 Git Bash 补跑门禁。
-2. 路径过滤、stdin ref 解析、delete-only、新分支基线回退和 fail-closed 语义先于依赖检查；只有命中门禁相关变更时才进入依赖检查。
-3. 依赖检查先要求 `npm` 可用，再要求存在 `node_modules`，然后以当前 shell 执行 `bash .githooks/ensure-platform-deps.sh --check`。当前 `--check` 只读，缺失时提示手工运行 `npm run platform-deps:install`。
-4. 依赖满足后，hook 按固定顺序执行 18 项门禁。`npm audit` 的已批准网络瞬态跳过规则、其它失败的阻断规则和纯 Windows shell 的放行语义均属于现有契约。
+2. 实现前的当前 hook 将路径过滤、stdin ref 解析、delete-only、新分支基线回退和 fail-closed 语义置于依赖检查之前；只有命中门禁相关变更时才进入依赖检查。
+3. 实现前的当前 hook 先要求 `npm` 可用，再要求存在 `node_modules`，然后以当前 shell 执行 `bash .githooks/ensure-platform-deps.sh --check`。当时的 `--check` 只读，缺失时提示手工运行 `npm run platform-deps:install`；这不是本规格的目标行为。
+4. 实现前的当前 hook 在依赖满足后按固定顺序执行 18 项门禁。`npm audit` 的已批准网络瞬态跳过规则、其它失败的阻断规则和纯 Windows shell 的放行语义均属于保留契约。
 5. `.githooks/ensure-platform-deps.sh` 通过当前执行的 Node 读取 `process.platform` / `process.arch`，目前只支持 `win32-x64` 和 `linux-x64`；其它平台 fail-closed，并提示手工处理。
-6. 现有测试已锁定 `--check` 不执行 npm、tar、解包或 node_modules 写入，以及缺失依赖时拒绝推送。实现本规格时，这些与“条件命中后执行 `npm ci`”直接冲突的测试断言必须更新为新契约；其余安全测试和 hook 顺序测试必须保留并扩展。
+6. 现有测试已锁定 `--check` 不执行 npm、tar、解包或 node_modules 写入，以及缺失依赖时拒绝推送。这里记录的是实现前的基线；实现本规格时，与“命中兼容性条件后执行 `npm ci`”直接冲突的 hook 断言必须更新为新契约。`--check` 的独立显式命令仍保持只读，不能把条件重建误实现为平台依赖补装；其余安全测试和 hook 顺序测试必须保留并扩展。除本段明确标为历史基线的描述外，本文不再把“pre-push 永不安装依赖”作为有效行为。
 
 问题是同一 checkout 在 Git Bash 与 WSL 之间复用 `node_modules` 时，目录可能来自另一套运行环境：Git Bash 通常使用 Windows Node（`process.platform=win32`），WSL 使用 Linux Node（`process.platform=linux`），原生包和执行器脚本可能因此不可加载。仅检查目录存在或检查少数平台包，无法证明 `node_modules` 由当前 Node/npm、当前主版本和当前 `package-lock.json` 产生。反向复用还可能让本应失败的 hook 在错误环境中继续执行，造成执行器、原生二进制和日志诊断不一致。
 
@@ -53,9 +53,9 @@
 
 | 值         | 适用环境                                                 | 必须核验的信号                                                                                                                                                              |
 | ---------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `git-bash` | Git for Windows 的 MSYS2 / MINGW Bash                    | `MSYSTEM` 为已知 `MINGW*` / `MSYS*` 值，或 `OSTYPE` 为 `msys*` / `mingw*`，或 `uname -s` 为 `MINGW*` / `MSYS*` / `CYGWIN*`；同时核对当前 Node 的平台结果                    |
+| `git-bash` | Git for Windows 的 MSYS2 / MINGW Bash                    | `MSYSTEM` 为已知 `MINGW*` / `MSYS*` 值，或 `OSTYPE` 为 `msys*` / `mingw*`，或 `uname -s` 为 `MINGW*` / `MSYS*` / `CYGWIN*`；至少一个信号必须存在且可读，同时核对当前 Node 的平台结果 |
 | `wsl`      | Windows Subsystem for Linux 内的 Bash                    | `WSL_INTEROP` 或 `WSL_DISTRO_NAME` 存在且非空，或 `/proc/version` / `/proc/sys/kernel/osrelease` 含可验证的 WSL 标识；同时要求 `uname -s=Linux`，并核对当前 Node 的平台结果 |
-| `posix`    | 非 WSL 的 Linux / macOS / BSD 等 POSIX shell             | `OSTYPE` / `uname -s` 与非 WSL 的 POSIX 信号一致，且没有被识别为 Git Bash 或 WSL                                                                                            |
+| `posix`    | 非 WSL 的 Linux / macOS / BSD 等 POSIX shell             | `OSTYPE` / `uname -s` 与非 WSL 的 POSIX 信号一致，且没有被识别为 Git Bash 或 WSL；至少一个 OS 信号必须存在且可读 |
 | `unknown`  | 信号冲突、信号缺失且无法可靠归类、探测命令失败或输出异常 | 不得继续依赖复用；按第 8 节 fail-closed 处理                                                                                                                                |
 
 检测顺序必须先排除信号冲突，再分类：
@@ -63,7 +63,7 @@
 1. 读取并校验 `MSYSTEM`、`OSTYPE`、`uname -s`，检查 Git Bash/MSYS/MINGW 信号。
 2. 读取 `WSL_INTEROP`、`WSL_DISTRO_NAME`，必要时读取 `/proc/version` 与 `/proc/sys/kernel/osrelease`，检查 WSL 信号。
 3. 用 `uname -s` 与当前 Node 的 `process.platform` / `process.arch` 交叉验证。
-4. 任一强信号相互矛盾（例如同时呈现 Git Bash 与 WSL、WSL 信号存在但 `uname` 非 Linux、Git Bash 信号存在但当前 Node 非 `win32`），或无法确认分类时，记录 `shellFamily=unknown` 并 fail-closed；不得猜测为 Git Bash 或 WSL。
+4. 任一强信号相互矛盾（例如同时呈现 Git Bash 与 WSL、WSL 信号存在但 `uname` 非 Linux、Git Bash 信号存在但当前 Node 非 `win32`），或无法确认分类时，记录 `shellFamily=unknown` 并 fail-closed；不得猜测为 Git Bash 或 WSL。`CYGWIN*` 只能作为 Bash-capable MSYS/Cygwin 信号，不能单独证明 Git for Windows；若无法与当前 Node 平台和其它信号一致，分类为 `unknown`。
 
 `MSYSTEM`、`OSTYPE`、`WSL_*` 和 `/proc` 内容属于探测输入，不写入指纹中的任意原始环境变量字段；日志只记录经过白名单归一化的分类和必要的布尔探测结果，避免泄露用户环境细节。
 
@@ -71,15 +71,15 @@
 
 Node/npm 必须来自当前 hook 执行器，而不是来自历史指纹、另一侧 checkout、固定路径或未经审计的用户 `PATH`：
 
-- Node 的真实可执行文件路径由当前 shell 解析，并由该 Node 自己输出 `process.execPath`、`process.version`、`process.platform` 和 `process.arch`。
-- npm 的真实可执行文件路径由当前 shell 解析；实现必须记录解析结果，并通过该 npm 的 `--version` 或等价受控探测获得 npm 版本。
-- `node`、`npm` 的路径必须是绝对路径，或先由受控解析转换为绝对路径后再调用。日志记录规范化路径和版本，但对用户目录、令牌、registry 参数做脱敏。
-- 解析结果必须绑定本次 hook 的进程。不能从 provenance 直接取旧路径，也不能静默用 PATH 中后来发现的第二套 npm 替代初始解析结果。
-- 推荐的受控调用边界是：先解析一次 Node 与 npm，验证两者可执行且版本可读；随后所有环境探测、`npm ci`、平台检查和 package script 调用均使用已解析的绝对路径。若无法保持该绑定，立即 fail-closed。
+- 兼容性预检必须通过当前 shell 的可执行文件解析（Bash 中使用 `type -P` 或等价的当前-shell lookup）各解析一次 `node` 与 `npm`。解析结果必须是一个非空、可执行的绝对路径；解析到 alias、function、builtin、相对路径或不可执行目标时立即 fail-closed。解析出的第一个目标就是本次 hook 的唯一目标，不能为“更合适”的候选再次扫描 `PATH`。
+- Node 的解析路径必须由该 Node 自己输出的 `process.execPath`、`process.version`、`process.platform` 和 `process.arch` 交叉核验；`process.execPath` 与解析路径必须在当前平台的规范化规则下指向同一可执行文件。
+- npm 的解析路径必须被记录为 `npm.resolvedPath`，并通过该绝对路径的 `--version` 或等价受控探测获得 npm 版本。后续 `npm ci`、`npm run` 和其它 npm 调用只能使用这个已解析路径；不能从 provenance 取旧路径，也不能静默用 PATH 中后来发现的第二套 npm 替代它。
+- `node.resolvedPath`、`node.execPath`、`npm.resolvedPath`、版本和平台信息都必须绑定本次 hook 进程。日志记录规范化后的脱敏路径和版本，但不记录完整 `PATH`、npm 配置或凭据。
+- 实现必须在预检阶段固定 Node/npm 句柄或绝对路径，并将同一绑定传递给环境探测、`npm ci`、平台检查和 package script 调用；若任一调用重新解析到不同目标或无法证明绑定，立即 fail-closed。
 - 现有门禁中出现的 `npx` 不能在预检后再次通过未审计的 `PATH` 解析。实现必须将其绑定到同一 npm/node 工具链（例如使用已解析 npm 的受控 `exec` 入口，或解析并核验 `npx` 与 npm 同目录且版本归属一致），并记录实际路径；无法证明绑定时，直接 fail-closed。
 - `npm ci` 的 `cwd` 必须是当前 Git checkout 根目录，参数必须是实现定义且经审计的固定参数集合，不得拼接未验证的用户输入。除项目根和当前锁文件外，不从 npm 配置、registry 输出或包内容推导可执行路径。
 
-Node 主版本与 npm 主版本均是匹配字段。版本值必须由当前执行器输出并按合法语义版本解析；无法读取、解析失败或版本不在仓库引擎约束内时，不得盲目复用，直接阻断并提示使用当前支持的 Node/npm 修复环境。
+Node 主版本与 npm 主版本均是匹配字段。版本值必须由当前执行器输出并按合法语义版本解析；Node 版本必须满足仓库 `engines.node >=20`，npm 版本必须可读取且可解析。任一版本无法读取或解析，或 Node 不满足引擎约束时，不得盲目复用，直接阻断并提示使用当前支持的 Node/npm 修复环境；合法但不同的 npm 主版本按矩阵触发重建。
 
 ### 4.3 平台分类
 
@@ -103,7 +103,7 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 
 `.w-model/` 已是本地生成物目录并被 Git 忽略。指纹仅描述仓库根 `node_modules`，不描述 Agent-specific 的 L0 Skill 目录，也不作为审计证据或密码学签名。
 
-若 `.w-model/` 不存在，实现可在受控目录创建它；若无法创建或无法写入，重建后的 hook 必须 fail-closed，因为无法完成 provenance 记录。指纹文件读取失败、空文件、非 UTF-8 JSON、JSON 顶层不是对象、schema 版本未知或任一字段非法，都按“指纹损坏”处理并触发重建；不允许把损坏值当作未变更的证明。
+若 `.w-model/` 不存在，实现可在受控目录创建它；若无法创建或无法写入，重建后的 hook 必须 fail-closed，因为无法完成 provenance 记录。指纹文件若能读取但为空、不是 UTF-8 JSON、JSON 顶层不是对象、schema 版本未知或任一字段非法，按“指纹损坏”处理并触发重建；若文件因权限、I/O 或其它读取错误而不可读，则直接 fail-closed，不得把读取失败伪装成损坏后重建。任何情形都不允许把未知或损坏值当作未变更的证明。
 
 ### 5.2 Schema
 
@@ -120,14 +120,18 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
     "arch": "x64"
   },
   "node": {
+    "resolvedPath": "/usr/bin/node",
     "execPath": "/usr/bin/node",
     "version": "v20.19.0",
     "major": 20
   },
   "npm": {
-    "execPath": "/usr/bin/npm",
+    "resolvedPath": "/usr/bin/npm",
     "version": "10.8.2",
     "major": 10
+  },
+  "nodeModules": {
+    "path": "node_modules"
   },
   "packageLock": {
     "path": "package-lock.json",
@@ -143,7 +147,8 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 - `checkoutRoot` 必须是当前 `git rev-parse --show-toplevel` 解析得到的绝对、规范化路径；无法取得或不能确认当前 checkout 根目录时 fail-closed。比较路径时使用当前平台规范化规则；不得把 Git Bash `/d/...` 与 WSL `/mnt/d/...` 仅按字符串改写后当作相同 Node 环境。
 - `shellFamily` 只能取已核验的值，不能写 `unknown` 作为可复用 provenance；无法分类时不写入可用指纹，直接阻断或完成重建后仍阻断。
 - `process.platform` 与 `process.arch` 必须是当前 Node 的精确输出，不能从 `uname` 或历史文件代填。
-- `node.execPath`、`node.version`、`node.major`、`npm.execPath`、`npm.version`、`npm.major` 必须来自本次执行器解析和探测。版本主数必须与完整版本一致。
+- `node.resolvedPath`、`node.execPath`、`node.version`、`node.major`、`npm.resolvedPath`、`npm.version`、`npm.major` 必须来自本次执行器解析和探测。Node 的 `execPath` 与 `resolvedPath` 必须一致；版本主数必须与完整版本一致。
+- `nodeModules.path` 固定为 checkout 根相对路径 `node_modules`，只描述被 hook 检查和重建的依赖目录。
 - `packageLock.path` 固定为 checkout 根相对路径 `package-lock.json`；hash 是对该文件当前原始字节按 SHA-256 计算的 lowercase hex，不能对解析后的 JSON、格式化内容或换行归一化后再 hash。
 - `createdAt` 只用于诊断，不能参与匹配判定；时间不可解析时指纹仍视为损坏，成功写入使用 UTC ISO 8601。
 - 不记录 PATH 全文、npm 配置全文、registry URL、认证信息、用户 token、原始 WSL 版本字符串或完整环境变量快照。
@@ -161,6 +166,8 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 
 指纹只用于判断“是否需要重建”，不是安装成功证明。即使恶意进程预先伪造了一个字段齐全的指纹，后续实现也必须在使用前重新探测当前 Node/npm、重新计算 lockfile hash，并检查目录及平台依赖；伪造指纹不能使不匹配环境继续执行。对于同 UID / 同 Windows 访问令牌进程直接篡改 checkout、锁文件或 `node_modules` 的主体，沿用仓库既有威胁模型：不声明对该主体提供不可抵赖或 OS 级隔离。
 
+实现可以清理 npm 自己在 `npm ci` 生命周期中管理的依赖目录内容，但不得在调用 npm 前由 hook 手工 `rm -rf node_modules`、手工解包或执行其它替代性重建；hook 的清理责任仅限自身临时文件和已确认归属的锁文件。
+
 ## 6. Hook 数据流与调用顺序
 
 以下顺序是行为契约。路径过滤之前不做可能产生网络或写盘副作用的依赖重建。
@@ -168,17 +175,44 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 1. 保留现有参数解析、`--force` / `PREPUSH_FORCE` 处理、纯 cmd / PowerShell 检测、Git push stdin ref 解析、路径范围聚合、delete-only 放行和 fail-closed 回退。
 2. 未命中门禁路径时按现有语义放行；命中后进入兼容性预检。
 3. 通过当前 Bash 的受控方式解析一次 `node` 和 `npm` 绝对路径；记录 `nodePath` / `npmPath` 的脱敏诊断信息。任一缺失、不可执行、解析为多个不一致目标或版本不可读时，输出明确原因并 `exit 1`。
-4. 使用该 Node 取得 `process.execPath`、Node 版本、`process.platform`、`process.arch`；使用该 npm 取得 npm 版本。校验 shellFamily，禁止把 Git Bash 与 WSL 合并。先执行支持平台前置检查；当前组合不是 `win32-x64` 或 `linux-x64` 时立即 `exit 1`，不执行 `npm ci`。
+4. 使用已解析的绝对 Node 取得 `process.execPath`、Node 版本、`process.platform`、`process.arch`；使用已解析的绝对 npm 取得 npm 版本。校验 shellFamily，禁止把 Git Bash 与 WSL 合并。先执行仅依据当前 Node 的支持平台前置判定；当前组合不是 `win32-x64` 或 `linux-x64` 时立即 `exit 1`，不执行 `npm ci`。此处不运行 `ensure-platform-deps.sh --check`，因为首次重建时平台包尚未存在；该完整平台依赖检查只在复用路径或 `npm ci` 后验路径执行。
 5. 取得当前 checkout 根目录并读取 `package-lock.json`；无法读取、hash 失败或 checkout 根不确定时 `exit 1`。在判断是否复用前，不得使用旧指纹补齐任何未知字段。
 6. 读取 `.w-model/node-modules-provenance.json`，按 schema 和一致性规则验证。缺失、损坏、schema 不符、shellFamily 不同、checkout 根不同、Node/npm 路径或主版本不同、`process.platform` / `process.arch` 不同、lockfile SHA-256 不同，均标记为需要重建。
 7. 若无需重建，执行当前 `ensure-platform-deps.sh --check`，且该检查必须使用已解析并绑定的 Node/npm 语境。检查失败则 `exit 1`，不得执行门禁。
-8. 若需要重建，取得 checkout 级互斥锁；锁等待期间重新执行步骤 3–7，因为另一个 hook 可能已完成重建。若复核后已匹配且平台检查通过，释放锁并继续，不重复 `npm ci`。
+8. 若需要重建，取得 checkout 级互斥锁；锁等待期间只做有限等待，不修改 `node_modules` 或 provenance。成功取得锁后，重新执行当前 shell、Node、npm、平台和 lockfile 探测，并重新读取 provenance；因为另一个 hook 可能已完成重建，若复核后已匹配且平台检查通过，释放锁并继续，不重复 `npm ci`。若重算仍不匹配，锁持有者才进入步骤 9。
 9. 锁持有者在 lockfile hash、当前 Node/npm、shellFamily 和平台再次确认后，以当前解析的绝对 npm 执行固定形式的 `npm ci`，`cwd` 为 checkout 根。不得先手工 `rm -rf node_modules`，不得切换到另一 npm，不得执行 `npm install` 代替 `npm ci`。`npm ci` 的生命周期脚本按当前 package.json 正常执行，既有 `postinstall` 行为继续受现有契约约束。
 10. `npm ci` 返回非零、被信号终止、超时、权限失败、lockfile 被并发修改或输出显示配置/解析错误时，记录脱敏摘要、删除本次临时文件、释放锁并 `exit 1`；不执行平台检查，不执行任何门禁。网络错误也不能让 hook继续门禁，用户需在环境恢复后重试。
 11. `npm ci` 成功后重新执行当前 Node/npm 和 lockfile 探测；确认 `node_modules` 与 `.bin/tsx` 等门禁运行时可用，并调用 `ensure-platform-deps.sh --check`。任一失败不写 provenance，释放锁并 `exit 1`。
 12. 由当前实测值构造并原子写入指纹；回读复核成功后释放锁。指纹写入失败不影响旧文件的保留策略，但本次 hook 必须 `exit 1`，不得以“npm ci 已成功”为由继续门禁。
 13. 释放锁后进入现有门禁段。18 项门禁的编号、命令、期望退出码和顺序保持不变；兼容性预检和可能的 `npm ci` 不计入 18 项，不得静默删除、重排、放宽任一门禁。
 14. 保留现有清理 trap、审计输出和最终 exit 语义。依赖兼容性失败统一阻断（`exit 1`）；纯 cmd / PowerShell 仍在步骤 1 以既有提示 `exit 0` 放行，不因无法运行 Bash 而尝试从 cmd / PowerShell 选择 npm 或自动安装。
+
+### 6.1 既有 18 项门禁的冻结顺序与退出语义
+
+兼容性预检及其可能执行的 `npm ci` 不计入下表。实现必须按下表顺序执行，不得因重建、复用或日志处理而插入、删除、重排或放宽门禁。命令中的临时 vitest 输出路径仍由 hook 创建；其余路径和参数保持当前 hook 定义。
+
+| # | 当前命令或检查 | 放行条件 |
+| --- | --- | --- |
+| 1 | `npm run self-test` | exit `0` |
+| 2 | `npm run check:verifier`（无参数输入错误样本） | exit `2` |
+| 3 | `npm run check:gate -- /tmp/nonexistent` | exit `2` |
+| 4 | `npm run check:verifier -- w-model-dev/scripts/samples/verifier/valid.json` | exit `0` |
+| 5 | `npm run check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json` | exit `1` |
+| 6 | `npx tsx w-model-dev/scripts/cli/security-scan.ts` | exit `0` |
+| 7 | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1` | exit `0` |
+| 8 | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1` | exit `2` |
+| 9 | `npm run check:coverage -- w-model-dev/scripts/samples/coverage/valid-minimal-coverage.json` | exit `0` |
+| 10 | `npm run check:exemption -- w-model-dev/scripts/samples/exemption/valid-full-approval.json` | exit `0` |
+| 11 | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1` | exit `0` |
+| 12 | `npx vitest run --coverage --reporter=json --outputFile=<hook-temp-json> --config config/vitest.config.ts` | exit `0` |
+| 13 | `npm audit --audit-level=high` | exit `0`, or the existing narrowly recognized network/unsupported-endpoint result is warned and skipped; all vulnerability, parse, permission, configuration, and other failures are exit `1` |
+| 14 | `npm run check:docs-consistency` using the step-12 JSON and provenance | exit `0` |
+| 15 | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` | exit `0` |
+| 16 | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"` | exit `0` |
+| 17 | `npx tsc -p config/tsconfig.json` | exit `0` |
+| 18 | `npx tsx eval/runner.ts` | exit `0` |
+
+`npm audit` 的网络/unsupported-endpoint 例外仅限第 13 项；兼容性预检中的 `npm ci` 失败永远阻断。当前 hook 的临时 vitest 统计与 provenance 传递给第 14 项的方式必须保持不变。
 
 ## 7. `npm ci` 重建触发矩阵
 
@@ -188,17 +222,19 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 | ---------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------- |
 | `node_modules` 缺失                                        | 重建                                     | 不再仅提示手工安装；当前 npm 执行 `npm ci`，失败即阻断     |
 | `node_modules` 存在，但 provenance 文件缺失                | 重建                                     | 缺失不能证明来源                                           |
-| provenance 为空、非法 JSON、非对象、未知版本或任一字段损坏 | 重建                                     | 损坏不能降级为匹配                                         |
+| provenance 可读但为空、非法 JSON、非对象、未知版本或任一字段损坏 | 重建                                     | 损坏不能降级为匹配                                         |
 | shellFamily 变化（Git Bash ↔ WSL，或其它已知类别变化）     | 重建                                     | 同一 checkout 路径不改变此规则                             |
 | shellFamily 检测不确定或信号冲突                           | 不盲目重建后放行；fail-closed            | 无法生成可信指纹，阻断并提示修复当前 Bash/WSL 识别环境     |
 | 当前 Node `process.platform` 变化                          | 重建                                     | `win32` 与 `linux` 永不互换                                |
 | 当前 Node `process.arch` 变化                              | 支持矩阵内重建；其它平台直接 fail-closed | 非 `x64` 平台不得执行 `npm ci`                             |
 | 当前 Node 可执行路径变化                                   | 重建                                     | 路径属于执行器身份，不能复用旧环境                         |
 | Node 主版本变化                                            | 重建                                     | 版本必须来自当前 Node；不满足 `engines.node >=20` 时阻断   |
+| Node/npm 版本无法读取或解析                                 | fail-closed                              | 不得用旧 provenance 补齐；Node 不满足 `engines.node >=20` 时同样阻断 |
 | npm 可执行路径变化                                         | 重建                                     | 不允许静默选择另一套 npm                                   |
-| npm 主版本变化                                             | 重建                                     | 版本来自当前 npm                                           |
+| npm 主版本变化                                             | 重建                                     | 版本来自当前 npm；合法但不同的主版本触发重建               |
 | 当前 `package-lock.json` SHA-256 变化                      | 重建                                     | 对原始文件字节 hash                                        |
-| checkout root 变化或无法确认                               | 重建后仍 fail-closed                     | 不能把另一个 checkout 的 provenance 当作本 checkout 的证明 |
+| checkout root 变化，但当前 root 可确认                       | 重建                                     | 当前 checkout 已知时，旧 provenance 只是来源不匹配         |
+| checkout root 无法确认或 provenance 文件存在但不可读         | fail-closed                              | 不执行 `npm ci`，不能用旧字段补齐或绕过权限问题           |
 | 所有字段匹配，但平台包缺失或平台未支持                     | 不写新指纹，fail-closed                  | `ensure-platform-deps --check` 仍是阻断检查                |
 | 所有字段匹配、平台检查通过                                 | 不重建                                   | 直接进入既有 18 项门禁                                     |
 | `npm ci` 成功但后验探测、平台检查或指纹原子写入失败        | fail-closed                              | 不继续门禁，也不写不完整指纹                               |
@@ -232,7 +268,7 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 ### 8.3 并发 hook
 
 - 以 checkout 根为粒度设置互斥锁，至少覆盖“复核 → npm ci → 后验 → 指纹原子写入”完整生命周期。
-- 第二个 hook 获取锁前可以做只读预检；获取锁后必须重新读取和重算，发现第一个 hook 已完成则跳过 `npm ci`。
+- 第二个 hook 获取锁前可以做只读预检；获取锁后必须重新读取和重算，发现第一个 hook 已完成且平台检查通过则跳过 `npm ci`；锁持有者仍须完成后验和 provenance 原子写入后才可释放锁。
 - 锁等待超过固定有限超时、锁 owner 无法验证、锁内容损坏或恢复动作不明确时 fail-closed。不能通过删除未知锁或无条件覆盖指纹来解锁。
 - 采用原子临时文件 + 同目录 rename；失败清理临时文件，不能留下可被下一次误读的半文件。
 
@@ -319,23 +355,24 @@ Git Bash 与 WSL 的平台结果必须独立记录和匹配。典型有效配对
 
 ## 12. 验收标准
 
-验收必须由可执行命令、测试或人工可复核证据给出，不得由 LLM 估算：
+验收必须由可执行命令、测试或人工可复核证据给出，不得由 LLM 估算。实现完成后，以下每行都必须有命令输出、测试断言或指定环境的人工记录；规格阶段不运行这些实现测试。
 
-- [ ] 规格实现只对当前解析到的绝对 Node/npm 执行探测和 `npm ci`，日志能显示脱敏路径、版本和平台；不存在未经审计的 PATH 静默切换。
-- [ ] Git Bash / WSL 分类使用 `MSYSTEM`、`OSTYPE`、`uname`、`WSL_*` 和 `/proc` 的可验证信号；冲突或不确定时 fail-closed。
-- [ ] Git Bash 的 win32 Node 与 WSL 的 linux Node 被识别为不同 provenance；切换环境不会复用另一侧 `node_modules`。
-- [ ] provenance 文件为 `.w-model/node-modules-provenance.json`，符合第 5.2 节固定 schema，记录 shellFamily、platform、arch、Node/npm 主版本、真实执行器路径和 package-lock SHA-256。
-- [ ] 指纹缺失、损坏、schema 不符、任一环境字段变化或 lockfile hash 变化均触发重建；当前执行器或 lockfile hash 无法确认时不盲目复用。
-- [ ] `npm ci` 只在触发矩阵命中且锁内二次复核仍不匹配时执行；完整匹配且平台检查通过时零次调用。
-- [ ] `npm ci` 使用 hook 解析到的当前 npm、当前 checkout root 和完整依赖重建语义；无手工 `rm -rf`、无 `npm install` 替代、无未经批准的参数拼接。
-- [ ] `npm ci` 或后验失败时返回 `exit 1`，不执行 `ensure-platform-deps --check`，不执行 18 项门禁，不写不完整 provenance。
-- [ ] 成功重建后，当前环境与 lockfile hash 重新计算，通过平台检查，再以临时文件 + 回读 + 同目录原子 rename 写入 provenance；并发 hook 最多一个实际重建。
-- [ ] `win32-x64` 与 `linux-x64` 继续支持；其它平台在 `npm ci` 前明确提示并 fail-closed。
-- [ ] 路径过滤、stdin ref、多 ref、delete-only、新分支 fail-closed、`--force`、纯 cmd / PowerShell `exit 0` 提示语义保持；无关变更不触发重建。
-- [ ] 18 项门禁的顺序、期望退出码、审计网络跳过边界保持；兼容性预检不计入 18 项。
-- [ ] L0 纯 Markdown Skill 安装不生成 provenance、不要求根 `node_modules`、不调用 npm ci。
-- [ ] 测试矩阵覆盖 shell 识别、执行器绑定、指纹状态、重建矩阵、失败阻断、并发、原子写、日志脱敏和现有 hook 回归；Git Bash 与 WSL 各有真实验证证据。
-- [ ] 实现后的 SSoT、README、INSTALL、troubleshooting、AGENTS、`.githooks` 和测试同步完成；`npm run check:docs-consistency`、Prettier、相关 Vitest 和适用门禁结果以真实命令输出为准。规格阶段不运行实现测试。
+| 验收项 | 可执行证据与通过条件 |
+| --- | --- |
+| 当前执行器绑定 | `npx vitest run w-model-dev/scripts/__tests__/platform-deps-hook.test.ts --config config/vitest.config.ts`；测试断言 `node` / `npm` 均由当前 shell 首次解析为一个绝对可执行路径，后续探测、`npm ci`、`npm run` 和平台检查只调用该路径；PATH 中放入第二套工具时无静默切换，日志含脱敏路径、版本和平台。 |
+| Git Bash / WSL 分类 | 同一测试命令覆盖 `MSYSTEM`、`OSTYPE`、`uname -s`、`WSL_INTEROP`、`WSL_DISTRO_NAME`、`/proc/version` 和 `/proc/sys/kernel/osrelease` 的 fixture；Git Bash、WSL、非 WSL POSIX 分别得到预期 `shellFamily`，冲突、信号缺失或探测失败得到 `unknown` 并以 `exit 1` 结束；任何断言不得使用脚本路径作为分类输入。 |
+| 双环境交叉验证 | Git Bash fixture 使用 `process.platform=win32` / `process.arch=x64`，WSL fixture 使用 `linux` / `x64`，反向配对均被阻断且不被重分类；真实 Git Bash 与 WSL 各运行一次 `bash .githooks/pre-push --force`，记录不同 shell/platform 身份和切换后重建。 |
+| Provenance schema | 运行 hook 后使用 `node -e` 读取 `.w-model/node-modules-provenance.json` 并断言 `format`、`schemaVersion=1`、`checkoutRoot`、`shellFamily`、`process.platform` / `process.arch`、`node.resolvedPath` / `execPath` / 主版本、`npm.resolvedPath` / 主版本、`nodeModules.path`、`packageLock.path` / SHA-256 和 `createdAt` 均存在且值来自本次探测；路径和 hash 规则符合第 5.2 节。 |
+| Rebuild matrix | 使用 hook fixture 分别模拟 `node_modules` 缺失、provenance 缺失/损坏/schema 错误、shell/platform/arch/Node/npm 路径或主版本变化、lockfile 字节变化，以及完整匹配；断言前述不匹配各恰调用一次当前绝对 npm 的 `npm ci`，完整匹配且平台检查通过恰调用零次。 |
+| Provenance 防伪 | 修改已存在 provenance 的 path、platform、arch、版本或 hash 后重跑 fixture；断言当前 Node/npm 和 lockfile 会重新计算，伪造字段不能放行或写成新的“匹配”指纹。 |
+| `npm ci` 安全边界 | 在调用记录器上运行 hook；断言 `npm ci` 的可执行文件等于本次 shell 解析的 `npm.resolvedPath`，`cwd` 等于 checkout root，参数来自固定白名单；源码/调用序列中不存在 hook 先行 `rm -rf node_modules`、手工解包或用 `npm install` 替代 `npm ci`。 |
+| 重建后验与原子写 | 让 `npm ci` 成功后改变 lockfile、移除 `.bin/tsx`、移除当前平台包、让临时文件回读失败或让同目录 rename 失败；断言不写不完整 provenance、清理自身临时文件、返回 `exit 1`，并且一次后验失败不进入 18 项门禁。成功路径断言 lockfile 重新 hash、平台检查通过、临时文件回读后原子替换目标。 |
+| Fail-closed | 分别注入 unknown shell、权限拒绝、I/O/读取失败、损坏锁或 provenance、npm 非零/信号/超时、网络/registry 失败、包校验失败、lifecycle 失败和锁超时；每种情形都返回 `exit 1`，不继续平台检查或 18 项门禁；`npm audit` 第 13 项的网络跳过例外不得扩展到 `npm ci`。 |
+| 并发 | 并发启动两个“不匹配” fixture；断言 checkout 级有限锁使锁内二次复核生效，最多一个实际 `npm ci`，最终 provenance 是完整可读 JSON；锁损坏、owner 不可验证和超时均 fail-closed，不能删除未知锁。 |
+| 平台矩阵 | 在支持平台 fixture 上断言 `win32-x64` 与 `linux-x64` 继续执行；在其它 `process.platform` / `process.arch` 组合上断言在 `npm ci`、平台依赖检查和门禁之前明确 `exit 1`。 |
+| 既有 hook 语义 | 运行现有 hook stdin/ref fixture 和 `bash .githooks/pre-push --force`；断言路径过滤、multi-ref、delete-only、新分支基线 fail-closed、无关路径放行和 18 项顺序/期望 exit code 不变；无关变更不调用 `npm ci`。原生 cmd/PowerShell 路径继续输出既有提示并 `exit 0`，不选择 npm、不安装依赖。 |
+| 18 项冻结 | 以 hook 日志或命令记录断言第 1 至第 18 项与第 6.1 节逐项同序；兼容性预检和 `npm ci` 不计数。第 13 项仅按现有窄网络/unsupported-endpoint 规则跳过，其余非零均阻断。 |
+| L0 边界与同步 | 在不安装根依赖的临时目录只复制 `w-model-dev/`，断言不生成 provenance、不要求根 `node_modules`、不调用 `npm ci`。实现变更后运行 `npm run check:docs-consistency`、相关 Vitest、Prettier 和适用门禁，且同步清单第 11 节列出的文件无旧契约残留。 |
 
 ## 13. 冻结项与后续发布决策
 
