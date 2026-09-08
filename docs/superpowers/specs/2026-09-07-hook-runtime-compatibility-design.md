@@ -1,7 +1,7 @@
 # Git Bash / WSL Hook Runtime Compatibility 规格
 
 - **日期：** 2026-09-07
-- **状态：** 已批准设计的规格，待后续实现
+- **状态：** 设计已获用户批准；书面规格待用户审阅
 - **范围：** 仓库根目录 `node_modules` 与本地 `.githooks/pre-push` / `.githooks/ensure-platform-deps.sh`
 - **当前版本约束：** 保持 `42.2.1`；本规格不要求版本 bump
 - **实施边界：** 本文只定义行为、数据契约、调用顺序、错误语义和验收方法，不实现代码，不改变 L0 Skill 分发模型
