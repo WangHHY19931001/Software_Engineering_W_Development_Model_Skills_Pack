@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-unsafe-regex -- The path matcher consumes bounded output segments and is followed by explicit redaction. */
 import * as path from 'node:path';
 
 export interface CodeHealthRedactionResult {
@@ -29,8 +30,9 @@ function isAbsolutePath(value: string): boolean {
 
 function redactEmbeddedAbsolutePaths(value: string, reasons: Set<string>): string {
   let sanitized = value;
-  const windowsPattern = /[A-Za-z]:[\\/](?:[^\\s/\\]+[\\/]?)+/g;
-  const posixPattern = /\/(?:[^\s/]+\/)+[^\s/]*/g;
+  // Consume the complete Windows path, including spaces, until an output delimiter.
+  const windowsPattern = /(?:[A-Za-z]:[\\/]|\\\\)[^\r\n"'<>|;,)]+/g;
+  const posixPattern = /(?<![A-Za-z0-9_])\/[^\r\n"'<>|;,)]+/g;
   sanitized = sanitized.replace(windowsPattern, () => {
     reasons.add('embedded Windows absolute path redacted');
     return '[REPO_PATH_REDACTED]';
@@ -45,13 +47,15 @@ function redactEmbeddedAbsolutePaths(value: string, reasons: Set<string>): strin
 export function containsSensitiveCodeHealthContent(value: unknown): boolean {
   if (typeof value === 'string') {
     return (
-      /(?:password|passwd|secret|token|api[_-]?key|authorization)\s*=/i.test(value) ||
+      /(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization)\s*[=:]/i.test(value) ||
       /^(?:Bearer|Basic)\s+/i.test(value)
     );
   }
   if (Array.isArray(value)) return value.some((item) => containsSensitiveCodeHealthContent(item));
   if (value !== null && typeof value === 'object') {
-    return Object.entries(value).some(([key, item]) => hasSecretFieldName(key) || containsSensitiveCodeHealthContent(item));
+    return Object.entries(value).some(
+      ([key, item]) => hasSecretFieldName(key) || containsSensitiveCodeHealthContent(item),
+    );
   }
   return false;
 }
@@ -92,6 +96,13 @@ function redactString(value: string, fieldName: string, reasons: Set<string>): s
     return '[REPO_PATH_REDACTED]';
   }
   let sanitized = redactEmbeddedAbsolutePaths(value, reasons);
+  sanitized = sanitized.replace(
+    /(?:\b(?:authorization|proxy-authorization)\s*:\s*)(?:Bearer|Basic)\s+[^\s,;)]*/gi,
+    () => {
+      reasons.add(`sensitive authorization redacted: ${fieldName || 'value'}`);
+      return '[REDACTED]';
+    },
+  );
   sanitized = sanitized.replace(
     /((?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization)\s*[=:]\s*)[^\s,;)]*/gi,
     (_match, prefix: string) => {

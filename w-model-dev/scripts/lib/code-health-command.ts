@@ -1,6 +1,8 @@
+/* eslint-disable security/detect-non-literal-fs-filename, security/detect-object-injection -- Paths are constrained beneath the repository-owned output root; environment keys are explicitly allowlisted. */
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
+import { TextDecoder } from 'node:util';
 import * as path from 'node:path';
 
 import type {
@@ -14,7 +16,10 @@ import { containsSensitiveCodeHealthContent, redactCodeHealthArtifact } from './
 export interface CodeHealthCommandRunnerOptions {
   rawOutputDir: string;
   now?: () => Date;
+  auditedEnvironmentKeys?: string[];
 }
+
+const DEFAULT_AUDITED_ENVIRONMENT_KEYS = ['CI', 'FORCE_COLOR', 'LANG', 'LC_ALL', 'NODE_ENV', 'NO_COLOR', 'TZ'] as const;
 
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -47,12 +52,79 @@ function observationFor(error: unknown): EvidenceObservationStatus {
   return code === 'ENOENT' || code === 'EACCES' ? 'unavailable' : 'not_run';
 }
 
-function boundedExitCode(code: number | null): 0 | 1 | 2 | null {
-  if (code === null) return null;
-  if (code === 0) return 0;
-  if (code === 1) return 1;
-  if (code === 2) return 2;
-  return 1;
+function isWithin(parent: string, child: string): boolean {
+  const relative = path.relative(parent, child);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function validateCwd(cwd: string): string {
+  const resolved = path.resolve(cwd);
+  if (!isWithin(process.cwd(), resolved)) throw new TypeError('cwd must be beneath the current repository root');
+  return relativeOutputPath(resolved);
+}
+
+function validateRawOutputDir(dir: string): string {
+  const resolved = path.resolve(dir);
+  if (!isWithin(process.cwd(), resolved))
+    throw new TypeError('rawOutputDir must be beneath the current repository root');
+  return resolved;
+}
+
+async function ensureSecureRawOutputDir(dir: string): Promise<string> {
+  const repositoryRoot = path.resolve(process.cwd());
+  const relative = path.relative(repositoryRoot, dir);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error('redaction blocked: raw output path must remain repository-relative');
+  }
+
+  let current = repositoryRoot;
+  const components = relative === '' ? [] : relative.split(path.sep);
+  for (const component of components) {
+    current = path.join(current, component);
+    try {
+      const entry = await fs.lstat(current);
+      if (entry.isSymbolicLink()) throw new Error('redaction blocked: raw output directory must not contain symlinks');
+      if (!entry.isDirectory()) throw new Error('rawOutputDir must contain directories only');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      try {
+        await fs.mkdir(current);
+      } catch (mkdirError) {
+        if ((mkdirError as NodeJS.ErrnoException).code !== 'EEXIST') throw mkdirError;
+      }
+      const created = await fs.lstat(current);
+      if (created.isSymbolicLink() || !created.isDirectory()) {
+        throw new Error('redaction blocked: raw output directory was replaced by a symlink or non-directory');
+      }
+    }
+  }
+
+  const realRepositoryRoot = await fs.realpath(repositoryRoot);
+  const realOutputDir = await fs.realpath(dir);
+  if (!isWithin(realRepositoryRoot, realOutputDir)) {
+    throw new Error('redaction blocked: raw output directory resolves outside the repository');
+  }
+  return realOutputDir;
+}
+
+function auditedEnvironment(requested: Record<string, string>, keys: readonly string[]): Record<string, string> {
+  if (!requested || typeof requested !== 'object' || Array.isArray(requested)) {
+    throw new TypeError('env must be a string map');
+  }
+  const allowed = new Set(keys);
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(requested)) {
+    if (!allowed.has(key)) throw new Error(`redaction blocked: environment key is not explicitly audited: ${key}`);
+    if (typeof value !== 'string' || value.includes('\u0000')) {
+      throw new Error(`redaction blocked: environment value is unsafe: ${key}`);
+    }
+    const sanitized = redactCodeHealthArtifact({ [key]: value });
+    if (sanitized.status === 'blocked') throw new Error(`redaction blocked: ${sanitized.reasons.join('; ')}`);
+    const output = sanitized.value as Record<string, string>;
+    if (output[key] !== value) throw new Error(`redaction blocked: environment value requires redaction: ${key}`);
+    result[key] = value;
+  }
+  return result;
 }
 
 function redactedText(value: unknown): string {
@@ -61,48 +133,44 @@ function redactedText(value: unknown): string {
   return JSON.stringify(result.value);
 }
 
+function decodeOutput(stdout: Buffer, stderr: Buffer): string {
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  try {
+    return `${decoder.decode(stdout)}${decoder.decode(stderr)}`;
+  } catch {
+    throw new Error('redaction blocked: command output is not valid UTF-8');
+  }
+}
+
 export function createCodeHealthCommandRunner(options: CodeHealthCommandRunnerOptions): CodeHealthCommandRunner {
   const now = options.now ?? (() => new Date());
-  const rawOutputDir = path.resolve(options.rawOutputDir);
-  const rawOutputRelative = path.relative(process.cwd(), rawOutputDir);
-  if (
-    rawOutputRelative === '..' ||
-    rawOutputRelative.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(rawOutputRelative)
-  ) {
-    throw new TypeError('rawOutputDir must be beneath the current repository root');
-  }
+  const rawOutputDir = validateRawOutputDir(options.rawOutputDir);
+  const auditedKeys = options.auditedEnvironmentKeys ?? DEFAULT_AUDITED_ENVIRONMENT_KEYS;
 
   return {
     async run(command, args, runOptions): Promise<CommandEvidence> {
       validateInvocation(command, args);
       if (!Number.isFinite(runOptions.timeoutMs) || runOptions.timeoutMs < 0)
         throw new TypeError('timeoutMs must be non-negative');
-      if (containsSensitiveCodeHealthContent(runOptions.env)) {
-        throw new Error('redaction blocked: sensitive environment must not be passed to a child process');
-      }
-      const sanitizedEnvironment = redactCodeHealthArtifact(runOptions.env);
-      if (sanitizedEnvironment.status === 'blocked') {
-        throw new Error(`redaction blocked: ${sanitizedEnvironment.reasons.join('; ')}`);
-      }
-      const environment = (sanitizedEnvironment.value ?? {}) as Record<string, string>;
+      const cwd = validateCwd(runOptions.cwd);
+      const environment = auditedEnvironment(runOptions.env, auditedKeys);
       const started = now();
       const outputName = `${started.toISOString().replace(/[^0-9]/g, '')}-${randomUUID()}.log`;
-      const outputFile = path.join(rawOutputDir, outputName);
-      await fs.mkdir(rawOutputDir, { recursive: true });
+      const secureOutputDir = await ensureSecureRawOutputDir(rawOutputDir);
+      const outputFile = path.join(secureOutputDir, outputName);
       let output = '';
-      let exitCode: 0 | 1 | 2 | null = null;
+      let exitCode: number | null = null;
       let observation: EvidenceObservationStatus = 'not_run';
       try {
         const result = await new Promise<{ code: number | null; output: string }>((resolve, reject) => {
           const child = spawn(command, args, {
             cwd: runOptions.cwd,
-            env: { ...process.env, ...runOptions.env },
+            env: environment,
             shell: false,
             windowsHide: true,
           });
-          let stdout = '';
-          let stderr = '';
+          const stdout: Buffer[] = [];
+          const stderr: Buffer[] = [];
           let settled = false;
           const finish = (callback: () => void): void => {
             if (settled) return;
@@ -111,15 +179,22 @@ export function createCodeHealthCommandRunner(options: CodeHealthCommandRunnerOp
           };
           const timer = setTimeout(() => {
             child.kill();
-            finish(() => resolve({ code: null, output: `${stdout}${stderr}\n[timeout]` }));
+            finish(() => {
+              try {
+                resolve({
+                  code: null,
+                  output: `${decodeOutput(Buffer.concat(stdout), Buffer.concat(stderr))}\n[timeout]`,
+                });
+              } catch (error) {
+                reject(error);
+              }
+            });
           }, runOptions.timeoutMs);
-          child.stdout.setEncoding('utf8');
-          child.stderr.setEncoding('utf8');
-          child.stdout.on('data', (chunk: string) => {
-            stdout += chunk;
+          child.stdout.on('data', (chunk: Buffer | string) => {
+            stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           });
-          child.stderr.on('data', (chunk: string) => {
-            stderr += chunk;
+          child.stderr.on('data', (chunk: Buffer | string) => {
+            stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
           });
           child.once('error', (error) => {
             clearTimeout(timer);
@@ -127,23 +202,46 @@ export function createCodeHealthCommandRunner(options: CodeHealthCommandRunnerOp
           });
           child.once('close', (code) => {
             clearTimeout(timer);
-            finish(() => resolve({ code, output: `${stdout}${stderr}` }));
+            finish(() => {
+              try {
+                resolve({ code, output: decodeOutput(Buffer.concat(stdout), Buffer.concat(stderr)) });
+              } catch (error) {
+                reject(error);
+              }
+            });
           });
         });
         output = redactedText({ output: result.output });
-        exitCode = boundedExitCode(result.code);
+        exitCode = result.code;
         observation = result.code === null ? 'not_run' : 'observed';
       } catch (error) {
         if (error instanceof Error && error.message.startsWith('redaction blocked:')) throw error;
         output = redactedText({ output: error instanceof Error ? error.message : String(error) });
         observation = observationFor(error);
       }
-      await fs.writeFile(outputFile, output, 'utf8');
+      const handle = await fs.open(outputFile, 'wx');
+      try {
+        await handle.writeFile(output, 'utf8');
+        const written = await handle.stat();
+        if (!written.isFile()) throw new Error('redaction blocked: raw output target must be a regular file');
+      } finally {
+        await handle.close();
+      }
+      const outputEntry = await fs.lstat(outputFile);
+      const outputRealPath = await fs.realpath(outputFile);
+      if (
+        outputEntry.isSymbolicLink() ||
+        !outputEntry.isFile() ||
+        !isWithin(secureOutputDir, outputRealPath) ||
+        path.resolve(outputRealPath) !== path.resolve(outputFile)
+      ) {
+        throw new Error('redaction blocked: raw output target must be a regular file beneath the controlled directory');
+      }
       const ended = now();
       const safeCommand = redactedText({ command, args });
       return {
         command: safeCommand,
-        cwd: relativeOutputPath(path.resolve(runOptions.cwd)),
+        cwd,
         environment,
         platform: process.platform,
         toolVersions: { node: process.version },
