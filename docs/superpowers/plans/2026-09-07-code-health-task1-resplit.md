@@ -247,7 +247,9 @@ npx tsc -p config/tsconfig.json --noEmit
 
 - [ ] **步骤 4：写入唯一 canonical 类型、错误和边界签名。**
 
-在 `code-health-contract.ts` 定义且只定义一次以下类型：
+1A 裁定：为保持 1A/1B 文件所有权边界，`CommandEvidence` 在 1A 只表示旧 command runner 产生的进程事实；candidate/scope 绑定由强制的 `EvidenceBinding` 承载。1A 不修改 `code-health-command.ts`，1B 才将 binding 接入 runner 和 evidence store。任何生命周期调用都必须拒绝缺 binding 的 evidence；不得将 binding 字段改成可选或使用 legacy 第二套类型。
+
+在 `code-health-contract.ts` 定义且只定义一次以下类型。`CommandEvidence` 保持进程事实字段，不包含 candidateId/scopeHash；`EvidenceBinding` 必须是进入 candidate/lifecycle 的强制外层绑定。
 
 ```ts
 export type CodeHealthPhase = 'P1' | 'P2' | 'P3' | 'P4';
