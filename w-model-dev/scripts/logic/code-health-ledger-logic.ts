@@ -1,7 +1,8 @@
 /* eslint-disable security/detect-non-literal-fs-filename, security/detect-object-injection, security/detect-unsafe-regex -- Archive paths are validated as repository-relative; dynamic keys are fixed allowlists; regexes validate bounded contract values. */
 /** Deterministic contracts and lifecycle rules for code-health campaign artifacts. */
 
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, realpathSync, promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
@@ -33,6 +34,8 @@ export interface RevisionIdentity {
 }
 
 export interface CommandEvidence {
+  candidateId?: string;
+  scopeHash?: string;
   command: string;
   cwd: string;
   environment: Record<string, string>;
@@ -89,11 +92,17 @@ export interface RollbackEvidence {
   command: CommandEvidence;
   preChangeRevision: string;
   patchPath: string;
-  patchSha256?: string;
+  patchSha256: string;
   owner: string;
-  patchExists: boolean;
-  rawOutputExists: boolean;
+  patchExists: true;
+  rawOutputExists: true;
+  sourceRevision: RevisionIdentity;
 }
+
+export interface EvidenceValidationOptions {
+  root?: string;
+}
+
 
 export interface SignatureRecord {
   role: 'A' | 'S' | 'V' | 'G' | 'R' | 'human';
@@ -497,10 +506,12 @@ export interface EvalDiffInput {
 export interface VerifyArchiveOptions {
   root?: string;
   sourceProject?: string;
+  expectedRevision?: RevisionIdentity;
 }
 export interface ArchiveCampaignOptions {
   root?: string;
   outputDir?: string;
+  sourceProject?: string;
   approval?: ApprovalDecision;
   verificationLevel?: 'package-only' | 'source-bound';
 }
@@ -610,6 +621,27 @@ function verifyLocalFile(root: string, relativePath: string, expectedHash?: stri
   } catch {
     return false;
   }
+}
+
+function isStrictUtc(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function verifyEvidenceFile(root: string, relativePath: unknown, expectedHash: unknown): boolean {
+  return typeof expectedHash === 'string' && HEX64_PATTERN.test(expectedHash) && typeof relativePath === 'string' && verifyLocalFile(root, relativePath, expectedHash);
+}
+
+function currentHead(root: string): string | null {
+  try {
+    const value = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', timeout: 5000 }).trim();
+    return SHA40_PATTERN.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateEvidenceFile(root: string, relativePath: string, expectedHash: string, field: string, reasons: string[]): void {
+  if (!verifyLocalFile(root, relativePath, expectedHash)) reasons.push(`${field} file is missing, symlinked, or hash-mismatched`);
 }
 
 function archiveFilesHash(files: Array<{ path: string; sha256: string }>): string {
@@ -1056,6 +1088,8 @@ function validateRollbackEvidence(
   candidate: CodeHealthCandidate,
   evidenceRefs: string[],
   reasons: string[],
+  root = process.cwd(),
+  expectedRevision: RevisionIdentity = candidate.revision,
 ): value is RollbackEvidence {
   if (!isRecord(value)) {
     reasons.push(`${field} must be an object`);
@@ -1063,7 +1097,7 @@ function validateRollbackEvidence(
   }
   hasOnlyKeys(
     value,
-    ['command', 'preChangeRevision', 'patchPath', 'patchSha256', 'owner', 'patchExists', 'rawOutputExists'],
+    ['command', 'preChangeRevision', 'patchPath', 'patchSha256', 'owner', 'patchExists', 'rawOutputExists', 'sourceRevision'],
     field,
     reasons,
   );
@@ -1096,6 +1130,14 @@ function validateRollbackEvidence(
     (!isRelativePath(value.command.rawOutputPath) || !evidenceRefs.includes(value.command.rawOutputPath as string))
   )
     reasons.push(`${field}.command raw output is not bound to event evidence`);
+  if (isRecord(value.command)) {
+    validateEvidenceFile(root, value.patchPath as string, value.patchSha256 as string, `${field}.patch`, reasons);
+    validateEvidenceFile(root, value.command.rawOutputPath as string, value.command.rawOutputSha256 as string, `${field}.rawOutput`, reasons);
+  }
+  const sourceReasons: string[] = [];
+  if (!validateRevision(value.sourceRevision, `${field}.sourceRevision`, sourceReasons)) reasons.push(...sourceReasons);
+  if (!isRecord(value.sourceRevision) || !sameRevision(value.sourceRevision as RevisionIdentity, expectedRevision))
+    reasons.push(`${field}.sourceRevision is not bound to the current candidate revision`);
   return reasons.length === 0;
 }
 

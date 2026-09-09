@@ -792,6 +792,65 @@ describe('code-health ledger contract', () => {
     expect(evaluateDeletion({ testCount: 1, coverageProvenance: '', governanceFacts: [] }).passed).toBe(false);
   });
 
+  it('rollback evidence requires real patch and raw-output files, hashes, and source binding', () => {
+    const candidate = validCandidate('CHG-P1-20260907-017', {
+      status: 'blocked',
+      rollback: { ...validCandidate('CHG-P1-20260907-017').rollback, patchSha256: 'a'.repeat(64) },
+    });
+    const evidence = {
+      command: { ...candidate.commands[0]!, rawOutputPath: 'evidence/missing-rollback.log', exitCode: 0, observation: 'observed' as const },
+      preChangeRevision: candidate.rollback.preChangeRevision,
+      patchPath: candidate.rollback.patchPath,
+      patchSha256: candidate.rollback.patchSha256,
+      owner: candidate.rollback.owner,
+      patchExists: true,
+      rawOutputExists: true,
+    };
+    expect(() =>
+      transitionCandidate(validLedger(candidate), candidate.candidateId, {
+        ...event('blocked', 'rolled-back', candidate.candidateId),
+        actorRole: 'S',
+        evidenceRefs: [evidence.command.rawOutputPath],
+        rollbackEvidence: evidence,
+      }),
+    ).toThrow(/file|hash|source|exist/i);
+  });
+
+  it('gate failure evidence cannot be recorded from a missing raw-output file', () => {
+    const candidate = validCandidate('CHG-P1-20260907-018');
+    expect(() =>
+      recordGateFailure(validLedger(candidate), candidate.candidateId, {
+        ...candidate.commands[0]!,
+        rawOutputPath: 'evidence/missing-gate-output.log',
+        exitCode: 7,
+        observation: 'observed',
+      }),
+    ).toThrow(/file|hash|evidence|exist/i);
+  });
+
+  it('gap validator rejects invalid identity, priority, status, risk, and coverage signal', () => {
+    expect(validateGapMatrix({
+      rows: [{
+        gapId: 'GAP-1',
+        candidateId: 'CHG-P0-00000000-000',
+        kind: 'security',
+        testLevels: ['unit'],
+        existingTestIds: [],
+        missingScenario: 'auth bypass',
+        evidenceSources: ['evidence/gap.json'],
+        risk: null,
+        priority: 'urgent',
+        owner: 'S-agent',
+        rtmIds: ['REQ-1'],
+        coverageSignal: null,
+        coverageIsSignalOnly: true,
+        status: 'bogus',
+      }],
+    })).toEqual(expect.arrayContaining([
+      expect.stringMatching(/candidateId|priority|status|risk|coverage/i),
+    ]));
+  });
+
   it('archiveCampaign and verifyArchive fail closed instead of trusting reference names or partial manifests', async () => {
     const candidate = validCandidate('CHG-P1-20260907-015', {
       status: 'verified',
