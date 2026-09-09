@@ -5,9 +5,39 @@
   "description": "One append-only code-health candidate lifecycle transition with source-bound evidence and signature references.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["eventId", "candidateId", "from", "to", "actorRole", "at", "revision", "evidenceRefs", "signatureRef"],
+  "required": [
+    "eventId",
+    "eventKind",
+    "candidateId",
+    "from",
+    "to",
+    "actorRole",
+    "at",
+    "revision",
+    "scopeHash",
+    "evidenceRefs",
+    "signatureRef"
+  ],
   "properties": {
     "eventId": { "description": "Never-reused ledger event identifier.", "type": "string", "minLength": 1 },
+    "eventKind": {
+      "description": "Canonical lifecycle event kind.",
+      "enum": [
+        "discovery",
+        "evidence",
+        "review",
+        "approval",
+        "implementation",
+        "verification",
+        "gate-failure",
+        "root-cause",
+        "root-cause-review",
+        "root-cause-gate",
+        "rework",
+        "rollback",
+        "archive"
+      ]
+    },
     "candidateId": {
       "description": "Candidate receiving this transition.",
       "type": "string",
@@ -53,6 +83,11 @@
     },
     "at": { "description": "UTC transition timestamp.", "type": "string", "format": "date-time" },
     "revision": { "description": "Revision identity attached to the event.", "$ref": "#/definitions/revision" },
+    "scopeHash": {
+      "description": "SHA-256 digest of the exact candidate scope.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "evidenceRefs": {
       "description": "Repository-relative evidence references supporting the event.",
       "type": "array",

@@ -15,7 +15,8 @@
     "rationale",
     "actor",
     "decidedAt",
-    "signatureRef"
+    "signatureRef",
+    "revision"
   ],
   "properties": {
     "candidateId": {
@@ -63,9 +64,29 @@
     "signatureRef": {
       "description": "Repository-relative signature or provenance reference for the human decision.",
       "$ref": "#/definitions/relativePath"
+    },
+    "revision": {
+      "description": "Revision at which the human decision was made.",
+      "$ref": "#/definitions/revision"
     }
   },
   "definitions": {
+    "revision": {
+      "description": "Source-bound repository revision identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commitSha", "treeSha", "sourceBundleSha256", "analyzedAt"],
+      "properties": {
+        "commitSha": { "description": "Commit SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "treeSha": { "description": "Tree SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "sourceBundleSha256": {
+          "description": "Source bundle SHA-256.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+      }
+    },
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",

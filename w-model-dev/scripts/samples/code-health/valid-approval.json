@@ -8,5 +8,11 @@
   "rationale": "The exact scope is independently reviewed and directly reversible.",
   "actor": "human-decision-maker",
   "decidedAt": "2026-09-07T00:03:00.000Z",
-  "signatureRef": "evidence/signature-human.json"
+  "signatureRef": "evidence/signature-human.json",
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  }
 }

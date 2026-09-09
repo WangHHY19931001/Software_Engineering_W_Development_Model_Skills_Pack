@@ -368,7 +368,10 @@
         },
         "owner": { "description": "Rollback owner.", "type": "string", "minLength": 1 },
         "executable": { "description": "Whether rollback is directly executable.", "type": "boolean" },
-        "patchSha256": { "description": "Optional SHA-256 digest of the retained rollback patch.", "$ref": "#/definitions/sha256" }
+        "patchSha256": {
+          "description": "Optional SHA-256 digest of the retained rollback patch.",
+          "$ref": "#/definitions/sha256"
+        }
       }
     },
     "review": {

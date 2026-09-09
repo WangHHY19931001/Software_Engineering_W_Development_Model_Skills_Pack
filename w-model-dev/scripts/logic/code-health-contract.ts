@@ -1,0 +1,1118 @@
+/** Canonical code-health contract shared by every phase and schema boundary. */
+
+import { containsSensitiveCodeHealthContent } from '../lib/code-health-redaction.js';
+
+export type CodeHealthPhase = 'P1' | 'P2' | 'P3' | 'P4';
+export type CodeHealthAction = 'delete-code' | 'add-test' | 'delete-test' | 'abstract';
+export type CodeHealthStatus =
+  | 'discovered'
+  | 'evidenced'
+  | 'under-review'
+  | 'approved'
+  | 'implemented'
+  | 'verified'
+  | 'archived'
+  | 'rejected'
+  | 'deferred'
+  | 'blocked'
+  | 'rolled-back';
+export type EvidenceObservationStatus = 'observed' | 'not_run' | 'unavailable' | 'unverified';
+export type ReviewDecision = 'approve' | 'reject' | 'defer' | 'block' | 'rollback';
+export type TestLevel = 'unit' | 'integration' | 'system' | 'acceptance';
+
+export const CODE_HEALTH_PHASES = ['P1', 'P2', 'P3', 'P4'] as const;
+export const CODE_HEALTH_ACTIONS = ['delete-code', 'add-test', 'delete-test', 'abstract'] as const;
+export const CODE_HEALTH_STATUSES = [
+  'discovered',
+  'evidenced',
+  'under-review',
+  'approved',
+  'implemented',
+  'verified',
+  'archived',
+  'rejected',
+  'deferred',
+  'blocked',
+  'rolled-back',
+] as const;
+export const EVIDENCE_OBSERVATIONS = ['observed', 'not_run', 'unavailable', 'unverified'] as const;
+
+export type ErrorCode =
+  | 'ARG_INVALID'
+  | 'STRUCTURE_INVALID'
+  | 'EVIDENCE_INVALID'
+  | 'SCOPE_MISMATCH'
+  | 'REVISION_MISMATCH'
+  | 'SECURITY_BLOCKED'
+  | 'ROLE_FORBIDDEN'
+  | 'TRANSITION_INVALID'
+  | 'NOT_IMPLEMENTED';
+
+export interface CandidateSelector {
+  candidateId: string;
+  phase: CodeHealthPhase;
+  action: CodeHealthAction;
+  files: string[];
+  symbols: string[];
+  scopeHash: string;
+}
+
+export interface EvidenceBinding {
+  candidate: CandidateSelector;
+  revision: RevisionIdentity;
+  rawOutputPath: string;
+  rawOutputSha256: string;
+}
+
+export class CodeHealthError extends Error {
+  readonly code: ErrorCode;
+  readonly safePath?: string;
+  readonly candidateId?: string;
+  readonly scopeHash?: string;
+  readonly expectedRevision?: RevisionIdentity;
+  readonly actualRevision?: RevisionIdentity;
+
+  constructor(
+    code: ErrorCode,
+    reason: string,
+    context: {
+      safePath?: string;
+      candidateId?: string;
+      scopeHash?: string;
+      expectedRevision?: RevisionIdentity;
+      actualRevision?: RevisionIdentity;
+    } = {},
+  ) {
+    super(reason);
+    this.name = 'CodeHealthError';
+    this.code = code;
+    this.safePath = context.safePath;
+    this.candidateId = context.candidateId;
+    this.scopeHash = context.scopeHash;
+    this.expectedRevision = context.expectedRevision;
+    this.actualRevision = context.actualRevision;
+  }
+}
+
+export interface RevisionIdentity {
+  commitSha: string;
+  treeSha: string;
+  sourceBundleSha256: string;
+  analyzedAt: string;
+}
+
+export interface CommandEvidence {
+  command: string;
+  cwd: string;
+  environment: Record<string, string>;
+  platform: string;
+  toolVersions: Record<string, string>;
+  startedAt: string;
+  endedAt: string;
+  /** The actual child-process exit code; null means no process result was available. */
+  exitCode: number | null;
+  observation: EvidenceObservationStatus;
+  rawOutputPath: string;
+  rawOutputSha256: string;
+}
+
+export interface RiskProfile {
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  behavior: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+  security: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+  concurrency: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+  platform: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+  lifecycle: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+  governance: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+  rationale: string;
+}
+
+export interface CoverageRecord {
+  statements: number | null;
+  branches: number | null;
+  functions: number | null;
+  lines: number | null;
+}
+
+export interface ImpactRecord {
+  rtmBefore: string[];
+  rtmAfter: string[];
+  coverageBefore: CoverageRecord;
+  coverageAfter: CoverageRecord;
+  testLevels: TestLevel[];
+  unmappedScenarios: string[];
+  coverageIsSignalOnly: true;
+}
+
+export interface RollbackPlan {
+  preChangeRevision: string;
+  command: string;
+  patchPath: string;
+  owner: string;
+  executable: boolean;
+  patchSha256?: string;
+}
+
+export interface RollbackEvidence {
+  command: CommandEvidence;
+  preChangeRevision: string;
+  patchPath: string;
+  patchSha256: string;
+  owner: string;
+  patchExists: true;
+  rawOutputExists: true;
+  sourceRevision: RevisionIdentity;
+}
+
+export interface EvidenceValidationOptions {
+  root?: string;
+}
+
+export interface SignatureRecord {
+  role: 'A' | 'S' | 'V' | 'G' | 'R' | 'human';
+  actor: string;
+  event: string;
+  scopeHash: string;
+  provenanceRef: string;
+  signedAt: string;
+}
+
+export interface CodeHealthCandidate {
+  candidateId: string;
+  phase: CodeHealthPhase;
+  action: CodeHealthAction;
+  status: CodeHealthStatus;
+  files: string[];
+  symbols: string[];
+  tests: string[];
+  callSites: string[];
+  sources: string[];
+  commands: CommandEvidence[];
+  revision: RevisionIdentity;
+  confidence: { level: 'low' | 'medium' | 'high'; score: number; rationale: string; uncertainties: string[] };
+  risk: RiskProfile;
+  rtmImpact: ImpactRecord;
+  coverageImpact: ImpactRecord;
+  rollback: RollbackPlan;
+  review: {
+    findings: string[];
+    unresolvedQuestions: string[];
+    decision: ReviewDecision | null;
+    humanDecision: 'approve' | 'reject' | 'defer' | null;
+  };
+  signatures: SignatureRecord[];
+  changeScope: { files: string[]; symbols: string[]; scopeHash: string };
+  evidenceRef: string;
+  archive: {
+    state: 'not_archived' | 'archived';
+    manifestPath: string | null;
+    contentHash: string | null;
+    redactionStatus: 'not_reviewed' | 'clean' | 'blocked';
+  };
+}
+
+export interface ArchiveTransitionEvidence {
+  manifestRef: string;
+  manifestSha256: string;
+  verificationLevel: 'package-only' | 'source-bound';
+  sourceRevision: RevisionIdentity;
+  redactionStatus: 'clean';
+}
+
+export interface GateFailureEvidence extends CommandEvidence {
+  candidateId: string;
+  scopeHash: string;
+  failureKind: 'test' | 'gate' | 'command';
+}
+
+export type LedgerEventKind =
+  | 'discovery'
+  | 'evidence'
+  | 'review'
+  | 'approval'
+  | 'implementation'
+  | 'verification'
+  | 'gate-failure'
+  | 'root-cause'
+  | 'root-cause-review'
+  | 'root-cause-gate'
+  | 'rework'
+  | 'rollback'
+  | 'archive';
+
+export interface LedgerEvent {
+  eventId: string;
+  eventKind: LedgerEventKind;
+  candidateId: string;
+  from: CodeHealthStatus | null;
+  to: CodeHealthStatus;
+  actorRole: 'O' | 'A' | 'S' | 'V' | 'G' | 'R' | 'human';
+  at: string;
+  previousRevision?: RevisionIdentity;
+  revision: RevisionIdentity;
+  scopeHash: string;
+  evidenceRefs: string[];
+  signatureRef: string;
+  gateFailureEvidence?: GateFailureEvidence;
+  rollbackEvidence?: RollbackEvidence;
+  archiveEvidence?: ArchiveTransitionEvidence;
+}
+
+export interface EnvironmentObservation {
+  platform: string;
+  shell: string;
+  runtime: string;
+  supported: boolean;
+  observed: EvidenceObservationStatus;
+  reason: string;
+}
+
+export interface CodeHealthLedger {
+  schemaVersion: '1.0';
+  campaignId: string;
+  createdAt: string;
+  baseline: RevisionIdentity;
+  environmentMatrix: EnvironmentObservation[];
+  candidates: CodeHealthCandidate[];
+  events: LedgerEvent[];
+  appendOnly: true;
+  redaction: { status: 'not_reviewed' | 'clean' | 'blocked'; rules: string[]; blockedReasons: string[] };
+}
+
+export interface ApprovalDecision {
+  candidateId: string;
+  decision: 'approve' | 'reject' | 'defer';
+  approvedAction: CodeHealthAction;
+  approvedFiles: string[];
+  approvedSymbols: string[];
+  scopeHash: string;
+  rationale: string;
+  actor: string;
+  decidedAt: string;
+  signatureRef: string;
+  revision: RevisionIdentity;
+}
+
+export interface StaticReference {
+  path: string;
+  symbol: string;
+  consumer: string;
+  kind:
+    | 'import'
+    | 'export'
+    | 'call'
+    | 'route'
+    | 'cli-registration'
+    | 'string-symbol'
+    | 'generated-input'
+    | 'schema'
+    | 'template'
+    | 'rtm'
+    | 'test-helper'
+    | 'dynamic-import'
+    | 'reflection'
+    | 'shell-platform';
+  line: number;
+  sourceHash: string;
+}
+
+export interface DynamicTraceScenario {
+  id: string;
+  environment: string;
+  reached: boolean | null;
+  observation: EvidenceObservationStatus;
+  command: CommandEvidence;
+}
+
+export interface DynamicTraceReport {
+  revision: RevisionIdentity;
+  scenarios: DynamicTraceScenario[];
+  rawTraceSha256: string;
+}
+
+export interface StaticInventoryReport {
+  revision: RevisionIdentity;
+  files: string[];
+  references: StaticReference[];
+  categories: string[];
+  unknowns: string[];
+  commands: CommandEvidence[];
+}
+
+export interface Phase1CandidateLead {
+  candidateId: string;
+  classification: 'candidate' | 'unknown' | 'blocked';
+  files: string[];
+  symbols: string[];
+  staticReferences: StaticReference[];
+  dynamicScenarios: DynamicTraceScenario[];
+  guardViolations: string[];
+  status: 'discovered' | 'blocked';
+}
+
+export interface FalsePositiveContext {
+  dynamicImports: string[];
+  reflection: string[];
+  platforms: string[];
+  schemas: string[];
+  templates: string[];
+  rtmIds: string[];
+  testHelpers: string[];
+  generatedReferences: string[];
+  externalContracts: string[];
+}
+
+export interface GapRow {
+  gapId: string;
+  candidateId: string;
+  kind: 'requirement' | 'public-contract' | 'branch' | 'error' | 'security' | 'concurrency' | 'platform';
+  testLevels: TestLevel[];
+  existingTestIds: string[];
+  missingScenario: string;
+  evidenceSources: string[];
+  risk: RiskProfile;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  owner: string;
+  rtmIds: string[];
+  coverageSignal: CoverageRecord;
+  coverageIsSignalOnly: true;
+  status: 'discovered' | 'approved' | 'implemented' | 'verified' | 'blocked';
+  redEvidence?: CommandEvidence;
+  greenEvidence?: CommandEvidence;
+  assertionHash?: string;
+  implementationHash?: string | null;
+}
+
+export type ProtectedTestClass =
+  | 'unique-negative'
+  | 'boundary'
+  | 'security'
+  | 'concurrency'
+  | 'platform'
+  | 'migration-rollback'
+  | 'pre-push'
+  | 'self-test'
+  | 'docs-consistency';
+
+export interface TestRecord {
+  testId: string;
+  file: string;
+  symbol: string;
+  author: string;
+  createdAt: string;
+  lastChangedAt: string;
+  level: TestLevel;
+  setup: string;
+  stimulus: string;
+  oracle: string;
+  failureSensitivity: string;
+  rtmIds: string[];
+  scenarioClass: string;
+  governanceFacts: string[];
+}
+
+export interface TestRemovalProofInput {
+  candidate: TestRecord;
+  survivor: TestRecord | null;
+  pre: { testCount: number; coverageProvenance: string; governanceFacts: string[] };
+  post: { testCount: number; coverageProvenance: string; governanceFacts: string[] } | null;
+}
+
+export interface DuplicateInput {
+  implementations: Array<{ file: string; symbol: string; sourceHash: string }>;
+  ast: string[];
+  dataFlow: string[];
+  callGraph: string[];
+  tests: string[];
+}
+
+export interface DuplicateCluster {
+  clusterId: string;
+  candidateId: string;
+  implementations: Array<{ file: string; symbol: string; sourceHash: string }>;
+  views: { ast: string[]; dataFlow: string[]; callGraph: string[]; signatures: string[]; tests: string[] };
+  stableProductionCallSites: string[];
+  status: 'under-review' | 'deferred' | 'rejected' | 'approved';
+  equivalenceProof?: {
+    inputsOutputs: string;
+    orderingMutationsSideEffects: string;
+    errorsRetries: string;
+    lifecycleResources: string;
+    security: string;
+    concurrencyPlatforms: string;
+    allDimensionsProven: true;
+  };
+  maintenanceBenefit?: string;
+  rollback?: RollbackPlan;
+  redaction?: { status: 'not_reviewed' | 'clean' | 'blocked'; reasons: string[] };
+}
+
+export interface AbstractionProposal {
+  targetApi: string;
+  migratedCallSites: string[];
+  inputsOutputs: string;
+  errorsRetries: string;
+  lifecycleResources: string;
+  security: string;
+  concurrencyPlatforms: string;
+  maintenanceBenefit: string;
+  rollback: RollbackPlan;
+}
+
+export interface CodeHealthEvidence {
+  evidenceId: string;
+  candidateId: string;
+  revision: RevisionIdentity;
+  staticReferences: StaticReference[];
+  dynamicScenarios: DynamicTraceScenario[];
+  commands: CommandEvidence[];
+  environment: Record<string, string>;
+  toolVersions: Record<string, string>;
+  unknowns: string[];
+  falsePositiveChecks: string[];
+  rtmImpact?: ImpactRecord;
+  coverageImpact?: ImpactRecord;
+  redaction: { status: 'not_reviewed' | 'clean' | 'blocked'; reasons: string[] };
+}
+
+export interface CodeHealthArchive {
+  archiveId: string;
+  candidateId: string;
+  status: 'archived' | 'deferred' | 'rejected' | 'blocked' | 'rolled-back';
+  ledgerEventRef: string;
+  diffPath: string | null;
+  diffSha256: string | null;
+  rollback: RollbackPlan;
+  manifestPath: string;
+  contentHash: string;
+  reviewRefs: string[];
+  gateRefs: string[];
+  signatureRefs: string[];
+  redaction: { status: 'clean' | 'blocked'; reasons: string[] };
+  retention: { location: string; until: string };
+  verificationLevel: 'package-only' | 'source-bound';
+  sourceRevision: RevisionIdentity;
+  archivedAt: string;
+}
+
+export interface CodeHealthCommandRunner {
+  run(
+    command: string,
+    args: string[],
+    options: { cwd: string; env: Record<string, string>; timeoutMs: number },
+  ): Promise<CommandEvidence>;
+}
+
+export interface Phase1RunResult {
+  exitCode: 0 | 1 | 2;
+  report: { candidates: CodeHealthCandidate[]; commands: CommandEvidence[]; unexercisedScenarios: string[] };
+  changedFiles: string[];
+}
+
+export interface GapDiscoveryInput {
+  requirements: unknown;
+  publicContracts: unknown;
+  branches: unknown;
+  errors: unknown;
+  securityProperties: unknown;
+  concurrencyProperties: unknown;
+  platforms: unknown;
+  coverageSignal: { lines: number | null };
+}
+export interface GapDiscoveryResult {
+  rows: GapRow[];
+  coverageAuthorization: false;
+}
+export interface TddHarnessInput {
+  gap: GapRow;
+  testCommand: string[];
+  implementation: string | null;
+}
+export interface TddHarnessResult extends CommandEvidence {
+  gapId: string;
+  assertionHash: string;
+  implementationHash: string | null;
+}
+export interface ApplyApprovedInput {
+  candidate: CodeHealthCandidate;
+  approval: ApprovalDecision;
+  mode: 'dry-run' | 'patch' | 'commit';
+  repositoryRoot: string;
+  currentRevision: RevisionIdentity;
+}
+
+export interface ApplyResultNotImplemented {
+  applied: false;
+  errorCode: 'NOT_IMPLEMENTED';
+  patchPath: null;
+  appliedFiles: [];
+  unrelatedFiles: [];
+  rollback: null;
+}
+
+export type ApplyResult = ApplyResultNotImplemented;
+export interface DeletionFacts {
+  testCount: number;
+  coverageProvenance: string;
+  governanceFacts: string[];
+  testCountDelta?: number;
+}
+export interface DeletionEvaluation {
+  passed: boolean;
+  violations: string[];
+}
+export interface ArchiveManifest {
+  archiveId: string;
+  candidateId: string;
+  scope: CandidateSelector;
+  contentHash: string;
+  files: Array<{
+    path: string;
+    kind: 'ledger' | 'candidate' | 'evidence' | 'approval' | 'review' | 'gate' | 'rollback';
+    sha256: string;
+  }>;
+  sourceRevision: RevisionIdentity;
+  approvalRef: string;
+  reviewRefs: string[];
+  gateRefs: string[];
+  humanSignatureRef: string;
+  redaction: { status: 'clean' | 'blocked'; reasons: string[] };
+  verificationLevel: 'package-only' | 'source-bound';
+  rollbackRef: string;
+  producerMetadata: { producerId: string; producerVersion: string };
+  createdAt: string;
+}
+
+export interface ArchiveResult {
+  exitCode: 0 | 1 | 2;
+  path: string;
+  manifest: ArchiveManifest | null;
+  verificationLevel: 'package-only' | 'source-bound';
+  errorCode?: ErrorCode;
+  reason?: string;
+}
+
+export interface ArchiveProduceInput {
+  candidate: CodeHealthCandidate;
+  ledger: CodeHealthLedger;
+  approval: ApprovalDecision;
+  verificationLevel: 'package-only' | 'source-bound';
+}
+
+export interface ArchiveConsumeInput {
+  manifestPath: string;
+  packageRoot: string;
+  verificationLevel: 'package-only' | 'source-bound';
+  sourceProject?: string;
+}
+
+export interface ArchiveVerifyInput extends ArchiveConsumeInput {
+  expectedRevision?: RevisionIdentity;
+}
+
+export interface EvalDiffInput {
+  changedBehavior: boolean;
+  prompts: unknown[];
+  mappings: unknown;
+}
+export interface VerifyArchiveOptions {
+  root?: string;
+  sourceProject?: string;
+  expectedRevision?: RevisionIdentity;
+}
+export interface ArchiveCampaignOptions {
+  root?: string;
+  outputDir?: string;
+  sourceProject?: string;
+  approval?: ApprovalDecision;
+  verificationLevel?: 'package-only' | 'source-bound';
+}
+
+const ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
+const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const HEX64_PATTERN = /^[0-9a-f]{64}$/;
+const SHA40_PATTERN = /^[0-9a-f]{40}$/;
+const STATUSES: readonly CodeHealthStatus[] = [
+  'discovered',
+  'evidenced',
+  'under-review',
+  'approved',
+  'implemented',
+  'verified',
+  'archived',
+  'rejected',
+  'deferred',
+  'blocked',
+  'rolled-back',
+];
+const ACTIONS: readonly CodeHealthAction[] = ['delete-code', 'add-test', 'delete-test', 'abstract'];
+const PHASES: readonly CodeHealthPhase[] = ['P1', 'P2', 'P3', 'P4'];
+const OBSERVATIONS: readonly EvidenceObservationStatus[] = ['observed', 'not_run', 'unavailable', 'unverified'];
+const REVIEW_DECISIONS: readonly ReviewDecision[] = ['approve', 'reject', 'defer', 'block', 'rollback'];
+const HUMAN_DECISIONS = ['approve', 'reject', 'defer'] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown, allowEmpty = true): value is string[] {
+  return Array.isArray(value) && (allowEmpty || value.length > 0) && value.every((item) => typeof item === 'string');
+}
+
+function recordValue(record: Record<string, unknown>, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) return entryValue;
+  }
+  return undefined;
+}
+
+export function isRelativePath(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    !value.startsWith('/') &&
+    !/^[A-Za-z]:[\\/]/.test(value) &&
+    !value.includes('\\') &&
+    !value.includes('//') &&
+    !value.includes('\u0000') &&
+    !value.split('/').includes('..') &&
+    !value.split('/').includes('')
+  );
+}
+
+export function isIsoDate(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+  field: string,
+  reasons: string[],
+): boolean {
+  const allowed = new Set(keys);
+  let valid = true;
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      reasons.push(`${field} has unknown property: ${key}`);
+      valid = false;
+    }
+  }
+  return valid;
+}
+
+function isSafeCommand(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && !/[;&|<>\r\n]/.test(value);
+}
+
+function hasSecretFieldName(fieldName: string): boolean {
+  return /(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization)/i.test(fieldName);
+}
+
+export function validateRevision(value: unknown, field: string, reasons: string[]): value is RevisionIdentity {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  hasOnlyKeys(value, ['commitSha', 'treeSha', 'sourceBundleSha256', 'analyzedAt'], field, reasons);
+  if (typeof value.commitSha !== 'string' || !SHA40_PATTERN.test(value.commitSha))
+    reasons.push(`${field}.commitSha is invalid`);
+  if (typeof value.treeSha !== 'string' || !SHA40_PATTERN.test(value.treeSha))
+    reasons.push(`${field}.treeSha is invalid`);
+  if (typeof value.sourceBundleSha256 !== 'string' || !HEX64_PATTERN.test(value.sourceBundleSha256))
+    reasons.push(`${field}.sourceBundleSha256 is invalid`);
+  if (!isIsoDate(value.analyzedAt)) reasons.push(`${field}.analyzedAt is invalid`);
+  return reasons.length === 0;
+}
+
+function validateCoverage(value: unknown, field: string, reasons: string[]): boolean {
+  if (!isRecord(value)) {
+    reasons.push(`${field} is required`);
+    return false;
+  }
+  hasOnlyKeys(value, ['statements', 'branches', 'functions', 'lines'], field, reasons);
+  for (const key of ['statements', 'branches', 'functions', 'lines']) {
+    const metric = recordValue(value, key);
+    if (!Object.keys(value).includes(key)) reasons.push(`${field}.${key} is required`);
+    if (metric !== null && (typeof metric !== 'number' || !Number.isFinite(metric) || metric < 0 || metric > 1)) {
+      reasons.push(`${field}.${key} must be null or a number between 0 and 1`);
+    }
+  }
+  return true;
+}
+
+function validateImpact(value: unknown, field: string, reasons: string[]): boolean {
+  if (!isRecord(value)) {
+    reasons.push(`${field} is required`);
+    return false;
+  }
+  hasOnlyKeys(
+    value,
+    [
+      'rtmBefore',
+      'rtmAfter',
+      'coverageBefore',
+      'coverageAfter',
+      'testLevels',
+      'unmappedScenarios',
+      'coverageIsSignalOnly',
+    ],
+    field,
+    reasons,
+  );
+  if (!isStringArray(value.rtmBefore) || !isStringArray(value.rtmAfter))
+    reasons.push(`${field}.rtmBefore/rtmAfter must be string arrays`);
+  if (!validateCoverage(value.coverageBefore, `${field}.coverageBefore`, reasons)) return false;
+  if (!validateCoverage(value.coverageAfter, `${field}.coverageAfter`, reasons)) return false;
+  if (
+    !isStringArray(value.testLevels) ||
+    !value.testLevels.every((level) => ['unit', 'integration', 'system', 'acceptance'].includes(level))
+  )
+    reasons.push(`${field}.testLevels is invalid`);
+  if (!isStringArray(value.unmappedScenarios)) reasons.push(`${field}.unmappedScenarios must be a string array`);
+  if (value.coverageIsSignalOnly !== true) reasons.push(`${field}.coverageIsSignalOnly must be true`);
+  return true;
+}
+
+export function validateCommandEvidence(value: unknown, field: string, reasons: string[]): value is CommandEvidence {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  hasOnlyKeys(
+    value,
+    [
+      'command',
+      'cwd',
+      'environment',
+      'platform',
+      'toolVersions',
+      'startedAt',
+      'endedAt',
+      'exitCode',
+      'observation',
+      'rawOutputPath',
+      'rawOutputSha256',
+    ],
+    field,
+    reasons,
+  );
+  if (!isSafeCommand(value.command)) reasons.push(`${field}.command is unsafe`);
+  if (typeof value.platform !== 'string' || value.platform.length === 0) reasons.push(`${field}.platform is required`);
+  if (!isRelativePath(value.cwd)) reasons.push(`${field}.cwd must be repository-relative`);
+  if (!isRelativePath(value.rawOutputPath)) reasons.push(`${field}.rawOutputPath must be repository-relative`);
+  if (
+    !isRecord(value.environment) ||
+    Object.keys(value.environment).some(hasSecretFieldName) ||
+    Object.values(value.environment).some(
+      (item) => typeof item !== 'string' || containsSensitiveCodeHealthContent(item),
+    )
+  )
+    reasons.push(`${field}.environment is not audited and redacted`);
+  if (!isRecord(value.toolVersions) || Object.values(value.toolVersions).some((item) => typeof item !== 'string'))
+    reasons.push(`${field}.toolVersions must be a string map`);
+  if (
+    !isIsoDate(value.startedAt) ||
+    !isIsoDate(value.endedAt) ||
+    Date.parse(value.endedAt as string) < Date.parse(value.startedAt as string)
+  )
+    reasons.push(`${field} timestamps are invalid`);
+  if (!OBSERVATIONS.includes(value.observation as EvidenceObservationStatus))
+    reasons.push(`${field}.observation is invalid`);
+  if (
+    value.exitCode !== null &&
+    (typeof value.exitCode !== 'number' || !Number.isInteger(value.exitCode) || value.exitCode < 0)
+  )
+    reasons.push(`${field}.exitCode must be null or a non-negative integer`);
+  if (typeof value.rawOutputSha256 !== 'string' || !HEX64_PATTERN.test(value.rawOutputSha256))
+    reasons.push(`${field}.rawOutputSha256 is invalid`);
+  if (value.observation === 'observed' && (typeof value.exitCode !== 'number' || value.exitCode < 0))
+    reasons.push(`${field} observed result must have an exitCode`);
+  if (value.observation !== 'observed' && value.exitCode !== null)
+    reasons.push(`${field} unknown result must have exitCode=null`);
+  return reasons.length === 0;
+}
+
+export function validateCodeHealthCandidate(candidate: unknown): string[] {
+  const reasons: string[] = [];
+  if (!isRecord(candidate)) return ['candidate must be an object'];
+  hasOnlyKeys(
+    candidate,
+    [
+      'candidateId',
+      'phase',
+      'action',
+      'status',
+      'files',
+      'symbols',
+      'tests',
+      'callSites',
+      'sources',
+      'commands',
+      'revision',
+      'confidence',
+      'risk',
+      'rtmImpact',
+      'coverageImpact',
+      'rollback',
+      'review',
+      'signatures',
+      'changeScope',
+      'evidenceRef',
+      'archive',
+    ],
+    'candidate',
+    reasons,
+  );
+  if (typeof candidate.candidateId !== 'string' || !ID_PATTERN.test(candidate.candidateId))
+    reasons.push('candidateId is invalid');
+  if (!PHASES.includes(candidate.phase as CodeHealthPhase)) reasons.push('phase is invalid');
+  if (!ACTIONS.includes(candidate.action as CodeHealthAction)) reasons.push('action is invalid');
+  if (!STATUSES.includes(candidate.status as CodeHealthStatus)) reasons.push('status is invalid');
+  for (const field of ['files', 'symbols', 'tests', 'callSites', 'sources']) {
+    const values = recordValue(candidate, field);
+    if (!isStringArray(values, field === 'tests' || field === 'callSites'))
+      reasons.push(`${field} must be a string array`);
+    if (Array.isArray(values) && values.some((file) => !isRelativePath(file)))
+      reasons.push(`${field} must contain repository-relative paths or identifiers`);
+  }
+  validateRevision(candidate.revision, 'revision', reasons);
+
+  if (!isRecord(candidate.confidence)) reasons.push('confidence is required');
+  else {
+    hasOnlyKeys(candidate.confidence, ['level', 'score', 'rationale', 'uncertainties'], 'confidence', reasons);
+    if (!['low', 'medium', 'high'].includes(candidate.confidence.level as string))
+      reasons.push('confidence.level is invalid');
+    if (
+      typeof candidate.confidence.score !== 'number' ||
+      candidate.confidence.score < 0 ||
+      candidate.confidence.score > 1
+    )
+      reasons.push('confidence.score is invalid');
+    if (typeof candidate.confidence.rationale !== 'string' || candidate.confidence.rationale.length === 0)
+      reasons.push('confidence.rationale is required');
+    if (!isStringArray(candidate.confidence.uncertainties))
+      reasons.push('confidence.uncertainties must be a string array');
+  }
+
+  if (!isRecord(candidate.risk)) reasons.push('risk is required');
+  else {
+    hasOnlyKeys(
+      candidate.risk,
+      ['severity', 'behavior', 'security', 'concurrency', 'platform', 'lifecycle', 'governance', 'rationale'],
+      'risk',
+      reasons,
+    );
+    const riskEnums: Record<string, readonly string[]> = {
+      severity: ['low', 'medium', 'high', 'critical'],
+      behavior: ['none', 'low', 'medium', 'high', 'unknown'],
+      security: ['none', 'low', 'medium', 'high', 'unknown'],
+      concurrency: ['none', 'low', 'medium', 'high', 'unknown'],
+      platform: ['none', 'low', 'medium', 'high', 'unknown'],
+      lifecycle: ['none', 'low', 'medium', 'high', 'unknown'],
+      governance: ['none', 'low', 'medium', 'high', 'unknown'],
+    };
+    for (const [field, allowed] of Object.entries(riskEnums)) {
+      const value = recordValue(candidate.risk, field);
+      if (typeof value !== 'string' || !allowed.includes(value)) reasons.push(`risk.${field} is invalid`);
+    }
+    if (typeof candidate.risk.rationale !== 'string' || candidate.risk.rationale.length === 0)
+      reasons.push('risk.rationale is required');
+  }
+  validateImpact(candidate.rtmImpact, 'rtmImpact', reasons);
+  validateImpact(candidate.coverageImpact, 'coverageImpact', reasons);
+  if (!Array.isArray(candidate.commands) || candidate.commands.length === 0) reasons.push('commands is required');
+  else {
+    for (const [index, command] of candidate.commands.entries()) {
+      if (!isRecord(command)) {
+        reasons.push(`commands[${index}] must be an object`);
+        continue;
+      }
+      hasOnlyKeys(
+        command,
+        [
+          'command',
+          'cwd',
+          'environment',
+          'platform',
+          'toolVersions',
+          'startedAt',
+          'endedAt',
+          'exitCode',
+          'observation',
+          'rawOutputPath',
+          'rawOutputSha256',
+        ],
+        `commands[${index}]`,
+        reasons,
+      );
+      for (const field of ['command', 'cwd', 'platform', 'rawOutputPath', 'rawOutputSha256']) {
+        const value = recordValue(command, field);
+        if (typeof value !== 'string' || value === '') reasons.push(`commands[${index}].${field} is required`);
+      }
+      if (!isSafeCommand(command.command)) reasons.push(`commands[${index}].command contains unsafe shell syntax`);
+      if (!isRelativePath(command.cwd)) reasons.push(`commands[${index}].cwd must be repository-relative`);
+      if (!isRelativePath(command.rawOutputPath))
+        reasons.push(`commands[${index}].rawOutputPath must be repository-relative`);
+      if (
+        !isRecord(command.environment) ||
+        Object.keys(command.environment).some((key) => hasSecretFieldName(key)) ||
+        Object.values(command.environment).some(
+          (value) => typeof value !== 'string' || containsSensitiveCodeHealthContent(value),
+        )
+      ) {
+        reasons.push(`commands[${index}].environment must be an audited redacted string map`);
+      }
+      if (
+        !isRecord(command.toolVersions) ||
+        Object.values(command.toolVersions).some((value) => typeof value !== 'string')
+      ) {
+        reasons.push(`commands[${index}].toolVersions must be a string map`);
+      }
+      if (
+        !isIsoDate(command.startedAt) ||
+        !isIsoDate(command.endedAt) ||
+        Date.parse(command.endedAt) < Date.parse(command.startedAt)
+      )
+        reasons.push(`commands[${index}] timestamps are invalid`);
+      if (
+        command.exitCode !== null &&
+        (typeof command.exitCode !== 'number' || !Number.isInteger(command.exitCode) || command.exitCode < 0)
+      ) {
+        reasons.push(`commands[${index}].exitCode must be a non-negative integer or null`);
+      }
+      if (!OBSERVATIONS.includes(command.observation as EvidenceObservationStatus))
+        reasons.push(`commands[${index}].observation is invalid`);
+      if (typeof command.rawOutputSha256 !== 'string' || !HEX64_PATTERN.test(command.rawOutputSha256)) {
+        reasons.push(`commands[${index}].rawOutputSha256 is invalid`);
+      }
+      if (
+        command.observation === 'observed' &&
+        (typeof command.exitCode !== 'number' || !Number.isInteger(command.exitCode))
+      ) {
+        reasons.push(`commands[${index}] observed result must have an exitCode`);
+      }
+      if (command.observation !== 'observed' && command.exitCode !== null) {
+        reasons.push(`commands[${index}] unknown result must have exitCode=null`);
+      }
+    }
+  }
+
+  if (!isRecord(candidate.rollback)) reasons.push('rollback is required');
+  else {
+    hasOnlyKeys(
+      candidate.rollback,
+      ['preChangeRevision', 'command', 'patchPath', 'owner', 'executable', 'patchSha256'],
+      'rollback',
+      reasons,
+    );
+    if (
+      typeof candidate.rollback.preChangeRevision !== 'string' ||
+      !SHA40_PATTERN.test(candidate.rollback.preChangeRevision)
+    )
+      reasons.push('rollback.preChangeRevision is invalid');
+    if (typeof candidate.rollback.command !== 'string' || candidate.rollback.command.length === 0)
+      reasons.push('rollback.command is required');
+    if (!isRelativePath(candidate.rollback.patchPath)) reasons.push('rollback.patchPath must be repository-relative');
+    if (typeof candidate.rollback.owner !== 'string' || candidate.rollback.owner.length === 0)
+      reasons.push('rollback.owner is required');
+    if (typeof candidate.rollback.executable !== 'boolean') reasons.push('rollback.executable is required');
+    if (
+      candidate.rollback.patchSha256 !== undefined &&
+      (typeof candidate.rollback.patchSha256 !== 'string' || !HEX64_PATTERN.test(candidate.rollback.patchSha256))
+    )
+      reasons.push('rollback.patchSha256 is invalid');
+  }
+
+  if (!isRecord(candidate.review)) reasons.push('review is required');
+  else {
+    hasOnlyKeys(candidate.review, ['findings', 'unresolvedQuestions', 'decision', 'humanDecision'], 'review', reasons);
+    if (!isStringArray(candidate.review.findings) || !isStringArray(candidate.review.unresolvedQuestions))
+      reasons.push('review findings/questions must be string arrays');
+    if (candidate.review.decision !== null && !REVIEW_DECISIONS.includes(candidate.review.decision as ReviewDecision))
+      reasons.push('review.decision is invalid');
+    if (
+      candidate.review.humanDecision !== null &&
+      !HUMAN_DECISIONS.includes(candidate.review.humanDecision as (typeof HUMAN_DECISIONS)[number])
+    )
+      reasons.push('review.humanDecision is invalid');
+    if (
+      candidate.status === 'discovered' &&
+      (candidate.review.decision !== null || candidate.review.humanDecision !== null)
+    )
+      reasons.push('discovered candidate cannot carry a review or human conclusion');
+  }
+
+  if (!Array.isArray(candidate.signatures)) reasons.push('signatures is required');
+  else {
+    for (const [index, signature] of candidate.signatures.entries()) {
+      if (!isRecord(signature)) {
+        reasons.push(`signatures[${index}] must be an object`);
+        continue;
+      }
+      hasOnlyKeys(
+        signature,
+        ['role', 'actor', 'event', 'scopeHash', 'provenanceRef', 'signedAt'],
+        `signatures[${index}]`,
+        reasons,
+      );
+      if (!['A', 'S', 'V', 'G', 'R', 'human'].includes(signature.role as string))
+        reasons.push(`signatures[${index}].role is invalid`);
+      for (const field of ['actor', 'event', 'provenanceRef']) {
+        const value = recordValue(signature, field);
+        if (typeof value !== 'string' || value === '') reasons.push(`signatures[${index}].${field} is required`);
+      }
+      if (typeof signature.scopeHash !== 'string' || !SHA256_PATTERN.test(signature.scopeHash))
+        reasons.push(`signatures[${index}].scopeHash is invalid`);
+      if (!isIsoDate(signature.signedAt)) reasons.push(`signatures[${index}].signedAt is invalid`);
+    }
+  }
+
+  if (!isRecord(candidate.changeScope)) reasons.push('changeScope is required');
+  else {
+    hasOnlyKeys(candidate.changeScope, ['files', 'symbols', 'scopeHash'], 'changeScope', reasons);
+    if (
+      !isStringArray(candidate.changeScope.files) ||
+      candidate.changeScope.files.length === 0 ||
+      candidate.changeScope.files.some((file) => !isRelativePath(file))
+    )
+      reasons.push('changeScope.files is invalid');
+    if (!isStringArray(candidate.changeScope.symbols) || candidate.changeScope.symbols.length === 0)
+      reasons.push('changeScope.symbols is invalid');
+    if (typeof candidate.changeScope.scopeHash !== 'string' || !SHA256_PATTERN.test(candidate.changeScope.scopeHash))
+      reasons.push('changeScope.scopeHash is invalid');
+  }
+  if (!isRelativePath(candidate.evidenceRef)) reasons.push('evidenceRef must be repository-relative');
+
+  if (!isRecord(candidate.archive)) reasons.push('archive is required');
+  else {
+    hasOnlyKeys(candidate.archive, ['state', 'manifestPath', 'contentHash', 'redactionStatus'], 'archive', reasons);
+    if (!['not_archived', 'archived'].includes(candidate.archive.state as string))
+      reasons.push('archive.state is invalid');
+    if (candidate.archive.manifestPath !== null && !isRelativePath(candidate.archive.manifestPath))
+      reasons.push('archive.manifestPath must be repository-relative or null');
+    if (
+      candidate.archive.contentHash !== null &&
+      (typeof candidate.archive.contentHash !== 'string' || !HEX64_PATTERN.test(candidate.archive.contentHash))
+    )
+      reasons.push('archive.contentHash is invalid');
+    if (!['not_reviewed', 'clean', 'blocked'].includes(candidate.archive.redactionStatus as string))
+      reasons.push('archive.redactionStatus is invalid');
+    if (
+      candidate.status === 'archived' &&
+      (candidate.archive.state !== 'archived' ||
+        !isRelativePath(candidate.archive.manifestPath) ||
+        typeof candidate.archive.contentHash !== 'string' ||
+        !HEX64_PATTERN.test(candidate.archive.contentHash) ||
+        candidate.archive.redactionStatus !== 'clean')
+    )
+      reasons.push('archived candidate requires archived state, manifest, content hash, and clean redaction');
+    if (candidate.status !== 'archived' && candidate.archive.state === 'archived')
+      reasons.push('only archived candidates may carry archived archive state');
+  }
+  return reasons;
+}

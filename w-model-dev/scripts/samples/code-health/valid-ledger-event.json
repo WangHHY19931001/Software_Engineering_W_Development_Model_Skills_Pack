@@ -1,5 +1,6 @@
 {
   "eventId": "EV-CHG-P1-20260907-001-discovered-evidenced",
+  "eventKind": "evidence",
   "candidateId": "CHG-P1-20260907-001",
   "from": "discovered",
   "to": "evidenced",
@@ -11,6 +12,7 @@
     "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "analyzedAt": "2026-09-07T00:00:00.000Z"
   },
+  "scopeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
   "evidenceRefs": ["evidence/CHG-P1-20260907-001.json"],
   "signatureRef": "evidence/signature-a.json"
 }
