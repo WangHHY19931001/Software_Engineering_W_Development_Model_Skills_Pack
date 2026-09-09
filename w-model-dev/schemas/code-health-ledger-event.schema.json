@@ -69,9 +69,52 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "rollbackEvidence": {
+      "description": "Observed rollback command and source-bound rollback metadata.",
+      "$ref": "#/definitions/rollbackEvidence"
+    },
+    "archiveEvidence": {
+      "description": "Complete source-bound guard for the verified-to-archived transition.",
+      "$ref": "#/definitions/archiveEvidence"
     }
   },
   "definitions": {
+    "relativePath": {
+      "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+    },
+    "sha256": {
+      "description": "Lowercase SHA-256 digest.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scope": {
+      "description": "Exact candidate file and symbol scope.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "symbols", "scopeHash"],
+      "properties": {
+        "files": {
+          "description": "Exact repository-relative files in scope.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One scoped file.", "$ref": "#/definitions/relativePath" }
+        },
+        "symbols": {
+          "description": "Exact symbols in scope.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One scoped symbol.", "type": "string", "minLength": 1 }
+        },
+        "scopeHash": {
+          "description": "SHA-256 scope digest with sha256 prefix.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
     "revision": {
       "description": "Source-bound repository revision identity.",
       "type": "object",
@@ -82,11 +125,290 @@
         "treeSha": { "description": "Lowercase Git tree SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
         "sourceBundleSha256": {
           "description": "SHA-256 of the analyzed source bundle.",
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "$ref": "#/definitions/sha256"
         },
         "analyzedAt": { "description": "UTC analysis timestamp.", "type": "string", "format": "date-time" }
       }
+    },
+    "commandEvidence": {
+      "description": "Command result with explicit observation, real exit code, and controlled raw output hash.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cwd",
+        "environment",
+        "platform",
+        "toolVersions",
+        "startedAt",
+        "endedAt",
+        "exitCode",
+        "observation",
+        "rawOutputPath",
+        "rawOutputSha256"
+      ],
+      "properties": {
+        "command": {
+          "description": "Executable and arguments without shell syntax.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+        },
+        "cwd": { "description": "Repository-relative working directory.", "$ref": "#/definitions/relativePath" },
+        "environment": {
+          "description": "Audited redacted environment map.",
+          "type": "object",
+          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+        },
+        "platform": { "description": "Observed platform.", "type": "string", "minLength": 1 },
+        "toolVersions": {
+          "description": "Observed tool versions.",
+          "type": "object",
+          "additionalProperties": { "description": "Tool version.", "type": "string" }
+        },
+        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
+        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "exitCode": {
+          "description": "Real non-negative process exit code, or null when no process result exists.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "observation": {
+          "description": "Command observation state.",
+          "enum": ["observed", "not_run", "unavailable", "unverified"]
+        },
+        "rawOutputPath": {
+          "description": "Controlled repository-relative raw output path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "rawOutputSha256": { "description": "SHA-256 of controlled raw output.", "$ref": "#/definitions/sha256" }
+      },
+      "allOf": [
+        {
+          "description": "Observed commands require an exit code.",
+          "if": { "properties": { "observation": { "const": "observed" } }, "required": ["observation"] },
+          "then": { "properties": { "exitCode": { "type": "integer", "minimum": 0 } } }
+        },
+        {
+          "description": "Non-observed commands cannot claim an exit code.",
+          "if": {
+            "properties": { "observation": { "enum": ["not_run", "unavailable", "unverified"] } },
+            "required": ["observation"]
+          },
+          "then": { "properties": { "exitCode": { "type": "null" } } }
+        }
+      ]
+    },
+    "approval": {
+      "description": "Human approval bound to the exact candidate scope.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "decision",
+        "approvedAction",
+        "approvedFiles",
+        "approvedSymbols",
+        "scopeHash",
+        "rationale",
+        "actor",
+        "decidedAt",
+        "signatureRef"
+      ],
+      "properties": {
+        "candidateId": {
+          "description": "Candidate identity receiving approval.",
+          "type": "string",
+          "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+        },
+        "decision": { "description": "Human approval decision.", "const": "approve" },
+        "approvedAction": {
+          "description": "Approved code-health action.",
+          "enum": ["delete-code", "add-test", "delete-test", "abstract"]
+        },
+        "approvedFiles": {
+          "description": "Exact approved repository-relative files.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One approved file.", "$ref": "#/definitions/relativePath" }
+        },
+        "approvedSymbols": {
+          "description": "Exact approved symbols.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One approved symbol.", "type": "string", "minLength": 1 }
+        },
+        "scopeHash": {
+          "description": "Approved scope SHA-256 digest with sha256 prefix.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "rationale": { "description": "Specific approval rationale.", "type": "string", "minLength": 1 },
+        "actor": { "description": "Human decision-maker identity.", "type": "string", "minLength": 1 },
+        "decidedAt": { "description": "UTC approval timestamp.", "type": "string", "format": "date-time" },
+        "signatureRef": {
+          "description": "Repository-relative approval signature reference.",
+          "$ref": "#/definitions/relativePath"
+        }
+      }
+    },
+    "rollbackEvidence": {
+      "description": "Complete observed rollback evidence bound to the candidate rollback plan.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "preChangeRevision",
+        "patchPath",
+        "patchSha256",
+        "owner",
+        "patchExists",
+        "rawOutputExists"
+      ],
+      "properties": {
+        "command": { "description": "Observed rollback command result.", "$ref": "#/definitions/commandEvidence" },
+        "preChangeRevision": {
+          "description": "Pre-change commit SHA-1.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "patchPath": {
+          "description": "Repository-relative rollback patch path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "patchSha256": { "description": "Rollback patch SHA-256.", "$ref": "#/definitions/sha256" },
+        "owner": { "description": "Rollback owner.", "type": "string", "minLength": 1 },
+        "patchExists": { "description": "Whether the rollback patch exists.", "const": true },
+        "rawOutputExists": { "description": "Whether the controlled rollback output exists.", "const": true }
+      }
+    },
+    "archiveManifest": {
+      "description": "Complete redacted archive manifest and content hash.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "files", "contentHash", "redaction", "verificationLevel"],
+      "properties": {
+        "path": { "description": "Repository-relative archive manifest path.", "$ref": "#/definitions/relativePath" },
+        "files": {
+          "description": "All retained archive files and hashes.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "One retained archive file.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {
+                "description": "Repository-relative retained file path.",
+                "$ref": "#/definitions/relativePath"
+              },
+              "sha256": { "description": "Retained file SHA-256.", "$ref": "#/definitions/sha256" }
+            }
+          }
+        },
+        "contentHash": {
+          "description": "SHA-256 of the canonical manifest file list.",
+          "$ref": "#/definitions/sha256"
+        },
+        "redaction": {
+          "description": "Final archive redaction result.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reasons"],
+          "properties": {
+            "status": { "description": "Archive must be clean to transition.", "const": "clean" },
+            "reasons": {
+              "description": "Redaction rules applied.",
+              "type": "array",
+              "items": { "description": "One redaction reason.", "type": "string" }
+            }
+          }
+        },
+        "verificationLevel": { "description": "Archive verification level.", "const": "source-bound" }
+      }
+    },
+    "archiveSignatures": {
+      "description": "Role signature references supporting the archive transition.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verifier", "gate", "human"],
+      "properties": {
+        "verifier": { "description": "Verifier signature reference.", "$ref": "#/definitions/relativePath" },
+        "gate": { "description": "Gate signature reference.", "$ref": "#/definitions/relativePath" },
+        "human": { "description": "Human signature reference.", "$ref": "#/definitions/relativePath" }
+      }
+    },
+    "archiveEvidence": {
+      "description": "All evidence required before a verified candidate can be archived.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "scope",
+        "approval",
+        "commands",
+        "manifest",
+        "rollback",
+        "sourceRevision",
+        "signatures"
+      ],
+      "properties": {
+        "candidateId": {
+          "description": "Candidate identity bound to every archive artifact.",
+          "type": "string",
+          "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+        },
+        "scope": { "description": "Exact candidate scope.", "$ref": "#/definitions/scope" },
+        "approval": { "description": "Matching human approval decision.", "$ref": "#/definitions/approval" },
+        "commands": {
+          "description": "Successful observed command results.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One successful command result.", "$ref": "#/definitions/commandEvidence" }
+        },
+        "manifest": { "description": "Clean source-bound archive manifest.", "$ref": "#/definitions/archiveManifest" },
+        "rollback": {
+          "description": "Rollback metadata and observed evidence.",
+          "$ref": "#/definitions/rollbackEvidence"
+        },
+        "sourceRevision": {
+          "description": "Revision shared by candidate, ledger, and transition.",
+          "$ref": "#/definitions/revision"
+        },
+        "signatures": {
+          "description": "Verifier, gate, and human signature references.",
+          "$ref": "#/definitions/archiveSignatures"
+        }
+      }
+    },
+    "revisionLegacy": {
+      "description": "Deprecated alias retained for schema compatibility.",
+      "$ref": "#/definitions/revision"
     }
-  }
+  },
+  "allOf": [
+    {
+      "description": "An archive transition requires its complete archive evidence object.",
+      "if": { "properties": { "to": { "const": "archived" } }, "required": ["to"] },
+      "then": {
+        "type": "object",
+        "properties": {
+          "archiveEvidence": { "description": "Required complete archive transition evidence." }
+        },
+        "required": ["archiveEvidence"]
+      }
+    },
+    {
+      "description": "A rollback transition requires explicit rollback evidence.",
+      "if": { "properties": { "to": { "const": "rolled-back" } }, "required": ["to"] },
+      "then": {
+        "type": "object",
+        "properties": {
+          "rollbackEvidence": { "description": "Required complete rollback transition evidence." }
+        },
+        "required": ["rollbackEvidence"]
+      }
+    }
+  ]
 }

@@ -58,6 +58,7 @@
     "files": {
       "description": "Repository-relative files in the candidate evidence scope.",
       "type": "array",
+      "minItems": 1,
       "items": {
         "description": "One repository-relative file path.",
         "type": "string",
@@ -67,6 +68,7 @@
     "symbols": {
       "description": "Exact symbols or identifiers in scope.",
       "type": "array",
+      "minItems": 1,
       "items": { "description": "One symbol or identifier.", "type": "string", "minLength": 1 }
     },
     "tests": {
@@ -90,6 +92,7 @@
     "sources": {
       "description": "Repository-relative evidence sources that produced or corroborate the candidate.",
       "type": "array",
+      "minItems": 1,
       "items": {
         "description": "One repository-relative source reference or stable identifier.",
         "type": "string",
@@ -196,8 +199,9 @@
         "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
         "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
         "exitCode": {
-          "description": "Observed process exit code, or null when no process result exists.",
-          "type": ["integer", "null"]
+          "description": "Observed non-negative process exit code, or null when no process result exists.",
+          "type": ["integer", "null"],
+          "minimum": 0
         },
         "observation": {
           "description": "Whether the command was observed, not run, unavailable, or unverified.",
@@ -217,7 +221,7 @@
             "properties": { "observation": { "const": "observed" } },
             "required": ["observation"]
           },
-          "then": { "type": "object", "properties": { "exitCode": { "type": "integer" } } }
+          "then": { "type": "object", "properties": { "exitCode": { "type": "integer", "minimum": 0 } } }
         },
         {
           "if": {
@@ -363,7 +367,8 @@
           "$ref": "#/definitions/relativePath"
         },
         "owner": { "description": "Rollback owner.", "type": "string", "minLength": 1 },
-        "executable": { "description": "Whether rollback is directly executable.", "type": "boolean" }
+        "executable": { "description": "Whether rollback is directly executable.", "type": "boolean" },
+        "patchSha256": { "description": "Optional SHA-256 digest of the retained rollback patch.", "$ref": "#/definitions/sha256" }
       }
     },
     "review": {
