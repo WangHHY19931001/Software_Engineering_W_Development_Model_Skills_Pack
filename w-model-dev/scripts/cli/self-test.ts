@@ -80,6 +80,14 @@ import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-swe
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
 import { checkStateMachineConsistency } from '../logic/state-machine-logic.js';
+import {
+  buildStaticInventory,
+  checkFalsePositiveGuards,
+  classifyScenario,
+  mergeDynamicTrace,
+  type Phase1Scenario,
+} from '../logic/code-health-phase1-logic.js';
+import type { FalsePositiveContext, Phase1CandidateLead, RevisionIdentity } from '../logic/code-health-contract.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -2374,6 +2382,81 @@ const CODE_HEALTH_CASES: CodeHealthCase[] = [
   },
 ];
 
+// -------------------- Phase 1 只读发现（静态 / 动态 / guard） --------------------
+
+interface CodeHealthPhase1StaticCase {
+  file: string;
+  expectedBlocked: boolean;
+  expectedCategories?: string[];
+  description: string;
+}
+
+interface CodeHealthPhase1Fixture {
+  revision: RevisionIdentity;
+  files: string[];
+  sourceText: Record<string, string>;
+  expectedCategories?: string[];
+  expectedUnavailable?: string[];
+  context?: FalsePositiveContext;
+  lead?: Phase1CandidateLead;
+}
+
+const CODE_HEALTH_PHASE1_STATIC_CASES: CodeHealthPhase1StaticCase[] = [
+  {
+    file: 'valid.json',
+    expectedBlocked: false,
+    expectedCategories: ['dynamic-import', 'reflection', 'shell-platform', 'schema-template-rtm', 'test-only-helper'],
+    description: '静态 inventory 覆盖动态 import/reflection/shell/schema-template-RTM/test helper',
+  },
+  {
+    file: 'blocked.json',
+    expectedBlocked: true,
+    expectedCategories: [],
+    description: '源文件不可读 → lead blocked，绝不产出 dead 结论',
+  },
+];
+
+interface CodeHealthPhase1GuardCase {
+  file: string;
+  expectedViolations: 'empty' | 'nonempty';
+  expectedClassification?: Phase1CandidateLead['classification'];
+  description: string;
+}
+
+const CODE_HEALTH_PHASE1_GUARD_CASES: CodeHealthPhase1GuardCase[] = [
+  {
+    file: 'valid.json',
+    expectedViolations: 'empty',
+    expectedClassification: 'candidate',
+    description: '无 false-positive 机制且 trace 全部 observed/reached → guard 为空，lead 保持 candidate（非 dead）',
+  },
+  {
+    file: 'blocked.json',
+    expectedViolations: 'nonempty',
+    expectedClassification: 'unknown',
+    description: 'false-positive guard 命中（dynamic import/reflection/platform）→ classification=unknown',
+  },
+];
+
+interface CodeHealthPhase1DynamicCase {
+  file: string;
+  expectedApplicable: number | 'at-least-one';
+  description: string;
+}
+
+const CODE_HEALTH_PHASE1_DYNAMIC_CASES: CodeHealthPhase1DynamicCase[] = [
+  {
+    file: 'valid.json',
+    expectedApplicable: 'at-least-one',
+    description: 'scenario matrix 结构合法且含声明 supported=false 的环境（保证 unexercisedScenarios 非空）',
+  },
+  {
+    file: 'blocked.json',
+    expectedApplicable: 0,
+    description: '全部 scenario 声明 supported=false → 无可用环境，候选只能 blocked/unknown，绝不产出 dead 结论',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -3563,6 +3646,135 @@ async function runCodeHealthCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- Phase 1 只读发现执行器 --------------------
+
+async function loadPhase1Fixture(abs: string): Promise<CodeHealthPhase1Fixture> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+  return parseJsonSafe<CodeHealthPhase1Fixture>(await fs.readFile(abs, 'utf-8'));
+}
+
+function phase1UnexercisedTrace(revision: RevisionIdentity) {
+  return {
+    revision,
+    scenarios: [{ id: 'unexercised', environment: 'ci', reached: null, observation: 'unavailable' as const }],
+    rawTraceSha256: 'd'.repeat(64),
+  };
+}
+
+async function runCodeHealthPhase1StaticCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE1_STATIC_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase1/static', c.file);
+    const fixture = await loadPhase1Fixture(abs);
+    const report = buildStaticInventory({
+      files: fixture.files,
+      sourceText: fixture.sourceText,
+      revision: fixture.revision,
+    });
+    const leads = mergeDynamicTrace(report, phase1UnexercisedTrace(fixture.revision));
+    const details: string[] = [];
+    const anyBlocked = leads.some((lead) => lead.status === 'blocked');
+    if (anyBlocked !== c.expectedBlocked) {
+      details.push(`  - 期望 blocked=${c.expectedBlocked}，实际 ${anyBlocked}（leads=${leads.length}）`);
+    }
+    for (const category of c.expectedCategories ?? []) {
+      if (!report.categories.includes(category)) {
+        details.push(`  - 缺 category ${category}（实际 ${report.categories.join(',')}）`);
+      }
+    }
+    for (const unavailable of fixture.expectedUnavailable ?? []) {
+      if (!report.unknowns.includes(unavailable)) {
+        details.push(`  - 期望 unavailable ${unavailable}（实际 ${report.unknowns.join(',')}）`);
+      }
+    }
+    results.push({
+      name: `code-health/phase1/static/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runCodeHealthPhase1GuardCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE1_GUARD_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase1/guards', c.file);
+    const fixture = await loadPhase1Fixture(abs);
+    const details: string[] = [];
+    let lead = fixture.lead;
+    if (lead === undefined && Array.isArray(fixture.files) && fixture.sourceText !== undefined) {
+      const report = buildStaticInventory({
+        files: fixture.files,
+        sourceText: fixture.sourceText,
+        revision: fixture.revision,
+      });
+      lead = mergeDynamicTrace(report, phase1UnexercisedTrace(fixture.revision))[0];
+    }
+    if (lead === undefined) {
+      details.push('  - 无 candidate lead（静态候选选择可能回归）');
+    } else {
+      const context = fixture.context as FalsePositiveContext;
+      const violations = checkFalsePositiveGuards(lead, context);
+      const matched = c.expectedViolations === 'empty' ? violations.length === 0 : violations.length > 0;
+      if (!matched) {
+        details.push(`  - 期望 guard ${c.expectedViolations}，实际 ${violations.length} 条：${violations.join('; ')}`);
+      }
+      if (c.expectedClassification !== undefined && lead.classification !== c.expectedClassification) {
+        details.push(`  - 期望 classification=${c.expectedClassification}，实际 ${lead.classification}`);
+      }
+    }
+    results.push({
+      name: `code-health/phase1/guards/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runCodeHealthPhase1DynamicCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE1_DYNAMIC_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase1/dynamic', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<{ scenarios?: Phase1Scenario[] }>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    const scenarios = fixture.scenarios;
+    if (!Array.isArray(scenarios) || scenarios.length === 0) {
+      details.push('  - scenarios 必须是非空数组');
+    } else {
+      for (const [index, scenario] of scenarios.entries()) {
+        if (
+          typeof scenario.id !== 'string' ||
+          typeof scenario.environment !== 'string' ||
+          typeof scenario.command !== 'string'
+        ) {
+          details.push(`  - scenario[${index}] 缺 id/environment/command`);
+        }
+      }
+      const applicable = scenarios.filter((scenario) => classifyScenario(scenario, process.platform).applicable).length;
+      if (c.expectedApplicable === 'at-least-one') {
+        if (applicable < 1) details.push('  - 至少应有一个可在当前 host 运行的 scenario');
+        if (!scenarios.some((scenario) => scenario.supported === false)) {
+          details.push('  - 应含声明 supported=false 的环境（保证 unexercisedScenarios 非空）');
+        }
+      } else if (applicable !== c.expectedApplicable) {
+        details.push(`  - 期望 applicable=${c.expectedApplicable}，实际 ${applicable}`);
+      }
+    }
+    results.push({
+      name: `code-health/phase1/dynamic/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -3620,6 +3832,9 @@ async function main(): Promise<void> {
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
   console.log(`CodeHealth 用例: ${CODE_HEALTH_CASES.length}`);
+  console.log(`CodeHealth Phase1 静态用例: ${CODE_HEALTH_PHASE1_STATIC_CASES.length}`);
+  console.log(`CodeHealth Phase1 Guard 用例: ${CODE_HEALTH_PHASE1_GUARD_CASES.length}`);
+  console.log(`CodeHealth Phase1 动态用例: ${CODE_HEALTH_PHASE1_DYNAMIC_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -3674,6 +3889,9 @@ async function main(): Promise<void> {
     phase3SpecStructureResults,
     detailedEnhanceResults,
     phase4SpecStructureResults,
+    codeHealthPhase1StaticResults,
+    codeHealthPhase1GuardResults,
+    codeHealthPhase1DynamicResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -3710,6 +3928,9 @@ async function main(): Promise<void> {
     runOpenspecArchiveCases(samplesDir),
     runUatPathMappingCases(samplesDir),
     runIcebergCases(samplesDir),
+    runCodeHealthPhase1StaticCases(samplesDir),
+    runCodeHealthPhase1GuardCases(samplesDir),
+    runCodeHealthPhase1DynamicCases(samplesDir),
   ]);
   const codeHealthResults = await runCodeHealthCases(samplesDir);
   const all = [
@@ -3749,6 +3970,9 @@ async function main(): Promise<void> {
     ...phase3SpecStructureResults,
     ...detailedEnhanceResults,
     ...phase4SpecStructureResults,
+    ...codeHealthPhase1StaticResults,
+    ...codeHealthPhase1GuardResults,
+    ...codeHealthPhase1DynamicResults,
   ];
 
   const passedCount = all.filter((r) => r.passed).length;

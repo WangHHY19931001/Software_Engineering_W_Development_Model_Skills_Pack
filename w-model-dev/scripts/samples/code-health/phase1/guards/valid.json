@@ -1,0 +1,36 @@
+{
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "lead": {
+    "candidateId": "CHG-P1-20260907-001",
+    "classification": "candidate",
+    "files": ["src/lonely.ts"],
+    "symbols": ["lonely"],
+    "staticReferences": [],
+    "dynamicScenarios": [
+      {
+        "id": "observed-trace",
+        "environment": "current-host",
+        "reached": true,
+        "observation": "observed"
+      }
+    ],
+    "guardViolations": [],
+    "status": "discovered"
+  },
+  "context": {
+    "dynamicImports": [],
+    "reflection": [],
+    "platforms": [],
+    "schemas": [],
+    "templates": [],
+    "rtmIds": [],
+    "testHelpers": [],
+    "generatedReferences": [],
+    "externalContracts": []
+  }
+}

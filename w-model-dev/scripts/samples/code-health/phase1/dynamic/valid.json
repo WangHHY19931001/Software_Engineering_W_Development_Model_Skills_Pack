@@ -1,0 +1,37 @@
+{
+  "scenarios": [
+    {
+      "id": "current-platform-smoke",
+      "environment": "current-platform-node",
+      "shell": "git-bash",
+      "supported": true,
+      "command": "node",
+      "args": ["--version"],
+      "cwd": ".",
+      "timeoutMs": 15000,
+      "targets": ["w-model-dev/scripts/logic/code-health-contract.ts"]
+    },
+    {
+      "id": "linux-bash-node",
+      "environment": "linux-bash",
+      "platform": "linux",
+      "shell": "bash",
+      "supported": true,
+      "command": "node",
+      "args": ["--version"],
+      "cwd": ".",
+      "timeoutMs": 15000
+    },
+    {
+      "id": "win32-powershell-declared-unsupported",
+      "environment": "win32-powershell",
+      "platform": "win32",
+      "shell": "powershell",
+      "supported": false,
+      "command": "node",
+      "args": ["--version"],
+      "cwd": ".",
+      "timeoutMs": 15000
+    }
+  ]
+}

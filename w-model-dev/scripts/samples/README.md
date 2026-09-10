@@ -32,12 +32,13 @@
 | `archive-integrity` | check-archive-integrity | ARCHIVE_INTEGRITY_CASES（4） | 归档完整性（清单 + 文件存在性） | 平铺 JSON |
 | `schema` | 各 check 共享的 schema 校验 | SCHEMA_CASES（16） | JSON Schema 反例（required / type / additionalProperties） | 平铺 JSON |
 | `code-health` | validateBySchema | CODE_HEALTH_CASES（17） | 代码健康 campaign、ledger、evidence、approval、archive 及负样本 fail-closed 契约 | 平铺 JSON |
+| `code-health/phase1` | code-health-phase1（logic/CLI，self-test 回归 fixture） | CODE_HEALTH_PHASE1_STATIC_CASES（2）+ GUARD_CASES（2）+ DYNAMIC_CASES（2） | Phase 1 只读发现 fixture（静态 inventory / false-positive guard / scenario matrix）；CLI 只读运行使用 dynamic/valid.json | 平铺 JSON |
 | `codegraph-queries` | check-codegraph-queries | CODEGRAPH_QUERY_CASES（4，sampleDir 形态） | codegraph 查询落盘校验（反模式 #38） | 嵌套 `.w-model/codegraph-queries/` |
 | `opsx-artifacts` | check-opsx-artifacts | OPSX_ARTIFACT_CASES（3，sampleDir 形态） | opsx 制品 + R3×3 + V 审查齐全性（反模式 #39/#40） | 嵌套 `openspec/` + `.w-model/r3-reviews/` + `.w-model/v-reviews/` |
 | `openspec-archive` | check-openspec-archive | OPENSPEC_ARCHIVE_CASES（3，sampleDir 形态） | opsx:archive 归档完整性 | 嵌套 `openspec/changes/archive/` |
 | `uat-path-mapping` | check-artifact-gate（B4/B5） | UAT_PATH_MAPPING_CASES（5，sampleDir 形态） | uat-path-mapping.md 解析与回填校验 | 嵌套 `docs/uat-path-mapping.md` |
 
-合计 278 条用例 + 1 条 metadata 用例 = **279 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
+合计 284 条用例 + 1 条 metadata 用例 = **285 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
 
 ## 排除项
 
